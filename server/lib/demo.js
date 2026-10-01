@@ -7,7 +7,7 @@ const { simular } = require('./financeiro');
 const { hashSenha, hashNumerica } = require('./senha');
 
 const CLIENTES = [
-  ['PF', 'Ana Beatriz Souza', '52998224725', 'ana.souza@email.com', '11987654321', '1990-04-12', 850000, 'São Paulo', 'SP'],
+  ['PF', 'João Pedro Souza', '52998224725', 'joao.souza@email.com', '11987654321', '1990-04-12', 850000, 'São Paulo', 'SP'],
   ['PF', 'Carlos Eduardo Lima', '11144477735', 'carlos.lima@email.com', '21998765432', '1985-09-30', 1200000, 'Rio de Janeiro', 'RJ'],
   ['PF', 'Fernanda Oliveira', '39053344705', 'fernanda.o@email.com', '31991234567', '1978-01-22', 2300000, 'Belo Horizonte', 'MG'],
   ['PF', 'Rafael Martins', '15350946056', 'rafael.martins@email.com', '41996543210', '1995-11-03', 480000, 'Curitiba', 'PR'],
@@ -72,14 +72,14 @@ function popularDemo(db) {
       db.prepare('INSERT INTO acessos_cliente (cliente_id, senha_hash, pin_hash, precisa_trocar_senha, limite_diario_centavos) VALUES (?, ?, ?, 0, ?)')
         .run(c.id, hashNumerica(senha), hashNumerica('246810'), 1_000_000);
     }
-    // Favorecidos da Ana (cadastrados pela equipe): um PIX e uma conta PAY AX.
-    const ana = db.prepare("SELECT id FROM clientes WHERE documento = '52998224725'").get().id;
+    // Favorecidos do João (cadastrados pela equipe): um PIX e uma conta PAY AX.
+    const joao = db.prepare("SELECT id FROM clientes WHERE documento = '52998224725'").get().id;
     const technova = db.prepare("SELECT cl.nome, cl.documento FROM clientes cl WHERE documento = '45997418000153'").get();
     db.prepare("INSERT INTO favorecidos (cliente_id, tipo, apelido, nome, documento, chave, usuario_id) VALUES (?, 'pix', 'TechNova', ?, ?, 'contato@technova.com.br', ?)")
-      .run(ana, technova.nome, technova.documento, adminId);
+      .run(joao, technova.nome, technova.documento, adminId);
     const padaria = db.prepare("SELECT c.id, cl.nome, cl.documento FROM contas c JOIN clientes cl ON cl.id = c.cliente_id WHERE cl.documento = '11222333000181'").get();
     db.prepare("INSERT INTO favorecidos (cliente_id, tipo, apelido, nome, documento, conta_id, usuario_id) VALUES (?, 'conta', 'Padaria', ?, ?, ?, ?)")
-      .run(ana, padaria.nome, padaria.documento, padaria.id, adminId);
+      .run(joao, padaria.nome, padaria.documento, padaria.id, adminId);
     // Empréstimos.
     for (const [idx, valor, taxa, n] of [[0, 1500000, 0.0189, 12], [4, 8000000, 0.0149, 24]]) {
       const conta = correntes[idx];
