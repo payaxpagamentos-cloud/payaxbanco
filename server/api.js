@@ -3,9 +3,10 @@
 const { Router } = require('express');
 const { autenticar, permitir } = require('./auth');
 const { ErroNegocio } = require('./lib/erros');
+const { criarServicoBradesco } = require('./integracoes/bradesco');
 
 /** Monta o roteador /api com autenticação e permissões por perfil. */
-function criarApi(db) {
+function criarApi(db, bradesco = criarServicoBradesco(db)) {
   const api = Router();
   const auth = autenticar(db);
   api.get('/saude', (_req, res) => res.json({ status: 'ok', sistema: 'Banqueiro PAY AX' }));
@@ -13,12 +14,14 @@ function criarApi(db) {
   api.use('/dashboard', auth, require('./routes/dashboard')(db));
   api.use('/clientes', auth, require('./routes/clientes')(db));
   api.use('/contas', auth, require('./routes/contas')(db));
-  api.use('/operacoes', auth, require('./routes/operacoes')(db));
+  api.use('/operacoes', auth, require('./routes/operacoes')(db, bradesco));
   api.use('/transacoes', auth, require('./routes/transacoes')(db));
   api.use('/pix', auth, require('./routes/pix')(db));
   api.use('/emprestimos', auth, require('./routes/emprestimos')(db));
   api.use('/relatorios', auth, permitir('admin', 'gerente'), require('./routes/relatorios')(db));
   api.use('/usuarios', auth, permitir('admin'), require('./routes/usuarios')(db));
+  api.use('/integracoes/bradesco/webhook', require('./routes/bradesco-webhook')(db, bradesco));
+  api.use('/integracoes/bradesco', auth, require('./routes/bradesco')(db, bradesco));
   api.use('/auditoria', auth, permitir('admin', 'gerente'), require('./routes/auditoria')(db));
   api.use((_req, _res, next) => next(new ErroNegocio('Rota não encontrada.', 404)));
   return api;

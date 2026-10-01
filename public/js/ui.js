@@ -194,6 +194,8 @@ const P = {
   menu: 'M3 6h18M3 12h18M3 18h18',
   baixar: 'M12 3v12m0 0l-4-4m4 4l4-4M4 21h16',
   chave: 'M15 7a4 4 0 1 1-3.9 5H3v3h3v3h3v-3h2.1A4 4 0 0 1 15 7z',
+  banco: 'M3 21h18M5 21V10m14 11V10M9 21v-7m6 7v-7M2 10l10-6 10 6z',
+  qr: 'M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h3v3h-3zm4 4h3v3h-3z',
   lua: 'M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z',
 };
 export const icone = (nome) => raw(`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[nome] ?? ''}"/></svg>`);

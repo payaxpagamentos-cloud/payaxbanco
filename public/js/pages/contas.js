@@ -6,6 +6,7 @@ import {
 } from '../ui.js';
 import { seletor, ligarSeletor } from './seletores.js';
 import { formOperacao } from './operacoes.js';
+import { receberViaPix } from './bradesco.js';
 
 export function abrirConta(cliente, aoSalvar) {
   modal({
@@ -106,7 +107,8 @@ export async function detalheConta({ alvo, id, ativo }) {
         <div><div class="rotulo">Chaves PIX</div><strong>${c.chaves_pix.length}</strong></div></div></div>
     ${operavel ? html`<div class="row" style="margin:16px 0">
       <button class="btn ouro" data-op="deposito">Depositar</button><button class="btn" data-op="saque">Sacar</button>
-      <button class="btn" data-op="transferencia">Transferir</button><button class="btn" data-op="pix">Enviar PIX</button></div>`
+      <button class="btn" data-op="transferencia">Transferir</button><button class="btn" data-op="pix">Enviar PIX</button>
+      <button class="btn primario" id="receber-pix">Receber via PIX</button></div>`
       : html`<div class="card card-body" style="margin:16px 0;background:var(--warn-bg);color:var(--warn);font-weight:600">Conta ${c.status}${c.cliente_status !== 'ativo' ? ` / titular ${c.cliente_status}` : ''}: movimentações indisponíveis.</div>`}
     <div class="grid grid-2-1">
       <div class="card"><div class="card-head"><h2>Extrato</h2>
@@ -143,6 +145,8 @@ export async function detalheConta({ alvo, id, ativo }) {
   $('#fim', alvo).addEventListener('change', (e) => { filtro.fim = e.target.value; filtro.pagina = 1; carregarExtrato(); });
 
   $$('[data-op]', alvo).forEach((b) => b.addEventListener('click', () => formOperacao(b.dataset.op, c, recarregar)));
+  const rp = $('#receber-pix', alvo);
+  if (rp) rp.onclick = () => receberViaPix(c, recarregar);
   $$('[data-status]', alvo).forEach((b) => b.addEventListener('click', async () => {
     const novo = b.dataset.status;
     const acoes = { bloqueada: 'Bloquear', ativa: 'Desbloquear', encerrada: 'Encerrar' };

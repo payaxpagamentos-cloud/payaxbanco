@@ -14,7 +14,7 @@ const substituir = {
   setup(b) {
     b.onResolve({ filter: /^(node:)?sqlite$/ }, () => ({ path: shim('sqlite.js') }));
     b.onResolve({ filter: /^(node:)?crypto$/ }, () => ({ path: shim('crypto.js') }));
-    b.onResolve({ filter: /^(node:)?(fs|path)$/ }, () => ({ path: shim('vazio.js') }));
+    b.onResolve({ filter: /^(node:)?(fs|path|https?)$/ }, () => ({ path: shim('vazio.js') }));
     b.onResolve({ filter: /^express$/ }, () => ({ path: shim('express.js') }));
     b.onResolve({ filter: /^\.\.?\/auth$/ }, (a) => (a.importer.includes(`${path.sep}server${path.sep}`) ? { path: shim('auth.js') } : undefined));
     b.onResolve({ filter: /(^|\/)lib\/senha$|^\.\/senha$/ }, (a) => (a.importer.includes(`${path.sep}server${path.sep}`) ? { path: shim('senha.js') } : undefined));

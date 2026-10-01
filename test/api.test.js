@@ -77,7 +77,7 @@ test('API do Banqueiro', async (t) => {
     assert.equal(p.dados.destino.nome, 'Bruno Comércio Ltda');
     const volta = await api.post('/operacoes/pix', { origem_conta_id: contaBruno.id, chave: 'Ana@X.com', valor_centavos: 5000 });
     assert.equal(volta.status, 201);
-    assert.equal((await api.post('/operacoes/pix', { origem_conta_id: contaAna.id, chave: 'nao@existe.com', valor_centavos: 1 })).status, 404);
+    assert.equal((await api.post('/operacoes/pix', { origem_conta_id: contaAna.id, chave: 'chave-invalida', valor_centavos: 1 })).status, 422);
   });
 
   await t.test('estorno reverte os dois lados e não pode repetir', async () => {

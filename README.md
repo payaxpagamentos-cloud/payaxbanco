@@ -18,6 +18,7 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 | **Chaves PIX** | CPF, CNPJ, e-mail, telefone ou chave aleatória (até 5 por conta). |
 | **Transações** | Consulta geral de lançamentos com filtros e **estorno** (reverte origem e destino). |
 | **Empréstimos** | Simulação e contratação pela Tabela Price, crédito automático em conta, cronograma de parcelas e pagamento em ordem com débito em conta; quitação automática. |
+| **Bradesco** | Conta PJ única da PAY AX no Bradesco: cobrança PIX com QR Code creditando a conta do cliente, webhook de confirmação, PIX para outros bancos, PIX sem identificação com vínculo manual e conciliação do saldo do banco com o saldo dos clientes. |
 | **Relatórios** | Exportação CSV (compatível com Excel) de clientes, contas, transações por período e carteira de crédito. |
 | **Auditoria** | Registro de todas as ações (login, cadastros, operações, estornos, alterações de limite/status) com usuário, data e IP. |
 | **Usuários** | Gestão de colaboradores e perfis de acesso. |
@@ -29,6 +30,38 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 | **Administrador** | Tudo, incluindo usuários e exclusão de clientes sem contas. |
 | **Gerente** | Concede/altera limites, contrata empréstimos, bloqueia/encerra contas, estorna, altera status de clientes, relatórios e auditoria. |
 | **Operador** | Cadastra clientes e contas, chaves PIX, operações de caixa até a alçada (padrão R$ 50.000,00) e pagamento de parcelas. |
+
+## Integração Bradesco
+
+Modelo: **uma conta PJ da PAY AX no Bradesco**. Todo dinheiro entra e sai por ela; o Banqueiro mantém o saldo de cada cliente
+e a tela **Bradesco** confere se o saldo do banco cobre o saldo dos clientes.
+
+| Fluxo | Como funciona |
+|---|---|
+| Receber (depósito via PIX) | Em uma conta, “Receber via PIX” gera uma cobrança imediata (`PUT /cob/{txid}`) com QR Code. Quando o Bradesco confirma o pagamento (webhook ou sincronização), a conta do cliente é creditada. Idempotente por `endToEndId`. |
+| PIX sem cobrança | PIX pago direto na chave da PAY AX fica em “PIX sem identificação” até um gerente vinculá-lo a uma conta. |
+| Enviar PIX | Chave de cliente PAY AX: transferência interna imediata. Chave de outro banco: o cliente é debitado e o PIX sai pela conta PAY AX no Bradesco; se o banco recusar, o valor volta automaticamente. |
+| Conciliação | Saldo no Bradesco × soma dos saldos dos clientes, extrato do banco com status de conciliação, cobranças e envios recentes. |
+
+**Modos** (`BRADESCO_MODO`):
+
+- `simulador` (padrão): reproduz o Bradesco localmente para testar tudo sem credenciais.
+- `sandbox`: ambiente de homologação do banco.
+- `producao`: ambiente real.
+
+| Variável | Descrição |
+|---|---|
+| `BRADESCO_MODO` | `simulador`, `sandbox` ou `producao`. |
+| `BRADESCO_TOKEN_URL` / `BRADESCO_PIX_BASE_URL` | URLs de autenticação e da API PIX informadas pelo Bradesco. |
+| `BRADESCO_CLIENT_ID` / `BRADESCO_CLIENT_SECRET` | Credenciais do aplicativo no portal Bradesco Developers. |
+| `BRADESCO_CERT_PFX` / `BRADESCO_CERT_SENHA` | Caminho e senha do certificado e-CNPJ (mTLS). |
+| `BRADESCO_CHAVE_PIX` | Chave PIX da conta PAY AX. |
+| `BRADESCO_WEBHOOK_TOKEN` | Segredo exigido no webhook. Cadastre no Bradesco a URL `https://SEU-DOMINIO/api/integracoes/bradesco/webhook?token=SEGREDO`. |
+| `BRADESCO_EXPIRACAO_COBRANCA` | Validade da cobrança em segundos (padrão 3600). |
+
+Situação: cobrança, consulta de recebidos e webhook seguem o padrão **API Pix do Banco Central** e já estão implementados para
+sandbox/produção (`server/integracoes/bradesco/api.js`). Envio de PIX, saldo e extrato usam APIs próprias do Bradesco e funcionam
+no simulador. Para sandbox e produção, serão ligados assim que houver a documentação técnica recebida no credenciamento.
 
 ## Demonstração online
 

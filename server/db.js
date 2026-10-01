@@ -111,6 +111,76 @@ CREATE TABLE IF NOT EXISTS auditoria (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_auditoria_data ON auditoria(criado_em);
+
+-- Integração Bradesco: cobranças PIX geradas para crédito em conta de cliente.
+CREATE TABLE IF NOT EXISTS cobrancas_pix (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conta_id INTEGER NOT NULL REFERENCES contas(id),
+  txid TEXT NOT NULL UNIQUE,
+  valor_centavos INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa','concluida','expirada','cancelada')),
+  pix_copia_e_cola TEXT,
+  expira_em TEXT NOT NULL,
+  end_to_end_id TEXT,
+  pago_em TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_cobrancas_conta ON cobrancas_pix(conta_id);
+
+-- PIX que entraram na conta PAY AX no Bradesco (idempotente por endToEndId).
+CREATE TABLE IF NOT EXISTS pix_recebidos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  end_to_end_id TEXT NOT NULL UNIQUE,
+  txid TEXT,
+  valor_centavos INTEGER NOT NULL,
+  pagador_nome TEXT,
+  pagador_documento TEXT,
+  info_pagador TEXT,
+  conta_id INTEGER REFERENCES contas(id),
+  transacao_id INTEGER REFERENCES transacoes(id),
+  status TEXT NOT NULL CHECK (status IN ('creditado','sem_vinculo')),
+  motivo TEXT,
+  recebido_em TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- PIX enviados da conta PAY AX no Bradesco para outros bancos, a pedido de clientes.
+CREATE TABLE IF NOT EXISTS pix_saidas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conta_id INTEGER NOT NULL REFERENCES contas(id),
+  transacao_id INTEGER REFERENCES transacoes(id),
+  valor_centavos INTEGER NOT NULL,
+  chave TEXT NOT NULL,
+  descricao TEXT,
+  idempotencia TEXT NOT NULL UNIQUE,
+  end_to_end_id TEXT,
+  status TEXT NOT NULL DEFAULT 'processando' CHECK (status IN ('processando','concluido','falhou')),
+  erro TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Estado do simulador do Bradesco (usado quando BRADESCO_MODO=simulador).
+CREATE TABLE IF NOT EXISTS bradesco_sim_movimentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  natureza TEXT NOT NULL CHECK (natureza IN ('C','D')),
+  valor_centavos INTEGER NOT NULL,
+  descricao TEXT,
+  end_to_end_id TEXT,
+  txid TEXT,
+  pagador_nome TEXT,
+  pagador_documento TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS bradesco_sim_cobrancas (
+  txid TEXT PRIMARY KEY,
+  valor_centavos INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  pix_copia_e_cola TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 function abrir(arquivo = config.dbFile) {

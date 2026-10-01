@@ -10,7 +10,7 @@ const { buscarConta, exigirContaOperavel, novoGrupo, lancar, exigirAlcada } = re
 
 const fmt = (c) => `${c.agencia}/${c.numero}-${c.digito}`;
 
-module.exports = (db) => {
+module.exports = (db, bradesco) => {
   const r = Router();
   const operadores = permitir('admin', 'gerente', 'operador');
 
@@ -76,15 +76,19 @@ module.exports = (db) => {
     res.status(201).json(transferir(req, origem, destino, valor, descricao, 'transferencia_enviada', 'transferencia_recebida'));
   });
 
-  r.post('/pix', operadores, (req, res) => {
+  r.post('/pix', operadores, async (req, res) => {
     const origem = buscarConta(db, req.body?.origem_conta_id);
     const chave = String(req.body?.chave ?? '').trim();
     v.exigir(chave, 'Informe a chave PIX de destino.');
+    const valor = v.valorCentavos(req.body?.valor_centavos);
     const registro = db.prepare('SELECT * FROM chaves_pix WHERE chave = ? OR chave = ?').get(chave, chave.toLowerCase())
       || (/^[\d.\-/()\s+]+$/.test(chave) ? db.prepare('SELECT * FROM chaves_pix WHERE chave = ?').get(v.digitos(chave)) : null);
-    if (!registro) throw naoEncontrado('Chave PIX');
+    if (!registro) {
+      // Chave de outro banco: o PIX sai pela conta PAY AX no Bradesco.
+      const descricao = v.texto(req.body?.descricao, 140);
+      return res.status(201).json(await bradesco.enviarPixExterno(req, origem, chave, valor, descricao));
+    }
     const destino = buscarConta(db, registro.conta_id);
-    const valor = v.valorCentavos(req.body?.valor_centavos);
     const descricao = v.texto(req.body?.descricao, 140) || `PIX para ${destino.cliente_nome}`;
     res.status(201).json({ ...transferir(req, origem, destino, valor, descricao, 'pix_enviado', 'pix_recebido'), destino: { nome: destino.cliente_nome, conta: fmt(destino) } });
   });
@@ -98,6 +102,9 @@ module.exports = (db) => {
     if (grupoOriginal.some((t) => t.estornada_em)) throw new ErroNegocio('Esta transação já foi estornada.', 409);
     if (grupoOriginal.some((t) => t.tipo === 'estorno')) throw new ErroNegocio('Não é possível estornar um estorno.', 409);
     if (grupoOriginal.some((t) => t.tipo.startsWith('emprestimo'))) throw new ErroNegocio('Movimentos de empréstimo não podem ser estornados por aqui.', 409);
+    if (grupoOriginal.some((t) => t.tipo.startsWith('pix_') && !t.contraparte_conta_id)) {
+      throw new ErroNegocio('PIX com outro banco já foi liquidado no Bradesco e não pode ser estornado aqui. Use a devolução PIX.', 409);
+    }
     const out = transacao(db, () => {
       const grupo = novoGrupo();
       for (const t of grupoOriginal) {

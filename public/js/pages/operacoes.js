@@ -6,7 +6,7 @@ const OPS = {
   deposito: { titulo: 'Depósito', desc: 'Crédito em espécie na conta do cliente.', icone: 'baixar', origem: 'Conta de crédito' },
   saque: { titulo: 'Saque', desc: 'Retirada em espécie, respeitando saldo + limite.', icone: 'emprestimos', origem: 'Conta de débito' },
   transferencia: { titulo: 'Transferência', desc: 'Entre contas PAY AX por agência e número.', icone: 'operacoes', origem: 'Conta de origem' },
-  pix: { titulo: 'PIX', desc: 'Envio instantâneo para uma chave PIX cadastrada.', icone: 'pix', origem: 'Conta de origem' },
+  pix: { titulo: 'PIX', desc: 'Para clientes PAY AX ou qualquer banco (via Bradesco).', icone: 'pix', origem: 'Conta de origem' },
 };
 
 /** Abre o formulário da operação. Se `contaSel` vier preenchida, a conta fica fixa. */
@@ -23,7 +23,8 @@ export function formOperacao(tipo, contaSel, aoConcluir) {
       ${tipo === 'transferencia' ? html`
         <div class="c4"><label>Agência destino</label><input name="destino_agencia" value="0001" inputmode="numeric"></div>
         <div class="c8"><label>Conta destino (número-dígito)</label><input name="destino_numero" placeholder="100001-5" required></div>` : ''}
-      ${tipo === 'pix' ? html`<div class="c12"><label>Chave PIX de destino</label><input name="chave" placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória" required></div>` : ''}
+      ${tipo === 'pix' ? html`<div class="c12"><label>Chave PIX de destino</label><input name="chave" placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória" required>
+        <div class="ajuda">Chaves de clientes PAY AX são liquidadas na hora; chaves de outros bancos saem pela conta PAY AX no Bradesco.</div></div>` : ''}
       <div class="c6"><label>Valor (R$)</label><input name="valor" class="moeda" inputmode="numeric" value="0,00" required></div>
       <div class="c6"><label>Descrição (opcional)</label><input name="descricao" maxlength="140"></div>
       <div class="c12 ajuda" id="disp">${origem && tipo !== 'deposito' ? `Disponível (saldo + limite): ${moeda(origem.saldo_centavos + origem.limite_centavos)}` : ''}</div>
@@ -53,7 +54,9 @@ export function formOperacao(tipo, contaSel, aoConcluir) {
         toast(`Transferência de ${moeda(valor)} concluída.`);
       } else {
         r = await api.post('/operacoes/pix', { origem_conta_id: contaId, chave: d.chave, valor_centavos: valor, descricao: d.descricao });
-        toast(`PIX de ${moeda(valor)} enviado para ${r.destino.nome.replace(/\.$/, '')}.`);
+        toast(r.externo
+          ? `PIX de ${moeda(valor)} enviado via Bradesco para ${r.chave}.`
+          : `PIX de ${moeda(valor)} enviado para ${r.destino.nome.replace(/\.$/, '')}.`);
       }
       fechar();
       aoConcluir?.(r);

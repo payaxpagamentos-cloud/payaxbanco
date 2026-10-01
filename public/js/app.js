@@ -12,6 +12,7 @@ import transacoes from './pages/transacoes.js';
 import relatorios from './pages/relatorios.js';
 import usuarios from './pages/usuarios.js';
 import auditoria from './pages/auditoria.js';
+import bradesco from './pages/bradesco.js';
 
 const TODOS = ['admin', 'gerente', 'operador'];
 const MENU = [
@@ -26,6 +27,7 @@ const MENU = [
   { rota: 'transacoes', rotulo: 'Transações', icone: 'transacoes', perfis: TODOS },
   { rota: 'emprestimos', rotulo: 'Empréstimos', icone: 'emprestimos', perfis: TODOS },
   { secao: 'Gestão' },
+  { rota: 'bradesco', rotulo: 'Bradesco', icone: 'banco', perfis: ['admin', 'gerente'] },
   { rota: 'relatorios', rotulo: 'Relatórios', icone: 'relatorios', perfis: ['admin', 'gerente'] },
   { rota: 'auditoria', rotulo: 'Auditoria', icone: 'auditoria', perfis: ['admin', 'gerente'] },
   { rota: 'usuarios', rotulo: 'Usuários', icone: 'usuarios', perfis: ['admin'] },
@@ -42,6 +44,7 @@ const ROTAS = {
   relatorios,
   usuarios,
   auditoria,
+  bradesco,
 };
 
 const PERFIL = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador' };
