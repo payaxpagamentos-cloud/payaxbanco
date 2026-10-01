@@ -1,5 +1,6 @@
 import { api } from '../api.js';
 import { pode, definirTitulo, semAlcada } from '../contexto.js';
+import { avisoAnalise } from './ouvidoria.js';
 import {
   html, $, $$, moeda, documento, telefone, cep, data, status, conta, TIPO_CONTA, modal, confirmar, toast,
   dadosForm, centavos, valorMoedaInput, paginacao, debounce, iniciais,
@@ -27,6 +28,7 @@ export function formCliente(cliente = null, aoSalvar) {
       <div class="c4"><label data-rot-renda>${c.tipo === 'PJ' ? 'Faturamento mensal (R$)' : 'Renda mensal (R$)'}</label><input name="renda" class="moeda" inputmode="numeric" value="${valorMoedaInput(c.renda_mensal_centavos)}"></div>
       <div class="c4"><label>Status</label><select name="status" ${editando && !pode('clientes.status') ? 'disabled' : ''}>
         ${['ativo', 'inativo', 'bloqueado'].map((s) => html`<option value="${s}" ${c.status === s ? 'selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`)}</select></div>
+      ${editando && pode('clientes.status') ? html`<div class="c8"><label>Motivo da mudança de status</label><input name="motivo_status" placeholder="Obrigatório ao mudar o status: o pedido vai para a Ouvidoria"></div>` : ''}
       <fieldset><legend>Endereço</legend></fieldset>
       <div class="c3"><label>CEP</label><input name="cep" value="${c.cep ? cep(c.cep) : ''}" placeholder="00000-000"></div>
       <div class="c6"><label>Logradouro</label><input name="logradouro" value="${c.logradouro ?? ''}"></div>
@@ -53,7 +55,7 @@ export function formCliente(cliente = null, aoSalvar) {
       delete corpo.renda;
       const salvo = editando ? await api.put(`/clientes/${c.id}`, corpo) : await api.post('/clientes', corpo);
       fechar();
-      toast(editando ? 'Cliente atualizado.' : 'Cliente cadastrado.');
+      toast(salvo.solicitacao ? `Cadastro salvo. Mudança de status: ${avisoAnalise(salvo.solicitacao)}` : editando ? 'Cliente atualizado.' : 'Cliente cadastrado.');
       aoSalvar?.(salvo);
     },
   });
@@ -143,10 +145,18 @@ export async function detalheCliente({ alvo, id, ativo }) {
   cartaoInternetBanking($('#ib-card', alvo), c);
   cartaoFavorecidos($('#fav-card', alvo), c);
   const ex = $('#excluir', alvo);
-  if (ex) ex.onclick = async () => {
-    if (!(await confirmar('Excluir cliente', `Excluir definitivamente ${c.nome}? Esta ação não pode ser desfeita.`, 'Excluir'))) return;
-    try { await api.del(`/clientes/${c.id}`); toast('Cliente excluído.'); location.hash = '#/clientes'; } catch (e) { toast(e.message, 'erro'); }
-  };
+  if (ex) ex.onclick = () => modal({
+    titulo: 'Excluir cliente',
+    rotuloEnviar: 'Excluir',
+    corpo: html`<p style="margin-top:0">Excluir definitivamente <strong>${c.nome}</strong>? Esta ação não pode ser desfeita.</p>
+      <label for="motivo-ex">Motivo</label><textarea id="motivo-ex" name="motivo"></textarea>`,
+    aoEnviar: async (form, fechar) => {
+      const r = await api.del(`/clientes/${c.id}?motivo=${encodeURIComponent(form.motivo.value)}`);
+      fechar();
+      if (r?.em_analise) { toast(avisoAnalise(r.solicitacao)); return; }
+      toast('Cliente excluído.'); location.hash = '#/clientes';
+    },
+  });
 }
 
 function mostrarSenhaProvisoria(r, cliente) {
@@ -196,9 +206,15 @@ async function cartaoInternetBanking(el, cliente) {
     },
   });
   const stb = $('#ib-status', el);
-  if (stb) stb.onclick = async () => {
-    try { await api.patch(`/clientes/${cliente.id}/internet-banking`, { status: st.status === 'ativo' ? 'bloqueado' : 'ativo' }); toast('Acesso atualizado.'); recarregar(); } catch (e) { toast(e.message, 'erro'); }
-  };
+  if (stb) stb.onclick = () => modal({
+    titulo: st.status === 'ativo' ? 'Bloquear acesso ao Internet Banking' : 'Desbloquear acesso ao Internet Banking',
+    rotuloEnviar: st.status === 'ativo' ? 'Bloquear' : 'Desbloquear',
+    corpo: html`<label for="motivo-ib">Motivo</label><textarea id="motivo-ib" name="motivo"></textarea>`,
+    aoEnviar: async (form, fechar) => {
+      const r = await api.patch(`/clientes/${cliente.id}/internet-banking`, { status: st.status === 'ativo' ? 'bloqueado' : 'ativo', motivo: form.motivo.value });
+      fechar(); toast(r.em_analise ? avisoAnalise(r.solicitacao) : 'Acesso atualizado.'); recarregar();
+    },
+  });
 }
 
 /** Favorecidos do cliente: a equipe cadastra; o cliente escolhe no PIX ou na transferência (sempre com a senha dele). */

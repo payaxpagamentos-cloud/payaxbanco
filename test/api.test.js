@@ -101,17 +101,24 @@ test('API do Banqueiro', async (t) => {
     assert.equal((await api.post(`/clientes/${bruno.id}/favorecidos`, { tipo: 'pix', chave: 'ana@x.com' }, tk)).status, 201);
   });
 
-  await t.test('bloqueio impede crédito; encerramento exige saldo zero', async () => {
-    assert.equal((await api.patch(`/contas/${contaBruno.id}/status`, { status: 'bloqueada', motivo: 'Suspeita' })).status, 200);
+  await t.test('bloqueio e encerramento passam pela Ouvidoria; encerramento exige saldo zero', async () => {
+    assert.equal((await api.post('/usuarios', { nome: 'Olívia Ouvidoria', email: 'ouv@payax.com.br', perfil: 'ouvidoria', senha: 'senha-forte-1' })).status, 201);
+    const tkOuv = await api.login('ouv@payax.com.br', 'senha-forte-1');
+    const aprovar = async (pedido) => {
+      assert.equal(pedido.status, 202, JSON.stringify(pedido.dados));
+      const r = await api.post(`/ouvidoria/${pedido.dados.solicitacao.id}/aprovar`, { parecer: 'Conferido.' }, tkOuv);
+      assert.equal(r.status, 200, JSON.stringify(r.dados));
+    };
+    await aprovar(await api.patch(`/contas/${contaBruno.id}/status`, { status: 'bloqueada', motivo: 'Suspeita de fraude' }));
     assert.equal((await api.post('/integracoes/bradesco/cobrancas', { conta_id: contaBruno.id, valor_centavos: 100 })).status, 409);
-    assert.equal((await api.patch(`/contas/${contaBruno.id}/status`, { status: 'ativa' })).status, 200);
-    assert.equal((await api.patch(`/contas/${contaBruno.id}/status`, { status: 'encerrada' })).status, 409);
+    await aprovar(await api.patch(`/contas/${contaBruno.id}/status`, { status: 'ativa', motivo: 'Cliente confirmou as operações' }));
+    assert.equal((await api.patch(`/contas/${contaBruno.id}/status`, { status: 'encerrada', motivo: 'Pedido do cliente' })).status, 409);
     const vazia = (await api.post('/contas', { cliente_id: bruno.id, tipo: 'pagamento' })).dados;
     await api.post('/pix', { conta_id: vazia.id, tipo: 'aleatoria' });
-    const enc = await api.patch(`/contas/${vazia.id}/status`, { status: 'encerrada' });
-    assert.equal(enc.status, 200);
+    await aprovar(await api.patch(`/contas/${vazia.id}/status`, { status: 'encerrada', motivo: 'Pedido do cliente' }));
+    assert.equal((await api.get(`/contas/${vazia.id}`)).dados.status, 'encerrada');
     assert.equal((await api.get(`/pix?q=${encodeURIComponent('-')}`)).dados.filter((k) => k.conta_id === vazia.id).length, 0);
-    assert.equal((await api.patch(`/contas/${vazia.id}/status`, { status: 'ativa' })).status, 409);
+    assert.equal((await api.patch(`/contas/${vazia.id}/status`, { status: 'ativa', motivo: 'Reabrir' })).status, 409);
   });
 
   await t.test('dashboard, relatórios CSV e auditoria', async () => {

@@ -1,7 +1,7 @@
 import { api } from '../api.js';
 import { html, $, $$, toast, confirmar, moeda, mascaraMoeda, centavos, valorMoedaInput } from '../ui.js';
 
-const PERFIL = { gerente: 'Gerente', operador: 'Operador' };
+const PERFIL = { gerente: 'Gerente', operador: 'Operador', ouvidoria: 'Ouvidoria' };
 
 /** Alçadas: o administrador define o que gerente e operador podem fazer e até que valor. */
 export default async function alcadas({ alvo, ativo }) {
@@ -25,13 +25,17 @@ function celula(p, perfil) {
   </td>`;
 }
 
-function desenhar(alvo, { perfis, permissoes }) {
+function desenhar(alvo, { perfis, permissoes, analises }) {
   const grupos = [...new Set(permissoes.map((p) => p.grupo))];
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Alçadas</h1>
-      <p class="muted">Defina o que cada perfil pode fazer e até que valor. O administrador tem acesso total; gerenciar usuários e alçadas é exclusivo dele.
-        As mudanças valem no próximo acesso de cada usuário e ficam registradas na auditoria.</p></div>
+      <p class="muted">Defina o que cada perfil pode fazer, até que valor e quais ações precisam de análise da Ouvidoria. O administrador tem acesso total;
+        gerenciar usuários e alçadas é exclusivo dele. As mudanças valem no próximo acesso de cada usuário e ficam registradas na auditoria.</p></div>
       <div class="row"><button class="btn" id="padrao">Restaurar padrão</button><button class="btn primario" id="salvar" disabled>Salvar alterações</button></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h2>Exigem análise da Ouvidoria</h2>
+      <p class="small muted" style="margin:4px 0 0">Quando ligado, quem tem a alçada faz o pedido com motivo e a ação só acontece depois que a Ouvidoria aprovar. Pedidos de encerramento feitos pelo cliente no Internet Banking sempre vão para a Ouvidoria.</p></div></div>
+      <div class="card-body alc-analises">${analises.map((a) => html`<label class="alc-chave alc-analise" for="an-${a.acao}">
+        <input type="checkbox" role="switch" id="an-${a.acao}" data-analise="${a.acao}" ${a.exige ? 'checked' : ''}><span>${a.rotulo}</span></label>`)}</div></div>
     <div class="card"><div class="table-wrap"><table class="alc-tabela">
       <thead><tr><th>Permissão</th><th>Administrador</th>${perfis.map((pf) => html`<th>${PERFIL[pf]}</th>`)}</tr></thead>
       ${grupos.map((g) => html`<tbody>
@@ -61,9 +65,11 @@ function desenhar(alvo, { perfis, permissoes }) {
     sem?.addEventListener('change', () => { $('.alc-teto', td).hidden = sem.checked; marcarAlterado(); });
     $('[data-teto]', td)?.addEventListener('input', marcarAlterado);
   });
+  $$('[data-analise]', alvo).forEach((i) => i.addEventListener('change', marcarAlterado));
 
   salvar.onclick = async () => {
     const corpo = Object.fromEntries(perfis.map((pf) => [pf, {}]));
+    corpo.analises = Object.fromEntries($$('[data-analise]', alvo).map((i) => [i.dataset.analise, i.checked]));
     for (const td of $$('.alc-celula', alvo)) {
       const permitido = $('[data-permitido]', td).checked;
       const sem = $('[data-sem-teto]', td);
@@ -76,7 +82,7 @@ function desenhar(alvo, { perfis, permissoes }) {
     try {
       const r = await api.put('/alcadas', corpo);
       toast(r.alteradas ? `${r.alteradas} ${r.alteradas === 1 ? 'regra alterada' : 'regras alteradas'}.` : 'Nenhuma alteração.');
-      desenhar(alvo, { perfis, permissoes: r.permissoes });
+      desenhar(alvo, r);
     } catch (err) {
       toast(err.message, 'erro');
       salvar.disabled = false;
@@ -84,11 +90,11 @@ function desenhar(alvo, { perfis, permissoes }) {
   };
 
   $('#padrao', alvo).onclick = async () => {
-    if (!(await confirmar('Restaurar padrão', 'Todas as regras de gerente e operador voltam ao padrão do sistema.', 'Restaurar'))) return;
+    if (!(await confirmar('Restaurar padrão', 'Todas as regras de gerente, operador e ouvidoria, e as análises da Ouvidoria, voltam ao padrão do sistema.', 'Restaurar'))) return;
     try {
       const r = await api.post('/alcadas/restaurar-padrao');
       toast('Alçadas restauradas ao padrão.');
-      desenhar(alvo, { perfis, permissoes: r.permissoes });
+      desenhar(alvo, r);
     } catch (err) { toast(err.message, 'erro'); }
   };
 }

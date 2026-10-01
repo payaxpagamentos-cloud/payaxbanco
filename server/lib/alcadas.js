@@ -10,7 +10,7 @@
 
 const { ErroNegocio } = require('./erros');
 
-const PERFIS_CONFIGURAVEIS = ['gerente', 'operador'];
+const PERFIS_CONFIGURAVEIS = ['gerente', 'operador', 'ouvidoria'];
 
 /** padrao: [permitido, limite em centavos ou null] por perfil. `valor`: a permissão tem teto em reais. */
 const CATALOGO = [
@@ -33,8 +33,10 @@ const CATALOGO = [
     padrao: { gerente: [true, null], operador: [false, null] } },
   { grupo: 'Bradesco', chave: 'bradesco.cobrancas', rotulo: 'Gerar cobranças PIX para clientes', padrao: { gerente: [true, null], operador: [true, null] } },
   { grupo: 'Bradesco', chave: 'bradesco.conciliar', rotulo: 'Conciliação e PIX recebidos sem cobrança', padrao: { gerente: [true, null], operador: [false, null] } },
-  { grupo: 'Gestão', chave: 'relatorios.ver', rotulo: 'Ver relatórios', padrao: { gerente: [true, null], operador: [false, null] } },
-  { grupo: 'Gestão', chave: 'auditoria.ver', rotulo: 'Ver auditoria', padrao: { gerente: [true, null], operador: [false, null] } },
+  { grupo: 'Ouvidoria', chave: 'ouvidoria.decidir', rotulo: 'Analisar solicitações (aprovar ou recusar)',
+    padrao: { gerente: [false, null], operador: [false, null], ouvidoria: [true, null] } },
+  { grupo: 'Gestão', chave: 'relatorios.ver', rotulo: 'Ver relatórios', padrao: { gerente: [true, null], operador: [false, null], ouvidoria: [true, null] } },
+  { grupo: 'Gestão', chave: 'auditoria.ver', rotulo: 'Ver auditoria', padrao: { gerente: [true, null], operador: [false, null], ouvidoria: [true, null] } },
 ];
 const POR_CHAVE = new Map(CATALOGO.map((p) => [p.chave, p]));
 
@@ -48,7 +50,8 @@ function regra(db, perfil, chave) {
   if (!PERFIS_CONFIGURAVEIS.includes(perfil)) return { permitido: false, limite_centavos: null };
   const gravada = db.prepare('SELECT permitido, limite_centavos FROM alcadas WHERE perfil = ? AND permissao = ?').get(perfil, chave);
   if (gravada) return { permitido: Boolean(gravada.permitido), limite_centavos: p.valor ? gravada.limite_centavos : null };
-  const [permitido, limite] = p.padrao[perfil];
+  // Perfil sem padrão no catálogo (ex.: Ouvidoria nas operações do dia a dia): não pode.
+  const [permitido, limite] = p.padrao[perfil] ?? [false, null];
   return { permitido, limite_centavos: limite };
 }
 
@@ -82,7 +85,7 @@ function listar(db) {
   return CATALOGO.map((p) => ({
     grupo: p.grupo, chave: p.chave, rotulo: p.rotulo, valor: Boolean(p.valor), ajuda_valor: p.ajudaValor ?? null,
     regras: Object.fromEntries(PERFIS_CONFIGURAVEIS.map((perfil) => [perfil, regra(db, perfil, p.chave)])),
-    padrao: Object.fromEntries(PERFIS_CONFIGURAVEIS.map((perfil) => [perfil, { permitido: p.padrao[perfil][0], limite_centavos: p.padrao[perfil][1] }])),
+    padrao: Object.fromEntries(PERFIS_CONFIGURAVEIS.map((perfil) => [perfil, { permitido: (p.padrao[perfil] ?? [false])[0], limite_centavos: (p.padrao[perfil] ?? [false, null])[1] }])),
   }));
 }
 

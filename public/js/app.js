@@ -14,6 +14,7 @@ import auditoria from './pages/auditoria.js';
 import aberturas from './pages/aberturas.js';
 import bradesco from './pages/bradesco.js';
 import alcadas from './pages/alcadas.js';
+import ouvidoria from './pages/ouvidoria.js';
 
 // `alcada`: só aparece para quem tem a permissão; `admin`: exclusivo do administrador.
 const MENU = [
@@ -28,6 +29,7 @@ const MENU = [
   { rota: 'transacoes', rotulo: 'Transações', icone: 'transacoes' },
   { rota: 'emprestimos', rotulo: 'Empréstimos', icone: 'emprestimos' },
   { secao: 'Gestão' },
+  { rota: 'ouvidoria', rotulo: 'Ouvidoria', icone: 'ouvidoria' },
   { rota: 'bradesco', rotulo: 'Bradesco', icone: 'banco', alcada: 'bradesco.conciliar' },
   { rota: 'relatorios', rotulo: 'Relatórios', icone: 'relatorios', alcada: 'relatorios.ver' },
   { rota: 'auditoria', rotulo: 'Auditoria', icone: 'auditoria', alcada: 'auditoria.ver' },
@@ -49,9 +51,10 @@ const ROTAS = {
   bradesco,
   aberturas,
   alcadas,
+  ouvidoria,
 };
 
-const PERFIL = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador' };
+const PERFIL = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador', ouvidoria: 'Ouvidoria' };
 
 
 function renderLayout() {
@@ -111,8 +114,16 @@ function sair() {
   rotear();
 }
 
+function contador(rota, n, titulo) {
+  const link = $(`.nav a[data-rota="${rota}"]`);
+  if (!link) return;
+  link.querySelector('.contador')?.remove();
+  if (n) link.insertAdjacentHTML('beforeend', `<span class="contador" title="${titulo}">${n}</span>`);
+}
+
 /** Mostra no menu quantas propostas de abertura de conta aguardam análise. */
 function atualizarContadorPropostas() {
+  if (pode('ouvidoria.decidir')) api.get('/ouvidoria/pendentes').then((r) => contador('ouvidoria', r.total, 'Aguardando análise da Ouvidoria')).catch(() => {});
   api.get('/aberturas', { status: 'em_analise' }).then((lista) => {
     const link = $('.nav a[data-rota="aberturas"]');
     if (!link) return;

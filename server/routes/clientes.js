@@ -6,6 +6,8 @@ const favorecidos = require('../lib/favorecidos');
 const alcadas = require('../lib/alcadas');
 
 const { alcada } = alcadas;
+const situacao = require('../lib/situacao');
+const ouvidoria = require('../lib/ouvidoria');
 const { naoEncontrado, ErroNegocio } = require('../lib/erros');
 const v = require('../lib/validacao');
 const { registrar } = require('../lib/auditoria');
@@ -61,12 +63,21 @@ module.exports = (db) => {
     if (!atual) throw naoEncontrado('Cliente');
     const c = normalizar(req.body ?? {}, atual);
     v.exigir(c.documento === atual.documento && c.tipo === atual.tipo, 'Documento e tipo do cliente não podem ser alterados.');
-    if (c.status !== atual.status) alcadas.exigir(db, req, 'clientes.status');
+    let solicitacao = null;
+    if (c.status !== atual.status) {
+      alcadas.exigir(db, req, 'clientes.status');
+      const acao = situacao.acaoCliente(c.status);
+      if (ouvidoria.exigeAnalise(db, acao)) {
+        // O cadastro é salvo; a mudança de situação aguarda a Ouvidoria.
+        solicitacao = ouvidoria.criar(db, req, { tipo: acao, clienteId: atual.id, dados: { status: c.status }, motivo: req.body?.motivo_status, origem: 'equipe' });
+        c.status = atual.status;
+      }
+    }
     db.prepare(`UPDATE clientes SET ${CAMPOS.map((k) => `${k} = ?`).join(', ')}, atualizado_em = datetime('now') WHERE id = ?`)
       .run(...CAMPOS.map((k) => c[k]), atual.id);
     const mudancas = Object.fromEntries(CAMPOS.filter((k) => c[k] !== atual[k]).map((k) => [k, c[k]]));
-    registrar(db, req, 'atualizar', 'cliente', atual.id, mudancas);
-    res.json(db.prepare('SELECT * FROM clientes WHERE id = ?').get(atual.id));
+    if (Object.keys(mudancas).length) registrar(db, req, 'atualizar', 'cliente', atual.id, mudancas);
+    res.json({ ...db.prepare('SELECT * FROM clientes WHERE id = ?').get(atual.id), solicitacao });
   });
 
   // ---------- Internet Banking do cliente ----------
@@ -109,6 +120,10 @@ module.exports = (db) => {
     v.exigir(['ativo', 'bloqueado'].includes(status), 'Status inválido.');
     v.exigir(Number.isInteger(limite) && limite >= 0 && limite <= 100_000_000, 'Limite diário inválido.');
     if (limite !== atual.limite_diario_centavos) alcadas.exigirValor(db, req, 'ib.gerenciar', limite);
+    if (status !== atual.status && ouvidoria.exigeAnalise(db, situacao.acaoIb(status))) {
+      const s = ouvidoria.criar(db, req, { tipo: situacao.acaoIb(status), clienteId: c.id, dados: { status }, motivo: req.body?.motivo, origem: 'equipe' });
+      return res.status(202).json({ em_analise: true, solicitacao: s });
+    }
     db.prepare('UPDATE acessos_cliente SET status = ?, limite_diario_centavos = ?, tentativas = 0, tentativas_pin = 0, bloqueado_ate = NULL WHERE cliente_id = ?')
       .run(status, limite, c.id);
     registrar(db, req, 'ib_atualizar', 'cliente', c.id, { status, limite_diario_centavos: limite });
@@ -129,13 +144,13 @@ module.exports = (db) => {
   });
 
   r.delete('/:id', alcada(db, 'clientes.excluir'), (req, res) => {
-    const atual = db.prepare('SELECT * FROM clientes WHERE id = ?').get(req.params.id);
-    if (!atual) throw naoEncontrado('Cliente');
-    if (db.prepare('SELECT 1 FROM contas WHERE cliente_id = ?').get(atual.id) || statusIb(atual.id)) {
-      throw new ErroNegocio('Cliente possui contas ou acesso ao Internet Banking. Inative-o em vez de excluir.', 409);
+    const atual = situacao.buscarCliente(db, req.params.id);
+    situacao.validarExclusaoCliente(db, atual);
+    if (ouvidoria.exigeAnalise(db, 'excluir_cliente')) {
+      const s = ouvidoria.criar(db, req, { tipo: 'excluir_cliente', clienteId: atual.id, motivo: req.body?.motivo ?? req.query.motivo, origem: 'equipe' });
+      return res.status(202).json({ em_analise: true, solicitacao: s });
     }
-    db.prepare('DELETE FROM clientes WHERE id = ?').run(atual.id);
-    registrar(db, req, 'excluir', 'cliente', atual.id, { nome: atual.nome });
+    situacao.excluirCliente(db, req, atual.id);
     res.status(204).end();
   });
 

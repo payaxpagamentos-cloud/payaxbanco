@@ -6,7 +6,7 @@ import { criarApi, tratarErro } from '../server/api.js';
 import { popularDemo } from '../server/lib/demo.js';
 
 window.PAYAX_DEMO = true;
-const CHAVE = 'payax.demo.db.v5';
+const CHAVE = 'payax.demo.db.v6';
 
 function carregarSalvo() {
   try {
@@ -21,7 +21,9 @@ function carregarSalvo() {
 
 let db;
 let api;
+let sqlJs;
 const pronto = initSqlJs().then((SQL) => {
+  sqlJs = SQL;
   configurar(SQL, carregarSalvo());
   try {
     db = abrir(':memory:');
@@ -31,6 +33,20 @@ const pronto = initSqlJs().then((SQL) => {
   }
   if (db.prepare('SELECT COUNT(*) AS n FROM clientes').get().n === 0) popularDemo(db);
   api = criarApi(db);
+});
+
+// Outra aba (ex.: Banqueiro e Internet Banking abertos ao mesmo tempo) salvou: carrega os dados dela,
+// para as duas abas trabalharem sobre o mesmo banco de demonstração.
+window.addEventListener('storage', (e) => {
+  if (e.key !== CHAVE || !e.newValue) return;
+  pronto.then(() => {
+    const bytes = carregarSalvo();
+    if (!bytes) return;
+    try { db.close?.(); } catch { /* ignora */ }
+    configurar(sqlJs, bytes);
+    db = abrir(':memory:');
+    api = criarApi(db);
+  });
 });
 
 function salvar() {

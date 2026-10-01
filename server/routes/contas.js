@@ -4,6 +4,8 @@ const { Router } = require('express');
 const alcadas = require('../lib/alcadas');
 
 const { alcada } = alcadas;
+const situacao = require('../lib/situacao');
+const ouvidoria = require('../lib/ouvidoria');
 const { transacao } = require('../db');
 const { ErroNegocio } = require('../lib/erros');
 const v = require('../lib/validacao');
@@ -98,22 +100,17 @@ module.exports = (db) => {
     res.json(buscarConta(db, conta.id));
   });
 
+  // Bloqueio, desbloqueio e encerramento: vão para a Ouvidoria quando a regra exige análise (tela Alçadas).
   r.patch('/:id/status', alcada(db, 'contas.status'), (req, res) => {
     const conta = buscarConta(db, req.params.id);
     const { status, motivo } = req.body ?? {};
-    v.exigir(['ativa', 'bloqueada', 'encerrada'].includes(status), 'Status inválido.');
-    if (conta.status === 'encerrada') throw new ErroNegocio('Conta encerrada não pode ser reaberta.', 409);
-    if (status === 'encerrada') {
-      if (conta.saldo_centavos !== 0) throw new ErroNegocio('Zere o saldo antes de encerrar a conta.', 409);
-      if (db.prepare("SELECT 1 FROM emprestimos WHERE conta_id = ? AND status = 'ativo'").get(conta.id)) {
-        throw new ErroNegocio('Conta possui empréstimo ativo.', 409);
-      }
-      db.prepare('DELETE FROM chaves_pix WHERE conta_id = ?').run(conta.id);
+    situacao.validarStatusConta(db, conta, status);
+    const acao = situacao.acaoConta(status);
+    if (ouvidoria.exigeAnalise(db, acao)) {
+      const s = transacao(db, () => ouvidoria.criar(db, req, { tipo: acao, clienteId: conta.cliente_id, contaId: conta.id, dados: { status }, motivo, origem: 'equipe' }));
+      return res.status(202).json({ em_analise: true, solicitacao: s });
     }
-    db.prepare(`UPDATE contas SET status = ?, encerrada_em = CASE WHEN ? = 'encerrada' THEN datetime('now') END WHERE id = ?`)
-      .run(status, status, conta.id);
-    registrar(db, req, `status_${status}`, 'conta', conta.id, { de: conta.status, motivo: v.texto(motivo) });
-    res.json(buscarConta(db, conta.id));
+    res.json(transacao(db, () => situacao.alterarStatusConta(db, req, conta.id, status, { motivo: v.texto(motivo) })));
   });
 
   return r;

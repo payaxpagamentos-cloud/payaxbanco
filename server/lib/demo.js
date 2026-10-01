@@ -5,6 +5,7 @@ const { transacao } = require('../db');
 const { proximoNumero, novoGrupo, lancar } = require('./conta');
 const { simular } = require('./financeiro');
 const { hashSenha, hashNumerica } = require('./senha');
+const ouvidoria = require('./ouvidoria');
 
 const CLIENTES = [
   ['PF', 'João Pedro Souza', '52998224725', 'joao.souza@email.com', '11987654321', '1990-04-12', 850000, 'São Paulo', 'SP'],
@@ -17,7 +18,8 @@ const CLIENTES = [
 
 function popularDemo(db) {
   transacao(db, () => {
-    const usuarios = [['Gabriela Gerente', 'gerente@payax.com.br', 'gerente'], ['Otávio Operador', 'operador@payax.com.br', 'operador']];
+    const usuarios = [['Gabriela Gerente', 'gerente@payax.com.br', 'gerente'], ['Otávio Operador', 'operador@payax.com.br', 'operador'],
+      ['Olívia Ouvidoria', 'ouvidoria@payax.com.br', 'ouvidoria']];
     for (const [nome, email, perfil] of usuarios) {
       if (!db.prepare('SELECT 1 FROM usuarios WHERE email = ?').get(email)) {
         db.prepare('INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?, ?, ?, ?)').run(nome, email, hashSenha('payax2026'), perfil);
@@ -92,6 +94,15 @@ function popularDemo(db) {
       }
       lancar(db, { contaId: conta.id, tipo: 'emprestimo_credito', valor, descricao: `Crédito empréstimo #${e.lastInsertRowid}`, grupo: novoGrupo(), usuarioId: adminId });
     }
+    // Ouvidoria: um bloqueio pedido pela gerente e um encerramento pedido pelo cliente, aguardando análise.
+    const gerente = db.prepare("SELECT id FROM usuarios WHERE email = 'gerente@payax.com.br'").get();
+    const contaDe = (documento) => db.prepare("SELECT c.id, c.cliente_id FROM contas c JOIN clientes cl ON cl.id = c.cliente_id WHERE cl.documento = ? AND c.tipo = 'corrente'").get(documento);
+    const carlos = contaDe('11144477735');
+    ouvidoria.criar(db, { usuario: gerente }, { tipo: 'bloquear_conta', clienteId: carlos.cliente_id, contaId: carlos.id, dados: { status: 'bloqueada' },
+      motivo: 'Cliente ligou informando perda do celular e suspeita de acesso indevido. Bloqueio preventivo até confirmar as últimas operações.', origem: 'equipe' });
+    const rafael = contaDe('15350946056') ?? db.prepare("SELECT c.id, c.cliente_id FROM contas c JOIN clientes cl ON cl.id = c.cliente_id WHERE cl.documento = '15350946056'").get();
+    ouvidoria.criar(db, { cliente: { id: rafael.cliente_id } }, { tipo: 'encerrar_conta', clienteId: rafael.cliente_id, contaId: rafael.id, dados: { status: 'encerrada' },
+      motivo: 'Vou usar outro banco', origem: 'cliente' });
   });
 }
 

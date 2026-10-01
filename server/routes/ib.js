@@ -16,6 +16,8 @@ const { localizarConta, buscarChaveInterna, transferir, enviarPix, fmt } = requi
 const { pagarParcela } = require('../lib/emprestimos');
 const favorecidos = require('../lib/favorecidos');
 const abertura = require('../lib/abertura');
+const ouvidoria = require('../lib/ouvidoria');
+const { transacao } = require('../db');
 const { lerBoleto, gerarBoletoBancario, gerarConvenio, formatarLinha } = require('../lib/boleto');
 
 const MAX_TENTATIVAS = 5;
@@ -132,6 +134,22 @@ module.exports = (db, bradesco) => {
     const valor = req.body?.valor_centavos === undefined ? null : v.valorCentavos(req.body.valor_centavos);
     return { origem, valor };
   }
+
+  // ---------- Solicitações à Ouvidoria (ex.: encerramento de conta) ----------
+  r.get('/solicitacoes', (req, res) => {
+    res.json(ouvidoria.listar(db, { cliente_id: req.cliente.id }).filter((x) => x.origem === 'cliente').map((x) => ({
+      id: x.id, protocolo: x.protocolo, tipo: x.tipo_rotulo, status: x.status, conta: x.conta_numero, criado_em: x.criado_em, decidido_em: x.decidido_em,
+    })));
+  });
+
+  r.post('/solicitacoes/encerramento', async (req, res) => {
+    const conta = minhaConta(req, req.body?.conta_id);
+    await confirmarPin(req);
+    const s = transacao(db, () => ouvidoria.criar(db, req, {
+      tipo: 'encerrar_conta', clienteId: req.cliente.id, contaId: conta.id, dados: { status: 'encerrada' }, motivo: req.body?.motivo, origem: 'cliente',
+    }));
+    res.status(201).json({ protocolo: s.protocolo, status: s.status });
+  });
 
   // ---------- Perfil e credenciais ----------
   r.get('/me', (req, res) => {

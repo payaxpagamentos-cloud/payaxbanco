@@ -316,3 +316,6 @@ body:has(.login) .faixa-demo ~ #app .login { min-height: calc(100vh - 37px); }
 .alc-teto { display: flex; align-items: center; gap: 6px; }
 .alc-teto input { height: 32px; }
 @media (prefers-reduced-motion: reduce) { .alc-chave input, .alc-chave input::after { transition: none; } }
+.alc-analises { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+@media (max-width: 820px) { .alc-analises { grid-template-columns: minmax(0, 1fr); } }
+.alc-tabela thead th:not(:first-child) { width: 190px; }

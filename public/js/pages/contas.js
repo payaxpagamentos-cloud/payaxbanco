@@ -1,5 +1,6 @@
 import { api } from '../api.js';
 import { pode, definirTitulo, semAlcada } from '../contexto.js';
+import { avisoAnalise } from './ouvidoria.js';
 import {
   html, $, $$, moeda, moedaSinal, documento, dataHora, data, status, conta, TIPO_CONTA, TIPO_TRANSACAO,
   modal, confirmar, toast, dadosForm, centavos, valorMoedaInput, paginacao, debounce,
@@ -84,7 +85,7 @@ export function estornar(transacao, aoConcluir) {
 }
 
 export async function detalheConta({ alvo, id, ativo }) {
-  const c = await api.get(`/contas/${id}`);
+  const [c, pendentes] = await Promise.all([api.get(`/contas/${id}`), api.get('/ouvidoria', { conta_id: id, status: 'em_analise' })]);
   if (!ativo()) return;
   definirTitulo(`Conta ${c.numero}-${c.digito}`);
   const gestor = pode('operacoes.estornar');
@@ -96,10 +97,12 @@ export async function detalheConta({ alvo, id, ativo }) {
       <p class="muted">Titular: <a href="#/clientes/${c.cliente_id}">${c.cliente_nome}</a> · ${documento(c.cliente_documento)} · aberta em ${data(c.aberta_em)}</p></div>
       <div class="row">
         ${pode('contas.limite') && c.status !== 'encerrada' ? html`<button class="btn" id="limite">Alterar limite</button>` : ''}
-        ${pode('contas.status') && c.status !== 'encerrada' ? html`
+        ${pode('contas.status') && c.status !== 'encerrada' && !pendentes.length ? html`
           ${c.status === 'ativa' ? html`<button class="btn perigo" data-status="bloqueada">Bloquear</button>` : html`<button class="btn" data-status="ativa">Desbloquear</button>`}
           <button class="btn perigo" data-status="encerrada">Encerrar</button>` : ''}
       </div></div>
+    ${pendentes.map((s) => html`<a class="card card-body row" href="#/ouvidoria" style="margin-bottom:16px;background:var(--warn-bg);color:var(--warn);font-weight:600;text-decoration:none">
+      ${s.tipo_rotulo} em análise na Ouvidoria · protocolo ${s.protocolo}</a>`)}
     <div class="saldo-hero"><div><div class="rotulo">Saldo atual</div><div class="valor">${moeda(c.saldo_centavos)}</div></div>
       <div class="meta"><div><div class="rotulo">Limite</div><strong>${moeda(c.limite_centavos)}</strong></div>
         <div><div class="rotulo">Disponível</div><strong>${moeda(disponivel)}</strong></div>
@@ -151,10 +154,11 @@ export async function detalheConta({ alvo, id, ativo }) {
       titulo: `${acoes[novo]} conta ${c.numero}-${c.digito}`,
       rotuloEnviar: acoes[novo],
       corpo: html`${novo === 'encerrada' ? html`<p style="margin-top:0">O encerramento é definitivo. O saldo deve estar zerado e as chaves PIX serão removidas.</p>` : ''}
-        <label>Motivo</label><textarea name="motivo" required></textarea>`,
+        <label>Motivo</label><textarea name="motivo" required></textarea>
+        <p class="small muted" style="margin:6px 0 0">Se esta ação exigir análise, ela vai para a Ouvidoria e só é feita depois de aprovada.</p>`,
       aoEnviar: async (form, fechar) => {
-        await api.patch(`/contas/${c.id}/status`, { status: novo, motivo: form.motivo.value });
-        fechar(); toast('Status da conta atualizado.'); recarregar();
+        const r = await api.patch(`/contas/${c.id}/status`, { status: novo, motivo: form.motivo.value });
+        fechar(); toast(r.em_analise ? avisoAnalise(r.solicitacao) : 'Status da conta atualizado.'); recarregar();
       },
     });
   }));

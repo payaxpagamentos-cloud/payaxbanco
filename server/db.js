@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nome TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   senha_hash TEXT NOT NULL,
-  perfil TEXT NOT NULL CHECK (perfil IN ('admin','gerente','operador')),
+  perfil TEXT NOT NULL CHECK (perfil IN ('admin','gerente','operador','ouvidoria')),
   ativo INTEGER NOT NULL DEFAULT 1,
   ultimo_acesso TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
@@ -112,15 +112,43 @@ CREATE TABLE IF NOT EXISTS auditoria (
 );
 CREATE INDEX IF NOT EXISTS idx_auditoria_data ON auditoria(criado_em);
 
--- Alçadas: o que gerente e operador podem fazer e até que valor (o administrador tem acesso total).
+-- Alçadas: o que gerente, operador e ouvidoria podem fazer e até que valor (o administrador tem acesso total).
 CREATE TABLE IF NOT EXISTS alcadas (
-  perfil TEXT NOT NULL CHECK (perfil IN ('gerente', 'operador')),
+  perfil TEXT NOT NULL CHECK (perfil IN ('gerente', 'operador', 'ouvidoria')),
   permissao TEXT NOT NULL,
   permitido INTEGER NOT NULL,
   limite_centavos INTEGER,
   atualizado_por INTEGER REFERENCES usuarios(id),
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (perfil, permissao)
+);
+
+-- Ouvidoria: ações sensíveis (encerramento, bloqueios, exclusão) aguardam análise antes de serem executadas.
+CREATE TABLE IF NOT EXISTS solicitacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  protocolo TEXT NOT NULL UNIQUE,
+  tipo TEXT NOT NULL,
+  cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
+  cliente_nome TEXT NOT NULL,
+  conta_id INTEGER REFERENCES contas(id),
+  dados TEXT,
+  motivo TEXT NOT NULL,
+  origem TEXT NOT NULL CHECK (origem IN ('equipe', 'cliente')),
+  solicitante_id INTEGER REFERENCES usuarios(id),
+  status TEXT NOT NULL DEFAULT 'em_analise' CHECK (status IN ('em_analise', 'aprovada', 'recusada', 'cancelada')),
+  parecer TEXT,
+  decidido_por INTEGER REFERENCES usuarios(id),
+  decidido_em TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes(status);
+
+-- Quais ações exigem análise da Ouvidoria (sem registro: vale o padrão do sistema).
+CREATE TABLE IF NOT EXISTS regras_analise (
+  acao TEXT PRIMARY KEY,
+  exige INTEGER NOT NULL,
+  atualizado_por INTEGER REFERENCES usuarios(id),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Integração Bradesco: cobranças PIX geradas para crédito em conta de cliente.
@@ -295,6 +323,29 @@ function migrar(db) {
   for (const [tabela, coluna, tipo] of COLUNAS) {
     const existe = db.prepare(`SELECT 1 FROM pragma_table_info('${tabela}') WHERE name = ?`).get(coluna);
     if (!existe) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
+  }
+  // Perfil Ouvidoria: bancos criados antes dele têm a restrição antiga de perfis.
+  for (const tabela of ['usuarios', 'alcadas']) {
+    const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabela)?.sql ?? '';
+    if (!sql.includes("'ouvidoria'")) reconstruir(db, tabela);
+  }
+}
+
+/** Recria a tabela com a definição atual do SCHEMA, preservando os dados (SQLite não altera CHECK existente). */
+function reconstruir(db, tabela) {
+  const criar = SCHEMA.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${tabela} \\([\\s\\S]*?\\n\\);`))[0]
+    .replace(`CREATE TABLE IF NOT EXISTS ${tabela} (`, `CREATE TABLE ${tabela}_novo (`);
+  const colunas = db.prepare(`SELECT name FROM pragma_table_info('${tabela}')`).all().map((c) => c.name).join(', ');
+  db.exec('PRAGMA foreign_keys = OFF;');
+  try {
+    transacao(db, () => {
+      db.exec(criar);
+      db.exec(`INSERT INTO ${tabela}_novo (${colunas}) SELECT ${colunas} FROM ${tabela};`);
+      db.exec(`DROP TABLE ${tabela};`);
+      db.exec(`ALTER TABLE ${tabela}_novo RENAME TO ${tabela};`);
+    });
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON;');
   }
 }
 

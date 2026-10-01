@@ -30,7 +30,14 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 | Perfil | Permissões |
 |---|---|
 | **Administrador** | Tudo, sem limite de valor. Exclusivo: usuários da equipe e tela **Alçadas**. |
-| **Gerente** e **Operador** | Definidas pelo administrador na tela **Alçadas**: cada permissão pode ser liberada ou retirada e, nas que envolvem dinheiro (limite de cheque especial, limite diário do Internet Banking, empréstimos e estornos), recebe um valor máximo. |
+| **Ouvidoria** | Analisa e decide (aprova ou recusa, com parecer) as solicitações sensíveis: encerramento e bloqueio de contas, bloqueio e reativação de clientes, exclusão de clientes. Não faz cadastros nem operações. |
+| **Gerente**, **Operador** e **Ouvidoria** | Definidas pelo administrador na tela **Alçadas**: cada permissão pode ser liberada ou retirada e, nas que envolvem dinheiro (limite de cheque especial, limite diário do Internet Banking, empréstimos e estornos), recebe um valor máximo. |
+
+**Ouvidoria.** Na tela Alçadas, o administrador escolhe quais ações exigem análise (padrão: encerramento, bloqueio e
+desbloqueio de contas, bloqueio e reativação de clientes e exclusão de clientes). Quem tem a alçada faz o pedido com motivo;
+a solicitação recebe protocolo (`OUV-AAAA-000000`) e a ação só é executada quando a Ouvidoria aprova. Quem pediu nunca
+decide o próprio pedido. O cliente também pede o encerramento da conta no Internet Banking (Meu perfil), com a senha de
+transação, e acompanha a situação pelo protocolo. Regras em `server/lib/ouvidoria.js` e `server/lib/situacao.js`.
 
 Padrão inicial (botão "Restaurar padrão"): o gerente pode tudo, exceto excluir clientes, sem teto de valor; o operador cadastra
 clientes, contas, chaves PIX e favorecidos, libera o Internet Banking e gera cobranças PIX. Nenhum perfil da equipe movimenta
