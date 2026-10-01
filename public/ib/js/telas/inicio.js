@@ -1,4 +1,4 @@
-import { html, $, moeda, data, icone } from '../../../js/ui.js';
+import { html, $, moeda, data, icone, iniciais } from '../../../js/ui.js';
 import { estado, carregarResumo, contaAtual, rotuloConta, alternarSaldo } from '../comum.js';
 
 const ACOES = [
@@ -43,7 +43,13 @@ export default async function inicio(alvo) {
         ${r.emprestimos.map((e) => html`<div class="row small" style="justify-content:space-between;margin-top:8px"><span>Parcela ${e.pagas + 1}/${e.num_parcelas} · vence ${data(e.proximo_vencimento)}</span><strong>${moeda(e.valor_parcela_centavos)}</strong></div>`)}</a>`
         : html`<a class="card card-body" href="#/extrato" style="color:inherit;text-decoration:none"><h3>Extrato</h3>
         <p class="small muted" style="margin:4px 0 0">Consulte entradas, saídas e comprovantes da sua conta.</p></a>`}
-    </div>`);
+    </div>
+    <a class="card card-body gerente-cartao gerente-inicio" href="#/gerente">
+      <span class="avatar grande">${r.gerentes[0] ? iniciais(r.gerentes[0].nome) : 'PA'}</span>
+      <div><div class="small muted">${r.gerentes.length ? 'Seu gerente de relacionamento' : 'Atendimento'}</div>
+        <strong class="gerente-nome">${r.gerentes.map((g) => g.nome).join(' · ') || 'Atendimento PAY AX'}</strong>
+        <div class="small muted">Tire dúvidas, peça orientações e acompanhe suas solicitações por mensagem.</div></div>
+      <span class="btn primario">${icone('conversa')} Enviar mensagem</span></a>`);
   $('#olho', alvo).onclick = () => { alternarSaldo(); inicio(alvo); };
   const sel = $('#conta', alvo);
   if (sel) sel.onchange = () => { estado.contaId = Number(sel.value); inicio(alvo); };

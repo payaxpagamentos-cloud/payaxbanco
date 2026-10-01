@@ -6,7 +6,7 @@ import { criarApi, tratarErro } from '../server/api.js';
 import { popularDemo } from '../server/lib/demo.js';
 
 window.PAYAX_DEMO = true;
-const CHAVE = 'payax.demo.db.v6';
+const CHAVE = 'payax.demo.db.v7';
 
 function carregarSalvo() {
   try {

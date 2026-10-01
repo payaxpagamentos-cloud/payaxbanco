@@ -247,3 +247,5 @@ body.tema .faixa-demo { position: static; transform: none; max-width: none; bord
 body.tema .faixa-demo .btn { height: 26px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .18); color: #fff; }
 body.tema .faixa-demo ~ #app .sidebar { height: calc(100vh - 37px); }
 body.tema .login-rodape { color: var(--text-2); }
+body.tema .msg.minha .msg-balao { background: var(--gradiente); color: #031029; }
+body.tema .conversa-lado .contador { background: var(--gradiente); color: #031029; }

@@ -143,6 +143,20 @@ CREATE TABLE IF NOT EXISTS solicitacoes (
 );
 CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes(status);
 
+-- Relacionamento: mensagens entre o cliente (Internet Banking) e o gerente da conta.
+CREATE TABLE IF NOT EXISTS mensagens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cliente_id INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+  gerente_id INTEGER REFERENCES usuarios(id),
+  autor TEXT NOT NULL CHECK (autor IN ('cliente', 'gerente')),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  texto TEXT NOT NULL,
+  lida_em TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens(cliente_id, gerente_id, id);
+CREATE INDEX IF NOT EXISTS idx_mensagens_data ON mensagens(criado_em);
+
 -- Quais ações exigem análise da Ouvidoria (sem registro: vale o padrão do sistema).
 CREATE TABLE IF NOT EXISTS regras_analise (
   acao TEXT PRIMARY KEY,
@@ -317,6 +331,7 @@ function abrir(arquivo = config.dbFile) {
 const COLUNAS = [
   ['transacoes', 'canal', "TEXT NOT NULL DEFAULT 'agencia'"],
   ['auditoria', 'cliente_id', 'INTEGER REFERENCES clientes(id)'],
+  ['contas', 'gerente_id', 'INTEGER REFERENCES usuarios(id)'], // gerente de relacionamento da conta
 ];
 
 function migrar(db) {

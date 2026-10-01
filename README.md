@@ -23,6 +23,7 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 | **Internet Banking** | Portal web do cliente em `/ib/`: saldo, extrato com comprovantes, PIX (enviar, receber por QR Code, minhas chaves), transferências, pagamento de boletos e contas de consumo, e empréstimos. |
 | **Relatórios** | Exportação CSV (compatível com Excel) de clientes, contas, transações por período e carteira de crédito. |
 | **Auditoria** | Registro de todas as ações (login, cadastros, operações, estornos, alterações de limite/status) com usuário, data e IP. |
+| **Relacionamento** | Cada conta tem um gerente. O cliente vê o nome dele no Internet Banking e conversa por mensagens em "Meu gerente"; o gerente responde no menu Relacionamento, que tem painel com carteira, clientes que entraram em contato, clientes contatados, conversas aguardando resposta e tempo médio de resposta. O administrador vê todos os gerentes. |
 | **Usuários** | Gestão de colaboradores e perfis de acesso. |
 
 ### Perfis de acesso e alçadas

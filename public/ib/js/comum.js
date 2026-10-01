@@ -19,6 +19,16 @@ export async function carregarResumo() {
   return estado.resumo;
 }
 
+/** Mensagens novas do gerente: contador no menu "Meu gerente". */
+export function atualizarAvisoGerente() {
+  api.get('/gerente').then(({ nao_lidas: n }) => {
+    const link = document.querySelector('.nav a[data-rota="gerente"]');
+    if (!link) return;
+    link.querySelector('.contador')?.remove();
+    if (n) link.insertAdjacentHTML('beforeend', `<span class="contador" title="Mensagens novas do seu gerente">${n}</span>`);
+  }).catch(() => {});
+}
+
 export const contaAtual = () => estado.resumo?.contas.find((c) => c.id === estado.contaId);
 export const TIPO_CONTA_IB = { corrente: 'Conta corrente', poupanca: 'Poupança', pagamento: 'Conta de pagamento', salario: 'Conta salário' };
 export const rotuloConta = (c) => `${TIPO_CONTA_IB[c.tipo]} · ${c.agencia} / ${c.numero}-${c.digito}`;

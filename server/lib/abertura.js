@@ -99,8 +99,10 @@ function aprovar(db, req, id) {
     }
     const clienteId = inserirCliente(db, { ...p.dados, status: 'ativo', observacoes: `Conta aberta pelo site (protocolo ${p.protocolo}).` });
     const { agencia, numero, digito } = proximoNumero(db);
-    const contaId = Number(db.prepare('INSERT INTO contas (cliente_id, tipo, agencia, numero, digito, limite_centavos) VALUES (?, ?, ?, ?, ?, 0)')
-      .run(clienteId, p.tipo_conta, agencia, numero, digito).lastInsertRowid);
+    // Quem aprova sendo gerente passa a ser o gerente de relacionamento da conta.
+    const gerenteId = req.usuario.perfil === 'gerente' ? req.usuario.id : null;
+    const contaId = Number(db.prepare('INSERT INTO contas (cliente_id, tipo, agencia, numero, digito, limite_centavos, gerente_id) VALUES (?, ?, ?, ?, ?, 0, ?)')
+      .run(clienteId, p.tipo_conta, agencia, numero, digito, gerenteId).lastInsertRowid);
     const senha = habilitarAcesso(db, clienteId);
     db.prepare("UPDATE propostas_conta SET status = 'aprovada', cliente_id = ?, conta_id = ?, usuario_id = ?, analisado_em = datetime('now') WHERE id = ?")
       .run(clienteId, contaId, req.usuario.id, p.id);

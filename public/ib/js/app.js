@@ -1,6 +1,6 @@
 import { api, sessao } from './api.js';
 import { html, $, $$, icone, toast, iniciais, marca } from '../../js/ui.js';
-import { estado } from './comum.js';
+import { estado, atualizarAvisoGerente } from './comum.js';
 import { RAIZ, avisarSite } from './raiz.js';
 import { telaLogin, telaPrimeiroAcesso } from './telas/login.js';
 import { abrirConta, acompanharProposta } from './telas/abertura.js';
@@ -11,6 +11,7 @@ import transferir from './telas/transferir.js';
 import extrato from './telas/extrato.js';
 import emprestimos from './telas/emprestimos.js';
 import perfil from './telas/perfil.js';
+import gerente from './telas/gerente.js';
 
 const MENU = [
   { secao: 'Minha conta' },
@@ -22,9 +23,10 @@ const MENU = [
   { rota: 'transferir', rotulo: 'Transferir', icone: 'operacoes' },
   { secao: 'Serviços' },
   { rota: 'emprestimos', rotulo: 'Empréstimos', icone: 'emprestimos' },
+  { rota: 'gerente', rotulo: 'Meu gerente', icone: 'conversa' },
   { rota: 'perfil', rotulo: 'Meu perfil', icone: 'perfil' },
 ];
-const TELAS = { inicio, pix, pagar, transferir, extrato, emprestimos, perfil };
+const TELAS = { inicio, pix, pagar, transferir, extrato, emprestimos, perfil, gerente };
 const INATIVIDADE_MS = 10 * 60 * 1000;
 
 const app = $('#app');
@@ -100,6 +102,7 @@ async function rotear() {
   const [rota = 'inicio', sub] = location.hash.replace(/^#\/?/, '').split('/');
   const tela = TELAS[rota] ?? inicio;
   $('#sidebar').classList.remove('aberta');
+  if (rota !== 'gerente') atualizarAvisoGerente();
   $$('[data-rota]').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === (TELAS[rota] ? rota : 'inicio')));
   const rotulo = MENU.find((m) => m.rota === (TELAS[rota] ? rota : 'inicio'))?.rotulo ?? 'Início';
   document.title = `${rotulo} · Internet Banking PAY AX`;

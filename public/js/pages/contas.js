@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { pode, definirTitulo, semAlcada } from '../contexto.js';
+import { pode, definirTitulo, semAlcada, usuarioAtual } from '../contexto.js';
 import { avisoAnalise } from './ouvidoria.js';
 import {
   html, $, $$, moeda, moedaSinal, documento, dataHora, data, status, conta, TIPO_CONTA, TIPO_TRANSACAO,
@@ -20,13 +20,21 @@ export function abrirConta(cliente, aoSalvar) {
         ${Object.entries(TIPO_CONTA).map(([k, v]) => html`<option value="${k}">${v}</option>`)}</select></div>
       <div class="c6"><label>Limite de cheque especial (R$)</label><input name="limite" class="moeda" inputmode="numeric" value="0,00" ${pode('contas.limite') ? '' : 'readonly'}>
         <div class="ajuda">${pode('contas.limite') ? 'Não se aplica a poupança.' : 'Seu perfil não tem alçada para conceder limite.'}</div></div>
+      ${pode('contas.gerente') ? html`<div class="c12"><label for="nc-gerente">Gerente de relacionamento</label>
+        <select id="nc-gerente" name="gerente_id"><option value="">${usuarioAtual().perfil === 'gerente' ? 'Eu mesmo' : 'Sem gerente'}</option></select></div>` : ''}
       <div class="c12 ajuda">Agência e número são gerados automaticamente (dígito verificador módulo 11).</div>
     </div>`,
-    aoAbrir: (el) => { if (!cliente) ligarSeletor(el, 'cliente_id', 'cliente'); },
+    aoAbrir: (el) => {
+      if (!cliente) ligarSeletor(el, 'cliente_id', 'cliente');
+      const sel = $('#nc-gerente', el);
+      if (sel) api.get('/relacionamento/gerentes').then((gs) => {
+        sel.insertAdjacentHTML('beforeend', String(html`${gs.filter((g) => g.id !== usuarioAtual().id).map((g) => html`<option value="${g.id}">${g.nome}</option>`)}`));
+      }).catch(() => {});
+    },
     aoEnviar: async (form, fechar) => {
       const d = dadosForm(form);
       if (!d.cliente_id) throw new Error('Selecione o titular.');
-      const nova = await api.post('/contas', { cliente_id: Number(d.cliente_id), tipo: d.tipo, limite_centavos: centavos(d.limite) });
+      const nova = await api.post('/contas', { cliente_id: Number(d.cliente_id), tipo: d.tipo, limite_centavos: centavos(d.limite), ...(d.gerente_id ? { gerente_id: Number(d.gerente_id) } : {}) });
       fechar();
       toast(`Conta ${nova.numero}-${nova.digito} aberta com sucesso.`);
       aoSalvar?.(nova);
@@ -52,12 +60,12 @@ export async function listaContas({ alvo, ativo }) {
     if (!ativo()) return;
     const t = $('#tabela', alvo);
     t.innerHTML = String(html`<div class="table-wrap"><table>
-      <thead><tr><th>Agência / Conta</th><th>Titular</th><th>Tipo</th><th class="num">Saldo</th><th class="num">Limite</th><th>Abertura</th><th>Status</th></tr></thead>
+      <thead><tr><th>Agência / Conta</th><th>Titular</th><th>Tipo</th><th>Gerente</th><th class="num">Saldo</th><th class="num">Limite</th><th>Abertura</th><th>Status</th></tr></thead>
       <tbody>${r.itens.length ? r.itens.map((c) => html`<tr class="clicavel" data-id="${c.id}">
         <td class="mono"><strong>${conta(c)}</strong></td><td>${c.cliente_nome}<div class="small muted">${documento(c.cliente_documento)}</div></td>
-        <td>${TIPO_CONTA[c.tipo]}</td><td class="num ${c.saldo_centavos < 0 ? 'neg' : ''}">${moeda(c.saldo_centavos)}</td>
+        <td>${TIPO_CONTA[c.tipo]}</td><td>${c.gerente_nome ?? html`<span class="muted">—</span>`}</td><td class="num ${c.saldo_centavos < 0 ? 'neg' : ''}">${moeda(c.saldo_centavos)}</td>
         <td class="num">${moeda(c.limite_centavos)}</td><td>${data(c.aberta_em)}</td><td>${status(c.status)}</td></tr>`)
-      : html`<tr><td colspan="7" class="vazio">Nenhuma conta encontrada.</td></tr>`}</tbody></table></div>`);
+      : html`<tr><td colspan="8" class="vazio">Nenhuma conta encontrada.</td></tr>`}</tbody></table></div>`);
     t.append(paginacao(r, (p) => { filtro.pagina = p; carregar(); }));
     $$('tr[data-id]', t).forEach((tr) => tr.addEventListener('click', () => { location.hash = `#/contas/${tr.dataset.id}`; }));
   }
@@ -94,7 +102,9 @@ export async function detalheConta({ alvo, id, ativo }) {
   alvo.innerHTML = String(html`
     <div class="page-head"><div><a href="#/contas" class="small">← Contas</a>
       <h1 style="margin-top:4px">${TIPO_CONTA[c.tipo]} ${conta(c)} ${status(c.status)}</h1>
-      <p class="muted">Titular: <a href="#/clientes/${c.cliente_id}">${c.cliente_nome}</a> · ${documento(c.cliente_documento)} · aberta em ${data(c.aberta_em)}</p></div>
+      <p class="muted">Titular: <a href="#/clientes/${c.cliente_id}">${c.cliente_nome}</a> · ${documento(c.cliente_documento)} · aberta em ${data(c.aberta_em)}</p>
+      <p class="muted" style="margin-top:2px">Gerente de relacionamento: <strong style="color:var(--text)">${c.gerente_nome ?? 'não definido'}</strong>
+        ${pode('contas.gerente') && c.status !== 'encerrada' ? html` · <button class="btn link" id="trocar-gerente">${c.gerente_nome ? 'Alterar' : 'Definir'}</button>` : ''}</p></div>
       <div class="row">
         ${pode('contas.limite') && c.status !== 'encerrada' ? html`<button class="btn" id="limite">Alterar limite</button>` : ''}
         ${pode('contas.status') && c.status !== 'encerrada' && !pendentes.length ? html`
@@ -162,6 +172,20 @@ export async function detalheConta({ alvo, id, ativo }) {
       },
     });
   }));
+  const tg = $('#trocar-gerente', alvo);
+  if (tg) tg.onclick = async () => {
+    const gerentes = await api.get('/relacionamento/gerentes');
+    modal({
+      titulo: 'Gerente de relacionamento',
+      corpo: html`<label for="ger-sel">Gerente da conta ${c.numero}-${c.digito}</label>
+        <select id="ger-sel" name="gerente"><option value="">Sem gerente</option>${gerentes.map((g) => html`<option value="${g.id}" ${g.id === c.gerente_id ? 'selected' : ''}>${g.nome}${g.perfil === 'admin' ? ' (administrador)' : ''}</option>`)}</select>
+        <p class="small muted" style="margin:8px 0 0">O cliente vê o nome do gerente no Internet Banking e conversa com ele em "Meu gerente".</p>`,
+      aoEnviar: async (form, fechar) => {
+        await api.patch(`/contas/${c.id}/gerente`, { gerente_id: form.gerente.value || null });
+        fechar(); toast('Gerente atualizado.'); recarregar();
+      },
+    });
+  };
   const lim = $('#limite', alvo);
   if (lim) lim.onclick = () => modal({
     titulo: 'Alterar limite',

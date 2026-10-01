@@ -17,6 +17,7 @@ const { pagarParcela } = require('../lib/emprestimos');
 const favorecidos = require('../lib/favorecidos');
 const abertura = require('../lib/abertura');
 const ouvidoria = require('../lib/ouvidoria');
+const rel = require('../lib/relacionamento');
 const { transacao } = require('../db');
 const { lerBoleto, gerarBoletoBancario, gerarConvenio, formatarLinha } = require('../lib/boleto');
 
@@ -135,6 +136,38 @@ module.exports = (db, bradesco) => {
     return { origem, valor };
   }
 
+  // ---------- Meu gerente (relacionamento) ----------
+  /** Gerente da conversa: um dos gerentes das contas do cliente; sem gerente, o "Atendimento PAY AX" (null). */
+  function gerenteDoCliente(req, informado) {
+    const gerentes = rel.gerentesDoCliente(db, req.cliente.id);
+    if (!gerentes.length) return null;
+    if (informado === undefined || informado === null || informado === '') return gerentes[0].id;
+    const g = gerentes.find((x) => x.id === Number(informado));
+    if (!g) throw new ErroNegocio('Gerente não encontrado.', 404);
+    return g.id;
+  }
+
+  r.get('/gerente', (req, res) => {
+    const gerentes = rel.gerentesDoCliente(db, req.cliente.id);
+    const naoLidas = db.prepare("SELECT COUNT(*) AS n FROM mensagens WHERE cliente_id = ? AND autor = 'gerente' AND lida_em IS NULL").get(req.cliente.id).n;
+    res.json({ gerentes, nao_lidas: naoLidas });
+  });
+
+  r.get('/mensagens', (req, res) => {
+    const gerenteId = gerenteDoCliente(req, req.query.gerente_id);
+    rel.marcarLidas(db, req.cliente.id, gerenteId, 'cliente');
+    res.json({ gerente_id: gerenteId, mensagens: rel.mensagens(db, req.cliente.id, gerenteId).map(({ usuario_nome, ...m }) => m) });
+  });
+
+  r.post('/mensagens', (req, res) => {
+    const gerenteId = gerenteDoCliente(req, req.body?.gerente_id);
+    const recentes = db.prepare("SELECT COUNT(*) AS n FROM mensagens WHERE cliente_id = ? AND autor = 'cliente' AND criado_em >= datetime('now', '-1 hour')").get(req.cliente.id).n;
+    if (recentes >= 30) throw new ErroNegocio('Muitas mensagens em pouco tempo. Aguarde a resposta do seu gerente.', 429);
+    const m = rel.enviar(db, { clienteId: req.cliente.id, gerenteId, autor: 'cliente', texto: req.body?.texto });
+    registrar(db, req, 'mensagem_cliente', 'cliente', req.cliente.id, { gerente_id: gerenteId });
+    res.status(201).json(m);
+  });
+
   // ---------- Solicitações à Ouvidoria (ex.: encerramento de conta) ----------
   r.get('/solicitacoes', (req, res) => {
     res.json(ouvidoria.listar(db, { cliente_id: req.cliente.id }).filter((x) => x.origem === 'cliente').map((x) => ({
@@ -204,7 +237,7 @@ module.exports = (db, bradesco) => {
         (SELECT COUNT(*) FROM parcelas p WHERE p.emprestimo_id = e.id AND p.status = 'paga') AS pagas,
         (SELECT MIN(vencimento) FROM parcelas p WHERE p.emprestimo_id = e.id AND p.status = 'aberta') AS proximo_vencimento
       FROM emprestimos e WHERE e.cliente_id = ? AND e.status = 'ativo'`).all(req.cliente.id);
-    res.json({ contas, emprestimos, limite: usoDiario(req) });
+    res.json({ contas, emprestimos, limite: usoDiario(req), gerentes: rel.gerentesDoCliente(db, req.cliente.id) });
   });
 
   r.get('/contas/:id/extrato', (req, res) => {

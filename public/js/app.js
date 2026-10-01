@@ -15,11 +15,13 @@ import aberturas from './pages/aberturas.js';
 import bradesco from './pages/bradesco.js';
 import alcadas from './pages/alcadas.js';
 import ouvidoria from './pages/ouvidoria.js';
+import relacionamento from './pages/relacionamento.js';
 
 // `alcada`: só aparece para quem tem a permissão; `admin`: exclusivo do administrador.
 const MENU = [
   { secao: 'Visão geral' },
   { rota: 'painel', rotulo: 'Painel', icone: 'painel' },
+  { rota: 'relacionamento', rotulo: 'Relacionamento', icone: 'conversa', alcada: 'relacionamento.atender' },
   { secao: 'Cadastro' },
   { rota: 'clientes', rotulo: 'Clientes', icone: 'clientes' },
   { rota: 'aberturas', rotulo: 'Abertura de contas', icone: 'mais' },
@@ -52,6 +54,7 @@ const ROTAS = {
   aberturas,
   alcadas,
   ouvidoria,
+  relacionamento,
 };
 
 const PERFIL = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador', ouvidoria: 'Ouvidoria' };
@@ -123,6 +126,7 @@ function contador(rota, n, titulo) {
 
 /** Mostra no menu quantas propostas de abertura de conta aguardam análise. */
 function atualizarContadorPropostas() {
+  if (pode('relacionamento.atender')) api.get('/relacionamento/pendentes').then((r) => contador('relacionamento', r.total, 'Mensagens de clientes não lidas')).catch(() => {});
   if (pode('ouvidoria.decidir')) api.get('/ouvidoria/pendentes').then((r) => contador('ouvidoria', r.total, 'Aguardando análise da Ouvidoria')).catch(() => {});
   api.get('/aberturas', { status: 'em_analise' }).then((lista) => {
     const link = $('.nav a[data-rota="aberturas"]');

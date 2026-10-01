@@ -13,6 +13,7 @@ export default async function perfil(alvo, sair) {
       <div class="card card-body"><dl class="dl" style="grid-template-columns:1fr">
         <div><dt>Nome</dt><dd>${me.nome}</dd></div><div><dt>${me.documento.length === 11 ? 'CPF' : 'CNPJ'}</dt><dd>${me.documento_mascarado}</dd></div>
         <div><dt>Contas</dt><dd>${estado.resumo.contas.map((c) => html`<div>${rotuloConta(c)}</div>`)}</dd></div>
+        <div><dt>Gerente de relacionamento</dt><dd>${estado.resumo.gerentes.map((g) => g.nome).join(' · ') || 'Atendimento PAY AX'} <a class="small" href="#/gerente">· enviar mensagem</a></dd></div>
         <div><dt>Limite diário (PIX, transferências e pagamentos)</dt><dd>${moeda(l.limite_centavos)} <span class="small muted">· para alterar, fale com a PAY AX</span></dd></div>
         <div><dt>Acesso anterior</dt><dd>${dataHora(me.ultimo_acesso)}</dd></div></dl></div>
       <div class="card card-body stack"><h2>Segurança</h2>

@@ -19,7 +19,7 @@ const CLIENTES = [
 function popularDemo(db) {
   transacao(db, () => {
     const usuarios = [['Gabriela Gerente', 'gerente@payax.com.br', 'gerente'], ['Otávio Operador', 'operador@payax.com.br', 'operador'],
-      ['Olívia Ouvidoria', 'ouvidoria@payax.com.br', 'ouvidoria']];
+      ['Olívia Ouvidoria', 'ouvidoria@payax.com.br', 'ouvidoria'], ['Marcos Andrade', 'marcos@payax.com.br', 'gerente']];
     for (const [nome, email, perfil] of usuarios) {
       if (!db.prepare('SELECT 1 FROM usuarios WHERE email = ?').get(email)) {
         db.prepare('INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?, ?, ?, ?)').run(nome, email, hashSenha('payax2026'), perfil);
@@ -94,6 +94,31 @@ function popularDemo(db) {
       }
       lancar(db, { contaId: conta.id, tipo: 'emprestimo_credito', valor, descricao: `Crédito empréstimo #${e.lastInsertRowid}`, grupo: novoGrupo(), usuarioId: adminId });
     }
+    // Relacionamento: carteiras dos gerentes e conversas de exemplo (minutos atrás).
+    const usuario = (email) => db.prepare('SELECT id FROM usuarios WHERE email = ?').get(email).id;
+    const gabriela = usuario('gerente@payax.com.br');
+    const marcos = usuario('marcos@payax.com.br');
+    const clienteDoc = (doc) => db.prepare('SELECT id FROM clientes WHERE documento = ?').get(doc).id;
+    const carteiras = { [gabriela]: ['52998224725', '39053344705', '11222333000181'], [marcos]: ['11144477735', '15350946056', '45997418000153'] };
+    for (const [g, docs] of Object.entries(carteiras)) {
+      for (const doc of docs) db.prepare('UPDATE contas SET gerente_id = ? WHERE cliente_id = ?').run(Number(g), clienteDoc(doc));
+    }
+    const msg = (doc, gerente, autor, minutosAtras, texto, lida = true) => db.prepare(`INSERT INTO mensagens (cliente_id, gerente_id, autor, usuario_id, texto, lida_em, criado_em)
+      VALUES (?, ?, ?, ?, ?, CASE WHEN ? THEN datetime('now', ?) END, datetime('now', ?))`)
+      .run(clienteDoc(doc), gerente, autor, autor === 'gerente' ? gerente : null, texto, lida ? 1 : 0, `-${Math.max(0, minutosAtras - 5)} minutes`, `-${minutosAtras} minutes`);
+    const dia = 24 * 60;
+    msg('52998224725', gabriela, 'cliente', 2 * dia + 300, 'Olá, Gabriela! Vou viajar no mês que vem. Consigo aumentar meu limite diário do PIX?');
+    msg('52998224725', gabriela, 'gerente', 2 * dia + 275, 'Olá, João! Consigo sim. Aumentei seu limite diário para R$ 10.000,00. Boa viagem!');
+    msg('52998224725', gabriela, 'cliente', 2 * dia + 260, 'Perfeito, obrigado!');
+    msg('52998224725', gabriela, 'gerente', 2 * dia + 250, 'Por nada! Qualquer coisa, estou por aqui.');
+    msg('39053344705', gabriela, 'gerente', 5 * dia + 120, 'Olá, Fernanda! Sou a Gabriela, sua gerente na PAY AX. Temos uma condição especial de crédito com parcelas fixas. Quer conhecer?');
+    msg('39053344705', gabriela, 'cliente', 4 * dia + 900, 'Oi, Gabriela. Tenho interesse, mas só no mês que vem.');
+    msg('39053344705', gabriela, 'gerente', 4 * dia + 860, 'Combinado! Te procuro no começo do mês.');
+    msg('11222333000181', gabriela, 'cliente', 95, 'Bom dia! Preciso gerar QR Code de cobrança para os clientes da padaria. Como faço?', false);
+    msg('45997418000153', marcos, 'cliente', dia + 400, 'Marcos, conseguimos receber PIX de clientes de outros bancos direto na conta da TechNova?');
+    msg('45997418000153', marcos, 'gerente', dia + 280, 'Consegue sim! Pelo Internet Banking, em PIX → Receber, você gera o QR Code com ou sem valor.');
+    msg('15350946056', marcos, 'gerente', 3 * dia, 'Olá, Rafael! Vi seu pedido de encerramento. Posso entender o motivo e ver se conseguimos ajudar?');
+
     // Ouvidoria: um bloqueio pedido pela gerente e um encerramento pedido pelo cliente, aguardando análise.
     const gerente = db.prepare("SELECT id FROM usuarios WHERE email = 'gerente@payax.com.br'").get();
     const contaDe = (documento) => db.prepare("SELECT c.id, c.cliente_id FROM contas c JOIN clientes cl ON cl.id = c.cliente_id WHERE cl.documento = ? AND c.tipo = 'corrente'").get(documento);

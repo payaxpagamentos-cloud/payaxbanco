@@ -26,8 +26,8 @@ function proximoNumero(db, agencia = config.agenciaPadrao) {
 
 function buscarConta(db, id) {
   const conta = db.prepare(`
-    SELECT c.*, cl.nome AS cliente_nome, cl.documento AS cliente_documento, cl.status AS cliente_status
-    FROM contas c JOIN clientes cl ON cl.id = c.cliente_id WHERE c.id = ?`).get(id);
+    SELECT c.*, cl.nome AS cliente_nome, cl.documento AS cliente_documento, cl.status AS cliente_status, g.nome AS gerente_nome
+    FROM contas c JOIN clientes cl ON cl.id = c.cliente_id LEFT JOIN usuarios g ON g.id = c.gerente_id WHERE c.id = ?`).get(id);
   if (!conta) throw naoEncontrado('Conta');
   return conta;
 }

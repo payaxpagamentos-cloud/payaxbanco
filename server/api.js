@@ -25,6 +25,7 @@ function criarApi(db, bradesco = criarServicoBradesco(db)) {
   api.use('/usuarios', auth, permitir('admin'), require('./routes/usuarios')(db));
   api.use('/alcadas', auth, permitir('admin'), require('./routes/alcadas')(db));
   api.use('/ouvidoria', auth, require('./routes/ouvidoria')(db));
+  api.use('/relacionamento', auth, require('./routes/relacionamento')(db));
   api.use('/integracoes/bradesco/webhook', require('./routes/bradesco-webhook')(db, bradesco));
   api.use('/integracoes/bradesco', auth, require('./routes/bradesco')(db, bradesco));
   api.use('/auditoria', auth, alcada(db, 'auditoria.ver'), require('./routes/auditoria')(db));

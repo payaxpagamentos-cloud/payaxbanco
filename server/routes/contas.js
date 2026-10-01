@@ -6,6 +6,7 @@ const alcadas = require('../lib/alcadas');
 const { alcada } = alcadas;
 const situacao = require('../lib/situacao');
 const ouvidoria = require('../lib/ouvidoria');
+const rel = require('../lib/relacionamento');
 const { transacao } = require('../db');
 const { ErroNegocio } = require('../lib/erros');
 const v = require('../lib/validacao');
@@ -30,10 +31,11 @@ module.exports = (db) => {
     if (req.query.status) { filtros.push('c.status = ?'); params.push(req.query.status); }
     if (req.query.tipo) { filtros.push('c.tipo = ?'); params.push(req.query.tipo); }
     if (req.query.cliente_id) { filtros.push('c.cliente_id = ?'); params.push(req.query.cliente_id); }
-    const where = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
-    const base = `FROM contas c JOIN clientes cl ON cl.id = c.cliente_id ${where}`;
+    if (req.query.gerente_id) { filtros.push('c.gerente_id = ?'); params.push(req.query.gerente_id); }
+    const where2 = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
+    const base = `FROM contas c JOIN clientes cl ON cl.id = c.cliente_id LEFT JOIN usuarios g ON g.id = c.gerente_id ${where2}`;
     const { total } = db.prepare(`SELECT COUNT(*) AS total ${base}`).get(...params);
-    const itens = db.prepare(`SELECT c.*, cl.nome AS cliente_nome, cl.documento AS cliente_documento, cl.tipo AS cliente_tipo
+    const itens = db.prepare(`SELECT c.*, cl.nome AS cliente_nome, cl.documento AS cliente_documento, cl.tipo AS cliente_tipo, g.nome AS gerente_nome
       ${base} ORDER BY c.aberta_em DESC, c.id DESC LIMIT ? OFFSET ?`).all(...params, limite, offset);
     res.json({ itens, total, pagina, limite });
   });
@@ -76,15 +78,30 @@ module.exports = (db) => {
     const cliente = db.prepare('SELECT * FROM clientes WHERE id = ?').get(cliente_id);
     v.exigir(cliente, 'Cliente não encontrado.');
     if (cliente.status !== 'ativo') throw new ErroNegocio('Só é possível abrir conta para clientes ativos.', 409);
+    // Gerente de relacionamento: o informado (com alçada) ou quem abre a conta, se for gerente.
+    let gerenteId = req.usuario.perfil === 'gerente' ? req.usuario.id : null;
+    if (req.body?.gerente_id !== undefined && req.body.gerente_id !== '' && Number(req.body.gerente_id) !== gerenteId) {
+      alcadas.exigir(db, req, 'contas.gerente');
+      gerenteId = rel.validarGerente(db, req.body.gerente_id);
+    }
     const id = transacao(db, () => {
       const { agencia, numero, digito } = proximoNumero(db);
-      const ins = db.prepare('INSERT INTO contas (cliente_id, tipo, agencia, numero, digito, limite_centavos) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(cliente.id, tipo, agencia, numero, digito, limite);
+      const ins = db.prepare('INSERT INTO contas (cliente_id, tipo, agencia, numero, digito, limite_centavos, gerente_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(cliente.id, tipo, agencia, numero, digito, limite, gerenteId);
       const novoId = Number(ins.lastInsertRowid);
       registrar(db, req, 'abrir', 'conta', novoId, { cliente: cliente.nome, tipo, agencia, numero: `${numero}-${digito}` });
       return novoId;
     });
     res.status(201).json(buscarConta(db, id));
+  });
+
+  r.patch('/:id/gerente', alcada(db, 'contas.gerente'), (req, res) => {
+    const conta = buscarConta(db, req.params.id);
+    v.exigir(conta.status !== 'encerrada', 'Conta encerrada.');
+    const gerenteId = rel.validarGerente(db, req.body?.gerente_id);
+    db.prepare('UPDATE contas SET gerente_id = ? WHERE id = ?').run(gerenteId, conta.id);
+    registrar(db, req, 'alterar_gerente', 'conta', conta.id, { de: conta.gerente_id, para: gerenteId });
+    res.json(buscarConta(db, conta.id));
   });
 
   r.patch('/:id/limite', alcada(db, 'contas.limite'), (req, res) => {
