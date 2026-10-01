@@ -1,0 +1,481 @@
+<title>Central de Testes PAY AX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: painel de homologação — links dos sistemas no topo, roteiro marcável à esquerda, registro de ajustes à direita. */
+:root{
+  --bg:#f3f8ff; --card:#ffffff; --card-2:#f5f9fe; --line:#dce7f6; --ink:#071a3c; --muted:#4a5f82; --dim:#8496b4;
+  --acc:#0b63d6; --acc-soft:#e8f3ff; --cyan:#19e3ff; --grad:linear-gradient(100deg,#1f8bff,#19e3ff); --on-grad:#031029;
+  --ok:#0e9f6e; --ok-bg:#e7f7f0; --warn:#b7791f; --warn-bg:#fef6e4; --bad:#c43b3b; --bad-bg:#fdecec;
+  --display:"Unbounded","Arial Black",system-ui,sans-serif; --body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --shadow:0 1px 2px rgba(7,26,60,.05),0 12px 30px -16px rgba(31,139,255,.28);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#071226; --card:#0d1b33; --card-2:#102240; --line:#1f3456; --ink:#e8f0fc; --muted:#a6b6d1; --dim:#6e81a3;
+  --acc:#5aa9ff; --acc-soft:#13294b; --ok:#3fd19b; --ok-bg:#0f2e25; --warn:#e7b04f; --warn-bg:#2f2610; --bad:#ff7b7b; --bad-bg:#3a1719;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 30px -16px rgba(0,0,0,.6); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#071226; --card:#0d1b33; --card-2:#102240; --line:#1f3456; --ink:#e8f0fc; --muted:#a6b6d1; --dim:#6e81a3;
+  --acc:#5aa9ff; --acc-soft:#13294b; --ok:#3fd19b; --ok-bg:#0f2e25; --warn:#e7b04f; --warn-bg:#2f2610; --bad:#ff7b7b; --bad-bg:#3a1719;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 30px -16px rgba(0,0,0,.6); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14.5px;line-height:1.55;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:28px 64px;display:grid;gap:28px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.15;text-wrap:balance}
+h1{font-size:clamp(22px,3vw,30px);font-weight:800;letter-spacing:-.02em}
+h2{font-size:17px;font-weight:700}
+h3{font-size:14px;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}
+.marca{font-family:var(--display);font-weight:800;letter-spacing:-.02em}
+.marca span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sobre{font-size:11px;font-weight:800;letter-spacing:.24em;text-transform:uppercase;color:var(--acc)}
+header{display:grid;gap:10px}
+header p{max-width:70ch;color:var(--muted)}
+
+/* Sistemas */
+.sistemas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.sistema{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px;display:grid;gap:14px;box-shadow:var(--shadow);align-content:start}
+.sistema .topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.abrir{display:inline-flex;align-items:center;gap:8px;background:var(--grad);color:var(--on-grad);font-weight:800;text-decoration:none;padding:11px 18px;border-radius:999px;white-space:nowrap}
+.abrir:hover{filter:brightness(1.05)}
+.abrir:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.acessos{display:grid;gap:8px;margin:0;padding:12px 14px;background:var(--card-2);border-radius:14px}
+.acessos div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13.5px}
+.acessos dt{color:var(--muted)}
+.acessos dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.nota{font-size:13px;color:var(--muted);background:var(--acc-soft);border-radius:12px;padding:10px 12px}
+
+/* Grade principal */
+.grade{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+.painel{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px;display:grid;gap:16px;min-width:0}
+.painel-cab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.progresso{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.barra{height:8px;border-radius:99px;background:var(--card-2);border:1px solid var(--line);overflow:hidden}
+.barra span{display:block;height:100%;background:var(--grad);transition:width .3s}
+.grupo{display:grid;gap:4px}
+.grupo-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0 6px;border-bottom:1px solid var(--line)}
+.grupo-cab span{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:9px 4px;border-bottom:1px dashed var(--line)}
+.item:last-child{border-bottom:0}
+.item input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--acc)}
+.item label{cursor:pointer}
+.item label b{display:block;font-weight:700}
+.item label small{display:block;color:var(--muted);font-size:12.5px}
+.item.feito label b{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--dim)}
+.mini{background:none;border:1px solid var(--line);color:var(--acc);font:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+.mini:hover{background:var(--acc-soft)}
+
+/* Ajustes */
+form{display:grid;gap:12px}
+.campos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label.rot{display:grid;gap:5px;font-size:12.5px;font-weight:700;color:var(--muted)}
+input[type=text],select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+textarea{min-height:96px;resize:vertical}
+.enviar{justify-self:start;border:0;cursor:pointer;font:inherit;font-weight:800;background:var(--grad);color:var(--on-grad);padding:11px 20px;border-radius:999px}
+.enviar:disabled{opacity:.5;cursor:not-allowed}
+.aviso{font-size:13px;padding:10px 12px;border-radius:12px;background:var(--warn-bg);color:var(--warn)}
+.aviso.ok{background:var(--ok-bg);color:var(--ok)}
+.filtros{display:flex;gap:6px;flex-wrap:wrap}
+.filtros button{border:1px solid var(--line);background:var(--card);color:var(--muted);font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;padding:5px 12px;cursor:pointer}
+.filtros button[aria-pressed=true]{background:var(--acc-soft);color:var(--acc);border-color:var(--acc)}
+.lista{display:grid;gap:10px}
+.ajuste{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:6px;background:var(--card)}
+.ajuste .linha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ajuste p{white-space:pre-wrap;overflow-wrap:anywhere}
+.ajuste .meta{font-size:12px;color:var(--dim)}
+.pill{font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 9px;border-radius:999px;text-transform:uppercase}
+.p-alta{background:var(--bad-bg);color:var(--bad)}.p-media{background:var(--warn-bg);color:var(--warn)}.p-baixa{background:var(--card-2);color:var(--muted)}
+.s-aberto{background:var(--acc-soft);color:var(--acc)}.s-corrigido{background:var(--ok-bg);color:var(--ok)}.s-andamento{background:var(--warn-bg);color:var(--warn)}
+.vazio{border:1px dashed var(--line);border-radius:14px;padding:18px;text-align:center;color:var(--muted);font-size:13.5px}
+
+@media (max-width:900px){.sistemas,.grade{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.campos{grid-template-columns:1fr}.sistema .topo{flex-direction:column}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Atualizações */
+.atualizacoes{display:grid;gap:14px}
+.at-resumo{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;font-size:13.5px;color:var(--muted)}
+.at-resumo b{color:var(--ink);font-variant-numeric:tabular-nums}
+.at{border:1px solid var(--line);border-radius:16px;background:var(--card);display:grid;grid-template-columns:96px minmax(0,1fr);overflow:hidden}
+.at-ver{background:var(--card-2);padding:16px 12px;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:flex-start;border-right:1px solid var(--line);text-align:center}
+.at-ver strong{font-family:var(--display);font-size:15px}
+.at-ver small{color:var(--dim);font-size:11.5px;font-variant-numeric:tabular-nums}
+.at-corpo{padding:16px 18px;display:grid;gap:10px;min-width:0}
+.at-cab{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.at-cab h3{font-size:15px}
+.at-tags{display:flex;gap:6px;flex-wrap:wrap}
+.at-tags span{font-size:11px;font-weight:700;color:var(--acc);background:var(--acc-soft);border-radius:999px;padding:2px 9px}
+.at ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:13.5px}
+.at details summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--acc)}
+.at details ol{margin:8px 0 0;padding-left:20px;display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.at-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.at-acoes button{border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:12.5px;font-weight:700;border-radius:999px;padding:6px 12px;cursor:pointer}
+.at-acoes button[aria-pressed=true][data-v=validado]{background:var(--ok-bg);color:var(--ok);border-color:var(--ok)}
+.at-acoes button[aria-pressed=true][data-v=ajuste]{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.at-acoes button:disabled{opacity:.5;cursor:not-allowed}
+.at-acoes .quem{font-size:12px;color:var(--dim)}
+.v-pendente{background:var(--warn-bg);color:var(--warn)}.v-validado{background:var(--ok-bg);color:var(--ok)}.v-ajuste{background:var(--bad-bg);color:var(--bad)}
+@media (max-width:620px){.at{grid-template-columns:1fr}.at-ver{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);justify-content:flex-start}}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="sobre">Homologação</span>
+    <h1><span class="marca">PAY <span>AX</span></span> · Central de testes</h1>
+    <p>Abra cada sistema, siga o roteiro e registre aqui tudo o que precisa ser corrigido. Os ajustes ficam salvos nesta página e eu leio a lista para fazer as correções.</p>
+  </header>
+
+  <section class="sistemas" aria-label="Sistemas para testar">
+    <article class="sistema">
+      <div class="topo">
+        <div><span class="sobre">Clientes</span><h2 style="margin-top:6px">Site + Internet Banking</h2></div>
+        <a class="abrir" href="https://claude.ai/artifact/VPrPvkc1rzD3jJUiBv6t4Z" target="_blank" rel="noopener">Abrir ↗</a>
+      </div>
+      <p class="muted">O site institucional. "Acessar minha conta" abre o login por cima do site.</p>
+      <dl class="acessos">
+        <div><dt>Pessoa física (CPF)</dt><dd>529.982.247-25</dd></div>
+        <div><dt>Empresa (CNPJ)</dt><dd>11.222.333/0001-81</dd></div>
+        <div><dt>Senha de acesso PF / PJ</dt><dd>135790 / 975310</dd></div>
+        <div><dt>Senha de transação</dt><dd>246810</dd></div>
+      </dl>
+    </article>
+    <article class="sistema">
+      <div class="topo">
+        <div><span class="sobre">Equipe PAY AX</span><h2 style="margin-top:6px">Banqueiro + Internet Banking</h2></div>
+        <a class="abrir" href="https://claude.ai/artifact/TkPsok8dSwZSGSrr6qhfew" target="_blank" rel="noopener">Abrir ↗</a>
+      </div>
+      <p class="muted">O sistema da equipe. A faixa no rodapé tem o botão "Abrir Internet Banking", com os mesmos dados.</p>
+      <dl class="acessos">
+        <div><dt>Administrador</dt><dd>admin@payax.com.br · admin123</dd></div>
+        <div><dt>Gerentes</dt><dd>gerente@ ou marcos@payax.com.br · payax2026</dd></div>
+        <div><dt>Operador</dt><dd>operador@payax.com.br · payax2026</dd></div>
+        <div><dt>Ouvidoria</dt><dd>ouvidoria@payax.com.br · payax2026</dd></div>
+      </dl>
+    </article>
+  </section>
+  <p class="nota">Os dados são fictícios e ficam no seu navegador; cada link tem os seus próprios. Para testar o caminho completo (cliente abre a conta, equipe aprova, cliente entra), use o link do Banqueiro, que tem o Internet Banking junto. O botão "Restaurar dados" volta tudo ao início.</p>
+
+  <section class="painel" aria-labelledby="t-atualizacoes">
+    <div class="painel-cab"><h2 id="t-atualizacoes">Atualizações do sistema</h2>
+      <div class="filtros" role="group" aria-label="Filtrar atualizações">
+        <button type="button" data-fa="todas" aria-pressed="true">Todas</button>
+        <button type="button" data-fa="pendente" aria-pressed="false">A validar</button>
+        <button type="button" data-fa="validado" aria-pressed="false">Validadas</button>
+        <button type="button" data-fa="ajuste" aria-pressed="false">Precisam de ajuste</button>
+      </div></div>
+    <p class="muted" style="font-size:13px">Cada atualização entra aqui com o que mudou e como validar. Marque <b>Validado</b> quando estiver de acordo ou <b>Precisa ajuste</b> para registrar o que corrigir. Quando todas estiverem validadas, a versão está pronta para produção.</p>
+    <div class="at-resumo" id="at-resumo"></div>
+    <div class="barra" aria-hidden="true"><span id="at-barra" style="width:0%"></span></div>
+    <div class="atualizacoes" id="atualizacoes"></div>
+  </section>
+
+  <div class="grade">
+    <section class="painel" aria-labelledby="t-roteiro">
+      <div class="painel-cab"><h2 id="t-roteiro">Roteiro de testes</h2><span class="progresso" id="progresso">0 de 0 testados</span></div>
+      <div class="barra" aria-hidden="true"><span id="barra" style="width:0%"></span></div>
+      <p class="muted" id="roteiro-aviso" style="font-size:13px">Marque cada item depois de testar. A marcação é compartilhada com quem tiver esta página.</p>
+      <div id="roteiro"></div>
+    </section>
+
+    <section class="painel" aria-labelledby="t-ajustes">
+      <div class="painel-cab"><h2 id="t-ajustes">Registrar ajuste</h2></div>
+      <form id="form" novalidate>
+        <div class="campos">
+          <label class="rot" for="f-sistema">Sistema
+            <select id="f-sistema">
+              <option>Site</option><option>Internet Banking</option><option>Banqueiro (equipe)</option><option>Geral</option>
+            </select></label>
+          <label class="rot" for="f-prioridade">Prioridade
+            <select id="f-prioridade"><option value="alta">Alta: impede o uso</option><option value="media" selected>Média: atrapalha</option><option value="baixa">Baixa: ajuste visual ou texto</option></select></label>
+        </div>
+        <label class="rot" for="f-tela">Tela ou função
+          <input type="text" id="f-tela" placeholder="Ex.: PIX, tela de envio" maxlength="120"></label>
+        <label class="rot" for="f-descricao">O que acontece e o que deveria acontecer
+          <textarea id="f-descricao" maxlength="2000" placeholder="Ex.: ao confirmar o PIX aparece erro. Deveria mostrar o comprovante."></textarea></label>
+        <div id="f-msg" class="aviso" hidden></div>
+        <button class="enviar" type="submit" id="f-enviar" disabled>Registrar ajuste</button>
+      </form>
+
+      <div class="painel-cab" style="margin-top:8px"><h2>Ajustes registrados</h2>
+        <div class="filtros" role="group" aria-label="Filtrar ajustes">
+          <button type="button" data-f="abertos" aria-pressed="true">Pendentes</button>
+          <button type="button" data-f="corrigido" aria-pressed="false">Corrigidos</button>
+          <button type="button" data-f="todos" aria-pressed="false">Todos</button>
+        </div>
+      </div>
+      <div class="lista" id="lista"><div class="vazio">Conectando à lista de ajustes…</div></div>
+    </section>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const ROTEIRO = [
+    { grupo: 'Site institucional', sistema: 'Site', itens: [
+      ['site-nav', 'Navegar pelas páginas', 'Soluções, Segmentos, Integração, Desenvolvedores, Ajuda e Sobre'],
+      ['site-calc', 'Calculadora de baixa manual', 'Mover os controles e conferir os valores'],
+      ['site-acessar', 'Acessar minha conta', 'Abre o login por cima do site; fechar com × ou Esc'],
+      ['site-abrir', 'Abra sua conta', 'Abre o formulário de abertura de conta'],
+      ['site-celular', 'Site no celular', 'Abrir o link no celular e navegar pelo menu'],
+    ]},
+    { grupo: 'Internet Banking (cliente)', sistema: 'Internet Banking', itens: [
+      ['ib-login', 'Entrar com CPF e teclado virtual', 'Testar também senha errada e o bloqueio após 5 tentativas'],
+      ['ib-pj', 'Entrar como empresa (CNPJ)', 'Aba "Empresa" na caixa de acesso'],
+      ['ib-saldo', 'Saldo e ocultar saldo', 'Ícone de olho no cartão de saldo'],
+      ['ib-pix-enviar', 'Enviar PIX por chave', 'Conferir o nome de quem recebe, valor e senha de transação'],
+      ['ib-pix-fav', 'PIX para favorecido', 'Usar o favorecido TechNova'],
+      ['ib-pix-receber', 'Receber por QR Code', 'Gerar cobrança com e sem valor'],
+      ['ib-chaves', 'Minhas chaves PIX', 'Cadastrar e excluir uma chave'],
+      ['ib-boleto', 'Pagar boleto e conta de consumo', 'Digitar a linha digitável'],
+      ['ib-transferir', 'Transferir entre contas PAY AX', 'Testar também valor maior que o saldo'],
+      ['ib-limite', 'Limite diário', 'Tentar ultrapassar o limite do dia'],
+      ['ib-limite-aumento', 'Pedir aumento de limite (24 h)', 'PIX → aba Meus limites: aumento fica agendado com contagem regressiva; redução vale na hora; cancelar o pedido'],
+      ['ib-extrato', 'Extrato e comprovantes', 'Filtrar por período e abrir um comprovante'],
+      ['ib-emprestimos', 'Empréstimos', 'Parcelas, vencimentos e pagar uma parcela'],
+      ['ib-perfil', 'Meu perfil', 'Trocar a senha de acesso e a senha de transação'],
+      ['ib-encerramento', 'Pedir encerramento da conta', 'Meu perfil → Solicitar encerramento; confirmar com a senha de transação e acompanhar o protocolo'],
+      ['ib-gerente', 'Meu gerente: nome e mensagens', 'Ver o gerente na tela inicial e em Meu perfil; enviar mensagem e ver a resposta'],
+      ['ib-sair', 'Sair', 'Volta para o site; recarregar a página com a sessão aberta'],
+    ]},
+    { grupo: 'Banqueiro (equipe)', sistema: 'Banqueiro (equipe)', itens: [
+      ['bq-perfis', 'Entrar com cada perfil', 'Administrador, gerente e operador veem menus diferentes'],
+      ['bq-cliente', 'Cadastrar cliente e abrir conta', 'Validação de CPF/CNPJ e número da conta'],
+      ['bq-aberturas', 'Aprovar e recusar propostas', 'Menu Abertura de contas; recusa exige motivo'],
+      ['bq-acesso', 'Habilitar Internet Banking', 'Gerar a senha provisória do cliente'],
+      ['bq-favorecidos', 'Cadastrar favorecido', 'Por chave PIX ou conta PAY AX'],
+      ['bq-movimento', 'Equipe não movimenta dinheiro', 'Conferir que não há botões de PIX, pagamento ou saque'],
+      ['bq-emprestimo', 'Contratar empréstimo', 'Valor creditado e parcelas geradas'],
+      ['bq-bradesco', 'Bradesco: cobrança e conciliação', 'Somente administrador e gerente'],
+      ['bq-relatorios', 'Relatórios e auditoria', 'Baixar CSV e conferir o registro das ações'],
+      ['bq-usuarios', 'Criar usuários gerente e operador', 'Menu Usuários (só administrador): criar, trocar perfil e desativar'],
+      ['bq-ouvidoria-pedido', 'Pedir bloqueio ou encerramento de conta', 'Como gerente: o pedido vai para a Ouvidoria com protocolo e a conta não muda até a análise'],
+      ['bq-ouvidoria-decisao', 'Ouvidoria aprova e recusa', 'Entrar como ouvidoria@payax.com.br: aprovar executa a ação; recusar exige parecer; quem pediu não decide'],
+      ['bq-conta-visao', 'Tela da conta: limites, solicitações e conversas', 'Conferir limites, pedido de aumento com tempo restante (recusar), solicitações e histórico de conversa'],
+      ['bq-gerente-conta', 'Gerente de cada conta', 'Na conta: ver e alterar o gerente; na lista de contas, coluna Gerente'],
+      ['bq-relacionamento', 'Relacionamento (painel do gerente)', 'Como gerente: indicadores, conversas, responder cliente e iniciar contato; como administrador: visão por gerente'],
+      ['bq-alcadas', 'Alçadas de cada perfil', 'Menu Alçadas: liberar ou retirar permissões e definir o valor máximo; entrar com o perfil e conferir'],
+    ]},
+    { grupo: 'Caminho completo', sistema: 'Geral', itens: [
+      ['fluxo-abertura', 'Abrir conta → aprovar → primeiro acesso', 'No link do Banqueiro: proposta pelo Internet Banking, aprovação pela equipe e primeiro acesso do cliente'],
+      ['fluxo-pix', 'PIX entre dois clientes', 'Enviar de um cliente e conferir no extrato do outro'],
+    ]},
+  ];
+  const TODOS = ROTEIRO.flatMap(g => g.itens.map(i => i[0]));
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let feitos = {};          // itemId -> true (estado compartilhado)
+  let ajustes = [];         // documentos da coleção "ajustes"
+  let filtro = 'abertos';
+  let db = null, user = null;
+
+  // ---- Roteiro
+  function desenharRoteiro(){
+    $('roteiro').innerHTML = ROTEIRO.map(g => {
+      const n = g.itens.filter(i => feitos[i[0]]).length;
+      return '<div class="grupo"><div class="grupo-cab"><h3>' + esc(g.grupo) + '</h3><span>' + n + ' de ' + g.itens.length + '</span></div>' +
+        g.itens.map(([id, titulo, dica]) =>
+          '<div class="item' + (feitos[id] ? ' feito' : '') + '">' +
+          '<input type="checkbox" id="c-' + id + '" data-item="' + id + '"' + (feitos[id] ? ' checked' : '') + (db ? '' : ' disabled') + '>' +
+          '<label for="c-' + id + '"><b>' + esc(titulo) + '</b><small>' + esc(dica) + '</small></label>' +
+          '<button type="button" class="mini" data-ajuste="' + id + '" data-sistema="' + esc(g.sistema) + '" data-tela="' + esc(titulo) + '">Ajuste</button></div>'
+        ).join('') + '</div>';
+    }).join('');
+    const n = TODOS.filter(id => feitos[id]).length;
+    $('progresso').textContent = n + ' de ' + TODOS.length + ' testados';
+    $('barra').style.width = (n / TODOS.length * 100).toFixed(1) + '%';
+  }
+  $('roteiro').addEventListener('change', async e => {
+    const id = e.target.dataset.item; if (!id || !db) return;
+    const marcado = e.target.checked;
+    try {
+      const ref = db.doc('roteiro/' + id);
+      if (marcado) await ref.set({ feito: true, por: user ? await user.id() : null, em: Date.now() });
+      else await ref.delete();
+    } catch (err) { e.target.checked = !marcado; mostrar('Não foi possível salvar a marcação. Tente de novo.', false); }
+  });
+  $('roteiro').addEventListener('click', e => {
+    const b = e.target.closest('[data-ajuste]'); if (!b) return;
+    $('f-sistema').value = b.dataset.sistema;
+    $('f-tela').value = b.dataset.tela;
+    $('f-descricao').focus();
+    $('form').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  });
+
+  // ---- Ajustes
+  const ROT_PRIOR = { alta: 'Alta', media: 'Média', baixa: 'Baixa' };
+  const ROT_STATUS = { aberto: 'Pendente', andamento: 'Em correção', corrigido: 'Corrigido' };
+  async function desenharLista(){
+    const vis = ajustes.filter(a => filtro === 'todos' ? true : filtro === 'corrigido' ? a.status === 'corrigido' : a.status !== 'corrigido');
+    if (!db) { $('lista').innerHTML = '<div class="vazio">Entre na sua conta claude.ai para ver e registrar ajustes.</div>'; return; }
+    if (!vis.length) {
+      $('lista').innerHTML = '<div class="vazio">' + (filtro === 'corrigido' ? 'Nenhum ajuste corrigido ainda.' : 'Nenhum ajuste pendente. Use o formulário acima ou o botão "Ajuste" de cada item do roteiro.') + '</div>';
+      return;
+    }
+    let nomes = {};
+    try { if (user) nomes = await user.profiles([...new Set(vis.map(a => a.autor).filter(Boolean))]); } catch (_) {}
+    $('lista').innerHTML = vis.map(a => {
+      const quando = a.criadoEm ? new Date(a.criadoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+      const nome = (a.autor && nomes[a.autor] && nomes[a.autor].name) || 'Alguém da equipe';
+      return '<article class="ajuste"><div class="linha">' +
+        '<span class="pill s-' + esc(a.status || 'aberto') + '">' + esc(ROT_STATUS[a.status] || 'Pendente') + '</span>' +
+        '<span class="pill p-' + esc(a.prioridade) + '">' + esc(ROT_PRIOR[a.prioridade] || '') + '</span>' +
+        '<h3>' + esc(a.sistema) + (a.tela ? ' · ' + esc(a.tela) : '') + '</h3></div>' +
+        '<p>' + esc(a.descricao) + '</p>' +
+        (a.resposta ? '<p class="muted" style="font-size:13px"><b>Correção:</b> ' + esc(a.resposta) + '</p>' : '') +
+        '<span class="meta">' + esc(nome) + (quando ? ' · ' + esc(quando) : '') + '</span></article>';
+    }).join('');
+  }
+  document.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => {
+    filtro = b.dataset.f;
+    document.querySelectorAll('[data-f]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    desenharLista();
+  }));
+  function mostrar(msg, ok){ const m = $('f-msg'); m.textContent = msg; m.className = 'aviso' + (ok ? ' ok' : ''); m.hidden = false; }
+  $('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!db) return;
+    const descricao = $('f-descricao').value.trim();
+    if (descricao.length < 5) { mostrar('Descreva o que acontece e o que deveria acontecer.', false); $('f-descricao').focus(); return; }
+    $('f-enviar').disabled = true;
+    try {
+      await db.collection('ajustes').add({
+        sistema: $('f-sistema').value, tela: $('f-tela').value.trim(), descricao,
+        prioridade: $('f-prioridade').value, status: 'aberto', autor: user ? await user.id() : null, criadoEm: Date.now(),
+      });
+      $('f-tela').value = ''; $('f-descricao').value = '';
+      mostrar('Ajuste registrado.', true);
+    } catch (err) {
+      mostrar(err && err.code === 'quota_exceeded' ? 'A lista atingiu o limite de registros.' : 'Não foi possível registrar. Verifique sua conexão e tente de novo.', false);
+    } finally { $('f-enviar').disabled = false; }
+  });
+
+
+  // ---- Atualizações do sistema (mais recente primeiro). Novas entradas são acrescentadas no topo a cada entrega.
+  const ATUALIZACOES = [
+    { id: 'v1.13', data: '01/10/2026', titulo: 'Meus limites dentro do PIX', sistemas: ['Internet Banking'],
+      mudou: ['"Meus limites" saiu do menu e virou uma aba da página PIX (Enviar · Receber · Minhas chaves · Meus limites).', 'Os atalhos "Alterar limite" da tela inicial e de Meu perfil levam para a nova aba.'],
+      validar: ['Entrar como João e abrir PIX → Meus limites.', 'Conferir que o menu lateral não tem mais "Meus limites".'] },
+    { id: 'v1.12', data: '01/10/2026', titulo: 'Aumento de limite em 24 horas com contagem regressiva', sistemas: ['Internet Banking', 'Banqueiro'],
+      mudou: ['Cliente altera o limite diário (PIX, transferências e pagamentos) com a senha de transação.', 'Redução vale na hora; aumento entra em vigor 24 horas depois, com o tempo que falta contando na tela.', 'Cliente pode cancelar o pedido; a equipe pode recusar durante o prazo.', 'Teto pelo Internet Banking: R$ 50.000,00 (acima disso, com o gerente).'],
+      validar: ['Ver o aumento já agendado do João e o tempo diminuindo.', 'Cancelar o pedido e fazer outro aumento; fazer uma redução e conferir que vale na hora.', 'No Banqueiro, na conta do João, recusar um aumento com motivo.'] },
+    { id: 'v1.11', data: '01/10/2026', titulo: 'Tela da conta: limites, solicitações e conversas', sistemas: ['Banqueiro'],
+      mudou: ['Saiu o botão "Gerar QR Code para depósito".', 'Quadro de limites: cheque especial, limite diário, usado e disponível hoje, aumento em andamento.', 'Histórico de solicitações (Ouvidoria e limites) e de conversas com o gerente na própria conta.'],
+      validar: ['Contas → abrir a conta do João e conferir os três quadros.', 'Usar "Responder" na conversa (como gerente da conta).'] },
+    { id: 'v1.10', data: '01/10/2026', titulo: 'Gerente da conta, chat e painel de Relacionamento', sistemas: ['Banqueiro', 'Internet Banking'],
+      mudou: ['Cada conta tem um gerente de relacionamento (coluna na lista e alteração na conta).', 'Internet Banking: "Meu gerente" com chat e aviso de mensagens novas; cartão do gerente na tela inicial.', 'Menu Relacionamento: carteira, quem entrou em contato, clientes contatados, aguardando resposta, tempo médio de resposta e gráfico.', 'Administrador vê todos os gerentes e o resumo por gerente.'],
+      validar: ['Como gerente@payax.com.br, responder a Padaria em Relacionamento.', 'Como João, enviar mensagem em Meu gerente e ver a resposta.', 'Como administrador, filtrar por gerente.'] },
+    { id: 'v1.9', data: '01/10/2026', titulo: 'Perfil Ouvidoria e análise de ações sensíveis', sistemas: ['Banqueiro', 'Internet Banking'],
+      mudou: ['Novo perfil Ouvidoria.', 'Encerramento, bloqueio e desbloqueio de contas, bloqueio de clientes e exclusão viram solicitação com protocolo e só acontecem após aprovação.', 'Quem pede não decide; recusa exige parecer; tudo na auditoria.', 'Cliente pede o encerramento da conta pelo Internet Banking.'],
+      validar: ['Como gerente, pedir bloqueio de uma conta.', 'Como ouvidoria@payax.com.br, aprovar e recusar.', 'Como cliente, pedir encerramento em Meu perfil.'] },
+    { id: 'v1.8', data: '01/10/2026', titulo: 'Alçadas configuráveis por perfil', sistemas: ['Banqueiro'],
+      mudou: ['Tela Alçadas: o administrador libera ou retira cada permissão e define valores máximos.', 'Escolha das ações que exigem análise da Ouvidoria.', 'Menu e botões seguem a alçada de cada usuário; regras conferidas no servidor.'],
+      validar: ['Liberar "Ver relatórios" ao operador e entrar como operador.', 'Pôr teto de empréstimo no gerente e tentar contratar acima.'] },
+    { id: 'v1.7', data: '01/10/2026', titulo: 'Visual claro unificado', sistemas: ['Banqueiro', 'Internet Banking'],
+      mudou: ['Banqueiro e Internet Banking no mesmo visual do site (fontes, cores e botões).', 'Faixa da demonstração no topo, sem cobrir o menu.'],
+      validar: ['Navegar por todas as telas do menu nos dois sistemas.'] },
+    { id: 'v1.6', data: '01/10/2026', titulo: 'Site institucional com o login por cima', sistemas: ['Site', 'Internet Banking'],
+      mudou: ['Site institucional claro e limpo.', '"Acessar minha conta" abre o login (CPF e teclado virtual) por cima do site; depois de entrar, o Internet Banking ocupa a tela.', '"Abra sua conta" abre o formulário de abertura.'],
+      validar: ['Abrir o site, entrar, sair e conferir a volta ao site.', 'Fechar o login com × e com Esc.'] },
+    { id: 'v1.5', data: '01/10/2026', titulo: 'Abertura de conta online', sistemas: ['Internet Banking', 'Banqueiro'],
+      mudou: ['Formulário de abertura em 4 passos com protocolo.', 'Equipe aprova ou recusa em Abertura de contas; aprovação cria cliente, conta e senha provisória.'],
+      validar: ['Abrir uma conta pelo site e aprovar no Banqueiro.', 'Fazer o primeiro acesso com a senha provisória.'] },
+    { id: 'v1.4', data: '01/10/2026', titulo: 'Equipe sem movimentação e favorecidos', sistemas: ['Banqueiro'],
+      mudou: ['Nenhum perfil da equipe faz PIX, transferência ou pagamento: só o cliente autoriza.', 'Gerente, operador e administrador cadastram favorecidos do cliente.'],
+      validar: ['Conferir que não há botões de movimentação no Banqueiro.', 'Cadastrar um favorecido e usá-lo no PIX do cliente.'] },
+    { id: 'v1.3', data: '01/10/2026', titulo: 'Segurança do acesso do cliente', sistemas: ['Internet Banking'],
+      mudou: ['Teclado virtual de pares (os números mudam a cada acesso).', 'Senha de transação em toda saída de dinheiro e bloqueios por tentativas.', 'O cliente não vê o banco liquidante.'],
+      validar: ['Errar a senha e a senha de transação e conferir os bloqueios.'] },
+    { id: 'v1.2', data: '01/10/2026', titulo: 'Internet Banking do cliente', sistemas: ['Internet Banking'],
+      mudou: ['Saldo, extrato com comprovantes, PIX (enviar, receber, chaves), transferências, boletos e contas de consumo, empréstimos e perfil.'],
+      validar: ['Seguir o roteiro de testes do Internet Banking acima.'] },
+    { id: 'v1.1', data: '01/10/2026', titulo: 'Integração com o Bradesco', sistemas: ['Banqueiro'],
+      mudou: ['Cobranças PIX, recebimentos por webhook, PIX e pagamentos para outros bancos e conciliação (em simulador até a homologação).'],
+      validar: ['Bradesco → gerar cobrança e simular pagamento; conferir a conciliação.'] },
+    { id: 'v1.0', data: '01/10/2026', titulo: 'Banqueiro: base do sistema', sistemas: ['Banqueiro'],
+      mudou: ['Clientes, contas, transações, chaves PIX, empréstimos, relatórios, usuários e auditoria.'],
+      validar: ['Seguir o roteiro de testes do Banqueiro acima.'] },
+  ];
+  let validacoes = {}; // id -> { status, por, em }
+  let filtroAt = 'todas';
+  const ROT_V = { pendente: 'A validar', validado: 'Validado', ajuste: 'Precisa ajuste' };
+  async function desenharAtualizacoes(){
+    const st = (a) => (validacoes[a.id] && validacoes[a.id].status) || 'pendente';
+    const n = { validado: 0, ajuste: 0, pendente: 0 };
+    ATUALIZACOES.forEach(a => n[st(a)]++);
+    $('at-resumo').innerHTML = '<span><b>' + ATUALIZACOES.length + '</b> atualizações</span><span><b>' + n.validado + '</b> validadas</span><span><b>' + n.pendente + '</b> a validar</span><span><b>' + n.ajuste + '</b> precisam de ajuste</span>' +
+      (n.validado === ATUALIZACOES.length ? '<span class="pill v-validado">Pronto para produção</span>' : '');
+    $('at-barra').style.width = (n.validado / ATUALIZACOES.length * 100).toFixed(1) + '%';
+    const vis = ATUALIZACOES.filter(a => filtroAt === 'todas' || st(a) === filtroAt);
+    let nomes = {};
+    try { const ids = [...new Set(vis.map(a => validacoes[a.id] && validacoes[a.id].por).filter(Boolean))]; if (user && ids.length) nomes = await user.profiles(ids); } catch (_) {}
+    $('atualizacoes').innerHTML = vis.length ? vis.map(a => {
+      const v = validacoes[a.id];
+      const s = st(a);
+      const quem = v && v.por ? ((nomes[v.por] && nomes[v.por].name) || 'Alguém da equipe') : '';
+      return '<article class="at"><div class="at-ver"><strong>' + esc(a.id) + '</strong><small>' + esc(a.data) + '</small></div><div class="at-corpo">' +
+        '<div class="at-cab"><div><h3>' + esc(a.titulo) + '</h3><div class="at-tags" style="margin-top:6px">' + a.sistemas.map(x => '<span>' + esc(x) + '</span>').join('') + '</div></div>' +
+        '<span class="pill v-' + s + '">' + ROT_V[s] + '</span></div>' +
+        '<ul>' + a.mudou.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>' +
+        '<details><summary>Como validar</summary><ol>' + a.validar.map(m => '<li>' + esc(m) + '</li>').join('') + '</ol></details>' +
+        '<div class="at-acoes">' +
+          '<button type="button" data-at="' + esc(a.id) + '" data-v="validado" aria-pressed="' + (s === 'validado') + '"' + (db ? '' : ' disabled') + '>✓ Validado</button>' +
+          '<button type="button" data-at="' + esc(a.id) + '" data-v="ajuste" aria-pressed="' + (s === 'ajuste') + '"' + (db ? '' : ' disabled') + '>Precisa ajuste</button>' +
+          (v && v.status ? '<button type="button" data-at="' + esc(a.id) + '" data-v="limpar"' + (db ? '' : ' disabled') + '>Desfazer</button>' : '') +
+          (quem ? '<span class="quem">' + esc(ROT_V[s]) + ' por ' + esc(quem) + (v.em ? ' · ' + esc(new Date(v.em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })) : '') + '</span>' : '') +
+        '</div></div></article>';
+    }).join('') : '<div class="vazio">Nenhuma atualização neste filtro.</div>';
+  }
+  document.querySelectorAll('[data-fa]').forEach(b => b.addEventListener('click', () => {
+    filtroAt = b.dataset.fa;
+    document.querySelectorAll('[data-fa]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    desenharAtualizacoes();
+  }));
+  $('atualizacoes').addEventListener('click', async e => {
+    const b = e.target.closest('[data-at]'); if (!b || !db) return;
+    const id = b.dataset.at, v = b.dataset.v;
+    b.disabled = true;
+    try {
+      const ref = db.doc('validacoes/' + id);
+      if (v === 'limpar') await ref.delete();
+      else await ref.set({ status: v, por: user ? await user.id() : null, em: Date.now() });
+      if (v === 'ajuste') {
+        const a = ATUALIZACOES.find(x => x.id === id);
+        $('f-sistema').value = a.sistemas[0] === 'Site' ? 'Site' : a.sistemas[0] === 'Internet Banking' ? 'Internet Banking' : 'Banqueiro (equipe)';
+        $('f-tela').value = a.id + ' · ' + a.titulo;
+        $('f-descricao').focus();
+        $('form').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+        mostrar('Descreva o ajuste desta atualização e clique em Registrar ajuste.', false);
+      }
+    } catch (_) { b.disabled = false; }
+  });
+
+  desenharRoteiro();
+  desenharAtualizacoes();
+  // ---- Conexão com o armazenamento compartilhado
+  (async () => {
+    try { [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]); } catch (_) { db = null; }
+    if (!db) {
+      $('roteiro-aviso').textContent = 'Entre na sua conta claude.ai para marcar os itens e registrar ajustes.';
+      desenharRoteiro(); desenharLista(); desenharAtualizacoes(); return;
+    }
+    $('f-enviar').disabled = false;
+    desenharRoteiro();
+    db.collection('roteiro').onSnapshot(snap => {
+      feitos = {}; snap.docs.forEach(d => { if (d.data() && d.data().feito) feitos[d.id] = true; });
+      desenharRoteiro();
+    }, () => {});
+    desenharAtualizacoes();
+    db.collection('validacoes').onSnapshot(snap => {
+      validacoes = {}; snap.docs.forEach(d => { validacoes[d.id] = d.data() || {}; });
+      desenharAtualizacoes();
+    }, () => {});
+    db.collection('ajustes').orderBy('criadoEm', 'desc').onSnapshot(snap => {
+      ajustes = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+      desenharLista();
+    }, () => { $('lista').innerHTML = '<div class="vazio">Não foi possível carregar os ajustes agora. Recarregue a página.</div>'; });
+  })();
+})();
+</script>
