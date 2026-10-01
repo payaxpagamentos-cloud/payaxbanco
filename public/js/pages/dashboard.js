@@ -31,7 +31,7 @@ export default async function dashboard({ alvo, ativo }) {
   const totalTipo = d.porTipo.reduce((a, t) => a + Math.max(0, t.saldo_centavos), 0) || 1;
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Painel do banco</h1><p class="muted">Visão consolidada da operação PAY AX.</p></div>
-      <div class="row"><a class="btn" href="#/clientes">+ Novo cliente</a><a class="btn ouro" href="#/operacoes">Nova operação</a></div></div>
+      <div class="row"><a class="btn" href="#/clientes">+ Novo cliente</a><a class="btn ouro" href="#/contas">Abrir conta</a></div></div>
     <div class="grid grid-4">
       <div class="card kpi azul"><div class="rotulo">Saldo sob custódia</div><div class="valor">${moeda(d.contas.saldo_total_centavos)}</div>
         <div class="sub">${numero(d.contas.ativas)} contas ativas · ${numero(d.contas.bloqueadas)} bloqueadas</div></div>

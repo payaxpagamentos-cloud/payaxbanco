@@ -1,5 +1,5 @@
 import { html, $, moeda, data, icone } from '../../../js/ui.js';
-import { estado, carregarResumo, contaAtual, rotuloConta, alternarSaldo, listaLancamentos, ligarComprovantes } from '../comum.js';
+import { estado, carregarResumo, contaAtual, rotuloConta, alternarSaldo } from '../comum.js';
 
 const ACOES = [
   { rota: 'pix', rotulo: 'PIX', icone: 'pix', destaque: true },
@@ -34,19 +34,16 @@ export default async function inicio(alvo) {
     <nav class="acoes" aria-label="Ações rápidas">
       ${ACOES.map((a) => html`<a class="acao ${a.destaque ? 'destaque' : ''}" href="#/${a.rota}"><span class="ic">${icone(a.icone)}</span>${a.rotulo}</a>`)}
     </nav>
-    <div class="grid grid-2-1">
-      <div class="card"><div class="card-head"><h2>Últimos lançamentos</h2><a href="#/extrato" class="small">Ver extrato →</a></div>
-        <div id="lancs">${listaLancamentos(r.ultimas)}</div></div>
-      <div class="stack">
-        <div class="card card-body"><h3>Limite diário</h3>
-          <p class="small muted" style="margin:4px 0 10px">PIX, transferências e pagamentos feitos hoje pelo Internet Banking.</p>
-          <div class="barra-h"><span style="width:${Math.min(100, (l.usado_centavos / Math.max(1, l.limite_centavos)) * 100).toFixed(1)}%"></span></div>
-          <div class="row small" style="justify-content:space-between;margin-top:6px"><span>Usado ${moeda(l.usado_centavos)}</span><span class="muted">de ${moeda(l.limite_centavos)}</span></div></div>
-        ${r.emprestimos.length ? html`<a class="card card-body" href="#/emprestimos" style="color:inherit;text-decoration:none"><h3>Empréstimos</h3>
-          ${r.emprestimos.map((e) => html`<div class="row small" style="justify-content:space-between;margin-top:8px"><span>Parcela ${e.pagas + 1}/${e.num_parcelas} · vence ${data(e.proximo_vencimento)}</span><strong>${moeda(e.valor_parcela_centavos)}</strong></div>`)}</a>` : ''}
-      </div>
+    <div class="grid grid-2">
+      <div class="card card-body"><h3>Limite diário</h3>
+        <p class="small muted" style="margin:4px 0 10px">PIX, transferências e pagamentos feitos hoje pelo Internet Banking.</p>
+        <div class="barra-h"><span style="width:${Math.min(100, (l.usado_centavos / Math.max(1, l.limite_centavos)) * 100).toFixed(1)}%"></span></div>
+        <div class="row small" style="justify-content:space-between;margin-top:6px"><span>Usado ${moeda(l.usado_centavos)}</span><span class="muted">de ${moeda(l.limite_centavos)}</span></div></div>
+      ${r.emprestimos.length ? html`<a class="card card-body" href="#/emprestimos" style="color:inherit;text-decoration:none"><h3>Empréstimos</h3>
+        ${r.emprestimos.map((e) => html`<div class="row small" style="justify-content:space-between;margin-top:8px"><span>Parcela ${e.pagas + 1}/${e.num_parcelas} · vence ${data(e.proximo_vencimento)}</span><strong>${moeda(e.valor_parcela_centavos)}</strong></div>`)}</a>`
+        : html`<a class="card card-body" href="#/extrato" style="color:inherit;text-decoration:none"><h3>Extrato</h3>
+        <p class="small muted" style="margin:4px 0 0">Consulte entradas, saídas e comprovantes da sua conta.</p></a>`}
     </div>`);
-  ligarComprovantes($('#lancs', alvo));
   $('#olho', alvo).onclick = () => { alternarSaldo(); inicio(alvo); };
   const sel = $('#conta', alvo);
   if (sel) sel.onchange = () => { estado.contaId = Number(sel.value); inicio(alvo); };

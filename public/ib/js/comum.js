@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { html, $, moeda, dataHora, data, modal, TIPO_TRANSACAO, icone } from '../../js/ui.js';
+import { html, $, moeda, dataHora, data, modal, TIPO_TRANSACAO, icone, marca } from '../../js/ui.js';
 import { tecladoPares } from './teclado.js';
 import { RAIZ } from './raiz.js';
 
@@ -81,7 +81,7 @@ export async function mostrarComprovante(transacaoId, { sucesso = false } = {}) 
     corpo: html`
       ${sucesso ? html`<div class="sucesso"><div class="ok">${icone('check')}</div><h2>${saida ? 'Pronto! Operação realizada.' : 'Recebido!'}</h2></div>` : ''}
       <div class="recibo">
-        <div style="text-align:center;margin-bottom:10px"><img src="${RAIZ}img/logo-payax.svg" alt="PAY AX" style="height:26px"></div>
+        <div style="text-align:center;margin-bottom:10px">${marca('clara')}</div>
         ${linhaRecibo('Operação', TIPO_TRANSACAO[c.tipo] ?? c.tipo)}
         ${linhaRecibo('Valor', moeda(Math.abs(c.valor_centavos)))}
         ${linhaRecibo('Data e hora', dataHora(c.criado_em))}

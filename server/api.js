@@ -15,7 +15,7 @@ function criarApi(db, bradesco = criarServicoBradesco(db)) {
   api.use('/dashboard', auth, require('./routes/dashboard')(db));
   api.use('/clientes', auth, require('./routes/clientes')(db));
   api.use('/contas', auth, require('./routes/contas')(db));
-  api.use('/operacoes', auth, require('./routes/operacoes')(db, bradesco));
+  api.use('/operacoes', auth, require('./routes/operacoes')(db));
   api.use('/transacoes', auth, require('./routes/transacoes')(db));
   api.use('/pix', auth, require('./routes/pix')(db));
   api.use('/emprestimos', auth, require('./routes/emprestimos')(db));

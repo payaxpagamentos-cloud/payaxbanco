@@ -72,6 +72,14 @@ function popularDemo(db) {
       db.prepare('INSERT INTO acessos_cliente (cliente_id, senha_hash, pin_hash, precisa_trocar_senha, limite_diario_centavos) VALUES (?, ?, ?, 0, ?)')
         .run(c.id, hashNumerica(senha), hashNumerica('246810'), 1_000_000);
     }
+    // Favorecidos da Ana (cadastrados pela equipe): um PIX e uma conta PAY AX.
+    const ana = db.prepare("SELECT id FROM clientes WHERE documento = '52998224725'").get().id;
+    const technova = db.prepare("SELECT cl.nome, cl.documento FROM clientes cl WHERE documento = '45997418000153'").get();
+    db.prepare("INSERT INTO favorecidos (cliente_id, tipo, apelido, nome, documento, chave, usuario_id) VALUES (?, 'pix', 'TechNova', ?, ?, 'contato@technova.com.br', ?)")
+      .run(ana, technova.nome, technova.documento, adminId);
+    const padaria = db.prepare("SELECT c.id, cl.nome, cl.documento FROM contas c JOIN clientes cl ON cl.id = c.cliente_id WHERE cl.documento = '11222333000181'").get();
+    db.prepare("INSERT INTO favorecidos (cliente_id, tipo, apelido, nome, documento, conta_id, usuario_id) VALUES (?, 'conta', 'Padaria', ?, ?, ?, ?)")
+      .run(ana, padaria.nome, padaria.documento, padaria.id, adminId);
     // Empréstimos.
     for (const [idx, valor, taxa, n] of [[0, 1500000, 0.0189, 12], [4, 8000000, 0.0149, 24]]) {
       const conta = correntes[idx];

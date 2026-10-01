@@ -72,17 +72,26 @@ test('Integração Bradesco (simulador)', async (t) => {
     assert.equal((await api.get(`/contas/${conta.id}`)).dados.saldo_centavos, 26050);
   });
 
-  await t.test('PIX para outro banco sai pelo Bradesco; falha devolve o valor', async () => {
-    const ok = await api.post('/operacoes/pix', { origem_conta_id: conta.id, chave: 'loja@outrobanco.com', valor_centavos: 5000 });
+  await t.test('PIX para outro banco (pelo cliente) sai pelo Bradesco; falha devolve o valor', async () => {
+    // Acesso do cliente ao Internet Banking.
+    const prov = (await api.post(`/clientes/${cli.dados.id}/internet-banking`)).dados.senha_provisoria;
+    const digitar = async (senha) => {
+      const d = (await api.post('/ib/auth/teclado', {}, null)).dados;
+      return { teclado_id: d.id, sequencia: [...senha].map((c) => d.teclas.findIndex((par) => par.includes(Number(c)))) };
+    };
+    const tk = (await api.post('/ib/auth/login', { documento: '52998224725', ...(await digitar(prov)) }, null)).dados.token;
+    await api.req('POST', '/ib/auth/primeiro-acesso', { nova_senha: '730194', pin: '482913' }, tk);
+    await api.patch(`/clientes/${cli.dados.id}/internet-banking`, { limite_diario_centavos: 100_000_000 });
+    const pix = async (valor) => api.req('POST', '/ib/pix', { conta_id: conta.id, chave: 'loja@outrobanco.com', valor_centavos: valor, pin: await digitar('482913') }, tk);
+    const ok = await pix(5000);
     assert.equal(ok.status, 201, JSON.stringify(ok.dados));
     assert.equal(ok.dados.externo, true);
-    assert.match(ok.dados.end_to_end_id, /^E60746948/);
     assert.equal((await api.get(`/contas/${conta.id}`)).dados.saldo_centavos, 21050);
     // Conta com limite alto, mas sem dinheiro suficiente na conta PAY AX do Bradesco.
     await api.patch(`/contas/${conta.id}/limite`, { limite_centavos: 10_000_000 });
-    const falha = await api.post('/operacoes/pix', { origem_conta_id: conta.id, chave: 'loja@outrobanco.com', valor_centavos: 5_000_000 });
+    const falha = await pix(5_000_000);
     assert.equal(falha.status, 502);
-    assert.match(falha.dados.erro, /voltou para a conta/);
+    assert.match(falha.dados.erro, /voltou para a sua conta/);
     assert.equal((await api.get(`/contas/${conta.id}`)).dados.saldo_centavos, 21050);
     const ext = await api.get(`/contas/${conta.id}/extrato`);
     const enviado = ext.dados.itens.find((x) => x.tipo === 'pix_enviado' && !x.estornada_em);

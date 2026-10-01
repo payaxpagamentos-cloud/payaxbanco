@@ -1,5 +1,5 @@
 import { api, sessao } from '../api.js';
-import { html, $ } from '../ui.js';
+import { html, $, marca } from '../ui.js';
 import { vitrine } from '../vitrine.js';
 
 export default function login(alvo, aoEntrar) {
@@ -10,7 +10,7 @@ export default function login(alvo, aoEntrar) {
         <section class="lado" aria-label="Novidades PAY AX"><div id="vitrine"></div></section>
         <section class="form-lado">
         <form id="form-login" novalidate>
-          <img src="img/logo-payax.svg" alt="PAY AX" style="height:34px;margin-bottom:4px">
+          <div style="align-self:center">${marca('clara')}</div>
           <div class="cabecalho-acesso"><h1>Acessar o Banqueiro</h1><p class="muted" style="margin:2px 0 4px">Entre com suas credenciais corporativas.</p></div>
           <div class="erro-form hidden" id="erro"></div>
           <div><label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="username" required></div>

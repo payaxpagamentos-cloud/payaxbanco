@@ -280,7 +280,16 @@ input.moeda { text-align: right; font-variant-numeric: tabular-nums; }
 .qr-pix svg { display: block; width: 100%; height: auto; }
 /* Nas telas de login, a faixa da demonstração fica sobre o lado branco, sem cobrir a arte. */
 /* Nas telas de acesso, a faixa da demonstração vira uma tira fina no topo, fora do cartão. */
-body:has(.login) .faixa-demo { position: static; transform: none; max-width: none; border: 0; border-radius: 0; box-shadow: none;
+body:has(.login) .faixa-demo, body:has(.site) .faixa-demo { position: static; transform: none; max-width: none; border: 0; border-radius: 0; box-shadow: none;
   justify-content: center; padding: 5px 12px; font-size: 12px; background: #04102A; color: #C9D5EA; }
-body:has(.login) .faixa-demo .btn { height: 26px; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); color: #fff; }
+body:has(.login) .faixa-demo .btn, body:has(.site) .faixa-demo .btn { height: 26px; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); color: #fff; }
 body:has(.login) .faixa-demo ~ #app .login { min-height: calc(100vh - 37px); }
+
+/* ===== Nome PAY AX em texto (provisório até o logo oficial ficar pronto) ===== */
+.marca { display: inline-flex; align-items: baseline; gap: .22em; font-weight: 900; font-size: 24px; letter-spacing: .04em; line-height: 1; white-space: nowrap; }
+.marca span { background: linear-gradient(90deg, #00C8FF, #1E88E5); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.marca-clara { color: var(--payax-azul); }
+.marca-escura { color: #fff; }
+.sidebar .brand .marca { font-size: 26px; }
+:root[data-theme="dark"] .marca-clara { color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .marca-clara { color: #fff; } }

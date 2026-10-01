@@ -1,11 +1,10 @@
 import { api, sessao } from './api.js';
-import { html, $, $$, icone, iniciais, toast, modal, dadosForm } from './ui.js';
+import { html, $, $$, icone, iniciais, toast, modal, dadosForm, marca } from './ui.js';
 import { usuarioAtual, definirTitulo } from './contexto.js';
 import login from './pages/login.js';
 import dashboard from './pages/dashboard.js';
 import { listaClientes, detalheCliente } from './pages/clientes.js';
 import { listaContas, detalheConta } from './pages/contas.js';
-import operacoes from './pages/operacoes.js';
 import pix from './pages/pix.js';
 import { listaEmprestimos, detalheEmprestimo } from './pages/emprestimos.js';
 import transacoes from './pages/transacoes.js';
@@ -23,7 +22,6 @@ const MENU = [
   { rota: 'contas', rotulo: 'Contas', icone: 'contas', perfis: TODOS },
   { rota: 'pix', rotulo: 'Chaves PIX', icone: 'pix', perfis: TODOS },
   { secao: 'Movimentação' },
-  { rota: 'operacoes', rotulo: 'Operações', icone: 'operacoes', perfis: TODOS },
   { rota: 'transacoes', rotulo: 'Transações', icone: 'transacoes', perfis: TODOS },
   { rota: 'emprestimos', rotulo: 'Empréstimos', icone: 'emprestimos', perfis: TODOS },
   { secao: 'Gestão' },
@@ -37,7 +35,6 @@ const ROTAS = {
   painel: dashboard,
   clientes: (ctx) => (ctx.id ? detalheCliente(ctx) : listaClientes(ctx)),
   contas: (ctx) => (ctx.id ? detalheConta(ctx) : listaContas(ctx)),
-  operacoes,
   pix,
   emprestimos: (ctx) => (ctx.id ? detalheEmprestimo(ctx) : listaEmprestimos(ctx)),
   transacoes,
@@ -56,7 +53,7 @@ function renderLayout() {
     <div class="layout">
       <aside class="sidebar" id="sidebar">
         <div class="brand">
-          <img src="img/logo-payax-branco.svg" alt="PAY AX">
+          ${marca('escura')}
         </div>
         <div class="brand" style="border:0;padding-bottom:0"><span class="produto">Banqueiro</span></div>
         <nav class="nav">

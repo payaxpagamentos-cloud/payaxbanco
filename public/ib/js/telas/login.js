@@ -1,50 +1,142 @@
 import { api, sessao } from '../api.js';
-import { html, $, mascaraDocumento } from '../../../js/ui.js';
+import { html, $, mascaraDocumento, marca, icone } from '../../../js/ui.js';
 import { tecladoPares, criarSenhaNova } from '../teclado.js';
 import { vitrine } from '../../../js/vitrine.js';
 import { RAIZ } from '../raiz.js';
 
+const PRODUTOS = [
+  { icone: 'pix', titulo: 'PIX 24 horas', texto: 'Envie e receba na hora, para qualquer banco, com QR Code e chaves.' },
+  { icone: 'barras', titulo: 'Pague suas contas', texto: 'Boletos, água, luz e telefone com comprovante na hora.' },
+  { icone: 'emprestimos', titulo: 'Crédito', texto: 'Empréstimos com parcelas fixas. Fale com seu gerente.' },
+  { icone: 'contas', titulo: 'Conta para empresas', texto: 'Receba de clientes e acompanhe tudo em tempo real.' },
+];
+
+/** Tela de acesso no padrão dos grandes bancos: cabeçalho, banner de campanhas e caixa de acesso em duas etapas. */
 export function telaLogin(alvo, aoEntrar, aviso) {
-  document.title = 'Entrar · Internet Banking PAY AX';
+  document.title = 'Internet Banking · PAY AX';
   alvo.innerHTML = String(html`
-    <div class="login">
-      <div class="login-cartao">
-        <section class="lado" aria-label="Novidades PAY AX"><div id="vitrine"></div></section>
-        <section class="form-lado">
-        <form id="form-login" novalidate>
-          <img src="${RAIZ}img/logo-payax.svg" alt="PAY AX" style="height:34px;margin-bottom:4px">
-          <div class="cabecalho-acesso"><h1>Internet Banking</h1><p class="muted" style="margin:2px 0 4px">Acesse com seu CPF ou CNPJ.</p></div>
-          <div class="erro-form ${aviso ? '' : 'hidden'}" id="erro">${aviso ?? ''}</div>
-          <div><label for="documento">CPF ou CNPJ</label><input id="documento" name="documento" inputmode="numeric" autocomplete="username" required></div>
-          <div id="teclado-login"></div>
-          <button class="btn primario" type="submit" id="entrar" disabled>Entrar</button>
-          ${window.PAYAX_DEMO ? html`<div class="card small" style="background:var(--info-bg);border:0;box-shadow:none;padding:10px 12px">
-            <strong>Demo:</strong> CPF <span class="mono">529.982.247-25</span> · senha <span class="mono">135790</span> · transação <span class="mono">246810</span></div>` : ''}
-          <p class="dica">Clique no botão com cada número da senha; as posições mudam a cada acesso.</p>
-        </form>
-        </section>
-      </div>
-      <div class="login-rodape">© ${new Date().getFullYear()} PAY AX · Nunca informe sua senha por telefone, e-mail ou mensagem.</div>
+    <div class="site">
+      <header class="site-topo">
+        <div class="site-linha">
+          ${marca('clara')}
+          <nav class="site-nav" aria-label="Seções">
+            <button type="button" data-rolar="produtos">Para você</button>
+            <button type="button" data-rolar="produtos">Para empresas</button>
+            <button type="button" data-rolar="produtos">PIX</button>
+            <button type="button" data-rolar="produtos">Crédito</button>
+            <button type="button" data-rolar="seguranca">Segurança</button>
+          </nav>
+          <span class="site-cadeado">${icone('auditoria')} Ambiente seguro</span>
+        </div>
+      </header>
+
+      <section class="site-hero">
+        <div id="vitrine" class="hero-vitrine"></div>
+        <div class="site-linha hero-linha">
+          <div class="caixa-acesso" id="caixa">
+            <h1>Acesse sua conta</h1>
+            <div class="abas-acesso" role="tablist">
+              <button type="button" role="tab" class="ativa" data-tipo="PF">Pessoa física</button>
+              <button type="button" role="tab" data-tipo="PJ">Empresa</button>
+            </div>
+            <div class="erro-form ${aviso ? '' : 'hidden'}" id="erro">${aviso ?? ''}</div>
+            <form id="passo-documento" novalidate>
+              <label for="documento" id="rotulo-doc">CPF</label>
+              <input id="documento" name="documento" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" required>
+              <button class="btn primario" type="submit">Continuar</button>
+              <p class="dica">Primeiro acesso? Use a senha provisória entregue pela PAY AX.</p>
+            </form>
+            <form id="passo-senha" novalidate hidden>
+              <div class="quem"><span>Olá! <strong id="doc-mascarado"></strong></span><button type="button" class="btn link" id="trocar">Trocar</button></div>
+              <div id="teclado-login"></div>
+              <button class="btn primario" type="submit" id="entrar" disabled>Entrar</button>
+            </form>
+            ${window.PAYAX_DEMO ? html`<div class="dica-demo"><strong>Demo:</strong> CPF 529.982.247-25 · senha 135790 · transação 246810</div>` : ''}
+          </div>
+        </div>
+      </section>
+
+      <section class="site-produtos" id="produtos">
+        <div class="site-linha">
+          <h2>Tudo o que você precisa, no computador</h2>
+          <div class="produtos">${PRODUTOS.map((p) => html`<div class="produto-card"><span class="ic">${icone(p.icone)}</span><h3>${p.titulo}</h3><p>${p.texto}</p></div>`)}</div>
+        </div>
+      </section>
+
+      <section class="site-aviso" id="seguranca">
+        <div class="site-linha">
+          <span class="ic">${icone('auditoria')}</span>
+          <div><strong>A PAY AX nunca pede sua senha</strong> por telefone, e-mail, SMS ou mensagem. Digite suas senhas somente no
+            teclado virtual desta página, cujos números mudam de posição a cada acesso.</div>
+        </div>
+      </section>
+
+      <footer class="site-rodape">
+        <div class="site-linha">
+          <div>${marca('escura')}<p>O futuro em cada transação.</p></div>
+          <div><h4>Produtos</h4><p>Conta digital · PIX · Pagamentos · Crédito</p></div>
+          <div><h4>Segurança</h4><p>Teclado virtual · Senha de transação · Limite diário</p></div>
+          <div><h4>Institucional</h4><p>© ${new Date().getFullYear()} PAY AX. Todos os direitos reservados.</p></div>
+        </div>
+      </footer>
     </div>`);
-  vitrine($('#vitrine', alvo), { raizImg: `${RAIZ}img/` });
-  const form = $('#form-login', alvo);
+
+  vitrine($('#vitrine', alvo), { raizImg: `${RAIZ}img/`, modo: 'hero' });
+  alvo.querySelectorAll('[data-rolar]').forEach((b) => b.addEventListener('click', () => $(`#${b.dataset.rolar}`, alvo).scrollIntoView({ behavior: 'smooth' })));
+
+  const erro = $('#erro', alvo);
+  const mostrarErro = (msg) => { erro.textContent = msg; erro.classList.remove('hidden'); };
+  const docInput = $('#documento', alvo);
+  mascaraDocumento(docInput);
+  let tipo = 'PF';
+  alvo.querySelectorAll('[data-tipo]').forEach((b) => b.addEventListener('click', () => {
+    tipo = b.dataset.tipo;
+    alvo.querySelectorAll('[data-tipo]').forEach((x) => x.classList.toggle('ativa', x === b));
+    $('#rotulo-doc', alvo).textContent = tipo === 'PF' ? 'CPF' : 'CNPJ';
+    docInput.placeholder = tipo === 'PF' ? '000.000.000-00' : '00.000.000/0000-00';
+    docInput.value = '';
+    docInput.focus();
+  }));
+
+  const passoDoc = $('#passo-documento', alvo);
+  const passoSenha = $('#passo-senha', alvo);
   const botao = $('#entrar', alvo);
-  const teclado = tecladoPares($('#teclado-login', alvo), { rotulo: 'Senha de acesso (6 números)', aoMudar: (ok) => { botao.disabled = !ok; } });
-  mascaraDocumento($('#documento', alvo));
-  setTimeout(() => $('#documento', alvo).focus(), 0);
-  form.addEventListener('submit', async (e) => {
+  let teclado = null;
+  setTimeout(() => docInput.focus(), 0);
+
+  passoDoc.addEventListener('submit', (e) => {
     e.preventDefault();
-    const erro = $('#erro', alvo);
-    if (!teclado.completo()) return;
+    erro.classList.add('hidden');
+    const d = docInput.value.replace(/\D/g, '');
+    if (d.length !== (tipo === 'PF' ? 11 : 14)) return mostrarErro(tipo === 'PF' ? 'Informe os 11 números do CPF.' : 'Informe os 14 números do CNPJ.');
+    $('#doc-mascarado', alvo).textContent = d.length === 11
+      ? `CPF ***.${d.slice(3, 6)}.${d.slice(6, 9)}-**`
+      : `CNPJ ${d.slice(0, 2)}.***.***/${d.slice(8, 12)}-**`;
+    passoDoc.hidden = true;
+    passoSenha.hidden = false;
+    alvo.querySelector('.abas-acesso').hidden = true;
+    teclado = tecladoPares($('#teclado-login', alvo), { rotulo: 'Senha de acesso (6 números)', aoMudar: (ok) => { botao.disabled = !ok; } });
+  });
+
+  $('#trocar', alvo).onclick = () => {
+    passoSenha.hidden = true;
+    passoDoc.hidden = false;
+    alvo.querySelector('.abas-acesso').hidden = false;
+    erro.classList.add('hidden');
+    docInput.focus();
+  };
+
+  passoSenha.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!teclado?.completo()) return;
     botao.disabled = true;
     erro.classList.add('hidden');
     try {
-      const r = await api.post('/auth/login', { documento: form.documento.value, ...teclado.valor() });
+      const r = await api.post('/auth/login', { documento: docInput.value, ...teclado.valor() });
       sessao.set({ token: r.token });
       aoEntrar(r);
     } catch (err) {
-      erro.textContent = err.message;
-      erro.classList.remove('hidden');
+      mostrarErro(err.message);
       teclado.renovar();
     }
   });
@@ -55,7 +147,7 @@ export async function telaPrimeiroAcesso(alvo, nome, aoConcluir, aoSair) {
   alvo.innerHTML = String(html`
     <div class="login">
       <div class="card card-body stack" style="width:min(420px,100%);border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.45)">
-        <img src="${RAIZ}img/logo-payax.svg" alt="PAY AX" style="height:36px;align-self:center">
+        <div style="align-self:center">${marca('clara')}</div>
         <div style="text-align:center"><h1>Bem-vindo(a), ${nome.split(' ')[0]}!</h1><p class="muted" style="margin:4px 0 0">Para sua segurança, crie suas senhas. São duas senhas diferentes, de 6 números cada.</p></div>
         <div class="passos"><span class="feito" id="p1"></span><span id="p2"></span></div>
         <div class="erro-form hidden" id="erro"></div>

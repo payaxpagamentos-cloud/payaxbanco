@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const { Router } = require('express');
 const { hashNumerica } = require('../lib/senha');
 const { senhaNumericaValida } = require('../lib/teclado');
+const favorecidos = require('../lib/favorecidos');
 const { permitir } = require('../auth');
 const { naoEncontrado, ErroNegocio } = require('../lib/erros');
 const v = require('../lib/validacao');
@@ -157,6 +158,19 @@ module.exports = (db) => {
       .run(status, limite, c.id);
     registrar(db, req, 'ib_atualizar', 'cliente', c.id, { status, limite_diario_centavos: limite });
     res.json(statusIb(c.id));
+  });
+
+  // ---------- Favorecidos (equipe cadastra; cliente usa no Internet Banking) ----------
+  const equipe = permitir('admin', 'gerente', 'operador');
+  r.get('/:id/favorecidos', (req, res) => res.json(favorecidos.listar(db, clienteAtivo(req.params.id).id)));
+  r.post('/:id/favorecidos', equipe, (req, res) => {
+    const c = clienteAtivo(req.params.id);
+    if (c.status !== 'ativo') throw new ErroNegocio('Só clientes ativos podem ter favorecidos.', 409);
+    res.status(201).json(favorecidos.criar(db, req, c.id, req.body));
+  });
+  r.delete('/:id/favorecidos/:fav', equipe, (req, res) => {
+    favorecidos.excluir(db, req, clienteAtivo(req.params.id).id, req.params.fav);
+    res.status(204).end();
   });
 
   r.delete('/:id', permitir('admin'), (req, res) => {

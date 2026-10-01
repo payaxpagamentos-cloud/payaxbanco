@@ -1,5 +1,5 @@
 import { api, sessao } from './api.js';
-import { html, $, $$, icone, toast, iniciais } from '../../js/ui.js';
+import { html, $, $$, icone, toast, iniciais, marca } from '../../js/ui.js';
 import { estado } from './comum.js';
 import { RAIZ } from './raiz.js';
 import { telaLogin, telaPrimeiroAcesso } from './telas/login.js';
@@ -63,7 +63,7 @@ function layout() {
   app.innerHTML = String(html`
     <div class="layout">
       <aside class="sidebar" id="sidebar">
-        <div class="brand"><img src="${RAIZ}img/logo-payax-branco.svg" alt="PAY AX"></div>
+        <div class="brand">${marca('escura')}</div>
         <div class="brand" style="border:0;padding-bottom:0"><span class="produto">Internet Banking</span></div>
         <nav class="nav" aria-label="Menu">
           ${MENU.map((m) => (m.secao ? html`<div class="secao">${m.secao}</div>`

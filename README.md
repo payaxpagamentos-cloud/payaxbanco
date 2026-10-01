@@ -1,4 +1,4 @@
-<p align="center"><img src="public/img/payax-marca.jpg" alt="PAY AX — O futuro em cada transação." width="320"></p>
+<h1 align="center">PAY AX</h1>
 
 # Banqueiro · PAY AX
 
@@ -183,7 +183,7 @@ public/
   index.html        # Banqueiro (equipe), SPA sem build
   ib/               # Internet Banking (cliente)
   css/style.css     # identidade visual PAY AX (tokens de cor no :root)
-  img/              # logo PAY AX (logo-payax.svg, logo-payax-branco.svg, payax-simbolo.svg)
+  img/              # fotos da vitrine (propagandas/) e imagens do sistema
   js/               # app, api, componentes de UI e páginas
 test/               # node:test
 ```
@@ -194,14 +194,9 @@ test/               # node:test
 
 ## Identidade visual
 
-Logo oficial PAY AX ("O futuro em cada transação."), em `public/img/`:
-
-| Arquivo | Uso |
-|---|---|
-| `logo-payax-branco.svg` | Logo vetorial para fundos escuros (menus laterais). |
-| `logo-payax.svg` | Logo vetorial para fundos claros (login e comprovantes). |
-| `payax-simbolo.svg` / `favicon.svg` | Símbolo "AX" (ícone da aba do navegador). |
-| `payax-marca.jpg` | Arte completa da marca (painel das telas de login). |
+O logo oficial da PAY AX ainda não está pronto. Até lá, o nome aparece em texto (função `marca()` em
+`public/js/ui.js`, estilo `.marca` em `public/css/style.css`). Quando o logo ficar pronto, basta trocar essa função por
+uma imagem: ela é usada no login, nos menus laterais e nos comprovantes.
 
 As cores ficam em `public/css/style.css`: azul-marinho (`--payax-azul`) e ciano da marca (`--payax-ouro`, nome mantido por compatibilidade).
 Tema claro e escuro e layout responsivo (celular/tablet) incluídos.

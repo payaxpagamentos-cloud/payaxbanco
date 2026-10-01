@@ -8,7 +8,6 @@ const v = require('../lib/validacao');
 const { registrar } = require('../lib/auditoria');
 const { buscarConta, exigirContaOperavel, novoGrupo, lancar } = require('../lib/conta');
 const { simular } = require('../lib/financeiro');
-const { pagarParcela } = require('../lib/emprestimos');
 
 function lerProposta(body) {
   const valor = v.valorCentavos(body?.valor_centavos);
@@ -72,10 +71,7 @@ module.exports = (db) => {
     res.status(201).json(detalhar(id));
   });
 
-  r.post('/:id/parcelas/:numero/pagar', permitir('admin', 'gerente', 'operador'), (req, res) => {
-    pagarParcela(db, req, req.params.id, req.params.numero);
-    res.json(detalhar(req.params.id));
-  });
+  // Parcelas são pagas pelo próprio cliente, no Internet Banking (débito autorizado com senha de transação).
 
   return r;
 };

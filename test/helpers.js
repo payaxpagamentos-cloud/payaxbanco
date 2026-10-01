@@ -33,8 +33,17 @@ async function iniciar() {
   }
 
   token = await login();
+
+  /** Credita a conta pelo caminho real: cobrança PIX gerada e paga (simulador do banco). */
+  async function creditar(contaId, valor) {
+    const c = await req('POST', '/integracoes/bradesco/cobrancas', { conta_id: contaId, valor_centavos: valor });
+    if (c.status !== 201) throw new Error(`Falha ao gerar cobrança: ${JSON.stringify(c.dados)}`);
+    const pg = await req('POST', `/integracoes/bradesco/cobrancas/${c.dados.txid}/simular-pagamento`);
+    if (pg.dados?.creditados !== 1) throw new Error(`Falha ao creditar: ${JSON.stringify(pg.dados)}`);
+  }
+
   return {
-    db, req, login,
+    db, req, login, creditar,
     usarToken: (t) => { token = t; },
     get: (c, tk) => req('GET', c, undefined, tk),
     post: (c, b, tk) => req('POST', c, b, tk),

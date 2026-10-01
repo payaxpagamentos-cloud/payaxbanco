@@ -30,7 +30,7 @@ test('Internet Banking', async (t) => {
   const beto = (await api.post('/clientes', { tipo: 'PF', nome: 'Beto Cliente', documento: '111.444.777-35' })).dados;
   const contaAna = (await api.post('/contas', { cliente_id: ana.id, tipo: 'corrente' })).dados;
   const contaBeto = (await api.post('/contas', { cliente_id: beto.id, tipo: 'corrente' })).dados;
-  await api.post('/operacoes/deposito', { conta_id: contaAna.id, valor_centavos: 1_000_000 });
+  await api.creditar(contaAna.id, 1_000_000);
   await api.post('/pix', { conta_id: contaBeto.id, tipo: 'cpf' });
   let tk;
   const ib = (m, c, b) => api.req(m, `/ib${c}`, b, tk);
@@ -103,6 +103,22 @@ test('Internet Banking', async (t) => {
     assert.equal(tr.status, 201);
   });
 
+  await t.test('transferência sem saldo é recusada e não altera nada; equipe estorna PIX interno', async () => {
+    const antes = (await ib('GET', '/resumo')).dados.contas[0].saldo_centavos;
+    const falha = await ib('POST', '/transferencias', await comPin({ conta_id: contaAna.id, destino_agencia: '0001', destino_numero: contaBeto.numero, valor_centavos: 99_000_000 }));
+    assert.ok([409, 422].includes(falha.status), JSON.stringify(falha.dados));
+    assert.equal((await ib('GET', '/resumo')).dados.contas[0].saldo_centavos, antes);
+    // Estorno (correção feita pelo gerente) desfaz os dois lados do PIX interno.
+    const ext = await api.get(`/contas/${contaAna.id}/extrato`);
+    const pix = ext.dados.itens.find((x) => x.tipo === 'pix_enviado' && x.contraparte_conta_id === contaBeto.id);
+    const betoAntes = (await api.get(`/contas/${contaBeto.id}`)).dados.saldo_centavos;
+    const est = await api.post('/operacoes/estorno', { transacao_id: pix.id, motivo: 'Teste' });
+    assert.equal(est.status, 201);
+    assert.equal(est.dados.estornadas, 2);
+    assert.equal((await api.get(`/contas/${contaBeto.id}`)).dados.saldo_centavos, betoAntes + pix.valor_centavos);
+    assert.equal((await api.post('/operacoes/estorno', { transacao_id: pix.id, motivo: 'De novo' })).status, 409);
+  });
+
   await t.test('pagamento de boleto e de conta de consumo', async () => {
     const b = gerarBoletoBancario({ valorCentavos: 18990, vencimento: '2026-12-01', campoLivre: '9' });
     const consulta = await ib('POST', '/pagamentos/consultar', { linha: b.linha_digitavel });
@@ -114,12 +130,12 @@ test('Internet Banking', async (t) => {
     assert.equal((await ib('POST', '/pagamentos', await comPin({ conta_id: contaAna.id, linha: conv.linha_digitavel }, '482913'))).status, 201);
     assert.equal((await ib('POST', '/pagamentos/consultar', { linha: '1234' })).status, 422);
     const saldo = (await ib('GET', '/resumo')).dados.contas[0].saldo_centavos;
-    assert.equal(saldo, 1_000_000 - 10000 - 5000 - 2500 - 18990 - 13472);
+    assert.equal(saldo, 1_000_000 - 5000 - 2500 - 18990 - 13472); // o PIX interno de 10000 foi estornado
   });
 
   await t.test('limite diário do Internet Banking', async () => {
     const r = await ib('GET', '/resumo');
-    assert.equal(r.dados.limite.usado_centavos, 10000 + 5000 + 2500 + 18990 + 13472);
+    assert.equal(r.dados.limite.usado_centavos, 5000 + 2500 + 18990 + 13472); // estornado não conta no limite
     const acima = await ib('POST', '/pix', await comPin({ conta_id: contaAna.id, chave: '11144477735', valor_centavos: r.dados.limite.disponivel_centavos + 1 }, '482913'));
     assert.equal(acima.status, 422);
     assert.match(acima.dados.erro, /limite diário/);

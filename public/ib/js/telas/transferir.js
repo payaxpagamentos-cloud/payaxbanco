@@ -10,8 +10,10 @@ export default async function transferir(alvo) {
   passoDestino($('#area', alvo));
 }
 
-function passoDestino(el) {
+async function passoDestino(el) {
+  const favs = (await api.get('/favorecidos').catch(() => [])).filter((f) => f.tipo === 'conta');
   el.innerHTML = String(html`<div class="passos"><span class="feito"></span><span></span></div>
+    ${favs.length ? html`<div style="margin-bottom:12px"><div class="small muted" style="margin-bottom:6px">Seus favorecidos</div><div class="chips">${favs.map((f) => html`<button type="button" class="chip" data-ag="${f.agencia}" data-num="${f.numero}">${f.apelido || f.nome}</button>`)}</div></div>` : ''}
     <form id="fd" class="form" novalidate>
       <div class="c4"><label for="ag">Agência</label><input id="ag" name="agencia" value="0001" inputmode="numeric"></div>
       <div class="c8"><label for="num">Conta com dígito</label><input id="num" name="numero" placeholder="100001-2" required></div>
@@ -19,6 +21,7 @@ function passoDestino(el) {
       <div class="c12"><button class="btn primario" type="submit" style="width:100%">Continuar</button></div>
     </form>`);
   const fd = $('#fd', el);
+  el.querySelectorAll('[data-ag]').forEach((b) => b.addEventListener('click', () => { fd.agencia.value = b.dataset.ag; fd.numero.value = b.dataset.num; fd.requestSubmit(); }));
   setTimeout(() => fd.numero.focus(), 30);
   fd.addEventListener('submit', async (e) => {
     e.preventDefault();

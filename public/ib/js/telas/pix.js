@@ -18,15 +18,18 @@ export default async function pix(alvo, sub = 'enviar') {
   return chaves(el);
 }
 
-function enviar(el) {
+async function enviar(el) {
+  const favs = (await api.get('/favorecidos').catch(() => [])).filter((f) => f.tipo === 'pix');
   el.innerHTML = String(html`<div class="card card-body" style="max-width:560px">
     <div class="passos"><span class="feito"></span><span></span><span></span></div>
     <form id="f1" class="stack" novalidate>
+      ${favs.length ? html`<div><div class="small muted" style="margin-bottom:6px">Seus favorecidos</div><div class="chips">${favs.map((f) => html`<button type="button" class="chip" data-fav="${f.chave}">${f.apelido || f.nome || f.chave}</button>`)}</div></div>` : ''}
       <div><label for="chave">Para quem você quer enviar?</label><input id="chave" name="chave" placeholder="CPF/CNPJ, e-mail, celular ou chave aleatória" autocomplete="off" required></div>
       <div class="erro-form hidden" id="erro"></div>
       <button class="btn primario" type="submit">Continuar</button>
     </form></div>`);
   const f1 = $('#f1', el);
+  $$('[data-fav]', el).forEach((b) => b.addEventListener('click', () => { f1.chave.value = b.dataset.fav; f1.requestSubmit(); }));
   setTimeout(() => f1.chave.focus(), 30);
   f1.addEventListener('submit', async (e) => {
     e.preventDefault();

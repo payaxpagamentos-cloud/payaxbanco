@@ -5,7 +5,6 @@ import {
   modal, confirmar, toast, dadosForm, centavos, valorMoedaInput, paginacao, debounce,
 } from '../ui.js';
 import { seletor, ligarSeletor } from './seletores.js';
-import { formOperacao } from './operacoes.js';
 import { receberViaPix } from './bradesco.js';
 
 export function abrirConta(cliente, aoSalvar) {
@@ -105,10 +104,9 @@ export async function detalheConta({ alvo, id, ativo }) {
       <div class="meta"><div><div class="rotulo">Limite</div><strong>${moeda(c.limite_centavos)}</strong></div>
         <div><div class="rotulo">Disponível</div><strong>${moeda(disponivel)}</strong></div>
         <div><div class="rotulo">Chaves PIX</div><strong>${c.chaves_pix.length}</strong></div></div></div>
-    ${operavel ? html`<div class="row" style="margin:16px 0">
-      <button class="btn ouro" data-op="deposito">Depositar</button><button class="btn" data-op="saque">Sacar</button>
-      <button class="btn" data-op="transferencia">Transferir</button><button class="btn" data-op="pix">Enviar PIX</button>
-      <button class="btn primario" id="receber-pix">Receber via PIX</button></div>`
+    ${operavel ? html`<div class="card card-body row" style="margin:16px 0;justify-content:space-between">
+      <span class="muted small">Transferências, PIX e pagamentos são autorizados pelo próprio cliente no Internet Banking.</span>
+      <button class="btn primario" id="receber-pix">Gerar QR Code para depósito</button></div>`
       : html`<div class="card card-body" style="margin:16px 0;background:var(--warn-bg);color:var(--warn);font-weight:600">Conta ${c.status}${c.cliente_status !== 'ativo' ? ` / titular ${c.cliente_status}` : ''}: movimentações indisponíveis.</div>`}
     <div class="grid grid-2-1">
       <div class="card"><div class="card-head"><h2>Extrato</h2>
@@ -144,7 +142,6 @@ export async function detalheConta({ alvo, id, ativo }) {
   $('#inicio', alvo).addEventListener('change', (e) => { filtro.inicio = e.target.value; filtro.pagina = 1; carregarExtrato(); });
   $('#fim', alvo).addEventListener('change', (e) => { filtro.fim = e.target.value; filtro.pagina = 1; carregarExtrato(); });
 
-  $$('[data-op]', alvo).forEach((b) => b.addEventListener('click', () => formOperacao(b.dataset.op, c, recarregar)));
   const rp = $('#receber-pix', alvo);
   if (rp) rp.onclick = () => receberViaPix(c, recarregar);
   $$('[data-status]', alvo).forEach((b) => b.addEventListener('click', async () => {

@@ -178,6 +178,21 @@ CREATE TABLE IF NOT EXISTS acessos_cliente (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Favorecidos do cliente (cadastrados pela equipe; o cliente usa no PIX e na transferência).
+CREATE TABLE IF NOT EXISTS favorecidos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('pix','conta')),
+  apelido TEXT,
+  nome TEXT,
+  documento TEXT,
+  chave TEXT,
+  conta_id INTEGER REFERENCES contas(id),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_favorecidos_cliente ON favorecidos(cliente_id);
+
 -- Desafios do teclado virtual de pares (uso único, expiram em 3 minutos).
 CREATE TABLE IF NOT EXISTS desafios_teclado (
   id TEXT PRIMARY KEY,

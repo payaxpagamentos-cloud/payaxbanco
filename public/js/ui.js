@@ -19,6 +19,10 @@ export function html(strings, ...vals) {
 export const $ = (sel, raiz = document) => raiz.querySelector(sel);
 export const $$ = (sel, raiz = document) => [...raiz.querySelectorAll(sel)];
 
+// ===== Marca =====
+/** Nome PAY AX em texto. Substitui o logo enquanto a arte oficial não está pronta. */
+export const marca = (variante = 'escura') => raw(`<span class="marca marca-${variante}" aria-label="PAY AX">PAY<span>AX</span></span>`);
+
 // ===== Formatação =====
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 export const moeda = (centavos) => BRL.format((Number(centavos) || 0) / 100);

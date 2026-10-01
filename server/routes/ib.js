@@ -14,6 +14,7 @@ const { paginacao } = require('../lib/paginacao');
 const { buscarConta, exigirContaOperavel } = require('../lib/conta');
 const { localizarConta, buscarChaveInterna, transferir, enviarPix, fmt } = require('../lib/movimentos');
 const { pagarParcela } = require('../lib/emprestimos');
+const favorecidos = require('../lib/favorecidos');
 const { lerBoleto, gerarBoletoBancario, gerarConvenio, formatarLinha } = require('../lib/boleto');
 
 const MAX_TENTATIVAS = 5;
@@ -176,14 +177,11 @@ module.exports = (db, bradesco) => {
   // ---------- Saldo e extrato ----------
   r.get('/resumo', (req, res) => {
     const contas = db.prepare("SELECT * FROM contas WHERE cliente_id = ? AND status <> 'encerrada' ORDER BY id").all(req.cliente.id);
-    const ids = contas.map((c) => c.id);
-    const ultimas = ids.length ? db.prepare(`SELECT t.id, t.conta_id, t.tipo, t.valor_centavos, t.descricao, t.criado_em, t.estornada_em
-      FROM transacoes t WHERE t.conta_id IN (${ids.map(() => '?').join(',')}) ORDER BY t.id DESC LIMIT 8`).all(...ids) : [];
     const emprestimos = db.prepare(`SELECT e.id, e.valor_centavos, e.num_parcelas, e.valor_parcela_centavos,
         (SELECT COUNT(*) FROM parcelas p WHERE p.emprestimo_id = e.id AND p.status = 'paga') AS pagas,
         (SELECT MIN(vencimento) FROM parcelas p WHERE p.emprestimo_id = e.id AND p.status = 'aberta') AS proximo_vencimento
       FROM emprestimos e WHERE e.cliente_id = ? AND e.status = 'ativo'`).all(req.cliente.id);
-    res.json({ contas, ultimas: limparLancamentos(ultimas), emprestimos, limite: usoDiario(req) });
+    res.json({ contas, emprestimos, limite: usoDiario(req) });
   });
 
   r.get('/contas/:id/extrato', (req, res) => {
@@ -220,6 +218,15 @@ module.exports = (db, bradesco) => {
       // Autenticação própria da PAY AX (os identificadores do banco liquidante ficam só com a equipe).
       autenticacao: `PAYAX-${t.grupo.replace(/-/g, '').slice(0, 24).toUpperCase()}`,
     });
+  });
+
+  // ---------- Favorecidos (somente consulta; o cadastro é feito pela equipe PAY AX) ----------
+  r.get('/favorecidos', (req, res) => {
+    res.json(favorecidos.listar(db, req.cliente.id).map((f) => ({
+      id: f.id, tipo: f.tipo, apelido: f.apelido, nome: f.nome, chave: f.chave,
+      agencia: f.agencia, numero: f.numero ? `${f.numero}-${f.digito}` : null, conta: f.conta,
+      documento: f.documento ? mascararDocumento(f.documento) : null,
+    })));
   });
 
   // ---------- PIX ----------

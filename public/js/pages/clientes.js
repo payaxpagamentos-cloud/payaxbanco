@@ -127,6 +127,7 @@ export async function detalheCliente({ alvo, id, ativo }) {
             : html`<tr><td colspan="5" class="vazio">Nenhum empréstimo.</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="stack"><div class="card" id="ib-card"><div class="card-head"><h2>Internet Banking</h2></div><div class="card-body muted">Carregando…</div></div>
+      <div class="card" id="fav-card"><div class="card-head"><h2>Favorecidos</h2><button class="btn sm" id="fav-novo" ${c.status !== 'ativo' ? html`disabled` : ''}>+ Cadastrar</button></div><div id="fav-lista" class="card-body muted">Carregando…</div></div>
       <div class="card"><div class="card-head"><h2>Dados cadastrais</h2></div><div class="card-body"><dl class="dl" style="grid-template-columns:1fr">
         <div><dt>E-mail</dt><dd>${c.email ?? '—'}</dd></div><div><dt>Telefone</dt><dd>${telefone(c.telefone)}</dd></div>
         <div><dt>${c.tipo === 'PF' ? 'Nascimento' : 'Fundação'}</dt><dd>${data(c.data_nascimento)}</dd></div>
@@ -140,6 +141,7 @@ export async function detalheCliente({ alvo, id, ativo }) {
   $('#editar', alvo).onclick = () => formCliente(c, recarregar);
   $('#abrir', alvo).onclick = () => abrirConta(c, (nova) => { location.hash = `#/contas/${nova.id}`; });
   cartaoInternetBanking($('#ib-card', alvo), c);
+  cartaoFavorecidos($('#fav-card', alvo), c);
   const ex = $('#excluir', alvo);
   if (ex) ex.onclick = async () => {
     if (!(await confirmar('Excluir cliente', `Excluir definitivamente ${c.nome}? Esta ação não pode ser desfeita.`, 'Excluir'))) return;
@@ -197,4 +199,45 @@ async function cartaoInternetBanking(el, cliente) {
   if (stb) stb.onclick = async () => {
     try { await api.patch(`/clientes/${cliente.id}/internet-banking`, { status: st.status === 'ativo' ? 'bloqueado' : 'ativo' }); toast('Acesso atualizado.'); recarregar(); } catch (e) { toast(e.message, 'erro'); }
   };
+}
+
+/** Favorecidos do cliente: a equipe cadastra; o cliente escolhe no PIX ou na transferência (sempre com a senha dele). */
+async function cartaoFavorecidos(el, cliente) {
+  const lista = await api.get(`/clientes/${cliente.id}/favorecidos`);
+  const corpo = $('#fav-lista', el);
+  corpo.classList.remove('muted');
+  corpo.innerHTML = String(lista.length ? html`<div class="stack" style="gap:10px">${lista.map((f) => html`<div class="row" style="justify-content:space-between;flex-wrap:nowrap">
+      <div style="min-width:0"><strong>${f.apelido || f.nome || f.chave}</strong> <span class="badge info">${f.tipo === 'pix' ? 'PIX' : 'Conta PAY AX'}</span>
+        <div class="small muted" style="word-break:break-all">${f.tipo === 'pix' ? `Chave ${f.chave}` : `Conta ${f.conta}`}${f.nome && f.apelido ? ` · ${f.nome}` : ''}</div></div>
+      <button class="btn sm perigo" data-fav-del="${f.id}">Remover</button></div>`)}</div>`
+    : html`<p style="margin:0" class="muted">Nenhum favorecido. Cadastre destinos frequentes do cliente para PIX e transferências.</p>`);
+  const recarregar = () => cartaoFavorecidos(el, cliente);
+  $$('[data-fav-del]', el).forEach((b) => b.addEventListener('click', async () => {
+    if (!(await confirmar('Remover favorecido', 'O cliente deixará de ver este favorecido no Internet Banking.', 'Remover'))) return;
+    try { await api.del(`/clientes/${cliente.id}/favorecidos/${b.dataset.favDel}`); toast('Favorecido removido.'); recarregar(); } catch (e) { toast(e.message, 'erro'); }
+  }));
+  const novo = $('#fav-novo', el);
+  if (novo) novo.onclick = () => modal({
+    titulo: 'Cadastrar favorecido',
+    rotuloEnviar: 'Cadastrar',
+    corpo: html`<div class="form">
+      <div class="c6"><label for="fav-tipo">Tipo</label><select id="fav-tipo" name="tipo"><option value="pix">Chave PIX (qualquer banco)</option><option value="conta">Conta PAY AX</option></select></div>
+      <div class="c6"><label for="fav-apelido">Apelido (opcional)</label><input id="fav-apelido" name="apelido" maxlength="60" placeholder="Ex.: Aluguel, Fornecedor"></div>
+      <div class="c12" data-pix><label for="fav-chave">Chave PIX</label><input id="fav-chave" name="chave" placeholder="CPF/CNPJ, e-mail, celular ou chave aleatória"></div>
+      <div class="c12" data-pix><label for="fav-nome">Nome do favorecido (para chaves de outros bancos)</label><input id="fav-nome" name="nome" maxlength="120"></div>
+      <div class="c4" data-conta hidden><label for="fav-ag">Agência</label><input id="fav-ag" name="agencia" value="0001" inputmode="numeric"></div>
+      <div class="c8" data-conta hidden><label for="fav-num">Conta com dígito</label><input id="fav-num" name="numero" placeholder="100001-2"></div>
+      <div class="c12 ajuda">Cadastrar um favorecido não movimenta dinheiro. Cada envio é autorizado pelo cliente com a senha de transação.</div></div>`,
+    aoAbrir: (m) => {
+      const tipo = $('#fav-tipo', m);
+      tipo.onchange = () => {
+        $$('[data-pix]', m).forEach((x) => { x.hidden = tipo.value !== 'pix'; });
+        $$('[data-conta]', m).forEach((x) => { x.hidden = tipo.value !== 'conta'; });
+      };
+    },
+    aoEnviar: async (form, fechar) => {
+      const f = await api.post(`/clientes/${cliente.id}/favorecidos`, dadosForm(form));
+      fechar(); toast(`Favorecido ${f.apelido || f.nome || f.chave} cadastrado.`); recarregar();
+    },
+  });
 }

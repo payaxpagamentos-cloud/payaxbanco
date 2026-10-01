@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { pode, definirTitulo } from '../contexto.js';
-import { html, $, $$, moeda, data, pct, status, modal, toast, dadosForm, centavos, debounce, confirmar } from '../ui.js';
+import { html, $, $$, moeda, data, pct, status, modal, toast, dadosForm, centavos, debounce } from '../ui.js';
 import { seletor, ligarSeletor } from './seletores.js';
 
 const hoje = () => new Date().toISOString().slice(0, 10);
@@ -102,15 +102,7 @@ export async function detalheEmprestimo({ alvo, id, ativo }) {
       <thead><tr><th>Nº</th><th>Vencimento</th><th class="num">Valor</th><th>Situação</th><th>Pagamento</th><th></th></tr></thead><tbody>
       ${e.parcelas.map((p) => html`<tr><td>${p.numero}</td><td>${data(p.vencimento)}</td><td class="num">${moeda(p.valor_centavos)}</td>
         <td>${p.status === 'aberta' && p.vencimento < hoje() ? status('vencida') : status(p.status)}</td><td>${p.paga_em ? data(p.paga_em) : '—'}</td>
-        <td class="right">${proxima && p.numero === proxima.numero && e.status === 'ativo' ? html`<button class="btn sm ouro" data-pagar="${p.numero}">Pagar com saldo da conta</button>` : ''}</td></tr>`)}
+        <td class="right small muted">${proxima && p.numero === proxima.numero && e.status === 'ativo' ? 'Próxima a pagar (cliente, no Internet Banking)' : ''}</td></tr>`)}
       </tbody></table></div></div>`);
-  $$('[data-pagar]', alvo).forEach((b) => b.addEventListener('click', async () => {
-    const p = e.parcelas.find((x) => String(x.numero) === b.dataset.pagar);
-    if (!(await confirmar('Pagar parcela', `Debitar ${moeda(p.valor_centavos)} da conta ${e.numero}-${e.digito} para quitar a parcela ${p.numero}?`, 'Pagar'))) return;
-    try {
-      await api.post(`/emprestimos/${e.id}/parcelas/${p.numero}/pagar`);
-      toast(`Parcela ${p.numero} paga.`);
-      detalheEmprestimo({ alvo, id, ativo });
-    } catch (err) { toast(err.message, 'erro'); }
-  }));
+
 }
