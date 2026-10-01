@@ -157,6 +157,21 @@ CREATE TABLE IF NOT EXISTS mensagens (
 CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens(cliente_id, gerente_id, id);
 CREATE INDEX IF NOT EXISTS idx_mensagens_data ON mensagens(criado_em);
 
+-- Pedidos do cliente para alterar o limite diário do Internet Banking (aumentos valem 24 horas depois).
+CREATE TABLE IF NOT EXISTS pedidos_limite (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cliente_id INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+  valor_atual_centavos INTEGER NOT NULL,
+  valor_novo_centavos INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('agendado', 'efetivado', 'cancelado', 'recusado')),
+  efetiva_em TEXT NOT NULL,
+  motivo TEXT,
+  decidido_por INTEGER REFERENCES usuarios(id),
+  concluido_em TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pedidos_limite_cliente ON pedidos_limite(cliente_id, status);
+
 -- Quais ações exigem análise da Ouvidoria (sem registro: vale o padrão do sistema).
 CREATE TABLE IF NOT EXISTS regras_analise (
   acao TEXT PRIMARY KEY,

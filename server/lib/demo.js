@@ -119,6 +119,13 @@ function popularDemo(db) {
     msg('45997418000153', marcos, 'gerente', dia + 280, 'Consegue sim! Pelo Internet Banking, em PIX → Receber, você gera o QR Code com ou sem valor.');
     msg('15350946056', marcos, 'gerente', 3 * dia, 'Olá, Rafael! Vi seu pedido de encerramento. Posso entender o motivo e ver se conseguimos ajudar?');
 
+    // Limite diário: João pediu aumento há 6 horas (entra em vigor em 18 horas); antes, uma redução.
+    const idJoao = clienteDoc('52998224725');
+    db.prepare(`INSERT INTO pedidos_limite (cliente_id, valor_atual_centavos, valor_novo_centavos, status, efetiva_em, concluido_em, criado_em)
+      VALUES (?, 1500000, 1000000, 'efetivado', datetime('now', '-10 days'), datetime('now', '-10 days'), datetime('now', '-10 days'))`).run(idJoao);
+    db.prepare(`INSERT INTO pedidos_limite (cliente_id, valor_atual_centavos, valor_novo_centavos, status, efetiva_em, criado_em)
+      VALUES (?, 1000000, 2000000, 'agendado', datetime('now', '+18 hours'), datetime('now', '-6 hours'))`).run(idJoao);
+
     // Ouvidoria: um bloqueio pedido pela gerente e um encerramento pedido pelo cliente, aguardando análise.
     const gerente = db.prepare("SELECT id FROM usuarios WHERE email = 'gerente@payax.com.br'").get();
     const contaDe = (documento) => db.prepare("SELECT c.id, c.cliente_id FROM contas c JOIN clientes cl ON cl.id = c.cliente_id WHERE cl.documento = ? AND c.tipo = 'corrente'").get(documento);

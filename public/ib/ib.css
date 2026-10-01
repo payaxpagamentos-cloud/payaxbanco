@@ -80,3 +80,5 @@ body.ib { background: var(--bg); }
 .gerente-inicio { margin-top: 16px; color: inherit; text-decoration: none; }
 .gerente-inicio:hover { border-color: var(--payax-azul-3); text-decoration: none; }
 .gerente-inicio .btn { pointer-events: none; }
+.tempo-restante { font-size: 16px; margin: 6px 0 2px; }
+.tempo-restante strong { font-size: 20px; font-variant-numeric: tabular-nums; }

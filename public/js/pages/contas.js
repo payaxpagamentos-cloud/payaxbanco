@@ -1,12 +1,14 @@
 import { api } from '../api.js';
-import { pode, definirTitulo, semAlcada, usuarioAtual } from '../contexto.js';
+import { pode, definirTitulo, semAlcada, usuarioAtual, ehAdmin } from '../contexto.js';
 import { avisoAnalise } from './ouvidoria.js';
 import {
   html, $, $$, moeda, moedaSinal, documento, dataHora, data, status, conta, TIPO_CONTA, TIPO_TRANSACAO,
   modal, confirmar, toast, dadosForm, centavos, valorMoedaInput, paginacao, debounce,
 } from '../ui.js';
 import { seletor, ligarSeletor } from './seletores.js';
-import { receberViaPix } from './bradesco.js';
+import { baloes, rolarFim } from '../chat.js';
+import { ligarContagens, restante } from '../prazo.js';
+import { abrirConversa } from './relacionamento.js';
 
 export function abrirConta(cliente, aoSalvar) {
   modal({
@@ -93,7 +95,7 @@ export function estornar(transacao, aoConcluir) {
 }
 
 export async function detalheConta({ alvo, id, ativo }) {
-  const [c, pendentes] = await Promise.all([api.get(`/contas/${id}`), api.get('/ouvidoria', { conta_id: id, status: 'em_analise' })]);
+  const [c, pendentes, hist] = await Promise.all([api.get(`/contas/${id}`), api.get('/ouvidoria', { conta_id: id, status: 'em_analise' }), api.get(`/contas/${id}/historico`)]);
   if (!ativo()) return;
   definirTitulo(`Conta ${c.numero}-${c.digito}`);
   const gestor = pode('operacoes.estornar');
@@ -117,10 +119,13 @@ export async function detalheConta({ alvo, id, ativo }) {
       <div class="meta"><div><div class="rotulo">Limite</div><strong>${moeda(c.limite_centavos)}</strong></div>
         <div><div class="rotulo">Disponível</div><strong>${moeda(disponivel)}</strong></div>
         <div><div class="rotulo">Chaves PIX</div><strong>${c.chaves_pix.length}</strong></div></div></div>
-    ${operavel ? html`<div class="card card-body row" style="margin:16px 0;justify-content:space-between">
-      <span class="muted small">Transferências, PIX e pagamentos são autorizados pelo próprio cliente no Internet Banking.</span>
-      <button class="btn primario" id="receber-pix" ${semAlcada('bradesco.cobrancas')}>Gerar QR Code para depósito</button></div>`
+    ${operavel ? html`<div class="card card-body small muted" style="margin:16px 0">Transferências, PIX e pagamentos são autorizados pelo próprio cliente no Internet Banking.</div>`
       : html`<div class="card card-body" style="margin:16px 0;background:var(--warn-bg);color:var(--warn);font-weight:600">Conta ${c.status}${c.cliente_status !== 'ativo' ? ` / titular ${c.cliente_status}` : ''}: movimentações indisponíveis.</div>`}
+    ${painelLimites(c, hist)}
+    <div class="grid grid-2" style="margin-bottom:16px">
+      ${painelSolicitacoes(hist)}
+      ${painelConversas(c, hist)}
+    </div>
     <div class="grid grid-2-1">
       <div class="card"><div class="card-head"><h2>Extrato</h2>
         <div class="row"><input type="date" id="inicio" style="width:auto"><input type="date" id="fim" style="width:auto"></div></div>
@@ -155,8 +160,20 @@ export async function detalheConta({ alvo, id, ativo }) {
   $('#inicio', alvo).addEventListener('change', (e) => { filtro.inicio = e.target.value; filtro.pagina = 1; carregarExtrato(); });
   $('#fim', alvo).addEventListener('change', (e) => { filtro.fim = e.target.value; filtro.pagina = 1; carregarExtrato(); });
 
-  const rp = $('#receber-pix', alvo);
-  if (rp) rp.onclick = () => receberViaPix(c, recarregar);
+  ligarContagens(alvo, recarregar);
+  rolarFim($('.chat-compacto', alvo));
+  $$('[data-recusar-limite]', alvo).forEach((b) => b.addEventListener('click', () => modal({
+    titulo: 'Recusar aumento de limite',
+    rotuloEnviar: 'Recusar aumento',
+    corpo: html`<p style="margin-top:0">O limite diário do cliente continua como está. O cliente vê o pedido como recusado no Internet Banking.</p>
+      <label for="mot-lim">Motivo (registro interno)</label><textarea id="mot-lim" name="motivo"></textarea>`,
+    aoEnviar: async (form, fechar) => {
+      await api.post(`/contas/limites/pedidos/${b.dataset.recusarLimite}/recusar`, { motivo: form.motivo.value });
+      fechar(); toast('Aumento recusado.'); recarregar();
+    },
+  })));
+  const responder = $('#responder-cliente', alvo);
+  if (responder) responder.onclick = () => abrirConversa(c.cliente_id, { gerenteId: c.gerente_id ?? null, gerenteNome: c.gerente_nome, aoFechar: recarregar });
   $$('[data-status]', alvo).forEach((b) => b.addEventListener('click', async () => {
     const novo = b.dataset.status;
     const acoes = { bloqueada: 'Bloquear', ativa: 'Desbloquear', encerrada: 'Encerrar' };
@@ -232,4 +249,49 @@ export function novaChavePix(contaSel, aoSalvar) {
       aoSalvar?.(k);
     },
   });
+}
+
+const STATUS_PEDIDO = { agendado: ['Aguardando prazo', 'warn'], efetivado: ['Em vigor', 'ok'], cancelado: ['Cancelado pelo cliente', ''], recusado: ['Recusado', 'danger'] };
+const STATUS_SOL = { em_analise: ['Em análise', 'warn'], aprovada: ['Aprovada', 'ok'], recusada: ['Recusada', 'danger'], cancelada: ['Cancelada', ''] };
+
+/** Todos os limites do titular: cheque especial da conta e limite diário do Internet Banking, com o aumento em andamento. */
+function painelLimites(c, hist) {
+  const d = hist.limite_diario;
+  const p = d?.pedido;
+  return html`<div class="card" style="margin-bottom:16px"><div class="card-head"><h2>Limites</h2>
+      ${pode('ib.gerenciar') && d ? html`<a class="btn sm" href="#/clientes/${c.cliente_id}">Gerenciar no cadastro</a>` : ''}</div>
+    <div class="card-body limites-grade">
+      <div><div class="rotulo">Cheque especial (esta conta)</div><strong>${moeda(c.limite_centavos)}</strong>
+        <div class="small muted">${c.saldo_centavos < 0 ? `Em uso: ${moeda(-c.saldo_centavos)}` : 'Sem uso no momento'}</div></div>
+      ${d ? html`<div><div class="rotulo">Limite diário no Internet Banking</div><strong>${moeda(d.limite_centavos)}</strong>
+          <div class="small muted">PIX, transferências e pagamentos do titular</div></div>
+        <div><div class="rotulo">Usado hoje</div><strong>${moeda(d.usado_centavos)}</strong>
+          <div class="barra-h" style="margin-top:6px"><span style="width:${Math.min(100, (d.usado_centavos / Math.max(1, d.limite_centavos)) * 100).toFixed(1)}%"></span></div></div>
+        <div><div class="rotulo">Disponível hoje</div><strong>${moeda(d.disponivel_centavos)}</strong></div>`
+        : html`<div class="muted small">O titular ainda não tem acesso ao Internet Banking.</div>`}
+    </div>
+    ${p ? html`<div class="card-body pedido-limite">
+      <div><strong>Aumento pedido pelo cliente: ${moeda(p.valor_atual_centavos)} → ${moeda(p.valor_novo_centavos)}</strong>
+        <div class="small muted">Pedido em ${dataHora(p.criado_em)}. Entra em vigor automaticamente em <strong data-prazo-ate="${p.efetiva_em}">${restante(p.efetiva_em)}</strong> (${dataHora(p.efetiva_em)}).</div>
+        <div class="barra-h" style="margin-top:8px"><span data-prazo-barra="${p.efetiva_em}" data-desde="${p.criado_em}"></span></div></div>
+      ${pode('ib.gerenciar') ? html`<button class="btn sm perigo" data-recusar-limite="${p.id}">Recusar aumento</button>` : ''}</div>` : ''}
+  </div>`;
+}
+
+function painelSolicitacoes(hist) {
+  const itens = [
+    ...hist.solicitacoes.map((s) => ({ quando: s.criado_em, titulo: s.tipo_rotulo, detalhe: `${s.protocolo}${s.conta_numero ? ` · conta ${s.conta_numero}` : ''} · ${s.origem === 'cliente' ? 'pedido do cliente' : `por ${s.solicitante_nome ?? 'equipe'}`}`, st: STATUS_SOL[s.status], link: '#/ouvidoria' })),
+    ...hist.pedidos_limite.map((x) => ({ quando: x.criado_em, titulo: `Limite diário: ${moeda(x.valor_atual_centavos)} → ${moeda(x.valor_novo_centavos)}`,
+      detalhe: x.valor_novo_centavos < x.valor_atual_centavos ? 'Redução pedida pelo cliente (imediata)' : `Aumento pedido pelo cliente${x.motivo ? ` · ${x.motivo}` : ''}`, st: STATUS_PEDIDO[x.status] })),
+  ].sort((a, b) => (a.quando < b.quando ? 1 : -1));
+  return html`<div class="card"><div class="card-head"><h2>Solicitações</h2><span class="small muted">${itens.length}</span></div>
+    <div class="lista-hist">${itens.length ? itens.map((i) => html`<div class="item-hist">
+        <div><strong>${i.titulo}</strong><div class="small muted">${i.detalhe}</div><div class="small muted">${dataHora(i.quando)}</div></div>
+        <span class="badge ${i.st[1]}">${i.st[0]}</span></div>`) : html`<div class="vazio">Nenhuma solicitação deste cliente.</div>`}</div></div>`;
+}
+
+function painelConversas(c, hist) {
+  return html`<div class="card"><div class="card-head"><h2>Conversas com o gerente</h2>
+      ${pode('relacionamento.atender') && (ehAdmin() || c.gerente_id === usuarioAtual().id) ? html`<button class="btn sm" id="responder-cliente">Responder</button>` : ''}</div>
+    <div class="card-body"><div class="chat-lista chat-compacto">${baloes(hist.mensagens, { lado: 'gerente', nomeOutro: c.cliente_nome.split(' ')[0], meuNome: usuarioAtual().nome })}</div></div></div>`;
 }

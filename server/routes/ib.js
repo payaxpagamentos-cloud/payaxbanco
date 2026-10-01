@@ -18,12 +18,12 @@ const favorecidos = require('../lib/favorecidos');
 const abertura = require('../lib/abertura');
 const ouvidoria = require('../lib/ouvidoria');
 const rel = require('../lib/relacionamento');
+const limites = require('../lib/limites');
 const { transacao } = require('../db');
 const { lerBoleto, gerarBoletoBancario, gerarConvenio, formatarLinha } = require('../lib/boleto');
 
 const MAX_TENTATIVAS = 5;
 const MAX_TENTATIVAS_PIN = 3;
-const SAIDAS = "('pix_enviado','transferencia_enviada','pagamento')";
 
 // O cliente não vê o banco que liquida as operações da PAY AX (lançamentos antigos podiam citar o parceiro).
 const limparDescricao = (d) => (d ? d.replace(/ via Bradesco/gi, '').replace(/ \(vinculado manualmente\)/i, '') : d);
@@ -106,13 +106,8 @@ module.exports = (db, bradesco) => {
     if (!(await verificarNumerica(candidatos(db, entrada), acesso(req).senha_hash))) throw new ErroNegocio('Senha de acesso incorreta.', 422);
   }
 
-  function usoDiario(req) {
-    const { usado } = db.prepare(`SELECT COALESCE(-SUM(t.valor_centavos),0) AS usado FROM transacoes t JOIN contas c ON c.id = t.conta_id
-      WHERE c.cliente_id = ? AND t.canal = 'internet_banking' AND t.tipo IN ${SAIDAS} AND t.estornada_em IS NULL
-        AND date(t.criado_em, ?) = date('now', ?)`).get(req.cliente.id, F, F);
-    const { limite_diario_centavos: limite } = acesso(req);
-    return { limite_centavos: limite, usado_centavos: usado, disponivel_centavos: Math.max(0, limite - usado) };
-  }
+  /** Limite diário, uso de hoje e aumento agendado (efetiva aumentos cujo prazo de 24 horas terminou). */
+  const usoDiario = (req) => limites.situacao(db, req.cliente.id);
 
   function exigirLimite(req, valor) {
     const u = usoDiario(req);
@@ -135,6 +130,24 @@ module.exports = (db, bradesco) => {
     const valor = req.body?.valor_centavos === undefined ? null : v.valorCentavos(req.body.valor_centavos);
     return { origem, valor };
   }
+
+  // ---------- Limites ----------
+  r.get('/limites', (req, res) => {
+    const contas = db.prepare("SELECT id, tipo, agencia, numero, digito, limite_centavos FROM contas WHERE cliente_id = ? AND status <> 'encerrada' ORDER BY id").all(req.cliente.id);
+    res.json({ diario: usoDiario(req), contas, pedidos: limites.listar(db, req.cliente.id) });
+  });
+
+  r.post('/limites/diario', async (req, res) => {
+    const novo = Number(req.body?.valor_centavos);
+    v.exigir(Number.isInteger(novo) && novo >= 0, 'Informe o novo limite.');
+    await confirmarPin(req);
+    res.json(transacao(db, () => limites.pedir(db, req, req.cliente.id, novo)));
+  });
+
+  r.post('/limites/pedidos/:id/cancelar', (req, res) => {
+    transacao(db, () => limites.cancelar(db, req, req.cliente.id, Number(req.params.id)));
+    res.json(usoDiario(req));
+  });
 
   // ---------- Meu gerente (relacionamento) ----------
   /** Gerente da conversa: um dos gerentes das contas do cliente; sem gerente, o "Atendimento PAY AX" (null). */

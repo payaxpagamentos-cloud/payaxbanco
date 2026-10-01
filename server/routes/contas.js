@@ -7,6 +7,7 @@ const { alcada } = alcadas;
 const situacao = require('../lib/situacao');
 const ouvidoria = require('../lib/ouvidoria');
 const rel = require('../lib/relacionamento');
+const limites = require('../lib/limites');
 const { transacao } = require('../db');
 const { ErroNegocio } = require('../lib/erros');
 const v = require('../lib/validacao');
@@ -93,6 +94,25 @@ module.exports = (db) => {
       return novoId;
     });
     res.status(201).json(buscarConta(db, id));
+  });
+
+  /** Limites, pedidos de limite, solicitações à Ouvidoria e conversas com o gerente do titular da conta. */
+  r.get('/:id/historico', (req, res) => {
+    const conta = buscarConta(db, req.params.id);
+    const mensagens = db.prepare(`SELECT m.id, m.autor, m.texto, m.criado_em, m.lida_em, m.gerente_id, g.nome AS gerente_nome, u.nome AS usuario_nome
+      FROM mensagens m LEFT JOIN usuarios g ON g.id = m.gerente_id LEFT JOIN usuarios u ON u.id = m.usuario_id
+      WHERE m.cliente_id = ? ORDER BY m.id DESC LIMIT 200`).all(conta.cliente_id).reverse();
+    res.json({
+      limite_diario: limites.situacao(db, conta.cliente_id),
+      pedidos_limite: limites.listar(db, conta.cliente_id),
+      solicitacoes: ouvidoria.listar(db, { cliente_id: conta.cliente_id }),
+      mensagens,
+    });
+  });
+
+  r.post('/limites/pedidos/:pid/recusar', alcada(db, 'ib.gerenciar'), (req, res) => {
+    transacao(db, () => limites.recusar(db, req, Number(req.params.pid), req.body?.motivo));
+    res.json({ ok: true });
   });
 
   r.patch('/:id/gerente', alcada(db, 'contas.gerente'), (req, res) => {

@@ -41,6 +41,8 @@ module.exports = {
   // Deslocamento usado para agrupar dados por dia no fuso local (datas são gravadas em UTC).
   fusoSqlite: process.env.PAYAX_FUSO || '-3 hours',
   // Operações acima deste valor exigem perfil gerente ou admin.
+  // Limite diário máximo que o cliente pode escolher sozinho no Internet Banking (acima disso, com o gerente).
+  limiteDiarioMaximoCentavos: Number(process.env.PAYAX_LIMITE_DIARIO_MAXIMO) || 5_000_000,
   limiteOperadorCentavos: Number(process.env.PAYAX_LIMITE_OPERADOR) || 5_000_000,
   // Integração com a conta PJ da PAY AX no Bradesco (conta única; o Banqueiro controla o saldo de cada cliente).
   bradesco: {

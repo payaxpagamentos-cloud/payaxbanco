@@ -348,3 +348,16 @@ body:has(.login) .faixa-demo ~ #app .login { min-height: calc(100vh - 37px); }
 .chat-envio { display: flex; gap: 10px; align-items: flex-end; margin-top: 12px; }
 .chat-envio textarea { flex: 1; min-height: 52px; height: 52px; resize: vertical; }
 .chat-envio .btn { height: 44px; }
+
+/* Conta: limites, solicitações e conversas */
+.limites-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 24px; }
+.limites-grade .rotulo { font-size: 12px; color: var(--text-2); font-weight: 600; }
+.limites-grade strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.pedido-limite { display: flex; gap: 16px; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); background: var(--warn-bg); }
+.pedido-limite > div { flex: 1; min-width: 0; }
+.pedido-limite .barra-h span { background: var(--warn); }
+.lista-hist { max-height: 360px; overflow-y: auto; }
+.item-hist { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.item-hist:last-child { border-bottom: 0; }
+.chat-compacto { height: 300px; }
+@media (max-width: 1100px) { .limites-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
