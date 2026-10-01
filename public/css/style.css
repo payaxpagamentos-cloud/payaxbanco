@@ -83,7 +83,7 @@ h3 { font-size: 14px; font-weight: 700; }
 .topbar .titulo { flex: 1; min-width: 0; }
 .topbar .usuario { display: flex; align-items: center; gap: 10px; }
 .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--payax-azul-2); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
-.menu-btn { display: none; }
+.btn.menu-btn { display: none; }
 .content { padding: 24px 28px 48px; max-width: 1400px; width: 100%; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .page-head p { margin: 4px 0 0; }
@@ -223,7 +223,7 @@ input.moeda { text-align: right; font-variant-numeric: tabular-nums; }
   .layout { grid-template-columns: minmax(0, 1fr); }
   .sidebar { position: fixed; left: 0; top: 0; z-index: 40; width: var(--sidebar); transform: translateX(-100%); transition: transform .2s; }
   .sidebar.aberta { transform: none; box-shadow: 0 0 0 100vmax rgba(0,0,0,.4); }
-  .menu-btn { display: inline-flex; }
+  .btn.menu-btn { display: inline-flex; }
   .topbar, .content { padding-left: 16px; padding-right: 16px; }
   .grid-2, .grid-4 { grid-template-columns: minmax(0, 1fr); }
   .form .c8, .form .c6, .form .c4, .form .c3, .form .c2 { grid-column: span 12; }

@@ -19,7 +19,7 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 | **Transações** | Consulta geral de lançamentos com filtros e **estorno** (reverte origem e destino). |
 | **Empréstimos** | Simulação e contratação pela Tabela Price, crédito automático em conta, cronograma de parcelas e pagamento em ordem com débito em conta; quitação automática. |
 | **Bradesco** | Conta PJ única da PAY AX no Bradesco: cobrança PIX com QR Code creditando a conta do cliente, webhook de confirmação, PIX para outros bancos, PIX sem identificação com vínculo manual e conciliação do saldo do banco com o saldo dos clientes. |
-| **Internet Banking** | Portal do cliente em `/ib/` (celular e desktop): saldo, extrato com comprovantes, PIX (enviar, receber por QR Code, minhas chaves), transferências, pagamento de boletos e contas de consumo, e empréstimos. |
+| **Internet Banking** | Portal web do cliente em `/ib/`: saldo, extrato com comprovantes, PIX (enviar, receber por QR Code, minhas chaves), transferências, pagamento de boletos e contas de consumo, e empréstimos. |
 | **Relatórios** | Exportação CSV (compatível com Excel) de clientes, contas, transações por período e carteira de crédito. |
 | **Auditoria** | Registro de todas as ações (login, cadastros, operações, estornos, alterações de limite/status) com usuário, data e IP. |
 | **Usuários** | Gestão de colaboradores e perfis de acesso. |
@@ -34,7 +34,7 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 
 ## Internet Banking
 
-Portal do cliente em **`/ib/`**, separado do Banqueiro e pensado primeiro para celular.
+Portal do cliente em **`/ib/`**, separado do Banqueiro. Versão web, com menu na lateral esquerda (a versão para celular será feita depois).
 
 - **Acesso:** a equipe habilita na ficha do cliente e entrega uma **senha provisória** de 6 números, que aparece uma única vez. No primeiro acesso, o cliente cria a senha de acesso e a **senha de transação** (6 números cada, diferentes entre si).
 - **Teclado virtual de pares:** login e confirmação de operações usam botões com dois números (ex.: "1 ou 4"), sorteados pelo servidor a cada uso e válidos uma única vez. O servidor recebe só quais botões foram clicados e testa as 64 combinações possíveis. Quem observa a tela ou captura o tráfego não descobre a senha. Senhas novas são criadas num teclado numérico embaralhado.

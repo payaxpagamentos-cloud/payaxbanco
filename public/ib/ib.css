@@ -1,19 +1,6 @@
 /* ===== Internet Banking PAY AX (complementa ../css/style.css) ===== */
 body.ib { background: var(--bg); }
-.ib-topo { position: sticky; top: 0; z-index: 20; background: var(--payax-azul); color: #fff; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; }
-.ib-topo .linha { max-width: 1040px; margin: 0 auto; display: flex; align-items: center; gap: 16px; }
-.ib-topo img { height: 30px; }
-.ib-topo .ola { flex: 1; min-width: 0; font-size: 13px; color: #B9C8E3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ib-topo .ola strong { color: #fff; font-size: 14px; }
-.ib-topo .btn { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); color: #fff; }
-.ib-topo .btn:hover { background: rgba(255,255,255,.16); }
-.ib-nav { display: flex; gap: 4px; max-width: 1040px; margin: 8px auto 0; overflow-x: auto; }
-.ib-nav a { color: #C9D5EA; padding: 8px 12px; border-radius: 8px; font-weight: 600; white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
-.ib-nav a:hover { background: rgba(255,255,255,.08); text-decoration: none; color: #fff; }
-.ib-nav a.ativo { background: rgba(245,183,0,.18); color: #fff; }
-.ib-nav svg, .ib-baixo svg { width: 18px; height: 18px; }
-.ib-conteudo { max-width: 1040px; margin: 0 auto; padding: 20px 16px 96px; }
-.ib-baixo { display: none; }
+.ib-conteudo { max-width: 1120px; }
 
 .saldo-card { background: linear-gradient(135deg, var(--payax-azul) 0%, var(--payax-azul-2) 70%, #1A4D96 100%); color: #fff; border-radius: 18px; padding: 20px; position: relative; overflow: hidden; }
 .saldo-card::after { content: ""; position: absolute; right: -50px; bottom: -70px; width: 200px; height: 200px; border-radius: 50%; border: 34px solid rgba(245,183,0,.16); }
@@ -66,18 +53,6 @@ body.ib { background: var(--bg); }
 .sucesso .ok svg { width: 28px; height: 28px; }
 .oculto { filter: blur(7px); user-select: none; }
 
-@media (max-width: 760px) {
-  .ib-nav { display: none; }
-  .ib-topo .sair-txt { display: none; }
-  .acoes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .ib-baixo { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--border); padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); }
-  .ib-baixo a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--text-2); padding: 4px 0; }
-  .ib-baixo a.ativo { color: var(--primary); }
-  .ib-baixo a:hover { text-decoration: none; }
-  .modal-fundo { align-items: end; padding: 0; }
-  .modal { width: 100%; border-radius: 16px 16px 0 0; max-height: 92vh; }
-  .toasts { left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
-}
 
 /* Teclado virtual */
 .teclado { display: flex; flex-direction: column; gap: 10px; }

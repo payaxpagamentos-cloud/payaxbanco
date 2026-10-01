@@ -1,5 +1,5 @@
 import { api, sessao } from './api.js';
-import { html, $, $$, icone, toast } from '../../js/ui.js';
+import { html, $, $$, icone, toast, iniciais } from '../../js/ui.js';
 import { estado } from './comum.js';
 import { telaLogin, telaPrimeiroAcesso } from './telas/login.js';
 import inicio from './telas/inicio.js';
@@ -11,13 +11,16 @@ import emprestimos from './telas/emprestimos.js';
 import perfil from './telas/perfil.js';
 
 const MENU = [
-  { rota: 'inicio', rotulo: 'Início', icone: 'casa', baixo: true },
-  { rota: 'pix', rotulo: 'PIX', icone: 'pix', baixo: true },
-  { rota: 'pagar', rotulo: 'Pagar', icone: 'barras', baixo: true },
+  { secao: 'Minha conta' },
+  { rota: 'inicio', rotulo: 'Início', icone: 'casa' },
+  { rota: 'extrato', rotulo: 'Extrato', icone: 'transacoes' },
+  { secao: 'Movimentar' },
+  { rota: 'pix', rotulo: 'PIX', icone: 'pix' },
+  { rota: 'pagar', rotulo: 'Pagar contas', icone: 'barras' },
   { rota: 'transferir', rotulo: 'Transferir', icone: 'operacoes' },
-  { rota: 'extrato', rotulo: 'Extrato', icone: 'transacoes', baixo: true },
+  { secao: 'Serviços' },
   { rota: 'emprestimos', rotulo: 'Empréstimos', icone: 'emprestimos' },
-  { rota: 'perfil', rotulo: 'Perfil', icone: 'perfil', baixo: true },
+  { rota: 'perfil', rotulo: 'Meu perfil', icone: 'perfil' },
 ];
 const TELAS = { inicio, pix, pagar, transferir, extrato, emprestimos, perfil };
 const INATIVIDADE_MS = 10 * 60 * 1000;
@@ -52,20 +55,36 @@ async function entrar() {
   rotear();
 }
 
+/** Layout web: menu na lateral esquerda (mesmo padrão do Banqueiro). */
 function layout() {
-  const primeiro = estado.me.nome.split(' ')[0];
+  const me = estado.me;
+  const nome = me.tipo === 'PJ' ? me.nome : me.nome.split(' ')[0];
   app.innerHTML = String(html`
-    <header class="ib-topo">
-      <div class="linha">
-        <img src="../img/logo-payax-branco.svg" alt="PAY AX">
-        <div class="ola">Olá, <strong>${estado.me.tipo === 'PJ' ? estado.me.nome : primeiro}</strong></div>
-        <button class="btn sm" id="sair" aria-label="Sair">${icone('sair')}<span class="sair-txt">Sair</span></button>
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand"><img src="../img/logo-payax-branco.svg" alt="PAY AX"></div>
+        <div class="brand" style="border:0;padding-bottom:0"><span class="produto">Internet Banking</span></div>
+        <nav class="nav" aria-label="Menu">
+          ${MENU.map((m) => (m.secao ? html`<div class="secao">${m.secao}</div>`
+            : html`<a href="#/${m.rota}" data-rota="${m.rota}">${icone(m.icone)}<span>${m.rotulo}</span></a>`))}
+        </nav>
+        <div class="rodape">Sessão encerrada após 10 min sem uso.<br>© ${new Date().getFullYear()} PAY AX</div>
+      </aside>
+      <div class="main">
+        <header class="topbar">
+          <button class="btn sm menu-btn" id="menu-btn" aria-label="Menu">${icone('menu')}</button>
+          <div class="titulo"><h1 id="titulo-pagina"></h1></div>
+          <div class="usuario">
+            <div class="nome right"><div style="font-weight:650">Olá, ${nome}</div><div class="small muted">${me.documento_mascarado}</div></div>
+            <span class="avatar">${iniciais(me.nome)}</span>
+            <button class="btn sm" id="sair">${icone('sair')} Sair</button>
+          </div>
+        </header>
+        <main class="content ib-conteudo" id="conteudo"></main>
       </div>
-      <nav class="ib-nav" aria-label="Menu">${MENU.map((m) => html`<a href="#/${m.rota}" data-rota="${m.rota}">${icone(m.icone)}${m.rotulo}</a>`)}</nav>
-    </header>
-    <main class="ib-conteudo" id="conteudo"></main>
-    <nav class="ib-baixo" aria-label="Menu principal">${MENU.filter((m) => m.baixo).map((m) => html`<a href="#/${m.rota}" data-rota="${m.rota}">${icone(m.icone)}${m.rotulo}</a>`)}</nav>`);
+    </div>`);
   $('#sair').onclick = () => sair();
+  $('#menu-btn').onclick = () => $('#sidebar').classList.toggle('aberta');
 }
 
 async function rotear() {
@@ -73,8 +92,11 @@ async function rotear() {
   if (!$('.ib-conteudo')) layout();
   const [rota = 'inicio', sub] = location.hash.replace(/^#\/?/, '').split('/');
   const tela = TELAS[rota] ?? inicio;
+  $('#sidebar').classList.remove('aberta');
   $$('[data-rota]').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === (TELAS[rota] ? rota : 'inicio')));
-  document.title = `${MENU.find((m) => m.rota === rota)?.rotulo ?? 'Início'} · Internet Banking PAY AX`;
+  const rotulo = MENU.find((m) => m.rota === (TELAS[rota] ? rota : 'inicio'))?.rotulo ?? 'Início';
+  document.title = `${rotulo} · Internet Banking PAY AX`;
+  $('#titulo-pagina').textContent = rotulo;
   const alvo = $('#conteudo');
   alvo.innerHTML = '<div class="carregando">Carregando…</div>';
   try {
