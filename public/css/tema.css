@@ -6,7 +6,7 @@
 @font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
 @font-face { font-family: "Unbounded"; src: url("../fonts/unbounded.woff2") format("woff2"); font-weight: 200 900; font-display: swap; }
 
-:root:has(body.ib), body.ib {
+:root:has(body.tema), body.tema {
   --ciano: #19E3FF;
   --azul: #1F8BFF;
   --azul-texto: #0B63D6;
@@ -28,77 +28,77 @@
   font-family: var(--fonte-texto);
   color-scheme: light;
 }
-body.ib { background: var(--bg); color: var(--text); font-family: var(--fonte-texto); }
-body.ib input, body.ib select, body.ib textarea, body.ib button { font-family: inherit; }
+body.tema { background: var(--bg); color: var(--text); font-family: var(--fonte-texto); }
+body.tema input, body.tema select, body.tema textarea, body.tema button { font-family: inherit; }
 /* :where() mantém a especificidade baixa para que os títulos de cada tela definam o próprio tamanho. */
-:where(body.ib) :where(h1, h2) { font-family: var(--fonte-titulo); letter-spacing: -.01em; font-weight: 700; }
-:where(body.ib) h1 { font-size: 20px; }
-:where(body.ib) h2 { font-size: 16px; }
-body.ib .grad { background: var(--gradiente); -webkit-background-clip: text; background-clip: text; color: transparent; }
+:where(body.tema) :where(h1, h2) { font-family: var(--fonte-titulo); letter-spacing: -.01em; font-weight: 700; }
+:where(body.tema) h1 { font-size: 20px; }
+:where(body.tema) h2 { font-size: 16px; }
+body.tema .grad { background: var(--gradiente); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 /* Nome PAY AX como no site: "PAY" marinho e "AX" em gradiente */
-body.ib .marca { font-family: var(--fonte-titulo); font-weight: 800; letter-spacing: -.02em; gap: .18em; }
-body.ib .marca span { background: var(--gradiente); -webkit-background-clip: text; background-clip: text; color: transparent; }
-body.ib .marca-clara, body.ib .marca-escura { color: var(--marinho); }
+body.tema .marca { font-family: var(--fonte-titulo); font-weight: 800; letter-spacing: -.02em; gap: .18em; }
+body.tema .marca span { background: var(--gradiente); -webkit-background-clip: text; background-clip: text; color: transparent; }
+body.tema .marca-clara, body.tema .marca-escura { color: var(--marinho); }
 
 /* Botões */
-body.ib .btn { border-radius: 999px; font-weight: 700; }
-body.ib .btn.primario, body.ib .btn.ouro, body.ib .btn.gradiente { background: var(--gradiente); border: 0; color: #031029; }
-body.ib .btn.primario:hover, body.ib .btn.ouro:hover, body.ib .btn.gradiente:hover { filter: brightness(1.04); box-shadow: 0 8px 26px -8px rgba(25, 227, 255, .7); }
-body.ib .btn.link { color: var(--azul-texto); border-radius: 0; }
-body.ib .btn:focus-visible, body.ib a:focus-visible { outline: 2px solid var(--azul); outline-offset: 3px; }
-body.ib input, body.ib select, body.ib textarea { border-radius: 12px; border-color: var(--border); }
-body.ib input:focus, body.ib select:focus, body.ib textarea:focus { outline: 3px solid rgba(31, 139, 255, .18); border-color: var(--azul); }
+body.tema .btn { border-radius: 999px; font-weight: 700; }
+body.tema .btn.primario, body.tema .btn.ouro, body.tema .btn.gradiente { background: var(--gradiente); border: 0; color: #031029; }
+body.tema .btn.primario:hover, body.tema .btn.ouro:hover, body.tema .btn.gradiente:hover { filter: brightness(1.04); box-shadow: 0 8px 26px -8px rgba(25, 227, 255, .7); }
+body.tema .btn.link { color: var(--azul-texto); border-radius: 0; }
+body.tema .btn:focus-visible, body.tema a:focus-visible { outline: 2px solid var(--azul); outline-offset: 3px; }
+body.tema input, body.tema select, body.tema textarea { border-radius: 12px; border-color: var(--border); }
+body.tema input:focus, body.tema select:focus, body.tema textarea:focus { outline: 3px solid rgba(31, 139, 255, .18); border-color: var(--azul); }
 
 /* Cartões e componentes */
-body.ib .card { border-radius: var(--radius); border-color: var(--border); }
-body.ib .modal { border-radius: 22px; }
-body.ib .modal-head h2 { font-size: 16px; }
-body.ib .toast { background: var(--marinho); border-left-color: var(--ciano); border-radius: 14px; }
-body.ib .barra-h > span { background: var(--gradiente); }
-body.ib .chip.ativo, body.ib .chip:hover { border-color: var(--azul); color: var(--azul-texto); }
-body.ib .passos span.feito { background: var(--gradiente); }
-body.ib .tecl-pontos span { border-color: var(--azul); }
-body.ib .tecl-pontos span.cheio { background: var(--gradiente); border-color: transparent; }
-body.ib .tecl-par, body.ib .tecl-apagar { border-radius: 14px; background: var(--surface); }
-body.ib .tecl-par:hover, body.ib .tecl-apagar:hover { border-color: var(--azul); background: var(--info-bg); }
-body.ib .etapas li.atual { border-bottom-color: var(--azul); }
-body.ib .etapas li.atual span { background: var(--gradiente); border-color: transparent; color: #031029; }
-body.ib .opcao span { border-radius: 16px; }
-body.ib .opcao input:checked + span { border-color: var(--azul); }
-body.ib .protocolo strong { font-family: var(--fonte-titulo); }
+body.tema .card { border-radius: var(--radius); border-color: var(--border); }
+body.tema .modal { border-radius: 22px; }
+body.tema .modal-head h2 { font-size: 16px; }
+body.tema .toast { background: var(--marinho); border-left-color: var(--ciano); border-radius: 14px; }
+body.tema .barra-h > span { background: var(--gradiente); }
+body.tema .chip.ativo, body.tema .chip:hover { border-color: var(--azul); color: var(--azul-texto); }
+body.tema .passos span.feito { background: var(--gradiente); }
+body.tema .tecl-pontos span { border-color: var(--azul); }
+body.tema .tecl-pontos span.cheio { background: var(--gradiente); border-color: transparent; }
+body.tema .tecl-par, body.tema .tecl-apagar { border-radius: 14px; background: var(--surface); }
+body.tema .tecl-par:hover, body.tema .tecl-apagar:hover { border-color: var(--azul); background: var(--info-bg); }
+body.tema .etapas li.atual { border-bottom-color: var(--azul); }
+body.tema .etapas li.atual span { background: var(--gradiente); border-color: transparent; color: #031029; }
+body.tema .opcao span { border-radius: 16px; }
+body.tema .opcao input:checked + span { border-color: var(--azul); }
+body.tema .protocolo strong { font-family: var(--fonte-titulo); }
 
 /* ===== Área logada: menu lateral claro ===== */
-body.ib .sidebar { background: var(--surface); color: var(--text-2); border-right: 1px solid var(--border); }
-body.ib .sidebar .brand { border-bottom-color: var(--border); }
-body.ib .sidebar .brand .marca { font-size: 24px; }
-body.ib .sidebar .brand .produto { color: var(--azul-texto); letter-spacing: .24em; font-size: 10.5px; }
-body.ib .nav .secao { color: var(--text-3); letter-spacing: .2em; }
-body.ib .nav a { color: var(--text-2); font-weight: 600; border-radius: 12px; }
-body.ib .nav a:hover { background: var(--surface-2); color: var(--text); }
-body.ib .nav a.ativo { background: var(--info-bg); color: var(--marinho); box-shadow: inset 3px 0 0 var(--azul); }
-body.ib .nav a.ativo svg { color: var(--azul); }
-body.ib .sidebar .rodape { color: var(--text-3); border-top-color: var(--border); }
-body.ib .topbar { background: rgba(255, 255, 255, .85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-body.ib .topbar h1 { font-size: 19px; }
-body.ib .avatar { background: var(--gradiente); color: #031029; }
+body.tema .sidebar { background: var(--surface); color: var(--text-2); border-right: 1px solid var(--border); }
+body.tema .sidebar .brand { border-bottom-color: var(--border); }
+body.tema .sidebar .brand .marca { font-size: 24px; }
+body.tema .sidebar .brand .produto { color: var(--azul-texto); letter-spacing: .24em; font-size: 10.5px; }
+body.tema .nav .secao { color: var(--text-3); letter-spacing: .2em; }
+body.tema .nav a { color: var(--text-2); font-weight: 600; border-radius: 12px; }
+body.tema .nav a:hover { background: var(--surface-2); color: var(--text); }
+body.tema .nav a.ativo { background: var(--info-bg); color: var(--marinho); box-shadow: inset 3px 0 0 var(--azul); }
+body.tema .nav a.ativo svg { color: var(--azul); }
+body.tema .sidebar .rodape { color: var(--text-3); border-top-color: var(--border); }
+body.tema .topbar { background: rgba(255, 255, 255, .85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+body.tema .topbar h1 { font-size: 19px; }
+body.tema .avatar { background: var(--gradiente); color: #031029; }
 
 /* Saldo: cartão no estilo do cartão PAY AX do site, em azul mais claro */
-body.ib .saldo-card { border-radius: 24px; padding: 24px;
+body.tema .saldo-card { border-radius: 24px; padding: 24px;
   background: radial-gradient(90% 140% at 100% 0%, rgba(25, 227, 255, .35), transparent 55%),
               repeating-linear-gradient(38deg, transparent 0 38px, rgba(255, 255, 255, .05) 38px 70px),
               linear-gradient(135deg, #0B3D91 0%, #1565D8 60%, #1F8BFF 100%);
   box-shadow: 0 24px 50px -24px rgba(31, 139, 255, .65); }
-body.ib .saldo-card::after { border: 2px solid rgba(25, 227, 255, .7); box-shadow: 0 0 30px rgba(25, 227, 255, .45); right: -60px; bottom: -90px; width: 230px; height: 230px; }
-body.ib .saldo-card .valor { font-family: var(--fonte-titulo); font-weight: 700; font-size: 30px; }
-body.ib .saldo-card .rotulo, body.ib .saldo-card .rodape { color: #D6E6FF; }
-body.ib .acao { border-radius: 18px; transition: transform .2s, box-shadow .2s, border-color .2s; }
-body.ib .acao:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--azul); }
-body.ib .acao .ic { border-radius: 14px; background: var(--info-bg); color: var(--azul-texto); }
-body.ib .acao.destaque .ic { background: var(--gradiente); color: #031029; }
+body.tema .saldo-card::after { border: 2px solid rgba(25, 227, 255, .7); box-shadow: 0 0 30px rgba(25, 227, 255, .45); right: -60px; bottom: -90px; width: 230px; height: 230px; }
+body.tema .saldo-card .valor { font-family: var(--fonte-titulo); font-weight: 700; font-size: 30px; }
+body.tema .saldo-card .rotulo, body.tema .saldo-card .rodape { color: #D6E6FF; }
+body.tema .acao { border-radius: 18px; transition: transform .2s, box-shadow .2s, border-color .2s; }
+body.tema .acao:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--azul); }
+body.tema .acao .ic { border-radius: 14px; background: var(--info-bg); color: var(--azul-texto); }
+body.tema .acao.destaque .ic { background: var(--gradiente); color: #031029; }
 
 /* Primeiro acesso: fundo claro com o anel do site */
-body.ib .login { background: radial-gradient(50% 60% at 80% 20%, rgba(31, 139, 255, .16), transparent 70%), radial-gradient(40% 50% at 10% 90%, rgba(25, 227, 255, .14), transparent 70%), var(--bg); }
+body.tema .login { background: radial-gradient(50% 60% at 80% 20%, rgba(31, 139, 255, .16), transparent 70%), radial-gradient(40% 50% at 10% 90%, rgba(25, 227, 255, .14), transparent 70%), var(--bg); }
 
 /* ===== Tela de acesso no layout do site institucional (versão clara) ===== */
 .acesso { min-height: 100vh; background: var(--bg); }
@@ -206,7 +206,7 @@ body:has(.acesso) .faixa-demo .btn { height: 26px; background: rgba(255, 255, 25
 }
 
 /* ===== Aberto por cima do site institucional: só a caixa de acesso, sobre o site escurecido ===== */
-html:has(body.ib.embutido), body.ib.embutido { background: transparent; }
+html:has(body.tema.embutido), body.tema.embutido { background: transparent; }
 .acesso-embutido { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
 .acesso-embutido .caixa-acesso { position: relative; width: min(400px, 100%); background: var(--surface); border-radius: 24px; padding: 28px;
   box-shadow: 0 40px 90px -30px rgba(7, 26, 60, .55); display: flex; flex-direction: column; gap: 12px; animation: subir .25s ease-out; }
@@ -228,3 +228,22 @@ html:has(body.ib.embutido), body.ib.embutido { background: transparent; }
 .fechar-caixa { position: absolute; top: 16px; right: 16px; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface);
   color: var(--text-2); font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
 .fechar-caixa:hover { background: var(--surface-2); color: var(--text); }
+
+/* ===== Banqueiro (equipe) no mesmo visual ===== */
+body.tema .kpi::after { background: var(--gradiente); }
+body.tema .kpi.azul::after { background: var(--azul); }
+body.tema .saldo-hero { border-radius: 24px;
+  background: radial-gradient(90% 140% at 100% 0%, rgba(25, 227, 255, .35), transparent 55%), linear-gradient(135deg, #0B3D91 0%, #1565D8 60%, #1F8BFF 100%); }
+body.tema .saldo-hero::before { background: none; border: 2px solid rgba(25, 227, 255, .6); }
+body.tema .tabs button.ativo { border-bottom-color: var(--azul); }
+body.tema th { background: var(--surface-2); }
+body.tema .nav .contador { background: var(--gradiente); color: #031029; }
+body.tema .badge.info { background: var(--info-bg); color: var(--azul-texto); }
+body.tema .login .lado { background: var(--marinho); }
+
+/* Faixa da demonstração: tira fina no topo, nunca por cima do menu */
+body.tema .faixa-demo { position: static; transform: none; max-width: none; border: 0; border-radius: 0; box-shadow: none; justify-content: center;
+  padding: 5px 12px; font-size: 12px; background: var(--marinho); color: #C9D5EA; }
+body.tema .faixa-demo .btn { height: 26px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .18); color: #fff; }
+body.tema .faixa-demo ~ #app .sidebar { height: calc(100vh - 37px); }
+body.tema .login-rodape { color: var(--text-2); }

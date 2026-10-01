@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const { autenticar, permitir } = require('./auth');
+const { alcada } = require('./lib/alcadas');
 const { ErroNegocio } = require('./lib/erros');
 const { criarServicoBradesco } = require('./integracoes/bradesco');
 
@@ -20,11 +21,12 @@ function criarApi(db, bradesco = criarServicoBradesco(db)) {
   api.use('/transacoes', auth, require('./routes/transacoes')(db));
   api.use('/pix', auth, require('./routes/pix')(db));
   api.use('/emprestimos', auth, require('./routes/emprestimos')(db));
-  api.use('/relatorios', auth, permitir('admin', 'gerente'), require('./routes/relatorios')(db));
+  api.use('/relatorios', auth, alcada(db, 'relatorios.ver'), require('./routes/relatorios')(db));
   api.use('/usuarios', auth, permitir('admin'), require('./routes/usuarios')(db));
+  api.use('/alcadas', auth, permitir('admin'), require('./routes/alcadas')(db));
   api.use('/integracoes/bradesco/webhook', require('./routes/bradesco-webhook')(db, bradesco));
   api.use('/integracoes/bradesco', auth, require('./routes/bradesco')(db, bradesco));
-  api.use('/auditoria', auth, permitir('admin', 'gerente'), require('./routes/auditoria')(db));
+  api.use('/auditoria', auth, alcada(db, 'auditoria.ver'), require('./routes/auditoria')(db));
   api.use((_req, _res, next) => next(new ErroNegocio('Rota não encontrada.', 404)));
   return api;
 }

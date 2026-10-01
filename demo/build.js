@@ -56,10 +56,12 @@ fs.mkdirSync(path.join(saida, 'ib'), { recursive: true });
   }
 
   const css = fs.readFileSync(path.join(raiz, 'public/css/style.css'), 'utf8');
-  const pagina = fs.readFileSync(path.join(__dirname, 'pagina.html'), 'utf8').replace('/*CSS*/', () => css);
+  const cssTema = fs.readFileSync(path.join(raiz, 'public/css/tema.css'), 'utf8');
+  // O Banqueiro fica na raiz do dist-demo/: as fontes ficam em fonts/ (e não em ../fonts/).
+  const pagina = fs.readFileSync(path.join(__dirname, 'pagina.html'), 'utf8').replace('/*CSS*/', () => (css + cssTema).replaceAll('../fonts/', 'fonts/'));
   fs.writeFileSync(path.join(saida, 'index.html'), pagina);
   const cssSite = fs.readFileSync(path.join(raiz, 'public/css/site.css'), 'utf8');
-  const cssIb = css + cssSite + fs.readFileSync(path.join(raiz, 'public/ib/ib.css'), 'utf8') + fs.readFileSync(path.join(raiz, 'public/ib/tema.css'), 'utf8');
+  const cssIb = css + cssSite + fs.readFileSync(path.join(raiz, 'public/ib/ib.css'), 'utf8') + cssTema;
   fs.writeFileSync(path.join(saida, 'ib', 'index.html'), fs.readFileSync(path.join(__dirname, 'pagina-ib.html'), 'utf8').replace('/*CSS*/', () => cssIb));
   fs.cpSync(path.join(raiz, 'public/img'), path.join(saida, 'img'), { recursive: true });
   fs.copyFileSync(path.join(raiz, 'public/favicon.svg'), path.join(saida, 'favicon.svg'));

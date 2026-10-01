@@ -1,7 +1,9 @@
 'use strict';
 
 const { Router } = require('express');
-const { permitir } = require('../auth');
+const alcadas = require('../lib/alcadas');
+
+const { alcada } = alcadas;
 const { transacao } = require('../db');
 const { ErroNegocio } = require('../lib/erros');
 const v = require('../lib/validacao');
@@ -62,13 +64,13 @@ module.exports = (db) => {
     res.json({ conta, itens, total: resumo.total, entradas_centavos: resumo.entradas_centavos, saidas_centavos: resumo.saidas_centavos, pagina, limite });
   });
 
-  r.post('/', permitir('admin', 'gerente', 'operador'), (req, res) => {
+  r.post('/', alcada(db, 'contas.abrir'), (req, res) => {
     const { cliente_id, tipo, limite_centavos = 0 } = req.body ?? {};
     v.exigir(TIPOS.includes(tipo), 'Tipo de conta inválido.');
     const limite = Number(limite_centavos);
     v.exigir(Number.isInteger(limite) && limite >= 0, 'Limite inválido.');
     v.exigir(tipo !== 'poupanca' || limite === 0, 'Conta poupança não possui limite.');
-    if (limite > 0 && req.usuario.perfil === 'operador') throw new ErroNegocio('Apenas gerentes podem conceder limite.', 403);
+    if (limite > 0) alcadas.exigirValor(db, req, 'contas.limite', limite);
     const cliente = db.prepare('SELECT * FROM clientes WHERE id = ?').get(cliente_id);
     v.exigir(cliente, 'Cliente não encontrado.');
     if (cliente.status !== 'ativo') throw new ErroNegocio('Só é possível abrir conta para clientes ativos.', 409);
@@ -83,19 +85,20 @@ module.exports = (db) => {
     res.status(201).json(buscarConta(db, id));
   });
 
-  r.patch('/:id/limite', permitir('admin', 'gerente'), (req, res) => {
+  r.patch('/:id/limite', alcada(db, 'contas.limite'), (req, res) => {
     const conta = buscarConta(db, req.params.id);
     const limite = Number(req.body?.limite_centavos);
     v.exigir(Number.isInteger(limite) && limite >= 0, 'Limite inválido.');
     v.exigir(conta.tipo !== 'poupanca' || limite === 0, 'Conta poupança não possui limite.');
     v.exigir(conta.status !== 'encerrada', 'Conta encerrada.');
+    alcadas.exigirValor(db, req, 'contas.limite', limite);
     v.exigir(conta.saldo_centavos >= -limite, 'O novo limite é menor que o saldo devedor atual.');
     db.prepare('UPDATE contas SET limite_centavos = ? WHERE id = ?').run(limite, conta.id);
     registrar(db, req, 'alterar_limite', 'conta', conta.id, { de: conta.limite_centavos, para: limite });
     res.json(buscarConta(db, conta.id));
   });
 
-  r.patch('/:id/status', permitir('admin', 'gerente'), (req, res) => {
+  r.patch('/:id/status', alcada(db, 'contas.status'), (req, res) => {
     const conta = buscarConta(db, req.params.id);
     const { status, motivo } = req.body ?? {};
     v.exigir(['ativa', 'bloqueada', 'encerrada'].includes(status), 'Status inválido.');

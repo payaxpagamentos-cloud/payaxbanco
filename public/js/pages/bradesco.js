@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { pode } from '../contexto.js';
+import { ehAdmin } from '../contexto.js';
 import { html, raw, $, $$, moeda, dataHora, modal, toast, centavos } from '../ui.js';
 import { seletor, ligarSeletor } from './seletores.js';
 
@@ -141,7 +141,7 @@ export default async function bradesco({ alvo, ativo }) {
           <td>${m.conciliado ? html`<span class="badge ok">Conciliado</span>` : html`<span class="badge danger">Não identificado</span>`}</td></tr>`)
           : html`<tr><td colspan="4" class="vazio">Sem movimentos.</td></tr>`}
       </tbody></table></div></div>
-    ${pode('admin') ? html`<div class="card card-body" style="margin-top:16px"><h3>Configuração</h3>
+    ${ehAdmin() ? html`<div class="card card-body" style="margin-top:16px"><h3>Configuração</h3>
       <p class="muted small" style="margin:6px 0 0">O modo, as credenciais e o certificado digital são definidos por variáveis de ambiente no servidor (veja o README). O webhook PIX deve ser cadastrado no Bradesco apontando para
       <span class="mono">https://SEU-DOMINIO/api/integracoes/bradesco/webhook?token=…</span>${st.webhook_protegido ? '' : html` <strong class="neg">— defina BRADESCO_WEBHOOK_TOKEN antes de ir para produção.</strong>`}</p></div>` : ''}`);
 

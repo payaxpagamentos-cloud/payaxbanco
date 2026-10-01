@@ -299,3 +299,20 @@ body:has(.login) .faixa-demo ~ #app .login { min-height: calc(100vh - 37px); }
 .chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
 .chip.ativo, .chip:hover { border-color: var(--payax-azul-3); color: var(--primary); }
 .nav .contador { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--payax-ouro); color: var(--payax-azul); font-size: 11px; font-weight: 800; display: grid; place-items: center; }
+
+/* ===== Alçadas ===== */
+.alc-tabela td, .alc-tabela th { vertical-align: top; }
+.alc-tabela thead th:not(:first-child) { width: 220px; }
+.alc-grupo th { background: var(--surface-2); color: var(--text-2); font-size: 11.5px; padding-top: 14px; }
+.alc-chave { display: inline-flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; font-size: 13px; color: var(--text); font-weight: 650; }
+.alc-chave input { width: 34px; height: 20px; appearance: none; -webkit-appearance: none; border-radius: 999px; background: var(--border); position: relative; cursor: pointer; padding: 0; border: 0; transition: background .2s; }
+.alc-chave input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.alc-chave input:checked { background: var(--ok); }
+.alc-chave input:checked::after { transform: translateX(14px); }
+.alc-valor { margin-top: 8px; display: grid; gap: 6px; }
+.alc-valor[hidden], .alc-teto[hidden] { display: none; }
+.alc-sem { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer; }
+.alc-sem input { width: 15px; height: 15px; }
+.alc-teto { display: flex; align-items: center; gap: 6px; }
+.alc-teto input { height: 32px; }
+@media (prefers-reduced-motion: reduce) { .alc-chave input, .alc-chave input::after { transition: none; } }

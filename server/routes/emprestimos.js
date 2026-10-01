@@ -1,7 +1,9 @@
 'use strict';
 
 const { Router } = require('express');
-const { permitir } = require('../auth');
+const alcadas = require('../lib/alcadas');
+
+const { alcada } = alcadas;
 const { transacao } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const v = require('../lib/validacao');
@@ -52,11 +54,12 @@ module.exports = (db) => {
 
   r.get('/:id', (req, res) => res.json(detalhar(req.params.id)));
 
-  r.post('/', permitir('admin', 'gerente'), (req, res) => {
+  r.post('/', alcada(db, 'emprestimos.conceder'), (req, res) => {
     const conta = buscarConta(db, req.body?.conta_id);
     exigirContaOperavel(conta);
     v.exigir(conta.tipo !== 'poupanca', 'Empréstimos não podem ser creditados em conta poupança.');
     const { valor, taxa, parcelas } = lerProposta(req.body);
+    alcadas.exigirValor(db, req, 'emprestimos.conceder', valor);
     const sim = simular(valor, taxa, parcelas);
     const id = transacao(db, () => {
       const ins = db.prepare(`INSERT INTO emprestimos (conta_id, cliente_id, valor_centavos, taxa_mensal, num_parcelas, valor_parcela_centavos, usuario_id)

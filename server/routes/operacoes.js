@@ -1,7 +1,9 @@
 'use strict';
 
 const { Router } = require('express');
-const { permitir } = require('../auth');
+const alcadas = require('../lib/alcadas');
+
+const { alcada } = alcadas;
 const { transacao } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const v = require('../lib/validacao');
@@ -14,12 +16,13 @@ module.exports = (db) => {
   // Depósitos, saques, transferências e PIX não são feitos pela equipe: só o cliente autoriza
   // movimentações, pelo Internet Banking. A equipe mantém apenas o estorno (correção de lançamentos).
 
-  r.post('/estorno', permitir('admin', 'gerente'), (req, res) => {
+  r.post('/estorno', alcada(db, 'operacoes.estornar'), (req, res) => {
     const original = db.prepare('SELECT * FROM transacoes WHERE id = ?').get(req.body?.transacao_id);
     if (!original) throw naoEncontrado('Transação');
     const motivo = v.texto(req.body?.motivo, 200);
     v.exigir(motivo, 'Informe o motivo do estorno.');
     const grupoOriginal = db.prepare('SELECT * FROM transacoes WHERE grupo = ? ORDER BY id').all(original.grupo);
+    alcadas.exigirValor(db, req, 'operacoes.estornar', Math.abs(original.valor_centavos));
     if (grupoOriginal.some((t) => t.estornada_em)) throw new ErroNegocio('Esta transação já foi estornada.', 409);
     if (grupoOriginal.some((t) => t.tipo === 'estorno')) throw new ErroNegocio('Não é possível estornar um estorno.', 409);
     if (grupoOriginal.some((t) => t.tipo.startsWith('emprestimo'))) throw new ErroNegocio('Movimentos de empréstimo não podem ser estornados por aqui.', 409);

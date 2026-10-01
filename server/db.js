@@ -112,6 +112,17 @@ CREATE TABLE IF NOT EXISTS auditoria (
 );
 CREATE INDEX IF NOT EXISTS idx_auditoria_data ON auditoria(criado_em);
 
+-- Alçadas: o que gerente e operador podem fazer e até que valor (o administrador tem acesso total).
+CREATE TABLE IF NOT EXISTS alcadas (
+  perfil TEXT NOT NULL CHECK (perfil IN ('gerente', 'operador')),
+  permissao TEXT NOT NULL,
+  permitido INTEGER NOT NULL,
+  limite_centavos INTEGER,
+  atualizado_por INTEGER REFERENCES usuarios(id),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (perfil, permissao)
+);
+
 -- Integração Bradesco: cobranças PIX geradas para crédito em conta de cliente.
 CREATE TABLE IF NOT EXISTS cobrancas_pix (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

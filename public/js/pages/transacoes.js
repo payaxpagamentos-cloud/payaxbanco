@@ -5,7 +5,7 @@ import { estornar } from './contas.js';
 
 export default async function transacoes({ alvo, ativo }) {
   const filtro = { q: '', tipo: '', inicio: '', fim: '', pagina: 1 };
-  const gestor = pode('admin', 'gerente');
+  const gestor = pode('operacoes.estornar');
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Transações</h1><p class="muted">Todos os lançamentos do banco, com filtros por período e tipo.</p></div>
       ${gestor ? html`<button class="btn" id="exportar">${icone('baixar')} Exportar CSV</button>` : ''}</div>

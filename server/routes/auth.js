@@ -6,6 +6,7 @@ const { verificarSenha, hashSenha } = require('../lib/senha');
 const { ErroNegocio } = require('../lib/erros');
 const { exigir } = require('../lib/validacao');
 const { registrar } = require('../lib/auditoria');
+const alcadas = require('../lib/alcadas');
 
 module.exports = (db) => {
   const r = Router();
@@ -19,10 +20,10 @@ module.exports = (db) => {
     db.prepare("UPDATE usuarios SET ultimo_acesso = datetime('now') WHERE id = ?").run(u.id);
     req.usuario = u;
     registrar(db, req, 'login', 'usuario', u.id);
-    res.json({ token: emitirToken(u), usuario: { id: u.id, nome: u.nome, email: u.email, perfil: u.perfil } });
+    res.json({ token: emitirToken(u), usuario: { id: u.id, nome: u.nome, email: u.email, perfil: u.perfil }, permissoes: alcadas.mapa(db, u.perfil) });
   });
 
-  r.get('/me', autenticar(db), (req, res) => res.json(req.usuario));
+  r.get('/me', autenticar(db), (req, res) => res.json({ ...req.usuario, permissoes: alcadas.mapa(db, req.usuario.perfil) }));
 
   r.post('/senha', autenticar(db), (req, res) => {
     const { senha_atual, nova_senha } = req.body ?? {};

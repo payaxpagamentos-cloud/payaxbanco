@@ -25,13 +25,17 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 | **Auditoria** | Registro de todas as ações (login, cadastros, operações, estornos, alterações de limite/status) com usuário, data e IP. |
 | **Usuários** | Gestão de colaboradores e perfis de acesso. |
 
-### Perfis de acesso
+### Perfis de acesso e alçadas
 
 | Perfil | Permissões |
 |---|---|
-| **Administrador** | Tudo, incluindo usuários e exclusão de clientes sem contas. |
-| **Gerente** | Concede/altera limites, contrata empréstimos, bloqueia/encerra contas, estorna, altera status de clientes, relatórios e auditoria. |
-| **Operador** | Cadastra clientes e contas, chaves PIX, operações de caixa até a alçada (padrão R$ 50.000,00) e pagamento de parcelas. |
+| **Administrador** | Tudo, sem limite de valor. Exclusivo: usuários da equipe e tela **Alçadas**. |
+| **Gerente** e **Operador** | Definidas pelo administrador na tela **Alçadas**: cada permissão pode ser liberada ou retirada e, nas que envolvem dinheiro (limite de cheque especial, limite diário do Internet Banking, empréstimos e estornos), recebe um valor máximo. |
+
+Padrão inicial (botão "Restaurar padrão"): o gerente pode tudo, exceto excluir clientes, sem teto de valor; o operador cadastra
+clientes, contas, chaves PIX e favorecidos, libera o Internet Banking e gera cobranças PIX. Nenhum perfil da equipe movimenta
+dinheiro do cliente: PIX, transferências e pagamentos são autorizados só pelo cliente, no Internet Banking. As regras ficam em
+`server/lib/alcadas.js`, são conferidas no servidor em cada operação e toda mudança fica na auditoria.
 
 ## Internet Banking
 

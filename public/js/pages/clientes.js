@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { pode, definirTitulo } from '../contexto.js';
+import { pode, definirTitulo, semAlcada } from '../contexto.js';
 import {
   html, $, $$, moeda, documento, telefone, cep, data, status, conta, TIPO_CONTA, modal, confirmar, toast,
   dadosForm, centavos, valorMoedaInput, paginacao, debounce, iniciais,
@@ -25,7 +25,7 @@ export function formCliente(cliente = null, aoSalvar) {
       <div class="c4"><label>Telefone</label><input name="telefone" value="${c.telefone ? telefone(c.telefone) : ''}" placeholder="(00) 00000-0000"></div>
       <div class="c4"><label data-rot-nasc>${c.tipo === 'PJ' ? 'Data de fundação' : 'Data de nascimento'}</label><input name="data_nascimento" type="date" value="${c.data_nascimento ?? ''}"></div>
       <div class="c4"><label data-rot-renda>${c.tipo === 'PJ' ? 'Faturamento mensal (R$)' : 'Renda mensal (R$)'}</label><input name="renda" class="moeda" inputmode="numeric" value="${valorMoedaInput(c.renda_mensal_centavos)}"></div>
-      <div class="c4"><label>Status</label><select name="status" ${editando && !pode('admin', 'gerente') ? 'disabled' : ''}>
+      <div class="c4"><label>Status</label><select name="status" ${editando && !pode('clientes.status') ? 'disabled' : ''}>
         ${['ativo', 'inativo', 'bloqueado'].map((s) => html`<option value="${s}" ${c.status === s ? 'selected' : ''}>${s[0].toUpperCase() + s.slice(1)}</option>`)}</select></div>
       <fieldset><legend>Endereço</legend></fieldset>
       <div class="c3"><label>CEP</label><input name="cep" value="${c.cep ? cep(c.cep) : ''}" placeholder="00000-000"></div>
@@ -63,7 +63,7 @@ export async function listaClientes({ alvo, ativo }) {
   const filtro = { q: '', status: '', tipo: '', pagina: 1 };
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Clientes</h1><p class="muted">Cadastro de pessoas físicas e jurídicas.</p></div>
-      <button class="btn primario" id="novo">+ Novo cliente</button></div>
+      <button class="btn primario" id="novo" ${semAlcada('clientes.cadastrar')}>+ Novo cliente</button></div>
     <div class="card">
       <div class="filtros">
         <div class="busca"><input id="q" type="search" placeholder="Buscar por nome, CPF/CNPJ ou e-mail"></div>
@@ -107,9 +107,9 @@ export async function detalheCliente({ alvo, id, ativo }) {
     <div class="page-head"><div><a href="#/clientes" class="small">← Clientes</a><h1 style="margin-top:4px">${c.nome}</h1>
       <p class="muted">${c.tipo === 'PF' ? 'CPF' : 'CNPJ'} ${documento(c.documento)} · cliente desde ${data(c.criado_em)} ${status(c.status)}</p></div>
       <div class="row">
-        ${pode('admin') && !c.contas.length ? html`<button class="btn perigo" id="excluir">Excluir</button>` : ''}
-        <button class="btn" id="editar">Editar cadastro</button>
-        <button class="btn primario" id="abrir" ${c.status !== 'ativo' ? html`disabled title="Cliente não está ativo"` : ''}>+ Abrir conta</button></div></div>
+        ${pode('clientes.excluir') && !c.contas.length ? html`<button class="btn perigo" id="excluir">Excluir</button>` : ''}
+        <button class="btn" id="editar" ${semAlcada('clientes.cadastrar')}>Editar cadastro</button>
+        <button class="btn primario" id="abrir" ${c.status !== 'ativo' ? html`disabled title="Cliente não está ativo"` : semAlcada('contas.abrir')}>+ Abrir conta</button></div></div>
     <div class="saldo-hero"><div><div class="rotulo">Saldo consolidado</div><div class="valor">${moeda(saldo)}</div></div>
       <div class="meta"><div><div class="rotulo">Contas</div><strong>${c.contas.length}</strong></div>
       <div><div class="rotulo">Empréstimos ativos</div><strong>${c.emprestimos.filter((e) => e.status === 'ativo').length}</strong></div>
@@ -127,7 +127,7 @@ export async function detalheCliente({ alvo, id, ativo }) {
             : html`<tr><td colspan="5" class="vazio">Nenhum empréstimo.</td></tr>`}</tbody></table></div></div>
       </div>
       <div class="stack"><div class="card" id="ib-card"><div class="card-head"><h2>Internet Banking</h2></div><div class="card-body muted">Carregando…</div></div>
-      <div class="card" id="fav-card"><div class="card-head"><h2>Favorecidos</h2><button class="btn sm" id="fav-novo" ${c.status !== 'ativo' ? html`disabled` : ''}>+ Cadastrar</button></div><div id="fav-lista" class="card-body muted">Carregando…</div></div>
+      <div class="card" id="fav-card"><div class="card-head"><h2>Favorecidos</h2><button class="btn sm" id="fav-novo" ${c.status !== 'ativo' ? html`disabled` : semAlcada('favorecidos.cadastrar')}>+ Cadastrar</button></div><div id="fav-lista" class="card-body muted">Carregando…</div></div>
       <div class="card"><div class="card-head"><h2>Dados cadastrais</h2></div><div class="card-body"><dl class="dl" style="grid-template-columns:1fr">
         <div><dt>E-mail</dt><dd>${c.email ?? '—'}</dd></div><div><dt>Telefone</dt><dd>${telefone(c.telefone)}</dd></div>
         <div><dt>${c.tipo === 'PF' ? 'Nascimento' : 'Fundação'}</dt><dd>${data(c.data_nascimento)}</dd></div>
@@ -165,7 +165,7 @@ async function cartaoInternetBanking(el, cliente) {
   const recarregar = () => cartaoInternetBanking(el, cliente);
   if (!st) {
     corpo.innerHTML = String(html`<p style="margin:0 0 12px">O cliente ainda não tem acesso ao Internet Banking.</p>
-      <button class="btn primario" id="ib-habilitar" ${cliente.status !== 'ativo' ? 'disabled' : ''}>Habilitar acesso</button>`);
+      <button class="btn primario" id="ib-habilitar" ${cliente.status !== 'ativo' ? 'disabled' : semAlcada('ib.habilitar')}>Habilitar acesso</button>`);
     corpo.classList.remove('muted');
     $('#ib-habilitar', el).onclick = async () => {
       try { const r = await api.post(`/clientes/${cliente.id}/internet-banking`); mostrarSenhaProvisoria(r, cliente); recarregar(); } catch (e) { toast(e.message, 'erro'); }
@@ -178,8 +178,8 @@ async function cartaoInternetBanking(el, cliente) {
       <div><dt>Situação</dt><dd>${situacao}</dd></div><div><dt>Limite diário</dt><dd class="num">${moeda(st.limite_diario_centavos)}</dd></div>
       <div><dt>Último acesso</dt><dd>${st.ultimo_acesso ? data(st.ultimo_acesso) : '—'}</dd></div><div><dt>Senha de transação</dt><dd>${st.tem_pin ? 'Cadastrada' : 'Pendente'}</dd></div></dl>
     <div class="row">
-      <button class="btn sm" id="ib-redefinir">Redefinir senha</button>
-      ${pode('admin', 'gerente') ? html`<button class="btn sm" id="ib-limite">Alterar limite</button>
+      <button class="btn sm" id="ib-redefinir" ${semAlcada('ib.habilitar')}>Redefinir senha</button>
+      ${pode('ib.gerenciar') ? html`<button class="btn sm" id="ib-limite">Alterar limite</button>
         <button class="btn sm ${st.status === 'ativo' ? 'perigo' : ''}" id="ib-status">${st.status === 'ativo' ? 'Bloquear acesso' : 'Desbloquear'}</button>` : ''}
     </div>`);
   $('#ib-redefinir', el).onclick = async () => {

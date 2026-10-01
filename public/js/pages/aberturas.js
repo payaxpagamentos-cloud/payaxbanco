@@ -18,7 +18,7 @@ function mostrarAprovacao(r) {
 function detalhe(id, aoMudar) {
   api.get(`/aberturas/${id}`).then((p) => {
     const d = p.dados;
-    const decidir = pode('admin', 'gerente') && p.status === 'em_analise';
+    const decidir = pode('aberturas.decidir') && p.status === 'em_analise';
     const { el, fechar } = modal({
       titulo: `Proposta ${p.protocolo}`,
       grande: true,

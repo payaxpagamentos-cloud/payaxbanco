@@ -60,7 +60,7 @@ export async function listaEmprestimos({ alvo, ativo }) {
   const filtro = { q: '', status: '' };
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Empréstimos</h1><p class="muted">Carteira de crédito pessoal e empresarial (Tabela Price).</p></div>
-      ${pode('admin', 'gerente') ? html`<button class="btn primario" id="novo">+ Contratar empréstimo</button>` : ''}</div>
+      ${pode('emprestimos.conceder') ? html`<button class="btn primario" id="novo">+ Contratar empréstimo</button>` : ''}</div>
     <div class="card"><div class="filtros"><div class="busca"><input type="search" id="q" placeholder="Buscar por cliente"></div>
       <div class="campo"><select id="st"><option value="">Todos</option><option value="ativo">Ativos</option><option value="quitado">Quitados</option></select></div></div>
       <div id="tabela"></div></div>`);

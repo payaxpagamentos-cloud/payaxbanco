@@ -2,7 +2,7 @@
 
 const crypto = require('node:crypto');
 const { Router } = require('express');
-const { permitir } = require('../auth');
+const { alcada } = require('../lib/alcadas');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const v = require('../lib/validacao');
 const { registrar } = require('../lib/auditoria');
@@ -22,7 +22,7 @@ module.exports = (db) => {
       ${where} ORDER BY p.criado_em DESC LIMIT 500`).all(...params));
   });
 
-  r.post('/', permitir('admin', 'gerente', 'operador'), (req, res) => {
+  r.post('/', alcada(db, 'pix.chaves'), (req, res) => {
     const conta = buscarConta(db, req.body?.conta_id);
     exigirContaOperavel(conta);
     const tipo = req.body?.tipo;
@@ -49,7 +49,7 @@ module.exports = (db) => {
     res.status(201).json(db.prepare('SELECT * FROM chaves_pix WHERE id = ?').get(ins.lastInsertRowid));
   });
 
-  r.delete('/:id', permitir('admin', 'gerente', 'operador'), (req, res) => {
+  r.delete('/:id', alcada(db, 'pix.chaves'), (req, res) => {
     const chave = db.prepare('SELECT * FROM chaves_pix WHERE id = ?').get(req.params.id);
     if (!chave) throw naoEncontrado('Chave PIX');
     db.prepare('DELETE FROM chaves_pix WHERE id = ?').run(chave.id);

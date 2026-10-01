@@ -1,4 +1,5 @@
 import { api } from '../api.js';
+import { semAlcada } from '../contexto.js';
 import { html, $, $$, dataHora, confirmar, toast, debounce } from '../ui.js';
 import { novaChavePix } from './contas.js';
 
@@ -6,7 +7,7 @@ export default async function pix({ alvo, ativo }) {
   let q = '';
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Chaves PIX</h1><p class="muted">Diretório interno de chaves PIX das contas PAY AX (máx. 5 por conta).</p></div>
-      <button class="btn primario" id="nova">+ Nova chave</button></div>
+      <button class="btn primario" id="nova" ${semAlcada('pix.chaves')}>+ Nova chave</button></div>
     <div class="card"><div class="filtros"><div class="busca"><input type="search" id="q" placeholder="Buscar por chave ou titular"></div></div><div id="tabela"></div></div>`);
   async function carregar() {
     const itens = await api.get('/pix', { q });

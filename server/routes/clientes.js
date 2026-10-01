@@ -3,7 +3,9 @@
 const { Router } = require('express');
 const { hashNumerica } = require('../lib/senha');
 const favorecidos = require('../lib/favorecidos');
-const { permitir } = require('../auth');
+const alcadas = require('../lib/alcadas');
+
+const { alcada } = alcadas;
 const { naoEncontrado, ErroNegocio } = require('../lib/erros');
 const v = require('../lib/validacao');
 const { registrar } = require('../lib/auditoria');
@@ -44,7 +46,7 @@ module.exports = (db) => {
     res.json(cliente);
   });
 
-  r.post('/', permitir('admin', 'gerente', 'operador'), (req, res) => {
+  r.post('/', alcada(db, 'clientes.cadastrar'), (req, res) => {
     const c = normalizar(req.body ?? {});
     if (db.prepare('SELECT 1 FROM clientes WHERE documento = ?').get(c.documento)) {
       throw new ErroNegocio('Já existe cliente com este documento.', 409);
@@ -54,14 +56,12 @@ module.exports = (db) => {
     res.status(201).json(db.prepare('SELECT * FROM clientes WHERE id = ?').get(id));
   });
 
-  r.put('/:id', permitir('admin', 'gerente', 'operador'), (req, res) => {
+  r.put('/:id', alcada(db, 'clientes.cadastrar'), (req, res) => {
     const atual = db.prepare('SELECT * FROM clientes WHERE id = ?').get(req.params.id);
     if (!atual) throw naoEncontrado('Cliente');
     const c = normalizar(req.body ?? {}, atual);
     v.exigir(c.documento === atual.documento && c.tipo === atual.tipo, 'Documento e tipo do cliente não podem ser alterados.');
-    if (c.status !== atual.status && req.usuario.perfil === 'operador') {
-      throw new ErroNegocio('Apenas gerentes podem alterar o status do cliente.', 403);
-    }
+    if (c.status !== atual.status) alcadas.exigir(db, req, 'clientes.status');
     db.prepare(`UPDATE clientes SET ${CAMPOS.map((k) => `${k} = ?`).join(', ')}, atualizado_em = datetime('now') WHERE id = ?`)
       .run(...CAMPOS.map((k) => c[k]), atual.id);
     const mudancas = Object.fromEntries(CAMPOS.filter((k) => c[k] !== atual[k]).map((k) => [k, c[k]]));
@@ -80,7 +80,7 @@ module.exports = (db) => {
 
   r.get('/:id/internet-banking', (req, res) => res.json(statusIb(clienteAtivo(req.params.id).id)));
 
-  r.post('/:id/internet-banking', permitir('admin', 'gerente', 'operador'), (req, res) => {
+  r.post('/:id/internet-banking', alcada(db, 'ib.habilitar'), (req, res) => {
     const c = clienteAtivo(req.params.id);
     if (c.status !== 'ativo') throw new ErroNegocio('Só clientes ativos podem ter Internet Banking.', 409);
     if (statusIb(c.id)) throw new ErroNegocio('Internet Banking já habilitado. Use “Redefinir senha”.', 409);
@@ -90,7 +90,7 @@ module.exports = (db) => {
     res.status(201).json({ ...statusIb(c.id), senha_provisoria: senha });
   });
 
-  r.post('/:id/internet-banking/redefinir-senha', permitir('admin', 'gerente', 'operador'), (req, res) => {
+  r.post('/:id/internet-banking/redefinir-senha', alcada(db, 'ib.habilitar'), (req, res) => {
     const c = clienteAtivo(req.params.id);
     if (!statusIb(c.id)) throw naoEncontrado('Acesso ao Internet Banking');
     const senha = senhaProvisoria();
@@ -100,7 +100,7 @@ module.exports = (db) => {
     res.json({ ...statusIb(c.id), senha_provisoria: senha });
   });
 
-  r.patch('/:id/internet-banking', permitir('admin', 'gerente'), (req, res) => {
+  r.patch('/:id/internet-banking', alcada(db, 'ib.gerenciar'), (req, res) => {
     const c = clienteAtivo(req.params.id);
     const atual = statusIb(c.id);
     if (!atual) throw naoEncontrado('Acesso ao Internet Banking');
@@ -108,6 +108,7 @@ module.exports = (db) => {
     const limite = req.body?.limite_diario_centavos === undefined ? atual.limite_diario_centavos : Number(req.body.limite_diario_centavos);
     v.exigir(['ativo', 'bloqueado'].includes(status), 'Status inválido.');
     v.exigir(Number.isInteger(limite) && limite >= 0 && limite <= 100_000_000, 'Limite diário inválido.');
+    if (limite !== atual.limite_diario_centavos) alcadas.exigirValor(db, req, 'ib.gerenciar', limite);
     db.prepare('UPDATE acessos_cliente SET status = ?, limite_diario_centavos = ?, tentativas = 0, tentativas_pin = 0, bloqueado_ate = NULL WHERE cliente_id = ?')
       .run(status, limite, c.id);
     registrar(db, req, 'ib_atualizar', 'cliente', c.id, { status, limite_diario_centavos: limite });
@@ -115,7 +116,7 @@ module.exports = (db) => {
   });
 
   // ---------- Favorecidos (equipe cadastra; cliente usa no Internet Banking) ----------
-  const equipe = permitir('admin', 'gerente', 'operador');
+  const equipe = alcada(db, 'favorecidos.cadastrar');
   r.get('/:id/favorecidos', (req, res) => res.json(favorecidos.listar(db, clienteAtivo(req.params.id).id)));
   r.post('/:id/favorecidos', equipe, (req, res) => {
     const c = clienteAtivo(req.params.id);
@@ -127,7 +128,7 @@ module.exports = (db) => {
     res.status(204).end();
   });
 
-  r.delete('/:id', permitir('admin'), (req, res) => {
+  r.delete('/:id', alcada(db, 'clientes.excluir'), (req, res) => {
     const atual = db.prepare('SELECT * FROM clientes WHERE id = ?').get(req.params.id);
     if (!atual) throw naoEncontrado('Cliente');
     if (db.prepare('SELECT 1 FROM contas WHERE cliente_id = ?').get(atual.id) || statusIb(atual.id)) {

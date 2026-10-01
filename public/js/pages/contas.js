@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { pode, definirTitulo } from '../contexto.js';
+import { pode, definirTitulo, semAlcada } from '../contexto.js';
 import {
   html, $, $$, moeda, moedaSinal, documento, dataHora, data, status, conta, TIPO_CONTA, TIPO_TRANSACAO,
   modal, confirmar, toast, dadosForm, centavos, valorMoedaInput, paginacao, debounce,
@@ -17,8 +17,8 @@ export function abrirConta(cliente, aoSalvar) {
         : seletor('cliente_id', 'Titular', 'Buscar cliente por nome ou documento')}</div>
       <div class="c6"><label>Tipo de conta</label><select name="tipo">
         ${Object.entries(TIPO_CONTA).map(([k, v]) => html`<option value="${k}">${v}</option>`)}</select></div>
-      <div class="c6"><label>Limite de cheque especial (R$)</label><input name="limite" class="moeda" inputmode="numeric" value="0,00" ${pode('admin', 'gerente') ? '' : 'readonly'}>
-        <div class="ajuda">${pode('admin', 'gerente') ? 'Não se aplica a poupança.' : 'Somente gerentes concedem limite.'}</div></div>
+      <div class="c6"><label>Limite de cheque especial (R$)</label><input name="limite" class="moeda" inputmode="numeric" value="0,00" ${pode('contas.limite') ? '' : 'readonly'}>
+        <div class="ajuda">${pode('contas.limite') ? 'Não se aplica a poupança.' : 'Seu perfil não tem alçada para conceder limite.'}</div></div>
       <div class="c12 ajuda">Agência e número são gerados automaticamente (dígito verificador módulo 11).</div>
     </div>`,
     aoAbrir: (el) => { if (!cliente) ligarSeletor(el, 'cliente_id', 'cliente'); },
@@ -37,7 +37,7 @@ export async function listaContas({ alvo, ativo }) {
   const filtro = { q: '', status: '', tipo: '', pagina: 1 };
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Contas</h1><p class="muted">Contas correntes, poupança, pagamento e salário.</p></div>
-      <button class="btn primario" id="nova">+ Abrir conta</button></div>
+      <button class="btn primario" id="nova" ${semAlcada('contas.abrir')}>+ Abrir conta</button></div>
     <div class="card">
       <div class="filtros">
         <div class="busca"><input id="q" type="search" placeholder="Buscar por número, titular ou documento"></div>
@@ -87,7 +87,7 @@ export async function detalheConta({ alvo, id, ativo }) {
   const c = await api.get(`/contas/${id}`);
   if (!ativo()) return;
   definirTitulo(`Conta ${c.numero}-${c.digito}`);
-  const gestor = pode('admin', 'gerente');
+  const gestor = pode('operacoes.estornar');
   const operavel = c.status === 'ativa' && c.cliente_status === 'ativo';
   const disponivel = c.saldo_centavos + c.limite_centavos;
   alvo.innerHTML = String(html`
@@ -95,8 +95,8 @@ export async function detalheConta({ alvo, id, ativo }) {
       <h1 style="margin-top:4px">${TIPO_CONTA[c.tipo]} ${conta(c)} ${status(c.status)}</h1>
       <p class="muted">Titular: <a href="#/clientes/${c.cliente_id}">${c.cliente_nome}</a> · ${documento(c.cliente_documento)} · aberta em ${data(c.aberta_em)}</p></div>
       <div class="row">
-        ${gestor && c.status !== 'encerrada' ? html`
-          <button class="btn" id="limite">Alterar limite</button>
+        ${pode('contas.limite') && c.status !== 'encerrada' ? html`<button class="btn" id="limite">Alterar limite</button>` : ''}
+        ${pode('contas.status') && c.status !== 'encerrada' ? html`
           ${c.status === 'ativa' ? html`<button class="btn perigo" data-status="bloqueada">Bloquear</button>` : html`<button class="btn" data-status="ativa">Desbloquear</button>`}
           <button class="btn perigo" data-status="encerrada">Encerrar</button>` : ''}
       </div></div>
@@ -106,13 +106,13 @@ export async function detalheConta({ alvo, id, ativo }) {
         <div><div class="rotulo">Chaves PIX</div><strong>${c.chaves_pix.length}</strong></div></div></div>
     ${operavel ? html`<div class="card card-body row" style="margin:16px 0;justify-content:space-between">
       <span class="muted small">Transferências, PIX e pagamentos são autorizados pelo próprio cliente no Internet Banking.</span>
-      <button class="btn primario" id="receber-pix">Gerar QR Code para depósito</button></div>`
+      <button class="btn primario" id="receber-pix" ${semAlcada('bradesco.cobrancas')}>Gerar QR Code para depósito</button></div>`
       : html`<div class="card card-body" style="margin:16px 0;background:var(--warn-bg);color:var(--warn);font-weight:600">Conta ${c.status}${c.cliente_status !== 'ativo' ? ` / titular ${c.cliente_status}` : ''}: movimentações indisponíveis.</div>`}
     <div class="grid grid-2-1">
       <div class="card"><div class="card-head"><h2>Extrato</h2>
         <div class="row"><input type="date" id="inicio" style="width:auto"><input type="date" id="fim" style="width:auto"></div></div>
         <div id="resumo" class="card-body" style="padding-bottom:0"></div><div id="extrato"></div></div>
-      <div class="card"><div class="card-head"><h2>Chaves PIX</h2>${operavel ? html`<button class="btn sm" id="nova-chave">+ Nova chave</button>` : ''}</div>
+      <div class="card"><div class="card-head"><h2>Chaves PIX</h2>${operavel && pode('pix.chaves') ? html`<button class="btn sm" id="nova-chave">+ Nova chave</button>` : ''}</div>
         <div class="table-wrap"><table><tbody>
         ${c.chaves_pix.length ? c.chaves_pix.map((k) => html`<tr><td><span class="badge info">${k.tipo.toUpperCase()}</span></td><td class="mono small" style="word-break:break-all">${k.chave}</td>
           <td class="right"><button class="btn sm perigo" data-del-chave="${k.id}">Remover</button></td></tr>`)

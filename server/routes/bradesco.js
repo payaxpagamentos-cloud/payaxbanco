@@ -1,12 +1,13 @@
 'use strict';
 
 const { Router } = require('express');
+const { alcada } = require('../lib/alcadas');
 const { permitir } = require('../auth');
 const v = require('../lib/validacao');
 
 module.exports = (db, bradesco) => {
   const r = Router();
-  const gestores = permitir('admin', 'gerente');
+  const gestores = alcada(db, 'bradesco.conciliar');
 
   r.get('/status', (_req, res) => res.json(bradesco.status()));
 
@@ -22,7 +23,7 @@ module.exports = (db, bradesco) => {
       ${where} ORDER BY p.id DESC LIMIT 100`).all(...params));
   });
 
-  r.post('/cobrancas', async (req, res) => {
+  r.post('/cobrancas', alcada(db, 'bradesco.cobrancas'), async (req, res) => {
     res.status(201).json(await bradesco.gerarCobranca(req, req.body?.conta_id, req.body?.valor_centavos));
   });
 
