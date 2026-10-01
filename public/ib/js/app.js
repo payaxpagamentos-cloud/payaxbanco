@@ -3,6 +3,7 @@ import { html, $, $$, icone, toast, iniciais, marca } from '../../js/ui.js';
 import { estado } from './comum.js';
 import { RAIZ } from './raiz.js';
 import { telaLogin, telaPrimeiroAcesso } from './telas/login.js';
+import { abrirConta, acompanharProposta } from './telas/abertura.js';
 import inicio from './telas/inicio.js';
 import pix from './telas/pix.js';
 import pagar from './telas/pagar.js';
@@ -118,4 +119,9 @@ window.addEventListener('hashchange', rotear);
 window.addEventListener('payax-ib:sair', (e) => sair(e.detail));
 
 if (sessao.get()?.token) entrar().catch(() => sair());
-else telaLogin(app, entrar);
+else {
+  telaLogin(app, entrar);
+  // Links do site institucional: #/abrir-conta e #/acompanhar abrem direto o assistente ou a consulta.
+  if (location.hash === '#/abrir-conta') abrirConta();
+  if (location.hash === '#/acompanhar') acompanharProposta();
+}

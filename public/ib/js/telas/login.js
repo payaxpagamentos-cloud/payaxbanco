@@ -2,7 +2,7 @@ import { api, sessao } from '../api.js';
 import { html, $, mascaraDocumento, marca, icone } from '../../../js/ui.js';
 import { tecladoPares, criarSenhaNova } from '../teclado.js';
 import { vitrine } from '../../../js/vitrine.js';
-import { RAIZ } from '../raiz.js';
+import { RAIZ, SITE } from '../raiz.js';
 import { abrirConta, acompanharProposta } from './abertura.js';
 
 const PRODUTOS = [
@@ -19,7 +19,7 @@ export function telaLogin(alvo, aoEntrar, aviso) {
     <div class="site">
       <header class="site-topo">
         <div class="site-linha">
-          ${marca('clara')}
+          ${SITE ? html`<a href="${SITE}" class="marca-link" title="Ir para o site da PAY AX">${marca('clara')}</a>` : marca('clara')}
           <nav class="site-nav" aria-label="Seções">
             <button type="button" data-rolar="produtos">Para você</button>
             <button type="button" data-rolar="produtos">Para empresas</button>
@@ -148,6 +148,16 @@ export function telaLogin(alvo, aoEntrar, aviso) {
       teclado.renovar();
     }
   });
+
+  // Vindo da caixa "Acesse sua conta" do site institucional: segue direto para a senha.
+  let doSite = null;
+  try { doSite = sessionStorage.getItem('payax.site.documento'); sessionStorage.removeItem('payax.site.documento'); } catch { /* ignora */ }
+  if (doSite && /^(\d{11}|\d{14})$/.test(doSite)) {
+    if (doSite.length === 14) alvo.querySelector('[data-tipo="PJ"]').click();
+    docInput.value = doSite;
+    docInput.dispatchEvent(new Event('input'));
+    passoDoc.requestSubmit();
+  }
 }
 
 export async function telaPrimeiroAcesso(alvo, nome, aoConcluir, aoSair) {

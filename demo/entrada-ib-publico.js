@@ -2,5 +2,6 @@
 import { faixaDemo } from './backend.js';
 
 window.PAYAX_RAIZ = '';
+window.PAYAX_SITE = null;
 faixaDemo(null);
 import('../public/ib/js/app.js');

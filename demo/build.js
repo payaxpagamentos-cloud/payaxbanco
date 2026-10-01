@@ -8,6 +8,7 @@ const esbuild = require('esbuild');
 const raiz = path.join(__dirname, '..');
 const saida = path.join(raiz, 'dist-demo');
 const saidaIb = path.join(raiz, 'dist-ib'); // publicação só do Internet Banking (link direto para clientes testarem)
+const saidaSite = path.join(raiz, 'dist-site'); // site institucional + Internet Banking em ib/
 const shim = (n) => path.join(__dirname, 'shims', n);
 
 const substituir = {
@@ -24,6 +25,8 @@ const substituir = {
 
 fs.rmSync(saida, { recursive: true, force: true });
 fs.rmSync(saidaIb, { recursive: true, force: true });
+fs.rmSync(saidaSite, { recursive: true, force: true });
+fs.mkdirSync(path.join(saidaSite, 'ib'), { recursive: true });
 fs.mkdirSync(path.join(saidaIb, 'img'), { recursive: true });
 fs.mkdirSync(path.join(saida, 'img'), { recursive: true });
 fs.mkdirSync(path.join(saida, 'ib'), { recursive: true });
@@ -44,16 +47,20 @@ fs.mkdirSync(path.join(saida, 'ib'), { recursive: true });
   await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada.js')], outfile: path.join(saida, 'banqueiro-demo.js') });
   await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada-ib.js')], outfile: path.join(saida, 'ib', 'banqueiro-ib.js') });
   await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada-ib-publico.js')], outfile: path.join(saidaIb, 'banqueiro-ib.js') });
+  await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada-site.js')], outfile: path.join(saidaSite, 'payax-site.js') });
+  await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada-site-ib.js')], outfile: path.join(saidaSite, 'ib', 'banqueiro-ib.js') });
 
   // Escapa caracteres não ASCII que o esbuild mantém em template literals (o tag html usa as strings processadas).
-  for (const bundle of [path.join(saida, 'banqueiro-demo.js'), path.join(saida, 'ib', 'banqueiro-ib.js'), path.join(saidaIb, 'banqueiro-ib.js')]) {
+  for (const bundle of [path.join(saida, 'banqueiro-demo.js'), path.join(saida, 'ib', 'banqueiro-ib.js'), path.join(saidaIb, 'banqueiro-ib.js'),
+    path.join(saidaSite, 'payax-site.js'), path.join(saidaSite, 'ib', 'banqueiro-ib.js')]) {
     fs.writeFileSync(bundle, fs.readFileSync(bundle, 'utf8').replace(/[^\x00-\x7f]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`));
   }
 
   const css = fs.readFileSync(path.join(raiz, 'public/css/style.css'), 'utf8');
   const pagina = fs.readFileSync(path.join(__dirname, 'pagina.html'), 'utf8').replace('/*CSS*/', () => css);
   fs.writeFileSync(path.join(saida, 'index.html'), pagina);
-  const cssIb = css + fs.readFileSync(path.join(raiz, 'public/ib/ib.css'), 'utf8');
+  const cssSite = fs.readFileSync(path.join(raiz, 'public/css/site.css'), 'utf8');
+  const cssIb = css + cssSite + fs.readFileSync(path.join(raiz, 'public/ib/ib.css'), 'utf8');
   fs.writeFileSync(path.join(saida, 'ib', 'index.html'), fs.readFileSync(path.join(__dirname, 'pagina-ib.html'), 'utf8').replace('/*CSS*/', () => cssIb));
   fs.cpSync(path.join(raiz, 'public/img'), path.join(saida, 'img'), { recursive: true });
   fs.copyFileSync(path.join(raiz, 'public/favicon.svg'), path.join(saida, 'favicon.svg'));
@@ -61,5 +68,9 @@ fs.mkdirSync(path.join(saida, 'ib'), { recursive: true });
   fs.writeFileSync(path.join(saidaIb, 'index.html'), paginaIb);
   fs.cpSync(path.join(raiz, 'public/img'), path.join(saidaIb, 'img'), { recursive: true });
   fs.copyFileSync(path.join(raiz, 'public/favicon.svg'), path.join(saidaIb, 'favicon.svg'));
-  console.log('Demonstração gerada em dist-demo/ (Banqueiro + Internet Banking) e dist-ib/ (só Internet Banking).');
+  fs.writeFileSync(path.join(saidaSite, 'index.html'), fs.readFileSync(path.join(__dirname, 'pagina-site.html'), 'utf8').replace('/*CSS*/', () => css + cssSite));
+  fs.writeFileSync(path.join(saidaSite, 'ib', 'index.html'), fs.readFileSync(path.join(__dirname, 'pagina-ib.html'), 'utf8').replace('/*CSS*/', () => cssIb));
+  fs.cpSync(path.join(raiz, 'public/img'), path.join(saidaSite, 'img'), { recursive: true });
+  fs.copyFileSync(path.join(raiz, 'public/favicon.svg'), path.join(saidaSite, 'favicon.svg'));
+  console.log('Demonstração gerada em dist-demo/ (Banqueiro + Internet Banking), dist-ib/ (só Internet Banking) e dist-site/ (site institucional + Internet Banking).');
 })().catch((e) => { console.error(e); process.exit(1); });

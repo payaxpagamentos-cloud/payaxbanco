@@ -1,10 +1,10 @@
 # HTTPS automático (Let's Encrypt). Aponte os dois domínios (DNS tipo A) para o IP do servidor.
 
-# Internet Banking (clientes): só o portal do cliente e a API dele ficam expostos.
+# Clientes: site institucional (raiz), Internet Banking e a API do cliente. A API da equipe fica bloqueada.
 {$DOMINIO_CLIENTES} {
 	encode gzip
 	@raiz path /
-	redir @raiz /ib/ 302
+	redir @raiz /site/ 302
 	@apiEquipe {
 		path /api/*
 		not path /api/ib/* /api/integracoes/bradesco/webhook* /api/saude
