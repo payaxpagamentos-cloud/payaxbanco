@@ -1,7 +1,7 @@
 import { api, sessao } from './api.js';
 import { html, $, $$, icone, toast, iniciais, marca } from '../../js/ui.js';
 import { estado } from './comum.js';
-import { RAIZ } from './raiz.js';
+import { RAIZ, avisarSite } from './raiz.js';
 import { telaLogin, telaPrimeiroAcesso } from './telas/login.js';
 import { abrirConta, acompanharProposta } from './telas/abertura.js';
 import inicio from './telas/inicio.js';
@@ -36,8 +36,11 @@ function sair(aviso) {
   estado.resumo = null;
   clearTimeout(temporizador);
   app.innerHTML = '';
-  history.replaceState(null, '', location.pathname);
-  telaLogin(app, entrar, typeof aviso === 'string' ? aviso : undefined);
+  history.replaceState(null, '', location.pathname + location.search);
+  const motivo = typeof aviso === 'string' ? aviso : undefined;
+  // Por cima do site: "Sair" fecha a janela; sessão expirada volta para a caixa de acesso com o aviso.
+  avisarSite(motivo ? 'deslogado' : 'fechar');
+  telaLogin(app, entrar, motivo);
 }
 
 function reiniciarInatividade() {
@@ -53,6 +56,8 @@ async function entrar() {
     return;
   }
   reiniciarInatividade();
+  document.body.classList.remove('embutido');
+  avisarSite('logado');
   if (!location.hash || location.hash === '#/') location.hash = '#/inicio';
   rotear();
 }

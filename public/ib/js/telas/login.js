@@ -1,7 +1,7 @@
 import { api, sessao } from '../api.js';
 import { html, raw, $, mascaraDocumento, marca, icone } from '../../../js/ui.js';
 import { tecladoPares, criarSenhaNova } from '../teclado.js';
-import { SITE } from '../raiz.js';
+import { SITE, EMBUTIDO, avisarSite } from '../raiz.js';
 import { abrirConta, acompanharProposta } from './abertura.js';
 
 const RECURSOS = [
@@ -13,10 +13,33 @@ const RECURSOS = [
 // Site em outro endereço (ex.: demonstração publicada): abre em nova aba.
 const alvoSite = raw(SITE && /^https?:/.test(SITE) ? 'target="_blank" rel="noopener"' : '');
 
-/** Tela de acesso no padrão dos grandes bancos: cabeçalho, banner de campanhas e caixa de acesso em duas etapas. */
-export function telaLogin(alvo, aoEntrar, aviso) {
-  document.title = 'Internet Banking · PAY AX';
-  alvo.innerHTML = String(html`
+/** Caixa "Acesse sua conta" em duas etapas: documento e senha no teclado virtual. */
+const caixaAcesso = (aviso, fechar = false) => html`
+    <div class="caixa-acesso" id="caixa" role="dialog" aria-labelledby="titulo-acesso">
+      ${fechar ? html`<button type="button" class="fechar-caixa" id="fechar-ib" aria-label="Fechar">×</button>` : ''}
+      <h1 id="titulo-acesso">Acesse sua conta</h1>
+      <div class="abas-acesso" role="tablist">
+        <button type="button" role="tab" class="ativa" data-tipo="PF">Pessoa física</button>
+        <button type="button" role="tab" data-tipo="PJ">Empresa</button>
+      </div>
+      <div class="erro-form ${aviso ? '' : 'hidden'}" id="erro">${aviso ?? ''}</div>
+      <form id="passo-documento" novalidate>
+        <label for="documento" id="rotulo-doc">CPF</label>
+        <input id="documento" name="documento" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" required>
+        <button class="btn pilula gradiente" type="submit">Continuar</button>
+        <p class="dica">Primeiro acesso? Use a senha provisória entregue pela PAY AX.</p>
+      </form>
+      <form id="passo-senha" novalidate hidden>
+        <div class="quem"><span>Olá! <strong id="doc-mascarado"></strong></span><button type="button" class="btn link" id="trocar">Trocar</button></div>
+        <div id="teclado-login"></div>
+        <button class="btn pilula gradiente" type="submit" id="entrar" disabled>Entrar</button>
+      </form>
+      <div class="sem-conta">Ainda não é cliente? <button type="button" class="btn link" id="abrir-conta-2">Abra sua conta</button></div>
+      ${window.PAYAX_DEMO ? html`<div class="dica-demo"><strong>Demo:</strong> CPF 529.982.247-25 · senha 135790 · transação 246810</div>` : ''}
+    </div>`;
+
+/** Página própria do Internet Banking: cabeçalho, chamada com a caixa de acesso, recursos e segurança. */
+const paginaAcesso = (aviso) => html`
     <div class="acesso">
       <header class="acesso-topo">
         <div class="acesso-linha">
@@ -43,27 +66,7 @@ export function telaLogin(alvo, aoEntrar, aviso) {
           </div>
           <div class="acesso-palco">
             <div class="anel tracejado" aria-hidden="true"></div><div class="anel" aria-hidden="true"></div>
-            <div class="caixa-acesso" id="caixa">
-              <h1>Acesse sua conta</h1>
-              <div class="abas-acesso" role="tablist">
-                <button type="button" role="tab" class="ativa" data-tipo="PF">Pessoa física</button>
-                <button type="button" role="tab" data-tipo="PJ">Empresa</button>
-              </div>
-              <div class="erro-form ${aviso ? '' : 'hidden'}" id="erro">${aviso ?? ''}</div>
-              <form id="passo-documento" novalidate>
-                <label for="documento" id="rotulo-doc">CPF</label>
-                <input id="documento" name="documento" inputmode="numeric" autocomplete="username" placeholder="000.000.000-00" required>
-                <button class="btn pilula gradiente" type="submit">Continuar</button>
-                <p class="dica">Primeiro acesso? Use a senha provisória entregue pela PAY AX.</p>
-              </form>
-              <form id="passo-senha" novalidate hidden>
-                <div class="quem"><span>Olá! <strong id="doc-mascarado"></strong></span><button type="button" class="btn link" id="trocar">Trocar</button></div>
-                <div id="teclado-login"></div>
-                <button class="btn pilula gradiente" type="submit" id="entrar" disabled>Entrar</button>
-              </form>
-              <div class="sem-conta">Ainda não é cliente? <button type="button" class="btn link" id="abrir-conta-2">Abra sua conta</button></div>
-              ${window.PAYAX_DEMO ? html`<div class="dica-demo"><strong>Demo:</strong> CPF 529.982.247-25 · senha 135790 · transação 246810</div>` : ''}
-            </div>
+            ${caixaAcesso(aviso)}
           </div>
         </div>
       </section>
@@ -99,12 +102,30 @@ export function telaLogin(alvo, aoEntrar, aviso) {
           <span>© ${new Date().getFullYear()} PAY AX. Todos os direitos reservados.</span>
         </div>
       </footer>
-    </div>`);
+    </div>`;
+
+/**
+ * Tela de acesso. Na página própria do Internet Banking mostra o layout do site (cabeçalho, chamada e recursos);
+ * aberta por cima do site institucional (modo embutido) mostra só a caixa de acesso.
+ */
+export function telaLogin(alvo, aoEntrar, aviso) {
+  document.title = 'Internet Banking · PAY AX';
+  if (EMBUTIDO) {
+    alvo.innerHTML = String(html`<div class="acesso-embutido">${caixaAcesso(aviso, true)}</div>`);
+    const fechar = () => avisarSite('fechar');
+    $('#fechar-ib', alvo).onclick = fechar;
+    alvo.querySelector('.acesso-embutido').addEventListener('click', (e) => { if (e.target === e.currentTarget) fechar(); });
+    document.body.classList.add('embutido');
+    document.onkeydown = (e) => { if (e.key === 'Escape' && $('#fechar-ib') && !document.querySelector('.modal-fundo')) fechar(); };
+  } else {
+    alvo.innerHTML = String(paginaAcesso(aviso));
+  }
 
   alvo.querySelectorAll('[data-rolar]').forEach((b) => b.addEventListener('click', () => $(`#${b.dataset.rolar}`, alvo).scrollIntoView({ behavior: 'smooth' })));
 
-  ['#abrir-conta', '#abrir-conta-2', '#abrir-conta-3'].forEach((id) => { $(id, alvo).onclick = abrirConta; });
-  $('#acompanhar', alvo).onclick = acompanharProposta;
+  ['#abrir-conta', '#abrir-conta-2', '#abrir-conta-3'].forEach((id) => { const b = $(id, alvo); if (b) b.onclick = abrirConta; });
+  const acompanhar = $('#acompanhar', alvo);
+  if (acompanhar) acompanhar.onclick = acompanharProposta;
 
   const erro = $('#erro', alvo);
   const mostrarErro = (msg) => { erro.textContent = msg; erro.classList.remove('hidden'); };

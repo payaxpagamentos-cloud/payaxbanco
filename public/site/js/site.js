@@ -39,12 +39,10 @@
   window.addEventListener('hashchange',go); go();
 
   // ---- hero: tilt + glow
-  const stage=document.getElementById('stage'),card=document.getElementById('card'),hero=document.getElementById('hero'),glow=document.getElementById('glow');
+  const stage=document.getElementById('stage'),card=document.getElementById('card'),hero=document.getElementById('hero');
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(!reduce){
     hero.addEventListener('pointermove',e=>{
-      const r=hero.getBoundingClientRect();
-      glow.style.left=(e.clientX-r.left)+'px';glow.style.top=(e.clientY-r.top)+'px';
       const s=stage.getBoundingClientRect();
       const x=(e.clientX-(s.left+s.width/2))/s.width, y=(e.clientY-(s.top+s.height/2))/s.height;
       card.style.setProperty('--ry',(x*22)+'deg');card.style.setProperty('--rx',(-y*16)+'deg');
@@ -102,12 +100,41 @@
     $('faq-empty').hidden=n>0;
   });
 
-  // ---- internet banking link (set URL when available)
-  const IB_URL='../ib/index.html';
+  // ---- Internet Banking por cima do site
+  // "Acessar minha conta" abre a caixa de acesso (CPF e teclado virtual) sobre o site; depois de entrar,
+  // o Internet Banking ocupa a tela inteira. "Abra sua conta" abre o assistente de abertura de conta.
+  const IB_URL=window.PAYAX_IB||'../ib/index.html';
+  let janela=null;
+  function abrirIB(rota){
+    if(!janela){
+      janela=document.createElement('div');janela.className='ib-sobre';
+      janela.innerHTML='<iframe title="Internet Banking PAY AX"></iframe>';
+      document.body.appendChild(janela);
+    }
+    janela.classList.remove('logado');drawer.hidden=true;
+    janela.querySelector('iframe').src=IB_URL+'?embutido=1'+(rota||'');
+    document.body.style.overflow='hidden';
+    requestAnimationFrame(()=>janela.querySelector('iframe').focus());
+  }
+  function fecharIB(){
+    if(!janela) return;
+    janela.remove();janela=null;document.body.style.overflow='';
+  }
+  window.addEventListener('message',e=>{
+    if(!janela||e.source!==janela.querySelector('iframe').contentWindow) return;
+    const ev=e.data&&e.data.payax;
+    if(ev==='fechar') fecharIB();
+    else if(ev==='logado') janela.classList.add('logado');
+    else if(ev==='deslogado') janela.classList.remove('logado');
+  });
+  document.addEventListener('click',e=>{
+    const a=e.target.closest('a[href="#acessar"],#ib-link,a[href="#abrir-conta"]');
+    if(!a) return;
+    e.preventDefault();
+    abrirIB(a.getAttribute('href')==='#abrir-conta'?'#/abrir-conta':'');
+  });
   const ib=$('ib-link');
-  if(IB_URL){
-    // "Acessar minha conta" (topo, menu e rodapé) leva direto ao Internet Banking.
-    document.querySelectorAll('a[href="#acessar"]').forEach(a=>{a.href=IB_URL;});
-    ib.href=IB_URL;ib.removeAttribute('aria-disabled');$('ib-note').textContent='Você será levado ao ambiente seguro da PAY AX.';}
-  else{ib.classList.add('is-off');ib.style.opacity='.5';ib.addEventListener('click',e=>e.preventDefault());}
+  ib.href='#acessar';ib.removeAttribute('aria-disabled');$('ib-note').textContent='O acesso abre no ambiente seguro da PAY AX.';
+  // Sessão aberta (ex.: página recarregada): volta direto para o Internet Banking.
+  try{ if(sessionStorage.getItem('payax.ib.sessao')) abrirIB(''); }catch(_){}
 })();
