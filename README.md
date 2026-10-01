@@ -84,13 +84,20 @@ Situação: cobrança, consulta de recebidos e webhook seguem o padrão **API Pi
 sandbox/produção (`server/integracoes/bradesco/api.js`). Envio de PIX, pagamento de boletos, saldo e extrato usam APIs próprias do Bradesco e funcionam
 no simulador. Para sandbox e produção, serão ligados assim que houver a documentação técnica recebida no credenciamento.
 
+## Vitrine de propagandas
+
+O painel lateral das telas de login (Banqueiro e Internet Banking) mostra peças da PAY AX. Cada acesso começa numa
+peça diferente, e elas trocam a cada 7 segundos (pausa com o mouse em cima; sem animação para quem prefere movimento
+reduzido). Para editar as campanhas, altere `public/js/propagandas.js`. Para usar artes prontas da agência, coloque os
+arquivos em `public/img/propagandas/` e informe `{ imagem: 'propagandas/arquivo.jpg', alt: '...' }`.
+
 ## Demonstração online
 
 Há uma versão de demonstração que roda inteira no navegador: o mesmo backend (rotas e regras de negócio)
 é empacotado com SQLite em JavaScript, e os dados ficam salvos só no navegador de quem abre.
 
 ```bash
-npm run build:demo   # gera dist-demo/: Banqueiro (index.html) e Internet Banking (ib/index.html)
+npm run build:demo   # gera dist-demo/ (Banqueiro + Internet Banking) e dist-ib/ (só o Internet Banking, para clientes testarem)
 ```
 
 Na demo, as senhas usam um hash simplificado e a exportação de CSV fica desativada. Use a versão instalada em produção.

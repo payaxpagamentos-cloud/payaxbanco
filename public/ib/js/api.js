@@ -1,3 +1,5 @@
+import { RAIZ } from './raiz.js';
+
 const CHAVE = 'payax.ib.sessao';
 let memoria = null;
 
@@ -16,7 +18,7 @@ async function chamar(metodo, caminho, corpo) {
   const s = sessao.get();
   if (s?.token) headers.Authorization = `Bearer ${s.token}`;
   if (corpo !== undefined) headers['Content-Type'] = 'application/json';
-  const resp = await fetch(`../api/ib${caminho}`, { method: metodo, headers, body: corpo === undefined ? undefined : JSON.stringify(corpo) });
+  const resp = await fetch(`${RAIZ}api/ib${caminho}`, { method: metodo, headers, body: corpo === undefined ? undefined : JSON.stringify(corpo) });
   if (resp.status === 401 && caminho !== '/auth/login') {
     sessao.limpar();
     window.dispatchEvent(new CustomEvent('payax-ib:sair', { detail: 'Sua sessão expirou. Entre novamente.' }));

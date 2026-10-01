@@ -7,6 +7,7 @@ const esbuild = require('esbuild');
 
 const raiz = path.join(__dirname, '..');
 const saida = path.join(raiz, 'dist-demo');
+const saidaIb = path.join(raiz, 'dist-ib'); // publicação só do Internet Banking (link direto para clientes testarem)
 const shim = (n) => path.join(__dirname, 'shims', n);
 
 const substituir = {
@@ -22,6 +23,8 @@ const substituir = {
 };
 
 fs.rmSync(saida, { recursive: true, force: true });
+fs.rmSync(saidaIb, { recursive: true, force: true });
+fs.mkdirSync(path.join(saidaIb, 'img'), { recursive: true });
 fs.mkdirSync(path.join(saida, 'img'), { recursive: true });
 fs.mkdirSync(path.join(saida, 'ib'), { recursive: true });
 
@@ -40,9 +43,10 @@ fs.mkdirSync(path.join(saida, 'ib'), { recursive: true });
   };
   await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada.js')], outfile: path.join(saida, 'banqueiro-demo.js') });
   await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada-ib.js')], outfile: path.join(saida, 'ib', 'banqueiro-ib.js') });
+  await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada-ib-publico.js')], outfile: path.join(saidaIb, 'banqueiro-ib.js') });
 
   // Escapa caracteres não ASCII que o esbuild mantém em template literals (o tag html usa as strings processadas).
-  for (const bundle of [path.join(saida, 'banqueiro-demo.js'), path.join(saida, 'ib', 'banqueiro-ib.js')]) {
+  for (const bundle of [path.join(saida, 'banqueiro-demo.js'), path.join(saida, 'ib', 'banqueiro-ib.js'), path.join(saidaIb, 'banqueiro-ib.js')]) {
     fs.writeFileSync(bundle, fs.readFileSync(bundle, 'utf8').replace(/[^\x00-\x7f]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`));
   }
 
@@ -53,5 +57,9 @@ fs.mkdirSync(path.join(saida, 'ib'), { recursive: true });
   fs.writeFileSync(path.join(saida, 'ib', 'index.html'), fs.readFileSync(path.join(__dirname, 'pagina-ib.html'), 'utf8').replace('/*CSS*/', () => cssIb));
   for (const f of fs.readdirSync(path.join(raiz, 'public/img'))) fs.copyFileSync(path.join(raiz, 'public/img', f), path.join(saida, 'img', f));
   fs.copyFileSync(path.join(raiz, 'public/favicon.svg'), path.join(saida, 'favicon.svg'));
-  console.log('Demonstração gerada em dist-demo/');
+  const paginaIb = fs.readFileSync(path.join(__dirname, 'pagina-ib.html'), 'utf8').replace('/*CSS*/', () => cssIb).replace('href="../favicon.svg"', 'href="favicon.svg"');
+  fs.writeFileSync(path.join(saidaIb, 'index.html'), paginaIb);
+  for (const f of fs.readdirSync(path.join(raiz, 'public/img'))) fs.copyFileSync(path.join(raiz, 'public/img', f), path.join(saidaIb, 'img', f));
+  fs.copyFileSync(path.join(raiz, 'public/favicon.svg'), path.join(saidaIb, 'favicon.svg'));
+  console.log('Demonstração gerada em dist-demo/ (Banqueiro + Internet Banking) e dist-ib/ (só Internet Banking).');
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -1,23 +1,21 @@
 import { api, sessao } from '../api.js';
 import { html, $, mascaraDocumento } from '../../../js/ui.js';
 import { tecladoPares, criarSenhaNova } from '../teclado.js';
+import { vitrine } from '../../../js/vitrine.js';
+import { RAIZ } from '../raiz.js';
 
 export function telaLogin(alvo, aoEntrar, aviso) {
   document.title = 'Entrar · Internet Banking PAY AX';
   alvo.innerHTML = String(html`
     <div class="login">
       <section class="lado">
-        <img class="arte" src="../img/payax-marca.jpg" alt="PAY AX — O futuro em cada transação.">
-        <div>
-          <h2>Internet Banking <span>PAY AX</span></h2>
-          <p>Consulte saldo e extrato, faça PIX, transferências e pagamentos com segurança.</p>
-        </div>
-        <div class="small" style="color:#7F93B8">© ${new Date().getFullYear()} PAY AX</div>
+        <div id="vitrine"></div>
+        <div class="rodape-lado">© ${new Date().getFullYear()} PAY AX</div>
       </section>
       <section class="form-lado">
         <form id="form-login" novalidate>
-          <img src="../img/logo-payax.svg" alt="PAY AX" style="height:44px;margin-bottom:8px">
-          <div><h1>Internet Banking</h1><p class="muted" style="margin:4px 0 8px">Acesse com seu CPF ou CNPJ.</p></div>
+          <img src="${RAIZ}img/logo-payax.svg" alt="PAY AX" style="height:44px;margin-bottom:8px">
+          <div class="cabecalho-acesso"><h1>Internet Banking</h1><p class="muted" style="margin:4px 0 8px">Acesse com seu CPF ou CNPJ.</p></div>
           <div class="erro-form ${aviso ? '' : 'hidden'}" id="erro">${aviso ?? ''}</div>
           <div><label for="documento">CPF ou CNPJ</label><input id="documento" name="documento" inputmode="numeric" autocomplete="username" required></div>
           <div id="teclado-login"></div>
@@ -29,6 +27,7 @@ export function telaLogin(alvo, aoEntrar, aviso) {
         </form>
       </section>
     </div>`);
+  vitrine($('#vitrine', alvo), { raizImg: `${RAIZ}img/` });
   const form = $('#form-login', alvo);
   const botao = $('#entrar', alvo);
   const teclado = tecladoPares($('#teclado-login', alvo), { rotulo: 'Senha de acesso (6 números)', aoMudar: (ok) => { botao.disabled = !ok; } });
@@ -57,8 +56,8 @@ export async function telaPrimeiroAcesso(alvo, nome, aoConcluir, aoSair) {
   alvo.innerHTML = String(html`
     <div style="min-height:100vh;display:grid;place-items:center;padding:24px 16px">
       <div class="card card-body stack" style="width:min(420px,100%)">
-        <img src="../img/logo-payax.svg" alt="PAY AX" style="height:36px;align-self:flex-start">
-        <div><h1>Bem-vindo(a), ${nome.split(' ')[0]}!</h1><p class="muted" style="margin:4px 0 0">Para sua segurança, crie suas senhas. São duas senhas diferentes, de 6 números cada.</p></div>
+        <img src="${RAIZ}img/logo-payax.svg" alt="PAY AX" style="height:36px;align-self:center">
+        <div style="text-align:center"><h1>Bem-vindo(a), ${nome.split(' ')[0]}!</h1><p class="muted" style="margin:4px 0 0">Para sua segurança, crie suas senhas. São duas senhas diferentes, de 6 números cada.</p></div>
         <div class="passos"><span class="feito" id="p1"></span><span id="p2"></span></div>
         <div class="erro-form hidden" id="erro"></div>
         <div id="etapa"></div>

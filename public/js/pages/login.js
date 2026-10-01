@@ -1,22 +1,19 @@
 import { api, sessao } from '../api.js';
 import { html, $ } from '../ui.js';
+import { vitrine } from '../vitrine.js';
 
 export default function login(alvo, aoEntrar) {
   document.title = 'Entrar · Banqueiro PAY AX';
   alvo.innerHTML = String(html`
     <div class="login">
       <section class="lado">
-        <img class="arte" src="img/payax-marca.jpg" alt="PAY AX — O futuro em cada transação.">
-        <div>
-          <h2>Banqueiro <span>PAY AX</span></h2>
-          <p>Clientes, contas, PIX, transferências, empréstimos e auditoria em um só lugar, com controle por perfil de acesso.</p>
-        </div>
-        <div class="small" style="color:#7F93B8">© ${new Date().getFullYear()} PAY AX · Uso exclusivo da equipe</div>
+        <div id="vitrine"></div>
+        <div class="rodape-lado">© ${new Date().getFullYear()} PAY AX · Uso exclusivo da equipe</div>
       </section>
       <section class="form-lado">
         <form id="form-login" novalidate>
-          <img src="img/logo-payax.svg" alt="PAY AX" style="height:44px;margin-bottom:8px" class="logo-claro">
-          <div><h1>Acessar o Banqueiro</h1><p class="muted" style="margin:4px 0 8px">Entre com suas credenciais corporativas.</p></div>
+          <img src="img/logo-payax.svg" alt="PAY AX" style="height:44px;margin-bottom:8px">
+          <div class="cabecalho-acesso"><h1>Acessar o Banqueiro</h1><p class="muted" style="margin:4px 0 8px">Entre com suas credenciais corporativas.</p></div>
           <div class="erro-form hidden" id="erro"></div>
           <div><label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="username" required></div>
           <div><label for="senha">Senha</label><input id="senha" name="senha" type="password" autocomplete="current-password" required></div>
@@ -29,6 +26,7 @@ export default function login(alvo, aoEntrar) {
         </form>
       </section>
     </div>`);
+  vitrine($('#vitrine', alvo), { raizImg: 'img/' });
   const form = $('#form-login', alvo);
   setTimeout(() => $('#email', alvo).focus(), 0);
   form.addEventListener('submit', async (e) => {

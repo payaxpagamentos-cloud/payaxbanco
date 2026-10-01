@@ -87,7 +87,7 @@ export function faixaDemo(link, { topo = false } = {}) {
   const el = document.createElement('div');
   el.className = `faixa-demo${topo ? ' topo' : ''}`;
   el.innerHTML = `<span><strong>Demonstração</strong> · dados fictícios no seu navegador</span>
-    <a class="btn sm" href="${link.href}">${link.rotulo}</a><button type="button" class="btn sm" id="demo-reset">Restaurar dados</button>`;
+    ${link ? `<a class="btn sm" href="${link.href}">${link.rotulo}</a>` : ''}<button type="button" class="btn sm" id="demo-reset">Restaurar dados</button>`;
   document.body.prepend(el);
   const botao = el.querySelector('#demo-reset');
   let armado = false;
