@@ -1,13 +1,17 @@
 const CHAVE = 'payax.sessao';
 
+// Cópia em memória garante a sessão mesmo quando o sessionStorage está bloqueado.
+let memoria = null;
 export const sessao = {
   get() {
-    try { return JSON.parse(sessionStorage.getItem(CHAVE)) || null; } catch { return null; }
+    try { return JSON.parse(sessionStorage.getItem(CHAVE)) || memoria; } catch { return memoria; }
   },
   set(dados) {
+    memoria = dados;
     try { sessionStorage.setItem(CHAVE, JSON.stringify(dados)); } catch { /* armazenamento indisponível */ }
   },
   limpar() {
+    memoria = null;
     try { sessionStorage.removeItem(CHAVE); } catch { /* ignora */ }
   },
 };
@@ -48,6 +52,7 @@ export const api = {
   patch: (c, corpo = {}) => chamar('PATCH', c, corpo),
   del: (c) => chamar('DELETE', c),
   async baixar(c, params) {
+    if (window.PAYAX_DEMO) throw new ErroApi('Exportação de arquivos indisponível na demonstração online. Use a versão instalada.', 400);
     const resp = await chamar('GET', c + qs(params), undefined, { bruto: true });
     const nome = /filename="([^"]+)"/.exec(resp.headers.get('Content-Disposition') || '')?.[1] || 'relatorio.csv';
     const url = URL.createObjectURL(await resp.blob());

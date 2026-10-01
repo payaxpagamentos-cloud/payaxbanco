@@ -53,7 +53,7 @@ function renderLayout() {
     <div class="layout">
       <aside class="sidebar" id="sidebar">
         <div class="brand">
-          <img src="/img/logo-payax-branco.svg" alt="PAY AX">
+          <img src="img/logo-payax-branco.svg" alt="PAY AX">
         </div>
         <div class="brand" style="border:0;padding-bottom:0"><span class="produto">Banqueiro</span></div>
         <nav class="nav">

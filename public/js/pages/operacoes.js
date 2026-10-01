@@ -53,7 +53,7 @@ export function formOperacao(tipo, contaSel, aoConcluir) {
         toast(`Transferência de ${moeda(valor)} concluída.`);
       } else {
         r = await api.post('/operacoes/pix', { origem_conta_id: contaId, chave: d.chave, valor_centavos: valor, descricao: d.descricao });
-        toast(`PIX de ${moeda(valor)} enviado para ${r.destino.nome}.`);
+        toast(`PIX de ${moeda(valor)} enviado para ${r.destino.nome.replace(/\.$/, '')}.`);
       }
       fechar();
       aoConcluir?.(r);

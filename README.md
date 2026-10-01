@@ -30,6 +30,17 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 | **Gerente** | Concede/altera limites, contrata empréstimos, bloqueia/encerra contas, estorna, altera status de clientes, relatórios e auditoria. |
 | **Operador** | Cadastra clientes e contas, chaves PIX, operações de caixa até a alçada (padrão R$ 50.000,00) e pagamento de parcelas. |
 
+## Demonstração online
+
+Há uma versão de demonstração que roda inteira no navegador: o mesmo backend (rotas e regras de negócio)
+é empacotado com SQLite em JavaScript, e os dados ficam salvos só no navegador de quem abre.
+
+```bash
+npm run build:demo   # gera dist-demo/ (index.html + banqueiro-demo.js + imagens)
+```
+
+Na demo, as senhas usam um hash simplificado e a exportação de CSV fica desativada. Use a versão instalada em produção.
+
 ## Como executar
 
 Requisitos: **Node.js 22.13+** (usa o SQLite nativo `node:sqlite`, sem dependências nativas).
