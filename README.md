@@ -86,7 +86,9 @@ no simulador. Para sandbox e produção, serão ligados assim que houver a docum
 
 ## Vitrine de propagandas
 
-O painel lateral das telas de login (Banqueiro e Internet Banking) mostra peças da PAY AX. Cada acesso começa numa
+O painel lateral das telas de login (Banqueiro e Internet Banking) mostra peças da PAY AX com fotos
+(pessoas na rua, no computador, pequenos negócios, a cidade de São Paulo) e uma cor de destaque por peça.
+As fotos são do Unsplash, de uso comercial gratuito. Os créditos estão em `public/img/propagandas/CREDITOS.md`. Cada acesso começa numa
 peça diferente, e elas trocam a cada 7 segundos (pausa com o mouse em cima; sem animação para quem prefere movimento
 reduzido). Para editar as campanhas, altere `public/js/propagandas.js`. Para usar artes prontas da agência, coloque os
 arquivos em `public/img/propagandas/` e informe `{ imagem: 'propagandas/arquivo.jpg', alt: '...' }`.

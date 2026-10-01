@@ -1,4 +1,4 @@
-import { html, icone } from './ui.js';
+import { html } from './ui.js';
 import { PROPAGANDAS } from './propagandas.js';
 
 const CHAVE = 'payax.vitrine.ultima';
@@ -18,11 +18,12 @@ export function vitrine(el, { raizImg = 'img/' } = {}) {
 
   el.innerHTML = String(html`
     <div class="vitrine" aria-roledescription="carrossel" aria-label="Novidades PAY AX">
-      ${pecas.map((p, i) => html`<div class="peca ${p.imagem ? 'peca-arte' : 'peca-desenhada'} ${i === atual ? 'ativa' : ''}" data-i="${i}" aria-hidden="${i === atual ? 'false' : 'true'}">
-        ${p.imagem ? html`<img src="${raizImg}${p.imagem}" alt="${p.alt ?? ''}">` : html`
-          <div class="peca-faixas" aria-hidden="true"></div>
-          <div class="peca-ilustra" aria-hidden="true">${icone(p.icone)}</div>
-          <div class="peca-texto"><img class="peca-logo" src="${raizImg}logo-payax-branco.svg" alt="PAY AX"><span class="selo">${p.selo}</span><h2>${p.titulo}</h2><p>${p.texto}</p></div>`}
+      ${pecas.map((p, i) => html`<div class="peca ${p.titulo ? 'peca-foto' : 'peca-arte'} ${i === atual ? 'ativa' : ''}" data-i="${i}"
+          aria-hidden="${i === atual ? 'false' : 'true'}" style="--cor:${p.cor ?? '#00C8FF'}">
+        <img src="${raizImg}${p.imagem}" alt="${p.alt ?? ''}" style="object-position:${p.foco ?? 'center'}" ${i === atual ? '' : 'loading="lazy"'}>
+        ${p.titulo ? html`<div class="peca-sombra" aria-hidden="true"></div>
+          <div class="peca-texto"><img class="peca-logo" src="${raizImg}logo-payax-branco.svg" alt="PAY AX">
+            <span class="selo">${p.selo}</span><h2>${p.titulo}<span class="destaque">${p.destaque ?? ''}</span></h2><p>${p.texto}</p></div>` : ''}
       </div>`)}
       <div class="vitrine-pontos" role="tablist">${pecas.map((_, i) => html`<button type="button" role="tab" aria-label="Peça ${i + 1}" class="${i === atual ? 'ativo' : ''}" data-ir="${i}"></button>`)}</div>
     </div>`);
