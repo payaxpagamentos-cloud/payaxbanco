@@ -12,7 +12,6 @@ import extrato from './telas/extrato.js';
 import emprestimos from './telas/emprestimos.js';
 import perfil from './telas/perfil.js';
 import gerente from './telas/gerente.js';
-import limites from './telas/limites.js';
 
 const MENU = [
   { secao: 'Minha conta' },
@@ -24,11 +23,10 @@ const MENU = [
   { rota: 'transferir', rotulo: 'Transferir', icone: 'operacoes' },
   { secao: 'Serviços' },
   { rota: 'emprestimos', rotulo: 'Empréstimos', icone: 'emprestimos' },
-  { rota: 'limites', rotulo: 'Meus limites', icone: 'auditoria' },
   { rota: 'gerente', rotulo: 'Meu gerente', icone: 'conversa' },
   { rota: 'perfil', rotulo: 'Meu perfil', icone: 'perfil' },
 ];
-const TELAS = { inicio, pix, pagar, transferir, extrato, emprestimos, perfil, gerente, limites };
+const TELAS = { inicio, pix, pagar, transferir, extrato, emprestimos, perfil, gerente };
 const INATIVIDADE_MS = 10 * 60 * 1000;
 
 const app = $('#app');

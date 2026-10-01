@@ -41,7 +41,7 @@ export default async function inicio(alvo) {
         <div class="barra-h"><span style="width:${Math.min(100, (l.usado_centavos / Math.max(1, l.limite_centavos)) * 100).toFixed(1)}%"></span></div>
         <div class="row small" style="justify-content:space-between;margin-top:6px"><span>Usado ${moeda(l.usado_centavos)}</span><span class="muted">de ${moeda(l.limite_centavos)}</span></div>
         ${l.pedido ? html`<div class="small" style="margin-top:8px;color:var(--warn)">Aumento para ${moeda(l.pedido.valor_novo_centavos)} em <strong data-prazo-ate="${l.pedido.efetiva_em}">${restante(l.pedido.efetiva_em)}</strong></div>` : ''}
-        <a class="small" href="#/limites" style="display:inline-block;margin-top:8px">Alterar limite →</a></div>
+        <a class="small" href="#/pix/limites" style="display:inline-block;margin-top:8px">Alterar limite →</a></div>
       ${r.emprestimos.length ? html`<a class="card card-body" href="#/emprestimos" style="color:inherit;text-decoration:none"><h3>Empréstimos</h3>
         ${r.emprestimos.map((e) => html`<div class="row small" style="justify-content:space-between;margin-top:8px"><span>Parcela ${e.pagas + 1}/${e.num_parcelas} · vence ${data(e.proximo_vencimento)}</span><strong>${moeda(e.valor_parcela_centavos)}</strong></div>`)}</a>`
         : html`<a class="card card-body" href="#/extrato" style="color:inherit;text-decoration:none"><h3>Extrato</h3>

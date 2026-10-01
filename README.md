@@ -23,7 +23,7 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 | **Internet Banking** | Portal web do cliente em `/ib/`: saldo, extrato com comprovantes, PIX (enviar, receber por QR Code, minhas chaves), transferências, pagamento de boletos e contas de consumo, e empréstimos. |
 | **Relatórios** | Exportação CSV (compatível com Excel) de clientes, contas, transações por período e carteira de crédito. |
 | **Auditoria** | Registro de todas as ações (login, cadastros, operações, estornos, alterações de limite/status) com usuário, data e IP. |
-| **Limites** | O cliente vê todos os limites em "Meus limites" e altera o limite diário do Internet Banking com a senha de transação: redução vale na hora; aumento entra em vigor 24 horas depois, com contagem regressiva, e pode ser cancelado pelo cliente ou recusado pela equipe. Teto pelo Internet Banking em `PAYAX_LIMITE_DIARIO_MAXIMO` (padrão R$ 50.000,00). |
+| **Limites** | O cliente vê todos os limites no PIX, aba "Meus limites", e altera o limite diário do Internet Banking com a senha de transação: redução vale na hora; aumento entra em vigor 24 horas depois, com contagem regressiva, e pode ser cancelado pelo cliente ou recusado pela equipe. Teto pelo Internet Banking em `PAYAX_LIMITE_DIARIO_MAXIMO` (padrão R$ 50.000,00). |
 | **Relacionamento** | Cada conta tem um gerente. O cliente vê o nome dele no Internet Banking e conversa por mensagens em "Meu gerente"; o gerente responde no menu Relacionamento, que tem painel com carteira, clientes que entraram em contato, clientes contatados, conversas aguardando resposta e tempo médio de resposta. O administrador vê todos os gerentes. |
 | **Usuários** | Gestão de colaboradores e perfis de acesso. |
 

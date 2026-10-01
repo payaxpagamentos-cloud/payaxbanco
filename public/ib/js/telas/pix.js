@@ -1,8 +1,9 @@
 import { api } from '../api.js';
 import { html, raw, $, $$, moeda, dataHora, toast, mascaraMoeda, centavos, confirmar, modal, dadosForm } from '../../../js/ui.js';
+import limites from './limites.js';
 import { estado, carregarResumo, rotuloConta, seletorConta, limiteRestante, confirmarComPin, mostrarComprovante, linhaRecibo } from '../comum.js';
 
-const ABAS = [['enviar', 'Enviar'], ['receber', 'Receber'], ['chaves', 'Minhas chaves']];
+const ABAS = [['enviar', 'Enviar'], ['receber', 'Receber'], ['chaves', 'Minhas chaves'], ['limites', 'Meus limites']];
 
 export default async function pix(alvo, sub = 'enviar') {
   await carregarResumo();
@@ -15,6 +16,7 @@ export default async function pix(alvo, sub = 'enviar') {
   const el = $('#aba', alvo);
   if (aba === 'enviar') return enviar(el);
   if (aba === 'receber') return receber(el);
+  if (aba === 'limites') return limites(el);
   return chaves(el);
 }
 

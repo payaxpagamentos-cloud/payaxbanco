@@ -5,14 +5,12 @@ import { ligarContagens, restante } from '../../../js/prazo.js';
 
 const STATUS = { agendado: ['Aguardando 24 h', 'warn'], efetivado: ['Em vigor', 'ok'], cancelado: ['Cancelado', ''], recusado: ['Não aprovado', 'danger'] };
 
-/** Meus limites: limite diário (com pedido de aumento em 24 horas e contagem regressiva) e cheque especial das contas. */
+/** Meus limites (aba do PIX): limite diário (com pedido de aumento em 24 horas e contagem regressiva) e cheque especial das contas. */
 export default async function limites(alvo) {
   const r = await api.get('/limites');
   const d = r.diario;
   const p = d.pedido;
   alvo.innerHTML = String(html`
-    <div class="page-head"><div><h1>Meus limites</h1><p class="muted">Acompanhe e ajuste os limites da sua conta.</p></div></div>
-
     ${p ? html`<div class="card card-body pedido-limite" style="margin-bottom:16px">
       <div><strong>Aumento de limite agendado: ${moeda(p.valor_atual_centavos)} → ${moeda(p.valor_novo_centavos)}</strong>
         <div class="tempo-restante">Falta <strong data-prazo-ate="${p.efetiva_em}">${restante(p.efetiva_em)}</strong> para o novo limite entrar em vigor</div>
