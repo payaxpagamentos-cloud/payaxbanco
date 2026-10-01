@@ -10,7 +10,7 @@
 
 const { ErroNegocio } = require('./erros');
 
-const PERFIS_CONFIGURAVEIS = ['gerente', 'operador', 'ouvidoria'];
+const PERFIS_CONFIGURAVEIS = ['gerente', 'operador', 'ouvidoria', 'antifraude'];
 
 /** padrao: [permitido, limite em centavos ou null] por perfil. `valor`: a permissão tem teto em reais. */
 const CATALOGO = [
@@ -38,8 +38,10 @@ const CATALOGO = [
     padrao: { gerente: [true, null], operador: [false, null], ouvidoria: [false, null] } },
   { grupo: 'Ouvidoria', chave: 'ouvidoria.decidir', rotulo: 'Analisar solicitações (aprovar ou recusar)',
     padrao: { gerente: [false, null], operador: [false, null], ouvidoria: [true, null] } },
-  { grupo: 'Gestão', chave: 'relatorios.ver', rotulo: 'Ver relatórios', padrao: { gerente: [true, null], operador: [false, null], ouvidoria: [true, null] } },
-  { grupo: 'Gestão', chave: 'auditoria.ver', rotulo: 'Ver auditoria', padrao: { gerente: [true, null], operador: [false, null], ouvidoria: [true, null] } },
+  { grupo: 'Antifraude', chave: 'antifraude.analisar', rotulo: 'Antifraude: painel, alertas e tentativas de acesso',
+    padrao: { gerente: [false, null], operador: [false, null], ouvidoria: [false, null], antifraude: [true, null] } },
+  { grupo: 'Gestão', chave: 'relatorios.ver', rotulo: 'Ver relatórios', padrao: { gerente: [true, null], operador: [false, null], ouvidoria: [true, null], antifraude: [true, null] } },
+  { grupo: 'Gestão', chave: 'auditoria.ver', rotulo: 'Ver auditoria', padrao: { gerente: [true, null], operador: [false, null], ouvidoria: [true, null], antifraude: [true, null] } },
 ];
 const POR_CHAVE = new Map(CATALOGO.map((p) => [p.chave, p]));
 

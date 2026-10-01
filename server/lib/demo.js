@@ -6,6 +6,7 @@ const { proximoNumero, novoGrupo, lancar } = require('./conta');
 const { simular } = require('./financeiro');
 const { hashSenha, hashNumerica } = require('./senha');
 const ouvidoria = require('./ouvidoria');
+const antifraude = require('./antifraude');
 
 const CLIENTES = [
   ['PF', 'João Pedro Souza', '52998224725', 'joao.souza@email.com', '11987654321', '1990-04-12', 850000, 'São Paulo', 'SP'],
@@ -19,7 +20,8 @@ const CLIENTES = [
 function popularDemo(db) {
   transacao(db, () => {
     const usuarios = [['Gabriela Gerente', 'gerente@payax.com.br', 'gerente'], ['Otávio Operador', 'operador@payax.com.br', 'operador'],
-      ['Olívia Ouvidoria', 'ouvidoria@payax.com.br', 'ouvidoria'], ['Marcos Andrade', 'marcos@payax.com.br', 'gerente']];
+      ['Olívia Ouvidoria', 'ouvidoria@payax.com.br', 'ouvidoria'], ['Marcos Andrade', 'marcos@payax.com.br', 'gerente'],
+      ['Augusto Antifraude', 'antifraude@payax.com.br', 'antifraude']];
     for (const [nome, email, perfil] of usuarios) {
       if (!db.prepare('SELECT 1 FROM usuarios WHERE email = ?').get(email)) {
         db.prepare('INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?, ?, ?, ?)').run(nome, email, hashSenha('payax2026'), perfil);
@@ -125,6 +127,35 @@ function popularDemo(db) {
       VALUES (?, 1500000, 1000000, 'efetivado', datetime('now', '-10 days'), datetime('now', '-10 days'), datetime('now', '-10 days'))`).run(idJoao);
     db.prepare(`INSERT INTO pedidos_limite (cliente_id, valor_atual_centavos, valor_novo_centavos, status, efetiva_em, criado_em)
       VALUES (?, 1000000, 2000000, 'agendado', datetime('now', '+18 hours'), datetime('now', '-6 hours'))`).run(idJoao);
+
+    // Antifraude: operações fora do padrão e tentativas de acesso suspeitas, para o painel ter o que mostrar.
+    const corrente = (doc) => db.prepare("SELECT c.id FROM contas c JOIN clientes cl ON cl.id = c.cliente_id WHERE cl.documento = ? AND c.tipo = 'corrente'").get(doc).id;
+    const pixIb = (de, para, valor, quando) => {
+      const g = novoGrupo();
+      const sai = lancar(db, { contaId: de, tipo: 'pix_enviado', valor: -valor, descricao: 'PIX', contraparteId: para, grupo: g, canal: 'internet_banking' });
+      const ent = lancar(db, { contaId: para, tipo: 'pix_recebido', valor, descricao: 'PIX', contraparteId: de, grupo: g, canal: 'internet_banking' });
+      db.prepare('UPDATE transacoes SET criado_em = ? WHERE id IN (?, ?)').run(db.prepare(`SELECT ${quando} AS q`).get().q, sai.id, ent.id);
+    };
+    const [cCarlos, cJoao, cPadaria, cFernanda, cTech] = ['11144477735', '52998224725', '11222333000181', '39053344705', '45997418000153'].map(corrente);
+    for (const [valor, dias] of [[9_500, 9], [12_000, 7], [14_500, 5], [11_000, 3]]) pixIb(cCarlos, cJoao, valor, `datetime('now', '-${dias} days')`);
+    pixIb(cCarlos, cPadaria, 620_000, "date('now', '-1 day') || ' 06:12:00'"); // 03h12 em Brasília, 50× a média, destinatário novo
+    for (let i = 0; i < 6; i++) pixIb(cFernanda, cTech, 35_000, `datetime('now', '-${130 - i * 1.5} minutes')`);
+    const tentativa = (canal, ident, clienteDoc, sucesso, motivo, ip, minutos) => db.prepare(`INSERT INTO tentativas_acesso (canal, identificador, cliente_id, usuario_id, sucesso, motivo, ip, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', ?))`).run(canal, canal === 'equipe' ? ident : antifraude.mascararDocumento(ident),
+      canal === 'equipe' ? null : (clienteDoc ? clienteDoc() : null), canal === 'equipe' ? (db.prepare('SELECT id FROM usuarios WHERE email = ?').get(ident)?.id ?? null) : null,
+      sucesso ? 1 : 0, motivo, ip, `-${minutos} minutes`);
+    const idCli = (doc) => () => clienteDoc(doc);
+    for (const m of [4320, 2880, 1440]) tentativa('internet_banking', '52998224725', idCli('52998224725'), true, null, 'navegador', m);
+    for (let i = 0; i < 5; i++) tentativa('internet_banking', '11144477735', idCli('11144477735'), false, i === 4 ? 'senha_incorreta_bloqueou' : 'senha_incorreta', '177.45.10.22', 300 - i);
+    for (const [i, doc] of ['12345678909', '98765432100', '11122233396', '22233344405', '33344455514', '44455566623'].entries()) {
+      tentativa('internet_banking', doc, null, false, 'documento_sem_acesso', '45.160.12.9', 50 - i * 2);
+    }
+    for (let i = 0; i < 6; i++) tentativa('equipe', 'admin@payax.com.br', null, false, 'senha_incorreta', '185.220.101.4', 30 - i);
+    for (const [i, email] of ['ti@payax.com.br', 'financeiro@payax.com.br', 'suporte@payax.com.br', 'diretoria@payax.com.br', 'root@payax.com.br'].entries()) {
+      tentativa('equipe', email, null, false, 'usuario_inexistente', '185.220.101.4', 24 - i);
+    }
+    tentativa('equipe', 'gerente@payax.com.br', null, false, 'senha_incorreta', 'navegador', 200);
+    antifraude.analisar(db);
 
     // Ouvidoria: um bloqueio pedido pela gerente e um encerramento pedido pelo cliente, aguardando análise.
     const gerente = db.prepare("SELECT id FROM usuarios WHERE email = 'gerente@payax.com.br'").get();

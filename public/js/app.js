@@ -16,6 +16,8 @@ import bradesco from './pages/bradesco.js';
 import alcadas from './pages/alcadas.js';
 import ouvidoria from './pages/ouvidoria.js';
 import relacionamento from './pages/relacionamento.js';
+import segurancaPagina from './pages/seguranca.js';
+import antifraudePagina from './pages/antifraude.js';
 
 // `alcada`: só aparece para quem tem a permissão; `admin`: exclusivo do administrador.
 const MENU = [
@@ -32,6 +34,8 @@ const MENU = [
   { rota: 'emprestimos', rotulo: 'Empréstimos', icone: 'emprestimos' },
   { secao: 'Gestão' },
   { rota: 'ouvidoria', rotulo: 'Ouvidoria', icone: 'ouvidoria' },
+  { rota: 'antifraude', rotulo: 'Antifraude', icone: 'escudo', alcada: 'antifraude.analisar' },
+  { rota: 'seguranca', rotulo: 'Segurança', icone: 'radar', admin: true },
   { rota: 'bradesco', rotulo: 'Bradesco', icone: 'banco', alcada: 'bradesco.conciliar' },
   { rota: 'relatorios', rotulo: 'Relatórios', icone: 'relatorios', alcada: 'relatorios.ver' },
   { rota: 'auditoria', rotulo: 'Auditoria', icone: 'auditoria', alcada: 'auditoria.ver' },
@@ -55,9 +59,11 @@ const ROTAS = {
   alcadas,
   ouvidoria,
   relacionamento,
+  seguranca: segurancaPagina,
+  antifraude: antifraudePagina,
 };
 
-const PERFIL = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador', ouvidoria: 'Ouvidoria' };
+const PERFIL = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador', ouvidoria: 'Ouvidoria', antifraude: 'Antifraude' };
 
 
 function renderLayout() {
@@ -127,6 +133,7 @@ function contador(rota, n, titulo) {
 /** Mostra no menu quantas propostas de abertura de conta aguardam análise. */
 function atualizarContadorPropostas() {
   if (pode('relacionamento.atender')) api.get('/relacionamento/pendentes').then((r) => contador('relacionamento', r.total, 'Mensagens de clientes não lidas')).catch(() => {});
+  if (pode('antifraude.analisar')) api.get('/antifraude/pendentes').then((r) => contador('antifraude', r.total, 'Alertas de fraude abertos')).catch(() => {});
   if (pode('ouvidoria.decidir')) api.get('/ouvidoria/pendentes').then((r) => contador('ouvidoria', r.total, 'Aguardando análise da Ouvidoria')).catch(() => {});
   api.get('/aberturas', { status: 'em_analise' }).then((lista) => {
     const link = $('.nav a[data-rota="aberturas"]');
@@ -135,6 +142,8 @@ function atualizarContadorPropostas() {
     if (lista.length) link.insertAdjacentHTML('beforeend', `<span class="contador" title="Aguardando análise">${lista.length}</span>`);
   }).catch(() => {});
 }
+
+window.addEventListener('payax:contadores', () => atualizarContadorPropostas());
 
 let geracao = 0;
 async function rotear() {

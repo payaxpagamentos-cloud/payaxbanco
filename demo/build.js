@@ -32,7 +32,38 @@ fs.mkdirSync(path.join(saidaIb, 'img'), { recursive: true });
 fs.mkdirSync(path.join(saida, 'img'), { recursive: true });
 fs.mkdirSync(path.join(saida, 'ib'), { recursive: true });
 
+/**
+ * Fotografia do código para o monitoramento de segurança da demonstração (o navegador não lê os arquivos):
+ * "atual" é o código deste build; "anterior" é a versão anterior no git. A demonstração começa com a
+ * versão anterior aprovada, então a primeira verificação mostra o que mudou na última atualização.
+ */
+function gerarManifestoIntegridade() {
+  const { execFileSync } = require('node:child_process');
+  const crypto = require('node:crypto');
+  const { listarArquivos, PASTAS, ARQUIVOS, TEXTO } = require('../server/lib/integridade-fs');
+  const atual = listarArquivos(raiz);
+  let anterior = atual.map((f) => ({ ...f }));
+  try {
+    const git = (...args) => execFileSync('git', args, { cwd: raiz, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const sujo = git('status', '--porcelain', '--', ...PASTAS, ...ARQUIVOS).trim() !== '';
+    const rev = sujo ? 'HEAD' : 'HEAD~1';
+    const caminhos = git('ls-tree', '-r', '--name-only', rev, '--', ...PASTAS, ...ARQUIVOS).split('\n').filter(Boolean);
+    anterior = caminhos.map((c) => {
+      const buf = execFileSync('git', ['show', `${rev}:${c}`], { cwd: raiz, maxBuffer: 64 * 1024 * 1024 });
+      return { caminho: c, hash: crypto.createHash('sha256').update(buf).digest('hex'), tamanho: buf.length, conteudo: TEXTO.test(c) && buf.length <= 400 * 1024 ? buf.toString('utf8') : null };
+    });
+  } catch { /* sem git: a demonstração começa sem alterações */ }
+  // Conteúdo só dos arquivos que mudaram (para mostrar as linhas); os demais vão só com a impressão digital.
+  const mapaAnt = new Map(anterior.map((f) => [f.caminho, f]));
+  const mapaAt = new Map(atual.map((f) => [f.caminho, f]));
+  const mudou = (c) => mapaAnt.get(c)?.hash !== mapaAt.get(c)?.hash;
+  const enxugar = (lista) => lista.map((f) => ({ caminho: f.caminho, hash: f.hash, tamanho: f.tamanho, conteudo: mudou(f.caminho) ? f.conteudo : null }));
+  fs.mkdirSync(path.join(__dirname, 'gerado'), { recursive: true });
+  fs.writeFileSync(path.join(__dirname, 'gerado', 'integridade.json'), JSON.stringify({ gerado_em: new Date().toISOString(), atual: enxugar(atual), anterior: enxugar(anterior) }));
+}
+
 (async () => {
+  gerarManifestoIntegridade();
   const opcoes = {
     bundle: true,
     format: 'iife',

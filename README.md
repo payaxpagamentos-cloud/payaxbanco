@@ -33,7 +33,8 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 |---|---|
 | **Administrador** | Tudo, sem limite de valor. Exclusivo: usuários da equipe e tela **Alçadas**. |
 | **Ouvidoria** | Analisa e decide (aprova ou recusa, com parecer) as solicitações sensíveis: encerramento e bloqueio de contas, bloqueio e reativação de clientes, exclusão de clientes. Não faz cadastros nem operações. |
-| **Gerente**, **Operador** e **Ouvidoria** | Definidas pelo administrador na tela **Alçadas**: cada permissão pode ser liberada ou retirada e, nas que envolvem dinheiro (limite de cheque especial, limite diário do Internet Banking, empréstimos e estornos), recebe um valor máximo. |
+| **Antifraude** | Menu **Antifraude**: analisa transações fora do padrão e tentativas de acesso, descarta ou confirma alertas (pode bloquear o Internet Banking e pedir o bloqueio da conta à Ouvidoria). |
+| **Gerente**, **Operador**, **Ouvidoria** e **Antifraude** | Definidas pelo administrador na tela **Alçadas**: cada permissão pode ser liberada ou retirada e, nas que envolvem dinheiro (limite de cheque especial, limite diário do Internet Banking, empréstimos e estornos), recebe um valor máximo. |
 
 **Ouvidoria.** Na tela Alçadas, o administrador escolhe quais ações exigem análise (padrão: encerramento, bloqueio e
 desbloqueio de contas, bloqueio e reativação de clientes e exclusão de clientes). Quem tem a alçada faz o pedido com motivo;
@@ -178,6 +179,27 @@ Internet Banking (`http://localhost:3000/ib/`):
 
 As duas senhas são digitadas no teclado virtual.
 
+### Segurança e Antifraude
+
+**Segurança** (só administrador, `server/lib/seguranca.js`). De hora em hora (e ao iniciar o servidor) é feita uma verificação
+completa da plataforma:
+
+- **Integridade do código** (`server/lib/integridade.js`): cada arquivo de `server/`, `public/` (Banqueiro, Internet Banking e site)
+  e da configuração de implantação tem o SHA-256 comparado com a versão aprovada. Arquivo novo, removido ou alterado aparece com as
+  linhas que mudaram. Depois de uma atualização legítima, o administrador clica em "Aprovar como nova versão" (com motivo, na auditoria).
+- **Funções da plataforma**: teste automático de 13 funções (banco, login, alçadas, Ouvidoria, teclado virtual, limites, boletos,
+  QR Code PIX, integração bancária, antifraude e telas do Banqueiro, Internet Banking e site).
+- **Servidor e conexões**: memória, carga, disco, tamanho do banco, último backup, requisições, erros 5xx, acessos negados e
+  bloqueios da última hora, e checklist de produção (HTTPS, segredos, webhook do banco, backup).
+
+Resultado: OK, atenção ou crítico, com histórico de todas as verificações.
+
+**Antifraude** (perfil Antifraude e administrador, `server/lib/antifraude.js`). Regras analisadas a cada operação do Internet
+Banking e ao abrir o painel: valor fora do padrão do cliente, madrugada, muitas operações em poucos minutos, destinatário novo com
+valor alto, conta nova movimentando muito, limite quase todo usado, senha errada várias vezes, acesso bloqueado, muitas falhas do
+mesmo IP, vários CPF/CNPJ testados, falhas de login da equipe e IP novo. Todo login (Internet Banking e Banqueiro) é registrado.
+O painel mostra indicadores, gráficos por dia, regra e hora, clientes com mais alertas e as tentativas de acesso.
+
 ### Configuração (variáveis de ambiente)
 
 | Variável | Padrão | Descrição |
@@ -191,6 +213,7 @@ As duas senhas são digitadas no teclado virtual.
 | `PAYAX_PEPPER` | valor de desenvolvimento | Segredo misturado às senhas dos clientes. **Obrigatório em produção e nunca pode mudar.** |
 | `PAYAX_TRUST_PROXY` | `loopback` | Proxies confiáveis para obter o IP real (`1` atrás do Caddy ou de um balanceador). |
 | `PAYAX_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
+| `PAYAX_SEGURANCA_INTERVALO_MIN` | `60` | Intervalo, em minutos, da verificação automática de segurança. |
 | `PAYAX_ADMIN_EMAIL` / `PAYAX_ADMIN_SENHA` / `PAYAX_ADMIN_NOME` | — | Administrador criado no primeiro start. |
 
 ### Testes

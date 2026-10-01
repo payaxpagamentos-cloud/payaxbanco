@@ -1,7 +1,7 @@
 import { api } from '../api.js';
 import { html, $, $$, toast, confirmar, moeda, mascaraMoeda, centavos, valorMoedaInput } from '../ui.js';
 
-const PERFIL = { gerente: 'Gerente', operador: 'Operador', ouvidoria: 'Ouvidoria' };
+const PERFIL = { gerente: 'Gerente', operador: 'Operador', ouvidoria: 'Ouvidoria', antifraude: 'Antifraude' };
 
 /** Alçadas: o administrador define o que gerente e operador podem fazer e até que valor. */
 export default async function alcadas({ alvo, ativo }) {

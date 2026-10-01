@@ -2,12 +2,13 @@ import { api } from '../api.js';
 import { usuarioAtual } from '../contexto.js';
 import { html, $, $$, dataHora, modal, toast, dadosForm, iniciais } from '../ui.js';
 
-const PERFIS = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador', ouvidoria: 'Ouvidoria' };
+const PERFIS = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador', ouvidoria: 'Ouvidoria', antifraude: 'Antifraude' };
 const DESCR = {
   admin: 'Acesso total, incluindo usuários e alçadas.',
   gerente: 'Concede limites e empréstimos, pede bloqueios e encerramentos, estorna e emite relatórios, conforme a alçada.',
   operador: 'Cadastra clientes, contas, chaves PIX e favorecidos e libera o Internet Banking, conforme a alçada.',
   ouvidoria: 'Analisa e decide encerramentos, bloqueios e outras solicitações sensíveis.',
+  antifraude: 'Monitora transações fora do padrão e tentativas de acesso; analisa e trata alertas de fraude.',
 };
 
 function formUsuario(u, aoSalvar) {
@@ -43,7 +44,7 @@ export default async function usuarios({ alvo, ativo }) {
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Usuários</h1><p class="muted">Colaboradores com acesso ao Banqueiro e seus perfis de permissão.</p></div>
       <button class="btn primario" id="novo">+ Novo usuário</button></div>
-    <div class="grid grid-4" style="margin-bottom:16px">${Object.entries(PERFIS).map(([k, v]) => html`<div class="card card-body"><h3>${v}</h3><p class="muted small" style="margin:4px 0 0">${DESCR[k]}</p></div>`)}</div>
+    <div class="grid perfis-grade" style="margin-bottom:16px">${Object.entries(PERFIS).map(([k, v]) => html`<div class="card card-body"><h3>${v}</h3><p class="muted small" style="margin:4px 0 0">${DESCR[k]}</p></div>`)}</div>
     <div class="card" id="tabela"></div>`);
   async function carregar() {
     const lista = await api.get('/usuarios');

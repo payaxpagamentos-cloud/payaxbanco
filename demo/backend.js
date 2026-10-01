@@ -4,9 +4,11 @@ import { configurar } from './shims/sqlite.js';
 import { abrir } from '../server/db.js';
 import { criarApi, tratarErro } from '../server/api.js';
 import { popularDemo } from '../server/lib/demo.js';
+import seguranca from '../server/lib/seguranca.js';
+import manifesto from './gerado/integridade.json';
 
 window.PAYAX_DEMO = true;
-const CHAVE = 'payax.demo.db.v8';
+const CHAVE = 'payax.demo.db.v9';
 
 function carregarSalvo() {
   try {
@@ -33,6 +35,7 @@ const pronto = initSqlJs().then((SQL) => {
   }
   if (db.prepare('SELECT COUNT(*) AS n FROM clientes').get().n === 0) popularDemo(db);
   api = criarApi(db);
+  iniciarSeguranca();
 });
 
 // Outra aba (ex.: Banqueiro e Internet Banking abertos ao mesmo tempo) salvou: carrega os dados dela,
@@ -48,6 +51,26 @@ window.addEventListener('storage', (e) => {
     api = criarApi(db);
   });
 });
+
+/**
+ * Monitoramento de segurança na demonstração: a "fonte" é a fotografia do código gerada no build.
+ * Um banco novo começa com a versão anterior aprovada, então a primeira verificação mostra o que mudou
+ * na última atualização. Depois, verifica de hora em hora enquanto a página estiver aberta.
+ */
+function iniciarSeguranca() {
+  seguranca.configurar({ fonte: { descricao: `fotografia do código de ${manifesto.gerado_em.slice(0, 10)}`, listar: () => manifesto.atual } });
+  const vazio = db.prepare('SELECT COUNT(*) AS n FROM integridade_base').get().n === 0;
+  if (vazio) {
+    const ins = db.prepare("INSERT INTO integridade_base (caminho, hash, tamanho, conteudo, aprovado_em) VALUES (?, ?, ?, ?, datetime('now', '-1 day'))");
+    for (const f of manifesto.anterior) ins.run(f.caminho, f.hash, f.tamanho, f.conteudo);
+  }
+  const ultima = db.prepare("SELECT (julianday('now') - julianday(MAX(criado_em))) * 24 * 60 AS min FROM verificacoes_seguranca").get().min;
+  if (ultima === null || ultima >= seguranca.estado.intervaloMin) {
+    try { seguranca.executar(db, { origem: vazio ? 'inicial' : 'agendada' }); salvar(); } catch (err) { console.warn('Verificação de segurança:', err); }
+  }
+  clearInterval(iniciarSeguranca.timer);
+  iniciarSeguranca.timer = setInterval(() => { try { seguranca.executar(db); salvar(); } catch { /* tenta de novo na próxima hora */ } }, seguranca.estado.intervaloMin * 60_000);
+}
 
 function salvar() {
   try {

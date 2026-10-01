@@ -7,6 +7,7 @@ const { ErroNegocio } = require('../lib/erros');
 const { exigir } = require('../lib/validacao');
 const { registrar } = require('../lib/auditoria');
 const alcadas = require('../lib/alcadas');
+const { registrarTentativa } = require('../lib/antifraude');
 
 module.exports = (db) => {
   const r = Router();
@@ -15,8 +16,11 @@ module.exports = (db) => {
     const { email, senha } = req.body ?? {};
     const u = db.prepare('SELECT * FROM usuarios WHERE email = ?').get(String(email ?? '').trim());
     if (!u || !u.ativo || !verificarSenha(senha ?? '', u.senha_hash)) {
+      registrarTentativa(db, { canal: 'equipe', identificador: String(email ?? '').trim().toLowerCase().slice(0, 120) || '(vazio)', usuarioId: u?.id ?? null,
+        sucesso: false, motivo: !u ? 'usuario_inexistente' : !u.ativo ? 'usuario_inativo' : 'senha_incorreta', ip: req.ip });
       throw new ErroNegocio('E-mail ou senha inválidos.', 401);
     }
+    registrarTentativa(db, { canal: 'equipe', identificador: u.email, usuarioId: u.id, sucesso: true, ip: req.ip });
     db.prepare("UPDATE usuarios SET ultimo_acesso = datetime('now') WHERE id = ?").run(u.id);
     req.usuario = u;
     registrar(db, req, 'login', 'usuario', u.id);

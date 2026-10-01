@@ -33,7 +33,7 @@ test('Alçadas da equipe', async (t) => {
     assert.equal((await api.put('/alcadas', {}, tkOperador)).status, 403);
     const r = await api.get('/alcadas');
     assert.equal(r.status, 200);
-    assert.deepEqual(r.dados.perfis, ['gerente', 'operador', 'ouvidoria']);
+    assert.deepEqual(r.dados.perfis, ['gerente', 'operador', 'ouvidoria', 'antifraude']);
     assert.ok(r.dados.permissoes.find((p) => p.chave === 'emprestimos.conceder').valor);
   });
 

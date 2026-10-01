@@ -361,3 +361,23 @@ body:has(.login) .faixa-demo ~ #app .login { min-height: calc(100vh - 37px); }
 .item-hist:last-child { border-bottom: 0; }
 .chat-compacto { height: 300px; }
 @media (max-width: 1100px) { .limites-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.perfis-grade { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+/* ===== Segurança ===== */
+.seg-status { display: flex; gap: 14px; align-items: center; }
+.seg-critico { background: var(--danger-bg); }
+.seg-atencao { background: var(--warn-bg); }
+.arquivos-alterados { display: flex; flex-direction: column; }
+.arq { border-top: 1px solid var(--border); padding: 10px 20px; }
+.arq summary { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; cursor: pointer; font-size: 13.5px; }
+.diff { margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; max-height: 360px; overflow-y: auto; font-size: 12px; background: var(--surface); }
+.diff-linha { display: grid; grid-template-columns: 48px 18px 1fr; white-space: pre; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.diff-linha.mais { background: var(--ok-bg); }
+.diff-linha.menos { background: var(--danger-bg); }
+.diff-n { color: var(--text-3); text-align: right; padding-right: 8px; user-select: none; }
+.diff-s { color: var(--text-2); user-select: none; }
+.diff code { font: inherit; padding-right: 12px; }
+.checagens { display: flex; flex-direction: column; }
+.checagem { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 20px; border-bottom: 1px solid var(--border); }
+.checagem:last-child { border-bottom: 0; }
+tr.selecionada { background: var(--info-bg); }

@@ -155,6 +155,7 @@ input[type=file]{font:inherit;font-size:13px;color:var(--muted)}
         <div><dt>Gerentes</dt><dd>gerente@ ou marcos@payax.com.br · payax2026</dd></div>
         <div><dt>Operador</dt><dd>operador@payax.com.br · payax2026</dd></div>
         <div><dt>Ouvidoria</dt><dd>ouvidoria@payax.com.br · payax2026</dd></div>
+        <div><dt>Antifraude</dt><dd>antifraude@payax.com.br · payax2026</dd></div>
       </dl>
     </article>
   </section>
@@ -274,6 +275,8 @@ input[type=file]{font:inherit;font-size:13px;color:var(--muted)}
       ['bq-ouvidoria-decisao', 'Ouvidoria aprova e recusa', 'Entrar como ouvidoria@payax.com.br: aprovar executa a ação; recusar exige parecer; quem pediu não decide'],
       ['bq-conta-visao', 'Tela da conta: limites, solicitações e conversas', 'Conferir limites, pedido de aumento com tempo restante (recusar), solicitações e histórico de conversa'],
       ['bq-gerente-conta', 'Gerente de cada conta', 'Na conta: ver e alterar o gerente; na lista de contas, coluna Gerente'],
+      ['bq-antifraude', 'Antifraude (painel e alertas)', 'Entrar como antifraude@payax.com.br: indicadores, gráficos, alertas e tentativas de acesso; analisar um alerta, descartar ou confirmar (com bloqueio do Internet Banking)'],
+      ['bq-seguranca', 'Segurança (só administrador)', 'Como administrador: integridade do código com as linhas alteradas, funções da plataforma, conexões, "Verificar agora" e "Aprovar como nova versão"'],
       ['bq-relacionamento', 'Relacionamento (painel do gerente)', 'Como gerente: indicadores, conversas, responder cliente e iniciar contato; como administrador: visão por gerente'],
       ['bq-alcadas', 'Alçadas de cada perfil', 'Menu Alçadas: liberar ou retirar permissões e definir o valor máximo; entrar com o perfil e conferir'],
     ]},
@@ -390,6 +393,9 @@ input[type=file]{font:inherit;font-size:13px;color:var(--muted)}
 
   // ---- Atualizações do sistema (mais recente primeiro). Novas entradas são acrescentadas no topo a cada entrega.
   const ATUALIZACOES = [
+    { id: 'v1.15', data: '01/10/2026', titulo: 'Módulo de Segurança e menu Antifraude', sistemas: ['Banqueiro', 'Internet Banking', 'Site', 'Servidor'],
+      mudou: ['Menu Segurança (só administrador): verificação automática de hora em hora de todas as frentes (Banqueiro, Internet Banking, site e servidor).', 'Integridade do código: compara cada arquivo com a versão aprovada e mostra o que foi adicionado, alterado ou removido, linha a linha; o administrador aprova a nova versão com um motivo.', 'Teste automático de 13 funções (banco de dados, login, alçadas, Ouvidoria, teclado virtual, limites, boletos, QR Code PIX, integração bancária, antifraude e telas).', 'Servidor e conexões: memória, disco, banco, backup, requisições, erros e acessos negados na última hora, e checklist de configuração de produção.', 'Menu Antifraude (equipe de antifraude e administrador): dashboard com alertas abertos, valor sob suspeita, acessos com falha, gráficos por dia, por regra e por hora, clientes com mais alertas.', '12 regras: valor fora do padrão, madrugada, muitas operações em poucos minutos, destinatário novo com valor alto, conta nova, limite quase todo usado, senha errada várias vezes, acesso bloqueado, muitas falhas do mesmo IP, vários CPF/CNPJ testados, falhas de login da equipe, IP novo.', 'Análise do alerta com parecer: descartar (falso positivo) ou confirmar fraude, podendo bloquear o Internet Banking e pedir o bloqueio da conta à Ouvidoria.', 'Novo perfil Antifraude em Usuários e Alçadas.'],
+      validar: ['Como administrador, abrir Segurança, ver as alterações desta versão e aprovar como nova versão.', 'Clicar em "Verificar agora" e conferir o histórico.', 'Como antifraude@payax.com.br, abrir Antifraude, analisar o alerta do Carlos (R$ 6.200 de madrugada) e confirmar.', 'Descartar um alerta como falso positivo.', 'Como operador, conferir que Segurança e Antifraude não aparecem no menu.'] },
     { id: 'v1.14', data: '01/10/2026', titulo: 'Central de Testes: pedidos de todas as frentes', sistemas: ['Central de Testes'],
       mudou: ['Área "Atualizações do sistema" para validar cada entrega antes da produção.', 'Formulário "Pedir alteração" para todas as frentes: site, Internet Banking, Banqueiro, integração Bradesco e produção.', 'Tipo de pedido (correção, alteração, texto ou imagem, nova função), filtro por frente e anexo de imagem ou PDF.', 'Roteiro do site com todas as páginas.'],
       validar: ['Registrar um pedido de alteração do site com uma imagem anexada.', 'Filtrar os pedidos por frente.'] },

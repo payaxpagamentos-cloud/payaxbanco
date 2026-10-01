@@ -19,6 +19,7 @@ const abertura = require('../lib/abertura');
 const ouvidoria = require('../lib/ouvidoria');
 const rel = require('../lib/relacionamento');
 const limites = require('../lib/limites');
+const { registrarTentativa } = require('../lib/antifraude');
 const { transacao } = require('../db');
 const { lerBoleto, gerarBoletoBancario, gerarConvenio, formatarLinha } = require('../lib/boleto');
 
@@ -46,10 +47,15 @@ module.exports = (db, bradesco) => {
     const documento = v.digitos(req.body?.documento);
     const a = documento && acessoPorDocumento.get(documento);
     const possiveis = candidatos(db, req.body); // consome o desafio mesmo se o documento não existir
-    const negar = () => { throw new ErroNegocio('CPF/CNPJ ou senha incorretos.', 401); };
-    if (!a) negar();
-    if (a.status !== 'ativo' || a.cliente_status !== 'ativo') throw new ErroNegocio('Acesso bloqueado. Procure a PAY AX para desbloquear.', 403);
+    // Toda tentativa fica registrada para o Antifraude (documento mascarado).
+    const tentativa = (sucesso, motivo) => registrarTentativa(db, {
+      canal: 'internet_banking', identificador: mascararDocumento(documento), clienteId: a?.cliente_id ?? null, sucesso, motivo, ip: req.ip,
+    });
+    const negar = (motivo) => { tentativa(false, motivo); throw new ErroNegocio('CPF/CNPJ ou senha incorretos.', 401); };
+    if (!a) negar('documento_sem_acesso');
+    if (a.status !== 'ativo' || a.cliente_status !== 'ativo') { tentativa(false, 'acesso_bloqueado'); throw new ErroNegocio('Acesso bloqueado. Procure a PAY AX para desbloquear.', 403); }
     if (a.bloqueado_ate && a.bloqueado_ate > db.prepare("SELECT datetime('now') AS n").get().n) {
+      tentativa(false, 'bloqueio_temporario');
       throw new ErroNegocio('Muitas tentativas incorretas. Tente novamente em alguns minutos.', 429);
     }
     if (!(await verificarNumerica(possiveis, a.senha_hash))) {
@@ -60,8 +66,9 @@ module.exports = (db, bradesco) => {
       } else {
         db.prepare('UPDATE acessos_cliente SET tentativas = ? WHERE id = ?').run(t, a.id);
       }
-      negar();
+      negar(t >= MAX_TENTATIVAS ? 'senha_incorreta_bloqueou' : 'senha_incorreta');
     }
+    tentativa(true, null);
     db.prepare("UPDATE acessos_cliente SET tentativas = 0, bloqueado_ate = NULL, ultimo_acesso = datetime('now') WHERE id = ?").run(a.id);
     registrar(db, { cliente: { id: a.cliente_id }, ip: req.ip }, 'ib_login', 'cliente', a.cliente_id);
     res.json({ token: emitirTokenCliente(a.cliente_id), cliente: { nome: a.nome }, precisa_trocar_senha: Boolean(a.precisa_trocar_senha) });

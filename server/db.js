@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nome TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   senha_hash TEXT NOT NULL,
-  perfil TEXT NOT NULL CHECK (perfil IN ('admin','gerente','operador','ouvidoria')),
+  perfil TEXT NOT NULL CHECK (perfil IN ('admin','gerente','operador','ouvidoria','antifraude')),
   ativo INTEGER NOT NULL DEFAULT 1,
   ultimo_acesso TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
@@ -114,7 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_auditoria_data ON auditoria(criado_em);
 
 -- Alçadas: o que gerente, operador e ouvidoria podem fazer e até que valor (o administrador tem acesso total).
 CREATE TABLE IF NOT EXISTS alcadas (
-  perfil TEXT NOT NULL CHECK (perfil IN ('gerente', 'operador', 'ouvidoria')),
+  perfil TEXT NOT NULL CHECK (perfil IN ('gerente', 'operador', 'ouvidoria', 'antifraude')),
   permissao TEXT NOT NULL,
   permitido INTEGER NOT NULL,
   limite_centavos INTEGER,
@@ -171,6 +171,66 @@ CREATE TABLE IF NOT EXISTS pedidos_limite (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_pedidos_limite_cliente ON pedidos_limite(cliente_id, status);
+
+-- Segurança: tentativas de acesso (Internet Banking e equipe), com sucesso ou falha.
+CREATE TABLE IF NOT EXISTS tentativas_acesso (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  canal TEXT NOT NULL CHECK (canal IN ('internet_banking', 'equipe')),
+  identificador TEXT NOT NULL,
+  cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  sucesso INTEGER NOT NULL,
+  motivo TEXT,
+  ip TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tentativas_data ON tentativas_acesso(criado_em);
+
+-- Antifraude: alertas gerados pelas regras sobre transações e acessos.
+CREATE TABLE IF NOT EXISTS alertas_fraude (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chave TEXT NOT NULL UNIQUE,
+  regra TEXT NOT NULL,
+  severidade TEXT NOT NULL CHECK (severidade IN ('baixa', 'media', 'alta')),
+  cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
+  conta_id INTEGER REFERENCES contas(id),
+  transacao_id INTEGER REFERENCES transacoes(id),
+  valor_centavos INTEGER,
+  descricao TEXT NOT NULL,
+  dados TEXT,
+  status TEXT NOT NULL DEFAULT 'aberto' CHECK (status IN ('aberto', 'descartado', 'confirmado')),
+  parecer TEXT,
+  analisado_por INTEGER REFERENCES usuarios(id),
+  analisado_em TEXT,
+  ocorrido_em TEXT NOT NULL,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_alertas_status ON alertas_fraude(status, severidade);
+
+-- Estado interno (ex.: até onde o antifraude já analisou).
+CREATE TABLE IF NOT EXISTS estado_sistema (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
+
+-- Segurança: linha de base aprovada dos arquivos da plataforma e verificações de hora em hora.
+CREATE TABLE IF NOT EXISTS integridade_base (
+  caminho TEXT PRIMARY KEY,
+  hash TEXT NOT NULL,
+  tamanho INTEGER NOT NULL,
+  conteudo TEXT,
+  aprovado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  aprovado_por INTEGER REFERENCES usuarios(id)
+);
+CREATE TABLE IF NOT EXISTS verificacoes_seguranca (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  status TEXT NOT NULL CHECK (status IN ('ok', 'atencao', 'critico')),
+  integridade TEXT NOT NULL,
+  funcoes TEXT NOT NULL,
+  servidor TEXT NOT NULL,
+  conexoes TEXT NOT NULL,
+  alertas_novos INTEGER NOT NULL DEFAULT 0,
+  duracao_ms INTEGER NOT NULL,
+  origem TEXT NOT NULL DEFAULT 'agendada',
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 -- Quais ações exigem análise da Ouvidoria (sem registro: vale o padrão do sistema).
 CREATE TABLE IF NOT EXISTS regras_analise (
@@ -354,10 +414,10 @@ function migrar(db) {
     const existe = db.prepare(`SELECT 1 FROM pragma_table_info('${tabela}') WHERE name = ?`).get(coluna);
     if (!existe) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
   }
-  // Perfil Ouvidoria: bancos criados antes dele têm a restrição antiga de perfis.
+  // Perfis Ouvidoria e Antifraude: bancos criados antes deles têm a restrição antiga de perfis.
   for (const tabela of ['usuarios', 'alcadas']) {
     const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabela)?.sql ?? '';
-    if (!sql.includes("'ouvidoria'")) reconstruir(db, tabela);
+    if (!sql.includes("'antifraude'")) reconstruir(db, tabela);
   }
 }
 

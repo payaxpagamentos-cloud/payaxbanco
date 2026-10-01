@@ -6,7 +6,7 @@ const v = require('../lib/validacao');
 const { hashSenha } = require('../lib/senha');
 const { registrar } = require('../lib/auditoria');
 
-const PERFIS = ['admin', 'gerente', 'operador', 'ouvidoria'];
+const PERFIS = ['admin', 'gerente', 'operador', 'ouvidoria', 'antifraude'];
 const COLS = 'id, nome, email, perfil, ativo, ultimo_acesso, criado_em';
 
 module.exports = (db) => {

@@ -3,6 +3,8 @@
 const { Router } = require('express');
 const { autenticar, permitir } = require('./auth');
 const { alcada } = require('./lib/alcadas');
+const seguranca = require('./lib/seguranca');
+const antifraude = require('./lib/antifraude');
 const { ErroNegocio } = require('./lib/erros');
 const { criarServicoBradesco } = require('./integracoes/bradesco');
 
@@ -10,9 +12,17 @@ const { criarServicoBradesco } = require('./integracoes/bradesco');
 function criarApi(db, bradesco = criarServicoBradesco(db)) {
   const api = Router();
   const auth = autenticar(db);
+  seguranca.configurar({ bradesco });
+  api.use(seguranca.contarRequisicoes);
   api.get('/saude', (_req, res) => res.json({ status: 'ok', sistema: 'Banqueiro PAY AX' }));
   api.use('/auth', require('./routes/auth')(db));
-  api.use('/ib', require('./routes/ib')(db, bradesco));
+  // Depois de cada operação do cliente que dá certo, o antifraude analisa o que entrou (servidor Node).
+  api.use('/ib', (req, res, next) => {
+    if (req.method === 'POST' && typeof res.on === 'function') {
+      res.on('finish', () => { if (res.statusCode < 400) { try { antifraude.analisar(db); } catch { /* volta a analisar no painel e de hora em hora */ } } });
+    }
+    next();
+  }, require('./routes/ib')(db, bradesco));
   api.use('/dashboard', auth, require('./routes/dashboard')(db));
   api.use('/clientes', auth, require('./routes/clientes')(db));
   api.use('/aberturas', auth, require('./routes/aberturas')(db));
@@ -25,6 +35,8 @@ function criarApi(db, bradesco = criarServicoBradesco(db)) {
   api.use('/usuarios', auth, permitir('admin'), require('./routes/usuarios')(db));
   api.use('/alcadas', auth, permitir('admin'), require('./routes/alcadas')(db));
   api.use('/ouvidoria', auth, require('./routes/ouvidoria')(db));
+  api.use('/seguranca', auth, permitir('admin'), require('./routes/seguranca')(db));
+  api.use('/antifraude', auth, alcada(db, 'antifraude.analisar'), require('./routes/antifraude')(db));
   api.use('/relacionamento', auth, require('./routes/relacionamento')(db));
   api.use('/integracoes/bradesco/webhook', require('./routes/bradesco-webhook')(db, bradesco));
   api.use('/integracoes/bradesco', auth, require('./routes/bradesco')(db, bradesco));
