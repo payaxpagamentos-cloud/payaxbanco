@@ -10,6 +10,8 @@ const { buscarConta, exigirContaOperavel, novoGrupo, lancar, exigirAlcada } = re
 const { SimuladorBradesco } = require('./simulador');
 const { ApiBradesco } = require('./api');
 const { gerarTxid, decimalParaCentavos } = require('./util');
+const { canalDe } = require('../../lib/movimentos');
+const { lerBoleto } = require('../../lib/boleto');
 
 const SISTEMA = { usuario: null, ip: 'bradesco' };
 const DIA = 24 * 60 * 60 * 1000;
@@ -50,7 +52,7 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
     });
     db.prepare(`INSERT INTO cobrancas_pix (conta_id, txid, valor_centavos, pix_copia_e_cola, expira_em, usuario_id)
       VALUES (?, ?, ?, ?, datetime('now', ?), ?)`)
-      .run(conta.id, txid, valor, r.pixCopiaECola, `+${cfg.expiracaoCobrancaSegundos} seconds`, req.usuario.id);
+      .run(conta.id, txid, valor, r.pixCopiaECola, `+${cfg.expiracaoCobrancaSegundos} seconds`, req.usuario?.id ?? null);
     registrar(db, req, 'gerar_cobranca_pix', 'conta', conta.id, { txid, valor_centavos: valor });
     return detalharCobranca(txid);
   }
@@ -118,7 +120,7 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
     exigirContaOperavel(conta);
     return transacao(db, () => {
       const t = lancar(db, {
-        contaId: conta.id, tipo: 'pix_recebido', valor: p.valor_centavos, grupo: novoGrupo(), usuarioId: req.usuario.id,
+        contaId: conta.id, tipo: 'pix_recebido', valor: p.valor_centavos, grupo: novoGrupo(), usuarioId: req.usuario?.id ?? null,
         descricao: `PIX recebido via Bradesco${p.pagador_nome ? ` · ${p.pagador_nome}` : ''} (vinculado manualmente)`,
       });
       db.prepare("UPDATE pix_recebidos SET status = 'creditado', conta_id = ?, transacao_id = ? WHERE id = ?").run(conta.id, t.id, p.id);
@@ -134,10 +136,12 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
     exigirContaOperavel(origem);
     exigirAlcada(req, valor);
     const idempotencia = gerarTxid();
+    const usuarioId = req.usuario?.id ?? null;
+    const canal = canalDe(req);
     const { saidaId, debito } = transacao(db, () => {
-      const t = lancar(db, { contaId: origem.id, tipo: 'pix_enviado', valor: -valor, descricao: `PIX para ${chave} (outro banco)${descricao ? ` · ${descricao}` : ''}`, grupo: novoGrupo(), usuarioId: req.usuario.id });
+      const t = lancar(db, { contaId: origem.id, tipo: 'pix_enviado', valor: -valor, descricao: `PIX para ${chave} (outro banco)${descricao ? ` · ${descricao}` : ''}`, grupo: novoGrupo(), usuarioId, canal });
       const s = db.prepare('INSERT INTO pix_saidas (conta_id, transacao_id, valor_centavos, chave, descricao, idempotencia, usuario_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(origem.id, t.id, valor, chave, descricao, idempotencia, req.usuario.id);
+        .run(origem.id, t.id, valor, chave, descricao, idempotencia, usuarioId);
       return { saidaId: Number(s.lastInsertRowid), debito: t };
     });
     try {
@@ -147,12 +151,44 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
       return { externo: true, chave, end_to_end_id: r.endToEndId, transacao_id: debito.id, saldo_origem_centavos: debito.saldo_apos_centavos };
     } catch (err) {
       transacao(db, () => {
-        lancar(db, { contaId: origem.id, tipo: 'estorno', valor, descricao: `Estorno automático: PIX para ${chave} não enviado`, grupo: novoGrupo(), usuarioId: req.usuario.id, ignorarLimite: true });
+        lancar(db, { contaId: origem.id, tipo: 'estorno', valor, descricao: `Estorno automático: PIX para ${chave} não enviado`, grupo: novoGrupo(), usuarioId, canal, ignorarLimite: true });
         db.prepare("UPDATE transacoes SET estornada_em = datetime('now') WHERE id = ?").run(debito.id);
         db.prepare("UPDATE pix_saidas SET status = 'falhou', erro = ?, atualizado_em = datetime('now') WHERE id = ?").run(err.message, saidaId);
         registrar(db, req, 'pix_externo_falhou', 'conta', origem.id, { chave, valor_centavos: valor, erro: err.message });
       });
       throw new ErroNegocio(`O PIX não foi enviado (${err.message}). O valor voltou para a conta do cliente.`, 502);
+    }
+  }
+
+  /** Paga boleto/conta de consumo pela conta PAY AX no Bradesco, debitando o cliente; devolve se o banco recusar. */
+  async function pagarBoleto(req, origem, linha, valorInformado) {
+    const b = lerBoleto(linha);
+    const valor = b.valor_centavos || v.valorCentavos(valorInformado, 'valor do pagamento');
+    exigirContaOperavel(origem);
+    exigirAlcada(req, valor);
+    const idempotencia = gerarTxid();
+    const usuarioId = req.usuario?.id ?? null;
+    const canal = canalDe(req);
+    const rotulo = b.tipo === 'boleto' ? `Pagamento de boleto (banco ${b.banco})` : 'Pagamento de conta de consumo';
+    const { pagamentoId, debito } = transacao(db, () => {
+      const t = lancar(db, { contaId: origem.id, tipo: 'pagamento', valor: -valor, descricao: rotulo, grupo: novoGrupo(), usuarioId, canal });
+      const s = db.prepare(`INSERT INTO pagamentos (conta_id, transacao_id, tipo, codigo_barras, linha_digitavel, valor_centavos, vencimento, idempotencia, canal)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(origem.id, t.id, b.tipo, b.codigo_barras, b.linha_digitavel, valor, b.vencimento, idempotencia, canal);
+      return { pagamentoId: Number(s.lastInsertRowid), debito: t };
+    });
+    try {
+      const r = await cliente.pagarBoleto({ idempotencia, codigoBarras: b.codigo_barras, valorCentavos: valor });
+      db.prepare("UPDATE pagamentos SET status = 'concluido', autenticacao = ?, atualizado_em = datetime('now') WHERE id = ?").run(r.autenticacao, pagamentoId);
+      registrar(db, req, 'pagamento', 'conta', origem.id, { tipo: b.tipo, valor_centavos: valor, autenticacao: r.autenticacao });
+      return { ...b, valor_centavos: valor, autenticacao: r.autenticacao, transacao_id: debito.id, saldo_centavos: debito.saldo_apos_centavos };
+    } catch (err) {
+      transacao(db, () => {
+        lancar(db, { contaId: origem.id, tipo: 'estorno', valor, descricao: `Estorno automático: ${rotulo.toLowerCase()} não realizado`, grupo: novoGrupo(), usuarioId, canal, ignorarLimite: true });
+        db.prepare("UPDATE transacoes SET estornada_em = datetime('now') WHERE id = ?").run(debito.id);
+        db.prepare("UPDATE pagamentos SET status = 'falhou', erro = ?, atualizado_em = datetime('now') WHERE id = ?").run(err.message, pagamentoId);
+        registrar(db, req, 'pagamento_falhou', 'conta', origem.id, { valor_centavos: valor, erro: err.message });
+      });
+      throw new ErroNegocio(`O pagamento não foi realizado (${err.message}). O valor voltou para a conta.`, 502);
     }
   }
 
@@ -168,6 +204,7 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
     const conhecidos = new Set([
       ...db.prepare('SELECT end_to_end_id FROM pix_recebidos').all().map((r) => r.end_to_end_id),
       ...db.prepare('SELECT end_to_end_id FROM pix_saidas WHERE end_to_end_id IS NOT NULL').all().map((r) => r.end_to_end_id),
+      ...db.prepare('SELECT autenticacao FROM pagamentos WHERE autenticacao IS NOT NULL').all().map((r) => r.autenticacao),
     ]);
     return {
       modo: cliente.modo,
@@ -214,7 +251,7 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
 
   return {
     cliente, gerarCobranca, detalharCobranca, processarRecebidos, sincronizar, vincular,
-    enviarPixExterno, conciliacao, simularPagamento, simularPixAvulso, configurarWebhook, status, normalizarChaveExterna,
+    enviarPixExterno, pagarBoleto, conciliacao, simularPagamento, simularPixAvulso, configurarWebhook, status, normalizarChaveExterna,
   };
 }
 

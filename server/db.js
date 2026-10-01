@@ -162,6 +162,41 @@ CREATE TABLE IF NOT EXISTS pix_saidas (
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Internet Banking: credenciais do cliente (separadas dos usuários da equipe).
+CREATE TABLE IF NOT EXISTS acessos_cliente (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cliente_id INTEGER NOT NULL UNIQUE REFERENCES clientes(id),
+  senha_hash TEXT NOT NULL,
+  pin_hash TEXT,
+  status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo','bloqueado')),
+  precisa_trocar_senha INTEGER NOT NULL DEFAULT 1,
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  tentativas_pin INTEGER NOT NULL DEFAULT 0,
+  bloqueado_ate TEXT,
+  limite_diario_centavos INTEGER NOT NULL DEFAULT 500000,
+  ultimo_acesso TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Pagamentos de boletos e contas de consumo, liquidados pela conta PAY AX no Bradesco.
+CREATE TABLE IF NOT EXISTS pagamentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conta_id INTEGER NOT NULL REFERENCES contas(id),
+  transacao_id INTEGER REFERENCES transacoes(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('boleto','convenio')),
+  codigo_barras TEXT NOT NULL,
+  linha_digitavel TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL,
+  vencimento TEXT,
+  idempotencia TEXT NOT NULL UNIQUE,
+  autenticacao TEXT,
+  status TEXT NOT NULL DEFAULT 'processando' CHECK (status IN ('processando','concluido','falhou')),
+  erro TEXT,
+  canal TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Estado do simulador do Bradesco (usado quando BRADESCO_MODO=simulador).
 CREATE TABLE IF NOT EXISTS bradesco_sim_movimentos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -189,8 +224,22 @@ function abrir(arquivo = config.dbFile) {
   db.exec('PRAGMA foreign_keys = ON;');
   if (arquivo !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
+  migrar(db);
   garantirAdmin(db);
   return db;
+}
+
+/** Colunas adicionadas depois da primeira versão (bancos existentes recebem ALTER TABLE). */
+const COLUNAS = [
+  ['transacoes', 'canal', "TEXT NOT NULL DEFAULT 'agencia'"],
+  ['auditoria', 'cliente_id', 'INTEGER REFERENCES clientes(id)'],
+];
+
+function migrar(db) {
+  for (const [tabela, coluna, tipo] of COLUNAS) {
+    const existe = db.prepare(`SELECT 1 FROM pragma_table_info('${tabela}') WHERE name = ?`).get(coluna);
+    if (!existe) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
+  }
 }
 
 function garantirAdmin(db) {

@@ -133,10 +133,10 @@ export async function detalheConta({ alvo, id, ativo }) {
     t.innerHTML = String(html`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th class="num">Valor</th><th class="num">Saldo</th>${gestor ? html`<th></th>` : ''}</tr></thead><tbody>
       ${r.itens.length ? r.itens.map((t) => html`<tr>
         <td class="small">${dataHora(t.criado_em)}</td>
-        <td><strong>${TIPO_TRANSACAO[t.tipo] ?? t.tipo}</strong> ${t.estornada_em ? html`<span class="badge warn">estornada</span>` : ''}
+        <td><strong>${TIPO_TRANSACAO[t.tipo] ?? t.tipo}</strong> ${t.estornada_em ? html`<span class="badge warn">estornada</span>` : ''} ${t.canal === 'internet_banking' ? html`<span class="badge info">Internet Banking</span>` : ''}
           <div class="small muted">${t.descricao ?? ''}${t.contraparte_nome ? ` · ${t.contraparte_nome} (${t.contraparte_conta})` : ''}${t.usuario_nome ? ` · por ${t.usuario_nome}` : ''}</div></td>
         <td class="num">${moedaSinal(t.valor_centavos)}</td><td class="num">${moeda(t.saldo_apos_centavos)}</td>
-        ${gestor ? html`<td class="right">${!t.estornada_em && t.tipo !== 'estorno' && !t.tipo.startsWith('emprestimo') ? html`<button class="btn sm" data-estornar="${t.id}">Estornar</button>` : ''}</td>` : ''}</tr>`)
+        ${gestor ? html`<td class="right">${!t.estornada_em && !['estorno', 'pagamento'].includes(t.tipo) && !t.tipo.startsWith('emprestimo') && !(t.tipo.startsWith('pix_') && !t.contraparte_conta_id) ? html`<button class="btn sm" data-estornar="${t.id}">Estornar</button>` : ''}</td>` : ''}</tr>`)
         : html`<tr><td colspan="5" class="vazio">Sem lançamentos no período.</td></tr>`}</tbody></table></div>`);
     t.append(paginacao(r, (p) => { filtro.pagina = p; carregarExtrato(); }));
     $$('[data-estornar]', t).forEach((b) => b.addEventListener('click', () => estornar(r.itens.find((x) => String(x.id) === b.dataset.estornar), recarregar)));

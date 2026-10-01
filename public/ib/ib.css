@@ -1,0 +1,81 @@
+/* ===== Internet Banking PAY AX (complementa ../css/style.css) ===== */
+body.ib { background: var(--bg); }
+.ib-topo { position: sticky; top: 0; z-index: 20; background: var(--payax-azul); color: #fff; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; }
+.ib-topo .linha { max-width: 1040px; margin: 0 auto; display: flex; align-items: center; gap: 16px; }
+.ib-topo img { height: 30px; }
+.ib-topo .ola { flex: 1; min-width: 0; font-size: 13px; color: #B9C8E3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ib-topo .ola strong { color: #fff; font-size: 14px; }
+.ib-topo .btn { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); color: #fff; }
+.ib-topo .btn:hover { background: rgba(255,255,255,.16); }
+.ib-nav { display: flex; gap: 4px; max-width: 1040px; margin: 8px auto 0; overflow-x: auto; }
+.ib-nav a { color: #C9D5EA; padding: 8px 12px; border-radius: 8px; font-weight: 600; white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
+.ib-nav a:hover { background: rgba(255,255,255,.08); text-decoration: none; color: #fff; }
+.ib-nav a.ativo { background: rgba(245,183,0,.18); color: #fff; }
+.ib-nav svg, .ib-baixo svg { width: 18px; height: 18px; }
+.ib-conteudo { max-width: 1040px; margin: 0 auto; padding: 20px 16px 96px; }
+.ib-baixo { display: none; }
+
+.saldo-card { background: linear-gradient(135deg, var(--payax-azul) 0%, var(--payax-azul-2) 70%, #1A4D96 100%); color: #fff; border-radius: 18px; padding: 20px; position: relative; overflow: hidden; }
+.saldo-card::after { content: ""; position: absolute; right: -50px; bottom: -70px; width: 200px; height: 200px; border-radius: 50%; border: 34px solid rgba(245,183,0,.16); }
+.saldo-card .topo { display: flex; justify-content: space-between; align-items: center; gap: 10px; position: relative; z-index: 1; }
+.saldo-card select { width: auto; max-width: 100%; background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.2); height: 32px; font-size: 12.5px; }
+.saldo-card select option { color: #0F172A; }
+.saldo-card .rotulo { color: #B9C8E3; font-size: 12.5px; font-weight: 600; margin-top: 14px; position: relative; z-index: 1; }
+.saldo-card .valor { font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; position: relative; z-index: 1; }
+.saldo-card .rodape { display: flex; gap: 6px 22px; flex-wrap: wrap; margin-top: 10px; font-size: 12.5px; color: #B9C8E3; position: relative; z-index: 1; }
+.saldo-card .rodape strong { color: #fff; font-variant-numeric: tabular-nums; }
+.olho { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; border-radius: 8px; height: 32px; width: 36px; display: grid; place-items: center; cursor: pointer; }
+.olho svg { width: 18px; height: 18px; }
+
+.acoes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.acao { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 6px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); color: var(--text); font: inherit; font-weight: 600; font-size: 12.5px; cursor: pointer; text-align: center; }
+.acao:hover { border-color: var(--payax-azul-3); text-decoration: none; }
+.acao .ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--info-bg); color: var(--primary); }
+.acao .ic svg { width: 22px; height: 22px; }
+.acao.destaque .ic { background: var(--payax-ouro); color: var(--payax-azul); }
+
+.lanc { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; background: none; border-left: 0; border-right: 0; border-top: 0; width: 100%; font: inherit; color: inherit; text-align: left; }
+.lanc:hover { background: var(--surface-2); }
+.lanc:last-child { border-bottom: 0; }
+.lanc .ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--surface-2); color: var(--text-2); }
+.lanc .ic.entrada { background: var(--ok-bg); color: var(--ok); }
+.lanc .ic svg { width: 18px; height: 18px; }
+.lanc .txt { flex: 1; min-width: 0; }
+.lanc .txt strong { display: block; }
+.lanc .txt span { display: block; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lanc .vl { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dia { padding: 10px 16px 6px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+
+.passos { display: flex; gap: 6px; margin-bottom: 14px; }
+.passos span { flex: 1; height: 4px; border-radius: 99px; background: var(--border); }
+.passos span.feito { background: var(--payax-ouro); }
+.destinatario { display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.valor-grande { font-size: 28px !important; height: 56px !important; font-weight: 750; }
+.pin { letter-spacing: .6em; text-align: center; font-size: 22px !important; height: 52px !important; font-variant-numeric: tabular-nums; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.chip.ativo, .chip:hover { border-color: var(--payax-azul-3); color: var(--primary); }
+
+.recibo { border: 1px dashed var(--border); border-radius: 12px; padding: 16px; }
+.recibo .linha { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.recibo .linha:last-child { border-bottom: 0; }
+.recibo .linha span:first-child { color: var(--text-2); }
+.recibo .linha span:last-child { text-align: right; font-weight: 600; word-break: break-all; }
+.sucesso { text-align: center; padding: 8px 0 16px; }
+.sucesso .ok { width: 56px; height: 56px; border-radius: 50%; background: var(--ok-bg); color: var(--ok); display: grid; place-items: center; margin: 0 auto 10px; }
+.sucesso .ok svg { width: 28px; height: 28px; }
+.oculto { filter: blur(7px); user-select: none; }
+
+@media (max-width: 760px) {
+  .ib-nav { display: none; }
+  .ib-topo .sair-txt { display: none; }
+  .acoes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ib-baixo { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--border); padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); }
+  .ib-baixo a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--text-2); padding: 4px 0; }
+  .ib-baixo a.ativo { color: var(--primary); }
+  .ib-baixo a:hover { text-decoration: none; }
+  .modal-fundo { align-items: end; padding: 0; }
+  .modal { width: 100%; border-radius: 16px 16px 0 0; max-height: 92vh; }
+  .toasts { left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 760px) { body.ib .faixa-demo { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } }

@@ -11,6 +11,7 @@ function criarApi(db, bradesco = criarServicoBradesco(db)) {
   const auth = autenticar(db);
   api.get('/saude', (_req, res) => res.json({ status: 'ok', sistema: 'Banqueiro PAY AX' }));
   api.use('/auth', require('./routes/auth')(db));
+  api.use('/ib', require('./routes/ib')(db, bradesco));
   api.use('/dashboard', auth, require('./routes/dashboard')(db));
   api.use('/clientes', auth, require('./routes/clientes')(db));
   api.use('/contas', auth, require('./routes/contas')(db));

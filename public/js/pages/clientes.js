@@ -126,21 +126,75 @@ export async function detalheCliente({ alvo, id, ativo }) {
           ${c.emprestimos.length ? c.emprestimos.map((e) => html`<tr class="clicavel" data-href="#/emprestimos/${e.id}"><td>#${e.id}</td><td>${data(e.criado_em)}</td><td class="num">${moeda(e.valor_centavos)}</td><td class="num">${e.num_parcelas}× ${moeda(e.valor_parcela_centavos)}</td><td>${status(e.status)}</td></tr>`)
             : html`<tr><td colspan="5" class="vazio">Nenhum empréstimo.</td></tr>`}</tbody></table></div></div>
       </div>
+      <div class="stack"><div class="card" id="ib-card"><div class="card-head"><h2>Internet Banking</h2></div><div class="card-body muted">Carregando…</div></div>
       <div class="card"><div class="card-head"><h2>Dados cadastrais</h2></div><div class="card-body"><dl class="dl" style="grid-template-columns:1fr">
         <div><dt>E-mail</dt><dd>${c.email ?? '—'}</dd></div><div><dt>Telefone</dt><dd>${telefone(c.telefone)}</dd></div>
         <div><dt>${c.tipo === 'PF' ? 'Nascimento' : 'Fundação'}</dt><dd>${data(c.data_nascimento)}</dd></div>
         <div><dt>Endereço</dt><dd>${endereco || '—'}${c.cidade ? html`<br>${c.cidade}/${c.uf ?? ''}` : ''}${c.cep ? html`<br>CEP ${cep(c.cep)}` : ''}</dd></div>
         <div><dt>Observações</dt><dd style="white-space:pre-wrap">${c.observacoes ?? '—'}</dd></div>
         <div><dt>Última atualização</dt><dd>${data(c.atualizado_em)}</dd></div>
-      </dl></div></div>
+      </dl></div></div></div>
     </div>`);
   $$('tr[data-href]', alvo).forEach((tr) => tr.addEventListener('click', () => { location.hash = tr.dataset.href; }));
   const recarregar = () => detalheCliente({ alvo, id, ativo });
   $('#editar', alvo).onclick = () => formCliente(c, recarregar);
   $('#abrir', alvo).onclick = () => abrirConta(c, (nova) => { location.hash = `#/contas/${nova.id}`; });
+  cartaoInternetBanking($('#ib-card', alvo), c);
   const ex = $('#excluir', alvo);
   if (ex) ex.onclick = async () => {
     if (!(await confirmar('Excluir cliente', `Excluir definitivamente ${c.nome}? Esta ação não pode ser desfeita.`, 'Excluir'))) return;
     try { await api.del(`/clientes/${c.id}`); toast('Cliente excluído.'); location.hash = '#/clientes'; } catch (e) { toast(e.message, 'erro'); }
+  };
+}
+
+function mostrarSenhaProvisoria(r, cliente) {
+  modal({
+    titulo: 'Senha provisória do Internet Banking',
+    corpo: html`<p style="margin-top:0">Entregue ao cliente por um canal seguro. Ela aparece <strong>só agora</strong> e deve ser trocada no primeiro acesso, quando o cliente também cria a senha de transação.</p>
+      <dl class="dl"><div><dt>Login</dt><dd class="mono">${documento(cliente.documento)}</dd></div><div><dt>Senha provisória</dt><dd class="mono" style="font-size:20px;letter-spacing:.06em">${r.senha_provisoria}</dd></div></dl>
+      <p class="ajuda">Endereço de acesso: <span class="mono">${location.origin}/ib/</span></p>`,
+    rodape: html`<div class="modal-foot"><button class="btn primario" data-cancelar>Entendi</button></div>`,
+  });
+}
+
+async function cartaoInternetBanking(el, cliente) {
+  const st = await api.get(`/clientes/${cliente.id}/internet-banking`);
+  const corpo = el.querySelector('.card-body');
+  const recarregar = () => cartaoInternetBanking(el, cliente);
+  if (!st) {
+    corpo.innerHTML = String(html`<p style="margin:0 0 12px">O cliente ainda não tem acesso ao Internet Banking.</p>
+      <button class="btn primario" id="ib-habilitar" ${cliente.status !== 'ativo' ? 'disabled' : ''}>Habilitar acesso</button>`);
+    corpo.classList.remove('muted');
+    $('#ib-habilitar', el).onclick = async () => {
+      try { const r = await api.post(`/clientes/${cliente.id}/internet-banking`); mostrarSenhaProvisoria(r, cliente); recarregar(); } catch (e) { toast(e.message, 'erro'); }
+    };
+    return;
+  }
+  corpo.classList.remove('muted');
+  const situacao = st.status === 'bloqueado' ? status('bloqueado') : st.precisa_trocar_senha ? html`<span class="badge warn">Aguardando primeiro acesso</span>` : status('ativo');
+  corpo.innerHTML = String(html`<dl class="dl" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <div><dt>Situação</dt><dd>${situacao}</dd></div><div><dt>Limite diário</dt><dd class="num">${moeda(st.limite_diario_centavos)}</dd></div>
+      <div><dt>Último acesso</dt><dd>${st.ultimo_acesso ? data(st.ultimo_acesso) : '—'}</dd></div><div><dt>Senha de transação</dt><dd>${st.tem_pin ? 'Cadastrada' : 'Pendente'}</dd></div></dl>
+    <div class="row">
+      <button class="btn sm" id="ib-redefinir">Redefinir senha</button>
+      ${pode('admin', 'gerente') ? html`<button class="btn sm" id="ib-limite">Alterar limite</button>
+        <button class="btn sm ${st.status === 'ativo' ? 'perigo' : ''}" id="ib-status">${st.status === 'ativo' ? 'Bloquear acesso' : 'Desbloquear'}</button>` : ''}
+    </div>`);
+  $('#ib-redefinir', el).onclick = async () => {
+    if (!(await confirmar('Redefinir senha', 'Gerar nova senha provisória? O cliente precisará cadastrar senha e senha de transação novamente.', 'Gerar senha'))) return;
+    try { const r = await api.post(`/clientes/${cliente.id}/internet-banking/redefinir-senha`); mostrarSenhaProvisoria(r, cliente); recarregar(); } catch (e) { toast(e.message, 'erro'); }
+  };
+  const lim = $('#ib-limite', el);
+  if (lim) lim.onclick = () => modal({
+    titulo: 'Limite diário do Internet Banking',
+    corpo: html`<label for="ib-lim">Limite para PIX, transferências e pagamentos por dia (R$)</label><input id="ib-lim" name="limite" class="moeda" inputmode="numeric" value="${valorMoedaInput(st.limite_diario_centavos)}">`,
+    aoEnviar: async (form, fechar) => {
+      await api.patch(`/clientes/${cliente.id}/internet-banking`, { limite_diario_centavos: centavos(form.limite.value) });
+      fechar(); toast('Limite atualizado.'); recarregar();
+    },
+  });
+  const stb = $('#ib-status', el);
+  if (stb) stb.onclick = async () => {
+    try { await api.patch(`/clientes/${cliente.id}/internet-banking`, { status: st.status === 'ativo' ? 'bloqueado' : 'ativo' }); toast('Acesso atualizado.'); recarregar(); } catch (e) { toast(e.message, 'erro'); }
   };
 }

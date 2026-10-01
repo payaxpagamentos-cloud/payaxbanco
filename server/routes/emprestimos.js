@@ -8,6 +8,7 @@ const v = require('../lib/validacao');
 const { registrar } = require('../lib/auditoria');
 const { buscarConta, exigirContaOperavel, novoGrupo, lancar } = require('../lib/conta');
 const { simular } = require('../lib/financeiro');
+const { pagarParcela } = require('../lib/emprestimos');
 
 function lerProposta(body) {
   const valor = v.valorCentavos(body?.valor_centavos);
@@ -72,23 +73,8 @@ module.exports = (db) => {
   });
 
   r.post('/:id/parcelas/:numero/pagar', permitir('admin', 'gerente', 'operador'), (req, res) => {
-    const e = detalhar(req.params.id);
-    if (e.status !== 'ativo') throw new ErroNegocio(`Empréstimo ${e.status}.`, 409);
-    const parcela = e.parcelas.find((p) => p.numero === Number(req.params.numero));
-    if (!parcela) throw naoEncontrado('Parcela');
-    if (parcela.status === 'paga') throw new ErroNegocio('Parcela já paga.', 409);
-    const anterior = e.parcelas.find((p) => p.status === 'aberta');
-    if (anterior.numero !== parcela.numero) throw new ErroNegocio(`Pague primeiro a parcela ${anterior.numero}.`, 409);
-    const conta = buscarConta(db, e.conta_id);
-    exigirContaOperavel(conta);
-    transacao(db, () => {
-      lancar(db, { contaId: conta.id, tipo: 'emprestimo_parcela', valor: -parcela.valor_centavos, descricao: `Parcela ${parcela.numero}/${e.num_parcelas} empréstimo #${e.id}`, grupo: novoGrupo(), usuarioId: req.usuario.id });
-      db.prepare("UPDATE parcelas SET status = 'paga', paga_em = datetime('now') WHERE id = ?").run(parcela.id);
-      const { abertas } = db.prepare("SELECT COUNT(*) AS abertas FROM parcelas WHERE emprestimo_id = ? AND status = 'aberta'").get(e.id);
-      if (abertas === 0) db.prepare("UPDATE emprestimos SET status = 'quitado' WHERE id = ?").run(e.id);
-      registrar(db, req, 'pagar_parcela', 'emprestimo', e.id, { parcela: parcela.numero, valor_centavos: parcela.valor_centavos });
-    });
-    res.json(detalhar(e.id));
+    pagarParcela(db, req, req.params.id, req.params.numero);
+    res.json(detalhar(req.params.id));
   });
 
   return r;

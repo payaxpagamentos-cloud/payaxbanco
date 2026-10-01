@@ -66,6 +66,12 @@ function popularDemo(db) {
       lancar(db, { contaId: origem.id, tipo: 'pix_enviado', valor: -valor, descricao: 'PIX', contraparteId: destino.id, grupo, usuarioId: adminId });
       lancar(db, { contaId: destino.id, tipo: 'pix_recebido', valor, descricao: 'PIX', contraparteId: origem.id, grupo, usuarioId: adminId });
     }
+    // Acesso ao Internet Banking para dois clientes de exemplo.
+    for (const [documento, senha] of [['52998224725', 'Cliente2026'], ['11222333000181', 'Empresa2026']]) {
+      const c = db.prepare('SELECT id FROM clientes WHERE documento = ?').get(documento);
+      db.prepare('INSERT INTO acessos_cliente (cliente_id, senha_hash, pin_hash, precisa_trocar_senha, limite_diario_centavos) VALUES (?, ?, ?, 0, ?)')
+        .run(c.id, hashSenha(senha), hashSenha('246810'), 1_000_000);
+    }
     // Empréstimos.
     for (const [idx, valor, taxa, n] of [[0, 1500000, 0.0189, 12], [4, 8000000, 0.0149, 24]]) {
       const conta = correntes[idx];

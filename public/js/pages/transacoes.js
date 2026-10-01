@@ -24,9 +24,9 @@ export default async function transacoes({ alvo, ativo }) {
       ${r.itens.length ? r.itens.map((x) => html`<tr>
         <td class="muted small">${x.id}</td><td class="small">${dataHora(x.criado_em)}</td>
         <td><a href="#/contas/${x.conta_id}">${x.cliente_nome}</a><div class="small muted mono">${x.agencia} / ${x.conta}</div></td>
-        <td>${TIPO_TRANSACAO[x.tipo] ?? x.tipo} ${x.estornada_em ? html`<span class="badge warn">estornada</span>` : ''}</td>
+        <td>${TIPO_TRANSACAO[x.tipo] ?? x.tipo} ${x.estornada_em ? html`<span class="badge warn">estornada</span>` : ''} ${x.canal === 'internet_banking' ? html`<span class="badge info">IB</span>` : ''}</td>
         <td class="small">${x.descricao ?? ''}</td><td class="num">${moedaSinal(x.valor_centavos)}</td><td class="small">${x.usuario_nome ?? '—'}</td>
-        ${gestor ? html`<td class="right">${!x.estornada_em && x.tipo !== 'estorno' && !x.tipo.startsWith('emprestimo') ? html`<button class="btn sm" data-estornar="${x.id}">Estornar</button>` : ''}</td>` : ''}</tr>`)
+        ${gestor ? html`<td class="right">${!x.estornada_em && !['estorno', 'pagamento'].includes(x.tipo) && !x.tipo.startsWith('emprestimo') && !(x.tipo.startsWith('pix_') && !x.contraparte_conta_id) ? html`<button class="btn sm" data-estornar="${x.id}">Estornar</button>` : ''}</td>` : ''}</tr>`)
         : html`<tr><td colspan="8" class="vazio">Nenhuma transação encontrada.</td></tr>`}</tbody></table></div>`);
     t.append(paginacao(r, (p) => { filtro.pagina = p; carregar(); }));
     $$('[data-estornar]', t).forEach((b) => b.addEventListener('click', () => estornar(r.itens.find((x) => String(x.id) === b.dataset.estornar), carregar)));

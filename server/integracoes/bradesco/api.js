@@ -104,6 +104,7 @@ class ApiBradesco {
   // Envio de PIX, saldo e extrato usam APIs próprias do Bradesco (fora do padrão do Banco Central).
   // Serão implementados com a documentação técnica recebida no credenciamento.
   async enviarPix() { throw new ErroBradesco('Envio de PIX pelo Bradesco ainda não habilitado: aguardando a documentação da API de pagamentos.', 501); }
+  async pagarBoleto() { throw new ErroBradesco('Pagamento de boletos pelo Bradesco ainda não habilitado: aguardando a documentação da API de pagamentos.', 501); }
   async saldo() { throw new ErroBradesco('Consulta de saldo pelo Bradesco ainda não habilitada: aguardando a documentação da API de extrato.', 501); }
   async extrato() { throw new ErroBradesco('Extrato do Bradesco ainda não habilitado: aguardando a documentação da API de extrato.', 501); }
 }

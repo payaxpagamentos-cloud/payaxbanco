@@ -53,7 +53,7 @@ export const TIPO_CONTA = { corrente: 'Corrente', poupanca: 'Poupança', pagamen
 export const TIPO_TRANSACAO = {
   deposito: 'Depósito', saque: 'Saque', transferencia_enviada: 'Transferência enviada', transferencia_recebida: 'Transferência recebida',
   pix_enviado: 'PIX enviado', pix_recebido: 'PIX recebido', emprestimo_credito: 'Crédito de empréstimo', emprestimo_parcela: 'Parcela de empréstimo',
-  estorno: 'Estorno', tarifa: 'Tarifa',
+  estorno: 'Estorno', tarifa: 'Tarifa', pagamento: 'Pagamento de conta',
 };
 const CLASSE_STATUS = { ativo: 'ok', ativa: 'ok', quitado: 'ok', paga: 'ok', inativo: '', encerrada: '', cancelado: '', bloqueado: 'danger', bloqueada: 'danger', aberta: 'warn', vencida: 'danger' };
 export const status = (s) => html`<span class="badge ${CLASSE_STATUS[s] ?? 'info'}">${s ? s[0].toUpperCase() + s.slice(1) : '—'}</span>`;
@@ -67,13 +67,38 @@ export function centavos(texto) {
   const normal = s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : s;
   return Math.round(Number(normal) * 100) || 0;
 }
+/**
+ * Campo de valor no estilo dos apps de banco: cada dígito entra pela direita (centavos) e o
+ * backspace remove o último, independentemente da posição do cursor. Colar "1.234,56" também funciona.
+ */
 export function mascaraMoeda(input) {
-  input.addEventListener('focus', () => input.select());
-  input.addEventListener('input', () => {
-    const dig = input.value.replace(/\D/g, '').replace(/^0+/, '');
-    const n = Number(dig || '0');
-    input.value = (n / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const MAX = 99_999_999_999;
+  let valor = centavos(input.value);
+  const aplicar = () => {
+    input.value = valorMoedaInput(valor);
+    const fim = input.value.length;
+    try { input.setSelectionRange(fim, fim); } catch { /* alguns tipos de input não aceitam */ }
+  };
+  input.addEventListener('beforeinput', (e) => {
+    const tipo = e.inputType || '';
+    if (tipo === 'insertText' || tipo === 'insertReplacementText') {
+      e.preventDefault();
+      const d = (e.data || '').replace(/\D/g, '');
+      if (d) { valor = Math.min(Number(`${valor}${d}`), MAX); aplicar(); }
+    } else if (tipo.startsWith('delete')) {
+      e.preventDefault();
+      valor = Math.floor(valor / 10);
+      aplicar();
+    } else if (tipo === 'insertFromPaste' || tipo === 'insertFromDrop') {
+      e.preventDefault();
+      valor = Math.min(centavos(e.dataTransfer?.getData('text') ?? e.data ?? ''), MAX);
+      aplicar();
+    }
   });
+  // Navegadores sem beforeinput: reconstrói a partir dos dígitos.
+  input.addEventListener('input', () => { valor = Math.min(Number(input.value.replace(/\D/g, '') || 0), MAX); aplicar(); });
+  input.addEventListener('focus', () => requestAnimationFrame(aplicar));
+  input.addEventListener('mouseup', () => requestAnimationFrame(aplicar));
 }
 export const valorMoedaInput = (c) => ((Number(c) || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -196,6 +221,14 @@ const P = {
   chave: 'M15 7a4 4 0 1 1-3.9 5H3v3h3v3h3v-3h2.1A4 4 0 0 1 15 7z',
   banco: 'M3 21h18M5 21V10m14 11V10M9 21v-7m6 7v-7M2 10l10-6 10 6z',
   qr: 'M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h3v3h-3zm4 4h3v3h-3z',
+  olho: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  olhoFechado: 'M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a10.6 10.6 0 0 0 5.4-1.4',
+  check: 'M20 6L9 17l-5-5',
+  barras: 'M4 5v14M7 5v14M10 5v14M14 5v14M16 5v14M20 5v14',
+  casa: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
+  perfil: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-8 9a8 8 0 0 1 16 0',
+  entrada: 'M12 5v14M5 12l7 7 7-7',
+  saida: 'M12 19V5M5 12l7-7 7 7',
   lua: 'M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z',
 };
 export const icone = (nome) => raw(`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[nome] ?? ''}"/></svg>`);

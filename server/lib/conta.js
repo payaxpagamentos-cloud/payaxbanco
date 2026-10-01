@@ -43,7 +43,7 @@ const novoGrupo = () => crypto.randomUUID();
  * Lança um movimento (crédito > 0, débito < 0) na conta, atualizando o saldo.
  * Deve ser chamado dentro de uma transação de banco.
  */
-function lancar(db, { contaId, tipo, valor, descricao = null, contraparteId = null, grupo, usuarioId = null, ignorarLimite = false }) {
+function lancar(db, { contaId, tipo, valor, descricao = null, contraparteId = null, grupo, usuarioId = null, ignorarLimite = false, canal = 'agencia' }) {
   const conta = db.prepare('SELECT id, saldo_centavos, limite_centavos, numero, digito FROM contas WHERE id = ?').get(contaId);
   const novoSaldo = conta.saldo_centavos + valor;
   if (valor < 0 && !ignorarLimite && novoSaldo < -conta.limite_centavos) {
@@ -51,13 +51,14 @@ function lancar(db, { contaId, tipo, valor, descricao = null, contraparteId = nu
   }
   db.prepare('UPDATE contas SET saldo_centavos = ? WHERE id = ?').run(novoSaldo, contaId);
   const r = db.prepare(`INSERT INTO transacoes
-      (conta_id, tipo, valor_centavos, saldo_apos_centavos, descricao, contraparte_conta_id, grupo, usuario_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(contaId, tipo, valor, novoSaldo, descricao, contraparteId, grupo, usuarioId);
+      (conta_id, tipo, valor_centavos, saldo_apos_centavos, descricao, contraparte_conta_id, grupo, usuario_id, canal)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(contaId, tipo, valor, novoSaldo, descricao, contraparteId, grupo, usuarioId, canal);
   return { id: Number(r.lastInsertRowid), saldo_apos_centavos: novoSaldo };
 }
 
 function exigirAlcada(req, valor) {
+  if (!req.usuario) return; // operações do próprio cliente seguem o limite diário do Internet Banking
   if (valor > config.limiteOperadorCentavos && req.usuario.perfil === 'operador') {
     throw new ErroNegocio('Valor acima da alçada do operador. Solicite a um gerente.', 403);
   }

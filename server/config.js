@@ -13,6 +13,7 @@ module.exports = {
   dbFile: process.env.PAYAX_DB || path.join(__dirname, '..', 'data', 'banqueiro.db'),
   secret,
   tokenTtlSeconds: 8 * 60 * 60,
+  tokenClienteTtlSeconds: 30 * 60,
   agenciaPadrao: process.env.PAYAX_AGENCIA || '0001',
   // Deslocamento usado para agrupar dados por dia no fuso local (datas são gravadas em UTC).
   fusoSqlite: process.env.PAYAX_FUSO || '-3 hours',

@@ -91,6 +91,14 @@ class SimuladorBradesco {
     return { endToEndId: e2e, status: 'CONCLUIDO' };
   }
 
+  async pagarBoleto({ codigoBarras, valorCentavos }) {
+    if (valorCentavos > this.saldoSync()) throw new ErroBradesco('Saldo insuficiente na conta PAY AX no Bradesco.', 422);
+    const autenticacao = `BRD${crypto.randomUUID().replace(/-/g, '').slice(0, 21).toUpperCase()}`;
+    this.db.prepare("INSERT INTO bradesco_sim_movimentos (natureza, valor_centavos, descricao, end_to_end_id) VALUES ('D', ?, ?, ?)")
+      .run(valorCentavos, `Pagamento ${codigoBarras[0] === '8' ? 'de conta de consumo' : 'de boleto'} ${codigoBarras.slice(0, 3)}…`, autenticacao);
+    return { autenticacao, status: 'CONCLUIDO' };
+  }
+
   async saldo() { return this.saldoSync(); }
 
   async extrato({ inicio }) {

@@ -23,31 +23,35 @@ const substituir = {
 
 fs.rmSync(saida, { recursive: true, force: true });
 fs.mkdirSync(path.join(saida, 'img'), { recursive: true });
+fs.mkdirSync(path.join(saida, 'ib'), { recursive: true });
 
 (async () => {
-await esbuild.build({
-  entryPoints: [path.join(__dirname, 'entrada.js')],
-  bundle: true,
-  format: 'iife',
-  platform: 'browser',
-  target: 'es2020',
-  minify: true,
-  legalComments: 'none',
-  charset: 'ascii',
-  outfile: path.join(saida, 'banqueiro-demo.js'),
-  define: { 'process.env.NODE_ENV': '"test"', 'process.env': JSON.stringify({ NODE_ENV: 'test', PAYAX_SECRET: 'demo', PAYAX_DB: ':memory:' }) },
-  plugins: [substituir],
-  logLevel: 'warning',
-});
+  const opcoes = {
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2020',
+    minify: true,
+    legalComments: 'none',
+    charset: 'ascii',
+    define: { 'process.env.NODE_ENV': '"test"', 'process.env': JSON.stringify({ NODE_ENV: 'test', PAYAX_SECRET: 'demo', PAYAX_DB: ':memory:' }) },
+    plugins: [substituir],
+    logLevel: 'warning',
+  };
+  await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada.js')], outfile: path.join(saida, 'banqueiro-demo.js') });
+  await esbuild.build({ ...opcoes, entryPoints: [path.join(__dirname, 'entrada-ib.js')], outfile: path.join(saida, 'ib', 'banqueiro-ib.js') });
 
-// Escapa caracteres não ASCII que o esbuild mantém em template literals (o tag html usa as strings processadas).
-const bundle = path.join(saida, 'banqueiro-demo.js');
-fs.writeFileSync(bundle, fs.readFileSync(bundle, 'utf8').replace(/[^\x00-\x7f]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`));
+  // Escapa caracteres não ASCII que o esbuild mantém em template literals (o tag html usa as strings processadas).
+  for (const bundle of [path.join(saida, 'banqueiro-demo.js'), path.join(saida, 'ib', 'banqueiro-ib.js')]) {
+    fs.writeFileSync(bundle, fs.readFileSync(bundle, 'utf8').replace(/[^\x00-\x7f]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`));
+  }
 
-const css = fs.readFileSync(path.join(raiz, 'public/css/style.css'), 'utf8');
-const pagina = fs.readFileSync(path.join(__dirname, 'pagina.html'), 'utf8').replace('/*CSS*/', () => css);
-fs.writeFileSync(path.join(saida, 'index.html'), pagina);
-for (const f of fs.readdirSync(path.join(raiz, 'public/img'))) fs.copyFileSync(path.join(raiz, 'public/img', f), path.join(saida, 'img', f));
-fs.copyFileSync(path.join(raiz, 'public/favicon.svg'), path.join(saida, 'favicon.svg'));
-console.log('Demonstração gerada em dist-demo/');
+  const css = fs.readFileSync(path.join(raiz, 'public/css/style.css'), 'utf8');
+  const pagina = fs.readFileSync(path.join(__dirname, 'pagina.html'), 'utf8').replace('/*CSS*/', () => css);
+  fs.writeFileSync(path.join(saida, 'index.html'), pagina);
+  const cssIb = css + fs.readFileSync(path.join(raiz, 'public/ib/ib.css'), 'utf8');
+  fs.writeFileSync(path.join(saida, 'ib', 'index.html'), fs.readFileSync(path.join(__dirname, 'pagina-ib.html'), 'utf8').replace('/*CSS*/', () => cssIb));
+  for (const f of fs.readdirSync(path.join(raiz, 'public/img'))) fs.copyFileSync(path.join(raiz, 'public/img', f), path.join(saida, 'img', f));
+  fs.copyFileSync(path.join(raiz, 'public/favicon.svg'), path.join(saida, 'favicon.svg'));
+  console.log('Demonstração gerada em dist-demo/');
 })().catch((e) => { console.error(e); process.exit(1); });

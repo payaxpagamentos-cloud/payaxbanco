@@ -7,36 +7,11 @@ const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const v = require('../lib/validacao');
 const { registrar } = require('../lib/auditoria');
 const { buscarConta, exigirContaOperavel, novoGrupo, lancar, exigirAlcada } = require('../lib/conta');
-
-const fmt = (c) => `${c.agencia}/${c.numero}-${c.digito}`;
+const { fmt, localizarConta, transferir, enviarPix } = require('../lib/movimentos');
 
 module.exports = (db, bradesco) => {
   const r = Router();
   const operadores = permitir('admin', 'gerente', 'operador');
-
-  function localizarDestino(body) {
-    if (body.destino_conta_id) return buscarConta(db, body.destino_conta_id);
-    const numero = String(body.destino_numero ?? '').replace(/[^\dXx]/g, '');
-    const agencia = v.digitos(body.destino_agencia) || require('../config').agenciaPadrao;
-    const semDigito = numero.length > 6 ? numero.slice(0, 6) : numero;
-    const linha = db.prepare('SELECT id FROM contas WHERE agencia = ? AND numero = ?').get(agencia, semDigito);
-    if (!linha) throw naoEncontrado('Conta de destino');
-    return buscarConta(db, linha.id);
-  }
-
-  function transferir(req, origem, destino, valor, descricao, tipoSaida, tipoEntrada) {
-    if (origem.id === destino.id) throw new ErroNegocio('Origem e destino devem ser contas diferentes.', 422);
-    exigirContaOperavel(origem);
-    exigirContaOperavel(destino);
-    exigirAlcada(req, valor);
-    return transacao(db, () => {
-      const grupo = novoGrupo();
-      const saida = lancar(db, { contaId: origem.id, tipo: tipoSaida, valor: -valor, descricao, contraparteId: destino.id, grupo, usuarioId: req.usuario.id });
-      lancar(db, { contaId: destino.id, tipo: tipoEntrada, valor, descricao, contraparteId: origem.id, grupo, usuarioId: req.usuario.id });
-      registrar(db, req, tipoSaida, 'conta', origem.id, { destino: fmt(destino), valor_centavos: valor, grupo });
-      return { grupo, transacao_id: saida.id, saldo_origem_centavos: saida.saldo_apos_centavos };
-    });
-  }
 
   r.post('/deposito', operadores, (req, res) => {
     const conta = buscarConta(db, req.body?.conta_id);
@@ -70,27 +45,16 @@ module.exports = (db, bradesco) => {
 
   r.post('/transferencia', operadores, (req, res) => {
     const origem = buscarConta(db, req.body?.origem_conta_id);
-    const destino = localizarDestino(req.body ?? {});
+    const destino = localizarConta(db, { contaId: req.body?.destino_conta_id, agencia: req.body?.destino_agencia, numero: req.body?.destino_numero });
     const valor = v.valorCentavos(req.body?.valor_centavos);
     const descricao = v.texto(req.body?.descricao, 140) || `Transferência ${fmt(origem)} → ${fmt(destino)}`;
-    res.status(201).json(transferir(req, origem, destino, valor, descricao, 'transferencia_enviada', 'transferencia_recebida'));
+    res.status(201).json(transferir(db, req, origem, destino, valor, descricao, 'transferencia_enviada', 'transferencia_recebida'));
   });
 
   r.post('/pix', operadores, async (req, res) => {
     const origem = buscarConta(db, req.body?.origem_conta_id);
-    const chave = String(req.body?.chave ?? '').trim();
-    v.exigir(chave, 'Informe a chave PIX de destino.');
     const valor = v.valorCentavos(req.body?.valor_centavos);
-    const registro = db.prepare('SELECT * FROM chaves_pix WHERE chave = ? OR chave = ?').get(chave, chave.toLowerCase())
-      || (/^[\d.\-/()\s+]+$/.test(chave) ? db.prepare('SELECT * FROM chaves_pix WHERE chave = ?').get(v.digitos(chave)) : null);
-    if (!registro) {
-      // Chave de outro banco: o PIX sai pela conta PAY AX no Bradesco.
-      const descricao = v.texto(req.body?.descricao, 140);
-      return res.status(201).json(await bradesco.enviarPixExterno(req, origem, chave, valor, descricao));
-    }
-    const destino = buscarConta(db, registro.conta_id);
-    const descricao = v.texto(req.body?.descricao, 140) || `PIX para ${destino.cliente_nome}`;
-    res.status(201).json({ ...transferir(req, origem, destino, valor, descricao, 'pix_enviado', 'pix_recebido'), destino: { nome: destino.cliente_nome, conta: fmt(destino) } });
+    res.status(201).json(await enviarPix(db, bradesco, req, origem, req.body?.chave, valor, v.texto(req.body?.descricao, 140)));
   });
 
   r.post('/estorno', permitir('admin', 'gerente'), (req, res) => {
@@ -102,8 +66,8 @@ module.exports = (db, bradesco) => {
     if (grupoOriginal.some((t) => t.estornada_em)) throw new ErroNegocio('Esta transação já foi estornada.', 409);
     if (grupoOriginal.some((t) => t.tipo === 'estorno')) throw new ErroNegocio('Não é possível estornar um estorno.', 409);
     if (grupoOriginal.some((t) => t.tipo.startsWith('emprestimo'))) throw new ErroNegocio('Movimentos de empréstimo não podem ser estornados por aqui.', 409);
-    if (grupoOriginal.some((t) => t.tipo.startsWith('pix_') && !t.contraparte_conta_id)) {
-      throw new ErroNegocio('PIX com outro banco já foi liquidado no Bradesco e não pode ser estornado aqui. Use a devolução PIX.', 409);
+    if (grupoOriginal.some((t) => (t.tipo.startsWith('pix_') && !t.contraparte_conta_id) || t.tipo === 'pagamento')) {
+      throw new ErroNegocio('Operação com outro banco já liquidada no Bradesco: não pode ser estornada aqui.', 409);
     }
     const out = transacao(db, () => {
       const grupo = novoGrupo();
