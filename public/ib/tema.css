@@ -1,0 +1,206 @@
+/*
+ * Tema do Internet Banking no visual do site institucional PAY AX, em versão clara:
+ * fontes Unbounded (títulos) e Manrope (texto), gradiente azul → ciano, anel ciano, feixes diagonais,
+ * botões em pílula e cartões arredondados. Carregado depois de style.css e ib.css.
+ */
+@font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: "Unbounded"; src: url("../fonts/unbounded.woff2") format("woff2"); font-weight: 200 900; font-display: swap; }
+
+:root:has(body.ib), body.ib {
+  --ciano: #19E3FF;
+  --azul: #1F8BFF;
+  --azul-texto: #0B63D6;
+  --marinho: #071A3C;
+  --gradiente: linear-gradient(100deg, #1F8BFF, #19E3FF);
+  --bg: #F3F8FF;
+  --surface: #FFFFFF;
+  --surface-2: #F4F8FE;
+  --border: #DCE7F6;
+  --text: #071A3C;
+  --text-2: #4A5F82;
+  --text-3: #8496B4;
+  --primary: var(--azul-texto);
+  --info-bg: #E8F3FF;
+  --shadow: 0 1px 2px rgba(7, 26, 60, .05), 0 10px 30px -12px rgba(31, 139, 255, .22);
+  --radius: 18px;
+  --fonte-titulo: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --fonte-texto: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--fonte-texto);
+  color-scheme: light;
+}
+body.ib { background: var(--bg); color: var(--text); font-family: var(--fonte-texto); }
+body.ib input, body.ib select, body.ib textarea, body.ib button { font-family: inherit; }
+/* :where() mantém a especificidade baixa para que os títulos de cada tela definam o próprio tamanho. */
+:where(body.ib) :where(h1, h2) { font-family: var(--fonte-titulo); letter-spacing: -.01em; font-weight: 700; }
+:where(body.ib) h1 { font-size: 20px; }
+:where(body.ib) h2 { font-size: 16px; }
+body.ib .grad { background: var(--gradiente); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* Nome PAY AX como no site: "PAY" marinho e "AX" em gradiente */
+body.ib .marca { font-family: var(--fonte-titulo); font-weight: 800; letter-spacing: -.02em; gap: .18em; }
+body.ib .marca span { background: var(--gradiente); -webkit-background-clip: text; background-clip: text; color: transparent; }
+body.ib .marca-clara, body.ib .marca-escura { color: var(--marinho); }
+
+/* Botões */
+body.ib .btn { border-radius: 999px; font-weight: 700; }
+body.ib .btn.primario, body.ib .btn.ouro, body.ib .btn.gradiente { background: var(--gradiente); border: 0; color: #031029; }
+body.ib .btn.primario:hover, body.ib .btn.ouro:hover, body.ib .btn.gradiente:hover { filter: brightness(1.04); box-shadow: 0 8px 26px -8px rgba(25, 227, 255, .7); }
+body.ib .btn.link { color: var(--azul-texto); border-radius: 0; }
+body.ib .btn:focus-visible, body.ib a:focus-visible { outline: 2px solid var(--azul); outline-offset: 3px; }
+body.ib input, body.ib select, body.ib textarea { border-radius: 12px; border-color: var(--border); }
+body.ib input:focus, body.ib select:focus, body.ib textarea:focus { outline: 3px solid rgba(31, 139, 255, .18); border-color: var(--azul); }
+
+/* Cartões e componentes */
+body.ib .card { border-radius: var(--radius); border-color: var(--border); }
+body.ib .modal { border-radius: 22px; }
+body.ib .modal-head h2 { font-size: 16px; }
+body.ib .toast { background: var(--marinho); border-left-color: var(--ciano); border-radius: 14px; }
+body.ib .barra-h > span { background: var(--gradiente); }
+body.ib .chip.ativo, body.ib .chip:hover { border-color: var(--azul); color: var(--azul-texto); }
+body.ib .passos span.feito { background: var(--gradiente); }
+body.ib .tecl-pontos span { border-color: var(--azul); }
+body.ib .tecl-pontos span.cheio { background: var(--gradiente); border-color: transparent; }
+body.ib .tecl-par, body.ib .tecl-apagar { border-radius: 14px; background: var(--surface); }
+body.ib .tecl-par:hover, body.ib .tecl-apagar:hover { border-color: var(--azul); background: var(--info-bg); }
+body.ib .etapas li.atual { border-bottom-color: var(--azul); }
+body.ib .etapas li.atual span { background: var(--gradiente); border-color: transparent; color: #031029; }
+body.ib .opcao span { border-radius: 16px; }
+body.ib .opcao input:checked + span { border-color: var(--azul); }
+body.ib .protocolo strong { font-family: var(--fonte-titulo); }
+
+/* ===== Área logada: menu lateral claro ===== */
+body.ib .sidebar { background: var(--surface); color: var(--text-2); border-right: 1px solid var(--border); }
+body.ib .sidebar .brand { border-bottom-color: var(--border); }
+body.ib .sidebar .brand .marca { font-size: 24px; }
+body.ib .sidebar .brand .produto { color: var(--azul-texto); letter-spacing: .24em; font-size: 10.5px; }
+body.ib .nav .secao { color: var(--text-3); letter-spacing: .2em; }
+body.ib .nav a { color: var(--text-2); font-weight: 600; border-radius: 12px; }
+body.ib .nav a:hover { background: var(--surface-2); color: var(--text); }
+body.ib .nav a.ativo { background: var(--info-bg); color: var(--marinho); box-shadow: inset 3px 0 0 var(--azul); }
+body.ib .nav a.ativo svg { color: var(--azul); }
+body.ib .sidebar .rodape { color: var(--text-3); border-top-color: var(--border); }
+body.ib .topbar { background: rgba(255, 255, 255, .85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+body.ib .topbar h1 { font-size: 19px; }
+body.ib .avatar { background: var(--gradiente); color: #031029; }
+
+/* Saldo: cartão no estilo do cartão PAY AX do site, em azul mais claro */
+body.ib .saldo-card { border-radius: 24px; padding: 24px;
+  background: radial-gradient(90% 140% at 100% 0%, rgba(25, 227, 255, .35), transparent 55%),
+              repeating-linear-gradient(38deg, transparent 0 38px, rgba(255, 255, 255, .05) 38px 70px),
+              linear-gradient(135deg, #0B3D91 0%, #1565D8 60%, #1F8BFF 100%);
+  box-shadow: 0 24px 50px -24px rgba(31, 139, 255, .65); }
+body.ib .saldo-card::after { border: 2px solid rgba(25, 227, 255, .7); box-shadow: 0 0 30px rgba(25, 227, 255, .45); right: -60px; bottom: -90px; width: 230px; height: 230px; }
+body.ib .saldo-card .valor { font-family: var(--fonte-titulo); font-weight: 700; font-size: 30px; }
+body.ib .saldo-card .rotulo, body.ib .saldo-card .rodape { color: #D6E6FF; }
+body.ib .acao { border-radius: 18px; transition: transform .2s, box-shadow .2s, border-color .2s; }
+body.ib .acao:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--azul); }
+body.ib .acao .ic { border-radius: 14px; background: var(--info-bg); color: var(--azul-texto); }
+body.ib .acao.destaque .ic { background: var(--gradiente); color: #031029; }
+
+/* Primeiro acesso: fundo claro com o anel do site */
+body.ib .login { background: radial-gradient(50% 60% at 80% 20%, rgba(31, 139, 255, .16), transparent 70%), radial-gradient(40% 50% at 10% 90%, rgba(25, 227, 255, .14), transparent 70%), var(--bg); }
+
+/* ===== Tela de acesso no layout do site institucional (versão clara) ===== */
+.acesso { min-height: 100vh; background: var(--bg); }
+.acesso-linha { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.acesso-topo { position: sticky; top: 0; z-index: 20; background: rgba(255, 255, 255, .86); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
+.acesso-topo .acesso-linha { display: flex; align-items: center; gap: 16px; height: 72px; }
+.acesso-topo .marca { font-size: 22px; }
+.acesso-produto { font-size: 10.5px; font-weight: 800; letter-spacing: .24em; text-transform: uppercase; color: var(--azul-texto); padding-left: 14px; border-left: 1px solid var(--border); white-space: nowrap; }
+.acesso-nav { display: flex; gap: 2px; flex: 1; margin-left: 12px; }
+.acesso-nav button, .acesso-nav a { background: none; border: 0; font: inherit; font-weight: 600; font-size: 14px; color: var(--text-2); padding: 9px 12px; border-radius: 10px; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.acesso-nav button:hover, .acesso-nav a:hover { background: var(--info-bg); color: var(--text); text-decoration: none; }
+.acesso-acompanhar { font-size: 14px; white-space: nowrap; }
+.btn.pilula { height: 44px; padding: 0 22px; border-radius: 999px; font-size: 14px; }
+
+.acesso-hero { position: relative; overflow: hidden; padding: 56px 0 72px;
+  background: radial-gradient(55% 70% at 75% 40%, rgba(31, 139, 255, .16), transparent 70%),
+              radial-gradient(40% 55% at 5% 100%, rgba(25, 227, 255, .14), transparent 70%); }
+.feixe { position: absolute; width: 120px; height: 1000px; transform: rotate(38deg); pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(25, 227, 255, .32) 50%, transparent); }
+.feixe.f1 { right: 6%; top: -470px; }
+.feixe.f2 { right: -4%; top: -380px; width: 56px; opacity: .6; }
+.feixe.f3 { left: -10%; bottom: -640px; width: 90px; opacity: .7; }
+.acesso-grade { position: relative; display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
+.sobretitulo { display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase; color: var(--azul-texto); }
+.acesso-chamada h2 { margin: 18px 0 0; font-size: clamp(28px, 3.4vw, 42px); font-weight: 800; line-height: 1.1; letter-spacing: -.025em; text-wrap: balance; }
+.acesso-chamada p { margin: 20px 0 0; font-size: 16px; line-height: 1.6; color: var(--text-2); max-width: 46ch; }
+.pilulas { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+.pilula-info { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-2); background: rgba(255, 255, 255, .7); border: 1px solid var(--border); padding: 7px 14px; border-radius: 999px; }
+.pilula-info i { width: 7px; height: 7px; border-radius: 50%; background: var(--ciano); box-shadow: 0 0 10px var(--ciano); }
+
+.acesso-palco { position: relative; display: grid; place-items: center; min-height: 500px; }
+.anel { position: absolute; width: min(500px, 100%); aspect-ratio: 1; border-radius: 50%; border: 2px solid var(--ciano);
+  box-shadow: 0 0 34px rgba(25, 227, 255, .45), inset 0 0 50px rgba(25, 227, 255, .14); }
+.anel.tracejado { width: min(560px, 110%); border: 1px dashed rgba(31, 139, 255, .35); box-shadow: none; animation: girar 70s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .anel.tracejado { animation: none; } }
+.acesso .caixa-acesso { position: relative; z-index: 1; width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 24px;
+  box-shadow: 0 30px 70px -30px rgba(7, 26, 60, .45), 0 0 0 6px rgba(255, 255, 255, .6); padding: 26px; display: flex; flex-direction: column; gap: 12px; }
+.acesso .caixa-acesso h1 { font-size: 19px; margin: 0; }
+.acesso .caixa-acesso form { display: flex; flex-direction: column; gap: 10px; }
+.acesso .caixa-acesso form[hidden], .acesso .abas-acesso[hidden] { display: none; }
+.acesso .caixa-acesso input { height: 46px; font-size: 16px; }
+.acesso .caixa-acesso .btn.pilula { height: 46px; }
+.acesso .caixa-acesso .tecl-par, .acesso .caixa-acesso .tecl-apagar { height: 42px; }
+.acesso .caixa-acesso .dica { font-size: 12px; color: var(--text-3); margin: 0; text-align: center; }
+.acesso .abas-acesso { display: flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 4px; }
+.acesso .abas-acesso button { flex: 1; background: none; border: 0; border-radius: 999px; padding: 8px; font: inherit; font-weight: 700; font-size: 13.5px; color: var(--text-2); cursor: pointer; }
+.acesso .abas-acesso button.ativa { background: var(--surface); color: var(--text); box-shadow: 0 1px 4px rgba(7, 26, 60, .12); }
+.acesso .quem { display: flex; justify-content: space-between; align-items: center; font-size: 13px; background: var(--surface-2); padding: 9px 12px; border-radius: 12px; }
+.acesso .sem-conta { font-size: 13px; color: var(--text-2); text-align: center; }
+.acesso .sem-conta .btn.link { font-weight: 700; }
+.acesso .dica-demo { font-size: 12px; background: var(--info-bg); border-radius: 12px; padding: 8px 10px; }
+
+.acesso-secao { padding: 72px 0; }
+.acesso-cab { margin-bottom: 36px; display: grid; gap: 14px; }
+.acesso-cab h2 { margin: 0; font-size: clamp(20px, 2.2vw, 27px); font-weight: 700; }
+.bento { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.ladrilho { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 22px; padding: 26px; background: var(--surface);
+  display: grid; gap: 10px; align-content: start; text-align: left; font: inherit; color: inherit; transition: transform .25s, box-shadow .25s, border-color .25s; }
+.ladrilho:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: #BFD6F5; }
+.ladrilho h3 { margin: 0; font-size: 15px; font-family: var(--fonte-titulo); font-weight: 700; }
+.ladrilho p { margin: 0; color: var(--text-2); font-size: 14px; }
+.ladrilho .ic { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: var(--azul-texto); background: var(--info-bg); border: 1px solid var(--border); }
+.ladrilho .ic svg { width: 22px; height: 22px; }
+.l-4 { grid-column: span 4; } .l-2 { grid-column: span 2; }
+.ladrilho.destaque { background: radial-gradient(90% 120% at 100% 0%, rgba(25, 227, 255, .22), transparent 60%), linear-gradient(160deg, #EAF4FF, #FFFFFF); }
+.ladrilho.destaque h3 { font-size: 18px; }
+.ladrilho.destaque p { max-width: 44ch; }
+.ladrilho .deco { position: absolute; right: -60px; bottom: -60px; width: 220px; height: 220px; border-radius: 50%; border: 2px solid rgba(25, 227, 255, .6); box-shadow: 0 0 30px rgba(25, 227, 255, .3); }
+.ladrilho-cta { cursor: pointer; border-color: #BFD6F5; }
+.ladrilho-cta .ic { background: var(--gradiente); color: #031029; border: 0; }
+.ladrilho-cta .vai { font-weight: 800; color: var(--azul-texto); font-size: 14px; }
+
+.acesso-seguranca { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.seg-grade { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }
+.seg-grade div { border-top: 2px solid var(--azul); padding-top: 18px; display: grid; gap: 8px; align-content: start; }
+.seg-grade h3 { margin: 0; font-size: 14.5px; font-family: var(--fonte-titulo); }
+.seg-grade p { margin: 0; color: var(--text-2); font-size: 14px; }
+
+.acesso-rodape { padding: 32px 0; color: var(--text-3); font-size: 13px; }
+.acesso-rodape .acesso-linha { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.acesso-rodape .slogan { margin-top: 8px; font-size: 10.5px; letter-spacing: .28em; text-transform: uppercase; color: var(--text-2); }
+
+body:has(.acesso) .faixa-demo { position: static; transform: none; max-width: none; border: 0; border-radius: 0; box-shadow: none; justify-content: center; padding: 5px 12px; font-size: 12px; background: var(--marinho); color: #C9D5EA; }
+body:has(.acesso) .faixa-demo .btn { height: 26px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .18); color: #fff; }
+
+@media (max-width: 1100px) { .acesso-acompanhar, .acesso-produto { display: none; } }
+@media (max-width: 960px) {
+  .acesso-grade { grid-template-columns: 1fr; }
+  .acesso-chamada { text-align: center; }
+  .acesso-chamada p { margin-inline: auto; }
+  .pilulas { justify-content: center; }
+  .acesso-palco { min-height: 0; padding: 24px 0; }
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .l-4, .l-2 { grid-column: span 2; }
+  .seg-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .acesso-nav { display: none; }
+  .acesso-topo .acesso-linha { justify-content: space-between; }
+  .acesso .caixa-acesso { width: 100%; }
+  .anel { display: none; }
+  .seg-grade { grid-template-columns: 1fr; }
+  .acesso-linha { padding: 0 16px; }
+}

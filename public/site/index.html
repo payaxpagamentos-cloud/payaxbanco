@@ -1,16 +1,816 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>PAY AX · O futuro em cada transação</title>
-  <meta name="description" content="PAY AX: conta digital para você e para a sua empresa, com PIX, pagamentos, transferências e crédito.">
-  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../css/style.css">
-  <link rel="stylesheet" href="../css/site.css">
-  <script type="module" src="js/site.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PAY AX · O futuro em cada transação</title>
+<meta name="description" content="PAY AX: conta digital PJ, PIX, boletos e conciliação automática.">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:"Manrope";src:url("../fonts/manrope.woff2") format("woff2");font-weight:200 800;font-display:swap}
+@font-face{font-family:"Unbounded";src:url("../fonts/unbounded.woff2") format("woff2");font-weight:200 900;font-display:swap}
+</style>
+<style>
+/* Layout: multi-page bank site (hash routes) in the logo's world — navy ground, cyan ring + diagonal beams; bento grids, live-flow diagrams, one calculator. Single dark theme by choice. */
+:root{
+  --n0:#030a1a; --n1:#061430; --n2:#0a1f45; --n3:#0f2a5c; --line:rgba(56,200,255,.16); --line2:rgba(56,200,255,.32);
+  --cyan:#19e3ff; --blue:#1f8bff; --ink:#eef6ff; --muted:#9ab0cf; --dim:#6a80a3; --ok:#3ef0a8;
+  --display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --wide:"Montserrat",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--n0)}
+body{background:var(--n0);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.6;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit}
+.wrap{max-width:1200px;margin:0 auto;padding-inline:24px}
+@media(max-width:480px){.wrap{padding-inline:16px}}
+.grad{background:linear-gradient(100deg,var(--blue),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+.eyebrow{font-family:var(--wide);font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--cyan);display:inline-block}
+h1,h2,h3{font-family:var(--display);line-height:1.12;text-wrap:balance;margin:0}
+h1{font-size:clamp(22px,2.9vw,36px);font-weight:800;letter-spacing:-.025em}
+h2{font-size:clamp(18px,2.1vw,25px);font-weight:700;letter-spacing:-.01em}
+h3{font-size:14.5px;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px;transition:transform .2s,box-shadow .2s,border-color .2s,color .2s;cursor:pointer;border:0;white-space:nowrap}
+.btn-primary{background:linear-gradient(100deg,var(--blue),var(--cyan));color:var(--n0)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 40px -8px rgba(25,227,255,.6)}
+.btn-ghost{border:1px solid var(--line2);background:rgba(255,255,255,.02)}
+.btn-ghost:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn[disabled]{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:6px}
+.arrow{width:18px;height:18px}
+
+/* ===== TOP BAR + NAV ===== */
+.topbar{background:var(--n1);border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.topbar .wrap{display:flex;justify-content:space-between;gap:16px;padding-block:8px}
+.topbar .seg{display:flex;gap:18px}
+.topbar .seg a[aria-current]{color:var(--cyan);font-weight:700}
+.topbar .slog{font-family:var(--wide);letter-spacing:.24em;text-transform:uppercase;font-size:10.5px}
+@media(max-width:640px){.topbar .slog{display:none}}
+header.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:rgba(3,10,26,.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:28px;height:74px}
+.wordmark{font-family:var(--display);font-weight:800;font-size:21px;letter-spacing:-.02em;display:inline-flex;align-items:baseline;flex:none}
+.wordmark .ax{margin-left:.18em}
+.menu{display:flex;gap:4px;list-style:none;margin:0;padding:0;flex:1}
+.menu>li{position:relative}
+.menu>li>a,.menu>li>button{display:flex;align-items:center;gap:6px;padding:10px 12px;border-radius:10px;font-size:13.5px;font-weight:600;color:var(--muted);background:none;border:0;cursor:pointer}
+.menu>li>a:hover,.menu>li>button:hover,.menu>li.open>button,.menu a.active{color:var(--ink);background:rgba(25,227,255,.06)}
+.menu a.active{color:var(--cyan)}
+.menu .chev{width:12px;height:12px;transition:transform .2s}
+.menu li.open .chev{transform:rotate(180deg)}
+.mega{position:absolute;top:calc(100% + 12px);left:-20px;width:min(680px,90vw);background:rgba(6,20,48,.97);border:1px solid var(--line2);border-radius:20px;padding:22px;box-shadow:0 40px 80px -30px rgba(0,0,0,.9),0 0 0 1px rgba(25,227,255,.05);display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;opacity:0;visibility:hidden;transform:translateY(-6px);transition:.18s}
+.mega.small{width:340px;grid-template-columns:1fr}
+.menu li.open .mega{opacity:1;visibility:visible;transform:none}
+.mega h4{grid-column:span 1;margin:0 0 6px;font-family:var(--wide);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);font-weight:500}
+.mega .col{display:grid;gap:2px;align-content:start}
+.mega a{display:grid;grid-template-columns:34px 1fr;gap:12px;padding:10px;border-radius:12px;align-items:center}
+.mega a:hover{background:rgba(25,227,255,.07)}
+.mega a .mi{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(25,227,255,.09);color:var(--cyan)}
+.mega a b{display:block;font-size:14px}
+.mega a small{display:block;color:var(--dim);font-size:12.5px;line-height:1.35}
+.nav-cta{display:flex;gap:10px;flex:none}
+.nav-cta .btn{padding:10px 18px;font-size:14px}
+.burger{display:none;background:none;border:1px solid var(--line2);border-radius:10px;width:44px;height:44px;place-items:center;cursor:pointer}
+@media(max-width:1080px){
+  .menu{display:none}
+  .burger{display:grid;margin-left:auto}
+  .nav-cta .btn-ghost{display:none}
+}
+@media(max-width:480px){.nav-cta .btn-primary{display:none}}
+.drawer{position:fixed;inset:0;z-index:60;background:rgba(3,10,26,.97);backdrop-filter:blur(10px);overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 30px)}
+.drawer .dh{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.drawer h4{font-family:var(--wide);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim);font-weight:500;margin:22px 0 8px}
+.drawer a.dl{display:block;padding:12px 0;border-bottom:1px solid var(--line);font-weight:600}
+.drawer .btns{display:grid;gap:10px;margin-top:26px}
+
+/* ===== PAGES ===== */
+.page{animation:fadein .45s ease both}
+@keyframes fadein{from{opacity:.001;transform:translateY(10px)}}
+section{padding-block:80px}
+.sec-head{display:grid;gap:16px;max-width:740px;margin-bottom:54px}
+.sec-head p{color:var(--muted);font-size:14.5px}
+.center{margin-inline:auto;text-align:center;justify-items:center}
+
+/* hero */
+.hero{position:relative;overflow:hidden;padding-block:64px 80px}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(55% 60% at 72% 42%,rgba(31,139,255,.24),transparent 70%),radial-gradient(40% 50% at 8% 95%,rgba(25,227,255,.10),transparent 70%);pointer-events:none}
+.beam{position:absolute;width:120px;height:1000px;transform:rotate(38deg);background:linear-gradient(180deg,transparent,rgba(25,227,255,.5) 50%,transparent);opacity:.5;pointer-events:none}
+.beam.b1{right:5%;top:-460px}.beam.b2{right:-5%;top:-360px;width:56px;opacity:.3}.beam.b3{left:-10%;bottom:-620px;width:90px;opacity:.35}
+.glow{position:absolute;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(25,227,255,.13),transparent 65%);pointer-events:none;transform:translate(-50%,-50%);left:70%;top:40%;transition:left .5s ease-out,top .5s ease-out}
+.hero .wrap{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+.hero .lead{font-size:15px;color:var(--muted);max-width:52ch;margin-top:22px}
+.ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px}
+.pills{display:flex;flex-wrap:wrap;gap:10px;margin-top:34px}
+.pill{font-size:13px;font-weight:600;color:var(--muted);border:1px solid var(--line);padding:7px 14px;border-radius:999px;display:inline-flex;gap:8px;align-items:center}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+@media(max-width:960px){.hero .wrap{grid-template-columns:1fr}}
+
+/* stage: ring + card + feed */
+.stage{position:relative;aspect-ratio:1;max-width:500px;width:100%;justify-self:center}
+.stage .ring{position:absolute;inset:6%;border-radius:50%;border:2px solid var(--cyan);box-shadow:0 0 34px rgba(25,227,255,.55),inset 0 0 50px rgba(25,227,255,.2)}
+.stage .ring.dash{inset:0;border:1px dashed rgba(25,227,255,.25);box-shadow:none;animation:spin 70s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.card3d{position:absolute;left:50%;top:44%;width:74%;aspect-ratio:1.586;transform:translate(-50%,-50%) perspective(900px) rotateX(var(--rx,8deg)) rotateY(var(--ry,-14deg));transition:transform .25s ease-out;border-radius:22px;padding:7% 7.5%;display:flex;flex-direction:column;justify-content:space-between;background:
+  linear-gradient(125deg,rgba(255,255,255,.14),transparent 40%),
+  repeating-linear-gradient(38deg,transparent 0 38px,rgba(25,227,255,.07) 38px 70px),
+  linear-gradient(140deg,#0c2b66,#061430 60%,#041026);border:1px solid rgba(25,227,255,.45);box-shadow:0 40px 80px -30px rgba(0,0,0,.9),0 0 50px -10px rgba(25,227,255,.35)}
+.card3d .row{display:flex;justify-content:space-between;align-items:center}
+.card3d .wordmark{font-size:clamp(16px,2.6vw,24px)}
+.chip-ic{width:15%;aspect-ratio:1.3;border-radius:6px;background:linear-gradient(135deg,#b9f6ff,#3aa7d8);opacity:.9}
+.card3d .num{font-family:var(--mono);letter-spacing:.14em;font-size:clamp(12px,1.8vw,16px);color:#cfe9ff}
+.card3d .meta{font-size:11px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase;font-family:var(--wide)}
+.feed{position:absolute;left:-4%;right:-4%;bottom:2%;display:grid;gap:10px}
+.toast{display:flex;align-items:center;gap:12px;background:rgba(6,20,48,.9);border:1px solid var(--line2);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:14px;padding:11px 14px;font-size:13px;box-shadow:0 20px 40px -20px rgba(0,0,0,.9);animation:slidein .5s ease both}
+.toast .ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:rgba(25,227,255,.12);color:var(--cyan);flex:none}
+.toast .t{flex:1;min-width:0}
+.toast b{display:block;font-size:13.5px}
+.toast small{color:var(--dim)}
+.toast .v{font-family:var(--mono);color:var(--cyan);white-space:nowrap}
+@keyframes slidein{from{opacity:.001;transform:translateY(12px) scale(.98)}}
+.sim{position:absolute;right:2%;top:2%;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);font-family:var(--wide)}
+
+/* ticker */
+.ticker{border-block:1px solid var(--line);background:var(--n1);overflow:hidden}
+.ticker .track{display:flex;gap:56px;padding-block:18px;white-space:nowrap;width:max-content;animation:tick 42s linear infinite;font-family:var(--wide);letter-spacing:.3em;text-transform:uppercase;font-size:12.5px;color:var(--muted)}
+.ticker .track span::after{content:"◆";color:var(--cyan);margin-left:56px;font-size:9px;vertical-align:middle}
+@keyframes tick{to{transform:translateX(-50%)}}
+
+/* bento */
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:16px}
+.tile{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:22px;padding:28px;background:linear-gradient(160deg,rgba(15,42,92,.55),rgba(6,20,48,.6));display:grid;gap:12px;align-content:start;min-width:0;transition:border-color .3s,transform .3s}
+.tile:hover{border-color:var(--line2);transform:translateY(-3px)}
+.tile p{color:var(--muted);font-size:14px}
+.tile .ic{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;color:var(--cyan);background:rgba(25,227,255,.1);border:1px solid var(--line)}
+.tile .go{margin-top:6px;font-weight:700;font-size:14px;color:var(--cyan);display:inline-flex;gap:6px;align-items:center}
+.t-4{grid-column:span 4}.t-2{grid-column:span 2}.t-3{grid-column:span 3}
+.tile.hl{background:radial-gradient(90% 120% at 100% 0%,rgba(25,227,255,.18),transparent 60%),linear-gradient(160deg,var(--n3),var(--n1))}
+.tile .deco{position:absolute;right:-60px;bottom:-60px;width:220px;height:220px;border-radius:50%;border:2px solid rgba(25,227,255,.35);box-shadow:0 0 30px rgba(25,227,255,.25)}
+@media(max-width:900px){.bento{grid-template-columns:1fr 1fr}.t-4,.t-2,.t-3{grid-column:span 2}}
+@media(min-width:600px) and (max-width:900px){.t-2,.t-3{grid-column:span 1}}
+
+/* two-path (plataforma vs API) */
+.paths{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.path{border-radius:24px;padding:34px;border:1px solid var(--line);background:var(--n1);display:grid;gap:14px;align-content:start}
+.path ul{list-style:none;padding:0;margin:6px 0 10px;display:grid;gap:10px}
+.path li{display:flex;gap:10px;color:var(--ink);font-size:15px}
+.path li::before{content:"";flex:none;width:18px;height:18px;margin-top:3px;border-radius:50%;background:radial-gradient(circle,var(--cyan) 30%,transparent 34%),rgba(25,227,255,.12);border:1px solid rgba(25,227,255,.4)}
+.path .ctas{margin-top:8px}
+@media(max-width:800px){.paths{grid-template-columns:1fr}}
+
+/* split sections */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.split .sec-head{margin-bottom:0}
+@media(max-width:900px){.split{grid-template-columns:1fr;gap:40px}}
+.checks{list-style:none;padding:0;margin:26px 0 0;display:grid;gap:12px}
+.checks li{display:flex;gap:12px;font-weight:500}
+.checks li::before{content:"";flex:none;width:20px;height:20px;margin-top:3px;border-radius:50%;background:radial-gradient(circle,var(--cyan) 30%,transparent 34%),rgba(25,227,255,.12);border:1px solid rgba(25,227,255,.4)}
+
+/* panel mock */
+.panel{border-radius:26px;padding:26px;background:linear-gradient(160deg,var(--n2),var(--n1));border:1px solid var(--line);box-shadow:0 40px 80px -40px rgba(31,139,255,.45);display:grid;gap:20px;min-width:0}
+.panel .top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.panel .top .wordmark{font-size:17px}
+.ex{font-size:10.5px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase;font-family:var(--wide)}
+.bal small{color:var(--muted);font-size:13px}
+.bal .v{font-family:var(--mono);font-size:clamp(24px,4vw,34px);font-variant-numeric:tabular-nums;margin-top:2px}
+.bars{display:flex;align-items:flex-end;gap:8px;height:86px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.bars span{flex:1;border-radius:6px 6px 2px 2px;background:linear-gradient(var(--cyan),rgba(31,139,255,.3))}
+.tx div{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px}
+.tx div:last-child{border-bottom:0}
+.tx .m{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tx .in{color:var(--cyan)}
+.tx small{display:block;color:var(--dim);font-size:12px}
+
+/* features grid */
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:22px;overflow:hidden}
+.fgrid>div{background:var(--n0);padding:30px 28px;display:grid;gap:10px;align-content:start;min-width:0}
+.fgrid>div:hover{background:var(--n1)}
+.fgrid p{color:var(--muted);font-size:14px}
+.fgrid .ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:var(--cyan);background:rgba(25,227,255,.1);border:1px solid var(--line)}
+@media(max-width:900px){.fgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.fgrid{grid-template-columns:1fr}}
+
+/* page hero (inner) */
+.phero{position:relative;overflow:hidden;padding-block:60px 54px;border-bottom:1px solid var(--line);background:radial-gradient(60% 90% at 85% 0%,rgba(31,139,255,.2),transparent 70%)}
+.phero::after{content:"";position:absolute;right:-140px;top:-160px;width:440px;height:440px;border-radius:50%;border:2px solid rgba(25,227,255,.45);box-shadow:0 0 40px rgba(25,227,255,.3);pointer-events:none}
+.phero .wrap{position:relative;display:grid;gap:18px;max-width:1200px}
+.phero p{font-size:15px;color:var(--muted);max-width:60ch}
+.crumbs{font-size:13px;color:var(--dim)}
+.crumbs a:hover{color:var(--cyan)}
+
+/* integration diagram */
+.diagram{border:1px solid var(--line);border-radius:26px;background:var(--n1);padding:clamp(20px,4vw,44px);overflow-x:auto}
+.diagram svg{display:block;width:100%;min-width:620px;height:auto}
+.node rect{fill:var(--n0);stroke:rgba(56,200,255,.4)}
+.node.main rect{stroke:var(--cyan);filter:drop-shadow(0 0 10px rgba(25,227,255,.45))}
+.node text{fill:var(--ink);font-family:var(--body);font-weight:700;font-size:15px}
+.node text.s{fill:var(--dim);font-weight:500;font-size:12px}
+.wire{stroke:rgba(56,200,255,.35);stroke-width:2;fill:none;stroke-dasharray:5 6}
+.pulse{fill:var(--cyan);filter:drop-shadow(0 0 6px var(--cyan))}
+.partner{display:flex;align-items:center;gap:22px;flex-wrap:wrap;border:1px solid var(--line2);border-radius:22px;padding:24px 28px;background:linear-gradient(120deg,var(--n2),var(--n1))}
+.plogo{display:flex;align-items:center;gap:14px}
+.plogo .box{min-width:150px;height:64px;border-radius:14px;background:#fff;color:#0b1c3a;display:grid;place-items:center;padding:0 18px;font-family:var(--body);font-weight:800;font-size:20px;letter-spacing:.02em}
+.plus{font-family:var(--display);font-size:26px;color:var(--cyan)}
+.partner .txt{flex:1;min-width:220px}
+.partner .txt small{color:var(--dim);display:block;margin-top:4px}
+.badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--ok);background:rgba(62,240,168,.08);border:1px solid rgba(62,240,168,.3);padding:5px 12px;border-radius:999px}
+.badge i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.stp{border:1px solid var(--line);border-radius:20px;padding:24px;background:var(--n1);display:grid;gap:10px;align-content:start}
+.stp .n{font-family:var(--mono);color:var(--cyan);font-size:13px;width:40px;height:40px;border-radius:50%;border:1.5px solid var(--cyan);display:grid;place-items:center;box-shadow:0 0 14px rgba(25,227,255,.3)}
+.stp p{color:var(--muted);font-size:13.5px}
+@media(max-width:900px){.steps{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.steps{grid-template-columns:1fr}}
+.soon{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.soon div{border:1px dashed var(--line2);border-radius:18px;padding:22px;color:var(--muted);display:grid;gap:6px}
+.soon b{color:var(--ink)}
+@media(max-width:800px){.soon{grid-template-columns:1fr}}
+
+/* calculator */
+.calc{border:1px solid var(--line2);border-radius:26px;padding:clamp(22px,4vw,40px);background:radial-gradient(80% 100% at 100% 0%,rgba(25,227,255,.14),transparent 60%),var(--n1);display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+.field{display:grid;gap:8px;margin-bottom:22px}
+.field label{font-weight:700;font-size:14.5px;display:flex;justify-content:space-between;gap:12px}
+.field label output{font-family:var(--mono);color:var(--cyan)}
+input[type=range]{width:100%;accent-color:var(--cyan)}
+.result{display:grid;gap:18px}
+.result .big{font-family:var(--display);font-size:clamp(28px,3.6vw,38px);font-weight:800;line-height:1}
+.result small{color:var(--muted);font-size:14px}
+.result .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.result .row2 div{border:1px solid var(--line);border-radius:14px;padding:14px}
+.result .row2 b{font-family:var(--mono);font-size:20px;display:block}
+@media(max-width:860px){.calc{grid-template-columns:1fr}}
+
+/* code */
+.code{border:1px solid var(--line2);border-radius:20px;background:#020716;overflow:hidden;min-width:0}
+.code .tabs{display:flex;gap:4px;padding:10px;border-bottom:1px solid var(--line);align-items:center}
+.code .tabs button{background:none;border:0;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:700;color:var(--dim);cursor:pointer}
+.code .tabs button[aria-selected=true]{background:rgba(25,227,255,.1);color:var(--cyan)}
+.code .tabs .ex{margin-left:auto}
+.code pre{margin:0;padding:22px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.7;color:#cfe3ff}
+.code .k{color:#ff9bd5}.code .s{color:var(--ok)}.code .c{color:var(--dim)}.code .f{color:var(--cyan)}
+
+/* access page */
+.access{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.acard{border-radius:24px;padding:34px;border:1px solid var(--line2);background:linear-gradient(160deg,var(--n2),var(--n1));display:grid;gap:14px;align-content:start;position:relative;overflow:hidden}
+.acard .ic{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;color:var(--cyan);background:rgba(25,227,255,.1);border:1px solid var(--line)}
+.acard p{color:var(--muted)}
+.acard .note{font-size:13px;color:var(--dim)}
+@media(max-width:800px){.access{grid-template-columns:1fr}}
+.tips{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}
+.tips div{border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;gap:6px}
+.tips p{color:var(--muted);font-size:14.5px}
+@media(max-width:800px){.tips{grid-template-columns:1fr}}
+
+/* docs list */
+.doclist{display:grid;grid-template-columns:1fr 1fr;gap:12px;list-style:none;padding:0;margin:0}
+.doclist li{border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;gap:12px;align-items:flex-start;font-size:15px}
+.doclist li span{font-family:var(--mono);color:var(--cyan);font-size:12px;margin-top:3px}
+@media(max-width:700px){.doclist{grid-template-columns:1fr}}
+
+/* FAQ */
+details{border-bottom:1px solid var(--line);padding-block:20px}
+details:first-of-type{border-top:1px solid var(--line)}
+summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:20px;font-weight:700;font-size:14.5px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:var(--mono);color:var(--cyan);font-size:22px;line-height:1;transition:transform .25s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{color:var(--muted);margin-top:10px;max-width:64ch}
+.faqwrap{display:grid;grid-template-columns:.8fr 1.2fr;gap:60px}
+@media(max-width:900px){.faqwrap{grid-template-columns:1fr;gap:28px}}
+.search{display:flex;align-items:center;gap:10px;border:1px solid var(--line2);border-radius:999px;padding:6px 6px 6px 20px;background:var(--n1);max-width:560px}
+.search input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:16px;padding:8px 0}
+
+/* security + about */
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+.sgrid div{border-top:2px solid var(--cyan);padding-top:20px;display:grid;gap:8px}
+.sgrid p{color:var(--muted);font-size:14px}
+@media(max-width:900px){.sgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.sgrid{grid-template-columns:1fr}}
+.values{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.values div{border:1px solid var(--line);border-radius:20px;padding:26px;display:grid;gap:8px;background:var(--n1)}
+.values p{color:var(--muted);font-size:14px}
+@media(max-width:800px){.values{grid-template-columns:1fr}}
+.logo-orb{position:relative;aspect-ratio:1;max-width:420px;width:100%;justify-self:center}
+.logo-orb img{width:100%;height:100%;border-radius:50%;object-fit:cover;box-shadow:0 0 60px -10px rgba(25,227,255,.5)}
+
+/* CTA */
+.cta-box{position:relative;overflow:hidden;border-radius:30px;padding:clamp(34px,6vw,72px);border:1px solid rgba(25,227,255,.35);background:radial-gradient(80% 120% at 100% 0%,rgba(25,227,255,.22),transparent 60%),linear-gradient(135deg,var(--n2),var(--n0));display:grid;grid-template-columns:1.3fr .7fr;gap:36px;align-items:center}
+.cta-box::after{content:"";position:absolute;right:-120px;top:-120px;width:380px;height:380px;border-radius:50%;border:2px solid rgba(25,227,255,.5);box-shadow:0 0 40px rgba(25,227,255,.35);pointer-events:none}
+.cta-box p{color:var(--muted);margin-top:14px;font-size:14.5px;max-width:48ch}
+.cta-box .col{display:flex;flex-direction:column;gap:12px;position:relative;z-index:1}
+@media(max-width:800px){.cta-box{grid-template-columns:1fr}}
+.contact{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.contact div{border:1px solid var(--line);border-radius:18px;padding:22px;display:grid;gap:6px;background:var(--n1)}
+.contact small{color:var(--dim)}
+.contact b{font-size:16px}
+@media(max-width:800px){.contact{grid-template-columns:1fr}}
+
+/* footer */
+footer{border-top:1px solid var(--line);background:var(--n1);padding-block:60px 30px;color:var(--muted);font-size:14px}
+.fcols{display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:32px}
+.fcols h5{margin:0 0 14px;font-family:var(--wide);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink);font-weight:500}
+.fcols ul{list-style:none;padding:0;margin:0;display:grid;gap:9px}
+.fcols a:hover{color:var(--cyan)}
+.fcols .slogan{font-family:var(--wide);letter-spacing:.28em;text-transform:uppercase;font-size:10.5px;margin-top:10px}
+.fbottom{margin-top:44px;padding-top:22px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;color:var(--dim);font-size:13px}
+@media(max-width:900px){.fcols{grid-template-columns:1fr 1fr}.fcols>div:first-child{grid-column:span 2}}
+
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body>
-  <div id="app"></div>
+<div class="topbar"><div class="wrap">
+  <div class="seg"><a href="#inicio" aria-current="true">Para empresas</a><a href="#provedores">Para provedores</a></div>
+  <div class="slog">O futuro em cada transação.</div>
+</div></div>
+
+<header class="nav">
+  <div class="wrap">
+    <a href="#inicio" class="wordmark" aria-label="PAY AX, início"><span>PAY</span><span class="ax grad">AX</span></a>
+    <ul class="menu" id="menu">
+      <li>
+        <button type="button" aria-expanded="false" data-drop>Soluções <svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg></button>
+        <div class="mega">
+          <div class="col">
+            <h4>Pela plataforma</h4>
+            <a href="#conta"><span class="mi">$</span><span><b>Conta Digital PJ</b><small>Saldo, extrato e pagamentos</small></span></a>
+            <a href="#pix"><span class="mi">◆</span><span><b>PIX</b><small>QR Code estático e dinâmico</small></span></a>
+            <a href="#boletos"><span class="mi">▥</span><span><b>Boletos com PIX</b><small>Boleto registrado com QR Code</small></span></a>
+            <a href="#cobranca"><span class="mi">↻</span><span><b>Gestão de cobrança</b><small>Conciliação e baixa automática</small></span></a>
+          </div>
+          <div class="col">
+            <h4>Por API</h4>
+            <a href="#api-pix"><span class="mi">{ }</span><span><b>API PIX</b><small>Cobranças e webhooks</small></span></a>
+            <a href="#api-boletos"><span class="mi">{ }</span><span><b>API Boletos</b><small>Emissão e consulta</small></span></a>
+            <a href="#baas"><span class="mi">⬡</span><span><b>Banking as a Service</b><small>Serviços financeiros com a sua marca</small></span></a>
+          </div>
+        </div>
+      </li>
+      <li>
+        <button type="button" aria-expanded="false" data-drop>Segmentos <svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg></button>
+        <div class="mega small"><div class="col">
+          <a href="#provedores"><span class="mi">⌁</span><span><b>Provedores de internet</b><small>Cobrança recorrente com baixa no IXC</small></span></a>
+          <a href="#inicio"><span class="mi">▦</span><span><b>Empresas</b><small>Conta PJ e recebimentos</small></span></a>
+        </div></div>
+      </li>
+      <li><a href="#integracao" data-nav="integracao">Integração</a></li>
+      <li><a href="#desenvolvedores" data-nav="desenvolvedores">Desenvolvedores</a></li>
+      <li><a href="#ajuda" data-nav="ajuda">Ajuda</a></li>
+      <li><a href="#sobre" data-nav="sobre">Sobre</a></li>
+    </ul>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="#acessar">Acessar minha conta</a>
+      <a class="btn btn-primary" href="#abrir-conta">Abra sua conta</a>
+    </div>
+    <button class="burger" id="burger" type="button" aria-label="Abrir menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </div>
+</header>
+
+<div class="drawer" id="drawer" hidden>
+  <div class="dh"><span class="wordmark"><span>PAY</span><span class="ax grad">AX</span></span><button class="burger" style="display:grid" id="closeDrawer" type="button" aria-label="Fechar menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <h4>Soluções</h4>
+  <a class="dl" href="#conta">Conta Digital PJ</a><a class="dl" href="#pix">PIX</a><a class="dl" href="#boletos">Boletos com PIX</a><a class="dl" href="#cobranca">Gestão de cobrança</a><a class="dl" href="#baas">Banking as a Service</a>
+  <h4>Navegar</h4>
+  <a class="dl" href="#provedores">Provedores de internet</a><a class="dl" href="#integracao">Integração</a><a class="dl" href="#desenvolvedores">Desenvolvedores</a><a class="dl" href="#ajuda">Ajuda</a><a class="dl" href="#sobre">Sobre</a>
+  <div class="btns"><a class="btn btn-primary" href="#abrir-conta">Abra sua conta</a><a class="btn btn-ghost" href="#acessar">Acessar minha conta</a></div>
+</div>
+
+<main id="app">
+
+<!-- ================= INÍCIO ================= -->
+<div class="page" data-page="inicio">
+  <section class="hero" id="hero">
+    <div class="beam b1"></div><div class="beam b2"></div><div class="beam b3"></div><div class="glow" id="glow"></div>
+    <div class="wrap">
+      <div>
+        <span class="eyebrow">Conta digital PJ · PIX · Boletos</span>
+        <h1 style="margin-top:20px">A conta que <span class="grad">recebe, concilia e dá baixa</span> por você.</h1>
+        <p class="lead">A PAY AX junta conta PJ, PIX, boletos e integração com o seu sistema de gestão. O cliente paga, o dinheiro entra e a fatura se resolve sozinha.</p>
+        <div class="ctas">
+          <a class="btn btn-primary" href="#abrir-conta">Abra sua conta <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          <a class="btn btn-ghost" href="#integracao">Ver integração com o IXC</a>
+        </div>
+        <div class="pills"><span class="pill"><i></i>PIX instantâneo</span><span class="pill"><i></i>Boleto com QR Code</span><span class="pill"><i></i>Baixa automática no IXC</span></div>
+      </div>
+      <div class="stage" id="stage" aria-hidden="true">
+        <div class="ring dash"></div><div class="ring"></div>
+        <span class="sim">Simulação</span>
+        <div class="card3d" id="card">
+          <div class="row"><span class="wordmark"><span>PAY</span><span class="ax grad">AX</span></span><span class="meta">Empresas</span></div>
+          <div class="chip-ic"></div>
+          <div class="row"><span class="num">•••• •••• •••• 2026</span><span class="meta">PJ</span></div>
+        </div>
+        <div class="feed" id="feed"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ticker" aria-hidden="true"><div class="track">
+    <span>Conta digital PJ</span><span>PIX</span><span>Boletos registrados</span><span>Integração IXC Provedor</span><span>Conciliação automática</span><span>API aberta</span><span>Banking as a Service</span>
+    <span>Conta digital PJ</span><span>PIX</span><span>Boletos registrados</span><span>Integração IXC Provedor</span><span>Conciliação automática</span><span>API aberta</span><span>Banking as a Service</span>
+  </div></div>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Soluções</span><h2>Uma plataforma. <span class="grad">Todo o ciclo do dinheiro.</span></h2><p>Da emissão da cobrança até o saldo na conta, sem planilha e sem conferência manual.</p></div>
+      <div class="bento">
+        <a class="tile t-4 hl" href="#cobranca"><span class="deco"></span><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M8 12l3 3 5-6"/></svg></span><h3 style="font-size:16px">Conciliação e baixa automática</h3><p style="max-width:44ch">Cada pagamento é identificado pela fatura e baixado no seu sistema. A equipe para de digitar comprovante.</p><span class="go">Conhecer →</span></a>
+        <a class="tile t-2" href="#pix"><span class="ic">◆</span><h3>PIX</h3><p>QR Code dinâmico por fatura, confirmação na hora.</p><span class="go">Ver PIX →</span></a>
+        <a class="tile t-2" href="#boletos"><span class="ic">▥</span><h3>Boletos com PIX</h3><p>Boleto registrado com QR Code no mesmo documento.</p><span class="go">Ver boletos →</span></a>
+        <a class="tile t-2" href="#conta"><span class="ic">$</span><h3>Conta Digital PJ</h3><p>Extrato em tempo real, PIX, TED e pagamentos.</p><span class="go">Ver conta →</span></a>
+        <a class="tile t-2" href="#desenvolvedores"><span class="ic">{ }</span><h3>API e BaaS</h3><p>Integre pagamentos ou ofereça serviços com a sua marca.</p><span class="go">Documentação →</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Como usar</span><h2>Escolha o seu caminho.</h2></div>
+      <div class="paths">
+        <div class="path"><h3 style="font-size:15.5px">Pela plataforma PAY AX</h3><p class="muted">Para quem quer começar a receber sem desenvolver nada.</p>
+          <ul><li>Emita cobranças por PIX e boleto</li><li>Acompanhe recebimentos no painel</li><li>Integre com o IXC Provedor em poucos passos</li></ul>
+          <div class="ctas"><a class="btn btn-primary" href="#abrir-conta">Abra sua conta</a></div></div>
+        <div class="path"><h3 style="font-size:15.5px">Pela API</h3><p class="muted">Para quem quer levar pagamentos para dentro do próprio sistema.</p>
+          <ul><li>API PIX e API Boletos</li><li>Webhooks de pagamento em tempo real</li><li>Ambiente de testes para a sua equipe</li></ul>
+          <div class="ctas"><a class="btn btn-ghost" href="#desenvolvedores">Ver documentação</a></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="calc-sec" style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Calculadora</span><h2>Quanto tempo a baixa manual <span class="grad">custa para você?</span></h2><p>Ajuste os números da sua operação e veja o tempo que a conciliação automática devolve para a equipe.</p></div>
+      <div class="calc">
+        <div>
+          <div class="field"><label for="c-fat">Faturas pagas por mês <output id="o-fat">3.000</output></label><input id="c-fat" type="range" min="200" max="30000" step="100" value="3000"></div>
+          <div class="field"><label for="c-min">Minutos para conferir e baixar cada uma <output id="o-min">1,5 min</output></label><input id="c-min" type="range" min="0.5" max="5" step="0.5" value="1.5"></div>
+          <div class="field" style="margin-bottom:0"><label for="c-hora">Custo da hora da equipe <output id="o-hora">R$ 25</output></label><input id="c-hora" type="range" min="10" max="100" step="5" value="25"></div>
+        </div>
+        <div class="result">
+          <small>Horas por mês gastas com baixa manual</small>
+          <div class="big grad" id="r-horas">75 h</div>
+          <div class="row2">
+            <div><small>Dias de trabalho (8 h)</small><b id="r-dias">9,4</b></div>
+            <div><small>Custo mensal</small><b id="r-custo">R$ 1.875</b></div>
+          </div>
+          <small>Estimativa com base nos números informados. Com a baixa automática, esse trabalho sai da rotina da equipe.</small>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="partner">
+        <div class="plogo"><span class="wordmark" style="font-size:28px"><span>PAY</span><span class="ax grad">AX</span></span><span class="plus">+</span><span class="box" data-partner-logo>IXC Provedor</span></div>
+        <div class="txt"><span class="badge"><i></i>Integração disponível</span><h3 style="margin-top:10px;font-size:15.5px">Integrada ao IXC Provedor, da IXC Soft</h3><small>Boletos pela carteira de cobrança do IXC, PIX por fatura e baixa automática.</small></div>
+        <a class="btn btn-primary" href="#integracao">Ver integração</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Segurança</span><h2>Seu dinheiro protegido <span class="grad">em cada etapa.</span></h2></div>
+      <div class="sgrid">
+        <div><h3>Criptografia</h3><p>Dados e transações trafegam protegidos de ponta a ponta.</p></div>
+        <div><h3>Acesso seguro</h3><p>Autenticação em dois fatores e permissões por usuário.</p></div>
+        <div><h3>Monitoramento</h3><p>Acompanhamento contínuo para identificar movimentos suspeitos.</p></div>
+        <div><h3>LGPD</h3><p>Dados pessoais tratados conforme a Lei Geral de Proteção de Dados.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0"><div class="wrap" data-cta></div></section>
+</div>
+
+<!-- ================= SOLUÇÕES ================= -->
+<div class="page" data-page="solucoes" hidden>
+  <div class="phero"><div class="wrap"><div class="crumbs"><a href="#inicio">Início</a> / Soluções</div><span class="eyebrow">Soluções PAY AX</span><h1>Receber bem é <span class="grad">o começo de tudo.</span></h1><p>Conta, PIX, boletos e gestão de cobrança trabalhando juntos, na plataforma ou pela API.</p></div></div>
+
+  <section id="conta">
+    <div class="wrap split">
+      <div class="panel" aria-label="Exemplo ilustrativo do painel da conta">
+        <div class="top"><span class="wordmark"><span>PAY</span><span class="ax grad">AX</span></span><span class="ex">Exemplo ilustrativo</span></div>
+        <div class="bal"><small>Recebido hoje</small><div class="v">R$ 18.472,30</div></div>
+        <div class="bars" aria-hidden="true"><span style="height:38%"></span><span style="height:52%"></span><span style="height:45%"></span><span style="height:70%"></span><span style="height:58%"></span><span style="height:84%"></span><span style="height:100%"></span></div>
+        <div class="tx">
+          <div><span>PIX · Fatura #20841<small>Baixada no IXC</small></span><span class="m in">+ R$ 99,90</span></div>
+          <div><span>Boleto · Fatura #20796<small>Baixado no IXC</small></span><span class="m in">+ R$ 129,90</span></div>
+          <div><span>Transferência enviada<small>Fornecedor</small></span><span class="m">− R$ 2.300,00</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="sec-head"><span class="eyebrow">Conta Digital PJ</span><h2>Uma conta para <span class="grad">quem recebe todo mês.</span></h2><p>Acompanhe cada entrada, pague fornecedores e tenha o fluxo de caixa sempre à vista.</p></div>
+        <ul class="checks"><li>Extrato em tempo real com cliente e fatura identificados</li><li>PIX, TED e pagamento de contas</li><li>Usuários com permissões diferentes</li><li>Relatórios para o contador</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="pix" style="background:var(--n1);border-block:1px solid var(--line)">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">PIX</span><h2>PIX feito para <span class="grad">cobrança recorrente.</span></h2><p>Cada fatura com o seu QR Code. Quando o cliente paga, você sabe na hora quem pagou e o quê.</p></div>
+      <div class="fgrid">
+        <div><span class="ic">◆</span><h3>QR Code dinâmico</h3><p>Valor, vencimento e identificação da fatura dentro do código.</p></div>
+        <div><span class="ic">⚡</span><h3>Confirmação instantânea</h3><p>O pagamento aparece no extrato em segundos, a qualquer hora.</p></div>
+        <div><span class="ic">↺</span><h3>Devolução simples</h3><p>Estorne um PIX pelo painel quando precisar.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="boletos">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Boletos com PIX</span><h2>O cliente escolhe <span class="grad">como quer pagar.</span></h2><p>Boleto registrado com QR Code PIX no mesmo documento. Quem prefere o código de barras paga no banco; quem prefere PIX paga na hora.</p></div>
+      <div class="fgrid">
+        <div><span class="ic">▥</span><h3>Boleto registrado</h3><p>Emissão individual ou em lote, com juros, multa e desconto.</p></div>
+        <div><span class="ic">◆</span><h3>QR Code no boleto</h3><p>Pagamento por PIX com compensação imediata.</p></div>
+        <div><span class="ic">⌁</span><h3>Pela carteira do IXC</h3><p>Provedores emitem direto do IXC Provedor, sem trocar de sistema.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cobranca" style="background:var(--n1);border-block:1px solid var(--line)">
+    <div class="wrap split">
+      <div>
+        <div class="sec-head"><span class="eyebrow">Gestão de cobrança</span><h2>Conciliação que <span class="grad">acontece sozinha.</span></h2><p>A PAY AX cruza cada pagamento com a fatura certa e avisa o seu sistema. Você só acompanha.</p></div>
+        <ul class="checks"><li>Baixa automática no sistema de gestão</li><li>Painel com recebidos, a vencer e em atraso</li><li>Relatórios de inadimplência</li></ul>
+      </div>
+      <div class="steps" style="grid-template-columns:1fr 1fr">
+        <div class="stp"><span class="n">01</span><h3>Cobrança emitida</h3><p>PIX ou boleto gerado para a fatura.</p></div>
+        <div class="stp"><span class="n">02</span><h3>Cliente paga</h3><p>No app do banco que ele preferir.</p></div>
+        <div class="stp"><span class="n">03</span><h3>Valor identificado</h3><p>A PAY AX liga o pagamento à fatura.</p></div>
+        <div class="stp"><span class="n">04</span><h3>Baixa feita</h3><p>O sistema de gestão é atualizado.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="baas">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Por API</span><h2>Leve a PAY AX <span class="grad">para dentro do seu sistema.</span></h2></div>
+      <div class="fgrid">
+        <div id="api-pix"><span class="ic">{ }</span><h3>API PIX</h3><p>Crie cobranças, consulte pagamentos e receba webhooks.</p></div>
+        <div id="api-boletos"><span class="ic">{ }</span><h3>API Boletos</h3><p>Emita, consulte e cancele boletos por integração.</p></div>
+        <div><span class="ic">⬡</span><h3>Banking as a Service</h3><p>Ofereça conta e pagamentos aos seus clientes com a sua marca.</p></div>
+      </div>
+      <div class="ctas"><a class="btn btn-ghost" href="#desenvolvedores">Ir para Desenvolvedores</a></div>
+    </div>
+  </section>
+  <section style="padding-top:0"><div class="wrap" data-cta></div></section>
+</div>
+
+<!-- ================= PROVEDORES ================= -->
+<div class="page" data-page="provedores" hidden>
+  <div class="phero"><div class="wrap"><div class="crumbs"><a href="#inicio">Início</a> / Segmentos / Provedores de internet</div><span class="eyebrow">Para provedores de internet</span><h1>Cobrança de provedor, <span class="grad">do jeito que tem que ser.</span></h1><p>Feito por quem conhece a rotina de um ISP: milhares de faturas por mês, cliente bloqueado esperando liberação e financeiro sem tempo para conferir comprovante.</p><div class="ctas" style="margin-top:10px"><a class="btn btn-primary" href="#abrir-conta">Abra sua conta</a><a class="btn btn-ghost" href="#integracao">Integração com o IXC</a></div></div></div>
+  <section>
+    <div class="wrap">
+      <div class="fgrid">
+        <div><span class="ic">⚡</span><h3>Liberação mais rápida</h3><p>Pagou por PIX, a fatura é baixada e o cliente volta a navegar sem ligar para o suporte.</p></div>
+        <div><span class="ic">↻</span><h3>Fim da baixa manual</h3><p>O financeiro deixa de conferir extrato linha por linha.</p></div>
+        <div><span class="ic">▥</span><h3>Boleto e PIX juntos</h3><p>Mais formas de pagar, menos inadimplência.</p></div>
+        <div><span class="ic">⌁</span><h3>Dentro do IXC</h3><p>Sua equipe continua no sistema que já conhece.</p></div>
+        <div><span class="ic">▦</span><h3>Visão do caixa</h3><p>Recebidos do dia e do mês no painel da conta.</p></div>
+        <div><span class="ic">☎</span><h3>Atendimento que entende ISP</h3><p>Suporte que fala a língua do provedor.</p></div>
+      </div>
+    </div>
+  </section>
+  <section style="padding-top:0"><div class="wrap" data-cta></div></section>
+</div>
+
+<!-- ================= INTEGRAÇÃO ================= -->
+<div class="page" data-page="integracao" hidden>
+  <div class="phero"><div class="wrap"><div class="crumbs"><a href="#inicio">Início</a> / Integração</div><span class="eyebrow">Integração</span><h1>PAY AX + <span class="grad">IXC Provedor</span></h1><p>A PAY AX se conecta ao IXC Provedor, sistema de gestão para provedores de internet da IXC Soft. Boletos e PIX saem do IXC, o pagamento entra na sua conta PAY AX e a baixa volta para o IXC automaticamente.</p></div></div>
+
+  <section>
+    <div class="wrap">
+      <div class="partner" style="margin-bottom:40px">
+        <div class="plogo"><span class="wordmark" style="font-size:28px"><span>PAY</span><span class="ax grad">AX</span></span><span class="plus">+</span><span class="box" data-partner-logo>IXC Provedor</span></div>
+        <div class="txt"><span class="badge"><i></i>Integração disponível</span><h3 style="margin-top:10px;font-size:15.5px">IXC Provedor · IXC Soft</h3><small>Carteira de cobrança, PIX e retorno de pagamentos.</small></div>
+        <a class="btn btn-ghost" href="https://www.ixcsoft.com.br/ixc-provedor" target="_blank" rel="noopener">Conhecer o IXC Provedor ↗</a>
+      </div>
+
+      <div class="diagram" aria-label="Fluxo da integração entre IXC Provedor, PAY AX e o cliente">
+        <svg viewBox="0 0 900 300" role="img">
+          <path id="w1" class="wire" d="M200 150 H350"/>
+          <path id="w2" class="wire" d="M550 150 H700"/>
+          <path id="w3" class="wire" d="M450 200 V260 H100 V200"/>
+          <circle class="pulse" r="5"><animateMotion dur="2.4s" repeatCount="indefinite"><mpath href="#w1"/></animateMotion></circle>
+          <circle class="pulse" r="5"><animateMotion dur="2.4s" begin="1.2s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear"><mpath href="#w2"/></animateMotion></circle>
+          <circle class="pulse" r="5"><animateMotion dur="3.2s" begin=".6s" repeatCount="indefinite"><mpath href="#w3"/></animateMotion></circle>
+          <g class="node"><rect x="10" y="100" width="190" height="100" rx="18"/><text x="105" y="145" text-anchor="middle">IXC Provedor</text><text class="s" x="105" y="168" text-anchor="middle">gera a fatura</text></g>
+          <g class="node main"><rect x="350" y="100" width="200" height="100" rx="18"/><text x="450" y="145" text-anchor="middle">PAY AX</text><text class="s" x="450" y="168" text-anchor="middle">boleto · PIX · conta PJ</text></g>
+          <g class="node"><rect x="700" y="100" width="190" height="100" rx="18"/><text x="795" y="145" text-anchor="middle">Seu cliente</text><text class="s" x="795" y="168" text-anchor="middle">paga por PIX ou boleto</text></g>
+          <text x="275" y="136" text-anchor="middle" fill="#9ab0cf" font-size="12" font-family="Manrope,sans-serif">emite cobrança</text>
+          <text x="625" y="136" text-anchor="middle" fill="#9ab0cf" font-size="12" font-family="Manrope,sans-serif">pagamento</text>
+          <text x="275" y="282" text-anchor="middle" fill="#19e3ff" font-size="12.5" font-weight="700" font-family="Manrope,sans-serif">baixa automática da fatura</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Como ativar</span><h2>Quatro passos até <span class="grad">a primeira baixa automática.</span></h2></div>
+      <div class="steps">
+        <div class="stp"><span class="n">01</span><h3>Abra sua conta</h3><p>Cadastro da empresa e análise da documentação.</p></div>
+        <div class="stp"><span class="n">02</span><h3>Configure a carteira</h3><p>Nossa equipe configura a carteira de cobrança PAY AX no seu IXC.</p></div>
+        <div class="stp"><span class="n">03</span><h3>Teste</h3><p>Emitimos cobranças de teste e confirmamos a baixa.</p></div>
+        <div class="stp"><span class="n">04</span><h3>Em produção</h3><p>As faturas passam a ser emitidas e baixadas pela PAY AX.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">O que a integração faz</span></div>
+      <div class="fgrid">
+        <div><span class="ic">▥</span><h3>Emissão pelo IXC</h3><p>Boletos com PIX gerados pela carteira de cobrança do IXC.</p></div>
+        <div><span class="ic">◆</span><h3>PIX por fatura</h3><p>Cada fatura com QR Code próprio, identificado na conciliação.</p></div>
+        <div><span class="ic">↻</span><h3>Retorno automático</h3><p>Pagamentos confirmados voltam para o IXC com a baixa feita.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="sec-head"><span class="eyebrow">Próximas integrações</span><h2>Usa outro sistema?</h2><p>Estamos ampliando as integrações. Conte qual sistema você usa e avisamos quando estiver disponível.</p></div>
+      <div class="soon">
+        <div><b>Outros ERPs para provedores</b>Em desenvolvimento</div>
+        <div><b>Sistemas de gestão empresarial</b>Em desenvolvimento</div>
+        <div><b>Integração própria via API</b><a href="#desenvolvedores" style="color:var(--cyan)">Disponível para desenvolvedores →</a></div>
+      </div>
+    </div>
+  </section>
+  <section style="padding-top:0"><div class="wrap" data-cta></div></section>
+</div>
+
+<!-- ================= DESENVOLVEDORES ================= -->
+<div class="page" data-page="desenvolvedores" hidden>
+  <div class="phero"><div class="wrap"><div class="crumbs"><a href="#inicio">Início</a> / Desenvolvedores</div><span class="eyebrow">Desenvolvedores</span><h1>Pagamentos em <span class="grad">poucas linhas de código.</span></h1><p>APIs REST para PIX e boletos, webhooks de pagamento e ambiente de testes. A documentação completa é liberada junto com a abertura da conta.</p></div></div>
+  <section>
+    <div class="wrap split" style="align-items:start">
+      <div>
+        <div class="sec-head"><span class="eyebrow">Exemplo</span><h2>Crie uma cobrança PIX.</h2><p>Uma chamada gera o QR Code. Quando o cliente paga, o seu sistema recebe um webhook.</p></div>
+        <ul class="checks"><li>Autenticação por token</li><li>Webhooks de pagamento confirmado</li><li>Ambiente de testes separado de produção</li></ul>
+        <div class="ctas"><a class="btn btn-primary" href="#abrir-conta">Solicitar acesso à API</a></div>
+      </div>
+      <div class="code">
+        <div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-code="curl">cURL</button><button role="tab" aria-selected="false" data-code="node">Node.js</button><span class="ex">Exemplo</span></div>
+<pre data-code-pane="curl"><span class="c"># Criar cobrança PIX (exemplo ilustrativo)</span>
+<span class="f">curl</span> -X POST $BASE_URL/v1/pix/cobrancas \
+  -H <span class="s">"Authorization: Bearer $TOKEN"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{
+    "valor": 99.90,
+    "vencimento": "2026-10-10",
+    "referencia": "fatura-20841"
+  }'</span></pre>
+<pre data-code-pane="node" hidden><span class="c">// Criar cobrança PIX (exemplo ilustrativo)</span>
+<span class="k">const</span> res = <span class="k">await</span> <span class="f">fetch</span>(<span class="s">`${BASE_URL}/v1/pix/cobrancas`</span>, {
+  method: <span class="s">"POST"</span>,
+  headers: {
+    Authorization: <span class="s">`Bearer ${TOKEN}`</span>,
+    <span class="s">"Content-Type"</span>: <span class="s">"application/json"</span>
+  },
+  body: JSON.<span class="f">stringify</span>({
+    valor: <span class="k">99.90</span>,
+    vencimento: <span class="s">"2026-10-10"</span>,
+    referencia: <span class="s">"fatura-20841"</span>
+  })
+});
+<span class="k">const</span> { qrcode, copiaecola } = <span class="k">await</span> res.<span class="f">json</span>();</pre>
+      </div>
+    </div>
+  </section>
+  <section style="padding-top:0"><div class="wrap">
+    <div class="fgrid">
+      <div><span class="ic">{ }</span><h3>API PIX</h3><p>Cobranças imediatas e com vencimento, consulta e devolução.</p></div>
+      <div><span class="ic">{ }</span><h3>API Boletos</h3><p>Emissão, consulta, cancelamento e boleto com PIX.</p></div>
+      <div><span class="ic">⬡</span><h3>BaaS</h3><p>Contas e pagamentos com a sua marca, sobre a infraestrutura PAY AX.</p></div>
+    </div>
+  </div></section>
+</div>
+
+<!-- ================= AJUDA ================= -->
+<div class="page" data-page="ajuda" hidden>
+  <div class="phero"><div class="wrap"><div class="crumbs"><a href="#inicio">Início</a> / Ajuda</div><span class="eyebrow">Central de ajuda</span><h1>Como podemos <span class="grad">ajudar?</span></h1>
+    <label class="search" for="faq-q"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="faq-q" type="search" placeholder="Busque por PIX, boleto, IXC..."></label>
+  </div></div>
+  <section>
+    <div class="wrap faqwrap">
+      <div class="sec-head"><span class="eyebrow">Dúvidas frequentes</span><h2>Perguntas que <span class="grad">sempre aparecem.</span></h2><p id="faq-empty" hidden>Nenhuma pergunta encontrada. Fale com a nossa equipe.</p></div>
+      <div id="faq">
+        <details open><summary>Quem pode abrir uma conta PAY AX?</summary><p>Empresas com CNPJ ativo. Nosso foco inicial são provedores de internet e negócios com cobrança recorrente.</p></details>
+        <details><summary>Preciso trocar de sistema para usar a PAY AX?</summary><p>Não. Se você usa o IXC Provedor, a PAY AX se conecta à sua carteira de cobrança e você continua no sistema que já conhece.</p></details>
+        <details><summary>Como funciona a baixa automática no IXC?</summary><p>Quando o cliente paga por PIX ou boleto, a PAY AX identifica a fatura e envia a confirmação ao IXC, que registra a baixa e libera o acesso do cliente.</p></details>
+        <details><summary>Como acesso minha conta?</summary><p>Pelo botão "Acessar minha conta", no topo do site, ou pelo app PAY AX. Nunca pedimos sua senha por telefone, e-mail ou WhatsApp.</p></details>
+        <details><summary>Consigo integrar com outro sistema?</summary><p>Sim. A PAY AX oferece API para integrar cobranças, pagamentos e consultas ao sistema que a sua empresa já usa.</p></details>
+        <details><summary>Quais documentos preciso para abrir a conta?</summary><p>Cartão CNPJ, contrato social ou última alteração, e documentos dos sócios. A lista completa está na página Abra sua conta.</p></details>
+        <details><summary>Quanto tempo leva para começar?</summary><p>Depois da análise de cadastro e da abertura da conta, nossa equipe acompanha a configuração da integração até a primeira cobrança.</p></details>
+      </div>
+    </div>
+  </section>
+  <section style="padding-top:0"><div class="wrap"><div class="sec-head"><span class="eyebrow">Canais de atendimento</span></div><div data-contact></div></div></section>
+</div>
+
+<!-- ================= SOBRE ================= -->
+<div class="page" data-page="sobre" hidden>
+  <div class="phero"><div class="wrap"><div class="crumbs"><a href="#inicio">Início</a> / Sobre</div><span class="eyebrow">Sobre a PAY AX</span><h1>O futuro <span class="grad">em cada transação.</span></h1></div></div>
+  <section>
+    <div class="wrap split">
+      <div>
+        <div class="sec-head"><h2>Tecnologia financeira para quem vive de <span class="grad">cobrança recorrente.</span></h2>
+          <p>A PAY AX Brasil nasceu da rotina de provedores de internet: muitas faturas, pouco tempo e um financeiro que precisava de um banco que conversasse com o sistema de gestão.</p>
+          <p>Unimos conta digital, meios de pagamento e integração para que o dinheiro entre, seja identificado e apareça no lugar certo, sem trabalho manual.</p></div>
+      </div>
+      <div class="logo-orb"><img src="data:image/jpeg;base64,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" alt="Logo PAY AX: O futuro em cada transação."></div>
+    </div>
+  </section>
+  <section style="padding-top:0"><div class="wrap">
+    <div class="values">
+      <div><h3>Simplicidade</h3><p>Menos etapas entre a cobrança e o dinheiro na conta.</p></div>
+      <div><h3>Transparência</h3><p>Cada transação visível e explicada no extrato.</p></div>
+      <div><h3>Proximidade</h3><p>Atendimento que conhece o dia a dia do cliente.</p></div>
+    </div>
+  </div></section>
+  <section style="padding-top:0"><div class="wrap" data-cta></div></section>
+</div>
+
+<!-- ================= ABRIR CONTA ================= -->
+<div class="page" data-page="abrir-conta" hidden>
+  <div class="phero"><div class="wrap"><div class="crumbs"><a href="#inicio">Início</a> / Abra sua conta</div><span class="eyebrow">Abra sua conta PJ</span><h1>Sua empresa na <span class="grad">PAY AX.</span></h1><p>Fale com a nossa equipe comercial. Fazemos a análise do cadastro e acompanhamos você até a primeira cobrança.</p></div></div>
+  <section>
+    <div class="wrap">
+      <div class="steps">
+        <div class="stp"><span class="n">01</span><h3>Contato</h3><p>Fale com o comercial pelos canais abaixo.</p></div>
+        <div class="stp"><span class="n">02</span><h3>Documentos</h3><p>Envie a documentação da empresa e dos sócios.</p></div>
+        <div class="stp"><span class="n">03</span><h3>Análise e contrato</h3><p>Análise cadastral e assinatura do contrato de abertura de conta.</p></div>
+        <div class="stp"><span class="n">04</span><h3>Conta ativa</h3><p>Acesso liberado e integração configurada.</p></div>
+      </div>
+    </div>
+  </section>
+  <section style="padding-top:0"><div class="wrap">
+    <div class="sec-head"><span class="eyebrow">Documentos necessários</span></div>
+    <ul class="doclist">
+      <li><span>01</span>Cartão CNPJ</li>
+      <li><span>02</span>Contrato social ou última alteração consolidada</li>
+      <li><span>03</span>Documento com foto dos sócios</li>
+      <li><span>04</span>Comprovante de endereço da empresa</li>
+    </ul>
+  </div></section>
+  <section style="padding-top:0"><div class="wrap"><div class="sec-head"><span class="eyebrow">Fale com o comercial</span></div><div data-contact></div></div></section>
+</div>
+
+<!-- ================= ACESSAR CONTA ================= -->
+<div class="page" data-page="acessar" hidden>
+  <div class="phero"><div class="wrap"><div class="crumbs"><a href="#inicio">Início</a> / Acessar minha conta</div><span class="eyebrow">Área do cliente</span><h1>Acesse sua <span class="grad">conta PAY AX.</span></h1><p>Escolha por onde quer entrar.</p></div></div>
+  <section>
+    <div class="wrap">
+      <div class="access">
+        <div class="acard"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg></span><h3 style="font-size:15.5px">Internet Banking</h3><p>Painel completo da conta no computador: extrato, cobranças, PIX e relatórios.</p><a class="btn btn-primary" id="ib-link" href="#acessar" aria-disabled="true">Entrar no Internet Banking</a><span class="note" id="ib-note">Acesso online em implantação.</span></div>
+        <div class="acard"><span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg></span><h3 style="font-size:15.5px">App PAY AX</h3><p>Sua conta no celular, com notificação de cada recebimento.</p><div class="ctas" style="margin-top:0"><button class="btn btn-ghost" disabled>App Store</button><button class="btn btn-ghost" disabled>Google Play</button></div><span class="note">Em breve nas lojas.</span></div>
+      </div>
+      <div class="tips">
+        <div><h3>Confira o endereço</h3><p>Entre na conta só pelo site oficial da PAY AX.</p></div>
+        <div><h3>Nunca informe sua senha</h3><p>A PAY AX não pede senha por telefone, e-mail ou WhatsApp.</p></div>
+        <div><h3>Ainda não é cliente?</h3><p><a href="#abrir-conta" style="color:var(--cyan)">Abra sua conta →</a></p></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+</main>
+
+<template id="tpl-cta">
+  <div class="cta-box">
+    <div><span class="eyebrow">Comece agora</span><h2 style="margin-top:14px">Leve sua cobrança <span class="grad">para o futuro.</span></h2><p>Fale com a equipe PAY AX, conheça a plataforma e receba uma proposta para a sua empresa.</p></div>
+    <div class="col"><a class="btn btn-primary" href="#abrir-conta">Abra sua conta</a><a class="btn btn-ghost" href="#ajuda">Falar com a equipe</a></div>
+  </div>
+</template>
+<template id="tpl-contact">
+  <div class="contact">
+    <div><small>WhatsApp comercial</small><b>A definir</b></div>
+    <div><small>E-mail</small><b>A definir</b></div>
+    <div><small>Horário</small><b>Seg. a sex., 8h às 18h</b></div>
+  </div>
+</template>
+
+<footer>
+  <div class="wrap">
+    <div class="fcols">
+      <div><a href="#inicio" class="wordmark"><span>PAY</span><span class="ax grad">AX</span></a><div class="slogan">O futuro em cada transação.</div></div>
+      <div><h5>Soluções</h5><ul><li><a href="#conta">Conta Digital PJ</a></li><li><a href="#pix">PIX</a></li><li><a href="#boletos">Boletos</a></li><li><a href="#cobranca">Gestão de cobrança</a></li></ul></div>
+      <div><h5>Plataforma</h5><ul><li><a href="#integracao">Integração IXC</a></li><li><a href="#desenvolvedores">Desenvolvedores</a></li><li><a href="#baas">Banking as a Service</a></li><li><a href="#provedores">Provedores</a></li></ul></div>
+      <div><h5>Empresa</h5><ul><li><a href="#sobre">Sobre</a></li><li><a href="#abrir-conta">Abra sua conta</a></li><li><a href="#acessar">Acessar conta</a></li></ul></div>
+      <div><h5>Suporte</h5><ul><li><a href="#ajuda">Central de ajuda</a></li><li><a href="#ajuda">Segurança</a></li><li><a href="#ajuda">Privacidade e LGPD</a></li></ul></div>
+    </div>
+    <div class="fbottom"><span>© 2026 PAY AX Brasil Ltda. Todos os direitos reservados.</span><span>IXC Provedor e IXC Soft são marcas de seus respectivos titulares.</span></div>
+  </div>
+</footer>
+
+<script src="js/site.js"></script>
 </body>
 </html>

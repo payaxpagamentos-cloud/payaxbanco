@@ -110,11 +110,6 @@ async function rotear() {
   window.scrollTo(0, 0);
 }
 
-try {
-  const tema = localStorage.getItem('payax.tema');
-  if (tema) document.documentElement.dataset.theme = tema;
-} catch { /* ignora */ }
-
 window.addEventListener('hashchange', rotear);
 window.addEventListener('payax-ib:sair', (e) => sair(e.detail));
 

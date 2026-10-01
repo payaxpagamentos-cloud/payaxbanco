@@ -19,7 +19,7 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 | **Transações** | Consulta geral de lançamentos com filtros e **estorno** (reverte origem e destino). |
 | **Empréstimos** | Simulação e contratação pela Tabela Price, crédito automático em conta, cronograma de parcelas e pagamento em ordem com débito em conta; quitação automática. |
 | **Bradesco** | Conta PJ única da PAY AX no Bradesco: cobrança PIX com QR Code creditando a conta do cliente, webhook de confirmação, PIX para outros bancos, PIX sem identificação com vínculo manual e conciliação do saldo do banco com o saldo dos clientes. |
-| **Site institucional** | Site público da PAY AX em `/site/` (Início, Para você, Para empresas, Crédito com simulador, Segurança, Sobre, Ajuda), com acesso ao Internet Banking e abertura de conta. Dados oficiais (CNPJ, telefones, tarifas) em `public/site/js/config.js`. |
+| **Site institucional** | Site público da PAY AX em `/site/` (soluções, provedores, integração IXC, desenvolvedores, ajuda, sobre). "Acessar minha conta" leva ao Internet Banking. |
 | **Internet Banking** | Portal web do cliente em `/ib/`: saldo, extrato com comprovantes, PIX (enviar, receber por QR Code, minhas chaves), transferências, pagamento de boletos e contas de consumo, e empréstimos. |
 | **Relatórios** | Exportação CSV (compatível com Excel) de clientes, contas, transações por período e carteira de crédito. |
 | **Auditoria** | Registro de todas as ações (login, cadastros, operações, estornos, alterações de limite/status) com usuário, data e IP. |
@@ -120,7 +120,7 @@ Há uma versão de demonstração que roda inteira no navegador: o mesmo backend
 é empacotado com SQLite em JavaScript, e os dados ficam salvos só no navegador de quem abre.
 
 ```bash
-npm run build:demo   # gera dist-demo/ (Banqueiro + Internet Banking), dist-ib/ (só o Internet Banking) e dist-site/ (site institucional + Internet Banking)
+npm run build:demo   # gera dist-demo/ (Banqueiro + Internet Banking) e dist-ib/ (só o Internet Banking, para clientes testarem)
 ```
 
 Na demo, as senhas usam um hash simplificado e a exportação de CSV fica desativada. Use a versão instalada em produção.
