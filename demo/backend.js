@@ -6,7 +6,7 @@ import { criarApi, tratarErro } from '../server/api.js';
 import { popularDemo } from '../server/lib/demo.js';
 
 window.PAYAX_DEMO = true;
-const CHAVE = 'payax.demo.db.v2';
+const CHAVE = 'payax.demo.db.v3';
 
 function carregarSalvo() {
   try {
@@ -83,12 +83,12 @@ window.fetch = async (entrada, opcoes = {}) => {
 };
 
 /** Faixa fixa da demonstração, com atalho para o outro portal e botão de restaurar os dados. */
-export function faixaDemo(link) {
+export function faixaDemo(link, { topo = false } = {}) {
   const el = document.createElement('div');
-  el.className = 'faixa-demo';
+  el.className = `faixa-demo${topo ? ' topo' : ''}`;
   el.innerHTML = `<span><strong>Demonstração</strong> · dados fictícios no seu navegador</span>
     <a class="btn sm" href="${link.href}">${link.rotulo}</a><button type="button" class="btn sm" id="demo-reset">Restaurar dados</button>`;
-  document.body.append(el);
+  document.body.prepend(el);
   const botao = el.querySelector('#demo-reset');
   let armado = false;
   botao.addEventListener('click', () => {

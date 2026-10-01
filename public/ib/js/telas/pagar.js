@@ -6,7 +6,7 @@ const SITUACAO = { processando: 'Processando', concluido: 'Pago', falhou: 'Não 
 
 export default async function pagar(alvo) {
   await carregarResumo();
-  const exemplos = estado.me?.modo_bradesco === 'simulador' ? await api.get('/pagamentos/exemplos').catch(() => []) : [];
+  const exemplos = estado.me?.ambiente_teste ? await api.get('/pagamentos/exemplos').catch(() => []) : [];
   const historico = await api.get('/pagamentos');
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Pagar contas</h1><p class="muted">Boletos e contas de consumo (água, luz, telefone, tributos).</p></div></div>

@@ -36,11 +36,14 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 
 Portal do cliente em **`/ib/`**, separado do Banqueiro e pensado primeiro para celular.
 
-- **Acesso:** a equipe habilita na ficha do cliente e entrega uma **senha provisória**, que aparece uma única vez. No primeiro acesso, o cliente cria a senha definitiva e a **senha de transação** (6 dígitos).
+- **Acesso:** a equipe habilita na ficha do cliente e entrega uma **senha provisória** de 6 números, que aparece uma única vez. No primeiro acesso, o cliente cria a senha de acesso e a **senha de transação** (6 números cada, diferentes entre si).
+- **Teclado virtual de pares:** login e confirmação de operações usam botões com dois números (ex.: "1 ou 4"), sorteados pelo servidor a cada uso e válidos uma única vez. O servidor recebe só quais botões foram clicados e testa as 64 combinações possíveis. Quem observa a tela ou captura o tráfego não descobre a senha. Senhas novas são criadas num teclado numérico embaralhado.
+- **Hash das senhas:** as senhas numéricas são combinadas com um segredo do servidor (`PAYAX_PEPPER`) antes do scrypt. Um vazamento só do banco de dados não permite testar o milhão de combinações.
+- **Banco liquidante invisível:** nenhuma tela, mensagem, comprovante ou resposta da API do cliente cita o Bradesco. O comprovante traz uma autenticação própria da PAY AX.
 - **Segurança:**
   - token próprio do cliente, que não vale na API da equipe, e vice-versa;
   - sessão de 30 minutos, encerrada após 10 minutos sem uso;
-  - 5 senhas erradas bloqueiam o login por 15 minutos;
+  - 5 senhas erradas bloqueiam o login por 15 minutos, e há limite de tentativas por IP;
   - 3 senhas de transação erradas bloqueiam o acesso até a agência liberar;
   - toda saída de dinheiro exige a senha de transação.
 - **Limite diário** por cliente para PIX, transferências e pagamentos (padrão R$ 5.000,00), ajustável pelo gerente.
@@ -92,6 +95,25 @@ npm run build:demo   # gera dist-demo/: Banqueiro (index.html) e Internet Bankin
 
 Na demo, as senhas usam um hash simplificado e a exportação de CSV fica desativada. Use a versão instalada em produção.
 
+## Tecnologia
+
+- **Servidor:** JavaScript (Node.js 22) com Express. Banco de dados SQLite nativo do Node (`node:sqlite`).
+- **Telas:** HTML, CSS e JavaScript puros (módulos ES), sem framework e sem etapa de build.
+- **Testes:** `node:test`.
+- **Implantação:** Docker, com HTTPS automático pelo Caddy.
+
+## Produção
+
+Veja o guia completo em **[docs/PRODUCAO.md](docs/PRODUCAO.md)**. Em resumo:
+
+```bash
+cp .env.example .env    # domínios, segredos e senha do administrador
+docker compose up -d --build
+```
+
+Em produção (`NODE_ENV=production`, padrão da imagem Docker), o sistema se recusa a iniciar sem `PAYAX_SECRET`,
+`PAYAX_PEPPER` e `PAYAX_ADMIN_SENHA`, envia HSTS e limita tentativas de login por IP. Para backup, use `npm run backup`.
+
 ## Como executar
 
 Requisitos: **Node.js 22.13+** (usa o SQLite nativo `node:sqlite`, sem dependências nativas).
@@ -104,7 +126,14 @@ npm start        # http://localhost:3000
 
 Acesso inicial: `admin@payax.com.br` / `admin123` — **altere a senha no primeiro acesso** (clique no avatar).
 Com o seed também existem `gerente@payax.com.br` e `operador@payax.com.br` (senha `payax2026`).
-Internet Banking (`http://localhost:3000/ib/`): CPF `529.982.247-25` / `Cliente2026` ou CNPJ `11.222.333/0001-81` / `Empresa2026`, senha de transação `246810`.
+Internet Banking (`http://localhost:3000/ib/`):
+
+| Cliente | Login | Senha de acesso | Senha de transação |
+|---|---|---|---|
+| Pessoa física | CPF `529.982.247-25` | `135790` | `246810` |
+| Pessoa jurídica | CNPJ `11.222.333/0001-81` | `975310` | `246810` |
+
+As duas senhas são digitadas no teclado virtual.
 
 ### Configuração (variáveis de ambiente)
 
@@ -116,6 +145,9 @@ Internet Banking (`http://localhost:3000/ib/`): CPF `529.982.247-25` / `Cliente2
 | `PAYAX_AGENCIA` | `0001` | Agência das novas contas. |
 | `PAYAX_LIMITE_OPERADOR` | `5000000` | Alçada do operador, em centavos. |
 | `PAYAX_FUSO` | `-3 hours` | Deslocamento para agrupar dados por dia (horário de Brasília). |
+| `PAYAX_PEPPER` | valor de desenvolvimento | Segredo misturado às senhas dos clientes. **Obrigatório em produção e nunca pode mudar.** |
+| `PAYAX_TRUST_PROXY` | `loopback` | Proxies confiáveis para obter o IP real (`1` atrás do Caddy ou de um balanceador). |
+| `PAYAX_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
 | `PAYAX_ADMIN_EMAIL` / `PAYAX_ADMIN_SENHA` / `PAYAX_ADMIN_NOME` | — | Administrador criado no primeiro start. |
 
 ### Testes

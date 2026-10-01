@@ -1,0 +1,32 @@
+# Produção em um servidor (VPS/nuvem) com HTTPS automático pelo Caddy.
+# Uso: copie .env.example para .env, preencha e rode `docker compose up -d --build`.
+services:
+  banqueiro:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PAYAX_TRUST_PROXY: "1"
+    volumes:
+      - dados:/app/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO_CLIENTES: ${DOMINIO_CLIENTES}
+      DOMINIO_EQUIPE: ${DOMINIO_EQUIPE}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - banqueiro
+
+volumes:
+  dados:
+  caddy_data:
+  caddy_config:

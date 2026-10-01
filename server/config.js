@@ -8,7 +8,30 @@ if (!process.env.PAYAX_SECRET && process.env.NODE_ENV !== 'test') {
   console.warn('[PAY AX] PAYAX_SECRET não definido: usando segredo temporário (sessões expiram ao reiniciar).');
 }
 
+// Segredo extra misturado às senhas numéricas do Internet Banking antes do hash. Precisa ser fixo:
+// trocá-lo invalida todas as senhas de clientes. Guarde-o fora do banco de dados.
+const pepper = process.env.PAYAX_PEPPER || 'payax-pepper-desenvolvimento';
+if (!process.env.PAYAX_PEPPER && process.env.NODE_ENV !== 'test') {
+  console.warn('[PAY AX] PAYAX_PEPPER não definido: usando valor de desenvolvimento (defina em produção).');
+}
+
+const producao = process.env.NODE_ENV === 'production';
+
+// Em produção, recusa iniciar com segredos ausentes ou valores de exemplo.
+if (producao) {
+  const faltando = ['PAYAX_SECRET', 'PAYAX_PEPPER', 'PAYAX_ADMIN_SENHA'].filter((k) => !process.env[k]);
+  if (faltando.length) throw new Error(`[PAY AX] Produção sem configuração obrigatória: ${faltando.join(', ')}. Veja docs/PRODUCAO.md.`);
+  if (process.env.PAYAX_SECRET.length < 32) throw new Error('[PAY AX] PAYAX_SECRET deve ter pelo menos 32 caracteres.');
+  if (process.env.PAYAX_ADMIN_SENHA.length < 12) throw new Error('[PAY AX] PAYAX_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
+}
+
 module.exports = {
+  producao,
+  // Quantos proxies confiar para obter o IP real (ex.: 1 atrás do balanceador do Render/Railway).
+  trustProxy: process.env.PAYAX_TRUST_PROXY ?? 'loopback',
+  // Tentativas de login por IP por minuto (equipe e clientes).
+  limiteLoginPorMinuto: Number(process.env.PAYAX_LIMITE_LOGIN) || 10,
+  pepper,
   port: Number(process.env.PORT) || 3000,
   dbFile: process.env.PAYAX_DB || path.join(__dirname, '..', 'data', 'banqueiro.db'),
   secret,

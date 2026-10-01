@@ -4,7 +4,7 @@
 const { transacao } = require('../db');
 const { proximoNumero, novoGrupo, lancar } = require('./conta');
 const { simular } = require('./financeiro');
-const { hashSenha } = require('./senha');
+const { hashSenha, hashNumerica } = require('./senha');
 
 const CLIENTES = [
   ['PF', 'Ana Beatriz Souza', '52998224725', 'ana.souza@email.com', '11987654321', '1990-04-12', 850000, 'São Paulo', 'SP'],
@@ -67,10 +67,10 @@ function popularDemo(db) {
       lancar(db, { contaId: destino.id, tipo: 'pix_recebido', valor, descricao: 'PIX', contraparteId: origem.id, grupo, usuarioId: adminId });
     }
     // Acesso ao Internet Banking para dois clientes de exemplo.
-    for (const [documento, senha] of [['52998224725', 'Cliente2026'], ['11222333000181', 'Empresa2026']]) {
+    for (const [documento, senha] of [['52998224725', '135790'], ['11222333000181', '975310']]) {
       const c = db.prepare('SELECT id FROM clientes WHERE documento = ?').get(documento);
       db.prepare('INSERT INTO acessos_cliente (cliente_id, senha_hash, pin_hash, precisa_trocar_senha, limite_diario_centavos) VALUES (?, ?, ?, 0, ?)')
-        .run(c.id, hashSenha(senha), hashSenha('246810'), 1_000_000);
+        .run(c.id, hashNumerica(senha), hashNumerica('246810'), 1_000_000);
     }
     // Empréstimos.
     for (const [idx, valor, taxa, n] of [[0, 1500000, 0.0189, 12], [4, 8000000, 0.0149, 24]]) {

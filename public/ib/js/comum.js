@@ -1,5 +1,6 @@
 import { api } from './api.js';
 import { html, $, moeda, dataHora, data, modal, TIPO_TRANSACAO, icone } from '../../js/ui.js';
+import { tecladoPares } from './teclado.js';
 
 /** Estado da sessão do cliente: dados pessoais, resumo e conta selecionada. */
 export const estado = { me: null, resumo: null, contaId: null, ocultarSaldo: false };
@@ -40,29 +41,27 @@ export function limiteRestante() {
 export function confirmarComPin({ titulo = 'Confirmar operação', resumo, executar }) {
   return new Promise((resolve) => {
     let concluido = false;
+    let teclado;
     const { el } = modal({
       titulo,
       rotuloEnviar: 'Confirmar',
-      corpo: html`${resumo}
-        <div style="margin-top:16px"><label for="pin">Senha de transação (6 dígitos)</label>
-        <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="6" class="pin" required></div>`,
-      aoEnviar: async (form, fechar) => {
-        const pin = form.pin.value.replace(/\D/g, '');
-        if (pin.length !== 6) throw new Error('Digite os 6 dígitos da senha de transação.');
+      corpo: html`${resumo}<div id="teclado-pin" style="margin-top:16px"></div>`,
+      aoAbrir: (m) => { teclado = tecladoPares($('#teclado-pin', m), { rotulo: 'Senha de transação' }); },
+      aoEnviar: async (_form, fechar) => {
+        if (!teclado.completo()) throw new Error('Digite os 6 números da senha de transação.');
         try {
-          const r = await executar(pin);
+          const r = await executar(teclado.valor());
           concluido = true;
           fechar();
           resolve(r);
         } catch (e) {
-          form.pin.value = '';
+          teclado.renovar(); // cada teclado vale para uma única tentativa
           throw e;
         }
       },
     });
     const observar = new MutationObserver(() => { if (!el.isConnected) { observar.disconnect(); if (!concluido) resolve(null); } });
     observar.observe(document.querySelector('#modal-root'), { childList: true });
-    setTimeout(() => $('#pin', el)?.focus(), 40);
   });
 }
 

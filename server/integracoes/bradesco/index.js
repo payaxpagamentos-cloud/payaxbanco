@@ -16,6 +16,12 @@ const { lerBoleto } = require('../../lib/boleto');
 const SISTEMA = { usuario: null, ip: 'bradesco' };
 const DIA = 24 * 60 * 60 * 1000;
 
+/**
+ * O cliente final não sabe qual banco liquida as operações da PAY AX: para ele, a mensagem é genérica.
+ * A equipe (Banqueiro) recebe o detalhe técnico.
+ */
+const mensagemParaCliente = (req, err, generica) => (req.cliente ? generica : err.message);
+
 function criarCliente(db, cfg) {
   if (cfg.modo === 'simulador') return new SimuladorBradesco(db, cfg);
   if (['sandbox', 'producao'].includes(cfg.modo)) return new ApiBradesco(cfg);
@@ -46,10 +52,15 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
     exigirContaOperavel(conta);
     const valor = v.valorCentavos(valorBruto);
     const txid = gerarTxid();
-    const r = await cliente.criarCobranca({
-      txid, valorCentavos: valor, expiracaoSegundos: cfg.expiracaoCobrancaSegundos,
-      solicitacao: `Depósito PAY AX conta ${conta.numero}-${conta.digito}`,
-    });
+    let r;
+    try {
+      r = await cliente.criarCobranca({
+        txid, valorCentavos: valor, expiracaoSegundos: cfg.expiracaoCobrancaSegundos,
+        solicitacao: `Depósito PAY AX conta ${conta.numero}-${conta.digito}`,
+      });
+    } catch (err) {
+      throw new ErroNegocio(mensagemParaCliente(req, err, 'Não foi possível gerar o QR Code agora. Tente novamente em instantes.'), err.status ?? 502);
+    }
     db.prepare(`INSERT INTO cobrancas_pix (conta_id, txid, valor_centavos, pix_copia_e_cola, expira_em, usuario_id)
       VALUES (?, ?, ?, ?, datetime('now', ?), ?)`)
       .run(conta.id, txid, valor, r.pixCopiaECola, `+${cfg.expiracaoCobrancaSegundos} seconds`, req.usuario?.id ?? null);
@@ -92,7 +103,7 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
         }
         const t = lancar(db, {
           contaId: conta.id, tipo: 'pix_recebido', valor, grupo: novoGrupo(), usuarioId: req.usuario?.id ?? null,
-          descricao: `PIX recebido via Bradesco${pagadorNome ? ` · ${pagadorNome}` : ''}`,
+          descricao: `PIX recebido${pagadorNome ? ` · ${pagadorNome}` : ''}`,
         });
         db.prepare("UPDATE cobrancas_pix SET status = 'concluida', end_to_end_id = ?, pago_em = datetime('now') WHERE id = ?").run(p.endToEndId, cob.id);
         db.prepare(`INSERT INTO pix_recebidos (end_to_end_id, txid, valor_centavos, pagador_nome, pagador_documento, info_pagador, conta_id, transacao_id, status, recebido_em)
@@ -121,7 +132,7 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
     return transacao(db, () => {
       const t = lancar(db, {
         contaId: conta.id, tipo: 'pix_recebido', valor: p.valor_centavos, grupo: novoGrupo(), usuarioId: req.usuario?.id ?? null,
-        descricao: `PIX recebido via Bradesco${p.pagador_nome ? ` · ${p.pagador_nome}` : ''} (vinculado manualmente)`,
+        descricao: `PIX recebido${p.pagador_nome ? ` · ${p.pagador_nome}` : ''}`,
       });
       db.prepare("UPDATE pix_recebidos SET status = 'creditado', conta_id = ?, transacao_id = ? WHERE id = ?").run(conta.id, t.id, p.id);
       registrar(db, req, 'vincular_pix', 'conta', conta.id, { end_to_end_id: p.end_to_end_id, valor_centavos: p.valor_centavos });
@@ -156,7 +167,9 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
         db.prepare("UPDATE pix_saidas SET status = 'falhou', erro = ?, atualizado_em = datetime('now') WHERE id = ?").run(err.message, saidaId);
         registrar(db, req, 'pix_externo_falhou', 'conta', origem.id, { chave, valor_centavos: valor, erro: err.message });
       });
-      throw new ErroNegocio(`O PIX não foi enviado (${err.message}). O valor voltou para a conta do cliente.`, 502);
+      throw new ErroNegocio(req.cliente
+        ? 'Não foi possível concluir o PIX agora. O valor voltou para a sua conta; tente novamente em instantes.'
+        : `O PIX não foi enviado (${err.message}). O valor voltou para a conta do cliente.`, 502);
     }
   }
 
@@ -188,7 +201,9 @@ function criarServicoBradesco(db, cfg = config.bradesco, cliente = criarCliente(
         db.prepare("UPDATE pagamentos SET status = 'falhou', erro = ?, atualizado_em = datetime('now') WHERE id = ?").run(err.message, pagamentoId);
         registrar(db, req, 'pagamento_falhou', 'conta', origem.id, { valor_centavos: valor, erro: err.message });
       });
-      throw new ErroNegocio(`O pagamento não foi realizado (${err.message}). O valor voltou para a conta.`, 502);
+      throw new ErroNegocio(req.cliente
+        ? 'Não foi possível concluir o pagamento agora. O valor voltou para a sua conta; tente novamente em instantes.'
+        : `O pagamento não foi realizado (${err.message}). O valor voltou para a conta.`, 502);
     }
   }
 

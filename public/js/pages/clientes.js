@@ -150,7 +150,7 @@ export async function detalheCliente({ alvo, id, ativo }) {
 function mostrarSenhaProvisoria(r, cliente) {
   modal({
     titulo: 'Senha provisória do Internet Banking',
-    corpo: html`<p style="margin-top:0">Entregue ao cliente por um canal seguro. Ela aparece <strong>só agora</strong> e deve ser trocada no primeiro acesso, quando o cliente também cria a senha de transação.</p>
+    corpo: html`<p style="margin-top:0">Entregue ao cliente por um canal seguro. Ela aparece <strong>só agora</strong>. O cliente digita os 6 números no teclado virtual e, no primeiro acesso, cria a senha de acesso e a senha de transação.</p>
       <dl class="dl"><div><dt>Login</dt><dd class="mono">${documento(cliente.documento)}</dd></div><div><dt>Senha provisória</dt><dd class="mono" style="font-size:20px;letter-spacing:.06em">${r.senha_provisoria}</dd></div></dl>
       <p class="ajuda">Endereço de acesso: <span class="mono">${location.origin}/ib/</span></p>`,
     rodape: html`<div class="modal-foot"><button class="btn primario" data-cancelar>Entendi</button></div>`,

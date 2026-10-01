@@ -8,4 +8,6 @@ function fnv(s) {
 }
 const hashSenha = (senha) => `demo$${fnv(`payax:${senha}`)}`;
 const verificarSenha = (senha, armazenado) => hashSenha(senha) === armazenado;
-module.exports = { hashSenha, verificarSenha };
+const hashNumerica = (senha) => `demon$${fnv(`payax:n:${senha}`)}`;
+const verificarNumerica = async (candidatos, armazenado) => candidatos.some((c) => hashNumerica(c) === armazenado);
+module.exports = { hashSenha, verificarSenha, hashNumerica, verificarNumerica };

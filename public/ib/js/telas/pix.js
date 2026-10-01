@@ -43,7 +43,7 @@ function passoValor(el, dest, chaveDigitada) {
   el.innerHTML = String(html`<div class="card card-body" style="max-width:560px">
     <div class="passos"><span class="feito"></span><span class="feito"></span><span></span></div>
     <div class="destinatario"><span class="avatar">${(dest.nome ?? '?')[0]}</span><div><strong>${dest.nome ?? dest.chave}</strong>
-      <div class="small muted">${dest.interno ? `${dest.documento} · ${dest.instituicao}` : `Chave ${dest.chave} · ${dest.instituicao} (via Bradesco)`}</div></div></div>
+      <div class="small muted">${dest.interno ? `${dest.documento} · ${dest.instituicao}` : `Chave ${dest.chave} · ${dest.instituicao}`}</div></div></div>
     <form id="f2" class="stack" style="margin-top:16px" novalidate>
       <div>${seletorConta()}</div>
       <div><label for="valor">Valor</label><input id="valor" name="valor" class="moeda valor-grande" inputmode="numeric" value="0,00">${limiteRestante()}</div>
@@ -105,7 +105,7 @@ function receber(el) {
 }
 
 function mostrarQr(c) {
-  const simulador = estado.me?.modo_bradesco === 'simulador';
+  const simulador = estado.me?.ambiente_teste;
   const { el, fechar } = modal({
     titulo: `Receber ${moeda(c.valor_centavos)}`,
     corpo: html`<div class="stack" style="align-items:center;text-align:center">

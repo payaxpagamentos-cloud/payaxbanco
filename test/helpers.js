@@ -2,6 +2,7 @@
 
 process.env.NODE_ENV = 'test';
 process.env.PAYAX_SECRET = 'segredo-de-teste';
+process.env.PAYAX_LIMITE_LOGIN = '1000'; // a suíte faz muitos logins seguidos; o limitador tem teste próprio
 
 const { abrir } = require('../server/db');
 const { criarApp } = require('../server/app');

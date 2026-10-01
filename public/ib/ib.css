@@ -78,4 +78,19 @@ body.ib { background: var(--bg); }
   .modal { width: 100%; border-radius: 16px 16px 0 0; max-height: 92vh; }
   .toasts { left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
 }
-@media (max-width: 760px) { body.ib .faixa-demo { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } }
+
+/* Teclado virtual */
+.teclado { display: flex; flex-direction: column; gap: 10px; }
+.tecl-rotulo { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.tecl-pontos { display: flex; gap: 10px; justify-content: center; padding: 4px 0; }
+.tecl-pontos span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--payax-azul-3); }
+.tecl-pontos span.cheio { background: var(--payax-azul-3); }
+.tecl-botoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tecl-botoes.simples { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tecl-par, .tecl-apagar { height: 48px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; font-variant-numeric: tabular-nums; user-select: none; }
+.tecl-par small { font-size: 11px; font-weight: 600; color: var(--text-3); margin: 0 2px; }
+.tecl-par:hover, .tecl-apagar:hover { border-color: var(--payax-azul-3); }
+.tecl-par:active { transform: scale(.97); }
+.tecl-apagar { font-size: 13px; color: var(--text-2); }
+.tecl-botoes .tecl-apagar { grid-column: span 1; }
+.tecl-botoes:not(.simples) .tecl-apagar { grid-column: span 1; }

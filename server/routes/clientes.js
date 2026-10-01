@@ -2,7 +2,8 @@
 
 const crypto = require('node:crypto');
 const { Router } = require('express');
-const { hashSenha } = require('../lib/senha');
+const { hashNumerica } = require('../lib/senha');
+const { senhaNumericaValida } = require('../lib/teclado');
 const { permitir } = require('../auth');
 const { naoEncontrado, ErroNegocio } = require('../lib/erros');
 const v = require('../lib/validacao');
@@ -109,10 +110,12 @@ module.exports = (db) => {
   // ---------- Internet Banking do cliente ----------
   const statusIb = (clienteId) => db.prepare(`SELECT status, precisa_trocar_senha, (pin_hash IS NOT NULL) AS tem_pin, limite_diario_centavos,
       ultimo_acesso, bloqueado_ate, criado_em FROM acessos_cliente WHERE cliente_id = ?`).get(clienteId) ?? null;
+  // Senha provisória de 6 números (digitada no teclado virtual do Internet Banking).
   const senhaProvisoria = () => {
-    const letras = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz';
-    const bytes = crypto.randomBytes(10);
-    return [...bytes].map((b, i) => (i % 3 === 2 ? String(b % 10) : letras[b % letras.length])).join('');
+    for (;;) {
+      const s = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+      if (senhaNumericaValida(s)) return s;
+    }
   };
   const clienteAtivo = (id) => {
     const c = db.prepare('SELECT * FROM clientes WHERE id = ?').get(id);
@@ -127,7 +130,7 @@ module.exports = (db) => {
     if (c.status !== 'ativo') throw new ErroNegocio('Só clientes ativos podem ter Internet Banking.', 409);
     if (statusIb(c.id)) throw new ErroNegocio('Internet Banking já habilitado. Use “Redefinir senha”.', 409);
     const senha = senhaProvisoria();
-    db.prepare('INSERT INTO acessos_cliente (cliente_id, senha_hash) VALUES (?, ?)').run(c.id, hashSenha(senha));
+    db.prepare('INSERT INTO acessos_cliente (cliente_id, senha_hash) VALUES (?, ?)').run(c.id, hashNumerica(senha));
     registrar(db, req, 'ib_habilitar', 'cliente', c.id);
     res.status(201).json({ ...statusIb(c.id), senha_provisoria: senha });
   });
@@ -137,7 +140,7 @@ module.exports = (db) => {
     if (!statusIb(c.id)) throw naoEncontrado('Acesso ao Internet Banking');
     const senha = senhaProvisoria();
     db.prepare(`UPDATE acessos_cliente SET senha_hash = ?, pin_hash = NULL, precisa_trocar_senha = 1, tentativas = 0, tentativas_pin = 0,
-      bloqueado_ate = NULL WHERE cliente_id = ?`).run(hashSenha(senha), c.id);
+      bloqueado_ate = NULL WHERE cliente_id = ?`).run(hashNumerica(senha), c.id);
     registrar(db, req, 'ib_redefinir_senha', 'cliente', c.id);
     res.json({ ...statusIb(c.id), senha_provisoria: senha });
   });

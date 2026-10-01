@@ -5,7 +5,8 @@ const crypto = require('node:crypto');
 const { Router } = require('express');
 const config = require('../config');
 const { emitirTokenCliente, autenticarCliente } = require('../auth');
-const { hashSenha, verificarSenha } = require('../lib/senha');
+const { hashNumerica, verificarNumerica } = require('../lib/senha');
+const { criarDesafio, candidatos, senhaNumericaValida } = require('../lib/teclado');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const v = require('../lib/validacao');
 const { registrar } = require('../lib/auditoria');
@@ -19,9 +20,12 @@ const MAX_TENTATIVAS = 5;
 const MAX_TENTATIVAS_PIN = 3;
 const SAIDAS = "('pix_enviado','transferencia_enviada','pagamento')";
 
+// O cliente não vê o banco que liquida as operações da PAY AX (lançamentos antigos podiam citar o parceiro).
+const limparDescricao = (d) => (d ? d.replace(/ via Bradesco/gi, '').replace(/ \(vinculado manualmente\)/i, '') : d);
+const limparLancamentos = (itens) => itens.map((t) => ({ ...t, descricao: limparDescricao(t.descricao) }));
+
 const mascararDocumento = (d) => (String(d).length === 11 ? `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**` : `${d.slice(0, 2)}.***.***/${d.slice(8, 12)}-**`);
-const senhaForte = (s) => typeof s === 'string' && s.length >= 8 && /\d/.test(s) && /[A-Za-z]/.test(s);
-const pinValido = (p) => /^\d{6}$/.test(String(p ?? '')) && !/^(\d)\1{5}$/.test(p) && !['123456', '654321'].includes(p);
+const REGRA_SENHA = 'deve ter 6 números e não pode ser sequência (123456) nem repetição (111111)';
 
 module.exports = (db, bradesco) => {
   const r = Router();
@@ -30,16 +34,20 @@ module.exports = (db, bradesco) => {
     JOIN clientes c ON c.id = a.cliente_id WHERE c.documento = ?`);
 
   // ---------- Login ----------
-  r.post('/auth/login', (req, res) => {
+  // Teclado virtual: cada desafio sorteia novos pares e vale para uma única digitação.
+  r.post('/auth/teclado', (_req, res) => res.json(criarDesafio(db)));
+
+  r.post('/auth/login', async (req, res) => {
     const documento = v.digitos(req.body?.documento);
     const a = documento && acessoPorDocumento.get(documento);
+    const possiveis = candidatos(db, req.body); // consome o desafio mesmo se o documento não existir
     const negar = () => { throw new ErroNegocio('CPF/CNPJ ou senha incorretos.', 401); };
     if (!a) negar();
     if (a.status !== 'ativo' || a.cliente_status !== 'ativo') throw new ErroNegocio('Acesso bloqueado. Procure a PAY AX para desbloquear.', 403);
     if (a.bloqueado_ate && a.bloqueado_ate > db.prepare("SELECT datetime('now') AS n").get().n) {
       throw new ErroNegocio('Muitas tentativas incorretas. Tente novamente em alguns minutos.', 429);
     }
-    if (!verificarSenha(req.body?.senha ?? '', a.senha_hash)) {
+    if (!(await verificarNumerica(possiveis, a.senha_hash))) {
       const t = a.tentativas + 1;
       if (t >= MAX_TENTATIVAS) {
         db.prepare("UPDATE acessos_cliente SET tentativas = 0, bloqueado_ate = datetime('now', '+15 minutes') WHERE id = ?").run(a.id);
@@ -66,11 +74,11 @@ module.exports = (db, bradesco) => {
 
   const acesso = (req) => db.prepare('SELECT * FROM acessos_cliente WHERE id = ?').get(req.acesso.id);
 
-  /** Confere a senha de transação (PIN). Três erros seguidos bloqueiam o acesso. */
-  function confirmarPin(req) {
+  /** Confere a senha de transação (teclado virtual em req.body.pin). Três erros seguidos bloqueiam o acesso. */
+  async function confirmarPin(req) {
     const a = acesso(req);
     if (!a.pin_hash) throw new ErroNegocio('Cadastre sua senha de transação.', 403);
-    if (verificarSenha(String(req.body?.pin ?? ''), a.pin_hash)) {
+    if (await verificarNumerica(candidatos(db, req.body?.pin), a.pin_hash)) {
       if (a.tentativas_pin) db.prepare('UPDATE acessos_cliente SET tentativas_pin = 0 WHERE id = ?').run(a.id);
       return;
     }
@@ -82,6 +90,11 @@ module.exports = (db, bradesco) => {
     }
     db.prepare('UPDATE acessos_cliente SET tentativas_pin = ? WHERE id = ?').run(t, a.id);
     throw new ErroNegocio(`Senha de transação incorreta. Restam ${MAX_TENTATIVAS_PIN - t} tentativa(s).`, 422);
+  }
+
+  /** Confere a senha de acesso digitada no teclado virtual (usada para trocar senhas). */
+  async function confirmarSenhaAtual(req, entrada) {
+    if (!(await verificarNumerica(candidatos(db, entrada), acesso(req).senha_hash))) throw new ErroNegocio('Senha de acesso incorreta.', 422);
   }
 
   function usoDiario(req) {
@@ -123,35 +136,39 @@ module.exports = (db, bradesco) => {
       precisa_trocar_senha: Boolean(a.precisa_trocar_senha),
       tem_pin: Boolean(a.pin_hash),
       ultimo_acesso: a.ultimo_acesso,
-      modo_bradesco: bradesco.status().modo,
+      ambiente_teste: bradesco.status().modo === 'simulador',
     });
   });
 
-  r.post('/auth/primeiro-acesso', (req, res) => {
+  // Senhas novas chegam em dígitos (teclado simples embaralhado), sempre por HTTPS.
+  r.post('/auth/primeiro-acesso', async (req, res) => {
     const { nova_senha, pin } = req.body ?? {};
-    v.exigir(senhaForte(nova_senha), 'A senha deve ter ao menos 8 caracteres, com letras e números.');
-    v.exigir(pinValido(pin), 'A senha de transação deve ter 6 números e não pode ser sequência ou repetição.');
-    v.exigir(!verificarSenha(nova_senha, acesso(req).senha_hash), 'Escolha uma senha diferente da provisória.');
+    v.exigir(senhaNumericaValida(nova_senha), `A senha de acesso ${REGRA_SENHA}.`);
+    v.exigir(senhaNumericaValida(pin), `A senha de transação ${REGRA_SENHA}.`);
+    v.exigir(nova_senha !== pin, 'A senha de transação deve ser diferente da senha de acesso.');
+    v.exigir(!(await verificarNumerica([nova_senha], acesso(req).senha_hash)), 'Escolha uma senha diferente da provisória.');
     db.prepare('UPDATE acessos_cliente SET senha_hash = ?, pin_hash = ?, precisa_trocar_senha = 0 WHERE id = ?')
-      .run(hashSenha(nova_senha), hashSenha(pin), req.acesso.id);
+      .run(hashNumerica(nova_senha), hashNumerica(pin), req.acesso.id);
     registrar(db, req, 'ib_primeiro_acesso', 'cliente', req.cliente.id);
     res.json({ ok: true });
   });
 
-  r.post('/auth/senha', (req, res) => {
-    const a = acesso(req);
-    if (!verificarSenha(req.body?.senha_atual ?? '', a.senha_hash)) throw new ErroNegocio('Senha atual incorreta.', 422);
-    v.exigir(senhaForte(req.body?.nova_senha), 'A senha deve ter ao menos 8 caracteres, com letras e números.');
-    db.prepare('UPDATE acessos_cliente SET senha_hash = ? WHERE id = ?').run(hashSenha(req.body.nova_senha), a.id);
+  r.post('/auth/senha', async (req, res) => {
+    await confirmarSenhaAtual(req, req.body?.senha_atual);
+    const nova = req.body?.nova_senha;
+    v.exigir(senhaNumericaValida(nova), `A senha de acesso ${REGRA_SENHA}.`);
+    v.exigir(!(await verificarNumerica([nova], acesso(req).pin_hash)), 'A senha de acesso deve ser diferente da senha de transação.');
+    db.prepare('UPDATE acessos_cliente SET senha_hash = ? WHERE id = ?').run(hashNumerica(nova), req.acesso.id);
     registrar(db, req, 'ib_alterar_senha', 'cliente', req.cliente.id);
     res.json({ ok: true });
   });
 
-  r.post('/auth/pin', (req, res) => {
-    const a = acesso(req);
-    if (!verificarSenha(req.body?.senha ?? '', a.senha_hash)) throw new ErroNegocio('Senha de acesso incorreta.', 422);
-    v.exigir(pinValido(req.body?.novo_pin), 'A senha de transação deve ter 6 números e não pode ser sequência ou repetição.');
-    db.prepare('UPDATE acessos_cliente SET pin_hash = ?, tentativas_pin = 0 WHERE id = ?').run(hashSenha(req.body.novo_pin), a.id);
+  r.post('/auth/pin', async (req, res) => {
+    await confirmarSenhaAtual(req, req.body?.senha);
+    const novo = req.body?.novo_pin;
+    v.exigir(senhaNumericaValida(novo), `A senha de transação ${REGRA_SENHA}.`);
+    v.exigir(!(await verificarNumerica([novo], acesso(req).senha_hash)), 'A senha de transação deve ser diferente da senha de acesso.');
+    db.prepare('UPDATE acessos_cliente SET pin_hash = ?, tentativas_pin = 0 WHERE id = ?').run(hashNumerica(novo), req.acesso.id);
     registrar(db, req, 'ib_alterar_pin', 'cliente', req.cliente.id);
     res.json({ ok: true });
   });
@@ -166,7 +183,7 @@ module.exports = (db, bradesco) => {
         (SELECT COUNT(*) FROM parcelas p WHERE p.emprestimo_id = e.id AND p.status = 'paga') AS pagas,
         (SELECT MIN(vencimento) FROM parcelas p WHERE p.emprestimo_id = e.id AND p.status = 'aberta') AS proximo_vencimento
       FROM emprestimos e WHERE e.cliente_id = ? AND e.status = 'ativo'`).all(req.cliente.id);
-    res.json({ contas, ultimas, emprestimos, limite: usoDiario(req) });
+    res.json({ contas, ultimas: limparLancamentos(ultimas), emprestimos, limite: usoDiario(req) });
   });
 
   r.get('/contas/:id/extrato', (req, res) => {
@@ -183,7 +200,7 @@ module.exports = (db, bradesco) => {
     const itens = db.prepare(`SELECT t.id, t.tipo, t.valor_centavos, t.saldo_apos_centavos, t.descricao, t.criado_em, t.estornada_em,
         clp.nome AS contraparte_nome FROM transacoes t LEFT JOIN contas cp ON cp.id = t.contraparte_conta_id
         LEFT JOIN clientes clp ON clp.id = cp.cliente_id WHERE ${where} ORDER BY t.id DESC LIMIT ? OFFSET ?`).all(...params, limite, offset);
-    res.json({ conta, itens, total, pagina, limite });
+    res.json({ conta, itens: limparLancamentos(itens), total, pagina, limite });
   });
 
   r.get('/comprovantes/:id', (req, res) => {
@@ -194,13 +211,14 @@ module.exports = (db, bradesco) => {
     const pixEntrada = db.prepare('SELECT end_to_end_id, pagador_nome, pagador_documento FROM pix_recebidos WHERE transacao_id = ?').get(t.id);
     const pagamento = db.prepare('SELECT tipo, linha_digitavel, vencimento, autenticacao FROM pagamentos WHERE transacao_id = ?').get(t.id);
     res.json({
-      id: t.id, tipo: t.tipo, valor_centavos: t.valor_centavos, descricao: t.descricao, criado_em: t.criado_em, estornada_em: t.estornada_em,
+      id: t.id, tipo: t.tipo, valor_centavos: t.valor_centavos, descricao: limparDescricao(t.descricao), criado_em: t.criado_em, estornada_em: t.estornada_em,
       conta: fmt(t), titular: req.cliente.nome, documento: mascararDocumento(req.cliente.documento),
       contraparte: cp ? { nome: cp.cliente_nome, documento: mascararDocumento(cp.cliente_documento), conta: fmt(cp), instituicao: 'PAY AX' } : null,
-      pix_saida: pixSaida ?? null,
-      pix_entrada: pixEntrada ? { ...pixEntrada, pagador_documento: pixEntrada.pagador_documento ? mascararDocumento(pixEntrada.pagador_documento) : null } : null,
-      pagamento: pagamento ? { ...pagamento, linha_formatada: formatarLinha(pagamento.linha_digitavel) } : null,
-      autenticacao: pixSaida?.end_to_end_id || pixEntrada?.end_to_end_id || pagamento?.autenticacao || t.grupo,
+      pix_saida: pixSaida ? { chave: pixSaida.chave, status: pixSaida.status } : null,
+      pix_entrada: pixEntrada ? { pagador_nome: pixEntrada.pagador_nome, pagador_documento: pixEntrada.pagador_documento ? mascararDocumento(pixEntrada.pagador_documento) : null } : null,
+      pagamento: pagamento ? { tipo: pagamento.tipo, vencimento: pagamento.vencimento, linha_formatada: formatarLinha(pagamento.linha_digitavel) } : null,
+      // Autenticação própria da PAY AX (os identificadores do banco liquidante ficam só com a equipe).
+      autenticacao: `PAYAX-${t.grupo.replace(/-/g, '').slice(0, 24).toUpperCase()}`,
     });
   });
 
@@ -264,9 +282,10 @@ module.exports = (db, bradesco) => {
   r.post('/pix', async (req, res) => {
     const { origem, valor } = prepararSaida(req);
     v.exigir(valor, 'Informe o valor.');
-    exigirLimite(req, valor);
-    confirmarPin(req);
-    res.status(201).json(await enviarPix(db, bradesco, req, origem, req.body?.chave, valor, v.texto(req.body?.descricao, 140)));
+    await confirmarPin(req);
+    exigirLimite(req, valor); // sem await entre a checagem e o débito
+    const { end_to_end_id: _e2e, ...r2 } = await enviarPix(db, bradesco, req, origem, req.body?.chave, valor, v.texto(req.body?.descricao, 140));
+    res.status(201).json(r2);
   });
 
   r.post('/pix/cobrancas', async (req, res) => {
@@ -288,12 +307,12 @@ module.exports = (db, bradesco) => {
     res.json({ nome: c.cliente_nome, documento: mascararDocumento(c.cliente_documento), conta: fmt(c), status: c.status });
   });
 
-  r.post('/transferencias', (req, res) => {
+  r.post('/transferencias', async (req, res) => {
     const { origem, valor } = prepararSaida(req);
     v.exigir(valor, 'Informe o valor.');
     const destino = localizarConta(db, { agencia: req.body?.destino_agencia, numero: req.body?.destino_numero });
-    exigirLimite(req, valor);
-    confirmarPin(req);
+    await confirmarPin(req);
+    exigirLimite(req, valor); // sem await entre a checagem e o débito
     const descricao = v.texto(req.body?.descricao, 140) || `Transferência para ${destino.cliente_nome}`;
     res.status(201).json(transferir(db, req, origem, destino, valor, descricao, 'transferencia_enviada', 'transferencia_recebida'));
   });
@@ -308,9 +327,10 @@ module.exports = (db, bradesco) => {
     const { origem } = prepararSaida(req);
     const b = lerBoleto(req.body?.linha);
     const valor = b.valor_centavos || v.valorCentavos(req.body?.valor_centavos, 'valor do pagamento');
-    exigirLimite(req, valor);
-    confirmarPin(req);
-    res.status(201).json(await bradesco.pagarBoleto(req, origem, b.linha_digitavel, valor));
+    await confirmarPin(req);
+    exigirLimite(req, valor); // sem await entre a checagem e o débito
+    const { autenticacao: _aut, codigo_barras: _cb, ...r2 } = await bradesco.pagarBoleto(req, origem, b.linha_digitavel, valor);
+    res.status(201).json(r2);
   });
 
   r.get('/pagamentos', (req, res) => {
@@ -338,8 +358,8 @@ module.exports = (db, bradesco) => {
     res.json(lista);
   });
 
-  r.post('/emprestimos/:id/parcelas/:numero/pagar', (req, res) => {
-    confirmarPin(req);
+  r.post('/emprestimos/:id/parcelas/:numero/pagar', async (req, res) => {
+    await confirmarPin(req);
     res.json(pagarParcela(db, req, req.params.id, req.params.numero));
   });
 

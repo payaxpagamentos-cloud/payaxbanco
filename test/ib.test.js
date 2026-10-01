@@ -34,23 +34,32 @@ test('Internet Banking', async (t) => {
   await api.post('/pix', { conta_id: contaBeto.id, tipo: 'cpf' });
   let tk;
   const ib = (m, c, b) => api.req(m, `/ib${c}`, b, tk);
+  // Simula o cliente clicando no teclado virtual: para cada dígito, o botão (par) que o contém.
+  const digitar = async (senha) => {
+    const d = (await api.post('/ib/auth/teclado', {}, null)).dados;
+    return { teclado_id: d.id, sequencia: [...senha].map((c) => d.teclas.findIndex((par) => par.includes(Number(c)))) };
+  };
+  const login = async (documento, senha) => api.post('/ib/auth/login', { documento, ...(await digitar(senha)) }, null);
+  const PIN = '482913';
+  const comPin = async (corpo, pin = PIN) => ({ ...corpo, pin: await digitar(pin) });
 
   await t.test('equipe habilita o acesso e recebe senha provisória', async () => {
     const r = await api.post(`/clientes/${ana.id}/internet-banking`);
     assert.equal(r.status, 201);
-    assert.match(r.dados.senha_provisoria, /^[A-Za-z0-9]{10}$/);
+    assert.match(r.dados.senha_provisoria, /^\d{6}$/);
     assert.equal((await api.post(`/clientes/${ana.id}/internet-banking`)).status, 409);
-    const login = await api.post('/ib/auth/login', { documento: '529.982.247-25', senha: r.dados.senha_provisoria }, null);
-    assert.equal(login.status, 200);
-    assert.equal(login.dados.precisa_trocar_senha, true);
-    tk = login.dados.token;
+    const l = await login('529.982.247-25', r.dados.senha_provisoria);
+    assert.equal(l.status, 200, JSON.stringify(l.dados));
+    assert.equal(l.dados.precisa_trocar_senha, true);
+    tk = l.dados.token;
   });
 
   await t.test('primeiro acesso é obrigatório e valida senha e PIN', async () => {
     assert.equal((await ib('GET', '/resumo')).status, 403);
-    assert.equal((await ib('POST', '/auth/primeiro-acesso', { nova_senha: 'curta', pin: '482913' })).status, 422);
-    assert.equal((await ib('POST', '/auth/primeiro-acesso', { nova_senha: 'SenhaNova2026', pin: '123456' })).status, 422);
-    assert.equal((await ib('POST', '/auth/primeiro-acesso', { nova_senha: 'SenhaNova2026', pin: '482913' })).status, 200);
+    assert.equal((await ib('POST', '/auth/primeiro-acesso', { nova_senha: '12345', pin: PIN })).status, 422);
+    assert.equal((await ib('POST', '/auth/primeiro-acesso', { nova_senha: '730194', pin: '123456' })).status, 422);
+    assert.equal((await ib('POST', '/auth/primeiro-acesso', { nova_senha: '730194', pin: '730194' })).status, 422);
+    assert.equal((await ib('POST', '/auth/primeiro-acesso', { nova_senha: '730194', pin: PIN })).status, 200);
     assert.equal((await ib('GET', '/resumo')).status, 200);
   });
 
@@ -64,7 +73,7 @@ test('Internet Banking', async (t) => {
     assert.deepEqual(r.dados.contas.map((c) => c.id), [contaAna.id]);
     assert.equal(r.dados.contas[0].saldo_centavos, 1_000_000);
     assert.equal((await ib('GET', `/contas/${contaBeto.id}/extrato`)).status, 404);
-    assert.equal((await ib('POST', '/pix', { conta_id: contaBeto.id, chave: 'x@y.com', valor_centavos: 1, pin: '482913' })).status, 404);
+    assert.equal((await ib('POST', '/pix', await comPin({ conta_id: contaBeto.id, chave: 'x@y.com', valor_centavos: 1 }, '482913'))).status, 404);
   });
 
   await t.test('PIX interno exige PIN e gera comprovante', async () => {
@@ -72,10 +81,10 @@ test('Internet Banking', async (t) => {
     assert.equal(dest.dados.interno, true);
     assert.equal(dest.dados.nome, 'Beto Cliente');
     assert.equal(dest.dados.documento, '***.444.777-**');
-    const errado = await ib('POST', '/pix', { conta_id: contaAna.id, chave: '11144477735', valor_centavos: 10000, pin: '000001' });
+    const errado = await ib('POST', '/pix', await comPin({ conta_id: contaAna.id, chave: '11144477735', valor_centavos: 10000 }, '000001'));
     assert.equal(errado.status, 422);
     assert.match(errado.dados.erro, /Restam 2/);
-    const ok = await ib('POST', '/pix', { conta_id: contaAna.id, chave: '11144477735', valor_centavos: 10000, pin: '482913' });
+    const ok = await ib('POST', '/pix', await comPin({ conta_id: contaAna.id, chave: '11144477735', valor_centavos: 10000 }, '482913'));
     assert.equal(ok.status, 201, JSON.stringify(ok.dados));
     const comp = await ib('GET', `/comprovantes/${ok.dados.transacao_id}`);
     assert.equal(comp.dados.contraparte.nome, 'Beto Cliente');
@@ -85,12 +94,12 @@ test('Internet Banking', async (t) => {
   });
 
   await t.test('PIX para outro banco e transferência', async () => {
-    const pix = await ib('POST', '/pix', { conta_id: contaAna.id, chave: 'loja@outro.com', valor_centavos: 5000, pin: '482913' });
+    const pix = await ib('POST', '/pix', await comPin({ conta_id: contaAna.id, chave: 'loja@outro.com', valor_centavos: 5000 }, '482913'));
     assert.equal(pix.status, 201);
     assert.equal(pix.dados.externo, true);
     const d = await ib('POST', '/transferencias/destinatario', { agencia: '0001', numero: `${contaBeto.numero}-${contaBeto.digito}` });
     assert.equal(d.dados.nome, 'Beto Cliente');
-    const tr = await ib('POST', '/transferencias', { conta_id: contaAna.id, destino_agencia: '0001', destino_numero: contaBeto.numero, valor_centavos: 2500, pin: '482913' });
+    const tr = await ib('POST', '/transferencias', await comPin({ conta_id: contaAna.id, destino_agencia: '0001', destino_numero: contaBeto.numero, valor_centavos: 2500 }, '482913'));
     assert.equal(tr.status, 201);
   });
 
@@ -98,11 +107,11 @@ test('Internet Banking', async (t) => {
     const b = gerarBoletoBancario({ valorCentavos: 18990, vencimento: '2026-12-01', campoLivre: '9' });
     const consulta = await ib('POST', '/pagamentos/consultar', { linha: b.linha_digitavel });
     assert.equal(consulta.dados.valor_centavos, 18990);
-    const pg = await ib('POST', '/pagamentos', { conta_id: contaAna.id, linha: b.linha_digitavel, pin: '482913' });
+    const pg = await ib('POST', '/pagamentos', await comPin({ conta_id: contaAna.id, linha: b.linha_digitavel }, '482913'));
     assert.equal(pg.status, 201, JSON.stringify(pg.dados));
-    assert.match(pg.dados.autenticacao, /^BRD/);
+    assert.ok(pg.dados.transacao_id);
     const conv = gerarConvenio({ valorCentavos: 13472 });
-    assert.equal((await ib('POST', '/pagamentos', { conta_id: contaAna.id, linha: conv.linha_digitavel, pin: '482913' })).status, 201);
+    assert.equal((await ib('POST', '/pagamentos', await comPin({ conta_id: contaAna.id, linha: conv.linha_digitavel }, '482913'))).status, 201);
     assert.equal((await ib('POST', '/pagamentos/consultar', { linha: '1234' })).status, 422);
     const saldo = (await ib('GET', '/resumo')).dados.contas[0].saldo_centavos;
     assert.equal(saldo, 1_000_000 - 10000 - 5000 - 2500 - 18990 - 13472);
@@ -111,7 +120,7 @@ test('Internet Banking', async (t) => {
   await t.test('limite diário do Internet Banking', async () => {
     const r = await ib('GET', '/resumo');
     assert.equal(r.dados.limite.usado_centavos, 10000 + 5000 + 2500 + 18990 + 13472);
-    const acima = await ib('POST', '/pix', { conta_id: contaAna.id, chave: '11144477735', valor_centavos: r.dados.limite.disponivel_centavos + 1, pin: '482913' });
+    const acima = await ib('POST', '/pix', await comPin({ conta_id: contaAna.id, chave: '11144477735', valor_centavos: r.dados.limite.disponivel_centavos + 1 }, '482913'));
     assert.equal(acima.status, 422);
     assert.match(acima.dados.erro, /limite diário/);
     assert.equal((await api.patch(`/clientes/${ana.id}/internet-banking`, { limite_diario_centavos: 2_000_000 })).status, 200);
@@ -135,21 +144,47 @@ test('Internet Banking', async (t) => {
   });
 
   await t.test('3 PINs errados bloqueiam; equipe redefine e desbloqueia', async () => {
-    for (let i = 0; i < 2; i++) await ib('POST', '/pix', { conta_id: contaAna.id, chave: '11144477735', valor_centavos: 100, pin: '999991' });
-    const bloq = await ib('POST', '/pix', { conta_id: contaAna.id, chave: '11144477735', valor_centavos: 100, pin: '999991' });
+    for (let i = 0; i < 2; i++) await ib('POST', '/pix', await comPin({ conta_id: contaAna.id, chave: '11144477735', valor_centavos: 100 }, '999991'));
+    const bloq = await ib('POST', '/pix', await comPin({ conta_id: contaAna.id, chave: '11144477735', valor_centavos: 100 }, '999991'));
     assert.equal(bloq.status, 403);
     assert.equal((await ib('GET', '/resumo')).status, 401);
     const nova = await api.post(`/clientes/${ana.id}/internet-banking/redefinir-senha`);
     assert.equal(nova.dados.status, 'bloqueado');
     await api.patch(`/clientes/${ana.id}/internet-banking`, { status: 'ativo' });
-    const login = await api.post('/ib/auth/login', { documento: '52998224725', senha: nova.dados.senha_provisoria }, null);
-    assert.equal(login.dados.precisa_trocar_senha, true);
+    const l = await login('52998224725', nova.dados.senha_provisoria);
+    assert.equal(l.dados.precisa_trocar_senha, true);
   });
 
   await t.test('5 senhas erradas bloqueiam o login temporariamente', async () => {
-    for (let i = 0; i < 5; i++) assert.equal((await api.post('/ib/auth/login', { documento: '52998224725', senha: 'errada' }, null)).status, 401);
-    assert.equal((await api.post('/ib/auth/login', { documento: '52998224725', senha: 'errada' }, null)).status, 429);
-    assert.equal((await api.post('/ib/auth/login', { documento: '00000000000', senha: 'x' }, null)).status, 401);
+    for (let i = 0; i < 5; i++) assert.equal((await login('52998224725', '000000')).status, 401);
+    assert.equal((await login('52998224725', '000000')).status, 429);
+    assert.equal((await login('00000000000', '000000')).status, 401);
+  });
+
+  await t.test('teclado virtual: desafio de uso único e sem dígitos no tráfego', async () => {
+    const d = (await api.post('/ib/auth/teclado', {}, null)).dados;
+    assert.equal(d.teclas.length, 5);
+    assert.deepEqual(d.teclas.flat().sort(), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const corpo = { documento: '11144477735', teclado_id: d.id, sequencia: [0, 0, 0, 0, 0, 0] };
+    await api.post('/ib/auth/login', corpo, null);
+    const reuso = await api.post('/ib/auth/login', corpo, null);
+    assert.equal(reuso.status, 422);
+    assert.match(reuso.dados.erro, /expirou/);
+    assert.equal((await api.post('/ib/auth/login', { documento: '11144477735', senha: '123456' }, null)).status, 422);
+  });
+
+  await t.test('cliente não vê o banco liquidante', async () => {
+    // Novo login da Ana (acesso redefinido no teste anterior).
+    const nova = await api.post(`/clientes/${ana.id}/internet-banking/redefinir-senha`);
+    await api.patch(`/clientes/${ana.id}/internet-banking`, { status: 'ativo' });
+    tk = (await login('52998224725', nova.dados.senha_provisoria)).dados.token;
+    assert.equal((await ib('POST', '/auth/primeiro-acesso', { nova_senha: '730194', pin: PIN })).status, 200);
+    const respostas = [await ib('GET', '/me'), await ib('GET', '/resumo'), await ib('GET', `/contas/${contaAna.id}/extrato?limite=100`)];
+    const ext = respostas[2].dados.itens;
+    for (const t2 of ext) respostas.push(await ib('GET', `/comprovantes/${t2.id}`));
+    respostas.push(await ib('POST', '/pix', await comPin({ conta_id: contaAna.id, chave: 'final@outro.com', valor_centavos: 100 })));
+    const texto = JSON.stringify(respostas.map((r) => r.dados));
+    assert.doesNotMatch(texto, /bradesco|60746948/i);
   });
 
   await t.test('auditoria registra ações do cliente', async () => {

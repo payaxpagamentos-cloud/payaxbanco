@@ -1,0 +1,23 @@
+# HTTPS automático (Let's Encrypt). Aponte os dois domínios (DNS tipo A) para o IP do servidor.
+
+# Internet Banking (clientes): só o portal do cliente e a API dele ficam expostos.
+{$DOMINIO_CLIENTES} {
+	encode gzip
+	@raiz path /
+	redir @raiz /ib/ 302
+	@apiEquipe {
+		path /api/*
+		not path /api/ib/* /api/integracoes/bradesco/webhook* /api/saude
+	}
+	respond @apiEquipe 404
+	reverse_proxy banqueiro:3000
+}
+
+# Banqueiro (equipe).
+{$DOMINIO_EQUIPE} {
+	encode gzip
+	# Recomendado: libere apenas o IP do escritório ou da VPN.
+	# @fora not remote_ip 200.200.200.200/32
+	# respond @fora 403
+	reverse_proxy banqueiro:3000
+}

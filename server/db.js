@@ -178,6 +178,14 @@ CREATE TABLE IF NOT EXISTS acessos_cliente (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Desafios do teclado virtual de pares (uso único, expiram em 3 minutos).
+CREATE TABLE IF NOT EXISTS desafios_teclado (
+  id TEXT PRIMARY KEY,
+  teclas TEXT NOT NULL,
+  expira_em TEXT NOT NULL,
+  usado INTEGER NOT NULL DEFAULT 0
+);
+
 -- Pagamentos de boletos e contas de consumo, liquidados pela conta PAY AX no Bradesco.
 CREATE TABLE IF NOT EXISTS pagamentos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

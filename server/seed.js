@@ -17,4 +17,4 @@ console.log('[PAY AX] Dados de demonstração criados.');
 console.log(`  admin:    ${config.admin.email} / ${config.admin.senha}`);
 console.log('  gerente:  gerente@payax.com.br / payax2026');
 console.log('  operador: operador@payax.com.br / payax2026');
-console.log('Internet Banking (/ib/): CPF 529.982.247-25 / Cliente2026 · CNPJ 11.222.333/0001-81 / Empresa2026 · senha de transação 246810');
+console.log('Internet Banking (/ib/): CPF 529.982.247-25 / senha 135790 · CNPJ 11.222.333/0001-81 / senha 975310 · senha de transação 246810');

@@ -13,7 +13,8 @@
     "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
     "seed": "node --disable-warning=ExperimentalWarning server/seed.js",
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
-    "build:demo": "node demo/build.js"
+    "build:demo": "node demo/build.js",
+    "backup": "node --disable-warning=ExperimentalWarning server/backup.js"
   },
   "dependencies": {
     "express": "^5.2.1",
