@@ -87,6 +87,10 @@ textarea{min-height:96px;resize:vertical}
 .pill{font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 9px;border-radius:999px;text-transform:uppercase}
 .p-alta{background:var(--bad-bg);color:var(--bad)}.p-media{background:var(--warn-bg);color:var(--warn)}.p-baixa{background:var(--card-2);color:var(--muted)}
 .s-aberto{background:var(--acc-soft);color:var(--acc)}.s-corrigido{background:var(--ok-bg);color:var(--ok)}.s-andamento{background:var(--warn-bg);color:var(--warn)}
+.anexos{display:flex;gap:8px;flex-wrap:wrap}
+.anexos img{width:96px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}
+.anexo-arq{font-size:12.5px;font-weight:700;color:var(--acc);border:1px solid var(--line);border-radius:999px;padding:4px 10px;text-decoration:none}
+input[type=file]{font:inherit;font-size:13px;color:var(--muted)}
 .vazio{border:1px dashed var(--line);border-radius:14px;padding:18px;text-align:center;color:var(--muted);font-size:13.5px}
 
 @media (max-width:900px){.sistemas,.grade{grid-template-columns:minmax(0,1fr)}}
@@ -179,31 +183,41 @@ textarea{min-height:96px;resize:vertical}
     </section>
 
     <section class="painel" aria-labelledby="t-ajustes">
-      <div class="painel-cab"><h2 id="t-ajustes">Registrar ajuste</h2></div>
+      <div class="painel-cab"><h2 id="t-ajustes">Pedir alteração</h2></div>
+      <p class="muted" style="font-size:13px">Use para qualquer frente: correções, mudanças de texto ou imagem do site, novas funções, integração e produção.</p>
       <form id="form" novalidate>
         <div class="campos">
-          <label class="rot" for="f-sistema">Sistema
+          <label class="rot" for="f-sistema">Frente
             <select id="f-sistema">
-              <option>Site</option><option>Internet Banking</option><option>Banqueiro (equipe)</option><option>Geral</option>
+              <option value="Site">Site institucional</option><option>Internet Banking</option><option>Banqueiro (equipe)</option>
+              <option>Integração Bradesco</option><option>Produção e infraestrutura</option><option>Geral</option>
             </select></label>
+          <label class="rot" for="f-tipo">Tipo de pedido
+            <select id="f-tipo"><option value="correcao">Correção de erro</option><option value="alteracao" selected>Alteração</option>
+              <option value="texto">Texto, imagem ou conteúdo</option><option value="nova">Nova funcionalidade</option></select></label>
           <label class="rot" for="f-prioridade">Prioridade
             <select id="f-prioridade"><option value="alta">Alta: impede o uso</option><option value="media" selected>Média: atrapalha</option><option value="baixa">Baixa: ajuste visual ou texto</option></select></label>
         </div>
-        <label class="rot" for="f-tela">Tela ou função
-          <input type="text" id="f-tela" placeholder="Ex.: PIX, tela de envio" maxlength="120"></label>
-        <label class="rot" for="f-descricao">O que acontece e o que deveria acontecer
-          <textarea id="f-descricao" maxlength="2000" placeholder="Ex.: ao confirmar o PIX aparece erro. Deveria mostrar o comprovante."></textarea></label>
+        <label class="rot" for="f-tela">Página, tela ou função
+          <input type="text" id="f-tela" placeholder="Ex.: Site · página Sobre · seção Quem somos" maxlength="120"></label>
+        <label class="rot" for="f-descricao">O que precisa mudar
+          <textarea id="f-descricao" maxlength="3000" placeholder="Ex.: trocar o telefone do rodapé para (11) 4000-0000 e a foto do topo pela imagem anexada."></textarea></label>
+        <div id="f-anexo-campo" hidden><label class="rot" for="f-anexo">Anexos (imagem ou PDF, opcional)
+          <input type="file" id="f-anexo" accept="image/*,application/pdf" multiple></label></div>
         <div id="f-msg" class="aviso" hidden></div>
-        <button class="enviar" type="submit" id="f-enviar" disabled>Registrar ajuste</button>
+        <button class="enviar" type="submit" id="f-enviar" disabled>Enviar pedido</button>
       </form>
 
-      <div class="painel-cab" style="margin-top:8px"><h2>Ajustes registrados</h2>
-        <div class="filtros" role="group" aria-label="Filtrar ajustes">
+      <div class="painel-cab" style="margin-top:8px"><h2>Pedidos registrados</h2>
+        <div class="filtros" role="group" aria-label="Filtrar pedidos">
           <button type="button" data-f="abertos" aria-pressed="true">Pendentes</button>
-          <button type="button" data-f="corrigido" aria-pressed="false">Corrigidos</button>
+          <button type="button" data-f="corrigido" aria-pressed="false">Concluídos</button>
           <button type="button" data-f="todos" aria-pressed="false">Todos</button>
         </div>
       </div>
+      <label class="rot" for="f-frente-filtro" style="max-width:280px">Frente
+        <select id="f-frente-filtro"><option value="">Todas as frentes</option><option value="Site">Site institucional</option><option>Internet Banking</option>
+          <option>Banqueiro (equipe)</option><option>Integração Bradesco</option><option>Produção e infraestrutura</option><option>Geral</option></select></label>
       <div class="lista" id="lista"><div class="vazio">Conectando à lista de ajustes…</div></div>
     </section>
   </div>
@@ -214,7 +228,13 @@ textarea{min-height:96px;resize:vertical}
 (function(){
   const ROTEIRO = [
     { grupo: 'Site institucional', sistema: 'Site', itens: [
-      ['site-nav', 'Navegar pelas páginas', 'Soluções, Segmentos, Integração, Desenvolvedores, Ajuda e Sobre'],
+      ['site-inicio', 'Página inicial', 'Título, textos, cartão PAY AX, blocos de soluções e chamada para abrir conta'],
+      ['site-menu', 'Menu Soluções e Segmentos', 'Abrir os menus e cada item: Conta PJ, PIX, Boletos, Cobrança, API, BaaS, Provedores'],
+      ['site-integracao', 'Página Integração (IXC)', 'Diagrama, passos e textos sobre o IXC Provedor'],
+      ['site-dev', 'Página Desenvolvedores', 'Exemplos de código e lista de recursos da API'],
+      ['site-ajuda', 'Página Ajuda', 'Busca nas perguntas frequentes e canais de contato'],
+      ['site-sobre', 'Página Sobre', 'Quem somos, valores e dados da empresa'],
+      ['site-contatos', 'Contatos e dados oficiais', 'Conferir WhatsApp, e-mail, horário, CNPJ e rodapé (hoje com "A definir")'],
       ['site-calc', 'Calculadora de baixa manual', 'Mover os controles e conferir os valores'],
       ['site-acessar', 'Acessar minha conta', 'Abre o login por cima do site; fechar com × ou Esc'],
       ['site-abrir', 'Abra sua conta', 'Abre o formulário de abertura de conta'],
@@ -306,12 +326,16 @@ textarea{min-height:96px;resize:vertical}
 
   // ---- Ajustes
   const ROT_PRIOR = { alta: 'Alta', media: 'Média', baixa: 'Baixa' };
-  const ROT_STATUS = { aberto: 'Pendente', andamento: 'Em correção', corrigido: 'Corrigido' };
+  const ROT_STATUS = { aberto: 'Pendente', andamento: 'Em andamento', corrigido: 'Concluído' };
+  const ROT_TIPO = { correcao: 'Correção', alteracao: 'Alteração', texto: 'Texto ou imagem', nova: 'Nova função' };
+  const ROT_FRENTE = { Site: 'Site institucional' };
+  let assets = null;
   async function desenharLista(){
-    const vis = ajustes.filter(a => filtro === 'todos' ? true : filtro === 'corrigido' ? a.status === 'corrigido' : a.status !== 'corrigido');
+    const frente = $('f-frente-filtro').value;
+    const vis = ajustes.filter(a => (filtro === 'todos' ? true : filtro === 'corrigido' ? a.status === 'corrigido' : a.status !== 'corrigido') && (!frente || a.sistema === frente));
     if (!db) { $('lista').innerHTML = '<div class="vazio">Entre na sua conta claude.ai para ver e registrar ajustes.</div>'; return; }
     if (!vis.length) {
-      $('lista').innerHTML = '<div class="vazio">' + (filtro === 'corrigido' ? 'Nenhum ajuste corrigido ainda.' : 'Nenhum ajuste pendente. Use o formulário acima ou o botão "Ajuste" de cada item do roteiro.') + '</div>';
+      $('lista').innerHTML = '<div class="vazio">' + (filtro === 'corrigido' ? 'Nenhum pedido concluído ainda.' : 'Nenhum pedido pendente. Use o formulário acima ou o botão "Ajuste" de cada item do roteiro.') + '</div>';
       return;
     }
     let nomes = {};
@@ -322,8 +346,12 @@ textarea{min-height:96px;resize:vertical}
       return '<article class="ajuste"><div class="linha">' +
         '<span class="pill s-' + esc(a.status || 'aberto') + '">' + esc(ROT_STATUS[a.status] || 'Pendente') + '</span>' +
         '<span class="pill p-' + esc(a.prioridade) + '">' + esc(ROT_PRIOR[a.prioridade] || '') + '</span>' +
-        '<h3>' + esc(a.sistema) + (a.tela ? ' · ' + esc(a.tela) : '') + '</h3></div>' +
+        (a.tipo ? '<span class="pill p-baixa">' + esc(ROT_TIPO[a.tipo] || a.tipo) + '</span>' : '') +
+        '<h3>' + esc(ROT_FRENTE[a.sistema] || a.sistema) + (a.tela ? ' · ' + esc(a.tela) : '') + '</h3></div>' +
         '<p>' + esc(a.descricao) + '</p>' +
+        (Array.isArray(a.anexos) && a.anexos.length ? '<div class="anexos">' + a.anexos.map(x => /^image\//.test(x.tipo || '')
+          ? '<a href="/_blob/' + esc(x.id) + '" target="_blank" rel="noopener"><img src="/_blob/' + esc(x.id) + '" alt="' + esc(x.nome) + '"></a>'
+          : '<a class="anexo-arq" href="/_blob/' + esc(x.id) + '" target="_blank" rel="noopener">' + esc(x.nome) + '</a>').join('') + '</div>' : '') +
         (a.resposta ? '<p class="muted" style="font-size:13px"><b>Correção:</b> ' + esc(a.resposta) + '</p>' : '') +
         '<span class="meta">' + esc(nome) + (quando ? ' · ' + esc(quando) : '') + '</span></article>';
     }).join('');
@@ -333,6 +361,7 @@ textarea{min-height:96px;resize:vertical}
     document.querySelectorAll('[data-f]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     desenharLista();
   }));
+  $('f-frente-filtro').addEventListener('change', desenharLista);
   function mostrar(msg, ok){ const m = $('f-msg'); m.textContent = msg; m.className = 'aviso' + (ok ? ' ok' : ''); m.hidden = false; }
   $('form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -341,12 +370,18 @@ textarea{min-height:96px;resize:vertical}
     if (descricao.length < 5) { mostrar('Descreva o que acontece e o que deveria acontecer.', false); $('f-descricao').focus(); return; }
     $('f-enviar').disabled = true;
     try {
+      const anexos = [];
+      const arquivos = assets ? [...$('f-anexo').files] : [];
+      for (const f of arquivos.slice(0, 5)) {
+        try { const up = await assets.upload(f); anexos.push({ id: up.id, nome: f.name, tipo: f.type }); }
+        catch (err) { mostrar('Não foi possível enviar o anexo "' + f.name + '"' + (err && err.code === 'too_large' ? ' (arquivo grande demais).' : '.'), false); $('f-enviar').disabled = false; return; }
+      }
       await db.collection('ajustes').add({
-        sistema: $('f-sistema').value, tela: $('f-tela').value.trim(), descricao,
+        sistema: $('f-sistema').value, tipo: $('f-tipo').value, tela: $('f-tela').value.trim(), descricao, anexos,
         prioridade: $('f-prioridade').value, status: 'aberto', autor: user ? await user.id() : null, criadoEm: Date.now(),
       });
-      $('f-tela').value = ''; $('f-descricao').value = '';
-      mostrar('Ajuste registrado.', true);
+      $('f-tela').value = ''; $('f-descricao').value = ''; if (assets) $('f-anexo').value = '';
+      mostrar('Pedido registrado.', true);
     } catch (err) {
       mostrar(err && err.code === 'quota_exceeded' ? 'A lista atingiu o limite de registros.' : 'Não foi possível registrar. Verifique sua conexão e tente de novo.', false);
     } finally { $('f-enviar').disabled = false; }
@@ -355,6 +390,9 @@ textarea{min-height:96px;resize:vertical}
 
   // ---- Atualizações do sistema (mais recente primeiro). Novas entradas são acrescentadas no topo a cada entrega.
   const ATUALIZACOES = [
+    { id: 'v1.14', data: '01/10/2026', titulo: 'Central de Testes: pedidos de todas as frentes', sistemas: ['Central de Testes'],
+      mudou: ['Área "Atualizações do sistema" para validar cada entrega antes da produção.', 'Formulário "Pedir alteração" para todas as frentes: site, Internet Banking, Banqueiro, integração Bradesco e produção.', 'Tipo de pedido (correção, alteração, texto ou imagem, nova função), filtro por frente e anexo de imagem ou PDF.', 'Roteiro do site com todas as páginas.'],
+      validar: ['Registrar um pedido de alteração do site com uma imagem anexada.', 'Filtrar os pedidos por frente.'] },
     { id: 'v1.13', data: '01/10/2026', titulo: 'Meus limites dentro do PIX', sistemas: ['Internet Banking'],
       mudou: ['"Meus limites" saiu do menu e virou uma aba da página PIX (Enviar · Receber · Minhas chaves · Meus limites).', 'Os atalhos "Alterar limite" da tela inicial e de Meu perfil levam para a nova aba.'],
       validar: ['Entrar como João e abrir PIX → Meus limites.', 'Conferir que o menu lateral não tem mais "Meus limites".'] },
@@ -443,7 +481,9 @@ textarea{min-height:96px;resize:vertical}
       else await ref.set({ status: v, por: user ? await user.id() : null, em: Date.now() });
       if (v === 'ajuste') {
         const a = ATUALIZACOES.find(x => x.id === id);
-        $('f-sistema').value = a.sistemas[0] === 'Site' ? 'Site' : a.sistemas[0] === 'Internet Banking' ? 'Internet Banking' : 'Banqueiro (equipe)';
+        const opcoes = [...$('f-sistema').options].map(o => o.value);
+        $('f-sistema').value = opcoes.includes(a.sistemas[0]) ? a.sistemas[0] : a.sistemas[0] === 'Banqueiro' ? 'Banqueiro (equipe)' : 'Geral';
+        $('f-tipo').value = 'correcao';
         $('f-tela').value = a.id + ' · ' + a.titulo;
         $('f-descricao').focus();
         $('form').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
@@ -462,6 +502,8 @@ textarea{min-height:96px;resize:vertical}
       desenharRoteiro(); desenharLista(); desenharAtualizacoes(); return;
     }
     $('f-enviar').disabled = false;
+    try { assets = await window.claude.use('assets'); } catch (_) { assets = null; }
+    $('f-anexo-campo').hidden = !assets;
     desenharRoteiro();
     db.collection('roteiro').onSnapshot(snap => {
       feitos = {}; snap.docs.forEach(d => { if (d.data() && d.data().feito) feitos[d.id] = true; });
