@@ -203,36 +203,42 @@ input.moeda { text-align: right; font-variant-numeric: tabular-nums; }
 .toast.erro { border-left-color: var(--danger); }
 
 /* Login */
-.login { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; }
-.login .lado { background: #050F26; color: #fff; padding: 48px; display: flex; flex-direction: column; justify-content: flex-end; gap: 18px; position: relative; overflow: hidden; }
-/* Vitrine de propagandas no painel lateral do login */
-.login .lado { padding: 0; }
-.login .lado .rodape-lado { position: absolute; left: 0; right: 0; bottom: 44px; z-index: 3; font-size: 12px; color: #7F93B8; text-align: center; }
-.vitrine { position: absolute; inset: 0; }
-.peca { position: absolute; inset: 0; opacity: 0; transition: opacity .9s ease; overflow: hidden; }
-.peca.ativa { opacity: 1; z-index: 1; }
-.peca img:not(.peca-logo) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.peca-foto img:not(.peca-logo) { transform: scale(1.06); transition: transform 8s ease-out; }
-.peca-foto.ativa img:not(.peca-logo) { transform: scale(1); }
-/* Sombra só na parte de baixo, levemente tingida com a cor da peça, para o texto ficar legível sobre a foto. */
-.peca-sombra { position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(4,10,24,0) 30%, rgba(4,10,24,.55) 58%, rgba(4,10,24,.94) 100%),
-              linear-gradient(0deg, color-mix(in srgb, var(--cor) 22%, transparent), transparent 55%); }
-.peca-texto { position: absolute; left: 40px; right: 40px; bottom: 76px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
-.peca-logo { height: 26px; margin-bottom: 4px; filter: drop-shadow(0 2px 8px rgba(0,0,0,.5)); }
-.peca .selo { display: inline-block; padding: 4px 12px; border-radius: 999px; background: var(--cor); color: #0A1428; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.peca h2 { margin: 0; font-size: 31px; font-weight: 800; line-height: 1.15; max-width: 520px; text-wrap: balance; color: #fff; text-shadow: 0 2px 16px rgba(0,0,0,.45); }
-.peca h2 .destaque { color: var(--cor); }
-.peca p { margin: 0; color: #DCE6F5; max-width: 460px; font-size: 15px; text-wrap: balance; text-shadow: 0 1px 8px rgba(0,0,0,.5); }
-.vitrine-pontos { position: absolute; left: 0; right: 0; bottom: 20px; z-index: 3; display: flex; justify-content: center; gap: 8px; }
-.vitrine-pontos button { width: 9px; height: 9px; padding: 0; border-radius: 99px; border: 0; background: rgba(255,255,255,.45); cursor: pointer; transition: width .3s; }
-.vitrine-pontos button.ativo { width: 26px; background: #fff; }
-@media (prefers-reduced-motion: reduce) { .peca, .peca img { transition: none !important; transform: none !important; } }
-/* Logo e títulos centralizados no formulário de acesso */
+/* ===== Telas de acesso: cartão centralizado sobre o fundo da marca ===== */
+.login { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(0,200,255,.20), transparent 38%),
+    radial-gradient(circle at 88% 85%, rgba(30,136,229,.28), transparent 45%),
+    linear-gradient(135deg, #04102A 0%, #0A1F44 55%, #0B2A5B 100%); }
+.login-cartao { width: min(960px, 100%); display: grid; grid-template-columns: 1fr 1fr; background: var(--surface); border-radius: 20px;
+  overflow: hidden; box-shadow: 0 24px 70px rgba(0, 0, 0, .45); }
+.login-rodape { color: #8FA3C4; font-size: 12px; text-align: center; }
+.login .lado { position: relative; background: #071A3C; color: #fff; min-height: 480px; }
+.login .form-lado { display: flex; align-items: center; justify-content: center; padding: 22px 40px; background: var(--surface); }
+.login form { width: min(360px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.login .tecl-par, .login .tecl-apagar { height: 42px; }
+.login .teclado { gap: 8px; }
 .login form > img, .login .cabecalho-acesso { align-self: center; text-align: center; }
-.login .form-lado { display: grid; place-items: center; padding: 32px; background: var(--surface); }
-.login form { width: min(380px, 100%); display: flex; flex-direction: column; gap: 14px; }
+.login .cabecalho-acesso h1 { font-size: 20px; }
 .login .btn { height: 42px; }
+.login .dica { font-size: 12px; color: var(--text-3); margin: 0; text-align: center; }
+
+/* Vitrine de propagandas: foto em cima, texto em bloco próprio embaixo (nunca sobre a foto) */
+.vitrine { position: absolute; inset: 0; }
+.peca { position: absolute; inset: 0; opacity: 0; transition: opacity .8s ease; display: flex; flex-direction: column; }
+.peca.ativa { opacity: 1; z-index: 1; }
+.peca-midia { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.peca-midia img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.peca-arte .peca-midia img { object-fit: cover; object-position: center; }
+.peca-texto { position: relative; padding: 16px 28px 36px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  background: #071A3C; border-top: 3px solid var(--cor); }
+.peca .selo { display: inline-block; padding: 3px 11px; border-radius: 999px; background: var(--cor); color: #0A1428; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.peca h2 { margin: 0; font-size: 22px; font-weight: 800; line-height: 1.2; text-wrap: balance; color: #fff; }
+.peca h2 .destaque { color: var(--cor); }
+.peca p { margin: 0; color: #C9D5EA; font-size: 13.5px; line-height: 1.45; text-wrap: balance; }
+.vitrine-pontos { position: absolute; left: 0; right: 0; bottom: 14px; z-index: 3; display: flex; justify-content: center; gap: 7px; }
+.vitrine-pontos button { width: 8px; height: 8px; padding: 0; border-radius: 99px; border: 0; background: rgba(255,255,255,.35); cursor: pointer; transition: width .3s; }
+.vitrine-pontos button.ativo { width: 22px; background: #fff; }
+@media (prefers-reduced-motion: reduce) { .peca { transition: none; } }
 
 .carregando { padding: 60px; text-align: center; color: var(--text-2); }
 
@@ -249,7 +255,7 @@ input.moeda { text-align: right; font-variant-numeric: tabular-nums; }
   .topbar, .content { padding-left: 16px; padding-right: 16px; }
   .grid-2, .grid-4 { grid-template-columns: minmax(0, 1fr); }
   .form .c8, .form .c6, .form .c4, .form .c3, .form .c2 { grid-column: span 12; }
-  .login { grid-template-columns: minmax(0, 1fr); }
+  .login-cartao { grid-template-columns: minmax(0, 1fr); }
   .login .lado { display: none; }
   .topbar .usuario .nome { display: none; }
 }
@@ -273,4 +279,8 @@ input.moeda { text-align: right; font-variant-numeric: tabular-nums; }
 .qr-pix { background: #FFFFFF; padding: 10px; border-radius: 12px; border: 1px solid var(--border); width: min(240px, 100%); }
 .qr-pix svg { display: block; width: 100%; height: auto; }
 /* Nas telas de login, a faixa da demonstração fica sobre o lado branco, sem cobrir a arte. */
-body:has(.login) .faixa-demo { left: auto; right: 16px; top: 16px; bottom: auto; max-width: none; flex-wrap: nowrap; white-space: nowrap; }
+/* Nas telas de acesso, a faixa da demonstração vira uma tira fina no topo, fora do cartão. */
+body:has(.login) .faixa-demo { position: static; transform: none; max-width: none; border: 0; border-radius: 0; box-shadow: none;
+  justify-content: center; padding: 5px 12px; font-size: 12px; background: #04102A; color: #C9D5EA; }
+body:has(.login) .faixa-demo .btn { height: 26px; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); color: #fff; }
+body:has(.login) .faixa-demo ~ #app .login { min-height: calc(100vh - 37px); }

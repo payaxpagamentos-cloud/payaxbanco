@@ -20,10 +20,9 @@ export function vitrine(el, { raizImg = 'img/' } = {}) {
     <div class="vitrine" aria-roledescription="carrossel" aria-label="Novidades PAY AX">
       ${pecas.map((p, i) => html`<div class="peca ${p.titulo ? 'peca-foto' : 'peca-arte'} ${i === atual ? 'ativa' : ''}" data-i="${i}"
           aria-hidden="${i === atual ? 'false' : 'true'}" style="--cor:${p.cor ?? '#00C8FF'}">
-        <img src="${raizImg}${p.imagem}" alt="${p.alt ?? ''}" style="object-position:${p.foco ?? 'center'}" ${i === atual ? '' : 'loading="lazy"'}>
-        ${p.titulo ? html`<div class="peca-sombra" aria-hidden="true"></div>
-          <div class="peca-texto"><img class="peca-logo" src="${raizImg}logo-payax-branco.svg" alt="PAY AX">
-            <span class="selo">${p.selo}</span><h2>${p.titulo}<span class="destaque">${p.destaque ?? ''}</span></h2><p>${p.texto}</p></div>` : ''}
+        <div class="peca-midia"><img src="${raizImg}${p.imagem}" alt="${p.alt ?? ''}" style="object-position:${p.foco ?? 'center'}"></div>
+        ${p.titulo ? html`<div class="peca-texto"><span class="selo">${p.selo}</span>
+          <h2>${p.titulo}<span class="destaque">${p.destaque ?? ''}</span></h2><p>${p.texto}</p></div>` : ''}
       </div>`)}
       <div class="vitrine-pontos" role="tablist">${pecas.map((_, i) => html`<button type="button" role="tab" aria-label="Peça ${i + 1}" class="${i === atual ? 'ativo' : ''}" data-ir="${i}"></button>`)}</div>
     </div>`);

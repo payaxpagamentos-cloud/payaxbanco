@@ -8,24 +8,23 @@ export function telaLogin(alvo, aoEntrar, aviso) {
   document.title = 'Entrar · Internet Banking PAY AX';
   alvo.innerHTML = String(html`
     <div class="login">
-      <section class="lado">
-        <div id="vitrine"></div>
-        <div class="rodape-lado">© ${new Date().getFullYear()} PAY AX</div>
-      </section>
-      <section class="form-lado">
+      <div class="login-cartao">
+        <section class="lado" aria-label="Novidades PAY AX"><div id="vitrine"></div></section>
+        <section class="form-lado">
         <form id="form-login" novalidate>
-          <img src="${RAIZ}img/logo-payax.svg" alt="PAY AX" style="height:44px;margin-bottom:8px">
-          <div class="cabecalho-acesso"><h1>Internet Banking</h1><p class="muted" style="margin:4px 0 8px">Acesse com seu CPF ou CNPJ.</p></div>
+          <img src="${RAIZ}img/logo-payax.svg" alt="PAY AX" style="height:34px;margin-bottom:4px">
+          <div class="cabecalho-acesso"><h1>Internet Banking</h1><p class="muted" style="margin:2px 0 4px">Acesse com seu CPF ou CNPJ.</p></div>
           <div class="erro-form ${aviso ? '' : 'hidden'}" id="erro">${aviso ?? ''}</div>
           <div><label for="documento">CPF ou CNPJ</label><input id="documento" name="documento" inputmode="numeric" autocomplete="username" required></div>
           <div id="teclado-login"></div>
           <button class="btn primario" type="submit" id="entrar" disabled>Entrar</button>
-          ${window.PAYAX_DEMO ? html`<div class="card card-body small" style="background:var(--info-bg);border:0;box-shadow:none">
-            <strong>Demonstração.</strong> CPF <span class="mono">529.982.247-25</span> · senha <span class="mono">135790</span><br>
-            ou CNPJ <span class="mono">11.222.333/0001-81</span> · senha <span class="mono">975310</span><br>Senha de transação: <span class="mono">246810</span></div>` : ''}
-          <p class="small muted" style="margin:0">Clique no botão que contém cada número da sua senha; a posição dos números muda a cada acesso. Primeiro acesso? Use a senha provisória entregue pela PAY AX. Nunca informe sua senha por telefone, e-mail ou mensagem.</p>
+          ${window.PAYAX_DEMO ? html`<div class="card small" style="background:var(--info-bg);border:0;box-shadow:none;padding:10px 12px">
+            <strong>Demo:</strong> CPF <span class="mono">529.982.247-25</span> · senha <span class="mono">135790</span> · transação <span class="mono">246810</span></div>` : ''}
+          <p class="dica">Clique no botão com cada número da senha; as posições mudam a cada acesso.</p>
         </form>
-      </section>
+        </section>
+      </div>
+      <div class="login-rodape">© ${new Date().getFullYear()} PAY AX · Nunca informe sua senha por telefone, e-mail ou mensagem.</div>
     </div>`);
   vitrine($('#vitrine', alvo), { raizImg: `${RAIZ}img/` });
   const form = $('#form-login', alvo);
@@ -54,8 +53,8 @@ export function telaLogin(alvo, aoEntrar, aviso) {
 export async function telaPrimeiroAcesso(alvo, nome, aoConcluir, aoSair) {
   document.title = 'Primeiro acesso · Internet Banking PAY AX';
   alvo.innerHTML = String(html`
-    <div style="min-height:100vh;display:grid;place-items:center;padding:24px 16px">
-      <div class="card card-body stack" style="width:min(420px,100%)">
+    <div class="login">
+      <div class="card card-body stack" style="width:min(420px,100%);border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.45)">
         <img src="${RAIZ}img/logo-payax.svg" alt="PAY AX" style="height:36px;align-self:center">
         <div style="text-align:center"><h1>Bem-vindo(a), ${nome.split(' ')[0]}!</h1><p class="muted" style="margin:4px 0 0">Para sua segurança, crie suas senhas. São duas senhas diferentes, de 6 números cada.</p></div>
         <div class="passos"><span class="feito" id="p1"></span><span id="p2"></span></div>
