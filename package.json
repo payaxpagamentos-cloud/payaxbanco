@@ -1,0 +1,20 @@
+{
+  "name": "payax-banqueiro",
+  "version": "1.0.0",
+  "description": "Banqueiro PAY AX — sistema de gestão bancária: clientes, contas, transações, PIX, empréstimos, usuários e auditoria.",
+  "main": "server/index.js",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning server/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
