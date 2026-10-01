@@ -11,6 +11,7 @@ import transacoes from './pages/transacoes.js';
 import relatorios from './pages/relatorios.js';
 import usuarios from './pages/usuarios.js';
 import auditoria from './pages/auditoria.js';
+import aberturas from './pages/aberturas.js';
 import bradesco from './pages/bradesco.js';
 
 const TODOS = ['admin', 'gerente', 'operador'];
@@ -19,6 +20,7 @@ const MENU = [
   { rota: 'painel', rotulo: 'Painel', icone: 'painel', perfis: TODOS },
   { secao: 'Cadastro' },
   { rota: 'clientes', rotulo: 'Clientes', icone: 'clientes', perfis: TODOS },
+  { rota: 'aberturas', rotulo: 'Abertura de contas', icone: 'mais', perfis: TODOS },
   { rota: 'contas', rotulo: 'Contas', icone: 'contas', perfis: TODOS },
   { rota: 'pix', rotulo: 'Chaves PIX', icone: 'pix', perfis: TODOS },
   { secao: 'Movimentação' },
@@ -42,6 +44,7 @@ const ROTAS = {
   usuarios,
   auditoria,
   bradesco,
+  aberturas,
 };
 
 const PERFIL = { admin: 'Administrador', gerente: 'Gerente', operador: 'Operador' };
@@ -112,6 +115,16 @@ function sair() {
   rotear();
 }
 
+/** Mostra no menu quantas propostas de abertura de conta aguardam análise. */
+function atualizarContadorPropostas() {
+  api.get('/aberturas', { status: 'em_analise' }).then((lista) => {
+    const link = $('.nav a[data-rota="aberturas"]');
+    if (!link) return;
+    link.querySelector('.contador')?.remove();
+    if (lista.length) link.insertAdjacentHTML('beforeend', `<span class="contador" title="Aguardando análise">${lista.length}</span>`);
+  }).catch(() => {});
+}
+
 let geracao = 0;
 async function rotear() {
   const [rota = 'painel', id] = location.hash.replace(/^#\/?/, '').split('/');
@@ -126,6 +139,7 @@ async function rotear() {
   const alvo = $('#conteudo');
   $('#sidebar').classList.remove('aberta');
   $$('.nav a').forEach((a) => a.classList.toggle('ativo', a.dataset.rota === rota));
+  atualizarContadorPropostas();
   if (!pagina || (item && !item.perfis.includes(usuarioAtual().perfil))) {
     definirTitulo('Página não encontrada');
     alvo.innerHTML = String(html`<div class="card vazio">Página não encontrada ou sem permissão. <a href="#/painel">Voltar ao painel</a></div>`);

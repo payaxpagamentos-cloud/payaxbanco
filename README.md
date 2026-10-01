@@ -84,6 +84,26 @@ Situação: cobrança, consulta de recebidos e webhook seguem o padrão **API Pi
 sandbox/produção (`server/integracoes/bradesco/api.js`). Envio de PIX, pagamento de boletos, saldo e extrato usam APIs próprias do Bradesco e funcionam
 no simulador. Para sandbox e produção, serão ligados assim que houver a documentação técnica recebida no credenciamento.
 
+## Abertura de conta online
+
+No site do Internet Banking, o botão **"Abra sua conta"** abre um assistente em quatro etapas:
+1. Dados pessoais ou da empresa
+2. Endereço e renda
+3. Tipo de conta e aceite dos termos e da LGPD
+4. Revisão
+
+Ao enviar, o interessado recebe um **protocolo** e pode consultar a situação em **"Acompanhe sua proposta"**,
+informando protocolo e CPF/CNPJ.
+
+A proposta não cria nada sozinha. No Banqueiro, a tela **Abertura de contas** lista as propostas, e o menu mostra um
+contador das que aguardam análise. Gerente ou administrador pode:
+- **Aprovar:** cria cliente, conta e acesso ao Internet Banking numa só transação e mostra a senha provisória uma única vez.
+- **Recusar:** registra o motivo internamente; o interessado vê apenas a situação.
+
+Também há validação de CPF/CNPJ, idade mínima de 18 anos, bloqueio de duplicidade (cliente existente ou proposta em
+análise) e limite de envios por IP. Verificação documental (fotos de documento e selfie) e consulta a birôs de
+crédito não estão incluídas.
+
 ## Vitrine de propagandas
 
 O painel lateral das telas de login (Banqueiro e Internet Banking) mostra peças da PAY AX com fotos

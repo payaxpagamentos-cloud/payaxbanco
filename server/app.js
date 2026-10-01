@@ -25,6 +25,7 @@ function criarApp(db) {
 
   // Freia tentativas de senha por IP (complementa o bloqueio por conta).
   app.use(['/api/auth/login', '/api/ib/auth/login'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  app.use('/api/ib/abertura', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   app.use('/api/ib/auth/teclado', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto * 3 }));
   app.use('/api', criarApi(db));
 

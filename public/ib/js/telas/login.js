@@ -3,6 +3,7 @@ import { html, $, mascaraDocumento, marca, icone } from '../../../js/ui.js';
 import { tecladoPares, criarSenhaNova } from '../teclado.js';
 import { vitrine } from '../../../js/vitrine.js';
 import { RAIZ } from '../raiz.js';
+import { abrirConta, acompanharProposta } from './abertura.js';
 
 const PRODUTOS = [
   { icone: 'pix', titulo: 'PIX 24 horas', texto: 'Envie e receba na hora, para qualquer banco, com QR Code e chaves.' },
@@ -27,6 +28,8 @@ export function telaLogin(alvo, aoEntrar, aviso) {
             <button type="button" data-rolar="seguranca">Segurança</button>
           </nav>
           <span class="site-cadeado">${icone('auditoria')} Ambiente seguro</span>
+          <button type="button" class="btn link site-acompanhar" id="acompanhar">Acompanhe sua proposta</button>
+          <button type="button" class="btn ouro" id="abrir-conta">Abra sua conta</button>
         </div>
       </header>
 
@@ -51,6 +54,7 @@ export function telaLogin(alvo, aoEntrar, aviso) {
               <div id="teclado-login"></div>
               <button class="btn primario" type="submit" id="entrar" disabled>Entrar</button>
             </form>
+            <div class="sem-conta">Ainda não é cliente? <button type="button" class="btn link" id="abrir-conta-2">Abra sua conta</button></div>
             ${window.PAYAX_DEMO ? html`<div class="dica-demo"><strong>Demo:</strong> CPF 529.982.247-25 · senha 135790 · transação 246810</div>` : ''}
           </div>
         </div>
@@ -58,7 +62,8 @@ export function telaLogin(alvo, aoEntrar, aviso) {
 
       <section class="site-produtos" id="produtos">
         <div class="site-linha">
-          <h2>Tudo o que você precisa, no computador</h2>
+          <div class="row" style="justify-content:space-between;margin-bottom:18px"><h2 style="margin:0">Tudo o que você precisa, no computador</h2>
+            <button type="button" class="btn primario" id="abrir-conta-3">Abra sua conta grátis</button></div>
           <div class="produtos">${PRODUTOS.map((p) => html`<div class="produto-card"><span class="ic">${icone(p.icone)}</span><h3>${p.titulo}</h3><p>${p.texto}</p></div>`)}</div>
         </div>
       </section>
@@ -83,6 +88,9 @@ export function telaLogin(alvo, aoEntrar, aviso) {
 
   vitrine($('#vitrine', alvo), { raizImg: `${RAIZ}img/`, modo: 'hero' });
   alvo.querySelectorAll('[data-rolar]').forEach((b) => b.addEventListener('click', () => $(`#${b.dataset.rolar}`, alvo).scrollIntoView({ behavior: 'smooth' })));
+
+  ['#abrir-conta', '#abrir-conta-2', '#abrir-conta-3'].forEach((id) => { $(id, alvo).onclick = abrirConta; });
+  $('#acompanhar', alvo).onclick = acompanharProposta;
 
   const erro = $('#erro', alvo);
   const mostrarErro = (msg) => { erro.textContent = msg; erro.classList.remove('hidden'); };

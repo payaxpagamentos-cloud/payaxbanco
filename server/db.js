@@ -178,6 +178,28 @@ CREATE TABLE IF NOT EXISTS acessos_cliente (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Propostas de abertura de conta feitas pelo site (analisadas pela equipe).
+CREATE TABLE IF NOT EXISTS propostas_conta (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  protocolo TEXT NOT NULL UNIQUE,
+  tipo TEXT NOT NULL CHECK (tipo IN ('PF','PJ')),
+  documento TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  email TEXT NOT NULL,
+  telefone TEXT NOT NULL,
+  tipo_conta TEXT NOT NULL CHECK (tipo_conta IN ('corrente','pagamento')),
+  dados TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'em_analise' CHECK (status IN ('em_analise','aprovada','recusada')),
+  motivo TEXT,
+  cliente_id INTEGER REFERENCES clientes(id),
+  conta_id INTEGER REFERENCES contas(id),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  analisado_em TEXT,
+  ip TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_propostas_status ON propostas_conta(status, criado_em);
+
 -- Favorecidos do cliente (cadastrados pela equipe; o cliente usa no PIX e na transferência).
 CREATE TABLE IF NOT EXISTS favorecidos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

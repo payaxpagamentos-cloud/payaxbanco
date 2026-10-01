@@ -15,6 +15,7 @@ const { buscarConta, exigirContaOperavel } = require('../lib/conta');
 const { localizarConta, buscarChaveInterna, transferir, enviarPix, fmt } = require('../lib/movimentos');
 const { pagarParcela } = require('../lib/emprestimos');
 const favorecidos = require('../lib/favorecidos');
+const abertura = require('../lib/abertura');
 const { lerBoleto, gerarBoletoBancario, gerarConvenio, formatarLinha } = require('../lib/boleto');
 
 const MAX_TENTATIVAS = 5;
@@ -62,6 +63,10 @@ module.exports = (db, bradesco) => {
     registrar(db, { cliente: { id: a.cliente_id }, ip: req.ip }, 'ib_login', 'cliente', a.cliente_id);
     res.json({ token: emitirTokenCliente(a.cliente_id), cliente: { nome: a.nome }, precisa_trocar_senha: Boolean(a.precisa_trocar_senha) });
   });
+
+  // Abertura de conta pelo site (público, sem login): envia a proposta e consulta a situação.
+  r.post('/abertura', (req, res) => res.status(201).json(abertura.criarProposta(db, req, req.body)));
+  r.post('/abertura/consulta', (req, res) => res.json(abertura.consultar(db, req.body?.protocolo, req.body?.documento)));
 
   r.use(autenticarCliente(db));
 

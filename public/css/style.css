@@ -148,7 +148,7 @@ tr:last-child td { border-bottom: 0; }
 .filtros .busca { flex: 1; min-width: 220px; }
 .form { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px 16px; }
 .form .c12 { grid-column: span 12; } .form .c8 { grid-column: span 8; } .form .c6 { grid-column: span 6; }
-.form .c4 { grid-column: span 4; } .form .c3 { grid-column: span 3; } .form .c2 { grid-column: span 2; }
+.form .c5 { grid-column: span 5; } .form .c4 { grid-column: span 4; } .form .c3 { grid-column: span 3; } .form .c2 { grid-column: span 2; }
 .form fieldset { grid-column: span 12; border: 0; padding: 0; margin: 4px 0 0; }
 .form legend { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
 label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-2); margin-bottom: 5px; }
@@ -254,7 +254,7 @@ input.moeda { text-align: right; font-variant-numeric: tabular-nums; }
   .btn.menu-btn { display: inline-flex; }
   .topbar, .content { padding-left: 16px; padding-right: 16px; }
   .grid-2, .grid-4 { grid-template-columns: minmax(0, 1fr); }
-  .form .c8, .form .c6, .form .c4, .form .c3, .form .c2 { grid-column: span 12; }
+  .form .c8, .form .c6, .form .c5, .form .c4, .form .c3, .form .c2 { grid-column: span 12; }
   .login-cartao { grid-template-columns: minmax(0, 1fr); }
   .login .lado { display: none; }
   .topbar .usuario .nome { display: none; }
@@ -293,3 +293,9 @@ body:has(.login) .faixa-demo ~ #app .login { min-height: calc(100vh - 37px); }
 .sidebar .brand .marca { font-size: 26px; }
 :root[data-theme="dark"] .marca-clara { color: #fff; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .marca-clara { color: #fff; } }
+
+/* Filtros em pílulas (usados no Banqueiro e no Internet Banking) */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.chip.ativo, .chip:hover { border-color: var(--payax-azul-3); color: var(--primary); }
+.nav .contador { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--payax-ouro); color: var(--payax-azul); font-size: 11px; font-weight: 800; display: grid; place-items: center; }
