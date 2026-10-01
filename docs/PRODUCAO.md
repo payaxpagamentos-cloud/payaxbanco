@@ -5,7 +5,7 @@ em nuvem no Brasil** com Docker. O Caddy faz o HTTPS automático e separa os doi
 
 | Domínio (exemplo) | Quem usa | O que fica exposto |
 |---|---|---|
-| `internetbanking.payax.com.br` | Clientes | Só o Internet Banking (`/ib/`), a API do cliente e o webhook PIX |
+| `www.payax.com.br` (ou `internetbanking.payax.com.br`) | Clientes | O site institucional (`/site/`) com o Internet Banking (`/ib/`), a API do cliente e o webhook PIX |
 | `banqueiro.payax.com.br` | Equipe PAY AX | O Banqueiro completo (recomendado restringir por IP ou VPN) |
 
 ## 1. Antes de começar (decisões do negócio)
