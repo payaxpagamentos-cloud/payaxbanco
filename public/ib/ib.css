@@ -3,7 +3,7 @@ body.ib { background: var(--bg); }
 .ib-conteudo { max-width: 1120px; }
 
 .saldo-card { background: linear-gradient(135deg, var(--payax-azul) 0%, var(--payax-azul-2) 70%, #1A4D96 100%); color: #fff; border-radius: 18px; padding: 20px; position: relative; overflow: hidden; }
-.saldo-card::after { content: ""; position: absolute; right: -50px; bottom: -70px; width: 200px; height: 200px; border-radius: 50%; border: 34px solid rgba(245,183,0,.16); }
+.saldo-card::after { content: ""; position: absolute; right: -50px; bottom: -70px; width: 200px; height: 200px; border-radius: 50%; border: 34px solid rgba(0,200,255,.16); }
 .saldo-card .topo { display: flex; justify-content: space-between; align-items: center; gap: 10px; position: relative; z-index: 1; }
 .saldo-card select { width: auto; max-width: 100%; background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.2); height: 32px; font-size: 12.5px; }
 .saldo-card select option { color: #0F172A; }

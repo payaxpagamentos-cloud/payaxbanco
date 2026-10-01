@@ -3,8 +3,9 @@
   --payax-azul: #0A1F44;
   --payax-azul-2: #123C7A;
   --payax-azul-3: #1E5BB8;
-  --payax-ouro: #F5B700;
-  --payax-ouro-2: #FFD25A;
+  /* Destaque da marca: ciano do logo PAY AX (o nome da variável foi mantido por compatibilidade). */
+  --payax-ouro: #00C8FF;
+  --payax-ouro-2: #66E3FF;
 
   --bg: #F3F5F9;
   --surface: #FFFFFF;
@@ -68,13 +69,13 @@ h3 { font-size: 14px; font-weight: 700; }
   color: #C9D5EA; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 20px 14px;
 }
 .sidebar .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; border-bottom: 1px solid rgba(255,255,255,.08); }
-.sidebar .brand img { height: 34px; }
+.sidebar .brand img { height: 30px; }
 .sidebar .brand .produto { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--payax-ouro); font-weight: 700; }
 .nav { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; overflow-y: auto; flex: 1; }
 .nav .secao { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: #6F84A8; margin: 14px 10px 6px; }
 .nav a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; color: #C9D5EA; font-weight: 500; }
 .nav a:hover { background: rgba(255,255,255,.06); text-decoration: none; color: #fff; }
-.nav a.ativo { background: rgba(245,183,0,.14); color: #fff; box-shadow: inset 3px 0 0 var(--payax-ouro); }
+.nav a.ativo { background: rgba(0,200,255,.14); color: #fff; box-shadow: inset 3px 0 0 var(--payax-ouro); }
 .nav svg { width: 18px; height: 18px; flex: none; }
 .sidebar .rodape { font-size: 11px; color: #6F84A8; padding: 12px 8px 0; border-top: 1px solid rgba(255,255,255,.08); }
 
@@ -172,7 +173,7 @@ input.moeda { text-align: right; font-variant-numeric: tabular-nums; }
 .dl dd.num { white-space: nowrap; word-break: normal; }
 
 .saldo-hero { background: linear-gradient(120deg, var(--payax-azul) 0%, var(--payax-azul-2) 100%); color: #fff; border-radius: var(--radius); padding: 22px 24px; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; position: relative; overflow: hidden; }
-.saldo-hero::before { content: ""; position: absolute; right: -40px; top: -40px; width: 180px; height: 180px; border-radius: 50%; background: rgba(245,183,0,.14); }
+.saldo-hero::before { content: ""; position: absolute; right: -40px; top: -40px; width: 180px; height: 180px; border-radius: 50%; background: rgba(0,200,255,.14); }
 .saldo-hero .rotulo { color: #B9C8E3; font-size: 12.5px; font-weight: 600; }
 .saldo-hero .valor { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .saldo-hero .meta { display: flex; gap: 28px; flex-wrap: wrap; position: relative; }
@@ -203,9 +204,12 @@ input.moeda { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Login */
 .login { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; }
-.login .lado { background: radial-gradient(circle at 20% 20%, #1A4D96 0%, var(--payax-azul) 55%, #061128 100%); color: #fff; padding: 48px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }
-.login .lado::after { content: ""; position: absolute; right: -120px; bottom: -120px; width: 420px; height: 420px; border-radius: 50%; border: 60px solid rgba(245,183,0,.12); }
-.login .lado h2 { font-size: 34px; font-weight: 800; max-width: 460px; line-height: 1.15; }
+.login .lado { background: #050F26; color: #fff; padding: 48px; display: flex; flex-direction: column; justify-content: flex-end; gap: 18px; position: relative; overflow: hidden; }
+/* Arte oficial da marca ocupando o painel; o texto fica sobre um degradê para leitura. */
+.login .lado .arte { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.login .lado::after { content: ""; position: absolute; inset: auto 0 0 0; height: 45%; background: linear-gradient(180deg, transparent, rgba(3, 10, 28, .92)); }
+.login .lado > *:not(.arte) { position: relative; z-index: 1; }
+.login .lado h2 { font-size: 26px; font-weight: 800; max-width: 460px; line-height: 1.2; }
 .login .lado h2 span { color: var(--payax-ouro); }
 .login .lado p { color: #B9C8E3; max-width: 440px; font-size: 15px; }
 .login .form-lado { display: grid; place-items: center; padding: 32px; background: var(--surface); }
@@ -250,3 +254,5 @@ input.moeda { text-align: right; font-variant-numeric: tabular-nums; }
 /* QR Code PIX: fundo sempre branco para leitura em qualquer tema */
 .qr-pix { background: #FFFFFF; padding: 10px; border-radius: 12px; border: 1px solid var(--border); width: min(240px, 100%); }
 .qr-pix svg { display: block; width: 100%; height: auto; }
+/* Nas telas de login, a faixa da demonstração fica sobre o lado branco, sem cobrir a arte. */
+body:has(.login) .faixa-demo { left: auto; right: 16px; top: 16px; bottom: auto; max-width: none; flex-wrap: nowrap; white-space: nowrap; }

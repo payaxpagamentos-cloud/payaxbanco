@@ -18,8 +18,8 @@ function grafico(serie) {
     const b = Math.max(4, larg / 2 - 5);
     const rot = d.dia.slice(8, 10) + '/' + d.dia.slice(5, 7);
     return `<g><title>${rot}: entradas ${moeda(d.entradas_centavos)} · saídas ${moeda(d.saidas_centavos)}</title>
-      <rect x="${x + larg / 2 - b - 1}" y="${y(d.entradas_centavos)}" width="${b}" height="${y(0) - y(d.entradas_centavos)}" rx="3" fill="#1E5BB8"/>
-      <rect x="${x + larg / 2 + 1}" y="${y(d.saidas_centavos)}" width="${b}" height="${y(0) - y(d.saidas_centavos)}" rx="3" fill="#F5B700"/>
+      <rect x="${x + larg / 2 - b - 1}" y="${y(d.entradas_centavos)}" width="${b}" height="${y(0) - y(d.entradas_centavos)}" rx="3" fill="#1565C0"/>
+      <rect x="${x + larg / 2 + 1}" y="${y(d.saidas_centavos)}" width="${b}" height="${y(0) - y(d.saidas_centavos)}" rx="3" fill="#00C8FF"/>
       ${i % 2 === 0 ? `<text x="${x + larg / 2}" y="${H - 8}" text-anchor="middle">${rot}</text>` : ''}</g>`;
   }).join('');
   return raw(`<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Entradas e saídas dos últimos 14 dias">${grade}${barras}</svg>`);
@@ -44,7 +44,7 @@ export default async function dashboard({ alvo, ativo }) {
     </div>
     <div class="grid grid-2-1" style="margin-top:16px">
       <div class="card"><div class="card-head"><h2>Fluxo dos últimos 14 dias</h2>
-        <div class="legenda"><span><i style="background:#1E5BB8"></i>Entradas</span><span><i style="background:#F5B700"></i>Saídas</span></div></div>
+        <div class="legenda"><span><i style="background:#1565C0"></i>Entradas</span><span><i style="background:#00C8FF"></i>Saídas</span></div></div>
         <div class="card-body">${grafico(d.serie)}</div></div>
       <div class="card"><div class="card-head"><h2>Saldo por tipo de conta</h2></div><div class="card-body stack">
         ${d.porTipo.length ? d.porTipo.map((t) => html`<div><div class="row" style="justify-content:space-between"><span>${TIPO_CONTA[t.tipo]} <span class="muted small">(${t.quantidade})</span></span><strong class="num">${moeda(t.saldo_centavos)}</strong></div>

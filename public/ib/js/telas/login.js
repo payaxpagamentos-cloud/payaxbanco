@@ -7,12 +7,12 @@ export function telaLogin(alvo, aoEntrar, aviso) {
   alvo.innerHTML = String(html`
     <div class="login">
       <section class="lado">
-        <img src="../img/logo-payax-branco.svg" alt="PAY AX" style="height:52px;align-self:flex-start">
-        <div style="position:relative;z-index:1">
-          <h2>Seu dinheiro, <span>na palma da mão.</span></h2>
-          <p>Consulte o saldo, faça PIX, pague contas e acompanhe tudo pelo Internet Banking PAY AX.</p>
+        <img class="arte" src="../img/payax-marca.jpg" alt="PAY AX — O futuro em cada transação.">
+        <div>
+          <h2>Internet Banking <span>PAY AX</span></h2>
+          <p>Consulte saldo e extrato, faça PIX, transferências e pagamentos com segurança.</p>
         </div>
-        <div class="small" style="color:#7F93B8;position:relative;z-index:1">© ${new Date().getFullYear()} PAY AX</div>
+        <div class="small" style="color:#7F93B8">© ${new Date().getFullYear()} PAY AX</div>
       </section>
       <section class="form-lado">
         <form id="form-login" novalidate>

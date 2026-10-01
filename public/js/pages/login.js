@@ -6,12 +6,12 @@ export default function login(alvo, aoEntrar) {
   alvo.innerHTML = String(html`
     <div class="login">
       <section class="lado">
-        <img src="img/logo-payax-branco.svg" alt="PAY AX" style="height:52px;align-self:flex-start">
-        <div style="position:relative;z-index:1">
-          <h2>Gestão bancária completa, <span>em um só lugar.</span></h2>
-          <p>Clientes, contas, PIX, transferências, empréstimos e auditoria — o Banqueiro reúne toda a operação da PAY AX com segurança e controle por perfil.</p>
+        <img class="arte" src="img/payax-marca.jpg" alt="PAY AX — O futuro em cada transação.">
+        <div>
+          <h2>Banqueiro <span>PAY AX</span></h2>
+          <p>Clientes, contas, PIX, transferências, empréstimos e auditoria em um só lugar, com controle por perfil de acesso.</p>
         </div>
-        <div class="small" style="color:#7F93B8;position:relative;z-index:1">© ${new Date().getFullYear()} PAY AX · Banqueiro</div>
+        <div class="small" style="color:#7F93B8">© ${new Date().getFullYear()} PAY AX · Uso exclusivo da equipe</div>
       </section>
       <section class="form-lado">
         <form id="form-login" novalidate>

@@ -1,4 +1,4 @@
-<p align="center"><img src="public/img/logo-payax.svg" alt="PAY AX" height="64"></p>
+<p align="center"><img src="public/img/payax-marca.jpg" alt="PAY AX — O futuro em cada transação." width="320"></p>
 
 # Banqueiro · PAY AX
 
@@ -185,8 +185,16 @@ test/               # node:test
 
 ## Identidade visual
 
-O logo fica em `public/img/` e as cores em `public/css/style.css` (`--payax-azul`, `--payax-ouro`…).
-Para usar a arte oficial da PAY AX, basta substituir os arquivos SVG mantendo os mesmos nomes.
+Logo oficial PAY AX ("O futuro em cada transação."), em `public/img/`:
+
+| Arquivo | Uso |
+|---|---|
+| `logo-payax-branco.svg` | Logo vetorial para fundos escuros (menus laterais). |
+| `logo-payax.svg` | Logo vetorial para fundos claros (login e comprovantes). |
+| `payax-simbolo.svg` / `favicon.svg` | Símbolo "AX" (ícone da aba do navegador). |
+| `payax-marca.jpg` | Arte completa da marca (painel das telas de login). |
+
+As cores ficam em `public/css/style.css`: azul-marinho (`--payax-azul`) e ciano da marca (`--payax-ouro`, nome mantido por compatibilidade).
 Tema claro e escuro e layout responsivo (celular/tablet) incluídos.
 
 | Login | Clientes | Celular |
