@@ -112,7 +112,10 @@
       document.body.appendChild(janela);
     }
     janela.classList.remove('logado');drawer.hidden=true;
-    janela.querySelector('iframe').src=IB_URL+'?embutido=1'+(rota||'');
+    const quadro=janela.querySelector('iframe');
+    // Arquivo único de demonstração: o Internet Banking vem como conteúdo, não como endereço.
+    if(window.PAYAX_IB_CONTEUDO) quadro.srcdoc=window.PAYAX_IB_CONTEUDO(rota||'');
+    else quadro.src=IB_URL+'?embutido=1'+(rota||'');
     document.body.style.overflow='hidden';
     requestAnimationFrame(()=>janela.querySelector('iframe').focus());
   }

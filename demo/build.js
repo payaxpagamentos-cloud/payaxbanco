@@ -127,5 +127,7 @@ function gerarManifestoIntegridade() {
       : `<!doctype html>\n<html lang="pt-BR">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n${robots}\n${conteudo}`);
   }
   fs.writeFileSync(path.join(saidaPacote, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+  const unico = require('./arquivo-unico').gerar();
+  console.log(`Arquivo único: ${path.relative(raiz, unico.arquivo)} (${(unico.tamanho / 1048576).toFixed(1)} MB).`);
   console.log('Demonstração gerada em dist-demo/ (Banqueiro + Internet Banking), dist-ib/ (só Internet Banking), dist-site/ (site institucional + Internet Banking) e dist-apresentacao/ (tudo junto, para hospedar).');
 })().catch((e) => { console.error(e); process.exit(1); });

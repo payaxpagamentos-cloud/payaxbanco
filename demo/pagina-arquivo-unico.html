@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>PAY AX · Demonstração</title>
+<link rel="icon" href="/*ICONE*/" type="image/svg+xml">
+<style>
+@font-face { font-family: 'Manrope'; src: url("/*FONTE_MANROPE*/") format('woff2'); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: 'Unbounded'; src: url("/*FONTE_UNBOUNDED*/") format('woff2'); font-weight: 200 900; font-display: swap; }
+:root { --azul: #0A1F44; --azul-2: #123C7A; --ciano: #00C8FF; --texto: #0F172A; --texto-2: #475569; --borda: #E2E8F0; --fundo: #F3F5F9; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif; background: var(--fundo); color: var(--texto); display: flex; flex-direction: column; overflow: hidden; }
+.topo { flex: none; height: 56px; display: flex; align-items: center; gap: 14px; padding: 0 16px; background: var(--azul); color: #fff; position: relative; z-index: 2; }
+.marca { font-family: 'Unbounded', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: .02em; white-space: nowrap; }
+.marca span { color: var(--ciano); margin-left: .18em; }
+.selo { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; color: rgba(255, 255, 255, .7); white-space: nowrap; }
+.abas { display: flex; gap: 6px; margin-left: auto; }
+.aba { font: inherit; font-weight: 650; font-size: 14px; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, .28); border-radius: 999px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.aba:hover { border-color: #fff; }
+.aba[aria-selected="true"] { background: #fff; color: var(--azul); border-color: #fff; }
+.aba:focus-visible { outline: 2px solid var(--ciano); outline-offset: 2px; }
+.acessos { background: var(--ciano); color: var(--azul); border-color: var(--ciano); }
+.palco { position: relative; flex: 1; min-height: 0; }
+.palco iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+.palco iframe[hidden] { display: none; }
+.carregando { position: absolute; inset: 0; display: grid; place-items: center; color: var(--texto-2); font-weight: 600; }
+.painel { position: absolute; right: 16px; top: 64px; z-index: 3; width: min(380px, calc(100% - 32px)); background: #fff; border: 1px solid var(--borda); border-radius: 18px; box-shadow: 0 20px 50px rgba(10, 31, 68, .22); padding: 18px 20px; }
+.painel[hidden] { display: none; }
+.painel h2 { font-family: 'Unbounded', sans-serif; font-size: 15px; margin: 0 0 4px; }
+.painel p { margin: 0 0 12px; font-size: 13px; color: var(--texto-2); }
+.painel h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--azul-2); margin: 14px 0 6px; }
+.painel dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
+.painel dt { color: var(--texto-2); }
+.painel dd { margin: 0; font-weight: 700; word-break: break-all; }
+.painel .fechar { position: absolute; right: 12px; top: 10px; border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer; color: var(--texto-2); }
+@media (max-width: 720px) {
+  .selo { display: none; }
+  .topo { gap: 8px; padding: 0 10px; }
+  .marca { font-size: 16px; }
+  .aba { font-size: 12.5px; padding: 6px 10px; }
+  .aba .longo { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="marca" aria-label="PAY AX">PAY<span>AX</span></div>
+  <div class="selo">Demonstração</div>
+  <nav class="abas" role="tablist" aria-label="Sistemas">
+    <button class="aba" role="tab" data-aba="site" aria-selected="true">Site<span class="longo"> e Internet Banking</span></button>
+    <button class="aba" role="tab" data-aba="banqueiro" aria-selected="false">Banqueiro</button>
+  </nav>
+  <button class="aba acessos" id="acessos" aria-expanded="false" aria-controls="painel">Acessos</button>
+</header>
+<div class="painel" id="painel" hidden role="dialog" aria-label="Acessos de teste">
+  <button class="fechar" id="fechar-painel" aria-label="Fechar">×</button>
+  <h2>Acessos de teste</h2>
+  <p>Todos os dados são fictícios e ficam só no seu navegador.</p>
+  <h3>Internet Banking</h3>
+  <p style="margin:0 0 6px">No site, clique em "Acessar minha conta".</p>
+  <dl><dt>CPF</dt><dd>529.982.247-25</dd><dt>Senha de acesso</dt><dd>135790</dd><dt>Senha de transação</dt><dd>246810</dd></dl>
+  <h3>Banqueiro (equipe)</h3>
+  <dl><dt>E-mail</dt><dd>gerente@payax.com.br</dd><dt>Senha</dt><dd>payax2026</dd></dl>
+</div>
+<main class="palco" id="palco"><div class="carregando" id="carregando">Carregando…</div></main>
+<script>/*APPS*/</script>
+<script>
+(() => {
+  const APPS = window.PAYAX_ARQUIVO_APPS;
+  const palco = document.getElementById('palco');
+  const quadros = {};
+  const TITULOS = { site: 'Site e Internet Banking PAY AX', banqueiro: 'Banqueiro PAY AX' };
+
+  function quadro(nome) {
+    if (!quadros[nome]) {
+      const f = document.createElement('iframe');
+      f.title = TITULOS[nome];
+      f.addEventListener('load', () => document.getElementById('carregando')?.remove(), { once: true });
+      f.srcdoc = APPS[nome];
+      palco.append(f);
+      quadros[nome] = f;
+    }
+    return quadros[nome];
+  }
+
+  function mostrar(nome) {
+    quadro(nome);
+    for (const [k, f] of Object.entries(quadros)) f.hidden = k !== nome;
+    document.querySelectorAll('[data-aba]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.aba === nome)));
+  }
+
+  // Usado pelas páginas embutidas: conteúdo do Internet Banking aberto sobre o site e links entre os sistemas.
+  window.PAYAX_ARQUIVO = {
+    ib(rota) {
+      const inicio = `<script>window.PAYAX_EMBUTIDO = true;${rota ? `location.hash = ${JSON.stringify(rota)};` : ''}<\/script>`;
+      return APPS.ib.replace('<head>', () => `<head>\n${inicio}`);
+    },
+    irPara(href) {
+      mostrar('site');
+      if (!/ib\//.test(href)) return;
+      const f = quadros.site;
+      const abrir = () => f.contentDocument?.querySelector('a[href="#acessar"]')?.click();
+      if (f.contentDocument?.readyState === 'complete') abrir(); else f.addEventListener('load', abrir, { once: true });
+    },
+  };
+
+  document.querySelectorAll('[data-aba]').forEach((b) => b.addEventListener('click', () => mostrar(b.dataset.aba)));
+  const painel = document.getElementById('painel');
+  const botao = document.getElementById('acessos');
+  const alternar = (abrir) => { painel.hidden = !abrir; botao.setAttribute('aria-expanded', String(abrir)); };
+  botao.addEventListener('click', () => alternar(painel.hidden));
+  document.getElementById('fechar-painel').addEventListener('click', () => alternar(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') alternar(false); });
+  mostrar('site');
+})();
+</script>
+</body>
+</html>

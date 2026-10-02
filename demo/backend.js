@@ -159,7 +159,9 @@ function despachar(metodo, url, cabecalhos, corpo) {
 
 const fetchOriginal = window.fetch.bind(window);
 window.fetch = async (entrada, opcoes = {}) => {
-  const url = new URL(typeof entrada === 'string' ? entrada : entrada.url, location.href);
+  // No arquivo único as páginas não têm endereço (about:srcdoc): usa uma base fictícia para ler o caminho.
+  const base = location.protocol === 'about:' ? 'http://demonstracao.local/' : location.href;
+  const url = new URL(typeof entrada === 'string' ? entrada : entrada.url, base);
   if (!/\/api\//.test(url.pathname)) return fetchOriginal(entrada, opcoes);
   await pronto;
   const metodo = (opcoes.method || 'GET').toUpperCase();
@@ -180,6 +182,11 @@ export function faixaDemo(link, { topo = false } = {}) {
   el.innerHTML = `<span><strong>Demonstração</strong> · dados fictícios no seu navegador</span>
     ${link ? `<a class="btn sm" href="${link.href}">${link.rotulo}</a>` : ''}<button type="button" class="btn sm" id="demo-reset">Restaurar dados</button>`;
   document.body.prepend(el);
+  // Arquivo único de demonstração: o link vai para a outra aba do próprio arquivo.
+  const ancora = el.querySelector('a.btn');
+  let arquivo = null;
+  try { arquivo = window.parent !== window ? window.parent.PAYAX_ARQUIVO : null; } catch { /* outra origem */ }
+  if (ancora && arquivo) ancora.addEventListener('click', (e) => { e.preventDefault(); arquivo.irPara(ancora.getAttribute('href')); });
   const botao = el.querySelector('#demo-reset');
   let armado = false;
   botao.addEventListener('click', () => {
