@@ -34,8 +34,6 @@ jobs:
       - run: npm ci
       - run: node demo/build.js
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true # ativa o GitHub Pages na primeira execução, se o token permitir
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist-apresentacao
