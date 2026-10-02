@@ -112,5 +112,20 @@ function gerarManifestoIntegridade() {
   fs.writeFileSync(path.join(saidaSite, 'ib', 'index.html'), fs.readFileSync(path.join(__dirname, 'pagina-ib.html'), 'utf8').replace('/*CSS*/', () => cssIb));
   fs.cpSync(path.join(raiz, 'public/fonts'), path.join(saidaSite, 'fonts'), { recursive: true });
   fs.copyFileSync(path.join(raiz, 'public/favicon.svg'), path.join(saidaSite, 'favicon.svg'));
-  console.log('Demonstração gerada em dist-demo/ (Banqueiro + Internet Banking), dist-ib/ (só Internet Banking) e dist-site/ (site institucional + Internet Banking).');
+  // Pacote para hospedar em qualquer servidor de arquivos (ex.: Netlify, Cloudflare Pages, S3): site + Internet Banking na raiz
+  // e o Banqueiro em banqueiro/. Páginas marcadas para não aparecer em buscadores.
+  const saidaPacote = path.join(raiz, 'dist-apresentacao');
+  fs.rmSync(saidaPacote, { recursive: true, force: true });
+  fs.cpSync(saidaSite, saidaPacote, { recursive: true });
+  fs.cpSync(saida, path.join(saidaPacote, 'banqueiro'), { recursive: true });
+  for (const f of ['index.html', 'ib/index.html', 'banqueiro/index.html', 'banqueiro/ib/index.html']) {
+    const arq = path.join(saidaPacote, f);
+    const conteudo = fs.readFileSync(arq, 'utf8');
+    const robots = '<meta name="robots" content="noindex, nofollow">';
+    // A página do Banqueiro é publicada sem esqueleto HTML (o claude.ai adiciona); fora dele, precisa de doctype e viewport.
+    fs.writeFileSync(arq, conteudo.includes('<head>') ? conteudo.replace('<head>', `<head>\n${robots}`)
+      : `<!doctype html>\n<html lang="pt-BR">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n${robots}\n${conteudo}`);
+  }
+  fs.writeFileSync(path.join(saidaPacote, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+  console.log('Demonstração gerada em dist-demo/ (Banqueiro + Internet Banking), dist-ib/ (só Internet Banking), dist-site/ (site institucional + Internet Banking) e dist-apresentacao/ (tudo junto, para hospedar).');
 })().catch((e) => { console.error(e); process.exit(1); });
