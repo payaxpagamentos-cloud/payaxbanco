@@ -73,4 +73,45 @@ test('Monitoramento de segurança', async (t) => {
     assert.equal(p.base.arquivos, 8);
     assert.ok(JSON.stringify((await api.get('/auditoria?entidade=verificacao_seguranca')).dados).includes('aprovar_integridade'));
   });
+
+  await t.test('restaurar a versão aprovada desfaz alteração e põe arquivo novo em quarentena', async () => {
+    fs.writeFileSync(path.join(raiz, 'server', 'regras.js'), 'const limite = 1;\nmodule.exports = { limite };\n');
+    fs.writeFileSync(path.join(raiz, 'server', 'invasor.js'), 'malicioso();\n');
+    let p = (await api.post('/seguranca/verificar')).dados;
+    assert.equal(p.integridade.alteracoes.length, 2);
+    const painel = (await api.get('/seguranca')).dados;
+    const prob = painel.problemas.find((x) => x.id === 'integridade');
+    assert.ok(prob.acoes.some((a) => a.acao === 'restaurar_todos'));
+    assert.equal((await api.post('/seguranca/corrigir', { acao: 'restaurar_arquivo', alvo: '../../etc/passwd' })).status, 422);
+    const r = await api.post('/seguranca/corrigir', { acao: 'restaurar_todos' });
+    assert.equal(r.status, 200, JSON.stringify(r.dados));
+    assert.match(r.dados.mensagem, /1 arquivo\(s\) restaurado/);
+    assert.equal(r.dados.verificacao.integridade.status, 'ok');
+    assert.equal(fs.readFileSync(path.join(raiz, 'server', 'regras.js'), 'utf8'), 'const limite = 999999;\nmodule.exports = { limite };\n');
+    assert.equal(fs.existsSync(path.join(raiz, 'server', 'invasor.js')), false);
+    assert.ok(JSON.stringify((await api.get('/auditoria?entidade=verificacao_seguranca')).dados).includes('seguranca_correcao'));
+    p = r.dados.verificacao;
+    assert.equal(p.origem, 'correcao');
+  });
+
+  await t.test('serviços: situação, tempo no ar, disponibilidade e correções', async () => {
+    const painel = (await api.get('/seguranca')).dados;
+    assert.equal(painel.servicos.length, 8);
+    const site = painel.servicos.find((s) => s.chave === 'site');
+    assert.equal(site.status, 'ok');
+    assert.ok(site.desde);
+    const d = (await api.get('/seguranca/servicos/site')).dados;
+    // Site caiu na verificação com site.js removido e voltou depois: há um incidente encerrado.
+    assert.ok(d.incidentes.some((i) => i.status === 'fora' && i.fim), JSON.stringify(d.incidentes));
+    assert.ok(d.disponibilidade.h24 < 100 && d.disponibilidade.h24 > 0);
+    assert.ok(d.acoes.some((a) => a.acao === 'retestar'));
+    assert.equal((await api.get('/seguranca/servicos/inexistente')).status, 404);
+    const banco = (await api.get('/seguranca/servicos/banco_dados')).dados;
+    assert.ok(banco.acoes.some((a) => a.acao === 'reparar_banco'));
+    const rep = await api.post('/seguranca/corrigir', { acao: 'reparar_banco' });
+    assert.match(rep.dados.mensagem, /íntegro/);
+    assert.equal((await api.post('/seguranca/corrigir', { acao: 'apagar_tudo' })).status, 422);
+    // Sem backup configurado na instalação de teste.
+    assert.equal((await api.post('/seguranca/corrigir', { acao: 'backup' })).status, 422);
+  });
 });

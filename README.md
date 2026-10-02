@@ -194,6 +194,15 @@ completa da plataforma:
 
 Resultado: OK, atenção ou crítico, com histórico de todas as verificações.
 
+- **Monitoramento dos serviços** (`server/lib/monitor-servicos.js`): a cada 5 minutos (`PAYAX_MONITOR_INTERVALO_MIN`) cada serviço
+  (Banqueiro, Internet Banking, site, servidor e API, banco de dados, integração Bradesco, antifraude e backup) é testado e
+  marcado como operacional, degradado ou fora do ar. Ao clicar no serviço: há quanto tempo está no ar, disponibilidade em 24 h,
+  7 e 30 dias, histórico hora a hora, incidentes e informações do serviço.
+- **Problemas e correções** (`server/lib/correcoes.js`): cada problema traz o passo a passo e, quando é seguro, o botão Corrigir
+  (restaurar a versão aprovada do código, mover arquivo desconhecido para a quarentena, fazer backup, reparar o banco, limpar
+  teclados vencidos, processar limites, rodar o antifraude). Toda correção fica na auditoria e dispara nova verificação.
+  Em produção o código fica protegido contra escrita (Docker): a restauração então é feita reimplantando a versão aprovada.
+
 **Antifraude** (perfil Antifraude e administrador, `server/lib/antifraude.js`). Regras analisadas a cada operação do Internet
 Banking e ao abrir o painel: valor fora do padrão do cliente, madrugada, muitas operações em poucos minutos, destinatário novo com
 valor alto, conta nova movimentando muito, limite quase todo usado, senha errada várias vezes, acesso bloqueado, muitas falhas do
@@ -214,6 +223,7 @@ O painel mostra indicadores, gráficos por dia, regra e hora, clientes com mais 
 | `PAYAX_TRUST_PROXY` | `loopback` | Proxies confiáveis para obter o IP real (`1` atrás do Caddy ou de um balanceador). |
 | `PAYAX_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
 | `PAYAX_SEGURANCA_INTERVALO_MIN` | `60` | Intervalo, em minutos, da verificação automática de segurança. |
+| `PAYAX_MONITOR_INTERVALO_MIN` | `5` | Intervalo, em minutos, do teste rápido de cada serviço (página de status). |
 | `PAYAX_ADMIN_EMAIL` / `PAYAX_ADMIN_SENHA` / `PAYAX_ADMIN_NOME` | — | Administrador criado no primeiro start. |
 
 ### Testes

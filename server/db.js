@@ -231,6 +231,17 @@ CREATE TABLE IF NOT EXISTS verificacoes_seguranca (
   origem TEXT NOT NULL DEFAULT 'agendada',
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- Situação de cada serviço (Banqueiro, Internet Banking, site, servidor, banco, Bradesco...) a cada teste rápido.
+CREATE TABLE IF NOT EXISTS monitor_servicos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  servico TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('ok', 'degradado', 'fora')),
+  ms INTEGER NOT NULL DEFAULT 0,
+  detalhe TEXT,
+  funcoes TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_monitor_servicos ON monitor_servicos (servico, criado_em);
 
 -- Quais ações exigem análise da Ouvidoria (sem registro: vale o padrão do sistema).
 CREATE TABLE IF NOT EXISTS regras_analise (

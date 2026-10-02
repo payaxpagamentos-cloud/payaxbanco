@@ -381,3 +381,48 @@ body:has(.login) .faixa-demo ~ #app .login { min-height: calc(100vh - 37px); }
 .checagem { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 20px; border-bottom: 1px solid var(--border); }
 .checagem:last-child { border-bottom: 0; }
 tr.selecionada { background: var(--info-bg); }
+
+/* ===== Segurança: monitoramento dos serviços e correções ===== */
+.serv-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; padding: 16px 20px 20px; }
+.serv-card { display: flex; gap: 12px; align-items: flex-start; text-align: left; font: inherit; color: inherit; background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; padding: 14px; cursor: pointer; transition: transform .12s, box-shadow .12s, border-color .12s; min-width: 0; }
+.serv-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--payax-azul-3); }
+.serv-card:focus-visible { outline: 2px solid var(--payax-azul-3); outline-offset: 2px; }
+.serv-card.serv-fora { border-color: var(--danger); background: var(--danger-bg); }
+.serv-card.serv-degradado { border-color: #f59e0b; }
+.serv-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.serv-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.serv-topo strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.serv-img { position: relative; display: inline-block; flex: none; border-radius: 16px; box-shadow: 0 4px 12px rgba(15, 23, 42, .18); }
+.serv-img svg { display: block; border-radius: 16px; }
+.serv-img.serv-fora svg { filter: grayscale(.7); }
+.serv-ponto { position: absolute; right: -3px; top: -3px; width: 14px; height: 14px; border-radius: 50%; border: 2.5px solid var(--surface); }
+.serv-img.serv-ok .serv-ponto { animation: serv-pulso 2.4s ease-out infinite; }
+.serv-img.serv-fora .serv-ponto { animation: serv-pulso-v 1.2s ease-out infinite; }
+@keyframes serv-pulso { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, .55); } 70%, 100% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); } }
+@keyframes serv-pulso-v { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .6); } 70%, 100% { box-shadow: 0 0 0 9px rgba(239, 68, 68, 0); } }
+@media (prefers-reduced-motion: reduce) { .serv-ponto { animation: none !important; } .serv-card { transition: none; } }
+.serv-barras { display: block; width: 100%; margin-top: 6px; }
+.serv-rodape { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; margin-top: 2px; }
+.serv-cabeca { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
+.serv-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.serv-kpi { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.serv-kpi span { font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); font-weight: 650; }
+.serv-kpi strong { font-size: 20px; }
+.serv-kpi small { color: var(--text-3); font-size: 11.5px; }
+.serv-kpi.destaque { background: var(--ok-bg); border-color: transparent; }
+.serv-kpi.destaque.neg { background: var(--danger-bg); }
+.serv-titulo { font-size: 14px; margin: 18px 0 8px; }
+.leg { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin: 0 3px 0 8px; vertical-align: -1px; }
+.leg.ok { background: #22c55e; } .leg.degradado { background: #f59e0b; } .leg.fora { background: var(--danger); } .leg.nd { background: var(--border); }
+.lista-simples { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.problemas { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px 20px; }
+.problema { border: 1px solid var(--border); border-left: 4px solid #f59e0b; border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; background: var(--surface); }
+.problema.prob-critico { border-left-color: var(--danger); }
+.problema-topo { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.problema-acoes { gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.como-corrigir summary, .pendencias > summary { cursor: pointer; font-size: 13px; color: var(--primary); font-weight: 600; }
+.como-corrigir ol { margin: 6px 0 0; padding-left: 20px; font-size: 13.5px; color: var(--text-2); display: flex; flex-direction: column; gap: 3px; }
+.pendencias { border-top: 1px dashed var(--border); padding-top: 10px; }
+.pendencias > summary { color: var(--text); }
+.arq-acoes { display: flex; justify-content: flex-end; margin: 8px 0 0; }
+@media (max-width: 600px) { .serv-cabeca { flex-direction: column; align-items: flex-start; } }

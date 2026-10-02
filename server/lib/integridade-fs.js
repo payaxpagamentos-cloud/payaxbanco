@@ -34,6 +34,35 @@ function listarArquivos(raiz = RAIZ) {
   return lista;
 }
 
-const fonteDisco = (raiz = RAIZ) => ({ descricao: 'arquivos do servidor', listar: () => listarArquivos(raiz) });
+/** Caminho relativo seguro dentro do que é monitorado (sem "..", sem caminho absoluto). */
+function caminhoSeguro(raiz, caminho) {
+  const rel = path.posix.normalize(String(caminho));
+  const permitido = ARQUIVOS.includes(rel) || PASTAS.some((p) => rel.startsWith(`${p}/`));
+  if (!permitido || rel.startsWith('..') || path.isAbsolute(rel) || rel.includes('\0')) throw new Error(`Caminho não permitido: ${caminho}`);
+  return path.join(raiz, rel);
+}
+
+/**
+ * Fonte de arquivos do disco. `restaurar` grava de volta o conteúdo da versão aprovada ou, para arquivo que não existia
+ * na versão aprovada (base = null), move o arquivo para a quarentena (pasta de dados), sem apagar.
+ */
+const fonteDisco = (raiz = RAIZ, pastaQuarentena = null) => ({
+  descricao: 'arquivos do servidor',
+  listar: () => listarArquivos(raiz),
+  existe: (caminho) => fs.existsSync(path.join(raiz, caminho)),
+  restaurar(caminho, base) {
+    const abs = caminhoSeguro(raiz, caminho);
+    if (base === null) {
+      const destino = path.join(pastaQuarentena ?? path.join(raiz, 'data', 'quarentena'), new Date().toISOString().replace(/[:.]/g, '-'), caminho);
+      fs.mkdirSync(path.dirname(destino), { recursive: true });
+      fs.copyFileSync(abs, destino);
+      fs.rmSync(abs);
+      return 'quarentena';
+    }
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, base.conteudo);
+    return 'restaurado';
+  },
+});
 
 module.exports = { fonteDisco, listarArquivos, PASTAS, ARQUIVOS, TEXTO };

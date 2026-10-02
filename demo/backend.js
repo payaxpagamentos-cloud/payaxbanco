@@ -8,7 +8,7 @@ import seguranca from '../server/lib/seguranca.js';
 import manifesto from './gerado/integridade.json';
 
 window.PAYAX_DEMO = true;
-const CHAVE = 'payax.demo.db.v9';
+const CHAVE = 'payax.demo.db.v10';
 
 function carregarSalvo() {
   try {
@@ -55,21 +55,73 @@ window.addEventListener('storage', (e) => {
 /**
  * Monitoramento de segurança na demonstração: a "fonte" é a fotografia do código gerada no build.
  * Um banco novo começa com a versão anterior aprovada, então a primeira verificação mostra o que mudou
- * na última atualização. Depois, verifica de hora em hora enquanto a página estiver aberta.
+ * na última atualização. Restaurações ficam guardadas no próprio banco da demonstração. O teste rápido dos
+ * serviços roda enquanto a página estiver aberta; o histórico dos 7 dias anteriores é fictício.
  */
+const abertaEm = Date.now();
+function lerEstado(chave) { return db.prepare('SELECT valor FROM estado_sistema WHERE chave = ?').get(chave)?.valor ?? null; }
+function gravarEstado(chave, valor) { db.prepare('INSERT INTO estado_sistema (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor').run(chave, valor); }
+
+const fonteDemo = {
+  descricao: `fotografia do código de ${manifesto.gerado_em.slice(0, 10)}`,
+  listar() {
+    const mudancas = JSON.parse(lerEstado('demo_restauracoes') ?? '{}');
+    const mapa = new Map(manifesto.atual.map((f) => [f.caminho, f]));
+    for (const [c, f] of Object.entries(mudancas)) { if (f === null) mapa.delete(c); else mapa.set(c, f); }
+    return [...mapa.values()];
+  },
+  restaurar(caminho, base) {
+    const mudancas = JSON.parse(lerEstado('demo_restauracoes') ?? '{}');
+    mudancas[caminho] = base === null ? null : { caminho, hash: base.hash, tamanho: base.tamanho, conteudo: base.conteudo };
+    gravarEstado('demo_restauracoes', JSON.stringify(mudancas));
+    return base === null ? 'quarentena' : 'restaurado';
+  },
+};
+
+/** Histórico fictício de 7 dias (um teste por hora), com alguns incidentes, para a página de status. */
+function historicoDemo() {
+  if (db.prepare('SELECT COUNT(*) AS n FROM monitor_servicos').get().n) return;
+  const DET = { banqueiro: '4 funções respondendo', internet_banking: '5 funções respondendo', site: 'Arquivos presentes', api: 'Respondendo',
+    banco_dados: 'Íntegro', bradesco: 'Modo simulador', antifraude: 'Análise em dia', backup: 'Último há 3 h' };
+  const INC = [
+    { servico: 'site', de: 122, ate: 121, status: 'fora', detalhe: 'Com falha: Site institucional (Arquivo ausente: public/site/index.html) — exemplo da demonstração' },
+    { servico: 'bradesco', de: 75, ate: 73, status: 'degradado', detalhe: '3 PIX com falha nas últimas 24 h — exemplo da demonstração' },
+    { servico: 'api', de: 50, ate: 49, status: 'degradado', detalhe: '4 erro(s) do servidor na última hora — exemplo da demonstração' },
+    { servico: 'internet_banking', de: 30, ate: 30, status: 'fora', detalhe: 'Com falha: Teclado virtual (login do cliente) (Teclado gerado com pares inválidos.) — exemplo da demonstração' },
+    { servico: 'backup', de: 6, ate: 0, status: 'degradado', detalhe: 'Último há 30 h — exemplo da demonstração' },
+  ];
+  const ins = db.prepare("INSERT INTO monitor_servicos (servico, status, ms, detalhe, funcoes, criado_em) VALUES (?, ?, ?, ?, '[]', datetime('now', ?))");
+  for (let h = 168; h >= 1; h--) {
+    for (const servico of Object.keys(DET)) {
+      const inc = INC.find((i) => i.servico === servico && h <= i.de && h >= i.ate);
+      ins.run(servico, inc ? inc.status : 'ok', 1 + ((h * 7 + servico.length) % 9), inc ? inc.detalhe : DET[servico], `-${h} hours`);
+    }
+  }
+  gravarEstado('ultimo_backup', new Date(Date.now() - 30 * 3600_000).toISOString());
+}
+
 function iniciarSeguranca() {
-  seguranca.configurar({ fonte: { descricao: `fotografia do código de ${manifesto.gerado_em.slice(0, 10)}`, listar: () => manifesto.atual } });
+  seguranca.configurar({
+    fonte: fonteDemo,
+    fazerBackup: () => ({ arquivo: 'cópia guardada no navegador (demonstração)', tamanho: db.export().length }),
+    coletarServidor: () => ({ ambiente: 'demonstracao', ativo_ha_s: Math.round((Date.now() - abertaEm) / 1000) }),
+  });
   const vazio = db.prepare('SELECT COUNT(*) AS n FROM integridade_base').get().n === 0;
   if (vazio) {
     const ins = db.prepare("INSERT INTO integridade_base (caminho, hash, tamanho, conteudo, aprovado_em) VALUES (?, ?, ?, ?, datetime('now', '-1 day'))");
     for (const f of manifesto.anterior) ins.run(f.caminho, f.hash, f.tamanho, f.conteudo);
   }
+  historicoDemo();
   const ultima = db.prepare("SELECT (julianday('now') - julianday(MAX(criado_em))) * 24 * 60 AS min FROM verificacoes_seguranca").get().min;
   if (ultima === null || ultima >= seguranca.estado.intervaloMin) {
     try { seguranca.executar(db, { origem: vazio ? 'inicial' : 'agendada' }); salvar(); } catch (err) { console.warn('Verificação de segurança:', err); }
+  } else {
+    try { seguranca.pulsar(db); salvar(); } catch (err) { console.warn('Monitoramento dos serviços:', err); }
   }
   clearInterval(iniciarSeguranca.timer);
   iniciarSeguranca.timer = setInterval(() => { try { seguranca.executar(db); salvar(); } catch { /* tenta de novo na próxima hora */ } }, seguranca.estado.intervaloMin * 60_000);
+  clearInterval(iniciarSeguranca.pulso);
+  iniciarSeguranca.pulso = setInterval(() => { try { seguranca.pulsar(db); salvar(); } catch { /* tenta de novo no próximo teste */ } }, seguranca.estado.pulsoMin * 60_000);
 }
 
 function salvar() {
