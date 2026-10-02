@@ -1,0 +1,41 @@
+# Publica a demonstração (site + Internet Banking + Banqueiro, dados fictícios no navegador) no GitHub Pages
+# a cada atualização. Endereço: https://payaxpagamentos-cloud.github.io/payaxbanco/
+# Requer, uma única vez: Settings → Pages → Source: GitHub Actions.
+name: Demonstração (GitHub Pages)
+
+on:
+  push:
+    branches: [claude/banqueiro-pay-ax-system-qeyucv]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publicacao.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # a demonstração compara o código com a versão anterior (menu Segurança)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node demo/build.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-apresentacao
+      - id: publicacao
+        uses: actions/deploy-pages@v4
