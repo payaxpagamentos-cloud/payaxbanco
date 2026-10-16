@@ -6,6 +6,7 @@ const { hashSenha } = require('../lib/senha');
 const { naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const v = require('../lib/validacao');
+const { alcadaUsuario } = require('../lib/aprovacao');
 
 const PERFIS = ['admin', 'supervisor', 'analista'];
 
@@ -19,8 +20,9 @@ module.exports = (db) => {
 
   r.get('/', permitir('admin'), (_req, res) => {
     res.json(db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.ativo, u.ultimo_acesso, u.criado_em,
+      u.alcada_aprovacao_centavos, u.totp_ativo,
       (SELECT COUNT(*) FROM empresas e WHERE e.analista_id = u.id AND e.status IN ('ativa','implantacao')) AS empresas
-      FROM usuarios u ORDER BY u.ativo DESC, u.nome`).all());
+      FROM usuarios u ORDER BY u.ativo DESC, u.nome`).all().map((u) => ({ ...u, alcada_efetiva_centavos: alcadaUsuario(u) })));
   });
 
   r.post('/', permitir('admin'), (req, res) => {
@@ -49,8 +51,14 @@ module.exports = (db) => {
       v.exigir(String(req.body.senha).length >= 8, 'A senha deve ter pelo menos 8 caracteres.');
       hash = hashSenha(req.body.senha);
     }
-    db.prepare('UPDATE usuarios SET nome = ?, perfil = ?, ativo = ?, senha_hash = ? WHERE id = ?').run(nome, perfil, ativo, hash, u.id);
-    registrar(db, req, 'usuario_alterado', { id: u.id, perfil, ativo, senha_redefinida: Boolean(req.body.senha) });
+    // Alçada de aprovação de pagamentos: vazio = padrão do perfil; -1 = sem limite; 0 = não aprova.
+    let alcada = u.alcada_aprovacao_centavos;
+    if ('alcada_aprovacao_centavos' in req.body) {
+      alcada = req.body.alcada_aprovacao_centavos === null || req.body.alcada_aprovacao_centavos === '' ? null : Number(req.body.alcada_aprovacao_centavos);
+      v.exigir(alcada === null || (Number.isInteger(alcada) && alcada >= -1), 'Alçada de aprovação inválida.');
+    }
+    db.prepare('UPDATE usuarios SET nome = ?, perfil = ?, ativo = ?, senha_hash = ?, alcada_aprovacao_centavos = ? WHERE id = ?').run(nome, perfil, ativo, hash, alcada, u.id);
+    registrar(db, req, 'usuario_alterado', { id: u.id, perfil, ativo, senha_redefinida: Boolean(req.body.senha), alcada_aprovacao: [u.alcada_aprovacao_centavos, alcada] });
     res.status(204).end();
   });
 

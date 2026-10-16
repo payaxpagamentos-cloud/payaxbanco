@@ -249,6 +249,10 @@ const P = {
   upload: 'M12 15V3m0 0l-4 4m4-4l4 4M4 21h16',
   lixo: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
   editar: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  cadeado: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
+  documento: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h6',
+  plug: 'M9 2v6M15 2v6M7 8h10v4a5 5 0 0 1-10 0zM12 17v5',
+  enviar: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
 };
 export const icone = (nome) => raw(`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[nome] ?? ''}"/></svg>`);
 

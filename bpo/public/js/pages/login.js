@@ -41,13 +41,45 @@ export default function login(alvo, aoEntrar) {
     botao.disabled = true;
     erro.classList.add('hidden');
     try {
-      sessao.set(await api.post('/auth/login', { email: form.email.value, senha: form.senha.value }));
+      const r = await api.post('/auth/login', { email: form.email.value, senha: form.senha.value });
+      if (r.precisa_2fa) { pedirCodigo(alvo, r.desafio, aoEntrar); return; }
+      sessao.set(r);
       alvo.innerHTML = '';
       aoEntrar();
     } catch (err) {
       erro.textContent = err.message;
       erro.classList.remove('hidden');
       botao.disabled = false;
+    }
+  });
+}
+
+/** Segunda etapa: código de 6 dígitos do aplicativo autenticador. */
+function pedirCodigo(alvo, desafio, aoEntrar) {
+  const form = $('#form-login', alvo);
+  form.innerHTML = String(html`<div style="align-self:center">${marca('clara')}</div>
+    <div class="cabecalho-acesso"><h1>Verificação em duas etapas</h1><p class="muted" style="margin:2px 0 4px">Digite o código de 6 dígitos do seu aplicativo autenticador.</p></div>
+    <div class="erro-form hidden" id="erro"></div>
+    <div><label for="codigo">Código</label><input id="codigo" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required style="font-size:22px;letter-spacing:.3em;text-align:center"></div>
+    <button class="btn primario" type="submit">Confirmar</button>
+    <p class="dica"><a href="#/login" id="voltar">Voltar</a> · Perdeu o celular? Peça ao administrador para redefinir a verificação.</p>`);
+  const novo = form.cloneNode(true);
+  form.replaceWith(novo);
+  $('#codigo', alvo).focus();
+  $('#voltar', alvo).addEventListener('click', (e) => { e.preventDefault(); login(alvo, aoEntrar); });
+  novo.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const erro = $('#erro', alvo);
+    try {
+      sessao.set(await api.post('/auth/2fa/login', { desafio, codigo: novo.codigo.value }));
+      alvo.innerHTML = '';
+      aoEntrar();
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.classList.remove('hidden');
+      novo.codigo.value = '';
+      novo.codigo.focus();
+      if (/Tempo esgotado/.test(err.message)) setTimeout(() => login(alvo, aoEntrar), 1500);
     }
   });
 }

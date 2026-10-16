@@ -9,6 +9,10 @@ const { prepararEmpresa } = require('./lib/carteira');
 const lanc = require('./lib/lancamentos');
 const conc = require('./lib/conciliacao');
 const { hoje, somarDias, somarMeses, inicioMes } = require('./lib/datas');
+const aprovacao = require('./lib/aprovacao');
+const cobranca = require('./lib/cobranca');
+const docs = require('./lib/documentos');
+const orc = require('./lib/orcamento');
 
 const db = abrir();
 if (db.prepare('SELECT COUNT(*) AS n FROM empresas').get().n) {
@@ -57,7 +61,7 @@ const DESPESAS_FIXAS = [
   ['Marketing e publicidade', 'Anúncios online', 20, [0.01, 0.03]],
 ];
 
-transacao(db, () => {
+const ids = transacao(db, () => {
   const ids = {
     supervisor: usuario('Carla Mendes', 'supervisor@bpo.payax.com.br', 'supervisor'),
     rafael: usuario('Rafael Souza', 'rafael@bpo.payax.com.br', 'analista'),
@@ -145,7 +149,104 @@ transacao(db, () => {
     // A rotina mensal mais próxima fica atrasada para aparecer no painel.
     db.prepare("UPDATE tarefas SET vencimento = ? WHERE id = (SELECT MIN(id) FROM tarefas WHERE empresa_id = ?)").run(somarDias(dia, -2), empresaId);
   }
+  return ids;
+});
+
+// ---------- Módulos de gestão: responsáveis e Portal, aprovação, cobrança, documentos, orçamento, fechamento ----------
+const SENHA_PORTAL = 'portal2026';
+transacao(db, () => {
+  const req = { usuario: { id: ids.supervisor } };
+  const reqAnalista = (empresaId) => ({ usuario: { id: db.prepare('SELECT analista_id FROM empresas WHERE id = ?').get(empresaId).analista_id } });
+  const empresas = db.prepare('SELECT * FROM empresas ORDER BY id').all();
+  const cat = (empresaId, nome) => db.prepare('SELECT id FROM categorias WHERE empresa_id = ? AND nome = ?').get(empresaId, nome).id;
+  const RESPONSAVEIS = [
+    ['Marta Lima', 'Sócia administradora', 'marta@paoquente.com.br'],
+    ['Dr. Paulo Andrade', 'Diretor clínico', 'paulo@clinicasorriso.com.br'],
+    ['Renata Okada', 'CFO', 'renata@technova.com.br'],
+    ['Sérgio Rota', 'Proprietário', 'sergio@rota66.com.br'],
+  ];
+  for (const [i, e] of empresas.entries()) {
+    const [nome, cargo, email] = RESPONSAVEIS[i];
+    // Responsável com acesso ao Portal (senha já definitiva na demonstração) e um contato só para relatórios.
+    db.prepare(`INSERT INTO responsaveis (empresa_id, nome, cargo, email, telefone, acesso_portal, senha_hash, precisa_trocar_senha, pode_aprovar, limite_aprovacao_centavos)
+      VALUES (?, ?, ?, ?, ?, 1, ?, 0, 1, ?)`).run(e.id, nome, cargo, email, `1199${String(1000000 + i * 1111).slice(0, 7)}`, hashSenha(SENHA_PORTAL), i === 2 ? 5_000_000 : -1);
+    db.prepare("INSERT INTO responsaveis (empresa_id, nome, cargo, email, recebe_relatorios) VALUES (?, 'Contador externo', 'Contabilidade', ?, 1)").run(e.id, `contabil+${e.id}@escritorio.com.br`);
+    db.prepare("UPDATE empresas SET aprovacao_ativa = 1, aprovacao_acima_centavos = 300000, chave_pix_cobranca = ? WHERE id = ?").run(e.cnpj, e.id);
+
+    // Códigos contábeis para a exportação.
+    db.prepare("UPDATE contas_bancarias SET conta_contabil = CASE descricao WHEN 'Conta movimento' THEN '1.1.1.02' ELSE '1.1.1.03' END WHERE empresa_id = ?").run(e.id);
+    const codigos = { 'Venda de produtos': '3.1.1.01', 'Prestação de serviços': '3.1.1.02', 'Compra de mercadorias': '4.1.1.01', 'Salários e encargos': '4.2.1.01',
+      'Aluguel e condomínio': '4.2.2.01', 'Energia, água e internet': '4.2.2.02', 'Impostos sobre vendas (Simples, ISS, ICMS)': '3.2.1.01', 'Tarifas bancárias': '4.3.1.01' };
+    for (const [n, c] of Object.entries(codigos)) db.prepare('UPDATE categorias SET conta_contabil = ? WHERE empresa_id = ? AND nome = ?').run(c, e.id, n);
+
+    // Pagamentos novos passando pela aprovação: um em conferência e um aguardando o cliente.
+    const conta = db.prepare("SELECT id FROM contas_bancarias WHERE empresa_id = ? AND descricao = 'Conta movimento'").get(e.id).id;
+    const fornecedor = db.prepare("SELECT id FROM contatos WHERE empresa_id = ? AND tipo = 'fornecedor' ORDER BY id LIMIT 1").get(e.id).id;
+    const [emConferencia] = lanc.criar(db, reqAnalista(e.id), e.id, { tipo: 'pagar', descricao: 'Compra extra de estoque', valor_centavos: 850_000,
+      vencimento: somarDias(dia, 4), categoria_id: cat(e.id, 'Compra de mercadorias'), contato_id: fornecedor, conta_bancaria_id: conta, documento: 'NF 4521' });
+    const [paraAprovar] = lanc.criar(db, reqAnalista(e.id), e.id, { tipo: 'pagar', descricao: 'Manutenção de equipamentos', valor_centavos: 420_000,
+      vencimento: somarDias(dia, 3), categoria_id: cat(e.id, 'Serviços terceirizados'), conta_bancaria_id: conta, documento: 'NF 991' });
+    aprovacao.conferir(db, req, e.id, paraAprovar, 'NF e dados bancários conferidos.');
+    void emConferencia;
+
+    // Documentos de exemplo (PDF mínimo), um ligado ao pagamento.
+    const pdf = (titulo) => Buffer.from(`%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 120]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj 4 0 obj<</Length ${44 + titulo.length}>>stream\nBT /F1 14 Tf 20 60 Td (${titulo}) Tj ET\nendstream endobj 5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF`);
+    docs.salvar(db, e.id, pdf('Contrato de prestacao de servicos BPO'), { nome: 'contrato-bpo-payax.pdf', tipo: 'contrato' }, { usuario_id: ids.supervisor });
+    docs.salvar(db, e.id, pdf('NF 991 - Manutencao'), { nome: 'nf-991.pdf', tipo: 'nota', lancamento_id: paraAprovar }, { responsavel_id: db.prepare('SELECT id FROM responsaveis WHERE empresa_id = ? AND acesso_portal = 1').get(e.id).id });
+
+    // Rateio entre dois centros de custo.
+    const centros = ['Operação', 'Administrativo'].map((n) => Number(db.prepare('INSERT INTO centros_custo (empresa_id, nome) VALUES (?, ?)').run(e.id, n).lastInsertRowid));
+    lanc.criar(db, req, e.id, { tipo: 'pagar', descricao: 'Internet e telefonia', valor_centavos: 48_000, vencimento: somarDias(dia, 8), categoria_id: cat(e.id, 'Energia, água e internet'),
+      conta_bancaria_id: conta, rateio: [{ centro_custo_id: centros[0], percentual: 60 }, { centro_custo_id: centros[1], percentual: 40 }] });
+
+    // Clientes em atraso para a rotina de cobrança.
+    const clientes = db.prepare("SELECT id FROM contatos WHERE empresa_id = ? AND tipo = 'cliente' ORDER BY id").all(e.id).map((c) => c.id);
+    const receita = cat(e.id, i === 1 || i === 2 ? 'Prestação de serviços' : 'Venda de produtos');
+    [[12, 0.04], [38, 0.03], [75, 0.02], [5, 0.025]].forEach(([atraso, fator], k) => {
+      const base = db.prepare("SELECT AVG(valor_centavos) AS m FROM lancamentos WHERE empresa_id = ? AND tipo = 'receber'").get(e.id).m;
+      lanc.criar(db, req, e.id, { tipo: 'receber', descricao: k === 3 ? 'Venda a prazo' : 'Fornecimento faturado', valor_centavos: Math.round(base * fator * 10),
+        vencimento: somarDias(dia, -atraso), categoria_id: receita, contato_id: clientes[k % clientes.length],
+        conta_bancaria_id: conta, documento: `Fat. ${1200 + k}` });
+    });
+    // A oficina tem uma compra grande programada que o caixa não cobre: alerta de falta de caixa.
+    if (i === 3) {
+      lanc.criar(db, reqAnalista(e.id), e.id, { tipo: 'pagar', descricao: 'Elevador automotivo (sinal)', valor_centavos: 15_000_000, vencimento: somarDias(dia, 12),
+        categoria_id: cat(e.id, 'Investimentos em imobilizado'), contato_id: fornecedor, conta_bancaria_id: conta });
+    }
+
+    // Cobrança: registros, uma promessa e o lembrete.
+    const devedor = db.prepare(`SELECT l.id, l.contato_id, l.valor_centavos FROM lancamentos l WHERE l.empresa_id = ? AND l.tipo = 'receber' AND l.status = 'aberto'
+      AND l.vencimento < ? AND l.contato_id IS NOT NULL ORDER BY l.vencimento LIMIT 1`).get(e.id, dia);
+    if (devedor) {
+      cobranca.registrarContato(db, reqAnalista(e.id), e.id, { contato_id: devedor.contato_id, lancamento_id: devedor.id, canal: 'whatsapp', descricao: 'Lembrete enviado; cliente pediu a segunda via do boleto.' });
+      cobranca.registrarPromessa(db, reqAnalista(e.id), e.id, { contato_id: devedor.contato_id, lancamento_id: devedor.id, data_prometida: somarDias(dia, 2), valor_centavos: devedor.valor_centavos, observacao: 'Prometeu pagar via PIX.' });
+    }
+
+    // Orçamento do ano pela média dos últimos meses, com 5% de reajuste.
+    orc.sugerir(db, e.id, dia.slice(0, 4), 5);
+    db.prepare('DELETE FROM orcamentos WHERE empresa_id = ? AND mes < ?').run(e.id, e.inicio_contrato.slice(0, 7));
+
+    // Conversa com o cliente.
+    const resp = db.prepare('SELECT id FROM responsaveis WHERE empresa_id = ? AND acesso_portal = 1').get(e.id).id;
+    const msg = db.prepare('INSERT INTO mensagens (empresa_id, autor, usuario_id, responsavel_id, texto, lida_em) VALUES (?, ?, ?, ?, ?, ?)');
+    msg.run(e.id, 'equipe', e.analista_id, null, `Olá! O fechamento do mês passado está pronto. A DRE já está disponível em Relatórios.`, new Date().toISOString());
+    msg.run(e.id, 'cliente', null, resp, 'Obrigado! Enviei a NF 991 da manutenção pelo Portal. Podem programar o pagamento?', null);
+
+    // Fechamento: o mês retrasado fechado; o mês passado em andamento.
+    const retrasado = somarMeses(dia, -2).slice(0, 7);
+    for (const etapa of ['conciliacao', 'vencidos', 'aprovacoes', 'classificacao', 'dre', 'envio']) {
+      db.prepare('INSERT INTO fechamentos (empresa_id, mes, etapa, usuario_id, observacao) VALUES (?, ?, ?, ?, ?)').run(e.id, retrasado, etapa, e.analista_id, 'Demonstração');
+    }
+    db.prepare("INSERT INTO fechamentos (empresa_id, mes, etapa, usuario_id) VALUES (?, ?, 'fechado', ?)").run(e.id, retrasado, ids.supervisor);
+    const passado = somarMeses(dia, -1).slice(0, 7);
+    for (const etapa of ['classificacao', 'vencidos'].slice(0, i % 3)) {
+      db.prepare('INSERT INTO fechamentos (empresa_id, mes, etapa, usuario_id, observacao) VALUES (?, ?, ?, ?, ?)').run(e.id, passado, etapa, e.analista_id, 'Revisado');
+    }
+  }
+  // Alçada: Juliana aprova até R$ 5.000,00.
+  db.prepare('UPDATE usuarios SET alcada_aprovacao_centavos = 500000 WHERE id = ?').run(ids.juliana);
 });
 
 console.log('[PAY AX BPO] Dados de demonstração criados.');
 console.log(`  supervisor@bpo.payax.com.br, rafael@bpo.payax.com.br e juliana@bpo.payax.com.br — senha "${SENHA}"`);
+console.log(`  Portal do Cliente (/portal/): marta@paoquente.com.br, paulo@clinicasorriso.com.br, renata@technova.com.br, sergio@rota66.com.br — senha "${SENHA_PORTAL}"`);

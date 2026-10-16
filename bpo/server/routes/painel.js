@@ -4,6 +4,7 @@ const { Router } = require('express');
 const { filtroCarteira, veTodas } = require('../lib/acesso');
 const { receitaCarteira } = require('../lib/carteira');
 const { hoje, somarDias } = require('../lib/datas');
+const { alertaCaixa } = require('../lib/resumo');
 
 /** Painel da carteira: contratos, rotinas e pendências financeiras de todas as empresas visíveis. */
 module.exports = (db) => {
@@ -29,10 +30,17 @@ module.exports = (db) => {
         (SELECT COUNT(*) FROM lancamentos l WHERE l.empresa_id = e.id AND l.status = 'aberto' AND l.tipo = 'receber' AND l.vencimento < ?) AS receber_vencidos,
         (SELECT COUNT(*) FROM extrato x WHERE x.empresa_id = e.id AND x.status = 'pendente') AS extrato_pendente,
         (SELECT MAX(x.data) FROM extrato x WHERE x.empresa_id = e.id) AS ultimo_extrato,
-        (SELECT COUNT(*) FROM tarefas t WHERE t.empresa_id = e.id AND t.status = 'aberta' AND t.vencimento < ?) AS tarefas_atrasadas
+        (SELECT COUNT(*) FROM tarefas t WHERE t.empresa_id = e.id AND t.status = 'aberta' AND t.vencimento < ?) AS tarefas_atrasadas,
+        (SELECT COUNT(*) FROM lancamentos l WHERE l.empresa_id = e.id AND l.status = 'aberto' AND l.aprovacao IN ('conferencia','pendente')) AS aprovacoes,
+        (SELECT COUNT(*) FROM mensagens m WHERE m.empresa_id = e.id AND m.autor = 'cliente' AND m.lida_em IS NULL) AS mensagens
       FROM empresas e LEFT JOIN usuarios u ON u.id = e.analista_id WHERE ${ativas}
       ORDER BY COALESCE(e.nome_fantasia, e.razao_social)`).all(dia, dia, dia, dia, dia, ...f.params)
-      .map((p) => ({ ...p, pontos: p.pagar_hoje + p.pagar_vencidos * 2 + p.receber_vencidos + Math.min(p.extrato_pendente, 20) + p.tarefas_atrasadas * 2 }))
+      .map((p) => {
+        const caixa = alertaCaixa(db, p.id);
+        return { ...p, falta_caixa: caixa.falta ? { data: caixa.data, saldo_centavos: caixa.saldo_centavos } : null,
+          pontos: p.pagar_hoje + p.pagar_vencidos * 2 + p.receber_vencidos + Math.min(p.extrato_pendente, 20) + p.tarefas_atrasadas * 2
+            + p.aprovacoes + p.mensagens * 2 + (caixa.falta ? 10 : 0) };
+      })
       .sort((a, b) => b.pontos - a.pontos);
 
     const porAnalista = veTodas(req.usuario)

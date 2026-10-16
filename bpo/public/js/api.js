@@ -1,4 +1,6 @@
-const CHAVE = 'bpo.sessao';
+let CHAVE = 'bpo.sessao';
+/** O Portal do Cliente usa outra chave: as duas sessões convivem no mesmo navegador. */
+export const usarChaveSessao = (chave) => { CHAVE = chave; };
 
 // Cópia em memória garante a sessão mesmo quando o sessionStorage está bloqueado.
 let memoria = null;
@@ -20,12 +22,13 @@ export class ErroApi extends Error {
   constructor(mensagem, status) { super(mensagem); this.status = status; }
 }
 
-async function chamar(metodo, caminho, corpo, { bruto = false } = {}) {
+async function chamar(metodo, caminho, corpo, { bruto = false, binario = false } = {}) {
   const headers = {};
   const s = sessao.get();
   if (s?.token) headers.Authorization = `Bearer ${s.token}`;
-  if (corpo !== undefined) headers['Content-Type'] = 'application/json';
-  const resp = await fetch(`/api${caminho}`, { method: metodo, headers, body: corpo === undefined ? undefined : JSON.stringify(corpo) });
+  if (corpo !== undefined) headers['Content-Type'] = binario ? 'application/octet-stream' : 'application/json';
+  const body = corpo === undefined ? undefined : binario ? corpo : JSON.stringify(corpo);
+  const resp = await fetch(`/api${caminho}`, { method: metodo, headers, body });
   if (resp.status === 401 && !caminho.startsWith('/auth/login')) {
     sessao.limpar();
     window.dispatchEvent(new CustomEvent('bpo:sair'));
@@ -51,6 +54,8 @@ export const api = {
   put: (c, corpo = {}) => chamar('PUT', c, corpo),
   patch: (c, corpo = {}) => chamar('PATCH', c, corpo),
   del: (c) => chamar('DELETE', c),
+  /** Envia um arquivo (corpo binário); metadados vão na query string. */
+  enviarArquivo: (c, params, arquivo) => chamar('POST', c + qs(params), arquivo, { binario: true }),
   async baixar(c, params) {
     const resp = await chamar('GET', c + qs(params), undefined, { bruto: true });
     const nome = /filename="([^"]+)"/.exec(resp.headers.get('Content-Disposition') || '')?.[1] || 'relatorio.csv';

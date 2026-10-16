@@ -13,31 +13,52 @@ import conciliacao from './pages/conciliacao.js';
 import fluxo from './pages/fluxo.js';
 import dre from './pages/dre.js';
 import cadastros from './pages/cadastros.js';
+import aprovacoes from './pages/aprovacoes.js';
+import cobranca from './pages/cobranca.js';
+import documentos from './pages/documentos.js';
+import orcamento from './pages/orcamento.js';
+import { fechamentoEmpresa, fechamentoCarteira } from './pages/fechamento.js';
+import mensagens from './pages/mensagens.js';
+import integracoes from './pages/integracoes.js';
+import seguranca from './pages/seguranca.js';
+import { minhaConta, configurar2fa } from './pages/conta.js';
 
 const MENU = [
   { secao: 'Carteira' },
   { rota: 'painel', rotulo: 'Painel', icone: 'painel' },
   { rota: 'empresas', rotulo: 'Empresas', icone: 'empresa' },
   { rota: 'tarefas', rotulo: 'Tarefas', icone: 'tarefas' },
+  { rota: 'fechamento', rotulo: 'Fechamento mensal', icone: 'cadeado' },
   { secao: 'Gestão', gestor: true },
   { rota: 'auditoria', rotulo: 'Auditoria', icone: 'auditoria', gestor: true },
   { rota: 'usuarios', rotulo: 'Usuários', icone: 'usuarios', admin: true },
+  { rota: 'seguranca', rotulo: 'Segurança e backups', icone: 'escudo', admin: true },
 ];
 const visivel = (m) => (m.admin ? ehAdmin() : m.gestor ? gestor() : true);
 
 // Menu da empresa em atendimento: #/e/{id}/{rota}
 const MENU_EMPRESA = [
+  { secao: 'Rotina' },
   { rota: 'visao', rotulo: 'Visão geral', icone: 'casa', pagina: visao },
   { rota: 'pagar', rotulo: 'Contas a pagar', icone: 'pagar', pagina: (ctx) => lancamentos({ ...ctx, tipo: 'pagar' }) },
   { rota: 'receber', rotulo: 'Contas a receber', icone: 'receber', pagina: (ctx) => lancamentos({ ...ctx, tipo: 'receber' }) },
-  { rota: 'conciliacao', rotulo: 'Conciliação bancária', icone: 'conciliar', pagina: conciliacao },
+  { rota: 'aprovacoes', rotulo: 'Aprovações', icone: 'check', pagina: aprovacoes, contador: 'aprovacoes' },
+  { rota: 'cobranca', rotulo: 'Cobrança', icone: 'conversa', pagina: cobranca },
+  { rota: 'conciliacao', rotulo: 'Conciliação bancária', icone: 'conciliar', pagina: conciliacao, contador: 'extrato' },
+  { secao: 'Relatórios' },
   { rota: 'fluxo', rotulo: 'Fluxo de caixa', icone: 'fluxo', pagina: fluxo },
-  { rota: 'dre', rotulo: 'DRE', icone: 'dre', pagina: dre },
+  { rota: 'dre', rotulo: 'DRE e centros de custo', icone: 'dre', pagina: dre },
+  { rota: 'orcamento', rotulo: 'Orçamento', icone: 'relatorios', pagina: orcamento },
+  { secao: 'Empresa' },
+  { rota: 'mensagens', rotulo: 'Mensagens', icone: 'ouvidoria', pagina: mensagens, contador: 'mensagens' },
+  { rota: 'documentos', rotulo: 'Documentos', icone: 'documento', pagina: documentos },
+  { rota: 'fechamento', rotulo: 'Fechamento do mês', icone: 'cadeado', pagina: fechamentoEmpresa },
   { rota: 'cadastros', rotulo: 'Cadastros', icone: 'cadastros', pagina: cadastros },
-  { rota: 'contrato', rotulo: 'Contrato', icone: 'empresa', pagina: contrato },
+  { rota: 'integracoes', rotulo: 'Integrações', icone: 'plug', pagina: integracoes },
+  { rota: 'contrato', rotulo: 'Contrato e responsáveis', icone: 'empresa', pagina: contrato },
 ];
 
-const ROTAS = { painel, empresas: listaEmpresas, tarefas, usuarios, auditoria };
+const ROTAS = { painel, empresas: listaEmpresas, tarefas, usuarios, auditoria, fechamento: fechamentoCarteira, seguranca };
 const PERFIL = { admin: 'Administrador', supervisor: 'Supervisor', analista: 'Analista' };
 
 let empresas = [];
@@ -67,7 +88,7 @@ function renderLayout() {
     </div>`);
   $('#sair').onclick = sair;
   $('#menu-btn').onclick = () => $('#sidebar').classList.toggle('aberta');
-  $('#avatar').onclick = alterarSenha;
+  $('#avatar').onclick = () => minhaConta(alterarSenha);
 }
 
 function renderMenu(rota, empresaId) {
@@ -91,13 +112,31 @@ function renderMenu(rota, empresaId) {
         <div class="nome">${atual.nome}</div>
         ${empresas.length > 1 ? html`<select id="troca-empresa" aria-label="Trocar empresa">${opcoes(empresas, { selecionado: atual.id, rotulo: 'rotulo' })}</select>` : ''}
       </div>
-      ${MENU_EMPRESA.map((m) => html`<a href="#/e/${atual.id}/${m.rota}" class="${empresaId && m.rota === rota ? 'ativo' : ''}">${icone(m.icone)}<span>${m.rotulo}</span></a>`)}` : ''}`);
+      ${MENU_EMPRESA.map((m) => (m.secao ? html`<div class="secao sub">${m.secao}</div>`
+        : html`<a href="#/e/${atual.id}/${m.rota}" data-rota-empresa="${m.rota}" class="${empresaId && m.rota === rota ? 'ativo' : ''}">${icone(m.icone)}<span>${m.rotulo}</span></a>`))}` : ''}`);
+  if (atual) atualizarContadores(atual.id);
+  $('.nav a.ativo')?.scrollIntoView({ block: 'nearest' });
   const troca = $('#troca-empresa');
   if (troca) troca.onchange = () => {
     const sub = empresaId ? rota : 'visao';
     location.hash = `#/e/${troca.value}/${sub}`;
   };
 }
+
+/** Contadores no menu da empresa: aprovações, extrato a conciliar e mensagens do cliente. */
+function atualizarContadores(empresaId) {
+  api.get('/painel').then((p) => {
+    const e = p.pendencias.find((x) => x.id === Number(empresaId));
+    if (!e) return;
+    const valores = { aprovacoes: e.aprovacoes, extrato: e.extrato_pendente, mensagens: e.mensagens };
+    for (const m of MENU_EMPRESA.filter((x) => x.contador)) {
+      const link = $(`.nav a[data-rota-empresa="${m.rota}"]`);
+      link?.querySelector('.contador')?.remove();
+      if (link && valores[m.contador]) link.insertAdjacentHTML('beforeend', `<span class="contador">${valores[m.contador]}</span>`);
+    }
+  }).catch(() => {});
+}
+window.addEventListener('bpo:contadores', () => { const a = empresaAtual.get(); if (a) atualizarContadores(a.id); });
 
 function alterarSenha() {
   modal({
@@ -137,6 +176,10 @@ async function rotear() {
     return;
   }
   if (partes[0] === 'login' || !partes[0]) { location.hash = '#/painel'; return; }
+  if (sessao.get()?.configurar_2fa) {
+    configurar2fa($('#app'), { obrigatorio: true, aoConcluir: (token) => { sessao.set({ ...sessao.get(), token, configurar_2fa: false }); rotear(); } });
+    return;
+  }
   if (!$('.layout')) {
     try {
       const { usuario } = await api.get('/auth/me');

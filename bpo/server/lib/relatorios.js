@@ -97,17 +97,23 @@ function dre(db, empresaId, { de, ate, regime = 'competencia', centro_custo_id: 
   periodo(de, ate);
   v.exigir(['competencia', 'caixa'].includes(regime), 'Regime deve ser competência ou caixa.');
   const colunas = meses(de, ate);
-  const filtroCentro = centro ? 'AND l.centro_custo_id = ?' : '';
+  // Com filtro de centro de custo, um lançamento rateado entra só com o percentual daquele centro.
+  const peso = centro ? 'COALESCE(r.percentual, 10000)' : '10000';
+  const juntarRateio = centro ? 'LEFT JOIN rateios r ON r.lancamento_id = l.id AND r.centro_custo_id = ?' : '';
+  const filtroCentro = centro ? 'AND (l.centro_custo_id = ? OR r.percentual IS NOT NULL)' : '';
+  const pJunta = centro ? [Number(centro)] : [];
   const pCentro = centro ? [Number(centro)] : [];
   const campoData = regime === 'caixa' ? 'l.pago_em' : 'l.competencia';
   const condicao = regime === 'caixa' ? "l.status = 'pago'" : "l.status <> 'cancelado'";
+  const ponderar = (x, campos) => (centro ? { ...x, ...Object.fromEntries(campos.map((c) => [c, Math.round((x[c] * x.peso) / 10000)])) } : x);
 
-  const principais = db.prepare(`SELECT ${campoData} AS data, l.valor_centavos, c.id AS categoria_id, c.nome AS categoria, c.tipo AS categoria_tipo, c.grupo_dre
-    FROM lancamentos l JOIN categorias c ON c.id = l.categoria_id
-    WHERE l.empresa_id = ? AND ${condicao} AND ${campoData} BETWEEN ? AND ? ${filtroCentro}`).all(empresaId, de, ate, ...pCentro);
-  const baixas = db.prepare(`SELECT l.pago_em AS data, l.tipo, l.juros_centavos, l.desconto_centavos FROM lancamentos l
+  const principais = db.prepare(`SELECT ${campoData} AS data, l.valor_centavos, ${peso} AS peso, c.id AS categoria_id, c.nome AS categoria, c.tipo AS categoria_tipo, c.grupo_dre
+    FROM lancamentos l JOIN categorias c ON c.id = l.categoria_id ${juntarRateio}
+    WHERE l.empresa_id = ? AND ${condicao} AND ${campoData} BETWEEN ? AND ? ${filtroCentro}`).all(...pJunta, empresaId, de, ate, ...pCentro)
+    .map((x) => ponderar(x, ['valor_centavos']));
+  const baixas = db.prepare(`SELECT l.pago_em AS data, l.tipo, l.juros_centavos, l.desconto_centavos, ${peso} AS peso FROM lancamentos l ${juntarRateio}
     WHERE l.empresa_id = ? AND l.status = 'pago' AND l.pago_em BETWEEN ? AND ? AND (l.juros_centavos > 0 OR l.desconto_centavos > 0) ${filtroCentro}`)
-    .all(empresaId, de, ate, ...pCentro);
+    .all(...pJunta, empresaId, de, ate, ...pCentro).map((x) => ponderar(x, ['juros_centavos', 'desconto_centavos']));
 
   const grupos = Object.fromEntries(GRUPOS_DRE.map((g) => [g.chave, { ...g, valores: zeros(colunas), categorias: new Map() }]));
   const somar = (grupo, nomeCat, idCat, data, valor) => {
@@ -172,4 +178,30 @@ function dre(db, empresaId, { de, ate, regime = 'competencia', centro_custo_id: 
   };
 }
 
-module.exports = { fluxoCaixa, dre };
+/**
+ * Resultado por centro de custo (departamento, unidade, projeto): receitas, despesas e resultado do
+ * período, já com os rateios aplicados. Itens fora da DRE não entram.
+ */
+function porCentro(db, empresaId, { de, ate, regime = 'competencia' } = {}) {
+  periodo(de, ate);
+  const campoData = regime === 'caixa' ? 'l.pago_em' : 'l.competencia';
+  const condicao = regime === 'caixa' ? "l.status = 'pago'" : "l.status <> 'cancelado'";
+  const linhas = db.prepare(`
+    WITH base AS (
+      SELECT l.id, l.valor_centavos, c.tipo, l.centro_custo_id FROM lancamentos l JOIN categorias c ON c.id = l.categoria_id
+      WHERE l.empresa_id = ? AND ${condicao} AND ${campoData} BETWEEN ? AND ? AND c.grupo_dre <> 'fora_dre'
+    ),
+    partes AS (
+      SELECT r.centro_custo_id AS centro, b.tipo, b.valor_centavos * r.percentual / 10000.0 AS valor FROM base b JOIN rateios r ON r.lancamento_id = b.id
+      UNION ALL
+      SELECT b.centro_custo_id, b.tipo, b.valor_centavos FROM base b WHERE NOT EXISTS (SELECT 1 FROM rateios r WHERE r.lancamento_id = b.id)
+    )
+    SELECT p.centro AS centro_custo_id, COALESCE(cc.nome, 'Sem centro de custo') AS nome,
+      ROUND(SUM(CASE WHEN p.tipo = 'receita' THEN p.valor ELSE 0 END)) AS receitas_centavos,
+      ROUND(SUM(CASE WHEN p.tipo = 'despesa' THEN p.valor ELSE 0 END)) AS despesas_centavos
+    FROM partes p LEFT JOIN centros_custo cc ON cc.id = p.centro GROUP BY p.centro ORDER BY cc.nome IS NULL, cc.nome`).all(empresaId, de, ate)
+    .map((l) => ({ ...l, resultado_centavos: l.receitas_centavos - l.despesas_centavos }));
+  return { de, ate, regime, linhas };
+}
+
+module.exports = { fluxoCaixa, dre, porCentro };

@@ -193,12 +193,197 @@ CREATE TABLE IF NOT EXISTS auditoria (
 CREATE INDEX IF NOT EXISTS idx_auditoria_data ON auditoria(criado_em);
 `;
 
+// Módulos adicionados depois da primeira versão: tabelas novas e colunas novas em tabelas existentes.
+const SCHEMA_V2 = `
+-- Responsáveis na empresa cliente. Com senha, acessam o Portal do Cliente.
+CREATE TABLE IF NOT EXISTS responsaveis (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  cargo TEXT,
+  email TEXT,
+  telefone TEXT,
+  recebe_relatorios INTEGER NOT NULL DEFAULT 1,
+  acesso_portal INTEGER NOT NULL DEFAULT 0,
+  senha_hash TEXT,
+  precisa_trocar_senha INTEGER NOT NULL DEFAULT 1,
+  pode_aprovar INTEGER NOT NULL DEFAULT 0,
+  limite_aprovacao_centavos INTEGER NOT NULL DEFAULT -1, -- -1 = sem limite
+  totp_segredo TEXT,
+  totp_ativo INTEGER NOT NULL DEFAULT 0,
+  totp_ultimo_passo INTEGER,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  ultimo_acesso TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_responsaveis_portal ON responsaveis(email COLLATE NOCASE) WHERE acesso_portal = 1;
+
+-- Rateio de um lançamento entre centros de custo (percentual em centésimos de ponto: 10000 = 100%).
+CREATE TABLE IF NOT EXISTS rateios (
+  lancamento_id INTEGER NOT NULL REFERENCES lancamentos(id) ON DELETE CASCADE,
+  centro_custo_id INTEGER NOT NULL REFERENCES centros_custo(id),
+  percentual INTEGER NOT NULL CHECK (percentual > 0 AND percentual <= 10000),
+  PRIMARY KEY (lancamento_id, centro_custo_id)
+);
+
+-- Histórico do fluxo de aprovação de pagamentos.
+CREATE TABLE IF NOT EXISTS aprovacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lancamento_id INTEGER NOT NULL REFERENCES lancamentos(id),
+  etapa TEXT NOT NULL CHECK (etapa IN ('solicitado','conferido','aprovado','recusado','reaberto')),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  responsavel_id INTEGER REFERENCES responsaveis(id),
+  comentario TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_aprovacoes_lanc ON aprovacoes(lancamento_id);
+
+-- Cobrança: contatos feitos, promessas de pagamento e acordos (renegociações).
+CREATE TABLE IF NOT EXISTS cobranca_registros (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  contato_id INTEGER NOT NULL REFERENCES contatos(id),
+  lancamento_id INTEGER REFERENCES lancamentos(id),
+  canal TEXT NOT NULL CHECK (canal IN ('lembrete','ligacao','email','whatsapp','visita','outro')),
+  descricao TEXT NOT NULL,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_cobranca_contato ON cobranca_registros(contato_id, criado_em);
+
+CREATE TABLE IF NOT EXISTS promessas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  contato_id INTEGER NOT NULL REFERENCES contatos(id),
+  lancamento_id INTEGER REFERENCES lancamentos(id),
+  data_prometida TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','cumprida','quebrada')),
+  observacao TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  resolvida_em TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS acordos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  contato_id INTEGER NOT NULL REFERENCES contatos(id),
+  valor_original_centavos INTEGER NOT NULL,
+  valor_acordo_centavos INTEGER NOT NULL,
+  parcelas INTEGER NOT NULL,
+  primeiro_vencimento TEXT NOT NULL,
+  observacao TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Arquivos (notas, boletos, contratos, comprovantes). O conteúdo fica em disco (BPO_ARQUIVOS).
+CREATE TABLE IF NOT EXISTS documentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  lancamento_id INTEGER REFERENCES lancamentos(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('nota','boleto','contrato','comprovante','extrato','outro')),
+  nome TEXT NOT NULL,
+  tamanho INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  arquivo TEXT NOT NULL,
+  descricao TEXT,
+  enviado_por_usuario INTEGER REFERENCES usuarios(id),
+  enviado_por_responsavel INTEGER REFERENCES responsaveis(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_documentos_empresa ON documentos(empresa_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_documentos_lanc ON documentos(lancamento_id);
+
+-- Orçamento mensal por categoria.
+CREATE TABLE IF NOT EXISTS orcamentos (
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  categoria_id INTEGER NOT NULL REFERENCES categorias(id),
+  mes TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos >= 0),
+  PRIMARY KEY (empresa_id, categoria_id, mes)
+);
+
+-- Fechamento mensal: cada etapa concluída de um mês. A etapa 'fechado' trava o período.
+CREATE TABLE IF NOT EXISTS fechamentos (
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  mes TEXT NOT NULL,
+  etapa TEXT NOT NULL,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  observacao TEXT,
+  concluido_em TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (empresa_id, mes, etapa)
+);
+
+-- Conversa entre a equipe e o cliente (Portal).
+CREATE TABLE IF NOT EXISTS mensagens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  autor TEXT NOT NULL CHECK (autor IN ('equipe','cliente')),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  responsavel_id INTEGER REFERENCES responsaveis(id),
+  texto TEXT NOT NULL,
+  lida_em TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mensagens_empresa ON mensagens(empresa_id, id);
+
+-- Chaves de API para sistemas de gestão (ERP) enviarem lançamentos. Só o hash fica gravado.
+CREATE TABLE IF NOT EXISTS chaves_api (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  prefixo TEXT NOT NULL UNIQUE,
+  hash TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id),
+  ultimo_uso TEXT,
+  revogada_em TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS configuracoes (
+  chave TEXT PRIMARY KEY,
+  valor TEXT NOT NULL
+);
+`;
+
+// [tabela, coluna, definição]
+const COLUNAS_V2 = [
+  ['usuarios', 'alcada_aprovacao_centavos', 'INTEGER'], // NULL = padrão do perfil; -1 = sem limite; 0 = não aprova
+  ['usuarios', 'totp_segredo', 'TEXT'],
+  ['usuarios', 'totp_ativo', 'INTEGER NOT NULL DEFAULT 0'],
+  ['usuarios', 'totp_ultimo_passo', 'INTEGER'],
+  ['empresas', 'aprovacao_ativa', 'INTEGER NOT NULL DEFAULT 0'],
+  ['empresas', 'aprovacao_acima_centavos', 'INTEGER NOT NULL DEFAULT 0'],
+  ['empresas', 'chave_pix_cobranca', 'TEXT'],
+  ['categorias', 'conta_contabil', 'TEXT'],
+  ['contas_bancarias', 'conta_contabil', 'TEXT'],
+  ['lancamentos', 'recorrente', 'INTEGER NOT NULL DEFAULT 0'],
+  ['lancamentos', 'origem_id', 'INTEGER REFERENCES lancamentos(id)'],
+  // dispensada | conferencia | pendente | aprovada | recusada
+  ['lancamentos', 'aprovacao', "TEXT NOT NULL DEFAULT 'dispensada'"],
+  ['lancamentos', 'acordo_id', 'INTEGER REFERENCES acordos(id)'],
+  ['lancamentos', 'renegociado_acordo_id', 'INTEGER REFERENCES acordos(id)'],
+  ['auditoria', 'responsavel_id', 'INTEGER REFERENCES responsaveis(id)'],
+];
+
+function migrar(db) {
+  db.exec(SCHEMA_V2);
+  for (const [tabela, coluna, def] of COLUNAS_V2) {
+    const existe = db.prepare(`SELECT 1 FROM pragma_table_info('${tabela}') WHERE name = ?`).get(coluna);
+    if (!existe) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${def}`);
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_lanc_aprovacao ON lancamentos(empresa_id, aprovacao) WHERE aprovacao IN ('conferencia','pendente')");
+}
+
 function abrir(arquivo = config.dbFile) {
   if (arquivo !== ':memory:') fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   const db = new DatabaseSync(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   if (arquivo !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
+  migrar(db);
   garantirAdmin(db);
   return db;
 }

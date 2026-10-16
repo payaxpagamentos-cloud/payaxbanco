@@ -3,9 +3,13 @@
 const { Router } = require('express');
 const { transacao } = require('../db');
 const { naoEncontrado } = require('../lib/erros');
-const { registrar } = require('../lib/auditoria');
+const { registrar, diferencas } = require('../lib/auditoria');
+const { resumoEmpresa } = require('../lib/resumo');
+const { exigirPeriodoAberto } = require('../lib/periodo');
+const aprov = require('../lib/aprovacao');
+const docs = require('../lib/documentos');
 const { gruposDoTipo, GRUPOS_DRE } = require('../lib/plano-contas');
-const { hoje, somarDias, inicioMes, fimMes } = require('../lib/datas');
+const { hoje, inicioMes } = require('../lib/datas');
 const lanc = require('../lib/lancamentos');
 const conc = require('../lib/conciliacao');
 const rel = require('../lib/relatorios');
@@ -30,27 +34,7 @@ module.exports = (db) => {
   const audit = (req, acao, detalhes) => registrar(db, req, acao, detalhes, eid(req));
 
   // ---------- Visão da empresa ----------
-  r.get('/resumo', (req, res) => {
-    const dia = hoje();
-    const e = eid(req);
-    const soma = (tipo, cond, ...p) => db.prepare(`SELECT COUNT(*) AS quantidade, COALESCE(SUM(valor_centavos), 0) AS total_centavos FROM lancamentos
-      WHERE empresa_id = ? AND tipo = ? AND status = 'aberto' AND ${cond}`).get(e, tipo, ...p);
-    const contas = lanc.saldos(db, e);
-    const proximos = db.prepare(`SELECT l.*, c.nome AS contato_nome FROM lancamentos l LEFT JOIN contatos c ON c.id = l.contato_id
-      WHERE l.empresa_id = ? AND l.status = 'aberto' AND l.vencimento <= ? ORDER BY l.vencimento, l.id LIMIT 15`).all(e, somarDias(dia, 7))
-      .map((l) => ({ ...l, situacao: lanc.situacao(l, dia) }));
-    const mesAtual = rel.dre(db, e, { de: inicioMes(dia), ate: fimMes(dia) });
-    res.json({
-      hoje: dia,
-      saldo_total_centavos: contas.filter((c) => c.ativo).reduce((a, c) => a + c.saldo_centavos, 0),
-      contas,
-      pagar: { vencidos: soma('pagar', 'vencimento < ?', dia), hoje: soma('pagar', 'vencimento = ?', dia), semana: soma('pagar', 'vencimento > ? AND vencimento <= ?', dia, somarDias(dia, 7)) },
-      receber: { vencidos: soma('receber', 'vencimento < ?', dia), hoje: soma('receber', 'vencimento = ?', dia), semana: soma('receber', 'vencimento > ? AND vencimento <= ?', dia, somarDias(dia, 7)) },
-      proximos,
-      resultado_mes: mesAtual.indicadores,
-      extrato_pendente: contas.reduce((a, c) => a + c.extrato_pendente, 0),
-    });
-  });
+  r.get('/resumo', (req, res) => res.json(resumoEmpresa(db, eid(req))));
 
   // ---------- Cadastros: categorias (plano de contas) ----------
   r.get('/categorias', (req, res) => {
@@ -63,11 +47,11 @@ module.exports = (db) => {
     v.exigir(nome, 'Informe o nome.');
     v.exigir(['receita', 'despesa'].includes(d.tipo), 'Tipo deve ser receita ou despesa.');
     v.exigir(gruposDoTipo(d.tipo).includes(d.grupo_dre), 'Grupo da DRE incompatível com o tipo.');
-    return { nome, tipo: d.tipo, grupo_dre: d.grupo_dre, ativo: d.ativo === undefined ? 1 : d.ativo ? 1 : 0 };
+    return { nome, tipo: d.tipo, grupo_dre: d.grupo_dre, conta_contabil: v.texto(d.conta_contabil, 40), ativo: d.ativo === undefined ? 1 : d.ativo ? 1 : 0 };
   };
   r.post('/categorias', (req, res) => {
     const d = dadosCategoria(req.body);
-    const x = db.prepare('INSERT INTO categorias (empresa_id, nome, tipo, grupo_dre) VALUES (?, ?, ?, ?)').run(eid(req), d.nome, d.tipo, d.grupo_dre);
+    const x = db.prepare('INSERT INTO categorias (empresa_id, nome, tipo, grupo_dre, conta_contabil) VALUES (?, ?, ?, ?, ?)').run(eid(req), d.nome, d.tipo, d.grupo_dre, d.conta_contabil);
     audit(req, 'categoria_criada', d);
     res.status(201).json({ id: Number(x.lastInsertRowid) });
   });
@@ -77,8 +61,8 @@ module.exports = (db) => {
     const d = dadosCategoria(req.body, atual);
     // O tipo não muda depois de usada: inverteria contas a pagar e a receber já lançadas.
     if (d.tipo !== atual.tipo) v.exigir(!db.prepare('SELECT 1 FROM lancamentos WHERE categoria_id = ?').get(atual.id), 'Categoria já usada: não é possível trocar o tipo.');
-    db.prepare('UPDATE categorias SET nome = ?, tipo = ?, grupo_dre = ?, ativo = ? WHERE id = ?').run(d.nome, d.tipo, d.grupo_dre, d.ativo, atual.id);
-    audit(req, 'categoria_alterada', { id: atual.id, ...d });
+    db.prepare('UPDATE categorias SET nome = ?, tipo = ?, grupo_dre = ?, conta_contabil = ?, ativo = ? WHERE id = ?').run(d.nome, d.tipo, d.grupo_dre, d.conta_contabil, d.ativo, atual.id);
+    audit(req, 'categoria_alterada', { id: atual.id, alteracoes: diferencas(atual, d) });
     res.status(204).end();
   });
 
@@ -141,12 +125,12 @@ module.exports = (db) => {
     const saldo = Number(d.saldo_inicial_centavos ?? 0);
     v.exigir(Number.isInteger(saldo), 'Saldo inicial inválido.');
     return { descricao, banco, agencia: v.texto(d.agencia, 20), numero: v.texto(d.numero, 30), saldo_inicial_centavos: saldo,
-      data_saldo_inicial: v.data(d.data_saldo_inicial || hoje(), 'a data do saldo inicial'), ativo: d.ativo === undefined ? 1 : d.ativo ? 1 : 0 };
+      data_saldo_inicial: v.data(d.data_saldo_inicial || hoje(), 'a data do saldo inicial'), conta_contabil: v.texto(d.conta_contabil, 40), ativo: d.ativo === undefined ? 1 : d.ativo ? 1 : 0 };
   };
   r.post('/contas-bancarias', (req, res) => {
     const d = dadosConta(req.body);
-    const x = db.prepare('INSERT INTO contas_bancarias (empresa_id, descricao, banco, agencia, numero, saldo_inicial_centavos, data_saldo_inicial) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(eid(req), d.descricao, d.banco, d.agencia, d.numero, d.saldo_inicial_centavos, d.data_saldo_inicial);
+    const x = db.prepare('INSERT INTO contas_bancarias (empresa_id, descricao, banco, agencia, numero, saldo_inicial_centavos, data_saldo_inicial, conta_contabil) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(eid(req), d.descricao, d.banco, d.agencia, d.numero, d.saldo_inicial_centavos, d.data_saldo_inicial, d.conta_contabil);
     audit(req, 'conta_bancaria_criada', d);
     res.status(201).json({ id: Number(x.lastInsertRowid) });
   });
@@ -154,9 +138,9 @@ module.exports = (db) => {
     const atual = db.prepare('SELECT * FROM contas_bancarias WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), eid(req));
     if (!atual) throw naoEncontrado('Conta bancária');
     const d = dadosConta(req.body, atual);
-    db.prepare('UPDATE contas_bancarias SET descricao = ?, banco = ?, agencia = ?, numero = ?, saldo_inicial_centavos = ?, data_saldo_inicial = ?, ativo = ? WHERE id = ?')
-      .run(d.descricao, d.banco, d.agencia, d.numero, d.saldo_inicial_centavos, d.data_saldo_inicial, d.ativo, atual.id);
-    audit(req, 'conta_bancaria_alterada', { id: atual.id, ...d });
+    db.prepare('UPDATE contas_bancarias SET descricao = ?, banco = ?, agencia = ?, numero = ?, saldo_inicial_centavos = ?, data_saldo_inicial = ?, conta_contabil = ?, ativo = ? WHERE id = ?')
+      .run(d.descricao, d.banco, d.agencia, d.numero, d.saldo_inicial_centavos, d.data_saldo_inicial, d.conta_contabil, d.ativo, atual.id);
+    audit(req, 'conta_bancaria_alterada', { id: atual.id, alteracoes: diferencas(atual, d) });
     res.status(204).end();
   });
   r.get('/contas-bancarias/:id/movimentos', (req, res) => {
@@ -187,6 +171,7 @@ module.exports = (db) => {
     const descricao = v.texto(req.body.descricao, 200);
     v.exigir(descricao, 'Informe o motivo do ajuste.');
     const data = v.data(req.body.data || hoje(), 'a data');
+    exigirPeriodoAberto(db, eid(req), data);
     const x = db.prepare(`INSERT INTO movimentos (empresa_id, conta_bancaria_id, data, valor_centavos, descricao, origem, usuario_id) VALUES (?, ?, ?, ?, ?, 'ajuste', ?)`)
       .run(eid(req), conta.id, data, valor, descricao, req.usuario.id);
     audit(req, 'ajuste_saldo', { conta_bancaria_id: conta.id, valor_centavos: valor, descricao });
@@ -196,6 +181,7 @@ module.exports = (db) => {
     const m = db.prepare('SELECT * FROM movimentos WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), eid(req));
     if (!m) throw naoEncontrado('Movimento');
     v.exigir(m.origem !== 'baixa', 'Movimento de baixa: estorne a baixa no lançamento.');
+    exigirPeriodoAberto(db, eid(req), m.data);
     transacao(db, () => {
       const ids = m.grupo ? db.prepare('SELECT id FROM movimentos WHERE grupo = ?').all(m.grupo).map((x) => x.id) : [m.id];
       for (const id of ids) {
@@ -224,9 +210,11 @@ module.exports = (db) => {
       if (q[campo]) { filtros.push(`l.${campo} = ?`); params.push(Number(q[campo])); }
     }
     if (q.busca) { filtros.push('(l.descricao LIKE ? OR l.documento LIKE ? OR ct.nome LIKE ?)'); const b = `%${q.busca}%`; params.push(b, b, b); }
+    if (q.aprovacao) { filtros.push('l.aprovacao = ?'); params.push(q.aprovacao); }
     return { where: filtros.join(' AND '), params, dia };
   }
-  const SELECT_LANC = `SELECT l.*, ct.nome AS contato_nome, cat.nome AS categoria_nome, cc.nome AS centro_nome, cb.descricao AS conta_nome
+  const SELECT_LANC = `SELECT l.*, (SELECT COUNT(*) FROM rateios r WHERE r.lancamento_id = l.id) AS rateado,
+    (SELECT COUNT(*) FROM documentos d WHERE d.lancamento_id = l.id) AS documentos, ct.nome AS contato_nome, cat.nome AS categoria_nome, cc.nome AS centro_nome, cb.descricao AS conta_nome
     FROM lancamentos l LEFT JOIN contatos ct ON ct.id = l.contato_id LEFT JOIN categorias cat ON cat.id = l.categoria_id
     LEFT JOIN centros_custo cc ON cc.id = l.centro_custo_id LEFT JOIN contas_bancarias cb ON cb.id = l.conta_bancaria_id`;
 
@@ -273,18 +261,21 @@ module.exports = (db) => {
     if (!l) throw naoEncontrado('Lançamento');
     const parcelas = l.grupo ? db.prepare('SELECT id, parcela, total_parcelas, vencimento, valor_centavos, status FROM lancamentos WHERE grupo = ? ORDER BY parcela').all(l.grupo) : [];
     const extrato = db.prepare('SELECT x.* FROM extrato x JOIN movimentos m ON m.id = x.movimento_id WHERE m.lancamento_id = ?').get(l.id) ?? null;
-    res.json({ ...l, situacao: lanc.situacao(l), parcelas, extrato });
+    const origem = l.origem_id ? db.prepare('SELECT id, valor_centavos, status FROM lancamentos WHERE id = ?').get(l.origem_id) : null;
+    const saldos = db.prepare('SELECT id, valor_centavos, status FROM lancamentos WHERE origem_id = ?').all(l.id);
+    res.json({ ...l, situacao: lanc.situacao(l), parcelas, extrato, rateio: lanc.rateioDe(db, l.id), aprovacoes: aprov.historico(db, l.id),
+      documentos: docs.listar(db, eid(req), { lancamento_id: l.id }), origem, saldos });
   });
 
   r.patch('/lancamentos/:id', (req, res) => {
-    const l = lanc.editar(db, eid(req), req.params.id, req.body);
-    audit(req, 'lancamento_alterado', { id: l.id });
-    res.json(l);
+    const { antes, depois } = lanc.editar(db, req, eid(req), req.params.id, req.body);
+    audit(req, 'lancamento_alterado', { id: depois.id, alteracoes: diferencas(antes, depois) });
+    res.json(depois);
   });
 
   r.post('/lancamentos/:id/baixa', (req, res) => {
     const movimento = lanc.baixar(db, req, eid(req), req.params.id, req.body);
-    audit(req, 'lancamento_baixado', { id: Number(req.params.id), movimento_id: movimento });
+    audit(req, 'lancamento_baixado', { id: Number(req.params.id), movimento_id: movimento, parcial: req.body.valor_principal_centavos != null });
     res.json({ movimento_id: movimento });
   });
 
@@ -355,6 +346,7 @@ module.exports = (db) => {
   // ---------- Relatórios ----------
   r.get('/fluxo-caixa', (req, res) => res.json(rel.fluxoCaixa(db, eid(req), req.query)));
   r.get('/dre', (req, res) => res.json(rel.dre(db, eid(req), req.query)));
+  r.get('/resultado-centros', (req, res) => res.json(rel.porCentro(db, eid(req), req.query)));
   r.get('/dre.csv', (req, res) => {
     const d = rel.dre(db, eid(req), req.query);
     const linhas = [['Linha', ...d.meses, 'Total']];

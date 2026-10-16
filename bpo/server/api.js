@@ -1,6 +1,8 @@
 'use strict';
 
 const { Router, json } = require('express');
+const { limitar } = require('./lib/limitador');
+const config = require('./config');
 const { autenticar, permitir } = require('./auth');
 const { carregarEmpresa } = require('./lib/acesso');
 const { ErroNegocio } = require('./lib/erros');
@@ -12,12 +14,31 @@ function criarApi(db) {
   api.get('/saude', (_req, res) => res.json({ status: 'ok', sistema: 'PAY AX BPO Financeiro' }));
   api.use('/auth', require('./routes/auth')(db, auth));
   api.use('/painel', auth, require('./routes/painel')(db));
+  api.use('/carteira', auth, require('./routes/carteira')(db));
   api.use('/usuarios', auth, require('./routes/usuarios')(db));
   api.use('/tarefas', auth, require('./routes/tarefas')(db));
   api.use('/auditoria', auth, permitir('admin', 'supervisor'), require('./routes/auditoria')(db));
+  api.use('/seguranca', auth, permitir('admin'), require('./routes/seguranca')(db));
+
+  // Portal do Cliente e API para sistemas de gestão: autenticação própria (não aceitam token da equipe).
+  api.use(['/portal/auth/login', '/portal/auth/2fa/login'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  api.use('/portal', require('./routes/portal')(db));
+  api.use('/integracao/v1', limitar({ janelaMs: 60_000, maximo: 120 }), require('./routes/api-externa')(db));
+
   // Extratos podem ser maiores que o limite padrão do corpo.
   api.use('/empresas/:empresaId/extrato/importar', auth, json({ limit: '5mb' }));
-  api.use('/empresas/:empresaId', auth, carregarEmpresa(db), require('./routes/financeiro')(db));
+  api.use('/empresas/:empresaId/integracoes/lancamentos/importar', auth, json({ limit: '5mb' }));
+  const porEmpresa = Router({ mergeParams: true });
+  porEmpresa.use('/aprovacoes', require('./routes/aprovacoes')(db));
+  porEmpresa.use('/cobranca', require('./routes/cobranca')(db));
+  porEmpresa.use('/documentos', require('./routes/documentos')(db));
+  porEmpresa.use('/orcamento', require('./routes/orcamento')(db));
+  porEmpresa.use('/fechamento', require('./routes/fechamento')(db));
+  porEmpresa.use('/mensagens', require('./routes/mensagens')(db));
+  porEmpresa.use('/responsaveis', require('./routes/responsaveis')(db));
+  porEmpresa.use('/integracoes', require('./routes/integracoes')(db));
+  porEmpresa.use(require('./routes/financeiro')(db));
+  api.use('/empresas/:empresaId', auth, carregarEmpresa(db), porEmpresa);
   api.use('/empresas', auth, require('./routes/empresas')(db));
   api.use((_req, _res, next) => next(new ErroNegocio('Rota não encontrada.', 404)));
   return api;

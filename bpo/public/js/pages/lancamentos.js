@@ -1,11 +1,12 @@
 import { api } from '../api.js';
 import { html, $, $$, moeda, numero, data, status, opcoes, paginacao, debounce, modal, dadosForm, toast, hoje, inicioMes, fimMes, somarMeses, somarDias } from '../ui.js';
-import { cadastrosDaEmpresa, novoLancamento, detalheLancamento, baixar, recarregar } from './comum.js';
+import { cadastrosDaEmpresa, novoLancamento, detalheLancamento, baixar, recarregar, APROVACAO } from './comum.js';
 
 const SITUACOES = [['a_vencer', 'A vencer'], ['vencido', 'Vencidos'], ['aberto', 'Em aberto (todos)'], ['pago', 'Baixados'], ['cancelado', 'Cancelados'], ['todos', 'Todos']];
 
 /** Contas a pagar ou a receber da empresa em atendimento. */
-export default async function lancamentos({ alvo, ativo, base, tipo }) {
+export default async function lancamentos({ alvo, ativo, base, tipo, empresa }) {
+  const empresaId = empresa.id;
   const cad = await cadastrosDaEmpresa(base);
   if (!ativo()) return;
   const dia = hoje();
@@ -64,14 +65,16 @@ export default async function lancamentos({ alvo, ativo, base, tipo }) {
     $('#tabela', alvo).innerHTML = String(html`<table><thead><tr><th class="sel"><input type="checkbox" id="todos" aria-label="Selecionar todos em aberto"></th>
       <th>Vencimento</th><th>Descrição</th><th>${pagar ? 'Fornecedor' : 'Cliente'}</th><th>Categoria</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>
       ${r.itens.length ? r.itens.map((l) => html`<tr class="clicavel" data-id="${l.id}">
-        <td class="sel">${l.status === 'aberto' ? html`<input type="checkbox" data-sel="${l.id}" ${selecionados.has(l.id) ? 'checked' : ''} aria-label="Selecionar">` : ''}</td>
+        <td class="sel">${l.status === 'aberto' && ['dispensada', 'aprovada'].includes(l.aprovacao) ? html`<input type="checkbox" data-sel="${l.id}" ${selecionados.has(l.id) ? 'checked' : ''} aria-label="Selecionar">` : ''}</td>
         <td style="white-space:nowrap">${data(l.vencimento)}${l.status === 'pago' ? html`<div class="small muted">baixa ${data(l.pago_em)}</div>` : ''}</td>
-        <td><strong>${l.descricao}</strong>${l.total_parcelas > 1 ? html` <span class="badge">${l.parcela}/${l.total_parcelas}</span>` : ''}${l.documento ? html`<div class="small muted">Doc. ${l.documento}</div>` : ''}</td>
+        <td><strong>${l.descricao}</strong>${l.total_parcelas > 1 ? html` <span class="badge">${l.recorrente ? 'Mensal ' : ''}${l.parcela}/${l.total_parcelas}</span>` : ''}
+          <div class="small muted">${[l.documento && `Doc. ${l.documento}`, l.documentos && `${l.documentos} anexo(s)`, l.rateado && 'rateado'].filter(Boolean).join(' · ')}</div></td>
         <td>${l.contato_nome ?? html`<span class="muted">—</span>`}</td>
         <td class="small">${l.categoria_nome}${l.centro_nome ? html`<div class="muted">${l.centro_nome}</div>` : ''}</td>
         <td class="num"><strong>${moeda(l.valor_centavos)}</strong>${l.status === 'pago' && l.valor_pago_centavos !== l.valor_centavos ? html`<div class="small muted">${pagar ? 'pago' : 'recebido'} ${moeda(l.valor_pago_centavos)}</div>` : ''}</td>
-        <td>${status(l.situacao)}</td>
-        <td class="right">${l.status === 'aberto' ? html`<button class="btn sm" data-baixar="${l.id}">${verbo}</button>` : ''}</td></tr>`)
+        <td>${status(l.situacao)} ${l.status === 'aberto' ? APROVACAO[l.aprovacao] ?? '' : ''}</td>
+        <td class="right">${l.status === 'aberto' ? (['dispensada', 'aprovada'].includes(l.aprovacao) ? html`<button class="btn sm" data-baixar="${l.id}">${verbo}</button>`
+          : html`<a class="btn sm" href="#/e/${empresaId}/aprovacoes">Aprovação</a>`) : ''}</td></tr>`)
         : html`<tr><td colspan="8" class="vazio">Nenhum lançamento com esses filtros.</td></tr>`}</tbody></table>`);
     $('#pag', alvo).replaceChildren(paginacao(r, (p) => { filtros.pagina = p; carregar(); }));
     $$('tr[data-id]', alvo).forEach((tr) => tr.addEventListener('click', (e) => {

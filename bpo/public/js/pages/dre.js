@@ -54,7 +54,16 @@ export default async function dre({ alvo, ativo, base }) {
       ${d.fora_dre.categorias.length ? html`<div class="card" style="margin-top:16px"><div class="card-head"><h2>Fora da DRE</h2><span class="small muted">Aportes, empréstimos, investimentos e distribuição de lucros: afetam o caixa, não o resultado</span></div>
         <div class="table-wrap"><table class="tabela-num"><thead><tr><th>Categoria</th>${d.meses.map((m) => html`<th class="num">${rotuloMes(m)}</th>`)}<th class="num">Total</th></tr></thead><tbody>
           ${d.fora_dre.categorias.map((c) => html`<tr><td>${c.nome}</td>${d.meses.map((m) => html`<td class="num ${c.valores[m] < 0 ? 'neg' : ''}">${c.valores[m] ? moeda(c.valores[m]) : '—'}</td>`)}<td class="num"><strong>${moeda(c.total)}</strong></td></tr>`)}
-        </tbody></table></div></div>` : ''}`);
+        </tbody></table></div></div>` : ''}
+      <div class="card" style="margin-top:16px"><div class="card-head"><h2>Resultado por centro de custo</h2><span class="small muted">Departamentos, unidades ou projetos, com os rateios aplicados</span></div>
+        <div class="table-wrap" id="centros-res"><div class="carregando">Carregando…</div></div></div>`);
+    api.get(`${base}/resultado-centros`, { de: filtros.de, ate: filtros.ate, regime: filtros.regime }).then((r) => {
+      if (!ativo()) return;
+      $('#centros-res', alvo).innerHTML = String(html`<table class="tabela-num"><thead><tr><th>Centro de custo</th><th class="num">Receitas</th><th class="num">Despesas</th><th class="num">Resultado</th><th class="num">Margem</th></tr></thead><tbody>
+        ${r.linhas.length ? r.linhas.map((c) => html`<tr><td>${c.nome}</td><td class="num">${moeda(c.receitas_centavos)}</td><td class="num">${moeda(c.despesas_centavos)}</td>
+          <td class="num ${c.resultado_centavos < 0 ? 'neg' : ''}"><strong>${moeda(c.resultado_centavos)}</strong></td><td class="num">${c.receitas_centavos ? pct(c.resultado_centavos / c.receitas_centavos) : '—'}</td></tr>`)
+          : html`<tr><td colspan="5" class="vazio">Sem lançamentos no período.</td></tr>`}</tbody></table>`);
+    }).catch(() => {});
     $$('tr.grupo', alvo).forEach((tr) => tr.addEventListener('click', () => {
       tr.classList.toggle('aberto');
       $$(`tr[data-de="${tr.dataset.grupo}"]`, alvo).forEach((c) => c.classList.toggle('oculto', !tr.classList.contains('aberto')));

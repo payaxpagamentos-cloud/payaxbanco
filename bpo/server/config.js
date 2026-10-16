@@ -18,16 +18,25 @@ if (producao) {
   if (process.env.BPO_ADMIN_SENHA.length < 12) throw new Error('[PAY AX BPO] BPO_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
 }
 
+const dbFile = process.env.BPO_DB || path.join(__dirname, '..', 'data', 'bpo.db');
+
 module.exports = {
   producao,
   port: Number(process.env.PORT) || 3100,
-  dbFile: process.env.BPO_DB || path.join(__dirname, '..', 'data', 'bpo.db'),
+  dbFile,
   secret,
   tokenTtlSeconds: 8 * 60 * 60,
   trustProxy: process.env.BPO_TRUST_PROXY ?? 'loopback',
   limiteLoginPorMinuto: Number(process.env.BPO_LIMITE_LOGIN) || 10,
   // Tolerância, em dias, entre a data do extrato e a do lançamento para sugerir conciliação.
   toleranciaConciliacaoDias: Number(process.env.BPO_TOLERANCIA_DIAS) || 3,
+  // Arquivos enviados (notas, boletos, comprovantes) e cópias de segurança do banco.
+  arquivosDir: process.env.BPO_ARQUIVOS || path.join(path.dirname(dbFile), 'arquivos'),
+  backupDir: process.env.BPO_BACKUPS || path.join(path.dirname(dbFile), 'backups'),
+  backupIntervaloHoras: Number(process.env.BPO_BACKUP_HORAS) || 24,
+  backupManter: Number(process.env.BPO_BACKUP_MANTER) || 30,
+  tamanhoMaximoArquivo: (Number(process.env.BPO_ARQUIVO_MAX_MB) || 10) * 1024 * 1024,
+  tokenPortalTtlSeconds: 2 * 60 * 60,
   admin: {
     nome: process.env.BPO_ADMIN_NOME || 'Administrador BPO',
     email: process.env.BPO_ADMIN_EMAIL || 'admin@bpo.payax.com.br',

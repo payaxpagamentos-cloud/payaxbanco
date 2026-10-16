@@ -21,23 +21,28 @@ export default async function painel({ alvo, ativo }) {
         <div class="sub">${numero(c.novas_mes)} contrato(s) novo(s) no mês</div></div>
       <div class="card kpi vermelho"><div class="rotulo">Tarefas atrasadas</div><div class="valor">${numero(t.atrasadas)}</div>
         <div class="sub">${numero(t.hoje)} para hoje · ${numero(t.semana)} nos próximos 7 dias</div></div>
-      <div class="card kpi"><div class="rotulo">Contratos vencendo</div><div class="valor">${numero(c.contratos_vencendo)}</div>
-        <div class="sub">Nos próximos 60 dias</div></div>
+      <div class="card kpi ${d.pendencias.some((p) => p.falta_caixa) ? 'vermelho' : ''}"><div class="rotulo">Risco de falta de caixa</div>
+        <div class="valor">${numero(d.pendencias.filter((p) => p.falta_caixa).length)}</div>
+        <div class="sub">Empresa(s) com saldo projetado negativo em 30 dias · ${numero(c.contratos_vencendo)} contrato(s) vencendo</div></div>
     </div>
 
     <div class="card" style="margin-top:16px">
       <div class="card-head"><h2>Pendências por empresa</h2><span class="small muted">Ordenadas pela urgência</span></div>
       <div class="table-wrap"><table><thead><tr><th>Empresa</th><th class="num">A pagar hoje</th><th class="num">Pagar vencidos</th>
-        <th class="num">Receber vencidos</th><th class="num">Extrato a conciliar</th><th>Último extrato</th><th class="num">Tarefas atrasadas</th></tr></thead><tbody>
+        <th class="num">Receber vencidos</th><th class="num">Extrato a conciliar</th><th>Alertas</th></tr></thead><tbody>
         ${d.pendencias.length ? d.pendencias.map((p) => html`<tr class="clicavel" data-href="#/e/${p.id}/visao">
           <td><strong>${p.nome}</strong>${p.analista_nome ? html`<div class="small muted">${p.analista_nome}</div>` : html`<div class="small" style="color:var(--warn)">Sem analista</div>`}</td>
           <td class="num">${p.pagar_hoje ? html`${numero(p.pagar_hoje)} · ${moeda(p.pagar_hoje_centavos)}` : '—'}</td>
           <td class="num ${p.pagar_vencidos ? 'neg' : ''}">${numero(p.pagar_vencidos)}</td>
           <td class="num ${p.receber_vencidos ? 'neg' : ''}">${numero(p.receber_vencidos)}</td>
-          <td class="num">${numero(p.extrato_pendente)}</td>
-          <td>${p.ultimo_extrato ? data(p.ultimo_extrato) : html`<span class="muted">Nunca importado</span>`}</td>
-          <td class="num ${p.tarefas_atrasadas ? 'neg' : ''}">${numero(p.tarefas_atrasadas)}</td></tr>`)
-          : html`<tr><td colspan="7" class="vazio">Nenhuma empresa ativa na carteira.</td></tr>`}
+          <td class="num">${numero(p.extrato_pendente)}${p.ultimo_extrato ? html`<div class="small muted">até ${data(p.ultimo_extrato)}</div>` : html`<div class="small muted">sem extrato</div>`}</td>
+          <td><div class="alerta-linha">
+            ${p.falta_caixa ? html`<span class="badge danger" title="Saldo projetado: ${moeda(p.falta_caixa.saldo_centavos)}">Falta de caixa em ${data(p.falta_caixa.data)}</span>` : ''}
+            ${p.aprovacoes ? html`<span class="badge warn">${numero(p.aprovacoes)} aprovação(ões)</span>` : ''}
+            ${p.mensagens ? html`<span class="badge info">${numero(p.mensagens)} mensagem(ns)</span>` : ''}
+            ${p.tarefas_atrasadas ? html`<span class="badge danger">${numero(p.tarefas_atrasadas)} tarefa(s) atrasada(s)</span>` : ''}
+            ${!p.falta_caixa && !p.aprovacoes && !p.mensagens && !p.tarefas_atrasadas ? html`<span class="muted small">—</span>` : ''}</div></td></tr>`)
+          : html`<tr><td colspan="6" class="vazio">Nenhuma empresa ativa na carteira.</td></tr>`}
       </tbody></table></div>
     </div>
 

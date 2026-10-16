@@ -52,11 +52,12 @@ async function contas({ el, base, ativo, reabrir }) {
     <div class="c6"><label>Saldo inicial (R$)</label><input name="saldo" class="moeda" inputmode="numeric" value="${valorMoedaInput(Math.abs(c.saldo_inicial_centavos ?? 0))}"></div>
     <div class="c2"><label>Sinal</label><select name="negativo"><option value="0">+</option><option value="1" ${(c.saldo_inicial_centavos ?? 0) < 0 ? 'selected' : ''}>−</option></select></div>
     <div class="c4"><label>Na data</label><input name="data_saldo_inicial" type="date" value="${c.data_saldo_inicial ?? hoje()}"></div>
+    <div class="c6"><label>Código contábil (opcional)</label><input name="conta_contabil" value="${c.conta_contabil ?? ''}" placeholder="Ex.: 1.1.1.02"></div>
   </div>`;
   const corpo = (f) => {
     const d = dadosForm(f);
     return { descricao: d.descricao, banco: d.banco, agencia: d.agencia, numero: d.numero, ativo: d.ativo === '1',
-      saldo_inicial_centavos: centavos(d.saldo) * (d.negativo === '1' ? -1 : 1), data_saldo_inicial: d.data_saldo_inicial };
+      saldo_inicial_centavos: centavos(d.saldo) * (d.negativo === '1' ? -1 : 1), data_saldo_inicial: d.data_saldo_inicial, conta_contabil: d.conta_contabil };
   };
   $('#nova', el).addEventListener('click', () => modal({
     titulo: 'Nova conta bancária', corpo: form(),
@@ -170,8 +171,8 @@ async function categorias({ el, base, ativo, reabrir }) {
   if (!ativo()) return;
   const rotuloGrupo = Object.fromEntries(grupos.map((g) => [g.chave, g.rotulo]));
   const opcoesGrupo = (tipo, sel) => opcoes(grupos.filter((g) => g.tipo === tipo || g.tipo === null).map((g) => ({ id: g.chave, nome: g.rotulo })), { selecionado: sel });
-  const tabela = (tipo, titulo) => html`<div class="card"><div class="card-head"><h2>${titulo}</h2></div><div class="table-wrap"><table><thead><tr><th>Categoria</th><th>Linha da DRE</th><th class="num">Lançamentos</th><th></th></tr></thead><tbody>
-    ${itens.filter((c) => c.tipo === tipo).map((c) => html`<tr><td>${c.nome}${c.ativo ? '' : html` <span class="badge">Inativa</span>`}</td><td class="small">${rotuloGrupo[c.grupo_dre]}</td>
+  const tabela = (tipo, titulo) => html`<div class="card"><div class="card-head"><h2>${titulo}</h2></div><div class="table-wrap"><table><thead><tr><th>Categoria</th><th>Linha da DRE</th><th>Cód. contábil</th><th class="num">Lançamentos</th><th></th></tr></thead><tbody>
+    ${itens.filter((c) => c.tipo === tipo).map((c) => html`<tr><td>${c.nome}${c.ativo ? '' : html` <span class="badge">Inativa</span>`}</td><td class="small">${rotuloGrupo[c.grupo_dre]}</td><td class="small mono">${c.conta_contabil ?? '—'}</td>
       <td class="num">${numero(c.uso)}</td><td class="right"><button class="btn sm" data-editar="${c.id}">Editar</button></td></tr>`)}</tbody></table></div></div>`;
   el.innerHTML = String(html`<div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="muted small">A linha da DRE define onde a categoria aparece no resultado. "Fora da DRE" afeta só o caixa.</span>
     <button class="btn primario" id="nova">+ Nova categoria</button></div>
@@ -180,6 +181,7 @@ async function categorias({ el, base, ativo, reabrir }) {
     <div class="c12"><label>Nome</label><input name="nome" required value="${c.nome ?? ''}"></div>
     <div class="c4"><label>Tipo</label><select name="tipo" id="tipo-cat" ${c.uso ? 'disabled' : ''}><option value="receita" ${c.tipo === 'receita' ? 'selected' : ''}>Receita</option><option value="despesa" ${c.tipo === 'despesa' ? 'selected' : ''}>Despesa</option></select></div>
     <div class="c8"><label>Linha da DRE</label><select name="grupo_dre" id="grupo-cat">${opcoesGrupo(c.tipo, c.grupo_dre)}</select></div>
+    <div class="c6"><label>Código contábil (opcional)</label><input name="conta_contabil" value="${c.conta_contabil ?? ''}" placeholder="Usado na exportação contábil"></div>
     ${c.id ? html`<div class="c6"><label>Situação</label><select name="ativo"><option value="1">Ativa</option><option value="0" ${c.ativo ? '' : 'selected'}>Inativa</option></select></div>` : ''}</div>`;
   const ligarTipo = (m) => $('#tipo-cat', m).addEventListener('change', (e) => { $('#grupo-cat', m).innerHTML = String(opcoesGrupo(e.target.value)); });
   const corpo = (f, c = {}) => { const d = dadosForm(f); return { ...d, tipo: d.tipo ?? c.tipo, ativo: d.ativo === undefined ? true : d.ativo === '1' }; };

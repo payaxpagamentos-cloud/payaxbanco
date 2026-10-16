@@ -53,3 +53,53 @@ td.sel input, th.sel input { width: 16px; height: 16px; }
 .filtros { align-items: flex-end; }
 .filtros .campo { width: auto; flex: 0 1 200px; }
 .filtros .busca { flex: 1 1 260px; }
+.nav .secao.sub { margin-top: 10px; }
+
+/* Linha do tempo (aprovação, cobrança) */
+.linha-tempo { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--border); display: grid; gap: 10px; }
+.linha-tempo li { position: relative; font-size: 13px; }
+.linha-tempo li::before { content: ""; position: absolute; left: -20px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--surface); border: 2px solid var(--text-3); }
+.linha-tempo li.aprovado::before, .linha-tempo li.conferido::before { border-color: var(--ok); background: var(--ok); }
+.linha-tempo li.recusado::before { border-color: var(--danger); background: var(--danger); }
+
+/* Conversa */
+.chat { display: flex; flex-direction: column; height: calc(100vh - 160px); min-height: 420px; }
+.chat-msgs { flex: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 70%; display: flex; flex-direction: column; gap: 4px; }
+.msg.minha { align-self: flex-end; align-items: flex-end; }
+.msg .balao { padding: 10px 14px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
+.msg.minha .balao { background: var(--info-bg); border-color: transparent; }
+.chat-form { display: flex; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--border); align-items: flex-end; }
+.chat-form textarea { min-height: 44px; flex: 1; }
+
+/* Etapas do fechamento */
+.etapa { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: start; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.etapa:last-child { border-bottom: 0; }
+.etapa .marca-etapa { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; font-size: 13px; font-weight: 800; color: #fff; }
+.etapa.feita .marca-etapa { background: var(--ok); border-color: var(--ok); }
+.pontos-etapas { display: flex; gap: 4px; }
+.pontos-etapas i { width: 12px; height: 12px; border-radius: 4px; background: var(--border); display: inline-block; }
+.pontos-etapas i.ok { background: var(--ok); }
+.pontos-etapas i.aviso { background: var(--warn); }
+
+/* Orçamento: grade editável */
+.orc input { height: 30px; width: 96px; text-align: right; font-size: 12.5px; padding: 0 6px; border-radius: 8px; }
+.orc td.var-ruim { color: var(--danger); font-weight: 650; }
+.orc td.var-boa { color: var(--ok); font-weight: 650; }
+.alerta { display: flex; gap: 10px; align-items: flex-start; padding: 12px 16px; border-radius: 14px; margin-bottom: 16px; font-size: 13.5px; }
+.alerta.perigo { background: var(--danger-bg); color: var(--danger); }
+.alerta.aviso { background: var(--warn-bg); color: var(--warn); }
+.alerta.info { background: var(--info-bg); color: var(--primary); }
+.alerta a { color: inherit; text-decoration: underline; font-weight: 700; }
+.alerta svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.linha-check { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--text); font-weight: 600; }
+.linha-check input { width: 16px; height: 16px; }
+
+/* Menu lateral compacto: carteira + empresa em atendimento cabem na tela */
+.sidebar { padding: 16px 12px; }
+.sidebar .brand { padding-bottom: 12px; }
+.nav { margin-top: 8px; }
+.nav a { padding: 6px 10px; font-size: 13.5px; }
+.nav .secao { margin: 10px 10px 4px; }
+.empresa-ativa { margin-top: 4px; padding: 8px 10px; }
+.empresa-ativa select { margin-top: 6px; height: 30px; }
