@@ -48,7 +48,7 @@ function autenticar(db) {
     if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
     const usuario = buscar.get(dados.sub);
     if (!usuario || !usuario.ativo) return next(new ErroNegocio('Usuário inativo.', 401));
-    if (dados.cfg2fa && !usuario.totp_ativo && !req.originalUrl.startsWith('/api/auth/')) {
+    if (dados.cfg2fa && !usuario.totp_ativo && !req.originalUrl.slice(config.basePath.length).startsWith('/api/auth/')) {
       return next(new ErroNegocio('Configure a autenticação em duas etapas para continuar.', 403, { configurar_2fa: true }));
     }
     req.usuario = usuario;
@@ -65,7 +65,7 @@ function autenticarPortal(db) {
     const r = dados && buscar.get(dados.sub);
     if (!r) return next(new ErroNegocio('Sessão expirada. Entre novamente.', 401));
     if (!['ativa', 'implantacao'].includes(r.empresa_status)) return next(new ErroNegocio('Acesso indisponível: contrato não está ativo.', 403));
-    const trocar = r.precisa_trocar_senha && !req.originalUrl.startsWith('/api/portal/auth/');
+    const trocar = r.precisa_trocar_senha && !req.originalUrl.slice(config.basePath.length).startsWith('/api/portal/auth/');
     if (trocar) return next(new ErroNegocio('Crie sua nova senha para continuar.', 403, { trocar_senha: true }));
     req.responsavel = r;
     req.empresa = db.prepare('SELECT * FROM empresas WHERE id = ?').get(r.empresa_id);

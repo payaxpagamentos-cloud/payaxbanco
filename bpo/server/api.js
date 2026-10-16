@@ -12,6 +12,8 @@ function criarApi(db) {
   const api = Router();
   const auth = autenticar(db);
   api.get('/saude', (_req, res) => res.json({ status: 'ok', sistema: 'Ativa BPO Financeiro' }));
+  // Endereços públicos do sistema da equipe e do Portal (usados nos links entre os dois).
+  api.get('/enderecos', (_req, res) => res.json({ equipe: `${config.basePath}/`, portal: `${config.portalPath}/` }));
   api.use('/auth', require('./routes/auth')(db, auth));
   api.use('/painel', auth, require('./routes/painel')(db));
   api.use('/carteira', auth, require('./routes/carteira')(db));

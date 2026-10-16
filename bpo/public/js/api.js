@@ -1,3 +1,10 @@
+/** Endereço base do sistema (ex.: '/bpo'), deduzido de onde este arquivo foi carregado: funciona na raiz ou num caminho. */
+export const BASE = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+
+let enderecosCache = null;
+/** Endereços do sistema da equipe e do Portal ({ equipe, portal }), configurados no servidor. */
+export const enderecos = () => (enderecosCache ??= fetch(`${BASE}/api/enderecos`).then((r) => r.json()).catch(() => ({ equipe: '/', portal: '/portal/' })));
+
 let CHAVE = 'bpo.sessao';
 /** O Portal do Cliente usa outra chave: as duas sessões convivem no mesmo navegador. */
 export const usarChaveSessao = (chave) => { CHAVE = chave; };
@@ -28,7 +35,7 @@ async function chamar(metodo, caminho, corpo, { bruto = false, binario = false }
   if (s?.token) headers.Authorization = `Bearer ${s.token}`;
   if (corpo !== undefined) headers['Content-Type'] = binario ? 'application/octet-stream' : 'application/json';
   const body = corpo === undefined ? undefined : binario ? corpo : JSON.stringify(corpo);
-  const resp = await fetch(`/api${caminho}`, { method: metodo, headers, body });
+  const resp = await fetch(`${BASE}/api${caminho}`, { method: metodo, headers, body });
   if (resp.status === 401 && !caminho.startsWith('/auth/login')) {
     sessao.limpar();
     window.dispatchEvent(new CustomEvent('bpo:sair'));

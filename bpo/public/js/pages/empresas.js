@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { api, enderecos } from '../api.js';
 import { html, $, $$, moeda, dataHora, confirmar, numero, data, documento, telefone, status, modal, dadosForm, toast, centavos, valorMoedaInput, opcoes, linksLinhas, debounce, hoje } from '../ui.js';
 import { gestor } from '../contexto.js';
 
@@ -147,10 +147,11 @@ async function responsaveis(alvo, base) {
       ${r.totp_ativo ? html`<button class="btn sm" data-reset2fa="${r.id}">Redefinir 2 etapas</button> ` : ''}<button class="btn sm" data-editar-resp="${r.id}">Editar</button>` : ''}</td></tr>`)
     : html`<tr><td class="vazio">Nenhum responsável cadastrado.</td></tr>`}</tbody></table>`);
 
+  const portal = new URL((await enderecos()).portal, location.origin).href;
   const mostrarSenha = (senha, nome) => modal({ titulo: 'Senha provisória do Portal',
     corpo: html`<p style="margin-top:0">Entregue a ${nome} por um canal seguro. Ela aparece só agora e precisa ser trocada no primeiro acesso.</p>
       <div class="card card-body mono" style="font-size:22px;text-align:center;letter-spacing:.1em;box-shadow:none">${senha}</div>
-      <p class="small muted">Endereço do Portal: <strong>${location.origin}/portal/</strong></p>` });
+      <p class="small muted">Endereço do Portal: <strong>${portal}</strong></p>` });
   const form = (r = {}) => html`<div class="form">
     <div class="c6"><label>Nome</label><input name="nome" required value="${r.nome ?? ''}"></div>
     <div class="c6"><label>Cargo</label><input name="cargo" value="${r.cargo ?? ''}" placeholder="Sócio, gerente financeiro…"></div>

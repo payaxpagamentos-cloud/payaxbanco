@@ -1,0 +1,109 @@
+ATIVA BPO FINANCEIRO — INSTALAÇÃO
+=================================
+
+Endereços depois de instalado:
+  Sistema da equipe ..... https://SEU-DOMINIO/bpo/
+  Portal do Cliente ..... https://SEU-DOMINIO/bpo-cliente/
+
+Os dois são servidos pelo mesmo programa (Node.js), que fica nesta pasta "bpo".
+As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
+
+
+1) REQUISITO
+   Node.js 22.13 ou mais novo no servidor.  Confira com:   node -v
+
+
+2) ENVIAR OS ARQUIVOS
+   Envie a pasta "bpo" inteira para o servidor, FORA da pasta pública do site
+   (ex.: /home/SEU-USUARIO/bpo — e não dentro de public_html).
+   O arquivo ".env" começa com ponto: confira se ele foi enviado (alguns programas de FTP o escondem).
+
+
+3) CONFERIR O .env
+   Já vem pronto, com os endereços /bpo e /bpo-cliente, um segredo novo e a senha inicial do
+   administrador (BPO_ADMIN_SENHA). Normalmente só é preciso mudar a PORTA se a 3100 estiver ocupada.
+   Não troque o BPO_SECRET depois de instalado.
+
+
+4) INICIAR
+   Escolha UMA das formas abaixo.
+
+   a) cPanel / hospedagem com "Setup Node.js App" (Aplicação Node.js)
+      - Node.js version ............ 22 ou mais novo
+      - Application mode ........... Production
+      - Application root ........... bpo
+      - Application URL ............ bpo
+      - Application startup file ... server/index.js
+      Em "Environment variables", cadastre as mesmas variáveis do arquivo .env
+      (o cPanel não lê o .env sozinho), MENOS a variável PORT.
+      Clique em Start. Para o Portal em /bpo-cliente, crie uma segunda aplicação com
+      Application URL "bpo-cliente", o mesmo Application root "bpo" e as mesmas variáveis.
+
+   b) Servidor próprio (VPS) com PM2
+         cd /home/SEU-USUARIO/bpo
+         npm install -g pm2
+         pm2 start "npm start" --name ativa-bpo
+         pm2 save && pm2 startup
+      Depois configure o Nginx ou o Apache (item 5).
+
+   c) Servidor próprio com Docker
+         docker build -t ativa-bpo .
+         docker run -d --name ativa-bpo --env-file .env -p 3100:3100 -v ativa-bpo-dados:/app/data ativa-bpo
+      Depois configure o Nginx ou o Apache (item 5).
+
+
+5) NGINX OU APACHE (só para as opções b e c)
+   O programa espera receber os endereços completos (/bpo/... e /bpo-cliente/...).
+
+   Nginx — dentro do "server { ... }" do seu domínio (com HTTPS):
+      location /bpo/ {
+          proxy_pass http://127.0.0.1:3100;
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          client_max_body_size 12m;
+      }
+      location /bpo-cliente/ {
+          proxy_pass http://127.0.0.1:3100;
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          client_max_body_size 12m;
+      }
+      location = /bpo { return 301 /bpo/; }
+      location = /bpo-cliente { return 301 /bpo-cliente/; }
+
+   Apache (módulos proxy e proxy_http ativos):
+      ProxyPreserveHost On
+      ProxyPass        /bpo-cliente http://127.0.0.1:3100/bpo-cliente
+      ProxyPassReverse /bpo-cliente http://127.0.0.1:3100/bpo-cliente
+      ProxyPass        /bpo http://127.0.0.1:3100/bpo
+      ProxyPassReverse /bpo http://127.0.0.1:3100/bpo
+      (as linhas do /bpo-cliente precisam vir ANTES das do /bpo)
+
+
+6) PRIMEIRO ACESSO
+   Abra https://SEU-DOMINIO/bpo/ e entre com:
+      E-mail: admin@ativabpo.com.br
+      Senha:  a que está em BPO_ADMIN_SENHA no arquivo .env
+   Troque a senha (clique no círculo com as iniciais, no alto à direita), cadastre a equipe
+   em Usuários e as empresas em Empresas. Os acessos ao Portal do Cliente são criados em
+   Empresa > Contrato e responsáveis.
+
+   Quer ver o sistema com dados de exemplo antes? Rode uma vez, com o sistema parado:
+      npm run seed
+   (cria empresas e usuários fictícios; não use no banco de produção definitivo)
+
+
+7) CÓPIAS DE SEGURANÇA
+   Tudo fica na pasta bpo/data: banco de dados (bpo.db), documentos enviados (arquivos/)
+   e backups automáticos diários do banco (backups/).
+   Copie a pasta data para outro lugar com frequência. Em Segurança e backups (administrador)
+   também dá para gerar e baixar um backup do banco.
+
+
+8) ATUALIZAR PARA UMA VERSÃO NOVA
+   Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
+   NÃO apague a pasta data nem o arquivo .env. Inicie de novo.
+
+Mais detalhes: README.md, nesta mesma pasta.

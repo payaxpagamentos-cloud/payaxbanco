@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { api, BASE } from '../api.js';
 import { html, $, $$, dataHora, toast, modal, dadosForm, confirmar, hoje, somarMeses, fimMes, numero, icone } from '../ui.js';
 import { gestor } from '../contexto.js';
 
@@ -21,7 +21,7 @@ export default async function integracoes({ alvo, ativo, base, empresa }) {
     <div class="grid grid-2" style="margin-top:16px;align-items:start">
       <div class="card"><div class="card-head"><h2>Chaves de API (ERP)</h2>${gestor() ? html`<button class="btn sm primario" id="nova-chave">+ Nova chave</button>` : ''}</div><div id="chaves"></div>
         <div class="card-body small muted" style="border-top:1px solid var(--border)">
-          <strong>Como usar:</strong> <code>POST /api/integracao/v1/lancamentos</code> com o cabeçalho <code>Authorization: Bearer bpo_…</code> e o corpo
+          <strong>Como usar:</strong> <code>POST ${location.origin}${BASE}/api/integracao/v1/lancamentos</code> com o cabeçalho <code>Authorization: Bearer bpo_…</code> e o corpo
           <code>{"tipo":"pagar","descricao":"NF 123","valor_centavos":15000,"vencimento":"AAAA-MM-DD","categoria":"Compra de mercadorias","contato":"Fornecedor","contato_documento":"CNPJ"}</code>
           (ou <code>{"lancamentos":[…]}</code> para vários). Também: <code>GET /empresa</code>, <code>GET /categorias</code>, <code>GET /lancamentos?desde=AAAA-MM-DD</code>.</div></div>
       <div class="stack">

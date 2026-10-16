@@ -18,10 +18,18 @@ if (producao) {
   if (process.env.BPO_ADMIN_SENHA.length < 12) throw new Error('[Ativa BPO] BPO_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
 }
 
+// Endereço em que o sistema é publicado: '' (raiz do domínio) ou um caminho, como '/bpo'.
+const caminho = (v) => String(v || '').replace(/\/+$/, '').replace(/^(?=[^/])/, '/');
+const basePath = caminho(process.env.BPO_BASE_PATH);
+// Endereço do Portal do Cliente (ex.: '/bpo-cliente'). Padrão: '/portal' dentro do sistema.
+const portalPath = caminho(process.env.BPO_PORTAL_PATH) || `${basePath}/portal`;
+
 const dbFile = process.env.BPO_DB || path.join(__dirname, '..', 'data', 'bpo.db');
 
 module.exports = {
   producao,
+  basePath,
+  portalPath,
   port: Number(process.env.PORT) || 3100,
   dbFile,
   secret,

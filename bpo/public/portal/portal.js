@@ -1,5 +1,5 @@
 import { api, sessao, usarChaveSessao } from '../js/api.js';
-import { html, raw, $, $$, icone, iniciais, toast, modal, dadosForm, marca, moeda, numero, data, pct, rotuloMes, status, hoje, somarMeses, fimMes } from '../js/ui.js';
+import { html, $, $$, icone, iniciais, toast, modal, dadosForm, marca, moeda, numero, data, pct, rotuloMes, status, hoje, somarMeses, fimMes } from '../js/ui.js';
 import { chat } from '../js/pages/mensagens.js';
 import { telaEntrada } from '../js/pages/entrada.js';
 import { passos2fa } from '../js/pages/conta.js';
@@ -30,7 +30,7 @@ function telaLogin(alvo) {
     rota: '/portal/auth/login',
     rota2fa: '/portal/auth/2fa/login',
     aviso: 'Esqueceu a senha? Peça uma nova à equipe Ativa.',
-    troca: raw('É da equipe Ativa? <a href="/">Acesse o sistema da equipe</a>.'),
+    troca: html`É da equipe Ativa? <a href="#" data-endereco="equipe">Acesse o sistema da equipe</a>.`,
     aoEntrar: () => rotear(),
   });
 }

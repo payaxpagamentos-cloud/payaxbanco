@@ -1,4 +1,4 @@
-import { api, sessao } from '../api.js';
+import { api, sessao, BASE, enderecos } from '../api.js';
 import { html, $, marca, icone } from '../ui.js';
 
 /**
@@ -9,7 +9,7 @@ export function telaEntrada(alvo, { titulo, subtitulo, chamada, texto, itens, ro
   document.title = tituloPagina;
   alvo.innerHTML = String(html`<div class="entrada">
     <section class="entrada-marca" aria-label="Ativa BPO Financeiro">
-      <img class="entrada-logo" src="/img/ativa-logo.png" alt="Ativa BPO Financeiro">
+      <img class="entrada-logo" src="${BASE}/img/ativa-logo.png" alt="Ativa BPO Financeiro">
       <div class="entrada-chamada"><span class="sobre">${chamada}</span><h2>${texto}</h2>
         <ul class="entrada-lista">${itens.map(([ic, t]) => html`<li><span>${icone(ic)}</span>${t}</li>`)}</ul></div>
       <div class="entrada-rodape">© ${new Date().getFullYear()} Ativa BPO Financeiro</div>
@@ -31,6 +31,9 @@ export function telaEntrada(alvo, { titulo, subtitulo, chamada, texto, itens, ro
       <div class="entrada-aviso">${icone('escudo')}<span>${aviso}</span></div>`);
     const form = $('#form-entrada', caixa);
     setTimeout(() => form.email.focus());
+    // Link para o outro acesso (equipe ↔ Portal), no endereço configurado no servidor.
+    const link = $('[data-endereco]', caixa);
+    if (link) enderecos().then((e) => { link.href = e[link.dataset.endereco]; });
     $('#ver-senha', caixa).addEventListener('click', (e) => {
       const visivel = form.senha.type === 'text';
       form.senha.type = visivel ? 'password' : 'text';

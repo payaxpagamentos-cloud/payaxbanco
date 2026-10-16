@@ -56,7 +56,7 @@ npm start        # http://localhost:3100
 
 Acesso inicial: `admin@ativabpo.com.br` / `admin123` (troque no primeiro acesso, clicando no avatar).
 Com o seed: `supervisor@`, `rafael@` e `juliana@ativabpo.com.br`, senha `bpo2026` (Rafael e Juliana são analistas;
-Juliana aprova até R$ 5.000,00). Portal do Cliente em `http://localhost:3100/portal/`: `marta@paoquente.com.br`,
+Juliana aprova até R$ 5.000,00). Portal do Cliente em `http://localhost:3100/portal/` (no servidor, `/bpo-cliente/`): `marta@paoquente.com.br`,
 `paulo@clinicasorriso.com.br`, `renata@technova.com.br` ou `sergio@rota66.com.br`, senha `portal2026`.
 
 Formato do CSV de extrato: `data;histórico;valor[;documento]`, com data `DD/MM/AAAA` ou `AAAA-MM-DD`, valor negativo
@@ -66,11 +66,23 @@ para saídas e vírgula ou ponto decimal. Cabeçalho e linhas de saldo sem data 
 npm test
 ```
 
+## Instalação no servidor (/bpo e /bpo-cliente)
+
+```bash
+cd bpo && npm run empacotar   # gera ../dist-bpo/ativa-bpo.zip
+```
+
+O pacote traz a pasta `bpo/` pronta para enviar ao servidor: código, dependências de produção já instaladas, `.env` com
+segredo e senha inicial do administrador gerados na hora (a senha aparece no terminal) e `LEIA-ME.txt` com o passo a
+passo (cPanel, PM2, Docker, Nginx e Apache). O sistema da equipe fica em `/bpo/` e o Portal do Cliente em `/bpo-cliente/`.
+
 ## Configuração
 
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `PORT` | `3100` | Porta HTTP. |
+| `BPO_BASE_PATH` | (raiz) | Endereço do sistema da equipe, ex.: `/bpo`. |
+| `BPO_PORTAL_PATH` | `<BPO_BASE_PATH>/portal` | Endereço do Portal do Cliente, ex.: `/bpo-cliente`. |
 | `BPO_DB` | `data/bpo.db` | Arquivo do banco SQLite. |
 | `BPO_SECRET` | aleatório | Segredo das sessões (mín. 32 caracteres). **Obrigatório em produção.** |
 | `BPO_ADMIN_EMAIL` / `BPO_ADMIN_SENHA` / `BPO_ADMIN_NOME` | — | Administrador criado no primeiro start. Senha obrigatória em produção (mín. 12). |

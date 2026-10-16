@@ -1,4 +1,4 @@
-import { $, raw } from '../ui.js';
+import { $, html } from '../ui.js';
 import { telaEntrada } from './entrada.js';
 
 /** Login da equipe da Ativa BPO Financeiro. */
@@ -13,7 +13,7 @@ export default function login(alvo, aoEntrar) {
     rota: '/auth/login',
     rota2fa: '/auth/2fa/login',
     aviso: 'Acesso restrito à equipe Ativa. Todas as ações ficam registradas.',
-    troca: raw('É cliente? Acesse o <a href="/portal/">Portal do Cliente</a>.'),
+    troca: html`É cliente? Acesse o <a href="#" data-endereco="portal">Portal do Cliente</a>.`,
     aoEntrar: () => { $('#app').innerHTML = ''; aoEntrar(); },
   });
 }

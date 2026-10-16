@@ -7,8 +7,8 @@ const backup = require('./lib/backup');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
-  console.log(`[Ativa BPO] BPO Financeiro disponível em http://localhost:${config.port}`);
-  console.log(`[Ativa BPO] Portal do Cliente em http://localhost:${config.port}/portal/`);
+  console.log(`[Ativa BPO] Sistema da equipe em http://localhost:${config.port}${config.basePath}/`);
+  console.log(`[Ativa BPO] Portal do Cliente em http://localhost:${config.port}${config.portalPath}/`);
 });
 
 // Backup automático do banco (padrão: a cada 24 h, mantendo os 30 mais recentes).
