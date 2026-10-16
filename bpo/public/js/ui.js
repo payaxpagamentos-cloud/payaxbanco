@@ -20,8 +20,11 @@ export const $ = (sel, raiz = document) => raiz.querySelector(sel);
 export const $$ = (sel, raiz = document) => [...raiz.querySelectorAll(sel)];
 
 // ===== Marca =====
-/** Nome PAY AX em texto. Substitui o logo enquanto a arte oficial não está pronta. */
-export const marca = (variante = 'escura') => raw(`<span class="marca marca-${variante}" aria-label="PAY AX">PAY<span>AX</span></span>`);
+const SIMBOLO = `<svg class="marca-simbolo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#0B1F3A"/><g fill="#22C58B">
+  <rect x="17" y="34" width="8" height="15" rx="1.6"/><rect x="28.5" y="27" width="8" height="22" rx="1.6"/><rect x="40" y="20" width="8" height="29" rx="1.6"/></g>
+  <path d="M14 36.5 27 24.5l8.5 5.7L48.5 16.5M41 15.5h8.5V24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+/** Logo Ativa BPO Financeiro: símbolo + nome. `variante`: 'clara' (fundo claro) ou 'escura' (fundo escuro). */
+export const marca = (variante = 'clara') => raw(`<span class="marca marca-${variante}" role="img" aria-label="Ativa BPO Financeiro">${SIMBOLO}<span class="marca-texto"><b>ativa</b><small>BPO FINANCEIRO</small></span></span>`);
 
 // ===== Formatação =====
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });

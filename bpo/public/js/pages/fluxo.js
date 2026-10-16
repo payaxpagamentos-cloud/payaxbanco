@@ -1,7 +1,7 @@
 import { api } from '../api.js';
 import { html, raw, $, moeda, moedaCurta, data, rotuloMes, opcoes, toast, hoje, inicioMes, fimMes, somarMeses } from '../ui.js';
 
-const COR = { entrada: '#1F8BFF', saida: '#19E3FF', previsto: 0.45, saldo: '#071A3C' };
+const COR = { entrada: '#22C58B', saida: '#5B7090', previsto: 0.4, saldo: '#0B1F3A' };
 
 /** Barras de entradas e saídas (cheias: realizado; claras: previsto) e linha do saldo final. */
 function grafico(periodos, agrupar) {

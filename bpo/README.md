@@ -1,6 +1,6 @@
-# BPO Financeiro · PAY AX
+# Ativa BPO Financeiro
 
-Sistema da equipe PAY AX que cuida do financeiro das empresas clientes (BPO Financeiro). É um sistema **separado** do
+Sistema da equipe Ativa que cuida do financeiro das empresas clientes (BPO Financeiro). É um sistema **separado** do
 Banqueiro: tem servidor, banco de dados, usuários e login próprios, e não acessa as contas PAY AX.
 
 ## Módulos
@@ -54,8 +54,8 @@ npm run seed     # opcional: equipe, quatro empresas e cerca de quatro meses de 
 npm start        # http://localhost:3100
 ```
 
-Acesso inicial: `admin@bpo.payax.com.br` / `admin123` (troque no primeiro acesso, clicando no avatar).
-Com o seed: `supervisor@`, `rafael@` e `juliana@bpo.payax.com.br`, senha `bpo2026` (Rafael e Juliana são analistas;
+Acesso inicial: `admin@ativabpo.com.br` / `admin123` (troque no primeiro acesso, clicando no avatar).
+Com o seed: `supervisor@`, `rafael@` e `juliana@ativabpo.com.br`, senha `bpo2026` (Rafael e Juliana são analistas;
 Juliana aprova até R$ 5.000,00). Portal do Cliente em `http://localhost:3100/portal/`: `marta@paoquente.com.br`,
 `paulo@clinicasorriso.com.br`, `renata@technova.com.br` ou `sergio@rota66.com.br`, senha `portal2026`.
 
@@ -82,7 +82,7 @@ npm test
 | `BPO_BACKUPS` | `data/backups` | Pasta dos backups do banco. Copie para outro local. |
 | `BPO_BACKUP_HORAS` / `BPO_BACKUP_MANTER` | `24` / `30` | Intervalo do backup automático e quantos manter. |
 
-Produção com Docker: `docker build -t payax-bpo bpo/` e rode com um volume em `/app/data`.
+Produção com Docker: `docker build -t ativa-bpo bpo/` e rode com um volume em `/app/data`.
 
 ## Tecnologia e arquitetura
 

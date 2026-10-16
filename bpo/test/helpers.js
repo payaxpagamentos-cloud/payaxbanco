@@ -42,7 +42,7 @@ async function iniciar() {
     return { status: resp.status, dados };
   }
 
-  async function login(email = 'admin@bpo.payax.com.br', senha = 'admin123') {
+  async function login(email = 'admin@ativabpo.com.br', senha = 'admin123') {
     const r = await req('POST', '/auth/login', { email, senha }, null);
     if (r.status !== 200) throw new Error(`Login falhou para ${email}: ${JSON.stringify(r.dados)}`);
     return r.dados.token;

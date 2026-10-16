@@ -19,15 +19,15 @@ test('Módulos do BPO', async (t) => {
   await t.test('preparação', async () => {
     empresa = (await api.post('/empresas', EMPRESA)).dados.id;
     cats = (await api.get(`${base()}/categorias`)).dados.itens;
-    conta = (await api.post(`${base()}/contas-bancarias`, { descricao: 'Movimento', banco: 'PAY AX', saldo_inicial_centavos: 100_000, data_saldo_inicial: dia(-200) })).dados.id;
+    conta = (await api.post(`${base()}/contas-bancarias`, { descricao: 'Movimento', banco: 'Banco do Brasil', saldo_inicial_centavos: 100_000, data_saldo_inicial: dia(-200) })).dados.id;
     await api.post(`${base()}/centros`, { nome: 'Loja Centro' });
     await api.post(`${base()}/centros`, { nome: 'Loja Bairro' });
     centros = (await api.get(`${base()}/centros`)).dados;
-    const a = await api.post('/usuarios', { nome: 'Ana', email: 'ana@bpo.payax.com.br', senha: 'senha-forte-1', perfil: 'analista' });
-    await api.post('/usuarios', { nome: 'Sueli', email: 'sueli@bpo.payax.com.br', senha: 'senha-forte-2', perfil: 'supervisor' });
+    const a = await api.post('/usuarios', { nome: 'Ana', email: 'ana@ativabpo.com.br', senha: 'senha-forte-1', perfil: 'analista' });
+    await api.post('/usuarios', { nome: 'Sueli', email: 'sueli@ativabpo.com.br', senha: 'senha-forte-2', perfil: 'supervisor' });
     await api.patch(`/empresas/${empresa}`, { analista_id: a.dados.id });
-    analistaTk = await api.login('ana@bpo.payax.com.br', 'senha-forte-1');
-    supervisorTk = await api.login('sueli@bpo.payax.com.br', 'senha-forte-2');
+    analistaTk = await api.login('ana@ativabpo.com.br', 'senha-forte-1');
+    supervisorTk = await api.login('sueli@ativabpo.com.br', 'senha-forte-2');
   });
 
   await t.test('responsáveis da empresa: só o gestor cria; acesso ao Portal gera senha provisória', async () => {
@@ -106,7 +106,7 @@ test('Módulos do BPO', async (t) => {
     await api.patch(`${base()}/lancamentos/${pagamento}`, { valor_centavos: 450_000 });
     assert.equal((await api.get(`${base()}/lancamentos/${pagamento}`)).dados.aprovacao, 'conferencia');
     // Alçada definida pelo administrador.
-    const ana = (await api.get('/usuarios')).dados.find((u) => u.email === 'ana@bpo.payax.com.br');
+    const ana = (await api.get('/usuarios')).dados.find((u) => u.email === 'ana@ativabpo.com.br');
     assert.equal(ana.alcada_efetiva_centavos, 0);
     await api.patch(`/usuarios/${ana.id}`, { alcada_aprovacao_centavos: 1_000_000 });
     assert.equal((await api.get('/usuarios')).dados.find((u) => u.id === ana.id).alcada_efetiva_centavos, 1_000_000);
@@ -248,14 +248,14 @@ test('Módulos do BPO', async (t) => {
   });
 
   await t.test('autenticação em duas etapas (equipe) e 2FA obrigatória', async () => {
-    const tk = await api.login('sueli@bpo.payax.com.br', 'senha-forte-2');
+    const tk = await api.login('sueli@ativabpo.com.br', 'senha-forte-2');
     const ini = await api.post('/auth/2fa/iniciar', {}, tk);
     assert.match(ini.dados.uri, /^otpauth:\/\/totp\//);
     assert.match(ini.dados.qr_svg, /<svg/);
     assert.equal((await api.post('/auth/2fa/ativar', { codigo: '000000' }, tk)).status, 422);
     const codigo = totp.codigo(ini.dados.segredo, totp.passoAtual());
     assert.equal((await api.post('/auth/2fa/ativar', { codigo }, tk)).status, 200);
-    const l = await api.post('/auth/login', { email: 'sueli@bpo.payax.com.br', senha: 'senha-forte-2' }, null);
+    const l = await api.post('/auth/login', { email: 'sueli@ativabpo.com.br', senha: 'senha-forte-2' }, null);
     assert.equal(l.dados.precisa_2fa, true);
     assert.equal(l.dados.token, undefined);
     // O código já usado na ativação não vale de novo; o do próximo passo vale.
@@ -265,7 +265,7 @@ test('Módulos do BPO', async (t) => {
     assert.equal(ok.status, 200, JSON.stringify(ok.dados));
     // 2FA obrigatória: quem não configurou só acessa a configuração.
     assert.equal((await api.patch('/seguranca/config', { exigir_2fa_equipe: true })).status, 204);
-    const ana = await api.post('/auth/login', { email: 'ana@bpo.payax.com.br', senha: 'senha-forte-1' }, null);
+    const ana = await api.post('/auth/login', { email: 'ana@ativabpo.com.br', senha: 'senha-forte-1' }, null);
     assert.equal(ana.dados.configurar_2fa, true);
     const bloqueado = await api.get('/painel', ana.dados.token);
     assert.equal(bloqueado.status, 403);
@@ -273,7 +273,7 @@ test('Módulos do BPO', async (t) => {
     assert.equal((await api.post('/auth/2fa/iniciar', {}, ana.dados.token)).status, 200);
     await api.patch('/seguranca/config', { exigir_2fa_equipe: false });
     const seg = (await api.get('/seguranca')).dados;
-    assert.equal(seg.usuarios.find((u) => u.email === 'sueli@bpo.payax.com.br').totp_ativo, 1);
+    assert.equal(seg.usuarios.find((u) => u.email === 'sueli@ativabpo.com.br').totp_ativo, 1);
     assert.equal((await api.get('/seguranca', analistaTk)).status, 403);
   });
 

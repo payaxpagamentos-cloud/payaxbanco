@@ -1,6 +1,7 @@
 import { api, sessao, usarChaveSessao } from '../js/api.js';
-import { html, $, $$, icone, iniciais, toast, modal, dadosForm, marca, moeda, numero, data, pct, rotuloMes, status, hoje, somarMeses, fimMes } from '../js/ui.js';
+import { html, raw, $, $$, icone, iniciais, toast, modal, dadosForm, marca, moeda, numero, data, pct, rotuloMes, status, hoje, somarMeses, fimMes } from '../js/ui.js';
 import { chat } from '../js/pages/mensagens.js';
+import { telaEntrada } from '../js/pages/entrada.js';
 import { passos2fa } from '../js/pages/conta.js';
 import { enviarDocumento, listaDocumentos, ligarDownloads, historicoAprovacao, APROVACAO } from '../js/pages/comum.js';
 
@@ -15,52 +16,22 @@ const MENU = [
   { rota: 'mensagens', rotulo: 'Fale com a equipe', icone: 'conversa' },
 ];
 const eu = () => sessao.get()?.responsavel;
-const titulo = (t) => { $('#titulo-pagina').textContent = t; document.title = `${t} · Portal do Cliente PAY AX`; };
+const titulo = (t) => { $('#titulo-pagina').textContent = t; document.title = `${t} · Portal do Cliente Ativa`; };
 
 // ---------- Acesso ----------
 function telaLogin(alvo) {
-  document.title = 'Entrar · Portal do Cliente PAY AX';
-  alvo.innerHTML = String(html`<div class="login"><div class="login-cartao">
-    <section class="lado bpo"><span class="sobretitulo" style="color:#19E3FF">Portal do Cliente</span>
-      <h2>O financeiro da sua empresa, acompanhado pela PAY AX.</h2>
-      <ul><li>${icone('check')}Aprove pagamentos de onde estiver</li><li>${icone('documento')}Envie notas, boletos e contratos</li>
-        <li>${icone('dre')}Consulte saldos, DRE e fluxo de caixa</li><li>${icone('conversa')}Converse com a equipe do BPO</li></ul></section>
-    <section class="form-lado"><form id="form" novalidate>
-      <div style="align-self:center">${marca('clara')}</div>
-      <div class="cabecalho-acesso"><h1>Portal do Cliente</h1><p class="muted" style="margin:2px 0 4px">Entre com o e-mail e a senha enviados pela equipe.</p></div>
-      <div class="erro-form hidden" id="erro"></div>
-      <div><label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="username" required></div>
-      <div><label for="senha">Senha</label><input id="senha" name="senha" type="password" autocomplete="current-password" required></div>
-      <button class="btn primario" type="submit">Entrar</button>
-      <p class="dica">Esqueceu a senha? Peça uma nova à equipe PAY AX.</p></form></section></div>
-    <div class="login-rodape">© ${new Date().getFullYear()} PAY AX · BPO Financeiro</div></div>`);
-  const form = $('#form', alvo);
-  setTimeout(() => form.email.focus());
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-      const r = await api.post('/portal/auth/login', dadosForm(form));
-      if (r.precisa_2fa) return telaCodigo(alvo, r.desafio);
-      sessao.set(r);
-      rotear();
-    } catch (err) { $('#erro', alvo).textContent = err.message; $('#erro', alvo).classList.remove('hidden'); }
-  });
-}
-
-function telaCodigo(alvo, desafio) {
-  $('#form', alvo).innerHTML = String(html`<div style="align-self:center">${marca('clara')}</div>
-    <div class="cabecalho-acesso"><h1>Verificação em duas etapas</h1><p class="muted">Digite o código do seu aplicativo autenticador.</p></div>
-    <div class="erro-form hidden" id="erro"></div>
-    <input name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required style="font-size:22px;letter-spacing:.3em;text-align:center">
-    <button class="btn primario" type="submit">Confirmar</button>`);
-  const velho = $('#form', alvo);
-  const form = velho.cloneNode(true);
-  velho.replaceWith(form);
-  form.codigo.focus();
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try { sessao.set(await api.post('/portal/auth/2fa/login', { desafio, codigo: form.codigo.value })); rotear(); }
-    catch (err) { $('#erro', alvo).textContent = err.message; $('#erro', alvo).classList.remove('hidden'); form.codigo.value = ''; }
+  telaEntrada(alvo, {
+    tituloPagina: 'Entrar · Portal do Cliente Ativa',
+    titulo: 'Portal do Cliente',
+    subtitulo: 'Entre com o e-mail e a senha enviados pela equipe Ativa.',
+    chamada: 'Portal do Cliente',
+    texto: 'O financeiro da sua empresa, acompanhado de perto.',
+    itens: [['check', 'Aprove pagamentos de onde estiver'], ['documento', 'Envie notas, boletos e contratos'], ['dre', 'Consulte saldos, DRE e fluxo de caixa'], ['conversa', 'Converse com a equipe do BPO']],
+    rota: '/portal/auth/login',
+    rota2fa: '/portal/auth/2fa/login',
+    aviso: 'Esqueceu a senha? Peça uma nova à equipe Ativa.',
+    troca: raw('É da equipe Ativa? <a href="/">Acesse o sistema da equipe</a>.'),
+    aoEntrar: () => rotear(),
   });
 }
 
@@ -90,11 +61,11 @@ function telaTrocarSenha(alvo) {
 function layout() {
   const r = eu();
   $('#app').innerHTML = String(html`<div class="layout">
-    <aside class="sidebar" id="sidebar"><div class="brand">${marca('escura')}</div>
+    <aside class="sidebar" id="sidebar"><div class="brand">${marca('clara')}</div>
       <div class="brand" style="border:0;padding-bottom:0"><span class="produto">Portal do Cliente</span></div>
       <div class="empresa-ativa"><div class="rotulo">Empresa</div><div class="nome">${r.empresa.nome}</div></div>
       <nav class="nav">${MENU.map((m) => html`<a href="#/${m.rota}" data-rota="${m.rota}">${icone(m.icone)}<span>${m.rotulo}</span></a>`)}</nav>
-      <div class="rodape">Atendimento PAY AX BPO Financeiro</div></aside>
+      <div class="rodape">Atendimento Ativa BPO Financeiro</div></aside>
     <div class="main"><header class="topbar"><button class="btn sm menu-btn" id="menu-btn" aria-label="Menu">${icone('menu')}</button>
       <div class="titulo"><h1 id="titulo-pagina"></h1></div>
       <div class="usuario"><div class="nome right"><div style="font-weight:650">${r.nome}</div><div class="small muted">${r.cargo ?? r.empresa.nome}</div></div>
@@ -152,7 +123,7 @@ const telas = {
 
   async aprovacoes(alvo) {
     let aba = 'pendente';
-    alvo.innerHTML = String(html`<div class="page-head"><div><h1>Aprovar pagamentos</h1><p class="muted">Pagamentos conferidos pela equipe PAY AX aguardando autorização da empresa.</p></div></div>
+    alvo.innerHTML = String(html`<div class="page-head"><div><h1>Aprovar pagamentos</h1><p class="muted">Pagamentos conferidos pela equipe Ativa aguardando autorização da empresa.</p></div></div>
       <div class="tabs"><button data-aba="pendente" class="ativo">Aguardando</button><button data-aba="aprovada">Aprovados</button><button data-aba="recusada">Recusados</button></div><div id="lista"></div>`);
     const carregar = async () => {
       const r = await api.get('/portal/aprovacoes', { status: aba });
@@ -173,7 +144,7 @@ const telas = {
       }));
       const decidir = (id, aprovar) => modal({
         titulo: aprovar ? 'Aprovar pagamento' : 'Recusar pagamento',
-        corpo: html`<p style="margin-top:0">${aprovar ? 'Você autoriza a equipe PAY AX a efetuar este pagamento.' : 'Explique o motivo para a equipe.'}</p>
+        corpo: html`<p style="margin-top:0">${aprovar ? 'Você autoriza a equipe Ativa a efetuar este pagamento.' : 'Explique o motivo para a equipe.'}</p>
           <label>Comentário${aprovar ? ' (opcional)' : ''}</label><textarea name="comentario" ${aprovar ? '' : 'required'}></textarea>`,
         rotuloEnviar: aprovar ? 'Aprovar' : 'Recusar',
         aoEnviar: async (f, x) => { await api.post(`/portal/aprovacoes/${id}/${aprovar ? 'aprovar' : 'recusar'}`, dadosForm(f)); x(); toast(aprovar ? 'Pagamento aprovado.' : 'Pagamento recusado.'); carregar(); },
@@ -200,7 +171,7 @@ const telas = {
     const de = `${dia.slice(0, 4)}-01-01`;
     const [d, f] = await Promise.all([api.get('/portal/dre', { de, ate: fimMes(dia) }), api.get('/portal/fluxo-caixa', { de: somarMeses(dia, 0), ate: fimMes(somarMeses(dia, 2)), agrupar: 'mes' })]);
     const val = (l, v) => (l.tipo === 'grupo' ? l.sinal * v : v);
-    alvo.innerHTML = String(html`<div class="page-head"><div><h1>Relatórios</h1><p class="muted">DRE do ano e fluxo de caixa previsto, preparados pela equipe PAY AX.</p></div></div>
+    alvo.innerHTML = String(html`<div class="page-head"><div><h1>Relatórios</h1><p class="muted">DRE do ano e fluxo de caixa previsto, preparados pela equipe Ativa.</p></div></div>
       <div class="card"><div class="card-head"><h2>DRE ${dia.slice(0, 4)} (competência)</h2><span class="small muted">Margem líquida ${d.indicadores.margem_liquida === null ? '—' : pct(d.indicadores.margem_liquida)}</span></div>
         <div class="table-wrap"><table class="tabela-num"><thead><tr><th></th>${d.meses.map((m) => html`<th class="num">${rotuloMes(m)}</th>`)}<th class="num">Total</th></tr></thead><tbody>
         ${d.linhas.map((l) => html`<tr class="${l.tipo === 'subtotal' ? `subtotal${l.destaque ? ' destaque' : ''}` : ''}"><td>${l.rotulo}</td>${d.meses.map((m) => html`<td class="num">${l.valores[m] ? moeda(val(l, l.valores[m])) : '—'}</td>`)}
@@ -224,7 +195,7 @@ const telas = {
   },
 
   async mensagens(alvo) {
-    await chat(alvo, { rota: '/portal/mensagens', lado: 'cliente', titulo: 'Conversa com a equipe PAY AX', vazio: 'Escreva para a equipe do BPO: dúvidas, pedidos e avisos.' });
+    await chat(alvo, { rota: '/portal/mensagens', lado: 'cliente', titulo: 'Conversa com a equipe Ativa', vazio: 'Escreva para a equipe do BPO: dúvidas, pedidos e avisos.' });
   },
 };
 

@@ -22,7 +22,7 @@ test('BPO Financeiro', async (t) => {
   const cat = (nome) => cats.find((c) => c.nome === nome).id;
 
   await t.test('login, sessão e senha', async () => {
-    assert.equal((await api.post('/auth/login', { email: 'admin@bpo.payax.com.br', senha: 'errada' }, null)).status, 401);
+    assert.equal((await api.post('/auth/login', { email: 'admin@ativabpo.com.br', senha: 'errada' }, null)).status, 401);
     assert.equal((await api.get('/painel', null)).status, 401);
     assert.equal((await api.get('/painel', 'token.falso')).status, 401);
     assert.equal((await api.get('/auth/me')).dados.usuario.perfil, 'admin');
@@ -41,9 +41,9 @@ test('BPO Financeiro', async (t) => {
   });
 
   await t.test('analista só vê as empresas da própria carteira', async () => {
-    const u = await api.post('/usuarios', { nome: 'Ana Analista', email: 'ana@bpo.payax.com.br', senha: 'senha-forte-1', perfil: 'analista' });
+    const u = await api.post('/usuarios', { nome: 'Ana Analista', email: 'ana@ativabpo.com.br', senha: 'senha-forte-1', perfil: 'analista' });
     analistaId = u.dados.id;
-    analistaTk = await api.login('ana@bpo.payax.com.br', 'senha-forte-1');
+    analistaTk = await api.login('ana@ativabpo.com.br', 'senha-forte-1');
     assert.equal((await api.get('/empresas', analistaTk)).dados.length, 0);
     assert.equal((await api.get(`${base()}/resumo`, analistaTk)).status, 403);
     assert.equal((await api.post('/empresas', { ...EMPRESA, cnpj: '06.990.590/0001-23' }, analistaTk)).status, 403);
@@ -56,7 +56,7 @@ test('BPO Financeiro', async (t) => {
   });
 
   await t.test('conta bancária, contatos e categorias validados', async () => {
-    const c = await api.post(`${base()}/contas-bancarias`, { descricao: 'Conta movimento', banco: 'PAY AX', agencia: '0001', numero: '12345-6',
+    const c = await api.post(`${base()}/contas-bancarias`, { descricao: 'Conta movimento', banco: 'Banco do Brasil', agencia: '0001', numero: '12345-6',
       saldo_inicial_centavos: 1_000_000, data_saldo_inicial: dia(-60) });
     assert.equal(c.status, 201);
     conta = c.dados.id;
@@ -158,7 +158,7 @@ test('BPO Financeiro', async (t) => {
   });
 
   await t.test('transferência entre contas não altera o caixa consolidado', async () => {
-    const c2 = await api.post(`${base()}/contas-bancarias`, { descricao: 'Aplicação', banco: 'PAY AX', saldo_inicial_centavos: 0, data_saldo_inicial: dia(-60) });
+    const c2 = await api.post(`${base()}/contas-bancarias`, { descricao: 'Aplicação', banco: 'Banco do Brasil', saldo_inicial_centavos: 0, data_saldo_inicial: dia(-60) });
     const antes = (await api.get(`${base()}/resumo`)).dados.saldo_total_centavos;
     assert.equal((await api.post(`${base()}/transferencias`, { origem_id: conta, destino_id: c2.dados.id, valor_centavos: 200_000, data: dia() })).status, 201);
     assert.equal((await api.get(`${base()}/resumo`)).dados.saldo_total_centavos, antes);

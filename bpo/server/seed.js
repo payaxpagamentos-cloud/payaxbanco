@@ -16,7 +16,7 @@ const orc = require('./lib/orcamento');
 
 const db = abrir();
 if (db.prepare('SELECT COUNT(*) AS n FROM empresas').get().n) {
-  console.log('[PAY AX BPO] Já existem empresas cadastradas: seed ignorado.');
+  console.log('[Ativa BPO] Já existem empresas cadastradas: seed ignorado.');
   process.exit(0);
 }
 
@@ -57,15 +57,15 @@ const DESPESAS_FIXAS = [
   ['Salários e encargos', 'Folha de pagamento', 5, [0.18, 0.24]],
   ['Pró-labore', 'Pró-labore dos sócios', 5, [0.06, 0.09]],
   ['Software e sistemas', 'Sistema de gestão', 15, [0.003, 0.008]],
-  ['Contabilidade e BPO', 'Mensalidade BPO PAY AX', 10, null],
+  ['Contabilidade e BPO', 'Mensalidade Ativa BPO', 10, null],
   ['Marketing e publicidade', 'Anúncios online', 20, [0.01, 0.03]],
 ];
 
 const ids = transacao(db, () => {
   const ids = {
-    supervisor: usuario('Carla Mendes', 'supervisor@bpo.payax.com.br', 'supervisor'),
-    rafael: usuario('Rafael Souza', 'rafael@bpo.payax.com.br', 'analista'),
-    juliana: usuario('Juliana Costa', 'juliana@bpo.payax.com.br', 'analista'),
+    supervisor: usuario('Carla Mendes', 'supervisor@ativabpo.com.br', 'supervisor'),
+    rafael: usuario('Rafael Souza', 'rafael@ativabpo.com.br', 'analista'),
+    juliana: usuario('Juliana Costa', 'juliana@ativabpo.com.br', 'analista'),
   };
   const req = { usuario: { id: ids.supervisor } };
   const inicio = inicioMes(somarMeses(dia, -4));
@@ -84,8 +84,8 @@ const ids = transacao(db, () => {
     const conta = (descricao, banco, saldo) => Number(db.prepare(`INSERT INTO contas_bancarias (empresa_id, descricao, banco, agencia, numero, saldo_inicial_centavos, data_saldo_inicial)
       VALUES (?, ?, ?, '0001', ?, ?, ?)`).run(empresaId, descricao, banco, String(entre(10000, 99999)), saldo, somarDias(inicio, -1)).lastInsertRowid);
     const receitaEsperada = ((e.receita[0] + e.receita[1]) / 2) * (e.semanal ? 4 : 1);
-    const movimento = conta('Conta movimento', 'PAY AX', Math.round(receitaEsperada * 0.4));
-    const reserva = conta('Reserva', 'PAY AX', Math.round(receitaEsperada * 0.2));
+    const movimento = conta('Conta movimento', 'Banco do Brasil', Math.round(receitaEsperada * 0.4));
+    const reserva = conta('Reserva', 'Itaú', Math.round(receitaEsperada * 0.2));
 
     const lancar = (tipo, descricao, categoria, valor, vencimento, contatoId) => {
       const [id] = lanc.criar(db, req, empresaId, { tipo, descricao, categoria_id: cat[categoria], valor_centavos: valor, vencimento, contato_id: contatoId ?? null, conta_bancaria_id: movimento });
@@ -191,7 +191,7 @@ transacao(db, () => {
 
     // Documentos de exemplo (PDF mínimo), um ligado ao pagamento.
     const pdf = (titulo) => Buffer.from(`%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 120]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj 4 0 obj<</Length ${44 + titulo.length}>>stream\nBT /F1 14 Tf 20 60 Td (${titulo}) Tj ET\nendstream endobj 5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF`);
-    docs.salvar(db, e.id, pdf('Contrato de prestacao de servicos BPO'), { nome: 'contrato-bpo-payax.pdf', tipo: 'contrato' }, { usuario_id: ids.supervisor });
+    docs.salvar(db, e.id, pdf('Contrato de prestacao de servicos BPO'), { nome: 'contrato-ativa-bpo.pdf', tipo: 'contrato' }, { usuario_id: ids.supervisor });
     docs.salvar(db, e.id, pdf('NF 991 - Manutencao'), { nome: 'nf-991.pdf', tipo: 'nota', lancamento_id: paraAprovar }, { responsavel_id: db.prepare('SELECT id FROM responsaveis WHERE empresa_id = ? AND acesso_portal = 1').get(e.id).id });
 
     // Rateio entre dois centros de custo.
@@ -247,6 +247,6 @@ transacao(db, () => {
   db.prepare('UPDATE usuarios SET alcada_aprovacao_centavos = 500000 WHERE id = ?').run(ids.juliana);
 });
 
-console.log('[PAY AX BPO] Dados de demonstração criados.');
-console.log(`  supervisor@bpo.payax.com.br, rafael@bpo.payax.com.br e juliana@bpo.payax.com.br — senha "${SENHA}"`);
+console.log('[Ativa BPO] Dados de demonstração criados.');
+console.log(`  supervisor@ativabpo.com.br, rafael@ativabpo.com.br e juliana@ativabpo.com.br — senha "${SENHA}"`);
 console.log(`  Portal do Cliente (/portal/): marta@paoquente.com.br, paulo@clinicasorriso.com.br, renata@technova.com.br, sergio@rota66.com.br — senha "${SENHA_PORTAL}"`);

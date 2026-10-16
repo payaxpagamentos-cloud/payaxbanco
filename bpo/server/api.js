@@ -11,7 +11,7 @@ const { ErroNegocio } = require('./lib/erros');
 function criarApi(db) {
   const api = Router();
   const auth = autenticar(db);
-  api.get('/saude', (_req, res) => res.json({ status: 'ok', sistema: 'PAY AX BPO Financeiro' }));
+  api.get('/saude', (_req, res) => res.json({ status: 'ok', sistema: 'Ativa BPO Financeiro' }));
   api.use('/auth', require('./routes/auth')(db, auth));
   api.use('/painel', auth, require('./routes/painel')(db));
   api.use('/carteira', auth, require('./routes/carteira')(db));

@@ -68,10 +68,9 @@ function renderLayout() {
   $('#app').innerHTML = String(html`
     <div class="layout">
       <aside class="sidebar" id="sidebar">
-        <div class="brand">${marca('escura')}</div>
-        <div class="brand" style="border:0;padding-bottom:0"><span class="produto">BPO Financeiro</span></div>
+        <div class="brand">${marca('clara')}</div>
         <nav class="nav" id="nav"></nav>
-        <div class="rodape">© ${new Date().getFullYear()} PAY AX · BPO Financeiro v1.0</div>
+        <div class="rodape">© ${new Date().getFullYear()} Ativa BPO Financeiro v1.0</div>
       </aside>
       <div class="main">
         <header class="topbar">

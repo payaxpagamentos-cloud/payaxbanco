@@ -1,4 +1,4 @@
-# BPO Financeiro PAY AX — imagem de produção
+# Ativa BPO Financeiro — imagem de produção
 ARG BASE=node:22-slim
 FROM ${BASE}
 

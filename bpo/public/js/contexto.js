@@ -17,5 +17,5 @@ export const empresaAtual = {
 export function definirTitulo(t) {
   const el = document.querySelector('#titulo-pagina');
   if (el) el.textContent = t;
-  document.title = `${t} · BPO Financeiro PAY AX`;
+  document.title = `${t} · Ativa BPO Financeiro`;
 }
