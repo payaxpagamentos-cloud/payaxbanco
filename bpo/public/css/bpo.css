@@ -1,0 +1,55 @@
+/* ===== BPO Financeiro: complementos do visual PAY AX ===== */
+
+/* Tela de acesso: painel de apresentação + formulário */
+.login .lado.bpo { display: flex; flex-direction: column; justify-content: center; gap: 18px; padding: 40px;
+  background: radial-gradient(70% 60% at 100% 0%, rgba(25, 227, 255, .25), transparent 60%), linear-gradient(150deg, #071A3C, #0B3D91); }
+.login .lado.bpo h2 { margin: 0; color: #fff; font-size: 24px; line-height: 1.2; text-wrap: balance; }
+.login .lado.bpo p { margin: 0; color: #C9D5EA; }
+.login .lado.bpo ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.login .lado.bpo li { display: flex; gap: 10px; align-items: center; color: #E5EEFC; font-weight: 600; }
+.login .lado.bpo li svg { width: 18px; height: 18px; color: #19E3FF; flex: none; }
+
+/* Seletor da empresa em atendimento, no menu lateral */
+.empresa-ativa { margin: 10px 6px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); }
+.empresa-ativa .rotulo { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--text-3); font-weight: 700; }
+.empresa-ativa .nome { font-weight: 750; color: var(--text); margin-top: 2px; line-height: 1.25; }
+.empresa-ativa select { margin-top: 8px; height: 32px; font-size: 12.5px; }
+
+/* Números da DRE e do fluxo */
+.tabela-num td, .tabela-num th { padding: 8px 12px; }
+.tabela-num td:first-child, .tabela-num th:first-child { position: sticky; left: 0; background: var(--surface); z-index: 1; min-width: 240px; }
+.tabela-num th:first-child { background: var(--surface-2); }
+.tabela-num tr.subtotal td { font-weight: 750; background: var(--surface-2); }
+.tabela-num tr.subtotal td:first-child { background: var(--surface-2); }
+.tabela-num tr.destaque td { background: var(--info-bg); font-size: 15px; }
+.tabela-num tr.destaque td:first-child { background: var(--info-bg); }
+.tabela-num tr.grupo td { font-weight: 650; cursor: pointer; }
+.tabela-num tr.grupo td:first-child::before { content: "▸"; display: inline-block; width: 16px; color: var(--text-3); transition: transform .15s; }
+.tabela-num tr.grupo.aberto td:first-child::before { transform: rotate(90deg); }
+.tabela-num tr.cat td { color: var(--text-2); font-size: 13px; }
+.tabela-num tr.cat td:first-child { padding-left: 34px; }
+.tabela-num tr.cat.oculto { display: none; }
+
+/* Conciliação: extrato à esquerda, sugestões abaixo de cada linha */
+.conc-item { display: grid; grid-template-columns: 96px 1fr auto; gap: 4px 14px; padding: 14px 18px; border-bottom: 1px solid var(--border); align-items: start; }
+.conc-item:last-child { border-bottom: 0; }
+.conc-item .valor { font-weight: 750; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.conc-item .acoes { grid-column: 2 / 4; display: flex; flex-wrap: wrap; gap: 6px; }
+.sugestao { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border: 1px dashed var(--border); border-radius: 12px; font-size: 12.5px; background: var(--surface-2); }
+.sugestao strong { font-weight: 700; }
+.conc-item.feito { opacity: .75; }
+
+.selecao-lote { position: sticky; bottom: 12px; z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; margin-top: 12px; border-radius: 16px; background: var(--marinho, #071A3C); color: #fff; box-shadow: var(--shadow); }
+td.sel, th.sel { width: 36px; }
+td.sel input, th.sel input { width: 16px; height: 16px; }
+.ponto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); vertical-align: 1px; margin-right: 6px; }
+.ponto.vermelho { background: var(--danger); } .ponto.amarelo { background: var(--warn); } .ponto.verde { background: var(--ok); }
+.alerta-linha { display: flex; gap: 6px; flex-wrap: wrap; }
+.zona-arquivo { border: 2px dashed var(--border); border-radius: 16px; padding: 24px; text-align: center; color: var(--text-2); cursor: pointer; }
+.zona-arquivo:hover, .zona-arquivo.arrastando { border-color: var(--azul, #1F8BFF); background: var(--info-bg); }
+
+/* Filtros em linha: os campos não ocupam a largura toda. */
+.filtros { align-items: flex-end; }
+.filtros .campo { width: auto; flex: 0 1 200px; }
+.filtros .busca { flex: 1 1 260px; }

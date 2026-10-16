@@ -1,0 +1,20 @@
+{
+  "name": "payax-bpo-financeiro",
+  "version": "1.0.0",
+  "description": "BPO Financeiro PAY AX — carteira de empresas atendidas, contas a pagar e a receber, conciliação bancária, fluxo de caixa e DRE.",
+  "main": "server/index.js",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning server/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

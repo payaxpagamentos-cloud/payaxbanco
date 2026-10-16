@@ -7,6 +7,9 @@ transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria
 
 ![Painel](docs/telas/painel-escuro.png)
 
+> **BPO Financeiro:** sistema separado da equipe que cuida do financeiro das empresas clientes (contas a pagar e a receber,
+> conciliação bancária, fluxo de caixa e DRE). Fica em [`bpo/`](bpo/README.md), com servidor, banco e login próprios.
+
 ## Funcionalidades
 
 | Módulo | O que faz |
