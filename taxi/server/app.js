@@ -15,6 +15,18 @@ const origemTiles = (() => {
   }
 })();
 
+/**
+ * Política de segurança das páginas. Com o Google Maps, libera os domínios que a API JavaScript do Google exige
+ * (lista da documentação do Google Maps para CSP); com o OpenStreetMap, só o servidor de mapas.
+ */
+const csp = config.mapa.provedor === 'google'
+  ? ["default-src 'self'", "script-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.google.com 'unsafe-eval' blob:",
+    "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.gstatic.com data: blob:", 'worker-src blob:',
+    'frame-src https://*.google.com', "frame-ancestors 'none'"].join('; ')
+  : `default-src 'self'; img-src 'self' data: ${origemTiles}; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'`;
+
 function criarApp(db) {
   const app = express();
   app.disable('x-powered-by');
@@ -26,7 +38,7 @@ function criarApp(db) {
       'Referrer-Policy': 'no-referrer',
       'Permissions-Policy': 'geolocation=(self), camera=(), microphone=()',
       ...(config.producao ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),
-      'Content-Security-Policy': `default-src 'self'; img-src 'self' data: ${origemTiles}; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'`,
+      'Content-Security-Policy': csp,
     });
     next();
   });

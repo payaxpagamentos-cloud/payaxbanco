@@ -18,7 +18,10 @@ if (producao) {
   if (process.env.TAXI_ADMIN_SENHA.length < 12) throw new Error('[APP Táxi] TAXI_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
 }
 
+const googleChave = process.env.TAXI_GOOGLE_MAPS_CHAVE || '';
 const [latCentro, lngCentro] = String(process.env.TAXI_MAPA_CENTRO || '-23.5505,-46.6333').split(',').map(Number);
+
+if (producao && process.env.TAXI_MAPA_PROVEDOR === 'google' && !googleChave) throw new Error('[APP Táxi] Google Maps sem TAXI_GOOGLE_MAPS_CHAVE.');
 
 module.exports = {
   producao,
@@ -31,13 +34,20 @@ module.exports = {
   // Fuso das datas de relatório e da bandeira 2.
   fuso: process.env.TAXI_FUSO || 'America/Sao_Paulo',
   mapa: {
-    // Camada de mapa (OpenStreetMap por padrão). O domínio entra na política de segurança das páginas.
+    // 'google' (Google Maps, padrão quando há chave) ou 'osm' (OpenStreetMap pelo Leaflet).
+    provedor: process.env.TAXI_MAPA_PROVEDOR || (googleChave ? 'google' : 'osm'),
+    // Chave do navegador (fica visível nas páginas: restrinja no Google Cloud pelos endereços do app) e o Map ID dos marcadores.
+    google_chave: googleChave,
+    google_map_id: process.env.TAXI_GOOGLE_MAP_ID || 'DEMO_MAP_ID',
+    // Camada do OpenStreetMap. O domínio entra na política de segurança das páginas.
     tiles: process.env.TAXI_MAPA_TILES || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     atribuicao: process.env.TAXI_MAPA_ATRIBUICAO || '&copy; colaboradores do OpenStreetMap',
     centro: [Number.isFinite(latCentro) ? latCentro : -23.5505, Number.isFinite(lngCentro) ? lngCentro : -46.6333],
   },
-  // Busca de endereços (Nominatim/OpenStreetMap por padrão). Vazio desliga a busca: os pontos são escolhidos no mapa.
+  // Busca de endereços: com o Google Maps, pela Geocoding API do Google (chave do servidor, ou a mesma do navegador);
+  // sem ele, pelo Nominatim/OpenStreetMap. TAXI_GEOCODER_URL vazio desliga a busca do OpenStreetMap.
   geocoder: {
+    google_chave: process.env.TAXI_GOOGLE_MAPS_CHAVE_SERVIDOR || googleChave,
     url: process.env.TAXI_GEOCODER_URL ?? 'https://nominatim.openstreetmap.org',
     contato: process.env.TAXI_GEOCODER_CONTATO || 'contato@apptaxi.com.br',
     paises: process.env.TAXI_GEOCODER_PAISES || 'br',

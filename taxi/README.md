@@ -35,7 +35,8 @@ celular (não precisa instalar nada da loja) e não depende do Ativa BPO: tem ba
 - Botões **Navegar** (Google Maps), **Cheguei**, **Iniciar** e **Finalizar**. Pode desistir antes de iniciar: a corrida volta para os outros.
 - Não recebe nem confirma pagamento: no fim aparece **"Você recebe R$ …"**, que já entra no saldo. Avalia o passageiro.
 - **Ganhos** de hoje, 7 ou 30 dias (valor recebido já sem a taxa, valor das corridas, taxa, km rodados), **saldo disponível** e extrato.
-- **Pede o PIX** do saldo (todo ou parte) para a chave PIX cadastrada, **no máximo um por dia**, e acompanha cada pedido (aguardando, pago com o identificador, ou cancelado com o motivo).
+- **Pede o PIX** do saldo (todo ou parte) para a chave PIX cadastrada, **no máximo um por dia**. O pedido fica *aguardando liberação*
+  até a gestão liberar (com o identificador da transferência) ou recusar (com o motivo, e o valor volta ao saldo).
 - Cadastra outros veículos (passam pela aprovação) e atualiza a chave PIX.
 
 ### Painel da central
@@ -48,8 +49,8 @@ celular (não precisa instalar nada da loja) e não depende do Ativa BPO: tem ba
 - **Pagamentos**: PIX a confirmar e **estornos a devolver**, com o identificador de cada operação.
 - **Motoristas**: análise do cadastro (aprovar, recusar com motivo, bloquear, liberar), aprovação de novos veículos, extrato e ajuste na conta.
 - **Passageiros**: busca, número de corridas, nota dada pelos motoristas, desativar e reativar conta.
-- **PIX dos motoristas**: fila dos pedidos de PIX feitos pelos motoristas; marcar como pago (com o identificador da transferência) ou cancelar
-  com motivo (o valor volta ao saldo e o motorista pode pedir de novo no mesmo dia). Saldos de todos os motoristas.
+- **PIX dos motoristas**: **todo pedido de PIX aguarda a liberação da gestão**. Liberar = fazer a transferência para a chave do motorista e
+  registrar o identificador; recusar = informar o motivo (o valor volta ao saldo e o motorista pode pedir de novo no mesmo dia). Saldos de todos os motoristas.
 - **Relatórios**: corridas, faturamento, receita da plataforma, ticket médio, gráfico por dia, por forma de pagamento,
   ranking de motoristas, impressão/PDF e **exportação para o Ativa BPO Financeiro**.
 - **Tarifas e regras** (só administrador): bandeirada, km nas bandeiras 1 e 2, minuto, tarifa mínima; taxa da plataforma, raio de busca,
@@ -78,8 +79,8 @@ taxista aceita a tempo). Se o motorista desiste, a corrida volta para os outros,
 
 **Motorista**: a **taxa da plataforma** (padrão 15%) sai do valor da corrida; o restante entra no saldo do motorista ao finalizar e fica
 **disponível na hora**. Como o dinheiro passa sempre pela plataforma, o motorista só tem valores a receber. Ele **pede o PIX** pelo app (todo o
-saldo ou parte, um pedido por dia, para a chave cadastrada); o valor sai do saldo no pedido. A plataforma faz a transferência e registra o
-identificador; se cancelar o pedido, o valor volta ao saldo.
+saldo ou parte, um pedido por dia, para a chave cadastrada); o valor sai do saldo no pedido. **Todo pedido é liberado pela gestão**, que faz a
+transferência e registra o identificador; se recusar, o valor volta ao saldo.
 
 ### Modo de pagamento (`TAXI_PAGAMENTOS`)
 - `simulado` (padrão fora de produção): para testes; o passageiro aprova o PIX ou o cartão por um botão na tela e os estornos saem na hora.
@@ -101,8 +102,8 @@ outras podem ser escolhidas com `?categoria_receita=` e `?categoria_despesa=`.
 - **Rota pelas ruas e tempo com trânsito**: exige um serviço de rotas (Google, Mapbox, OSRM próprio). A estimativa usa a distância em
   linha reta × fator de rota e a velocidade média configurada; o valor cobrado usa o GPS real.
 - **Notificação com o app fechado** (push) e **apps nas lojas** (Android/iOS): a versão atual roda no navegador, com o app aberto.
-- **Mapa e busca de endereços**: por padrão usam os serviços públicos do OpenStreetMap, que têm limite de uso. Para muitos acessos,
-  contrate um provedor de mapas e configure `TAXI_MAPA_TILES` e `TAXI_GEOCODER_URL`.
+- **Google Maps**: o mapa e a busca de endereços usam o Google Maps quando há chave (veja abaixo); o Google cobra por uso
+  (carregamentos de mapa e buscas de endereço) depois da cota gratuita mensal. Sem chave, o app usa o OpenStreetMap, cujos serviços públicos têm limite de uso.
 
 ## Instalação
 
@@ -130,6 +131,16 @@ npm run seed
 - Com proxy reverso, ajuste `TAXI_TRUST_PROXY`. O banco fica em `TAXI_DB` (padrão `data/taxi.db`): faça backup dessa pasta.
 - Docker: `docker build -t app-taxi . && docker run -p 3200:3200 -v taxi-dados:/app/data -e TAXI_SECRET=... -e TAXI_ADMIN_SENHA=... app-taxi`
 
+### Google Maps
+1. No [Google Cloud Console](https://console.cloud.google.com/), crie um projeto com faturamento e ative a **Maps JavaScript API** e a **Geocoding API**.
+2. Crie uma chave para o navegador, restrita aos endereços do app (*Referenciadores HTTP*, ex.: `https://app.suaempresa.com.br/*`) e às duas APIs,
+   e configure `TAXI_GOOGLE_MAPS_CHAVE`. Essa chave aparece nas páginas; a restrição impede o uso por terceiros.
+3. Opcional: uma segunda chave só para o servidor (restrita pelo IP do servidor e à Geocoding API) em `TAXI_GOOGLE_MAPS_CHAVE_SERVIDOR`.
+4. Em *Google Maps Platform → Gerenciamento de mapas*, crie um **Map ID** (tipo JavaScript) e configure `TAXI_GOOGLE_MAP_ID`
+   (os marcadores do táxi, da origem e do destino precisam dele; `DEMO_MAP_ID` serve só para testes).
+
+Com a chave, o mapa passa a ser o Google Maps nas três páginas; o botão **Navegar** do motorista abre a rota no aplicativo Google Maps.
+
 ### Configuração
 
 | Variável | Padrão | Para quê |
@@ -140,8 +151,12 @@ npm run seed
 | `TAXI_DB` | `data/taxi.db` | Arquivo do banco |
 | `TAXI_FUSO` | `America/Sao_Paulo` | Fuso dos relatórios e da bandeira 2 |
 | `TAXI_MAPA_CENTRO` | `-23.5505,-46.6333` | Centro inicial do mapa |
-| `TAXI_MAPA_TILES` / `TAXI_MAPA_ATRIBUICAO` | OpenStreetMap | Camada do mapa |
-| `TAXI_GEOCODER_URL` | Nominatim (OSM) | Busca de endereços; vazio desliga |
+| `TAXI_GOOGLE_MAPS_CHAVE` | — | Chave do Google Maps (liga o Google Maps nas páginas e na busca de endereços) |
+| `TAXI_GOOGLE_MAPS_CHAVE_SERVIDOR` | a mesma | Chave usada pelo servidor na busca de endereços (Geocoding API) |
+| `TAXI_GOOGLE_MAP_ID` | `DEMO_MAP_ID` | Map ID do Google (marcadores) |
+| `TAXI_MAPA_PROVEDOR` | `google` com chave, senão `osm` | Força o provedor do mapa |
+| `TAXI_MAPA_TILES` / `TAXI_MAPA_ATRIBUICAO` | OpenStreetMap | Camada do mapa sem Google |
+| `TAXI_GEOCODER_URL` | Nominatim (OSM) | Busca de endereços sem Google; vazio desliga |
 | `TAXI_GEOCODER_CONTATO` / `TAXI_GEOCODER_PAISES` | — / `br` | Identificação exigida pelo Nominatim e países da busca |
 | `TAXI_TRUST_PROXY` | `loopback` | Proxies confiáveis (IP real no limite de login) |
 | `TAXI_LIMITE_LOGIN` | `10` | Tentativas de login/cadastro por minuto por IP |
@@ -149,8 +164,9 @@ npm run seed
 
 ## Segurança
 - Senhas com scrypt; sessão por token assinado (HMAC) de 12 horas; o perfil é sempre lido do banco a cada requisição.
+- CSP sem scripts externos; com o Google Maps, só os domínios do Google exigidos pela API do mapa.
 - Cada perfil só alcança as próprias rotas; passageiro e motorista só veem as próprias corridas; o passageiro vê os táxis próximos com posição arredondada.
-- Limite de tentativas de login e cadastro por IP; cabeçalhos de segurança (CSP sem scripts externos, sem iframes).
+- Limite de tentativas de login e cadastro por IP; cabeçalhos de segurança (sem iframes).
 - Ações da central (aprovações, cancelamentos, pagamentos, PIX dos motoristas, tarifas, regras, equipe) ficam na auditoria.
 
 ## Testes
@@ -172,6 +188,6 @@ taxi/
 │   ├── index.js, app.js, api.js, auth.js, config.js, db.js, seed.js
 │   ├── lib/      corridas, financeiro, tarifa, pix, geo, datas, validacao, ...
 │   └── routes/   auth, passageiro, motorista, central, geo
-├── public/       páginas /passageiro, /motorista e /central (JavaScript sem build; Leaflet para o mapa)
+├── public/       páginas /passageiro, /motorista e /central (JavaScript sem build; Google Maps ou Leaflet para o mapa)
 └── test/
 ```

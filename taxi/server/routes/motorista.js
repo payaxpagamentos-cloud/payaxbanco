@@ -111,7 +111,7 @@ module.exports = (db) => {
       saldo_centavos: fin.saldo(db, id(req)),
       pix: fin.pixDisponivel(db, id(req)),
       extrato: fin.extrato(db, id(req), 50),
-      repasses: db.prepare('SELECT id, valor_centavos, chave_pix, status, criado_em, concluido_em, identificador FROM repasses WHERE motorista_id = ? ORDER BY id DESC LIMIT 30').all(id(req)),
+      repasses: db.prepare('SELECT id, valor_centavos, chave_pix, status, criado_em, concluido_em, identificador, motivo FROM repasses WHERE motorista_id = ? ORDER BY id DESC LIMIT 30').all(id(req)),
     });
   });
 

@@ -210,14 +210,15 @@ module.exports = (db) => {
     res.json(db.prepare(`SELECT r.*, u.nome, m.cpf FROM repasses r JOIN usuarios u ON u.id = r.motorista_id JOIN motoristas m ON m.usuario_id = r.motorista_id
       WHERE (? IS NULL OR r.status = ?) ORDER BY r.id DESC LIMIT 300`).all(status, status));
   });
-  r.post('/repasses/:id/pagar', (req, res) => {
-    fin.pagarRepasse(db, req.usuario, nid(req), req.body.identificador);
-    registrar(db, req, 'repasse_pago', { repasse: nid(req), identificador: req.body.identificador });
+  /** Pedidos de PIX dos motoristas: a gestão libera (faz a transferência e registra o identificador) ou recusa (o valor volta ao saldo). */
+  r.post('/repasses/:id/liberar', (req, res) => {
+    fin.liberarPix(db, req.usuario, nid(req), req.body.identificador);
+    registrar(db, req, 'pix_liberado', { pedido: nid(req), identificador: req.body.identificador });
     res.status(204).end();
   });
-  r.post('/repasses/:id/cancelar', (req, res) => {
-    fin.cancelarRepasse(db, req.usuario, nid(req), req.body.motivo);
-    registrar(db, req, 'repasse_cancelado', { repasse: nid(req), motivo: req.body.motivo });
+  r.post('/repasses/:id/recusar', (req, res) => {
+    fin.recusarPix(db, req.usuario, nid(req), req.body.motivo);
+    registrar(db, req, 'pix_recusado', { pedido: nid(req), motivo: req.body.motivo });
     res.status(204).end();
   });
 

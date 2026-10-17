@@ -47,7 +47,7 @@ const saldos = (db) => db.prepare(`SELECT m.usuario_id AS motorista_id, u.nome, 
   FROM lancamentos_motorista l JOIN motoristas m ON m.usuario_id = l.motorista_id JOIN usuarios u ON u.id = m.usuario_id
   GROUP BY m.usuario_id HAVING SUM(l.valor_centavos) <> 0 ORDER BY saldo_centavos DESC`).all();
 
-/** PIX que o motorista ainda pode pedir hoje: um por dia (pedidos cancelados pela central não contam). */
+/** PIX que o motorista ainda pode pedir hoje: um por dia (pedidos recusados pela gestão não contam). */
 function pixDisponivel(db, motoristaId) {
   const { repasse_minimo_centavos: minimo } = lerConfig(db);
   const [ini, fim] = intervalo(local().data, local().data);
@@ -59,7 +59,7 @@ function pixDisponivel(db, motoristaId) {
 
 /**
  * O motorista pede o PIX do saldo disponível (todo ou parte), para a chave PIX cadastrada. No máximo um pedido por dia.
- * O valor sai do saldo na hora; a plataforma faz a transferência e marca como paga, ou cancela e o valor volta.
+ * O valor sai do saldo na hora e o pedido aguarda a liberação da gestão; se recusado, o valor volta.
  */
 function solicitarPix(db, motoristaId, valor) {
   return transacao(db, () => {
@@ -81,26 +81,30 @@ function solicitarPix(db, motoristaId, valor) {
 
 function repasse(db, id) {
   const r = db.prepare('SELECT * FROM repasses WHERE id = ?').get(id);
-  if (!r) throw naoEncontrado('Repasse');
+  if (!r) throw naoEncontrado('Pedido de PIX');
   return r;
 }
 
-/** Marca o repasse como pago, com o identificador da transferência (ex.: E2E do PIX). */
-function pagarRepasse(db, usuario, id, identificador) {
+/**
+ * Todo pedido de PIX do motorista aguarda a liberação da gestão. Liberar = fazer a transferência para a chave do motorista
+ * e registrar o identificador dela (ex.: E2E do PIX). Com a API PIX da conta da plataforma ligada, a liberação dispara a transferência.
+ */
+function liberarPix(db, usuario, id, identificador) {
   const r = repasse(db, id);
-  if (r.status !== 'pendente') throw new ErroNegocio('Repasse já concluído ou cancelado.', 409);
+  if (r.status !== 'pendente') throw new ErroNegocio('Este pedido de PIX já foi liberado ou recusado.', 409);
   db.prepare(`UPDATE repasses SET status = 'pago', concluido_em = ?, concluido_por = ?, identificador = ? WHERE id = ?`)
     .run(agora(), usuario.id, v.texto(identificador, 'o identificador da transferência', 100), id);
 }
 
-function cancelarRepasse(db, usuario, id, motivo) {
+/** Recusa o pedido de PIX, com motivo (o motorista vê). O valor volta ao saldo e ele pode pedir de novo no mesmo dia. */
+function recusarPix(db, usuario, id, motivo) {
   transacao(db, () => {
     const r = repasse(db, id);
-    if (r.status !== 'pendente') throw new ErroNegocio('Só repasses pendentes podem ser cancelados.', 409);
+    if (r.status !== 'pendente') throw new ErroNegocio('Este pedido de PIX já foi liberado ou recusado.', 409);
     db.prepare(`UPDATE repasses SET status = 'cancelado', concluido_em = ?, concluido_por = ?, motivo = ? WHERE id = ?`)
       .run(agora(), usuario.id, v.texto(motivo, 'o motivo', 300), id);
     db.prepare(`INSERT INTO lancamentos_motorista (motorista_id, repasse_id, tipo, descricao, valor_centavos, criado_em, criado_por)
-      VALUES (?, ?, 'estorno_repasse', ?, ?, ?, ?)`).run(r.motorista_id, id, `PIX #${id} cancelado: valor devolvido ao saldo`, r.valor_centavos, agora(), usuario.id);
+      VALUES (?, ?, 'estorno_repasse', ?, ?, ?, ?)`).run(r.motorista_id, id, `PIX #${id} recusado: valor devolvido ao saldo`, r.valor_centavos, agora(), usuario.id);
   });
 }
 
@@ -189,4 +193,4 @@ function exportarBpo(db, de, ate, { categoriaReceita = 'Prestação de serviços
   return `${linhas.map((l) => l.map(csv).join(';')).join('\r\n')}\r\n`;
 }
 
-module.exports = { creditarCorrida, saldo, extrato, ganhos, saldos, pixDisponivel, solicitarPix, repasse, pagarRepasse, cancelarRepasse, ajustar, relatorio, exportarBpo };
+module.exports = { creditarCorrida, saldo, extrato, ganhos, saldos, pixDisponivel, solicitarPix, repasse, liberarPix, recusarPix, ajustar, relatorio, exportarBpo };

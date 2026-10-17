@@ -317,7 +317,7 @@ test('APP Táxi', async (t) => {
     assert.equal((await api.get(`/passageiro/corridas/${semMotorista}`, admin)).status, 403);
   });
 
-  await t.test('motorista pede o PIX do saldo: um por dia; cancelado volta ao saldo', async () => {
+  await t.test('motorista pede o PIX do saldo (um por dia) e a gestão libera ou recusa', async () => {
     const saldoCarlos = (await api.get('/motorista/ganhos', motorista)).dados.saldo_centavos;
     assert.ok(saldoCarlos > 0);
     await api.patch('/central/config', { repasse_minimo_centavos: 2000 }, admin);
@@ -336,17 +336,17 @@ test('APP Táxi', async (t) => {
     assert.equal(segundo.status, 409);
     assert.match(segundo.dados.erro, /já pediu um PIX hoje/);
     assert.equal((await api.get('/motorista/ganhos', motorista)).dados.pix.pode_pedir, false);
-    // A central não consegue transferir (ex.: chave errada) e cancela: o valor volta e o motorista pode pedir de novo.
+    // A gestão recusa (ex.: chave errada): o valor volta e o motorista pode pedir de novo.
     const fila = (await api.get('/central/repasses?status=pendente', admin)).dados;
     assert.equal(fila[0].id, p1.dados.id);
-    assert.equal((await api.post(`/central/repasses/${p1.dados.id}/cancelar`, {}, admin)).status, 422);
-    assert.equal((await api.post(`/central/repasses/${p1.dados.id}/cancelar`, { motivo: 'Chave errada' }, admin)).status, 204);
+    assert.equal((await api.post(`/central/repasses/${p1.dados.id}/recusar`, {}, admin)).status, 422);
+    assert.equal((await api.post(`/central/repasses/${p1.dados.id}/recusar`, { motivo: 'Chave errada' }, admin)).status, 204);
     assert.equal((await api.get('/motorista/ganhos', motorista)).dados.saldo_centavos, saldoCarlos);
     const p2 = await api.post('/motorista/pix', {}, motorista); // sem valor: o saldo todo
     assert.equal(p2.dados.valor_centavos, saldoCarlos);
     assert.equal((await api.get('/central/painel', admin)).dados.repasses_pendentes.total, saldoCarlos);
-    assert.equal((await api.post(`/central/repasses/${p2.dados.id}/pagar`, { identificador: 'E12345678202610171200abc' }, admin)).status, 204);
-    assert.equal((await api.post(`/central/repasses/${p2.dados.id}/pagar`, { identificador: 'x' }, admin)).status, 409);
+    assert.equal((await api.post(`/central/repasses/${p2.dados.id}/liberar`, { identificador: 'E12345678202610171200abc' }, admin)).status, 204);
+    assert.equal((await api.post(`/central/repasses/${p2.dados.id}/liberar`, { identificador: 'x' }, admin)).status, 409);
     const g = (await api.get('/motorista/ganhos', motorista)).dados;
     assert.equal(g.saldo_centavos, 0);
     assert.equal(g.repasses[0].status, 'pago');
@@ -401,7 +401,7 @@ test('APP Táxi', async (t) => {
     assert.equal((await api.get('/passageiro/corridas', passageiro)).status, 401);
     assert.equal((await api.post('/auth/login', { email: 'ana@teste.com', senha: 'senha-da-ana' })).status, 403);
     const aud = (await api.get('/central/auditoria', admin)).dados;
-    assert.ok(aud.some((a) => a.acao === 'repasse_pago'));
+    assert.ok(aud.some((a) => a.acao === 'pix_liberado'));
   });
 
   await t.test('páginas e cabeçalhos de segurança', async () => {

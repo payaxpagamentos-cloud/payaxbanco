@@ -51,6 +51,7 @@ function ir(tela) {
   Promise.resolve(TELAS[tela][1](conteudo)).catch((err) => toast(err.message, true));
 }
 
+const situacaoPix = (s) => el('span', { class: `etiqueta ${{ pendente: 'aviso', pago: 'ok', cancelado: 'erro' }[s]}` }, { pendente: 'aguardando liberação', pago: 'liberado', cancelado: 'recusado' }[s]);
 const cabeca = (titulo, ...acoes) => el('div', { class: 'cabeca' }, el('h1', { style: 'margin:0' }, titulo), el('div', { class: 'linha' }, acoes));
 const indicador = (rotulo, valor, nota) => el('div', { class: 'cartao indicador' }, el('div', { class: 'rotulo' }, rotulo), el('div', { class: 'valor num' }, valor), nota ? el('div', { class: 'nota' }, nota) : null);
 const tabela = (colunas, linhas, vazio = 'Nada por aqui.') => linhas.length
@@ -93,7 +94,7 @@ async function telaPainel(c) {
         indicador('Corridas hoje', p.hoje.finalizadas, `${p.hoje.canceladas} cancelada(s)`),
         indicador('Faturamento hoje', dinheiro(p.hoje.bruto_centavos), `taxa da plataforma ${dinheiro(p.hoje.taxa_centavos)}`),
         indicador('Saldo dos motoristas', dinheiro(p.a_repassar_centavos), 'disponível para pedirem o PIX'),
-        indicador('PIX a fazer', dinheiro(p.repasses_pendentes.total), `${p.repasses_pendentes.n} pedido(s) de motoristas`),
+        indicador('PIX a liberar', dinheiro(p.repasses_pendentes.total), `${p.repasses_pendentes.n} pedido(s) de motoristas`),
         indicador('Estornos a devolver', cob.estorno ?? 0, 'corridas canceladas depois de pagas'),
         indicador('Faturas em aberto', dinheiro(p.faturas_abertas.total), `${p.faturas_abertas.n} fatura(s) de empresas`)),
       (p.motoristas_pendentes || p.veiculos_pendentes) ? el('div', { class: 'aviso' }, `${p.motoristas_pendentes} motorista(s) e ${p.veiculos_pendentes} veículo(s) aguardando aprovação. `,
@@ -420,24 +421,24 @@ async function telaRepasses(c) {
     const [saldos, repasses] = await Promise.all([api.get('/central/saldos'), api.get('/central/repasses')]);
     const aReceber = saldos.filter((s) => s.saldo_centavos > 0);
     limpar(corpo,
-      el('div', { class: 'grade' }, indicador('PIX a fazer', dinheiro(repasses.filter((r) => r.status === 'pendente').reduce((a, r) => a + r.valor_centavos, 0)),
+      el('div', { class: 'grade' }, indicador('Aguardando liberação', dinheiro(repasses.filter((r) => r.status === 'pendente').reduce((a, r) => a + r.valor_centavos, 0)),
         `${repasses.filter((r) => r.status === 'pendente').length} pedido(s)`),
       indicador('Saldo dos motoristas', dinheiro(aReceber.reduce((a, s) => a + s.saldo_centavos, 0)), `${aReceber.length} motorista(s) com valor disponível`)),
       el('h2', { style: 'margin-top:8px' }, 'Pedidos de PIX'),
       tabela(['#', 'Motorista', 'Chave PIX', 'Pedido em', 'Situação', 'Identificador', '>Valor', ''], repasses.map((r) => el('tr', {},
-        td(r.id), td(r.nome), td(r.chave_pix), td(dataHora(r.criado_em)), td(situacaoEtq(r.status)), td(r.identificador ?? r.motivo ?? '—'), td(dinheiro(r.valor_centavos), true),
+        td(r.id), td(r.nome), td(r.chave_pix), td(dataHora(r.criado_em)), td(situacaoPix(r.status)), td(r.identificador ?? r.motivo ?? '—'), td(dinheiro(r.valor_centavos), true),
         td(r.status === 'pendente' ? el('div', { class: 'linha' },
-          botao('Marcar pago', 'primario', async () => {
-            const id = await perguntar(`PIX #${r.id} · ${dinheiro(r.valor_centavos)}`, `Faça o PIX para ${r.chave_pix} e informe o identificador (E2E) ou o nº do comprovante`);
+          botao('Liberar PIX', 'primario', async () => {
+            const id = await perguntar(`Liberar PIX #${r.id} · ${dinheiro(r.valor_centavos)}`, `Faça o PIX para ${r.nome} (chave ${r.chave_pix}) e informe o identificador (E2E) ou o nº do comprovante`);
             if (!id) return;
-            await api.post(`/central/repasses/${r.id}/pagar`, { identificador: id });
-            toast('PIX registrado como pago.');
+            await api.post(`/central/repasses/${r.id}/liberar`, { identificador: id });
+            toast('PIX liberado.');
             await carregar();
           }),
-          botao('Cancelar', 'perigo', async () => {
-            const motivo = await perguntar('Cancelar pedido de PIX', 'Motivo (o motorista vê; o valor volta ao saldo dele)');
+          botao('Recusar', 'perigo', async () => {
+            const motivo = await perguntar('Recusar pedido de PIX', 'Motivo (o motorista vê; o valor volta ao saldo dele)');
             if (!motivo) return;
-            await api.post(`/central/repasses/${r.id}/cancelar`, { motivo });
+            await api.post(`/central/repasses/${r.id}/recusar`, { motivo });
             await carregar();
           })) : null))), 'Nenhum pedido de PIX ainda.'),
       el('h2', { style: 'margin-top:8px' }, 'Saldos dos motoristas'),
@@ -445,7 +446,7 @@ async function telaRepasses(c) {
       );
   };
   limpar(c, cabeca('PIX dos motoristas'), el('p', { class: 'pequeno mudo' },
-    'O valor de cada corrida (já sem a taxa) fica disponível para o motorista, que pede o PIX pelo app, no máximo um por dia. Faça a transferência para a chave informada e registre aqui.'), corpo);
+    'O valor de cada corrida (já sem a taxa) fica disponível para o motorista, que pede o PIX pelo app, no máximo um por dia. Todo pedido aguarda a liberação da gestão: faça a transferência para a chave do motorista e clique em Liberar PIX, ou recuse com o motivo (o valor volta ao saldo dele).'), corpo);
   await carregar();
 }
 
