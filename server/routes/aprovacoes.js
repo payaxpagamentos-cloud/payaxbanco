@@ -5,6 +5,10 @@ const { transacao } = require('../db');
 const { permitir } = require('../auth');
 const { registrar } = require('../lib/auditoria');
 const aprov = require('../lib/aprovacao');
+const avisos = require('../lib/avisos');
+
+// Avisa o cliente sem travar a resposta; falhas ficam registradas na tabela de e-mails.
+const avisar = (db, empresaId, ids) => { for (const id of ids) avisos.avisarAprovacao(db, empresaId, id).catch(() => {}); };
 const v = require('../lib/validacao');
 
 module.exports = (db) => {
@@ -25,6 +29,7 @@ module.exports = (db) => {
   r.post('/:id/conferir', (req, res) => {
     aprov.conferir(db, req, eid(req), req.params.id, req.body.comentario);
     registrar(db, req, 'pagamento_conferido', { id: Number(req.params.id) }, eid(req));
+    avisar(db, eid(req), [Number(req.params.id)]);
     res.status(204).end();
   });
   for (const [rota, aprovar] of [['aprovar', true], ['recusar', false]]) {
@@ -47,6 +52,7 @@ module.exports = (db) => {
       }
     });
     registrar(db, req, req.body.acao === 'conferir' ? 'pagamentos_conferidos' : 'pagamentos_aprovados', { ids }, eid(req));
+    if (req.body.acao === 'conferir') avisar(db, eid(req), ids);
     res.json({ processados: ids.length });
   });
 

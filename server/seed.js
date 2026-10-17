@@ -78,7 +78,8 @@ const ids = transacao(db, () => {
         'Escopo: contas a pagar e a receber, conciliação diária, fluxo de caixa e DRE mensal até o dia 8.').lastInsertRowid);
     prepararEmpresa(db, empresaId, ids[e.analista]);
     const cat = Object.fromEntries(db.prepare('SELECT nome, id FROM categorias WHERE empresa_id = ?').all(empresaId).map((c) => [c.nome, c.id]));
-    const contato = (tipo, nome) => Number(db.prepare('INSERT INTO contatos (empresa_id, tipo, nome) VALUES (?, ?, ?)').run(empresaId, tipo, nome).lastInsertRowid);
+    const contato = (tipo, nome) => Number(db.prepare('INSERT INTO contatos (empresa_id, tipo, nome, email, telefone) VALUES (?, ?, ?, ?, ?)')
+      .run(empresaId, tipo, nome, `financeiro@${nome.toLowerCase().normalize('NFD').replace(/[^a-z]/g, '').slice(0, 20)}.com.br`, `119${String(entre(10000000, 99999999))}`).lastInsertRowid);
     const clientes = e.clientes.map((n) => contato('cliente', n));
     const fornecedores = e.fornecedores.map((n) => contato('fornecedor', n));
     const conta = (descricao, banco, saldo) => Number(db.prepare(`INSERT INTO contas_bancarias (empresa_id, descricao, banco, agencia, numero, saldo_inicial_centavos, data_saldo_inicial)

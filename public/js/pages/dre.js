@@ -14,7 +14,7 @@ export default async function dre({ alvo, ativo, base }) {
   ];
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>DRE gerencial</h1><p class="muted">Demonstração do resultado pelas categorias do plano de contas. Clique em um grupo para ver as categorias.</p></div>
-      <button class="btn" id="csv">Exportar CSV</button></div>
+      <div class="row"><button class="btn" id="imprimir">Imprimir / PDF</button><button class="btn" id="csv">Exportar CSV</button></div></div>
     <div class="card"><div class="filtros">
       <div><label>De</label><input type="date" data-f="de" value="${filtros.de}"></div>
       <div><label>Até</label><input type="date" data-f="ate" value="${filtros.ate}"></div>
@@ -76,6 +76,7 @@ export default async function dre({ alvo, ativo, base }) {
     $('[data-f=ate]', alvo).value = filtros.ate;
     carregar();
   }));
+  $('#imprimir', alvo).addEventListener('click', () => { $$('tr.grupo', alvo).forEach((tr) => { tr.classList.add('aberto'); $$(`tr[data-de="${tr.dataset.grupo}"]`, alvo).forEach((c) => c.classList.remove('oculto')); }); window.print(); });
   $('#csv', alvo).addEventListener('click', () => api.baixar(`${base}/dre.csv`, filtros).catch((err) => toast(err.message, 'erro')));
   await carregar();
 }

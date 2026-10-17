@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { html, $, $$, moeda, numero, data, status, opcoes, paginacao, debounce, modal, dadosForm, toast, hoje, inicioMes, fimMes, somarMeses, somarDias } from '../ui.js';
-import { cadastrosDaEmpresa, novoLancamento, detalheLancamento, baixar, recarregar, APROVACAO } from './comum.js';
+import { cadastrosDaEmpresa, novoLancamento, detalheLancamento, baixar, recarregar, APROVACAO, importarNfe } from './comum.js';
 
 const SITUACOES = [['a_vencer', 'A vencer'], ['vencido', 'Vencidos'], ['aberto', 'Em aberto (todos)'], ['pago', 'Baixados'], ['cancelado', 'Cancelados'], ['todos', 'Todos']];
 
@@ -30,7 +30,7 @@ export default async function lancamentos({ alvo, ativo, base, tipo, empresa }) 
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Contas a ${pagar ? 'pagar' : 'receber'}</h1>
       <p class="muted">${pagar ? 'Fornecedores, impostos, folha e demais saídas.' : 'Vendas, serviços e demais entradas.'}</p></div>
-      <div class="row"><button class="btn" id="csv">Exportar CSV</button><button class="btn primario" id="novo">+ Nova conta a ${pagar ? 'pagar' : 'receber'}</button></div></div>
+      <div class="row"><button class="btn" id="nfe">Importar NF-e (XML)</button><button class="btn" id="csv">Exportar CSV</button><button class="btn primario" id="novo">+ Nova conta a ${pagar ? 'pagar' : 'receber'}</button></div></div>
     <div class="grid grid-4" id="totais"></div>
     <div class="card" style="margin-top:16px">
       <div class="filtros">
@@ -93,6 +93,7 @@ export default async function lancamentos({ alvo, ativo, base, tipo, empresa }) 
   $$('[data-f]', alvo).forEach((s) => s.addEventListener('change', () => { filtros[s.dataset.f] = s.value; filtros.pagina = 1; carregar(); }));
   $('#periodo', alvo).addEventListener('change', (e) => { aplicarPeriodo(e.target.value); filtros.pagina = 1; carregar(); });
   $('#novo', alvo).addEventListener('click', () => novoLancamento(base, tipo));
+  $('#nfe', alvo).addEventListener('click', () => importarNfe(base).catch((err) => toast(err.message, 'erro')));
   $('#csv', alvo).addEventListener('click', () => api.baixar(`${base}/lancamentos.csv`, filtros).catch((err) => toast(err.message, 'erro')));
   $('#lote-limpar', alvo).addEventListener('click', () => { selecionados.clear(); carregar(); });
   $('#lote-baixar', alvo).addEventListener('click', () => modal({

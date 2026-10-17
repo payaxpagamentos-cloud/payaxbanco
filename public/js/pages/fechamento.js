@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { html, $, $$, dataHora, toast, modal, dadosForm, hoje, somarMeses, rotuloMes, pct, icone } from '../ui.js';
+import { html, $, $$, dataHora, toast, modal, dadosForm, hoje, somarMeses, rotuloMes, pct, icone, confirmar } from '../ui.js';
 import { gestor } from '../contexto.js';
 
 const mesAnterior = () => somarMeses(hoje(), -1).slice(0, 7);
@@ -25,7 +25,8 @@ export async function fechamentoEmpresa({ alvo, ativo, base }) {
             <div><strong>${e.rotulo}</strong>${e.auto ? html` <span class="badge">Verificação automática</span>` : ''}
               ${e.verificacao ? html`<div class="small ${e.verificacao.ok ? 'pos' : 'neg'}">${e.verificacao.detalhe}</div>` : ''}
               ${e.concluida ? html`<div class="small muted">Concluída por ${e.concluida.usuario_nome} em ${dataHora(e.concluida.concluido_em)}${e.concluida.observacao ? ` · ${e.concluida.observacao}` : ''}</div>` : ''}</div>
-            <div>${f.fechado ? '' : e.concluida ? html`<button class="btn sm" data-desmarcar>Desmarcar</button>` : html`<button class="btn sm primario" data-marcar>Concluir</button>`}</div></div>`)}
+            <div class="row" style="justify-content:flex-end">${!f.fechado && e.chave === 'envio' ? html`<button class="btn sm" data-enviar-relatorio>${icone('email')} Enviar por e-mail</button>` : ''}
+              ${f.fechado ? '' : e.concluida ? html`<button class="btn sm" data-desmarcar>Desmarcar</button>` : html`<button class="btn sm primario" data-marcar>Concluir</button>`}</div></div>`)}
           <div class="card-body row" style="justify-content:flex-end;border-top:1px solid var(--border)">
             ${f.fechado ? (gestor() ? html`<button class="btn perigo" id="reabrir">Reabrir mês</button>` : html`<span class="small muted">Só supervisor ou administrador reabre.</span>`)
               : html`<button class="btn primario" id="fechar" ${f.pode_fechar ? '' : 'disabled'}>Fechar ${rotuloMes(mes)}</button>`}</div></div>
@@ -48,6 +49,12 @@ export async function fechamentoEmpresa({ alvo, ativo, base }) {
     $$('[data-desmarcar]', alvo).forEach((b) => b.addEventListener('click', async () => {
       try { await api.post(`${base}/fechamento/etapas`, { mes, etapa: etapa(b).chave, concluir: false }); carregar(); } catch (err) { toast(err.message, 'erro'); }
     }));
+    $('[data-enviar-relatorio]', alvo)?.addEventListener('click', async (ev) => {
+      if (!(await confirmar('Enviar relatório do mês', `Envia o resumo de ${rotuloMes(mes)} (resultado, saldos e pendências) por e-mail aos responsáveis marcados para receber relatórios, com o link do Portal.`, 'Enviar'))) return;
+      ev.target.disabled = true;
+      try { const r = await api.post(`${base}/fechamento/enviar-relatorio`, { mes }); toast(`Relatório enviado para ${r.destinatarios.join(', ')}.`); carregar(); }
+      catch (err) { toast(err.message, 'erro'); ev.target.disabled = false; }
+    });
     $('#fechar', alvo)?.addEventListener('click', async () => {
       try { await api.post(`${base}/fechamento/fechar`, { mes }); toast(`${rotuloMes(mes)} fechado.`); carregar(); } catch (err) { toast(err.message, 'erro'); }
     });

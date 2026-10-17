@@ -6,7 +6,8 @@ const config = require('../config');
 const { registrar } = require('../lib/auditoria');
 const backup = require('../lib/backup');
 const dois = require('../lib/doisfatores');
-const { naoEncontrado } = require('../lib/erros');
+const email = require('../lib/email');
+const { naoEncontrado, ErroNegocio } = require('../lib/erros');
 
 /** Segurança (administrador): 2FA obrigatória, situação da 2FA da equipe, backups. */
 module.exports = (db) => {
@@ -23,6 +24,12 @@ module.exports = (db) => {
       backup_intervalo_horas: config.backupIntervaloHoras,
       backup_manter: config.backupManter,
       documentos_armazenados: arquivos,
+      email: {
+        configurado: email.configurado(), servidor: config.smtp.host ? `${config.smtp.host}:${config.smtp.porta}` : null, remetente: config.smtp.remetente,
+        url_publica: config.urlPublica || null,
+        enviados_24h: db.prepare("SELECT COUNT(*) AS n FROM emails WHERE status = 'enviado' AND criado_em >= datetime('now', '-1 day')").get().n,
+        falhas: db.prepare("SELECT tipo, para, erro, criado_em FROM emails WHERE status = 'falhou' ORDER BY id DESC LIMIT 5").all(),
+      },
       falhas_login_24h: db.prepare("SELECT COUNT(*) AS n FROM auditoria WHERE acao IN ('login_falhou','login_2fa_falhou','portal_login_falhou') AND criado_em >= datetime('now', '-1 day')").get().n,
     });
   });
@@ -39,6 +46,14 @@ module.exports = (db) => {
     if (!x.changes) throw naoEncontrado('Usuário');
     registrar(db, req, 'usuario_2fa_redefinida', { id: Number(req.params.id) });
     res.status(204).end();
+  });
+
+  r.post('/email-teste', async (req, res) => {
+    const r2 = await email.enviar(db, { para: req.body.para, tipo: 'teste', assunto: 'Teste de e-mail — Ativa BPO Financeiro', titulo: 'Envio de e-mail funcionando',
+      linhas: ['Este é um e-mail de teste da Ativa BPO Financeiro. Se você recebeu, os lembretes, avisos de aprovação e relatórios serão entregues.'] }, { exigir: true });
+    registrar(db, req, 'email_teste', { para: req.body.para, enviado: r2.enviado });
+    if (!r2.enviado) throw new ErroNegocio('E-mail de destino inválido.', 422);
+    res.json(r2);
   });
 
   r.post('/backups', (req, res) => {

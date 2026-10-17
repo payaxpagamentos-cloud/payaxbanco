@@ -8,7 +8,7 @@ export default async function orcamento({ alvo, ativo, base }) {
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Orçamento × realizado</h1><p class="muted">Metas mensais por categoria comparadas com o realizado pela competência.</p></div>
       <div class="row"><select id="ano" class="campo" style="width:auto">${[anoAtual - 1, anoAtual, anoAtual + 1].map((a) => html`<option ${a === anoAtual ? 'selected' : ''}>${a}</option>`)}</select>
-        <button class="btn" id="sugerir">Sugerir pela média</button></div></div>
+        <button class="btn" id="sugerir">Sugerir pela média</button><button class="btn" id="imprimir">Imprimir / PDF</button></div></div>
     <div class="tabs"><button data-aba="comparativo" class="ativo">Comparativo</button><button data-aba="editar">Editar orçamento</button></div>
     <div id="orc"></div>`);
 
@@ -72,6 +72,7 @@ export default async function orcamento({ alvo, ativo, base }) {
       });
     }
   };
+  $('#imprimir', alvo).addEventListener('click', () => window.print());
   $('#ano', alvo).addEventListener('change', (e) => { estado.ano = Number(e.target.value); carregar(); });
   $$('[data-aba]', alvo).forEach((b) => b.addEventListener('click', () => {
     estado.aba = b.dataset.aba;

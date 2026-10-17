@@ -210,3 +210,22 @@ body.tema .entrada-caixa .campo input:focus { outline: none; border: 0; }
   .entrada-form { padding: 32px 16px; }
   .entrada-caixa { transform: none; animation: none; border-radius: 24px; }
 }
+.boleto-linha { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 14px 0; padding: 12px 14px; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface-2); }
+.boleto-linha .mono { font-size: 13.5px; letter-spacing: .02em; word-break: break-all; }
+
+/* Impressão / PDF dos relatórios: só o conteúdo, com o nome da empresa no título da página */
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body, body.tema { background: #fff !important; }
+  .layout { display: block; }
+  .sidebar, .menu-btn, .topbar .usuario, .filtros, .tabs, .chips, .page-head .btn, .page-head .row, .page-head select, #toasts, .selecao-lote, .alerta { display: none !important; }
+  .topbar { position: static; border: 0; padding: 0 0 8px; background: none !important; backdrop-filter: none; }
+  .content { padding: 0; max-width: none; }
+  .card { box-shadow: none !important; border-color: #ccc; break-inside: avoid; }
+  .kpi::after { display: none; }
+  .table-wrap { overflow: visible; }
+  .tabela-num td, .tabela-num th { padding: 4px 6px; font-size: 10.5px; }
+  .tabela-num td:first-child, .tabela-num th:first-child { position: static; min-width: 0; }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .chart { height: 200px; }
+}

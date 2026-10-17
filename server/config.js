@@ -45,6 +45,18 @@ module.exports = {
   backupManter: Number(process.env.BPO_BACKUP_MANTER) || 30,
   tamanhoMaximoArquivo: (Number(process.env.BPO_ARQUIVO_MAX_MB) || 10) * 1024 * 1024,
   tokenPortalTtlSeconds: 2 * 60 * 60,
+  // Endereço público usado nos links dos e-mails (ex.: http://179.199.151.187 ou https://sistema.ativabpo.com.br).
+  urlPublica: String(process.env.BPO_URL_PUBLICA || '').replace(/\/+$/, ''),
+  // E-mail (SMTP). Sem BPO_SMTP_HOST, o envio fica desligado. BPO_SMTP_MODO=teste guarda as mensagens em memória.
+  smtp: {
+    host: process.env.BPO_SMTP_HOST || '',
+    porta: Number(process.env.BPO_SMTP_PORTA) || 587,
+    seguro: process.env.BPO_SMTP_SEGURO === '1' || Number(process.env.BPO_SMTP_PORTA) === 465,
+    usuario: process.env.BPO_SMTP_USUARIO || '',
+    senha: process.env.BPO_SMTP_SENHA || '',
+    remetente: process.env.BPO_EMAIL_REMETENTE || 'Ativa BPO Financeiro <nao-responda@ativabpo.com.br>',
+    modo: process.env.BPO_SMTP_MODO || '',
+  },
   admin: {
     nome: process.env.BPO_ADMIN_NOME || 'Administrador BPO',
     email: process.env.BPO_ADMIN_EMAIL || 'admin@ativabpo.com.br',

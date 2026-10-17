@@ -6,6 +6,7 @@ const config = require('./config');
 const { autenticar, permitir } = require('./auth');
 const { carregarEmpresa } = require('./lib/acesso');
 const { ErroNegocio } = require('./lib/erros');
+const { lerBoleto } = require('./lib/boleto');
 
 /** Monta o roteador /api. Tudo exige login, exceto /saude e /auth/login. */
 function criarApi(db) {
@@ -30,6 +31,9 @@ function criarApi(db) {
   // Extratos podem ser maiores que o limite padrão do corpo.
   api.use('/empresas/:empresaId/extrato/importar', auth, json({ limit: '5mb' }));
   api.use('/empresas/:empresaId/integracoes/lancamentos/importar', auth, json({ limit: '5mb' }));
+  api.use('/empresas/:empresaId/integracoes/nfe', auth, json({ limit: '5mb' }));
+  // Leitura da linha digitável de boletos e contas de consumo (valor e vencimento).
+  api.get('/utilidades/boleto', auth, (req, res) => res.json(lerBoleto(req.query.linha)));
   const porEmpresa = Router({ mergeParams: true });
   porEmpresa.use('/aprovacoes', require('./routes/aprovacoes')(db));
   porEmpresa.use('/cobranca', require('./routes/cobranca')(db));

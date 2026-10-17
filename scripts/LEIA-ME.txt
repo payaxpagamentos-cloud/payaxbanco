@@ -102,8 +102,20 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
    também dá para gerar e baixar um backup do banco.
 
 
-8) ATUALIZAR PARA UMA VERSÃO NOVA
-   Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
-   NÃO apague a pasta data nem o arquivo .env. Inicie de novo.
+8) E-MAIL (LEMBRETES, APROVAÇÕES, ACESSO AO PORTAL E RELATÓRIOS)
+   Preencha no .env os dados SMTP do seu provedor de e-mail e reinicie (pm2 restart ativa-bpo):
+      BPO_SMTP_HOST=smtp.seuprovedor.com.br
+      BPO_SMTP_PORTA=587            (465 se o provedor usar SSL direto)
+      BPO_SMTP_USUARIO=financeiro@ativabpo.com.br
+      BPO_SMTP_SENHA=senha-do-email (no Gmail/Google Workspace: "senha de app")
+      BPO_EMAIL_REMETENTE=Ativa BPO Financeiro <financeiro@ativabpo.com.br>
+      BPO_URL_PUBLICA=http://179.199.151.187   (ou o domínio, quando houver)
+   Depois, em Segurança e backups (administrador), use "Enviar e-mail de teste".
+   Sem isso o sistema funciona normalmente; só os envios automáticos ficam desligados.
+
+
+9) ATUALIZAR PARA UMA VERSÃO NOVA
+   Pare o sistema, substitua as pastas server, public, scripts e node_modules e os arquivos package*.json.
+   NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart ativa-bpo).
 
 Mais detalhes: README.md, nesta mesma pasta.

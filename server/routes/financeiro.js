@@ -5,6 +5,7 @@ const { transacao } = require('../db');
 const { naoEncontrado } = require('../lib/erros');
 const { registrar, diferencas } = require('../lib/auditoria');
 const { resumoEmpresa } = require('../lib/resumo');
+const { lerBoleto } = require('../lib/boleto');
 const { exigirPeriodoAberto } = require('../lib/periodo');
 const aprov = require('../lib/aprovacao');
 const docs = require('../lib/documentos');
@@ -247,8 +248,12 @@ module.exports = (db) => {
     // Com `baixar`, o lançamento (sem parcelas) já entra pago; se a baixa falhar, nada é gravado.
     const baixar = Boolean(req.body.baixar);
     v.exigir(!baixar || Number(req.body.parcelas ?? 1) === 1, 'Lançamento parcelado não pode ser baixado na criação.');
+    // Boleto: valida a linha digitável e guarda (só lançamento único).
+    const boleto = req.body.codigo_barras ? lerBoleto(req.body.codigo_barras) : null;
+    v.exigir(!boleto || (Number(req.body.parcelas ?? 1) === 1 && Number(req.body.repeticoes ?? 1) === 1), 'Linha digitável só em lançamento único.');
     const ids = transacao(db, () => {
       const novos = lanc.criar(db, req, eid(req), req.body);
+      if (boleto) db.prepare('UPDATE lancamentos SET codigo_barras = ? WHERE id = ?').run(boleto.linha_digitavel, novos[0]);
       if (baixar) lanc.baixar(db, req, eid(req), novos[0], req.body.baixa ?? {});
       return novos;
     });
@@ -268,6 +273,10 @@ module.exports = (db) => {
   });
 
   r.patch('/lancamentos/:id', (req, res) => {
+    if ('codigo_barras' in req.body) {
+      const b = req.body.codigo_barras ? lerBoleto(req.body.codigo_barras) : null;
+      db.prepare("UPDATE lancamentos SET codigo_barras = ? WHERE id = ? AND empresa_id = ? AND status = 'aberto'").run(b?.linha_digitavel ?? null, Number(req.params.id), eid(req));
+    }
     const { antes, depois } = lanc.editar(db, req, eid(req), req.params.id, req.body);
     audit(req, 'lancamento_alterado', { id: depois.id, alteracoes: diferencas(antes, depois) });
     res.json(depois);

@@ -7,6 +7,7 @@ const { hashSenha } = require('../lib/senha');
 const { naoEncontrado } = require('../lib/erros');
 const { registrar, diferencas } = require('../lib/auditoria');
 const v = require('../lib/validacao');
+const avisos = require('../lib/avisos');
 
 const CAMPOS = 'id, empresa_id, nome, cargo, email, telefone, recebe_relatorios, acesso_portal, pode_aprovar, limite_aprovacao_centavos, totp_ativo, ativo, ultimo_acesso, precisa_trocar_senha, criado_em';
 
@@ -38,13 +39,20 @@ module.exports = (db) => {
       acesso_portal: portal, pode_aprovar: portal && d.pode_aprovar ? 1 : 0, limite_aprovacao_centavos: limite, ativo: d.ativo === undefined ? 1 : d.ativo ? 1 : 0 };
   };
 
-  r.post('/', gestor, (req, res) => {
+  // Acesso ao Portal por e-mail (opcional): se o envio falhar, a senha continua sendo mostrada na tela.
+  const enviarAcesso = async (id, senha) => {
+    try { return (await avisos.enviarAcessoPortal(db, db.prepare('SELECT * FROM responsaveis WHERE id = ?').get(id), senha)).enviado; } catch { return false; }
+  };
+
+  r.post('/', gestor, async (req, res) => {
     const d = dados(req.body);
     const senha = d.acesso_portal ? senhaProvisoria() : null;
     const x = db.prepare(`INSERT INTO responsaveis (empresa_id, nome, cargo, email, telefone, recebe_relatorios, acesso_portal, senha_hash, pode_aprovar, limite_aprovacao_centavos)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(eid(req), d.nome, d.cargo, d.email, d.telefone, d.recebe_relatorios, d.acesso_portal, senha && hashSenha(senha), d.pode_aprovar, d.limite_aprovacao_centavos);
-    registrar(db, req, 'responsavel_criado', { id: Number(x.lastInsertRowid), nome: d.nome, acesso_portal: d.acesso_portal, pode_aprovar: d.pode_aprovar }, eid(req));
-    res.status(201).json({ id: Number(x.lastInsertRowid), senha_provisoria: senha });
+    const id = Number(x.lastInsertRowid);
+    registrar(db, req, 'responsavel_criado', { id, nome: d.nome, acesso_portal: d.acesso_portal, pode_aprovar: d.pode_aprovar }, eid(req));
+    const enviado = senha && req.body.enviar_email ? await enviarAcesso(id, senha) : false;
+    res.status(201).json({ id, senha_provisoria: senha, email_enviado: enviado });
   });
 
   const carregar = (req) => {
@@ -53,7 +61,7 @@ module.exports = (db) => {
     return x;
   };
 
-  r.patch('/:id', gestor, (req, res) => {
+  r.patch('/:id', gestor, async (req, res) => {
     const atual = carregar(req);
     const d = dados(req.body, atual);
     // Ganhou acesso agora: gera a senha provisória.
@@ -63,16 +71,16 @@ module.exports = (db) => {
       .run(d.nome, d.cargo, d.email, d.telefone, d.recebe_relatorios, d.acesso_portal, d.pode_aprovar, d.limite_aprovacao_centavos, d.ativo,
         senha && hashSenha(senha), senha, atual.id);
     registrar(db, req, 'responsavel_alterado', { id: atual.id, alteracoes: diferencas(atual, d) }, eid(req));
-    res.json({ senha_provisoria: senha });
+    res.json({ senha_provisoria: senha, email_enviado: senha && req.body.enviar_email ? await enviarAcesso(atual.id, senha) : false });
   });
 
-  r.post('/:id/nova-senha', gestor, (req, res) => {
+  r.post('/:id/nova-senha', gestor, async (req, res) => {
     const x = carregar(req);
     v.exigir(x.acesso_portal, 'Este responsável não tem acesso ao Portal.');
     const senha = senhaProvisoria();
     db.prepare('UPDATE responsaveis SET senha_hash = ?, precisa_trocar_senha = 1 WHERE id = ?').run(hashSenha(senha), x.id);
     registrar(db, req, 'responsavel_senha_redefinida', { id: x.id }, eid(req));
-    res.json({ senha_provisoria: senha });
+    res.json({ senha_provisoria: senha, email_enviado: req.body.enviar_email ? await enviarAcesso(x.id, senha) : false });
   });
 
   r.post('/:id/reset-2fa', gestor, (req, res) => {

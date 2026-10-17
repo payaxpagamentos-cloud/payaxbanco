@@ -3,6 +3,8 @@
 process.env.NODE_ENV = 'test';
 process.env.BPO_SECRET = 'segredo-de-teste';
 process.env.BPO_LIMITE_LOGIN = '1000';
+process.env.BPO_SMTP_MODO = 'teste';
+process.env.BPO_URL_PUBLICA = 'http://bpo.teste';
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');

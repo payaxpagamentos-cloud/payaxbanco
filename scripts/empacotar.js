@@ -37,6 +37,15 @@ BPO_ADMIN_SENHA=${senhaAdmin}
 BPO_ADMIN_NOME=Administrador Ativa
 # Atrás de Nginx/Apache/cPanel: confia no proxy para obter o IP real dos acessos.
 BPO_TRUST_PROXY=1
+# Endereço público usado nos links dos e-mails (troque pelo domínio quando tiver um).
+BPO_URL_PUBLICA=http://179.199.151.187
+# E-mail (SMTP) para lembretes de cobrança, avisos de aprovação, acesso ao Portal e relatórios.
+# Preencha com os dados do seu provedor (ex.: Gmail/Google Workspace, Microsoft 365, Zoho, Locaweb, Hostinger) e reinicie.
+BPO_SMTP_HOST=
+BPO_SMTP_PORTA=587
+BPO_SMTP_USUARIO=
+BPO_SMTP_SENHA=
+BPO_EMAIL_REMETENTE=Ativa BPO Financeiro <financeiro@ativabpo.com.br>
 # Banco, documentos e backups ficam em ./data (faça cópia desta pasta).
 # BPO_DB=/caminho/para/bpo.db
 `;

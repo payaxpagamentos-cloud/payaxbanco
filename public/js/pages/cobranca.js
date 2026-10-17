@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { html, $, $$, moeda, numero, data, dataHora, pct, opcoes, modal, dadosForm, toast, centavos, valorMoedaInput, hoje, somarDias } from '../ui.js';
+import { html, $, $$, moeda, numero, data, dataHora, pct, opcoes, modal, dadosForm, toast, centavos, valorMoedaInput, hoje, somarDias, icone } from '../ui.js';
 
 const CANAIS = [
   { id: 'ligacao', nome: 'Ligação' }, { id: 'whatsapp', nome: 'WhatsApp' }, { id: 'email', nome: 'E-mail' },
@@ -15,7 +15,8 @@ export default async function cobranca({ alvo, ativo, base, empresa }) {
   let aba = 'inadimplencia';
   alvo.innerHTML = String(html`
     <div class="page-head"><div><h1>Cobrança e inadimplência</h1><p class="muted">Lembretes de vencimento, histórico de contatos, promessas de pagamento e acordos.</p></div>
-      <button class="btn" id="pix">Chave PIX nas mensagens</button></div>
+      <button class="btn" id="pix">Configurar cobrança</button></div>
+    <div id="cob-config"></div>
     <div class="tabs">${[['inadimplencia', 'Inadimplência'], ['lembretes', 'Lembretes'], ['promessas', 'Promessas de pagamento']].map(([k, r]) =>
       html`<button data-aba="${k}" class="${k === aba ? 'ativo' : ''}">${r}</button>`)}</div>
     <div id="aba-cob"></div>`);
@@ -65,15 +66,21 @@ export default async function cobranca({ alvo, ativo, base, empresa }) {
             <div class="valor">${moeda(l.valor_centavos)}</div>
             <div class="acoes">
               ${wa ? html`<a class="btn sm" href="${wa}" target="_blank" rel="noopener" data-enviado="whatsapp">WhatsApp</a>` : html`<span class="small muted">Sem telefone</span>`}
-              ${l.email ? html`<a class="btn sm" href="mailto:${l.email}?subject=${encodeURIComponent(`Lembrete de pagamento — ${empresa.nome_fantasia || empresa.razao_social}`)}&body=${encodeURIComponent(l.texto)}" data-enviado="email">E-mail</a>` : ''}
+              ${l.email && cfg.email_configurado ? html`<button class="btn sm primario" data-email-servidor>Enviar e-mail</button>` : ''}
+              ${l.email && !cfg.email_configurado ? html`<a class="btn sm" href="mailto:${l.email}?subject=${encodeURIComponent(`Lembrete de pagamento — ${empresa.nome_fantasia || empresa.razao_social}`)}&body=${encodeURIComponent(l.texto)}" data-enviado="email">E-mail</a>` : ''}
               <button class="btn sm" data-copiar>Copiar texto</button>
-              <button class="btn sm primario" data-registrar>Registrar envio</button>
+              <button class="btn sm" data-registrar>Registrar envio</button>
             </div></div>`;
         }) : html`<div class="vazio">Nenhum título vencendo nos próximos 3 dias.</div>`}</div>`);
       for (const item of $$('[data-l]', el())) {
         const l = lista.find((x) => x.id === Number(item.dataset.l));
         const registrar = (canal) => api.post(`${base}/cobranca/registros`, { contato_id: l.contato_id, lancamento_id: l.id, canal: 'lembrete', descricao: `Lembrete enviado por ${canal}.` });
         $$('[data-enviado]', item).forEach((a) => a.addEventListener('click', () => registrar(a.dataset.enviado === 'email' ? 'e-mail' : 'WhatsApp').then(() => toast('Envio registrado no histórico.')).catch(() => {})));
+        $('[data-email-servidor]', item)?.addEventListener('click', async (ev) => {
+          ev.target.disabled = true;
+          try { await api.post(`${base}/cobranca/lembretes/${l.id}/email`); toast(`Lembrete enviado para ${l.email}.`); telas.lembretes(); }
+          catch (err) { toast(err.message, 'erro'); ev.target.disabled = false; }
+        });
         $('[data-copiar]', item).addEventListener('click', () => navigator.clipboard?.writeText(l.texto).then(() => toast('Texto copiado.')).catch(() => toast('Não foi possível copiar.', 'erro')));
         $('[data-registrar]', item).addEventListener('click', () => registrar('outro canal').then(() => { toast('Lembrete registrado.'); telas.lembretes(); }).catch((err) => toast(err.message, 'erro')));
       }
@@ -168,10 +175,27 @@ export default async function cobranca({ alvo, ativo, base, empresa }) {
     $$('[data-aba]', alvo).forEach((x) => x.classList.toggle('ativo', x === b));
     abrir();
   }));
+  let cfg = await api.get(`${base}/cobranca/config`);
+  const faixaConfig = () => {
+    $('#cob-config', alvo).innerHTML = String(html`<div class="alerta ${cfg.lembrete_auto && cfg.email_configurado ? 'info' : 'aviso'}">${icone('email')}<div>
+      ${!cfg.email_configurado ? html`O envio de e-mails não está configurado no servidor: os lembretes são enviados à mão (WhatsApp ou e-mail do seu computador).`
+        : cfg.lembrete_auto ? html`<strong>Lembretes automáticos ligados:</strong> e-mail ${cfg.lembrete_dias_antes} dia(s) antes do vencimento, no dia e com 1, 7, 15 e 30 dias de atraso.`
+          : html`Lembretes automáticos desligados. Ligue em "Configurar cobrança" para o sistema enviar os e-mails sozinho.`}</div></div>`);
+  };
+  faixaConfig();
   $('#pix', alvo).addEventListener('click', () => modal({
-    titulo: 'Chave PIX nas mensagens de cobrança',
-    corpo: html`<label>Chave PIX da empresa (aparece no texto dos lembretes)</label><input name="chave" value="${empresa.chave_pix_cobranca ?? ''}">`,
-    aoEnviar: async (form, fechar) => { await api.patch(`${base}/cobranca/config`, { chave_pix_cobranca: dadosForm(form).chave }); fechar(); toast('Chave salva.'); window.dispatchEvent(new Event('bpo:recarregar')); },
+    titulo: 'Configurar cobrança',
+    corpo: html`<div class="form">
+      <div class="c12"><label class="linha-check"><input type="checkbox" name="auto" ${cfg.lembrete_auto ? 'checked' : ''} ${cfg.email_configurado ? '' : 'disabled'}> Enviar lembretes automáticos por e-mail aos clientes</label>
+        ${cfg.email_configurado ? '' : html`<div class="ajuda">Disponível quando o e-mail (SMTP) estiver configurado no servidor.</div>`}</div>
+      <div class="c6"><label>Dias antes do vencimento</label><input name="dias" type="number" min="0" max="15" value="${cfg.lembrete_dias_antes}"></div>
+      <div class="c12"><label>Chave PIX da empresa (vai no texto dos lembretes)</label><input name="chave" value="${cfg.chave_pix_cobranca ?? ''}"></div></div>`,
+    aoEnviar: async (form, fechar) => {
+      const d = dadosForm(form);
+      await api.patch(`${base}/cobranca/config`, { chave_pix_cobranca: d.chave, lembrete_auto: Boolean(d.auto), lembrete_dias_antes: Number(d.dias) });
+      cfg = await api.get(`${base}/cobranca/config`);
+      fechar(); toast('Cobrança configurada.'); faixaConfig();
+    },
   }));
   await abrir();
 }

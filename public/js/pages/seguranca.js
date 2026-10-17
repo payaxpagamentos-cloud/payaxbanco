@@ -19,6 +19,16 @@ export default async function seguranca({ alvo, ativo }) {
           <div class="sub">Automático a cada ${s.backup_intervalo_horas} h · guarda ${s.backup_manter}</div></div>
         <div class="card kpi"><div class="rotulo">Documentos armazenados</div><div class="valor">${numero(s.documentos_armazenados)}</div><div class="sub">Fora do banco: inclua a pasta de arquivos no backup do servidor</div></div>
       </div>
+      <div class="card" style="margin-top:16px"><div class="card-head"><h2>E-mail do sistema</h2>
+        ${s.email.configurado ? html`<span class="badge ok">Configurado</span>` : html`<span class="badge warn">Não configurado</span>`}</div><div class="card-body">
+        ${s.email.configurado ? html`<dl class="dl"><div><dt>Servidor</dt><dd>${s.email.servidor ?? 'modo de teste'}</dd></div><div><dt>Remetente</dt><dd>${s.email.remetente}</dd></div>
+            <div><dt>Endereço nos links</dt><dd>${s.email.url_publica ?? html`<span class="neg">BPO_URL_PUBLICA não definida</span>`}</dd></div><div><dt>Enviados em 24 h</dt><dd>${numero(s.email.enviados_24h)}</dd></div></dl>
+          ${s.email.falhas.length ? html`<div class="alerta perigo" style="margin-top:12px"><div><strong>Últimas falhas:</strong> ${s.email.falhas.map((f) => `${f.para} (${f.erro})`).join('; ')}</div></div>` : ''}
+          <form id="form-teste" class="row" style="margin-top:14px"><input name="para" type="email" placeholder="seu@email.com.br" required style="max-width:320px"><button class="btn primario">Enviar e-mail de teste</button></form>`
+          : html`<p class="muted" style="margin:0">Sem servidor de e-mail, os lembretes de cobrança, avisos de aprovação, acessos ao Portal e relatórios não são enviados automaticamente.
+            Para ligar, preencha no arquivo <code>.env</code> do servidor: <code>BPO_SMTP_HOST</code>, <code>BPO_SMTP_PORTA</code>, <code>BPO_SMTP_USUARIO</code>, <code>BPO_SMTP_SENHA</code>,
+            <code>BPO_EMAIL_REMETENTE</code> e <code>BPO_URL_PUBLICA</code>, e reinicie o sistema.</p>`}
+      </div></div>
       <div class="card card-body" style="margin-top:16px"><label style="display:flex;gap:10px;align-items:center;margin:0;color:var(--text);font-size:14px">
         <input type="checkbox" id="exigir" style="width:18px;height:18px" ${s.exigir_2fa_equipe ? 'checked' : ''}>
         <span><strong>Exigir verificação em duas etapas de toda a equipe.</strong> <span class="muted">Quem não tiver ativado só consegue entrar depois de configurar o aplicativo autenticador.</span></span></label></div>
@@ -39,6 +49,10 @@ export default async function seguranca({ alvo, ativo }) {
     $('#exigir', alvo).addEventListener('change', async (e) => {
       try { await api.patch('/seguranca/config', { exigir_2fa_equipe: e.target.checked }); toast(e.target.checked ? 'Verificação em duas etapas obrigatória.' : 'Verificação em duas etapas opcional.'); }
       catch (err) { toast(err.message, 'erro'); e.target.checked = !e.target.checked; }
+    });
+    $('#form-teste', alvo)?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try { await api.post('/seguranca/email-teste', { para: e.target.para.value }); toast(`E-mail de teste enviado para ${e.target.para.value}.`); carregar(); } catch (err) { toast(err.message, 'erro'); carregar(); }
     });
     $('#backup', alvo).addEventListener('click', async () => {
       try { const b = await api.post('/seguranca/backups'); toast(`Backup ${b.nome} gerado.`); carregar(); } catch (err) { toast(err.message, 'erro'); }

@@ -342,6 +342,20 @@ CREATE TABLE IF NOT EXISTS chaves_api (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- E-mails enviados pelo sistema (para conferência e auditoria).
+CREATE TABLE IF NOT EXISTS emails (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
+  tipo TEXT NOT NULL,
+  para TEXT NOT NULL,
+  assunto TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('enviado','falhou')),
+  erro TEXT,
+  referencia TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_emails_ref ON emails(tipo, referencia, criado_em);
+
 CREATE TABLE IF NOT EXISTS configuracoes (
   chave TEXT PRIMARY KEY,
   valor TEXT NOT NULL
@@ -366,6 +380,10 @@ const COLUNAS_V2 = [
   ['lancamentos', 'acordo_id', 'INTEGER REFERENCES acordos(id)'],
   ['lancamentos', 'renegociado_acordo_id', 'INTEGER REFERENCES acordos(id)'],
   ['auditoria', 'responsavel_id', 'INTEGER REFERENCES responsaveis(id)'],
+  ['lancamentos', 'chave_nfe', 'TEXT'],
+  ['empresas', 'lembrete_auto', 'INTEGER NOT NULL DEFAULT 0'],
+  ['empresas', 'lembrete_dias_antes', 'INTEGER NOT NULL DEFAULT 3'],
+  ['lancamentos', 'codigo_barras', 'TEXT'],
 ];
 
 function migrar(db) {
@@ -374,6 +392,7 @@ function migrar(db) {
     const existe = db.prepare(`SELECT 1 FROM pragma_table_info('${tabela}') WHERE name = ?`).get(coluna);
     if (!existe) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${def}`);
   }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_lanc_nfe ON lancamentos(empresa_id, chave_nfe) WHERE chave_nfe IS NOT NULL');
   db.exec("CREATE INDEX IF NOT EXISTS idx_lanc_aprovacao ON lancamentos(empresa_id, aprovacao) WHERE aprovacao IN ('conferencia','pendente')");
 }
 

@@ -148,8 +148,9 @@ async function responsaveis(alvo, base) {
     : html`<tr><td class="vazio">Nenhum responsável cadastrado.</td></tr>`}</tbody></table>`);
 
   const portal = new URL((await enderecos()).portal, location.origin).href;
-  const mostrarSenha = (senha, nome) => modal({ titulo: 'Senha provisória do Portal',
-    corpo: html`<p style="margin-top:0">Entregue a ${nome} por um canal seguro. Ela aparece só agora e precisa ser trocada no primeiro acesso.</p>
+  const mostrarSenha = (senha, nome, enviado) => modal({ titulo: 'Senha provisória do Portal',
+    corpo: html`${enviado ? html`<div class="alerta info">O acesso foi enviado por e-mail para ${nome}.</div>` : ''}
+      <p style="margin-top:0">${enviado ? 'Se precisar, a senha também está aqui.' : `Entregue a ${nome} por um canal seguro.`} Ela aparece só agora e precisa ser trocada no primeiro acesso.</p>
       <div class="card card-body mono" style="font-size:22px;text-align:center;letter-spacing:.1em;box-shadow:none">${senha}</div>
       <p class="small muted">Endereço do Portal: <strong>${portal}</strong></p>` });
   const form = (r = {}) => html`<div class="form">
@@ -160,7 +161,8 @@ async function responsaveis(alvo, base) {
     <div class="c12 stack" style="gap:8px">
       <label class="linha-check"><input type="checkbox" name="recebe_relatorios" ${r.recebe_relatorios ?? 1 ? 'checked' : ''}> Recebe os relatórios do fechamento</label>
       <label class="linha-check"><input type="checkbox" name="acesso_portal" id="acesso" ${r.acesso_portal ? 'checked' : ''}> Acessa o Portal do Cliente</label>
-      <label class="linha-check"><input type="checkbox" name="pode_aprovar" id="aprova" ${r.pode_aprovar ? 'checked' : ''}> Aprova pagamentos no Portal</label></div>
+      <label class="linha-check"><input type="checkbox" name="pode_aprovar" id="aprova" ${r.pode_aprovar ? 'checked' : ''}> Aprova pagamentos no Portal</label>
+      ${r.senha_definida ? '' : html`<label class="linha-check"><input type="checkbox" name="enviar_email" checked> Enviar o acesso ao Portal por e-mail (se o envio estiver configurado)</label>`}</div>
     <div class="c6" id="campo-limite"><label>Limite por pagamento (R$)</label><input name="limite" class="moeda" inputmode="numeric" value="${valorMoedaInput(r.limite_aprovacao_centavos > 0 ? r.limite_aprovacao_centavos : 0)}">
       <div class="ajuda">Zero = sem limite.</div></div>
     ${r.id ? html`<div class="c6"><label>Situação</label><select name="ativo"><option value="1">Ativo</option><option value="0" ${r.ativo ? '' : 'selected'}>Inativo</option></select></div>` : ''}</div>`;
@@ -168,21 +170,22 @@ async function responsaveis(alvo, base) {
     const d = dadosForm(f);
     const limite = centavos(d.limite);
     return { nome: d.nome, cargo: d.cargo, email: d.email, telefone: d.telefone, recebe_relatorios: Boolean(d.recebe_relatorios), acesso_portal: Boolean(d.acesso_portal),
-      pode_aprovar: Boolean(d.pode_aprovar), limite_aprovacao_centavos: limite > 0 ? limite : -1, ativo: d.ativo === undefined ? true : d.ativo === '1' };
+      pode_aprovar: Boolean(d.pode_aprovar), limite_aprovacao_centavos: limite > 0 ? limite : -1, ativo: d.ativo === undefined ? true : d.ativo === '1',
+      enviar_email: Boolean(d.enviar_email) };
   };
   const recarregar = () => responsaveis(alvo, base);
   $('#novo-resp', alvo)?.replaceWith($('#novo-resp', alvo).cloneNode(true));
   $('#novo-resp', alvo)?.addEventListener('click', () => modal({ titulo: 'Novo responsável', corpo: form(),
-    aoEnviar: async (f, fechar) => { const r = await api.post(`${base}/responsaveis`, corpo(f)); fechar(); recarregar(); if (r.senha_provisoria) mostrarSenha(r.senha_provisoria, dadosForm(f).nome); } }));
+    aoEnviar: async (f, fechar) => { const r = await api.post(`${base}/responsaveis`, corpo(f)); fechar(); recarregar(); if (r.senha_provisoria) mostrarSenha(r.senha_provisoria, dadosForm(f).nome, r.email_enviado); } }));
   $$('[data-editar-resp]', alvo).forEach((b) => b.addEventListener('click', () => {
     const r = lista.find((x) => x.id === Number(b.dataset.editarResp));
     modal({ titulo: `Editar ${r.nome}`, corpo: form(r),
-      aoEnviar: async (f, fechar) => { const x = await api.patch(`${base}/responsaveis/${r.id}`, corpo(f)); fechar(); recarregar(); if (x.senha_provisoria) mostrarSenha(x.senha_provisoria, r.nome); } });
+      aoEnviar: async (f, fechar) => { const x = await api.patch(`${base}/responsaveis/${r.id}`, corpo(f)); fechar(); recarregar(); if (x.senha_provisoria) mostrarSenha(x.senha_provisoria, r.nome, x.email_enviado); } });
   }));
   $$('[data-senha]', alvo).forEach((b) => b.addEventListener('click', async () => {
     const r = lista.find((x) => x.id === Number(b.dataset.senha));
-    if (!(await confirmar('Gerar nova senha', `A senha atual de ${r.nome} deixa de valer.`, 'Gerar'))) return;
-    try { const x = await api.post(`${base}/responsaveis/${r.id}/nova-senha`); mostrarSenha(x.senha_provisoria, r.nome); recarregar(); } catch (err) { toast(err.message, 'erro'); }
+    if (!(await confirmar('Gerar nova senha', `A senha atual de ${r.nome} deixa de valer. A nova é enviada por e-mail (se o envio estiver configurado) e mostrada na tela.`, 'Gerar'))) return;
+    try { const x = await api.post(`${base}/responsaveis/${r.id}/nova-senha`, { enviar_email: true }); mostrarSenha(x.senha_provisoria, r.nome, x.email_enviado); recarregar(); } catch (err) { toast(err.message, 'erro'); }
   }));
   $$('[data-reset2fa]', alvo).forEach((b) => b.addEventListener('click', async () => {
     if (!(await confirmar('Redefinir verificação em duas etapas', 'Use quando o responsável perdeu o celular.', 'Redefinir'))) return;

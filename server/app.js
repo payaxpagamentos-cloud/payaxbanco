@@ -28,7 +28,7 @@ function criarApp(db) {
     const r = express.Router();
     r.use(['/api/auth/login', '/api/auth/2fa/login'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
     // O importador de extrato tem limite próprio (maior); as demais rotas aceitam até 200 kB.
-    r.use((req, res, next) => (/\/(extrato|lancamentos)\/importar$/.test(req.path) ? next() : express.json({ limit: '200kb' })(req, res, next)));
+    r.use((req, res, next) => (/\/((extrato|lancamentos)\/importar|integracoes\/nfe)$/.test(req.path) ? next() : express.json({ limit: '200kb' })(req, res, next)));
     r.use('/api', api);
     r.get(['/', '/index.html'], (_req, res) => res.sendFile(path.join(publico, pagina)));
     r.use(express.static(publico, { index: false }));

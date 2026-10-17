@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const { registrar } = require('../lib/auditoria');
 const fech = require('../lib/fechamento');
+const avisos = require('../lib/avisos');
 const { hoje, somarMeses } = require('../lib/datas');
 
 module.exports = (db) => {
@@ -19,6 +20,12 @@ module.exports = (db) => {
     fech.marcar(db, req, eid(req), req.body.mes, req.body.etapa, Boolean(req.body.concluir), req.body.observacao);
     registrar(db, req, 'fechamento_etapa', { mes: req.body.mes, etapa: req.body.etapa, concluir: Boolean(req.body.concluir), observacao: req.body.observacao }, eid(req));
     res.status(204).end();
+  });
+  // Relatório do mês por e-mail aos responsáveis; conclui a etapa "Relatórios enviados ao cliente".
+  r.post('/enviar-relatorio', async (req, res) => {
+    const r2 = await avisos.enviarRelatorioMes(db, req, req.empresa, req.body.mes);
+    registrar(db, req, 'relatorio_enviado', { mes: req.body.mes, ...r2 }, eid(req));
+    res.json(r2);
   });
   r.post('/fechar', (req, res) => {
     fech.fechar(db, req, eid(req), req.body.mes);

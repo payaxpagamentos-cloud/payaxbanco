@@ -4,6 +4,7 @@ const { Router } = require('express');
 const { permitir } = require('../auth');
 const { registrar } = require('../lib/auditoria');
 const integ = require('../lib/integracoes');
+const nfe = require('../lib/nfe');
 const v = require('../lib/validacao');
 
 const celula = (x) => {
@@ -37,6 +38,14 @@ module.exports = (db) => {
     const ids = integ.criarEmLote(db, req, eid(req), integ.lerCsvLancamentos(req.body.conteudo));
     registrar(db, req, 'lancamentos_importados', { quantidade: ids.length, arquivo: req.body.arquivo }, eid(req));
     res.status(201).json({ importados: ids.length });
+  });
+
+  // NF-e (XML): prévia e lançamento em contas a pagar ou a receber, com o XML anexado.
+  r.post('/nfe', (req, res) => {
+    v.exigir(typeof req.body.conteudo === 'string', 'Envie o XML da NF-e.');
+    const r2 = nfe.importar(db, req, req.empresa, req.body);
+    if (!req.body.previa) registrar(db, req, 'nfe_importada', { chave: r2.chave, ids: r2.ids, tipo: r2.tipo }, eid(req));
+    res.status(req.body.previa ? 200 : 201).json(r2);
   });
 
   r.get('/contabil', (req, res) => {

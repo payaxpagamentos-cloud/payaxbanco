@@ -40,7 +40,8 @@ export default async function fluxo({ alvo, ativo, base }) {
   const dia = hoje();
   const filtros = { de: inicioMes(somarMeses(dia, -2)), ate: fimMes(somarMeses(dia, 3)), agrupar: 'mes', conta_bancaria_id: '' };
   alvo.innerHTML = String(html`
-    <div class="page-head"><div><h1>Fluxo de caixa</h1><p class="muted">Realizado pelas baixas nas contas; previsto pelas contas em aberto. Vencidos não pagos entram em hoje.</p></div></div>
+    <div class="page-head"><div><h1>Fluxo de caixa</h1><p class="muted">Realizado pelas baixas nas contas; previsto pelas contas em aberto. Vencidos não pagos entram em hoje.</p></div>
+      <button class="btn" id="imprimir">Imprimir / PDF</button></div>
     <div class="card"><div class="filtros">
       <div><label>De</label><input type="date" data-f="de" value="${filtros.de}"></div>
       <div><label>Até</label><input type="date" data-f="ate" value="${filtros.ate}"></div>
@@ -81,6 +82,7 @@ export default async function fluxo({ alvo, ativo, base }) {
             <td class="num"><strong>${moeda(c.total)}</strong></td></tr>`) : html`<tr><td colspan="${ps.length + 2}" class="vazio">Sem movimentação no período.</td></tr>`}
         </tbody></table></div></div>`);
   };
+  alvo.querySelector('#imprimir').addEventListener('click', () => window.print());
   alvo.querySelectorAll('[data-f]').forEach((el) => el.addEventListener('change', () => { filtros[el.dataset.f] = el.value; carregar(); }));
   await carregar();
 }

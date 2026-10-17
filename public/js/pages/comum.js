@@ -72,6 +72,8 @@ function formLancamento(tipo, l, cad, { novo, rateio = [] }) {
     <div class="c4"><label>Vencimento${novo ? ' (1º)' : ''}</label><input name="vencimento" type="date" required value="${l.vencimento ?? hoje()}"></div>
     <div class="c4"><label>Competência</label><input name="competencia" type="date" value="${l.competencia ?? ''}"><div class="ajuda">Mês da DRE. Em branco: o vencimento.</div></div>
     <div class="c4"><label>Nº documento</label><input name="documento" value="${l.documento ?? ''}" placeholder="NF, boleto…"></div>
+    ${tipo === 'pagar' ? html`<div class="c12"><label>Linha digitável do boleto (opcional)</label><input name="codigo_barras" id="linha-boleto" inputmode="numeric" value="${l.codigo_barras ?? ''}" placeholder="Cole a linha digitável: valor e vencimento são preenchidos sozinhos">
+      <div class="ajuda" id="boleto-info"></div></div>` : ''}
     ${novo ? html`<div class="c4"><label>Repetição</label><select name="modo" id="modo">
         <option value="unico">Lançamento único</option><option value="parcelas">Parcelado (divide o valor)</option><option value="recorrente">Recorrente mensal (repete o valor)</option></select></div>
       <div class="c4 hidden" id="campo-qtd"><label id="rotulo-qtd">Quantidade</label><input name="quantidade" type="number" min="2" max="120" value="12"></div>` : ''}
@@ -87,6 +89,19 @@ function formLancamento(tipo, l, cad, { novo, rateio = [] }) {
 
 function ligarForm(el) {
   ligarRateio(el);
+  // Boleto: lê a linha digitável e preenche valor e vencimento.
+  const linha = $('#linha-boleto', el);
+  linha?.addEventListener('change', async () => {
+    const info = $('#boleto-info', el);
+    if (!linha.value.trim()) { info.textContent = ''; return; }
+    try {
+      const b = await api.get('/utilidades/boleto', { linha: linha.value });
+      if (b.valor_centavos) { const v = $('[name=valor]', el); v.value = valorMoedaInput(b.valor_centavos); v.dispatchEvent(new Event('input')); }
+      if (b.vencimento) $('[name=vencimento]', el).value = b.vencimento;
+      info.className = 'ajuda pos';
+      info.textContent = `Boleto válido${b.banco ? ` · banco ${b.banco}` : ''}${b.valor_centavos ? ` · ${moeda(b.valor_centavos)}` : ''}${b.vencimento ? ` · vence ${data(b.vencimento)}` : ''}`;
+    } catch (err) { info.className = 'ajuda neg'; info.textContent = err.message; }
+  });
   const modo = $('#modo', el);
   if (modo) modo.addEventListener('change', () => {
     $('#campo-qtd', el).classList.toggle('hidden', modo.value === 'unico');
@@ -101,6 +116,7 @@ function corpoLancamento(form, tipo) {
     vencimento: d.vencimento, competencia: d.competencia || undefined, centro_custo_id: d.centro_custo_id || null,
     conta_bancaria_id: d.conta_bancaria_id || null, documento: d.documento || null, observacoes: d.observacoes || null,
   };
+  if ('codigo_barras' in d) corpo.codigo_barras = d.codigo_barras.trim() || null;
   if (d.modo === 'parcelas') corpo.parcelas = Number(d.quantidade);
   if (d.modo === 'recorrente') corpo.repeticoes = Number(d.quantidade);
   const usarRateio = $('#usar-rateio', form)?.checked;
@@ -244,6 +260,9 @@ export async function detalheLancamento(base, id) {
           <div><dt>Juros / desconto</dt><dd class="num">${moeda(l.juros_centavos)} / ${moeda(l.desconto_centavos)}</dd></div>
           <div><dt>Conciliação</dt><dd>${l.extrato ? html`<span class="badge ok">Conciliado</span> <span class="small muted">${data(l.extrato.data)}</span>` : html`<span class="badge warn">Não conciliado</span>`}</dd></div>` : ''}
       </dl>
+      ${l.codigo_barras ? html`<div class="boleto-linha"><div><span class="small muted">Linha digitável do boleto</span><div class="mono">${l.codigo_barras.replace(/^(\d{5})(\d{5})(\d{5})(\d{6})(\d{5})(\d{6})(\d)(\d{14})$/, '$1.$2 $3.$4 $5.$6 $7 $8')}</div></div>
+        <button class="btn sm" id="copiar-boleto">Copiar</button></div>` : ''}
+      ${l.chave_nfe ? html`<p class="small muted">NF-e: <span class="mono">${l.chave_nfe}</span></p>` : ''}
       ${l.origem ? html`<p class="small muted">Saldo da baixa parcial do lançamento #${l.origem.id}.</p>` : ''}
       ${l.saldos.length ? html`<p class="small muted">Baixa parcial: saldo de ${moeda(l.saldos.reduce((a, s) => a + s.valor_centavos, 0))} no lançamento ${l.saldos.map((s) => `#${s.id}`).join(', ')}.</p>` : ''}
       ${l.observacoes ? html`<p class="small" style="white-space:pre-wrap">${l.observacoes}</p>` : ''}
@@ -260,6 +279,7 @@ export async function detalheLancamento(base, id) {
       <button class="btn" data-cancelar>Fechar</button></div>`,
   });
   ligarDownloads(el, (d) => `${base}/documentos/${d}/arquivo`);
+  $('#copiar-boleto', el)?.addEventListener('click', () => navigator.clipboard?.writeText(l.codigo_barras).then(() => toast('Linha digitável copiada.')).catch(() => toast('Não foi possível copiar.', 'erro')));
   $('#anexar', el).addEventListener('click', () => { fechar(); enviarDocumento(`${base}/documentos`, { lancamentoId: l.id, tipoPadrao: l.status === 'pago' ? 'comprovante' : 'nota', aoEnviar: () => detalheLancamento(base, l.id) }); });
   const acao = (nome, fn) => $(`[data-acao=${nome}]`, el)?.addEventListener('click', fn);
   acao('baixar', () => { fechar(); baixar(base, l, cad.contas); });
@@ -277,5 +297,60 @@ export async function detalheLancamento(base, id) {
   acao('estornar', async () => {
     if (!(await confirmar('Estornar baixa', l.extrato ? 'A baixa será desfeita e a linha do extrato volta para "a conciliar".' : 'A baixa será desfeita e o lançamento volta a ficar em aberto.', 'Estornar'))) return;
     try { await api.post(`${base}/lancamentos/${l.id}/estorno`); fechar(); toast('Baixa estornada.'); recarregar(); } catch (err) { toast(err.message, 'erro'); }
+  });
+}
+
+/** Importação do XML da NF-e: prévia do que será lançado e confirmação. */
+export async function importarNfe(base) {
+  const cad = await cadastrosDaEmpresa(base);
+  let conteudo = null;
+  let previa = null;
+  const { el } = modal({
+    titulo: 'Importar NF-e (XML)', grande: true,
+    corpo: html`<p class="muted" style="margin-top:0">Nota de compra (a empresa é a destinatária) vira conta a pagar ao fornecedor; nota de venda (a empresa emitiu) vira conta a receber.
+      As duplicatas da nota viram as parcelas e o XML fica anexado.</p>
+      <label class="zona-arquivo" id="zona-nfe"><div id="zona-nfe-texto"><strong>Escolha o arquivo XML da NF-e</strong></div><input type="file" id="arquivo-nfe" accept=".xml" hidden></label>
+      <div id="previa-nfe" style="margin-top:14px"></div>`,
+    rotuloEnviar: 'Lançar NF-e',
+    aoEnviar: async (form, fechar) => {
+      if (!previa) throw new Error('Escolha o XML da NF-e.');
+      const d = dadosForm(form);
+      const r = await api.post(`${base}/integracoes/nfe`, { conteudo, categoria_id: d.categoria_id, conta_bancaria_id: d.conta_bancaria_id || null,
+        centro_custo_id: d.centro_custo_id || null, vencimento: d.vencimento || undefined, aceitar_sem_protocolo: Boolean(d.sem_protocolo) });
+      fechar();
+      toast(`NF-e lançada: ${r.ids.length} ${r.tipo === 'pagar' ? 'conta(s) a pagar' : 'conta(s) a receber'}.`);
+      recarregar();
+    },
+  });
+  const mostrar = (p) => {
+    const tipoCat = p.tipo === 'pagar' ? 'despesa' : 'receita';
+    $('#previa-nfe', el).innerHTML = String(html`
+      ${p.ja_lancada ? html`<div class="alerta perigo">Esta NF-e já foi lançada (lançamento #${p.ja_lancada}).</div>` : ''}
+      <dl class="dl"><div><dt>Lança como</dt><dd>${p.tipo === 'pagar' ? 'Contas a pagar' : 'Contas a receber'}</dd></div>
+        <div><dt>${p.tipo === 'pagar' ? 'Fornecedor' : 'Cliente'}</dt><dd>${p.contato?.fantasia || p.contato?.nome || '—'}${p.contato_existente ? '' : html` <span class="badge info">novo</span>`}</dd></div>
+        <div><dt>NF-e</dt><dd>${p.numero}${p.serie ? `/${p.serie}` : ''} · ${data(p.emissao)}</dd></div><div><dt>Valor total</dt><dd>${moeda(p.valor_centavos)}</dd></div></dl>
+      <div class="table-wrap" style="margin:12px 0"><table><tbody>${p.parcelas.map((x, i) => html`<tr><td>${x.numero ? `Duplicata ${x.numero}` : `Parcela ${i + 1}`}</td><td>${data(x.vencimento)}</td><td class="num">${moeda(x.valor_centavos)}</td></tr>`)}</tbody></table></div>
+      <div class="form">
+        <div class="c6"><label>Categoria</label><select name="categoria_id" required>${opcoes(cad.categorias.filter((c) => c.tipo === tipoCat), { vazio: 'Selecione' })}</select></div>
+        <div class="c6"><label>Conta prevista</label><select name="conta_bancaria_id">${opcoes(cad.contas, { rotulo: 'descricao', vazio: 'A definir' })}</select></div>
+        <div class="c6"><label>Centro de custo</label><select name="centro_custo_id">${opcoes(cad.centros, { vazio: 'Nenhum' })}</select></div>
+        ${p.duplicatas.length ? '' : html`<div class="c6"><label>Vencimento (a nota não traz duplicatas)</label><input type="date" name="vencimento" value="${p.parcelas[0].vencimento}"></div>`}
+        ${p.autorizada ? '' : html`<div class="c12"><label class="linha-check"><input type="checkbox" name="sem_protocolo"> O XML não traz a autorização da SEFAZ. Lançar mesmo assim.</label></div>`}
+      </div>`);
+  };
+  $('#arquivo-nfe', el).addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    conteudo = await f.text();
+    $('#zona-nfe-texto', el).innerHTML = String(html`<strong>${f.name}</strong> · lendo…`);
+    try {
+      previa = await api.post(`${base}/integracoes/nfe`, { conteudo, previa: true });
+      $('#zona-nfe-texto', el).innerHTML = String(html`<strong>${f.name}</strong>`);
+      mostrar(previa);
+    } catch (err) {
+      previa = null;
+      $('#zona-nfe-texto', el).innerHTML = String(html`<strong>${f.name}</strong> · <span class="neg">${err.message}</span>`);
+      $('#previa-nfe', el).innerHTML = '';
+    }
   });
 }
