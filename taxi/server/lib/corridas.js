@@ -5,12 +5,14 @@ const { ErroNegocio, naoEncontrado } = require('./erros');
 const { distancia, estimarRota } = require('./geo');
 const tarifa = require('./tarifa');
 const fin = require('./financeiro');
+const pag = require('./pagamentos');
+const emp = require('./empresas');
 const v = require('./validacao');
 const { hoje } = require('./datas');
 
-const ATIVAS = ['solicitada', 'aceita', 'chegou', 'em_andamento'];
+const ATIVAS = ['aguardando_pagamento', 'solicitada', 'aceita', 'chegou', 'em_andamento'];
 const CATEGORIAS = ['comum', 'executivo'];
-const FORMAS = ['pix', 'cartao', 'dinheiro'];
+const FORMAS = ['pix', 'cartao', 'empresa'];
 // Posições de GPS com velocidade aparente acima disto são descartadas do trajeto (salto de sinal).
 const VELOCIDADE_MAXIMA_KMH = 150;
 
@@ -25,12 +27,29 @@ function estimar(db, origem, destino, instante = new Date()) {
   return CATEGORIAS.map((c) => ({ categoria: c, bandeira: b, ...rota, valor_centavos: tarifa.calcular(ts[c], { ...rota, bandeira: b }) }));
 }
 
-/** Solicitações sem motorista há mais tempo que o limite são canceladas pelo sistema. */
+/**
+ * Encerra a corrida como cancelada: cancela cobranças em aberto e devolve o que o passageiro já pagou.
+ */
+function encerrar(db, c, quem, motivo) {
+  db.prepare(`UPDATE corridas SET status = 'cancelada', cancelada_em = ?, cancelada_por = ?, motivo_cancelamento = ? WHERE id = ?`).run(agora(), quem, motivo, c.id);
+  pag.cancelarPendentes(db, c.id);
+  if (c.valor_pago_centavos > 0) {
+    pag.criar(db, c, 'estorno', c.valor_pago_centavos, `Corrida cancelada (${quem})`);
+    db.prepare(`UPDATE corridas SET pagamento_status = 'estornado' WHERE id = ?`).run(c.id);
+  }
+}
+
+/** Pedidos sem pagamento e solicitações sem motorista há mais tempo que o limite são cancelados pelo sistema (com estorno). */
 function expirarSolicitacoes(db) {
-  const { expirar_solicitacao_min: min } = lerConfig(db);
-  const corte = new Date(Date.now() - min * 60_000).toISOString();
-  db.prepare(`UPDATE corridas SET status = 'cancelada', cancelada_em = ?, cancelada_por = 'sistema', motivo_cancelamento = 'Nenhum motorista disponível.'
-    WHERE status = 'solicitada' AND solicitada_em < ?`).run(agora(), corte);
+  const cfg = lerConfig(db);
+  const corte = (min) => new Date(Date.now() - min * 60_000).toISOString();
+  const vencidas = [
+    ...db.prepare(`SELECT * FROM corridas WHERE status = 'aguardando_pagamento' AND criada_em < ?`).all(corte(cfg.expirar_pagamento_min))
+      .map((c) => [c, 'Pagamento não confirmado a tempo.']),
+    ...db.prepare(`SELECT * FROM corridas WHERE status = 'solicitada' AND solicitada_em < ?`).all(corte(cfg.expirar_solicitacao_min))
+      .map((c) => [c, 'Nenhum motorista disponível.']),
+  ];
+  if (vencidas.length) transacao(db, () => { for (const [c, motivo] of vencidas) encerrar(db, c, 'sistema', motivo); });
 }
 
 function buscar(db, id) {
@@ -59,18 +78,22 @@ function detalhar(db, c) {
       out.motorista.distancia_ate_origem_m = r.distancia_m;
     }
   }
+  if (c.empresa_id) out.empresa = db.prepare('SELECT razao_social FROM empresas WHERE id = ?').get(c.empresa_id)?.razao_social;
+  out.cobrancas = db.prepare('SELECT id, tipo, forma, valor_centavos, status, motivo, criada_em, concluida_em FROM cobrancas WHERE corrida_id = ? ORDER BY id').all(c.id);
   const p = db.prepare('SELECT nome, telefone FROM usuarios WHERE id = ?').get(c.passageiro_id);
   const notaP = db.prepare('SELECT AVG(nota_do_motorista) AS media FROM corridas WHERE passageiro_id = ?').get(c.passageiro_id).media;
   out.passageiro = { ...p, nota_media: notaP === null ? null : Math.round(notaP * 10) / 10 };
   return out;
 }
 
-const corridaAtivaPassageiro = (db, id) => db.prepare(`SELECT * FROM corridas WHERE passageiro_id = ? AND (status IN ('solicitada','aceita','chegou','em_andamento')
+/** Corrida em curso do passageiro ou a última finalizada que ainda tem complemento a pagar ou avaliação. */
+const corridaAtivaPassageiro = (db, id) => db.prepare(`SELECT * FROM corridas WHERE passageiro_id = ?
+  AND (status IN ('aguardando_pagamento','solicitada','aceita','chegou','em_andamento')
   OR (status = 'finalizada' AND (pagamento_status = 'pendente' OR nota_do_passageiro IS NULL) AND finalizada_em > ?)) ORDER BY id DESC LIMIT 1`)
   .get(id, new Date(Date.now() - 6 * 3_600_000).toISOString());
 
-const corridaAtivaMotorista = (db, id) => db.prepare(`SELECT * FROM corridas WHERE motorista_id = ? AND (status IN ('aceita','chegou','em_andamento')
-  OR (status = 'finalizada' AND pagamento_status = 'pendente')) ORDER BY id DESC LIMIT 1`).get(id);
+const corridaAtivaMotorista = (db, id) => db.prepare(`SELECT * FROM corridas WHERE motorista_id = ? AND status IN ('aceita','chegou','em_andamento')
+  ORDER BY id DESC LIMIT 1`).get(id);
 
 function solicitar(db, passageiroId, dados) {
   const origem = v.ponto(dados.origem, 'a origem');
@@ -79,16 +102,24 @@ function solicitar(db, passageiroId, dados) {
   const forma = v.opcao(dados.forma_pagamento, 'a forma de pagamento', FORMAS);
   v.exigir(distancia(origem, destino) >= 100, 'Origem e destino estão muito próximos.');
   v.exigir(distancia(origem, destino) <= 300_000, 'Destino fora da área atendida (mais de 300 km).');
+  expirarSolicitacoes(db);
   return transacao(db, () => {
-    expirarSolicitacoes(db);
-    const ativa = db.prepare(`SELECT id FROM corridas WHERE passageiro_id = ? AND status IN ('solicitada','aceita','chegou','em_andamento')`).get(passageiroId);
+    const ativa = db.prepare(`SELECT id FROM corridas WHERE passageiro_id = ? AND status IN ('aguardando_pagamento','solicitada','aceita','chegou','em_andamento')`).get(passageiroId);
     if (ativa) throw new ErroNegocio('Você já tem uma corrida em andamento.', 409);
     const est = estimar(db, origem, destino).find((e) => e.categoria === categoria);
+    const empresa = forma === 'empresa' ? emp.exigirAutorizacao(db, passageiroId, dados.empresa_id, est.valor_centavos) : null;
+    // PIX e cartão: a corrida espera o pagamento antes de ir para os taxistas. Empresa: sai direto (é faturada).
+    const status = empresa ? 'solicitada' : 'aguardando_pagamento';
+    const quando = agora();
     const r = db.prepare(`INSERT INTO corridas (passageiro_id, categoria, origem_endereco, origem_lat, origem_lng, destino_endereco, destino_lat, destino_lng,
-      distancia_estimada_m, duracao_estimada_s, bandeira, valor_estimado_centavos, forma_pagamento, solicitada_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(passageiroId, categoria, origem.endereco, origem.lat, origem.lng,
-      destino.endereco, destino.lat, destino.lng, est.distancia_m, est.duracao_s, est.bandeira, est.valor_centavos, forma, agora());
-    return Number(r.lastInsertRowid);
+      distancia_estimada_m, duracao_estimada_s, bandeira, valor_estimado_centavos, forma_pagamento, empresa_id, modelo_cobranca, status,
+      pagamento_status, criada_em, solicitada_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(passageiroId, categoria, origem.endereco, origem.lat, origem.lng,
+      destino.endereco, destino.lat, destino.lng, est.distancia_m, est.duracao_s, est.bandeira, est.valor_centavos, forma, empresa?.id ?? null,
+      lerConfig(db).modelo_cobranca, status, empresa ? 'faturado' : 'pendente', quando, quando);
+    const id = Number(r.lastInsertRowid);
+    const cobranca = empresa ? null : pag.criar(db, buscar(db, id), 'corrida', est.valor_centavos);
+    return { id, cobranca_id: cobranca };
   });
 }
 
@@ -159,7 +190,7 @@ function daMotorista(db, motoristaId, corridaId) {
 function exigirStatus(c, ...status) {
   if (!status.includes(c.status)) throw new ErroNegocio(`Operação indisponível: a corrida está ${ROTULO[c.status]}.`, 409);
 }
-const ROTULO = { solicitada: 'aguardando motorista', aceita: 'aceita', chegou: 'com o motorista no local', em_andamento: 'em andamento', finalizada: 'finalizada', cancelada: 'cancelada' };
+const ROTULO = { aguardando_pagamento: 'aguardando o pagamento', solicitada: 'aguardando motorista', aceita: 'aceita', chegou: 'com o motorista no local', em_andamento: 'em andamento', finalizada: 'finalizada', cancelada: 'cancelada' };
 
 function chegou(db, motoristaId, corridaId) {
   const c = daMotorista(db, motoristaId, corridaId);
@@ -191,8 +222,11 @@ function posicao(db, motoristaId, lat, lng) {
 }
 
 /**
- * Finaliza pela distância percorrida (GPS) e pelo tempo real, na bandeira do início.
- * Sem trajeto registrado (GPS desligado), usa a distância estimada até o destino.
+ * Finaliza a corrida. O taxímetro (distância percorrida pelo GPS e tempo real, na bandeira do pedido) é sempre registrado;
+ * sem trajeto (GPS desligado), usa a distância estimada. O valor final depende do modelo de cobrança do pedido:
+ * - 'estimativa' (preço fechado): vale o valor estimado, já pago antes;
+ * - 'taximetro': vale o taxímetro; se ficou abaixo do pago, a diferença é estornada; acima, gera um complemento a pagar.
+ * Empresa: o valor final entra na fatura do mês. A parte do motorista (valor final menos a taxa) vai para o saldo dele.
  */
 function finalizar(db, motoristaId, corridaId) {
   return transacao(db, () => {
@@ -202,17 +236,30 @@ function finalizar(db, motoristaId, corridaId) {
     const fim = agora();
     const duracao = Math.max(0, Math.round((Date.parse(fim) - Date.parse(c.iniciada_em)) / 1000));
     const dist = c.distancia_percorrida_m > 0 ? c.distancia_percorrida_m : c.distancia_estimada_m;
-    const valor = tarifa.calcular(tarifas(db)[c.categoria], { distancia_m: dist, duracao_s: duracao, bandeira: c.bandeira });
+    const taximetro = tarifa.calcular(tarifas(db)[c.categoria], { distancia_m: dist, duracao_s: duracao, bandeira: c.bandeira });
+    const valor = c.modelo_cobranca === 'taximetro' ? taximetro : c.valor_estimado_centavos;
     const partes = tarifa.dividir(valor, cfg.taxa_plataforma_bp);
-    db.prepare(`UPDATE corridas SET status = 'finalizada', finalizada_em = ?, duracao_real_s = ?, distancia_percorrida_m = ?, valor_final_centavos = ?,
-      taxa_plataforma_centavos = ?, valor_motorista_centavos = ? WHERE id = ?`)
-      .run(fim, duracao, dist, valor, partes.taxa_plataforma_centavos, partes.valor_motorista_centavos, c.id);
-    return buscar(db, c.id);
+    db.prepare(`UPDATE corridas SET status = 'finalizada', finalizada_em = ?, duracao_real_s = ?, distancia_percorrida_m = ?, valor_taximetro_centavos = ?,
+      valor_final_centavos = ?, taxa_plataforma_centavos = ?, valor_motorista_centavos = ? WHERE id = ?`)
+      .run(fim, duracao, dist, taximetro, valor, partes.taxa_plataforma_centavos, partes.valor_motorista_centavos, c.id);
+    if (c.forma_pagamento !== 'empresa') {
+      const diferenca = valor - c.valor_pago_centavos;
+      if (diferenca < 0) {
+        pag.criar(db, c, 'estorno', -diferenca, 'Taxímetro abaixo do valor pago');
+        db.prepare('UPDATE corridas SET valor_pago_centavos = ? WHERE id = ?').run(valor, c.id);
+      } else if (diferenca > 0) {
+        pag.criar(db, c, 'complemento', diferenca, 'Taxímetro acima do valor pago');
+        db.prepare(`UPDATE corridas SET pagamento_status = 'pendente' WHERE id = ?`).run(c.id);
+      }
+    }
+    const final = buscar(db, c.id);
+    fin.creditarCorrida(db, final);
+    return final;
   });
 }
 
 /**
- * Cancelamento. Passageiro: antes de a corrida começar. Motorista: desiste antes do início e a corrida
+ * Cancelamento (o que já foi pago é estornado). Passageiro: antes de a corrida começar. Motorista: desiste antes do início e a corrida
  * volta a ser oferecida aos outros. Central: a qualquer momento antes da finalização.
  */
 function cancelar(db, quem, corridaId, motivo, ator = {}) {
@@ -221,7 +268,7 @@ function cancelar(db, quem, corridaId, motivo, ator = {}) {
     const texto = v.opcional(motivo, 'o motivo', 300);
     if (quem === 'passageiro') {
       if (c.passageiro_id !== ator.id) throw naoEncontrado('Corrida');
-      exigirStatus(c, 'solicitada', 'aceita', 'chegou');
+      exigirStatus(c, 'aguardando_pagamento', 'solicitada', 'aceita', 'chegou');
     } else if (quem === 'motorista') {
       if (c.motorista_id !== ator.id) throw naoEncontrado('Corrida');
       exigirStatus(c, 'aceita', 'chegou');
@@ -230,22 +277,10 @@ function cancelar(db, quem, corridaId, motivo, ator = {}) {
         .run(agora(), c.id);
       return 'redistribuida';
     } else {
-      exigirStatus(c, 'solicitada', 'aceita', 'chegou', 'em_andamento');
+      exigirStatus(c, 'aguardando_pagamento', 'solicitada', 'aceita', 'chegou', 'em_andamento');
     }
-    db.prepare(`UPDATE corridas SET status = 'cancelada', cancelada_em = ?, cancelada_por = ?, motivo_cancelamento = ? WHERE id = ?`).run(agora(), quem, texto, c.id);
+    encerrar(db, c, quem, texto);
     return 'cancelada';
-  });
-}
-
-/** Confirma o pagamento e lança na conta do motorista (crédito do PIX ou débito da taxa do dinheiro/cartão). */
-function confirmarPagamento(db, corridaId, usuario) {
-  return transacao(db, () => {
-    const c = buscar(db, corridaId);
-    if (usuario.perfil === 'motorista' && c.motorista_id !== usuario.id) throw naoEncontrado('Corrida');
-    exigirStatus(c, 'finalizada');
-    if (c.pagamento_status === 'pago') throw new ErroNegocio('Pagamento já confirmado.', 409);
-    db.prepare(`UPDATE corridas SET pagamento_status = 'pago', pago_em = ?, pagamento_confirmado_por = ? WHERE id = ?`).run(agora(), usuario.id, c.id);
-    fin.lancarCorrida(db, { ...c, pagamento_status: 'pago' }, usuario.id);
   });
 }
 
@@ -266,5 +301,5 @@ function avaliar(db, quem, corridaId, ator, { nota, comentario }) {
 
 module.exports = {
   ATIVAS, CATEGORIAS, FORMAS, tarifas, estimar, expirarSolicitacoes, buscar, detalhar, notaMedia, corridaAtivaPassageiro, corridaAtivaMotorista,
-  solicitar, motoristaApto, ofertas, aceitar, recusar, chegou, iniciar, posicao, finalizar, cancelar, confirmarPagamento, avaliar,
+  solicitar, motoristaApto, ofertas, aceitar, recusar, chegou, iniciar, posicao, finalizar, cancelar, avaliar,
 };

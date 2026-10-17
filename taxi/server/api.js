@@ -13,8 +13,8 @@ function criarApi(db) {
     db.prepare('SELECT 1').get();
     res.json({ ok: true });
   });
-  /** Configuração pública das páginas: camada do mapa e centro padrão. */
-  api.get('/publico', (_req, res) => res.json({ mapa: config.mapa, busca_enderecos: Boolean(config.geocoder.url) }));
+  /** Configuração pública das páginas: camada do mapa, centro padrão e modo de pagamento. */
+  api.get('/publico', (_req, res) => res.json({ mapa: config.mapa, busca_enderecos: Boolean(config.geocoder.url), pagamentos: config.pagamentos }));
 
   api.use('/auth', require('./routes/auth')(db, autenticado));
   api.use('/geo', autenticado, require('./routes/geo')());

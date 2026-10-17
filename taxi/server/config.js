@@ -42,6 +42,9 @@ module.exports = {
     contato: process.env.TAXI_GEOCODER_CONTATO || 'contato@apptaxi.com.br',
     paises: process.env.TAXI_GEOCODER_PAISES || 'br',
   },
+  // Pagamentos: 'simulado' (testes: o passageiro aprova na tela) ou 'manual' (PIX na chave da plataforma, confirmado pela central;
+  // cartão indisponível). A cobrança automática de PIX e cartão exige um intermediador de pagamentos (PSP) ligado em lib/pagamentos.js.
+  pagamentos: process.env.TAXI_PAGAMENTOS || (producao ? 'manual' : 'simulado'),
   admin: {
     nome: process.env.TAXI_ADMIN_NOME || 'Administrador da Central',
     email: process.env.TAXI_ADMIN_EMAIL || 'admin@apptaxi.com.br',

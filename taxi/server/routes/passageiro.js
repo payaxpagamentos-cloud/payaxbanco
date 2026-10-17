@@ -1,25 +1,14 @@
 'use strict';
 
 const { Router } = require('express');
-const QRCode = require('qrcode');
-const { lerConfig } = require('../db');
+const { lerConfig, transacao } = require('../db');
 const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
-const pix = require('../lib/pix');
+const pag = require('../lib/pagamentos');
+const emp = require('../lib/empresas');
 const { distancia } = require('../lib/geo');
 const cor = require('../lib/corridas');
 const v = require('../lib/validacao');
-
-/** PIX copia e cola da corrida finalizada e ainda não paga (para a chave da plataforma). */
-async function pixDaCorrida(db, c) {
-  const cfg = lerConfig(db);
-  if (!cfg.pix_chave) throw new ErroNegocio('PIX indisponível: a central ainda não cadastrou a chave PIX. Pague ao motorista em dinheiro ou cartão.', 409);
-  const copia = pix.copiaECola({
-    chave: cfg.pix_chave, recebedor: cfg.pix_recebedor, cidade: cfg.pix_cidade, valorCentavos: c.valor_final_centavos,
-    txid: `CORRIDA${c.id}`, descricao: `Corrida ${c.id}`,
-  });
-  return { copia_e_cola: copia, qr_svg: await QRCode.toString(copia, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }), valor_centavos: c.valor_final_centavos };
-}
 
 module.exports = (db) => {
   const r = Router();
@@ -50,7 +39,10 @@ module.exports = (db) => {
     res.json(lista);
   });
 
-  r.post('/corridas', (req, res) => res.status(201).json({ id: cor.solicitar(db, req.usuario.id, req.body) }));
+  /** Empresas pelas quais a gestão autorizou este passageiro a pedir (forma "empresa"). */
+  r.get('/empresas', (req, res) => res.json(emp.autorizadas(db, req.usuario.id)));
+
+  r.post('/corridas', (req, res) => res.status(201).json(cor.solicitar(db, req.usuario.id, req.body)));
 
   r.get('/corridas/atual', (req, res) => {
     cor.expirarSolicitacoes(db);
@@ -73,11 +65,21 @@ module.exports = (db) => {
     res.status(204).end();
   });
 
-  r.get('/corridas/:id/pix', async (req, res) => {
+  /** Cobrança em aberto da corrida (pagamento antes da viagem ou complemento do taxímetro), com o PIX para pagar. */
+  r.get('/corridas/:id/cobranca', async (req, res) => {
     const c = minha(req);
-    if (c.status !== 'finalizada' || c.forma_pagamento !== 'pix') throw new ErroNegocio('Esta corrida não é paga por PIX.', 409);
-    if (c.pagamento_status === 'pago') throw new ErroNegocio('Pagamento já confirmado.', 409);
-    res.json(await pixDaCorrida(db, c));
+    const cob = db.prepare(`SELECT * FROM cobrancas WHERE corrida_id = ? AND status = 'pendente' AND tipo <> 'estorno' ORDER BY id DESC LIMIT 1`).get(c.id);
+    if (!cob) throw new ErroNegocio('Nenhum pagamento pendente nesta corrida.', 409);
+    res.json(await pag.paraPagar(db, cob));
+  });
+
+  /** Modo de testes: aprova o pagamento como se o banco tivesse confirmado. */
+  r.post('/cobrancas/:id/simular', (req, res) => {
+    if (pag.modo() !== 'simulado') throw new ErroNegocio('Disponível só no modo de testes.', 403);
+    const cob = pag.buscar(db, Number(req.params.id));
+    if (cor.buscar(db, cob.corrida_id).passageiro_id !== req.usuario.id || cob.tipo === 'estorno') throw naoEncontrado('Cobrança');
+    transacao(db, () => pag.concluir(db, cob.id, req.usuario.id, `SIMULADO-${cob.id}`));
+    res.status(204).end();
   });
 
   return r;

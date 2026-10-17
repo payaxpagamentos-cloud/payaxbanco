@@ -29,10 +29,10 @@ export const hojeLocal = () => new Date().toLocaleDateString('en-CA');
 export const somarDias = (d, n) => { const x = new Date(`${d}T12:00:00`); x.setDate(x.getDate() + n); return x.toLocaleDateString('en-CA'); };
 export const iniciais = (nome) => String(nome ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
 
-export const FORMAS = { pix: 'PIX', cartao: 'Cartão', dinheiro: 'Dinheiro' };
+export const FORMAS = { pix: 'PIX', cartao: 'Cartão', empresa: 'Empresa' };
 export const CATEGORIAS = { comum: 'Táxi comum', executivo: 'Executivo' };
 export const STATUS = {
-  solicitada: ['Procurando motorista', 'aviso'], aceita: ['Motorista a caminho', 'info'], chegou: ['Motorista no local', 'info'],
+  aguardando_pagamento: ['Aguardando pagamento', 'aviso'], solicitada: ['Procurando motorista', 'aviso'], aceita: ['Motorista a caminho', 'info'], chegou: ['Motorista no local', 'info'],
   em_andamento: ['Em viagem', 'info'], finalizada: ['Finalizada', 'ok'], cancelada: ['Cancelada', 'erro'],
 };
 export const etiquetaStatus = (s) => el('span', { class: `etiqueta ${STATUS[s]?.[1] ?? ''}` }, STATUS[s]?.[0] ?? s);

@@ -7,7 +7,9 @@ usarSessao('passageiro');
 const raiz = $('#app');
 
 // Estado do pedido em montagem.
-const pedido = { origem: null, destino: null, categoria: 'comum', forma: 'pix', estimativas: null, marcando: 'destino' };
+const pedido = { origem: null, destino: null, categoria: 'comum', forma: 'pix', empresaId: null, estimativas: null, marcando: 'destino' };
+// Empresas pelas quais a gestão autorizou este passageiro a pedir (forma de pagamento "Empresa").
+let empresas = [];
 let mapa, rotaCamada, carrosCamada, pararAtualizacao, corridaAtual = null, ultimoStatus = null;
 
 window.addEventListener('taxi:sair', () => iniciar());
@@ -35,6 +37,7 @@ async function montarApp(usuario) {
   rotaCamada = camada(mapa);
   carrosCamada = camada(mapa);
   mapa?.on('click', (e) => marcarNoMapa(e.latlng));
+  empresas = await api.get('/passageiro/empresas').catch(() => []);
   pararAtualizacao = repetir(() => atualizar(painel), 3000);
   if (!pedido.origem) usarMinhaPosicao(true);
 }
@@ -122,8 +125,9 @@ function redesenharPedido() {
 
   const pedir = el('button', { class: 'btn primario grande', disabled: !estimativas }, estimativas ? 'Pedir táxi' : 'Escolha origem e destino');
   pedir.addEventListener('click', () => acao(pedir, async () => {
-    await api.post('/passageiro/corridas', { origem, destino, categoria: pedido.categoria, forma_pagamento: pedido.forma });
-    toast('Procurando o motorista mais próximo…');
+    const empresaId = pedido.forma === 'empresa' ? Number(pedido.empresaId ?? empresas[0]?.id) : undefined;
+    await api.post('/passageiro/corridas', { origem, destino, categoria: pedido.categoria, forma_pagamento: pedido.forma, empresa_id: empresaId });
+    toast(pedido.forma === 'empresa' ? 'Procurando o motorista mais próximo…' : 'Faça o pagamento para chamar o táxi.');
     await atualizar(painel);
   }));
 
@@ -141,11 +145,21 @@ function redesenharPedido() {
       el('span', { class: 'meio' }, el('strong', {}, CATEGORIAS[e.categoria]), el('br'),
         el('span', { class: 'pequeno mudo' }, `${km(e.distancia_m)} · ~${minutos(e.duracao_s)}${e.bandeira === 2 ? ' · bandeira 2' : ''}`)),
       el('span', { class: 'valor num' }, `~${dinheiro(e.valor_centavos)}`)))),
-      el('div', {}, el('div', { class: 'pequeno mudo', style: 'margin-bottom:6px' }, 'Pagamento'),
-        el('div', { class: 'pilulas' }, Object.entries(FORMAS).map(([k, rot]) => el('button', { type: 'button', class: pedido.forma === k ? 'on' : '',
-          onclick: () => { pedido.forma = k; redesenharPedido(); } }, rot)))),
-      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O valor final segue o taxímetro: distância percorrida e tempo de viagem.')) : null,
+      el('div', {}, el('div', { class: 'pequeno mudo', style: 'margin-bottom:6px' }, 'Pagamento (antes da viagem)'),
+        // "Empresa" só aparece para quem a gestão autorizou.
+        el('div', { class: 'pilulas' }, Object.entries(FORMAS).filter(([k]) => k !== 'empresa' || empresas.length).map(([k, rot]) => el('button', { type: 'button',
+          class: pedido.forma === k ? 'on' : '', onclick: () => { pedido.forma = k; redesenharPedido(); } }, rot))),
+        pedido.forma === 'empresa' ? seletorEmpresa() : null),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, pedido.forma === 'empresa' ? 'A corrida entra na fatura da empresa.'
+        : 'Você paga agora e o táxi é chamado assim que o pagamento for confirmado.')) : null,
     el('div', { style: 'margin-top:14px' }, pedir));
+}
+
+function seletorEmpresa() {
+  const dica = (e) => (e.disponivel_centavos === null ? '' : ` · disponível ${dinheiro(e.disponivel_centavos)}`);
+  if (empresas.length === 1) return el('p', { class: 'pequeno', style: 'margin:8px 0 0' }, `${empresas[0].razao_social}${dica(empresas[0])}`);
+  return el('select', { style: 'margin-top:8px', 'aria-label': 'Empresa', onchange: (e) => { pedido.empresaId = Number(e.target.value); } },
+    empresas.map((e) => el('option', { value: e.id, selected: Number(pedido.empresaId) === e.id }, `${e.razao_social}${dica(e)}`)));
 }
 
 /** Consulta a corrida atual e redesenha o painel conforme a situação. */
@@ -180,7 +194,7 @@ async function atualizar(painel) {
 }
 
 function avisarMudanca(c) {
-  const msg = { aceita: 'Motorista a caminho!', chegou: 'Seu motorista chegou.', em_andamento: 'Boa viagem!', finalizada: 'Você chegou ao destino.', cancelada: 'Corrida cancelada.' }[c.status];
+  const msg = { solicitada: 'Pagamento confirmado. Procurando motorista…', aceita: 'Motorista a caminho!', chegou: 'Seu motorista chegou.', em_andamento: 'Boa viagem!', finalizada: 'Você chegou ao destino.', cancelada: 'Corrida cancelada.' }[c.status];
   if (msg) toast(msg);
   try { navigator.vibrate?.(200); } catch { /* sem vibração */ }
 }
@@ -205,7 +219,41 @@ function blocoMotorista(c) {
       m.telefone ? el('a', { class: 'btn pequeno', href: `tel:${m.telefone}` }, 'Ligar') : null)));
 }
 
-let pixCache = null;
+/** Cobrança em aberto (pagamento antes da viagem ou complemento do taxímetro), guardada para não refazer o QR a cada atualização. */
+let cobrancaCache = null;
+async function blocoPagamento(c, painel) {
+  if (cobrancaCache?.chave !== `${c.id}:${c.status}:${c.pagamento_status}`) {
+    try { cobrancaCache = { chave: `${c.id}:${c.status}:${c.pagamento_status}`, ...(await api.get(`/passageiro/corridas/${c.id}/cobranca`)) }; }
+    catch (err) { cobrancaCache = { chave: `${c.id}:${c.status}:${c.pagamento_status}`, erro: err.message }; }
+  }
+  const cob = cobrancaCache;
+  if (cob.erro) return [el('div', { class: 'aviso' }, cob.erro)];
+  const partes = [];
+  if (cob.forma === 'pix') {
+    const qr = el('div', { class: 'qr' });
+    qr.innerHTML = cob.qr_svg; // SVG gerado pelo servidor a partir do código PIX
+    partes.push(el('p', { class: 'pequeno', style: 'text-align:center' }, `Pague ${dinheiro(cob.valor_centavos)} com o PIX abaixo. ${cob.modo === 'manual' ? 'Assim que o pagamento for confirmado, chamamos o táxi.' : 'Modo de testes: use o botão abaixo para simular o pagamento.'}`), qr,
+      el('div', { class: 'copiar', style: 'margin-top:10px' }, cob.copia_e_cola),
+      el('button', { class: 'btn grande', style: 'margin-top:8px', onclick: () => navigator.clipboard?.writeText(cob.copia_e_cola).then(() => toast('Código PIX copiado.'), () => toast('Copie o código manualmente.', true)) }, 'Copiar código PIX'));
+  } else {
+    partes.push(el('p', { class: 'pequeno', style: 'text-align:center' }, `Pagamento de ${dinheiro(cob.valor_centavos)} no cartão.`));
+  }
+  if (cob.modo === 'simulado') {
+    const simular = el('button', { class: 'btn primario grande', style: 'margin-top:8px' }, cob.forma === 'pix' ? 'Simular PIX recebido (modo de testes)' : 'Pagar com cartão (modo de testes)');
+    simular.addEventListener('click', () => acao(simular, async () => { await api.post(`/passageiro/cobrancas/${cob.id}/simular`); toast('Pagamento aprovado.'); await atualizar(painel); }));
+    partes.push(simular);
+  }
+  return partes;
+}
+
+/** Devoluções feitas ou a caminho (cancelamento após o pagamento ou taxímetro abaixo do pago). */
+function blocoEstornos(c) {
+  const estornos = (c.cobrancas ?? []).filter((x) => x.tipo === 'estorno');
+  if (!estornos.length) return null;
+  return el('div', { class: 'aviso ok', style: 'margin-top:10px' }, estornos.map((x) =>
+    el('div', {}, `${x.status === 'concluida' ? 'Devolvido' : 'Devolução em andamento'}: ${dinheiro(x.valor_centavos)}${x.motivo ? ` (${x.motivo.toLowerCase()})` : ''}`)));
+}
+
 async function desenharCorrida(painel, c) {
   const partes = [el('div', { class: 'alca' }), el('div', { class: 'linha entre' }, etiquetaStatus(c.status), el('span', { class: 'pequeno mudo' }, `Corrida #${c.id}`))];
   const trajeto = el('div', { class: 'coluna pequeno', style: 'margin-top:10px' },
@@ -213,43 +261,38 @@ async function desenharCorrida(painel, c) {
     el('div', { class: 'ponto' }, el('span', { class: 'bola destino', style: 'margin-top:4px' }), el('span', {}, c.destino_endereco)));
   const cancelar = el('button', { class: 'btn perigo grande', style: 'margin-top:12px' }, 'Cancelar corrida');
   cancelar.addEventListener('click', async () => {
-    const motivo = await perguntar('Cancelar corrida', 'Motivo (opcional)', { obrigatorio: false });
+    const pago = c.valor_pago_centavos > 0;
+    const motivo = await perguntar('Cancelar corrida', pago ? `Motivo (opcional). ${dinheiro(c.valor_pago_centavos)} serão devolvidos.` : 'Motivo (opcional)', { obrigatorio: false });
     if (motivo === null) return;
     await acao(cancelar, () => api.post(`/passageiro/corridas/${c.id}/cancelar`, { motivo }));
     await atualizar(painel);
   });
+  const pagamento = el('p', { class: 'mudo pequeno' }, `${CATEGORIAS[c.categoria]} · ${FORMAS[c.forma_pagamento]}${c.empresa ? ` (${c.empresa})` : ''} · `,
+    c.forma_pagamento === 'empresa' ? `estimativa ${dinheiro(c.valor_estimado_centavos)}` : `pago ${dinheiro(c.valor_pago_centavos)}`);
 
-  if (c.status === 'solicitada') {
-    partes.push(el('h2', { style: 'margin-top:12px' }, 'Procurando motorista…'), el('p', { class: 'mudo' }, `${CATEGORIAS[c.categoria]} · estimativa ${dinheiro(c.valor_estimado_centavos)} · ${FORMAS[c.forma_pagamento]}`), trajeto, cancelar);
+  if (c.status === 'aguardando_pagamento') {
+    partes.push(el('h2', { style: 'margin-top:12px' }, `Pague ${dinheiro(c.valor_estimado_centavos)} para chamar o táxi`),
+      el('p', { class: 'mudo pequeno' }, `${CATEGORIAS[c.categoria]} · ${km(c.distancia_estimada_m)} · ~${minutos(c.duracao_estimada_s)}`),
+      await blocoPagamento(c, painel), trajeto, cancelar);
+  } else if (c.status === 'solicitada') {
+    partes.push(el('h2', { style: 'margin-top:12px' }, 'Procurando motorista…'), pagamento, trajeto, cancelar);
   } else if (c.status === 'aceita' || c.status === 'chegou') {
     partes.push(el('h2', { style: 'margin-top:12px' }, c.status === 'chegou' ? 'Seu motorista chegou!' : `Chega em ~${minutos(c.motorista?.chegada_s ?? 60)}`),
-      blocoMotorista(c), trajeto, cancelar);
+      blocoMotorista(c), pagamento, trajeto, cancelar);
   } else if (c.status === 'em_andamento') {
-    partes.push(el('h2', { style: 'margin-top:12px' }, 'Em viagem'), blocoMotorista(c), trajeto,
-      el('p', { class: 'pequeno mudo' }, `Percorrido: ${km(c.distancia_percorrida_m)} · estimativa ${dinheiro(c.valor_estimado_centavos)}`));
+    partes.push(el('h2', { style: 'margin-top:12px' }, 'Em viagem'), blocoMotorista(c), pagamento, trajeto,
+      el('p', { class: 'pequeno mudo' }, `Percorrido: ${km(c.distancia_percorrida_m)}`));
   } else if (c.status === 'finalizada') {
     partes.push(el('div', { style: 'text-align:center;margin:10px 0' }, el('div', { class: 'mudo' }, 'Valor da corrida'),
       el('div', { class: 'grande-valor num' }, dinheiro(c.valor_final_centavos)),
-      el('div', { class: 'pequeno mudo' }, `${km(c.distancia_percorrida_m)} · ${minutos(c.duracao_real_s)} · ${FORMAS[c.forma_pagamento]}`)));
+      el('div', { class: 'pequeno mudo' }, `${km(c.distancia_percorrida_m)} · ${minutos(c.duracao_real_s)} · ${FORMAS[c.forma_pagamento]}${c.empresa ? ` (${c.empresa})` : ''}`)));
     if (c.pagamento_status === 'pendente') {
-      if (c.forma_pagamento === 'pix') {
-        if (pixCache?.id !== c.id) {
-          try { pixCache = { id: c.id, ...(await api.get(`/passageiro/corridas/${c.id}/pix`)) }; } catch (err) { pixCache = { id: c.id, erro: err.message }; }
-        }
-        if (pixCache.erro) partes.push(el('div', { class: 'aviso' }, pixCache.erro));
-        else {
-          const qr = el('div', { class: 'qr' });
-          qr.innerHTML = pixCache.qr_svg; // SVG gerado pelo servidor a partir do código PIX
-          partes.push(el('p', { class: 'pequeno', style: 'text-align:center' }, 'Pague com o PIX abaixo e mostre o comprovante ao motorista.'), qr,
-            el('div', { class: 'copiar', style: 'margin-top:10px' }, pixCache.copia_e_cola),
-            el('button', { class: 'btn grande', style: 'margin-top:8px', onclick: () => navigator.clipboard?.writeText(pixCache.copia_e_cola).then(() => toast('Código PIX copiado.'), () => toast('Copie o código manualmente.', true)) }, 'Copiar código PIX'));
-        }
-      } else {
-        partes.push(el('div', { class: 'aviso' }, `Pague ${dinheiro(c.valor_final_centavos)} ao motorista em ${FORMAS[c.forma_pagamento].toLowerCase()}.`));
-      }
+      partes.push(el('div', { class: 'aviso' }, `O taxímetro deu ${dinheiro(c.valor_final_centavos)} e você pagou ${dinheiro(c.valor_pago_centavos)} antes. Falta pagar a diferença.`),
+        await blocoPagamento(c, painel));
     } else {
-      partes.push(el('div', { class: 'aviso ok' }, 'Pagamento confirmado. Obrigado!'));
+      partes.push(el('div', { class: 'aviso ok' }, c.forma_pagamento === 'empresa' ? 'Corrida lançada na fatura da empresa.' : 'Corrida paga. Obrigado!'));
     }
+    partes.push(blocoEstornos(c));
     if (c.nota_do_passageiro === null) partes.push(avaliacao(c, painel));
   }
   limpar(painel, partes);

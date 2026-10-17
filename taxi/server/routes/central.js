@@ -9,6 +9,8 @@ const { hashSenha } = require('../lib/senha');
 const { registrar } = require('../lib/auditoria');
 const cor = require('../lib/corridas');
 const fin = require('../lib/financeiro');
+const pag = require('../lib/pagamentos');
+const emp = require('../lib/empresas');
 const v = require('../lib/validacao');
 
 /** Período 'de'/'ate' da query (padrão: hoje), limitado a um ano. */
@@ -29,7 +31,7 @@ module.exports = (db) => {
     cor.expirarSolicitacoes(db);
     const [ini, fim] = intervalo(hoje(), hoje());
     const corte = new Date(Date.now() - 5 * 60_000).toISOString();
-    const status = Object.fromEntries(db.prepare(`SELECT status, COUNT(*) AS n FROM corridas WHERE status IN ('solicitada','aceita','chegou','em_andamento') GROUP BY status`)
+    const status = Object.fromEntries(db.prepare(`SELECT status, COUNT(*) AS n FROM corridas WHERE status IN ('aguardando_pagamento','solicitada','aceita','chegou','em_andamento') GROUP BY status`)
       .all().map((x) => [x.status, x.n]));
     const dia = db.prepare(`SELECT COUNT(*) AS finalizadas, COALESCE(SUM(valor_final_centavos),0) AS bruto, COALESCE(SUM(taxa_plataforma_centavos),0) AS taxa
       FROM corridas WHERE status = 'finalizada' AND finalizada_em >= ? AND finalizada_em < ?`).get(ini, fim);
@@ -39,11 +41,12 @@ module.exports = (db) => {
       motoristas_online: db.prepare(`SELECT COUNT(*) AS n FROM motoristas WHERE online = 1 AND posicao_em > ?`).get(corte).n,
       corridas_ativas: status,
       hoje: { finalizadas: dia.finalizadas, canceladas, bruto_centavos: dia.bruto, taxa_centavos: dia.taxa },
-      pagamentos_pendentes: db.prepare(`SELECT COUNT(*) AS n FROM corridas WHERE status = 'finalizada' AND pagamento_status = 'pendente'`).get().n,
+      // Na central: PIX a confirmar (modo manual), complementos a receber e estornos a devolver.
+      cobrancas_pendentes: Object.fromEntries(db.prepare(`SELECT tipo, COUNT(*) AS n FROM cobrancas WHERE status = 'pendente' GROUP BY tipo`).all().map((x) => [x.tipo, x.n])),
+      faturas_abertas: db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(valor_centavos),0) AS total FROM faturas WHERE status = 'aberta'`).get(),
       motoristas_pendentes: db.prepare(`SELECT COUNT(*) AS n FROM motoristas WHERE situacao = 'pendente'`).get().n,
       veiculos_pendentes: db.prepare(`SELECT COUNT(*) AS n FROM veiculos WHERE situacao = 'pendente'`).get().n,
       a_repassar_centavos: saldos.filter((s) => s.saldo_centavos > 0).reduce((a, s) => a + s.saldo_centavos, 0),
-      a_cobrar_centavos: -saldos.filter((s) => s.saldo_centavos < 0).reduce((a, s) => a + s.saldo_centavos, 0),
       repasses_pendentes: db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(valor_centavos),0) AS total FROM repasses WHERE status = 'pendente'`).get(),
     });
   });
@@ -59,7 +62,7 @@ module.exports = (db) => {
       corridas: db.prepare(`SELECT c.id, c.status, c.categoria, c.origem_endereco, c.origem_lat, c.origem_lng, c.destino_endereco, c.destino_lat, c.destino_lng,
           c.solicitada_em, c.motorista_id, p.nome AS passageiro_nome, u.nome AS motorista_nome
         FROM corridas c JOIN usuarios p ON p.id = c.passageiro_id LEFT JOIN usuarios u ON u.id = c.motorista_id
-        WHERE c.status IN ('solicitada','aceita','chegou','em_andamento') ORDER BY c.id`).all(),
+        WHERE c.status IN ('aguardando_pagamento','solicitada','aceita','chegou','em_andamento') ORDER BY c.id`).all(),
     });
   });
 
@@ -67,13 +70,13 @@ module.exports = (db) => {
   r.get('/corridas', (req, res) => {
     const [de, ate] = periodo(req.query, 6);
     const [ini, fim] = intervalo(de, ate);
-    const status = req.query.status ? v.opcao(req.query.status, 'o status', ['solicitada', 'aceita', 'chegou', 'em_andamento', 'finalizada', 'cancelada']) : null;
+    const status = req.query.status ? v.opcao(req.query.status, 'o status', ['aguardando_pagamento', 'solicitada', 'aceita', 'chegou', 'em_andamento', 'finalizada', 'cancelada']) : null;
     const pendentes = req.query.pagamento === 'pendente';
     res.json(db.prepare(`SELECT c.id, c.status, c.categoria, c.origem_endereco, c.destino_endereco, c.solicitada_em, c.finalizada_em, c.cancelada_em, c.cancelada_por,
-        c.forma_pagamento, c.pagamento_status, c.valor_estimado_centavos, c.valor_final_centavos, c.taxa_plataforma_centavos, c.nota_do_passageiro,
+        c.forma_pagamento, c.pagamento_status, c.empresa_id, c.valor_estimado_centavos, c.valor_final_centavos, c.taxa_plataforma_centavos, c.nota_do_passageiro,
         p.nome AS passageiro_nome, u.nome AS motorista_nome
       FROM corridas c JOIN usuarios p ON p.id = c.passageiro_id LEFT JOIN usuarios u ON u.id = c.motorista_id
-      WHERE c.solicitada_em >= ? AND c.solicitada_em < ? AND (? IS NULL OR c.status = ?) AND (? = 0 OR (c.status = 'finalizada' AND c.pagamento_status = 'pendente'))
+      WHERE c.criada_em >= ? AND c.criada_em < ? AND (? IS NULL OR c.status = ?) AND (? = 0 OR c.pagamento_status = 'pendente')
       ORDER BY c.id DESC LIMIT 500`).all(ini, fim, status, status, pendentes ? 1 : 0));
   });
   r.get('/corridas/:id', (req, res) => res.json(cor.detalhar(db, cor.buscar(db, nid(req)))));
@@ -83,9 +86,18 @@ module.exports = (db) => {
     registrar(db, req, 'corrida_cancelada', { corrida: nid(req), motivo: req.body.motivo });
     res.status(204).end();
   });
-  r.post('/corridas/:id/pagamento', (req, res) => {
-    cor.confirmarPagamento(db, nid(req), req.usuario);
-    registrar(db, req, 'pagamento_confirmado', { corrida: nid(req) });
+
+  // Cobranças: PIX recebido na chave da plataforma (modo manual), complementos e estornos devolvidos.
+  r.get('/cobrancas', (req, res) => {
+    const status = req.query.status ? v.opcao(req.query.status, 'o status', ['pendente', 'concluida', 'cancelada']) : null;
+    res.json(db.prepare(`SELECT b.*, c.status AS corrida_status, u.nome AS passageiro_nome, u.email AS passageiro_email FROM cobrancas b
+      JOIN corridas c ON c.id = b.corrida_id JOIN usuarios u ON u.id = c.passageiro_id WHERE (? IS NULL OR b.status = ?) ORDER BY b.id DESC LIMIT 300`).all(status, status));
+  });
+  r.post('/cobrancas/:id/concluir', (req, res) => {
+    const cob = pag.buscar(db, nid(req));
+    const ident = v.texto(req.body.identificador, cob.tipo === 'estorno' ? 'o identificador da devolução' : 'o identificador do pagamento (E2E do PIX)', 100);
+    transacao(db, () => pag.concluir(db, cob.id, req.usuario.id, ident));
+    registrar(db, req, cob.tipo === 'estorno' ? 'estorno_concluido' : 'pagamento_confirmado', { cobranca: cob.id, corrida: cob.corrida_id, identificador: ident });
     res.status(204).end();
   });
 
@@ -161,6 +173,8 @@ module.exports = (db) => {
       taxa_plataforma_bp: (x) => v.inteiro(x, 'a taxa da plataforma', { min: 0, max: 5000 }),
       raio_busca_km: (x) => v.numero(x, 'o raio de busca', { min: 0.5, max: 50 }),
       expirar_solicitacao_min: (x) => v.inteiro(x, 'o tempo de espera', { min: 1, max: 60 }),
+      expirar_pagamento_min: (x) => v.inteiro(x, 'o prazo para pagar', { min: 2, max: 60 }),
+      modelo_cobranca: (x) => v.opcao(x, 'o modelo de cobrança', ['estimativa', 'taximetro']),
       repasse_minimo_centavos: (x) => v.inteiro(x, 'o repasse mínimo', { min: 0, max: 10_000_000 }),
       fator_rota: (x) => v.numero(x, 'o fator de rota', { min: 1, max: 3 }),
       velocidade_media_kmh: (x) => v.numero(x, 'a velocidade média', { min: 5, max: 120 }),
@@ -222,6 +236,121 @@ module.exports = (db) => {
       categoriaDespesa: v.opcional(req.query.categoria_despesa, 'a categoria de despesa', 120) ?? undefined,
     });
     res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="taxi-bpo-${de}-a-${ate}.csv"` }).send(`﻿${csv}`);
+  });
+
+  // Empresas (corridas faturadas) e passageiros autorizados a pedir por elas
+  const dadosEmpresa = (b, parcial = false) => {
+    const d = {};
+    if (!parcial || b.razao_social !== undefined) d.razao_social = v.texto(b.razao_social, 'a razão social', 160);
+    if (!parcial || b.cnpj !== undefined) { v.exigir(v.cnpjValido(b.cnpj), 'CNPJ inválido.'); d.cnpj = v.digitos(b.cnpj); }
+    if (!parcial || b.email_financeiro !== undefined) d.email_financeiro = v.email(b.email_financeiro);
+    if (b.telefone !== undefined) d.telefone = b.telefone ? v.telefone(b.telefone) : null;
+    if (b.limite_mensal_centavos !== undefined) d.limite_mensal_centavos = b.limite_mensal_centavos ? v.inteiro(b.limite_mensal_centavos, 'o limite mensal', { min: 1 }) : null;
+    if (b.dia_vencimento !== undefined) d.dia_vencimento = v.inteiro(b.dia_vencimento, 'o dia de vencimento', { min: 1, max: 28 });
+    if (b.ativa !== undefined) d.ativa = b.ativa ? 1 : 0;
+    return d;
+  };
+  r.get('/empresas', (_req, res) => res.json(db.prepare(`SELECT e.*,
+      (SELECT COUNT(*) FROM empresa_usuarios eu WHERE eu.empresa_id = e.id AND eu.ativo = 1) AS usuarios_autorizados
+    FROM empresas e ORDER BY e.razao_social`).all().map((e) => ({ ...e, gasto_mes_centavos: emp.gastoNoMes(db, e.id) }))));
+  r.post('/empresas', (req, res) => {
+    const d = dadosEmpresa(req.body);
+    if (db.prepare('SELECT 1 FROM empresas WHERE cnpj = ?').get(d.cnpj)) throw new ErroNegocio('Empresa já cadastrada com este CNPJ.', 409);
+    const cols = Object.keys(d);
+    const x = db.prepare(`INSERT INTO empresas (${cols.join(', ')}, criada_em) VALUES (${cols.map(() => '?').join(', ')}, ?)`).run(...Object.values(d), agora());
+    registrar(db, req, 'empresa_criada', { empresa: Number(x.lastInsertRowid), ...d });
+    res.status(201).json({ id: Number(x.lastInsertRowid) });
+  });
+  r.patch('/empresas/:id', (req, res) => {
+    emp.buscar(db, nid(req));
+    const d = dadosEmpresa(req.body, true);
+    v.exigir(Object.keys(d).length, 'Nada para alterar.');
+    db.prepare(`UPDATE empresas SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), nid(req));
+    registrar(db, req, 'empresa_alterada', { empresa: nid(req), ...d });
+    res.status(204).end();
+  });
+
+  r.get('/empresas/:id/usuarios', (req, res) => {
+    emp.buscar(db, nid(req));
+    res.json(db.prepare(`SELECT eu.usuario_id, u.nome, u.email, u.telefone, eu.ativo, eu.limite_mensal_centavos, eu.centro_custo, eu.autorizado_em
+      FROM empresa_usuarios eu JOIN usuarios u ON u.id = eu.usuario_id WHERE eu.empresa_id = ? ORDER BY u.nome`).all(nid(req))
+      .map((u) => ({ ...u, gasto_mes_centavos: emp.gastoNoMes(db, nid(req), u.usuario_id) })));
+  });
+  /** Autoriza um passageiro (pelo e-mail da conta dele no app) a pedir corridas pela empresa. */
+  r.post('/empresas/:id/usuarios', (req, res) => {
+    const e = emp.buscar(db, nid(req));
+    const u = db.prepare(`SELECT id, perfil FROM usuarios WHERE email = ?`).get(v.email(req.body.email));
+    if (!u || u.perfil !== 'passageiro') throw new ErroNegocio('Nenhum passageiro com este e-mail. Peça para a pessoa criar a conta no app primeiro.', 404);
+    const limite = req.body.limite_mensal_centavos ? v.inteiro(req.body.limite_mensal_centavos, 'o limite mensal', { min: 1 }) : null;
+    const centro = v.opcional(req.body.centro_custo, 'o centro de custo', 80);
+    db.prepare(`INSERT INTO empresa_usuarios (empresa_id, usuario_id, limite_mensal_centavos, centro_custo, autorizado_em, autorizado_por) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT (empresa_id, usuario_id) DO UPDATE SET ativo = 1, limite_mensal_centavos = excluded.limite_mensal_centavos, centro_custo = excluded.centro_custo,
+      autorizado_em = excluded.autorizado_em, autorizado_por = excluded.autorizado_por`).run(e.id, u.id, limite, centro, agora(), req.usuario.id);
+    registrar(db, req, 'empresa_usuario_autorizado', { empresa: e.id, usuario: u.id, limite, centro });
+    res.status(201).json({ usuario_id: u.id });
+  });
+  r.patch('/empresas/:id/usuarios/:uid', (req, res) => {
+    const sets = [];
+    const vals = [];
+    if (req.body.ativo !== undefined) { sets.push('ativo = ?'); vals.push(req.body.ativo ? 1 : 0); }
+    if (req.body.limite_mensal_centavos !== undefined) {
+      sets.push('limite_mensal_centavos = ?');
+      vals.push(req.body.limite_mensal_centavos ? v.inteiro(req.body.limite_mensal_centavos, 'o limite mensal', { min: 1 }) : null);
+    }
+    if (req.body.centro_custo !== undefined) { sets.push('centro_custo = ?'); vals.push(v.opcional(req.body.centro_custo, 'o centro de custo', 80)); }
+    v.exigir(sets.length, 'Nada para alterar.');
+    const x = db.prepare(`UPDATE empresa_usuarios SET ${sets.join(', ')} WHERE empresa_id = ? AND usuario_id = ?`).run(...vals, nid(req), Number(req.params.uid));
+    if (!x.changes) throw naoEncontrado('Autorização');
+    registrar(db, req, 'empresa_usuario_alterado', { empresa: nid(req), usuario: Number(req.params.uid), ...req.body });
+    res.status(204).end();
+  });
+
+  r.get('/empresas/:id/corridas', (req, res) => {
+    emp.buscar(db, nid(req));
+    res.json(emp.corridasDaEmpresa(db, nid(req), { competencia: req.query.competencia ?? hoje().slice(0, 7) }));
+  });
+  r.get('/empresas/:id/faturas', (req, res) => res.json(db.prepare('SELECT * FROM faturas WHERE empresa_id = ? ORDER BY competencia DESC').all(nid(req))));
+  r.post('/empresas/:id/faturas', (req, res) => {
+    const f = emp.gerarFatura(db, req.usuario, nid(req), req.body.competencia);
+    registrar(db, req, 'fatura_gerada', { empresa: nid(req), competencia: req.body.competencia, ...f });
+    res.status(201).json(f);
+  });
+  const fatura = (id) => {
+    const f = db.prepare('SELECT * FROM faturas WHERE id = ?').get(id);
+    if (!f) throw naoEncontrado('Fatura');
+    return f;
+  };
+  r.post('/faturas/:id/pagar', (req, res) => {
+    const f = fatura(nid(req));
+    if (f.status !== 'aberta') throw new ErroNegocio('Fatura já paga ou cancelada.', 409);
+    const ident = v.texto(req.body.identificador, 'o identificador do pagamento', 100);
+    db.prepare(`UPDATE faturas SET status = 'paga', paga_em = ?, identificador = ? WHERE id = ?`).run(agora(), ident, f.id);
+    registrar(db, req, 'fatura_paga', { fatura: f.id, identificador: ident });
+    res.status(204).end();
+  });
+  /** Cancela a fatura e libera as corridas para uma nova (ex.: corrigir uma corrida antes de reenviar). */
+  r.post('/faturas/:id/cancelar', (req, res) => {
+    const f = fatura(nid(req));
+    if (f.status !== 'aberta') throw new ErroNegocio('Só faturas abertas podem ser canceladas.', 409);
+    transacao(db, () => {
+      db.prepare(`UPDATE faturas SET status = 'cancelada' WHERE id = ?`).run(f.id);
+      db.prepare('UPDATE corridas SET fatura_id = NULL WHERE fatura_id = ?').run(f.id);
+    });
+    registrar(db, req, 'fatura_cancelada', { fatura: f.id, motivo: v.texto(req.body.motivo, 'o motivo', 300) });
+    res.status(204).end();
+  });
+  /** Extrato da fatura em CSV para enviar à empresa. */
+  r.get('/faturas/:id/csv', (req, res) => {
+    const f = fatura(nid(req));
+    const e = emp.buscar(db, f.empresa_id);
+    const linhas = [['Corrida', 'Data', 'Passageiro', 'E-mail', 'Centro de custo', 'Origem', 'Destino', 'Km', 'Valor']];
+    for (const c of emp.corridasDaEmpresa(db, f.empresa_id, { faturaId: f.id })) {
+      linhas.push([c.id, c.finalizada_em.slice(0, 10).split('-').reverse().join('/'), c.passageiro, c.email, c.centro_custo ?? '', c.origem_endereco, c.destino_endereco,
+        (c.distancia_percorrida_m / 1000).toFixed(1).replace('.', ','), (c.valor_final_centavos / 100).toFixed(2).replace('.', ',')]);
+    }
+    linhas.push(['', '', '', '', '', '', 'Total', '', (f.valor_centavos / 100).toFixed(2).replace('.', ',')]);
+    const csv = linhas.map((l) => l.map((t) => (/[;"\n]/.test(String(t)) ? `"${String(t).replace(/"/g, '""')}"` : String(t))).join(';')).join('\r\n');
+    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="fatura-${e.cnpj}-${f.competencia}.csv"` }).send(`\ufeff${csv}\r\n`);
   });
 
   // Equipe da central (só administrador)

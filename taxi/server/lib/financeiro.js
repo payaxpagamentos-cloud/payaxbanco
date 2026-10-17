@@ -5,20 +5,17 @@ const { ErroNegocio, naoEncontrado } = require('./erros');
 const { intervalo, local } = require('./datas');
 const v = require('./validacao');
 
-const FORMA = { pix: 'PIX', cartao: 'cartão', dinheiro: 'dinheiro' };
+const FORMA = { pix: 'PIX', cartao: 'cartão', empresa: 'empresa' };
 
 /**
- * Lançamento da corrida paga na conta do motorista:
- * - PIX: a plataforma recebeu o valor inteiro e credita a parte do motorista;
- * - dinheiro ou cartão (maquininha do motorista): o motorista recebeu tudo e é debitada a taxa da plataforma.
+ * Crédito da corrida finalizada na conta do motorista: o valor final menos a taxa da plataforma.
+ * Tudo é pago à plataforma antes (ou faturado à empresa), então o motorista só tem valores a receber.
  */
-function lancarCorrida(db, c, usuarioId) {
-  const recebeuPlataforma = c.forma_pagamento === 'pix';
-  const valor = recebeuPlataforma ? c.valor_motorista_centavos : -c.taxa_plataforma_centavos;
-  const descricao = recebeuPlataforma ? `Corrida #${c.id} paga por PIX (sua parte)` : `Taxa da plataforma, corrida #${c.id} paga em ${FORMA[c.forma_pagamento]}`;
-  if (!valor) return;
-  db.prepare(`INSERT INTO lancamentos_motorista (motorista_id, corrida_id, tipo, descricao, valor_centavos, criado_em, criado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(c.motorista_id, c.id, recebeuPlataforma ? 'corrida' : 'taxa', descricao, valor, agora(), usuarioId);
+function creditarCorrida(db, c) {
+  if (!c.valor_motorista_centavos) return;
+  db.prepare(`INSERT INTO lancamentos_motorista (motorista_id, corrida_id, tipo, descricao, valor_centavos, criado_em)
+    VALUES (?, ?, 'corrida', ?, ?, ?)`).run(c.motorista_id, c.id, `Corrida #${c.id} (${FORMA[c.forma_pagamento]}): ${(c.valor_final_centavos / 100).toFixed(2).replace('.', ',')} menos a taxa`,
+    c.valor_motorista_centavos, agora());
 }
 
 const saldo = (db, motoristaId) =>
@@ -40,13 +37,12 @@ function ganhos(db, motoristaId, de, ate) {
     bruto_centavos: soma((c) => c.valor_final_centavos),
     taxa_centavos: soma((c) => c.taxa_plataforma_centavos),
     liquido_centavos: soma((c) => c.valor_motorista_centavos),
-    recebido_em_maos_centavos: soma((c) => (c.forma_pagamento !== 'pix' && c.pagamento_status === 'pago' ? c.valor_final_centavos : 0)),
     distancia_m: soma((c) => c.distancia_percorrida_m),
     tempo_s: soma((c) => c.duracao_real_s ?? 0),
   };
 }
 
-/** Motoristas com saldo diferente de zero, do maior para o menor. */
+/** Motoristas com saldo diferente de zero (negativo só por ajuste manual), do maior para o menor. */
 const saldos = (db) => db.prepare(`SELECT m.usuario_id AS motorista_id, u.nome, m.chave_pix, SUM(l.valor_centavos) AS saldo_centavos
   FROM lancamentos_motorista l JOIN motoristas m ON m.usuario_id = l.motorista_id JOIN usuarios u ON u.id = m.usuario_id
   GROUP BY m.usuario_id HAVING SUM(l.valor_centavos) <> 0 ORDER BY saldo_centavos DESC`).all();
@@ -117,8 +113,8 @@ function relatorio(db, de, ate) {
     WHERE (c.finalizada_em >= ? AND c.finalizada_em < ?) OR (c.cancelada_em >= ? AND c.cancelada_em < ?)`).all(ini, fim, ini, fim);
   const dias = new Map();
   const motoristas = new Map();
-  const formas = { pix: 0, cartao: 0, dinheiro: 0 };
-  const tot = { finalizadas: 0, canceladas: 0, bruto_centavos: 0, taxa_centavos: 0, motoristas_centavos: 0, a_receber_centavos: 0 };
+  const formas = { pix: 0, cartao: 0, empresa: 0 };
+  const tot = { finalizadas: 0, canceladas: 0, bruto_centavos: 0, taxa_centavos: 0, motoristas_centavos: 0, complementos_pendentes_centavos: 0, faturado_empresas_centavos: 0 };
   for (const c of corridas) {
     const dia = local(c.finalizada_em ?? c.cancelada_em).data;
     const d = dias.get(dia) ?? { data: dia, finalizadas: 0, canceladas: 0, bruto_centavos: 0, taxa_centavos: 0 };
@@ -133,7 +129,7 @@ function relatorio(db, de, ate) {
       tot.bruto_centavos += c.valor_final_centavos;
       tot.taxa_centavos += c.taxa_plataforma_centavos;
       tot.motoristas_centavos += c.valor_motorista_centavos;
-      if (c.pagamento_status === 'pendente') tot.a_receber_centavos += c.valor_final_centavos;
+      if (c.forma_pagamento === 'empresa') tot.faturado_empresas_centavos += c.valor_final_centavos;
       formas[c.forma_pagamento] += c.valor_final_centavos;
       const m = motoristas.get(c.motorista_id) ?? { motorista_id: c.motorista_id, nome: c.motorista_nome, corridas: 0, bruto_centavos: 0 };
       m.corridas++;
@@ -142,8 +138,14 @@ function relatorio(db, de, ate) {
     }
     dias.set(dia, d);
   }
+  // Cobranças do período: complementos ainda a pagar e estornos devolvidos aos passageiros.
+  const cob = (tipo, status) => db.prepare(`SELECT COALESCE(SUM(valor_centavos), 0) AS s FROM cobrancas WHERE tipo = ? AND status = ? AND criada_em >= ? AND criada_em < ?`)
+    .get(tipo, status, ini, fim).s;
+  tot.complementos_pendentes_centavos = cob('complemento', 'pendente');
   return {
     de, ate, ...tot,
+    estornos_centavos: cob('estorno', 'concluida'),
+    estornos_pendentes_centavos: cob('estorno', 'pendente'),
     ticket_medio_centavos: tot.finalizadas ? Math.round(tot.bruto_centavos / tot.finalizadas) : 0,
     por_forma_centavos: formas,
     por_dia: [...dias.values()].sort((a, b) => a.data.localeCompare(b.data)),
@@ -166,7 +168,7 @@ function exportarBpo(db, de, ate, { categoriaReceita = 'Prestação de serviços
   const linhas = [['tipo', 'descrição', 'valor', 'vencimento', 'competência', 'categoria', 'contato', 'CPF/CNPJ', 'documento']];
   const corridas = db.prepare(`SELECT c.id, c.finalizada_em, c.forma_pagamento, c.taxa_plataforma_centavos, c.valor_final_centavos, u.nome, m.cpf
     FROM corridas c JOIN motoristas m ON m.usuario_id = c.motorista_id JOIN usuarios u ON u.id = c.motorista_id
-    WHERE c.status = 'finalizada' AND c.pagamento_status = 'pago' AND c.finalizada_em >= ? AND c.finalizada_em < ? ORDER BY c.id`).all(ini, fim);
+    WHERE c.status = 'finalizada' AND c.finalizada_em >= ? AND c.finalizada_em < ? ORDER BY c.id`).all(ini, fim);
   for (const c of corridas) {
     if (!c.taxa_plataforma_centavos) continue;
     const d = dataBr(c.finalizada_em);
@@ -182,4 +184,4 @@ function exportarBpo(db, de, ate, { categoriaReceita = 'Prestação de serviços
   return `${linhas.map((l) => l.map(csv).join(';')).join('\r\n')}\r\n`;
 }
 
-module.exports = { lancarCorrida, saldo, extrato, ganhos, saldos, gerarRepasses, repasse, pagarRepasse, cancelarRepasse, ajustar, relatorio, exportarBpo };
+module.exports = { creditarCorrida, saldo, extrato, ganhos, saldos, gerarRepasses, repasse, pagarRepasse, cancelarRepasse, ajustar, relatorio, exportarBpo };

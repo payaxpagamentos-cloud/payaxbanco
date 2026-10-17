@@ -82,9 +82,16 @@ CREATE TABLE IF NOT EXISTS corridas (
   duracao_estimada_s INTEGER NOT NULL,
   bandeira INTEGER NOT NULL CHECK (bandeira IN (1,2)),
   valor_estimado_centavos INTEGER NOT NULL,
-  forma_pagamento TEXT NOT NULL CHECK (forma_pagamento IN ('pix','cartao','dinheiro')),
+  -- Tudo é pago antes da viagem: PIX ou cartão (a chamada só sai depois do pagamento) ou empresa (faturado no mês).
+  forma_pagamento TEXT NOT NULL CHECK (forma_pagamento IN ('pix','cartao','empresa')),
+  empresa_id INTEGER REFERENCES empresas(id),
+  fatura_id INTEGER REFERENCES faturas(id),
+  -- 'estimativa': vale o valor pago antes (preço fechado); 'taximetro': vale o taxímetro e a diferença é devolvida ou cobrada.
+  modelo_cobranca TEXT NOT NULL CHECK (modelo_cobranca IN ('estimativa','taximetro')),
+  valor_pago_centavos INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'solicitada'
-    CHECK (status IN ('solicitada','aceita','chegou','em_andamento','finalizada','cancelada')),
+    CHECK (status IN ('aguardando_pagamento','solicitada','aceita','chegou','em_andamento','finalizada','cancelada')),
+  criada_em TEXT NOT NULL,
   solicitada_em TEXT NOT NULL,
   aceita_em TEXT,
   chegou_em TEXT,
@@ -99,12 +106,12 @@ CREATE TABLE IF NOT EXISTS corridas (
   ultima_lng REAL,
   ultima_posicao_em TEXT,
   duracao_real_s INTEGER,
+  valor_taximetro_centavos INTEGER,
   valor_final_centavos INTEGER,
   taxa_plataforma_centavos INTEGER,
   valor_motorista_centavos INTEGER,
-  pagamento_status TEXT NOT NULL DEFAULT 'pendente' CHECK (pagamento_status IN ('pendente','pago')),
-  pago_em TEXT,
-  pagamento_confirmado_por INTEGER REFERENCES usuarios(id),
+  -- pendente: aguardando o pagamento (ou o complemento do taxímetro); pago; faturado (empresa); estornado (cancelada após o pagamento).
+  pagamento_status TEXT NOT NULL DEFAULT 'pendente' CHECK (pagamento_status IN ('pendente','pago','faturado','estornado')),
   nota_do_passageiro INTEGER CHECK (nota_do_passageiro BETWEEN 1 AND 5),
   comentario_do_passageiro TEXT,
   nota_do_motorista INTEGER CHECK (nota_do_motorista BETWEEN 1 AND 5)
@@ -113,6 +120,64 @@ CREATE INDEX IF NOT EXISTS idx_corridas_status ON corridas(status, solicitada_em
 CREATE INDEX IF NOT EXISTS idx_corridas_passageiro ON corridas(passageiro_id, id);
 CREATE INDEX IF NOT EXISTS idx_corridas_motorista ON corridas(motorista_id, id);
 CREATE INDEX IF NOT EXISTS idx_corridas_finalizada ON corridas(finalizada_em);
+CREATE INDEX IF NOT EXISTS idx_corridas_empresa ON corridas(empresa_id, finalizada_em);
+
+-- Cobranças e estornos ao passageiro. A corrida paga antes gera a cobrança 'corrida'; o taxímetro acima do valor pago,
+-- um 'complemento'; cancelamento ou taxímetro abaixo do pago, um 'estorno'.
+CREATE TABLE IF NOT EXISTS cobrancas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  corrida_id INTEGER NOT NULL REFERENCES corridas(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('corrida','complemento','estorno')),
+  forma TEXT NOT NULL CHECK (forma IN ('pix','cartao')),
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','concluida','cancelada')),
+  motivo TEXT,
+  identificador TEXT,
+  criada_em TEXT NOT NULL,
+  concluida_em TEXT,
+  concluida_por INTEGER REFERENCES usuarios(id)
+);
+CREATE INDEX IF NOT EXISTS idx_cobrancas_corrida ON cobrancas(corrida_id);
+CREATE INDEX IF NOT EXISTS idx_cobrancas_status ON cobrancas(status, tipo);
+
+-- Empresas clientes (corridas faturadas). Só pede pela empresa o passageiro autorizado pela gestão.
+CREATE TABLE IF NOT EXISTS empresas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  razao_social TEXT NOT NULL,
+  cnpj TEXT NOT NULL UNIQUE,
+  email_financeiro TEXT NOT NULL,
+  telefone TEXT,
+  limite_mensal_centavos INTEGER CHECK (limite_mensal_centavos IS NULL OR limite_mensal_centavos > 0),
+  dia_vencimento INTEGER NOT NULL DEFAULT 10 CHECK (dia_vencimento BETWEEN 1 AND 28),
+  ativa INTEGER NOT NULL DEFAULT 1,
+  criada_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS empresa_usuarios (
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+  ativo INTEGER NOT NULL DEFAULT 1,
+  limite_mensal_centavos INTEGER CHECK (limite_mensal_centavos IS NULL OR limite_mensal_centavos > 0),
+  centro_custo TEXT,
+  autorizado_em TEXT NOT NULL,
+  autorizado_por INTEGER REFERENCES usuarios(id),
+  PRIMARY KEY (empresa_id, usuario_id)
+);
+
+CREATE TABLE IF NOT EXISTS faturas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  competencia TEXT NOT NULL,
+  corridas INTEGER NOT NULL,
+  valor_centavos INTEGER NOT NULL,
+  vencimento TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','paga','cancelada')),
+  identificador TEXT,
+  criada_em TEXT NOT NULL,
+  criada_por INTEGER REFERENCES usuarios(id),
+  paga_em TEXT,
+  UNIQUE (empresa_id, competencia)
+);
 
 -- Motoristas que recusaram ou desistiram da corrida: ela não é oferecida de novo a eles.
 CREATE TABLE IF NOT EXISTS recusas (
@@ -127,7 +192,7 @@ CREATE TABLE IF NOT EXISTS lancamentos_motorista (
   motorista_id INTEGER NOT NULL REFERENCES motoristas(usuario_id),
   corrida_id INTEGER REFERENCES corridas(id),
   repasse_id INTEGER REFERENCES repasses(id),
-  tipo TEXT NOT NULL CHECK (tipo IN ('corrida','taxa','repasse','estorno_repasse','ajuste')),
+  tipo TEXT NOT NULL CHECK (tipo IN ('corrida','repasse','estorno_repasse','ajuste')),
   descricao TEXT NOT NULL,
   valor_centavos INTEGER NOT NULL,
   criado_em TEXT NOT NULL,
@@ -170,6 +235,8 @@ const CONFIG_PADRAO = {
   taxa_plataforma_bp: '1500', // 15,00% (em pontos-base)
   raio_busca_km: '5',
   expirar_solicitacao_min: '10',
+  expirar_pagamento_min: '15',
+  modelo_cobranca: 'estimativa',
   repasse_minimo_centavos: '2000',
   fator_rota: '1.3', // distância por ruas ≈ distância em linha reta × fator
   velocidade_media_kmh: '25',
@@ -222,7 +289,7 @@ function transacao(db, fn) {
   }
 }
 
-/** Configurações como números (exceto as de texto do PIX). */
+/** Configurações como números (exceto as de texto: modelo de cobrança e PIX). */
 function lerConfig(db) {
   const c = Object.fromEntries(db.prepare('SELECT chave, valor FROM configuracoes').all().map((r) => [r.chave, r.valor]));
   const num = (k) => Number(c[k]);
@@ -230,6 +297,8 @@ function lerConfig(db) {
     taxa_plataforma_bp: num('taxa_plataforma_bp'),
     raio_busca_km: num('raio_busca_km'),
     expirar_solicitacao_min: num('expirar_solicitacao_min'),
+    expirar_pagamento_min: num('expirar_pagamento_min'),
+    modelo_cobranca: c.modelo_cobranca,
     repasse_minimo_centavos: num('repasse_minimo_centavos'),
     fator_rota: num('fator_rota'),
     velocidade_media_kmh: num('velocidade_media_kmh'),

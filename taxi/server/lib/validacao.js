@@ -15,6 +15,18 @@ function cpfValido(valor) {
   return true;
 }
 
+function cnpjValido(valor) {
+  const cnpj = digitos(valor);
+  if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false;
+  const calc = (base) => {
+    const pesos = base.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const r = pesos.reduce((acc, p, i) => acc + Number(base[i]) * p, 0) % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  const d1 = calc(cnpj.slice(0, 12));
+  return cnpj.endsWith(`${d1}${calc(cnpj.slice(0, 12) + d1)}`);
+}
+
 /** CNH: 11 dígitos com os dois verificadores (cálculo do Denatran). */
 function cnhValida(valor) {
   const cnh = digitos(valor);
@@ -112,4 +124,4 @@ function placa(v) {
   return p;
 }
 
-module.exports = { digitos, cpfValido, cnhValida, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data, ponto, placa };
+module.exports = { digitos, cpfValido, cnpjValido, cnhValida, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data, ponto, placa };

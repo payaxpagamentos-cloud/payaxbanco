@@ -28,6 +28,8 @@ const TELAS = {
   corridas: ['Corridas', telaCorridas],
   motoristas: ['Motoristas', telaMotoristas],
   passageiros: ['Passageiros', telaPassageiros],
+  empresas: ['Empresas', telaEmpresas],
+  pagamentos: ['Pagamentos', telaPagamentos],
   repasses: ['Repasses', telaRepasses],
   relatorios: ['Relatórios', telaRelatorios],
   tarifas: ['Tarifas e regras', telaTarifas],
@@ -62,7 +64,8 @@ const botao = (texto, classe, fn) => {
   b.addEventListener('click', () => acao(b, fn));
   return b;
 };
-const situacaoEtq = (s) => el('span', { class: `etiqueta ${{ aprovado: 'ok', pendente: 'aviso', recusado: 'erro', bloqueado: 'erro', pago: 'ok', cancelado: 'erro' }[s] ?? ''}` }, s);
+const situacaoEtq = (s) => el('span', { class: `etiqueta ${{ aprovado: 'ok', pendente: 'aviso', recusado: 'erro', bloqueado: 'erro', pago: 'ok', paga: 'ok', concluida: 'ok',
+  faturado: 'info', aberta: 'aviso', ativa: 'ok', suspensa: 'erro', liberado: 'ok', estornado: 'erro', cancelado: 'erro', cancelada: 'erro' }[s] ?? ''}` }, s);
 
 function filtroPeriodo(estado, aoMudar) {
   const de = el('input', { type: 'date', value: estado.de });
@@ -79,18 +82,19 @@ async function telaPainel(c) {
   limpar(c, cabeca('Painel', el('span', { class: 'pequeno mudo' }, 'Atualiza sozinho')), corpo);
   pararTela = repetir(async () => {
     const p = await api.get('/central/painel');
-    contadores = { motoristas: p.motoristas_pendentes + p.veiculos_pendentes, corridas: p.pagamentos_pendentes, repasses: p.repasses_pendentes.n };
+    const cob = p.cobrancas_pendentes;
+    contadores = { motoristas: p.motoristas_pendentes + p.veiculos_pendentes, pagamentos: (cob.estorno ?? 0) + (cob.corrida ?? 0), repasses: p.repasses_pendentes.n };
     const a = p.corridas_ativas;
     limpar(corpo,
       el('div', { class: 'grade' },
         indicador('Motoristas online', p.motoristas_online),
-        indicador('Procurando motorista', a.solicitada ?? 0, 'pedidos na fila'),
+        indicador('Procurando motorista', a.solicitada ?? 0, `${a.aguardando_pagamento ?? 0} aguardando pagamento`),
         indicador('Em atendimento', (a.aceita ?? 0) + (a.chegou ?? 0) + (a.em_andamento ?? 0), `${a.em_andamento ?? 0} em viagem`),
         indicador('Corridas hoje', p.hoje.finalizadas, `${p.hoje.canceladas} cancelada(s)`),
         indicador('Faturamento hoje', dinheiro(p.hoje.bruto_centavos), `taxa da plataforma ${dinheiro(p.hoje.taxa_centavos)}`),
         indicador('A repassar', dinheiro(p.a_repassar_centavos), `${p.repasses_pendentes.n} repasse(s) pendente(s)`),
-        indicador('Taxas a cobrar', dinheiro(p.a_cobrar_centavos), 'de corridas em dinheiro/cartão'),
-        indicador('Pagamentos pendentes', p.pagamentos_pendentes, 'corridas finalizadas sem confirmação')),
+        indicador('Estornos a devolver', cob.estorno ?? 0, `${cob.complemento ?? 0} complemento(s) a receber`),
+        indicador('Faturas em aberto', dinheiro(p.faturas_abertas.total), `${p.faturas_abertas.n} fatura(s) de empresas`)),
       (p.motoristas_pendentes || p.veiculos_pendentes) ? el('div', { class: 'aviso' }, `${p.motoristas_pendentes} motorista(s) e ${p.veiculos_pendentes} veículo(s) aguardando aprovação. `,
         el('a', { href: '#', onclick: (e) => { e.preventDefault(); ir('motoristas'); } }, 'Analisar')) : null);
   }, 5000);
@@ -132,28 +136,29 @@ async function detalheCorrida(id) {
   const linha = (r, v) => el('div', { class: 'chave pequeno' }, el('span', { class: 'mudo' }, r), el('strong', { style: 'text-align:right' }, v ?? '—'));
   await modal(`Corrida #${c.id}`, (fechar) => [
     el('div', { class: 'linha' }, etiquetaStatus(c.status), el('span', { class: 'etiqueta' }, CATEGORIAS[c.categoria]), el('span', { class: 'etiqueta' }, FORMAS[c.forma_pagamento]),
-      c.status === 'finalizada' ? situacaoEtq(c.pagamento_status === 'pago' ? 'pago' : 'pendente') : null),
+      situacaoEtq(c.pagamento_status)),
     linha('Passageiro', `${c.passageiro.nome} · ${c.passageiro.telefone ?? ''}`),
     linha('Motorista', c.motorista ? `${c.motorista.nome} · ${c.motorista.placa ?? ''}` : null),
     linha('Origem', c.origem_endereco), linha('Destino', c.destino_endereco),
     linha('Solicitada', dataHora(c.solicitada_em)), linha('Aceita', dataHora(c.aceita_em)), linha('Início', dataHora(c.iniciada_em)), linha('Fim', dataHora(c.finalizada_em)),
     linha('Estimativa', `${dinheiro(c.valor_estimado_centavos)} · ${km(c.distancia_estimada_m)} · ${minutos(c.duracao_estimada_s)} · bandeira ${c.bandeira}`),
+    c.empresa ? linha('Empresa', c.empresa) : null,
+    linha('Cobrança', c.modelo_cobranca === 'taximetro' ? 'pelo taxímetro (diferença devolvida ou cobrada)' : 'preço fechado (vale o valor pago)'),
     c.valor_final_centavos !== null ? linha('Valor final', `${dinheiro(c.valor_final_centavos)} · ${km(c.distancia_percorrida_m)} · ${minutos(c.duracao_real_s)}`) : null,
+    c.valor_taximetro_centavos !== null ? linha('Taxímetro', dinheiro(c.valor_taximetro_centavos)) : null,
+    c.forma_pagamento !== 'empresa' ? linha('Pago pelo passageiro', dinheiro(c.valor_pago_centavos)) : null,
+    c.cobrancas.length ? el('div', { style: 'margin-top:8px' }, el('h3', {}, 'Pagamentos e estornos'), c.cobrancas.map((b) => el('div', { class: 'chave pequeno' },
+      el('span', {}, `${{ corrida: 'Pagamento', complemento: 'Complemento', estorno: 'Estorno' }[b.tipo]} · ${FORMAS[b.forma]} · ${dataHora(b.criada_em)}`),
+      el('span', { class: 'linha' }, el('strong', { class: 'num' }, dinheiro(b.valor_centavos)), situacaoEtq(b.status))))) : null,
     c.valor_final_centavos !== null ? linha('Plataforma / motorista', `${dinheiro(c.taxa_plataforma_centavos)} / ${dinheiro(c.valor_motorista_centavos)}`) : null,
     c.status === 'cancelada' ? linha('Cancelada por', `${c.cancelada_por}${c.motivo_cancelamento ? `: ${c.motivo_cancelamento}` : ''}`) : null,
     c.nota_do_passageiro ? linha('Avaliação do passageiro', `${'★'.repeat(c.nota_do_passageiro)} ${c.comentario_do_passageiro ?? ''}`) : null,
     el('div', { class: 'linha', style: 'margin-top:14px' },
-      ['solicitada', 'aceita', 'chegou', 'em_andamento'].includes(c.status) ? botao('Cancelar corrida', 'perigo', async () => {
+      ['aguardando_pagamento', 'solicitada', 'aceita', 'chegou', 'em_andamento'].includes(c.status) ? botao('Cancelar corrida', 'perigo', async () => {
         const motivo = await perguntar('Cancelar corrida', 'Motivo');
         if (!motivo) return;
         await api.post(`/central/corridas/${c.id}/cancelar`, { motivo });
         toast('Corrida cancelada.');
-        fechar();
-      }) : null,
-      c.status === 'finalizada' && c.pagamento_status === 'pendente' ? botao('Confirmar pagamento', 'primario', async () => {
-        if (!(await confirmar('Confirmar pagamento', `Confirma o recebimento de ${dinheiro(c.valor_final_centavos)} (${FORMAS[c.forma_pagamento]})?`))) return;
-        await api.post(`/central/corridas/${c.id}/pagamento`);
-        toast('Pagamento confirmado.');
         fechar();
       }) : null,
       el('div', { style: 'flex:1' }), el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
@@ -169,13 +174,13 @@ async function telaCorridas(c) {
     limpar(corpo, tabela(['#', 'Status', 'Passageiro', 'Motorista', 'Trajeto', 'Quando', 'Pagamento', '>Valor', ''], lista.map((x) => el('tr', {},
       td(x.id), td(etiquetaStatus(x.status)), td(x.passageiro_nome), td(x.motorista_nome ?? '—'),
       td(el('span', { class: 'pequeno' }, `${x.origem_endereco} → ${x.destino_endereco}`)), td(dataHora(x.solicitada_em)),
-      td(x.status === 'finalizada' ? el('span', {}, `${FORMAS[x.forma_pagamento]} `, situacaoEtq(x.pagamento_status === 'pago' ? 'pago' : 'pendente')) : FORMAS[x.forma_pagamento]),
+      td(el('span', {}, `${FORMAS[x.forma_pagamento]} `, situacaoEtq(x.pagamento_status))),
       td(dinheiro(x.valor_final_centavos ?? x.valor_estimado_centavos), true),
       td(botao('Ver', '', async () => { await detalheCorrida(x.id); await carregar(); })))), 'Nenhuma corrida no período.'));
   };
   const status = el('select', { onchange: (e) => { estado.status = e.target.value; carregar(); } }, el('option', { value: '' }, 'Todos'),
-    ['solicitada', 'aceita', 'chegou', 'em_andamento', 'finalizada', 'cancelada'].map((s) => el('option', { value: s }, s.replace('_', ' '))));
-  const pag = el('select', { onchange: (e) => { estado.pagamento = e.target.value; carregar(); } }, el('option', { value: '' }, 'Todos'), el('option', { value: 'pendente' }, 'Pagamento pendente'));
+    ['aguardando_pagamento', 'solicitada', 'aceita', 'chegou', 'em_andamento', 'finalizada', 'cancelada'].map((s) => el('option', { value: s }, s.replace('_', ' '))));
+  const pag = el('select', { onchange: (e) => { estado.pagamento = e.target.value; carregar(); } }, el('option', { value: '' }, 'Todos'), el('option', { value: 'pendente' }, 'Pagamento ou complemento pendente'));
   limpar(c, cabeca('Corridas'), el('div', { class: 'filtros' }, filtroPeriodo(estado, carregar), el('label', { class: 'campo' }, 'Status', status), el('label', { class: 'campo' }, 'Pagamento', pag)), corpo);
   await carregar();
 }
@@ -264,16 +269,158 @@ async function telaPassageiros(c) {
   await carregar();
 }
 
+// ---------- Pagamentos (cobranças e estornos) ----------
+async function telaPagamentos(c) {
+  let filtro = 'pendente';
+  const corpo = el('div');
+  const carregar = async () => {
+    const lista = await api.get(`/central/cobrancas${filtro ? `?status=${filtro}` : ''}`);
+    const rotulo = { corrida: 'Pagamento da corrida', complemento: 'Complemento (taxímetro)', estorno: 'Estorno ao passageiro' };
+    limpar(corpo, tabela(['#', 'Tipo', 'Corrida', 'Passageiro', 'Forma', 'Criada', 'Situação', '>Valor', ''], lista.map((b) => el('tr', {},
+      td(b.id), td(rotulo[b.tipo]), td(botao(`#${b.corrida_id}`, '', () => detalheCorrida(b.corrida_id))), td(el('span', {}, b.passageiro_nome, el('br'), el('span', { class: 'pequeno mudo' }, b.passageiro_email))),
+      td(FORMAS[b.forma]), td(dataHora(b.criada_em)), td(el('span', {}, situacaoEtq(b.status), b.identificador ? el('div', { class: 'pequeno mudo' }, b.identificador) : null)),
+      td(dinheiro(b.valor_centavos), true),
+      td(b.status === 'pendente' ? botao(b.tipo === 'estorno' ? 'Marcar devolvido' : 'Confirmar recebido', 'primario', async () => {
+        const id = await perguntar(b.tipo === 'estorno' ? `Devolver ${dinheiro(b.valor_centavos)}` : `Confirmar ${dinheiro(b.valor_centavos)}`,
+          b.tipo === 'estorno' ? 'Faça a devolução pelo banco e informe o identificador (E2E do PIX ou nº do estorno)' : 'Confira o PIX no extrato da conta e informe o identificador (E2E)');
+        if (!id) return;
+        await api.post(`/central/cobrancas/${b.id}/concluir`, { identificador: id });
+        toast('Registrado.');
+        await carregar();
+      }) : null))), 'Nenhuma cobrança nesta situação.'));
+  };
+  const pilulas = el('div', { class: 'pilulas' });
+  const desenhar = () => limpar(pilulas, [['pendente', 'Pendentes'], ['concluida', 'Concluídas'], ['cancelada', 'Canceladas'], ['', 'Todas']]
+    .map(([k, r]) => el('button', { class: filtro === k ? 'on' : '', onclick: () => { filtro = k; desenhar(); carregar(); } }, r)));
+  desenhar();
+  limpar(c, cabeca('Pagamentos e estornos'), el('p', { class: 'pequeno mudo' },
+    'Tudo é pago antes da viagem. Com o intermediador de pagamentos ligado, PIX, cartão e estornos são confirmados sozinhos; até lá, a central confirma os PIX recebidos na chave da plataforma e registra as devoluções aqui.'),
+  el('div', { class: 'filtros' }, pilulas), corpo);
+  await carregar();
+}
+
+// ---------- Empresas (faturado) ----------
+const reaisParaCentavos = (txt) => (String(txt ?? '').trim() ? Math.round(Number(String(txt).replace(/\./g, '').replace(',', '.')) * 100) : null);
+
+async function telaEmpresas(c) {
+  const corpo = el('div', { class: 'coluna' });
+  const carregar = async () => {
+    const lista = await api.get('/central/empresas');
+    limpar(corpo, tabela(['Empresa', 'CNPJ', 'Autorizados', '>Gasto no mês', '>Limite mensal', 'Situação', ''], lista.map((e) => el('tr', {},
+      td(el('strong', {}, e.razao_social)), td(e.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')), td(e.usuarios_autorizados),
+      td(dinheiro(e.gasto_mes_centavos), true), td(e.limite_mensal_centavos ? dinheiro(e.limite_mensal_centavos) : 'sem limite', true),
+      td(situacaoEtq(e.ativa ? 'ativa' : 'suspensa')), td(botao('Abrir', 'primario', () => detalheEmpresa(e, carregar))))), 'Nenhuma empresa cadastrada.'));
+  };
+  const nova = el('button', { class: 'btn primario' }, 'Nova empresa');
+  nova.addEventListener('click', () => modal('Nova empresa', (fechar) => {
+    const f = el('form', { class: 'form' },
+      el('label', { class: 'campo' }, 'Razão social', el('input', { name: 'razao_social', required: true })),
+      el('div', { class: 'duas' }, el('label', { class: 'campo' }, 'CNPJ', el('input', { name: 'cnpj', required: true })), el('label', { class: 'campo' }, 'Telefone', el('input', { name: 'telefone' }))),
+      el('label', { class: 'campo' }, 'E-mail do financeiro (recebe a fatura)', el('input', { name: 'email_financeiro', type: 'email', required: true })),
+      el('div', { class: 'duas' }, el('label', { class: 'campo' }, 'Limite mensal da empresa (R$, opcional)', el('input', { name: 'limite' })),
+        el('label', { class: 'campo' }, 'Dia de vencimento da fatura', el('input', { name: 'dia_vencimento', type: 'number', min: 1, max: 28, value: 10 }))),
+      el('div', { class: 'linha entre' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Cancelar'), el('button', { class: 'btn primario' }, 'Cadastrar')));
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const d = lerForm(f);
+      acao(f.querySelector('.primario'), async () => {
+        await api.post('/central/empresas', { razao_social: d.razao_social, cnpj: d.cnpj, telefone: d.telefone || undefined, email_financeiro: d.email_financeiro,
+          limite_mensal_centavos: reaisParaCentavos(d.limite), dia_vencimento: Number(d.dia_vencimento) });
+        toast('Empresa cadastrada.');
+        fechar();
+        await carregar();
+      });
+    });
+    return f;
+  }));
+  limpar(c, cabeca('Empresas (corridas faturadas)', nova),
+    el('p', { class: 'pequeno mudo' }, 'Só pede corrida pela empresa o passageiro que você autorizar aqui (pelo e-mail da conta dele no app). As corridas entram na fatura do mês.'), corpo);
+  await carregar();
+}
+
+async function detalheEmpresa(e, aoFechar) {
+  const usuarios = el('div');
+  const faturas = el('div');
+  const competencia = el('input', { type: 'month', value: hojeLocal().slice(0, 7) });
+  const carregar = async () => {
+    const [us, fs] = await Promise.all([api.get(`/central/empresas/${e.id}/usuarios`), api.get(`/central/empresas/${e.id}/faturas`)]);
+    limpar(usuarios, us.length ? us.map((u) => el('div', { class: 'chave pequeno' },
+      el('span', {}, el('strong', {}, u.nome), ` · ${u.email}`, el('br'), el('span', { class: 'mudo' },
+        `${u.centro_custo ? `${u.centro_custo} · ` : ''}gasto no mês ${dinheiro(u.gasto_mes_centavos)} · ${u.limite_mensal_centavos ? `limite ${dinheiro(u.limite_mensal_centavos)}` : 'sem limite'}`)),
+      el('span', { class: 'linha' }, situacaoEtq(u.ativo ? 'liberado' : 'bloqueado'),
+        botao('Limite', '', async () => {
+          const v = await perguntar('Limite mensal do usuário', 'Valor em reais (vazio = sem limite)', { obrigatorio: false, valor: u.limite_mensal_centavos ? (u.limite_mensal_centavos / 100).toFixed(2).replace('.', ',') : '' });
+          if (v === null) return;
+          await api.patch(`/central/empresas/${e.id}/usuarios/${u.usuario_id}`, { limite_mensal_centavos: reaisParaCentavos(v) });
+          await carregar();
+        }),
+        botao(u.ativo ? 'Bloquear' : 'Liberar', u.ativo ? 'perigo' : '', async () => {
+          await api.patch(`/central/empresas/${e.id}/usuarios/${u.usuario_id}`, { ativo: !u.ativo });
+          await carregar();
+        })))) : el('p', { class: 'mudo pequeno' }, 'Ninguém autorizado ainda.'));
+    limpar(faturas, fs.length ? fs.map((f) => el('div', { class: 'chave pequeno' },
+      el('span', {}, el('strong', {}, f.competencia.split('-').reverse().join('/')), ` · ${f.corridas} corrida(s) · vence ${f.vencimento.split('-').reverse().join('/')}`,
+        f.identificador ? el('div', { class: 'mudo' }, f.identificador) : null),
+      el('span', { class: 'linha' }, el('strong', { class: 'num' }, dinheiro(f.valor_centavos)), situacaoEtq(f.status),
+        botao('CSV', '', async () => {
+          const resp = await api.get(`/central/faturas/${f.id}/csv`, { bruto: true });
+          const url = URL.createObjectURL(await resp.blob());
+          el('a', { href: url, download: `fatura-${e.cnpj}-${f.competencia}.csv` }).click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }),
+        f.status === 'aberta' ? botao('Marcar paga', 'primario', async () => {
+          const id = await perguntar('Fatura paga', 'Identificador do pagamento (PIX, TED ou boleto)');
+          if (!id) return;
+          await api.post(`/central/faturas/${f.id}/pagar`, { identificador: id });
+          await carregar();
+        }) : null,
+        f.status === 'aberta' ? botao('Cancelar', 'perigo', async () => {
+          const motivo = await perguntar('Cancelar fatura', 'Motivo (as corridas voltam para uma nova fatura)');
+          if (!motivo) return;
+          await api.post(`/central/faturas/${f.id}/cancelar`, { motivo });
+          await carregar();
+        }) : null))) : el('p', { class: 'mudo pequeno' }, 'Nenhuma fatura gerada.'));
+  };
+  const autorizar = el('form', { class: 'form' },
+    el('div', { class: 'duas' }, el('label', { class: 'campo' }, 'E-mail do passageiro', el('input', { name: 'email', type: 'email', required: true })),
+      el('label', { class: 'campo' }, 'Centro de custo (opcional)', el('input', { name: 'centro_custo' }))),
+    el('div', { class: 'duas' }, el('label', { class: 'campo' }, 'Limite mensal (R$, opcional)', el('input', { name: 'limite' })), el('div', { style: 'align-self:end' }, el('button', { class: 'btn primario' }, 'Autorizar'))));
+  autorizar.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const d = lerForm(autorizar);
+    acao(autorizar.querySelector('button'), async () => {
+      await api.post(`/central/empresas/${e.id}/usuarios`, { email: d.email, centro_custo: d.centro_custo, limite_mensal_centavos: reaisParaCentavos(d.limite) });
+      toast('Passageiro autorizado.');
+      autorizar.reset();
+      await carregar();
+    });
+  });
+  const gerar = el('button', { class: 'btn' }, 'Gerar fatura');
+  gerar.addEventListener('click', () => acao(gerar, async () => {
+    const f = await api.post(`/central/empresas/${e.id}/faturas`, { competencia: competencia.value });
+    toast(`Fatura gerada: ${f.corridas} corrida(s), ${dinheiro(f.valor_centavos)}.`);
+    await carregar();
+  }));
+  await carregar();
+  await modal(e.razao_social, (fechar) => [
+    el('p', { class: 'pequeno mudo' }, `Financeiro: ${e.email_financeiro} · vencimento dia ${e.dia_vencimento} · ${e.limite_mensal_centavos ? `limite da empresa ${dinheiro(e.limite_mensal_centavos)}` : 'sem limite mensal'}`),
+    el('h3', {}, 'Quem pode pedir pela empresa'), autorizar, usuarios,
+    el('h3', { style: 'margin-top:14px' }, 'Faturas'), el('div', { class: 'linha' }, competencia, gerar), faturas,
+    el('div', { class: 'linha entre', style: 'margin-top:14px' },
+      botao(e.ativa ? 'Suspender empresa' : 'Reativar empresa', e.ativa ? 'perigo' : '', async () => { await api.patch(`/central/empresas/${e.id}`, { ativa: !e.ativa }); fechar(); }),
+      el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
+  ]);
+  await aoFechar();
+}
+
 // ---------- Repasses ----------
 async function telaRepasses(c) {
   const corpo = el('div', { class: 'coluna' });
   const carregar = async () => {
     const [saldos, repasses] = await Promise.all([api.get('/central/saldos'), api.get('/central/repasses')]);
     const aReceber = saldos.filter((s) => s.saldo_centavos > 0);
-    const devendo = saldos.filter((s) => s.saldo_centavos < 0);
     limpar(corpo,
       el('div', { class: 'grade' }, indicador('A repassar', dinheiro(aReceber.reduce((a, s) => a + s.saldo_centavos, 0)), `${aReceber.length} motorista(s)`),
-        indicador('Taxas a cobrar', dinheiro(-devendo.reduce((a, s) => a + s.saldo_centavos, 0)), `${devendo.length} motorista(s); descontadas das próximas corridas por PIX`),
         indicador('Repasses pendentes', dinheiro(repasses.filter((r) => r.status === 'pendente').reduce((a, r) => a + r.valor_centavos, 0)), 'gerados e ainda não transferidos')),
       el('h2', { style: 'margin-top:8px' }, 'Saldos dos motoristas'),
       tabela(['Motorista', 'Chave PIX', '>Saldo'], saldos.map((s) => el('tr', {}, td(s.nome), td(s.chave_pix ?? el('span', { class: 'etiqueta erro' }, 'sem chave')), td(dinheiro(s.saldo_centavos), true))), 'Nenhum saldo em aberto.'),
@@ -316,7 +463,9 @@ async function telaRelatorios(c) {
     limpar(corpo,
       el('div', { class: 'grade' }, indicador('Corridas finalizadas', r.finalizadas, `${r.canceladas} cancelada(s)`), indicador('Faturamento bruto', dinheiro(r.bruto_centavos), `ticket médio ${dinheiro(r.ticket_medio_centavos)}`),
         indicador('Receita da plataforma', dinheiro(r.taxa_centavos)), indicador('Parte dos motoristas', dinheiro(r.motoristas_centavos)),
-        indicador('A receber', dinheiro(r.a_receber_centavos), 'corridas sem pagamento confirmado')),
+        indicador('Faturado a empresas', dinheiro(r.faturado_empresas_centavos)),
+        indicador('Estornos devolvidos', dinheiro(r.estornos_centavos), r.estornos_pendentes_centavos ? `${dinheiro(r.estornos_pendentes_centavos)} a devolver` : null),
+        indicador('Complementos a receber', dinheiro(r.complementos_pendentes_centavos), 'taxímetro acima do valor pago')),
       el('div', { class: 'cartao' }, el('h2', {}, 'Faturamento por dia'), r.por_dia.length
         ? el('div', { class: 'barras', role: 'img', 'aria-label': 'Faturamento por dia' }, r.por_dia.map((d) => el('div', { class: 'barra', style: `height:${Math.max(2, (d.bruto_centavos / maior) * 100)}%`,
           title: `${d.data.split('-').reverse().join('/')}: ${dinheiro(d.bruto_centavos)} · ${d.finalizadas} corrida(s)` })))
@@ -370,12 +519,16 @@ async function telaTarifas(c) {
 
   const regras = el('form', { class: 'form' },
     el('div', { class: 'duas' }, campo('Taxa da plataforma (%)', 'taxa', (cfg.taxa_plataforma_bp / 100).toString().replace('.', ',')), campo('Raio de busca de motoristas (km)', 'raio', cfg.raio_busca_km)),
-    el('div', { class: 'duas' }, campo('Espera máxima por motorista (min)', 'expirar', cfg.expirar_solicitacao_min), campo('Repasse mínimo (R$)', 'minimo', reais(cfg.repasse_minimo_centavos))),
+    el('div', { class: 'duas' }, campo('Espera máxima por motorista (min)', 'expirar', cfg.expirar_solicitacao_min), campo('Prazo para pagar o pedido (min)', 'expirarPag', cfg.expirar_pagamento_min)),
+    campo('Repasse mínimo (R$)', 'minimo', reais(cfg.repasse_minimo_centavos)),
+    el('label', { class: 'campo' }, 'Valor cobrado do passageiro', el('select', { name: 'modelo', disabled: !admin },
+      el('option', { value: 'estimativa', selected: cfg.modelo_cobranca === 'estimativa' }, 'Preço fechado: vale o valor pago antes'),
+      el('option', { value: 'taximetro', selected: cfg.modelo_cobranca === 'taximetro' }, 'Taxímetro: devolve ou cobra a diferença no fim'))),
     el('div', { class: 'duas' }, campo('Bandeira 2: início (hora)', 'b2ini', cfg.bandeira2_inicio_hora, { type: 'number', min: 0, max: 23 }), campo('Bandeira 2: fim (hora)', 'b2fim', cfg.bandeira2_fim_hora, { type: 'number', min: 0, max: 23 })),
     el('label', { class: 'linha pequeno' }, el('input', { type: 'checkbox', name: 'b2dom', checked: cfg.bandeira2_domingo, disabled: !admin, style: 'width:auto;min-height:0' }), 'Bandeira 2 o dia todo aos domingos'),
     el('label', { class: 'linha pequeno' }, el('input', { type: 'checkbox', name: 'b2fer', checked: cfg.bandeira2_feriados, disabled: !admin, style: 'width:auto;min-height:0' }), 'Bandeira 2 nos feriados nacionais'),
     el('div', { class: 'duas' }, campo('Fator de rota (ruas ÷ linha reta)', 'fator', cfg.fator_rota), campo('Velocidade média urbana (km/h)', 'vel', cfg.velocidade_media_kmh)),
-    el('h3', { style: 'margin-top:8px' }, 'PIX da plataforma (recebe as corridas pagas por PIX)'),
+    el('h3', { style: 'margin-top:8px' }, 'PIX da plataforma (recebe os pagamentos por PIX)'),
     campo('Chave PIX', 'pix', cfg.pix_chave, { placeholder: 'CNPJ, e-mail, telefone ou chave aleatória' }),
     el('div', { class: 'duas' }, campo('Nome do recebedor', 'recebedor', cfg.pix_recebedor, { maxlength: 25 }), campo('Cidade', 'cidade', cfg.pix_cidade, { maxlength: 15 })),
     admin ? el('button', { class: 'btn primario' }, 'Salvar regras') : el('p', { class: 'pequeno mudo' }, 'Só o administrador altera tarifas e regras.'));
@@ -384,7 +537,7 @@ async function telaTarifas(c) {
     const d = lerForm(regras);
     acao(regras.querySelector('button'), async () => {
       await api.patch('/central/config', {
-        taxa_plataforma_bp: Math.round(Number(d.taxa.replace(',', '.')) * 100), raio_busca_km: d.raio, expirar_solicitacao_min: Number(d.expirar), repasse_minimo_centavos: centavos(d.minimo),
+        taxa_plataforma_bp: Math.round(Number(d.taxa.replace(',', '.')) * 100), raio_busca_km: d.raio, expirar_solicitacao_min: Number(d.expirar), expirar_pagamento_min: Number(d.expirarPag), modelo_cobranca: d.modelo, repasse_minimo_centavos: centavos(d.minimo),
         bandeira2_inicio_hora: Number(d.b2ini), bandeira2_fim_hora: Number(d.b2fim), bandeira2_domingo: d.b2dom === 'on', bandeira2_feriados: d.b2fer === 'on',
         fator_rota: d.fator, velocidade_media_kmh: d.vel, pix_chave: d.pix, pix_recebedor: d.recebedor, pix_cidade: d.cidade,
       });
@@ -393,7 +546,7 @@ async function telaTarifas(c) {
   });
   limpar(c, cabeca('Tarifas e regras'),
     el('div', { style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px' }, tarifas.map(formTarifa), el('div', { class: 'cartao', style: 'grid-row:span 2' }, el('h2', {}, 'Regras'), regras)),
-    el('p', { class: 'pequeno mudo' }, 'Valor da corrida = bandeirada + km × distância percorrida + minuto × tempo de viagem, nunca abaixo da mínima. A estimativa usa a distância em linha reta × fator de rota.'));
+    el('p', { class: 'pequeno mudo' }, 'Taxímetro = bandeirada + km × distância percorrida + minuto × tempo de viagem, nunca abaixo da mínima. A estimativa (paga antes da viagem) usa a distância em linha reta × fator de rota. Confira a regra da prefeitura antes de usar o preço fechado.'));
 }
 
 // ---------- Equipe ----------

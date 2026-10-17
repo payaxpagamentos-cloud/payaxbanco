@@ -1,7 +1,8 @@
 'use strict';
 
 const { Router } = require('express');
-const { transacao, agora } = require('../db');
+const { transacao, agora, lerConfig } = require('../db');
+const { dividir } = require('../lib/tarifa');
 const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { hoje, somarDias } = require('../lib/datas');
@@ -49,7 +50,7 @@ module.exports = (db) => {
     transacao(db, () => {
       if (!online) {
         const ativa = cor.corridaAtivaMotorista(db, id(req));
-        if (ativa && ativa.status !== 'finalizada') throw new ErroNegocio('Finalize a corrida antes de ficar offline.', 409);
+        if (ativa) throw new ErroNegocio('Finalize a corrida antes de ficar offline.', 409);
         db.prepare('UPDATE motoristas SET online = 0 WHERE usuario_id = ?').run(id(req));
         return;
       }
@@ -76,15 +77,21 @@ module.exports = (db) => {
   r.post('/ofertas/:id/aceitar', (req, res) => { cor.aceitar(db, id(req), cid(req)); res.status(204).end(); });
   r.post('/ofertas/:id/recusar', (req, res) => { cor.recusar(db, id(req), cid(req)); res.status(204).end(); });
 
-  /** Corrida em curso; sem ela, a última paga nos 15 minutos anteriores que o motorista ainda não avaliou. */
-  r.get('/corrida-atual', (req, res) => res.json(cor.detalhar(db, cor.corridaAtivaMotorista(db, id(req))
-    ?? db.prepare(`SELECT * FROM corridas WHERE motorista_id = ? AND status = 'finalizada' AND pagamento_status = 'pago' AND nota_do_motorista IS NULL
-      AND finalizada_em > ? ORDER BY id DESC LIMIT 1`).get(id(req), new Date(Date.now() - 15 * 60_000).toISOString()))));
+  /** Corrida em curso; sem ela, a última finalizada nos 15 minutos anteriores que o motorista ainda não avaliou. */
+  r.get('/corrida-atual', (req, res) => {
+    const c = cor.detalhar(db, cor.corridaAtivaMotorista(db, id(req))
+      ?? db.prepare(`SELECT * FROM corridas WHERE motorista_id = ? AND status = 'finalizada' AND nota_do_motorista IS NULL
+        AND finalizada_em > ? ORDER BY id DESC LIMIT 1`).get(id(req), new Date(Date.now() - 15 * 60_000).toISOString()));
+    if (!c) return res.json(null);
+    // O motorista vê o que recebe (sem a taxa) e não os pagamentos do passageiro.
+    delete c.cobrancas;
+    delete c.valor_pago_centavos;
+    res.json({ ...c, ganho_estimado_centavos: dividir(c.valor_estimado_centavos, lerConfig(db).taxa_plataforma_bp).valor_motorista_centavos });
+  });
   r.post('/corridas/:id/chegou', (req, res) => { cor.chegou(db, id(req), cid(req)); res.status(204).end(); });
   r.post('/corridas/:id/iniciar', (req, res) => { cor.iniciar(db, id(req), cid(req)); res.status(204).end(); });
   r.post('/corridas/:id/finalizar', (req, res) => res.json(cor.finalizar(db, id(req), cid(req))));
   r.post('/corridas/:id/cancelar', (req, res) => { cor.cancelar(db, 'motorista', cid(req), req.body.motivo, req.usuario); res.status(204).end(); });
-  r.post('/corridas/:id/pagamento', (req, res) => { cor.confirmarPagamento(db, cid(req), req.usuario); res.status(204).end(); });
   r.post('/corridas/:id/avaliar', (req, res) => { cor.avaliar(db, 'motorista', cid(req), req.usuario, req.body); res.status(204).end(); });
 
   r.get('/corridas', (req, res) => res.json(db.prepare(`SELECT id, status, categoria, origem_endereco, destino_endereco, aceita_em, finalizada_em, forma_pagamento,

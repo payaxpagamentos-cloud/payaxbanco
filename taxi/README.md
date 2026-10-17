@@ -1,7 +1,7 @@
 # APP Táxi
 
 Aplicativo de táxi com três partes num só servidor: **app do passageiro**, **app do motorista** e **painel da central**,
-com tarifa por taxímetro, pagamento por PIX, cartão ou dinheiro e **repasses** aos motoristas. Funciona no navegador do
+com **pagamento sempre antes da viagem** (PIX, cartão ou empresa faturada), tarifa por taxímetro e **repasses** aos motoristas. Funciona no navegador do
 celular (não precisa instalar nada da loja) e não depende do Ativa BPO: tem banco, usuários e login próprios.
 
 | Endereço | Para quem |
@@ -16,66 +16,89 @@ celular (não precisa instalar nada da loja) e não depende do Ativa BPO: tem ba
 - Cadastro com nome, celular, e-mail e senha.
 - Origem pela localização do aparelho; destino pela **busca de endereço** ou tocando no mapa.
 - **Estimativa de preço** para Táxi comum e Executivo, com distância, tempo e aviso de bandeira 2.
-- Forma de pagamento: **PIX**, **cartão** ou **dinheiro**. Vê os táxis livres por perto (posição aproximada).
+- Forma de pagamento, escolhida **antes** e paga **antes**: **PIX** ou **cartão** (a chamada só vai para os taxistas depois que o
+  pagamento é confirmado) ou **Empresa** (faturado), que só aparece para quem a gestão autorizou naquela empresa, com o saldo disponível do mês.
+  Nada é pago ao taxista na hora. Vê os táxis livres por perto (posição aproximada).
 - Acompanha a corrida: procurando motorista → a caminho (com tempo de chegada) → chegou → em viagem → finalizada.
   Vê nome, nota, carro, cor e **placa** do motorista, com botão para ligar.
-- No fim, o valor pelo taxímetro; se for PIX, o **QR Code e o "copia e cola"** já com o valor. Avalia o motorista (1 a 5 estrelas e comentário).
-- Pode cancelar antes de a viagem começar. Histórico de corridas.
+- No PIX, o **QR Code e o "copia e cola"** já com o valor. No fim, o valor da corrida, as devoluções (se houver) e a avaliação do motorista
+  (1 a 5 estrelas e comentário).
+- Pode cancelar antes de a viagem começar: **o que já pagou é estornado**. Histórico de corridas.
 
 ### App do motorista
 - Cadastro com **CPF e CNH validados** (dígitos verificadores), validade da CNH, chave PIX e o veículo (placa antiga ou Mercosul,
   modelo, cor, ano, categoria). Fica **em análise** até a central aprovar.
 - Fica online escolhendo um veículo aprovado. A posição vem do GPS; sem GPS (ou no computador), toca no mapa para marcar.
-- **Ofertas de corrida** dentro do raio configurado, da mais próxima para a mais distante, com quanto ele ganha, distância até o passageiro,
-  destino e forma de pagamento. Aceita ou recusa; o primeiro que aceita leva (dois motoristas não pegam a mesma corrida).
+- **Ofertas de corrida** dentro do raio configurado, da mais próxima para a mais distante, mostrando em destaque **quanto ele recebe, já sem a
+  taxa da plataforma**, a distância até o passageiro e o destino. Só chegam corridas já pagas (ou de empresa). Aceita ou recusa; o primeiro que aceita leva (dois motoristas não pegam a mesma corrida).
   Veículo executivo atende as duas categorias; o comum, só a comum.
 - Botões **Navegar** (Google Maps), **Cheguei**, **Iniciar** e **Finalizar**. Pode desistir antes de iniciar: a corrida volta para os outros.
-- Confirma o pagamento recebido e avalia o passageiro.
-- **Ganhos** de hoje, 7 ou 30 dias (bruto, taxa, líquido, recebido em mãos, km rodados), **saldo**, extrato e repasses.
+- Não recebe nem confirma pagamento: no fim aparece **"Você recebe R$ …"**, que já entra no saldo. Avalia o passageiro.
+- **Ganhos** de hoje, 7 ou 30 dias (valor recebido já sem a taxa, valor das corridas, taxa, km rodados), **saldo**, extrato e repasses.
 - Cadastra outros veículos (passam pela aprovação) e atualiza a chave PIX.
 
 ### Painel da central
 - **Painel**: motoristas online, pedidos na fila, corridas em atendimento, faturamento e taxa do dia, valores a repassar e a cobrar, pendências.
 - **Mapa ao vivo**: táxis livres e ocupados, pedidos aguardando motorista e a lista de corridas em curso.
-- **Corridas**: filtro por período, status e pagamento pendente; detalhe completo (horários, estimativa × valor final, divisão, avaliação);
-  cancelar corrida e confirmar pagamento.
+- **Corridas**: filtro por período, status e pagamento pendente; detalhe completo (horários, estimativa, taxímetro, valor final, valor pago,
+  pagamentos e estornos, divisão, avaliação); cancelar corrida (com estorno).
+- **Empresas**: cadastro (CNPJ, e-mail do financeiro, limite mensal, vencimento), **autorização de passageiros** pelo e-mail da conta no app
+  (com centro de custo e limite mensal por pessoa, bloquear e liberar), **faturas** do mês (gerar, CSV com as corridas, marcar paga, cancelar).
+- **Pagamentos**: PIX a confirmar, complementos e **estornos a devolver**, com o identificador de cada operação.
 - **Motoristas**: análise do cadastro (aprovar, recusar com motivo, bloquear, liberar), aprovação de novos veículos, extrato e ajuste na conta.
 - **Passageiros**: busca, número de corridas, nota dada pelos motoristas, desativar e reativar conta.
 - **Repasses**: saldos de todos os motoristas, gerar repasses, marcar como pago (com o identificador do PIX) ou cancelar.
 - **Relatórios**: corridas, faturamento, receita da plataforma, ticket médio, gráfico por dia, por forma de pagamento,
   ranking de motoristas, impressão/PDF e **exportação para o Ativa BPO Financeiro**.
 - **Tarifas e regras** (só administrador): bandeirada, km nas bandeiras 1 e 2, minuto, tarifa mínima; taxa da plataforma, raio de busca,
-  espera máxima, repasse mínimo, horário da bandeira 2, domingos e feriados, chave PIX da plataforma.
+  espera máxima, prazo para pagar, repasse mínimo, **valor cobrado (preço fechado ou taxímetro)**, horário da bandeira 2, domingos e feriados,
+  chave PIX da plataforma.
 - **Equipe** (só administrador): usuários **administrador** e **operador** e o registro de auditoria.
 
 ## Como o dinheiro funciona
 
-**Valor da corrida** = bandeirada + km × distância percorrida + minuto × tempo de viagem, nunca abaixo da tarifa mínima.
-A distância percorrida é a soma das posições de GPS enviadas pelo motorista durante a viagem (saltos de sinal acima de 150 km/h
-são descartados); sem GPS, vale a distância estimada. A bandeira 2 vale à noite (padrão 20h às 6h), aos domingos e nos feriados nacionais,
-e é definida no momento do pedido.
+**Tudo é pago antes, nunca na hora.**
 
-A **taxa da plataforma** (padrão 15%) é calculada sobre o valor final. Cada motorista tem uma **conta corrente** com a plataforma:
-
-| Pagamento | Quem recebe o dinheiro | Lançamento na conta do motorista |
+| Forma | Quando paga | O que acontece |
 |---|---|---|
-| **PIX** (chave da plataforma) | a plataforma | **crédito** da parte do motorista |
-| **Cartão** (maquininha do motorista) | o motorista | **débito** da taxa da plataforma |
-| **Dinheiro** | o motorista | **débito** da taxa da plataforma |
+| **PIX** | antes de chamar o táxi | A corrida fica "aguardando pagamento"; com o PIX confirmado, a chamada vai para os taxistas. Sem pagamento no prazo (padrão 15 min), é cancelada. |
+| **Cartão** | antes de chamar o táxi | Igual ao PIX (exige o intermediador de pagamentos; veja abaixo). |
+| **Empresa** | na fatura do mês | Só para passageiros autorizados pela gestão, dentro dos limites mensais da empresa e da pessoa. A chamada sai na hora. |
 
-Saldo positivo é o que a plataforma deve repassar; negativo é taxa que o motorista deve e é descontada das próximas corridas por PIX.
-**Gerar repasses** cria um repasse para cada motorista com saldo acima do mínimo e chave PIX cadastrada; o valor sai do saldo na hora
-e volta se o repasse for cancelado. A central faz o PIX pelo banco e registra o identificador da transferência.
+**Valor cobrado do passageiro** (regra em *Tarifas e regras*):
+- **Preço fechado** (padrão): vale a estimativa paga antes. O taxímetro fica registrado na corrida para conferência.
+- **Taxímetro**: vale o taxímetro (bandeirada + km × distância percorrida + minuto × tempo de viagem, nunca abaixo da mínima). Se der
+  menos que o pago, a diferença é **estornada**; se der mais, o passageiro paga um **complemento** no app. Na empresa, entra na fatura o valor do taxímetro.
+
+Confira a regra da prefeitura da cidade antes de escolher: em alguns lugares a cobrança de táxi precisa seguir o taxímetro.
+
+A distância percorrida soma as posições de GPS do motorista durante a viagem (saltos de sinal acima de 150 km/h são descartados);
+sem GPS, vale a distância estimada. A bandeira 2 vale à noite (padrão 20h às 6h), aos domingos e nos feriados nacionais, e é definida no pedido.
+
+**Cancelamento**: o que o passageiro pagou é **estornado** (pelo passageiro antes do início, pela central, ou pelo sistema quando nenhum
+taxista aceita a tempo). Se o motorista desiste, a corrida volta para os outros, sem estorno.
+
+**Motorista**: a **taxa da plataforma** (padrão 15%) sai do valor final; o restante entra no saldo do motorista ao finalizar a corrida.
+Como o dinheiro passa sempre pela plataforma, o motorista só tem valores a receber. **Gerar repasses** cria um repasse para cada motorista
+com saldo acima do mínimo e chave PIX cadastrada; o valor sai do saldo na hora e volta se o repasse for cancelado. A central faz o PIX pelo banco
+e registra o identificador da transferência.
+
+### Modo de pagamento (`TAXI_PAGAMENTOS`)
+- `simulado` (padrão fora de produção): para testes; o passageiro aprova o PIX ou o cartão por um botão na tela e os estornos saem na hora.
+- `manual` (padrão em produção): o PIX vai para a chave da plataforma e a central confirma o recebimento em *Pagamentos*; os estornos
+  ficam lá para a central devolver. Cartão fica indisponível.
+- Para confirmar PIX e cobrar cartão **automaticamente**, é preciso contratar um intermediador de pagamentos e ligá-lo em
+  `server/lib/pagamentos.js` (criar a cobrança nele e receber a confirmação por webhook).
 
 ### Integração com o Ativa BPO Financeiro
 Em **Relatórios → Exportar para o BPO**, sai o CSV no formato do importador do BPO (*Integrações → Importar lançamentos por CSV*):
-as taxas da plataforma das corridas pagas entram como **contas a receber** e os repasses pagos como **contas a pagar**, com o motorista
+as taxas da plataforma das corridas finalizadas entram como **contas a receber** e os repasses pagos como **contas a pagar**, com o motorista
 como contato (pelo CPF). As categorias padrão são as do plano de contas inicial do BPO (*Prestação de serviços* e *Serviços terceirizados*);
 outras podem ser escolhidas com `?categoria_receita=` e `?categoria_despesa=`.
 
 ### O que depende de terceiros (não incluído)
-- **Confirmação automática do PIX** e **cartão de crédito no app**: exigem contrato com um banco ou intermediador de pagamentos (PSP),
-  que avisa o pagamento por webhook. Hoje o QR Code PIX é gerado pelo sistema e a confirmação é feita pelo motorista ou pela central.
+- **Confirmação automática do PIX**, **cartão de crédito** e **estorno automático**: exigem contrato com um banco ou intermediador de pagamentos
+  (PSP), que avisa o pagamento por webhook. Sem ele, o sistema gera o QR Code PIX e a central confirma e devolve pela tela *Pagamentos*.
 - **Transferência automática dos repasses**: exige a API PIX do banco da empresa. Hoje a central transfere e registra o identificador.
 - **Rota pelas ruas e tempo com trânsito**: exige um serviço de rotas (Google, Mapbox, OSRM próprio). A estimativa usa a distância em
   linha reta × fator de rota e a velocidade média configurada; o valor cobrado usa o GPS real.
@@ -97,7 +120,7 @@ npm start              # http://localhost:3200
 Primeiro acesso à central: o e-mail e a senha de `TAXI_ADMIN_EMAIL` / `TAXI_ADMIN_SENHA` (padrão em desenvolvimento:
 `admin@apptaxi.com.br` / `admin123`). Cadastre a **chave PIX da plataforma** em *Tarifas e regras* antes de aceitar corridas por PIX.
 
-Dados de demonstração (um passageiro e três motoristas online no centro de São Paulo, senha `demo12345`):
+Dados de demonstração (um passageiro autorizado a pedir pela empresa de exemplo e três motoristas online no centro de São Paulo, senha `demo12345`):
 
 ```bash
 npm run seed
@@ -124,6 +147,7 @@ npm run seed
 | `TAXI_GEOCODER_CONTATO` / `TAXI_GEOCODER_PAISES` | — / `br` | Identificação exigida pelo Nominatim e países da busca |
 | `TAXI_TRUST_PROXY` | `loopback` | Proxies confiáveis (IP real no limite de login) |
 | `TAXI_LIMITE_LOGIN` | `10` | Tentativas de login/cadastro por minuto por IP |
+| `TAXI_PAGAMENTOS` | `simulado` (`manual` em produção) | Modo de pagamento (veja acima) |
 
 ## Segurança
 - Senhas com scrypt; sessão por token assinado (HMAC) de 12 horas; o perfil é sempre lido do banco a cada requisição.
@@ -137,9 +161,10 @@ npm run seed
 npm test
 ```
 
-Cobrem o fluxo inteiro pela API: cadastros e validações, aprovação, estimativa, oferta e aceite (inclusive disputa entre dois motoristas),
-trajeto por GPS com descarte de saltos, valor final e divisão, PIX copia e cola (com CRC), pagamentos em PIX e dinheiro, avaliações,
-cancelamentos, redistribuição, expiração, repasses, relatório, a exportação lida pelo importador do Ativa BPO e as permissões.
+Cobrem o fluxo inteiro pela API: cadastros e validações, aprovação, pagamento antes (a chamada só sai depois), PIX copia e cola (com CRC),
+oferta com o valor do motorista sem a taxa e aceite (inclusive disputa entre dois motoristas), trajeto por GPS com descarte de saltos,
+preço fechado e taxímetro (complemento e estorno), empresa (autorização, limites, fatura), cancelamentos e expirações com estorno,
+redistribuição, avaliações, repasses, relatório, a exportação lida pelo importador do Ativa BPO e as permissões.
 
 ## Estrutura
 

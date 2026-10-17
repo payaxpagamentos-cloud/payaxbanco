@@ -75,7 +75,7 @@ async function atualizar(painel) {
   if (perfil.online && posicao && Date.now() - ultimoEnvio > 60_000) definirPosicao(posicao, true);
   if (perfil.situacao !== 'aprovado') return desenharCadastro(painel);
   const corrida = await api.get('/motorista/corrida-atual');
-  if (corrida && !(corrida.pagamento_status === 'pago' && pulados.has(corrida.id))) return desenharCorrida(painel, corrida);
+  if (corrida && !(corrida.status === 'finalizada' && pulados.has(corrida.id))) return desenharCorrida(painel, corrida);
   if (!perfil.online) return desenharOffline(painel);
   const ofertas = await api.get('/motorista/ofertas');
   desenharOfertas(painel, ofertas);
@@ -159,7 +159,7 @@ const navegar = (lat, lng) => el('a', { class: 'btn pequeno', target: '_blank', 
 function desenharCorrida(painel, c) {
   const alvo = ['aceita', 'chegou'].includes(c.status) ? { lat: c.origem_lat, lng: c.origem_lng } : { lat: c.destino_lat, lng: c.destino_lng };
   pontos.atualizar([{ chave: 'origem', lat: c.origem_lat, lng: c.origem_lng, icone: ICONES.origem() }, { chave: 'destino', lat: c.destino_lat, lng: c.destino_lng, icone: ICONES.destino() }]);
-  const chave = `c:${c.id}:${c.status}:${c.pagamento_status}:${c.nota_do_motorista}`;
+  const chave = `c:${c.id}:${c.status}:${c.nota_do_motorista}`;
   // Em viagem, só a distância muda: atualiza o texto sem redesenhar os botões.
   if (painel.dataset.chave === chave) {
     const d = painel.querySelector('[data-percorrido]');
@@ -180,7 +180,10 @@ function desenharCorrida(painel, c) {
   const trajeto = el('div', { class: 'coluna pequeno' },
     el('div', { class: 'ponto' }, el('span', { class: 'bola origem', style: 'margin-top:4px' }), el('span', {}, c.origem_endereco)),
     el('div', { class: 'ponto' }, el('span', { class: 'bola destino', style: 'margin-top:4px' }), el('span', {}, c.destino_endereco)));
-  const partes = [el('div', { class: 'alca' }), el('div', { class: 'linha entre' }, etiquetaStatus(c.status), el('span', { class: 'pequeno mudo' }, `#${c.id} · ${FORMAS[c.forma_pagamento]}`))];
+  const partes = [el('div', { class: 'alca' }), el('div', { class: 'linha entre' }, etiquetaStatus(c.status), el('span', { class: 'pequeno mudo' }, `#${c.id} · ${FORMAS[c.forma_pagamento]} (já pago)`))];
+  // O passageiro já pagou (ou a empresa é faturada): o motorista só vê quanto recebe, sem a taxa da plataforma.
+  const ganho = el('div', { class: 'cartao plano', style: 'margin:10px 0;text-align:center' }, el('div', { class: 'mudo pequeno' }, 'Você recebe (estimado)'),
+    el('div', { class: 'grande-valor num', style: 'font-size:24px' }, dinheiro(c.ganho_estimado_centavos)));
 
   if (c.status === 'aceita' || c.status === 'chegou') {
     const desistir = el('button', { class: 'btn perigo' }, 'Desistir');
@@ -190,35 +193,26 @@ function desenharCorrida(painel, c) {
       await acao(desistir, () => api.post(`/motorista/corridas/${c.id}/cancelar`, { motivo }));
       await atualizar(painel);
     });
-    partes.push(passageiro, trajeto,
+    partes.push(passageiro, ganho, trajeto,
       el('div', { class: 'linha', style: 'margin-top:12px' }, navegar(c.origem_lat, c.origem_lng), desistir, el('div', { style: 'flex:1' }),
         c.status === 'aceita' ? botao('Cheguei', '', () => api.post(`/motorista/corridas/${c.id}/chegou`)) : null),
       el('div', { style: 'margin-top:10px' }, botao('Iniciar corrida', 'primario grande', () => api.post(`/motorista/corridas/${c.id}/iniciar`))));
   } else if (c.status === 'em_andamento') {
-    partes.push(passageiro, trajeto, el('p', { class: 'mudo', 'data-percorrido': '' }, `Percorrido: ${km(c.distancia_percorrida_m)}`),
+    partes.push(passageiro, ganho, trajeto, el('p', { class: 'mudo', 'data-percorrido': '' }, `Percorrido: ${km(c.distancia_percorrida_m)}`),
       el('div', { class: 'linha' }, navegar(c.destino_lat, c.destino_lng), el('span', { class: 'pequeno mudo' }, `Início ${hora(c.iniciada_em)}`)),
       el('div', { style: 'margin-top:10px' }, botao('Finalizar corrida', 'escuro grande', async () => {
         if (posicao) await api.post('/motorista/posicao', posicao).catch(() => {});
         const f = await api.post(`/motorista/corridas/${c.id}/finalizar`);
-        toast(`Corrida finalizada: ${dinheiro(f.valor_final_centavos)}`);
+        toast(`Corrida finalizada: você recebe ${dinheiro(f.valor_motorista_centavos)}`);
       })));
-  } else if (c.pagamento_status === 'pago') {
-    partes.push(el('div', { class: 'aviso ok', style: 'margin-top:10px' }, `Pagamento confirmado: ${dinheiro(c.valor_final_centavos)}.`),
-      el('p', { style: 'text-align:center;margin:14px 0 6px' }, `Como foi a corrida com ${p.nome.split(' ')[0]}?`),
-      el('div', { class: 'linha', style: 'justify-content:center' }, [1, 2, 3, 4, 5].map((n) => botao(`${n}★`, 'pequeno', () => api.post(`/motorista/corridas/${c.id}/avaliar`, { nota: n })))),
-      el('div', { style: 'text-align:center;margin-top:10px' }, el('button', { class: 'btn pequeno', onclick: () => { pulados.add(c.id); delete painel.dataset.chave; atualizar(painel); } }, 'Pular')));
   } else {
-    const recebeMotorista = c.forma_pagamento !== 'pix';
-    partes.push(el('div', { style: 'text-align:center;margin:10px 0' }, el('div', { class: 'mudo' }, 'Valor da corrida'),
-      el('div', { class: 'grande-valor num' }, dinheiro(c.valor_final_centavos)),
-      el('div', { class: 'pequeno mudo' }, `${km(c.distancia_percorrida_m)} · ${minutos(c.duracao_real_s)} · você recebe ${dinheiro(c.valor_motorista_centavos)}`)),
-    el('div', { class: 'aviso' }, recebeMotorista
-      ? `Receba ${dinheiro(c.valor_final_centavos)} em ${FORMAS[c.forma_pagamento].toLowerCase()}. A taxa da plataforma (${dinheiro(c.taxa_plataforma_centavos)}) é descontada do seu saldo.`
-      : `O passageiro paga ${dinheiro(c.valor_final_centavos)} por PIX à plataforma. Confira o comprovante: sua parte entra no saldo e vai no próximo repasse.`),
-    el('div', { style: 'margin-top:10px' }, botao(recebeMotorista ? 'Confirmar que recebi' : 'Confirmar PIX recebido', 'primario grande', async () => {
-      await api.post(`/motorista/corridas/${c.id}/pagamento`);
-      toast('Pagamento confirmado.');
-    })));
+    partes.push(el('div', { style: 'text-align:center;margin:10px 0' }, el('div', { class: 'mudo' }, 'Você recebe'),
+      el('div', { class: 'grande-valor num' }, dinheiro(c.valor_motorista_centavos)),
+      el('div', { class: 'pequeno mudo' }, `Já descontada a taxa da plataforma · ${km(c.distancia_percorrida_m)} · ${minutos(c.duracao_real_s)}`)),
+    el('div', { class: 'aviso ok' }, 'O valor já entrou no seu saldo e vai no próximo repasse por PIX.'),
+    el('p', { style: 'text-align:center;margin:14px 0 6px' }, `Como foi a corrida com ${p.nome.split(' ')[0]}?`),
+    el('div', { class: 'linha', style: 'justify-content:center' }, [1, 2, 3, 4, 5].map((n) => botao(`${n}★`, 'pequeno', () => api.post(`/motorista/corridas/${c.id}/avaliar`, { nota: n })))),
+    el('div', { style: 'text-align:center;margin-top:10px' }, el('button', { class: 'btn pequeno', onclick: () => { pulados.add(c.id); delete painel.dataset.chave; atualizar(painel); } }, 'Pular')));
   }
   limpar(painel, partes);
 }
@@ -232,15 +226,14 @@ async function ganhos() {
     limpar(corpo,
       el('div', { class: 'pilulas' }, [[0, 'Hoje'], [6, '7 dias'], [29, '30 dias']].map(([d, r]) => el('button', { class: periodo === d ? 'on' : '', onclick: () => { periodo = d; carregar(); } }, r))),
       el('div', { class: 'cartao plano' },
-        el('div', { class: 'mudo pequeno' }, 'Líquido no período'), el('div', { class: 'grande-valor num' }, dinheiro(g.liquido_centavos)),
+        el('div', { class: 'mudo pequeno' }, 'Você recebe no período (já sem a taxa)'), el('div', { class: 'grande-valor num' }, dinheiro(g.liquido_centavos)),
         el('div', { class: 'chave' }, el('span', {}, 'Corridas'), el('strong', {}, g.total_corridas)),
-        el('div', { class: 'chave' }, el('span', {}, 'Valor bruto'), el('strong', { class: 'num' }, dinheiro(g.bruto_centavos))),
+        el('div', { class: 'chave' }, el('span', {}, 'Valor das corridas'), el('strong', { class: 'num' }, dinheiro(g.bruto_centavos))),
         el('div', { class: 'chave' }, el('span', {}, 'Taxa da plataforma'), el('strong', { class: 'num' }, `− ${dinheiro(g.taxa_centavos)}`)),
-        el('div', { class: 'chave' }, el('span', {}, 'Recebido em mãos'), el('strong', { class: 'num' }, dinheiro(g.recebido_em_maos_centavos))),
         el('div', { class: 'chave' }, el('span', {}, 'Rodado'), el('strong', {}, `${km(g.distancia_m)} · ${minutos(g.tempo_s)}`))),
       el('div', { class: `aviso ${g.saldo_centavos < 0 ? 'erro' : 'ok'}` }, g.saldo_centavos >= 0
         ? `Saldo a receber: ${dinheiro(g.saldo_centavos)} (pago por PIX nos repasses${perfil?.chave_pix ? ` para ${perfil.chave_pix}` : ' — cadastre sua chave PIX em Conta'}).`
-        : `Você deve ${dinheiro(-g.saldo_centavos)} de taxas: o valor é descontado das próximas corridas pagas por PIX.`),
+        : `Saldo negativo de ${dinheiro(-g.saldo_centavos)} por ajuste da central: é descontado das próximas corridas.`),
       el('h3', { style: 'margin-top:6px' }, 'Extrato'),
       g.extrato.length ? g.extrato.map((l) => el('div', { class: 'chave pequeno' }, el('span', {}, l.descricao, el('br'), el('span', { class: 'mudo' }, dataHora(l.criado_em))),
         el('strong', { class: 'num', style: `color:var(--${l.valor_centavos < 0 ? 'erro' : 'ok'})` }, dinheiro(l.valor_centavos)))) : el('p', { class: 'mudo pequeno' }, 'Sem lançamentos.'),

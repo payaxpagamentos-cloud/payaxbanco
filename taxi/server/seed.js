@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Dados de demonstração: um passageiro e três motoristas aprovados e online no centro de São Paulo.
+ * Dados de demonstração: um passageiro (autorizado a pedir por uma empresa) e três motoristas aprovados e online no centro de São Paulo.
  * Senha de todos: demo12345. Não use em produção.
  */
 const { abrir, agora } = require('./db');
@@ -32,4 +32,11 @@ for (const [nome, email, tel, cpf, cnh, placa, modelo, cor, ano, cat, lat, lng] 
   db.prepare('UPDATE motoristas SET veiculo_id = ? WHERE usuario_id = ?').run(Number(v.lastInsertRowid), id);
 }
 db.prepare("UPDATE configuracoes SET valor = 'pix@apptaxi.com.br' WHERE chave = 'pix_chave' AND valor = ''").run();
+// Empresa de exemplo com a passageira autorizada a pedir pela empresa (faturado).
+if (!db.prepare('SELECT 1 FROM empresas').get()) {
+  const e = Number(db.prepare(`INSERT INTO empresas (razao_social, cnpj, email_financeiro, limite_mensal_centavos, criada_em) VALUES (?, ?, ?, ?, ?)`)
+    .run('Padaria Pão Quente Ltda', '11222333000181', 'financeiro@paoquente.com.br', 500000, agora()).lastInsertRowid);
+  const p = db.prepare('SELECT id FROM usuarios WHERE email = ?').get('passageiro@demo.com').id;
+  db.prepare(`INSERT INTO empresa_usuarios (empresa_id, usuario_id, centro_custo, autorizado_em) VALUES (?, ?, 'Comercial', ?)`).run(e, p, agora());
+}
 console.log('[APP Táxi] Demonstração pronta. Passageiro: passageiro@demo.com · Motoristas: joao@, maria@, pedro@demo.com · senha demo12345');
