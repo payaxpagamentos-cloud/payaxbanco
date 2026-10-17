@@ -176,7 +176,6 @@ test('APP Táxi', async (t) => {
     assert.equal(r.status, 200, JSON.stringify(r.dados));
     const c = r.dados;
     const tf = api.db.prepare("SELECT * FROM tarifas WHERE categoria = 'comum'").get();
-    assert.equal(c.modelo_cobranca, 'estimativa');
     assert.equal(c.valor_taximetro_centavos, tarifa.calcular(tf, { distancia_m: c.distancia_percorrida_m, duracao_s: c.duracao_real_s, bandeira: 1 }));
     assert.equal(c.valor_final_centavos, c.valor_estimado_centavos);
     assert.equal(c.pagamento_status, 'pago');
@@ -272,37 +271,19 @@ test('APP Táxi', async (t) => {
     assert.equal((await api.post('/passageiro/corridas', pedido, passageiro)).status, 403);
   });
 
-  await t.test('modelo taxímetro: complemento quando passa do pago, estorno quando fica abaixo', async () => {
-    await api.patch('/central/config', { modelo_cobranca: 'taximetro' }, admin);
-    const viagem = async (tk, ajustar) => {
-      const id = (await api.post('/passageiro/corridas', { origem: SE, destino: PAULISTA, forma_pagamento: 'pix' }, passageiro)).dados.id;
-      await pagar(id);
-      assert.equal((await api.post(`/motorista/ofertas/${id}/aceitar`, {}, tk)).status, 204);
-      await api.post(`/motorista/corridas/${id}/iniciar`, {}, tk);
-      ajustar(id);
-      const fim = (await api.post(`/motorista/corridas/${id}/finalizar`, {}, tk)).dados;
-      await api.post(`/motorista/corridas/${id}/avaliar`, { nota: 5 }, tk);
-      return fim;
-    };
-    // Viagem mais longa que a estimativa: o passageiro paga o complemento depois.
-    const longa = await viagem(motorista, (id) => api.db.prepare('UPDATE corridas SET distancia_percorrida_m = 20000 WHERE id = ?').run(id));
-    assert.equal(longa.valor_final_centavos, longa.valor_taximetro_centavos);
-    assert.equal(longa.pagamento_status, 'pendente');
-    const comp = (await api.get(`/passageiro/corridas/${longa.id}/cobranca`, passageiro)).dados;
-    assert.equal(comp.tipo, 'complemento');
-    assert.equal(comp.valor_centavos, longa.valor_final_centavos - longa.valor_estimado_centavos);
-    assert.equal((await api.get('/passageiro/corridas/atual', passageiro)).dados.id, longa.id); // continua na tela até pagar
-    await pagar(longa.id);
-    assert.equal((await api.get(`/passageiro/corridas/${longa.id}`, passageiro)).dados.valor_pago_centavos, longa.valor_final_centavos);
-    await api.post(`/passageiro/corridas/${longa.id}/avaliar`, { nota: 5 }, passageiro);
-    // Viagem curta (taxímetro abaixo do pago): a diferença volta ao passageiro.
-    const curta = await viagem(bia, () => {});
-    assert.ok(curta.valor_final_centavos < curta.valor_estimado_centavos);
-    assert.deepEqual(cobrancas(curta.id).map((x) => [x.tipo, x.status]), [['corrida', 'concluida'], ['estorno', 'concluida']]);
-    assert.equal(cobrancas(curta.id)[1].valor_centavos, curta.valor_estimado_centavos - curta.valor_final_centavos);
-    assert.equal(curta.pagamento_status, 'pago');
-    await api.post(`/passageiro/corridas/${curta.id}/avaliar`, { nota: 4 }, passageiro);
-    await api.patch('/central/config', { modelo_cobranca: 'estimativa' }, admin);
+  await t.test('preço fechado mesmo quando o taxímetro dá mais ou menos', async () => {
+    const id = (await api.post('/passageiro/corridas', { origem: SE, destino: PAULISTA, forma_pagamento: 'pix' }, passageiro)).dados.id;
+    await pagar(id);
+    await api.post(`/motorista/ofertas/${id}/aceitar`, {}, motorista);
+    await api.post(`/motorista/corridas/${id}/iniciar`, {}, motorista);
+    api.db.prepare('UPDATE corridas SET distancia_percorrida_m = 20000 WHERE id = ?').run(id); // trânsito, desvio: rodou bem mais
+    const fim = (await api.post(`/motorista/corridas/${id}/finalizar`, {}, motorista)).dados;
+    assert.ok(fim.valor_taximetro_centavos > fim.valor_estimado_centavos);
+    assert.equal(fim.valor_final_centavos, fim.valor_estimado_centavos);
+    assert.equal(fim.pagamento_status, 'pago');
+    assert.deepEqual(cobrancas(id).map((x) => x.tipo), ['corrida']); // nada a cobrar nem a devolver depois
+    await api.post(`/motorista/corridas/${id}/avaliar`, { nota: 5 }, motorista);
+    await api.post(`/passageiro/corridas/${id}/avaliar`, { nota: 5 }, passageiro);
   });
 
   await t.test('cancelamentos e expirações devolvem o que foi pago', async () => {
@@ -336,32 +317,51 @@ test('APP Táxi', async (t) => {
     assert.equal((await api.get(`/passageiro/corridas/${semMotorista}`, admin)).status, 403);
   });
 
-  await t.test('repasses: gera, cancela (volta ao saldo) e paga', async () => {
+  await t.test('motorista pede o PIX do saldo: um por dia; cancelado volta ao saldo', async () => {
     const saldoCarlos = (await api.get('/motorista/ganhos', motorista)).dados.saldo_centavos;
+    assert.ok(saldoCarlos > 0);
+    await api.patch('/central/config', { repasse_minimo_centavos: 2000 }, admin);
+    assert.match((await api.post('/motorista/pix', {}, bia)).dados.erro, /chave PIX/); // Bia não cadastrou chave
+    assert.equal((await api.post('/motorista/pix', { valor_centavos: 100 }, motorista)).status, 422); // abaixo do mínimo (R$ 20)
+    assert.equal((await api.post('/motorista/pix', { valor_centavos: saldoCarlos + 1 }, motorista)).status, 422);
+    const g0 = (await api.get('/motorista/ganhos', motorista)).dados;
+    assert.equal(g0.pix.pode_pedir, true);
     await api.patch('/central/config', { repasse_minimo_centavos: 0 }, admin);
-    const r = await api.post('/central/repasses', {}, admin);
-    assert.equal(r.status, 201);
-    assert.equal(r.dados.gerados.length, 1);
-    assert.deepEqual(r.dados.ignorados, [{ motorista_id: biaId, motivo: 'sem chave PIX cadastrada' }]);
-    assert.equal(r.dados.gerados[0].valor_centavos, saldoCarlos);
-    const rep = r.dados.gerados[0].id;
-    assert.equal((await api.get('/motorista/ganhos', motorista)).dados.saldo_centavos, 0);
-    assert.equal((await api.post(`/central/repasses/${rep}/cancelar`, {}, admin)).status, 422);
-    assert.equal((await api.post(`/central/repasses/${rep}/cancelar`, { motivo: 'Chave errada' }, admin)).status, 204);
+    const parte = Math.floor(saldoCarlos / 2);
+    const p1 = await api.post('/motorista/pix', { valor_centavos: parte }, motorista);
+    assert.equal(p1.status, 201, JSON.stringify(p1.dados));
+    assert.equal(p1.dados.chave_pix, 'carlos@teste.com');
+    assert.equal((await api.get('/motorista/ganhos', motorista)).dados.saldo_centavos, saldoCarlos - parte);
+    const segundo = await api.post('/motorista/pix', {}, motorista);
+    assert.equal(segundo.status, 409);
+    assert.match(segundo.dados.erro, /já pediu um PIX hoje/);
+    assert.equal((await api.get('/motorista/ganhos', motorista)).dados.pix.pode_pedir, false);
+    // A central não consegue transferir (ex.: chave errada) e cancela: o valor volta e o motorista pode pedir de novo.
+    const fila = (await api.get('/central/repasses?status=pendente', admin)).dados;
+    assert.equal(fila[0].id, p1.dados.id);
+    assert.equal((await api.post(`/central/repasses/${p1.dados.id}/cancelar`, {}, admin)).status, 422);
+    assert.equal((await api.post(`/central/repasses/${p1.dados.id}/cancelar`, { motivo: 'Chave errada' }, admin)).status, 204);
     assert.equal((await api.get('/motorista/ganhos', motorista)).dados.saldo_centavos, saldoCarlos);
-    const novo = (await api.post('/central/repasses', { motorista_ids: [motoristaId] }, admin)).dados.gerados[0].id;
-    assert.equal((await api.post(`/central/repasses/${novo}/pagar`, { identificador: 'E12345678202610171200abc' }, admin)).status, 204);
-    assert.equal((await api.post(`/central/repasses/${novo}/pagar`, { identificador: 'x' }, admin)).status, 409);
+    const p2 = await api.post('/motorista/pix', {}, motorista); // sem valor: o saldo todo
+    assert.equal(p2.dados.valor_centavos, saldoCarlos);
+    assert.equal((await api.get('/central/painel', admin)).dados.repasses_pendentes.total, saldoCarlos);
+    assert.equal((await api.post(`/central/repasses/${p2.dados.id}/pagar`, { identificador: 'E12345678202610171200abc' }, admin)).status, 204);
+    assert.equal((await api.post(`/central/repasses/${p2.dados.id}/pagar`, { identificador: 'x' }, admin)).status, 409);
     const g = (await api.get('/motorista/ganhos', motorista)).dados;
     assert.equal(g.saldo_centavos, 0);
     assert.equal(g.repasses[0].status, 'pago');
+    assert.equal(g.repasses[0].identificador, 'E12345678202610171200abc');
+    assert.equal((await api.post('/motorista/pix', {}, motorista)).status, 409); // já usou o PIX do dia
+    // No dia seguinte pode pedir de novo.
+    api.db.prepare('UPDATE repasses SET criado_em = ? WHERE motorista_id = ?').run(new Date(Date.now() - 86_400_000 * 2).toISOString(), motoristaId);
+    assert.equal((await api.get('/motorista/ganhos', motorista)).dados.pix.ja_pediu_hoje, false);
     const painel = (await api.get('/central/painel', admin)).dados;
     assert.equal(painel.a_repassar_centavos, (await api.get('/motorista/ganhos', bia)).dados.saldo_centavos);
   });
 
   await t.test('relatório e exportação para o BPO', async () => {
     const rel = (await api.get('/central/relatorio', admin)).dados;
-    assert.equal(rel.finalizadas, 4);
+    assert.equal(rel.finalizadas, 3);
     assert.equal(rel.canceladas, 3);
     assert.equal(rel.por_dia[0].data, hoje());
     assert.equal(rel.bruto_centavos, rel.por_forma_centavos.pix + rel.por_forma_centavos.cartao + rel.por_forma_centavos.empresa);
@@ -372,14 +372,14 @@ test('APP Táxi', async (t) => {
     const csv = await api.get('/central/exportar-bpo', admin);
     assert.match(csv.headers.get('content-type'), /text\/csv/);
     const linhas = csv.dados.replace(/^﻿/, '').trim().split('\r\n');
-    assert.equal(linhas.length, 1 + 4 + 1); // cabeçalho, 4 taxas, 1 repasse
+    assert.equal(linhas.length, 1 + 3 + 1); // cabeçalho, 3 taxas, 1 PIX pago ao motorista
     assert.match(linhas[1], /^receber;Taxa da plataforma/);
     assert.match(linhas.at(-1), /^pagar;Repasse ao motorista/);
     // O arquivo é lido pelo importador do Ativa BPO Financeiro (quando o APP Táxi está no mesmo repositório).
     let lerCsvLancamentos;
     try { ({ lerCsvLancamentos } = require('../../server/lib/integracoes')); } catch { return; }
     const itens = lerCsvLancamentos(csv.dados.replace(/^﻿/, ''));
-    assert.equal(itens.length, 5);
+    assert.equal(itens.length, 4);
     assert.equal(itens.at(-1).tipo, 'pagar');
     assert.equal(itens.at(-1).categoria, 'Serviços terceirizados');
   });

@@ -47,29 +47,35 @@ const saldos = (db) => db.prepare(`SELECT m.usuario_id AS motorista_id, u.nome, 
   FROM lancamentos_motorista l JOIN motoristas m ON m.usuario_id = l.motorista_id JOIN usuarios u ON u.id = m.usuario_id
   GROUP BY m.usuario_id HAVING SUM(l.valor_centavos) <> 0 ORDER BY saldo_centavos DESC`).all();
 
-/**
- * Gera um repasse pendente para cada motorista com saldo a receber acima do mínimo (ou só os informados).
- * O valor sai do saldo na hora; se o repasse for cancelado, volta.
- */
-function gerarRepasses(db, usuario, motoristaIds) {
+/** PIX que o motorista ainda pode pedir hoje: um por dia (pedidos cancelados pela central não contam). */
+function pixDisponivel(db, motoristaId) {
   const { repasse_minimo_centavos: minimo } = lerConfig(db);
+  const [ini, fim] = intervalo(local().data, local().data);
+  const hojeJaPediu = Boolean(db.prepare(`SELECT 1 FROM repasses WHERE motorista_id = ? AND status <> 'cancelado' AND criado_em >= ? AND criado_em < ?`)
+    .get(motoristaId, ini, fim));
+  const s = saldo(db, motoristaId);
+  return { saldo_centavos: s, minimo_centavos: minimo, pode_pedir: !hojeJaPediu && s >= Math.max(minimo, 1), ja_pediu_hoje: hojeJaPediu };
+}
+
+/**
+ * O motorista pede o PIX do saldo disponível (todo ou parte), para a chave PIX cadastrada. No máximo um pedido por dia.
+ * O valor sai do saldo na hora; a plataforma faz a transferência e marca como paga, ou cancela e o valor volta.
+ */
+function solicitarPix(db, motoristaId, valor) {
   return transacao(db, () => {
-    const gerados = [];
-    const ignorados = [];
-    for (const s of saldos(db)) {
-      if (motoristaIds && !motoristaIds.includes(s.motorista_id)) continue;
-      if (s.saldo_centavos < minimo) { if (motoristaIds) ignorados.push({ motorista_id: s.motorista_id, motivo: 'saldo abaixo do mínimo' }); continue; }
-      if (!s.chave_pix) { ignorados.push({ motorista_id: s.motorista_id, motivo: 'sem chave PIX cadastrada' }); continue; }
-      const pendente = db.prepare("SELECT 1 FROM repasses WHERE motorista_id = ? AND status = 'pendente'").get(s.motorista_id);
-      if (pendente) { ignorados.push({ motorista_id: s.motorista_id, motivo: 'já tem repasse pendente' }); continue; }
-      const r = db.prepare(`INSERT INTO repasses (motorista_id, valor_centavos, chave_pix, criado_em, criado_por) VALUES (?, ?, ?, ?, ?)`)
-        .run(s.motorista_id, s.saldo_centavos, s.chave_pix, agora(), usuario.id);
-      const id = Number(r.lastInsertRowid);
-      db.prepare(`INSERT INTO lancamentos_motorista (motorista_id, repasse_id, tipo, descricao, valor_centavos, criado_em, criado_por)
-        VALUES (?, ?, 'repasse', ?, ?, ?, ?)`).run(s.motorista_id, id, `Repasse #${id} para a chave PIX ${s.chave_pix}`, -s.saldo_centavos, agora(), usuario.id);
-      gerados.push({ id, motorista_id: s.motorista_id, nome: s.nome, valor_centavos: s.saldo_centavos });
-    }
-    return { gerados, ignorados };
+    const m = db.prepare('SELECT chave_pix FROM motoristas WHERE usuario_id = ?').get(motoristaId);
+    if (!m?.chave_pix) throw new ErroNegocio('Cadastre sua chave PIX em Conta antes de pedir o PIX.', 422);
+    const d = pixDisponivel(db, motoristaId);
+    if (d.ja_pediu_hoje) throw new ErroNegocio('Você já pediu um PIX hoje. Novo pedido a partir de amanhã.', 409);
+    const quanto = valor === undefined || valor === null ? d.saldo_centavos : v.inteiro(valor, 'o valor', { min: 1 });
+    v.exigir(quanto <= d.saldo_centavos, 'Valor maior que o saldo disponível.');
+    v.exigir(quanto >= d.minimo_centavos, `O valor mínimo do PIX é ${(d.minimo_centavos / 100).toFixed(2).replace('.', ',')}.`);
+    const r = db.prepare(`INSERT INTO repasses (motorista_id, valor_centavos, chave_pix, criado_em, criado_por) VALUES (?, ?, ?, ?, ?)`)
+      .run(motoristaId, quanto, m.chave_pix, agora(), motoristaId);
+    const id = Number(r.lastInsertRowid);
+    db.prepare(`INSERT INTO lancamentos_motorista (motorista_id, repasse_id, tipo, descricao, valor_centavos, criado_em, criado_por)
+      VALUES (?, ?, 'repasse', ?, ?, ?, ?)`).run(motoristaId, id, `PIX #${id} pedido para a chave ${m.chave_pix}`, -quanto, agora(), motoristaId);
+    return { id, valor_centavos: quanto, chave_pix: m.chave_pix };
   });
 }
 
@@ -94,7 +100,7 @@ function cancelarRepasse(db, usuario, id, motivo) {
     db.prepare(`UPDATE repasses SET status = 'cancelado', concluido_em = ?, concluido_por = ?, motivo = ? WHERE id = ?`)
       .run(agora(), usuario.id, v.texto(motivo, 'o motivo', 300), id);
     db.prepare(`INSERT INTO lancamentos_motorista (motorista_id, repasse_id, tipo, descricao, valor_centavos, criado_em, criado_por)
-      VALUES (?, ?, 'estorno_repasse', ?, ?, ?, ?)`).run(r.motorista_id, id, `Repasse #${id} cancelado: valor devolvido ao saldo`, r.valor_centavos, agora(), usuario.id);
+      VALUES (?, ?, 'estorno_repasse', ?, ?, ?, ?)`).run(r.motorista_id, id, `PIX #${id} cancelado: valor devolvido ao saldo`, r.valor_centavos, agora(), usuario.id);
   });
 }
 
@@ -114,7 +120,7 @@ function relatorio(db, de, ate) {
   const dias = new Map();
   const motoristas = new Map();
   const formas = { pix: 0, cartao: 0, empresa: 0 };
-  const tot = { finalizadas: 0, canceladas: 0, bruto_centavos: 0, taxa_centavos: 0, motoristas_centavos: 0, complementos_pendentes_centavos: 0, faturado_empresas_centavos: 0 };
+  const tot = { finalizadas: 0, canceladas: 0, bruto_centavos: 0, taxa_centavos: 0, motoristas_centavos: 0, faturado_empresas_centavos: 0 };
   for (const c of corridas) {
     const dia = local(c.finalizada_em ?? c.cancelada_em).data;
     const d = dias.get(dia) ?? { data: dia, finalizadas: 0, canceladas: 0, bruto_centavos: 0, taxa_centavos: 0 };
@@ -138,10 +144,9 @@ function relatorio(db, de, ate) {
     }
     dias.set(dia, d);
   }
-  // Cobranças do período: complementos ainda a pagar e estornos devolvidos aos passageiros.
+  // Estornos do período (corridas canceladas depois de pagas): devolvidos e ainda a devolver.
   const cob = (tipo, status) => db.prepare(`SELECT COALESCE(SUM(valor_centavos), 0) AS s FROM cobrancas WHERE tipo = ? AND status = ? AND criada_em >= ? AND criada_em < ?`)
     .get(tipo, status, ini, fim).s;
-  tot.complementos_pendentes_centavos = cob('complemento', 'pendente');
   return {
     de, ate, ...tot,
     estornos_centavos: cob('estorno', 'concluida'),
@@ -184,4 +189,4 @@ function exportarBpo(db, de, ate, { categoriaReceita = 'Prestação de serviços
   return `${linhas.map((l) => l.map(csv).join(';')).join('\r\n')}\r\n`;
 }
 
-module.exports = { creditarCorrida, saldo, extrato, ganhos, saldos, gerarRepasses, repasse, pagarRepasse, cancelarRepasse, ajustar, relatorio, exportarBpo };
+module.exports = { creditarCorrida, saldo, extrato, ganhos, saldos, pixDisponivel, solicitarPix, repasse, pagarRepasse, cancelarRepasse, ajustar, relatorio, exportarBpo };

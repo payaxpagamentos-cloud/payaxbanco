@@ -209,12 +209,37 @@ function desenharCorrida(painel, c) {
     partes.push(el('div', { style: 'text-align:center;margin:10px 0' }, el('div', { class: 'mudo' }, 'Você recebe'),
       el('div', { class: 'grande-valor num' }, dinheiro(c.valor_motorista_centavos)),
       el('div', { class: 'pequeno mudo' }, `Já descontada a taxa da plataforma · ${km(c.distancia_percorrida_m)} · ${minutos(c.duracao_real_s)}`)),
-    el('div', { class: 'aviso ok' }, 'O valor já entrou no seu saldo e vai no próximo repasse por PIX.'),
+    el('div', { class: 'aviso ok' }, 'O valor já entrou no seu saldo. Peça o PIX para a sua conta em Ganhos (um por dia).'),
     el('p', { style: 'text-align:center;margin:14px 0 6px' }, `Como foi a corrida com ${p.nome.split(' ')[0]}?`),
     el('div', { class: 'linha', style: 'justify-content:center' }, [1, 2, 3, 4, 5].map((n) => botao(`${n}★`, 'pequeno', () => api.post(`/motorista/corridas/${c.id}/avaliar`, { nota: n })))),
     el('div', { style: 'text-align:center;margin-top:10px' }, el('button', { class: 'btn pequeno', onclick: () => { pulados.add(c.id); delete painel.dataset.chave; atualizar(painel); } }, 'Pular')));
   }
   limpar(painel, partes);
+}
+
+/** Saldo disponível e pedido de PIX para a conta do motorista (um por dia). */
+function blocoPix(g, recarregar) {
+  const { pix } = g;
+  const caixa = el('div', { class: 'cartao plano' }, el('div', { class: 'mudo pequeno' }, 'Disponível para PIX'),
+    el('div', { class: 'grande-valor num' }, dinheiro(g.saldo_centavos)));
+  if (!perfil?.chave_pix) return limpar(caixa, caixa.firstChild, caixa.lastChild, el('div', { class: 'aviso' }, 'Cadastre sua chave PIX em Conta para pedir a transferência.'));
+  if (pix.ja_pediu_hoje) caixa.append(el('div', { class: 'aviso' }, 'Você já pediu o PIX de hoje. Amanhã pode pedir de novo.'));
+  else if (!pix.pode_pedir) caixa.append(el('p', { class: 'pequeno mudo' }, pix.minimo_centavos ? `Valor mínimo para pedir: ${dinheiro(pix.minimo_centavos)}.` : 'Sem saldo disponível no momento.'));
+  else {
+    const valor = el('input', { inputmode: 'decimal', value: (g.saldo_centavos / 100).toFixed(2).replace('.', ','), 'aria-label': 'Valor do PIX' });
+    const pedir = el('button', { class: 'btn primario' }, 'Pedir PIX');
+    pedir.addEventListener('click', () => acao(pedir, async () => {
+      const centavos = Math.round(Number(valor.value.replace(/\./g, '').replace(',', '.')) * 100);
+      if (!Number.isFinite(centavos) || centavos <= 0) throw new Error('Informe um valor válido.');
+      if (!(await confirmar('Pedir PIX', `Transferir ${dinheiro(centavos)} para a chave ${perfil.chave_pix}? Você pode pedir um PIX por dia.`, 'Pedir'))) return;
+      await api.post('/motorista/pix', { valor_centavos: centavos });
+      toast('PIX pedido. A transferência é feita pela central.');
+      await recarregar();
+    }));
+    caixa.append(el('p', { class: 'pequeno mudo', style: 'margin:8px 0' }, `Para a chave ${perfil.chave_pix} · um pedido por dia${pix.minimo_centavos ? ` · mínimo ${dinheiro(pix.minimo_centavos)}` : ''}`),
+      el('div', { class: 'linha' }, el('div', { style: 'flex:1' }, valor), pedir));
+  }
+  return caixa;
 }
 
 async function ganhos() {
@@ -231,14 +256,12 @@ async function ganhos() {
         el('div', { class: 'chave' }, el('span', {}, 'Valor das corridas'), el('strong', { class: 'num' }, dinheiro(g.bruto_centavos))),
         el('div', { class: 'chave' }, el('span', {}, 'Taxa da plataforma'), el('strong', { class: 'num' }, `− ${dinheiro(g.taxa_centavos)}`)),
         el('div', { class: 'chave' }, el('span', {}, 'Rodado'), el('strong', {}, `${km(g.distancia_m)} · ${minutos(g.tempo_s)}`))),
-      el('div', { class: `aviso ${g.saldo_centavos < 0 ? 'erro' : 'ok'}` }, g.saldo_centavos >= 0
-        ? `Saldo a receber: ${dinheiro(g.saldo_centavos)} (pago por PIX nos repasses${perfil?.chave_pix ? ` para ${perfil.chave_pix}` : ' — cadastre sua chave PIX em Conta'}).`
-        : `Saldo negativo de ${dinheiro(-g.saldo_centavos)} por ajuste da central: é descontado das próximas corridas.`),
+      blocoPix(g, carregar),
       el('h3', { style: 'margin-top:6px' }, 'Extrato'),
       g.extrato.length ? g.extrato.map((l) => el('div', { class: 'chave pequeno' }, el('span', {}, l.descricao, el('br'), el('span', { class: 'mudo' }, dataHora(l.criado_em))),
         el('strong', { class: 'num', style: `color:var(--${l.valor_centavos < 0 ? 'erro' : 'ok'})` }, dinheiro(l.valor_centavos)))) : el('p', { class: 'mudo pequeno' }, 'Sem lançamentos.'),
-      g.repasses.length ? [el('h3', { style: 'margin-top:6px' }, 'Repasses'), g.repasses.map((r) => el('div', { class: 'chave pequeno' },
-        el('span', {}, `#${r.id} · ${dataHora(r.criado_em)}`, el('br'), el('span', { class: 'mudo' }, r.identificador ?? r.chave_pix)),
+      g.repasses.length ? [el('h3', { style: 'margin-top:6px' }, 'Meus pedidos de PIX'), g.repasses.map((r) => el('div', { class: 'chave pequeno' },
+        el('span', {}, `#${r.id} · ${dataHora(r.criado_em)}`, el('br'), el('span', { class: 'mudo' }, r.status === 'pendente' ? `aguardando a transferência para ${r.chave_pix}` : (r.identificador ?? r.chave_pix))),
         el('span', { class: 'linha' }, el('strong', { class: 'num' }, dinheiro(r.valor_centavos)), el('span', { class: `etiqueta ${r.status === 'pago' ? 'ok' : r.status === 'cancelado' ? 'erro' : 'aviso'}` }, r.status))))] : null);
   };
   await carregar().catch((err) => toast(err.message, true));

@@ -86,8 +86,6 @@ CREATE TABLE IF NOT EXISTS corridas (
   forma_pagamento TEXT NOT NULL CHECK (forma_pagamento IN ('pix','cartao','empresa')),
   empresa_id INTEGER REFERENCES empresas(id),
   fatura_id INTEGER REFERENCES faturas(id),
-  -- 'estimativa': vale o valor pago antes (preço fechado); 'taximetro': vale o taxímetro e a diferença é devolvida ou cobrada.
-  modelo_cobranca TEXT NOT NULL CHECK (modelo_cobranca IN ('estimativa','taximetro')),
   valor_pago_centavos INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'solicitada'
     CHECK (status IN ('aguardando_pagamento','solicitada','aceita','chegou','em_andamento','finalizada','cancelada')),
@@ -106,11 +104,12 @@ CREATE TABLE IF NOT EXISTS corridas (
   ultima_lng REAL,
   ultima_posicao_em TEXT,
   duracao_real_s INTEGER,
+  -- Preço fechado: o valor final é a estimativa paga antes; o taxímetro fica registrado só para conferência.
   valor_taximetro_centavos INTEGER,
   valor_final_centavos INTEGER,
   taxa_plataforma_centavos INTEGER,
   valor_motorista_centavos INTEGER,
-  -- pendente: aguardando o pagamento (ou o complemento do taxímetro); pago; faturado (empresa); estornado (cancelada após o pagamento).
+  -- pendente: aguardando o pagamento; pago; faturado (empresa); estornado (cancelada após o pagamento).
   pagamento_status TEXT NOT NULL DEFAULT 'pendente' CHECK (pagamento_status IN ('pendente','pago','faturado','estornado')),
   nota_do_passageiro INTEGER CHECK (nota_do_passageiro BETWEEN 1 AND 5),
   comentario_do_passageiro TEXT,
@@ -122,12 +121,11 @@ CREATE INDEX IF NOT EXISTS idx_corridas_motorista ON corridas(motorista_id, id);
 CREATE INDEX IF NOT EXISTS idx_corridas_finalizada ON corridas(finalizada_em);
 CREATE INDEX IF NOT EXISTS idx_corridas_empresa ON corridas(empresa_id, finalizada_em);
 
--- Cobranças e estornos ao passageiro. A corrida paga antes gera a cobrança 'corrida'; o taxímetro acima do valor pago,
--- um 'complemento'; cancelamento ou taxímetro abaixo do pago, um 'estorno'.
+-- Cobranças e estornos ao passageiro: a corrida paga antes gera a cobrança 'corrida'; o cancelamento depois do pagamento, um 'estorno'.
 CREATE TABLE IF NOT EXISTS cobrancas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   corrida_id INTEGER NOT NULL REFERENCES corridas(id),
-  tipo TEXT NOT NULL CHECK (tipo IN ('corrida','complemento','estorno')),
+  tipo TEXT NOT NULL CHECK (tipo IN ('corrida','estorno')),
   forma TEXT NOT NULL CHECK (forma IN ('pix','cartao')),
   valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
   status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','concluida','cancelada')),
@@ -200,6 +198,7 @@ CREATE TABLE IF NOT EXISTS lancamentos_motorista (
 );
 CREATE INDEX IF NOT EXISTS idx_lanc_motorista ON lancamentos_motorista(motorista_id, id);
 
+-- PIX pedidos pelo motorista (no máximo um por dia) do saldo disponível; a plataforma transfere e registra.
 CREATE TABLE IF NOT EXISTS repasses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   motorista_id INTEGER NOT NULL REFERENCES motoristas(usuario_id),
@@ -207,7 +206,7 @@ CREATE TABLE IF NOT EXISTS repasses (
   chave_pix TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','pago','cancelado')),
   criado_em TEXT NOT NULL,
-  criado_por INTEGER REFERENCES usuarios(id),
+  criado_por INTEGER REFERENCES usuarios(id), -- o motorista que pediu o PIX
   concluido_em TEXT,
   concluido_por INTEGER REFERENCES usuarios(id),
   identificador TEXT,
@@ -236,8 +235,7 @@ const CONFIG_PADRAO = {
   raio_busca_km: '5',
   expirar_solicitacao_min: '10',
   expirar_pagamento_min: '15',
-  modelo_cobranca: 'estimativa',
-  repasse_minimo_centavos: '2000',
+  repasse_minimo_centavos: '0', // valor mínimo de cada PIX pedido pelo motorista (0 = sem mínimo)
   fator_rota: '1.3', // distância por ruas ≈ distância em linha reta × fator
   velocidade_media_kmh: '25',
   bandeira2_inicio_hora: '20',
@@ -289,7 +287,7 @@ function transacao(db, fn) {
   }
 }
 
-/** Configurações como números (exceto as de texto: modelo de cobrança e PIX). */
+/** Configurações como números (exceto as de texto do PIX). */
 function lerConfig(db) {
   const c = Object.fromEntries(db.prepare('SELECT chave, valor FROM configuracoes').all().map((r) => [r.chave, r.valor]));
   const num = (k) => Number(c[k]);
@@ -298,7 +296,6 @@ function lerConfig(db) {
     raio_busca_km: num('raio_busca_km'),
     expirar_solicitacao_min: num('expirar_solicitacao_min'),
     expirar_pagamento_min: num('expirar_pagamento_min'),
-    modelo_cobranca: c.modelo_cobranca,
     repasse_minimo_centavos: num('repasse_minimo_centavos'),
     fator_rota: num('fator_rota'),
     velocidade_media_kmh: num('velocidade_media_kmh'),

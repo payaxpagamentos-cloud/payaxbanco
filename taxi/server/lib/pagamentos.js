@@ -9,8 +9,7 @@ const pix = require('./pix');
 /**
  * Cobranças ao passageiro. Tudo é pago antes da viagem:
  * - 'corrida': o valor estimado, pago por PIX ou cartão; ao ser concluída, a chamada vai para os taxistas;
- * - 'complemento': no modelo taxímetro, o que passou do valor pago;
- * - 'estorno': devolução (corrida cancelada depois de paga, ou taxímetro abaixo do pago).
+ * - 'estorno': devolução da corrida cancelada depois de paga (preço fechado: não há acerto no fim da viagem).
  *
  * Modo 'simulado' (testes): o passageiro aprova o pagamento na própria tela e os estornos saem na hora.
  * Modo 'manual': PIX na chave da plataforma, confirmado pela central; estornos feitos pela central; sem cartão.
@@ -48,8 +47,6 @@ function concluir(db, id, usuarioId, identificador) {
     if (c.status !== 'aguardando_pagamento') return; // pagamento atrasado de corrida já expirada: a central devolve
     db.prepare(`UPDATE corridas SET status = 'solicitada', solicitada_em = ?, valor_pago_centavos = ?, pagamento_status = 'pago' WHERE id = ?`)
       .run(agora(), cob.valor_centavos, c.id);
-  } else if (cob.tipo === 'complemento') {
-    db.prepare(`UPDATE corridas SET valor_pago_centavos = valor_pago_centavos + ?, pagamento_status = 'pago' WHERE id = ?`).run(cob.valor_centavos, c.id);
   }
 }
 

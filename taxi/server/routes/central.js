@@ -41,7 +41,7 @@ module.exports = (db) => {
       motoristas_online: db.prepare(`SELECT COUNT(*) AS n FROM motoristas WHERE online = 1 AND posicao_em > ?`).get(corte).n,
       corridas_ativas: status,
       hoje: { finalizadas: dia.finalizadas, canceladas, bruto_centavos: dia.bruto, taxa_centavos: dia.taxa },
-      // Na central: PIX a confirmar (modo manual), complementos a receber e estornos a devolver.
+      // Na central: PIX a confirmar (modo manual) e estornos a devolver.
       cobrancas_pendentes: Object.fromEntries(db.prepare(`SELECT tipo, COUNT(*) AS n FROM cobrancas WHERE status = 'pendente' GROUP BY tipo`).all().map((x) => [x.tipo, x.n])),
       faturas_abertas: db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(valor_centavos),0) AS total FROM faturas WHERE status = 'aberta'`).get(),
       motoristas_pendentes: db.prepare(`SELECT COUNT(*) AS n FROM motoristas WHERE situacao = 'pendente'`).get().n,
@@ -87,7 +87,7 @@ module.exports = (db) => {
     res.status(204).end();
   });
 
-  // Cobranças: PIX recebido na chave da plataforma (modo manual), complementos e estornos devolvidos.
+  // Cobranças: PIX recebido na chave da plataforma (modo manual) e estornos devolvidos.
   r.get('/cobrancas', (req, res) => {
     const status = req.query.status ? v.opcao(req.query.status, 'o status', ['pendente', 'concluida', 'cancelada']) : null;
     res.json(db.prepare(`SELECT b.*, c.status AS corrida_status, u.nome AS passageiro_nome, u.email AS passageiro_email FROM cobrancas b
@@ -174,8 +174,7 @@ module.exports = (db) => {
       raio_busca_km: (x) => v.numero(x, 'o raio de busca', { min: 0.5, max: 50 }),
       expirar_solicitacao_min: (x) => v.inteiro(x, 'o tempo de espera', { min: 1, max: 60 }),
       expirar_pagamento_min: (x) => v.inteiro(x, 'o prazo para pagar', { min: 2, max: 60 }),
-      modelo_cobranca: (x) => v.opcao(x, 'o modelo de cobrança', ['estimativa', 'taximetro']),
-      repasse_minimo_centavos: (x) => v.inteiro(x, 'o repasse mínimo', { min: 0, max: 10_000_000 }),
+      repasse_minimo_centavos: (x) => v.inteiro(x, 'o valor mínimo do PIX', { min: 0, max: 10_000_000 }),
       fator_rota: (x) => v.numero(x, 'o fator de rota', { min: 1, max: 3 }),
       velocidade_media_kmh: (x) => v.numero(x, 'a velocidade média', { min: 5, max: 120 }),
       bandeira2_inicio_hora: (x) => v.inteiro(x, 'o início da bandeira 2', { min: 0, max: 23 }),
@@ -196,7 +195,7 @@ module.exports = (db) => {
     res.status(204).end();
   });
 
-  // Financeiro: saldos, repasses, ajustes, relatório e exportação
+  // Financeiro: saldos, PIX pedidos pelos motoristas (repasses), ajustes, relatório e exportação
   r.get('/saldos', (_req, res) => res.json(fin.saldos(db)));
   r.get('/motoristas/:id/extrato', (req, res) => res.json({ saldo_centavos: fin.saldo(db, nid(req)), lancamentos: fin.extrato(db, nid(req), 200) }));
   r.post('/motoristas/:id/ajuste', soAdmin, (req, res) => {
@@ -210,12 +209,6 @@ module.exports = (db) => {
     const status = req.query.status ? v.opcao(req.query.status, 'o status', ['pendente', 'pago', 'cancelado']) : null;
     res.json(db.prepare(`SELECT r.*, u.nome, m.cpf FROM repasses r JOIN usuarios u ON u.id = r.motorista_id JOIN motoristas m ON m.usuario_id = r.motorista_id
       WHERE (? IS NULL OR r.status = ?) ORDER BY r.id DESC LIMIT 300`).all(status, status));
-  });
-  r.post('/repasses', (req, res) => {
-    const ids = Array.isArray(req.body.motorista_ids) ? req.body.motorista_ids.map(Number) : null;
-    const out = fin.gerarRepasses(db, req.usuario, ids);
-    registrar(db, req, 'repasses_gerados', out.gerados.map((g) => g.id));
-    res.status(201).json(out);
   });
   r.post('/repasses/:id/pagar', (req, res) => {
     fin.pagarRepasse(db, req.usuario, nid(req), req.body.identificador);

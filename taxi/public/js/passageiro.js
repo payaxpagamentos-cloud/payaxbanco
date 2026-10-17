@@ -219,7 +219,7 @@ function blocoMotorista(c) {
       m.telefone ? el('a', { class: 'btn pequeno', href: `tel:${m.telefone}` }, 'Ligar') : null)));
 }
 
-/** Cobrança em aberto (pagamento antes da viagem ou complemento do taxímetro), guardada para não refazer o QR a cada atualização. */
+/** Cobrança em aberto (pagamento antes da viagem), guardada para não refazer o QR a cada atualização. */
 let cobrancaCache = null;
 async function blocoPagamento(c, painel) {
   if (cobrancaCache?.chave !== `${c.id}:${c.status}:${c.pagamento_status}`) {
@@ -246,7 +246,7 @@ async function blocoPagamento(c, painel) {
   return partes;
 }
 
-/** Devoluções feitas ou a caminho (cancelamento após o pagamento ou taxímetro abaixo do pago). */
+/** Devoluções feitas ou a caminho (corrida cancelada depois de paga). */
 function blocoEstornos(c) {
   const estornos = (c.cobrancas ?? []).filter((x) => x.tipo === 'estorno');
   if (!estornos.length) return null;
@@ -286,12 +286,7 @@ async function desenharCorrida(painel, c) {
     partes.push(el('div', { style: 'text-align:center;margin:10px 0' }, el('div', { class: 'mudo' }, 'Valor da corrida'),
       el('div', { class: 'grande-valor num' }, dinheiro(c.valor_final_centavos)),
       el('div', { class: 'pequeno mudo' }, `${km(c.distancia_percorrida_m)} · ${minutos(c.duracao_real_s)} · ${FORMAS[c.forma_pagamento]}${c.empresa ? ` (${c.empresa})` : ''}`)));
-    if (c.pagamento_status === 'pendente') {
-      partes.push(el('div', { class: 'aviso' }, `O taxímetro deu ${dinheiro(c.valor_final_centavos)} e você pagou ${dinheiro(c.valor_pago_centavos)} antes. Falta pagar a diferença.`),
-        await blocoPagamento(c, painel));
-    } else {
-      partes.push(el('div', { class: 'aviso ok' }, c.forma_pagamento === 'empresa' ? 'Corrida lançada na fatura da empresa.' : 'Corrida paga. Obrigado!'));
-    }
+    partes.push(el('div', { class: 'aviso ok' }, c.forma_pagamento === 'empresa' ? 'Corrida lançada na fatura da empresa.' : 'Corrida paga. Obrigado!'));
     partes.push(blocoEstornos(c));
     if (c.nota_do_passageiro === null) partes.push(avaliacao(c, painel));
   }

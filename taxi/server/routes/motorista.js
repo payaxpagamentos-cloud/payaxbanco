@@ -98,7 +98,10 @@ module.exports = (db) => {
       pagamento_status, valor_final_centavos, valor_motorista_centavos, taxa_plataforma_centavos, nota_do_passageiro
     FROM corridas WHERE motorista_id = ? ORDER BY id DESC LIMIT 100`).all(id(req))));
 
-  /** Ganhos do período (padrão: hoje), saldo, extrato e repasses. */
+  /** Pede o PIX do saldo disponível para a chave cadastrada (todo ou `valor_centavos`). Um por dia. */
+  r.post('/pix', (req, res) => res.status(201).json(fin.solicitarPix(db, id(req), req.body.valor_centavos)));
+
+  /** Ganhos do período (padrão: hoje), saldo, extrato e PIX pedidos. */
   r.get('/ganhos', (req, res) => {
     const ate = req.query.ate ? v.data(req.query.ate, 'a data final') : hoje();
     const de = req.query.de ? v.data(req.query.de, 'a data inicial') : ate;
@@ -106,6 +109,7 @@ module.exports = (db) => {
     res.json({
       ...fin.ganhos(db, id(req), de, ate),
       saldo_centavos: fin.saldo(db, id(req)),
+      pix: fin.pixDisponivel(db, id(req)),
       extrato: fin.extrato(db, id(req), 50),
       repasses: db.prepare('SELECT id, valor_centavos, chave_pix, status, criado_em, concluido_em, identificador FROM repasses WHERE motorista_id = ? ORDER BY id DESC LIMIT 30').all(id(req)),
     });

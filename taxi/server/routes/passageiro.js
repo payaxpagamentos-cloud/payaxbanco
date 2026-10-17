@@ -65,7 +65,7 @@ module.exports = (db) => {
     res.status(204).end();
   });
 
-  /** Cobrança em aberto da corrida (pagamento antes da viagem ou complemento do taxímetro), com o PIX para pagar. */
+  /** Cobrança em aberto da corrida (pagamento antes da viagem), com o PIX para pagar. */
   r.get('/corridas/:id/cobranca', async (req, res) => {
     const c = minha(req);
     const cob = db.prepare(`SELECT * FROM cobrancas WHERE corrida_id = ? AND status = 'pendente' AND tipo <> 'estorno' ORDER BY id DESC LIMIT 1`).get(c.id);

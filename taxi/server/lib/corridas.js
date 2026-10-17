@@ -86,10 +86,10 @@ function detalhar(db, c) {
   return out;
 }
 
-/** Corrida em curso do passageiro ou a última finalizada que ainda tem complemento a pagar ou avaliação. */
+/** Corrida em curso do passageiro ou a última finalizada ainda sem avaliação. */
 const corridaAtivaPassageiro = (db, id) => db.prepare(`SELECT * FROM corridas WHERE passageiro_id = ?
   AND (status IN ('aguardando_pagamento','solicitada','aceita','chegou','em_andamento')
-  OR (status = 'finalizada' AND (pagamento_status = 'pendente' OR nota_do_passageiro IS NULL) AND finalizada_em > ?)) ORDER BY id DESC LIMIT 1`)
+  OR (status = 'finalizada' AND nota_do_passageiro IS NULL AND finalizada_em > ?)) ORDER BY id DESC LIMIT 1`)
   .get(id, new Date(Date.now() - 6 * 3_600_000).toISOString());
 
 const corridaAtivaMotorista = (db, id) => db.prepare(`SELECT * FROM corridas WHERE motorista_id = ? AND status IN ('aceita','chegou','em_andamento')
@@ -112,11 +112,11 @@ function solicitar(db, passageiroId, dados) {
     const status = empresa ? 'solicitada' : 'aguardando_pagamento';
     const quando = agora();
     const r = db.prepare(`INSERT INTO corridas (passageiro_id, categoria, origem_endereco, origem_lat, origem_lng, destino_endereco, destino_lat, destino_lng,
-      distancia_estimada_m, duracao_estimada_s, bandeira, valor_estimado_centavos, forma_pagamento, empresa_id, modelo_cobranca, status,
+      distancia_estimada_m, duracao_estimada_s, bandeira, valor_estimado_centavos, forma_pagamento, empresa_id, status,
       pagamento_status, criada_em, solicitada_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(passageiroId, categoria, origem.endereco, origem.lat, origem.lng,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(passageiroId, categoria, origem.endereco, origem.lat, origem.lng,
       destino.endereco, destino.lat, destino.lng, est.distancia_m, est.duracao_s, est.bandeira, est.valor_centavos, forma, empresa?.id ?? null,
-      lerConfig(db).modelo_cobranca, status, empresa ? 'faturado' : 'pendente', quando, quando);
+      status, empresa ? 'faturado' : 'pendente', quando, quando);
     const id = Number(r.lastInsertRowid);
     const cobranca = empresa ? null : pag.criar(db, buscar(db, id), 'corrida', est.valor_centavos);
     return { id, cobranca_id: cobranca };
@@ -222,11 +222,9 @@ function posicao(db, motoristaId, lat, lng) {
 }
 
 /**
- * Finaliza a corrida. O taxímetro (distância percorrida pelo GPS e tempo real, na bandeira do pedido) é sempre registrado;
- * sem trajeto (GPS desligado), usa a distância estimada. O valor final depende do modelo de cobrança do pedido:
- * - 'estimativa' (preço fechado): vale o valor estimado, já pago antes;
- * - 'taximetro': vale o taxímetro; se ficou abaixo do pago, a diferença é estornada; acima, gera um complemento a pagar.
- * Empresa: o valor final entra na fatura do mês. A parte do motorista (valor final menos a taxa) vai para o saldo dele.
+ * Finaliza a corrida a preço fechado: o valor final é a estimativa (paga antes, ou faturada à empresa).
+ * O taxímetro (distância percorrida pelo GPS e tempo real, na bandeira do pedido) fica registrado só para conferência;
+ * sem trajeto (GPS desligado), usa a distância estimada. A parte do motorista (valor final menos a taxa) vai para o saldo dele.
  */
 function finalizar(db, motoristaId, corridaId) {
   return transacao(db, () => {
@@ -237,21 +235,11 @@ function finalizar(db, motoristaId, corridaId) {
     const duracao = Math.max(0, Math.round((Date.parse(fim) - Date.parse(c.iniciada_em)) / 1000));
     const dist = c.distancia_percorrida_m > 0 ? c.distancia_percorrida_m : c.distancia_estimada_m;
     const taximetro = tarifa.calcular(tarifas(db)[c.categoria], { distancia_m: dist, duracao_s: duracao, bandeira: c.bandeira });
-    const valor = c.modelo_cobranca === 'taximetro' ? taximetro : c.valor_estimado_centavos;
+    const valor = c.valor_estimado_centavos;
     const partes = tarifa.dividir(valor, cfg.taxa_plataforma_bp);
     db.prepare(`UPDATE corridas SET status = 'finalizada', finalizada_em = ?, duracao_real_s = ?, distancia_percorrida_m = ?, valor_taximetro_centavos = ?,
       valor_final_centavos = ?, taxa_plataforma_centavos = ?, valor_motorista_centavos = ? WHERE id = ?`)
       .run(fim, duracao, dist, taximetro, valor, partes.taxa_plataforma_centavos, partes.valor_motorista_centavos, c.id);
-    if (c.forma_pagamento !== 'empresa') {
-      const diferenca = valor - c.valor_pago_centavos;
-      if (diferenca < 0) {
-        pag.criar(db, c, 'estorno', -diferenca, 'Taxímetro abaixo do valor pago');
-        db.prepare('UPDATE corridas SET valor_pago_centavos = ? WHERE id = ?').run(valor, c.id);
-      } else if (diferenca > 0) {
-        pag.criar(db, c, 'complemento', diferenca, 'Taxímetro acima do valor pago');
-        db.prepare(`UPDATE corridas SET pagamento_status = 'pendente' WHERE id = ?`).run(c.id);
-      }
-    }
     const final = buscar(db, c.id);
     fin.creditarCorrida(db, final);
     return final;

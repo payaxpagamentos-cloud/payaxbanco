@@ -1,5 +1,5 @@
 import { api, sessao, usarSessao } from './api.js';
-import { el, $, limpar, dinheiro, km, minutos, dataHora, FORMAS, CATEGORIAS, etiquetaStatus, toast, acao, perguntar, confirmar, marca, repetir, modal, lerForm,
+import { el, $, limpar, dinheiro, km, minutos, dataHora, FORMAS, CATEGORIAS, etiquetaStatus, toast, acao, perguntar, marca, repetir, modal, lerForm,
   hojeLocal, somarDias } from './ui.js';
 import { criarMapa, camada, ICONES, enquadrar } from './mapa.js';
 import { telaEntrada } from './entrada.js';
@@ -30,7 +30,7 @@ const TELAS = {
   passageiros: ['Passageiros', telaPassageiros],
   empresas: ['Empresas', telaEmpresas],
   pagamentos: ['Pagamentos', telaPagamentos],
-  repasses: ['Repasses', telaRepasses],
+  repasses: ['PIX dos motoristas', telaRepasses],
   relatorios: ['Relatórios', telaRelatorios],
   tarifas: ['Tarifas e regras', telaTarifas],
   equipe: ['Equipe', telaEquipe, 'admin'],
@@ -92,8 +92,9 @@ async function telaPainel(c) {
         indicador('Em atendimento', (a.aceita ?? 0) + (a.chegou ?? 0) + (a.em_andamento ?? 0), `${a.em_andamento ?? 0} em viagem`),
         indicador('Corridas hoje', p.hoje.finalizadas, `${p.hoje.canceladas} cancelada(s)`),
         indicador('Faturamento hoje', dinheiro(p.hoje.bruto_centavos), `taxa da plataforma ${dinheiro(p.hoje.taxa_centavos)}`),
-        indicador('A repassar', dinheiro(p.a_repassar_centavos), `${p.repasses_pendentes.n} repasse(s) pendente(s)`),
-        indicador('Estornos a devolver', cob.estorno ?? 0, `${cob.complemento ?? 0} complemento(s) a receber`),
+        indicador('Saldo dos motoristas', dinheiro(p.a_repassar_centavos), 'disponível para pedirem o PIX'),
+        indicador('PIX a fazer', dinheiro(p.repasses_pendentes.total), `${p.repasses_pendentes.n} pedido(s) de motoristas`),
+        indicador('Estornos a devolver', cob.estorno ?? 0, 'corridas canceladas depois de pagas'),
         indicador('Faturas em aberto', dinheiro(p.faturas_abertas.total), `${p.faturas_abertas.n} fatura(s) de empresas`)),
       (p.motoristas_pendentes || p.veiculos_pendentes) ? el('div', { class: 'aviso' }, `${p.motoristas_pendentes} motorista(s) e ${p.veiculos_pendentes} veículo(s) aguardando aprovação. `,
         el('a', { href: '#', onclick: (e) => { e.preventDefault(); ir('motoristas'); } }, 'Analisar')) : null);
@@ -143,12 +144,11 @@ async function detalheCorrida(id) {
     linha('Solicitada', dataHora(c.solicitada_em)), linha('Aceita', dataHora(c.aceita_em)), linha('Início', dataHora(c.iniciada_em)), linha('Fim', dataHora(c.finalizada_em)),
     linha('Estimativa', `${dinheiro(c.valor_estimado_centavos)} · ${km(c.distancia_estimada_m)} · ${minutos(c.duracao_estimada_s)} · bandeira ${c.bandeira}`),
     c.empresa ? linha('Empresa', c.empresa) : null,
-    linha('Cobrança', c.modelo_cobranca === 'taximetro' ? 'pelo taxímetro (diferença devolvida ou cobrada)' : 'preço fechado (vale o valor pago)'),
     c.valor_final_centavos !== null ? linha('Valor final', `${dinheiro(c.valor_final_centavos)} · ${km(c.distancia_percorrida_m)} · ${minutos(c.duracao_real_s)}`) : null,
-    c.valor_taximetro_centavos !== null ? linha('Taxímetro', dinheiro(c.valor_taximetro_centavos)) : null,
+    c.valor_taximetro_centavos !== null ? linha('Taxímetro (só conferência)', dinheiro(c.valor_taximetro_centavos)) : null,
     c.forma_pagamento !== 'empresa' ? linha('Pago pelo passageiro', dinheiro(c.valor_pago_centavos)) : null,
     c.cobrancas.length ? el('div', { style: 'margin-top:8px' }, el('h3', {}, 'Pagamentos e estornos'), c.cobrancas.map((b) => el('div', { class: 'chave pequeno' },
-      el('span', {}, `${{ corrida: 'Pagamento', complemento: 'Complemento', estorno: 'Estorno' }[b.tipo]} · ${FORMAS[b.forma]} · ${dataHora(b.criada_em)}`),
+      el('span', {}, `${{ corrida: 'Pagamento', estorno: 'Estorno' }[b.tipo]} · ${FORMAS[b.forma]} · ${dataHora(b.criada_em)}`),
       el('span', { class: 'linha' }, el('strong', { class: 'num' }, dinheiro(b.valor_centavos)), situacaoEtq(b.status))))) : null,
     c.valor_final_centavos !== null ? linha('Plataforma / motorista', `${dinheiro(c.taxa_plataforma_centavos)} / ${dinheiro(c.valor_motorista_centavos)}`) : null,
     c.status === 'cancelada' ? linha('Cancelada por', `${c.cancelada_por}${c.motivo_cancelamento ? `: ${c.motivo_cancelamento}` : ''}`) : null,
@@ -180,7 +180,7 @@ async function telaCorridas(c) {
   };
   const status = el('select', { onchange: (e) => { estado.status = e.target.value; carregar(); } }, el('option', { value: '' }, 'Todos'),
     ['aguardando_pagamento', 'solicitada', 'aceita', 'chegou', 'em_andamento', 'finalizada', 'cancelada'].map((s) => el('option', { value: s }, s.replace('_', ' '))));
-  const pag = el('select', { onchange: (e) => { estado.pagamento = e.target.value; carregar(); } }, el('option', { value: '' }, 'Todos'), el('option', { value: 'pendente' }, 'Pagamento ou complemento pendente'));
+  const pag = el('select', { onchange: (e) => { estado.pagamento = e.target.value; carregar(); } }, el('option', { value: '' }, 'Todos'), el('option', { value: 'pendente' }, 'Aguardando pagamento'));
   limpar(c, cabeca('Corridas'), el('div', { class: 'filtros' }, filtroPeriodo(estado, carregar), el('label', { class: 'campo' }, 'Status', status), el('label', { class: 'campo' }, 'Pagamento', pag)), corpo);
   await carregar();
 }
@@ -275,7 +275,7 @@ async function telaPagamentos(c) {
   const corpo = el('div');
   const carregar = async () => {
     const lista = await api.get(`/central/cobrancas${filtro ? `?status=${filtro}` : ''}`);
-    const rotulo = { corrida: 'Pagamento da corrida', complemento: 'Complemento (taxímetro)', estorno: 'Estorno ao passageiro' };
+    const rotulo = { corrida: 'Pagamento da corrida', estorno: 'Estorno ao passageiro' };
     limpar(corpo, tabela(['#', 'Tipo', 'Corrida', 'Passageiro', 'Forma', 'Criada', 'Situação', '>Valor', ''], lista.map((b) => el('tr', {},
       td(b.id), td(rotulo[b.tipo]), td(botao(`#${b.corrida_id}`, '', () => detalheCorrida(b.corrida_id))), td(el('span', {}, b.passageiro_nome, el('br'), el('span', { class: 'pequeno mudo' }, b.passageiro_email))),
       td(FORMAS[b.forma]), td(dataHora(b.criada_em)), td(el('span', {}, situacaoEtq(b.status), b.identificador ? el('div', { class: 'pequeno mudo' }, b.identificador) : null)),
@@ -420,36 +420,32 @@ async function telaRepasses(c) {
     const [saldos, repasses] = await Promise.all([api.get('/central/saldos'), api.get('/central/repasses')]);
     const aReceber = saldos.filter((s) => s.saldo_centavos > 0);
     limpar(corpo,
-      el('div', { class: 'grade' }, indicador('A repassar', dinheiro(aReceber.reduce((a, s) => a + s.saldo_centavos, 0)), `${aReceber.length} motorista(s)`),
-        indicador('Repasses pendentes', dinheiro(repasses.filter((r) => r.status === 'pendente').reduce((a, r) => a + r.valor_centavos, 0)), 'gerados e ainda não transferidos')),
-      el('h2', { style: 'margin-top:8px' }, 'Saldos dos motoristas'),
-      tabela(['Motorista', 'Chave PIX', '>Saldo'], saldos.map((s) => el('tr', {}, td(s.nome), td(s.chave_pix ?? el('span', { class: 'etiqueta erro' }, 'sem chave')), td(dinheiro(s.saldo_centavos), true))), 'Nenhum saldo em aberto.'),
-      el('h2', { style: 'margin-top:8px' }, 'Repasses'),
-      tabela(['#', 'Motorista', 'Chave PIX', 'Gerado', 'Situação', 'Identificador', '>Valor', ''], repasses.map((r) => el('tr', {},
+      el('div', { class: 'grade' }, indicador('PIX a fazer', dinheiro(repasses.filter((r) => r.status === 'pendente').reduce((a, r) => a + r.valor_centavos, 0)),
+        `${repasses.filter((r) => r.status === 'pendente').length} pedido(s)`),
+      indicador('Saldo dos motoristas', dinheiro(aReceber.reduce((a, s) => a + s.saldo_centavos, 0)), `${aReceber.length} motorista(s) com valor disponível`)),
+      el('h2', { style: 'margin-top:8px' }, 'Pedidos de PIX'),
+      tabela(['#', 'Motorista', 'Chave PIX', 'Pedido em', 'Situação', 'Identificador', '>Valor', ''], repasses.map((r) => el('tr', {},
         td(r.id), td(r.nome), td(r.chave_pix), td(dataHora(r.criado_em)), td(situacaoEtq(r.status)), td(r.identificador ?? r.motivo ?? '—'), td(dinheiro(r.valor_centavos), true),
         td(r.status === 'pendente' ? el('div', { class: 'linha' },
           botao('Marcar pago', 'primario', async () => {
-            const id = await perguntar(`Repasse #${r.id} · ${dinheiro(r.valor_centavos)}`, `Faça o PIX para ${r.chave_pix} e informe o identificador (E2E) ou o nº do comprovante`);
+            const id = await perguntar(`PIX #${r.id} · ${dinheiro(r.valor_centavos)}`, `Faça o PIX para ${r.chave_pix} e informe o identificador (E2E) ou o nº do comprovante`);
             if (!id) return;
             await api.post(`/central/repasses/${r.id}/pagar`, { identificador: id });
-            toast('Repasse registrado como pago.');
+            toast('PIX registrado como pago.');
             await carregar();
           }),
           botao('Cancelar', 'perigo', async () => {
-            const motivo = await perguntar('Cancelar repasse', 'Motivo (o valor volta ao saldo do motorista)');
+            const motivo = await perguntar('Cancelar pedido de PIX', 'Motivo (o motorista vê; o valor volta ao saldo dele)');
             if (!motivo) return;
             await api.post(`/central/repasses/${r.id}/cancelar`, { motivo });
             await carregar();
-          })) : null))), 'Nenhum repasse gerado ainda.'));
+          })) : null))), 'Nenhum pedido de PIX ainda.'),
+      el('h2', { style: 'margin-top:8px' }, 'Saldos dos motoristas'),
+      tabela(['Motorista', 'Chave PIX', '>Saldo'], saldos.map((s) => el('tr', {}, td(s.nome), td(s.chave_pix ?? el('span', { class: 'etiqueta erro' }, 'sem chave')), td(dinheiro(s.saldo_centavos), true))), 'Nenhum saldo em aberto.'),
+      );
   };
-  const gerar = el('button', { class: 'btn primario' }, 'Gerar repasses');
-  gerar.addEventListener('click', () => acao(gerar, async () => {
-    if (!(await confirmar('Gerar repasses', 'Cria um repasse pendente para cada motorista com saldo acima do mínimo e chave PIX cadastrada.', 'Gerar'))) return;
-    const r = await api.post('/central/repasses');
-    toast(`${r.gerados.length} repasse(s) gerado(s)${r.ignorados.length ? `; ${r.ignorados.length} ignorado(s) (${[...new Set(r.ignorados.map((i) => i.motivo))].join(', ')})` : ''}.`);
-    await carregar();
-  }));
-  limpar(c, cabeca('Repasses aos motoristas', gerar), corpo);
+  limpar(c, cabeca('PIX dos motoristas'), el('p', { class: 'pequeno mudo' },
+    'O valor de cada corrida (já sem a taxa) fica disponível para o motorista, que pede o PIX pelo app, no máximo um por dia. Faça a transferência para a chave informada e registre aqui.'), corpo);
   await carregar();
 }
 
@@ -465,7 +461,7 @@ async function telaRelatorios(c) {
         indicador('Receita da plataforma', dinheiro(r.taxa_centavos)), indicador('Parte dos motoristas', dinheiro(r.motoristas_centavos)),
         indicador('Faturado a empresas', dinheiro(r.faturado_empresas_centavos)),
         indicador('Estornos devolvidos', dinheiro(r.estornos_centavos), r.estornos_pendentes_centavos ? `${dinheiro(r.estornos_pendentes_centavos)} a devolver` : null),
-        indicador('Complementos a receber', dinheiro(r.complementos_pendentes_centavos), 'taxímetro acima do valor pago')),
+      ),
       el('div', { class: 'cartao' }, el('h2', {}, 'Faturamento por dia'), r.por_dia.length
         ? el('div', { class: 'barras', role: 'img', 'aria-label': 'Faturamento por dia' }, r.por_dia.map((d) => el('div', { class: 'barra', style: `height:${Math.max(2, (d.bruto_centavos / maior) * 100)}%`,
           title: `${d.data.split('-').reverse().join('/')}: ${dinheiro(d.bruto_centavos)} · ${d.finalizadas} corrida(s)` })))
@@ -520,10 +516,7 @@ async function telaTarifas(c) {
   const regras = el('form', { class: 'form' },
     el('div', { class: 'duas' }, campo('Taxa da plataforma (%)', 'taxa', (cfg.taxa_plataforma_bp / 100).toString().replace('.', ',')), campo('Raio de busca de motoristas (km)', 'raio', cfg.raio_busca_km)),
     el('div', { class: 'duas' }, campo('Espera máxima por motorista (min)', 'expirar', cfg.expirar_solicitacao_min), campo('Prazo para pagar o pedido (min)', 'expirarPag', cfg.expirar_pagamento_min)),
-    campo('Repasse mínimo (R$)', 'minimo', reais(cfg.repasse_minimo_centavos)),
-    el('label', { class: 'campo' }, 'Valor cobrado do passageiro', el('select', { name: 'modelo', disabled: !admin },
-      el('option', { value: 'estimativa', selected: cfg.modelo_cobranca === 'estimativa' }, 'Preço fechado: vale o valor pago antes'),
-      el('option', { value: 'taximetro', selected: cfg.modelo_cobranca === 'taximetro' }, 'Taxímetro: devolve ou cobra a diferença no fim'))),
+    campo('Valor mínimo do PIX pedido pelo motorista (R$)', 'minimo', reais(cfg.repasse_minimo_centavos)),
     el('div', { class: 'duas' }, campo('Bandeira 2: início (hora)', 'b2ini', cfg.bandeira2_inicio_hora, { type: 'number', min: 0, max: 23 }), campo('Bandeira 2: fim (hora)', 'b2fim', cfg.bandeira2_fim_hora, { type: 'number', min: 0, max: 23 })),
     el('label', { class: 'linha pequeno' }, el('input', { type: 'checkbox', name: 'b2dom', checked: cfg.bandeira2_domingo, disabled: !admin, style: 'width:auto;min-height:0' }), 'Bandeira 2 o dia todo aos domingos'),
     el('label', { class: 'linha pequeno' }, el('input', { type: 'checkbox', name: 'b2fer', checked: cfg.bandeira2_feriados, disabled: !admin, style: 'width:auto;min-height:0' }), 'Bandeira 2 nos feriados nacionais'),
@@ -537,7 +530,7 @@ async function telaTarifas(c) {
     const d = lerForm(regras);
     acao(regras.querySelector('button'), async () => {
       await api.patch('/central/config', {
-        taxa_plataforma_bp: Math.round(Number(d.taxa.replace(',', '.')) * 100), raio_busca_km: d.raio, expirar_solicitacao_min: Number(d.expirar), expirar_pagamento_min: Number(d.expirarPag), modelo_cobranca: d.modelo, repasse_minimo_centavos: centavos(d.minimo),
+        taxa_plataforma_bp: Math.round(Number(d.taxa.replace(',', '.')) * 100), raio_busca_km: d.raio, expirar_solicitacao_min: Number(d.expirar), expirar_pagamento_min: Number(d.expirarPag), repasse_minimo_centavos: centavos(d.minimo),
         bandeira2_inicio_hora: Number(d.b2ini), bandeira2_fim_hora: Number(d.b2fim), bandeira2_domingo: d.b2dom === 'on', bandeira2_feriados: d.b2fer === 'on',
         fator_rota: d.fator, velocidade_media_kmh: d.vel, pix_chave: d.pix, pix_recebedor: d.recebedor, pix_cidade: d.cidade,
       });
@@ -546,7 +539,7 @@ async function telaTarifas(c) {
   });
   limpar(c, cabeca('Tarifas e regras'),
     el('div', { style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px' }, tarifas.map(formTarifa), el('div', { class: 'cartao', style: 'grid-row:span 2' }, el('h2', {}, 'Regras'), regras)),
-    el('p', { class: 'pequeno mudo' }, 'Taxímetro = bandeirada + km × distância percorrida + minuto × tempo de viagem, nunca abaixo da mínima. A estimativa (paga antes da viagem) usa a distância em linha reta × fator de rota. Confira a regra da prefeitura antes de usar o preço fechado.'));
+    el('p', { class: 'pequeno mudo' }, 'Preço fechado: o passageiro paga antes a estimativa = bandeirada + km × distância estimada + minuto × tempo estimado, nunca abaixo da mínima (distância em linha reta × fator de rota). O taxímetro da viagem real fica registrado só para conferência.'));
 }
 
 // ---------- Equipe ----------
