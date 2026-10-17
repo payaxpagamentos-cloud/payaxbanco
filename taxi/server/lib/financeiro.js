@@ -14,7 +14,7 @@ const FORMA = { pix: 'PIX', cartao: 'cartão', empresa: 'empresa' };
 function creditarCorrida(db, c) {
   if (!c.valor_motorista_centavos) return;
   db.prepare(`INSERT INTO lancamentos_motorista (motorista_id, corrida_id, tipo, descricao, valor_centavos, criado_em)
-    VALUES (?, ?, 'corrida', ?, ?, ?)`).run(c.motorista_id, c.id, `Corrida #${c.id} (${FORMA[c.forma_pagamento]}): ${(c.valor_final_centavos / 100).toFixed(2).replace('.', ',')} menos a taxa`,
+    VALUES (?, ?, 'corrida', ?, ?, ?)`).run(c.motorista_id, c.id, `Corrida (${FORMA[c.forma_pagamento]}): ${(c.valor_final_centavos / 100).toFixed(2).replace('.', ',')} menos a taxa`,
     c.valor_motorista_centavos, agora());
 }
 
@@ -74,7 +74,7 @@ function solicitarPix(db, motoristaId, valor) {
       .run(motoristaId, quanto, m.chave_pix, agora(), motoristaId);
     const id = Number(r.lastInsertRowid);
     db.prepare(`INSERT INTO lancamentos_motorista (motorista_id, repasse_id, tipo, descricao, valor_centavos, criado_em, criado_por)
-      VALUES (?, ?, 'repasse', ?, ?, ?, ?)`).run(motoristaId, id, `PIX #${id} pedido para a chave ${m.chave_pix}`, -quanto, agora(), motoristaId);
+      VALUES (?, ?, 'repasse', ?, ?, ?, ?)`).run(motoristaId, id, `PIX pedido para a chave ${m.chave_pix}`, -quanto, agora(), motoristaId);
     return { id, valor_centavos: quanto, chave_pix: m.chave_pix };
   });
 }
@@ -104,7 +104,7 @@ function recusarPix(db, usuario, id, motivo) {
     db.prepare(`UPDATE repasses SET status = 'cancelado', concluido_em = ?, concluido_por = ?, motivo = ? WHERE id = ?`)
       .run(agora(), usuario.id, v.texto(motivo, 'o motivo', 300), id);
     db.prepare(`INSERT INTO lancamentos_motorista (motorista_id, repasse_id, tipo, descricao, valor_centavos, criado_em, criado_por)
-      VALUES (?, ?, 'estorno_repasse', ?, ?, ?, ?)`).run(r.motorista_id, id, `PIX #${id} recusado: valor devolvido ao saldo`, r.valor_centavos, agora(), usuario.id);
+      VALUES (?, ?, 'estorno_repasse', ?, ?, ?, ?)`).run(r.motorista_id, id, 'PIX recusado: valor devolvido ao saldo', r.valor_centavos, agora(), usuario.id);
   });
 }
 

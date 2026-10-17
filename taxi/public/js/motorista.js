@@ -180,7 +180,7 @@ function desenharCorrida(painel, c) {
   const trajeto = el('div', { class: 'coluna pequeno' },
     el('div', { class: 'ponto' }, el('span', { class: 'bola origem', style: 'margin-top:4px' }), el('span', {}, c.origem_endereco)),
     el('div', { class: 'ponto' }, el('span', { class: 'bola destino', style: 'margin-top:4px' }), el('span', {}, c.destino_endereco)));
-  const partes = [el('div', { class: 'alca' }), el('div', { class: 'linha entre' }, etiquetaStatus(c.status), el('span', { class: 'pequeno mudo' }, `#${c.id} · ${FORMAS[c.forma_pagamento]} (já pago)`))];
+  const partes = [el('div', { class: 'alca' }), el('div', { class: 'linha entre' }, etiquetaStatus(c.status), el('span', { class: 'pequeno mudo' }, `${FORMAS[c.forma_pagamento]} (já pago)`))];
   // O passageiro já pagou (ou a empresa é faturada): o motorista só vê quanto recebe, sem a taxa da plataforma.
   const ganho = el('div', { class: 'cartao plano', style: 'margin:10px 0;text-align:center' }, el('div', { class: 'mudo pequeno' }, 'Você recebe (estimado)'),
     el('div', { class: 'grande-valor num', style: 'font-size:24px' }, dinheiro(c.ganho_estimado_centavos)));
@@ -261,7 +261,7 @@ async function ganhos() {
       g.extrato.length ? g.extrato.map((l) => el('div', { class: 'chave pequeno' }, el('span', {}, l.descricao, el('br'), el('span', { class: 'mudo' }, dataHora(l.criado_em))),
         el('strong', { class: 'num', style: `color:var(--${l.valor_centavos < 0 ? 'erro' : 'ok'})` }, dinheiro(l.valor_centavos)))) : el('p', { class: 'mudo pequeno' }, 'Sem lançamentos.'),
       g.repasses.length ? [el('h3', { style: 'margin-top:6px' }, 'Meus pedidos de PIX'), g.repasses.map((r) => el('div', { class: 'chave pequeno' },
-        el('span', {}, `#${r.id} · ${dataHora(r.criado_em)}`, el('br'), el('span', { class: 'mudo' }, r.status === 'pendente' ? `aguardando a liberação da gestão · ${r.chave_pix}` : r.status === 'cancelado' ? (r.motivo ?? 'recusado') : r.identificador)),
+        el('span', {}, `Pedido em ${dataHora(r.criado_em)}`, el('br'), el('span', { class: 'mudo' }, r.status === 'pendente' ? `aguardando a liberação da gestão · ${r.chave_pix}` : r.status === 'cancelado' ? (r.motivo ?? 'recusado') : r.identificador)),
         el('span', { class: 'linha' }, el('strong', { class: 'num' }, dinheiro(r.valor_centavos)), el('span', { class: `etiqueta ${r.status === 'pago' ? 'ok' : r.status === 'cancelado' ? 'erro' : 'aviso'}` }, { pendente: 'aguardando', pago: 'liberado', cancelado: 'recusado' }[r.status]))))] : null);
   };
   await carregar().catch((err) => toast(err.message, true));

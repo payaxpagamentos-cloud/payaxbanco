@@ -255,7 +255,7 @@ function blocoEstornos(c) {
 }
 
 async function desenharCorrida(painel, c) {
-  const partes = [el('div', { class: 'alca' }), el('div', { class: 'linha entre' }, etiquetaStatus(c.status), el('span', { class: 'pequeno mudo' }, `Corrida #${c.id}`))];
+  const partes = [el('div', { class: 'alca' }), el('div', { class: 'linha entre' }, etiquetaStatus(c.status))];
   const trajeto = el('div', { class: 'coluna pequeno', style: 'margin-top:10px' },
     el('div', { class: 'ponto' }, el('span', { class: 'bola origem', style: 'margin-top:4px' }), el('span', {}, c.origem_endereco)),
     el('div', { class: 'ponto' }, el('span', { class: 'bola destino', style: 'margin-top:4px' }), el('span', {}, c.destino_endereco)));
