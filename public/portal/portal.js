@@ -23,13 +23,13 @@ function telaLogin(alvo) {
   telaEntrada(alvo, {
     tituloPagina: 'Entrar · Portal do Cliente Ativa',
     titulo: 'Portal do Cliente',
-    subtitulo: 'Entre com o e-mail e a senha enviados pela equipe Ativa.',
-    chamada: 'Portal do Cliente',
-    texto: 'O financeiro da sua empresa, acompanhado de perto.',
-    itens: [['check', 'Aprove pagamentos de onde estiver'], ['documento', 'Envie notas, boletos e contratos'], ['dre', 'Consulte saldos, DRE e fluxo de caixa'], ['conversa', 'Converse com a equipe do BPO']],
+    selo: 'Sua empresa acompanhada pela Ativa',
+    linha1: 'O financeiro da sua empresa,',
+    destaque: 'organizado e em dia.',
+    descricao: 'Aprove pagamentos, envie notas e boletos, consulte saldos, DRE e fluxo de caixa e fale com a equipe Ativa de onde estiver.',
     rota: '/portal/auth/login',
     rota2fa: '/portal/auth/2fa/login',
-    aviso: 'Esqueceu a senha? Peça uma nova à equipe Ativa.',
+    aviso: 'Conexão segura · esqueceu a senha? Peça à equipe Ativa',
     troca: html`É da equipe Ativa? <a href="#" data-endereco="equipe">Acesse o sistema da equipe</a>.`,
     aoEntrar: () => rotear(),
   });

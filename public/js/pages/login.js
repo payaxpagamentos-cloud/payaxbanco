@@ -5,14 +5,14 @@ import { telaEntrada } from './entrada.js';
 export default function login(alvo, aoEntrar) {
   telaEntrada(alvo, {
     tituloPagina: 'Entrar · Ativa BPO Financeiro',
-    titulo: 'Bem-vindo de volta',
-    subtitulo: 'Acesse com seu e-mail e senha da equipe.',
-    chamada: 'BPO Financeiro',
-    texto: 'O financeiro dos seus clientes, organizado e em dia.',
-    itens: [['pagar', 'Contas a pagar e a receber'], ['conciliar', 'Conciliação bancária'], ['fluxo', 'Fluxo de caixa e DRE'], ['check', 'Aprovação de pagamentos'], ['tarefas', 'Fechamento mensal da carteira']],
+    titulo: 'Entre em sua conta',
+    selo: 'BPO financeiro da sua carteira, ao vivo',
+    linha1: 'Mais controle para o financeiro dos seus clientes',
+    destaque: 'crescer.',
+    descricao: 'Contas a pagar e a receber, conciliação, fluxo de caixa, DRE e aprovações de todas as empresas em um só painel, atualizados ao longo do dia.',
     rota: '/auth/login',
     rota2fa: '/auth/2fa/login',
-    aviso: 'Acesso restrito à equipe Ativa. Todas as ações ficam registradas.',
+    aviso: 'Conexão segura · acesso só para a equipe',
     troca: html`É cliente? Acesse o <a href="#" data-endereco="portal">Portal do Cliente</a>.`,
     aoEntrar: () => { $('#app').innerHTML = ''; aoEntrar(); },
   });

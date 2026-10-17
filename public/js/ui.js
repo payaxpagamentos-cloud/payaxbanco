@@ -256,6 +256,8 @@ const P = {
   documento: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h6',
   plug: 'M9 2v6M15 2v6M7 8h10v4a5 5 0 0 1-10 0zM12 17v5',
   enviar: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
+  email: 'M4 6h16v12H4zM4 7l8 6 8-6',
+  entrar: 'M10 17l5-5-5-5M15 12H3M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4',
 };
 export const icone = (nome) => raw(`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[nome] ?? ''}"/></svg>`);
 
