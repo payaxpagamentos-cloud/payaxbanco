@@ -144,7 +144,7 @@ function redesenharPedido() {
       el('span', { class: 'icone' }, e.categoria === 'executivo' ? '🚘' : '🚕'),
       el('span', { class: 'meio' }, el('strong', {}, CATEGORIAS[e.categoria]), el('br'),
         el('span', { class: 'pequeno mudo' }, `${km(e.distancia_m)} · ~${minutos(e.duracao_s)}${e.bandeira === 2 ? ' · bandeira 2' : ''}`)),
-      el('span', { class: 'valor num' }, `~${dinheiro(e.valor_centavos)}`)))),
+      el('span', { class: 'valor num' }, dinheiro(e.valor_centavos))))),
       el('div', {}, el('div', { class: 'pequeno mudo', style: 'margin-bottom:6px' }, 'Pagamento (antes da viagem)'),
         // "Empresa" só aparece para quem a gestão autorizou.
         el('div', { class: 'pilulas' }, Object.entries(FORMAS).filter(([k]) => k !== 'empresa' || empresas.length).map(([k, rot]) => el('button', { type: 'button',

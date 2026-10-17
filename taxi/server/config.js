@@ -55,6 +55,12 @@ module.exports = {
   // Pagamentos: 'simulado' (testes: o passageiro aprova na tela) ou 'manual' (PIX na chave da plataforma, confirmado pela central;
   // cartão indisponível). A cobrança automática de PIX e cartão exige um intermediador de pagamentos (PSP) ligado em lib/pagamentos.js.
   pagamentos: process.env.TAXI_PAGAMENTOS || (producao ? 'manual' : 'simulado'),
+  // Rotas pelas ruas (navegador do motorista e estimativa do preço fechado): servidor OSRM. Vazio desliga (estimativa em linha reta).
+  // O servidor público de demonstração serve para testes; em produção, rode um OSRM próprio com o mapa do Brasil.
+  rotas: {
+    url: String(process.env.TAXI_ROTAS_URL ?? 'https://router.project-osrm.org').replace(/\/+$/, ''),
+    timeoutMs: Number(process.env.TAXI_ROTAS_TIMEOUT_MS) || 6000,
+  },
   admin: {
     nome: process.env.TAXI_ADMIN_NOME || 'Administrador da Central',
     email: process.env.TAXI_ADMIN_EMAIL || 'admin@apptaxi.com.br',

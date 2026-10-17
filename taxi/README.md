@@ -32,7 +32,10 @@ celular (não precisa instalar nada da loja) e não depende do Ativa BPO: tem ba
 - **Ofertas de corrida** dentro do raio configurado, da mais próxima para a mais distante, mostrando em destaque **quanto ele recebe, já sem a
   taxa da plataforma**, a distância até o passageiro e o destino. Só chegam corridas já pagas (ou de empresa). Aceita ou recusa; o primeiro que aceita leva (dois motoristas não pegam a mesma corrida).
   Veículo executivo atende as duas categorias; o comum, só a comum.
-- Botões **Navegar** (Google Maps), **Cheguei**, **Iniciar** e **Finalizar**. Pode desistir antes de iniciar: a corrida volta para os outros.
+- **Navegador próprio no app** (como Google Maps/Waze): rota pelas ruas desenhada no mapa, a próxima manobra com seta e distância
+  ("Em 300 m, vire à direita na Rua Augusta"), **instruções por voz** em português, **recálculo** quando sai do caminho, tempo restante e horário
+  de chegada, tela acesa durante a navegação (quando o celular permite). Atalhos para abrir a mesma rota no Google Maps ou no Waze, se o motorista preferir.
+- Botões **Navegar**, **Cheguei**, **Iniciar** e **Finalizar**. Pode desistir antes de iniciar: a corrida volta para os outros.
 - Não recebe nem confirma pagamento: no fim aparece **"Você recebe R$ …"**, que já entra no saldo. Avalia o passageiro.
 - **Ganhos** de hoje, 7 ou 30 dias (valor recebido já sem a taxa, valor das corridas, taxa, km rodados), **saldo disponível** e extrato.
 - **Pede o PIX** do saldo (todo ou parte) para a chave PIX cadastrada, **no máximo um por dia**. O pedido fica *aguardando liberação*
@@ -69,7 +72,9 @@ celular (não precisa instalar nada da loja) e não depende do Ativa BPO: tem ba
 | **Empresa** | na fatura do mês | Só para passageiros autorizados pela gestão, dentro dos limites mensais da empresa e da pessoa. A chamada sai na hora. |
 
 **Preço fechado.** O passageiro paga antes a estimativa (bandeirada + km × distância estimada + minuto × tempo estimado, nunca abaixo da
-mínima), e esse é o valor final da corrida, sem acerto no fim. O taxímetro da viagem real fica registrado na corrida só para conferência.
+mínima), e esse é o valor final da corrida, sem acerto no fim. A distância é a da **rota pelas ruas** (servidor de rotas, abaixo); o tempo é o
+maior entre o da rota e a distância na velocidade média configurada (o servidor de rotas não considera trânsito). Sem servidor de rotas,
+vale a linha reta × fator de rota. O taxímetro da viagem real fica registrado na corrida só para conferência.
 
 No taxímetro de conferência, a distância percorrida soma as posições de GPS do motorista durante a viagem (saltos de sinal acima de 150 km/h são descartados);
 sem GPS, vale a distância estimada. A bandeira 2 vale à noite (padrão 20h às 6h), aos domingos e nos feriados nacionais, e é definida no pedido.
@@ -99,8 +104,10 @@ outras podem ser escolhidas com `?categoria_receita=` e `?categoria_despesa=`.
 - **Confirmação automática do PIX**, **cartão de crédito** e **estorno automático**: exigem contrato com um banco ou intermediador de pagamentos
   (PSP), que avisa o pagamento por webhook. Sem ele, o sistema gera o QR Code PIX e a central confirma e devolve pela tela *Pagamentos*.
 - **Transferência automática do PIX pedido pelo motorista**: exige ligar a API PIX da conta da plataforma. Hoje a central transfere e registra o identificador.
-- **Rota pelas ruas e tempo com trânsito**: exige um serviço de rotas (Google, Mapbox, OSRM próprio). A estimativa usa a distância em
-  linha reta × fator de rota e a velocidade média configurada; o valor cobrado usa o GPS real.
+- **Trânsito em tempo real** no navegador e na estimativa (como no Waze): exige um serviço de trânsito pago (Google, TomTom, HERE).
+  O navegador do app usa as rotas do OSRM, sem trânsito.
+- **Navegação com o app fechado ou com a tela bloqueada**: o navegador roda no navegador do celular, com o app aberto; isso só é possível
+  num app nativo (Android/iOS).
 - **Notificação com o app fechado** (push) e **apps nas lojas** (Android/iOS): a versão atual roda no navegador, com o app aberto.
 - **Google Maps**: o mapa e a busca de endereços usam o Google Maps quando há chave (veja abaixo); o Google cobra por uso
   (carregamentos de mapa e buscas de endereço) depois da cota gratuita mensal. Sem chave, o app usa o OpenStreetMap, cujos serviços públicos têm limite de uso.
@@ -131,6 +138,21 @@ npm run seed
 - Com proxy reverso, ajuste `TAXI_TRUST_PROXY`. O banco fica em `TAXI_DB` (padrão `data/taxi.db`): faça backup dessa pasta.
 - Docker: `docker build -t app-taxi . && docker run -p 3200:3200 -v taxi-dados:/app/data -e TAXI_SECRET=... -e TAXI_ADMIN_SENHA=... app-taxi`
 
+### Servidor de rotas (navegador e preço fechado)
+O navegador do motorista e a estimativa usam o [OSRM](https://project-osrm.org/), motor de rotas livre sobre o mapa do OpenStreetMap, sem custo por uso.
+Por padrão, o app usa o servidor público de demonstração do OSRM, **só para testes** (não aceita uso comercial). Em produção, rode um próprio
+com o mapa da região (ex.: Sudeste do Brasil, do [Geofabrik](https://download.geofabrik.de/south-america/brazil.html)):
+
+```bash
+wget https://download.geofabrik.de/south-america/brazil/sudeste-latest.osm.pbf
+docker run -t -v "$PWD:/data" ghcr.io/project-osrm/osrm-backend osrm-extract -p /opt/car.lua /data/sudeste-latest.osm.pbf
+docker run -t -v "$PWD:/data" ghcr.io/project-osrm/osrm-backend osrm-partition /data/sudeste-latest.osrm
+docker run -t -v "$PWD:/data" ghcr.io/project-osrm/osrm-backend osrm-customize /data/sudeste-latest.osrm
+docker run -d -p 5000:5000 -v "$PWD:/data" ghcr.io/project-osrm/osrm-backend osrm-routed --algorithm mld /data/sudeste-latest.osrm
+```
+
+e configure `TAXI_ROTAS_URL=http://servidor-de-rotas:5000`. Atualize o mapa de tempos em tempos (ruas novas, mãos de direção) repetindo os passos.
+
 ### Google Maps
 1. No [Google Cloud Console](https://console.cloud.google.com/), crie um projeto com faturamento e ative a **Maps JavaScript API** e a **Geocoding API**.
 2. Crie uma chave para o navegador, restrita aos endereços do app (*Referenciadores HTTP*, ex.: `https://app.suaempresa.com.br/*`) e às duas APIs,
@@ -154,6 +176,7 @@ Com a chave, o mapa passa a ser o Google Maps nas três páginas; o botão **Nav
 | `TAXI_GOOGLE_MAPS_CHAVE` | — | Chave do Google Maps (liga o Google Maps nas páginas e na busca de endereços) |
 | `TAXI_GOOGLE_MAPS_CHAVE_SERVIDOR` | a mesma | Chave usada pelo servidor na busca de endereços (Geocoding API) |
 | `TAXI_GOOGLE_MAP_ID` | `DEMO_MAP_ID` | Map ID do Google (marcadores) |
+| `TAXI_ROTAS_URL` | servidor público do OSRM (só testes) | Servidor de rotas OSRM; vazio desliga (estimativa em linha reta, sem navegador) |
 | `TAXI_MAPA_PROVEDOR` | `google` com chave, senão `osm` | Força o provedor do mapa |
 | `TAXI_MAPA_TILES` / `TAXI_MAPA_ATRIBUICAO` | OpenStreetMap | Camada do mapa sem Google |
 | `TAXI_GEOCODER_URL` | Nominatim (OSM) | Busca de endereços sem Google; vazio desliga |
@@ -186,7 +209,7 @@ redistribuição, avaliações, PIX pedido pelo motorista (um por dia, cancelame
 taxi/
 ├── server/
 │   ├── index.js, app.js, api.js, auth.js, config.js, db.js, seed.js
-│   ├── lib/      corridas, financeiro, tarifa, pix, geo, datas, validacao, ...
+│   ├── lib/      corridas, financeiro, pagamentos, empresas, rotas, tarifa, pix, geo, datas, validacao, ...
 │   └── routes/   auth, passageiro, motorista, central, geo
 ├── public/       páginas /passageiro, /motorista e /central (JavaScript sem build; Google Maps ou Leaflet para o mapa)
 └── test/

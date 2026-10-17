@@ -4,6 +4,7 @@ process.env.NODE_ENV = 'test';
 process.env.TAXI_SECRET = 'segredo-de-teste';
 process.env.TAXI_LIMITE_LOGIN = '1000';
 process.env.TAXI_GEOCODER_URL = '';
+process.env.TAXI_ROTAS_URL = ''; // estimativa em linha reta (determinística); as rotas têm teste próprio com um OSRM falso
 
 const { abrir } = require('../server/db');
 const { criarApp } = require('../server/app');

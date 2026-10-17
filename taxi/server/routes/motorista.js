@@ -3,6 +3,8 @@
 const { Router } = require('express');
 const { transacao, agora, lerConfig } = require('../db');
 const { dividir } = require('../lib/tarifa');
+const { rota } = require('../lib/rotas');
+const { distancia } = require('../lib/geo');
 const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { hoje, somarDias } = require('../lib/datas');
@@ -74,6 +76,14 @@ module.exports = (db) => {
   });
 
   r.get('/ofertas', (req, res) => res.json(cor.ofertas(db, id(req))));
+
+  /** Rota pelas ruas para o navegador do app: da posição informada até o ponto (embarque ou destino da corrida). */
+  r.get('/rota', async (req, res) => {
+    const de = { lat: v.numero(req.query.lat, 'a latitude', { min: -90, max: 90 }), lng: v.numero(req.query.lng, 'a longitude', { min: -180, max: 180 }) };
+    const ate = { lat: v.numero(req.query.dlat, 'a latitude do destino', { min: -90, max: 90 }), lng: v.numero(req.query.dlng, 'a longitude do destino', { min: -180, max: 180 }) };
+    v.exigir(distancia(de, ate) <= 300_000, 'Destino longe demais para traçar a rota.');
+    res.json(await rota(de, ate));
+  });
   r.post('/ofertas/:id/aceitar', (req, res) => { cor.aceitar(db, id(req), cid(req)); res.status(204).end(); });
   r.post('/ofertas/:id/recusar', (req, res) => { cor.recusar(db, id(req), cid(req)); res.status(204).end(); });
 

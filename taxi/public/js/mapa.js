@@ -5,7 +5,8 @@ import { el } from './ui.js';
  * Mapa das três páginas, com o provedor configurado no servidor:
  * - 'google': Google Maps (API JavaScript, com a chave da plataforma);
  * - 'osm': OpenStreetMap pelo Leaflet (global L, carregado de /vendor/leaflet).
- * As páginas usam só esta interface: on('click', fn), setView([lat, lng], zoom), getCenter() e as funções camada() e enquadrar().
+ * As páginas usam só esta interface: on('click', fn), aoArrastar(fn), setView([lat, lng], zoom), getCenter(), linha(pontos)
+ * e as funções camada() e enquadrar().
  */
 let publico = null;
 export const configPublica = async () => (publico ??= await api.get('/publico'));
@@ -18,6 +19,7 @@ export const ICONES = {
   destino: () => ({ classe: 'destino', texto: 'B', tamanho: 34 }),
   eu: () => ({ classe: 'eu', texto: '', tamanho: 18 }),
 };
+const COR_ROTA = '#1C5FD4';
 const pinoHtml = (i) => `<div class="pin ${i.classe}">${i.texto}</div>`;
 
 export async function criarMapa(div, { zoom = 14 } = {}) {
@@ -41,7 +43,12 @@ function mapaLeaflet(div, cfg, zoom) {
   const icone = (i) => L.divIcon({ className: '', html: pinoHtml(i), iconSize: [i.tamanho, i.tamanho], iconAnchor: [i.tamanho / 2, i.tamanho / 2] });
   return {
     on: (evento, fn) => m.on(evento, (e) => fn({ latlng: { lat: e.latlng.lat, lng: e.latlng.lng } })),
+    aoArrastar: (fn) => m.on('dragstart', fn),
     setView: (p, z) => m.setView(p, z),
+    linha(pontos) {
+      const pl = L.polyline(pontos, { color: COR_ROTA, weight: 7, opacity: 0.9 }).addTo(m);
+      return { definir: (p) => pl.setLatLngs(p), remover: () => pl.remove() };
+    },
     getCenter: () => { const c = m.getCenter(); return { lat: c.lat, lng: c.lng }; },
     getZoom: () => m.getZoom(),
     enquadrar: (pontos, zoomMax) => m.fitBounds(L.latLngBounds(pontos), { padding: [50, 50], maxZoom: zoomMax }),
@@ -84,7 +91,13 @@ async function mapaGoogle(div, cfg, zoom) {
   const conteudo = (i) => { const d = document.createElement('div'); d.innerHTML = pinoHtml(i); d.style.transform = 'translateY(50%)'; return d; };
   return {
     on: (evento, fn) => m.addListener(evento, (e) => fn({ latlng: { lat: e.latLng.lat(), lng: e.latLng.lng() } })),
+    aoArrastar: (fn) => m.addListener('dragstart', fn),
     setView: (p, z) => { m.setCenter({ lat: p[0], lng: p[1] }); if (z) m.setZoom(z); },
+    linha(pontos) {
+      const caminho = (p) => p.map(([lat, lng]) => ({ lat, lng }));
+      const pl = new g.maps.Polyline({ path: caminho(pontos), map: m, strokeColor: COR_ROTA, strokeWeight: 7, strokeOpacity: 0.9 });
+      return { definir: (p) => pl.setPath(caminho(p)), remover: () => pl.setMap(null) };
+    },
     getCenter: () => { const c = m.getCenter(); return { lat: c.lat(), lng: c.lng() }; },
     getZoom: () => m.getZoom(),
     enquadrar(pontos, zoomMax) {

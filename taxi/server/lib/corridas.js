@@ -3,6 +3,7 @@
 const { transacao, lerConfig, agora } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('./erros');
 const { distancia, estimarRota } = require('./geo');
+const { rota } = require('./rotas');
 const tarifa = require('./tarifa');
 const fin = require('./financeiro');
 const pag = require('./pagamentos');
@@ -18,13 +19,27 @@ const VELOCIDADE_MAXIMA_KMH = 150;
 
 const tarifas = (db) => Object.fromEntries(db.prepare('SELECT * FROM tarifas').all().map((t) => [t.categoria, t]));
 
-/** Estimativa de cada categoria entre dois pontos, com a bandeira de agora. */
-function estimar(db, origem, destino, instante = new Date()) {
+/**
+ * Distância e tempo para o preço fechado: pela rota nas ruas (OSRM). O tempo do OSRM não considera trânsito, então vale o
+ * maior entre ele e a distância na velocidade média configurada. Sem servidor de rotas, linha reta × fator de rota.
+ */
+async function percurso(db, origem, destino) {
   const cfg = lerConfig(db);
-  const rota = estimarRota(origem, destino, cfg);
+  try {
+    const r = await rota(origem, destino);
+    return { distancia_m: r.distancia_m, duracao_s: Math.max(r.duracao_s, Math.round(r.distancia_m / ((cfg.velocidade_media_kmh * 1000) / 3600))), por_ruas: true };
+  } catch {
+    return { ...estimarRota(origem, destino, cfg), por_ruas: false };
+  }
+}
+
+/** Estimativa (preço fechado) de cada categoria entre dois pontos, com a bandeira de agora. */
+async function estimar(db, origem, destino, instante = new Date()) {
+  const cfg = lerConfig(db);
+  const caminho = await percurso(db, origem, destino);
   const b = tarifa.bandeira(instante, cfg);
   const ts = tarifas(db);
-  return CATEGORIAS.map((c) => ({ categoria: c, bandeira: b, ...rota, valor_centavos: tarifa.calcular(ts[c], { ...rota, bandeira: b }) }));
+  return CATEGORIAS.map((c) => ({ categoria: c, bandeira: b, ...caminho, valor_centavos: tarifa.calcular(ts[c], { ...caminho, bandeira: b }) }));
 }
 
 /**
@@ -95,7 +110,7 @@ const corridaAtivaPassageiro = (db, id) => db.prepare(`SELECT * FROM corridas WH
 const corridaAtivaMotorista = (db, id) => db.prepare(`SELECT * FROM corridas WHERE motorista_id = ? AND status IN ('aceita','chegou','em_andamento')
   ORDER BY id DESC LIMIT 1`).get(id);
 
-function solicitar(db, passageiroId, dados) {
+async function solicitar(db, passageiroId, dados) {
   const origem = v.ponto(dados.origem, 'a origem');
   const destino = v.ponto(dados.destino, 'o destino');
   const categoria = v.opcao(dados.categoria ?? 'comum', 'a categoria', CATEGORIAS);
@@ -103,10 +118,11 @@ function solicitar(db, passageiroId, dados) {
   v.exigir(distancia(origem, destino) >= 100, 'Origem e destino estão muito próximos.');
   v.exigir(distancia(origem, destino) <= 300_000, 'Destino fora da área atendida (mais de 300 km).');
   expirarSolicitacoes(db);
+  const estimativas = await estimar(db, origem, destino);
   return transacao(db, () => {
     const ativa = db.prepare(`SELECT id FROM corridas WHERE passageiro_id = ? AND status IN ('aguardando_pagamento','solicitada','aceita','chegou','em_andamento')`).get(passageiroId);
     if (ativa) throw new ErroNegocio('Você já tem uma corrida em andamento.', 409);
-    const est = estimar(db, origem, destino).find((e) => e.categoria === categoria);
+    const est = estimativas.find((e) => e.categoria === categoria);
     const empresa = forma === 'empresa' ? emp.exigirAutorizacao(db, passageiroId, dados.empresa_id, est.valor_centavos) : null;
     // PIX e cartão: a corrida espera o pagamento antes de ir para os taxistas. Empresa: sai direto (é faturada).
     const status = empresa ? 'solicitada' : 'aguardando_pagamento';

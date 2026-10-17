@@ -3,10 +3,14 @@ import { el, $, limpar, dinheiro, km, minutos, dataHora, hora, iniciais, FORMAS,
   lerForm, hojeLocal, somarDias } from './ui.js';
 import { criarMapa, camada, ICONES, enquadrar } from './mapa.js';
 import { telaEntrada } from './entrada.js';
+import { abrirNavegador } from './navegador.js';
 
 usarSessao('motorista');
 const raiz = $('#app');
 
+// Quem acompanha a posição do motorista (o navegador do app).
+const ouvintesPosicao = new Set();
+const assinarPosicao = (fn) => { ouvintesPosicao.add(fn); return () => ouvintesPosicao.delete(fn); };
 const pulados = new Set(); // corridas pagas cuja avaliação o motorista pulou
 let mapa, eu, pontos, pararAtualizacao, perfil = null, posicao = null, gpsManual = false, vigia = null, ultimoEnvio = 0, ofertasVistas = new Set();
 
@@ -63,6 +67,7 @@ async function definirPosicao(p, forcar = false) {
   const primeira = !posicao;
   posicao = p;
   eu.atualizar([{ chave: 'eu', ...p, icone: ICONES.eu() }]);
+  for (const fn of ouvintesPosicao) fn(p);
   if (primeira) mapa?.setView([p.lat, p.lng], 15);
   if (!perfil?.online || (!forcar && Date.now() - ultimoEnvio < 4000)) return;
   ultimoEnvio = Date.now();
@@ -154,7 +159,11 @@ function cartaoOferta(o, painel) {
     el('div', { class: 'linha', style: 'margin-top:10px' }, recusar, el('div', { style: 'flex:1' }), aceitar));
 }
 
-const navegar = (lat, lng) => el('a', { class: 'btn pequeno', target: '_blank', rel: 'noopener', href: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving&dir_action=navigate` }, 'Navegar');
+/** Abre o navegador do app até o ponto (embarque ou destino). */
+const navegar = (lat, lng, nome) => el('button', { class: 'btn pequeno primario', onclick: () => abrirNavegador({
+  destino: { lat, lng, nome }, posicao: () => posicao, assinar: assinarPosicao,
+  aoTocarMapa: (p) => { if (gpsManual) definirPosicao({ lat: p.lat, lng: p.lng }, true); },
+}).catch((err) => toast(err.message, true)) }, '➤ Navegar');
 
 function desenharCorrida(painel, c) {
   const alvo = ['aceita', 'chegou'].includes(c.status) ? { lat: c.origem_lat, lng: c.origem_lng } : { lat: c.destino_lat, lng: c.destino_lng };
@@ -194,12 +203,12 @@ function desenharCorrida(painel, c) {
       await atualizar(painel);
     });
     partes.push(passageiro, ganho, trajeto,
-      el('div', { class: 'linha', style: 'margin-top:12px' }, navegar(c.origem_lat, c.origem_lng), desistir, el('div', { style: 'flex:1' }),
+      el('div', { class: 'linha', style: 'margin-top:12px' }, navegar(c.origem_lat, c.origem_lng, `Embarque: ${c.origem_endereco}`), desistir, el('div', { style: 'flex:1' }),
         c.status === 'aceita' ? botao('Cheguei', '', () => api.post(`/motorista/corridas/${c.id}/chegou`)) : null),
       el('div', { style: 'margin-top:10px' }, botao('Iniciar corrida', 'primario grande', () => api.post(`/motorista/corridas/${c.id}/iniciar`))));
   } else if (c.status === 'em_andamento') {
     partes.push(passageiro, ganho, trajeto, el('p', { class: 'mudo', 'data-percorrido': '' }, `Percorrido: ${km(c.distancia_percorrida_m)}`),
-      el('div', { class: 'linha' }, navegar(c.destino_lat, c.destino_lng), el('span', { class: 'pequeno mudo' }, `Início ${hora(c.iniciada_em)}`)),
+      el('div', { class: 'linha' }, navegar(c.destino_lat, c.destino_lng, `Destino: ${c.destino_endereco}`), el('span', { class: 'pequeno mudo' }, `Início ${hora(c.iniciada_em)}`)),
       el('div', { style: 'margin-top:10px' }, botao('Finalizar corrida', 'escuro grande', async () => {
         if (posicao) await api.post('/motorista/posicao', posicao).catch(() => {});
         const f = await api.post(`/motorista/corridas/${c.id}/finalizar`);

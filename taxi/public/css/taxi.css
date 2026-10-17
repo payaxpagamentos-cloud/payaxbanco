@@ -187,3 +187,15 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
   .conteudo{ padding: 16px; }
 }
 @media print{ .menu, .filtros, .btn{ display: none !important; } .central{ display: block; } }
+
+/* Navegador do motorista (tela cheia, por cima do app) */
+.navegador{ position: fixed; inset: 0; z-index: 2500; display: flex; flex-direction: column; background: var(--bg); }
+.nav-topo{ background: #0E3B2E; color: #fff; padding: calc(10px + env(safe-area-inset-top)) 16px 12px; z-index: 600; box-shadow: 0 6px 20px -10px rgba(0,0,0,.5); }
+.nav-faixa{ display: flex; gap: 14px; align-items: center; }
+.nav-seta{ font-size: 44px; line-height: 1; width: 56px; text-align: center; font-weight: 800; }
+.nav-dist{ font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+.nav-instr{ font-size: 17px; font-weight: 600; opacity: .95; }
+.nav-depois{ margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.18); font-size: 14px; opacity: .85; }
+.nav-base{ background: var(--surface); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); z-index: 600; }
+.nav-resumo{ font-size: 18px; font-weight: 800; }
+.nav-nome{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

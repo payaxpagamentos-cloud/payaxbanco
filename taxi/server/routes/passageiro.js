@@ -19,10 +19,10 @@ module.exports = (db) => {
     return c;
   };
 
-  r.get('/estimativa', (req, res) => {
+  r.get('/estimativa', async (req, res) => {
     const o = { lat: v.numero(req.query.olat, 'a latitude da origem', { min: -90, max: 90 }), lng: v.numero(req.query.olng, 'a longitude da origem', { min: -180, max: 180 }) };
     const d = { lat: v.numero(req.query.dlat, 'a latitude do destino', { min: -90, max: 90 }), lng: v.numero(req.query.dlng, 'a longitude do destino', { min: -180, max: 180 }) };
-    res.json(cor.estimar(db, o, d));
+    res.json(await cor.estimar(db, o, d));
   });
 
   /** Motoristas online por perto (só a posição, para mostrar no mapa). */
@@ -42,7 +42,7 @@ module.exports = (db) => {
   /** Empresas pelas quais a gestão autorizou este passageiro a pedir (forma "empresa"). */
   r.get('/empresas', (req, res) => res.json(emp.autorizadas(db, req.usuario.id)));
 
-  r.post('/corridas', (req, res) => res.status(201).json(cor.solicitar(db, req.usuario.id, req.body)));
+  r.post('/corridas', async (req, res) => res.status(201).json(await cor.solicitar(db, req.usuario.id, req.body)));
 
   r.get('/corridas/atual', (req, res) => {
     cor.expirarSolicitacoes(db);
