@@ -23,8 +23,12 @@ const [latCentro, lngCentro] = String(process.env.TAXI_MAPA_CENTRO || '-23.5505,
 
 if (producao && process.env.TAXI_MAPA_PROVEDOR === 'google' && !googleChave) throw new Error('[APP Táxi] Google Maps sem TAXI_GOOGLE_MAPS_CHAVE.');
 
+// Endereço em que o app é publicado: '' (raiz do domínio) ou um caminho, como '/taxi'.
+const basePath = String(process.env.TAXI_BASE_PATH || '').replace(/\/+$/, '').replace(/^(?=[^/])/, '/');
+
 module.exports = {
   producao,
+  basePath,
   port: Number(process.env.PORT) || 3200,
   dbFile: process.env.TAXI_DB || path.join(__dirname, '..', 'data', 'taxi.db'),
   secret,

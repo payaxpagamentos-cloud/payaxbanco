@@ -14,7 +14,7 @@ async function iniciar() {
   const servidor = criarApp(db).listen(0);
   await new Promise((r) => servidor.once('listening', r));
   const raiz = `http://127.0.0.1:${servidor.address().port}`;
-  const base = `${raiz}/api`;
+  const base = `${raiz}${require('../server/config').basePath}/api`;
 
   async function req(metodo, caminho, corpo, tk) {
     const resp = await fetch(base + caminho, {

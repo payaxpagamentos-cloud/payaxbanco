@@ -132,6 +132,15 @@ Dados de demonstração (um passageiro autorizado a pedir pela empresa de exempl
 npm run seed
 ```
 
+### Pacote de instalação (para subir no servidor)
+
+```bash
+npm run empacotar   # gera dist/app-taxi.zip: pasta taxi/ com dependências, .env com segredos novos e LEIA-ME.txt
+```
+
+O `LEIA-ME.txt` do pacote traz o passo a passo (PM2, Docker ou cPanel, Nginx ou Apache, HTTPS, dados de teste e roteiro de teste).
+Por padrão o app fica em `https://SEU-DOMINIO/taxi/` (`TAXI_BASE_PATH=/taxi`), e pode dividir o servidor com o Ativa BPO.
+
 ### Produção
 - Rode atrás de HTTPS (nginx, Caddy ou o balanceador do provedor): a **localização do celular só funciona em HTTPS**.
 - Defina `NODE_ENV=production`, `TAXI_SECRET` (32+ caracteres) e `TAXI_ADMIN_SENHA` (12+ caracteres); o servidor recusa iniciar sem eles.
@@ -168,6 +177,7 @@ Com a chave, o mapa passa a ser o Google Maps nas três páginas; o botão **Nav
 | Variável | Padrão | Para quê |
 |---|---|---|
 | `PORT` | `3200` | Porta do servidor |
+| `TAXI_BASE_PATH` | — (raiz) | Caminho em que o app é publicado (ex.: `/taxi`) |
 | `TAXI_SECRET` | aleatório | Assina as sessões (sem ele, todos saem ao reiniciar) |
 | `TAXI_ADMIN_NOME` / `_EMAIL` / `_SENHA` | — | Administrador criado no primeiro início |
 | `TAXI_DB` | `data/taxi.db` | Arquivo do banco |

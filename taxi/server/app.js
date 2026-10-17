@@ -42,16 +42,23 @@ function criarApp(db) {
     });
     next();
   });
-  app.use(['/api/auth/login', '/api/auth/cadastro', '/api/auth/cadastro-motorista'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
-  app.use(express.json({ limit: '100kb' }));
-  app.use('/api', criarApi(db));
+  // Tudo é servido em TAXI_BASE_PATH (ex.: /taxi): páginas, arquivos e a API em <endereço>/api.
+  const r = express.Router();
+  r.use(['/api/auth/login', '/api/auth/cadastro', '/api/auth/cadastro-motorista'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  r.use(express.json({ limit: '100kb' }));
+  r.use('/api', criarApi(db));
 
   const publico = path.join(__dirname, '..', 'public');
   // Leaflet (mapa) servido do próprio pacote, sem CDN.
-  app.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));
+  r.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));
   // "/passageiro" sem a barra final leva a "/passageiro/" (as páginas usam caminhos relativos à pasta).
-  app.get(/^\/(passageiro|motorista|central)$/, (req, res) => res.redirect(`${req.path}/`));
-  app.use(express.static(publico));
+  r.get(/^\/(passageiro|motorista|central)$/, (req, res) => res.redirect(`${req.baseUrl}${req.path}/`));
+  r.use(express.static(publico));
+  if (config.basePath) {
+    app.get(['/', config.basePath], (req, res, next) => (req.originalUrl.split('?')[0] === '/' || req.originalUrl.split('?')[0] === config.basePath
+      ? res.redirect(`${config.basePath}/`) : next()));
+  }
+  app.use(config.basePath || '/', r);
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => tratarErro(err, res));
   return app;

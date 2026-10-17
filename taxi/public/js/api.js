@@ -1,3 +1,6 @@
+/** Endereço base do app (ex.: '/taxi'), deduzido de onde este arquivo foi carregado: funciona na raiz do domínio ou num caminho. */
+export const BASE = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+
 /** Chamadas à API com a sessão de cada app (passageiro, motorista e central convivem no mesmo navegador). */
 let CHAVE = 'taxi.sessao';
 let memoria = null;
@@ -28,7 +31,7 @@ async function chamar(metodo, caminho, corpo, { bruto = false } = {}) {
   if (corpo !== undefined) headers['Content-Type'] = 'application/json';
   let resp;
   try {
-    resp = await fetch(`/api${caminho}`, { method: metodo, headers, body: corpo === undefined ? undefined : JSON.stringify(corpo) });
+    resp = await fetch(`${BASE}/api${caminho}`, { method: metodo, headers, body: corpo === undefined ? undefined : JSON.stringify(corpo) });
   } catch {
     throw new ErroApi('Sem conexão com o servidor. Verifique a internet.', 0);
   }

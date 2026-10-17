@@ -7,8 +7,8 @@ const { expirarSolicitacoes } = require('./lib/corridas');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
-  const url = `http://localhost:${config.port}`;
-  console.log(`[APP Táxi] Passageiro: ${url}/passageiro/  ·  Motorista: ${url}/motorista/  ·  Central: ${url}/central/`);
+  const url = `http://localhost:${config.port}${config.basePath}`;
+  console.log(`[APP Táxi] Passageiro: ${url}/passageiro/  ·  Motorista: ${url}/motorista/  ·  Gestão: ${url}/central/`);
 });
 
 // Solicitações sem motorista expiram mesmo sem ninguém consultando.

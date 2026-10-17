@@ -1,0 +1,108 @@
+APP TÁXI — INSTALAÇÃO (FASE DE TESTES)
+======================================
+
+Endereços depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
+  Início (escolha do app) ... https://SEU-DOMINIO/taxi/
+  Passageiro (cliente) ...... https://SEU-DOMINIO/taxi/passageiro/
+  Motorista ................. https://SEU-DOMINIO/taxi/motorista/
+  Gestão .................... https://SEU-DOMINIO/taxi/central/
+
+Os três são servidos pelo mesmo programa (Node.js), que fica nesta pasta "taxi".
+As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
+Pode ficar no mesmo servidor do Ativa BPO (portas diferentes: o BPO usa 3100, o táxi 3200).
+
+
+IMPORTANTE: HTTPS
+   O celular só libera a LOCALIZAÇÃO (GPS) para sites em HTTPS. Sem HTTPS (ex.: http://IP),
+   o app abre, mas o passageiro e o motorista precisam tocar no mapa para marcar onde estão,
+   e o navegador do motorista não acompanha o carro. Use um domínio com certificado
+   (Let's Encrypt é gratuito: certbot --nginx -d SEU-DOMINIO).
+
+
+1) REQUISITO
+   Node.js 22.13 ou mais novo no servidor.  Confira com:   node -v
+
+
+2) ENVIAR OS ARQUIVOS
+   Envie a pasta "taxi" inteira para o servidor, FORA da pasta pública do site
+   (ex.: /home/SEU-USUARIO/taxi). O arquivo ".env" começa com ponto: confira se foi enviado.
+
+
+3) CONFERIR O .env
+   Já vem pronto: endereço /taxi, segredo novo, senha da gestão (TAXI_ADMIN_SENHA) e
+   pagamentos em modo de TESTE (TAXI_PAGAMENTOS=simulado). Não troque o TAXI_SECRET depois de instalado.
+
+
+4) DADOS DE TESTE (recomendado nesta fase)
+   Com o sistema parado, rode uma vez dentro da pasta taxi:
+      npm run seed
+   Cria contas de teste, todas com a senha  demo12345 :
+      Passageiro (cliente) ... passageiro@demo.com  (autorizado a pedir pela empresa de teste)
+      Motoristas ............. joao@demo.com, maria@demo.com, pedro@demo.com  (aprovados, no centro de SP)
+   Também dá para criar contas novas pelos próprios apps (Criar conta).
+
+
+5) INICIAR
+   a) Servidor próprio (VPS) com PM2
+         cd /home/SEU-USUARIO/taxi
+         npm install -g pm2
+         pm2 start "npm start" --name app-taxi
+         pm2 save && pm2 startup
+      Depois configure o Nginx ou o Apache (item 6).
+
+   b) Docker
+         docker build -t app-taxi .
+         docker run -d --name app-taxi --env-file .env -p 3200:3200 -v app-taxi-dados:/app/data app-taxi
+      Depois configure o Nginx ou o Apache (item 6).
+
+   c) cPanel ("Setup Node.js App")
+      - Node.js version ........... 22 ou mais novo
+      - Application mode .......... Production
+      - Application root .......... taxi
+      - Application URL ........... taxi
+      - Application startup file .. server/index.js
+      Em "Environment variables", cadastre as variáveis do arquivo .env (menos PORT). Clique em Start.
+
+
+6) NGINX OU APACHE (só para as opções a e b)
+   Nginx — dentro do "server { ... }" do domínio (com HTTPS):
+      location /taxi/ {
+          proxy_pass http://127.0.0.1:3200;
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+      }
+      location = /taxi { return 301 /taxi/; }
+
+   Apache (módulos proxy e proxy_http ativos):
+      ProxyPreserveHost On
+      ProxyPass        /taxi http://127.0.0.1:3200/taxi
+      ProxyPassReverse /taxi http://127.0.0.1:3200/taxi
+
+
+7) PRIMEIRO ACESSO À GESTÃO
+   Abra https://SEU-DOMINIO/taxi/central/ e entre com:
+      E-mail: admin@apptaxi.com.br
+      Senha:  a que está em TAXI_ADMIN_SENHA no arquivo .env
+   Em "Tarifas e regras", confira as tarifas e cadastre a CHAVE PIX da plataforma (aparece no QR Code do passageiro).
+
+
+8) ROTEIRO DE TESTE (com 3 celulares ou abas)
+   1. Gestão: entre em /taxi/central/ e deixe o "Mapa ao vivo" aberto.
+   2. Motorista: no celular, abra /taxi/motorista/, entre como joao@demo.com e toque em "Ficar online".
+   3. Passageiro: em outro celular, abra /taxi/passageiro/, entre como passageiro@demo.com, escolha o destino,
+      a forma de pagamento e toque em "Pedir táxi". No PIX/cartão, toque em "Simular ... (modo de testes)".
+   4. Motorista: aceite, toque em "Navegar", "Cheguei", "Iniciar corrida" e "Finalizar corrida".
+   5. Passageiro: avalie o motorista. Motorista: em "Ganhos", peça o PIX.
+   6. Gestão: em "PIX dos motoristas", libere o pedido; veja Corridas, Empresas, Pagamentos e Relatórios.
+   Dica: no app, use "Adicionar à tela de início" do navegador do celular para abrir como aplicativo.
+
+
+9) CÓPIAS DE SEGURANÇA
+   Tudo fica na pasta taxi/data (banco taxi.db). Copie essa pasta com frequência.
+
+
+10) ATUALIZAR PARA UMA VERSÃO NOVA
+   Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
+   NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart app-taxi).
+   Nesta fase de testes, se a versão nova avisar que o banco mudou, apague data/taxi.db e rode npm run seed de novo.
