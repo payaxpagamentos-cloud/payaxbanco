@@ -182,3 +182,22 @@ body.tema .sidebar .brand{ justify-content: flex-start; padding-left: 6px; }
   .entrada-marca{ display: none; }
   .entrada-form{ padding: 40px 16px; align-items: flex-start; }
 }
+
+/* Login cabe inteiro na janela, sem rolagem: tamanhos acompanham a altura da tela */
+.entrada { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.entrada-marca { padding: clamp(18px, 5vh, 48px) clamp(28px, 4vw, 56px); gap: clamp(10px, 3vh, 32px); }
+.entrada-logo { width: clamp(84px, 24vh, 220px); }
+.entrada-chamada h2 { margin-top: clamp(6px, 1.4vh, 14px); font-size: clamp(20px, min(2.6vw, 4.4vh), 36px); }
+.entrada-chamada p { margin-top: clamp(6px, 1.4vh, 14px); }
+.entrada-lista { margin-top: clamp(10px, 2.4vh, 22px); gap: clamp(6px, 1.3vh, 12px); }
+.entrada-lista li span { width: clamp(26px, 3.6vh, 32px); height: clamp(26px, 3.6vh, 32px); }
+.entrada-form { padding: clamp(16px, 4vh, 40px) 24px; overflow-y: auto; }
+.entrada-caixa { gap: clamp(8px, 1.6vh, 14px); }
+.entrada-caixa .marca { margin-bottom: clamp(2px, 1.6vh, 18px); }
+.entrada-caixa h1 { font-size: clamp(20px, 3.2vh, 24px); }
+.entrada-caixa input { height: clamp(40px, 5.6vh, 48px); }
+.entrada-caixa .btn.primario { height: clamp(42px, 6vh, 50px); }
+.entrada-aviso { padding-top: clamp(8px, 1.6vh, 14px); }
+@media (max-height: 700px) { .entrada-chamada p { display: none; } }
+@media (max-height: 600px) { .entrada-lista { display: none; } }
+@media (max-width: 900px) { .entrada { height: auto; min-height: 100dvh; overflow: visible; } }
