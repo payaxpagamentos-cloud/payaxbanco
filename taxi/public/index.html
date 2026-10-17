@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#FFC21A">
+  <title>APP Táxi</title>
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/taxi.css">
+  <style>
+    .inicio{ max-width: 960px; margin: 0 auto; padding: 40px 16px; }
+    .inicio header{ display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+    .inicio header img{ width: 40px; height: 40px; }
+    .inicio header strong{ font-size: 24px; letter-spacing: -.02em; }
+    .portas{ display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .porta{ display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: inherit; }
+    .porta .icone{ font-size: 34px; }
+    .porta:hover{ border-color: var(--amarelo-forte); }
+  </style>
+</head>
+<body>
+  <div class="inicio">
+    <header><img src="/img/favicon.svg" alt=""><strong>APP Táxi</strong></header>
+    <h1>Escolha como você quer entrar</h1>
+    <p class="mudo">Peça um táxi, dirija com a gente ou acompanhe a operação.</p>
+    <div class="portas">
+      <a class="cartao porta" href="/passageiro/"><span class="icone">🙋</span><h2>Sou passageiro</h2><span class="mudo">Peça a corrida, veja o preço antes, acompanhe o motorista no mapa e pague por PIX, cartão ou dinheiro.</span></a>
+      <a class="cartao porta" href="/motorista/"><span class="icone">🚕</span><h2>Sou motorista</h2><span class="mudo">Fique online, aceite corridas perto de você, acompanhe seus ganhos e receba os repasses por PIX.</span></a>
+      <a class="cartao porta" href="/central/"><span class="icone">🖥️</span><h2>Central</h2><span class="mudo">Mapa ao vivo, aprovação de motoristas, tarifas, repasses e relatórios.</span></a>
+    </div>
+  </div>
+</body>
+</html>

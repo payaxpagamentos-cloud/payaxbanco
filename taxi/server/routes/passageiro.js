@@ -1,0 +1,84 @@
+'use strict';
+
+const { Router } = require('express');
+const QRCode = require('qrcode');
+const { lerConfig } = require('../db');
+const { permitir } = require('../auth');
+const { ErroNegocio, naoEncontrado } = require('../lib/erros');
+const pix = require('../lib/pix');
+const { distancia } = require('../lib/geo');
+const cor = require('../lib/corridas');
+const v = require('../lib/validacao');
+
+/** PIX copia e cola da corrida finalizada e ainda não paga (para a chave da plataforma). */
+async function pixDaCorrida(db, c) {
+  const cfg = lerConfig(db);
+  if (!cfg.pix_chave) throw new ErroNegocio('PIX indisponível: a central ainda não cadastrou a chave PIX. Pague ao motorista em dinheiro ou cartão.', 409);
+  const copia = pix.copiaECola({
+    chave: cfg.pix_chave, recebedor: cfg.pix_recebedor, cidade: cfg.pix_cidade, valorCentavos: c.valor_final_centavos,
+    txid: `CORRIDA${c.id}`, descricao: `Corrida ${c.id}`,
+  });
+  return { copia_e_cola: copia, qr_svg: await QRCode.toString(copia, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }), valor_centavos: c.valor_final_centavos };
+}
+
+module.exports = (db) => {
+  const r = Router();
+  r.use(permitir('passageiro'));
+  const minha = (req) => {
+    const c = cor.buscar(db, Number(req.params.id));
+    if (c.passageiro_id !== req.usuario.id) throw naoEncontrado('Corrida');
+    return c;
+  };
+
+  r.get('/estimativa', (req, res) => {
+    const o = { lat: v.numero(req.query.olat, 'a latitude da origem', { min: -90, max: 90 }), lng: v.numero(req.query.olng, 'a longitude da origem', { min: -180, max: 180 }) };
+    const d = { lat: v.numero(req.query.dlat, 'a latitude do destino', { min: -90, max: 90 }), lng: v.numero(req.query.dlng, 'a longitude do destino', { min: -180, max: 180 }) };
+    res.json(cor.estimar(db, o, d));
+  });
+
+  /** Motoristas online por perto (só a posição, para mostrar no mapa). */
+  r.get('/proximos', (req, res) => {
+    const lat = v.numero(req.query.lat, 'a latitude', { min: -90, max: 90 });
+    const lng = v.numero(req.query.lng, 'a longitude', { min: -180, max: 180 });
+    const corte = new Date(Date.now() - 5 * 60_000).toISOString();
+    const { raio_busca_km: raio } = lerConfig(db);
+    const lista = db.prepare(`SELECT m.lat, m.lng, v.categoria FROM motoristas m JOIN veiculos v ON v.id = m.veiculo_id
+      WHERE m.online = 1 AND m.situacao = 'aprovado' AND m.lat IS NOT NULL AND m.posicao_em > ?`).all(corte)
+      .filter((m) => distancia(m, { lat, lng }) <= raio * 1000)
+      // Arredonda a posição (cerca de 100 m): o passageiro vê que há carros, não onde exatamente cada um está.
+      .map((m) => ({ lat: Math.round(m.lat * 1000) / 1000, lng: Math.round(m.lng * 1000) / 1000, categoria: m.categoria }));
+    res.json(lista);
+  });
+
+  r.post('/corridas', (req, res) => res.status(201).json({ id: cor.solicitar(db, req.usuario.id, req.body) }));
+
+  r.get('/corridas/atual', (req, res) => {
+    cor.expirarSolicitacoes(db);
+    res.json(cor.detalhar(db, cor.corridaAtivaPassageiro(db, req.usuario.id)));
+  });
+
+  r.get('/corridas', (req, res) => res.json(db.prepare(`SELECT c.id, c.status, c.categoria, c.origem_endereco, c.destino_endereco, c.solicitada_em, c.finalizada_em,
+      c.valor_estimado_centavos, c.valor_final_centavos, c.forma_pagamento, c.pagamento_status, c.nota_do_passageiro, u.nome AS motorista_nome
+    FROM corridas c LEFT JOIN usuarios u ON u.id = c.motorista_id WHERE c.passageiro_id = ? ORDER BY c.id DESC LIMIT 100`).all(req.usuario.id)));
+
+  r.get('/corridas/:id', (req, res) => res.json(cor.detalhar(db, minha(req))));
+
+  r.post('/corridas/:id/cancelar', (req, res) => {
+    cor.cancelar(db, 'passageiro', Number(req.params.id), req.body.motivo, req.usuario);
+    res.status(204).end();
+  });
+
+  r.post('/corridas/:id/avaliar', (req, res) => {
+    cor.avaliar(db, 'passageiro', Number(req.params.id), req.usuario, req.body);
+    res.status(204).end();
+  });
+
+  r.get('/corridas/:id/pix', async (req, res) => {
+    const c = minha(req);
+    if (c.status !== 'finalizada' || c.forma_pagamento !== 'pix') throw new ErroNegocio('Esta corrida não é paga por PIX.', 409);
+    if (c.pagamento_status === 'pago') throw new ErroNegocio('Pagamento já confirmado.', 409);
+    res.json(await pixDaCorrida(db, c));
+  });
+
+  return r;
+};

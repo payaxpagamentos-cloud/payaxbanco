@@ -1,0 +1,22 @@
+{
+  "name": "app-taxi",
+  "version": "1.0.0",
+  "description": "APP Táxi — app do passageiro, app do motorista, painel da central, pagamentos e repasses.",
+  "main": "server/index.js",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "leaflet": "1.9.4",
+    "qrcode": "^1.5.4"
+  }
+}
