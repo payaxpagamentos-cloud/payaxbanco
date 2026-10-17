@@ -1,23 +1,37 @@
 'use strict';
 
-/* Cópia consistente do banco (VACUUM INTO), mesmo com o sistema rodando. Mantém as últimas N cópias. Só roda no Node. */
 const fs = require('node:fs');
 const path = require('node:path');
 const config = require('../config');
 
-const pasta = () => process.env.PAYAX_BACKUP_DIR || path.join(path.dirname(config.dbFile), 'backups');
-const manter = () => Number(process.env.PAYAX_BACKUP_MANTER) || 14;
-
-function gerarBackup(db) {
-  if (config.dbFile === ':memory:') throw new Error('Banco em memória: não há arquivo para copiar.');
-  const dir = pasta();
+/** Cópia consistente do banco (VACUUM INTO) com data e hora no nome; mantém as N mais recentes. */
+function gerar(db, dir = config.backupDir) {
   fs.mkdirSync(dir, { recursive: true });
   const carimbo = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-  const destino = path.join(dir, `banqueiro-${carimbo}.db`);
-  db.exec(`VACUUM INTO '${destino.replace(/'/g, "''")}'`);
-  const antigos = fs.readdirSync(dir).filter((f) => /^banqueiro-.*\.db$/.test(f)).sort().reverse().slice(manter());
-  for (const f of antigos) fs.rmSync(path.join(dir, f));
-  return { arquivo: path.basename(destino), tamanho: fs.statSync(destino).size };
+  let nome = `bpo-${carimbo}.db`;
+  for (let i = 1; fs.existsSync(path.join(dir, nome)); i++) nome = `bpo-${carimbo}-${i}.db`;
+  const destino = path.join(dir, nome);
+  db.prepare('VACUUM INTO ?').run(destino);
+  limpar(dir);
+  return { nome, tamanho: fs.statSync(destino).size };
 }
 
-module.exports = { gerarBackup, pasta, manter };
+function listar(dir = config.backupDir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter((n) => /^bpo-[\d-]+\.db$/.test(n))
+    .map((nome) => ({ nome, tamanho: fs.statSync(path.join(dir, nome)).size, criado_em: fs.statSync(path.join(dir, nome)).mtime.toISOString() }))
+    .sort((a, b) => b.nome.localeCompare(a.nome));
+}
+
+function limpar(dir) {
+  for (const b of listar(dir).slice(config.backupManter)) fs.rmSync(path.join(dir, b.nome), { force: true });
+}
+
+/** Caminho de um backup pelo nome (sem permitir sair da pasta). */
+function caminho(nome, dir = config.backupDir) {
+  if (!/^bpo-[\d-]+\.db$/.test(String(nome))) return null;
+  const p = path.join(dir, nome);
+  return fs.existsSync(p) ? p : null;
+}
+
+module.exports = { gerar, listar, caminho };

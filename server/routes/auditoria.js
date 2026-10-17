@@ -1,21 +1,21 @@
 'use strict';
 
 const { Router } = require('express');
-const { paginacao } = require('../lib/paginacao');
 
 module.exports = (db) => {
   const r = Router();
   r.get('/', (req, res) => {
-    const { limite, offset, pagina } = paginacao(req.query);
-    const filtros = [];
+    const filtros = ['1 = 1'];
     const params = [];
-    if (req.query.entidade) { filtros.push('a.entidade = ?'); params.push(req.query.entidade); }
-    if (req.query.usuario_id) { filtros.push('a.usuario_id = ?'); params.push(req.query.usuario_id); }
-    if (req.query.q) { filtros.push('(a.acao LIKE ? OR a.detalhes LIKE ? OR u.nome LIKE ?)'); params.push(...Array(3).fill(`%${req.query.q}%`)); }
-    const where = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
-    const base = `FROM auditoria a LEFT JOIN usuarios u ON u.id = a.usuario_id ${where}`;
-    const { total } = db.prepare(`SELECT COUNT(*) AS total ${base}`).get(...params);
-    const itens = db.prepare(`SELECT a.*, u.nome AS usuario_nome ${base} ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(...params, limite, offset);
+    if (req.query.empresa_id) { filtros.push('a.empresa_id = ?'); params.push(Number(req.query.empresa_id)); }
+    if (req.query.acao) { filtros.push('a.acao LIKE ?'); params.push(`%${req.query.acao}%`); }
+    const pagina = Math.max(1, Number(req.query.pagina) || 1);
+    const limite = 50;
+    const where = filtros.join(' AND ');
+    const total = db.prepare(`SELECT COUNT(*) AS n FROM auditoria a WHERE ${where}`).get(...params).n;
+    const itens = db.prepare(`SELECT a.*, u.nome AS usuario_nome, e.razao_social AS empresa_nome FROM auditoria a
+      LEFT JOIN usuarios u ON u.id = a.usuario_id LEFT JOIN empresas e ON e.id = a.empresa_id
+      WHERE ${where} ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(...params, limite, (pagina - 1) * limite);
     res.json({ itens, total, pagina, limite });
   });
   return r;

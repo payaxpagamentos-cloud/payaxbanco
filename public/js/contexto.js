@@ -1,16 +1,21 @@
 import { sessao } from './api.js';
 
 export const usuarioAtual = () => sessao.get()?.usuario;
-export const ehAdmin = () => usuarioAtual()?.perfil === 'admin';
-/** Alçada do usuário para uma permissão (ex.: 'contas.limite'), definida pelo administrador na tela Alçadas. */
-export const pode = (chave) => ehAdmin() || Boolean(sessao.get()?.permissoes?.[chave]?.permitido);
-/** Teto de valor da alçada, em centavos (null = sem teto). */
-export const tetoAlcada = (chave) => (ehAdmin() ? null : sessao.get()?.permissoes?.[chave]?.limite_centavos ?? null);
-/** Atributo para desabilitar um botão quando o usuário não tem a alçada. */
-export const semAlcada = (chave) => (pode(chave) ? '' : 'disabled');
+export const perfil = () => usuarioAtual()?.perfil;
+export const ehAdmin = () => perfil() === 'admin';
+/** Supervisor e administrador gerenciam a carteira (contratos, analistas) e veem todas as empresas. */
+export const gestor = () => ['admin', 'supervisor'].includes(perfil());
+
+const CHAVE_EMPRESA = 'bpo.empresa';
+/** Empresa em atendimento (a última aberta), para manter o menu financeiro à mão. */
+export const empresaAtual = {
+  get() { try { return JSON.parse(sessionStorage.getItem(CHAVE_EMPRESA)); } catch { return null; } },
+  set(e) { try { sessionStorage.setItem(CHAVE_EMPRESA, JSON.stringify(e)); } catch { /* ignora */ } },
+  limpar() { try { sessionStorage.removeItem(CHAVE_EMPRESA); } catch { /* ignora */ } },
+};
 
 export function definirTitulo(t) {
   const el = document.querySelector('#titulo-pagina');
   if (el) el.textContent = t;
-  document.title = `${t} · Banqueiro PAY AX`;
+  document.title = `${t} · Ativa BPO Financeiro`;
 }

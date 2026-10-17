@@ -6,406 +6,381 @@ const { DatabaseSync } = require('node:sqlite');
 const config = require('./config');
 const { hashSenha } = require('./lib/senha');
 
+// Valores em centavos (inteiros). Datas de negócio em 'AAAA-MM-DD'; carimbos de criação em UTC.
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nome TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   senha_hash TEXT NOT NULL,
-  perfil TEXT NOT NULL CHECK (perfil IN ('admin','gerente','operador','ouvidoria','antifraude')),
+  perfil TEXT NOT NULL CHECK (perfil IN ('admin','supervisor','analista')),
   ativo INTEGER NOT NULL DEFAULT 1,
   ultimo_acesso TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS clientes (
+-- Carteira: empresas atendidas pelo BPO.
+CREATE TABLE IF NOT EXISTS empresas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tipo TEXT NOT NULL CHECK (tipo IN ('PF','PJ')),
-  nome TEXT NOT NULL,
-  documento TEXT NOT NULL UNIQUE,
+  razao_social TEXT NOT NULL,
+  nome_fantasia TEXT,
+  cnpj TEXT NOT NULL UNIQUE,
   email TEXT,
   telefone TEXT,
-  data_nascimento TEXT,
-  renda_mensal_centavos INTEGER NOT NULL DEFAULT 0,
-  cep TEXT, logradouro TEXT, numero TEXT, complemento TEXT,
-  bairro TEXT, cidade TEXT, uf TEXT,
-  status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo','inativo','bloqueado')),
+  responsavel TEXT,
+  analista_id INTEGER REFERENCES usuarios(id),
+  plano TEXT NOT NULL DEFAULT 'essencial' CHECK (plano IN ('essencial','completo','premium')),
+  mensalidade_centavos INTEGER NOT NULL DEFAULT 0 CHECK (mensalidade_centavos >= 0),
+  dia_vencimento INTEGER NOT NULL DEFAULT 10 CHECK (dia_vencimento BETWEEN 1 AND 28),
+  inicio_contrato TEXT NOT NULL,
+  fim_contrato TEXT,
+  status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('implantacao','ativa','suspensa','encerrada')),
   observacoes TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_empresas_analista ON empresas(analista_id);
 
-CREATE TABLE IF NOT EXISTS contas (
+CREATE TABLE IF NOT EXISTS tarefas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_id INTEGER NOT NULL REFERENCES clientes(id),
-  tipo TEXT NOT NULL CHECK (tipo IN ('corrente','poupanca','pagamento','salario')),
-  agencia TEXT NOT NULL,
-  numero TEXT NOT NULL,
-  digito TEXT NOT NULL,
-  saldo_centavos INTEGER NOT NULL DEFAULT 0,
-  limite_centavos INTEGER NOT NULL DEFAULT 0 CHECK (limite_centavos >= 0),
-  status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa','bloqueada','encerrada')),
-  aberta_em TEXT NOT NULL DEFAULT (datetime('now')),
-  encerrada_em TEXT,
-  UNIQUE (agencia, numero)
-);
-CREATE INDEX IF NOT EXISTS idx_contas_cliente ON contas(cliente_id);
-
-CREATE TABLE IF NOT EXISTS transacoes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  conta_id INTEGER NOT NULL REFERENCES contas(id),
-  tipo TEXT NOT NULL,
-  valor_centavos INTEGER NOT NULL,
-  saldo_apos_centavos INTEGER NOT NULL,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  titulo TEXT NOT NULL,
   descricao TEXT,
-  contraparte_conta_id INTEGER REFERENCES contas(id),
-  grupo TEXT NOT NULL,
-  usuario_id INTEGER REFERENCES usuarios(id),
-  estornada_em TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_transacoes_conta ON transacoes(conta_id, criado_em);
-CREATE INDEX IF NOT EXISTS idx_transacoes_grupo ON transacoes(grupo);
-CREATE INDEX IF NOT EXISTS idx_transacoes_data ON transacoes(criado_em);
-
-CREATE TABLE IF NOT EXISTS chaves_pix (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  conta_id INTEGER NOT NULL REFERENCES contas(id),
-  tipo TEXT NOT NULL CHECK (tipo IN ('cpf','cnpj','email','telefone','aleatoria')),
-  chave TEXT NOT NULL UNIQUE,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS emprestimos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  conta_id INTEGER NOT NULL REFERENCES contas(id),
-  cliente_id INTEGER NOT NULL REFERENCES clientes(id),
-  valor_centavos INTEGER NOT NULL,
-  taxa_mensal REAL NOT NULL,
-  num_parcelas INTEGER NOT NULL,
-  valor_parcela_centavos INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo','quitado','cancelado')),
-  usuario_id INTEGER REFERENCES usuarios(id),
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS parcelas (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  emprestimo_id INTEGER NOT NULL REFERENCES emprestimos(id),
-  numero INTEGER NOT NULL,
+  responsavel_id INTEGER REFERENCES usuarios(id),
   vencimento TEXT NOT NULL,
-  valor_centavos INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','paga')),
-  paga_em TEXT,
-  UNIQUE (emprestimo_id, numero)
+  recorrencia TEXT NOT NULL DEFAULT 'nenhuma' CHECK (recorrencia IN ('nenhuma','semanal','mensal')),
+  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','concluida','cancelada')),
+  concluida_em TEXT,
+  concluida_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_tarefas_empresa ON tarefas(empresa_id, status, vencimento);
+
+-- Plano de contas da empresa. grupo_dre define a linha da DRE.
+CREATE TABLE IF NOT EXISTS categorias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('receita','despesa')),
+  grupo_dre TEXT NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (empresa_id, nome)
+);
+
+CREATE TABLE IF NOT EXISTS centros_custo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (empresa_id, nome)
+);
+
+-- Fornecedores e clientes da empresa atendida.
+CREATE TABLE IF NOT EXISTS contatos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('fornecedor','cliente','ambos')),
+  nome TEXT NOT NULL,
+  documento TEXT,
+  email TEXT,
+  telefone TEXT,
+  chave_pix TEXT,
+  observacoes TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_contatos_empresa ON contatos(empresa_id);
+
+CREATE TABLE IF NOT EXISTS contas_bancarias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  descricao TEXT NOT NULL,
+  banco TEXT NOT NULL,
+  agencia TEXT,
+  numero TEXT,
+  saldo_inicial_centavos INTEGER NOT NULL DEFAULT 0,
+  data_saldo_inicial TEXT NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Contas a pagar e a receber. Uma compra parcelada gera um lançamento por parcela (mesmo grupo).
+CREATE TABLE IF NOT EXISTS lancamentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('pagar','receber')),
+  descricao TEXT NOT NULL,
+  contato_id INTEGER REFERENCES contatos(id),
+  categoria_id INTEGER REFERENCES categorias(id),
+  centro_custo_id INTEGER REFERENCES centros_custo(id),
+  conta_bancaria_id INTEGER REFERENCES contas_bancarias(id),
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  competencia TEXT NOT NULL,
+  vencimento TEXT NOT NULL,
+  documento TEXT,
+  parcela INTEGER NOT NULL DEFAULT 1,
+  total_parcelas INTEGER NOT NULL DEFAULT 1,
+  grupo TEXT,
+  status TEXT NOT NULL DEFAULT 'aberto' CHECK (status IN ('aberto','pago','cancelado')),
+  pago_em TEXT,
+  valor_pago_centavos INTEGER,
+  juros_centavos INTEGER NOT NULL DEFAULT 0,
+  desconto_centavos INTEGER NOT NULL DEFAULT 0,
+  observacoes TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_lanc_empresa ON lancamentos(empresa_id, tipo, status, vencimento);
+CREATE INDEX IF NOT EXISTS idx_lanc_competencia ON lancamentos(empresa_id, competencia);
+CREATE INDEX IF NOT EXISTS idx_lanc_grupo ON lancamentos(grupo);
+
+-- Livro caixa de cada conta bancária: baixas, transferências e ajustes. Valor com sinal (+ entrada, - saída).
+CREATE TABLE IF NOT EXISTS movimentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  conta_bancaria_id INTEGER NOT NULL REFERENCES contas_bancarias(id),
+  data TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos <> 0),
+  descricao TEXT NOT NULL,
+  origem TEXT NOT NULL CHECK (origem IN ('baixa','transferencia','ajuste')),
+  lancamento_id INTEGER REFERENCES lancamentos(id),
+  grupo TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mov_conta ON movimentos(conta_bancaria_id, data);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mov_lancamento ON movimentos(lancamento_id) WHERE lancamento_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS importacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  conta_bancaria_id INTEGER NOT NULL REFERENCES contas_bancarias(id),
+  arquivo TEXT,
+  formato TEXT NOT NULL,
+  itens INTEGER NOT NULL,
+  duplicados INTEGER NOT NULL,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Linhas do extrato importado. Cada uma é conciliada com um movimento do livro caixa ou ignorada.
+CREATE TABLE IF NOT EXISTS extrato (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  conta_bancaria_id INTEGER NOT NULL REFERENCES contas_bancarias(id),
+  importacao_id INTEGER REFERENCES importacoes(id),
+  data TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL,
+  descricao TEXT,
+  documento TEXT,
+  fitid TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','conciliado','ignorado')),
+  movimento_id INTEGER UNIQUE REFERENCES movimentos(id),
+  conciliado_por INTEGER REFERENCES usuarios(id),
+  conciliado_em TEXT,
+  UNIQUE (conta_bancaria_id, fitid)
+);
+CREATE INDEX IF NOT EXISTS idx_extrato_conta ON extrato(conta_bancaria_id, status, data);
 
 CREATE TABLE IF NOT EXISTS auditoria (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   usuario_id INTEGER REFERENCES usuarios(id),
+  empresa_id INTEGER REFERENCES empresas(id),
   acao TEXT NOT NULL,
-  entidade TEXT NOT NULL,
-  entidade_id INTEGER,
   detalhes TEXT,
   ip TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_auditoria_data ON auditoria(criado_em);
+`;
 
--- Alçadas: o que gerente, operador e ouvidoria podem fazer e até que valor (o administrador tem acesso total).
-CREATE TABLE IF NOT EXISTS alcadas (
-  perfil TEXT NOT NULL CHECK (perfil IN ('gerente', 'operador', 'ouvidoria', 'antifraude')),
-  permissao TEXT NOT NULL,
-  permitido INTEGER NOT NULL,
-  limite_centavos INTEGER,
-  atualizado_por INTEGER REFERENCES usuarios(id),
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (perfil, permissao)
-);
-
--- Ouvidoria: ações sensíveis (encerramento, bloqueios, exclusão) aguardam análise antes de serem executadas.
-CREATE TABLE IF NOT EXISTS solicitacoes (
+// Módulos adicionados depois da primeira versão: tabelas novas e colunas novas em tabelas existentes.
+const SCHEMA_V2 = `
+-- Responsáveis na empresa cliente. Com senha, acessam o Portal do Cliente.
+CREATE TABLE IF NOT EXISTS responsaveis (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  protocolo TEXT NOT NULL UNIQUE,
-  tipo TEXT NOT NULL,
-  cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
-  cliente_nome TEXT NOT NULL,
-  conta_id INTEGER REFERENCES contas(id),
-  dados TEXT,
-  motivo TEXT NOT NULL,
-  origem TEXT NOT NULL CHECK (origem IN ('equipe', 'cliente')),
-  solicitante_id INTEGER REFERENCES usuarios(id),
-  status TEXT NOT NULL DEFAULT 'em_analise' CHECK (status IN ('em_analise', 'aprovada', 'recusada', 'cancelada')),
-  parecer TEXT,
-  decidido_por INTEGER REFERENCES usuarios(id),
-  decidido_em TEXT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  cargo TEXT,
+  email TEXT,
+  telefone TEXT,
+  recebe_relatorios INTEGER NOT NULL DEFAULT 1,
+  acesso_portal INTEGER NOT NULL DEFAULT 0,
+  senha_hash TEXT,
+  precisa_trocar_senha INTEGER NOT NULL DEFAULT 1,
+  pode_aprovar INTEGER NOT NULL DEFAULT 0,
+  limite_aprovacao_centavos INTEGER NOT NULL DEFAULT -1, -- -1 = sem limite
+  totp_segredo TEXT,
+  totp_ativo INTEGER NOT NULL DEFAULT 0,
+  totp_ultimo_passo INTEGER,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  ultimo_acesso TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_solicitacoes_status ON solicitacoes(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_responsaveis_portal ON responsaveis(email COLLATE NOCASE) WHERE acesso_portal = 1;
 
--- Relacionamento: mensagens entre o cliente (Internet Banking) e o gerente da conta.
+-- Rateio de um lançamento entre centros de custo (percentual em centésimos de ponto: 10000 = 100%).
+CREATE TABLE IF NOT EXISTS rateios (
+  lancamento_id INTEGER NOT NULL REFERENCES lancamentos(id) ON DELETE CASCADE,
+  centro_custo_id INTEGER NOT NULL REFERENCES centros_custo(id),
+  percentual INTEGER NOT NULL CHECK (percentual > 0 AND percentual <= 10000),
+  PRIMARY KEY (lancamento_id, centro_custo_id)
+);
+
+-- Histórico do fluxo de aprovação de pagamentos.
+CREATE TABLE IF NOT EXISTS aprovacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lancamento_id INTEGER NOT NULL REFERENCES lancamentos(id),
+  etapa TEXT NOT NULL CHECK (etapa IN ('solicitado','conferido','aprovado','recusado','reaberto')),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  responsavel_id INTEGER REFERENCES responsaveis(id),
+  comentario TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_aprovacoes_lanc ON aprovacoes(lancamento_id);
+
+-- Cobrança: contatos feitos, promessas de pagamento e acordos (renegociações).
+CREATE TABLE IF NOT EXISTS cobranca_registros (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  contato_id INTEGER NOT NULL REFERENCES contatos(id),
+  lancamento_id INTEGER REFERENCES lancamentos(id),
+  canal TEXT NOT NULL CHECK (canal IN ('lembrete','ligacao','email','whatsapp','visita','outro')),
+  descricao TEXT NOT NULL,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_cobranca_contato ON cobranca_registros(contato_id, criado_em);
+
+CREATE TABLE IF NOT EXISTS promessas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  contato_id INTEGER NOT NULL REFERENCES contatos(id),
+  lancamento_id INTEGER REFERENCES lancamentos(id),
+  data_prometida TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','cumprida','quebrada')),
+  observacao TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  resolvida_em TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS acordos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  contato_id INTEGER NOT NULL REFERENCES contatos(id),
+  valor_original_centavos INTEGER NOT NULL,
+  valor_acordo_centavos INTEGER NOT NULL,
+  parcelas INTEGER NOT NULL,
+  primeiro_vencimento TEXT NOT NULL,
+  observacao TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Arquivos (notas, boletos, contratos, comprovantes). O conteúdo fica em disco (BPO_ARQUIVOS).
+CREATE TABLE IF NOT EXISTS documentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  lancamento_id INTEGER REFERENCES lancamentos(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('nota','boleto','contrato','comprovante','extrato','outro')),
+  nome TEXT NOT NULL,
+  tamanho INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  arquivo TEXT NOT NULL,
+  descricao TEXT,
+  enviado_por_usuario INTEGER REFERENCES usuarios(id),
+  enviado_por_responsavel INTEGER REFERENCES responsaveis(id),
+  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_documentos_empresa ON documentos(empresa_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_documentos_lanc ON documentos(lancamento_id);
+
+-- Orçamento mensal por categoria.
+CREATE TABLE IF NOT EXISTS orcamentos (
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  categoria_id INTEGER NOT NULL REFERENCES categorias(id),
+  mes TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos >= 0),
+  PRIMARY KEY (empresa_id, categoria_id, mes)
+);
+
+-- Fechamento mensal: cada etapa concluída de um mês. A etapa 'fechado' trava o período.
+CREATE TABLE IF NOT EXISTS fechamentos (
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  mes TEXT NOT NULL,
+  etapa TEXT NOT NULL,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  observacao TEXT,
+  concluido_em TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (empresa_id, mes, etapa)
+);
+
+-- Conversa entre a equipe e o cliente (Portal).
 CREATE TABLE IF NOT EXISTS mensagens (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_id INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
-  gerente_id INTEGER REFERENCES usuarios(id),
-  autor TEXT NOT NULL CHECK (autor IN ('cliente', 'gerente')),
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  autor TEXT NOT NULL CHECK (autor IN ('equipe','cliente')),
   usuario_id INTEGER REFERENCES usuarios(id),
+  responsavel_id INTEGER REFERENCES responsaveis(id),
   texto TEXT NOT NULL,
   lida_em TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens(cliente_id, gerente_id, id);
-CREATE INDEX IF NOT EXISTS idx_mensagens_data ON mensagens(criado_em);
+CREATE INDEX IF NOT EXISTS idx_mensagens_empresa ON mensagens(empresa_id, id);
 
--- Pedidos do cliente para alterar o limite diário do Internet Banking (aumentos valem 24 horas depois).
-CREATE TABLE IF NOT EXISTS pedidos_limite (
+-- Chaves de API para sistemas de gestão (ERP) enviarem lançamentos. Só o hash fica gravado.
+CREATE TABLE IF NOT EXISTS chaves_api (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_id INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
-  valor_atual_centavos INTEGER NOT NULL,
-  valor_novo_centavos INTEGER NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('agendado', 'efetivado', 'cancelado', 'recusado')),
-  efetiva_em TEXT NOT NULL,
-  motivo TEXT,
-  decidido_por INTEGER REFERENCES usuarios(id),
-  concluido_em TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_pedidos_limite_cliente ON pedidos_limite(cliente_id, status);
-
--- Segurança: tentativas de acesso (Internet Banking e equipe), com sucesso ou falha.
-CREATE TABLE IF NOT EXISTS tentativas_acesso (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  canal TEXT NOT NULL CHECK (canal IN ('internet_banking', 'equipe')),
-  identificador TEXT NOT NULL,
-  cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
-  usuario_id INTEGER REFERENCES usuarios(id),
-  sucesso INTEGER NOT NULL,
-  motivo TEXT,
-  ip TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_tentativas_data ON tentativas_acesso(criado_em);
-
--- Antifraude: alertas gerados pelas regras sobre transações e acessos.
-CREATE TABLE IF NOT EXISTS alertas_fraude (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  chave TEXT NOT NULL UNIQUE,
-  regra TEXT NOT NULL,
-  severidade TEXT NOT NULL CHECK (severidade IN ('baixa', 'media', 'alta')),
-  cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
-  conta_id INTEGER REFERENCES contas(id),
-  transacao_id INTEGER REFERENCES transacoes(id),
-  valor_centavos INTEGER,
-  descricao TEXT NOT NULL,
-  dados TEXT,
-  status TEXT NOT NULL DEFAULT 'aberto' CHECK (status IN ('aberto', 'descartado', 'confirmado')),
-  parecer TEXT,
-  analisado_por INTEGER REFERENCES usuarios(id),
-  analisado_em TEXT,
-  ocorrido_em TEXT NOT NULL,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_alertas_status ON alertas_fraude(status, severidade);
-
--- Estado interno (ex.: até onde o antifraude já analisou).
-CREATE TABLE IF NOT EXISTS estado_sistema (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
-
--- Segurança: linha de base aprovada dos arquivos da plataforma e verificações de hora em hora.
-CREATE TABLE IF NOT EXISTS integridade_base (
-  caminho TEXT PRIMARY KEY,
-  hash TEXT NOT NULL,
-  tamanho INTEGER NOT NULL,
-  conteudo TEXT,
-  aprovado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  aprovado_por INTEGER REFERENCES usuarios(id)
-);
-CREATE TABLE IF NOT EXISTS verificacoes_seguranca (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  status TEXT NOT NULL CHECK (status IN ('ok', 'atencao', 'critico')),
-  integridade TEXT NOT NULL,
-  funcoes TEXT NOT NULL,
-  servidor TEXT NOT NULL,
-  conexoes TEXT NOT NULL,
-  alertas_novos INTEGER NOT NULL DEFAULT 0,
-  duracao_ms INTEGER NOT NULL,
-  origem TEXT NOT NULL DEFAULT 'agendada',
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
--- Situação de cada serviço (Banqueiro, Internet Banking, site, servidor, banco, Bradesco...) a cada teste rápido.
-CREATE TABLE IF NOT EXISTS monitor_servicos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  servico TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('ok', 'degradado', 'fora')),
-  ms INTEGER NOT NULL DEFAULT 0,
-  detalhe TEXT,
-  funcoes TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_monitor_servicos ON monitor_servicos (servico, criado_em);
-
--- Quais ações exigem análise da Ouvidoria (sem registro: vale o padrão do sistema).
-CREATE TABLE IF NOT EXISTS regras_analise (
-  acao TEXT PRIMARY KEY,
-  exige INTEGER NOT NULL,
-  atualizado_por INTEGER REFERENCES usuarios(id),
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- Integração Bradesco: cobranças PIX geradas para crédito em conta de cliente.
-CREATE TABLE IF NOT EXISTS cobrancas_pix (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  conta_id INTEGER NOT NULL REFERENCES contas(id),
-  txid TEXT NOT NULL UNIQUE,
-  valor_centavos INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa','concluida','expirada','cancelada')),
-  pix_copia_e_cola TEXT,
-  expira_em TEXT NOT NULL,
-  end_to_end_id TEXT,
-  pago_em TEXT,
-  usuario_id INTEGER REFERENCES usuarios(id),
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_cobrancas_conta ON cobrancas_pix(conta_id);
-
--- PIX que entraram na conta PAY AX no Bradesco (idempotente por endToEndId).
-CREATE TABLE IF NOT EXISTS pix_recebidos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  end_to_end_id TEXT NOT NULL UNIQUE,
-  txid TEXT,
-  valor_centavos INTEGER NOT NULL,
-  pagador_nome TEXT,
-  pagador_documento TEXT,
-  info_pagador TEXT,
-  conta_id INTEGER REFERENCES contas(id),
-  transacao_id INTEGER REFERENCES transacoes(id),
-  status TEXT NOT NULL CHECK (status IN ('creditado','sem_vinculo')),
-  motivo TEXT,
-  recebido_em TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- PIX enviados da conta PAY AX no Bradesco para outros bancos, a pedido de clientes.
-CREATE TABLE IF NOT EXISTS pix_saidas (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  conta_id INTEGER NOT NULL REFERENCES contas(id),
-  transacao_id INTEGER REFERENCES transacoes(id),
-  valor_centavos INTEGER NOT NULL,
-  chave TEXT NOT NULL,
-  descricao TEXT,
-  idempotencia TEXT NOT NULL UNIQUE,
-  end_to_end_id TEXT,
-  status TEXT NOT NULL DEFAULT 'processando' CHECK (status IN ('processando','concluido','falhou')),
-  erro TEXT,
-  usuario_id INTEGER REFERENCES usuarios(id),
-  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- Internet Banking: credenciais do cliente (separadas dos usuários da equipe).
-CREATE TABLE IF NOT EXISTS acessos_cliente (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_id INTEGER NOT NULL UNIQUE REFERENCES clientes(id),
-  senha_hash TEXT NOT NULL,
-  pin_hash TEXT,
-  status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo','bloqueado')),
-  precisa_trocar_senha INTEGER NOT NULL DEFAULT 1,
-  tentativas INTEGER NOT NULL DEFAULT 0,
-  tentativas_pin INTEGER NOT NULL DEFAULT 0,
-  bloqueado_ate TEXT,
-  limite_diario_centavos INTEGER NOT NULL DEFAULT 500000,
-  ultimo_acesso TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- Propostas de abertura de conta feitas pelo site (analisadas pela equipe).
-CREATE TABLE IF NOT EXISTS propostas_conta (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  protocolo TEXT NOT NULL UNIQUE,
-  tipo TEXT NOT NULL CHECK (tipo IN ('PF','PJ')),
-  documento TEXT NOT NULL,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
   nome TEXT NOT NULL,
-  email TEXT NOT NULL,
-  telefone TEXT NOT NULL,
-  tipo_conta TEXT NOT NULL CHECK (tipo_conta IN ('corrente','pagamento')),
-  dados TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'em_analise' CHECK (status IN ('em_analise','aprovada','recusada')),
-  motivo TEXT,
-  cliente_id INTEGER REFERENCES clientes(id),
-  conta_id INTEGER REFERENCES contas(id),
-  usuario_id INTEGER REFERENCES usuarios(id),
-  analisado_em TEXT,
-  ip TEXT,
+  prefixo TEXT NOT NULL UNIQUE,
+  hash TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id),
+  ultimo_uso TEXT,
+  revogada_em TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_propostas_status ON propostas_conta(status, criado_em);
 
--- Favorecidos do cliente (cadastrados pela equipe; o cliente usa no PIX e na transferência).
-CREATE TABLE IF NOT EXISTS favorecidos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_id INTEGER NOT NULL REFERENCES clientes(id),
-  tipo TEXT NOT NULL CHECK (tipo IN ('pix','conta')),
-  apelido TEXT,
-  nome TEXT,
-  documento TEXT,
-  chave TEXT,
-  conta_id INTEGER REFERENCES contas(id),
-  usuario_id INTEGER REFERENCES usuarios(id),
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_favorecidos_cliente ON favorecidos(cliente_id);
-
--- Desafios do teclado virtual de pares (uso único, expiram em 3 minutos).
-CREATE TABLE IF NOT EXISTS desafios_teclado (
-  id TEXT PRIMARY KEY,
-  teclas TEXT NOT NULL,
-  expira_em TEXT NOT NULL,
-  usado INTEGER NOT NULL DEFAULT 0
-);
-
--- Pagamentos de boletos e contas de consumo, liquidados pela conta PAY AX no Bradesco.
-CREATE TABLE IF NOT EXISTS pagamentos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  conta_id INTEGER NOT NULL REFERENCES contas(id),
-  transacao_id INTEGER REFERENCES transacoes(id),
-  tipo TEXT NOT NULL CHECK (tipo IN ('boleto','convenio')),
-  codigo_barras TEXT NOT NULL,
-  linha_digitavel TEXT NOT NULL,
-  valor_centavos INTEGER NOT NULL,
-  vencimento TEXT,
-  idempotencia TEXT NOT NULL UNIQUE,
-  autenticacao TEXT,
-  status TEXT NOT NULL DEFAULT 'processando' CHECK (status IN ('processando','concluido','falhou')),
-  erro TEXT,
-  canal TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
--- Estado do simulador do Bradesco (usado quando BRADESCO_MODO=simulador).
-CREATE TABLE IF NOT EXISTS bradesco_sim_movimentos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  natureza TEXT NOT NULL CHECK (natureza IN ('C','D')),
-  valor_centavos INTEGER NOT NULL,
-  descricao TEXT,
-  end_to_end_id TEXT,
-  txid TEXT,
-  pagador_nome TEXT,
-  pagador_documento TEXT,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
-CREATE TABLE IF NOT EXISTS bradesco_sim_cobrancas (
-  txid TEXT PRIMARY KEY,
-  valor_centavos INTEGER NOT NULL,
-  status TEXT NOT NULL,
-  pix_copia_e_cola TEXT NOT NULL,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+CREATE TABLE IF NOT EXISTS configuracoes (
+  chave TEXT PRIMARY KEY,
+  valor TEXT NOT NULL
 );
 `;
+
+// [tabela, coluna, definição]
+const COLUNAS_V2 = [
+  ['usuarios', 'alcada_aprovacao_centavos', 'INTEGER'], // NULL = padrão do perfil; -1 = sem limite; 0 = não aprova
+  ['usuarios', 'totp_segredo', 'TEXT'],
+  ['usuarios', 'totp_ativo', 'INTEGER NOT NULL DEFAULT 0'],
+  ['usuarios', 'totp_ultimo_passo', 'INTEGER'],
+  ['empresas', 'aprovacao_ativa', 'INTEGER NOT NULL DEFAULT 0'],
+  ['empresas', 'aprovacao_acima_centavos', 'INTEGER NOT NULL DEFAULT 0'],
+  ['empresas', 'chave_pix_cobranca', 'TEXT'],
+  ['categorias', 'conta_contabil', 'TEXT'],
+  ['contas_bancarias', 'conta_contabil', 'TEXT'],
+  ['lancamentos', 'recorrente', 'INTEGER NOT NULL DEFAULT 0'],
+  ['lancamentos', 'origem_id', 'INTEGER REFERENCES lancamentos(id)'],
+  // dispensada | conferencia | pendente | aprovada | recusada
+  ['lancamentos', 'aprovacao', "TEXT NOT NULL DEFAULT 'dispensada'"],
+  ['lancamentos', 'acordo_id', 'INTEGER REFERENCES acordos(id)'],
+  ['lancamentos', 'renegociado_acordo_id', 'INTEGER REFERENCES acordos(id)'],
+  ['auditoria', 'responsavel_id', 'INTEGER REFERENCES responsaveis(id)'],
+];
+
+function migrar(db) {
+  db.exec(SCHEMA_V2);
+  for (const [tabela, coluna, def] of COLUNAS_V2) {
+    const existe = db.prepare(`SELECT 1 FROM pragma_table_info('${tabela}') WHERE name = ?`).get(coluna);
+    if (!existe) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${def}`);
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_lanc_aprovacao ON lancamentos(empresa_id, aprovacao) WHERE aprovacao IN ('conferencia','pendente')");
+}
 
 function abrir(arquivo = config.dbFile) {
   if (arquivo !== ':memory:') fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   const db = new DatabaseSync(arquivo);
-  db.exec('PRAGMA foreign_keys = ON;');
+  db.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   if (arquivo !== ':memory:') db.exec('PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
   migrar(db);
@@ -413,63 +388,29 @@ function abrir(arquivo = config.dbFile) {
   return db;
 }
 
-/** Colunas adicionadas depois da primeira versão (bancos existentes recebem ALTER TABLE). */
-const COLUNAS = [
-  ['transacoes', 'canal', "TEXT NOT NULL DEFAULT 'agencia'"],
-  ['auditoria', 'cliente_id', 'INTEGER REFERENCES clientes(id)'],
-  ['contas', 'gerente_id', 'INTEGER REFERENCES usuarios(id)'], // gerente de relacionamento da conta
-];
-
-function migrar(db) {
-  for (const [tabela, coluna, tipo] of COLUNAS) {
-    const existe = db.prepare(`SELECT 1 FROM pragma_table_info('${tabela}') WHERE name = ?`).get(coluna);
-    if (!existe) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
-  }
-  // Perfis Ouvidoria e Antifraude: bancos criados antes deles têm a restrição antiga de perfis.
-  for (const tabela of ['usuarios', 'alcadas']) {
-    const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabela)?.sql ?? '';
-    if (!sql.includes("'antifraude'")) reconstruir(db, tabela);
-  }
-}
-
-/** Recria a tabela com a definição atual do SCHEMA, preservando os dados (SQLite não altera CHECK existente). */
-function reconstruir(db, tabela) {
-  const criar = SCHEMA.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${tabela} \\([\\s\\S]*?\\n\\);`))[0]
-    .replace(`CREATE TABLE IF NOT EXISTS ${tabela} (`, `CREATE TABLE ${tabela}_novo (`);
-  const colunas = db.prepare(`SELECT name FROM pragma_table_info('${tabela}')`).all().map((c) => c.name).join(', ');
-  db.exec('PRAGMA foreign_keys = OFF;');
-  try {
-    transacao(db, () => {
-      db.exec(criar);
-      db.exec(`INSERT INTO ${tabela}_novo (${colunas}) SELECT ${colunas} FROM ${tabela};`);
-      db.exec(`DROP TABLE ${tabela};`);
-      db.exec(`ALTER TABLE ${tabela}_novo RENAME TO ${tabela};`);
-    });
-  } finally {
-    db.exec('PRAGMA foreign_keys = ON;');
-  }
-}
-
 function garantirAdmin(db) {
-  const { total } = db.prepare('SELECT COUNT(*) AS total FROM usuarios').get();
-  if (total > 0) return;
-  db.prepare('INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?, ?, ?, ?)')
-    .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha), 'admin');
-  if (process.env.NODE_ENV !== 'test') {
-    console.log(`[PAY AX] Usuário administrador criado: ${config.admin.email} (altere a senha no primeiro acesso).`);
-  }
+  const existe = db.prepare("SELECT 1 FROM usuarios WHERE perfil = 'admin' LIMIT 1").get();
+  if (existe) return;
+  const { nome, email, senha } = config.admin;
+  db.prepare('INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?, ?, ?, ?)').run(nome, email, hashSenha(senha), 'admin');
 }
 
-/** Executa fn dentro de uma transação SQLite (BEGIN IMMEDIATE / COMMIT / ROLLBACK). */
+const abertas = new WeakSet();
+
+/** Executa fn dentro de uma transação (BEGIN IMMEDIATE … COMMIT). Chamadas aninhadas usam a transação de fora. */
 function transacao(db, fn) {
+  if (abertas.has(db)) return fn();
   db.exec('BEGIN IMMEDIATE');
+  abertas.add(db);
   try {
-    const resultado = fn();
+    const r = fn();
     db.exec('COMMIT');
-    return resultado;
+    return r;
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
+  } finally {
+    abertas.delete(db);
   }
 }
 

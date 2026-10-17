@@ -2,7 +2,7 @@
 
 // Gera o pacote de instalação: <saída>/ativa-bpo.zip com a pasta bpo/ pronta para enviar ao servidor
 // (código, dependências de produção já instaladas, .env com segredos novos e LEIA-ME).
-// Uso: node scripts/empacotar.js [pasta de saída]   (padrão: ../dist-bpo)
+// Uso: node scripts/empacotar.js [pasta de saída]   (padrão: dist)
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -10,7 +10,7 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
 const raiz = path.join(__dirname, '..');
-const saida = path.resolve(process.argv[2] || path.join(raiz, '..', 'dist-bpo'));
+const saida = path.resolve(process.argv[2] || path.join(raiz, 'dist'));
 const pasta = path.join(saida, 'bpo');
 
 fs.rmSync(saida, { recursive: true, force: true });

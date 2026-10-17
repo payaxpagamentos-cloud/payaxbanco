@@ -1,8 +1,15 @@
 'use strict';
 
 process.env.NODE_ENV = 'test';
-process.env.PAYAX_SECRET = 'segredo-de-teste';
-process.env.PAYAX_LIMITE_LOGIN = '1000'; // a suíte faz muitos logins seguidos; o limitador tem teste próprio
+process.env.BPO_SECRET = 'segredo-de-teste';
+process.env.BPO_LIMITE_LOGIN = '1000';
+const os = require('node:os');
+const fs = require('node:fs');
+const path = require('node:path');
+const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'bpo-teste-'));
+process.env.BPO_ARQUIVOS = path.join(temp, 'arquivos');
+process.env.BPO_BACKUPS = path.join(temp, 'backups');
+process.on('exit', () => fs.rmSync(temp, { recursive: true, force: true }));
 
 const { abrir } = require('../server/db');
 const { criarApp } = require('../server/app');
@@ -26,7 +33,16 @@ async function iniciar() {
     return { status: resp.status, dados, headers: resp.headers };
   }
 
-  async function login(email = 'admin@payax.com.br', senha = 'admin123') {
+  /** Envio de arquivo (corpo binário, metadados na query). */
+  async function enviarArquivo(caminho, conteudo, tk = token) {
+    const resp = await fetch(base + caminho, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${tk}` }, body: conteudo });
+    const texto = await resp.text();
+    let dados = texto;
+    try { dados = JSON.parse(texto); } catch { /* vazio */ }
+    return { status: resp.status, dados };
+  }
+
+  async function login(email = 'admin@ativabpo.com.br', senha = 'admin123') {
     const r = await req('POST', '/auth/login', { email, senha }, null);
     if (r.status !== 200) throw new Error(`Login falhou para ${email}: ${JSON.stringify(r.dados)}`);
     return r.dados.token;
@@ -34,24 +50,17 @@ async function iniciar() {
 
   token = await login();
 
-  /** Credita a conta pelo caminho real: cobrança PIX gerada e paga (simulador do banco). */
-  async function creditar(contaId, valor) {
-    const c = await req('POST', '/integracoes/bradesco/cobrancas', { conta_id: contaId, valor_centavos: valor });
-    if (c.status !== 201) throw new Error(`Falha ao gerar cobrança: ${JSON.stringify(c.dados)}`);
-    const pg = await req('POST', `/integracoes/bradesco/cobrancas/${c.dados.txid}/simular-pagamento`);
-    if (pg.dados?.creditados !== 1) throw new Error(`Falha ao creditar: ${JSON.stringify(pg.dados)}`);
-  }
-
   return {
-    db, req, login, creditar,
-    usarToken: (t) => { token = t; },
+    db, req, login, enviarArquivo,
     get: (c, tk) => req('GET', c, undefined, tk),
     post: (c, b, tk) => req('POST', c, b, tk),
-    put: (c, b, tk) => req('PUT', c, b, tk),
     patch: (c, b, tk) => req('PATCH', c, b, tk),
     del: (c, tk) => req('DELETE', c, undefined, tk),
     fechar: () => new Promise((r) => servidor.close(r)),
   };
 }
 
-module.exports = { iniciar };
+/** Data relativa a hoje (horário de Brasília). */
+const dia = (deslocamento = 0) => require('../server/lib/datas').somarDias(require('../server/lib/datas').hoje(), deslocamento);
+
+module.exports = { iniciar, dia };

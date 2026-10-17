@@ -3,30 +3,22 @@
 const config = require('./config');
 const { abrir } = require('./db');
 const { criarApp } = require('./app');
-const seguranca = require('./lib/seguranca');
-const { fonteDisco } = require('./lib/integridade-fs');
-const monitorServidor = require('./lib/monitor-servidor');
-const { gerarBackup } = require('./lib/backup');
-const path = require('node:path');
+const backup = require('./lib/backup');
 
 const db = abrir();
-const app = criarApp(db);
-
-// Monitoramento de segurança: verifica ao iniciar e depois de hora em hora (PAYAX_SEGURANCA_INTERVALO_MIN).
-// O monitoramento dos serviços (página de status) roda a cada PAYAX_MONITOR_INTERVALO_MIN minutos (padrão 5).
-seguranca.configurar({
-  fonte: fonteDisco(undefined, path.join(path.dirname(config.dbFile), 'quarentena')),
-  coletarServidor: monitorServidor.coletar,
-  fazerBackup: gerarBackup,
+criarApp(db).listen(config.port, () => {
+  console.log(`[Ativa BPO] Sistema da equipe em http://localhost:${config.port}${config.basePath}/`);
+  console.log(`[Ativa BPO] Portal do Cliente em http://localhost:${config.port}${config.portalPath}/`);
 });
 
-app.listen(config.port, () => {
-  console.log(`[PAY AX] Banqueiro disponível em http://localhost:${config.port}`);
+// Backup automático do banco (padrão: a cada 24 h, mantendo os 30 mais recentes).
+const fazerBackup = () => {
   try {
-    const v = seguranca.executar(db, { origem: 'inicial' });
-    console.log(`[PAY AX] Verificação de segurança: ${v.status} (integridade: ${v.integridade.status}).`);
+    const b = backup.gerar(db);
+    console.log(`[Ativa BPO] Backup gerado: ${b.nome}`);
   } catch (err) {
-    console.error('[PAY AX] Verificação de segurança falhou:', err.message);
+    console.error('[Ativa BPO] Falha no backup:', err.message);
   }
-  seguranca.agendar(db);
-});
+};
+setInterval(fazerBackup, config.backupIntervaloHoras * 3_600_000).unref();
+if (!backup.listar().length) fazerBackup();

@@ -20,8 +20,11 @@ export const $ = (sel, raiz = document) => raiz.querySelector(sel);
 export const $$ = (sel, raiz = document) => [...raiz.querySelectorAll(sel)];
 
 // ===== Marca =====
-/** Nome PAY AX em texto. Substitui o logo enquanto a arte oficial não está pronta. */
-export const marca = (variante = 'escura') => raw(`<span class="marca marca-${variante}" aria-label="PAY AX">PAY<span>AX</span></span>`);
+const SIMBOLO = `<svg class="marca-simbolo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="32" fill="#0B1F3A"/><g fill="#22C58B">
+  <rect x="17" y="34" width="8" height="15" rx="1.6"/><rect x="28.5" y="27" width="8" height="22" rx="1.6"/><rect x="40" y="20" width="8" height="29" rx="1.6"/></g>
+  <path d="M14 36.5 27 24.5l8.5 5.7L48.5 16.5M41 15.5h8.5V24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+/** Logo Ativa BPO Financeiro: símbolo + nome. `variante`: 'clara' (fundo claro) ou 'escura' (fundo escuro). */
+export const marca = (variante = 'clara') => raw(`<span class="marca marca-${variante}" role="img" aria-label="Ativa BPO Financeiro">${SIMBOLO}<span class="marca-texto"><b>ativa</b><small>BPO FINANCEIRO</small></span></span>`);
 
 // ===== Formatação =====
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -53,15 +56,15 @@ export function telefone(t) {
 export const cep = (c) => (c ? String(c).replace(/(\d{5})(\d{3})/, '$1-$2') : '—');
 export const iniciais = (nome) => String(nome ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 
-export const TIPO_CONTA = { corrente: 'Corrente', poupanca: 'Poupança', pagamento: 'Pagamento', salario: 'Salário' };
-export const TIPO_TRANSACAO = {
-  deposito: 'Depósito', saque: 'Saque', transferencia_enviada: 'Transferência enviada', transferencia_recebida: 'Transferência recebida',
-  pix_enviado: 'PIX enviado', pix_recebido: 'PIX recebido', emprestimo_credito: 'Crédito de empréstimo', emprestimo_parcela: 'Parcela de empréstimo',
-  estorno: 'Estorno', tarifa: 'Tarifa', pagamento: 'Pagamento de conta',
+const CLASSE_STATUS = {
+  ativa: 'ok', pago: 'ok', concluida: 'ok', conciliado: 'ok', implantacao: 'info', aberto: 'info', aberta: 'info', pendente: 'warn',
+  vencido: 'danger', suspensa: 'warn', encerrada: '', cancelado: '', cancelada: '', ignorado: '',
 };
-const CLASSE_STATUS = { ativo: 'ok', ativa: 'ok', quitado: 'ok', paga: 'ok', inativo: '', encerrada: '', cancelado: '', bloqueado: 'danger', bloqueada: 'danger', aberta: 'warn', vencida: 'danger' };
-export const status = (s) => html`<span class="badge ${CLASSE_STATUS[s] ?? 'info'}">${s ? s[0].toUpperCase() + s.slice(1) : '—'}</span>`;
-export const conta = (c) => `${c.agencia ?? '0001'} / ${c.numero}-${c.digito}`;
+const ROTULO_STATUS = {
+  ativa: 'Ativa', pago: 'Pago', concluida: 'Concluída', conciliado: 'Conciliado', implantacao: 'Implantação', aberto: 'Em aberto', aberta: 'Aberta',
+  pendente: 'Pendente', vencido: 'Vencido', suspensa: 'Suspensa', encerrada: 'Encerrada', cancelado: 'Cancelado', cancelada: 'Cancelada', ignorado: 'Ignorado',
+};
+export const status = (s) => html`<span class="badge ${CLASSE_STATUS[s] ?? 'info'}">${ROTULO_STATUS[s] ?? s ?? '—'}</span>`;
 
 // ===== Entrada de moeda =====
 /** Converte texto "1.234,56" em centavos inteiros. */
@@ -238,5 +241,54 @@ const P = {
   conversa: 'M8 10h8M8 14h5M21 12a8 8 0 0 1-11.8 7L3 21l2-6.2A8 8 0 1 1 21 12z',
   ouvidoria: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2zM8 9h8M8 13h5',
   lua: 'M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z',
+  empresa: 'M3 21h18M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16m0-10h4a2 2 0 0 1 2 2v8M9 7h2M9 11h2M9 15h2',
+  tarefas: 'M9 11l2 2 4-4M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z',
+  conciliar: 'M8 7h12l-3-3M16 17H4l3 3M4 7h1M19 17h1',
+  fluxo: 'M3 17l6-6 4 4 8-8M15 7h6v6',
+  dre: 'M4 4h16M4 9h10M4 14h16M4 19h8',
+  cadastros: 'M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6',
+  pagar: 'M12 19V5M5 12l7-7 7 7',
+  receber: 'M12 5v14M5 12l7 7 7-7',
+  upload: 'M12 15V3m0 0l-4 4m4-4l4 4M4 21h16',
+  lixo: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
+  editar: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  cadeado: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
+  documento: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h6',
+  plug: 'M9 2v6M15 2v6M7 8h10v4a5 5 0 0 1-10 0zM12 17v5',
+  enviar: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
 };
 export const icone = (nome) => raw(`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${P[nome] ?? ''}"/></svg>`);
+
+// ===== Datas de negócio (horário de Brasília) =====
+export const hoje = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+export function somarDias(d, n) {
+  const x = new Date(`${d}T00:00:00Z`);
+  x.setUTCDate(x.getUTCDate() + n);
+  return x.toISOString().slice(0, 10);
+}
+export const inicioMes = (d) => `${d.slice(0, 7)}-01`;
+export function fimMes(d) {
+  const [a, m] = d.split('-').map(Number);
+  return new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
+}
+export function somarMeses(d, n) {
+  const [a, m] = d.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1 + n, 1)).toISOString().slice(0, 10);
+}
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+export const rotuloMes = (am) => `${MESES[Number(am.slice(5, 7)) - 1]}/${am.slice(2, 4)}`;
+export const moedaCurta = (c) => new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(c / 100);
+
+/** Opções de <select> a partir de uma lista; `vazio` adiciona a primeira opção em branco. */
+export function opcoes(lista, { valor = 'id', rotulo = 'nome', selecionado, vazio } = {}) {
+  return html`${vazio !== undefined ? html`<option value="">${vazio}</option>` : ''}${lista.map((o) =>
+    html`<option value="${o[valor]}" ${raw(String(o[valor]) === String(selecionado ?? '') ? 'selected' : '')}>${o[rotulo]}</option>`)}`;
+}
+
+/** Liga cliques em linhas com data-href. */
+export function linksLinhas(raiz) {
+  $$('tr[data-href]', raiz).forEach((tr) => tr.addEventListener('click', (e) => {
+    if (e.target.closest('button, a, input, label')) return;
+    location.hash = tr.dataset.href;
+  }));
+}

@@ -1,276 +1,123 @@
-<h1 align="center">PAY AX</h1>
+# Ativa BPO Financeiro
 
-# Banqueiro · PAY AX
+Sistema da equipe Ativa que cuida do financeiro das empresas clientes (BPO Financeiro): servidor, banco de dados,
+usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 
-Sistema de gestão bancária da **PAY AX**: administração de clientes, contas, operações de caixa,
-transferências, PIX, empréstimos, usuários, relatórios e trilha de auditoria — com a identidade visual PAY AX.
+## Módulos
 
-![Painel](docs/telas/painel-escuro.png)
+| # | Módulo | O que tem |
+|---|---|---|
+| 1 | **Gestão de empresas** | Cadastro dos clientes do BPO com CNPJ validado, contrato (analista, plano, mensalidade, vigência, situação, escopo), contas bancárias e **responsáveis na empresa** (cargo, contato, quem recebe relatórios, quem acessa o Portal e quem aprova pagamentos, com limite). |
+| 2 | **Painel financeiro** | Por empresa: saldos, a pagar e a receber (vencidos, hoje, 7 dias), resultado do mês, inadimplência de 90 dias, **alerta de falta de caixa** (saldo projetado dia a dia nos próximos 30 dias) e pagamentos aguardando aprovação. Na carteira: pendências de todas as empresas ordenadas por urgência, com alertas. |
+| 3 | **Contas a pagar** | Despesas com fornecedor, categoria, centro de custo (ou rateio), competência e vencimento; **parcelamento** (divide o valor) e **recorrência mensal** (repete o valor); baixa com juros e desconto, baixa em lote, estorno; **comprovantes e notas anexados** ao lançamento. |
+| 4 | **Contas a receber** | Cobranças com cliente e vencimento, recebimentos, **pagamentos parciais** (o saldo continua em aberto, ligado ao original), mensalidades recorrentes e valores em atraso. |
+| 5 | **Conciliação bancária** | Extrato OFX (1.x e 2.x) ou CSV sem duplicar; sugestões; conciliação automática dos pares sem ambiguidade; baixar e conciliar; lançar direto do extrato as **movimentações sem classificação** (tarifas, rendimentos); diferença do período entre banco e sistema. |
+| 6 | **Fluxo de caixa** | Realizado e previsto, diário (até 92 dias) ou mensal, consolidado ou por conta, saldo projetado, alerta de saldo negativo e quebra por categoria. |
+| 7 | **Categorias e centros de custo** | Plano de contas ligado às linhas da DRE (com código contábil), centros de custo por departamento, unidade ou projeto e **rateio** de um lançamento entre vários centros (percentuais somando 100%). A DRE filtrada por centro e o **resultado por centro de custo** já aplicam o rateio. |
+| 8 | **Aprovação de pagamentos** | Regra por empresa (liga e define o valor mínimo). Fluxo **solicitação → conferência pela equipe → autorização → pagamento**: a baixa fica bloqueada até a aprovação. **Alçada por usuário** (padrão do perfil, valor máximo ou sem limite) e limite por responsável no Portal. Quem lançou não aprova. Histórico com quem conferiu, aprovou ou recusou (recusa exige motivo). Valor aumentado depois de aprovado volta para conferência. |
+| 9 | **Cobrança e inadimplência** | Aging por faixa (1-30, 31-60, 61-90, 90+), taxa de inadimplência, devedores com último contato e promessa; **lembretes de vencimento** com texto pronto (com a chave PIX da empresa) para abrir no WhatsApp ou no e-mail, com registro do envio; **histórico de contatos**; **promessas de pagamento** (cumpridas automaticamente quando o título é pago); **acordos** que substituem títulos vencidos por novas parcelas. |
+| 10 | **Documentos** | Notas, boletos, contratos, comprovantes e extratos vinculados à empresa ou ao lançamento, enviados pela equipe ou pelo cliente. Ficam fora do banco, com nome aleatório e SHA-256 conferido no download (sempre como anexo). Até 10 MB, formatos de documento. |
+| 11 | **Relatórios gerenciais** | DRE (competência ou caixa, análise vertical, margens, CSV), receitas e despesas por categoria, resultado por centro de custo, inadimplência e **orçamento × realizado** (orçamento mensal por categoria, sugestão pela média dos últimos meses com reajuste). |
+| 12 | **Gestão da equipe do BPO** | Tarefas recorrentes com responsável e prazo, pendências por cliente, carteira por analista e **fechamento mensal**: checklist com verificações automáticas (extratos conciliados até o fim do mês, vencidos tratados, nada aguardando aprovação) e etapas manuais (revisão, DRE, envio ao cliente). Mês fechado **trava** lançamentos, baixas e ajustes com data nele; só supervisor reabre, com motivo. Painel do fechamento de toda a carteira. |
+| 13 | **Portal do Cliente** | Em `/portal/`: posição financeira, contas em aberto, **aprovação de pagamentos** dentro do limite, **envio de documentos**, DRE e fluxo de caixa, e **conversa com a equipe** (a equipe responde no menu Mensagens). Senha provisória gerada pela equipe e trocada no primeiro acesso. |
+| 14 | **Integrações** | **API para sistemas de gestão** (chave por empresa, só o hash gravado, revogável): envia lançamentos com categoria por nome e contato por CPF/CNPJ, consulta saldos e lançamentos. **Importação de lançamentos por CSV** do ERP. **Exportação contábil** em partidas dobradas (débito, crédito, valor, histórico) pelos códigos contábeis. Bancos por OFX/CSV; cobrança por WhatsApp e e-mail. |
+| 15 | **Segurança e histórico** | Permissões por função (analista, supervisor, administrador) e por carteira; **autenticação em duas etapas** por aplicativo (TOTP) para equipe e Portal, opcionalmente **obrigatória** para a equipe; **backups** automáticos do banco (com download e retenção) e manuais; **registro de alterações** na auditoria com o valor antes e depois. |
 
-> **BPO Financeiro:** sistema separado da equipe que cuida do financeiro das empresas clientes (contas a pagar e a receber,
-> conciliação bancária, fluxo de caixa e DRE). Fica em [`bpo/`](bpo/README.md), com servidor, banco e login próprios.
+### O que depende de terceiros (não incluído)
 
-## Funcionalidades
+- **Leitura automática do extrato pelo banco** (API bancária ou Open Finance): exige credenciamento com cada banco ou contrato com um agregador. Hoje o extrato entra por arquivo.
+- **Disparo automático** de cobrança por WhatsApp Business, SMS ou e-mail: exige um provedor de mensagens. Hoje a equipe envia pelo próprio WhatsApp ou e-mail, com o texto pronto e o registro do envio.
+- **Emissão de boletos e PIX cobrança** para os clientes da empresa: depende da integração bancária da conta de cada empresa.
+- **Leitura de NF-e** (XML da SEFAZ) para lançar automaticamente.
 
-| Módulo | O que faz |
+### Perfis
+
+| Perfil | Acesso |
 |---|---|
-| **Painel** | Saldo sob custódia, clientes, movimentação do dia, carteira de crédito, fluxo de 14 dias, saldo por tipo de conta, últimas transações e maiores clientes. |
-| **Clientes** | Cadastro PF/PJ com validação de CPF/CNPJ, contato, endereço, renda/faturamento, status (ativo, inativo, bloqueado) e ficha com contas e empréstimos. |
-| **Contas** | Abertura de conta corrente, poupança, pagamento ou salário com número sequencial e dígito verificador (módulo 11); limite de cheque especial; bloqueio, desbloqueio e encerramento; extrato com filtro por período. |
-| **Operações** | Depósito, saque, transferência entre contas e PIX por chave, sempre em transação atômica e respeitando saldo + limite. |
-| **Chaves PIX** | CPF, CNPJ, e-mail, telefone ou chave aleatória (até 5 por conta). |
-| **Transações** | Consulta geral de lançamentos com filtros e **estorno** (reverte origem e destino). |
-| **Empréstimos** | Simulação e contratação pela Tabela Price, crédito automático em conta, cronograma de parcelas e pagamento em ordem com débito em conta; quitação automática. |
-| **Bradesco** | Conta PJ única da PAY AX no Bradesco: cobrança PIX com QR Code creditando a conta do cliente, webhook de confirmação, PIX para outros bancos, PIX sem identificação com vínculo manual e conciliação do saldo do banco com o saldo dos clientes. |
-| **Site institucional** | Site público da PAY AX em `/site/` (soluções, provedores, integração IXC, desenvolvedores, ajuda, sobre). "Acessar minha conta" abre o login do Internet Banking por cima do site; depois de entrar, o Internet Banking ocupa a tela. |
-| **Internet Banking** | Portal web do cliente em `/ib/`: saldo, extrato com comprovantes, PIX (enviar, receber por QR Code, minhas chaves), transferências, pagamento de boletos e contas de consumo, e empréstimos. |
-| **Relatórios** | Exportação CSV (compatível com Excel) de clientes, contas, transações por período e carteira de crédito. |
-| **Auditoria** | Registro de todas as ações (login, cadastros, operações, estornos, alterações de limite/status) com usuário, data e IP. |
-| **Limites** | O cliente vê todos os limites no PIX, aba "Meus limites", e altera o limite diário do Internet Banking com a senha de transação: redução vale na hora; aumento entra em vigor 24 horas depois, com contagem regressiva, e pode ser cancelado pelo cliente ou recusado pela equipe. Teto pelo Internet Banking em `PAYAX_LIMITE_DIARIO_MAXIMO` (padrão R$ 50.000,00). |
-| **Relacionamento** | Cada conta tem um gerente. O cliente vê o nome dele no Internet Banking e conversa por mensagens em "Meu gerente"; o gerente responde no menu Relacionamento, que tem painel com carteira, clientes que entraram em contato, clientes contatados, conversas aguardando resposta e tempo médio de resposta. O administrador vê todos os gerentes. |
-| **Usuários** | Gestão de colaboradores e perfis de acesso. |
+| **Analista** | Só as empresas da própria carteira: lançamentos, conciliação, cobrança, relatórios, cadastros, documentos, mensagens, fechamento e tarefas. Confere pagamentos; aprova só se o administrador der alçada. |
+| **Supervisor** | Todas as empresas; cadastra empresas, contratos, responsáveis e acessos ao Portal; regras de aprovação; chaves de API; reabre mês fechado; auditoria. Aprova sem limite (padrão). |
+| **Administrador** | Tudo, inclusive usuários, alçadas e Segurança e backups. |
+| **Responsável (Portal)** | Só a própria empresa: consulta, envia documentos, conversa e, se tiver permissão, aprova pagamentos até o limite. |
 
-### Perfis de acesso e alçadas
-
-| Perfil | Permissões |
-|---|---|
-| **Administrador** | Tudo, sem limite de valor. Exclusivo: usuários da equipe e tela **Alçadas**. |
-| **Ouvidoria** | Analisa e decide (aprova ou recusa, com parecer) as solicitações sensíveis: encerramento e bloqueio de contas, bloqueio e reativação de clientes, exclusão de clientes. Não faz cadastros nem operações. |
-| **Antifraude** | Menu **Antifraude**: analisa transações fora do padrão e tentativas de acesso, descarta ou confirma alertas (pode bloquear o Internet Banking e pedir o bloqueio da conta à Ouvidoria). |
-| **Gerente**, **Operador**, **Ouvidoria** e **Antifraude** | Definidas pelo administrador na tela **Alçadas**: cada permissão pode ser liberada ou retirada e, nas que envolvem dinheiro (limite de cheque especial, limite diário do Internet Banking, empréstimos e estornos), recebe um valor máximo. |
-
-**Ouvidoria.** Na tela Alçadas, o administrador escolhe quais ações exigem análise (padrão: encerramento, bloqueio e
-desbloqueio de contas, bloqueio e reativação de clientes e exclusão de clientes). Quem tem a alçada faz o pedido com motivo;
-a solicitação recebe protocolo (`OUV-AAAA-000000`) e a ação só é executada quando a Ouvidoria aprova. Quem pediu nunca
-decide o próprio pedido. O cliente também pede o encerramento da conta no Internet Banking (Meu perfil), com a senha de
-transação, e acompanha a situação pelo protocolo. Regras em `server/lib/ouvidoria.js` e `server/lib/situacao.js`.
-
-Padrão inicial (botão "Restaurar padrão"): o gerente pode tudo, exceto excluir clientes, sem teto de valor; o operador cadastra
-clientes, contas, chaves PIX e favorecidos, libera o Internet Banking e gera cobranças PIX. Nenhum perfil da equipe movimenta
-dinheiro do cliente: PIX, transferências e pagamentos são autorizados só pelo cliente, no Internet Banking. As regras ficam em
-`server/lib/alcadas.js`, são conferidas no servidor em cada operação e toda mudança fica na auditoria.
-
-## Internet Banking
-
-Portal do cliente em **`/ib/`**, separado do Banqueiro. Versão web, com menu na lateral esquerda (a versão para celular será feita depois).
-
-- **Acesso:** a equipe habilita na ficha do cliente e entrega uma **senha provisória** de 6 números, que aparece uma única vez. No primeiro acesso, o cliente cria a senha de acesso e a **senha de transação** (6 números cada, diferentes entre si).
-- **Teclado virtual de pares:** login e confirmação de operações usam botões com dois números (ex.: "1 ou 4"), sorteados pelo servidor a cada uso e válidos uma única vez. O servidor recebe só quais botões foram clicados e testa as 64 combinações possíveis. Quem observa a tela ou captura o tráfego não descobre a senha. Senhas novas são criadas num teclado numérico embaralhado.
-- **Hash das senhas:** as senhas numéricas são combinadas com um segredo do servidor (`PAYAX_PEPPER`) antes do scrypt. Um vazamento só do banco de dados não permite testar o milhão de combinações.
-- **Banco liquidante invisível:** nenhuma tela, mensagem, comprovante ou resposta da API do cliente cita o Bradesco. O comprovante traz uma autenticação própria da PAY AX.
-- **Segurança:**
-  - token próprio do cliente, que não vale na API da equipe, e vice-versa;
-  - sessão de 30 minutos, encerrada após 10 minutos sem uso;
-  - 5 senhas erradas bloqueiam o login por 15 minutos, e há limite de tentativas por IP;
-  - 3 senhas de transação erradas bloqueiam o acesso até a agência liberar;
-  - toda saída de dinheiro exige a senha de transação.
-- **Limite diário** por cliente para PIX, transferências e pagamentos (padrão R$ 5.000,00), ajustável pelo gerente.
-- **Pagamentos:** linha digitável FEBRABAN validada (dígitos verificadores, valor e vencimento, incluindo o novo fator de vencimento de 22/02/2025). Boletos (47 dígitos) e contas de consumo (48). A liquidação é feita pela conta PAY AX no Bradesco.
-- **Auditoria:** toda ação do cliente entra na trilha, com o cliente identificado. Os lançamentos ficam marcados com o canal "Internet Banking".
-
-## Integração Bradesco
-
-Modelo: **uma conta PJ da PAY AX no Bradesco**. Todo dinheiro entra e sai por ela; o Banqueiro mantém o saldo de cada cliente
-e a tela **Bradesco** confere se o saldo do banco cobre o saldo dos clientes.
-
-| Fluxo | Como funciona |
-|---|---|
-| Receber (depósito via PIX) | Em uma conta, “Receber via PIX” gera uma cobrança imediata (`PUT /cob/{txid}`) com QR Code. Quando o Bradesco confirma o pagamento (webhook ou sincronização), a conta do cliente é creditada. Idempotente por `endToEndId`. |
-| PIX sem cobrança | PIX pago direto na chave da PAY AX fica em “PIX sem identificação” até um gerente vinculá-lo a uma conta. |
-| Enviar PIX | Chave de cliente PAY AX: transferência interna imediata. Chave de outro banco: o cliente é debitado e o PIX sai pela conta PAY AX no Bradesco; se o banco recusar, o valor volta automaticamente. |
-| Conciliação | Saldo no Bradesco × soma dos saldos dos clientes, extrato do banco com status de conciliação, cobranças e envios recentes. |
-
-**Modos** (`BRADESCO_MODO`):
-
-- `simulador` (padrão): reproduz o Bradesco localmente para testar tudo sem credenciais.
-- `sandbox`: ambiente de homologação do banco.
-- `producao`: ambiente real.
-
-| Variável | Descrição |
-|---|---|
-| `BRADESCO_MODO` | `simulador`, `sandbox` ou `producao`. |
-| `BRADESCO_TOKEN_URL` / `BRADESCO_PIX_BASE_URL` | URLs de autenticação e da API PIX informadas pelo Bradesco. |
-| `BRADESCO_CLIENT_ID` / `BRADESCO_CLIENT_SECRET` | Credenciais do aplicativo no portal Bradesco Developers. |
-| `BRADESCO_CERT_PFX` / `BRADESCO_CERT_SENHA` | Caminho e senha do certificado e-CNPJ (mTLS). |
-| `BRADESCO_CHAVE_PIX` | Chave PIX da conta PAY AX. |
-| `BRADESCO_WEBHOOK_TOKEN` | Segredo exigido no webhook. Cadastre no Bradesco a URL `https://SEU-DOMINIO/api/integracoes/bradesco/webhook?token=SEGREDO`. |
-| `BRADESCO_EXPIRACAO_COBRANCA` | Validade da cobrança em segundos (padrão 3600). |
-
-Pagamento de boletos/contas também sai pela conta PAY AX no Bradesco, com devolução automática ao cliente se o banco recusar.
-
-Situação: cobrança, consulta de recebidos e webhook seguem o padrão **API Pix do Banco Central** e já estão implementados para
-sandbox/produção (`server/integracoes/bradesco/api.js`). Envio de PIX, pagamento de boletos, saldo e extrato usam APIs próprias do Bradesco e funcionam
-no simulador. Para sandbox e produção, serão ligados assim que houver a documentação técnica recebida no credenciamento.
-
-## Abertura de conta online
-
-No site do Internet Banking, o botão **"Abra sua conta"** abre um assistente em quatro etapas:
-1. Dados pessoais ou da empresa
-2. Endereço e renda
-3. Tipo de conta e aceite dos termos e da LGPD
-4. Revisão
-
-Ao enviar, o interessado recebe um **protocolo** e pode consultar a situação em **"Acompanhe sua proposta"**,
-informando protocolo e CPF/CNPJ.
-
-A proposta não cria nada sozinha. No Banqueiro, a tela **Abertura de contas** lista as propostas, e o menu mostra um
-contador das que aguardam análise. Gerente ou administrador pode:
-- **Aprovar:** cria cliente, conta e acesso ao Internet Banking numa só transação e mostra a senha provisória uma única vez.
-- **Recusar:** registra o motivo internamente; o interessado vê apenas a situação.
-
-Também há validação de CPF/CNPJ, idade mínima de 18 anos, bloqueio de duplicidade (cliente existente ou proposta em
-análise) e limite de envios por IP. Verificação documental (fotos de documento e selfie) e consulta a birôs de
-crédito não estão incluídas.
-
-## Vitrine de propagandas
-
-O painel lateral das telas de login (Banqueiro e Internet Banking) mostra peças da PAY AX com fotos
-(pessoas na rua, no computador, pequenos negócios, a cidade de São Paulo) e uma cor de destaque por peça.
-As fotos são do Unsplash, de uso comercial gratuito. Os créditos estão em `public/img/propagandas/CREDITOS.md`. Cada acesso começa numa
-peça diferente, e elas trocam a cada 7 segundos (pausa com o mouse em cima; sem animação para quem prefere movimento
-reduzido). Para editar as campanhas, altere `public/js/propagandas.js`. Para usar artes prontas da agência, coloque os
-arquivos em `public/img/propagandas/` e informe `{ imagem: 'propagandas/arquivo.jpg', alt: '...' }`.
-
-## Demonstração online
-
-Há uma versão de demonstração que roda inteira no navegador: o mesmo backend (rotas e regras de negócio)
-é empacotado com SQLite em JavaScript, e os dados ficam salvos só no navegador de quem abre.
-
-```bash
-npm run build:demo   # gera dist-demo/ (Banqueiro + Internet Banking), dist-ib/ (só o Internet Banking) e dist-site/ (site + Internet Banking por cima)
-```
-
-Na demo, as senhas usam um hash simplificado e a exportação de CSV fica desativada. Use a versão instalada em produção.
-
-## Tecnologia
-
-- **Servidor:** JavaScript (Node.js 22) com Express. Banco de dados SQLite nativo do Node (`node:sqlite`).
-- **Telas:** HTML, CSS e JavaScript puros (módulos ES), sem framework e sem etapa de build.
-- **Testes:** `node:test`.
-- **Implantação:** Docker, com HTTPS automático pelo Caddy.
-
-## Produção
-
-Veja o guia completo em **[docs/PRODUCAO.md](docs/PRODUCAO.md)**. Em resumo:
-
-```bash
-cp .env.example .env    # domínios, segredos e senha do administrador
-docker compose up -d --build
-```
-
-Em produção (`NODE_ENV=production`, padrão da imagem Docker), o sistema se recusa a iniciar sem `PAYAX_SECRET`,
-`PAYAX_PEPPER` e `PAYAX_ADMIN_SENHA`, envia HSTS e limita tentativas de login por IP. Para backup, use `npm run backup`.
+As regras ficam no servidor: cada rota `/api/empresas/:id/...` confere se a empresa está na carteira do usuário, e todo
+cadastro usado num lançamento (categoria, contato, conta, centro de custo) precisa ser da mesma empresa. Tokens da equipe,
+do Portal e chaves de API têm audiências diferentes: um não vale no lugar do outro.
 
 ## Como executar
 
-Requisitos: **Node.js 22.13+** (usa o SQLite nativo `node:sqlite`, sem dependências nativas).
+Requisitos: **Node.js 22.13+**.
 
 ```bash
 npm install
-npm run seed     # opcional: dados de demonstração
-npm start        # http://localhost:3000
+npm run seed     # opcional: equipe, quatro empresas e cerca de quatro meses de movimento
+npm start        # http://localhost:3100
 ```
 
-Acesso inicial: `admin@payax.com.br` / `admin123` — **altere a senha no primeiro acesso** (clique no avatar).
-Com o seed também existem `gerente@payax.com.br` e `operador@payax.com.br` (senha `payax2026`).
-Internet Banking (`http://localhost:3000/ib/`):
+Acesso inicial: `admin@ativabpo.com.br` / `admin123` (troque no primeiro acesso, clicando no avatar).
+Com o seed: `supervisor@`, `rafael@` e `juliana@ativabpo.com.br`, senha `bpo2026` (Rafael e Juliana são analistas;
+Juliana aprova até R$ 5.000,00). Portal do Cliente em `http://localhost:3100/portal/` (no servidor, `/bpo-cliente/`): `marta@paoquente.com.br`,
+`paulo@clinicasorriso.com.br`, `renata@technova.com.br` ou `sergio@rota66.com.br`, senha `portal2026`.
 
-| Cliente | Login | Senha de acesso | Senha de transação |
-|---|---|---|---|
-| Pessoa física | CPF `529.982.247-25` | `135790` | `246810` |
-| Pessoa jurídica | CNPJ `11.222.333/0001-81` | `975310` | `246810` |
-
-As duas senhas são digitadas no teclado virtual.
-
-### Segurança e Antifraude
-
-**Segurança** (só administrador, `server/lib/seguranca.js`). De hora em hora (e ao iniciar o servidor) é feita uma verificação
-completa da plataforma:
-
-- **Integridade do código** (`server/lib/integridade.js`): cada arquivo de `server/`, `public/` (Banqueiro, Internet Banking e site)
-  e da configuração de implantação tem o SHA-256 comparado com a versão aprovada. Arquivo novo, removido ou alterado aparece com as
-  linhas que mudaram. Depois de uma atualização legítima, o administrador clica em "Aprovar como nova versão" (com motivo, na auditoria).
-- **Funções da plataforma**: teste automático de 13 funções (banco, login, alçadas, Ouvidoria, teclado virtual, limites, boletos,
-  QR Code PIX, integração bancária, antifraude e telas do Banqueiro, Internet Banking e site).
-- **Servidor e conexões**: memória, carga, disco, tamanho do banco, último backup, requisições, erros 5xx, acessos negados e
-  bloqueios da última hora, e checklist de produção (HTTPS, segredos, webhook do banco, backup).
-
-Resultado: OK, atenção ou crítico, com histórico de todas as verificações.
-
-- **Monitoramento dos serviços** (`server/lib/monitor-servicos.js`): a cada 5 minutos (`PAYAX_MONITOR_INTERVALO_MIN`) cada serviço
-  (Banqueiro, Internet Banking, site, servidor e API, banco de dados, integração Bradesco, antifraude e backup) é testado e
-  marcado como operacional, degradado ou fora do ar. Ao clicar no serviço: há quanto tempo está no ar, disponibilidade em 24 h,
-  7 e 30 dias, histórico hora a hora, incidentes e informações do serviço.
-- **Problemas e correções** (`server/lib/correcoes.js`): cada problema traz o passo a passo e, quando é seguro, o botão Corrigir
-  (restaurar a versão aprovada do código, mover arquivo desconhecido para a quarentena, fazer backup, reparar o banco, limpar
-  teclados vencidos, processar limites, rodar o antifraude). Toda correção fica na auditoria e dispara nova verificação.
-  Em produção o código fica protegido contra escrita (Docker): a restauração então é feita reimplantando a versão aprovada.
-
-**Antifraude** (perfil Antifraude e administrador, `server/lib/antifraude.js`). Regras analisadas a cada operação do Internet
-Banking e ao abrir o painel: valor fora do padrão do cliente, madrugada, muitas operações em poucos minutos, destinatário novo com
-valor alto, conta nova movimentando muito, limite quase todo usado, senha errada várias vezes, acesso bloqueado, muitas falhas do
-mesmo IP, vários CPF/CNPJ testados, falhas de login da equipe e IP novo. Todo login (Internet Banking e Banqueiro) é registrado.
-O painel mostra indicadores, gráficos por dia, regra e hora, clientes com mais alertas e as tentativas de acesso.
-
-### Configuração (variáveis de ambiente)
-
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `PORT` | `3000` | Porta HTTP. |
-| `PAYAX_SECRET` | aleatório | Segredo de assinatura das sessões. **Defina em produção** (senão as sessões caem a cada reinício). |
-| `PAYAX_DB` | `data/banqueiro.db` | Arquivo do banco SQLite. |
-| `PAYAX_AGENCIA` | `0001` | Agência das novas contas. |
-| `PAYAX_LIMITE_OPERADOR` | `5000000` | Alçada do operador, em centavos. |
-| `PAYAX_FUSO` | `-3 hours` | Deslocamento para agrupar dados por dia (horário de Brasília). |
-| `PAYAX_PEPPER` | valor de desenvolvimento | Segredo misturado às senhas dos clientes. **Obrigatório em produção e nunca pode mudar.** |
-| `PAYAX_TRUST_PROXY` | `loopback` | Proxies confiáveis para obter o IP real (`1` atrás do Caddy ou de um balanceador). |
-| `PAYAX_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
-| `PAYAX_SEGURANCA_INTERVALO_MIN` | `60` | Intervalo, em minutos, da verificação automática de segurança. |
-| `PAYAX_MONITOR_INTERVALO_MIN` | `5` | Intervalo, em minutos, do teste rápido de cada serviço (página de status). |
-| `PAYAX_ADMIN_EMAIL` / `PAYAX_ADMIN_SENHA` / `PAYAX_ADMIN_NOME` | — | Administrador criado no primeiro start. |
-
-### Testes
+Formato do CSV de extrato: `data;histórico;valor[;documento]`, com data `DD/MM/AAAA` ou `AAAA-MM-DD`, valor negativo
+para saídas e vírgula ou ponto decimal. Cabeçalho e linhas de saldo sem data são ignorados.
 
 ```bash
 npm test
 ```
 
-Cobrem validação de CPF/CNPJ, Tabela Price, cadastro, abertura de contas, depósito/saque com limite,
-transferência atômica, PIX, estorno, empréstimo, permissões por perfil, bloqueio/encerramento, relatórios e auditoria.
+## Instalação no servidor (/bpo e /bpo-cliente)
 
-## Arquitetura
-
-```
-server/
-  index.js          # inicialização
-  app.js            # Express, cabeçalhos de segurança, rotas /api
-  db.js             # esquema SQLite e transações
-  auth.js           # tokens HMAC, autenticação e perfis
-  seed.js           # dados de demonstração
-  lib/              # validação, regras de conta, cálculo financeiro, auditoria
-  routes/           # auth, clientes, contas, operacoes, pix, emprestimos, transacoes, dashboard, relatorios, usuarios, auditoria
-public/
-  index.html        # Banqueiro (equipe), SPA sem build
-  ib/               # Internet Banking (cliente)
-  css/style.css     # identidade visual PAY AX (tokens de cor no :root)
-  img/              # fotos da vitrine (propagandas/) e imagens do sistema
-  js/               # app, api, componentes de UI e páginas
-test/               # node:test
+```bash
+npm run empacotar   # gera dist/ativa-bpo.zip
 ```
 
-- Valores monetários são armazenados em **centavos (inteiros)**, nunca em ponto flutuante.
-- Toda movimentação ocorre dentro de `BEGIN IMMEDIATE … COMMIT`; cada lançamento grava o saldo após a operação.
-- Senhas com `scrypt`; sessões assinadas com HMAC-SHA256 (8 h); CSP restritiva; CSV protegido contra injeção de fórmulas.
+O pacote traz a pasta `bpo/` pronta para enviar ao servidor: código, dependências de produção já instaladas, `.env` com
+segredo e senha inicial do administrador gerados na hora (a senha aparece no terminal) e `LEIA-ME.txt` com o passo a
+passo (cPanel, PM2, Docker, Nginx e Apache). O sistema da equipe fica em `/bpo/` e o Portal do Cliente em `/bpo-cliente/`.
 
-## Identidade visual
+## Configuração
 
-O logo oficial da PAY AX ainda não está pronto. Até lá, o nome aparece em texto (função `marca()` em
-`public/js/ui.js`, estilo `.marca` em `public/css/style.css`). Quando o logo ficar pronto, basta trocar essa função por
-uma imagem: ela é usada no login, nos menus laterais e nos comprovantes.
-
-As cores ficam em `public/css/style.css`: azul-marinho (`--payax-azul`) e ciano da marca (`--payax-ouro`, nome mantido por compatibilidade).
-Tema claro e escuro e layout responsivo (celular/tablet) incluídos.
-
-| Login | Clientes | Celular |
+| Variável | Padrão | Descrição |
 |---|---|---|
-| ![](docs/telas/login.png) | ![](docs/telas/clientes.png) | ![](docs/telas/mobile.png) |
+| `PORT` | `3100` | Porta HTTP. |
+| `BPO_BASE_PATH` | (raiz) | Endereço do sistema da equipe, ex.: `/bpo`. |
+| `BPO_PORTAL_PATH` | `<BPO_BASE_PATH>/portal` | Endereço do Portal do Cliente, ex.: `/bpo-cliente`. |
+| `BPO_DB` | `data/bpo.db` | Arquivo do banco SQLite. |
+| `BPO_SECRET` | aleatório | Segredo das sessões (mín. 32 caracteres). **Obrigatório em produção.** |
+| `BPO_ADMIN_EMAIL` / `BPO_ADMIN_SENHA` / `BPO_ADMIN_NOME` | — | Administrador criado no primeiro start. Senha obrigatória em produção (mín. 12). |
+| `BPO_TRUST_PROXY` | `loopback` | Proxies confiáveis para obter o IP real. |
+| `BPO_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
+| `BPO_TOLERANCIA_DIAS` | `3` | Diferença de datas aceita para sugerir conciliação com um movimento já lançado. |
+| `BPO_ARQUIVOS` | `data/arquivos` | Pasta dos documentos enviados. **Inclua no backup do servidor** (o backup automático cobre só o banco). |
+| `BPO_ARQUIVO_MAX_MB` | `10` | Tamanho máximo de cada documento. |
+| `BPO_BACKUPS` | `data/backups` | Pasta dos backups do banco. Copie para outro local. |
+| `BPO_BACKUP_HORAS` / `BPO_BACKUP_MANTER` | `24` / `30` | Intervalo do backup automático e quantos manter. |
+
+Produção com Docker: `docker build -t ativa-bpo bpo/` e rode com um volume em `/app/data`.
+
+## Tecnologia e arquitetura
+
+Node.js 22 + Express, SQLite nativo (`node:sqlite`), telas em HTML/CSS/JS puros sem
+build, testes com `node:test`. Valores em centavos (inteiros); movimentações em transação.
+
+```
+bpo/
+  server/
+    db.js              # esquema: empresas, tarefas, categorias, contatos, contas, lançamentos, movimentos, extrato, auditoria
+    lib/lancamentos.js # criar/parcelar, baixa, estorno, transferências, saldos
+    lib/conciliacao.js # importação, sugestões, conciliação manual e automática
+    lib/extrato.js     # leitura de OFX e CSV
+    lib/relatorios.js  # fluxo de caixa, DRE e resultado por centro de custo
+    lib/aprovacao.js   # conferência, alçada e autorização de pagamentos
+    lib/cobranca.js    # inadimplência, lembretes, promessas e acordos
+    lib/fechamento.js  # checklist e travamento do mês
+    lib/documentos.js  # armazenamento de arquivos
+    lib/orcamento.js   # orçado × realizado
+    lib/integracoes.js # chaves de API, CSV de lançamentos, exportação contábil
+    lib/totp.js        # autenticação em duas etapas (RFC 6238)
+    lib/backup.js      # backups do banco
+    routes/            # equipe (por empresa e carteira), portal, api-externa (ERP), seguranca
+  public/              # telas da equipe (SPA)
+  public/portal/       # Portal do Cliente
+  test/
+```

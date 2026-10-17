@@ -1,42 +1,56 @@
 'use strict';
 
+const fs = require('node:fs');
 const { Router } = require('express');
-const seguranca = require('../lib/seguranca');
-const { transacao } = require('../db');
-const v = require('../lib/validacao');
+const config = require('../config');
+const { registrar } = require('../lib/auditoria');
+const backup = require('../lib/backup');
+const dois = require('../lib/doisfatores');
 const { naoEncontrado } = require('../lib/erros');
 
-/** Monitoramento de segurança (somente administrador). */
+/** Segurança (administrador): 2FA obrigatória, situação da 2FA da equipe, backups. */
 module.exports = (db) => {
   const r = Router();
 
-  r.get('/', (_req, res) => res.json(seguranca.painel(db)));
-
-  r.get('/verificacoes/:id', (req, res) => res.json(seguranca.detalhar(db, req.params.id)));
-
-  r.post('/verificar', (req, res) => res.json(transacao(db, () => seguranca.executar(db, { origem: 'manual', usuarioId: req.usuario.id }))));
-
-  /** Aprova as alterações de código atuais como a nova versão oficial (linha de base). */
-  r.post('/integridade/aprovar', (req, res) => {
-    const motivo = v.texto(req.body?.motivo, 500);
-    v.exigir(motivo && motivo.length >= 5, 'Informe o motivo (ex.: atualização da versão 1.15).');
-    const arquivos = transacao(db, () => seguranca.aprovarIntegridade(db, req, motivo));
-    res.json({ arquivos, verificacao: transacao(db, () => seguranca.executar(db, { origem: 'aprovacao', usuarioId: req.usuario.id })) });
+  r.get('/', (_req, res) => {
+    const arquivos = fs.existsSync(config.arquivosDir) ? fs.readdirSync(config.arquivosDir, { recursive: true }).length : 0;
+    res.json({
+      exigir_2fa_equipe: dois.exigidaEquipe(db),
+      usuarios: db.prepare('SELECT id, nome, email, perfil, ativo, totp_ativo, ultimo_acesso FROM usuarios ORDER BY ativo DESC, nome').all(),
+      portal: db.prepare(`SELECT r.id, r.nome, r.email, r.totp_ativo, r.ultimo_acesso, COALESCE(e.nome_fantasia, e.razao_social) AS empresa
+        FROM responsaveis r JOIN empresas e ON e.id = r.empresa_id WHERE r.acesso_portal = 1 AND r.ativo = 1 ORDER BY e.razao_social, r.nome`).all(),
+      backups: backup.listar(),
+      backup_intervalo_horas: config.backupIntervaloHoras,
+      backup_manter: config.backupManter,
+      documentos_armazenados: arquivos,
+      falhas_login_24h: db.prepare("SELECT COUNT(*) AS n FROM auditoria WHERE acao IN ('login_falhou','login_2fa_falhou','portal_login_falhou') AND criado_em >= datetime('now', '-1 day')").get().n,
+    });
   });
 
-  /** Situação, tempo no ar, disponibilidade, incidentes e correções de um serviço. */
-  r.get('/servicos/:chave', (req, res) => {
-    const info = seguranca.infoServico(db, req.params.chave);
-    if (!info) throw naoEncontrado('Serviço');
-    res.json(info);
+  r.patch('/config', (req, res) => {
+    const exigir = Boolean(req.body.exigir_2fa_equipe);
+    db.prepare("INSERT INTO configuracoes (chave, valor) VALUES ('exigir_2fa_equipe', ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor").run(exigir ? '1' : '0');
+    registrar(db, req, 'seguranca_configurada', { exigir_2fa_equipe: exigir });
+    res.status(204).end();
   });
 
-  /** Corrige um problema encontrado (ações seguras do sistema) e verifica de novo. */
-  r.post('/corrigir', (req, res) => {
-    const { acao, alvo } = req.body ?? {};
-    const mensagem = seguranca.corrigir(db, req, { acao: String(acao ?? ''), alvo: alvo === undefined ? undefined : String(alvo) });
-    const verificacao = transacao(db, () => seguranca.executar(db, { origem: 'correcao', usuarioId: req.usuario.id }));
-    res.json({ mensagem, verificacao });
+  r.post('/usuarios/:id/reset-2fa', (req, res) => {
+    const x = db.prepare('UPDATE usuarios SET totp_ativo = 0, totp_segredo = NULL, totp_ultimo_passo = NULL WHERE id = ?').run(Number(req.params.id));
+    if (!x.changes) throw naoEncontrado('Usuário');
+    registrar(db, req, 'usuario_2fa_redefinida', { id: Number(req.params.id) });
+    res.status(204).end();
+  });
+
+  r.post('/backups', (req, res) => {
+    const b = backup.gerar(db);
+    registrar(db, req, 'backup_manual', b);
+    res.status(201).json(b);
+  });
+  r.get('/backups/:nome', (req, res) => {
+    const p = backup.caminho(req.params.nome);
+    if (!p) throw naoEncontrado('Backup');
+    registrar(db, req, 'backup_baixado', { nome: req.params.nome });
+    res.download(p, req.params.nome);
   });
 
   return r;
