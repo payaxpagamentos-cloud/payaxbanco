@@ -1,0 +1,95 @@
+PABX — INSTALAÇÃO
+=================
+
+Endereço depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
+  Painel (master e empresas) ... https://SEU-DOMINIO/pabx/
+
+O painel é servido por um programa Node.js, que fica nesta pasta "pabx".
+As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
+Pode ficar no mesmo servidor do Ativa BPO e do APP Táxi (portas diferentes: BPO 3100, táxi 3200, PABX 3300).
+
+IMPORTANTE: o painel cuida do cadastro e do acompanhamento (empresas, ramais, filas, URAs, números,
+campanhas, chamadas, tarifas e relatórios). Quem faz as ligações é a central telefônica (Asterisk,
+FreeSWITCH ou outra), que conversa com o painel pela API de integração (menu Integrações).
+
+
+1) REQUISITO
+   Node.js 22.13 ou mais novo no servidor.  Confira com:   node -v
+
+
+2) ENVIAR OS ARQUIVOS
+   Envie a pasta "pabx" inteira para o servidor, FORA da pasta pública do site
+   (ex.: /home/SEU-USUARIO/pabx). O arquivo ".env" começa com ponto: confira se foi enviado.
+
+
+3) CONFERIR O .env
+   Já vem pronto: endereço /pabx, segredo novo e a senha do master (PABX_ADMIN_SENHA).
+   Não troque o PABX_SECRET depois de instalado.
+
+
+4) DADOS DE TESTE (opcional)
+   Com o sistema parado, rode uma vez dentro da pasta pabx:
+      npm run seed
+   Cria 3 empresas de exemplo com ramais, filas, URA, números, campanha e chamadas do mês.
+   Contas de teste, todas com a senha  demo12345 :
+      Cliente (administrador) ... cliente@cobranca.demo, cliente@clinica.demo, cliente@loja.demo
+      Supervisor ................ supervisor@cobranca.demo  (só consulta)
+   Os ramais de teste aparecem online por alguns minutos e depois ficam offline (nenhuma central real está registrando).
+
+
+5) INICIAR
+   a) Servidor próprio (VPS) com PM2
+         cd /home/SEU-USUARIO/pabx
+         npm install -g pm2
+         pm2 start "npm start" --name pabx
+         pm2 save && pm2 startup
+      Depois configure o Nginx ou o Apache (item 6).
+
+   b) Docker
+         docker build -t pabx .
+         docker run -d --name pabx --env-file .env -p 3300:3300 -v pabx-dados:/app/data pabx
+      Depois configure o Nginx ou o Apache (item 6).
+
+   c) cPanel ("Setup Node.js App")
+      - Node.js version ........... 22 ou mais novo
+      - Application mode .......... Production
+      - Application root .......... pabx
+      - Application URL ........... pabx
+      - Application startup file .. server/index.js
+      Em "Environment variables", cadastre as variáveis do arquivo .env (menos PORT). Clique em Start.
+
+
+6) NGINX OU APACHE (só para as opções a e b)
+   Nginx — dentro do "server { ... }" do domínio (com HTTPS):
+      location /pabx/ {
+          proxy_pass http://127.0.0.1:3300;
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+      }
+      location = /pabx { return 301 /pabx/; }
+
+   Apache (módulos proxy e proxy_http ativos):
+      ProxyPreserveHost On
+      ProxyPass        /pabx http://127.0.0.1:3300/pabx
+      ProxyPassReverse /pabx http://127.0.0.1:3300/pabx
+
+
+7) PRIMEIRO ACESSO
+   Abra https://SEU-DOMINIO/pabx/ e entre com:
+      E-mail: master@pabx.com.br
+      Senha:  a que está em PABX_ADMIN_SENHA no arquivo .env
+   Depois:
+     1. Configurações: nome da plataforma, cadência de tarifação e os padrões das empresas novas.
+     2. Terminação: cadastre a rota da operadora e os números (DIDs).
+     3. Empresas: crie as empresas, com o primeiro administrador de cada uma, e atribua os números.
+     4. Integrações: crie a chave de API de cada empresa e passe para quem cuida da central telefônica.
+
+
+8) CÓPIAS DE SEGURANÇA
+   Tudo fica na pasta pabx/data (banco pabx.db). Copie essa pasta com frequência.
+
+
+9) ATUALIZAR PARA UMA VERSÃO NOVA
+   Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
+   NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart pabx).

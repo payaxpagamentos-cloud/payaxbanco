@@ -4,6 +4,8 @@ Sistema da equipe Ativa que cuida do financeiro das empresas clientes (BPO Finan
 usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 
 > Neste repositório também está o **APP Táxi** (pasta [`taxi/`](taxi/README.md)): app do passageiro, app do motorista, painel da central e repasses, com servidor próprio. Ele exporta taxas e repasses no CSV de importação do BPO.
+>
+> E o **PABX** (pasta [`pabx/`](pabx/README.md), publicado em `/pabx`): painel do master e das empresas para ramais, chamadas, campanhas, números entrantes, terminação e integração com a central telefônica, com servidor próprio.
 
 ## Módulos
 
