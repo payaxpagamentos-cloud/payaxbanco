@@ -11,7 +11,7 @@ próprios veículos.
 | **Cliente** (administrador da empresa) | O painel da própria empresa: mapa ao vivo, histórico, alertas, veículos, motoristas, cercas, manutenção, relatórios, comandos (bloqueio), configurações e integrações. |
 | **Operador** | O painel da empresa para monitorar: consulta tudo e trata os alertas, sem alterar cadastros nem enviar comandos. |
 
-Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do repositório. Mapa do OpenStreetMap (Leaflet servido pelo próprio
+Sistema independente: servidor, banco de dados (SQLite), usuários e login próprios. Mapa do OpenStreetMap (Leaflet servido pelo próprio
 sistema). Tema escuro por padrão, com o claro no botão do topo.
 
 ## Como os veículos chegam ao sistema

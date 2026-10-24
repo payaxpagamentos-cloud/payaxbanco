@@ -7,8 +7,6 @@ Endereço depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
 
 O sistema é um programa Node.js, que fica nesta pasta "rastreador".
 As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
-Pode ficar no mesmo servidor do Ativa BPO, do APP Táxi e do PABX (portas diferentes: BPO 3100, táxi 3200,
-PABX 3300, rastreador 3400).
 
 O programa abre DUAS portas:
   3400 (HTTP) ... painel, API e a recepção do app Traccar Client. Fica atrás do Nginx/Apache (item 6).

@@ -1,5 +1,5 @@
 {
-  "name": "payax-rastreador",
+  "name": "rastreador-veiculos",
   "version": "1.0.0",
   "description": "Rastreador de Veículos — mapa ao vivo, histórico de trajetos, cercas, alertas, bloqueio remoto e relatórios da frota, com recepção dos rastreadores GT06 e do app Traccar Client.",
   "main": "server/index.js",
