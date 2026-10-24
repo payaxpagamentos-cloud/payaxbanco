@@ -14,7 +14,10 @@ const origemTiles = (() => {
     return '';
   }
 })();
-const CSP = `default-src 'self'; img-src 'self' data: ${origemTiles}; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'`;
+/** Origens do mapa vetorial (estilo, fontes, ícones e dados vêm do mesmo servidor do estilo). */
+const origensVetor = [...new Set([config.mapa.estilo, config.mapa.estilo_escuro].filter(Boolean).map((u) => { try { return new URL(u).origin; } catch { return ''; } }))].join(' ');
+const CSP = [`default-src 'self'`, `img-src 'self' data: blob: ${origemTiles} ${origensVetor}`, `style-src 'self' 'unsafe-inline'`, `font-src 'self'`, `script-src 'self'`,
+  `connect-src 'self' ${origensVetor}`, `worker-src 'self' blob:`, `frame-ancestors 'none'`].join('; ');
 
 function criarApp(db, extras = {}) {
   const app = express();
@@ -41,6 +44,9 @@ function criarApp(db, extras = {}) {
   r.use('/api', criarApi(db, extras));
   // Leaflet (mapa) servido do próprio pacote, sem CDN.
   r.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));
+  // MapLibre (mapa vetorial) e a ponte dele com o Leaflet, também do próprio pacote.
+  r.use('/vendor/maplibre', express.static(path.join(path.dirname(require.resolve('maplibre-gl/package.json')), 'dist'), { maxAge: '7d' }));
+  r.get('/vendor/maplibre-leaflet.js', (_req, res) => res.sendFile(require.resolve('@maplibre/maplibre-gl-leaflet'), { maxAge: '7d' }));
   // "/compartilhar" sem a barra final leva a "/compartilhar/" (a página usa caminhos relativos à pasta).
   r.get(/^\/compartilhar$/, (req, res) => res.redirect(`${req.baseUrl}/compartilhar/`));
   r.use(express.static(path.join(__dirname, '..', 'public')));

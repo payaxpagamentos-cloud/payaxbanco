@@ -298,9 +298,9 @@ pre.codigo{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; backgr
 .leaflet-container{ font-family: inherit; }
 .leaflet-popup-content{ font-size: 12px; }
 .leaflet-bar a{ color: #111827; }
-/* Mapa em tons suaves: quem chama a atenção são os veículos e as cercas. */
-:root:not([data-tema="escuro"]) .leaflet-tile-pane{ filter: saturate(.45) brightness(1.04) contrast(.94); }
-:root[data-tema="escuro"] .leaflet-tile-pane{ filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.88) saturate(.6); }
+/* Camada de imagens (reserva sem WebGL) em tons suaves; o mapa vetorial já tem o estilo de cada tema. */
+:root:not([data-tema="escuro"]) .mapa-raster .leaflet-tile-pane{ filter: saturate(.45) brightness(1.04) contrast(.94); }
+:root[data-tema="escuro"] .mapa-raster .leaflet-tile-pane{ filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.88) saturate(.6); }
 :root[data-tema="escuro"] .leaflet-control-attribution{ background: rgba(21, 24, 29, .8); color: var(--text-2); }
 :root[data-tema="escuro"] .leaflet-control-attribution a{ color: var(--text-2); }
 

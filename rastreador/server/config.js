@@ -37,7 +37,14 @@ module.exports = {
   // Fuso das datas do dashboard e dos relatórios.
   fuso: process.env.RASTREADOR_FUSO || 'America/Sao_Paulo',
   mapa: {
-    // Camada do OpenStreetMap (ou outro servidor de mapas no mesmo formato). O domínio entra na política de segurança das páginas.
+    // Mapa vetorial moderno (MapLibre), com um estilo para o tema claro e outro para o escuro. Padrão: OpenFreeMap (gratuito, sem chave).
+    // "raster" em RASTREADOR_MAPA_ESTILO desliga o vetorial e usa a camada de imagens abaixo.
+    estilo: process.env.RASTREADOR_MAPA_ESTILO === 'raster' ? null : (process.env.RASTREADOR_MAPA_ESTILO || 'https://tiles.openfreemap.org/styles/liberty'),
+    estilo_escuro: process.env.RASTREADOR_MAPA_ESTILO === 'raster' ? null
+      : (process.env.RASTREADOR_MAPA_ESTILO_ESCURO || process.env.RASTREADOR_MAPA_ESTILO || 'https://tiles.openfreemap.org/styles/dark'),
+    atribuicao_vetorial: process.env.RASTREADOR_MAPA_ATRIBUICAO_VETORIAL
+      || '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> &copy; colaboradores do OpenStreetMap',
+    // Camada de imagens (reserva quando o navegador não tem WebGL). O domínio entra na política de segurança das páginas.
     tiles: process.env.RASTREADOR_MAPA_TILES || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     atribuicao: process.env.RASTREADOR_MAPA_ATRIBUICAO || '&copy; colaboradores do OpenStreetMap',
     centro: [Number.isFinite(latCentro) ? latCentro : -23.5505, Number.isFinite(lngCentro) ? lngCentro : -46.6333],

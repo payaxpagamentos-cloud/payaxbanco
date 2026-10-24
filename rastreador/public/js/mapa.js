@@ -1,8 +1,9 @@
 /**
- * Mapa (Leaflet, global L carregado de vendor/leaflet) com a camada configurada no servidor (OpenStreetMap por padrão).
+ * Mapa (Leaflet, global L carregado de vendor/leaflet). O fundo é vetorial e moderno (MapLibre, estilo configurado no servidor,
+ * OpenFreeMap por padrão), com um estilo para cada tema; sem WebGL no navegador, volta para a camada de imagens.
  * As telas usam só esta interface: veículos girados pelo curso, trajetos, cercas e pontos.
  */
-import { api } from './api.js';
+import { api, BASE } from './api.js';
 import { el, placa as fmtPlaca } from './ui.js';
 
 let publico = null;
@@ -21,6 +22,38 @@ function htmlVeiculo(v, selecionado) {
   return `<div class="veic${selecionado ? ' sel' : ''}">${forma}<span class="rot">${esc(fmtPlaca(v.placa))}</span></div>`;
 }
 
+/** Carrega o MapLibre (módulo) e a ponte com o Leaflet, uma única vez. */
+let vetorial = null;
+function carregarVetorial() {
+  vetorial ??= (async () => {
+    const tela = document.createElement('canvas');
+    if (!(tela.getContext('webgl2') || tela.getContext('webgl'))) throw new Error('Sem WebGL');
+    document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet', href: `${BASE}/vendor/maplibre/maplibre-gl.css` }));
+    window.maplibregl = await import(`${BASE}/vendor/maplibre/maplibre-gl.mjs`);
+    await new Promise((ok, falha) => document.head.append(Object.assign(document.createElement('script'), { src: `${BASE}/vendor/maplibre-leaflet.js`, onload: ok, onerror: falha })));
+  })();
+  return vetorial;
+}
+const temaEscuro = () => document.documentElement.dataset.tema === 'escuro';
+
+/** Fundo do mapa: vetorial (troca de estilo junto com o tema) ou, se não der, a camada de imagens. */
+async function fundo(L, m, div, cfg) {
+  if (cfg.mapa.estilo) {
+    try {
+      await carregarVetorial();
+      const estilo = () => (temaEscuro() ? cfg.mapa.estilo_escuro : cfg.mapa.estilo);
+      const camada = L.maplibreGL({ style: estilo(), attribution: cfg.mapa.atribuicao_vetorial }).addTo(m);
+      let atual = estilo();
+      new MutationObserver(() => {
+        if (estilo() !== atual) { atual = estilo(); camada.getMaplibreMap().setStyle(atual); }
+      }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
+      return;
+    } catch { /* sem WebGL ou sem acesso ao estilo: usa as imagens */ }
+  }
+  div.classList.add('mapa-raster');
+  L.tileLayer(cfg.mapa.tiles, { maxZoom: 19, attribution: cfg.mapa.atribuicao }).addTo(m);
+}
+
 export async function criarMapa(div, { zoom = 12 } = {}) {
   const cfg = await configPublica();
   if (!window.L) {
@@ -29,7 +62,7 @@ export async function criarMapa(div, { zoom = 12 } = {}) {
   }
   const L = window.L;
   const m = L.map(div, { zoomControl: false, attributionControl: true }).setView(cfg.mapa.centro, zoom);
-  L.tileLayer(cfg.mapa.tiles, { maxZoom: 19, attribution: cfg.mapa.atribuicao }).addTo(m);
+  await fundo(L, m, div, cfg);
   L.control.zoom({ position: 'topright' }).addTo(m);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(m);
   new ResizeObserver(() => m.invalidateSize()).observe(div);

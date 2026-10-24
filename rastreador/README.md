@@ -11,8 +11,10 @@ próprios veículos.
 | **Cliente** (administrador da empresa) | O painel da própria empresa: mapa ao vivo, histórico, alertas, veículos, motoristas, cercas, manutenção, relatórios, comandos (bloqueio), configurações e integrações. |
 | **Operador** | O painel da empresa para monitorar: consulta tudo e trata os alertas, sem alterar cadastros nem enviar comandos. |
 
-Sistema independente: servidor, banco de dados (SQLite), usuários e login próprios. Mapa do OpenStreetMap (Leaflet servido pelo próprio
-sistema). Tema escuro por padrão, com o claro no botão do topo.
+Sistema independente: servidor, banco de dados (SQLite), usuários e login próprios. Mapa vetorial moderno, no estilo dos aplicativos de
+navegação (MapLibre com os estilos gratuitos do OpenFreeMap: "Liberty" no tema claro e "Dark" no escuro); sem WebGL no navegador, usa a
+camada de imagens do OpenStreetMap. Outro estilo (MapTiler, Stadia…) entra pelo `.env` (`RASTREADOR_MAPA_ESTILO`). Tema claro por padrão,
+com o escuro no botão do topo.
 
 ## Rastreador J16 4G (Indica Planos)
 
