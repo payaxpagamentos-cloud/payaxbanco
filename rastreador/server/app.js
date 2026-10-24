@@ -6,7 +6,7 @@ const config = require('./config');
 const { criarApi, tratarErro } = require('./api');
 const { limitar } = require('./lib/limitador');
 
-/** Origem da camada de mapa (ex.: https://tile.openstreetmap.org), liberada na política de segurança. */
+/** Origem da camada de imagens do mapa (ex.: https://*.basemaps.cartocdn.com), liberada na política de segurança. */
 const origemTiles = (() => {
   try {
     return new URL(config.mapa.tiles.replace(/\{s\}/, 'a').replace(/\{[^}]+\}/g, '0')).origin.replace('://a.', '://*.');

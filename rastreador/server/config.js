@@ -44,9 +44,11 @@ module.exports = {
       : (process.env.RASTREADOR_MAPA_ESTILO_ESCURO || process.env.RASTREADOR_MAPA_ESTILO || 'https://tiles.openfreemap.org/styles/dark'),
     atribuicao_vetorial: process.env.RASTREADOR_MAPA_ATRIBUICAO_VETORIAL
       || '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> &copy; colaboradores do OpenStreetMap',
-    // Camada de imagens (reserva quando o navegador não tem WebGL). O domínio entra na política de segurança das páginas.
-    tiles: process.env.RASTREADOR_MAPA_TILES || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    atribuicao: process.env.RASTREADOR_MAPA_ATRIBUICAO || '&copy; colaboradores do OpenStreetMap',
+    // Camada de imagens (reserva quando o navegador não tem WebGL): CARTO Voyager. Os servidores do OpenStreetMap não são usados,
+    // porque bloqueiam sistemas com muitos acessos. O domínio entra na política de segurança das páginas.
+    tiles: process.env.RASTREADOR_MAPA_TILES || 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    atribuicao: process.env.RASTREADOR_MAPA_ATRIBUICAO
+      || '&copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> &copy; colaboradores do OpenStreetMap',
     centro: [Number.isFinite(latCentro) ? latCentro : -23.5505, Number.isFinite(lngCentro) ? lngCentro : -46.6333],
   },
   admin: {

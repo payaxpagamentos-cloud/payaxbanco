@@ -51,7 +51,7 @@ async function fundo(L, m, div, cfg) {
     } catch { /* sem WebGL ou sem acesso ao estilo: usa as imagens */ }
   }
   div.classList.add('mapa-raster');
-  L.tileLayer(cfg.mapa.tiles, { maxZoom: 19, attribution: cfg.mapa.atribuicao }).addTo(m);
+  L.tileLayer(cfg.mapa.tiles, { maxZoom: 19, subdomains: 'abcd', attribution: cfg.mapa.atribuicao }).addTo(m);
 }
 
 export async function criarMapa(div, { zoom = 12 } = {}) {
@@ -62,6 +62,8 @@ export async function criarMapa(div, { zoom = 12 } = {}) {
   }
   const L = window.L;
   const m = L.map(div, { zoomControl: false, attributionControl: true }).setView(cfg.mapa.centro, zoom);
+  // Rodapé só com os créditos do mapa (sem o prefixo padrão do Leaflet, que traz uma bandeira).
+  m.attributionControl.setPrefix(false);
   await fundo(L, m, div, cfg);
   L.control.zoom({ position: 'topright' }).addTo(m);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(m);

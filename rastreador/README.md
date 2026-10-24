@@ -13,7 +13,7 @@ próprios veículos.
 
 Sistema independente: servidor, banco de dados (SQLite), usuários e login próprios. Mapa vetorial moderno, no estilo dos aplicativos de
 navegação (MapLibre com os estilos gratuitos do OpenFreeMap: "Liberty" no tema claro e "Dark" no escuro); sem WebGL no navegador, usa a
-camada de imagens do OpenStreetMap. Outro estilo (MapTiler, Stadia…) entra pelo `.env` (`RASTREADOR_MAPA_ESTILO`). Tema claro por padrão,
+camada de imagens do CARTO (os servidores do OpenStreetMap não são usados). Outro estilo (MapTiler, Stadia…) entra pelo `.env` (`RASTREADOR_MAPA_ESTILO`). Tema claro por padrão,
 com o escuro no botão do topo.
 
 ## Rastreador J16 4G (Indica Planos)
