@@ -36,22 +36,74 @@ function carregarVetorial() {
 }
 const temaEscuro = () => document.documentElement.dataset.tema === 'escuro';
 
-/** Fundo do mapa: vetorial (troca de estilo junto com o tema) ou, se não der, a camada de imagens. */
-async function fundo(L, m, div, cfg) {
+/** Camada do mapa de ruas: vetorial (troca de estilo junto com o tema) ou, se não der, a camada de imagens. */
+async function camadaRuas(L, div, cfg) {
   if (cfg.mapa.estilo) {
     try {
       await carregarVetorial();
       const estilo = () => (temaEscuro() ? cfg.mapa.estilo_escuro : cfg.mapa.estilo);
-      const camada = L.maplibreGL({ style: estilo(), attribution: cfg.mapa.atribuicao_vetorial }).addTo(m);
+      // Os créditos do rodapé são controlados aqui (trocam com a camada); o MapLibre não põe os dele.
+      const camada = L.maplibreGL({ style: estilo(), attributionControl: false });
       let atual = estilo();
       new MutationObserver(() => {
-        if (estilo() !== atual) { atual = estilo(); camada.getMaplibreMap().setStyle(atual); }
+        if (estilo() !== atual && camada.getMaplibreMap()) { atual = estilo(); camada.getMaplibreMap().setStyle(atual); }
       }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
-      return;
+      return camada;
     } catch { /* sem WebGL ou sem acesso ao estilo: usa as imagens */ }
   }
   div.classList.add('mapa-raster');
-  L.tileLayer(cfg.mapa.tiles, { maxZoom: 19, subdomains: 'abcd', attribution: cfg.mapa.atribuicao }).addTo(m);
+  return L.tileLayer(cfg.mapa.tiles, { maxZoom: 20, maxNativeZoom: 19, subdomains: 'abcd' });
+}
+
+/** Satélite: a imagem e, por cima, os nomes de ruas e lugares (como o modo híbrido dos aplicativos de mapa). */
+function camadaSatelite(L, cfg) {
+  const s = cfg.mapa.satelite;
+  return L.layerGroup([
+    L.tileLayer(s.tiles, { maxZoom: 20, maxNativeZoom: 19 }),
+    ...s.rotulos.map((u) => L.tileLayer(u, { maxZoom: 20, maxNativeZoom: 19 })),
+  ]);
+}
+
+const CHAVE_CAMADA = 'rastreador.camada';
+const lerCamada = () => { try { return localStorage.getItem(CHAVE_CAMADA) === 'satelite' ? 'satelite' : 'mapa'; } catch { return 'mapa'; } };
+
+/** Fundo do mapa e o botão Mapa / Satélite (a escolha fica lembrada neste navegador). */
+async function fundo(L, m, div, cfg) {
+  const camadas = { mapa: await camadaRuas(L, div, cfg), satelite: cfg.mapa.satelite?.tiles ? camadaSatelite(L, cfg) : null };
+  // Créditos de cada fundo no rodapé (trocados junto com a camada).
+  const creditos = { mapa: div.classList.contains('mapa-raster') ? cfg.mapa.atribuicao : cfg.mapa.atribuicao_vetorial, satelite: cfg.mapa.satelite?.atribuicao };
+  let atual = camadas.satelite ? lerCamada() : 'mapa';
+  camadas[atual].addTo(m);
+  m.attributionControl.addAttribution(creditos[atual]);
+  div.classList.toggle('mapa-satelite', atual === 'satelite');
+  if (!camadas.satelite) return;
+  const Seletor = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd() {
+      const caixa = L.DomUtil.create('div', 'seletor-camada');
+      L.DomEvent.disableClickPropagation(caixa);
+      const botoes = ['mapa', 'satelite'].map((k) => {
+        const b = L.DomUtil.create('button', k === atual ? 'on' : '', caixa);
+        b.type = 'button';
+        b.textContent = k === 'mapa' ? 'Mapa' : 'Satélite';
+        b.title = k === 'mapa' ? 'Mapa de ruas' : 'Imagem de satélite com os nomes das ruas';
+        b.addEventListener('click', () => {
+          if (k === atual) return;
+          m.removeLayer(camadas[atual]);
+          m.attributionControl.removeAttribution(creditos[atual]);
+          atual = k;
+          camadas[atual].addTo(m);
+          m.attributionControl.addAttribution(creditos[atual]);
+          div.classList.toggle('mapa-satelite', atual === 'satelite');
+          for (const x of botoes) x.classList.toggle('on', x === b);
+          try { localStorage.setItem(CHAVE_CAMADA, atual); } catch { /* sem armazenamento: só nesta tela */ }
+        });
+        return b;
+      });
+      return caixa;
+    },
+  });
+  new Seletor().addTo(m);
 }
 
 export async function criarMapa(div, { zoom = 12 } = {}) {
@@ -61,7 +113,8 @@ export async function criarMapa(div, { zoom = 12 } = {}) {
     return null;
   }
   const L = window.L;
-  const m = L.map(div, { zoomControl: false, attributionControl: true }).setView(cfg.mapa.centro, zoom);
+  // Até o zoom 20 (rua e quarteirão); a roda do mouse anda de meio em meio nível para aproximar com mais precisão.
+  const m = L.map(div, { zoomControl: false, attributionControl: true, maxZoom: 20, zoomSnap: 0.5, wheelPxPerZoomLevel: 90 }).setView(cfg.mapa.centro, zoom);
   // Rodapé só com os créditos do mapa (sem o prefixo padrão do Leaflet, que traz uma bandeira).
   m.attributionControl.setPrefix(false);
   await fundo(L, m, div, cfg);
@@ -74,8 +127,9 @@ export async function criarMapa(div, { zoom = 12 } = {}) {
     L: m,
     aoClicar: (fn) => m.on('click', (e) => fn({ lat: e.latlng.lat, lng: e.latlng.lng })),
     centro: () => { const c = m.getCenter(); return { lat: c.lat, lng: c.lng }; },
-    ir: (lat, lng, z) => m.setView([lat, lng], z ?? Math.max(m.getZoom(), 15)),
-    enquadrar(pontos, zoomMax = 16) {
+    // Ao escolher um veículo, vai direto para o zoom de rua (17), sem afastar se já estiver mais perto.
+    ir: (lat, lng, z) => m.setView([lat, lng], z ?? Math.max(m.getZoom(), 17)),
+    enquadrar(pontos, zoomMax = 17) {
       const p = pontos.filter((x) => x && Number.isFinite(x[0]) && Number.isFinite(x[1]));
       if (p.length === 1) m.setView(p[0], zoomMax);
       else if (p.length) m.fitBounds(L.latLngBounds(p), { padding: [40, 40], maxZoom: zoomMax });

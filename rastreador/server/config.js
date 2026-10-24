@@ -49,6 +49,16 @@ module.exports = {
     tiles: process.env.RASTREADOR_MAPA_TILES || 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
     atribuicao: process.env.RASTREADOR_MAPA_ATRIBUICAO
       || '&copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> &copy; colaboradores do OpenStreetMap',
+    // Satélite (botão Mapa / Satélite): imagem do Esri World Imagery com os nomes de ruas e lugares por cima (como o modo híbrido).
+    // Para outro provedor (ex.: MapTiler com chave), troque as URLs; RASTREADOR_SATELITE_ROTULOS vazio tira os nomes.
+    satelite: {
+      tiles: process.env.RASTREADOR_SATELITE_TILES || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      rotulos: String(process.env.RASTREADOR_SATELITE_ROTULOS ?? [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+      ].join(' ')).split(/\s+/).filter(Boolean),
+      atribuicao: process.env.RASTREADOR_SATELITE_ATRIBUICAO || 'Imagens &copy; Esri, Maxar, Earthstar Geographics',
+    },
     centro: [Number.isFinite(latCentro) ? latCentro : -23.5505, Number.isFinite(lngCentro) ? lngCentro : -46.6333],
   },
   admin: {

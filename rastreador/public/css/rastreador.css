@@ -296,6 +296,15 @@ pre.codigo{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; backgr
 .pino.inicio{ background: #16A34A; } .pino.fim{ background: #DC2626; } .pino.parada{ background: #7C3AED; } .pino.alerta{ background: #F59E0B; color: #111827; }
 .pino.vertice{ width: 16px; height: 16px; font-size: 8px; background: #111827; }
 .leaflet-container{ font-family: inherit; }
+/* Botão Mapa / Satélite */
+.seletor-camada{ display: flex; background: var(--surface); border-radius: 8px; padding: 3px; box-shadow: var(--shadow-flutuante); gap: 2px; }
+.seletor-camada button{ border: 0; background: none; cursor: pointer; padding: 5px 12px; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 600;
+  color: var(--text-2); }
+.seletor-camada button:hover{ color: var(--text); }
+.seletor-camada button.on{ background: var(--text); color: var(--surface); }
+/* No satélite, a placa e as cercas precisam destacar sobre a imagem */
+.mapa-satelite .veic .rot{ box-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
+.mapa-satelite .leaflet-tile-pane{ filter: none !important; }
 .leaflet-popup-content{ font-size: 12px; }
 .leaflet-bar a{ color: #111827; }
 /* Camada de imagens (reserva sem WebGL) em tons suaves; o mapa vetorial já tem o estilo de cada tema. */
