@@ -24,7 +24,8 @@ function criarApp(db, extras = {}) {
     res.set({
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
-      'Referrer-Policy': 'no-referrer',
+      // O OpenStreetMap recusa as imagens do mapa sem a origem do site (Referer); só a origem é enviada, nunca o caminho.
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Permissions-Policy': 'geolocation=(), camera=(), microphone=()',
       ...(config.producao ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),
       'Content-Security-Policy': CSP,
