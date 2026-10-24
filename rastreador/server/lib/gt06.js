@@ -1,20 +1,23 @@
 'use strict';
 
 const net = require('node:net');
-const { receber } = require('./posicoes');
-const com = require('./comandos');
 
 /**
  * Protocolo GT06 (Concox e compatíveis: GT06, GT06N, J16, ST-901 e muitos outros), por TCP.
  * Quadro: 78 78 | tamanho (1) | protocolo (1) | conteúdo | serial (2) | CRC-ITU (2) | 0D 0A  (ou 79 79 com o tamanho em 2 bytes).
+ * Os modelos 4G (como o J16 4G) usam também a posição 0xA0, os alarmes 0xA4/0xA5 e a informação 0x94 (tensão externa),
+ * com a célula da rede 4G (LAC de 4 bytes e célula de 8).
  */
-const P = { LOGIN: 0x01, GPS: 0x12, STATUS: 0x13, RESPOSTA: 0x15, ALARME: 0x16, RESPOSTA2: 0x21, GPS2: 0x22, HEARTBEAT: 0x23, ALARME2: 0x26, COMANDO: 0x80, HORA: 0x8a };
+const P = {
+  LOGIN: 0x01, GPS: 0x12, STATUS: 0x13, RESPOSTA: 0x15, ALARME: 0x16, RESPOSTA2: 0x21, GPS2: 0x22, HEARTBEAT: 0x23, ALARME2: 0x26, COMANDO: 0x80, HORA: 0x8a,
+  INFO: 0x94, GPS_4G: 0xa0, LBS_4G: 0xa1, ALARME_4G: 0xa4, ALARME_LBS_4G: 0xa5,
+};
 // Alarmes do quadro de alarme que viram alerta.
 const ALARMES = { 0x01: 'panico', 0x02: 'bateria_desconectada', 0x0e: 'bateria_baixa', 0x0f: 'bateria_baixa', 0x19: 'bateria_baixa', 0x13: 'violacao' };
 // Alarme do byte de estado (bits 3 a 5).
 const ALARMES_ESTADO = { 4: 'panico', 3: 'bateria_baixa', 2: 'bateria_desconectada' };
-// Tensão aproximada de cada nível de bateria informado (0 a 6), em volts da bateria interna.
-const NIVEL_TENSAO = [0, 3.4, 3.6, 3.7, 3.8, 3.9, 4.1];
+// Tensão aproximada de cada nível de bateria informado (1 a 6), em volts da bateria interna (0: sem bateria interna, como o J16).
+const NIVEL_TENSAO = [null, 3.4, 3.6, 3.7, 3.8, 3.9, 4.1];
 const TAMANHO_MAX_BUFFER = 64 * 1024;
 
 /** CRC-ITU (CRC-16/X-25), como o protocolo especifica. */
@@ -60,9 +63,12 @@ function extrair(buf) {
   return { quadros, resto: buf.subarray(i) };
 }
 
-/** Data e posição GPS (18 bytes a partir de `o`). */
-function lerGps(c, o = 0) {
-  const gpsEm = new Date(Date.UTC(2000 + c[o], c[o + 1] - 1, c[o + 2], c[o + 3], c[o + 4], c[o + 5])).toISOString();
+/**
+ * Data e posição GPS (18 bytes a partir de `o`). A hora vem no fuso informado pelo equipamento no login (`fusoMin`, em minutos;
+ * 0 quando ele manda em UTC, o padrão). Nos flags, o bit 14 diz que o bit 15 traz a ignição.
+ */
+function lerGps(c, o = 0, fusoMin = 0) {
+  const gpsEm = new Date(Date.UTC(2000 + c[o], c[o + 1] - 1, c[o + 2], c[o + 3], c[o + 4], c[o + 5]) - fusoMin * 60_000).toISOString();
   let lat = c.readUInt32BE(o + 7) / 1_800_000;
   let lng = c.readUInt32BE(o + 11) / 1_800_000;
   const flags = c.readUInt16BE(o + 16);
@@ -70,8 +76,30 @@ function lerGps(c, o = 0) {
   if (flags & 0x0800) lng = -lng;
   return {
     gps_em: gpsEm, satelites: c[o + 6] & 0x0f, lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)), velocidade_kmh: c[o + 15],
-    curso: flags & 0x03ff, valido: Boolean(flags & 0x1000),
+    curso: flags & 0x03ff, valido: Boolean(flags & 0x1000), ...(flags & 0x4000 ? { ignicao: Boolean(flags & 0x8000) } : {}),
   };
+}
+
+/** Tamanho da célula da rede depois do GPS na posição 4G (0xA0): MCC (2), MNC (1, ou 2 se o bit 15 do MCC vier ligado), LAC (4) e célula (8). */
+const tamanhoCelula4g = (c, o) => 2 + (c.readUInt16BE(o) & 0x8000 ? 2 : 1) + 4 + 8;
+
+/** Fuso do login (2 bytes depois do IMEI e do tipo): horas×100 + minutos nos 12 bits altos; o bit 3 ligado é oeste (negativo). */
+function lerFuso(c) {
+  if (c.length < 12) return 0;
+  const x = c.readUInt16BE(10);
+  const v = x >> 4;
+  return (x & 0x08 ? -1 : 1) * (Math.floor(v / 100) * 60 + (v % 100));
+}
+
+/**
+ * Fim do quadro de alarme: estado do terminal, nível da bateria, sinal GSM, alarme e idioma (mais a cerca, no 0xA4).
+ * Lido a partir do fim, porque o tamanho do LBS no meio muda entre os modelos 2G e 4G.
+ */
+function lerFimAlarme(c, extra = 0) {
+  const o = c.length - 5 - extra;
+  if (o < 0) return {};
+  const e = lerEstado(c[o]);
+  return { ignicao: e.ignicao, bloqueado: e.bloqueado, tensao: NIVEL_TENSAO[c[o + 1]] ?? null, evento: ALARMES[c[o + 3]] ?? e.evento };
 }
 
 /** Byte de estado do terminal: ignição (ACC), corte de combustível e alarme. */
@@ -83,16 +111,23 @@ function lerEstado(info) {
  * Traduz um quadro em { tipo, ... }: login (imei), posicao (mensagem para receber()), estado, resposta (de comando) ou hora.
  * Devolve também se o quadro pede confirmação (ack).
  */
-function decodificar(q) {
+function decodificar(q, { fusoMin = 0 } = {}) {
   const c = q.conteudo;
   switch (q.protocolo) {
     case P.LOGIN: {
       const hex = c.subarray(0, 8).toString('hex');
-      return { tipo: 'login', imei: hex.replace(/^0/, ''), ack: true };
+      return { tipo: 'login', imei: hex.replace(/^0/, ''), fusoMin: lerFuso(c), ack: true };
+    }
+    case P.GPS_4G: {
+      const m = lerGps(c, 0, fusoMin);
+      // Depois da célula 4G: ignição (ACC), modo de envio e se é reenvio da memória.
+      const o = 18 + tamanhoCelula4g(c, 18);
+      if (c.length > o) m.ignicao = c[o] === 1;
+      return { tipo: 'posicao', mensagem: m, ack: false };
     }
     case P.GPS:
     case P.GPS2: {
-      const m = lerGps(c);
+      const m = lerGps(c, 0, fusoMin);
       // GT06 de modelo mais novo (0x22): depois do LBS (8 bytes) vem a ignição (ACC).
       if (q.protocolo === P.GPS2 && c.length > 26) m.ignicao = c[26] === 1;
       return { tipo: 'posicao', mensagem: m, ack: false };
@@ -103,16 +138,15 @@ function decodificar(q) {
       return { tipo: 'estado', mensagem: { ...e, tensao: NIVEL_TENSAO[c[1]] ?? null }, ack: true };
     }
     case P.ALARME:
-    case P.ALARME2: {
-      const m = lerGps(c);
-      // Depois do GPS: o LBS (o primeiro byte é o tamanho dele, com o próprio byte), estado do terminal, nível da bateria, sinal GSM e o alarme.
-      const o = 18 + (c[18] || 9);
-      if (c.length > o + 3) {
-        const e = lerEstado(c[o]);
-        Object.assign(m, { ignicao: e.ignicao, bloqueado: e.bloqueado, tensao: NIVEL_TENSAO[c[o + 1]] ?? null, evento: ALARMES[c[o + 3]] ?? e.evento });
-      }
-      return { tipo: 'posicao', mensagem: m, ack: true };
-    }
+    case P.ALARME2:
+    case P.ALARME_4G:
+      return { tipo: 'posicao', mensagem: { ...lerGps(c, 0, fusoMin), ...lerFimAlarme(c, q.protocolo === P.ALARME_4G ? 1 : 0) }, ack: true };
+    // Alarme sem GPS (só a célula 4G): vale o estado e o alarme, na última posição conhecida.
+    case P.ALARME_LBS_4G:
+      return { tipo: 'estado', mensagem: lerFimAlarme(c), ack: true };
+    // Informação: o tipo 0x00 traz a tensão externa (bateria do veículo) em centésimos de volt.
+    case P.INFO:
+      return c[0] === 0x00 && c.length >= 3 ? { tipo: 'estado', mensagem: { tensao: c.readUInt16BE(1) / 100 }, ack: false } : { tipo: 'outro', ack: false };
     case P.RESPOSTA: {
       const n = c[0];
       return { tipo: 'resposta', comando: c.readUInt32BE(1), texto: c.subarray(5, 1 + n).toString('latin1').trim(), ack: false };
@@ -144,6 +178,9 @@ function quadroHora(serial) {
  * Comandos pendentes são entregues no login e assim que são criados, se o equipamento estiver conectado.
  */
 function iniciarGt06(db, porta, { host } = {}) {
+  // Só o servidor usa o banco: a montagem e a leitura dos quadros (acima) servem também ao simulador, sem configuração.
+  const { receber } = require('./posicoes');
+  const com = require('./comandos');
   const conexoes = new Map();
 
   function entregar(imei) {
@@ -159,7 +196,7 @@ function iniciarGt06(db, porta, { host } = {}) {
   }
 
   const servidor = net.createServer((socket) => {
-    const cx = { socket, imei: null, serial: 0 };
+    const cx = { socket, imei: null, serial: 0, fusoMin: 0 };
     let buf = Buffer.alloc(0);
     // Sem login em 1 minuto, ou sem mensagem por 15 minutos, a conexão cai (o equipamento reconecta sozinho).
     const semLogin = setTimeout(() => { if (!cx.imei) socket.destroy(); }, 60_000);
@@ -184,10 +221,11 @@ function iniciarGt06(db, porta, { host } = {}) {
     });
 
     function tratar(q) {
-      const d = decodificar(q);
+      const d = decodificar(q, { fusoMin: cx.fusoMin });
       if (d.ack) socket.write(quadro(q.protocolo, Buffer.alloc(0), q.serial));
       if (d.tipo === 'login') {
         cx.imei = d.imei;
+        cx.fusoMin = d.fusoMin;
         const anterior = conexoes.get(d.imei);
         if (anterior && anterior !== cx) anterior.socket.destroy();
         conexoes.set(d.imei, cx);

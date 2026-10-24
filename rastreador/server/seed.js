@@ -7,6 +7,7 @@ const { abrir, agora, transacao } = require('./db');
 const { hashSenha } = require('./lib/senha');
 const { receber } = require('./lib/posicoes');
 const { distancia } = require('./lib/geo');
+const { imeiValido } = require('./lib/validacao');
 
 const db = abrir();
 const SENHA = hashSenha('demo12345');
@@ -89,12 +90,14 @@ function apagarExemplos() {
     db.prepare('DELETE FROM usuarios WHERE empresa_id = ?').run(id);
     db.prepare('DELETE FROM empresas WHERE id = ?').run(id);
   }
-  db.prepare("DELETE FROM rastreadores WHERE imei LIKE '35971004%' OR imei LIKE 'app-demo%'").run();
+  db.prepare("DELETE FROM rastreadores WHERE imei LIKE '86655708000%' OR imei LIKE 'app-demo%'").run();
 }
 
 transacao(db, apagarExemplos);
 const agoraMs = Date.now();
-let imei = 359710040000100;
+// IMEIs de exemplo na faixa do J16 4G, com o dígito verificador certo.
+let sequencia = 100;
+const proximoImei = () => { const b = `86655708000${sequencia++}`; return [...'0123456789'].map((d) => b + d).find(imeiValido); };
 let total = 0;
 
 for (const [i, e] of EMPRESAS.entries()) {
@@ -116,9 +119,9 @@ for (const [i, e] of EMPRESAS.entries()) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(eid, nome, cpf, String(Math.floor(entre(1e10, 9e10))), 'D', validade, `119${Math.floor(entre(1e7, 9e7))}`, agora()).lastInsertRowid));
 
   for (const [j, x] of e.veiculos.entries()) {
-    const id = x.celular ? `app-demo${String(j + 1).padStart(4, '0')}` : String(imei++);
+    const id = x.celular ? `app-demo${String(j + 1).padStart(4, '0')}` : proximoImei();
     const rid = Number(db.prepare('INSERT INTO rastreadores (imei, modelo, protocolo, chip_numero, chip_operadora, empresa_id, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(id, x.celular ? 'Celular (Traccar Client)' : 'GT06N', x.celular ? 'osmand' : 'gt06', x.celular ? null : `1199${Math.floor(entre(1e6, 9e6))}`, x.celular ? null : 'Vivo',
+      .run(id, x.celular ? 'Celular (Traccar Client)' : 'J16 4G', x.celular ? 'osmand' : 'gt06', x.celular ? null : `1199${Math.floor(entre(1e6, 9e6))}`, x.celular ? null : 'Vivo',
         eid, agora()).lastInsertRowid);
     const vid = Number(db.prepare(`INSERT INTO veiculos (empresa_id, placa, descricao, marca, modelo, ano, tipo, rastreador_id, motorista_id, limite_velocidade_kmh, hodometro_m, criado_em)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(eid, x.placa, x.descricao, x.marca, x.modelo, x.ano, x.tipo, rid, motoristas[j] ?? null, x.limite, x.km * 1000, agora()).lastInsertRowid);
@@ -165,7 +168,7 @@ db.prepare(`INSERT INTO comandos (empresa_id, veiculo_id, rastreador_id, tipo, t
 db.prepare("UPDATE alertas SET tratado_em = ocorrido_em, observacao = 'Verificado pela central.' WHERE ocorrido_em < ? AND tipo <> 'panico'")
   .run(new Date(agoraMs - 12 * 3_600_000).toISOString());
 // Um equipamento que tentou enviar sem estar cadastrado.
-receber(db, { imei: '359710049999999', protocolo: 'gt06', ip: '177.10.20.30' });
+receber(db, { imei: '866557080099908', protocolo: 'gt06', ip: '177.10.20.30' });
 
 console.log(`Seed concluído: ${EMPRESAS.length} empresas, ${EMPRESAS.reduce((s, e) => s + e.veiculos.length, 0)} veículos, ${total} posições.`);
 console.log('Contas (senha demo12345): cliente@transportes.demo, cliente@entregas.demo, cliente@pessoal.demo e operador@transportes.demo (operador).');

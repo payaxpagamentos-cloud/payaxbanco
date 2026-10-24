@@ -1,7 +1,7 @@
 {
   "name": "rastreador-veiculos",
   "version": "1.0.0",
-  "description": "Rastreador de Veículos — mapa ao vivo, histórico de trajetos, cercas, alertas, bloqueio remoto e relatórios da frota, com recepção dos rastreadores GT06 e do app Traccar Client.",
+  "description": "Rastreador de Veículos — mapa ao vivo, histórico de trajetos, cercas, alertas, bloqueio remoto e relatórios da frota, para o rastreador J16 4G (GT06), o app Traccar Client e outros sistemas.",
   "main": "server/index.js",
   "private": true,
   "type": "commonjs",
@@ -13,7 +13,8 @@
     "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
     "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/seed.js",
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
-    "empacotar": "node scripts/empacotar.js"
+    "empacotar": "node scripts/empacotar.js",
+    "simular": "node scripts/simular-j16.js"
   },
   "dependencies": {
     "express": "^5.2.1",

@@ -14,6 +14,41 @@ próprios veículos.
 Sistema independente: servidor, banco de dados (SQLite), usuários e login próprios. Mapa do OpenStreetMap (Leaflet servido pelo próprio
 sistema). Tema escuro por padrão, com o claro no botão do topo.
 
+## Rastreador J16 4G (Indica Planos)
+
+O equipamento usado é o **J16 4G** (etiqueta "IMEI: 8665570…", "4G SA"), que fala o protocolo **GT06** pela rede 4G. O sistema já vem
+preparado para ele: posições 4G (0xA0), estado e alarmes (0x13, 0x16, 0xA4, 0xA5), tensão (0x94), fuso informado no login e os comandos do
+modelo, usados sempre que o rastreador está cadastrado com o modelo "J16 4G":
+
+| Ação no painel | Texto enviado ao J16 |
+|---|---|
+| Bloquear / Desbloquear | `RELAY,1#` / `RELAY,0#` |
+| Consultar estado | `STATUS#` (bateria, GPRS, sinal, GPS, ACC, relé) |
+| Consultar configuração | `PARAM#` |
+| Pedir posição / Reiniciar | `WHERE#` / `RESET#` |
+| Personalizado | qualquer texto do manual (ex.: `SZCS#SOURCE_OFF_TYPE=0`, `VERSION#`) |
+
+**Passo a passo**
+1. Master → **Rastreadores → Novo rastreador**: IMEI da etiqueta (o sistema confere o dígito verificador), modelo **J16 4G**, empresa.
+2. Empresa → **Veículos → Novo veículo**: placa e o rastreador.
+3. SMS para o número do chip do J16, um por vez (resposta "SET OK"):
+   ```
+   SZCS#IMEI=866557088453933#TERIID=866557088453933#
+   APN,indica.br,indica,indica#            (chip Vivo da Indica; Algar: APN,indica.algar.br,algar,1212#)
+   SERVER,1,SEU-DOMINIO,5023,0#            (com IP: SERVER,0,IP-DO-SERVIDOR,5023,0#)
+   TIMER,30,3600#
+   GMT,W,0,0#
+   SZCS#GPS_DISSLP=1
+   SZCS#SLPDISCONNECT=0
+   STATUS#
+   ```
+   Atenção: depois do `SERVER`, o J16 passa a enviar para este sistema e deixa de aparecer na plataforma da Indica (`smartconn.mine.nu:4998`).
+4. **Instalação**: positivo e negativo na bateria (12/24 V; o J16 não tem bateria interna), fio da **ignição no pós-chave** (sem ele o
+   rastreador fica em espera) e o **relé no fio da bomba de combustível** para o bloqueio. Tampa bem fechada, LED para cima, longe de metal.
+   Chip **M2M** com plano de dados.
+5. Sem o aparelho em mãos, dá para testar com o simulador, que se conecta como o J16 e responde aos comandos:
+   `npm run simular -- 866557088453933 SEU-SERVIDOR 5023`.
+
 ## Como os veículos chegam ao sistema
 
 | Origem | Como liga | Comandos |

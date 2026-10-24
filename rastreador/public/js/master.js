@@ -1,7 +1,7 @@
 /** Telas do master (equipe da plataforma). */
 import { api, qs } from './api.js';
 import { el, limpar, dinheiro, dataHora, data, desde, inteiro, toast, campo, area, escolha, marcar, formModal, perguntar, confirmar, repetir, telefone, etiqueta, placa,
-  TIPOS_EMPRESA, PERFIS, PROTOCOLOS, reaisCampo, centavos } from './ui.js';
+  TIPOS_EMPRESA, PERFIS, PROTOCOLOS, MODELOS_RASTREADOR, reaisCampo, centavos } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, painelMapa, painelIntegracoes, situacaoDiag, linhaDado } from './comum.js';
 import { configPublica } from './mapa.js';
 import { barras } from './graficos.js';
@@ -127,9 +127,10 @@ async function telaRastreadores(ctx) {
   busca.addEventListener('change', () => { estado.busca = busca.value; carregar(); });
 
   const form = (r, padrao = {}) => formModal(r ? `Rastreador ${r.imei}` : 'Novo rastreador', () => [
-    el('div', { class: 'duas' }, campo('IMEI / identificador', { name: 'imei', required: true, maxlength: 40, value: r?.imei ?? padrao.imei ?? '', class: 'mono' }),
+    el('div', { class: 'duas' }, campo('IMEI / identificador (15 dígitos da etiqueta)', { name: 'imei', required: true, maxlength: 46, value: r?.imei ?? padrao.imei ?? '', class: 'mono', inputmode: 'numeric' }),
       escolha('Protocolo', 'protocolo', PROTOCOLOS, r?.protocolo ?? padrao.protocolo ?? 'gt06')),
-    campo('Modelo', { name: 'modelo', maxlength: 60, value: r?.modelo ?? '', placeholder: 'Ex.: GT06N, J16, ST-901' }),
+    campo('Modelo (J16 já vem com os comandos de bloqueio e consulta dele)', { name: 'modelo', maxlength: 60, value: r?.modelo ?? padrao.modelo ?? 'J16 4G', list: 'modelos-rastreador' }),
+    el('datalist', { id: 'modelos-rastreador' }, MODELOS_RASTREADOR.map((m) => el('option', { value: m }))),
     el('div', { class: 'duas' }, campo('Número do chip', { name: 'chip_numero', inputmode: 'tel', value: r?.chip_numero ?? '' }),
       campo('Operadora do chip', { name: 'chip_operadora', maxlength: 40, value: r?.chip_operadora ?? '' })),
     escolha('Empresa', 'empresa_id', { '': 'Estoque (sem empresa)', ...nomesEmp }, r?.empresa_id ?? ''),
@@ -255,7 +256,7 @@ async function telaConfiguracoes(ctx) {
         campo('Mensalidade por veículo (R$)', { name: 'mensalidade', inputmode: 'decimal', value: reaisCampo(c.mensalidade_padrao_centavos) }),
         campo('Alerta sem comunicação (min)', { name: 'sem_comunicacao_padrao_min', type: 'number', min: 0, value: c.sem_comunicacao_padrao_min }))),
     el('fieldset', {}, el('legend', {}, 'Comandos enviados aos rastreadores GT06'),
-      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O texto varia por fabricante (ex.: DYD,000000# e HFYD,000000# em alguns modelos). Confira no manual do equipamento.'),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Usados nos modelos sem comandos próprios (o J16 4G já tem os dele: RELAY,1#, RELAY,0#, STATUS#, PARAM#). O texto varia por fabricante (ex.: DYD,000000# e HFYD,000000#).'),
       el('div', { class: 'duas' }, campo('Bloquear', { name: 'gt06_cmd_bloquear', required: true, maxlength: 60, value: c.gt06_cmd_bloquear, class: 'mono' }),
         campo('Desbloquear', { name: 'gt06_cmd_desbloquear', required: true, maxlength: 60, value: c.gt06_cmd_desbloquear, class: 'mono' })),
       el('div', { class: 'duas' }, campo('Pedir posição', { name: 'gt06_cmd_localizar', required: true, maxlength: 60, value: c.gt06_cmd_localizar, class: 'mono' }),

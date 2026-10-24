@@ -10,16 +10,36 @@ const TIPOS = {
   desbloquear: 'Desbloquear o veículo',
   localizar: 'Pedir a posição agora',
   reiniciar: 'Reiniciar o equipamento',
+  status: 'Consultar o estado do equipamento',
+  parametros: 'Consultar a configuração do equipamento',
   personalizado: 'Comando personalizado',
 };
+
+/**
+ * Modelos conhecidos e os textos dos comandos de cada um (o modelo do rastreador é reconhecido pelo nome cadastrado).
+ * J16 4G: comandos do manual da Indica Planos (relé de corte no fio de bloqueio; o J16 só corta com o veículo devagar ou parado).
+ */
+const MODELOS = {
+  j16: {
+    nome: 'J16 4G', protocolo: 'gt06', reconhece: /\bj16\b/i,
+    comandos: { bloquear: 'RELAY,1#', desbloquear: 'RELAY,0#', localizar: 'WHERE#', reiniciar: 'RESET#', status: 'STATUS#', parametros: 'PARAM#' },
+  },
+};
+const modeloDe = (nome) => Object.values(MODELOS).find((m) => m.reconhece.test(String(nome ?? ''))) ?? null;
+// Comandos de consulta que não têm texto configurável: o padrão do protocolo GT06.
+const PADRAO_GT06 = { status: 'STATUS#', parametros: 'PARAM#' };
 
 /** Avisa o servidor GT06 de um comando novo, para entregar na hora se o equipamento estiver conectado. */
 const canal = new EventEmitter();
 
-/** Texto enviado ao equipamento: o configurado para o GT06; na API, o próprio tipo (o sistema integrador traduz). */
-function textoComando(cfg, tipo, protocolo, texto) {
+/**
+ * Texto enviado ao equipamento: o do modelo conhecido (ex.: J16), senão o configurado para o GT06;
+ * na API, o próprio tipo (o sistema integrador traduz).
+ */
+function textoComando(cfg, tipo, rastreador, texto) {
   if (tipo === 'personalizado') return v.texto(texto, 'o comando', 120);
-  return protocolo === 'gt06' ? cfg[`gt06_cmd_${tipo}`] : tipo;
+  if (rastreador.protocolo !== 'gt06') return tipo;
+  return modeloDe(rastreador.modelo)?.comandos[tipo] ?? cfg[`gt06_cmd_${tipo}`] ?? PADRAO_GT06[tipo];
 }
 
 /**
@@ -35,7 +55,7 @@ function criar(db, veiculo, d, usuarioId) {
     const digitada = String(d.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '');
     if (digitada !== veiculo.placa) throw new ErroNegocio('Para bloquear, digite a placa do veículo para confirmar.', 422);
   }
-  const texto = textoComando(lerConfig(db), tipo, r.protocolo, d.texto);
+  const texto = textoComando(lerConfig(db), tipo, r, d.texto);
   const id = transacao(db, () => {
     if (tipo === 'bloquear' || tipo === 'desbloquear') {
       db.prepare("UPDATE comandos SET status = 'cancelado', respondido_em = ? WHERE veiculo_id = ? AND status = 'pendente' AND tipo IN ('bloquear','desbloquear')")
@@ -77,4 +97,4 @@ function expirar(db, horas) {
   return db.prepare("UPDATE comandos SET status = 'expirado', respondido_em = ? WHERE status IN ('pendente','enviado') AND criado_em < ?").run(agora(), corte).changes;
 }
 
-module.exports = { TIPOS, canal, criar, pendentes, marcarEnviado, responder, respostaSucesso, expirar };
+module.exports = { TIPOS, MODELOS, modeloDe, canal, criar, pendentes, marcarEnviado, responder, respostaSucesso, expirar };

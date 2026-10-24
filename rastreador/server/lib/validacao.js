@@ -95,10 +95,21 @@ function placa(v) {
   return p;
 }
 
-/** Identificador do equipamento: IMEI (15 dígitos) ou o código do app (4 a 40 letras, números, ponto, traço ou sublinhado). */
+/** IMEI de 15 dígitos com o dígito verificador (Luhn) certo. */
+function imeiValido(t) {
+  let soma = 0;
+  [...t].reverse().forEach((d, i) => { let n = Number(d); if (i % 2) { n *= 2; if (n > 9) n -= 9; } soma += n; });
+  return soma % 10 === 0;
+}
+
+/**
+ * Identificador do equipamento: IMEI (15 dígitos, conferido pelo dígito verificador) ou o código do app
+ * (4 a 40 letras, números, ponto, traço ou sublinhado).
+ */
 function imei(v) {
-  const t = String(v ?? '').trim();
+  const t = String(v ?? '').replace(/^IMEI[:\s]*/i, '').trim();
   exigir(/^[A-Za-z0-9._-]{4,40}$/.test(t), 'IMEI / identificador inválido (de 4 a 40 letras ou números).');
+  if (/^\d{15}$/.test(t)) exigir(imeiValido(t), 'IMEI inválido: confira os 15 dígitos da etiqueta do rastreador.');
   return t;
 }
 
@@ -120,4 +131,4 @@ function coordenadas(lat, lng) {
 const booleano = (v) => v === true || v === 1 || v === '1' || v === 'true' || v === 'on';
 
 module.exports = { digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data, placa,
-  imei, horario, coordenadas, booleano };
+  imei, imeiValido, horario, coordenadas, booleano };

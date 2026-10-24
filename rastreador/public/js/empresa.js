@@ -72,6 +72,7 @@ function detalheVeiculo(ctx, v, painel, fechar) {
       el('button', { class: 'btn pequeno', onclick: () => { veiculoHistorico = v.id; ctx.ir('historico'); } }, icone('historico'), 'Histórico'),
       pode(ctx) ? botao('Compartilhar', '', () => compartilhar(ctx, v)) : null,
       comComandos ? botao('Pedir posição', '', () => enviarComando(ctx, v, 'localizar')) : null,
+      comComandos ? botao('Consultar estado', '', () => enviarComando(ctx, v, 'status')) : null,
       comComandos ? (v.bloqueado
         ? botao('Desbloquear', 'primario', () => enviarComando(ctx, v, 'desbloquear'))
         : botao('Bloquear', 'perigo', () => enviarComando(ctx, v, 'bloquear'))) : null),
@@ -89,7 +90,8 @@ async function enviarComando(ctx, v, tipo, texto) {
     return;
   }
   const c = await api.post(`${base(ctx)}/veiculos/${v.id}/comandos`, { tipo, confirmacao, texto });
-  toast(c.status === 'pendente' ? `Comando "${TIPOS_COMANDO[tipo]}" na fila: vai assim que o rastreador conectar.` : `Comando "${TIPOS_COMANDO[tipo]}" enviado.`);
+  const consulta = tipo === 'status' || tipo === 'parametros' ? ' A resposta do equipamento aparece em Comandos.' : '';
+  toast(`${c.status === 'pendente' ? `Comando "${TIPOS_COMANDO[tipo]}" na fila: vai assim que o rastreador conectar.` : `Comando "${TIPOS_COMANDO[tipo]}" enviado.`}${consulta}`);
 }
 
 async function compartilhar(ctx, v) {
@@ -612,7 +614,20 @@ async function telaComandos(ctx) {
         carregar();
       }) : null))), 'Nenhum comando enviado. Os comandos (bloquear, desbloquear, pedir posição) são enviados pelo mapa ao vivo.'));
   }
-  limpar(ctx.conteudo, el('p', { class: 'mudo', style: 'margin-top:0' }, 'Comandos enviados aos rastreadores. Sem conexão, o comando espera o equipamento conectar (expira em 24 h).'),
+  const veiculos = (await api.get(`${base(ctx)}/veiculos`)).filter((x) => x.ativo && x.imei && x.protocolo !== 'osmand');
+  const novo = pode(ctx) && veiculos.length ? el('button', { class: 'btn primario', onclick: async () => {
+    const r = await formModal('Enviar comando', (f) => {
+      const tipo = escolha('Comando', 'tipo', Object.fromEntries(Object.entries(TIPOS_COMANDO).filter(([k]) => k !== 'bloquear')), 'status');
+      const texto = campo('Texto do comando (exatamente como no manual, ex.: SZCS#SOURCE_OFF_TYPE=0)', { name: 'texto', maxlength: 120, class: 'mono' });
+      const ajustar = () => texto.classList.toggle('oculto', f.querySelector('[name=tipo]').value !== 'personalizado');
+      tipo.querySelector('select').addEventListener('change', ajustar);
+      queueMicrotask(ajustar);
+      return [escolha('Veículo', 'veiculo_id', Object.fromEntries(veiculos.map((x) => [x.id, `${placa(x.placa)} · ${x.rastreador_modelo ?? x.imei}`])), veiculos[0].id), tipo, texto,
+        el('p', { class: 'pequeno fraco', style: 'margin:0' }, 'Para bloquear, use o botão Bloquear no mapa ao vivo (pede a placa para confirmar).')];
+    }, (d) => api.post(`${base(ctx)}/veiculos/${d.veiculo_id}/comandos`, { tipo: d.tipo, texto: d.texto }), { rotulo: 'Enviar' });
+    if (r) { toast('Comando criado.'); carregar(); }
+  } }, 'Enviar comando') : null;
+  limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, 'Comandos enviados aos rastreadores e as respostas. Sem conexão, o comando espera o equipamento conectar (expira em 24 h).'), novo),
     cartao(null, lista));
   ctx.parar(repetir(carregar, 10_000));
 }

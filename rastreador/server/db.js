@@ -193,7 +193,7 @@ CREATE TABLE IF NOT EXISTS comandos (
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
   veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
   rastreador_id INTEGER NOT NULL REFERENCES rastreadores(id),
-  tipo TEXT NOT NULL CHECK (tipo IN ('bloquear','desbloquear','localizar','reiniciar','personalizado')),
+  tipo TEXT NOT NULL CHECK (tipo IN ('bloquear','desbloquear','localizar','reiniciar','status','parametros','personalizado')),
   texto TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','enviado','confirmado','falhou','expirado','cancelado')),
   criado_por INTEGER REFERENCES usuarios(id),

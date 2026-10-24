@@ -11,7 +11,8 @@ const { foraDoHorario } = require('../server/lib/posicoes');
 const { manutencao } = require('../server/lib/manutencao');
 const { local } = require('../server/lib/datas');
 
-const IMEI = '359710045123456';
+// IMEI do rastreador J16 4G da etiqueta.
+const IMEI = '866557088453933';
 const min = (n, base = Date.now()) => new Date(base + n * 60_000).toISOString();
 /** Ponto a `metros` ao norte de (lat, lng). */
 const norte = (lat, lng, metros) => ({ lat: lat + metros / 111_195, lng });
@@ -37,7 +38,7 @@ test('protocolo GT06: CRC, quadros e decodificação', () => {
   const { quadros, resto } = gt.extrair(Buffer.concat([Buffer.from([0x00, 0x11]), login, login.subarray(0, 6)]));
   assert.equal(quadros.length, 1);
   assert.equal(resto.length, 6, 'o pedaço incompleto fica para a próxima leitura');
-  assert.deepEqual(gt.decodificar(quadros[0]), { tipo: 'login', imei: '123456789012345', ack: true });
+  assert.deepEqual(gt.decodificar(quadros[0]), { tipo: 'login', imei: '123456789012345', fusoMin: 0, ack: true });
   // CRC errado: o quadro é ignorado.
   const ruim = Buffer.from(login);
   ruim[14] ^= 0xff;
@@ -62,6 +63,24 @@ test('protocolo GT06: CRC, quadros e decodificação', () => {
   assert.equal(cmd.conteudo.readUInt32BE(1), 42);
   const resp = Buffer.concat([Buffer.from([4 + 2]), cmd.conteudo.subarray(1, 5), Buffer.from('OK'), Buffer.from([0, 2])]);
   assert.deepEqual(gt.decodificar(gt.extrair(gt.quadro(0x15, resp, 4)).quadros[0]), { tipo: 'resposta', comando: 42, texto: 'OK', ack: false });
+
+  // Modelos 4G (J16 4G): login com o fuso (oeste 3:00 = UTC-3), posição 0xA0 com a célula 4G e a ignição, alarme 0xA4 e tensão (0x94).
+  const login4g = Buffer.concat([Buffer.from('0866557088453933', 'hex'), Buffer.from([0x36, 0x08]), Buffer.from([(300 << 4 | 0x08) >> 8, (300 << 4 | 0x08) & 0xff])]);
+  const l = gt.decodificar(gt.extrair(gt.quadro(0x01, login4g, 1)).quadros[0]);
+  assert.deepEqual([l.imei, l.fusoMin], ['866557088453933', -180]);
+  const celula4g = Buffer.concat([Buffer.from([0x02, 0xd4, 0x0b]), Buffer.alloc(4), Buffer.alloc(8)]); // MCC 724 (Brasil), MNC 11
+  const a0 = gt.extrair(gt.quadro(0xa0, Buffer.concat([gpsGt06({ em: '2026-10-20T10:45:10Z', lat: -23.5, lng: -46.6, vel: 40 }), celula4g, Buffer.from([1, 0, 0])]), 2)).quadros[0];
+  const p4g = gt.decodificar(a0, { fusoMin: -180 });
+  assert.equal(p4g.mensagem.gps_em, em, 'hora local (UTC-3) convertida para UTC');
+  assert.deepEqual([p4g.mensagem.lat, p4g.mensagem.ignicao, p4g.mensagem.velocidade_kmh], [-23.5, true, 40]);
+  const a4 = Buffer.concat([gpsGt06({ em, lat: 1, lng: 2 }), Buffer.from([16]), celula4g, Buffer.from([0x02, 5, 4, 0x01, 0x02, 0x00])]);
+  assert.equal(gt.decodificar(gt.extrair(gt.quadro(0xa4, a4, 3)).quadros[0]).mensagem.evento, 'panico');
+  const info = gt.decodificar({ protocolo: 0x94, conteudo: Buffer.from([0x00, 0x04, 0xd8]), serial: 1 });
+  assert.deepEqual(info.mensagem, { tensao: 12.4 });
+  // Quadro longo (79 79, tamanho em 2 bytes).
+  const corpo = Buffer.concat([Buffer.from([0x00, 0x08, 0x94]), Buffer.from([0x00, 0x04, 0xd8]), Buffer.from([0x00, 0x05])]);
+  const longo = Buffer.concat([Buffer.from([0x79, 0x79]), corpo, Buffer.from([gt.crc16(corpo) >> 8, gt.crc16(corpo) & 0xff]), Buffer.from([0x0d, 0x0a])]);
+  assert.equal(gt.extrair(longo).quadros[0].protocolo, 0x94);
 });
 
 test('viagens, paradas, cercas, horário e manutenção', () => {
@@ -126,11 +145,14 @@ test('Rastreador', async (t) => {
     empresa = r.dados.id;
     outra = (await api.post('/master/empresas', { nome: 'Outra' }, master)).dados.id;
     cliente = await api.login('gestora@rota.com', 'senha-da-gestora');
-    const x = await api.post('/master/rastreadores', { imei: IMEI, modelo: 'GT06N', protocolo: 'gt06', chip_numero: '(11) 99999-0000', empresa_id: empresa }, master);
+    const x = await api.post('/master/rastreadores', { imei: `IMEI:${IMEI}`, modelo: 'J16 4G', protocolo: 'gt06', chip_numero: '(11) 99999-0000', empresa_id: empresa }, master);
     assert.equal(x.status, 201);
     rastreador = x.dados.id;
     assert.equal((await api.post('/master/rastreadores', { imei: IMEI }, master)).status, 409);
     assert.equal((await api.post('/master/rastreadores', { imei: 'x' }, master)).status, 422);
+    const digito = await api.post('/master/rastreadores', { imei: '866557088453934' }, master);
+    assert.equal(digito.status, 422, 'IMEI com o dígito verificador errado');
+    assert.match(digito.dados.erro, /confira os 15 dígitos/);
     const estoque = (await api.get('/master/rastreadores?situacao=empresa', master)).dados;
     assert.deepEqual(estoque.map((e) => e.imei), [IMEI]);
   });
@@ -155,7 +177,7 @@ test('Rastreador', async (t) => {
     const dois = await api.post(`${base()}/veiculos`, { placa: 'DEF4567', rastreador_id: rastreador }, cliente);
     assert.equal(dois.status, 422);
     assert.match(dois.dados.erro, /outro veículo/);
-    const deOutra = (await api.post('/master/rastreadores', { imei: '111122223333444', empresa_id: outra }, master)).dados.id;
+    const deOutra = (await api.post('/master/rastreadores', { imei: '111122223333442', empresa_id: outra }, master)).dados.id;
     assert.equal((await api.post(`${base()}/veiculos`, { placa: 'DEF4567', rastreador_id: deOutra }, cliente)).status, 422);
     // Celular como rastreador (Traccar Client), cadastrado pela própria empresa.
     app = (await api.post(`${base()}/rastreadores`, {}, cliente)).dados;
@@ -287,6 +309,20 @@ test('Rastreador', async (t) => {
     const c = api.db.prepare('SELECT * FROM comandos WHERE id = ?').get(id);
     assert.equal(c.status, 'confirmado');
     assert.equal(c.resposta, 'Cut off the fuel supply: Success!');
+    // Consulta de estado do J16: o texto do modelo (STATUS#) e a resposta guardada no comando.
+    const st = await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'status' }, cliente);
+    assert.equal(st.status, 201);
+    await esperar(() => gt.extrair(recebido).quadros.some((q) => q.protocolo === 0x80 && q.conteudo.readUInt32BE(1) === st.dados.id));
+    const qst = gt.extrair(recebido).quadros.find((q) => q.protocolo === 0x80 && q.conteudo.readUInt32BE(1) === st.dados.id);
+    assert.equal(qst.conteudo.subarray(5, qst.conteudo.length - 2).toString(), 'STATUS#');
+    const txt = Buffer.from('Battery:100%; GPRS:Link Up; GSM Signal:4; GPS:Successful positioning');
+    await enviar(gt.quadro(0x15, Buffer.concat([Buffer.from([4 + txt.length]), qst.conteudo.subarray(1, 5), txt]), 41));
+    await esperar(() => api.db.prepare('SELECT status FROM comandos WHERE id = ?').get(st.dados.id).status === 'confirmado');
+    // Posição 4G (0xA0) com a ignição desligada no fim do quadro.
+    const cel = Buffer.concat([Buffer.from([0x02, 0xd4, 0x0b]), Buffer.alloc(12)]);
+    await enviar(gt.quadro(0xa0, Buffer.concat([gpsGt06({ em: min(5, t0), lat: norte(patio.lat, patio.lng, 4100).lat, lng: patio.lng, vel: 0 }), cel, Buffer.from([0, 0, 0])]), 42));
+    await esperar(() => veic().posicao_em === min(5, t0));
+    assert.equal(veic().ignicao, 0);
     // Celular não recebe comandos.
     const moto = api.db.prepare('SELECT id FROM veiculos WHERE placa = ?').get('DEF4567').id;
     assert.equal((await api.post(`${base()}/veiculos/${moto}/comandos`, { tipo: 'localizar' }, cliente)).status, 422);
@@ -297,26 +333,26 @@ test('Rastreador', async (t) => {
   await t.test('mapa, percurso, relatórios e alertas', async () => {
     const mapa = (await api.get(`${base()}/mapa`, operador)).dados;
     const v = mapa.veiculos.find((x) => x.id === veiculo);
-    assert.equal(v.situacao, 'movimento');
+    assert.equal(v.situacao, 'parado', 'a última posição (0xA0) chegou parada e desligada');
     assert.equal(v.bloqueado, 1);
     assert.equal(mapa.cercas.length, 1);
 
     const p = (await api.get(`${base()}/veiculos/${veiculo}/percurso`, cliente)).dados;
-    assert.equal(p.pontos.length, 5);
+    assert.equal(p.pontos.length, 6);
     assert.equal(p.viagens.length, 1);
-    assert.equal(p.viagens[0].em_andamento, true);
+    assert.equal(p.viagens[0].em_andamento, false, 'a ignição desligada encerrou a viagem');
     assert.equal(p.velocidade_max_kmh, 100);
     assert.ok(p.alertas.length >= 3);
     assert.equal((await api.get(`${base()}/veiculos/${veiculo}/percurso?de=2026-01-01&ate=2026-01-30`, cliente)).status, 422);
 
     const resumo = (await api.get(`${base()}/relatorios/resumo`, cliente)).dados;
     const linha = resumo.linhas.find((x) => x.id === veiculo);
-    assert.ok(Math.abs(linha.distancia_m - 4000) < 5);
+    assert.ok(Math.abs(linha.distancia_m - 4100) < 5);
     assert.equal(linha.excessos, 1);
     assert.equal(linha.velocidade_max_kmh, 100);
     const arquivo = await api.get(`${base()}/relatorios/resumo?csv=1`, cliente);
     assert.match(arquivo.headers.get('content-type'), /text\/csv/);
-    assert.match(arquivo.dados, /ABC1D23;Caminhão 01;;4,0;/);
+    assert.match(arquivo.dados, /ABC1D23;Caminhão 01;;4,1;/);
     const viag = (await api.get(`${base()}/relatorios/viagens?veiculo_id=${veiculo}`, cliente)).dados;
     assert.equal(viag.viagens.length, 1);
 
@@ -360,7 +396,7 @@ test('Rastreador', async (t) => {
     assert.deepEqual(frota.map((x) => x.placa).sort(), ['ABC1D23', 'DEF4567']);
     assert.equal(frota.find((x) => x.placa === 'ABC1D23').bloqueado, true);
     const pos = (await i.get(`/veiculos/ABC1D23/posicoes?de=${min(-120)}`)).dados;
-    assert.equal(pos.length, 7);
+    assert.equal(pos.length, 8);
 
     // Rastreador do protocolo "api" (outro sistema entrega as posições e os comandos).
     const gw = (await api.post('/master/rastreadores', { imei: 'gw-0001', protocolo: 'api', empresa_id: empresa }, master)).dados.id;
@@ -369,7 +405,7 @@ test('Rastreador', async (t) => {
     const lote = await i.post('/posicoes', [
       { imei: 'gw-0001', lat: -23.548, lng: -46.631, velocidade_kmh: 30, ignicao: true, gps_em: min(-2) },
       { imei: 'gw-0001', lat: -23.548, lng: -46.631, velocidade_kmh: 30, ignicao: true, gps_em: min(-2) },
-      { imei: IMEI.replace(/6$/, '7'), lat: 1, lng: 1 },
+      { imei: 'nao-cadastrado-01', lat: 1, lng: 1 },
       { lat: 1, lng: 1 },
     ]);
     assert.equal(lote.status, 200);

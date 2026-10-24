@@ -67,7 +67,10 @@ export const TIPOS_ALERTA = {
 };
 // Alertas que pedem atenção imediata (vermelhos).
 export const ALERTAS_GRAVES = ['panico', 'bateria_desconectada', 'violacao'];
-export const TIPOS_COMANDO = { bloquear: 'Bloquear', desbloquear: 'Desbloquear', localizar: 'Pedir posição', reiniciar: 'Reiniciar equipamento', personalizado: 'Personalizado' };
+export const TIPOS_COMANDO = { bloquear: 'Bloquear', desbloquear: 'Desbloquear', localizar: 'Pedir posição', reiniciar: 'Reiniciar equipamento', status: 'Consultar estado',
+  parametros: 'Consultar configuração', personalizado: 'Personalizado' };
+// Modelos sugeridos no cadastro do rastreador (o J16 4G tem os comandos próprios no servidor).
+export const MODELOS_RASTREADOR = ['J16 4G', 'GT06N', 'GT06', 'ST-901', 'Concox GT06E'];
 export const STATUS_COMANDO = {
   pendente: ['Aguardando envio', 'aviso'], enviado: ['Enviado', 'info'], confirmado: ['Confirmado', 'ok'], falhou: ['Falhou', 'erro'], expirado: ['Expirado', 'erro'],
   cancelado: ['Cancelado', ''],

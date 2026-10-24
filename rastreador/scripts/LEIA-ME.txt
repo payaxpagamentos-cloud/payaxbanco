@@ -90,11 +90,24 @@ O programa abre DUAS portas:
      4. A empresa cadastra os veículos e escolhe o rastreador de cada um.
 
 
-8) CONFIGURAR O RASTREADOR GT06
-   Por SMS para o número do chip do rastreador (a senha padrão costuma ser 123456 ou 666666; confira no manual):
-      SERVER,1,SEU-DOMINIO,5023,0#        (ou: adminip123456 IP-DO-SERVIDOR 5023)
-      APN,zap.vivo.com.br#                (APN da operadora do chip)
-      TIMER,30#                           (posição a cada 30 segundos)
+8) CONFIGURAR O RASTREADOR J16 4G (Indica Planos)
+   a) No painel (master): Rastreadores → Novo rastreador → IMEI da etiqueta, modelo "J16 4G", empresa.
+      Na empresa: Veículos → Novo veículo → escolha o rastreador.
+   b) Mande por SMS para o número do chip do J16, um por vez, esperando "SET OK" (troque o IMEI e o domínio):
+      SZCS#IMEI=866557088453933#TERIID=866557088453933#
+      APN,indica.br,indica,indica#        (chip Vivo da Indica; Algar: APN,indica.algar.br,algar,1212#)
+      SERVER,1,SEU-DOMINIO,5023,0#        (com IP fixo: SERVER,0,IP-DO-SERVIDOR,5023,0#)
+      TIMER,30,3600#                      (30 s ligado, 1 h desligado)
+      GMT,W,0,0#                          (hora em UTC; o sistema converte para Brasília)
+      SZCS#GPS_DISSLP=1
+      SZCS#SLPDISCONNECT=0                (continua conectado parado: recebe o bloqueio a qualquer hora)
+      STATUS#                             (confere: GPRS Link Up e GPS posicionando)
+      Depois do SERVER o J16 deixa de enviar para a plataforma da Indica e passa a enviar para este sistema.
+   c) Instalação: positivo/negativo na bateria (12/24 V), ignição no pós-chave (obrigatório), relé de bloqueio
+      no fio da bomba de combustível. Tampa fechada, LED para cima, longe de metal. Chip M2M com dados.
+   d) Teste sem o aparelho: dentro da pasta rastreador,
+         npm run simular -- 866557088453933 SEU-DOMINIO 5023
+      O simulador se conecta como o J16, anda pelo mapa e responde ao bloqueio e ao STATUS#.
    Equipamento que se conecta sem estar cadastrado aparece em Rastreadores → "Equipamentos não cadastrados".
 
 
