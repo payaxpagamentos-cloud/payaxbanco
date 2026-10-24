@@ -1,0 +1,117 @@
+RASTREADOR DE VEÍCULOS — INSTALAÇÃO
+===================================
+
+Endereço depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
+  Painel (master e empresas) ...... https://SEU-DOMINIO/rastreador/
+  Link de localização compartilhada  https://SEU-DOMINIO/rastreador/compartilhar/#código
+
+O sistema é um programa Node.js, que fica nesta pasta "rastreador".
+As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
+Pode ficar no mesmo servidor do Ativa BPO, do APP Táxi e do PABX (portas diferentes: BPO 3100, táxi 3200,
+PABX 3300, rastreador 3400).
+
+O programa abre DUAS portas:
+  3400 (HTTP) ... painel, API e a recepção do app Traccar Client. Fica atrás do Nginx/Apache (item 6).
+  5023 (TCP) .... os rastreadores GT06 se conectam DIRETO nela, pelo IP ou domínio do servidor.
+                  Libere a porta 5023 no firewall do servidor (e no painel da hospedagem, se houver).
+                  Não passa pelo Nginx/Apache.
+
+
+1) REQUISITO
+   Node.js 22.13 ou mais novo no servidor.  Confira com:   node -v
+
+
+2) ENVIAR OS ARQUIVOS
+   Envie a pasta "rastreador" inteira para o servidor, FORA da pasta pública do site
+   (ex.: /home/SEU-USUARIO/rastreador). O arquivo ".env" começa com ponto: confira se foi enviado.
+
+
+3) CONFERIR O .env
+   Já vem pronto: endereço /rastreador, porta GT06 5023, segredo novo e a senha do master (RASTREADOR_ADMIN_SENHA).
+   Não troque o RASTREADOR_SECRET depois de instalado.
+
+
+4) DADOS DE TESTE (opcional)
+   Com o sistema parado, rode uma vez dentro da pasta rastreador:
+      npm run seed
+   Cria 3 empresas de exemplo com veículos, motoristas, cercas, manutenção e 3 dias de trajetos em São Paulo.
+   Contas de teste, todas com a senha  demo12345 :
+      Administrador da empresa ... cliente@transportes.demo, cliente@entregas.demo, cliente@pessoal.demo
+      Operador (monitoramento) ... operador@transportes.demo
+   Os veículos de teste aparecem andando por alguns minutos e depois ficam "sem sinal" (nenhum rastreador real está enviando).
+
+
+5) INICIAR
+   a) Servidor próprio (VPS) com PM2
+         cd /home/SEU-USUARIO/rastreador
+         npm install -g pm2
+         pm2 start "npm start" --name rastreador
+         pm2 save && pm2 startup
+      Depois configure o Nginx ou o Apache (item 6) e libere a porta 5023 (ex.: ufw allow 5023/tcp).
+
+   b) Docker
+         docker build -t rastreador .
+         docker run -d --name rastreador --env-file .env -p 3400:3400 -p 5023:5023 -v rastreador-dados:/app/data rastreador
+      Depois configure o Nginx ou o Apache (item 6).
+
+   c) cPanel ("Setup Node.js App")
+      - Node.js version ........... 22 ou mais novo
+      - Application mode .......... Production
+      - Application root .......... rastreador
+      - Application URL ........... rastreador
+      - Application startup file .. server/index.js
+      Em "Environment variables", cadastre as variáveis do arquivo .env (menos PORT). Clique em Start.
+      ATENÇÃO: hospedagem compartilhada com cPanel normalmente NÃO libera portas TCP próprias. Nesse caso use
+      RASTREADOR_GT06_PORTA=0 e só o app Traccar Client (celular) ou a API; para rastreadores GT06, use uma VPS.
+
+
+6) NGINX OU APACHE (só para as opções a e b)
+   Nginx — dentro do "server { ... }" do domínio (com HTTPS):
+      location /rastreador/ {
+          proxy_pass http://127.0.0.1:3400;
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+      }
+      location = /rastreador { return 301 /rastreador/; }
+
+   Apache (módulos proxy e proxy_http ativos):
+      ProxyPreserveHost On
+      ProxyPass        /rastreador http://127.0.0.1:3400/rastreador
+      ProxyPassReverse /rastreador http://127.0.0.1:3400/rastreador
+
+
+7) PRIMEIRO ACESSO
+   Abra https://SEU-DOMINIO/rastreador/ e entre com:
+      E-mail: master@rastreador.com.br
+      Senha:  a que está em RASTREADOR_ADMIN_SENHA no arquivo .env
+   Depois:
+     1. Configurações: nome da plataforma, tempos e os textos dos comandos de bloqueio do seu modelo de rastreador.
+     2. Empresas: crie as empresas (limite de veículos e mensalidade), com o primeiro administrador de cada uma.
+     3. Rastreadores: cadastre o IMEI de cada equipamento e entregue à empresa.
+     4. A empresa cadastra os veículos e escolhe o rastreador de cada um.
+
+
+8) CONFIGURAR O RASTREADOR GT06
+   Por SMS para o número do chip do rastreador (a senha padrão costuma ser 123456 ou 666666; confira no manual):
+      SERVER,1,SEU-DOMINIO,5023,0#        (ou: adminip123456 IP-DO-SERVIDOR 5023)
+      APN,zap.vivo.com.br#                (APN da operadora do chip)
+      TIMER,30#                           (posição a cada 30 segundos)
+   Equipamento que se conecta sem estar cadastrado aparece em Rastreadores → "Equipamentos não cadastrados".
+
+
+9) CELULAR COMO RASTREADOR (app Traccar Client, Android e iPhone)
+   Em Veículos → "Cadastrar celular como rastreador" o sistema gera o identificador. No app:
+      Identificador do dispositivo ... o gerado (ex.: app-1234567890)
+      Endereço do servidor ........... https://SEU-DOMINIO/rastreador/api/osmand
+      Frequência ..................... 30
+
+
+10) CÓPIAS DE SEGURANÇA
+   Tudo fica na pasta rastreador/data (banco rastreador.db). Copie essa pasta com frequência.
+   As posições com mais de 180 dias são apagadas sozinhas (ajustável em Configurações).
+
+
+11) ATUALIZAR PARA UMA VERSÃO NOVA
+   Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
+   NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart rastreador).
