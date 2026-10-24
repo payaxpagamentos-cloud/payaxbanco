@@ -19,7 +19,7 @@ const origensVetor = [...new Set([config.mapa.estilo, config.mapa.estilo_escuro]
 /** Origens das imagens de satélite e dos nomes por cima delas. */
 const origensSatelite = [...new Set([config.mapa.satelite.tiles, ...config.mapa.satelite.rotulos].map((u) => { try { return new URL(u.replace(/\{[^}]+\}/g, '0')).origin; } catch { return ''; } }))].join(' ');
 const CSP = [`default-src 'self'`, `img-src 'self' data: blob: ${origemTiles} ${origensVetor} ${origensSatelite}`, `style-src 'self' 'unsafe-inline'`, `font-src 'self'`, `script-src 'self'`,
-  `connect-src 'self' ${origensVetor}`, `worker-src 'self' blob:`, `frame-ancestors 'none'`].join('; ');
+  `connect-src 'self' ${origensVetor} ${origensSatelite}`, `worker-src 'self' blob:`, `frame-ancestors 'none'`].join('; ');
 
 function criarApp(db, extras = {}) {
   const app = express();

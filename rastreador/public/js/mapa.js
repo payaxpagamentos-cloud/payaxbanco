@@ -3,7 +3,7 @@
  * OpenFreeMap por padrão), com um estilo para cada tema; sem WebGL no navegador, volta para a camada de imagens.
  * As telas usam só esta interface: veículos girados pelo curso, trajetos, cercas e pontos.
  */
-import { api, BASE } from './api.js';
+import { api, BASE, sessao, qs } from './api.js';
 import { el, placa as fmtPlaca } from './ui.js';
 
 let publico = null;
@@ -36,63 +36,81 @@ function carregarVetorial() {
 }
 const temaEscuro = () => document.documentElement.dataset.tema === 'escuro';
 
-/** Camada do mapa de ruas: vetorial (troca de estilo junto com o tema) ou, se não der, a camada de imagens. */
-async function camadaRuas(L, div, cfg) {
-  if (cfg.mapa.estilo) {
-    try {
-      await carregarVetorial();
-      const estilo = () => (temaEscuro() ? cfg.mapa.estilo_escuro : cfg.mapa.estilo);
-      // Os créditos do rodapé são controlados aqui (trocam com a camada); o MapLibre não põe os dele.
-      const camada = L.maplibreGL({ style: estilo(), attributionControl: false });
-      let atual = estilo();
-      new MutationObserver(() => {
-        if (estilo() !== atual && camada.getMaplibreMap()) { atual = estilo(); camada.getMaplibreMap().setStyle(atual); }
-      }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
-      return camada;
-    } catch { /* sem WebGL ou sem acesso ao estilo: usa as imagens */ }
-  }
-  div.classList.add('mapa-raster');
-  return L.tileLayer(cfg.mapa.tiles, { maxZoom: 20, maxNativeZoom: 19, subdomains: 'abcd' });
-}
-
-/** Satélite: a imagem e, por cima, os nomes de ruas e lugares (como o modo híbrido dos aplicativos de mapa). */
-function camadaSatelite(L, cfg) {
-  const s = cfg.mapa.satelite;
-  return L.layerGroup([
-    L.tileLayer(s.tiles, { maxZoom: 20, maxNativeZoom: 19 }),
-    ...s.rotulos.map((u) => L.tileLayer(u, { maxZoom: 20, maxNativeZoom: 19 })),
-  ]);
-}
+/** Estilos vetoriais (JSON) carregados uma vez por página. */
+const estilos = new Map();
+const lerEstilo = (url) => {
+  if (!estilos.has(url)) estilos.set(url, fetch(url).then((r) => { if (!r.ok) throw new Error(`Estilo ${r.status}`); return r.json(); }));
+  return estilos.get(url);
+};
 
 const CHAVE_CAMADA = 'rastreador.camada';
-const lerCamada = () => { try { return localStorage.getItem(CHAVE_CAMADA) === 'satelite' ? 'satelite' : 'mapa'; } catch { return 'mapa'; } };
+// Satélite é o padrão (como o modo satélite dos aplicativos de mapa); a escolha fica lembrada no navegador.
+const lerCamada = () => { try { return localStorage.getItem(CHAVE_CAMADA) === 'mapa' ? 'mapa' : 'satelite'; } catch { return 'satelite'; } };
 
-/** Fundo do mapa e o botão Mapa / Satélite (a escolha fica lembrada neste navegador). */
+/**
+ * Fundo vetorial: um só mapa (MapLibre) que troca de estilo entre Mapa (claro moderno ou escuro, pelo tema) e Satélite híbrido.
+ * Devolve null se o navegador não tiver WebGL ou o estilo não carregar.
+ */
+async function fundoVetorial(L, cfg) {
+  if (!cfg.mapa.estilo) return null;
+  try {
+    await carregarVetorial();
+    const [claro, escuro] = await Promise.all([lerEstilo(cfg.mapa.estilo), lerEstilo(cfg.mapa.estilo_escuro)]);
+    const { modernizar, hibrido } = await import('./estilo-mapa.js');
+    const mapaClaro = cfg.mapa.estilo_padrao ? modernizar(claro) : claro;
+    const satelite = cfg.mapa.satelite?.tiles ? hibrido(claro, cfg.mapa.satelite) : null;
+    const estilo = (modo) => (modo === 'satelite' && satelite ? satelite : temaEscuro() ? escuro : mapaClaro);
+    return { estilo, temSatelite: Boolean(satelite), criar: (modo) => L.maplibreGL({ style: estilo(modo), attributionControl: false }) };
+  } catch {
+    return null;
+  }
+}
+
+/** Reserva sem WebGL: camadas de imagens (ruas do CARTO; satélite com os nomes por cima). */
+function fundoImagens(L, cfg) {
+  const s = cfg.mapa.satelite;
+  return {
+    mapa: L.tileLayer(cfg.mapa.tiles, { maxZoom: 20, maxNativeZoom: 19, subdomains: 'abcd' }),
+    satelite: s?.tiles ? L.layerGroup([L.tileLayer(s.tiles, { maxZoom: 20, maxNativeZoom: 19 }), ...s.rotulos.map((u) => L.tileLayer(u, { maxZoom: 20, maxNativeZoom: 19 }))]) : null,
+  };
+}
+
+/** Fundo do mapa e o botão Mapa / Satélite. */
 async function fundo(L, m, div, cfg) {
-  const camadas = { mapa: await camadaRuas(L, div, cfg), satelite: cfg.mapa.satelite?.tiles ? camadaSatelite(L, cfg) : null };
-  // Créditos de cada fundo no rodapé (trocados junto com a camada).
-  const creditos = { mapa: div.classList.contains('mapa-raster') ? cfg.mapa.atribuicao : cfg.mapa.atribuicao_vetorial, satelite: cfg.mapa.satelite?.atribuicao };
-  let atual = camadas.satelite ? lerCamada() : 'mapa';
-  camadas[atual].addTo(m);
+  const vetor = await fundoVetorial(L, cfg);
+  const temSatelite = vetor ? vetor.temSatelite : Boolean(cfg.mapa.satelite?.tiles);
+  let atual = temSatelite ? lerCamada() : 'mapa';
+  const creditos = { mapa: vetor ? cfg.mapa.atribuicao_vetorial : cfg.mapa.atribuicao, satelite: [cfg.mapa.satelite?.atribuicao, vetor ? cfg.mapa.atribuicao_vetorial : null].filter(Boolean).join(' · ') };
+  let trocar;
+  if (vetor) {
+    const camada = vetor.criar(atual).addTo(m);
+    const aplicar = () => camada.getMaplibreMap()?.setStyle(vetor.estilo(atual));
+    trocar = (novo) => { atual = novo; aplicar(); };
+    // No modo Mapa, o estilo acompanha o tema (claro ou escuro).
+    new MutationObserver(() => { if (atual === 'mapa') aplicar(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
+  } else {
+    div.classList.add('mapa-raster');
+    const camadas = fundoImagens(L, cfg);
+    camadas[atual].addTo(m);
+    trocar = (novo) => { m.removeLayer(camadas[atual]); atual = novo; camadas[atual].addTo(m); };
+  }
   m.attributionControl.addAttribution(creditos[atual]);
   div.classList.toggle('mapa-satelite', atual === 'satelite');
-  if (!camadas.satelite) return;
+  if (!temSatelite) return;
   const Seletor = L.Control.extend({
     options: { position: 'topright' },
     onAdd() {
       const caixa = L.DomUtil.create('div', 'seletor-camada');
       L.DomEvent.disableClickPropagation(caixa);
-      const botoes = ['mapa', 'satelite'].map((k) => {
+      const botoes = ['satelite', 'mapa'].map((k) => {
         const b = L.DomUtil.create('button', k === atual ? 'on' : '', caixa);
         b.type = 'button';
         b.textContent = k === 'mapa' ? 'Mapa' : 'Satélite';
-        b.title = k === 'mapa' ? 'Mapa de ruas' : 'Imagem de satélite com os nomes das ruas';
+        b.title = k === 'mapa' ? 'Mapa de ruas' : 'Imagem de satélite com os nomes de bairros, ruas e lugares';
         b.addEventListener('click', () => {
           if (k === atual) return;
-          m.removeLayer(camadas[atual]);
           m.attributionControl.removeAttribution(creditos[atual]);
-          atual = k;
-          camadas[atual].addTo(m);
+          trocar(k);
           m.attributionControl.addAttribution(creditos[atual]);
           div.classList.toggle('mapa-satelite', atual === 'satelite');
           for (const x of botoes) x.classList.toggle('on', x === b);
@@ -106,7 +124,78 @@ async function fundo(L, m, div, cfg) {
   new Seletor().addTo(m);
 }
 
-export async function criarMapa(div, { zoom = 12 } = {}) {
+/** Endereço de um ponto (painel do veículo), guardado por ~10 m para não perguntar de novo a cada atualização. */
+const enderecos = new Map();
+export function enderecoDe(lat, lng) {
+  const chave = `${Number(lat).toFixed(4)},${Number(lng).toFixed(4)}`;
+  if (!enderecos.has(chave)) enderecos.set(chave, api.get(`/geo/endereco${qs({ lat, lng })}`).catch(() => { enderecos.delete(chave); return null; }));
+  return enderecos.get(chave);
+}
+
+/**
+ * Campo de busca de endereços no mapa (rua e número, bairro, cidade ou nome de um lugar): leva o mapa até o resultado
+ * e marca o ponto. Só para quem está logado.
+ */
+function campoBusca(L, m) {
+  let marca = null;
+  let timer = null;
+  let ultima = '';
+  const Busca = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd() {
+      const caixa = L.DomUtil.create('div', 'busca-mapa');
+      L.DomEvent.disableClickPropagation(caixa);
+      L.DomEvent.disableScrollPropagation(caixa);
+      const campo = L.DomUtil.create('input', '', caixa);
+      Object.assign(campo, { type: 'search', placeholder: 'Buscar endereço ou lugar', autocomplete: 'off' });
+      campo.setAttribute('aria-label', 'Buscar endereço ou lugar no mapa');
+      const lista = L.DomUtil.create('div', 'resultados oculto', caixa);
+      const fechar = () => lista.classList.add('oculto');
+      const ir = (r) => {
+        fechar();
+        campo.value = r.nome;
+        marca?.remove();
+        marca = L.marker([r.lat, r.lng], { icon: L.divIcon({ className: '', html: '<div class="pino-busca"></div>', iconSize: [26, 34], iconAnchor: [13, 32] }) })
+          .addTo(m).bindPopup(() => el('div', {}, el('strong', {}, r.nome), r.endereco ? el('div', {}, r.endereco) : null, r.cep ? el('div', { class: 'pequeno' }, `CEP ${r.cep}`) : null,
+            el('a', { href: linkGoogle(r.lat, r.lng), target: '_blank', rel: 'noopener', class: 'pequeno' }, 'Abrir no Google Maps'))).openPopup();
+        m.setView([r.lat, r.lng], 18);
+      };
+      const mostrar = (rs) => {
+        lista.replaceChildren(...(rs.length ? rs.map((r) => {
+          const b = el('button', { type: 'button' }, el('strong', {}, r.nome), r.endereco ? el('span', {}, r.endereco) : null);
+          b.addEventListener('click', () => ir(r));
+          return b;
+        }) : [el('div', { class: 'vazio' }, 'Nenhum endereço encontrado.')]));
+        lista.classList.remove('oculto');
+      };
+      const procurar = async () => {
+        const q = campo.value.trim();
+        if (q.length < 3) return fechar();
+        if (q === ultima) return lista.classList.remove('oculto');
+        ultima = q;
+        const c = m.getCenter();
+        try {
+          const rs = await api.get(`/geo/buscar${qs({ q, lat: c.lat.toFixed(4), lng: c.lng.toFixed(4) })}`);
+          if (campo.value.trim() === q) mostrar(rs);
+        } catch (err) {
+          lista.replaceChildren(el('div', { class: 'vazio' }, err.message));
+          lista.classList.remove('oculto');
+        }
+      };
+      campo.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(procurar, 450); });
+      campo.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); ultima = ''; procurar().then(() => lista.querySelector('button')?.click()); }
+        if (e.key === 'Escape') { fechar(); campo.value = ''; ultima = ''; marca?.remove(); marca = null; }
+      });
+      campo.addEventListener('focus', () => { if (lista.children.length && campo.value.trim().length >= 3) lista.classList.remove('oculto'); });
+      m.on('click', fechar);
+      return caixa;
+    },
+  });
+  new Busca().addTo(m);
+}
+
+export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
   const cfg = await configPublica();
   if (!window.L) {
     div.append(el('div', { class: 'mapa-indisponivel' }, 'Mapa indisponível.'));
@@ -118,6 +207,7 @@ export async function criarMapa(div, { zoom = 12 } = {}) {
   // Rodapé só com os créditos do mapa (sem o prefixo padrão do Leaflet, que traz uma bandeira).
   m.attributionControl.setPrefix(false);
   await fundo(L, m, div, cfg);
+  if (busca && cfg.busca && sessao.get()?.token) campoBusca(L, m);
   L.control.zoom({ position: 'topright' }).addTo(m);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(m);
   new ResizeObserver(() => m.invalidateSize()).observe(div);

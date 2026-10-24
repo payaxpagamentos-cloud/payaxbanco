@@ -2,7 +2,7 @@
 import { api, BASE } from './api.js';
 import { el, limpar, dataHora, desde, km, kmh, placa, telefone, toast, acao, campo, escolha, modal, formModal, confirmar, icone, repetir, etiquetaSituacao,
   SITUACOES, TIPOS_VEICULO } from './ui.js';
-import { criarMapa, linkGoogle } from './mapa.js';
+import { criarMapa, linkGoogle, enderecoDe } from './mapa.js';
 
 export const cartao = (titulo, ...conteudo) => el('section', { class: 'cartao' }, titulo ? el('h2', {}, titulo) : null, conteudo);
 // tom: '' (neutro), 'ok', 'aviso' ou 'erro' (só o número muda de cor).
@@ -129,7 +129,11 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
 
 /** Dados de leitura do veículo (posição, velocidade, ignição, comunicação, hodômetro). */
 export function resumoVeiculo(v) {
+  // Endereço de onde o veículo está (preenchido quando a busca responde).
+  const endereco = el('span', { class: 'endereco-veiculo' }, v.lat !== null ? 'buscando endereço…' : '—');
+  if (v.lat !== null) enderecoDe(v.lat, v.lng).then((e) => { endereco.textContent = e?.completo || 'endereço não encontrado'; });
   return el('div', { class: 'coluna', style: 'gap:0;margin-top:10px' },
+    v.lat !== null ? el('div', { class: 'local-veiculo' }, endereco) : null,
     linhaDado('Velocidade', v.posicao_em ? kmh(v.velocidade_kmh) : null),
     linhaDado('Ignição', v.ignicao === 1 ? 'ligada' : v.ignicao === 0 ? 'desligada' : 'não informada'),
     linhaDado('Última posição', v.posicao_em ? `${dataHora(v.posicao_em)} (${desde(v.posicao_em)})` : null),

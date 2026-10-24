@@ -42,6 +42,8 @@ module.exports = {
     estilo: process.env.RASTREADOR_MAPA_ESTILO === 'raster' ? null : (process.env.RASTREADOR_MAPA_ESTILO || 'https://tiles.openfreemap.org/styles/liberty'),
     estilo_escuro: process.env.RASTREADOR_MAPA_ESTILO === 'raster' ? null
       : (process.env.RASTREADOR_MAPA_ESTILO_ESCURO || process.env.RASTREADOR_MAPA_ESTILO || 'https://tiles.openfreemap.org/styles/dark'),
+    // Estilo padrão: recebe o visual moderno do sistema (paleta clara e prédios planos). Um estilo próprio no .env é usado como vier.
+    estilo_padrao: !process.env.RASTREADOR_MAPA_ESTILO,
     atribuicao_vetorial: process.env.RASTREADOR_MAPA_ATRIBUICAO_VETORIAL
       || '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> &copy; colaboradores do OpenStreetMap',
     // Camada de imagens (reserva quando o navegador não tem WebGL): CARTO Voyager. Os servidores do OpenStreetMap não são usados,
@@ -60,6 +62,11 @@ module.exports = {
       atribuicao: process.env.RASTREADOR_SATELITE_ATRIBUICAO || 'Imagens &copy; Esri, Maxar, Earthstar Geographics',
     },
     centro: [Number.isFinite(latCentro) ? latCentro : -23.5505, Number.isFinite(lngCentro) ? lngCentro : -46.6333],
+  },
+  // Busca de endereços e endereço do veículo (Photon/OpenStreetMap). RASTREADOR_GEOCODER_URL vazio desliga.
+  geocoder: {
+    url: String(process.env.RASTREADOR_GEOCODER_URL ?? 'https://photon.komoot.io').replace(/\/+$/, ''),
+    timeoutMs: Number(process.env.RASTREADOR_GEOCODER_TIMEOUT_MS) || 6000,
   },
   admin: {
     nome: process.env.RASTREADOR_ADMIN_NOME || 'Master',

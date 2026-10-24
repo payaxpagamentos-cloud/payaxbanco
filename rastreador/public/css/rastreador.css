@@ -337,3 +337,21 @@ pre.codigo{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; backgr
   .player{ right: 12px; }
 }
 @media print{ .lateral, .ferramentas, .filtros, .btn{ display: none !important; } .casca{ display: block; } .tela-mapa{ display: block; } .cartao{ border: 0; } }
+
+/* Busca de endereços no mapa e endereço do veículo */
+.busca-mapa{ position: relative; width: min(320px, calc(100vw - 120px)); }
+.busca-mapa input{ background: var(--surface); border: 0; box-shadow: var(--shadow-flutuante); border-radius: 10px; padding: 9px 14px 9px 36px; min-height: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 11px center; background-size: 16px; }
+.busca-mapa input:focus{ box-shadow: var(--shadow-flutuante), 0 0 0 3px var(--azul-suave); }
+.busca-mapa .resultados{ position: absolute; top: 46px; left: 0; right: 0; background: var(--surface); border-radius: 10px; box-shadow: var(--shadow-flutuante); padding: 4px;
+  max-height: 320px; overflow-y: auto; }
+.busca-mapa .resultados button{ display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; color: var(--text);
+  font: inherit; font-size: 13px; }
+.busca-mapa .resultados button:hover{ background: var(--surface-2); }
+.busca-mapa .resultados button span{ display: block; font-size: 12px; color: var(--text-3); margin-top: 1px; }
+.busca-mapa .resultados .vazio{ padding: 10px; font-size: 13px; color: var(--text-3); }
+.pino-busca{ width: 26px; height: 34px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 34'%3E%3Cpath d='M13 1C6.4 1 1 6.3 1 12.8 1 21.7 13 33 13 33s12-11.3 12-20.2C25 6.3 19.6 1 13 1z' fill='%23DC2626' stroke='%23fff' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='4.5' fill='%23fff'/%3E%3C/svg%3E") no-repeat center / contain;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+.painel-veiculo{ top: 64px; max-height: calc(100% - 76px); }
+.local-veiculo{ background: var(--surface-2); border-radius: 8px; padding: 9px 11px; font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }

@@ -16,7 +16,7 @@ function criarApi(db, extras = {}) {
     db.prepare('SELECT 1').get();
     res.json({ ok: true });
   });
-  api.get('/publico', (_req, res) => res.json({ nome: lerConfig(db).nome_plataforma, mapa: config.mapa, gt06_porta: config.portaGt06 }));
+  api.get('/publico', (_req, res) => res.json({ nome: lerConfig(db).nome_plataforma, mapa: config.mapa, gt06_porta: config.portaGt06, busca: Boolean(config.geocoder.url) }));
 
   /** Localização compartilhada por link (sem login), enquanto o link vale e a empresa está ativa. */
   api.get('/publico/compartilhado/:codigo', (req, res) => {
@@ -30,6 +30,7 @@ function criarApi(db, extras = {}) {
 
   api.use('/auth', require('./routes/auth')(db, autenticado));
   api.use('/osmand', require('./routes/osmand')(db));
+  api.use('/geo', autenticado, require('./routes/geo')());
   api.use('/integracao', require('./routes/integracao')(db));
   api.use('/master', autenticado, require('./routes/master')(db, extras));
   api.use('/empresas/:eid', autenticado, acessoEmpresa(db), require('./routes/empresa')(db, extras));
