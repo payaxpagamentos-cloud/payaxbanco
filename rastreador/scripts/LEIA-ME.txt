@@ -40,6 +40,14 @@ O programa abre DUAS portas:
 
 
 5) INICIAR
+   O jeito mais simples (VPS com Node.js 22.13+), dentro da pasta rastreador:
+         sudo bash instalar.sh
+   O script NÃO mexe nos outros sistemas do servidor (Discador, /manager, Asterisk...): confere se as portas
+   3400 e 5023 estão livres (se não estiverem, para sem alterar nada), inicia só o processo "rastreador" no PM2
+   e cria um arquivo NOVO só com o endereço /rastreador para o Nginx ou o Apache. Ele não recarrega o servidor
+   web sozinho: mostra a linha a acrescentar e o comando de recarregar, para você conferir antes.
+
+   Ou, manualmente:
    a) Servidor próprio (VPS) com PM2
          cd /home/SEU-USUARIO/rastreador
          npm install -g pm2

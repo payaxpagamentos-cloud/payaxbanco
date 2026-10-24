@@ -44,6 +44,10 @@ RASTREADOR_TRUST_PROXY=1
 `;
 fs.writeFileSync(path.join(pasta, '.env'), env, { mode: 0o600 });
 fs.copyFileSync(path.join(raiz, 'scripts', 'LEIA-ME.txt'), path.join(pasta, 'LEIA-ME.txt'));
+fs.copyFileSync(path.join(raiz, 'scripts', 'instalar.sh'), path.join(pasta, 'instalar.sh'));
+fs.chmodSync(path.join(pasta, 'instalar.sh'), 0o755);
+fs.mkdirSync(path.join(pasta, 'scripts'), { recursive: true });
+fs.copyFileSync(path.join(raiz, 'scripts', 'simular-j16.js'), path.join(pasta, 'scripts', 'simular-j16.js'));
 fs.mkdirSync(path.join(pasta, 'data'), { recursive: true });
 
 const zip = path.join(saida, 'rastreador.zip');
