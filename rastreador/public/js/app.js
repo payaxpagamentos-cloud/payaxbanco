@@ -116,7 +116,7 @@ async function desenhar() {
 }
 
 function ferramentas(u) {
-  const tema = document.documentElement.dataset.tema || 'escuro';
+  const tema = document.documentElement.dataset.tema || 'claro';
   const trocar = (t) => {
     document.documentElement.dataset.tema = t;
     try { localStorage.setItem('rastreador.tema', t); } catch { /* ignora */ }

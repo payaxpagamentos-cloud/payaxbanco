@@ -23,7 +23,7 @@ async function telaDashboard(ctx) {
       el('div', { class: 'grade' },
         indicador('Veículos', inteiro(v.total), `limite do plano: ${inteiro(d.empresa.limite_veiculos)}`),
         indicador('Em movimento', inteiro(v.movimento), `${inteiro(v.ligado)} parado(s) ligado(s)`, 'ok'),
-        indicador('Sem sinal', inteiro(v.sem_sinal), v.sem_sinal ? 'sem comunicar nos últimos minutos' : v.sem_posicao ? `${inteiro(v.sem_posicao)} aguardando a 1ª posição`
+        indicador('Sem sinal', inteiro(v.sem_sinal), v.sem_sinal ? 'sem comunicação' : v.sem_posicao ? `${inteiro(v.sem_posicao)} aguardando a 1ª posição`
           : 'todos comunicando', v.sem_sinal ? 'erro' : ''),
         indicador('Rodados hoje', km(d.hoje.distancia_m), `${duracaoH(d.hoje.ligado_s)} com motor ligado`),
         indicador('Alertas pendentes', inteiro(d.alertas_pendentes), `${inteiro(semana)} nos últimos 7 dias`, d.alertas_pendentes ? 'aviso' : '')),
@@ -152,7 +152,7 @@ async function telaHistorico(ctx) {
     }
     const pts = p.pontos.map((x) => [x.lat, x.lng]);
     if (mapa && pts.length) {
-      camadas.push(mapa.linha(pts, { cor: '#1E88E5', peso: 5 }));
+      camadas.push(mapa.linha(pts, { cor: '#2563EB', peso: 5 }));
       camadas.push(mapa.ponto(...pts[0], { classe: 'inicio', texto: 'A', titulo: `Início ${dataHora(p.pontos[0].gps_em)}` }));
       camadas.push(mapa.ponto(...pts.at(-1), { classe: 'fim', texto: 'B', titulo: `Fim ${dataHora(p.pontos.at(-1).gps_em)}` }));
       p.paradas.forEach((s, i) => camadas.push(mapa.ponto(s.lat, s.lng, { classe: 'parada', texto: String(i + 1), titulo: `Parada ${i + 1}: ${duracaoH(s.duracao_s)} (${hora(s.inicio)}–${hora(s.fim)})` })));
@@ -167,7 +167,7 @@ async function telaHistorico(ctx) {
       const ini = Date.parse(vg.inicio);
       const fim = Date.parse(vg.fim);
       const sub = p.pontos.filter((x) => Date.parse(x.gps_em) >= ini && Date.parse(x.gps_em) <= fim).map((x) => [x.lat, x.lng]);
-      camadas.push(mapa.linha(sub, { cor: '#F2C318', peso: 7 }));
+      camadas.push(mapa.linha(sub, { cor: '#F59E0B', peso: 7 }));
       mapa.enquadrar(sub);
     };
     limpar(resultado,
@@ -418,7 +418,7 @@ async function telaCercas(ctx) {
   function editar(c) {
     edicao = c
       ? { ...c, pontos: c.pontos ? [...c.pontos] : [], desenho: [] }
-      : { tipo: 'circulo', nome: '', lat: null, lng: null, raio_m: 300, pontos: [], cor: '#1E88E5', alertar_entrada: 1, alertar_saida: 1, ativa: 1, veiculos: [], desenho: [] };
+      : { tipo: 'circulo', nome: '', lat: null, lng: null, raio_m: 300, pontos: [], cor: '#2563EB', alertar_entrada: 1, alertar_saida: 1, ativa: 1, veiculos: [], desenho: [] };
     desenharCercas();
     redesenharEdicao();
     if (c && mapa) mapa.enquadrar(c.tipo === 'circulo' ? [[c.lat, c.lng]] : c.pontos, 16);

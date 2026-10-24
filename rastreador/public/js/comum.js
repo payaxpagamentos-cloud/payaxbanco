@@ -5,7 +5,8 @@ import { el, limpar, dataHora, desde, km, kmh, placa, telefone, toast, acao, cam
 import { criarMapa, linkGoogle } from './mapa.js';
 
 export const cartao = (titulo, ...conteudo) => el('section', { class: 'cartao' }, titulo ? el('h2', {}, titulo) : null, conteudo);
-export const indicador = (rotulo, valor, nota, classe = '') => el('div', { class: `cartao indicador ${classe}` }, el('div', { class: 'rotulo' }, rotulo),
+// tom: '' (neutro), 'ok', 'aviso' ou 'erro' (só o número muda de cor).
+export const indicador = (rotulo, valor, nota, tom = '') => el('div', { class: `cartao indicador${tom ? ` tom-${tom}` : ''}` }, el('div', { class: 'rotulo' }, rotulo),
   el('div', { class: 'valor num' }, valor), nota ? el('div', { class: 'nota' }, nota) : null);
 export const td = (conteudo, classe = '') => el('td', { class: classe }, conteudo);
 export const tabela = (colunas, linhas, vazio = 'Nada por aqui.') => (linhas.length
@@ -71,9 +72,9 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
       el('div', { class: 'pequeno mudo' }, [v.descricao, mostrarEmpresa ? v.empresa : v.motorista].filter(Boolean).join(' · ') || TIPOS_VEICULO[v.tipo]),
       el('div', { class: 'pequeno fraco linha entre' }, el('span', {}, v.posicao_em ? `${kmh(v.velocidade_kmh)} · ${v.ignicao === 1 ? 'ligado' : v.ignicao === 0 ? 'desligado' : 'ignição ?'}` : 'sem posição'),
         el('span', {}, desde(v.comunicacao_em))),
-      v.alertas_pendentes || v.bloqueado ? el('div', { class: 'linha', style: 'gap:6px;margin-top:4px' },
-        v.bloqueado ? el('span', { class: 'etiqueta erro' }, 'bloqueado') : null,
-        v.alertas_pendentes ? el('span', { class: 'etiqueta aviso' }, `${v.alertas_pendentes} alerta(s)`) : null) : null))
+      v.alertas_pendentes || v.bloqueado ? el('div', { class: 'marcas' },
+        v.bloqueado ? el('span', { class: 'texto-erro' }, '● Bloqueado') : null,
+        v.alertas_pendentes ? el('span', { class: 'texto-aviso' }, `● ${v.alertas_pendentes} ${v.alertas_pendentes === 1 ? 'alerta' : 'alertas'}`) : null) : null))
       : el('p', { class: 'mudo pequeno', style: 'padding:8px' }, veiculos.length ? 'Nenhum veículo com esse filtro.' : 'Nenhum veículo cadastrado.'));
     for (const [id, mk] of marcadores) mk.selecionar(id === estado.selecionado);
   }

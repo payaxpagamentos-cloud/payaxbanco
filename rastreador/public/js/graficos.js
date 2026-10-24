@@ -9,13 +9,15 @@ const svg = (tag, attrs = {}, ...filhos) => {
   return e;
 };
 
-export const CORES = { amarelo: '#F2C318', azul: '#0F6EA8', verde: '#20A852', roxo: '#8E6CEF', cinza: '#7C8392' };
+export const CORES = { amarelo: '#D97706', azul: '#2563EB', verde: '#16A34A', roxo: '#7C3AED', cinza: '#9CA3AF' };
 
 /** Pizza: [{ rotulo, valor, cor }]. Mostra a legenda e o valor de cada fatia ao passar o mouse. */
 export function pizza(fatias, { formato = (v) => String(v), vazio = 'Sem dados' } = {}) {
   const total = fatias.reduce((s, f) => s + (f.valor || 0), 0);
   const legenda = el('div', { class: 'legenda' }, fatias.map((f) => el('span', {}, el('i', { style: `background:${f.cor}` }), `${f.rotulo}: ${formato(f.valor || 0)}`)));
   if (!total) return el('div', { class: 'pizza' }, el('div', { class: 'vazio-grafico' }, vazio), legenda);
+  // Rosca: o total no centro.
+  const comCentro = (svgEl) => el('div', { class: 'pizza' }, el('div', { class: 'rosca' }, svgEl, el('div', { class: 'centro' }, el('strong', {}, formato(total)), el('span', {}, 'total'))), legenda);
   const g = svg('svg', { viewBox: '-1 -1 2 2', role: 'img', 'aria-label': fatias.map((f) => `${f.rotulo} ${formato(f.valor || 0)}`).join(', ') });
   g.style.transform = 'rotate(-90deg)';
   let acumulado = 0;
@@ -31,7 +33,8 @@ export function pizza(fatias, { formato = (v) => String(v), vazio = 'Sem dados' 
     const [x2, y2] = [Math.cos(2 * Math.PI * acumulado), Math.sin(2 * Math.PI * acumulado)];
     g.append(svg('path', { d: `M ${x1} ${y1} A 1 1 0 ${fracao > 0.5 ? 1 : 0} 1 ${x2} ${y2} L 0 0 Z`, fill: f.cor }, titulo));
   }
-  return el('div', { class: 'pizza' }, g, legenda);
+  g.append(svg('circle', { cx: 0, cy: 0, r: 0.68, class: 'furo' }));
+  return comCentro(g);
 }
 
 /** Barras verticais: [{ rotulo, valor, titulo }], com o rótulo de cada uma embaixo. */

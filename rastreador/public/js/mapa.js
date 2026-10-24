@@ -8,7 +8,7 @@ import { el, placa as fmtPlaca } from './ui.js';
 let publico = null;
 export const configPublica = async () => (publico ??= await api.get('/publico'));
 
-export const COR_SITUACAO = { movimento: '#20A852', ligado: '#E0A800', parado: '#1E88E5', sem_sinal: '#E5484D', sem_posicao: '#7C8392', sem_rastreador: '#7C8392' };
+export const COR_SITUACAO = { movimento: '#16A34A', ligado: '#D97706', parado: '#2563EB', sem_sinal: '#DC2626', sem_posicao: '#9CA3AF', sem_rastreador: '#9CA3AF' };
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** Ícone do veículo: seta no sentido do curso (ou círculo, parado) na cor da situação, com a placa embaixo. */
@@ -58,7 +58,7 @@ export async function criarMapa(div, { zoom = 12 } = {}) {
       };
     },
     /** Trajeto: linha (com uma cor por trecho de velocidade, se `cores` vier) e a camada para remover. */
-    linha(pontos, { cor = '#1E88E5', peso = 5 } = {}) {
+    linha(pontos, { cor = '#2563EB', peso = 5 } = {}) {
       const pl = L.polyline(pontos, { color: cor, weight: peso, opacity: 0.9 }).addTo(m);
       return { remover: () => pl.remove(), definir: (p) => pl.setLatLngs(p) };
     },
@@ -71,7 +71,7 @@ export async function criarMapa(div, { zoom = 12 } = {}) {
     },
     /** Cerca: círculo (lat, lng, raio_m) ou polígono (pontos). */
     cerca(c, { aoClicar } = {}) {
-      const estilo = { color: c.cor || '#1E88E5', weight: 2, fillOpacity: 0.12 };
+      const estilo = { color: c.cor || '#2563EB', weight: 2, fillOpacity: 0.08 };
       const camada = c.tipo === 'circulo' ? L.circle([c.lat, c.lng], { radius: c.raio_m, ...estilo }) : L.polygon(c.pontos, estilo);
       camada.addTo(m).bindTooltip(c.nome ?? '', { sticky: true });
       if (aoClicar) camada.on('click', () => aoClicar(c));
