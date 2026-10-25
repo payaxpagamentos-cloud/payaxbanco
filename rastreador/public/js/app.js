@@ -2,6 +2,7 @@ import { api, sessao } from './api.js';
 import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, PERFIS } from './ui.js';
 import { TELAS_MASTER } from './master.js';
 import { TELAS_EMPRESA } from './empresa.js';
+import { iniciarCena } from './cena-entrada.js';
 
 const raiz = $('#app');
 let pararTela = null;
@@ -147,7 +148,7 @@ function telaEntrada() {
   const f = el('form', { class: 'form' },
     campo('E-mail', { name: 'email', type: 'email', autocomplete: 'username', required: true }),
     campo('Senha', { name: 'senha', type: 'password', autocomplete: 'current-password', required: true }),
-    el('button', { class: 'btn primario', style: 'min-height:44px' }, 'Entrar'));
+    el('button', { class: 'btn primario entrar' }, 'Entrar', icone('entrar')));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(f.querySelector('button'), async () => {
@@ -156,9 +157,21 @@ function telaEntrada() {
       desenhar();
     });
   });
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'cartao' },
-    marca(nomePlataforma), el('h1', { style: 'margin:18px 0 4px;font-size:22px' }, 'Entrar no painel'),
-    el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'Use o e-mail e a senha que você recebeu.'), f)));
+  // Cidade em 3D ao fundo, com os veículos sendo localizados; o login num cartão de vidro por cima.
+  const cena = el('canvas', { class: 'cena', 'aria-hidden': 'true' });
+  const recursos = ['Localização em tempo real', 'Bloqueio remoto', 'Cercas virtuais', 'Alertas no celular'];
+  limpar(raiz, el('div', { class: 'entrada-3d' }, cena, el('div', { class: 'brilho' }),
+    el('div', { class: 'entrada-conteudo' },
+      el('section', { class: 'chamada' },
+        marca(nomePlataforma),
+        el('h1', {}, 'Sua frota,', el('br'), el('span', {}, 'ao vivo.')),
+        el('p', {}, 'Acompanhe cada veículo no mapa, receba alertas na hora e bloqueie à distância, tudo em um só painel.'),
+        el('ul', {}, recursos.map((r) => el('li', {}, el('i'), r)))),
+      el('section', { class: 'cartao-vidro' },
+        el('h2', {}, 'Entrar no painel'),
+        el('p', { class: 'sub' }, 'Use o e-mail e a senha que você recebeu.'), f,
+        el('div', { class: 'rodape-entrada' }, el('span', { class: 'ponto-vivo' }), 'Servidor de rastreamento online')))));
+  pararTela = iniciarCena(cena);
   f.querySelector('input').focus();
 }
 
