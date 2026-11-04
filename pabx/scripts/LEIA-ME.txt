@@ -1,4 +1,4 @@
-PABX — INSTALAÇÃO
+ZOE PABX Inteligente — INSTALAÇÃO
 =================
 
 Endereço depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):

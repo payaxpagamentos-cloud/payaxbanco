@@ -228,10 +228,64 @@ CREATE TABLE IF NOT EXISTS auditoria (
   criado_em TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_auditoria ON auditoria(id DESC);
+
+-- ZOE: atendente virtual ligada ao IXC do provedor. Uma configuração por empresa; o token do IXC fica cifrado.
+CREATE TABLE IF NOT EXISTS zoe_config (
+  empresa_id INTEGER PRIMARY KEY REFERENCES empresas(id),
+  ativo INTEGER NOT NULL DEFAULT 0,
+  ixc_url TEXT,
+  ixc_token_cifrado TEXT,
+  desbloqueio_ativo INTEGER NOT NULL DEFAULT 1,
+  desbloqueio_limite INTEGER NOT NULL DEFAULT 1 CHECK (desbloqueio_limite BETWEEN 0 AND 10),
+  desbloqueio_periodo_dias INTEGER NOT NULL DEFAULT 30 CHECK (desbloqueio_periodo_dias BETWEEN 1 AND 365),
+  canal_email INTEGER NOT NULL DEFAULT 1,
+  canal_sms INTEGER NOT NULL DEFAULT 1,
+  canal_whatsapp INTEGER NOT NULL DEFAULT 0,
+  whatsapp_webhook TEXT,
+  fila_financeiro_id INTEGER REFERENCES filas(id) ON DELETE SET NULL,
+  fila_suporte_id INTEGER REFERENCES filas(id) ON DELETE SET NULL,
+  fila_comercial_id INTEGER REFERENCES filas(id) ON DELETE SET NULL,
+  atualizado_em TEXT NOT NULL
+);
+
+-- Uma linha por ligação atendida pela ZOE (uid da central telefônica). Guarda o id do cliente no IXC, não o CPF.
+CREATE TABLE IF NOT EXISTS zoe_atendimentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  uid TEXT NOT NULL,
+  telefone TEXT,
+  etapa TEXT NOT NULL DEFAULT 'identificar' CHECK (etapa IN ('identificar','documento','confirmar','menu','transferir','encerrado')),
+  metodo_confirmacao TEXT CHECK (metodo_confirmacao IN ('cpf3','nascimento')),
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  cliente_id TEXT,
+  cliente_nome TEXT,
+  motivo TEXT CHECK (motivo IN ('financeiro','suporte','comercial','outro')),
+  resultado TEXT NOT NULL DEFAULT 'em_curso' CHECK (resultado IN ('em_curso','resolvido','transferido','abandonado')),
+  fila_id INTEGER REFERENCES filas(id) ON DELETE SET NULL,
+  resumo TEXT,
+  inicio TEXT NOT NULL,
+  fim TEXT,
+  UNIQUE (empresa_id, uid)
+);
+CREATE INDEX IF NOT EXISTS idx_zoe_atendimentos ON zoe_atendimentos(empresa_id, inicio);
+
+-- Tudo o que a ZOE fez em cada ligação (consulta, boleto, desbloqueio, transferência, erro do IXC).
+CREATE TABLE IF NOT EXISTS zoe_acoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  atendimento_id INTEGER NOT NULL REFERENCES zoe_atendimentos(id),
+  cliente_id TEXT,
+  tipo TEXT NOT NULL CHECK (tipo IN ('identificacao','confirmacao','faturas','boleto','desbloqueio','transferencia','erro')),
+  sucesso INTEGER NOT NULL DEFAULT 1,
+  detalhes TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_zoe_acoes ON zoe_acoes(atendimento_id);
+CREATE INDEX IF NOT EXISTS idx_zoe_acoes_cliente ON zoe_acoes(empresa_id, cliente_id, tipo, criado_em);
 `;
 
 const CONFIG_PADRAO = {
-  nome_plataforma: 'PABX',
+  nome_plataforma: 'ZOE PABX Inteligente',
   // Tarifação: cobra no mínimo `cadencia_inicial_s` e depois em blocos de `cadencia_s` (padrão 30/6).
   cadencia_inicial_s: '30',
   cadencia_s: '6',
@@ -256,8 +310,15 @@ function abrir(arquivo = config.dbFile) {
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
 
+  // Migração: ramal usado pelo usuário no telefone do painel.
+  if (!db.prepare('PRAGMA table_info(usuarios)').all().some((c) => c.name === 'ramal_id')) {
+    db.exec('ALTER TABLE usuarios ADD COLUMN ramal_id INTEGER REFERENCES ramais(id) ON DELETE SET NULL');
+  }
+
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);
+  // Instalações antigas com o nome padrão de antes passam a usar o nome novo (um nome escolhido no painel não muda).
+  db.prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'nome_plataforma' AND valor = 'PABX'").run(CONFIG_PADRAO.nome_plataforma);
 
   if (!db.prepare("SELECT 1 FROM usuarios WHERE perfil = 'master' LIMIT 1").get()) {
     db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, 'master', ?)")

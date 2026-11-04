@@ -38,7 +38,7 @@ async function iniciar() {
   });
 
   return {
-    db, req, login, central,
+    db, base, req, login, central,
     get: (c, tk) => req('GET', c, undefined, tk),
     post: (c, b, tk) => req('POST', c, b ?? {}, tk),
     patch: (c, b, tk) => req('PATCH', c, b, tk),

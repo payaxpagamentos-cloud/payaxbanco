@@ -1,4 +1,4 @@
-# PABX — imagem de produção
+# ZOE PABX Inteligente — imagem de produção
 ARG BASE=node:22-slim
 FROM ${BASE}
 

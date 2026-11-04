@@ -6,7 +6,8 @@ const config = require('./config');
 const { criarApi, tratarErro } = require('./api');
 const { limitar } = require('./lib/limitador');
 
-const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'";
+// connect-src inclui o Asterisk (WSS) quando o telefone do painel está configurado; media-src permite o áudio da ligação.
+const CSP = `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; media-src 'self' blob: mediastream:; connect-src 'self'${config.webrtc.origem ? ` ${config.webrtc.origem}` : ''}; frame-ancestors 'none'`;
 
 function criarApp(db) {
   const app = express();
@@ -17,7 +18,7 @@ function criarApp(db) {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'no-referrer',
-      'Permissions-Policy': 'geolocation=(), camera=(), microphone=()',
+      'Permissions-Policy': 'geolocation=(), camera=(), microphone=(self)',
       ...(config.producao ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),
       'Content-Security-Policy': CSP,
     });

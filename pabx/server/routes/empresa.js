@@ -11,6 +11,7 @@ const { periodo, listarChamadas, csv, reais, enviarCsv, COLUNAS_CHAMADAS } = req
 const { criarUsuario, alterarUsuario, criarChave, senhaSip } = require('../lib/contas');
 const { inicioMes, intervalo, hoje } = require('../lib/datas');
 const v = require('../lib/validacao');
+const config = require('../config');
 
 const DESTINOS = ['ramal', 'fila', 'ura'];
 const TABELA_DESTINO = { ramal: 'ramais', fila: 'filas', ura: 'uras' };
@@ -434,10 +435,27 @@ module.exports = (db) => {
     res.status(204).end();
   });
 
-  r.get('/usuarios', administra, (req, res) => res.json(db.prepare(`SELECT id, nome, email, perfil, ativo, ultimo_acesso, criado_em FROM usuarios
-    WHERE empresa_id = ? ORDER BY nome`).all(eid(req))));
+  r.get('/usuarios', administra, (req, res) => res.json(db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.ativo, u.ultimo_acesso, u.criado_em, u.ramal_id, r.numero AS ramal
+    FROM usuarios u LEFT JOIN ramais r ON r.id = u.ramal_id WHERE u.empresa_id = ? ORDER BY u.nome`).all(eid(req))));
+  /** Ramal que o usuário usa no telefone do painel (um ramal ativo da empresa, de um usuário só). */
+  const ligarRamal = (usuarioId, ramalId, empresaId) => {
+    if (ramalId === undefined) return;
+    let id = null;
+    if (ramalId !== null && ramalId !== '') {
+      const x = db.prepare('SELECT id FROM ramais WHERE id = ? AND empresa_id = ? AND ativo = 1').get(Number(ramalId), empresaId);
+      v.exigir(x, 'Ramal não encontrado nesta empresa.');
+      const outro = db.prepare('SELECT nome FROM usuarios WHERE ramal_id = ? AND id <> ?').get(x.id, usuarioId);
+      v.exigir(!outro, `Este ramal já é usado por ${outro?.nome} no telefone do painel.`);
+      id = x.id;
+    }
+    db.prepare('UPDATE usuarios SET ramal_id = ? WHERE id = ?').run(id, usuarioId);
+  };
   r.post('/usuarios', administra, (req, res) => {
-    const id = criarUsuario(db, req.body, { perfis: ['cliente', 'supervisor'], empresaId: eid(req) });
+    const id = transacao(db, () => {
+      const novo = criarUsuario(db, req.body, { perfis: ['cliente', 'supervisor'], empresaId: eid(req) });
+      ligarRamal(novo, req.body.ramal_id, eid(req));
+      return novo;
+    });
     registrar(db, req, 'usuario_criado', { id, perfil: req.body.perfil });
     res.status(201).json({ id });
   });
@@ -445,9 +463,30 @@ module.exports = (db) => {
     const u = db.prepare('SELECT * FROM usuarios WHERE id = ? AND empresa_id = ?').get(nid(req), eid(req));
     if (!u) throw naoEncontrado('Usuário');
     v.exigir(!(u.id === req.usuario.id && (req.body.ativo !== undefined && !v.booleano(req.body.ativo))), 'Você não pode desativar o seu próprio usuário.');
-    alterarUsuario(db, u, req.body, { perfis: ['cliente', 'supervisor'] });
+    transacao(db, () => {
+      alterarUsuario(db, u, req.body, { perfis: ['cliente', 'supervisor'] });
+      ligarRamal(u.id, req.body.ramal_id, eid(req));
+    });
     registrar(db, req, 'usuario_alterado', { id: u.id, campos: Object.keys(req.body).filter((k) => k !== 'senha') });
     res.status(204).end();
+  });
+
+  // ---------- Telefone do painel (WebRTC) ----------
+  /**
+   * Configuração do telefone do usuário logado: endereço do Asterisk e o ramal ligado ao usuário, com a senha SIP
+   * (só do próprio ramal). Sem WSS configurado no servidor ou sem ramal, o telefone fica desligado.
+   */
+  r.get('/telefone', (req, res) => {
+    const w = config.webrtc;
+    const ramal = req.usuario.ramal_id
+      ? db.prepare('SELECT id, numero, nome, senha_sip FROM ramais WHERE id = ? AND empresa_id = ? AND ativo = 1').get(req.usuario.ramal_id, eid(req))
+      : null;
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      configurado: Boolean(w.wss),
+      wss: w.wss, dominio: w.dominio, stun: w.stun,
+      ramal: ramal ? { id: ramal.id, numero: ramal.numero, nome: ramal.nome, usuario_sip: `${eid(req)}_${ramal.numero}`, senha_sip: ramal.senha_sip } : null,
+    });
   });
 
   // ---------- Integrações (chaves da API) ----------
@@ -464,6 +503,9 @@ module.exports = (db) => {
     registrar(db, req, 'chave_revogada', { id: k.id, prefixo: k.prefixo });
     res.status(204).end();
   });
+
+  // ---------- ZOE (atendente virtual ligada ao IXC) ----------
+  r.use('/zoe', require('../zoe/rotas').rotasPainel(db));
 
   return r;
 };

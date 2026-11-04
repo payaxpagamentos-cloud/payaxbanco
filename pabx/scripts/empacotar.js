@@ -22,7 +22,7 @@ for (const item of ['server', 'public', 'package.json', 'package-lock.json', 'Do
 execFileSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], { cwd: pasta, stdio: 'inherit' });
 
 const senhaAdmin = crypto.randomBytes(12).toString('base64url');
-const env = `# PABX — configuração do servidor
+const env = `# ZOE PABX Inteligente — configuração do servidor
 NODE_ENV=production
 PORT=3300
 # Endereço do painel: https://SEU-DOMINIO/pabx/
@@ -42,6 +42,9 @@ PABX_TRUST_PROXY=1
 `;
 fs.writeFileSync(path.join(pasta, '.env'), env, { mode: 0o600 });
 fs.copyFileSync(path.join(raiz, 'scripts', 'LEIA-ME.txt'), path.join(pasta, 'LEIA-ME.txt'));
+// Script da URA da ZOE, para copiar no servidor do Asterisk.
+fs.mkdirSync(path.join(pasta, 'asterisk'), { recursive: true });
+fs.copyFileSync(path.join(raiz, 'scripts', 'zoe-agi.js'), path.join(pasta, 'asterisk', 'zoe-agi.js'));
 fs.mkdirSync(path.join(pasta, 'data'), { recursive: true });
 
 const zip = path.join(saida, 'pabx.zip');

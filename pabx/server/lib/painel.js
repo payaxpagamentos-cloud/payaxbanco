@@ -23,7 +23,9 @@ function dashboard(db, empresaId = null) {
       COALESCE(SUM(direcao = 'entrada' AND status = 'atendida'), 0) AS recebidas_atendidas,
       COALESCE(SUM(status = 'atendida'), 0) AS atendidas,
       COALESCE(SUM(CASE WHEN direcao = 'saida' THEN custo_centavos END), 0) AS gastos_centavos,
-      COALESCE(SUM(duracao_s), 0) AS duracao_s
+      COALESCE(SUM(duracao_s), 0) AS duracao_s,
+      COALESCE(SUM(status IN ('nao_atendida','ocupado','falha')), 0) AS perdidas,
+      COALESCE(ROUND(AVG(CASE WHEN status = 'atendida' THEN duracao_s END)), 0) AS tma_s
     FROM chamadas WHERE ${filtro} AND inicio >= ? AND inicio < ?`).get(...p, ini, fimHoje);
 
   const passo = 15 * 60_000;

@@ -1,9 +1,9 @@
 /** Telas do painel da empresa (perfil cliente e supervisor; o master entra pela lista de empresas). */
 import { api, qs } from './api.js';
-import { el, limpar, dinheiro, dataHora, hora, duracao, minutos, inteiro, telefone, gb, barraUso, toast, campo, area, escolha, marcar, formModal, modal, confirmar,
-  repetir, etiqueta, etiquetaChamada, DIRECOES, TIPOS_DESTINO, PERFIS } from './ui.js';
+import { el, limpar, acao, dinheiro, dataHora, hora, duracao, minutos, inteiro, telefone, gb, barraUso, toast, campo, area, escolha, marcar, formModal, modal, confirmar,
+  repetir, etiqueta, etiquetaChamada, pessoa, situacao, DIRECOES, TIPOS_DESTINO, PERFIS } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, cartaoUtilizacao, cartaoSimultaneas, cartaoRamais, cartaoUsoMes, cartaoRecursos,
-  painelChamadas, painelRelatorios, painelIntegracoes } from './comum.js';
+  painelChamadas, painelRelatorios, painelIntegracoes, cartaoStatusLigacoes, indicadoresTelefonia } from './comum.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
 const pode = (ctx) => !ctx.somenteLeitura;
@@ -13,16 +13,17 @@ async function telaDashboard(ctx) {
   ctx.parar(repetir(async () => {
     const d = await api.get(`${base(ctx)}/dashboard`);
     limpar(ctx.conteudo, el('div', { class: 'grade-dash' },
+      el('div', { class: 'c12' }, el('div', { class: 'grade' }, indicadoresTelefonia(d))),
+      el('div', { class: 'c8' }, cartaoSimultaneas(d.simultaneas, d.em_curso)),
+      el('div', { class: 'c4' }, cartaoStatusLigacoes(d.utilizacao.hoje, d.em_curso)),
       el('div', { class: 'c5' }, cartaoUtilizacao(d.utilizacao)),
-      el('div', { class: 'c4' }, cartaoSimultaneas(d.simultaneas, d.em_curso)),
       el('div', { class: 'c3' }, cartaoRamais(d.ramais)),
-      el('div', { class: 'c5' }, cartaoUsoMes(d.uso_mes)),
-      el('div', { class: 'c7' }, cartaoRecursos(d.recursos),
-        el('div', { style: 'height:18px' }),
-        cartao('Limites', el('div', { class: 'grade' },
-          el('div', {}, el('div', { class: 'pequeno mudo' }, 'Ramais ativos'), barraUso(d.ramais.total, d.empresa.limite_ramais)),
-          el('div', {}, el('div', { class: 'pequeno mudo' }, 'Chamadas simultâneas agora'), barraUso(d.em_curso, d.empresa.limite_canais)),
-          el('div', {}, el('div', { class: 'pequeno mudo' }, 'Disco das gravações'), barraUso(d.disco.usado_bytes, d.disco.limite_bytes, { formato: (b) => gb(b).replace('GB', ''), sufixo: 'GB' })))))));
+      el('div', { class: 'c4' }, cartaoUsoMes(d.uso_mes)),
+      el('div', { class: 'c6' }, cartaoRecursos(d.recursos)),
+      el('div', { class: 'c6' }, cartao('Limites', el('div', { class: 'coluna' },
+        el('div', {}, el('div', { class: 'pequeno mudo' }, 'Ramais ativos'), barraUso(d.ramais.total, d.empresa.limite_ramais)),
+        el('div', {}, el('div', { class: 'pequeno mudo' }, 'Chamadas simultâneas agora'), barraUso(d.em_curso, d.empresa.limite_canais)),
+        el('div', {}, el('div', { class: 'pequeno mudo' }, 'Disco das gravações'), barraUso(d.disco.usado_bytes, d.disco.limite_bytes, { formato: (b) => gb(b).replace('GB', ''), sufixo: 'GB' })))))));
   }, 10_000));
 }
 
@@ -32,17 +33,17 @@ async function telaSupervisao(ctx) {
     const falando = s.agentes.filter((a) => a.falando_com);
     limpar(ctx.conteudo, el('div', { class: 'coluna' },
       el('div', { class: 'grade' },
-        indicador('Chamadas agora', inteiro(s.em_curso)),
-        indicador('Agentes falando', `${falando.length}/${s.agentes.length}`),
-        indicador('Agentes online', inteiro(s.agentes.filter((a) => a.online).length)),
-        indicador('Campanhas ativas', inteiro(s.campanhas.filter((c) => c.status === 'ativa').length))),
+        indicador('Chamadas agora', inteiro(s.em_curso), null, 'chamadas', 'azul'),
+        indicador('Agentes falando', `${falando.length}/${s.agentes.length}`, null, 'headset', 'verde'),
+        indicador('Agentes online', inteiro(s.agentes.filter((a) => a.online).length), null, 'pessoas', 'roxo'),
+        indicador('Campanhas ativas', inteiro(s.campanhas.filter((c) => c.status === 'ativa').length), null, 'campanhas', 'laranja')),
       cartao('Campanhas', tabela(['Campanha', 'Status', 'Fila', '^Em curso', '^Pendentes', '^Atendidos', '^Sem sucesso', 'Progresso'], s.campanhas.map((c) => el('tr', {},
         td(c.nome), td(etiqueta(c.status, c.status === 'ativa' ? 'ok' : 'aviso')), td(c.fila ?? '—'), td(c.em_curso, 'centro num'), td(c.pendentes, 'centro num'),
         td(c.atendidos, 'centro num'), td(c.sem_sucesso, 'centro num'), el('td', { style: 'width:160px' }, barraUso(c.contatos - c.pendentes, c.contatos)))),
       'Nenhuma campanha ativa ou pausada.')),
       cartao('Agentes (ramais)', tabela(['Ramal', 'Pessoa', 'Situação', 'Falando com', '^Desde', '^Chamadas hoje'], s.agentes.map((a) => el('tr', {},
-        td(a.numero, 'num'), td(a.nome),
-        td(a.falando_com ? etiqueta('em chamada', 'info') : a.online ? etiqueta('livre', 'ok') : etiqueta('offline')),
+        td(a.numero, 'num'), td(pessoa(a.nome)),
+        td(a.falando_com ? situacao('Em chamada', 'info') : a.online ? situacao('Livre', 'ok') : situacao('Offline', 'erro')),
         td(a.falando_com ? telefone(a.falando_com) : '—'), td(a.desde ? hora(a.desde) : '—', 'centro'), td(a.chamadas_hoje, 'centro num'))), 'Nenhum ramal ativo.'))));
   }, 5000));
 }
@@ -148,8 +149,8 @@ async function telaRamais(ctx) {
     const ativos = ramais.filter((r) => r.ativo);
     resumo.textContent = `${ativos.length} ramal(is) ativo(s) · ${ativos.filter((r) => r.online).length} online`;
     limpar(lista, tabela(['Ramal', 'Pessoa', 'Filas', 'Situação', 'Último registro', '^Gravação', '^Ações'], ramais.map((r) => el('tr', {},
-      td(el('strong', { class: 'num' }, r.numero)), td([r.nome, r.email ? el('div', { class: 'pequeno mudo' }, r.email) : null]), td(r.filas ?? '—'),
-      td(!r.ativo ? etiqueta('desativado', 'erro') : r.em_curso ? etiqueta('em chamada', 'info') : r.online ? etiqueta('online', 'ok') : etiqueta('offline')),
+      td(el('strong', { class: 'num' }, r.numero)), td(pessoa(r.nome, r.email)), td(r.filas ?? '—'),
+      td(!r.ativo ? situacao('Desativado') : r.em_curso ? situacao('Em chamada', 'info') : r.online ? situacao('Online', 'ok') : situacao('Offline', 'erro')),
       td(r.registro_em ? [dataHora(r.registro_em), el('div', { class: 'pequeno mudo' }, [r.registro_ip, r.registro_agente].filter(Boolean).join(' · '))] : '—'),
       td(r.gravar ? 'sim' : 'não', 'centro'),
       el('td', { class: 'acoes' }, admin ? [
@@ -226,9 +227,9 @@ async function telaTerminacao(ctx) {
   const mes = Object.fromEntries(t.mes.map((x) => [x.tipo_destino, x]));
   limpar(ctx.conteudo, el('div', { class: 'coluna' },
     el('div', { class: 'grade' },
-      indicador('Rota de saída', t.rota ? t.rota.nome : 'Sem rota', t.rota ? (t.rota.ativa ? 'ativa' : 'inativa') : 'fale com o suporte para ligar para fora'),
-      indicador('Chamadas simultâneas', inteiro(t.limite_canais), 'limite contratado'),
-      indicador('Tarifação', `${t.cadencia.inicial_s}/${t.cadencia.passo_s}`, `mínimo de ${t.cadencia.inicial_s} s e depois a cada ${t.cadencia.passo_s} s`)),
+      indicador('Rota de saída', t.rota ? t.rota.nome : 'Sem rota', t.rota ? (t.rota.ativa ? 'ativa' : 'inativa') : 'fale com o suporte para ligar para fora', 'terminacao', 'azul'),
+      indicador('Chamadas simultâneas', inteiro(t.limite_canais), 'limite contratado', 'chamadas', 'roxo'),
+      indicador('Tarifação', `${t.cadencia.inicial_s}/${t.cadencia.passo_s}`, `mínimo de ${t.cadencia.inicial_s} s e depois a cada ${t.cadencia.passo_s} s`, 'relogio', 'laranja')),
     cartao('Tarifas e consumo do mês', tabela(['Destino', '>Preço por minuto', '>Ligações no mês', '>Minutos tarifados', '>Gasto no mês'],
       ['fixo', 'movel', 'internacional'].map((k) => el('tr', {}, td(TIPOS_DESTINO[k]), td(dinheiro(t.tarifas[k]), 'dir num'), td(inteiro(mes[k]?.chamadas), 'dir num'),
         td(minutos(mes[k]?.tarifado_s), 'dir num'), td(dinheiro(mes[k]?.custo_centavos), 'dir num'))))),
@@ -369,10 +370,12 @@ async function telaConfiguracoes(ctx) {
   el('p', { class: 'pequeno mudo' }, 'Para mudar o plano, fale com o suporte.'));
 
   const usuarios = el('div');
+  const ramaisAtivos = admin ? (await api.get(`${base(ctx)}/ramais`)).filter((r) => r.ativo) : [];
   const formUsuario = (u) => formModal(u ? `Editar ${u.nome}` : 'Novo usuário', () => [
     campo('Nome', { name: 'nome', required: true, maxlength: 120, value: u?.nome ?? '' }),
     u ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, u.email) : campo('E-mail', { name: 'email', type: 'email', required: true }),
     escolha('Perfil', 'perfil', { cliente: PERFIS.cliente, supervisor: PERFIS.supervisor }, u?.perfil ?? 'supervisor'),
+    escolha('Ramal no telefone do painel', 'ramal_id', { '': 'Nenhum (não liga pelo painel)', ...Object.fromEntries(ramaisAtivos.map((r) => [r.id, `${r.numero} · ${r.nome}`])) }, u?.ramal_id ?? ''),
     campo(u ? 'Nova senha (deixe em branco para manter)' : 'Senha inicial (mínimo 8)', { name: 'senha', type: 'password', minlength: 8, required: !u, autocomplete: 'new-password' }),
     u ? marcar('Usuário ativo', { name: 'ativo', checked: Boolean(u.ativo) }) : null,
   ], (d) => {
@@ -381,8 +384,8 @@ async function telaConfiguracoes(ctx) {
   });
   async function carregarUsuarios() {
     const lista = await api.get(`${base(ctx)}/usuarios`);
-    limpar(usuarios, tabela(['Nome', 'E-mail', 'Perfil', 'Último acesso', 'Situação', '^'], lista.map((u) => el('tr', {},
-      td(u.nome), td(u.email), td(PERFIS[u.perfil]), td(dataHora(u.ultimo_acesso)), td(u.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo', 'erro')),
+    limpar(usuarios, tabela(['Nome', 'E-mail', 'Perfil', 'Ramal', 'Último acesso', 'Situação', '^'], lista.map((u) => el('tr', {},
+      td(pessoa(u.nome)), td(u.email), td(PERFIS[u.perfil]), td(u.ramal ?? '—', 'num'), td(dataHora(u.ultimo_acesso)), td(u.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo', 'erro')),
       el('td', { class: 'acoes' }, botaoIcone('editar', 'Editar', async () => { if (await formUsuario(u)) { toast('Usuário salvo.'); carregarUsuarios(); } })))), 'Nenhum usuário.'),
     el('div', { style: 'margin-top:12px' }, botao('Novo usuário', 'primario', async () => { if (await formUsuario()) { toast('Usuário criado.'); carregarUsuarios(); } })));
   }
@@ -403,7 +406,142 @@ async function telaIntegracoes(ctx) {
   });
 }
 
+// ---------- ZOE (atendente virtual ligada ao IXC) ----------
+const MOTIVOS_ZOE = { financeiro: 'Financeiro', suporte: 'Suporte técnico', comercial: 'Comercial', outro: 'Outros' };
+const RESULTADOS_ZOE = { em_curso: ['Em curso', 'info'], resolvido: ['Resolvido pela ZOE', 'ok'], transferido: ['Transferido', 'aviso'], abandonado: ['Desligou', ''] };
+const ACOES_ZOE = {
+  identificacao: 'Identificação', confirmacao: 'Confirmação de identidade', faturas: 'Consulta de faturas', boleto: 'Envio de boleto',
+  desbloqueio: 'Desbloqueio de confiança', transferencia: 'Transferência', erro: 'Falha no IXC',
+};
+const etiquetaZoe = (r) => etiqueta(RESULTADOS_ZOE[r]?.[0] ?? r, RESULTADOS_ZOE[r]?.[1]);
+const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '—');
+
+function detalheAcaoZoe(a) {
+  const d = a.detalhes ?? {};
+  const partes = {
+    identificacao: () => (a.sucesso ? `pelo ${d.por === 'telefone' ? 'número que ligou' : 'CPF/CNPJ'}` : d.por === 'telefone' ? 'número não cadastrado' : 'CPF/CNPJ não encontrado'),
+    confirmacao: () => `${d.metodo === 'cpf3' ? '3 primeiros dígitos do CPF/CNPJ' : 'data de nascimento'}: ${a.sucesso ? 'confere' : 'não confere'}`,
+    faturas: () => `${d.quantidade} em aberto (${dinheiro(d.total_centavos)})`,
+    boleto: () => (a.sucesso ? `fatura ${d.fatura_id} para ${d.destino}` : d.erro),
+    desbloqueio: () => (a.sucesso ? `contrato ${d.contrato_id}${d.mensagem_ixc ? ` — ${d.mensagem_ixc}` : ''}`
+      : ({ limite: 'limite do período atingido', bloqueio_manual: 'bloqueio manual', ja_liberado: 'já estava liberado', sem_contrato: 'sem contrato bloqueado por atraso',
+        desligado: 'desligado na configuração' })[d.motivo] ?? d.erro ?? 'negado'),
+    transferencia: () => MOTIVOS_ZOE[d.motivo] ?? d.motivo,
+    erro: () => d.erro,
+  };
+  return partes[a.tipo]?.() ?? '';
+}
+
+async function telaZoe(ctx) {
+  const admin = pode(ctx);
+  const painel = el('div', { class: 'coluna' });
+  const configuracao = el('div');
+  let dados = await api.get(`${base(ctx)}/zoe`);
+
+  const abrirAtendimento = async (id) => {
+    const a = await api.get(`${base(ctx)}/zoe/atendimentos/${id}`);
+    modal(`Ligação de ${a.telefone ? telefone(a.telefone) : 'número oculto'}`, () => [
+      el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Início'), el('strong', {}, dataHora(a.inicio))),
+      el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Cliente'), el('strong', {}, a.cliente_nome ? `${a.cliente_nome} (IXC ${a.cliente_id})` : 'não identificado')),
+      el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Resultado'), etiquetaZoe(a.resultado)),
+      a.fila ? el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Fila'), el('strong', {}, a.fila)) : null,
+      a.resumo ? el('p', { class: 'pequeno', style: 'margin:12px 0' }, el('strong', {}, 'Resumo para o atendente: '), a.resumo) : null,
+      tabela(['Hora', 'O que a ZOE fez', 'Detalhe', 'Situação'], a.acoes.map((x) => el('tr', {},
+        td(hora(x.criado_em)), td(ACOES_ZOE[x.tipo] ?? x.tipo), td(el('span', { class: 'pequeno' }, detalheAcaoZoe(x))),
+        td(x.sucesso ? etiqueta('ok', 'ok') : etiqueta('não', 'erro'))))),
+    ], { largo: true });
+  };
+
+  function desenharPainel() {
+    const h = dados.hoje;
+    const m = dados.mes;
+    limpar(painel,
+      el('div', { class: 'grade' },
+        indicador('Ligações hoje', inteiro(h.total), h.em_curso ? `${h.em_curso} em curso agora` : null, 'chamadas', 'azul'),
+        indicador('Resolvidas pela ZOE', pct(h.resolvidos, h.total - h.em_curso), `${inteiro(h.resolvidos)} sem atendente`, 'zoe', 'roxo'),
+        indicador('Transferidas hoje', inteiro(h.transferidos), null, 'headset', 'laranja'),
+        indicador('Boletos no mês', inteiro(m.boletos), null, 'documento', 'verde'),
+        indicador('Desbloqueios no mês', inteiro(m.desbloqueios), null, 'aberto', 'ciano')),
+      el('div', { class: 'grade-dash' },
+        el('div', { class: 'c4' }, cartao('Motivos das ligações de hoje', el('div', { class: 'coluna' }, Object.entries(MOTIVOS_ZOE).map(([k, r]) =>
+          el('div', {}, el('div', { class: 'pequeno mudo' }, r), barraUso(h[k], h.total || 0)))))),
+        el('div', { class: 'c8' }, cartao('Últimas ligações', tabela(['Início', 'Telefone', 'Cliente', 'Motivo', 'Resultado', 'Fila'], dados.ultimos.map((a) => {
+          const tr = el('tr', { class: 'clicavel', title: 'Ver o que a ZOE fez' },
+            td(dataHora(a.inicio), 'num'), td(a.telefone ? telefone(a.telefone) : '—', 'num'), td(a.cliente_nome ?? el('span', { class: 'mudo' }, 'não identificado')),
+            td(MOTIVOS_ZOE[a.motivo] ?? '—'), td(etiquetaZoe(a.resultado)), td(a.fila ?? '—'));
+          tr.addEventListener('click', () => abrirAtendimento(a.id).catch((err) => toast(err.message, true)));
+          return tr;
+        }), 'Nenhuma ligação atendida pela ZOE ainda.')))));
+  }
+
+  function desenharConfiguracao() {
+    const c = dados.config;
+    const filas = { '': 'Fila padrão da central', ...Object.fromEntries(dados.filas.map((f) => [f.id, f.nome])) };
+    const dis = !admin;
+    const f = el('form', { class: 'form' },
+      marcar('ZOE ligada (atende as ligações que a central enviar para ela)', { name: 'ativo', checked: c.ativo, disabled: dis }),
+      el('h3', { style: 'margin:8px 0 0' }, 'IXC Provedor'),
+      el('div', { class: 'duas' },
+        campo('Endereço do IXC', { name: 'ixc_url', type: 'url', placeholder: 'https://ixc.seuprovedor.com.br', value: c.ixc_url ?? '', disabled: dis }),
+        campo(c.token_configurado ? 'Token (configurado — deixe em branco para manter)' : 'Token do usuário da ZOE no IXC',
+          { name: 'ixc_token', type: 'password', autocomplete: 'off', placeholder: c.token_configurado ? '••••••••' : 'id:token', disabled: dis })),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Crie no IXC um usuário só para a ZOE, com permissão apenas para consultar clientes, contratos e faturas, '
+        + 'gerar boleto e fazer desbloqueio de confiança (Configurações > Usuários > Token). O token fica cifrado e não aparece de novo.'),
+      el('h3', { style: 'margin:8px 0 0' }, 'Desbloqueio de confiança'),
+      marcar('Permitir que a ZOE libere contratos bloqueados por atraso', { name: 'desbloqueio_ativo', checked: c.desbloqueio_ativo, disabled: dis }),
+      el('div', { class: 'duas' },
+        campo('Desbloqueios por cliente', { name: 'desbloqueio_limite', type: 'number', min: 0, max: 10, value: c.desbloqueio_limite, disabled: dis }),
+        campo('A cada (dias)', { name: 'desbloqueio_periodo_dias', type: 'number', min: 1, max: 365, value: c.desbloqueio_periodo_dias, disabled: dis })),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O prazo da liberação é o configurado no IXC. Bloqueio manual e contrato cancelado nunca são liberados pela ZOE.'),
+      el('h3', { style: 'margin:8px 0 0' }, 'Envio do boleto'),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Só para os contatos já cadastrados no IXC, nunca para um número informado na ligação.'),
+      marcar('E-mail (enviado pelo IXC)', { name: 'canal_email', checked: c.canal_email, disabled: dis }),
+      marcar('SMS (enviado pelo IXC)', { name: 'canal_sms', checked: c.canal_sms, disabled: dis }),
+      marcar('WhatsApp (pelo seu serviço de WhatsApp)', { name: 'canal_whatsapp', checked: c.canal_whatsapp, disabled: dis }),
+      campo('Endereço que recebe o boleto para enviar por WhatsApp (webhook)', { name: 'whatsapp_webhook', type: 'url', placeholder: 'https://…', value: c.whatsapp_webhook ?? '', disabled: dis }),
+      el('h3', { style: 'margin:8px 0 0' }, 'Transferência para atendente'),
+      el('div', { class: 'tres' },
+        escolha('Financeiro', 'fila_financeiro_id', filas, c.fila_financeiro_id ?? '', { disabled: dis }),
+        escolha('Suporte técnico', 'fila_suporte_id', filas, c.fila_suporte_id ?? '', { disabled: dis }),
+        escolha('Comercial', 'fila_comercial_id', filas, c.fila_comercial_id ?? '', { disabled: dis })),
+      admin ? el('div', { class: 'linha', style: 'gap:10px;flex-wrap:wrap' },
+        el('button', { class: 'btn primario largo' }, 'Salvar'),
+        botao('Testar conexão com o IXC', '', async () => {
+          const d = lerZoe(f);
+          await api.post(`${base(ctx)}/zoe/testar`, { ixc_url: d.ixc_url || undefined, ixc_token: d.ixc_token || undefined });
+          toast('Conexão com o IXC funcionando.');
+        })) : null);
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      acao(f.querySelector('button.primario'), async () => {
+        dados.config = await api.put(`${base(ctx)}/zoe`, lerZoe(f));
+        toast('Configuração da ZOE salva.');
+        desenharConfiguracao();
+      });
+    });
+    limpar(configuracao, cartao('Configuração da ZOE', f));
+  }
+
+  limpar(ctx.conteudo, el('div', { class: 'coluna' },
+    dados.config.ativo ? null : el('p', { class: 'aviso' }, 'A ZOE está desligada. Ligue o IXC abaixo e, na central telefônica, mande as ligações para o script da ZOE (veja o README).'),
+    painel, configuracao));
+  desenharPainel();
+  desenharConfiguracao();
+  ctx.parar(repetir(async () => {
+    const novo = await api.get(`${base(ctx)}/zoe`);
+    dados = { ...novo, config: dados.config };
+    desenharPainel();
+  }, 15_000));
+}
+
+function lerZoe(f) {
+  const d = Object.fromEntries(new FormData(f));
+  for (const k of ['ativo', 'desbloqueio_ativo', 'canal_email', 'canal_sms', 'canal_whatsapp']) d[k] = f.querySelector(`[name=${k}]`).checked;
+  if (!d.ixc_token) delete d.ixc_token;
+  return d;
+}
+
 export const TELAS_EMPRESA = {
   dashboard: telaDashboard, supervisao: telaSupervisao, campanhas: telaCampanhas, ramais: telaRamais, chamadas: telaChamadas, crm: telaCrm,
-  terminacao: telaTerminacao, numeros: telaNumeros, recursos: telaRecursos, relatorios: telaRelatorios, configuracoes: telaConfiguracoes, integracoes: telaIntegracoes,
+  terminacao: telaTerminacao, numeros: telaNumeros, recursos: telaRecursos, relatorios: telaRelatorios, configuracoes: telaConfiguracoes, integracoes: telaIntegracoes, zoe: telaZoe,
 };

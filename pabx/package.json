@@ -1,7 +1,7 @@
 {
   "name": "payax-pabx",
   "version": "1.0.0",
-  "description": "PABX — painel do master e das empresas: ramais, chamadas, campanhas, números entrantes, terminação e integração com a central telefônica.",
+  "description": "ZOE PABX Inteligente — painel do master e das empresas: ramais, chamadas, campanhas, números entrantes, terminação e integração com a central telefônica.",
   "main": "server/index.js",
   "private": true,
   "type": "commonjs",
@@ -13,9 +13,14 @@
     "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
     "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/seed.js",
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
-    "empacotar": "node scripts/empacotar.js"
+    "empacotar": "node scripts/empacotar.js",
+    "vendor": "esbuild node_modules/jssip/lib/JsSIP.js --bundle --minify --format=iife --global-name=JsSIP --platform=browser --target=es2020 --legal-comments=inline --outfile=public/vendor/jssip.min.js"
   },
   "dependencies": {
     "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.0",
+    "jssip": "3.13.8"
   }
 }

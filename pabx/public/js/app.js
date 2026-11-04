@@ -1,11 +1,12 @@
 import { api, sessao } from './api.js';
-import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, PERFIS } from './ui.js';
+import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, PERFIS } from './ui.js';
 import { TELAS_MASTER } from './master.js';
 import { TELAS_EMPRESA } from './empresa.js';
+import { iniciarTelefone, pararTelefone } from './telefone.js';
 
 const raiz = $('#app');
 let pararTela = null;
-let nomePlataforma = 'PABX';
+let nomePlataforma = 'ZOE PABX Inteligente';
 const nomesEmpresa = new Map();
 
 const PLATAFORMA = ['master', 'suporte'];
@@ -18,11 +19,23 @@ const MENU_MASTER = [
 ];
 const MENU_EMPRESA = [
   ['dashboard', 'Dashboard', 'dashboard', null, [['dashboard', 'Dashboard'], ['supervisao', 'Supervisão de campanhas']]],
+  ['zoe', 'ZOE', 'zoe'],
   ['campanhas', 'Campanhas', 'campanhas'], ['ramais', 'Pessoas / Ramais', 'pessoas'], ['chamadas', 'Chamadas', 'chamadas'], ['crm', 'CRM', 'crm'],
   ['terminacao', 'Terminação', 'terminacao'], ['numeros', 'Números Entrantes', 'numeros'], ['recursos', 'Recursos PABX', 'recursos'],
   ['relatorios', 'Relatórios', 'relatorios'], ['configuracoes', 'Configurações', 'configuracoes'],
   ['integracoes', 'Integrações', 'integracoes', ['master', 'suporte', 'cliente']],
 ];
+
+// Frase sob o título de cada tela.
+const SUBTITULOS = {
+  dashboard: 'Visão geral da telefonia', supervisao: 'Campanhas e agentes em tempo real', zoe: 'Atendente virtual ligada ao IXC',
+  campanhas: 'Discador: listas, filas e andamento', ramais: 'Gerencie os ramais e as pessoas da sua empresa', chamadas: 'Histórico de ligações com filtros e exportação',
+  crm: 'Contatos e histórico de ligações', terminacao: 'Rota de saída, tarifação e consumo', numeros: 'Para onde vai cada número que recebe ligações',
+  recursos: 'Filas de atendimento e URAs (menus de atendimento)', relatorios: 'Acompanhe o desempenho da sua telefonia', configuracoes: 'Dados da empresa, plano e usuários',
+  integracoes: 'Chaves de API para a central telefônica', empresas: 'Empresas clientes da plataforma', usuarios: 'Quem acessa o painel e com qual perfil',
+  seguranca: 'Acessos recusados, IPs bloqueados e atividades', diagnostico: 'Verificações da plataforma e das rotas',
+};
+let pararSaude = null;
 
 window.addEventListener('pabx:sair', () => desenhar());
 window.addEventListener('hashchange', () => desenhar());
@@ -41,8 +54,10 @@ async function desenhar() {
   pararTela?.();
   pararTela = null;
   const s = sessao.get();
-  if (!s?.token) return telaEntrada();
+  if (!s?.token) { pararSaude?.(); pararSaude = null; pararTelefone(); return telaEntrada(); }
   const u = s.usuario;
+  // Telefone do painel: para os usuários das empresas (o ramal vem do usuário).
+  if (!PLATAFORMA.includes(u.perfil)) iniciarTelefone({ empresaId: u.empresa_id });
   let { empresaId, tela } = rota();
   // Usuário de empresa sempre fica no painel da própria empresa.
   if (!PLATAFORMA.includes(u.perfil) && empresaId !== u.empresa_id) {
@@ -88,14 +103,11 @@ async function desenhar() {
     empresaId && PLATAFORMA.includes(u.perfil) ? el('a', { class: 'item voltar', href: '#/empresas', title: 'Voltar ao master' }, icone('entrar'), el('span', { class: 'rotulo' }, 'Voltar ao master')) : null);
 
   const trilha = el('div', { class: 'trilha' });
-  if (empresaId) {
-    if (PLATAFORMA.includes(u.perfil)) trilha.append(el('a', { href: '#/empresas' }, 'Empresas'), el('span', { class: 'sep' }, '/'));
-    trilha.append(el('a', { href: link(empresaId, 'dashboard') }, nomeEmpresa.toUpperCase()), el('span', { class: 'sep' }, '/'), titulo);
-  } else {
-    trilha.append(titulo);
-  }
+  if (empresaId) trilha.append(el('a', { href: '#/empresas' }, 'Empresas'), el('span', { class: 'sep' }, '/'), el('a', { href: link(empresaId, 'dashboard') }, nomeEmpresa));
 
-  const topo = el('header', { class: 'topo' }, el('div', {}, el('h1', { style: 'margin:0' }, titulo), trilha), ferramentas(u));
+  const subtitulo = SUBTITULOS[tela] ? el('p', { class: 'subtitulo' }, SUBTITULOS[tela]) : null;
+  const topo = el('header', { class: 'topo' }, el('div', {}, empresaId && PLATAFORMA.includes(u.perfil) ? trilha : null, el('h1', { style: 'margin:0' }, titulo), subtitulo),
+    ferramentas(u));
   casca.append(lateral, el('div', { class: 'principal' }, topo, conteudo));
   limpar(raiz, casca);
   document.title = `${titulo} · ${nomeEmpresa ? `${nomeEmpresa} · ` : ''}${nomePlataforma}`;
@@ -115,7 +127,7 @@ async function desenhar() {
 }
 
 function ferramentas(u) {
-  const tema = document.documentElement.dataset.tema || 'escuro';
+  const tema = document.documentElement.dataset.tema || 'claro';
   const trocar = (t) => {
     document.documentElement.dataset.tema = t;
     try { localStorage.setItem('pabx.tema', t); } catch { /* ignora */ }
@@ -125,10 +137,22 @@ function ferramentas(u) {
     el('div', { class: 'quem' }, el('strong', {}, u.nome), el('div', { class: 'pequeno mudo' }, u.email), el('div', { class: 'pequeno mudo' }, PERFIS[u.perfil])),
     el('button', { onclick: () => { menu.classList.add('oculto'); alterarSenha(); } }, 'Alterar senha'),
     el('button', { onclick: () => { sessao.limpar(); nomesEmpresa.clear(); location.hash = ''; desenhar(); } }, 'Sair'));
-  return el('div', { class: 'ferramentas' },
+  const status = el('span', { class: 'status-sistema', title: 'Conexão com o servidor' }, 'Sistema Online');
+  pararSaude?.();
+  pararSaude = repetir(async () => {
+    try {
+      await api.get('/saude');
+      status.className = 'status-sistema';
+      status.textContent = 'Sistema Online';
+    } catch {
+      status.className = 'status-sistema erro';
+      status.textContent = 'Sem conexão';
+    }
+  }, 30_000);
+  return el('div', { class: 'ferramentas' }, status,
     el('button', { class: tema === 'claro' ? 'on' : '', title: 'Tema claro', dataset: { temaBtn: 'claro' }, onclick: () => trocar('claro') }, icone('sol')),
     el('button', { class: tema === 'escuro' ? 'on' : '', title: 'Tema escuro', dataset: { temaBtn: 'escuro' }, onclick: () => trocar('escuro') }, icone('lua')),
-    el('button', { class: 'usuario', title: u.nome, onclick: () => menu.classList.toggle('oculto') }, el('span', { class: 'avatar' }, iniciais(u.nome)), el('span', { class: 'nome' }, u.nome)),
+    el('button', { class: 'usuario', title: u.nome, onclick: () => menu.classList.toggle('oculto') }, el('span', { class: 'avatar' }, iniciais(u.nome)), el('span', { class: 'nome' }, u.nome), icone('abaixo')),
     menu);
 }
 
@@ -146,7 +170,7 @@ function telaEntrada() {
   const f = el('form', { class: 'form' },
     campo('E-mail', { name: 'email', type: 'email', autocomplete: 'username', required: true }),
     campo('Senha', { name: 'senha', type: 'password', autocomplete: 'current-password', required: true }),
-    el('button', { class: 'btn primario', style: 'min-height:44px' }, 'Entrar'));
+    el('button', { class: 'btn primario', style: 'min-height:42px;margin-top:4px' }, 'Entrar'));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(f.querySelector('button'), async () => {
@@ -156,9 +180,9 @@ function telaEntrada() {
     });
   });
   limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'cartao' },
-    marca(nomePlataforma), el('h1', { style: 'margin:18px 0 4px;font-size:22px' }, 'Entrar no painel'),
+    marca(nomePlataforma), el('h1', { style: 'margin:28px 0 4px;font-size:20px' }, 'Entrar no painel'),
     el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'Use o e-mail e a senha que você recebeu.'), f)));
   f.querySelector('input').focus();
 }
 
-api.get('/publico').then((p) => { nomePlataforma = p.nome || 'PABX'; }).catch(() => {}).finally(desenhar);
+api.get('/publico').then((p) => { nomePlataforma = p.nome || 'ZOE PABX Inteligente'; }).catch(() => {}).finally(desenhar);

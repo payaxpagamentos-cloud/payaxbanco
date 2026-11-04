@@ -7,10 +7,10 @@ const { manutencao } = require('./lib/chamadas');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
-  console.log(`[PABX] Painel: http://localhost:${config.port}${config.basePath}/`);
+  console.log(`[ZOE PABX] Painel: http://localhost:${config.port}${config.basePath}/`);
 });
 
 // Encerra chamadas presas e marca offline os ramais sem registro, mesmo sem ninguém no painel.
 setInterval(() => {
-  try { manutencao(db); } catch (err) { console.error('[PABX] Falha na manutenção:', err.message); }
+  try { manutencao(db); } catch (err) { console.error('[ZOE PABX] Falha na manutenção:', err.message); }
 }, 60_000).unref();
