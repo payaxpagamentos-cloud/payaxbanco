@@ -23,6 +23,9 @@ module.exports = (db) => {
     next();
   });
 
+  // ZOE: etapas da ligação atendida pela atendente virtual (identificar, confirmar, boleto, desbloqueio, transferir).
+  r.use('/zoe', require('../zoe/rotas').rotasIntegracao(db));
+
   /** Configuração completa da empresa para a central telefônica montar o plano de discagem. */
   r.get('/config', (req, res) => {
     const e = req.empresa;

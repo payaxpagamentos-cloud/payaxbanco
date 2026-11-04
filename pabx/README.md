@@ -33,6 +33,8 @@ Servidor próprio (Node.js + SQLite), sem depender do Ativa BPO nem do APP Táxi
 - **Integrações**: chaves de API de todas as empresas e o guia da API.
 
 ### Cliente
+- **ZOE**: a atendente virtual ligada ao IXC (veja [ZOE](#zoe-atendente-virtual)). Ligações de hoje, quanto a ZOE resolveu sozinha,
+  transferidas, boletos e desbloqueios do mês, motivos das ligações, o que a ZOE fez em cada ligação e a configuração.
 - **Dashboard**: os cartões Utilização, Chamadas Simultâneas, Ramais, Uso mês atual, Recursos de voz e texto (TTS/STT) e Limites.
 - **Supervisão de campanhas**: progresso de cada campanha e cada agente (livre, em chamada, offline), atualizando sozinha.
 - **Campanhas** (discador): modo, fila que atende, canais e tentativas; importação de contatos ("nome;telefone"), ativar, pausar e encerrar.
@@ -70,6 +72,67 @@ Autenticação pela chave da empresa (Integrações → Nova chave) no cabeçalh
 | `POST /campanhas/:id/proximos` | Discador: próximos contatos a ligar (até os canais livres), já marcados como "discando". |
 
 Repetir a mesma mensagem (mesmo `uid`) não duplica a chamada.
+
+## ZOE (atendente virtual)
+
+A ZOE atende as ligações de clientes de provedores de internet e resolve sozinha o que é repetitivo, consultando e agindo
+direto no **IXC Provedor**. Fase 1 (esta): **URA por teclas**. A voz com IA (fase 2) usa as mesmas etapas da API.
+
+| Tecla | O que a ZOE faz |
+|---|---|
+| — | Identifica pelo número que ligou (BINA) ou pede o CPF/CNPJ, e confirma: número cadastrado + 3 primeiros dígitos do CPF/CNPJ; número desconhecido + data de nascimento. Nada do contrato é dito antes. |
+| 1 | Segunda via: diz quantas faturas estão abertas, vencimento e valor, e envia boleto e PIX por WhatsApp, SMS ou e-mail **cadastrados no IXC**. |
+| 2 | Desbloqueio de confiança: só contrato bloqueado por atraso (nunca bloqueio manual), dentro do limite por cliente (padrão 1 a cada 30 dias). O prazo é o do IXC. |
+| 3, 4, 0 | Transfere para a fila de suporte, comercial ou atendimento, com um resumo da conversa. |
+
+Se o IXC não responder em 3 segundos, a ZOE avisa e transfere. Tudo o que ela fez fica registrado por ligação (tela ZOE),
+sem guardar o CPF. Ela não negocia desconto, não muda plano e não cancela contrato.
+
+**Configurar** (tela ZOE, administrador da empresa):
+1. No IXC, crie um usuário só para a ZOE, com permissão apenas para consultar clientes, contratos e faturas, gerar boleto e
+   fazer desbloqueio de confiança, e copie o token (Configurações > Usuários > Token).
+2. Informe o endereço do IXC e o token, clique em **Testar conexão**, escolha os canais e as filas de cada motivo e ligue a ZOE.
+   O token fica cifrado com o `PABX_SECRET` (se ele mudar, informe o token de novo).
+3. WhatsApp: o IXC não envia por WhatsApp; informe o endereço do seu serviço (webhook). A ZOE envia um `POST` com
+   `{ evento: "zoe.boleto", telefone, cliente_nome, fatura: { id, vencimento, valor_centavos }, pdf_base64 }`.
+
+**No Asterisk/Issabel**: copie `scripts/zoe-agi.js` (no pacote: `asterisk/zoe-agi.js`) para o servidor do Asterisk (Node.js 22),
+crie uma chave em Integrações e mande as ligações para ele:
+
+```
+; extensions.conf
+exten => s,1,Answer()
+ same => n,Set(ZOE_STATUS=)
+ same => n,AGI(/opt/zoe/zoe-agi.js,https://SEU-DOMINIO/pabx/api/integracao,pbx_SUA_CHAVE)
+ same => n,GotoIf($["${ZOE_STATUS}" = "resolvido"]?fim)
+ same => n,Queue(${IF($["${ZOE_FILA_NOME}" = ""]?atendimento:${ZOE_FILA_NOME})})
+ same => n(fim),Hangup()
+```
+
+O script deixa no canal `ZOE_STATUS` (`resolvido`, `transferir`, `indisponivel` ou `desligou`), `ZOE_FILA_ID`, `ZOE_FILA_NOME` e `ZOE_RESUMO`.
+Com a ZOE desligada ou fora do ar, `ZOE_STATUS=indisponivel` e a ligação segue para a fila padrão.
+
+Voz: com `ZOE_TTS_APP=Flite` (ou outra aplicação de texto para voz do Asterisk) no ambiente do Asterisk, a ZOE fala o texto que a API devolve.
+Sem ela, toca áudios gravados em `sounds/zoe/`: `aviso`, `digite-documento`, `digite-cpf3`, `digite-nascimento`, `menu`, `sem-faturas`,
+`faturas-abertas`, `vence-em`, `mes-01` a `mes-12`, `valor-de`, `reais`, `e`, `centavos`, `canal-whatsapp`, `canal-sms`, `canal-email`,
+`boleto-enviado`, `liberado`, `ja-liberado`, `desbloqueio-limite`, `desbloqueio-negado`, `transferindo`, `obrigada`.
+
+**API da ZOE** (mesma chave `X-Api-Key`, base `/pabx/api/integracao/zoe/atendimentos`). Cada resposta traz a `etapa` seguinte
+(`documento`, `confirmar`, `menu`, `transferir`) e a `fala` pronta para texto para voz:
+
+| Método e caminho | Para quê |
+|---|---|
+| `POST /` | Início: `{ uid, telefone }`. |
+| `POST /:uid/documento` | CPF/CNPJ: `{ documento }`. |
+| `POST /:uid/confirmar` | Confirmação: `{ codigo }` (3 dígitos ou DDMMAAAA). |
+| `GET /:uid/faturas` | Faturas abertas, total e canais disponíveis (com destino mascarado). |
+| `POST /:uid/boleto` | `{ canal: whatsapp\|sms\|email, fatura_id? }` (padrão: a mais antiga). |
+| `POST /:uid/desbloqueio` | Desbloqueio de confiança → `{ liberado, motivo? }`. |
+| `POST /:uid/transferir` | `{ motivo: financeiro\|suporte\|comercial\|outro }` → fila e resumo. |
+| `POST /:uid/fim` | Fim da ligação. |
+
+**A validar no IXC do piloto**: os recursos usados (`cliente`, `cliente_contrato`, `fn_areceber`, `get_boleto` com `tipo_boleto` `mail`/`sms`/`arquivo`,
+`desbloqueio_confianca`) e os códigos de situação do contrato estão todos em `server/zoe/ixc.js`, para ajustar num lugar só.
 
 ## Rodar
 

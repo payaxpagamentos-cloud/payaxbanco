@@ -42,6 +42,9 @@ PABX_TRUST_PROXY=1
 `;
 fs.writeFileSync(path.join(pasta, '.env'), env, { mode: 0o600 });
 fs.copyFileSync(path.join(raiz, 'scripts', 'LEIA-ME.txt'), path.join(pasta, 'LEIA-ME.txt'));
+// Script da URA da ZOE, para copiar no servidor do Asterisk.
+fs.mkdirSync(path.join(pasta, 'asterisk'), { recursive: true });
+fs.copyFileSync(path.join(raiz, 'scripts', 'zoe-agi.js'), path.join(pasta, 'asterisk', 'zoe-agi.js'));
 fs.mkdirSync(path.join(pasta, 'data'), { recursive: true });
 
 const zip = path.join(saida, 'pabx.zip');

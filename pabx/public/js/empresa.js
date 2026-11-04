@@ -1,6 +1,6 @@
 /** Telas do painel da empresa (perfil cliente e supervisor; o master entra pela lista de empresas). */
 import { api, qs } from './api.js';
-import { el, limpar, dinheiro, dataHora, hora, duracao, minutos, inteiro, telefone, gb, barraUso, toast, campo, area, escolha, marcar, formModal, modal, confirmar,
+import { el, limpar, acao, dinheiro, dataHora, hora, duracao, minutos, inteiro, telefone, gb, barraUso, toast, campo, area, escolha, marcar, formModal, modal, confirmar,
   repetir, etiqueta, etiquetaChamada, DIRECOES, TIPOS_DESTINO, PERFIS } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, cartaoUtilizacao, cartaoSimultaneas, cartaoRamais, cartaoUsoMes, cartaoRecursos,
   painelChamadas, painelRelatorios, painelIntegracoes } from './comum.js';
@@ -403,7 +403,142 @@ async function telaIntegracoes(ctx) {
   });
 }
 
+// ---------- ZOE (atendente virtual ligada ao IXC) ----------
+const MOTIVOS_ZOE = { financeiro: 'Financeiro', suporte: 'Suporte técnico', comercial: 'Comercial', outro: 'Outros' };
+const RESULTADOS_ZOE = { em_curso: ['Em curso', 'info'], resolvido: ['Resolvido pela ZOE', 'ok'], transferido: ['Transferido', 'aviso'], abandonado: ['Desligou', ''] };
+const ACOES_ZOE = {
+  identificacao: 'Identificação', confirmacao: 'Confirmação de identidade', faturas: 'Consulta de faturas', boleto: 'Envio de boleto',
+  desbloqueio: 'Desbloqueio de confiança', transferencia: 'Transferência', erro: 'Falha no IXC',
+};
+const etiquetaZoe = (r) => etiqueta(RESULTADOS_ZOE[r]?.[0] ?? r, RESULTADOS_ZOE[r]?.[1]);
+const pct = (a, b) => (b ? `${Math.round((a / b) * 100)}%` : '—');
+
+function detalheAcaoZoe(a) {
+  const d = a.detalhes ?? {};
+  const partes = {
+    identificacao: () => (a.sucesso ? `pelo ${d.por === 'telefone' ? 'número que ligou' : 'CPF/CNPJ'}` : d.por === 'telefone' ? 'número não cadastrado' : 'CPF/CNPJ não encontrado'),
+    confirmacao: () => `${d.metodo === 'cpf3' ? '3 primeiros dígitos do CPF/CNPJ' : 'data de nascimento'}: ${a.sucesso ? 'confere' : 'não confere'}`,
+    faturas: () => `${d.quantidade} em aberto (${dinheiro(d.total_centavos)})`,
+    boleto: () => (a.sucesso ? `fatura ${d.fatura_id} para ${d.destino}` : d.erro),
+    desbloqueio: () => (a.sucesso ? `contrato ${d.contrato_id}${d.mensagem_ixc ? ` — ${d.mensagem_ixc}` : ''}`
+      : ({ limite: 'limite do período atingido', bloqueio_manual: 'bloqueio manual', ja_liberado: 'já estava liberado', sem_contrato: 'sem contrato bloqueado por atraso',
+        desligado: 'desligado na configuração' })[d.motivo] ?? d.erro ?? 'negado'),
+    transferencia: () => MOTIVOS_ZOE[d.motivo] ?? d.motivo,
+    erro: () => d.erro,
+  };
+  return partes[a.tipo]?.() ?? '';
+}
+
+async function telaZoe(ctx) {
+  const admin = pode(ctx);
+  const painel = el('div', { class: 'coluna' });
+  const configuracao = el('div');
+  let dados = await api.get(`${base(ctx)}/zoe`);
+
+  const abrirAtendimento = async (id) => {
+    const a = await api.get(`${base(ctx)}/zoe/atendimentos/${id}`);
+    modal(`Ligação de ${a.telefone ? telefone(a.telefone) : 'número oculto'}`, () => [
+      el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Início'), el('strong', {}, dataHora(a.inicio))),
+      el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Cliente'), el('strong', {}, a.cliente_nome ? `${a.cliente_nome} (IXC ${a.cliente_id})` : 'não identificado')),
+      el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Resultado'), etiquetaZoe(a.resultado)),
+      a.fila ? el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Fila'), el('strong', {}, a.fila)) : null,
+      a.resumo ? el('p', { class: 'pequeno', style: 'margin:12px 0' }, el('strong', {}, 'Resumo para o atendente: '), a.resumo) : null,
+      tabela(['Hora', 'O que a ZOE fez', 'Detalhe', 'Situação'], a.acoes.map((x) => el('tr', {},
+        td(hora(x.criado_em)), td(ACOES_ZOE[x.tipo] ?? x.tipo), td(el('span', { class: 'pequeno' }, detalheAcaoZoe(x))),
+        td(x.sucesso ? etiqueta('ok', 'ok') : etiqueta('não', 'erro'))))),
+    ], { largo: true });
+  };
+
+  function desenharPainel() {
+    const h = dados.hoje;
+    const m = dados.mes;
+    limpar(painel,
+      el('div', { class: 'grade' },
+        indicador('Ligações hoje', inteiro(h.total), h.em_curso ? `${h.em_curso} em curso agora` : null),
+        indicador('Resolvidas pela ZOE', pct(h.resolvidos, h.total - h.em_curso), `${inteiro(h.resolvidos)} sem precisar de atendente`),
+        indicador('Transferidas hoje', inteiro(h.transferidos)),
+        indicador('Boletos enviados no mês', inteiro(m.boletos)),
+        indicador('Desbloqueios no mês', inteiro(m.desbloqueios))),
+      el('div', { class: 'grade-dash' },
+        el('div', { class: 'c4' }, cartao('Motivos das ligações de hoje', el('div', { class: 'coluna' }, Object.entries(MOTIVOS_ZOE).map(([k, r]) =>
+          el('div', {}, el('div', { class: 'pequeno mudo' }, r), barraUso(h[k], h.total || 0)))))),
+        el('div', { class: 'c8' }, cartao('Últimas ligações', tabela(['Início', 'Telefone', 'Cliente', 'Motivo', 'Resultado', 'Fila'], dados.ultimos.map((a) => {
+          const tr = el('tr', { class: 'clicavel', title: 'Ver o que a ZOE fez' },
+            td(dataHora(a.inicio)), td(a.telefone ? telefone(a.telefone) : '—', 'num'), td(a.cliente_nome ?? el('span', { class: 'mudo' }, 'não identificado')),
+            td(MOTIVOS_ZOE[a.motivo] ?? '—'), td(etiquetaZoe(a.resultado)), td(a.fila ?? '—'));
+          tr.addEventListener('click', () => abrirAtendimento(a.id).catch((err) => toast(err.message, true)));
+          return tr;
+        }), 'Nenhuma ligação atendida pela ZOE ainda.')))));
+  }
+
+  function desenharConfiguracao() {
+    const c = dados.config;
+    const filas = { '': 'Fila padrão da central', ...Object.fromEntries(dados.filas.map((f) => [f.id, f.nome])) };
+    const dis = !admin;
+    const f = el('form', { class: 'form' },
+      marcar('ZOE ligada (atende as ligações que a central enviar para ela)', { name: 'ativo', checked: c.ativo, disabled: dis }),
+      el('h3', { style: 'margin:8px 0 0' }, 'IXC Provedor'),
+      el('div', { class: 'duas' },
+        campo('Endereço do IXC', { name: 'ixc_url', type: 'url', placeholder: 'https://ixc.seuprovedor.com.br', value: c.ixc_url ?? '', disabled: dis }),
+        campo(c.token_configurado ? 'Token (configurado — deixe em branco para manter)' : 'Token do usuário da ZOE no IXC',
+          { name: 'ixc_token', type: 'password', autocomplete: 'off', placeholder: c.token_configurado ? '••••••••' : 'id:token', disabled: dis })),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Crie no IXC um usuário só para a ZOE, com permissão apenas para consultar clientes, contratos e faturas, '
+        + 'gerar boleto e fazer desbloqueio de confiança (Configurações > Usuários > Token). O token fica cifrado e não aparece de novo.'),
+      el('h3', { style: 'margin:8px 0 0' }, 'Desbloqueio de confiança'),
+      marcar('Permitir que a ZOE libere contratos bloqueados por atraso', { name: 'desbloqueio_ativo', checked: c.desbloqueio_ativo, disabled: dis }),
+      el('div', { class: 'duas' },
+        campo('Desbloqueios por cliente', { name: 'desbloqueio_limite', type: 'number', min: 0, max: 10, value: c.desbloqueio_limite, disabled: dis }),
+        campo('A cada (dias)', { name: 'desbloqueio_periodo_dias', type: 'number', min: 1, max: 365, value: c.desbloqueio_periodo_dias, disabled: dis })),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O prazo da liberação é o configurado no IXC. Bloqueio manual e contrato cancelado nunca são liberados pela ZOE.'),
+      el('h3', { style: 'margin:8px 0 0' }, 'Envio do boleto'),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Só para os contatos já cadastrados no IXC, nunca para um número informado na ligação.'),
+      marcar('E-mail (enviado pelo IXC)', { name: 'canal_email', checked: c.canal_email, disabled: dis }),
+      marcar('SMS (enviado pelo IXC)', { name: 'canal_sms', checked: c.canal_sms, disabled: dis }),
+      marcar('WhatsApp (pelo seu serviço de WhatsApp)', { name: 'canal_whatsapp', checked: c.canal_whatsapp, disabled: dis }),
+      campo('Endereço que recebe o boleto para enviar por WhatsApp (webhook)', { name: 'whatsapp_webhook', type: 'url', placeholder: 'https://…', value: c.whatsapp_webhook ?? '', disabled: dis }),
+      el('h3', { style: 'margin:8px 0 0' }, 'Transferência para atendente'),
+      el('div', { class: 'tres' },
+        escolha('Financeiro', 'fila_financeiro_id', filas, c.fila_financeiro_id ?? '', { disabled: dis }),
+        escolha('Suporte técnico', 'fila_suporte_id', filas, c.fila_suporte_id ?? '', { disabled: dis }),
+        escolha('Comercial', 'fila_comercial_id', filas, c.fila_comercial_id ?? '', { disabled: dis })),
+      admin ? el('div', { class: 'linha', style: 'gap:10px;flex-wrap:wrap' },
+        el('button', { class: 'btn primario largo' }, 'Salvar'),
+        botao('Testar conexão com o IXC', '', async () => {
+          const d = lerZoe(f);
+          await api.post(`${base(ctx)}/zoe/testar`, { ixc_url: d.ixc_url || undefined, ixc_token: d.ixc_token || undefined });
+          toast('Conexão com o IXC funcionando.');
+        })) : null);
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      acao(f.querySelector('button.primario'), async () => {
+        dados.config = await api.put(`${base(ctx)}/zoe`, lerZoe(f));
+        toast('Configuração da ZOE salva.');
+        desenharConfiguracao();
+      });
+    });
+    limpar(configuracao, cartao('Configuração da ZOE', f));
+  }
+
+  limpar(ctx.conteudo, el('div', { class: 'coluna' },
+    dados.config.ativo ? null : el('p', { class: 'aviso' }, 'A ZOE está desligada. Ligue o IXC abaixo e, na central telefônica, mande as ligações para o script da ZOE (veja o README).'),
+    painel, configuracao));
+  desenharPainel();
+  desenharConfiguracao();
+  ctx.parar(repetir(async () => {
+    const novo = await api.get(`${base(ctx)}/zoe`);
+    dados = { ...novo, config: dados.config };
+    desenharPainel();
+  }, 15_000));
+}
+
+function lerZoe(f) {
+  const d = Object.fromEntries(new FormData(f));
+  for (const k of ['ativo', 'desbloqueio_ativo', 'canal_email', 'canal_sms', 'canal_whatsapp']) d[k] = f.querySelector(`[name=${k}]`).checked;
+  if (!d.ixc_token) delete d.ixc_token;
+  return d;
+}
+
 export const TELAS_EMPRESA = {
   dashboard: telaDashboard, supervisao: telaSupervisao, campanhas: telaCampanhas, ramais: telaRamais, chamadas: telaChamadas, crm: telaCrm,
-  terminacao: telaTerminacao, numeros: telaNumeros, recursos: telaRecursos, relatorios: telaRelatorios, configuracoes: telaConfiguracoes, integracoes: telaIntegracoes,
+  terminacao: telaTerminacao, numeros: telaNumeros, recursos: telaRecursos, relatorios: telaRelatorios, configuracoes: telaConfiguracoes, integracoes: telaIntegracoes, zoe: telaZoe,
 };

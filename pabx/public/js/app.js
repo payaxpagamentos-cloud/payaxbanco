@@ -18,6 +18,7 @@ const MENU_MASTER = [
 ];
 const MENU_EMPRESA = [
   ['dashboard', 'Dashboard', 'dashboard', null, [['dashboard', 'Dashboard'], ['supervisao', 'Supervisão de campanhas']]],
+  ['zoe', 'ZOE', 'zoe'],
   ['campanhas', 'Campanhas', 'campanhas'], ['ramais', 'Pessoas / Ramais', 'pessoas'], ['chamadas', 'Chamadas', 'chamadas'], ['crm', 'CRM', 'crm'],
   ['terminacao', 'Terminação', 'terminacao'], ['numeros', 'Números Entrantes', 'numeros'], ['recursos', 'Recursos PABX', 'recursos'],
   ['relatorios', 'Relatórios', 'relatorios'], ['configuracoes', 'Configurações', 'configuracoes'],

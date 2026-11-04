@@ -158,7 +158,7 @@ input:focus, select:focus, textarea:focus{ outline: 2px solid var(--azul); outli
 .etiqueta{ display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 11px; font-weight: 800; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
 .etiqueta.ok{ background: var(--ok-bg); color: var(--ok); }
 .etiqueta.erro{ background: var(--erro-bg); color: var(--erro); }
-.etiqueta.aviso{ background: var(--aviso-bg); color: var(--aviso); }
+.etiqueta.aviso{ background: var(--aviso-bg); color: var(--aviso); padding: 2px 10px; border-radius: 999px; font-size: 11px; }
 .etiqueta.info{ background: var(--info-bg); color: var(--azul); }
 .bolinha{ display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--text-3); }
 .bolinha.ok{ background: var(--ok); } .bolinha.erro{ background: var(--erro); } .bolinha.aviso{ background: var(--aviso); }

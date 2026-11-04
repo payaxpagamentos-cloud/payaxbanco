@@ -465,5 +465,8 @@ module.exports = (db) => {
     res.status(204).end();
   });
 
+  // ---------- ZOE (atendente virtual ligada ao IXC) ----------
+  r.use('/zoe', require('../zoe/rotas').rotasPainel(db));
+
   return r;
 };
