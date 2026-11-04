@@ -53,7 +53,8 @@ function criarApp(db, extras = {}) {
   r.get('/vendor/maplibre-leaflet.js', (_req, res) => res.sendFile(require.resolve('@maplibre/maplibre-gl-leaflet'), { maxAge: '7d' }));
   // "/compartilhar" sem a barra final leva a "/compartilhar/" (a página usa caminhos relativos à pasta).
   r.get(/^\/compartilhar$/, (req, res) => res.redirect(`${req.baseUrl}/compartilhar/`));
-  r.use(express.static(path.join(__dirname, '..', 'public')));
+  // no-cache: o navegador sempre confere se há versão nova das telas (evita ficar com a versão antiga depois de atualizar).
+  r.use(express.static(path.join(__dirname, '..', 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   if (config.basePath) {
     app.get(config.basePath, (req, res, next) => (req.originalUrl.split('?')[0] === config.basePath ? res.redirect(`${config.basePath}/`) : next()));
     app.get('/', (_req, res) => res.redirect(`${config.basePath}/`));
