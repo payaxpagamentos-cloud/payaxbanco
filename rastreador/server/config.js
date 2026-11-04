@@ -46,11 +46,10 @@ module.exports = {
     estilo_padrao: !process.env.RASTREADOR_MAPA_ESTILO,
     atribuicao_vetorial: process.env.RASTREADOR_MAPA_ATRIBUICAO_VETORIAL
       || '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> &copy; colaboradores do OpenStreetMap',
-    // Camada de imagens (reserva quando o navegador não tem WebGL): CARTO Voyager. Os servidores do OpenStreetMap não são usados,
-    // porque bloqueiam sistemas com muitos acessos. O domínio entra na política de segurança das páginas.
-    tiles: process.env.RASTREADOR_MAPA_TILES || 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    atribuicao: process.env.RASTREADOR_MAPA_ATRIBUICAO
-      || '&copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> &copy; colaboradores do OpenStreetMap',
+    // Camada de imagens (reserva quando o navegador não tem WebGL): mapa de ruas da Esri. Os servidores do OpenStreetMap bloqueiam
+    // sistemas com muitos acessos e o CARTO passou a exigir chave. O domínio entra na política de segurança das páginas.
+    tiles: process.env.RASTREADOR_MAPA_TILES || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    atribuicao: process.env.RASTREADOR_MAPA_ATRIBUICAO || 'Mapa &copy; Esri, HERE, Garmin, colaboradores do OpenStreetMap',
     // Satélite (botão Mapa / Satélite): imagem do Esri World Imagery com os nomes de ruas e lugares por cima (como o modo híbrido).
     // Para outro provedor (ex.: MapTiler com chave), troque as URLs; RASTREADOR_SATELITE_ROTULOS vazio tira os nomes.
     satelite: {
@@ -70,6 +69,8 @@ module.exports = {
     reverso: String(process.env.RASTREADOR_GEOCODER_REVERSO_URL ?? 'https://nominatim.openstreetmap.org').replace(/\/+$/, ''),
     timeoutMs: Number(process.env.RASTREADOR_GEOCODER_TIMEOUT_MS) || 6000,
   },
+  // Mapas do Google (Map Tiles API). Com a chave, o mapa de ruas e o satélite passam a ser os do Google; sem ela, os gratuitos.
+  google: { chave: process.env.RASTREADOR_GOOGLE_MAPS_CHAVE || '' },
   admin: {
     nome: process.env.RASTREADOR_ADMIN_NOME || 'Master',
     email: process.env.RASTREADOR_ADMIN_EMAIL || 'master@rastreador.com.br',

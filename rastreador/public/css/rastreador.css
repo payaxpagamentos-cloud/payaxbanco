@@ -296,6 +296,8 @@ pre.codigo{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; backgr
 .pino.inicio{ background: #16A34A; } .pino.fim{ background: #DC2626; } .pino.parada{ background: #7C3AED; } .pino.alerta{ background: #F59E0B; color: #111827; }
 .pino.vertice{ width: 16px; height: 16px; font-size: 8px; background: #111827; }
 .leaflet-container{ font-family: inherit; }
+/* Logo do Google (exigido com os mapas do Google) */
+.logo-google{ height: 18px; margin: 0 0 4px 4px !important; pointer-events: none; }
 /* Botão Mapa / Satélite */
 .seletor-camada{ display: flex; background: var(--surface); border-radius: 8px; padding: 3px; box-shadow: var(--shadow-flutuante); gap: 2px; }
 .seletor-camada button{ border: 0; background: none; cursor: pointer; padding: 5px 12px; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 600;
@@ -353,8 +355,32 @@ pre.codigo{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; backgr
 .busca-mapa .resultados .vazio{ padding: 10px; font-size: 13px; color: var(--text-3); }
 .pino-busca{ width: 26px; height: 34px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 34'%3E%3Cpath d='M13 1C6.4 1 1 6.3 1 12.8 1 21.7 13 33 13 33s12-11.3 12-20.2C25 6.3 19.6 1 13 1z' fill='%23DC2626' stroke='%23fff' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='4.5' fill='%23fff'/%3E%3C/svg%3E") no-repeat center / contain;
   filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
-.painel-veiculo{ top: 64px; max-height: calc(100% - 76px); }
-.local-veiculo{ background: var(--surface-2); border-radius: 8px; padding: 9px 11px; font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
+/* Faixa do veículo escolhido, embaixo do mapa (como nos aplicativos de mapa) */
+.painel-veiculo{ top: auto; bottom: 46px; left: 12px; right: 64px; width: auto; max-height: 46%; padding: 0; overflow: hidden; display: flex; }
+.painel-veiculo .faixa{ display: flex; flex-direction: column; width: 100%; min-height: 0; }
+.faixa-topo{ display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 10px 16px; }
+.faixa-titulo{ display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; min-width: 0; }
+.faixa-titulo h2{ margin: 0; font-size: 17px; }
+.faixa-titulo .mudo{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.faixa.recolhida .faixa-corpo{ display: none; }
+.faixa.recolhida .faixa-topo .icone-btn svg{ transform: rotate(90deg); }
+.faixa-topo .icone-btn svg{ transform: rotate(-90deg); transition: transform .15s; }
+.faixa-topo .fechar-faixa svg{ transform: none; }
+.faixa-corpo{ display: grid; grid-template-columns: minmax(220px, 1.1fr) minmax(0, 2fr); gap: 10px 16px; padding: 0 16px 14px; overflow-y: auto; align-items: start; }
+.local-veiculo{ display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 600;
+  line-height: 1.4; }
+.local-veiculo svg{ width: 18px; height: 18px; flex: none; color: var(--azul); margin-top: 1px; }
+.local-veiculo a{ display: block; font-weight: 500; margin-top: 3px; }
+.dados-veiculo{ display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.dado{ display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+.dado span{ font-size: 11px; color: var(--text-3); font-weight: 600; }
+.dado strong{ font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.faixa .acoes-veiculo{ grid-column: 1 / -1; margin-top: 0; padding-top: 10px; }
+@media (max-width: 860px){
+  .painel-veiculo{ left: 8px; right: 8px; bottom: 8px; max-height: 60%; }
+  .faixa-corpo{ grid-template-columns: 1fr; }
+  .dados-veiculo{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 /* ---------- Tela de entrada: cidade em 3D ao fundo e o login num cartão de vidro ---------- */
 .entrada-3d{ position: relative; min-height: 100vh; overflow: hidden; background: radial-gradient(120% 90% at 30% 20%, #0B1A33 0%, #050A14 55%, #02050B 100%);

@@ -3,7 +3,7 @@ import { api, qs, baixar, BASE } from './api.js';
 import { el, limpar, dinheiro, dataHora, hora, data, desde, km, kmh, placa, telefone, inteiro, toast, acao, campo, escolha, marcar, formModal, modal, confirmar,
   perguntar, repetir, etiqueta, etiquetaSituacao, etiquetaComando, etiquetaAlerta, hojeLocal, somarDias, centavos, icone, PERFIS, TIPOS_VEICULO,
   TIPOS_ALERTA, TIPOS_COMANDO, PROTOCOLOS } from './ui.js';
-import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, linhaDado, campoData, painelMapa, resumoVeiculo, painelIntegracoes } from './comum.js';
+import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, linhaDado, campoData, painelMapa, faixaVeiculo, painelIntegracoes } from './comum.js';
 import { criarMapa, configPublica, linkGoogle, COR_SITUACAO } from './mapa.js';
 import { pizza, barras } from './graficos.js';
 
@@ -62,21 +62,21 @@ async function telaMapa(ctx) {
 
 function detalheVeiculo(ctx, v, painel, fechar) {
   const comComandos = pode(ctx) && v.imei && v.protocolo !== 'osmand';
-  limpar(painel,
-    el('div', { class: 'linha entre' }, el('h2', { style: 'margin:0' }, placa(v.placa)), botaoIcone('seta', 'Fechar', fechar)),
-    el('div', { class: 'pequeno mudo' }, [v.descricao, TIPOS_VEICULO[v.tipo]].filter(Boolean).join(' · ')),
-    el('div', { class: 'linha', style: 'margin-top:8px;gap:6px' }, etiquetaSituacao(v.situacao), v.bloqueado ? etiqueta('bloqueado', 'erro') : null,
-      v.alertas_pendentes ? el('a', { class: 'etiqueta aviso', href: `#/empresa/${ctx.empresaId}/alertas`, style: 'text-decoration:none' }, `${v.alertas_pendentes} alerta(s)`) : null),
-    resumoVeiculo(v),
-    el('div', { class: 'acoes-veiculo' },
+  limpar(painel, faixaVeiculo(v, {
+    titulo: [v.descricao, TIPOS_VEICULO[v.tipo]].filter(Boolean).join(' · '),
+    etiquetas: [etiquetaSituacao(v.situacao), v.bloqueado ? etiqueta('bloqueado', 'erro') : null,
+      v.alertas_pendentes ? el('a', { class: 'etiqueta aviso', href: `#/empresa/${ctx.empresaId}/alertas`, style: 'text-decoration:none' }, `${v.alertas_pendentes} alerta(s)`) : null],
+    acoes: [
       el('button', { class: 'btn pequeno', onclick: () => { veiculoHistorico = v.id; ctx.ir('historico'); } }, icone('historico'), 'Histórico'),
       pode(ctx) ? botao('Compartilhar', '', () => compartilhar(ctx, v)) : null,
       comComandos ? botao('Pedir posição', '', () => enviarComando(ctx, v, 'localizar')) : null,
       comComandos ? botao('Consultar estado', '', () => enviarComando(ctx, v, 'status')) : null,
       comComandos ? (v.bloqueado
         ? botao('Desbloquear', 'primario', () => enviarComando(ctx, v, 'desbloquear'))
-        : botao('Bloquear', 'perigo', () => enviarComando(ctx, v, 'bloquear'))) : null),
-    v.protocolo === 'osmand' ? el('p', { class: 'pequeno fraco' }, 'Rastreador por celular: não recebe comandos de bloqueio.') : null);
+        : botao('Bloquear', 'perigo', () => enviarComando(ctx, v, 'bloquear'))) : null,
+    ],
+    fechar,
+  }));
 }
 
 /** Envia o comando; bloquear pede a placa digitada, porque corta o combustível ou a ignição do veículo. */

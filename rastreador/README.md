@@ -13,7 +13,7 @@ próprios veículos.
 
 Sistema independente: servidor, banco de dados (SQLite), usuários e login próprios. Mapa vetorial moderno, no estilo dos aplicativos de
 navegação (MapLibre com os estilos gratuitos do OpenFreeMap: "Liberty" no tema claro e "Dark" no escuro); sem WebGL no navegador, usa a
-camada de imagens do CARTO (os servidores do OpenStreetMap não são usados). Outro estilo (MapTiler, Stadia…) entra pelo `.env` (`RASTREADOR_MAPA_ESTILO`).
+camada de ruas da Esri (os servidores do OpenStreetMap não são usados). Outro estilo (MapTiler, Stadia…) entra pelo `.env` (`RASTREADOR_MAPA_ESTILO`).
 Todos os mapas têm o botão **Satélite / Mapa**. O padrão é o satélite híbrido, como o dos aplicativos de mapa: foto aérea (Esri World Imagery)
 com os nomes de bairros, ruas e lugares (com os ícones) por cima; o Mapa de ruas tem visual moderno (fundo claro, ruas brancas, avenidas em
 amarelo, prédios planos). Zoom até 20; a escolha fica lembrada no navegador. O **campo de busca** no mapa encontra rua e número, bairro ou lugar
@@ -54,6 +54,18 @@ modelo, usados sempre que o rastreador está cadastrado com o modelo "J16 4G":
    Chip **M2M** com plano de dados.
 5. Sem o aparelho em mãos, dá para testar com o simulador, que se conecta como o J16 e responde aos comandos:
    `npm run simular -- 866557088453933 SEU-SERVIDOR 5023`.
+
+## Mapas do Google (opcional)
+
+Com a chave do Google no `.env` (`RASTREADOR_GOOGLE_MAPS_CHAVE`), o botão **Satélite / Mapa** passa a mostrar o satélite (com os nomes por
+cima) e as ruas do próprio Google, em alta resolução, com o logo e os créditos que o Google exige. Sem a chave, ficam os mapas gratuitos.
+
+1. No [Google Cloud Console](https://console.cloud.google.com/): crie um projeto e ative o **faturamento** (o Google tem cota mensal gratuita
+   e cobra pelas imagens acima dela; confira a tabela de preços da Map Tiles API).
+2. Em **APIs e serviços → Biblioteca**, ative a **Map Tiles API**.
+3. Em **APIs e serviços → Credenciais → Criar credenciais → Chave de API**. Em "Restrições de API", deixe só a **Map Tiles API**.
+   Crie também um **alerta de orçamento** em Faturamento.
+4. No servidor, acrescente ao `.env` a linha `RASTREADOR_GOOGLE_MAPS_CHAVE=SUA_CHAVE` e rode `pm2 restart rastreador`.
 
 ## Como os veículos chegam ao sistema
 

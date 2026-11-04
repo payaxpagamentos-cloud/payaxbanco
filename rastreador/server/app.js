@@ -6,7 +6,7 @@ const config = require('./config');
 const { criarApi, tratarErro } = require('./api');
 const { limitar } = require('./lib/limitador');
 
-/** Origem da camada de imagens do mapa (ex.: https://*.basemaps.cartocdn.com), liberada na política de segurança. */
+/** Origem da camada de imagens do mapa (ex.: https://server.arcgisonline.com), liberada na política de segurança. */
 const origemTiles = (() => {
   try {
     return new URL(config.mapa.tiles.replace(/\{s\}/, 'a').replace(/\{[^}]+\}/g, '0')).origin.replace('://a.', '://*.');
@@ -18,8 +18,10 @@ const origemTiles = (() => {
 const origensVetor = [...new Set([config.mapa.estilo, config.mapa.estilo_escuro].filter(Boolean).map((u) => { try { return new URL(u).origin; } catch { return ''; } }))].join(' ');
 /** Origens das imagens de satélite e dos nomes por cima delas. */
 const origensSatelite = [...new Set([config.mapa.satelite.tiles, ...config.mapa.satelite.rotulos].map((u) => { try { return new URL(u.replace(/\{[^}]+\}/g, '0')).origin; } catch { return ''; } }))].join(' ');
-const CSP = [`default-src 'self'`, `img-src 'self' data: blob: ${origemTiles} ${origensVetor} ${origensSatelite}`, `style-src 'self' 'unsafe-inline'`, `font-src 'self'`, `script-src 'self'`,
-  `connect-src 'self' ${origensVetor} ${origensSatelite}`, `worker-src 'self' blob:`, `frame-ancestors 'none'`].join('; ');
+/** Com a chave do Google: as imagens do mapa, os créditos da área visível e o logo do Google. */
+const origensGoogle = config.google.chave ? 'https://tile.googleapis.com https://maps.gstatic.com' : '';
+const CSP = [`default-src 'self'`, `img-src 'self' data: blob: ${origemTiles} ${origensVetor} ${origensSatelite} ${origensGoogle}`, `style-src 'self' 'unsafe-inline'`, `font-src 'self'`, `script-src 'self'`,
+  `connect-src 'self' ${origensVetor} ${origensSatelite} ${origensGoogle}`, `worker-src 'self' blob:`, `frame-ancestors 'none'`].join('; ');
 
 function criarApp(db, extras = {}) {
   const app = express();

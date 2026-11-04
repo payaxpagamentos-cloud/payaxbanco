@@ -66,7 +66,7 @@ async function fundoVetorial(L, cfg) {
   }
 }
 
-/** Reserva sem WebGL: camadas de imagens (ruas do CARTO; satélite com os nomes por cima). */
+/** Reserva sem WebGL: camadas de imagens (ruas da Esri; satélite com os nomes por cima). */
 function fundoImagens(L, cfg) {
   const s = cfg.mapa.satelite;
   return {
@@ -75,8 +75,65 @@ function fundoImagens(L, cfg) {
   };
 }
 
+/**
+ * Mapas do Google (com a chave no servidor): ruas e satélite com os nomes por cima, em alta resolução. O Google exige o logo e
+ * os créditos da área visível, que são atualizados quando o mapa para de mexer.
+ */
+function fundoGoogle(L, m, g) {
+  const url = (tipo) => `https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${encodeURIComponent(g.sessoes[tipo])}&key=${encodeURIComponent(g.chave)}`;
+  const camadas = {
+    mapa: L.tileLayer(url('mapa'), { maxZoom: 21, maxNativeZoom: 21 }),
+    satelite: L.tileLayer(url('satelite'), { maxZoom: 21, maxNativeZoom: 20 }),
+  };
+  m.setMaxZoom(21);
+  const Logo = L.Control.extend({
+    options: { position: 'bottomleft' },
+    onAdd() {
+      const img = L.DomUtil.create('img', 'logo-google');
+      Object.assign(img, { src: 'https://maps.gstatic.com/mapfiles/api-3/images/google_white5.png', alt: 'Google' });
+      return img;
+    },
+  });
+  new Logo().addTo(m);
+  let atual = null;
+  let creditos = 'Google';
+  let timer = null;
+  const atualizarCreditos = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const b = m.getBounds();
+      const q = new URLSearchParams({ session: g.sessoes[atual], key: g.chave, zoom: String(Math.round(m.getZoom())),
+        north: b.getNorth().toFixed(5), south: b.getSouth().toFixed(5), east: b.getEast().toFixed(5), west: b.getWest().toFixed(5) });
+      try {
+        const r = await (await fetch(`https://tile.googleapis.com/tile/v1/viewport?${q}`)).json();
+        m.attributionControl.removeAttribution(creditos);
+        // O texto do Google já traz o ©; só traduz os termos.
+        creditos = r.copyright ? r.copyright.replace(/Map data/g, 'Dados do mapa').replace(/Imagery/g, 'Imagens') : 'Google';
+        m.attributionControl.addAttribution(creditos);
+      } catch { /* mantém os créditos anteriores */ }
+    }, 400);
+  };
+  m.on('moveend', atualizarCreditos);
+  return {
+    camadas,
+    mostrar(tipo) {
+      if (atual) m.removeLayer(camadas[atual]);
+      atual = tipo;
+      camadas[atual].addTo(m);
+      atualizarCreditos();
+    },
+  };
+}
+
 /** Fundo do mapa e o botão Mapa / Satélite. */
 async function fundo(L, m, div, cfg) {
+  if (cfg.google) {
+    const g = fundoGoogle(L, m, cfg.google);
+    let atual = lerCamada();
+    g.mostrar(atual);
+    div.classList.toggle('mapa-satelite', atual === 'satelite');
+    return seletorCamada(L, m, () => atual, (novo) => { atual = novo; g.mostrar(novo); div.classList.toggle('mapa-satelite', novo === 'satelite'); });
+  }
   const vetor = await fundoVetorial(L, cfg);
   const temSatelite = vetor ? vetor.temSatelite : Boolean(cfg.mapa.satelite?.tiles);
   let atual = temSatelite ? lerCamada() : 'mapa';
@@ -97,24 +154,31 @@ async function fundo(L, m, div, cfg) {
   m.attributionControl.addAttribution(creditos[atual]);
   div.classList.toggle('mapa-satelite', atual === 'satelite');
   if (!temSatelite) return;
+  seletorCamada(L, m, () => atual, (k) => {
+    m.attributionControl.removeAttribution(creditos[atual]);
+    trocar(k);
+    m.attributionControl.addAttribution(creditos[atual]);
+    div.classList.toggle('mapa-satelite', atual === 'satelite');
+  });
+}
+
+/** Botão Satélite / Mapa no canto do mapa; a escolha fica lembrada no navegador. */
+function seletorCamada(L, m, atual, trocar) {
   const Seletor = L.Control.extend({
     options: { position: 'topright' },
     onAdd() {
       const caixa = L.DomUtil.create('div', 'seletor-camada');
       L.DomEvent.disableClickPropagation(caixa);
       const botoes = ['satelite', 'mapa'].map((k) => {
-        const b = L.DomUtil.create('button', k === atual ? 'on' : '', caixa);
+        const b = L.DomUtil.create('button', k === atual() ? 'on' : '', caixa);
         b.type = 'button';
         b.textContent = k === 'mapa' ? 'Mapa' : 'Satélite';
         b.title = k === 'mapa' ? 'Mapa de ruas' : 'Imagem de satélite com os nomes de bairros, ruas e lugares';
         b.addEventListener('click', () => {
-          if (k === atual) return;
-          m.attributionControl.removeAttribution(creditos[atual]);
+          if (k === atual()) return;
           trocar(k);
-          m.attributionControl.addAttribution(creditos[atual]);
-          div.classList.toggle('mapa-satelite', atual === 'satelite');
           for (const x of botoes) x.classList.toggle('on', x === b);
-          try { localStorage.setItem(CHAVE_CAMADA, atual); } catch { /* sem armazenamento: só nesta tela */ }
+          try { localStorage.setItem(CHAVE_CAMADA, k); } catch { /* sem armazenamento: só nesta tela */ }
         });
         return b;
       });
@@ -218,7 +282,11 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
     aoClicar: (fn) => m.on('click', (e) => fn({ lat: e.latlng.lat, lng: e.latlng.lng })),
     centro: () => { const c = m.getCenter(); return { lat: c.lat, lng: c.lng }; },
     // Ao escolher um veículo, vai direto para o zoom de rua (17), sem afastar se já estiver mais perto.
-    ir: (lat, lng, z) => m.setView([lat, lng], z ?? Math.max(m.getZoom(), 17)),
+    // `cobertoEmbaixo`: altura (px) coberta por um painel na parte de baixo; o ponto fica no meio do que sobra.
+    ir: (lat, lng, z, { cobertoEmbaixo = 0 } = {}) => {
+      m.setView([lat, lng], z ?? Math.max(m.getZoom(), 17), { animate: false });
+      if (cobertoEmbaixo) m.panBy([0, cobertoEmbaixo / 2], { animate: false });
+    },
     enquadrar(pontos, zoomMax = 17) {
       const p = pontos.filter((x) => x && Number.isFinite(x[0]) && Number.isFinite(x[1]));
       if (p.length === 1) m.setView(p[0], zoomMax);

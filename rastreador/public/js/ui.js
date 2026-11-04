@@ -221,6 +221,7 @@ const P = {
   play: 'M7 4l13 8-13 8z',
   pausa: 'M7 4h3v16H7zM14 4h3v16h-3z',
   check: 'M4 12l5 5L20 6',
+  fechar: 'M6 6l12 12M18 6 6 18',
 };
 export function icone(nome) {
   return el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },

@@ -6,6 +6,7 @@ const config = require('./config');
 const { autenticar, acessoEmpresa } = require('./auth');
 const { ErroNegocio } = require('./lib/erros');
 const { lerConfig, agora } = require('./db');
+const { sessoesGoogle } = require('./lib/google');
 
 /** `extras.gt06`: o servidor dos rastreadores GT06 (conexões abertas e entrega de comandos), quando estiver ligado. */
 function criarApi(db, extras = {}) {
@@ -16,7 +17,14 @@ function criarApi(db, extras = {}) {
     db.prepare('SELECT 1').get();
     res.json({ ok: true });
   });
-  api.get('/publico', (_req, res) => res.json({ nome: lerConfig(db).nome_plataforma, mapa: config.mapa, gt06_porta: config.portaGt06, busca: Boolean(config.geocoder.url) }));
+  api.get('/publico', async (_req, res, next) => {
+    try {
+      res.json({ nome: lerConfig(db).nome_plataforma, mapa: config.mapa, gt06_porta: config.portaGt06, busca: Boolean(config.geocoder.url),
+        google: await sessoesGoogle() });
+    } catch (err) {
+      next(err);
+    }
+  });
 
   /** Localização compartilhada por link (sem login), enquanto o link vale e a empresa está ativa. */
   api.get('/publico/compartilhado/:codigo', (req, res) => {

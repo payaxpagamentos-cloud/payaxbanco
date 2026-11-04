@@ -1,6 +1,6 @@
 /** Peças usadas tanto no painel do master quanto no das empresas. */
 import { api, BASE } from './api.js';
-import { el, limpar, dataHora, desde, km, kmh, placa, telefone, toast, acao, campo, escolha, modal, formModal, confirmar, icone, repetir, etiquetaSituacao,
+import { el, limpar, dataHora, desde, km, kmh, placa, telefone, toast, acao, campo, escolha, modal, formModal, confirmar, icone, repetir, etiquetaSituacao, etiqueta,
   SITUACOES, TIPOS_VEICULO } from './ui.js';
 import { criarMapa, linkGoogle, enderecoDe } from './mapa.js';
 
@@ -82,17 +82,18 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
   function escolher(v, centralizar) {
     estado.selecionado = v.id;
     desenharLista();
-    if (centralizar && mapa && v.lat !== null) mapa.ir(v.lat, v.lng);
     if (!detalhe) {
-      limpar(painel, el('div', { class: 'linha entre' }, el('h2', { style: 'margin:0' }, placa(v.placa)), botaoIcone('seta', 'Fechar', () => fecharPainel())),
-        el('div', { class: 'pequeno mudo' }, v.empresa), etiquetaSituacao(v.situacao), resumoVeiculo(v),
-        mostrarEmpresa ? el('a', { class: 'btn pequeno', href: `#/empresa/${v.empresa_id}/mapa`, style: 'margin-top:10px' }, 'Abrir no painel da empresa') : null);
-      painel.classList.remove('oculto');
-      return;
+      limpar(painel, faixaVeiculo(v, {
+        titulo: [v.descricao, v.empresa].filter(Boolean).join(' · '), etiquetas: [etiquetaSituacao(v.situacao), v.bloqueado ? etiqueta('bloqueado', 'erro') : null],
+        acoes: [mostrarEmpresa ? el('a', { class: 'btn pequeno', href: `#/empresa/${v.empresa_id}/mapa` }, 'Abrir no painel da empresa') : null], fechar: fecharPainel,
+      }));
+    } else {
+      ultimoDetalhe = v.id;
+      detalhe(v, painel, fecharPainel);
     }
-    ultimoDetalhe = v.id;
     painel.classList.remove('oculto');
-    detalhe(v, painel, fecharPainel);
+    // Centraliza o veículo na parte do mapa que a faixa não cobre.
+    if (centralizar && mapa && v.lat !== null) mapa.ir(v.lat, v.lng, undefined, { cobertoEmbaixo: painel.offsetHeight + 12 });
   }
   function fecharPainel() {
     estado.selecionado = null;
@@ -128,20 +129,50 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
 }
 
 /** Dados de leitura do veículo (posição, velocidade, ignição, comunicação, hodômetro). */
+/** Endereço de onde o veículo está (preenchido quando a busca responde), com o link para abrir no Google Maps. */
+export function enderecoVeiculo(v) {
+  if (v.lat === null) return el('div', { class: 'local-veiculo' }, 'Aguardando a primeira posição');
+  const texto = el('span', {}, 'buscando endereço…');
+  enderecoDe(v.lat, v.lng).then((e) => { texto.textContent = e?.completo || 'endereço não encontrado'; });
+  return el('div', { class: 'local-veiculo' }, icone('cercas'), el('div', {}, texto,
+    el('a', { href: linkGoogle(v.lat, v.lng), target: '_blank', rel: 'noopener', class: 'pequeno' }, `${v.lat.toFixed(5)}, ${v.lng.toFixed(5)} · abrir no Google Maps`)));
+}
+
+/** Dados do veículo em blocos pequenos (velocidade, ignição, posição, comunicação, motorista, hodômetro, bateria). */
 export function resumoVeiculo(v) {
-  // Endereço de onde o veículo está (preenchido quando a busca responde).
-  const endereco = el('span', { class: 'endereco-veiculo' }, v.lat !== null ? 'buscando endereço…' : '—');
-  if (v.lat !== null) enderecoDe(v.lat, v.lng).then((e) => { endereco.textContent = e?.completo || 'endereço não encontrado'; });
-  return el('div', { class: 'coluna', style: 'gap:0;margin-top:10px' },
-    v.lat !== null ? el('div', { class: 'local-veiculo' }, endereco) : null,
-    linhaDado('Velocidade', v.posicao_em ? kmh(v.velocidade_kmh) : null),
-    linhaDado('Ignição', v.ignicao === 1 ? 'ligada' : v.ignicao === 0 ? 'desligada' : 'não informada'),
-    linhaDado('Última posição', v.posicao_em ? `${dataHora(v.posicao_em)} (${desde(v.posicao_em)})` : null),
-    linhaDado('Última comunicação', v.comunicacao_em ? desde(v.comunicacao_em) : 'nunca'),
-    v.motorista ? linhaDado('Motorista', v.motorista_telefone ? `${v.motorista} · ${telefone(v.motorista_telefone)}` : v.motorista) : null,
-    linhaDado('Hodômetro', km(v.hodometro_m)),
-    v.tensao !== null && v.tensao !== undefined ? linhaDado('Bateria', `${Number(v.tensao).toFixed(1)} V`) : null,
-    v.lat !== null ? linhaDado('Coordenadas', el('a', { href: linkGoogle(v.lat, v.lng), target: '_blank', rel: 'noopener' }, `${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}`)) : null);
+  const bloco = (rotulo, valor) => el('div', { class: 'dado' }, el('span', {}, rotulo), el('strong', {}, valor ?? '—'));
+  return el('div', { class: 'dados-veiculo' },
+    bloco('Velocidade', v.posicao_em ? kmh(v.velocidade_kmh) : null),
+    bloco('Ignição', v.ignicao === 1 ? 'Ligada' : v.ignicao === 0 ? 'Desligada' : '—'),
+    bloco('Última posição', v.posicao_em ? desde(v.posicao_em) : null),
+    bloco('Comunicação', v.comunicacao_em ? desde(v.comunicacao_em) : 'nunca'),
+    bloco('Hodômetro', km(v.hodometro_m)),
+    v.tensao !== null && v.tensao !== undefined ? bloco('Bateria', `${Number(v.tensao).toFixed(1)} V`) : null,
+    v.motorista ? bloco('Motorista', v.motorista_telefone ? `${v.motorista} · ${telefone(v.motorista_telefone)}` : v.motorista) : null);
+}
+
+/**
+ * Faixa do veículo escolhido, embaixo do mapa (como nos aplicativos de mapa): placa e endereço, os dados e as ações.
+ * O botão recolher deixa só a primeira linha. `acoes` são os botões (podem não existir).
+ */
+export function faixaVeiculo(v, { titulo, etiquetas = [], acoes = [], fechar }) {
+  const faixa = el('div', { class: 'faixa' });
+  let recolhida = false;
+  try { recolhida = localStorage.getItem('rastreador.faixa') === 'recolhida'; } catch { /* padrão: aberta */ }
+  const alternar = el('button', { class: 'icone-btn', type: 'button', title: 'Recolher / abrir', 'aria-label': 'Recolher ou abrir os dados do veículo' }, icone('seta'));
+  const aplicar = () => { faixa.classList.toggle('recolhida', recolhida); };
+  alternar.addEventListener('click', () => {
+    recolhida = !recolhida;
+    aplicar();
+    try { localStorage.setItem('rastreador.faixa', recolhida ? 'recolhida' : 'aberta'); } catch { /* só nesta tela */ }
+  });
+  faixa.append(
+    el('div', { class: 'faixa-topo' },
+      el('div', { class: 'faixa-titulo' }, el('h2', {}, placa(v.placa)), el('span', { class: 'pequeno mudo' }, titulo), ...etiquetas),
+      el('div', { class: 'linha', style: 'gap:2px' }, alternar, botaoIcone('fechar', 'Fechar', fechar, 'fechar-faixa'))),
+    el('div', { class: 'faixa-corpo' }, enderecoVeiculo(v), resumoVeiculo(v), acoes.filter(Boolean).length ? el('div', { class: 'acoes-veiculo' }, acoes) : null));
+  aplicar();
+  return faixa;
 }
 
 // ---------- Integrações ----------
