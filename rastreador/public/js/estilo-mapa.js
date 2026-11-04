@@ -78,7 +78,9 @@ export function modernizar(estilo) {
  */
 export function hibrido(estilo, satelite) {
   const s = structuredClone(estilo);
-  s.sources = { ...s.sources, satelite: { type: 'raster', tiles: [satelite.tiles], tileSize: 256, maxzoom: 19 } };
+  // tileSize 128: cada imagem de 256 px ocupa 128 px na tela, então o mapa sempre usa a foto um nível mais detalhada
+  // (sem isso, ele estica a foto do nível anterior e a imagem fica borrada, ainda mais em telas com escala de 125% ou mais).
+  s.sources = { ...s.sources, satelite: { type: 'raster', tiles: [satelite.tiles], tileSize: 128, maxzoom: 19 } };
   const vias = s.layers.filter((l) => l.type === 'line' && /^road_(motorway|trunk_primary|secondary_tertiary|link)$|^bridge_(motorway|trunk_primary)$/.test(l.id))
     .map((l) => ({ ...l, paint: { ...l.paint, 'line-color': /secondary_tertiary/.test(l.id) ? '#FFFFFF' : '#F6D27A', 'line-opacity': /secondary_tertiary/.test(l.id) ? 0.3 : 0.5 } }));
   // Nomes de bairros e cidades maiores, como no satélite dos aplicativos de mapa.

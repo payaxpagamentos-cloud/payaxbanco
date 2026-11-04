@@ -298,6 +298,11 @@ pre.codigo{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; backgr
 .leaflet-container{ font-family: inherit; }
 /* Logo do Google (exigido com os mapas do Google) */
 .logo-google{ height: 18px; margin: 0 0 4px 4px !important; pointer-events: none; }
+/* Tela cheia do mapa */
+.botao-tela-cheia a{ display: grid !important; place-items: center; width: 30px; height: 30px; color: #111827; }
+.botao-tela-cheia svg{ width: 16px; height: 16px; }
+.area-mapa:fullscreen{ background: var(--surface-2); }
+.area-mapa.mapa-cheio{ position: fixed; inset: 0; z-index: 4000; }
 /* Botão Mapa / Satélite */
 .seletor-camada{ display: flex; background: var(--surface); border-radius: 8px; padding: 3px; box-shadow: var(--shadow-flutuante); gap: 2px; }
 .seletor-camada button{ border: 0; background: none; cursor: pointer; padding: 5px 12px; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 600;

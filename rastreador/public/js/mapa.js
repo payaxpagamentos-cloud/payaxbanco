@@ -4,7 +4,7 @@
  * As telas usam só esta interface: veículos girados pelo curso, trajetos, cercas e pontos.
  */
 import { api, BASE, sessao, qs } from './api.js';
-import { el, placa as fmtPlaca } from './ui.js';
+import { el, icone, placa as fmtPlaca } from './ui.js';
 
 let publico = null;
 export const configPublica = async () => (publico ??= await api.get('/publico'));
@@ -71,7 +71,9 @@ function fundoImagens(L, cfg) {
   const s = cfg.mapa.satelite;
   return {
     mapa: L.tileLayer(cfg.mapa.tiles, { maxZoom: 20, maxNativeZoom: 19, subdomains: 'abcd' }),
-    satelite: s?.tiles ? L.layerGroup([L.tileLayer(s.tiles, { maxZoom: 20, maxNativeZoom: 19 }), ...s.rotulos.map((u) => L.tileLayer(u, { maxZoom: 20, maxNativeZoom: 19 }))]) : null,
+    // detectRetina: em telas de alta densidade usa a foto um nível mais detalhada (fica nítida em vez de esticada).
+    satelite: s?.tiles ? L.layerGroup([L.tileLayer(s.tiles, { maxZoom: 20, maxNativeZoom: 19, detectRetina: true }),
+      ...s.rotulos.map((u) => L.tileLayer(u, { maxZoom: 20, maxNativeZoom: 19, detectRetina: true }))]) : null,
   };
 }
 
@@ -272,6 +274,7 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
   m.attributionControl.setPrefix(false);
   await fundo(L, m, div, cfg);
   if (busca && cfg.busca && sessao.get()?.token) campoBusca(L, m);
+  telaCheia(L, m, div);
   L.control.zoom({ position: 'topright' }).addTo(m);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(m);
   new ResizeObserver(() => m.invalidateSize()).observe(div);
@@ -326,6 +329,42 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
     },
     remover: () => m.remove(),
   };
+}
+
+/**
+ * Botão de tela cheia: o mapa (com a busca, o botão Satélite / Mapa e a faixa do veículo) ocupa a tela inteira, para analisar os
+ * arredores. Esc ou o mesmo botão voltam. Onde o navegador não deixa (iPhone), o mapa cobre a página.
+ */
+function telaCheia(L, m, div) {
+  const alvo = div.closest('.area-mapa') || div.parentElement;
+  const Cheia = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd() {
+      const caixa = L.DomUtil.create('div', 'leaflet-bar botao-tela-cheia');
+      const b = L.DomUtil.create('a', '', caixa);
+      Object.assign(b, { href: '#', role: 'button' });
+      const desenhar = () => {
+        const cheia = document.fullscreenElement === alvo || alvo.classList.contains('mapa-cheio');
+        b.replaceChildren(icone(cheia ? 'reduzir' : 'expandir'));
+        b.title = cheia ? 'Sair da tela cheia (Esc)' : 'Abrir o mapa em tela cheia';
+        b.setAttribute('aria-label', b.title);
+      };
+      L.DomEvent.on(b, 'click', (e) => {
+        L.DomEvent.preventDefault(e);
+        L.DomEvent.stopPropagation(e);
+        if (document.fullscreenElement === alvo) document.exitFullscreen();
+        else if (alvo.classList.contains('mapa-cheio')) alvo.classList.remove('mapa-cheio');
+        else if (alvo.requestFullscreen) alvo.requestFullscreen().catch(() => alvo.classList.add('mapa-cheio'));
+        else alvo.classList.add('mapa-cheio');
+        setTimeout(() => { m.invalidateSize(); desenhar(); }, 150);
+      });
+      document.addEventListener('fullscreenchange', () => { m.invalidateSize(); desenhar(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && alvo.classList.contains('mapa-cheio')) { alvo.classList.remove('mapa-cheio'); m.invalidateSize(); desenhar(); } });
+      desenhar();
+      return caixa;
+    },
+  });
+  new Cheia().addTo(m);
 }
 
 /** Link para abrir o ponto no Google Maps (rota até o veículo pelo celular). */
