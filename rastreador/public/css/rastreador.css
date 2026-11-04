@@ -375,7 +375,9 @@ pre.codigo{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; backgr
 .local-veiculo{ display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 600;
   line-height: 1.4; }
 .local-veiculo svg{ width: 18px; height: 18px; flex: none; color: var(--azul); margin-top: 1px; }
-.local-veiculo a{ display: block; font-weight: 500; margin-top: 3px; }
+.local-veiculo .coords{ display: block; font-weight: 500; margin-top: 3px; }
+.links-google{ display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.links-google .btn{ min-height: 28px; font-weight: 600; }
 .dados-veiculo{ display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
 .dado{ display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
 .dado span{ font-size: 11px; color: var(--text-3); font-weight: 600; }

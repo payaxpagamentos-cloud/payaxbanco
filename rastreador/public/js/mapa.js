@@ -367,5 +367,7 @@ function telaCheia(L, m, div) {
   new Cheia().addTo(m);
 }
 
-/** Link para abrir o ponto no Google Maps (rota até o veículo pelo celular). */
+/** Links para o próprio Google Maps (gratuitos, sem chave): o ponto, o Street View e a rota até lá. */
 export const linkGoogle = (lat, lng) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+export const linkStreetView = (lat, lng) => `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+export const linkRota = (lat, lng) => `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;

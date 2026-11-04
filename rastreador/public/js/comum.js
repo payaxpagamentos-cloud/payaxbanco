@@ -2,7 +2,7 @@
 import { api, BASE } from './api.js';
 import { el, limpar, dataHora, desde, km, kmh, placa, telefone, toast, acao, campo, escolha, modal, formModal, confirmar, icone, repetir, etiquetaSituacao, etiqueta,
   SITUACOES, TIPOS_VEICULO } from './ui.js';
-import { criarMapa, linkGoogle, enderecoDe } from './mapa.js';
+import { criarMapa, linkGoogle, linkStreetView, linkRota, enderecoDe } from './mapa.js';
 
 export const cartao = (titulo, ...conteudo) => el('section', { class: 'cartao' }, titulo ? el('h2', {}, titulo) : null, conteudo);
 // tom: '' (neutro), 'ok', 'aviso' ou 'erro' (só o número muda de cor).
@@ -134,8 +134,12 @@ export function enderecoVeiculo(v) {
   if (v.lat === null) return el('div', { class: 'local-veiculo' }, 'Aguardando a primeira posição');
   const texto = el('span', {}, 'buscando endereço…');
   enderecoDe(v.lat, v.lng).then((e) => { texto.textContent = e?.completo || 'endereço não encontrado'; });
+  const google = (rotulo, href) => el('a', { href, target: '_blank', rel: 'noopener', class: 'btn pequeno' }, rotulo);
   return el('div', { class: 'local-veiculo' }, icone('cercas'), el('div', {}, texto,
-    el('a', { href: linkGoogle(v.lat, v.lng), target: '_blank', rel: 'noopener', class: 'pequeno' }, `${v.lat.toFixed(5)}, ${v.lng.toFixed(5)} · abrir no Google Maps`)));
+    el('span', { class: 'pequeno fraco coords' }, `${v.lat.toFixed(5)}, ${v.lng.toFixed(5)}`),
+    // O próprio Google Maps, numa aba nova (no celular, abre o aplicativo).
+    el('div', { class: 'links-google' }, google('Google Maps', linkGoogle(v.lat, v.lng)), google('Street View', linkStreetView(v.lat, v.lng)),
+      google('Rota até o veículo', linkRota(v.lat, v.lng)))));
 }
 
 /** Dados do veículo em blocos pequenos (velocidade, ignição, posição, comunicação, motorista, hodômetro, bateria). */
