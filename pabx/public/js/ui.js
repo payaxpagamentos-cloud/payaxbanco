@@ -188,8 +188,11 @@ export function icone(nome) {
   return el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
     el('path', { d: P[nome] ?? '' }));
 }
+/** Marca: símbolo da ZOE + nome (a primeira palavra em destaque, o resto como subtítulo). */
 export function marca(nome = 'ZOE PABX Inteligente') {
-  const svg = el('svg', { viewBox: '0 0 24 24', fill: 'currentColor', 'aria-hidden': 'true' },
-    el('path', { d: 'M7.2 3.5c.6 0 1.1.4 1.3.9l1 3c.2.6 0 1.2-.5 1.6L7.7 10a11 11 0 0 0 6.3 6.3l1-1.3c.4-.5 1-.7 1.6-.5l3 1c.5.2.9.7.9 1.3V19c0 .8-.7 1.5-1.5 1.5C11 20.5 3.5 13 3.5 5c0-.8.7-1.5 1.5-1.5h2.2z' }));
-  return el('span', { class: 'marca' }, svg, el('span', {}, nome));
+  const [principal, ...resto] = String(nome).trim().split(/\s+/);
+  const svg = el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
+    el('path', { d: 'M6 6.5h12L6 17.5h12' }));
+  return el('span', { class: 'marca' }, el('span', { class: 'simbolo' }, svg),
+    el('span', { class: 'texto' }, el('strong', {}, principal), resto.length ? el('small', {}, resto.join(' ')) : null));
 }

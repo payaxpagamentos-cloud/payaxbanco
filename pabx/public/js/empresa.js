@@ -464,7 +464,7 @@ async function telaZoe(ctx) {
           el('div', {}, el('div', { class: 'pequeno mudo' }, r), barraUso(h[k], h.total || 0)))))),
         el('div', { class: 'c8' }, cartao('Últimas ligações', tabela(['Início', 'Telefone', 'Cliente', 'Motivo', 'Resultado', 'Fila'], dados.ultimos.map((a) => {
           const tr = el('tr', { class: 'clicavel', title: 'Ver o que a ZOE fez' },
-            td(dataHora(a.inicio)), td(a.telefone ? telefone(a.telefone) : '—', 'num'), td(a.cliente_nome ?? el('span', { class: 'mudo' }, 'não identificado')),
+            td(dataHora(a.inicio), 'num'), td(a.telefone ? telefone(a.telefone) : '—', 'num'), td(a.cliente_nome ?? el('span', { class: 'mudo' }, 'não identificado')),
             td(MOTIVOS_ZOE[a.motivo] ?? '—'), td(etiquetaZoe(a.resultado)), td(a.fila ?? '—'));
           tr.addEventListener('click', () => abrirAtendimento(a.id).catch((err) => toast(err.message, true)));
           return tr;

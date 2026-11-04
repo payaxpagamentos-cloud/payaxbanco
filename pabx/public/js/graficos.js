@@ -9,7 +9,7 @@ const svg = (tag, attrs = {}, ...filhos) => {
   return e;
 };
 
-export const CORES = { amarelo: '#F2C318', azul: '#0F6EA8', verde: '#20A852', roxo: '#8E6CEF', cinza: '#7C8392' };
+export const CORES = { amarelo: '#F5A524', azul: '#6366F1', verde: '#22B07D', roxo: '#A78BFA', cinza: '#8D929C' };
 
 /** Pizza: [{ rotulo, valor, cor }]. Mostra a legenda e o valor de cada fatia ao passar o mouse. */
 export function pizza(fatias, { formato = (v) => String(v), vazio = 'Sem dados' } = {}) {
@@ -31,6 +31,7 @@ export function pizza(fatias, { formato = (v) => String(v), vazio = 'Sem dados' 
     const [x2, y2] = [Math.cos(2 * Math.PI * acumulado), Math.sin(2 * Math.PI * acumulado)];
     g.append(svg('path', { d: `M ${x1} ${y1} A 1 1 0 ${fracao > 0.5 ? 1 : 0} 1 ${x2} ${y2} L 0 0 Z`, fill: f.cor }, titulo));
   }
+  g.append(svg('circle', { cx: 0, cy: 0, r: 0.64, class: 'furo' })); // rosca
   return el('div', { class: 'pizza' }, g, legenda);
 }
 

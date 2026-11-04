@@ -91,7 +91,7 @@ async function desenhar() {
   const trilha = el('div', { class: 'trilha' });
   if (empresaId) {
     if (PLATAFORMA.includes(u.perfil)) trilha.append(el('a', { href: '#/empresas' }, 'Empresas'), el('span', { class: 'sep' }, '/'));
-    trilha.append(el('a', { href: link(empresaId, 'dashboard') }, nomeEmpresa.toUpperCase()), el('span', { class: 'sep' }, '/'), titulo);
+    trilha.append(el('a', { href: link(empresaId, 'dashboard') }, nomeEmpresa), el('span', { class: 'sep' }, '/'), titulo);
   } else {
     trilha.append(titulo);
   }
@@ -147,7 +147,7 @@ function telaEntrada() {
   const f = el('form', { class: 'form' },
     campo('E-mail', { name: 'email', type: 'email', autocomplete: 'username', required: true }),
     campo('Senha', { name: 'senha', type: 'password', autocomplete: 'current-password', required: true }),
-    el('button', { class: 'btn primario', style: 'min-height:44px' }, 'Entrar'));
+    el('button', { class: 'btn primario', style: 'min-height:42px;margin-top:4px' }, 'Entrar'));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(f.querySelector('button'), async () => {
@@ -157,7 +157,7 @@ function telaEntrada() {
     });
   });
   limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'cartao' },
-    marca(nomePlataforma), el('h1', { style: 'margin:18px 0 4px;font-size:22px' }, 'Entrar no painel'),
+    marca(nomePlataforma), el('h1', { style: 'margin:28px 0 4px;font-size:20px' }, 'Entrar no painel'),
     el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'Use o e-mail e a senha que você recebeu.'), f)));
   f.querySelector('input').focus();
 }
