@@ -43,9 +43,17 @@ const lerEstilo = (url) => {
   return estilos.get(url);
 };
 
-const CHAVE_CAMADA = 'rastreador.camada';
-// Satélite é o padrão (como o modo satélite dos aplicativos de mapa); a escolha fica lembrada no navegador.
-const lerCamada = () => { try { return localStorage.getItem(CHAVE_CAMADA) === 'mapa' ? 'mapa' : 'satelite'; } catch { return 'satelite'; } };
+// O mapa de ruas é o padrão (reto e exato; a foto de satélite sai inclinada em bairros com prédios altos). O satélite fica no botão,
+// e a escolha fica lembrada no navegador.
+const CHAVE_CAMADA_VERSAO = 'rastreador.camada.v2';
+const lerCamada = () => {
+  try {
+    // A escolha antiga (de quando o satélite era o padrão) não vale mais: começa no mapa de ruas.
+    return localStorage.getItem(CHAVE_CAMADA_VERSAO) === 'satelite' ? 'satelite' : 'mapa';
+  } catch {
+    return 'mapa';
+  }
+};
 
 /**
  * Fundo vetorial: um só mapa (MapLibre) que troca de estilo entre Mapa (claro moderno ou escuro, pelo tema) e Satélite híbrido.
@@ -171,7 +179,7 @@ function seletorCamada(L, m, atual, trocar) {
     onAdd() {
       const caixa = L.DomUtil.create('div', 'seletor-camada');
       L.DomEvent.disableClickPropagation(caixa);
-      const botoes = ['satelite', 'mapa'].map((k) => {
+      const botoes = ['mapa', 'satelite'].map((k) => {
         const b = L.DomUtil.create('button', k === atual() ? 'on' : '', caixa);
         b.type = 'button';
         b.textContent = k === 'mapa' ? 'Mapa' : 'Satélite';
@@ -180,7 +188,7 @@ function seletorCamada(L, m, atual, trocar) {
           if (k === atual()) return;
           trocar(k);
           for (const x of botoes) x.classList.toggle('on', x === b);
-          try { localStorage.setItem(CHAVE_CAMADA, k); } catch { /* sem armazenamento: só nesta tela */ }
+          try { localStorage.setItem(CHAVE_CAMADA_VERSAO, k); } catch { /* sem armazenamento: só nesta tela */ }
         });
         return b;
       });

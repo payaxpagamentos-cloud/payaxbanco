@@ -14,7 +14,7 @@ próprios veículos.
 Sistema independente: servidor, banco de dados (SQLite), usuários e login próprios. Mapa vetorial moderno, no estilo dos aplicativos de
 navegação (MapLibre com os estilos gratuitos do OpenFreeMap: "Liberty" no tema claro e "Dark" no escuro); sem WebGL no navegador, usa a
 camada de ruas da Esri (os servidores do OpenStreetMap não são usados). Outro estilo (MapTiler, Stadia…) entra pelo `.env` (`RASTREADOR_MAPA_ESTILO`).
-Todos os mapas têm o botão **Satélite / Mapa**. O padrão é o satélite híbrido, como o dos aplicativos de mapa: foto aérea (Esri World Imagery)
+Todos os mapas têm o botão **Satélite / Mapa**. O padrão é o **Mapa** de ruas (reto e exato; a foto de satélite sai inclinada em bairros com prédios altos). O **Satélite** é o híbrido, como o dos aplicativos de mapa: foto aérea (Esri World Imagery)
 com os nomes de bairros, ruas e lugares (com os ícones) por cima; o Mapa de ruas tem visual moderno (fundo claro, ruas brancas, avenidas em
 amarelo, prédios planos). Zoom até 20; a escolha fica lembrada no navegador. O **campo de busca** no mapa encontra rua e número, bairro ou lugar
 (Photon/OpenStreetMap, `RASTREADOR_GEOCODER_URL`), e o painel do veículo mostra o **endereço** de onde ele está. Para uso comercial com licença, troque o satélite por um provedor com chave (`RASTREADOR_SATELITE_*`). Tema claro por padrão,
