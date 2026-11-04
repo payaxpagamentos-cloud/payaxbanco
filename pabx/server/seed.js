@@ -11,7 +11,7 @@ const { classificar, tarifar, custo } = require('./lib/chamadas');
 
 const db = abrir();
 if (db.prepare('SELECT 1 FROM empresas').get()) {
-  console.log('[PABX] Já existem empresas: a demonstração não foi criada de novo.');
+  console.log('[ZOE PABX] Já existem empresas: a demonstração não foi criada de novo.');
   process.exit(0);
 }
 
@@ -106,4 +106,4 @@ for (const [i, d] of EMPRESAS.entries()) {
   db.prepare("INSERT INTO uso_recursos (empresa_id, recurso, quantidade, criado_em) VALUES (?, 'tts', ?, ?), (?, 'stt', ?, ?)").run(eid, 120 + i * 40, agora(), eid, 35 + i * 10, agora());
 }
 
-console.log(`[PABX] Demonstração pronta. Clientes: ${EMPRESAS.map((e) => e.email).join(', ')} · supervisor@cobranca.demo · senha demo12345`);
+console.log(`[ZOE PABX] Demonstração pronta. Clientes: ${EMPRESAS.map((e) => e.email).join(', ')} · supervisor@cobranca.demo · senha demo12345`);

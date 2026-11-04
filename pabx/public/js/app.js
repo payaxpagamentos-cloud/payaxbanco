@@ -5,7 +5,7 @@ import { TELAS_EMPRESA } from './empresa.js';
 
 const raiz = $('#app');
 let pararTela = null;
-let nomePlataforma = 'PABX';
+let nomePlataforma = 'ZOE PABX Inteligente';
 const nomesEmpresa = new Map();
 
 const PLATAFORMA = ['master', 'suporte'];
@@ -161,4 +161,4 @@ function telaEntrada() {
   f.querySelector('input').focus();
 }
 
-api.get('/publico').then((p) => { nomePlataforma = p.nome || 'PABX'; }).catch(() => {}).finally(desenhar);
+api.get('/publico').then((p) => { nomePlataforma = p.nome || 'ZOE PABX Inteligente'; }).catch(() => {}).finally(desenhar);

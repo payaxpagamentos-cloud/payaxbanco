@@ -1,6 +1,6 @@
-# PABX
+# ZOE PABX Inteligente
 
-Painel de gestão de PABX em nuvem, publicado em `/pabx`, com dois níveis de acesso:
+Painel de gestão de PABX em nuvem (**ZOE PABX Inteligente**), publicado em `/pabx`, com dois níveis de acesso:
 
 | Perfil | O que vê |
 |---|---|

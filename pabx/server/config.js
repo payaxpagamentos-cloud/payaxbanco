@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 
 const secret = process.env.PABX_SECRET || crypto.randomBytes(32).toString('hex');
 if (!process.env.PABX_SECRET && process.env.NODE_ENV !== 'test') {
-  console.warn('[PABX] PABX_SECRET não definido: usando segredo temporário (sessões expiram ao reiniciar).');
+  console.warn('[ZOE PABX] PABX_SECRET não definido: usando segredo temporário (sessões expiram ao reiniciar).');
 }
 
 const producao = process.env.NODE_ENV === 'production';
@@ -13,9 +13,9 @@ const producao = process.env.NODE_ENV === 'production';
 // Em produção, recusa iniciar com segredos ausentes ou fracos.
 if (producao) {
   const faltando = ['PABX_SECRET', 'PABX_ADMIN_SENHA'].filter((k) => !process.env[k]);
-  if (faltando.length) throw new Error(`[PABX] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
-  if (process.env.PABX_SECRET.length < 32) throw new Error('[PABX] PABX_SECRET deve ter pelo menos 32 caracteres.');
-  if (process.env.PABX_ADMIN_SENHA.length < 12) throw new Error('[PABX] PABX_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
+  if (faltando.length) throw new Error(`[ZOE PABX] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
+  if (process.env.PABX_SECRET.length < 32) throw new Error('[ZOE PABX] PABX_SECRET deve ter pelo menos 32 caracteres.');
+  if (process.env.PABX_ADMIN_SENHA.length < 12) throw new Error('[ZOE PABX] PABX_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
 }
 
 // Endereço em que o painel é publicado: '' (raiz do domínio) ou um caminho, como '/pabx'.

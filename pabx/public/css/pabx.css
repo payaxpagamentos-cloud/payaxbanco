@@ -1,4 +1,4 @@
-/* PABX — painel do master e das empresas. Tema escuro por padrão, com o claro no botão do topo. */
+/* ZOE PABX Inteligente — painel do master e das empresas. Tema escuro por padrão, com o claro no botão do topo. */
 @font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
 
 :root, :root[data-tema="escuro"]{
@@ -82,6 +82,8 @@ a{ color: var(--azul); }
 .lateral .topo-lateral{ display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 18px; }
 .lateral .recolher{ border: 0; background: none; cursor: pointer; color: var(--text); padding: 4px; border-radius: 8px; display: grid; place-items: center; }
 .lateral .recolher svg{ width: 18px; height: 18px; }
+.lateral .topo-lateral .marca{ min-width: 0; font-size: 16px; white-space: normal; line-height: 1.15; }
+.lateral .topo-lateral .marca svg{ width: 24px; height: 24px; }
 .casca.recolhida .recolher svg{ transform: rotate(180deg); }
 .lateral a.item{ display: flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; padding: 10px 14px; border-radius: 999px; font-weight: 700; font-size: 13px; }
 .lateral a.item svg{ width: 18px; height: 18px; flex: none; opacity: .9; }

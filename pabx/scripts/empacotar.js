@@ -22,7 +22,7 @@ for (const item of ['server', 'public', 'package.json', 'package-lock.json', 'Do
 execFileSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], { cwd: pasta, stdio: 'inherit' });
 
 const senhaAdmin = crypto.randomBytes(12).toString('base64url');
-const env = `# PABX — configuração do servidor
+const env = `# ZOE PABX Inteligente — configuração do servidor
 NODE_ENV=production
 PORT=3300
 # Endereço do painel: https://SEU-DOMINIO/pabx/

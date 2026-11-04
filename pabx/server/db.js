@@ -231,7 +231,7 @@ CREATE INDEX IF NOT EXISTS idx_auditoria ON auditoria(id DESC);
 `;
 
 const CONFIG_PADRAO = {
-  nome_plataforma: 'PABX',
+  nome_plataforma: 'ZOE PABX Inteligente',
   // Tarifação: cobra no mínimo `cadencia_inicial_s` e depois em blocos de `cadencia_s` (padrão 30/6).
   cadencia_inicial_s: '30',
   cadencia_s: '6',
@@ -258,6 +258,8 @@ function abrir(arquivo = config.dbFile) {
 
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);
+  // Instalações antigas com o nome padrão de antes passam a usar o nome novo (um nome escolhido no painel não muda).
+  db.prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'nome_plataforma' AND valor = 'PABX'").run(CONFIG_PADRAO.nome_plataforma);
 
   if (!db.prepare("SELECT 1 FROM usuarios WHERE perfil = 'master' LIMIT 1").get()) {
     db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, 'master', ?)")
