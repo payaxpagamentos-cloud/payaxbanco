@@ -58,12 +58,13 @@ modelo, usados sempre que o rastreador está cadastrado com o modelo "J16 4G":
 ## Mapas do Google (opcional)
 
 Com a chave do Google no `.env` (`RASTREADOR_GOOGLE_MAPS_CHAVE`), o botão **Satélite / Mapa** passa a mostrar o satélite (com os nomes por
-cima) e as ruas do próprio Google, em alta resolução, com o logo e os créditos que o Google exige. Sem a chave, ficam os mapas gratuitos.
+cima) e as ruas do próprio Google, em alta resolução, com o logo e os créditos que o Google exige. O endereço dos veículos e a busca passam a
+usar a **Geocoding API** do Google (mais exata, inclusive no número). Sem a chave, ou se o Google falhar, ficam os serviços gratuitos.
 
 1. No [Google Cloud Console](https://console.cloud.google.com/): crie um projeto e ative o **faturamento** (o Google tem cota mensal gratuita
    e cobra pelas imagens acima dela; confira a tabela de preços da Map Tiles API).
-2. Em **APIs e serviços → Biblioteca**, ative a **Map Tiles API**.
-3. Em **APIs e serviços → Credenciais → Criar credenciais → Chave de API**. Em "Restrições de API", deixe só a **Map Tiles API**.
+2. Em **APIs e serviços → Biblioteca**, ative a **Map Tiles API** e a **Geocoding API**.
+3. Em **APIs e serviços → Credenciais → Criar credenciais → Chave de API**. Em "Restrições de API", deixe só a **Map Tiles API** e a **Geocoding API**.
    Crie também um **alerta de orçamento** em Faturamento.
 4. No servidor, acrescente ao `.env` a linha `RASTREADOR_GOOGLE_MAPS_CHAVE=SUA_CHAVE` e rode `pm2 restart rastreador`.
 
