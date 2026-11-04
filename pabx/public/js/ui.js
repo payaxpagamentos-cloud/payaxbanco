@@ -1,6 +1,6 @@
 /** Criação de elementos e formatação comuns às telas. Texto vindo da API entra sempre como texto, nunca como HTML. */
 export function el(tag, attrs = {}, ...filhos) {
-  const e = tag === 'svg' || tag === 'path' ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
+  const e = ['svg', 'path', 'rect', 'circle', 'g'].includes(tag) ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
   for (const [k, v] of Object.entries(attrs ?? {})) {
     if (v === null || v === undefined || v === false) continue;
     if (k === 'class') e.setAttribute('class', v);
@@ -174,6 +174,13 @@ const P = {
   recursos: 'M4 4h16v16H4zM8 8h3v3H8zM13 8h3v3h-3zM8 13h3v3H8zM13 13h3v3h-3z',
   zoe: 'M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8zM19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9zM5 15l.7 1.6 1.6.7-1.6.7L5 19.6l-.7-1.6-1.6-.7 1.6-.7z',
   editar: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  headset: 'M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H5a1 1 0 0 1-1-1zM20 14h-3v6h2a1 1 0 0 0 1-1zM17 20a4 4 0 0 1-4 2h-1',
+  relogio: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+  ok: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6',
+  perdida: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9 9l6 6M15 9l-6 6',
+  dinheiro: 'M12 3v18M16.5 7.5c-.8-1.2-2.4-2-4.5-2-2.5 0-4 1.3-4 3s1.5 2.6 4 3 4 1.4 4 3.2-1.6 3.3-4 3.3c-2.2 0-3.9-.9-4.6-2.3',
+  documento: 'M6 2h9l5 5v15H6zM14 2v6h6M9 13l2 2 4-4',
+  abaixo: 'M6 9l6 6 6-6',
   cadeado: 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z',
   aberto: 'M7 11V8a5 5 0 0 1 9.6-2M5 11h14v10H5z',
   lixo: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
@@ -188,11 +195,18 @@ export function icone(nome) {
   return el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
     el('path', { d: P[nome] ?? '' }));
 }
-/** Marca: símbolo da ZOE + nome (a primeira palavra em destaque, o resto como subtítulo). */
+/** Marca: ondas de voz + nome (a primeira palavra em destaque, o resto como subtítulo). */
 export function marca(nome = 'ZOE PABX Inteligente') {
   const [principal, ...resto] = String(nome).trim().split(/\s+/);
-  const svg = el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2.4', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
-    el('path', { d: 'M6 6.5h12L6 17.5h12' }));
+  const alturas = [6, 12, 18, 10, 16, 8];
+  const svg = el('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
+    alturas.map((h, i) => el('rect', { x: 1.6 + i * 3.6, y: 12 - h / 2, width: 2.2, height: h, rx: 1.1, fill: 'currentColor' })));
   return el('span', { class: 'marca' }, el('span', { class: 'simbolo' }, svg),
     el('span', { class: 'texto' }, el('strong', {}, principal), resto.length ? el('small', {}, resto.join(' ')) : null));
 }
+
+/** Pessoa com as iniciais num círculo (tabelas de ramais, agentes e usuários). */
+export const pessoa = (nome, extra) => el('span', { class: 'pessoa' }, el('span', { class: 'iniciais' }, iniciais(nome)),
+  el('span', {}, nome, extra ? el('div', { class: 'pequeno mudo' }, extra) : null));
+/** Situação com ponto colorido, sem fundo (online, offline, em chamada). */
+export const situacao = (texto, tipo = '') => el('span', { class: `situacao ${tipo}` }, texto);

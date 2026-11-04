@@ -9,13 +9,17 @@ const svg = (tag, attrs = {}, ...filhos) => {
   return e;
 };
 
-export const CORES = { amarelo: '#F5A524', azul: '#6366F1', verde: '#22B07D', roxo: '#A78BFA', cinza: '#8D929C' };
+export const CORES = { amarelo: '#F59E0B', azul: '#2563EB', verde: '#16A34A', roxo: '#8B5CF6', cinza: '#94A3B8', vermelho: '#EF4444', ciano: '#38BDF8' };
 
 /** Pizza: [{ rotulo, valor, cor }]. Mostra a legenda e o valor de cada fatia ao passar o mouse. */
-export function pizza(fatias, { formato = (v) => String(v), vazio = 'Sem dados' } = {}) {
+export function pizza(fatias, { formato = (v) => String(v), vazio = 'Sem dados', centro = null, lado = false } = {}) {
   const total = fatias.reduce((s, f) => s + (f.valor || 0), 0);
-  const legenda = el('div', { class: 'legenda' }, fatias.map((f) => el('span', {}, el('i', { style: `background:${f.cor}` }), `${f.rotulo}: ${formato(f.valor || 0)}`)));
-  if (!total) return el('div', { class: 'pizza' }, el('div', { class: 'vazio-grafico' }, vazio), legenda);
+  const pct = (v) => (total ? `${(Math.round((v / total) * 1000) / 10).toLocaleString('pt-BR')}%` : '0%');
+  // Ao lado: rótulo e percentual em linhas (como um resumo); embaixo: rótulo e valor.
+  const legenda = lado
+    ? el('div', { class: 'legenda lado' }, fatias.map((f) => el('span', {}, el('i', { style: `background:${f.cor}` }), el('em', {}, f.rotulo), el('b', { class: 'num' }, pct(f.valor || 0)))))
+    : el('div', { class: 'legenda' }, fatias.map((f) => el('span', {}, el('i', { style: `background:${f.cor}` }), `${f.rotulo}: ${formato(f.valor || 0)}`)));
+  if (!total) return el('div', { class: 'pizza' }, el('div', { class: 'vazio-grafico' }, vazio), lado ? null : legenda);
   const g = svg('svg', { viewBox: '-1 -1 2 2', role: 'img', 'aria-label': fatias.map((f) => `${f.rotulo} ${formato(f.valor || 0)}`).join(', ') });
   g.style.transform = 'rotate(-90deg)';
   let acumulado = 0;
@@ -31,8 +35,9 @@ export function pizza(fatias, { formato = (v) => String(v), vazio = 'Sem dados' 
     const [x2, y2] = [Math.cos(2 * Math.PI * acumulado), Math.sin(2 * Math.PI * acumulado)];
     g.append(svg('path', { d: `M ${x1} ${y1} A 1 1 0 ${fracao > 0.5 ? 1 : 0} 1 ${x2} ${y2} L 0 0 Z`, fill: f.cor }, titulo));
   }
-  g.append(svg('circle', { cx: 0, cy: 0, r: 0.64, class: 'furo' })); // rosca
-  return el('div', { class: 'pizza' }, g, legenda);
+  g.append(svg('circle', { cx: 0, cy: 0, r: 0.7, class: 'furo' })); // rosca
+  const rosca = el('div', { class: 'rosca' }, g, centro ? el('div', { class: 'centro' }, el('strong', { class: 'num' }, centro.valor), el('small', {}, centro.rotulo)) : null);
+  return el('div', { class: `pizza${lado ? ' lado' : ''}` }, rosca, legenda);
 }
 
 /**

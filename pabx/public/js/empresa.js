@@ -1,9 +1,9 @@
 /** Telas do painel da empresa (perfil cliente e supervisor; o master entra pela lista de empresas). */
 import { api, qs } from './api.js';
 import { el, limpar, acao, dinheiro, dataHora, hora, duracao, minutos, inteiro, telefone, gb, barraUso, toast, campo, area, escolha, marcar, formModal, modal, confirmar,
-  repetir, etiqueta, etiquetaChamada, DIRECOES, TIPOS_DESTINO, PERFIS } from './ui.js';
+  repetir, etiqueta, etiquetaChamada, pessoa, situacao, DIRECOES, TIPOS_DESTINO, PERFIS } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, cartaoUtilizacao, cartaoSimultaneas, cartaoRamais, cartaoUsoMes, cartaoRecursos,
-  painelChamadas, painelRelatorios, painelIntegracoes } from './comum.js';
+  painelChamadas, painelRelatorios, painelIntegracoes, cartaoStatusLigacoes, indicadoresTelefonia } from './comum.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
 const pode = (ctx) => !ctx.somenteLeitura;
@@ -13,16 +13,17 @@ async function telaDashboard(ctx) {
   ctx.parar(repetir(async () => {
     const d = await api.get(`${base(ctx)}/dashboard`);
     limpar(ctx.conteudo, el('div', { class: 'grade-dash' },
+      el('div', { class: 'c12' }, el('div', { class: 'grade' }, indicadoresTelefonia(d))),
+      el('div', { class: 'c8' }, cartaoSimultaneas(d.simultaneas, d.em_curso)),
+      el('div', { class: 'c4' }, cartaoStatusLigacoes(d.utilizacao.hoje, d.em_curso)),
       el('div', { class: 'c5' }, cartaoUtilizacao(d.utilizacao)),
-      el('div', { class: 'c4' }, cartaoSimultaneas(d.simultaneas, d.em_curso)),
       el('div', { class: 'c3' }, cartaoRamais(d.ramais)),
-      el('div', { class: 'c5' }, cartaoUsoMes(d.uso_mes)),
-      el('div', { class: 'c7' }, cartaoRecursos(d.recursos),
-        el('div', { style: 'height:18px' }),
-        cartao('Limites', el('div', { class: 'grade' },
-          el('div', {}, el('div', { class: 'pequeno mudo' }, 'Ramais ativos'), barraUso(d.ramais.total, d.empresa.limite_ramais)),
-          el('div', {}, el('div', { class: 'pequeno mudo' }, 'Chamadas simultâneas agora'), barraUso(d.em_curso, d.empresa.limite_canais)),
-          el('div', {}, el('div', { class: 'pequeno mudo' }, 'Disco das gravações'), barraUso(d.disco.usado_bytes, d.disco.limite_bytes, { formato: (b) => gb(b).replace('GB', ''), sufixo: 'GB' })))))));
+      el('div', { class: 'c4' }, cartaoUsoMes(d.uso_mes)),
+      el('div', { class: 'c6' }, cartaoRecursos(d.recursos)),
+      el('div', { class: 'c6' }, cartao('Limites', el('div', { class: 'coluna' },
+        el('div', {}, el('div', { class: 'pequeno mudo' }, 'Ramais ativos'), barraUso(d.ramais.total, d.empresa.limite_ramais)),
+        el('div', {}, el('div', { class: 'pequeno mudo' }, 'Chamadas simultâneas agora'), barraUso(d.em_curso, d.empresa.limite_canais)),
+        el('div', {}, el('div', { class: 'pequeno mudo' }, 'Disco das gravações'), barraUso(d.disco.usado_bytes, d.disco.limite_bytes, { formato: (b) => gb(b).replace('GB', ''), sufixo: 'GB' })))))));
   }, 10_000));
 }
 
@@ -32,17 +33,17 @@ async function telaSupervisao(ctx) {
     const falando = s.agentes.filter((a) => a.falando_com);
     limpar(ctx.conteudo, el('div', { class: 'coluna' },
       el('div', { class: 'grade' },
-        indicador('Chamadas agora', inteiro(s.em_curso)),
-        indicador('Agentes falando', `${falando.length}/${s.agentes.length}`),
-        indicador('Agentes online', inteiro(s.agentes.filter((a) => a.online).length)),
-        indicador('Campanhas ativas', inteiro(s.campanhas.filter((c) => c.status === 'ativa').length))),
+        indicador('Chamadas agora', inteiro(s.em_curso), null, 'chamadas', 'azul'),
+        indicador('Agentes falando', `${falando.length}/${s.agentes.length}`, null, 'headset', 'verde'),
+        indicador('Agentes online', inteiro(s.agentes.filter((a) => a.online).length), null, 'pessoas', 'roxo'),
+        indicador('Campanhas ativas', inteiro(s.campanhas.filter((c) => c.status === 'ativa').length), null, 'campanhas', 'laranja')),
       cartao('Campanhas', tabela(['Campanha', 'Status', 'Fila', '^Em curso', '^Pendentes', '^Atendidos', '^Sem sucesso', 'Progresso'], s.campanhas.map((c) => el('tr', {},
         td(c.nome), td(etiqueta(c.status, c.status === 'ativa' ? 'ok' : 'aviso')), td(c.fila ?? '—'), td(c.em_curso, 'centro num'), td(c.pendentes, 'centro num'),
         td(c.atendidos, 'centro num'), td(c.sem_sucesso, 'centro num'), el('td', { style: 'width:160px' }, barraUso(c.contatos - c.pendentes, c.contatos)))),
       'Nenhuma campanha ativa ou pausada.')),
       cartao('Agentes (ramais)', tabela(['Ramal', 'Pessoa', 'Situação', 'Falando com', '^Desde', '^Chamadas hoje'], s.agentes.map((a) => el('tr', {},
-        td(a.numero, 'num'), td(a.nome),
-        td(a.falando_com ? etiqueta('em chamada', 'info') : a.online ? etiqueta('livre', 'ok') : etiqueta('offline')),
+        td(a.numero, 'num'), td(pessoa(a.nome)),
+        td(a.falando_com ? situacao('Em chamada', 'info') : a.online ? situacao('Livre', 'ok') : situacao('Offline', 'erro')),
         td(a.falando_com ? telefone(a.falando_com) : '—'), td(a.desde ? hora(a.desde) : '—', 'centro'), td(a.chamadas_hoje, 'centro num'))), 'Nenhum ramal ativo.'))));
   }, 5000));
 }
@@ -148,8 +149,8 @@ async function telaRamais(ctx) {
     const ativos = ramais.filter((r) => r.ativo);
     resumo.textContent = `${ativos.length} ramal(is) ativo(s) · ${ativos.filter((r) => r.online).length} online`;
     limpar(lista, tabela(['Ramal', 'Pessoa', 'Filas', 'Situação', 'Último registro', '^Gravação', '^Ações'], ramais.map((r) => el('tr', {},
-      td(el('strong', { class: 'num' }, r.numero)), td([r.nome, r.email ? el('div', { class: 'pequeno mudo' }, r.email) : null]), td(r.filas ?? '—'),
-      td(!r.ativo ? etiqueta('desativado', 'erro') : r.em_curso ? etiqueta('em chamada', 'info') : r.online ? etiqueta('online', 'ok') : etiqueta('offline')),
+      td(el('strong', { class: 'num' }, r.numero)), td(pessoa(r.nome, r.email)), td(r.filas ?? '—'),
+      td(!r.ativo ? situacao('Desativado') : r.em_curso ? situacao('Em chamada', 'info') : r.online ? situacao('Online', 'ok') : situacao('Offline', 'erro')),
       td(r.registro_em ? [dataHora(r.registro_em), el('div', { class: 'pequeno mudo' }, [r.registro_ip, r.registro_agente].filter(Boolean).join(' · '))] : '—'),
       td(r.gravar ? 'sim' : 'não', 'centro'),
       el('td', { class: 'acoes' }, admin ? [
@@ -226,9 +227,9 @@ async function telaTerminacao(ctx) {
   const mes = Object.fromEntries(t.mes.map((x) => [x.tipo_destino, x]));
   limpar(ctx.conteudo, el('div', { class: 'coluna' },
     el('div', { class: 'grade' },
-      indicador('Rota de saída', t.rota ? t.rota.nome : 'Sem rota', t.rota ? (t.rota.ativa ? 'ativa' : 'inativa') : 'fale com o suporte para ligar para fora'),
-      indicador('Chamadas simultâneas', inteiro(t.limite_canais), 'limite contratado'),
-      indicador('Tarifação', `${t.cadencia.inicial_s}/${t.cadencia.passo_s}`, `mínimo de ${t.cadencia.inicial_s} s e depois a cada ${t.cadencia.passo_s} s`)),
+      indicador('Rota de saída', t.rota ? t.rota.nome : 'Sem rota', t.rota ? (t.rota.ativa ? 'ativa' : 'inativa') : 'fale com o suporte para ligar para fora', 'terminacao', 'azul'),
+      indicador('Chamadas simultâneas', inteiro(t.limite_canais), 'limite contratado', 'chamadas', 'roxo'),
+      indicador('Tarifação', `${t.cadencia.inicial_s}/${t.cadencia.passo_s}`, `mínimo de ${t.cadencia.inicial_s} s e depois a cada ${t.cadencia.passo_s} s`, 'relogio', 'laranja')),
     cartao('Tarifas e consumo do mês', tabela(['Destino', '>Preço por minuto', '>Ligações no mês', '>Minutos tarifados', '>Gasto no mês'],
       ['fixo', 'movel', 'internacional'].map((k) => el('tr', {}, td(TIPOS_DESTINO[k]), td(dinheiro(t.tarifas[k]), 'dir num'), td(inteiro(mes[k]?.chamadas), 'dir num'),
         td(minutos(mes[k]?.tarifado_s), 'dir num'), td(dinheiro(mes[k]?.custo_centavos), 'dir num'))))),
@@ -382,7 +383,7 @@ async function telaConfiguracoes(ctx) {
   async function carregarUsuarios() {
     const lista = await api.get(`${base(ctx)}/usuarios`);
     limpar(usuarios, tabela(['Nome', 'E-mail', 'Perfil', 'Último acesso', 'Situação', '^'], lista.map((u) => el('tr', {},
-      td(u.nome), td(u.email), td(PERFIS[u.perfil]), td(dataHora(u.ultimo_acesso)), td(u.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo', 'erro')),
+      td(pessoa(u.nome)), td(u.email), td(PERFIS[u.perfil]), td(dataHora(u.ultimo_acesso)), td(u.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo', 'erro')),
       el('td', { class: 'acoes' }, botaoIcone('editar', 'Editar', async () => { if (await formUsuario(u)) { toast('Usuário salvo.'); carregarUsuarios(); } })))), 'Nenhum usuário.'),
     el('div', { style: 'margin-top:12px' }, botao('Novo usuário', 'primario', async () => { if (await formUsuario()) { toast('Usuário criado.'); carregarUsuarios(); } })));
   }
@@ -454,11 +455,11 @@ async function telaZoe(ctx) {
     const m = dados.mes;
     limpar(painel,
       el('div', { class: 'grade' },
-        indicador('Ligações hoje', inteiro(h.total), h.em_curso ? `${h.em_curso} em curso agora` : null),
-        indicador('Resolvidas pela ZOE', pct(h.resolvidos, h.total - h.em_curso), `${inteiro(h.resolvidos)} sem precisar de atendente`),
-        indicador('Transferidas hoje', inteiro(h.transferidos)),
-        indicador('Boletos enviados no mês', inteiro(m.boletos)),
-        indicador('Desbloqueios no mês', inteiro(m.desbloqueios))),
+        indicador('Ligações hoje', inteiro(h.total), h.em_curso ? `${h.em_curso} em curso agora` : null, 'chamadas', 'azul'),
+        indicador('Resolvidas pela ZOE', pct(h.resolvidos, h.total - h.em_curso), `${inteiro(h.resolvidos)} sem atendente`, 'zoe', 'roxo'),
+        indicador('Transferidas hoje', inteiro(h.transferidos), null, 'headset', 'laranja'),
+        indicador('Boletos no mês', inteiro(m.boletos), null, 'documento', 'verde'),
+        indicador('Desbloqueios no mês', inteiro(m.desbloqueios), null, 'aberto', 'ciano')),
       el('div', { class: 'grade-dash' },
         el('div', { class: 'c4' }, cartao('Motivos das ligações de hoje', el('div', { class: 'coluna' }, Object.entries(MOTIVOS_ZOE).map(([k, r]) =>
           el('div', {}, el('div', { class: 'pequeno mudo' }, r), barraUso(h[k], h.total || 0)))))),

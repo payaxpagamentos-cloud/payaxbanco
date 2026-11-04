@@ -3,7 +3,7 @@ import { api, qs } from './api.js';
 import { el, limpar, dinheiro, dataHora, inteiro, gb, barraUso, toast, campo, escolha, marcar, formModal, perguntar, confirmar, repetir, telefone,
   TIPOS_EMPRESA, PERFIS, reaisCampo, centavos } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, cartaoUtilizacao, cartaoSimultaneas, cartaoRamais, cartaoUsoMes, cartaoRecursos,
-  painelChamadas, painelRelatorios, painelIntegracoes, situacaoDiag } from './comum.js';
+  painelChamadas, painelRelatorios, painelIntegracoes, situacaoDiag, cartaoStatusLigacoes, indicadoresTelefonia } from './comum.js';
 
 const listaEmpresas = () => api.get('/master/empresas');
 
@@ -13,18 +13,18 @@ async function telaDashboard(ctx) {
     const d = await api.get('/master/dashboard');
     limpar(ctx.conteudo, el('div', { class: 'grade-dash' },
       el('div', { class: 'c12' }, el('div', { class: 'grade' },
-        indicador('Empresas ativas', inteiro(d.empresas.ativa ?? 0), d.empresas.bloqueada ? `${d.empresas.bloqueada} bloqueada(s)` : 'nenhuma bloqueada'),
-        indicador('Chamadas agora', inteiro(d.em_curso), `pico de hoje: ${d.simultaneas.pico}`),
-        indicador('Ramais online', `${inteiro(d.ramais.online)}/${inteiro(d.ramais.total)}`),
-        indicador('Faturamento do mês', dinheiro(d.utilizacao.mes.gastos_centavos), `hoje: ${dinheiro(d.utilizacao.hoje.gastos_centavos)}`))),
+        indicador('Empresas ativas', inteiro(d.empresas.ativa ?? 0), d.empresas.bloqueada ? `${d.empresas.bloqueada} bloqueada(s)` : 'nenhuma bloqueada', 'empresas', 'azul'),
+        indicadoresTelefonia(d).slice(0, 3),
+        indicador('Faturamento do mês', dinheiro(d.utilizacao.mes.gastos_centavos), `hoje: ${dinheiro(d.utilizacao.hoje.gastos_centavos)}`, 'dinheiro', 'laranja'))),
+      el('div', { class: 'c8' }, cartaoSimultaneas(d.simultaneas, d.em_curso)),
+      el('div', { class: 'c4' }, cartaoStatusLigacoes(d.utilizacao.hoje, d.em_curso)),
       el('div', { class: 'c5' }, cartaoUtilizacao(d.utilizacao)),
-      el('div', { class: 'c4' }, cartaoSimultaneas(d.simultaneas, d.em_curso)),
       el('div', { class: 'c3' }, cartaoRamais(d.ramais)),
-      el('div', { class: 'c5' }, cartaoUsoMes(d.uso_mes)),
+      el('div', { class: 'c4' }, cartaoUsoMes(d.uso_mes)),
       el('div', { class: 'c7' }, cartao('Empresas com mais chamadas hoje', tabela(['Empresa', '>Chamadas', '>Agora', '>Valor'], d.top_empresas.map((e) =>
         el('tr', { class: 'clicavel', onclick: () => ctx.ir('dashboard', e.id) }, td(e.nome), td(inteiro(e.chamadas), 'dir num'), td(inteiro(e.em_curso), 'dir num'),
           td(dinheiro(e.custo_centavos), 'dir num'))), 'Nenhuma chamada hoje.'))),
-      el('div', { class: 'c12' }, cartaoRecursos(d.recursos))));
+      el('div', { class: 'c5' }, cartaoRecursos(d.recursos))));
   }, 10_000));
 }
 
@@ -201,8 +201,9 @@ async function telaSeguranca(ctx) {
       carregar();
     };
     limpar(corpo,
-      el('div', { class: 'grade' }, indicador('Logins recusados (24 h)', inteiro(r.falhas_login.reduce((s, x) => s + x.tentativas, 0)), `${r.falhas_login.length} endereço(s)`),
-        indicador('IPs bloqueados', inteiro(r.ips_bloqueados.length)), indicador('Chaves de API ativas', inteiro(r.chaves_ativas)), indicador('Masters ativos', inteiro(r.masters))),
+      el('div', { class: 'grade' }, indicador('Logins recusados (24 h)', inteiro(r.falhas_login.reduce((s, x) => s + x.tentativas, 0)), `${r.falhas_login.length} endereço(s)`, 'perdida', 'vermelho'),
+        indicador('IPs bloqueados', inteiro(r.ips_bloqueados.length), null, 'seguranca', 'laranja'), indicador('Chaves de API ativas', inteiro(r.chaves_ativas), null, 'integracoes', 'azul'),
+        indicador('Masters ativos', inteiro(r.masters), null, 'usuarios', 'roxo')),
       el('div', { class: 'grade-dash' },
         el('div', { class: 'c6' }, cartao('Logins recusados nas últimas 24 h', tabela(['IP', '>Tentativas', 'Última', '^'], r.falhas_login.map((x) => el('tr', {},
           td(el('span', { class: 'mono' }, x.ip ?? '—')), td(inteiro(x.tentativas), 'dir num'), td(dataHora(x.ultima)),
