@@ -66,6 +66,8 @@ module.exports = {
   // Busca de endereços e endereço do veículo (Photon/OpenStreetMap). RASTREADOR_GEOCODER_URL vazio desliga.
   geocoder: {
     url: String(process.env.RASTREADOR_GEOCODER_URL ?? 'https://photon.komoot.io').replace(/\/+$/, ''),
+    // Endereço do veículo: a rua vem do Nominatim (mede até o traçado da rua). Vazio usa só o Photon.
+    reverso: String(process.env.RASTREADOR_GEOCODER_REVERSO_URL ?? 'https://nominatim.openstreetmap.org').replace(/\/+$/, ''),
     timeoutMs: Number(process.env.RASTREADOR_GEOCODER_TIMEOUT_MS) || 6000,
   },
   admin: {

@@ -3,8 +3,9 @@
 const config = require('../config');
 
 /**
- * Busca de endereços e endereço de um ponto, pelo Photon (OpenStreetMap; padrão: photon.komoot.io, gratuito, sem chave).
- * As respostas ficam em memória para não repetir a mesma consulta (o ponto de um veículo parado é consultado várias vezes).
+ * Busca de endereços (Photon) e endereço de um ponto (Nominatim para a rua, Photon para o bairro), ambos do OpenStreetMap,
+ * gratuitos e sem chave. O Nominatim mede a distância até o traçado da rua (o Photon mede até o meio dela e, numa rua comprida,
+ * escolhe a vizinha). As respostas ficam em memória para não repetir a mesma consulta.
  */
 const MAX_CACHE = 5000;
 const cache = new Map();
@@ -51,13 +52,60 @@ async function buscar(texto, perto) {
   return lembrar(chave, f.map(formatar).filter((x) => Number.isFinite(x.lat)));
 }
 
-/** Endereço mais próximo do ponto (arredondado a ~10 m, para o cache servir ao veículo parado). */
+// O Nominatim aceita no máximo 1 consulta por segundo: as consultas entram numa fila.
+let filaNominatim = Promise.resolve();
+const INTERVALO_NOMINATIM_MS = 1100;
+function nominatim(lat, lng) {
+  const vez = filaNominatim.then(async () => {
+    const url = new URL(`${config.geocoder.reverso}/reverse`);
+    for (const [k, v] of Object.entries({ lat: lat.toFixed(6), lon: lng.toFixed(6), format: 'jsonv2', zoom: 18, addressdetails: 1, 'accept-language': 'pt-BR' })) {
+      url.searchParams.set(k, String(v));
+    }
+    try {
+      const resp = await fetch(url, { headers: { 'User-Agent': 'Rastreador de Veiculos', Accept: 'application/json' }, signal: AbortSignal.timeout(config.geocoder.timeoutMs) });
+      return resp.ok ? await resp.json() : null;
+    } finally {
+      await new Promise((r) => setTimeout(r, INTERVALO_NOMINATIM_MS));
+    }
+  });
+  filaNominatim = vez.catch(() => {});
+  return vez;
+}
+
+/** Junta a rua (e o número, se o mapa tiver) do Nominatim com o bairro do Photon. */
+function juntar(n, bairroPhoton, cidadePhoton, lat, lng) {
+  const a = n.address ?? {};
+  const rua = a.road ? [a.road, a.house_number].filter(Boolean).join(', ') : null;
+  const bairro = bairroPhoton || a.suburb || a.city_district || a.neighbourhood || null;
+  const cidade = a.city || a.town || a.village || cidadePhoton || null;
+  const regiao = [bairro, cidade].filter((x, i, l) => x && l.indexOf(x) === i).join(', ');
+  const fim = [regiao, a.state].filter(Boolean).join(' – ');
+  const lugar = n.name && n.name !== a.road ? n.name : null;
+  return {
+    nome: lugar || rua || bairro || cidade || 'Local',
+    endereco: [lugar ? rua : null, fim].filter(Boolean).join(' – ') || null,
+    completo: [lugar, rua, fim].filter(Boolean).join(' – '),
+    cep: a.postcode ?? null,
+    lat, lng,
+  };
+}
+
+/** Endereço do ponto (arredondado a ~10 m, para o cache servir ao veículo parado). Sem o Nominatim, usa só o Photon. */
 async function endereco(lat, lng) {
-  if (!config.geocoder.url) return null;
+  if (!config.geocoder.url && !config.geocoder.reverso) return null;
   const chave = `r|${lat.toFixed(4)},${lng.toFixed(4)}`;
   if (cache.has(chave)) return cache.get(chave);
-  const f = await consultar('/reverse', { lat: lat.toFixed(6), lon: lng.toFixed(6), limit: 1, lang: 'default' });
-  return lembrar(chave, f[0] ? formatar(f[0]) : null);
+  const [n, f] = await Promise.all([
+    config.geocoder.reverso ? nominatim(lat, lng).catch(() => null) : null,
+    config.geocoder.url ? consultar('/reverse', { lat: lat.toFixed(6), lon: lng.toFixed(6), limit: 1, lang: 'default' }).catch(() => []) : [],
+  ]);
+  const photon = f[0] ? formatar(f[0]) : null;
+  if (n?.address) {
+    const p = f[0]?.properties ?? {};
+    return lembrar(chave, juntar(n, p.district || p.locality || null, p.city || null, lat, lng));
+  }
+  if (!photon && !n) throw new Error('Nenhum serviço de endereço respondeu');
+  return lembrar(chave, photon);
 }
 
 module.exports = { buscar, endereco, formatar };
