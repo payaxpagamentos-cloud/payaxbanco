@@ -81,8 +81,14 @@ export function hibrido(estilo, satelite) {
   // tileSize 128: cada imagem de 256 px ocupa 128 px na tela, então o mapa sempre usa a foto um nível mais detalhada
   // (sem isso, ele estica a foto do nível anterior e a imagem fica borrada, ainda mais em telas com escala de 125% ou mais).
   s.sources = { ...s.sources, satelite: { type: 'raster', tiles: [satelite.tiles], tileSize: 128, maxzoom: 19 } };
-  const vias = s.layers.filter((l) => l.type === 'line' && /^road_(motorway|trunk_primary|secondary_tertiary|link)$|^bridge_(motorway|trunk_primary)$/.test(l.id))
-    .map((l) => ({ ...l, paint: { ...l.paint, 'line-color': /secondary_tertiary/.test(l.id) ? '#FFFFFF' : '#F6D27A', 'line-opacity': /secondary_tertiary/.test(l.id) ? 0.3 : 0.5 } }));
+  // Traçado de todas as ruas no chão, em linhas claras: com os prédios altos inclinados na foto, mostra onde a rua fica de verdade.
+  const vias = s.layers.filter((l) => l.type === 'line' && /^(road|bridge)_(motorway|trunk_primary|secondary_tertiary|link|minor|street|service_track)$/.test(l.id))
+    .map((l) => {
+      const principal = /motorway|trunk_primary|_link$/.test(l.id);
+      const avenida = /secondary_tertiary/.test(l.id);
+      return { ...l, paint: { ...l.paint, 'line-color': principal ? '#F6D27A' : '#FFFFFF', 'line-opacity': principal ? 0.6 : avenida ? 0.5 : 0.42,
+        'line-width': principal ? l.paint['line-width'] : ['interpolate', ['exponential', 1.4], ['zoom'], 13, avenida ? 0.8 : 0.4, 16, avenida ? 2.2 : 1.4, 20, avenida ? 6 : 4] } };
+    });
   // Nomes de bairros e cidades maiores, como no satélite dos aplicativos de mapa.
   const tamanhoLugar = { label_other: [11, 12, 16, 17], label_village: [10, 12, 16, 18], label_town: [8, 13, 14, 20], label_city: [8, 14, 14, 22] };
   const nomes = s.layers.filter((l) => l.type === 'symbol').map((l) => {
