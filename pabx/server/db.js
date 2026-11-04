@@ -310,6 +310,11 @@ function abrir(arquivo = config.dbFile) {
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
 
+  // Migração: ramal usado pelo usuário no telefone do painel.
+  if (!db.prepare('PRAGMA table_info(usuarios)').all().some((c) => c.name === 'ramal_id')) {
+    db.exec('ALTER TABLE usuarios ADD COLUMN ramal_id INTEGER REFERENCES ramais(id) ON DELETE SET NULL');
+  }
+
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);
   // Instalações antigas com o nome padrão de antes passam a usar o nome novo (um nome escolhido no painel não muda).

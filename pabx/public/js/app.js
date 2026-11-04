@@ -2,6 +2,7 @@ import { api, sessao } from './api.js';
 import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, PERFIS } from './ui.js';
 import { TELAS_MASTER } from './master.js';
 import { TELAS_EMPRESA } from './empresa.js';
+import { iniciarTelefone, pararTelefone } from './telefone.js';
 
 const raiz = $('#app');
 let pararTela = null;
@@ -53,8 +54,10 @@ async function desenhar() {
   pararTela?.();
   pararTela = null;
   const s = sessao.get();
-  if (!s?.token) { pararSaude?.(); pararSaude = null; return telaEntrada(); }
+  if (!s?.token) { pararSaude?.(); pararSaude = null; pararTelefone(); return telaEntrada(); }
   const u = s.usuario;
+  // Telefone do painel: para os usuários das empresas (o ramal vem do usuário).
+  if (!PLATAFORMA.includes(u.perfil)) iniciarTelefone({ empresaId: u.empresa_id });
   let { empresaId, tela } = rota();
   // Usuário de empresa sempre fica no painel da própria empresa.
   if (!PLATAFORMA.includes(u.perfil) && empresaId !== u.empresa_id) {

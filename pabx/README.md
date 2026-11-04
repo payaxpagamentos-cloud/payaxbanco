@@ -48,6 +48,42 @@ Servidor próprio (Node.js + SQLite), sem depender do Ativa BPO nem do APP Táxi
 - **Configurações**: contato, gravação, plano contratado e usuários da empresa (administrador e supervisor).
 - **Integrações**: chaves de API da empresa.
 
+## Telefone no painel
+
+Botão azul no canto inferior direito, para os usuários das empresas: abre o teclado para **ligar** (com mudo, teclas durante a
+ligação e desligar) e, quando chega uma ligação, mostra o aviso **no meio da tela** com toque para **atender ou recusar**.
+Com o painel minimizado ou em outra aba, o navegador mostra uma notificação do sistema (o usuário ativa no próprio telefone,
+em "Ativar aviso de ligação") e o título da aba pisca; clicar na notificação traz o painel de volta. O navegador precisa
+estar aberto: fechar a aba desconecta o ramal. O ponto no botão mostra a situação (verde: online; vermelho: desconectado).
+
+Cada usuário liga com **o próprio ramal**: o administrador escolhe em Configurações → Usuários → "Ramal no telefone do painel"
+(um usuário por ramal). O painel entrega a senha SIP só do ramal do usuário logado.
+
+Para funcionar:
+1. **Asterisk com WebRTC** (PJSIP): transporte WSS com certificado válido e os ramais com `webrtc=yes`:
+   ```
+   ; pjsip.conf
+   [transport-wss]
+   type=transport
+   protocol=wss
+   bind=0.0.0.0
+   ; http.conf: tlsenable=yes, tlsbindaddr=0.0.0.0:8089, tlscertfile/tlsprivatekey do seu domínio
+
+   [1_100]            ; usuario_sip = <empresa>_<ramal> (veja GET /config da integração)
+   type=endpoint
+   webrtc=yes
+   context=ramais
+   disallow=all
+   allow=opus,ulaw
+   auth=1_100
+   aors=1_100
+   ```
+2. No servidor do painel: `PABX_WEBRTC_WSS=wss://pbx.seudominio.com.br:8089/ws` (e, se o domínio SIP for outro, `PABX_SIP_DOMINIO`).
+   O endereço entra na política de segurança (CSP) do painel, que só conversa com ele.
+3. O painel precisa estar em **https** (o navegador só libera o microfone assim).
+
+A biblioteca SIP (JsSIP, licença MIT) fica em `public/vendor/jssip.min.js`; para atualizar: `npm run vendor`.
+
 ## Tarifação e limites
 
 - Só as ligações **realizadas e atendidas** são cobradas. O tipo vem do número discado: móvel (9 dígitos começando com 9), fixo,

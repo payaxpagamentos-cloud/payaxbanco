@@ -29,7 +29,7 @@ function lerToken(token) {
 const PLATAFORMA = ['master', 'suporte'];
 
 function autenticar(db) {
-  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.empresa_id, u.ativo, e.nome AS empresa_nome, e.status AS empresa_status
+  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.empresa_id, u.ativo, u.ramal_id, e.nome AS empresa_nome, e.status AS empresa_status
     FROM usuarios u LEFT JOIN empresas e ON e.id = u.empresa_id WHERE u.id = ?`);
   return (req, _res, next) => {
     const c = req.get('authorization') || '';

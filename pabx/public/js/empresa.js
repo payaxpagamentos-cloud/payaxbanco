@@ -370,10 +370,12 @@ async function telaConfiguracoes(ctx) {
   el('p', { class: 'pequeno mudo' }, 'Para mudar o plano, fale com o suporte.'));
 
   const usuarios = el('div');
+  const ramaisAtivos = admin ? (await api.get(`${base(ctx)}/ramais`)).filter((r) => r.ativo) : [];
   const formUsuario = (u) => formModal(u ? `Editar ${u.nome}` : 'Novo usuário', () => [
     campo('Nome', { name: 'nome', required: true, maxlength: 120, value: u?.nome ?? '' }),
     u ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, u.email) : campo('E-mail', { name: 'email', type: 'email', required: true }),
     escolha('Perfil', 'perfil', { cliente: PERFIS.cliente, supervisor: PERFIS.supervisor }, u?.perfil ?? 'supervisor'),
+    escolha('Ramal no telefone do painel', 'ramal_id', { '': 'Nenhum (não liga pelo painel)', ...Object.fromEntries(ramaisAtivos.map((r) => [r.id, `${r.numero} · ${r.nome}`])) }, u?.ramal_id ?? ''),
     campo(u ? 'Nova senha (deixe em branco para manter)' : 'Senha inicial (mínimo 8)', { name: 'senha', type: 'password', minlength: 8, required: !u, autocomplete: 'new-password' }),
     u ? marcar('Usuário ativo', { name: 'ativo', checked: Boolean(u.ativo) }) : null,
   ], (d) => {
@@ -382,8 +384,8 @@ async function telaConfiguracoes(ctx) {
   });
   async function carregarUsuarios() {
     const lista = await api.get(`${base(ctx)}/usuarios`);
-    limpar(usuarios, tabela(['Nome', 'E-mail', 'Perfil', 'Último acesso', 'Situação', '^'], lista.map((u) => el('tr', {},
-      td(pessoa(u.nome)), td(u.email), td(PERFIS[u.perfil]), td(dataHora(u.ultimo_acesso)), td(u.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo', 'erro')),
+    limpar(usuarios, tabela(['Nome', 'E-mail', 'Perfil', 'Ramal', 'Último acesso', 'Situação', '^'], lista.map((u) => el('tr', {},
+      td(pessoa(u.nome)), td(u.email), td(PERFIS[u.perfil]), td(u.ramal ?? '—', 'num'), td(dataHora(u.ultimo_acesso)), td(u.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo', 'erro')),
       el('td', { class: 'acoes' }, botaoIcone('editar', 'Editar', async () => { if (await formUsuario(u)) { toast('Usuário salvo.'); carregarUsuarios(); } })))), 'Nenhum usuário.'),
     el('div', { style: 'margin-top:12px' }, botao('Novo usuário', 'primario', async () => { if (await formUsuario()) { toast('Usuário criado.'); carregarUsuarios(); } })));
   }
