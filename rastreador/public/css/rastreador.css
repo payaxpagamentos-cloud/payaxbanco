@@ -823,3 +823,37 @@ p.aviso, div.aviso{ font-size: 12px; }
   .btn{ min-height: 40px; } .btn.pequeno{ min-height: 36px; }
   .lateral a.item{ min-height: 44px; }
 }
+
+/* ---------- Configurações: as seções (Geral, Comandos, Integrações) em cartões no topo da página ---------- */
+.abas-config{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; padding: 0 25px 18px; }
+.aba-config{ display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+  color: var(--text); text-decoration: none; position: relative; overflow: hidden; transition: transform .22s, box-shadow .22s, border-color .2s, background .2s;
+  animation: rt-page-in .38s cubic-bezier(.16, 1, .3, 1) both; }
+.aba-config:nth-child(2){ animation-delay: .04s; } .aba-config:nth-child(3){ animation-delay: .08s; }
+.aba-config::before{ content: ""; position: absolute; inset: auto 0 0; height: 2px; background: var(--grad-linha); opacity: 0; transition: opacity .22s; }
+.aba-config:hover{ text-decoration: none; transform: translateY(-3px); box-shadow: var(--shadow-hover); border-color: var(--border-forte); }
+.aba-config:hover::before{ opacity: 1; }
+.aba-config .aba-icone{ width: 38px; height: 38px; border-radius: 11px; background: var(--surface-2); color: var(--ciano); display: grid; place-items: center; flex: none;
+  transition: background .2s, color .2s; }
+.aba-config .aba-icone svg{ width: 19px; height: 19px; }
+.aba-config .aba-texto{ display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aba-config strong{ font-size: 13px; font-weight: 600; }
+.aba-config small{ font-size: 11px; color: var(--text-2); line-height: 1.4; }
+.aba-config.on{ border-color: var(--azul); background: var(--azul-suave); box-shadow: inset 3px 0 var(--menta-sel); }
+.aba-config.on::before{ opacity: 1; }
+.aba-config.on .aba-icone{ background: var(--grad-acao); color: #FFFFFF; }
+.aba-config.on strong{ color: var(--azul); }
+:root[data-tema="escuro"] .aba-config.on{ background: #16233D; }
+@media (max-width: 1100px) and (min-width: 861px){ .abas-config{ padding: 0 18px 16px; } }
+@media (max-width: 860px){
+  /* No celular, as seções viram pílulas roláveis (só o nome). */
+  .abas-config{ display: flex; overflow-x: auto; gap: 8px; padding: 0 15px 14px; scrollbar-width: none; }
+  .abas-config::-webkit-scrollbar{ display: none; }
+  .aba-config{ flex: none; padding: 7px 14px 7px 8px; border-radius: 999px; gap: 8px; min-height: 44px; }
+  .aba-config:hover{ transform: none; }
+  .aba-config::before{ display: none; }
+  .aba-config .aba-icone{ width: 28px; height: 28px; border-radius: 50%; }
+  .aba-config .aba-icone svg{ width: 15px; height: 15px; }
+  .aba-config small{ display: none; }
+  .aba-config strong{ font-size: 12px; }
+}

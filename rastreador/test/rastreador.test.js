@@ -331,13 +331,15 @@ test('Rastreador', async (t) => {
   });
 
   await t.test('mapa, percurso, relatórios e alertas', async () => {
+    // As posições deste teste são de até 1 h atrás: logo depois da meia-noite elas ficam no dia anterior, então o período começa nesse dia.
+    const desde = `de=${local(Date.now() - 60 * 60_000).data}`;
     const mapa = (await api.get(`${base()}/mapa`, operador)).dados;
     const v = mapa.veiculos.find((x) => x.id === veiculo);
     assert.equal(v.situacao, 'parado', 'a última posição (0xA0) chegou parada e desligada');
     assert.equal(v.bloqueado, 1);
     assert.equal(mapa.cercas.length, 1);
 
-    const p = (await api.get(`${base()}/veiculos/${veiculo}/percurso`, cliente)).dados;
+    const p = (await api.get(`${base()}/veiculos/${veiculo}/percurso?${desde}`, cliente)).dados;
     assert.equal(p.pontos.length, 6);
     assert.equal(p.viagens.length, 1);
     assert.equal(p.viagens[0].em_andamento, false, 'a ignição desligada encerrou a viagem');
@@ -345,15 +347,15 @@ test('Rastreador', async (t) => {
     assert.ok(p.alertas.length >= 3);
     assert.equal((await api.get(`${base()}/veiculos/${veiculo}/percurso?de=2026-01-01&ate=2026-01-30`, cliente)).status, 422);
 
-    const resumo = (await api.get(`${base()}/relatorios/resumo`, cliente)).dados;
+    const resumo = (await api.get(`${base()}/relatorios/resumo?${desde}`, cliente)).dados;
     const linha = resumo.linhas.find((x) => x.id === veiculo);
     assert.ok(Math.abs(linha.distancia_m - 4100) < 5);
     assert.equal(linha.excessos, 1);
     assert.equal(linha.velocidade_max_kmh, 100);
-    const arquivo = await api.get(`${base()}/relatorios/resumo?csv=1`, cliente);
+    const arquivo = await api.get(`${base()}/relatorios/resumo?csv=1&${desde}`, cliente);
     assert.match(arquivo.headers.get('content-type'), /text\/csv/);
     assert.match(arquivo.dados, /ABC1D23;Caminhão 01;;4,1;/);
-    const viag = (await api.get(`${base()}/relatorios/viagens?veiculo_id=${veiculo}`, cliente)).dados;
+    const viag = (await api.get(`${base()}/relatorios/viagens?veiculo_id=${veiculo}&${desde}`, cliente)).dados;
     assert.equal(viag.viagens.length, 1);
 
     const pend = (await api.get(`${base()}/alertas`, operador)).dados;

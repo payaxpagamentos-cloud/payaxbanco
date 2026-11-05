@@ -11,17 +11,27 @@ let nomePlataforma = 'Rastreador';
 const nomesEmpresa = new Map();
 
 const PLATAFORMA = ['master', 'suporte'];
-// [rota, rótulo, ícone, perfis que veem (vazio = todos)]
+// [rota, rótulo, ícone, perfis que veem (vazio = todos), seções]
+// Seções: [rota, rótulo, ícone, descrição, perfis que veem]. O item do menu abre a primeira seção permitida, e a página mostra as
+// seções em cartões no topo (as rotas de cada seção continuam as mesmas: #/comandos, #/integracoes...).
 const MENU_MASTER = [
   ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa geral', 'mapa'], ['empresas', 'Empresas', 'empresas'], ['rastreadores', 'Rastreadores', 'rastreadores'],
   ['usuarios', 'Permissões e usuários', 'usuarios', ['master']], ['diagnostico', 'Diagnóstico', 'diagnostico'],
-  ['configuracoes', 'Configurações', 'configuracoes', ['master']], ['integracoes', 'Integrações', 'integracoes'], ['atividades', 'Atividades', 'seguranca', ['master']],
+  ['configuracoes', 'Configurações', 'configuracoes', null, [
+    ['configuracoes', 'Geral', 'configuracoes', 'Plataforma, rastreamento, padrões das empresas e comandos GT06', ['master']],
+    ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas'],
+  ]],
+  ['atividades', 'Atividades', 'seguranca', ['master']],
 ];
 const MENU_EMPRESA = [
   ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa ao vivo', 'mapa'], ['historico', 'Histórico', 'historico'], ['alertas', 'Alertas', 'alertas'],
   ['veiculos', 'Veículos', 'veiculos'], ['motoristas', 'Motoristas', 'motoristas'], ['cercas', 'Cercas', 'cercas'], ['manutencao', 'Manutenção', 'manutencao'],
-  ['relatorios', 'Relatórios', 'relatorios'], ['comandos', 'Comandos', 'comandos'], ['configuracoes', 'Configurações', 'configuracoes'],
-  ['integracoes', 'Integrações', 'integracoes', ['master', 'suporte', 'cliente']],
+  ['relatorios', 'Relatórios', 'relatorios'],
+  ['configuracoes', 'Configurações', 'configuracoes', null, [
+    ['configuracoes', 'Geral', 'configuracoes', 'Alertas, horário de uso, contato, plano e usuários'],
+    ['comandos', 'Comandos', 'comandos', 'Envio de comandos aos rastreadores e as respostas'],
+    ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas', ['master', 'suporte', 'cliente']],
+  ]],
 ];
 
 // Linha de apoio embaixo do título (as telas que já têm a própria explicação ficam sem).
@@ -29,12 +39,12 @@ const SUBTITULOS_MASTER = {
   dashboard: 'Resumo da plataforma, das empresas e dos equipamentos.', mapa: 'Última posição dos veículos de todas as empresas.',
   empresas: 'Clientes da plataforma, planos e limites.', rastreadores: 'Equipamentos cadastrados, estoque e instalação.',
   usuarios: 'Quem acessa a plataforma e o que cada perfil pode fazer.', diagnostico: 'Conexões dos equipamentos e mensagens recebidas.',
-  configuracoes: 'Padrões da plataforma e dos comandos.', atividades: 'Registro das ações feitas no painel.',
+  configuracoes: 'Padrões da plataforma, comandos GT06 e integrações.', atividades: 'Registro das ações feitas no painel.',
 };
 const SUBTITULOS_EMPRESA = {
   dashboard: 'Resumo da frota, dos deslocamentos e dos alertas.', mapa: 'Última posição de cada veículo.', historico: 'Trajetos, paradas e viagens por período.',
   alertas: 'Ocorrências dos veículos e o que já foi tratado.', cercas: 'Áreas monitoradas com aviso de entrada e saída.', relatorios: 'Relatórios por veículo e período.',
-  configuracoes: 'Preferências da empresa e dos alertas.',
+  configuracoes: 'Preferências da empresa, comandos e integrações.',
 };
 
 window.addEventListener('rastreador:sair', () => desenhar());
@@ -66,8 +76,12 @@ async function desenhar() {
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
   const telas = empresaId ? TELAS_EMPRESA : TELAS_MASTER;
-  const item = menu.find(([k, , , perfis, subs]) => (k === tela || subs?.some(([sk]) => sk === tela)) && (!perfis || perfis.includes(u.perfil)));
+  const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
+  const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp]) => permitido(sp));
+  const item = menu.find(([k, , , perfis, subs]) => permitido(perfis) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));
   if (!item || !telas[tela]) return ir(empresaId, 'dashboard');
+  const secoes = secoesDe(item[4]);
+  const secao = secoes.find(([sk]) => sk === tela);
 
   let nomeEmpresa = null;
   if (empresaId) {
@@ -83,16 +97,16 @@ async function desenhar() {
     }
   }
 
-  const titulo = item[4]?.find(([sk]) => sk === tela)?.[1] ?? item[1];
+  const titulo = item[1];
   const conteudo = el('main', { class: 'conteudo' });
   let recolhida = false;
   try { recolhida = localStorage.getItem('rastreador.menu') === 'recolhido'; } catch { /* padrão */ }
   const casca = el('div', { class: `casca${recolhida ? ' recolhida' : ''}` });
 
-  const itens = menu.filter(([, , , perfis]) => !perfis || perfis.includes(u.perfil)).map(([k, rotulo, ic, , subs]) => {
-    const ativo = k === tela || subs?.some(([sk]) => sk === tela);
-    const a = el('a', { class: `item${ativo ? ' on' : ''}`, href: link(empresaId, subs ? subs[0][0] : k), title: rotulo }, icone(ic), el('span', { class: 'rotulo' }, rotulo));
-    return subs && ativo ? [a, el('div', { class: 'grupo-sub' }, subs.map(([sk, sr]) => el('a', { class: `sub${sk === tela ? ' on' : ''}`, href: link(empresaId, sk) }, sr)))] : a;
+  const itens = menu.filter(([, , , perfis, subs]) => permitido(perfis) && (!subs || secoesDe(subs).length)).map(([k, rotulo, ic, , subs]) => {
+    const ativo = subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela;
+    return el('a', { class: `item${ativo ? ' on' : ''}`, href: link(empresaId, subs ? secoesDe(subs)[0][0] : k), title: rotulo, 'aria-current': ativo ? 'page' : null },
+      icone(ic), el('span', { class: 'rotulo' }, rotulo));
   });
   const lateral = el('nav', { class: 'lateral', 'aria-label': 'Menu' },
     el('div', { class: 'topo-lateral' }, marca(nomePlataforma), el('button', { class: 'recolher', title: 'Recolher menu', onclick: () => {
@@ -107,17 +121,26 @@ async function desenhar() {
   const trilha = el('nav', { class: 'trilha', 'aria-label': 'Você está em' });
   if (empresaId) {
     if (PLATAFORMA.includes(u.perfil)) trilha.append(el('a', { href: '#/empresas' }, 'Empresas'), el('span', { class: 'sep' }, '/'));
-    trilha.append(el('a', { href: link(empresaId, 'dashboard') }, nomeEmpresa), el('span', { class: 'sep' }, '/'), el('strong', {}, titulo));
+    trilha.append(el('a', { href: link(empresaId, 'dashboard') }, nomeEmpresa), el('span', { class: 'sep' }, '/'));
   } else {
-    trilha.append(nomePlataforma, el('span', { class: 'sep', 'aria-hidden': 'true' }, '/'), el('strong', {}, titulo));
+    trilha.append(nomePlataforma, el('span', { class: 'sep', 'aria-hidden': 'true' }, '/'));
   }
+  // Nas páginas com seções (Configurações), a trilha termina na seção: ".../ Configurações / Comandos".
+  if (secao) trilha.append(el('a', { href: link(empresaId, secoes[0][0]) }, titulo), el('span', { class: 'sep', 'aria-hidden': 'true' }, '/'), el('strong', {}, secao[1]));
+  else trilha.append(el('strong', {}, titulo));
 
-  const subtitulo = (empresaId ? SUBTITULOS_EMPRESA : SUBTITULOS_MASTER)[tela];
+  const subtitulo = (empresaId ? SUBTITULOS_EMPRESA : SUBTITULOS_MASTER)[secao ? item[0] : tela];
   const topo = el('header', { class: 'topo' }, el('div', {}, trilha,
     el('h1', { style: 'margin:0' }, titulo), subtitulo ? el('p', { class: 'subtitulo' }, subtitulo) : null), ferramentas(u));
-  casca.append(lateral, el('div', { class: 'principal' }, topo, conteudo));
+  // Seções em cartões no topo da página (ficam fora do conteúdo, que cada tela redesenha).
+  const abas = secoes.length > 1 ? el('nav', { class: 'abas-config', 'aria-label': `Seções de ${titulo}` }, secoes.map(([sk, sr, sic, sd]) => {
+    const on = sk === tela;
+    return el('a', { class: `aba-config${on ? ' on' : ''}`, href: link(empresaId, sk), 'aria-current': on ? 'page' : null },
+      el('span', { class: 'aba-icone' }, icone(sic)), el('span', { class: 'aba-texto' }, el('strong', {}, sr), el('small', {}, sd)));
+  })) : null;
+  casca.append(lateral, el('div', { class: 'principal' }, topo, abas, conteudo));
   limpar(raiz, casca);
-  document.title = `${titulo} · ${nomeEmpresa ? `${nomeEmpresa} · ` : ''}${nomePlataforma}`;
+  document.title = `${secao ? `${secao[1]} · ` : ''}${titulo} · ${nomeEmpresa ? `${nomeEmpresa} · ` : ''}${nomePlataforma}`;
 
   const ctx = {
     usuario: u, empresaId, nomeEmpresa, conteudo,
