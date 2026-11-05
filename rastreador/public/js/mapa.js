@@ -19,7 +19,7 @@ function htmlVeiculo(v, selecionado) {
   const forma = andando
     ? `<svg viewBox="0 0 24 24" style="transform:rotate(${Number(v.curso) || 0}deg)"><path d="M12 2 20 21 12 16.5 4 21z" fill="${cor}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`
     : `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="${cor}" stroke="#fff" stroke-width="2.4"/>${v.bloqueado ? '<path d="M9 12h6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>' : ''}</svg>`;
-  return `<div class="veic${selecionado ? ' sel' : ''}">${forma}<span class="rot">${esc(fmtPlaca(v.placa))}</span></div>`;
+  return `<div class="veic s-${esc(v.situacao)}${selecionado ? ' sel' : ''}">${forma}<span class="rot">${esc(fmtPlaca(v.placa))}</span></div>`;
 }
 
 /** Carrega o MapLibre (módulo) e a ponte com o Leaflet, uma única vez. */

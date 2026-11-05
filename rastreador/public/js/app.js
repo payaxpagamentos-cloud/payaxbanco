@@ -3,6 +3,7 @@ import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, for
 import { TELAS_MASTER } from './master.js';
 import { TELAS_EMPRESA } from './empresa.js';
 import { iniciarCena } from './cena-entrada.js';
+import './efeitos.js';
 
 const raiz = $('#app');
 let pararTela = null;
