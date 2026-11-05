@@ -77,20 +77,31 @@ async function telaMapa(ctx) {
   await painelMapa(ctx, `${base(ctx)}/mapa`, { detalhe: (v, painel, fechar) => detalheVeiculo(ctx, v, painel, fechar) });
 }
 
-function detalheVeiculo(ctx, v, painel, fechar) {
-  const comComandos = pode(ctx) && v.imei && v.protocolo !== 'osmand';
+/** Por que o veículo não recebe comandos (para mostrar no lugar do botão Bloquear), ou null se recebe. */
+const semComandos = (v) => (!v.imei ? 'Sem rastreador instalado: cadastre um em Veículos para poder bloquear.'
+  : v.protocolo === 'osmand' ? 'Celular (Traccar Client) não recebe comandos de bloqueio.' : null);
+
+/**
+ * Faixa do veículo escolhido no mapa, com as ações (bloquear e desbloquear primeiro). Também usada no Mapa geral do master:
+ * aí `ctx.empresaId` é a empresa do veículo e `mostrarEmpresa` põe o nome dela e o atalho para o painel.
+ */
+export function detalheVeiculo(ctx, v, painel, fechar, { mostrarEmpresa = false } = {}) {
+  const motivo = semComandos(v);
+  const comComandos = pode(ctx) && !motivo;
   limpar(painel, faixaVeiculo(v, {
-    titulo: [v.descricao, TIPOS_VEICULO[v.tipo]].filter(Boolean).join(' · '),
+    titulo: [v.descricao, mostrarEmpresa ? v.empresa : TIPOS_VEICULO[v.tipo]].filter(Boolean).join(' · '),
     etiquetas: [etiquetaSituacao(v.situacao), v.bloqueado ? etiqueta('bloqueado', 'erro') : null,
       v.alertas_pendentes ? el('a', { class: 'etiqueta aviso', href: `#/empresa/${ctx.empresaId}/alertas`, style: 'text-decoration:none' }, `${v.alertas_pendentes} alerta(s)`) : null],
     acoes: [
-      el('button', { class: 'btn pequeno', onclick: () => { veiculoHistorico = v.id; ctx.ir('historico'); } }, icone('historico'), 'Histórico'),
-      pode(ctx) ? botao('Compartilhar', '', () => compartilhar(ctx, v)) : null,
+      comComandos ? (v.bloqueado
+        ? botao([icone('aberto'), 'Desbloquear'], 'primario', () => enviarComando(ctx, v, 'desbloquear'))
+        : botao([icone('cadeado'), 'Bloquear veículo'], 'perigo bloquear', () => enviarComando(ctx, v, 'bloquear'))) : null,
       comComandos ? botao('Pedir posição', '', () => enviarComando(ctx, v, 'localizar')) : null,
       comComandos ? botao('Consultar estado', '', () => enviarComando(ctx, v, 'status')) : null,
-      comComandos ? (v.bloqueado
-        ? botao('Desbloquear', 'primario', () => enviarComando(ctx, v, 'desbloquear'))
-        : botao('Bloquear', 'perigo', () => enviarComando(ctx, v, 'bloquear'))) : null,
+      el('button', { class: 'btn pequeno', onclick: () => { veiculoHistorico = v.id; ctx.ir('historico', ctx.empresaId); } }, icone('historico'), 'Histórico'),
+      pode(ctx) ? botao('Compartilhar', '', () => compartilhar(ctx, v)) : null,
+      mostrarEmpresa ? el('a', { class: 'btn pequeno', href: `#/empresa/${ctx.empresaId}/mapa` }, 'Abrir no painel da empresa') : null,
+      pode(ctx) && motivo ? el('span', { class: 'pequeno mudo', style: 'align-self:center' }, motivo) : null,
     ],
     fechar,
   }));
@@ -327,6 +338,9 @@ async function telaVeiculos(ctx) {
         td(x.motorista ?? '—'), td(x.limite_velocidade_kmh ? kmh(x.limite_velocidade_kmh) : '—', 'dir num'), td(km(x.hodometro_m), 'dir num'),
         td([etiquetaSituacao(x.situacao), x.bloqueado ? etiqueta('bloqueado', 'erro') : null]),
         el('td', { class: 'acoes' },
+          pode(ctx) && x.ativo && !semComandos(x) ? (x.bloqueado
+            ? botaoIcone('aberto', 'Desbloquear o veículo', async () => { await enviarComando(ctx, x, 'desbloquear'); carregar(); })
+            : botaoIcone('cadeado', 'Bloquear o veículo', async () => { await enviarComando(ctx, x, 'bloquear'); carregar(); }, 'perigo')) : null,
           botaoIcone('historico', 'Histórico', () => { veiculoHistorico = x.id; ctx.ir('historico'); }),
           pode(ctx) ? botaoIcone('editar', 'Editar', () => formVeiculo(x)) : null,
           pode(ctx) ? botaoIcone('relatorios', 'Ajustar hodômetro', async () => {

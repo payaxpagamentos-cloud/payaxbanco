@@ -4,6 +4,7 @@ import { el, limpar, dinheiro, dataHora, data, desde, inteiro, toast, campo, are
   TIPOS_EMPRESA, PERFIS, PROTOCOLOS, MODELOS_RASTREADOR, reaisCampo, centavos, icone } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, painelMapa, painelIntegracoes, situacaoDiag, linhaDado, blocoDestaque } from './comum.js';
 import { configPublica } from './mapa.js';
+import { detalheVeiculo } from './empresa.js';
 import { area as graficoArea } from './graficos.js';
 
 const listaEmpresas = () => api.get('/master/empresas');
@@ -50,7 +51,11 @@ async function telaDashboard(ctx) {
 }
 
 async function telaMapa(ctx) {
-  await painelMapa(ctx, '/master/mapa', { mostrarEmpresa: true });
+  // A faixa do veículo tem as mesmas ações do painel da empresa (bloquear, desbloquear, pedir posição...), na empresa do veículo.
+  await painelMapa(ctx, '/master/mapa', {
+    mostrarEmpresa: true,
+    detalhe: (v, painel, fechar) => detalheVeiculo({ ...ctx, empresaId: v.empresa_id, somenteLeitura: false }, v, painel, fechar, { mostrarEmpresa: true }),
+  });
 }
 
 // ---------- Empresas ----------

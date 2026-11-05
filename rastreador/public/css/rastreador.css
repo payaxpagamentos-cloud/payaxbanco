@@ -979,3 +979,7 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
   .abas-config .aba-config small{ display: none; }
   .abas-config .aba-config{ padding: 7px 14px 7px 8px; border-radius: 999px; gap: 8px; }
 }
+/* Bloquear: o botão vermelho cheio, para achar de primeira na faixa do veículo */
+.btn.perigo.bloquear{ background: var(--erro); border-color: var(--erro); color: #FFFFFF; font-weight: 600; }
+.btn.perigo.bloquear:hover{ background: var(--erro); filter: brightness(1.08); }
+:root[data-tema="escuro"] .btn.perigo.bloquear{ color: #0A0E19; }

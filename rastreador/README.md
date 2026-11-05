@@ -95,7 +95,8 @@ Equipamento que envia sem estar cadastrado aparece em **Rastreadores → Equipam
   (14 dias), últimos alertas, mais rodados na semana, alertas por tipo, manutenções vencidas/próximas e CNH vencendo em 30 dias.
 - **Mapa ao vivo**: lista com busca e filtro por situação ao lado do mapa (atualiza a cada 10 s); veículo girado pelo curso e colorido pela
   situação; painel do veículo com velocidade, ignição, comunicação, motorista e hodômetro, e os botões **Histórico, Compartilhar, Pedir posição,
-  Bloquear/Desbloquear** (bloquear pede a placa digitada). As cercas aparecem no mapa.
+  Bloquear/Desbloquear** (bloquear pede a placa digitada). As cercas aparecem no mapa. O bloqueio também fica no cadeado de cada
+  linha em **Veículos** e, para o master, na faixa do veículo no **Mapa geral**.
 - **Histórico**: trajeto de até 7 dias com início, fim, paradas numeradas e alertas no mapa; viagens (clique destaca o trecho) e paradas;
   **reprodução** do trajeto com velocidade de 1× a 64×.
 - **Alertas**: pendentes, tratados ou todos, por tipo, veículo e período; tratar um ou todos (com observação); CSV.
