@@ -12,14 +12,23 @@ export const configPublica = async () => (publico ??= await api.get('/publico'))
 export const COR_SITUACAO = { movimento: '#16A34A', ligado: '#D97706', parado: '#2563EB', sem_sinal: '#DC2626', sem_posicao: '#9CA3AF', sem_rastreador: '#9CA3AF' };
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/** Ícone do veículo: seta no sentido do curso (ou círculo, parado) na cor da situação, com a placa embaixo. */
+/**
+ * Ícone do veículo: um carro pequeno visto de cima, na cor da situação, com a frente apontando para o curso (o rumo da última
+ * posição, também quando parado) e a placa embaixo. Bloqueado: um cadeado vermelho no canto.
+ */
 function htmlVeiculo(v, selecionado) {
   const cor = COR_SITUACAO[v.situacao] ?? '#7C8392';
-  const andando = v.situacao === 'movimento';
-  const forma = andando
-    ? `<svg viewBox="0 0 24 24" style="transform:rotate(${Number(v.curso) || 0}deg)"><path d="M12 2 20 21 12 16.5 4 21z" fill="${cor}" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>`
-    : `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="${cor}" stroke="#fff" stroke-width="2.4"/>${v.bloqueado ? '<path d="M9 12h6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>' : ''}</svg>`;
-  return `<div class="veic s-${esc(v.situacao)}${selecionado ? ' sel' : ''}">${forma}<span class="rot">${esc(fmtPlaca(v.placa))}</span></div>`;
+  const curso = Number(v.curso) || 0;
+  const carro = `<svg class="carro" viewBox="0 0 32 32" style="transform:rotate(${curso}deg)" aria-hidden="true">`
+    + '<rect x="7.6" y="10" width="2.2" height="3.2" rx="1" fill="#0B1A2E" opacity=".55"/><rect x="22.2" y="10" width="2.2" height="3.2" rx="1" fill="#0B1A2E" opacity=".55"/>'
+    + `<rect x="9" y="3" width="14" height="26" rx="6" fill="${cor}" stroke="#fff" stroke-width="1.6"/>`
+    + '<path d="M11.3 10.6Q16 8.4 20.7 10.6L19.8 14Q16 12.9 12.2 14Z" fill="#0B1A2E" opacity=".72"/>'
+    + '<path d="M12.3 22.4Q16 23.4 19.7 22.4L20.3 25Q16 26.4 11.7 25Z" fill="#0B1A2E" opacity=".62"/>'
+    + '<rect x="12.2" y="14.6" width="7.6" height="7.4" rx="1.6" fill="#fff" opacity=".2"/>'
+    + '<circle cx="12.4" cy="4.9" r="1.1" fill="#FFF6C9"/><circle cx="19.6" cy="4.9" r="1.1" fill="#FFF6C9"/>'
+    + '</svg>';
+  const trava = v.bloqueado ? '<span class="trava" title="Bloqueado"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : '';
+  return `<div class="veic s-${esc(v.situacao)}${selecionado ? ' sel' : ''}">${carro}${trava}<span class="rot">${esc(fmtPlaca(v.placa))}</span></div>`;
 }
 
 /** Carrega o MapLibre (módulo) e a ponte com o Leaflet, uma única vez. */

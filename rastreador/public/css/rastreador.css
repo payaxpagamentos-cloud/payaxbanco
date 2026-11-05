@@ -857,3 +857,12 @@ p.aviso, div.aviso{ font-size: 12px; }
   .aba-config small{ display: none; }
   .aba-config strong{ font-size: 12px; }
 }
+
+/* ---------- Veículo no mapa: carro pequeno visto de cima ---------- */
+.veic .carro{ width: 30px; height: 30px; display: block; filter: drop-shadow(0 1.5px 2px rgba(0, 0, 0, .45)); transition: transform .4s ease; }
+.veic.sel .carro{ scale: 1.3; filter: drop-shadow(0 0 0 #fff) drop-shadow(0 2px 4px rgba(0, 0, 0, .5)); }
+.veic.sel::after{ content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid #36E0C0; box-shadow: 0 0 0 3px rgba(54, 224, 192, .25); pointer-events: none; }
+.veic .trava{ position: absolute; right: -3px; bottom: -1px; width: 14px; height: 14px; border-radius: 50%; background: #DC2626; border: 1.5px solid #fff; display: grid; place-items: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .4); }
+.veic .trava svg{ width: 8px; height: 8px; }
+.veic.sel .trava svg{ scale: 1; }
