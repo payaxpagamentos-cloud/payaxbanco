@@ -468,6 +468,16 @@ test('Rastreador', async (t) => {
     const dash = (await api.get('/master/dashboard', master)).dados;
     assert.equal(dash.faturamento_mensal_centavos, 2 * 5990);
     assert.equal(dash.desconhecidos, 1);
+    // Financeiro: o valor de cada cliente e o total batem com o faturamento do dashboard; a planilha sai em CSV; só o master vê.
+    const fin = (await api.get('/master/financeiro', master)).dados;
+    assert.equal(fin.resumo.faturamento_mensal_centavos, dash.faturamento_mensal_centavos);
+    const linhaFin = fin.clientes.find((c) => c.id === empresa);
+    assert.equal(linhaFin.veiculos, 2);
+    assert.equal(linhaFin.total_centavos, 2 * 5990);
+    const planilha = await api.get('/master/financeiro?csv=1', master);
+    assert.match(planilha.headers.get('content-type'), /text\/csv/);
+    assert.match(planilha.dados, /Transportes Rota Ltda;.*;2;.*;59,90;119,80/);
+    assert.equal((await api.get('/master/financeiro', cliente)).status, 403);
     assert.equal((await api.get('/master/diagnostico', master)).status, 200);
     assert.equal((await api.del(`/master/empresas/${empresa}`, { confirmacao: 'errado' }, master)).status, 422);
     assert.equal((await api.del(`/master/empresas/${empresa}`, { confirmacao: 'Transportes Rota Ltda' }, master)).status, 204);

@@ -8,7 +8,7 @@ const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { criarUsuario, alterarUsuario, criarChave } = require('../lib/contas');
-const { veiculosMapa } = require('../lib/relatorios');
+const { veiculosMapa, csv, reais, enviarCsv } = require('../lib/relatorios');
 const { hoje, somarDias } = require('../lib/datas');
 const v = require('../lib/validacao');
 
@@ -80,6 +80,47 @@ module.exports = (db, extras = {}) => {
         (SELECT COUNT(*) FROM rastreadores r WHERE r.empresa_id = e.id) AS rastreadores,
         (SELECT COUNT(*) FROM alertas a WHERE a.empresa_id = e.id AND a.tratado_em IS NULL) AS alertas_pendentes
       FROM empresas e WHERE ${onde.join(' AND ')} ORDER BY e.nome LIMIT 1000`).all(new Date(Date.now() - cfg.online_min * 60_000).toISOString(), ...p));
+  });
+
+  // ---------- Financeiro ----------
+  /**
+   * Valor mensal de cada cliente: mensalidade por veículo × veículos ativos (a mesma conta do dashboard). Só as empresas ativas entram
+   * no faturamento; o valor das bloqueadas aparece à parte. Com ?csv=1, baixa a planilha.
+   */
+  r.get('/financeiro', soMaster, (req, res) => {
+    const q = req.query;
+    const onde = ["e.status <> 'excluida'"];
+    const p = [];
+    if (q.busca) { onde.push('(e.nome LIKE ? OR e.documento LIKE ?)'); p.push(`%${String(q.busca).trim()}%`, `%${v.digitos(q.busca) || String(q.busca).trim()}%`); }
+    if (q.status) { onde.push('e.status = ?'); p.push(v.opcao(q.status, 'o status', ['ativa', 'bloqueada'])); }
+    const clientes = db.prepare(`SELECT e.id, e.nome, e.documento, e.tipo, e.status, e.motivo_bloqueio, e.limite_veiculos, e.mensalidade_centavos, e.criada_em,
+        (SELECT COUNT(*) FROM veiculos v WHERE v.empresa_id = e.id AND v.ativo = 1) AS veiculos
+      FROM empresas e WHERE ${onde.join(' AND ')} ORDER BY e.nome LIMIT 1000`).all(...p)
+      .map((c) => ({ ...c, total_centavos: c.mensalidade_centavos * c.veiculos }))
+      .sort((a, b) => b.total_centavos - a.total_centavos || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const ativas = clientes.filter((c) => c.status === 'ativa');
+    const faturamento = ativas.reduce((s, c) => s + c.total_centavos, 0);
+    const veiculosCobrados = ativas.reduce((s, c) => s + c.veiculos, 0);
+    const pagantes = ativas.filter((c) => c.total_centavos > 0).length;
+    const resumo = {
+      faturamento_mensal_centavos: faturamento,
+      clientes_ativos: ativas.length,
+      clientes_pagantes: pagantes,
+      veiculos_cobrados: veiculosCobrados,
+      ticket_medio_centavos: pagantes ? Math.round(faturamento / pagantes) : 0,
+      valor_medio_veiculo_centavos: veiculosCobrados ? Math.round(faturamento / veiculosCobrados) : 0,
+      bloqueadas: clientes.length - ativas.length,
+      bloqueadas_centavos: clientes.filter((c) => c.status !== 'ativa').reduce((s, c) => s + c.total_centavos, 0),
+      vagas_livres: ativas.reduce((s, c) => s + Math.max(0, c.limite_veiculos - c.veiculos), 0),
+    };
+    if (q.csv) {
+      return enviarCsv(res, `financeiro-${hoje()}.csv`, csv([
+        ['nome', 'Cliente'], ['documento', 'CNPJ/CPF'], ['tipo', 'Tipo'], [(c) => (c.status === 'ativa' ? 'Ativa' : 'Bloqueada'), 'Situação'],
+        ['veiculos', 'Veículos ativos'], ['limite_veiculos', 'Limite'], [(c) => reais(c.mensalidade_centavos), 'Mensalidade por veículo (R$)'],
+        [(c) => reais(c.total_centavos), 'Total mensal (R$)'],
+      ], clientes));
+    }
+    res.json({ resumo, clientes });
   });
 
   r.get('/empresas/:id', (req, res) => {

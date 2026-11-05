@@ -7,7 +7,7 @@ próprios veículos.
 | Perfil | O que vê |
 |---|---|
 | **Master** | A plataforma inteira: empresas, rastreadores (estoque e instalados), mapa de todas as frotas, usuários, diagnóstico, configurações, integrações e atividades. Entra no painel de qualquer empresa pela lista de Empresas. |
-| **Suporte** | Como o master, sem usuários, configurações e atividades; não exclui empresas nem rastreadores. |
+| **Suporte** | Como o master, sem usuários, configurações, financeiro e atividades; não exclui empresas nem rastreadores. |
 | **Cliente** (administrador da empresa) | O painel da própria empresa: mapa ao vivo, histórico, alertas, veículos, motoristas, cercas, manutenção, relatórios, comandos (bloqueio), configurações e integrações. |
 | **Operador** | O painel da empresa para monitorar: consulta tudo e trata os alertas, sem alterar cadastros nem enviar comandos. |
 
@@ -118,6 +118,8 @@ Equipamento que envia sem estar cadastrado aparece em **Rastreadores → Equipam
 - **Mapa geral**: todos os veículos de todas as empresas.
 - **Empresas**: tipo, limite de veículos, mensalidade por veículo, editar, bloquear (os usuários não entram e as posições deixam de ser gravadas),
   excluir (os rastreadores voltam ao estoque). Clicar abre o painel da empresa.
+- **Financeiro** (só o master): valor mensal de cada cliente (mensalidade por veículo × veículos ativos), uso do plano, participação
+  no faturamento, ticket médio, valor das empresas bloqueadas (fora do total), edição rápida do plano e planilha CSV.
 - **Rastreadores**: estoque e instalados (IMEI, modelo, protocolo, chip e operadora, empresa, veículo, última comunicação, conectado agora).
 - **Permissões e usuários**, **Diagnóstico** (servidor GT06, recepção, veículos mudos, comandos parados, empresas no limite),
   **Configurações** (tempos, retenção e os textos dos comandos GT06 do seu fabricante), **Integrações** e **Atividades**.

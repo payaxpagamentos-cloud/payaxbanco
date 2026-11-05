@@ -15,7 +15,8 @@ const PLATAFORMA = ['master', 'suporte'];
 // Seções: [rota, rótulo, ícone, descrição, perfis que veem]. O item do menu abre a primeira seção permitida, e a página mostra as
 // seções em cartões no topo (as rotas de cada seção continuam as mesmas: #/comandos, #/integracoes...).
 const MENU_MASTER = [
-  ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa geral', 'mapa'], ['empresas', 'Empresas', 'empresas'], ['rastreadores', 'Rastreadores', 'rastreadores'],
+  ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa geral', 'mapa'], ['empresas', 'Empresas', 'empresas'], ['financeiro', 'Financeiro', 'carteira', ['master']],
+  ['rastreadores', 'Rastreadores', 'rastreadores'],
   ['usuarios', 'Permissões e usuários', 'usuarios', ['master']], ['diagnostico', 'Diagnóstico', 'diagnostico'],
   ['configuracoes', 'Configurações', 'configuracoes', null, [
     ['configuracoes', 'Geral', 'configuracoes', 'Plataforma, rastreamento, padrões das empresas e comandos GT06', ['master']],
@@ -37,7 +38,7 @@ const MENU_EMPRESA = [
 // Linha de apoio embaixo do título (as telas que já têm a própria explicação ficam sem).
 const SUBTITULOS_MASTER = {
   dashboard: 'Resumo da plataforma, das empresas e dos equipamentos.', mapa: 'Última posição dos veículos de todas as empresas.',
-  empresas: 'Clientes da plataforma, planos e limites.', rastreadores: 'Equipamentos cadastrados, estoque e instalação.',
+  empresas: 'Clientes da plataforma, planos e limites.', financeiro: 'Valor mensal de cada cliente: mensalidade por veículo × veículos ativos.', rastreadores: 'Equipamentos cadastrados, estoque e instalação.',
   usuarios: 'Quem acessa a plataforma e o que cada perfil pode fazer.', diagnostico: 'Conexões dos equipamentos e mensagens recebidas.',
   configuracoes: 'Padrões da plataforma, comandos GT06 e integrações.', atividades: 'Registro das ações feitas no painel.',
 };

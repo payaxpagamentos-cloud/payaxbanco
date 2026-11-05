@@ -866,3 +866,14 @@ p.aviso, div.aviso{ font-size: 12px; }
   box-shadow: 0 1px 2px rgba(0, 0, 0, .4); }
 .veic .trava svg{ width: 8px; height: 8px; }
 .veic.sel .trava svg{ scale: 1; }
+
+/* ---------- Financeiro ---------- */
+.participacao{ display: flex; align-items: center; gap: 8px; min-width: 120px; }
+.participacao .trilho{ flex: 1; height: 6px; border-radius: 99px; background: var(--barra-fundo); overflow: hidden; }
+.participacao .trilho span{ display: block; height: 100%; border-radius: 99px; background: var(--grad-linha); }
+.participacao .num{ font-size: 11px; color: var(--text-2); min-width: 38px; text-align: right; }
+.total-financeiro{ display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid var(--border); font-size: 12px; }
+.total-financeiro strong{ font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
+.cartao > .linha.entre input{ width: 220px; } .cartao > .linha.entre select{ width: auto; }
+@media (max-width: 860px){ .cartao > .linha.entre input{ width: 100%; } .cartao > .linha.entre > .linha{ width: 100%; } }

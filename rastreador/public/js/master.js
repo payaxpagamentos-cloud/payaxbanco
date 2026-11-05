@@ -1,5 +1,5 @@
 /** Telas do master (equipe da plataforma). */
-import { api, qs } from './api.js';
+import { api, qs, baixar } from './api.js';
 import { el, limpar, dinheiro, dataHora, data, desde, inteiro, toast, campo, area, escolha, marcar, formModal, perguntar, confirmar, repetir, telefone, etiqueta, placa,
   TIPOS_EMPRESA, PERFIS, PROTOCOLOS, MODELOS_RASTREADOR, reaisCampo, centavos, icone } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, painelMapa, painelIntegracoes, situacaoDiag, linhaDado, blocoDestaque } from './comum.js';
@@ -126,6 +126,88 @@ async function telaEmpresas(ctx) {
     lista,
     el('div', { class: 'linha', style: 'justify-content:flex-end;margin-top:16px' },
       el('button', { class: 'btn primario', onclick: async () => { if (await formEmpresa()) { toast('Empresa criada.'); carregar(); } } }, 'Nova empresa'))));
+  await carregar();
+}
+
+// ---------- Financeiro ----------
+// CNPJ (14 dígitos) ou CPF (11) com pontuação.
+const documentoFmt = (d) => {
+  const x = String(d ?? '').replace(/\D/g, '');
+  if (x.length === 14) return x.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  if (x.length === 11) return x.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  return x || null;
+};
+
+/** Plano de um cliente: limite de veículos e mensalidade por veículo, com a prévia do total pelos veículos ativos de agora. */
+async function formPlano(c) {
+  return formModal(`Plano de ${c.nome}`, (f) => {
+    const previa = el('p', { class: 'aviso ok', style: 'margin:0' });
+    const atualizar = () => {
+      const m = centavos(f.querySelector('[name=mensalidade]')?.value ?? '') ?? 0;
+      previa.textContent = `Com os ${inteiro(c.veiculos)} veículo(s) ativo(s) de hoje: ${dinheiro(Math.max(0, m) * c.veiculos)} por mês.`;
+    };
+    queueMicrotask(() => { f.querySelector('[name=mensalidade]').addEventListener('input', atualizar); atualizar(); });
+    return [
+      el('div', { class: 'duas' },
+        campo('Limite de veículos', { name: 'limite_veiculos', type: 'number', min: 0, required: true, value: c.limite_veiculos }),
+        campo('Mensalidade por veículo (R$)', { name: 'mensalidade', inputmode: 'decimal', required: true, value: reaisCampo(c.mensalidade_centavos) })),
+      previa,
+    ];
+  }, (d) => api.put(`/master/empresas/${c.id}`, { limite_veiculos: d.limite_veiculos, mensalidade_centavos: centavos(d.mensalidade) ?? 0 }), { rotulo: 'Salvar plano' });
+}
+
+async function telaFinanceiro(ctx) {
+  const estado = { busca: '', status: '' };
+  const busca = el('input', { placeholder: 'Cliente ou CNPJ/CPF…', 'aria-label': 'Buscar cliente' });
+  const status = escolha(null, 'status', { '': 'Todas as situações', ativa: 'Ativas', bloqueada: 'Bloqueadas' }, '');
+  status.setAttribute('aria-label', 'Situação');
+  const filtrar = () => { Object.assign(estado, { busca: busca.value.trim(), status: status.value }); carregar(); };
+  busca.addEventListener('keydown', (e) => { if (e.key === 'Enter') filtrar(); });
+  status.addEventListener('change', filtrar);
+  const indicadores = el('div', { class: 'grade' });
+  const lista = el('div');
+  const rodape = el('div', { class: 'total-financeiro' });
+
+  async function carregar() {
+    const { resumo: r, clientes } = await api.get(`/master/financeiro${qs(estado)}`);
+    limpar(indicadores,
+      indicador('Faturamento mensal', dinheiro(r.faturamento_mensal_centavos), `${inteiro(r.clientes_ativos)} cliente(s) ativo(s)`, 'ok', 'carteira'),
+      indicador('Veículos cobrados', inteiro(r.veiculos_cobrados), `${inteiro(r.vagas_livres)} vaga(s) livre(s) nos planos`, '', 'veiculos'),
+      indicador('Ticket médio', dinheiro(r.ticket_medio_centavos), `por cliente pagante (${inteiro(r.clientes_pagantes)})`, '', 'empresas'),
+      indicador('Valor médio por veículo', dinheiro(r.valor_medio_veiculo_centavos), 'faturamento ÷ veículos cobrados', '', 'rota'),
+      indicador('Bloqueadas', dinheiro(r.bloqueadas_centavos), `${inteiro(r.bloqueadas)} cliente(s) fora do faturamento`, r.bloqueadas ? 'aviso' : '', 'cadeado'));
+    const total = r.faturamento_mensal_centavos;
+    limpar(lista, tabela(['Cliente', 'Tipo', 'Situação', 'Veículos', '>Mensalidade/veículo', '>Total mensal', 'Participação', '^Ações'], clientes.map((c) => {
+      const uso = c.limite_veiculos ? Math.min(100, Math.round((c.veiculos / c.limite_veiculos) * 100)) : 0;
+      const parte = c.status === 'ativa' && total ? (c.total_centavos / total) * 100 : 0;
+      return el('tr', {},
+        td([el('strong', {}, c.nome), documentoFmt(c.documento) ? el('div', { class: 'pequeno mudo mono' }, documentoFmt(c.documento)) : null]),
+        td(TIPOS_EMPRESA[c.tipo] ?? c.tipo),
+        td(c.status === 'ativa' ? etiqueta('ativa', 'ok') : el('span', { class: 'etiqueta erro', title: c.motivo_bloqueio ?? '' }, 'bloqueada')),
+        td(el('div', { class: `uso${c.veiculos >= c.limite_veiculos && c.limite_veiculos ? ' cheio' : ''}` },
+          el('div', { class: 'numeros' }, el('span', {}, `${inteiro(c.veiculos)} de ${inteiro(c.limite_veiculos)}`), el('span', {}, `${uso}%`)),
+          el('div', { class: 'trilho' }, el('span', { style: `width:${uso}%` })))),
+        td(dinheiro(c.mensalidade_centavos), 'dir num'),
+        td(el('strong', { class: c.status === 'ativa' ? '' : 'mudo' }, dinheiro(c.total_centavos)), 'dir num'),
+        td(c.status === 'ativa'
+          ? el('div', { class: 'participacao', title: `${parte.toFixed(1).replace('.', ',')}% do faturamento` },
+            el('div', { class: 'trilho' }, el('span', { style: `width:${parte.toFixed(1)}%` })), el('span', { class: 'num' }, `${parte.toFixed(1).replace('.', ',')}%`))
+          : el('span', { class: 'pequeno mudo' }, 'fora do total')),
+        el('td', { class: 'acoes' },
+          botaoIcone('editar', 'Editar plano', async () => { if (await formPlano(c)) { toast('Plano salvo.'); carregar(); } }),
+          botaoIcone('dashboard', 'Abrir o painel do cliente', () => { ctx.renomearEmpresa(c.id, c.nome); ctx.ir('dashboard', c.id); })));
+    }), estado.busca || estado.status ? 'Nenhum cliente com esse filtro.' : 'Nenhum cliente cadastrado.'));
+    limpar(rodape, el('span', { class: 'mudo' }, `${inteiro(clientes.length)} cliente(s) na lista · só as empresas ativas entram no total`),
+      el('span', {}, 'Total mensal: ', el('strong', { class: 'num' }, dinheiro(total))));
+  }
+
+  limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'gap:16px' },
+    indicadores,
+    el('section', { class: 'cartao' },
+      el('div', { class: 'linha entre', style: 'margin-bottom:14px' }, el('h2', { style: 'margin:0' }, 'Valor por cliente'),
+        el('div', { class: 'linha' }, busca, status,
+          el('button', { class: 'btn', type: 'button', onclick: () => baixar(`/master/financeiro${qs({ ...estado, csv: 1 })}`, 'financeiro.csv') }, icone('baixar'), 'Baixar planilha'))),
+      lista, rodape)));
   await carregar();
 }
 
@@ -323,6 +405,6 @@ async function telaAtividades(ctx) {
 }
 
 export const TELAS_MASTER = {
-  dashboard: telaDashboard, mapa: telaMapa, empresas: telaEmpresas, rastreadores: telaRastreadores, usuarios: telaUsuarios, diagnostico: telaDiagnostico,
+  dashboard: telaDashboard, mapa: telaMapa, empresas: telaEmpresas, financeiro: telaFinanceiro, rastreadores: telaRastreadores, usuarios: telaUsuarios, diagnostico: telaDiagnostico,
   configuracoes: telaConfiguracoes, integracoes: telaIntegracoes, atividades: telaAtividades,
 };
