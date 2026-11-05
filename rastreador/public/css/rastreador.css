@@ -925,3 +925,19 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 /* Parâmetros com a explicação embaixo do campo */
 .parametro{ display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .dica-campo{ font-size: 10.5px; color: var(--text-3); line-height: 1.4; }
+.lateral .rodape-lateral .versao{ display: block; margin-top: 4px; font-size: 9.5px; color: #6E7F9E; font-variant-numeric: tabular-nums; }
+
+/* ---------- Bloco de destaque mais baixo: texto e botões à esquerda, a órbita sozinha no canto direito ---------- */
+.destaque{ min-height: 0; padding: 20px 26px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 14px; }
+.destaque-texto{ max-width: 680px; }
+.destaque-rotulo{ margin-bottom: 8px; }
+.destaque h2{ font-size: 22px; letter-spacing: -.6px; margin: 0 0 6px; line-height: 1.25; }
+.destaque p{ max-width: 640px; }
+.destaque-orbita{ right: 28px; top: -78px; width: 250px; height: 250px; opacity: .85; }
+.destaque-acoes .btn{ min-height: 32px; font-size: 12px; }
+@media (max-width: 1100px) and (min-width: 861px){ .destaque h2{ font-size: 20px; } }
+@media (max-width: 860px){
+  .destaque{ padding: 18px; min-height: 0; }
+  .destaque h2{ font-size: 18px; }
+  .destaque-orbita{ right: -110px; top: -90px; }
+}

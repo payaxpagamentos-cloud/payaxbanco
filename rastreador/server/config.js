@@ -23,7 +23,12 @@ const basePath = String(process.env.RASTREADOR_BASE_PATH || '').replace(/\/+$/, 
 const latCentro = Number(process.env.RASTREADOR_MAPA_LAT);
 const lngCentro = Number(process.env.RASTREADOR_MAPA_LNG);
 
+// Versão do pacote instalado (gravada pelo empacotar.js); no código de desenvolvimento, "desenvolvimento".
+let versao = 'desenvolvimento';
+try { versao = JSON.parse(require('node:fs').readFileSync(path.join(__dirname, 'versao.json'), 'utf8')).versao || versao; } catch { /* sem arquivo */ }
+
 module.exports = {
+  versao,
   producao,
   basePath,
   port: Number(process.env.PORT) || 3400,

@@ -8,6 +8,7 @@ import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 const raiz = $('#app');
 let pararTela = null;
 let nomePlataforma = 'Rastreador';
+let versao = '';
 const nomesEmpresa = new Map();
 
 const PLATAFORMA = ['master', 'suporte'];
@@ -117,7 +118,8 @@ async function desenhar() {
     } }, icone('seta'))),
     itens,
     empresaId && PLATAFORMA.includes(u.perfil) ? el('a', { class: 'item voltar', href: '#/empresas', title: 'Voltar ao master' }, icone('entrar'), el('span', { class: 'rotulo' }, 'Voltar ao master')) : null,
-    el('div', { class: 'rodape-lateral' }, el('strong', {}, nomeEmpresa ?? nomePlataforma), PERFIS[u.perfil] ?? ''));
+    el('div', { class: 'rodape-lateral' }, el('strong', {}, nomeEmpresa ?? nomePlataforma), PERFIS[u.perfil] ?? '',
+      versao ? el('span', { class: 'versao', title: 'Versão instalada' }, `Versão ${versao}`) : null));
   lateral.children[0].after(el('div', { class: 'rotulo-secao' }, empresaId ? 'Painel da empresa' : 'Plataforma'));
 
   const trilha = el('nav', { class: 'trilha', 'aria-label': 'Você está em' });
@@ -236,4 +238,4 @@ function telaEntrada() {
   f.querySelector('input').focus();
 }
 
-api.get('/publico').then((p) => { nomePlataforma = p.nome || 'Rastreador'; }).catch(() => {}).finally(desenhar);
+api.get('/publico').then((p) => { nomePlataforma = p.nome || 'Rastreador'; versao = p.versao || ''; }).catch(() => {}).finally(desenhar);

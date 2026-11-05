@@ -258,7 +258,7 @@ export function blocoDestaque(...acoes) {
   const raiz = el('section', { class: 'destaque' },
     el('div', { class: 'destaque-aura', 'aria-hidden': 'true' }), el('div', { class: 'destaque-grao', 'aria-hidden': 'true' }),
     el('div', { class: 'destaque-orbita', 'aria-hidden': 'true' }, el('div', { class: 'destaque-rastro' }, el('div', { class: 'destaque-ponto' }))),
-    el('div', { class: 'destaque-texto' }, el('div', { class: 'destaque-rotulo' }, ponto, rotulo), el('h2', {}, titulo, el('br'), destaque), texto),
+    el('div', { class: 'destaque-texto' }, el('div', { class: 'destaque-rotulo' }, ponto, rotulo), el('h2', {}, titulo, ' ', destaque), texto),
     acoes.length ? el('div', { class: 'destaque-acoes' }, acoes) : null);
   return {
     raiz,

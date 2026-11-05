@@ -49,8 +49,14 @@ fs.chmodSync(path.join(pasta, 'instalar.sh'), 0o755);
 fs.mkdirSync(path.join(pasta, 'scripts'), { recursive: true });
 fs.copyFileSync(path.join(raiz, 'scripts', 'simular-j16.js'), path.join(pasta, 'scripts', 'simular-j16.js'));
 fs.mkdirSync(path.join(pasta, 'data'), { recursive: true });
+// Versão do pacote (data e hora de Brasília): aparece no menu do painel, para conferir se a atualização entrou.
+const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+const versao = `${p.year}.${p.month}.${p.day}-${p.hour}${p.minute}`;
+fs.writeFileSync(path.join(pasta, 'server', 'versao.json'), `${JSON.stringify({ versao })}\n`);
 
-const zip = path.join(saida, 'rastreador.zip');
+// O nome do arquivo leva a versão, para não confundir com um pacote antigo na pasta de Downloads.
+const zip = path.join(saida, `rastreador-${versao}.zip`);
 execFileSync('zip', ['-qr', zip, 'rastreador'], { cwd: saida });
-console.log(`Pacote: ${zip}`);
+console.log(`Pacote: ${zip} (versão ${versao})`);
 console.log(`Senha inicial do master (master@rastreador.com.br): ${senhaAdmin}`);

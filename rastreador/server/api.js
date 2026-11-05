@@ -15,12 +15,12 @@ function criarApi(db, extras = {}) {
 
   api.get('/saude', (_req, res) => {
     db.prepare('SELECT 1').get();
-    res.json({ ok: true });
+    res.json({ ok: true, versao: config.versao });
   });
   api.get('/publico', async (_req, res, next) => {
     try {
       res.json({ nome: lerConfig(db).nome_plataforma, mapa: config.mapa, gt06_porta: config.portaGt06, busca: Boolean(config.geocoder.url),
-        google: await sessoesGoogle(), google_js: config.google.js_chave || null });
+        google: await sessoesGoogle(), google_js: config.google.js_chave || null, versao: config.versao });
     } catch (err) {
       next(err);
     }
