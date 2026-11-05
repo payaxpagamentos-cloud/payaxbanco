@@ -18,13 +18,14 @@ const PLATAFORMA = ['master', 'suporte'];
 const MENU_MASTER = [
   ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa geral', 'mapa'], ['empresas', 'Empresas', 'empresas'], ['financeiro', 'Financeiro', 'carteira', ['master']],
   ['rastreadores', 'Rastreadores', 'rastreadores'],
-  ['usuarios', 'Permissões e usuários', 'usuarios', ['master']], ['diagnostico', 'Diagnóstico', 'diagnostico'],
+  ['usuarios', 'Permissões e usuários', 'usuarios', ['master']],
   ['configuracoes', 'Configurações', 'configuracoes', null, [
     ['configuracoes', 'Parâmetros', 'configuracoes', 'Nome da plataforma e regras do rastreamento', ['master']],
     ['comandos-gt06', 'Comandos GT06', 'comandos', 'Textos enviados aos rastreadores sem comandos próprios', ['master']],
     ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas'],
+    ['diagnostico', 'Diagnóstico', 'diagnostico', 'Servidor GT06, recepção e equipamentos com problema'],
+    ['atividades', 'Atividades', 'seguranca', 'Registro das ações feitas no painel', ['master']],
   ]],
-  ['atividades', 'Atividades', 'seguranca', ['master']],
 ];
 const MENU_EMPRESA = [
   ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa ao vivo', 'mapa'], ['historico', 'Histórico', 'historico'], ['alertas', 'Alertas', 'alertas'],
@@ -42,7 +43,7 @@ const SUBTITULOS_MASTER = {
   dashboard: 'Resumo da plataforma, das empresas e dos equipamentos.', mapa: 'Última posição dos veículos de todas as empresas.',
   empresas: 'Clientes da plataforma, planos e limites.', financeiro: 'Valor mensal de cada cliente: mensalidade por veículo × veículos ativos.', rastreadores: 'Equipamentos cadastrados, estoque e instalação.',
   usuarios: 'Quem acessa a plataforma e o que cada perfil pode fazer.', diagnostico: 'Conexões dos equipamentos e mensagens recebidas.',
-  configuracoes: 'Parâmetros da plataforma, comandos GT06 e integrações.', atividades: 'Registro das ações feitas no painel.',
+  configuracoes: 'Parâmetros, comandos GT06, integrações, diagnóstico e atividades.', atividades: 'Registro das ações feitas no painel.',
 };
 const SUBTITULOS_EMPRESA = {
   dashboard: 'Resumo da frota, dos deslocamentos e dos alertas.', mapa: 'Última posição de cada veículo.', historico: 'Trajetos, paradas e viagens por período.',
@@ -144,6 +145,9 @@ async function desenhar() {
   })) : null;
   casca.append(lateral, el('div', { class: 'principal' }, topo, abas, conteudo));
   limpar(raiz, casca);
+  // Com as seções em fila (celular e telas médias), a seção aberta fica à vista.
+  const abaAtiva = abas?.querySelector('.aba-config.on');
+  if (abaAtiva && abas.scrollWidth > abas.clientWidth) abas.scrollLeft = abaAtiva.offsetLeft - (abas.clientWidth - abaAtiva.offsetWidth) / 2;
   document.title = `${secao ? `${secao[1]} · ` : ''}${titulo} · ${nomeEmpresa ? `${nomeEmpresa} · ` : ''}${nomePlataforma}`;
 
   const ctx = {

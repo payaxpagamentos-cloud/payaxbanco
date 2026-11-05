@@ -121,9 +121,10 @@ Equipamento que envia sem estar cadastrado aparece em **Rastreadores → Equipam
 - **Financeiro** (só o master): valor mensal de cada cliente (mensalidade por veículo × veículos ativos), uso do plano, participação
   no faturamento, ticket médio, valor das empresas bloqueadas (fora do total), edição rápida do plano e planilha CSV.
 - **Rastreadores**: estoque e instalados (IMEI, modelo, protocolo, chip e operadora, empresa, veículo, última comunicação, conectado agora).
-- **Permissões e usuários**, **Diagnóstico** (servidor GT06, recepção, veículos mudos, comandos parados, empresas no limite),
-  **Configurações** em seções: **Parâmetros** (nome da plataforma, tempos, retenção, alerta padrão de sem comunicação), **Comandos GT06**
-  (os textos do seu fabricante) e **Integrações**; e **Atividades**.
+- **Permissões e usuários**.
+- **Configurações** em seções: **Parâmetros** (nome da plataforma, tempos, retenção, alerta padrão de sem comunicação), **Comandos GT06**
+  (os textos do seu fabricante), **Integrações**, **Diagnóstico** (servidor GT06, recepção, veículos mudos, comandos parados, empresas
+  no limite) e **Atividades**.
 
 ## Alertas
 
