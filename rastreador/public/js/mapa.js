@@ -134,13 +134,15 @@ function fundoGoogle(L, m, g) {
   };
   m.on('moveend', atualizarCreditos);
   return {
-    camadas,
+    temSatelite: true,
     mostrar(tipo) {
+      if (tipo === atual) return;
       if (atual) m.removeLayer(camadas[atual]);
       atual = tipo;
       camadas[atual].addTo(m);
       atualizarCreditos();
     },
+    remover() { if (atual) m.removeLayer(camadas[atual]); atual = null; },
   };
 }
 
@@ -157,87 +159,142 @@ function carregarScript(src) {
   return scripts.get(src);
 }
 
-// Se o Google recusar a chave (limite da demonstração, chave errada), a página volta ao mapa gratuito até fechar a aba.
-const CHAVE_GOOGLE_FALHOU = 'rastreador.googleFalhou';
-const googleFalhou = () => { try { return sessionStorage.getItem(CHAVE_GOOGLE_FALHOU) === '1'; } catch { return false; } };
+// Memória do Google no navegador: se falhou (sem resposta, limite da demonstração, chave recusada), fica 30 min sem tentar; se abriu
+// bem nas últimas 24 h, a página espera um instante por ele antes de mostrar o mapa gratuito (para não trocar o mapa na frente do usuário).
+const CHAVE_GOOGLE_FALHOU = 'rastreador.google.falhou';
+const CHAVE_GOOGLE_OK = 'rastreador.google.ok';
+const lerHora = (k) => { try { return Number(localStorage.getItem(k)) || 0; } catch { return 0; } };
+const gravarHora = (k) => { try { localStorage.setItem(k, String(Date.now())); } catch { /* sem armazenamento */ } };
+const googleFalhouRecente = () => Date.now() - lerHora(CHAVE_GOOGLE_FALHOU) < 30 * 60_000;
+const googleOkRecente = () => Date.now() - lerHora(CHAVE_GOOGLE_OK) < 24 * 3600_000;
+let aoFalharGoogle = null;
+const marcarFalhaGoogle = (motivo) => {
+  gravarHora(CHAVE_GOOGLE_FALHOU);
+  try { localStorage.removeItem(CHAVE_GOOGLE_OK); } catch { /* sem armazenamento */ }
+  console.warn(`Google Maps indisponível (${motivo}): usando o mapa gratuito.`);
+};
+window.gm_authFailure = () => { marcarFalhaGoogle('chave recusada pelo Google'); aoFalharGoogle?.(); };
 
 /**
  * Google Maps direto no navegador (Maps JavaScript API, como a chave de demonstração): ruas e satélite com os nomes (híbrido),
- * desenhados pelo próprio Google dentro do Leaflet, com o logo e os créditos dele.
+ * desenhados pelo próprio Google dentro do Leaflet, com o logo e os créditos dele. Se o Google não responder em 8 s, desiste.
  */
 async function fundoGoogleJs(L, m, chave) {
-  window.gm_authFailure = () => {
-    try { sessionStorage.setItem(CHAVE_GOOGLE_FALHOU, '1'); } catch { /* sem armazenamento */ }
-    console.warn('Google Maps recusou a chave: usando o mapa gratuito.');
-    location.reload();
-  };
   const q = new URLSearchParams({ key: chave, v: 'weekly', language: 'pt-BR', region: 'BR', loading: 'async', callback: '__rastreadorGoogle' });
-  const pronto = new Promise((ok, falha) => {
-    window.__rastreadorGoogle = ok;
-    setTimeout(() => falha(new Error('Google Maps não respondeu')), 12000);
-  });
-  await Promise.all([carregarScript(`https://maps.googleapis.com/maps/api/js?${q}`).then(() => pronto), carregarScript(`${BASE}/vendor/googlemutant.js`)]);
-  m.setMaxZoom(21);
+  const pronto = window.google?.maps?.Map ? Promise.resolve() : new Promise((ok) => { window.__rastreadorGoogle = ok; });
+  // O limite vale mesmo se o script do Google nem chegar (conexão pendurada).
+  let relogio;
+  const limite = new Promise((_, falha) => { relogio = setTimeout(() => falha(new Error('o Google não respondeu')), 8000); });
+  try {
+    await Promise.race([Promise.all([carregarScript(`https://maps.googleapis.com/maps/api/js?${q}`).then(() => pronto), carregarScript(`${BASE}/vendor/googlemutant.js`)]), limite]);
+  } finally {
+    clearTimeout(relogio);
+  }
+  gravarHora(CHAVE_GOOGLE_OK);
   const camadas = {
     mapa: L.gridLayer.googleMutant({ type: 'roadmap', maxZoom: 21 }),
     satelite: L.gridLayer.googleMutant({ type: 'hybrid', maxZoom: 21 }),
   };
   let atual = null;
   return {
+    google: true,
+    temSatelite: true,
     mostrar(tipo) {
+      if (tipo === atual) return;
+      m.setMaxZoom(21);
       if (atual) m.removeLayer(camadas[atual]);
       atual = tipo;
       camadas[atual].addTo(m);
     },
+    remover() {
+      if (atual) m.removeLayer(camadas[atual]);
+      atual = null;
+      m.setMaxZoom(20);
+    },
   };
 }
 
-/** Fundo do mapa e o botão Mapa / Satélite. */
-async function fundo(L, m, div, cfg) {
-  if (!cfg.google && cfg.google_js && !googleFalhou()) {
-    try {
-      const g = await fundoGoogleJs(L, m, cfg.google_js);
-      let atual = lerCamada();
-      g.mostrar(atual);
-      div.classList.toggle('mapa-satelite', atual === 'satelite');
-      return seletorCamada(L, m, () => atual, (novo) => { atual = novo; g.mostrar(novo); div.classList.toggle('mapa-satelite', novo === 'satelite'); });
-    } catch (e) {
-      console.warn('Google Maps indisponível, usando o mapa gratuito:', e.message);
-    }
-  }
-  if (cfg.google) {
-    const g = fundoGoogle(L, m, cfg.google);
-    let atual = lerCamada();
-    g.mostrar(atual);
-    div.classList.toggle('mapa-satelite', atual === 'satelite');
-    return seletorCamada(L, m, () => atual, (novo) => { atual = novo; g.mostrar(novo); div.classList.toggle('mapa-satelite', novo === 'satelite'); });
-  }
+/** Mapa gratuito: vetorial (MapLibre, com o estilo de cada tema) ou, sem WebGL, as camadas de imagens. Só cria o que for mostrado. */
+async function fundoGratuito(L, m, div, cfg) {
   const vetor = await fundoVetorial(L, cfg);
   const temSatelite = vetor ? vetor.temSatelite : Boolean(cfg.mapa.satelite?.tiles);
-  let atual = temSatelite ? lerCamada() : 'mapa';
   const creditos = { mapa: vetor ? cfg.mapa.atribuicao_vetorial : cfg.mapa.atribuicao, satelite: [cfg.mapa.satelite?.atribuicao, vetor ? cfg.mapa.atribuicao_vetorial : null].filter(Boolean).join(' · ') };
-  let trocar;
-  if (vetor) {
-    const camada = vetor.criar(atual).addTo(m);
-    const aplicar = () => camada.getMaplibreMap()?.setStyle(vetor.estilo(atual));
-    trocar = (novo) => { atual = novo; aplicar(); };
-    // No modo Mapa, o estilo acompanha o tema (claro ou escuro).
-    new MutationObserver(() => { if (atual === 'mapa') aplicar(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
-  } else {
-    div.classList.add('mapa-raster');
-    const camadas = fundoImagens(L, cfg);
-    camadas[atual].addTo(m);
-    trocar = (novo) => { m.removeLayer(camadas[atual]); atual = novo; camadas[atual].addTo(m); };
+  const camadas = vetor ? null : fundoImagens(L, cfg);
+  let camada = null;
+  let observador = null;
+  let atual = null;
+  if (!vetor) div.classList.add('mapa-raster');
+  return {
+    temSatelite,
+    mostrar(tipo) {
+      const t = temSatelite ? tipo : 'mapa';
+      if (t === atual) return;
+      if (atual) m.attributionControl.removeAttribution(creditos[atual]);
+      if (vetor) {
+        if (!camada) {
+          camada = vetor.criar(t).addTo(m);
+          // No modo Mapa, o estilo acompanha o tema (claro ou escuro).
+          observador = new MutationObserver(() => { if (atual === 'mapa') camada.getMaplibreMap()?.setStyle(vetor.estilo('mapa')); });
+          observador.observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
+        } else {
+          camada.getMaplibreMap()?.setStyle(vetor.estilo(t));
+        }
+      } else {
+        if (atual) m.removeLayer(camadas[atual]);
+        camadas[t].addTo(m);
+      }
+      atual = t;
+      m.attributionControl.addAttribution(creditos[atual]);
+    },
+    remover() {
+      if (atual) m.attributionControl.removeAttribution(creditos[atual]);
+      observador?.disconnect();
+      if (camada) m.removeLayer(camada);
+      else if (atual) m.removeLayer(camadas[atual]);
+      div.classList.remove('mapa-raster');
+      camada = null;
+      atual = null;
+    },
+  };
+}
+
+/**
+ * Fundo do mapa e o botão Mapa / Satélite. O mapa nunca fica esperando o Google: o gratuito abre na hora e, se o Google (chave no
+ * navegador) responder, troca para ele; se falhar depois, volta ao gratuito.
+ */
+async function fundo(L, m, div, cfg) {
+  let atual = lerCamada();
+  let base = null;
+  let seletor = null;
+  const aplicar = () => {
+    const t = base.temSatelite ? atual : 'mapa';
+    base.mostrar(t);
+    div.classList.toggle('mapa-satelite', t === 'satelite');
+  };
+  const colocarSeletor = () => {
+    if (!seletor && base.temSatelite) seletor = seletorCamada(L, m, () => atual, (novo) => { atual = novo; aplicar(); });
+  };
+  const trocarBase = (nova) => {
+    if (!div.isConnected) return nova.remover();
+    base?.remover();
+    base = nova;
+    aplicar();
+    colocarSeletor();
+  };
+
+  if (cfg.google) {
+    trocarBase(fundoGoogle(L, m, cfg.google));
+    return;
   }
-  m.attributionControl.addAttribution(creditos[atual]);
-  div.classList.toggle('mapa-satelite', atual === 'satelite');
-  if (!temSatelite) return;
-  seletorCamada(L, m, () => atual, (k) => {
-    m.attributionControl.removeAttribution(creditos[atual]);
-    trocar(k);
-    m.attributionControl.addAttribution(creditos[atual]);
-    div.classList.toggle('mapa-satelite', atual === 'satelite');
-  });
+  const google = cfg.google_js && !googleFalhouRecente() ? fundoGoogleJs(L, m, cfg.google_js) : null;
+  google?.catch((e) => marcarFalhaGoogle(e.message));
+  if (google) aoFalharGoogle = () => { if (base?.google) fundoGratuito(L, m, div, cfg).then(trocarBase); };
+  if (google && googleOkRecente()) {
+    const g = await Promise.race([google, new Promise((r) => { setTimeout(r, 2500, null); })]).catch(() => null);
+    if (g) return trocarBase(g);
+  }
+  trocarBase(await fundoGratuito(L, m, div, cfg));
+  google?.then(trocarBase, () => {});
 }
 
 /** Botão Satélite / Mapa no canto do mapa; a escolha fica lembrada no navegador. */
@@ -263,7 +320,7 @@ function seletorCamada(L, m, atual, trocar) {
       return caixa;
     },
   });
-  new Seletor().addTo(m);
+  return new Seletor().addTo(m);
 }
 
 /** Endereço de um ponto (painel do veículo), guardado por ~10 m para não perguntar de novo a cada atualização. */

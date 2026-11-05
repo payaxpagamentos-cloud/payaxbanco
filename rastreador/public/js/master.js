@@ -55,24 +55,26 @@ async function telaMapa(ctx) {
 
 // ---------- Empresas ----------
 async function formEmpresa(atual) {
+  // Empresa nova: o plano (limite e mensalidade) é informado aqui, sem valor padrão; só o alerta sem comunicação vem dos parâmetros.
   const cfg = atual ? null : await api.get('/master/configuracoes').catch(() => null);
-  const e = atual ?? { tipo: 'frota', limite_veiculos: cfg?.limite_veiculos_padrao ?? 10, mensalidade_centavos: cfg?.mensalidade_padrao_centavos ?? 0,
-    sem_comunicacao_min: cfg?.sem_comunicacao_padrao_min ?? 120 };
+  const e = atual ?? { tipo: 'frota', limite_veiculos: '', mensalidade_centavos: null, sem_comunicacao_min: cfg?.sem_comunicacao_padrao_min ?? 120 };
   return formModal(atual ? `Editar ${atual.nome}` : 'Nova empresa', () => [
     el('fieldset', {}, el('legend', {}, 'Empresa'),
       campo('Nome', { name: 'nome', required: true, maxlength: 160, value: e.nome ?? '' }),
       el('div', { class: 'duas' }, campo('CNPJ ou CPF', { name: 'documento', value: e.documento ?? '', inputmode: 'numeric' }), escolha('Tipo', 'tipo', TIPOS_EMPRESA, e.tipo)),
       el('div', { class: 'duas' }, campo('E-mail', { name: 'email', type: 'email', value: e.email ?? '' }), campo('Telefone', { name: 'telefone', type: 'tel', value: e.telefone ?? '' }))),
-    el('fieldset', {}, el('legend', {}, 'Plano'),
-      el('div', { class: 'tres' }, campo('Limite de veículos', { name: 'limite_veiculos', type: 'number', min: 0, required: true, value: e.limite_veiculos }),
-        campo('Mensalidade por veículo (R$)', { name: 'mensalidade', inputmode: 'decimal', value: reaisCampo(e.mensalidade_centavos) }),
-        campo('Alerta sem comunicação (min)', { name: 'sem_comunicacao_min', type: 'number', min: 0, value: e.sem_comunicacao_min }))),
+    el('fieldset', {}, el('legend', {}, 'Plano contratado'),
+      el('div', { class: 'duas' }, campo('Limite de veículos', { name: 'limite_veiculos', type: 'number', min: 0, required: true, value: e.limite_veiculos, placeholder: 'Ex.: 10' }),
+        campo('Mensalidade por veículo (R$)', { name: 'mensalidade', inputmode: 'decimal', required: true, value: reaisCampo(e.mensalidade_centavos), placeholder: 'Ex.: 49,90' })),
+      el('p', { class: 'pequeno fraco', style: 'margin:0' }, 'O valor do mês é a mensalidade × os veículos ativos da empresa (veja em Financeiro).')),
+    el('fieldset', {}, el('legend', {}, 'Rastreamento'),
+      campo('Alerta de veículo sem comunicação depois de (minutos, 0 = não alertar)', { name: 'sem_comunicacao_min', type: 'number', min: 0, value: e.sem_comunicacao_min })),
     atual ? null : el('fieldset', {}, el('legend', {}, 'Primeiro administrador da empresa (opcional)'),
       el('div', { class: 'duas' }, campo('Nome', { name: 'adm_nome', maxlength: 120 }), campo('E-mail', { name: 'adm_email', type: 'email' })),
       campo('Senha inicial (mínimo 8)', { name: 'adm_senha', type: 'password', minlength: 8, autocomplete: 'new-password' })),
   ], async (d) => {
     const corpo = { nome: d.nome, documento: d.documento, tipo: d.tipo, email: d.email, telefone: d.telefone, limite_veiculos: d.limite_veiculos,
-      mensalidade_centavos: centavos(d.mensalidade) ?? 0, sem_comunicacao_min: d.sem_comunicacao_min };
+      mensalidade_centavos: centavos(d.mensalidade), sem_comunicacao_min: d.sem_comunicacao_min };
     if (atual) return api.put(`/master/empresas/${atual.id}`, corpo);
     if (d.adm_email) corpo.administrador = { nome: d.adm_nome, email: d.adm_email, senha: d.adm_senha };
     return api.post('/master/empresas', corpo);
@@ -90,13 +92,13 @@ async function telaEmpresas(ctx) {
 
   async function carregar() {
     const empresas = await api.get(`/master/empresas${qs(estado)}`);
-    limpar(lista, tabela(['Empresa', 'Tipo', '^Veículos', '^Online', '^Rastreadores', '^Alertas', '>Mensal', '^Ações'], empresas.map((e) => el('tr', { class: 'clicavel', onclick: () => {
+    limpar(lista, tabela(['Empresa', 'Tipo', '^Veículos', '^Online', '^Rastreadores', '^Alertas', '^Ações'], empresas.map((e) => el('tr', { class: 'clicavel', onclick: () => {
       ctx.renomearEmpresa(e.id, e.nome);
       ctx.ir('dashboard', e.id);
     } },
       td([el('strong', {}, e.nome), e.status === 'bloqueada' ? el('div', {}, el('span', { class: 'etiqueta erro', title: e.motivo_bloqueio ?? '' }, `bloqueada: ${e.motivo_bloqueio ?? ''}`)) : null]),
       td(TIPOS_EMPRESA[e.tipo]), td(`${e.veiculos}/${e.limite_veiculos}`, 'centro num'), td(inteiro(e.online), 'centro num'), td(inteiro(e.rastreadores), 'centro num'),
-      td(e.alertas_pendentes ? etiqueta(inteiro(e.alertas_pendentes), 'aviso') : '0', 'centro'), td(dinheiro(e.mensalidade_centavos * e.veiculos), 'dir num'),
+      td(e.alertas_pendentes ? etiqueta(inteiro(e.alertas_pendentes), 'aviso') : '0', 'centro'),
       el('td', { class: 'acoes' },
         botaoIcone('editar', 'Editar', async () => { if (await formEmpresa(await api.get(`/master/empresas/${e.id}`))) { toast('Empresa salva.'); carregar(); } }),
         e.status === 'bloqueada'
@@ -341,37 +343,53 @@ async function telaDiagnostico(ctx) {
 }
 
 // ---------- Configurações ----------
-async function telaConfiguracoes(ctx) {
+/** Campo de parâmetro com a explicação embaixo. */
+const parametro = (rotulo, attrs, dica) => el('div', { class: 'parametro' }, campo(rotulo, attrs), dica ? el('small', { class: 'dica-campo' }, dica) : null);
+
+/** Formulário de parâmetros: os cartões montados por `montar(config)` e um único Salvar, que grava só os campos desta tela. */
+async function telaParametros(ctx, montar) {
   const c = await api.get('/master/configuracoes');
-  const f = el('form', { class: 'form', style: 'max-width:820px' },
-    el('fieldset', {}, el('legend', {}, 'Plataforma'), campo('Nome exibido no painel', { name: 'nome_plataforma', required: true, maxlength: 60, value: c.nome_plataforma })),
-    el('fieldset', {}, el('legend', {}, 'Rastreamento'),
-      el('div', { class: 'tres' }, campo('Online se comunicou há até (min)', { name: 'online_min', type: 'number', min: 1, value: c.online_min }),
-        campo('Parada que encerra a viagem (min)', { name: 'parada_min', type: 'number', min: 1, value: c.parada_min }),
-        campo('Guardar posições por (dias)', { name: 'retencao_dias', type: 'number', min: 7, value: c.retencao_dias })),
-      el('div', { class: 'duas' }, campo('Descartar saltos do GPS acima de (km/h)', { name: 'velocidade_max_plausivel_kmh', type: 'number', min: 50, value: c.velocidade_max_plausivel_kmh }),
-        campo('Comando sem resposta expira em (horas)', { name: 'comando_expira_horas', type: 'number', min: 1, value: c.comando_expira_horas }))),
-    el('fieldset', {}, el('legend', {}, 'Padrões para empresas novas'),
-      el('div', { class: 'tres' }, campo('Limite de veículos', { name: 'limite_veiculos_padrao', type: 'number', min: 0, value: c.limite_veiculos_padrao }),
-        campo('Mensalidade por veículo (R$)', { name: 'mensalidade', inputmode: 'decimal', value: reaisCampo(c.mensalidade_padrao_centavos) }),
-        campo('Alerta sem comunicação (min)', { name: 'sem_comunicacao_padrao_min', type: 'number', min: 0, value: c.sem_comunicacao_padrao_min }))),
-    el('fieldset', {}, el('legend', {}, 'Comandos enviados aos rastreadores GT06'),
-      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Usados nos modelos sem comandos próprios (o J16 4G já tem os dele: RELAY,1#, RELAY,0#, STATUS#, PARAM#). O texto varia por fabricante (ex.: DYD,000000# e HFYD,000000#).'),
-      el('div', { class: 'duas' }, campo('Bloquear', { name: 'gt06_cmd_bloquear', required: true, maxlength: 60, value: c.gt06_cmd_bloquear, class: 'mono' }),
-        campo('Desbloquear', { name: 'gt06_cmd_desbloquear', required: true, maxlength: 60, value: c.gt06_cmd_desbloquear, class: 'mono' })),
-      el('div', { class: 'duas' }, campo('Pedir posição', { name: 'gt06_cmd_localizar', required: true, maxlength: 60, value: c.gt06_cmd_localizar, class: 'mono' }),
-        campo('Reiniciar', { name: 'gt06_cmd_reiniciar', required: true, maxlength: 60, value: c.gt06_cmd_reiniciar, class: 'mono' }))),
-    el('div', {}, el('button', { class: 'btn primario largo' }, 'Salvar')));
+  const salvar = el('button', { class: 'btn primario largo' }, 'Salvar');
+  const f = el('form', { class: 'coluna', style: 'gap:16px' }, montar(c), el('div', { class: 'linha', style: 'justify-content:flex-end' }, salvar));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
-    const d = Object.fromEntries(new FormData(f));
-    const corpo = { ...d, mensalidade_padrao_centavos: centavos(d.mensalidade) ?? 0 };
-    delete corpo.mensalidade;
-    const b = f.querySelector('button');
-    b.disabled = true;
-    api.patch('/master/configuracoes', corpo).then(() => toast('Configurações salvas.'), (err) => toast(err.message, true)).finally(() => { b.disabled = false; });
+    salvar.disabled = true;
+    api.patch('/master/configuracoes', Object.fromEntries(new FormData(f)))
+      .then(() => toast('Parâmetros salvos.'), (err) => toast(err.message, true)).finally(() => { salvar.disabled = false; });
   });
-  limpar(ctx.conteudo, el('section', { class: 'cartao' }, f));
+  limpar(ctx.conteudo, f);
+}
+
+async function telaConfiguracoes(ctx) {
+  await telaParametros(ctx, (c) => el('div', { class: 'grade-dash' },
+    el('div', { class: 'c4' }, cartao('Plataforma',
+      el('div', { class: 'form' }, parametro('Nome exibido no painel', { name: 'nome_plataforma', required: true, maxlength: 60, value: c.nome_plataforma },
+        'Aparece no menu, na tela de entrada e no título das páginas.')))),
+    el('div', { class: 'c8' }, cartao('Rastreamento',
+      el('div', { class: 'form' },
+        el('div', { class: 'tres' },
+          parametro('Online se comunicou há até (min)', { name: 'online_min', type: 'number', min: 1, required: true, value: c.online_min }, 'Dentro desse tempo, o veículo conta como online.'),
+          parametro('Parada que encerra a viagem (min)', { name: 'parada_min', type: 'number', min: 1, required: true, value: c.parada_min }, 'Parado por mais tempo, a viagem termina no histórico.'),
+          parametro('Guardar posições por (dias)', { name: 'retencao_dias', type: 'number', min: 7, required: true, value: c.retencao_dias }, 'Posições mais antigas são apagadas.')),
+        el('div', { class: 'tres' },
+          parametro('Descartar saltos do GPS acima de (km/h)', { name: 'velocidade_max_plausivel_kmh', type: 'number', min: 50, required: true, value: c.velocidade_max_plausivel_kmh },
+            'Pontos com velocidade impossível são ignorados.'),
+          parametro('Comando sem resposta expira em (horas)', { name: 'comando_expira_horas', type: 'number', min: 1, required: true, value: c.comando_expira_horas },
+            'Depois disso, o comando é cancelado.'),
+          parametro('Alerta sem comunicação nas empresas novas (min)', { name: 'sem_comunicacao_padrao_min', type: 'number', min: 0, required: true, value: c.sem_comunicacao_padrao_min },
+            'Valor inicial; cada empresa pode mudar no cadastro.')))))));
+}
+
+async function telaComandosGt06(ctx) {
+  await telaParametros(ctx, (c) => cartao('Textos dos comandos',
+    el('p', { class: 'mudo', style: 'margin-top:0' }, 'Usados nos rastreadores GT06 sem comandos próprios (o J16 4G já tem os dele: RELAY,1#, RELAY,0#, STATUS#, PARAM#). O texto varia por fabricante, por exemplo DYD,000000# e HFYD,000000#.'),
+    el('div', { class: 'form' },
+      el('div', { class: 'duas' },
+        parametro('Bloquear', { name: 'gt06_cmd_bloquear', required: true, maxlength: 60, value: c.gt06_cmd_bloquear, class: 'mono' }, 'Corta o combustível ou a ignição.'),
+        parametro('Desbloquear', { name: 'gt06_cmd_desbloquear', required: true, maxlength: 60, value: c.gt06_cmd_desbloquear, class: 'mono' }, 'Libera o veículo de novo.')),
+      el('div', { class: 'duas' },
+        parametro('Pedir posição', { name: 'gt06_cmd_localizar', required: true, maxlength: 60, value: c.gt06_cmd_localizar, class: 'mono' }, 'O rastreador manda a localização na hora.'),
+        parametro('Reiniciar', { name: 'gt06_cmd_reiniciar', required: true, maxlength: 60, value: c.gt06_cmd_reiniciar, class: 'mono' }, 'Reinicia o equipamento.')))));
 }
 
 // ---------- Integrações ----------
@@ -406,5 +424,5 @@ async function telaAtividades(ctx) {
 
 export const TELAS_MASTER = {
   dashboard: telaDashboard, mapa: telaMapa, empresas: telaEmpresas, financeiro: telaFinanceiro, rastreadores: telaRastreadores, usuarios: telaUsuarios, diagnostico: telaDiagnostico,
-  configuracoes: telaConfiguracoes, integracoes: telaIntegracoes, atividades: telaAtividades,
+  configuracoes: telaConfiguracoes, 'comandos-gt06': telaComandosGt06, integracoes: telaIntegracoes, atividades: telaAtividades,
 };

@@ -148,6 +148,10 @@ module.exports = (db, extras = {}) => {
 
   /** Nova empresa, com o primeiro administrador (opcional) já criado. */
   r.post('/empresas', (req, res) => {
+    // O plano é da empresa: sem valor padrão, o limite e a mensalidade são informados no cadastro.
+    const informado = (k) => req.body[k] !== undefined && req.body[k] !== null && req.body[k] !== '';
+    v.exigir(informado('limite_veiculos'), 'Informe o limite de veículos do plano.');
+    v.exigir(informado('mensalidade_centavos'), 'Informe a mensalidade por veículo.');
     const d = dadosEmpresa(req.body);
     const id = transacao(db, () => {
       const eid = Number(db.prepare(`INSERT INTO empresas (${CAMPOS.join(', ')}, criada_em) VALUES (${CAMPOS.map(() => '?').join(', ')}, ?)`)

@@ -600,7 +600,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{ outline: none
 .destaque h2 .linha-destaque{ color: #7DF3DC; }
 .destaque p{ font-size: 12px; color: #BFD3E6; margin: 0; line-height: 1.6; max-width: 420px; }
 .destaque-acoes{ position: relative; display: flex; gap: 8px; flex-wrap: wrap; }
-.destaque-acoes .btn{ background: rgba(255, 255, 255, .10); border: 1px solid rgba(255, 255, 255, .22); color: #FFFFFF; backdrop-filter: none; }
+.destaque-acoes .btn{ background: rgba(10, 24, 46, .62); border: 1px solid rgba(255, 255, 255, .22); color: #FFFFFF; backdrop-filter: none; }
 .destaque-acoes .btn:hover{ background: rgba(255, 255, 255, .18); border-color: rgba(255, 255, 255, .4); }
 @keyframes rt-fluid{ 0%{ transform: translate(-3%, 4%) rotate(0); } 50%{ transform: translate(5%, -3%) rotate(180deg); } 100%{ transform: translate(-3%, 4%) rotate(360deg); } }
 @keyframes rt-orbit{ to{ transform: rotate(360deg); } }
@@ -877,3 +877,51 @@ p.aviso, div.aviso{ font-size: 12px; }
 .total-financeiro strong{ font-size: 16px; font-weight: 650; letter-spacing: -.3px; }
 .cartao > .linha.entre input{ width: 220px; } .cartao > .linha.entre select{ width: auto; }
 @media (max-width: 860px){ .cartao > .linha.entre input{ width: 100%; } .cartao > .linha.entre > .linha{ width: 100%; } }
+
+/* ---------- Alinhamento e simetria ---------- */
+/* Sem cursor de texto piscando fora dos campos (aparecia na marca e nos títulos ao clicar). */
+body{ caret-color: transparent; }
+input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
+.lateral, .ferramentas, .marca, .seletor-camada, .abas-config, .filtro-sit{ -webkit-user-select: none; user-select: none; }
+/* Menu: nada encolhe nem fica por cima (o rótulo "Plataforma" era espremido em telas baixas), rótulos numa linha só,
+   rolagem fina e escura quando a tela é baixa. */
+.casca{ grid-template-columns: 220px minmax(0, 1fr); }
+.lateral > *{ flex-shrink: 0; }
+.lateral{ scrollbar-width: thin; scrollbar-color: #2A3A5C transparent; }
+.lateral::-webkit-scrollbar{ width: 6px; }
+.lateral::-webkit-scrollbar-thumb{ background: #2A3A5C; border-radius: 6px; }
+.lateral::-webkit-scrollbar-track{ background: transparent; }
+.lateral a.item .rotulo{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.lateral .rotulo-secao{ line-height: 1.4; }
+@media (max-height: 760px) and (min-width: 861px){
+  .lateral{ padding-top: 16px; padding-bottom: 12px; gap: 2px; }
+  .lateral .topo-lateral{ padding-bottom: 10px; }
+  .lateral a.item{ min-height: 34px; padding-top: 6px; padding-bottom: 6px; }
+  .lateral .rodape-lateral{ padding-top: 10px; }
+}
+/* Topo: título e ferramentas centralizados na mesma linha */
+.topo{ align-items: center; }
+/* Indicadores: linhas sempre completas (4 → 4 ou 2+2; 5 → 5 ou 1+2+2; 6 → 6, 3+3 ou 2+2+2) */
+.grade:not(.mini):has(> .indicador){ grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); }
+.grade:not(.mini):has(> .indicador:nth-child(2):last-child){ --cols: 2; }
+.grade:not(.mini):has(> .indicador:nth-child(3):last-child){ --cols: 3; }
+.grade:not(.mini):has(> .indicador:nth-child(4):last-child){ --cols: 4; }
+.grade:not(.mini):has(> .indicador:nth-child(5):last-child){ --cols: 5; }
+.grade:not(.mini):has(> .indicador:nth-child(6):last-child){ --cols: 6; }
+@media (max-width: 1320px){ .grade:not(.mini):has(> .indicador:nth-child(6):last-child){ --cols: 3; } }
+@media (max-width: 1100px){
+  .grade:not(.mini):has(> .indicador:nth-child(4):last-child){ --cols: 2; }
+  .grade:not(.mini):has(> .indicador:nth-child(5):last-child){ --cols: 2; }
+  .grade:not(.mini):has(> .indicador:nth-child(5):last-child) > :first-child{ grid-column: span 2; }
+}
+@media (max-width: 860px){
+  .grade:not(.mini):has(> .indicador:nth-child(6):last-child){ --cols: 2; }
+  .grade:not(.mini):has(> .indicador:nth-child(3):last-child){ --cols: 2; }
+  .grade:not(.mini):has(> .indicador:nth-child(3):last-child) > :first-child{ grid-column: span 2; }
+}
+/* Painéis lado a lado com a mesma altura */
+.grade-dash{ align-items: stretch; }
+.grade-dash > * > .cartao:only-child{ height: 100%; }
+/* Parâmetros com a explicação embaixo do campo */
+.parametro{ display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dica-campo{ font-size: 10.5px; color: var(--text-3); line-height: 1.4; }

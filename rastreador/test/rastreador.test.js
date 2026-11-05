@@ -143,7 +143,8 @@ test('Rastreador', async (t) => {
     }, master);
     assert.equal(r.status, 201);
     empresa = r.dados.id;
-    outra = (await api.post('/master/empresas', { nome: 'Outra' }, master)).dados.id;
+    assert.equal((await api.post('/master/empresas', { nome: 'Sem plano' }, master)).status, 422, 'o plano é informado no cadastro');
+    outra = (await api.post('/master/empresas', { nome: 'Outra', limite_veiculos: 5, mensalidade_centavos: 3990 }, master)).dados.id;
     cliente = await api.login('gestora@rota.com', 'senha-da-gestora');
     const x = await api.post('/master/rastreadores', { imei: `IMEI:${IMEI}`, modelo: 'J16 4G', protocolo: 'gt06', chip_numero: '(11) 99999-0000', empresa_id: empresa }, master);
     assert.equal(x.status, 201);

@@ -116,13 +116,14 @@ Equipamento que envia sem estar cadastrado aparece em **Rastreadores → Equipam
 - **Dashboard**: empresas, veículos online, rastreadores (instalados e em estoque), mensagens recebidas hoje e por dia, conexões GT06,
   faturamento mensal (veículos ativos × mensalidade) e equipamentos não cadastrados.
 - **Mapa geral**: todos os veículos de todas as empresas.
-- **Empresas**: tipo, limite de veículos, mensalidade por veículo, editar, bloquear (os usuários não entram e as posições deixam de ser gravadas),
+- **Empresas**: cadastro com o plano da empresa (limite de veículos e mensalidade por veículo, sem valor padrão), editar, bloquear (os usuários não entram e as posições deixam de ser gravadas),
   excluir (os rastreadores voltam ao estoque). Clicar abre o painel da empresa.
 - **Financeiro** (só o master): valor mensal de cada cliente (mensalidade por veículo × veículos ativos), uso do plano, participação
   no faturamento, ticket médio, valor das empresas bloqueadas (fora do total), edição rápida do plano e planilha CSV.
 - **Rastreadores**: estoque e instalados (IMEI, modelo, protocolo, chip e operadora, empresa, veículo, última comunicação, conectado agora).
 - **Permissões e usuários**, **Diagnóstico** (servidor GT06, recepção, veículos mudos, comandos parados, empresas no limite),
-  **Configurações** (tempos, retenção e os textos dos comandos GT06 do seu fabricante), **Integrações** e **Atividades**.
+  **Configurações** em seções: **Parâmetros** (nome da plataforma, tempos, retenção, alerta padrão de sem comunicação), **Comandos GT06**
+  (os textos do seu fabricante) e **Integrações**; e **Atividades**.
 
 ## Alertas
 

@@ -19,7 +19,8 @@ const MENU_MASTER = [
   ['rastreadores', 'Rastreadores', 'rastreadores'],
   ['usuarios', 'Permissões e usuários', 'usuarios', ['master']], ['diagnostico', 'Diagnóstico', 'diagnostico'],
   ['configuracoes', 'Configurações', 'configuracoes', null, [
-    ['configuracoes', 'Geral', 'configuracoes', 'Plataforma, rastreamento, padrões das empresas e comandos GT06', ['master']],
+    ['configuracoes', 'Parâmetros', 'configuracoes', 'Nome da plataforma e regras do rastreamento', ['master']],
+    ['comandos-gt06', 'Comandos GT06', 'comandos', 'Textos enviados aos rastreadores sem comandos próprios', ['master']],
     ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas'],
   ]],
   ['atividades', 'Atividades', 'seguranca', ['master']],
@@ -40,7 +41,7 @@ const SUBTITULOS_MASTER = {
   dashboard: 'Resumo da plataforma, das empresas e dos equipamentos.', mapa: 'Última posição dos veículos de todas as empresas.',
   empresas: 'Clientes da plataforma, planos e limites.', financeiro: 'Valor mensal de cada cliente: mensalidade por veículo × veículos ativos.', rastreadores: 'Equipamentos cadastrados, estoque e instalação.',
   usuarios: 'Quem acessa a plataforma e o que cada perfil pode fazer.', diagnostico: 'Conexões dos equipamentos e mensagens recebidas.',
-  configuracoes: 'Padrões da plataforma, comandos GT06 e integrações.', atividades: 'Registro das ações feitas no painel.',
+  configuracoes: 'Parâmetros da plataforma, comandos GT06 e integrações.', atividades: 'Registro das ações feitas no painel.',
 };
 const SUBTITULOS_EMPRESA = {
   dashboard: 'Resumo da frota, dos deslocamentos e dos alertas.', mapa: 'Última posição de cada veículo.', historico: 'Trajetos, paradas e viagens por período.',
