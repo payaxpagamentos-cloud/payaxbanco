@@ -71,11 +71,12 @@ function correlacionar(db, inc) {
   }
 }
 
-const textoValor = (a) => `${a.valor}${a.unidade ? ` ${a.unidade}` : ''}`;
+const textoValor = (a) => `${Number(Number(a.valor).toFixed(2)).toLocaleString('pt-BR')}${a.unidade ? ` ${a.unidade}` : ''}`;
+const quando = (iso, fuso) => new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, dateStyle: 'short', timeStyle: 'medium' }).format(new Date(iso));
 
-function inferirCtosDoIncidente(db, inc, eq, amostra, status, regra, texto) {
+function inferirCtosDoIncidente(db, inc, eq, amostra, status, regra, texto, fuso = 'America/Sao_Paulo') {
   const evid = `${texto}: ${NOMES_METRICA[amostra.metrica] ?? amostra.metrica} ${textoValor(amostra)} medido em ${eq.nome}${amostra.ponto ? ` · ${amostra.ponto}` : ''} `
-    + `às ${amostra.observado_em} (amostra ${amostra.origem_evento_id}, regra "${regra.nome}" v${regra.versao}). Inferência pela topologia; não é medição da CTO.`;
+    + `em ${quando(amostra.observado_em, fuso)} (amostra ${amostra.origem_evento_id}, regra "${regra.nome}" v${regra.versao}). Inferência pela topologia; não é medição da CTO.`;
   const ids = rede.inferirCtos(db, { organizacaoId: inc.organizacao_id, equipamentoId: eq.id, ponto: amostra.ponto, status, evidencia: evid });
   if (ids.length) evento(db, inc.id, 'inferencia_cto', { ctos: ids, status, evidencia: evid });
 }
@@ -133,13 +134,13 @@ function processarAmostra(db, org, amostra, eq) {
         evento(db, id, 'aberto', `${violacoes} amostra(s) seguidas ${regra.comparacao === 'menor' ? 'abaixo' : 'acima'} de ${regra.limiar}${amostra.unidade ? ` ${amostra.unidade}` : ''}.`, null, amostra.observado_em);
         correlacionar(db, db.prepare('SELECT * FROM incidentes WHERE id = ?').get(id));
       }
-      inferirCtosDoIncidente(db, { id, organizacao_id: org }, eq, amostra, SEV_CTO[regra.severidade], regra, 'Indício de falha');
+      inferirCtosDoIncidente(db, { id, organizacao_id: org }, eq, amostra, SEV_CTO[regra.severidade], regra, 'Indício de falha', organizacao.fuso);
       resultado.push({ regra: regra.id, acao: recente ? 'reaberto' : 'aberto', incidente: id });
     } else if (aberto && recuperacoes >= regra.confirmacoes && aberto.origem === 'monitoramento') {
       db.prepare(`UPDATE incidentes SET status = 'resolvido', resolvido_em = ?, resolucao = 'automatica', ultima_observacao = ?, atualizado_em = ? WHERE id = ?`)
         .run(amostra.observado_em, amostra.observado_em, agora(), aberto.id);
       evento(db, aberto.id, 'resolvido', `Recuperação confirmada em ${recuperacoes} amostra(s) ${regra.comparacao === 'menor' ? 'a partir de' : 'até'} ${regra.limiar_recuperacao}. Duração: ${Math.round((Date.parse(amostra.observado_em) - Date.parse(aberto.inicio)) / 60_000)} min.`, null, amostra.observado_em);
-      inferirCtosDoIncidente(db, aberto, eq, amostra, 'operacional', regra, 'Recuperação confirmada');
+      inferirCtosDoIncidente(db, aberto, eq, amostra, 'operacional', regra, 'Recuperação confirmada', organizacao.fuso);
       resultado.push({ regra: regra.id, acao: 'resolvido', incidente: aberto.id });
     } else {
       resultado.push({ regra: regra.id, acao: viola ? 'aguardando_confirmacao' : 'normal' });

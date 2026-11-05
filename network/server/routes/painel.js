@@ -28,7 +28,7 @@ module.exports = (db) => {
         const ev = i.evidencias ? JSON.parse(i.evidencias) : {};
         const m = ev.medicoes?.at(-1);
         out.alertas.push({ tipo: 'incidente', id: i.id, criticidade: i.severidade, titulo: i.titulo, em: i.inicio, responsavel: i.responsavel_nome,
-          evidencia: m ? `${m.valor}${m.unidade ? ` ${m.unidade}` : ''} em ${m.em}` : i.origem === 'manual' ? 'Registro manual' : null,
+          evidencia: m ? `Última medição: ${Number(m.valor.toFixed(2)).toLocaleString('pt-BR')}${m.unidade ? ` ${m.unidade}` : ''}` : i.origem === 'manual' ? 'Registro manual' : null,
           detalhe: imp.portas_ocupadas ? `${imp.portas_ocupadas} porta(s) ocupada(s) nas CTOs afetadas${imp.clientes_unicos ? ` · ${imp.clientes_unicos} cliente(s) único(s)` : ''}` : null,
           link: `#/noc/incidente/${i.id}` });
       }
@@ -75,7 +75,7 @@ module.exports = (db) => {
       const limite = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10);
       for (const d of db.prepare('SELECT d.*, v.placa FROM veiculo_documentos d JOIN veiculos v ON v.id = d.veiculo_id WHERE d.organizacao_id = ? AND d.vencimento <= ? ORDER BY d.vencimento LIMIT 5').all(org, limite)) {
         out.alertas.push({ tipo: 'documento', id: d.veiculo_id, criticidade: d.vencimento < hoje ? 'alta' : 'baixa', titulo: `${d.tipo.toUpperCase()} ${d.vencimento < hoje ? 'vencido' : 'vencendo'} · ${d.placa}`,
-          em: null, evidencia: `Vencimento ${d.vencimento}`, link: `#/veiculos/${d.veiculo_id}` });
+          em: null, evidencia: `Vencimento ${d.vencimento.split('-').reverse().join('/')}`, link: `#/veiculos/${d.veiculo_id}` });
       }
     }
     const ordem = { critica: 0, alta: 1, media: 2, baixa: 3 };

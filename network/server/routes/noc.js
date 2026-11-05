@@ -32,9 +32,10 @@ module.exports = (db) => {
     const coletas = db.prepare('SELECT fonte, MAX(observado_em) AS ultima, MAX(recebido_em) AS recebida, COUNT(*) AS n FROM amostras WHERE organizacao_id = ? AND recebido_em >= ? GROUP BY fonte')
       .all(req.org, new Date(Date.now() - 24 * 3600_000).toISOString());
     const coletores = db.prepare('SELECT nome, ultimo_uso FROM coletores WHERE organizacao_id = ? AND revogado_em IS NULL').all(req.org);
-    const ultimoColetor = coletores.map((c) => c.ultimo_uso).filter(Boolean).sort().at(-1) ?? null;
+    // Último recebimento: o uso mais recente de um token ou a última amostra gravada (o que for mais novo).
+    const ultimoColetor = [...coletores.map((c) => c.ultimo_uso), ...coletas.map((c) => c.recebida)].filter(Boolean).sort().at(-1) ?? null;
     return {
-      monitoramento: { estado: !coletores.length ? 'nao_configurada' : !ultimoColetor ? 'testando'
+      monitoramento: { estado: !coletores.length && !coletas.length ? 'nao_configurada' : !ultimoColetor ? 'testando'
         : Date.now() - Date.parse(ultimoColetor) > o.desatualizado_min * 60_000 ? 'desatualizada' : 'conectada', ultimo_recebimento: ultimoColetor, fontes: coletas },
       rastreador: { estado: base.estadoAtual(ra, o.desatualizado_min, rastreador.intervalo(ra?.config ?? {})), ultimo_sucesso: ra?.ultimo_sucesso ?? null, ultimo_erro: ra?.ultimo_erro ?? null },
       downdetector: { estado: base.estadoAtual(dd, o.desatualizado_min, downdetector.intervalo(dd?.config ?? {})), ultimo_sucesso: dd?.ultimo_sucesso ?? null, ultimo_erro: dd?.ultimo_erro ?? null },
