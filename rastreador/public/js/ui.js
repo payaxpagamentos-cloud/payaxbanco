@@ -224,13 +224,19 @@ const P = {
   fechar: 'M6 6l12 12M18 6 6 18',
   expandir: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   reduzir: 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5',
+  // Equivalentes aos ícones do Lucide (licença ISC) usados no visual novo.
+  radar: 'M19.07 4.93A10 10 0 0 0 6.99 3.34M4 6h.01M2.29 9.62A10 10 0 1 0 21.31 8.35M16.24 7.76A6 6 0 1 0 8.23 16.67M12 18h.01M17.99 11.66A6 6 0 0 1 15.77 16.67M14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM13.41 10.59l5.66-5.66',
+  navegacao: 'M3 11l19-9-9 19-2-8-8-2z',
+  rota: 'M9 19a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15M21 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+  atividade: 'M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2',
+  carteira: 'M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4',
+  sem_sinal: 'M12 20h.01M8.5 16.43a5 5 0 0 1 7 0M2 8.82a15 15 0 0 1 4.18-2.65M19 12.86a10 10 0 0 0-2.93-1.97M22 8.82a15 15 0 0 0-11.29-3.76M5 12.86a10 10 0 0 1 5.17-2.69M2 2l20 20',
+  pergunta: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01',
 };
 export function icone(nome) {
   return el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
     el('path', { d: P[nome] ?? '' }));
 }
 export function marca(nome = 'Rastreador') {
-  const svg = el('svg', { viewBox: '0 0 24 24', fill: 'currentColor', 'aria-hidden': 'true' },
-    el('path', { d: 'M12 1.5a7.5 7.5 0 0 0-7.5 7.5c0 5.6 6.4 12.6 6.7 12.9.4.4 1.2.4 1.6 0 .3-.3 6.7-7.3 6.7-12.9A7.5 7.5 0 0 0 12 1.5zm0 4.7a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z' }));
-  return el('span', { class: 'marca' }, svg, el('span', {}, nome));
+  return el('span', { class: 'marca' }, el('span', { class: 'marca-icone' }, icone('radar')), el('span', {}, nome));
 }

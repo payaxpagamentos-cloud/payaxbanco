@@ -1,33 +1,51 @@
 /** Telas do master (equipe da plataforma). */
 import { api, qs } from './api.js';
 import { el, limpar, dinheiro, dataHora, data, desde, inteiro, toast, campo, area, escolha, marcar, formModal, perguntar, confirmar, repetir, telefone, etiqueta, placa,
-  TIPOS_EMPRESA, PERFIS, PROTOCOLOS, MODELOS_RASTREADOR, reaisCampo, centavos } from './ui.js';
-import { cartao, indicador, tabela, td, botao, botaoIcone, painelMapa, painelIntegracoes, situacaoDiag, linhaDado } from './comum.js';
+  TIPOS_EMPRESA, PERFIS, PROTOCOLOS, MODELOS_RASTREADOR, reaisCampo, centavos, icone } from './ui.js';
+import { cartao, indicador, tabela, td, botao, botaoIcone, painelMapa, painelIntegracoes, situacaoDiag, linhaDado, blocoDestaque } from './comum.js';
 import { configPublica } from './mapa.js';
-import { barras } from './graficos.js';
+import { area as graficoArea } from './graficos.js';
 
 const listaEmpresas = () => api.get('/master/empresas');
 
 // ---------- Dashboard ----------
+const agora = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const primeiroNome = (nome) => String(nome ?? '').trim().split(/\s+/)[0] || 'Olá';
+
 async function telaDashboard(ctx) {
+  // O bloco de destaque fica fixo; a cada 15 s só os textos e os painéis de baixo são trocados.
+  const heroi = blocoDestaque(
+    el('a', { class: 'btn', href: '#/mapa' }, icone('mapa'), 'Abrir o mapa geral'),
+    el('a', { class: 'btn', href: '#/diagnostico' }, icone('diagnostico'), 'Diagnóstico'));
+  heroi.atualizar({ rotulo: 'Carregando a plataforma…', vivo: false, titulo: `Olá, ${primeiroNome(ctx.usuario.nome)}.`, destaque: 'Central de rastreamento.', texto: '' });
+  const corpo = el('div', { class: 'coluna', style: 'gap:16px' });
+  limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'gap:16px' }, heroi.raiz, corpo));
   ctx.parar(repetir(async () => {
     const d = await api.get('/master/dashboard');
-    limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'gap:18px' },
+    const gt06 = d.conexoes_gt06 === null ? 'servidor GT06 desligado' : `${inteiro(d.conexoes_gt06)} GT06 conectado(s)`;
+    heroi.atualizar({
+      rotulo: d.veiculos.online ? `${inteiro(d.veiculos.online)} veículo(s) online agora` : 'Nenhum veículo comunicando agora',
+      vivo: d.veiculos.online > 0,
+      titulo: `Olá, ${primeiroNome(ctx.usuario.nome)}.`,
+      destaque: 'Central de rastreamento.',
+      texto: `${inteiro(d.empresas.ativa ?? 0)} empresa(s) ativa(s) · ${inteiro(d.mensagens_hoje)} mensagem(ns) hoje · ${gt06}. Atualizado às ${agora()}.`,
+    });
+    limpar(corpo,
       el('div', { class: 'grade' },
-        indicador('Empresas ativas', inteiro(d.empresas.ativa ?? 0), d.empresas.bloqueada ? `${d.empresas.bloqueada} bloqueada(s)` : 'nenhuma bloqueada'),
-        indicador('Veículos online', `${inteiro(d.veiculos.online)}/${inteiro(d.veiculos.total)}`, 'comunicaram nos últimos minutos', 'ok'),
-        indicador('Rastreadores', inteiro(d.rastreadores.total), `${inteiro(d.rastreadores.instalados)} instalados · ${inteiro(d.rastreadores.estoque)} no estoque`),
-        indicador('Mensagens hoje', inteiro(d.mensagens_hoje), d.conexoes_gt06 === null ? 'servidor GT06 desligado' : `${inteiro(d.conexoes_gt06)} GT06 conectado(s)`),
-        indicador('Faturamento mensal', dinheiro(d.faturamento_mensal_centavos), 'veículos ativos × mensalidade'),
-        indicador('Não cadastrados', inteiro(d.desconhecidos), 'equipamentos que tentaram enviar', d.desconhecidos ? 'aviso' : '')),
+        indicador('Empresas ativas', inteiro(d.empresas.ativa ?? 0), d.empresas.bloqueada ? `${d.empresas.bloqueada} bloqueada(s)` : 'nenhuma bloqueada', '', 'empresas'),
+        indicador('Veículos online', `${inteiro(d.veiculos.online)}/${inteiro(d.veiculos.total)}`, 'comunicaram nos últimos minutos', 'ok', 'radar'),
+        indicador('Rastreadores', inteiro(d.rastreadores.total), `${inteiro(d.rastreadores.instalados)} instalados · ${inteiro(d.rastreadores.estoque)} no estoque`, '', 'rastreadores'),
+        indicador('Mensagens hoje', inteiro(d.mensagens_hoje), gt06, '', 'atividade'),
+        indicador('Faturamento mensal', dinheiro(d.faturamento_mensal_centavos), 'veículos ativos × mensalidade', '', 'carteira'),
+        indicador('Não cadastrados', inteiro(d.desconhecidos), 'equipamentos que tentaram enviar', d.desconhecidos ? 'aviso' : '', 'pergunta')),
       el('div', { class: 'grade-dash' },
-        el('div', { class: 'c7' }, cartao('Mensagens recebidas por dia (14 dias)', barras(d.mensagens_por_dia.map((x) => ({
+        el('div', { class: 'c7' }, cartao('Mensagens recebidas por dia (14 dias)', graficoArea(d.mensagens_por_dia.map((x) => ({
           rotulo: x.data.slice(8), valor: x.mensagens, titulo: `${data(x.data)}: ${inteiro(x.mensagens)} mensagem(ns)` }))))),
         el('div', { class: 'c5' }, cartao('Empresas', tabela(['Empresa', '>Veículos', '>Online', '>Alertas'], d.top_empresas.map((e) =>
           el('tr', { class: 'clicavel', onclick: () => { ctx.renomearEmpresa(e.id, e.nome); ctx.ir('dashboard', e.id); } }, td(e.nome),
             td(`${inteiro(e.veiculos)}/${inteiro(e.limite_veiculos)}`, 'dir num'), td(inteiro(e.online), 'dir num'),
-            td(e.alertas_pendentes ? etiqueta(inteiro(e.alertas_pendentes), 'aviso') : '0', 'dir')))), 'Nenhuma empresa.'))),
-      d.alertas_pendentes ? el('p', { class: 'pequeno mudo' }, `${inteiro(d.alertas_pendentes)} alerta(s) pendente(s) somando todas as empresas.`) : null));
+            td(e.alertas_pendentes ? etiqueta(inteiro(e.alertas_pendentes), 'aviso') : '0', 'dir'))), 'Nenhuma empresa.')))),
+      d.alertas_pendentes ? el('p', { class: 'pequeno mudo' }, `${inteiro(d.alertas_pendentes)} alerta(s) pendente(s) somando todas as empresas.`) : null);
   }, 15_000));
 }
 

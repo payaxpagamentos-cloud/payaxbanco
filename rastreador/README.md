@@ -18,7 +18,9 @@ Todos os mapas têm o botão **Satélite / Mapa**. O padrão é o **Mapa** de ru
 com os nomes de bairros, ruas e lugares (com os ícones) por cima; o Mapa de ruas tem visual moderno (fundo claro, ruas brancas, avenidas em
 amarelo, prédios planos). Zoom até 20; a escolha fica lembrada no navegador. O **campo de busca** no mapa encontra rua e número, bairro ou lugar
 (Photon/OpenStreetMap, `RASTREADOR_GEOCODER_URL`), e o painel do veículo mostra o **endereço** de onde ele está. Para uso comercial com licença, troque o satélite por um provedor com chave (`RASTREADOR_SATELITE_*`). Tema claro por padrão,
-com o escuro no botão do topo.
+com o escuro no botão do topo. O visual segue a referência aprovada: menu azul-marinho com detalhe verde-menta, destaques em azul,
+ciano e menta e, nos dashboards, um bloco com gradiente fluido e órbita animada. O botão **Pausar efeitos** (no topo) para as
+animações contínuas, e a preferência "reduzir movimento" do sistema já as deixa paradas.
 
 ## Rastreador J16 4G (Indica Planos)
 

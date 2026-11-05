@@ -3,9 +3,9 @@ import { api, qs, baixar, BASE } from './api.js';
 import { el, limpar, dinheiro, dataHora, hora, data, desde, km, kmh, placa, telefone, inteiro, toast, acao, campo, escolha, marcar, formModal, modal, confirmar,
   perguntar, repetir, etiqueta, etiquetaSituacao, etiquetaComando, etiquetaAlerta, hojeLocal, somarDias, centavos, icone, PERFIS, TIPOS_VEICULO,
   TIPOS_ALERTA, TIPOS_COMANDO, PROTOCOLOS } from './ui.js';
-import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, linhaDado, campoData, painelMapa, faixaVeiculo, painelIntegracoes } from './comum.js';
+import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, linhaDado, campoData, painelMapa, faixaVeiculo, painelIntegracoes, blocoDestaque } from './comum.js';
 import { criarMapa, configPublica, linkGoogle, COR_SITUACAO } from './mapa.js';
-import { pizza, barras } from './graficos.js';
+import { pizza, area } from './graficos.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
 const pode = (ctx) => !ctx.somenteLeitura;
@@ -14,19 +14,36 @@ const duracaoH = (s) => { const t = Math.round(s ?? 0); const h = Math.floor(t /
 let veiculoHistorico = null;
 
 // ---------- Dashboard ----------
+const agora = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const primeiroNome = (nome) => String(nome ?? '').trim().split(/\s+/)[0] || 'Olá';
+
 async function telaDashboard(ctx) {
+  // O bloco de destaque fica fixo; a cada 30 s só os textos e os painéis de baixo são trocados.
+  const heroi = blocoDestaque(
+    el('a', { class: 'btn', href: `#/empresa/${ctx.empresaId}/mapa` }, icone('mapa'), 'Abrir o mapa ao vivo'),
+    el('a', { class: 'btn', href: `#/empresa/${ctx.empresaId}/alertas` }, icone('alertas'), 'Ver alertas'));
+  heroi.atualizar({ rotulo: 'Carregando a frota…', vivo: false, titulo: `Olá, ${primeiroNome(ctx.usuario.nome)}.`, destaque: 'Sua frota em um só lugar.', texto: '' });
+  const corpo = el('div', { class: 'coluna', style: 'gap:16px' });
+  limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'gap:16px' }, heroi.raiz, corpo));
   ctx.parar(repetir(async () => {
     const d = await api.get(`${base(ctx)}/dashboard`);
     const v = d.veiculos;
     const semana = d.alertas_semana.reduce((s, x) => s + x.n, 0);
-    limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'gap:18px' },
+    heroi.atualizar({
+      rotulo: v.movimento ? `${inteiro(v.movimento)} em movimento agora` : v.total ? 'Nenhum veículo em movimento agora' : 'Nenhum veículo cadastrado',
+      vivo: v.movimento > 0,
+      titulo: `Olá, ${primeiroNome(ctx.usuario.nome)}.`,
+      destaque: 'Sua frota em um só lugar.',
+      texto: `Hoje: ${km(d.hoje.distancia_m)} rodados e ${duracaoH(d.hoje.ligado_s)} com motor ligado · ${inteiro(d.alertas_pendentes)} alerta(s) pendente(s). Atualizado às ${agora()}.`,
+    });
+    limpar(corpo,
       el('div', { class: 'grade' },
-        indicador('Veículos', inteiro(v.total), `limite do plano: ${inteiro(d.empresa.limite_veiculos)}`),
-        indicador('Em movimento', inteiro(v.movimento), `${inteiro(v.ligado)} parado(s) ligado(s)`, 'ok'),
+        indicador('Veículos', inteiro(v.total), `limite do plano: ${inteiro(d.empresa.limite_veiculos)}`, '', 'veiculos'),
+        indicador('Em movimento', inteiro(v.movimento), `${inteiro(v.ligado)} parado(s) ligado(s)`, 'ok', 'navegacao'),
         indicador('Sem sinal', inteiro(v.sem_sinal), v.sem_sinal ? 'sem comunicação' : v.sem_posicao ? `${inteiro(v.sem_posicao)} aguardando a 1ª posição`
-          : 'todos comunicando', v.sem_sinal ? 'erro' : ''),
-        indicador('Rodados hoje', km(d.hoje.distancia_m), `${duracaoH(d.hoje.ligado_s)} com motor ligado`),
-        indicador('Alertas pendentes', inteiro(d.alertas_pendentes), `${inteiro(semana)} nos últimos 7 dias`, d.alertas_pendentes ? 'aviso' : '')),
+          : 'todos comunicando', v.sem_sinal ? 'erro' : '', 'sem_sinal'),
+        indicador('Rodados hoje', km(d.hoje.distancia_m), `${duracaoH(d.hoje.ligado_s)} com motor ligado`, '', 'rota'),
+        indicador('Alertas pendentes', inteiro(d.alertas_pendentes), `${inteiro(semana)} nos últimos 7 dias`, d.alertas_pendentes ? 'aviso' : '', 'alertas')),
       el('div', { class: 'grade-dash' },
         el('div', { class: 'c4' }, cartao('Frota agora', pizza([
           { rotulo: 'Em movimento', valor: v.movimento, cor: COR_SITUACAO.movimento }, { rotulo: 'Parado ligado', valor: v.ligado, cor: COR_SITUACAO.ligado },
@@ -34,11 +51,11 @@ async function telaDashboard(ctx) {
           { rotulo: 'Sem posição/rastreador', valor: v.sem_posicao + v.sem_rastreador, cor: COR_SITUACAO.sem_posicao },
         ], { vazio: 'Nenhum veículo cadastrado' }), v.bloqueados ? el('p', { class: 'aviso erro pequeno', style: 'margin:12px 0 0' }, `${v.bloqueados} veículo(s) bloqueado(s).`) : null,
         el('a', { class: 'btn', href: `#/empresa/${ctx.empresaId}/mapa`, style: 'margin-top:12px;width:100%' }, icone('mapa'), 'Abrir o mapa ao vivo'))),
-        el('div', { class: 'c8' }, cartao('Quilômetros por dia (14 dias)', barras(d.km_por_dia.map((x) => ({
+        el('div', { class: 'c8' }, cartao('Quilômetros por dia (14 dias)', area(d.km_por_dia.map((x) => ({
           rotulo: x.data.slice(8), valor: x.distancia_m, titulo: `${data(x.data)}: ${km(x.distancia_m)}` })))),
         el('div', { class: 'c7' }, cartao('Últimos alertas', tabela(['Quando', 'Veículo', 'Alerta', 'Situação'], d.ultimos_alertas.map((a) => el('tr', {},
           td(dataHora(a.ocorrido_em)), td(placa(a.placa)), td([etiquetaAlerta(a.tipo), el('div', { class: 'pequeno mudo' }, a.mensagem)]),
-          td(a.tratado_em ? etiqueta('tratado', 'ok') : etiqueta('pendente', 'aviso'))))), 'Nenhum alerta.'),
+          td(a.tratado_em ? etiqueta('tratado', 'ok') : etiqueta('pendente', 'aviso')))), 'Nenhum alerta.')),
           el('a', { class: 'btn pequeno', href: `#/empresa/${ctx.empresaId}/alertas`, style: 'margin-top:10px' }, 'Ver todos'))),
         el('div', { class: 'c5' }, cartao('Mais rodados na semana', tabela(['Veículo', '>Distância', '>Vel. máx.'], d.ranking.map((x) => el('tr', {},
           td([el('strong', {}, placa(x.placa)), x.descricao ? el('div', { class: 'pequeno mudo' }, x.descricao) : null]), td(km(x.distancia_m), 'dir num'),
@@ -48,10 +65,10 @@ async function telaDashboard(ctx) {
             'Nenhum alerta na semana.'))),
         el('div', { class: 'c6' }, cartao('Manutenção', tabela(['Veículo', 'Serviço', 'Próxima', 'Situação'], d.manutencoes.map((m) => el('tr', {},
           td(placa(m.placa)), td(m.descricao), td([m.proxima_km !== null ? `${inteiro(m.proxima_km)} km` : null, m.proxima_data ? el('div', { class: 'pequeno mudo' }, data(m.proxima_data)) : null]),
-          td(m.situacao === 'vencida' ? etiqueta('vencida', 'erro') : etiqueta('próxima', 'aviso'))))), 'Nenhuma manutenção vencida ou próxima.')),
+          td(m.situacao === 'vencida' ? etiqueta('vencida', 'erro') : etiqueta('próxima', 'aviso')))), 'Nenhuma manutenção vencida ou próxima.'))),
         el('div', { class: 'c6' }, cartao('CNH vencida ou vencendo em 30 dias', tabela(['Motorista', 'Validade'], d.cnh.map((m) => el('tr', {},
           td(m.nome), td(m.cnh_validade < hojeLocal() ? etiqueta(`vencida em ${data(m.cnh_validade)}`, 'erro') : etiqueta(data(m.cnh_validade), 'aviso')))),
-        'Nenhuma CNH vencendo.'))))));
+        'Nenhuma CNH vencendo.')))));
   }, 30_000));
 }
 

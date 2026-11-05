@@ -5,8 +5,9 @@ import { el, limpar, dataHora, desde, km, kmh, placa, telefone, toast, acao, cam
 import { criarMapa, linkGoogle, linkStreetView, linkRota, enderecoDe } from './mapa.js';
 
 export const cartao = (titulo, ...conteudo) => el('section', { class: 'cartao' }, titulo ? el('h2', {}, titulo) : null, conteudo);
-// tom: '' (neutro), 'ok', 'aviso' ou 'erro' (só o número muda de cor).
-export const indicador = (rotulo, valor, nota, tom = '') => el('div', { class: `cartao indicador${tom ? ` tom-${tom}` : ''}` }, el('div', { class: 'rotulo' }, rotulo),
+// tom: '' (neutro), 'ok', 'aviso' ou 'erro' (só o número muda de cor). ic: nome do ícone ao lado do rótulo (opcional).
+export const indicador = (rotulo, valor, nota, tom = '', ic = null) => el('div', { class: `cartao indicador${tom ? ` tom-${tom}` : ''}` },
+  el('div', { class: 'rotulo' }, ic ? icone(ic) : null, rotulo),
   el('div', { class: 'valor num' }, valor), nota ? el('div', { class: 'nota' }, nota) : null);
 export const td = (conteudo, classe = '') => el('td', { class: classe }, conteudo);
 export const tabela = (colunas, linhas, vazio = 'Nada por aqui.') => (linhas.length
@@ -241,4 +242,32 @@ export function painelIntegracoes(alvo, { listar, criar, revogar, empresas = nul
   limpar(alvo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, 'Chaves que outros sistemas usam para consultar a frota e enviar posições.'), nova), cartao(null, lista),
     el('div', { style: 'height:18px' }), doc);
   return carregar().catch((err) => toast(err.message, true));
+}
+
+/**
+ * Bloco de destaque dos dashboards (gradiente fluido, órbita e o ponto que pulsa). Fica fixo na página e só troca os textos a
+ * cada atualização, para a animação não recomeçar. `atualizar({ rotulo, vivo, titulo, destaque, texto })`: o ponto só pulsa quando
+ * `vivo` vem dos dados reais (por exemplo, veículos em movimento agora).
+ */
+export function blocoDestaque(...acoes) {
+  const ponto = el('span', { class: 'ponto parado', 'aria-hidden': 'true' });
+  const rotulo = el('span', {});
+  const titulo = el('span', {});
+  const destaque = el('span', { class: 'linha-destaque' });
+  const texto = el('p', {});
+  const raiz = el('section', { class: 'destaque' },
+    el('div', { class: 'destaque-aura', 'aria-hidden': 'true' }), el('div', { class: 'destaque-grao', 'aria-hidden': 'true' }),
+    el('div', { class: 'destaque-orbita', 'aria-hidden': 'true' }, el('div', { class: 'destaque-rastro' }, el('div', { class: 'destaque-ponto' }))),
+    el('div', { class: 'destaque-texto' }, el('div', { class: 'destaque-rotulo' }, ponto, rotulo), el('h2', {}, titulo, el('br'), destaque), texto),
+    acoes.length ? el('div', { class: 'destaque-acoes' }, acoes) : null);
+  return {
+    raiz,
+    atualizar(d) {
+      ponto.className = `ponto ${d.vivo ? 'vivo' : 'parado'}`;
+      rotulo.textContent = d.rotulo;
+      titulo.textContent = d.titulo;
+      destaque.textContent = d.destaque;
+      texto.textContent = d.texto;
+    },
+  };
 }

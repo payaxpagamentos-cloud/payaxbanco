@@ -3,7 +3,7 @@ import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, for
 import { TELAS_MASTER } from './master.js';
 import { TELAS_EMPRESA } from './empresa.js';
 import { iniciarCena } from './cena-entrada.js';
-import './efeitos.js';
+import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 
 const raiz = $('#app');
 let pararTela = null;
@@ -23,6 +23,19 @@ const MENU_EMPRESA = [
   ['relatorios', 'Relatórios', 'relatorios'], ['comandos', 'Comandos', 'comandos'], ['configuracoes', 'Configurações', 'configuracoes'],
   ['integracoes', 'Integrações', 'integracoes', ['master', 'suporte', 'cliente']],
 ];
+
+// Linha de apoio embaixo do título (as telas que já têm a própria explicação ficam sem).
+const SUBTITULOS_MASTER = {
+  dashboard: 'Resumo da plataforma, das empresas e dos equipamentos.', mapa: 'Última posição dos veículos de todas as empresas.',
+  empresas: 'Clientes da plataforma, planos e limites.', rastreadores: 'Equipamentos cadastrados, estoque e instalação.',
+  usuarios: 'Quem acessa a plataforma e o que cada perfil pode fazer.', diagnostico: 'Conexões dos equipamentos e mensagens recebidas.',
+  configuracoes: 'Padrões da plataforma e dos comandos.', atividades: 'Registro das ações feitas no painel.',
+};
+const SUBTITULOS_EMPRESA = {
+  dashboard: 'Resumo da frota, dos deslocamentos e dos alertas.', mapa: 'Última posição de cada veículo.', historico: 'Trajetos, paradas e viagens por período.',
+  alertas: 'Ocorrências dos veículos e o que já foi tratado.', cercas: 'Áreas monitoradas com aviso de entrada e saída.', relatorios: 'Relatórios por veículo e período.',
+  configuracoes: 'Preferências da empresa e dos alertas.',
+};
 
 window.addEventListener('rastreador:sair', () => desenhar());
 window.addEventListener('hashchange', () => desenhar());
@@ -87,17 +100,21 @@ async function desenhar() {
       try { localStorage.setItem('rastreador.menu', casca.classList.contains('recolhida') ? 'recolhido' : 'aberto'); } catch { /* ignora */ }
     } }, icone('seta'))),
     itens,
-    empresaId && PLATAFORMA.includes(u.perfil) ? el('a', { class: 'item voltar', href: '#/empresas', title: 'Voltar ao master' }, icone('entrar'), el('span', { class: 'rotulo' }, 'Voltar ao master')) : null);
+    empresaId && PLATAFORMA.includes(u.perfil) ? el('a', { class: 'item voltar', href: '#/empresas', title: 'Voltar ao master' }, icone('entrar'), el('span', { class: 'rotulo' }, 'Voltar ao master')) : null,
+    el('div', { class: 'rodape-lateral' }, el('strong', {}, nomeEmpresa ?? nomePlataforma), PERFIS[u.perfil] ?? ''));
+  lateral.children[0].after(el('div', { class: 'rotulo-secao' }, empresaId ? 'Painel da empresa' : 'Plataforma'));
 
-  const trilha = el('div', { class: 'trilha' });
+  const trilha = el('nav', { class: 'trilha', 'aria-label': 'Você está em' });
   if (empresaId) {
     if (PLATAFORMA.includes(u.perfil)) trilha.append(el('a', { href: '#/empresas' }, 'Empresas'), el('span', { class: 'sep' }, '/'));
-    trilha.append(el('a', { href: link(empresaId, 'dashboard') }, nomeEmpresa.toUpperCase()), el('span', { class: 'sep' }, '/'), titulo);
+    trilha.append(el('a', { href: link(empresaId, 'dashboard') }, nomeEmpresa), el('span', { class: 'sep' }, '/'), el('strong', {}, titulo));
   } else {
-    trilha.append(titulo);
+    trilha.append(nomePlataforma, el('span', { class: 'sep', 'aria-hidden': 'true' }, '/'), el('strong', {}, titulo));
   }
 
-  const topo = el('header', { class: 'topo' }, el('div', {}, el('h1', { style: 'margin:0' }, titulo), trilha), ferramentas(u));
+  const subtitulo = (empresaId ? SUBTITULOS_EMPRESA : SUBTITULOS_MASTER)[tela];
+  const topo = el('header', { class: 'topo' }, el('div', {}, trilha,
+    el('h1', { style: 'margin:0' }, titulo), subtitulo ? el('p', { class: 'subtitulo' }, subtitulo) : null), ferramentas(u));
   casca.append(lateral, el('div', { class: 'principal' }, topo, conteudo));
   limpar(raiz, casca);
   document.title = `${titulo} · ${nomeEmpresa ? `${nomeEmpresa} · ` : ''}${nomePlataforma}`;
@@ -128,9 +145,20 @@ function ferramentas(u) {
     el('div', { class: 'quem' }, el('strong', {}, u.nome), el('div', { class: 'pequeno mudo' }, u.email), el('div', { class: 'pequeno mudo' }, PERFIS[u.perfil])),
     el('button', { onclick: () => { menu.classList.add('oculto'); alterarSenha(); } }, 'Alterar senha'),
     el('button', { onclick: () => { sessao.limpar(); nomesEmpresa.clear(); location.hash = ''; desenhar(); } }, 'Sair'));
+  // Pausar / ativar os efeitos contínuos (gradiente, órbita, pulsos).
+  const efeitos = el('button', { class: 'controle-efeitos', type: 'button' });
+  const desenharEfeitos = () => {
+    const p = efeitosPausados();
+    efeitos.replaceChildren(icone(p ? 'play' : 'pausa'), el('span', {}, p ? 'Ativar efeitos' : 'Pausar efeitos'));
+    efeitos.setAttribute('aria-pressed', String(p));
+    efeitos.title = p ? 'Ativar os efeitos de movimento' : 'Pausar os efeitos de movimento';
+  };
+  efeitos.addEventListener('click', () => { alternarEfeitos(); desenharEfeitos(); });
+  desenharEfeitos();
   return el('div', { class: 'ferramentas' },
-    el('button', { class: tema === 'claro' ? 'on' : '', title: 'Tema claro', dataset: { temaBtn: 'claro' }, onclick: () => trocar('claro') }, icone('sol')),
-    el('button', { class: tema === 'escuro' ? 'on' : '', title: 'Tema escuro', dataset: { temaBtn: 'escuro' }, onclick: () => trocar('escuro') }, icone('lua')),
+    efeitos,
+    el('button', { class: tema === 'claro' ? 'on' : '', title: 'Tema claro', 'aria-label': 'Tema claro', dataset: { temaBtn: 'claro' }, onclick: () => trocar('claro') }, icone('sol')),
+    el('button', { class: tema === 'escuro' ? 'on' : '', title: 'Tema escuro', 'aria-label': 'Tema escuro', dataset: { temaBtn: 'escuro' }, onclick: () => trocar('escuro') }, icone('lua')),
     el('button', { class: 'usuario', title: u.nome, onclick: () => menu.classList.toggle('oculto') }, el('span', { class: 'avatar' }, iniciais(u.nome)), el('span', { class: 'nome' }, u.nome)),
     menu);
 }
@@ -158,6 +186,7 @@ function telaEntrada() {
       desenhar();
     });
   });
+  const rodape = el('div', { class: 'rodape-entrada', 'aria-live': 'polite' }, el('span', { class: 'ponto-vivo parado' }), 'Verificando o servidor…');
   // Cidade em 3D ao fundo, com os veículos sendo localizados; o login num cartão de vidro por cima.
   const cena = el('canvas', { class: 'cena', 'aria-hidden': 'true' });
   const recursos = ['Localização em tempo real', 'Bloqueio remoto', 'Cercas virtuais', 'Alertas no celular'];
@@ -171,7 +200,13 @@ function telaEntrada() {
       el('section', { class: 'cartao-vidro' },
         el('h2', {}, 'Entrar no painel'),
         el('p', { class: 'sub' }, 'Use o e-mail e a senha que você recebeu.'), f,
-        el('div', { class: 'rodape-entrada' }, el('span', { class: 'ponto-vivo' }), 'Servidor de rastreamento online')))));
+        rodape))));
+  // O estado do servidor vem de uma consulta real (não fica "online" por padrão).
+  api.get('/saude').then(() => {
+    rodape.replaceChildren(el('span', { class: 'ponto-vivo' }), 'Servidor de rastreamento online');
+  }).catch(() => {
+    rodape.replaceChildren(el('span', { class: 'ponto-vivo erro' }), 'Sem resposta do servidor agora');
+  });
   pararTela = iniciarCena(cena);
   f.querySelector('input').focus();
 }

@@ -6,7 +6,7 @@
  */
 const TAM = 9; // a cidade vai de -TAM a +TAM quadras
 const AVENIDA = 3; // uma avenida a cada 3 ruas
-const CORES = ['#22C55E', '#38BDF8', '#F59E0B', '#A78BFA', '#F472B6'];
+const CORES = ['#36E0C0', '#6C9DFF', '#5CDDD5', '#8B7BFF', '#F5C46B'];
 const LETRAS = 'ABCDEFGHJKLMNPRSTUVWXYZ';
 
 // Gerador fixo: a cidade é sempre a mesma.
@@ -167,7 +167,7 @@ export function iniciarCena(canvas) {
     const t = (quadro % 90) / 90;
     for (const fase of [0, 0.5]) {
       const k = (t + fase) % 1;
-      ctx.strokeStyle = `rgba(56, 189, 248, ${0.8 * (1 - k)})`;
+      ctx.strokeStyle = `rgba(54, 224, 192, ${0.8 * (1 - k)})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       for (let a = 0; a <= 32; a++) {
@@ -178,7 +178,7 @@ export function iniciarCena(canvas) {
       ctx.stroke();
     }
     const topo = projetar(v.x, 1.6, v.z);
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+    ctx.strokeStyle = 'rgba(54, 224, 192, 0.9)';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(topo.x, topo.y); ctx.stroke();
@@ -189,7 +189,7 @@ export function iniciarCena(canvas) {
     const x = topo.x - w / 2;
     const y = topo.y - 30;
     ctx.fillStyle = 'rgba(8, 15, 30, 0.85)';
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+    ctx.strokeStyle = 'rgba(54, 224, 192, 0.7)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.roundRect(x, y, w, 26, 13); ctx.fill(); ctx.stroke();
     ctx.fillStyle = v.cor;
