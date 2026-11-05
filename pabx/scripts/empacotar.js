@@ -21,7 +21,11 @@ for (const item of ['server', 'public', 'package.json', 'package-lock.json', 'Do
 // Dependências só de produção (todas em JavaScript: o mesmo pacote serve para Linux e Windows).
 execFileSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], { cwd: pasta, stdio: 'inherit' });
 
-const senhaAdmin = crypto.randomBytes(12).toString('base64url');
+// Master: PABX_ADMIN_EMAIL / PABX_ADMIN_SENHA / PABX_ADMIN_NOME no ambiente de quem empacota; sem eles, master@pabx.com.br com senha nova.
+const emailAdmin = process.env.PABX_ADMIN_EMAIL || 'master@pabx.com.br';
+const senhaAdmin = process.env.PABX_ADMIN_SENHA || crypto.randomBytes(12).toString('base64url');
+const nomeAdmin = process.env.PABX_ADMIN_NOME || 'Master';
+if (senhaAdmin.length < 12) throw new Error('PABX_ADMIN_SENHA deve ter pelo menos 12 caracteres (o servidor recusa senha menor em produção).');
 const env = `# ZOE PABX Inteligente — configuração do servidor
 NODE_ENV=production
 PORT=3300
@@ -30,9 +34,9 @@ PABX_BASE_PATH=/pabx
 # Segredo das sessões (gerado agora). Não compartilhe e não troque depois de instalado.
 PABX_SECRET=${crypto.randomBytes(32).toString('hex')}
 # Master, criado no primeiro acesso.
-PABX_ADMIN_EMAIL=master@pabx.com.br
+PABX_ADMIN_EMAIL=${emailAdmin}
 PABX_ADMIN_SENHA=${senhaAdmin}
-PABX_ADMIN_NOME=Master
+PABX_ADMIN_NOME=${nomeAdmin}
 # Atrás de Nginx/Apache: confia no proxy para obter o IP real dos acessos (usado na Segurança e no bloqueio de IP).
 PABX_TRUST_PROXY=1
 # Fuso das datas do dashboard e dos relatórios.
@@ -50,4 +54,4 @@ fs.mkdirSync(path.join(pasta, 'data'), { recursive: true });
 const zip = path.join(saida, 'pabx.zip');
 execFileSync('zip', ['-qr', zip, 'pabx'], { cwd: saida });
 console.log(`Pacote: ${zip}`);
-console.log(`Senha inicial do master (master@pabx.com.br): ${senhaAdmin}`);
+console.log(`Master: ${emailAdmin}${process.env.PABX_ADMIN_SENHA ? '' : ` · senha inicial: ${senhaAdmin}`}`);
