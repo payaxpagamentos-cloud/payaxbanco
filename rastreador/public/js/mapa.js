@@ -135,8 +135,67 @@ function fundoGoogle(L, m, g) {
   };
 }
 
+/** Carrega um script uma única vez. */
+const scripts = new Map();
+function carregarScript(src) {
+  if (!scripts.has(src)) {
+    scripts.set(src, new Promise((ok, falha) => {
+      const s = document.createElement('script');
+      Object.assign(s, { src, async: true, onload: ok, onerror: () => falha(new Error(`Não carregou ${src}`)) });
+      document.head.append(s);
+    }));
+  }
+  return scripts.get(src);
+}
+
+// Se o Google recusar a chave (limite da demonstração, chave errada), a página volta ao mapa gratuito até fechar a aba.
+const CHAVE_GOOGLE_FALHOU = 'rastreador.googleFalhou';
+const googleFalhou = () => { try { return sessionStorage.getItem(CHAVE_GOOGLE_FALHOU) === '1'; } catch { return false; } };
+
+/**
+ * Google Maps direto no navegador (Maps JavaScript API, como a chave de demonstração): ruas e satélite com os nomes (híbrido),
+ * desenhados pelo próprio Google dentro do Leaflet, com o logo e os créditos dele.
+ */
+async function fundoGoogleJs(L, m, chave) {
+  window.gm_authFailure = () => {
+    try { sessionStorage.setItem(CHAVE_GOOGLE_FALHOU, '1'); } catch { /* sem armazenamento */ }
+    console.warn('Google Maps recusou a chave: usando o mapa gratuito.');
+    location.reload();
+  };
+  const q = new URLSearchParams({ key: chave, v: 'weekly', language: 'pt-BR', region: 'BR', loading: 'async', callback: '__rastreadorGoogle' });
+  const pronto = new Promise((ok, falha) => {
+    window.__rastreadorGoogle = ok;
+    setTimeout(() => falha(new Error('Google Maps não respondeu')), 12000);
+  });
+  await Promise.all([carregarScript(`https://maps.googleapis.com/maps/api/js?${q}`).then(() => pronto), carregarScript(`${BASE}/vendor/googlemutant.js`)]);
+  m.setMaxZoom(21);
+  const camadas = {
+    mapa: L.gridLayer.googleMutant({ type: 'roadmap', maxZoom: 21 }),
+    satelite: L.gridLayer.googleMutant({ type: 'hybrid', maxZoom: 21 }),
+  };
+  let atual = null;
+  return {
+    mostrar(tipo) {
+      if (atual) m.removeLayer(camadas[atual]);
+      atual = tipo;
+      camadas[atual].addTo(m);
+    },
+  };
+}
+
 /** Fundo do mapa e o botão Mapa / Satélite. */
 async function fundo(L, m, div, cfg) {
+  if (!cfg.google && cfg.google_js && !googleFalhou()) {
+    try {
+      const g = await fundoGoogleJs(L, m, cfg.google_js);
+      let atual = lerCamada();
+      g.mostrar(atual);
+      div.classList.toggle('mapa-satelite', atual === 'satelite');
+      return seletorCamada(L, m, () => atual, (novo) => { atual = novo; g.mostrar(novo); div.classList.toggle('mapa-satelite', novo === 'satelite'); });
+    } catch (e) {
+      console.warn('Google Maps indisponível, usando o mapa gratuito:', e.message);
+    }
+  }
   if (cfg.google) {
     const g = fundoGoogle(L, m, cfg.google);
     let atual = lerCamada();

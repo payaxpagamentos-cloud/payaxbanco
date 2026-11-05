@@ -20,7 +20,7 @@ function criarApi(db, extras = {}) {
   api.get('/publico', async (_req, res, next) => {
     try {
       res.json({ nome: lerConfig(db).nome_plataforma, mapa: config.mapa, gt06_porta: config.portaGt06, busca: Boolean(config.geocoder.url),
-        google: await sessoesGoogle() });
+        google: await sessoesGoogle(), google_js: config.google.js_chave || null });
     } catch (err) {
       next(err);
     }

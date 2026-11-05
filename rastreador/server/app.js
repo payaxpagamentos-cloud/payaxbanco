@@ -20,8 +20,14 @@ const origensVetor = [...new Set([config.mapa.estilo, config.mapa.estilo_escuro]
 const origensSatelite = [...new Set([config.mapa.satelite.tiles, ...config.mapa.satelite.rotulos].map((u) => { try { return new URL(u.replace(/\{[^}]+\}/g, '0')).origin; } catch { return ''; } }))].join(' ');
 /** Com a chave do Google: as imagens do mapa, os créditos da área visível e o logo do Google. */
 const origensGoogle = config.google.chave ? 'https://tile.googleapis.com https://maps.gstatic.com' : '';
-const CSP = [`default-src 'self'`, `img-src 'self' data: blob: ${origemTiles} ${origensVetor} ${origensSatelite} ${origensGoogle}`, `style-src 'self' 'unsafe-inline'`, `font-src 'self'`, `script-src 'self'`,
-  `connect-src 'self' ${origensVetor} ${origensSatelite} ${origensGoogle}`, `worker-src 'self' blob:`, `frame-ancestors 'none'`].join('; ');
+/** Com a chave do Google Maps no navegador (Maps JavaScript API): as origens que o próprio Google pede liberar. */
+const gjs = config.google.js_chave;
+const gjsImg = gjs ? 'https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.googleusercontent.com https://*.ggpht.com' : '';
+const CSP = [`default-src 'self'`, `img-src 'self' data: blob: ${origemTiles} ${origensVetor} ${origensSatelite} ${origensGoogle} ${gjsImg}`,
+  `style-src 'self' 'unsafe-inline'${gjs ? ' https://fonts.googleapis.com' : ''}`, `font-src 'self'${gjs ? ' https://fonts.gstatic.com' : ''}`,
+  `script-src 'self'${gjs ? " 'unsafe-eval' blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com" : ''}`,
+  `connect-src 'self' ${origensVetor} ${origensSatelite} ${origensGoogle}${gjs ? ' https://*.googleapis.com https://*.google.com https://*.gstatic.com data: blob:' : ''}`,
+  `worker-src 'self' blob:`, ...(gjs ? ['frame-src https://*.google.com'] : []), `frame-ancestors 'none'`].join('; ');
 
 function criarApp(db, extras = {}) {
   const app = express();
@@ -50,6 +56,7 @@ function criarApp(db, extras = {}) {
   r.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));
   // MapLibre (mapa vetorial) e a ponte dele com o Leaflet, também do próprio pacote.
   r.use('/vendor/maplibre', express.static(path.join(path.dirname(require.resolve('maplibre-gl/package.json')), 'dist'), { maxAge: '7d' }));
+  r.get('/vendor/googlemutant.js', (_req, res) => res.sendFile(require.resolve('leaflet.gridlayer.googlemutant/dist/Leaflet.GoogleMutant.js'), { maxAge: '7d' }));
   r.get('/vendor/maplibre-leaflet.js', (_req, res) => res.sendFile(require.resolve('@maplibre/maplibre-gl-leaflet'), { maxAge: '7d' }));
   // "/compartilhar" sem a barra final leva a "/compartilhar/" (a página usa caminhos relativos à pasta).
   r.get(/^\/compartilhar$/, (req, res) => res.redirect(`${req.baseUrl}/compartilhar/`));

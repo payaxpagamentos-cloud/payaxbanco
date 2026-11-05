@@ -70,7 +70,12 @@ module.exports = {
     timeoutMs: Number(process.env.RASTREADOR_GEOCODER_TIMEOUT_MS) || 6000,
   },
   // Mapas do Google (Map Tiles API). Com a chave, o mapa de ruas e o satélite passam a ser os do Google; sem ela, os gratuitos.
-  google: { chave: process.env.RASTREADOR_GOOGLE_MAPS_CHAVE || '' },
+  google: {
+    chave: process.env.RASTREADOR_GOOGLE_MAPS_CHAVE || '',
+    // Chave do Google Maps no navegador (Maps JavaScript API), como a "chave de demonstração": só o mapa e o satélite, sem
+    // faturamento, mas com limite de uso. Vai para o navegador: restrinja-a ao endereço do site no Google Cloud.
+    js_chave: process.env.RASTREADOR_GOOGLE_MAPS_JS_CHAVE || '',
+  },
   admin: {
     nome: process.env.RASTREADOR_ADMIN_NOME || 'Master',
     email: process.env.RASTREADOR_ADMIN_EMAIL || 'master@rastreador.com.br',

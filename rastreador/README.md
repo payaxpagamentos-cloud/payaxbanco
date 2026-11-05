@@ -68,6 +68,14 @@ usar a **Geocoding API** do Google (mais exata, inclusive no número). Sem a cha
    Crie também um **alerta de orçamento** em Faturamento.
 4. No servidor, acrescente ao `.env` a linha `RASTREADOR_GOOGLE_MAPS_CHAVE=SUA_CHAVE` e rode `pm2 restart rastreador`.
 
+### Só para ver como fica: chave de demonstração do Google (sem faturamento)
+
+A "chave de demonstração do Maps" do Google não libera a Map Tiles API nem a Geocoding API; ela serve para o Google Maps no
+navegador (Maps JavaScript API). Coloque-a no `.env` como `RASTREADOR_GOOGLE_MAPS_JS_CHAVE=SUA_CHAVE` (e não na
+`RASTREADOR_GOOGLE_MAPS_CHAVE`) e rode `pm2 restart rastreador`: o Mapa e o Satélite passam a ser os do Google. O endereço continua
+pelo serviço gratuito. A chave fica visível no navegador; no Google Cloud, restrinja-a a "Sites" com o endereço do painel. A chave de
+demonstração tem limite de uso: se o Google recusar, o mapa volta sozinho ao gratuito até a aba ser fechada.
+
 ## Como os veículos chegam ao sistema
 
 | Origem | Como liga | Comandos |
