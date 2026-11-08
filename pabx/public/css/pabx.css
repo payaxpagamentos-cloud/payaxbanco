@@ -285,8 +285,9 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 13px; }
 .legenda.lado span{ display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; }
 .legenda.lado em{ font-style: normal; color: var(--text); }
 .legenda.lado b{ font-weight: 700; color: var(--text); }
-.pizza .furo{ fill: var(--surface); }
-.pizza path, .pizza circle:not(.furo){ stroke: var(--surface); stroke-width: .03; }
+.pizza .trilho-rosca{ fill: none; stroke: var(--barra-fundo); stroke-width: .3; }
+.pizza .fatia{ transition: stroke-width .15s; }
+.pizza .fatia:hover{ stroke-width: .34; }
 .legenda{ display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; font-size: 12px; color: var(--text-2); }
 .legenda span{ display: inline-flex; align-items: center; gap: 6px; }
 .legenda i{ width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
@@ -405,4 +406,99 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .cartao-chamada .botoes{ padding-bottom: 22px; }
 @media (max-width: 860px){ .telefone{ right: 16px; bottom: 16px; } .telefone-botao{ width: 54px; height: 54px; } }
 @media print{ .telefone, .telefone-chamada{ display: none !important; } }
+/* ==========================================================================
+   Efeito vidro: superfícies translúcidas com desfoque sobre um fundo com luzes de cor.
+   Sem suporte a backdrop-filter, o navegador fica com as superfícies sólidas acima.
+   ========================================================================== */
+:root, :root[data-tema="claro"]{
+  --vidro: rgba(255, 255, 255, .52);
+  --vidro-forte: rgba(255, 255, 255, .78);
+  --vidro-borda: rgba(255, 255, 255, .75);
+  --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, .9);
+  --vidro-sombra: 0 8px 32px -12px rgba(30, 58, 138, .22);
+  --vidro-desfoque: blur(18px) saturate(170%);
+  --vidro-campo: rgba(255, 255, 255, .7);
+  --vidro-telefone: rgba(255, 255, 255, .9);
+  --vidro-lateral: linear-gradient(180deg, rgba(12, 31, 74, .93) 0%, rgba(10, 24, 56, .95) 100%);
+  --luz-1: rgba(59, 130, 246, .36);
+  --luz-2: rgba(139, 92, 246, .28);
+  --luz-3: rgba(14, 165, 233, .26);
+}
+:root[data-tema="escuro"]{
+  --vidro: rgba(17, 26, 43, .55);
+  --vidro-forte: rgba(17, 26, 43, .8);
+  --vidro-borda: rgba(255, 255, 255, .09);
+  --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, .06);
+  --vidro-sombra: 0 10px 36px -12px rgba(0, 0, 0, .6);
+  --vidro-campo: rgba(14, 22, 38, .6);
+  --vidro-telefone: rgba(17, 26, 43, .92);
+  --vidro-lateral: linear-gradient(180deg, rgba(8, 20, 46, .78) 0%, rgba(6, 15, 34, .82) 100%);
+  --luz-1: rgba(37, 99, 235, .35);
+  --luz-2: rgba(124, 58, 237, .28);
+  --luz-3: rgba(14, 165, 233, .22);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+  /* Fundo com luzes de cor (fixo), para o vidro ter o que desfocar */
+  body{ background:
+      radial-gradient(42rem 32rem at 12% -6%, var(--luz-1), transparent 70%),
+      radial-gradient(38rem 30rem at 96% 8%, var(--luz-2), transparent 70%),
+      radial-gradient(46rem 36rem at 60% 108%, var(--luz-3), transparent 70%),
+      var(--bg);
+    background-attachment: fixed; }
+
+  .cartao, .modal, .telefone-painel, .cartao-chamada, .menu-usuario, .status-sistema, .toast, .ferramentas .usuario:hover, .btn:not(.primario){
+    background: var(--vidro);
+    -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque);
+    border: 1px solid var(--vidro-borda);
+    box-shadow: var(--vidro-brilho), var(--vidro-sombra);
+  }
+  .modal, .telefone-painel, .cartao-chamada, .menu-usuario, .toast{ background: var(--vidro-forte); }
+  .btn:not(.primario){ box-shadow: var(--vidro-brilho); }
+  .btn:not(.primario):hover{ background: var(--vidro-forte); }
+
+  /* Menu lateral azul-marinho em vidro */
+  .lateral{ background: var(--vidro-lateral); -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%);
+    border-right: 1px solid rgba(255, 255, 255, .08); box-shadow: inset -1px 0 0 rgba(255, 255, 255, .04); }
+  .lateral a.item.on{ background: linear-gradient(135deg, rgba(59, 130, 246, .95), rgba(37, 99, 235, .95)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 8px 20px -8px rgba(37, 99, 235, .9); }
+
+  /* Campos e teclas levemente translúcidos */
+  input:not([type="checkbox"]), select, textarea{ background-color: var(--vidro-campo); }
+  /* Telefone: vidro mais fosco (o teclado precisa ficar legível sobre os gráficos) */
+  .telefone-painel{ background: var(--vidro-telefone); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); }
+  .tecla{ background: var(--surface-2); border: 1px solid var(--vidro-borda); box-shadow: var(--vidro-brilho); }
+  .tecla:hover{ background: var(--hover); }
+  .telefone .controle{ background: var(--vidro); border-color: var(--vidro-borda); }
+
+  /* Ícones dos indicadores e etiquetas com um toque de vidro */
+  .indicador .ic{ box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 0 0 1px rgba(255, 255, 255, .35); }
+  .tabela tr.clicavel:hover td{ background: rgba(37, 99, 235, .06); }
+  .tabela tr.clicavel:hover td:first-child{ box-shadow: -12px 0 0 rgba(37, 99, 235, .06); }
+  .tabela tr.clicavel:hover td:last-child{ box-shadow: 12px 0 0 rgba(37, 99, 235, .06); }
+
+  /* Fundos atrás das janelas: desfoque mais forte */
+  .modal-fundo{ background: rgba(8, 15, 32, .35); -webkit-backdrop-filter: blur(8px) saturate(140%); backdrop-filter: blur(8px) saturate(140%); }
+  .telefone-chamada{ background: rgba(8, 15, 32, .3); -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); }
+
+  /* Botão do telefone com brilho de vidro */
+  .telefone-botao{ box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 12px 28px -8px rgba(29, 78, 216, .65); }
+
+  /* Entrada: cartão de vidro sobre o azul-marinho */
+  .entrada{ background:
+      radial-gradient(36rem 26rem at 20% 10%, rgba(59, 130, 246, .45), transparent 70%),
+      radial-gradient(30rem 24rem at 85% 85%, rgba(139, 92, 246, .35), transparent 70%),
+      linear-gradient(180deg, #0C1F4A, #0A1838); }
+  .entrada .cartao{ background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .2); color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 24px 60px -20px rgba(0, 0, 0, .6);
+    -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
+  .entrada .cartao .mudo, .entrada label.campo, .entrada .marca .texto small{ color: rgba(255, 255, 255, .78); }
+  .entrada .marca{ color: #fff; }
+  .entrada input{ background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .25); color: #fff; }
+  .entrada input::placeholder{ color: rgba(255, 255, 255, .55); }
+  .entrada input:focus{ border-color: #93C5FD; box-shadow: 0 0 0 3px rgba(147, 197, 253, .25); }
+
+  /* Celular: menu do topo em vidro */
+  @media (max-width: 860px){
+    .lateral{ background: var(--vidro-lateral); }
+  }
+}
 @media (prefers-reduced-motion: reduce){ *{ animation: none !important; transition: none !important; } }
