@@ -39,7 +39,9 @@ const canal = new EventEmitter();
 function textoComando(cfg, tipo, rastreador, texto) {
   if (tipo === 'personalizado') return v.texto(texto, 'o comando', 120);
   if (rastreador.protocolo !== 'gt06') return tipo;
-  return modeloDe(rastreador.modelo)?.comandos[tipo] ?? cfg[`gt06_cmd_${tipo}`] ?? PADRAO_GT06[tipo];
+  // Relé invertido na ficha do equipamento: o corte e o desbloqueio trocam de texto.
+  const t = rastreador.rele_invertido && (tipo === 'bloquear' || tipo === 'desbloquear') ? (tipo === 'bloquear' ? 'desbloquear' : 'bloquear') : tipo;
+  return modeloDe(rastreador.modelo)?.comandos[t] ?? cfg[`gt06_cmd_${t}`] ?? PADRAO_GT06[t];
 }
 
 /**
@@ -61,8 +63,8 @@ function criar(db, veiculo, d, usuarioId) {
       db.prepare("UPDATE comandos SET status = 'cancelado', respondido_em = ? WHERE veiculo_id = ? AND status = 'pendente' AND tipo IN ('bloquear','desbloquear')")
         .run(agora(), veiculo.id);
     }
-    return Number(db.prepare(`INSERT INTO comandos (empresa_id, veiculo_id, rastreador_id, tipo, texto, criado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(veiculo.empresa_id, veiculo.id, r.id, tipo, texto, usuarioId ?? null, agora()).lastInsertRowid);
+    return Number(db.prepare(`INSERT INTO comandos (empresa_id, veiculo_id, rastreador_id, tipo, texto, rotulo, criado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(veiculo.empresa_id, veiculo.id, r.id, tipo, texto, d.rotulo ? String(d.rotulo).slice(0, 120) : null, usuarioId ?? null, agora()).lastInsertRowid);
   });
   canal.emit('comando', { id, imei: r.imei, protocolo: r.protocolo });
   return id;

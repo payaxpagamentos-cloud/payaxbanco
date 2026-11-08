@@ -53,7 +53,7 @@ test('protocolo GT06: CRC, quadros e decodificação', () => {
   assert.equal(p22.mensagem.ignicao, true);
   // Estado: ACC ligado, corte de combustível e alarme de pânico (bits 3-5 = 100).
   const est = gt.decodificar(gt.extrair(gt.quadro(0x13, Buffer.from([0x80 | 0x20 | 0x02, 4, 3, 0, 2]), 9)).quadros[0]);
-  assert.deepEqual(est.mensagem, { ignicao: true, bloqueado: true, evento: 'panico', tensao: 3.8 });
+  assert.deepEqual(est.mensagem, { ignicao: true, bloqueado: true, evento: 'panico', tensao: 3.8, sinal: 3 });
   // Alarme 0x16 com corte de energia.
   const alarme = Buffer.concat([gpsGt06({ em, lat: 1, lng: 2 }), Buffer.from([9]), Buffer.alloc(8), Buffer.from([0x02, 5, 4, 0x02, 0x02])]);
   assert.equal(gt.decodificar(gt.extrair(gt.quadro(0x16, alarme, 10)).quadros[0]).mensagem.evento, 'bateria_desconectada');

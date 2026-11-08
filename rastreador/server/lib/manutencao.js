@@ -3,6 +3,8 @@
 const { lerConfig, transacao } = require('../db');
 const { alertar } = require('./alertas');
 const { expirar } = require('./comandos');
+const agenda = require('./agenda');
+const zap = require('./whatsapp');
 
 /**
  * Tarefas de fundo: alerta de veículo sem comunicação (uma vez até ele voltar), expiração dos comandos sem resposta
@@ -22,6 +24,25 @@ function manutencao(db, { limpar = false } = {}) {
       db.prepare('UPDATE veiculos SET sem_comunicacao_alertado = 1 WHERE id = ?').run(x.id);
     }
   });
+  // Sumiço suspeito: estava andando ou com a ignição ligada e parou de comunicar (sinal de bloqueador ou aparelho arrancado).
+  const sumicoMs = (cfg.sumico_min || 5) * 60_000;
+  const sumidos = db.prepare(`SELECT v.* FROM veiculos v JOIN empresas e ON e.id = v.empresa_id
+    WHERE v.ativo = 1 AND e.status = 'ativa' AND v.rastreador_id IS NOT NULL AND v.comunicacao_em IS NOT NULL AND v.sumico_alertado = 0
+      AND (v.ignicao = 1 OR v.velocidade_kmh >= 5) AND v.comunicacao_em < ?`).all(new Date(agoraMs - sumicoMs).toISOString())
+    // Só a perda recente: depois de 6 h sem sinal vale o alerta comum de "sem comunicação".
+    .filter((x) => agoraMs - Date.parse(x.comunicacao_em) < 6 * 3_600_000);
+  transacao(db, () => {
+    for (const x of sumidos) {
+      const min = Math.round((agoraMs - Date.parse(x.comunicacao_em)) / 60_000);
+      alertar(db, x, 'sumico_suspeito', `${x.placa} parou de comunicar ${x.velocidade_kmh >= 5 ? `andando a ${Math.round(x.velocidade_kmh)} km/h` : 'com a ignição ligada'} há ${min} min. Pode ser bloqueador de sinal.`,
+        { lat: x.lat, lng: x.lng, velocidade_kmh: x.velocidade_kmh, gps_em: new Date(agoraMs).toISOString() });
+      db.prepare('UPDATE veiculos SET sumico_alertado = 1 WHERE id = ?').run(x.id);
+    }
+  });
+  // Bloqueio programado e liberações.
+  agenda.verificar(db);
+  // Mensagens do WhatsApp que ficaram para depois.
+  zap.processarFila(db).catch(() => {});
   const expirados = expirar(db, cfg.comando_expira_horas);
   let apagadas = 0;
   if (limpar) {
@@ -35,7 +56,7 @@ function manutencao(db, { limpar = false } = {}) {
     db.prepare('DELETE FROM uso_diario WHERE data < ?').run(corte.slice(0, 10));
     db.prepare('DELETE FROM compartilhamentos WHERE expira_em < ?').run(corte);
   }
-  return { sem_comunicacao: mudos.length, expirados, apagadas };
+  return { sem_comunicacao: mudos.length, sumico: sumidos.length, expirados, apagadas };
 }
 
 module.exports = { manutencao };

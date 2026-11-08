@@ -13,7 +13,7 @@ const P = {
   INFO: 0x94, GPS_4G: 0xa0, LBS_4G: 0xa1, ALARME_4G: 0xa4, ALARME_LBS_4G: 0xa5,
 };
 // Alarmes do quadro de alarme que viram alerta.
-const ALARMES = { 0x01: 'panico', 0x02: 'bateria_desconectada', 0x0e: 'bateria_baixa', 0x0f: 'bateria_baixa', 0x19: 'bateria_baixa', 0x13: 'violacao' };
+const ALARMES = { 0x01: 'panico', 0x02: 'bateria_desconectada', 0x03: 'vibracao', 0x09: 'deslocamento', 0x0e: 'bateria_baixa', 0x0f: 'bateria_baixa', 0x19: 'bateria_baixa', 0x13: 'violacao' };
 // Alarme do byte de estado (bits 3 a 5).
 const ALARMES_ESTADO = { 4: 'panico', 3: 'bateria_baixa', 2: 'bateria_desconectada' };
 // Tensão aproximada de cada nível de bateria informado (1 a 6), em volts da bateria interna (0: sem bateria interna, como o J16).
@@ -99,7 +99,7 @@ function lerFimAlarme(c, extra = 0) {
   const o = c.length - 5 - extra;
   if (o < 0) return {};
   const e = lerEstado(c[o]);
-  return { ignicao: e.ignicao, bloqueado: e.bloqueado, tensao: NIVEL_TENSAO[c[o + 1]] ?? null, evento: ALARMES[c[o + 3]] ?? e.evento };
+  return { ignicao: e.ignicao, bloqueado: e.bloqueado, tensao: NIVEL_TENSAO[c[o + 1]] ?? null, sinal: c[o + 2] <= 4 ? c[o + 2] : null, evento: ALARMES[c[o + 3]] ?? e.evento };
 }
 
 /** Byte de estado do terminal: ignição (ACC), corte de combustível e alarme. */
@@ -135,7 +135,8 @@ function decodificar(q, { fusoMin = 0 } = {}) {
     case P.STATUS:
     case P.HEARTBEAT: {
       const e = lerEstado(c[0]);
-      return { tipo: 'estado', mensagem: { ...e, tensao: NIVEL_TENSAO[c[1]] ?? null }, ack: true };
+      // Depois do estado: nível da bateria e do sinal GSM (0 a 4).
+      return { tipo: 'estado', mensagem: { ...e, tensao: NIVEL_TENSAO[c[1]] ?? null, sinal: c.length > 2 && c[2] <= 4 ? c[2] : null }, ack: true };
     }
     case P.ALARME:
     case P.ALARME2:

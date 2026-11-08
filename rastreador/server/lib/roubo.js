@@ -18,9 +18,15 @@ const AVISO_MS = 60_000;
 
 const kmh = (x) => `${Math.round(Number(x) || 0)} km/h`;
 
-function evento(db, ocorrenciaId, texto, pos = {}) {
+function evento(db, ocorrenciaId, texto, pos = {}, { avisar = true } = {}) {
   db.prepare('INSERT INTO ocorrencia_eventos (ocorrencia_id, em, texto, lat, lng, velocidade_kmh) VALUES (?, ?, ?, ?, ?, ?)')
     .run(ocorrenciaId, agora(), texto, pos.lat ?? null, pos.lng ?? null, pos.velocidade_kmh ?? null);
+  // Cada passo do Modo Roubo vai pelo WhatsApp (o bloqueio programado só registra, para não avisar toda noite).
+  const oc = db.prepare('SELECT o.empresa_id, o.tipo, v.placa, v.lat, v.lng FROM ocorrencias o JOIN veiculos v ON v.id = o.veiculo_id WHERE o.id = ?').get(ocorrenciaId);
+  if (avisar && oc?.tipo === 'roubo') {
+    require('./notificacoes').avisar(db, oc.empresa_id, 'roubo', { titulo: `🚨 Modo Roubo · ${oc.placa}`, texto, lat: pos.lat ?? oc.lat, lng: pos.lng ?? oc.lng,
+      caminho: `/empresa/${oc.empresa_id}/roubo` });
+  }
 }
 
 const limiteSeguro = (db) => lerConfig(db).bloqueio_velocidade_segura_kmh || 20;
@@ -46,18 +52,71 @@ function seguroAgora(v, limite) {
 
 /** Aciona o modo roubo no veículo. Exige a placa digitada, como o bloqueio comum. */
 function abrir(db, veiculo, d, usuarioId) {
+  const digitada = String(d.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '');
+  if (digitada !== veiculo.placa) throw new ErroNegocio('Para acionar o modo roubo, digite a placa do veículo para confirmar.', 422);
+  const aberta = db.prepare("SELECT * FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(veiculo.id);
+  v_exigir(!aberta || aberta.tipo !== 'roubo', 'Este veículo já está em modo roubo.');
+  return transacao(db, () => {
+    // Já no bloqueio programado: a mesma ocorrência vira Modo Roubo (o corte já pedido continua valendo).
+    if (aberta) {
+      db.prepare("UPDATE ocorrencias SET tipo = 'roubo', criada_por = ?, observacao = ? WHERE id = ?").run(usuarioId ?? null, d.observacao ? String(d.observacao).slice(0, 500) : null, aberta.id);
+      evento(db, aberta.id, 'Modo roubo acionado (o veículo estava no bloqueio programado).', { lat: veiculo.lat, lng: veiculo.lng, velocidade_kmh: veiculo.velocidade_kmh });
+      perseguir(db, aberta.id, veiculo, usuarioId);
+      return aberta.id;
+    }
+    const id = abrirInterno(db, veiculo, { tipo: 'roubo', usuarioId, observacao: d.observacao });
+    perseguir(db, id, veiculo, usuarioId);
+    return id;
+  });
+}
+
+/** Modo Roubo aberto pelo sistema (ex.: saída de cerca com a ação "acionar Modo Roubo"), sem a placa digitada. */
+function abrirAutomatico(db, veiculo, motivo) {
+  const aberta = db.prepare("SELECT * FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(veiculo.id);
+  if (aberta?.tipo === 'roubo') return aberta.id;
+  if (aberta) {
+    db.prepare("UPDATE ocorrencias SET tipo = 'roubo' WHERE id = ?").run(aberta.id);
+    evento(db, aberta.id, `Modo roubo acionado automaticamente: ${motivo}.`);
+    perseguir(db, aberta.id, veiculo, null);
+    return aberta.id;
+  }
+  const id = abrirInterno(db, veiculo, { tipo: 'roubo', observacao: motivo });
+  evento(db, id, `Acionado automaticamente: ${motivo}.`);
+  perseguir(db, id, veiculo, null);
+  return id;
+}
+
+/** Modo perseguição: o J16 passa a mandar posição a cada 10 s enquanto a ocorrência estiver aberta. */
+function perseguir(db, ocorrenciaId, veiculo, usuarioId) {
+  const r = db.prepare('SELECT protocolo FROM rastreadores WHERE id = ?').get(veiculo.rastreador_id);
+  if (!r || r.protocolo !== 'gt06') return;
+  const [a, b] = require('./equipamento').PERSEGUICAO;
+  com.criar(db, veiculo, { tipo: 'personalizado', texto: `TIMER,${a},${b}#`, rotulo: 'Modo perseguição: posição a cada 10 s' }, usuarioId);
+  db.prepare('UPDATE ocorrencias SET perseguicao = 1 WHERE id = ?').run(ocorrenciaId);
+  evento(db, ocorrenciaId, 'Modo perseguição: o rastreador passa a mandar posição a cada 10 s.', {}, { avisar: false });
+}
+
+/** Volta o J16 ao perfil de envio da ficha, depois da perseguição. */
+function voltarPerfil(db, veiculo, usuarioId) {
+  const r = db.prepare('SELECT protocolo, perfil FROM rastreadores WHERE id = ?').get(veiculo.rastreador_id);
+  if (!r || r.protocolo !== 'gt06') return;
+  for (const c of require('./equipamento').AJUSTES.perfil(r.perfil)) com.criar(db, veiculo, { tipo: 'personalizado', ...c }, usuarioId);
+}
+
+/**
+ * Abre a ocorrência (roubo ou bloqueio programado) e já manda o corte se o veículo estiver seguro; senão, espera.
+ * Usada dentro de uma transação.
+ */
+function abrirInterno(db, veiculo, { tipo, usuarioId = null, observacao = null }) {
   v_exigir(veiculo.rastreador_id, 'O veículo não tem rastreador instalado.');
   const r = db.prepare('SELECT protocolo FROM rastreadores WHERE id = ?').get(veiculo.rastreador_id);
   v_exigir(r && r.protocolo !== 'osmand', 'Este rastreador (aplicativo no celular) não recebe o comando de bloqueio.');
-  const digitada = String(d.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '');
-  if (digitada !== veiculo.placa) throw new ErroNegocio('Para acionar o modo roubo, digite a placa do veículo para confirmar.', 422);
-  v_exigir(!db.prepare("SELECT 1 FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(veiculo.id), 'Este veículo já está em modo roubo.');
   const limite = limiteSeguro(db);
-  return transacao(db, () => {
-    const id = Number(db.prepare(`INSERT INTO ocorrencias (empresa_id, veiculo_id, status, observacao, criada_por, criada_em)
-      VALUES (?, ?, 'aguardando', ?, ?, ?)`).run(veiculo.empresa_id, veiculo.id, d.observacao ? String(d.observacao).slice(0, 500) : null, usuarioId ?? null, agora()).lastInsertRowid);
+  {
+    const id = Number(db.prepare(`INSERT INTO ocorrencias (empresa_id, veiculo_id, tipo, status, observacao, criada_por, criada_em)
+      VALUES (?, ?, ?, 'aguardando', ?, ?, ?)`).run(veiculo.empresa_id, veiculo.id, tipo, observacao ? String(observacao).slice(0, 500) : null, usuarioId, agora()).lastInsertRowid);
     const pos = { lat: veiculo.lat, lng: veiculo.lng, velocidade_kmh: veiculo.velocidade_kmh };
-    evento(db, id, 'Modo roubo acionado.', pos);
+    evento(db, id, tipo === 'roubo' ? 'Modo roubo acionado.' : 'Início do horário de bloqueio programado.', pos);
     const oc = db.prepare('SELECT * FROM ocorrencias WHERE id = ?').get(id);
     if (veiculo.bloqueado) {
       db.prepare("UPDATE ocorrencias SET status = 'bloqueado' WHERE id = ?").run(id);
@@ -68,7 +127,7 @@ function abrir(db, veiculo, d, usuarioId) {
     if (motivo) enviarCorte(db, oc, veiculo, motivo, pos);
     else evento(db, id, `Bloqueio inteligente: aguardando a velocidade baixar de ${kmh(limite)} (agora ${kmh(veiculo.velocidade_kmh)}).`, pos);
     return id;
-  });
+  }
 }
 
 function v_exigir(cond, msg) {
@@ -128,21 +187,22 @@ function encerrar(db, oc, d, usuarioId) {
       db.prepare("UPDATE comandos SET status = 'cancelado', respondido_em = ? WHERE veiculo_id = ? AND tipo = 'bloquear' AND status = 'pendente'").run(agora(), veiculo.id);
     }
     if (d.desbloquear && veiculo.rastreador_id) com.criar(db, veiculo, { tipo: 'desbloquear' }, usuarioId);
+    if (oc.perseguicao) voltarPerfil(db, veiculo, usuarioId);
     db.prepare("UPDATE ocorrencias SET status = 'encerrada', encerrada_por = ?, encerrada_em = ? WHERE id = ?").run(usuarioId ?? null, agora(), oc.id);
-    evento(db, oc.id, d.desbloquear ? 'Ocorrência encerrada e desbloqueio enviado.' : 'Ocorrência encerrada (o veículo continua como está).');
+    evento(db, oc.id, d.texto ?? (d.desbloquear ? 'Ocorrência encerrada e desbloqueio enviado.' : 'Ocorrência encerrada (o veículo continua como está).'));
   });
 }
 
 /** Ocorrências da empresa: as em andamento (com o veículo e a linha do tempo) e as últimas encerradas. */
-function listar(db, empresaId) {
+function listar(db, empresaId, tipo = 'roubo') {
   const lista = db.prepare(`SELECT o.*, v.placa, v.descricao, v.lat, v.lng, v.velocidade_kmh, v.ignicao, v.bloqueado, v.posicao_em, v.comunicacao_em,
       u.nome AS criada_por_nome, ue.nome AS encerrada_por_nome, c.status AS comando_status
     FROM ocorrencias o JOIN veiculos v ON v.id = o.veiculo_id LEFT JOIN usuarios u ON u.id = o.criada_por LEFT JOIN usuarios ue ON ue.id = o.encerrada_por
     LEFT JOIN comandos c ON c.id = o.comando_id
-    WHERE o.empresa_id = ? AND (o.status <> 'encerrada' OR o.encerrada_em >= ?) ORDER BY o.status = 'encerrada', o.criada_em DESC LIMIT 100`)
-    .all(empresaId, new Date(Date.now() - 90 * 24 * 3_600_000).toISOString());
+    WHERE o.empresa_id = ? AND o.tipo = ? AND (o.status <> 'encerrada' OR o.encerrada_em >= ?) ORDER BY o.status = 'encerrada', o.criada_em DESC LIMIT 100`)
+    .all(empresaId, tipo, new Date(Date.now() - 90 * 24 * 3_600_000).toISOString());
   const eventos = db.prepare('SELECT em, texto, lat, lng, velocidade_kmh FROM ocorrencia_eventos WHERE ocorrencia_id = ? ORDER BY id DESC LIMIT 50');
   return lista.map((o) => ({ ...o, eventos: o.status === 'encerrada' ? [] : eventos.all(o.id) }));
 }
 
-module.exports = { abrir, aoReceber, aoResponder, forcar, encerrar, listar, limiteSeguro };
+module.exports = { abrir, abrirAutomatico, abrirInterno, aoReceber, aoResponder, forcar, encerrar, listar, limiteSeguro };

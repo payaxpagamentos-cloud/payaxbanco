@@ -5,9 +5,10 @@ const { distancia, dentroCerca } = require('./geo');
 const { alertar, TIPOS } = require('./alertas');
 const { local } = require('./datas');
 const roubo = require('./roubo');
+const estacionado = require('./estacionado');
 
 // Eventos informados pelo próprio equipamento que viram alerta.
-const EVENTOS = ['panico', 'bateria_desconectada', 'bateria_baixa', 'violacao'];
+const EVENTOS = ['panico', 'bateria_desconectada', 'bateria_baixa', 'violacao', 'vibracao', 'deslocamento'];
 // O mesmo evento repetido nesse intervalo (o equipamento reenvia o alarme) não gera outro alerta.
 const REPETICAO_EVENTO_MS = 2 * 60_000;
 // Salto entre posições só é descartado se for maior que isso (evita descartar pequenas correções do GPS).
@@ -61,8 +62,13 @@ function verificarCercas(db, veiculo, pos) {
     if (antes && antes.dentro === dentro) continue;
     gravar.run(c.id, veiculo.id, dentro, pos.gps_em);
     if (!antes) continue;
+    // Cerca com horário de vigência (ex.: garagem só à noite): fora dele, só registra onde o veículo está.
+    if (c.horario_inicio && c.horario_fim && foraDoHorario(pos.gps_em, { horario_inicio: c.horario_inicio, horario_fim: c.horario_fim, dias_uso: '0123456' })) continue;
     if (dentro && c.alertar_entrada) alertar(db, veiculo, 'cerca_entrada', `${veiculo.placa} entrou na cerca ${c.nome}.`, pos);
     if (!dentro && c.alertar_saida) alertar(db, veiculo, 'cerca_saida', `${veiculo.placa} saiu da cerca ${c.nome}.`, pos);
+    if (!dentro && c.acao_saida === 'roubo') {
+      try { roubo.abrirAutomatico(db, veiculo, `saiu da cerca ${c.nome}`); } catch { /* veículo sem rastreador que receba comando */ }
+    }
   }
 }
 
@@ -103,8 +109,13 @@ function receber(db, m) {
     const nova = !v.posicao_em || gpsEm > v.posicao_em;
     const pos = { lat: temPosicao ? lat : v.lat, lng: temPosicao ? lng : v.lng, velocidade_kmh: velocidade, gps_em: gpsEm };
 
-    const mudar = { comunicacao_em: t, sem_comunicacao_alertado: 0 };
+    const mudar = { comunicacao_em: t, sem_comunicacao_alertado: 0, sumico_alertado: 0 };
     let status = 'sem_posicao';
+    if (v.sumico_alertado && v.comunicacao_em) {
+      const min = Math.round((Date.parse(t) - Date.parse(v.comunicacao_em)) / 60_000);
+      alertar(db, v, 'voltou_comunicar', `${v.placa} voltou a comunicar depois de ${min >= 120 ? `${Math.floor(min / 60)} h` : `${min} min`} sem sinal.`, pos);
+    }
+    if (m.sinal !== null && m.sinal !== undefined) db.prepare('UPDATE rastreadores SET sinal_gsm = ? WHERE id = ?').run(m.sinal, r.id);
 
     if (temPosicao) {
       let somaM = 0;
@@ -113,7 +124,7 @@ function receber(db, m) {
         const dt = (Date.parse(gpsEm) - Date.parse(v.posicao_em)) / 1000;
         const d = distancia({ lat: v.lat, lng: v.lng }, { lat, lng });
         if (d > SALTO_MINIMO_M && (d / Math.max(dt, 1)) * 3.6 > cfg.velocidade_max_plausivel_kmh) {
-          db.prepare('UPDATE veiculos SET comunicacao_em = ?, sem_comunicacao_alertado = 0 WHERE id = ?').run(t, v.id);
+          db.prepare('UPDATE veiculos SET comunicacao_em = ?, sem_comunicacao_alertado = 0, sumico_alertado = 0 WHERE id = ?').run(t, v.id);
           return { status: 'descartada', veiculo_id: v.id };
         }
         // Parado, o GPS oscila alguns metros: só soma com o veículo andando ou num deslocamento claro.
@@ -124,7 +135,7 @@ function receber(db, m) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(v.id, lat, lng, velocidade, numeroOuNulo(m.curso) === null ? null : Math.round(Number(m.curso)) % 360,
         numeroOuNulo(m.altitude), numeroOuNulo(m.satelites), ignicao, tensao, evento ?? (m.evento ? String(m.evento).slice(0, 40) : null), gpsEm, t);
       if (!ins.changes) {
-        db.prepare('UPDATE veiculos SET comunicacao_em = ?, sem_comunicacao_alertado = 0 WHERE id = ?').run(t, v.id);
+        db.prepare('UPDATE veiculos SET comunicacao_em = ?, sem_comunicacao_alertado = 0, sumico_alertado = 0 WHERE id = ?').run(t, v.id);
         return { status: 'repetida', veiculo_id: v.id };
       }
       status = 'gravada';
@@ -172,6 +183,8 @@ function receber(db, m) {
     db.prepare(`UPDATE veiculos SET ${campos.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...campos.map((k) => mudar[k]), v.id);
     // Modo roubo: com o veículo já atualizado, o bloqueio inteligente decide se manda o corte agora.
     roubo.aoReceber(db, v.id);
+    // Modo Estacionado: saiu do raio, ligou a ignição ou o aparelho acusou deslocamento.
+    estacionado.aoReceber(db, v.id, { ignicaoAntes: v.ignicao, evento });
     return { status, veiculo_id: v.id, rastreador_id: r.id };
   });
 }

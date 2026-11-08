@@ -74,6 +74,19 @@ module.exports = {
     reverso: String(process.env.RASTREADOR_GEOCODER_REVERSO_URL ?? 'https://nominatim.openstreetmap.org').replace(/\/+$/, ''),
     timeoutMs: Number(process.env.RASTREADOR_GEOCODER_TIMEOUT_MS) || 6000,
   },
+  // WhatsApp pela Evolution API (a mesma do manager). Sem URL, os avisos ficam só no painel.
+  whatsapp: {
+    url: String(process.env.RASTREADOR_EVOLUTION_URL || '').replace(/\/+$/, ''),
+    instancia: process.env.RASTREADOR_EVOLUTION_INSTANCIA || '',
+    chave: process.env.RASTREADOR_EVOLUTION_CHAVE || '',
+  },
+  // Endereço público do painel (ex.: https://seu-dominio/rastreador), usado nos links das mensagens.
+  urlPublica: String(process.env.RASTREADOR_URL_PUBLICA || '').replace(/\/+$/, ''),
+  // Assistente com IA (Anthropic). Sem chave, o assistente fica desligado.
+  ia: {
+    chave: process.env.RASTREADOR_IA_CHAVE || '',
+    modelo: process.env.RASTREADOR_IA_MODELO || 'claude-haiku-5-5',
+  },
   // Mapas do Google (Map Tiles API). Com a chave, o mapa de ruas e o satélite passam a ser os do Google; sem ela, os gratuitos.
   google: {
     chave: process.env.RASTREADOR_GOOGLE_MAPS_CHAVE || '',

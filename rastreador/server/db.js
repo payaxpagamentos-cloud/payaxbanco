@@ -173,7 +173,7 @@ CREATE TABLE IF NOT EXISTS alertas (
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
   veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
   tipo TEXT NOT NULL CHECK (tipo IN ('velocidade','cerca_entrada','cerca_saida','ignicao_ligada','ignicao_desligada','fora_horario','panico',
-    'bateria_desconectada','bateria_baixa','sem_comunicacao','violacao')),
+    'bateria_desconectada','bateria_baixa','sem_comunicacao','violacao','sumico_suspeito','voltou_comunicar','estacionado_violado','vibracao','deslocamento')),
   mensagem TEXT NOT NULL,
   lat REAL,
   lng REAL,
@@ -315,6 +315,126 @@ CREATE TABLE IF NOT EXISTS ocorrencia_eventos (
   velocidade_kmh REAL
 );
 CREATE INDEX IF NOT EXISTS idx_ocorrencia_eventos ON ocorrencia_eventos(ocorrencia_id, id);
+
+-- Modo Estacionado: o ponto vigiado (sai do raio ou liga a ignição = alerta). Um armado por veículo.
+CREATE TABLE IF NOT EXISTS estacionamentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  lat REAL NOT NULL,
+  lng REAL NOT NULL,
+  raio_m INTEGER NOT NULL,
+  armado_em TEXT NOT NULL,
+  armado_por INTEGER REFERENCES usuarios(id),
+  automatico INTEGER NOT NULL DEFAULT 0,
+  violado_em TEXT,
+  motivo_violacao TEXT,
+  desarmado_em TEXT,
+  desarmado_por INTEGER REFERENCES usuarios(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_estacionado_armado ON estacionamentos(veiculo_id) WHERE desarmado_em IS NULL;
+
+-- Bloqueio programado: horário diário de bloqueio por veículo (pode virar a noite: 23:00 às 06:00).
+CREATE TABLE IF NOT EXISTS bloqueio_agendas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL UNIQUE REFERENCES veiculos(id) ON DELETE CASCADE,
+  dias TEXT NOT NULL DEFAULT '0123456',
+  inicio TEXT NOT NULL,
+  fim TEXT NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  -- Janela já tratada (início do horário em que o corte foi pedido), para não repetir o corte na mesma noite.
+  janela_bloqueada TEXT,
+  criado_em TEXT NOT NULL
+);
+
+-- Liberação fora do horário: o motorista gera o código no app e o gestor aplica (libera por N horas).
+CREATE TABLE IF NOT EXISTS liberacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  motorista_id INTEGER REFERENCES motoristas(id),
+  codigo_hash TEXT NOT NULL,
+  horas_pedidas INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'aguardando' CHECK (status IN ('aguardando','ativa','expirada','encerrada','cancelada')),
+  criado_em TEXT NOT NULL,
+  expira_em TEXT NOT NULL,
+  aplicada_em TEXT,
+  aplicada_por INTEGER REFERENCES usuarios(id),
+  horas INTEGER,
+  libera_ate TEXT,
+  aviso_enviado INTEGER NOT NULL DEFAULT 0,
+  encerrada_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_liberacoes_empresa ON liberacoes(empresa_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_liberacoes_abertas ON liberacoes(status) WHERE status IN ('aguardando','ativa');
+
+-- Quem recebe os avisos pelo WhatsApp (empresa_id nulo: equipe da plataforma, recebe a segurança de todas as empresas).
+CREATE TABLE IF NOT EXISTS contatos_notificacao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  numero TEXT NOT NULL,
+  tipos TEXT NOT NULL DEFAULT '',
+  silencio_inicio TEXT,
+  silencio_fim TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL
+);
+
+-- Fila de mensagens do WhatsApp (texto e, opcional, um PDF), com novas tentativas se a Evolution falhar.
+CREATE TABLE IF NOT EXISTS mensagens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
+  numero TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  arquivo TEXT,
+  arquivo_nome TEXT,
+  origem TEXT,
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','enviada','falhou')),
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  proxima_em TEXT NOT NULL,
+  erro TEXT,
+  criado_em TEXT NOT NULL,
+  enviado_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_mensagens_pendentes ON mensagens(proxima_em) WHERE status = 'pendente';
+CREATE INDEX IF NOT EXISTS idx_mensagens_empresa ON mensagens(empresa_id, criado_em);
+
+-- Relatórios programados (PDF pelo WhatsApp) e o histórico de envios.
+CREATE TABLE IF NOT EXISTS relatorios_agenda (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  frequencia TEXT NOT NULL CHECK (frequencia IN ('diario','semanal','quinzenal','mensal')),
+  conteudo TEXT NOT NULL DEFAULT 'frota,seguranca,motoristas,custos',
+  contatos TEXT NOT NULL DEFAULT '',
+  ativo INTEGER NOT NULL DEFAULT 1,
+  proximo_em TEXT NOT NULL,
+  ultimo_em TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS relatorios_envios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  agenda_id INTEGER REFERENCES relatorios_agenda(id) ON DELETE SET NULL,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  de TEXT NOT NULL,
+  ate TEXT NOT NULL,
+  destinos INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  erro TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_relatorios_envios ON relatorios_envios(empresa_id, criado_em);
+
+-- Perguntas ao assistente por empresa e dia (limite diário).
+CREATE TABLE IF NOT EXISTS ia_uso (
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  data TEXT NOT NULL,
+  perguntas INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (empresa_id, data)
+);
 `;
 
 const CONFIG_PADRAO = {
@@ -334,6 +454,15 @@ const CONFIG_PADRAO = {
   sem_comunicacao_padrao_min: '120',
   // Bloqueio inteligente (modo roubo): o corte só é enviado com o veículo abaixo desta velocidade.
   bloqueio_velocidade_segura_kmh: '20',
+  // Modo Estacionado: distância do ponto que dispara o alerta.
+  estacionado_raio_m: '100',
+  // Sumiço suspeito: andando ou ligado e sem comunicar por N minutos.
+  sumico_min: '5',
+  // Código de liberação do app do motorista: validade e aviso antes de a liberação acabar.
+  liberacao_codigo_min: '10',
+  liberacao_aviso_min: '15',
+  // Perguntas ao assistente por empresa, por dia.
+  ia_limite_dia: '50',
   // Textos enviados aos rastreadores GT06 (variam por fabricante: ex. DYD,000000# e HFYD,000000#).
   gt06_cmd_bloquear: 'RELAY,1#',
   gt06_cmd_desbloquear: 'RELAY,0#',
@@ -349,6 +478,7 @@ function abrir(arquivo = config.dbFile) {
   const db = new DatabaseSync(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+  migrar(db);
 
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);
@@ -358,6 +488,49 @@ function abrir(arquivo = config.dbFile) {
       .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha), agora());
   }
   return db;
+}
+
+/**
+ * Atualiza um banco criado por uma versão anterior: colunas novas (ALTER TABLE ADD COLUMN) e a lista de tipos de alerta
+ * (a tabela de alertas é recriada com os dados, porque o SQLite não altera um CHECK).
+ */
+function migrar(db) {
+  const colunas = (t) => new Set(db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name));
+  const NOVAS = {
+    veiculos: { consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0' },
+    empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8' },
+    cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
+    motoristas: { senha_hash: 'TEXT', app_ultimo_acesso: 'TEXT' },
+    rastreadores: { rele_invertido: 'INTEGER NOT NULL DEFAULT 0', sinal_gsm: 'INTEGER', firmware: 'TEXT', perfil: "TEXT NOT NULL DEFAULT 'padrao'", saude: 'TEXT', saude_em: 'TEXT' },
+    comandos: { rotulo: 'TEXT' },
+    ocorrencias: { tipo: "TEXT NOT NULL DEFAULT 'roubo'", perseguicao: 'INTEGER NOT NULL DEFAULT 0' },
+  };
+  for (const [tabela, cols] of Object.entries(NOVAS)) {
+    const tem = colunas(tabela);
+    for (const [nome, def] of Object.entries(cols)) if (!tem.has(nome)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${nome} ${def}`);
+  }
+  const sqlAlertas = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'alertas'").get()?.sql ?? '';
+  if (!sqlAlertas.includes('sumico_suspeito')) {
+    const criar = SCHEMA.slice(SCHEMA.indexOf('CREATE TABLE IF NOT EXISTS alertas'), SCHEMA.indexOf('CREATE INDEX IF NOT EXISTS idx_alertas_empresa'));
+    db.exec('PRAGMA foreign_keys = OFF');
+    try {
+      db.exec('BEGIN IMMEDIATE');
+      db.exec('ALTER TABLE alertas RENAME TO alertas_antiga');
+      db.exec(criar);
+      db.exec(`INSERT INTO alertas (id, empresa_id, veiculo_id, tipo, mensagem, lat, lng, velocidade_kmh, ocorrido_em, tratado_em, tratado_por, observacao)
+        SELECT id, empresa_id, veiculo_id, tipo, mensagem, lat, lng, velocidade_kmh, ocorrido_em, tratado_em, tratado_por, observacao FROM alertas_antiga`);
+      db.exec('DROP TABLE alertas_antiga');
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_alertas_empresa ON alertas(empresa_id, ocorrido_em);
+        CREATE INDEX IF NOT EXISTS idx_alertas_veiculo ON alertas(veiculo_id, ocorrido_em);
+        CREATE INDEX IF NOT EXISTS idx_alertas_pendentes ON alertas(empresa_id) WHERE tratado_em IS NULL;`);
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    } finally {
+      db.exec('PRAGMA foreign_keys = ON');
+    }
+  }
 }
 
 const abertas = new WeakSet();
