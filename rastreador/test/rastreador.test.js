@@ -459,6 +459,52 @@ test('Rastreador', async (t) => {
     assert.equal((await api.get(`${base()}/mapa`, cliente)).dados.veiculos.find((x) => x.id === veiculo).motorista, 'João Silva');
   });
 
+  await t.test('modo roubo: bloqueio inteligente só corta abaixo da velocidade segura', async () => {
+    const { receber } = require('../server/lib/posicoes');
+    const { responder } = require('../server/lib/comandos');
+    const db = api.db;
+    db.prepare('UPDATE veiculos SET bloqueado = 0 WHERE id = ?').run(veiculo);
+    db.prepare("UPDATE comandos SET status = 'cancelado' WHERE veiculo_id = ? AND status IN ('pendente','enviado')").run(veiculo);
+    const placaV = db.prepare('SELECT placa FROM veiculos WHERE id = ?').get(veiculo).placa;
+    const p0 = db.prepare('SELECT lat, lng FROM veiculos WHERE id = ?').get(veiculo);
+    let t1 = Date.now() - 60_000;
+    const posicao = (vel, ign = true) => { t1 += 20_000; return receber(db, { imei: IMEI, protocolo: 'gt06', lat: p0.lat, lng: p0.lng, velocidade_kmh: vel, ignicao: ign, gps_em: new Date(t1).toISOString() }); };
+    const cortes = () => db.prepare("SELECT * FROM comandos WHERE veiculo_id = ? AND tipo = 'bloquear' AND status = 'pendente'").all(veiculo);
+    posicao(70);
+    // Sem a placa digitada, não aciona; o operador (só acompanha) também não.
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/roubo`, { confirmacao: 'XXX' }, cliente)).status, 422);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/roubo`, { confirmacao: placaV }, operador)).status, 403);
+    const ab = await api.post(`${base()}/veiculos/${veiculo}/roubo`, { confirmacao: placaV, observacao: 'Levado no estacionamento' }, cliente);
+    assert.equal(ab.status, 201);
+    assert.equal(ab.dados.status, 'aguardando', 'a 70 km/h o corte espera');
+    assert.equal(cortes().length, 0);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/roubo`, { confirmacao: placaV }, cliente)).status, 422, 'um modo roubo por vez');
+    posicao(45);
+    assert.equal(cortes().length, 0, 'ainda acima de 20 km/h');
+    posicao(12);
+    assert.equal(cortes().length, 1, 'abaixo de 20 km/h o corte sai');
+    let oc = (await api.get(`${base()}/roubo`, operador)).dados.ocorrencias.find((o) => o.id === ab.dados.id);
+    assert.equal(oc.status, 'bloqueio_enviado');
+    assert.ok(oc.eventos.some((e) => /12 km\/h/.test(e.texto)));
+    assert.equal((await api.get(`${base()}/mapa`, cliente)).dados.veiculos.find((x) => x.id === veiculo).roubo, 'bloqueio_enviado');
+    responder(db, cortes()[0].id, { sucesso: true, resposta: 'RELAY=1 OK' });
+    oc = (await api.get(`${base()}/roubo`, cliente)).dados.ocorrencias.find((o) => o.id === ab.dados.id);
+    assert.equal(oc.status, 'bloqueado');
+    assert.equal(db.prepare('SELECT bloqueado FROM veiculos WHERE id = ?').get(veiculo).bloqueado, 1);
+    // Encerrar com desbloqueio manda o RELAY,0#.
+    assert.equal((await api.post(`${base()}/roubo/${ab.dados.id}/encerrar`, { desbloquear: true }, cliente)).status, 204);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM comandos WHERE veiculo_id = ? AND tipo = 'desbloquear' AND status = 'pendente'").get(veiculo).n, 1);
+    // Corte forçado: sai na hora, mesmo andando.
+    responder(db, db.prepare("SELECT id FROM comandos WHERE veiculo_id = ? AND tipo = 'desbloquear' AND status = 'pendente'").get(veiculo).id, { sucesso: true });
+    posicao(80);
+    const ab2 = await api.post(`${base()}/veiculos/${veiculo}/roubo`, { confirmacao: placaV }, cliente);
+    assert.equal(ab2.dados.status, 'aguardando');
+    assert.equal((await api.post(`${base()}/roubo/${ab2.dados.id}/forcar`, { confirmacao: placaV }, cliente)).status, 204);
+    assert.equal(cortes().length, 1);
+    assert.equal((await api.post(`${base()}/roubo/${ab2.dados.id}/encerrar`, {}, cliente)).status, 204);
+    assert.equal(cortes().length, 0, 'encerrar cancela o corte ainda não entregue');
+  });
+
   await t.test('bloqueio da empresa e exclusão', async () => {
     assert.equal((await api.post(`/master/empresas/${empresa}/bloquear`, { motivo: 'Inadimplente' }, master)).status, 204);
     assert.equal((await api.get(`${base()}/mapa`, cliente)).status, 401);

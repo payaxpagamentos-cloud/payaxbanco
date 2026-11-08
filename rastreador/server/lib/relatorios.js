@@ -137,7 +137,8 @@ function veiculosMapa(db, empresaId = null) {
   const agoraMs = Date.now();
   return db.prepare(`SELECT v.id, v.empresa_id, e.nome AS empresa, v.placa, v.descricao, v.tipo, v.lat, v.lng, v.velocidade_kmh, v.curso, v.ignicao, v.tensao,
       v.bloqueado, v.posicao_em, v.comunicacao_em, v.limite_velocidade_kmh, v.hodometro_m, m.nome AS motorista, m.telefone AS motorista_telefone,
-      r.imei, r.protocolo, (SELECT COUNT(*) FROM alertas a WHERE a.veiculo_id = v.id AND a.tratado_em IS NULL) AS alertas_pendentes
+      r.imei, r.protocolo, (SELECT COUNT(*) FROM alertas a WHERE a.veiculo_id = v.id AND a.tratado_em IS NULL) AS alertas_pendentes,
+      (SELECT o.status FROM ocorrencias o WHERE o.veiculo_id = v.id AND o.status <> 'encerrada') AS roubo
     FROM veiculos v JOIN empresas e ON e.id = v.empresa_id LEFT JOIN motoristas m ON m.id = v.motorista_id LEFT JOIN rastreadores r ON r.id = v.rastreador_id
     WHERE v.ativo = 1 AND e.status <> 'excluida' ${empresaId ? 'AND v.empresa_id = ?' : ''} ORDER BY v.placa`)
     .all(...(empresaId ? [empresaId] : []))

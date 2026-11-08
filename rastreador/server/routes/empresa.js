@@ -9,6 +9,7 @@ const { registrar } = require('../lib/auditoria');
 const { criarUsuario, alterarUsuario, criarChave } = require('../lib/contas');
 const { TIPOS: TIPOS_ALERTA } = require('../lib/alertas');
 const com = require('../lib/comandos');
+const roubo = require('../lib/roubo');
 const { situacao } = require('../lib/posicoes');
 const rel = require('../lib/relatorios');
 const { hoje, somarDias, intervalo, inicioDia } = require('../lib/datas');
@@ -200,6 +201,28 @@ module.exports = (db, extras = {}) => {
     registrar(db, req, 'comando_criado', { placa: x.placa, tipo: req.body.tipo });
     const c = db.prepare('SELECT id, tipo, status FROM comandos WHERE id = ?').get(id);
     res.status(201).json(c);
+  });
+
+  // ---------- Modo roubo (bloqueio inteligente) ----------
+  const ocorrencia = daEmpresa('ocorrencias', 'Ocorrência', false);
+  r.get('/roubo', (req, res) => res.json({ velocidade_segura_kmh: roubo.limiteSeguro(db), ocorrencias: roubo.listar(db, eid(req)) }));
+  r.post('/veiculos/:id/roubo', gestor, (req, res) => {
+    const x = veiculo(req, req.params.id);
+    const id = roubo.abrir(db, x, req.body, req.usuario.id);
+    registrar(db, req, 'modo_roubo_acionado', { placa: x.placa });
+    res.status(201).json(db.prepare('SELECT id, status FROM ocorrencias WHERE id = ?').get(id));
+  });
+  r.post('/roubo/:id/forcar', gestor, (req, res) => {
+    const oc = ocorrencia(req, req.params.id);
+    roubo.forcar(db, oc, req.body);
+    registrar(db, req, 'modo_roubo_corte_forcado', { ocorrencia: oc.id });
+    res.status(204).end();
+  });
+  r.post('/roubo/:id/encerrar', gestor, (req, res) => {
+    const oc = ocorrencia(req, req.params.id);
+    roubo.encerrar(db, oc, { desbloquear: req.body.desbloquear === true }, req.usuario.id);
+    registrar(db, req, 'modo_roubo_encerrado', { ocorrencia: oc.id, desbloquear: req.body.desbloquear === true });
+    res.status(204).end();
   });
 
   r.get('/comandos', (req, res) => {

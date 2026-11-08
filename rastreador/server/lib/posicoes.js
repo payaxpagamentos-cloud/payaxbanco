@@ -4,6 +4,7 @@ const { agora, transacao, lerConfig } = require('../db');
 const { distancia, dentroCerca } = require('./geo');
 const { alertar, TIPOS } = require('./alertas');
 const { local } = require('./datas');
+const roubo = require('./roubo');
 
 // Eventos informados pelo próprio equipamento que viram alerta.
 const EVENTOS = ['panico', 'bateria_desconectada', 'bateria_baixa', 'violacao'];
@@ -169,6 +170,8 @@ function receber(db, m) {
 
     const campos = Object.keys(mudar);
     db.prepare(`UPDATE veiculos SET ${campos.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...campos.map((k) => mudar[k]), v.id);
+    // Modo roubo: com o veículo já atualizado, o bloqueio inteligente decide se manda o corte agora.
+    roubo.aoReceber(db, v.id);
     return { status, veiculo_id: v.id, rastreador_id: r.id };
   });
 }

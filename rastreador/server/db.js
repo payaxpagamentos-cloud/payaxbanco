@@ -288,6 +288,33 @@ CREATE TABLE IF NOT EXISTS auditoria (
   criado_em TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_auditoria ON auditoria(id DESC);
+
+-- Módulo de roubo: a ocorrência (com o bloqueio inteligente, que espera a velocidade segura) e a linha do tempo dela.
+CREATE TABLE IF NOT EXISTS ocorrencias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('aguardando','bloqueio_enviado','bloqueado','encerrada')),
+  observacao TEXT,
+  comando_id INTEGER,
+  aviso_em TEXT,
+  criada_por INTEGER REFERENCES usuarios(id),
+  criada_em TEXT NOT NULL,
+  encerrada_por INTEGER REFERENCES usuarios(id),
+  encerrada_em TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ocorrencia_aberta ON ocorrencias(veiculo_id) WHERE status <> 'encerrada';
+CREATE INDEX IF NOT EXISTS idx_ocorrencias_empresa ON ocorrencias(empresa_id, criada_em);
+CREATE TABLE IF NOT EXISTS ocorrencia_eventos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ocorrencia_id INTEGER NOT NULL REFERENCES ocorrencias(id) ON DELETE CASCADE,
+  em TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  lat REAL,
+  lng REAL,
+  velocidade_kmh REAL
+);
+CREATE INDEX IF NOT EXISTS idx_ocorrencia_eventos ON ocorrencia_eventos(ocorrencia_id, id);
 `;
 
 const CONFIG_PADRAO = {
@@ -305,6 +332,8 @@ const CONFIG_PADRAO = {
   limite_veiculos_padrao: '10',
   mensalidade_padrao_centavos: '4990',
   sem_comunicacao_padrao_min: '120',
+  // Bloqueio inteligente (modo roubo): o corte só é enviado com o veículo abaixo desta velocidade.
+  bloqueio_velocidade_segura_kmh: '20',
   // Textos enviados aos rastreadores GT06 (variam por fabricante: ex. DYD,000000# e HFYD,000000#).
   gt06_cmd_bloquear: 'RELAY,1#',
   gt06_cmd_desbloquear: 'RELAY,0#',

@@ -84,6 +84,8 @@ function responder(db, id, { sucesso, resposta }) {
     if (sucesso && (c.tipo === 'bloquear' || c.tipo === 'desbloquear')) {
       db.prepare('UPDATE veiculos SET bloqueado = ? WHERE id = ?').run(c.tipo === 'bloquear' ? 1 : 0, c.veiculo_id);
     }
+    // Corte do modo roubo: a ocorrência acompanha a resposta (carregado aqui para não haver dependência circular).
+    require('./roubo').aoResponder(db, c, sucesso, resposta);
     return true;
   });
 }

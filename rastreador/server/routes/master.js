@@ -364,6 +364,7 @@ module.exports = (db, extras = {}) => {
     const limites = {
       online_min: [1, 1440], parada_min: [1, 240], retencao_dias: [7, 3650], velocidade_max_plausivel_kmh: [50, 1000], comando_expira_horas: [1, 720],
       limite_veiculos_padrao: [0, 100_000], mensalidade_padrao_centavos: [0, 10_000_000], sem_comunicacao_padrao_min: [0, 7 * 24 * 60],
+      bloqueio_velocidade_segura_kmh: [5, 60],
     };
     const novos = {};
     for (const k of Object.keys(d)) {
