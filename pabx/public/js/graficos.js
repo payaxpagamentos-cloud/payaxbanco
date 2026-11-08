@@ -22,20 +22,21 @@ export function pizza(fatias, { formato = (v) => String(v), vazio = 'Sem dados',
   if (!total) return el('div', { class: 'pizza' }, el('div', { class: 'vazio-grafico' }, vazio), lado ? null : legenda);
   const g = svg('svg', { viewBox: '-1 -1 2 2', role: 'img', 'aria-label': fatias.map((f) => `${f.rotulo} ${formato(f.valor || 0)}`).join(', ') });
   g.style.transform = 'rotate(-90deg)';
+  // Anel vazado (traços sobre um círculo): o fundo do cartão aparece no meio, inclusive com o efeito vidro.
+  const visiveis = fatias.filter((x) => x.valor > 0);
+  const folga = visiveis.length > 1 ? 0.8 : 0; // pequeno espaço entre as fatias (em % da volta)
+  g.append(svg('circle', { cx: 0, cy: 0, r: 0.82, class: 'trilho-rosca', pathLength: 100 }));
   let acumulado = 0;
-  for (const f of fatias.filter((x) => x.valor > 0)) {
+  for (const f of visiveis) {
     const fracao = f.valor / total;
     const titulo = svg('title', {}, `${f.rotulo}: ${formato(f.valor)} (${Math.round(fracao * 100)}%)`);
-    if (fracao >= 0.9999) {
-      g.append(svg('circle', { cx: 0, cy: 0, r: 1, fill: f.cor }, titulo));
-      break;
-    }
-    const [x1, y1] = [Math.cos(2 * Math.PI * acumulado), Math.sin(2 * Math.PI * acumulado)];
+    const tamanho = Math.max(0.01, fracao * 100 - folga);
+    g.append(svg('circle', {
+      cx: 0, cy: 0, r: 0.82, fill: 'none', stroke: f.cor, 'stroke-width': 0.3, pathLength: 100,
+      'stroke-dasharray': `${tamanho} ${100 - tamanho}`, 'stroke-dashoffset': -acumulado * 100, class: 'fatia',
+    }, titulo));
     acumulado += fracao;
-    const [x2, y2] = [Math.cos(2 * Math.PI * acumulado), Math.sin(2 * Math.PI * acumulado)];
-    g.append(svg('path', { d: `M ${x1} ${y1} A 1 1 0 ${fracao > 0.5 ? 1 : 0} 1 ${x2} ${y2} L 0 0 Z`, fill: f.cor }, titulo));
   }
-  g.append(svg('circle', { cx: 0, cy: 0, r: 0.7, class: 'furo' })); // rosca
   const rosca = el('div', { class: 'rosca' }, g, centro ? el('div', { class: 'centro' }, el('strong', { class: 'num' }, centro.valor), el('small', {}, centro.rotulo)) : null);
   return el('div', { class: `pizza${lado ? ' lado' : ''}` }, rosca, legenda);
 }
