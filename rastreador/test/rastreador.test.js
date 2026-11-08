@@ -296,8 +296,22 @@ test('Rastreador', async (t) => {
 
     // Bloqueio: exige digitar a placa; o equipamento conectado recebe na hora e a resposta confirma.
     assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'bloquear' }, cliente)).status, 422);
+    // Andando acima da velocidade segura, o corte comum também espera (bloqueio inteligente); desbloquear cancela antes do corte.
+    const situacaoAntes = api.db.prepare('SELECT velocidade_kmh, ignicao, posicao_em FROM veiculos WHERE id = ?').get(veiculo);
+    api.db.prepare('UPDATE veiculos SET velocidade_kmh = 62, ignicao = 1, posicao_em = ? WHERE id = ?').run(new Date().toISOString(), veiculo);
+    const quadrosAntes = gt.extrair(recebido).quadros.length;
+    const espera = await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'bloquear', confirmacao: 'abc-1d23' }, cliente);
+    assert.equal(espera.status, 201);
+    assert.equal(espera.dados.status, 'aguardando_velocidade');
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'bloquear', confirmacao: 'abc-1d23' }, cliente)).status, 422, 'um bloqueio por vez');
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'desbloquear' }, cliente)).status, 201);
+    assert.equal(api.db.prepare('SELECT status FROM ocorrencias WHERE id = ?').get(espera.dados.ocorrencia_id).status, 'encerrada');
+    assert.ok(!gt.extrair(recebido).quadros.slice(quadrosAntes).some((q) => q.protocolo === 0x80), 'nenhum corte saiu com o veículo andando');
+    // Devagar (posição recente abaixo de 20 km/h), o corte sai na hora.
+    api.db.prepare('UPDATE veiculos SET velocidade_kmh = 5, posicao_em = ? WHERE id = ?').run(new Date().toISOString(), veiculo);
     const antes = gt.extrair(recebido).quadros.length;
     const bl = await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'bloquear', confirmacao: 'abc-1d23' }, cliente);
+    api.db.prepare('UPDATE veiculos SET velocidade_kmh = ?, ignicao = ?, posicao_em = ? WHERE id = ?').run(situacaoAntes.velocidade_kmh, situacaoAntes.ignicao, situacaoAntes.posicao_em, veiculo);
     assert.equal(bl.status, 201);
     await esperar(() => gt.extrair(recebido).quadros.slice(antes).some((q) => q.protocolo === 0x80));
     qs = gt.extrair(recebido).quadros.slice(antes).filter((q) => q.protocolo === 0x80);
@@ -685,6 +699,45 @@ test('Rastreador', async (t) => {
       assistente.definirCliente(null);
       Object.assign(config.geocoder, geo);
     }
+  });
+
+  await t.test('frota: custo, nota, ficha do equipamento e a senha do app do motorista', async () => {
+    const db = api.db;
+    assert.ok((await api.put(`${base()}/configuracoes`, { preco_combustivel_centavos: 600, ocioso_l_h: '1,0' }, cliente)).status < 300);
+    assert.ok((await api.put(`${base()}/veiculos/${veiculo}`, { consumo_km_l: '5,0' }, cliente)).status < 300);
+    const d = (await api.get(`${base()}/desempenho`, cliente)).dados;
+    const x = d.veiculos.find((y) => y.id === veiculo);
+    assert.equal(x.consumo_km_l, 5);
+    assert.equal(d.totais.sem_consumo, d.veiculos.filter((y) => !y.consumo_km_l).length);
+    assert.ok(d.totais.sem_consumo < d.veiculos.length, 'o veículo com consumo não conta como "sem consumo"');
+    // km ÷ consumo × preço + horas paradas ligado × litros/h × preço (o km da resposta vem arredondado a 100 m).
+    assert.ok(Math.abs(x.custo_centavos - ((x.km / 5) * 600 + (x.ocioso_s / 3600) * 1.0 * 600)) <= 10, `custo ${x.custo_centavos}`);
+    assert.ok(x.nota >= 0 && x.nota <= 100);
+
+    // Ficha do J16: a empresa consulta; os ajustes são da equipe da plataforma; o operador só vê.
+    const ficha = await api.get(`${base()}/veiculos/${veiculo}/equipamento`, operador);
+    assert.equal(ficha.status, 200);
+    assert.ok(ficha.dados.perfis.padrao);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'status' }, cliente)).status, 201, 'a empresa consulta');
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'perfil', valor: 'precisao' }, cliente)).status, 403, 'o ajuste é da plataforma');
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'status' }, operador)).status, 403);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'xpto' }, master)).status, 422);
+    const perfil = await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'perfil', valor: 'precisao' }, master);
+    assert.equal(perfil.status, 201);
+    assert.deepEqual(db.prepare(`SELECT texto FROM comandos WHERE id IN (${perfil.dados.comandos.join(',')}) ORDER BY id`).all().map((c) => c.texto), ['TIMER,10,60#', 'HBT,10,60#']);
+    assert.equal(db.prepare('SELECT perfil FROM rastreadores WHERE id = ?').get(rastreador).perfil, 'precisao');
+
+    // App do motorista: a senha é guardada com hash e a lista de motoristas não devolve o hash.
+    const m = await api.post(`${base()}/motoristas`, { nome: 'Zé do App', cpf: '153.509.460-56' }, cliente);
+    assert.equal(m.status, 201);
+    assert.equal((await api.put(`${base()}/motoristas/${m.dados.id}/app`, { senha: '12a4' }, cliente)).status, 422);
+    assert.equal((await api.put(`${base()}/motoristas/${m.dados.id}/app`, { senha: '4321' }, cliente)).status, 204);
+    const lista = (await api.get(`${base()}/motoristas`, cliente)).dados;
+    const ze = lista.find((y) => y.id === m.dados.id);
+    assert.equal(ze.app, true);
+    assert.ok(lista.every((y) => !('senha_hash' in y)), 'o hash da senha não sai do servidor');
+    assert.equal((await api.post('/motorista/login', { cpf: '15350946056', senha: '4321' })).status, 200);
+    assert.equal((await api.post('/motorista/login', { cpf: '15350946056', senha: '0000' })).status, 401);
   });
 
   await t.test('bloqueio da empresa e exclusão', async () => {

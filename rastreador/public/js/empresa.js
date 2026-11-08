@@ -1,11 +1,13 @@
 /** Telas do painel da empresa (administrador e operador; o master entra pela lista de empresas). */
 import { api, qs, baixar, BASE } from './api.js';
 import { el, limpar, dinheiro, dataHora, hora, data, desde, km, kmh, placa, telefone, inteiro, toast, acao, campo, escolha, marcar, formModal, modal, confirmar,
-  perguntar, repetir, etiqueta, etiquetaSituacao, etiquetaComando, etiquetaAlerta, hojeLocal, somarDias, centavos, icone, PERFIS, TIPOS_VEICULO,
-  TIPOS_ALERTA, TIPOS_COMANDO, PROTOCOLOS } from './ui.js';
+  perguntar, repetir, etiqueta, etiquetaSituacao, etiquetaComando, etiquetaAlerta, hojeLocal, somarDias, centavos, reaisCampo, icone, PERFIS, TIPOS_VEICULO,
+  TIPOS_ALERTA, TIPOS_COMANDO, PROTOCOLOS, ALERTAS_SEGURANCA } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, linhaDado, campoData, painelMapa, faixaVeiculo, painelIntegracoes, blocoDestaque } from './comum.js';
 import { criarMapa, configPublica, linkGoogle, COR_SITUACAO } from './mapa.js';
 import { pizza, area } from './graficos.js';
+import { acionarRoubo, estacionar, desarmar, STATUS_ROUBO } from './seguranca.js';
+import { abrirFicha } from './frota.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
 const pode = (ctx) => !ctx.somenteLeitura;
@@ -25,8 +27,15 @@ async function telaDashboard(ctx) {
   heroi.atualizar({ rotulo: 'Carregando a frota…', vivo: false, titulo: `Olá, ${primeiroNome(ctx.usuario.nome)}.`, destaque: 'Sua frota em um só lugar.', texto: '' });
   const corpo = el('div', { class: 'coluna', style: 'gap:16px' });
   limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'gap:16px' }, heroi.raiz, corpo));
+  // Nota e custo do mês: contas mais pesadas, atualizadas a cada 5 minutos.
+  let desemp = null;
+  let desempEm = 0;
   ctx.parar(repetir(async () => {
-    const d = await api.get(`${base(ctx)}/dashboard`);
+    if (Date.now() - desempEm > 5 * 60_000) {
+      desempEm = Date.now();
+      desemp = await api.get(`${base(ctx)}/desempenho${qs({ de: `${hojeLocal().slice(0, 7)}-01`, ate: hojeLocal() })}`).catch(() => desemp);
+    }
+    const [d, seg] = await Promise.all([api.get(`${base(ctx)}/dashboard`), api.get(`${base(ctx)}/seguranca`).catch(() => null)]);
     const v = d.veiculos;
     const semana = d.alertas_semana.reduce((s, x) => s + x.n, 0);
     heroi.atualizar({
@@ -36,14 +45,28 @@ async function telaDashboard(ctx) {
       destaque: 'Sua frota em um só lugar.',
       texto: `Hoje: ${km(d.hoje.distancia_m)} rodados e ${duracaoH(d.hoje.ligado_s)} com motor ligado · ${inteiro(d.alertas_pendentes)} alerta(s) pendente(s). Atualizado às ${agora()}.`,
     });
+    const armados = seg ? seg.estacionados.filter((e) => !e.desarmado_em) : [];
+    const faixaSeg = (tela, ic, rotulo, valor, tom, nota) => el('a', { class: `item-seguranca${tom ? ` tom-${tom}` : ''}`, href: `#/empresa/${ctx.empresaId}/${tela}` },
+      el('span', { class: 'aba-icone' }, icone(ic)), el('span', {}, el('small', {}, rotulo), el('strong', {}, valor), nota ? el('em', {}, nota) : null));
     limpar(corpo,
-      el('div', { class: 'grade' },
+      seg ? el('section', { class: 'faixa-seguranca', 'aria-label': 'Segurança agora' },
+        el('h2', {}, 'Segurança agora'),
+        faixaSeg('roubo', 'seguranca', 'Em Modo Roubo', inteiro(seg.roubo), seg.roubo ? 'erro' : '', seg.roubo ? 'acompanhe' : 'nenhum'),
+        faixaSeg('estacionados', 'alvo', 'Estacionados', inteiro(armados.length), armados.some((e) => e.violado_em) ? 'erro' : '', armados.some((e) => e.violado_em) ? 'violado!' : 'vigiando'),
+        faixaSeg('veiculos', 'cadeado', 'Bloqueados', inteiro(v.bloqueados ?? 0), '', ''),
+        faixaSeg('bloqueio-programado', 'historico', 'Bloqueio programado', inteiro(seg.agendas.filter((a) => a.ativo).length), '',
+          `${inteiro(seg.agendas.filter((a) => a.ativo && a.em_horario).length)} no horário`),
+        faixaSeg('liberacoes', 'aberto', 'Liberações', inteiro(seg.liberacoes.filter((l) => l.status === 'ativa').length), '', 'ativas')) : null,
+      el('div', { class: 'grade sete' },
         indicador('Veículos', inteiro(v.total), `limite do plano: ${inteiro(d.empresa.limite_veiculos)}`, '', 'veiculos'),
         indicador('Em movimento', inteiro(v.movimento), `${inteiro(v.ligado)} parado(s) ligado(s)`, 'ok', 'navegacao'),
         indicador('Sem sinal', inteiro(v.sem_sinal), v.sem_sinal ? 'sem comunicação' : v.sem_posicao ? `${inteiro(v.sem_posicao)} aguardando a 1ª posição`
           : 'todos comunicando', v.sem_sinal ? 'erro' : '', 'sem_sinal'),
         indicador('Rodados hoje', km(d.hoje.distancia_m), `${duracaoH(d.hoje.ligado_s)} com motor ligado`, '', 'rota'),
-        indicador('Alertas pendentes', inteiro(d.alertas_pendentes), `${inteiro(semana)} nos últimos 7 dias`, d.alertas_pendentes ? 'aviso' : '', 'alertas')),
+        indicador('Alertas pendentes', inteiro(d.alertas_pendentes), `${inteiro(semana)} nos últimos 7 dias`, d.alertas_pendentes ? 'aviso' : '', 'alertas'),
+        indicador('Custo do mês', desemp?.totais.custo_centavos != null ? dinheiro(desemp.totais.custo_centavos) : '—',
+          desemp?.totais.custo_centavos != null ? 'combustível e motor parado' : 'informe consumo e preço', '', 'carteira'),
+        indicador('Nota média', desemp?.totais.nota_media ?? '—', 'dos motoristas no mês', desemp?.totais.nota_media == null ? '' : desemp.totais.nota_media >= 85 ? 'ok' : desemp.totais.nota_media >= 70 ? 'aviso' : 'erro', 'motoristas')),
       el('div', { class: 'grade-dash' },
         el('div', { class: 'c4' }, cartao('Frota agora', pizza([
           { rotulo: 'Em movimento', valor: v.movimento, cor: COR_SITUACAO.movimento }, { rotulo: 'Parado ligado', valor: v.ligado, cor: COR_SITUACAO.ligado },
@@ -88,19 +111,36 @@ const semComandos = (v) => (!v.imei ? 'Sem rastreador instalado: cadastre um em 
 export function detalheVeiculo(ctx, v, painel, fechar, { mostrarEmpresa = false } = {}) {
   const motivo = semComandos(v);
   const comComandos = pode(ctx) && !motivo;
+  const emRoubo = v.ocorrencia_tipo === 'roubo';
+  const corteEsperando = v.ocorrencia_tipo === 'manual' && v.roubo === 'aguardando';
+  const linkEmpresa = (tela) => `#/empresa/${ctx.empresaId}/${tela}`;
   limpar(painel, faixaVeiculo(v, {
     titulo: [v.descricao, mostrarEmpresa ? v.empresa : TIPOS_VEICULO[v.tipo]].filter(Boolean).join(' · '),
-    etiquetas: [etiquetaSituacao(v.situacao), v.bloqueado ? etiqueta('bloqueado', 'erro') : null,
-      v.alertas_pendentes ? el('a', { class: 'etiqueta aviso', href: `#/empresa/${ctx.empresaId}/alertas`, style: 'text-decoration:none' }, `${v.alertas_pendentes} alerta(s)`) : null],
+    etiquetas: [etiquetaSituacao(v.situacao),
+      emRoubo ? el('a', { class: 'etiqueta erro forte', href: linkEmpresa('roubo'), style: 'text-decoration:none' }, 'MODO ROUBO') : null,
+      v.ocorrencia_tipo === 'manual' ? etiqueta(v.roubo === 'aguardando' ? 'corte aguardando velocidade segura' : STATUS_ROUBO[v.roubo]?.[0] ?? v.roubo, 'aviso') : null,
+      v.ocorrencia_tipo === 'agenda' ? el('a', { class: 'etiqueta aviso', href: linkEmpresa('bloqueio-programado'), style: 'text-decoration:none' }, 'bloqueio programado') : null,
+      v.bloqueado && !emRoubo ? etiqueta('bloqueado', 'erro') : null,
+      v.estacionado ? el('a', { class: 'etiqueta info', href: linkEmpresa('estacionados'), style: 'text-decoration:none' }, 'estacionado') : null,
+      v.alertas_pendentes ? el('a', { class: 'etiqueta aviso', href: linkEmpresa('alertas'), style: 'text-decoration:none' }, `${v.alertas_pendentes} alerta(s)`) : null],
     acoes: [
-      comComandos ? (v.bloqueado
-        ? botao([icone('aberto'), 'Desbloquear'], 'primario', () => enviarComando(ctx, v, 'desbloquear'))
-        : botao([icone('cadeado'), 'Bloquear veículo'], 'perigo bloquear', () => enviarComando(ctx, v, 'bloquear'))) : null,
+      // Segurança primeiro: Modo Roubo, Estacionar e Bloquear.
+      comComandos ? (emRoubo
+        ? el('a', { class: 'btn pequeno perigo', href: linkEmpresa('roubo') }, icone('seguranca'), 'Acompanhar a ocorrência')
+        : botao([icone('seguranca'), 'Modo Roubo'], 'perigo', () => acionarRoubo(ctx, v))) : null,
+      pode(ctx) && v.imei && v.protocolo !== 'api' ? (v.estacionado
+        ? botao([icone('alvo'), 'Desarmar estacionado'], '', () => desarmar(ctx, v))
+        : botao([icone('alvo'), 'Estacionar'], '', () => estacionar(ctx, v))) : null,
+      comComandos ? (corteEsperando
+        ? botao('Cancelar o bloqueio', '', () => enviarComando(ctx, v, 'desbloquear'))
+        : v.bloqueado
+          ? botao([icone('aberto'), 'Desbloquear'], 'primario', () => enviarComando(ctx, v, 'desbloquear'))
+          : emRoubo ? null : botao([icone('cadeado'), 'Bloquear'], 'bloquear', () => enviarComando(ctx, v, 'bloquear'))) : null,
       comComandos ? botao('Pedir posição', '', () => enviarComando(ctx, v, 'localizar')) : null,
-      comComandos ? botao('Consultar estado', '', () => enviarComando(ctx, v, 'status')) : null,
+      v.imei && v.protocolo === 'gt06' ? botao([icone('rastreadores'), 'Equipamento'], '', () => abrirFicha(ctx, v.id)) : null,
       el('button', { class: 'btn pequeno', onclick: () => { veiculoHistorico = v.id; ctx.ir('historico', ctx.empresaId); } }, icone('historico'), 'Histórico'),
       pode(ctx) ? botao('Compartilhar', '', () => compartilhar(ctx, v)) : null,
-      mostrarEmpresa ? el('a', { class: 'btn pequeno', href: `#/empresa/${ctx.empresaId}/mapa` }, 'Abrir no painel da empresa') : null,
+      mostrarEmpresa ? el('a', { class: 'btn pequeno', href: linkEmpresa('mapa') }, 'Abrir no painel da empresa') : null,
       pode(ctx) && motivo ? el('span', { class: 'pequeno mudo', style: 'align-self:center' }, motivo) : null,
     ],
     fechar,
@@ -111,13 +151,17 @@ export function detalheVeiculo(ctx, v, painel, fechar, { mostrarEmpresa = false 
 async function enviarComando(ctx, v, tipo, texto) {
   let confirmacao;
   if (tipo === 'bloquear') {
-    confirmacao = await perguntar(`Bloquear ${placa(v.placa)}`, `Digite a placa para confirmar. ${v.velocidade_kmh >= 20 ? `ATENÇÃO: o veículo está a ${kmh(v.velocidade_kmh)}. ` : ''}`
-      + 'A maioria dos rastreadores só corta com o veículo abaixo de 20 km/h.');
+    confirmacao = await perguntar(`Bloquear ${placa(v.placa)}`, `Digite a placa para confirmar. ${v.velocidade_kmh >= 20 ? `O veículo está a ${kmh(v.velocidade_kmh)}: ` : ''}`
+      + 'com o bloqueio inteligente, o corte só sai abaixo da velocidade segura ou com a ignição desligada.');
     if (!confirmacao) return;
   } else if (tipo === 'desbloquear' && !await confirmar(`Desbloquear ${placa(v.placa)}`, 'O veículo volta a funcionar normalmente.', 'Desbloquear')) {
     return;
   }
   const c = await api.post(`${base(ctx)}/veiculos/${v.id}/comandos`, { tipo, confirmacao, texto });
+  if (c.status === 'aguardando_velocidade') {
+    toast(`Bloqueio inteligente: o corte sai sozinho quando o ${placa(v.placa)} ficar abaixo de ${c.velocidade_segura_kmh} km/h ou desligar.`);
+    return;
+  }
   const consulta = tipo === 'status' || tipo === 'parametros' ? ' A resposta do equipamento aparece em Comandos.' : '';
   toast(`${c.status === 'pendente' ? `Comando "${TIPOS_COMANDO[tipo]}" na fila: vai assim que o rastreador conectar.` : `Comando "${TIPOS_COMANDO[tipo]}" enviado.`}${consulta}`);
 }
@@ -285,7 +329,10 @@ async function telaAlertas(ctx) {
       td(a.lat !== null ? el('a', { href: linkGoogle(a.lat, a.lng), target: '_blank', rel: 'noopener' }, 'ver no mapa') : '—'),
       td(a.tratado_em ? [etiqueta('tratado', 'ok'), el('div', { class: 'pequeno mudo' }, `${a.tratado_por_nome ?? ''} · ${dataHora(a.tratado_em)}`),
         a.observacao ? el('div', { class: 'pequeno' }, a.observacao) : null] : etiqueta('pendente', 'aviso')),
-      el('td', { class: 'acoes' }, a.tratado_em ? null : botao('Tratar', 'primario', async () => {
+      el('td', { class: 'acoes' }, pode(ctx) && !a.tratado_em && ALERTAS_SEGURANCA.includes(a.tipo) ? botao([icone('seguranca'), 'Modo Roubo'], 'perigo', async () => {
+        const v = (await api.get(`${base(ctx)}/mapa`)).find((x) => x.id === a.veiculo_id);
+        if (v) await acionarRoubo(ctx, v);
+      }) : null, a.tratado_em ? null : botao('Tratar', 'primario', async () => {
         const obs = await perguntar('Tratar alerta', 'O que foi feito? (opcional)', { obrigatorio: false });
         if (obs === null) return;
         await api.post(`${base(ctx)}/alertas/${a.id}/tratar`, { observacao: obs });
@@ -314,6 +361,9 @@ async function telaVeiculos(ctx) {
         campo('Ano', { name: 'ano', type: 'number', min: 1950, max: new Date().getFullYear() + 1, value: x?.ano ?? '' })),
       el('div', { class: 'duas' }, campo('Cor', { name: 'cor', maxlength: 30, value: x?.cor ?? '' }),
         campo('Limite de velocidade (km/h, 0 = sem alerta)', { name: 'limite_velocidade_kmh', type: 'number', min: 0, max: 300, value: x?.limite_velocidade_kmh ?? 0 })),
+      el('div', { class: 'duas' }, campo('Consumo médio (km/l, para o custo em reais)', { name: 'consumo_km_l', inputmode: 'decimal', maxlength: 6,
+        value: x?.consumo_km_l ? String(x.consumo_km_l).replace('.', ',') : '', placeholder: 'Ex.: 9,5' }),
+      el('div', { class: 'campo-marcar' }, marcar('Estacionar automático à noite (22h às 6h, ao desligar a ignição)', { name: 'estacionado_auto', checked: Boolean(x?.estacionado_auto) }))),
       escolha('Rastreador', 'rastreador_id', { '': 'Sem rastreador', ...Object.fromEntries(livres.map((r) => [r.id, `${r.imei} · ${r.modelo ?? PROTOCOLOS[r.protocolo]}`])) }, x?.rastreador_id ?? ''),
       escolha('Motorista', 'motorista_id', { '': 'Sem motorista fixo', ...Object.fromEntries(motoristas.filter((m) => m.ativo).map((m) => [m.id, m.nome])) }, x?.motorista_id ?? ''),
       x ? null : campo('Hodômetro atual (km)', { name: 'hodometro_km', type: 'number', min: 0, step: '0.1', value: 0 }),
@@ -341,6 +391,11 @@ async function telaVeiculos(ctx) {
           pode(ctx) && x.ativo && !semComandos(x) ? (x.bloqueado
             ? botaoIcone('aberto', 'Desbloquear o veículo', async () => { await enviarComando(ctx, x, 'desbloquear'); carregar(); })
             : botaoIcone('cadeado', 'Bloquear o veículo', async () => { await enviarComando(ctx, x, 'bloquear'); carregar(); }, 'perigo')) : null,
+          pode(ctx) && x.ativo && !semComandos(x) ? botaoIcone('seguranca', 'Modo Roubo', async () => {
+            const v = (await api.get(`${base(ctx)}/mapa`)).find((y) => y.id === x.id);
+            if (v) await acionarRoubo(ctx, v);
+          }) : null,
+          x.imei && x.protocolo === 'gt06' ? botaoIcone('rastreadores', 'Equipamento (J16)', () => abrirFicha(ctx, x.id)) : null,
           botaoIcone('historico', 'Histórico', () => { veiculoHistorico = x.id; ctx.ir('historico'); }),
           pode(ctx) ? botaoIcone('editar', 'Editar', () => formVeiculo(x)) : null,
           pode(ctx) ? botaoIcone('relatorios', 'Ajustar hodômetro', async () => {
@@ -391,22 +446,36 @@ async function telaMotoristas(ctx) {
     ], (d) => (m ? api.put(`${base(ctx)}/motoristas/${m.id}`, d) : api.post(`${base(ctx)}/motoristas`, d)));
     if (r) { toast('Motorista salvo.'); carregar(); }
   };
+  const formApp = async (m) => {
+    if (!m.cpf) return toast('Cadastre o CPF do motorista: é o usuário do app.', true);
+    const r = await formModal(`Acesso ao app · ${m.nome}`, () => [
+      el('p', { class: 'mudo', style: 'margin:0' }, `No app do motorista (${location.origin}${BASE}/motorista/), ${m.nome.split(' ')[0]} entra com o CPF e esta senha para ver o veículo e pedir a liberação do bloqueio programado.`),
+      campo('Senha numérica (4 a 6 números)', { name: 'senha', inputmode: 'numeric', pattern: '[0-9]{4,6}', minlength: 4, maxlength: 6, required: true, autocomplete: 'off' }),
+      m.app ? el('button', { type: 'button', class: 'btn perigo pequeno', onclick: async (e) => acao(e.currentTarget, async () => {
+        await api.put(`${base(ctx)}/motoristas/${m.id}/app`, { senha: null });
+        toast('Acesso ao app removido.');
+        e.target.closest('.modal-fundo')?.remove();
+        carregar();
+      }) }, 'Remover o acesso') : null,
+    ], (d) => api.put(`${base(ctx)}/motoristas/${m.id}/app`, { senha: d.senha }), { rotulo: m.app ? 'Trocar a senha' : 'Liberar o acesso' });
+    if (r) { toast('Acesso ao app salvo. Passe a senha ao motorista.'); carregar(); }
+  };
   async function carregar() {
     const l = await api.get(`${base(ctx)}/motoristas`);
     const hoje = hojeLocal();
-    limpar(corpo, cartao(null, tabela(['Nome', 'CPF', 'Telefone', 'CNH', 'Validade', 'Veículos', '^Ações'], l.map((m) => el('tr', { class: m.ativo ? '' : 'inativo' },
+    limpar(corpo, cartao(null, tabela(['Nome', 'CPF', 'Telefone', 'CNH', 'Validade', 'Veículos', 'App', '^Ações'], l.map((m) => el('tr', { class: m.ativo ? '' : 'inativo' },
       td([el('strong', {}, m.nome), m.ativo ? null : el('div', { class: 'pequeno mudo' }, 'inativo')]), td(m.cpf ? m.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '—'),
       td(m.telefone ? el('a', { href: `https://wa.me/55${m.telefone}`, target: '_blank', rel: 'noopener' }, telefone(m.telefone)) : '—'),
       td(m.cnh ? `${m.cnh}${m.cnh_categoria ? ` (${m.cnh_categoria})` : ''}` : '—'),
       td(!m.cnh_validade ? '—' : m.cnh_validade < hoje ? etiqueta(`vencida ${data(m.cnh_validade)}`, 'erro') : m.cnh_validade <= somarDias(hoje, 30) ? etiqueta(data(m.cnh_validade), 'aviso') : data(m.cnh_validade)),
-      td(m.veiculos ?? '—'),
-      el('td', { class: 'acoes' }, pode(ctx) ? [botaoIcone('editar', 'Editar', () => form(m)), botaoIcone('lixo', 'Excluir', async () => {
+      td(m.veiculos ?? '—'), td(m.app ? etiqueta(m.app_ultimo_acesso ? `entrou ${desde(m.app_ultimo_acesso)}` : 'com acesso', 'ok') : '—'),
+      el('td', { class: 'acoes' }, pode(ctx) ? [botaoIcone('cadeado', 'Acesso ao app do motorista', () => formApp(m)), botaoIcone('editar', 'Editar', () => form(m)), botaoIcone('lixo', 'Excluir', async () => {
         if (!await confirmar('Excluir motorista', `Excluir ${m.nome}? Os veículos dele ficam sem motorista.`, 'Excluir')) return;
         await api.del(`${base(ctx)}/motoristas/${m.id}`);
         carregar();
       }, 'perigo')] : null))), 'Nenhum motorista cadastrado.')));
   }
-  limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, 'Motoristas, contato e validade da CNH (avisada no dashboard 30 dias antes).'),
+  limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, 'Motoristas, contato, validade da CNH (avisada no dashboard 30 dias antes) e o acesso ao app do motorista.'),
     pode(ctx) ? el('button', { class: 'btn primario', onclick: () => form(null) }, 'Novo motorista') : null), corpo);
   await carregar();
 }
@@ -449,7 +518,8 @@ async function telaCercas(ctx) {
   function editar(c) {
     edicao = c
       ? { ...c, pontos: c.pontos ? [...c.pontos] : [], desenho: [] }
-      : { tipo: 'circulo', nome: '', lat: null, lng: null, raio_m: 300, pontos: [], cor: '#2563EB', alertar_entrada: 1, alertar_saida: 1, ativa: 1, veiculos: [], desenho: [] };
+      : { tipo: 'circulo', nome: '', lat: null, lng: null, raio_m: 300, pontos: [], cor: '#2563EB', alertar_entrada: 1, alertar_saida: 1, ativa: 1, veiculos: [], desenho: [],
+        horario_inicio: null, horario_fim: null, acao_saida: 'avisar' };
     desenharCercas();
     redesenharEdicao();
     if (c && mapa) mapa.enquadrar(c.tipo === 'circulo' ? [[c.lat, c.lng]] : c.pontos, 16);
@@ -468,6 +538,12 @@ async function telaCercas(ctx) {
     dica.classList.remove('oculto');
     f.append(
       el('h2', { style: 'margin:0' }, edicao.id ? `Editar ${edicao.nome}` : 'Nova cerca'),
+      edicao.id ? null : el('div', { class: 'modelos-cerca' }, el('span', { class: 'pequeno mudo' }, 'Modelos prontos'), el('div', { class: 'chips' },
+        Object.entries(MODELOS_CERCA).map(([k, m]) => el('button', { type: 'button', class: 'chip', onclick: () => {
+          Object.assign(edicao, m, { nome: m.nome });
+          redesenharEdicao();
+          formulario();
+        } }, MODELOS_CERCA[k].nome)))),
       campo('Nome', { name: 'nome', required: true, maxlength: 80, value: edicao.nome, placeholder: 'Ex.: Garagem, Cliente X, Área de entrega' }),
       tipo, edicao.tipo === 'circulo' ? raio : el('div', { class: 'linha', style: 'gap:6px' }, el('span', { class: 'pequeno mudo' }, `${edicao.pontos.length} ponto(s)`),
         el('button', { type: 'button', class: 'btn pequeno', onclick: () => { edicao.pontos.pop(); redesenharEdicao(); formulario(); } }, 'Desfazer ponto'),
@@ -476,6 +552,9 @@ async function telaCercas(ctx) {
       marcar('Alertar na entrada', { name: 'alertar_entrada', checked: Boolean(edicao.alertar_entrada) }),
       marcar('Alertar na saída', { name: 'alertar_saida', checked: Boolean(edicao.alertar_saida) }),
       marcar('Cerca ativa', { name: 'ativa', checked: Boolean(edicao.ativa) }),
+      el('fieldset', {}, el('legend', {}, 'Vigência (vazio = o dia todo)'), el('div', { class: 'duas' },
+        campo('Vale das', { name: 'horario_inicio', type: 'time', value: edicao.horario_inicio ?? '' }), campo('até', { name: 'horario_fim', type: 'time', value: edicao.horario_fim ?? '' }))),
+      escolha('Ao sair da cerca', 'acao_saida', { avisar: 'Só avisar (painel e WhatsApp)', roubo: 'Acionar o Modo Roubo (bloqueio inteligente)' }, edicao.acao_saida ?? 'avisar'),
       el('fieldset', {}, el('legend', {}, 'Veículos (nenhum marcado = todos)'), el('div', { class: 'lista-marcar' },
         veiculos.map((x) => marcar(placa(x.placa), { name: `v_${x.id}`, checked: edicao.veiculos.includes(x.id) })))),
       el('div', { class: 'linha entre' },
@@ -495,6 +574,7 @@ async function telaCercas(ctx) {
         const d = Object.fromEntries(new FormData(f));
         const corpo = {
           nome: d.nome, tipo: edicao.tipo, cor: edicao.cor, alertar_entrada: f.alertar_entrada.checked, alertar_saida: f.alertar_saida.checked, ativa: f.ativa.checked,
+          horario_inicio: d.horario_inicio, horario_fim: d.horario_fim, acao_saida: d.acao_saida,
           veiculos: veiculos.filter((x) => f[`v_${x.id}`].checked).map((x) => x.id),
           ...(edicao.tipo === 'circulo' ? { lat: edicao.lat, lng: edicao.lng, raio_m: Number(d.raio_m) } : { pontos: edicao.pontos }),
         };
@@ -519,7 +599,8 @@ async function telaCercas(ctx) {
         el('div', { class: 'linha entre' }, el('strong', {}, el('i', { class: 'bolinha', style: `background:${c.cor}` }), c.nome), c.ativa ? null : etiqueta('inativa')),
         el('div', { class: 'pequeno mudo' }, [c.tipo === 'circulo' ? `círculo de ${inteiro(c.raio_m)} m` : `polígono de ${c.pontos.length} pontos`,
           [c.alertar_entrada ? 'entrada' : null, c.alertar_saida ? 'saída' : null].filter(Boolean).join(' e ') || 'sem alerta',
-          c.veiculos.length ? `${c.veiculos.length} veículo(s)` : 'todos os veículos'].join(' · '))))
+          c.horario_inicio ? `das ${c.horario_inicio} às ${c.horario_fim}` : null, c.acao_saida === 'roubo' ? 'saída aciona o Modo Roubo' : null,
+          c.veiculos.length ? `${c.veiculos.length} veículo(s)` : 'todos os veículos'].filter(Boolean).join(' · '))))
         : el('p', { class: 'mudo' }, 'Nenhuma cerca criada.'));
   }
 
@@ -531,6 +612,14 @@ async function telaCercas(ctx) {
   }
   await carregar();
 }
+
+// Modelos prontos de cerca (o usuário ajusta o raio e marca o centro no mapa).
+const MODELOS_CERCA = {
+  casa: { nome: 'Casa', cor: '#16A34A', raio_m: 150, alertar_entrada: 1, alertar_saida: 1, horario_inicio: '22:00', horario_fim: '06:00', acao_saida: 'avisar' },
+  garagem: { nome: 'Garagem', cor: '#2563EB', raio_m: 200, alertar_entrada: 1, alertar_saida: 1, horario_inicio: '22:00', horario_fim: '06:00', acao_saida: 'roubo' },
+  cliente: { nome: 'Cliente', cor: '#7C3AED', raio_m: 300, alertar_entrada: 1, alertar_saida: 0, horario_inicio: null, horario_fim: null, acao_saida: 'avisar' },
+  proibida: { nome: 'Área proibida', cor: '#DC2626', raio_m: 500, alertar_entrada: 1, alertar_saida: 0, horario_inicio: null, horario_fim: null, acao_saida: 'avisar' },
+};
 
 // ---------- Manutenção ----------
 async function telaManutencao(ctx) {
@@ -676,6 +765,10 @@ async function telaConfiguracoes(ctx) {
       el('div', { class: 'linha' }, DIAS.map((d, i) => marcar(d, { name: `dia_${i}`, checked: e.dias_uso.includes(String(i)), disabled: !pode(ctx) }))),
       el('p', { class: 'pequeno fraco', style: 'margin:0' }, 'Deixe o horário vazio para não usar este alerta. Pode virar a noite (ex.: 22:00 às 06:00).')),
     campo('Alertar veículo sem comunicação depois de (minutos, 0 = não alertar)', { name: 'sem_comunicacao_min', type: 'number', min: 0, value: e.sem_comunicacao_min, disabled: !pode(ctx) }),
+    el('fieldset', {}, el('legend', {}, 'Custos (Frota → Custos)'), el('div', { class: 'duas' },
+      campo('Preço do combustível (R$ por litro)', { name: 'preco_combustivel', inputmode: 'decimal', maxlength: 8, placeholder: 'Ex.: 6,19',
+        value: e.preco_combustivel_centavos ? reaisCampo(e.preco_combustivel_centavos) : '', disabled: !pode(ctx) }),
+      campo('Motor ligado parado gasta (litros por hora)', { name: 'ocioso_l_h', inputmode: 'decimal', maxlength: 5, value: String(e.ocioso_l_h ?? 0.8).replace('.', ','), disabled: !pode(ctx) }))),
     el('div', { class: 'duas' }, campo('E-mail de contato', { name: 'email', type: 'email', value: e.email ?? '', disabled: !pode(ctx) }),
       campo('Telefone', { name: 'telefone', value: e.telefone ?? '', disabled: !pode(ctx) })),
     pode(ctx) ? el('div', {}, el('button', { class: 'btn primario' }, 'Salvar')) : null);
@@ -686,6 +779,7 @@ async function telaConfiguracoes(ctx) {
       await api.put(`${base(ctx)}/configuracoes`, {
         alertar_ignicao: f.alertar_ignicao.checked, horario_inicio: d.horario_inicio, horario_fim: d.horario_fim,
         dias_uso: DIAS.map((_, i) => (f[`dia_${i}`].checked ? i : '')).join(''), sem_comunicacao_min: d.sem_comunicacao_min, email: d.email, telefone: d.telefone,
+        preco_combustivel_centavos: centavos(d.preco_combustivel), ocioso_l_h: d.ocioso_l_h,
       });
       toast('Configurações salvas.');
     });

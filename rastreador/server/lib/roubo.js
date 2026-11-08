@@ -116,7 +116,7 @@ function abrirInterno(db, veiculo, { tipo, usuarioId = null, observacao = null }
     const id = Number(db.prepare(`INSERT INTO ocorrencias (empresa_id, veiculo_id, tipo, status, observacao, criada_por, criada_em)
       VALUES (?, ?, ?, 'aguardando', ?, ?, ?)`).run(veiculo.empresa_id, veiculo.id, tipo, observacao ? String(observacao).slice(0, 500) : null, usuarioId, agora()).lastInsertRowid);
     const pos = { lat: veiculo.lat, lng: veiculo.lng, velocidade_kmh: veiculo.velocidade_kmh };
-    evento(db, id, tipo === 'roubo' ? 'Modo roubo acionado.' : 'Início do horário de bloqueio programado.', pos);
+    evento(db, id, { roubo: 'Modo roubo acionado.', agenda: 'Início do horário de bloqueio programado.', manual: 'Bloqueio pedido pelo painel.' }[tipo] ?? 'Bloqueio aberto.', pos);
     const oc = db.prepare('SELECT * FROM ocorrencias WHERE id = ?').get(id);
     if (veiculo.bloqueado) {
       db.prepare("UPDATE ocorrencias SET status = 'bloqueado' WHERE id = ?").run(id);
@@ -167,6 +167,28 @@ function aoResponder(db, comando, sucesso, resposta) {
   }
 }
 
+/**
+ * Bloquear (botão comum): com o veículo seguro (devagar ou desligado) o comando sai na hora, como sempre (devolve null).
+ * Andando acima da velocidade segura, abre um bloqueio inteligente "manual": o corte espera, igual ao Modo Roubo, mas sem
+ * perseguição e sem avisos de roubo. Devolve o id da ocorrência.
+ */
+function bloquearComSeguranca(db, veiculo, d, usuarioId) {
+  if (veiculo.bloqueado || seguroAgora(veiculo, limiteSeguro(db))) return null;
+  const digitada = String(d.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '');
+  if (digitada !== veiculo.placa) throw new ErroNegocio('Para bloquear, digite a placa do veículo para confirmar.', 422);
+  v_exigir(!db.prepare("SELECT 1 FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(veiculo.id),
+    'Já há um bloqueio em andamento neste veículo (veja em Segurança).');
+  return transacao(db, () => abrirInterno(db, veiculo, { tipo: 'manual', usuarioId }));
+}
+
+/** Desbloquear (botão comum) com um bloqueio manual aberto: encerra a ocorrência (e só desbloqueia se o corte já saiu). */
+function desbloquearManual(db, veiculo, usuarioId) {
+  const oc = db.prepare("SELECT * FROM ocorrencias WHERE veiculo_id = ? AND tipo = 'manual' AND status <> 'encerrada'").get(veiculo.id);
+  if (!oc) return false;
+  encerrar(db, oc, { desbloquear: oc.status !== 'aguardando', texto: oc.status === 'aguardando' ? 'Bloqueio cancelado antes do corte.' : 'Desbloqueio pedido pelo painel.' }, usuarioId);
+  return true;
+}
+
 /** Corte imediato, sem esperar a velocidade (o cliente assume o risco; exige a placa digitada). */
 function forcar(db, oc, d) {
   const veiculo = db.prepare('SELECT * FROM veiculos WHERE id = ?').get(oc.veiculo_id);
@@ -205,4 +227,4 @@ function listar(db, empresaId, tipo = 'roubo') {
   return lista.map((o) => ({ ...o, eventos: o.status === 'encerrada' ? [] : eventos.all(o.id) }));
 }
 
-module.exports = { abrir, abrirAutomatico, abrirInterno, aoReceber, aoResponder, forcar, encerrar, listar, limiteSeguro };
+module.exports = { abrir, abrirAutomatico, abrirInterno, aoReceber, aoResponder, forcar, encerrar, listar, limiteSeguro, bloquearComSeguranca, desbloquearManual };

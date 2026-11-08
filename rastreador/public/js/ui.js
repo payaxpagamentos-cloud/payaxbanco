@@ -64,9 +64,13 @@ export const TIPOS_ALERTA = {
   velocidade: 'Excesso de velocidade', cerca_entrada: 'Entrada na cerca', cerca_saida: 'Saída da cerca', ignicao_ligada: 'Ignição ligada',
   ignicao_desligada: 'Ignição desligada', fora_horario: 'Uso fora do horário', panico: 'Botão de pânico', bateria_desconectada: 'Bateria desconectada',
   bateria_baixa: 'Bateria baixa', sem_comunicacao: 'Sem comunicação', violacao: 'Violação do equipamento',
+  sumico_suspeito: 'Sumiço suspeito', voltou_comunicar: 'Voltou a comunicar', estacionado_violado: 'Estacionado violado', vibracao: 'Vibração no veículo',
+  deslocamento: 'Deslocamento (alarme do aparelho)',
 };
 // Alertas que pedem atenção imediata (vermelhos).
-export const ALERTAS_GRAVES = ['panico', 'bateria_desconectada', 'violacao'];
+export const ALERTAS_GRAVES = ['panico', 'bateria_desconectada', 'violacao', 'sumico_suspeito', 'estacionado_violado'];
+// Alertas que podem ser roubo: mostram o atalho "Modo Roubo".
+export const ALERTAS_SEGURANCA = ['panico', 'bateria_desconectada', 'violacao', 'sumico_suspeito', 'estacionado_violado', 'vibracao', 'deslocamento', 'cerca_saida', 'fora_horario'];
 export const TIPOS_COMANDO = { bloquear: 'Bloquear', desbloquear: 'Desbloquear', localizar: 'Pedir posição', reiniciar: 'Reiniciar equipamento', status: 'Consultar estado',
   parametros: 'Consultar configuração', personalizado: 'Personalizado' };
 // Modelos sugeridos no cadastro do rastreador (o J16 4G tem os comandos próprios no servidor).

@@ -1,0 +1,31 @@
+/* App do motorista: uma coluna, letras maiores e botões grandes para o celular. */
+body.app-motorista-pagina{ font-size: 15px; background: var(--bg); min-height: 100vh; }
+.app-motorista-pagina #app{ max-width: 480px; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 16px 32px; }
+.motorista-marca{ display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 15px; }
+.motorista-marca .marca-icone{ width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--menta); color: #0B1B3F; }
+.motorista-marca .marca-icone svg{ width: 18px; height: 18px; }
+.motorista-topo{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.motorista-entrada{ display: flex; flex-direction: column; gap: 12px; padding-top: 8vh; }
+.motorista-entrada h1{ font-size: 28px; margin: 12px 0 0; }
+.motorista-entrada input, .app-motorista-pagina .btn.largo{ min-height: 48px; font-size: 16px; }
+.app-motorista-pagina h1{ font-size: 24px; margin: 0; }
+.veiculo-motorista{ background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative; overflow: hidden; }
+.veiculo-motorista::before{ content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--ok); }
+.veiculo-motorista.tom-erro::before{ background: var(--erro); }
+.veiculo-motorista.tom-aviso::before{ background: var(--aviso); }
+.veiculo-motorista h2{ margin: 0; font-size: 20px; letter-spacing: .02em; }
+.veiculo-motorista .estado{ text-align: right; display: flex; flex-direction: column; }
+.veiculo-motorista .estado strong{ font-size: 15px; }
+.veiculo-motorista.tom-ok .estado strong{ color: var(--ok); }
+.veiculo-motorista.tom-erro .estado strong{ color: var(--erro); }
+.veiculo-motorista.tom-aviso .estado strong{ color: var(--aviso); }
+.veiculo-motorista .estado span{ font-size: 12px; color: var(--text-2); }
+.pedir{ display: flex; flex-direction: column; gap: 10px; }
+.pedir .chip{ font-size: 15px; padding: 10px 18px; }
+.codigo-motorista{ text-align: center; padding: 16px; border-radius: 14px; background: linear-gradient(135deg, #0B1B3F, #12306B 60%, #087E92); color: #FFFFFF; }
+.codigo-motorista p{ margin: 0 0 8px; font-size: 13px; opacity: .85; }
+.codigo-motorista .numero{ font-size: 44px; font-weight: 800; letter-spacing: .12em; font-variant-numeric: tabular-nums; color: var(--menta); }
+.codigo-motorista .btn{ background: rgba(255, 255, 255, .12); color: #FFFFFF; border-color: rgba(255, 255, 255, .25); }
+.pedidos{ list-style: none; margin: 0; padding: 0; }
+.pedidos li{ display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.pedidos .dir{ text-align: right; }

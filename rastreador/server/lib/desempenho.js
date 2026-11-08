@@ -67,7 +67,7 @@ function calcular(db, empresaId, de, ate) {
     const litrosOciosos = (p.ocioso_s / 3600) * (empresa?.ocioso_l_h ?? 0.8);
     const custo = preco && litros !== null ? { combustivel: litros * preco, ocioso: litrosOciosos * preco } : null;
     return {
-      id: x.id, placa: x.placa, descricao: x.descricao, motorista_id: x.motorista_id, motorista: x.motorista,
+      id: x.id, placa: x.placa, descricao: x.descricao, motorista_id: x.motorista_id, motorista: x.motorista, consumo_km_l: x.consumo_km_l,
       km: Math.round(km * 10) / 10, ligado_s: u.s, velocidade_max_kmh: u.vmax, ...p, excessos: al.velocidade ?? 0, fora_horario: al.fora_horario ?? 0,
       alertas: Object.values(al).reduce((s, k) => s + k, 0), ...n,
       litros: litros === null ? null : Math.round((litros + litrosOciosos) * 10) / 10,

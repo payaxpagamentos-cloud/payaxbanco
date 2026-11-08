@@ -62,6 +62,10 @@ module.exports = (db, extras = {}) => {
           (SELECT COUNT(*) FROM alertas a WHERE a.empresa_id = e.id AND a.tratado_em IS NULL) AS alertas_pendentes
         FROM empresas e LEFT JOIN veiculos v ON v.empresa_id = e.id AND v.ativo = 1 WHERE e.status <> 'excluida'
         GROUP BY e.id ORDER BY veiculos DESC, e.nome LIMIT 10`).all(corte),
+      // Modo Roubo em andamento em todas as empresas (a central acompanha).
+      roubos: db.prepare(`SELECT o.id, o.status, o.criada_em, o.empresa_id, e.nome AS empresa, v.id AS veiculo_id, v.placa, v.descricao, v.velocidade_kmh, v.posicao_em
+        FROM ocorrencias o JOIN veiculos v ON v.id = o.veiculo_id JOIN empresas e ON e.id = o.empresa_id
+        WHERE o.tipo = 'roubo' AND o.status <> 'encerrada' ORDER BY o.criada_em DESC`).all(),
     });
   });
 

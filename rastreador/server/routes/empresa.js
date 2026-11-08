@@ -211,6 +211,18 @@ module.exports = (db, extras = {}) => {
   // ---------- Comandos ----------
   r.post('/veiculos/:id/comandos', gestor, (req, res) => {
     const x = veiculo(req, req.params.id);
+    // Todo corte passa pelo bloqueio inteligente: andando acima da velocidade segura, o corte espera.
+    if (req.body.tipo === 'bloquear') {
+      const oc = roubo.bloquearComSeguranca(db, x, req.body, req.usuario.id);
+      if (oc) {
+        registrar(db, req, 'bloqueio_inteligente', { placa: x.placa });
+        return res.status(201).json({ ocorrencia_id: oc, status: 'aguardando_velocidade', velocidade_segura_kmh: roubo.limiteSeguro(db) });
+      }
+    }
+    if (req.body.tipo === 'desbloquear' && roubo.desbloquearManual(db, x, req.usuario.id)) {
+      registrar(db, req, 'comando_criado', { placa: x.placa, tipo: 'desbloquear' });
+      return res.status(201).json({ tipo: 'desbloquear', status: 'pendente' });
+    }
     const id = com.criar(db, x, req.body, req.usuario.id);
     registrar(db, req, 'comando_criado', { placa: x.placa, tipo: req.body.tipo });
     const c = db.prepare('SELECT id, tipo, status FROM comandos WHERE id = ?').get(id);
@@ -291,7 +303,9 @@ module.exports = (db, extras = {}) => {
   // ---------- Motoristas ----------
   r.get('/motoristas', (req, res) => {
     res.json(db.prepare(`SELECT m.*, (SELECT GROUP_CONCAT(v.placa, ', ') FROM veiculos v WHERE v.motorista_id = m.id AND v.ativo = 1) AS veiculos
-      FROM motoristas m WHERE m.empresa_id = ? ORDER BY m.ativo DESC, m.nome`).all(eid(req)));
+      FROM motoristas m WHERE m.empresa_id = ? ORDER BY m.ativo DESC, m.nome`).all(eid(req))
+      // O hash da senha do app não sai do servidor: só se o motorista tem acesso.
+      .map(({ senha_hash: senha, ...m }) => ({ ...m, app: Boolean(senha) })));
   });
 
   const dadosMotorista = (d, atual) => {
@@ -763,8 +777,11 @@ module.exports = (db, extras = {}) => {
         ids.push(com.criar(db, x, { tipo: 'personalizado', texto: c.texto, rotulo: c.rotulo }, req.usuario.id));
         return;
       }
-      const f = equip.AJUSTES[ajuste] ?? (plataforma ? equip.AJUSTES_PLATAFORMA[ajuste] : null);
-      if (!f) throw new ErroNegocio(equip.AJUSTES_PLATAFORMA[ajuste] ? 'Só a equipe da plataforma faz este ajuste.' : 'Ajuste desconhecido.', 422);
+      // A empresa consulta e reinicia; os ajustes (intervalos, alarmes, fuso, servidor) são da equipe da plataforma, porque um erro tira o aparelho do ar.
+      const conhecido = equip.AJUSTES[ajuste] ?? equip.AJUSTES_PLATAFORMA[ajuste];
+      if (!conhecido) throw new ErroNegocio('Ajuste desconhecido.', 422);
+      if (!plataforma) throw new ErroNegocio('Só a equipe da plataforma faz este ajuste. Peça ao suporte.', 403);
+      const f = conhecido;
       if (ajuste === 'fabrica') v.exigir(String(req.body.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '') === x.placa, 'Digite a placa para confirmar o padrão de fábrica.');
       if (ajuste === 'perfil') {
         v.exigir(equip.PERFIS[req.body.valor], 'Perfil desconhecido.');

@@ -2,6 +2,10 @@ import { api, sessao } from './api.js';
 import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, PERFIS } from './ui.js';
 import { TELAS_MASTER } from './master.js';
 import { TELAS_EMPRESA } from './empresa.js';
+import { TELAS_SEGURANCA } from './seguranca.js';
+import { TELAS_FROTA } from './frota.js';
+import { TELAS_AVISOS } from './avisos.js';
+import { montarAssistente } from './assistente.js';
 import { iniciarCena } from './cena-entrada.js';
 import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 
@@ -22,19 +26,40 @@ const MENU_MASTER = [
   ['configuracoes', 'Configurações', 'configuracoes', null, [
     ['configuracoes', 'Parâmetros', 'configuracoes', 'Nome da plataforma e regras do rastreamento', ['master']],
     ['comandos-gt06', 'Comandos GT06', 'comandos', 'Textos enviados aos rastreadores sem comandos próprios', ['master']],
+    ['whatsapp', 'WhatsApp', 'alertas', 'Conexão com a Evolution, teste e contatos da central', ['master', 'suporte']],
+    ['assistente-ia', 'Assistente IA', 'pergunta', 'Limite por empresa e o uso do mês', ['master']],
     ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas'],
     ['diagnostico', 'Diagnóstico', 'diagnostico', 'Servidor GT06, recepção e equipamentos com problema'],
     ['atividades', 'Atividades', 'seguranca', 'Registro das ações feitas no painel', ['master']],
   ]],
 ];
+const GESTOR = ['master', 'suporte', 'cliente'];
 const MENU_EMPRESA = [
   ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa ao vivo', 'mapa'], ['historico', 'Histórico', 'historico'], ['alertas', 'Alertas', 'alertas'],
-  ['veiculos', 'Veículos', 'veiculos'], ['motoristas', 'Motoristas', 'motoristas'], ['cercas', 'Cercas', 'cercas'], ['manutencao', 'Manutenção', 'manutencao'],
-  ['relatorios', 'Relatórios', 'relatorios'],
+  ['seguranca', 'Segurança', 'seguranca', null, [
+    ['roubo', 'Roubo', 'seguranca', 'Modo Roubo com bloqueio inteligente e o kit de ocorrência'],
+    ['estacionados', 'Estacionados', 'alvo', 'Veículo parado e vigiado: avisa se ligar ou sair'],
+    ['bloqueio-programado', 'Bloqueio programado', 'cadeado', 'Horário de bloqueio e o app do motorista'],
+    ['liberacoes', 'Liberações', 'aberto', 'Código do motorista para liberar o veículo', GESTOR],
+  ]],
+  ['cercas', 'Cercas', 'cercas'],
+  ['frota', 'Frota', 'veiculos', null, [
+    ['veiculos', 'Veículos', 'veiculos', 'Cadastro, rastreador e motorista fixo'],
+    ['motoristas', 'Motoristas', 'motoristas', 'Cadastro, CNH e acesso ao app'],
+    ['ranking', 'Nota e ranking', 'dashboard', 'Nota de 0 a 100 de cada motorista'],
+    ['custos', 'Custos', 'carteira', 'Combustível e motor parado em reais'],
+    ['manutencao', 'Manutenção', 'manutencao', 'Planos por km e por data'],
+    ['equipamentos', 'Equipamentos', 'rastreadores', 'Saúde e funções do J16'],
+  ]],
+  ['relatorios', 'Relatórios', 'relatorios', null, [
+    ['relatorios', 'Relatórios', 'relatorios', 'Por veículo e período, em planilha e PDF'],
+    ['programados', 'Programados', 'historico', 'PDF pelo WhatsApp: diário, semanal, quinzenal e mensal'],
+  ]],
   ['configuracoes', 'Configurações', 'configuracoes', null, [
-    ['configuracoes', 'Geral', 'configuracoes', 'Alertas, horário de uso, contato, plano e usuários'],
+    ['configuracoes', 'Geral', 'configuracoes', 'Alertas, horário de uso, custos, plano e usuários'],
+    ['notificacoes', 'Notificações', 'alertas', 'Contatos do WhatsApp e o que cada um recebe'],
     ['comandos', 'Comandos', 'comandos', 'Envio de comandos aos rastreadores e as respostas'],
-    ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas', ['master', 'suporte', 'cliente']],
+    ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas', GESTOR],
   ]],
 ];
 
@@ -43,12 +68,13 @@ const SUBTITULOS_MASTER = {
   dashboard: 'Resumo da plataforma, das empresas e dos equipamentos.', mapa: 'Última posição dos veículos de todas as empresas.',
   empresas: 'Clientes da plataforma, planos e limites.', financeiro: 'Valor mensal de cada cliente: mensalidade por veículo × veículos ativos.', rastreadores: 'Equipamentos cadastrados, estoque e instalação.',
   usuarios: 'Quem acessa a plataforma e o que cada perfil pode fazer.', diagnostico: 'Conexões dos equipamentos e mensagens recebidas.',
-  configuracoes: 'Parâmetros, comandos GT06, integrações, diagnóstico e atividades.', atividades: 'Registro das ações feitas no painel.',
+  configuracoes: 'Parâmetros, comandos GT06, WhatsApp, assistente, integrações, diagnóstico e atividades.', atividades: 'Registro das ações feitas no painel.',
 };
 const SUBTITULOS_EMPRESA = {
   dashboard: 'Resumo da frota, dos deslocamentos e dos alertas.', mapa: 'Última posição de cada veículo.', historico: 'Trajetos, paradas e viagens por período.',
-  alertas: 'Ocorrências dos veículos e o que já foi tratado.', cercas: 'Áreas monitoradas com aviso de entrada e saída.', relatorios: 'Relatórios por veículo e período.',
-  configuracoes: 'Preferências da empresa, comandos e integrações.',
+  alertas: 'Ocorrências dos veículos e o que já foi tratado.', cercas: 'Áreas monitoradas: entrada, saída, horário e ação ao sair.',
+  seguranca: 'Modo Roubo, estacionados, bloqueio programado e liberações.', frota: 'Veículos, motoristas, nota, custos, manutenção e equipamentos.',
+  relatorios: 'Relatórios por período e os que chegam sozinhos pelo WhatsApp.', configuracoes: 'Preferências, avisos pelo WhatsApp, comandos e integrações.',
 };
 
 window.addEventListener('rastreador:sair', () => desenhar());
@@ -79,7 +105,7 @@ async function desenhar() {
     ({ empresaId, tela } = rota());
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
-  const telas = empresaId ? TELAS_EMPRESA : TELAS_MASTER;
+  const telas = empresaId ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS } : TELAS_MASTER;
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
   const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp]) => permitido(sp));
   const item = menu.find(([k, , , perfis, subs]) => permitido(perfis) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));
@@ -158,6 +184,8 @@ async function desenhar() {
     ir: (tela2, eid = empresaId) => ir(eid, tela2),
     renomearEmpresa: (id, nome) => nomesEmpresa.set(id, nome),
   };
+  // Assistente com IA: botão fixo no canto, em todas as telas da empresa (só aparece se a plataforma ligou).
+  if (empresaId) montarAssistente(casca, ctx);
   try {
     await telas[tela](ctx);
   } catch (err) {
