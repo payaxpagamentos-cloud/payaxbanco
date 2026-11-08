@@ -48,6 +48,9 @@ function criarApp(db, extras = {}) {
   // Tudo é servido em RASTREADOR_BASE_PATH (ex.: /rastreador): o painel, a página de compartilhamento e a API em <endereço>/api.
   const r = express.Router();
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  r.use('/api/motorista/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  // Código de liberação: poucas tentativas por minuto (são 6 números).
+  r.use(/^\/api\/empresas\/\d+\/liberacoes\/(consultar|aplicar)$/, limitar({ janelaMs: 60_000, maximo: 20 }));
   // A API de integração recebe lotes de posições; o app Traccar Client envia formulário ou JSON.
   r.use(express.json({ limit: '1mb' }));
   r.use(express.urlencoded({ extended: false, limit: '100kb' }));

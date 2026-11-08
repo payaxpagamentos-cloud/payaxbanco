@@ -10,6 +10,8 @@ const { registrar } = require('../lib/auditoria');
 const { criarUsuario, alterarUsuario, criarChave } = require('../lib/contas');
 const { veiculosMapa, csv, reais, enviarCsv } = require('../lib/relatorios');
 const { hoje, somarDias } = require('../lib/datas');
+const zap = require('../lib/whatsapp');
+const notif = require('../lib/notificacoes');
 const v = require('../lib/validacao');
 
 const TIPOS = ['frota', 'pessoa', 'locadora'];
@@ -365,6 +367,7 @@ module.exports = (db, extras = {}) => {
       online_min: [1, 1440], parada_min: [1, 240], retencao_dias: [7, 3650], velocidade_max_plausivel_kmh: [50, 1000], comando_expira_horas: [1, 720],
       limite_veiculos_padrao: [0, 100_000], mensalidade_padrao_centavos: [0, 10_000_000], sem_comunicacao_padrao_min: [0, 7 * 24 * 60],
       bloqueio_velocidade_segura_kmh: [5, 60],
+      estacionado_raio_m: [30, 2000], sumico_min: [2, 120], liberacao_codigo_min: [3, 60], liberacao_aviso_min: [0, 120], ia_limite_dia: [0, 10_000],
     };
     const novos = {};
     for (const k of Object.keys(d)) {
@@ -396,6 +399,60 @@ module.exports = (db, extras = {}) => {
     db.prepare('UPDATE chaves_api SET revogada_em = ? WHERE id = ?').run(agora(), k.id);
     registrar(db, req, 'chave_revogada', { prefixo: k.prefixo }, k.empresa_id);
     res.status(204).end();
+  });
+
+  // ---------- WhatsApp (Evolution) e contatos da plataforma ----------
+  r.get('/whatsapp', async (_req, res, next) => {
+    try {
+      res.json({
+        situacao: await zap.situacao(),
+        fila: db.prepare("SELECT status, COUNT(*) AS n FROM mensagens WHERE criado_em >= ? GROUP BY status").all(new Date(Date.now() - 86_400_000).toISOString()),
+        mensagens: db.prepare(`SELECT m.id, m.numero, substr(m.texto, 1, 140) AS texto, m.origem, m.status, m.tentativas, m.erro, m.criado_em, m.enviado_em, e.nome AS empresa
+          FROM mensagens m LEFT JOIN empresas e ON e.id = m.empresa_id ORDER BY m.id DESC LIMIT 50`).all(),
+        contatos: db.prepare('SELECT * FROM contatos_notificacao WHERE empresa_id IS NULL ORDER BY nome').all(),
+        tipos: notif.TIPOS_AVISO, seguranca: [...notif.SEGURANCA],
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  r.post('/whatsapp/teste', soMaster, (req, res) => {
+    v.exigir(zap.configurado(), 'Configure a Evolution no .env do servidor (RASTREADOR_EVOLUTION_URL, _INSTANCIA e _CHAVE).');
+    zap.enfileirar(db, { numero: v.telefone(req.body.numero), texto: '*Rastreador*\nMensagem de teste: o WhatsApp da plataforma está funcionando.', origem: 'teste' });
+    res.status(202).json({ ok: true });
+  });
+  const dadosContato = (d, atual) => {
+    const tipos = [].concat(d.tipos ?? (atual ? atual.tipos.split(',') : [])).map(String).filter((t) => notif.SEGURANCA.has(t));
+    v.exigir(tipos.length, 'Marque pelo menos um aviso de segurança.');
+    return { nome: v.texto(d.nome ?? atual?.nome, 'o nome', 80), numero: zap.normalizarNumero(v.telefone(d.numero ?? atual?.numero)), tipos: [...new Set(tipos)].join(','),
+      ativo: d.ativo !== undefined ? (v.booleano(d.ativo) ? 1 : 0) : atual?.ativo ?? 1 };
+  };
+  r.post('/contatos', soMaster, (req, res) => {
+    const x = dadosContato(req.body);
+    const id = Number(db.prepare('INSERT INTO contatos_notificacao (empresa_id, nome, numero, tipos, ativo, criado_em) VALUES (NULL, ?, ?, ?, ?, ?)')
+      .run(x.nome, x.numero, x.tipos, x.ativo, agora()).lastInsertRowid);
+    res.status(201).json({ id });
+  });
+  r.put('/contatos/:id', soMaster, (req, res) => {
+    const atual = db.prepare('SELECT * FROM contatos_notificacao WHERE id = ? AND empresa_id IS NULL').get(nid(req));
+    if (!atual) throw naoEncontrado('Contato');
+    const x = dadosContato(req.body, atual);
+    db.prepare('UPDATE contatos_notificacao SET nome = ?, numero = ?, tipos = ?, ativo = ? WHERE id = ?').run(x.nome, x.numero, x.tipos, x.ativo, atual.id);
+    res.status(204).end();
+  });
+  r.delete('/contatos/:id', soMaster, (req, res) => {
+    db.prepare('DELETE FROM contatos_notificacao WHERE id = ? AND empresa_id IS NULL').run(nid(req));
+    res.status(204).end();
+  });
+
+  // ---------- Assistente com IA: uso por empresa ----------
+  r.get('/ia', soMaster, (_req, res) => {
+    const cfgIa = config.ia;
+    res.json({
+      configurado: Boolean(cfgIa.chave), modelo: cfgIa.modelo, limite_dia: lerConfig(db).ia_limite_dia,
+      uso: db.prepare(`SELECT u.empresa_id, e.nome AS empresa, SUM(CASE WHEN u.data = ? THEN u.perguntas ELSE 0 END) AS hoje, SUM(u.perguntas) AS mes
+        FROM ia_uso u JOIN empresas e ON e.id = u.empresa_id WHERE u.data >= ? GROUP BY u.empresa_id ORDER BY mes DESC`).all(hoje(), hoje().slice(0, 8) + '01'),
+    });
   });
 
   return r;

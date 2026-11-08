@@ -88,6 +88,16 @@ function responder(db, id, { sucesso, resposta }) {
     }
     // Corte do modo roubo: a ocorrência acompanha a resposta (carregado aqui para não haver dependência circular).
     require('./roubo').aoResponder(db, c, sucesso, resposta);
+    // Consultas do equipamento (STATUS#, PARAM#, CXZT): os campos lidos vão para a ficha do rastreador.
+    if (resposta && /^(STATUS#|PARAM#|CXZT)$/i.test(c.texto)) {
+      const lido = require('./equipamento').lerResposta(resposta);
+      if (Object.keys(lido).length) {
+        const r = db.prepare('SELECT saude FROM rastreadores WHERE id = ?').get(c.rastreador_id);
+        const saude = { ...(r?.saude ? JSON.parse(r.saude) : {}), ...lido };
+        db.prepare('UPDATE rastreadores SET saude = ?, saude_em = ?, firmware = COALESCE(?, firmware) WHERE id = ?')
+          .run(JSON.stringify(saude), agora(), lido.firmware ?? null, c.rastreador_id);
+      }
+    }
     return true;
   });
 }

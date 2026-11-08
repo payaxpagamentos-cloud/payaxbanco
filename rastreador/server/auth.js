@@ -12,7 +12,13 @@ function emitirToken(usuario) {
   return `${payload}.${assinar(payload)}`;
 }
 
-function lerToken(token) {
+/** Token do app do motorista: outro público ("rastreador-motorista"), com o id do motorista. */
+function emitirTokenMotorista(motorista) {
+  const payload = Buffer.from(JSON.stringify({ sub: motorista.id, aud: 'rastreador-motorista', exp: Math.floor(Date.now() / 1000) + 30 * 86_400 })).toString('base64url');
+  return `${payload}.${assinar(payload)}`;
+}
+
+function lerToken(token, aud = 'rastreador') {
   const [payload, assinatura] = String(token ?? '').split('.');
   if (!payload || !assinatura) return null;
   const esperado = Buffer.from(assinar(payload));
@@ -20,7 +26,7 @@ function lerToken(token) {
   if (esperado.length !== recebido.length || !crypto.timingSafeEqual(esperado, recebido)) return null;
   try {
     const dados = JSON.parse(Buffer.from(payload, 'base64url').toString());
-    return dados.aud === 'rastreador' && dados.exp > Date.now() / 1000 ? dados : null;
+    return dados.aud === aud && dados.exp > Date.now() / 1000 ? dados : null;
   } catch {
     return null;
   }
@@ -39,6 +45,20 @@ function autenticar(db) {
     if (!usuario || !usuario.ativo) return next(new ErroNegocio('Usuário inativo.', 401));
     if (usuario.empresa_id && usuario.empresa_status !== 'ativa') return next(new ErroNegocio('Empresa bloqueada. Fale com o suporte.', 401));
     req.usuario = usuario;
+    next();
+  };
+}
+
+/** App do motorista: o motorista ativo, de empresa ativa, com o app liberado (senha cadastrada). */
+function autenticarMotorista(db) {
+  const buscar = db.prepare(`SELECT m.*, e.nome AS empresa_nome, e.status AS empresa_status FROM motoristas m JOIN empresas e ON e.id = m.empresa_id WHERE m.id = ?`);
+  return (req, _res, next) => {
+    const c = req.get('authorization') || '';
+    const dados = lerToken(c.startsWith('Bearer ') ? c.slice(7) : null, 'rastreador-motorista');
+    if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
+    const m = buscar.get(dados.sub);
+    if (!m || !m.ativo || !m.senha_hash || m.empresa_status !== 'ativa') return next(new ErroNegocio('Acesso do motorista desativado.', 401));
+    req.motorista = m;
     next();
   };
 }
@@ -67,4 +87,4 @@ function acessoEmpresa(db) {
   };
 }
 
-module.exports = { emitirToken, lerToken, autenticar, permitir, acessoEmpresa, PLATAFORMA };
+module.exports = { emitirToken, emitirTokenMotorista, lerToken, autenticar, autenticarMotorista, permitir, acessoEmpresa, PLATAFORMA };

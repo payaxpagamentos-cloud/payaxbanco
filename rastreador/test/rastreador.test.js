@@ -505,6 +505,122 @@ test('Rastreador', async (t) => {
     assert.equal(cortes().length, 0, 'encerrar cancela o corte ainda não entregue');
   });
 
+  await t.test('segurança: estacionado, sumiço suspeito, bloqueio programado com código do motorista e WhatsApp', async () => {
+    const http = require('node:http');
+    const config = require('../server/config');
+    const { receber } = require('../server/lib/posicoes');
+    const { manutencao } = require('../server/lib/manutencao');
+    const agenda = require('../server/lib/agenda');
+    const zap = require('../server/lib/whatsapp');
+    const { local } = require('../server/lib/datas');
+    const db = api.db;
+    // Só os alertas criados neste teste (os anteriores podem ter o mesmo horário).
+    const desde = db.prepare('SELECT COALESCE(MAX(id), 0) AS n FROM alertas').get().n;
+    // Evolution de mentira: guarda o que chegar.
+    const recebidas = [];
+    const evo = http.createServer((q, rs) => { let b = ''; q.on('data', (c) => { b += c; }); q.on('end', () => { recebidas.push({ url: q.url, apikey: q.headers.apikey, corpo: JSON.parse(b || '{}') }); rs.end('{"key":{"id":"1"}}'); }); });
+    await new Promise((ok) => evo.listen(0, '127.0.0.1', ok));
+    Object.assign(config.whatsapp, { url: `http://127.0.0.1:${evo.address().port}`, instancia: 'central', chave: 'chave-teste' });
+    // Espera a fila esvaziar (o envio também começa sozinho logo depois de a mensagem entrar).
+    const esvaziar = async () => {
+      for (let i = 0; i < 100; i++) {
+        await zap.processarFila(db);
+        if (!db.prepare("SELECT 1 FROM mensagens WHERE status = 'pendente'").get()) return;
+        await new Promise((ok) => { setTimeout(ok, 20); });
+      }
+    };
+    try {
+      db.prepare("UPDATE ocorrencias SET status = 'encerrada', encerrada_em = ? WHERE veiculo_id = ? AND status <> 'encerrada'").run(new Date().toISOString(), veiculo);
+      db.prepare('UPDATE veiculos SET bloqueado = 0 WHERE id = ?').run(veiculo);
+      const c = await api.post(`${base()}/contatos`, { nome: 'Ana', numero: '(11) 99999-0000', tipos: ['estacionado_violado', 'sumico_suspeito', 'voltou_comunicar', 'liberacao'] }, cliente);
+      assert.equal(c.status, 201);
+      const p0 = db.prepare('SELECT lat, lng, posicao_em FROM veiculos WHERE id = ?').get(veiculo);
+      // Depois da última posição já gravada (os testes anteriores deixaram posições de até alguns segundos à frente).
+      let t1 = Math.max(Date.now(), Date.parse(p0.posicao_em ?? 0)) + 1000;
+      const posicao = (dLat, vel, ign) => { t1 += 2000; return receber(db, { imei: IMEI, protocolo: 'gt06', lat: p0.lat + dLat, lng: p0.lng, velocidade_kmh: vel, ignicao: ign, gps_em: new Date(t1).toISOString() }); };
+      posicao(0, 0, false);
+
+      // Estacionado: saiu 300 m do ponto → alerta (e WhatsApp para a Ana); o aparelho recebe o MOVING.
+      assert.equal((await api.post(`${base()}/veiculos/${veiculo}/estacionar`, {}, cliente)).status, 201);
+      assert.ok(db.prepare("SELECT 1 FROM comandos WHERE veiculo_id = ? AND texto LIKE 'MOVING,ON,%'").get(veiculo));
+      assert.equal((await api.post(`${base()}/veiculos/${veiculo}/estacionar`, {}, cliente)).status, 422, 'um por vez');
+      posicao(0.0001, 0, false);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM alertas WHERE veiculo_id = ? AND tipo = 'estacionado_violado' AND id > ?").get(veiculo, desde).n, 0, '11 m não dispara');
+      posicao(0.0027, 12, false);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM alertas WHERE veiculo_id = ? AND tipo = 'estacionado_violado' AND id > ?").get(veiculo, desde).n, 1);
+      await esvaziar();
+      const msg = recebidas.find((x) => /Estacionado violado/.test(x.corpo.text ?? ''));
+      assert.ok(msg, 'aviso pelo WhatsApp');
+      assert.equal(msg.corpo.number, '5511999990000');
+      assert.equal(msg.apikey, 'chave-teste');
+      assert.match(msg.url, /\/message\/sendText\/central$/);
+      assert.equal((await api.post(`${base()}/veiculos/${veiculo}/desarmar`, {}, cliente)).status, 204);
+      assert.ok(db.prepare("SELECT 1 FROM comandos WHERE veiculo_id = ? AND texto = 'MOVING,OFF#'").get(veiculo));
+
+      // Sumiço suspeito: andando e 10 min sem comunicar → alerta; voltou → outro alerta.
+      posicao(0, 45, true);
+      db.prepare('UPDATE veiculos SET comunicacao_em = ? WHERE id = ?').run(new Date(Date.now() - 10 * 60_000).toISOString(), veiculo);
+      manutencao(db);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM alertas WHERE veiculo_id = ? AND tipo = 'sumico_suspeito' AND id > ?").get(veiculo, desde).n, 1);
+      manutencao(db);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM alertas WHERE veiculo_id = ? AND tipo = 'sumico_suspeito' AND id > ?").get(veiculo, desde).n, 1, 'uma vez só');
+      posicao(0, 0, false);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM alertas WHERE veiculo_id = ? AND tipo = 'voltou_comunicar' AND id > ?").get(veiculo, desde).n, 1);
+
+      // Bloqueio programado agora (janela que contém este minuto): o corte sai pelo bloqueio inteligente (parado).
+      const l = local();
+      const hm = (m) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; };
+      const agoraMin = l.hora * 60 + l.minuto;
+      assert.equal((await api.put(`${base()}/veiculos/${veiculo}/agenda`, { dias: '0123456', inicio: hm(agoraMin - 60), fim: hm(agoraMin + 60) }, cliente)).status, 204);
+      agenda.verificar(db);
+      let oc = db.prepare("SELECT * FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(veiculo);
+      assert.equal(oc.tipo, 'agenda');
+      assert.equal(oc.status, 'bloqueio_enviado');
+      agenda.verificar(db);
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM ocorrencias WHERE veiculo_id = ? AND tipo = 'agenda'").get(veiculo).n, 1, 'um corte por noite');
+
+      // App do motorista: senha numérica, login pelo CPF, código de 6 números.
+      const mot = db.prepare('SELECT id FROM motoristas WHERE cpf = ?').get('52998224725');
+      assert.equal((await api.put(`${base()}/motoristas/${mot.id}/app`, { senha: '12' }, cliente)).status, 422);
+      assert.equal((await api.put(`${base()}/motoristas/${mot.id}/app`, { senha: '4321' }, cliente)).status, 204);
+      assert.equal((await api.post('/motorista/login', { cpf: '529.982.247-25', senha: '0000' })).status, 401);
+      const lg = await api.post('/motorista/login', { cpf: '529.982.247-25', senha: '4321' });
+      assert.equal(lg.status, 200);
+      assert.equal((await api.get('/motorista/eu', cliente)).status, 401, 'o token do painel não abre o app');
+      const eu = (await api.get('/motorista/eu', lg.dados.token)).dados;
+      assert.equal(eu.veiculos[0].agenda.em_horario, true);
+      const pedido = await api.post('/motorista/liberacoes', { veiculo_id: veiculo, horas: 2 }, lg.dados.token);
+      assert.equal(pedido.status, 201);
+      assert.match(pedido.dados.codigo, /^\d{6}$/);
+      assert.equal((await api.post(`${base()}/liberacoes/consultar`, { codigo: '000000' === pedido.dados.codigo ? '111111' : '000000' }, cliente)).status, 422);
+      const conf = await api.post(`${base()}/liberacoes/consultar`, { codigo: pedido.dados.codigo }, cliente);
+      assert.equal(conf.dados.motorista, 'João Silva');
+      assert.equal(conf.dados.horas_pedidas, 2);
+      assert.equal((await api.post(`${base()}/liberacoes/aplicar`, { codigo: pedido.dados.codigo, horas: 1 }, operador)).status, 403, 'o operador não libera');
+      const ap = await api.post(`${base()}/liberacoes/aplicar`, { codigo: pedido.dados.codigo, horas: 1 }, cliente);
+      assert.equal(ap.status, 200);
+      assert.equal(db.prepare("SELECT status FROM ocorrencias WHERE id = ?").get(oc.id).status, 'encerrada');
+      assert.equal(db.prepare("SELECT COUNT(*) AS n FROM comandos WHERE veiculo_id = ? AND tipo = 'desbloquear' AND status = 'pendente'").get(veiculo).n, 1);
+      assert.equal((await api.post(`${base()}/liberacoes/aplicar`, { codigo: pedido.dados.codigo, horas: 1 }, cliente)).status, 422, 'código vale uma vez');
+      agenda.verificar(db);
+      assert.ok(!db.prepare("SELECT 1 FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(veiculo), 'liberado: não corta');
+      // Fim da liberação, ainda no horário: o corte volta.
+      db.prepare("UPDATE liberacoes SET libera_ate = ? WHERE veiculo_id = ? AND status = 'ativa'").run(new Date(Date.now() - 1000).toISOString(), veiculo);
+      agenda.verificar(db);
+      agenda.verificar(db);
+      oc = db.prepare("SELECT * FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(veiculo);
+      assert.equal(oc?.tipo, 'agenda', 'voltou ao bloqueio programado');
+      await esvaziar();
+      assert.ok(recebidas.some((x) => /Liberação/.test(x.corpo.text ?? '')), 'aviso da liberação pelo WhatsApp');
+      // Remover o horário libera o veículo.
+      assert.equal((await api.del(`${base()}/veiculos/${veiculo}/agenda`, undefined, cliente)).status, 204);
+      assert.equal(db.prepare('SELECT status FROM ocorrencias WHERE id = ?').get(oc.id).status, 'encerrada');
+    } finally {
+      Object.assign(config.whatsapp, { url: '', instancia: '', chave: '' });
+      await new Promise((ok) => evo.close(ok));
+    }
+  });
+
   await t.test('bloqueio da empresa e exclusão', async () => {
     assert.equal((await api.post(`/master/empresas/${empresa}/bloquear`, { motivo: 'Inadimplente' }, master)).status, 204);
     assert.equal((await api.get(`${base()}/mapa`, cliente)).status, 401);
