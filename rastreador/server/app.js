@@ -39,7 +39,9 @@ function criarApp(db, extras = {}) {
       'X-Frame-Options': 'DENY',
       // O OpenStreetMap recusa as imagens do mapa sem a origem do site (Referer); só a origem é enviada, nunca o caminho.
       'Referrer-Policy': 'strict-origin-when-cross-origin',
-      'Permissions-Policy': 'geolocation=(), camera=(), microphone=()',
+      // Localização só para o próprio site (o SOS do app do motorista manda a posição do celular); câmera e microfone, ninguém
+      // (as fotos do app vêm pelo seletor de arquivos do celular, que não precisa desta permissão).
+      'Permissions-Policy': 'geolocation=(self), camera=(), microphone=()',
       ...(config.producao ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),
       'Content-Security-Policy': CSP,
     });
@@ -52,6 +54,9 @@ function criarApp(db, extras = {}) {
   // Código de liberação: poucas tentativas por minuto (são 6 números).
   r.use(/^\/api\/empresas\/\d+\/liberacoes\/(consultar|aplicar)$/, limitar({ janelaMs: 60_000, maximo: 20 }));
   r.use(/^\/api\/empresas\/\d+\/assistente$/, limitar({ janelaMs: 60_000, maximo: 12 }));
+  // App do motorista: fotos do checklist, do abastecimento e da avaria (já reduzidas no celular) e poucos envios por minuto.
+  r.use(/^\/api\/motorista\/(sos|checklists|abastecimentos|avarias)$/, limitar({ janelaMs: 60_000, maximo: 10 }));
+  r.use('/api/motorista', express.json({ limit: '8mb' }));
   // A API de integração recebe lotes de posições; o app Traccar Client envia formulário ou JSON.
   r.use(express.json({ limit: '1mb' }));
   r.use(express.urlencoded({ extended: false, limit: '100kb' }));

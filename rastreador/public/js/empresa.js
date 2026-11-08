@@ -8,6 +8,7 @@ import { criarMapa, configPublica, linkGoogle, COR_SITUACAO } from './mapa.js';
 import { pizza, area } from './graficos.js';
 import { acionarRoubo, estacionar, desarmar, STATUS_ROUBO } from './seguranca.js';
 import { abrirFicha } from './frota.js';
+import { qrVeiculo, cartaoAvarias } from './diario.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
 const pode = (ctx) => !ctx.somenteLeitura;
@@ -385,7 +386,8 @@ async function telaVeiculos(ctx) {
       cartao(null, tabela(['Placa', 'Veículo', 'Rastreador', 'Motorista', '>Limite', '>Hodômetro', 'Situação', '^Ações'], veiculos.map((x) => el('tr', { class: x.ativo ? '' : 'inativo' },
         td(el('strong', {}, placa(x.placa))), td([x.descricao ?? TIPOS_VEICULO[x.tipo], el('div', { class: 'pequeno mudo' }, [x.marca, x.modelo, x.ano, x.cor].filter(Boolean).join(' · '))]),
         td(x.imei ? [el('span', { class: 'mono pequeno' }, x.imei), el('div', { class: 'pequeno mudo' }, x.rastreador_modelo ?? PROTOCOLOS[x.protocolo])] : '—'),
-        td(x.motorista ?? '—'), td(x.limite_velocidade_kmh ? kmh(x.limite_velocidade_kmh) : '—', 'dir num'), td(km(x.hodometro_m), 'dir num'),
+        td([x.motorista ?? (x.condutor ? null : '—'), x.condutor && x.condutor !== x.motorista ? el('div', { class: 'pequeno' }, etiqueta(`com ${x.condutor} (QR)`, 'info')) : null]),
+        td(x.limite_velocidade_kmh ? kmh(x.limite_velocidade_kmh) : '—', 'dir num'), td(km(x.hodometro_m), 'dir num'),
         td([etiquetaSituacao(x.situacao), x.bloqueado ? etiqueta('bloqueado', 'erro') : null]),
         el('td', { class: 'acoes' },
           pode(ctx) && x.ativo && !semComandos(x) ? (x.bloqueado
@@ -396,6 +398,7 @@ async function telaVeiculos(ctx) {
             if (v) await acionarRoubo(ctx, v);
           }) : null,
           x.imei && x.protocolo === 'gt06' ? botaoIcone('rastreadores', 'Equipamento (J16)', () => abrirFicha(ctx, x.id)) : null,
+          x.ativo ? botaoIcone('qr', 'QR code do veículo (app do motorista)', () => qrVeiculo(ctx, x)) : null,
           botaoIcone('historico', 'Histórico', () => { veiculoHistorico = x.id; ctx.ir('historico'); }),
           pode(ctx) ? botaoIcone('editar', 'Editar', () => formVeiculo(x)) : null,
           pode(ctx) ? botaoIcone('relatorios', 'Ajustar hodômetro', async () => {
@@ -646,8 +649,9 @@ async function telaManutencao(ctx) {
     if (r) { toast('Manutenção registrada.'); carregar(); }
   };
   async function carregar() {
-    const { planos, registros } = await api.get(`${base(ctx)}/manutencoes`);
+    const [{ planos, registros }, avarias] = await Promise.all([api.get(`${base(ctx)}/manutencoes`), cartaoAvarias(ctx)]);
     limpar(corpo,
+      avarias,
       cartao('Planos', tabela(['Veículo', 'Serviço', 'Intervalo', 'Última', 'Próxima', 'Situação', '^Ações'], planos.map((m) => el('tr', {},
         td([el('strong', {}, placa(m.placa)), el('div', { class: 'pequeno mudo' }, `hodômetro ${inteiro(m.km_atual)} km`)]), td(m.descricao),
         td([m.intervalo_km ? `${inteiro(m.intervalo_km)} km` : null, m.intervalo_dias ? `${inteiro(m.intervalo_dias)} dias` : null].filter(Boolean).join(' ou ')),
@@ -765,6 +769,9 @@ async function telaConfiguracoes(ctx) {
       el('div', { class: 'linha' }, DIAS.map((d, i) => marcar(d, { name: `dia_${i}`, checked: e.dias_uso.includes(String(i)), disabled: !pode(ctx) }))),
       el('p', { class: 'pequeno fraco', style: 'margin:0' }, 'Deixe o horário vazio para não usar este alerta. Pode virar a noite (ex.: 22:00 às 06:00).')),
     campo('Alertar veículo sem comunicação depois de (minutos, 0 = não alertar)', { name: 'sem_comunicacao_min', type: 'number', min: 0, value: e.sem_comunicacao_min, disabled: !pode(ctx) }),
+    el('fieldset', {}, el('legend', {}, 'App do motorista'),
+      marcar('Mostrar ao motorista a posição dele no ranking (ex.: 2º de 8)', { name: 'app_ranking', checked: Boolean(e.app_ranking), disabled: !pode(ctx) }),
+      el('p', { class: 'pequeno fraco', style: 'margin:0' }, 'A nota e as dicas aparecem sempre; a posição no ranking, só com esta opção.')),
     el('fieldset', {}, el('legend', {}, 'Custos (Frota → Custos)'), el('div', { class: 'duas' },
       campo('Preço do combustível (R$ por litro)', { name: 'preco_combustivel', inputmode: 'decimal', maxlength: 8, placeholder: 'Ex.: 6,19',
         value: e.preco_combustivel_centavos ? reaisCampo(e.preco_combustivel_centavos) : '', disabled: !pode(ctx) }),
@@ -779,7 +786,7 @@ async function telaConfiguracoes(ctx) {
       await api.put(`${base(ctx)}/configuracoes`, {
         alertar_ignicao: f.alertar_ignicao.checked, horario_inicio: d.horario_inicio, horario_fim: d.horario_fim,
         dias_uso: DIAS.map((_, i) => (f[`dia_${i}`].checked ? i : '')).join(''), sem_comunicacao_min: d.sem_comunicacao_min, email: d.email, telefone: d.telefone,
-        preco_combustivel_centavos: centavos(d.preco_combustivel), ocioso_l_h: d.ocioso_l_h,
+        preco_combustivel_centavos: centavos(d.preco_combustivel), ocioso_l_h: d.ocioso_l_h, app_ranking: f.app_ranking.checked,
       });
       toast('Configurações salvas.');
     });

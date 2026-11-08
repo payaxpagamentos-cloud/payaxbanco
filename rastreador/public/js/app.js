@@ -6,6 +6,7 @@ import { TELAS_SEGURANCA } from './seguranca.js';
 import { TELAS_FROTA } from './frota.js';
 import { TELAS_AVISOS } from './avisos.js';
 import { montarAssistente } from './assistente.js';
+import { TELAS_DIARIO } from './diario.js';
 import { iniciarCena } from './cena-entrada.js';
 import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 
@@ -46,6 +47,7 @@ const MENU_EMPRESA = [
   ['frota', 'Frota', 'veiculos', null, [
     ['veiculos', 'Veículos', 'veiculos', 'Cadastro, rastreador e motorista fixo'],
     ['motoristas', 'Motoristas', 'motoristas', 'Cadastro, CNH e acesso ao app'],
+    ['checklists', 'Checklists', 'check', 'Saída do veículo, pelo app do motorista'],
     ['ranking', 'Nota e ranking', 'dashboard', 'Nota de 0 a 100 de cada motorista'],
     ['custos', 'Custos', 'carteira', 'Combustível e motor parado em reais'],
     ['manutencao', 'Manutenção', 'manutencao', 'Planos por km e por data'],
@@ -105,7 +107,7 @@ async function desenhar() {
     ({ empresaId, tela } = rota());
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
-  const telas = empresaId ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS } : TELAS_MASTER;
+  const telas = empresaId ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO } : TELAS_MASTER;
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
   const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp]) => permitido(sp));
   const item = menu.find(([k, , , perfis, subs]) => permitido(perfis) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));

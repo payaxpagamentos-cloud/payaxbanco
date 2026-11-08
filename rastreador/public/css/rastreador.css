@@ -1181,3 +1181,21 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
   .abas-config:has(> :nth-child(6)) .aba-config .aba-icone{ width: 28px; height: 28px; border-radius: 50%; }
   .abas-config:has(> :nth-child(6)) .aba-config strong{ overflow: visible; }
 }
+
+/* Diário do app do motorista no painel: checklists, fotos e o QR do veículo */
+.fotos-painel{ display: flex; gap: 6px; flex-wrap: wrap; }
+.foto-painel{ width: 54px; height: 54px; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: zoom-in; background: var(--surface-2); }
+.foto-painel img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.foto-grande{ display: block; max-width: 100%; max-height: 70vh; margin: 0 auto; border-radius: 12px; }
+.qr-area{ display: grid; place-items: center; padding: 16px; background: #FFFFFF; border-radius: 14px; border: 1px solid var(--border); }
+.qr-area svg{ width: min(280px, 100%); height: auto; }
+.lista-checklists{ display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+.checklist-painel{ display: flex; flex-direction: column; gap: 10px; border-left: 4px solid var(--ok); }
+.checklist-painel.reprovado{ border-left-color: var(--erro); }
+.itens-check{ list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px; }
+.itens-check li{ display: flex; gap: 6px; align-items: flex-start; }
+.itens-check svg{ width: 14px; height: 14px; flex: none; margin-top: 1px; }
+.itens-check li.ok svg{ color: var(--ok); }
+.itens-check li.problema{ color: var(--erro); font-weight: 600; }
+.itens-check em{ font-style: normal; font-weight: 400; color: var(--text-2); }
+@media (max-width: 860px){ .lista-checklists{ grid-template-columns: minmax(0, 1fr); } .itens-check{ grid-template-columns: minmax(0, 1fr); } }

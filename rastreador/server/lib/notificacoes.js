@@ -27,6 +27,7 @@ const TIPOS_AVISO = {
   vibracao: 'Vibração no veículo',
   deslocamento: 'Deslocamento (alarme do aparelho)',
   relatorios: 'Relatórios programados',
+  app_motorista: 'App do motorista (checklist com problema e avarias)',
 };
 const SEGURANCA = new Set(['roubo', 'estacionado_violado', 'sumico_suspeito', 'panico', 'bateria_desconectada', 'violacao', 'liberacao']);
 // Tipo de alerta → tipo de aviso.

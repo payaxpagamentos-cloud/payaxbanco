@@ -35,6 +35,10 @@ module.exports = {
   // Porta TCP em que os rastreadores do protocolo GT06 (e compatíveis) se conectam. 0 desliga.
   portaGt06: process.env.RASTREADOR_GT06_PORTA === undefined ? 5023 : Number(process.env.RASTREADOR_GT06_PORTA),
   dbFile: process.env.RASTREADOR_DB || path.join(__dirname, '..', 'data', 'rastreador.db'),
+  // Fotos do app do motorista (checklist, abastecimento e avaria). Nos testes, numa pasta temporária.
+  fotosDir: process.env.RASTREADOR_FOTOS || (process.env.NODE_ENV === 'test'
+    ? path.join(require('node:os').tmpdir(), `rastreador-fotos-teste-${process.pid}`)
+    : path.join(path.dirname(process.env.RASTREADOR_DB || path.join(__dirname, '..', 'data', 'rastreador.db')), 'fotos')),
   secret,
   tokenTtlSeconds: 12 * 60 * 60,
   trustProxy: process.env.RASTREADOR_TRUST_PROXY ?? 'loopback',

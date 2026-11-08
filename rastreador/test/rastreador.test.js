@@ -740,6 +740,120 @@ test('Rastreador', async (t) => {
     assert.equal((await api.post('/motorista/login', { cpf: '15350946056', senha: '0000' })).status, 401);
   });
 
+  await t.test('app do motorista: QR do veículo, SOS, checklist com foto, abastecimento, avaria, nota e avisos no celular', async () => {
+    const db = api.db;
+    const push = require('../server/lib/push');
+    const condutores = require('../server/lib/condutores');
+    const enviados = [];
+    push.definirEnvio(async (inscricao, corpo, opcoes) => {
+      enviados.push({ inscricao, corpo: JSON.parse(corpo), opcoes });
+      if (inscricao.endpoint.endsWith('/sumiu')) { const e = new Error('Gone'); e.statusCode = 410; throw e; }
+    });
+    try {
+      const login = await api.post('/motorista/login', { cpf: '15350946056', senha: '4321' });
+      const tk = login.dados.token;
+      const ze = db.prepare("SELECT id FROM motoristas WHERE cpf = '15350946056'").get().id;
+      const mot = (metodo, c, b) => api.req(metodo, `/motorista${c}`, b, tk);
+      // Sem veículo: o checklist pede para escanear o QR.
+      assert.match((await mot('POST', '/checklists', { itens: [] })).dados.erro, /Escaneie o QR code/);
+
+      // QR code do veículo: o painel gera; o motorista escaneia e assume.
+      const qr = (await api.get(`${base()}/veiculos/${veiculo}/qr`, cliente)).dados;
+      assert.match(qr.svg, /^<svg/);
+      const codigo = qr.link.split('#veiculo=')[1];
+      assert.ok(codigo && codigo.length >= 10);
+      assert.ok(!(await api.get(`${base()}/veiculos`, cliente)).dados.some((x) => 'codigo_qr' in x), 'o código não vai na lista');
+      assert.equal((await mot('GET', `/qr/${codigo}`)).dados.placa, 'ABC1D23');
+      assert.equal((await mot('GET', '/qr/naoexiste123')).status, 404);
+      assert.equal((await mot('POST', '/assumir', { codigo })).status, 201);
+      const eu = (await mot('GET', '/eu')).dados;
+      assert.equal(eu.veiculos[0].placa, 'ABC1D23');
+      assert.ok(eu.veiculos[0].assumido_em);
+      assert.equal(eu.checklist_itens.length, 8);
+      assert.equal((await api.get(`${base()}/veiculos`, cliente)).dados.find((x) => x.id === veiculo).condutor, 'Zé do App');
+      // Trechos: antes do QR, o motorista fixo; depois, quem assumiu.
+      const vv = db.prepare('SELECT * FROM veiculos WHERE id = ?').get(veiculo);
+      const tr = condutores.trechos(db, vv, '2000-01-01T00:00:00.000Z', '2100-01-01T00:00:00.000Z');
+      assert.deepEqual(tr.map((x) => x.motorista_id), [vv.motorista_id, ze]);
+
+      // SOS com a localização do celular: vira alerta de pânico (e não duplica em menos de 1 minuto).
+      const sos = await mot('POST', '/sos', { lat: -23.6, lng: -46.7 });
+      assert.equal(sos.status, 201);
+      const al = db.prepare("SELECT * FROM alertas WHERE veiculo_id = ? AND tipo = 'panico' ORDER BY id DESC LIMIT 1").get(veiculo);
+      assert.match(al.mensagem, /SOS pelo app do motorista: Zé do App/);
+      assert.equal(al.lat, -23.6);
+      assert.equal((await mot('POST', '/sos', {})).dados.repetido, true);
+
+      // Checklist: todos os itens respondidos; um problema reprova; a foto fica guardada e o painel abre.
+      const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(60, 1)]).toString('base64');
+      assert.equal((await mot('POST', '/checklists', { itens: [{ id: 'pneus', ok: true }] })).status, 422);
+      const itens = eu.checklist_itens.map((i) => ({ id: i.id, ok: i.id !== 'pneus', obs: i.id === 'pneus' ? 'estepe murcho' : undefined }));
+      assert.equal((await mot('POST', '/checklists', { itens, fotos: [Buffer.from('não é foto').toString('base64')] })).status, 422);
+      const grande = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(1_600_000)]).toString('base64');
+      assert.match((await mot('POST', '/checklists', { itens, fotos: [grande] })).dados.erro, /grande demais/, 'corpo grande passa do limite geral e a foto é recusada pelo tamanho');
+      const ck = await mot('POST', '/checklists', { itens, km: 120500, fotos: [`data:image/jpeg;base64,${jpeg}`] });
+      assert.equal(ck.status, 201);
+      assert.equal(ck.dados.aprovado, false);
+      const lista = (await api.get(`${base()}/checklists?reprovados=1`, operador)).dados.checklists;
+      assert.equal(lista[0].motorista, 'Zé do App');
+      assert.equal(lista[0].itens.find((i) => i.id === 'pneus').obs, 'estepe murcho');
+      const foto = await fetch(`${api.raiz}/api${base()}/fotos/${lista[0].fotos[0]}`, { headers: { Authorization: `Bearer ${cliente}` } });
+      assert.equal(foto.status, 200);
+      assert.equal(foto.headers.get('content-type'), 'image/jpeg');
+      assert.equal((await api.get(`/empresas/${outra}/fotos/${lista[0].fotos[0]}`, master)).status, 404, 'foto de outra empresa não abre');
+
+      // Abastecimento: entra no consumo real e no valor abastecido da tela de Custos.
+      const ab = await mot('POST', '/abastecimentos', { litros: '40,5', valor_centavos: 25_000, km: 120_600, posto: 'Posto Centro' });
+      assert.equal(ab.status, 201);
+      assert.equal(ab.dados.preco_litro_centavos, 617);
+      const dsp = (await api.get(`${base()}/desempenho`, cliente)).dados;
+      const xv = dsp.veiculos.find((y) => y.id === veiculo);
+      assert.equal(xv.abastecido_centavos, 25_000);
+      assert.equal(xv.litros_abastecidos, 40.5);
+      if (xv.km > 0) assert.equal(xv.consumo_real_km_l, Math.round((xv.km / 40.5) * 10) / 10);
+      assert.equal(dsp.totais.abastecido_centavos, 25_000);
+      assert.equal((await api.get(`${base()}/abastecimentos`, cliente)).dados.abastecimentos[0].posto, 'Posto Centro');
+
+      // Avaria: aberta → resolvida pelo gestor; o operador só vê.
+      const av = await mot('POST', '/avarias', { descricao: 'Retrovisor quebrado', gravidade: 'media' });
+      assert.equal(av.status, 201);
+      assert.equal((await api.get(`${base()}/avarias`, operador)).dados.avarias[0].descricao, 'Retrovisor quebrado');
+      assert.equal((await api.put(`${base()}/avarias/${av.dados.id}`, { status: 'resolvida' }, operador)).status, 403);
+      assert.equal((await api.put(`${base()}/avarias/${av.dados.id}`, { status: 'resolvida', observacao: 'Trocado' }, cliente)).status, 204);
+      assert.equal((await api.get(`${base()}/avarias?status=abertas`, cliente)).dados.avarias.length, 0);
+      assert.equal((await api.get(`${base()}/avarias?status=resolvidas`, cliente)).dados.avarias[0].resolvida_por_nome, 'Gestora');
+      const hist = (await mot('GET', '/historico')).dados;
+      assert.deepEqual([hist.checklists.length, hist.abastecimentos.length, hist.avarias.length], [1, 1, 1]);
+
+      // Minha nota: a posição no ranking só aparece se a empresa permitir.
+      const n1 = (await mot('GET', '/nota?periodo=mes')).dados;
+      assert.equal(n1.periodo, 'mes');
+      assert.equal(n1.posicao, null);
+      assert.ok(n1.dicas.length >= 1);
+      assert.ok((await api.put(`${base()}/configuracoes`, { app_ranking: true }, cliente)).status < 300);
+      const n2 = (await mot('GET', '/nota?periodo=mes')).dados;
+      assert.ok(n2.posicao && n2.posicao.lugar >= 1, JSON.stringify(n2));
+
+      // Avisos no celular: inscreve o aparelho; o aviso sai assinado; aparelho que sumiu (410) sai da lista.
+      assert.equal((await mot('POST', '/avisos', { endpoint: 'http://inseguro', keys: { p256dh: 'a', auth: 'b' } })).status, 422);
+      assert.equal((await mot('POST', '/avisos', { endpoint: 'https://push.exemplo/ok', keys: { p256dh: 'chave', auth: 'segredo' } })).status, 201);
+      assert.equal((await mot('POST', '/avisos', { endpoint: 'https://push.exemplo/sumiu', keys: { p256dh: 'chave', auth: 'segredo' } })).status, 201);
+      assert.equal((await mot('GET', '/eu')).dados.avisos.inscrito, true);
+      assert.equal(await push.enviar(db, ze, { titulo: 'Teste', texto: 'Olá' }), 1);
+      assert.equal(enviados.length, 2);
+      assert.ok(enviados[0].opcoes.vapidDetails.publicKey && enviados[0].opcoes.vapidDetails.privateKey);
+      assert.equal(enviados[0].corpo.titulo, 'Teste');
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM push_inscricoes WHERE motorista_id = ?').get(ze).n, 1);
+      assert.ok(!JSON.stringify((await api.get('/master/configuracoes', master)).dados).includes(enviados[0].opcoes.vapidDetails.privateKey), 'a chave privada não aparece no painel');
+
+      // Devolver: o veículo volta ao motorista fixo.
+      assert.equal((await mot('POST', '/devolver', {})).status, 204);
+      assert.equal((await mot('GET', '/eu')).dados.veiculos.length, 0);
+    } finally {
+      push.definirEnvio(null);
+    }
+  });
+
   await t.test('bloqueio da empresa e exclusão', async () => {
     assert.equal((await api.post(`/master/empresas/${empresa}/bloquear`, { motivo: 'Inadimplente' }, master)).status, 204);
     assert.equal((await api.get(`${base()}/mapa`, cliente)).status, 401);
