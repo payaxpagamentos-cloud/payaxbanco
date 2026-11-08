@@ -29,3 +29,92 @@ body.app-motorista-pagina{ font-size: 15px; background: var(--bg); min-height: 1
 .pedidos{ list-style: none; margin: 0; padding: 0; }
 .pedidos li{ display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
 .pedidos .dir{ text-align: right; }
+
+/* Telas das funções do app (checklist, abastecimento, avaria, nota, SOS) */
+.motorista-topo strong{ font-size: 16px; }
+.voltar-app{ display: inline-flex; align-items: center; gap: 4px; }
+.voltar-app svg{ width: 14px; height: 14px; }
+.vazio-app, .feito{ display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 24px 18px; }
+.vazio-app svg{ width: 40px; height: 40px; color: var(--ciano); }
+.vazio-app p, .feito p{ margin: 0; }
+.feito .feito-icone{ width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--ok-bg); color: var(--ok); }
+.feito .feito-icone svg{ width: 32px; height: 32px; }
+.feito .btn{ margin-top: 8px; }
+.sos-feito .feito-icone{ background: var(--erro-bg); color: var(--erro); }
+.veiculo-escolhido{ display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.veiculo-escolhido svg{ width: 18px; height: 18px; color: var(--ciano); }
+.assumido{ border-top: 1px dashed var(--border); padding-top: 8px; }
+
+/* SOS: segurar 2 s (o anel enche) */
+.sos{ position: relative; display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; min-height: 84px; border: 0; border-radius: 22px; cursor: pointer;
+  background: linear-gradient(135deg, #DC2626, #B91C1C); color: #FFFFFF; box-shadow: 0 14px 30px -14px rgba(220, 38, 38, .8); overflow: hidden; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.sos > svg{ width: 34px; height: 34px; position: relative; }
+.sos-texto{ display: flex; flex-direction: column; text-align: left; position: relative; }
+.sos-texto strong{ font-size: 24px; letter-spacing: .06em; line-height: 1.1; }
+.sos-texto small{ font-size: 12px; opacity: .85; }
+.sos-progresso{ position: absolute; inset: 0; background: rgba(255, 255, 255, .22); transform-origin: left; transform: scaleX(0); }
+.sos.segurando .sos-progresso{ transform: scaleX(1); transition: transform 2s linear; }
+.sos.enviando{ opacity: .8; }
+
+/* Atalhos (2 colunas) */
+.atalhos-app{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.atalho-app{ display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 14px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); text-align: left; cursor: pointer; min-height: 104px; }
+.atalho-app:active{ transform: scale(.98); }
+.atalho-icone{ width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--azul-suave); color: var(--azul); margin-bottom: 6px; }
+.atalho-icone svg{ width: 21px; height: 21px; }
+.atalho-app strong{ font-size: 15px; }
+.atalho-app small{ font-size: 12px; color: var(--text-2); }
+.avisos-app{ display: flex; align-items: center; gap: 12px; padding: 14px; }
+.avisos-app > svg{ width: 26px; height: 26px; color: var(--ciano); flex: none; }
+.avisos-app > div{ flex: 1; min-width: 0; }
+
+/* Checklist */
+.checklist{ display: flex; flex-direction: column; gap: 8px; }
+.item-check{ display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); }
+.item-check > span{ font-weight: 600; font-size: 14px; }
+.item-check .opcoes{ display: flex; gap: 6px; }
+.item-check .opcoes button{ display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 8px 10px;
+  font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-2); }
+.item-check .opcoes svg{ width: 14px; height: 14px; }
+.item-check.ok{ border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+.item-check.ok .opcao-ok{ background: var(--ok); border-color: var(--ok); color: #FFFFFF; }
+.item-check.problema{ border-color: color-mix(in srgb, var(--erro) 45%, transparent); background: var(--erro-bg); }
+.item-check.problema .opcao-problema{ background: var(--erro); border-color: var(--erro); color: #FFFFFF; }
+.item-check .obs{ width: 100%; min-height: 42px; border-radius: 10px; border: 1px solid var(--border-forte); padding: 8px 10px; background: var(--campo); }
+
+/* Fotos */
+.seletor-fotos{ display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.miniaturas{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.miniaturas:empty{ display: none; }
+.miniatura{ position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--surface-2); }
+.miniatura img{ width: 100%; height: 100%; object-fit: cover; }
+.miniatura button{ position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .6); color: #FFFFFF; display: grid; place-items: center; }
+.miniatura button svg{ width: 13px; height: 13px; }
+.foto-btn{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.foto-btn svg{ width: 18px; height: 18px; }
+.chip.grave.on{ background: var(--erro); }
+.chips.centro{ justify-content: center; }
+.app-motorista-pagina textarea{ width: 100%; border-radius: 12px; border: 1px solid var(--border-forte); padding: 10px 12px; background: var(--campo); font-size: 15px; }
+
+/* Minha nota */
+.nota-app{ display: flex; align-items: center; gap: 16px; padding: 18px; }
+.nota-app .anel{ --c: var(--azul); width: 104px; height: 104px; flex: none; border-radius: 50%; display: grid; place-content: center; text-align: center;
+  background: radial-gradient(circle, var(--surface) 62%, transparent 63%), conic-gradient(var(--c) calc(var(--p) * 1%), var(--barra-fundo) 0); }
+.nota-app.tom-ok .anel{ --c: var(--ok); } .nota-app.tom-aviso .anel{ --c: var(--aviso); } .nota-app.tom-erro .anel{ --c: var(--erro); }
+.nota-app .anel strong{ font-size: 32px; line-height: 1; font-variant-numeric: tabular-nums; }
+.nota-app .anel span{ font-size: 11px; color: var(--text-3); }
+.nota-app p{ margin: 2px 0 0; }
+.posicao-app{ display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--azul); }
+.posicao-app svg{ width: 16px; height: 16px; }
+.dicas{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.dicas li{ display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.dicas .menos{ flex: none; min-width: 44px; text-align: center; padding: 3px 6px; border-radius: 8px; background: var(--erro-bg); color: var(--erro); font-weight: 800; font-size: 13px; }
+.dicas .mais{ flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--ok-bg); color: var(--ok); display: grid; place-items: center; }
+.dicas .mais svg{ width: 15px; height: 15px; }
+.feito h2{ font-size: 24px; margin: 4px 0 0; letter-spacing: .02em; }
+.item-check{ flex-wrap: nowrap; }
+.item-check > span{ flex: 1 1 auto; min-width: 0; }
+.item-check .opcoes{ flex: none; }
+.item-check:has(.obs:not(.oculto)){ flex-wrap: wrap; }

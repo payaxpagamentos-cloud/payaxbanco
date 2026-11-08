@@ -428,6 +428,90 @@ CREATE TABLE IF NOT EXISTS relatorios_envios (
 );
 CREATE INDEX IF NOT EXISTS idx_relatorios_envios ON relatorios_envios(empresa_id, criado_em);
 
+-- App do motorista: quem está com o veículo (assumido pelo QR code), para a nota e o custo saírem por motorista.
+CREATE TABLE IF NOT EXISTS condutores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  motorista_id INTEGER NOT NULL REFERENCES motoristas(id) ON DELETE CASCADE,
+  inicio TEXT NOT NULL,
+  fim TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_condutores_veiculo ON condutores(veiculo_id, inicio);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_condutor_aberto ON condutores(veiculo_id) WHERE fim IS NULL;
+
+-- Checklist de saída, abastecimentos e avarias enviados pelo app do motorista (as fotos ficam em fotos).
+CREATE TABLE IF NOT EXISTS checklists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  motorista_id INTEGER REFERENCES motoristas(id) ON DELETE SET NULL,
+  itens TEXT NOT NULL,
+  aprovado INTEGER NOT NULL,
+  km INTEGER,
+  observacao TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_checklists_empresa ON checklists(empresa_id, criado_em);
+CREATE TABLE IF NOT EXISTS abastecimentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  motorista_id INTEGER REFERENCES motoristas(id) ON DELETE SET NULL,
+  litros REAL NOT NULL CHECK (litros > 0),
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  km INTEGER,
+  hodometro_km INTEGER,
+  posto TEXT,
+  completo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_abastecimentos_veiculo ON abastecimentos(veiculo_id, criado_em);
+CREATE TABLE IF NOT EXISTS avarias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  motorista_id INTEGER REFERENCES motoristas(id) ON DELETE SET NULL,
+  descricao TEXT NOT NULL,
+  gravidade TEXT NOT NULL CHECK (gravidade IN ('baixa','media','alta')),
+  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','em_andamento','resolvida')),
+  observacao TEXT,
+  resolvida_em TEXT,
+  resolvida_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_avarias_empresa ON avarias(empresa_id, status);
+CREATE TABLE IF NOT EXISTS fotos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  origem TEXT NOT NULL CHECK (origem IN ('checklist','abastecimento','avaria')),
+  origem_id INTEGER NOT NULL,
+  arquivo TEXT NOT NULL,
+  tipo TEXT NOT NULL,
+  tamanho INTEGER NOT NULL,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fotos_origem ON fotos(origem, origem_id);
+
+-- Avisos no celular do motorista (notificações do navegador) e as chaves do servidor que as assinam.
+CREATE TABLE IF NOT EXISTS push_inscricoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  motorista_id INTEGER NOT NULL REFERENCES motoristas(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  criado_em TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS chaves_servidor (
+  nome TEXT PRIMARY KEY,
+  valor TEXT NOT NULL
+);
+-- Avisos já mandados ao motorista (não repete o "bloqueio começa em 15 min" na mesma noite).
+CREATE TABLE IF NOT EXISTS avisos_motorista (
+  chave TEXT PRIMARY KEY,
+  criado_em TEXT NOT NULL
+);
+
 -- Perguntas ao assistente por empresa e dia (limite diário).
 CREATE TABLE IF NOT EXISTS ia_uso (
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
@@ -497,8 +581,8 @@ function abrir(arquivo = config.dbFile) {
 function migrar(db) {
   const colunas = (t) => new Set(db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name));
   const NOVAS = {
-    veiculos: { consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0' },
-    empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8' },
+    veiculos: { consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
+    empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0' },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
     motoristas: { senha_hash: 'TEXT', app_ultimo_acesso: 'TEXT' },
     rastreadores: { rele_invertido: 'INTEGER NOT NULL DEFAULT 0', sinal_gsm: 'INTEGER', firmware: 'TEXT', perfil: "TEXT NOT NULL DEFAULT 'padrao'", saude: 'TEXT', saude_em: 'TEXT' },
@@ -510,6 +594,7 @@ function migrar(db) {
     const tem = colunas(tabela);
     for (const [nome, def] of Object.entries(cols)) if (!tem.has(nome)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${nome} ${def}`);
   }
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_veiculo_qr ON veiculos(codigo_qr) WHERE codigo_qr IS NOT NULL');
   const sqlAlertas = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'alertas'").get()?.sql ?? '';
   if (!sqlAlertas.includes('sumico_suspeito')) {
     const criar = SCHEMA.slice(SCHEMA.indexOf('CREATE TABLE IF NOT EXISTS alertas'), SCHEMA.indexOf('CREATE INDEX IF NOT EXISTS idx_alertas_empresa'));

@@ -8,6 +8,8 @@ const roubo = require('./roubo');
 const com = require('./comandos');
 const notif = require('./notificacoes');
 const zap = require('./whatsapp');
+const push = require('./push');
+const condutores = require('./condutores');
 
 /**
  * Bloqueio programado (ex.: 23:00 às 06:00) e liberações por código.
@@ -56,7 +58,7 @@ function removerAgenda(db, veiculo) {
 
 /** Motorista: gera o código (6 dígitos) para o gestor liberar o veículo. Cancela o pedido anterior do mesmo veículo. */
 function pedirLiberacao(db, motorista, veiculo, horas) {
-  exigir(veiculo.motorista_id === motorista.id, 'Este veículo não está com você.');
+  exigir(condutores.veiculosDo(db, motorista).some((x) => x.id === veiculo.id), 'Este veículo não está com você.');
   const h = Math.max(1, Math.min(12, Number(horas) || 1));
   const cfg = lerConfig(db);
   const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
@@ -94,6 +96,7 @@ function aplicarCodigo(db, empresaId, codigo, horas, usuarioId) {
     notif.avisar(db, empresaId, 'liberacao', { titulo: `Liberação aplicada · ${veiculo.placa}`, texto: `${l.motorista ?? 'Motorista'} liberado por ${h} h, até ${horaCurta(ate)}.`,
       caminho: `/empresa/${empresaId}/liberacoes` });
   });
+  push.avisar(db, l.motorista_id, { titulo: `Liberado · ${veiculo.placa}`, texto: `O gestor liberou o veículo por ${h} h, até ${horaCurta(ate)}.` });
   return { veiculo: veiculo.placa, horas: h, libera_ate: ate, motorista: l.motorista };
 }
 
@@ -118,8 +121,23 @@ function verificar(db) {
     const texto = `A liberação do ${l.placa} termina às ${horaCurta(l.libera_ate)}. Depois disso o veículo volta a ser bloqueado (só com ele parado ou devagar).`;
     notif.avisar(db, l.empresa_id, 'liberacao', { titulo: `Liberação acabando · ${l.placa}`, texto, caminho: `/empresa/${l.empresa_id}/liberacoes` });
     if (l.motorista_telefone) zap.enfileirar(db, { empresaId: l.empresa_id, numero: l.motorista_telefone, texto: `*Rastreador*\n${texto}`, origem: 'liberacao' });
+    push.avisar(db, l.motorista_id, { titulo: `Liberação acabando · ${l.placa}`, texto });
   }
-  for (const l of db.prepare("SELECT * FROM liberacoes WHERE status = 'ativa' AND libera_ate <= ?").all(agoraIso)) transacao(db, () => encerrarLiberacao(db, l));
+  for (const l of db.prepare(`SELECT l.*, v.placa FROM liberacoes l JOIN veiculos v ON v.id = l.veiculo_id WHERE l.status = 'ativa' AND l.libera_ate <= ?`).all(agoraIso)) {
+    transacao(db, () => encerrarLiberacao(db, l));
+    push.avisar(db, l.motorista_id, { titulo: `Liberação encerrada · ${l.placa}`, texto: 'O prazo acabou. O veículo volta a ser bloqueado assim que estiver parado ou devagar.' });
+  }
+  // Aviso no celular 15 minutos antes de o bloqueio programado começar (para quem está com o veículo).
+  const daqui15 = new Date(Date.now() + 15 * 60_000);
+  for (const a of db.prepare(`SELECT a.*, v.placa, v.motorista_id FROM bloqueio_agendas a JOIN veiculos v ON v.id = a.veiculo_id JOIN empresas e ON e.id = a.empresa_id
+    WHERE a.ativo = 1 AND v.ativo = 1 AND e.status = 'ativa'`).all()) {
+    const proxima = janela(a, daqui15);
+    if (!proxima || janela(a) || liberacaoAtiva(db, a.veiculo_id)) continue;
+    const motoristaId = condutores.atual(db, a.veiculo_id)?.motorista_id ?? a.motorista_id;
+    if (motoristaId && push.umaVez(db, `bloqueio:${a.id}:${proxima}`)) {
+      push.avisar(db, motoristaId, { titulo: `Bloqueio às ${a.inicio} · ${a.placa}`, texto: `O bloqueio programado começa às ${a.inicio}. Precisa usar depois? Peça a liberação no app.` });
+    }
+  }
 
   for (const a of db.prepare(`SELECT a.*, v.rastreador_id FROM bloqueio_agendas a JOIN veiculos v ON v.id = a.veiculo_id JOIN empresas e ON e.id = a.empresa_id
     WHERE a.ativo = 1 AND v.ativo = 1 AND e.status = 'ativa'`).all()) {

@@ -20,6 +20,11 @@ const desempenho = require('../lib/desempenho');
 const pdf = require('../lib/pdf');
 const progr = require('../lib/relatoriosProgramados');
 const assistente = require('../lib/assistente');
+const diario = require('../lib/diario');
+const fotos = require('../lib/fotos');
+const condutores = require('../lib/condutores');
+const QRCode = require('qrcode');
+const config = require('../config');
 const { situacao } = require('../lib/posicoes');
 const rel = require('../lib/relatorios');
 const { hoje, somarDias, intervalo, inicioDia } = require('../lib/datas');
@@ -97,9 +102,12 @@ module.exports = (db, extras = {}) => {
   // ---------- Veículos ----------
   r.get('/veiculos', (req, res) => {
     const cfg = lerConfig(db);
-    const lista = db.prepare(`SELECT v.*, r.imei, r.protocolo, r.modelo AS rastreador_modelo, m.nome AS motorista FROM veiculos v
-      LEFT JOIN rastreadores r ON r.id = v.rastreador_id LEFT JOIN motoristas m ON m.id = v.motorista_id WHERE v.empresa_id = ? ORDER BY v.ativo DESC, v.placa`).all(eid(req));
-    res.json(lista.map((x) => ({ ...x, situacao: !x.ativo ? 'inativo' : x.imei ? situacao(x, cfg.online_min) : 'sem_rastreador' })));
+    const lista = db.prepare(`SELECT v.*, r.imei, r.protocolo, r.modelo AS rastreador_modelo, m.nome AS motorista, mc.nome AS condutor, ca.inicio AS condutor_desde
+      FROM veiculos v LEFT JOIN rastreadores r ON r.id = v.rastreador_id LEFT JOIN motoristas m ON m.id = v.motorista_id
+      LEFT JOIN condutores ca ON ca.veiculo_id = v.id AND ca.fim IS NULL LEFT JOIN motoristas mc ON mc.id = ca.motorista_id
+      WHERE v.empresa_id = ? ORDER BY v.ativo DESC, v.placa`).all(eid(req));
+    // O código do QR não vai na lista: o painel pede o QR pronto (com o link) só quando for imprimir.
+    res.json(lista.map(({ codigo_qr: _qr, ...x }) => ({ ...x, situacao: !x.ativo ? 'inativo' : x.imei ? situacao(x, cfg.online_min) : 'sem_rastreador' })));
   });
 
   /** Rastreador disponível para a empresa: dela e sem veículo (ou o do próprio veículo). */
@@ -567,7 +575,8 @@ module.exports = (db, extras = {}) => {
     res.json({
       empresa: { nome: e.nome, documento: e.documento, tipo: e.tipo, email: e.email, telefone: e.telefone, limite_veiculos: e.limite_veiculos,
         mensalidade_centavos: e.mensalidade_centavos, alertar_ignicao: Boolean(e.alertar_ignicao), horario_inicio: e.horario_inicio, horario_fim: e.horario_fim,
-        dias_uso: e.dias_uso, sem_comunicacao_min: e.sem_comunicacao_min, preco_combustivel_centavos: e.preco_combustivel_centavos, ocioso_l_h: e.ocioso_l_h },
+        dias_uso: e.dias_uso, sem_comunicacao_min: e.sem_comunicacao_min, preco_combustivel_centavos: e.preco_combustivel_centavos, ocioso_l_h: e.ocioso_l_h,
+        app_ranking: Boolean(e.app_ranking) },
       veiculos_ativos: db.prepare('SELECT COUNT(*) AS n FROM veiculos WHERE empresa_id = ? AND ativo = 1').get(e.id).n,
       usuarios: db.prepare('SELECT id, nome, email, perfil, ativo, ultimo_acesso FROM usuarios WHERE empresa_id = ? ORDER BY nome').all(e.id),
     });
@@ -590,6 +599,7 @@ module.exports = (db, extras = {}) => {
         ? v.inteiro(d.preco_combustivel_centavos, 'o preço do combustível', { min: 0, max: 100_000 }) : e.preco_combustivel_centavos,
       ocioso_l_h: d.ocioso_l_h !== undefined && d.ocioso_l_h !== ''
         ? v.numero(String(d.ocioso_l_h).replace(',', '.'), 'o consumo parado', { min: 0, max: 20 }) : e.ocioso_l_h,
+      app_ranking: d.app_ranking !== undefined ? (v.booleano(d.app_ranking) ? 1 : 0) : e.app_ranking,
     };
     if (comHorario) v.exigir(x.horario_inicio !== x.horario_fim, 'O início e o fim do horário de uso devem ser diferentes.');
     const campos = Object.keys(x);
@@ -791,6 +801,45 @@ module.exports = (db, extras = {}) => {
     });
     registrar(db, req, 'equipamento_ajustado', { placa: x.placa, ajuste });
     res.status(201).json({ comandos: ids });
+  });
+
+  // ---------- App do motorista: checklists, abastecimentos, avarias, fotos e o QR code de cada veículo ----------
+  const periodoDiario = (req) => { const [de, ate] = rel.periodo(req.query, { padraoDias: 29, maxDias: 366 }); const [ini, fim] = intervalo(de, ate); return { de, ate, ini, fim }; };
+  r.get('/checklists', (req, res) => {
+    const p = periodoDiario(req);
+    res.json({ ...p, itens: diario.ITENS_CHECKLIST, checklists: diario.listarChecklists(db, eid(req), { ...p, veiculoId: req.query.veiculo_id ? Number(req.query.veiculo_id) : null,
+      reprovados: req.query.reprovados === '1' }) });
+  });
+  r.get('/abastecimentos', (req, res) => {
+    const p = periodoDiario(req);
+    res.json({ ...p, abastecimentos: diario.listarAbastecimentos(db, eid(req), { ...p, veiculoId: req.query.veiculo_id ? Number(req.query.veiculo_id) : null }) });
+  });
+  const avaria = daEmpresa('avarias', 'Avaria', false);
+  r.get('/avarias', (req, res) => res.json({ gravidades: diario.GRAVIDADES, situacoes: diario.STATUS_AVARIA,
+    avarias: diario.listarAvarias(db, eid(req), String(req.query.status || 'abertas')) }));
+  r.put('/avarias/:id', gestor, (req, res) => {
+    const a = avaria(req, req.params.id);
+    diario.atualizarAvaria(db, a, req.body, req.usuario.id);
+    registrar(db, req, 'avaria_atualizada', { id: a.id, status: req.body.status });
+    res.status(204).end();
+  });
+  r.get('/fotos/:id', (req, res) => {
+    const f = fotos.arquivo(db, eid(req), req.params.id);
+    if (!f) throw new ErroNegocio('Foto não encontrada.', 404);
+    res.set({ 'Content-Type': f.tipo, 'Cache-Control': 'private, max-age=86400' }).sendFile(f.caminho);
+  });
+  const linkQr = (req, codigo) => `${config.urlPublica || `${req.protocol}://${req.get('host')}${config.basePath}`}/motorista/#veiculo=${codigo}`;
+  r.get('/veiculos/:id/qr', (req, res, next) => {
+    const x = veiculo(req, req.params.id);
+    const link = linkQr(req, condutores.codigoQr(db, x));
+    QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0B1B3F', light: '#FFFFFF' } })
+      .then((svg) => res.json({ placa: x.placa, descricao: x.descricao, link, svg, condutor: condutores.atual(db, x.id)?.nome ?? null })).catch(next);
+  });
+  r.post('/veiculos/:id/qr/novo', gestor, (req, res) => {
+    const x = veiculo(req, req.params.id);
+    condutores.novoCodigoQr(db, x);
+    registrar(db, req, 'qr_veiculo_trocado', { placa: x.placa });
+    res.status(204).end();
   });
 
   // ---------- Assistente com IA (só consulta os dados da empresa) ----------

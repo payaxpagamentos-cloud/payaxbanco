@@ -137,8 +137,20 @@ Equipamento que envia sem estar cadastrado aparece em **Rastreadores → Equipam
   dirigiu pior este mês?", "quanto gastei de combustível?") com os dados da própria empresa. Só consulta: não bloqueia nem muda nada.
 
 ### App do motorista (`/motorista/`)
-Para o celular (pode ser instalado na tela inicial). O motorista entra com o CPF e a senha numérica, vê se o veículo está liberado ou bloqueado
-pelo horário e toca em **Pedir liberação**: sai um código de 6 números (vale 10 min) para passar ao gestor, que aplica em Segurança → Liberações.
+Para o celular (pode ser instalado na tela inicial). O motorista entra com o CPF e a senha numérica (cadastrada em Frota → Motoristas) e:
+- **Assume o veículo pelo QR code**: cada veículo tem um QR (Frota → Veículos, botão do QR, para imprimir e colar). A câmera do celular abre o
+  link e o veículo passa para o motorista; a nota e o custo contam para quem estava com o veículo em cada trecho. "Devolver" encerra.
+- **SOS**: segurar o botão por 2 segundos manda o alerta de pânico com a localização do celular (painel e WhatsApp), com o atalho para ligar 190.
+- **Pedir liberação** do bloqueio programado: código de 6 números (vale 10 min) que o gestor aplica em Segurança → Liberações.
+- **Checklist de saída** (8 itens, com observação e fotos): aparece em Frota → Checklists; item com problema avisa a empresa pelo WhatsApp.
+- **Abastecimento** (litros, valor, km, posto e foto do cupom): aparece em Frota → Custos e passa a dar o **consumo real** do veículo.
+- **Reportar avaria** (gravidade e fotos): vira um chamado em Frota → Manutenção (aberta, em andamento, resolvida) e avisa pelo WhatsApp.
+- **Minha nota**: a nota da semana ou do mês, as dicas do que mais pesou e onde perdeu pontos; a posição no ranking aparece se a empresa
+  ligar em Configurações → Geral.
+- **Avisos no celular**: liberação aplicada, bloqueio começando em 15 minutos, liberação acabando e liberação encerrada. No iPhone, só com
+  o app adicionado à Tela de Início.
+
+As fotos chegam reduzidas pelo próprio celular (cerca de 200 KB) e ficam em `data/fotos` (ou `RASTREADOR_FOTOS`).
 - **Integrações**: chaves de API e o guia de como ligar GT06, celular e outros sistemas.
 
 ### Master

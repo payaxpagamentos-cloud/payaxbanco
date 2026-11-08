@@ -3,6 +3,7 @@ import { api, qs, baixar } from './api.js';
 import { el, limpar, dinheiro, dataHora, desde, km, kmh, placa, inteiro, toast, acao, campo, escolha, modal, perguntar, repetir, etiqueta, icone,
   hojeLocal, somarDias } from './ui.js';
 import { cartao, indicador, tabela, td, botao, acoesTopo, linhaDado } from './comum.js';
+import { cartaoAbastecimentos } from './diario.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
 const link = (ctx, tela) => `#/empresa/${ctx.empresaId}/${tela}`;
@@ -100,8 +101,8 @@ async function telaCustos(ctx) {
   limpar(ctx.conteudo, acoesTopo(per.raiz, pdf), corpo);
   async function carregar(de, ate) {
     atual = [de, ate];
-    const d = await api.get(`${base(ctx)}/desempenho${qs({ de, ate })}`);
-    const consumo = new Map(d.veiculos.map((x) => [x.id, x.consumo_km_l]));
+    const [d, ab] = await Promise.all([api.get(`${base(ctx)}/desempenho${qs({ de, ate })}`), api.get(`${base(ctx)}/abastecimentos${qs({ de, ate })}`)]);
+    const consumo = new Map(d.veiculos.map((x) => [x.id, x.consumo_real_km_l ?? x.consumo_km_l]));
     const t = d.totais;
     const porKm = t.custo_centavos && t.km ? Math.round(t.custo_centavos / t.km) : null;
     limpar(corpo,
@@ -111,15 +112,18 @@ async function telaCustos(ctx) {
         indicador('Custo de combustível', t.custo_centavos !== null ? dinheiro(t.custo_centavos) : '—', `${data2(de)} a ${data2(ate)}`, '', 'carteira'),
         indicador('Gasto com motor parado', t.custo_ocioso_centavos !== null ? dinheiro(t.custo_ocioso_centavos) : '—', 'ligado sem andar (mais de 5 min)', t.custo_ocioso_centavos ? 'aviso' : '', 'pausa'),
         indicador('Rodados', km(t.km * 1000), `${inteiro(d.veiculos.length)} veículo(s)`, '', 'rota'),
-        indicador('Custo por km', porKm !== null ? dinheiro(porKm) : '—', `combustível a ${d.preco_combustivel_centavos ? dinheiro(d.preco_combustivel_centavos) : '—'}/litro`, '', 'dashboard')),
+        indicador('Custo por km', porKm !== null ? dinheiro(porKm) : '—', `combustível a ${d.preco_combustivel_centavos ? dinheiro(d.preco_combustivel_centavos) : '—'}/litro`, '', 'dashboard'),
+        indicador('Abastecido', dinheiro(t.abastecido_centavos ?? 0), `${String(t.litros_abastecidos ?? 0).replace('.', ',')} L lançados no app`, '', 'combustivel')),
       cartao('Por veículo', tabela(['Veículo', 'Motorista', '>Km', '>Consumo', '>Litros', '>Ligado parado', '>Custo parado', '>Custo total', '>R$/km'], d.veiculos.map((x) => el('tr', {},
         td([el('strong', {}, placa(x.placa)), x.descricao ? el('div', { class: 'pequeno mudo' }, x.descricao) : null]), td(x.motorista ?? '—'),
-        td(inteiro(Math.round(x.km)), 'dir num'), td(consumo.get(x.id) ? `${String(consumo.get(x.id)).replace('.', ',')} km/l` : etiqueta('sem consumo', 'aviso'), 'dir num'),
+        td(inteiro(Math.round(x.km)), 'dir num'), td(consumo.get(x.id) ? [`${String(consumo.get(x.id)).replace('.', ',')} km/l`,
+          x.consumo_real_km_l ? el('div', { class: 'pequeno', style: 'color:var(--ok)' }, 'real (abastecimentos)') : null] : etiqueta('sem consumo', 'aviso'), 'dir num'),
         td(x.litros !== null ? `${String(x.litros).replace('.', ',')} L` : '—', 'dir num'), td(horasMin(x.ocioso_s), 'dir num'),
         td(x.custo_ocioso_centavos !== null ? dinheiro(x.custo_ocioso_centavos) : '—', 'dir num'), td(x.custo_centavos !== null ? el('strong', {}, dinheiro(x.custo_centavos)) : '—', 'dir num'),
         td(x.custo_centavos && x.km ? dinheiro(Math.round(x.custo_centavos / x.km)) : '—', 'dir num'))), 'Nenhum veículo ativo.')),
-      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Custo = km ÷ consumo médio × preço do combustível, mais as horas de motor ligado parado × litros por hora × preço. '
-        + 'O consumo fica no cadastro de cada veículo; o preço e os litros por hora parado, em Configurações → Geral.'));
+      cartaoAbastecimentos(ctx, ab.abastecimentos),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Custo = km ÷ consumo × preço do combustível, mais as horas de motor ligado parado × litros por hora × preço. '
+        + 'O consumo é o real, pelos abastecimentos lançados no app, ou o médio do cadastro do veículo; o preço e os litros por hora parado ficam em Configurações → Geral.'));
   }
   await carregar(per.de, per.ate);
 }
