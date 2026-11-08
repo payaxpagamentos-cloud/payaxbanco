@@ -504,6 +504,7 @@ function migrar(db) {
     rastreadores: { rele_invertido: 'INTEGER NOT NULL DEFAULT 0', sinal_gsm: 'INTEGER', firmware: 'TEXT', perfil: "TEXT NOT NULL DEFAULT 'padrao'", saude: 'TEXT', saude_em: 'TEXT' },
     comandos: { rotulo: 'TEXT' },
     ocorrencias: { tipo: "TEXT NOT NULL DEFAULT 'roubo'", perseguicao: 'INTEGER NOT NULL DEFAULT 0' },
+    ia_uso: { tokens_entrada: 'INTEGER NOT NULL DEFAULT 0', tokens_saida: 'INTEGER NOT NULL DEFAULT 0' },
   };
   for (const [tabela, cols] of Object.entries(NOVAS)) {
     const tem = colunas(tabela);

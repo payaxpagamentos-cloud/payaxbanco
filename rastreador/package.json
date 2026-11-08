@@ -17,6 +17,7 @@
     "simular": "node scripts/simular-j16.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@maplibre/maplibre-gl-leaflet": "0.1.4",
     "express": "^5.2.1",
     "leaflet": "1.9.4",

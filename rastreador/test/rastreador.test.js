@@ -621,6 +621,72 @@ test('Rastreador', async (t) => {
     }
   });
 
+  await t.test('assistente com IA: só dados da empresa, recusa e limite por dia', async () => {
+    const assistente = require('../server/lib/assistente');
+    const config = require('../server/config');
+    const geo = { ...config.geocoder };
+    Object.assign(config.geocoder, { url: '', reverso: '' });
+    const pedidos = [];
+    const roteiro = [];
+    assistente.definirCliente({ beta: { messages: { create: async (p) => { pedidos.push(structuredClone(p)); return roteiro.shift(); } } } });
+    try {
+      assert.equal((await api.get(`${base()}/assistente`, cliente)).dados.ligado, true);
+      // Volta 1: o modelo pede a frota, a posição e uma placa de outra empresa; volta 2: responde.
+      const quando = `${local().data} ${String(local().hora).padStart(2, '0')}:00`;
+      roteiro.push({
+        stop_reason: 'tool_use', usage: { input_tokens: 100, output_tokens: 20 },
+        content: [
+          { type: 'thinking', thinking: '', signature: 'x' },
+          { type: 'tool_use', id: 't1', name: 'situacao_frota', input: {} },
+          { type: 'tool_use', id: 't2', name: 'posicao_em', input: { placa: 'abc-1d23', quando } },
+          { type: 'tool_use', id: 't3', name: 'trajeto', input: { placa: 'ZZZ9Z99', de: '2026-01-01', ate: '2026-01-02' } },
+        ],
+      }, { stop_reason: 'end_turn', usage: { input_tokens: 300, output_tokens: 40 }, content: [{ type: 'text', text: 'O **ABC1D23** está na garagem.' }] });
+      const r = await api.post(`${base()}/assistente`, { pergunta: 'Onde está o caminhão?', historico: [{ papel: 'assistente', texto: 'oi' }, { papel: 'usuario', texto: 'Bom dia' }, { papel: 'assistente', texto: 'Bom dia!' }] }, operador);
+      assert.equal(r.status, 200, JSON.stringify(r.dados));
+      assert.equal(r.dados.resposta, 'O **ABC1D23** está na garagem.');
+      assert.deepEqual(r.dados.ferramentas, ['situacao_frota', 'posicao_em', 'trajeto']);
+      const [p1, p2] = pedidos;
+      assert.equal(p1.model, config.ia.modelo);
+      assert.equal(p1.fallbacks, 'default');
+      assert.deepEqual(p1.betas, ['server-side-fallback-2026-07-01']);
+      assert.ok(!p1.tool_choice, 'o modelo decide quando usar as ferramentas');
+      assert.match(p1.system, /Transportes Rota Ltda/);
+      assert.deepEqual(p1.messages.map((m) => m.role), ['user', 'assistant', 'user'], 'histórico começa pelo usuário e alterna');
+      // As três respostas voltam numa mensagem só, depois do turno do modelo com o raciocínio intacto.
+      assert.equal(p2.messages.at(-2).content[0].type, 'thinking');
+      const resultados = p2.messages.at(-1).content;
+      assert.deepEqual(resultados.map((x) => x.tool_use_id), ['t1', 't2', 't3']);
+      const frota = JSON.parse(resultados[0].content);
+      assert.ok(frota.some((x) => x.placa === 'ABC1D23'));
+      assert.ok(!JSON.stringify(frota).includes('Outra'), 'nada de outra empresa');
+      assert.equal(JSON.parse(resultados[1].content).placa, 'ABC1D23');
+      assert.equal(resultados[2].is_error, true);
+      assert.match(resultados[2].content, /Não há veículo com a placa/);
+      const uso = api.db.prepare('SELECT * FROM ia_uso WHERE empresa_id = ?').get(empresa);
+      assert.deepEqual([uso.perguntas, uso.tokens_entrada, uso.tokens_saida], [1, 400, 60]);
+
+      // Recusa do modelo: resposta educada, sem texto parcial.
+      roteiro.push({ stop_reason: 'refusal', usage: { input_tokens: 10, output_tokens: 0 }, content: [] });
+      assert.match((await api.post(`${base()}/assistente`, { pergunta: 'x' }, cliente)).dados.resposta, /Não posso ajudar/);
+
+      // Limite por dia (parâmetro da plataforma) e assistente desligado com limite 0.
+      assert.ok((await api.patch('/master/configuracoes', { ia_limite_dia: 2 }, master)).status < 300);
+      const cheio = await api.post(`${base()}/assistente`, { pergunta: 'mais uma' }, cliente);
+      assert.equal(cheio.status, 429);
+      assert.match(cheio.dados.erro, /Limite de 2 perguntas/);
+      assert.ok((await api.patch('/master/configuracoes', { ia_limite_dia: 0 }, master)).status < 300);
+      assert.equal((await api.post(`${base()}/assistente`, { pergunta: 'x' }, cliente)).status, 403);
+      const painel = (await api.get('/master/ia', master)).dados;
+      assert.equal(painel.uso.find((u) => u.empresa_id === empresa).hoje, 2);
+      assert.equal((await api.post(`${base()}/assistente`, { pergunta: '' }, cliente)).status, 400);
+    } finally {
+      await api.patch('/master/configuracoes', { ia_limite_dia: 50 }, master);
+      assistente.definirCliente(null);
+      Object.assign(config.geocoder, geo);
+    }
+  });
+
   await t.test('bloqueio da empresa e exclusão', async () => {
     assert.equal((await api.post(`/master/empresas/${empresa}/bloquear`, { motivo: 'Inadimplente' }, master)).status, 204);
     assert.equal((await api.get(`${base()}/mapa`, cliente)).status, 401);

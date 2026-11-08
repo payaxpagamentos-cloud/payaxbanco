@@ -69,7 +69,7 @@ const permitir = (...perfis) => (req, _res, next) =>
 
 /**
  * Acesso ao painel de uma empresa (/empresas/:eid): a equipe da plataforma entra em qualquer empresa não excluída;
- * cliente e operador, só na própria. O operador consulta e trata os alertas, sem alterar cadastros nem enviar comandos.
+ * cliente e operador, só na própria. O operador consulta, trata os alertas e pergunta ao assistente, sem alterar cadastros nem enviar comandos.
  */
 function acessoEmpresa(db) {
   const buscar = db.prepare("SELECT * FROM empresas WHERE id = ? AND status <> 'excluida'");
@@ -79,7 +79,7 @@ function acessoEmpresa(db) {
     if (!PLATAFORMA.includes(u.perfil) && u.empresa_id !== eid) return next(new ErroNegocio('Empresa não encontrada.', 404));
     const empresa = Number.isInteger(eid) ? buscar.get(eid) : null;
     if (!empresa) return next(new ErroNegocio('Empresa não encontrada.', 404));
-    if (u.perfil === 'operador' && req.method !== 'GET' && !/^\/alertas(\/|$)/.test(req.path)) {
+    if (u.perfil === 'operador' && req.method !== 'GET' && !/^\/(alertas|assistente)(\/|$)/.test(req.path)) {
       return next(new ErroNegocio('O operador só consulta e trata alertas.', 403));
     }
     req.empresa = empresa;

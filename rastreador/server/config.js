@@ -85,7 +85,7 @@ module.exports = {
   // Assistente com IA (Anthropic). Sem chave, o assistente fica desligado.
   ia: {
     chave: process.env.RASTREADOR_IA_CHAVE || '',
-    modelo: process.env.RASTREADOR_IA_MODELO || 'claude-haiku-5-5',
+    modelo: process.env.RASTREADOR_IA_MODELO || 'claude-opus-5-5',
   },
   // Mapas do Google (Map Tiles API). Com a chave, o mapa de ruas e o satélite passam a ser os do Google; sem ela, os gratuitos.
   google: {

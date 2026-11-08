@@ -450,7 +450,8 @@ module.exports = (db, extras = {}) => {
     const cfgIa = config.ia;
     res.json({
       configurado: Boolean(cfgIa.chave), modelo: cfgIa.modelo, limite_dia: lerConfig(db).ia_limite_dia,
-      uso: db.prepare(`SELECT u.empresa_id, e.nome AS empresa, SUM(CASE WHEN u.data = ? THEN u.perguntas ELSE 0 END) AS hoje, SUM(u.perguntas) AS mes
+      uso: db.prepare(`SELECT u.empresa_id, e.nome AS empresa, SUM(CASE WHEN u.data = ? THEN u.perguntas ELSE 0 END) AS hoje, SUM(u.perguntas) AS mes,
+          SUM(u.tokens_entrada) AS tokens_entrada, SUM(u.tokens_saida) AS tokens_saida
         FROM ia_uso u JOIN empresas e ON e.id = u.empresa_id WHERE u.data >= ? GROUP BY u.empresa_id ORDER BY mes DESC`).all(hoje(), hoje().slice(0, 8) + '01'),
     });
   });

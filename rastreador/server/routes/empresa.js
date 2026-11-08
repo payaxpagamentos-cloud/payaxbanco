@@ -19,6 +19,7 @@ const { hashSenha } = require('../lib/senha');
 const desempenho = require('../lib/desempenho');
 const pdf = require('../lib/pdf');
 const progr = require('../lib/relatoriosProgramados');
+const assistente = require('../lib/assistente');
 const { situacao } = require('../lib/posicoes');
 const rel = require('../lib/relatorios');
 const { hoje, somarDias, intervalo, inicioDia } = require('../lib/datas');
@@ -773,6 +774,12 @@ module.exports = (db, extras = {}) => {
     });
     registrar(db, req, 'equipamento_ajustado', { placa: x.placa, ajuste });
     res.status(201).json({ comandos: ids });
+  });
+
+  // ---------- Assistente com IA (só consulta os dados da empresa) ----------
+  r.get('/assistente', (req, res) => res.json(assistente.situacao(db, eid(req))));
+  r.post('/assistente', async (req, res, next) => {
+    try { res.json(await assistente.perguntar(db, req.empresa, { pergunta: req.body?.pergunta, historico: req.body?.historico })); } catch (err) { next(err); }
   });
 
   // ---------- Nota do motorista, ranking e custos ----------

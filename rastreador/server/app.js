@@ -51,6 +51,7 @@ function criarApp(db, extras = {}) {
   r.use('/api/motorista/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // Código de liberação: poucas tentativas por minuto (são 6 números).
   r.use(/^\/api\/empresas\/\d+\/liberacoes\/(consultar|aplicar)$/, limitar({ janelaMs: 60_000, maximo: 20 }));
+  r.use(/^\/api\/empresas\/\d+\/assistente$/, limitar({ janelaMs: 60_000, maximo: 12 }));
   // A API de integração recebe lotes de posições; o app Traccar Client envia formulário ou JSON.
   r.use(express.json({ limit: '1mb' }));
   r.use(express.urlencoded({ extended: false, limit: '100kb' }));
