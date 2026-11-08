@@ -16,6 +16,9 @@ const equip = require('../lib/equipamento');
 const notif = require('../lib/notificacoes');
 const zap = require('../lib/whatsapp');
 const { hashSenha } = require('../lib/senha');
+const desempenho = require('../lib/desempenho');
+const pdf = require('../lib/pdf');
+const progr = require('../lib/relatoriosProgramados');
 const { situacao } = require('../lib/posicoes');
 const rel = require('../lib/relatorios');
 const { hoje, somarDias, intervalo, inicioDia } = require('../lib/datas');
@@ -770,6 +773,77 @@ module.exports = (db, extras = {}) => {
     });
     registrar(db, req, 'equipamento_ajustado', { placa: x.placa, ajuste });
     res.status(201).json({ comandos: ids });
+  });
+
+  // ---------- Nota do motorista, ranking e custos ----------
+  r.get('/desempenho', (req, res) => {
+    const [de, ate] = rel.periodo(req.query, { padraoDias: 29, maxDias: 93 });
+    res.json(desempenho.calcular(db, eid(req), de, ate));
+  });
+  const enviarPdf = (res, nome, buffer) => res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${nome}"` }).send(buffer);
+  r.get('/relatorios/periodo.pdf', async (req, res, next) => {
+    try {
+      const [de, ate] = rel.periodo(req.query, { padraoDias: 29, maxDias: 93 });
+      const conteudo = String(req.query.conteudo || 'frota,seguranca,motoristas,custos').split(',').filter((c) => progr.CONTEUDOS[c]);
+      enviarPdf(res, `relatorio-${de}-a-${ate}.pdf`, await pdf.relatorioPeriodo(db, eid(req), de, ate, conteudo, lerConfig(db).nome_plataforma));
+    } catch (err) { next(err); }
+  });
+  r.get('/roubo/:id/relatorio.pdf', async (req, res, next) => {
+    try {
+      const oc = ocorrencia(req, req.params.id);
+      enviarPdf(res, `ocorrencia-${oc.id}.pdf`, await pdf.relatorioOcorrencia(db, oc, lerConfig(db).nome_plataforma));
+    } catch (err) { next(err); }
+  });
+  r.post('/roubo/:id/relatorio/whatsapp', gestor, async (req, res, next) => {
+    try {
+      const oc = ocorrencia(req, req.params.id);
+      v.exigir(zap.configurado(), 'O WhatsApp ainda não foi ligado no servidor.');
+      const c = contato(req, req.body.contato_id);
+      const placaV = db.prepare('SELECT placa FROM veiculos WHERE id = ?').get(oc.veiculo_id).placa;
+      zap.enfileirar(db, { empresaId: eid(req), numero: c.numero, texto: `*Ocorrência de roubo · ${placaV}*\nRelatório com o veículo, a linha do tempo e o trajeto.`,
+        arquivo: await pdf.relatorioOcorrencia(db, oc, lerConfig(db).nome_plataforma), arquivoNome: `ocorrencia-${placaV}.pdf`, origem: 'roubo' });
+      res.status(202).json({ ok: true });
+    } catch (err) { next(err); }
+  });
+
+  // ---------- Relatórios programados ----------
+  const agendaRel = daEmpresa('relatorios_agenda', 'Agendamento');
+  const dadosAgendaRel = (d, atual) => {
+    const conteudo = [].concat(d.conteudo ?? (atual ? atual.conteudo.split(',') : Object.keys(progr.CONTEUDOS))).filter((c) => progr.CONTEUDOS[c]);
+    v.exigir(conteudo.length, 'Escolha pelo menos um conteúdo.');
+    const contatos = [].concat(d.contatos ?? (atual ? atual.contatos.split(',') : [])).map(Number).filter(Boolean)
+      .filter((id) => db.prepare('SELECT 1 FROM contatos_notificacao WHERE id = ? AND empresa_id = ?').get(id, eid(d._req)));
+    v.exigir(contatos.length, 'Escolha pelo menos um contato do WhatsApp (cadastre em Configurações → Notificações).');
+    const frequencia = v.opcao(d.frequencia ?? atual?.frequencia, 'a frequência', Object.keys(progr.FREQUENCIAS));
+    return { nome: v.texto(d.nome ?? atual?.nome ?? `Relatório ${progr.FREQUENCIAS[frequencia].toLowerCase()}`, 'o nome', 80), frequencia, conteudo: conteudo.join(','),
+      contatos: [...new Set(contatos)].join(','), ativo: d.ativo !== undefined ? (v.booleano(d.ativo) ? 1 : 0) : atual?.ativo ?? 1 };
+  };
+  r.get('/relatorios-programados', (req, res) => res.json({
+    frequencias: progr.FREQUENCIAS, conteudos: progr.CONTEUDOS, whatsapp: zap.configurado(),
+    contatos: db.prepare('SELECT id, nome, numero FROM contatos_notificacao WHERE empresa_id = ? AND ativo = 1 ORDER BY nome').all(eid(req)),
+    agendas: db.prepare('SELECT * FROM relatorios_agenda WHERE empresa_id = ? ORDER BY nome').all(eid(req)),
+    envios: db.prepare('SELECT * FROM relatorios_envios WHERE empresa_id = ? ORDER BY id DESC LIMIT 40').all(eid(req)),
+  }));
+  r.post('/relatorios-programados', gestor, (req, res) => {
+    const x = dadosAgendaRel({ ...req.body, _req: req });
+    const id = Number(db.prepare(`INSERT INTO relatorios_agenda (empresa_id, nome, frequencia, conteudo, contatos, ativo, proximo_em, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(eid(req), x.nome, x.frequencia, x.conteudo, x.contatos, x.ativo, progr.proximoEnvio(x.frequencia), agora()).lastInsertRowid);
+    res.status(201).json({ id });
+  });
+  r.put('/relatorios-programados/:id', gestor, (req, res) => {
+    const atual = agendaRel(req, req.params.id);
+    const x = dadosAgendaRel({ ...req.body, _req: req }, atual);
+    db.prepare('UPDATE relatorios_agenda SET nome = ?, frequencia = ?, conteudo = ?, contatos = ?, ativo = ?, proximo_em = ? WHERE id = ?')
+      .run(x.nome, x.frequencia, x.conteudo, x.contatos, x.ativo, x.frequencia !== atual.frequencia ? progr.proximoEnvio(x.frequencia) : atual.proximo_em, atual.id);
+    res.status(204).end();
+  });
+  r.delete('/relatorios-programados/:id', gestor, (req, res) => {
+    const atual = agendaRel(req, req.params.id);
+    db.prepare('DELETE FROM relatorios_agenda WHERE id = ?').run(atual.id);
+    res.status(204).end();
+  });
+  r.post('/relatorios-programados/:id/enviar', gestor, async (req, res, next) => {
+    try { res.json(await progr.enviar(db, agendaRel(req, req.params.id))); } catch (err) { next(err); }
   });
 
   return r;

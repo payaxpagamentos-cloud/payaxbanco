@@ -5,6 +5,7 @@ const { alertar } = require('./alertas');
 const { expirar } = require('./comandos');
 const agenda = require('./agenda');
 const zap = require('./whatsapp');
+const relatoriosProgramados = require('./relatoriosProgramados');
 
 /**
  * Tarefas de fundo: alerta de veículo sem comunicação (uma vez até ele voltar), expiração dos comandos sem resposta
@@ -43,6 +44,8 @@ function manutencao(db, { limpar = false } = {}) {
   agenda.verificar(db);
   // Mensagens do WhatsApp que ficaram para depois.
   zap.processarFila(db).catch(() => {});
+  // Relatórios programados cuja hora chegou (PDF pelo WhatsApp).
+  relatoriosProgramados.executar(db).catch((err) => console.error('[Rastreador] Relatório programado:', err.message));
   const expirados = expirar(db, cfg.comando_expira_horas);
   let apagadas = 0;
   if (limpar) {
