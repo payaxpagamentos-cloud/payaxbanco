@@ -6,6 +6,8 @@ usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 > Neste repositório também está o **APP Táxi** (pasta [`taxi/`](taxi/README.md)): app do passageiro, app do motorista, painel da central e repasses, com servidor próprio. Ele exporta taxas e repasses no CSV de importação do BPO.
 >
 > E o **PABX** (pasta [`pabx/`](pabx/README.md), publicado em `/pabx`): painel do master e das empresas para ramais, chamadas, campanhas, números entrantes, terminação e integração com a central telefônica, com servidor próprio.
+>
+> E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
 
 ## Módulos
 
