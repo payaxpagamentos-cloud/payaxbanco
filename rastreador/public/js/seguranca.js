@@ -73,7 +73,7 @@ async function escolherEAcionar(ctx, velocidadeSegura, depois) {
       el('div', { class: 'linha entre' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Voltar'), el('button', { class: 'btn perigo' }, 'Continuar')));
   });
   if (!id) return;
-  const mapa = await api.get(`${base(ctx)}/mapa`);
+  const { veiculos: mapa } = await api.get(`${base(ctx)}/mapa`);
   const v = mapa.find((x) => x.id === id) ?? veiculos.find((x) => x.id === id);
   await acionarRoubo(ctx, v, { velocidadeSegura, depois });
 }
@@ -198,7 +198,7 @@ async function telaRoubo(ctx) {
 async function telaEstacionados(ctx) {
   const corpo = el('div', { class: 'coluna', style: 'gap:16px' });
   const novo = pode(ctx) ? el('button', { class: 'btn primario', onclick: async () => {
-    const [veiculos, mapa, s] = await Promise.all([api.get(`${base(ctx)}/veiculos`), api.get(`${base(ctx)}/mapa`), api.get(`${base(ctx)}/seguranca`)]);
+    const [veiculos, { veiculos: mapa }, s] = await Promise.all([api.get(`${base(ctx)}/veiculos`), api.get(`${base(ctx)}/mapa`), api.get(`${base(ctx)}/seguranca`)]);
     const armados = new Set(s.estacionados.filter((e) => !e.desarmado_em).map((e) => e.veiculo_id));
     const livres = comRastreador(veiculos).filter((x) => !armados.has(x.id));
     if (!livres.length) return toast('Todos os veículos com rastreador já estão estacionados.', true);
@@ -223,7 +223,7 @@ async function telaEstacionados(ctx) {
         td(e.violado_em ? [etiqueta('violado', 'erro'), el('div', { class: 'pequeno mudo' }, `${e.motivo_violacao ?? ''} · ${dataHora(e.violado_em)}`)] : etiqueta('vigiando', 'ok')),
         el('td', { class: 'acoes' },
           pode(ctx) && e.violado_em ? botao('Modo Roubo', 'perigo', async () => {
-            const v = (await api.get(`${base(ctx)}/mapa`)).find((x) => x.id === e.veiculo_id);
+            const v = (await api.get(`${base(ctx)}/mapa`)).veiculos.find((x) => x.id === e.veiculo_id);
             if (v) acionarRoubo(ctx, v, { velocidadeSegura: s.velocidade_segura_kmh });
           }) : null,
           pode(ctx) ? botao('Desarmar', '', () => desarmar(ctx, { id: e.veiculo_id, placa: e.placa }, carregar)) : null))),

@@ -250,7 +250,7 @@ async function telaEquipamentos(ctx) {
   limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0;max-width:720px' },
     'Saúde de cada rastreador: sinal, bateria e comunicação. A ficha mostra as consultas e as funções do J16.')), corpo);
   async function carregar() {
-    const veiculos = (await api.get(`${base(ctx)}/mapa`)).filter((x) => x.imei);
+    const veiculos = (await api.get(`${base(ctx)}/mapa`)).veiculos.filter((x) => x.imei);
     limpar(corpo, cartao(null, tabela(['Veículo', 'Rastreador', 'Sinal 4G', '>Bateria', 'Comunicação', 'Situação', '^'], veiculos.map((x) => el('tr', {},
       td([el('strong', {}, placa(x.placa)), x.descricao ? el('div', { class: 'pequeno mudo' }, x.descricao) : null]),
       td([x.rastreador_modelo ?? x.protocolo, el('div', { class: 'pequeno mudo mono' }, x.imei)]), td(barrasSinal(x.sinal_gsm)),

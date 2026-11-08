@@ -330,7 +330,7 @@ async function telaAlertas(ctx) {
       td(a.tratado_em ? [etiqueta('tratado', 'ok'), el('div', { class: 'pequeno mudo' }, `${a.tratado_por_nome ?? ''} · ${dataHora(a.tratado_em)}`),
         a.observacao ? el('div', { class: 'pequeno' }, a.observacao) : null] : etiqueta('pendente', 'aviso')),
       el('td', { class: 'acoes' }, pode(ctx) && !a.tratado_em && ALERTAS_SEGURANCA.includes(a.tipo) ? botao([icone('seguranca'), 'Modo Roubo'], 'perigo', async () => {
-        const v = (await api.get(`${base(ctx)}/mapa`)).find((x) => x.id === a.veiculo_id);
+        const v = (await api.get(`${base(ctx)}/mapa`)).veiculos.find((x) => x.id === a.veiculo_id);
         if (v) await acionarRoubo(ctx, v);
       }) : null, a.tratado_em ? null : botao('Tratar', 'primario', async () => {
         const obs = await perguntar('Tratar alerta', 'O que foi feito? (opcional)', { obrigatorio: false });
@@ -392,7 +392,7 @@ async function telaVeiculos(ctx) {
             ? botaoIcone('aberto', 'Desbloquear o veículo', async () => { await enviarComando(ctx, x, 'desbloquear'); carregar(); })
             : botaoIcone('cadeado', 'Bloquear o veículo', async () => { await enviarComando(ctx, x, 'bloquear'); carregar(); }, 'perigo')) : null,
           pode(ctx) && x.ativo && !semComandos(x) ? botaoIcone('seguranca', 'Modo Roubo', async () => {
-            const v = (await api.get(`${base(ctx)}/mapa`)).find((y) => y.id === x.id);
+            const v = (await api.get(`${base(ctx)}/mapa`)).veiculos.find((y) => y.id === x.id);
             if (v) await acionarRoubo(ctx, v);
           }) : null,
           x.imei && x.protocolo === 'gt06' ? botaoIcone('rastreadores', 'Equipamento (J16)', () => abrirFicha(ctx, x.id)) : null,
