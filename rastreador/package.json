@@ -1,0 +1,28 @@
+{
+  "name": "rastreador-veiculos",
+  "version": "1.0.0",
+  "description": "Rastreador de Veículos — mapa ao vivo, histórico de trajetos, cercas, alertas, bloqueio remoto e relatórios da frota, para o rastreador J16 4G (GT06), o app Traccar Client e outros sistemas.",
+  "main": "server/index.js",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "empacotar": "node scripts/empacotar.js",
+    "simular": "node scripts/simular-j16.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "@maplibre/maplibre-gl-leaflet": "0.1.4",
+    "express": "^5.2.1",
+    "leaflet": "1.9.4",
+    "leaflet.gridlayer.googlemutant": "^0.16.0",
+    "maplibre-gl": "6.12.0",
+    "pdfkit": "^0.15.2"
+  }
+}
