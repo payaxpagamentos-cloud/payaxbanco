@@ -1,4 +1,9 @@
 'use strict';
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 
 // Dados de exemplo: 3 empresas com veículos, rastreadores, motoristas, cercas, manutenção e 3 dias de trajetos em São Paulo.
 // Uso: npm run seed   (com o servidor parado; recria as empresas de exemplo se já existirem)

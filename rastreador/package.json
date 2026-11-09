@@ -19,6 +19,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
     "@maplibre/maplibre-gl-leaflet": "0.1.4",
+    "better-sqlite3-multiple-ciphers": "^13.0.3",
     "express": "^5.2.1",
     "leaflet": "1.9.4",
     "leaflet.gridlayer.googlemutant": "^0.16.0",
@@ -26,5 +27,8 @@
     "pdfkit": "^0.15.2",
     "qrcode": "^1.5.4",
     "web-push": "^4.0.0"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^5.10.0"
   }
 }

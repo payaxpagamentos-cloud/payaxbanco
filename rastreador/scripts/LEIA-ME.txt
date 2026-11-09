@@ -142,3 +142,23 @@ O programa abre DUAS portas:
    NÃO apague a pasta data nem o arquivo .env: o banco é atualizado sozinho na primeira vez que a versão nova sobe.
    No navegador, recarregue com Ctrl+F5; a versão aparece no rodapé do menu. Se algo der errado, pare o sistema, volte a pasta
    data-backup-VERSAO para data e instale a versão anterior.
+
+12) PROTEÇÃO DO SISTEMA (criptografia e licença)
+   O código deste sistema é proprietário (veja o arquivo LICENSE). Para proteger os dados e evitar cópia:
+
+   a) BANCO CRIPTOGRAFADO (AES-256)
+      No .env, defina uma frase secreta e longa:
+         RASTREADOR_DB_CHAVE=uma-frase-bem-grande-e-secreta
+      Banco NOVO já nasce criptografado. Banco que JÁ EXISTE: pare o sistema e converta sem perder dados:
+         pm2 stop rastreador
+         node scripts/cifrar-banco.js cifrar      (gera data/rastreador.db.novo)
+         mv data/rastreador.db data/rastreador.db.antigo && mv data/rastreador.db.novo data/rastreador.db
+         pm2 start rastreador
+      ATENÇÃO: sem a chave, o banco não abre. Guarde a chave em local seguro (perdeu a chave = perdeu os dados).
+
+   b) LICENÇA PRESA AO SERVIDOR (uso do fornecedor)
+      O fornecedor gera o par de chaves uma vez (node scripts/licenca.js gerar-par), põe a chave pública em
+      server/lib/licenca.js e emite a licença de cada cliente para o domínio/host do servidor dele
+      (node scripts/licenca.js emitir SEU-DOMINIO 365 "Cliente"). O cliente recebe a linha e põe em
+      RASTREADOR_LICENCA no .env. Em produção, sem licença válida para este servidor, o sistema não inicia.
+

@@ -1,3 +1,8 @@
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 /**
  * App do motorista: entra com CPF e senha numérica e, no celular:
  * - assume o veículo pelo QR code (a câmera do celular abre o link do QR);

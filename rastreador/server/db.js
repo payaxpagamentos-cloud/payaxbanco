@@ -1,8 +1,43 @@
 'use strict';
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 
 const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
+
+/**
+ * Banco criptografado (AES-256/SQLCipher) quando RASTREADOR_DB_CHAVE está definido no .env. Sem a chave, o arquivo do banco
+ * é ilegível: copiá-lo para outro servidor não adianta sem a chave. Sem a variável, usa o SQLite comum (como antes).
+ * O driver cifrado (better-sqlite3-multiple-ciphers) tem a mesma API (prepare/run/get/all/exec) usada aqui.
+ */
+const chaveBanco = process.env.RASTREADOR_DB_CHAVE || '';
+function novoBanco(arquivo) {
+  if (!chaveBanco) return new DatabaseSync(arquivo);
+  let Cifrado;
+  try {
+    Cifrado = require('better-sqlite3-multiple-ciphers');
+  } catch {
+    throw new Error('[Rastreador] RASTREADOR_DB_CHAVE está definido, mas o driver de banco criptografado não está instalado '
+      + '(better-sqlite3-multiple-ciphers). Reinstale as dependências ou remova a chave do .env para usar o banco sem criptografia.');
+  }
+  const db = new Cifrado(arquivo);
+  // SQLCipher com AES-256. A chave do .env vira a chave do banco; sem ela, nenhuma leitura é possível.
+  db.pragma(`cipher='sqlcipher'`);
+  db.pragma(`key='${String(chaveBanco).replace(/'/g, "''")}'`);
+  // Confere a chave logo de cara: com a chave errada (ou um banco não cifrado), esta leitura falha com uma mensagem clara.
+  try {
+    db.prepare('SELECT count(*) FROM sqlite_master').get();
+  } catch {
+    db.close();
+    throw new Error('[Rastreador] Não foi possível abrir o banco com a RASTREADOR_DB_CHAVE informada. Confira a chave no .env '
+      + '(se o banco foi criado sem criptografia, converta-o antes: scripts/cifrar-banco.js).');
+  }
+  return db;
+}
 const config = require('./config');
 const { hashSenha } = require('./lib/senha');
 
@@ -559,7 +594,7 @@ const agora = () => new Date().toISOString();
 
 function abrir(arquivo = config.dbFile) {
   if (arquivo !== ':memory:') fs.mkdirSync(path.dirname(arquivo), { recursive: true });
-  const db = new DatabaseSync(arquivo);
+  const db = novoBanco(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
   migrar(db);

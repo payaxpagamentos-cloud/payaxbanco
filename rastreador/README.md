@@ -237,6 +237,8 @@ Configuração: veja [`.env.exemplo`](.env.exemplo). Instalação em servidor (P
 
 ### Segurança
 
+- **Software proprietário** (veja LICENSE). O banco pode ser criptografado em disco (AES-256) com RASTREADOR_DB_CHAVE, e a execução pode ser presa a um servidor por licença (RASTREADOR_LICENCA). O JavaScript do navegador é ofuscado no pacote.
+
 - O identificador do OsmAnd (celular) funciona como senha: quem souber pode enviar posições por ele. O sistema gera identificadores
   aleatórios (`app-` + 10 dígitos) para os celulares, e o endereço do OsmAnd só aceita identificadores cadastrados como celular:
   o IMEI de um GT06 enviado por ali é ignorado (a posição de um GT06 só entra pela porta TCP).

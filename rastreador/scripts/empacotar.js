@@ -1,4 +1,9 @@
 'use strict';
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 
 // Gera o pacote de instalação: <saída>/rastreador.zip com a pasta rastreador/ pronta para enviar ao servidor
 // (código, dependências de produção já instaladas, .env com segredos novos e LEIA-ME).
@@ -46,8 +51,33 @@ fs.writeFileSync(path.join(pasta, '.env'), env, { mode: 0o600 });
 fs.copyFileSync(path.join(raiz, 'scripts', 'LEIA-ME.txt'), path.join(pasta, 'LEIA-ME.txt'));
 fs.copyFileSync(path.join(raiz, 'scripts', 'instalar.sh'), path.join(pasta, 'instalar.sh'));
 fs.chmodSync(path.join(pasta, 'instalar.sh'), 0o755);
+fs.copyFileSync(path.join(raiz, 'LICENSE'), path.join(pasta, 'LICENSE'));
 fs.mkdirSync(path.join(pasta, 'scripts'), { recursive: true });
-fs.copyFileSync(path.join(raiz, 'scripts', 'simular-j16.js'), path.join(pasta, 'scripts', 'simular-j16.js'));
+// Scripts úteis no servidor: simulador, criptografia do banco e verificação da licença.
+for (const s of ['simular-j16.js', 'cifrar-banco.js']) fs.copyFileSync(path.join(raiz, 'scripts', s), path.join(pasta, 'scripts', s));
+
+// Ofusca o JavaScript que roda no navegador (dificulta ler e copiar). Só no pacote; o código-fonte continua legível.
+// Os módulos mantêm import/export e os nomes exportados (renameGlobals desligado), para não quebrar o carregamento.
+const obf = require('javascript-obfuscator');
+const opcoesObf = {
+  compact: true, controlFlowFlattening: true, controlFlowFlatteningThreshold: 0.6,
+  deadCodeInjection: true, deadCodeInjectionThreshold: 0.2, simplify: true,
+  renameGlobals: false, identifierNamesGenerator: 'mangled',
+  stringArray: true, stringArrayThreshold: 0.75, stringArrayEncoding: ['base64'],
+  splitStrings: true, splitStringsChunkLength: 10, selfDefending: false, target: 'browser',
+};
+let ofuscados = 0;
+for (const sub of ['js', 'motorista']) {
+  const dir = path.join(pasta, 'public', sub);
+  for (const nome of fs.readdirSync(dir)) {
+    if (!nome.endsWith('.js') || nome === 'sw.js') continue; // o service worker fica como está (registrado por caminho fixo)
+    const alvo = path.join(dir, nome);
+    const fonte = fs.readFileSync(alvo, 'utf8');
+    fs.writeFileSync(alvo, obf.obfuscate(fonte, opcoesObf).getObfuscatedCode());
+    ofuscados++;
+  }
+}
+console.log(`JavaScript do navegador ofuscado: ${ofuscados} arquivo(s).`);
 fs.mkdirSync(path.join(pasta, 'data'), { recursive: true });
 // Versão do pacote (data e hora de Brasília): aparece no menu do painel, para conferir se a atualização entrou.
 const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
