@@ -34,7 +34,7 @@ function seletorPeriodo(inicial, fn) {
 
 // ---------- Nota do motorista ----------
 const tomNota = (n) => (n === null || n === undefined ? '' : n >= 85 ? 'ok' : n >= 70 ? 'aviso' : 'erro');
-const selo = (n) => el('span', { class: `nota tom-${tomNota(n)}` }, n ?? '—');
+const selo = (n) => el('span', { class: `nota-selo tom-${tomNota(n)}` }, n ?? '—');
 const MOTIVOS = { velocidade: 'Excesso de velocidade', horario: 'Uso fora do horário', ociosidade: 'Motor ligado parado', bruscos: 'Variações bruscas' };
 const MAX_DESCONTO = { velocidade: 40, horario: 20, ociosidade: 20, bruscos: 20 };
 
