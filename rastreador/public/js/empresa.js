@@ -390,12 +390,10 @@ async function telaVeiculos(ctx) {
   const corpo = el('div', { class: 'coluna', style: 'gap:18px' });
   const novo = pode(ctx) ? el('button', { class: 'btn primario', onclick: () => formVeiculo(ctx, null, carregar) }, 'Novo veículo') : null;
   let rastreadores = [];
-  let motoristas = [];
 
   async function carregar() {
-    const [veiculos, rs, ms] = await Promise.all([api.get(`${base(ctx)}/veiculos`), api.get(`${base(ctx)}/rastreadores`), api.get(`${base(ctx)}/motoristas`)]);
+    const [veiculos, rs] = await Promise.all([api.get(`${base(ctx)}/veiculos`), api.get(`${base(ctx)}/rastreadores`)]);
     rastreadores = rs;
-    motoristas = ms;
     limpar(corpo,
       cartao(null, tabela(['Placa', 'Veículo', 'Rastreador', 'Motorista', '>Limite', '>Hodômetro', 'Situação', '^Ações'], veiculos.map((x) => el('tr', { class: x.ativo ? '' : 'inativo' },
         td(el('strong', {}, placa(x.placa))), td([x.descricao ?? TIPOS_VEICULO[x.tipo], el('div', { class: 'pequeno mudo' }, [x.marca, x.modelo, x.ano, x.cor].filter(Boolean).join(' · '))]),
