@@ -448,7 +448,7 @@ async function telaWhatsapp(ctx) {
           const f = el('form', { class: 'form' }, campo('Mandar para (WhatsApp com DDD)', { name: 'numero', required: true, inputmode: 'tel' }),
             el('button', { class: 'btn primario', disabled: !s.configurado || null }, 'Enviar teste'));
           f.addEventListener('submit', (e) => { e.preventDefault(); const b = f.querySelector('button'); b.disabled = true;
-            api.post('/master/whatsapp/teste', { numero: f.numero.value }).then(() => { toast('Teste na fila.'); setTimeout(carregar, 3000); }, (err) => toast(err.message, true))
+            api.post('/master/whatsapp/teste', { numero: f.numero.value }).then(() => { toast('Teste na fila.'); setTimeout(() => corpo.isConnected && carregar(), 3000); }, (err) => toast(err.message, true))
               .finally(() => { b.disabled = false; }); });
           return f;
         })())),

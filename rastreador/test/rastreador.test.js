@@ -870,6 +870,43 @@ test('Rastreador', async (t) => {
     assert.equal((await api.post(`${base()}/roubo/${oc.id}/encerrar`, { desbloquear: false }, cliente)).status, 204);
   });
 
+  await t.test('robustez da API: corpo ausente, listas no lugar de texto, limite de tentativas e dados internos', async () => {
+    // Sem corpo ou com um valor solto: resposta 4xx, nunca 500.
+    const semCorpo = await fetch(`${api.raiz}/api/auth/login`, { method: 'POST' });
+    assert.equal(semCorpo.status, 401);
+    const solto = await fetch(`${api.raiz}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '"texto"' });
+    assert.equal(solto.status, 400);
+    // Lista onde se espera texto: 422 (antes passava pela regex e quebrava no banco).
+    assert.equal((await api.post(`${base()}/cercas`, { nome: 'X', tipo: 'circulo', lat: -23.5, lng: -46.6, raio_m: 100, cor: ['#aabbcc'] }, cliente)).status, 422);
+    assert.equal((await api.put(`${base()}/veiculos/${veiculo}/agenda`, { dias: '12345', inicio: ['23:00'], fim: '06:00' }, cliente)).status, 422);
+    assert.equal((await api.post(`${base()}/veiculos`, { placa: ['ABC1D23'] }, cliente)).status, 422);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'perfil', valor: ['padrao'] }, master)).status, 422);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'servidor' }, master)).status, 422);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'constructor' }, master)).status, 422);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'servidor', valor: { host: '10.0.0.1', porta: 5023 } }, master)).status, 201);
+    // O código do QR não sai no detalhe do veículo (só na rota do QR, para gestores).
+    assert.ok(!('codigo_qr' in (await api.get(`${base()}/veiculos/${veiculo}`, cliente)).dados));
+    assert.equal((await api.get(`${base()}/veiculos/${veiculo}/qr`, operador)).status, 403);
+    // Só o master mexe no plano; o suporte segue editando o cadastro.
+    assert.equal((await api.post(`${base()}/usuarios`, { nome: 'Sup', email: 'sup@plataforma.com', senha: 'senha-do-sup', perfil: 'suporte' }, cliente)).status, 422);
+    assert.equal((await api.post('/master/usuarios', { nome: 'Sup', email: 'sup@plataforma.com', senha: 'senha-do-sup', perfil: 'suporte' }, master)).status, 201);
+    const suporte = await api.login('sup@plataforma.com', 'senha-do-sup');
+    assert.equal((await api.put(`/master/empresas/${empresa}`, { mensalidade_centavos: 100 }, suporte)).status, 403);
+    assert.ok((await api.put(`/master/empresas/${empresa}`, { telefone: '11999990000' }, suporte)).status < 300);
+    assert.equal((await api.post('/master/empresas', { nome: 'Nova', limite_veiculos: 1, mensalidade_centavos: 100 }, suporte)).status, 403);
+    // O limite de tentativas do código vale também com maiúsculas e barra final.
+    let bloqueado = 0;
+    for (let i = 0; i < 25; i++) {
+      const r = await api.post(`${base()}/Liberacoes/Consultar/`, { codigo: '000000' }, cliente);
+      if (r.status === 429) bloqueado++;
+    }
+    assert.ok(bloqueado >= 4, `o limite por minuto tem de valer para o caminho em maiúsculas (${bloqueado} bloqueadas)`);
+    // Posição pelo endereço público do celular com o IMEI de um GT06 é ignorada.
+    const antes = api.db.prepare('SELECT COUNT(*) AS n FROM posicoes WHERE veiculo_id = ?').get(veiculo).n;
+    await api.osmand({ id: IMEI, lat: -10, lon: -50, timestamp: Math.floor(Date.now() / 1000) });
+    assert.equal(api.db.prepare('SELECT COUNT(*) AS n FROM posicoes WHERE veiculo_id = ?').get(veiculo).n, antes);
+  });
+
   await t.test('bloqueio da empresa e exclusão', async () => {
     assert.equal((await api.post(`/master/empresas/${empresa}/bloquear`, { motivo: 'Inadimplente' }, master)).status, 204);
     assert.equal((await api.get(`${base()}/mapa`, cliente)).status, 401);

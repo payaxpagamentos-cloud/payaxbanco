@@ -41,7 +41,7 @@ export async function acionarRoubo(ctx, v, { velocidadeSegura = 20, depois } = {
   ], (d) => api.post(`${base(ctx)}/veiculos/${v.id}/roubo`, d), { rotulo: 'Acionar Modo Roubo' });
   if (!r) return;
   toast(r.status === 'aguardando' ? 'Modo Roubo acionado. O corte sai quando a velocidade baixar.' : 'Modo Roubo acionado. Corte enviado ao rastreador.');
-  if (depois) depois(); else ctx.ir('roubo');
+  if (depois) depois(); else ctx.ir('roubo', ctx.empresaId);
 }
 
 /** Modo Estacionado: guarda o ponto e vigia (ignição ligada ou saída do raio disparam o alerta). */
@@ -242,6 +242,7 @@ async function telaBloqueioProgramado(ctx) {
   let veiculos = [];
   const form = async (a) => {
     const opcoes = comRastreador(veiculos);
+    if (!a && !opcoes.length) return toast(veiculos.length ? 'Nenhum veículo com rastreador instalado.' : 'Aguarde o carregamento dos veículos.', true);
     const dias = String(a?.dias ?? '12345');
     const r = await formModal(a ? `Bloqueio programado · ${placa(a.placa)}` : 'Novo bloqueio programado', () => [
       a ? el('input', { type: 'hidden', name: 'veiculo', value: a.veiculo_id })

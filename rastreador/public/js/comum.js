@@ -126,7 +126,8 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
     const sel = veiculos.find((x) => x.id === ultimoDetalhe);
     if (sel && detalhe) detalhe(sel, painel, fecharPainel, { atualizacao: true });
   }
-  ctx.parar(repetir(carregar, 10_000));
+  const pararAtualizacao = repetir(carregar, 10_000);
+  ctx.parar(() => { pararAtualizacao(); mapa?.remover(); });
 }
 
 /** Dados de leitura do veículo (posição, velocidade, ignição, comunicação, hodômetro). */

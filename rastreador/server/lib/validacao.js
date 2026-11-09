@@ -2,7 +2,12 @@
 
 const { ErroNegocio } = require('./erros');
 
-const digitos = (v) => String(v ?? '').replace(/\D/g, '');
+/** Só texto, número ou booleano: uma lista ou objeto onde se espera um valor simples é recusado (o banco não aceita e daria erro 500). */
+const simples = (v, nome = 'o valor') => {
+  if (v !== null && v !== undefined && typeof v === 'object') throw new ErroNegocio(`${nome[0].toUpperCase()}${nome.slice(1)} inválido.`, 422);
+  return v;
+};
+const digitos = (v) => String(simples(v, 'o número') ?? '').replace(/\D/g, '');
 
 function cpfValido(valor) {
   const cpf = digitos(valor);
@@ -41,20 +46,21 @@ const exigir = (condicao, msg) => { if (!condicao) falhar(msg); };
 
 /** Texto obrigatório, sem espaços nas pontas e com tamanho máximo. */
 function texto(v, nome, max = 255) {
-  const t = String(v ?? '').trim();
+  const t = String(simples(v, nome) ?? '').trim();
   exigir(t, `Informe ${nome}.`);
   exigir(t.length <= max, `${nome[0].toUpperCase()}${nome.slice(1)} deve ter até ${max} caracteres.`);
   return t;
 }
-const opcional = (v, nome, max = 255) => (v === undefined || v === null || String(v).trim() === '' ? null : texto(v, nome, max));
+const opcional = (v, nome, max = 255) => (v === undefined || v === null || String(simples(v, nome)).trim() === '' ? null : texto(v, nome, max));
 
 function inteiro(v, nome, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
-  const n = Number(v);
+  const n = Number(simples(v, nome));
   exigir(Number.isInteger(n) && n >= min && n <= max, `${nome[0].toUpperCase()}${nome.slice(1)} inválido.`);
   return n;
 }
 
 function numero(v, nome, { min = -Infinity, max = Infinity } = {}) {
+  simples(v, nome);
   const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v);
   exigir(v !== '' && v !== null && v !== undefined && Number.isFinite(n) && n >= min && n <= max, `${nome[0].toUpperCase()}${nome.slice(1)} inválido.`);
   return n;
@@ -115,7 +121,7 @@ function imei(v) {
 
 /** Hora 'HH:MM' (00:00 a 23:59). */
 function horario(v, nome) {
-  const t = String(v ?? '').trim();
+  const t = String(simples(v, nome) ?? '').trim();
   exigir(/^([01]\d|2[0-3]):[0-5]\d$/.test(t), `${nome[0].toUpperCase()}${nome.slice(1)} inválido (use HH:MM).`);
   return t;
 }
@@ -130,5 +136,5 @@ function coordenadas(lat, lng) {
 
 const booleano = (v) => v === true || v === 1 || v === '1' || v === 'true' || v === 'on';
 
-module.exports = { digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data, placa,
+module.exports = { simples, digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data, placa,
   imei, imeiValido, horario, coordenadas, booleano };

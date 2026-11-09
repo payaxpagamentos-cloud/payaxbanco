@@ -153,7 +153,7 @@ module.exports = (db, extras = {}) => {
   const CAMPOS = ['nome', 'documento', 'tipo', 'email', 'telefone', 'limite_veiculos', 'mensalidade_centavos', 'sem_comunicacao_min'];
 
   /** Nova empresa, com o primeiro administrador (opcional) já criado. */
-  r.post('/empresas', (req, res) => {
+  r.post('/empresas', soMaster, (req, res) => {
     // O plano é da empresa: sem valor padrão, o limite e a mensalidade são informados no cadastro.
     const informado = (k) => req.body[k] !== undefined && req.body[k] !== null && req.body[k] !== '';
     v.exigir(informado('limite_veiculos'), 'Informe o limite de veículos do plano.');
@@ -171,6 +171,9 @@ module.exports = (db, extras = {}) => {
 
   r.put('/empresas/:id', (req, res) => {
     const atual = empresa(req.params.id);
+    if (req.usuario.perfil !== 'master' && ['limite_veiculos', 'mensalidade_centavos'].some((k) => req.body[k] !== undefined)) {
+      throw new ErroNegocio('Só o master altera o plano da empresa (limite de veículos e mensalidade).', 403);
+    }
     const d = dadosEmpresa(req.body, atual);
     db.prepare(`UPDATE empresas SET ${CAMPOS.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...CAMPOS.map((k) => d[k]), atual.id);
     registrar(db, req, 'empresa_alterada', { campos: CAMPOS.filter((k) => d[k] !== atual[k]) }, atual.id);

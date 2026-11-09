@@ -238,7 +238,10 @@ Configuração: veja [`.env.exemplo`](.env.exemplo). Instalação em servidor (P
 ### Segurança
 
 - O identificador do OsmAnd (celular) funciona como senha: quem souber pode enviar posições por ele. O sistema gera identificadores
-  aleatórios (`app-` + 10 dígitos) para os celulares; não use o IMEI de um GT06 num celular.
+  aleatórios (`app-` + 10 dígitos) para os celulares, e o endereço do OsmAnd só aceita identificadores cadastrados como celular:
+  o IMEI de um GT06 enviado por ali é ignorado (a posição de um GT06 só entra pela porta TCP).
+- Entradas malformadas (corpo ausente, lista no lugar de texto, chave desconhecida) respondem 4xx, nunca derrubam o processo; o limite
+  de tentativas por minuto (login, código de liberação, assistente, envios do app) vale para qualquer grafia do endereço.
 - O protocolo GT06 não tem autenticação: só o IMEI cadastrado é aceito, e cada IMEI tem uma conexão por vez.
 - Bloquear exige digitar a placa. Todo corte passa pelo **bloqueio inteligente**: andando acima da velocidade segura (20 km/h), o corte
   espera e sai sozinho quando o veículo diminui ou desliga. Forçar o corte em movimento só pelo Modo Roubo, com a placa e um aviso de risco.
