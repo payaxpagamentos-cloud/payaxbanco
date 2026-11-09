@@ -6,6 +6,7 @@ const { expirar } = require('./comandos');
 const agenda = require('./agenda');
 const zap = require('./whatsapp');
 const relatoriosProgramados = require('./relatoriosProgramados');
+const roubo = require('./roubo');
 
 /**
  * Tarefas de fundo: alerta de veículo sem comunicação (uma vez até ele voltar), expiração dos comandos sem resposta
@@ -47,6 +48,8 @@ function manutencao(db, { limpar = false } = {}) {
   // Relatórios programados cuja hora chegou (PDF pelo WhatsApp).
   relatoriosProgramados.executar(db).catch((err) => console.error('[Rastreador] Relatório programado:', err.message));
   const expirados = expirar(db, cfg.comando_expira_horas);
+  // Corte do Modo Roubo que expirou sem resposta volta a esperar a próxima posição segura.
+  if (expirados) transacao(db, () => roubo.aoExpirar(db));
   let apagadas = 0;
   if (limpar) {
     const corte = new Date(agoraMs - cfg.retencao_dias * 86_400_000).toISOString();
@@ -58,6 +61,18 @@ function manutencao(db, { limpar = false } = {}) {
     db.prepare('DELETE FROM alertas WHERE ocorrido_em < ? AND tratado_em IS NOT NULL').run(corte);
     db.prepare('DELETE FROM uso_diario WHERE data < ?').run(corte.slice(0, 10));
     db.prepare('DELETE FROM compartilhamentos WHERE expira_em < ?').run(corte);
+    // Registros que só crescem: fila do WhatsApp (o PDF de uma mensagem que falhou sai depois de 1 dia; a mensagem, depois de 90),
+    // avisos do app já mandados, condutores encerrados, equipamentos desconhecidos que sumiram e a auditoria (1 ano).
+    const dias = (n) => new Date(agoraMs - n * 86_400_000).toISOString();
+    db.prepare("UPDATE mensagens SET arquivo = NULL WHERE arquivo IS NOT NULL AND status <> 'pendente' AND criado_em < ?").run(dias(1));
+    db.prepare("DELETE FROM mensagens WHERE status <> 'pendente' AND criado_em < ?").run(dias(90));
+    db.prepare('DELETE FROM avisos_motorista WHERE criado_em < ?').run(dias(7));
+    db.prepare('DELETE FROM condutores WHERE fim IS NOT NULL AND fim < ?').run(corte);
+    db.prepare('DELETE FROM desconhecidos WHERE ultimo_contato < ?').run(dias(90));
+    db.prepare('DELETE FROM auditoria WHERE criado_em < ?').run(dias(365));
+    db.prepare('DELETE FROM relatorios_envios WHERE criado_em < ?').run(dias(365));
+    // Estatísticas do planejador de consultas e o arquivo WAL compactado (uma vez por dia, depois da limpeza).
+    try { db.exec('PRAGMA optimize; PRAGMA wal_checkpoint(TRUNCATE);'); } catch { /* banco em memória nos testes */ }
   }
   return { sem_comunicacao: mudos.length, sumico: sumidos.length, expirados, apagadas };
 }

@@ -1,7 +1,6 @@
 'use strict';
 
 const { agora, transacao } = require('../db');
-const { ErroNegocio } = require('./erros');
 const { alertar } = require('./alertas');
 const notif = require('./notificacoes');
 const fotos = require('./fotos');
@@ -74,9 +73,11 @@ function checklist(db, m, veiculo, d) {
 }
 
 function abastecimento(db, m, veiculo, d) {
-  const litros = v.numero(String(d.litros ?? '').replace(',', '.'), 'a quantidade de litros', { min: 0.5, max: 2000 });
-  const valor = d.valor_centavos !== undefined ? v.inteiro(d.valor_centavos, 'o valor', { min: 100, max: 10_000_000 })
-    : Math.round(v.numero(String(d.valor ?? '').replace(/\./g, '').replace(',', '.'), 'o valor', { min: 1, max: 100_000 }) * 100);
+  const litros = Number(String(d.litros ?? '').replace(',', '.'));
+  v.exigir(Number.isFinite(litros) && litros >= 0.5 && litros <= 2000, 'Informe os litros abastecidos (entre 0,5 e 2.000).');
+  const valorReais = d.valor_centavos !== undefined ? Number(d.valor_centavos) / 100 : Number(String(d.valor ?? '').replace(/\./g, '').replace(',', '.'));
+  v.exigir(Number.isFinite(valorReais) && valorReais >= 1 && valorReais <= 100_000, 'Informe o valor pago (entre R$ 1,00 e R$ 100.000,00).');
+  const valor = Math.round(valorReais * 100);
   const km = d.km === undefined || d.km === null || d.km === '' ? null : v.inteiro(d.km, 'o km do painel', { min: 0, max: 9_999_999 });
   const posto = textoOpcional(d.posto, 'o posto', 80);
   const lista = fotos.conferir(d.fotos);

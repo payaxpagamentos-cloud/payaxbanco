@@ -197,6 +197,9 @@ Evolution falhar.
   viagens de menos de 100 m são ignoradas.
 - **Situação no mapa**: sem sinal quando não comunica há mais de 10 min (ajustável); em movimento a partir de 3 km/h; parado ligado ou parado.
 - Posições antigas reenviadas pela memória do equipamento entram no histórico, mas não mudam a posição atual nem geram alertas.
+- **Limpeza automática** (uma vez por dia): posições, alertas tratados e uso diário mais antigos que a retenção (Master → Parâmetros);
+  mensagens do WhatsApp já enviadas ou que falharam depois de 90 dias (o PDF anexo sai em 1 dia); auditoria e envios de relatórios
+  depois de 1 ano; equipamentos desconhecidos sem contato há 90 dias. Checklists, abastecimentos, avarias e fotos ficam guardados.
 
 ## Link de localização compartilhada
 

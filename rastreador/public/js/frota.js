@@ -1,6 +1,6 @@
 /** Frota: nota dos motoristas e ranking, custo em reais e os equipamentos (a ficha do J16 com saúde, consultas e ajustes). */
 import { api, qs, baixar } from './api.js';
-import { el, limpar, dinheiro, dataHora, desde, km, kmh, placa, inteiro, toast, acao, campo, escolha, modal, perguntar, repetir, etiqueta, icone,
+import { el, limpar, dinheiro, dataHora, desde, km, kmh, placa, inteiro, toast, acao, modal, perguntar, repetir, etiqueta, icone,
   hojeLocal, somarDias } from './ui.js';
 import { cartao, indicador, tabela, td, botao, acoesTopo, linhaDado } from './comum.js';
 import { cartaoAbastecimentos } from './diario.js';

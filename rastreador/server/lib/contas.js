@@ -6,6 +6,8 @@ const { hashSenha } = require('./senha');
 const { ErroNegocio } = require('./erros');
 const v = require('./validacao');
 
+const hashChave = (segredo) => crypto.createHash('sha256').update(segredo).digest('hex');
+
 /** Cria um usuário. Perfis da plataforma (master, suporte) sem empresa; cliente e operador, sempre de uma empresa. */
 function criarUsuario(db, d, { perfis, empresaId = null }) {
   const perfil = v.opcao(d.perfil, 'o perfil', perfis);
@@ -38,7 +40,6 @@ function criarChave(db, empresaId, nome, usuarioId) {
   return { id: Number(r.lastInsertRowid), prefixo, chave: `rst_${prefixo}_${segredo}` };
 }
 
-const hashChave = (segredo) => crypto.createHash('sha256').update(segredo).digest('hex');
 
 /** Empresa dona da chave informada, se a chave existe, não foi revogada e a empresa não foi excluída. */
 function lerChave(db, chave) {

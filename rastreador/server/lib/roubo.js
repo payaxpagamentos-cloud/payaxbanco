@@ -189,6 +189,20 @@ function desbloquearManual(db, veiculo, usuarioId) {
   return true;
 }
 
+/**
+ * Corte que ficou sem resposta (comando expirado pela manutenção ou cancelado por outro comando): a ocorrência volta a esperar e
+ * o corte sai de novo na próxima posição segura, em vez de ficar parada em "bloqueio enviado" para sempre.
+ */
+function aoExpirar(db) {
+  const lista = db.prepare(`SELECT o.id FROM ocorrencias o JOIN comandos c ON c.id = o.comando_id
+    WHERE o.status = 'bloqueio_enviado' AND c.status IN ('expirado', 'cancelado', 'falhou')`).all();
+  for (const { id } of lista) {
+    db.prepare("UPDATE ocorrencias SET status = 'aguardando', comando_id = NULL WHERE id = ?").run(id);
+    evento(db, id, 'O rastreador não respondeu ao corte a tempo: tentando de novo na próxima posição segura.');
+  }
+  return lista.length;
+}
+
 /** Corte imediato, sem esperar a velocidade (o cliente assume o risco; exige a placa digitada). */
 function forcar(db, oc, d) {
   const veiculo = db.prepare('SELECT * FROM veiculos WHERE id = ?').get(oc.veiculo_id);
@@ -227,4 +241,4 @@ function listar(db, empresaId, tipo = 'roubo') {
   return lista.map((o) => ({ ...o, eventos: o.status === 'encerrada' ? [] : eventos.all(o.id) }));
 }
 
-module.exports = { abrir, abrirAutomatico, abrirInterno, aoReceber, aoResponder, forcar, encerrar, listar, limiteSeguro, bloquearComSeguranca, desbloquearManual };
+module.exports = { abrir, abrirAutomatico, abrirInterno, aoReceber, aoResponder, aoExpirar, forcar, encerrar, listar, limiteSeguro, bloquearComSeguranca, desbloquearManual };

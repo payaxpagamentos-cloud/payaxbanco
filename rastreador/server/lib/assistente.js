@@ -233,7 +233,7 @@ const EXECUTAR = {
     return db.prepare(`SELECT o.tipo, o.status, o.criada_em, o.encerrada_em, o.observacao, v.placa FROM ocorrencias o JOIN veiculos v ON v.id = o.veiculo_id
       WHERE o.empresa_id = ? AND o.criada_em >= ? ORDER BY o.criada_em DESC LIMIT ${MAX_LISTA}`)
       .all(empresaId, new Date(Date.now() - 90 * 86_400_000).toISOString())
-      .map((o) => ({ placa: o.placa, tipo: o.tipo === 'agenda' ? 'bloqueio programado' : 'roubo', situacao: STATUS[o.status] ?? o.status, observacao: o.observacao, aberta: dataLocal(o.criada_em), encerrada: dataLocal(o.encerrada_em) }));
+      .map((o) => ({ placa: o.placa, tipo: { agenda: 'bloqueio programado', manual: 'bloqueio pelo painel' }[o.tipo] ?? 'roubo', situacao: STATUS[o.status] ?? o.status, observacao: o.observacao, aberta: dataLocal(o.criada_em), encerrada: dataLocal(o.encerrada_em) }));
   },
 };
 
