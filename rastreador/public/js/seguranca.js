@@ -31,7 +31,7 @@ const comRastreador = (veiculos) => veiculos.filter((x) => x.ativo && x.imei && 
 /** Aciona o Modo Roubo: digita a placa para confirmar; o corte espera a velocidade segura. */
 export async function acionarRoubo(ctx, v, { velocidadeSegura = 20, depois } = {}) {
   const r = await formModal(`Modo Roubo · ${placa(v.placa)}`, () => [
-    el('div', { class: 'aviso-roubo' }, icone('seguranca'), el('div', {},
+    el('div', { class: 'aviso-roubo' }, icone('sos'), el('div', {},
       el('strong', {}, 'Bloqueio inteligente'),
       el('p', {}, `O corte só sai com o veículo abaixo de ${velocidadeSegura} km/h ou com a ignição desligada, para não causar acidente. `
         + 'Enquanto isso, o rastreador passa a mandar a posição a cada 10 segundos e cada passo vai para o WhatsApp dos contatos de segurança.'))),
@@ -172,7 +172,7 @@ function contagens(ctx, s, ocorrencias) {
 async function telaRoubo(ctx) {
   const corpo = el('div', { class: 'coluna', style: 'gap:16px' });
   let velocidadeSegura = 20;
-  const acionar = pode(ctx) ? el('button', { class: 'btn perigo', onclick: () => escolherEAcionar(ctx, velocidadeSegura, () => carregar()) }, icone('seguranca'), 'Acionar Modo Roubo') : null;
+  const acionar = pode(ctx) ? el('button', { class: 'btn perigo roubo', onclick: () => escolherEAcionar(ctx, velocidadeSegura, () => carregar()) }, icone('sos'), 'Acionar Modo Roubo') : null;
   limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0;max-width:720px' },
     'Com o Modo Roubo, o corte de combustível espera o veículo ficar abaixo da velocidade segura. Cada passo fica na linha do tempo e vai para o WhatsApp.'), acionar), corpo);
   async function carregar() {
@@ -183,7 +183,7 @@ async function telaRoubo(ctx) {
     limpar(corpo,
       contagens(ctx, s, abertas.length),
       abertas.length ? el('div', { class: 'ocorrencias' }, abertas.map((o) => cartaoOcorrencia(ctx, o, carregar)))
-        : cartao(null, el('div', { class: 'vazio-seguranca' }, icone('seguranca'), el('strong', {}, 'Nenhum veículo em Modo Roubo.'),
+        : cartao(null, el('div', { class: 'vazio-seguranca' }, icone('sos'), el('strong', {}, 'Nenhum veículo em Modo Roubo.'),
           el('span', { class: 'mudo' }, `Em caso de roubo, acione aqui, no mapa ou na lista de veículos. O corte espera o veículo ficar abaixo de ${velocidadeSegura} km/h.`))),
       cartao('Ocorrências encerradas (90 dias)', tabela(['Veículo', 'Acionada', 'Encerrada', 'Por', '^Relatório'], encerradas.map((o) => el('tr', {},
         td([el('strong', {}, placa(o.placa)), o.descricao ? el('div', { class: 'pequeno mudo' }, o.descricao) : null]), td(dataHora(o.criada_em)), td(dataHora(o.encerrada_em)),
@@ -222,7 +222,7 @@ async function telaEstacionados(ctx) {
         td([dataHora(e.armado_em), el('div', { class: 'pequeno mudo' }, e.automatico ? 'automático (noite)' : e.armado_por_nome ?? '')]),
         td(e.violado_em ? [etiqueta('violado', 'erro'), el('div', { class: 'pequeno mudo' }, `${e.motivo_violacao ?? ''} · ${dataHora(e.violado_em)}`)] : etiqueta('vigiando', 'ok')),
         el('td', { class: 'acoes' },
-          pode(ctx) && e.violado_em ? botao('Modo Roubo', 'perigo', async () => {
+          pode(ctx) && e.violado_em ? botao([icone('sos'), 'Modo Roubo'], 'perigo roubo', async () => {
             const v = (await api.get(`${base(ctx)}/mapa`)).veiculos.find((x) => x.id === e.veiculo_id);
             if (v) acionarRoubo(ctx, v, { velocidadeSegura: s.velocidade_segura_kmh });
           }) : null,
