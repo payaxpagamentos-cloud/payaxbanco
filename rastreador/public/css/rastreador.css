@@ -570,7 +570,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible{ outline: none
 .indicador .rotulo{ display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); font-weight: 500; }
 .indicador .rotulo svg{ width: 14px; height: 14px; color: var(--ciano); flex: none; }
 .indicador .valor{ font-size: 28px; font-weight: 600; letter-spacing: -1px; line-height: 1.2; margin: 9px 0 4px; }
-.indicador .nota{ font-size: 11px; color: var(--text-2); margin-top: 0; }
+.indicador .nota{ font-size: 11px; color: var(--text-2); margin-top: 0; white-space: normal; overflow-wrap: anywhere; }
 .grade.mini .indicador{ padding: 10px 12px; }
 .grade.mini .indicador:hover{ transform: none; box-shadow: none; }
 .grade.mini .indicador::before{ display: none; }
@@ -923,7 +923,12 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
   .grade:not(.mini):has(> .indicador:nth-child(6):last-child){ --cols: 2; }
   .grade:not(.mini):has(> .indicador:nth-child(3):last-child){ --cols: 2; }
   .grade:not(.mini):has(> .indicador:nth-child(3):last-child) > :first-child{ grid-column: span 2; }
+  /* Sete ou mais (dashboard da empresa): duas colunas no celular, o primeiro ocupando a linha inteira (1 + 2 + 2 + 2). */
+  .grade:not(.mini):has(> .indicador:nth-child(7)){ --cols: 2; }
+  .grade:not(.mini):has(> .indicador:nth-child(7):last-child) > :first-child{ grid-column: span 2; }
 }
+/* Sete indicadores: uma linha só nas telas largas; 4 + 3 nas médias. */
+@media (min-width: 1300px){ .grade:not(.mini):has(> .indicador:nth-child(7):last-child){ --cols: 7; } }
 /* Painéis lado a lado com a mesma altura */
 .grade-dash{ align-items: stretch; }
 .grade-dash > * > .cartao:only-child{ height: 100%; }
@@ -1076,16 +1081,17 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 .item-seguranca.tom-erro em{ color: var(--erro); font-weight: 700; }
 
 /* Nota do motorista */
-.nota{ display: inline-grid; place-items: center; min-width: 38px; height: 26px; padding: 0 8px; border-radius: 8px; font-weight: 800; font-variant-numeric: tabular-nums; font-size: 13px;
+/* Selo da nota do motorista (não confundir com o texto pequeno .nota dos indicadores). */
+.nota-selo{ display: inline-grid; place-items: center; min-width: 38px; height: 26px; padding: 0 8px; border-radius: 8px; font-weight: 800; font-variant-numeric: tabular-nums; font-size: 13px;
   background: var(--surface-2); color: var(--text-2); }
-.nota.tom-ok{ background: var(--ok-bg); color: var(--ok); }
-.nota.tom-aviso{ background: var(--aviso-bg); color: var(--aviso); }
-.nota.tom-erro{ background: var(--erro-bg); color: var(--erro); }
+.nota-selo.tom-ok{ background: var(--ok-bg); color: var(--ok); }
+.nota-selo.tom-aviso{ background: var(--aviso-bg); color: var(--aviso); }
+.nota-selo.tom-erro{ background: var(--erro-bg); color: var(--erro); }
 .posicao{ display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-weight: 800; font-size: 11px; background: var(--surface-2); color: var(--text-2); }
 .posicao.p1{ background: var(--grad-acao); color: #FFFFFF; }
 .posicao.p2, .posicao.p3{ background: var(--azul-suave); color: var(--azul); }
 .nota-grande{ display: flex; gap: 14px; align-items: center; margin-bottom: 14px; }
-.nota-grande .nota{ min-width: 64px; height: 52px; font-size: 24px; border-radius: 14px; }
+.nota-grande .nota-selo{ min-width: 64px; height: 52px; font-size: 24px; border-radius: 14px; }
 .descontos{ display: grid; gap: 10px; margin-bottom: 14px; }
 .desconto{ font-size: 12px; }
 .desconto .trilho{ height: 6px; border-radius: 99px; background: var(--barra-fundo); overflow: hidden; margin-top: 4px; }
@@ -1173,8 +1179,6 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 @media (prefers-reduced-motion: reduce){ .ocorrencia.status-aguardando::before, .pensando span{ animation: none; } }
 .efeitos-pausados .ocorrencia.status-aguardando::before, .efeitos-pausados .pensando span{ animation: none; }
 
-/* Dashboard da empresa: os sete indicadores numa linha só nas telas largas */
-@media (min-width: 1300px){ .grade.sete{ grid-template-columns: repeat(7, minmax(0, 1fr)); } }
 /* Muitas seções (o master tem 7): no computador viram pílulas com o nome inteiro, sem a descrição. */
 @media (min-width: 861px){
   .abas-config:has(> :nth-child(7)){ display: flex; flex-wrap: wrap; gap: 8px; }
