@@ -18,6 +18,7 @@ const condutores = require('./condutores');
  */
 const exigir = (c, msg) => { if (!c) throw new ErroNegocio(msg, 422); };
 const hhmm = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+const horaCurta = (iso) => { const l = local(iso); return `${String(l.hora).padStart(2, '0')}:${String(l.minuto).padStart(2, '0')}`; };
 const hashCodigo = (empresaId, codigo) => crypto.createHash('sha256').update(`${empresaId}:${String(codigo).replace(/\D/g, '')}`).digest('hex');
 
 /** A janela de bloqueio em que `instante` está (com a chave do dia em que ela começou), ou null. Pode virar a noite. */
@@ -106,7 +107,6 @@ function encerrarLiberacao(db, liberacao, usuarioId = null) {
   db.prepare('UPDATE bloqueio_agendas SET janela_bloqueada = NULL WHERE veiculo_id = ?').run(liberacao.veiculo_id);
 }
 
-const horaCurta = (iso) => { const l = local(iso); return `${String(l.hora).padStart(2, '0')}:${String(l.minuto).padStart(2, '0')}`; };
 
 /** Tarefa de cada minuto: começo e fim dos horários, fim das liberações (com aviso antes) e códigos vencidos. */
 function verificar(db) {

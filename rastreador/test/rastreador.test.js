@@ -854,6 +854,22 @@ test('Rastreador', async (t) => {
     }
   });
 
+  await t.test('modo roubo: corte sem resposta do aparelho volta a esperar a próxima posição segura', async () => {
+    const db = api.db;
+    db.prepare('UPDATE veiculos SET velocidade_kmh = 0, ignicao = 0, posicao_em = ? WHERE id = ?').run(new Date().toISOString(), veiculo);
+    const r = await api.post(`${base()}/veiculos/${veiculo}/roubo`, { confirmacao: 'ABC1D23' }, cliente);
+    assert.equal(r.status, 201);
+    assert.equal(r.dados.status, 'bloqueio_enviado', 'parado: o corte sai na hora');
+    const oc = db.prepare('SELECT * FROM ocorrencias WHERE id = ?').get(r.dados.id);
+    // O aparelho não respondeu dentro do prazo: a manutenção expira o comando e a ocorrência volta a "aguardando".
+    db.prepare("UPDATE comandos SET criado_em = ? WHERE id = ?").run(new Date(Date.now() - 100 * 3_600_000).toISOString(), oc.comando_id);
+    const m = manutencao(db);
+    assert.ok(m.expirados >= 1);
+    assert.equal(db.prepare('SELECT status FROM ocorrencias WHERE id = ?').get(oc.id).status, 'aguardando');
+    assert.match(db.prepare('SELECT texto FROM ocorrencia_eventos WHERE ocorrencia_id = ? ORDER BY id DESC LIMIT 1').get(oc.id).texto, /não respondeu ao corte/);
+    assert.equal((await api.post(`${base()}/roubo/${oc.id}/encerrar`, { desbloquear: false }, cliente)).status, 204);
+  });
+
   await t.test('bloqueio da empresa e exclusão', async () => {
     assert.equal((await api.post(`/master/empresas/${empresa}/bloquear`, { motivo: 'Inadimplente' }, master)).status, 204);
     assert.equal((await api.get(`${base()}/mapa`, cliente)).status, 401);

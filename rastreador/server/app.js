@@ -77,7 +77,6 @@ function criarApp(db, extras = {}) {
     app.get('/', (_req, res) => res.redirect(`${config.basePath}/`));
   }
   app.use(config.basePath || '/', r);
-  // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => tratarErro(err, res));
   return app;
 }

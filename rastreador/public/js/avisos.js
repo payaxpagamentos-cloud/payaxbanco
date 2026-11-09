@@ -1,6 +1,6 @@
 /** Avisos da empresa: contatos do WhatsApp (quem recebe o quê, com horário de silêncio) e os relatórios programados em PDF. */
 import { api } from './api.js';
-import { el, limpar, dataHora, telefone, toast, acao, campo, marcar, formModal, confirmar, repetir, etiqueta, icone } from './ui.js';
+import { el, limpar, dataHora, telefone, toast, campo, marcar, formModal, confirmar, repetir, etiqueta, icone } from './ui.js';
 import { cartao, tabela, td, botao, botaoIcone, acoesTopo } from './comum.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;

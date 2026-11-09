@@ -49,14 +49,13 @@ const mapa = (lat, lng) => (lat !== null && lat !== undefined ? `https://maps.go
 
 /** Texto padrão: empresa, título, detalhe, local, hora e o link do painel (se configurado). */
 function montar({ empresa, titulo, texto, lat, lng, em, caminho }) {
-  const linhas = [`*${SEGURANCA_TITULO(titulo)}*`, texto];
+  const linhas = [`*${titulo}*`, texto];
   const l = mapa(lat, lng);
   if (l) linhas.push(`Local: ${l}`);
   linhas.push(`${empresa ? `${empresa} · ` : ''}${dataCurta(em ?? new Date().toISOString())}`);
   if (config.urlPublica && caminho) linhas.push(`Abrir no painel: ${config.urlPublica}/#${caminho}`);
   return linhas.join('\n');
 }
-const SEGURANCA_TITULO = (t) => t;
 
 /**
  * Avisa os contatos que pediram este tipo. Devolve quantas mensagens entraram na fila.

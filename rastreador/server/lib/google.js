@@ -12,6 +12,10 @@ const TIPOS = {
   satelite: { mapType: 'satellite', layerTypes: ['layerRoadmap'] },
 };
 const sessoes = new Map();
+// Quando o Google recusa (chave sem faturamento, API desligada), o sistema não tenta de novo a cada página aberta: espera
+// 10 minutos e avisa uma vez por período. Sem isso, cada abertura do painel esperava o Google falhar e o log enchia.
+const ESPERA_FALHA_MS = 10 * 60 * 1000;
+let falhouEm = 0;
 
 async function criarSessao(tipo) {
   const resp = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(config.google.chave)}`, {
@@ -30,6 +34,7 @@ async function criarSessao(tipo) {
 /** Sessões válidas de ruas e satélite, ou null sem chave (ou se o Google recusar: o sistema volta ao mapa gratuito). */
 async function sessoesGoogle() {
   if (!config.google.chave) return null;
+  if (Date.now() - falhouEm < ESPERA_FALHA_MS) return null;
   try {
     const r = {};
     for (const tipo of Object.keys(TIPOS)) {
@@ -42,7 +47,8 @@ async function sessoesGoogle() {
     }
     return { chave: config.google.chave, sessoes: r };
   } catch (err) {
-    console.error('[Rastreador] Mapa do Google indisponível, usando o gratuito:', err.message);
+    falhouEm = Date.now();
+    console.error(`[Rastreador] Mapa do Google indisponível, usando o gratuito (nova tentativa em ${ESPERA_FALHA_MS / 60_000} min):`, err.message);
     return null;
   }
 }

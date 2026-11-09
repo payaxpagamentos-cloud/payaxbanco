@@ -829,7 +829,7 @@ module.exports = (db, extras = {}) => {
     res.set({ 'Content-Type': f.tipo, 'Cache-Control': 'private, max-age=86400' }).sendFile(f.caminho);
   });
   const linkQr = (req, codigo) => `${config.urlPublica || `${req.protocol}://${req.get('host')}${config.basePath}`}/motorista/#veiculo=${codigo}`;
-  r.get('/veiculos/:id/qr', (req, res, next) => {
+  r.get('/veiculos/:id/qr', gestor, (req, res, next) => {
     const x = veiculo(req, req.params.id);
     const link = linkQr(req, condutores.codigoQr(db, x));
     QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0B1B3F', light: '#FFFFFF' } })

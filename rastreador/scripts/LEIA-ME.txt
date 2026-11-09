@@ -132,5 +132,13 @@ O programa abre DUAS portas:
 
 
 11) ATUALIZAR PARA UMA VERSÃO NOVA
-   Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
-   NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart rastreador).
+   O nome do arquivo traz a versão (ex.: rastreador-2026.11.08-0356.zip). No servidor, com o sistema em /opt/rastreador:
+      cd /opt && rm -rf rastreador-novo && mkdir rastreador-novo && cd rastreador-novo && unzip -q ../rastreador-VERSAO.zip
+      pm2 stop rastreador
+      cp -a /opt/rastreador/data /opt/rastreador/data-backup-VERSAO        (cópia de segurança do banco e das fotos)
+      cp -r /opt/rastreador-novo/rastreador/{server,public,node_modules,scripts,package.json,package-lock.json} /opt/rastreador/
+      pm2 start rastreador
+      curl -s http://127.0.0.1:PORTA/rastreador/api/saude                  (tem que mostrar a versão nova)
+   NÃO apague a pasta data nem o arquivo .env: o banco é atualizado sozinho na primeira vez que a versão nova sobe.
+   No navegador, recarregue com Ctrl+F5; a versão aparece no rodapé do menu. Se algo der errado, pare o sistema, volte a pasta
+   data-backup-VERSAO para data e instale a versão anterior.
