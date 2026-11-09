@@ -711,26 +711,52 @@ p.aviso.ok, div.aviso.ok{ border-color: color-mix(in srgb, var(--ok) 25%, transp
 }
 @media (max-width: 860px){
   .casca, .casca.recolhida{ grid-template-columns: minmax(0, 1fr); }
-  .lateral{ position: sticky; top: 0; z-index: 1100; height: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 10px 12px; gap: 6px;
-    align-items: center; border-bottom: 0; scrollbar-width: none; }
-  .lateral .voltar{ margin-top: 0; border-top: 0; padding-top: 9px; }
-  .lateral::-webkit-scrollbar{ display: none; }
-  .lateral .topo-lateral{ display: flex; padding: 0 8px 0 0; flex: none; }
-  .lateral .recolher, .lateral .rotulo-secao, .lateral .rodape-lateral{ display: none; }
-  .lateral .marca > span:last-child{ display: none; }
-  .lateral a.item{ flex: none; min-height: 44px; padding: 9px 12px; }
-  .lateral a.item:hover{ transform: none; }
-  .lateral a.item.on{ box-shadow: inset 0 -2px #36E0C0; }
-  .topo{ padding: 16px 15px 14px; flex-wrap: wrap; }
-  .topo h1{ font-size: 25px; }
+  /* Barra do topo: marca e o botão do menu. O menu aberto cobre a página com a lista inteira. */
+  .lateral{ position: sticky; top: 0; z-index: 1100; height: auto; flex-direction: row; align-items: center; padding: 8px 12px; gap: 6px; border-bottom: 0; overflow: visible; }
+  .lateral .topo-lateral{ display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0; }
+  .lateral .recolher, .lateral .rotulo-secao, .lateral .rodape-lateral, .lateral a.item{ display: none; }
+  .lateral .menu-celular{ display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, .08); color: #FFFFFF; cursor: pointer; }
+  .lateral .menu-celular svg{ width: 22px; height: 22px; }
+  .casca.menu-aberto .lateral{ position: fixed; inset: 0; height: 100dvh; flex-direction: column; align-items: stretch; overflow-y: auto; padding: 8px 12px 24px; gap: 4px; }
+  .casca.menu-aberto .lateral .topo-lateral{ margin-bottom: 10px; }
+  .casca.menu-aberto .lateral .rotulo-secao{ display: block; }
+  .casca.menu-aberto .lateral a.item{ display: flex; min-height: 50px; padding: 10px 14px; font-size: 15px; gap: 14px; }
+  .casca.menu-aberto .lateral a.item svg{ width: 20px; height: 20px; }
+  .casca.menu-aberto .lateral a.item:hover{ transform: none; }
+  .casca.menu-aberto .lateral .voltar{ margin-top: 10px; }
+  .casca.menu-aberto .lateral .rodape-lateral{ display: block; margin-top: auto; }
+  body:has(.casca.menu-aberto){ overflow: hidden; }
+  /* Cabeçalho: título à esquerda, botões à direita, na mesma linha (sem a linha extra de ferramentas). */
+  .topo{ display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; padding: 14px 15px 10px; gap: 8px; }
+  .topo h1{ font-size: 23px; }
+  .ferramentas .controle-efeitos{ display: none; }
+  .ferramentas button{ width: 40px; height: 40px; }
+  .ferramentas .usuario{ padding: 0 4px; }
   .conteudo{ padding: 0 15px 24px; }
   .conteudo.cheio{ padding: 0; }
-  .ferramentas .controle-efeitos span{ display: none; }
   .destaque{ padding: 24px 20px; min-height: 185px; }
   .destaque-orbita{ right: -85px; }
   .destaque h2{ font-size: 25px; }
   .tabela th, .tabela td{ padding: 12px 8px; }
+  /* Tabelas largas viram cartões: uma linha por registro, cada célula com o nome da coluna à esquerda e o valor à direita. */
+  .tabela.empilha, .tabela.empilha tbody, .tabela.empilha tr, .tabela.empilha td{ display: block; width: 100%; }
+  .tabela.empilha thead{ display: none; }
+  .tabela.empilha tr{ padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .tabela.empilha tbody tr:last-child{ border-bottom: 0; }
+  .tabela.empilha tbody tr:hover td{ background: none; }
+  .tabela.empilha td{ display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 5px 0; border: 0; text-align: right; white-space: normal; }
+  .tabela.empilha td::before{ content: attr(data-rotulo); flex: 0 0 34%; text-align: left; font-size: 11px; color: var(--text-3); font-weight: 600; padding-top: 2px; }
+  .tabela.empilha td[data-rotulo=""]::before, .tabela.empilha td.acoes::before{ display: none; }
+  .tabela.empilha td .celula{ display: block; flex: 1; min-width: 0; }
+  .tabela.empilha td.acoes{ justify-content: flex-end; padding-top: 10px; }
+  .tabela.empilha td.acoes .celula{ display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+  .tabela.empilha td:first-child .celula{ font-size: 14px; }
+  .tabela.empilha td .celula .etiquetas{ justify-content: flex-end; }
+  pre.codigo{ white-space: pre-wrap; word-break: break-word; }
 }
+/* Fora do celular, o invólucro da célula não muda nada no layout e o botão do menu não aparece. */
+.celula{ display: contents; }
+.menu-celular{ display: none; }
 @media (pointer: coarse){
   .ferramentas .controle-efeitos, .ferramentas button{ min-height: 44px; min-width: 44px; }
   .lateral a.item{ min-height: 44px; }
@@ -1214,3 +1240,7 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 .itens-check li.problema{ color: var(--erro); font-weight: 600; }
 .itens-check em{ font-style: normal; font-weight: 400; color: var(--text-2); }
 @media (max-width: 860px){ .lista-checklists{ grid-template-columns: minmax(0, 1fr); } .itens-check{ grid-template-columns: minmax(0, 1fr); } }
+/* No celular, os créditos do mapa numa linha só e pequenos, para não cobrir a faixa do veículo. */
+@media (max-width: 860px){
+  .leaflet-control-attribution{ font-size: 9px; max-width: 72vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}

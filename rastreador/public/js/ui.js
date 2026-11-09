@@ -217,6 +217,7 @@ const P = {
   diagnostico: 'M3 4h18v12H3zM8 20h8M12 16v4M7 10h2l2-3 2 6 2-3h2',
   seguranca: 'M6 10V8a6 6 0 0 1 12 0v2M5 10h14v11H5zM12 14v3',
   editar: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  menu: 'M4 7h16M4 12h16M4 17h16',
   combustivel: 'M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M7 8h4M14 9h2a2 2 0 0 1 2 2v5.5a1.5 1.5 0 0 0 3 0V8l-3-3',
   camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   qr: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM18 18h2v2h-2zM14 19h1M19 14h1',

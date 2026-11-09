@@ -140,11 +140,19 @@ async function desenhar() {
     return el('a', { class: `item${ativo ? ' on' : ''}`, href: link(empresaId, subs ? secoesDe(subs)[0][0] : k), title: rotulo, 'aria-current': ativo ? 'page' : null },
       icone(ic), el('span', { class: 'rotulo' }, rotulo));
   });
+  // No celular, o menu vira um botão que abre a lista inteira por cima da página (a tira que rolava escondia metade dos itens).
+  const menuCel = el('button', { class: 'menu-celular', type: 'button', 'aria-label': 'Abrir o menu', 'aria-expanded': 'false' }, icone('menu'));
+  menuCel.addEventListener('click', () => {
+    const aberto = casca.classList.toggle('menu-aberto');
+    menuCel.replaceChildren(icone(aberto ? 'fechar' : 'menu'));
+    menuCel.setAttribute('aria-expanded', String(aberto));
+    menuCel.setAttribute('aria-label', aberto ? 'Fechar o menu' : 'Abrir o menu');
+  });
   const lateral = el('nav', { class: 'lateral', 'aria-label': 'Menu' },
     el('div', { class: 'topo-lateral' }, marca(nomePlataforma), el('button', { class: 'recolher', title: 'Recolher menu', onclick: () => {
       casca.classList.toggle('recolhida');
       try { localStorage.setItem('rastreador.menu', casca.classList.contains('recolhida') ? 'recolhido' : 'aberto'); } catch { /* ignora */ }
-    } }, icone('seta'))),
+    } }, icone('seta')), menuCel),
     itens,
     empresaId && PLATAFORMA.includes(u.perfil) ? el('a', { class: 'item voltar', href: '#/empresas', title: 'Voltar ao master' }, icone('entrar'), el('span', { class: 'rotulo' }, 'Voltar ao master')) : null,
     el('div', { class: 'rodape-lateral' }, el('strong', {}, nomeEmpresa ?? nomePlataforma), PERFIS[u.perfil] ?? '',

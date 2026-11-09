@@ -10,11 +10,26 @@ export const indicador = (rotulo, valor, nota, tom = '', ic = null) => el('div',
   el('div', { class: 'rotulo' }, ic ? icone(ic) : null, rotulo),
   el('div', { class: 'valor num' }, valor), nota ? el('div', { class: 'nota' }, nota) : null);
 export const td = (conteudo, classe = '') => el('td', { class: classe }, conteudo);
-export const tabela = (colunas, linhas, vazio = 'Nada por aqui.') => (linhas.length
-  ? el('div', { class: 'rolagem' }, el('table', { class: 'tabela' },
+/**
+ * Tabela com cabeçalho ('>' alinha à direita, '^' centraliza). Cada célula recebe o nome da coluna (data-rotulo) e o conteúdo
+ * entra num <span class="celula">: no celular, as tabelas largas (4 colunas ou mais) empilham cada linha como um cartão.
+ */
+export function tabela(colunas, linhas, vazio = 'Nada por aqui.') {
+  if (!linhas.length) return el('p', { class: 'mudo', style: 'margin:0' }, vazio);
+  const rotulos = colunas.map((c) => c.replace(/^[>^]/, ''));
+  for (const tr of linhas) {
+    [...tr.children].forEach((cel, i) => {
+      if (cel.tagName !== 'TD' || cel.querySelector(':scope > .celula')) return;
+      cel.dataset.rotulo = rotulos[i] ?? '';
+      const w = el('span', { class: 'celula' });
+      w.append(...cel.childNodes);
+      cel.append(w);
+    });
+  }
+  return el('div', { class: 'rolagem' }, el('table', { class: `tabela${colunas.length >= 4 ? ' empilha' : ''}` },
     el('thead', {}, el('tr', {}, colunas.map((c) => el('th', { class: c.startsWith('>') ? 'dir' : c.startsWith('^') ? 'centro' : '' }, c.replace(/^[>^]/, ''))))),
-    el('tbody', {}, linhas)))
-  : el('p', { class: 'mudo', style: 'margin:0' }, vazio));
+    el('tbody', {}, linhas)));
+}
 export const botao = (texto, classe, fn) => {
   const b = el('button', { class: `btn pequeno ${classe}`, type: 'button' }, texto);
   b.addEventListener('click', (e) => { e.stopPropagation(); acao(b, fn); });
