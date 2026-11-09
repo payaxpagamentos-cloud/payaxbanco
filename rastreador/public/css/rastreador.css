@@ -980,9 +980,20 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
   .abas-config .aba-config{ padding: 7px 14px 7px 8px; border-radius: 999px; gap: 8px; }
 }
 /* Bloquear: o botão vermelho cheio, para achar de primeira na faixa do veículo */
-.btn.perigo.bloquear{ background: var(--erro); border-color: var(--erro); color: #FFFFFF; font-weight: 600; }
-.btn.perigo.bloquear:hover{ background: var(--erro); filter: brightness(1.08); }
-:root[data-tema="escuro"] .btn.perigo.bloquear{ color: #0A0E19; }
+/* Ações do veículo com cor própria, para não confundir: Modo Roubo (SOS) vermelho, Bloquear âmbar, Desbloquear verde. */
+.btn.roubo{ background: var(--erro); border-color: var(--erro); color: #FFFFFF; font-weight: 600; }
+.btn.bloquear{ background: var(--aviso); border-color: var(--aviso); color: #FFFFFF; font-weight: 600; }
+.btn.desbloquear{ background: var(--ok); border-color: var(--ok); color: #FFFFFF; font-weight: 600; }
+.btn.roubo:hover, .btn.bloquear:hover, .btn.desbloquear:hover{ filter: brightness(1.08); }
+:root[data-tema="escuro"] .btn.roubo, :root[data-tema="escuro"] .btn.bloquear, :root[data-tema="escuro"] .btn.desbloquear{ color: #0A0E19; }
+.icone-btn.roubo{ color: var(--erro); background: var(--erro-bg); }
+.icone-btn.roubo:hover{ color: #FFFFFF; background: var(--erro); }
+.icone-btn.bloquear{ color: var(--aviso); background: var(--aviso-bg); }
+.icone-btn.bloquear:hover{ color: #FFFFFF; background: var(--aviso); }
+.icone-btn.desbloquear{ color: var(--ok); background: var(--ok-bg); }
+.icone-btn.desbloquear:hover{ color: #FFFFFF; background: var(--ok); }
+.icone-btn.qr{ color: var(--azul); }
+.icone-btn.qr:hover{ color: var(--azul); background: var(--azul-suave); }
 
 /* =====================================================================================================================
    Segurança, Frota, avisos e o assistente (mesmas cores: azul-marinho, azul, ciano e menta)
