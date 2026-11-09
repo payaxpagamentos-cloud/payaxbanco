@@ -1,10 +1,18 @@
 'use strict';
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 
 const config = require('./config');
 const { abrir } = require('./db');
 const { criarApp } = require('./app');
 const { iniciarGt06 } = require('./lib/gt06');
 const { manutencao } = require('./lib/manutencao');
+
+// Licença de uso presa a este servidor: em produção, sem licença válida o sistema não sobe (proteção de cópia).
+require('./lib/licenca').exigir();
 
 const db = abrir();
 const extras = {};

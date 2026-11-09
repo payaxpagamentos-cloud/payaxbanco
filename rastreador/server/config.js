@@ -1,4 +1,9 @@
 'use strict';
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -16,6 +21,10 @@ if (producao) {
   if (faltando.length) throw new Error(`[Rastreador] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
   if (process.env.RASTREADOR_SECRET.length < 32) throw new Error('[Rastreador] RASTREADOR_SECRET deve ter pelo menos 32 caracteres.');
   if (process.env.RASTREADOR_ADMIN_SENHA.length < 12) throw new Error('[Rastreador] RASTREADOR_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
+  if (process.env.RASTREADOR_DB_EXIGE_CIFRA === '1' && !process.env.RASTREADOR_DB_CHAVE) {
+    throw new Error('[Rastreador] RASTREADOR_DB_EXIGE_CIFRA=1 mas falta RASTREADOR_DB_CHAVE (a chave da criptografia do banco).');
+  }
+  if (!process.env.RASTREADOR_DB_CHAVE) console.warn('[Rastreador] Banco sem criptografia (defina RASTREADOR_DB_CHAVE para criptografar os dados em disco).');
 }
 
 // Endereço em que o painel é publicado: '' (raiz do domínio) ou um caminho, como '/rastreador'.
@@ -35,6 +44,10 @@ module.exports = {
   // Porta TCP em que os rastreadores do protocolo GT06 (e compatíveis) se conectam. 0 desliga.
   portaGt06: process.env.RASTREADOR_GT06_PORTA === undefined ? 5023 : Number(process.env.RASTREADOR_GT06_PORTA),
   dbFile: process.env.RASTREADOR_DB || path.join(__dirname, '..', 'data', 'rastreador.db'),
+  // Criptografia do banco (AES-256). Com a chave, o arquivo do banco fica ilegível sem ela. GUARDE a chave: perder a chave = perder o banco.
+  dbChave: process.env.RASTREADOR_DB_CHAVE || '',
+  // Banco cifrado é obrigatório em produção? (padrão: só avisa se estiver sem chave).
+  dbExigeCifra: process.env.RASTREADOR_DB_EXIGE_CIFRA === '1',
   // Fotos do app do motorista (checklist, abastecimento e avaria). Nos testes, numa pasta temporária.
   fotosDir: process.env.RASTREADOR_FOTOS || (process.env.NODE_ENV === 'test'
     ? path.join(require('node:os').tmpdir(), `rastreador-fotos-teste-${process.pid}`)

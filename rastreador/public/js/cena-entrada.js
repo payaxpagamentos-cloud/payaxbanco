@@ -1,3 +1,8 @@
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 /**
  * Cena da tela de entrada: uma cidade à noite em 3D (perspectiva), girando devagar, com prédios, avenidas iluminadas e veículos
  * andando pelas ruas com rastro de luz. De tempos em tempos um veículo é "localizado": pulso de radar no chão e a placa por cima.

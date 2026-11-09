@@ -1,3 +1,8 @@
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 /**
  * Pausa dos efeitos contínuos (gradiente fluido, órbita, pulsos): o botão do topo liga e desliga, e a escolha fica lembrada no
  * navegador. Com "reduzir movimento" no sistema, começa pausado (e o CSS já tira as animações).

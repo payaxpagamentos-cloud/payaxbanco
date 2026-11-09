@@ -1,3 +1,8 @@
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 /** Frota: nota dos motoristas e ranking, custo em reais e os equipamentos (a ficha do J16 com saúde, consultas e ajustes). */
 import { api, qs, baixar } from './api.js';
 import { el, limpar, dinheiro, dataHora, desde, km, kmh, placa, inteiro, toast, acao, modal, perguntar, repetir, etiqueta, icone,

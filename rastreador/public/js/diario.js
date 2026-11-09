@@ -1,3 +1,8 @@
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 /** O que chega do app do motorista: checklists, abastecimentos e avarias (com fotos), e o QR code de cada veículo. */
 import { api, qs } from './api.js';
 import { el, limpar, dinheiro, dataHora, placa, inteiro, toast, escolha, modal, confirmar, perguntar, etiqueta, icone, hojeLocal, somarDias } from './ui.js';

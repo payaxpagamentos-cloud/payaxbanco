@@ -1,4 +1,9 @@
 'use strict';
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
 
 // Simulador do rastreador J16 4G (protocolo GT06 4G): conecta no servidor como o equipamento, envia login, posições a cada
 // poucos segundos (andando em volta do ponto de partida), estado da ignição, e responde aos comandos (bloqueio, status…).
