@@ -52,14 +52,17 @@ function criarApp(db, extras = {}) {
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   r.use('/api/motorista/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // Código de liberação: poucas tentativas por minuto (são 6 números).
-  r.use(/^\/api\/empresas\/\d+\/liberacoes\/(consultar|aplicar)$/, limitar({ janelaMs: 60_000, maximo: 20 }));
-  r.use(/^\/api\/empresas\/\d+\/assistente$/, limitar({ janelaMs: 60_000, maximo: 12 }));
+  // As rotas do Express aceitam maiúsculas e a barra final: o limite tem de valer para essas formas também, senão é contornado.
+  r.use(/^\/api\/empresas\/\d+\/liberacoes\/(consultar|aplicar)\/?$/i, limitar({ janelaMs: 60_000, maximo: 20 }));
+  r.use(/^\/api\/empresas\/\d+\/assistente\/?$/i, limitar({ janelaMs: 60_000, maximo: 12 }));
   // App do motorista: fotos do checklist, do abastecimento e da avaria (já reduzidas no celular) e poucos envios por minuto.
-  r.use(/^\/api\/motorista\/(sos|checklists|abastecimentos|avarias)$/, limitar({ janelaMs: 60_000, maximo: 10 }));
+  r.use(/^\/api\/motorista\/(sos|checklists|abastecimentos|avarias)\/?$/i, limitar({ janelaMs: 60_000, maximo: 10 }));
   r.use('/api/motorista', express.json({ limit: '8mb' }));
   // A API de integração recebe lotes de posições; o app Traccar Client envia formulário ou JSON.
   r.use(express.json({ limit: '1mb' }));
   r.use(express.urlencoded({ extended: false, limit: '100kb' }));
+  // Sem corpo (ou com um valor solto), as rotas leem req.body.x sem erro.
+  r.use((req, _res, next) => { if (req.body === undefined || req.body === null || typeof req.body !== 'object') req.body = {}; next(); });
   r.use('/api', criarApi(db, extras));
   // Leaflet (mapa) servido do próprio pacote, sem CDN.
   r.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));

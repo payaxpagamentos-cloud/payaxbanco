@@ -14,8 +14,10 @@ const raiz = document.getElementById('app');
 const CHAVE = 'rastreador.motorista';
 const CHAVE_CODIGO = 'rastreador.motorista.codigo';
 const CHAVE_QR = 'rastreador.motorista.qr';
-const ler = (k, area = localStorage) => { try { return JSON.parse(area.getItem(k)); } catch { return null; } };
-const gravar = (k, v, area = localStorage) => { try { if (v === null) area.removeItem(k); else area.setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento */ } };
+// Tudo dentro do try: em navegador com armazenamento bloqueado, até ler `localStorage` lança erro.
+const area = (onde) => (onde === 'sessao' ? sessionStorage : localStorage);
+const ler = (k, onde) => { try { return JSON.parse(area(onde).getItem(k)); } catch { return null; } };
+const gravar = (k, v, onde) => { try { if (v === null) area(onde).removeItem(k); else area(onde).setItem(k, JSON.stringify(v)); } catch { /* sem armazenamento */ } };
 let sessao = ler(CHAVE);
 let dados = null;
 let timer = null;
@@ -23,7 +25,7 @@ let relogio = null;
 
 // QR code do veículo: a câmera abre ".../motorista/#veiculo=CODIGO". Guarda o código até entrar.
 const qrDoLink = /^#veiculo=([\w-]{8,20})$/.exec(location.hash);
-if (qrDoLink) { gravar(CHAVE_QR, qrDoLink[1], sessionStorage); history.replaceState(null, '', location.pathname); }
+if (qrDoLink) { gravar(CHAVE_QR, qrDoLink[1], 'sessao'); history.replaceState(null, '', location.pathname); }
 
 async function chamar(metodo, caminho, corpo) {
   let resp;
@@ -96,7 +98,7 @@ function entrar() {
   });
   limpar(raiz, el('section', { class: 'motorista-entrada' }, marcaApp(),
     el('h1', {}, 'Olá, motorista.'),
-    el('p', { class: 'mudo' }, ler(CHAVE_QR, sessionStorage) ? 'Entre para assumir o veículo do QR code.' : 'Entre com o seu CPF e a senha que o gestor cadastrou para você.'), f,
+    el('p', { class: 'mudo' }, ler(CHAVE_QR, 'sessao') ? 'Entre para assumir o veículo do QR code.' : 'Entre com o seu CPF e a senha que o gestor cadastrou para você.'), f,
     el('p', { class: 'pequeno fraco' }, 'Esqueceu a senha? Peça ao gestor da frota para cadastrar uma nova.')));
   cpf.focus();
 }
@@ -370,7 +372,7 @@ function cartaoCodigo(v, c, aoTrocar) {
   const atualizar = () => {
     const s = Math.max(0, Math.round((Date.parse(c.expira_em) - Date.now()) / 1000));
     resta.textContent = s ? `Expira em ${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : 'Código expirado';
-    if (!s) { gravar(CHAVE_CODIGO, null); aoTrocar(); }
+    if (!s) { clearInterval(relogio); gravar(CHAVE_CODIGO, null); aoTrocar(); }
   };
   clearInterval(relogio);
   relogio = setInterval(atualizar, 1000);
@@ -403,9 +405,15 @@ function pedir(v, alvo, aoTerminar) {
 }
 
 async function assumirPeloQr(codigo) {
-  gravar(CHAVE_QR, null, sessionStorage);
+  gravar(CHAVE_QR, null, 'sessao');
   let q;
-  try { q = await chamar('GET', `/qr/${encodeURIComponent(codigo)}`); } catch (err) { return tela('QR code', el('p', { class: 'aviso erro' }, err.message)); }
+  try {
+    q = await chamar('GET', `/qr/${encodeURIComponent(codigo)}`);
+  } catch (err) {
+    // O código fica na tela para tentar de novo (ex.: sem internet na garagem), sem precisar escanear outra vez.
+    return tela('QR code', el('p', { class: 'aviso erro' }, err.message),
+      el('button', { class: 'btn primario largo', type: 'button', onclick: () => assumirPeloQr(codigo) }, 'Tentar de novo'));
+  }
   if (q.com_voce) return inicio();
   const erro = el('div');
   const botao = el('button', { class: 'btn primario largo', type: 'button' }, icone('veiculos'), `Assumir o ${placa(q.placa)}`);
@@ -417,7 +425,7 @@ async function assumirPeloQr(codigo) {
 
 async function inicio() {
   clearInterval(timer);
-  const codigoQr = ler(CHAVE_QR, sessionStorage);
+  const codigoQr = ler(CHAVE_QR, 'sessao');
   if (codigoQr) return assumirPeloQr(codigoQr);
   const corpo = el('div', { class: 'coluna', style: 'gap:14px' });
   limpar(raiz, el('header', { class: 'motorista-topo' }, marcaApp(), el('button', { class: 'btn pequeno', onclick: sair }, 'Sair')), corpo);
@@ -462,6 +470,7 @@ async function inicio() {
         el('div', { class: 'pequeno mudo' }, p.libera_ate ? `${p.horas} h · até ${horaDe(p.libera_ate)}${p.aplicada_por ? ` · ${p.aplicada_por}` : ''}` : `pedido de ${p.horas_pedidas} h`)))))) : null);
   }
   await carregar();
+  if (!sessao) return; // a sessão venceu durante a carga: a tela de entrada já está na página
   timer = setInterval(() => { if (document.visibilityState === 'visible' && !document.querySelector('.pedir')) carregar(); }, 20_000);
 }
 

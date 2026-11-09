@@ -37,7 +37,7 @@ function janela(agenda, instante = new Date()) {
 const liberacaoAtiva = (db, veiculoId) => db.prepare("SELECT * FROM liberacoes WHERE veiculo_id = ? AND status = 'ativa' AND libera_ate > ?").get(veiculoId, agora());
 
 function salvarAgenda(db, veiculo, d) {
-  const hora = (x, nome) => { exigir(/^([01]\d|2[0-3]):[0-5]\d$/.test(String(x ?? '')), `Informe ${nome} (HH:MM).`); return x; };
+  const hora = (x, nome) => { exigir(typeof x === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(x), `Informe ${nome} (HH:MM).`); return x; };
   const inicio = hora(d.inicio, 'o início');
   const fim = hora(d.fim, 'o fim');
   exigir(inicio !== fim, 'O início e o fim não podem ser iguais.');

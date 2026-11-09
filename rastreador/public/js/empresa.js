@@ -291,7 +291,7 @@ async function telaHistorico(ctx) {
     player.classList.remove('oculto');
     mostrar();
   }
-  ctx.parar(() => limparMapa());
+  ctx.parar(() => { limparMapa(); mapa?.remover(); });
   desenharFiltros();
   await carregar();
 }
@@ -491,6 +491,7 @@ async function telaCercas(ctx) {
   const dica = el('div', { class: 'dica-mapa oculto' });
   limpar(ctx.conteudo, el('div', { class: 'tela-mapa' }, lado, el('div', { class: 'area-mapa' }, divMapa, dica)));
   const mapa = await criarMapa(divMapa);
+  ctx.parar(() => mapa?.remover());
   const veiculos = (await api.get(`${base(ctx)}/veiculos`)).filter((x) => x.ativo);
   let cercas = [];
   let camadas = [];

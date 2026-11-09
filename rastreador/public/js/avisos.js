@@ -15,6 +15,7 @@ async function telaNotificacoes(ctx) {
   const corpo = el('div', { class: 'coluna', style: 'gap:16px' });
   let dados = null;
   const form = async (c) => {
+    if (!dados) return toast('Aguarde o carregamento.', true);
     const marcados = new Set(c ? c.tipos.split(',') : dados.seguranca);
     const r = await formModal(c ? `Editar ${c.nome}` : 'Novo contato do WhatsApp', () => [
       el('div', { class: 'duas' }, campo('Nome', { name: 'nome', required: true, maxlength: 80, value: c?.nome ?? '' }),
@@ -49,7 +50,7 @@ async function telaNotificacoes(ctx) {
             tipos.length > 4 ? el('span', { class: 'pequeno mudo' }, `+${tipos.length - 4}`) : null)),
           td(c.silencio_inicio ? `${c.silencio_inicio} às ${c.silencio_fim}` : '—'), td(c.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo', '')),
           el('td', { class: 'acoes' }, pode(ctx) ? [
-            botao('Testar', '', async () => { await api.post(`${base(ctx)}/contatos/${c.id}/testar`, {}); toast('Mensagem de teste na fila.'); setTimeout(carregar, 3000); }),
+            botao('Testar', '', async () => { await api.post(`${base(ctx)}/contatos/${c.id}/testar`, {}); toast('Mensagem de teste na fila.'); setTimeout(() => corpo.isConnected && carregar(), 3000); }),
             botaoIcone('editar', 'Editar', () => form(c)),
             botaoIcone('lixo', 'Excluir', async () => {
               if (!await confirmar('Excluir contato', `${c.nome} deixa de receber os avisos.`, 'Excluir')) return;
@@ -72,6 +73,7 @@ async function telaProgramados(ctx) {
   const corpo = el('div', { class: 'coluna', style: 'gap:16px' });
   let dados = null;
   const form = async (a) => {
+    if (!dados) return toast('Aguarde o carregamento.', true);
     if (!dados.contatos.length) return toast('Cadastre antes um contato em Configurações → Notificações.', true);
     const conteudo = new Set(a ? a.conteudo.split(',') : Object.keys(dados.conteudos));
     const contatos = new Set(a ? a.contatos.split(',').map(Number) : [dados.contatos[0].id]);

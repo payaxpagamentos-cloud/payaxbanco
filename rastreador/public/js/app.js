@@ -96,7 +96,7 @@ async function desenhar() {
   pararTela?.();
   pararTela = null;
   // Janela aberta numa tela não fica por cima da próxima.
-  for (const m of document.querySelectorAll('.modal-fundo')) m.remove();
+  for (const m of document.querySelectorAll('.modal-fundo')) (m.fechar ?? (() => m.remove()))();
   const s = sessao.get();
   if (!s?.token) return telaEntrada();
   const u = s.usuario;
@@ -182,7 +182,8 @@ async function desenhar() {
     usuario: u, empresaId, nomeEmpresa, conteudo,
     master: PLATAFORMA.includes(u.perfil), soMaster: u.perfil === 'master', somenteLeitura: u.perfil === 'operador',
     telaCheia: () => { conteudo.classList.add('cheio'); casca.classList.add('com-mapa'); },
-    parar: (fn) => { pararTela = fn; },
+    // Uma tela que termina de montar depois de o usuário já ter trocado de página não pode registrar a parada no lugar da tela nova.
+    parar: (fn) => { if (conteudo.isConnected) pararTela = fn; else fn(); },
     ir: (tela2, eid = empresaId) => ir(eid, tela2),
     renomearEmpresa: (id, nome) => nomesEmpresa.set(id, nome),
   };

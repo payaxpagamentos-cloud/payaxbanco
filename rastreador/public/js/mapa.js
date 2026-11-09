@@ -281,6 +281,7 @@ async function fundo(L, m, div, cfg) {
     aplicar();
     colocarSeletor();
   };
+  div._limparFundo = () => { base?.remover(); base = null; };
 
   if (cfg.google) {
     trocarBase(fundoGoogle(L, m, cfg.google));
@@ -407,10 +408,11 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
   m.attributionControl.setPrefix(false);
   await fundo(L, m, div, cfg);
   if (busca && cfg.busca && sessao.get()?.token) campoBusca(L, m);
-  telaCheia(L, m, div);
+  const limparCheia = telaCheia(L, m, div);
   L.control.zoom({ position: 'topright' }).addTo(m);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(m);
-  new ResizeObserver(() => m.invalidateSize()).observe(div);
+  const observadorTamanho = new ResizeObserver(() => m.invalidateSize());
+  observadorTamanho.observe(div);
   const icone = (v, sel) => L.divIcon({ className: '', html: htmlVeiculo(v, sel), iconSize: [30, 30], iconAnchor: [15, 15] });
 
   return {
@@ -460,7 +462,8 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
       if (aoClicar) camada.on('click', () => aoClicar(c));
       return { remover: () => camada.remove(), limites: () => camada.getBounds() };
     },
-    remover: () => m.remove(),
+    // Ao sair da tela: solta o WebGL, os observadores e os listeners do documento (senão cada visita ao mapa ficava na memória).
+    remover: () => { observadorTamanho.disconnect(); limparCheia(); div._limparFundo?.(); m.remove(); },
   };
 }
 
@@ -470,6 +473,7 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
  */
 function telaCheia(L, m, div) {
   const alvo = div.closest('.area-mapa') || div.parentElement;
+  let limpar = () => {};
   const Cheia = L.Control.extend({
     options: { position: 'topright' },
     onAdd() {
@@ -491,13 +495,17 @@ function telaCheia(L, m, div) {
         else alvo.classList.add('mapa-cheio');
         setTimeout(() => { m.invalidateSize(); desenhar(); }, 150);
       });
-      document.addEventListener('fullscreenchange', () => { m.invalidateSize(); desenhar(); });
-      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && alvo.classList.contains('mapa-cheio')) { alvo.classList.remove('mapa-cheio'); m.invalidateSize(); desenhar(); } });
+      const aoMudar = () => { m.invalidateSize(); desenhar(); };
+      const aoTecla = (e) => { if (e.key === 'Escape' && alvo.classList.contains('mapa-cheio')) { alvo.classList.remove('mapa-cheio'); m.invalidateSize(); desenhar(); } };
+      document.addEventListener('fullscreenchange', aoMudar);
+      document.addEventListener('keydown', aoTecla);
+      limpar = () => { document.removeEventListener('fullscreenchange', aoMudar); document.removeEventListener('keydown', aoTecla); };
       desenhar();
       return caixa;
     },
   });
   new Cheia().addTo(m);
+  return () => limpar();
 }
 
 /** Links para o próprio Google Maps (gratuitos, sem chave): o ponto, o Street View e a rota até lá. */

@@ -162,7 +162,7 @@ module.exports = (db, extras = {}) => {
   });
 
   r.get('/veiculos/:id', (req, res) => {
-    const x = veiculo(req, req.params.id);
+    const { codigo_qr: _qr, ...x } = veiculo(req, req.params.id);
     res.json({
       ...x,
       rastreador: x.rastreador_id ? db.prepare('SELECT id, imei, modelo, protocolo, chip_numero, chip_operadora, ultima_comunicacao FROM rastreadores WHERE id = ?')
@@ -373,7 +373,7 @@ module.exports = (db, extras = {}) => {
       tipo,
       alertar_entrada: d.alertar_entrada !== undefined ? (v.booleano(d.alertar_entrada) ? 1 : 0) : atual?.alertar_entrada ?? 1,
       alertar_saida: d.alertar_saida !== undefined ? (v.booleano(d.alertar_saida) ? 1 : 0) : atual?.alertar_saida ?? 1,
-      cor: d.cor !== undefined ? (/^#[0-9a-fA-F]{6}$/.test(String(d.cor)) ? d.cor : v.falhar('Cor inválida.')) : atual?.cor ?? '#1E88E5',
+      cor: d.cor !== undefined ? (typeof d.cor === 'string' && /^#[0-9a-fA-F]{6}$/.test(d.cor) ? d.cor : v.falhar('Cor inválida.')) : atual?.cor ?? '#1E88E5',
       ativa: d.ativa !== undefined ? (v.booleano(d.ativa) ? 1 : 0) : atual?.ativa ?? 1,
       horario_inicio: d.horario_inicio !== undefined ? (d.horario_inicio ? v.horario(d.horario_inicio, 'o início da vigência') : null) : atual?.horario_inicio ?? null,
       horario_fim: d.horario_fim !== undefined ? (d.horario_fim ? v.horario(d.horario_fim, 'o fim da vigência') : null) : atual?.horario_fim ?? null,
@@ -770,6 +770,20 @@ module.exports = (db, extras = {}) => {
         ORDER BY id DESC LIMIT 30`).all(x.id),
     });
   });
+  /** O valor de cada ajuste do J16, conferido antes de virar comando (texto para o aparelho ou coluna no banco). */
+  const valorDoAjuste = (ajuste, valor) => {
+    switch (ajuste) {
+      case 'perfil': v.exigir(typeof valor === 'string' && Object.hasOwn(equip.PERFIS, valor), 'Perfil desconhecido.'); return valor;
+      case 'sono': return v.opcao(valor ?? 'online', 'o modo de sono', ['online', 'economia']);
+      case 'velocidade': return valor ? v.inteiro(valor, 'o limite de velocidade', { min: 1, max: 255 }) : 0;
+      case 'numero_central': case 'numero_sos': return valor === null || valor === undefined || valor === '' ? null : v.telefone(valor);
+      case 'servidor': return { host: v.texto(valor?.host, 'o endereço do servidor', 120).replace(/[^\w.-]/g, ''), porta: v.inteiro(valor?.porta, 'a porta', { min: 1, max: 65535 }) };
+      case 'apn': return { apn: v.texto(valor?.apn, 'a APN', 80).replace(/[,#\s]/g, ''), usuario: (v.opcional(valor?.usuario, 'o usuário da APN', 60) ?? '').replace(/[,#\s]/g, ''),
+        senha: (v.opcional(valor?.senha, 'a senha da APN', 60) ?? '').replace(/[,#\s]/g, '') };
+      case 'fuso': case 'fabrica': return null;
+      default: return v.booleano(valor);
+    }
+  };
   r.post('/veiculos/:id/equipamento', gestor, (req, res) => {
     const { x, rr } = rastreadorDo(req);
     v.exigir(rr.protocolo === 'gt06', 'Só rastreadores GT06 (como o J16) recebem estes ajustes.');
@@ -782,22 +796,19 @@ module.exports = (db, extras = {}) => {
         db.prepare('UPDATE rastreadores SET rele_invertido = ? WHERE id = ?').run(v.booleano(req.body.valor) ? 1 : 0, rr.id);
         return;
       }
-      if (equip.CONSULTAS[ajuste]) {
+      if (Object.hasOwn(equip.CONSULTAS, ajuste)) {
         const c = equip.CONSULTAS[ajuste];
         ids.push(com.criar(db, x, { tipo: 'personalizado', texto: c.texto, rotulo: c.rotulo }, req.usuario.id));
         return;
       }
       // A empresa consulta e reinicia; os ajustes (intervalos, alarmes, fuso, servidor) são da equipe da plataforma, porque um erro tira o aparelho do ar.
-      const conhecido = equip.AJUSTES[ajuste] ?? equip.AJUSTES_PLATAFORMA[ajuste];
-      if (!conhecido) throw new ErroNegocio('Ajuste desconhecido.', 422);
+      const f = Object.hasOwn(equip.AJUSTES, ajuste) ? equip.AJUSTES[ajuste] : Object.hasOwn(equip.AJUSTES_PLATAFORMA, ajuste) ? equip.AJUSTES_PLATAFORMA[ajuste] : null;
+      if (!f) throw new ErroNegocio('Ajuste desconhecido.', 422);
       if (!plataforma) throw new ErroNegocio('Só a equipe da plataforma faz este ajuste. Peça ao suporte.', 403);
-      const f = conhecido;
-      if (ajuste === 'fabrica') v.exigir(String(req.body.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '') === x.placa, 'Digite a placa para confirmar o padrão de fábrica.');
-      if (ajuste === 'perfil') {
-        v.exigir(equip.PERFIS[req.body.valor], 'Perfil desconhecido.');
-        db.prepare('UPDATE rastreadores SET perfil = ? WHERE id = ?').run(req.body.valor, rr.id);
-      }
-      for (const c of f(req.body.valor ?? null)) ids.push(com.criar(db, x, { tipo: 'personalizado', ...c }, req.usuario.id));
+      if (ajuste === 'fabrica') v.exigir(String(v.simples(req.body.confirmacao) ?? '').toUpperCase().replace(/[\s-]/g, '') === x.placa, 'Digite a placa para confirmar o padrão de fábrica.');
+      const valor = valorDoAjuste(ajuste, req.body.valor);
+      if (ajuste === 'perfil') db.prepare('UPDATE rastreadores SET perfil = ? WHERE id = ?').run(valor, rr.id);
+      for (const c of f(valor)) ids.push(com.criar(db, x, { tipo: 'personalizado', ...c }, req.usuario.id));
     });
     registrar(db, req, 'equipamento_ajustado', { placa: x.placa, ajuste });
     res.status(201).json({ comandos: ids });

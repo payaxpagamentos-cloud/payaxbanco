@@ -111,6 +111,7 @@ export function modal(titulo, conteudo, { largo = false } = {}) {
   return new Promise((resolve) => {
     const fundo = el('div', { class: 'modal-fundo' });
     const fechar = (v = null) => { fundo.remove(); document.removeEventListener('keydown', esc); resolve(v); };
+    fundo.fechar = fechar;
     const esc = (e) => { if (e.key === 'Escape') fechar(); };
     document.addEventListener('keydown', esc);
     fundo.addEventListener('mousedown', (e) => { if (e.target === fundo) fechar(); });
@@ -174,9 +175,14 @@ export const centavos = (txt) => (txt === '' || txt === undefined ? undefined : 
 export function repetir(fn, ms) {
   let parado = false;
   let timer;
+  let primeira = true;
   const ciclo = async () => {
     if (parado) return;
-    if (document.visibilityState === 'visible') { try { await fn(); } catch { /* próxima tentativa */ } }
+    if (document.visibilityState === 'visible') {
+      // A primeira falha aparece (a tela ficaria em "Carregando…" sem explicação); as seguintes esperam a próxima tentativa.
+      try { await fn(); } catch (err) { if (primeira) toast(err.message, true); }
+      primeira = false;
+    }
     if (!parado) timer = setTimeout(ciclo, ms);
   };
   ciclo();

@@ -87,6 +87,9 @@ function receber(db, m) {
       registrarDesconhecido(db, m.imei, m.protocolo, m.ip);
       return { status: 'desconhecido' };
     }
+    // O endereço do celular (OsmAnd) é público: só aceita os identificadores cadastrados como celular. Um IMEI de GT06 enviado
+    // por ali (posição forjada) é ignorado; o GT06 de verdade fala pela porta TCP.
+    if (m.protocolo === 'osmand' && r.protocolo !== 'osmand') return { status: 'protocolo_errado', rastreador_id: r.id };
     const t = agora();
     db.prepare('UPDATE rastreadores SET ultima_comunicacao = ?, ultimo_ip = COALESCE(?, ultimo_ip) WHERE id = ?').run(t, m.ip ?? null, r.id);
     const v = db.prepare(`SELECT v.*, e.status AS empresa_status, e.alertar_ignicao, e.horario_inicio, e.horario_fim, e.dias_uso
