@@ -10,7 +10,7 @@ const noc = require('../lib/noc');
 const base = require('../conectores/base');
 const rastreador = require('../conectores/rastreador');
 const downdetector = require('../conectores/downdetector');
-const { criarToken } = require('./coletor');
+const { criarToken, ESCOPOS } = require('./coletor');
 const v = require('../lib/validacao');
 
 const SEV = ['critica', 'alta', 'media', 'baixa'];
@@ -236,11 +236,13 @@ module.exports = (db) => {
 
   // ---------------- Coletores (tokens) ----------------
   r.get('/coletores', exigir('integracoes.ver'), (req, res) => {
-    res.json(db.prepare('SELECT id, nome, prefixo, criado_em, ultimo_uso, revogado_em FROM coletores WHERE organizacao_id = ? ORDER BY id DESC').all(req.org));
+    res.json(db.prepare('SELECT id, nome, prefixo, escopos, criado_em, ultimo_uso, revogado_em FROM coletores WHERE organizacao_id = ? ORDER BY id DESC').all(req.org));
   });
   r.post('/coletores', exigir('integracoes.editar'), (req, res) => {
-    const t = criarToken(db, req.org, v.texto(req.body?.nome, 'o nome do coletor', 80), req.usuario.id);
-    registrar(db, req, 'coletor_criado', { recurso: 'coletor', recursoId: t.id, depois: { prefixo: t.prefixo } });
+    const escopos = [].concat(req.body?.escopos ?? ['amostras']).map(String);
+    if (!escopos.length || escopos.some((e) => !ESCOPOS.includes(e))) throw new ErroNegocio(`Escopos válidos: ${ESCOPOS.join(', ')}.`, 422);
+    const t = criarToken(db, req.org, v.texto(req.body?.nome, 'o nome do coletor', 80), req.usuario.id, [...new Set(escopos)]);
+    registrar(db, req, 'coletor_criado', { recurso: 'coletor', recursoId: t.id, depois: { prefixo: t.prefixo, escopos } });
     res.status(201).json({ ...t, aviso: 'Copie o token agora: ele não será mostrado de novo.' });
   });
   r.post('/coletores/:id/revogar', exigir('integracoes.editar'), (req, res) => {

@@ -7,7 +7,7 @@ usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 >
 > E o **PABX** (pasta [`pabx/`](pabx/README.md), publicado em `/pabx`): painel do master e das empresas para ramais, chamadas, campanhas, números entrantes, terminação e integração com a central telefônica, com servidor próprio.
 >
-> E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
+> E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): tráfego e Anti-DDoS (NetFlow/IPFIX/sFlow, bloqueio por BGP, sessões RADIUS e avisos por Telegram e WhatsApp), rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
 
 ## Módulos
 

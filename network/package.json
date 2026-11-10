@@ -1,7 +1,7 @@
 {
   "name": "manager-network",
   "version": "1.0.0",
-  "description": "Manager Network — rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet.",
+  "description": "Manager Network — tráfego e Anti-DDoS, rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet.",
   "main": "server/index.js",
   "private": true,
   "type": "commonjs",
@@ -14,7 +14,9 @@
     "migrar": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/migrar.js",
     "demo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/demo.js",
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
-    "coletor": "node scripts/coletor-exemplo.js"
+    "coletor": "node scripts/coletor-exemplo.js",
+    "coletor-rede": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/coletor-rede.js",
+    "simulador": "node scripts/simulador-fluxos.js"
   },
   "dependencies": {
     "express": "^5.2.1",

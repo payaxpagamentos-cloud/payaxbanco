@@ -45,12 +45,18 @@ async function validarDestino(url) {
 }
 
 /** GET JSON com timeout, sem seguir redirecionamentos, classificando o resultado no estado da integração. */
-async function buscarJson(url, cabecalhos = {}) {
+const buscarJson = (url, cabecalhos = {}) => requisitarJson(url, { cabecalhos });
+
+/** POST JSON (avisos por Telegram, WhatsApp e webhook), com as mesmas proteções e classificação de erros do GET. */
+const enviarJson = (url, corpo, cabecalhos = {}) => requisitarJson(url, { metodo: 'POST', corpo, cabecalhos, aceitaTexto: true });
+
+async function requisitarJson(url, { metodo = 'GET', corpo, cabecalhos = {}, aceitaTexto = false }) {
   await validarDestino(url);
   let resp;
   try {
-    resp = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'ManagerNetwork/1.0', ...cabecalhos }, redirect: 'manual',
-      signal: AbortSignal.timeout(config.conectorTimeoutMs) });
+    resp = await fetch(url, { method: metodo, headers: { Accept: 'application/json', 'User-Agent': 'ManagerNetwork/1.0',
+      ...(corpo !== undefined ? { 'Content-Type': 'application/json' } : {}), ...cabecalhos }, body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
+    redirect: 'manual', signal: AbortSignal.timeout(config.conectorTimeoutMs) });
   } catch (err) {
     if (err.name === 'TimeoutError') throw new ErroConector(`Tempo esgotado (${config.conectorTimeoutMs / 1000} s) aguardando a fonte.`);
     throw new ErroConector(`Sem conexão com a fonte: ${err.cause?.code || err.message}.`);
@@ -65,7 +71,10 @@ async function buscarJson(url, cabecalhos = {}) {
   if (!resp.ok) throw new ErroConector(`A fonte respondeu HTTP ${resp.status}.`, 'falha', { status: resp.status });
   const texto = await resp.text();
   if (texto.length > 5_000_000) throw new ErroConector('Resposta grande demais.');
-  try { return JSON.parse(texto); } catch { throw new ErroConector('A fonte não respondeu JSON.', 'falha', { status: resp.status }); }
+  try { return JSON.parse(texto); } catch {
+    if (aceitaTexto) return { texto: texto.slice(0, 500) };
+    throw new ErroConector('A fonte não respondeu JSON.', 'falha', { status: resp.status });
+  }
 }
 
 // ---------------- Configuração e estado das integrações ----------------
@@ -128,4 +137,4 @@ function estadoAtual(x, desatualizadoMin, intervaloS) {
   return x.estado;
 }
 
-module.exports = { ErroConector, validarDestino, buscarJson, ler, publico, salvar, segredoDe, registrarResultado, estadoAtual, ipPrivado };
+module.exports = { ErroConector, validarDestino, buscarJson, enviarJson, ler, publico, salvar, segredoDe, registrarResultado, estadoAtual, ipPrivado };

@@ -404,3 +404,25 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .stat .valor { font-size: 26px; }
   .caminho > span:first-child, .caminho > .sep { display: none; }
 }
+
+/* ---------------- Gráficos e tráfego ---------------- */
+.grafico-caixa { display: grid; gap: 10px; }
+.grafico-area { position: relative; }
+.grafico { width: 100%; height: auto; display: block; overflow: visible; }
+.grafico:focus-visible { outline: 2px solid var(--verde-vivo); }
+.grafico .grade-linha { stroke: var(--borda); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.grafico .eixo { font-size: 11px; fill: var(--texto-3); font-family: var(--fonte); }
+.grafico .referencia { stroke: var(--vermelho); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.grafico .referencia-texto { fill: var(--vermelho); }
+.grafico .cruz { stroke: var(--texto-3); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dica-grafico { position: absolute; top: 4px; transform: translateX(-50%); background: var(--painel); border: 1px solid var(--borda-forte); border-radius: 8px; padding: 8px 10px;
+  font-size: 12px; box-shadow: var(--sombra-alta); pointer-events: none; min-width: 150px; display: grid; gap: 3px; }
+.dica-grafico[hidden] { display: none; }
+.legenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--texto-2); }
+.legenda > span { display: inline-flex; align-items: center; gap: 6px; }
+.chave { display: inline-block; width: 12px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.legenda .chave { margin-right: 0; }
+.comando { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: var(--azul-suave); border-radius: 6px; padding: 6px 8px;
+  word-break: break-all; display: block; }
+.barra-uso { height: 6px; background: var(--borda); border-radius: 99px; overflow: hidden; min-width: 80px; }
+.barra-uso > span { display: block; height: 100%; background: var(--verde); border-radius: 99px; }

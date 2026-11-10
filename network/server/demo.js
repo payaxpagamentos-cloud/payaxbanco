@@ -18,6 +18,7 @@ const { criarApp } = require('./app');
 const { criarOrganizacao } = require('./lib/organizacoes');
 const { hashSenha } = require('./lib/senha');
 const { processarAmostra } = require('./lib/noc');
+const { demoTrafego } = require('./demo-trafego');
 
 const SENHA = 'demo12345';
 const db = abrir();
@@ -25,8 +26,8 @@ if (db.prepare("SELECT 1 FROM usuarios WHERE email = 'demo@managernetwork.local'
   console.log('A organização demonstrativa já existe (demo@managernetwork.local).');
   process.exit(0);
 }
-const org = criarOrganizacao(db, { nome: 'Provedor Demonstração', demonstracao: true });
-db.prepare("UPDATE organizacoes SET nome = 'Provedor Demonstração · Praia Grande' WHERE id = ?").run(org);
+const org = criarOrganizacao(db, { nome: 'Conecta Fibra', demonstracao: true });
+db.prepare("UPDATE organizacoes SET nome = 'Conecta Fibra · Praia Grande' WHERE id = ?").run(org);
 const PERFIS = { demo: 'admin', 'gestor.demo': 'gestor', 'noc.demo': 'noc', 'frota.demo': 'frota', 'lucas.demo': 'tecnico', 'rafael.demo': 'tecnico', 'bruno.demo': 'tecnico',
   'comissoes.demo': 'comissoes', 'tv.demo': 'consulta' };
 const NOMES = { demo: 'Adriano Almeida', 'gestor.demo': 'Gestão Operacional', 'noc.demo': 'Operador NOC', 'frota.demo': 'Gestão de Frota', 'lucas.demo': 'Lucas Oliveira',
@@ -177,9 +178,13 @@ const servidor = criarApp(db).listen(0, async () => {
     c5 = await req('lucas.demo', 'GET', `/chamados/${c5.id}`);
     await req('lucas.demo', 'POST', `/chamados/${c5.id}/concluir`, { versao: c5.versao });
 
-    console.log('Organização demonstrativa criada. Acessos (senha demo12345):');
+    // Tráfego, Anti-DDoS e sessões dos assinantes (fictícios)
+    await demoTrafego(db, org, post);
+
+    console.log('Organização demonstrativa "Conecta Fibra" criada. Acessos (senha demo12345):');
     for (const [k, p] of Object.entries(PERFIS)) console.log(`  ${k}@managernetwork.local  (${p})`);
-    console.log('Rastreador e Downdetector ficam não configurados: não há conexão real inventada.');
+    console.log('Rastreador, Downdetector e canais de aviso ficam não configurados: não há conexão real inventada.');
+    console.log('Para ver a detecção ao vivo: cadastre o exportador 127.0.0.1 (borda), rode "npm run coletor-rede" e "ATAQUE=dns ALVO=203.0.113.10 npm run simulador".');
   } catch (err) {
     console.error('Falha ao criar a demonstração:', err.message);
     process.exitCode = 1;

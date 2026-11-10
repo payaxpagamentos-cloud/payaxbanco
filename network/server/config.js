@@ -53,6 +53,16 @@ module.exports = {
   conectorTimeoutMs: Number(process.env.NETWORK_CONECTOR_TIMEOUT_MS) || 10_000,
   // Liga as coletas periódicas (rastreador, Downdetector). Nos testes, as coletas são chamadas diretamente.
   coletasAutomaticas: process.env.NETWORK_COLETAS !== '0' && !teste,
+  // Coletor de rede (flows e RADIUS). Roda em processo próprio (npm run coletor-rede) ou dentro do servidor com NETWORK_COLETOR_EMBUTIDO=1.
+  coletorRede: {
+    embutido: process.env.NETWORK_COLETOR_EMBUTIDO === '1',
+    host: process.env.NETWORK_FLUXOS_HOST || '0.0.0.0',
+    // Portas UDP: 2055 (NetFlow), 4739 (IPFIX), 6343 (sFlow). Qualquer porta aceita qualquer formato.
+    portasFluxo: String(process.env.NETWORK_FLUXOS_PORTAS ?? '2055,4739,6343').split(',').map((x) => Number(x.trim())).filter((x) => Number.isInteger(x) && x > 0),
+    // Contabilidade RADIUS (cópia do accounting do BRAS). 0 desliga.
+    portaRadius: Number(process.env.NETWORK_RADIUS_PORTA ?? 1813),
+    bufferBytes: (Number(process.env.NETWORK_FLUXOS_BUFFER_MB) || 32) * 1024 * 1024,
+  },
   mapa: {
     // Camada de imagens do mapa (Leaflet). Use um provedor licenciado para o volume de uso da operação.
     tiles: process.env.NETWORK_MAPA_TILES || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',

@@ -10,6 +10,11 @@ const MENU = [
     ['chamados', 'Chamados técnicos', 'chamado', 'chamados.ver', () => import('./telas/chamados.js')],
     ['equipe', 'Equipe e comissões', 'equipe', ['equipe.ver', 'comissoes.ver'], () => import('./telas/equipe.js')],
   ]],
+  ['Tráfego e segurança', [
+    ['trafego', 'Tráfego', 'grafico', 'trafego.ver', () => import('./telas/trafego.js')],
+    ['ddos', 'Anti-DDoS', 'escudo', 'ddos.ver', () => import('./telas/ddos.js')],
+    ['assinantes', 'Assinantes', 'pino', 'assinantes.ver', () => import('./telas/assinantes.js')],
+  ]],
   ['Gestão de frota', [
     ['veiculos', 'Veículos', 'carro', 'frota.ver', () => import('./telas/veiculos.js')],
     ['manutencao', 'Manutenção e lavagem', 'chave', 'manutencao.ver', () => import('./telas/manutencao.js')],
@@ -18,6 +23,7 @@ const MENU = [
   ]],
   ['Sistema', [
     ['integracoes', 'Integrações', 'plugue', 'integracoes.ver', () => import('./telas/integracoes.js')],
+    ['fontes', 'Fontes e avisos', 'servidor', ['ddos.configurar', 'avisos.configurar'], () => import('./telas/fontes.js')],
     ['admin', 'Organização e acessos', 'escudo', 'usuarios.gerenciar', () => import('./telas/admin.js')],
   ]],
 ];
@@ -100,6 +106,7 @@ function estrutura(rota, principal) {
     if (e.key !== 'Enter' || !busca.value.trim()) return;
     const t = busca.value.trim();
     if (/^[A-Za-z]{3}-?\d[A-Za-z0-9]\d{2}$/.test(t) && permitido('frota.ver')) ir(`#/veiculos?busca=${encodeURIComponent(t)}`);
+    else if (/^(\d{1,3}\.){3}\d{1,3}$|^[0-9a-f:]+:[0-9a-f:]*$/i.test(t) && permitido('trafego.ver')) ir(`#/trafego/ip/${encodeURIComponent(t)}`);
     else if (/^#?\d+$/.test(t) && permitido('chamados.ver')) ir(`#/chamados?busca=${encodeURIComponent(t.replace('#', ''))}`);
     else if (permitido('rede.ver')) ir(`#/rede?busca=${encodeURIComponent(t)}`);
   });

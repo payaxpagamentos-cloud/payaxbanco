@@ -43,6 +43,8 @@ const ICONES = {
   atualizar: '<path d="M20 8a8 8 0 0 0-14-3L3 8m0-5v5h5M4 16a8 8 0 0 0 14 3l3-3m0 5v-5h-5"/>',
   sair: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11"/>',
   config: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/>',
+  raio: '<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/>',
+  grafico: '<path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 5-7"/>',
   camera: '<path d="M3 8h4l2-3h6l2 3h4v12H3V8Z"/><circle cx="12" cy="13" r="4"/>',
 };
 
@@ -107,6 +109,29 @@ export function desde(iso) {
   return `há ${Math.floor(s / 86400)} dia(s)`;
 }
 export const duracaoMin = (m) => (m === null || m === undefined ? '—' : m < 60 ? `${Math.round(m)} min` : `${Math.floor(m / 60)} h ${String(Math.round(m % 60)).padStart(2, '0')} min`);
+export function bits(bps) {
+  const x = Number(bps ?? 0);
+  if (x >= 1e9) return `${numero(x / 1e9, 2)} Gbps`;
+  if (x >= 1e6) return `${numero(x / 1e6, 1)} Mbps`;
+  if (x >= 1e3) return `${numero(x / 1e3)} kbps`;
+  return `${numero(x)} bps`;
+}
+export function pacotes(pps, sufixo = 'pps') {
+  const x = Number(pps ?? 0);
+  if (x >= 1e6) return `${numero(x / 1e6, 2)} mi ${sufixo}`;
+  if (x >= 1e3) return `${numero(x / 1e3)} mil ${sufixo}`;
+  return `${numero(x)} ${sufixo}`;
+}
+export function bytes(b) {
+  const x = Number(b ?? 0);
+  if (x >= 1e12) return `${numero(x / 1e12, 2)} TB`;
+  if (x >= 1e9) return `${numero(x / 1e9, 2)} GB`;
+  if (x >= 1e6) return `${numero(x / 1e6, 1)} MB`;
+  if (x >= 1e3) return `${numero(x / 1e3)} kB`;
+  return `${numero(x)} B`;
+}
+/** Valor de uma métrica de limite do Anti-DDoS com a unidade. */
+export const valorMetrica = (m, v) => (String(m).endsWith('bps') ? bits(v) : m === 'fps' ? pacotes(v, 'fluxos/s') : m === 'syn_pps' ? pacotes(v, 'SYN/s') : pacotes(v));
 export const placa = (p) => (/^[A-Z]{3}\d{4}$/.test(p ?? '') ? `${p.slice(0, 3)}-${p.slice(3)}` : p ?? '');
 export const iniciais = (n) => String(n ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join('');
 /** Valor de <input type=datetime-local> para ISO (UTC) e de volta. */
@@ -142,6 +167,15 @@ export const R = {
   categoria: { passeio: 'Passeio', utilitario: 'Utilitário', picape: 'Picape', van: 'Van', caminhao: 'Caminhão', moto: 'Moto', outro: 'Outro' },
   fornecedor: { oficina: 'Oficina / mecânico', posto: 'Posto', lavagem: 'Lavagem', pecas: 'Peças', outro: 'Outro' },
   documento: { crlv: 'CRLV', seguro: 'Seguro', licenciamento: 'Licenciamento', ipva: 'IPVA', vistoria: 'Vistoria', outro: 'Outro' },
+  statusAtaque: { ativo: ['Em andamento', 'erro'], encerrado: ['Encerrado', 'ok'] },
+  direcaoAtaque: { entrada: ['Externo → interno', 'erro'], saida: ['Saindo da rede', 'aviso'], interno: ['Interno', 'aviso'] },
+  statusMitigacao: { aguardando_aprovacao: ['Aguardando aprovação', 'aviso'], ativa: ['Ativa', 'erro'], retirada: ['Retirada', 'neutra'], recusada: ['Recusada', 'neutra'],
+    bloqueada: ['Impedida pelas proteções', 'aviso'] },
+  tipoMitigacao: { blackhole: 'Blackhole (RTBH)', flowspec: 'FlowSpec', limpeza: 'Limpeza em linha' },
+  modoMitigacao: { desligada: 'Só alertar', manual: 'Pedir aprovação', automatica: 'Bloquear automaticamente' },
+  papelExportador: { borda: 'Borda (internet)', bras: 'BRAS (assinantes)', core: 'Core (interno)' },
+  metricaDdos: { bps: 'Tráfego (bits/s)', pps: 'Pacotes/s', fps: 'Fluxos/s', tcp_bps: 'TCP (bits/s)', udp_bps: 'UDP (bits/s)', syn_pps: 'SYN/s', icmp_pps: 'ICMP (pacotes/s)' },
+  escopoLimite: { ip: 'Cada IP', grupo: 'Soma do grupo' },
   equipamento: { olt: 'OLT', switch: 'Switch', roteador: 'Roteador', servidor: 'Servidor', outro: 'Outro' },
 };
 export const etq = (texto, tipo = '') => el('span', { class: `etq ${tipo}` }, texto);

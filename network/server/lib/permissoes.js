@@ -47,6 +47,13 @@ const P = {
   'combustivel.comprovantes': ['admin', 'frota'],
   'rastreamento.ver': ['admin', 'gestor', 'frota'],
   'rastreamento.vincular': ['admin', 'frota'],
+  // Tráfego e Anti-DDoS. Sessões dos assinantes têm login e MAC (dado pessoal): fora do perfil de consulta/TV.
+  'trafego.ver': ['admin', 'gestor', 'noc', 'consulta'],
+  'ddos.ver': ['admin', 'gestor', 'noc', 'consulta'],
+  'ddos.operar': ['admin', 'noc'],
+  'ddos.configurar': ['admin', 'noc'],
+  'assinantes.ver': ['admin', 'gestor', 'noc'],
+  'avisos.configurar': ['admin'],
   'integracoes.ver': ['admin', 'noc', 'frota', 'gestor'],
   'integracoes.editar': ['admin'],
   'usuarios.gerenciar': ['admin'],

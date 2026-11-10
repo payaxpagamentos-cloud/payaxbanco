@@ -47,6 +47,9 @@ function criarApi(db, extras = {}) {
   api.use('/noc', require('./routes/noc')(db));
   api.use('/rastreamento', require('./routes/rastreamento')(db, extras));
   api.use('/integracoes', require('./routes/integracoes')(db, extras));
+  api.use('/trafego', require('./routes/trafego')(db));
+  api.use('/ddos', require('./routes/ddos')(db));
+  api.use('/avisos', require('./routes/avisos')(db));
   api.use((_req, _res, next) => next(new ErroNegocio('Rota não encontrada.', 404)));
   return api;
 }

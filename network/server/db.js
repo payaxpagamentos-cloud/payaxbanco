@@ -814,6 +814,308 @@ CREATE TABLE amostras_servico_externo (
 CREATE INDEX idx_amostras_servico ON amostras_servico_externo(servico_id, id DESC);
 `,
   },
+  {
+    versao: 2,
+    nome: 'trafego_antiddos',
+    sql: `
+-- ===================== Tráfego, Anti-DDoS, sessões dos assinantes e avisos =====================
+-- Escopos do token do coletor: amostras (monitoramento), sessoes (RADIUS por API), bgp (leitura dos anúncios pelo ExaBGP).
+ALTER TABLE coletores ADD COLUMN escopos TEXT NOT NULL DEFAULT 'amostras';
+
+-- Roteadores de borda, BRAS e core que exportam flows. O pacote é aceito só se vier do IP cadastrado.
+-- papel: borda (tráfego de/para a internet, usado no Anti-DDoS), bras (sessões dos assinantes), core (tráfego interno).
+CREATE TABLE exportadores_fluxo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nome TEXT NOT NULL,
+  ip TEXT NOT NULL UNIQUE,
+  papel TEXT NOT NULL DEFAULT 'borda' CHECK (papel IN ('borda','bras','core')),
+  -- Usada quando o pacote não informa a amostragem (1 = sem amostragem).
+  taxa_amostragem INTEGER NOT NULL DEFAULT 1 CHECK (taxa_amostragem >= 1),
+  ativo INTEGER NOT NULL DEFAULT 1,
+  observacao TEXT,
+  formato TEXT,
+  ultimo_pacote TEXT,
+  pacotes INTEGER NOT NULL DEFAULT 0,
+  fluxos INTEGER NOT NULL DEFAULT 0,
+  erros INTEGER NOT NULL DEFAULT 0,
+  sem_template INTEGER NOT NULL DEFAULT 0,
+  ultimo_erro TEXT,
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL
+);
+
+-- Parâmetros do Anti-DDoS e da sessão BGP por organização.
+CREATE TABLE ddos_config (
+  organizacao_id INTEGER PRIMARY KEY REFERENCES organizacoes(id),
+  -- Avaliações seguidas (a cada 5 s) acima do limite para abrir o ataque.
+  confirmacoes INTEGER NOT NULL DEFAULT 2 CHECK (confirmacoes BETWEEN 1 AND 12),
+  -- O ataque só conta como normalizado abaixo de limite × fator (histerese), por encerrar_apos_s segundos seguidos.
+  fator_recuperacao REAL NOT NULL DEFAULT 0.8 CHECK (fator_recuperacao > 0 AND fator_recuperacao <= 1),
+  encerrar_apos_s INTEGER NOT NULL DEFAULT 120 CHECK (encerrar_apos_s BETWEEN 10 AND 3600),
+  max_acoes_simultaneas INTEGER NOT NULL DEFAULT 10 CHECK (max_acoes_simultaneas >= 1),
+  duracao_padrao_min INTEGER NOT NULL DEFAULT 30 CHECK (duracao_padrao_min BETWEEN 1 AND 10080),
+  max_duracao_min INTEGER NOT NULL DEFAULT 1440 CHECK (max_duracao_min BETWEEN 1 AND 10080),
+  bgp_next_hop_blackhole TEXT NOT NULL DEFAULT '192.0.2.1',
+  bgp_next_hop_blackhole_v6 TEXT NOT NULL DEFAULT '100::1',
+  bgp_community_blackhole TEXT NOT NULL DEFAULT '65535:666',
+  bgp_next_hop_limpeza TEXT,
+  bgp_community_limpeza TEXT,
+  limpeza_prefixo_v4 INTEGER NOT NULL DEFAULT 24 CHECK (limpeza_prefixo_v4 BETWEEN 8 AND 32),
+  limpeza_prefixo_v6 INTEGER NOT NULL DEFAULT 48 CHECK (limpeza_prefixo_v6 BETWEEN 16 AND 128),
+  flowspec_acao TEXT NOT NULL DEFAULT 'discard' CHECK (flowspec_acao IN ('discard','rate-limit')),
+  flowspec_taxa_bps INTEGER,
+  retencao_minuto_dias INTEGER NOT NULL DEFAULT 8 CHECK (retencao_minuto_dias BETWEEN 1 AND 90),
+  retencao_hora_dias INTEGER NOT NULL DEFAULT 400 CHECK (retencao_hora_dias BETWEEN 30 AND 1100),
+  -- Marco Civil da Internet (art. 13): registros de conexão por 1 ano, no mínimo.
+  retencao_sessoes_dias INTEGER NOT NULL DEFAULT 400 CHECK (retencao_sessoes_dias >= 366),
+  versao INTEGER NOT NULL DEFAULT 1,
+  atualizado_em TEXT NOT NULL
+);
+
+-- Grupos de IPs protegidos (ex.: Clientes residenciais, Corporativos, Servidores), com a política de mitigação.
+CREATE TABLE grupos_ip (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nome TEXT NOT NULL,
+  descricao TEXT,
+  mitigacao_modo TEXT NOT NULL DEFAULT 'manual' CHECK (mitigacao_modo IN ('desligada','manual','automatica')),
+  mitigacao_tipo TEXT NOT NULL DEFAULT 'flowspec' CHECK (mitigacao_tipo IN ('blackhole','flowspec','limpeza')),
+  mitigacao_duracao_min INTEGER CHECK (mitigacao_duracao_min IS NULL OR mitigacao_duracao_min BETWEEN 1 AND 10080),
+  ativo INTEGER NOT NULL DEFAULT 1,
+  versao INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, nome)
+);
+
+CREATE TABLE grupo_prefixos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  grupo_id INTEGER NOT NULL REFERENCES grupos_ip(id),
+  prefixo TEXT NOT NULL,
+  versao_ip INTEGER NOT NULL CHECK (versao_ip IN (4,6)),
+  criado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, prefixo)
+);
+
+-- Limites por grupo. escopo ip = cada IP do grupo; grupo = soma do grupo. janela_s: média de 5, 10 ou 60 s.
+CREATE TABLE ddos_limites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  grupo_id INTEGER NOT NULL REFERENCES grupos_ip(id),
+  escopo TEXT NOT NULL CHECK (escopo IN ('ip','grupo')),
+  direcao TEXT NOT NULL CHECK (direcao IN ('entrada','saida')),
+  metrica TEXT NOT NULL CHECK (metrica IN ('bps','pps','fps','tcp_bps','udp_bps','syn_pps','icmp_pps')),
+  limite REAL NOT NULL CHECK (limite > 0),
+  janela_s INTEGER NOT NULL CHECK (janela_s IN (5,10,60)),
+  severidade TEXT NOT NULL DEFAULT 'alta' CHECK (severidade IN ('critica','alta','media','baixa')),
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL
+);
+CREATE INDEX idx_ddos_limites ON ddos_limites(organizacao_id, grupo_id);
+
+-- IPs e blocos que nenhuma ação de bloqueio pode atingir (DNS, gerência, clientes críticos, o próprio next-hop).
+CREATE TABLE nunca_bloquear (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  prefixo TEXT NOT NULL,
+  versao_ip INTEGER NOT NULL CHECK (versao_ip IN (4,6)),
+  motivo TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, prefixo)
+);
+
+CREATE TABLE ataques (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  numero INTEGER NOT NULL,
+  grupo_id INTEGER REFERENCES grupos_ip(id),
+  alvo TEXT NOT NULL,
+  alvo_tipo TEXT NOT NULL CHECK (alvo_tipo IN ('ip','grupo')),
+  versao_ip INTEGER,
+  -- entrada: de fora para dentro; saida: de dentro para fora; interno: dentro da rede (módulo de ataques internos).
+  direcao TEXT NOT NULL CHECK (direcao IN ('entrada','saida','interno')),
+  vetor TEXT,
+  metrica TEXT NOT NULL,
+  limite REAL NOT NULL,
+  janela_s INTEGER NOT NULL,
+  severidade TEXT NOT NULL CHECK (severidade IN ('critica','alta','media','baixa')),
+  status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo','encerrado')),
+  inicio TEXT NOT NULL,
+  fim TEXT,
+  ultima_atualizacao TEXT NOT NULL,
+  atual_bps REAL NOT NULL DEFAULT 0,
+  atual_pps REAL NOT NULL DEFAULT 0,
+  pico_bps REAL NOT NULL DEFAULT 0,
+  pico_pps REAL NOT NULL DEFAULT 0,
+  pico_fps REAL NOT NULL DEFAULT 0,
+  total_bytes REAL NOT NULL DEFAULT 0,
+  origens TEXT,
+  portas_origem TEXT,
+  portas_destino TEXT,
+  protocolos TEXT,
+  encerrado_por INTEGER REFERENCES usuarios(id),
+  motivo_encerramento TEXT,
+  criado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, numero)
+);
+CREATE UNIQUE INDEX uq_ataque_ativo ON ataques(organizacao_id, alvo, direcao) WHERE status = 'ativo';
+CREATE INDEX idx_ataques_org ON ataques(organizacao_id, status, inicio DESC);
+
+-- Medições do ataque a cada 10 s (gráfico e relatório).
+CREATE TABLE ataque_serie (
+  ataque_id INTEGER NOT NULL REFERENCES ataques(id),
+  em TEXT NOT NULL,
+  bps REAL NOT NULL,
+  pps REAL NOT NULL,
+  PRIMARY KEY (ataque_id, em)
+) WITHOUT ROWID;
+
+CREATE TABLE ataque_eventos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ataque_id INTEGER NOT NULL REFERENCES ataques(id),
+  tipo TEXT NOT NULL,
+  detalhes TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  em TEXT NOT NULL
+);
+
+-- Ações de bloqueio por BGP. O sistema gera o anúncio; o ExaBGP do provedor lê os anúncios ativos e os aplica.
+CREATE TABLE mitigacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  ataque_id INTEGER REFERENCES ataques(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('blackhole','flowspec','limpeza')),
+  prefixo TEXT NOT NULL,
+  versao_ip INTEGER NOT NULL CHECK (versao_ip IN (4,6)),
+  regra TEXT,
+  status TEXT NOT NULL CHECK (status IN ('aguardando_aprovacao','ativa','retirada','recusada','bloqueada')),
+  origem TEXT NOT NULL CHECK (origem IN ('automatica','manual')),
+  motivo TEXT,
+  duracao_min INTEGER NOT NULL,
+  solicitada_em TEXT NOT NULL,
+  solicitada_por INTEGER REFERENCES usuarios(id),
+  aprovada_em TEXT,
+  aprovada_por INTEGER REFERENCES usuarios(id),
+  ativada_em TEXT,
+  expira_em TEXT,
+  retirada_em TEXT,
+  retirada_por INTEGER REFERENCES usuarios(id),
+  motivo_retirada TEXT,
+  versao INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX idx_mitigacoes_org ON mitigacoes(organizacao_id, status);
+CREATE UNIQUE INDEX uq_mitigacao_vigente ON mitigacoes(organizacao_id, tipo, prefixo) WHERE status IN ('aguardando_aprovacao','ativa');
+
+-- Tráfego somado por minuto, por grupo e direção (curto prazo) e por IP e hora (longo prazo).
+CREATE TABLE trafego_minuto (
+  organizacao_id INTEGER NOT NULL,
+  minuto TEXT NOT NULL,
+  grupo_id INTEGER NOT NULL,
+  direcao TEXT NOT NULL,
+  bytes REAL NOT NULL,
+  pacotes REAL NOT NULL,
+  fluxos REAL NOT NULL,
+  bytes_tcp REAL NOT NULL DEFAULT 0,
+  bytes_udp REAL NOT NULL DEFAULT 0,
+  PRIMARY KEY (organizacao_id, minuto, grupo_id, direcao)
+) WITHOUT ROWID;
+
+CREATE TABLE trafego_ip_hora (
+  organizacao_id INTEGER NOT NULL,
+  hora TEXT NOT NULL,
+  ip TEXT NOT NULL,
+  direcao TEXT NOT NULL,
+  grupo_id INTEGER,
+  bytes REAL NOT NULL,
+  pacotes REAL NOT NULL,
+  fluxos REAL NOT NULL,
+  PRIMARY KEY (organizacao_id, hora, ip, direcao)
+) WITHOUT ROWID;
+CREATE INDEX idx_trafego_ip ON trafego_ip_hora(organizacao_id, ip, hora);
+
+-- Servidores de acesso (BRAS/NAS) que enviam a contabilidade RADIUS (cópia do accounting) para o Manager Network.
+CREATE TABLE radius_nas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nome TEXT NOT NULL,
+  ip TEXT NOT NULL UNIQUE,
+  segredo_cifrado TEXT NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  ultimo_pacote TEXT,
+  pacotes INTEGER NOT NULL DEFAULT 0,
+  erros INTEGER NOT NULL DEFAULT 0,
+  ultimo_erro TEXT,
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL
+);
+
+-- Sessões PPPoE/IPoE: qual login usou qual IP, de quando a quando.
+CREATE TABLE sessoes_assinantes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  login TEXT NOT NULL,
+  ip TEXT,
+  ipv6_prefixo TEXT,
+  ipv6_delegado TEXT,
+  nas_ip TEXT NOT NULL,
+  sessao_id TEXT NOT NULL,
+  mac TEXT,
+  nas_porta TEXT,
+  inicio TEXT NOT NULL,
+  fim TEXT,
+  ultima_atualizacao TEXT NOT NULL,
+  bytes_entrada REAL NOT NULL DEFAULT 0,
+  bytes_saida REAL NOT NULL DEFAULT 0,
+  motivo_fim TEXT,
+  fonte TEXT NOT NULL CHECK (fonte IN ('radius','api')),
+  UNIQUE (organizacao_id, nas_ip, sessao_id)
+);
+CREATE INDEX idx_sessoes_ip ON sessoes_assinantes(organizacao_id, ip, inicio);
+CREATE INDEX idx_sessoes_login ON sessoes_assinantes(organizacao_id, login, inicio);
+CREATE INDEX idx_sessoes_ativas ON sessoes_assinantes(organizacao_id, fim);
+
+-- Canais de aviso (Telegram, WhatsApp, webhook) e a fila de envios com tentativas.
+CREATE TABLE avisos_canais (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('telegram','whatsapp','webhook')),
+  nome TEXT NOT NULL,
+  config TEXT NOT NULL DEFAULT '{}',
+  segredo_cifrado TEXT,
+  eventos TEXT NOT NULL DEFAULT '[]',
+  severidade_min TEXT NOT NULL DEFAULT 'baixa' CHECK (severidade_min IN ('critica','alta','media','baixa')),
+  ativo INTEGER NOT NULL DEFAULT 1,
+  ultimo_envio TEXT,
+  ultimo_erro TEXT,
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL
+);
+
+CREATE TABLE avisos_envios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  canal_id INTEGER NOT NULL REFERENCES avisos_canais(id),
+  evento TEXT NOT NULL,
+  recurso TEXT,
+  recurso_id INTEGER,
+  texto TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','enviado','falha')),
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  proxima_tentativa TEXT NOT NULL,
+  erro TEXT,
+  erro_id TEXT,
+  criado_em TEXT NOT NULL,
+  enviado_em TEXT
+);
+CREATE INDEX idx_avisos_fila ON avisos_envios(status, proxima_tentativa);
+CREATE INDEX idx_avisos_org ON avisos_envios(organizacao_id, id DESC);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

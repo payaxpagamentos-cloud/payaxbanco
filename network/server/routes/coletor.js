@@ -6,6 +6,9 @@ const { agora, transacao } = require('../db');
 const { ErroNegocio } = require('../lib/erros');
 const { sha256 } = require('../lib/cripto');
 const { processarAmostra } = require('../lib/noc');
+const radius = require('../lib/radius');
+const mitigacao = require('../lib/mitigacao');
+const { lerIp, lerPrefixo } = require('../lib/ip');
 
 const MAX_LOTE = 1000;
 
@@ -19,13 +22,19 @@ function lerToken(db, token) {
   return k;
 }
 
-function criarToken(db, org, nome, usuarioId) {
+/** Escopos: amostras (monitoramento), sessoes (eventos RADIUS pela API), bgp (ExaBGP lê os anúncios ativos). */
+const ESCOPOS = ['amostras', 'sessoes', 'bgp'];
+
+function criarToken(db, org, nome, usuarioId, escopos = ['amostras']) {
   const prefixo = crypto.randomBytes(4).toString('hex');
   const segredo = crypto.randomBytes(24).toString('base64url');
-  const id = Number(db.prepare('INSERT INTO coletores (organizacao_id, nome, prefixo, hash, criado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(org, nome, prefixo, sha256(segredo), usuarioId, agora()).lastInsertRowid);
-  return { id, prefixo, token: `mnc_${prefixo}_${segredo}` };
+  const id = Number(db.prepare('INSERT INTO coletores (organizacao_id, nome, prefixo, hash, escopos, criado_por, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(org, nome, prefixo, sha256(segredo), escopos.join(','), usuarioId, agora()).lastInsertRowid);
+  return { id, prefixo, escopos, token: `mnc_${prefixo}_${segredo}` };
 }
+
+const exigirEscopo = (escopo) => (req, _res, next) =>
+  (req.coletor.escopos.split(',').includes(escopo) ? next() : next(new ErroNegocio(`Este token não tem o escopo "${escopo}".`, 403)));
 
 /**
  * Entrada das amostras da plataforma de monitoramento ou do agente na rede do provedor (Authorization: Bearer mnc_...).
@@ -43,7 +52,7 @@ module.exports = (db) => {
     next();
   });
 
-  r.post('/amostras', (req, res) => {
+  r.post('/amostras', exigirEscopo('amostras'), (req, res) => {
     const lista = Array.isArray(req.body) ? req.body : Array.isArray(req.body?.amostras) ? req.body.amostras : [req.body];
     if (!lista.length || lista.length > MAX_LOTE) throw new ErroNegocio(`Envie de 1 a ${MAX_LOTE} amostras.`, 422);
     const org = req.coletor.organizacao_id;
@@ -76,6 +85,40 @@ module.exports = (db) => {
     res.json({ recebidas: resultado.filter((x) => x.status === 'gravada').length, resultado });
   });
 
+  /**
+   * Eventos de sessão (alternativa ao accounting RADIUS por UDP, ex.: FreeRADIUS com rlm_rest).
+   * { eventos: [{ tipo: inicio|atualizacao|fim, login, sessao_id, nas_ip, ip?, ipv6_prefixo?, ipv6_delegado?, mac?, bytes_entrada?, bytes_saida?, motivo_fim?, em? }] }
+   */
+  r.post('/sessoes', exigirEscopo('sessoes'), (req, res) => {
+    const lista = Array.isArray(req.body?.eventos) ? req.body.eventos : [req.body];
+    if (!lista.length || lista.length > MAX_LOTE) throw new ErroNegocio(`Envie de 1 a ${MAX_LOTE} eventos.`, 422);
+    const org = req.coletor.organizacao_id;
+    const resultado = lista.map((e, i) => {
+      try {
+        if (!e || !['inicio', 'atualizacao', 'fim'].includes(e.tipo)) throw new Error('tipo deve ser inicio, atualizacao ou fim');
+        for (const [campo, f] of [['ip', lerIp], ['nas_ip', lerIp], ['ipv6_prefixo', lerPrefixo], ['ipv6_delegado', lerPrefixo]]) {
+          if (e[campo] !== undefined && e[campo] !== null && !f(e[campo])) throw new Error(`${campo} inválido`);
+        }
+        if (e.em && !Number.isFinite(Date.parse(e.em))) throw new Error('em inválido');
+        const em = e.em ? new Date(Date.parse(e.em)).toISOString() : agora();
+        const ev = { tipo: e.tipo, login: String(e.login ?? '').slice(0, 120), sessao_id: String(e.sessao_id ?? '').slice(0, 120), nas_ip: e.nas_ip,
+          ip: e.ip ?? null, ipv6_prefixo: e.ipv6_prefixo ? lerPrefixo(e.ipv6_prefixo).texto : null, ipv6_delegado: e.ipv6_delegado ? lerPrefixo(e.ipv6_delegado).texto : null,
+          mac: e.mac ? String(e.mac).slice(0, 40) : null, nas_porta: e.nas_porta ? String(e.nas_porta).slice(0, 80) : null,
+          bytes_entrada: Number(e.bytes_entrada) || 0, bytes_saida: Number(e.bytes_saida) || 0, motivo_fim: e.motivo_fim ? String(e.motivo_fim).slice(0, 120) : null };
+        return { indice: i, ...transacao(db, () => radius.registrarSessao(db, org, ev, 'api', em)) };
+      } catch (err) {
+        return { indice: i, acao: 'invalido', erro: err.message };
+      }
+    });
+    res.json({ resultado });
+  });
+
+  /** Anúncios BGP ativos (lidos pelo scripts/exabgp-sincronizar.js). */
+  r.get('/bgp', exigirEscopo('bgp'), (req, res) => {
+    res.json({ gerado_em: agora(), anuncios: mitigacao.anunciosAtivos(db, req.coletor.organizacao_id) });
+  });
+
   return r;
 };
 module.exports.criarToken = criarToken;
+module.exports.ESCOPOS = ESCOPOS;
