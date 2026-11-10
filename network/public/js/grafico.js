@@ -110,7 +110,7 @@ export function graficoLinhas({ series: todasSeries, altura = 240, formatoY = St
       mostrar(tempos[idx]);
     });
     svg.addEventListener('blur', esconder);
-    return [el('div', { class: 'grafico-area' }, svg, dica), legenda()];
+    return [el('div', { class: 'grafico-area' }, svg, dica), legenda()].filter(Boolean); // sem legenda (uma série só), nada no lugar
   };
   const isolar = (nome) => { isolada = isolada === nome ? null : nome; desenhar(); };
   const legenda = () => {
