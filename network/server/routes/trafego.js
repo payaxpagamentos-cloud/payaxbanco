@@ -252,7 +252,7 @@ module.exports = (db) => {
 
   // ---------------------------------------------------------------- Conteúdos
   const nomeChave = (catalogo, nomesAsn) => (ch) => {
-    if (ch.startsWith('c:')) { const c = catalogo.get(Number(ch.slice(2))); return { nome: c?.nome ?? 'Conteúdo removido', categoria: c?.categoria ?? 'outros', catalogado: true }; }
+    if (ch.startsWith('c:')) { const c = catalogo.get(Number(ch.slice(2))); return { nome: c?.nome ?? 'Conteúdo removido', categoria: c?.categoria ?? 'outros', marca: c?.marca ?? null, catalogado: true }; }
     if (ch.startsWith('as:')) { const asn = Number(ch.slice(3)); return { nome: `AS${asn}${nomesAsn.get(asn) ? ` · ${nomesAsn.get(asn)}` : ''}`, categoria: null, asn, catalogado: false }; }
     return { nome: ch === 'outros' ? 'Outros (cauda longa)' : 'Sem identificação', categoria: null, catalogado: false };
   };
@@ -323,7 +323,7 @@ module.exports = (db) => {
   r.get('/conteudos', exigir('trafego.ver'), (req, res) => {
     conteudo.garantirCatalogo(db, req.org);
     const lista = db.prepare('SELECT * FROM conteudos WHERE organizacao_id = ? ORDER BY nome').all(req.org);
-    res.json({ categorias: conteudo.CATEGORIAS, base_asn: db.prepare('SELECT origem, faixas, importado_em FROM asn_base WHERE id = 1').get() ?? null,
+    res.json({ categorias: conteudo.CATEGORIAS, marcas: conteudo.MARCAS, base_asn: db.prepare('SELECT origem, faixas, importado_em FROM asn_base WHERE id = 1').get() ?? null,
       itens: lista.map((c) => ({ ...c, regras: db.prepare('SELECT id, tipo, valor FROM conteudo_regras WHERE conteudo_id = ? ORDER BY tipo, valor').all(c.id) })) });
   });
   const conteudoDe = (req) => {
@@ -348,8 +348,9 @@ module.exports = (db) => {
   r.post('/conteudos', exigir('ddos.configurar'), (req, res) => {
     const b = req.body ?? {};
     const t = agora();
-    const id = Number(db.prepare('INSERT INTO conteudos (organizacao_id, nome, categoria, criado_em, atualizado_em) VALUES (?, ?, ?, ?, ?)')
-      .run(req.org, v.texto(b.nome, 'o nome', 80), v.opcao(b.categoria ?? 'outros', 'a categoria', Object.keys(conteudo.CATEGORIAS)), t, t).lastInsertRowid);
+    const marca = b.marca ? v.opcao(b.marca, 'o logo', conteudo.MARCAS) : null;
+    const id = Number(db.prepare('INSERT INTO conteudos (organizacao_id, nome, categoria, marca, criado_em, atualizado_em) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(req.org, v.texto(b.nome, 'o nome', 80), v.opcao(b.categoria ?? 'outros', 'a categoria', Object.keys(conteudo.CATEGORIAS)), marca, t, t).lastInsertRowid);
     for (const x of [].concat(b.regras ?? [])) regra(req, id, x);
     registrar(db, req, 'conteudo_criado', { recurso: 'conteudo', recursoId: id, depois: b });
     res.status(201).json(db.prepare('SELECT * FROM conteudos WHERE id = ?').get(id));
@@ -359,8 +360,9 @@ module.exports = (db) => {
     const b = req.body ?? {};
     const d = { nome: b.nome !== undefined ? v.texto(b.nome, 'o nome', 80) : c.nome,
       categoria: b.categoria !== undefined ? v.opcao(b.categoria, 'a categoria', Object.keys(conteudo.CATEGORIAS)) : c.categoria,
-      ativo: b.ativo !== undefined ? (v.booleano(b.ativo) ? 1 : 0) : c.ativo };
-    db.prepare('UPDATE conteudos SET nome = ?, categoria = ?, ativo = ?, atualizado_em = ? WHERE id = ?').run(d.nome, d.categoria, d.ativo, agora(), c.id);
+      ativo: b.ativo !== undefined ? (v.booleano(b.ativo) ? 1 : 0) : c.ativo,
+      marca: b.marca !== undefined ? (b.marca ? v.opcao(b.marca, 'o logo', conteudo.MARCAS) : null) : c.marca };
+    db.prepare('UPDATE conteudos SET nome = ?, categoria = ?, ativo = ?, marca = ?, atualizado_em = ? WHERE id = ?').run(d.nome, d.categoria, d.ativo, d.marca, agora(), c.id);
     registrar(db, req, 'conteudo_alterado', { recurso: 'conteudo', recursoId: c.id, antes: c, depois: d });
     res.json(db.prepare('SELECT * FROM conteudos WHERE id = ?').get(c.id));
   });

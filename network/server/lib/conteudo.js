@@ -16,23 +16,23 @@ const { TabelaPrefixos, lerPrefixo } = require('./ip');
 const CATEGORIAS = { video: 'Vídeo e streaming', redes_sociais: 'Redes sociais', jogos: 'Jogos', nuvem_cdn: 'Nuvem e CDN', musica: 'Música', comunicacao: 'Comunicação',
   software: 'Software e atualizações', outros: 'Outros' };
 
-/** Catálogo inicial (ASNs públicos conhecidos). O provedor confere, ajusta e completa na tela de Conteúdo. */
+/** Catálogo inicial (ASNs públicos conhecidos e o logo, de public/js/marcas.js). O provedor confere, ajusta e completa na tela de Conteúdo. */
 const CATALOGO_PADRAO = [
-  ['Google e YouTube', 'video', [15169, 36040, 19527, 43515, 139070]],
-  ['Netflix', 'video', [2906, 40027, 55095]],
-  ['Meta (Facebook, Instagram, WhatsApp)', 'redes_sociais', [32934, 63293]],
+  ['Google e YouTube', 'video', [15169, 36040, 19527, 43515, 139070], 'google'],
+  ['Netflix', 'video', [2906, 40027, 55095], 'netflix'],
+  ['Meta (Facebook, Instagram, WhatsApp)', 'redes_sociais', [32934, 63293], 'meta'],
   ['Amazon (AWS e Prime Video)', 'nuvem_cdn', [16509, 14618]],
-  ['Akamai', 'nuvem_cdn', [20940, 16625, 21342, 32787]],
-  ['Cloudflare', 'nuvem_cdn', [13335, 209242]],
+  ['Akamai', 'nuvem_cdn', [20940, 16625, 21342, 32787], 'akamai'],
+  ['Cloudflare', 'nuvem_cdn', [13335, 209242], 'cloudflare'],
   ['Microsoft (Xbox, Office, Azure)', 'software', [8075, 8068, 12076]],
-  ['Apple', 'software', [714, 6185]],
-  ['TikTok', 'redes_sociais', [396986, 138699]],
-  ['Fastly', 'nuvem_cdn', [54113]],
-  ['Twitch', 'video', [46489]],
-  ['Valve (Steam)', 'jogos', [32590]],
-  ['Riot Games', 'jogos', [6507]],
-  ['X (Twitter)', 'redes_sociais', [13414]],
-  ['Spotify', 'musica', [8403]],
+  ['Apple', 'software', [714, 6185], 'apple'],
+  ['TikTok', 'redes_sociais', [396986, 138699], 'tiktok'],
+  ['Fastly', 'nuvem_cdn', [54113], 'fastly'],
+  ['Twitch', 'video', [46489], 'twitch'],
+  ['Valve (Steam)', 'jogos', [32590], 'steam'],
+  ['Riot Games', 'jogos', [6507], 'riotgames'],
+  ['X (Twitter)', 'redes_sociais', [13414], 'x'],
+  ['Spotify', 'musica', [8403], 'spotify'],
 ];
 
 /** Cria o catálogo padrão uma vez por organização. */
@@ -42,9 +42,9 @@ function garantirCatalogo(db, org) {
   const t = agora();
   db.exec('SAVEPOINT catalogo');
   try {
-    for (const [nome, categoria, asns] of CATALOGO_PADRAO) {
-      const id = Number(db.prepare('INSERT OR IGNORE INTO conteudos (organizacao_id, nome, categoria, padrao, criado_em, atualizado_em) VALUES (?, ?, ?, 1, ?, ?)')
-        .run(org, nome, categoria, t, t).lastInsertRowid);
+    for (const [nome, categoria, asns, marca = null] of CATALOGO_PADRAO) {
+      const id = Number(db.prepare('INSERT OR IGNORE INTO conteudos (organizacao_id, nome, categoria, marca, padrao, criado_em, atualizado_em) VALUES (?, ?, ?, ?, 1, ?, ?)')
+        .run(org, nome, categoria, marca, t, t).lastInsertRowid);
       if (!id) continue;
       for (const asn of asns) db.prepare("INSERT OR IGNORE INTO conteudo_regras (organizacao_id, conteudo_id, tipo, valor, criado_em) VALUES (?, ?, 'asn', ?, ?)").run(org, id, String(asn), t);
     }
@@ -170,4 +170,7 @@ class Classificador {
   }
 }
 
-module.exports = { CATEGORIAS, CATALOGO_PADRAO, garantirCatalogo, BaseAsn, importarBase, Classificador, hex };
+/** Logos disponíveis (public/js/marcas.js). */
+const MARCAS = ['google', 'youtube', 'netflix', 'meta', 'akamai', 'cloudflare', 'apple', 'tiktok', 'fastly', 'twitch', 'steam', 'riotgames', 'x', 'spotify', 'whatsapp', 'instagram'];
+
+module.exports = { MARCAS, CATEGORIAS, CATALOGO_PADRAO, garantirCatalogo, BaseAsn, importarBase, Classificador, hex };

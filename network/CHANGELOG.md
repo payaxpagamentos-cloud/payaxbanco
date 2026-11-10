@@ -7,6 +7,9 @@
   capacidade, protocolos empilhados, entrada por grupo, pacotes/s e os 20 IPs com mais tráfego agora (média de 10 s). Legenda clicável isola a série.
 - **Conteúdo**: cada flow é ligado ao conteúdo pelo prefixo do catálogo, pelo ASN exportado pelo roteador ou pela base IP → ASN (`npm run importar-asn`).
   Ranking, série empilhada, diagrama de fluxo conteúdo → clientes, comparação com o período anterior (só com histórico suficiente) e catálogo editável.
+- **Conteúdo em cartões**: os 6 maiores conteúdos em cartões com o logo da empresa, volume, participação, média, pico, variação e minigráfico;
+  abaixo, o **Top 10** (com "Ver lista completa"). Logos do Simple Icons (CC0) guardados no próprio sistema, na cor oficial; sem logo (Amazon,
+  Microsoft, ASNs fora do catálogo), as iniciais. O logo de cada conteúdo pode ser trocado no Catálogo (migração 4).
 - Capacidade dos links de borda na configuração do Anti-DDoS (`capacidade_bps`).
 - **Efeito vidro no Consumo**: luzes de cor (verde-esmeralda, azul e violeta) atrás do painel e quadros, seletores e caixa de leitura translúcidos com
   desfoque. Navegador sem suporte ou efeitos pausados mantêm o painel sólido. Opacidade conferida para as séries manterem contraste de 3:1.

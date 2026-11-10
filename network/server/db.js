@@ -1221,6 +1221,19 @@ CREATE TABLE conteudo_hora (
 ) WITHOUT ROWID;
 `,
   },
+  {
+    versao: 4,
+    nome: 'conteudo_marcas',
+    sql: `
+-- Logo do conteúdo (identificador em public/js/marcas.js). Vazio = iniciais do nome.
+ALTER TABLE conteudos ADD COLUMN marca TEXT;
+UPDATE conteudos SET marca = CASE nome
+  WHEN 'Google e YouTube' THEN 'google' WHEN 'Netflix' THEN 'netflix' WHEN 'Meta (Facebook, Instagram, WhatsApp)' THEN 'meta' WHEN 'Akamai' THEN 'akamai'
+  WHEN 'Cloudflare' THEN 'cloudflare' WHEN 'Apple' THEN 'apple' WHEN 'TikTok' THEN 'tiktok' WHEN 'Fastly' THEN 'fastly' WHEN 'Twitch' THEN 'twitch'
+  WHEN 'Valve (Steam)' THEN 'steam' WHEN 'Riot Games' THEN 'riotgames' WHEN 'X (Twitter)' THEN 'x' WHEN 'Spotify' THEN 'spotify' END
+WHERE padrao = 1;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

@@ -498,7 +498,7 @@ html.sem-efeitos .grafana .ao-vivo { animation: none; }
 @media (max-width: 640px) { .grafana { padding: 10px; margin: 0 -6px; } .grafana .c2, .grafana .c3 { grid-column: span 6; } .grafana .gf-stat .valor { font-size: 22px; } }
 
 /* ---------------- Conteúdo ---------------- */
-.ranking-conteudo .nome-conteudo { display: flex; align-items: center; gap: 8px; }
+.nome-conteudo { display: flex; align-items: center; gap: 10px; }
 .ranking-conteudo .cor { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 .fluxo-diagrama { width: 100%; height: auto; display: block; }
 .fluxo-diagrama text { font-size: 12px; fill: var(--texto-2); font-family: var(--fonte); }
@@ -564,3 +564,31 @@ html.sem-efeitos .grafana .ao-vivo { animation: none; }
   html:not(.sem-efeitos) .grafana .barra-uso { background: rgba(255, 255, 255, 0.09); }
   html:not(.sem-efeitos) .grafana .grafico .grade-linha { stroke: rgba(255, 255, 255, 0.08); }
 }
+
+/* ---------------- Conteúdo: top 6 em cartões ---------------- */
+.cartoes-conteudo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+.cartao-conteudo { position: relative; background: var(--painel); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra);
+  padding: 16px 16px 0; display: flex; flex-direction: column; gap: 10px; overflow: hidden; min-width: 0; }
+.cartao-conteudo .cc-topo { display: flex; align-items: flex-start; gap: 12px; }
+.cartao-conteudo .cc-nome { display: grid; min-width: 0; flex: 1; }
+.cartao-conteudo .cc-nome strong { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cartao-conteudo .cc-nome small { color: var(--texto-3); font-size: 12px; }
+.cartao-conteudo .cc-posicao { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--texto-3); }
+.cartao-conteudo .cc-valores { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.cartao-conteudo .cc-volume { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.cartao-conteudo .cc-pct { font-size: 15px; font-weight: 600; color: var(--texto-2); font-variant-numeric: tabular-nums; }
+.cartao-conteudo .cc-rodape { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--texto-3); }
+.cartao-conteudo .cc-rodape strong { color: var(--texto); font-weight: 600; }
+.cartao-conteudo .minigrafico { width: calc(100% + 32px); margin: 0 -16px; height: 44px; display: block; }
+.cartao-conteudo .variacao { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+/* Subir ou descer não é bom nem ruim por si: a seta diz a direção, sem cor de alerta. */
+.variacao.sobe, .variacao.desce { background: var(--azul-suave); color: var(--texto-2); }
+.variacao.neutra { background: var(--azul-suave); color: var(--texto-3); font-weight: 500; }
+.logo-marca { flex-shrink: 0; display: inline-grid; place-items: center; border-radius: 12px; background: var(--marca, var(--grafite)); color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.logo-marca svg { width: 56%; height: 56%; fill: currentColor; }
+.logo-marca.iniciais { background: var(--grafite-2); color: #dcebe0; font-weight: 700; font-size: 13px; letter-spacing: 0.02em; }
+.nome-conteudo .logo-marca { border-radius: 8px; }
+.nome-conteudo .logo-marca.iniciais { font-size: 10px; }
+@media (max-width: 1100px) { .cartoes-conteudo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .cartoes-conteudo { grid-template-columns: minmax(0, 1fr); } }

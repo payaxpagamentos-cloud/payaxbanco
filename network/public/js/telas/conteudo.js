@@ -1,6 +1,7 @@
 import { api, qs } from '../api.js';
 import { el, limpar, icone, pode, cabecalho, painel, tabela, abas, carregar, faixa, stat, vazio, bits, bytes, numero, toast, formulario, confirmar, dataHora } from '../ui.js';
-import { graficoLinhas } from '../grafico.js';
+import { graficoLinhas, minigrafico } from '../grafico.js';
+import { MARCAS } from '../marcas.js';
 import { navTrafego } from '../nav-trafego.js';
 
 const PERIODOS = [[1, '1 h'], [6, '6 h'], [24, '24 h'], [168, '7 dias'], [720, '30 dias']];
@@ -46,19 +47,9 @@ export default async function conteudo({ alvo, query }) {
             nota: `${pct(d.cobertura.asn)} com ASN fora do catálogo`, notaTipo: 'neutra' }),
           stat({ rotulo: 'Sem identificação', ic: 'info', valor: pct(d.cobertura.desconhecido), semDado: d.cobertura.desconhecido === null,
             nota: d.base_asn ? `Base ASN de ${dataHora(d.base_asn.importado_em)}` : 'Sem base ASN', notaTipo: d.cobertura.desconhecido > 0.2 ? 'aviso' : 'neutra' })),
-        painel('Principais conteúdos', tabela([
-          { titulo: '#', valor: (x) => x.posicao, classe: 'num' },
-          { titulo: 'Conteúdo', valor: (x) => el('div', { class: 'nome-conteudo' }, el('span', { class: 'cor', style: `background:${cor.get(x.chave) ?? 'var(--s-outros)'}` }),
-            el('div', {}, el('div', { class: 'forte' }, x.nome), el('div', { class: 'fraco' }, x.catalogado ? rotuloCategoria(x.categoria) : x.asn ? 'ASN fora do catálogo' : ''))) },
-          { titulo: 'Volume', valor: (x) => bytes(x.bytes), classe: 'num' },
-          { titulo: 'Participação', valor: (x) => el('div', { style: 'min-width:120px' }, pct(x.participacao), el('div', { class: 'barra-uso' }, el('span', { style: `width:${Math.max(1, x.participacao * 100)}%;background:${cor.get(x.chave) ?? 'var(--s-outros)'}` }))) },
-          { titulo: 'Média', valor: (x) => bits(x.media_bps), classe: 'num' },
-          { titulo: 'Pico', valor: (x) => bits(x.pico_bps), classe: 'num' },
-          { titulo: 'Período anterior', valor: (x) => (!d.comparavel ? el('span', { class: 'fraco' }, 'sem histórico') : x.variacao === null ? el('span', { class: 'fraco' }, 'novo') : el('span', { class: x.variacao > 0.15 ? 'forte' : '' },
-            `${x.variacao >= 0 ? '▲' : '▼'} ${numero(Math.abs(x.variacao) * 100)}%`)), classe: 'num' },
-          { titulo: '', valor: (x) => (x.asn && pode('ddos.configurar') ? el('button', { class: 'botao fantasma pequeno', onclick: (e) => { e.stopPropagation(); catalogar(x, TELAS.ranking); } }, 'Catalogar') : '') },
-        ], d.itens.slice(0, 30), { vazioTexto: 'Sem flows no período. O consumo por conteúdo começa a aparecer no primeiro minuto de coleta.' }), {
-          semCorpo: true, rodape: [el('span', {}, 'Volumes estimados pela amostragem dos roteadores. CDNs compartilhadas (Akamai, Cloudflare, AWS) entregam vários serviços e aparecem pelo nome da CDN.')] }),
+        el('section', { class: 'cartoes-conteudo', 'aria-label': 'Os 6 maiores conteúdos' },
+          d.itens.slice(0, 6).map((x) => cartaoConteudo(x, cor.get(x.chave) ?? 'var(--s-outros)', d.series.find((sr) => sr.chave === x.chave)?.pontos ?? [], d.comparavel))),
+        listaTop(d, cor, TELAS.ranking),
         el('div', {},
           painel('Consumo ao longo do tempo', graficoLinhas({ series: d.series.map((x) => ({ nome: x.nome, cor: cor.get(x.chave), pontos: x.pontos })), formatoY: bits, empilhado: true, altura: 280,
             formatoX: (t) => (horas <= 24 ? new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })),
@@ -74,7 +65,7 @@ export default async function conteudo({ alvo, query }) {
         el('code', { class: 'comando' }, 'wget https://iptoasn.com/data/ip2asn-combined.tsv.gz && npm run importar-asn -- ip2asn-combined.tsv.gz'),
         el('p', { class: 'fraco' }, 'O coletor passa a usar a base nova em até 10 segundos.'))),
       painel('Catálogo de conteúdos', tabela([
-        { titulo: 'Conteúdo', valor: (x) => el('div', {}, el('div', { class: 'forte' }, x.nome), el('div', { class: 'fraco' }, `${c.categorias[x.categoria]}${x.padrao ? ' · catálogo inicial' : ''}${x.ativo ? '' : ' · desativado'}`)) },
+        { titulo: 'Conteúdo', valor: (x) => el('div', { class: 'nome-conteudo' }, logoConteudo(x, 28), el('div', {}, el('div', { class: 'forte' }, x.nome), el('div', { class: 'fraco' }, `${c.categorias[x.categoria]}${x.padrao ? ' · catálogo inicial' : ''}${x.ativo ? '' : ' · desativado'}`))) },
         { titulo: 'Reconhecido por', valor: (x) => el('div', { class: 'filtros', style: 'margin:0;gap:6px' }, x.regras.length ? x.regras.map((r) => el('span', { class: 'etq neutra sem-ponto' },
           r.tipo === 'asn' ? `AS${r.valor}` : r.valor,
           pode('ddos.configurar') ? el('button', { class: 'botao-icone', style: 'width:18px;height:18px;border:0', 'aria-label': `Remover ${r.valor}`, onclick: async (e) => {
@@ -88,6 +79,64 @@ export default async function conteudo({ alvo, query }) {
         rodape: [el('span', {}, 'O catálogo inicial usa ASNs públicos conhecidos: confira e complete com os da sua região (ex.: caches locais, provedores de jogos). Prefixo vence ASN. Mudanças valem a partir do próximo minuto.')] }))),
   };
   trocar(aba);
+}
+
+/** Logo da empresa (ícone na cor oficial) ou, sem logo, as iniciais do nome. */
+function logoConteudo(x, tamanho = 44) {
+  const m = x.marca ? MARCAS[x.marca] : null;
+  if (m) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', m.d);
+    svg.append(p);
+    return el('span', { class: 'logo-marca', style: `--marca:${m.cor};width:${tamanho}px;height:${tamanho}px`, title: m.titulo }, svg);
+  }
+  const iniciais = x.asn ? 'AS' : x.chave === 'desconhecido' ? '?' : String(x.nome).replace(/\(.*\)/, '').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+  return el('span', { class: 'logo-marca iniciais', style: `width:${tamanho}px;height:${tamanho}px`, 'aria-hidden': 'true' }, iniciais);
+}
+
+function cartaoConteudo(x, cor, pontos, comparavel) {
+  const variacao = !comparavel ? el('span', { class: 'variacao neutra' }, 'sem histórico') : x.variacao === null ? el('span', { class: 'variacao neutra' }, 'novo')
+    : el('span', { class: `variacao ${x.variacao > 0.15 ? 'sobe' : x.variacao < -0.15 ? 'desce' : 'neutra'}`, title: 'Comparado com o período anterior' },
+      `${x.variacao >= 0 ? '▲' : '▼'} ${numero(Math.abs(x.variacao) * 100)}%`);
+  return el('article', { class: 'cartao-conteudo' },
+    el('div', { class: 'cc-topo' }, logoConteudo(x),
+      el('div', { class: 'cc-nome' }, el('span', { class: 'cc-posicao' }, `${x.posicao}º`), el('strong', {}, x.nome),
+        el('small', {}, x.catalogado ? rotuloCategoria(x.categoria) : x.asn ? 'ASN fora do catálogo' : 'Sem identificação')), variacao),
+    el('div', { class: 'cc-valores' }, el('div', { class: 'cc-volume' }, bytes(x.bytes)), el('div', { class: 'cc-pct' }, pct(x.participacao))),
+    el('div', { class: 'barra-uso', title: `${pct(x.participacao)} do total` }, el('span', { style: `width:${Math.max(1, x.participacao * 100)}%;background:${cor}` })),
+    el('div', { class: 'cc-rodape' }, el('span', {}, 'Média ', el('strong', {}, bits(x.media_bps))), el('span', {}, 'Pico ', el('strong', {}, bits(x.pico_bps)))),
+    pontos.length > 1 ? minigrafico(pontos, cor) : null);
+}
+
+/** Os 10 maiores em lista (com opção de ver a lista completa). */
+function listaTop(d, cor, recarregar) {
+  let completa = false;
+  const caixa = el('div');
+  const desenhar = () => {
+    const linhas = completa ? d.itens : d.itens.slice(0, 10);
+    limpar(caixa, painel(completa ? `Todos os conteúdos (${d.itens.length})` : 'Top 10', tabela([
+      { titulo: '#', valor: (x) => `${x.posicao}º`, classe: 'num' },
+      { titulo: 'Conteúdo', valor: (x) => el('div', { class: 'nome-conteudo' }, logoConteudo(x, 28),
+        el('div', {}, el('div', { class: 'forte' }, x.nome), el('div', { class: 'fraco' }, x.catalogado ? rotuloCategoria(x.categoria) : x.asn ? 'ASN fora do catálogo' : ''))) },
+      { titulo: 'Volume', valor: (x) => bytes(x.bytes), classe: 'num' },
+      { titulo: 'Participação', valor: (x) => el('div', { style: 'min-width:120px' }, pct(x.participacao), el('div', { class: 'barra-uso' }, el('span', { style: `width:${Math.max(1, x.participacao * 100)}%;background:${cor.get(x.chave) ?? 'var(--s-outros)'}` }))) },
+      { titulo: 'Média', valor: (x) => bits(x.media_bps), classe: 'num' },
+      { titulo: 'Pico', valor: (x) => bits(x.pico_bps), classe: 'num' },
+      { titulo: 'Período anterior', valor: (x) => (!d.comparavel ? el('span', { class: 'fraco' }, 'sem histórico') : x.variacao === null ? el('span', { class: 'fraco' }, 'novo') : el('span', { class: x.variacao > 0.15 ? 'forte' : '' },
+        `${x.variacao >= 0 ? '▲' : '▼'} ${numero(Math.abs(x.variacao) * 100)}%`)), classe: 'num' },
+      { titulo: '', valor: (x) => (x.asn && pode('ddos.configurar') ? el('button', { class: 'botao fantasma pequeno', onclick: (e) => { e.stopPropagation(); catalogar(x, recarregar); } }, 'Catalogar') : '') },
+    ], linhas, { vazioTexto: 'Sem flows no período. O consumo por conteúdo começa a aparecer no primeiro minuto de coleta.' }), {
+      semCorpo: true,
+      acoes: [d.itens.length > 10 ? el('button', { class: 'botao fantasma pequeno', onclick: () => { completa = !completa; desenhar(); } },
+        completa ? 'Mostrar só o top 10' : `Ver lista completa (${d.itens.length})`) : null],
+      rodape: [el('span', {}, 'Volumes estimados pela amostragem dos roteadores. CDNs compartilhadas (Akamai, Cloudflare, AWS) entregam vários serviços e aparecem pelo nome da CDN.')] }));
+  };
+  desenhar();
+  return caixa;
 }
 
 const rotuloCategoria = (c) => ({ video: 'Vídeo e streaming', redes_sociais: 'Redes sociais', jogos: 'Jogos', nuvem_cdn: 'Nuvem e CDN', musica: 'Música', comunicacao: 'Comunicação',
@@ -161,11 +210,12 @@ function editarConteudo(x, categorias, depois) {
   return formulario(x ? `Editar ${x.nome}` : 'Novo conteúdo', [
     { nome: 'nome', rotulo: 'Nome', obrigatorio: true, valor: x?.nome, inteiro: true },
     { nome: 'categoria', rotulo: 'Categoria', tipo: 'select', vazio: false, valor: x?.categoria ?? 'outros', opcoes: Object.entries(categorias) },
+    { nome: 'marca', rotulo: 'Logo', tipo: 'select', vazio: 'Iniciais do nome', valor: x?.marca ?? '', opcoes: Object.entries(MARCAS).map(([k, m]) => [k, m.titulo]) },
     !x ? { nome: 'asn', rotulo: 'ASN (opcional)', placeholder: '2906' } : null,
     x ? { nome: 'ativo', rotulo: 'Ativo', tipo: 'checkbox', valor: x.ativo } : null,
   ], { largo: true, enviar: async (d) => {
-    if (x) await api.patch(`/trafego/conteudos/${x.id}`, d);
-    else await api.post('/trafego/conteudos', { nome: d.nome, categoria: d.categoria, regras: d.asn ? [{ tipo: 'asn', valor: d.asn }] : [] });
+    if (x) await api.patch(`/trafego/conteudos/${x.id}`, { ...d, marca: d.marca || null });
+    else await api.post('/trafego/conteudos', { nome: d.nome, categoria: d.categoria, marca: d.marca || null, regras: d.asn ? [{ tipo: 'asn', valor: d.asn }] : [] });
     toast('Conteúdo salvo.');
     depois();
   } });

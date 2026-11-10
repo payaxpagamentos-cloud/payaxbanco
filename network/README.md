@@ -168,7 +168,10 @@ Passo a passo para o provedor: [`GUIA-DO-PROVEDOR.md`](GUIA-DO-PROVEDOR.md). Res
 
 Armazenamento: o coletor soma o tráfego em memória e grava no SQLite por minuto e grupo (8 dias) e por IP e hora (400 dias);
 sessões ficam no mínimo 366 dias (Marco Civil). Consumo em tempo real: somas de 5 s por 6 horas. Conteúdo: por minuto (8 dias) e por hora (400 dias),
-até 300 conteúdos/ASNs por minuto (o resto em "outros"). O detalhe de cada flow não é guardado; um banco colunar (ClickHouse) pode ser
+até 300 conteúdos/ASNs por minuto (o resto em "outros").
+
+Logos dos conteúdos: [Simple Icons](https://simpleicons.org) 15.0.0 (CC0), em `public/js/marcas.js`, usados só para identificar quem entrega
+o tráfego. As marcas pertencem aos seus donos; Amazon e Microsoft não constam do Simple Icons a pedido delas e aparecem com as iniciais. O detalhe de cada flow não é guardado; um banco colunar (ClickHouse) pode ser
 acrescentado depois, se o provedor precisar dessa consulta.
 
 ## Regras que o sistema garante

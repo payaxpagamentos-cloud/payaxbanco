@@ -439,6 +439,11 @@ test('Consumo em tempo real e conteúdos: classificação por ASN, top do moment
   // Ranking de conteúdos
   const r = (await api.get('/trafego/conteudo?horas=1', tk.consulta)).dados;
   assert.deepEqual(r.itens.map((x) => x.nome), ['Google e YouTube', 'Netflix', 'AS64512 · REGIONAL FICTICIO', 'Sem identificação']);
+  assert.deepEqual(r.itens.map((x) => x.marca ?? null), ['google', 'netflix', null, null], 'logo do catálogo; ASN e sem identificação ficam com as iniciais');
+  assert.equal((await api.patch(`/trafego/conteudos/${id('Netflix')}`, { marca: 'nao-existe' }, tk.noc)).status, 422);
+  assert.equal((await api.patch(`/trafego/conteudos/${id('Netflix')}`, { marca: null }, tk.noc)).dados.marca, null);
+  assert.equal((await api.patch(`/trafego/conteudos/${id('Netflix')}`, { marca: 'netflix' }, tk.noc)).dados.marca, 'netflix');
+  assert.ok((await api.get('/trafego/conteudos', tk.noc)).dados.marcas.includes('google'));
   assert.equal(r.itens[0].participacao, 6e6 / 10.5e6);
   assert.equal(r.itens[0].pico_bps, (6e6 * 8) / 60);
   assert.equal(r.cobertura.catalogo, 9e6 / 10.5e6);
