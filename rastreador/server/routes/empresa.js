@@ -20,6 +20,7 @@ const agendaLib = require('../lib/agenda');
 const equip = require('../lib/equipamento');
 const notif = require('../lib/notificacoes');
 const seg = require('../lib/seguros');
+const ufinal = require('../lib/usuariosFinais');
 const zap = require('../lib/whatsapp');
 const { hashSenha } = require('../lib/senha');
 const desempenho = require('../lib/desempenho');
@@ -983,6 +984,45 @@ module.exports = (db, extras = {}) => {
     const ids = seg.definirGrantsUsuario(db, eid(req), alvo.id, req.body.tipos);
     registrar(db, req, 'seguro_permissao_usuario', { usuario: alvo.id, total: ids.length });
     res.json({ liberados: ids });
+  });
+
+  // ---------- App do cliente: usuários finais e atendimento ----------
+  r.get('/usuarios-app', gestor, (req, res) => res.json({
+    usuarios: ufinal.listar(db, eid(req)),
+    veiculos: db.prepare('SELECT id, placa, descricao FROM veiculos WHERE empresa_id = ? AND ativo = 1 ORDER BY placa').all(eid(req)),
+  }));
+  r.post('/usuarios-app', gestor, (req, res) => {
+    const u = ufinal.criar(db, eid(req), req.body);
+    registrar(db, req, 'usuario_app_criado', { id: u.id });
+    res.status(201).json(u);
+  });
+  r.put('/usuarios-app/:id', gestor, (req, res) => {
+    const u = ufinal.atualizar(db, eid(req), nid(req), req.body);
+    registrar(db, req, 'usuario_app_alterado', { id: u.id });
+    res.json(u);
+  });
+  r.post('/usuarios-app/:id/senha', gestor, (req, res) => {
+    ufinal.definirSenha(db, eid(req), nid(req), req.body.senha);
+    registrar(db, req, 'usuario_app_senha', { id: nid(req) });
+    res.json({ ok: true });
+  });
+  r.delete('/usuarios-app/:id', gestor, (req, res) => {
+    ufinal.remover(db, eid(req), nid(req));
+    registrar(db, req, 'usuario_app_excluido', { id: nid(req) });
+    res.status(204).end();
+  });
+
+  r.get('/atendimento', gestor, (req, res) => {
+    const e = db.prepare('SELECT plano_nome, atend_whatsapp, atend_telefone, atend_horario FROM empresas WHERE id = ?').get(eid(req));
+    res.json(e);
+  });
+  r.put('/atendimento', gestor, (req, res) => {
+    const d = req.body;
+    db.prepare('UPDATE empresas SET plano_nome = ?, atend_whatsapp = ?, atend_telefone = ?, atend_horario = ? WHERE id = ?').run(
+      v.opcional(d.plano_nome, 'o nome do plano', 60), v.opcional(d.atend_whatsapp, 'o WhatsApp', 30),
+      v.opcional(d.atend_telefone, 'o telefone', 30), v.opcional(d.atend_horario, 'o horário', 120), eid(req));
+    registrar(db, req, 'atendimento_alterado', undefined);
+    res.json({ ok: true });
   });
 
   return r;

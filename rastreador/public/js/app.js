@@ -13,6 +13,7 @@ import { TELAS_AVISOS } from './avisos.js';
 import { montarAssistente } from './assistente.js';
 import { TELAS_DIARIO } from './diario.js';
 import { TELAS_SEGUROS, TELAS_SEGUROS_MASTER } from './seguros.js';
+import { TELAS_CLIENTES } from './clientes.js';
 import { iniciarCena } from './cena-entrada.js';
 import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 
@@ -74,6 +75,10 @@ const MENU_EMPRESA = [
     ['seguros-contratacoes', 'Contratações', 'relatorios', 'Pedidos de contratação e apólices'],
     ['seguros-usuarios', 'Quem pode contratar', 'usuarios', 'Libere o que cada operador pode contratar', GESTOR],
   ]],
+  ['app-cliente', 'App do cliente', 'usuarios', GESTOR, [
+    ['usuarios-app', 'Usuários', 'usuarios', 'Quem acessa o app do cliente e vê o próprio veículo'],
+    ['atendimento', 'Atendimento e plano', 'pergunta', 'Contatos de suporte e o nome do plano'],
+  ]],
   ['configuracoes', 'Configurações', 'configuracoes', null, [
     ['configuracoes', 'Geral', 'configuracoes', 'Alertas, horário de uso, custos, plano e usuários'],
     ['notificacoes', 'Notificações', 'alertas', 'Contatos do WhatsApp e o que cada um recebe'],
@@ -96,6 +101,7 @@ const SUBTITULOS_EMPRESA = {
   seguranca: 'Modo Roubo, estacionados, bloqueio programado e liberações.', frota: 'Veículos, motoristas, nota, custos, manutenção e equipamentos.',
   relatorios: 'Relatórios por período e os que chegam sozinhos pelo WhatsApp.', configuracoes: 'Preferências, avisos pelo WhatsApp, comandos e integrações.',
   seguros: 'Seguros disponíveis para a sua frota, contratações e permissões.',
+  'app-cliente': 'Usuários do app do cliente e as informações de atendimento.',
 };
 
 window.addEventListener('rastreador:sair', () => desenhar());
@@ -127,7 +133,7 @@ async function desenhar() {
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
   const telas = empresaId
-    ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO, ...TELAS_SEGUROS }
+    ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO, ...TELAS_SEGUROS, ...TELAS_CLIENTES }
     : { ...TELAS_MASTER, ...TELAS_SEGUROS_MASTER };
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
   const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp]) => permitido(sp));

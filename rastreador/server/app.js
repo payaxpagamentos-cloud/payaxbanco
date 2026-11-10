@@ -56,6 +56,7 @@ function criarApp(db, extras = {}) {
   const r = express.Router();
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   r.use('/api/motorista/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  r.use('/api/usuario/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // Código de liberação: poucas tentativas por minuto (são 6 números).
   // As rotas do Express aceitam maiúsculas e a barra final: o limite tem de valer para essas formas também, senão é contornado.
   r.use(/^\/api\/empresas\/\d+\/liberacoes\/(consultar|aplicar)\/?$/i, limitar({ janelaMs: 60_000, maximo: 20 }));
@@ -78,6 +79,7 @@ function criarApp(db, extras = {}) {
   // "/compartilhar" sem a barra final leva a "/compartilhar/" (a página usa caminhos relativos à pasta).
   r.get(/^\/compartilhar$/, (req, res) => res.redirect(`${req.baseUrl}/compartilhar/`));
   r.get(/^\/motorista$/, (req, res) => res.redirect(`${req.baseUrl}/motorista/`));
+  r.get(/^\/cliente$/, (req, res) => res.redirect(`${req.baseUrl}/cliente/`));
   // no-cache: o navegador sempre confere se há versão nova das telas (evita ficar com a versão antiga depois de atualizar).
   r.use(express.static(path.join(__dirname, '..', 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   if (config.basePath) {
