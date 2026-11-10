@@ -68,6 +68,26 @@ function autenticarMotorista(db) {
   };
 }
 
+/** Token do app do cliente (usuário final): público "rastreador-usuario", 30 dias, com o id do usuário final. */
+function emitirTokenUsuarioFinal(uf) {
+  const payload = Buffer.from(JSON.stringify({ sub: uf.id, aud: 'rastreador-usuario', exp: Math.floor(Date.now() / 1000) + 30 * 86_400 })).toString('base64url');
+  return `${payload}.${assinar(payload)}`;
+}
+
+/** App do cliente: o usuário final ativo, de empresa ativa, com senha cadastrada. */
+function autenticarUsuarioFinal(db) {
+  const buscar = db.prepare('SELECT uf.*, e.nome AS empresa_nome, e.status AS empresa_status FROM usuarios_finais uf JOIN empresas e ON e.id = uf.empresa_id WHERE uf.id = ?');
+  return (req, _res, next) => {
+    const c = req.get('authorization') || '';
+    const dados = lerToken(c.startsWith('Bearer ') ? c.slice(7) : null, 'rastreador-usuario');
+    if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
+    const uf = buscar.get(dados.sub);
+    if (!uf || !uf.ativo || !uf.senha_hash || uf.empresa_status !== 'ativa') return next(new ErroNegocio('Acesso do cliente desativado.', 401));
+    req.usuarioFinal = uf;
+    next();
+  };
+}
+
 /** Restringe a rota aos perfis informados. */
 const permitir = (...perfis) => (req, _res, next) =>
   perfis.includes(req.usuario?.perfil) ? next() : next(new ErroNegocio('Seu perfil não tem permissão para esta operação.', 403));
@@ -92,4 +112,4 @@ function acessoEmpresa(db) {
   };
 }
 
-module.exports = { emitirToken, emitirTokenMotorista, lerToken, autenticar, autenticarMotorista, permitir, acessoEmpresa, PLATAFORMA };
+module.exports = { emitirToken, emitirTokenMotorista, emitirTokenUsuarioFinal, lerToken, autenticar, autenticarMotorista, autenticarUsuarioFinal, permitir, acessoEmpresa, PLATAFORMA };

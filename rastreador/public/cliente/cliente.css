@@ -1,0 +1,124 @@
+/*
+ Rastreador de Veículos — © 2026 Adriano Almeida. Todos os direitos reservados.
+ Software proprietário. Uso mediante licença. É proibida a reprodução, distribuição, engenharia reversa ou
+ criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
+*/
+:root{
+  --nav:#0B1B3F; --nav2:#12306B; --mint:#36E0C0; --azul:#1C58E3; --cyan:#087E92;
+  --bg:#EEF2F9; --card:#FFFFFF; --linha:#E6EBF3; --txt:#16233D; --txt2:#5A6782; --txt3:#8A97AD;
+  --ok:#15803D; --ok-bg:#E8F8EE; --aviso:#B45309; --aviso-bg:#FEF3E2; --erro:#DC2626; --erro-bg:#FEECEC;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg)}
+body.app-cliente{font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:var(--txt);-webkit-font-smoothing:antialiased}
+#app{max-width:480px;margin:0 auto;min-height:100vh;position:relative}
+.carregando-app{padding:60px 20px;text-align:center;color:var(--txt3)}
+.som{position:absolute;width:1px;height:1px;overflow:hidden}
+
+/* header */
+.cab{background:linear-gradient(135deg,#081530,#0B1B3F 55%,#0E2A5C);color:#fff;padding:max(14px,env(safe-area-inset-top)) 18px 22px;border-radius:0 0 22px 22px}
+.cab .topo{display:flex;align-items:center;justify-content:space-between}
+.marca{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;letter-spacing:-.01em}
+.marca .ic{width:30px;height:30px;border-radius:9px;background:var(--mint);display:grid;place-items:center}
+.marca .ic svg{width:17px;height:17px;color:#0B1B3F}
+.avatar{width:36px;height:36px;border-radius:50%;background:#2A3B6B;color:#cfe;display:grid;place-items:center;font-weight:700;font-size:13px;border:0;cursor:pointer}
+.ola{margin-top:16px;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.ola small{display:block;color:#9DB0D0;font-size:13px;font-weight:500;margin-top:3px}
+
+/* conteúdo */
+.corpo{padding:16px 16px 96px;display:flex;flex-direction:column;gap:14px;margin-top:-8px}
+.card{background:var(--card);border-radius:16px;box-shadow:0 8px 22px -14px rgba(11,27,63,.25);border:1px solid var(--linha);overflow:hidden}
+.card .pad{padding:15px 16px}
+.rot{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--txt3);display:flex;align-items:center;gap:7px}
+.rot svg{width:15px;height:15px;color:var(--cyan)}
+.mudo{color:var(--txt3)}
+
+/* veículo */
+.veic-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.placa{font-size:19px;font-weight:800;letter-spacing:.02em;color:var(--nav)}
+.veic-sub{color:var(--txt2);font-size:12.5px;margin-top:1px}
+.chip{padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.chip.ok{background:var(--ok-bg);color:var(--ok)} .chip.aviso{background:var(--aviso-bg);color:var(--aviso)}
+.chip.erro{background:var(--erro-bg);color:var(--erro)} .chip.neutro{background:#EEF2F9;color:var(--txt2)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.stat{background:#F6F8FC;border:1px solid var(--linha);border-radius:11px;padding:9px 8px;text-align:center}
+.stat .v{font-size:14px;font-weight:800;color:var(--nav)}
+.stat .l{font-size:10px;color:var(--txt3);margin-top:1px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:14px;padding:13px;border-radius:12px;background:linear-gradient(135deg,var(--azul),var(--cyan));color:#fff;font-weight:700;font-size:14.5px;border:0;cursor:pointer;text-decoration:none}
+.btn:disabled{opacity:.6}
+.btn.claro{background:#F1F5FC;color:var(--azul)}
+.btn svg{width:17px;height:17px}
+
+/* plano */
+.linha{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-top:1px solid var(--linha)}
+.linha:first-of-type{border-top:0}
+.linha .k{color:var(--txt2);font-size:13px}
+.linha .vv{font-weight:700;color:var(--nav);font-size:13.5px;text-align:right}
+.preco{font-size:24px;font-weight:800;color:var(--nav);letter-spacing:-.02em}
+.preco small{font-size:13px;color:var(--txt3);font-weight:600}
+.badge-ok{font-size:11px;font-weight:700;color:var(--ok);background:var(--ok-bg);padding:3px 9px;border-radius:999px}
+
+/* seguros */
+.seg{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--linha)}
+.seg:first-of-type{border-top:0}
+.seg .sic{width:38px;height:38px;border-radius:11px;background:#EAF0FF;color:var(--azul);display:grid;place-items:center;flex:none}
+.seg .sic svg{width:19px;height:19px}
+.seg .nome{font-weight:700;color:var(--nav);font-size:13.5px}
+.seg .meta{color:var(--txt3);font-size:11.5px;margin-top:1px}
+.seg .val{margin-left:auto;text-align:right;flex:none}
+.seg .val .p{font-weight:800;color:var(--nav);font-size:13.5px}
+.st{font-size:10.5px;font-weight:700}
+.st.ok{color:var(--ok)} .st.pend{color:var(--aviso)} .st.neutro{color:var(--txt3)}
+
+/* atendimento */
+.aten{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:4px}
+.aten a{display:flex;align-items:center;gap:9px;padding:11px;border:1px solid var(--linha);border-radius:12px;text-decoration:none;color:var(--nav);font-weight:700;font-size:13px;background:#F9FBFE;min-width:0}
+.aten a>div{min-width:0}
+.aten a .ai{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none}
+.aten a .ai svg{width:16px;height:16px}
+.ai.wa{background:#E7F8EE;color:#13A150}.ai.tel{background:#E9EFFF;color:var(--azul)}
+.ai.ch{background:#FFF0E6;color:#C2410C}.ai.doc{background:#EDE9FE;color:#6D28D9}
+.aten small{display:block;color:var(--txt3);font-size:10.5px;font-weight:500;margin-top:1px}
+.horario{margin-top:11px;font-size:11.5px;color:var(--txt2);display:flex;align-items:center;gap:7px}
+.horario svg{width:14px;height:14px;color:var(--txt3);flex:none}
+
+/* login */
+.login{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:28px 22px;background:linear-gradient(160deg,#081530,#0B1B3F 60%,#0E2A5C);color:#fff}
+.login .marca{justify-content:center;font-size:22px;margin-bottom:6px}
+.login .marca .ic{width:38px;height:38px}.login .marca .ic svg{width:22px;height:22px}
+.login h1{text-align:center;font-size:19px;font-weight:700;margin-top:18px}
+.login p.sub{text-align:center;color:#9DB0D0;font-size:13px;margin:6px 0 22px}
+.login .campo{display:block;margin-bottom:12px}
+.login .campo span{display:block;font-size:12px;color:#B9C6E0;margin-bottom:6px;font-weight:600}
+.login input{width:100%;padding:14px;border-radius:12px;border:1px solid #2A3B6B;background:#0E2347;color:#fff;font-size:15px}
+.login input::placeholder{color:#64749A}
+.login .btn{margin-top:8px;padding:15px;font-size:15px}
+.login .aviso{background:rgba(220,38,38,.15);border:1px solid rgba(220,38,38,.4);color:#FECACA;padding:11px 13px;border-radius:11px;font-size:13px;margin-bottom:12px}
+.login .rod{text-align:center;color:#64749A;font-size:11px;margin-top:22px;line-height:1.5}
+
+/* nav inferior */
+.nav{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:#fff;border-top:1px solid var(--linha);display:flex;justify-content:space-around;align-items:center;height:calc(64px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom)}
+.nav button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--txt3);font-size:10.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.nav button svg{width:21px;height:21px}
+.nav button.on{color:var(--azul)}
+
+/* folha de ações (sheet) */
+.fundo{position:fixed;inset:0;background:rgba(8,16,38,.45);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+.sheet{background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));max-height:86vh;overflow:auto}
+.sheet h2{font-size:17px;color:var(--nav);margin-bottom:4px}
+.sheet .fechar{float:right;border:0;background:#F1F5FC;width:30px;height:30px;border-radius:50%;font-size:16px;color:var(--txt2);cursor:pointer}
+.opt{display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--linha);border-radius:13px;margin-top:10px;cursor:pointer;background:#fff;width:100%;text-align:left}
+.opt .sic{width:36px;height:36px;border-radius:10px;background:#EAF0FF;color:var(--azul);display:grid;place-items:center;flex:none}
+.opt .sic svg{width:18px;height:18px}
+.opt .nome{font-weight:700;color:var(--nav);font-size:14px}
+.opt .meta{color:var(--txt3);font-size:12px}
+.opt .p{margin-left:auto;font-weight:800;color:var(--azul)}
+.campo-sel{display:block;margin-top:12px}
+.campo-sel span{font-size:12px;color:var(--txt2);font-weight:600}
+.campo-sel select{width:100%;margin-top:5px;padding:12px;border-radius:11px;border:1px solid var(--linha);font-size:14px;background:#fff}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--nav);color:#fff;padding:11px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:60;max-width:90%;text-align:center;box-shadow:0 10px 30px -10px rgba(0,0,0,.5)}
+.toast.erro{background:var(--erro)}
+.vazio{padding:26px 14px;text-align:center;color:var(--txt3);font-size:13px}
+.vazio svg{width:32px;height:32px;color:var(--mint);margin-bottom:6px}

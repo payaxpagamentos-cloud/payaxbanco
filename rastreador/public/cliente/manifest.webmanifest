@@ -1,0 +1,11 @@
+{
+  "name": "Minha conta · Rastreador",
+  "short_name": "Minha conta",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B1B3F",
+  "theme_color": "#0B1B3F",
+  "lang": "pt-BR",
+  "icons": [{ "src": "../img/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

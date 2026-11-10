@@ -609,6 +609,29 @@ CREATE TABLE IF NOT EXISTS seguros_contratacoes (
 );
 CREATE INDEX IF NOT EXISTS idx_seg_contr_empresa ON seguros_contratacoes(empresa_id, criada_em);
 CREATE INDEX IF NOT EXISTS idx_seg_contr_status ON seguros_contratacoes(status);
+
+-- Usuário final (dono do veículo): entra no app do cliente com e-mail ou CPF + senha e vê só o que é dele.
+CREATE TABLE IF NOT EXISTS usuarios_finais (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  email TEXT COLLATE NOCASE,
+  cpf TEXT,
+  telefone TEXT,
+  senha_hash TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  ultimo_acesso TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_uf_email ON usuarios_finais(email) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_uf_cpf ON usuarios_finais(empresa_id, cpf) WHERE cpf IS NOT NULL;
+
+-- Veículos que cada usuário final pode acompanhar (só os da própria empresa).
+CREATE TABLE IF NOT EXISTS usuario_final_veiculos (
+  usuario_final_id INTEGER NOT NULL REFERENCES usuarios_finais(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id),
+  PRIMARY KEY (usuario_final_id, veiculo_id)
+);
 `;
 
 const CONFIG_PADRAO = {
@@ -685,7 +708,8 @@ function migrar(db) {
   const colunas = (t) => new Set(db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name));
   const NOVAS = {
     veiculos: { consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
-    empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0' },
+    empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0',
+      plano_nome: 'TEXT', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT' },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
     motoristas: { senha_hash: 'TEXT', app_ultimo_acesso: 'TEXT' },
     rastreadores: { rele_invertido: 'INTEGER NOT NULL DEFAULT 0', sinal_gsm: 'INTEGER', firmware: 'TEXT', perfil: "TEXT NOT NULL DEFAULT 'padrao'", saude: 'TEXT', saude_em: 'TEXT' },
