@@ -394,7 +394,7 @@ test('Consumo em tempo real e conteúdos: classificação por ASN, top do moment
   const conteudo = require('../server/lib/conteudo');
   const g = (await api.post('/ddos/grupos', { nome: 'Clientes', prefixos: ['203.0.113.0/24'] }, tk.noc)).dados;
   await api.post('/trafego/exportadores', { nome: 'Borda', ip: '192.0.2.1', papel: 'borda' }, tk.noc);
-  conteudo.importarBase(api.db, ['198.18.0.0\t198.18.0.255\t15169\tUS\tGOOGLE', '198.18.9.0\t198.18.9.255\t64512\tZZ\tREGIONAL FICTICIO'], 'teste');
+  conteudo.importarBase(api.db, ['198.18.0.0\t198.18.0.255\t15169\tUS\tGOOGLE', '198.18.1.0\t198.18.1.255\t36040\tUS\tYOUTUBE', '198.18.9.0\t198.18.9.255\t64512\tZZ\tREGIONAL FICTICIO'], 'teste');
   conteudo.garantirCatalogo(api.db, 1);
   assert.equal(conteudo.garantirCatalogo(api.db, 1), false, 'catálogo criado uma vez só');
   const ag = new Agregador();
@@ -407,6 +407,7 @@ test('Consumo em tempo real e conteúdos: classificação por ASN, top do moment
   ag.registrar(f('192.0.2.200', '203.0.113.11', 3e6, { srcAs: 2906 }), exp, T); // Netflix pelo ASN do flow
   ag.registrar(f('198.18.9.9', '203.0.113.12', 1e6, { proto: 17 }), exp, T + 1000); // ASN fora do catálogo
   ag.registrar(f('198.51.100.1', '203.0.113.12', 5e5), exp, T + 1000);      // sem ASN
+  ag.registrar(f('198.18.1.7', '203.0.113.13', 2e6), exp, T + 1000);        // YouTube (AS36040), separado do Google
   ag.registrar(f('203.0.113.10', '198.18.0.5', 2e6), exp, T + 1000);        // upload para o Google
   assert.ok(ag.gravarTempoReal(api.db, T + 6000) >= 2, 'blocos de 5 s fechados');
   const top = api.db.prepare("SELECT ip, posicao, bps FROM trafego_top_atual WHERE direcao = 'entrada' ORDER BY posicao").all();
@@ -415,18 +416,19 @@ test('Consumo em tempo real e conteúdos: classificação por ASN, top do moment
   ag.gravar(api.db, T + 60_000);
   const ch = new Map(api.db.prepare("SELECT chave, SUM(bytes) AS b FROM conteudo_minuto WHERE direcao = 'entrada' GROUP BY chave").all().map((x) => [x.chave, x.b]));
   const id = (n) => api.db.prepare('SELECT id FROM conteudos WHERE nome = ?').get(n).id;
-  assert.equal(ch.get(`c:${id('Google e YouTube')}`), 6e6);
+  assert.equal(ch.get(`c:${id('Google')}`), 6e6);
+  assert.equal(ch.get(`c:${id('YouTube')}`), 2e6, 'YouTube separado do Google');
   assert.equal(ch.get(`c:${id('Netflix')}`), 3e6);
   assert.equal(ch.get('as:64512'), 1e6);
   assert.equal(ch.get('desconhecido'), 5e5);
-  assert.equal(api.db.prepare('SELECT SUM(bytes) AS b FROM conteudo_hora').get().b, 12.5e6, 'hora recebe o mesmo que o minuto');
+  assert.equal(api.db.prepare('SELECT SUM(bytes) AS b FROM conteudo_hora').get().b, 14.5e6, 'hora recebe o mesmo que o minuto');
 
   // API de tempo real
   const tr = (await api.get('/trafego/tempo-real?minutos=15', tk.consulta)).dados;
   assert.equal(tr.passo_s, 5);
   const ponto = tr.serie.find((p) => p.em === T);
-  assert.equal(ponto.entrada_bps, (10.5e6 * 8) / 5, 'os quatro flows de entrada caem no mesmo bloco de 5 s');
-  assert.equal(ponto.tcp_bps, (9.5e6 * 8) / 5);
+  assert.equal(ponto.entrada_bps, (12.5e6 * 8) / 5, 'os flows de entrada caem no mesmo bloco de 5 s');
+  assert.equal(ponto.tcp_bps, (11.5e6 * 8) / 5);
   assert.equal(ponto.udp_bps, (1e6 * 8) / 5);
   assert.equal(tr.top.entrada[0].ip, '203.0.113.10');
   assert.equal(tr.top.entrada[0].login, undefined, 'consulta não vê login');
@@ -438,20 +440,21 @@ test('Consumo em tempo real e conteúdos: classificação por ASN, top do moment
 
   // Ranking de conteúdos
   const r = (await api.get('/trafego/conteudo?horas=1', tk.consulta)).dados;
-  assert.deepEqual(r.itens.map((x) => x.nome), ['Google e YouTube', 'Netflix', 'AS64512 · REGIONAL FICTICIO', 'Sem identificação']);
-  assert.deepEqual(r.itens.map((x) => x.marca ?? null), ['google', 'netflix', null, null], 'logo do catálogo; ASN e sem identificação ficam com as iniciais');
+  assert.deepEqual(r.itens.map((x) => x.nome), ['Google', 'Netflix', 'YouTube', 'AS64512 · REGIONAL FICTICIO', 'Sem identificação']);
+  assert.match(r.itens[2].aviso, /^Estimativa/, 'YouTube avisa que a separação é estimada');
+  assert.deepEqual(r.itens.map((x) => x.marca ?? null), ['google', 'netflix', 'youtube', null, null], 'logo do catálogo; ASN e sem identificação ficam com as iniciais');
   assert.equal((await api.patch(`/trafego/conteudos/${id('Netflix')}`, { marca: 'nao-existe' }, tk.noc)).status, 422);
   assert.equal((await api.patch(`/trafego/conteudos/${id('Netflix')}`, { marca: null }, tk.noc)).dados.marca, null);
   assert.equal((await api.patch(`/trafego/conteudos/${id('Netflix')}`, { marca: 'netflix' }, tk.noc)).dados.marca, 'netflix');
   assert.ok((await api.get('/trafego/conteudos', tk.noc)).dados.marcas.includes('google'));
-  assert.equal(r.itens[0].participacao, 6e6 / 10.5e6);
+  assert.equal(r.itens[0].participacao, 6e6 / 12.5e6);
   assert.equal(r.itens[0].pico_bps, (6e6 * 8) / 60);
-  assert.equal(r.cobertura.catalogo, 9e6 / 10.5e6);
-  assert.equal(r.base_asn.faixas, 2);
-  assert.deepEqual(r.fluxo.map((x) => [x.origem_nome, x.grupo_nome]).slice(0, 1), [['Google e YouTube', 'Clientes']]);
+  assert.equal(r.cobertura.catalogo, 11e6 / 12.5e6);
+  assert.equal(r.base_asn.faixas, 3);
+  assert.deepEqual(r.fluxo.map((x) => [x.origem_nome, x.grupo_nome]).slice(0, 1), [['Google', 'Clientes']]);
   assert.ok(r.series.some((s) => s.nome === 'Netflix'));
   const up = (await api.get('/trafego/conteudo?horas=1&direcao=saida', tk.noc)).dados;
-  assert.equal(up.itens[0].nome, 'Google e YouTube');
+  assert.equal(up.itens[0].nome, 'Google');
 
   // Catálogo: regras únicas, permissões e reclassificação
   assert.equal((await api.post(`/trafego/conteudos/${id('Netflix')}/regras`, { tipo: 'asn', valor: '15169' }, tk.noc)).status, 409, 'ASN já está em outro conteúdo');

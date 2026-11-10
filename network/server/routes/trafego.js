@@ -252,7 +252,7 @@ module.exports = (db) => {
 
   // ---------------------------------------------------------------- Conteúdos
   const nomeChave = (catalogo, nomesAsn) => (ch) => {
-    if (ch.startsWith('c:')) { const c = catalogo.get(Number(ch.slice(2))); return { nome: c?.nome ?? 'Conteúdo removido', categoria: c?.categoria ?? 'outros', marca: c?.marca ?? null, catalogado: true }; }
+    if (ch.startsWith('c:')) { const c = catalogo.get(Number(ch.slice(2))); return { nome: c?.nome ?? 'Conteúdo removido', categoria: c?.categoria ?? 'outros', marca: c?.marca ?? null, aviso: c?.aviso ?? null, catalogado: true }; }
     if (ch.startsWith('as:')) { const asn = Number(ch.slice(3)); return { nome: `AS${asn}${nomesAsn.get(asn) ? ` · ${nomesAsn.get(asn)}` : ''}`, categoria: null, asn, catalogado: false }; }
     return { nome: ch === 'outros' ? 'Outros (cauda longa)' : 'Sem identificação', categoria: null, catalogado: false };
   };
@@ -361,8 +361,10 @@ module.exports = (db) => {
     const d = { nome: b.nome !== undefined ? v.texto(b.nome, 'o nome', 80) : c.nome,
       categoria: b.categoria !== undefined ? v.opcao(b.categoria, 'a categoria', Object.keys(conteudo.CATEGORIAS)) : c.categoria,
       ativo: b.ativo !== undefined ? (v.booleano(b.ativo) ? 1 : 0) : c.ativo,
-      marca: b.marca !== undefined ? (b.marca ? v.opcao(b.marca, 'o logo', conteudo.MARCAS) : null) : c.marca };
-    db.prepare('UPDATE conteudos SET nome = ?, categoria = ?, ativo = ?, marca = ?, atualizado_em = ? WHERE id = ?').run(d.nome, d.categoria, d.ativo, d.marca, agora(), c.id);
+      marca: b.marca !== undefined ? (b.marca ? v.opcao(b.marca, 'o logo', conteudo.MARCAS) : null) : c.marca,
+      aviso: b.aviso !== undefined ? v.opcional(b.aviso, 'o aviso', 300) : c.aviso };
+    db.prepare('UPDATE conteudos SET nome = ?, categoria = ?, ativo = ?, marca = ?, aviso = ?, atualizado_em = ? WHERE id = ?')
+      .run(d.nome, d.categoria, d.ativo, d.marca, d.aviso, agora(), c.id);
     registrar(db, req, 'conteudo_alterado', { recurso: 'conteudo', recursoId: c.id, antes: c, depois: d });
     res.json(db.prepare('SELECT * FROM conteudos WHERE id = ?').get(c.id));
   });

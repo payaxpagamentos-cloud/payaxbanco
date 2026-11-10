@@ -1234,6 +1234,25 @@ UPDATE conteudos SET marca = CASE nome
 WHERE padrao = 1;
 `,
   },
+  {
+    versao: 5,
+    nome: 'google_youtube_separados',
+    sql: `
+-- Aviso de limitação mostrado junto do conteúdo (ex.: separação estimada).
+ALTER TABLE conteudos ADD COLUMN aviso TEXT;
+-- "Google e YouTube" do catálogo inicial vira dois conteúdos. O histórico já gravado continua no conteúdo antigo (agora "Google").
+INSERT INTO conteudos (organizacao_id, nome, categoria, marca, aviso, padrao, criado_em, atualizado_em)
+  SELECT c.organizacao_id, 'YouTube', 'video', 'youtube', 'Estimativa: boa parte do vídeo do YouTube chega pelos servidores do Google (AS15169) e conta como Google. Cadastre aqui os prefixos do cache do Google (GGC) na sua rede para separar melhor.', 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  FROM conteudos c WHERE c.nome = 'Google e YouTube' AND c.padrao = 1
+  AND NOT EXISTS (SELECT 1 FROM conteudos y WHERE y.organizacao_id = c.organizacao_id AND y.nome = 'YouTube');
+UPDATE conteudo_regras SET conteudo_id = (SELECT y.id FROM conteudos y WHERE y.organizacao_id = conteudo_regras.organizacao_id AND y.nome = 'YouTube')
+  WHERE tipo = 'asn' AND valor IN ('36040', '43515')
+  AND conteudo_id IN (SELECT id FROM conteudos WHERE nome = 'Google e YouTube' AND padrao = 1);
+UPDATE conteudos SET nome = 'Google', categoria = 'nuvem_cdn', marca = 'google', aviso = 'Inclui a parte do vídeo do YouTube entregue pelos servidores do Google (AS15169), que o flow não separa pelo ASN.', atualizado_em = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  WHERE nome = 'Google e YouTube' AND padrao = 1
+  AND NOT EXISTS (SELECT 1 FROM conteudos g WHERE g.organizacao_id = conteudos.organizacao_id AND g.nome = 'Google');
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

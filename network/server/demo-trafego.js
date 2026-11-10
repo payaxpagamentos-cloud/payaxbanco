@@ -10,10 +10,10 @@ const { agora, proximoNumero } = require('./db');
 const conteudo = require('./lib/conteudo');
 
 // Participação de cada conteúdo no download (soma 1). Netflix e Google crescem à noite; software e jogos de dia.
-const MIX = [['Google e YouTube', 0.31], ['Netflix', 0.2], ['Meta (Facebook, Instagram, WhatsApp)', 0.12], ['Akamai', 0.07], ['Amazon (AWS e Prime Video)', 0.06],
+const MIX = [['YouTube', 0.19], ['Google', 0.12], ['Netflix', 0.2], ['Meta (Facebook, Instagram, WhatsApp)', 0.12], ['Akamai', 0.07], ['Amazon (AWS e Prime Video)', 0.06],
   ['TikTok', 0.05], ['Cloudflare', 0.04], ['Microsoft (Xbox, Office, Azure)', 0.03], ['Apple', 0.02], ['Valve (Steam)', 0.02], ['as:64512', 0.03], ['as:64513', 0.02], ['desconhecido', 0.03]];
 // Faixas fictícias do simulador (198.18.0.0/15, RFC 2544) ligadas a ASNs, para a tela Conteúdo funcionar ao vivo na demonstração.
-const BASE_DEMO = [['198.18.0.0', '198.18.0.255', 15169, 'GOOGLE'], ['198.18.1.0', '198.18.1.255', 2906, 'NETFLIX'], ['198.18.2.0', '198.18.2.255', 32934, 'FACEBOOK'],
+const BASE_DEMO = [['198.18.0.0', '198.18.0.127', 15169, 'GOOGLE'], ['198.18.0.128', '198.18.0.255', 36040, 'YOUTUBE'], ['198.18.1.0', '198.18.1.255', 2906, 'NETFLIX'], ['198.18.2.0', '198.18.2.255', 32934, 'FACEBOOK'],
   ['198.18.3.0', '198.18.3.255', 20940, 'AKAMAI'], ['198.18.4.0', '198.18.4.255', 13335, 'CLOUDFLARENET'], ['198.18.5.0', '198.18.5.255', 396986, 'BYTEDANCE'],
   ['198.18.6.0', '198.18.6.255', 64512, 'PROVEDOR REGIONAL FICTICIO']];
 
@@ -98,7 +98,7 @@ async function demoTrafego(db, org, post) {
   const peso = (n, ms) => {
     const h = ((new Date(ms).getUTCHours() - 3 + 24) % 24);
     const noite = h >= 19 || h <= 1;
-    if (n === 'Netflix' || n === 'Google e YouTube') return noite ? 1.15 : 0.9;
+    if (n === 'Netflix' || n === 'YouTube') return noite ? 1.15 : 0.9;
     if (n.startsWith('Microsoft') || n.startsWith('Apple') || n.startsWith('Valve')) return noite ? 0.7 : 1.4;
     return 1;
   };

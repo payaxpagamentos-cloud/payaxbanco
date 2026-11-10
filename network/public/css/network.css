@@ -592,3 +592,11 @@ html.sem-efeitos .grafana .ao-vivo { animation: none; }
 .nome-conteudo .logo-marca.iniciais { font-size: 10px; }
 @media (max-width: 1100px) { .cartoes-conteudo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .cartoes-conteudo { grid-template-columns: minmax(0, 1fr); } }
+
+.cartao-conteudo .cc-aviso { display: flex; gap: 6px; align-items: flex-start; font-size: 11.5px; line-height: 1.35; color: var(--texto-3); margin: -2px 0 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cartao-conteudo .cc-aviso svg { width: 13px; height: 13px; display: inline-block; vertical-align: -2px; margin-right: 4px; }
+.cartao-conteudo .cc-estimativa { margin-left: 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--laranja);
+  background: var(--laranja-suave); border-radius: 99px; padding: 1px 7px; }
+.info-aviso { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--texto-3); cursor: help; }
+.info-aviso svg { width: 14px; height: 14px; }

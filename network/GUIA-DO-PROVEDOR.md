@@ -70,6 +70,8 @@ Use **Testar** depois de salvar. Falhas aparecem em "Últimos envios" com o erro
   3. Em **Catálogo**, confira os ASNs do catálogo inicial e inclua os caches dentro da sua rede (ex.: o servidor de cache da Netflix ou do Google)
      **por prefixo**: o tráfego que sai do cache não passa pela borda, mas o prefixo cadastrado garante o nome certo se ele aparecer.
   4. Na lista, use **Catalogar** nos ASNs que aparecem sem nome.
+  5. **Google e YouTube** aparecem separados, mas boa parte do vídeo do YouTube vem dos servidores do Google (AS15169) e conta como Google.
+     Para separar melhor, cadastre no conteúdo **YouTube** os prefixos do cache do Google (GGC) instalado na sua rede.
 
 O flow mostra a rede de origem, não o site nem o vídeo: CDNs compartilhadas (Akamai, Cloudflare, AWS) aparecem pelo nome da CDN.
 

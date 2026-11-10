@@ -10,6 +10,9 @@
 - **Conteúdo em cartões**: os 6 maiores conteúdos em cartões com o logo da empresa, volume, participação, média, pico, variação e minigráfico;
   abaixo, o **Top 10** (com "Ver lista completa"). Logos do Simple Icons (CC0) guardados no próprio sistema, na cor oficial; sem logo (Amazon,
   Microsoft, ASNs fora do catálogo), as iniciais. O logo de cada conteúdo pode ser trocado no Catálogo (migração 4).
+- **Google e YouTube separados** no catálogo (Google: AS15169, 19527, 139070; YouTube: AS36040, 43515), cada um com o seu logo. Como boa parte do
+  YouTube chega pelos servidores do Google, o YouTube aparece com o selo "estimativa" e um aviso; prefixos do cache GGC cadastrados no YouTube
+  melhoram a separação. Catálogos existentes são convertidos pela migração 5 (o histórico já gravado fica em "Google"). Novo campo de aviso por conteúdo.
 - Capacidade dos links de borda na configuração do Anti-DDoS (`capacidade_bps`).
 - **Efeito vidro no Consumo**: luzes de cor (verde-esmeralda, azul e violeta) atrás do painel e quadros, seletores e caixa de leitura translúcidos com
   desfoque. Navegador sem suporte ou efeitos pausados mantêm o painel sólido. Opacidade conferida para as séries manterem contraste de 3:1.

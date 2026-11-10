@@ -104,11 +104,12 @@ function cartaoConteudo(x, cor, pontos, comparavel) {
       `${x.variacao >= 0 ? '▲' : '▼'} ${numero(Math.abs(x.variacao) * 100)}%`);
   return el('article', { class: 'cartao-conteudo' },
     el('div', { class: 'cc-topo' }, logoConteudo(x),
-      el('div', { class: 'cc-nome' }, el('span', { class: 'cc-posicao' }, `${x.posicao}º`), el('strong', {}, x.nome),
+      el('div', { class: 'cc-nome' }, el('span', { class: 'cc-posicao' }, `${x.posicao}º`, /^Estimativa/.test(x.aviso ?? '') ? el('span', { class: 'cc-estimativa' }, 'estimativa') : null), el('strong', {}, x.nome),
         el('small', {}, x.catalogado ? rotuloCategoria(x.categoria) : x.asn ? 'ASN fora do catálogo' : 'Sem identificação')), variacao),
     el('div', { class: 'cc-valores' }, el('div', { class: 'cc-volume' }, bytes(x.bytes)), el('div', { class: 'cc-pct' }, pct(x.participacao))),
     el('div', { class: 'barra-uso', title: `${pct(x.participacao)} do total` }, el('span', { style: `width:${Math.max(1, x.participacao * 100)}%;background:${cor}` })),
     el('div', { class: 'cc-rodape' }, el('span', {}, 'Média ', el('strong', {}, bits(x.media_bps))), el('span', {}, 'Pico ', el('strong', {}, bits(x.pico_bps)))),
+    x.aviso ? el('p', { class: 'cc-aviso', title: x.aviso }, icone('info'), x.aviso) : null,
     pontos.length > 1 ? minigrafico(pontos, cor) : null);
 }
 
@@ -121,7 +122,8 @@ function listaTop(d, cor, recarregar) {
     limpar(caixa, painel(completa ? `Todos os conteúdos (${d.itens.length})` : 'Top 10', tabela([
       { titulo: '#', valor: (x) => `${x.posicao}º`, classe: 'num' },
       { titulo: 'Conteúdo', valor: (x) => el('div', { class: 'nome-conteudo' }, logoConteudo(x, 28),
-        el('div', {}, el('div', { class: 'forte' }, x.nome), el('div', { class: 'fraco' }, x.catalogado ? rotuloCategoria(x.categoria) : x.asn ? 'ASN fora do catálogo' : ''))) },
+        el('div', {}, el('div', { class: 'forte' }, x.nome, x.aviso ? el('span', { class: 'info-aviso', title: x.aviso, 'aria-label': x.aviso, role: 'img' }, icone('info')) : null),
+          el('div', { class: 'fraco' }, x.catalogado ? rotuloCategoria(x.categoria) : x.asn ? 'ASN fora do catálogo' : ''))) },
       { titulo: 'Volume', valor: (x) => bytes(x.bytes), classe: 'num' },
       { titulo: 'Participação', valor: (x) => el('div', { style: 'min-width:120px' }, pct(x.participacao), el('div', { class: 'barra-uso' }, el('span', { style: `width:${Math.max(1, x.participacao * 100)}%;background:${cor.get(x.chave) ?? 'var(--s-outros)'}` }))) },
       { titulo: 'Média', valor: (x) => bits(x.media_bps), classe: 'num' },
@@ -212,9 +214,11 @@ function editarConteudo(x, categorias, depois) {
     { nome: 'categoria', rotulo: 'Categoria', tipo: 'select', vazio: false, valor: x?.categoria ?? 'outros', opcoes: Object.entries(categorias) },
     { nome: 'marca', rotulo: 'Logo', tipo: 'select', vazio: 'Iniciais do nome', valor: x?.marca ?? '', opcoes: Object.entries(MARCAS).map(([k, m]) => [k, m.titulo]) },
     !x ? { nome: 'asn', rotulo: 'ASN (opcional)', placeholder: '2906' } : null,
+    x ? { nome: 'aviso', rotulo: 'Aviso mostrado junto do conteúdo', tipo: 'textarea', valor: x.aviso ?? '', inteiro: true,
+      ajuda: 'Para explicar uma limitação (ex.: separação estimada). Se começar com "Estimativa", o cartão ganha o selo de estimativa.' } : null,
     x ? { nome: 'ativo', rotulo: 'Ativo', tipo: 'checkbox', valor: x.ativo } : null,
   ], { largo: true, enviar: async (d) => {
-    if (x) await api.patch(`/trafego/conteudos/${x.id}`, { ...d, marca: d.marca || null });
+    if (x) await api.patch(`/trafego/conteudos/${x.id}`, { ...d, marca: d.marca || null, aviso: d.aviso || null });
     else await api.post('/trafego/conteudos', { nome: d.nome, categoria: d.categoria, marca: d.marca || null, regras: d.asn ? [{ tipo: 'asn', valor: d.asn }] : [] });
     toast('Conteúdo salvo.');
     depois();

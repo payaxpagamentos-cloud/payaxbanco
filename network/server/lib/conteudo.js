@@ -17,8 +17,13 @@ const CATEGORIAS = { video: 'Vídeo e streaming', redes_sociais: 'Redes sociais'
   software: 'Software e atualizações', outros: 'Outros' };
 
 /** Catálogo inicial (ASNs públicos conhecidos e o logo, de public/js/marcas.js). O provedor confere, ajusta e completa na tela de Conteúdo. */
+// Google e YouTube ficam separados, mas o YouTube também é entregue pelos servidores do Google: a separação é estimativa.
+const AVISO_YOUTUBE = 'Estimativa: boa parte do vídeo do YouTube chega pelos servidores do Google (AS15169) e conta como Google. Cadastre aqui os prefixos do cache do Google (GGC) na sua rede para separar melhor.';
+const AVISO_GOOGLE = 'Inclui a parte do vídeo do YouTube entregue pelos servidores do Google (AS15169), que o flow não separa pelo ASN.';
+
 const CATALOGO_PADRAO = [
-  ['Google e YouTube', 'video', [15169, 36040, 19527, 43515, 139070], 'google'],
+  ['Google', 'nuvem_cdn', [15169, 19527, 139070], 'google', AVISO_GOOGLE],
+  ['YouTube', 'video', [36040, 43515], 'youtube', AVISO_YOUTUBE],
   ['Netflix', 'video', [2906, 40027, 55095], 'netflix'],
   ['Meta (Facebook, Instagram, WhatsApp)', 'redes_sociais', [32934, 63293], 'meta'],
   ['Amazon (AWS e Prime Video)', 'nuvem_cdn', [16509, 14618]],
@@ -42,9 +47,9 @@ function garantirCatalogo(db, org) {
   const t = agora();
   db.exec('SAVEPOINT catalogo');
   try {
-    for (const [nome, categoria, asns, marca = null] of CATALOGO_PADRAO) {
-      const id = Number(db.prepare('INSERT OR IGNORE INTO conteudos (organizacao_id, nome, categoria, marca, padrao, criado_em, atualizado_em) VALUES (?, ?, ?, ?, 1, ?, ?)')
-        .run(org, nome, categoria, marca, t, t).lastInsertRowid);
+    for (const [nome, categoria, asns, marca = null, aviso = null] of CATALOGO_PADRAO) {
+      const id = Number(db.prepare('INSERT OR IGNORE INTO conteudos (organizacao_id, nome, categoria, marca, aviso, padrao, criado_em, atualizado_em) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+        .run(org, nome, categoria, marca, aviso, t, t).lastInsertRowid);
       if (!id) continue;
       for (const asn of asns) db.prepare("INSERT OR IGNORE INTO conteudo_regras (organizacao_id, conteudo_id, tipo, valor, criado_em) VALUES (?, ?, 'asn', ?, ?)").run(org, id, String(asn), t);
     }
