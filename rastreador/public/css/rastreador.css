@@ -917,6 +917,27 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 @media (max-width: 860px){ .casca, .casca.recolhida{ grid-template-columns: minmax(0, 1fr); } }
 .casca.recolhida{ grid-template-columns: 72px minmax(0, 1fr); }
 @media (max-width: 860px){ .casca.recolhida{ grid-template-columns: minmax(0, 1fr); } }
+/* No mapa (Mapa ao vivo, Histórico, Cercas), o menu recolhe para sobrar tela e volta ao chegar com o cursor
+   na borda esquerda (ou ao focar com o teclado). Só no desktop; no celular o menu já é a barra de cima. */
+.puxador-menu{ display: none; }
+@media (min-width: 861px){
+  .casca.com-mapa{ grid-template-columns: minmax(0, 1fr); }
+  .casca.com-mapa .lateral{
+    position: fixed; left: 0; top: 0; height: 100vh; width: 220px; overflow-y: auto;
+    transform: translateX(-100%); transition: transform .22s ease; z-index: 70; will-change: transform;
+  }
+  .casca.com-mapa .puxador-menu{ display: block; position: fixed; left: 0; top: 0; width: 16px; height: 100vh; z-index: 69; }
+  .casca.com-mapa .puxador-menu::before{
+    content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 4px; height: 54px; border-radius: 0 4px 4px 0; background: #36E0C0; opacity: .5;
+    transition: opacity .2s ease, height .2s ease;
+  }
+  .casca.com-mapa .puxador-menu:hover::before{ opacity: .9; height: 76px; }
+  .casca.com-mapa .puxador-menu:hover ~ .lateral,
+  .casca.com-mapa .lateral:hover,
+  .casca.com-mapa .lateral:focus-within{ transform: translateX(0); box-shadow: 10px 0 34px rgba(8, 16, 38, .32); }
+}
+@media (prefers-reduced-motion: reduce){ .casca.com-mapa .lateral{ transition: none; } }
 .lateral > *{ flex-shrink: 0; }
 .lateral{ scrollbar-width: thin; scrollbar-color: #2A3A5C transparent; }
 .lateral::-webkit-scrollbar{ width: 6px; }

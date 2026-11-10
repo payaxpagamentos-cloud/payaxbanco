@@ -184,7 +184,9 @@ async function desenhar() {
     return el('a', { class: `aba-config${on ? ' on' : ''}`, href: link(empresaId, sk), 'aria-current': on ? 'page' : null },
       el('span', { class: 'aba-icone' }, icone(sic)), el('span', { class: 'aba-texto' }, el('strong', {}, sr), el('small', {}, sd)));
   })) : null;
-  casca.append(lateral, el('div', { class: 'principal' }, topo, abas, conteudo));
+  // Faixa invisível na borda esquerda: no mapa, o menu recolhe e volta quando o cursor chega aqui.
+  const puxadorMenu = el('div', { class: 'puxador-menu', 'aria-hidden': 'true' });
+  casca.append(puxadorMenu, lateral, el('div', { class: 'principal' }, topo, abas, conteudo));
   limpar(raiz, casca);
   // Com as seções em fila (celular e telas médias), a seção aberta fica à vista.
   const abaAtiva = abas?.querySelector('.aba-config.on');
