@@ -1265,3 +1265,18 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 @media (max-width: 860px){
   .leaflet-control-attribution{ font-size: 9px; max-width: 72vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* ---------- Seguros ---------- */
+.grade-seguros{ display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.seguro-card{ display: flex; flex-direction: column; gap: 8px; padding: 18px; }
+.seguro-card .seguro-ic{ width: 46px; height: 46px; border-radius: 12px; background: var(--azul-suave); color: var(--azul);
+  display: grid; place-items: center; }
+.seguro-card .seguro-ic svg{ width: 24px; height: 24px; }
+.seguro-card h3{ margin: 2px 0 0; font-size: 15px; }
+.seguro-card p{ margin: 0; flex: 1; font-size: 12.5px; line-height: 1.45; }
+.seguro-card .btn{ margin-top: 4px; }
+.seguro-bloq{ display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; }
+.seguro-bloq svg{ width: 15px; height: 15px; flex: none; }
+.com-icone{ display: inline-flex; align-items: center; gap: 7px; }
+.com-icone svg{ width: 17px; height: 17px; flex: none; color: var(--azul); }
+.sub-cartao{ background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-top: 12px; box-shadow: none; }

@@ -221,6 +221,7 @@ const P = {
   usuarios: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7.5M22 21a7 7 0 0 0-4-6.3',
   diagnostico: 'M3 4h18v12H3zM8 20h8M12 16v4M7 10h2l2-3 2 6 2-3h2',
   seguranca: 'M6 10V8a6 6 0 0 1 12 0v2M5 10h14v11H5zM12 14v3',
+  seguro: 'M3 12a9 9 0 0 1 18 0ZM12 12v6a3 3 0 0 0 5 0M12 2v2',
   editar: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
   menu: 'M4 7h16M4 12h16M4 17h16',
   combustivel: 'M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M7 8h4M14 9h2a2 2 0 0 1 2 2v5.5a1.5 1.5 0 0 0 3 0V8l-3-3',

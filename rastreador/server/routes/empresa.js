@@ -19,6 +19,7 @@ const estacionado = require('../lib/estacionado');
 const agendaLib = require('../lib/agenda');
 const equip = require('../lib/equipamento');
 const notif = require('../lib/notificacoes');
+const seg = require('../lib/seguros');
 const zap = require('../lib/whatsapp');
 const { hashSenha } = require('../lib/senha');
 const desempenho = require('../lib/desempenho');
@@ -933,6 +934,42 @@ module.exports = (db, extras = {}) => {
   });
   r.post('/relatorios-programados/:id/enviar', gestor, async (req, res, next) => {
     try { res.json(await progr.enviar(db, agendaRel(req, req.params.id))); } catch (err) { next(err); }
+  });
+
+  // ---------- Seguros ----------
+  // Portfólio da empresa (liberado pelo master) e o que o usuário logado pode contratar.
+  r.get('/seguros', (req, res) => {
+    const permitidos = new Set(seg.permitidosDoUsuario(db, req.usuario, eid(req)).map((t) => t.id));
+    const tipos = seg.portfolioEmpresa(db, eid(req)).map((t) => ({ ...t, pode_contratar: permitidos.has(t.id) }));
+    res.json({ tipos, gestor: ['master', 'suporte', 'cliente'].includes(req.usuario.perfil) });
+  });
+  r.get('/seguros/contratacoes', (req, res) => res.json(seg.contratacoes(db, { empresaId: eid(req) })));
+  r.post('/seguros/contratar', async (req, res, next) => {
+    try {
+      const c = await seg.contratar(db, {
+        empresa: req.empresa, usuario: req.usuario, tipoId: req.body.tipo_id,
+        veiculoId: req.body.veiculo_id, motoristaId: req.body.motorista_id,
+        observacao: req.body.observacao, dados: req.body.dados,
+      });
+      registrar(db, req, 'seguro_contratado', { id: c.id, tipo_id: c.tipo_id });
+      res.status(201).json(c);
+    } catch (err) { next(err); }
+  });
+  // Admin da empresa define o que cada operador pode contratar.
+  r.get('/seguros/usuarios', gestor, (req, res) => {
+    const usuarios = db.prepare("SELECT id, nome, email, perfil FROM usuarios WHERE empresa_id = ? AND ativo = 1 ORDER BY perfil DESC, nome").all(eid(req));
+    res.json({
+      tipos: seg.portfolioEmpresa(db, eid(req)),
+      usuarios: usuarios.map((u) => ({ ...u, liberados: u.perfil === 'operador' ? [...seg.grantsUsuario(db, u.id)] : 'todos' })),
+    });
+  });
+  r.put('/seguros/usuarios/:id', gestor, (req, res) => {
+    const alvo = db.prepare('SELECT * FROM usuarios WHERE id = ? AND empresa_id = ?').get(nid(req), eid(req));
+    if (!alvo) throw naoEncontrado('Usuário');
+    if (alvo.perfil !== 'operador') throw new ErroNegocio('O administrador da empresa já pode contratar todo o portfólio.', 422);
+    const ids = seg.definirGrantsUsuario(db, eid(req), alvo.id, req.body.tipos);
+    registrar(db, req, 'seguro_permissao_usuario', { usuario: alvo.id, total: ids.length });
+    res.json({ liberados: ids });
   });
 
   return r;
