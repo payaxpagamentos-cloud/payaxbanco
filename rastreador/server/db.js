@@ -554,6 +554,56 @@ CREATE TABLE IF NOT EXISTS ia_uso (
   perguntas INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (empresa_id, data)
 );
+
+-- Seguros. Catálogo de tipos editável pelo master; integra com uma plataforma externa que emite as apólices.
+-- produto_externo: código do produto na plataforma externa (preenchido quando a integração for ligada).
+CREATE TABLE IF NOT EXISTS seguros_tipos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  descricao TEXT,
+  icone TEXT NOT NULL DEFAULT 'seguro',
+  produto_externo TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  ordem INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL
+);
+
+-- Portfólio da empresa: quais tipos o master liberou para cada empresa ver e contratar.
+CREATE TABLE IF NOT EXISTS empresa_seguros (
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  tipo_id INTEGER NOT NULL REFERENCES seguros_tipos(id),
+  habilitado_em TEXT NOT NULL,
+  PRIMARY KEY (empresa_id, tipo_id)
+);
+
+-- Permissão por usuário: quais tipos cada operador pode contratar (o administrador da empresa define).
+-- O administrador (cliente) pode contratar todo o portfólio sem precisar de linha aqui.
+CREATE TABLE IF NOT EXISTS usuario_seguros (
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+  tipo_id INTEGER NOT NULL REFERENCES seguros_tipos(id),
+  liberado_em TEXT NOT NULL,
+  PRIMARY KEY (usuario_id, tipo_id)
+);
+
+-- Contratações (apólices). Nascem 'pendente' e seguem para a plataforma externa, que emite e devolve o número.
+CREATE TABLE IF NOT EXISTS seguros_contratacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  tipo_id INTEGER NOT NULL REFERENCES seguros_tipos(id),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  veiculo_id INTEGER REFERENCES veiculos(id),
+  motorista_id INTEGER REFERENCES motoristas(id),
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','enviada','emitida','recusada','cancelada')),
+  referencia_externa TEXT,
+  apolice_numero TEXT,
+  valor_centavos INTEGER,
+  dados TEXT,
+  observacao TEXT,
+  criada_em TEXT NOT NULL,
+  atualizada_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_seg_contr_empresa ON seguros_contratacoes(empresa_id, criada_em);
+CREATE INDEX IF NOT EXISTS idx_seg_contr_status ON seguros_contratacoes(status);
 `;
 
 const CONFIG_PADRAO = {
@@ -605,6 +655,19 @@ function abrir(arquivo = config.dbFile) {
   if (!db.prepare("SELECT 1 FROM usuarios WHERE perfil = 'master' LIMIT 1").get()) {
     db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, 'master', ?)")
       .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha), agora());
+  }
+
+  // Catálogo inicial de seguros (editável pelo master): 6 tipos. Só semeia se a tabela estiver vazia.
+  if (!db.prepare('SELECT 1 FROM seguros_tipos LIMIT 1').get()) {
+    const insSeg = db.prepare('INSERT INTO seguros_tipos (nome, descricao, icone, ativo, ordem, criado_em) VALUES (?, ?, ?, 1, ?, ?)');
+    [
+      ['Seguro de Guincho e Assistência 24h', 'Reboque, chaveiro, pane seca e socorro mecânico na estrada.', 'manutencao'],
+      ['Proteção de Renda', 'Renda garantida ao motorista em caso de afastamento ou imprevisto.', 'carteira'],
+      ['Seguro para Motorista de App', 'Cobertura para quem roda em aplicativo (Uber, 99, iFood).', 'motoristas'],
+      ['Seguro do Veículo', 'Cobertura do veículo rastreado: roubo, furto e colisão.', 'veiculos'],
+      ['Seguro de Acidentes Pessoais', 'Indenização por acidente com o motorista ou passageiros.', 'seguranca'],
+      ['Seguro de Vida', 'Amparo à família do motorista em caso de morte ou invalidez.', 'estrela'],
+    ].forEach(([nome, desc, ic], i) => insSeg.run(nome, desc, ic, i, agora()));
   }
   return db;
 }

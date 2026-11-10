@@ -12,6 +12,7 @@ import { TELAS_FROTA } from './frota.js';
 import { TELAS_AVISOS } from './avisos.js';
 import { montarAssistente } from './assistente.js';
 import { TELAS_DIARIO } from './diario.js';
+import { TELAS_SEGUROS, TELAS_SEGUROS_MASTER } from './seguros.js';
 import { iniciarCena } from './cena-entrada.js';
 import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 
@@ -29,6 +30,11 @@ const MENU_MASTER = [
   ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa geral', 'mapa'], ['empresas', 'Empresas', 'empresas'], ['financeiro', 'Financeiro', 'carteira', ['master']],
   ['rastreadores', 'Rastreadores', 'rastreadores'],
   ['usuarios', 'Permissões e usuários', 'usuarios', ['master']],
+  ['seguros', 'Seguros', 'seguro', ['master', 'suporte'], [
+    ['seguros-tipos', 'Tipos', 'seguro', 'Catálogo dos seguros oferecidos', ['master', 'suporte']],
+    ['seguros-empresas', 'Por empresa', 'empresas', 'O que cada empresa pode ver e contratar', ['master', 'suporte']],
+    ['seguros-contratacoes', 'Contratações', 'carteira', 'Pedidos de contratação e apólices', ['master', 'suporte']],
+  ]],
   ['configuracoes', 'Configurações', 'configuracoes', null, [
     ['configuracoes', 'Parâmetros', 'configuracoes', 'Nome da plataforma e regras do rastreamento', ['master']],
     ['comandos-gt06', 'Comandos GT06', 'comandos', 'Textos enviados aos rastreadores sem comandos próprios', ['master']],
@@ -62,6 +68,11 @@ const MENU_EMPRESA = [
     ['relatorios', 'Relatórios', 'relatorios', 'Por veículo e período, em planilha e PDF'],
     ['programados', 'Programados', 'historico', 'PDF pelo WhatsApp: diário, semanal, quinzenal e mensal'],
   ]],
+  ['seguros', 'Seguros', 'seguro', null, [
+    ['seguros', 'Contratar', 'seguro', 'Seguros disponíveis para a sua frota'],
+    ['seguros-contratacoes', 'Contratações', 'carteira', 'Pedidos de contratação e apólices'],
+    ['seguros-usuarios', 'Quem pode contratar', 'usuarios', 'Libere o que cada operador pode contratar', GESTOR],
+  ]],
   ['configuracoes', 'Configurações', 'configuracoes', null, [
     ['configuracoes', 'Geral', 'configuracoes', 'Alertas, horário de uso, custos, plano e usuários'],
     ['notificacoes', 'Notificações', 'alertas', 'Contatos do WhatsApp e o que cada um recebe'],
@@ -76,12 +87,14 @@ const SUBTITULOS_MASTER = {
   empresas: 'Clientes da plataforma, planos e limites.', financeiro: 'Valor mensal de cada cliente: mensalidade por veículo × veículos ativos.', rastreadores: 'Equipamentos cadastrados, estoque e instalação.',
   usuarios: 'Quem acessa a plataforma e o que cada perfil pode fazer.', diagnostico: 'Conexões dos equipamentos e mensagens recebidas.',
   configuracoes: 'Parâmetros, comandos GT06, WhatsApp, assistente, integrações, diagnóstico e atividades.', atividades: 'Registro das ações feitas no painel.',
+  seguros: 'Catálogo de seguros, portfólio de cada empresa e as contratações.',
 };
 const SUBTITULOS_EMPRESA = {
   dashboard: 'Resumo da frota, dos deslocamentos e dos alertas.', mapa: 'Última posição de cada veículo.', historico: 'Trajetos, paradas e viagens por período.',
   alertas: 'Ocorrências dos veículos e o que já foi tratado.', cercas: 'Áreas monitoradas: entrada, saída, horário e ação ao sair.',
   seguranca: 'Modo Roubo, estacionados, bloqueio programado e liberações.', frota: 'Veículos, motoristas, nota, custos, manutenção e equipamentos.',
   relatorios: 'Relatórios por período e os que chegam sozinhos pelo WhatsApp.', configuracoes: 'Preferências, avisos pelo WhatsApp, comandos e integrações.',
+  seguros: 'Seguros disponíveis para a sua frota, contratações e permissões.',
 };
 
 window.addEventListener('rastreador:sair', () => desenhar());
@@ -112,7 +125,9 @@ async function desenhar() {
     ({ empresaId, tela } = rota());
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
-  const telas = empresaId ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO } : TELAS_MASTER;
+  const telas = empresaId
+    ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO, ...TELAS_SEGUROS }
+    : { ...TELAS_MASTER, ...TELAS_SEGUROS_MASTER };
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
   const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp]) => permitido(sp));
   const item = menu.find(([k, , , perfis, subs]) => permitido(perfis) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));

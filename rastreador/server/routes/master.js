@@ -17,6 +17,7 @@ const { veiculosMapa, csv, reais, enviarCsv } = require('../lib/relatorios');
 const { hoje, somarDias } = require('../lib/datas');
 const zap = require('../lib/whatsapp');
 const notif = require('../lib/notificacoes');
+const seg = require('../lib/seguros');
 const v = require('../lib/validacao');
 
 const TIPOS = ['frota', 'pessoa', 'locadora'];
@@ -466,6 +467,47 @@ module.exports = (db, extras = {}) => {
           SUM(u.tokens_entrada) AS tokens_entrada, SUM(u.tokens_saida) AS tokens_saida
         FROM ia_uso u JOIN empresas e ON e.id = u.empresa_id WHERE u.data >= ? GROUP BY u.empresa_id ORDER BY mes DESC`).all(hoje(), hoje().slice(0, 8) + '01'),
     });
+  });
+
+  // ---------- Seguros: catálogo de tipos (master edita; suporte consulta) ----------
+  r.get('/seguros/tipos', (_req, res) => res.json(seg.catalogo(db, { todos: true })));
+  r.post('/seguros/tipos', soMaster, (req, res) => {
+    const t = seg.criarTipo(db, req.body);
+    registrar(db, req, 'seguro_tipo_criado', { id: t.id, nome: t.nome });
+    res.status(201).json(t);
+  });
+  r.put('/seguros/tipos/:id', soMaster, (req, res) => {
+    const t = seg.atualizarTipo(db, nid(req), req.body);
+    registrar(db, req, 'seguro_tipo_alterado', { id: t.id });
+    res.json(t);
+  });
+  r.delete('/seguros/tipos/:id', soMaster, (req, res) => {
+    seg.removerTipo(db, nid(req));
+    registrar(db, req, 'seguro_tipo_excluido', { id: nid(req) });
+    res.status(204).end();
+  });
+
+  // ---------- Seguros: portfólio por empresa (o que cada empresa pode oferecer) ----------
+  r.get('/empresas/:id/seguros', (req, res) => {
+    const e = empresa(nid(req));
+    res.json({ tipos: seg.catalogo(db, { todos: true }), habilitados: [...seg.idsPortfolio(db, e.id)] });
+  });
+  r.put('/empresas/:id/seguros', (req, res) => {
+    const e = empresa(nid(req));
+    const port = seg.definirPortfolio(db, e.id, req.body.tipos);
+    registrar(db, req, 'seguro_portfolio_definido', { total: port.length }, e.id);
+    res.json({ habilitados: port.map((t) => t.id) });
+  });
+
+  // ---------- Seguros: contratações de todas as empresas ----------
+  r.get('/seguros/contratacoes', (req, res) => res.json(seg.contratacoes(db, {
+    empresaId: req.query.empresa_id ? Number(req.query.empresa_id) : null,
+    status: req.query.status || null,
+  })));
+  r.patch('/seguros/contratacoes/:id', (req, res) => {
+    const c = seg.atualizarContratacao(db, nid(req), req.body);
+    registrar(db, req, 'seguro_contratacao_atualizada', { id: c.id, status: c.status }, c.empresa_id);
+    res.json(c);
   });
 
   return r;
