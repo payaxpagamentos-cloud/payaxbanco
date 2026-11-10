@@ -1280,3 +1280,8 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 .com-icone{ display: inline-flex; align-items: center; gap: 7px; }
 .com-icone svg{ width: 17px; height: 17px; flex: none; color: var(--azul); }
 .sub-cartao{ background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-top: 12px; box-shadow: none; }
+.seguro-card .seguro-preco{ font-size: 20px; font-weight: 800; color: var(--azul); margin-top: 2px; }
+.seguro-card .seguro-preco.sob-consulta{ font-size: 14px; font-weight: 600; color: var(--text-3); }
+.seguro-card .seguro-margem{ font-size: 11px; margin-top: -4px; }
+.campo-pct{ display: inline-flex; align-items: center; gap: 4px; }
+.campo-pct input{ text-align: right; }

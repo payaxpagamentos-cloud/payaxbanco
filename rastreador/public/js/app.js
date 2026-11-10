@@ -70,7 +70,8 @@ const MENU_EMPRESA = [
   ]],
   ['seguros', 'Seguros', 'seguro', null, [
     ['seguros', 'Contratar', 'seguro', 'Seguros disponíveis para a sua frota'],
-    ['seguros-contratacoes', 'Contratações', 'carteira', 'Pedidos de contratação e apólices'],
+    ['seguros-precos', 'Preços de revenda', 'carteira', 'Margem que a sua empresa cobra por seguro', GESTOR],
+    ['seguros-contratacoes', 'Contratações', 'relatorios', 'Pedidos de contratação e apólices'],
     ['seguros-usuarios', 'Quem pode contratar', 'usuarios', 'Libere o que cada operador pode contratar', GESTOR],
   ]],
   ['configuracoes', 'Configurações', 'configuracoes', null, [

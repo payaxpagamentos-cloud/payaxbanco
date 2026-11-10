@@ -563,15 +563,18 @@ CREATE TABLE IF NOT EXISTS seguros_tipos (
   descricao TEXT,
   icone TEXT NOT NULL DEFAULT 'seguro',
   produto_externo TEXT,
+  custo_centavos INTEGER,
   ativo INTEGER NOT NULL DEFAULT 1,
   ordem INTEGER NOT NULL DEFAULT 0,
   criado_em TEXT NOT NULL
 );
 
 -- Portfólio da empresa: quais tipos o master liberou para cada empresa ver e contratar.
+-- margem_percent: percentual de revenda que a empresa cobra sobre o custo (preço de venda = custo × (1 + margem/100)).
 CREATE TABLE IF NOT EXISTS empresa_seguros (
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
   tipo_id INTEGER NOT NULL REFERENCES seguros_tipos(id),
+  margem_percent REAL NOT NULL DEFAULT 0,
   habilitado_em TEXT NOT NULL,
   PRIMARY KEY (empresa_id, tipo_id)
 );
@@ -596,6 +599,8 @@ CREATE TABLE IF NOT EXISTS seguros_contratacoes (
   status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','enviada','emitida','recusada','cancelada')),
   referencia_externa TEXT,
   apolice_numero TEXT,
+  custo_centavos INTEGER,
+  margem_percent REAL,
   valor_centavos INTEGER,
   dados TEXT,
   observacao TEXT,
@@ -687,6 +692,9 @@ function migrar(db) {
     comandos: { rotulo: 'TEXT' },
     ocorrencias: { tipo: "TEXT NOT NULL DEFAULT 'roubo'", perseguicao: 'INTEGER NOT NULL DEFAULT 0' },
     ia_uso: { tokens_entrada: 'INTEGER NOT NULL DEFAULT 0', tokens_saida: 'INTEGER NOT NULL DEFAULT 0' },
+    seguros_tipos: { custo_centavos: 'INTEGER' },
+    empresa_seguros: { margem_percent: 'REAL NOT NULL DEFAULT 0' },
+    seguros_contratacoes: { custo_centavos: 'INTEGER', margem_percent: 'REAL' },
   };
   for (const [tabela, cols] of Object.entries(NOVAS)) {
     const tem = colunas(tabela);
