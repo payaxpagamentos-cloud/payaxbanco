@@ -32,13 +32,16 @@ function verificarExportadores(db) {
 
 /** Apaga o que passou da retenção (minuto: 8 dias; IP/hora: 400 dias; sessões: 400 dias, por padrão). */
 function limpar(db) {
-  for (const c of db.prepare('SELECT organizacao_id FROM organizacoes o JOIN ddos_config c ON c.organizacao_id = o.id').all()) {
+  for (const c of db.prepare('SELECT c.organizacao_id FROM organizacoes o JOIN ddos_config c ON c.organizacao_id = o.id').all()) {
     const cfg = mitigacao.configDdos(db, c.organizacao_id);
     const dias = (n) => new Date(Date.now() - n * 86400_000).toISOString();
     db.prepare('DELETE FROM trafego_minuto WHERE organizacao_id = ? AND minuto < ?').run(c.organizacao_id, dias(cfg.retencao_minuto_dias).slice(0, 16));
     db.prepare('DELETE FROM trafego_ip_hora WHERE organizacao_id = ? AND hora < ?').run(c.organizacao_id, dias(cfg.retencao_hora_dias).slice(0, 16));
     db.prepare('DELETE FROM sessoes_assinantes WHERE organizacao_id = ? AND fim IS NOT NULL AND fim < ?').run(c.organizacao_id, dias(cfg.retencao_sessoes_dias));
     db.prepare('DELETE FROM avisos_envios WHERE organizacao_id = ? AND criado_em < ?').run(c.organizacao_id, dias(90));
+    db.prepare('DELETE FROM trafego_tempo_real WHERE organizacao_id = ? AND em < ?').run(c.organizacao_id, new Date(Date.now() - 6 * 3600_000).toISOString());
+    db.prepare('DELETE FROM conteudo_minuto WHERE organizacao_id = ? AND minuto < ?').run(c.organizacao_id, dias(cfg.retencao_minuto_dias).slice(0, 16));
+    db.prepare('DELETE FROM conteudo_hora WHERE organizacao_id = ? AND hora < ?').run(c.organizacao_id, dias(cfg.retencao_hora_dias).slice(0, 16));
   }
 }
 

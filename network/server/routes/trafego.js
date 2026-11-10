@@ -11,6 +11,8 @@ const { lerIp, textoDe } = require('../lib/ip');
 const { cifrar } = require('../lib/cripto');
 const radius = require('../lib/radius');
 const { estadoFonte } = require('./ddos');
+const conteudo = require('../lib/conteudo');
+const { lerPrefixo } = require('../lib/ip');
 const v = require('../lib/validacao');
 
 const PAPEIS = ['borda', 'bras', 'core'];
@@ -192,6 +194,189 @@ module.exports = (db) => {
     db.prepare('UPDATE radius_nas SET nome = ?, ip = ?, ativo = ?, segredo_cifrado = ?, atualizado_em = ? WHERE id = ?').run(d.nome, d.ip, d.ativo, segredo, agora(), n.id);
     registrar(db, req, 'nas_alterado', { recurso: 'nas', recursoId: n.id, antes: { nome: n.nome, ip: n.ip, ativo: n.ativo }, depois: { ...d, segredo_alterado: Boolean(b.segredo) } });
     res.json(nasPublico(n.id));
+  });
+
+  // ---------------------------------------------------------------- Consumo em tempo real
+  /**
+   * Painel de consumo: somas de 5 s (até 6 h). Resolução: até 15 min, 5 s; até 1 h, 10 s; até 6 h, 1 min.
+   * Devolve séries de bits/s e pacotes/s por direção, protocolos (entrada), por grupo (entrada), o top de IPs agora e a capacidade.
+   */
+  r.get('/tempo-real', exigir('trafego.ver'), (req, res) => {
+    const minutos = v.inteiro(req.query.minutos ?? 15, 'o período', { min: 5, max: 360 });
+    const passo = minutos <= 15 ? 5 : minutos <= 60 ? 10 : 60;
+    const agoraMs = Date.now();
+    // Só blocos fechados: o bloco de 5 s em andamento (e o atraso da gravação) ficariam como queda falsa.
+    const fim = Math.floor(agoraMs / 5000) * 5000 - 5000;
+    const desde = new Date(fim - minutos * 60_000).toISOString();
+    const ate = new Date(fim).toISOString();
+    const grupoId = req.query.grupo_id ? Number(req.query.grupo_id) : null;
+    const fg = grupoId ? 'AND grupo_id = ?' : '';
+    const p = grupoId ? [req.org, desde, ate, grupoId] : [req.org, desde, ate];
+    const bloco = `CAST(strftime('%s', substr(em, 1, 19)) / ${passo} AS INTEGER) * ${passo}`;
+    const linhas = db.prepare(`SELECT ${bloco} AS b, direcao, SUM(bytes) AS bytes, SUM(pacotes) AS pacotes, SUM(fluxos) AS fluxos, SUM(bytes_tcp) AS tcp, SUM(bytes_udp) AS udp,
+      SUM(bytes_icmp) AS icmp FROM trafego_tempo_real WHERE organizacao_id = ? AND em >= ? AND em < ? ${fg} GROUP BY b, direcao ORDER BY b`).all(...p);
+    const pontos = new Map();
+    for (const l of linhas) {
+      const em = l.b * 1000;
+      if (!pontos.has(em)) pontos.set(em, { em, entrada_bps: 0, saida_bps: 0, entrada_pps: 0, saida_pps: 0, entrada_fps: 0, tcp_bps: 0, udp_bps: 0, icmp_bps: 0, outros_bps: 0 });
+      const x = pontos.get(em);
+      x[`${l.direcao}_bps`] = (l.bytes * 8) / passo;
+      x[`${l.direcao}_pps`] = l.pacotes / passo;
+      if (l.direcao === 'entrada') {
+        x.entrada_fps = l.fluxos / passo;
+        x.tcp_bps = (l.tcp * 8) / passo;
+        x.udp_bps = (l.udp * 8) / passo;
+        x.icmp_bps = (l.icmp * 8) / passo;
+        x.outros_bps = Math.max(0, ((l.bytes - l.tcp - l.udp - l.icmp) * 8) / passo);
+      }
+    }
+    const grupos = db.prepare(`SELECT ${bloco} AS b, t.grupo_id, g.nome, SUM(t.bytes) AS bytes FROM trafego_tempo_real t JOIN grupos_ip g ON g.id = t.grupo_id
+      WHERE t.organizacao_id = ? AND t.em >= ? AND t.em < ? AND t.direcao = 'entrada' GROUP BY b, t.grupo_id ORDER BY b`).all(req.org, desde, ate);
+    const porGrupo = new Map();
+    for (const l of grupos) {
+      if (!porGrupo.has(l.grupo_id)) porGrupo.set(l.grupo_id, { id: l.grupo_id, nome: l.nome, pontos: [] });
+      porGrupo.get(l.grupo_id).pontos.push([l.b * 1000, (l.bytes * 8) / passo]);
+    }
+    const verLogin = pode(req.usuario.perfil, 'assinantes.ver');
+    const top = db.prepare(`SELECT t.direcao, t.posicao, t.ip, t.bps, t.pps, t.atualizado_em, g.nome AS grupo_nome FROM trafego_top_atual t LEFT JOIN grupos_ip g ON g.id = t.grupo_id
+      WHERE t.organizacao_id = ? ORDER BY t.direcao, t.posicao`).all(req.org)
+      .map((x) => ({ ...x, login: verLogin ? radius.loginNoInstante(db, req.org, x.ip)?.login ?? null : undefined }));
+    const cfg = db.prepare('SELECT capacidade_bps FROM ddos_config WHERE organizacao_id = ?').get(req.org);
+    const lista = [...pontos.values()];
+    res.json({ minutos, passo_s: passo, gerado_em: agora(), ate, serie: lista, grupos: [...porGrupo.values()],
+      top: { entrada: top.filter((x) => x.direcao === 'entrada'), saida: top.filter((x) => x.direcao === 'saida'), atualizado_em: top[0]?.atualizado_em ?? null },
+      capacidade_bps: cfg?.capacidade_bps ?? null,
+      exportadores: db.prepare("SELECT nome, papel, ultimo_pacote, ativo FROM exportadores_fluxo WHERE organizacao_id = ? AND papel = 'borda'").all(req.org)
+        .map((e) => ({ ...e, estado: estadoFonte(e) })) });
+  });
+
+  // ---------------------------------------------------------------- Conteúdos
+  const nomeChave = (catalogo, nomesAsn) => (ch) => {
+    if (ch.startsWith('c:')) { const c = catalogo.get(Number(ch.slice(2))); return { nome: c?.nome ?? 'Conteúdo removido', categoria: c?.categoria ?? 'outros', catalogado: true }; }
+    if (ch.startsWith('as:')) { const asn = Number(ch.slice(3)); return { nome: `AS${asn}${nomesAsn.get(asn) ? ` · ${nomesAsn.get(asn)}` : ''}`, categoria: null, asn, catalogado: false }; }
+    return { nome: ch === 'outros' ? 'Outros (cauda longa)' : 'Sem identificação', categoria: null, catalogado: false };
+  };
+
+  /**
+   * Principais conteúdos no período: ranking, série empilhada dos 8 maiores, fluxo conteúdo → grupo de clientes,
+   * comparação com o período anterior e cobertura da identificação.
+   */
+  r.get('/conteudo', exigir('trafego.ver'), (req, res) => {
+    conteudo.garantirCatalogo(db, req.org);
+    const horas = periodo(req.query, 24, 24 * 90);
+    const direcao = v.opcao(req.query.direcao ?? 'entrada', 'a direção', ['entrada', 'saida']);
+    const porHora = horas > 48;
+    const tab = porHora ? 'conteudo_hora' : 'conteudo_minuto';
+    const col = porHora ? 'hora' : 'minuto';
+    const fmt = (ms) => (porHora ? `${new Date(ms).toISOString().slice(0, 13)}:00` : new Date(ms).toISOString().slice(0, 16));
+    const agoraMs = Date.now();
+    const desde = fmt(agoraMs - horas * 3600_000);
+    const antes = fmt(agoraMs - 2 * horas * 3600_000);
+    const catalogo = new Map(db.prepare('SELECT * FROM conteudos WHERE organizacao_id = ?').all(req.org).map((c) => [c.id, c]));
+    const ranking = db.prepare(`SELECT chave, SUM(bytes) AS bytes, SUM(pacotes) AS pacotes, SUM(fluxos) AS fluxos FROM ${tab}
+      WHERE organizacao_id = ? AND direcao = ? AND ${col} >= ? GROUP BY chave ORDER BY bytes DESC`).all(req.org, direcao, desde);
+    const anterior = new Map(db.prepare(`SELECT chave, SUM(bytes) AS bytes FROM ${tab} WHERE organizacao_id = ? AND direcao = ? AND ${col} >= ? AND ${col} < ? GROUP BY chave`)
+      .all(req.org, direcao, antes, desde).map((x) => [x.chave, x.bytes]));
+    // Só compara com o período anterior se houver dados desde o começo dele (senão a variação seria enganosa).
+    const primeiro = db.prepare(`SELECT MIN(${col}) AS m FROM ${tab} WHERE organizacao_id = ? AND direcao = ?`).get(req.org, direcao).m;
+    const comparavel = Boolean(primeiro && Date.parse(`${primeiro}${porHora ? '' : ':00'}Z`) <= agoraMs - 2 * horas * 3600_000 + horas * 360_000);
+    const asns = ranking.filter((x) => x.chave.startsWith('as:')).map((x) => Number(x.chave.slice(3)));
+    const nomesAsn = new Map(asns.length ? db.prepare(`SELECT asn, nome FROM asn_nomes WHERE asn IN (${asns.map(() => '?').join(',')})`).all(...asns).map((x) => [x.asn, x.nome]) : []);
+    const nome = nomeChave(catalogo, nomesAsn);
+    const total = ranking.reduce((s, x) => s + x.bytes, 0);
+    // Pico: maior minuto (ou hora) do conteúdo no período, em bits/s.
+    const seg = porHora ? 3600 : 60;
+    const picos = new Map(db.prepare(`SELECT chave, MAX(b) AS pico FROM (SELECT chave, ${col}, SUM(bytes) AS b FROM ${tab} WHERE organizacao_id = ? AND direcao = ? AND ${col} >= ?
+      GROUP BY chave, ${col}) GROUP BY chave`).all(req.org, direcao, desde).map((x) => [x.chave, (x.pico * 8) / seg]));
+    const itens = ranking.map((x, i) => ({ posicao: i + 1, chave: x.chave, ...nome(x.chave), bytes: x.bytes, pacotes: x.pacotes, fluxos: x.fluxos,
+      participacao: total ? x.bytes / total : 0, media_bps: (x.bytes * 8) / (horas * 3600), pico_bps: picos.get(x.chave) ?? 0,
+      anterior_bytes: anterior.get(x.chave) ?? 0, variacao: comparavel && anterior.get(x.chave) ? x.bytes / anterior.get(x.chave) - 1 : null }));
+    // Série empilhada: 8 maiores e "demais"
+    const principais = itens.filter((x) => x.chave !== 'outros' && x.chave !== 'desconhecido').slice(0, 8).map((x) => x.chave);
+    const passoMin = porHora ? (horas > 24 * 30 ? 24 * 60 : 60) : horas <= 6 ? 5 : 15;
+    const blocoSql = porHora ? `CAST(strftime('%s', hora || ':00') / ${passoMin * 60} AS INTEGER) * ${passoMin * 60}` : `CAST(strftime('%s', minuto || ':00') / ${passoMin * 60} AS INTEGER) * ${passoMin * 60}`;
+    const serie = new Map();
+    for (const l of db.prepare(`SELECT ${blocoSql} AS b, chave, SUM(bytes) AS bytes FROM ${tab} WHERE organizacao_id = ? AND direcao = ? AND ${col} >= ? GROUP BY b, chave`)
+      .all(req.org, direcao, desde)) {
+      const ch = principais.includes(l.chave) ? l.chave : 'demais';
+      if (!serie.has(l.b)) serie.set(l.b, {});
+      const x = serie.get(l.b);
+      x[ch] = (x[ch] ?? 0) + (l.bytes * 8) / (passoMin * 60);
+    }
+    const blocos = [...serie.keys()].sort((a, b) => a - b).filter((b) => (b + passoMin * 60) * 1000 <= agoraMs - 60_000);
+    const series = [...principais, 'demais'].map((ch) => ({ chave: ch, nome: ch === 'demais' ? 'Demais' : nome(ch).nome, pontos: blocos.map((b) => [b * 1000, serie.get(b)[ch] ?? 0]) }));
+    // Fluxo conteúdo → grupo de clientes
+    const fluxo = db.prepare(`SELECT t.chave, t.grupo_id, g.nome AS grupo_nome, SUM(t.bytes) AS bytes FROM ${tab} t LEFT JOIN grupos_ip g ON g.id = t.grupo_id
+      WHERE t.organizacao_id = ? AND t.direcao = ? AND t.${col} >= ? GROUP BY t.chave, t.grupo_id`).all(req.org, direcao, desde)
+      .map((x) => ({ origem: principais.includes(x.chave) ? x.chave : 'demais', origem_nome: principais.includes(x.chave) ? nome(x.chave).nome : 'Demais', grupo_id: x.grupo_id,
+        grupo_nome: x.grupo_nome ?? 'Sem grupo', bytes: x.bytes }))
+      .reduce((m, x) => { const k = `${x.origem}|${x.grupo_id}`; const y = m.get(k); if (y) y.bytes += x.bytes; else m.set(k, { ...x }); return m; }, new Map());
+    const identificado = itens.filter((x) => x.catalogado).reduce((s, x) => s + x.bytes, 0);
+    const comAsn = itens.filter((x) => x.asn).reduce((s, x) => s + x.bytes, 0);
+    const base = db.prepare('SELECT origem, faixas, importado_em FROM asn_base WHERE id = 1').get() ?? null;
+    res.json({ horas, direcao, passo_min: passoMin, total_bytes: total, comparavel, itens: itens.slice(0, 100), series, fluxo: [...fluxo.values()].sort((a, b) => b.bytes - a.bytes),
+      cobertura: { catalogo: total ? identificado / total : null, asn: total ? comAsn / total : null, desconhecido: total ? (itens.find((x) => x.chave === 'desconhecido')?.bytes ?? 0) / total : null },
+      base_asn: base, gerado_em: agora() });
+  });
+
+  // Catálogo de conteúdos
+  r.get('/conteudos', exigir('trafego.ver'), (req, res) => {
+    conteudo.garantirCatalogo(db, req.org);
+    const lista = db.prepare('SELECT * FROM conteudos WHERE organizacao_id = ? ORDER BY nome').all(req.org);
+    res.json({ categorias: conteudo.CATEGORIAS, base_asn: db.prepare('SELECT origem, faixas, importado_em FROM asn_base WHERE id = 1').get() ?? null,
+      itens: lista.map((c) => ({ ...c, regras: db.prepare('SELECT id, tipo, valor FROM conteudo_regras WHERE conteudo_id = ? ORDER BY tipo, valor').all(c.id) })) });
+  });
+  const conteudoDe = (req) => {
+    const c = db.prepare('SELECT * FROM conteudos WHERE id = ? AND organizacao_id = ?').get(Number(req.params.id), req.org);
+    if (!c) throw new ErroNegocio('Conteúdo não encontrado.', 404);
+    return c;
+  };
+  const regra = (req, conteudoId, b) => {
+    const tipo = v.opcao(b?.tipo, 'o tipo da regra', ['asn', 'prefixo']);
+    let valor;
+    if (tipo === 'asn') valor = String(v.inteiro(String(b.valor ?? '').replace(/^AS/i, ''), 'o ASN', { min: 1, max: 4294967295 }));
+    else {
+      const p0 = lerPrefixo(b.valor, { estrito: true });
+      if (!p0) throw new ErroNegocio('Prefixo inválido (ex.: 203.0.113.0/24, com os bits de host zerados).', 422);
+      valor = p0.texto;
+    }
+    const ja = db.prepare('SELECT c.nome FROM conteudo_regras r JOIN conteudos c ON c.id = r.conteudo_id WHERE r.organizacao_id = ? AND r.tipo = ? AND r.valor = ?').get(req.org, tipo, valor);
+    if (ja) throw new ErroNegocio(`${tipo === 'asn' ? `AS${valor}` : valor} já está em ${ja.nome}.`, 409);
+    db.prepare('INSERT INTO conteudo_regras (organizacao_id, conteudo_id, tipo, valor, criado_em) VALUES (?, ?, ?, ?, ?)').run(req.org, conteudoId, tipo, valor, agora());
+    return { tipo, valor };
+  };
+  r.post('/conteudos', exigir('ddos.configurar'), (req, res) => {
+    const b = req.body ?? {};
+    const t = agora();
+    const id = Number(db.prepare('INSERT INTO conteudos (organizacao_id, nome, categoria, criado_em, atualizado_em) VALUES (?, ?, ?, ?, ?)')
+      .run(req.org, v.texto(b.nome, 'o nome', 80), v.opcao(b.categoria ?? 'outros', 'a categoria', Object.keys(conteudo.CATEGORIAS)), t, t).lastInsertRowid);
+    for (const x of [].concat(b.regras ?? [])) regra(req, id, x);
+    registrar(db, req, 'conteudo_criado', { recurso: 'conteudo', recursoId: id, depois: b });
+    res.status(201).json(db.prepare('SELECT * FROM conteudos WHERE id = ?').get(id));
+  });
+  r.patch('/conteudos/:id', exigir('ddos.configurar'), (req, res) => {
+    const c = conteudoDe(req);
+    const b = req.body ?? {};
+    const d = { nome: b.nome !== undefined ? v.texto(b.nome, 'o nome', 80) : c.nome,
+      categoria: b.categoria !== undefined ? v.opcao(b.categoria, 'a categoria', Object.keys(conteudo.CATEGORIAS)) : c.categoria,
+      ativo: b.ativo !== undefined ? (v.booleano(b.ativo) ? 1 : 0) : c.ativo };
+    db.prepare('UPDATE conteudos SET nome = ?, categoria = ?, ativo = ?, atualizado_em = ? WHERE id = ?').run(d.nome, d.categoria, d.ativo, agora(), c.id);
+    registrar(db, req, 'conteudo_alterado', { recurso: 'conteudo', recursoId: c.id, antes: c, depois: d });
+    res.json(db.prepare('SELECT * FROM conteudos WHERE id = ?').get(c.id));
+  });
+  r.post('/conteudos/:id/regras', exigir('ddos.configurar'), (req, res) => {
+    const c = conteudoDe(req);
+    const x = regra(req, c.id, req.body);
+    registrar(db, req, 'conteudo_regra_incluida', { recurso: 'conteudo', recursoId: c.id, depois: x });
+    res.status(201).json(x);
+  });
+  r.post('/conteudos/:id/regras/:rid/remover', exigir('ddos.configurar'), (req, res) => {
+    const c = conteudoDe(req);
+    const x = db.prepare('SELECT * FROM conteudo_regras WHERE id = ? AND conteudo_id = ?').get(Number(req.params.rid), c.id);
+    if (!x) throw new ErroNegocio('Regra não encontrada.', 404);
+    db.prepare('DELETE FROM conteudo_regras WHERE id = ?').run(x.id);
+    registrar(db, req, 'conteudo_regra_removida', { recurso: 'conteudo', recursoId: c.id, antes: { tipo: x.tipo, valor: x.valor } });
+    res.json({ ok: true });
   });
 
   return r;

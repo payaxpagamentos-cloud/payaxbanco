@@ -382,6 +382,8 @@ module.exports = (db) => {
       retencao_minuto_dias: v.inteiro(b.retencao_minuto_dias ?? atual.retencao_minuto_dias, 'a retenção por minuto', { min: 1, max: 90 }),
       retencao_hora_dias: v.inteiro(b.retencao_hora_dias ?? atual.retencao_hora_dias, 'a retenção por hora', { min: 30, max: 1100 }),
       retencao_sessoes_dias: v.inteiro(b.retencao_sessoes_dias ?? atual.retencao_sessoes_dias, 'a retenção das sessões', { min: 366, max: 3650 }),
+      capacidade_bps: b.capacidade_bps !== undefined ? (b.capacidade_bps === null || b.capacidade_bps === '' ? null
+        : v.numero(b.capacidade_bps, 'a capacidade dos links', { min: 1e6, max: 1e13 })) : atual.capacidade_bps,
     };
     if (d.duracao_padrao_min > d.max_duracao_min) throw new ErroNegocio('A duração padrão não pode passar da duração máxima.', 422);
     if (d.flowspec_acao === 'rate-limit' && !d.flowspec_taxa_bps) throw new ErroNegocio('Informe a taxa do FlowSpec para limitar em vez de descartar.', 422);

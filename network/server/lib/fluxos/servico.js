@@ -14,6 +14,7 @@ const { Agregador } = require('./agregador');
 const { Detector } = require('./deteccao');
 const radius = require('../radius');
 const { decifrar } = require('../cripto');
+const { garantirCatalogo } = require('../conteudo');
 
 const semPrefixoV4 = (a) => (a.startsWith('::ffff:') ? a.slice(7) : a);
 
@@ -31,6 +32,8 @@ function iniciarColetorRede(db, { host = '0.0.0.0', portasFluxo = [], portaRadiu
 
   function recarregar() {
     ag.carregarGrupos(db);
+    for (const { organizacao_id: org } of db.prepare('SELECT DISTINCT organizacao_id FROM exportadores_fluxo').all()) garantirCatalogo(db, org);
+    ag.carregarConteudos(db);
     det.carregar();
     exportadores = new Map(db.prepare('SELECT * FROM exportadores_fluxo WHERE ativo = 1').all().map((e) => [e.ip, e]));
     nas = new Map(db.prepare('SELECT * FROM radius_nas WHERE ativo = 1').all().map((n) => {
@@ -123,7 +126,7 @@ function iniciarColetorRede(db, { host = '0.0.0.0', portasFluxo = [], portaRadiu
   })();
 
   if (lacos) {
-    timers.push(setInterval(proteger('detecção', () => det.avaliar(relogio())), 5000));
+    timers.push(setInterval(proteger('detecção', () => { det.avaliar(relogio()); ag.gravarTempoReal(db, relogio()); }), 5000));
     timers.push(setInterval(proteger('configuração', () => { gravarEstatisticas(); recarregar(); }), 10_000));
     timers.push(setInterval(proteger('memória', () => ag.limparOciosos(relogio())), 30_000));
     const proximoMinuto = 60_000 - (Date.now() % 60_000) + 200;
@@ -142,6 +145,7 @@ function iniciarColetorRede(db, { host = '0.0.0.0', portasFluxo = [], portaRadiu
     gravarEstatisticas,
     avaliar: () => det.avaliar(relogio()),
     gravar: () => ag.gravar(db, relogio()),
+    gravarTempoReal: () => ag.gravarTempoReal(db, relogio()),
     desconhecidos,
     fechar: () => { for (const t of timers) clearInterval(t); for (const s of sockets) s.close(); },
   };

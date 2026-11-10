@@ -1116,6 +1116,111 @@ CREATE INDEX idx_avisos_fila ON avisos_envios(status, proxima_tentativa);
 CREATE INDEX idx_avisos_org ON avisos_envios(organizacao_id, id DESC);
 `,
   },
+  {
+    versao: 3,
+    nome: 'consumo_conteudo',
+    sql: `
+-- ===================== Consumo em tempo real e conteúdos =====================
+-- Capacidade somada dos links de borda (para o medidor de uso). Vazio = medidor desligado.
+ALTER TABLE ddos_config ADD COLUMN capacidade_bps REAL;
+ALTER TABLE ddos_config ADD COLUMN conteudos_semeados INTEGER NOT NULL DEFAULT 0;
+
+-- Somas a cada 5 s por grupo e direção (painel em tempo real). Guardadas por 6 horas.
+CREATE TABLE trafego_tempo_real (
+  organizacao_id INTEGER NOT NULL,
+  em TEXT NOT NULL,
+  grupo_id INTEGER NOT NULL,
+  direcao TEXT NOT NULL,
+  bytes REAL NOT NULL,
+  pacotes REAL NOT NULL,
+  fluxos REAL NOT NULL,
+  bytes_tcp REAL NOT NULL DEFAULT 0,
+  bytes_udp REAL NOT NULL DEFAULT 0,
+  bytes_icmp REAL NOT NULL DEFAULT 0,
+  PRIMARY KEY (organizacao_id, em, grupo_id, direcao)
+) WITHOUT ROWID;
+
+-- Os 20 IPs com mais tráfego agora (média de 10 s), reescritos a cada 5 s pelo coletor.
+CREATE TABLE trafego_top_atual (
+  organizacao_id INTEGER NOT NULL,
+  direcao TEXT NOT NULL,
+  posicao INTEGER NOT NULL,
+  ip TEXT NOT NULL,
+  grupo_id INTEGER,
+  bps REAL NOT NULL,
+  pps REAL NOT NULL,
+  atualizado_em TEXT NOT NULL,
+  PRIMARY KEY (organizacao_id, direcao, posicao)
+) WITHOUT ROWID;
+
+-- Catálogo de conteúdos (Google/YouTube, Netflix, Meta...): reconhecidos pelo ASN ou por prefixos cadastrados.
+CREATE TABLE conteudos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nome TEXT NOT NULL,
+  categoria TEXT NOT NULL DEFAULT 'outros' CHECK (categoria IN ('video','redes_sociais','jogos','nuvem_cdn','musica','comunicacao','software','outros')),
+  ativo INTEGER NOT NULL DEFAULT 1,
+  padrao INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, nome)
+);
+CREATE TABLE conteudo_regras (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  conteudo_id INTEGER NOT NULL REFERENCES conteudos(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('asn','prefixo')),
+  valor TEXT NOT NULL,
+  criado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, tipo, valor)
+);
+
+-- Base pública IP → ASN (ex.: iptoasn.com), importada por scripts/importar-asn.js. Igual para todas as organizações.
+-- inicio/fim em hexadecimal de tamanho fixo (8 dígitos no IPv4, 32 no IPv6), para ordenar como texto.
+CREATE TABLE asn_faixas (
+  versao_ip INTEGER NOT NULL,
+  inicio TEXT NOT NULL,
+  fim TEXT NOT NULL,
+  asn INTEGER NOT NULL,
+  PRIMARY KEY (versao_ip, inicio)
+) WITHOUT ROWID;
+CREATE TABLE asn_nomes (
+  asn INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL,
+  pais TEXT
+);
+CREATE TABLE asn_base (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  origem TEXT NOT NULL,
+  faixas INTEGER NOT NULL,
+  importado_em TEXT NOT NULL
+);
+
+-- Consumo por conteúdo. chave: c:<id do conteúdo> | as:<ASN> | desconhecido | outros.
+CREATE TABLE conteudo_minuto (
+  organizacao_id INTEGER NOT NULL,
+  minuto TEXT NOT NULL,
+  chave TEXT NOT NULL,
+  direcao TEXT NOT NULL,
+  grupo_id INTEGER NOT NULL,
+  bytes REAL NOT NULL,
+  pacotes REAL NOT NULL,
+  fluxos REAL NOT NULL,
+  PRIMARY KEY (organizacao_id, minuto, chave, direcao, grupo_id)
+) WITHOUT ROWID;
+CREATE TABLE conteudo_hora (
+  organizacao_id INTEGER NOT NULL,
+  hora TEXT NOT NULL,
+  chave TEXT NOT NULL,
+  direcao TEXT NOT NULL,
+  grupo_id INTEGER NOT NULL,
+  bytes REAL NOT NULL,
+  pacotes REAL NOT NULL,
+  fluxos REAL NOT NULL,
+  PRIMARY KEY (organizacao_id, hora, chave, direcao, grupo_id)
+) WITHOUT ROWID;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

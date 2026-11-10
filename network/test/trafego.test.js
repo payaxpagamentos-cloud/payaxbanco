@@ -386,3 +386,82 @@ test('PDF: acentos em WinAnsi e estrutura válida', () => {
   const xref = Number(/startxref\n(\d+)/.exec(s)[1]);
   assert.equal(s.slice(xref, xref + 4), 'xref');
 });
+
+test('Consumo em tempo real e conteúdos: classificação por ASN, top do momento, ranking, fluxo e catálogo', async (t) => {
+  const api = await iniciar();
+  t.after(() => api.fechar());
+  const tk = await api.equipe();
+  const conteudo = require('../server/lib/conteudo');
+  const g = (await api.post('/ddos/grupos', { nome: 'Clientes', prefixos: ['203.0.113.0/24'] }, tk.noc)).dados;
+  await api.post('/trafego/exportadores', { nome: 'Borda', ip: '192.0.2.1', papel: 'borda' }, tk.noc);
+  conteudo.importarBase(api.db, ['198.18.0.0\t198.18.0.255\t15169\tUS\tGOOGLE', '198.18.9.0\t198.18.9.255\t64512\tZZ\tREGIONAL FICTICIO'], 'teste');
+  conteudo.garantirCatalogo(api.db, 1);
+  assert.equal(conteudo.garantirCatalogo(api.db, 1), false, 'catálogo criado uma vez só');
+  const ag = new Agregador();
+  ag.carregarGrupos(api.db);
+  ag.carregarConteudos(api.db);
+  const exp = { org: 1, papel: 'borda' };
+  const f = (src, dst, bytes, extra = {}) => ({ v: 4, src: ip.lerIp(src).n, dst: ip.lerIp(dst).n, sport: 443, dport: 50000, proto: 6, flags: 0x18, bytes, pkts: bytes / 1000, srcAs: 0, dstAs: 0, ...extra });
+  const T = Math.floor(Date.now() / 60_000) * 60_000 - 3 * 60_000;
+  ag.registrar(f('198.18.0.5', '203.0.113.10', 6e6), exp, T);              // Google pela base IP → ASN
+  ag.registrar(f('192.0.2.200', '203.0.113.11', 3e6, { srcAs: 2906 }), exp, T); // Netflix pelo ASN do flow
+  ag.registrar(f('198.18.9.9', '203.0.113.12', 1e6, { proto: 17 }), exp, T + 1000); // ASN fora do catálogo
+  ag.registrar(f('198.51.100.1', '203.0.113.12', 5e5), exp, T + 1000);      // sem ASN
+  ag.registrar(f('203.0.113.10', '198.18.0.5', 2e6), exp, T + 1000);        // upload para o Google
+  assert.ok(ag.gravarTempoReal(api.db, T + 6000) >= 2, 'blocos de 5 s fechados');
+  const top = api.db.prepare("SELECT ip, posicao, bps FROM trafego_top_atual WHERE direcao = 'entrada' ORDER BY posicao").all();
+  assert.equal(top[0].ip, '203.0.113.10');
+  assert.equal(top[0].bps, (6e6 * 8) / 10, 'média de 10 s');
+  ag.gravar(api.db, T + 60_000);
+  const ch = new Map(api.db.prepare("SELECT chave, SUM(bytes) AS b FROM conteudo_minuto WHERE direcao = 'entrada' GROUP BY chave").all().map((x) => [x.chave, x.b]));
+  const id = (n) => api.db.prepare('SELECT id FROM conteudos WHERE nome = ?').get(n).id;
+  assert.equal(ch.get(`c:${id('Google e YouTube')}`), 6e6);
+  assert.equal(ch.get(`c:${id('Netflix')}`), 3e6);
+  assert.equal(ch.get('as:64512'), 1e6);
+  assert.equal(ch.get('desconhecido'), 5e5);
+  assert.equal(api.db.prepare('SELECT SUM(bytes) AS b FROM conteudo_hora').get().b, 12.5e6, 'hora recebe o mesmo que o minuto');
+
+  // API de tempo real
+  const tr = (await api.get('/trafego/tempo-real?minutos=15', tk.consulta)).dados;
+  assert.equal(tr.passo_s, 5);
+  const ponto = tr.serie.find((p) => p.em === T);
+  assert.equal(ponto.entrada_bps, (10.5e6 * 8) / 5, 'os quatro flows de entrada caem no mesmo bloco de 5 s');
+  assert.equal(ponto.tcp_bps, (9.5e6 * 8) / 5);
+  assert.equal(ponto.udp_bps, (1e6 * 8) / 5);
+  assert.equal(tr.top.entrada[0].ip, '203.0.113.10');
+  assert.equal(tr.top.entrada[0].login, undefined, 'consulta não vê login');
+  assert.equal(tr.grupos[0].nome, 'Clientes');
+  assert.equal((await api.get('/trafego/tempo-real?minutos=500', tk.noc)).status, 422);
+  const cfg = (await api.get('/ddos/config', tk.noc)).dados;
+  assert.equal((await api.put('/ddos/config', { versao: cfg.versao, capacidade_bps: 20e9 }, tk.noc)).dados.capacidade_bps, 20e9);
+  assert.equal((await api.get('/trafego/tempo-real', tk.noc)).dados.capacidade_bps, 20e9);
+
+  // Ranking de conteúdos
+  const r = (await api.get('/trafego/conteudo?horas=1', tk.consulta)).dados;
+  assert.deepEqual(r.itens.map((x) => x.nome), ['Google e YouTube', 'Netflix', 'AS64512 · REGIONAL FICTICIO', 'Sem identificação']);
+  assert.equal(r.itens[0].participacao, 6e6 / 10.5e6);
+  assert.equal(r.itens[0].pico_bps, (6e6 * 8) / 60);
+  assert.equal(r.cobertura.catalogo, 9e6 / 10.5e6);
+  assert.equal(r.base_asn.faixas, 2);
+  assert.deepEqual(r.fluxo.map((x) => [x.origem_nome, x.grupo_nome]).slice(0, 1), [['Google e YouTube', 'Clientes']]);
+  assert.ok(r.series.some((s) => s.nome === 'Netflix'));
+  const up = (await api.get('/trafego/conteudo?horas=1&direcao=saida', tk.noc)).dados;
+  assert.equal(up.itens[0].nome, 'Google e YouTube');
+
+  // Catálogo: regras únicas, permissões e reclassificação
+  assert.equal((await api.post(`/trafego/conteudos/${id('Netflix')}/regras`, { tipo: 'asn', valor: '15169' }, tk.noc)).status, 409, 'ASN já está em outro conteúdo');
+  assert.equal((await api.post('/trafego/conteudos', { nome: 'Regional', regras: [{ tipo: 'asn', valor: 'AS64512' }] }, tk.consulta)).status, 403);
+  const novo = await api.post('/trafego/conteudos', { nome: 'Jogos regionais', categoria: 'jogos', regras: [{ tipo: 'asn', valor: 'AS64512' }] }, tk.noc);
+  assert.equal(novo.status, 201);
+  assert.equal((await api.post(`/trafego/conteudos/${novo.dados.id}/regras`, { tipo: 'prefixo', valor: '198.51.100.5/24' }, tk.noc)).status, 422);
+  assert.equal((await api.post(`/trafego/conteudos/${novo.dados.id}/regras`, { tipo: 'prefixo', valor: '198.51.100.0/24' }, tk.noc)).status, 201);
+  ag.carregarConteudos(api.db);
+  const chave = (src, as = 0) => ag.classificador.classificar(1, 4, ip.lerIp(src).n, as);
+  assert.equal(chave('198.18.9.1'), `c:${novo.dados.id}`);
+  assert.equal(chave('198.51.100.1'), `c:${novo.dados.id}`, 'prefixo cadastrado');
+  assert.equal(chave('198.18.0.1', 2906), `c:${id('Netflix')}`, 'ASN do flow vale mais que a base');
+  const cat = (await api.get('/trafego/conteudos', tk.consulta)).dados;
+  assert.equal(cat.itens.find((x) => x.nome === 'Jogos regionais').regras.length, 2);
+  assert.equal((await api.get('/trafego/conteudo', await api.outraOrganizacao())).dados.total_bytes, 0, 'isolamento');
+  assert.equal(g.nome, 'Clientes');
+});

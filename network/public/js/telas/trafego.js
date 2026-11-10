@@ -1,6 +1,7 @@
 import { api, qs, baixar } from '../api.js';
 import { el, limpar, icone, pode, cabecalho, painel, tabela, carregar, carregando, faixa, stat, vazio, dataHora, hora, bits, pacotes, bytes, etqDe } from '../ui.js';
 import { graficoLinhas } from '../grafico.js';
+import { navTrafego } from '../nav-trafego.js';
 
 const PERIODOS = [[1, '1 h'], [6, '6 h'], [24, '24 h'], [168, '7 dias'], [720, '30 dias']];
 const formatoX = (horas) => (t) => (horas <= 24 ? new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -15,7 +16,7 @@ export default async function trafego({ alvo, params, query, ir, aoSair }) {
   let timer = null;
   aoSair(() => clearInterval(timer));
   limpar(alvo, cabecalho({ sobretitulo: 'Tráfego e segurança', titulo: 'Tráfego da rede',
-    descricao: 'Entrada e saída dos blocos protegidos, medidas pelos flows dos roteadores de borda. Volumes são estimativas pela taxa de amostragem.' }), filtros, corpo);
+    descricao: 'Entrada e saída dos blocos protegidos, medidas pelos flows dos roteadores de borda. Volumes são estimativas pela taxa de amostragem.' }), navTrafego('trafego'), filtros, corpo);
 
   const grupos = await api.get('/ddos/grupos').catch(() => []);
   const desenharFiltros = () => {

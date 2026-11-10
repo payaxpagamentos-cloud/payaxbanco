@@ -13,12 +13,16 @@
  */
 
 const { TabelaPrefixos, ipTexto } = require('../ip');
+const { Classificador } = require('../conteudo');
 
 const M = { bytes: 0, pkts: 1, fluxos: 2, bytes_tcp: 3, bytes_udp: 4, pkts_icmp: 5, pkts_syn: 6 };
 const K = 7;
 const SEG = 60;
 const MAX_CAPTURA = 20_000;
 const OCIOSO_S = 180;
+const BLOCO_MS = 5000;
+const MAX_CONTEUDOS = 300;
+const TOP = 20;
 
 /** Métricas dos limites → como calcular a partir das somas de uma janela. */
 const METRICAS = {
@@ -103,8 +107,14 @@ class Agregador {
     this.contadores = new Map(); // chave → Contador
     this.minuto = new Map(); // 'org|grupo|dir' → [bytes, pkts, fluxos, tcp, udp]
     this.minutoAtual = null;
+    this.tempoReal = new Map(); // 'bloco|org|grupo|dir' → [bytes, pkts, fluxos, tcp, udp, icmp]
+    this.conteudo = new Map(); // 'org|chave|dir|grupo' → [bytes, pkts, fluxos]
+    this.classificador = new Classificador();
     this.estatisticas = { fluxos: 0, ignorados: 0, internos: 0 };
   }
+
+  /** Recarrega o catálogo de conteúdos e a base IP → ASN. */
+  carregarConteudos(db) { this.classificador.carregar(db); }
 
   /** Recarrega os grupos de IPs (chamado no início e periodicamente). */
   carregarGrupos(db) {
@@ -157,7 +167,66 @@ class Agregador {
     if (!mm) { mm = [0, 0, 0, 0, 0]; this.minuto.set(km, mm); }
     mm[0] += f.bytes; mm[1] += f.pkts; mm[2] += 1;
     if (f.proto === 6) mm[3] += f.bytes; else if (f.proto === 17) mm[4] += f.bytes;
+    // soma de 5 s (painel em tempo real)
+    const kt = `${Math.floor(agoraMs / BLOCO_MS) * BLOCO_MS}|${km}`;
+    let tr = this.tempoReal.get(kt);
+    if (!tr) { tr = [0, 0, 0, 0, 0, 0]; this.tempoReal.set(kt, tr); }
+    tr[0] += f.bytes; tr[1] += f.pkts; tr[2] += 1;
+    if (f.proto === 6) tr[3] += f.bytes; else if (f.proto === 17) tr[4] += f.bytes; else if (f.proto === 1 || f.proto === 58) tr[5] += f.bytes;
+    // conteúdo do lado remoto
+    const chave = this.classificador.classificar(exp.org, v, outro, dir === 'entrada' ? f.srcAs : f.dstAs);
+    const kc = `${exp.org}|${chave}|${dir}|${grupo}`;
+    let cc = this.conteudo.get(kc);
+    if (!cc) { cc = [0, 0, 0]; this.conteudo.set(kc, cc); }
+    cc[0] += f.bytes; cc[1] += f.pkts; cc[2] += 1;
     return dir;
+  }
+
+  /**
+   * Grava os blocos de 5 s já fechados e o top 20 de IPs do momento (média de 10 s). Chamado a cada 5 s.
+   */
+  gravarTempoReal(db, agoraMs) {
+    const atual = Math.floor(agoraMs / BLOCO_MS) * BLOCO_MS;
+    const ins = db.prepare(`INSERT INTO trafego_tempo_real (organizacao_id, em, grupo_id, direcao, bytes, pacotes, fluxos, bytes_tcp, bytes_udp, bytes_icmp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO UPDATE SET bytes = bytes + excluded.bytes, pacotes = pacotes + excluded.pacotes, fluxos = fluxos + excluded.fluxos,
+      bytes_tcp = bytes_tcp + excluded.bytes_tcp, bytes_udp = bytes_udp + excluded.bytes_udp, bytes_icmp = bytes_icmp + excluded.bytes_icmp`);
+    const fimSeg = Math.floor(agoraMs / 1000) - 1;
+    const tops = new Map(); // 'org|dir' → [{ ip, grupo, bps, pps }]
+    for (const c of this.contadores.values()) {
+      if (c.escopo !== 'ip') continue;
+      const bps = c.taxa('bps', 10, fimSeg);
+      if (!bps) continue;
+      const k = `${c.org}|${c.dir}`;
+      if (!tops.has(k)) tops.set(k, []);
+      tops.get(k).push({ ip: c.texto, grupo: c.grupoId, bps, pps: c.taxa('pps', 10, fimSeg) });
+    }
+    const orgs = new Set([...this.orgs.keys()]);
+    let n = 0;
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      for (const [k, x] of this.tempoReal) {
+        const [bloco, org, grupo, dir] = k.split('|');
+        if (Number(bloco) >= atual) continue;
+        ins.run(Number(org), new Date(Number(bloco)).toISOString(), Number(grupo), dir, ...x);
+        this.tempoReal.delete(k);
+        n++;
+      }
+      const t = new Date(agoraMs).toISOString();
+      for (const org of orgs) {
+        db.prepare('DELETE FROM trafego_top_atual WHERE organizacao_id = ?').run(org);
+        for (const dir of ['entrada', 'saida']) {
+          (tops.get(`${org}|${dir}`) ?? []).sort((a, b) => b.bps - a.bps).slice(0, TOP).forEach((x, i) => {
+            db.prepare('INSERT INTO trafego_top_atual (organizacao_id, direcao, posicao, ip, grupo_id, bps, pps, atualizado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+              .run(org, dir, i + 1, x.ip, x.grupo, x.bps, x.pps, t);
+          });
+        }
+      }
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
+    return n;
   }
 
   /** Grava as somas do minuto e as somas por IP/hora. Retorna o número de linhas gravadas. */
@@ -183,13 +252,50 @@ class Agregador {
         c.hora = [0, 0, 0];
         n++;
       }
+      n += this.gravarConteudo(db, minuto, hora);
       db.exec('COMMIT');
     } catch (err) {
       db.exec('ROLLBACK');
       throw err;
     }
     this.minuto.clear();
+    this.conteudo.clear();
     return n;
+  }
+
+  /** Conteúdos do minuto: até 300 chaves por organização e direção; o resto entra em "outros". */
+  gravarConteudo(db, minuto, hora) {
+    const sql = (tabela, col) => db.prepare(`INSERT INTO ${tabela} (organizacao_id, ${col}, chave, direcao, grupo_id, bytes, pacotes, fluxos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT DO UPDATE SET bytes = bytes + excluded.bytes, pacotes = pacotes + excluded.pacotes, fluxos = fluxos + excluded.fluxos`);
+    const insMin = sql('conteudo_minuto', 'minuto');
+    const insHora = sql('conteudo_hora', 'hora');
+    const porGrupo = new Map(); // 'org|dir' → Map(chave → total)
+    for (const [k, x] of this.conteudo) {
+      const [org, chave, dir] = k.split('|');
+      const g = `${org}|${dir}`;
+      if (!porGrupo.has(g)) porGrupo.set(g, new Map());
+      const m = porGrupo.get(g);
+      m.set(chave, (m.get(chave) ?? 0) + x[0]);
+    }
+    const manter = new Set();
+    for (const [g, m] of porGrupo) {
+      [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, MAX_CONTEUDOS).forEach(([chave]) => manter.add(`${g}|${chave}`));
+    }
+    const final = new Map();
+    for (const [k, x] of this.conteudo) {
+      const [org, chave, dir, grupo] = k.split('|');
+      const ch = manter.has(`${org}|${dir}|${chave}`) ? chave : 'outros';
+      const kk = `${org}|${ch}|${dir}|${grupo}`;
+      const y = final.get(kk) ?? [0, 0, 0];
+      y[0] += x[0]; y[1] += x[1]; y[2] += x[2];
+      final.set(kk, y);
+    }
+    for (const [k, x] of final) {
+      const [org, chave, dir, grupo] = k.split('|');
+      insMin.run(Number(org), minuto, chave, dir, Number(grupo), ...x);
+      insHora.run(Number(org), hora, chave, dir, Number(grupo), ...x);
+    }
+    return final.size;
   }
 
   /** Remove da memória quem não tem tráfego há 3 minutos e não está em suspeita nem em ataque. */

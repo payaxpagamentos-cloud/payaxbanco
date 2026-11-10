@@ -7,6 +7,15 @@
  */
 
 const { agora, proximoNumero } = require('./db');
+const conteudo = require('./lib/conteudo');
+
+// Participação de cada conteúdo no download (soma 1). Netflix e Google crescem à noite; software e jogos de dia.
+const MIX = [['Google e YouTube', 0.31], ['Netflix', 0.2], ['Meta (Facebook, Instagram, WhatsApp)', 0.12], ['Akamai', 0.07], ['Amazon (AWS e Prime Video)', 0.06],
+  ['TikTok', 0.05], ['Cloudflare', 0.04], ['Microsoft (Xbox, Office, Azure)', 0.03], ['Apple', 0.02], ['Valve (Steam)', 0.02], ['as:64512', 0.03], ['as:64513', 0.02], ['desconhecido', 0.03]];
+// Faixas fictícias do simulador (198.18.0.0/15, RFC 2544) ligadas a ASNs, para a tela Conteúdo funcionar ao vivo na demonstração.
+const BASE_DEMO = [['198.18.0.0', '198.18.0.255', 15169, 'GOOGLE'], ['198.18.1.0', '198.18.1.255', 2906, 'NETFLIX'], ['198.18.2.0', '198.18.2.255', 32934, 'FACEBOOK'],
+  ['198.18.3.0', '198.18.3.255', 20940, 'AKAMAI'], ['198.18.4.0', '198.18.4.255', 13335, 'CLOUDFLARENET'], ['198.18.5.0', '198.18.5.255', 396986, 'BYTEDANCE'],
+  ['198.18.6.0', '198.18.6.255', 64512, 'PROVEDOR REGIONAL FICTICIO']];
 
 const LOGINS = ['ana.souza', 'bruno.lima', 'carla.mendes', 'diego.alves', 'elaine.rocha', 'fabio.nunes', 'gabriela.reis', 'heitor.campos', 'iris.moura', 'joao.pereira',
   'karina.dias', 'leandro.vaz', 'marcia.teles', 'nicolas.freitas', 'olivia.prado', 'paulo.barros', 'quiteria.luz', 'rodrigo.paz', 'sabrina.cruz', 'tiago.melo',
@@ -74,6 +83,71 @@ async function demoTrafego(db, org, post) {
     const fim1 = new Date(agoraMs - (1 + (i % 2)) * 86400_000 - i * 600_000).toISOString();
     insSessao.run(org, login, ip, v6, `D-${1000 + i}`, mac, `ether1/vlan${100 + (i % 4)}`, ini1, fim1, fim1, 9.1e9 * peso, 1.1e9 * peso, i % 5 === 0 ? 'Perda de portadora' : 'Pedido do usuário');
     if (i !== 7) insSessao.run(org, login, ip, v6, `D-${2000 + i}`, mac, `ether1/vlan${100 + (i % 4)}`, fim1, null, t, 4.2e9 * peso, 0.5e9 * peso, null);
+  });
+  db.exec('COMMIT');
+
+  // Conteúdos, consumo em tempo real e capacidade (fictícios)
+  conteudo.garantirCatalogo(db, org);
+  if (!db.prepare('SELECT 1 FROM asn_base WHERE id = 1').get()) {
+    conteudo.importarBase(db, BASE_DEMO.map((x) => `${x[0]}\t${x[1]}\t${x[2]}\tZZ\t${x[3]}`), 'demonstração (faixas fictícias 198.18.0.0/15)');
+    db.prepare("INSERT OR REPLACE INTO asn_nomes (asn, nome, pais) VALUES (64513, 'JOGOS ONLINE FICTICIO', 'ZZ')").run();
+  }
+  db.prepare('UPDATE ddos_config SET capacidade_bps = 10e9 WHERE organizacao_id = ?').run(org);
+  const ids = new Map(db.prepare('SELECT id, nome FROM conteudos WHERE organizacao_id = ?').all(org).map((c) => [c.nome, c.id]));
+  const chaves = MIX.map(([n, p]) => [n.startsWith('as:') || n === 'desconhecido' ? n : `c:${ids.get(n)}`, p, n]);
+  const peso = (n, ms) => {
+    const h = ((new Date(ms).getUTCHours() - 3 + 24) % 24);
+    const noite = h >= 19 || h <= 1;
+    if (n === 'Netflix' || n === 'Google e YouTube') return noite ? 1.15 : 0.9;
+    if (n.startsWith('Microsoft') || n.startsWith('Apple') || n.startsWith('Valve')) return noite ? 0.7 : 1.4;
+    return 1;
+  };
+  const insCm = db.prepare(`INSERT OR REPLACE INTO conteudo_minuto (organizacao_id, minuto, chave, direcao, grupo_id, bytes, pacotes, fluxos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+  const insCh = db.prepare(`INSERT INTO conteudo_hora (organizacao_id, hora, chave, direcao, grupo_id, bytes, pacotes, fluxos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT DO UPDATE SET bytes = bytes + excluded.bytes, pacotes = pacotes + excluded.pacotes, fluxos = fluxos + excluded.fluxos`);
+  const insTr = db.prepare(`INSERT OR REPLACE INTO trafego_tempo_real (organizacao_id, em, grupo_id, direcao, bytes, pacotes, fluxos, bytes_tcp, bytes_udp, bytes_icmp)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  db.exec('BEGIN');
+  const minutos = db.prepare(`SELECT minuto, grupo_id, direcao, bytes FROM trafego_minuto WHERE organizacao_id = ?`).all(org);
+  for (const m of minutos) {
+    const ms = Date.parse(`${m.minuto}:00Z`);
+    const pesos = chaves.map(([, p, n]) => p * peso(n, ms));
+    const soma = pesos.reduce((a, b) => a + b, 0);
+    chaves.forEach(([ch], i) => {
+      const b = (m.bytes * pesos[i]) / soma;
+      insCm.run(org, m.minuto, ch, m.direcao, m.grupo_id, b, b / 1100, b / 90_000);
+    });
+  }
+  // Por hora: 7 dias (as últimas 24 h repetem a soma por minuto; antes disso, a mesma curva).
+  for (let h = 7 * 24; h >= 1; h--) {
+    const ms = agoraMs - h * 3600_000;
+    const hora = `${new Date(ms).toISOString().slice(0, 13)}:00`;
+    for (const [gid, pico] of grupos) {
+      for (const dir of ['entrada', 'saida']) {
+        const total = ((pico * curva(ms) * 3600) / 8) * (dir === 'saida' ? (gid === serv.id ? 1.4 : 0.12) : 1);
+        const pesos = chaves.map(([, p, n]) => p * peso(n, ms));
+        const soma = pesos.reduce((a, b) => a + b, 0);
+        chaves.forEach(([ch], i) => { const b = (total * pesos[i]) / soma; insCh.run(org, hora, ch, dir, gid, b, b / 1100, b / 90_000); });
+      }
+    }
+  }
+  // Tempo real: últimas 6 h em blocos de 5 s
+  for (let k = 6 * 720; k >= 2; k--) {
+    const ms = Math.floor(agoraMs / 5000) * 5000 - k * 5000;
+    for (const [gid, pico] of grupos) {
+      const ruido = 0.85 + Math.random() * 0.3;
+      const entrada = (pico * curva(ms) * ruido * 5) / 8;
+      const saida = entrada * (gid === serv.id ? 1.4 : 0.12);
+      insTr.run(org, new Date(ms).toISOString(), gid, 'entrada', entrada, entrada / 1100, entrada / 90_000, entrada * 0.71, entrada * 0.26, entrada * 0.004);
+      insTr.run(org, new Date(ms).toISOString(), gid, 'saida', saida, saida / 400, saida / 30_000, saida * 0.8, saida * 0.18, saida * 0.003);
+    }
+  }
+  const insTop = db.prepare('INSERT OR REPLACE INTO trafego_top_atual (organizacao_id, direcao, posicao, ip, grupo_id, bps, pps, atualizado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  LOGINS.slice(0, 12).forEach((_, i) => {
+    const ip = i < 5 ? `198.51.100.${45 + i}` : `203.0.113.${10 + i * 3}`;
+    const bps = (i < 5 ? 180e6 : 95e6) / (1 + i * 0.35);
+    insTop.run(org, 'entrada', i + 1, ip, i < 5 ? corp.id : res.id, bps, bps / 9000, t);
+    insTop.run(org, 'saida', i + 1, ip, i < 5 ? corp.id : res.id, bps * 0.11, (bps * 0.11) / 3000, t);
   });
   db.exec('COMMIT');
 

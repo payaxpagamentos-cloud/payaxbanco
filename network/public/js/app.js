@@ -11,7 +11,9 @@ const MENU = [
     ['equipe', 'Equipe e comissões', 'equipe', ['equipe.ver', 'comissoes.ver'], () => import('./telas/equipe.js')],
   ]],
   ['Tráfego e segurança', [
-    ['trafego', 'Tráfego', 'grafico', 'trafego.ver', () => import('./telas/trafego.js')],
+    ['trafego', 'Tráfego da rede', 'grafico', 'trafego.ver', () => import('./telas/trafego.js')],
+    ['consumo', 'Consumo', 'atividade', 'trafego.ver', () => import('./telas/consumo.js'), true],
+    ['conteudo', 'Conteúdo', 'camadas', 'trafego.ver', () => import('./telas/conteudo.js'), true],
     ['ddos', 'Anti-DDoS', 'escudo', 'ddos.ver', () => import('./telas/ddos.js')],
     ['assinantes', 'Assinantes', 'pino', 'assinantes.ver', () => import('./telas/assinantes.js')],
   ]],
@@ -86,8 +88,8 @@ function estrutura(rota, principal) {
   for (const [grupo, itens] of MENU) {
     const vis = itens.filter(([, , , perm]) => permitido(perm));
     if (!vis.length) continue;
-    menu.append(el('div', { class: 'grupo-menu' }, grupo), el('nav', { 'aria-label': grupo }, vis.map(([r, rot, ic]) =>
-      el('a', { class: `link-menu${r === rota ? ' ativo' : ''}`, href: `#/${r}`, 'aria-current': r === rota ? 'page' : null, onclick: () => alternarMenu(false) }, icone(ic), rot))));
+    menu.append(el('div', { class: 'grupo-menu' }, grupo), el('nav', { 'aria-label': grupo }, vis.map(([r, rot, ic, , , sub]) =>
+      el('a', { class: `link-menu${sub ? ' sub' : ''}${r === rota ? ' ativo' : ''}`, href: `#/${r}`, 'aria-current': r === rota ? 'page' : null, onclick: () => alternarMenu(false) }, icone(ic), rot))));
   }
   menu.append(el('div', { class: 'menu-rodape' },
     u.demonstracao ? el('div', { class: 'selo-demo' }, 'Ambiente demonstrativo', el('small', {}, 'Dados fictícios, separados da operação real')) : null,

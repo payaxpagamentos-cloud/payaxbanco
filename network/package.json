@@ -16,7 +16,8 @@
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
     "coletor": "node scripts/coletor-exemplo.js",
     "coletor-rede": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/coletor-rede.js",
-    "simulador": "node scripts/simulador-fluxos.js"
+    "simulador": "node scripts/simulador-fluxos.js",
+    "importar-asn": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/importar-asn.js"
   },
   "dependencies": {
     "express": "^5.2.1",

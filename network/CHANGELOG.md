@@ -1,5 +1,16 @@
 # Changelog — Manager Network
 
+## Tráfego da rede · Consumo e Conteúdo (2026-11)
+
+- **Tráfego da rede** ganha os submenus **Consumo** e **Conteúdo** (também como abas na tela).
+- **Consumo**: painel em tempo real no estilo Grafana, com somas de 5 s gravadas pelo coletor (guardadas por 6 h), minigráficos, medidor de uso da
+  capacidade, protocolos empilhados, entrada por grupo, pacotes/s e os 20 IPs com mais tráfego agora (média de 10 s). Legenda clicável isola a série.
+- **Conteúdo**: cada flow é ligado ao conteúdo pelo prefixo do catálogo, pelo ASN exportado pelo roteador ou pela base IP → ASN (`npm run importar-asn`).
+  Ranking, série empilhada, diagrama de fluxo conteúdo → clientes, comparação com o período anterior (só com histórico suficiente) e catálogo editável.
+- Capacidade dos links de borda na configuração do Anti-DDoS (`capacidade_bps`).
+- Migração 3 (`consumo_conteudo`). Demonstração "Conecta Fibra" com consumo e conteúdos fictícios; o simulador manda tráfego de redes de conteúdo
+  fictícias (198.18.0.0/15) e upload.
+
 ## Etapa 0 · Base de tráfego e Anti-DDoS (2026-11)
 
 - **Coletor de rede** (`npm run coletor-rede`): NetFlow v5, NetFlow v9, IPFIX e sFlow v5 por UDP, com amostragem (do pacote ou do cadastro),

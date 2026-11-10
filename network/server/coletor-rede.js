@@ -19,6 +19,6 @@ coletor.pronto.then((p) => {
   console.error(`[Network] Coletor de rede não iniciou: ${err.message}. Portas abaixo de 1024 exigem permissão; confira se outra aplicação já usa a porta.`);
   process.exit(1);
 });
-const sair = () => { try { coletor.gravarEstatisticas(); coletor.gravar(); } catch { /* encerrando */ } coletor.fechar(); db.close(); process.exit(0); };
+const sair = () => { try { coletor.gravarEstatisticas(); coletor.gravarTempoReal(); coletor.gravar(); } catch { /* encerrando */ } coletor.fechar(); db.close(); process.exit(0); };
 process.on('SIGINT', sair);
 process.on('SIGTERM', sair);

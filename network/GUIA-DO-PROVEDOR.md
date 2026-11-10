@@ -60,7 +60,20 @@ Em **Fontes e avisos → Avisos** (só administrador):
 
 Use **Testar** depois de salvar. Falhas aparecem em "Últimos envios" com o erro e o ID.
 
-## 7. Testar sem a rede real
+## 7. Consumo e Conteúdo
+
+- **Consumo** (Tráfego da rede → Consumo): painel ao vivo. Clique em **Informar capacidade** e digite a soma dos links de borda (ex.: 2 × 10 Gbps = 20),
+  para o medidor de uso. Bom para deixar aberto numa TV do NOC.
+- **Conteúdo** (Tráfego da rede → Conteúdo): mostra de quais redes vem o tráfego dos clientes. Para funcionar bem:
+  1. no roteador de borda, exporte o ASN de origem no flow (*bgp-origin-as*), **ou**
+  2. importe a base pública IP → ASN uma vez por semana: `wget https://iptoasn.com/data/ip2asn-combined.tsv.gz && npm run importar-asn -- ip2asn-combined.tsv.gz`.
+  3. Em **Catálogo**, confira os ASNs do catálogo inicial e inclua os caches dentro da sua rede (ex.: o servidor de cache da Netflix ou do Google)
+     **por prefixo**: o tráfego que sai do cache não passa pela borda, mas o prefixo cadastrado garante o nome certo se ele aparecer.
+  4. Na lista, use **Catalogar** nos ASNs que aparecem sem nome.
+
+O flow mostra a rede de origem, não o site nem o vídeo: CDNs compartilhadas (Akamai, Cloudflare, AWS) aparecem pelo nome da CDN.
+
+## 8. Testar sem a rede real
 
 ```bash
 npm run demo                                  # organização "Conecta Fibra" com dados fictícios

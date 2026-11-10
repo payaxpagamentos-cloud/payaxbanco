@@ -23,6 +23,8 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 9 | **Rastreamento** | Posições do rastreador com horário da medição e idade; parado ≠ sem comunicação; ignição ausente = desconhecida; trajeto do período; vínculo dispositivo ↔ veículo pelo IMEI (a placa só sugere); chamados próximos por distância em linha reta (não é ETA). |
 | 10 | **Integrações** | Rastreador, coletores de monitoramento e Downdetector: configuração, teste de conexão, estado (não configurada, conectada, parcial, desatualizada, sem permissão, limite atingido, falha), último sucesso, erro com ID e histórico de coletas. |
 | 11 | **Tráfego** | Entrada e saída dos blocos protegidos por NetFlow v5/v9, IPFIX e sFlow (com amostragem, IPv6, VLAN, PPPoE e MPLS); gráfico por minuto ou hora, IPs que mais recebem e enviam (CSV), ficha do IP com tráfego, ataques e quem usou o endereço. |
+| 11a | **Consumo** | Painel em tempo real no estilo Grafana (escuro): entrada, saída, pacotes, fluxos e UDP com minigráficos, medidor de uso da capacidade dos links, tráfego com legenda de média/máximo/atual, protocolos empilhados, entrada por grupo, pacotes/s e maiores consumidores agora. Somas de 5 s, períodos de 5 min a 6 h, atualização a cada 5, 10 ou 30 s. |
+| 11b | **Conteúdo** | Principais conteúdos pelo ASN de origem de cada flow (ou pela base IP → ASN importada): ranking com participação, média, pico e comparação com o período anterior, consumo empilhado no tempo, diagrama de fluxo conteúdo → grupos de clientes e catálogo editável (Google/YouTube, Netflix, Meta, CDNs…) por ASN ou prefixo. |
 | 12 | **Anti-DDoS** | Detecção a cada 5 s com médias de 5, 10 e 60 s por IP e por grupo (bits/s, pacotes/s, fluxos/s, TCP, UDP, SYN, ICMP), confirmação e histerese, vetor do ataque (amplificação DNS/NTP/SSDP/Memcached…, SYN flood, ICMP), separação de fora para dentro e saindo da rede. Bloqueio por BGP (FlowSpec, blackhole, limpeza em linha) automático ou com aprovação, sempre com lista "nunca bloquear", limite de ações simultâneas, retirada automática e registro de quem fez. Relatório do ataque em PDF. |
 | 13 | **Assinantes** | Sessões PPPoE/IPoE pela contabilidade RADIUS do BRAS (cópia do accounting, conferida pelo segredo): login, IP, IPv6, MAC, início e fim. Busca por login, IP ou MAC e "quem estava com este IP" no instante do ataque. |
 | 14 | **Fontes e avisos** | Roteadores exportadores, NAS RADIUS, ponte com o ExaBGP e canais "Manager Network Alertas" no Telegram, WhatsApp (API oficial) ou webhook, com fila e novas tentativas. |
@@ -160,8 +162,13 @@ Passo a passo para o provedor: [`GUIA-DO-PROVEDOR.md`](GUIA-DO-PROVEDOR.md). Res
 4. **Fontes e avisos → RADIUS**: cadastre o BRAS e o segredo e inclua o servidor como accounting adicional. Ou use
    `POST /api/coletor/sessoes` com um token de escopo `sessoes`.
 
+5. **Conteúdo**: importe a base pública IP → ASN (`npm run importar-asn -- ip2asn-combined.tsv.gz`, do iptoasn.com) uma vez por semana, ou exporte
+   o ASN no flow (src_as/dst_as). Confira o catálogo inicial na aba **Catálogo**.
+6. **Consumo**: informe a capacidade somada dos links de borda no próprio painel, para o medidor de uso.
+
 Armazenamento: o coletor soma o tráfego em memória e grava no SQLite por minuto e grupo (8 dias) e por IP e hora (400 dias);
-sessões ficam no mínimo 366 dias (Marco Civil). O detalhe de cada flow não é guardado; um banco colunar (ClickHouse) pode ser
+sessões ficam no mínimo 366 dias (Marco Civil). Consumo em tempo real: somas de 5 s por 6 horas. Conteúdo: por minuto (8 dias) e por hora (400 dias),
+até 300 conteúdos/ASNs por minuto (o resto em "outros"). O detalhe de cada flow não é guardado; um banco colunar (ClickHouse) pode ser
 acrescentado depois, se o provedor precisar dessa consulta.
 
 ## Regras que o sistema garante
@@ -192,7 +199,7 @@ network/
     conectores/        # base (SSRF, timeout, estados, backoff), rastreador, downdetector
     lib/ip.js          # IPv4/IPv6, prefixos e busca pelo prefixo mais específico
     lib/fluxos/        # decodificar (NetFlow/IPFIX/sFlow), agregador, deteccao, servico (UDP), gerar (simulador/testes)
-    lib/mitigacao.js radius.js avisos.js pdf.js relatorio-ataque.js
+    lib/mitigacao.js radius.js avisos.js pdf.js relatorio-ataque.js conteudo.js (catálogo, base IP → ASN, classificação)
     routes/            # organizacao, frota, manutencao, combustivel, rede, chamados, equipe, noc, coletor, rastreamento, integracoes, painel,
                        # trafego, ddos, avisos
     coletor-rede.js    # processo do coletor de flows e RADIUS
@@ -200,7 +207,7 @@ network/
     coletas.js         # agenda das coletas
     demo.js            # organização demonstrativa (separada)
   public/              # SPA sem build (módulos ES), Leaflet + markercluster servidos do próprio pacote
-  scripts/coletor-exemplo.js exabgp-sincronizar.js simulador-fluxos.js
+  scripts/coletor-exemplo.js exabgp-sincronizar.js simulador-fluxos.js importar-asn.js
   test/                # node:test, incluindo o rastreador real em processo separado
 ```
 
