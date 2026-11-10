@@ -156,15 +156,14 @@ export function detalheVeiculo(ctx, v, painel, fechar, { mostrarEmpresa = false 
   }));
 }
 
-/** Envia o comando; bloquear pede a placa digitada, porque corta o combustível ou a ignição do veículo. */
+/** Envia o comando; bloquear confirma (corta o combustível ou a ignição) e manda a placa como confirmação. Desbloquear é direto. */
 async function enviarComando(ctx, v, tipo, texto) {
   let confirmacao;
   if (tipo === 'bloquear') {
-    confirmacao = await perguntar(`Bloquear ${placa(v.placa)}`, `Digite a placa para confirmar.${v.velocidade_kmh >= 20 ? ` O veículo está a ${kmh(v.velocidade_kmh)}.` : ''}`
-      + ' Com o bloqueio inteligente, o corte só sai abaixo da velocidade segura ou com a ignição desligada.');
-    if (!confirmacao) return;
-  } else if (tipo === 'desbloquear' && !await confirmar(`Desbloquear ${placa(v.placa)}`, 'O veículo volta a funcionar normalmente.', 'Desbloquear')) {
-    return;
+    if (!await confirmar(`Bloquear ${placa(v.placa)}`, `Realmente deseja bloquear?${v.velocidade_kmh >= 20
+      ? ` O veículo está a ${kmh(v.velocidade_kmh)} — com o bloqueio inteligente, o corte sai quando ele reduzir ou desligar.`
+      : ' Com o bloqueio inteligente, o corte só sai abaixo da velocidade segura ou com a ignição desligada.'}`, 'Bloquear')) return;
+    confirmacao = v.placa;
   }
   const c = await api.post(`${base(ctx)}/veiculos/${v.id}/comandos`, { tipo, confirmacao, texto });
   if (c.status === 'aguardando_velocidade') {
