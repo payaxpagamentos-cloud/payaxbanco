@@ -6,7 +6,7 @@
 
 /** Seguros: portfólio por empresa (master), permissão por usuário (admin) e as contratações. A emissão é feita por uma plataforma externa. */
 import { api } from './api.js';
-import { el, limpar, toast, icone, acao, formModal, confirmar, escolha, campo, area, marcar, etiqueta, placa, dataHora } from './ui.js';
+import { el, limpar, toast, icone, acao, formModal, confirmar, escolha, campo, area, marcar, etiqueta, placa, dataHora, dinheiro, centavos, reaisCampo } from './ui.js';
 import { cartao, tabela, td, botaoIcone, linhaDado } from './comum.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
@@ -21,6 +21,8 @@ const ROTULO_ICONE = {
   veiculos: 'Veículo', seguranca: 'Escudo', estrela: 'Estrela', cadeado: 'Cadeado', alvo: 'Alvo', rastreadores: 'Rastreador',
 };
 const lerMarcados = (checks) => checks.filter((c) => c.querySelector('input').checked).map((c) => Number(c.querySelector('input').value));
+const pct = (p) => `${String(Number(p) || 0).replace('.', ',')}%`;
+const precoTexto = (c) => (c == null ? 'Sob consulta' : dinheiro(c));
 
 // ===================== EMPRESA =====================
 
@@ -44,6 +46,11 @@ function cardSeguro(ctx, t) {
     el('div', { class: 'seguro-ic' }, icone(t.icone || 'seguro')),
     el('h3', {}, t.nome),
     el('p', { class: 'mudo' }, t.descricao || ''),
+    el('div', { class: `seguro-preco${t.preco_venda_centavos == null ? ' sob-consulta' : ''}` }, precoTexto(t.preco_venda_centavos)),
+    // Só o administrador vê o custo e a margem; o usuário final vê apenas o preço de venda.
+    t.custo_centavos !== undefined && t.custo_centavos != null
+      ? el('div', { class: 'seguro-margem mudo' }, `custo ${dinheiro(t.custo_centavos)} · margem ${pct(t.margem_percent)}`)
+      : null,
     t.pode_contratar
       ? (() => { const b = el('button', { class: 'btn primario largo' }, 'Contratar'); b.addEventListener('click', () => contratar(ctx, t)); return b; })()
       : el('div', { class: 'seguro-bloq mudo' }, icone('cadeado'), 'Sem permissão — fale com o administrador'));
@@ -58,6 +65,7 @@ async function contratar(ctx, t) {
   const optsM = { '': 'Nenhum / não se aplica', ...Object.fromEntries(motoristas.map((m) => [m.id, m.nome])) };
   await formModal(`Contratar · ${t.nome}`, () => [
     el('p', { class: 'mudo', style: 'margin:0' }, t.descricao || ''),
+    el('p', { style: 'margin:0;font-size:15px' }, 'Preço: ', el('strong', { style: 'color:var(--azul)' }, precoTexto(t.preco_venda_centavos))),
     escolha('Veículo (opcional)', 'veiculo_id', optsV, ''),
     escolha('Motorista (opcional)', 'motorista_id', optsM, ''),
     area('Observação (opcional)', { name: 'observacao', maxlength: 500, rows: 3 }),
@@ -74,10 +82,11 @@ async function telaSegurosContratacoes(ctx) {
   const lista = el('div');
   limpar(ctx.conteudo, el('section', { class: 'cartao grande' }, lista));
   const cs = await api.get(`${base(ctx)}/seguros/contratacoes`);
-  limpar(lista, tabela(['Seguro', 'Veículo / Motorista', 'Solicitante', '^Status', 'Apólice', 'Data'], cs.map((c) => el('tr', {},
+  limpar(lista, tabela(['Seguro', 'Veículo / Motorista', 'Solicitante', '^Valor', '^Status', 'Apólice', 'Data'], cs.map((c) => el('tr', {},
     td(el('span', { class: 'com-icone' }, icone(c.tipo_icone || 'seguro'), c.tipo_nome)),
     td(c.veiculo_placa ? placa(c.veiculo_placa) : (c.motorista_nome ?? '—')),
     td(c.usuario_nome ?? '—'),
+    td(c.valor_centavos != null ? dinheiro(c.valor_centavos) : '—', 'centro'),
     td(etiquetaStatus(c.status), 'centro'),
     td(c.apolice_numero ?? '—'),
     td(dataHora(c.criada_em)))), 'Nenhuma contratação ainda. Contrate na aba “Contratar”.'));
@@ -115,17 +124,50 @@ function blocoOperador(ctx, u, tipos) {
     el('div', { class: 'linha', style: 'justify-content:flex-end;margin-top:8px' }, salvar));
 }
 
+async function telaSegurosPrecos(ctx) {
+  const cont = el('div');
+  limpar(ctx.conteudo, cont);
+  const { tipos } = await api.get(`${base(ctx)}/seguros/precos`);
+  if (!tipos.length) {
+    limpar(cont, cartao(null, el('p', { class: 'mudo', style: 'margin:0' }, 'Sua empresa ainda não tem seguros no portfólio. Fale com a central para liberar.')));
+    return;
+  }
+  const linhas = tipos.map((t) => {
+    const temCusto = t.custo_centavos != null;
+    const venda = el('strong', {});
+    const entrada = el('input', { type: 'number', min: 0, max: 1000, step: '0.5', value: t.margem_percent ?? 0, 'data-id': t.id, disabled: !temCusto, style: 'width:84px' });
+    const recalc = () => { venda.textContent = temCusto ? dinheiro(Math.round(t.custo_centavos * (1 + (Number(entrada.value) || 0) / 100))) : 'Sob consulta'; };
+    entrada.addEventListener('input', recalc); recalc();
+    return el('tr', {},
+      td(el('span', { class: 'com-icone' }, icone(t.icone || 'seguro'), t.nome)),
+      td(temCusto ? dinheiro(t.custo_centavos) : el('span', { class: 'mudo' }, 'Sem custo'), 'centro'),
+      td(el('span', { class: 'campo-pct' }, entrada, el('span', {}, '%')), 'centro'),
+      td(venda, 'centro'));
+  });
+  const salvar = el('button', { class: 'btn primario' }, 'Salvar preços');
+  salvar.addEventListener('click', () => acao(salvar, async () => {
+    const margens = [...cont.querySelectorAll('input[data-id]')].map((i) => ({ tipo_id: Number(i.dataset.id), margem_percent: Number(i.value) || 0 }));
+    await api.put(`${base(ctx)}/seguros/precos`, { margens });
+    toast('Preços de revenda salvos.');
+  }));
+  limpar(cont, el('section', { class: 'cartao grande' },
+    el('p', { class: 'mudo', style: 'margin:0 0 14px' }, 'Defina a margem (%) que a sua empresa cobra sobre o custo de cada seguro. O cliente final vê o preço de venda. Seguros “sem custo” ainda não têm preço definido pela central.'),
+    tabela(['Seguro', '^Custo', '^Sua margem', '^Preço de venda'], linhas, 'Nenhum seguro no portfólio.'),
+    el('div', { class: 'linha', style: 'justify-content:flex-end;margin-top:14px' }, salvar)));
+}
+
 // ===================== MASTER =====================
 
 async function telaSegurosTipos(ctx) {
   const lista = el('div');
   async function carregar() {
     const tipos = await api.get('/master/seguros/tipos');
-    const cols = ['Seguro', 'Descrição', 'Produto externo', '^Situação'];
+    const cols = ['Seguro', 'Descrição', '^Custo', 'Produto externo', '^Situação'];
     if (ctx.soMaster) cols.push('^Ações');
     limpar(lista, tabela(cols, tipos.map((t) => el('tr', {},
       td(el('span', { class: 'com-icone' }, icone(t.icone || 'seguro'), el('strong', {}, t.nome))),
       td(el('span', { class: 'mudo' }, t.descricao ?? '—')),
+      td(t.custo_centavos != null ? dinheiro(t.custo_centavos) : el('span', { class: 'mudo' }, '—'), 'centro'),
       td(t.produto_externo ? el('code', {}, t.produto_externo) : el('span', { class: 'mudo' }, '—')),
       td(t.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo', ''), 'centro'),
       ctx.soMaster ? el('td', { class: 'acoes' },
@@ -146,13 +188,19 @@ async function telaSegurosTipos(ctx) {
 }
 
 function formTipo(t) {
+  const enviar = (d) => {
+    const corpo = { ...d, custo_centavos: centavos(d.custo) ?? null };
+    delete corpo.custo;
+    return t ? api.put(`/master/seguros/tipos/${t.id}`, corpo) : api.post('/master/seguros/tipos', corpo);
+  };
   return formModal(t ? `Editar ${t.nome}` : 'Novo tipo de seguro', () => [
     campo('Nome', { name: 'nome', required: true, maxlength: 80, value: t?.nome ?? '' }),
     area('Descrição', { name: 'descricao', maxlength: 300, rows: 2 }, t?.descricao ?? ''),
     escolha('Ícone', 'icone', Object.fromEntries(ICONES_SEG.map((k) => [k, ROTULO_ICONE[k] ?? k])), t?.icone ?? 'seguro'),
+    campo('Preço de custo (R$) — base para a revenda das empresas', { name: 'custo', inputmode: 'decimal', value: reaisCampo(t?.custo_centavos) }),
     campo('Código do produto na plataforma externa (opcional)', { name: 'produto_externo', maxlength: 80, value: t?.produto_externo ?? '' }),
     marcar('Ativo (pode ser habilitado nas empresas)', { name: 'ativo', checked: t ? !!t.ativo : true }),
-  ], (d) => (t ? api.put(`/master/seguros/tipos/${t.id}`, d) : api.post('/master/seguros/tipos', d)), { rotulo: t ? 'Salvar' : 'Criar' });
+  ], enviar, { rotulo: t ? 'Salvar' : 'Criar' });
 }
 
 async function telaSegurosEmpresas(ctx) {
@@ -189,13 +237,14 @@ async function telaSegurosContratacoesMaster(ctx) {
   filtro.addEventListener('change', carregar);
   async function carregar() {
     const cs = await api.get(`/master/seguros/contratacoes${filtro.value ? `?status=${filtro.value}` : ''}`);
-    const cols = ['Empresa', 'Seguro', 'Veículo / Motorista', 'Solicitante', '^Status', 'Apólice', 'Data'];
+    const cols = ['Empresa', 'Seguro', 'Solicitante', '^Custo', '^Venda', '^Status', 'Apólice', 'Data'];
     if (ctx.master) cols.push('^Ações');
     limpar(lista, tabela(cols, cs.map((c) => el('tr', {},
       td(el('strong', {}, c.empresa_nome)),
       td(el('span', { class: 'com-icone' }, icone(c.tipo_icone || 'seguro'), c.tipo_nome)),
-      td(c.veiculo_placa ? placa(c.veiculo_placa) : (c.motorista_nome ?? '—')),
       td(c.usuario_nome ?? '—'),
+      td(c.custo_centavos != null ? dinheiro(c.custo_centavos) : '—', 'centro'),
+      td(c.valor_centavos != null ? el('strong', {}, dinheiro(c.valor_centavos)) : '—', 'centro'),
       td(etiquetaStatus(c.status), 'centro'),
       td(c.apolice_numero ?? '—'),
       td(dataHora(c.criada_em)),
@@ -213,6 +262,9 @@ function formContratacao(c) {
     linhaDado('Empresa', c.empresa_nome),
     linhaDado('Solicitante', c.usuario_nome ?? '—'),
     linhaDado('Veículo / Motorista', c.veiculo_placa ? placa(c.veiculo_placa) : (c.motorista_nome ?? '—')),
+    linhaDado('Custo', c.custo_centavos != null ? dinheiro(c.custo_centavos) : '—'),
+    linhaDado('Margem da empresa', c.margem_percent != null ? pct(c.margem_percent) : '—'),
+    linhaDado('Preço de venda', c.valor_centavos != null ? dinheiro(c.valor_centavos) : '—'),
     escolha('Status', 'status', STATUS_SEGURO, c.status),
     campo('Número da apólice', { name: 'apolice_numero', maxlength: 80, value: c.apolice_numero ?? '' }),
     campo('Referência na plataforma externa', { name: 'referencia_externa', maxlength: 120, value: c.referencia_externa ?? '' }),
@@ -220,5 +272,5 @@ function formContratacao(c) {
   ], (d) => api.patch(`/master/seguros/contratacoes/${c.id}`, d), { rotulo: 'Salvar' });
 }
 
-export const TELAS_SEGUROS = { seguros: telaSeguros, 'seguros-contratacoes': telaSegurosContratacoes, 'seguros-usuarios': telaSegurosUsuarios };
+export const TELAS_SEGUROS = { seguros: telaSeguros, 'seguros-precos': telaSegurosPrecos, 'seguros-contratacoes': telaSegurosContratacoes, 'seguros-usuarios': telaSegurosUsuarios };
 export const TELAS_SEGUROS_MASTER = { 'seguros-tipos': telaSegurosTipos, 'seguros-empresas': telaSegurosEmpresas, 'seguros-contratacoes': telaSegurosContratacoesMaster };

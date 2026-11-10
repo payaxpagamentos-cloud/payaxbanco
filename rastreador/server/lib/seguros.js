@@ -16,6 +16,12 @@ const STATUS = { pendente: 'Pendente', enviada: 'Enviada à seguradora', emitida
 // Ícones aceitos no catálogo (o master escolhe um); são chaves que já existem no painel.
 const ICONES = ['seguro', 'manutencao', 'carteira', 'motoristas', 'veiculos', 'seguranca', 'estrela', 'cadeado', 'alvo', 'rastreadores'];
 
+// Preço de venda = custo × (1 + margem/100). Sem custo definido, não há preço (fica "sob consulta").
+const precoVenda = (custoCentavos, margemPercent) => (custoCentavos == null ? null
+  : Math.round(custoCentavos * (1 + (Number(margemPercent) || 0) / 100)));
+const custoDe = (x) => (x === '' || x === null || x === undefined ? null : Math.max(0, Math.round(Number(x)) || 0));
+const margemDe = (x) => { const p = Number(x); return !Number.isFinite(p) || p < 0 ? 0 : Math.min(p, 1000); };
+
 // ---------- Catálogo de tipos (master) ----------
 function catalogo(db, { todos = false } = {}) {
   return db.prepare(`SELECT * FROM seguros_tipos ${todos ? '' : 'WHERE ativo = 1'} ORDER BY ordem, id`).all();
@@ -31,21 +37,22 @@ function dadosTipo(d) {
     descricao: v.opcional(d.descricao, 'a descrição', 300),
     icone: d.icone && ICONES.includes(d.icone) ? d.icone : 'seguro',
     produto_externo: v.opcional(d.produto_externo, 'o código do produto', 80),
+    custo_centavos: custoDe(d.custo_centavos),
     ativo: d.ativo === undefined ? 1 : (v.booleano(d.ativo) ? 1 : 0),
   };
 }
 function criarTipo(db, d) {
   const x = dadosTipo(d);
   const ordem = (db.prepare('SELECT MAX(ordem) AS m FROM seguros_tipos').get().m ?? -1) + 1;
-  const { lastInsertRowid } = db.prepare('INSERT INTO seguros_tipos (nome, descricao, icone, produto_externo, ativo, ordem, criado_em) VALUES (?,?,?,?,?,?,?)')
-    .run(x.nome, x.descricao, x.icone, x.produto_externo, x.ativo, ordem, agora());
+  const { lastInsertRowid } = db.prepare('INSERT INTO seguros_tipos (nome, descricao, icone, produto_externo, custo_centavos, ativo, ordem, criado_em) VALUES (?,?,?,?,?,?,?,?)')
+    .run(x.nome, x.descricao, x.icone, x.produto_externo, x.custo_centavos, x.ativo, ordem, agora());
   return tipo(db, lastInsertRowid);
 }
 function atualizarTipo(db, id, d) {
   tipo(db, id);
   const x = dadosTipo(d);
-  db.prepare('UPDATE seguros_tipos SET nome=?, descricao=?, icone=?, produto_externo=?, ativo=? WHERE id=?')
-    .run(x.nome, x.descricao, x.icone, x.produto_externo, x.ativo, Number(id));
+  db.prepare('UPDATE seguros_tipos SET nome=?, descricao=?, icone=?, produto_externo=?, custo_centavos=?, ativo=? WHERE id=?')
+    .run(x.nome, x.descricao, x.icone, x.produto_externo, x.custo_centavos, x.ativo, Number(id));
   return tipo(db, id);
 }
 function removerTipo(db, id) {
@@ -61,8 +68,25 @@ function removerTipo(db, id) {
 
 // ---------- Portfólio por empresa (master define) ----------
 function portfolioEmpresa(db, empresaId, { todos = false } = {}) {
-  return db.prepare(`SELECT t.* FROM empresa_seguros es JOIN seguros_tipos t ON t.id = es.tipo_id
-    WHERE es.empresa_id = ? ${todos ? '' : 'AND t.ativo = 1'} ORDER BY t.ordem, t.id`).all(Number(empresaId));
+  return db.prepare(`SELECT t.*, es.margem_percent FROM empresa_seguros es JOIN seguros_tipos t ON t.id = es.tipo_id
+    WHERE es.empresa_id = ? ${todos ? '' : 'AND t.ativo = 1'} ORDER BY t.ordem, t.id`).all(Number(empresaId))
+    .map((t) => ({ ...t, preco_venda_centavos: precoVenda(t.custo_centavos, t.margem_percent) }));
+}
+/** Preços de revenda da empresa: custo (do master), margem (da empresa) e o preço de venda calculado. */
+function precosEmpresa(db, empresaId) {
+  return portfolioEmpresa(db, empresaId);
+}
+/** A empresa define o percentual de margem por seguro. margens: [{ tipo_id, margem_percent }]. */
+function definirMargens(db, empresaId, margens) {
+  const port = idsPortfolio(db, empresaId);
+  transacao(db, () => {
+    const upd = db.prepare('UPDATE empresa_seguros SET margem_percent = ? WHERE empresa_id = ? AND tipo_id = ?');
+    for (const m of (Array.isArray(margens) ? margens : [])) {
+      const tid = Number(m.tipo_id);
+      if (port.has(tid)) upd.run(margemDe(m.margem_percent), Number(empresaId), tid);
+    }
+  });
+  return precosEmpresa(db, empresaId);
 }
 function idsPortfolio(db, empresaId) {
   return new Set(db.prepare('SELECT tipo_id FROM empresa_seguros WHERE empresa_id = ?').all(Number(empresaId)).map((r) => r.tipo_id));
@@ -128,9 +152,13 @@ async function contratar(db, { empresa, usuario, tipoId, veiculoId, motoristaId,
   const obs = v.opcional(observacao, 'a observação', 500);
   const payload = dados && typeof dados === 'object' && !Array.isArray(dados) ? JSON.stringify(dados) : null;
 
+  // Congela o preço no momento da contratação: custo (master), margem da empresa e o preço de venda cobrado do cliente.
+  const margem = db.prepare('SELECT margem_percent FROM empresa_seguros WHERE empresa_id = ? AND tipo_id = ?').get(empresa.id, t.id)?.margem_percent ?? 0;
+  const venda = precoVenda(t.custo_centavos, margem);
+
   const { lastInsertRowid } = db.prepare(`INSERT INTO seguros_contratacoes
-    (empresa_id, tipo_id, usuario_id, veiculo_id, motorista_id, status, dados, observacao, criada_em)
-    VALUES (?,?,?,?,?,'pendente',?,?,?)`).run(empresa.id, t.id, usuario.id, vid, mid, payload, obs, agora());
+    (empresa_id, tipo_id, usuario_id, veiculo_id, motorista_id, status, custo_centavos, margem_percent, valor_centavos, dados, observacao, criada_em)
+    VALUES (?,?,?,?,?,'pendente',?,?,?,?,?,?)`).run(empresa.id, t.id, usuario.id, vid, mid, t.custo_centavos, margem, venda, payload, obs, agora());
 
   let contr = db.prepare('SELECT * FROM seguros_contratacoes WHERE id = ?').get(lastInsertRowid);
   // Tenta emitir na plataforma externa. Enquanto a integração não estiver ligada, fica 'pendente'.
@@ -165,8 +193,8 @@ function contratacoes(db, { empresaId = null, status = null, limite = 300 } = {}
   if (empresaId) { cond.push('c.empresa_id = ?'); args.push(Number(empresaId)); }
   if (status) { cond.push('c.status = ?'); args.push(status); }
   const where = cond.length ? `WHERE ${cond.join(' AND ')}` : '';
-  return db.prepare(`SELECT c.id, c.empresa_id, c.tipo_id, c.status, c.referencia_externa, c.apolice_numero, c.valor_centavos,
-      c.observacao, c.criada_em, c.atualizada_em,
+  return db.prepare(`SELECT c.id, c.empresa_id, c.tipo_id, c.status, c.referencia_externa, c.apolice_numero,
+      c.custo_centavos, c.margem_percent, c.valor_centavos, c.observacao, c.criada_em, c.atualizada_em,
       t.nome AS tipo_nome, t.icone AS tipo_icone, e.nome AS empresa_nome,
       ve.placa AS veiculo_placa, m.nome AS motorista_nome, u.nome AS usuario_nome
     FROM seguros_contratacoes c
@@ -192,7 +220,8 @@ function atualizarContratacao(db, id, d) {
 }
 
 module.exports = {
-  STATUS, ICONES, catalogo, tipo, criarTipo, atualizarTipo, removerTipo,
-  portfolioEmpresa, idsPortfolio, definirPortfolio, grantsUsuario, permitidosDoUsuario, definirGrantsUsuario,
+  STATUS, ICONES, precoVenda, catalogo, tipo, criarTipo, atualizarTipo, removerTipo,
+  portfolioEmpresa, idsPortfolio, definirPortfolio, precosEmpresa, definirMargens,
+  grantsUsuario, permitidosDoUsuario, definirGrantsUsuario,
   contratar, contratacoes, atualizarContratacao, emitirNaPlataforma,
 };

@@ -938,10 +938,23 @@ module.exports = (db, extras = {}) => {
 
   // ---------- Seguros ----------
   // Portfólio da empresa (liberado pelo master) e o que o usuário logado pode contratar.
+  // O usuário final vê só o preço de venda; o custo e a margem ficam para o administrador (gestor).
   r.get('/seguros', (req, res) => {
+    const ehGestor = ['master', 'suporte', 'cliente'].includes(req.usuario.perfil);
     const permitidos = new Set(seg.permitidosDoUsuario(db, req.usuario, eid(req)).map((t) => t.id));
-    const tipos = seg.portfolioEmpresa(db, eid(req)).map((t) => ({ ...t, pode_contratar: permitidos.has(t.id) }));
-    res.json({ tipos, gestor: ['master', 'suporte', 'cliente'].includes(req.usuario.perfil) });
+    const tipos = seg.portfolioEmpresa(db, eid(req)).map((t) => {
+      const base = { id: t.id, nome: t.nome, descricao: t.descricao, icone: t.icone, preco_venda_centavos: t.preco_venda_centavos, pode_contratar: permitidos.has(t.id) };
+      if (ehGestor) { base.custo_centavos = t.custo_centavos; base.margem_percent = t.margem_percent; }
+      return base;
+    });
+    res.json({ tipos, gestor: ehGestor });
+  });
+  // Preços de revenda (admin da empresa): custo (do master), margem da empresa e o preço de venda.
+  r.get('/seguros/precos', gestor, (req, res) => res.json({ tipos: seg.precosEmpresa(db, eid(req)) }));
+  r.put('/seguros/precos', gestor, (req, res) => {
+    const tipos = seg.definirMargens(db, eid(req), req.body.margens);
+    registrar(db, req, 'seguro_margens_definidas', { total: tipos.length });
+    res.json({ tipos });
   });
   r.get('/seguros/contratacoes', (req, res) => res.json(seg.contratacoes(db, { empresaId: eid(req) })));
   r.post('/seguros/contratar', async (req, res, next) => {
