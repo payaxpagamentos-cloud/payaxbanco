@@ -8,6 +8,8 @@
 - **Conteúdo**: cada flow é ligado ao conteúdo pelo prefixo do catálogo, pelo ASN exportado pelo roteador ou pela base IP → ASN (`npm run importar-asn`).
   Ranking, série empilhada, diagrama de fluxo conteúdo → clientes, comparação com o período anterior (só com histórico suficiente) e catálogo editável.
 - Capacidade dos links de borda na configuração do Anti-DDoS (`capacidade_bps`).
+- **Efeito vidro no Consumo**: luzes de cor (verde-esmeralda, azul e violeta) atrás do painel e quadros, seletores e caixa de leitura translúcidos com
+  desfoque. Navegador sem suporte ou efeitos pausados mantêm o painel sólido. Opacidade conferida para as séries manterem contraste de 3:1.
 - Migração 3 (`consumo_conteudo`). Demonstração "Conecta Fibra" com consumo e conteúdos fictícios; o simulador manda tráfego de redes de conteúdo
   fictícias (198.18.0.0/15) e upload.
 

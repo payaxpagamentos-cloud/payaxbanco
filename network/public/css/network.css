@@ -472,7 +472,7 @@ html.sem-efeitos .grafana .ao-vivo { animation: none; }
 .grafana .gf-painel h3 small { font-weight: 400; color: var(--texto-3); }
 .grafana .c2 { grid-column: span 2; } .grafana .c3 { grid-column: span 3; } .grafana .c4 { grid-column: span 4; } .grafana .c6 { grid-column: span 6; }
 .grafana .c8 { grid-column: span 8; } .grafana .c12 { grid-column: span 12; }
-.grafana .gf-stat { position: relative; overflow: hidden; min-height: 112px; }
+.grafana .gf-stat { position: relative; overflow: hidden; min-height: 118px; padding-bottom: 50px; }
 .grafana .gf-stat .valor { white-space: nowrap; font-size: 24px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; position: relative; z-index: 1; }
 .grafana .gf-stat .sub { font-size: 12px; color: var(--texto-3); position: relative; z-index: 1; }
 .grafana .gf-stat .minigrafico { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 46px; }
@@ -505,3 +505,62 @@ html.sem-efeitos .grafana .ao-vivo { animation: none; }
 .fluxo-diagrama .fita { fill-opacity: 0.35; transition: fill-opacity 0.15s; }
 .fluxo-diagrama .fita:hover, .fluxo-diagrama .fita:focus { fill-opacity: 0.7; outline: none; }
 .fluxo-diagrama .no { stroke: var(--painel); stroke-width: 2; }
+
+/* ---------------- Consumo: efeito vidro ----------------
+   Luzes de cor atrás do painel e quadros translúcidos com desfoque. Opacidade dos quadros (42%) e força das luzes conferidas para as
+   cores das séries manterem contraste de 3:1 até no ponto mais iluminado. Sem suporte a backdrop-filter, ou com os efeitos
+   pausados (botão do topo), o painel fica com as superfícies sólidas acima. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html:not(.sem-efeitos) .grafana {
+    --vidro: rgba(20, 32, 26, 0.42);
+    --vidro-forte: rgba(20, 30, 25, 0.82);
+    --vidro-borda: rgba(255, 255, 255, 0.09);
+    --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --vidro-sombra: 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+    --vidro-desfoque: blur(18px) saturate(160%);
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+      radial-gradient(36rem 28rem at 6% -6%, rgba(56, 199, 139, 0.32), transparent 70%),
+      radial-gradient(32rem 26rem at 96% 6%, rgba(57, 135, 229, 0.36), transparent 70%),
+      radial-gradient(40rem 32rem at 55% 104%, rgba(144, 133, 233, 0.32), transparent 70%),
+      radial-gradient(26rem 22rem at 18% 62%, rgba(25, 158, 112, 0.2), transparent 70%),
+      radial-gradient(24rem 20rem at 85% 55%, rgba(57, 135, 229, 0.16), transparent 70%),
+      #0b120e;
+    border: 1px solid var(--vidro-borda);
+    box-shadow: var(--vidro-brilho), 0 24px 60px -30px rgba(0, 0, 0, 0.8);
+  }
+  html:not(.sem-efeitos) .grafana .gf-painel {
+    background: var(--vidro);
+    -webkit-backdrop-filter: var(--vidro-desfoque);
+    backdrop-filter: var(--vidro-desfoque);
+    border: 1px solid var(--vidro-borda);
+    border-radius: 10px;
+    box-shadow: var(--vidro-brilho), var(--vidro-sombra);
+  }
+  html:not(.sem-efeitos) .grafana select,
+  html:not(.sem-efeitos) .grafana .gf-botao,
+  html:not(.sem-efeitos) .grafana .alternador {
+    background: rgba(255, 255, 255, 0.06);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-color: var(--vidro-borda);
+    box-shadow: var(--vidro-brilho);
+  }
+  html:not(.sem-efeitos) .grafana select option { background: #16211c; color: var(--texto); }
+  html:not(.sem-efeitos) .grafana .gf-botao:hover { background: rgba(255, 255, 255, 0.11); }
+  html:not(.sem-efeitos) .grafana .alternador button[aria-pressed=true] { background: rgba(255, 255, 255, 0.14); }
+  /* Caixa de leitura e avisos: vidro mais fosco, para o texto ficar legível sobre as linhas */
+  html:not(.sem-efeitos) .grafana .dica-grafico,
+  html:not(.sem-efeitos) .grafana .aviso-faixa {
+    background: var(--vidro-forte);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    backdrop-filter: blur(20px) saturate(170%);
+    border: 1px solid var(--vidro-borda);
+  }
+  html:not(.sem-efeitos) .grafana .tabela td, html:not(.sem-efeitos) .grafana .tabela th { border-color: rgba(255, 255, 255, 0.07); }
+  html:not(.sem-efeitos) .grafana .medidor-fundo { stroke: rgba(255, 255, 255, 0.09); }
+  html:not(.sem-efeitos) .grafana .barra-uso { background: rgba(255, 255, 255, 0.09); }
+  html:not(.sem-efeitos) .grafana .grafico .grade-linha { stroke: rgba(255, 255, 255, 0.08); }
+}
