@@ -76,6 +76,12 @@ p { margin: 0; }
 .avatar { width: 36px; height: 36px; border-radius: 50%; background: #d7ead9; color: var(--grafite); display: grid; place-items: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
 .perfil strong { display: block; color: #fff; font-size: 13px; }
 .perfil small { color: #9fb3a4; font-size: 11.5px; }
+/* O menu fica parado enquanto a página rola; se a tela for baixa, ele rola por dentro. Textos longos (e-mail) encurtam com "…"
+   em vez de alargar o rodapé do menu. */
+.menu { overflow-x: hidden; overscroll-behavior: contain; }
+.menu-rodape { grid-template-columns: minmax(0, 1fr); }
+.perfil > div { min-width: 0; }
+.perfil strong, .perfil small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .principal { margin-left: var(--menu-largura); min-height: 100vh; display: flex; flex-direction: column; min-width: 0; }
 .topo {
