@@ -243,7 +243,9 @@ function iniciarGt06(db, porta, { host } = {}) {
       if (!cx.imei) return; // antes do login, nada é aceito
       if (d.tipo === 'posicao' || d.tipo === 'estado') receber(db, { ...d.mensagem, imei: cx.imei, protocolo: 'gt06', ip: socket.remoteAddress });
       if (d.tipo === 'resposta') {
-        const c = db.prepare('SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id WHERE c.id = ? AND r.imei = ?').get(d.comando, cx.imei);
+        // Alguns aparelhos não devolvem o identificador do comando: aí a resposta vale para o comando enviado mais antigo dele.
+        const c = db.prepare('SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id WHERE c.id = ? AND r.imei = ?').get(d.comando, cx.imei)
+          ?? db.prepare("SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id WHERE r.imei = ? AND c.status = 'enviado' ORDER BY c.id LIMIT 1").get(cx.imei);
         if (c) com.responder(db, c.id, { sucesso: com.respostaSucesso(d.texto), resposta: d.texto });
       }
     }
