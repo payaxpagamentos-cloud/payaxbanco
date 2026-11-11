@@ -117,6 +117,8 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
     }
     painel.classList.remove('oculto');
     // Centraliza o veículo na parte do mapa que a faixa não cobre.
+    // No celular a lista fica embaixo do mapa: ao tocar num veículo, a tela sobe até o mapa.
+    if (centralizar && window.matchMedia('(max-width: 860px)').matches) window.scrollTo({ top: 0, behavior: 'smooth' });
     if (centralizar && mapa && v.lat !== null) mapa.ir(v.lat, v.lng, undefined, { cobertoEmbaixo: painel.offsetHeight + 12 });
   }
   function fecharPainel() {

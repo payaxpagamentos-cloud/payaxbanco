@@ -306,8 +306,10 @@ async function fundo(L, m, div, cfg) {
 
 /** Botão Satélite / Mapa no canto do mapa; a escolha fica lembrada no navegador. */
 function seletorCamada(L, m, atual, trocar) {
+  // No celular a busca ocupa a largura de cima: o botão Mapa / Satélite fica logo abaixo dela, à esquerda, sem cobrir a busca.
+  const celular = window.matchMedia('(max-width: 860px)').matches;
   const Seletor = L.Control.extend({
-    options: { position: 'topright' },
+    options: { position: celular ? 'topleft' : 'topright' },
     onAdd() {
       const caixa = L.DomUtil.create('div', 'seletor-camada');
       L.DomEvent.disableClickPropagation(caixa);
