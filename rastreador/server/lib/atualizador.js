@@ -81,10 +81,11 @@ function aplicar(bufferZip) {
 function reverter() {
   const lista = backupsExistentes();
   if (!lista.length) throw new ErroNegocio('Não há backup guardado para reverter.', 400);
+  const de = versaoAtual();
   const bkp = path.join(DIR_BACKUP, lista[0]);
   fs.cpSync(path.join(bkp, 'server'), path.join(RAIZ, 'server'), { recursive: true });
   fs.cpSync(path.join(bkp, 'public'), path.join(RAIZ, 'public'), { recursive: true });
-  return { versao: versaoAtual() };
+  return { de, versao: versaoAtual() };
 }
 
 module.exports = { estado, versaoAtual, aplicar, reverter };
