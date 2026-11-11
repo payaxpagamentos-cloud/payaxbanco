@@ -1291,3 +1291,13 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 .seletor-arquivo:hover{ border-color: var(--azul); background: var(--azul-suave); }
 .seletor-arquivo svg{ width: 22px; height: 22px; color: var(--azul); flex: none; }
 .seletor-arquivo strong{ color: var(--text); font-size: 14px; }
+
+/* ---------- Mapa ao vivo no celular: o mapa ocupa a tela (sem o título), e a lista de veículos fica logo abaixo ---------- */
+@media (max-width: 860px){
+  .casca.com-mapa .topo{ display: none; }
+  .tela-mapa{ grid-template-rows: calc(100dvh - 190px) auto; border-top: 0; }
+  .area-mapa{ min-height: 320px; }
+  .area-mapa .busca-mapa{ width: calc(100vw - 92px); }
+  .tela-mapa .lado{ padding: 12px 16px 24px; }
+  .area-mapa .painel-veiculo{ z-index: 1000; }
+}
