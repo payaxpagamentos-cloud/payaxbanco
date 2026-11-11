@@ -489,6 +489,12 @@ test('Rastreador', async (t) => {
     assert.equal(bloq(), 0, 'relé invertido: acionado = liberado');
     receber(db, { imei: IMEI, protocolo: 'gt06', bloqueado: false, ignicao: false });
     assert.equal(bloq(), 1, 'relé invertido: solto = bloqueado');
+    // Desbloqueio enviado e sem resposta em texto: o estado do aparelho (liberado) confirma o comando.
+    const cid = db.prepare(`INSERT INTO comandos (empresa_id, veiculo_id, rastreador_id, tipo, texto, status, criado_em, enviado_em)
+      VALUES (?, ?, ?, 'desbloquear', 'RELAY,1#', 'enviado', ?, ?)`).run(antes.empresa_id, veiculo, rid, new Date().toISOString(), new Date().toISOString()).lastInsertRowid;
+    receber(db, { imei: IMEI, protocolo: 'gt06', bloqueado: true, ignicao: true });
+    assert.equal(db.prepare('SELECT status FROM comandos WHERE id = ?').get(cid).status, 'confirmado', 'o estado do aparelho confirma o desbloqueio');
+    assert.equal(bloq(), 0);
     db.prepare('UPDATE rastreadores SET rele_invertido = 0 WHERE id = ?').run(rid);
     const cols = Object.keys(antes).filter((k) => k !== 'id');
     db.prepare(`UPDATE veiculos SET ${cols.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...cols.map((k) => antes[k]), veiculo);

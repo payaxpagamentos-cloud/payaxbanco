@@ -187,6 +187,12 @@ function receber(db, m) {
     // O aparelho informa se o relé está acionado em toda mensagem de estado (também sem GPS, como o sinal de vida);
     // com o relé ligado ao contrário (sentido invertido), acionado = liberado.
     if (typeof m.bloqueado === 'boolean') mudar.bloqueado = (r.rele_invertido ? !m.bloqueado : m.bloqueado) ? 1 : 0;
+    if (mudar.bloqueado !== undefined) {
+      // O aparelho já está no estado pedido: o bloqueio/desbloqueio enviado fica confirmado (mesmo sem a resposta em texto).
+      const alvo = mudar.bloqueado ? 'bloquear' : 'desbloquear';
+      const enviado = db.prepare("SELECT id FROM comandos WHERE veiculo_id = ? AND status = 'enviado' AND tipo = ? ORDER BY id DESC LIMIT 1").get(v.id, alvo);
+      if (enviado) require('./comandos').responder(db, enviado.id, { sucesso: true, resposta: `Confirmado pelo estado do aparelho (${mudar.bloqueado ? 'bloqueado' : 'desbloqueado'}).` });
+    }
     if (evento) alertarEvento(db, v, evento, pos);
 
     const campos = Object.keys(mudar);
