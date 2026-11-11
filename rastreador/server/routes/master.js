@@ -6,7 +6,7 @@
 */
 
 const fs = require('node:fs');
-const { Router } = require('express');
+const { Router, raw } = require('express');
 const config = require('../config');
 const { transacao, agora, lerConfig, CONFIG_PADRAO, CONFIG_TEXTO } = require('../db');
 const { permitir } = require('../auth');
@@ -18,6 +18,7 @@ const { hoje, somarDias } = require('../lib/datas');
 const zap = require('../lib/whatsapp');
 const notif = require('../lib/notificacoes');
 const seg = require('../lib/seguros');
+const atualizador = require('../lib/atualizador');
 const v = require('../lib/validacao');
 
 const TIPOS = ['frota', 'pessoa', 'locadora'];
@@ -508,6 +509,22 @@ module.exports = (db, extras = {}) => {
     const c = seg.atualizarContratacao(db, nid(req), req.body);
     registrar(db, req, 'seguro_contratacao_atualizada', { id: c.id, status: c.status }, c.empresa_id);
     res.json(c);
+  });
+
+  // ---------- Atualização do sistema pelo painel (só master) ----------
+  const reiniciarEmBreve = () => setTimeout(() => process.exit(0), 1200); // o PM2/Docker sobe de novo com o código novo
+  r.get('/sistema', soMaster, (_req, res) => res.json(atualizador.estado()));
+  r.post('/sistema/atualizar', soMaster, raw({ type: '*/*', limit: '80mb' }), (req, res) => {
+    const out = atualizador.aplicar(req.body);
+    registrar(db, req, 'sistema_atualizado', { de: out.anterior, para: out.versao });
+    res.json({ ok: true, versao: out.versao });
+    reiniciarEmBreve();
+  });
+  r.post('/sistema/reverter', soMaster, (req, res) => {
+    const out = atualizador.reverter();
+    registrar(db, req, 'sistema_revertido', { versao: out.versao });
+    res.json({ ok: true, versao: out.versao });
+    reiniciarEmBreve();
   });
 
   return r;

@@ -44,6 +44,7 @@ const MENU_MASTER = [
     ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas'],
     ['diagnostico', 'Diagnóstico', 'diagnostico', 'Servidor GT06, recepção e equipamentos com problema'],
     ['atividades', 'Atividades', 'seguranca', 'Registro das ações feitas no painel', ['master']],
+    ['sistema', 'Atualizar sistema', 'baixar', 'Subir uma nova versão do sistema (só o master)', ['master']],
   ]],
 ];
 const GESTOR = ['master', 'suporte', 'cliente'];
