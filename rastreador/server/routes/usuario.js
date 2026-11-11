@@ -53,8 +53,11 @@ module.exports = (db) => {
     }
     const margem = db.prepare('SELECT margem_percent FROM empresa_seguros WHERE empresa_id = ? AND tipo_id = ?').get(u.empresa_id, t.id)?.margem_percent ?? 0;
     const venda = seg.precoVenda(t.custo_centavos, margem);
-    db.prepare(`INSERT INTO seguros_contratacoes (empresa_id, tipo_id, usuario_id, veiculo_id, status, custo_centavos, margem_percent, valor_centavos, observacao, criada_em)
-      VALUES (?,?,NULL,?,'pendente',?,?,?,?,?)`).run(u.empresa_id, t.id, veiculoId, t.custo_centavos, margem, venda, `Solicitado pelo app do cliente (${u.nome})`, agora());
+    // Evita pedidos repetidos: um pedido pendente do mesmo seguro por cliente.
+    const jaPediu = db.prepare("SELECT 1 FROM seguros_contratacoes WHERE usuario_final_id = ? AND tipo_id = ? AND status = 'pendente'").get(u.id, t.id);
+    if (jaPediu) throw new ErroNegocio('Você já pediu esse seguro. A empresa vai confirmar em breve.', 409);
+    db.prepare(`INSERT INTO seguros_contratacoes (empresa_id, tipo_id, usuario_id, veiculo_id, usuario_final_id, status, custo_centavos, margem_percent, valor_centavos, observacao, criada_em)
+      VALUES (?,?,NULL,?,?,'pendente',?,?,?,?,?)`).run(u.empresa_id, t.id, veiculoId, u.id, t.custo_centavos, margem, venda, `Solicitado pelo app do cliente (${u.nome})`, agora());
     res.status(201).json({ ok: true });
   });
 

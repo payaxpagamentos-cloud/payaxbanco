@@ -104,7 +104,8 @@ function acessoEmpresa(db) {
     if (!PLATAFORMA.includes(u.perfil) && u.empresa_id !== eid) return next(new ErroNegocio('Empresa não encontrada.', 404));
     const empresa = Number.isInteger(eid) ? buscar.get(eid) : null;
     if (!empresa) return next(new ErroNegocio('Empresa não encontrada.', 404));
-    if (u.perfil === 'operador' && req.method !== 'GET' && !/^\/(alertas|assistente)(\/|$)/.test(req.path)) {
+    // Operador: só consulta, trata alertas, usa o assistente e contrata os seguros que o administrador liberou para ele.
+    if (u.perfil === 'operador' && req.method !== 'GET' && !/^\/(alertas|assistente|seguros\/contratar)(\/|$)/.test(req.path)) {
       return next(new ErroNegocio('O operador só consulta e trata alertas.', 403));
     }
     req.empresa = empresa;

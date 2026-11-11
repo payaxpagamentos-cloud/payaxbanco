@@ -207,11 +207,16 @@ async function telaSegurosEmpresas(ctx) {
   const empresas = await api.get('/master/empresas');
   const painel = el('div');
   const sel = escolha('Empresa', 'empresa', { '': 'Escolha a empresa…', ...Object.fromEntries(empresas.map((e) => [e.id, e.nome])) }, '');
-  sel.querySelector('select').addEventListener('change', (ev) => carregar(ev.target.value));
+  sel.querySelector('select').addEventListener('change', (ev) => carregar(ev.target.value).catch((e) => toast(e.message, true)));
 
+  // Trocando rápido de empresa, só a resposta do último pedido vale (uma resposta atrasada da empresa anterior é descartada).
+  let pedido = 0;
   async function carregar(id) {
+    const meu = ++pedido;
     if (!id) { limpar(painel, el('p', { class: 'mudo' }, 'Escolha uma empresa para liberar os seguros do portfólio dela.')); return; }
+    limpar(painel, el('p', { class: 'mudo' }, 'Carregando…'));
     const { tipos, habilitados } = await api.get(`/master/empresas/${id}/seguros`);
+    if (meu !== pedido) return;
     if (!tipos.length) { limpar(painel, el('p', { class: 'mudo' }, 'Nenhum tipo de seguro no catálogo. Cadastre em “Tipos”.')); return; }
     const set = new Set(habilitados);
     const checks = tipos.map((t) => marcar(`${t.nome}${t.ativo ? '' : ' (inativo)'}`, { value: t.id, checked: set.has(t.id) }));

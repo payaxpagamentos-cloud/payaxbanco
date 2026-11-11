@@ -57,6 +57,7 @@ function criarApp(db, extras = {}) {
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   r.use('/api/motorista/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   r.use('/api/usuario/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  r.use(/^\/api\/usuario\/seguros\/solicitar\/?$/i, limitar({ janelaMs: 60_000, maximo: 5 }));
   // Código de liberação: poucas tentativas por minuto (são 6 números).
   // As rotas do Express aceitam maiúsculas e a barra final: o limite tem de valer para essas formas também, senão é contornado.
   r.use(/^\/api\/empresas\/\d+\/liberacoes\/(consultar|aplicar)\/?$/i, limitar({ janelaMs: 60_000, maximo: 20 }));

@@ -200,6 +200,8 @@ module.exports = (db, extras = {}) => {
     if (String(req.body?.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '') !== x.placa) throw new ErroNegocio('Digite a placa para confirmar a exclusão.', 422);
     transacao(db, () => {
       db.prepare('DELETE FROM manutencao_registros WHERE veiculo_id = ?').run(x.id);
+      db.prepare('DELETE FROM usuario_final_veiculos WHERE veiculo_id = ?').run(x.id);
+      db.prepare('UPDATE seguros_contratacoes SET veiculo_id = NULL WHERE veiculo_id = ?').run(x.id);
       db.prepare('DELETE FROM veiculos WHERE id = ?').run(x.id);
     });
     registrar(db, req, 'veiculo_excluido', { placa: x.placa });
@@ -360,6 +362,7 @@ module.exports = (db, extras = {}) => {
     const x = motorista(req, req.params.id);
     transacao(db, () => {
       db.prepare('UPDATE veiculos SET motorista_id = NULL WHERE motorista_id = ?').run(x.id);
+      db.prepare('UPDATE seguros_contratacoes SET motorista_id = NULL WHERE motorista_id = ?').run(x.id);
       db.prepare('DELETE FROM motoristas WHERE id = ?').run(x.id);
     });
     registrar(db, req, 'motorista_excluido', { nome: x.nome });
@@ -957,7 +960,11 @@ module.exports = (db, extras = {}) => {
     registrar(db, req, 'seguro_margens_definidas', { total: tipos.length });
     res.json({ tipos });
   });
-  r.get('/seguros/contratacoes', (req, res) => res.json(seg.contratacoes(db, { empresaId: eid(req) })));
+  // O operador vê o valor de venda, mas não o custo nem a margem da empresa.
+  r.get('/seguros/contratacoes', (req, res) => {
+    const lista = seg.contratacoes(db, { empresaId: eid(req) });
+    res.json(req.usuario.perfil === 'operador' ? lista.map(({ custo_centavos: _c, margem_percent: _m, ...x }) => x) : lista);
+  });
   r.post('/seguros/contratar', async (req, res, next) => {
     try {
       const c = await seg.contratar(db, {
@@ -1013,13 +1020,15 @@ module.exports = (db, extras = {}) => {
   });
 
   r.get('/atendimento', gestor, (req, res) => {
-    const e = db.prepare('SELECT plano_nome, atend_whatsapp, atend_telefone, atend_horario FROM empresas WHERE id = ?').get(eid(req));
+    const e = db.prepare('SELECT plano_nome, plano_valor_centavos, atend_whatsapp, atend_telefone, atend_horario FROM empresas WHERE id = ?').get(eid(req));
     res.json(e);
   });
   r.put('/atendimento', gestor, (req, res) => {
     const d = req.body;
-    db.prepare('UPDATE empresas SET plano_nome = ?, atend_whatsapp = ?, atend_telefone = ?, atend_horario = ? WHERE id = ?').run(
-      v.opcional(d.plano_nome, 'o nome do plano', 60), v.opcional(d.atend_whatsapp, 'o WhatsApp', 30),
+    const valor = d.plano_valor_centavos === null || d.plano_valor_centavos === undefined || d.plano_valor_centavos === ''
+      ? null : v.inteiro(d.plano_valor_centavos, 'o valor do plano', { min: 0, max: 100_000_000 });
+    db.prepare('UPDATE empresas SET plano_nome = ?, plano_valor_centavos = ?, atend_whatsapp = ?, atend_telefone = ?, atend_horario = ? WHERE id = ?').run(
+      v.opcional(d.plano_nome, 'o nome do plano', 60), valor, v.opcional(d.atend_whatsapp, 'o WhatsApp', 30),
       v.opcional(d.atend_telefone, 'o telefone', 30), v.opcional(d.atend_horario, 'o horário', 120), eid(req));
     registrar(db, req, 'atendimento_alterado', undefined);
     res.json({ ok: true });

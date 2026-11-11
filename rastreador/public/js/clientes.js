@@ -6,7 +6,7 @@
 
 /** Gestão do app do cliente: usuários finais (acesso + veículos vinculados) e as informações de atendimento/plano. */
 import { api, BASE } from './api.js';
-import { el, limpar, toast, formModal, confirmar, perguntar, campo, marcar, etiqueta, placa } from './ui.js';
+import { el, limpar, toast, formModal, confirmar, perguntar, campo, marcar, etiqueta, placa, centavos, reaisCampo } from './ui.js';
 import { cartao, tabela, td, botaoIcone } from './comum.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
@@ -61,10 +61,11 @@ function formUsuario(ctx, veiculos, u) {
       campo(u ? 'Nova senha (opcional)' : 'Senha de acesso', { name: 'senha', type: 'text', maxlength: 60, placeholder: 'mínimo 6 caracteres' })),
     el('label', { class: 'rotulo-campo', style: 'display:block;margin-top:4px;font-weight:600;font-size:13px' }, 'Veículos que ele acompanha'),
     checks.length ? el('div', { class: 'lista-marcar' }, checks) : el('p', { class: 'mudo' }, 'Cadastre veículos primeiro em Frota → Veículos.'),
+    u ? marcar('Acesso ativo (desmarque para bloquear a entrada no app)', { name: 'ativo', checked: !!u.ativo }) : null,
   ], (d) => {
     const corpo = { nome: d.nome, email: d.email, cpf: d.cpf, telefone: d.telefone, veiculos: lerMarcados(checks) };
     if (d.senha) corpo.senha = d.senha;
-    if (u) corpo.ativo = true;
+    if (u) corpo.ativo = d.ativo === true;
     return u ? api.put(`${base(ctx)}/usuarios-app/${u.id}`, corpo) : api.post(`${base(ctx)}/usuarios-app`, corpo);
   }, { rotulo: u ? 'Salvar' : 'Criar acesso' });
 }
@@ -77,13 +78,15 @@ async function telaAtendimento(ctx) {
     btn.disabled = true;
     try {
       await api.put(`${base(ctx)}/atendimento`, {
-        plano_nome: form.plano_nome.value, atend_whatsapp: form.atend_whatsapp.value,
+        plano_nome: form.plano_nome.value, plano_valor_centavos: centavos(form.plano_valor.value) ?? null, atend_whatsapp: form.atend_whatsapp.value,
         atend_telefone: form.atend_telefone.value, atend_horario: form.atend_horario.value,
       });
       toast('Atendimento salvo.');
     } catch (err) { toast(err.message, true); } finally { btn.disabled = false; }
   } },
-    campo('Nome do plano (aparece no app do cliente)', { name: 'plano_nome', maxlength: 60, value: a.plano_nome ?? '', placeholder: 'Rastreamento' }),
+    el('div', { class: 'duas' },
+      campo('Nome do plano (aparece no app do cliente)', { name: 'plano_nome', maxlength: 60, value: a.plano_nome ?? '', placeholder: 'Rastreamento' }),
+      campo('Mensalidade cobrada do cliente (R$)', { name: 'plano_valor', inputmode: 'decimal', value: reaisCampo(a.plano_valor_centavos), placeholder: 'em branco = não mostrar' })),
     el('div', { class: 'duas' },
       campo('WhatsApp do atendimento', { name: 'atend_whatsapp', inputmode: 'tel', maxlength: 30, value: a.atend_whatsapp ?? '', placeholder: '(41) 99999-9999' }),
       campo('Telefone / central', { name: 'atend_telefone', inputmode: 'tel', maxlength: 30, value: a.atend_telefone ?? '', placeholder: '0800 000 0000' })),
