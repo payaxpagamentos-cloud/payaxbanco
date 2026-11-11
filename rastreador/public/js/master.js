@@ -560,47 +560,62 @@ async function esperarReinicio(versaoNova, status) {
 
 async function telaSistema(ctx) {
   const info = await api.get('/master/sistema');
-  const arquivo = el('input', { type: 'file', accept: '.zip,application/zip' });
+  const ultima = (info.historico || []).find((h) => h.acao === 'sistema_atualizado');
+
+  const arquivo = el('input', { type: 'file', accept: '.zip,application/zip', style: 'display:none' });
+  const nomeArq = el('span', { class: 'mudo' }, 'Nenhum arquivo escolhido');
+  arquivo.addEventListener('change', () => { nomeArq.textContent = arquivo.files?.[0]?.name || 'Nenhum arquivo escolhido'; });
+  const seletor = el('label', { class: 'seletor-arquivo' }, icone('baixar'),
+    el('div', {}, el('strong', {}, 'Escolher o arquivo da atualização'), el('br'), nomeArq), arquivo);
+  const senha = el('input', { type: 'password', autocomplete: 'current-password', placeholder: 'sua senha' });
   const status = el('div');
   const enviar = el('button', { class: 'btn primario' }, 'Enviar e atualizar');
   enviar.addEventListener('click', () => acao(enviar, async () => {
     const f = arquivo.files?.[0];
     if (!f) { toast('Escolha o arquivo .zip da atualização.', true); return; }
-    if (!await confirmar('Atualizar o sistema', `Vou instalar "${f.name}" e reiniciar o sistema (alguns segundos). Seus dados — veículos, empresas, histórico — e a configuração são preservados. Continuar?`, 'Atualizar agora')) return;
+    if (!senha.value) { toast('Digite a sua senha para confirmar.', true); return; }
     limpar(status, el('p', { class: 'mudo' }, 'Enviando o arquivo…'));
     const buf = await f.arrayBuffer();
     let resp;
     try {
       resp = await fetch(`${BASE}/api/master/sistema/atualizar`, {
-        method: 'POST', headers: { Authorization: `Bearer ${sessao.get()?.token ?? ''}`, 'Content-Type': 'application/octet-stream' }, body: buf,
+        method: 'POST', headers: { Authorization: `Bearer ${sessao.get()?.token ?? ''}`, 'Content-Type': 'application/octet-stream', 'x-confirmacao': senha.value }, body: buf,
       });
     } catch { throw new Error('Falha ao enviar o arquivo. Verifique a internet e tente de novo.'); }
     if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.erro || `Erro ${resp.status} ao atualizar.`); }
     const r = await resp.json();
+    senha.value = '';
     limpar(status, el('p', { class: 'mudo' }, `Arquivo recebido (versão ${r.versao}). O sistema está reiniciando…`));
     await esperarReinicio(r.versao, status);
   }));
 
-  const partes = [
-    linhaDado('Versão instalada', info.versao || '—'),
-    linhaDado('Node.js', info.node),
-    el('p', { class: 'mudo', style: 'margin:12px 0' }, 'Escolha o arquivo .zip da atualização e clique em “Enviar e atualizar”. O sistema instala e reinicia sozinho em poucos segundos. Seus dados (veículos, empresas, histórico) e a configuração são preservados — nada é apagado.'),
-    el('div', { class: 'linha', style: 'gap:10px;flex-wrap:wrap' }, arquivo, enviar),
-    status,
-  ];
-  if (info.backups?.length) {
-    const reverter = el('button', { class: 'btn' }, 'Reverter para a versão anterior');
-    reverter.addEventListener('click', () => acao(reverter, async () => {
-      if (!await confirmar('Voltar à versão anterior', 'Restaura a última versão guardada e reinicia o sistema. Seus dados continuam intactos. Continuar?', 'Reverter')) return;
-      const r = await api.post('/master/sistema/reverter');
-      limpar(status, el('p', { class: 'mudo' }, 'Revertendo e reiniciando…'));
-      await esperarReinicio(r.versao, status);
-    }));
-    partes.push(el('div', { style: 'margin-top:18px;border-top:1px solid var(--border);padding-top:14px' },
-      el('p', { class: 'pequeno fraco', style: 'margin:0 0 8px' }, `${info.backups.length} backup(s) guardado(s). Se algo sair errado depois de atualizar, volte aqui e reverta.`),
-      reverter));
-  }
-  limpar(ctx.conteudo, cartao('Atualizar o sistema', ...partes));
+  const linhaHist = (h) => {
+    const d = h.detalhes || {};
+    const txt = h.acao === 'sistema_revertido' ? `↩ Revertido → ${d.para || '—'}` : `${d.de || '—'} → ${d.para || '—'}`;
+    return linhaDado(txt, `${dataHora(h.criado_em)}${h.usuario ? ` · ${h.usuario}` : ''}`);
+  };
+  const reverter = info.backups?.length ? el('button', { class: 'btn' }, 'Reverter para a versão anterior') : null;
+  if (reverter) reverter.addEventListener('click', () => acao(reverter, async () => {
+    const s = await perguntar('Voltar à versão anterior', 'Digite a sua senha para confirmar. O sistema reinicia na versão anterior; os dados continuam intactos.');
+    if (!s) return;
+    const r = await api.post('/master/sistema/reverter', { senha: s });
+    limpar(status, el('p', { class: 'mudo' }, 'Revertendo e reiniciando…'));
+    await esperarReinicio(r.versao, status);
+  }));
+
+  limpar(ctx.conteudo,
+    cartao('Atualizar o sistema',
+      el('p', { class: 'mudo', style: 'margin:0 0 14px' }, 'Envie aqui o arquivo da atualização (rastreador-AAAA.MM.NN.zip). O sistema confere o arquivo e instala sozinho, do mesmo jeito que a atualização pelo terminal. Se a versão nova não subir, ele volta para a anterior.'),
+      linhaDado('Versão instalada', info.versao || '—'),
+      linhaDado('Node.js', info.node),
+      ultima ? el('p', { class: 'aviso ok', style: 'margin:14px 0 0' }, `✓ Atualizado para a versão ${ultima.detalhes?.para || info.versao} em ${dataHora(ultima.criado_em)}.`) : null,
+      el('h3', { style: 'margin:22px 0 10px;font-size:15px' }, 'Enviar uma versão nova'),
+      seletor,
+      el('label', { class: 'campo', style: 'margin-top:12px;max-width:320px' }, 'Sua senha (para confirmar)', senha),
+      el('div', { class: 'linha', style: 'margin-top:14px' }, enviar),
+      status),
+    cartao('Atualizações', (info.historico || []).length ? el('div', {}, info.historico.map(linhaHist)) : el('p', { class: 'mudo', style: 'margin:0' }, 'Ainda sem atualizações registradas.')),
+    reverter ? cartao('Segurança', el('p', { class: 'pequeno fraco', style: 'margin:0 0 10px' }, `${info.backups.length} backup(s) guardado(s). Se algo sair errado depois de atualizar, reverta para a versão anterior.`), reverter) : null);
 }
 
 export const TELAS_MASTER = {

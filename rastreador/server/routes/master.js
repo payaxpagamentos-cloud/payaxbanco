@@ -13,6 +13,7 @@ const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { criarUsuario, alterarUsuario, criarChave } = require('../lib/contas');
+const { verificarSenha } = require('../lib/senha');
 const { veiculosMapa, csv, reais, enviarCsv } = require('../lib/relatorios');
 const { hoje, somarDias } = require('../lib/datas');
 const zap = require('../lib/whatsapp');
@@ -513,16 +514,29 @@ module.exports = (db, extras = {}) => {
 
   // ---------- Atualização do sistema pelo painel (só master) ----------
   const reiniciarEmBreve = () => setTimeout(() => process.exit(0), 1200); // o PM2/Docker sobe de novo com o código novo
-  r.get('/sistema', soMaster, (_req, res) => res.json(atualizador.estado()));
+  // Confere a senha do master antes de atualizar/reverter (vem no cabeçalho x-confirmacao, ou no corpo quando é JSON).
+  const conferirSenha = (req) => {
+    const senha = String(req.get('x-confirmacao') ?? (Buffer.isBuffer(req.body) ? '' : req.body?.senha) ?? '');
+    const u = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(req.usuario.id);
+    if (!u || !verificarSenha(senha, u.senha_hash)) throw new ErroNegocio('Senha incorreta. Confirme a sua senha para continuar.', 401);
+  };
+  const historicoSistema = () => db.prepare(`SELECT a.acao, a.detalhes, a.criado_em, u.nome AS usuario
+    FROM auditoria a LEFT JOIN usuarios u ON u.id = a.usuario_id
+    WHERE a.acao IN ('sistema_atualizado', 'sistema_revertido') ORDER BY a.id DESC LIMIT 15`).all()
+    .map((h) => ({ acao: h.acao, usuario: h.usuario, criado_em: h.criado_em, detalhes: h.detalhes ? JSON.parse(h.detalhes) : {} }));
+
+  r.get('/sistema', soMaster, (_req, res) => res.json({ ...atualizador.estado(), historico: historicoSistema() }));
   r.post('/sistema/atualizar', soMaster, raw({ type: '*/*', limit: '80mb' }), (req, res) => {
+    conferirSenha(req);
     const out = atualizador.aplicar(req.body);
     registrar(db, req, 'sistema_atualizado', { de: out.anterior, para: out.versao });
     res.json({ ok: true, versao: out.versao });
     reiniciarEmBreve();
   });
   r.post('/sistema/reverter', soMaster, (req, res) => {
+    conferirSenha(req);
     const out = atualizador.reverter();
-    registrar(db, req, 'sistema_revertido', { versao: out.versao });
+    registrar(db, req, 'sistema_revertido', { de: out.de, para: out.versao });
     res.json({ ok: true, versao: out.versao });
     reiniciarEmBreve();
   });

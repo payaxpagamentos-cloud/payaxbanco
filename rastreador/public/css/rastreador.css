@@ -1285,3 +1285,9 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 .seguro-card .seguro-margem{ font-size: 11px; margin-top: -4px; }
 .campo-pct{ display: inline-flex; align-items: center; gap: 4px; }
 .campo-pct input{ text-align: right; }
+
+/* ---------- Atualizar o sistema ---------- */
+.seletor-arquivo{ display: flex; align-items: center; gap: 12px; padding: 16px; border: 2px dashed var(--border); border-radius: 12px; cursor: pointer; color: var(--text-2); max-width: 560px; }
+.seletor-arquivo:hover{ border-color: var(--azul); background: var(--azul-suave); }
+.seletor-arquivo svg{ width: 22px; height: 22px; color: var(--azul); flex: none; }
+.seletor-arquivo strong{ color: var(--text); font-size: 14px; }
