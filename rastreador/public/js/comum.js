@@ -72,6 +72,9 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
   limpar(ctx.conteudo, el('div', { class: 'tela-mapa' },
     el('aside', { class: 'lado' }, busca, contagem, lista),
     el('div', { class: 'area-mapa' }, divMapa, painel)));
+  // A lista de veículos é pedida junto com a montagem do mapa (antes era uma coisa depois da outra).
+  let primeira = api.get(caminho);
+  primeira.catch(() => {});
   const mapa = await criarMapa(divMapa);
   const marcadores = new Map();
   const camadasCercas = [];
@@ -124,7 +127,9 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
   }
 
   async function carregar() {
-    const r = await api.get(caminho);
+    const pedido = primeira ?? api.get(caminho);
+    primeira = null;
+    const r = await pedido;
     veiculos = r.veiculos;
     if (mapa && r.cercas && !camadasCercas.length) for (const c of r.cercas) camadasCercas.push(mapa.cerca(c));
     if (mapa) {

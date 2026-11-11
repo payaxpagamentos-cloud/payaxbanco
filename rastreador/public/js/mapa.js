@@ -280,13 +280,14 @@ async function fundo(L, m, div, cfg) {
     if (!seletor && base.temSatelite) seletor = seletorCamada(L, m, () => atual, (novo) => { atual = novo; aplicar(); });
   };
   const trocarBase = (nova) => {
-    if (!div.isConnected) return nova.remover();
+    if (!div.isConnected || div._mapaFechado) return nova.remover();
     base?.remover();
     base = nova;
     aplicar();
     colocarSeletor();
   };
-  div._limparFundo = () => { base?.remover(); base = null; };
+  div._mapaFechado = false;
+  div._limparFundo = () => { div._mapaFechado = true; base?.remover(); base = null; };
 
   if (cfg.google) {
     trocarBase(fundoGoogle(L, m, cfg.google));
@@ -411,7 +412,8 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
   const m = L.map(div, { zoomControl: false, attributionControl: true, maxZoom: 20, zoomSnap: 0.5, wheelPxPerZoomLevel: 90 }).setView(cfg.mapa.centro, zoom);
   // Rodapé só com os créditos do mapa (sem o prefixo padrão do Leaflet, que traz uma bandeira).
   m.attributionControl.setPrefix(false);
-  await fundo(L, m, div, cfg);
+  // O fundo (Google ou MapLibre) carrega em paralelo: os veículos já aparecem enquanto as imagens do mapa chegam.
+  fundo(L, m, div, cfg).catch(() => {});
   if (busca && cfg.busca && sessao.get()?.token) campoBusca(L, m);
   const limparCheia = telaCheia(L, m, div);
   L.control.zoom({ position: 'topright' }).addTo(m);
