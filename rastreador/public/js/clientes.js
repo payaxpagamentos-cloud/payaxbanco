@@ -6,7 +6,7 @@
 
 /** Gestão do app do cliente: usuários finais (acesso + veículos vinculados) e as informações de atendimento/plano. */
 import { api, BASE } from './api.js';
-import { el, limpar, toast, formModal, confirmar, perguntar, campo, marcar, etiqueta, placa, dataHora } from './ui.js';
+import { el, limpar, toast, formModal, confirmar, perguntar, campo, marcar, etiqueta, placa } from './ui.js';
 import { cartao, tabela, td, botaoIcone } from './comum.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
