@@ -5,7 +5,7 @@
 */
 /** Telas do painel da empresa (administrador e operador; o master entra pela lista de empresas). */
 import { api, qs, baixar, BASE } from './api.js';
-import { el, limpar, dinheiro, dataHora, hora, data, desde, km, kmh, placa, telefone, inteiro, toast, acao, campo, escolha, marcar, formModal, modal, confirmar,
+import { etiquetaRele, el, limpar, dinheiro, dataHora, hora, data, desde, km, kmh, placa, telefone, inteiro, toast, acao, campo, escolha, marcar, formModal, modal, confirmar,
   perguntar, repetir, etiqueta, etiquetaSituacao, etiquetaComando, etiquetaAlerta, hojeLocal, somarDias, centavos, reaisCampo, icone, PERFIS, TIPOS_VEICULO,
   TIPOS_ALERTA, TIPOS_COMANDO, PROTOCOLOS, ALERTAS_SEGURANCA } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, linhaDado, campoData, painelMapa, faixaVeiculo, painelIntegracoes, blocoDestaque } from './comum.js';
@@ -126,7 +126,7 @@ export function detalheVeiculo(ctx, v, painel, fechar, { mostrarEmpresa = false 
       emRoubo ? el('a', { class: 'etiqueta erro forte', href: linkEmpresa('roubo'), style: 'text-decoration:none' }, 'MODO ROUBO') : null,
       v.ocorrencia_tipo === 'manual' ? etiqueta(v.roubo === 'aguardando' ? 'corte aguardando velocidade segura' : STATUS_ROUBO[v.roubo]?.[0] ?? v.roubo, 'aviso') : null,
       v.ocorrencia_tipo === 'agenda' ? el('a', { class: 'etiqueta aviso', href: linkEmpresa('bloqueio-programado'), style: 'text-decoration:none' }, 'bloqueio programado') : null,
-      v.bloqueado && !emRoubo ? etiqueta('bloqueado', 'erro') : null,
+      !emRoubo ? etiquetaRele(v) : null,
       v.estacionado ? el('a', { class: 'etiqueta info', href: linkEmpresa('estacionados'), style: 'text-decoration:none' }, 'estacionado') : null,
       v.alertas_pendentes ? el('a', { class: 'etiqueta aviso', href: linkEmpresa('alertas'), style: 'text-decoration:none' }, `${v.alertas_pendentes} alerta(s)`) : null],
     acoes: [
@@ -404,7 +404,7 @@ async function telaVeiculos(ctx) {
         td(x.imei ? [el('span', { class: 'mono pequeno' }, x.imei), el('div', { class: 'pequeno mudo' }, x.rastreador_modelo ?? PROTOCOLOS[x.protocolo])] : '—'),
         td([x.motorista ?? (x.condutor ? null : '—'), x.condutor && x.condutor !== x.motorista ? el('div', { class: 'pequeno' }, etiqueta(`com ${x.condutor} (QR)`, 'info')) : null]),
         td(x.limite_velocidade_kmh ? kmh(x.limite_velocidade_kmh) : '—', 'dir num'), td(km(x.hodometro_m), 'dir num'),
-        td([etiquetaSituacao(x.situacao), x.bloqueado ? etiqueta('bloqueado', 'erro') : null]),
+        td([etiquetaSituacao(x.situacao), etiquetaRele(x)]),
         el('td', { class: 'acoes' },
           pode(ctx) && x.ativo && !semComandos(x) ? (x.bloqueado
             ? botaoIcone('aberto', 'Desbloquear o veículo', async () => { await enviarComando(ctx, x, 'desbloquear'); carregar(); }, 'desbloquear')
