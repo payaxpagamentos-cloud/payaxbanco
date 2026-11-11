@@ -4,9 +4,9 @@
  criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
 */
 /** Telas do master (equipe da plataforma). */
-import { api, qs, baixar } from './api.js';
+import { api, qs, baixar, sessao, BASE } from './api.js';
 import { el, limpar, dinheiro, dataHora, data, desde, inteiro, toast, campo, area, escolha, marcar, formModal, perguntar, confirmar, repetir, telefone, etiqueta, placa,
-  TIPOS_EMPRESA, PERFIS, PROTOCOLOS, MODELOS_RASTREADOR, reaisCampo, centavos, icone } from './ui.js';
+  TIPOS_EMPRESA, PERFIS, PROTOCOLOS, MODELOS_RASTREADOR, reaisCampo, centavos, icone, acao } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, painelMapa, painelIntegracoes, situacaoDiag, linhaDado, blocoDestaque } from './comum.js';
 import { configPublica } from './mapa.js';
 import { detalheVeiculo } from './empresa.js';
@@ -538,7 +538,73 @@ async function telaAtividades(ctx) {
   await carregar();
 }
 
+// ---------- Atualizar o sistema (só master): sobe o .zip e o sistema reinicia sozinho ----------
+async function esperarReinicio(versaoNova, status) {
+  for (let i = 0; i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const resp = await fetch(`${BASE}/api/saude`, { cache: 'no-store' });
+      if (resp.ok) {
+        const j = await resp.json().catch(() => ({}));
+        if (j.versao === versaoNova) {
+          limpar(status, el('p', { class: 'aviso ok' }, `✅ Atualizado! Agora na versão ${j.versao}. Recarregando a página…`));
+          setTimeout(() => location.reload(), 2500);
+          return;
+        }
+      }
+    } catch { /* ainda reiniciando */ }
+    limpar(status, el('p', { class: 'mudo' }, `Reiniciando o sistema… aguarde (${i + 1})`));
+  }
+  limpar(status, el('p', { class: 'aviso' }, 'O sistema está demorando a voltar. Recarregue a página (F5) em alguns segundos.'));
+}
+
+async function telaSistema(ctx) {
+  const info = await api.get('/master/sistema');
+  const arquivo = el('input', { type: 'file', accept: '.zip,application/zip' });
+  const status = el('div');
+  const enviar = el('button', { class: 'btn primario' }, 'Enviar e atualizar');
+  enviar.addEventListener('click', () => acao(enviar, async () => {
+    const f = arquivo.files?.[0];
+    if (!f) { toast('Escolha o arquivo .zip da atualização.', true); return; }
+    if (!await confirmar('Atualizar o sistema', `Vou instalar "${f.name}" e reiniciar o sistema (alguns segundos). Seus dados — veículos, empresas, histórico — e a configuração são preservados. Continuar?`, 'Atualizar agora')) return;
+    limpar(status, el('p', { class: 'mudo' }, 'Enviando o arquivo…'));
+    const buf = await f.arrayBuffer();
+    let resp;
+    try {
+      resp = await fetch(`${BASE}/api/master/sistema/atualizar`, {
+        method: 'POST', headers: { Authorization: `Bearer ${sessao.get()?.token ?? ''}`, 'Content-Type': 'application/octet-stream' }, body: buf,
+      });
+    } catch { throw new Error('Falha ao enviar o arquivo. Verifique a internet e tente de novo.'); }
+    if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.erro || `Erro ${resp.status} ao atualizar.`); }
+    const r = await resp.json();
+    limpar(status, el('p', { class: 'mudo' }, `Arquivo recebido (versão ${r.versao}). O sistema está reiniciando…`));
+    await esperarReinicio(r.versao, status);
+  }));
+
+  const partes = [
+    linhaDado('Versão instalada', info.versao || '—'),
+    linhaDado('Node.js', info.node),
+    el('p', { class: 'mudo', style: 'margin:12px 0' }, 'Escolha o arquivo .zip da atualização e clique em “Enviar e atualizar”. O sistema instala e reinicia sozinho em poucos segundos. Seus dados (veículos, empresas, histórico) e a configuração são preservados — nada é apagado.'),
+    el('div', { class: 'linha', style: 'gap:10px;flex-wrap:wrap' }, arquivo, enviar),
+    status,
+  ];
+  if (info.backups?.length) {
+    const reverter = el('button', { class: 'btn' }, 'Reverter para a versão anterior');
+    reverter.addEventListener('click', () => acao(reverter, async () => {
+      if (!await confirmar('Voltar à versão anterior', 'Restaura a última versão guardada e reinicia o sistema. Seus dados continuam intactos. Continuar?', 'Reverter')) return;
+      const r = await api.post('/master/sistema/reverter');
+      limpar(status, el('p', { class: 'mudo' }, 'Revertendo e reiniciando…'));
+      await esperarReinicio(r.versao, status);
+    }));
+    partes.push(el('div', { style: 'margin-top:18px;border-top:1px solid var(--border);padding-top:14px' },
+      el('p', { class: 'pequeno fraco', style: 'margin:0 0 8px' }, `${info.backups.length} backup(s) guardado(s). Se algo sair errado depois de atualizar, volte aqui e reverta.`),
+      reverter));
+  }
+  limpar(ctx.conteudo, cartao('Atualizar o sistema', ...partes));
+}
+
 export const TELAS_MASTER = {
+  sistema: telaSistema,
   dashboard: telaDashboard, mapa: telaMapa, empresas: telaEmpresas, financeiro: telaFinanceiro, rastreadores: telaRastreadores, usuarios: telaUsuarios, diagnostico: telaDiagnostico,
   configuracoes: telaConfiguracoes, 'comandos-gt06': telaComandosGt06, integracoes: telaIntegracoes, atividades: telaAtividades,
   whatsapp: telaWhatsapp, 'assistente-ia': telaAssistenteIa,
