@@ -86,6 +86,15 @@ export const STATUS_COMANDO = {
 };
 export const etiqueta = (texto, tipo = '') => el('span', { class: `etiqueta ${tipo}` }, texto);
 export const etiquetaSituacao = (s) => etiqueta(SITUACOES[s]?.[0] ?? s, SITUACOES[s]?.[1]);
+/**
+ * Situação do corte (relé) para o operador: "bloqueando…"/"desbloqueando…" enquanto o rastreador não confirma o comando,
+ * depois "bloqueado" ou "desbloqueado". Só para veículos com rastreador que recebe comandos (GT06).
+ */
+export const etiquetaRele = (v) => {
+  if (v.rele_pendente) return etiqueta(v.rele_pendente === 'bloquear' ? 'bloqueando…' : 'desbloqueando…', 'aviso');
+  if (v.bloqueado) return etiqueta('bloqueado', 'erro');
+  return v.protocolo === 'gt06' ? etiqueta('desbloqueado', 'ok') : null;
+};
 export const etiquetaComando = (s) => etiqueta(STATUS_COMANDO[s]?.[0] ?? s, STATUS_COMANDO[s]?.[1]);
 export const etiquetaAlerta = (t) => etiqueta(TIPOS_ALERTA[t] ?? t, ALERTAS_GRAVES.includes(t) ? 'erro' : 'aviso');
 

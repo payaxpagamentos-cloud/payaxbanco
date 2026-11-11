@@ -5,7 +5,7 @@
 */
 /** Peças usadas tanto no painel do master quanto no das empresas. */
 import { api, BASE } from './api.js';
-import { el, limpar, dataHora, desde, km, kmh, placa, telefone, toast, acao, campo, escolha, modal, formModal, confirmar, icone, repetir, etiquetaSituacao, etiqueta,
+import { etiquetaRele, el, limpar, dataHora, desde, km, kmh, placa, telefone, toast, acao, campo, escolha, modal, formModal, confirmar, icone, repetir, etiquetaSituacao, etiqueta,
   SITUACOES, TIPOS_VEICULO } from './ui.js';
 import { criarMapa, linkGoogle, linkStreetView, linkRota, enderecoDe } from './mapa.js';
 
@@ -96,8 +96,9 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
       el('div', { class: 'pequeno mudo' }, [v.descricao, mostrarEmpresa ? v.empresa : v.motorista].filter(Boolean).join(' · ') || TIPOS_VEICULO[v.tipo]),
       el('div', { class: 'pequeno fraco linha entre' }, el('span', {}, v.posicao_em ? `${kmh(v.velocidade_kmh)} · ${v.ignicao === 1 ? 'ligado' : v.ignicao === 0 ? 'desligado' : 'ignição ?'}` : 'sem posição'),
         el('span', {}, desde(v.comunicacao_em))),
-      v.alertas_pendentes || v.bloqueado ? el('div', { class: 'marcas' },
-        v.bloqueado ? el('span', { class: 'texto-erro' }, '● Bloqueado') : null,
+      v.alertas_pendentes || v.bloqueado || v.rele_pendente ? el('div', { class: 'marcas' },
+        v.rele_pendente ? el('span', { class: 'texto-aviso' }, v.rele_pendente === 'bloquear' ? '● Bloqueando…' : '● Desbloqueando…')
+          : v.bloqueado ? el('span', { class: 'texto-erro' }, '● Bloqueado') : null,
         v.alertas_pendentes ? el('span', { class: 'texto-aviso' }, `● ${v.alertas_pendentes} ${v.alertas_pendentes === 1 ? 'alerta' : 'alertas'}`) : null) : null))
       : el('p', { class: 'mudo pequeno', style: 'padding:8px' }, veiculos.length ? 'Nenhum veículo com esse filtro.' : 'Nenhum veículo cadastrado.'));
     for (const [id, mk] of marcadores) mk.selecionar(id === estado.selecionado);
@@ -108,7 +109,7 @@ export async function painelMapa(ctx, caminho, { detalhe, mostrarEmpresa = false
     desenharLista();
     if (!detalhe) {
       limpar(painel, faixaVeiculo(v, {
-        titulo: [v.descricao, v.empresa].filter(Boolean).join(' · '), etiquetas: [etiquetaSituacao(v.situacao), v.bloqueado ? etiqueta('bloqueado', 'erro') : null],
+        titulo: [v.descricao, v.empresa].filter(Boolean).join(' · '), etiquetas: [etiquetaSituacao(v.situacao), etiquetaRele(v)],
         acoes: [mostrarEmpresa ? el('a', { class: 'btn pequeno', href: `#/empresa/${v.empresa_id}/mapa` }, 'Abrir no painel da empresa') : null], fechar: fecharPainel,
       }));
     } else {

@@ -473,6 +473,27 @@ test('Rastreador', async (t) => {
     assert.equal((await api.get(`${base()}/mapa`, cliente)).dados.veiculos.find((x) => x.id === veiculo).motorista, 'João Silva');
   });
 
+  await t.test('estado do relé: vale também no sinal de vida (sem GPS) e respeita o relé invertido', async () => {
+    const { receber } = require('../server/lib/posicoes');
+    const db = api.db;
+    const bloq = () => db.prepare('SELECT bloqueado FROM veiculos WHERE id = ?').get(veiculo).bloqueado;
+    const rid = db.prepare('SELECT rastreador_id FROM veiculos WHERE id = ?').get(veiculo).rastreador_id;
+    const antes = db.prepare('SELECT * FROM veiculos WHERE id = ?').get(veiculo);
+    // Sinal de vida do GT06: estado sem posição.
+    receber(db, { imei: IMEI, protocolo: 'gt06', bloqueado: true, ignicao: false });
+    assert.equal(bloq(), 1, 'relé normal: acionado = bloqueado');
+    receber(db, { imei: IMEI, protocolo: 'gt06', bloqueado: false, ignicao: false });
+    assert.equal(bloq(), 0, 'relé normal: solto = liberado');
+    db.prepare('UPDATE rastreadores SET rele_invertido = 1 WHERE id = ?').run(rid);
+    receber(db, { imei: IMEI, protocolo: 'gt06', bloqueado: true, ignicao: true });
+    assert.equal(bloq(), 0, 'relé invertido: acionado = liberado');
+    receber(db, { imei: IMEI, protocolo: 'gt06', bloqueado: false, ignicao: false });
+    assert.equal(bloq(), 1, 'relé invertido: solto = bloqueado');
+    db.prepare('UPDATE rastreadores SET rele_invertido = 0 WHERE id = ?').run(rid);
+    const cols = Object.keys(antes).filter((k) => k !== 'id');
+    db.prepare(`UPDATE veiculos SET ${cols.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...cols.map((k) => antes[k]), veiculo);
+  });
+
   await t.test('modo roubo: bloqueio inteligente só corta abaixo da velocidade segura', async () => {
     const { receber } = require('../server/lib/posicoes');
     const { responder } = require('../server/lib/comandos');

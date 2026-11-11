@@ -109,7 +109,8 @@ module.exports = (db, extras = {}) => {
   // ---------- Veículos ----------
   r.get('/veiculos', (req, res) => {
     const cfg = lerConfig(db);
-    const lista = db.prepare(`SELECT v.*, r.imei, r.protocolo, r.modelo AS rastreador_modelo, m.nome AS motorista, mc.nome AS condutor, ca.inicio AS condutor_desde
+    const lista = db.prepare(`SELECT v.*, r.imei, r.protocolo, r.modelo AS rastreador_modelo, m.nome AS motorista, mc.nome AS condutor, ca.inicio AS condutor_desde,
+      (SELECT c.tipo FROM comandos c WHERE c.veiculo_id = v.id AND c.status IN ('pendente','enviado') AND c.tipo IN ('bloquear','desbloquear') ORDER BY c.id DESC LIMIT 1) AS rele_pendente
       FROM veiculos v LEFT JOIN rastreadores r ON r.id = v.rastreador_id LEFT JOIN motoristas m ON m.id = v.motorista_id
       LEFT JOIN condutores ca ON ca.veiculo_id = v.id AND ca.fim IS NULL LEFT JOIN motoristas mc ON mc.id = ca.motorista_id
       WHERE v.empresa_id = ? ORDER BY v.ativo DESC, v.placa`).all(eid(req));
