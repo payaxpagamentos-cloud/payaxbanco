@@ -183,7 +183,8 @@ function receber(db, m) {
         mudar.fora_horario_alertado = 0;
       }
       if (tensao !== null) mudar.tensao = tensao;
-      if (typeof m.bloqueado === 'boolean') mudar.bloqueado = m.bloqueado ? 1 : 0;
+      // O aparelho informa se o relé está acionado; com o relé ligado ao contrário (sentido invertido), acionado = liberado.
+      if (typeof m.bloqueado === 'boolean') mudar.bloqueado = (r.rele_invertido ? !m.bloqueado : m.bloqueado) ? 1 : 0;
     }
     if (evento) alertarEvento(db, v, evento, pos);
 
