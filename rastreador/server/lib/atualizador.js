@@ -21,8 +21,10 @@ const MANTER_BACKUPS = 3;
 function versaoAtual() {
   try { return JSON.parse(fs.readFileSync(path.join(RAIZ, 'server', 'versao.json'), 'utf8')).versao; } catch { return null; }
 }
+// Do mais novo para o mais antigo, pela hora gravada no fim do nome (backup-<versão>-<timestamp>), não pela ordem alfabética.
+const horaDoBackup = (nome) => Number(nome.slice(nome.lastIndexOf('-') + 1)) || 0;
 function backupsExistentes() {
-  try { return fs.readdirSync(DIR_BACKUP).filter((n) => n.startsWith('backup-')).sort().reverse(); } catch { return []; }
+  try { return fs.readdirSync(DIR_BACKUP).filter((n) => n.startsWith('backup-')).sort((a, b) => horaDoBackup(b) - horaDoBackup(a)); } catch { return []; }
 }
 function estado() {
   return { versao: versaoAtual(), node: process.versions.node, backups: backupsExistentes() };

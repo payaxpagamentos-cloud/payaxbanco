@@ -114,6 +114,7 @@ async function inicio() {
   try {
     painelDados = await chamar('GET', '/painel');
   } catch (err) {
+    if (!sessao) return; // sessão expirou: chamar() já mostrou a tela de entrar
     limpar(raiz, el('p', { class: 'carregando-app' }, err.message));
     return;
   }
@@ -173,9 +174,10 @@ function cardPlano(p) {
       el('div', {}, el('div', { style: 'font-weight:800;color:var(--nav);font-size:16px' }, p.nome),
         el('div', { class: 'veic-sub' }, 'Monitoramento 24h · app e painel')),
       el('span', { class: 'badge-ok' }, '● Ativo')),
-    el('div', { style: 'margin-top:12px' },
+    // A mensalidade só aparece quando a empresa definiu o valor cobrado do cliente.
+    p.mensalidade_centavos != null ? el('div', { style: 'margin-top:12px' },
       el('div', { class: 'linha' }, el('span', { class: 'k' }, 'Mensalidade'),
-        el('span', { class: 'preco' }, p.mensalidade_centavos ? dinheiro(p.mensalidade_centavos) : 'Incluso', p.mensalidade_centavos ? el('small', {}, '/mês') : null)))));
+        el('span', { class: 'preco' }, dinheiro(p.mensalidade_centavos), el('small', {}, '/mês')))) : null));
 }
 
 function cardSeguros(seguros) {
@@ -252,12 +254,17 @@ async function sheetSeguros() {
 
 async function solicitar(t, selV, fundo) {
   const veiculoId = selV ? selV.querySelector('select').value : null;
+  const botoes = [...fundo.querySelectorAll('button.opt')];
+  botoes.forEach((b) => { b.disabled = true; }); // evita dois pedidos com toque duplo
   try {
     await chamar('POST', '/seguros/solicitar', { tipo_id: t.id, veiculo_id: veiculoId });
     fundo.remove();
     toast('Solicitação enviada! A empresa vai confirmar a contratação.');
     inicio();
-  } catch (err) { toast(err.message, true); }
+  } catch (err) {
+    botoes.forEach((b) => { b.disabled = false; });
+    toast(err.message, true);
+  }
 }
 
 // placa com hífen (ABC1D23 fica ABC-1D23); se não bater o padrão, mostra como está.

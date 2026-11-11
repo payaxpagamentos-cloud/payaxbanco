@@ -596,6 +596,7 @@ CREATE TABLE IF NOT EXISTS seguros_contratacoes (
   usuario_id INTEGER REFERENCES usuarios(id),
   veiculo_id INTEGER REFERENCES veiculos(id),
   motorista_id INTEGER REFERENCES motoristas(id),
+  usuario_final_id INTEGER,
   status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','enviada','emitida','recusada','cancelada')),
   referencia_externa TEXT,
   apolice_numero TEXT,
@@ -709,7 +710,7 @@ function migrar(db) {
   const NOVAS = {
     veiculos: { consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
     empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0',
-      plano_nome: 'TEXT', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT' },
+      plano_nome: 'TEXT', plano_valor_centavos: 'INTEGER', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT' },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
     motoristas: { senha_hash: 'TEXT', app_ultimo_acesso: 'TEXT' },
     rastreadores: { rele_invertido: 'INTEGER NOT NULL DEFAULT 0', sinal_gsm: 'INTEGER', firmware: 'TEXT', perfil: "TEXT NOT NULL DEFAULT 'padrao'", saude: 'TEXT', saude_em: 'TEXT' },
@@ -718,7 +719,7 @@ function migrar(db) {
     ia_uso: { tokens_entrada: 'INTEGER NOT NULL DEFAULT 0', tokens_saida: 'INTEGER NOT NULL DEFAULT 0' },
     seguros_tipos: { custo_centavos: 'INTEGER' },
     empresa_seguros: { margem_percent: 'REAL NOT NULL DEFAULT 0' },
-    seguros_contratacoes: { custo_centavos: 'INTEGER', margem_percent: 'REAL' },
+    seguros_contratacoes: { custo_centavos: 'INTEGER', margem_percent: 'REAL', usuario_final_id: 'INTEGER' },
   };
   for (const [tabela, cols] of Object.entries(NOVAS)) {
     const tem = colunas(tabela);

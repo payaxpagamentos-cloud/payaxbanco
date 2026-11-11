@@ -210,10 +210,11 @@ function contratacoes(db, { empresaId = null, status = null, limite = 300 } = {}
 function atualizarContratacao(db, id, d) {
   const c = db.prepare('SELECT * FROM seguros_contratacoes WHERE id = ?').get(Number(id));
   if (!c) throw naoEncontrado('Contratação');
+  // Campo que não veio na requisição mantém o valor atual (só apaga quando enviado vazio).
   const status = d.status ? v.opcao(d.status, 'o status', Object.keys(STATUS)) : c.status;
-  const apolice = v.opcional(d.apolice_numero, 'o número da apólice', 80);
-  const ref = v.opcional(d.referencia_externa, 'a referência', 120);
-  const obs = v.opcional(d.observacao, 'a observação', 500);
+  const apolice = d.apolice_numero === undefined ? c.apolice_numero : v.opcional(d.apolice_numero, 'o número da apólice', 80);
+  const ref = d.referencia_externa === undefined ? c.referencia_externa : v.opcional(d.referencia_externa, 'a referência', 120);
+  const obs = d.observacao === undefined ? c.observacao : v.opcional(d.observacao, 'a observação', 500);
   db.prepare('UPDATE seguros_contratacoes SET status=?, apolice_numero=?, referencia_externa=?, observacao=?, atualizada_em=? WHERE id=?')
     .run(status, apolice, ref, obs, agora(), c.id);
   return db.prepare('SELECT * FROM seguros_contratacoes WHERE id = ?').get(c.id);

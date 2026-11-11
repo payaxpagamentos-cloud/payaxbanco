@@ -416,7 +416,11 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
   const limparCheia = telaCheia(L, m, div);
   L.control.zoom({ position: 'topright' }).addTo(m);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(m);
-  const observadorTamanho = new ResizeObserver(() => m.invalidateSize());
+  // Depois de remover() o mapa não existe mais: uma resposta do servidor que chegue atrasada (o usuário já saiu da tela)
+  // não pode desenhar nele — o Leaflet quebraria com "reading 'appendChild'". As camadas são criadas, mas não entram no mapa.
+  let vivo = true;
+  const noMapa = (camada) => (vivo ? camada.addTo(m) : camada);
+  const observadorTamanho = new ResizeObserver(() => { if (vivo) m.invalidateSize(); });
   observadorTamanho.observe(div);
   const icone = (v, sel) => L.divIcon({ className: '', html: htmlVeiculo(v, sel), iconSize: [30, 30], iconAnchor: [15, 15] });
 
@@ -427,10 +431,12 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
     // Ao escolher um veículo, vai direto para o zoom de rua (17), sem afastar se já estiver mais perto.
     // `cobertoEmbaixo`: altura (px) coberta por um painel na parte de baixo; o ponto fica no meio do que sobra.
     ir: (lat, lng, z, { cobertoEmbaixo = 0 } = {}) => {
+      if (!vivo) return;
       m.setView([lat, lng], z ?? Math.max(m.getZoom(), 17), { animate: false });
       if (cobertoEmbaixo) m.panBy([0, cobertoEmbaixo / 2], { animate: false });
     },
     enquadrar(pontos, zoomMax = 17) {
+      if (!vivo) return;
       const p = pontos.filter((x) => x && Number.isFinite(x[0]) && Number.isFinite(x[1]));
       if (p.length === 1) m.setView(p[0], zoomMax);
       else if (p.length) m.fitBounds(L.latLngBounds(p), { padding: [40, 40], maxZoom: zoomMax });
@@ -439,7 +445,7 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
     veiculo(v, { aoClicar } = {}) {
       let sel = false;
       let atual = v;
-      const mk = L.marker([v.lat, v.lng], { icon: icone(v, sel), title: fmtPlaca(v.placa), zIndexOffset: 100 }).addTo(m);
+      const mk = noMapa(L.marker([v.lat, v.lng], { icon: icone(v, sel), title: fmtPlaca(v.placa), zIndexOffset: 100 }));
       if (aoClicar) mk.on('click', () => aoClicar(atual));
       return {
         atualizar(novo) { atual = novo; mk.setLatLng([novo.lat, novo.lng]); mk.setIcon(icone(novo, sel)); },
@@ -449,13 +455,14 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
     },
     /** Trajeto: linha (com uma cor por trecho de velocidade, se `cores` vier) e a camada para remover. */
     linha(pontos, { cor = '#2563EB', peso = 5 } = {}) {
-      const pl = L.polyline(pontos, { color: cor, weight: peso, opacity: 0.9 }).addTo(m);
+      const pl = noMapa(L.polyline(pontos, { color: cor, weight: peso, opacity: 0.9 }));
       return { remover: () => pl.remove(), definir: (p) => pl.setLatLngs(p) };
     },
     /** Ponto simples (início, fim, parada, alerta) com texto ao passar o mouse e conteúdo ao clicar. */
     ponto(lat, lng, { classe = '', texto = '', titulo = '', popup } = {}) {
       const mk = L.marker([lat, lng], { icon: L.divIcon({ className: '', html: `<div class="pino ${classe}">${esc(texto)}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
-        title: titulo }).addTo(m);
+        title: titulo });
+      noMapa(mk);
       if (popup) mk.bindPopup(() => popup());
       return { remover: () => mk.remove(), mover: (a, b) => mk.setLatLng([a, b]) };
     },
@@ -463,12 +470,13 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
     cerca(c, { aoClicar } = {}) {
       const estilo = { color: c.cor || '#2563EB', weight: 2, fillOpacity: 0.08 };
       const camada = c.tipo === 'circulo' ? L.circle([c.lat, c.lng], { radius: c.raio_m, ...estilo }) : L.polygon(c.pontos, estilo);
-      camada.addTo(m).bindTooltip(c.nome ?? '', { sticky: true });
+      // Nome da cerca como texto (não HTML): quem cadastra a cerca não consegue injetar marcação no mapa dos outros.
+      noMapa(camada).bindTooltip(el('span', {}, c.nome ?? ''), { sticky: true });
       if (aoClicar) camada.on('click', () => aoClicar(c));
       return { remover: () => camada.remove(), limites: () => camada.getBounds() };
     },
     // Ao sair da tela: solta o WebGL, os observadores e os listeners do documento (senão cada visita ao mapa ficava na memória).
-    remover: () => { observadorTamanho.disconnect(); limparCheia(); div._limparFundo?.(); m.remove(); },
+    remover: () => { if (!vivo) return; vivo = false; observadorTamanho.disconnect(); limparCheia(); div._limparFundo?.(); m.remove(); },
   };
 }
 

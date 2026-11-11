@@ -504,7 +504,7 @@ module.exports = (db, extras = {}) => {
   // ---------- Seguros: contratações de todas as empresas ----------
   r.get('/seguros/contratacoes', (req, res) => res.json(seg.contratacoes(db, {
     empresaId: req.query.empresa_id ? Number(req.query.empresa_id) : null,
-    status: req.query.status || null,
+    status: req.query.status ? v.opcao(req.query.status, 'o status', Object.keys(seg.STATUS)) : null,
   })));
   r.patch('/seguros/contratacoes/:id', (req, res) => {
     const c = seg.atualizarContratacao(db, nid(req), req.body);
@@ -518,7 +518,8 @@ module.exports = (db, extras = {}) => {
   const conferirSenha = (req) => {
     const senha = String(req.get('x-confirmacao') ?? (Buffer.isBuffer(req.body) ? '' : req.body?.senha) ?? '');
     const u = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(req.usuario.id);
-    if (!u || !verificarSenha(senha, u.senha_hash)) throw new ErroNegocio('Senha incorreta. Confirme a sua senha para continuar.', 401);
+    // 403 (e não 401): senha de confirmação errada não pode derrubar a sessão do master.
+    if (!u || !verificarSenha(senha, u.senha_hash)) throw new ErroNegocio('Senha incorreta. Confirme a sua senha para continuar.', 403);
   };
   const historicoSistema = () => db.prepare(`SELECT a.acao, a.detalhes, a.criado_em, u.nome AS usuario
     FROM auditoria a LEFT JOIN usuarios u ON u.id = a.usuario_id

@@ -80,6 +80,7 @@ function remover(db, empresaId, id) {
   buscar(db, empresaId, id);
   transacao(db, () => {
     db.prepare('DELETE FROM usuario_final_veiculos WHERE usuario_final_id = ?').run(Number(id));
+    db.prepare('UPDATE seguros_contratacoes SET usuario_final_id = NULL WHERE usuario_final_id = ?').run(Number(id));
     db.prepare('DELETE FROM usuarios_finais WHERE id = ? AND empresa_id = ?').run(Number(id), Number(empresaId));
   });
 }
@@ -92,17 +93,19 @@ function painel(db, uf) {
     velocidade_kmh: x.velocidade_kmh, ignicao: x.ignicao, tensao: x.tensao, bloqueado: !!x.bloqueado,
     lat: x.lat, lng: x.lng, posicao_em: x.posicao_em, comunicacao_em: x.comunicacao_em, modelo: x.rastreador_modelo,
   }));
-  const emp = db.prepare('SELECT nome, mensalidade_centavos, plano_nome, atend_whatsapp, atend_telefone, atend_horario, telefone, email FROM empresas WHERE id = ?').get(uf.empresa_id);
+  // plano_valor_centavos = o que a EMPRESA cobra do cliente final (não a mensalidade que a plataforma cobra da empresa).
+  const emp = db.prepare('SELECT nome, plano_valor_centavos, plano_nome, atend_whatsapp, atend_telefone, atend_horario, telefone, email FROM empresas WHERE id = ?').get(uf.empresa_id);
+  // Só os seguros DELE: os dos veículos vinculados a ele e os que ele mesmo pediu pelo app. Nunca os de outros clientes.
   const vids = [...vinc];
-  const marcadores = vids.length ? vids.map(() => '?').join(',') : null;
+  const doVeiculo = vids.length ? `c.veiculo_id IN (${vids.map(() => '?').join(',')}) OR ` : '';
   const seguros = db.prepare(`SELECT c.id, c.status, c.valor_centavos, c.apolice_numero, c.criada_em, t.nome AS tipo_nome, t.icone AS tipo_icone, ve.placa AS veiculo_placa
     FROM seguros_contratacoes c JOIN seguros_tipos t ON t.id = c.tipo_id LEFT JOIN veiculos ve ON ve.id = c.veiculo_id
-    WHERE c.empresa_id = ? ${marcadores ? `AND (c.veiculo_id IN (${marcadores}) OR c.veiculo_id IS NULL)` : ''} AND c.status <> 'cancelada'
-    ORDER BY c.criada_em DESC`).all(uf.empresa_id, ...vids);
+    WHERE c.empresa_id = ? AND (${doVeiculo}c.usuario_final_id = ?) AND c.status <> 'cancelada'
+    ORDER BY c.criada_em DESC`).all(uf.empresa_id, ...vids, uf.id);
   return {
     usuario: { nome: uf.nome, empresa: emp.nome },
     veiculos,
-    plano: { nome: emp.plano_nome || 'Rastreamento', mensalidade_centavos: emp.mensalidade_centavos, status: 'ativo' },
+    plano: { nome: emp.plano_nome || 'Rastreamento', mensalidade_centavos: emp.plano_valor_centavos ?? null, status: 'ativo' },
     seguros,
     atendimento: {
       whatsapp: emp.atend_whatsapp || null,
