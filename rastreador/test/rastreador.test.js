@@ -496,6 +496,13 @@ test('Rastreador', async (t) => {
     const bloq = () => db.prepare('SELECT bloqueado FROM veiculos WHERE id = ?').get(veiculo).bloqueado;
     const rid = db.prepare('SELECT rastreador_id FROM veiculos WHERE id = ?').get(veiculo).rastreador_id;
     const antes = db.prepare('SELECT * FROM veiculos WHERE id = ?').get(veiculo);
+    // J16: o bit de corte das mensagens de estado não é confiável e é ignorado (vale o último comando confirmado).
+    db.prepare('UPDATE veiculos SET bloqueado = 0 WHERE id = ?').run(veiculo);
+    receber(db, { imei: IMEI, protocolo: 'gt06', bloqueado: true, ignicao: false });
+    assert.equal(db.prepare('SELECT bloqueado FROM veiculos WHERE id = ?').get(veiculo).bloqueado, 0, 'J16: bit de estado ignorado');
+    // Os demais GT06 seguem o bit.
+    const modeloAntes = db.prepare('SELECT modelo FROM rastreadores WHERE id = ?').get(rid).modelo;
+    db.prepare("UPDATE rastreadores SET modelo = 'GT06 genérico' WHERE id = ?").run(rid);
     // Sinal de vida do GT06: estado sem posição.
     receber(db, { imei: IMEI, protocolo: 'gt06', bloqueado: true, ignicao: false });
     assert.equal(bloq(), 1, 'relé normal: acionado = bloqueado');
@@ -521,7 +528,7 @@ test('Rastreador', async (t) => {
     assert.equal(receber(db, { ...fix, ignicao: false, evento: 'panico' }).status, 'repetida');
     assert.equal(nAlertas(), antesSos + 1, 'o SOS repetindo a posição gera o alerta');
     assert.equal(db.prepare('SELECT ignicao FROM veiculos WHERE id = ?').get(veiculo).ignicao, 0);
-    db.prepare('UPDATE rastreadores SET rele_invertido = 0 WHERE id = ?').run(rid);
+    db.prepare('UPDATE rastreadores SET rele_invertido = 0, modelo = ? WHERE id = ?').run(modeloAntes, rid);
     const cols = Object.keys(antes).filter((k) => k !== 'id');
     db.prepare(`UPDATE veiculos SET ${cols.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...cols.map((k) => antes[k]), veiculo);
   });

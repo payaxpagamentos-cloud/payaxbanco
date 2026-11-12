@@ -26,7 +26,9 @@ const TIPOS = {
  */
 const MODELOS = {
   j16: {
-    nome: 'J16 4G', protocolo: 'gt06', reconhece: /\bj16\b/i,
+    // estadoRele: false = o bit de corte das mensagens de estado do J16 não é confiável (muda sem o relé mudar); a situação na
+    // tela segue o último bloqueio/desbloqueio confirmado pelo aparelho.
+    nome: 'J16 4G', protocolo: 'gt06', reconhece: /\bj16\b/i, estadoRele: false,
     comandos: { bloquear: 'RELAY,1#', desbloquear: 'RELAY,0#', localizar: 'WHERE#', reiniciar: 'RESET#', status: 'STATUS#', parametros: 'PARAM#' },
   },
 };
