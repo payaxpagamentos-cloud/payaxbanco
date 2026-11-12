@@ -1305,3 +1305,12 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
   .tela-mapa .lado{ padding: 12px 16px 24px; }
   .area-mapa .painel-veiculo{ z-index: 1000; }
 }
+
+/* ---------- Janelas (formulários): os botões Cancelar / Salvar ficam sempre à vista, presos no pé da janela ---------- */
+.modal{ max-height: calc(100dvh - 32px); }
+.acoes-modal{ position: sticky; bottom: -24px; z-index: 2; margin: 6px -24px -24px; padding: 12px 24px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface); border-top: 1px solid var(--border); }
+@media (max-width: 860px){
+  .modal-fundo{ padding: 10px; }
+  .modal{ max-height: calc(100dvh - 20px); }
+}

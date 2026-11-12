@@ -145,7 +145,7 @@ export const formModal = (titulo, campos, enviar, { rotulo = 'Salvar', largo = f
   const f = el('form', { class: 'form' });
   const ok = el('button', { class: 'btn primario largo' }, rotulo);
   f.append(...[].concat(campos(f)).flat(Infinity).filter(Boolean),
-    el('div', { class: 'linha entre', style: 'margin-top:6px' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Cancelar'), ok));
+    el('div', { class: 'linha entre acoes-modal' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Cancelar'), ok));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(ok, async () => fechar((await enviar(lerForm(f), f)) ?? true));
