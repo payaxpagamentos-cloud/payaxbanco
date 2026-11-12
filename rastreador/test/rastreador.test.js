@@ -511,11 +511,12 @@ test('Rastreador', async (t) => {
       assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, cliente)).dados.multas[0].na_central, true, 'segunda vez: já na central');
       const hist = (await api.get(`${base()}/multas/consultas`, operador)).dados;
       assert.equal(hist.ligada, true);
-      assert.equal(hist.automatica.intervalo_dias, 7, 'semanal por padrão');
+      assert.equal(hist.automatica.intervalo_dias, 0, 'manual por padrão');
+      assert.equal(hist.automatica.uf, 'SP');
       assert.equal((await api.put('/master/multas/intervalo', { dias: 3 }, master)).status, 422);
       assert.equal((await api.put('/master/multas/intervalo', { dias: 15 }, master)).dados.intervalo_dias, 15);
       assert.equal((await api.get(`${base()}/multas/consultas`, cliente)).dados.automatica.intervalo_dias, 15);
-      assert.equal((await api.put('/master/multas/intervalo', { dias: 7 }, master)).status, 200);
+      assert.equal((await api.put('/master/multas/intervalo', { dias: 0 }, master)).status, 200);
       assert.ok(hist.consultas.length >= 3);
       assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, operador)).status, 403, 'operador não consulta');
     } finally {

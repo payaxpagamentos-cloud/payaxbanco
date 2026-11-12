@@ -12,7 +12,7 @@ import { linkGoogle } from './mapa.js';
 
 const TOM = { notificada: 'aviso', condutor_indicado: 'info', em_recurso: 'info', a_pagar: 'erro', paga: 'ok', cancelada: '' };
 const GRAV = { leve: 'Leve', media: 'Média', grave: 'Grave', gravissima: 'Gravíssima' };
-const INTERVALO = { 1: 'todo dia', 7: 'uma vez por semana', 15: 'a cada 15 dias' };
+const INTERVALO = { 0: 'só quando alguém consultar (manual)', 1: 'todo dia', 7: 'uma vez por semana', 15: 'a cada 15 dias' };
 const prazoTexto = (dias, data_) => (dias === null || dias === undefined ? '—' : dias < 0 ? `venceu (${data(data_)})` : dias === 0 ? 'hoje' : `${dias} dia(s) · ${data(data_)}`);
 const paraLocal = (iso) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 
@@ -146,7 +146,7 @@ async function telaMultas(ctx, { master = false } = {}) {
               if (await formMulta(ctx, dados)) { toast('Multa cadastrada.'); carregar(); }
             }) : null)),
         el('p', { class: 'pequeno mudo', style: 'margin:0 0 10px' }, dados.consulta_automatica
-          ? `Consulta automática ligada: os veículos são consultados no DETRAN/SENATRAN ${INTERVALO[dados.automatica?.intervalo_dias] ?? 'uma vez por semana'} (com a placa e o RENAVAM).`
+          ? (dados.automatica?.intervalo_dias ? `Consulta automática ligada (DETRAN-${dados.automatica.uf}): os veículos são consultados ${INTERVALO[dados.automatica.intervalo_dias]}.` : `Consulta ligada ao DETRAN-${dados.automatica?.uf ?? 'SP'} no modo manual: use "Consultar agora" ou a aba Consultar multas.`)
           : 'Consulta automática (DETRAN/SENATRAN): aguardando a contratação do serviço de consulta. Por enquanto, cadastre as multas com a notificação.'),
         tabela(['Data', 'Placa', master ? 'Empresa' : null, 'Infração', '>Valor', 'Condutor', '^Situação', 'Indicar até', '^'].filter(Boolean), dados.multas.map((m) => el('tr', { style: 'cursor:pointer', onclick: () => detalheMulta(ctx, dados, m.id, { master, gestor, aoMudar: carregar }) },
           td(dataHora(m.ocorrida_em)), td(el('strong', {}, placa(m.placa))), master ? td(m.empresa) : null,
@@ -191,12 +191,14 @@ async function telaConsultar(ctx, { master = false } = {}) {
     const a = d.automatica;
     limpar(situacaoEl, el('div', { class: `aviso-faixa ${d.ligada ? 'ok' : 'aviso'}`, style: 'padding:12px 14px;border-radius:12px;margin-bottom:14px;background:var(--surface-2)' },
       d.ligada
-        ? el('div', {}, el('strong', {}, '● Consulta automática ligada. '), `O sistema consulta sozinho os veículos ativos ${INTERVALO[a.intervalo_dias]} (${a.em_dia} de ${a.veiculos} em dia${a.ultima ? `, a última em ${dataHora(a.ultima)}` : ''}). Multas novas entram na central e geram aviso.`)
-        : el('div', {}, el('strong', {}, '● Consulta automática aguardando o serviço. '), `Quando o serviço de consulta (DETRAN/SENATRAN) for contratado e ligado no servidor, os veículos passam a ser consultados sozinhos ${INTERVALO[a.intervalo_dias]}, e esta consulta na hora também funciona.`),
+        ? (a.intervalo_dias === 0
+          ? el('div', {}, el('strong', {}, `● Consulta ligada ao DETRAN-${a.uf}, no modo manual. `), 'Consulte um veículo quando quiser abaixo; as multas encontradas dos veículos da frota entram na central.')
+          : el('div', {}, el('strong', {}, `● Consulta automática ligada (DETRAN-${a.uf}). `), `O sistema consulta sozinho os veículos ativos ${INTERVALO[a.intervalo_dias]} (${a.em_dia} de ${a.veiculos} em dia${a.ultima ? `, a última em ${dataHora(a.ultima)}` : ''}). Multas novas entram na central e geram aviso.`))
+        : el('div', {}, el('strong', {}, '● Consulta aguardando o serviço. '), `Quando o serviço de consulta (DETRAN-${a.uf}) for contratado e ligado no servidor, esta consulta passa a funcionar${a.intervalo_dias ? ` e os veículos são consultados sozinhos ${INTERVALO[a.intervalo_dias]}` : ''}.`),
       master ? el('div', { class: 'linha', style: 'gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap' }, el('span', { class: 'pequeno' }, 'Consultar cada veículo:'),
-        ...[[1, 'Diária'], [7, 'Semanal'], [15, 'Quinzenal']].map(([dias, rot]) => el('button', { type: 'button', class: `btn pequeno${a.intervalo_dias === dias ? ' primario' : ''}`, onclick: async () => {
-          await api.put('/master/multas/intervalo', { dias }); toast(`Consulta automática: ${rot.toLowerCase()}.`); carregar();
-        } }, rot)), el('span', { class: 'pequeno mudo' }, 'semanal custa cerca de 1/7 da diária')) : null));
+        ...[[0, 'Manual'], [1, 'Diária'], [7, 'Semanal'], [15, 'Quinzenal']].map(([dias, rot]) => el('button', { type: 'button', class: `btn pequeno${a.intervalo_dias === dias ? ' primario' : ''}`, onclick: async () => {
+          await api.put('/master/multas/intervalo', { dias }); toast(dias ? `Consulta automática: ${rot.toLowerCase()}.` : 'Consulta manual: só quando alguém consultar.'); carregar();
+        } }, rot)), el('span', { class: 'pequeno mudo' }, 'manual: paga só as consultas feitas')) : null));
     limpar(historicoEl, cartao('Consultas feitas', tabela(['Quando', 'Placa', master ? 'Empresa' : null, '^Multas', '^Apontamentos', '^Novas', 'Por', '^'].filter(Boolean),
       d.consultas.map((c) => el('tr', {}, td(dataHora(c.criado_em)), td(el('strong', {}, placa(c.placa))), master ? td(c.empresa ?? '—') : null,
         td(c.erro ? etiqueta('erro', 'erro') : String(c.multas), 'centro'), td(c.erro ? '—' : String(c.apontamentos), 'centro'), td(String(c.novas), 'centro'), td(c.usuario ?? 'automática'),
