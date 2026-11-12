@@ -202,6 +202,7 @@ module.exports = (db, extras = {}) => {
     transacao(db, () => {
       db.prepare('DELETE FROM manutencao_registros WHERE veiculo_id = ?').run(x.id);
       db.prepare('DELETE FROM usuario_final_veiculos WHERE veiculo_id = ?').run(x.id);
+      db.prepare('DELETE FROM testes_bloqueio WHERE veiculo_id = ?').run(x.id);
       db.prepare('UPDATE seguros_contratacoes SET veiculo_id = NULL WHERE veiculo_id = ?').run(x.id);
       db.prepare('DELETE FROM veiculos WHERE id = ?').run(x.id);
     });
@@ -250,6 +251,28 @@ module.exports = (db, extras = {}) => {
     registrar(db, req, 'comando_criado', { placa: x.placa, tipo: req.body.tipo });
     const c = db.prepare('SELECT id, tipo, status FROM comandos WHERE id = ?').get(id);
     res.status(201).json(c);
+  });
+
+  // ---------- Teste de bloqueio (instalação): o técnico confirma que o motor corta e volta ----------
+  r.get('/veiculos/:id/teste-bloqueio', (req, res) => {
+    const x = veiculo(req, req.params.id);
+    res.json({ ok: x.teste_bloqueio_ok, em: x.teste_bloqueio_em, testes: db.prepare(`SELECT t.*, u.nome AS usuario FROM testes_bloqueio t
+      LEFT JOIN usuarios u ON u.id = t.usuario_id WHERE t.veiculo_id = ? ORDER BY t.id DESC LIMIT 20`).all(x.id) });
+  });
+  r.post('/veiculos/:id/teste-bloqueio', gestor, (req, res) => {
+    const x = veiculo(req, req.params.id);
+    const corte = v.booleano(req.body.corte_ok);
+    const volta = v.booleano(req.body.volta_ok);
+    const resp = (id) => (id ? db.prepare('SELECT resposta FROM comandos WHERE id = ? AND veiculo_id = ?').get(Number(id), x.id)?.resposta ?? null : null);
+    const t = agora();
+    transacao(db, () => {
+      db.prepare(`INSERT INTO testes_bloqueio (empresa_id, veiculo_id, usuario_id, corte_ok, volta_ok, resposta_corte, resposta_volta, observacao, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(x.empresa_id, x.id, req.usuario.id, corte ? 1 : 0, volta ? 1 : 0, resp(req.body.comando_corte),
+        resp(req.body.comando_volta), req.body.observacao ? String(req.body.observacao).slice(0, 300) : null, t);
+      db.prepare('UPDATE veiculos SET teste_bloqueio_ok = ?, teste_bloqueio_em = ? WHERE id = ?').run(corte && volta ? 1 : 0, t, x.id);
+    });
+    registrar(db, req, 'teste_bloqueio', { placa: x.placa, corte_ok: corte, volta_ok: volta });
+    res.status(201).json({ ok: corte && volta });
   });
 
   // ---------- Modo roubo (bloqueio inteligente) ----------
