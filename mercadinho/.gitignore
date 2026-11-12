@@ -5,3 +5,6 @@ backups/
 *.db-*
 .env
 dist/
+apresentacao/img/
+apresentacao/fontes/
+apresentacao/*.pdf

@@ -17,7 +17,8 @@
     "backup": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/backup.js",
     "importar-produtos": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/importar-produtos.js",
     "importar-fotos": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/importar-fotos.js",
-    "ponte": "node scripts/ponte-maquininha.js"
+    "ponte": "node scripts/ponte-maquininha.js",
+    "apresentacao": "node apresentacao/gerar.js"
   },
   "dependencies": {
     "express": "^5.2.1",
