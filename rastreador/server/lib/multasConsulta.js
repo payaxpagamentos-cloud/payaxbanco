@@ -63,13 +63,25 @@ function traduzirApiBrasil(j) {
   const d = j?.data ?? {};
   const listaMultas = d.debitosMultas?.ocorrencia ?? [];
   // "2026-09-23 10:45" → com hora; "2026-09-23" (sem hora) → meio-dia de Brasília, marcado como sem_hora (a tela mostra só a data).
+  // Com fuso (ex.: "2026-09-23T03:00:00.000Z") vale o instante informado; sem fuso, é hora de Brasília.
+  const comFuso = (t) => /(Z|[+-]\d{2}:?\d{2})$/i.test(t);
   const hora = (x) => {
     const t = String(x ?? '').trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return `${t}T12:00:00-03:00`;
+    if (comFuso(t) && Number.isFinite(Date.parse(t))) {
+      const d = new Date(t);
+      // Meia-noite de Brasília = o DETRAN só informou o dia: grava ao meio-dia (a tela mostra só a data).
+      return d.getUTCHours() === 3 && d.getUTCMinutes() === 0 ? `${new Date(d.getTime() - 3 * 3_600_000).toISOString().slice(0, 10)}T12:00:00-03:00` : d.toISOString();
+    }
     const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(:\d{2})?/.exec(t);
     return m ? `${m[1]}T${m[2]}${m[3] ?? ':00'}-03:00` : null;
   };
-  const semHora = (x) => /^\d{4}-\d{2}-\d{2}$/.test(String(x ?? '').trim());
+  const semHora = (x) => {
+    const t = String(x ?? '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return true;
+    if (comFuso(t) && Number.isFinite(Date.parse(t))) { const d = new Date(t); return d.getUTCHours() === 3 && d.getUTCMinutes() === 0; }
+    return /^\d{4}-\d{2}-\d{2}[ T]00:00(:00)?$/.test(t);
+  };
   // "Multa - 7RA1502937 - TRANSITAR ..." → "TRANSITAR ..." (o número já vai no auto de infração).
   const limparDescricao = (d, id) => String(d ?? '').replace(new RegExp(`^\\s*multa\\s*-\\s*${String(id ?? '').replace(/[^\w]/g, '')}\\s*-\\s*`, 'i'), '').replace(/^\s*multa\s*-\s*/i, '').trim();
   const multas = listaMultas.map((m) => ({
