@@ -159,21 +159,26 @@ async function perguntarAssincrona(placa, { urlRetorno } = {}) {
   if (!job) throw new ErroNegocio(`API Brasil: ${ini?.data?.msg || ini?.message || 'a consulta não foi aceita'}.`, 502);
   const intervalo = Number(process.env.RASTREADOR_MULTAS_INTERVALO_MS) || 5000;
   const limite = Date.now() + (Number(process.env.RASTREADOR_MULTAS_LIMITE_MS) || 5 * 60_000);
+  let ultima = null;
   while (Date.now() < limite) {
     await espera(intervalo);
     let j;
     try { j = await postarApiBrasil(URL_ASYNC(), { tipo: 'consulta-chave', 'job-id': job, homolog }, 30_000); } catch (err) { if (err.instavel) continue; throw err; }
-    const d = j?.data ?? {};
+    // Formatos aceitos: data.{job_status|status, payload} (documentado), ou o mesmo no topo, ou data.data / resultado.
+    const d = j?.data?.payload || j?.data?.job_status || j?.data?.status ? j.data : (j?.payload || j?.job_status || j?.status ? j : (j?.data?.data ?? j?.data ?? {}));
     const st = String(d.job_status ?? d.status ?? '').toLowerCase();
-    if (st === 'completed' || d.payload) {
-      const p = d.payload ?? {};
+    ultima = { status: st || null, chaves: Object.keys(j ?? {}), chaves_data: j?.data && typeof j.data === 'object' ? Object.keys(j.data) : null, msg: d.msg ?? j?.message ?? null };
+    if (['completed', 'concluido', 'concluída', 'concluida', 'done', 'success', 'finished'].includes(st) || d.payload || d.resultado || d.dadosDoVeiculo) {
+      if (d.dadosDoVeiculo) return traduzirApiBrasil({ error: false, homolog, data: d });
+      const p = d.payload ?? d.resultado ?? {};
       if (p.success === false) throw new ErroNegocio(`API Brasil: ${p.msg || 'a consulta não foi concluída'}.`, 502);
       const dados = Array.isArray(p.dados) ? p.dados[0] : p.dados;
       return traduzirApiBrasil({ error: false, homolog, valor_consulta: j.valor_consulta ?? null, data: dados ?? {} });
     }
     if (['failed', 'error', 'erro', 'falhou', 'cancelled', 'canceled'].includes(st)) throw new ErroNegocio(`API Brasil: ${d.msg || d.payload?.msg || 'a consulta falhou'}.`, 502);
   }
-  throw new ErroNegocio('O DETRAN passou de 5 minutos sem responder. Veja em "Consultas feitas" mais tarde ou tente de novo.', 504);
+  console.error('[Rastreador] Consulta de multas (API Brasil) sem conclusão em 5 min. Última resposta:', JSON.stringify(ultima));
+  throw new ErroNegocio(`O DETRAN passou de 5 minutos sem responder (última situação na API Brasil: ${ultima?.status || ultima?.msg || 'sem resposta'}). Tente de novo mais tarde.`, 504);
 }
 
 /** Cadastra na central as multas que ainda não estão lá (pelo número do auto). Devolve cada multa com { na_central, nova }. */
