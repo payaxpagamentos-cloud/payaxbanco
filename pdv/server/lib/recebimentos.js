@@ -59,10 +59,12 @@ function detalhe(db, empresaId, id) {
  * Registra um recebimento no balcão: os títulos do IXC escolhidos (ou um recebimento avulso) e as formas de pagamento.
  * Tudo numa transação: ou entra inteiro, ou não entra. A baixa no IXC é feita depois, pela fila.
  */
-function criar(db, { empresa, usuario, dados }) {
+function criar(db, { empresa, usuario, dados, origem = 'balcao' }) {
   const cfg = lerConfig(db, empresa.id);
+  const autoatendimento = origem === 'autoatendimento';
   return transacao(db, () => {
-    const caixa = resolverCaixa(db, empresa, usuario, cfg, dados.caixa_id);
+    // A tela do cliente não tem gaveta: recebe só no cartão/PIX e fica fora do caixa do balcão.
+    const caixa = autoatendimento ? null : resolverCaixa(db, empresa, usuario, cfg, dados.caixa_id);
     const titulos = (Array.isArray(dados.titulos) ? dados.titulos : []).map((t, i) => lerTitulo(t, i));
     const avulso = !titulos.length;
     if (avulso && !cfg.permitir_avulso) throw new ErroNegocio('Escolha pelo menos uma fatura. O recebimento avulso está desligado nas Configurações.', 422);
@@ -96,13 +98,13 @@ function criar(db, { empresa, usuario, dados }) {
     const pagamentos = lerPagamentos(db, empresa, dados.pagamentos, { total, caixa, usuario });
     const momento = agora();
     const numero = (db.prepare('SELECT COALESCE(MAX(numero), 0) AS n FROM recebimentos WHERE empresa_id = ?').get(empresa.id).n) + 1;
-    const lojaId = caixa?.loja_id ?? usuario.loja_id ?? db.prepare('SELECT id FROM lojas WHERE empresa_id = ? AND ativa = 1 ORDER BY id LIMIT 1').get(empresa.id)?.id;
+    const lojaId = dados.loja_id ?? caixa?.loja_id ?? usuario.loja_id ?? db.prepare('SELECT id FROM lojas WHERE empresa_id = ? AND ativa = 1 ORDER BY id LIMIT 1').get(empresa.id)?.id;
     if (!lojaId) throw new ErroNegocio('Cadastre uma loja antes de receber.', 409);
 
-    const r = db.prepare(`INSERT INTO recebimentos (empresa_id, numero, caixa_id, loja_id, operador_id, data, cliente_ixc_id, cliente_nome, cliente_documento, contrato_ixc_id,
+    const r = db.prepare(`INSERT INTO recebimentos (empresa_id, numero, caixa_id, loja_id, operador_id, origem, data, cliente_ixc_id, cliente_nome, cliente_documento, contrato_ixc_id,
         valor_titulos_centavos, acrescimo_centavos, desconto_centavos, valor_centavos, recebido_centavos, troco_centavos, status, ixc_status, conferencia, observacao, criado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmado', ?, 'pendente', ?, ?)`)
-      .run(empresa.id, numero, caixa?.id ?? null, lojaId, usuario.id, hoje(),
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmado', ?, 'pendente', ?, ?)`)
+      .run(empresa.id, numero, caixa?.id ?? null, lojaId, usuario.id, origem, hoje(),
         v.opcional(dados.cliente_ixc_id, 'o cliente', 20), v.texto(dados.cliente_nome, 'o nome do cliente', 160),
         dados.cliente_documento ? v.digitos(dados.cliente_documento).slice(0, 14) : null,
         v.opcional(dados.contrato_ixc_id, 'o contrato', 20),
@@ -253,6 +255,7 @@ function listar(db, empresaId, f = {}) {
   if (f.status) add('r.status = ?', v.opcao(f.status, 'a situação', ['confirmado', 'cancelado']));
   if (f.ixc_status) add('r.ixc_status = ?', v.opcao(f.ixc_status, 'a situação no IXC', ['pendente', 'enviando', 'baixado', 'parcial', 'erro', 'manual', 'avulso', 'estornado']));
   if (f.conferencia) add('r.conferencia = ?', v.opcao(f.conferencia, 'a conferência', ['pendente', 'conferido', 'divergente']));
+  if (f.origem) add('r.origem = ?', v.opcao(f.origem, 'a origem', ['balcao', 'autoatendimento']));
   if (f.busca) {
     const t = `%${String(f.busca).trim().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
     where.push("(r.cliente_nome LIKE ? ESCAPE '\\' OR r.cliente_documento LIKE ? ESCAPE '\\' OR CAST(r.numero AS TEXT) = ?)");

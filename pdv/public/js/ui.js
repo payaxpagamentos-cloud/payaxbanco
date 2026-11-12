@@ -226,6 +226,7 @@ export const STATUS_CARTAO = {
   pendente: ['Esperando a maquininha', 'aviso'], enviada: ['Na maquininha', 'info'], aprovada: ['Aprovada', 'ok'], negada: ['Negada', 'erro'],
   cancelada: ['Cancelada', ''], expirada: ['Expirada', 'erro'], estornada: ['Estornada', ''],
 };
+export const ORIGENS = { balcao: 'Balcão', autoatendimento: 'Tela do cliente' };
 export const CONFERENCIA = { pendente: ['Não conferido', ''], conferido: ['Conferido', 'ok'], divergente: ['Divergente', 'erro'] };
 export const STATUS_CAIXA = { aberto: ['Aberto', 'info'], fechado: ['Fechado', ''], conferido: ['Conferido', 'ok'] };
 export const etiqueta = (texto, tipo = '') => el('span', { class: `etiqueta ${tipo}` }, texto);

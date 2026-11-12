@@ -1,5 +1,5 @@
-import { api } from '../api.js';
-import { el, limpar, campo, escolha, marcar, formModal, toast, icone, etiqueta, pessoa, dataHora, PERFIS } from '../ui.js';
+import { api, BASE } from '../api.js';
+import { el, limpar, campo, escolha, marcar, formModal, modal, confirmar, toast, acao, icone, etiqueta, pessoa, dataHora, PERFIS } from '../ui.js';
 
 const PERFIS_EMPRESA = { operador: PERFIS.operador, supervisor: PERFIS.supervisor, admin: PERFIS.admin };
 
@@ -28,12 +28,16 @@ export async function telaCadastros(ctx) {
 
     limpar(pdvs, el('div', { class: 'linha entre' }, el('h2', { style: 'margin:0' }, 'Estações de caixa (PDVs)'),
       ctx.administra ? el('button', { class: 'btn primario', onclick: () => editarPdv(null, l.itens) }, 'Novo PDV') : null),
-      el('p', { class: 'mudo' }, 'Cada PDV é um ponto de atendimento no balcão: só um caixa fica aberto por PDV de cada vez.'),
+      el('p', { class: 'mudo' }, 'Cada PDV é um ponto de atendimento no balcão: só um caixa fica aberto por PDV de cada vez. A tela do cliente é a que fica virada para quem paga: o cliente digita o CPF e passa o cartão na maquininha do PDV.'),
       el('table', { class: 'tabela' }, el('tbody', {}, p.itens.map((x) => el('tr', {},
         el('td', {}, el('strong', {}, x.nome), el('div', { class: 'pequeno mudo' }, x.loja_nome)),
         el('td', {}, x.caixa_aberto_id ? etiqueta('Caixa aberto', 'info') : el('span', { class: 'pequeno mudo' }, 'livre')),
+        el('td', {}, x.autoatendimento ? etiqueta('Tela do cliente ligada', 'ok') : el('span', { class: 'pequeno mudo' }, 'sem tela do cliente'),
+          el('div', { class: 'pequeno mudo' }, x.maquininha_nome ? `maquininha: ${x.maquininha_nome}` : 'sem maquininha ligada')),
         el('td', { class: 'dir' }, x.ativo ? null : etiqueta('Inativo', ''),
-          ctx.administra ? el('button', { class: 'btn pequeno', onclick: () => editarPdv(x, l.itens) }, icone('editar'), 'Editar') : null))))));
+          el('div', { class: 'linha', style: 'gap:6px;justify-content:flex-end' },
+            ctx.administra ? el('button', { class: 'btn pequeno', onclick: () => telaDoCliente(x) }, icone('pdv'), x.autoatendimento ? 'Tela do cliente' : 'Ligar tela do cliente') : null,
+            ctx.administra ? el('button', { class: 'btn pequeno', onclick: () => editarPdv(x, l.itens) }, icone('editar'), 'Editar') : null)))))));
 
     limpar(usuarios, el('div', { class: 'linha entre' }, el('h2', { style: 'margin:0' }, 'Quem usa o PDV'),
       ctx.administra ? el('button', { class: 'btn primario', onclick: () => editarUsuario(null, l.itens) }, 'Novo usuário') : null),
@@ -75,6 +79,48 @@ export async function telaCadastros(ctx) {
       await carregar();
     });
   }
+
+  /** Liga (ou desliga) a tela do cliente do PDV e mostra a chave e o endereço para abrir no aparelho. */
+  function telaDoCliente(pdv) {
+    const endereco = `${location.origin}${BASE}/cliente/`;
+    modal(`Tela do cliente · ${pdv.nome}`, (fechar) => {
+      const partes = [
+        el('p', { class: 'mudo' }, 'A tela do cliente fica virada para quem vai pagar: ele digita o CPF/CNPJ, escolhe as faturas e passa o cartão na maquininha deste PDV. Não recebe dinheiro e não entra no caixa do balcão.'),
+        el('div', { class: 'chave' }, el('span', {}, 'Endereço da tela'), el('code', { class: 'mono' }, endereco)),
+        pdv.maquininha_nome ? null : el('p', { class: 'aviso' }, 'Nenhuma maquininha ativa ligada a este PDV ou à loja: a tela vai consultar as faturas, mas não vai conseguir cobrar.'),
+      ];
+      const ligar = el('button', { class: 'btn primario' }, pdv.autoatendimento ? 'Gerar nova chave' : 'Ligar e gerar a chave');
+      ligar.addEventListener('click', () => acao(ligar, async () => {
+        if (pdv.autoatendimento && !await confirmar('Nova chave', 'A chave atual para de funcionar e a tela precisa ser ativada de novo. Continuar?', 'Gerar nova chave')) return;
+        const r = await api.post(`${base}/cadastros/pdvs/${pdv.id}/autoatendimento`, {});
+        fechar(null);
+        await mostrarChave(r.chave, endereco);
+        await carregar();
+      }));
+      const acoes = el('div', { class: 'linha entre', style: 'margin-top:12px;gap:8px' },
+        el('button', { class: 'btn', onclick: () => fechar(null) }, 'Fechar'),
+        el('div', { class: 'linha', style: 'gap:8px' },
+          pdv.autoatendimento ? el('button', { class: 'btn perigo', onclick: () => acao(null, async () => {
+            if (!await confirmar('Desligar a tela do cliente', `A tela do ${pdv.nome} para de funcionar na hora. Continuar?`, 'Desligar')) return;
+            await api.del(`${base}/cadastros/pdvs/${pdv.id}/autoatendimento`);
+            toast('Tela do cliente desligada.');
+            fechar(null);
+            await carregar();
+          }) }, 'Desligar') : null,
+          ligar));
+      return [...partes.filter(Boolean), acoes];
+    });
+  }
+
+  const mostrarChave = (chave, endereco) => modal('Chave da tela do cliente', (fechar) => [
+    el('p', { class: 'mudo' }, 'Guarde agora: por segurança, esta chave não aparece de novo. No aparelho da tela do cliente, abra o endereço abaixo e cole a chave uma única vez.'),
+    el('div', { class: 'chave' }, el('span', {}, 'Endereço'), el('code', { class: 'mono' }, endereco)),
+    el('div', { class: 'chave' }, el('span', {}, 'Chave'), el('code', { class: 'mono' }, chave)),
+    el('p', { class: 'pequeno mudo' }, 'Atalho: abrir o endereço com #' + 'a chave no fim já ativa a tela, sem digitar nada.'),
+    el('div', { class: 'linha entre', style: 'margin-top:12px' },
+      el('button', { class: 'btn', onclick: () => { navigator.clipboard?.writeText(`${endereco}#${chave}`); toast('Endereço com a chave copiado.'); } }, 'Copiar endereço + chave'),
+      el('button', { class: 'btn primario', onclick: () => fechar(true) }, 'Já guardei')),
+  ]);
 
   function editarUsuario(usuario, listaLojas) {
     formModal(usuario ? usuario.nome : 'Novo usuário', () => [

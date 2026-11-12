@@ -1,4 +1,4 @@
-import { api } from '../api.js';
+import { api, BASE } from '../api.js';
 import { el, limpar, campo, area, marcar, lerForm, toast, acao, icone, FORMAS, dataHora } from '../ui.js';
 
 const FORMAS_LISTA = Object.keys(FORMAS);
@@ -9,8 +9,9 @@ export async function telaConfiguracoes(ctx) {
   const cartaoIxc = el('div', { class: 'cartao' });
   const cartaoRegras = el('div', { class: 'cartao' });
   const cartaoComprovante = el('div', { class: 'cartao' });
+  const cartaoCliente = el('div', { class: 'cartao' });
   const cartaoAuditoria = el('div', { class: 'cartao' });
-  limpar(ctx.conteudo, el('div', { class: 'coluna' }, cartaoIxc, cartaoRegras, cartaoComprovante, cartaoAuditoria));
+  limpar(ctx.conteudo, el('div', { class: 'coluna' }, cartaoIxc, cartaoRegras, cartaoComprovante, cartaoCliente, cartaoAuditoria));
   const somenteLeitura = !ctx.administra;
 
   async function carregar() {
@@ -91,6 +92,31 @@ export async function telaConfiguracoes(ctx) {
       });
     });
     limpar(cartaoComprovante, el('h2', {}, 'Comprovante do balcão'), el('p', { class: 'mudo' }, 'Texto impresso na bobina acima e abaixo dos valores.'), formComp);
+
+    // ---- Tela do cliente ----
+    const logoAtual = c.logo_url || 'img/logo-cliente.png';
+    const previa = el('img', { src: logoAtual.startsWith('http') ? logoAtual : `${BASE}/${logoAtual.replace(/^\//, '')}`,
+      alt: 'Logo da tela do cliente', style: 'max-width:280px;max-height:90px;object-fit:contain;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px' });
+    const formCliente = el('form', { class: 'form' },
+      campo('Logo (arquivo publicado, ex.: img/logo-cliente.png, ou endereço https)',
+        { name: 'logo_url', value: c.logo_url ?? '', placeholder: 'img/logo-cliente.png', maxlength: 300, disabled: somenteLeitura,
+          oninput: (e) => { const v2 = e.target.value.trim() || 'img/logo-cliente.png'; previa.src = v2.startsWith('http') ? v2 : `${BASE}/${v2.replace(/^\//, '')}`; } }),
+      previa,
+      campo('Recado na tela do cliente (opcional)', { name: 'autoatendimento_mensagem', value: c.autoatendimento_mensagem ?? '', maxlength: 200, disabled: somenteLeitura,
+        placeholder: 'Ex.: Pague aqui com cartão. Dúvidas? Chame o atendente.' }));
+    const salvarCliente = el('button', { class: 'btn primario' }, 'Salvar tela do cliente');
+    if (!somenteLeitura) formCliente.append(el('div', { class: 'linha entre' }, el('span', {}), salvarCliente));
+    formCliente.addEventListener('submit', (e) => {
+      e.preventDefault();
+      acao(salvarCliente, async () => {
+        await api.patch(`${base}/configuracoes`, lerForm(formCliente));
+        toast('Tela do cliente salva.');
+        await carregar();
+      });
+    });
+    limpar(cartaoCliente, el('h2', {}, 'Tela do cliente (autoatendimento)'),
+      el('p', { class: 'mudo' }, 'É a tela virada para quem vai pagar: o cliente digita o CPF/CNPJ, escolhe as faturas e passa o cartão na maquininha. Ligue a tela em Lojas, PDVs e usuários, no PDV onde ela vai ficar.'),
+      formCliente);
 
     // ---- Auditoria ----
     if (ctx.supervisiona) {

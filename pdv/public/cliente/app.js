@@ -1,0 +1,370 @@
+/**
+ * Tela do cliente (autoatendimento). Fica virada para quem vai pagar:
+ * o cliente digita o CPF/CNPJ, escolhe as faturas, passa o cartão na maquininha e leva o comprovante.
+ *
+ * A tela guarda só a chave do PDV (uma vez, na ativação). Nenhum dado de cliente fica no aparelho,
+ * e a tela volta sozinha ao início depois de um tempo parada.
+ */
+
+const BASE = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+const CHAVE = 'pdv.cliente.chave';
+const PARADA_MS = 90_000;   // volta ao início depois de parada
+const FIM_MS = 25_000;      // tempo que o comprovante fica na tela
+
+const raiz = document.getElementById('tela');
+let chave = null;
+let abertura = null;
+let estado = {};
+let relogioParada = null;
+let pararEspera = null;
+
+// ---------- ferramentas ----------
+function el(tag, attrs = {}, ...filhos) {
+  const e = tag === 'svg' || tag === 'path' ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs ?? {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'class') e.setAttribute('class', v);
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'checked' || k === 'disabled') e[k] = !!v;
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const f of filhos.flat(Infinity)) if (f !== null && f !== undefined && f !== false) e.append(f instanceof Node ? f : String(f));
+  return e;
+}
+const real = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const dinheiro = (c) => real.format((c ?? 0) / 100 || 0);
+const dataBr = (d) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : '');
+const digitos = (t) => String(t ?? '').replace(/\D/g, '');
+
+/** CPF/CNPJ com a máscara aparecendo enquanto o cliente digita. */
+function mascara(d) {
+  if (d.length <= 11) {
+    return d.replace(/^(\d{3})(\d{0,3})(\d{0,3})(\d{0,2}).*/, (_, a, b, c, e) =>
+      a + (b ? `.${b}` : '') + (c ? `.${c}` : '') + (e ? `-${e}` : ''));
+  }
+  return d.slice(0, 14).replace(/^(\d{2})(\d{0,3})(\d{0,3})(\d{0,4})(\d{0,2}).*/, (_, a, b, c, e, f) =>
+    a + (b ? `.${b}` : '') + (c ? `.${c}` : '') + (e ? `/${e}` : '') + (f ? `-${f}` : ''));
+}
+
+async function api(metodo, caminho, corpo) {
+  const resp = await fetch(`${BASE}/api/autoatendimento${caminho}`, {
+    method: metodo,
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': chave ?? '' },
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+  });
+  if (resp.status === 401) { apagarChave(); throw new Error('Esta tela precisa ser ativada de novo. Chame o atendente.'); }
+  if (!resp.ok) {
+    let msg = 'Não foi possível concluir. Chame o atendente.';
+    try { msg = (await resp.json()).erro || msg; } catch { /* sem corpo */ }
+    throw new Error(msg);
+  }
+  return resp.status === 204 ? null : resp.json();
+}
+
+const guardarChave = (v) => { chave = v; try { localStorage.setItem(CHAVE, v); } catch { /* sem armazenamento */ } };
+const apagarChave = () => { chave = null; try { localStorage.removeItem(CHAVE); } catch { /* ignora */ } };
+
+/** Volta ao início depois de um tempo parada (ninguém fica vendo a fatura do outro). */
+function contarParada(ms = PARADA_MS) {
+  clearTimeout(relogioParada);
+  relogioParada = setTimeout(() => inicio(), ms);
+}
+const semParada = () => clearTimeout(relogioParada);
+for (const evento of ['pointerdown', 'keydown']) document.addEventListener(evento, () => { if (relogioParada) contarParada(); });
+
+/** O logo pode ser um arquivo publicado junto com o PDV ou um endereço https. */
+const urlLogo = (u) => (!u ? `${BASE}/img/logo-cliente.png` : /^https?:\/\//i.test(u) ? u : `${BASE}/${String(u).replace(/^\//, '')}`);
+
+const marca = () => el('div', { class: 'marca' },
+  el('img', { src: urlLogo(abertura?.logo_url), alt: abertura?.empresa?.nome ?? 'Logo',
+    onerror: (e) => { e.target.src = `${BASE}/img/logo-cliente.png`; } }),
+  abertura?.loja ? el('div', { class: 'loja' }, `${abertura.loja}${abertura.pdv ? ` · ${abertura.pdv.nome}` : ''}`) : null);
+
+const desenhar = (...partes) => raiz.replaceChildren(marca(), ...partes.flat(Infinity).filter(Boolean));
+
+// ---------- ativação ----------
+function telaAtivacao(erro) {
+  semParada();
+  const campo = el('input', { placeholder: 'pdv_xxxxxxxx_...', autocomplete: 'off', spellcheck: 'false' });
+  const botao = el('button', { class: 'btn principal largo' }, 'Ativar esta tela');
+  const form = el('form', { class: 'painel', onsubmit: async (e) => {
+    e.preventDefault();
+    botao.disabled = true;
+    guardarChave(campo.value.trim());
+    try {
+      await iniciar();
+    } catch (err) {
+      apagarChave();
+      botao.disabled = false;
+      telaAtivacao(err.message);
+    }
+  } },
+  el('h1', {}, 'Tela do cliente'),
+  el('p', { class: 'ajuda' }, 'Esta tela ainda não está ativada. O administrador gera a chave em Lojas, PDVs e usuários › Tela do cliente.'),
+  erro ? el('div', { class: 'erro-caixa' }, erro) : null,
+  el('label', { class: 'campo' }, 'Chave do PDV', campo),
+  botao);
+  desenhar(form);
+  campo.focus();
+}
+
+// ---------- 1. início: digitar o documento ----------
+function inicio() {
+  semParada();
+  estado = { documento: '' };
+  const visor = el('div', { class: 'visor vazio' }, 'CPF ou CNPJ');
+  const continuar = el('button', { class: 'btn principal largo', disabled: true }, 'Continuar');
+  const aviso = el('div');
+
+  const atualizar = () => {
+    const d = estado.documento;
+    visor.textContent = d ? mascara(d) : 'CPF ou CNPJ';
+    visor.className = `visor${d ? '' : ' vazio'}`;
+    continuar.disabled = !(d.length === 11 || d.length === 14);
+  };
+  const digitar = (n) => { if (estado.documento.length < 14) { estado.documento += n; atualizar(); } };
+  const apagar = () => { estado.documento = estado.documento.slice(0, -1); atualizar(); };
+
+  const teclado = el('div', { class: 'teclado' },
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((n) => el('button', { type: 'button', onclick: () => digitar(n) }, n)),
+    el('button', { type: 'button', class: 'acao', onclick: () => { estado.documento = ''; atualizar(); } }, 'Limpar'),
+    el('button', { type: 'button', onclick: () => digitar('0') }, '0'),
+    el('button', { type: 'button', class: 'acao', onclick: apagar }, 'Apagar'));
+
+  continuar.addEventListener('click', async () => {
+    continuar.disabled = true;
+    continuar.textContent = 'Procurando…';
+    try {
+      const r = await api('POST', '/faturas', { documento: estado.documento });
+      if (!r.encontrado) {
+        aviso.replaceChildren(el('div', { class: 'aviso' }, 'Não encontramos este CPF/CNPJ. Confira os números ou procure o atendente.'));
+        continuar.textContent = 'Continuar';
+        continuar.disabled = false;
+        return;
+      }
+      telaFaturas(r);
+    } catch (err) {
+      aviso.replaceChildren(el('div', { class: 'erro-caixa' }, err.message));
+      continuar.textContent = 'Continuar';
+      continuar.disabled = false;
+    }
+  });
+
+  // Teclado físico também funciona (muitos balcões têm um).
+  const teclas = (e) => {
+    if (/^\d$/.test(e.key)) digitar(e.key);
+    else if (e.key === 'Backspace') apagar();
+    else if (e.key === 'Enter' && !continuar.disabled) continuar.click();
+    else if (e.key === 'Escape') { estado.documento = ''; atualizar(); }
+  };
+  document.onkeydown = teclas;
+
+  desenhar(el('div', { class: 'painel' },
+    el('h1', {}, 'Pague sua fatura aqui'),
+    el('p', { class: 'ajuda' }, 'Digite seu CPF ou CNPJ para ver as faturas em aberto.'),
+    abertura?.mensagem ? el('div', { class: 'recado' }, abertura.mensagem) : null,
+    visor, teclado, aviso, continuar,
+    el('p', { class: 'rodape' }, 'Precisa de ajuda? Chame o atendente.')));
+}
+
+// ---------- 2. faturas do cliente ----------
+function telaFaturas(dados) {
+  document.onkeydown = null;
+  contarParada();
+  estado = { ...estado, cliente: dados.cliente, faturas: dados.faturas, escolhidas: new Set(dados.faturas.map((f) => f.id)) };
+  if (!dados.faturas.length) {
+    desenhar(el('div', { class: 'painel' },
+      el('div', { class: 'selo' }, el('svg', { viewBox: '0 0 24 24' }, el('path', { d: 'M5 12.5l5 5 9-10' }))),
+      el('h1', {}, 'Tudo em dia!'),
+      el('p', { class: 'ajuda' }, `${dados.cliente.nome}, não há faturas em aberto para este CPF/CNPJ.`),
+      el('button', { class: 'btn largo', onclick: () => inicio() }, 'Voltar ao início')));
+    contarParada(20_000);
+    return;
+  }
+
+  const lista = el('div');
+  const total = el('strong', {});
+  const pagar = el('button', { class: 'btn principal largo' }, 'Pagar');
+  const somar = () => estado.faturas.filter((f) => estado.escolhidas.has(f.id)).reduce((s, f) => s + f.total_centavos, 0);
+  const atualizar = () => {
+    total.textContent = dinheiro(somar());
+    pagar.disabled = !estado.escolhidas.size || !abertura.maquininha;
+    pagar.textContent = estado.escolhidas.size ? `Pagar ${dinheiro(somar())}` : 'Escolha uma fatura';
+  };
+
+  for (const f of estado.faturas) {
+    const marcado = estado.escolhidas.has(f.id);
+    const linha = el('label', { class: `fatura${marcado ? ' on' : ''}` },
+      el('input', { type: 'checkbox', checked: marcado, onchange: (e) => {
+        if (e.target.checked) { estado.escolhidas.add(f.id); linha.classList.add('on'); } else { estado.escolhidas.delete(f.id); linha.classList.remove('on'); }
+        atualizar();
+      } }),
+      el('div', { class: 'corpo' },
+        el('strong', {}, `Vencimento ${dataBr(f.vencimento)}`),
+        el('span', {}, f.dias_atraso > 0 ? el('span', { class: 'atrasada' }, `${f.dias_atraso} dia(s) em atraso`) : 'Em dia',
+          f.documento ? ` · ${f.documento}` : '')),
+      el('div', { class: 'valor' }, dinheiro(f.total_centavos),
+        f.acrescimo_centavos ? el('small', {}, `inclui ${dinheiro(f.acrescimo_centavos)} de multa e juros`) : null));
+    lista.append(linha);
+  }
+  atualizar();
+  pagar.addEventListener('click', () => telaFormas(somar()));
+
+  desenhar(el('div', { class: 'painel' },
+    el('h2', {}, `Olá, ${dados.cliente.nome}`),
+    el('p', { class: 'ajuda' }, `CPF/CNPJ ${dados.cliente.documento} · escolha o que deseja pagar`),
+    lista,
+    el('div', { class: 'total' }, el('span', {}, 'Total'), total),
+    !abertura.maquininha ? el('div', { class: 'aviso' }, 'Nenhuma maquininha ligada nesta tela. Procure o atendente para pagar.') : null,
+    pagar,
+    el('button', { class: 'btn largo', onclick: () => inicio() }, 'Cancelar')));
+}
+
+// ---------- 3. forma de pagamento ----------
+function telaFormas(valor) {
+  contarParada();
+  const botao = (forma, rotulo, extra) => el('button', { class: 'btn largo', onclick: () => escolher(forma) },
+    el('span', {}, rotulo, extra ? el('div', { class: 'rodape' }, extra) : null));
+  const escolher = async (forma) => {
+    if (forma === 'credito') return telaParcelas(valor);
+    await cobrar(forma, valor, 1);
+  };
+  desenhar(el('div', { class: 'painel' },
+    el('h1', {}, 'Como quer pagar?'),
+    el('div', { class: 'total' }, el('span', {}, 'Total a pagar'), el('strong', {}, dinheiro(valor))),
+    abertura.formas.includes('debito') ? botao('debito', 'Cartão de débito') : null,
+    abertura.formas.includes('credito') ? botao('credito', 'Cartão de crédito', 'à vista ou parcelado') : null,
+    abertura.formas.includes('pix') ? botao('pix', 'PIX', 'pelo leitor da maquininha') : null,
+    el('button', { class: 'btn largo', onclick: () => telaFaturas({ cliente: estado.cliente, faturas: estado.faturas }) }, 'Voltar')));
+}
+
+function telaParcelas(valor) {
+  contarParada();
+  const opcoes = [];
+  for (let n = 1; n <= 12; n++) {
+    if (n > 1 && Math.round(valor / n) < 500) break; // não oferece parcela menor que R$ 5,00
+    opcoes.push(el('button', { class: 'btn largo', onclick: () => cobrar('credito', valor, n) },
+      el('span', {}, n === 1 ? 'À vista' : `${n}x de ${dinheiro(Math.round(valor / n))}`, n > 1 ? el('div', { class: 'rodape' }, `total ${dinheiro(valor)}`) : null)));
+  }
+  desenhar(el('div', { class: 'painel' },
+    el('h1', {}, 'Em quantas vezes?'),
+    el('p', { class: 'ajuda' }, 'O parcelamento segue as regras da sua operadora de cartão.'),
+    opcoes,
+    el('button', { class: 'btn largo', onclick: () => telaFormas(valor) }, 'Voltar')));
+}
+
+// ---------- 4. maquininha ----------
+async function cobrar(forma, valor, parcelas) {
+  semParada();
+  desenhar(el('div', { class: 'painel' }, el('div', { class: 'esperando' },
+    el('div', { class: 'ondas' }, el('i'), el('i'), el('i')), el('h1', {}, 'Enviando para a maquininha…'))));
+  let cobranca;
+  try {
+    cobranca = await api('POST', '/cobrancas', { forma, valor_centavos: valor, parcelas });
+  } catch (err) {
+    return telaErro(err.message, valor);
+  }
+  telaEsperando(cobranca, valor, forma, parcelas);
+}
+
+function telaEsperando(cobranca, valor, forma, parcelas) {
+  const situacao = el('h1', {}, 'Siga na maquininha');
+  const detalhe = el('p', { class: 'ajuda' }, forma === 'pix' ? 'Leia o QR Code na maquininha para pagar.' : 'Insira, aproxime ou passe o cartão na maquininha.');
+  const cancelar = el('button', { class: 'btn largo' }, 'Cancelar pagamento');
+  cancelar.addEventListener('click', async () => {
+    cancelar.disabled = true;
+    pararEspera?.();
+    try { await api('POST', `/cobrancas/${cobranca.id}/cancelar`); } catch { /* segue */ }
+    telaFaturas({ cliente: estado.cliente, faturas: estado.faturas });
+  });
+
+  desenhar(el('div', { class: 'painel' },
+    el('div', { class: 'esperando' }, el('div', { class: 'ondas' }, el('i'), el('i'), el('i')), situacao, detalhe,
+      el('div', { class: 'total' }, el('span', {}, parcelas > 1 ? `${parcelas}x` : 'Total'), el('strong', {}, dinheiro(valor)))),
+    cancelar));
+
+  // Pergunta ao PDV de dois em dois segundos como está a cobrança.
+  let parado = false;
+  let timer;
+  pararEspera = () => { parado = true; clearTimeout(timer); };
+  const ciclo = async () => {
+    if (parado) return;
+    try {
+      const t = await api('GET', `/cobrancas/${cobranca.id}`);
+      if (t.status === 'aprovada') { pararEspera(); return concluir(t); }
+      if (['negada', 'cancelada', 'expirada'].includes(t.status)) {
+        pararEspera();
+        return telaErro(t.status === 'negada' ? `Pagamento não aprovado${t.mensagem ? `: ${t.mensagem}` : '.'}` : 'A cobrança foi encerrada na maquininha.', valor);
+      }
+      if (t.status === 'enviada') situacao.textContent = 'Passe o cartão na maquininha';
+    } catch (err) {
+      pararEspera();
+      return telaErro(err.message, valor);
+    }
+    timer = setTimeout(ciclo, 2000);
+  };
+  ciclo();
+}
+
+// ---------- 5. fim ----------
+async function concluir(cobranca) {
+  desenhar(el('div', { class: 'painel' }, el('div', { class: 'esperando' },
+    el('div', { class: 'ondas' }, el('i'), el('i'), el('i')), el('h1', {}, 'Pagamento aprovado!'), el('p', { class: 'ajuda' }, 'Registrando o recibo…'))));
+  let recibo;
+  try {
+    recibo = await api('POST', '/recebimentos', {
+      transacao_id: cobranca.id,
+      cliente_ixc_id: estado.cliente.id,
+      faturas: [...estado.escolhidas],
+    });
+  } catch (err) {
+    // O cartão passou: o cliente não pode sair sem registro, então chamamos o atendente com os dados na tela.
+    return telaErro(`${err.message} O pagamento foi aprovado no cartão (NSU ${cobranca.nsu ?? '—'}): mostre esta tela ao atendente.`, cobranca.valor_centavos, true);
+  }
+  desenhar(el('div', { class: 'painel' },
+    el('div', { class: 'selo' }, el('svg', { viewBox: '0 0 24 24' }, el('path', { d: 'M5 12.5l5 5 9-10' }))),
+    el('h1', {}, 'Pagamento concluído'),
+    el('p', { class: 'ajuda' }, `Recibo nº ${recibo.numero} · ${dinheiro(recibo.valor_centavos)}`),
+    el('div', { class: 'total' }, el('span', {}, 'Faturas pagas'), el('strong', {}, String(recibo.titulos.length))),
+    el('pre', { class: 'comprovante' }, recibo.comprovante),
+    el('div', { class: 'linha' },
+      el('button', { class: 'btn', onclick: () => window.print() }, 'Imprimir'),
+      el('button', { class: 'btn principal', onclick: () => inicio() }, 'Concluir')),
+    el('p', { class: 'rodape' }, 'Guarde seu comprovante. Obrigado!')));
+  contarParada(FIM_MS);
+}
+
+function telaErro(mensagem, valor, chamarAtendente = false) {
+  desenhar(el('div', { class: 'painel' },
+    el('div', { class: 'selo erro' }, el('svg', { viewBox: '0 0 24 24' }, el('path', { d: 'M7 7l10 10M17 7L7 17' }))),
+    el('h1', {}, chamarAtendente ? 'Chame o atendente' : 'Não deu certo'),
+    el('p', { class: 'ajuda' }, mensagem),
+    valor ? el('div', { class: 'total' }, el('span', {}, 'Valor'), el('strong', {}, dinheiro(valor))) : null,
+    el('div', { class: 'linha' },
+      estado.faturas?.length && !chamarAtendente
+        ? el('button', { class: 'btn', onclick: () => telaFaturas({ cliente: estado.cliente, faturas: estado.faturas }) }, 'Tentar de novo')
+        : null,
+      el('button', { class: 'btn principal', onclick: () => inicio() }, 'Voltar ao início'))));
+  contarParada(chamarAtendente ? 180_000 : 45_000);
+}
+
+// ---------- entrada ----------
+async function iniciar() {
+  abertura = await api('GET', '/');
+  if (!abertura.ixc_pronto) {
+    desenhar(el('div', { class: 'painel' },
+      el('h1', {}, 'Atendimento indisponível'),
+      el('p', { class: 'ajuda' }, 'A consulta de faturas está fora do ar neste momento. Procure o atendente.')));
+    return;
+  }
+  inicio();
+}
+
+try { chave = localStorage.getItem(CHAVE); } catch { chave = null; }
+// A chave também pode vir no endereço da tela (…/cliente/#pdv_xxxx_yyyy), para ativar sem teclado.
+if (location.hash.startsWith('#pdv_')) {
+  guardarChave(location.hash.slice(1));
+  history.replaceState(null, '', location.pathname);
+}
+if (!chave) telaAtivacao();
+else iniciar().catch((err) => telaAtivacao(err.message));

@@ -36,6 +36,8 @@ function configPublica(db, empresaId) {
     permitir_avulso: !!c.permitir_avulso,
     comprovante_cabecalho: c.comprovante_cabecalho,
     comprovante_rodape: c.comprovante_rodape,
+    logo_url: c.logo_url,
+    autoatendimento_mensagem: c.autoatendimento_mensagem,
     atualizado_em: c.atualizado_em,
   };
 }
@@ -76,12 +78,27 @@ function salvarConfig(db, empresaId, d) {
   if (d.permitir_avulso !== undefined) por('permitir_avulso', v.booleano(d.permitir_avulso) ? 1 : 0);
   if (d.comprovante_cabecalho !== undefined) por('comprovante_cabecalho', v.opcional(d.comprovante_cabecalho, 'o cabeçalho do comprovante', 300));
   if (d.comprovante_rodape !== undefined) por('comprovante_rodape', v.opcional(d.comprovante_rodape, 'o rodapé do comprovante', 300));
+  if (d.logo_url !== undefined) por('logo_url', imagem(d.logo_url));
+  if (d.autoatendimento_mensagem !== undefined) por('autoatendimento_mensagem', v.opcional(d.autoatendimento_mensagem, 'o recado da tela do cliente', 200));
 
   if (campos.length) {
     por('atualizado_em', agora());
     db.prepare(`UPDATE config_empresa SET ${campos.join(', ')} WHERE empresa_id = ?`).run(...valores, empresaId);
   }
   return configPublica(db, empresaId);
+}
+
+/**
+ * Endereço da imagem do logo: um arquivo publicado junto com o PDV (ex.: img/logo-cliente.png)
+ * ou um endereço https. Nada de javascript:, data: ou caminho que saia da pasta.
+ */
+function imagem(valor) {
+  const t = v.opcional(valor, 'o endereço do logo', 300);
+  if (!t) return null;
+  if (/^https:\/\//i.test(t)) return v.url(t, 'o endereço do logo');
+  v.exigir(/^[A-Za-z0-9][A-Za-z0-9._\/-]*\.(png|jpg|jpeg|svg|webp)$/i.test(t) && !t.includes('..'),
+    'Logo inválido: informe um arquivo publicado (ex.: img/logo-cliente.png) ou um endereço https.');
+  return t;
 }
 
 /** Cliente do IXC da empresa. Lança erro de negócio quando a integração não está configurada ou está desligada. */

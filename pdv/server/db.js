@@ -49,12 +49,18 @@ CREATE TABLE IF NOT EXISTS lojas (
 );
 
 -- Estações de caixa (um computador no balcão). O caixa é aberto sempre num PDV.
+-- Com autoatendimento ligado, o mesmo PDV também atende a tela do cliente (o cliente digita o CPF e paga no cartão):
+-- a chave identifica a tela e o usuário "Autoatendimento" assina os recebimentos feitos por ela.
 CREATE TABLE IF NOT EXISTS pdvs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
   loja_id INTEGER NOT NULL REFERENCES lojas(id),
   nome TEXT NOT NULL,
   ativo INTEGER NOT NULL DEFAULT 1,
+  autoatendimento INTEGER NOT NULL DEFAULT 0,
+  chave_prefixo TEXT UNIQUE,
+  chave_hash TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
   criado_em TEXT NOT NULL,
   UNIQUE (loja_id, nome)
 );
@@ -78,6 +84,9 @@ CREATE TABLE IF NOT EXISTS config_empresa (
   permitir_avulso INTEGER NOT NULL DEFAULT 1,
   comprovante_cabecalho TEXT,
   comprovante_rodape TEXT,
+  -- Tela do cliente (autoatendimento): logo e recado que aparecem para quem está pagando.
+  logo_url TEXT,
+  autoatendimento_mensagem TEXT,
   atualizado_em TEXT NOT NULL
 );
 
@@ -149,6 +158,7 @@ CREATE TABLE IF NOT EXISTS recebimentos (
   caixa_id INTEGER REFERENCES caixas(id),
   loja_id INTEGER NOT NULL REFERENCES lojas(id),
   operador_id INTEGER NOT NULL REFERENCES usuarios(id),
+  origem TEXT NOT NULL DEFAULT 'balcao' CHECK (origem IN ('balcao','autoatendimento')),
   data TEXT NOT NULL,
   cliente_ixc_id TEXT,
   cliente_nome TEXT NOT NULL,
@@ -301,6 +311,24 @@ function abrir(arquivo = config.dbFile) {
   const db = new DatabaseSync(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+
+  // Migrações de instalações feitas antes da tela do cliente.
+  const colunas = (tabela) => db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name);
+  const pdvColunas = colunas('pdvs');
+  if (!pdvColunas.includes('autoatendimento')) {
+    db.exec(`ALTER TABLE pdvs ADD COLUMN autoatendimento INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE pdvs ADD COLUMN chave_prefixo TEXT;
+      ALTER TABLE pdvs ADD COLUMN chave_hash TEXT;
+      ALTER TABLE pdvs ADD COLUMN usuario_id INTEGER REFERENCES usuarios(id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_pdvs_chave ON pdvs(chave_prefixo) WHERE chave_prefixo IS NOT NULL;`);
+  }
+  const configColunas = colunas('config_empresa');
+  if (!configColunas.includes('logo_url')) {
+    db.exec('ALTER TABLE config_empresa ADD COLUMN logo_url TEXT; ALTER TABLE config_empresa ADD COLUMN autoatendimento_mensagem TEXT;');
+  }
+  if (!colunas('recebimentos').includes('origem')) {
+    db.exec("ALTER TABLE recebimentos ADD COLUMN origem TEXT NOT NULL DEFAULT 'balcao'");
+  }
 
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);

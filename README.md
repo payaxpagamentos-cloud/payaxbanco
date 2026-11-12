@@ -9,7 +9,7 @@ usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 >
 > E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
 >
-> E o **Payax PDV** (pasta [`pdv/`](pdv/README.md), publicado em `/pdv`): ponto de venda do balcão para receber as faturas do **IXC Provedor** com as **maquininhas de cartão**, controle de caixa e a conferência diária do que foi recebido no PDV com o que foi baixado no IXC, com servidor próprio.
+> E o **Payax PDV** (pasta [`pdv/`](pdv/README.md), publicado em `/pdv`): ponto de venda do balcão para receber as faturas do **IXC Provedor** com as **maquininhas de cartão**, **tela do cliente** (o cliente digita o CPF e paga sozinho), controle de caixa e a conferência diária do que foi recebido no PDV com o que foi baixado no IXC, com servidor próprio.
 
 ## Módulos
 

@@ -25,9 +25,9 @@ module.exports = (db) => {
   r.get('/exportar.csv', (req, res) => {
     const { itens } = recebimentos.listar(db, req.empresa.id, { ...req.query, limite: 500 });
     enviarCsv(res, `recebimentos-${req.query.de ?? hoje()}.csv`, [
-      ['Nº', 'Data', 'Hora', 'Cliente', 'CPF/CNPJ', 'Código IXC', 'Loja', 'Operador', 'Formas', 'Títulos', 'Acréscimo', 'Desconto', 'Total', 'Situação', 'Baixa no IXC', 'Conferência'],
+      ['Nº', 'Data', 'Hora', 'Cliente', 'CPF/CNPJ', 'Código IXC', 'Loja', 'Operador', 'Origem', 'Formas', 'Títulos', 'Acréscimo', 'Desconto', 'Total', 'Situação', 'Baixa no IXC', 'Conferência'],
       ...itens.map((x) => [x.numero, x.data, String(x.criado_em).slice(11, 16), x.cliente_nome, x.cliente_documento ?? '', x.cliente_ixc_id ?? '',
-        x.loja_nome, x.operador_nome, x.formas.map((f) => FORMAS[f] ?? f).join(' + '),
+        x.loja_nome, x.operador_nome, x.origem === 'autoatendimento' ? 'Tela do cliente' : 'Balcão', x.formas.map((f) => FORMAS[f] ?? f).join(' + '),
         reais(x.valor_titulos_centavos), reais(x.acrescimo_centavos), reais(x.desconto_centavos), reais(x.valor_centavos),
         x.status === 'cancelado' ? 'Cancelado' : 'Confirmado', SITUACAO_IXC[x.ixc_status] ?? x.ixc_status, x.conferencia]),
     ]);

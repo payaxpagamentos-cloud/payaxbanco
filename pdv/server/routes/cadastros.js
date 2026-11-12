@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const { agora } = require('../db');
 const { criarUsuario, alterarUsuario, lojaDaEmpresa, gerarChaveTerminal } = require('../lib/contas');
+const { ativar: ativarTela, desligar: desligarTela } = require('../lib/autoatendimento');
 const { cifrar } = require('../lib/cripto');
 const { permitir } = require('../auth');
 const { registrar } = require('../lib/auditoria');
@@ -45,9 +46,25 @@ module.exports = (db) => {
 
   // ----- PDVs (estações de caixa) -----
   r.get('/pdvs', (req, res) => res.json({
-    itens: db.prepare(`SELECT p.*, l.nome AS loja_nome, (SELECT c.id FROM caixas c WHERE c.pdv_id = p.id AND c.status = 'aberto') AS caixa_aberto_id
+    itens: db.prepare(`SELECT p.id, p.empresa_id, p.loja_id, p.nome, p.ativo, p.autoatendimento, p.criado_em, l.nome AS loja_nome,
+        (SELECT c.id FROM caixas c WHERE c.pdv_id = p.id AND c.status = 'aberto') AS caixa_aberto_id,
+        (SELECT t.nome FROM terminais t WHERE t.empresa_id = p.empresa_id AND t.ativo = 1 AND t.modo <> 'manual'
+          AND (t.pdv_id = p.id OR (t.pdv_id IS NULL AND t.loja_id = p.loja_id)) ORDER BY t.pdv_id IS NULL, t.id LIMIT 1) AS maquininha_nome
       FROM pdvs p JOIN lojas l ON l.id = p.loja_id WHERE p.empresa_id = ? ORDER BY l.nome, p.nome`).all(req.empresa.id),
   }));
+
+  // Tela do cliente: liga (e gera a chave, mostrada uma única vez) ou desliga.
+  r.post('/pdvs/:id/autoatendimento', administra, (req, res) => {
+    const x = ativarTela(db, req.empresa, req.params.id);
+    registrar(db, req, 'autoatendimento_ligado', { pdv: x.pdv_id });
+    res.json(x);
+  });
+
+  r.delete('/pdvs/:id/autoatendimento', administra, (req, res) => {
+    const x = desligarTela(db, req.empresa, req.params.id);
+    registrar(db, req, 'autoatendimento_desligado', { pdv: x.pdv_id });
+    res.json(x);
+  });
 
   r.post('/pdvs', administra, (req, res) => {
     const lojaId = lojaDaEmpresa(db, req.empresa.id, req.body.loja_id);

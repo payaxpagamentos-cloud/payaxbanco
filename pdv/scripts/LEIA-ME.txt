@@ -110,11 +110,22 @@ Quem emite as faturas continua sendo o IXC: o PDV só consulta e baixa.
      - Digitado pelo operador: sem integração; o operador passa o cartão e digita o NSU.
 
 
-9) CÓPIAS DE SEGURANÇA
+9) TELA DO CLIENTE (a que fica virada para quem vai pagar)
+   O cliente digita o CPF/CNPJ, vê as faturas em aberto, escolhe quais pagar e passa o cartão na maquininha.
+     1. No painel: Lojas, PDVs e usuários > no PDV onde a tela vai ficar > "Ligar tela do cliente".
+        A chave aparece UMA ÚNICA VEZ (botão "Copiar endereço + chave").
+     2. No aparelho da tela (monitor com toque, tablet ou o segundo monitor do caixa), abra
+        https://SEU-DOMINIO/pdv/cliente/ e cole a chave. Com o endereço copiado no passo 1, ela já ativa sozinha.
+     3. O logo e o recado da tela saem em Configurações > Tela do cliente.
+   A tela não recebe dinheiro, não dá desconto e não cancela nada: cobra no cartão/PIX da maquininha daquele PDV.
+   Os recebimentos aparecem no painel com origem "Tela do cliente" e entram na mesma conferência com o IXC.
+
+
+10) CÓPIAS DE SEGURANÇA
    Tudo fica na pasta pdv/data (banco pdv.db). Copie essa pasta com frequência:
    é nela que estão os recebimentos, os caixas e a conferência.
 
 
-10) ATUALIZAR PARA UMA VERSÃO NOVA
+11) ATUALIZAR PARA UMA VERSÃO NOVA
    Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
    NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart pdv).

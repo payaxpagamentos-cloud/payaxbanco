@@ -20,6 +20,8 @@ function criarApi(db) {
   api.use('/auth', require('./routes/auth')(db, autenticado));
   // Maquininhas: autenticadas pela chave do terminal, não por usuário.
   api.use('/integracao', require('./routes/integracao')(db));
+  // Tela do cliente (autoatendimento): autenticada pela chave do PDV.
+  api.use('/autoatendimento', require('./routes/autoatendimento')(db));
   api.use('/master', autenticado, require('./routes/master')(db));
   api.use('/empresas/:eid', autenticado, acessoEmpresa(db), require('./routes/empresa')(db));
   api.use((_req, _res, next) => next(new ErroNegocio('Rota não encontrada.', 404)));

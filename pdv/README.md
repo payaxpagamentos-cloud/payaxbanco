@@ -13,15 +13,32 @@ hora fica numa fila e aparece na conferência até alguém resolver — o balcã
 | # | Módulo | O que tem |
 |---|---|---|
 | 1 | **Balcão (PDV)** | Busca do cliente no IXC por CPF/CNPJ, nome, telefone ou código; faturas em aberto já com **multa e juros** calculados pelas regras da empresa; várias faturas no mesmo atendimento; **desconto** dentro do limite; **recebimento sem fatura** (avulso); **várias formas de pagamento** no mesmo recebimento; troco; comprovante na bobina (58 mm ou 80 mm). Atalhos: F2 dinheiro, F3 PIX, F4 débito, F5 crédito, F8 finalizar. |
-| 2 | **Maquininhas de cartão** | Cobrança enviada ao aparelho e acompanhada na tela até aprovar, negar ou expirar. Três modos por maquininha: **aplicativo na maquininha** (busca a cobrança no PDV), **adquirente/webhook** (o PDV chama o endereço do intermediador) e **digitado pelo operador** (NSU lido no comprovante). Guarda NSU, autorização, bandeira, final do cartão e parcelas em cada pagamento. |
-| 3 | **Caixa** | Abertura com fundo de troco (um caixa aberto por PDV), **sangria** e **suprimento**, fechamento com **contagem por forma de pagamento** e a diferença apontada, reabertura com motivo e conferência pela supervisão. Diferença de caixa vira divergência na conferência. |
-| 4 | **Baixa no IXC** | Baixa automática ao confirmar o recebimento, com **fila e novas tentativas** quando o IXC não responde; "tentar agora" no painel; **marcar baixa manual** (quando alguém baixou direto no IXC); **estorno** das faturas quando o recebimento é cancelado. Tipo de recebimento e conta do IXC configuráveis por forma de pagamento. |
-| 5 | **Conferência IXC** | Confronto **fatura a fatura** com o IXC: situação e valor que o IXC devolveu. Totais do período: recebido no PDV, baixado no IXC, **falta confirmar**, cancelados, multa e juros, descontos; quebra por **forma de pagamento, operador, maquininha e dia**. |
-| 6 | **Divergências** | Fatura **não baixada**, **valor diferente**, **fatura que sumiu** do IXC, **cancelado com baixa** e **diferença de caixa**. Cada uma é resolvida ou ignorada com explicação, quem resolveu e quando. |
-| 7 | **Recebimentos** | Tudo o que passou pelo PDV, com filtros por período, cliente, situação e baixa. No detalhe: títulos, pagamentos, erros do IXC, reimpressão do comprovante, cancelamento com motivo (supervisão) e conferência individual. |
-| 8 | **Cadastros e segurança** | Lojas, estações de caixa (PDVs), maquininhas (com chave própria, mostrada uma única vez) e usuários por perfil. Token do IXC e tokens das maquininhas **cifrados** no banco. Auditoria de tudo: quem recebeu, cancelou, conferiu, mexeu na configuração e de qual IP. |
-| 9 | **Plataforma (master)** | Várias empresas atendidas no mesmo servidor: visão geral do que cada uma recebeu hoje, baixas pendentes, divergências, caixas abertos e maquininhas; usuários; auditoria geral; fila de baixas. |
-| 10 | **Exportações** | CSV dos recebimentos, dos caixas e da conferência (uma linha por fatura, com o valor do PDV, o valor do IXC e a diferença) — pronto para abrir na planilha do financeiro. |
+| 2 | **Tela do cliente (autoatendimento)** | A tela virada para quem vai pagar, em `/pdv/cliente/`: o cliente **digita o CPF/CNPJ** num teclado grande, vê as próprias faturas (já com multa e juros), escolhe quais pagar, passa o cartão na maquininha do PDV e leva o comprovante. Com o **logo do provedor** no topo. Não recebe dinheiro, não dá desconto e não cancela nada: isso é do balcão. |
+| 3 | **Maquininhas de cartão** | Cobrança enviada ao aparelho e acompanhada na tela até aprovar, negar ou expirar. Três modos por maquininha: **aplicativo na maquininha** (busca a cobrança no PDV), **adquirente/webhook** (o PDV chama o endereço do intermediador) e **digitado pelo operador** (NSU lido no comprovante). Guarda NSU, autorização, bandeira, final do cartão e parcelas em cada pagamento. |
+| 4 | **Caixa** | Abertura com fundo de troco (um caixa aberto por PDV), **sangria** e **suprimento**, fechamento com **contagem por forma de pagamento** e a diferença apontada, reabertura com motivo e conferência pela supervisão. Diferença de caixa vira divergência na conferência. |
+| 5 | **Baixa no IXC** | Baixa automática ao confirmar o recebimento, com **fila e novas tentativas** quando o IXC não responde; "tentar agora" no painel; **marcar baixa manual** (quando alguém baixou direto no IXC); **estorno** das faturas quando o recebimento é cancelado. Tipo de recebimento e conta do IXC configuráveis por forma de pagamento. |
+| 6 | **Conferência IXC** | Confronto **fatura a fatura** com o IXC: situação e valor que o IXC devolveu. Totais do período: recebido no PDV, baixado no IXC, **falta confirmar**, cancelados, multa e juros, descontos; quebra por **forma de pagamento, operador, maquininha e dia**. |
+| 7 | **Divergências** | Fatura **não baixada**, **valor diferente**, **fatura que sumiu** do IXC, **cancelado com baixa** e **diferença de caixa**. Cada uma é resolvida ou ignorada com explicação, quem resolveu e quando. |
+| 8 | **Recebimentos** | Tudo o que passou pelo PDV, com filtros por período, cliente, situação e baixa. No detalhe: títulos, pagamentos, erros do IXC, reimpressão do comprovante, cancelamento com motivo (supervisão) e conferência individual. |
+| 9 | **Cadastros e segurança** | Lojas, estações de caixa (PDVs), maquininhas (com chave própria, mostrada uma única vez) e usuários por perfil. Token do IXC e tokens das maquininhas **cifrados** no banco. Auditoria de tudo: quem recebeu, cancelou, conferiu, mexeu na configuração e de qual IP. |
+| 10 | **Plataforma (master)** | Várias empresas atendidas no mesmo servidor: visão geral do que cada uma recebeu hoje, baixas pendentes, divergências, caixas abertos e maquininhas; usuários; auditoria geral; fila de baixas. |
+| 11 | **Exportações** | CSV dos recebimentos, dos caixas e da conferência (uma linha por fatura, com o valor do PDV, o valor do IXC e a diferença) — pronto para abrir na planilha do financeiro. |
+
+### Tela do cliente, passo a passo
+
+1. **Ligue a tela** no PDV onde ela vai ficar: *Lojas, PDVs e usuários › Tela do cliente › Ligar e gerar a chave*.
+   A chave (`pdv_<prefixo>_<segredo>`) aparece **uma única vez**.
+2. No aparelho da tela (um monitor com toque, um tablet ou um segundo monitor do caixa), abra
+   `https://SEU-DOMINIO/pdv/cliente/` e cole a chave. O botão *Copiar endereço + chave* do painel gera um
+   link que já ativa a tela sozinho (`…/cliente/#pdv_...`).
+3. O logo e o recado saem em *Configurações › Tela do cliente* (por padrão, o logo que acompanha o sistema).
+4. A tela cobra na **maquininha ligada àquele PDV** (ou à loja). Sem maquininha, ela só consulta as faturas.
+
+Cuidados que já vêm prontos: a consulta exige o CPF/CNPJ **completo e válido** e é limitada a 20 por minuto por
+aparelho; o nome do cliente aparece **parcialmente escondido** (`MARIA D****`); a tela volta sozinha ao início
+depois de parada e ao fim de cada atendimento; fatura já recebida no PDV não aparece de novo; e o recebimento
+entra com origem **"tela do cliente"**, em nome do usuário `Autoatendimento · <PDV>`, **fora do caixa do balcão**
+(não tem gaveta), mas dentro da mesma conferência com o IXC.
 
 ### O que depende de terceiros (não incluído)
 
@@ -38,6 +55,7 @@ hora fica numa fila e aparece na conferência até alguém resolver — o balcã
 | Perfil | Acesso |
 |---|---|
 | **Operador de caixa** | Balcão, o próprio caixa (abrir, sangria, suprimento, fechar) e os recebimentos. Não cancela recebimento nem mexe em cadastros. |
+| **Tela do cliente** | Não é login: é a chave de um PDV. Só consulta faturas pelo CPF/CNPJ completo e cobra no cartão/PIX daquele PDV. |
 | **Supervisor** | Tudo o que o operador vê, de todos os operadores, mais: cancelar recebimento, conferir com o IXC, resolver divergências, fechar e reabrir caixa, marcar baixa manual. Não altera cadastros. |
 | **Administrador** | Tudo na empresa, incluindo IXC, maquininhas, lojas, PDVs e usuários. |
 | **Master / Suporte** | A plataforma: empresas atendidas, usuários, auditoria e fila de baixas. O master também cria empresas e usuários. |
@@ -91,7 +109,8 @@ aplicativo da maquininha e `LEIA-ME.txt` com o passo a passo (cPanel, PM2, Docke
 
 Na empresa (menu Configurações): endereço e token do IXC, conta e **tipo de recebimento do IXC por forma de
 pagamento**, baixa automática, multa (%), juros ao mês (%), desconto máximo (%), exigir caixa aberto, permitir
-recebimento avulso e os textos do comprovante.
+recebimento avulso, os textos do comprovante e, para a **tela do cliente**, o logo (arquivo publicado como
+`img/logo-cliente.png` ou endereço `https://`) e o recado que aparece para quem está pagando.
 
 ## IXC: o que o PDV usa
 
@@ -119,6 +138,18 @@ aparece uma única vez, ao cadastrar ou ao gerar outra).
 | `POST /api/integracao/terminal/resultado` | `{ "referencia", "status": "aprovada\|negada\|cancelada", "nsu", "autorizacao", "bandeira", "cartao_final", "mensagem" }`. Reenviar o mesmo resultado não dá erro. |
 | `GET /api/integracao/terminal/cobranca/:id` | Situação de uma cobrança. |
 
+## Tela do cliente: API
+
+Mesma ideia, com a chave do PDV (`X-Api-Key: pdv_<prefixo>_<segredo>`), usada só pela página `/pdv/cliente/`:
+
+| Rota | Para quê |
+|---|---|
+| `GET /api/autoatendimento` | Marca, loja, logo, recado e formas de pagamento daquela tela. |
+| `POST /api/autoatendimento/faturas` | `{ "documento": "529.982.247-25" }` → faturas em aberto, com o nome parcialmente escondido. |
+| `POST /api/autoatendimento/cobrancas` | `{ "forma", "valor_centavos", "parcelas" }` → manda a maquininha do PDV cobrar. |
+| `GET /api/autoatendimento/cobrancas/:id` | Situação da cobrança (a tela pergunta de 2 em 2 segundos). |
+| `POST /api/autoatendimento/recebimentos` | `{ "transacao_id", "cliente_ixc_id", "faturas": [...] }` → grava o recebimento, baixa no IXC e devolve o comprovante. |
+
 `scripts/maquininha-exemplo.js` é um aplicativo de exemplo completo (buscar → passar o cartão → devolver o
 resultado), pronto para trocar a função `passarCartao` pelo SDK da adquirente.
 
@@ -141,7 +172,9 @@ pdv/
     lib/conferencia.js    # confronto com o IXC, totais do período e divergências
     lib/comprovante.js    # comprovante em texto para a bobina
     routes/               # auth, master, empresa (clientes, caixa, recebimentos, cartão, conferência, cadastros, configurações) e integração
+    lib/autoatendimento.js # tela do cliente: chave do PDV, consulta por CPF/CNPJ e recebimento sem caixa
   public/                 # painel: js/telas/pdv.js (balcão), caixa, recebimentos, conferência, maquininhas, cadastros, configurações
+  public/cliente/         # tela do cliente (autoatendimento), com teclado grande e o logo do provedor
   scripts/maquininha-exemplo.js
   test/                   # fluxo do balcão, cartão, IXC fora do ar e isolamento entre empresas
 ```

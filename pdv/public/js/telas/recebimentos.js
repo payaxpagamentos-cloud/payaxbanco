@@ -1,13 +1,13 @@
 import { api, baixar, qs } from '../api.js';
 import {
   el, limpar, dinheiro, campo, escolha, modal, perguntar, toast, acao, icone,
-  FORMAS_CURTAS, STATUS_IXC, CONFERENCIA, etiqueta, etiquetaDe, dataHora, dataBr, hojeLocal, somarDias, documento,
+  FORMAS_CURTAS, STATUS_IXC, CONFERENCIA, ORIGENS, etiqueta, etiquetaDe, dataHora, dataBr, hojeLocal, somarDias, documento,
 } from '../ui.js';
 
 /** Tudo o que passou pelo PDV, com a situação da baixa no IXC e o comprovante de cada atendimento. */
 export async function telaRecebimentos(ctx) {
   const base = `/empresas/${ctx.empresaId}`;
-  const filtros = { de: somarDias(hojeLocal(), -7), ate: hojeLocal(), busca: '', ixc_status: '', status: '', limite: 200 };
+  const filtros = { de: somarDias(hojeLocal(), -7), ate: hojeLocal(), busca: '', ixc_status: '', status: '', origem: '', limite: 200 };
   const topo = el('div', { class: 'cartao' });
   const tabela = el('div', { class: 'cartao' });
   limpar(ctx.conteudo, el('div', { class: 'coluna' }, topo, tabela));
@@ -26,7 +26,9 @@ export async function telaRecebimentos(ctx) {
         escolha('Baixa no IXC', 'ixc', { '': 'Todas', pendente: 'Aguardando', erro: 'Com erro', parcial: 'Parcial', baixado: 'Baixada', manual: 'Manual', avulso: 'Sem fatura' },
           filtros.ixc_status, { onchange: (e) => { filtros.ixc_status = e.target.value; carregar(); } }),
         escolha('Situação', 'status', { '': 'Todas', confirmado: 'Confirmados', cancelado: 'Cancelados' }, filtros.status,
-          { onchange: (e) => { filtros.status = e.target.value; carregar(); } })));
+          { onchange: (e) => { filtros.status = e.target.value; carregar(); } }),
+        escolha('Origem', 'origem', { '': 'Balcão e tela do cliente', balcao: 'Balcão', autoatendimento: 'Tela do cliente' }, filtros.origem,
+          { onchange: (e) => { filtros.origem = e.target.value; carregar(); } })));
 
     limpar(tabela, dados.itens.length ? el('table', { class: 'tabela' },
       el('thead', {}, el('tr', {}, ['Nº', 'Data', 'Cliente', 'Formas', 'Valor', 'Baixa no IXC', 'Conferência'].map((t) => el('th', {}, t)))),
@@ -34,7 +36,7 @@ export async function telaRecebimentos(ctx) {
         el('td', {}, `#${x.numero}`),
         el('td', {}, dataBr(x.data), el('div', { class: 'pequeno mudo' }, dataHora(x.criado_em).slice(-5))),
         el('td', {}, x.status === 'cancelado' ? el('s', {}, x.cliente_nome) : x.cliente_nome,
-          el('div', { class: 'pequeno mudo' }, [documento(x.cliente_documento), x.operador_nome].filter(Boolean).join(' · '))),
+          el('div', { class: 'pequeno mudo' }, [documento(x.cliente_documento), x.origem === 'autoatendimento' ? 'Tela do cliente' : x.operador_nome].filter(Boolean).join(' · '))),
         el('td', { class: 'pequeno' }, x.formas.map((f) => FORMAS_CURTAS[f] ?? f).join(' + ')),
         el('td', { class: 'num dir' }, x.status === 'cancelado' ? el('s', {}, dinheiro(x.valor_centavos)) : dinheiro(x.valor_centavos)),
         el('td', {}, x.status === 'cancelado' ? etiqueta('Cancelado', '') : etiquetaDe(STATUS_IXC, x.ixc_status)),
@@ -49,7 +51,7 @@ export async function telaRecebimentos(ctx) {
         el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap' },
           r.status === 'cancelado' ? etiqueta('Cancelado', 'erro') : etiqueta('Confirmado', 'ok'),
           etiquetaDe(STATUS_IXC, r.ixc_status), etiquetaDe(CONFERENCIA, r.conferencia)),
-        el('p', { class: 'pequeno mudo' }, `${dataHora(r.criado_em)} · ${r.loja_nome}${r.pdv_nome ? ` · ${r.pdv_nome}` : ''} · ${r.operador_nome}`),
+        el('p', { class: 'pequeno mudo' }, `${dataHora(r.criado_em)} · ${r.loja_nome}${r.pdv_nome ? ` · ${r.pdv_nome}` : ''} · ${r.operador_nome} · ${ORIGENS[r.origem] ?? 'Balcão'}`),
         el('h3', {}, r.cliente_nome),
         el('p', { class: 'pequeno mudo' }, [documento(r.cliente_documento), r.cliente_ixc_id ? `código ${r.cliente_ixc_id}` : null].filter(Boolean).join(' · ')),
         el('table', { class: 'tabela' }, el('thead', {}, el('tr', {}, ['Fatura', 'Vencimento', 'Valor', 'Multa/juros', 'Desconto', 'Total', 'Baixa'].map((t) => el('th', {}, t)))),
