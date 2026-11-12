@@ -17,6 +17,7 @@ module.exports = (db) => {
 
   r.get('/vendas', (req, res) => res.json(relatorios.vendas(db, periodo(req))));
   r.get('/mais-vendidos', (req, res) => res.json(relatorios.maisVendidos(db, { ...periodo(req), limite: Math.min(Number(req.query.limite) || 20, 200) })));
+  r.get('/mais-lucrativos', (req, res) => res.json(relatorios.maisLucrativos(db, { ...periodo(req), limite: Math.min(Number(req.query.limite) || 20, 200) })));
   r.get('/abc', (req, res) => res.json(relatorios.curvaAbc(db, periodo(req))));
   r.get('/categorias', (req, res) => res.json(relatorios.porCategoria(db, periodo(req))));
   r.get('/moradores', (req, res) => res.json(relatorios.porMorador(db, periodo(req))));
@@ -31,6 +32,12 @@ module.exports = (db) => {
         { rotulo: 'Produto', campo: 'nome' }, { rotulo: 'Categoria', campo: 'categoria' },
         { rotulo: 'Quantidade', valor: (l) => qtd(l.qtd_mil) }, { rotulo: 'Faturamento', valor: (l) => dinheiro(l.total_centavos) },
         { rotulo: 'Custo', valor: (l) => dinheiro(l.custo_centavos) }, { rotulo: 'Lucro', valor: (l) => dinheiro(l.lucro_centavos) },
+      ]],
+      'mais-lucrativos': () => [relatorios.maisLucrativos(db, { ...p, limite: 500 }), [
+        { rotulo: 'Produto', campo: 'nome' }, { rotulo: 'Categoria', campo: 'categoria' },
+        { rotulo: 'Quantidade', valor: (l) => qtd(l.qtd_mil) }, { rotulo: 'Faturamento', valor: (l) => dinheiro(l.total_centavos) },
+        { rotulo: 'Custo', valor: (l) => dinheiro(l.custo_centavos) }, { rotulo: 'Lucro', valor: (l) => dinheiro(l.lucro_centavos) },
+        { rotulo: 'Margem %', valor: (l) => (l.margem_bp / 100).toFixed(2).replace('.', ',') },
       ]],
       abc: () => [relatorios.curvaAbc(db, p), [
         { rotulo: 'Classe', campo: 'classe' }, { rotulo: 'Produto', campo: 'nome' },

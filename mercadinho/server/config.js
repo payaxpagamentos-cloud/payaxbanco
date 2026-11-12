@@ -29,6 +29,10 @@ module.exports = {
   // Fotos dos produtos: ficam ao lado do banco (a mesma pasta que entra na cópia de segurança).
   fotosDir: process.env.MERCADO_FOTOS || path.join(path.dirname(process.env.MERCADO_DB || path.join(__dirname, '..', 'data', 'mercadinho.db')), 'fotos'),
   fotoMaximoBytes: Number(process.env.MERCADO_FOTO_MAX_BYTES) || 2 * 1024 * 1024,
+  // Vídeos e imagens da vitrine: também ao lado do banco, para entrar na cópia de segurança.
+  vitrineDir: process.env.MERCADO_VITRINE || path.join(path.dirname(process.env.MERCADO_DB || path.join(__dirname, '..', 'data', 'mercadinho.db')), 'vitrine'),
+  vitrineVideoMaxBytes: Number(process.env.MERCADO_VITRINE_VIDEO_MAX_MB || 80) * 1024 * 1024,
+  vitrineImagemMaxBytes: 8 * 1024 * 1024,
   secret,
   tokenTtlSeconds: 12 * 60 * 60,
   // "Manter conectado" na tela de entrada: sessão mais longa, por opção de quem entra.

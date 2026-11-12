@@ -30,23 +30,29 @@ function vendas(db, { de, ate }) {
 }
 
 /** Produtos mais vendidos no período, com lucro e participação. */
-function maisVendidos(db, { de, ate, limite = 20 }) {
+function maisVendidos(db, { de, ate, limite = 20, ordem = 'faturamento' }) {
   const [inicio, fim] = intervalo(de, ate);
   const linhas = db.prepare(`SELECT p.id, p.nome, p.unidade, c.nome AS categoria,
       SUM(i.qtd_mil) AS qtd_mil, SUM(i.total_centavos) AS total_centavos,
-      SUM(i.qtd_mil * i.custo_centavos / 1000) AS custo_centavos
+      SUM(i.qtd_mil * i.custo_centavos / 1000) AS custo_centavos,
+      SUM(i.total_centavos) - SUM(i.qtd_mil * i.custo_centavos / 1000.0) AS lucro_bruto
     FROM venda_itens i JOIN vendas v ON v.id = i.venda_id JOIN produtos p ON p.id = i.produto_id
     LEFT JOIN categorias c ON c.id = p.categoria_id
     WHERE v.status = 'paga' AND v.fechada_em >= ? AND v.fechada_em < ?
-    GROUP BY p.id ORDER BY total_centavos DESC LIMIT ?`).all(inicio, fim, limite);
+    GROUP BY p.id ORDER BY ${ordem === 'lucro' ? 'lucro_bruto' : 'total_centavos'} DESC LIMIT ?`).all(inicio, fim, limite)
+    .map(({ lucro_bruto, ...l }) => l);
   const total = linhas.reduce((s, l) => s + l.total_centavos, 0);
   return linhas.map((l) => ({
     ...l,
     custo_centavos: Math.round(l.custo_centavos),
     lucro_centavos: Math.round(l.total_centavos - l.custo_centavos),
     participacao_bp: total ? Math.round((l.total_centavos / total) * 10_000) : 0,
+    margem_bp: l.total_centavos ? Math.round(((l.total_centavos - l.custo_centavos) / l.total_centavos) * 10_000) : 0,
   }));
 }
+
+/** Os produtos que mais deixam lucro (venda menos o custo da mercadoria), não os que mais faturam. */
+const maisLucrativos = (db, opcoes) => maisVendidos(db, { ...opcoes, ordem: 'lucro' });
 
 /**
  * Curva ABC: do produto que mais fatura para o que menos fatura, A são os que completam os primeiros 80%
@@ -118,4 +124,4 @@ function csv(linhas, colunas) {
   return `﻿${[cabecalho, ...corpo].join('\n')}\n`;
 }
 
-module.exports = { vendas, maisVendidos, curvaAbc, porCategoria, porMorador, semGiro, perdas, csv };
+module.exports = { vendas, maisVendidos, curvaAbc, porCategoria, porMorador, semGiro, perdas, csv, maisLucrativos };

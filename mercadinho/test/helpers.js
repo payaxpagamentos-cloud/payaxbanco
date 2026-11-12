@@ -9,7 +9,12 @@ process.env.MERCADO_SECRET = 'segredo-de-teste-com-mais-de-32-caracteres';
 process.env.MERCADO_LIMITE_LOGIN = '1000';
 // As fotos dos testes vão para uma pasta temporária, longe do data/ do projeto.
 process.env.MERCADO_FOTOS = fs.mkdtempSync(path.join(os.tmpdir(), 'mercadinho-fotos-'));
-process.on('exit', () => { try { fs.rmSync(process.env.MERCADO_FOTOS, { recursive: true, force: true }); } catch { /* já foi */ } });
+process.env.MERCADO_VITRINE = fs.mkdtempSync(path.join(os.tmpdir(), 'mercadinho-vitrine-'));
+process.on('exit', () => {
+  for (const pasta of [process.env.MERCADO_FOTOS, process.env.MERCADO_VITRINE]) {
+    try { fs.rmSync(pasta, { recursive: true, force: true }); } catch { /* já foi */ }
+  }
+});
 
 const { abrir } = require('../server/db');
 const { criarApp } = require('../server/app');

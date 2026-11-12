@@ -3,15 +3,32 @@
 const { agora, lerConfig } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('./erros');
 const v = require('./validacao');
+const { hoje } = require('./datas');
 
 const CAMPOS = `p.id, p.codigo_barras, p.nome, p.categoria_id, p.fornecedor_id, p.unidade, p.pesavel, p.preco_centavos,
-  p.custo_centavos, p.estoque_mil, p.estoque_minimo_mil, p.controla_validade, p.foto, p.ativo, p.criado_em, p.atualizado_em,
+  p.custo_centavos, p.estoque_mil, p.estoque_minimo_mil, p.controla_validade, p.foto, p.oferta_preco_centavos, p.oferta_ate,
+  p.ativo, p.criado_em, p.atualizado_em,
   c.nome AS categoria, c.cor AS categoria_cor, f.nome AS fornecedor`;
 const JUNCOES = 'FROM produtos p LEFT JOIN categorias c ON c.id = p.categoria_id LEFT JOIN fornecedores f ON f.id = p.fornecedor_id';
 
 /** Margem do preço sobre o custo, em pontos-base (custo 1000 e preço 1500 => 5000 = 50%). */
 const margemBp = (preco, custo) => (custo > 0 ? Math.round(((preco - custo) / custo) * 10_000) : null);
-const comMargem = (p) => (p ? { ...p, margem_bp: margemBp(p.preco_centavos, p.custo_centavos) } : p);
+
+/**
+ * A oferta vale se tem preço menor que o normal e a data ainda não passou (o último dia conta).
+ * É a única regra de preço: a venda, o terminal e a vitrine passam todos por aqui.
+ */
+function emOferta(p, dia = hoje()) {
+  return p?.oferta_preco_centavos != null && p.oferta_preco_centavos < p.preco_centavos && (!p.oferta_ate || dia <= p.oferta_ate);
+}
+const precoVigente = (p, dia = hoje()) => (emOferta(p, dia) ? p.oferta_preco_centavos : p.preco_centavos);
+
+const comMargem = (p) => (p ? {
+  ...p,
+  margem_bp: margemBp(p.preco_centavos, p.custo_centavos),
+  em_oferta: emOferta(p),
+  preco_vigente_centavos: precoVigente(p),
+} : p);
 
 function listar(db, { busca = '', categoria_id = null, fornecedor_id = null, situacao = 'ativos', ordem = 'nome', limite = 500 } = {}) {
   const where = [];
@@ -59,11 +76,29 @@ function dados(db, d, { novo = true } = {}) {
   if (novo || d.controla_validade !== undefined) campos.controla_validade = d.controla_validade ? 1 : 0;
   if (d.ativo !== undefined) campos.ativo = d.ativo ? 1 : 0;
   if (campos.pesavel && campos.unidade === 'un') campos.unidade = 'kg';
+  // Oferta: preço vazio retira a oferta (e a data junto).
+  if (d.oferta_preco !== undefined || d.oferta_preco_centavos !== undefined) {
+    const vazio = (x) => x === null || x === undefined || String(x).trim() === '';
+    campos.oferta_preco_centavos = d.oferta_preco_centavos !== undefined
+      ? (vazio(d.oferta_preco_centavos) ? null : v.inteiro(d.oferta_preco_centavos, 'o preço da oferta', { min: 1 }))
+      : (vazio(d.oferta_preco) ? null : v.centavos(d.oferta_preco, 'o preço da oferta', { min: 1 }));
+    if (campos.oferta_preco_centavos === null) campos.oferta_ate = null;
+  }
+  if (d.oferta_ate !== undefined && campos.oferta_ate !== null) campos.oferta_ate = v.dataOpcional(d.oferta_ate, 'o fim da oferta');
   return campos;
+}
+
+/** A oferta tem que baixar o preço; data no passado não faz sentido ao gravar. */
+function conferirOferta(campos, atual = {}) {
+  const oferta = campos.oferta_preco_centavos !== undefined ? campos.oferta_preco_centavos : atual.oferta_preco_centavos;
+  const preco = campos.preco_centavos ?? atual.preco_centavos;
+  if (oferta != null && oferta >= preco) throw new ErroNegocio('O preço da oferta precisa ser menor que o preço normal.', 422);
+  if (campos.oferta_ate && campos.oferta_ate < hoje()) throw new ErroNegocio('A data final da oferta já passou.', 422);
 }
 
 function criar(db, d, usuario) {
   const campos = dados(db, d, { novo: true });
+  conferirOferta(campos);
   if (campos.codigo_barras && db.prepare('SELECT 1 FROM produtos WHERE codigo_barras = ?').get(campos.codigo_barras)) {
     throw new ErroNegocio('Já existe um produto com este código de barras.', 409);
   }
@@ -85,6 +120,7 @@ function atualizar(db, id, d) {
   const atual = db.prepare('SELECT * FROM produtos WHERE id = ?').get(id);
   if (!atual) throw naoEncontrado('Produto');
   const campos = dados(db, d, { novo: false });
+  conferirOferta(campos, atual);
   if (campos.codigo_barras && db.prepare('SELECT 1 FROM produtos WHERE codigo_barras = ? AND id <> ?').get(campos.codigo_barras, id)) {
     throw new ErroNegocio('Já existe um produto com este código de barras.', 409);
   }
@@ -104,4 +140,4 @@ function precoSugerido(db, custo_centavos) {
   return dezenas + 190;
 }
 
-module.exports = { listar, obter, buscarParaVenda, criar, atualizar, precoSugerido, margemBp };
+module.exports = { listar, obter, buscarParaVenda, criar, atualizar, precoSugerido, margemBp, emOferta, precoVigente };

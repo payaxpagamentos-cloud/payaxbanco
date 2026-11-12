@@ -62,9 +62,35 @@ async function enviarArquivo(caminho, blob) {
   return resp.json();
 }
 
+/**
+ * Envia um arquivo grande (vídeo da vitrine) avisando o andamento — fetch não informa o progresso do envio.
+ * aoProgredir recebe de 0 a 1.
+ */
+function enviarComProgresso(caminho, arquivo, aoProgredir) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${BASE}/api${caminho}`);
+    const s = sessao.get();
+    if (s?.token) xhr.setRequestHeader('Authorization', `Bearer ${s.token}`);
+    xhr.setRequestHeader('Content-Type', arquivo.type || 'application/octet-stream');
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) aoProgredir?.(e.loaded / e.total); };
+    xhr.onerror = () => reject(new ErroApi('Sem conexão com o servidor. Verifique a rede.', 0));
+    xhr.onload = () => {
+      let corpo = null;
+      try { corpo = JSON.parse(xhr.responseText); } catch { /* sem corpo */ }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(corpo);
+      // 413 sem JSON vem do nginx, antes de chegar ao sistema: o limite de envio dele está baixo.
+      const msg = corpo?.erro || (xhr.status === 413 ? 'Arquivo grande demais para o servidor (limite de envio do nginx).' : `Erro ${xhr.status}`);
+      return reject(new ErroApi(msg, xhr.status));
+    };
+    xhr.send(arquivo);
+  });
+}
+
 export const api = {
   get: (c) => chamar('GET', c),
   enviarArquivo,
+  enviarComProgresso,
   post: (c, b = {}) => chamar('POST', c, b),
   patch: (c, b = {}) => chamar('PATCH', c, b),
   delete: (c) => chamar('DELETE', c),

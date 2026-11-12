@@ -245,6 +245,9 @@ input[type="checkbox"]{ width: 19px; height: 19px; min-height: 0; accent-color: 
 input[type="color"]{ padding: 4px; }
 .form{ display: flex; flex-direction: column; gap: 14px; }
 .form .duas{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grupo-oferta{ border: 1px dashed var(--vidro-borda-forte); border-radius: var(--raio-p); padding: 10px 14px 14px; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.grupo-oferta legend{ padding: 0 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: var(--acento); }
+.grupo-oferta p{ margin: 0; }
 .form .tres{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 @media (max-width: 560px){ .form .duas, .form .tres{ grid-template-columns: 1fr; } }
 /* Ação discreta no rótulo de um campo (ex.: "sugerir" o preço), sem alterar a altura da linha. */
@@ -574,3 +577,18 @@ td.direita, th.direita{ text-align: right; }
   body::before{ animation: none; }
   *, *::before, *::after{ animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
+
+/* ---------- gestão da vitrine ---------- */
+.vt-opcao{ align-items: flex-start; padding: 6px 0; }
+.vt-opcao input{ margin-top: 3px; }
+.divisor{ border: 0; border-top: 1px solid var(--vidro-borda); margin: 4px 0; }
+.passos{ margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--texto-2); font-size: 13px; }
+.endereco-tv{ display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--raio-p); background: var(--vidro-forte); border: 1px solid var(--vidro-borda); margin-bottom: 10px; }
+.endereco-tv code{ flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; color: var(--acento); }
+.midia{ display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--raio-p); border: 1px solid var(--vidro-borda); background: rgba(255,255,255,.03); }
+.midia.desligada{ opacity: .55; }
+.miniatura-midia{ width: 96px; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; flex: none; }
+.miniatura-midia img, .miniatura-midia video{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.barra-envio{ height: 8px; border-radius: 99px; background: var(--vidro-forte); overflow: hidden; margin-top: 4px; }
+.barra-envio span{ display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--acento), var(--acento-2)); transition: width .2s ease; }
+@media (max-width: 560px){ .midia{ flex-wrap: wrap; } .miniatura-midia{ width: 72px; } }

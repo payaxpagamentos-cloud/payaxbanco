@@ -84,6 +84,9 @@ CREATE TABLE IF NOT EXISTS produtos (
   controla_validade INTEGER NOT NULL DEFAULT 0,
   -- Nome do arquivo da foto em data/fotos (ex.: "12-a1b2c3d4.jpg"). NULL mostra o desenho de reserva.
   foto TEXT,
+  -- Oferta: preço promocional (menor que o normal) válido até a data, inclusive. Sem data, vale até ser retirada.
+  oferta_preco_centavos INTEGER CHECK (oferta_preco_centavos IS NULL OR oferta_preco_centavos > 0),
+  oferta_ate TEXT,
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL,
   atualizado_em TEXT NOT NULL
@@ -362,6 +365,20 @@ CREATE TABLE IF NOT EXISTS configuracoes (
   valor TEXT NOT NULL
 );
 
+-- Vídeos e imagens que passam na vitrine (TV e tablet parado). O arquivo fica em data/vitrine.
+CREATE TABLE IF NOT EXISTS vitrine_midias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo TEXT NOT NULL CHECK (tipo IN ('video','imagem')),
+  arquivo TEXT NOT NULL UNIQUE,
+  titulo TEXT NOT NULL DEFAULT '',
+  -- Quanto tempo a imagem fica na tela. O vídeo toca até o fim.
+  duracao_seg INTEGER NOT NULL DEFAULT 10 CHECK (duracao_seg BETWEEN 3 AND 120),
+  tamanho_bytes INTEGER NOT NULL DEFAULT 0,
+  ordem INTEGER NOT NULL DEFAULT 0,
+  ativa INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS auditoria (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   usuario_id INTEGER REFERENCES usuarios(id),
@@ -403,6 +420,15 @@ const CONFIG_PADRAO = {
   pix_chave: '',
   pix_recebedor: 'MERCADINHO DO CONDOMINIO',
   pix_cidade: 'SAO PAULO',
+  // Vitrine: o que passa na TV e no tablet parado.
+  vitrine_mais_vendidos: '1',
+  vitrine_mais_lucrativos: '1',
+  vitrine_ofertas: '1',
+  vitrine_midias: '1',
+  vitrine_qtd_produtos: '6',
+  vitrine_segundos_produto: '8',
+  vitrine_tablet: '1',
+  vitrine_tablet_ocioso: '45',
 };
 
 const agora = () => new Date().toISOString();
@@ -414,6 +440,8 @@ const COLUNAS_NOVAS = [
   ['vendas', 'terminal_id', 'INTEGER REFERENCES terminais(id)'],
   ['pagamentos', 'conferido_em', 'TEXT'],
   ['pagamentos', 'conferido_por', 'INTEGER REFERENCES usuarios(id)'],
+  ['produtos', 'oferta_preco_centavos', 'INTEGER'],
+  ['produtos', 'oferta_ate', 'TEXT'],
 ];
 
 function migrar(db) {
@@ -484,6 +512,14 @@ function lerConfig(db) {
     pix_chave: c.pix_chave,
     pix_recebedor: c.pix_recebedor,
     pix_cidade: c.pix_cidade,
+    vitrine_mais_vendidos: c.vitrine_mais_vendidos === '1',
+    vitrine_mais_lucrativos: c.vitrine_mais_lucrativos === '1',
+    vitrine_ofertas: c.vitrine_ofertas === '1',
+    vitrine_midias: c.vitrine_midias === '1',
+    vitrine_qtd_produtos: Number(c.vitrine_qtd_produtos),
+    vitrine_segundos_produto: Number(c.vitrine_segundos_produto),
+    vitrine_tablet: c.vitrine_tablet === '1',
+    vitrine_tablet_ocioso: Number(c.vitrine_tablet_ocioso),
   };
 }
 

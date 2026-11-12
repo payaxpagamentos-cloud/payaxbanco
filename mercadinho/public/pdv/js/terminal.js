@@ -1,5 +1,6 @@
 import { api, pareamento } from './api.js';
 import { el, $, limpar, dinheiro, qtd, icone, toast, acao, fotoProduto } from '../../js/ui.js';
+import { criarVitrine } from '../../vitrine/vitrine.js';
 
 /**
  * Terminal do balcão — a única tela que o cliente usa.
@@ -11,7 +12,11 @@ const SEGUNDOS_INATIVO = 90;
 const SEGUNDOS_AVISO = 20;
 
 const app = () => $('#app');
-const pintar = (...filhos) => limpar(app(), el('div', { class: 'terminal-tela' }, ...filhos));
+const pintar = (...filhos) => {
+  fecharVitrine(); // qualquer troca de tela tira a vitrine da frente
+  naEspera = false;
+  limpar(app(), el('div', { class: 'terminal-tela' }, ...filhos));
+};
 
 /* ---------- marca ---------- */
 /** Logo da loja. Para trocar, substitua public/img/binho-logo.png pelo logo de vocês. */
@@ -56,6 +61,45 @@ function avisarInatividade() {
     }
   }, 1000);
 }
+
+/* ---------- vitrine: quando ninguém está comprando ---------- */
+/**
+ * Com a tela de espera parada pelo tempo configurado, a vitrine (ofertas, produtos, vídeos) cobre a tela.
+ * Ela some com um toque — ou quando alguém passa um produto no leitor, e aí a compra já começa direto.
+ */
+const vitrine = criarVitrine({ modo: 'tablet' });
+let timerVitrine;
+let sobreposicao = null;
+let naEspera = false; // só a tela "Passe o produto no leitor" chama a vitrine (a lista sem código, não)
+
+function fecharVitrine() {
+  clearTimeout(timerVitrine);
+  if (!sobreposicao) return;
+  vitrine.parar();
+  sobreposicao.remove();
+  sobreposicao = null;
+}
+
+function agendarVitrine() {
+  clearTimeout(timerVitrine);
+  const cfg = vitrine.dados?.tablet;
+  if (!cfg?.ligada || sobreposicao || !naEspera || estado.venda?.itens?.length) return;
+  timerVitrine = setTimeout(abrirVitrine, cfg.ocioso_segundos * 1000);
+}
+
+function abrirVitrine() {
+  if (sobreposicao || !naEspera || estado.venda?.itens?.length) return;
+  // O clique fecha a vitrine sem chegar ao botão que está embaixo dela.
+  sobreposicao = el('div', { class: 'vitrine-sobre', onclick: (e) => { e.stopPropagation(); fecharVitrine(); agendarVitrine(); } }, vitrine.elemento);
+  document.body.append(sobreposicao);
+  vitrine.iniciar();
+}
+
+// Leitor ou teclado: fecha a vitrine antes de o código ser lido (fase de captura), sem engolir a tecla.
+document.addEventListener('keydown', () => { if (sobreposicao) fecharVitrine(); agendarVitrine(); }, true);
+document.addEventListener('pointerdown', () => { if (!sobreposicao) agendarVitrine(); });
+// Parado e sem a vitrine na tela, de tempos em tempos confere se a administração mudou algo.
+setInterval(() => { if (!sobreposicao) vitrine.carregar().then(agendarVitrine); }, 5 * 60 * 1000);
 
 /* ---------- leitor de código de barras ---------- */
 let buffer = '';
@@ -139,6 +183,8 @@ function telaEspera() {
         el('h1', {}, 'Passe o produto no ', el('em', {}, 'leitor')),
         el('p', {}, 'Um de cada vez. O que você passar aparece aqui na tela — no fim, é só escolher como pagar.'),
         el('button', { class: 'btn grande', style: 'max-width: 380px', onclick: telaSemCodigo }, icone('produtos'), 'Produto sem código de barras')))));
+  naEspera = true;
+  agendarVitrine();
 }
 
 function telaCompra() {
@@ -189,7 +235,8 @@ async function telaSemCodigo() {
           fotoProduto(p, { classe: 'foto-produto vitrine' }),
           el('span', { class: 'cat' }, p.categoria ?? 'Outros'),
           el('span', { class: 'nome' }, p.nome),
-          el('span', { class: 'preco' }, `${dinheiro(p.preco_centavos)}${p.pesavel ? ` / ${p.unidade}` : ''}`))))
+          p.preco_cheio_centavos ? el('s', { class: 'preco-cheio' }, dinheiro(p.preco_cheio_centavos)) : null,
+          el('span', { class: `preco${p.preco_cheio_centavos ? ' oferta' : ''}` }, `${dinheiro(p.preco_centavos)}${p.pesavel ? ` / ${p.unidade}` : ''}`))))
         : el('div', { class: 'cartao' }, el('div', { class: 'vazio' }, 'Todos os produtos têm código de barras. Passe no leitor.'))));
 }
 
@@ -477,6 +524,7 @@ async function iniciar() {
   if (!pareamento.get()?.token) return telaPareamento();
   try {
     estado.inicio = await api.get('/inicio');
+    vitrine.carregar().then(agendarVitrine); // sem esperar: a vitrine não pode atrasar o caixa
     document.title = `Caixa — ${estado.inicio.mercado.nome}`;
     estado.venda = await api.get('/venda');
     estado.tela = estado.venda?.itens?.length ? 'compra' : 'espera';

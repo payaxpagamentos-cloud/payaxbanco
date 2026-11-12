@@ -268,3 +268,7 @@ input:focus{ outline: none; border-color: var(--marca-forte); box-shadow: 0 0 0 
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{ animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
+
+/* Produto em oferta na lista "sem código": o preço normal aparece riscado. */
+.cartao-produto .preco-cheio{ font-size: 13px; color: var(--texto-3, #7A8797); }
+.cartao-produto .preco.oferta{ color: #D9304F; }

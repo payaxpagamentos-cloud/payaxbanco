@@ -8,6 +8,7 @@ import compras from './pages/compras.js';
 import financeiro from './pages/financeiro.js';
 import moradores from './pages/moradores.js';
 import relatorios from './pages/relatorios.js';
+import vitrine from './pages/vitrine.js';
 import configuracoes from './pages/config.js';
 import minhaConta from './pages/minhaconta.js';
 
@@ -24,6 +25,7 @@ const MENU = [
   { rota: 'moradores', rotulo: 'Moradores', icone: 'moradores', pagina: moradores, perfis: EQUIPE },
   { rota: 'financeiro', rotulo: 'Financeiro', icone: 'financeiro', pagina: financeiro, perfis: ['admin', 'gerente'] },
   { rota: 'relatorios', rotulo: 'Relatórios', icone: 'relatorios', pagina: relatorios, perfis: ['admin', 'gerente'] },
+  { rota: 'vitrine', rotulo: 'Vitrine', icone: 'tv', pagina: vitrine, perfis: ['admin', 'gerente'] },
   { rota: 'config', rotulo: 'Configurações', icone: 'config', pagina: configuracoes, perfis: ['admin', 'gerente'] },
 ];
 const MENU_MORADOR = [

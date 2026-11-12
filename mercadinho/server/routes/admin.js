@@ -11,8 +11,12 @@ const v = require('../lib/validacao');
 
 const PERFIS = ['admin', 'gerente', 'caixa', 'estoque'];
 // Configurações guardadas como número inteiro (o restante é texto livre ou liga/desliga).
-const NUMERICAS = { limite_fiado_padrao_centavos: [0, 10_000_000], vencimento_fatura_dia: [1, 28], alerta_validade_dias: [1, 365], margem_padrao_bp: [0, 100_000], terminal_segundos_fim: [3, 120] };
-const BOOLEANAS = ['permitir_estoque_negativo', 'terminal_pix', 'terminal_cartao', 'terminal_conta'];
+const NUMERICAS = {
+  limite_fiado_padrao_centavos: [0, 10_000_000], vencimento_fatura_dia: [1, 28], alerta_validade_dias: [1, 365], margem_padrao_bp: [0, 100_000], terminal_segundos_fim: [3, 120],
+  vitrine_qtd_produtos: [1, 30], vitrine_segundos_produto: [3, 60], vitrine_tablet_ocioso: [10, 600],
+};
+const BOOLEANAS = ['permitir_estoque_negativo', 'terminal_pix', 'terminal_cartao', 'terminal_conta',
+  'vitrine_mais_vendidos', 'vitrine_mais_lucrativos', 'vitrine_ofertas', 'vitrine_midias', 'vitrine_tablet'];
 
 /** Configurações da loja, maquininhas, usuários e auditoria. */
 module.exports = (db, { admin }) => {

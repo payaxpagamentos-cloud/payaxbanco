@@ -42,6 +42,9 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
 
 
 4) PUBLICAR NO DOMÍNIO (Nginx)
+   # Os vídeos da vitrine chegam a 80 MB: sem esta linha o nginx recusa o envio (limite padrão de 1 MB).
+   client_max_body_size 100m;
+
    location /mercadinho/ {
      proxy_pass http://127.0.0.1:3300/mercadinho/;
      proxy_set_header Host $host;
@@ -93,7 +96,8 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
      2. Apague o banco atual:      rm data/mercadinho.db data/mercadinho.db-shm data/mercadinho.db-wal
      3. Copie o da cópia:          cp backups/<data>/mercadinho.db data/
      4. Copie as fotos:            rm -rf data/fotos && cp -a backups/<data>/fotos data/
-     5. Suba de novo:              systemctl start mercadinho
+     5. Copie a vitrine:           rm -rf data/vitrine && cp -a backups/<data>/vitrine data/   (se a cópia tiver)
+     6. Suba de novo:              systemctl start mercadinho
 
      ATENÇÃO: depois de restaurar, a senha do administrador é a do sistema de
      ONDE veio a cópia, não a que está no .env desta máquina. O MERCADO_ADMIN_SENHA
@@ -119,3 +123,22 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
    menu do Chrome > "Adicionar à tela inicial"; no iPad: Compartilhar > "Adicionar à
    Tela de Início"). O pareamento fica salvo no aparelho: só é pedido de novo se a
    administração desativar o terminal ou se os dados do navegador forem apagados.
+
+
+9) VITRINE (TV DA LOJA E TABLET PARADO)
+   Ofertas, mais vendidos, mais lucrativos e os vídeos e imagens de vocês passando
+   sozinhos. Configure em Gestão > Vitrine (lá também se enviam os vídeos).
+
+   Na TV: abra https://SEU-DOMINIO/mercadinho/vitrine/ no navegador da TV (ou do
+   computador ligado nela) e toque em "Tela cheia". Não pede login: mostra só nome,
+   foto e preço. A cada volta busca de novo o que mudou.
+
+   No tablet do caixa: com a tela de espera parada pelo tempo configurado, a vitrine
+   aparece sozinha. Some com um toque ou ao passar um produto no leitor.
+
+   Vídeos: MP4 (H.264) ou WebM, até 80 MB, de preferência deitados (16:9). Tocam sem
+   som, porque o navegador só deixa tocar sozinho assim. Imagens: JPEG, PNG ou WebP,
+   até 8 MB. Os arquivos ficam em data/vitrine e entram na cópia de segurança.
+
+   Ofertas: em Produtos > editar (campo "Oferta") ou em Gestão > Vitrine > Nova oferta.
+   O preço da oferta é o cobrado no terminal, até a data informada (o último dia conta).

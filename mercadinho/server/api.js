@@ -40,6 +40,8 @@ function criarApi(db) {
   api.use('/moradores', autenticado, require('./routes/moradores')(db, { equipe, gestao }));
   api.use('/relatorios', autenticado, gestao, require('./routes/relatorios')(db));
   api.use('/admin', autenticado, gestao, require('./routes/admin')(db, { admin }));
+  // Vitrine (TV e tablet parado): a sequência é pública; a gestão exige login de gerente ou admin.
+  api.use('/vitrine', require('./routes/vitrine')(db, { autenticado, gestao }));
 
   api.use((_req, _res, next) => next(new ErroNegocio('Rota não encontrada.', 404)));
   return api;

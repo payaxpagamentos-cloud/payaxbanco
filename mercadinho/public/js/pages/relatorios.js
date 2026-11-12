@@ -7,7 +7,7 @@ const CORES = ['#22D3A5', '#5B9DFF', '#B57BFF', '#FFC65C', '#FF7A8A', '#5BE8D4',
 export default async function relatorios({ alvo, definirTitulo }) {
   let aba = 'vendas';
   let periodo = { de: somarDias(hojeLocal(), -29), ate: hojeLocal() };
-  const ABAS = [['vendas', 'Vendas'], ['mais-vendidos', 'Mais vendidos'], ['abc', 'Curva ABC'], ['categorias', 'Categorias'], ['moradores', 'Moradores'], ['sem-giro', 'Sem giro'], ['perdas', 'Perdas']];
+  const ABAS = [['vendas', 'Vendas'], ['mais-vendidos', 'Mais vendidos'], ['mais-lucrativos', 'Mais lucrativos'], ['abc', 'Curva ABC'], ['categorias', 'Categorias'], ['moradores', 'Moradores'], ['sem-giro', 'Sem giro'], ['perdas', 'Perdas']];
 
   function desenhar() {
     definirTitulo('Relatórios', `${dataBr(periodo.de)} a ${dataBr(periodo.ate)}`);
@@ -58,6 +58,22 @@ export default async function relatorios({ alvo, definirTitulo }) {
           el('section', { class: 'cartao' },
             el('h2', {}, 'Movimento por hora'),
             v.por_hora.length ? colunas(v.por_hora.map((h) => ({ rotulo: `${String(h.hora).padStart(2, '0')}h`, valor: h.total }))) : el('div', { class: 'vazio' }, 'Sem vendas no período.'))));
+    }
+
+    if (aba === 'mais-lucrativos') {
+      const lista = await api.get(`/relatorios/mais-lucrativos${q}`);
+      const lucro = lista.reduce((s, p) => s + p.lucro_centavos, 0);
+      return limpar(corpo, el('section', { class: 'cartao' },
+        el('p', { class: 'mudo pequeno', style: 'margin-top: 0' }, 'Os produtos que mais deixam dinheiro no caixa depois de pagar a mercadoria — não os que mais faturam. Quem fatura muito com margem baixa fica mais para baixo aqui.'),
+        tabela([
+          { titulo: '#', celula: (p) => el('span', { class: 'mudo' }, String(lista.indexOf(p) + 1)) },
+          { titulo: 'Produto', celula: (p) => el('span', {}, el('div', { class: 'destaque' }, p.nome), el('div', { class: 'pequeno mudo' }, p.categoria ?? 'sem categoria')) },
+          { titulo: 'Quantidade', direita: true, celula: (p) => qtd(p.qtd_mil, p.unidade) },
+          { titulo: 'Faturamento', direita: true, celula: (p) => dinheiro(p.total_centavos) },
+          { titulo: 'Lucro', direita: true, celula: (p) => el('strong', { class: 'positivo' }, dinheiro(p.lucro_centavos)) },
+          { titulo: 'Margem', direita: true, celula: (p) => percentual(p.margem_bp) },
+          { titulo: 'Do lucro total', direita: true, celula: (p) => percentual(lucro ? Math.round((p.lucro_centavos / lucro) * 10_000) : 0) },
+        ], lista, { vazio: 'Sem vendas no período.' })));
     }
 
     if (aba === 'mais-vendidos' || aba === 'abc') {

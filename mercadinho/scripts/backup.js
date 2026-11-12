@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Cópia de segurança do mercadinho: o banco inteiro e as fotos dos produtos.
+ * Cópia de segurança do mercadinho: o banco inteiro, as fotos dos produtos e os vídeos e imagens da vitrine.
  *
  *   node --env-file=.env scripts/backup.js                  (grava em ./backups)
  *   node --env-file=.env scripts/backup.js /mnt/pendrive    (grava onde você mandar)
@@ -82,6 +82,11 @@ db.exec(`VACUUM INTO '${arquivoDb.replace(/'/g, "''")}'`);
 db.close();
 
 // Fotos: arquivos comuns, cópia direta.
+let midias = 0;
+if (fs.existsSync(config.vitrineDir)) {
+  fs.cpSync(config.vitrineDir, path.join(destino, 'vitrine'), { recursive: true });
+  midias = fs.readdirSync(path.join(destino, 'vitrine')).length;
+}
 let fotos = 0;
 if (fs.existsSync(config.fotosDir)) {
   fs.cpSync(config.fotosDir, path.join(destino, 'fotos'), { recursive: true });
@@ -90,7 +95,7 @@ if (fs.existsSync(config.fotosDir)) {
 
 const conferencia = conferir(arquivoDb);
 console.log(`[Mercadinho] Cópia de segurança em ${destino}`);
-console.log(`  banco ${tamanho(arquivoDb)} (integridade: ${conferencia.integridade}) · ${conferencia.produtos} produtos · ${conferencia.vendas} vendas · ${fotos} fotos`);
+console.log(`  banco ${tamanho(arquivoDb)} (integridade: ${conferencia.integridade}) · ${conferencia.produtos} produtos · ${conferencia.vendas} vendas · ${fotos} fotos · ${midias} mídias da vitrine`);
 
 // Guarda as cópias dos últimos dias e apaga as mais antigas.
 const antigas = fs.readdirSync(raizDestino)

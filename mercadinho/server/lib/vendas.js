@@ -6,6 +6,7 @@ const estoque = require('./estoque');
 const moradores = require('./moradores');
 const caixaLib = require('./caixa');
 const { hoje } = require('./datas');
+const { precoVigente } = require('./produtos');
 
 const FORMAS = ['dinheiro', 'pix', 'debito', 'credito', 'fiado'];
 
@@ -89,7 +90,7 @@ function adicionarItem(db, venda_id, { produto_id, qtd_mil = 1000, preco_centavo
     if (!Number.isInteger(qtd_mil) || qtd_mil <= 0) throw new ErroNegocio('Quantidade inválida.', 422);
     if (!p.pesavel && qtd_mil % 1000 !== 0) throw new ErroNegocio(`${p.nome} é vendido por unidade: use quantidades inteiras.`, 422);
 
-    const preco = preco_centavos ?? p.preco_centavos;
+    const preco = preco_centavos ?? precoVigente(p);
     const existente = desconto_centavos === 0
       ? db.prepare('SELECT * FROM venda_itens WHERE venda_id = ? AND produto_id = ? AND preco_centavos = ? AND desconto_centavos = 0').get(venda_id, produto_id, preco)
       : null;
