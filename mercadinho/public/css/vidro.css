@@ -417,13 +417,15 @@ td.direita, th.direita{ text-align: right; }
   text-align: center; font-size: 14px; color: var(--texto-2);
 }
 
-/* Em tela estreita a loja não cabe ao lado: o cartão vai para o meio e o véu fecha mais. */
+/* No celular a foto da loja sai: sobra o cartão de acesso sobre o escuro da marca.
+ * Em tela pequena a loja apareceria em pedaços e só roubaria contraste do formulário. */
 @media (max-width: 760px){
   .entrada{ justify-items: center; }
   .entrada::before{
     background:
-      linear-gradient(180deg, rgba(1,18,30,.34) 0%, rgba(1,18,30,.70) 48%, #011829 92%),
-      url("../img/loja.webp") 42% 62% / auto 140% no-repeat;
+      radial-gradient(520px 420px at 12% 4%, rgba(2,150,125,.26), transparent 62%),
+      radial-gradient(620px 520px at 88% 96%, rgba(4,62,82,.40), transparent 64%),
+      #011829;
   }
   .entrada .painel-entrada{ max-width: 420px; }
 }
