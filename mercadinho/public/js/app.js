@@ -1,5 +1,5 @@
 import { api, sessao } from './api.js';
-import { el, $, limpar, icone, iniciais, toast, modal, acao, lerForm, marca, PERFIS } from './ui.js';
+import { el, $, limpar, icone, iniciais, toast, modal, acao, lerForm, marca, RAIZ, PERFIS } from './ui.js';
 import painel from './pages/painel.js';
 import vendas from './pages/vendas.js';
 import produtos from './pages/produtos.js';
@@ -47,7 +47,7 @@ aplicarTema(temaSalvo() ?? 'escuro');
 /* ---------- entrada ---------- */
 function telaLogin(erro) {
   const form = el('form', { class: 'form', onsubmit: entrar },
-    el('label', { class: 'campo' }, 'E-mail', el('input', { name: 'email', type: 'email', autocomplete: 'username', required: true, placeholder: 'voce@mercadinho.com.br' })),
+    el('label', { class: 'campo' }, 'E-mail', el('input', { name: 'email', type: 'email', autocomplete: 'username', required: true, placeholder: 'voce@mercadobinho.com.br' })),
     el('label', { class: 'campo' }, 'Senha', el('input', { name: 'senha', type: 'password', autocomplete: 'current-password', required: true, placeholder: '••••••••' })),
     erro ? el('p', { class: 'etiqueta erro' }, erro) : null,
     el('button', { class: 'btn primario grande' }, 'Entrar'));
@@ -66,22 +66,12 @@ function telaLogin(erro) {
     });
   }
 
-  const recurso = (simbolo, texto) => el('div', { class: 'item' }, el('span', { class: 'chip' }, icone(simbolo)), texto);
-
-  limpar($('#app'), el('div', { class: 'entrada' }, el('div', { class: 'painel-entrada' },
-    el('div', { class: 'apresentacao' },
-      marca(estado.publico.nome_mercado, estado.publico.condominio || 'do Condomínio'),
-      el('h1', {}, 'O mercadinho do condomínio ', el('em', {}, 'em um lugar só')),
-      el('p', {}, 'Frente de caixa, estoque, compras, financeiro e a conta de cada morador — com a maquininha de cartão conversando direto com o sistema.'),
-      el('div', { class: 'recursos' },
-        recurso('pdv', 'PDV com leitor de código de barras e balança'),
-        recurso('cartao', 'Cartão, PIX, dinheiro e conta do morador'),
-        recurso('produtos', 'Estoque com custo médio, validade e inventário'),
-        recurso('financeiro', 'Fluxo de caixa, DRE e contas do mês'))),
+  limpar($('#app'), el('div', { class: 'entrada' },
     el('div', { class: 'cartao caixa' },
-      el('h2', {}, 'Entrar'),
-      el('p', { class: 'mudo pequeno', style: 'margin: -4px 0 18px' }, 'Use o e-mail e a senha que a administração cadastrou.'),
-      form))));
+      el('img', { class: 'logo-entrada no-escuro', src: `${RAIZ}/img/binho-logo.png`, alt: estado.publico.nome_mercado || 'Mercado Binho' }),
+      el('img', { class: 'logo-entrada no-claro', src: `${RAIZ}/img/binho-logo-escuro.png`, alt: '', 'aria-hidden': 'true' }),
+      el('p', { class: 'erp' }, 'ERP Mercado Binho'),
+      form)));
 }
 
 /* ---------- layout ---------- */

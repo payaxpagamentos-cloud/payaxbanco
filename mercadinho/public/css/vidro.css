@@ -358,24 +358,19 @@ td.direita, th.direita{ text-align: right; }
 
 /* ---------- entrada (login) ---------- */
 .entrada{ min-height: 100vh; display: grid; place-items: center; padding: 28px 20px; }
-.entrada .painel-entrada{ display: grid; grid-template-columns: 1.05fr .95fr; gap: 28px; width: 100%; max-width: 940px; align-items: center; }
-.entrada .apresentacao{ padding: 8px 8px 8px 4px; }
-.entrada .apresentacao h1{ font-size: 40px; line-height: 1.04; margin: 18px 0 14px; }
-.entrada .apresentacao h1 em{ font-style: normal; background: linear-gradient(120deg, var(--acento), var(--acento-2) 55%, var(--acento-3)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.entrada .apresentacao p{ color: var(--texto-2); font-size: 16px; max-width: 42ch; }
-.entrada .recursos{ display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
-.entrada .recursos .item{ display: flex; align-items: center; gap: 12px; font-weight: 650; font-size: 14px; }
-.entrada .recursos .chip{ width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; flex: none;
-  background: var(--vidro-forte); border: 1px solid var(--vidro-borda); color: var(--acento); box-shadow: var(--brilho); }
-.entrada .recursos .chip svg{ width: 18px; height: 18px; }
-.entrada .caixa{ padding: 32px; }
-.entrada .caixa h2{ font-size: 22px; margin-bottom: 4px; }
-@media (max-width: 860px){
-  .entrada .painel-entrada{ grid-template-columns: 1fr; max-width: 440px; gap: 18px; }
-  .entrada .apresentacao{ text-align: center; }
-  .entrada .apresentacao h1{ font-size: 30px; }
-  .entrada .apresentacao p, .entrada .recursos{ display: none; }
-  .entrada .caixa{ padding: 24px; }
+.entrada .caixa{ width: 100%; max-width: 400px; padding: 40px 32px 32px; text-align: center; }
+.entrada .logo-entrada{ display: block; width: 100%; max-width: 236px; height: auto; margin: 0 auto 12px; }
+/* O logo tem o "Binho" em branco: no tema claro entra a versão de tinta escura. */
+.entrada .logo-entrada.no-claro{ display: none; }
+[data-tema="claro"] .entrada .logo-entrada.no-escuro{ display: none; }
+[data-tema="claro"] .entrada .logo-entrada.no-claro{ display: block; }
+.entrada .erp{ font-family: var(--display); font-size: 11px; font-weight: 600; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--texto-2); margin: 0 0 28px; }
+.entrada .form{ text-align: left; }
+@media (max-width: 520px){
+  .entrada .caixa{ padding: 30px 22px 24px; }
+  .entrada .logo-entrada{ max-width: 200px; }
+}
 }
 
 /* ---------- PDV ---------- */
