@@ -1,0 +1,120 @@
+Payax PDV — INSTALAÇÃO
+======================
+
+Endereço depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
+  PDV (balcão, caixa e conferência) ... https://SEU-DOMINIO/pdv/
+
+O PDV é servido por um programa Node.js, que fica nesta pasta "pdv".
+As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
+Pode ficar no mesmo servidor dos outros sistemas (portas diferentes: BPO 3100, táxi 3200,
+PABX 3300, rastreador 3400, network 3500, PDV 3600).
+
+O QUE O PDV FAZ: recebe no balcão as faturas que estão no IXC (dinheiro, PIX, cartão pela
+maquininha), devolve a baixa de cada título ao IXC e guarda tudo para a conferência do dia.
+Quem emite as faturas continua sendo o IXC: o PDV só consulta e baixa.
+
+
+1) REQUISITO
+   Node.js 22.13 ou mais novo no servidor.  Confira com:   node -v
+
+
+2) ENVIAR OS ARQUIVOS
+   Envie a pasta "pdv" inteira para o servidor, FORA da pasta pública do site
+   (ex.: /home/SEU-USUARIO/pdv). O arquivo ".env" começa com ponto: confira se foi enviado.
+
+
+3) CONFERIR O .env
+   Já vem pronto: endereço /pdv, segredo novo e a senha do master (PDV_ADMIN_SENHA).
+   Não troque o PDV_SECRET depois de instalado: ele também protege o token do IXC
+   e as chaves das maquininhas que já estiverem cadastradas.
+   Se o IXC do provedor fica na rede interna e só responde em http://, acrescente  PDV_HTTP=1 .
+
+
+4) DADOS DE EXEMPLO (opcional, só para conhecer o sistema)
+   Com o sistema parado, rode uma vez dentro da pasta pdv:
+      npm run seed
+   Cria a empresa "Provedor Exemplo" com duas lojas, três PDVs, maquininhas e quatro dias
+   de movimento. Contas de teste, todas com a senha  pdv2026 :
+      Administrador ... gerente@provedorexemplo.com.br
+      Supervisor ...... supervisor@provedorexemplo.com.br
+      Operadores ...... caixa@provedorexemplo.com.br e balcao@provedorexemplo.com.br
+   Não use o seed no banco de produção.
+
+
+5) INICIAR
+   a) Servidor próprio (VPS) com PM2
+         cd /home/SEU-USUARIO/pdv
+         npm install -g pm2
+         pm2 start "npm start" --name pdv
+         pm2 save && pm2 startup
+      Depois configure o Nginx ou o Apache (item 6).
+
+   b) Docker
+         docker build -t pdv .
+         docker run -d --name pdv --env-file .env -p 3600:3600 -v pdv-dados:/app/data pdv
+
+   c) cPanel ("Setup Node.js App")
+      - Node.js version ........... 22 ou mais novo
+      - Application mode .......... Production
+      - Application root .......... pdv
+      - Application URL ........... pdv
+      - Application startup file .. server/index.js
+      Em "Environment variables", cadastre as variáveis do arquivo .env (menos PORT). Clique em Start.
+
+
+6) NGINX / APACHE
+   Nginx:
+      location /pdv/ {
+          proxy_pass http://127.0.0.1:3600/pdv/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+      }
+      location = /pdv { return 301 /pdv/; }
+
+   Apache (módulos proxy e proxy_http ativos):
+      ProxyPreserveHost On
+      ProxyPass        /pdv http://127.0.0.1:3600/pdv
+      ProxyPassReverse /pdv http://127.0.0.1:3600/pdv
+
+   Atrás de proxy, deixe  PDV_TRUST_PROXY=1  no .env (o IP real aparece na auditoria).
+
+
+7) PRIMEIRO ACESSO
+   Abra https://SEU-DOMINIO/pdv/ e entre com:
+      E-mail: master@pdv.com.br
+      Senha:  a que está em PDV_ADMIN_SENHA no arquivo .env
+   Depois:
+     1. Empresas: crie a empresa do provedor (já nasce com a loja "Matriz" e o "Caixa 1").
+     2. Configurações da empresa: endereço do IXC, token e "Testar conexão".
+        O token é de um usuário do IXC criado só para o PDV (no IXC: Configurações >
+        Usuários > Token), no formato  id:hash . Informe também, se usar, o id da conta
+        e o tipo de recebimento do IXC de cada forma de pagamento.
+     3. Regras do balcão: multa, juros ao mês, desconto máximo e se exige caixa aberto.
+     4. Lojas, PDVs e usuários: um PDV por estação de balcão; operadores, supervisores e
+        administradores.
+     5. Maquininhas: cadastre cada aparelho e guarde a chave (ela aparece uma única vez).
+     6. Comprovante: cabeçalho e rodapé que saem na bobina.
+
+
+8) MAQUININHAS DE CARTÃO
+   Três jeitos, escolhidos em cada maquininha:
+     - Aplicativo na maquininha (recomendado): o aplicativo instalado no aparelho busca a
+       cobrança no PDV e devolve o resultado.
+          GET  /pdv/api/integracao/terminal/cobranca    (204 = nada a cobrar)
+          POST /pdv/api/integracao/terminal/resultado   { "referencia": "...", "status": "aprovada", "nsu": "..." }
+       Cabeçalho em todas as chamadas:  X-Api-Key: pdv_<prefixo>_<segredo>
+       Em scripts/maquininha-exemplo.js há um exemplo pronto para adaptar.
+     - Adquirente (webhook): o PDV chama o endereço do adquirente/intermediador e o
+       resultado volta no mesmo POST /resultado.
+     - Digitado pelo operador: sem integração; o operador passa o cartão e digita o NSU.
+
+
+9) CÓPIAS DE SEGURANÇA
+   Tudo fica na pasta pdv/data (banco pdv.db). Copie essa pasta com frequência:
+   é nela que estão os recebimentos, os caixas e a conferência.
+
+
+10) ATUALIZAR PARA UMA VERSÃO NOVA
+   Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
+   NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart pdv).

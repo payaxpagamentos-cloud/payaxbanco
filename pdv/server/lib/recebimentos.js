@@ -91,6 +91,7 @@ function criar(db, { empresa, usuario, dados }) {
         : 'Desconto não permitido nesta empresa.');
     }
     for (const t of titulos) t.total_centavos = t.valor_centavos + t.acrescimo_centavos - t.desconto_centavos;
+    conferirFaturasRepetidas(db, empresa.id, titulos);
 
     const pagamentos = lerPagamentos(db, empresa, dados.pagamentos, { total, caixa, usuario });
     const momento = agora();
@@ -138,6 +139,23 @@ function resolverCaixa(db, empresa, usuario, cfg, caixaId) {
   }
   if (cfg.exigir_caixa) throw new ErroNegocio('Abra o caixa antes de receber.', 409);
   return null;
+}
+
+/**
+ * Trava a cobrança em dobro: uma fatura do IXC já recebida num recebimento confirmado não entra noutro
+ * (clique duplicado no balcão, reenvio da mesma tela ou o cliente voltando com o mesmo boleto).
+ * Se aquele recebimento foi cancelado, a fatura pode ser recebida de novo.
+ */
+function conferirFaturasRepetidas(db, empresaId, titulos) {
+  const busca = db.prepare(`SELECT r.numero, r.data FROM recebimento_titulos t JOIN recebimentos r ON r.id = t.recebimento_id
+    WHERE r.empresa_id = ? AND r.status = 'confirmado' AND t.fatura_ixc_id = ? ORDER BY r.id DESC LIMIT 1`);
+  for (const t of titulos) {
+    if (!t.fatura_ixc_id) continue;
+    const antes = busca.get(empresaId, t.fatura_ixc_id);
+    if (antes) {
+      throw new ErroNegocio(`A fatura ${t.fatura_ixc_id} já foi recebida no PDV em ${antes.data.split('-').reverse().join('/')} (recebimento ${antes.numero}). Cancele aquele recebimento antes de receber de novo.`, 409);
+    }
+  }
 }
 
 function lerTitulo(t, i) {

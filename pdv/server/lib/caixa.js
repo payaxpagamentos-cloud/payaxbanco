@@ -122,18 +122,20 @@ function fechar(db, { empresa, usuario, caixaId, contagem = {}, observacao }) {
     db.prepare(`UPDATE caixas SET status = 'fechado', fechado_em = ?, fechado_por = ?, contagem = ?, diferenca_centavos = ?, observacao = COALESCE(?, observacao)
       WHERE id = ?`).run(momento, usuario.id, JSON.stringify({ contado, esperado }), diferenca, v.opcional(observacao, 'a observação', 300), caixa.id);
 
+    // Um caixa reaberto e fechado de novo substitui a divergência anterior, em vez de abrir outra.
+    db.prepare("DELETE FROM divergencias WHERE caixa_id = ? AND tipo = 'caixa_diferenca' AND status = 'aberta'").run(caixa.id);
     if (diferenca !== 0) {
-      db.prepare(`INSERT OR IGNORE INTO divergencias (empresa_id, recebimento_id, titulo_id, data, tipo, detalhes, valor_pdv_centavos, valor_ixc_centavos, criado_em)
-        VALUES (?, NULL, NULL, ?, 'caixa_diferenca', ?, ?, ?, ?)`)
-        .run(empresa.id, caixa.data,
-          `Caixa ${caixa.id} (${extraNome(db, caixa)}) fechado com diferença de ${(diferenca / 100).toFixed(2)}.`,
+      db.prepare(`INSERT INTO divergencias (empresa_id, caixa_id, data, tipo, detalhes, valor_pdv_centavos, valor_ixc_centavos, criado_em)
+        VALUES (?, ?, ?, 'caixa_diferenca', ?, ?, ?, ?)`)
+        .run(empresa.id, caixa.id, caixa.data,
+          `Caixa ${caixa.id} (${nomeDoPdv(db, caixa)}) fechado por ${usuario.nome} com diferença de ${(diferenca / 100).toFixed(2)}.`,
           Object.values(contado).reduce((a, b) => a + b, 0), Object.values(esperado).reduce((a, b) => a + b, 0), momento);
     }
     return detalhe(db, empresa.id, caixa.id);
   });
 }
 
-const extraNome = (db, caixa) => db.prepare('SELECT nome FROM pdvs WHERE id = ?').get(caixa.pdv_id)?.nome ?? `PDV ${caixa.pdv_id}`;
+const nomeDoPdv = (db, caixa) => db.prepare('SELECT nome FROM pdvs WHERE id = ?').get(caixa.pdv_id)?.nome ?? `PDV ${caixa.pdv_id}`;
 
 /** Supervisão marca o caixa como conferido (dinheiro recolhido e valores batidos). */
 function conferir(db, { empresa, usuario, caixaId, observacao }) {

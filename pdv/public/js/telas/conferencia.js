@@ -1,6 +1,6 @@
 import { api, baixar, qs } from '../api.js';
 import {
-  el, limpar, dinheiro, inteiro, campo, escolha, modal, perguntar, toast, acao, icone,
+  el, limpar, dinheiro, inteiro, campo, modal, perguntar, toast, acao, icone,
   FORMAS_CURTAS, STATUS_IXC, CONFERENCIA, etiqueta, etiquetaDe, dataBr, dataHora, hojeLocal, somarDias, documento,
 } from '../ui.js';
 
@@ -86,7 +86,8 @@ export async function telaConferencia(ctx) {
       el('tbody', {}, itens.map((d) => el('tr', {},
         el('td', {}, dataBr(d.data)),
         el('td', {}, el('strong', {}, tipos[d.tipo] ?? d.tipo), el('div', { class: 'pequeno mudo' }, d.detalhes)),
-        el('td', {}, d.recebimento_numero ? `#${d.recebimento_numero}` : '—', el('div', { class: 'pequeno mudo' }, d.cliente_nome ?? '')),
+        el('td', {}, d.recebimento_numero ? `#${d.recebimento_numero}` : (d.caixa_id ? `Caixa ${d.caixa_id}` : '—'),
+          el('div', { class: 'pequeno mudo' }, d.cliente_nome ?? d.pdv_nome ?? '')),
         el('td', { class: 'num dir' }, d.valor_pdv_centavos === null ? '—' : dinheiro(d.valor_pdv_centavos)),
         el('td', { class: 'num dir' }, d.valor_ixc_centavos === null ? '—' : dinheiro(d.valor_ixc_centavos)),
         el('td', { class: 'dir' }, ctx.supervisiona

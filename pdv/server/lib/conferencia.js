@@ -190,9 +190,9 @@ function listarDivergencias(db, empresaId, { de, ate, status = 'aberta', tipo, l
   if (status && status !== 'todas') { where.push('d.status = ?'); params.push(v.opcao(status, 'a situação', ['aberta', 'resolvida', 'ignorada'])); }
   if (tipo) { where.push('d.tipo = ?'); params.push(v.opcao(tipo, 'o tipo', Object.keys(TIPOS))); }
   return db.prepare(`SELECT d.*, r.numero AS recebimento_numero, r.cliente_nome, r.valor_centavos AS recebimento_valor_centavos,
-      t.fatura_ixc_id, t.vencimento, u.nome AS resolvido_por_nome
+      t.fatura_ixc_id, t.vencimento, u.nome AS resolvido_por_nome, p.nome AS pdv_nome
     FROM divergencias d LEFT JOIN recebimentos r ON r.id = d.recebimento_id LEFT JOIN recebimento_titulos t ON t.id = d.titulo_id
-    LEFT JOIN usuarios u ON u.id = d.resolvido_por
+    LEFT JOIN usuarios u ON u.id = d.resolvido_por LEFT JOIN caixas c ON c.id = d.caixa_id LEFT JOIN pdvs p ON p.id = c.pdv_id
     WHERE ${where.join(' AND ')} ORDER BY d.status = 'aberta' DESC, d.data DESC, d.id DESC LIMIT ?`)
     .all(...params, Math.min(500, Number(limite) || 200));
 }

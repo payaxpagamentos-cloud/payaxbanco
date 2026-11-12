@@ -254,6 +254,7 @@ CREATE TABLE IF NOT EXISTS divergencias (
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
   recebimento_id INTEGER REFERENCES recebimentos(id),
   titulo_id INTEGER REFERENCES recebimento_titulos(id),
+  caixa_id INTEGER REFERENCES caixas(id),
   data TEXT NOT NULL,
   tipo TEXT NOT NULL CHECK (tipo IN ('nao_baixado','valor_diferente','baixa_nao_confirmada','fatura_sumiu','caixa_diferenca','cancelado_com_baixa')),
   detalhes TEXT,

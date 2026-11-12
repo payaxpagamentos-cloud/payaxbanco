@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import {
-  el, limpar, dinheiro, campo, escolha, marcar, formModal, modal, confirmar, toast, acao, icone,
+  el, limpar, dinheiro, campo, escolha, marcar, formModal, modal, confirmar, toast, icone,
   ADQUIRENTES, MODOS_TERMINAL, STATUS_CARTAO, FORMAS_CURTAS, etiquetaDe, etiqueta, dataHora,
 } from '../ui.js';
 
