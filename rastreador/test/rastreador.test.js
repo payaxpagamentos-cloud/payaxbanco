@@ -100,6 +100,21 @@ test('GT06 4G: sinal de vida 0x23, resposta 0x21 e corte adiado', () => {
   assert.ok(!com.respostaAdiada('Cut off the fuel supply: Success! Speed: 0km/h.'));
 });
 
+test('API Brasil (Débitos V4): tradução da resposta', () => {
+  const { traduzirApiBrasil } = require('../server/lib/multasConsulta');
+  const r = traduzirApiBrasil({ error: false, homolog: true, valor_consulta: '8,00', data: {
+    dadosDoVeiculo: { placa: 'ABC1234', totalDebito: 1075.64 },
+    debitosMultas: { quantidade: 1, totalDebito: 293.47, ocorrencia: [{ dataHoraMulta: '2025-02-15 10:45', dataVencimento: '2025-04-18', descricao: 'Avançar o sinal vermelho',
+      fonte: 'DETRAN - MARINGA', identificador: 'HML0004521', local: 'Av. Brasil', uf: 'PR', valor: 293.47 }] },
+    debitosIPVA: { ocorrencia: null, totalDebito: 782.17 }, debitosLicenciamento: { ocorrencia: null, totalDebito: 0 }, restricoes: null } });
+  assert.equal(r.multas[0].auto_infracao, 'HML0004521');
+  assert.equal(r.multas[0].valor_centavos, 29347);
+  assert.equal(new Date(r.multas[0].ocorrida_em).toISOString(), '2025-02-15T13:45:00.000Z');
+  assert.deepEqual(r.apontamentos.map((x) => [x.tipo, x.valor_centavos]), [['ipva', 78217]]);
+  assert.equal(r.homolog, true);
+  assert.throws(() => traduzirApiBrasil({ error: true, message: 'Placa inválida' }), /Placa inválida/);
+});
+
 test('viagens, paradas, cercas, horário e manutenção', () => {
   const t0 = Date.parse('2026-10-20T10:00:00Z');
   const p = (m, metros, vel, ignicao = 1) => ({ ...norte(-23.5, -46.6, metros), velocidade_kmh: vel, ignicao, gps_em: min(m, t0) });
