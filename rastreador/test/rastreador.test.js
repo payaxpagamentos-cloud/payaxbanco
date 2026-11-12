@@ -565,6 +565,33 @@ test('Rastreador', async (t) => {
     } finally {
       delete process.env.RASTREADOR_MULTAS_URL; delete process.env.RASTREADOR_MULTAS_CHAVE; falso.close();
     }
+    // API Brasil assíncrona: pedido → job-id → "processing" → "completed" com o payload; o webhook só confirma.
+    const pedidosAb = [];
+    const ab = http.createServer((q, s4) => { let b = ''; q.on('data', (x) => { b += x; }); q.on('end', () => {
+      const corpo = JSON.parse(b); pedidosAb.push(corpo); s4.setHeader('Content-Type', 'application/json');
+      if (corpo.tipo === 'debitos-v4-async') return s4.end(JSON.stringify({ error: false, data: { accepted: true, 'job-id': 'job-1', msg: 'consulta em processamento' } }));
+      const pronto = pedidosAb.filter((x) => x.tipo === 'consulta-chave').length >= 2;
+      s4.end(JSON.stringify({ error: false, data: pronto ? { 'job-id': 'job-1', job_status: 'completed', payload: { success: true, dados: [{
+        dadosDoVeiculo: { placa: 'ABC1D23' }, debitosMultas: { ocorrencia: [{ identificador: 'SP-ASYNC-1', descricao: 'Estacionar em local proibido', fonte: 'PREFEITURA DE SAO PAULO', valor: 195.23, dataHoraMulta: '2026-10-01 09:30', uf: 'SP' }] },
+        debitosIPVA: { ocorrencia: null, totalDebito: 0 } }] } } : { 'job-id': 'job-1', job_status: 'processing' } }));
+    }); }).listen(0);
+    await new Promise((ok) => ab.once('listening', ok));
+    Object.assign(process.env, { RASTREADOR_MULTAS_FORNECEDOR: 'apibrasil', RASTREADOR_MULTAS_CHAVE: 'teste', RASTREADOR_MULTAS_URL_ASYNC: `http://127.0.0.1:${ab.address().port}/`, RASTREADOR_MULTAS_INTERVALO_MS: '20' });
+    try {
+      const ini = await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, cliente);
+      let c5;
+      for (let i = 0; i < 100; i++) { c5 = (await api.get(`${base()}/multas/consultas/${ini.dados.id}`, cliente)).dados; if (c5.status !== 'consultando') break; await new Promise((ok) => { setTimeout(ok, 30); }); }
+      assert.equal(c5.status, 'ok', c5.erro);
+      assert.equal(c5.resultado.multas[0].auto_infracao, 'SP-ASYNC-1');
+      assert.equal(c5.resultado.novas, 1, 'a multa real entra na central');
+      assert.equal(pedidosAb[0].tipo, 'debitos-v4-async');
+      assert.match(pedidosAb[0].webhook_url, /\/api\/publico\/multas-retorno$/);
+      assert.equal(pedidosAb[1]['job-id'], 'job-1');
+      assert.equal((await api.post('/publico/multas-retorno', { qualquer: 'coisa' })).status, 204);
+    } finally {
+      for (const k of ['RASTREADOR_MULTAS_FORNECEDOR', 'RASTREADOR_MULTAS_CHAVE', 'RASTREADOR_MULTAS_URL_ASYNC', 'RASTREADOR_MULTAS_INTERVALO_MS']) delete process.env[k];
+      ab.close();
+    }
     db.prepare('DELETE FROM condutores WHERE veiculo_id = ? AND motorista_id = ?').run(veiculo, mot.id);
     db.prepare('UPDATE multas SET motorista_id = NULL WHERE motorista_id = ?').run(mot.id);
     assert.equal((await api.del(`${base()}/motoristas/${mot.id}`, undefined, cliente)).status, 204);

@@ -22,6 +22,9 @@ function criarApi(db, extras = {}) {
     db.prepare('SELECT 1').get();
     res.json({ ok: true, versao: config.versao });
   });
+  // Aviso da API Brasil (consulta de multas assíncrona): só confirma o recebimento. O resultado nunca vem daqui — o sistema busca
+  // pelo job-id, autenticado; assim um aviso falso não altera nada.
+  api.post('/publico/multas-retorno', (_req, res) => res.status(204).end());
   api.get('/publico', async (_req, res, next) => {
     try {
       res.json({ nome: lerConfig(db).nome_plataforma, mapa: config.mapa, gt06_porta: config.portaGt06, busca: Boolean(config.geocoder.url),
