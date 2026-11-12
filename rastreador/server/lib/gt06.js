@@ -140,7 +140,11 @@ function decodificar(q, { fusoMin = 0 } = {}) {
     case P.STATUS:
     case P.HEARTBEAT: {
       const e = lerEstado(c[0]);
-      // Depois do estado: nível da bateria e do sinal GSM (0 a 4).
+      // Sinal de vida do GT06 4G (0x23, 6 bytes): estado, tensão externa (2 bytes, centésimos de volt), sinal GSM e idioma.
+      if (q.protocolo === P.HEARTBEAT && c.length >= 6) {
+        return { tipo: 'estado', mensagem: { ...e, tensao: c.readUInt16BE(1) / 100, sinal: c[3] <= 4 ? c[3] : null }, ack: true };
+      }
+      // Formato antigo (0x13): nível da bateria e do sinal GSM (0 a 4).
       return { tipo: 'estado', mensagem: { ...e, tensao: NIVEL_TENSAO[c[1]] ?? null, sinal: c.length > 2 && c[2] <= 4 ? c[2] : null }, ack: true };
     }
     case P.ALARME:
@@ -158,7 +162,8 @@ function decodificar(q, { fusoMin = 0 } = {}) {
       return { tipo: 'resposta', comando: c.readUInt32BE(1), texto: c.subarray(5, 1 + n).toString('latin1').trim(), ack: false };
     }
     case P.RESPOSTA2:
-      return { tipo: 'resposta', comando: c.readUInt32BE(0), texto: c.subarray(5).toString(c[4] === 1 ? 'utf16le' : 'latin1').trim(), ack: false };
+      // Codificação: 1 = ASCII; 2 = UTF-16 big-endian (o Node só lê little-endian: inverte os pares de bytes).
+      return { tipo: 'resposta', comando: c.readUInt32BE(0), texto: (c[4] === 1 ? c.subarray(5).toString('latin1') : Buffer.from(c.subarray(5)).swap16().toString('utf16le')).trim(), ack: false };
     case P.HORA:
       return { tipo: 'hora', ack: false };
     default:
@@ -189,11 +194,13 @@ function iniciarGt06(db, porta, { host } = {}) {
   const com = require('./comandos');
   const conexoes = new Map();
 
-  function entregar(imei) {
+  function entregar(imei, { reenviar = false } = {}) {
     const cx = conexoes.get(imei);
     if (!cx) return;
     const r = db.prepare('SELECT id FROM rastreadores WHERE imei = ?').get(imei);
     if (!r) return;
+    // Corte/desbloqueio enviado numa conexão que caiu sem resposta: vai de novo (o J16 ignora se já estiver no estado).
+    if (reenviar) db.prepare("UPDATE comandos SET status = 'pendente' WHERE rastreador_id = ? AND status = 'enviado' AND resposta IS NULL AND tipo IN ('bloquear','desbloquear')").run(r.id);
     for (const c of com.pendentes(db, r.id)) {
       cx.serial = (cx.serial + 1) & 0xffff;
       cx.socket.write(quadroComando(c.id, c.texto, cx.serial));
@@ -214,9 +221,10 @@ function iniciarGt06(db, porta, { host } = {}) {
     });
     socket.on('data', (dados) => {
       buf = Buffer.concat([buf, dados]);
-      if (buf.length > TAMANHO_MAX_BUFFER) return socket.destroy();
+      // Primeiro lê os quadros completos (uma rajada grande de posições guardadas não se perde); o limite vale para o que sobra.
       const { quadros, resto } = extrair(buf);
       buf = Buffer.from(resto);
+      if (buf.length > TAMANHO_MAX_BUFFER) { socket.destroy(); }
       for (const q of quadros) {
         try {
           tratar(q);
@@ -236,7 +244,7 @@ function iniciarGt06(db, porta, { host } = {}) {
         if (anterior && anterior !== cx) anterior.socket.destroy();
         conexoes.set(d.imei, cx);
         receber(db, { imei: d.imei, protocolo: 'gt06', ip: socket.remoteAddress });
-        entregar(d.imei);
+        entregar(d.imei, { reenviar: true });
         return;
       }
       if (d.tipo === 'hora') return socket.write(quadroHora(q.serial));
@@ -245,7 +253,9 @@ function iniciarGt06(db, porta, { host } = {}) {
       if (d.tipo === 'resposta') {
         // Alguns aparelhos não devolvem o identificador do comando: aí a resposta vale para o comando enviado mais antigo dele.
         const c = db.prepare('SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id WHERE c.id = ? AND r.imei = ?').get(d.comando, cx.imei)
-          ?? db.prepare("SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id WHERE r.imei = ? AND c.status = 'enviado' ORDER BY c.id LIMIT 1").get(cx.imei);
+          ?? db.prepare(`SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id WHERE r.imei = ? AND c.status = 'enviado' AND c.resposta IS NULL
+            AND c.enviado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes') AND (c.tipo IN ('bloquear','desbloquear')) = ? ORDER BY c.id LIMIT 1`)
+            .get(cx.imei, /fuel|relay|cut ?off|restore|oil|dyd|hfyd/i.test(d.texto) ? 1 : 0);
         if (c) com.responder(db, c.id, { sucesso: com.respostaSucesso(d.texto), resposta: d.texto });
       }
     }

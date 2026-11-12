@@ -54,7 +54,8 @@ function manutencao(db, { limpar = false } = {}) {
   relatoriosProgramados.executar(db).catch((err) => console.error('[Rastreador] Relatório programado:', err.message));
   const expirados = expirar(db, cfg.comando_expira_horas);
   // Corte do Modo Roubo que expirou sem resposta volta a esperar a próxima posição segura.
-  if (expirados) transacao(db, () => roubo.aoExpirar(db));
+  // Também cobre o corte cancelado por outro comando (não só o expirado).
+  transacao(db, () => roubo.aoExpirar(db));
   let apagadas = 0;
   if (limpar) {
     const corte = new Date(agoraMs - cfg.retencao_dias * 86_400_000).toISOString();

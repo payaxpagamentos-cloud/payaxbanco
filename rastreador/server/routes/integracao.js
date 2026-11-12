@@ -74,10 +74,10 @@ module.exports = (db) => {
   r.post('/posicoes', (req, res) => {
     const lista = Array.isArray(req.body) ? req.body : Array.isArray(req.body?.posicoes) ? req.body.posicoes : [req.body];
     v.exigir(lista.length >= 1 && lista.length <= MAX_LOTE, `Envie de 1 a ${MAX_LOTE} posições por vez.`);
-    const daEmpresa = db.prepare('SELECT 1 FROM rastreadores WHERE imei = ? AND empresa_id = ?');
+    const daEmpresa = db.prepare("SELECT 1 FROM rastreadores WHERE imei = ? AND empresa_id = ? AND protocolo = 'api'");
     const resultado = lista.map((p, i) => {
       if (!p || typeof p !== 'object' || !/^[A-Za-z0-9._-]{4,40}$/.test(String(p.imei ?? ''))) return { indice: i, status: 'invalida', erro: 'imei ausente ou inválido' };
-      if (!daEmpresa.get(String(p.imei), req.empresa.id)) return { indice: i, status: 'desconhecido', erro: 'rastreador não cadastrado nesta empresa' };
+      if (!daEmpresa.get(String(p.imei), req.empresa.id)) return { indice: i, status: 'desconhecido', erro: 'rastreador não cadastrado nesta empresa (como integração/API)' };
       const x = receber(db, {
         imei: String(p.imei), protocolo: 'api', ip: req.ip, lat: p.lat, lng: p.lng ?? p.lon, velocidade_kmh: p.velocidade_kmh, curso: p.curso, altitude: p.altitude,
         satelites: p.satelites, ignicao: typeof p.ignicao === 'boolean' ? p.ignicao : null, tensao: p.tensao, evento: EVENTOS.includes(p.evento) ? p.evento : null,
@@ -101,7 +101,8 @@ module.exports = (db) => {
 
   /** Resultado do comando: { sucesso: true|false, resposta? }. */
   r.post('/comandos/:id', (req, res) => {
-    const c = db.prepare("SELECT id FROM comandos WHERE id = ? AND empresa_id = ? AND status IN ('pendente','enviado')").get(Number(req.params.id), req.empresa.id);
+    const c = db.prepare(`SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id
+      WHERE c.id = ? AND c.empresa_id = ? AND c.status IN ('pendente','enviado') AND r.protocolo = 'api'`).get(Number(req.params.id), req.empresa.id);
     if (!c) throw new ErroNegocio('Comando não encontrado ou já respondido.', 404);
     com.responder(db, c.id, { sucesso: v.booleano(req.body.sucesso), resposta: req.body.resposta });
     res.json({ ok: true });

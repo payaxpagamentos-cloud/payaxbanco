@@ -125,15 +125,19 @@ function receber(db, m) {
     }
     if (m.sinal !== null && m.sinal !== undefined) db.prepare('UPDATE rastreadores SET sinal_gsm = ? WHERE id = ?').run(m.sinal, r.id);
 
-    if (temPosicao) {
+    // Mensagem que repete a última posição (alarme, SOS) ou com salto impossível: a posição não entra, mas o estado (ignição,
+    // relé, alarme, tensão) é de agora e vale.
+    let soEstado = false;
+    posicao: if (temPosicao) {
       let somaM = 0;
       let ligadoS = 0;
       if (nova && v.posicao_em && v.lat !== null) {
         const dt = (Date.parse(gpsEm) - Date.parse(v.posicao_em)) / 1000;
         const d = distancia({ lat: v.lat, lng: v.lng }, { lat, lng });
         if (d > SALTO_MINIMO_M && (d / Math.max(dt, 1)) * 3.6 > cfg.velocidade_max_plausivel_kmh) {
-          db.prepare('UPDATE veiculos SET comunicacao_em = ?, sem_comunicacao_alertado = 0, sumico_alertado = 0 WHERE id = ?').run(t, v.id);
-          return { status: 'descartada', veiculo_id: v.id };
+          status = 'descartada';
+          soEstado = true;
+          break posicao;
         }
         // Parado, o GPS oscila alguns metros: só soma com o veículo andando ou num deslocamento claro.
         if (velocidade >= 3 || d >= 50) somaM = Math.round(d);
@@ -143,8 +147,10 @@ function receber(db, m) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(v.id, lat, lng, velocidade, numeroOuNulo(m.curso) === null ? null : Math.round(Number(m.curso)) % 360,
         numeroOuNulo(m.altitude), numeroOuNulo(m.satelites), ignicao, tensao, evento ?? (m.evento ? String(m.evento).slice(0, 40) : null), gpsEm, t);
       if (!ins.changes) {
-        db.prepare('UPDATE veiculos SET comunicacao_em = ?, sem_comunicacao_alertado = 0, sumico_alertado = 0 WHERE id = ?').run(t, v.id);
-        return { status: 'repetida', veiculo_id: v.id };
+        status = 'repetida';
+        // Só a repetição da posição atual traz estado de agora; uma antiga reenviada da memória não.
+        soEstado = gpsEm === v.posicao_em;
+        break posicao;
       }
       status = 'gravada';
       db.prepare(`INSERT INTO uso_diario (veiculo_id, data, distancia_m, ligado_s, velocidade_max_kmh, posicoes) VALUES (?, ?, ?, ?, ?, 1)
@@ -167,7 +173,8 @@ function receber(db, m) {
       }
     }
 
-    if (nova || !temPosicao) {
+    const estadoAtual = (nova && !soEstado && status === 'gravada') || !temPosicao || soEstado;
+    if (estadoAtual) {
       if (ignicao !== null) {
         if (v.ignicao !== null && ignicao !== v.ignicao && v.alertar_ignicao) {
           alertar(db, v, ignicao ? 'ignicao_ligada' : 'ignicao_desligada', `${v.placa}: ignição ${ignicao ? 'ligada' : 'desligada'}.`, pos);
@@ -186,14 +193,14 @@ function receber(db, m) {
     }
     // O aparelho informa se o relé está acionado em toda mensagem de estado (também sem GPS, como o sinal de vida);
     // com o relé ligado ao contrário (sentido invertido), acionado = liberado.
-    if (typeof m.bloqueado === 'boolean') mudar.bloqueado = (r.rele_invertido ? !m.bloqueado : m.bloqueado) ? 1 : 0;
+    if (estadoAtual && typeof m.bloqueado === 'boolean') mudar.bloqueado = (r.rele_invertido ? !m.bloqueado : m.bloqueado) ? 1 : 0;
     if (mudar.bloqueado !== undefined) {
       // O aparelho já está no estado pedido: o bloqueio/desbloqueio enviado fica confirmado (mesmo sem a resposta em texto).
       const alvo = mudar.bloqueado ? 'bloquear' : 'desbloquear';
       const enviado = db.prepare("SELECT id FROM comandos WHERE veiculo_id = ? AND status = 'enviado' AND tipo = ? ORDER BY id DESC LIMIT 1").get(v.id, alvo);
       if (enviado) require('./comandos').responder(db, enviado.id, { sucesso: true, resposta: `Confirmado pelo estado do aparelho (${mudar.bloqueado ? 'bloqueado' : 'desbloqueado'}).` });
     }
-    if (evento) alertarEvento(db, v, evento, pos);
+    if (evento && (estadoAtual || status === 'gravada')) alertarEvento(db, v, evento, pos);
 
     const campos = Object.keys(mudar);
     db.prepare(`UPDATE veiculos SET ${campos.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...campos.map((k) => mudar[k]), v.id);
@@ -212,6 +219,8 @@ function receber(db, m) {
 function situacao(v, onlineMin, agoraMs = Date.now()) {
   if (!v.posicao_em) return 'sem_posicao';
   if (!v.comunicacao_em || agoraMs - Date.parse(v.comunicacao_em) > onlineMin * 60_000) return 'sem_sinal';
+  // Ignição desligada informada pelo aparelho vale mais que a última velocidade (a do GPS pode ser de antes de parar).
+  if (v.ignicao === 0) return 'parado';
   if ((v.velocidade_kmh ?? 0) >= 3) return 'movimento';
   return v.ignicao === 1 ? 'ligado' : 'parado';
 }

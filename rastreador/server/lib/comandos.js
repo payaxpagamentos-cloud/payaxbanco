@@ -62,6 +62,10 @@ function criar(db, veiculo, d, usuarioId) {
     const digitada = String(d.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '');
     if (digitada !== veiculo.placa) throw new ErroNegocio('Para bloquear, digite a placa do veículo para confirmar.', 422);
   }
+  // Corte e desbloqueio só pelos botões (placa, velocidade segura, relé invertido e o estado na tela); nunca por texto livre.
+  if (tipo === 'personalizado' && /(^|[^A-Z])(RELAY|DYD|HFYD|JAMRELAY)\b/i.test(String(d.texto ?? ''))) {
+    throw new ErroNegocio('Para cortar ou liberar o veículo, use os botões Bloquear e Desbloquear.', 422);
+  }
   const texto = textoComando(lerConfig(db), tipo, r, d.texto);
   const id = transacao(db, () => {
     if (tipo === 'bloquear' || tipo === 'desbloquear') {
@@ -86,6 +90,12 @@ function responder(db, id, { sucesso, resposta }) {
   return transacao(db, () => {
     const c = db.prepare("SELECT * FROM comandos WHERE id = ? AND status IN ('pendente','enviado')").get(id);
     if (!c) return false;
+    // Corte/desbloqueio aceito mas ADIADO pelo aparelho ("será executado quando tiver GPS e abaixo de 20 km/h"): o relé ainda não
+    // mudou. O comando continua em andamento (a tela mostra "bloqueando…") e é confirmado quando o aparelho informar o novo estado.
+    if (sucesso && (c.tipo === 'bloquear' || c.tipo === 'desbloquear') && respostaAdiada(resposta)) {
+      db.prepare("UPDATE comandos SET status = 'enviado', resposta = ?, enviado_em = COALESCE(enviado_em, ?) WHERE id = ?").run(String(resposta).slice(0, 500), agora(), id);
+      return true;
+    }
     db.prepare('UPDATE comandos SET status = ?, respondido_em = ?, resposta = ?, enviado_em = COALESCE(enviado_em, ?) WHERE id = ?')
       .run(sucesso ? 'confirmado' : 'falhou', agora(), resposta ? String(resposta).slice(0, 500) : null, agora(), id);
     if (sucesso && (c.tipo === 'bloquear' || c.tipo === 'desbloquear')) {
@@ -107,6 +117,9 @@ function responder(db, id, { sucesso, resposta }) {
   });
 }
 
+/** O aparelho aceitou, mas só vai executar depois (GPS fixo e velocidade baixa). */
+function respostaAdiada(texto) { return /will be executed|be executed after|after gps|aguard|ser[aá] executad/i.test(String(texto ?? '')); }
+
 /** Resposta de texto do equipamento: falha quando fala em erro; senão, confirmado. */
 const respostaSucesso = (texto) => !/fail|error|erro|invalid|inv[aá]lid/i.test(String(texto ?? ''));
 
@@ -116,4 +129,4 @@ function expirar(db, horas) {
   return db.prepare("UPDATE comandos SET status = 'expirado', respondido_em = ? WHERE status IN ('pendente','enviado') AND criado_em < ?").run(agora(), corte).changes;
 }
 
-module.exports = { TIPOS, MODELOS, modeloDe, canal, criar, pendentes, marcarEnviado, responder, respostaSucesso, expirar };
+module.exports = { TIPOS, MODELOS, modeloDe, canal, criar, pendentes, marcarEnviado, responder, respostaSucesso, respostaAdiada, expirar };
