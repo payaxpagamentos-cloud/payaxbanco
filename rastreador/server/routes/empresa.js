@@ -883,9 +883,21 @@ module.exports = (db, extras = {}) => {
   const consultaMultas = require('../lib/multasConsulta');
   r.get('/multas', (req, res) => {
     const lista = multas.listar(db, { empresaId: eid(req), situacao: req.query.situacao || undefined });
-    res.json({ resumo: multas.resumo(lista), multas: lista, consulta_automatica: consultaMultas.configurado(), situacoes: multas.SITUACOES, gravidades: multas.GRAVIDADES,
+    res.json({ resumo: multas.resumo(lista), multas: lista, consulta_automatica: consultaMultas.configurado(), automatica: consultaMultas.situacao(db, eid(req)), situacoes: multas.SITUACOES, gravidades: multas.GRAVIDADES,
       motoristas: db.prepare('SELECT id, nome FROM motoristas WHERE empresa_id = ? ORDER BY nome').all(eid(req)),
       veiculos: db.prepare('SELECT id, placa, descricao FROM veiculos WHERE empresa_id = ? ORDER BY placa').all(eid(req)) });
+  });
+  // Consultar multas na hora: uma placa → multas e apontamentos (débitos, restrições, roubo/furto); histórico das consultas.
+  r.get('/multas/consultas', (req, res) => res.json({ ligada: consultaMultas.configurado(), automatica: consultaMultas.situacao(db, eid(req)),
+    consultas: consultaMultas.historico(db, { empresaId: eid(req) }),
+    veiculos: db.prepare('SELECT id, placa, descricao, renavam FROM veiculos WHERE empresa_id = ? AND ativo = 1 ORDER BY placa').all(eid(req)) }));
+  r.get('/multas/consultas/:id', (req, res) => res.json(consultaMultas.consulta(db, nid(req), { empresaId: eid(req) })));
+  r.post('/multas/consultar-placa', gestor, async (req, res, next) => {
+    try {
+      const r2 = await consultaMultas.consultarPlaca(db, { empresaId: eid(req), placa: req.body.placa, renavam: req.body.renavam, usuarioId: req.usuario.id });
+      registrar(db, req, 'multas_consulta', { placa: r2.placa, multas: r2.multas.length, apontamentos: r2.apontamentos.length });
+      res.json(r2);
+    } catch (err) { next(err); }
   });
   r.get('/multas/arquivos/:id', (req, res) => {
     const a = multas.arquivo(db, eid(req), req.params.id);

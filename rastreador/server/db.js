@@ -678,6 +678,21 @@ CREATE TABLE IF NOT EXISTS multas (
 CREATE INDEX IF NOT EXISTS ix_multas_empresa ON multas (empresa_id, ocorrida_em);
 CREATE INDEX IF NOT EXISTS ix_multas_veiculo ON multas (veiculo_id);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_multas_auto ON multas (empresa_id, auto_infracao) WHERE auto_infracao IS NOT NULL;
+-- Consultas feitas na hora ("Consultar multas"): o que voltou de multas e apontamentos (débitos, restrições, roubo/furto).
+CREATE TABLE IF NOT EXISTS multas_consultas (
+  id INTEGER PRIMARY KEY,
+  empresa_id INTEGER REFERENCES empresas(id),
+  placa TEXT NOT NULL,
+  renavam TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  multas INTEGER NOT NULL DEFAULT 0,
+  apontamentos INTEGER NOT NULL DEFAULT 0,
+  novas INTEGER NOT NULL DEFAULT 0,
+  resultado TEXT,
+  erro TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_multas_consultas ON multas_consultas (empresa_id, id);
 CREATE TABLE IF NOT EXISTS multa_arquivos (
   id INTEGER PRIMARY KEY,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),

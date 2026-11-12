@@ -160,5 +160,78 @@ async function telaMultas(ctx, { master = false } = {}) {
   await carregar();
 }
 
-export const TELAS_MULTAS = { multas: (ctx) => telaMultas(ctx) };
-export const TELAS_MULTAS_MASTER = { multas: (ctx) => telaMultas(ctx, { master: true }) };
+// ---------- Consultar multas (na hora) ----------
+const TIPO_APONT = { ipva: 'IPVA', licenciamento: 'Licenciamento', dpvat: 'DPVAT', restricao: 'Restrição', roubo_furto: 'Roubo / furto', recall: 'Recall',
+  gravame: 'Gravame (financiamento)', renajud: 'RENAJUD (judicial)', bloqueio: 'Bloqueio' };
+
+function resultadoConsulta(r) {
+  const nada = !r.multas.length && !r.apontamentos.length;
+  return el('div', { class: 'coluna', style: 'gap:12px' },
+    el('div', { class: 'linha entre', style: 'flex-wrap:wrap;gap:8px' },
+      el('div', {}, el('strong', { style: 'font-size:20px' }, placa(r.placa)), el('div', { class: 'pequeno mudo' }, `Consultado em ${dataHora(r.consultado_em)}${r.veiculo_da_frota ? ' · veículo da frota' : ' · fora da frota'}`)),
+      nada ? etiqueta('Nada consta', 'ok') : etiqueta(`${r.multas.length} multa(s) · ${r.apontamentos.length} apontamento(s)`, 'erro')),
+    nada ? el('div', { class: 'cartao', style: 'text-align:center;padding:22px' }, el('div', { style: 'font-size:34px' }, '✅'), el('strong', {}, 'Nenhuma multa e nenhum apontamento para esta placa.')) : null,
+    r.multas.length ? cartao(`Multas (${r.multas.length})`, tabela(['Data', 'Infração', '>Valor', '^Central'], r.multas.map((m) => el('tr', {},
+      td(m.ocorrida_em ? dataHora(m.ocorrida_em) : '—'), td([m.descricao, el('div', { class: 'pequeno mudo' }, [m.auto_infracao, m.orgao, m.gravidade ? GRAV[m.gravidade] : null].filter(Boolean).join(' · '))]),
+      td(m.valor_centavos !== null ? dinheiro(m.valor_centavos) : '—', 'dir num'),
+      td(m.nova ? etiqueta('nova · adicionada', 'aviso') : m.na_central ? etiqueta('já na central', 'ok') : etiqueta(r.veiculo_da_frota ? 'não adicionada' : 'fora da frota', ''), 'centro'))))) : null,
+    r.apontamentos.length ? cartao(`Apontamentos (${r.apontamentos.length})`, tabela(['Tipo', 'Descrição', '>Valor', 'Situação'], r.apontamentos.map((a) => el('tr', {},
+      td(el('strong', {}, TIPO_APONT[a.tipo] ?? a.tipo)), td(a.descricao || '—'), td(a.valor_centavos !== null ? dinheiro(a.valor_centavos) : '—', 'dir num'), td(a.situacao ?? '—'))))) : null);
+}
+
+async function telaConsultar(ctx, { master = false } = {}) {
+  const base = master ? '/master/multas' : `/empresas/${ctx.empresaId}/multas`;
+  const podeConsultar = master || !ctx.somenteLeitura;
+  const resultado = el('div');
+  const historicoEl = el('div');
+  const situacaoEl = el('div');
+  async function carregar() {
+    const d = await api.get(`${base}/consultas`);
+    const a = d.automatica;
+    limpar(situacaoEl, el('div', { class: `aviso-faixa ${d.ligada ? 'ok' : 'aviso'}`, style: 'padding:12px 14px;border-radius:12px;margin-bottom:14px;background:var(--surface-2)' },
+      d.ligada
+        ? el('div', {}, el('strong', {}, '● Consulta automática ligada. '), `Todo dia o sistema consulta sozinho os veículos ativos (${a.consultados_24h} de ${a.veiculos} nas últimas 24 h${a.ultima ? `, a última às ${dataHora(a.ultima)}` : ''}). Multas novas entram na central e geram aviso.`)
+        : el('div', {}, el('strong', {}, '● Consulta automática aguardando o serviço. '), 'Quando o serviço de consulta (DETRAN/SENATRAN) for contratado e ligado no servidor, os veículos passam a ser consultados todo dia, sozinhos, e esta consulta na hora também funciona.')));
+    limpar(historicoEl, cartao('Consultas feitas', tabela(['Quando', 'Placa', master ? 'Empresa' : null, '^Multas', '^Apontamentos', '^Novas', 'Por', '^'].filter(Boolean),
+      d.consultas.map((c) => el('tr', {}, td(dataHora(c.criado_em)), td(el('strong', {}, placa(c.placa))), master ? td(c.empresa ?? '—') : null,
+        td(c.erro ? etiqueta('erro', 'erro') : String(c.multas), 'centro'), td(c.erro ? '—' : String(c.apontamentos), 'centro'), td(String(c.novas), 'centro'), td(c.usuario ?? 'automática'),
+        el('td', { class: 'acoes' }, c.erro ? el('span', { class: 'pequeno mudo', title: c.erro }, 'falhou') : botaoIcone('olho', 'Ver o resultado', async () => {
+          const x = await api.get(`${base}/consultas/${c.id}`);
+          modal(`Consulta · ${placa(x.placa)}`, () => [resultadoConsulta(x.resultado)], { largo: true });
+        })))), 'Nenhuma consulta feita ainda.')));
+    return d;
+  }
+  const d = await (async () => { limpar(ctx.conteudo, situacaoEl); return carregar(); })();
+  const selVeic = escolha('Veículo da frota', 'veiculo', { '': '— digitar a placa —', ...Object.fromEntries((d.veiculos ?? []).map((v) => [v.id, `${placa(v.placa)}${v.descricao ? ` · ${v.descricao}` : ''}`])) }, '');
+  const inPlaca = campo('Placa', { name: 'placa', maxlength: 8, placeholder: 'ABC1D23', style: 'text-transform:uppercase' });
+  const inRenavam = campo('RENAVAM (opcional, alguns estados exigem)', { name: 'renavam', inputmode: 'numeric', maxlength: 11 });
+  selVeic.querySelector('select')?.addEventListener('change', (e) => {
+    const v = (d.veiculos ?? []).find((x) => String(x.id) === e.target.value);
+    inPlaca.querySelector('input').value = v ? placa(v.placa) : '';
+    inRenavam.querySelector('input').value = v?.renavam ?? '';
+  });
+  const botaoConsultar = el('button', { class: 'btn primario', type: 'submit', disabled: !podeConsultar }, icone('lupa'), 'Consultar');
+  const form = el('form', { class: 'form', onsubmit: async (e) => {
+    e.preventDefault();
+    const placaTxt = inPlaca.querySelector('input').value.trim();
+    if (!placaTxt) return toast('Informe a placa.', true);
+    botaoConsultar.disabled = true;
+    limpar(resultado, el('div', { class: 'carregando-linha' }), el('p', { class: 'mudo' }, `Consultando ${placaTxt.toUpperCase()} no DETRAN/SENATRAN… pode levar alguns segundos.`));
+    try {
+      const r = await api.post(`${base}/consultar-placa`, { placa: placaTxt, renavam: inRenavam.querySelector('input').value });
+      limpar(resultado, resultadoConsulta(r));
+      if (r.novas) toast(`${r.novas} multa(s) nova(s) adicionada(s) à central.`);
+    } catch (err) {
+      limpar(resultado, el('p', { class: 'aviso erro' }, err.message));
+    } finally { botaoConsultar.disabled = !podeConsultar; carregar(); }
+  } },
+    master ? null : selVeic,
+    el('div', { class: 'duas' }, inPlaca, inRenavam),
+    el('div', { class: 'linha', style: 'justify-content:flex-end' }, botaoConsultar));
+  ctx.conteudo.append(
+    cartao('Consultar multas', el('p', { class: 'mudo', style: 'margin:0 0 12px' }, 'Veja na hora se um veículo tem multas ou algum apontamento (IPVA, licenciamento, restrição, roubo/furto). As multas dos veículos da frota entram sozinhas na central.'), form),
+    resultado, historicoEl);
+}
+
+export const TELAS_MULTAS = { multas: (ctx) => telaMultas(ctx), 'multas-consultar': (ctx) => telaConsultar(ctx) };
+export const TELAS_MULTAS_MASTER = { multas: (ctx) => telaMultas(ctx, { master: true }), 'multas-consultar': (ctx) => telaConsultar(ctx, { master: true }) };
