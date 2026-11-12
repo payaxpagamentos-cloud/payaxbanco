@@ -1,4 +1,4 @@
-/** Endereço base do painel (ex.: '/pabx'), deduzido de onde este arquivo foi carregado: funciona na raiz do domínio ou num caminho. */
+/** Endereço base do painel (ex.: '/pdv'), deduzido de onde este arquivo foi carregado: funciona na raiz do domínio ou num caminho. */
 export const BASE = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 
 const CHAVE = 'pdv.sessao';

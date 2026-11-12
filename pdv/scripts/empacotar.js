@@ -26,7 +26,7 @@ const emailAdmin = process.env.PDV_ADMIN_EMAIL || 'master@pdv.com.br';
 const senhaAdmin = process.env.PDV_ADMIN_SENHA || crypto.randomBytes(12).toString('base64url');
 const nomeAdmin = process.env.PDV_ADMIN_NOME || 'Master';
 if (senhaAdmin.length < 12) throw new Error('PDV_ADMIN_SENHA deve ter pelo menos 12 caracteres (o servidor recusa senha menor em produção).');
-const env = `# ZOE PDV Inteligente — configuração do servidor
+const env = `# Payax PDV — configuração do servidor
 NODE_ENV=production
 PORT=3600
 # Endereço do painel: https://SEU-DOMINIO/pdv/
