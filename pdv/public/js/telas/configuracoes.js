@@ -1,4 +1,4 @@
-import { api, BASE } from '../api.js';
+import { api, BASE, enviarImagem } from '../api.js';
 import { el, limpar, campo, area, marcar, lerForm, toast, acao, icone, FORMAS, dataHora } from '../ui.js';
 
 const FORMAS_LISTA = Object.keys(FORMAS);
@@ -94,14 +94,42 @@ export async function telaConfiguracoes(ctx) {
     limpar(cartaoComprovante, el('h2', {}, 'Comprovante do balcão'), el('p', { class: 'mudo' }, 'Texto impresso na bobina acima e abaixo dos valores.'), formComp);
 
     // ---- Tela do cliente ----
-    const logoAtual = c.logo_url || 'img/logo-cliente.png';
-    const previa = el('img', { src: logoAtual.startsWith('http') ? logoAtual : `${BASE}/${logoAtual.replace(/^\//, '')}`,
-      alt: 'Logo da tela do cliente', style: 'max-width:280px;max-height:90px;object-fit:contain;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px' });
+    const endereco = (u, padrao = '') => {
+      const v2 = (u || padrao).trim();
+      return !v2 ? '' : v2.startsWith('http') ? v2 : `${BASE}/${v2.replace(/^\//, '')}`;
+    };
+    /** Campo de imagem: pré-visualização, envio do arquivo e, para quem preferir, o endereço digitado. */
+    const campoImagem = (tipo, rotulo, dica, valor, padrao, estilo) => {
+      const previa2 = el('img', { src: endereco(valor, padrao), alt: rotulo, style: estilo, hidden: !endereco(valor, padrao) });
+      const texto = el('input', { name: tipo === 'logo' ? 'logo_url' : 'autoatendimento_fundo', value: valor ?? '', placeholder: padrao || 'https://…',
+        maxlength: 300, disabled: somenteLeitura, oninput: (e) => { previa2.src = endereco(e.target.value, padrao); previa2.hidden = !previa2.src; } });
+      const arquivo = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', hidden: true, onchange: async (e) => {
+        const f = e.target.files?.[0];
+        e.target.value = '';
+        if (!f) return;
+        await acao(null, async () => {
+          const r = await enviarImagem(`${base}/configuracoes/imagens/${tipo}`, f);
+          toast('Imagem enviada.');
+          texto.value = r.url;
+          previa2.src = `${endereco(r.url)}?v=${Date.now()}`;
+          previa2.hidden = false;
+        });
+      } });
+      return el('div', { class: 'campo' }, rotulo,
+        el('div', { class: 'pequeno mudo', style: 'font-weight:400;margin-bottom:6px' }, dica),
+        previa2, texto, arquivo,
+        somenteLeitura ? null : el('div', { class: 'linha', style: 'gap:8px;margin-top:8px' },
+          el('button', { type: 'button', class: 'btn pequeno', onclick: () => arquivo.click() }, icone('baixar'), 'Enviar imagem'),
+          valor ? el('button', { type: 'button', class: 'btn pequeno', onclick: () => { texto.value = ''; previa2.src = endereco('', padrao); previa2.hidden = !previa2.src; } }, 'Usar o padrão') : null));
+    };
+
     const formCliente = el('form', { class: 'form' },
-      campo('Logo (arquivo publicado, ex.: img/logo-cliente.png, ou endereço https)',
-        { name: 'logo_url', value: c.logo_url ?? '', placeholder: 'img/logo-cliente.png', maxlength: 300, disabled: somenteLeitura,
-          oninput: (e) => { const v2 = e.target.value.trim() || 'img/logo-cliente.png'; previa.src = v2.startsWith('http') ? v2 : `${BASE}/${v2.replace(/^\//, '')}`; } }),
-      previa,
+      campoImagem('logo', 'Logo da tela do cliente', 'PNG, JPEG ou WebP (até 5 MB). Também aceita um endereço https.',
+        c.logo_url, 'img/logo-cliente.png', 'max-width:280px;max-height:90px;object-fit:contain;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px'),
+      campoImagem('fundo', 'Imagem de fundo (propaganda)', 'A arte que fica atrás do painel de vidro, na tela inteira. Sem imagem, a tela usa o fundo azul do sistema.',
+        c.autoatendimento_fundo, '', 'max-width:280px;max-height:150px;object-fit:cover;border:1px solid var(--border);border-radius:10px'),
+      marcar('A arte de fundo já tem a marca do provedor (não repetir o logo na tela)',
+        { name: 'autoatendimento_fundo_marca', checked: c.autoatendimento_fundo_marca, disabled: somenteLeitura }),
       el('div', { class: 'duas' },
         campo('Chamada (título grande)', { name: 'autoatendimento_titulo', value: c.autoatendimento_titulo ?? '', maxlength: 80, disabled: somenteLeitura,
           placeholder: 'Sua casa mais conectada.' }),

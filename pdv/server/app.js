@@ -6,7 +6,8 @@ const config = require('./config');
 const { criarApi, tratarErro } = require('./api');
 const { limitar } = require('./lib/limitador');
 
-const CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'";
+// img-src aceita https: para o provedor poder apontar o logo/fundo da tela do cliente para um endereço externo.
+const CSP = "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'";
 
 function criarApp(db) {
   const app = express();
@@ -28,6 +29,8 @@ function criarApp(db) {
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   r.use(express.json({ limit: '1mb' }));
   r.use('/api', criarApi(db));
+  // Imagens enviadas pelo painel (logo e fundo da tela do cliente): nomes aleatórios, só leitura.
+  r.use('/arquivos', express.static(config.arquivosDir, { index: false, dotfiles: 'deny', maxAge: '7d', fallthrough: true }));
   r.use(express.static(path.join(__dirname, '..', 'public')));
   if (config.basePath) {
     app.get(config.basePath, (req, res, next) => (req.originalUrl.split('?')[0] === config.basePath ? res.redirect(`${config.basePath}/`) : next()));

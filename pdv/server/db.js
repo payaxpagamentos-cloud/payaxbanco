@@ -86,6 +86,8 @@ CREATE TABLE IF NOT EXISTS config_empresa (
   comprovante_rodape TEXT,
   -- Tela do cliente (autoatendimento): logo, chamada e recado que aparecem para quem está pagando.
   logo_url TEXT,
+  autoatendimento_fundo TEXT,
+  autoatendimento_fundo_marca INTEGER NOT NULL DEFAULT 0,
   autoatendimento_titulo TEXT,
   autoatendimento_subtitulo TEXT,
   autoatendimento_mensagem TEXT,
@@ -330,6 +332,12 @@ function abrir(arquivo = config.dbFile) {
   }
   if (!colunas('config_empresa').includes('autoatendimento_titulo')) {
     db.exec('ALTER TABLE config_empresa ADD COLUMN autoatendimento_titulo TEXT; ALTER TABLE config_empresa ADD COLUMN autoatendimento_subtitulo TEXT;');
+  }
+  if (!colunas('config_empresa').includes('autoatendimento_fundo')) {
+    db.exec('ALTER TABLE config_empresa ADD COLUMN autoatendimento_fundo TEXT');
+  }
+  if (!colunas('config_empresa').includes('autoatendimento_fundo_marca')) {
+    db.exec('ALTER TABLE config_empresa ADD COLUMN autoatendimento_fundo_marca INTEGER NOT NULL DEFAULT 0');
   }
   if (!colunas('recebimentos').includes('origem')) {
     db.exec("ALTER TABLE recebimentos ADD COLUMN origem TEXT NOT NULL DEFAULT 'balcao'");

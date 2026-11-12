@@ -161,3 +161,54 @@ test('Tela do cliente: sem maquininha ela só consulta', async (t) => {
   assert.equal(cobranca.status, 409);
   assert.match(cobranca.dados.erro, /maquininha/i);
 });
+
+test('Tela do cliente: propaganda de fundo enviada pelo painel', async (t) => {
+  const ixc = await ixcFalso();
+  const app = await iniciar();
+  const e = await empresaDeTeste(app, { ixcUrl: ixc.url, ixcToken: ixc.token, terminal: false });
+  t.after(async () => { await app.fechar(); await ixc.fechar(); });
+  const { chave } = (await app.post(`/empresas/${e.eid}/cadastros/pdvs/${e.pdv.id}/autoatendimento`, {}, e.admin)).dados;
+
+  // PNG 1×1 de verdade (o servidor confere o começo do arquivo).
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const enviar = (tipo, corpo, tipoConteudo, token) => fetch(`${app.base}/empresas/${e.eid}/configuracoes/imagens/${tipo}`, {
+    method: 'POST', headers: { 'Content-Type': tipoConteudo, Authorization: `Bearer ${token}` }, body: corpo,
+  });
+
+  await t.test('só o administrador envia, e só imagem de verdade', async () => {
+    assert.equal((await enviar('fundo', png, 'image/png', e.operador)).status, 403);
+    assert.equal((await enviar('fundo', Buffer.from('<svg onload=alert(1)>'), 'image/png', e.admin)).status, 422);
+    assert.equal((await enviar('maluco', png, 'image/png', e.admin)).status, 422);
+  });
+
+  let url;
+  await t.test('a arte enviada vira o fundo da tela e fica servida pelo PDV', async () => {
+    const r = await enviar('fundo', png, 'image/png', e.admin);
+    assert.equal(r.status, 201);
+    ({ url } = await r.json());
+    assert.match(url, new RegExp(`^arquivos/empresa${e.eid}/fundo-[0-9a-f]{16}\\.png$`));
+
+    const abertura = await app.req('GET', '/autoatendimento/', undefined, null, { 'X-Api-Key': chave });
+    assert.equal(abertura.dados.fundo_url, url);
+
+    const imagem = await fetch(`${app.base.replace(/\/api$/, '')}/${url}`);
+    assert.equal(imagem.status, 200);
+    assert.equal(imagem.headers.get('content-type'), 'image/png');
+    assert.equal(Buffer.from(await imagem.arrayBuffer()).length, png.length);
+  });
+
+  await t.test('enviar outra arte troca a anterior', async () => {
+    const r = await enviar('fundo', png, 'image/png', e.admin);
+    const { url: nova } = await r.json();
+    assert.notEqual(nova, url);
+    const c = await app.get(`/empresas/${e.eid}/configuracoes`, e.admin);
+    assert.equal(c.dados.autoatendimento_fundo, nova);
+    assert.equal((await fetch(`${app.base.replace(/\/api$/, '')}/${url}`)).status, 404, 'a anterior é apagada do servidor');
+  });
+
+  await t.test('sem arte, a tela volta ao fundo do sistema', async () => {
+    await app.patch(`/empresas/${e.eid}/configuracoes`, { autoatendimento_fundo: '' }, e.admin);
+    const abertura = await app.req('GET', '/autoatendimento/', undefined, null, { 'X-Api-Key': chave });
+    assert.equal(abertura.dados.fundo_url, null);
+  });
+});

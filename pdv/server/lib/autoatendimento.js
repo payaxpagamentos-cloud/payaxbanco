@@ -84,6 +84,10 @@ function abertura(db, { pdv, empresa }) {
     loja: db.prepare('SELECT nome FROM lojas WHERE id = ?').get(pdv.loja_id)?.nome ?? null,
     pdv: { id: pdv.id, nome: pdv.nome },
     logo_url: cfg.logo_url || 'img/logo-cliente.png',
+    // Propaganda do provedor atrás do painel de vidro; sem imagem, vale a arte desenhada na própria tela.
+    fundo_url: cfg.autoatendimento_fundo || null,
+    // Quando a arte já traz a marca, a tela não repete o logo em cima dela.
+    fundo_tem_marca: !!cfg.autoatendimento_fundo_marca,
     // Chamada da operadora no alto da tela; sem configurar, vale o texto padrão.
     titulo: cfg.autoatendimento_titulo || 'Sua casa mais conectada.',
     subtitulo: cfg.autoatendimento_subtitulo || 'Internet para todos os seus momentos.',

@@ -116,7 +116,10 @@ Quem emite as faturas continua sendo o IXC: o PDV só consulta e baixa.
         A chave aparece UMA ÚNICA VEZ (botão "Copiar endereço + chave").
      2. No aparelho da tela (monitor com toque, tablet ou o segundo monitor do caixa), abra
         https://SEU-DOMINIO/pdv/cliente/ e cole a chave. Com o endereço copiado no passo 1, ela já ativa sozinha.
-     3. O logo, a chamada ("Sua casa mais conectada."), a frase e o recado saem em Configurações > Tela do cliente.
+     3. Em Configurações > Tela do cliente, envie a ARTE DE FUNDO (a propaganda que fica atrás do painel de
+        vidro, na tela inteira) e o LOGO. Sugestão de tamanho: 1080x1920 no totem em pé, 1920x1080 no deitado.
+        Se a arte já tiver a marca, marque "A arte de fundo já tem a marca" para a tela não repetir o logo.
+        Sem arte, a tela usa o fundo azul do sistema com a chamada e a frase, também editáveis ali.
    NO TOTEM: a tela abre numa tela de espera com o logo ("toque para começar"), entra em tela cheia no primeiro
    toque, segura o monitor aceso e se ajusta a telas em pé (1080x1920). Deixe o navegador do totem em modo
    quiosque abrindo direto o endereço da tela; depois de cada pagamento ela volta sozinha para a tela de espera.
@@ -125,8 +128,8 @@ Quem emite as faturas continua sendo o IXC: o PDV só consulta e baixa.
 
 
 10) CÓPIAS DE SEGURANÇA
-   Tudo fica na pasta pdv/data (banco pdv.db). Copie essa pasta com frequência:
-   é nela que estão os recebimentos, os caixas e a conferência.
+   Tudo fica na pasta pdv/data: o banco (pdv.db) e as imagens enviadas pelo painel (data/arquivos).
+   Copie essa pasta com frequência: é nela que estão os recebimentos, os caixas, a conferência e a arte da tela.
 
 
 11) ATUALIZAR PARA UMA VERSÃO NOVA

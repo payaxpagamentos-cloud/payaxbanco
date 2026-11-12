@@ -31,9 +31,14 @@ hora fica numa fila e aparece na conferência até alguém resolver — o balcã
 2. No aparelho da tela (um monitor com toque, um tablet ou um segundo monitor do caixa), abra
    `https://SEU-DOMINIO/pdv/cliente/` e cole a chave. O botão *Copiar endereço + chave* do painel gera um
    link que já ativa a tela sozinho (`…/cliente/#pdv_...`).
-3. O logo, a **chamada** ("Sua casa mais conectada."), a frase e o recado saem em *Configurações › Tela do cliente*
-   (por padrão, o logo que acompanha o sistema e a chamada acima). O visual é o do provedor: fundo azul com
-   brilhos, marca em destaque, passos **CPF → Fatura → Pagamento** e a ação em laranja.
+3. Em *Configurações › Tela do cliente* você **envia a arte do provedor** (PNG, JPEG ou WebP, até 5 MB): a
+   **imagem de fundo** — a propaganda que ocupa a tela inteira atrás do painel — e o **logo**. Quando a arte já
+   traz a marca, marque *"A arte de fundo já tem a marca"* e a tela não repete o logo. Sem imagem, vale o fundo
+   azul do sistema com a chamada ("Sua casa mais conectada.") e a frase, também configuráveis aqui.
+   Tamanho sugerido da arte: **1080×1920** no totem em pé e **1920×1080** no monitor deitado.
+4. O painel por cima da propaganda é de **vidro fosco** (`backdrop-filter`): a arte aparece desfocada por trás,
+   com os passos **CPF → Fatura → Pagamento**, o teclado grande e a ação em laranja. Em navegador sem suporte ao
+   desfoque, o painel fica sólido para não perder leitura.
 4. A tela cobra na **maquininha ligada àquele PDV** (ou à loja). Sem maquininha, ela só consulta as faturas.
 
 No totem (monitor vertical com toque), a tela abre numa **tela de espera** com o logo e o convite "toque para
@@ -111,6 +116,8 @@ aplicativo da maquininha e `LEIA-ME.txt` com o passo a passo (cPanel, PM2, Docke
 | `PDV_FUSO` | `America/Sao_Paulo` | Fuso do dia do caixa, dos relatórios e da conferência (o painel segue esta data, não a do computador do balcão). |
 | `PDV_TRUST_PROXY` | `loopback` | Proxies confiáveis para obter o IP real. |
 | `PDV_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
+| `PDV_ARQUIVOS` | `data/arquivos` | Pasta das imagens enviadas pelo painel (logo e propaganda da tela do cliente). **Inclua no backup.** |
+| `PDV_ARQUIVO_MAX_MB` | `5` | Tamanho máximo de cada imagem enviada. |
 | `PDV_HTTP` | — | `1` permite IXC e maquininha em `http://` (só para servidores na rede interna; o padrão exige `https://`). |
 | `PDV_IXC_TIMEOUT` | `8000` | Tempo máximo (ms) de espera do IXC e do adquirente. |
 | `PDV_CARTAO_EXPIRA_MIN` | `5` | Minutos até uma cobrança sem resposta da maquininha ser dada como expirada. |

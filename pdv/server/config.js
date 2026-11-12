@@ -37,6 +37,9 @@ module.exports = {
   ixcTimeoutMs: Number(process.env.PDV_IXC_TIMEOUT) || 8000,
   // Cobrança no cartão sem resposta da maquininha por este tempo é dada como expirada.
   cartaoExpiraMin: Number(process.env.PDV_CARTAO_EXPIRA_MIN) || 5,
+  // Imagens enviadas pelo painel (logo e fundo da tela do cliente). Inclua esta pasta no backup do servidor.
+  arquivosDir: process.env.PDV_ARQUIVOS || path.join(__dirname, '..', 'data', 'arquivos'),
+  arquivoMaxMb: Number(process.env.PDV_ARQUIVO_MAX_MB) || 5,
   // Fuso do caixa, dos relatórios e da conferência.
   fuso: process.env.PDV_FUSO || 'America/Sao_Paulo',
   admin: {

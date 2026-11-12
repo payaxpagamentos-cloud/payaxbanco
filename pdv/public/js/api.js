@@ -55,6 +55,27 @@ export const api = {
   del: (c, b) => chamar('DELETE', c, b),
 };
 
+/** Envia uma imagem (logo, fundo da tela do cliente) como o arquivo puro no corpo. */
+export async function enviarImagem(caminho, arquivo) {
+  const s = sessao.get();
+  let resp;
+  try {
+    resp = await fetch(`${BASE}/api${caminho}`, {
+      method: 'POST',
+      headers: { 'Content-Type': arquivo.type || 'application/octet-stream', ...(s?.token ? { Authorization: `Bearer ${s.token}` } : {}) },
+      body: arquivo,
+    });
+  } catch {
+    throw new ErroApi('Sem conexão com o servidor. Verifique a internet.', 0);
+  }
+  if (!resp.ok) {
+    let msg = `Erro ${resp.status}`;
+    try { msg = (await resp.json()).erro || msg; } catch { /* sem corpo */ }
+    throw new ErroApi(msg, resp.status);
+  }
+  return resp.json();
+}
+
 /** Baixa um arquivo da API (com a sessão) e entrega ao navegador. */
 export async function baixar(caminho, nome) {
   const resp = await chamar('GET', caminho, undefined, { bruto: true });

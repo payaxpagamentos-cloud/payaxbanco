@@ -37,6 +37,8 @@ function configPublica(db, empresaId) {
     comprovante_cabecalho: c.comprovante_cabecalho,
     comprovante_rodape: c.comprovante_rodape,
     logo_url: c.logo_url,
+    autoatendimento_fundo: c.autoatendimento_fundo,
+    autoatendimento_fundo_marca: !!c.autoatendimento_fundo_marca,
     autoatendimento_titulo: c.autoatendimento_titulo,
     autoatendimento_subtitulo: c.autoatendimento_subtitulo,
     autoatendimento_mensagem: c.autoatendimento_mensagem,
@@ -81,6 +83,8 @@ function salvarConfig(db, empresaId, d) {
   if (d.comprovante_cabecalho !== undefined) por('comprovante_cabecalho', v.opcional(d.comprovante_cabecalho, 'o cabeçalho do comprovante', 300));
   if (d.comprovante_rodape !== undefined) por('comprovante_rodape', v.opcional(d.comprovante_rodape, 'o rodapé do comprovante', 300));
   if (d.logo_url !== undefined) por('logo_url', imagem(d.logo_url));
+  if (d.autoatendimento_fundo !== undefined) por('autoatendimento_fundo', imagem(d.autoatendimento_fundo));
+  if (d.autoatendimento_fundo_marca !== undefined) por('autoatendimento_fundo_marca', v.booleano(d.autoatendimento_fundo_marca) ? 1 : 0);
   if (d.autoatendimento_titulo !== undefined) por('autoatendimento_titulo', v.opcional(d.autoatendimento_titulo, 'o título da tela do cliente', 80));
   if (d.autoatendimento_subtitulo !== undefined) por('autoatendimento_subtitulo', v.opcional(d.autoatendimento_subtitulo, 'a frase da tela do cliente', 120));
   if (d.autoatendimento_mensagem !== undefined) por('autoatendimento_mensagem', v.opcional(d.autoatendimento_mensagem, 'o recado da tela do cliente', 200));

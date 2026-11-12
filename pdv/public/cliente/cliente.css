@@ -9,8 +9,8 @@
   --azul-marca: #3C85C4;
   --laranja: #F2801E;
   --laranja-claro: #FFA04D;
-  --vidro: rgba(255, 255, 255, .93);
-  --vidro-borda: rgba(255, 255, 255, .6);
+  --vidro: rgba(255, 255, 255, .76);
+  --vidro-borda: rgba(255, 255, 255, .55);
   --texto: #0B2A5B;
   --texto-2: #4A6184;
   --texto-3: #8699B5;
@@ -41,6 +41,12 @@ body{ color: var(--texto); font-size: 18px; line-height: 1.45; -webkit-font-smoo
 button{ font: inherit; color: inherit; cursor: pointer; }
 .carregando{ padding: 40px; color: #DCE9FB; }
 
+/* Propaganda do provedor no fundo: a arte enviada no painel cobre a tela inteira, com um véu azul
+   por cima para o painel de vidro continuar legível. */
+.fundo{ position: fixed; inset: 0; z-index: 0; background-repeat: no-repeat; background-size: cover; background-position: center; }
+.fundo::after{ content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(4, 26, 62, .35) 0%, rgba(4, 26, 62, .2) 35%, rgba(4, 26, 62, .55) 100%); }
+
 /* Fios de luz do fundo (azuis e laranjas), só decoração. */
 .brilhos{ position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
 .brilhos i{ position: absolute; border-radius: 50%; border: 2px solid transparent; filter: blur(.4px); opacity: .55; }
@@ -56,7 +62,8 @@ button{ font: inherit; color: inherit; cursor: pointer; }
 .marca .pilula{ display: inline-flex; align-items: center; justify-content: center; background: #fff; border-radius: 999px; padding: 14px 34px;
   box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .9); }
 .marca img{ display: block; max-width: min(360px, 68vw); max-height: 96px; object-fit: contain; }
-.marca .loja{ color: rgba(226, 240, 255, .8); font-size: 14px; font-weight: 600; letter-spacing: .04em; }
+.marca .loja{ color: #EAF3FF; font-size: 14px; font-weight: 700; letter-spacing: .04em; background: rgba(4, 26, 62, .45); border-radius: 999px;
+  padding: 4px 14px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .chamada{ width: min(960px, 100%); display: flex; align-items: center; justify-content: space-between; gap: 18px; color: #fff; padding: 0 6px; }
 .chamada h1{ margin: 0; font-size: clamp(26px, 4.4vw, 46px); font-weight: 800; letter-spacing: -.025em; line-height: 1.08; text-shadow: 0 2px 18px rgba(3, 20, 48, .45); }
 .chamada p{ margin: 6px 0 0; font-size: clamp(15px, 1.9vw, 21px); font-weight: 600; color: rgba(226, 240, 255, .92); }
@@ -65,9 +72,12 @@ button{ font: inherit; color: inherit; cursor: pointer; }
 
 /* ----- cartão de vidro ----- */
 .painel{ position: relative; width: min(820px, 100%); background: var(--vidro); border: 1px solid var(--vidro-borda); border-radius: 30px;
-  box-shadow: 0 28px 70px -30px rgba(2, 16, 40, .85), inset 0 1px 0 rgba(255, 255, 255, .9);
-  -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%);
+  box-shadow: 0 30px 80px -30px rgba(2, 16, 40, .9), inset 0 1px 0 rgba(255, 255, 255, .85);
+  -webkit-backdrop-filter: blur(26px) saturate(165%); backdrop-filter: blur(26px) saturate(165%);
   padding: 26px; display: flex; flex-direction: column; gap: 18px; animation: subir .2s ease-out; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+  .painel{ background: rgba(255, 255, 255, .95); }
+}
 @keyframes subir{ from{ opacity: 0; transform: translateY(10px); } to{ opacity: 1; transform: none; } }
 h2{ margin: 0; font-size: clamp(24px, 3.4vw, 38px); font-weight: 800; letter-spacing: -.02em; text-align: center; color: var(--texto); }
 .ajuda{ margin: -6px 0 0; color: var(--texto-2); text-align: center; font-size: clamp(15px, 1.8vw, 20px); font-weight: 600; }
@@ -98,7 +108,7 @@ h2{ margin: 0; font-size: clamp(24px, 3.4vw, 38px); font-weight: 800; letter-spa
 
 /* ----- teclado ----- */
 .teclado{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.teclado button{ background: linear-gradient(180deg, #FFFFFF, #F3F7FD); border: 1px solid var(--borda); border-radius: 18px; color: var(--texto);
+.teclado button{ background: linear-gradient(180deg, rgba(255, 255, 255, .95), rgba(243, 247, 253, .88)); border: 1px solid rgba(255, 255, 255, .9); border-radius: 18px; color: var(--texto);
   font-size: clamp(26px, 3.6vw, 38px); font-weight: 800; padding: 16px 0; box-shadow: 0 6px 14px -10px rgba(11, 42, 91, .8);
   transition: transform .08s, background .12s; }
 .teclado button:active{ transform: scale(.96); background: #E8F0FB; }
@@ -228,7 +238,7 @@ h2{ margin: 0; font-size: clamp(24px, 3.4vw, 38px); font-weight: 800; letter-spa
 }
 /* ----- totem em pé (1080×1920 e parecidas) ----- */
 @media (orientation: portrait) and (min-width: 700px) and (min-height: 1400px){
-  #tela{ justify-content: center; gap: 40px; padding: 60px 54px 70px; font-size: 22px; }
+  #tela{ justify-content: center; gap: 32px; padding: 44px 54px 48px; font-size: 22px; }
   .marca .pilula{ padding: 20px 52px; }
   .marca img{ max-width: min(520px, 74vw); max-height: 150px; }
   .marca .loja{ font-size: 18px; }

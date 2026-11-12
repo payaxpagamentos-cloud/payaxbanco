@@ -91,8 +91,9 @@ async function modoTotem() {
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 const marca = () => el('div', { class: 'marca' },
-  el('span', { class: 'pilula' }, el('img', { src: urlLogo(abertura?.logo_url), alt: abertura?.empresa?.nome ?? 'Logo',
-    onerror: (e) => { e.target.src = `${BASE}/img/logo-cliente.png`; } })),
+  abertura?.fundo_url && abertura?.fundo_tem_marca ? null
+    : el('span', { class: 'pilula' }, el('img', { src: urlLogo(abertura?.logo_url), alt: abertura?.empresa?.nome ?? 'Logo',
+      onerror: (e) => { e.target.src = `${BASE}/img/logo-cliente.png`; } })),
   abertura?.loja ? el('div', { class: 'loja' }, `${abertura.loja}${abertura.pdv ? ` · ${abertura.pdv.nome}` : ''}`) : null);
 
 const svg = (d, attrs = {}) => el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', ...attrs },
@@ -119,7 +120,16 @@ const ajudaRodape = () => el('div', { class: 'rodape-ajuda' },
 
 const brilhos = () => el('div', { class: 'brilhos' }, el('i'), el('i'), el('i'), el('i'));
 
-const desenhar = (...partes) => raiz.replaceChildren(brilhos(), marca(), chamada(), ...partes.flat(Infinity).filter(Boolean), ajudaRodape());
+/** Fundo da tela: a propaganda enviada pelo provedor ou, sem ela, os fios de luz desenhados aqui. */
+const fundo = () => (abertura?.fundo_url
+  ? el('div', { class: 'fundo', style: `background-image:url("${urlLogo(abertura.fundo_url).replace(/"/g, '%22')}")` })
+  : brilhos());
+
+const desenhar = (...partes) => raiz.replaceChildren(
+  fundo(), marca(),
+  // Com a arte do provedor no fundo, a chamada já está nela: a tela não repete o texto.
+  abertura?.fundo_url ? null : chamada(),
+  ...partes.flat(Infinity).filter(Boolean), ajudaRodape());
 
 /** Passos do atendimento: 1 CPF · 2 Fatura · 3 Pagamento. */
 function passos(atual) {
