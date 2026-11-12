@@ -360,8 +360,8 @@ td.direita, th.direita{ text-align: right; }
  * A tela de entrada é a vitrine do sistema: fica sempre no escuro da marca, mesmo com o
  * tema claro escolhido, porque a arte da loja foi feita sobre esse fundo. */
 .entrada{
-  min-height: 100vh; display: flex; flex-direction: column; gap: 12px;
-  padding: 26px clamp(16px, 3.5vw, 52px) 18px;
+  min-height: 100vh; display: grid; align-items: center;
+  padding: 24px clamp(16px, 3.5vw, 52px);
   background:
     radial-gradient(760px 520px at 5% -8%, rgba(2,150,125,.40), transparent 62%),
     radial-gradient(1040px 700px at 27% 80%, rgba(9,58,76,.72), transparent 66%),
@@ -369,11 +369,8 @@ td.direita, th.direita{ text-align: right; }
     #011829;
   color: #E7F4F1;
 }
-.entrada .topo-entrada{ flex: none; }
-.entrada .topo-entrada .logo{ display: block; width: clamp(150px, 15vw, 206px); height: auto; }
-
 .entrada .painel-entrada{
-  flex: 1; width: 100%; max-width: 1480px; margin: 0 auto;
+  width: 100%; max-width: 1480px; margin: 0 auto;
   display: grid; grid-template-columns: 1.5fr minmax(360px, 440px);
   gap: clamp(16px, 3vw, 48px); align-items: center;
 }
@@ -421,8 +418,6 @@ td.direita, th.direita{ text-align: right; }
   margin: 20px 0 0; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.09);
   text-align: center; font-size: 14px; color: var(--texto-2);
 }
-.entrada .rodape-entrada{ flex: none; text-align: center; font-size: 13px; color: rgba(222,240,236,.45); }
-
 @media (max-width: 980px){
   .entrada .painel-entrada{ grid-template-columns: 1fr; gap: 24px; justify-items: center; }
   .entrada .caixa{ order: 1; }
@@ -430,7 +425,7 @@ td.direita, th.direita{ text-align: right; }
   .entrada .loja{ max-width: 520px; }
 }
 @media (max-width: 560px){
-  .entrada{ padding: 20px 16px 14px; }
+  .entrada{ padding: 20px 16px; }
   .entrada .caixa{ padding: 26px 20px 22px; }
 }
 }

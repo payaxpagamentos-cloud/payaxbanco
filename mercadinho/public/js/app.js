@@ -100,12 +100,7 @@ function telaLogin(erro) {
     });
   }
 
-  const nome = estado.publico.nome_mercado || 'Mercado Binho';
-
   limpar($('#app'), el('div', { class: 'entrada' },
-    el('header', { class: 'topo-entrada' },
-      el('img', { class: 'logo', src: `${RAIZ}/img/binho-logo.png`, alt: nome })),
-
     el('div', { class: 'painel-entrada' },
       el('div', { class: 'vitrine' },
         el('img', { class: 'loja', src: `${RAIZ}/img/loja.webp`, alt: '', 'aria-hidden': 'true' })),
@@ -115,9 +110,7 @@ function telaLogin(erro) {
         el('h2', {}, 'Bem-vindo'),
         form,
         el('p', { class: 'ajuda' }, 'Precisa de ajuda? ',
-          el('button', { type: 'button', class: 'elo', onclick: falarComSuporte }, 'Fale com o suporte')))),
-
-    el('footer', { class: 'rodape-entrada' }, `${nome} · Gestão do seu mercado`)));
+          el('button', { type: 'button', class: 'elo', onclick: falarComSuporte }, 'Fale com o suporte'))))));
 }
 
 /* ---------- layout ---------- */
