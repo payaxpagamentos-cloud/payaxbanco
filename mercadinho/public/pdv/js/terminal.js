@@ -1,5 +1,5 @@
 import { api, pareamento } from './api.js';
-import { el, $, limpar, dinheiro, qtd, icone, toast, acao, marca } from '../../js/ui.js';
+import { el, $, limpar, dinheiro, qtd, icone, toast, acao } from '../../js/ui.js';
 
 /**
  * Terminal do balcão — a única tela que o cliente usa.
@@ -13,9 +13,15 @@ const SEGUNDOS_AVISO = 20;
 const app = () => $('#app');
 const pintar = (...filhos) => limpar(app(), el('div', { class: 'terminal-tela' }, ...filhos));
 
+/* ---------- marca ---------- */
+/** Logo da loja. Para trocar, substitua public/img/binho-logo.png pelo logo de vocês. */
+const logo = (classe) => el('img', { class: classe, src: '../img/binho-logo.png', alt: estado.inicio?.mercado.nome ?? 'Mercado Binho' });
+
 /* ---------- cabeçalho ---------- */
 const topo = (passo) => el('header', { class: 'terminal-topo' },
-  marca(estado.inicio?.mercado.nome ?? 'Mercadinho', estado.inicio?.mercado.condominio || 'Autoatendimento'),
+  el('div', { class: 'marca-loja' },
+    logo('logo-topo'),
+    estado.inicio?.mercado.condominio ? el('span', { class: 'condominio' }, estado.inicio.mercado.condominio) : null),
   passo ? el('span', { class: 'passo' }, passo) : null);
 
 /* ---------- relógio de inatividade ---------- */
@@ -129,6 +135,7 @@ function telaEspera() {
   pintar(topo('Passo 1 de 2'),
     el('div', { class: 'terminal-corpo' },
       el('div', { class: 'espera' }, el('div', { class: 'conteudo-espera' },
+        logo('logo-espera'),
         el('div', { class: 'alvo-leitor' }, icone('busca')),
         el('h1', {}, 'Passe o produto no ', el('em', {}, 'leitor')),
         el('p', {}, 'Um de cada vez. O que você passar aparece aqui na tela — no fim, é só escolher como pagar.'),
@@ -471,6 +478,7 @@ async function iniciar() {
   if (!pareamento.get()?.token) return telaPareamento();
   try {
     estado.inicio = await api.get('/inicio');
+    document.title = `Caixa — ${estado.inicio.mercado.nome}`;
     estado.venda = await api.get('/venda');
     estado.tela = estado.venda?.itens?.length ? 'compra' : 'espera';
     montar();

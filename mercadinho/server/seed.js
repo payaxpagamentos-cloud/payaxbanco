@@ -30,11 +30,11 @@ if (db.prepare('SELECT COUNT(*) AS n FROM produtos').get().n > 0) {
   process.exit(0);
 }
 
-gravarConfig(db, 'nome_mercado', 'Mercadinho do Condomínio');
+gravarConfig(db, 'nome_mercado', 'Mercado Binho');
 gravarConfig(db, 'condominio', 'Residencial Jardim das Acácias');
 gravarConfig(db, 'endereco', 'Rua das Acácias, 120 — Térreo do Bloco A');
-gravarConfig(db, 'pix_chave', 'mercadinho@acacias.com.br');
-gravarConfig(db, 'pix_recebedor', 'MERCADINHO ACACIAS');
+gravarConfig(db, 'pix_chave', 'contato@mercadobinho.com.br');
+gravarConfig(db, 'pix_recebedor', 'MERCADO BINHO');
 
 const gerente = usuario('Marina Gerente', 'gerente@mercadinho.com.br', 'gerente');
 const operador = usuario('Ana Caixa', 'caixa@mercadinho.com.br', 'caixa');

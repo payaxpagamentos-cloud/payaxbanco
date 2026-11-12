@@ -62,6 +62,12 @@ A administração pode desativar o terminal ou gerar um código novo a qualquer 
 
 **Dinheiro não entra no terminal**: não há quem dê troco. Quais formas aparecem fica em *Configurações › Loja*.
 
+**Logo da loja.** O terminal mostra `public/img/binho-logo.png` no topo e na tela de espera, e
+`public/img/binho-simbolo.png` como ícone da aba e da tela inicial do tablet. Para trocar, substitua os dois
+arquivos mantendo os nomes. O logo precisa ter **fundo transparente**: ele assenta direto sobre o fundo escuro
+do terminal, e os vazados do desenho (contorno das letras, a casa dentro da sacola) deixam o fundo aparecer.
+O nome que aparece no cupom e no título da aba vem de *Configurações › Loja*.
+
 **Cuidados que já estão no sistema**
 
 * Carrinho esquecido no balcão: a tela avisa e cancela a compra sozinha depois de 90 segundos sem ninguém mexer
