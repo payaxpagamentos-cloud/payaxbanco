@@ -149,6 +149,9 @@ async function consultarVeiculo(db, veic) {
  * "Consultar multas" na hora: uma placa (da frota ou não). As multas de veículos da empresa entram na central; tudo fica
  * registrado no histórico de consultas.
  */
+// Consultas rodando agora (id → promessa), para o clique duplo não pagar duas vezes.
+const emAndamento = new Map();
+
 function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = null }) {
   const p = multas.placaLimpa(placa);
   if (!/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(p)) throw new ErroNegocio('Informe uma placa válida (ex.: ABC1D23).', 422);
@@ -174,7 +177,6 @@ function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = nul
   emAndamento.set(id, pronto);
   return { id, status: 'consultando', placa: p, pronto };
 }
-const emAndamento = new Map();
 
 /** Consulta e espera o resultado (usado nos testes e pela rotina interna). */
 async function consultarPlaca(db, args) {
