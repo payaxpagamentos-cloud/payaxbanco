@@ -1,0 +1,67 @@
+MERCADINHO DO CONDOMÍNIO — INSTALAÇÃO
+=====================================
+
+Endereço depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
+  Sistema ........ https://SEU-DOMINIO/mercadinho/
+
+A mesma tela serve a equipe (PDV, estoque, compras, financeiro) e os moradores
+(cada morador vê só a própria conta). Tudo roda neste programa Node.js, nesta pasta.
+As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
+
+
+1) REQUISITO
+   Node.js 22.13 ou mais novo no servidor.  Confira com:   node -v
+
+
+2) ENVIAR OS ARQUIVOS
+   Envie a pasta "mercadinho" inteira para o servidor, FORA da pasta pública do site
+   (ex.: /home/SEU-USUARIO/mercadinho). O arquivo ".env" começa com ponto: confira se foi enviado.
+
+
+3) LIGAR
+   cd /home/SEU-USUARIO/mercadinho
+   node --disable-warning=ExperimentalWarning --env-file=.env server/index.js
+
+   Para subir junto com o servidor, crie um serviço systemd (exemplo):
+
+   [Unit]
+   Description=Mercadinho do Condominio
+   After=network.target
+
+   [Service]
+   WorkingDirectory=/home/SEU-USUARIO/mercadinho
+   ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning --env-file=.env server/index.js
+   Restart=always
+   User=SEU-USUARIO
+
+   [Install]
+   WantedBy=multi-user.target
+
+
+4) PUBLICAR NO DOMÍNIO (Nginx)
+   location /mercadinho/ {
+     proxy_pass http://127.0.0.1:3300/mercadinho/;
+     proxy_set_header Host $host;
+     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+     proxy_set_header X-Forwarded-Proto $scheme;
+   }
+
+   Use HTTPS (Let's Encrypt é gratuito: certbot --nginx -d SEU-DOMINIO).
+
+
+5) PRIMEIRO ACESSO
+   Entre com o e-mail e a senha do administrador que estão no arquivo .env e, na primeira vez:
+     - Configurações > Loja: nome, condomínio, chave PIX e limite padrão da conta dos moradores;
+     - Configurações > Usuários: crie a conta de cada pessoa da equipe (gerente, caixa, estoquista);
+     - Configurações > Maquininhas: cadastre a maquininha de cartão (veja o README);
+     - Produtos: cadastre a mercadoria (ou importe aos poucos, bipando no PDV).
+
+
+6) CÓPIA DE SEGURANÇA
+   Todo o sistema está no arquivo data/mercadinho.db. Copie a pasta "data" todo dia
+   (ex.: cron com "cp -a data /backup/mercadinho-$(date +%F)").
+
+
+7) LEITOR DE CÓDIGO DE BARRAS
+   Qualquer leitor USB serve: ele digita o código e dá Enter, igual a um teclado.
+   No PDV, deixe o cursor no campo de busca (tecla F3 volta para ele).

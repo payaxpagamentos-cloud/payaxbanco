@@ -8,6 +8,8 @@ usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 > E o **PABX** (pasta [`pabx/`](pabx/README.md), publicado em `/pabx`): painel do master e das empresas para ramais, chamadas, campanhas, números entrantes, terminação e integração com a central telefônica, com servidor próprio.
 >
 > E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
+>
+> E o **Mercadinho do Condomínio** (pasta [`mercadinho/`](mercadinho/README.md), publicado em `/mercadinho`): PDV com leitor de código de barras, estoque com custo médio e validade, compras e recebimento, financeiro com fluxo de caixa e DRE, conta dos moradores (fiado) com fatura mensal e cobrança no cartão pela maquininha (ponte TEF local ou Mercado Pago Point), com servidor próprio.
 
 ## Módulos
 
