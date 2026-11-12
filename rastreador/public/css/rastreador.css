@@ -1314,3 +1314,9 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
   .modal-fundo{ padding: 10px; }
   .modal{ max-height: calc(100dvh - 20px); }
 }
+
+/* ---------- Teste de bloqueio (instalação) ---------- */
+.teste-bloqueio h3{ font-size: 18px; }
+.carregando-linha{ height: 4px; border-radius: 4px; background: var(--azul-suave); overflow: hidden; position: relative; margin: 6px 0 12px; }
+.carregando-linha::after{ content: ''; position: absolute; inset: 0 auto 0 0; width: 35%; background: var(--azul); border-radius: 4px; animation: rt-carregando 1.1s ease-in-out infinite; }
+@keyframes rt-carregando{ from{ left: -35%; } to{ left: 100%; } }

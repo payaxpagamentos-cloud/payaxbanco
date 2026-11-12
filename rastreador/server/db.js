@@ -633,6 +633,21 @@ CREATE TABLE IF NOT EXISTS usuario_final_veiculos (
   veiculo_id INTEGER NOT NULL REFERENCES veiculos(id),
   PRIMARY KEY (usuario_final_id, veiculo_id)
 );
+
+-- Teste de bloqueio feito na instalação (o técnico confirma que o motor corta e volta).
+CREATE TABLE IF NOT EXISTS testes_bloqueio (
+  id INTEGER PRIMARY KEY,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  corte_ok INTEGER NOT NULL,
+  volta_ok INTEGER NOT NULL,
+  resposta_corte TEXT,
+  resposta_volta TEXT,
+  observacao TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_testes_bloqueio_veiculo ON testes_bloqueio (veiculo_id, id);
 `;
 
 const CONFIG_PADRAO = {
@@ -708,7 +723,7 @@ function abrir(arquivo = config.dbFile) {
 function migrar(db) {
   const colunas = (t) => new Set(db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name));
   const NOVAS = {
-    veiculos: { consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
+    veiculos: { teste_bloqueio_ok: 'INTEGER', teste_bloqueio_em: 'TEXT', consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
     empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0',
       plano_nome: 'TEXT', plano_valor_centavos: 'INTEGER', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT' },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
