@@ -299,7 +299,7 @@ td.direita, th.direita{ text-align: right; }
   border-right: 1px solid var(--vidro-borda);
 }
 .marca{ display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 4px 6px 14px; }
-.marca .logo-marca{ display: block; width: 100%; max-width: 168px; height: auto; }
+.marca .logo-marca{ display: block; width: 100%; max-width: 128px; height: auto; }
 .marca .logo-marca.no-claro{ display: none; }
 [data-tema="claro"] .marca .logo-marca.no-escuro{ display: none; }
 [data-tema="claro"] .marca .logo-marca.no-claro{ display: block; }
