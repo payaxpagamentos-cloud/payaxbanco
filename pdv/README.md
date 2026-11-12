@@ -34,6 +34,12 @@ hora fica numa fila e aparece na conferência até alguém resolver — o balcã
 3. O logo e o recado saem em *Configurações › Tela do cliente* (por padrão, o logo que acompanha o sistema).
 4. A tela cobra na **maquininha ligada àquele PDV** (ou à loja). Sem maquininha, ela só consulta as faturas.
 
+No totem (monitor vertical com toque), a tela abre numa **tela de espera** com o logo e o convite "toque para
+começar", entra em **tela cheia** no primeiro toque, **segura o monitor aceso** (Wake Lock) e se ajusta sozinha a
+telas em pé — 1080×1920 e parecidas — com teclado, botões e valores maiores. Deitada (monitor do balcão virado
+para o cliente) ela continua igual, só mais compacta. Depois de cada atendimento, e sempre que fica parada, volta
+à tela de espera: ninguém encontra a fatura de outra pessoa aberta.
+
 Cuidados que já vêm prontos: a consulta exige o CPF/CNPJ **completo e válido** e é limitada a 20 por minuto por
 aparelho; o nome do cliente aparece **parcialmente escondido** (`MARIA D****`); a tela volta sozinha ao início
 depois de parada e ao fim de cada atendimento; fatura já recebida no PDV não aparece de novo; e o recebimento

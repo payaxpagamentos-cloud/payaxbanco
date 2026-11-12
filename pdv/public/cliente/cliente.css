@@ -113,3 +113,66 @@ h2{ margin: 0; font-size: 21px; font-weight: 700; }
   #tela > *:not(.painel), .btn, .teclado{ display: none !important; }
   .painel{ box-shadow: none; border: 0; }
 }
+
+/* ==========================================================================
+   Totem: tela de espera, telas verticais (1080×1920 e parecidas) e dedo em vez de mouse.
+   ========================================================================== */
+.painel.espera{ align-items: center; text-align: center; gap: 24px; cursor: pointer; user-select: none; padding: 40px 32px; }
+.painel.espera h1{ font-size: 34px; }
+.painel.espera .btn{ pointer-events: none; }
+.toque{ position: relative; display: grid; place-items: center; width: 150px; height: 150px; margin: 6px auto; }
+.toque .aro{ position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--azul); opacity: .35; animation: aro 2.2s ease-out infinite; }
+.toque .dedo{ display: grid; place-items: center; width: 96px; height: 96px; border-radius: 50%; background: rgba(60, 133, 196, .12); color: var(--azul);
+  animation: tocar 2.2s ease-in-out infinite; }
+.toque svg{ width: 46px; height: 46px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes aro{ 0%{ transform: scale(.62); opacity: .5; } 70%{ transform: scale(1); opacity: 0; } 100%{ opacity: 0; } }
+@keyframes tocar{ 0%, 100%{ transform: translateY(0); } 50%{ transform: translateY(-8px); } }
+
+/* Dedo em vez de mouse: alvos maiores e nada de cursor piscando na tela. */
+@media (pointer: coarse){
+  body{ cursor: none; }
+  .btn{ min-height: 72px; }
+  .teclado button{ padding: 22px 0; }
+  .fatura{ padding: 20px; }
+  .fatura input{ width: 30px; height: 30px; }
+}
+
+/* Totem em pé (monitor vertical): tudo maior e o conteúdo no meio da altura. */
+@media (orientation: portrait) and (min-width: 700px){
+  #tela{ justify-content: center; gap: 44px; padding: 56px 48px 72px; font-size: 22px; }
+  .marca img{ max-width: min(620px, 82vw); max-height: 210px; padding: 20px 30px; border-radius: 24px; }
+  .marca .loja{ font-size: 20px; }
+  .painel{ width: min(880px, 100%); padding: 44px; border-radius: 32px; gap: 26px; }
+  h1{ font-size: 42px; }
+  h2{ font-size: 30px; }
+  .ajuda{ font-size: 22px; }
+  .recado{ font-size: 21px; padding: 16px 22px; }
+  .visor{ font-size: 58px; min-height: 104px; }
+  .teclado{ gap: 18px; }
+  .teclado button{ font-size: 42px; padding: 28px 0; border-radius: 22px; }
+  .teclado button.acao{ font-size: 26px; }
+  .btn{ font-size: 26px; min-height: 86px; border-radius: 22px; }
+  .fatura{ padding: 24px 26px; border-radius: 22px; }
+  .fatura .corpo strong{ font-size: 25px; }
+  .fatura .corpo span{ font-size: 19px; }
+  .fatura .valor{ font-size: 28px; } .fatura .valor small{ font-size: 16px; }
+  .total strong{ font-size: 52px; }
+  .total span{ font-size: 22px; }
+  .selo{ width: 130px; height: 130px; } .selo svg{ width: 72px; height: 72px; }
+  .comprovante{ font-size: 17px; padding: 22px 26px; }
+  .rodape{ font-size: 19px; }
+  .campo{ font-size: 20px; } .campo input{ font-size: 22px; padding: 18px 20px; }
+  .toque{ width: 200px; height: 200px; } .toque .dedo{ width: 128px; height: 128px; } .toque svg{ width: 62px; height: 62px; }
+  .painel.espera h1{ font-size: 50px; }
+}
+/* Totem alto (1080×1920): ainda maior, para ler de longe. */
+@media (orientation: portrait) and (min-height: 1500px){
+  #tela{ font-size: 26px; gap: 60px; }
+  .marca img{ max-height: 260px; }
+  h1{ font-size: 52px; }
+  .painel.espera h1{ font-size: 62px; }
+  .visor{ font-size: 70px; min-height: 124px; }
+  .teclado button{ font-size: 52px; padding: 36px 0; }
+  .btn{ font-size: 30px; min-height: 104px; }
+  .total strong{ font-size: 62px; }
+}

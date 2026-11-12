@@ -8,8 +8,9 @@
 
 const BASE = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const CHAVE = 'pdv.cliente.chave';
-const PARADA_MS = 90_000;   // volta ao início depois de parada
+const PARADA_MS = 60_000;   // volta à tela de espera depois de parado
 const FIM_MS = 25_000;      // tempo que o comprovante fica na tela
+const DIGITANDO_MS = 120_000; // enquanto o cliente está digitando, espera mais
 
 const raiz = document.getElementById('tela');
 let chave = null;
@@ -67,13 +68,27 @@ const apagarChave = () => { chave = null; try { localStorage.removeItem(CHAVE); 
 /** Volta ao início depois de um tempo parada (ninguém fica vendo a fatura do outro). */
 function contarParada(ms = PARADA_MS) {
   clearTimeout(relogioParada);
-  relogioParada = setTimeout(() => inicio(), ms);
+  relogioParada = setTimeout(() => espera(), ms);
 }
 const semParada = () => clearTimeout(relogioParada);
 for (const evento of ['pointerdown', 'keydown']) document.addEventListener(evento, () => { if (relogioParada) contarParada(); });
 
 /** O logo pode ser um arquivo publicado junto com o PDV ou um endereço https. */
 const urlLogo = (u) => (!u ? `${BASE}/img/logo-cliente.png` : /^https?:\/\//i.test(u) ? u : `${BASE}/${String(u).replace(/^\//, '')}`);
+
+/**
+ * Totem: tela cheia, sem menu do navegador e sem deixar o monitor apagar.
+ * Só dá para pedir tela cheia a partir de um toque do cliente — por isso o pedido sai no primeiro toque.
+ */
+let telaCheiaPedida = false;
+async function modoTotem() {
+  if (!telaCheiaPedida) {
+    telaCheiaPedida = true;
+    try { await document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }); } catch { /* o navegador pode recusar */ }
+  }
+  try { await navigator.wakeLock?.request('screen'); } catch { /* sem suporte: o monitor do totem costuma ser configurado no sistema */ }
+}
+document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 const marca = () => el('div', { class: 'marca' },
   el('img', { src: urlLogo(abertura?.logo_url), alt: abertura?.empresa?.nome ?? 'Logo',
@@ -108,10 +123,28 @@ function telaAtivacao(erro) {
   campo.focus();
 }
 
+// ---------- 0. espera: o que fica na tela do totem entre um cliente e outro ----------
+function espera() {
+  semParada();
+  document.onkeydown = null;
+  estado = {};
+  const comecar = () => { modoTotem(); inicio(); };
+  const painel = el('div', { class: 'painel espera', role: 'button', tabindex: '0', onclick: comecar,
+    onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ' || /^\d$/.test(e.key)) comecar(); } },
+  el('h1', {}, 'Pague sua fatura aqui'),
+  el('p', { class: 'ajuda' }, 'Cartão de débito, crédito e PIX.'),
+  abertura?.mensagem ? el('div', { class: 'recado' }, abertura.mensagem) : null,
+  el('div', { class: 'toque' }, el('span', { class: 'aro' }), el('span', { class: 'dedo' },
+    el('svg', { viewBox: '0 0 24 24' }, el('path', { d: 'M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-2a1.5 1.5 0 0 1 3 0v2m0-1a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-1.5a5 5 0 0 1-4-2l-2.5-3.5a1.6 1.6 0 0 1 2.4-2L9 14' })))),
+  el('div', { class: 'btn principal largo' }, 'Toque para começar'));
+  desenhar(painel);
+  painel.focus();
+}
+
 // ---------- 1. início: digitar o documento ----------
 function inicio() {
-  semParada();
   estado = { documento: '' };
+  contarParada(DIGITANDO_MS);
   const visor = el('div', { class: 'visor vazio' }, 'CPF ou CNPJ');
   const continuar = el('button', { class: 'btn principal largo', disabled: true }, 'Continuar');
   const aviso = el('div');
@@ -177,7 +210,7 @@ function telaFaturas(dados) {
       el('div', { class: 'selo' }, el('svg', { viewBox: '0 0 24 24' }, el('path', { d: 'M5 12.5l5 5 9-10' }))),
       el('h1', {}, 'Tudo em dia!'),
       el('p', { class: 'ajuda' }, `${dados.cliente.nome}, não há faturas em aberto para este CPF/CNPJ.`),
-      el('button', { class: 'btn largo', onclick: () => inicio() }, 'Voltar ao início')));
+      el('button', { class: 'btn largo', onclick: () => espera() }, 'Voltar ao início')));
     contarParada(20_000);
     return;
   }
@@ -217,7 +250,7 @@ function telaFaturas(dados) {
     el('div', { class: 'total' }, el('span', {}, 'Total'), total),
     !abertura.maquininha ? el('div', { class: 'aviso' }, 'Nenhuma maquininha ligada nesta tela. Procure o atendente para pagar.') : null,
     pagar,
-    el('button', { class: 'btn largo', onclick: () => inicio() }, 'Cancelar')));
+    el('button', { class: 'btn largo', onclick: () => espera() }, 'Cancelar')));
 }
 
 // ---------- 3. forma de pagamento ----------
@@ -329,7 +362,7 @@ async function concluir(cobranca) {
     el('pre', { class: 'comprovante' }, recibo.comprovante),
     el('div', { class: 'linha' },
       el('button', { class: 'btn', onclick: () => window.print() }, 'Imprimir'),
-      el('button', { class: 'btn principal', onclick: () => inicio() }, 'Concluir')),
+      el('button', { class: 'btn principal', onclick: () => espera() }, 'Concluir')),
     el('p', { class: 'rodape' }, 'Guarde seu comprovante. Obrigado!')));
   contarParada(FIM_MS);
 }
@@ -344,7 +377,7 @@ function telaErro(mensagem, valor, chamarAtendente = false) {
       estado.faturas?.length && !chamarAtendente
         ? el('button', { class: 'btn', onclick: () => telaFaturas({ cliente: estado.cliente, faturas: estado.faturas }) }, 'Tentar de novo')
         : null,
-      el('button', { class: 'btn principal', onclick: () => inicio() }, 'Voltar ao início'))));
+      el('button', { class: 'btn principal', onclick: () => espera() }, 'Voltar ao início'))));
   contarParada(chamarAtendente ? 180_000 : 45_000);
 }
 
@@ -357,7 +390,7 @@ async function iniciar() {
       el('p', { class: 'ajuda' }, 'A consulta de faturas está fora do ar neste momento. Procure o atendente.')));
     return;
   }
-  inicio();
+  espera();
 }
 
 try { chave = localStorage.getItem(CHAVE); } catch { chave = null; }
