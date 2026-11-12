@@ -61,7 +61,9 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
        aparece UMA vez e digite-o no aparelho ao abrir o endereço terminado em /pdv/;
      - Moradores: defina a senha de 4 números de cada um (é com ela que o morador
        lança a compra na conta pelo terminal);
-     - Produtos: cadastre a mercadoria (ou importe aos poucos, bipando no PDV).
+     - Produtos: monte o catálogo. Se vocês já têm uma planilha, use
+       Produtos > Importar planilha (ou node scripts/importar-produtos.js catalogo.csv)
+       — ele confere tudo antes de gravar. Depois suba as fotos (item 6b).
 
 
 6) CÓPIA DE SEGURANÇA

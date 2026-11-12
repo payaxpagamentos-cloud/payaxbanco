@@ -181,6 +181,29 @@ ficar em dúvida sobre o que foi cobrado.
   que encontrou na prateleira e aplica — cada diferença vira um movimento, com o valor total da sobra/falta.
 * Alertas de reposição por estoque mínimo, com o valor do estoque a custo e a preço de venda.
 
+### Montar o catálogo por planilha
+
+Cadastrar 300 itens um a um não é trabalho para ninguém. Em **Produtos › Importar planilha** (ou pelo
+terminal, com `scripts/importar-produtos.js`) o sistema lê um CSV com o catálogo:
+
+```
+nome;codigo_barras;categoria;fornecedor;unidade;preco;custo;estoque;estoque_minimo;pesavel
+Arroz branco tipo 1 - 5 kg;7891000053508;Mercearia;Distribuidora Central;un;28,90;21,50;24;6;nao
+Banana prata - kg;;Hortifrúti;;kg;7,90;4,60;12;4;sim
+```
+
+* O cabeçalho pode estar em qualquer ordem, com ou sem acento (`Preço de venda`, `Código de barras`, `EAN`,
+  `Qtd`… tudo é reconhecido). Separador `;`, `,` ou tabulação; valores com vírgula decimal.
+* O produto é encontrado pelo **código de barras** e, na falta dele, pelo **nome**: o que já existe é
+  atualizado, o que não existe é criado.
+* A importação é sempre em **duas etapas**. A primeira confere e mostra, linha a linha, o que vai acontecer —
+  quantos produtos novos, o que muda de preço em cada um que já existe e quais linhas estão erradas (com o
+  número da linha). Só depois disso é que se manda gravar, e **com qualquer linha errada nada é gravado**.
+* O estoque de quem já está cadastrado **não** é mexido, a não ser que você marque a opção — e aí a diferença
+  vira um movimento de ajuste, que fica no histórico do produto.
+* Pelo terminal: `node scripts/importar-produtos.js catalogo.csv` confere; `--aplicar` grava; `--estoque`
+  também acerta o estoque; `--modelo` gera uma planilha de exemplo para preencher.
+
 ## Compras
 
 Pedido ao fornecedor (rascunho → enviado → recebido), com **sugestão de reposição** pronta por fornecedor

@@ -5,6 +5,7 @@ const { agora } = require('../db');
 const express = require('express');
 const produtos = require('../lib/produtos');
 const fotos = require('../lib/fotos');
+const importacao = require('../lib/importacao');
 const { naoEncontrado, ErroNegocio } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const v = require('../lib/validacao');
@@ -114,6 +115,28 @@ module.exports = (db, { estoque }) => {
     const p = produtos.atualizar(db, Number(req.params.id), req.body);
     registrar(db, req, 'produto_alterado', p.nome);
     res.json(p);
+  });
+
+  /**
+   * Importação do catálogo por planilha. A planilha sobe como texto CSV mesmo (sem JSON no meio),
+   * e o caminho é sempre em duas etapas: sem `aplicar` só confere e devolve o que mudaria.
+   */
+  r.post('/importar', estoque, express.raw({ type: ['text/csv', 'text/plain'], limit: '2mb' }), (req, res) => {
+    const csv = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body ?? '');
+    const opcoes = {
+      ajustar_estoque: req.query.ajustar_estoque === '1',
+      criar_categorias: req.query.criar_categorias !== '0',
+    };
+    if (req.query.aplicar !== '1') return res.json(importacao.analisar(db, csv, opcoes));
+    const resultado = importacao.aplicar(db, csv, { ...opcoes, usuario_id: req.usuario.id });
+    registrar(db, req, 'catalogo_importado', `${resultado.criados} criados, ${resultado.atualizados} atualizados`);
+    return res.json(resultado);
+  });
+
+  /** Modelo de planilha, para quem vai montar o catálogo do zero. */
+  r.get('/importar/modelo', (_req, res) => {
+    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="modelo-produtos.csv"' });
+    res.send(`\uFEFF${importacao.MODELO}\n`);
   });
 
   /**

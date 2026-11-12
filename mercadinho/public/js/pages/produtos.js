@@ -1,5 +1,5 @@
-import { api } from '../api.js';
-import { el, $, limpar, dinheiro, emReais, qtd, percentual, dataBr, dataHora, icone, tabela, modal, toast, acao, etiqueta, lerForm, opcoes, fotoProduto, reduzirImagem, UNIDADES } from '../ui.js';
+import { api, baixar } from '../api.js';
+import { el, $, limpar, dinheiro, emReais, qtd, percentual, dataBr, dataHora, icone, indicador, tabela, modal, toast, acao, etiqueta, lerForm, opcoes, fotoProduto, reduzirImagem, UNIDADES } from '../ui.js';
 
 /** Cadastro de produtos, categorias e fornecedores. */
 export default async function produtos({ alvo, usuario, definirTitulo }) {
@@ -15,6 +15,7 @@ export default async function produtos({ alvo, usuario, definirTitulo }) {
         el('div', { class: 'abas' }, [['produtos', 'Produtos'], ['categorias', 'Categorias'], ['fornecedores', 'Fornecedores']].map(([chave, rotulo]) =>
           el('button', { class: aba === chave ? 'ativa' : '', onclick: () => { aba = chave; desenhar(); } }, rotulo))),
         podeEditar ? el('div', { class: 'linha' },
+          aba === 'produtos' ? el('button', { class: 'btn', onclick: importar }, icone('baixar'), 'Importar planilha') : null,
           aba === 'produtos' ? el('button', { class: 'btn', onclick: reajuste }, icone('financeiro'), 'Reajustar preços') : null,
           el('button', { class: 'btn primario', onclick: () => (aba === 'produtos' ? editarProduto() : aba === 'categorias' ? editarCategoria() : editarFornecedor()) },
             icone('mais'), aba === 'produtos' ? 'Novo produto' : aba === 'categorias' ? 'Nova categoria' : 'Novo fornecedor')) : null),
@@ -242,6 +243,90 @@ export default async function produtos({ alvo, usuario, definirTitulo }) {
   el('div', { class: 'linha fim' },
     el('button', { type: 'button', class: 'btn fantasma', onclick: () => fechar() }, 'Voltar'),
     el('button', { type: 'submit', class: 'btn primario' }, 'Salvar'))));
+
+  /**
+   * Importação do catálogo por planilha, em duas etapas: confere primeiro (sem gravar nada),
+   * mostra linha a linha o que vai mudar e só então grava.
+   */
+  const importar = () => modal('Importar catálogo por planilha', (fechar) => {
+    let texto = null;
+    let analise = null;
+    const resultado = el('div', {});
+    const ajustarEstoque = el('input', { type: 'checkbox' });
+    const criarCategorias = el('input', { type: 'checkbox', checked: true });
+    const botaoImportar = el('button', { class: 'btn primario', disabled: true, onclick: (e) => acao(e.currentTarget, async () => {
+      const r = await enviarPlanilha(true);
+      toast(`${r.criados} produto(s) criado(s) e ${r.atualizados} atualizado(s).`);
+      fechar();
+      recarregar();
+    }) }, icone('check'), 'Importar');
+
+    const enviarPlanilha = (aplicar) => {
+      const params = new URLSearchParams({
+        ...(aplicar ? { aplicar: '1' } : {}),
+        ...(ajustarEstoque.checked ? { ajustar_estoque: '1' } : {}),
+        ...(criarCategorias.checked ? {} : { criar_categorias: '0' }),
+      });
+      return api.enviarArquivo(`/produtos/importar?${params}`, new Blob([texto], { type: 'text/csv' }));
+    };
+
+    const conferir = async (botao) => {
+      await acao(botao, async () => {
+        analise = await enviarPlanilha(false);
+        botaoImportar.disabled = analise.resumo.erros > 0 || (analise.resumo.criar + analise.resumo.atualizar) === 0;
+        pintarResultado();
+      });
+    };
+
+    const pintarResultado = () => {
+      const { resumo, itens } = analise;
+      const erros = itens.filter((i) => i.acao === 'erro');
+      const alteracoes = itens.filter((i) => i.acao === 'atualizar' && i.mudancas.length);
+      limpar(resultado,
+        el('div', { class: 'grade' },
+          indicador({ simbolo: 'mais', rotulo: 'Produtos novos', valor: String(resumo.criar) }),
+          indicador({ simbolo: 'editar', cor: 'azul', rotulo: 'Já cadastrados', valor: String(resumo.atualizar), nota: `${alteracoes.length} com mudança` }),
+          indicador({ simbolo: 'alerta', cor: resumo.erros ? 'vermelho' : '', rotulo: 'Linhas com erro', valor: String(resumo.erros) })),
+        resumo.categorias_novas.length || resumo.fornecedores_novos.length
+          ? el('p', { class: 'pequeno mudo' }, `Serão criados: ${[...resumo.categorias_novas, ...resumo.fornecedores_novos].join(', ')}.`) : null,
+        erros.length ? el('div', {}, el('h3', {}, 'Corrija na planilha'), tabela([
+          { titulo: 'Linha', celula: (i) => i.linha },
+          { titulo: 'Produto', celula: (i) => i.nome || '—' },
+          { titulo: 'Problema', celula: (i) => i.erro },
+        ], erros)) : null,
+        alteracoes.length ? el('div', {}, el('h3', {}, 'O que muda nos que já existem'), tabela([
+          { titulo: 'Produto', celula: (i) => i.nome },
+          { titulo: 'Mudanças', celula: (i) => i.mudancas.join(' · ') },
+        ], alteracoes.slice(0, 50))) : null,
+        resumo.erros ? el('p', { class: 'etiqueta erro' }, 'Com linhas erradas nada é gravado. Corrija a planilha e confira de novo.') : null);
+    };
+
+    const escolher = el('input', { type: 'file', accept: '.csv,text/csv', onchange: async (e) => {
+      const arquivo = e.target.files?.[0];
+      if (!arquivo) return;
+      const bytes = await arquivo.arrayBuffer();
+      // Planilha do Excel vem em UTF-8 ou Windows-1252: tenta a primeira e cai na segunda.
+      texto = new TextDecoder('utf-8').decode(bytes);
+      if (texto.includes('\uFFFD')) texto = new TextDecoder('windows-1252').decode(bytes);
+      conferir(e.target.parentElement.querySelector('.btn.azul'));
+    } });
+
+    return [
+      el('p', { class: 'mudo' }, 'A planilha precisa de um cabeçalho com, no mínimo, o nome (ou o código de barras) e o preço. '
+        + 'Também lê categoria, fornecedor, unidade, custo, estoque, estoque mínimo e se o produto é pesável.'),
+      el('div', { class: 'linha' },
+        el('button', { class: 'btn pequeno', onclick: (e) => acao(e.currentTarget, () => baixar('/produtos/importar/modelo', 'modelo-produtos.csv')) }, icone('baixar'), 'Baixar modelo'),
+        el('span', { class: 'pequeno mudo' }, 'Separador ; ou , · valores com vírgula decimal')),
+      el('label', { class: 'campo' }, 'Planilha (.csv)', escolher),
+      el('label', { class: 'marcador' }, criarCategorias, 'Criar categorias e fornecedores que ainda não existirem'),
+      el('label', { class: 'marcador' }, ajustarEstoque, 'Acertar o estoque dos produtos pelo valor da planilha (gera movimento de ajuste)'),
+      el('div', { class: 'linha' }, el('button', { class: 'btn azul', onclick: (e) => (texto ? conferir(e.currentTarget) : toast('Escolha a planilha primeiro.', 'erro')) }, 'Conferir planilha')),
+      resultado,
+      el('div', { class: 'linha fim' },
+        el('button', { class: 'btn fantasma', onclick: () => fechar() }, 'Voltar'),
+        botaoImportar),
+    ];
+  }, { largo: true });
 
   const reajuste = () => modal('Reajustar preços', (fechar) => el('form', {
     class: 'form',
