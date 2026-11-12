@@ -12,7 +12,8 @@ import { linkGoogle, configPublica } from './mapa.js';
 
 const TOM = { notificada: 'aviso', condutor_indicado: 'info', em_recurso: 'info', a_pagar: 'erro', paga: 'ok', cancelada: '' };
 const GRAV = { leve: 'Leve', media: 'Média', grave: 'Grave', gravissima: 'Gravíssima' };
-const quandoMulta = (m) => (m.ocorrida_em ? (m.sem_hora ? new Date(m.ocorrida_em).toLocaleDateString('pt-BR') : dataHora(m.ocorrida_em)) : '—');
+const meiaNoiteBrasilia = (iso) => { const d = new Date(iso); return d.getUTCHours() === 3 && d.getUTCMinutes() === 0; };
+const quandoMulta = (m) => (m.ocorrida_em ? (m.sem_hora || meiaNoiteBrasilia(m.ocorrida_em) ? new Date(m.ocorrida_em).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : dataHora(m.ocorrida_em)) : '—');
 const escHtml = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const LOGO = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#04131F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
   + '<path d="M19.07 4.93A10 10 0 0 0 6.99 3.34M4 6h.01M2.29 9.62A10 10 0 1 0 21.31 8.35M16.24 7.76A6 6 0 1 0 8.23 16.67M12 18h.01M17.99 11.66A6 6 0 0 1 15.77 16.67M14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM13.41 10.59l5.66-5.66"/></svg>';
@@ -72,9 +73,12 @@ export async function fichaMulta(m, { placaTxt, origem, condutor } = {}) {
   </div>
   <div class="rodape">${escHtml(origem ?? 'Dados da Central de multas.')} Documento informativo; o auto de infração oficial é o do órgão autuador.</div>
 </div>
-<div class="acoes"><button class="sec" onclick="window.close()">Fechar</button><button onclick="window.print()">Imprimir / salvar PDF</button></div>
+<div class="acoes"><button class="sec" id="fechar">Fechar</button><button id="imprimir">Imprimir / salvar PDF</button></div>
 </body></html>`);
   janela.document.close();
+  // A política de segurança do painel bloqueia scripts escritos na página: os botões são ligados daqui.
+  janela.document.getElementById('imprimir')?.addEventListener('click', () => { janela.focus(); janela.print(); });
+  janela.document.getElementById('fechar')?.addEventListener('click', () => janela.close());
 }
 
 const INTERVALO = { 0: 'só quando alguém consultar (manual)', 1: 'todo dia', 7: 'uma vez por semana', 15: 'a cada 15 dias' };
