@@ -510,6 +510,17 @@ test('Rastreador', async (t) => {
     assert.ok(!('observacao' in minhas[0]));
     // Consultar multas na hora (serviço de consulta simulado): multa nova entra na central; apontamentos aparecem; erro sem serviço.
     assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, cliente)).status, 422, 'sem o serviço contratado');
+    // A consulta roda em segundo plano: o POST devolve o id e a tela acompanha até sair do "consultando".
+    const consultar = async (placaC) => {
+      const ini = await api.post(`${base()}/multas/consultar-placa`, { placa: placaC }, cliente);
+      assert.equal(ini.status, 202);
+      for (let i = 0; i < 50; i++) {
+        const c = (await api.get(`${base()}/multas/consultas/${ini.dados.id}`, cliente)).dados;
+        if (c.status !== 'consultando') return { status: 200, dados: c.resultado, c };
+        await new Promise((ok) => { setTimeout(ok, 50); });
+      }
+      throw new Error('a consulta não terminou');
+    };
     const http = require('node:http');
     const falso = http.createServer((q, s2) => { s2.setHeader('Content-Type', 'application/json'); s2.end(JSON.stringify({
       multas: [{ auto: 'RJ999', descricao: 'Avançar o sinal vermelho', gravidade: 'Gravíssima', valor: '293,47', data_hora: new Date(Date.now() - 86_400_000).toISOString() }],
@@ -518,12 +529,12 @@ test('Rastreador', async (t) => {
     process.env.RASTREADOR_MULTAS_URL = `http://127.0.0.1:${falso.address().port}/`;
     process.env.RASTREADOR_MULTAS_CHAVE = 'teste';
     try {
-      const c1 = await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC-1D23' }, cliente);
+      const c1 = await consultar('ABC-1D23');
       assert.equal(c1.status, 200);
       assert.equal(c1.dados.novas, 1);
       assert.equal(c1.dados.multas[0].gravidade, 'gravissima');
       assert.equal(c1.dados.apontamentos[0].valor_centavos, 120050);
-      assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, cliente)).dados.multas[0].na_central, true, 'segunda vez: já na central');
+      assert.equal((await consultar('ABC1D23')).dados.multas[0].na_central, true, 'segunda vez: já na central');
       const hist = (await api.get(`${base()}/multas/consultas`, operador)).dados;
       assert.equal(hist.ligada, true);
       assert.equal(hist.automatica.intervalo_dias, 0, 'manual por padrão');
@@ -532,8 +543,25 @@ test('Rastreador', async (t) => {
       assert.equal((await api.put('/master/multas/intervalo', { dias: 15 }, master)).dados.intervalo_dias, 15);
       assert.equal((await api.get(`${base()}/multas/consultas`, cliente)).dados.automatica.intervalo_dias, 15);
       assert.equal((await api.put('/master/multas/intervalo', { dias: 0 }, master)).status, 200);
-      assert.ok(hist.consultas.length >= 3);
+      assert.ok(hist.consultas.length >= 2);
       assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, operador)).status, 403, 'operador não consulta');
+      // A fonte fora do ar (504) duas vezes e depois responde: o sistema tenta de novo sozinho.
+      let pedidos = 0;
+      const instavel = http.createServer((q, s3) => { pedidos++; if (pedidos <= 2) { s3.statusCode = 504; return s3.end(); }
+        s3.setHeader('Content-Type', 'application/json'); s3.end(JSON.stringify({ multas: [], apontamentos: [] })); }).listen(0);
+      await new Promise((ok) => instavel.once('listening', ok));
+      process.env.RASTREADOR_MULTAS_URL = `http://127.0.0.1:${instavel.address().port}/`;
+      process.env.RASTREADOR_MULTAS_ESPERA_MS = '20';
+      const c3 = await consultar('XYZ9A88');
+      assert.equal(pedidos, 3);
+      assert.deepEqual(c3.dados.multas, []);
+      pedidos = -10; // agora sempre 504
+      const ini = await api.post(`${base()}/multas/consultar-placa`, { placa: 'QWE1R23' }, cliente);
+      let c4;
+      for (let i = 0; i < 50; i++) { c4 = (await api.get(`${base()}/multas/consultas/${ini.dados.id}`, cliente)).dados; if (c4.status !== 'consultando') break; await new Promise((ok) => { setTimeout(ok, 50); }); }
+      assert.equal(c4.status, 'erro');
+      assert.match(c4.erro, /DETRAN não respondeu/);
+      instavel.close(); delete process.env.RASTREADOR_MULTAS_ESPERA_MS;
     } finally {
       delete process.env.RASTREADOR_MULTAS_URL; delete process.env.RASTREADOR_MULTAS_CHAVE; falso.close();
     }

@@ -690,7 +690,8 @@ CREATE TABLE IF NOT EXISTS multas_consultas (
   novas INTEGER NOT NULL DEFAULT 0,
   resultado TEXT,
   erro TEXT,
-  criado_em TEXT NOT NULL
+  criado_em TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ok'
 );
 CREATE INDEX IF NOT EXISTS ix_multas_consultas ON multas_consultas (empresa_id, id);
 CREATE TABLE IF NOT EXISTS multa_arquivos (
@@ -791,6 +792,7 @@ function migrar(db) {
     seguros_tipos: { custo_centavos: 'INTEGER' },
     empresa_seguros: { margem_percent: 'REAL NOT NULL DEFAULT 0' },
     seguros_contratacoes: { custo_centavos: 'INTEGER', margem_percent: 'REAL', usuario_final_id: 'INTEGER' },
+    multas_consultas: { status: "TEXT NOT NULL DEFAULT 'ok'" },
   };
   for (const [tabela, cols] of Object.entries(NOVAS)) {
     const tem = colunas(tabela);
