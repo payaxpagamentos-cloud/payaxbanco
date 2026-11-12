@@ -360,15 +360,26 @@ td.direita, th.direita{ text-align: right; }
  * A foto da loja ocupa a tela inteira e o cartão de acesso flutua sobre ela.
  * Fica sempre no escuro da marca, mesmo com o tema claro escolhido. */
 .entrada{
+  position: relative;
   min-height: 100vh; display: grid; align-items: center; justify-items: end;
   padding: clamp(16px, 4vh, 40px) clamp(16px, 5vw, 72px);
   background: #011829; color: #E7F4F1;
+}
+/* A marca fica no alto, fora do fluxo, para não disputar espaço com o cartão. */
+.entrada .topo-entrada{
+  position: absolute; z-index: 2;
+  top: clamp(18px, 3.4vh, 34px); left: clamp(16px, 5vw, 56px);
+}
+.entrada .topo-entrada .logo{
+  display: block; width: clamp(140px, 13.5vw, 196px); height: auto;
+  filter: drop-shadow(0 8px 22px rgba(0,0,0,.65));
 }
 /* A foto em tamanho natural à esquerda, com um véu que a dissolve no escuro da marca
  * antes de chegar ao cartão — assim não há corte visível nem deformação da loja. */
 .entrada::before{
   content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
+    linear-gradient(180deg, rgba(1,18,30,.58) 0%, rgba(1,18,30,.18) 14%, rgba(1,18,30,0) 26%),
     linear-gradient(96deg, rgba(1,18,30,.06) 0%, rgba(1,18,30,.20) 45%, rgba(1,18,30,.42) 80%),
     url("../img/loja.webp") left center / auto 100% no-repeat;
 }

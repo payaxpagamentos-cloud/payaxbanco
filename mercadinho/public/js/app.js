@@ -100,7 +100,12 @@ function telaLogin(erro) {
     });
   }
 
+  const nome = estado.publico.nome_mercado || 'Mercado Binho';
+
   limpar($('#app'), el('div', { class: 'entrada' },
+    el('header', { class: 'topo-entrada' },
+      el('img', { class: 'logo', src: `${RAIZ}/img/binho-logo.png`, alt: nome })),
+
     el('div', { class: 'painel-entrada' },
       el('div', { class: 'cartao caixa' },
         el('span', { class: 'selo-entrada' }, icone('entrar')),
