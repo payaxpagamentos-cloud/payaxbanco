@@ -30,9 +30,14 @@ function criarApp(db) {
 
   // Tudo é servido em MERCADO_BASE_PATH (ex.: /mercadinho): as páginas e a API em <endereço>/api.
   const r = express.Router();
-  r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  r.use(['/api/auth/login', '/api/terminal/parear'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  // Tentativas de senha do morador no terminal: o limite por morador fica em lib/terminal.js.
+  r.use('/api/terminal/venda', limitar({ janelaMs: 60_000, maximo: 120 }));
   r.use(express.json({ limit: '256kb' }));
   r.use('/api', criarApi(db));
+  // "/pdv" sem a barra final leva a "/pdv/" (a tela do terminal usa caminhos relativos à pasta).
+  // A rota casa com as duas formas, então só redireciona quando a barra realmente falta.
+  r.get('/pdv', (req, res, next) => (req.originalUrl.split('?')[0].endsWith('/') ? next() : res.redirect(`${req.baseUrl}/pdv/`)));
   r.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: config.producao ? '1h' : 0 }));
 
   if (config.basePath) {

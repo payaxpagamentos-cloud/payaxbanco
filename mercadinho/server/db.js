@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS moradores (
   -- Limite da conta do mês (fiado). NULL usa o limite padrão das configurações.
   limite_centavos INTEGER CHECK (limite_centavos IS NULL OR limite_centavos >= 0),
   fiado_liberado INTEGER NOT NULL DEFAULT 1,
+  -- Senha numérica que o morador digita no terminal para lançar a compra na conta.
+  pin_hash TEXT,
   ativo INTEGER NOT NULL DEFAULT 1,
   observacao TEXT,
   criado_em TEXT NOT NULL,
@@ -160,10 +162,25 @@ CREATE TABLE IF NOT EXISTS caixa_mov (
 );
 CREATE INDEX IF NOT EXISTS idx_caixa_mov ON caixa_mov(caixa_id, id);
 
+-- Terminais de autoatendimento (o tablet/computador do balcão). O aparelho é pareado uma vez
+-- com um código gerado pela administração e passa a usar um token próprio, sem senha de ninguém.
+CREATE TABLE IF NOT EXISTS terminais (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  codigo_hash TEXT NOT NULL,
+  pareado_em TEXT,
+  ultimo_uso TEXT,
+  ultimo_ip TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id)
+);
+
 CREATE TABLE IF NOT EXISTS vendas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   caixa_id INTEGER REFERENCES caixas(id),
   usuario_id INTEGER REFERENCES usuarios(id),
+  terminal_id INTEGER REFERENCES terminais(id),
   morador_id INTEGER REFERENCES moradores(id),
   origem TEXT NOT NULL DEFAULT 'pdv' CHECK (origem IN ('pdv','autoatendimento')),
   status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','paga','cancelada')),
@@ -205,6 +222,9 @@ CREATE TABLE IF NOT EXISTS pagamentos (
   troco_centavos INTEGER NOT NULL DEFAULT 0,
   parcelas INTEGER NOT NULL DEFAULT 1 CHECK (parcelas BETWEEN 1 AND 12),
   transacao_id INTEGER REFERENCES transacoes_cartao(id),
+  -- Pagamento do terminal confirmado pelo próprio cliente (PIX): a gestão confere depois no extrato.
+  conferido_em TEXT,
+  conferido_por INTEGER REFERENCES usuarios(id),
   criado_em TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pagamentos_venda ON pagamentos(venda_id);
@@ -371,8 +391,12 @@ const CONFIG_PADRAO = {
   margem_padrao_bp: '3500',
   // Deixa a venda sair mesmo sem saldo no estoque (útil enquanto o cadastro está sendo ajustado).
   permitir_estoque_negativo: '0',
-  // Modo autoatendimento: o próprio morador registra a compra e lança na conta.
-  autoatendimento: '0',
+  // Formas que o terminal do cliente aceita (dinheiro fica de fora: não há quem dê troco).
+  terminal_pix: '1',
+  terminal_cartao: '1',
+  terminal_conta: '1',
+  // Segundos até o terminal voltar sozinho para a tela inicial depois da compra.
+  terminal_segundos_fim: '12',
   pix_chave: '',
   pix_recebedor: 'MERCADINHO DO CONDOMINIO',
   pix_cidade: 'SAO PAULO',
@@ -380,11 +404,27 @@ const CONFIG_PADRAO = {
 
 const agora = () => new Date().toISOString();
 
+/** Colunas acrescentadas depois da primeira versão: entram sozinhas em bancos que já existem. */
+const COLUNAS_NOVAS = [
+  ['moradores', 'pin_hash', 'TEXT'],
+  ['vendas', 'terminal_id', 'INTEGER REFERENCES terminais(id)'],
+  ['pagamentos', 'conferido_em', 'TEXT'],
+  ['pagamentos', 'conferido_por', 'INTEGER REFERENCES usuarios(id)'],
+];
+
+function migrar(db) {
+  for (const [tabela, coluna, tipo] of COLUNAS_NOVAS) {
+    const existe = db.prepare(`SELECT 1 FROM pragma_table_info(?) WHERE name = ?`).get(tabela, coluna);
+    if (!existe) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
+  }
+}
+
 function abrir(arquivo = config.dbFile) {
   if (arquivo !== ':memory:') fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   const db = new DatabaseSync(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+  migrar(db);
 
   const cat = db.prepare('INSERT OR IGNORE INTO categorias (nome, cor) VALUES (?, ?)');
   for (const c of CATEGORIAS_PADRAO) cat.run(...c);
@@ -433,7 +473,10 @@ function lerConfig(db) {
     alerta_validade_dias: Number(c.alerta_validade_dias),
     margem_padrao_bp: Number(c.margem_padrao_bp),
     permitir_estoque_negativo: c.permitir_estoque_negativo === '1',
-    autoatendimento: c.autoatendimento === '1',
+    terminal_pix: c.terminal_pix === '1',
+    terminal_cartao: c.terminal_cartao === '1',
+    terminal_conta: c.terminal_conta === '1',
+    terminal_segundos_fim: Number(c.terminal_segundos_fim),
     pix_chave: c.pix_chave,
     pix_recebedor: c.pix_recebedor,
     pix_cidade: c.pix_cidade,

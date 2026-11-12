@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { el, $, limpar, dinheiro, emReais, percentual, dataHora, icone, tabela, modal, toast, acao, etiqueta, lerForm, opcoes, PERFIS } from '../ui.js';
+import { el, $, limpar, dinheiro, emReais, percentual, dataHora, icone, tabela, modal, toast, acao, etiqueta, lerForm, opcoes, confirmar, PERFIS } from '../ui.js';
 
 const PROVEDORES = {
   simulado: 'Simulada (testes) — aprova tudo sem maquininha de verdade',
@@ -15,7 +15,7 @@ export default async function configuracoes({ alvo, usuario, definirTitulo }) {
   function desenhar() {
     definirTitulo('Configurações', 'Loja, maquininhas e equipe');
     limpar(alvo,
-      el('div', { class: 'abas' }, [['loja', 'Loja'], ['maquininhas', 'Maquininhas'], ...(ehAdmin ? [['usuarios', 'Usuários']] : []), ['auditoria', 'Auditoria']].map(([chave, rotulo]) =>
+      el('div', { class: 'abas' }, [['loja', 'Loja'], ['terminais', 'Terminais'], ['maquininhas', 'Maquininhas'], ...(ehAdmin ? [['usuarios', 'Usuários']] : []), ['auditoria', 'Auditoria']].map(([chave, rotulo]) =>
         el('button', { class: aba === chave ? 'ativa' : '', onclick: () => { aba = chave; desenhar(); } }, rotulo))),
       el('div', { id: 'corpo' }));
     recarregar();
@@ -24,6 +24,7 @@ export default async function configuracoes({ alvo, usuario, definirTitulo }) {
   async function recarregar() {
     const corpo = $('#corpo');
     if (aba === 'loja') return loja(corpo);
+    if (aba === 'terminais') return terminais(corpo);
     if (aba === 'maquininhas') return maquininhas(corpo);
     if (aba === 'usuarios') return usuarios(corpo);
     return auditoria(corpo);
@@ -45,6 +46,10 @@ export default async function configuracoes({ alvo, usuario, definirTitulo }) {
             alerta_validade_dias: Number(d.alerta_validade_dias),
             margem_padrao_bp: Math.round(Number(String(d.margem_padrao).replace(',', '.')) * 100),
             permitir_estoque_negativo: e.target.permitir_estoque_negativo.checked,
+            terminal_pix: e.target.terminal_pix.checked,
+            terminal_cartao: e.target.terminal_cartao.checked,
+            terminal_conta: e.target.terminal_conta.checked,
+            terminal_segundos_fim: Number(d.terminal_segundos_fim),
           });
           toast('Configurações salvas.');
         });
@@ -73,8 +78,73 @@ export default async function configuracoes({ alvo, usuario, definirTitulo }) {
         el('label', { class: 'campo' }, 'Margem sugerida nas compras (%)', el('input', { name: 'margem_padrao', inputmode: 'decimal', value: (c.margem_padrao_bp / 100).toString().replace('.', ',') }))),
       el('label', { class: 'marcador' }, el('input', { type: 'checkbox', name: 'permitir_estoque_negativo', checked: c.permitir_estoque_negativo ? true : null }),
         'Deixar vender sem saldo no estoque (usar só enquanto o cadastro está sendo ajustado)'),
+
+      el('h2', {}, 'Terminal do cliente'),
+      el('p', { class: 'pequeno mudo', style: 'margin-top: -8px' }, 'Formas de pagamento que o terminal do balcão oferece. Dinheiro não entra: não há quem dê troco.'),
+      el('label', { class: 'marcador' }, el('input', { type: 'checkbox', name: 'terminal_pix', checked: c.terminal_pix ? true : null }), 'PIX (QR Code na tela)'),
+      el('label', { class: 'marcador' }, el('input', { type: 'checkbox', name: 'terminal_cartao', checked: c.terminal_cartao ? true : null }), 'Cartão na maquininha'),
+      el('label', { class: 'marcador' }, el('input', { type: 'checkbox', name: 'terminal_conta', checked: c.terminal_conta ? true : null }), 'Conta do morador (com senha de 4 números)'),
+      el('label', { class: 'campo' }, 'Segundos na tela de "compra concluída"', el('input', { name: 'terminal_segundos_fim', type: 'number', min: 3, max: 120, value: c.terminal_segundos_fim })),
       el('button', { class: 'btn primario' }, icone('check'), 'Salvar configurações'))));
   }
+
+  /* ---------- terminais do balcão ---------- */
+  async function terminais(corpo) {
+    const lista = await api.get('/admin/terminais');
+    limpar(corpo, el('section', { class: 'cartao' },
+      el('div', { class: 'linha entre' },
+        el('h2', {}, 'Terminais de autoatendimento'),
+        el('button', { class: 'btn primario', onclick: novoTerminal }, icone('mais'), 'Novo terminal')),
+      el('p', { class: 'pequeno mudo' }, 'O terminal é a tela do balcão em que o próprio cliente passa os produtos e paga. '
+        + 'Abra o endereço do sistema com /pdv no fim (por exemplo, https://seu-dominio/mercadinho/pdv/) no aparelho e digite o código de pareamento uma única vez.'),
+      tabela([
+        { titulo: 'Terminal', celula: (t) => el('span', {}, el('div', { class: 'destaque' }, t.nome),
+          el('div', { class: 'pequeno mudo' }, t.pareado_em ? `pareado em ${dataHora(t.pareado_em)}` : 'aguardando pareamento')) },
+        { titulo: 'Último uso', celula: (t) => dataHora(t.ultimo_uso) },
+        { titulo: 'Compras', direita: true, celula: (t) => t.vendas },
+        { titulo: 'Situação', direita: true, celula: (t) => etiqueta(t.ativo ? 'ativo' : 'desativado', t.ativo ? 'ok' : 'erro') },
+        { titulo: '', direita: true, celula: (t) => el('span', { class: 'linha fim' },
+          el('button', { class: 'btn pequeno', onclick: (e) => { e.stopPropagation(); novoCodigo(t); } }, 'Novo código'),
+          el('button', { class: 'btn pequeno', onclick: async (e) => {
+            e.stopPropagation();
+            if (t.ativo && !await confirmar('Desativar o terminal?', 'O aparelho para de funcionar na hora e precisa de um código novo para voltar.', 'Desativar', true)) return;
+            await api.patch(`/admin/terminais/${t.id}`, { ativo: !t.ativo });
+            recarregar();
+          } }, t.ativo ? 'Desativar' : 'Ativar')) },
+      ], lista, { vazio: 'Nenhum terminal cadastrado ainda.' })));
+  }
+
+  const mostrarCodigo = (nome, codigo) => modal('Código de pareamento', (fechar) => [
+    el('p', { class: 'mudo' }, `Digite este código no terminal "${nome}". Ele aparece uma única vez — se perder, gere outro.`),
+    el('div', { class: 'cartao sem-brilho centro', style: 'padding: 26px' },
+      el('div', { class: 'display', style: 'font-size: 38px; letter-spacing: .18em' }, codigo)),
+    el('p', { class: 'pequeno mudo' }, 'No aparelho do balcão, abra o endereço do sistema terminado em /pdv/ e informe o código.'),
+    el('div', { class: 'linha fim' }, el('button', { class: 'btn primario', onclick: () => fechar() }, 'Anotei')),
+  ]);
+
+  const novoTerminal = () => modal('Novo terminal', (fechar) => el('form', {
+    class: 'form',
+    onsubmit: async (e) => {
+      e.preventDefault();
+      await acao(e.target.querySelector('button[type=submit]'), async () => {
+        const r = await api.post('/admin/terminais', lerForm(e.target));
+        fechar();
+        recarregar();
+        mostrarCodigo(r.terminal.nome, r.codigo);
+      });
+    },
+  },
+  el('label', { class: 'campo' }, 'Nome', el('input', { name: 'nome', required: true, autofocus: true, placeholder: 'Ex.: Balcão do mercadinho' })),
+  el('div', { class: 'linha fim' },
+    el('button', { type: 'button', class: 'btn fantasma', onclick: () => fechar() }, 'Voltar'),
+    el('button', { type: 'submit', class: 'btn primario' }, 'Cadastrar'))));
+
+  const novoCodigo = async (t) => {
+    if (!await confirmar('Gerar um código novo?', `O terminal "${t.nome}" para de funcionar até ser pareado de novo com o código novo.`, 'Gerar código')) return;
+    const r = await api.post(`/admin/terminais/${t.id}/codigo`, {});
+    recarregar();
+    mostrarCodigo(t.nome, r.codigo);
+  };
 
   /* ---------- maquininhas ---------- */
   async function maquininhas(corpo) {

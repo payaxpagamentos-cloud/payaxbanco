@@ -1,0 +1,117 @@
+/* Terminal do balcão: tela única, letras grandes e alvos de toque largos. Usa as mesmas cores do vidro.css. */
+:root{ --raio-terminal: 26px; }
+
+body.terminal{ font-size: 17px; overflow: hidden; }
+.terminal-tela{ min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ---------- cabeçalho fixo ---------- */
+.terminal-topo{
+  display: flex; align-items: center; gap: 14px; padding: 18px 28px;
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+  backdrop-filter: var(--desfoque); -webkit-backdrop-filter: var(--desfoque);
+  border-bottom: 1px solid var(--vidro-borda);
+}
+.terminal-topo .marca .nome{ font-size: 17px; }
+.terminal-topo .passo{ margin-left: auto; font-size: 13px; color: var(--texto-3); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+
+.terminal-corpo{ flex: 1; display: flex; flex-direction: column; padding: 26px 28px 32px; gap: 20px; min-height: 0; }
+@media (max-width: 760px){ .terminal-corpo{ padding: 16px; gap: 14px; } .terminal-topo{ padding: 14px 16px; } }
+
+/* ---------- tela de espera ---------- */
+.espera{ flex: 1; display: grid; place-items: center; text-align: center; }
+.espera .conteudo-espera{ max-width: 680px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.espera h1{ font-size: clamp(32px, 5vw, 54px); margin: 0; }
+.espera h1 em{ font-style: normal; background: linear-gradient(120deg, var(--acento), var(--acento-2) 60%, var(--acento-3));
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
+.espera p{ font-size: clamp(16px, 2vw, 21px); color: var(--texto-2); margin: 0; }
+/* Alvo do leitor: o anel pulsa para o cliente entender onde passar o produto. */
+.alvo-leitor{
+  width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center; color: var(--acento);
+  background: radial-gradient(circle at 50% 40%, rgba(43,232,176,.3), transparent 70%);
+  border: 2px solid rgba(43,232,176,.5); animation: pulsar 2.4s ease-in-out infinite;
+}
+.alvo-leitor svg{ width: 64px; height: 64px; }
+@keyframes pulsar{ 0%, 100%{ box-shadow: 0 0 0 0 rgba(43,232,176,.35); } 50%{ box-shadow: 0 0 0 26px rgba(43,232,176,0); } }
+
+/* ---------- carrinho ---------- */
+.compra{ flex: 1; display: grid; grid-template-columns: 1fr 400px; gap: 20px; min-height: 0; }
+@media (max-width: 1000px){ .compra{ grid-template-columns: 1fr; } }
+.compra .lista{ display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden; }
+.compra .lista .cabecalho{ display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--vidro-borda); }
+.compra .lista .itens{ overflow-y: auto; padding: 8px 12px 16px; flex: 1; }
+.item-compra{ display: flex; align-items: center; gap: 16px; padding: 16px 12px; border-radius: 18px; animation: surgir .22s ease both; }
+.item-compra + .item-compra{ border-top: 1px solid var(--vidro-borda); }
+.item-compra .nome{ font-size: 18px; font-weight: 700; }
+.item-compra .detalhe{ font-size: 14px; color: var(--texto-3); }
+.item-compra .valor{ font-family: var(--display); font-size: 21px; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.item-compra .btn{ min-height: 48px; }
+.item-novo{ background: linear-gradient(90deg, rgba(43,232,176,.18), transparent 70%); }
+
+.resumo{ display: flex; flex-direction: column; gap: 14px; }
+.resumo .valor-total{ font-family: var(--display); font-size: clamp(42px, 6vw, 60px); font-weight: 600; letter-spacing: -.055em; line-height: 1; font-variant-numeric: tabular-nums; }
+.resumo .rotulo-total{ font-size: 13px; text-transform: uppercase; letter-spacing: .14em; color: var(--texto-3); font-weight: 800; }
+.btn.enorme{ min-height: 72px; font-size: 21px; border-radius: 999px; width: 100%; }
+.btn.enorme svg{ width: 24px; height: 24px; }
+
+/* ---------- formas de pagamento ---------- */
+.escolha-pagamento{ display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 18px; }
+.opcao-pagamento{
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 34px 20px; cursor: pointer;
+  border-radius: var(--raio-terminal); background: var(--vidro-forte); border: 1px solid var(--vidro-borda);
+  font-size: 20px; font-weight: 750; color: var(--texto); box-shadow: var(--brilho);
+  transition: transform .16s cubic-bezier(.2,.8,.3,1), border-color .16s ease;
+}
+.opcao-pagamento:hover{ transform: translateY(-3px); border-color: var(--acento); }
+.opcao-pagamento .circulo{ width: 72px; height: 72px; border-radius: 26px; display: grid; place-items: center; color: var(--tinta);
+  background: linear-gradient(145deg, #6BF7D0, var(--acento) 50%, var(--acento-2)); box-shadow: 0 14px 34px -14px var(--acento); }
+.opcao-pagamento .circulo svg{ width: 34px; height: 34px; }
+.opcao-pagamento small{ font-size: 14px; font-weight: 600; color: var(--texto-3); }
+
+/* ---------- PIX / cartão ---------- */
+.painel-pagar{ display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; padding: 30px; }
+.painel-pagar .qr{ width: min(330px, 70vw); border-radius: 22px; background: #fff; padding: 14px; box-shadow: 0 24px 60px -28px rgba(0,0,0,.9); }
+.painel-pagar .valor{ font-family: var(--display); font-size: 42px; letter-spacing: -.05em; }
+.copia-cola{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; word-break: break-all; max-width: 560px; color: var(--texto-3); }
+.aguardando{ display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px; }
+.aguardando .girando{ width: 46px; height: 46px; border-width: 4px; }
+
+/* ---------- teclado numérico ---------- */
+.teclado-numerico{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: min(340px, 100%); margin: 0 auto; }
+.teclado-numerico button{
+  min-height: 68px; font-size: 26px; font-weight: 700; border-radius: 20px; cursor: pointer;
+  background: var(--vidro-forte); border: 1px solid var(--vidro-borda); color: var(--texto); box-shadow: var(--brilho);
+  transition: transform .1s ease, border-color .12s ease;
+}
+.teclado-numerico button:hover{ border-color: var(--vidro-borda-forte); }
+.teclado-numerico button:active{ transform: scale(.96); }
+.teclado-numerico button.apagar{ color: var(--aviso); }
+.teclado-numerico button.confirmar{ background: linear-gradient(135deg, #5DF3C6, var(--acento) 50%, #0FBF93); color: var(--tinta); border-color: transparent; }
+.visor{ font-family: var(--display); font-size: 40px; letter-spacing: .1em; text-align: center; min-height: 58px; font-variant-numeric: tabular-nums; }
+.visor.vazio{ color: var(--texto-3); letter-spacing: -.03em; font-size: 20px; }
+.pontos-pin{ display: flex; gap: 14px; justify-content: center; }
+.pontos-pin span{ width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--vidro-borda-forte); }
+.pontos-pin span.cheio{ background: var(--acento); border-color: var(--acento); box-shadow: 0 0 14px -2px var(--acento); }
+
+/* ---------- escolha de produto sem código ---------- */
+.grade-produtos{ display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; overflow-y: auto; padding: 4px; max-height: 60vh; }
+.cartao-produto{ display: flex; flex-direction: column; gap: 6px; padding: 18px; border-radius: 20px; cursor: pointer; text-align: left;
+  background: var(--vidro-forte); border: 1px solid var(--vidro-borda); color: var(--texto); box-shadow: var(--brilho); }
+.cartao-produto:hover{ border-color: var(--acento); transform: translateY(-2px); }
+.cartao-produto .nome{ font-weight: 700; font-size: 16px; line-height: 1.25; }
+.cartao-produto .preco{ font-family: var(--display); font-size: 19px; letter-spacing: -.04em; color: var(--acento); }
+.cartao-produto .cat{ font-size: 12px; color: var(--texto-3); text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
+
+/* ---------- fim ---------- */
+.fim{ flex: 1; display: grid; place-items: center; text-align: center; }
+.fim .selo-ok{ width: 120px; height: 120px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 10px;
+  background: linear-gradient(145deg, #6BF7D0, var(--acento)); color: var(--tinta); box-shadow: 0 20px 50px -18px var(--acento);
+  animation: entrar-selo .45s cubic-bezier(.2,.9,.3,1.2) both; }
+.fim .selo-ok svg{ width: 58px; height: 58px; }
+@keyframes entrar-selo{ from{ transform: scale(.4); opacity: 0; } to{ transform: none; opacity: 1; } }
+.fim h1{ font-size: clamp(30px, 4.6vw, 48px); margin: 0; }
+.contagem{ font-size: 14px; color: var(--texto-3); }
+
+/* ---------- aviso de inatividade ---------- */
+.inatividade{ position: fixed; inset: 0; z-index: 150; display: grid; place-items: center; padding: 20px;
+  background: rgba(3,6,14,.72); backdrop-filter: blur(10px); animation: surgir .2s ease; }
+.inatividade .cartao{ max-width: 460px; text-align: center; padding: 32px; }

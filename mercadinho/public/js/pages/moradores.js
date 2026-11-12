@@ -71,9 +71,12 @@ export default async function moradores({ alvo, usuario, definirTitulo }) {
         indicador({ simbolo: 'cartao', cor: 'azul', rotulo: 'Limite', valor: dinheiro(m.limite_centavos), nota: `disponível ${dinheiro(m.disponivel_centavos)}` }),
         indicador({ simbolo: 'compras', cor: 'roxo', rotulo: 'Consumo do mês', valor: dinheiro(m.consumo_do_mes.total_centavos), nota: `${m.consumo_do_mes.compras} compra(s)` })),
       el('p', { class: 'pequeno mudo' }, [m.telefone, m.email, m.acesso ? `portal: ${m.acesso.email}` : 'sem acesso ao portal', m.observacao].filter(Boolean).join(' · ')),
+      el('p', { class: 'linha pequeno' }, 'Terminal do balcão:',
+        m.tem_pin ? etiqueta('senha cadastrada', 'ok') : etiqueta('sem senha — não compra na conta pelo terminal', 'aviso')),
       el('div', { class: 'linha' },
         el('button', { class: 'btn primario pequeno', onclick: () => { fechar(); receber(m); } }, icone('dinheiro'), 'Receber pagamento'),
         el('button', { class: 'btn pequeno', onclick: () => { fechar(); editar(m); } }, icone('editar'), 'Editar'),
+        gestao ? el('button', { class: 'btn pequeno', onclick: () => { fechar(); senhaTerminal(m); } }, icone('caixa'), m.tem_pin ? 'Trocar senha do terminal' : 'Criar senha do terminal') : null,
         gestao ? el('button', { class: 'btn pequeno', onclick: () => { fechar(); ajuste(m); } }, 'Ajuste manual') : null,
         gestao ? el('button', { class: 'btn pequeno', onclick: () => { fechar(); acesso(m); } }, icone('usuarios'), m.acesso ? 'Trocar acesso' : 'Criar acesso') : null),
       m.faturas.length ? el('div', {}, el('h3', {}, 'Faturas'), tabela([
@@ -167,6 +170,37 @@ export default async function moradores({ alvo, usuario, definirTitulo }) {
   el('div', { class: 'linha fim' },
     el('button', { type: 'button', class: 'btn fantasma', onclick: () => fechar() }, 'Voltar'),
     el('button', { type: 'submit', class: 'btn primario' }, 'Lançar'))));
+
+  /** Senha numérica que o morador digita no terminal do balcão para comprar na conta. */
+  const senhaTerminal = (m) => modal(`Senha do terminal — ${m.nome}`, (fechar) => el('form', {
+    class: 'form',
+    onsubmit: async (e) => {
+      e.preventDefault();
+      const d = lerForm(e.target);
+      if (d.pin !== d.repetir) return toast('As duas senhas estão diferentes.', 'erro');
+      await acao(e.target.querySelector('button[type=submit]'), async () => {
+        await api.post(`/moradores/${m.id}/pin`, { pin: d.pin });
+        toast('Senha do terminal definida. Passe o número ao morador.');
+        fechar();
+        recarregar();
+      });
+    },
+  },
+  el('p', { class: 'mudo' }, 'Com esta senha o morador identifica a conta dele no terminal e lança a compra na fatura do mês. '
+    + 'São de 4 a 8 números — evite datas óbvias e números repetidos.'),
+  el('div', { class: 'duas' },
+    el('label', { class: 'campo' }, 'Senha', el('input', { name: 'pin', inputmode: 'numeric', pattern: '[0-9]{4,8}', maxlength: 8, required: true, autofocus: true, placeholder: '0000' })),
+    el('label', { class: 'campo' }, 'Repita a senha', el('input', { name: 'repetir', inputmode: 'numeric', pattern: '[0-9]{4,8}', maxlength: 8, required: true }))),
+  el('div', { class: 'linha entre' },
+    m.tem_pin ? el('button', { type: 'button', class: 'btn perigo pequeno', onclick: async () => {
+      await api.post(`/moradores/${m.id}/pin`, { pin: null });
+      toast('Senha removida.');
+      fechar();
+      recarregar();
+    } }, 'Remover senha') : el('span', {}),
+    el('div', { class: 'linha' },
+      el('button', { type: 'button', class: 'btn fantasma', onclick: () => fechar() }, 'Voltar'),
+      el('button', { type: 'submit', class: 'btn primario' }, 'Salvar senha')))));
 
   const acesso = (m) => modal(`Acesso ao portal — ${m.nome}`, (fechar) => el('form', {
     class: 'form',

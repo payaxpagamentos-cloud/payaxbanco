@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const moradores = require('../lib/moradores');
+const terminal = require('../lib/terminal');
 const { hashSenha } = require('../lib/senha');
 const { agora } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
@@ -60,6 +61,7 @@ module.exports = (db, { equipe, gestao }) => {
       extrato: moradores.extrato(db, m.id),
       faturas: moradores.faturas(db, { morador_id: m.id }),
       acesso: db.prepare('SELECT id, email, ativo, ultimo_acesso FROM usuarios WHERE morador_id = ?').get(m.id) ?? null,
+      tem_pin: Boolean(db.prepare('SELECT pin_hash FROM moradores WHERE id = ?').get(m.id).pin_hash),
     });
   });
 
@@ -112,6 +114,17 @@ module.exports = (db, { equipe, gestao }) => {
     });
     registrar(db, req, 'morador_ajuste', `#${req.params.id} ${sinal} ${req.body.valor}`);
     res.json(moradores.obter(db, Number(req.params.id)));
+  });
+
+  /**
+   * Senha numérica que o morador digita no terminal para comprar na conta.
+   * Enviar vazio apaga a senha (e a conta deixa de ser usada no balcão).
+   */
+  r.post('/:id/pin', gestao, (req, res) => {
+    const vazio = req.body.pin === null || String(req.body.pin ?? '').trim() === '';
+    const r2 = terminal.definirPin(db, Number(req.params.id), vazio ? null : req.body.pin);
+    registrar(db, req, r2.pin ? 'morador_pin_definido' : 'morador_pin_removido', `#${req.params.id}`);
+    res.json(r2);
   });
 
   /** Cria (ou atualiza) o acesso do morador ao portal. */

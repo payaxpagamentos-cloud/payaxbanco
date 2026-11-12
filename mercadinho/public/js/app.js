@@ -1,8 +1,7 @@
 import { api, sessao } from './api.js';
 import { el, $, limpar, icone, iniciais, toast, modal, acao, lerForm, marca, PERFIS } from './ui.js';
 import painel from './pages/painel.js';
-import pdv from './pages/pdv.js';
-import caixa from './pages/caixa.js';
+import vendas from './pages/vendas.js';
 import produtos from './pages/produtos.js';
 import estoque from './pages/estoque.js';
 import compras from './pages/compras.js';
@@ -16,8 +15,7 @@ const EQUIPE = ['admin', 'gerente', 'caixa', 'estoque'];
 const MENU = [
   { secao: 'Dia a dia' },
   { rota: 'painel', rotulo: 'Painel', icone: 'painel', pagina: painel, perfis: EQUIPE },
-  { rota: 'pdv', rotulo: 'PDV — frente de caixa', icone: 'pdv', pagina: pdv, perfis: ['admin', 'gerente', 'caixa'] },
-  { rota: 'caixa', rotulo: 'Caixa', icone: 'caixa', pagina: caixa, perfis: ['admin', 'gerente', 'caixa'] },
+  { rota: 'vendas', rotulo: 'Vendas do terminal', icone: 'pdv', pagina: vendas, perfis: ['admin', 'gerente', 'caixa'] },
   { secao: 'Mercadoria' },
   { rota: 'produtos', rotulo: 'Produtos', icone: 'produtos', pagina: produtos, perfis: EQUIPE },
   { rota: 'estoque', rotulo: 'Estoque', icone: 'estoque', pagina: estoque, perfis: EQUIPE },
@@ -35,7 +33,7 @@ const MENU_MORADOR = [
 
 const estado = { usuario: null, publico: { nome_mercado: 'Mercadinho' }, limparPagina: null };
 const itens = () => (estado.usuario?.perfil === 'morador' ? MENU_MORADOR : MENU).filter((m) => m.secao || m.perfis.includes(estado.usuario.perfil));
-const rotaPadrao = () => (estado.usuario?.perfil === 'morador' ? 'minha-conta' : estado.usuario?.perfil === 'caixa' ? 'pdv' : 'painel');
+const rotaPadrao = () => (estado.usuario?.perfil === 'morador' ? 'minha-conta' : 'painel');
 
 /* ---------- tema ---------- */
 const temaSalvo = () => { try { return localStorage.getItem('mercadinho.tema'); } catch { return null; } };

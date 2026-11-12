@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const { agora, lerConfig, gravarConfig, CONFIG_PADRAO } = require('../db');
 const maquininha = require('../lib/maquininha');
+const terminais = require('../lib/terminal');
 const { hashSenha } = require('../lib/senha');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
@@ -10,8 +11,8 @@ const v = require('../lib/validacao');
 
 const PERFIS = ['admin', 'gerente', 'caixa', 'estoque'];
 // Configurações guardadas como número inteiro (o restante é texto livre ou liga/desliga).
-const NUMERICAS = { limite_fiado_padrao_centavos: [0, 10_000_000], vencimento_fatura_dia: [1, 28], alerta_validade_dias: [1, 365], margem_padrao_bp: [0, 100_000] };
-const BOOLEANAS = ['permitir_estoque_negativo', 'autoatendimento'];
+const NUMERICAS = { limite_fiado_padrao_centavos: [0, 10_000_000], vencimento_fatura_dia: [1, 28], alerta_validade_dias: [1, 365], margem_padrao_bp: [0, 100_000], terminal_segundos_fim: [3, 120] };
+const BOOLEANAS = ['permitir_estoque_negativo', 'terminal_pix', 'terminal_cartao', 'terminal_conta'];
 
 /** Configurações da loja, maquininhas, usuários e auditoria. */
 module.exports = (db, { admin }) => {
@@ -80,6 +81,37 @@ module.exports = (db, { admin }) => {
   r.post('/maquininhas/:id/testar', async (req, res) => res.json(await maquininha.testar(db, Number(req.params.id))));
 
   r.get('/transacoes', (req, res) => res.json(maquininha.listar(db, { status: req.query.status || null, limite: Math.min(Number(req.query.limite) || 100, 500) })));
+
+  /* ---------- terminais do balcão ---------- */
+
+  r.get('/terminais', (_req, res) => res.json(terminais.listar(db)));
+
+  /**
+   * Cadastra o terminal e devolve o código de pareamento. O código aparece UMA vez:
+   * no banco fica só o hash, como acontece com senha.
+   */
+  r.post('/terminais', (req, res) => {
+    const { terminal, codigo } = terminais.criar(db, { nome: v.texto(req.body.nome, 'o nome do terminal', 80), usuario_id: req.usuario.id });
+    registrar(db, req, 'terminal_criado', terminal.nome);
+    res.status(201).json({ terminal, codigo });
+  });
+
+  /** Gera um código novo (aparelho trocado, ou o anterior se perdeu). */
+  r.post('/terminais/:id/codigo', (req, res) => {
+    const atual = terminais.obter(db, Number(req.params.id));
+    if (!atual) throw naoEncontrado('Terminal');
+    const { codigo } = terminais.criar(db, { nome: atual.nome, usuario_id: req.usuario.id });
+    // O terminal antigo é desativado: o aparelho que estava com ele para de funcionar na hora.
+    terminais.revogar(db, atual.id, false);
+    registrar(db, req, 'terminal_novo_codigo', `#${atual.id} ${atual.nome}`);
+    res.status(201).json({ codigo });
+  });
+
+  r.patch('/terminais/:id', (req, res) => {
+    const t = terminais.revogar(db, Number(req.params.id), Boolean(req.body.ativo));
+    registrar(db, req, t.ativo ? 'terminal_ativado' : 'terminal_desativado', `#${t.id} ${t.nome}`);
+    res.json(t);
+  });
 
   r.get('/usuarios', admin, (_req, res) => res.json(db.prepare(`SELECT u.id, u.nome, u.email, u.telefone, u.perfil, u.ativo, u.ultimo_acesso, u.criado_em,
     m.nome AS morador FROM usuarios u LEFT JOIN moradores m ON m.id = u.morador_id ORDER BY u.ativo DESC, u.nome`).all()));

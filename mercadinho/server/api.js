@@ -24,10 +24,12 @@ function criarApi(db) {
   /** O que as telas precisam saber antes do login. */
   api.get('/publico', (_req, res) => {
     const cfg = lerConfig(db);
-    res.json({ nome_mercado: cfg.nome_mercado, condominio: cfg.condominio, autoatendimento: cfg.autoatendimento, versao: '1.0' });
+    res.json({ nome_mercado: cfg.nome_mercado, condominio: cfg.condominio, versao: '1.0' });
   });
 
   api.use('/auth', require('./routes/auth')(db, autenticado));
+  // Terminal do balcão: o próprio cliente registra a compra e paga. Tem token e rotas próprias.
+  api.use('/terminal', require('./routes/terminal')(db));
   api.use('/painel', autenticado, equipe, require('./routes/painel')(db));
   api.use('/produtos', autenticado, equipe, require('./routes/produtos')(db, { estoque }));
   api.use('/estoque', autenticado, equipe, require('./routes/estoque')(db, { estoque }));

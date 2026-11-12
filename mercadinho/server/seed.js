@@ -10,7 +10,7 @@ const { hashSenha } = require('./lib/senha');
 const produtosLib = require('./lib/produtos');
 const estoque = require('./lib/estoque');
 const vendas = require('./lib/vendas');
-const caixaLib = require('./lib/caixa');
+const terminalLib = require('./lib/terminal');
 const moradores = require('./lib/moradores');
 const compras = require('./lib/compras');
 const { hoje, somarDias } = require('./lib/datas');
@@ -158,15 +158,23 @@ const CESTAS = [
   [['Água mineral 1,5 L', 2000], ['Biscoito recheado 130 g', 2000]],
   [['Pizza congelada calabresa', 1000], ['Sorvete pote 1,5 L', 1000]],
 ];
-const FORMAS = ['dinheiro', 'pix', 'debito', 'credito', 'fiado'];
-const caixa = caixaLib.abrirCaixa(db, { usuario_id: operador, abertura_centavos: 20_000 });
+// O terminal do balcão (é por ele que o cliente registra a compra e paga).
+const { terminal, codigo } = terminalLib.criar(db, { nome: 'Balcão do mercadinho', usuario_id: gerente });
+db.prepare("UPDATE terminais SET pareado_em = ?, ultimo_uso = ? WHERE id = ?").run(agora(), agora(), terminal.id);
+// Senha do terminal dos moradores da demonstração (na vida real cada um recebe a sua).
+for (const m of moradoresCriados) terminalLib.definirPin(db, m.id, '4703');
+
+const FORMAS = ['pix', 'debito', 'credito', 'fiado'];
 let n = 0;
 for (let diasAtras = 6; diasAtras >= 0; diasAtras--) {
   for (let i = 0; i < 3 + (diasAtras % 3); i++) {
     const cesta = CESTAS[n % CESTAS.length];
     const forma = FORMAS[n % FORMAS.length];
-    const morador = forma === 'fiado' ? moradoresCriados[n % moradoresCriados.length] : null;
-    const venda = vendas.abrir(db, { usuario_id: operador, caixa_id: caixa.id, morador_id: morador?.id ?? null });
+    // No fiado, escolhe quem ainda tem mais espaço no limite (a demonstração não pode estourar a conta de ninguém).
+    const morador = forma === 'fiado'
+      ? moradoresCriados.map((m) => moradores.obter(db, m.id)).sort((a, b) => b.disponivel_centavos - a.disponivel_centavos)[0]
+      : null;
+    const venda = vendas.abrir(db, { terminal_id: terminal.id, origem: 'autoatendimento', morador_id: morador?.id ?? null });
     for (const [nome, qtd] of cesta) vendas.adicionarItem(db, venda.id, { produto_id: porNome[nome].id, qtd_mil: qtd });
     const atual = vendas.obter(db, venda.id);
     let transacao_id = null;
@@ -178,9 +186,10 @@ for (let diasAtras = 6; diasAtras >= 0; diasAtras--) {
           atual.total_centavos - Math.round(atual.total_centavos * 0.0349), String(100000 + n), somarDias(hoje(), 30), agora(), agora());
       transacao_id = Number(t.lastInsertRowid);
     }
+    if (morador) vendas.definirMorador(db, venda.id, morador.id);
     vendas.finalizar(db, venda.id, {
-      pagamentos: [{ forma, valor_centavos: atual.total_centavos, recebido_centavos: forma === 'dinheiro' ? atual.total_centavos : null, transacao_id }],
-      usuario_id: operador,
+      pagamentos: [{ forma, valor_centavos: atual.total_centavos, transacao_id }],
+      usuario_id: null,
     });
     // Joga a venda para o dia certo (a demonstração precisa de histórico).
     const data = new Date(Date.now() - diasAtras * 86_400_000 - i * 3_600_000).toISOString();
@@ -195,6 +204,8 @@ estoque.movimentar(db, { produto_id: porNome['Café torrado e moído 500 g'].id,
 estoque.movimentar(db, { produto_id: porNome['Papel toalha 2 rolos'].id, tipo: 'perda', qtd_mil: 9000, observacao: 'Embalagens molhadas', usuario_id: operador, permitirNegativo: true });
 db.prepare('UPDATE lotes SET validade = ? WHERE produto_id = ?').run(somarDias(hoje(), 3), porNome['Iogurte morango 170 g'].id);
 
-console.log(`[Mercadinho] Demonstração pronta: ${criados.length} produtos, ${moradoresCriados.length} moradores e ${n} vendas.`);
+console.log(`[Mercadinho] Demonstração pronta: ${criados.length} produtos, ${moradoresCriados.length} moradores e ${n} compras no terminal.`);
+console.log(`[Mercadinho] Terminal do balcão já pareado. Para parear outro aparelho, use o código: ${codigo}`);
+console.log('[Mercadinho] Senha dos moradores no terminal (demonstração): 4703');
 console.log('[Mercadinho] Acessos (senha demo12345): gerente@mercadinho.com.br · caixa@mercadinho.com.br · estoque@mercadinho.com.br · moradora@demo.com');
 console.log(`[Mercadinho] Administrador: ${require('./config').admin.email} (senha definida em MERCADO_ADMIN_SENHA).`);

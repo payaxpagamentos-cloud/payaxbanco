@@ -9,8 +9,9 @@ const { hoje } = require('./datas');
 
 const FORMAS = ['dinheiro', 'pix', 'debito', 'credito', 'fiado'];
 
-const venda = (db, id) => db.prepare(`SELECT v.*, u.nome AS operador, m.nome AS morador, m.bloco, m.unidade
-  FROM vendas v LEFT JOIN usuarios u ON u.id = v.usuario_id LEFT JOIN moradores m ON m.id = v.morador_id WHERE v.id = ?`).get(id);
+const venda = (db, id) => db.prepare(`SELECT v.*, u.nome AS operador, t.nome AS terminal, m.nome AS morador, m.bloco, m.unidade
+  FROM vendas v LEFT JOIN usuarios u ON u.id = v.usuario_id LEFT JOIN terminais t ON t.id = v.terminal_id
+  LEFT JOIN moradores m ON m.id = v.morador_id WHERE v.id = ?`).get(id);
 
 const itens = (db, venda_id) => db.prepare(`SELECT i.*, p.unidade, p.pesavel, p.codigo_barras FROM venda_itens i
   JOIN produtos p ON p.id = i.produto_id WHERE i.venda_id = ? ORDER BY i.id`).all(venda_id);
@@ -44,18 +45,34 @@ function recalcular(db, venda_id) {
   return obter(db, venda_id);
 }
 
-/** Abre uma venda no caixa do operador (ou reaproveita a que já estiver aberta). */
-function abrir(db, { usuario_id, caixa_id = null, morador_id = null, origem = 'pdv' }) {
-  const existente = db.prepare("SELECT id FROM vendas WHERE usuario_id = ? AND status = 'aberta' ORDER BY id DESC").get(usuario_id);
+/**
+ * Abre uma venda (ou reaproveita a que já está aberta): no caixa do operador, quando é o atendimento,
+ * ou no terminal do balcão, quando é o próprio cliente registrando a compra.
+ */
+function abrir(db, { usuario_id = null, terminal_id = null, caixa_id = null, morador_id = null, origem = 'pdv' }) {
+  const existente = origem === 'autoatendimento'
+    ? db.prepare("SELECT id FROM vendas WHERE terminal_id = ? AND status = 'aberta' ORDER BY id DESC").get(terminal_id)
+    : db.prepare("SELECT id FROM vendas WHERE usuario_id = ? AND status = 'aberta' ORDER BY id DESC").get(usuario_id);
   if (existente) return obter(db, existente.id);
   if (origem === 'pdv') {
     const caixa = caixa_id ? caixaLib.exigirAberto(db, caixa_id) : caixaLib.abertoDo(db, usuario_id);
     if (!caixa) throw new ErroNegocio('Abra o caixa antes de registrar vendas.', 409);
     caixa_id = caixa.id;
   }
-  const r = db.prepare('INSERT INTO vendas (caixa_id, usuario_id, morador_id, origem, criada_em) VALUES (?, ?, ?, ?, ?)')
-    .run(caixa_id, usuario_id, morador_id, origem, agora());
+  const r = db.prepare('INSERT INTO vendas (caixa_id, usuario_id, terminal_id, morador_id, origem, criada_em) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(caixa_id, usuario_id, terminal_id, morador_id, origem, agora());
   return obter(db, Number(r.lastInsertRowid));
+}
+
+/**
+ * Carrinho esquecido no terminal (o cliente desistiu e foi embora) é cancelado sozinho,
+ * para o próximo não encontrar a compra de outra pessoa na tela.
+ */
+function expirarAbandonadas(db, minutos = 20) {
+  const corte = new Date(Date.now() - minutos * 60_000).toISOString();
+  const abertas = db.prepare("SELECT id FROM vendas WHERE origem = 'autoatendimento' AND status = 'aberta' AND criada_em < ?").all(corte);
+  for (const v of abertas) cancelar(db, v.id, { motivo: 'Carrinho abandonado no terminal', usuario_id: null });
+  return abertas.length;
 }
 
 /**
@@ -233,9 +250,10 @@ function cancelar(db, venda_id, { motivo, usuario_id }) {
 }
 
 const listar = (db, { status = null, caixa_id = null, morador_id = null, de = null, ate = null, limite = 100 } = {}) => db.prepare(`
-  SELECT v.*, u.nome AS operador, m.nome AS morador, m.bloco, m.unidade,
+  SELECT v.*, u.nome AS operador, t.nome AS terminal, m.nome AS morador, m.bloco, m.unidade,
     (SELECT GROUP_CONCAT(DISTINCT pg.forma) FROM pagamentos pg WHERE pg.venda_id = v.id) AS formas
-  FROM vendas v LEFT JOIN usuarios u ON u.id = v.usuario_id LEFT JOIN moradores m ON m.id = v.morador_id
+  FROM vendas v LEFT JOIN usuarios u ON u.id = v.usuario_id LEFT JOIN terminais t ON t.id = v.terminal_id
+  LEFT JOIN moradores m ON m.id = v.morador_id
   WHERE (? IS NULL OR v.status = ?) AND (? IS NULL OR v.caixa_id = ?) AND (? IS NULL OR v.morador_id = ?)
     AND (? IS NULL OR v.criada_em >= ?) AND (? IS NULL OR v.criada_em < ?)
   ORDER BY v.id DESC LIMIT ?`).all(status, status, caixa_id, caixa_id, morador_id, morador_id, de, de, ate, ate, limite);
@@ -253,4 +271,4 @@ function cupom(db, venda_id) {
   };
 }
 
-module.exports = { abrir, obter, listar, itens, pagamentos, adicionarItem, alterarItem, removerItem, definirMorador, aplicarDesconto, finalizar, cancelar, cupom, recalcular, FORMAS };
+module.exports = { abrir, expirarAbandonadas, obter, listar, itens, pagamentos, adicionarItem, alterarItem, removerItem, definirMorador, aplicarDesconto, finalizar, cancelar, cupom, recalcular, FORMAS };

@@ -1,11 +1,14 @@
 MERCADINHO DO CONDOMÍNIO — INSTALAÇÃO
 =====================================
 
-Endereço depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
-  Sistema ........ https://SEU-DOMINIO/mercadinho/
+Endereços depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
+  Painel da equipe ........ https://SEU-DOMINIO/mercadinho/
+  Terminal do cliente ..... https://SEU-DOMINIO/mercadinho/pdv/
 
-A mesma tela serve a equipe (PDV, estoque, compras, financeiro) e os moradores
-(cada morador vê só a própria conta). Tudo roda neste programa Node.js, nesta pasta.
+O painel é usado pela equipe (estoque, compras, financeiro, moradores) e pelos
+moradores (cada um vê só a própria conta). O terminal é a tela do balcão em que
+o CLIENTE passa os produtos e paga sozinho: abra esse endereço no tablet do
+balcão, em tela cheia, e deixe ali. Tudo roda neste programa Node.js, nesta pasta.
 As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
 
 
@@ -54,6 +57,10 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
      - Configurações > Loja: nome, condomínio, chave PIX e limite padrão da conta dos moradores;
      - Configurações > Usuários: crie a conta de cada pessoa da equipe (gerente, caixa, estoquista);
      - Configurações > Maquininhas: cadastre a maquininha de cartão (veja o README);
+     - Configurações > Terminais: cadastre o terminal do balcão, anote o código que
+       aparece UMA vez e digite-o no aparelho ao abrir o endereço terminado em /pdv/;
+     - Moradores: defina a senha de 4 números de cada um (é com ela que o morador
+       lança a compra na conta pelo terminal);
      - Produtos: cadastre a mercadoria (ou importe aos poucos, bipando no PDV).
 
 
@@ -64,4 +71,12 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
 
 7) LEITOR DE CÓDIGO DE BARRAS
    Qualquer leitor USB serve: ele digita o código e dá Enter, igual a um teclado.
-   No PDV, deixe o cursor no campo de busca (tecla F3 volta para ele).
+   No terminal não é preciso clicar em nada antes de bipar: a tela escuta o leitor
+   o tempo todo.
+
+
+8) O TABLET DO BALCÃO
+   Abra https://SEU-DOMINIO/mercadinho/pdv/ no navegador, em tela cheia (no Android:
+   menu do Chrome > "Adicionar à tela inicial"; no iPad: Compartilhar > "Adicionar à
+   Tela de Início"). O pareamento fica salvo no aparelho: só é pedido de novo se a
+   administração desativar o terminal ou se os dados do navegador forem apagados.

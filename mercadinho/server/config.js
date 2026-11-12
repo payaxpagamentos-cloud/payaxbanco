@@ -28,6 +28,8 @@ module.exports = {
   dbFile: process.env.MERCADO_DB || path.join(__dirname, '..', 'data', 'mercadinho.db'),
   secret,
   tokenTtlSeconds: 12 * 60 * 60,
+  // O terminal do balcão fica pareado por um ano (a administração pode desativá-lo a qualquer momento).
+  terminalTtlSeconds: Number(process.env.MERCADO_TERMINAL_TTL_DIAS || 365) * 24 * 60 * 60,
   trustProxy: process.env.MERCADO_TRUST_PROXY ?? 'loopback',
   limiteLoginPorMinuto: Number(process.env.MERCADO_LIMITE_LOGIN) || 10,
   // Fuso usado nos fechamentos de caixa, nas competências e nos relatórios.

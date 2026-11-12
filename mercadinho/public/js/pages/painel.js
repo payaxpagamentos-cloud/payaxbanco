@@ -28,16 +28,20 @@ export default async function painel({ alvo, definirTitulo }) {
             el('span', {}, `Margem ${percentual(d.ultimos_7_dias.margem_bp)}`))),
 
         el('section', { class: 'cartao' },
-          el('h2', {}, 'Caixa'),
-          d.caixa
+          el('div', { class: 'linha entre' }, el('h2', {}, 'Terminal do balcão'),
+            d.pix_a_conferir.n ? etiqueta(`${d.pix_a_conferir.n} PIX a conferir`, 'aviso') : null),
+          d.terminais.length
             ? el('div', { class: 'coluna' },
-              el('div', { class: 'linha entre' }, el('span', { class: 'mudo' }, 'Dinheiro na gaveta'), el('strong', { class: 'num' }, dinheiro(d.caixa.dinheiro_esperado_centavos))),
-              el('div', { class: 'linha entre' }, el('span', { class: 'mudo' }, 'Vendas no caixa'), el('span', {}, `${d.caixa.vendas} · ${dinheiro(d.caixa.total_centavos)}`)),
-              el('div', { class: 'linha entre' }, el('span', { class: 'mudo' }, 'Aberto em'), el('span', {}, dataHora(d.caixa.caixa.aberto_em))),
-              el('a', { class: 'btn primario', href: '#/pdv' }, icone('pdv'), 'Ir para o PDV'))
+              ...d.terminais.map((t) => el('div', { class: 'linha entre' },
+                el('span', {}, el('div', { class: 'destaque' }, t.nome),
+                  el('div', { class: 'pequeno mudo' }, t.pareado_em ? `último uso ${dataHora(t.ultimo_uso)}` : 'aguardando pareamento')),
+                el('span', { class: 'linha' },
+                  el('strong', { class: 'num' }, dinheiro(t.vendas_hoje.total)),
+                  etiqueta(t.ativo ? 'ativo' : 'desativado', t.ativo ? 'ok' : 'erro')))),
+              el('a', { class: 'btn primario', href: '#/vendas' }, icone('pdv'), 'Ver as compras do terminal'))
             : el('div', { class: 'coluna' },
-              el('p', { class: 'mudo' }, 'Nenhum caixa aberto no seu usuário.'),
-              el('a', { class: 'btn primario', href: '#/caixa' }, icone('caixa'), 'Abrir o caixa')))),
+              el('p', { class: 'mudo' }, 'Nenhum terminal cadastrado. O cliente registra a compra e paga sozinho na tela do balcão.'),
+              el('a', { class: 'btn primario', href: '#/config' }, icone('config'), 'Cadastrar o terminal')))),
 
       el('div', { class: 'grade', style: 'grid-template-columns: repeat(auto-fit, minmax(330px, 1fr))' },
         el('section', { class: 'cartao' },
@@ -80,7 +84,7 @@ export default async function painel({ alvo, definirTitulo }) {
         tabela([
           { titulo: 'Venda', celula: (v) => `#${v.id}` },
           { titulo: 'Hora', celula: (v) => dataHora(v.fechada_em) },
-          { titulo: 'Operador', celula: (v) => v.operador ?? '—' },
+          { titulo: 'Terminal', celula: (v) => v.terminal ?? '—' },
           { titulo: 'Morador', celula: (v) => v.morador ?? '—' },
           { titulo: 'Total', direita: true, celula: (v) => dinheiro(v.total_centavos) },
         ], d.ultimas_vendas, { vazio: 'Nenhuma venda registrada ainda.' })));

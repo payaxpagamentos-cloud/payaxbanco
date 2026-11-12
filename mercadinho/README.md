@@ -1,7 +1,11 @@
 # Mercadinho do Condomínio
 
-Sistema completo para o mercadinho (ou mercado autônomo) de um condomínio: **frente de caixa (PDV)**,
+Sistema completo para o mercadinho (ou mercado autônomo) de um condomínio: **terminal de autoatendimento (PDV)**,
 **estoque**, **compras**, **financeiro**, **conta dos moradores** e **conexão com a maquininha de cartão**.
+
+O PDV é a tela do balcão que **o próprio cliente usa**: ele passa os produtos no leitor, confere a compra e paga.
+Não há operador, não há login e não há como chegar ao resto do sistema por ali. A equipe trabalha no painel
+administrativo, em outro endereço.
 
 Roda num único processo Node.js, guarda tudo num arquivo SQLite e não precisa de build: o navegador
 recebe as páginas prontas. A interface usa efeito de vidro (*glassmorphism*), com tema claro e escuro.
@@ -16,6 +20,9 @@ Com `npm run seed`, entre com **gerente@mercadinho.com.br**, **caixa@mercadinho.
 **estoque@mercadinho.com.br** ou **moradora@demo.com** — senha `demo12345`.
 Sem o seed, use o administrador definido em `MERCADO_ADMIN_EMAIL` / `MERCADO_ADMIN_SENHA`.
 
+O terminal do cliente fica em **http://localhost:3300/pdv/** — o `seed` imprime um código de pareamento para
+usar na primeira vez, e a senha de terminal dos moradores da demonstração é `4703`.
+
 ---
 
 ## Quem usa e o que cada um vê
@@ -24,38 +31,66 @@ Sem o seed, use o administrador definido em `MERCADO_ADMIN_EMAIL` / `MERCADO_ADM
 |---|---|
 | **Administrador** | Tudo, incluindo os usuários do sistema |
 | **Gerente** | Operação inteira: PDV, estoque, compras, financeiro, relatórios e configurações |
-| **Operador de caixa** | PDV, caixa e consulta de produtos e moradores |
+| **Operador de caixa** | Acompanha as vendas do terminal e consulta produtos e moradores |
 | **Estoquista** | Produtos, estoque, fornecedores e compras |
 | **Morador** | Só a própria conta: o que consumiu, o extrato e as faturas |
+| **Cliente no balcão** | O terminal (`/pdv/`): passa os produtos e paga. Nenhum acesso ao resto |
 
 ---
 
-## PDV — frente de caixa
+## PDV — o terminal do cliente
 
-* Bipe o código de barras (qualquer leitor USB funciona: ele digita e dá Enter) ou procure pelo nome.
-* Produto pesável pede o **peso ou o valor em reais** — informa um e o outro é calculado.
-* Bipar o mesmo produto duas vezes soma na mesma linha; dá para alterar a quantidade ou remover o item.
-* Desconto na venda inteira, venda identificada para um morador e cancelamento com devolução ao estoque.
-* **Pagamento misto**: a mesma venda aceita dinheiro + PIX + cartão + conta do morador, e só fecha quando
-  a soma bate com o total.
-  * **Dinheiro** — calcula o troco, com atalhos de cédula.
-  * **PIX** — gera o *copia e cola* e o QR Code na hora, com o valor que falta, na chave do mercadinho.
-  * **Cartão** — manda a cobrança para a maquininha e espera a aprovação (veja abaixo).
-  * **Conta do morador** — confere o limite antes de lançar.
-* No fim, o **cupom não fiscal** aparece pronto para imprimir.
-* Atalhos: `F2` recebe, `F3` volta para o leitor, `F8` cancela a venda.
+Endereço do terminal: o do sistema com **`/pdv/`** no fim (por exemplo, `https://seu-dominio/mercadinho/pdv/`).
+Abra num tablet ou num computador com leitor de código de barras, em tela cheia, e deixe ali.
 
-### Caixa
+**Como o aparelho entra no ar.** Em *Configurações › Terminais*, cadastre o terminal e anote o **código de
+pareamento** (aparece uma única vez). No aparelho, abra o endereço e digite o código: ele troca o código por um
+token próprio, que vale por um ano e fica só naquele aparelho. Nenhuma senha de funcionário passa pelo balcão.
+A administração pode desativar o terminal ou gerar um código novo a qualquer momento — o aparelho antigo para na hora.
 
-Abre com o troco informado, recebe **sangrias** e **suprimentos** e fecha com a conferência do dinheiro:
-o sistema mostra o esperado, você digita o contado e a **diferença fica registrada** (sobra ou falta).
-Nenhuma venda sai sem caixa aberto, e nenhum caixa fecha com venda em aberto.
+**O que o cliente faz, do começo ao fim:**
 
----
+1. A tela de espera pede para passar o primeiro produto no leitor. Quem leva hortifrúti, pão ou granel toca em
+   **Produto sem código** e escolhe na tela; se for vendido por peso, digita o peso da balança num teclado grande.
+2. Cada item aparece na lista, com o total crescendo ao lado. Dá para **tirar um item** ou cancelar tudo.
+3. Em **Pagar**, escolhe como quer pagar:
+   * **PIX** — o QR Code aparece na tela com o valor certo; depois de pagar no banco, toca em "Já paguei".
+   * **Cartão** — débito, crédito à vista ou em 2x/3x. A cobrança vai para a maquininha e a tela acompanha até aprovar.
+   * **Minha conta** — digita o número do apartamento, escolhe o nome e confirma com uma **senha de 4 números**.
+     O sistema mostra quanto ainda cabe no limite e lança a compra na fatura do mês.
+4. A tela de fim mostra o resumo, oferece o cupom e volta sozinha ao início para o próximo cliente.
+
+**Dinheiro não entra no terminal**: não há quem dê troco. Quais formas aparecem fica em *Configurações › Loja*.
+
+**Cuidados que já estão no sistema**
+
+* Carrinho esquecido no balcão: a tela avisa e cancela a compra sozinha depois de 90 segundos sem ninguém mexer
+  (e o servidor limpa o que tiver ficado para trás).
+* A senha do morador trava por 10 minutos depois de 5 erros seguidos, para ninguém ficar testando senha no balcão.
+* A lista de moradores não é pública: o cliente digita a unidade e só vê quem mora nela.
+* Um terminal nunca enxerga a compra de outro, e a venda só fecha com o pagamento conferido pelo servidor.
+
+### Conferência dos PIX
+
+No PIX é o próprio cliente quem confirma que pagou — é assim que funciona um mercadinho de condomínio sem
+ninguém no caixa. Por isso a tela **Vendas do terminal › Conferência de PIX** lista cada um desses pagamentos
+para a gestão bater com o extrato da conta e marcar como conferido. O que ficar pendente continua aparecendo.
+
+### Vendas do terminal (equipe)
+
+A equipe acompanha tudo em **Vendas do terminal**: o que foi vendido no período, por qual forma, qual morador
+comprou na conta, o cupom de cada compra e o **cancelamento** (devolve o estoque, estorna o fiado e cancela a
+cobrança no cartão). O painel mostra o terminal ativo, o último uso e quanto ele vendeu hoje.
+
+### Caixa com atendente
+
+O sistema nasceu com um caixa atendido (abertura com troco, sangria, suprimento e fechamento com conferência) e
+essas rotas continuam no servidor, com testes. Como o mercadinho é de autoatendimento, elas não aparecem no
+menu — é só reativar as telas se um dia houver alguém no balcão.
 
 ## Maquininha de cartão
 
-A venda no cartão **nunca** é fechada sem uma cobrança aprovada e registrada. Cada tentativa vira uma
+A compra no cartão **nunca** é fechada sem uma cobrança aprovada e registrada. Cada tentativa vira uma
 transação no banco (pendente → aprovada / negada / cancelada / expirada), com NSU, autorização e bandeira.
 
 Quando aprova, o sistema calcula a **taxa da adquirente** e o **prazo de crédito** cadastrados e lança o
@@ -160,10 +195,12 @@ Tudo em `.env` (veja [`.env.exemplo`](.env.exemplo)):
 | `MERCADO_TRUST_PROXY` | `1` atrás de Nginx/Apache |
 | `MERCADO_LIMITE_LOGIN` | Tentativas de login por minuto, por IP |
 | `MERCADO_MAQUININHA_TIMEOUT_MS` / `MERCADO_MAQUININHA_EXPIRAR_MIN` | Espera e expiração das cobranças no cartão |
+| `MERCADO_TERMINAL_TTL_DIAS` | Dias de validade do pareamento do terminal (padrão 365) |
 
 Dentro do sistema (**Configurações › Loja**): nome e endereço do mercadinho, chave PIX, limite padrão da
-conta dos moradores, dia de vencimento da fatura, aviso de validade, margem sugerida nas compras e a opção
-de deixar vender sem saldo em estoque.
+conta dos moradores, dia de vencimento da fatura, aviso de validade, margem sugerida nas compras, a opção de
+deixar vender sem saldo em estoque e **as formas que o terminal aceita**. Em **Configurações › Terminais**
+ficam os aparelhos do balcão.
 
 ### Em produção
 
@@ -192,12 +229,13 @@ server/
   api.js          monta as rotas e decide o perfil que entra em cada uma
   auth.js         token assinado (HMAC) e controle de perfil
   db.js           schema SQLite, configurações e transações
-  lib/            as regras: estoque, vendas, caixa, compras, financeiro, moradores, maquininha, pix, relatórios
+  lib/            as regras: estoque, vendas, terminal, caixa, compras, financeiro, moradores, maquininha, pix, relatórios
   routes/         as rotas HTTP, uma por assunto
 public/
   css/vidro.css   o tema de vidro (claro e escuro)
-  js/app.js       navegação, layout e login
+  js/app.js       navegação, layout e login do painel da equipe
   js/pages/       uma tela por arquivo
+  pdv/            o terminal do cliente: página própria, sem menu e sem login
 test/             testes de ponta a ponta, com uma ponte TEF falsa
 ```
 
@@ -213,13 +251,14 @@ Tudo sob `/api`, com `Authorization: Bearer <token>` obtido em `POST /api/auth/l
 | `/api/painel` | A tela inicial inteira numa chamada |
 | `/api/produtos`, `/api/produtos/categorias`, `/api/produtos/fornecedores` | Cadastros e busca do PDV |
 | `/api/estoque` | Movimentos, entradas, perdas, acertos, alertas e inventários |
-| `/api/caixa` | Abertura, sangria, suprimento, conferência e fechamento |
-| `/api/pdv` | Venda, itens, pagamentos, PIX, maquininha e cupom |
+| `/api/terminal` | **O terminal do cliente**: pareamento, carrinho, conta do morador, PIX, maquininha e cupom (token próprio) |
+| `/api/pdv` | Vendas para a equipe: consulta, cancelamento e conferência dos PIX |
+| `/api/caixa` | Caixa atendido: abertura, sangria, suprimento e fechamento (sem tela no menu) |
 | `/api/compras` | Pedidos, sugestão de reposição e recebimento |
 | `/api/financeiro` | Lançamentos, baixas, fluxo de caixa e DRE |
 | `/api/moradores` | Moradores, conta, faturas e portal do morador |
 | `/api/relatorios` | Relatórios e exportação em CSV |
-| `/api/admin` | Configurações, maquininhas, usuários e auditoria |
+| `/api/admin` | Configurações, terminais, maquininhas, usuários e auditoria |
 
 ### Testes
 
@@ -229,7 +268,9 @@ npm test
 
 Cobrem os caminhos que doem se quebrarem: permissões por perfil, custo médio, venda com troco, venda no
 cartão (inclusive a ponte TEF, com um agente falso), limite e fatura do morador, recebimento de compra com
-contas a pagar, inventário, DRE e PIX.
+contas a pagar, inventário, DRE e PIX. E o terminal inteiro: pareamento, separação entre o token do aparelho e
+a sessão da equipe, carrinho, senha do morador (com o bloqueio depois de cinco erros), cartão, carrinho
+abandonado e a conferência dos PIX.
 
 ---
 
@@ -238,6 +279,9 @@ contas a pagar, inventário, DRE e PIX.
 * **Não emite documento fiscal** (NFC-e, SAT ou CF-e). O cupom é de controle interno — o que é o normal em
   mercadinho de condomínio sem inscrição estadual própria. Para emitir fiscal, é preciso contratar um
   emissor e ligá-lo ao fechamento da venda.
+* **Não confirma o PIX sozinho**: quem avisa que pagou é o cliente, na tela. Para conferir automaticamente seria
+  preciso ligar o sistema à API do banco (PIX recebidos) ou a um intermediador de pagamentos. Até lá, a tela de
+  conferência existe justamente para a gestão bater com o extrato.
 * **Não faz conciliação automática com a adquirente**: o recebível é calculado pela taxa e pelo prazo que
   você cadastra na maquininha. Se a adquirente mudar a taxa, atualize o cadastro.
 * O limite de requisições e as sessões ficam na memória do processo: para rodar em mais de uma instância,

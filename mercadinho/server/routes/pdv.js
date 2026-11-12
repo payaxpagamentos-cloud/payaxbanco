@@ -7,6 +7,7 @@ const vendas = require('../lib/vendas');
 const produtos = require('../lib/produtos');
 const maquininha = require('../lib/maquininha');
 const pix = require('../lib/pix');
+const terminalLib = require('../lib/terminal');
 const { ErroNegocio } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { intervalo } = require('../lib/datas');
@@ -139,6 +140,18 @@ module.exports = (db, { gestao }) => {
   });
 
   r.get('/cartao', gestao, (req, res) => res.json(maquininha.listar(db, { status: req.query.status || null, limite: Math.min(Number(req.query.limite) || 100, 500) })));
+
+  /** PIX confirmados pelo próprio cliente no terminal: a gestão confere no extrato do banco. */
+  r.get('/conferencia', gestao, (req, res) => {
+    const [de, ate] = req.query.de && req.query.ate ? intervalo(v.data(req.query.de, 'a data inicial'), v.data(req.query.ate, 'a data final')) : [null, null];
+    res.json(terminalLib.paraConferir(db, { de, ate, pendentes: req.query.pendentes === '1' }));
+  });
+
+  r.post('/pagamentos/:id/conferir', gestao, (req, res) => {
+    const p = terminalLib.conferirPagamento(db, v.inteiro(req.params.id, 'o pagamento', { min: 1 }), req.usuario.id);
+    registrar(db, req, p.conferido_em ? 'pix_conferido' : 'pix_conferencia_desfeita', `pagamento #${p.id}`);
+    res.json(p);
+  });
 
   return r;
 };
