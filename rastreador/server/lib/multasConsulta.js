@@ -12,7 +12,7 @@
  *    licenciamento, restrições, roubo/furto, recall…), e as multas de veículos da empresa já entram na central.
  * Ligar: RASTREADOR_MULTAS_URL e RASTREADOR_MULTAS_CHAVE no .env do servidor. Formato do adaptador (a tradução da resposta do
  * serviço contratado fica em `traduzir` / `traduzirApontamento`):
- *   Pedido:   POST {URL}  { placa, renavam }   (cabeçalho Authorization: Bearer {CHAVE})
+ *   Pedido:   POST {URL}  { placa, renavam, uf }   (uf = RASTREADOR_MULTAS_UF, padrão SP; cabeçalho Authorization: Bearer {CHAVE})
  *   Resposta: { multas: [{ auto_infracao, orgao, codigo, descricao, gravidade, pontos, valor, data_hora, local, municipio, prazo_indicacao, vencimento }],
  *               apontamentos: [{ tipo, descricao, valor, situacao }] }
  */
@@ -25,7 +25,9 @@ const URL_SERVICO = () => process.env.RASTREADOR_MULTAS_URL || '';
 const CHAVE = () => process.env.RASTREADOR_MULTAS_CHAVE || '';
 const configurado = () => Boolean(URL_SERVICO() && CHAVE());
 const POR_RODADA = 10; // veículos por minuto (o serviço cobra por consulta e tem limite de pedidos)
-const intervaloDias = (db) => [1, 7, 15].includes(lerConfig(db).multas_consulta_dias) ? lerConfig(db).multas_consulta_dias : 7;
+const intervaloDias = (db) => ([0, 1, 7, 15].includes(lerConfig(db).multas_consulta_dias) ? lerConfig(db).multas_consulta_dias : 0);
+// Estado do DETRAN consultado (os veículos da operação são de SP).
+const UF = () => (process.env.RASTREADOR_MULTAS_UF || 'SP').toUpperCase();
 const intervaloMs = (db) => intervaloDias(db) * 24 * 3600_000;
 const reaisParaCentavos = (x) => (x === undefined || x === null || x === '' ? null : Math.round(Number(String(x).replace(/\./g, '').replace(',', '.')) * 100));
 
@@ -51,7 +53,7 @@ async function perguntar(placa, renavam) {
   try {
     r = await fetch(URL_SERVICO(), {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${CHAVE()}` },
-      body: JSON.stringify({ placa, renavam: renavam || undefined }), signal: AbortSignal.timeout(25_000),
+      body: JSON.stringify({ placa, renavam: renavam || undefined, uf: UF() }), signal: AbortSignal.timeout(25_000),
     });
   } catch (err) {
     throw new ErroNegocio(`O serviço de consulta de multas não respondeu (${err.name === 'TimeoutError' ? 'demorou demais' : 'sem conexão'}). Tente de novo.`, 502);
@@ -127,7 +129,8 @@ function consulta(db, id, { empresaId = null } = {}) {
 /** Rodada da manutenção: consulta os veículos ativos cuja última consulta passou do intervalo (semanal por padrão), poucos por vez. */
 let rodando = false;
 async function rodada(db, { empresaId = null, forcar = false } = {}) {
-  if (!configurado() || rodando) return { configurado: configurado(), consultados: 0, novas: 0 };
+  // Manual (intervalo 0): só o "Consultar multas" e o "Consultar agora" (forcar) consultam.
+  if (!configurado() || rodando || (!forcar && intervaloDias(db) === 0)) return { configurado: configurado(), consultados: 0, novas: 0 };
   rodando = true;
   try {
     const corte = forcar ? agora() : new Date(Date.now() - intervaloMs(db)).toISOString();
@@ -149,14 +152,14 @@ function situacao(db, empresaId = null) {
   const onde = empresaId ? 'AND empresa_id = ?' : '';
   const p = empresaId ? [empresaId] : [];
   const tot = db.prepare(`SELECT COUNT(*) AS n, SUM(multas_consulta_em >= ?) AS em_dia, MAX(multas_consulta_em) AS ultima FROM veiculos WHERE ativo = 1 ${onde}`)
-    .get(new Date(Date.now() - intervaloMs(db)).toISOString(), ...p);
-  return { ligada: configurado(), intervalo_dias: intervaloDias(db), veiculos: tot.n, em_dia: tot.em_dia ?? 0, ultima: tot.ultima };
+    .get(new Date(Date.now() - (intervaloMs(db) || 7 * 86_400_000)).toISOString(), ...p);
+  return { ligada: configurado(), uf: UF(), intervalo_dias: intervaloDias(db), veiculos: tot.n, em_dia: tot.em_dia ?? 0, ultima: tot.ultima };
 }
 
 /** O master escolhe o intervalo da consulta automática: 1 (diária), 7 (semanal) ou 15 (quinzenal). */
 function definirIntervalo(db, dias) {
   const d = Number(dias);
-  if (![1, 7, 15].includes(d)) throw new ErroNegocio('Escolha diária, semanal ou quinzenal.', 422);
+  if (![0, 1, 7, 15].includes(d)) throw new ErroNegocio('Escolha manual, diária, semanal ou quinzenal.', 422);
   db.prepare('INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor').run('multas_consulta_dias', String(d));
   return d;
 }
