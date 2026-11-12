@@ -32,7 +32,10 @@ const MENU_MASTER = [
   ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa geral', 'mapa'], ['empresas', 'Empresas', 'empresas'], ['financeiro', 'Financeiro', 'carteira', ['master']],
   ['rastreadores', 'Rastreadores', 'rastreadores'],
   ['usuarios', 'Permissões e usuários', 'usuarios', ['master']],
-  ['multas', 'Central de multas', 'multa', ['master', 'suporte']],
+  ['multas', 'Central de multas', 'multa', ['master', 'suporte'], [
+    ['multas', 'Central', 'multa', 'Multas de todas as empresas, prazos e quem dirigia', ['master', 'suporte']],
+    ['multas-consultar', 'Consultar multas', 'lupa', 'Ver na hora se um veículo tem multa ou apontamento', ['master', 'suporte']],
+  ]],
   ['seguros', 'Seguros', 'seguro', ['master', 'suporte'], [
     ['seguros-tipos', 'Tipos', 'seguro', 'Catálogo dos seguros oferecidos', ['master', 'suporte']],
     ['seguros-empresas', 'Por empresa', 'empresas', 'O que cada empresa pode ver e contratar', ['master', 'suporte']],
@@ -59,7 +62,10 @@ const MENU_EMPRESA = [
     ['liberacoes', 'Liberações', 'aberto', 'Código do motorista para liberar o veículo', GESTOR],
   ]],
   ['cercas', 'Cercas', 'cercas'],
-  ['multas', 'Multas', 'multa'],
+  ['multas', 'Central de multas', 'multa', null, [
+    ['multas', 'Central', 'multa', 'Multas, prazos, notificação e quem dirigia'],
+    ['multas-consultar', 'Consultar multas', 'lupa', 'Ver na hora se um veículo tem multa ou apontamento'],
+  ]],
   ['frota', 'Frota', 'veiculos', null, [
     ['veiculos', 'Veículos', 'veiculos', 'Cadastro, rastreador e motorista fixo'],
     ['motoristas', 'Motoristas', 'motoristas', 'Cadastro, CNH e acesso ao app'],

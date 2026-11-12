@@ -505,8 +505,19 @@ module.exports = (db, extras = {}) => {
   const multas = require('../lib/multas');
   r.get('/multas', (req, res) => {
     const lista = multas.listar(db, { empresaId: req.query.empresa_id ? Number(req.query.empresa_id) : undefined, situacao: req.query.situacao || undefined, limite: 1000 });
-    res.json({ resumo: multas.resumo(lista), multas: lista, consulta_automatica: require('../lib/multasConsulta').configurado(), situacoes: multas.SITUACOES,
+    res.json({ resumo: multas.resumo(lista), multas: lista, consulta_automatica: require('../lib/multasConsulta').configurado(), automatica: require('../lib/multasConsulta').situacao(db), situacoes: multas.SITUACOES,
       gravidades: multas.GRAVIDADES, empresas: db.prepare("SELECT id, nome FROM empresas WHERE status <> 'excluida' ORDER BY nome").all() });
+  });
+  const consultaMultas = require('../lib/multasConsulta');
+  r.get('/multas/consultas', (req, res) => res.json({ ligada: consultaMultas.configurado(), automatica: consultaMultas.situacao(db),
+    consultas: consultaMultas.historico(db, { limite: 50 }), veiculos: [] }));
+  r.get('/multas/consultas/:id', (req, res) => res.json(consultaMultas.consulta(db, nid(req))));
+  r.post('/multas/consultar-placa', async (req, res, next) => {
+    try {
+      const r2 = await consultaMultas.consultarPlaca(db, { placa: req.body.placa, renavam: req.body.renavam, usuarioId: req.usuario.id });
+      registrar(db, req, 'multas_consulta', { placa: r2.placa, multas: r2.multas.length, apontamentos: r2.apontamentos.length });
+      res.json(r2);
+    } catch (err) { next(err); }
   });
   r.get('/multas/arquivos/:id', (req, res) => {
     const a = multas.arquivo(db, null, req.params.id);

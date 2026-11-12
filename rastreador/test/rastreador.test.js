@@ -493,6 +493,29 @@ test('Rastreador', async (t) => {
     const minhas = (await api.get('/motorista/multas', tk)).dados.multas;
     assert.deepEqual(minhas.map((m) => m.auto_infracao), ['SP12345678']);
     assert.ok(!('observacao' in minhas[0]));
+    // Consultar multas na hora (serviço de consulta simulado): multa nova entra na central; apontamentos aparecem; erro sem serviço.
+    assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, cliente)).status, 422, 'sem o serviço contratado');
+    const http = require('node:http');
+    const falso = http.createServer((q, s2) => { s2.setHeader('Content-Type', 'application/json'); s2.end(JSON.stringify({
+      multas: [{ auto: 'RJ999', descricao: 'Avançar o sinal vermelho', gravidade: 'Gravíssima', valor: '293,47', data_hora: new Date(Date.now() - 86_400_000).toISOString() }],
+      apontamentos: [{ tipo: 'ipva', descricao: 'IPVA 2026', valor: 1200.5, situacao: 'vencido' }] })); }).listen(0);
+    await new Promise((ok) => falso.once('listening', ok));
+    process.env.RASTREADOR_MULTAS_URL = `http://127.0.0.1:${falso.address().port}/`;
+    process.env.RASTREADOR_MULTAS_CHAVE = 'teste';
+    try {
+      const c1 = await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC-1D23' }, cliente);
+      assert.equal(c1.status, 200);
+      assert.equal(c1.dados.novas, 1);
+      assert.equal(c1.dados.multas[0].gravidade, 'gravissima');
+      assert.equal(c1.dados.apontamentos[0].valor_centavos, 120050);
+      assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, cliente)).dados.multas[0].na_central, true, 'segunda vez: já na central');
+      const hist = (await api.get(`${base()}/multas/consultas`, operador)).dados;
+      assert.equal(hist.ligada, true);
+      assert.ok(hist.consultas.length >= 3);
+      assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, operador)).status, 403, 'operador não consulta');
+    } finally {
+      delete process.env.RASTREADOR_MULTAS_URL; delete process.env.RASTREADOR_MULTAS_CHAVE; falso.close();
+    }
     db.prepare('DELETE FROM condutores WHERE veiculo_id = ? AND motorista_id = ?').run(veiculo, mot.id);
     db.prepare('UPDATE multas SET motorista_id = NULL WHERE motorista_id = ?').run(mot.id);
     assert.equal((await api.del(`${base()}/motoristas/${mot.id}`, undefined, cliente)).status, 204);

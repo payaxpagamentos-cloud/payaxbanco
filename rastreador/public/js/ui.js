@@ -252,6 +252,7 @@ const P = {
   play: 'M7 4l13 8-13 8z',
   pausa: 'M7 4h3v16H7zM14 4h3v16h-3z',
   check: 'M4 12l5 5L20 6',
+  lupa: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4.2-4.2',
   multa: 'M6 2h9l5 5v15H6zM14 2v6h6M13 11v5M13 19h.01',
   fechar: 'M6 6l12 12M18 6 6 18',
   expandir: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
