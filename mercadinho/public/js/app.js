@@ -100,7 +100,6 @@ function telaLogin(erro) {
     });
   }
 
-  const pilula = (simbolo, texto) => el('span', { class: 'pilula' }, icone(simbolo), texto);
   const nome = estado.publico.nome_mercado || 'Mercado Binho';
 
   limpar($('#app'), el('div', { class: 'entrada' },
@@ -109,8 +108,6 @@ function telaLogin(erro) {
 
     el('div', { class: 'painel-entrada' },
       el('div', { class: 'vitrine' },
-        el('p', { class: 'chamada' }, 'Vendas, estoque e financeiro em um só lugar.'),
-        el('div', { class: 'pilulas' }, pilula('pdv', 'PDV'), pilula('produtos', 'Estoque'), pilula('financeiro', 'Financeiro')),
         el('img', { class: 'loja', src: `${RAIZ}/img/loja.webp`, alt: '', 'aria-hidden': 'true' })),
 
       el('div', { class: 'cartao caixa' },
