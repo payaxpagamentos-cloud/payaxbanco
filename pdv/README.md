@@ -168,6 +168,44 @@ Mesma ideia, com a chave do PDV (`X-Api-Key: pdv_<prefixo>_<segredo>`), usada s�
 `scripts/maquininha-exemplo.js` é um aplicativo de exemplo completo (buscar → passar o cartão → devolver o
 resultado), pronto para trocar a função `passarCartao` pelo SDK da adquirente.
 
+## Antes de ligar em produção
+
+### 1. Homologar o IXC do provedor
+
+Os nomes de recurso e de campo mudam entre versões do IXC. Rode **na rede do provedor**, contra um IXC de
+**homologação** (nunca o de produção na primeira vez):
+
+```bash
+node scripts/homologar-ixc.js https://ixc.seuprovedor.com.br 7:hash-do-token \
+  --cpf 529.982.247-25 --baixar 98765 --tipo-recebimento 3 --conta 2 --estornar
+```
+
+Ele confere, um a um: conexão e token, busca do cliente por CPF/CNPJ, contratos, faturas em aberto, a **baixa**
+(igualzinha à que o PDV faz), a releitura da fatura para ver se o IXC gravou situação e valor certos, e o
+**estorno** que devolve a fatura ao estado anterior. No fim mostra o que passou e o que falhou, com os valores
+que o IXC devolveu. Se algo falhar, é só ajustar `server/lib/ixc.js`, onde ficam todos os nomes de recurso e campo.
+
+Anote também, no IXC, os **ids do tipo de recebimento** (dinheiro, PIX, débito, crédito) e o **id da conta**:
+são eles que vão em *Configurações › IXC* para a baixa cair na conta certa.
+
+### 2. Preparar a maquininha
+
+| Modo | Quando usar | O que falta fazer |
+|---|---|---|
+| **Aplicativo na maquininha** | Maquininha inteligente (Stone, PagBank, Cielo LIO, Mercado Pago, GetNet) | Um aplicativo no aparelho que busque a cobrança no PDV e devolva o resultado. Base pronta: `scripts/maquininha-exemplo.js` — troque `passarCartao` pelo SDK da adquirente. |
+| **Adquirente (webhook)** | Intermediador/TEF com API própria | Apontar o endereço no cadastro da maquininha. O PDV faz `POST` nesse endereço com `{ referencia, forma, valor_centavos, parcelas, serial, adquirente }` e espera o retorno em `POST /api/integracao/terminal/resultado` com a mesma `referencia`. |
+| **Digitado pelo operador** | Maquininha avulsa, sem integração | Nada: o operador passa o cartão no aparelho e digita o NSU no PDV. Não serve para o totem (lá não há operador). |
+
+Enquanto o aparelho não chega, dá para testar tudo com a **maquininha simulada**:
+
+```bash
+node scripts/maquininha-simulada.js https://SEU-DOMINIO/pdv pdv_<prefixo>_<segredo> --demora 4
+# --negar, --alternar e --ignorar testam cartão recusado, alternado e cobrança que expira
+```
+
+Ela responde como o aparelho responderia: o balcão e o totem funcionam de ponta a ponta, inclusive a baixa no
+IXC. Use só em ambiente de teste — cada aprovação vira um recebimento de verdade.
+
 ## Tecnologia e arquitetura
 
 Node.js 22 + Express, SQLite nativo (`node:sqlite`), telas em HTML/CSS/JS puros sem build, testes com
@@ -190,7 +228,10 @@ pdv/
     lib/autoatendimento.js # tela do cliente: chave do PDV, consulta por CPF/CNPJ e recebimento sem caixa
   public/                 # painel: js/telas/pdv.js (balcão), caixa, recebimentos, conferência, maquininhas, cadastros, configurações
   public/cliente/         # tela do cliente (autoatendimento), com teclado grande e o logo do provedor
-  scripts/maquininha-exemplo.js
+  scripts/
+    homologar-ixc.js      # confere, contra o IXC do provedor, tudo o que o PDV usa (inclusive baixa e estorno)
+    maquininha-exemplo.js # base do aplicativo que roda na maquininha
+    maquininha-simulada.js# responde como o aparelho, para testar sem maquininha
   test/                   # fluxo do balcão, cartão, IXC fora do ar e isolamento entre empresas
 ```
 

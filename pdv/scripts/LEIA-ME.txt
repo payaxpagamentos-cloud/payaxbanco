@@ -110,7 +110,18 @@ Quem emite as faturas continua sendo o IXC: o PDV só consulta e baixa.
      - Digitado pelo operador: sem integração; o operador passa o cartão e digita o NSU.
 
 
-9) TELA DO CLIENTE (a que fica virada para quem vai pagar)
+9) ANTES DE LIGAR DE VERDADE (na pasta maquininha/ deste pacote)
+   a) Homologar o IXC do provedor (rode na rede do provedor, num IXC de homologação):
+        node maquininha/homologar-ixc.js https://ixc.seuprovedor.com.br 7:hash --cpf 000.000.000-00 \
+             --baixar <fatura de teste> --tipo-recebimento 3 --conta 2 --estornar
+      Confere conexão, token, cliente, contratos, faturas, a baixa e o estorno. Se algo falhar, mande a saída
+      para quem cuida do PDV: os nomes de recurso e campo do IXC ficam todos em server/lib/ixc.js.
+   b) Testar sem maquininha (ambiente de teste):
+        node maquininha/maquininha-simulada.js https://SEU-DOMINIO/pdv pdv_<prefixo>_<segredo> --demora 4
+      Responde como o aparelho. Cada aprovação vira um recebimento de verdade, com baixa no IXC.
+
+
+10) TELA DO CLIENTE (a que fica virada para quem vai pagar)
    O cliente digita o CPF/CNPJ, vê as faturas em aberto, escolhe quais pagar e passa o cartão na maquininha.
      1. No painel: Lojas, PDVs e usuários > no PDV onde a tela vai ficar > "Ligar tela do cliente".
         A chave aparece UMA ÚNICA VEZ (botão "Copiar endereço + chave").
@@ -127,11 +138,11 @@ Quem emite as faturas continua sendo o IXC: o PDV só consulta e baixa.
    Os recebimentos aparecem no painel com origem "Tela do cliente" e entram na mesma conferência com o IXC.
 
 
-10) CÓPIAS DE SEGURANÇA
+11) CÓPIAS DE SEGURANÇA
    Tudo fica na pasta pdv/data: o banco (pdv.db) e as imagens enviadas pelo painel (data/arquivos).
    Copie essa pasta com frequência: é nela que estão os recebimentos, os caixas, a conferência e a arte da tela.
 
 
-11) ATUALIZAR PARA UMA VERSÃO NOVA
+12) ATUALIZAR PARA UMA VERSÃO NOVA
    Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
    NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart pdv).

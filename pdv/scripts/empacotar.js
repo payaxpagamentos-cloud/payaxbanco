@@ -48,9 +48,11 @@ PDV_TRUST_PROXY=1
 `;
 fs.writeFileSync(path.join(pasta, '.env'), env, { mode: 0o600 });
 fs.copyFileSync(path.join(raiz, 'scripts', 'LEIA-ME.txt'), path.join(pasta, 'LEIA-ME.txt'));
-// Exemplo do aplicativo da maquininha, para quem for integrar o aparelho.
+// Ferramentas da instalação: exemplo e simulador da maquininha e a homologação do IXC.
 fs.mkdirSync(path.join(pasta, 'maquininha'), { recursive: true });
-fs.copyFileSync(path.join(raiz, 'scripts', 'maquininha-exemplo.js'), path.join(pasta, 'maquininha', 'maquininha-exemplo.js'));
+for (const arquivo of ['maquininha-exemplo.js', 'maquininha-simulada.js', 'homologar-ixc.js']) {
+  fs.copyFileSync(path.join(raiz, 'scripts', arquivo), path.join(pasta, 'maquininha', arquivo));
+}
 fs.mkdirSync(path.join(pasta, 'data'), { recursive: true });
 
 const zip = path.join(saida, 'pdv.zip');
