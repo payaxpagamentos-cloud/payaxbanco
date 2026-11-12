@@ -534,7 +534,13 @@ test('Rastreador', async (t) => {
       assert.equal(c1.dados.novas, 1);
       assert.equal(c1.dados.multas[0].gravidade, 'gravissima');
       assert.equal(c1.dados.apontamentos[0].valor_centavos, 120050);
-      assert.equal((await consultar('ABC1D23')).dados.multas[0].na_central, true, 'segunda vez: já na central');
+      const repetida = await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, cliente);
+      assert.equal(repetida.dados.guardada, true, 'consultada há pouco: volta na hora, sem pagar de novo');
+      assert.equal(repetida.dados.id, c1.c.id);
+      const forcada = await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23', forcar: true }, cliente);
+      assert.notEqual(forcada.dados.id, c1.c.id, 'consultar de novo agora faz uma consulta nova');
+      for (let i = 0; i < 50 && (await api.get(`${base()}/multas/consultas/${forcada.dados.id}`, cliente)).dados.status === 'consultando'; i++) await new Promise((ok) => { setTimeout(ok, 30); });
+      assert.equal((await api.get(`${base()}/multas/consultas/${forcada.dados.id}`, cliente)).dados.resultado.multas[0].na_central, true, 'segunda vez: já na central');
       const hist = (await api.get(`${base()}/multas/consultas`, operador)).dados;
       assert.equal(hist.ligada, true);
       assert.equal(hist.automatica.intervalo_dias, 0, 'manual por padrão');
@@ -562,6 +568,12 @@ test('Rastreador', async (t) => {
       assert.equal(c4.status, 'erro');
       assert.match(c4.erro, /DETRAN não respondeu/);
       instavel.close(); delete process.env.RASTREADOR_MULTAS_ESPERA_MS;
+      // Limpar o histórico: saem os erros (e os testes); ficam as que deram certo.
+      assert.equal((await api.del(`${base()}/multas/consultas/limpar`, undefined, operador)).status, 403);
+      const limpo = await api.del(`${base()}/multas/consultas/limpar`, undefined, cliente);
+      assert.ok(limpo.dados.apagadas >= 1);
+      const depois = (await api.get(`${base()}/multas/consultas`, cliente)).dados.consultas;
+      assert.ok(depois.length >= 1 && depois.every((x) => !x.erro && x.status === 'ok'));
     } finally {
       delete process.env.RASTREADOR_MULTAS_URL; delete process.env.RASTREADOR_MULTAS_CHAVE; falso.close();
     }
@@ -578,7 +590,7 @@ test('Rastreador', async (t) => {
     await new Promise((ok) => ab.once('listening', ok));
     Object.assign(process.env, { RASTREADOR_MULTAS_FORNECEDOR: 'apibrasil', RASTREADOR_MULTAS_CHAVE: 'teste', RASTREADOR_MULTAS_URL_ASYNC: `http://127.0.0.1:${ab.address().port}/`, RASTREADOR_MULTAS_INTERVALO_MS: '20' });
     try {
-      const ini = await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, cliente);
+      const ini = await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23', forcar: true }, cliente);
       let c5;
       for (let i = 0; i < 100; i++) { c5 = (await api.get(`${base()}/multas/consultas/${ini.dados.id}`, cliente)).dados; if (c5.status !== 'consultando') break; await new Promise((ok) => { setTimeout(ok, 30); }); }
       assert.equal(c5.status, 'ok', c5.erro);

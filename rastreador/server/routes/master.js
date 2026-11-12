@@ -516,10 +516,15 @@ module.exports = (db, extras = {}) => {
     registrar(db, req, 'multas_intervalo', { dias: d });
     res.json({ intervalo_dias: d });
   });
+  r.delete('/multas/consultas/limpar', (req, res) => {
+    const n = consultaMultas.limparHistorico(db);
+    registrar(db, req, 'multas_consultas_limpas', { apagadas: n });
+    res.json({ apagadas: n });
+  });
   r.get('/multas/consultas/:id', (req, res) => res.json(consultaMultas.consulta(db, nid(req))));
   r.post('/multas/consultar-placa', async (req, res, next) => {
     try {
-      const { pronto: _p, ...r2 } = consultaMultas.iniciarConsulta(db, { placa: req.body.placa, renavam: req.body.renavam, usuarioId: req.usuario.id,
+      const { pronto: _p, ...r2 } = consultaMultas.iniciarConsulta(db, { placa: req.body.placa, renavam: req.body.renavam, usuarioId: req.usuario.id, forcar: Boolean(req.body.forcar),
         urlRetorno: `${config.urlPublica || `${req.protocol}://${req.get('host')}${config.basePath}`}/api/publico/multas-retorno` });
       registrar(db, req, 'multas_consulta', { placa: r2.placa });
       res.status(202).json(r2);

@@ -74,6 +74,7 @@ function traduzirApiBrasil(j) {
   const limparDescricao = (d, id) => String(d ?? '').replace(new RegExp(`^\\s*multa\\s*-\\s*${String(id ?? '').replace(/[^\w]/g, '')}\\s*-\\s*`, 'i'), '').replace(/^\s*multa\s*-\s*/i, '').trim();
   const multas = listaMultas.map((m) => ({
     auto_infracao: m.identificador ?? null, orgao: m.fonte ?? null, infracao_codigo: null, descricao: limparDescricao(m.descricao, m.identificador) || 'Infração de trânsito', gravidade: null, pontos: null, sem_hora: semHora(m.dataHoraMulta),
+    linha_digitavel: m.linhaDigitavel && m.linhaDigitavel !== 'null' ? String(m.linhaDigitavel) : null,
     valor_centavos: Number.isFinite(Number(m.valor)) ? Math.round(Number(m.valor) * 100) : null, ocorrida_em: hora(m.dataHoraMulta), local_texto: m.local ?? null,
     municipio: m.uf ? `(${m.uf})` : null, prazo_indicacao: null, vencimento: m.dataVencimento ?? null,
   }));
@@ -91,7 +92,9 @@ function traduzirApiBrasil(j) {
   const restr = d.restricoes;
   if (Array.isArray(restr)) for (const r of restr) apontamentos.push({ tipo: 'restricao', descricao: typeof r === 'string' ? r : (r.descricao ?? r.tipo ?? JSON.stringify(r)), valor_centavos: null, situacao: r.situacao ?? 'ativa' });
   else if (restr && typeof restr === 'object') for (const [k, val] of Object.entries(restr)) if (val && val !== 'NADA CONSTA') apontamentos.push({ tipo: 'restricao', descricao: `${k}: ${typeof val === 'string' ? val : JSON.stringify(val)}`, valor_centavos: null, situacao: 'ativa' });
-  return { multas, apontamentos, custo: j.valor_consulta ?? null, homolog: Boolean(j.homolog) };
+  // PDF da consulta (quando a API Brasil gera): link https direto, aberto numa aba nova.
+  const pdf = typeof d.pdf === 'string' && /^https:\/\//i.test(d.pdf) ? d.pdf : null;
+  return { multas, apontamentos, pdf, custo: j.valor_consulta ?? null, homolog: Boolean(j.homolog) };
 }
 
 /** Pergunta ao serviço contratado, tentando de novo (até 2 vezes) quando a fonte (DETRAN) está fora do ar ou demora (502/503/504). */
@@ -166,7 +169,7 @@ async function perguntarAssincrona(placa, { urlRetorno } = {}) {
   const ini = await postarApiBrasil(URL_ASYNC(), { tipo: 'debitos-v4-async', placa, webhook_url: urlRetorno || 'https://127.0.0.1/sem-retorno', homolog });
   const job = ini?.data?.['job-id'] ?? ini?.['job-id'];
   if (!job) throw new ErroNegocio(`API Brasil: ${ini?.data?.msg || ini?.message || 'a consulta não foi aceita'}.`, 502);
-  const intervalo = Number(process.env.RASTREADOR_MULTAS_INTERVALO_MS) || 5000;
+  const intervalo = Number(process.env.RASTREADOR_MULTAS_INTERVALO_MS) || 2000; // a busca do resultado é gratuita: confere de 2 em 2 s
   const limite = Date.now() + (Number(process.env.RASTREADOR_MULTAS_LIMITE_MS) || 5 * 60_000);
   let ultima = null;
   while (Date.now() < limite) {
@@ -223,7 +226,7 @@ async function consultarVeiculo(db, veic) {
 // Consultas rodando agora (id → promessa), para o clique duplo não pagar duas vezes.
 const emAndamento = new Map();
 
-function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = null, urlRetorno = null }) {
+function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = null, urlRetorno = null, forcar = false }) {
   const p = multas.placaLimpa(placa);
   if (!/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(p)) throw new ErroNegocio('Informe uma placa válida (ex.: ABC1D23).', 422);
   if (!configurado()) throw new ErroNegocio('A consulta de multas ainda não foi ligada: falta contratar o serviço de consulta (DETRAN/SENATRAN).', 422);
@@ -233,6 +236,12 @@ function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = nul
   // A mesma placa já está sendo consultada (clique duplo, outra aba): acompanha aquela, sem pagar de novo.
   const andamento = db.prepare("SELECT id FROM multas_consultas WHERE placa = ? AND status = 'consultando' AND criado_em > ?").get(p, new Date(Date.now() - 4 * 60_000).toISOString());
   if (andamento) return { id: andamento.id, status: 'consultando', placa: p, pronto: emAndamento.get(andamento.id) ?? Promise.resolve() };
+  // Consultada com sucesso nas últimas 24 h: devolve na hora o resultado guardado (sem esperar o DETRAN e sem pagar de novo).
+  if (!forcar) {
+    const recente = db.prepare(`SELECT id, criado_em FROM multas_consultas WHERE placa = ? AND status = 'ok' AND erro IS NULL AND resultado NOT LIKE '%"homolog":true%'
+      AND criado_em > ? ${empresaId ? 'AND empresa_id = ?' : ''} ORDER BY id DESC LIMIT 1`).get(...[p, new Date(Date.now() - 24 * 3600_000).toISOString(), ...(empresaId ? [empresaId] : [])]);
+    if (recente) return { id: recente.id, status: 'ok', placa: p, guardada: true, consultado_em: recente.criado_em, pronto: Promise.resolve() };
+  }
   const id = Number(db.prepare(`INSERT INTO multas_consultas (empresa_id, placa, renavam, usuario_id, status, criado_em) VALUES (?, ?, ?, ?, 'consultando', ?)`)
     .run(empresaId ?? veic?.empresa_id ?? null, p, ren ?? veic?.renavam ?? null, usuarioId, agora()).lastInsertRowid);
   const fim = (campos) => db.prepare(`UPDATE multas_consultas SET status = ?, multas = ?, apontamentos = ?, novas = ?, resultado = ?, erro = ? WHERE id = ?`)
@@ -242,7 +251,7 @@ function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = nul
     // Em teste (homologação) os dados são de exemplo: nunca entram na central.
     const imp = veic && !r.homolog ? importar(db, veic.empresa_id, p, r.multas) : { novas: 0, resultado: r.multas.map((m) => ({ ...m, na_central: false, nova: false })) };
     if (veic) db.prepare('UPDATE veiculos SET multas_consulta_em = ? WHERE id = ?').run(agora(), veic.id);
-    const resultado = { placa: p, veiculo_da_frota: Boolean(veic), multas: imp.resultado, apontamentos: r.apontamentos, novas: imp.novas, consultado_em: agora(), custo: r.custo ?? null, homolog: r.homolog ?? false };
+    const resultado = { placa: p, veiculo_da_frota: Boolean(veic), multas: imp.resultado, apontamentos: r.apontamentos, novas: imp.novas, consultado_em: agora(), custo: r.custo ?? null, homolog: r.homolog ?? false, pdf: r.pdf ?? null };
     fim({ multas: r.multas.length, apontamentos: r.apontamentos.length, novas: imp.novas, resultado });
   }).catch((err) => { fim({ erro: err.message }); }).finally(() => emAndamento.delete(id));
   emAndamento.set(id, pronto);
@@ -256,6 +265,12 @@ async function consultarPlaca(db, args) {
   const c = consulta(db, id);
   if (c.status === 'erro') throw new ErroNegocio(c.erro, 502);
   return { id, ...c.resultado };
+}
+
+/** Apaga do histórico as consultas com erro e as de teste (homologação); ficam só as que deram certo. */
+function limparHistorico(db, { empresaId = null } = {}) {
+  return db.prepare(`DELETE FROM multas_consultas WHERE status <> 'consultando' AND (erro IS NOT NULL OR status = 'erro' OR resultado LIKE '%"homolog":true%')
+    ${empresaId ? 'AND empresa_id = ?' : ''}`).run(...(empresaId ? [empresaId] : [])).changes;
 }
 
 function historico(db, { empresaId = null, limite = 30 } = {}) {
@@ -307,4 +322,4 @@ function definirIntervalo(db, dias) {
   return d;
 }
 
-module.exports = { iniciarConsulta, traduzirApiBrasil, definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };
+module.exports = { limparHistorico, iniciarConsulta, traduzirApiBrasil, definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };
