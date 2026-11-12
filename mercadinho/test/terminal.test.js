@@ -5,9 +5,11 @@ const assert = require('node:assert/strict');
 const { iniciar } = require('./helpers');
 
 /** Prepara a loja: produtos, chave PIX e um terminal já pareado. */
-async function comTerminal(app, { pix = true } = {}) {
+async function comTerminal(app, { pix = true, conta = false } = {}) {
   const admin = await app.login();
   if (pix) await app.patch('/admin/config', { pix_chave: 'mercadinho@condominio.com.br' }, admin);
+  // A compra na conta do morador vem desligada de fábrica: o terminal nasce com cartão e PIX.
+  if (conta) await app.patch('/admin/config', { terminal_conta: true }, admin);
   const cafe = (await app.post('/produtos', { nome: 'Café 500g', codigo_barras: '7891000053508', preco: '21,90', custo: '15,00', estoque: '20', categoria_id: 1 }, admin)).dados;
   const agua = (await app.post('/produtos', { nome: 'Água 1,5L', preco: '3,99', custo: '2,20', estoque: '40', categoria_id: 2 }, admin)).dados;
   const criado = await app.post('/admin/terminais', { nome: 'Balcão do mercadinho' }, admin);
@@ -53,7 +55,10 @@ test('terminal: cliente monta o carrinho e paga no PIX', async (t) => {
 
   const inicio = await app.get('/terminal/inicio', token);
   assert.equal(inicio.dados.formas.pix, true);
-  assert.equal(inicio.dados.formas.fiado, true);
+  assert.equal(inicio.dados.formas.debito, true);
+  assert.equal(inicio.dados.formas.credito, true);
+  // De fábrica o terminal não vende na conta do morador.
+  assert.equal(inicio.dados.formas.fiado, false);
   assert.equal(inicio.dados.mercado.nome, 'Mercadinho do Condomínio');
 
   // Começa sem compra na tela.
@@ -107,7 +112,7 @@ test('terminal: cliente monta o carrinho e paga no PIX', async (t) => {
 test('terminal: compra na conta do morador com senha', async (t) => {
   const app = await iniciar();
   t.after(() => app.fechar());
-  const { admin, cafe, token } = await comTerminal(app);
+  const { admin, cafe, token } = await comTerminal(app, { conta: true });
   const morador = (await app.post('/moradores', { nome: 'Carla Souza', bloco: 'B', unidade: '304', limite: '50,00' }, admin)).dados;
 
   const venda = (await app.post('/terminal/venda', {}, token)).dados;
@@ -141,7 +146,7 @@ test('terminal: compra na conta do morador com senha', async (t) => {
 test('terminal: conta do morador confere o limite e lança na fatura', async (t) => {
   const app = await iniciar();
   t.after(() => app.fechar());
-  const { admin, cafe, token } = await comTerminal(app);
+  const { admin, cafe, token } = await comTerminal(app, { conta: true });
   const morador = (await app.post('/moradores', { nome: 'Roberto Lima', bloco: 'A', unidade: '202', limite: '30,00' }, admin)).dados;
   await app.post(`/moradores/${morador.id}/pin`, { pin: '2468' }, admin);
 

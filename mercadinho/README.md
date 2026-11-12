@@ -53,14 +53,22 @@ A administração pode desativar o terminal ou gerar um código novo a qualquer 
 1. A tela de espera pede para passar o primeiro produto no leitor. Quem leva hortifrúti, pão ou granel toca em
    **Produto sem código** e escolhe na tela; se for vendido por peso, digita o peso da balança num teclado grande.
 2. Cada item aparece na lista, com o total crescendo ao lado. Dá para **tirar um item** ou cancelar tudo.
-3. Em **Pagar**, escolhe como quer pagar:
-   * **PIX** — o QR Code aparece na tela com o valor certo; depois de pagar no banco, toca em "Já paguei".
-   * **Cartão** — débito, crédito à vista ou em 2x/3x. A cobrança vai para a maquininha e a tela acompanha até aprovar.
-   * **Minha conta** — digita o número do apartamento, escolhe o nome e confirma com uma **senha de 4 números**.
-     O sistema mostra quanto ainda cabe no limite e lança a compra na fatura do mês.
+3. Em **Pagar**, a tela mostra três opções, cada uma com um toque só:
+   * **Cartão de débito** e **cartão de crédito** — a cobrança vai direto para a maquininha e a tela acompanha
+     até aprovar, sem passos no meio.
+   * **PIX** — o QR Code aparece com o valor certo; depois de pagar no banco, o cliente toca em "Já paguei".
 4. A tela de fim mostra o resumo, oferece o cupom e volta sozinha ao início para o próximo cliente.
 
+A **conta do morador** (fiado no terminal) existe e vem **desligada**: ligue em *Configurações › Loja* se o
+mercadinho quiser vender na conta. Com ela ligada aparece uma quarta opção — o cliente digita o apartamento,
+escolhe o nome e confirma com uma **senha de 4 números**; o sistema mostra quanto ainda cabe no limite e lança
+a compra na fatura do mês.
+
 **Dinheiro não entra no terminal**: não há quem dê troco. Quais formas aparecem fica em *Configurações › Loja*.
+
+**O terminal tem visual próprio**: tela clara, de leitura fácil a um passo de distância, com a barra da marca
+no escuro do logo e o verde só nas ações. O painel da equipe continua no tema de vidro — são duas telas com
+públicos diferentes, e cada uma tem a sua folha de estilo (`public/css/terminal.css` e `public/css/vidro.css`).
 
 **Logo da loja.** O terminal mostra `public/img/binho-logo.png` no topo e na tela de espera, e
 `public/img/binho-simbolo.png` como ícone da aba e da tela inicial do tablet. Para trocar, substitua os dois

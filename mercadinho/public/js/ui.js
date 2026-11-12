@@ -74,6 +74,7 @@ const ICONES = {
   balanca: 'M12 2a3 3 0 0 1 2.8 2H20v2h-2.3l3.3 8c0 1.9-1.8 3-4 3s-4-1.1-4-3l3.3-8H14.8a3 3 0 0 1-1.8 1.8V20h4v2H7v-2h4V7.8A3 3 0 0 1 9.2 6H6.9l3.3 8c0 1.9-1.8 3-4 3s-4-1.1-4-3l3.3-8H3V4h6.2A3 3 0 0 1 12 2Z',
   usuarios: 'M9 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0 2c3.3 0 8 1.7 8 5v3H1v-3c0-3.3 4.7-5 8-5Zm8.5-2a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm.5 2c2.8.2 5 1.6 5 4.2V20h-4v-3c0-1.6-.8-2.9-2-3.8.3 0 .7-.1 1-.2Z',
   relogio: 'M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm1 3v5.3l3.5 2.1-1 1.7L11 13V7h2Z',
+  codigobarras: 'M2 4h2v16H2V4Zm3.5 0h1.2v16H5.5V4Zm2.8 0h2v16h-2V4Zm3.4 0h1.2v16h-1.2V4Zm2.6 0h2v16h-2V4Zm3.5 0h1.2v16h-1.2V4ZM20 4h2v16h-2V4Z',
 };
 export function icone(nome, classe) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

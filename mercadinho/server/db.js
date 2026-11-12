@@ -392,9 +392,10 @@ const CONFIG_PADRAO = {
   // Deixa a venda sair mesmo sem saldo no estoque (útil enquanto o cadastro está sendo ajustado).
   permitir_estoque_negativo: '0',
   // Formas que o terminal do cliente aceita (dinheiro fica de fora: não há quem dê troco).
+  // A conta do morador vem desligada: ligue em Configurações > Loja se o mercadinho vender fiado no terminal.
   terminal_pix: '1',
   terminal_cartao: '1',
-  terminal_conta: '1',
+  terminal_conta: '0',
   // Segundos até o terminal voltar sozinho para a tela inicial depois da compra.
   terminal_segundos_fim: '12',
   pix_chave: '',

@@ -135,8 +135,7 @@ function telaEspera() {
   pintar(topo('Passo 1 de 2'),
     el('div', { class: 'terminal-corpo' },
       el('div', { class: 'espera' }, el('div', { class: 'conteudo-espera' },
-        logo('logo-espera'),
-        el('div', { class: 'alvo-leitor' }, icone('busca')),
+        el('div', { class: 'alvo-leitor' }, icone('codigobarras')),
         el('h1', {}, 'Passe o produto no ', el('em', {}, 'leitor')),
         el('p', {}, 'Um de cada vez. O que você passar aparece aqui na tela — no fim, é só escolher como pagar.'),
         el('button', { class: 'btn grande', style: 'max-width: 380px', onclick: telaSemCodigo }, icone('produtos'), 'Produto sem código de barras')))));
@@ -167,7 +166,7 @@ function telaCompra() {
           : el('div', { class: 'vazio' }, 'Passe o primeiro produto no leitor.'))),
 
       el('aside', { class: 'resumo' },
-        el('div', { class: 'cartao' },
+        el('div', { class: 'cartao caixa-total' },
           el('div', { class: 'rotulo-total' }, 'Total a pagar'),
           el('div', { class: 'valor-total' }, dinheiro(venda?.total_centavos ?? 0))),
         el('button', { class: 'btn primario enorme', disabled: !itens.length, onclick: () => { estado.tela = 'pagamento'; montar(); } }, icone('dinheiro'), 'Pagar'),
@@ -210,22 +209,30 @@ const acaoSegura = async (fn) => {
 };
 
 /* ---------- pagamento ---------- */
+/**
+ * Uma tela, três caminhos: débito e crédito vão direto para a maquininha e o PIX mostra o QR.
+ * A conta do morador só aparece se a loja tiver ligado essa forma nas configurações.
+ */
 function telaPagamento() {
   const formas = estado.inicio.formas;
-  const opcao = (chave, rotulo, nota, simbolo, aoTocar) => (formas[chave]
-    ? el('button', { class: 'opcao-pagamento', onclick: aoTocar }, el('span', { class: 'circulo' }, icone(simbolo)), rotulo, el('small', {}, nota))
-    : null);
+  const opcoes = [
+    formas.debito && { rotulo: 'Cartão de débito', nota: 'Insira ou aproxime o cartão na maquininha', simbolo: 'cartao', aoTocar: () => cobrarCartao('debito') },
+    formas.credito && { rotulo: 'Cartão de crédito', nota: 'Insira ou aproxime o cartão na maquininha', simbolo: 'cartao', aoTocar: () => cobrarCartao('credito') },
+    formas.pix && { rotulo: 'PIX', nota: 'Leia o QR Code no aplicativo do seu banco', simbolo: 'pix', aoTocar: telaPix },
+    formas.fiado && { rotulo: 'Minha conta', nota: 'Vai para a fatura do mês do seu apartamento', simbolo: 'moradores', aoTocar: telaConta },
+  ].filter(Boolean);
 
   pintar(topo('Passo 2 de 2'),
     el('div', { class: 'terminal-corpo' },
       el('div', { class: 'linha entre' },
-        el('div', {}, el('h1', { style: 'margin-bottom: 4px' }, 'Como você quer pagar?'),
-          el('p', { class: 'mudo', style: 'margin: 0' }, `Total de ${dinheiro(estado.venda.total_centavos)}`)),
+        el('div', {},
+          el('h1', { style: 'margin-bottom: 6px' }, 'Como você quer pagar?'),
+          el('p', { class: 'mudo', style: 'margin: 0; font-size: 19px' }, `Total de ${dinheiro(estado.venda.total_centavos)}`)),
         el('button', { class: 'btn grande', style: 'width: auto', onclick: () => { estado.tela = 'compra'; montar(); } }, icone('voltar'), 'Voltar')),
-      el('div', { class: 'escolha-pagamento' },
-        opcao('pix', 'PIX', 'Leia o QR Code com o banco', 'pix', telaPix),
-        opcao('debito', 'Cartão', 'Débito ou crédito na maquininha', 'cartao', () => telaCartao()),
-        opcao('fiado', 'Minha conta', 'Vai para a fatura do mês', 'moradores', () => telaConta()))));
+      opcoes.length
+        ? el('div', { class: 'escolha-pagamento' }, opcoes.map((o) => el('button', { class: 'opcao-pagamento', onclick: o.aoTocar },
+          el('span', { class: 'circulo' }, icone(o.simbolo)), o.rotulo, el('small', {}, o.nota))))
+        : el('div', { class: 'cartao' }, el('div', { class: 'vazio' }, 'Nenhuma forma de pagamento disponível. Chame a administração.'))));
 }
 
 async function telaPix() {
@@ -235,7 +242,7 @@ async function telaPix() {
     const pix = await api.post(`/venda/${estado.venda.id}/pix`, {});
     pintar(topo('Pagamento'),
       el('div', { class: 'terminal-corpo' }, el('div', { class: 'cartao painel-pagar' },
-        el('h1', { style: 'margin: 0' }, 'Pague com PIX'),
+        el('h1', {}, 'Pague com PIX'),
         el('p', { class: 'mudo', style: 'margin: 0' }, 'Abra o aplicativo do seu banco e leia o código.'),
         el('img', { class: 'qr', src: pix.qrcode, alt: 'QR Code do PIX' }),
         el('div', { class: 'valor' }, dinheiro(pix.valor_centavos)),
@@ -252,36 +259,24 @@ async function telaPix() {
   }
 }
 
-function telaCartao() {
-  const maquininha = estado.inicio.maquininhas[0];
-  const botao = (forma, rotulo, parcelas = 1) => el('button', { class: 'btn primario enorme', style: 'max-width: 440px', onclick: () => cobrarCartao(forma, parcelas) },
-    icone('cartao'), rotulo);
-  pintar(topo('Pagamento'), el('div', { class: 'terminal-corpo' }, el('div', { class: 'cartao painel-pagar' },
-    el('h1', { style: 'margin: 0' }, 'Pagamento no cartão'),
-    el('div', { class: 'valor' }, dinheiro(estado.venda.total_centavos)),
-    el('p', { class: 'mudo', style: 'margin: 0' }, maquininha ? `Vamos enviar a cobrança para a ${maquininha.nome}.` : 'Nenhuma maquininha disponível.'),
-    botao('debito', 'Débito'),
-    botao('credito', 'Crédito à vista'),
-    el('div', { class: 'linha', style: 'justify-content: center' },
-      [2, 3].map((n) => el('button', { class: 'btn grande', style: 'width: auto', onclick: () => cobrarCartao('credito', n) }, `Crédito ${n}x`))),
-    el('button', { class: 'btn grande', style: 'max-width: 440px', onclick: () => { estado.tela = 'pagamento'; montar(); } }, 'Escolher outra forma'))));
-}
-
 /** Manda a cobrança para a maquininha e acompanha até aprovar, negar ou o cliente desistir. */
-async function cobrarCartao(forma, parcelas) {
+async function cobrarCartao(forma) {
   const maquininha = estado.inicio.maquininhas[0];
+  const nome = forma === 'debito' ? 'Cartão de débito' : 'Cartão de crédito';
   if (!maquininha) return toast('Nenhuma maquininha disponível. Escolha outra forma.', 'erro');
   let cancelado = false;
   const mostrar = (texto, extra = null) => pintar(topo('Pagamento'), el('div', { class: 'terminal-corpo' }, el('div', { class: 'cartao painel-pagar' },
-    el('div', { class: 'aguardando' }, el('div', { class: 'girando' }), el('h2', { style: 'margin: 0' }, texto),
-      el('p', { class: 'mudo' }, 'Siga as instruções na maquininha: insira ou aproxime o cartão.')),
+    el('div', { class: 'aguardando' },
+      el('div', { class: 'girando' }),
+      el('h1', {}, texto),
+      el('p', { class: 'mudo', style: 'margin: 0' }, `${nome} · siga as instruções na maquininha.`)),
     el('div', { class: 'valor' }, dinheiro(estado.venda.total_centavos)),
     extra)));
   mostrar('Enviando para a maquininha…');
 
   try {
-    let cobranca = await api.post(`/venda/${estado.venda.id}/cartao`, { maquininha_id: maquininha.id, forma, parcelas });
-    mostrar('Aguardando o cartão…', el('button', { class: 'btn grande perigo', style: 'max-width: 380px', onclick: () => { cancelado = true; estado.tela = 'pagamento'; montar(); } }, 'Desistir'));
+    let cobranca = await api.post(`/venda/${estado.venda.id}/cartao`, { maquininha_id: maquininha.id, forma, parcelas: 1 });
+    mostrar('Passe o cartão', el('button', { class: 'btn grande', style: 'max-width: 380px', onclick: () => { cancelado = true; estado.tela = 'pagamento'; montar(); } }, 'Escolher outra forma'));
     let tentativas = 0;
     while (cobranca.status === 'pendente' && tentativas < 60 && !cancelado) {
       await new Promise((r) => setTimeout(r, 2000));
