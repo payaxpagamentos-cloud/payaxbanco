@@ -8,10 +8,74 @@
 import { api } from './api.js';
 import { el, limpar, toast, formModal, modal, confirmar, campo, area, escolha, etiqueta, placa, dinheiro, dataHora, data, kmh, centavos, reaisCampo, icone } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone } from './comum.js';
-import { linkGoogle } from './mapa.js';
+import { linkGoogle, configPublica } from './mapa.js';
 
 const TOM = { notificada: 'aviso', condutor_indicado: 'info', em_recurso: 'info', a_pagar: 'erro', paga: 'ok', cancelada: '' };
 const GRAV = { leve: 'Leve', media: 'Média', grave: 'Grave', gravissima: 'Gravíssima' };
+const quandoMulta = (m) => (m.ocorrida_em ? (m.sem_hora ? new Date(m.ocorrida_em).toLocaleDateString('pt-BR') : dataHora(m.ocorrida_em)) : '—');
+const escHtml = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const LOGO = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#04131F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+  + '<path d="M19.07 4.93A10 10 0 0 0 6.99 3.34M4 6h.01M2.29 9.62A10 10 0 1 0 21.31 8.35M16.24 7.76A6 6 0 1 0 8.23 16.67M12 18h.01M17.99 11.66A6 6 0 0 1 15.77 16.67M14 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM13.41 10.59l5.66-5.66"/></svg>';
+
+/**
+ * Ficha da multa: uma página com a logo do Rastreador e os dados da infração, pronta para imprimir ou salvar em PDF
+ * (Imprimir → Salvar como PDF). Abre numa aba nova.
+ */
+export async function fichaMulta(m, { placaTxt, origem, condutor } = {}) {
+  const janela = window.open('', '_blank');
+  if (!janela) return toast('Libere as janelas (pop-up) deste site para ver a multa.', true);
+  const nome = (await configPublica().catch(() => null))?.nome ?? 'Rastreador';
+  const linha = (rot, val) => (val ? `<tr><th>${escHtml(rot)}</th><td>${escHtml(val)}</td></tr>` : '');
+  const pl = placa(placaTxt ?? m.placa ?? '');
+  janela.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Multa ${escHtml(m.auto_infracao ?? '')} · ${escHtml(pl)}</title>
+<style>
+  *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#0B1A2E;background:#EEF2F7}
+  .folha{max-width:760px;margin:24px auto;background:#fff;border-radius:16px;box-shadow:0 10px 30px rgba(8,16,38,.12);overflow:hidden}
+  .topo{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 26px;background:#0B1528;color:#fff}
+  .marca{display:flex;align-items:center;gap:12px;font-weight:800;font-size:20px}
+  .marca span.ic{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#34E1C2,#22B8A0)}
+  .topo small{display:block;font-weight:500;font-size:12px;opacity:.75}
+  .doc{text-align:right;font-size:12px;opacity:.85}
+  .corpo{padding:24px 26px}
+  .placa{display:inline-block;border:2px solid #0B1A2E;border-radius:6px;padding:4px 12px;font-weight:800;letter-spacing:2px;font-size:20px}
+  h1{font-size:19px;line-height:1.35;margin:16px 0 6px}
+  .valor{font-size:30px;font-weight:800;color:#B42318;margin:8px 0 18px}
+  table{width:100%;border-collapse:collapse;font-size:14px} th{width:38%;text-align:left;color:#5B6576;font-weight:600;padding:9px 0;border-bottom:1px solid #E6EAF0}
+  td{padding:9px 0;border-bottom:1px solid #E6EAF0;font-weight:600}
+  .rodape{padding:14px 26px 22px;color:#6B7485;font-size:12px}
+  .acoes{max-width:760px;margin:0 auto 30px;display:flex;justify-content:flex-end;gap:10px;padding:0 4px}
+  button{border:0;border-radius:10px;padding:11px 18px;font-weight:700;font-size:14px;cursor:pointer;background:linear-gradient(135deg,#1D4ED8,#0E7490);color:#fff}
+  button.sec{background:#fff;color:#0B1A2E;border:1px solid #D5DBE5}
+  @media print{body{background:#fff}.folha{box-shadow:none;margin:0;border-radius:0}.acoes{display:none}.topo{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<div class="folha">
+  <div class="topo"><div class="marca"><span class="ic">${LOGO}</span><div>${escHtml(nome)}<small>Central de multas</small></div></div>
+    <div class="doc">Ficha da multa<br>${escHtml(new Date().toLocaleString('pt-BR'))}</div></div>
+  <div class="corpo">
+    <span class="placa">${escHtml(pl)}</span>
+    <h1>${escHtml(m.descricao ?? 'Infração de trânsito')}</h1>
+    ${m.valor_centavos != null ? `<div class="valor">${escHtml(dinheiro(m.valor_centavos))}</div>` : ''}
+    <table>
+      ${linha('Data da infração', quandoMulta(m))}
+      ${linha('Auto de infração', m.auto_infracao)}
+      ${linha('Órgão / fonte', m.orgao)}
+      ${linha('Código da infração', m.infracao_codigo)}
+      ${linha('Gravidade', m.gravidade ? `${GRAV[m.gravidade]}${m.pontos ? ` · ${m.pontos} pontos` : ''}` : (m.pontos ? `${m.pontos} pontos` : ''))}
+      ${linha('Local', [m.local_texto, m.municipio].filter(Boolean).join(' · '))}
+      ${linha('Vencimento', m.vencimento ? data(m.vencimento) : '')}
+      ${linha('Indicar o condutor até', m.prazo_indicacao ? data(m.prazo_indicacao) : '')}
+      ${linha('Condutor', condutor)}
+      ${linha('Situação', m.situacao ? ({ notificada: 'Notificada', condutor_indicado: 'Condutor indicado', em_recurso: 'Em recurso', a_pagar: 'A pagar', paga: 'Paga', cancelada: 'Cancelada' }[m.situacao] ?? m.situacao) : '')}
+    </table>
+  </div>
+  <div class="rodape">${escHtml(origem ?? 'Dados da Central de multas.')} Documento informativo; o auto de infração oficial é o do órgão autuador.</div>
+</div>
+<div class="acoes"><button class="sec" onclick="window.close()">Fechar</button><button onclick="window.print()">Imprimir / salvar PDF</button></div>
+</body></html>`);
+  janela.document.close();
+}
+
 const INTERVALO = { 0: 'só quando alguém consultar (manual)', 1: 'todo dia', 7: 'uma vez por semana', 15: 'a cada 15 dias' };
 const prazoTexto = (dias, data_) => (dias === null || dias === undefined ? '—' : dias < 0 ? `venceu (${data(data_)})` : dias === 0 ? 'hoje' : `${dias} dia(s) · ${data(data_)}`);
 const paraLocal = (iso) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
@@ -88,6 +152,7 @@ async function detalheMulta(ctx, dados, id, { master, gestor, aoMudar }) {
           (d) => api.put(`/empresas/${ctx.empresaId}/multas/${m.id}`, { situacao: d.situacao }));
         if (r) { toast('Situação atualizada.'); fechar(); aoMudar(); }
       }),
+      botao([icone('multa'), 'Ver multa'], '', () => fichaMulta(m, { condutor: m.motorista, origem: m.fonte === 'consulta' ? 'Encontrada pela consulta de multas.' : 'Cadastrada na Central de multas.' })),
       botao('Editar', '', async () => { fechar(); if (await formMulta(ctx, dados, m)) { toast('Multa salva.'); aoMudar(); } }),
       botao('Excluir', 'perigo', async () => {
         if (!await confirmar('Excluir a multa', 'A multa e a notificação anexada são apagadas.', 'Excluir')) return;
@@ -99,7 +164,7 @@ async function detalheMulta(ctx, dados, id, { master, gestor, aoMudar }) {
         etiqueta(m.fonte === 'consulta' ? 'consulta automática' : 'cadastrada', '')),
       el('h3', { style: 'margin:0 0 8px' }, m.descricao),
       master ? linha('Empresa', m.empresa) : null,
-      linha('Data e hora', dataHora(m.ocorrida_em)), linha('Local', [m.local_texto, m.municipio].filter(Boolean).join(' · ') || '—'),
+      linha(m.sem_hora ? 'Data' : 'Data e hora', quandoMulta(m)), linha('Local', [m.local_texto, m.municipio].filter(Boolean).join(' · ') || '—'),
       linha('Auto / órgão', [m.auto_infracao, m.orgao, m.infracao_codigo ? `código ${m.infracao_codigo}` : null].filter(Boolean).join(' · ') || '—'),
       linha('Valor', m.valor_centavos !== null ? dinheiro(m.valor_centavos) : '—'),
       linha('Indicar o condutor até', prazoTexto(m.dias_indicacao, m.prazo_indicacao)), linha('Vencimento', prazoTexto(m.dias_vencimento, m.vencimento)),
@@ -149,7 +214,7 @@ async function telaMultas(ctx, { master = false } = {}) {
           ? (dados.automatica?.intervalo_dias ? `Consulta automática ligada (DETRAN-${dados.automatica.uf}): os veículos são consultados ${INTERVALO[dados.automatica.intervalo_dias]}.` : `Consulta ligada ao DETRAN-${dados.automatica?.uf ?? 'SP'} no modo manual: use "Consultar agora" ou a aba Consultar multas.`)
           : 'Consulta automática (DETRAN/SENATRAN): aguardando a contratação do serviço de consulta. Por enquanto, cadastre as multas com a notificação.'),
         tabela(['Data', 'Placa', master ? 'Empresa' : null, 'Infração', '>Valor', 'Condutor', '^Situação', 'Indicar até', '^'].filter(Boolean), dados.multas.map((m) => el('tr', { style: 'cursor:pointer', onclick: () => detalheMulta(ctx, dados, m.id, { master, gestor, aoMudar: carregar }) },
-          td(dataHora(m.ocorrida_em)), td(el('strong', {}, placa(m.placa))), master ? td(m.empresa) : null,
+          td(quandoMulta(m)), td(el('strong', {}, placa(m.placa))), master ? td(m.empresa) : null,
           td([m.descricao, el('div', { class: 'pequeno mudo' }, [m.auto_infracao, m.orgao, m.gravidade ? GRAV[m.gravidade] : null].filter(Boolean).join(' · '))]),
           td(m.valor_centavos !== null ? dinheiro(m.valor_centavos) : '—', 'dir num'), td(m.motorista ?? el('span', { class: 'mudo' }, 'sem condutor')),
           td(etiqueta(dados.situacoes[m.situacao], TOM[m.situacao]), 'centro'),
@@ -174,10 +239,11 @@ function resultadoConsulta(r) {
         r.custo ? etiqueta(`custo: R$ ${r.custo}`, '') : null,
         nada ? etiqueta('Nada consta', 'ok') : etiqueta(`${r.multas.length} multa(s) · ${r.apontamentos.length} apontamento(s)`, 'erro'))),
     nada ? el('div', { class: 'cartao', style: 'text-align:center;padding:22px' }, el('div', { style: 'font-size:34px' }, '✅'), el('strong', {}, 'Nenhuma multa e nenhum apontamento para esta placa.')) : null,
-    r.multas.length ? cartao(`Multas (${r.multas.length})`, tabela(['Data', 'Infração', '>Valor', '^Central'], r.multas.map((m) => el('tr', {},
-      td(m.ocorrida_em ? dataHora(m.ocorrida_em) : '—'), td([m.descricao, el('div', { class: 'pequeno mudo' }, [m.auto_infracao, m.orgao, m.gravidade ? GRAV[m.gravidade] : null].filter(Boolean).join(' · '))]),
+    r.multas.length ? cartao(`Multas (${r.multas.length})`, tabela(['Data', 'Infração', '>Valor', '^Central', '^'], r.multas.map((m) => el('tr', {},
+      td(quandoMulta(m)), td([m.descricao, el('div', { class: 'pequeno mudo' }, [m.auto_infracao, m.orgao, m.gravidade ? GRAV[m.gravidade] : null].filter(Boolean).join(' · '))]),
       td(m.valor_centavos !== null ? dinheiro(m.valor_centavos) : '—', 'dir num'),
-      td(m.nova ? etiqueta('nova · adicionada', 'aviso') : m.na_central ? etiqueta('já na central', 'ok') : etiqueta(r.homolog ? 'teste' : r.veiculo_da_frota ? 'não adicionada' : 'fora da frota', ''), 'centro'))))) : null,
+      td(m.nova ? etiqueta('nova · adicionada', 'aviso') : m.na_central ? etiqueta('já na central', 'ok') : etiqueta(r.homolog ? 'teste' : r.veiculo_da_frota ? 'não adicionada' : 'fora da frota', ''), 'centro'),
+      el('td', { class: 'acoes' }, botao([icone('multa'), 'Ver multa'], '', () => fichaMulta(m, { placaTxt: r.placa, origem: `Consulta ${r.homolog ? 'de teste ' : ''}feita em ${dataHora(r.consultado_em)} (DETRAN / prefeitura / Renainf).` }))))))) : null,
     r.apontamentos.length ? cartao(`Apontamentos (${r.apontamentos.length})`, tabela(['Tipo', 'Descrição', '>Valor', 'Situação'], r.apontamentos.map((a) => el('tr', {},
       td(el('strong', {}, TIPO_APONT[a.tipo] ?? a.tipo)), td(a.descricao || '—'), td(a.valor_centavos !== null ? dinheiro(a.valor_centavos) : '—', 'dir num'), td(a.situacao ?? '—'))))) : null);
 }

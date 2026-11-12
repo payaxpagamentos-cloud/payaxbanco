@@ -793,6 +793,7 @@ function migrar(db) {
     empresa_seguros: { margem_percent: 'REAL NOT NULL DEFAULT 0' },
     seguros_contratacoes: { custo_centavos: 'INTEGER', margem_percent: 'REAL', usuario_final_id: 'INTEGER' },
     multas_consultas: { status: "TEXT NOT NULL DEFAULT 'ok'" },
+    multas: { sem_hora: 'INTEGER NOT NULL DEFAULT 0' },
   };
   for (const [tabela, cols] of Object.entries(NOVAS)) {
     const tem = colunas(tabela);

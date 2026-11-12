@@ -38,7 +38,7 @@ function normalizar(db, empresaId, d) {
     placa, veiculo_id: veic?.id ?? null, auto_infracao: texto(d.auto_infracao, 40), orgao: texto(d.orgao, 80), infracao_codigo: texto(d.infracao_codigo, 20),
     descricao: v.texto(d.descricao, 'a descrição da infração', 300), gravidade, pontos: d.pontos ? v.inteiro(d.pontos, 'os pontos', { min: 0, max: 40 }) : (gravidade ? GRAVIDADES[gravidade][1] : null),
     valor_centavos: valor, ocorrida_em: new Date(ocorrida).toISOString(), local_texto: texto(d.local_texto, 200), municipio: texto(d.municipio, 80),
-    prazo_indicacao: dataOuNulo(d.prazo_indicacao), vencimento: dataOuNulo(d.vencimento), observacao: texto(d.observacao, 500),
+    prazo_indicacao: dataOuNulo(d.prazo_indicacao), vencimento: dataOuNulo(d.vencimento), observacao: texto(d.observacao, 500), sem_hora: d.sem_hora ? 1 : 0,
   };
 }
 
@@ -65,10 +65,10 @@ function criar(db, empresaId, d, { usuarioId = null, fonte = 'manual' } = {}) {
   const sugerido = x.veiculo_id ? condutorNoHorario(db, x.veiculo_id, x.ocorrida_em) : null;
   return transacao(db, () => {
     const id = Number(db.prepare(`INSERT INTO multas (empresa_id, veiculo_id, placa, auto_infracao, orgao, infracao_codigo, descricao, gravidade, pontos, valor_centavos,
-      ocorrida_em, local_texto, municipio, prazo_indicacao, vencimento, motorista_id, fonte, observacao, criada_por, criada_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(empresaId, x.veiculo_id, x.placa, x.auto_infracao, x.orgao, x.infracao_codigo,
+      ocorrida_em, local_texto, municipio, prazo_indicacao, vencimento, motorista_id, fonte, observacao, criada_por, criada_em, sem_hora)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(empresaId, x.veiculo_id, x.placa, x.auto_infracao, x.orgao, x.infracao_codigo,
       x.descricao, x.gravidade, x.pontos, x.valor_centavos, x.ocorrida_em, x.local_texto, x.municipio, x.prazo_indicacao, x.vencimento,
-      sugerido?.motorista_id ?? null, fonte, x.observacao, usuarioId, agora()).lastInsertRowid);
+      sugerido?.motorista_id ?? null, fonte, x.observacao, usuarioId, agora(), x.sem_hora).lastInsertRowid);
     salvarArquivos(db, empresaId, id, d.arquivos);
     return id;
   });
