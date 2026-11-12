@@ -34,6 +34,15 @@ module.exports = (db) => {
 
   r.get('/painel', autenticado, (req, res) => res.json(uf.painel(db, req.usuarioFinal)));
 
+  // Multas dos veículos do cliente.
+  r.get('/multas', autenticado, (req, res) => {
+    const multas = require('../lib/multas');
+    const ids = db.prepare('SELECT veiculo_id FROM usuario_final_veiculos WHERE usuario_final_id = ?').all(req.usuarioFinal.id).map((x) => x.veiculo_id);
+    res.json({ situacoes: multas.SITUACOES, multas: multas.listar(db, { empresaId: req.usuarioFinal.empresa_id, veiculoIds: ids }).map((m) => ({
+      id: m.id, placa: m.placa, descricao: m.descricao, orgao: m.orgao, gravidade: m.gravidade, pontos: m.pontos, valor_centavos: m.valor_centavos,
+      ocorrida_em: m.ocorrida_em, local_texto: m.local_texto, municipio: m.municipio, situacao: m.situacao, vencimento: m.vencimento, dias_vencimento: m.dias_vencimento })) });
+  });
+
   // Seguros disponíveis para a empresa (para o cliente pedir um novo).
   r.get('/seguros', autenticado, (req, res) => res.json({
     tipos: seg.portfolioEmpresa(db, req.usuarioFinal.empresa_id)

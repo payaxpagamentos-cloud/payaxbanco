@@ -282,6 +282,46 @@ async function telaNota(periodo = 'semana') {
       el('div', { class: 'dir pequeno mudo' }, dataHora(o.em)))))) : null);
 }
 
+// ---------- Minhas multas ----------
+const SIT_MULTA = { notificada: ['Notificada', 'aviso'], condutor_indicado: ['Você foi indicado', 'aviso'], em_recurso: ['Em recurso', ''], a_pagar: ['A pagar', 'erro'],
+  paga: ['Paga', 'ok'], cancelada: ['Cancelada', ''] };
+const GRAV_MULTA = { leve: 'Leve', media: 'Média', grave: 'Grave', gravissima: 'Gravíssima' };
+async function abrirArquivoMulta(id) {
+  const janela = window.open('', '_blank');
+  try {
+    const resp = await fetch(`${BASE}/api/motorista/multas/arquivos/${id}`, { headers: { Authorization: `Bearer ${sessao.token}` } });
+    if (!resp.ok) throw new Error('Arquivo não encontrado.');
+    const url = URL.createObjectURL(await resp.blob());
+    if (janela) janela.location = url; else location.href = url;
+  } catch (err) { janela?.close(); alert(err.message); }
+}
+async function telaMultas() {
+  const corpo = el('div', { class: 'coluna', style: 'gap:12px' }, el('p', { class: 'mudo' }, 'Carregando…'));
+  tela('Minhas multas', corpo);
+  let r;
+  try { r = await chamar('GET', '/multas'); } catch (err) { return aviso(corpo, err.message); }
+  const pontos = r.multas.filter((m) => m.situacao !== 'cancelada').reduce((s, m) => s + (m.pontos ?? 0), 0);
+  limpar(corpo,
+    el('section', { class: 'cartao' }, el('div', { class: 'linha entre' },
+      el('div', {}, el('strong', {}, `${r.multas.length} multa(s)`), el('div', { class: 'pequeno mudo' }, 'em que você é o condutor')),
+      el('div', { class: 'dir' }, el('strong', {}, `${pontos} pontos`), el('div', { class: 'pequeno mudo' }, 'somando as multas')))),
+    r.multas.length ? r.multas.map((m) => {
+      const [rot, tom] = SIT_MULTA[m.situacao] ?? [m.situacao, ''];
+      return el('article', { class: 'cartao multa-app' },
+        el('div', { class: 'linha entre', style: 'gap:8px;align-items:flex-start' },
+          el('div', {}, el('strong', {}, placa(m.placa)), el('div', { class: 'pequeno mudo' }, dataHora(m.ocorrida_em))),
+          el('span', { class: `etiqueta ${tom}` }, rot)),
+        el('p', { style: 'margin:8px 0 4px;font-weight:600' }, m.descricao),
+        el('p', { class: 'pequeno mudo', style: 'margin:0' }, [m.local_texto, m.municipio].filter(Boolean).join(' · ') || ''),
+        el('div', { class: 'linha entre', style: 'margin-top:8px' },
+          el('span', { class: 'pequeno' }, [m.gravidade ? GRAV_MULTA[m.gravidade] : null, m.pontos ? `${m.pontos} pontos` : null].filter(Boolean).join(' · ')),
+          el('strong', {}, m.valor_centavos !== null ? reais(m.valor_centavos) : '')),
+        m.arquivos?.length ? el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap;margin-top:10px' }, m.arquivos.map((a, i) =>
+          el('button', { type: 'button', class: 'btn pequeno', onclick: () => abrirArquivoMulta(a.id) }, icone('multa'),
+            m.arquivos.length > 1 ? `Notificação ${i + 1}` : 'Ver notificação'))) : null);
+    }) : el('section', { class: 'cartao' }, el('p', { class: 'mudo', style: 'margin:0' }, 'Nenhuma multa em seu nome. Continue assim! 👏')));
+}
+
 // ---------- SOS ----------
 function botaoSos(veiculos) {
   const anel = el('span', { class: 'sos-progresso' });
@@ -466,7 +506,8 @@ async function inicio() {
         atalho('check', 'Checklist', 'antes de sair', telaChecklist),
         atalho('combustivel', 'Abastecer', 'litros e cupom', telaAbastecimento),
         atalho('manutencao', 'Avaria', 'avisar o gestor', telaAvaria),
-        atalho('estrela', 'Minha nota', 'e as dicas', () => telaNota())),
+        atalho('estrela', 'Minha nota', 'e as dicas', () => telaNota()),
+        atalho('multa', 'Minhas multas', 'que você recebeu', telaMultas)),
       cartaoAvisos(),
       dados.pedidos.length ? el('section', { class: 'cartao' }, el('h2', {}, 'Meus pedidos de liberação'), el('ul', { class: 'pedidos' }, dados.pedidos.slice(0, 6).map((p) => el('li', {},
         el('div', {}, el('strong', {}, placa(p.placa)), el('div', { class: 'pequeno mudo' }, dataHora(p.criado_em))),

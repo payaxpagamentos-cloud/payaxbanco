@@ -14,6 +14,7 @@ import { montarAssistente } from './assistente.js';
 import { TELAS_DIARIO } from './diario.js';
 import { TELAS_SEGUROS, TELAS_SEGUROS_MASTER } from './seguros.js';
 import { TELAS_CLIENTES } from './clientes.js';
+import { TELAS_MULTAS, TELAS_MULTAS_MASTER } from './multas.js';
 import { iniciarCena } from './cena-entrada.js';
 import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 
@@ -31,6 +32,7 @@ const MENU_MASTER = [
   ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa geral', 'mapa'], ['empresas', 'Empresas', 'empresas'], ['financeiro', 'Financeiro', 'carteira', ['master']],
   ['rastreadores', 'Rastreadores', 'rastreadores'],
   ['usuarios', 'Permissões e usuários', 'usuarios', ['master']],
+  ['multas', 'Central de multas', 'multa', ['master', 'suporte']],
   ['seguros', 'Seguros', 'seguro', ['master', 'suporte'], [
     ['seguros-tipos', 'Tipos', 'seguro', 'Catálogo dos seguros oferecidos', ['master', 'suporte']],
     ['seguros-empresas', 'Por empresa', 'empresas', 'O que cada empresa pode ver e contratar', ['master', 'suporte']],
@@ -57,6 +59,7 @@ const MENU_EMPRESA = [
     ['liberacoes', 'Liberações', 'aberto', 'Código do motorista para liberar o veículo', GESTOR],
   ]],
   ['cercas', 'Cercas', 'cercas'],
+  ['multas', 'Multas', 'multa'],
   ['frota', 'Frota', 'veiculos', null, [
     ['veiculos', 'Veículos', 'veiculos', 'Cadastro, rastreador e motorista fixo'],
     ['motoristas', 'Motoristas', 'motoristas', 'Cadastro, CNH e acesso ao app'],
@@ -95,6 +98,7 @@ const SUBTITULOS_MASTER = {
   usuarios: 'Quem acessa a plataforma e o que cada perfil pode fazer.', diagnostico: 'Conexões dos equipamentos e mensagens recebidas.',
   configuracoes: 'Parâmetros, comandos GT06, WhatsApp, assistente, integrações, diagnóstico e atividades.', atividades: 'Registro das ações feitas no painel.',
   seguros: 'Catálogo de seguros, portfólio de cada empresa e as contratações.',
+  multas: 'Multas de todas as empresas, com a notificação e quem dirigia.',
 };
 const SUBTITULOS_EMPRESA = {
   dashboard: 'Resumo da frota, dos deslocamentos e dos alertas.', mapa: 'Última posição de cada veículo.', historico: 'Trajetos, paradas e viagens por período.',
@@ -103,6 +107,7 @@ const SUBTITULOS_EMPRESA = {
   relatorios: 'Relatórios por período e os que chegam sozinhos pelo WhatsApp.', configuracoes: 'Preferências, avisos pelo WhatsApp, comandos e integrações.',
   seguros: 'Seguros disponíveis para a sua frota, contratações e permissões.',
   'app-cliente': 'Usuários do app do cliente e as informações de atendimento.',
+  multas: 'Multas dos veículos, a notificação, quem dirigia no horário e a indicação do condutor.',
 };
 
 window.addEventListener('rastreador:sair', () => desenhar());
@@ -134,8 +139,8 @@ async function desenhar() {
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
   const telas = empresaId
-    ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO, ...TELAS_SEGUROS, ...TELAS_CLIENTES }
-    : { ...TELAS_MASTER, ...TELAS_SEGUROS_MASTER };
+    ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO, ...TELAS_SEGUROS, ...TELAS_CLIENTES, ...TELAS_MULTAS }
+    : { ...TELAS_MASTER, ...TELAS_SEGUROS_MASTER, ...TELAS_MULTAS_MASTER };
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
   const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp]) => permitido(sp));
   const item = menu.find(([k, , , perfis, subs]) => permitido(perfis) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));

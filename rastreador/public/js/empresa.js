@@ -365,6 +365,8 @@ async function formVeiculo(ctx, x, aoSalvar) {
     el('div', { class: 'tres' }, campo('Marca', { name: 'marca', maxlength: 60, value: x?.marca ?? '' }), campo('Modelo', { name: 'modelo', maxlength: 60, value: x?.modelo ?? '' }),
       campo('Ano', { name: 'ano', type: 'number', min: 1950, max: new Date().getFullYear() + 1, value: x?.ano ?? '' })),
     el('div', { class: 'duas' }, campo('Cor', { name: 'cor', maxlength: 30, value: x?.cor ?? '' }),
+      campo('RENAVAM (para a consulta de multas)', { name: 'renavam', inputmode: 'numeric', maxlength: 11, value: x?.renavam ?? '' })),
+    el('div', { class: 'duas' },
       campo('Limite de velocidade (km/h, 0 = sem alerta)', { name: 'limite_velocidade_kmh', type: 'number', min: 0, max: 300, value: x?.limite_velocidade_kmh ?? 0 })),
     el('div', { class: 'duas' }, campo('Consumo médio (km/l, para o custo em reais)', { name: 'consumo_km_l', inputmode: 'decimal', maxlength: 6,
       value: x?.consumo_km_l ? String(x.consumo_km_l).replace('.', ',') : '', placeholder: 'Ex.: 9,5' }),

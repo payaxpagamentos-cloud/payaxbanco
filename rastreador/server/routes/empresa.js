@@ -141,6 +141,7 @@ module.exports = (db, extras = {}) => {
       marca: val('marca', opc('a marca', 60)),
       modelo: val('modelo', opc('o modelo', 60)),
       cor: val('cor', opc('a cor', 30)),
+      renavam: val('renavam', (x) => { const r = String(x ?? '').replace(/\D/g, ''); v.exigir(!r || /^\d{9,11}$/.test(r), 'O RENAVAM tem 9 a 11 números.'); return r || null; }),
       ano: val('ano', (x) => (x === '' || x === null ? null : v.inteiro(x, 'o ano', { min: 1950, max: new Date().getFullYear() + 1 }))),
       tipo: v.opcao(d.tipo ?? atual?.tipo ?? 'carro', 'o tipo', TIPOS_VEICULO),
       rastreador_id: d.rastreador_id !== undefined ? rastreadorLivre(req, d.rastreador_id, atual?.id ?? null) : atual?.rastreador_id ?? null,
@@ -153,7 +154,7 @@ module.exports = (db, extras = {}) => {
       estacionado_auto: d.estacionado_auto !== undefined ? (v.booleano(d.estacionado_auto) ? 1 : 0) : atual?.estacionado_auto ?? 0,
     };
   };
-  const CAMPOS_VEICULO = ['placa', 'descricao', 'marca', 'modelo', 'cor', 'ano', 'tipo', 'rastreador_id', 'motorista_id', 'limite_velocidade_kmh', 'ativo', 'consumo_km_l', 'estacionado_auto'];
+  const CAMPOS_VEICULO = ['placa', 'descricao', 'marca', 'modelo', 'cor', 'renavam', 'ano', 'tipo', 'rastreador_id', 'motorista_id', 'limite_velocidade_kmh', 'ativo', 'consumo_km_l', 'estacionado_auto'];
   const exigirLimite = (req, extra = 1) => {
     const n = db.prepare('SELECT COUNT(*) AS n FROM veiculos WHERE empresa_id = ? AND ativo = 1').get(eid(req)).n;
     if (n + extra > req.empresa.limite_veiculos) throw new ErroNegocio(`Limite de ${req.empresa.limite_veiculos} veículos ativos do plano atingido. Fale com o suporte.`, 422);
@@ -204,6 +205,7 @@ module.exports = (db, extras = {}) => {
       db.prepare('DELETE FROM usuario_final_veiculos WHERE veiculo_id = ?').run(x.id);
       db.prepare('DELETE FROM testes_bloqueio WHERE veiculo_id = ?').run(x.id);
       db.prepare('UPDATE seguros_contratacoes SET veiculo_id = NULL WHERE veiculo_id = ?').run(x.id);
+      db.prepare('UPDATE multas SET veiculo_id = NULL WHERE veiculo_id = ?').run(x.id);
       db.prepare('DELETE FROM veiculos WHERE id = ?').run(x.id);
     });
     registrar(db, req, 'veiculo_excluido', { placa: x.placa });
@@ -392,6 +394,7 @@ module.exports = (db, extras = {}) => {
     transacao(db, () => {
       db.prepare('UPDATE veiculos SET motorista_id = NULL WHERE motorista_id = ?').run(x.id);
       db.prepare('UPDATE seguros_contratacoes SET motorista_id = NULL WHERE motorista_id = ?').run(x.id);
+      db.prepare('UPDATE multas SET motorista_id = NULL WHERE motorista_id = ?').run(x.id);
       db.prepare('DELETE FROM motoristas WHERE id = ?').run(x.id);
     });
     registrar(db, req, 'motorista_excluido', { nome: x.nome });
@@ -875,6 +878,43 @@ module.exports = (db, extras = {}) => {
     registrar(db, req, 'avaria_atualizada', { id: a.id, status: req.body.status });
     res.status(204).end();
   });
+  // ---------- Central de multas ----------
+  const multas = require('../lib/multas');
+  const consultaMultas = require('../lib/multasConsulta');
+  r.get('/multas', (req, res) => {
+    const lista = multas.listar(db, { empresaId: eid(req), situacao: req.query.situacao || undefined });
+    res.json({ resumo: multas.resumo(lista), multas: lista, consulta_automatica: consultaMultas.configurado(), situacoes: multas.SITUACOES, gravidades: multas.GRAVIDADES,
+      motoristas: db.prepare('SELECT id, nome FROM motoristas WHERE empresa_id = ? ORDER BY nome').all(eid(req)),
+      veiculos: db.prepare('SELECT id, placa, descricao FROM veiculos WHERE empresa_id = ? ORDER BY placa').all(eid(req)) });
+  });
+  r.get('/multas/arquivos/:id', (req, res) => {
+    const a = multas.arquivo(db, eid(req), req.params.id);
+    if (!a) throw new ErroNegocio('Arquivo não encontrado.', 404);
+    res.set({ 'Content-Type': a.tipo, 'Cache-Control': 'private, max-age=86400' }).sendFile(a.caminho);
+  });
+  r.get('/multas/:id', (req, res) => res.json(multas.detalhe(db, nid(req), { empresaId: eid(req) })));
+  r.post('/multas', gestor, (req, res) => {
+    const id = multas.criar(db, eid(req), req.body, { usuarioId: req.usuario.id });
+    registrar(db, req, 'multa_cadastrada', { id, placa: req.body.placa });
+    res.status(201).json(multas.detalhe(db, id, { empresaId: eid(req) }));
+  });
+  r.put('/multas/:id', gestor, (req, res) => {
+    multas.atualizar(db, eid(req), nid(req), req.body);
+    registrar(db, req, 'multa_alterada', { id: nid(req), situacao: req.body.situacao, motorista_id: req.body.motorista_id });
+    res.json(multas.detalhe(db, nid(req), { empresaId: eid(req) }));
+  });
+  r.delete('/multas/:id', gestor, (req, res) => {
+    multas.remover(db, eid(req), nid(req));
+    registrar(db, req, 'multa_excluida', { id: nid(req) });
+    res.status(204).end();
+  });
+  r.post('/multas/consultar', gestor, async (req, res, next) => {
+    try {
+      v.exigir(consultaMultas.configurado(), 'A consulta automática ainda não foi ligada: falta contratar o serviço de consulta de multas.');
+      res.json(await consultaMultas.rodada(db, { empresaId: eid(req), forcar: true }));
+    } catch (err) { next(err); }
+  });
+
   r.get('/fotos/:id', (req, res) => {
     const f = fotos.arquivo(db, eid(req), req.params.id);
     if (!f) throw new ErroNegocio('Foto não encontrada.', 404);

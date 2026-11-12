@@ -113,6 +113,7 @@ async function inicio() {
   limpar(raiz, el('p', { class: 'carregando-app', role: 'status' }, 'Carregando…'));
   try {
     painelDados = await chamar('GET', '/painel');
+    painelDados.multas = (await chamar('GET', '/multas').catch(() => null))?.multas ?? [];
   } catch (err) {
     if (!sessao) return; // sessão expirou: chamar() já mostrou a tela de entrar
     limpar(raiz, el('p', { class: 'carregando-app' }, err.message));
@@ -122,7 +123,11 @@ async function inicio() {
   clearInterval(timer);
   timer = setInterval(async () => {
     if (document.visibilityState !== 'visible') return;
-    try { painelDados = await chamar('GET', '/painel'); render(); } catch { /* mantém a tela */ }
+    try {
+      const novo = await chamar('GET', '/painel');
+      novo.multas = (await chamar('GET', '/multas').catch(() => null))?.multas ?? painelDados.multas ?? [];
+      painelDados = novo; render();
+    } catch { /* mantém a tela */ }
   }, 30000);
 }
 
@@ -139,6 +144,7 @@ function render() {
     d.veiculos.length ? null : el('div', { class: 'card' }, el('div', { class: 'vazio' }, ico(IC.carro), el('div', {}, 'Nenhum veículo vinculado à sua conta ainda.'))),
     cardPlano(d.plano),
     cardSeguros(d.seguros),
+    cardMultas(d.multas ?? []),
     cardAtendimento(d.atendimento));
 
   limpar(raiz, cab, corpo, navInferior());
@@ -195,6 +201,25 @@ function cardSeguros(seguros) {
     el('div', { class: 'rot' }, ico(IC.seguro), 'Seguros contratados'),
     el('div', { style: 'margin-top:6px' }, corpo),
     el('button', { class: 'btn claro', onclick: sheetSeguros }, ico(IC.mais), 'Contratar novo seguro')));
+}
+
+const SIT_MULTA = { notificada: ['Notificada', 'aviso'], condutor_indicado: ['Condutor indicado', 'neutro'], em_recurso: ['Em recurso', 'neutro'],
+  a_pagar: ['A pagar', 'erro'], paga: ['Paga', 'ok'], cancelada: ['Cancelada', 'neutro'] };
+function cardMultas(multas) {
+  const abertas = multas.filter((m) => !['paga', 'cancelada'].includes(m.situacao));
+  const corpo = multas.length
+    ? multas.slice(0, 6).map((m) => {
+      const [rot, cls] = SIT_MULTA[m.situacao] || [m.situacao, 'neutro'];
+      return el('div', { class: 'seg' },
+        el('div', { class: 'sic' }, ico(IC.doc)),
+        el('div', {}, el('div', { class: 'nome' }, m.descricao),
+          el('div', { class: 'meta' }, `${formataPlaca(m.placa)} · ${dataBR(m.ocorrida_em)}${m.pontos ? ` · ${m.pontos} pts` : ''}`)),
+        el('div', { class: 'val' }, el('div', { class: 'p' }, m.valor_centavos != null ? dinheiro(m.valor_centavos) : '—'), el('div', { class: `st ${cls}` }, rot)));
+    })
+    : [el('div', { class: 'vazio' }, ico(IC.doc), el('div', {}, 'Nenhuma multa nos seus veículos.'))];
+  return el('div', { class: 'card' }, el('div', { class: 'pad' },
+    el('div', { class: 'rot' }, ico(IC.doc), 'Multas', abertas.length ? el('span', { class: 'st erro', style: 'margin-left:auto' }, `${abertas.length} em aberto`) : null),
+    el('div', { style: 'margin-top:6px' }, corpo)));
 }
 
 function cardAtendimento(a) {

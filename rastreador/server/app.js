@@ -66,6 +66,8 @@ function criarApp(db, extras = {}) {
   r.use(/^\/api\/motorista\/(sos|checklists|abastecimentos|avarias)\/?$/i, limitar({ janelaMs: 60_000, maximo: 10 }));
   r.use('/api/motorista', express.json({ limit: '8mb' }));
   // A API de integração recebe lotes de posições; o app Traccar Client envia formulário ou JSON.
+  // Multas: a notificação (PDF ou fotos) vai junto.
+  r.use(/^\/api\/empresas\/\d+\/multas/, express.json({ limit: '24mb' }));
   r.use(express.json({ limit: '1mb' }));
   r.use(express.urlencoded({ extended: false, limit: '100kb' }));
   // Sem corpo (ou com um valor solto), as rotas leem req.body.x sem erro.
