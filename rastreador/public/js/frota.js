@@ -245,7 +245,7 @@ export async function abrirFicha(ctx, veiculoId) {
             }); return b; })()))) : null,
       !plataforma && gt06 ? el('p', { class: 'aviso pequeno', style: 'margin:0' }, 'Intervalos, alarmes e instalação são ajustados pela equipe da plataforma. Peça ao suporte o que precisar.') : null,
       secao('Últimos comandos', tabela(['Quando', 'Comando', 'Situação', 'Resposta'], f.comandos.map((c) => el('tr', {},
-        td(dataHora(c.criado_em)), td([c.rotulo ?? c.tipo, el('div', { class: 'pequeno mudo mono' }, c.texto ?? '')]),
+        td(dataHora(c.criado_em)), td([c.rotulo ?? ({ bloquear: 'Bloquear', desbloquear: 'Desbloquear', status: 'Consultar estado', parametros: 'Consultar configuração', reiniciar: 'Reiniciar' }[c.tipo] ?? c.tipo), el('div', { class: 'pequeno mudo mono' }, c.texto ?? '')]),
         td(etiqueta(c.status, c.status === 'confirmado' ? 'ok' : c.status === 'falhou' || c.status === 'expirado' ? 'erro' : 'aviso')),
         td(c.resposta ? el('span', { class: 'pequeno mono resposta' }, c.resposta) : '—'))), 'Nenhum comando ainda.')));
   }

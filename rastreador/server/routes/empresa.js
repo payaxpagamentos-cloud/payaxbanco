@@ -782,7 +782,7 @@ module.exports = (db, extras = {}) => {
         sinal_gsm: rr.sinal_gsm, firmware: rr.firmware, perfil: rr.perfil, rele_invertido: rr.rele_invertido, saude: rr.saude ? JSON.parse(rr.saude) : null, saude_em: rr.saude_em,
         ultima_comunicacao: rr.ultima_comunicacao, conectado: Boolean(extras.gt06?.conectado?.(rr.imei)) },
       perfis: equip.PERFIS,
-      comandos: db.prepare(`SELECT id, tipo, texto, rotulo, status, criado_em, respondido_em, resposta FROM comandos WHERE veiculo_id = ? AND (tipo = 'personalizado' OR tipo IN ('status','parametros','reiniciar'))
+      comandos: db.prepare(`SELECT id, tipo, texto, rotulo, status, criado_em, respondido_em, resposta FROM comandos WHERE veiculo_id = ? AND (tipo = 'personalizado' OR tipo IN ('status','parametros','reiniciar','bloquear','desbloquear'))
         ORDER BY id DESC LIMIT 30`).all(x.id),
     });
   });
