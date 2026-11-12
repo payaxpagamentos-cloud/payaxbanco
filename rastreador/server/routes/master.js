@@ -519,9 +519,9 @@ module.exports = (db, extras = {}) => {
   r.get('/multas/consultas/:id', (req, res) => res.json(consultaMultas.consulta(db, nid(req))));
   r.post('/multas/consultar-placa', async (req, res, next) => {
     try {
-      const r2 = await consultaMultas.consultarPlaca(db, { placa: req.body.placa, renavam: req.body.renavam, usuarioId: req.usuario.id });
-      registrar(db, req, 'multas_consulta', { placa: r2.placa, multas: r2.multas.length, apontamentos: r2.apontamentos.length });
-      res.json(r2);
+      const { pronto: _p, ...r2 } = consultaMultas.iniciarConsulta(db, { placa: req.body.placa, renavam: req.body.renavam, usuarioId: req.usuario.id });
+      registrar(db, req, 'multas_consulta', { placa: r2.placa });
+      res.status(202).json(r2);
     } catch (err) { next(err); }
   });
   r.get('/multas/arquivos/:id', (req, res) => {

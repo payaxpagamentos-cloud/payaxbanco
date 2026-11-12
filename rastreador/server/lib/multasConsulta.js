@@ -81,21 +81,38 @@ function traduzirApiBrasil(j) {
   return { multas, apontamentos, custo: j.valor_consulta ?? null, homolog: Boolean(j.homolog) };
 }
 
-/** Pergunta ao serviço contratado: devolve { multas, apontamentos } já traduzidos. */
-async function perguntar(placa, renavam) {
+/** Pergunta ao serviço contratado, tentando de novo (até 2 vezes) quando a fonte (DETRAN) está fora do ar ou demora (502/503/504). */
+async function perguntar(placa, renavam, { tentativas = 3, espera = Number(process.env.RASTREADOR_MULTAS_ESPERA_MS) || 15_000 } = {}) {
+  for (let i = 1; ; i++) {
+    try {
+      return await perguntarUmaVez(placa, renavam);
+    } catch (err) {
+      if (!err.instavel || i >= tentativas) throw err;
+      await new Promise((ok) => { setTimeout(ok, espera); });
+    }
+  }
+}
+
+async function perguntarUmaVez(placa, renavam) {
   if (!configurado()) throw new ErroNegocio('A consulta de multas ainda não foi ligada: falta contratar o serviço de consulta (DETRAN/SENATRAN).', 422);
   let r;
   try {
     r = await fetch(URL_SERVICO(), {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${CHAVE()}` },
       body: JSON.stringify(FORNECEDOR() === 'apibrasil' ? { tipo: 'debitos-v4', placa, homolog: HOMOLOG() } : { placa, renavam: renavam || undefined, uf: UF() }),
-      signal: AbortSignal.timeout(40_000),
+      // A API Brasil busca no DETRAN, na prefeitura e no Renainf na hora: pode passar de 1 minuto (a tela espera em segundo plano).
+      signal: AbortSignal.timeout(180_000),
     });
   } catch (err) {
     throw new ErroNegocio(`O serviço de consulta de multas não respondeu (${err.name === 'TimeoutError' ? 'demorou demais' : 'sem conexão'}). Tente de novo.`, 502);
   }
   if (r.status === 402) throw new ErroNegocio('Sem saldo no serviço de consulta de multas: recarregue a conta (API Brasil → Recarregar).', 402);
   if (r.status === 401 || r.status === 403) throw new ErroNegocio('A chave do serviço de consulta de multas foi recusada: confira o token no .env do servidor.', 502);
+  if ([502, 503, 504].includes(r.status)) {
+    const e = new ErroNegocio('O DETRAN não respondeu agora (instabilidade na fonte). O sistema tentou 3 vezes; tente de novo em alguns minutos.', 502);
+    e.instavel = true;
+    throw e;
+  }
   if (!r.ok) throw new ErroNegocio(`O serviço de consulta de multas recusou o pedido (${r.status}).`, 502);
   const j = await r.json().catch(() => ({}));
   if (FORNECEDOR() === 'apibrasil') return traduzirApiBrasil(j);
@@ -132,32 +149,44 @@ async function consultarVeiculo(db, veic) {
  * "Consultar multas" na hora: uma placa (da frota ou não). As multas de veículos da empresa entram na central; tudo fica
  * registrado no histórico de consultas.
  */
-async function consultarPlaca(db, { empresaId = null, placa, renavam, usuarioId = null }) {
+function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = null }) {
   const p = multas.placaLimpa(placa);
   if (!/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(p)) throw new ErroNegocio('Informe uma placa válida (ex.: ABC1D23).', 422);
+  if (!configurado()) throw new ErroNegocio('A consulta de multas ainda não foi ligada: falta contratar o serviço de consulta (DETRAN/SENATRAN).', 422);
   const ren = String(renavam ?? '').replace(/\D/g, '') || null;
   const veic = empresaId ? db.prepare('SELECT id, empresa_id, renavam FROM veiculos WHERE empresa_id = ? AND placa = ?').get(empresaId, p)
     : db.prepare('SELECT id, empresa_id, renavam FROM veiculos WHERE placa = ? ORDER BY ativo DESC LIMIT 1').get(p);
-  const reg = (dados) => db.prepare(`INSERT INTO multas_consultas (empresa_id, placa, renavam, usuario_id, multas, apontamentos, novas, resultado, erro, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(empresaId ?? veic?.empresa_id ?? null, p, ren ?? veic?.renavam ?? null, usuarioId, dados.multas ?? 0, dados.apontamentos ?? 0,
-    dados.novas ?? 0, dados.resultado ? JSON.stringify(dados.resultado) : null, dados.erro ?? null, agora()).lastInsertRowid;
-  let r;
-  try {
-    r = await perguntar(p, ren ?? veic?.renavam);
-  } catch (err) {
-    reg({ erro: err.message });
-    throw err;
-  }
-  // Em teste (homologação) os dados são de exemplo: nunca entram na central.
-  const imp = veic && !r.homolog ? importar(db, veic.empresa_id, p, r.multas) : { novas: 0, resultado: r.multas.map((m) => ({ ...m, na_central: false, nova: false })) };
-  if (veic) db.prepare('UPDATE veiculos SET multas_consulta_em = ? WHERE id = ?').run(agora(), veic.id);
-  const resultado = { placa: p, veiculo_da_frota: Boolean(veic), multas: imp.resultado, apontamentos: r.apontamentos, novas: imp.novas, consultado_em: agora(), custo: r.custo ?? null, homolog: r.homolog ?? false };
-  const id = reg({ multas: r.multas.length, apontamentos: r.apontamentos.length, novas: imp.novas, resultado });
-  return { id: Number(id), ...resultado };
+  // A mesma placa já está sendo consultada (clique duplo, outra aba): acompanha aquela, sem pagar de novo.
+  const andamento = db.prepare("SELECT id FROM multas_consultas WHERE placa = ? AND status = 'consultando' AND criado_em > ?").get(p, new Date(Date.now() - 4 * 60_000).toISOString());
+  if (andamento) return { id: andamento.id, status: 'consultando', placa: p, pronto: emAndamento.get(andamento.id) ?? Promise.resolve() };
+  const id = Number(db.prepare(`INSERT INTO multas_consultas (empresa_id, placa, renavam, usuario_id, status, criado_em) VALUES (?, ?, ?, ?, 'consultando', ?)`)
+    .run(empresaId ?? veic?.empresa_id ?? null, p, ren ?? veic?.renavam ?? null, usuarioId, agora()).lastInsertRowid);
+  const fim = (campos) => db.prepare(`UPDATE multas_consultas SET status = ?, multas = ?, apontamentos = ?, novas = ?, resultado = ?, erro = ? WHERE id = ?`)
+    .run(campos.erro ? 'erro' : 'ok', campos.multas ?? 0, campos.apontamentos ?? 0, campos.novas ?? 0, campos.resultado ? JSON.stringify(campos.resultado) : null, campos.erro ?? null, id);
+  // Roda em segundo plano: a resposta do serviço pode demorar; a tela acompanha pelo id. O resultado é guardado mesmo se chegar tarde.
+  const pronto = perguntar(p, ren ?? veic?.renavam).then((r) => {
+    // Em teste (homologação) os dados são de exemplo: nunca entram na central.
+    const imp = veic && !r.homolog ? importar(db, veic.empresa_id, p, r.multas) : { novas: 0, resultado: r.multas.map((m) => ({ ...m, na_central: false, nova: false })) };
+    if (veic) db.prepare('UPDATE veiculos SET multas_consulta_em = ? WHERE id = ?').run(agora(), veic.id);
+    const resultado = { placa: p, veiculo_da_frota: Boolean(veic), multas: imp.resultado, apontamentos: r.apontamentos, novas: imp.novas, consultado_em: agora(), custo: r.custo ?? null, homolog: r.homolog ?? false };
+    fim({ multas: r.multas.length, apontamentos: r.apontamentos.length, novas: imp.novas, resultado });
+  }).catch((err) => { fim({ erro: err.message }); }).finally(() => emAndamento.delete(id));
+  emAndamento.set(id, pronto);
+  return { id, status: 'consultando', placa: p, pronto };
+}
+const emAndamento = new Map();
+
+/** Consulta e espera o resultado (usado nos testes e pela rotina interna). */
+async function consultarPlaca(db, args) {
+  const { id, pronto } = iniciarConsulta(db, args);
+  await pronto;
+  const c = consulta(db, id);
+  if (c.status === 'erro') throw new ErroNegocio(c.erro, 502);
+  return { id, ...c.resultado };
 }
 
 function historico(db, { empresaId = null, limite = 30 } = {}) {
-  return db.prepare(`SELECT c.id, c.placa, c.multas, c.apontamentos, c.novas, c.erro, c.criado_em, u.nome AS usuario, e.nome AS empresa
+  return db.prepare(`SELECT c.id, c.placa, c.multas, c.apontamentos, c.novas, c.erro, c.status, c.criado_em, u.nome AS usuario, e.nome AS empresa
     FROM multas_consultas c LEFT JOIN usuarios u ON u.id = c.usuario_id LEFT JOIN empresas e ON e.id = c.empresa_id
     ${empresaId ? 'WHERE c.empresa_id = ?' : ''} ORDER BY c.id DESC LIMIT ${Number(limite)}`).all(...(empresaId ? [empresaId] : []));
 }
@@ -205,4 +234,4 @@ function definirIntervalo(db, dias) {
   return d;
 }
 
-module.exports = { traduzirApiBrasil, definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };
+module.exports = { iniciarConsulta, traduzirApiBrasil, definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };

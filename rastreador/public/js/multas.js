@@ -203,8 +203,8 @@ async function telaConsultar(ctx, { master = false } = {}) {
         } }, rot)), el('span', { class: 'pequeno mudo' }, 'manual: paga só as consultas feitas')) : null));
     limpar(historicoEl, cartao('Consultas feitas', tabela(['Quando', 'Placa', master ? 'Empresa' : null, '^Multas', '^Apontamentos', '^Novas', 'Por', '^'].filter(Boolean),
       d.consultas.map((c) => el('tr', {}, td(dataHora(c.criado_em)), td(el('strong', {}, placa(c.placa))), master ? td(c.empresa ?? '—') : null,
-        td(c.erro ? etiqueta('erro', 'erro') : String(c.multas), 'centro'), td(c.erro ? '—' : String(c.apontamentos), 'centro'), td(String(c.novas), 'centro'), td(c.usuario ?? 'automática'),
-        el('td', { class: 'acoes' }, c.erro ? el('span', { class: 'pequeno mudo', title: c.erro }, 'falhou') : botaoIcone('olho', 'Ver o resultado', async () => {
+        td(c.status === 'consultando' ? etiqueta('consultando…', 'aviso') : c.erro ? etiqueta('erro', 'erro') : String(c.multas), 'centro'), td(c.erro || c.status === 'consultando' ? '—' : String(c.apontamentos), 'centro'), td(String(c.novas), 'centro'), td(c.usuario ?? 'automática'),
+        el('td', { class: 'acoes' }, c.status === 'consultando' ? null : c.erro ? el('span', { class: 'pequeno mudo', title: c.erro }, 'falhou') : botaoIcone('olho', 'Ver o resultado', async () => {
           const x = await api.get(`${base}/consultas/${c.id}`);
           modal(`Consulta · ${placa(x.placa)}`, () => [resultadoConsulta(x.resultado)], { largo: true });
         })))), 'Nenhuma consulta feita ainda.')));
@@ -225,11 +225,24 @@ async function telaConsultar(ctx, { master = false } = {}) {
     const placaTxt = inPlaca.querySelector('input').value.trim();
     if (!placaTxt) return toast('Informe a placa.', true);
     botaoConsultar.disabled = true;
-    limpar(resultado, el('div', { class: 'carregando-linha' }), el('p', { class: 'mudo' }, `Consultando ${placaTxt.toUpperCase()} no DETRAN/SENATRAN… pode levar alguns segundos.`));
+    const texto = el('p', { class: 'mudo' }, `Consultando ${placaTxt.toUpperCase()} no DETRAN, na prefeitura e no Renainf…`);
+    limpar(resultado, el('div', { class: 'carregando-linha' }), texto,
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Pode levar até 2 minutos. Pode sair desta tela: o resultado fica guardado em "Consultas feitas".'));
     try {
-      const r = await api.post(`${base}/consultar-placa`, { placa: placaTxt, renavam: inRenavam.querySelector('input').value });
-      limpar(resultado, resultadoConsulta(r));
-      if (r.novas) toast(`${r.novas} multa(s) nova(s) adicionada(s) à central.`);
+      const ini = await api.post(`${base}/consultar-placa`, { placa: placaTxt, renavam: inRenavam.querySelector('input').value });
+      const t0 = Date.now();
+      let c;
+      for (;;) {
+        await new Promise((ok) => { setTimeout(ok, 2500); });
+        if (!resultado.isConnected) return; // saiu da tela: o resultado fica no histórico
+        c = await api.get(`${base}/consultas/${ini.id}`);
+        if (c.status !== 'consultando') break;
+        texto.textContent = `Consultando ${ini.placa} no DETRAN, na prefeitura e no Renainf… ${Math.round((Date.now() - t0) / 1000)} s`;
+        if (Date.now() - t0 > 240_000) throw new Error('A consulta está demorando mais que o normal. O resultado aparece em "Consultas feitas" quando chegar.');
+      }
+      if (c.status === 'erro') throw new Error(c.erro);
+      limpar(resultado, resultadoConsulta(c.resultado));
+      if (c.resultado.novas) toast(`${c.resultado.novas} multa(s) nova(s) adicionada(s) à central.`);
     } catch (err) {
       limpar(resultado, el('p', { class: 'aviso erro' }, err.message));
     } finally { botaoConsultar.disabled = !podeConsultar; carregar(); }
