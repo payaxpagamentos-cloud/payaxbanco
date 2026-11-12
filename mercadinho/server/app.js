@@ -41,7 +41,11 @@ function criarApp(db) {
   r.get('/pdv', (req, res, next) => (req.originalUrl.split('?')[0].endsWith('/') ? next() : res.redirect(`${req.baseUrl}/pdv/`)));
   // Fotos dos produtos: arquivos simples, servidos para as telas (o <img> do navegador não manda token).
   r.use('/fotos', express.static(pastaFotos(), { maxAge: '30d', immutable: true, index: false, fallthrough: true }));
-  r.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: config.producao ? '1h' : 0 }));
+  // Tela, scripts e estilos: o navegador sempre confere se mudaram (ETag) antes de usar a cópia guardada.
+  // Sem nada novo, a resposta é um 304 vazio; com atualização, a versão nova aparece na hora.
+  r.use(express.static(path.join(__dirname, '..', 'public'), {
+    setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+  }));
 
   if (config.basePath) {
     app.get(['/', config.basePath], (req, res, next) => (req.originalUrl.split('?')[0] === '/' || req.originalUrl.split('?')[0] === config.basePath
