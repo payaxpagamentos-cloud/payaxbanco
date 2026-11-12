@@ -1,178 +1,254 @@
-/* Tela do cliente (autoatendimento): fica virada para quem vai pagar. Tudo grande, com toque e teclado. */
+/* Tela do cliente (autoatendimento / totem) — identidade do provedor: fundo azul com brilhos,
+   marca em destaque, cartão de vidro com os passos CPF → Fatura → Pagamento e ação em laranja. */
 @font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
 
 :root{
-  --fundo: #F2F6FC;
-  --superficie: #FFFFFF;
-  --borda: #DCE4F0;
-  --texto: #0F1B2D;
-  --texto-2: #55627A;
-  --azul: #3C85C4;        /* azul da marca */
-  --azul-forte: #2A6EA8;
-  --laranja: #DD8540;     /* laranja da marca */
+  --azul-escuro: #06224F;
+  --azul: #0B57B8;
+  --azul-claro: #2FA8FF;
+  --azul-marca: #3C85C4;
+  --laranja: #F2801E;
+  --laranja-claro: #FFA04D;
+  --vidro: rgba(255, 255, 255, .93);
+  --vidro-borda: rgba(255, 255, 255, .6);
+  --texto: #0B2A5B;
+  --texto-2: #4A6184;
+  --texto-3: #8699B5;
+  --campo: #FFFFFF;
+  --borda: #DCE6F5;
   --ok: #15803D;
   --ok-bg: #E7F6EC;
   --aviso: #B45309;
   --aviso-bg: #FEF3C7;
-  --erro: #DC2626;
+  --erro: #C81E1E;
   --erro-bg: #FDECEC;
-  --sombra: 0 2px 4px rgba(15, 27, 45, .04), 0 18px 40px -22px rgba(15, 27, 45, .35);
   color-scheme: light;
   font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body{ margin: 0; height: 100%; }
-body{ background:
-    radial-gradient(60rem 40rem at 15% -10%, rgba(60, 133, 196, .18), transparent 70%),
-    radial-gradient(50rem 36rem at 110% 110%, rgba(221, 133, 64, .16), transparent 70%),
-    var(--fundo);
-  color: var(--texto); font-size: 18px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+html, body{ margin: 0; min-height: 100%; }
+/* O fundo vai no html para cobrir a página inteira, mesmo quando o conteúdo passa da altura da tela. */
+html{
+  background:
+    radial-gradient(90rem 60rem at 110% -10%, rgba(47, 168, 255, .55), transparent 60%),
+    radial-gradient(70rem 50rem at -15% 20%, rgba(11, 87, 184, .75), transparent 62%),
+    radial-gradient(60rem 48rem at 50% 115%, rgba(47, 168, 255, .38), transparent 62%),
+    linear-gradient(160deg, #0A3F96 0%, #0A2A6B 45%, #06224F 100%);
+  background-attachment: fixed;
+  background-color: #06224F;
+}
+body{ color: var(--texto); font-size: 18px; line-height: 1.45; -webkit-font-smoothing: antialiased; background: transparent; }
 button{ font: inherit; color: inherit; cursor: pointer; }
-.carregando{ padding: 40px; color: var(--texto-2); }
+.carregando{ padding: 40px; color: #DCE9FB; }
 
-#tela{ min-height: 100%; display: flex; flex-direction: column; align-items: center; padding: 28px 20px 36px; gap: 22px; }
-.marca{ display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.marca img{ max-width: min(460px, 80vw); max-height: 150px; object-fit: contain; background: #fff; border-radius: 18px;
-  padding: 14px 22px; box-shadow: 0 1px 2px rgba(15, 27, 45, .05), 0 14px 32px -20px rgba(15, 27, 45, .45); }
-.marca .loja{ color: var(--texto-2); font-size: 15px; letter-spacing: .02em; }
-.painel{ width: min(760px, 100%); background: var(--superficie); border: 1px solid var(--borda); border-radius: 22px; box-shadow: var(--sombra);
-  padding: 28px; display: flex; flex-direction: column; gap: 18px; animation: subir .18s ease-out; }
-@keyframes subir{ from{ opacity: 0; transform: translateY(8px); } to{ opacity: 1; transform: none; } }
-h1{ margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -.02em; text-align: center; }
-h2{ margin: 0; font-size: 21px; font-weight: 700; }
-.ajuda{ margin: 0; color: var(--texto-2); text-align: center; font-size: 17px; }
-.recado{ background: rgba(60, 133, 196, .1); color: var(--azul-forte); border-radius: 14px; padding: 12px 16px; text-align: center; font-weight: 600; }
+/* Fios de luz do fundo (azuis e laranjas), só decoração. */
+.brilhos{ position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.brilhos i{ position: absolute; border-radius: 50%; border: 2px solid transparent; filter: blur(.4px); opacity: .55; }
+.brilhos i:nth-child(1){ width: 150vmax; height: 150vmax; left: -75vmax; top: -45vmax; border-top-color: rgba(120, 200, 255, .55); border-right-color: rgba(120, 200, 255, .25); transform: rotate(-12deg); }
+.brilhos i:nth-child(2){ width: 120vmax; height: 120vmax; right: -70vmax; top: -20vmax; border-bottom-color: rgba(255, 160, 77, .5); border-left-color: rgba(255, 160, 77, .18); transform: rotate(18deg); }
+.brilhos i:nth-child(3){ width: 110vmax; height: 110vmax; left: -60vmax; bottom: -55vmax; border-top-color: rgba(255, 160, 77, .35); transform: rotate(8deg); }
+.brilhos i:nth-child(4){ width: 170vmax; height: 170vmax; right: -95vmax; bottom: -80vmax; border-left-color: rgba(120, 200, 255, .4); transform: rotate(-6deg); }
 
-/* Documento digitado + teclado */
-.visor{ font-size: 40px; font-weight: 800; letter-spacing: .06em; text-align: center; padding: 14px 10px; border-bottom: 3px solid var(--borda); min-height: 72px;
-  font-variant-numeric: tabular-nums; }
-.visor.vazio{ color: #B6C1D4; }
+#tela{ position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 26px 20px 30px; }
+
+/* ----- marca e chamada ----- */
+.marca{ display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.marca .pilula{ display: inline-flex; align-items: center; justify-content: center; background: #fff; border-radius: 999px; padding: 14px 34px;
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .9); }
+.marca img{ display: block; max-width: min(360px, 68vw); max-height: 96px; object-fit: contain; }
+.marca .loja{ color: rgba(226, 240, 255, .8); font-size: 14px; font-weight: 600; letter-spacing: .04em; }
+.chamada{ width: min(960px, 100%); display: flex; align-items: center; justify-content: space-between; gap: 18px; color: #fff; padding: 0 6px; }
+.chamada h1{ margin: 0; font-size: clamp(26px, 4.4vw, 46px); font-weight: 800; letter-spacing: -.025em; line-height: 1.08; text-shadow: 0 2px 18px rgba(3, 20, 48, .45); }
+.chamada p{ margin: 6px 0 0; font-size: clamp(15px, 1.9vw, 21px); font-weight: 600; color: rgba(226, 240, 255, .92); }
+.chamada .arte{ flex: none; width: clamp(120px, 24vw, 230px); opacity: .95; }
+.chamada .arte svg{ width: 100%; height: auto; display: block; filter: drop-shadow(0 12px 26px rgba(3, 20, 48, .5)); }
+
+/* ----- cartão de vidro ----- */
+.painel{ position: relative; width: min(820px, 100%); background: var(--vidro); border: 1px solid var(--vidro-borda); border-radius: 30px;
+  box-shadow: 0 28px 70px -30px rgba(2, 16, 40, .85), inset 0 1px 0 rgba(255, 255, 255, .9);
+  -webkit-backdrop-filter: blur(20px) saturate(150%); backdrop-filter: blur(20px) saturate(150%);
+  padding: 26px; display: flex; flex-direction: column; gap: 18px; animation: subir .2s ease-out; }
+@keyframes subir{ from{ opacity: 0; transform: translateY(10px); } to{ opacity: 1; transform: none; } }
+h2{ margin: 0; font-size: clamp(24px, 3.4vw, 38px); font-weight: 800; letter-spacing: -.02em; text-align: center; color: var(--texto); }
+.ajuda{ margin: -6px 0 0; color: var(--texto-2); text-align: center; font-size: clamp(15px, 1.8vw, 20px); font-weight: 600; }
+.recado{ background: rgba(11, 87, 184, .1); color: #0B4FA8; border-radius: 14px; padding: 12px 16px; text-align: center; font-weight: 700; }
+
+/* ----- passos 1 CPF · 2 Fatura · 3 Pagamento ----- */
+.passos{ display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: nowrap; }
+.passo{ display: inline-flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, .75); border: 1px solid rgba(255, 255, 255, .9);
+  border-radius: 999px; padding: 6px 16px 6px 6px; color: var(--texto-3); font-weight: 700; font-size: clamp(13px, 1.5vw, 17px); white-space: nowrap;
+  box-shadow: 0 2px 8px -4px rgba(11, 42, 91, .3); }
+.passo .n{ display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #EDF3FB; color: var(--texto-3); font-size: 15px; font-weight: 800; }
+.passo.feito{ color: var(--azul); } .passo.feito .n{ background: rgba(11, 87, 184, .14); color: var(--azul); }
+.passo.on{ background: linear-gradient(180deg, #1C6FD6, #0B57B8); border-color: transparent; color: #fff; box-shadow: 0 10px 22px -12px rgba(11, 87, 184, .9); }
+.passo.on .n{ background: #fff; color: var(--azul); }
+.traco{ flex: 1 1 18px; max-width: 58px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .85); }
+.traco.feito{ background: rgba(11, 87, 184, .45); }
+
+/* ----- campo do documento ----- */
+.campo-doc{ display: flex; align-items: center; gap: 16px; background: var(--campo); border: 1px solid var(--borda); border-radius: 20px; padding: 14px 20px;
+  box-shadow: 0 10px 24px -18px rgba(11, 42, 91, .7); }
+.campo-doc .ic{ flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: rgba(11, 87, 184, .1); color: var(--azul); }
+.campo-doc .ic svg{ width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.campo-doc .divisoria{ width: 1px; align-self: stretch; background: var(--borda); }
+.campo-doc .corpo{ flex: 1; min-width: 0; }
+.campo-doc .rotulo{ font-size: clamp(13px, 1.4vw, 17px); font-weight: 800; color: var(--texto); }
+.campo-doc .valor{ font-size: clamp(26px, 4vw, 42px); font-weight: 800; letter-spacing: .04em; color: var(--texto); font-variant-numeric: tabular-nums; line-height: 1.2; }
+.campo-doc .valor.vazio{ color: var(--texto-3); }
+
+/* ----- teclado ----- */
 .teclado{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.teclado button{ background: var(--superficie); border: 1px solid var(--borda); border-radius: 16px; font-size: 30px; font-weight: 700; padding: 18px 0;
+.teclado button{ background: linear-gradient(180deg, #FFFFFF, #F3F7FD); border: 1px solid var(--borda); border-radius: 18px; color: var(--texto);
+  font-size: clamp(26px, 3.6vw, 38px); font-weight: 800; padding: 16px 0; box-shadow: 0 6px 14px -10px rgba(11, 42, 91, .8);
   transition: transform .08s, background .12s; }
-.teclado button:active{ transform: scale(.96); background: #EDF3FB; }
-.teclado button.acao{ font-size: 20px; font-weight: 700; color: var(--texto-2); }
+.teclado button:active{ transform: scale(.96); background: #E8F0FB; }
+.teclado button.acao{ font-size: clamp(16px, 2vw, 22px); font-weight: 700; color: var(--texto-2); }
+.teclado button.acao svg{ width: 34px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 
-.btn{ display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--borda); background: var(--superficie);
-  border-radius: 16px; padding: 18px 24px; font-size: 20px; font-weight: 700; min-height: 64px; transition: transform .08s, background .12s; }
-.btn:active{ transform: scale(.98); }
-.btn:disabled{ opacity: .45; cursor: default; }
-.btn.principal{ background: var(--azul); border-color: transparent; color: #fff; box-shadow: 0 10px 24px -12px rgba(42, 110, 168, .9); }
-.btn.principal:active{ background: var(--azul-forte); }
-.btn.laranja{ background: var(--laranja); border-color: transparent; color: #fff; }
+/* ----- botões ----- */
+.btn{ display: inline-flex; align-items: center; justify-content: center; gap: 12px; border: 1px solid var(--borda); background: #fff; color: var(--texto);
+  border-radius: 999px; padding: 16px 26px; font-size: clamp(17px, 2vw, 23px); font-weight: 800; min-height: 64px; transition: transform .08s, filter .12s;
+  box-shadow: 0 8px 20px -14px rgba(11, 42, 91, .8); }
+.btn:active{ transform: scale(.985); }
+.btn:disabled{ opacity: .5; cursor: default; }
+.btn.principal{ background: linear-gradient(180deg, var(--laranja-claro), var(--laranja)); border-color: transparent; color: #fff;
+  box-shadow: 0 16px 34px -16px rgba(242, 128, 30, .95), inset 0 1px 0 rgba(255, 255, 255, .5); }
+.btn.principal:disabled{ background: linear-gradient(180deg, #C9D6E8, #AEBFD6); box-shadow: none; }
+.btn.azul{ background: linear-gradient(180deg, #1C6FD6, #0B57B8); border-color: transparent; color: #fff; box-shadow: 0 16px 34px -18px rgba(11, 87, 184, .95); }
 .btn.largo{ width: 100%; }
+.btn .seta{ width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .linha{ display: flex; gap: 12px; }
 .linha > *{ flex: 1; }
 
-/* Faturas */
-.fatura{ display: flex; align-items: center; gap: 16px; border: 2px solid var(--borda); border-radius: 16px; padding: 16px 18px; cursor: pointer; background: var(--superficie); }
+/* ----- formas aceitas e ajuda ----- */
+.formas-aceitas{ display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; color: var(--texto); font-weight: 800;
+  font-size: clamp(14px, 1.6vw, 18px); }
+.formas-aceitas span{ display: inline-flex; align-items: center; gap: 8px; }
+.formas-aceitas svg{ width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.formas-aceitas .ponto{ width: 5px; height: 5px; border-radius: 50%; background: var(--texto-3); }
+.rodape-ajuda{ display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; font-weight: 700; font-size: clamp(14px, 1.7vw, 19px);
+  text-shadow: 0 2px 12px rgba(3, 20, 48, .5); }
+.rodape-ajuda svg{ width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ----- faturas ----- */
+.fatura{ display: flex; align-items: center; gap: 16px; border: 2px solid var(--borda); border-radius: 20px; padding: 16px 18px; cursor: pointer; background: #fff; }
 .fatura + .fatura{ margin-top: 10px; }
-.fatura.on{ border-color: var(--azul); background: rgba(60, 133, 196, .08); }
-.fatura input{ width: 26px; height: 26px; accent-color: var(--azul); flex: none; }
+.fatura.on{ border-color: var(--azul); background: rgba(11, 87, 184, .06); }
+.fatura input{ width: 28px; height: 28px; accent-color: var(--azul); flex: none; }
 .fatura .corpo{ flex: 1; min-width: 0; }
-.fatura .corpo strong{ display: block; font-size: 19px; }
-.fatura .corpo span{ color: var(--texto-2); font-size: 15px; }
-.fatura .valor{ text-align: right; font-size: 21px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fatura .valor small{ display: block; font-size: 13px; font-weight: 600; color: var(--aviso); }
-.atrasada{ color: var(--aviso); font-weight: 700; }
+.fatura .corpo strong{ display: block; font-size: clamp(17px, 2vw, 23px); }
+.fatura .corpo span{ color: var(--texto-2); font-size: clamp(13px, 1.5vw, 17px); font-weight: 600; }
+.fatura .valor{ text-align: right; font-size: clamp(19px, 2.2vw, 26px); font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fatura .valor small{ display: block; font-size: clamp(11px, 1.2vw, 14px); font-weight: 700; color: var(--aviso); }
+.atrasada{ color: var(--aviso); font-weight: 800; }
+.total{ display: flex; align-items: baseline; justify-content: space-between; gap: 12px; border-top: 2px dashed var(--borda); padding-top: 14px; }
+.total span{ font-size: clamp(15px, 1.7vw, 20px); color: var(--texto-2); font-weight: 700; }
+.total strong{ font-size: clamp(30px, 4.6vw, 50px); font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
-.total{ display: flex; align-items: baseline; justify-content: space-between; border-top: 2px dashed var(--borda); padding-top: 16px; }
-.total span{ font-size: 18px; color: var(--texto-2); }
-.total strong{ font-size: 38px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-
-/* Esperando a maquininha */
-.esperando{ display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 10px 0 4px; text-align: center; }
+/* ----- esperando a maquininha ----- */
+.esperando{ display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
 .esperando .total{ width: 100%; }
 .ondas{ display: flex; gap: 10px; }
 .ondas i{ width: 16px; height: 16px; border-radius: 50%; background: var(--azul); animation: pular 1s ease-in-out infinite; }
 .ondas i:nth-child(2){ animation-delay: .15s; } .ondas i:nth-child(3){ animation-delay: .3s; }
 @keyframes pular{ 0%, 100%{ transform: translateY(0); opacity: .35; } 50%{ transform: translateY(-10px); opacity: 1; } }
 
-/* Fim */
+/* ----- fim, avisos e comprovante ----- */
 .selo{ width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto; background: var(--ok-bg); color: var(--ok); }
 .selo.erro{ background: var(--erro-bg); color: var(--erro); }
 .selo svg{ width: 54px; height: 54px; fill: none; stroke: currentColor; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
 .comprovante{ display: block; width: max-content; max-width: 100%; margin: 0 auto; font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 13px; line-height: 1.35; white-space: pre; overflow-x: auto; background: #F6F8FC; border: 1px solid var(--borda); border-radius: 14px; padding: 16px 20px; }
-.aviso{ background: var(--aviso-bg); color: var(--aviso); border-radius: 14px; padding: 14px 16px; font-weight: 600; text-align: center; }
-.erro-caixa{ background: var(--erro-bg); color: var(--erro); border-radius: 14px; padding: 14px 16px; font-weight: 600; text-align: center; }
-.rodape{ color: var(--texto-2); font-size: 14px; text-align: center; }
-.campo{ display: block; font-size: 15px; color: var(--texto-2); font-weight: 600; }
+  font-size: 13px; line-height: 1.35; white-space: pre; overflow-x: auto; background: #F6F8FC; border: 1px solid var(--borda); border-radius: 16px; padding: 16px 20px; }
+.aviso{ background: var(--aviso-bg); color: var(--aviso); border-radius: 16px; padding: 14px 16px; font-weight: 700; text-align: center; }
+.erro-caixa{ background: var(--erro-bg); color: var(--erro); border-radius: 16px; padding: 14px 16px; font-weight: 700; text-align: center; }
+.rodape{ color: var(--texto-2); font-size: clamp(13px, 1.4vw, 16px); text-align: center; font-weight: 600; }
+.campo{ display: block; font-size: 15px; color: var(--texto-2); font-weight: 700; }
 .campo input{ display: block; width: 100%; margin-top: 6px; padding: 14px 16px; font-size: 18px; border: 1px solid var(--borda); border-radius: 14px; background: #fff; }
-.campo input:focus{ outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px rgba(60, 133, 196, .2); }
+.campo input:focus{ outline: none; border-color: var(--azul); box-shadow: 0 0 0 3px rgba(11, 87, 184, .2); }
 
-@media (max-width: 520px){
-  #tela{ padding: 18px 14px 28px; }
-  .painel{ padding: 20px; border-radius: 18px; }
-  h1{ font-size: 23px; }
-  .visor{ font-size: 32px; }
-  .teclado button{ font-size: 26px; padding: 15px 0; }
-  .total strong{ font-size: 30px; }
-}
-@media print{
-  #tela > *:not(.painel), .btn, .teclado{ display: none !important; }
-  .painel{ box-shadow: none; border: 0; }
-}
-
-/* ==========================================================================
-   Totem: tela de espera, telas verticais (1080×1920 e parecidas) e dedo em vez de mouse.
-   ========================================================================== */
-.painel.espera{ align-items: center; text-align: center; gap: 24px; cursor: pointer; user-select: none; padding: 40px 32px; }
-.painel.espera h1{ font-size: 34px; }
+/* ----- tela de espera do totem ----- */
+.painel.espera{ align-items: center; text-align: center; gap: 22px; cursor: pointer; user-select: none; padding: 34px 30px; }
 .painel.espera .btn{ pointer-events: none; }
-.toque{ position: relative; display: grid; place-items: center; width: 150px; height: 150px; margin: 6px auto; }
+.toque{ position: relative; display: grid; place-items: center; width: 140px; height: 140px; margin: 2px auto; }
 .toque .aro{ position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--azul); opacity: .35; animation: aro 2.2s ease-out infinite; }
-.toque .dedo{ display: grid; place-items: center; width: 96px; height: 96px; border-radius: 50%; background: rgba(60, 133, 196, .12); color: var(--azul);
-  animation: tocar 2.2s ease-in-out infinite; }
-.toque svg{ width: 46px; height: 46px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.toque .dedo{ display: grid; place-items: center; width: 92px; height: 92px; border-radius: 50%; background: rgba(11, 87, 184, .12); color: var(--azul); animation: tocar 2.2s ease-in-out infinite; }
+.toque svg{ width: 44px; height: 44px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 @keyframes aro{ 0%{ transform: scale(.62); opacity: .5; } 70%{ transform: scale(1); opacity: 0; } 100%{ opacity: 0; } }
 @keyframes tocar{ 0%, 100%{ transform: translateY(0); } 50%{ transform: translateY(-8px); } }
 
-/* Dedo em vez de mouse: alvos maiores e nada de cursor piscando na tela. */
+/* ----- dedo em vez de mouse ----- */
 @media (pointer: coarse){
   body{ cursor: none; }
   .btn{ min-height: 72px; }
-  .teclado button{ padding: 22px 0; }
-  .fatura{ padding: 20px; }
-  .fatura input{ width: 30px; height: 30px; }
+  .teclado button{ padding: 20px 0; }
+  .fatura input{ width: 32px; height: 32px; }
 }
-
-/* Totem em pé (monitor vertical): tudo maior e o conteúdo no meio da altura. */
-@media (orientation: portrait) and (min-width: 700px){
-  #tela{ justify-content: center; gap: 44px; padding: 56px 48px 72px; font-size: 22px; }
-  .marca img{ max-width: min(620px, 82vw); max-height: 210px; padding: 20px 30px; border-radius: 24px; }
-  .marca .loja{ font-size: 20px; }
-  .painel{ width: min(880px, 100%); padding: 44px; border-radius: 32px; gap: 26px; }
-  h1{ font-size: 42px; }
-  h2{ font-size: 30px; }
-  .ajuda{ font-size: 22px; }
-  .recado{ font-size: 21px; padding: 16px 22px; }
-  .visor{ font-size: 58px; min-height: 104px; }
+/* ----- telas baixas (monitor do balcão deitado): cabe tudo sem rolar ----- */
+@media (max-height: 820px){
+  .chamada{ display: none; }
+  .marca .pilula{ padding: 8px 22px; } .marca img{ max-height: 56px; } .marca .loja{ font-size: 13px; }
+  #tela{ gap: 10px; padding: 10px 16px 10px; }
+  .painel{ padding: 16px 18px; gap: 10px; border-radius: 22px; }
+  h2{ font-size: 24px; } .ajuda{ font-size: 14px; margin-top: -4px; }
+  .passo{ padding: 4px 14px 4px 4px; font-size: 14px; } .passo .n{ width: 28px; height: 28px; font-size: 13px; }
+  .recado{ padding: 8px 14px; font-size: 15px; }
+  .campo-doc{ padding: 10px 16px; border-radius: 16px; gap: 12px; }
+  .campo-doc .ic{ width: 42px; height: 42px; border-radius: 12px; } .campo-doc .ic svg{ width: 24px; height: 24px; }
+  .campo-doc .rotulo{ font-size: 12px; } .campo-doc .valor{ font-size: 27px; }
+  .teclado{ gap: 7px; } .teclado button{ padding: 7px 0; font-size: 24px; border-radius: 13px; }
+  .teclado button.acao{ font-size: 16px; } .teclado button.acao svg{ width: 28px; height: 20px; }
+  .btn{ min-height: 50px; padding: 10px 18px; font-size: 17px; }
+  .formas-aceitas{ font-size: 14px; gap: 10px; } .formas-aceitas svg{ width: 20px; height: 20px; }
+  .rodape-ajuda{ font-size: 14px; } .rodape-ajuda svg{ width: 20px; height: 20px; }
+  .fatura{ padding: 12px 14px; border-radius: 16px; }
+  .selo{ width: 72px; height: 72px; } .selo svg{ width: 40px; height: 40px; }
+  .toque{ width: 110px; height: 110px; } .toque .dedo{ width: 74px; height: 74px; } .toque svg{ width: 36px; height: 36px; }
+}
+/* Telas bem baixas: só o essencial na frente do cliente. */
+@media (max-height: 700px){
+  .recado, .formas-aceitas{ display: none; }
+  .marca .loja{ display: none; }
+}
+@media (max-width: 560px){
+  #tela{ padding: 16px 12px 22px; gap: 16px; }
+  .painel{ padding: 18px; border-radius: 24px; }
+  .passo{ padding: 4px 10px 4px 4px; gap: 6px; } .passo .n{ width: 28px; height: 28px; font-size: 13px; }
+  .traco{ max-width: 20px; }
+  .chamada .arte{ display: none; }
+}
+/* ----- tablet em pé (ex.: 800×1280): meio-termo entre o balcão e o totem ----- */
+@media (orientation: portrait) and (min-width: 700px) and (max-height: 1399px){
+  #tela{ gap: 18px; padding: 22px 24px 24px; }
+  .chamada h1{ font-size: 32px; } .chamada p{ font-size: 17px; } .chamada .arte{ width: 150px; }
+  .marca img{ max-height: 78px; }
+  .painel{ padding: 22px; gap: 14px; }
+  .teclado{ gap: 10px; } .teclado button{ padding: 12px 0; }
+  .btn{ min-height: 60px; }
+  .campo-doc{ padding: 12px 18px; }
+}
+/* ----- totem em pé (1080×1920 e parecidas) ----- */
+@media (orientation: portrait) and (min-width: 700px) and (min-height: 1400px){
+  #tela{ justify-content: center; gap: 40px; padding: 60px 54px 70px; font-size: 22px; }
+  .marca .pilula{ padding: 20px 52px; }
+  .marca img{ max-width: min(520px, 74vw); max-height: 150px; }
+  .marca .loja{ font-size: 18px; }
+  .chamada{ width: 100%; }
+  .painel{ width: 100%; padding: 42px; border-radius: 40px; gap: 26px; }
+  .passo{ padding: 10px 24px 10px 10px; } .passo .n{ width: 46px; height: 46px; font-size: 20px; }
+  .traco{ max-width: 80px; height: 4px; }
+  .campo-doc{ padding: 20px 26px; border-radius: 26px; }
+  .campo-doc .ic{ width: 72px; height: 72px; border-radius: 20px; } .campo-doc .ic svg{ width: 40px; height: 40px; }
   .teclado{ gap: 18px; }
-  .teclado button{ font-size: 42px; padding: 28px 0; border-radius: 22px; }
-  .teclado button.acao{ font-size: 26px; }
-  .btn{ font-size: 26px; min-height: 86px; border-radius: 22px; }
-  .fatura{ padding: 24px 26px; border-radius: 22px; }
-  .fatura .corpo strong{ font-size: 25px; }
-  .fatura .corpo span{ font-size: 19px; }
-  .fatura .valor{ font-size: 28px; } .fatura .valor small{ font-size: 16px; }
-  .total strong{ font-size: 52px; }
-  .total span{ font-size: 22px; }
+  .teclado button{ padding: 26px 0; border-radius: 24px; }
+  .btn{ min-height: 96px; padding: 20px 32px; }
+  .fatura{ padding: 22px 26px; border-radius: 26px; }
   .selo{ width: 130px; height: 130px; } .selo svg{ width: 72px; height: 72px; }
   .comprovante{ font-size: 17px; padding: 22px 26px; }
+  .toque{ width: 190px; height: 190px; } .toque .dedo{ width: 124px; height: 124px; } .toque svg{ width: 58px; height: 58px; }
   .rodape{ font-size: 19px; }
-  .campo{ font-size: 20px; } .campo input{ font-size: 22px; padding: 18px 20px; }
-  .toque{ width: 200px; height: 200px; } .toque .dedo{ width: 128px; height: 128px; } .toque svg{ width: 62px; height: 62px; }
-  .painel.espera h1{ font-size: 50px; }
 }
-/* Totem alto (1080×1920): ainda maior, para ler de longe. */
-@media (orientation: portrait) and (min-height: 1500px){
-  #tela{ font-size: 26px; gap: 60px; }
-  .marca img{ max-height: 260px; }
-  h1{ font-size: 52px; }
-  .painel.espera h1{ font-size: 62px; }
-  .visor{ font-size: 70px; min-height: 124px; }
-  .teclado button{ font-size: 52px; padding: 36px 0; }
-  .btn{ font-size: 30px; min-height: 104px; }
-  .total strong{ font-size: 62px; }
+@media print{
+  body{ background: #fff; }
+  .brilhos, .marca, .chamada, .passos, .btn, .teclado, .rodape-ajuda, .formas-aceitas{ display: none !important; }
+  .painel{ box-shadow: none; border: 0; backdrop-filter: none; background: #fff; }
 }

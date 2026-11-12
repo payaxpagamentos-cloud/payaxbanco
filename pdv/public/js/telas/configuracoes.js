@@ -102,6 +102,11 @@ export async function telaConfiguracoes(ctx) {
         { name: 'logo_url', value: c.logo_url ?? '', placeholder: 'img/logo-cliente.png', maxlength: 300, disabled: somenteLeitura,
           oninput: (e) => { const v2 = e.target.value.trim() || 'img/logo-cliente.png'; previa.src = v2.startsWith('http') ? v2 : `${BASE}/${v2.replace(/^\//, '')}`; } }),
       previa,
+      el('div', { class: 'duas' },
+        campo('Chamada (título grande)', { name: 'autoatendimento_titulo', value: c.autoatendimento_titulo ?? '', maxlength: 80, disabled: somenteLeitura,
+          placeholder: 'Sua casa mais conectada.' }),
+        campo('Frase abaixo da chamada', { name: 'autoatendimento_subtitulo', value: c.autoatendimento_subtitulo ?? '', maxlength: 120, disabled: somenteLeitura,
+          placeholder: 'Internet para todos os seus momentos.' })),
       campo('Recado na tela do cliente (opcional)', { name: 'autoatendimento_mensagem', value: c.autoatendimento_mensagem ?? '', maxlength: 200, disabled: somenteLeitura,
         placeholder: 'Ex.: Pague aqui com cartão. Dúvidas? Chame o atendente.' }));
     const salvarCliente = el('button', { class: 'btn primario' }, 'Salvar tela do cliente');

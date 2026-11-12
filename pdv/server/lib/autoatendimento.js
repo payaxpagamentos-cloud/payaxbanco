@@ -84,6 +84,9 @@ function abertura(db, { pdv, empresa }) {
     loja: db.prepare('SELECT nome FROM lojas WHERE id = ?').get(pdv.loja_id)?.nome ?? null,
     pdv: { id: pdv.id, nome: pdv.nome },
     logo_url: cfg.logo_url || 'img/logo-cliente.png',
+    // Chamada da operadora no alto da tela; sem configurar, vale o texto padrão.
+    titulo: cfg.autoatendimento_titulo || 'Sua casa mais conectada.',
+    subtitulo: cfg.autoatendimento_subtitulo || 'Internet para todos os seus momentos.',
     mensagem: cfg.autoatendimento_mensagem || null,
     // Sem maquininha ligada ao PDV a tela só consulta: não há como cobrar.
     maquininha: terminal ? { id: terminal.id, nome: terminal.nome, adquirente: terminal.adquirente } : null,

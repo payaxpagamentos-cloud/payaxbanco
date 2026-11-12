@@ -31,7 +31,9 @@ hora fica numa fila e aparece na conferência até alguém resolver — o balcã
 2. No aparelho da tela (um monitor com toque, um tablet ou um segundo monitor do caixa), abra
    `https://SEU-DOMINIO/pdv/cliente/` e cole a chave. O botão *Copiar endereço + chave* do painel gera um
    link que já ativa a tela sozinho (`…/cliente/#pdv_...`).
-3. O logo e o recado saem em *Configurações › Tela do cliente* (por padrão, o logo que acompanha o sistema).
+3. O logo, a **chamada** ("Sua casa mais conectada."), a frase e o recado saem em *Configurações › Tela do cliente*
+   (por padrão, o logo que acompanha o sistema e a chamada acima). O visual é o do provedor: fundo azul com
+   brilhos, marca em destaque, passos **CPF → Fatura → Pagamento** e a ação em laranja.
 4. A tela cobra na **maquininha ligada àquele PDV** (ou à loja). Sem maquininha, ela só consulta as faturas.
 
 No totem (monitor vertical com toque), a tela abre numa **tela de espera** com o logo e o convite "toque para

@@ -116,7 +116,7 @@ Quem emite as faturas continua sendo o IXC: o PDV só consulta e baixa.
         A chave aparece UMA ÚNICA VEZ (botão "Copiar endereço + chave").
      2. No aparelho da tela (monitor com toque, tablet ou o segundo monitor do caixa), abra
         https://SEU-DOMINIO/pdv/cliente/ e cole a chave. Com o endereço copiado no passo 1, ela já ativa sozinha.
-     3. O logo e o recado da tela saem em Configurações > Tela do cliente.
+     3. O logo, a chamada ("Sua casa mais conectada."), a frase e o recado saem em Configurações > Tela do cliente.
    NO TOTEM: a tela abre numa tela de espera com o logo ("toque para começar"), entra em tela cheia no primeiro
    toque, segura o monitor aceso e se ajusta a telas em pé (1080x1920). Deixe o navegador do totem em modo
    quiosque abrindo direto o endereço da tela; depois de cada pagamento ela volta sozinha para a tela de espera.

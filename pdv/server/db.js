@@ -84,8 +84,10 @@ CREATE TABLE IF NOT EXISTS config_empresa (
   permitir_avulso INTEGER NOT NULL DEFAULT 1,
   comprovante_cabecalho TEXT,
   comprovante_rodape TEXT,
-  -- Tela do cliente (autoatendimento): logo e recado que aparecem para quem está pagando.
+  -- Tela do cliente (autoatendimento): logo, chamada e recado que aparecem para quem está pagando.
   logo_url TEXT,
+  autoatendimento_titulo TEXT,
+  autoatendimento_subtitulo TEXT,
   autoatendimento_mensagem TEXT,
   atualizado_em TEXT NOT NULL
 );
@@ -325,6 +327,9 @@ function abrir(arquivo = config.dbFile) {
   const configColunas = colunas('config_empresa');
   if (!configColunas.includes('logo_url')) {
     db.exec('ALTER TABLE config_empresa ADD COLUMN logo_url TEXT; ALTER TABLE config_empresa ADD COLUMN autoatendimento_mensagem TEXT;');
+  }
+  if (!colunas('config_empresa').includes('autoatendimento_titulo')) {
+    db.exec('ALTER TABLE config_empresa ADD COLUMN autoatendimento_titulo TEXT; ALTER TABLE config_empresa ADD COLUMN autoatendimento_subtitulo TEXT;');
   }
   if (!colunas('recebimentos').includes('origem')) {
     db.exec("ALTER TABLE recebimentos ADD COLUMN origem TEXT NOT NULL DEFAULT 'balcao'");
