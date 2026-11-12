@@ -735,6 +735,8 @@ const CONFIG_PADRAO = {
   gt06_cmd_desbloquear: 'RELAY,0#',
   gt06_cmd_localizar: 'WHERE#',
   gt06_cmd_reiniciar: 'RESET#',
+  // Consulta automática de multas: a cada quantos dias cada veículo é consultado (1 = diária, 7 = semanal, 15 = quinzenal).
+  multas_consulta_dias: '7',
 };
 const CONFIG_TEXTO = ['nome_plataforma', 'gt06_cmd_bloquear', 'gt06_cmd_desbloquear', 'gt06_cmd_localizar', 'gt06_cmd_reiniciar'];
 

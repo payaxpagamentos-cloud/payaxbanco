@@ -16,7 +16,7 @@
  *   Resposta: { multas: [{ auto_infracao, orgao, codigo, descricao, gravidade, pontos, valor, data_hora, local, municipio, prazo_indicacao, vencimento }],
  *               apontamentos: [{ tipo, descricao, valor, situacao }] }
  */
-const { agora } = require('../db');
+const { agora, lerConfig } = require('../db');
 const { ErroNegocio } = require('./erros');
 const multas = require('./multas');
 const { avisar } = require('./notificacoes');
@@ -25,7 +25,8 @@ const URL_SERVICO = () => process.env.RASTREADOR_MULTAS_URL || '';
 const CHAVE = () => process.env.RASTREADOR_MULTAS_CHAVE || '';
 const configurado = () => Boolean(URL_SERVICO() && CHAVE());
 const POR_RODADA = 10; // veículos por minuto (o serviço cobra por consulta e tem limite de pedidos)
-const INTERVALO_MS = 24 * 3600_000;
+const intervaloDias = (db) => [1, 7, 15].includes(lerConfig(db).multas_consulta_dias) ? lerConfig(db).multas_consulta_dias : 7;
+const intervaloMs = (db) => intervaloDias(db) * 24 * 3600_000;
 const reaisParaCentavos = (x) => (x === undefined || x === null || x === '' ? null : Math.round(Number(String(x).replace(/\./g, '').replace(',', '.')) * 100));
 
 function traduzir(x) {
@@ -123,13 +124,13 @@ function consulta(db, id, { empresaId = null } = {}) {
   return { ...c, resultado: c.resultado ? JSON.parse(c.resultado) : null };
 }
 
-/** Rodada da manutenção: consulta os veículos ativos que não foram consultados nas últimas 24 h (poucos por vez). */
+/** Rodada da manutenção: consulta os veículos ativos cuja última consulta passou do intervalo (semanal por padrão), poucos por vez. */
 let rodando = false;
 async function rodada(db, { empresaId = null, forcar = false } = {}) {
   if (!configurado() || rodando) return { configurado: configurado(), consultados: 0, novas: 0 };
   rodando = true;
   try {
-    const corte = forcar ? agora() : new Date(Date.now() - INTERVALO_MS).toISOString();
+    const corte = forcar ? agora() : new Date(Date.now() - intervaloMs(db)).toISOString();
     const lista = db.prepare(`SELECT v.id, v.empresa_id, v.placa, v.renavam FROM veiculos v JOIN empresas e ON e.id = v.empresa_id
       WHERE v.ativo = 1 AND e.status = 'ativa' ${empresaId ? 'AND v.empresa_id = ?' : ''} AND (v.multas_consulta_em IS NULL OR v.multas_consulta_em < ?)
       ORDER BY v.multas_consulta_em LIMIT ?`).all(...[...(empresaId ? [empresaId] : []), corte, forcar ? 200 : POR_RODADA]);
@@ -147,9 +148,17 @@ async function rodada(db, { empresaId = null, forcar = false } = {}) {
 function situacao(db, empresaId = null) {
   const onde = empresaId ? 'AND empresa_id = ?' : '';
   const p = empresaId ? [empresaId] : [];
-  const tot = db.prepare(`SELECT COUNT(*) AS n, SUM(multas_consulta_em >= ?) AS hoje, MAX(multas_consulta_em) AS ultima FROM veiculos WHERE ativo = 1 ${onde}`)
-    .get(new Date(Date.now() - INTERVALO_MS).toISOString(), ...p);
-  return { ligada: configurado(), veiculos: tot.n, consultados_24h: tot.hoje ?? 0, ultima: tot.ultima };
+  const tot = db.prepare(`SELECT COUNT(*) AS n, SUM(multas_consulta_em >= ?) AS em_dia, MAX(multas_consulta_em) AS ultima FROM veiculos WHERE ativo = 1 ${onde}`)
+    .get(new Date(Date.now() - intervaloMs(db)).toISOString(), ...p);
+  return { ligada: configurado(), intervalo_dias: intervaloDias(db), veiculos: tot.n, em_dia: tot.em_dia ?? 0, ultima: tot.ultima };
 }
 
-module.exports = { configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };
+/** O master escolhe o intervalo da consulta automática: 1 (diária), 7 (semanal) ou 15 (quinzenal). */
+function definirIntervalo(db, dias) {
+  const d = Number(dias);
+  if (![1, 7, 15].includes(d)) throw new ErroNegocio('Escolha diária, semanal ou quinzenal.', 422);
+  db.prepare('INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor').run('multas_consulta_dias', String(d));
+  return d;
+}
+
+module.exports = { definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };
