@@ -130,7 +130,7 @@ export default async function produtos({ alvo, usuario, definirTitulo }) {
     el('div', { class: 'duas' },
       el('label', { class: 'campo' }, 'Custo (R$)', custo),
       el('label', { class: 'campo' }, el('span', { class: 'linha entre' }, 'Preço de venda (R$)',
-        el('button', { type: 'button', class: 'btn pequeno fantasma', onclick: sugerir }, 'sugerir')), preco)),
+        el('button', { type: 'button', class: 'acao-campo', onclick: sugerir }, 'sugerir')), preco)),
     el('div', { class: 'duas' },
       el('label', { class: 'campo' }, 'Estoque mínimo', el('input', { name: 'estoque_minimo', inputmode: 'decimal', value: p ? qtd(p.estoque_minimo_mil) : '0' })),
       p ? null : el('label', { class: 'campo' }, 'Estoque inicial', el('input', { name: 'estoque', inputmode: 'decimal', value: '0' }))),

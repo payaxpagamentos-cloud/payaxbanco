@@ -27,10 +27,10 @@ export default async function estoque({ alvo, usuario, definirTitulo }) {
       const [a, valor] = await Promise.all([api.get('/estoque/alertas'), api.get('/estoque/valor')]);
       return limpar(corpo, el('div', { class: 'coluna' },
         el('div', { class: 'grade' },
-          indicador({ rotulo: 'Valor em estoque (custo)', valor: dinheiro(valor.custo_centavos), nota: `${valor.produtos} produtos com saldo` }),
-          indicador({ rotulo: 'A preço de venda', valor: dinheiro(valor.venda_centavos), nota: `lucro potencial ${dinheiro(valor.venda_centavos - valor.custo_centavos)}`, tom: 'verde' }),
-          indicador({ rotulo: 'Abaixo do mínimo', valor: String(a.estoque_baixo.length), tom: a.estoque_baixo.length ? 'vermelho' : null, nota: `${a.sem_estoque} sem nenhum saldo` }),
-          indicador({ rotulo: 'Lotes vencidos', valor: String(a.vencidos.length), tom: a.vencidos.length ? 'vermelho' : null, nota: `${a.vencendo.length} vencem em ${a.alerta_validade_dias} dias` })),
+          indicador({ simbolo: 'produtos', cor: 'azul', rotulo: 'Valor em estoque (custo)', valor: dinheiro(valor.custo_centavos), nota: `${valor.produtos} produtos com saldo` }),
+          indicador({ simbolo: 'financeiro', rotulo: 'A preço de venda', valor: dinheiro(valor.venda_centavos), nota: `lucro potencial ${dinheiro(valor.venda_centavos - valor.custo_centavos)}`, tom: 'verde' }),
+          indicador({ simbolo: 'alerta', cor: a.estoque_baixo.length ? 'vermelho' : 'ambar', rotulo: 'Abaixo do mínimo', valor: String(a.estoque_baixo.length), tom: a.estoque_baixo.length ? 'vermelho' : null, nota: `${a.sem_estoque} sem nenhum saldo` }),
+          indicador({ simbolo: 'relogio', cor: a.vencidos.length ? 'vermelho' : 'ambar', rotulo: 'Lotes vencidos', valor: String(a.vencidos.length), tom: a.vencidos.length ? 'vermelho' : null, nota: `${a.vencendo.length} vencem em ${a.alerta_validade_dias} dias` })),
         el('section', { class: 'cartao' },
           el('h2', {}, 'Precisa repor'),
           tabela([

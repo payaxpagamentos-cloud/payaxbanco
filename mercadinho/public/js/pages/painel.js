@@ -10,10 +10,11 @@ export default async function painel({ alvo, definirTitulo }) {
 
     limpar(alvo,
       el('div', { class: 'grade' },
-        indicador({ rotulo: 'Vendas de hoje', valor: dinheiro(d.vendas_hoje.total_centavos), nota: `${d.vendas_hoje.vendas} venda(s) · ticket ${dinheiro(d.vendas_hoje.ticket_medio_centavos)}` }),
-        indicador({ rotulo: 'Lucro de hoje', valor: dinheiro(d.vendas_hoje.lucro_centavos), tom: 'verde', nota: 'Venda menos o custo da mercadoria' }),
-        indicador({ rotulo: 'Estoque na prateleira', valor: dinheiro(d.estoque.valor.custo_centavos), nota: `${d.estoque.valor.produtos} produtos · ${dinheiro(d.estoque.valor.venda_centavos)} a preço de venda` }),
+        indicador({ simbolo: 'pdv', rotulo: 'Vendas de hoje', valor: dinheiro(d.vendas_hoje.total_centavos), nota: `${d.vendas_hoje.vendas} venda(s) · ticket ${dinheiro(d.vendas_hoje.ticket_medio_centavos)}` }),
+        indicador({ simbolo: 'financeiro', rotulo: 'Lucro de hoje', valor: dinheiro(d.vendas_hoje.lucro_centavos), tom: 'verde', nota: 'Venda menos o custo da mercadoria' }),
+        indicador({ simbolo: 'produtos', cor: 'azul', rotulo: 'Estoque na prateleira', valor: dinheiro(d.estoque.valor.custo_centavos), nota: `${d.estoque.valor.produtos} produtos · ${dinheiro(d.estoque.valor.venda_centavos)} a preço de venda` }),
         indicador({
+          simbolo: 'moradores', cor: d.moradores_devedores.total > 0 ? 'vermelho' : 'roxo',
           rotulo: 'Fiado em aberto', valor: dinheiro(d.moradores_devedores.total),
           tom: d.moradores_devedores.total > 0 ? 'vermelho' : null, nota: `${d.moradores_devedores.moradores} morador(es) com saldo`,
         })),

@@ -85,17 +85,26 @@ export default async function pdv({ alvo, usuario, definirTitulo }) {
     return adicionar(produto.id, 1);
   }
 
-  /** Esconde a lista de sugestões (ela só aparece quando há algo para mostrar). */
+  /**
+   * Esconde a lista de sugestões e descarta buscas em andamento — sem isso, uma busca antiga
+   * poderia voltar depois do item entrar no carrinho e reabrir a lista por cima da tela.
+   */
+  let buscaAtual = 0;
   function fecharSugestoes() {
+    buscaAtual++;
     const caixaSugestoes = $('#sugestoes');
     if (caixaSugestoes) { limpar(caixaSugestoes); caixaSugestoes.classList.add('oculto'); }
   }
 
   /** Busca enquanto o operador digita; código bipado entra direto no carrinho. */
   async function buscar(termo) {
-    const caixaSugestoes = $('#sugestoes');
     if (!termo || termo.length < 2) return fecharSugestoes();
+    const minhaBusca = ++buscaAtual;
     const achados = await api.get(`/produtos/busca?termo=${encodeURIComponent(termo)}`);
+    // Outra busca (ou um item escolhido) aconteceu enquanto o servidor respondia: esta resposta não vale mais.
+    if (minhaBusca !== buscaAtual || $('#leitor')?.value.trim() !== termo) return undefined;
+    const caixaSugestoes = $('#sugestoes');
+    if (!caixaSugestoes) return undefined;
     caixaSugestoes.classList.remove('oculto');
     limpar(caixaSugestoes, achados.length
       ? achados.map((p) => el('button', { type: 'button', onclick: () => { fecharSugestoes(); escolher(p); } },
@@ -188,7 +197,7 @@ export default async function pdv({ alvo, usuario, definirTitulo }) {
   async function receber() {
     if (!venda?.itens.length) return toast('Adicione itens antes de receber.', 'erro');
     const pagamentos = [];
-    const concluida = await modal(`Receber ${dinheiro(venda.total_centavos)}`, (fechar) => {
+    const concluida = await modal(`Pagamento da venda #${venda.id}`, (fechar) => {
       let forma = 'dinheiro';
       const painel = el('div', { class: 'coluna' });
       const listaPagamentos = el('div', { class: 'coluna' });
@@ -207,7 +216,7 @@ export default async function pdv({ alvo, usuario, definirTitulo }) {
         const restante = falta();
         botaoFinalizar.disabled = restante !== 0;
         botaoFinalizar.textContent = restante === 0 ? 'Finalizar venda' : `Falta ${dinheiro(restante)}`;
-        limpar(listaPagamentos, pagamentos.map((p, i) => el('div', { class: 'linha entre' },
+        limpar(listaPagamentos, pagamentos.map((p, i) => el('div', { class: 'linha entre pago' },
           el('span', {}, etiqueta(FORMAS[p.forma], 'ok'), p.troco_centavos ? el('span', { class: 'pequeno mudo' }, ` troco ${dinheiro(p.troco_centavos)}`) : null),
           el('span', { class: 'linha' }, el('strong', { class: 'num' }, dinheiro(p.valor_centavos)),
             el('button', { class: 'btn icone fantasma', title: 'Remover', onclick: () => { pagamentos.splice(i, 1); atualizar(); montar(); } }, icone('x'))))));
@@ -218,6 +227,13 @@ export default async function pdv({ alvo, usuario, definirTitulo }) {
 
       function montar() {
         const restante = Math.max(0, falta());
+        if (restante === 0 && pagamentos.length) {
+          return limpar(painel, el('div', { class: 'cartao sem-brilho recebido' },
+            el('span', { class: 'marca-check' }, icone('check')),
+            el('div', {},
+              el('div', { class: 'destaque' }, 'Tudo recebido'),
+              el('div', { class: 'pequeno mudo' }, 'Confira o troco, se houver, e finalize a venda.'))));
+        }
         const campoValor = el('input', { inputmode: 'decimal', value: emReais(restante) });
         let conteudo;
 
@@ -300,9 +316,9 @@ export default async function pdv({ alvo, usuario, definirTitulo }) {
 
       atualizar();
       return [
-        el('div', { class: 'linha entre' },
-          el('div', {}, el('div', { class: 'mudo pequeno' }, `Venda #${venda.id} · ${venda.itens.length} item(ns)`),
-            el('div', { class: 'total' }, dinheiro(venda.total_centavos))),
+        el('div', { class: 'linha entre', style: 'align-items: flex-end' },
+          el('div', { class: 'total' }, dinheiro(venda.total_centavos),
+            el('small', {}, `${venda.itens.length} item(ns)${venda.morador ? ` · ${venda.morador}` : ''}`)),
           venda.desconto_centavos ? etiqueta(`desconto ${dinheiro(venda.desconto_centavos)}`, 'info') : null),
         listaPagamentos,
         painel,
@@ -379,7 +395,7 @@ export default async function pdv({ alvo, usuario, definirTitulo }) {
 
     limpar(alvo, el('div', { class: 'pdv' },
       el('section', { class: 'coluna' },
-        el('div', { class: 'cartao' },
+        el('div', { class: 'cartao busca' },
           el('form', { class: 'leitor', style: 'position: relative', onsubmit: aoEnviarLeitor },
             icone('busca'),
             el('input', {
@@ -398,7 +414,7 @@ export default async function pdv({ alvo, usuario, definirTitulo }) {
               el('td', {}, el('div', { class: 'destaque' }, i.descricao),
                 el('div', { class: 'pequeno mudo' }, `${qtd(i.qtd_mil, i.unidade)} × ${dinheiro(i.preco_centavos)}`)),
               el('td', { class: 'direita num destaque' }, dinheiro(i.total_centavos)),
-              el('td', { class: 'direita', style: 'width: 92px' },
+              el('td', { class: 'direita', style: 'width: 118px; white-space: nowrap' },
                 el('button', { class: 'btn icone fantasma', title: 'Alterar quantidade', onclick: async () => {
                   const nova = await alterarQuantidade(i);
                   if (!nova) return;

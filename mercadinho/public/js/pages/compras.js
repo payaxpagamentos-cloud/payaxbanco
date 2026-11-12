@@ -129,7 +129,7 @@ export default async function compras({ alvo, usuario, definirTitulo }) {
     const c = await api.get(`/compras/${id}`);
     await modal(`Pedido #${c.id} · ${c.fornecedor}`, (fechar) => [
       el('div', { class: 'grade' },
-        indicador({ rotulo: 'Total', valor: dinheiro(c.total_centavos), nota: `${c.parcelas}x` }),
+        indicador({ simbolo: 'compras', rotulo: 'Total', valor: dinheiro(c.total_centavos), nota: `${c.parcelas}x` }),
         indicador({ rotulo: 'Situação', valor: c.status, nota: c.recebida_em ? `recebido em ${dataHora(c.recebida_em)}` : c.previsao ? `previsão ${dataBr(c.previsao)}` : '' }),
         indicador({ rotulo: 'Itens', valor: String(c.itens.length), nota: c.numero_nota ? `NF ${c.numero_nota}` : '' })),
       tabela([

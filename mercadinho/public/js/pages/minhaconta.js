@@ -9,9 +9,9 @@ export default async function minhaConta({ alvo, definirTitulo }) {
 
   limpar(alvo,
     el('div', { class: 'grade' },
-      indicador({ rotulo: 'Saldo em aberto', valor: dinheiro(m.saldo_centavos), tom: m.saldo_centavos > 0 ? 'vermelho' : 'verde', nota: m.saldo_centavos > 0 ? 'a acertar com o mercadinho' : 'tudo em dia' }),
-      indicador({ rotulo: 'Consumo deste mês', valor: dinheiro(d.consumo_do_mes.total_centavos), nota: `${d.consumo_do_mes.compras} compra(s)` }),
-      indicador({ rotulo: 'Limite', valor: dinheiro(m.limite_centavos), nota: `disponível ${dinheiro(m.disponivel_centavos)}` })),
+      indicador({ simbolo: 'dinheiro', cor: m.saldo_centavos > 0 ? 'vermelho' : '', rotulo: 'Saldo em aberto', valor: dinheiro(m.saldo_centavos), tom: m.saldo_centavos > 0 ? 'vermelho' : 'verde', nota: m.saldo_centavos > 0 ? 'a acertar com o mercadinho' : 'tudo em dia' }),
+      indicador({ simbolo: 'compras', cor: 'roxo', rotulo: 'Consumo deste mês', valor: dinheiro(d.consumo_do_mes.total_centavos), nota: `${d.consumo_do_mes.compras} compra(s)` }),
+      indicador({ simbolo: 'cartao', cor: 'azul', rotulo: 'Limite', valor: dinheiro(m.limite_centavos), nota: `disponível ${dinheiro(m.disponivel_centavos)}` })),
 
     el('section', { class: 'cartao' },
       el('h2', {}, 'Minhas compras'),

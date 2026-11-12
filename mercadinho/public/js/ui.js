@@ -90,7 +90,12 @@ export function icone(nome, classe) {
 /* ---------- peças prontas ---------- */
 export const etiqueta = (texto, tom) => el('span', { class: `etiqueta${tom ? ` ${tom}` : ''}` }, texto);
 
-export const indicador = ({ rotulo, valor, nota, tom, classe = '' }) => el('div', { class: `cartao indicador ${classe}` },
+/**
+ * Cartão de número grande. `simbolo` é o nome de um ícone (vira o selo colorido do canto)
+ * e `cor` escolhe o tom do selo: verde (padrão), azul, roxo, ambar ou vermelho.
+ */
+export const indicador = ({ rotulo, valor, nota, tom, simbolo, cor = '', classe = '' }) => el('div', { class: `cartao indicador ${cor} ${classe}`.trim() },
+  simbolo ? el('span', { class: 'selo-icone' }, icone(simbolo)) : null,
   el('span', { class: 'rotulo' }, rotulo),
   el('span', { class: `valor${tom ? ` ${tom}` : ''}` }, valor),
   nota ? el('span', { class: 'nota' }, nota) : null);

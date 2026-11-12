@@ -51,10 +51,10 @@ export default async function caixa({ alvo, usuario, definirTitulo }) {
   function blocoAberto(c) {
     return el('div', { class: 'coluna' },
       el('div', { class: 'grade' },
-        indicador({ rotulo: 'Dinheiro na gaveta', valor: dinheiro(c.dinheiro_esperado_centavos), nota: `abertura ${dinheiro(c.caixa.abertura_centavos)}` }),
-        indicador({ rotulo: 'Vendas', valor: dinheiro(c.total_centavos), nota: `${c.vendas} venda(s) · ticket ${dinheiro(c.ticket_medio_centavos)}` }),
-        indicador({ rotulo: 'Lucro bruto', valor: dinheiro(c.lucro_centavos), tom: 'verde', nota: `custo ${dinheiro(c.custo_centavos)}` }),
-        indicador({ rotulo: 'Sangrias', valor: dinheiro(c.sangrias_centavos), nota: `suprimentos ${dinheiro(c.suprimentos_centavos)}` })),
+        indicador({ simbolo: 'dinheiro', rotulo: 'Dinheiro na gaveta', valor: dinheiro(c.dinheiro_esperado_centavos), nota: `abertura ${dinheiro(c.caixa.abertura_centavos)}` }),
+        indicador({ simbolo: 'pdv', cor: 'azul', rotulo: 'Vendas', valor: dinheiro(c.total_centavos), nota: `${c.vendas} venda(s) · ticket ${dinheiro(c.ticket_medio_centavos)}` }),
+        indicador({ simbolo: 'financeiro', rotulo: 'Lucro bruto', valor: dinheiro(c.lucro_centavos), tom: 'verde', nota: `custo ${dinheiro(c.custo_centavos)}` }),
+        indicador({ simbolo: 'baixar', cor: 'ambar', rotulo: 'Sangrias', valor: dinheiro(c.sangrias_centavos), nota: `suprimentos ${dinheiro(c.suprimentos_centavos)}` })),
 
       el('div', { class: 'grade', style: 'grid-template-columns: repeat(auto-fit, minmax(320px, 1fr))' },
         el('section', { class: 'cartao' },

@@ -12,10 +12,10 @@ export default async function financeiro({ alvo, definirTitulo }) {
     definirTitulo('Financeiro', 'Contas, fluxo de caixa e resultado');
     limpar(alvo,
       el('div', { class: 'grade' },
-        indicador({ rotulo: 'A pagar vencido', valor: dinheiro(resumo.pagar.vencido_centavos), tom: resumo.pagar.vencido_centavos ? 'vermelho' : null, nota: `hoje ${dinheiro(resumo.pagar.hoje_centavos)}` }),
-        indicador({ rotulo: 'A pagar (7 dias)', valor: dinheiro(resumo.pagar.semana_centavos), nota: `total em aberto ${dinheiro(resumo.pagar.aberto_centavos)}` }),
-        indicador({ rotulo: 'A receber em aberto', valor: dinheiro(resumo.receber.aberto_centavos), tom: 'verde', nota: `vencido ${dinheiro(resumo.receber.vencido_centavos)}` }),
-        indicador({ rotulo: 'Saldo previsto', valor: dinheiro(resumo.saldo_previsto_centavos), tom: resumo.saldo_previsto_centavos >= 0 ? 'verde' : 'vermelho', nota: 'a receber menos a pagar' })),
+        indicador({ simbolo: 'alerta', cor: 'vermelho', rotulo: 'A pagar vencido', valor: dinheiro(resumo.pagar.vencido_centavos), tom: resumo.pagar.vencido_centavos ? 'vermelho' : null, nota: `hoje ${dinheiro(resumo.pagar.hoje_centavos)}` }),
+        indicador({ simbolo: 'relogio', cor: 'ambar', rotulo: 'A pagar (7 dias)', valor: dinheiro(resumo.pagar.semana_centavos), nota: `total em aberto ${dinheiro(resumo.pagar.aberto_centavos)}` }),
+        indicador({ simbolo: 'baixar', rotulo: 'A receber em aberto', valor: dinheiro(resumo.receber.aberto_centavos), tom: 'verde', nota: `vencido ${dinheiro(resumo.receber.vencido_centavos)}` }),
+        indicador({ simbolo: 'financeiro', cor: 'azul', rotulo: 'Saldo previsto', valor: dinheiro(resumo.saldo_previsto_centavos), tom: resumo.saldo_previsto_centavos >= 0 ? 'verde' : 'vermelho', nota: 'a receber menos a pagar' })),
       el('div', { class: 'linha entre' },
         el('div', { class: 'abas' }, [['pagar', 'Contas a pagar'], ['receber', 'Contas a receber'], ['fluxo', 'Fluxo de caixa'], ['dre', 'DRE do mês']].map(([chave, rotulo]) =>
           el('button', { class: aba === chave ? 'ativa' : '', onclick: () => { aba = chave; desenhar(); } }, rotulo))),
@@ -123,9 +123,9 @@ export default async function financeiro({ alvo, definirTitulo }) {
     const f = await api.get(`/financeiro/fluxo?de=${de}&ate=${hojeLocal()}`);
     limpar(corpo,
       el('div', { class: 'grade' },
-        indicador({ rotulo: 'Entradas (30 dias)', valor: dinheiro(f.entradas_centavos), tom: 'verde' }),
-        indicador({ rotulo: 'Saídas (30 dias)', valor: dinheiro(f.saidas_centavos), tom: 'vermelho' }),
-        indicador({ rotulo: 'Resultado do período', valor: dinheiro(f.saldo_centavos), tom: f.saldo_centavos >= 0 ? 'verde' : 'vermelho' })),
+        indicador({ simbolo: 'baixar', rotulo: 'Entradas (30 dias)', valor: dinheiro(f.entradas_centavos), tom: 'verde' }),
+        indicador({ simbolo: 'compras', cor: 'vermelho', rotulo: 'Saídas (30 dias)', valor: dinheiro(f.saidas_centavos), tom: 'vermelho' }),
+        indicador({ simbolo: 'financeiro', cor: 'azul', rotulo: 'Resultado do período', valor: dinheiro(f.saldo_centavos), tom: f.saldo_centavos >= 0 ? 'verde' : 'vermelho' })),
       el('section', { class: 'cartao' },
         el('h2', {}, 'Entradas por dia'),
         f.dias.length ? colunas(f.dias.map((d) => ({ rotulo: d.dia.slice(8, 10), valor: d.entradas_centavos }))) : el('div', { class: 'vazio' }, 'Sem movimento no período.'),

@@ -27,8 +27,8 @@ export default async function moradores({ alvo, usuario, definirTitulo }) {
       const abertas = lista.filter((f) => f.status === 'aberta');
       return limpar(corpo,
         el('div', { class: 'grade' },
-          indicador({ rotulo: 'Faturas em aberto', valor: String(abertas.length), nota: dinheiro(abertas.reduce((s, f) => s + f.valor_centavos, 0)) }),
-          indicador({ rotulo: 'Faturas emitidas', valor: String(lista.length) })),
+          indicador({ simbolo: 'relatorios', cor: 'ambar', rotulo: 'Faturas em aberto', valor: String(abertas.length), nota: dinheiro(abertas.reduce((s, f) => s + f.valor_centavos, 0)) }),
+          indicador({ simbolo: 'check', rotulo: 'Faturas emitidas', valor: String(lista.length) })),
         el('section', { class: 'cartao' }, tabela([
           { titulo: 'Competência', celula: (f) => mesPorExtenso(f.competencia) },
           { titulo: 'Morador', celula: (f) => `${f.morador} · ${f.bloco}/${f.unidade}` },
@@ -44,8 +44,8 @@ export default async function moradores({ alvo, usuario, definirTitulo }) {
     const devendo = lista.filter((m) => m.saldo_centavos > 0);
     limpar(corpo,
       el('div', { class: 'grade' },
-        indicador({ rotulo: 'Moradores cadastrados', valor: String(lista.length) }),
-        indicador({ rotulo: 'Com conta em aberto', valor: String(devendo.length), nota: dinheiro(devendo.reduce((s, m) => s + m.saldo_centavos, 0)), tom: devendo.length ? 'vermelho' : null })),
+        indicador({ simbolo: 'moradores', cor: 'roxo', rotulo: 'Moradores cadastrados', valor: String(lista.length) }),
+        indicador({ simbolo: 'alerta', cor: devendo.length ? 'vermelho' : 'ambar', rotulo: 'Com conta em aberto', valor: String(devendo.length), nota: dinheiro(devendo.reduce((s, m) => s + m.saldo_centavos, 0)), tom: devendo.length ? 'vermelho' : null })),
       el('section', { class: 'cartao' },
         el('div', { class: 'linha', style: 'margin-bottom: 12px' },
           el('input', { class: 'crescer', placeholder: 'Buscar por nome, bloco ou apartamento', value: filtros.busca, oninput: (e) => { filtros.busca = e.target.value; recarregar(); } }),
@@ -67,9 +67,9 @@ export default async function moradores({ alvo, usuario, definirTitulo }) {
     const m = await api.get(`/moradores/${id}`);
     await modal(`${m.nome} · ${m.bloco}/${m.unidade}`, (fechar) => [
       el('div', { class: 'grade' },
-        indicador({ rotulo: 'Saldo devedor', valor: dinheiro(m.saldo_centavos), tom: m.saldo_centavos > 0 ? 'vermelho' : 'verde' }),
-        indicador({ rotulo: 'Limite', valor: dinheiro(m.limite_centavos), nota: `disponível ${dinheiro(m.disponivel_centavos)}` }),
-        indicador({ rotulo: 'Consumo do mês', valor: dinheiro(m.consumo_do_mes.total_centavos), nota: `${m.consumo_do_mes.compras} compra(s)` })),
+        indicador({ simbolo: 'dinheiro', cor: m.saldo_centavos > 0 ? 'vermelho' : '', rotulo: 'Saldo devedor', valor: dinheiro(m.saldo_centavos), tom: m.saldo_centavos > 0 ? 'vermelho' : 'verde' }),
+        indicador({ simbolo: 'cartao', cor: 'azul', rotulo: 'Limite', valor: dinheiro(m.limite_centavos), nota: `disponível ${dinheiro(m.disponivel_centavos)}` }),
+        indicador({ simbolo: 'compras', cor: 'roxo', rotulo: 'Consumo do mês', valor: dinheiro(m.consumo_do_mes.total_centavos), nota: `${m.consumo_do_mes.compras} compra(s)` })),
       el('p', { class: 'pequeno mudo' }, [m.telefone, m.email, m.acesso ? `portal: ${m.acesso.email}` : 'sem acesso ao portal', m.observacao].filter(Boolean).join(' · ')),
       el('div', { class: 'linha' },
         el('button', { class: 'btn primario pequeno', onclick: () => { fechar(); receber(m); } }, icone('dinheiro'), 'Receber pagamento'),

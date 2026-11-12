@@ -42,7 +42,7 @@ const temaSalvo = () => { try { return localStorage.getItem('mercadinho.tema'); 
 function aplicarTema(tema) {
   document.documentElement.dataset.tema = tema;
   try { localStorage.setItem('mercadinho.tema', tema); } catch { /* ignora */ }
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', tema === 'claro' ? '#EEF2F8' : '#070B14');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', tema === 'claro' ? '#EDF1F9' : '#05070F');
 }
 aplicarTema(temaSalvo() ?? 'escuro');
 
@@ -68,11 +68,22 @@ function telaLogin(erro) {
     });
   }
 
-  limpar($('#app'), el('div', { class: 'entrada' }, el('div', { class: 'cartao caixa' },
-    marca(estado.publico.nome_mercado, estado.publico.condominio || 'do Condomínio'),
-    el('h1', {}, 'Boas-vindas'),
-    el('p', { class: 'mudo', style: 'margin-top:-6px' }, 'Entre para abrir o caixa, repor o estoque ou acompanhar as contas.'),
-    form)));
+  const recurso = (simbolo, texto) => el('div', { class: 'item' }, el('span', { class: 'chip' }, icone(simbolo)), texto);
+
+  limpar($('#app'), el('div', { class: 'entrada' }, el('div', { class: 'painel-entrada' },
+    el('div', { class: 'apresentacao' },
+      marca(estado.publico.nome_mercado, estado.publico.condominio || 'do Condomínio'),
+      el('h1', {}, 'O mercadinho do condomínio ', el('em', {}, 'em um lugar só')),
+      el('p', {}, 'Frente de caixa, estoque, compras, financeiro e a conta de cada morador — com a maquininha de cartão conversando direto com o sistema.'),
+      el('div', { class: 'recursos' },
+        recurso('pdv', 'PDV com leitor de código de barras e balança'),
+        recurso('cartao', 'Cartão, PIX, dinheiro e conta do morador'),
+        recurso('produtos', 'Estoque com custo médio, validade e inventário'),
+        recurso('financeiro', 'Fluxo de caixa, DRE e contas do mês'))),
+    el('div', { class: 'cartao caixa' },
+      el('h2', {}, 'Entrar'),
+      el('p', { class: 'mudo pequeno', style: 'margin: -4px 0 18px' }, 'Use o e-mail e a senha que a administração cadastrou.'),
+      form))));
 }
 
 /* ---------- layout ---------- */
