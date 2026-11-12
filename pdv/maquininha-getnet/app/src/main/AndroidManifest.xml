@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Android 11+: sem isto o sistema não deixa este app enxergar (nem chamar) o app de pagamento da Getnet. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="getnet" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+
+        <!-- Modo Quiosque do POS Digital: faz este app aparecer na lista de aplicativos do quiosque
+             (só ele abre, tela sempre ligada, senha para sair). -->
+        <meta-data android:name="kiosk_mode" android:value="1" />
+
+        <!-- Opcional: esconde os atalhos de Pagamento/Pré-autorização/Estorno do app da Getnet, para o
+             cliente só pagar por aqui. Se ligar isto, a Getnet exige que o SEU app ofereça pagamento e
+             estorno — por isso vem desligado. -->
+        <!-- <meta-data android:name="priority_pay" android:value="1" /> -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="user">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

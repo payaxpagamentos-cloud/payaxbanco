@@ -207,3 +207,42 @@ test('Balcão: a mesma fatura não é recebida duas vezes', async (t) => {
   const denovo = await app.post(`/empresas/${e.eid}/recebimentos`, corpo, e.operador);
   assert.equal(denovo.status, 201, JSON.stringify(denovo.dados));
 });
+
+test('Maquininha: só oferece as formas que o aparelho aceita', async (t) => {
+  const app = await iniciar();
+  const e = await empresaDeTeste(app, { terminal: false });
+  t.after(() => app.fechar());
+
+  await t.test('Getnet (Santander) nasce com crédito e débito, sem PIX', async () => {
+    const r = await app.post(`/empresas/${e.eid}/cadastros/terminais`,
+      { nome: 'POS Santander', loja_id: e.loja.id, pdv_id: e.pdv.id, adquirente: 'getnet' }, e.admin);
+    assert.equal(r.status, 201, JSON.stringify(r.dados));
+    assert.deepEqual(r.dados.formas, ['debito', 'credito']);
+
+    await app.post(`/empresas/${e.eid}/caixa`, { pdv_id: e.pdv.id, fundo_centavos: 0 }, e.operador);
+    const pix = await app.post(`/empresas/${e.eid}/cartao/cobrancas`, { terminal_id: r.dados.id, forma: 'pix', valor_centavos: 5000 }, e.operador);
+    assert.equal(pix.status, 409);
+    assert.match(pix.dados.erro, /não aceita PIX/);
+
+    const debito = await app.post(`/empresas/${e.eid}/cartao/cobrancas`, { terminal_id: r.dados.id, forma: 'debito', valor_centavos: 5000 }, e.operador);
+    assert.equal(debito.status, 201, JSON.stringify(debito.dados));
+  });
+
+  await t.test('a tela do cliente mostra só o que a maquininha do PDV faz', async () => {
+    const { chave } = (await app.post(`/empresas/${e.eid}/cadastros/pdvs/${e.pdv.id}/autoatendimento`, {}, e.admin)).dados;
+    const abertura = await app.req('GET', '/autoatendimento/', undefined, null, { 'X-Api-Key': chave });
+    assert.deepEqual(abertura.dados.formas, ['debito', 'credito']);
+  });
+
+  await t.test('o CV da transação é guardado para o estorno no aparelho', async () => {
+    const terminais = (await app.get(`/empresas/${e.eid}/cadastros/terminais`, e.admin)).dados.itens;
+    const maquina = terminais[0];
+    const { chave } = (await app.post(`/empresas/${e.eid}/cadastros/terminais/${maquina.id}/chave`, {}, e.admin)).dados;
+    const cobranca = (await app.post(`/empresas/${e.eid}/cartao/cobrancas`, { terminal_id: maquina.id, forma: 'credito', valor_centavos: 9900, parcelas: 2 }, e.operador)).dados;
+    await app.terminal(chave).get('/terminal/cobranca');
+    const r = await app.terminal(chave).post('/terminal/resultado',
+      { referencia: cobranca.referencia, status: 'aprovada', nsu: '000123', cv: '004567', autorizacao: '778899', bandeira: 'VISA', cartao_final: '4321' });
+    assert.equal(r.status, 200, JSON.stringify(r.dados));
+    assert.equal(r.dados.cv, '004567');
+  });
+});

@@ -22,11 +22,12 @@ export async function telaMaquininhas(ctx) {
     limpar(lista, el('div', { class: 'linha entre' }, el('h2', { style: 'margin:0' }, 'Maquininhas'),
       ctx.administra ? el('button', { class: 'btn primario', onclick: () => editar(null, lojas, pdvs) }, 'Nova maquininha') : null),
       itens.length ? el('table', { class: 'tabela' },
-        el('thead', {}, el('tr', {}, ['Maquininha', 'Adquirente', 'Integração', 'Loja / PDV', 'Último contato', ''].map((t) => el('th', {}, t)))),
+        el('thead', {}, el('tr', {}, ['Maquininha', 'Adquirente', 'Integração', 'Aceita', 'Loja / PDV', 'Último contato', ''].map((t) => el('th', {}, t)))),
         el('tbody', {}, itens.map((t) => el('tr', {},
           el('td', {}, el('strong', {}, t.nome), t.serial ? el('div', { class: 'pequeno mudo' }, `série ${t.serial}`) : null),
           el('td', {}, ADQUIRENTES[t.adquirente] ?? t.adquirente, t.modelo ? el('div', { class: 'pequeno mudo' }, t.modelo) : null),
           el('td', {}, MODOS_TERMINAL[t.modo], t.modo !== 'manual' ? el('div', { class: 'pequeno mudo' }, t.chave_definida ? 'chave gerada' : 'sem chave') : null),
+          el('td', { class: 'pequeno' }, (t.formas ?? []).map((f) => FORMAS_CURTAS[f] ?? f).join(', ')),
           el('td', { class: 'pequeno' }, [t.loja_nome, t.pdv_nome].filter(Boolean).join(' · ')),
           el('td', { class: 'pequeno mudo' }, t.ultimo_contato ? dataHora(t.ultimo_contato) : 'nunca'),
           el('td', { class: 'dir' }, el('div', { class: 'linha', style: 'gap:6px;justify-content:flex-end' },
@@ -75,6 +76,24 @@ Cabeçalho: X-Api-Key: pdv_<prefixo>_<segredo>`));
       };
       setTimeout(mostrar, 0);
       form.addEventListener('change', mostrar);
+      const formas = t?.formas ?? ['debito', 'credito', 'pix'];
+      const aviso = el('p', { class: 'pequeno mudo' }, '');
+      const avisarAdquirente = () => {
+        const a = form.querySelector('[name=adquirente]')?.value;
+        const pix = form.querySelector('[name=forma_pix]');
+        const getnet = a === 'getnet';
+        aviso.textContent = getnet
+          ? 'Getnet (Santander): o aplicativo de pagamento do POS Digital faz crédito, débito e voucher pelo deeplink — PIX não passa por ele.'
+          : '';
+        if (pix) {
+          // Na Getnet o PIX não entra pelo deeplink: a opção fica desmarcada e travada.
+          if (getnet && pix.checked) pix.checked = false;
+          pix.disabled = getnet;
+          pix.closest('.marcar')?.classList.toggle('mudo', getnet);
+        }
+      };
+      setTimeout(avisarAdquirente, 0);
+      form.addEventListener('change', avisarAdquirente);
       return [
         campo('Nome', { name: 'nome', required: true, maxlength: 80, value: t?.nome ?? '' }),
         el('div', { class: 'duas' },
@@ -85,10 +104,18 @@ Cabeçalho: X-Api-Key: pdv_<prefixo>_<segredo>`));
           campo('Número de série', { name: 'serial', maxlength: 60, value: t?.serial ?? '' })),
         el('div', { class: 'duas' }, modo, escolha('PDV', 'pdv_id', opcoesPdv, t?.pdv_id ?? '')),
         endereco, token,
+        el('fieldset', {}, el('legend', {}, 'O que esta maquininha aceita'),
+          el('div', { class: 'tres' },
+            marcar('Débito', { name: 'forma_debito', checked: formas.includes('debito') }),
+            marcar('Crédito', { name: 'forma_credito', checked: formas.includes('credito') }),
+            marcar('PIX', { name: 'forma_pix', checked: formas.includes('pix') })),
+          aviso),
         t ? marcar('Maquininha ativa', { name: 'ativo', checked: !!t.ativo }) : null,
       ];
     }, async (d) => {
-      const corpo = { ...d, pdv_id: d.pdv_id || null, token: d.token || undefined };
+      const escolhidas = ['debito', 'credito', 'pix'].filter((f) => d[`forma_${f}`]);
+      if (!escolhidas.length) throw new Error('Escolha pelo menos uma forma de pagamento aceita pela maquininha.');
+      const corpo = { ...d, formas: escolhidas, pdv_id: d.pdv_id || null, token: d.token || undefined };
       if (d.modo !== 'webhook') { corpo.endereco = null; delete corpo.token; }
       const r = t ? await api.patch(`${base}/cadastros/terminais/${t.id}`, corpo) : await api.post(`${base}/cadastros/terminais`, corpo);
       toast(t ? 'Maquininha salva.' : 'Maquininha cadastrada.');

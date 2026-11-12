@@ -8,6 +8,16 @@ const { ErroNegocio, naoEncontrado } = require('./erros');
 const v = require('./validacao');
 
 const FORMAS_CARTAO = ['debito', 'credito', 'pix'];
+
+/** Formas que este aparelho aceita (o cadastro manda; na dúvida, as três). */
+function formasDoTerminal(terminal) {
+  try {
+    const lista = JSON.parse(terminal.formas || '[]').filter((f) => FORMAS_CARTAO.includes(f));
+    return lista.length ? lista : FORMAS_CARTAO;
+  } catch {
+    return FORMAS_CARTAO;
+  }
+}
 const ABERTAS = ['pendente', 'enviada'];
 
 const publico = (t) => (t ? {
@@ -22,6 +32,7 @@ const publico = (t) => (t ? {
   nsu: t.nsu,
   autorizacao: t.autorizacao,
   cartao_final: t.cartao_final,
+  cv: t.cv,
   mensagem: t.mensagem,
   recebimento_id: t.recebimento_id,
   criado_em: t.criado_em,
@@ -45,6 +56,9 @@ function lerTerminal(db, empresaId, id) {
 async function cobrar(db, { empresa, terminalId, forma, valorCentavos, parcelas = 1, operadorId = null, caixaId = null }) {
   const terminal = lerTerminal(db, empresa.id, terminalId);
   v.opcao(forma, 'a forma de pagamento', FORMAS_CARTAO);
+  if (!formasDoTerminal(terminal).includes(forma)) {
+    throw new ErroNegocio(`A maquininha "${terminal.nome}" não aceita ${forma === 'pix' ? 'PIX' : forma}.`, 409);
+  }
   const valor = v.centavos(valorCentavos, 'o valor');
   const p = forma === 'credito' ? v.inteiro(parcelas, 'o número de parcelas', { min: 1, max: 24 }) : 1;
   if (terminal.modo === 'manual') throw new ErroNegocio('Esta maquininha é de digitação manual: informe o NSU e a autorização do comprovante.', 409);
@@ -115,13 +129,14 @@ function resultado(db, terminal, d) {
     if (t.status === status) return publico(t);
     throw new ErroNegocio(`Esta cobrança já foi encerrada como ${t.status}.`, 409);
   }
-  db.prepare(`UPDATE transacoes_cartao SET status = ?, bandeira = ?, nsu = ?, autorizacao = ?, cartao_final = ?, mensagem = ?, comprovante = ?, atualizado_em = ?
+  db.prepare(`UPDATE transacoes_cartao SET status = ?, bandeira = ?, nsu = ?, autorizacao = ?, cartao_final = ?, cv = ?, mensagem = ?, comprovante = ?, atualizado_em = ?
     WHERE id = ?`).run(
     status,
     v.opcional(d.bandeira, 'a bandeira', 30),
     v.opcional(d.nsu, 'o NSU', 30),
     v.opcional(d.autorizacao, 'a autorização', 30),
     v.opcional(String(d.cartao_final ?? '').replace(/\D/g, '').slice(-4), 'os últimos dígitos do cartão', 4),
+    v.opcional(d.cv, 'o CV da transação', 30),
     v.opcional(d.mensagem, 'a mensagem', 300),
     v.opcional(d.comprovante, 'o comprovante', 4000),
     agora(), t.id,
@@ -169,4 +184,4 @@ function expirarVencidas(db) {
   return r.changes;
 }
 
-module.exports = { FORMAS_CARTAO, cobrar, proximaPendente, resultado, registrarManual, cancelar, buscar, expirarVencidas, publico, lerTerminal };
+module.exports = { FORMAS_CARTAO, formasDoTerminal, cobrar, proximaPendente, resultado, registrarManual, cancelar, buscar, expirarVencidas, publico, lerTerminal };

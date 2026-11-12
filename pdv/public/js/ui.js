@@ -216,7 +216,7 @@ export const FORMAS = { dinheiro: 'Dinheiro', pix: 'PIX', debito: 'Cartão de d�
 export const FORMAS_CURTAS = { dinheiro: 'Dinheiro', pix: 'PIX', debito: 'Débito', credito: 'Crédito', transferencia: 'Transferência', outro: 'Outro' };
 export const ICONE_FORMA = { dinheiro: 'dinheiro', pix: 'pix', debito: 'cartao', credito: 'cartao', transferencia: 'sincronizar', outro: 'recebimentos' };
 export const PERFIS = { master: 'Master', suporte: 'Suporte', admin: 'Administrador', supervisor: 'Supervisor', operador: 'Operador de caixa' };
-export const ADQUIRENTES = { stone: 'Stone', cielo: 'Cielo', rede: 'Rede', getnet: 'GetNet', pagbank: 'PagBank', mercadopago: 'Mercado Pago', sipag: 'Sipag', safrapay: 'SafraPay', outro: 'Outro' };
+export const ADQUIRENTES = { stone: 'Stone', cielo: 'Cielo', rede: 'Rede', getnet: 'Getnet (Santander)', pagbank: 'PagBank', mercadopago: 'Mercado Pago', sipag: 'Sipag', safrapay: 'SafraPay', outro: 'Outro' };
 export const MODOS_TERMINAL = { agente: 'Aplicativo na maquininha', webhook: 'Adquirente (webhook)', manual: 'Digitado pelo operador' };
 export const STATUS_IXC = {
   pendente: ['Aguardando baixa', 'aviso'], enviando: ['Enviando ao IXC', 'info'], baixado: ['Baixado no IXC', 'ok'], parcial: ['Baixa parcial', 'aviso'],

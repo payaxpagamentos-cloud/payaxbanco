@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:keepScreenOn="true"
+    android:padding="20dp"
+    android:background="#06224F">
+
+    <TextView
+        android:id="@+id/situacao"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:text="Iniciando…" />
+
+    <TextView
+        android:id="@+id/detalhe"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:layout_marginTop="10dp"
+        android:textColor="#BFD6F5"
+        android:textSize="15sp"
+        android:text="" />
+
+    <TextView
+        android:id="@+id/rodape"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:layout_marginTop="24dp"
+        android:textColor="#7FA3D6"
+        android:textSize="12sp"
+        android:text="" />
+
+    <Button
+        android:id="@+id/configurar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:text="Configurar" />
+</LinearLayout>

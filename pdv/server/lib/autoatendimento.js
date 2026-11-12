@@ -15,7 +15,7 @@ const { ErroNegocio, naoEncontrado } = require('./erros');
 const { hashSenha } = require('./senha');
 const { clienteIxc, lerConfig, configPublica } = require('./ixcEmpresa');
 const { comAcrescimo, criar } = require('./recebimentos');
-const { cobrar, buscar: buscarCobranca, publico: cobrancaPublica } = require('./maquininha');
+const { cobrar, buscar: buscarCobranca, publico: cobrancaPublica, formasDoTerminal } = require('./maquininha');
 const { digitos } = require('./ixc');
 const v = require('./validacao');
 
@@ -94,7 +94,8 @@ function abertura(db, { pdv, empresa }) {
     mensagem: cfg.autoatendimento_mensagem || null,
     // Sem maquininha ligada ao PDV a tela só consulta: não há como cobrar.
     maquininha: terminal ? { id: terminal.id, nome: terminal.nome, adquirente: terminal.adquirente } : null,
-    formas: terminal ? FORMAS : [],
+    // Só aparece para o cliente o que a maquininha daquele PDV realmente faz.
+    formas: terminal ? FORMAS.filter((f) => formasDoTerminal(terminal).includes(f)) : [],
     ixc_pronto: !!(cfg.ixc_ativo && cfg.ixc_url),
   };
 }

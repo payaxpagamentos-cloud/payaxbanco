@@ -14,6 +14,17 @@ const v = require('../lib/validacao');
 const ADMINISTRA = ['master', 'suporte', 'admin'];
 const PERFIS_EMPRESA = ['admin', 'supervisor', 'operador'];
 const ADQUIRENTES = ['stone', 'cielo', 'rede', 'getnet', 'pagbank', 'mercadopago', 'sipag', 'safrapay', 'outro'];
+const FORMAS_CARTAO = ['debito', 'credito', 'pix'];
+// A maquininha da Getnet (Santander) faz crédito e débito pelo deeplink de pagamento; PIX não entra por ali.
+const FORMAS_PADRAO = { getnet: ['debito', 'credito'] };
+
+/** Formas aceitas pelo aparelho, como vieram do painel (vazio = o padrão do adquirente). */
+function formasDoCadastro(d, adquirente) {
+  if (d.formas === undefined) return JSON.stringify(FORMAS_PADRAO[adquirente] ?? FORMAS_CARTAO);
+  const lista = (Array.isArray(d.formas) ? d.formas : []).filter((f) => FORMAS_CARTAO.includes(f));
+  v.exigir(lista.length > 0, 'Escolha pelo menos uma forma de pagamento aceita pela maquininha.');
+  return JSON.stringify([...new Set(lista)]);
+}
 
 /** Cadastros da empresa (/api/empresas/:eid/cadastros): lojas, PDVs, maquininhas e usuários. */
 module.exports = (db) => {
@@ -89,12 +100,16 @@ module.exports = (db) => {
   });
 
   // ----- Maquininhas -----
-  const terminalPublico = (t) => ({ ...t, token_cifrado: undefined, chave_hash: undefined, chave_definida: !!t.chave_hash, token_definido: !!t.token_cifrado });
+  const terminalPublico = (t) => ({
+    ...t, token_cifrado: undefined, chave_hash: undefined, chave_definida: !!t.chave_hash, token_definido: !!t.token_cifrado,
+    formas: (() => { try { return JSON.parse(t.formas || '[]'); } catch { return FORMAS_CARTAO; } })(),
+  });
 
   r.get('/terminais', (req, res) => res.json({
     itens: db.prepare(`SELECT t.*, l.nome AS loja_nome, p.nome AS pdv_nome FROM terminais t JOIN lojas l ON l.id = t.loja_id
       LEFT JOIN pdvs p ON p.id = t.pdv_id WHERE t.empresa_id = ? ORDER BY t.nome`).all(req.empresa.id).map(terminalPublico),
     adquirentes: ADQUIRENTES,
+    formas_cartao: FORMAS_CARTAO,
   }));
 
   r.post('/terminais', administra, (req, res) => {
@@ -103,12 +118,13 @@ module.exports = (db) => {
     if (!lojaId) throw new ErroNegocio('Escolha a loja da maquininha.', 422);
     const modo = v.opcao(d.modo ?? 'agente', 'o modo de integração', ['agente', 'webhook', 'manual']);
     const endereco = modo === 'webhook' ? v.url(d.endereco, 'o endereço do adquirente', { permitirHttp: config.permitirHttp }) : null;
-    const x = db.prepare(`INSERT INTO terminais (empresa_id, loja_id, pdv_id, nome, adquirente, modelo, serial, modo, endereco, token_cifrado, criado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    const adquirente = v.opcao(d.adquirente ?? 'outro', 'o adquirente', ADQUIRENTES);
+    const x = db.prepare(`INSERT INTO terminais (empresa_id, loja_id, pdv_id, nome, adquirente, modelo, serial, modo, endereco, token_cifrado, formas, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       req.empresa.id, lojaId, pdvDaEmpresa(db, req.empresa.id, d.pdv_id),
-      v.texto(d.nome, 'o nome da maquininha', 80), v.opcao(d.adquirente ?? 'outro', 'o adquirente', ADQUIRENTES),
+      v.texto(d.nome, 'o nome da maquininha', 80), adquirente,
       v.opcional(d.modelo, 'o modelo', 60), v.opcional(d.serial, 'o número de série', 60), modo, endereco,
-      d.token ? cifrar(v.texto(d.token, 'o token do adquirente', 300)) : null, agora());
+      d.token ? cifrar(v.texto(d.token, 'o token do adquirente', 300)) : null, formasDoCadastro(d, adquirente), agora());
     const id = Number(x.lastInsertRowid);
     const chave = modo === 'manual' ? null : gerarChaveTerminal(db, id);
     registrar(db, req, 'terminal_criado', { terminal: id, modo });
@@ -121,7 +137,7 @@ module.exports = (db) => {
     const modo = d.modo === undefined ? t.modo : v.opcao(d.modo, 'o modo de integração', ['agente', 'webhook', 'manual']);
     const endereco = d.endereco === undefined ? t.endereco : (d.endereco ? v.url(d.endereco, 'o endereço do adquirente', { permitirHttp: config.permitirHttp }) : null);
     if (modo === 'webhook' && !endereco) throw new ErroNegocio('Informe o endereço do adquirente para o modo webhook.', 422);
-    db.prepare(`UPDATE terminais SET nome = ?, adquirente = ?, modelo = ?, serial = ?, modo = ?, endereco = ?, pdv_id = ?, loja_id = ?, ativo = ?
+    db.prepare(`UPDATE terminais SET nome = ?, adquirente = ?, modelo = ?, serial = ?, modo = ?, endereco = ?, pdv_id = ?, loja_id = ?, ativo = ?, formas = ?
       ${d.token ? ', token_cifrado = ?' : ''} WHERE id = ?`).run(
       d.nome === undefined ? t.nome : v.texto(d.nome, 'o nome da maquininha', 80),
       d.adquirente === undefined ? t.adquirente : v.opcao(d.adquirente, 'o adquirente', ADQUIRENTES),
@@ -131,6 +147,7 @@ module.exports = (db) => {
       d.pdv_id === undefined ? t.pdv_id : pdvDaEmpresa(db, req.empresa.id, d.pdv_id),
       d.loja_id === undefined ? t.loja_id : lojaDaEmpresa(db, req.empresa.id, d.loja_id) ?? t.loja_id,
       d.ativo === undefined ? t.ativo : (v.booleano(d.ativo) ? 1 : 0),
+      d.formas === undefined ? t.formas : formasDoCadastro(d, d.adquirente ?? t.adquirente),
       ...(d.token ? [cifrar(v.texto(d.token, 'o token do adquirente', 300))] : []), t.id);
     registrar(db, req, 'terminal_alterado', { terminal: t.id });
     res.json(terminalPublico(db.prepare('SELECT * FROM terminais WHERE id = ?').get(t.id)));

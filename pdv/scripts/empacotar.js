@@ -53,6 +53,8 @@ fs.mkdirSync(path.join(pasta, 'maquininha'), { recursive: true });
 for (const arquivo of ['maquininha-exemplo.js', 'maquininha-simulada.js', 'homologar-ixc.js']) {
   fs.copyFileSync(path.join(raiz, 'scripts', arquivo), path.join(pasta, 'maquininha', arquivo));
 }
+// Aplicativo da maquininha Getnet (Santander), para quem for compilar e instalar no aparelho.
+fs.cpSync(path.join(raiz, 'maquininha-getnet'), path.join(pasta, 'maquininha', 'getnet-android'), { recursive: true });
 fs.mkdirSync(path.join(pasta, 'data'), { recursive: true });
 
 const zip = path.join(saida, 'pdv.zip');

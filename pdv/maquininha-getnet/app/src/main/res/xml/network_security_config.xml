@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Só HTTPS. Se o PDV estiver num servidor interno sem certificado, troque o domínio abaixo e
+     descomente o bloco: aí aquele endereço (e só ele) passa a aceitar http://. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <!--
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">192.168.0.10</domain>
+    </domain-config>
+    -->
+</network-security-config>

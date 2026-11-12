@@ -1,0 +1,4 @@
+// Projeto do aplicativo que roda na maquininha Getnet (Santander) e conversa com o Payax PDV.
+plugins {
+    id 'com.android.application' version '8.1.4' apply false
+}

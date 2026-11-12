@@ -192,9 +192,14 @@ são eles que vão em *Configurações › IXC* para a baixa cair na conta certa
 
 | Modo | Quando usar | O que falta fazer |
 |---|---|---|
-| **Aplicativo na maquininha** | Maquininha inteligente (Stone, PagBank, Cielo LIO, Mercado Pago, GetNet) | Um aplicativo no aparelho que busque a cobrança no PDV e devolva o resultado. Base pronta: `scripts/maquininha-exemplo.js` — troque `passarCartao` pelo SDK da adquirente. |
+| **Getnet (Santander)** | A maquininha do Santander (POS Digital / Get Smart) | **Já está pronto**: o aplicativo do aparelho está em [`maquininha-getnet/`](maquininha-getnet/README.md) — compile, instale na maquininha e informe o endereço do PDV e a chave. Falta só a homologação com a Getnet. |
+| **Aplicativo na maquininha** | Outras maquininhas inteligentes (Stone, PagBank, Cielo LIO, Mercado Pago) | Um aplicativo no aparelho que busque a cobrança no PDV e devolva o resultado. Base pronta: `scripts/maquininha-exemplo.js` — troque `passarCartao` pelo SDK da adquirente. |
 | **Adquirente (webhook)** | Intermediador/TEF com API própria | Apontar o endereço no cadastro da maquininha. O PDV faz `POST` nesse endereço com `{ referencia, forma, valor_centavos, parcelas, serial, adquirente }` e espera o retorno em `POST /api/integracao/terminal/resultado` com a mesma `referencia`. |
 | **Digitado pelo operador** | Maquininha avulsa, sem integração | Nada: o operador passa o cartão no aparelho e digita o NSU no PDV. Não serve para o totem (lá não há operador). |
+
+Cada maquininha diz, no cadastro, **o que ela aceita** (débito, crédito, PIX). A da Getnet já nasce com débito e
+crédito: o deeplink de pagamento do POS Digital não faz PIX, e a tela do cliente passa a não oferecer essa opção
+naquele PDV.
 
 Enquanto o aparelho não chega, dá para testar tudo com a **maquininha simulada**:
 
@@ -228,6 +233,7 @@ pdv/
     lib/autoatendimento.js # tela do cliente: chave do PDV, consulta por CPF/CNPJ e recebimento sem caixa
   public/                 # painel: js/telas/pdv.js (balcão), caixa, recebimentos, conferência, maquininhas, cadastros, configurações
   public/cliente/         # tela do cliente (autoatendimento), com teclado grande e o logo do provedor
+  maquininha-getnet/      # aplicativo Android da maquininha Santander (Getnet), pronto para compilar
   scripts/
     homologar-ixc.js      # confere, contra o IXC do provedor, tudo o que o PDV usa (inclusive baixa e estorno)
     maquininha-exemplo.js # base do aplicativo que roda na maquininha

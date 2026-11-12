@@ -108,6 +108,9 @@ CREATE TABLE IF NOT EXISTS terminais (
   modelo TEXT,
   serial TEXT,
   modo TEXT NOT NULL DEFAULT 'agente' CHECK (modo IN ('agente','webhook','manual')),
+  -- O que este aparelho aceita: ["debito","credito","pix"]. A maquininha da Getnet (Santander), por exemplo,
+  -- faz crédito e débito pelo deeplink de pagamento, mas não PIX.
+  formas TEXT NOT NULL DEFAULT '["debito","credito","pix"]',
   endereco TEXT,
   token_cifrado TEXT,
   chave_prefixo TEXT UNIQUE,
@@ -252,6 +255,8 @@ CREATE TABLE IF NOT EXISTS transacoes_cartao (
   nsu TEXT,
   autorizacao TEXT,
   cartao_final TEXT,
+  -- CV da transação (Getnet: cvNumber), pedido pela maquininha para estornar no mesmo dia.
+  cv TEXT,
   mensagem TEXT,
   comprovante TEXT,
   recebimento_id INTEGER REFERENCES recebimentos(id),
@@ -335,6 +340,12 @@ function abrir(arquivo = config.dbFile) {
   }
   if (!colunas('config_empresa').includes('autoatendimento_fundo')) {
     db.exec('ALTER TABLE config_empresa ADD COLUMN autoatendimento_fundo TEXT');
+  }
+  if (!colunas('terminais').includes('formas')) {
+    db.exec(`ALTER TABLE terminais ADD COLUMN formas TEXT NOT NULL DEFAULT '["debito","credito","pix"]'`);
+  }
+  if (!colunas('transacoes_cartao').includes('cv')) {
+    db.exec('ALTER TABLE transacoes_cartao ADD COLUMN cv TEXT');
   }
   if (!colunas('config_empresa').includes('autoatendimento_fundo_marca')) {
     db.exec('ALTER TABLE config_empresa ADD COLUMN autoatendimento_fundo_marca INTEGER NOT NULL DEFAULT 0');
