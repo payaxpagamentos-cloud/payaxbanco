@@ -110,10 +110,10 @@ function traduzirApiBrasil(j) {
 }
 
 /** Pergunta ao serviço contratado, tentando de novo (até 2 vezes) quando a fonte (DETRAN) está fora do ar ou demora (502/503/504). */
-async function perguntar(placa, renavam, { tentativas = 3, espera: pausa = Number(process.env.RASTREADOR_MULTAS_ESPERA_MS) || 15_000, urlRetorno } = {}) {
+async function perguntar(placa, renavam, { tentativas = 3, espera: pausa = Number(process.env.RASTREADOR_MULTAS_ESPERA_MS) || 15_000, urlRetorno, tipo } = {}) {
   for (let i = 1; ; i++) {
     try {
-      return await perguntarUmaVez(placa, renavam, { urlRetorno });
+      return await perguntarUmaVez(placa, renavam, { urlRetorno, tipo });
     } catch (err) {
       if (!err.instavel || i >= tentativas) throw err;
       await espera(pausa);
@@ -121,7 +121,63 @@ async function perguntar(placa, renavam, { tentativas = 3, espera: pausa = Numbe
   }
 }
 
+/**
+ * Consulta rápida: API Brasil "Multas (Renainf)" (tipo "renainf", R$ 3,45): só as multas do Renainf (sem IPVA/licenciamento).
+ * O formato da resposta não está na documentação: a leitura procura a lista de infrações em qualquer lugar da resposta.
+ */
+function lerRenainf(j) {
+  if (j?.error) throw new ErroNegocio(`API Brasil: ${j.message || 'a consulta falhou'}.`, 502);
+  const achar = (o, prof = 0) => {
+    if (!o || typeof o !== 'object' || prof > 6) return null;
+    if (Array.isArray(o)) return o.length && o.every((x) => x && typeof x === 'object' && !Array.isArray(x)) && o.some((x) => Object.keys(x).some((k) => /infra|descri|auto|ait|valor/i.test(k))) ? o : null;
+    for (const v of Object.values(o)) { const a = achar(v, prof + 1); if (a) return a; }
+    return null;
+  };
+  const lista = achar(j?.data ?? j) ?? [];
+  const campo = (x, re) => { const k = Object.keys(x).find((c) => re.test(c)); return k ? x[k] : null; };
+  const reais = (v) => { if (v === null || v === undefined || v === '') return null; const n = typeof v === 'number' ? v : Number(String(v).replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')); return Number.isFinite(n) ? Math.round(n * 100) : null; };
+  const quando = (v) => { const t = String(v ?? '').trim(); const br = /^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}:\d{2}))?/.exec(t); if (br) return { em: `${br[3]}-${br[2]}-${br[1]}T${br[4] ?? '12:00'}:00-03:00`, sem: !br[4] }; const iso = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/.exec(t); return iso ? { em: `${iso[1]}T${iso[2] ?? '12:00'}:00-03:00`, sem: !iso[2] } : { em: null, sem: false }; };
+  const multas = lista.map((x) => {
+    const q = quando(campo(x, /^data.?hora|datahora|data.?infra|^data$|data_?ocorr/i));
+    return { auto_infracao: campo(x, /auto|ait|identificador|^numero/i), orgao: campo(x, /orgao|autuador|fonte/i), infracao_codigo: campo(x, /^cod/i),
+      descricao: String(campo(x, /descri|infra(cao|ção)?$/i) ?? 'Infração de trânsito'), gravidade: null, pontos: null, valor_centavos: reais(campo(x, /valor/i)),
+      ocorrida_em: q.em, sem_hora: q.sem, local_texto: campo(x, /local|endere/i), municipio: campo(x, /munic/i), prazo_indicacao: null, vencimento: null };
+  });
+  return { multas, apontamentos: [], pdf: null, custo: j?.valor_consulta ?? null, homolog: Boolean(j?.homolog),
+    estrutura: { chaves: Object.keys(j ?? {}), chaves_data: j?.data && typeof j.data === 'object' ? Object.keys(j.data) : null, campos_item: lista[0] ? Object.keys(lista[0]) : null } };
+}
+
+/** Consulta simples: API Brasil "Débitos Resumidos" (tipo "consulta-debitos", R$ 3,78): só se tem débito e os totais, sem a lista. */
+function lerResumida(j) {
+  if (j?.error) throw new ErroNegocio(`API Brasil: ${j.message || 'a consulta falhou'}.`, 502);
+  const d = j?.data && typeof j.data === 'object' ? j.data : {};
+  const apontamentos = [];
+  const visitar = (o, prefixo = '', prof = 0) => {
+    if (!o || typeof o !== 'object' || prof > 3) return;
+    for (const [k, v] of Object.entries(o)) {
+      const nome = prefixo ? `${prefixo} › ${k}` : k;
+      if (v && typeof v === 'object' && !Array.isArray(v)) visitar(v, nome, prof + 1);
+      else if (!Array.isArray(v) && v !== null && v !== '' && /debit|valor|total|multa|ipva|licenc|dpvat|possui/i.test(k)) {
+        const num = typeof v === 'number' ? v : (/^[\d.,]+$/.test(String(v)) ? Number(String(v).replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')) : NaN);
+        apontamentos.push({ tipo: 'resumo', descricao: `${nome.replace(/_/g, ' ')}${typeof v === 'boolean' ? `: ${v ? 'sim' : 'não'}` : Number.isFinite(num) ? '' : `: ${v}`}`,
+          valor_centavos: typeof v !== 'boolean' && Number.isFinite(num) && /valor|total|debit/i.test(k) ? Math.round(num * 100) : null, situacao: null });
+      }
+    }
+  };
+  visitar(d);
+  return { multas: [], apontamentos, pdf: null, custo: j?.valor_consulta ?? null, homolog: Boolean(j?.homolog), resumida: true,
+    estrutura: { chaves: Object.keys(j ?? {}), chaves_data: Object.keys(d) } };
+}
+
 async function perguntarUmaVez(placa, renavam, opcoes = {}) {
+  if (opcoes.tipo === 'resumida' && FORNECEDOR() === 'apibrasil') {
+    if (!configurado()) throw new ErroNegocio('A consulta de multas ainda não foi ligada: falta contratar o serviço de consulta (DETRAN/SENATRAN).', 422);
+    return lerResumida(await postarApiBrasil('https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits', { tipo: 'consulta-debitos', placa, homolog: HOMOLOG() }, 120_000));
+  }
+  if (opcoes.tipo === 'renainf' && FORNECEDOR() === 'apibrasil') {
+    if (!configurado()) throw new ErroNegocio('A consulta de multas ainda não foi ligada: falta contratar o serviço de consulta (DETRAN/SENATRAN).', 422);
+    return lerRenainf(await postarApiBrasil('https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits', { tipo: 'renainf', placa, homolog: HOMOLOG() }, 120_000));
+  }
   if (ASSINCRONA()) return perguntarAssincrona(placa, opcoes);
   if (!configurado()) throw new ErroNegocio('A consulta de multas ainda não foi ligada: falta contratar o serviço de consulta (DETRAN/SENATRAN).', 422);
   let r;
@@ -238,7 +294,8 @@ async function consultarVeiculo(db, veic) {
 // Consultas rodando agora (id → promessa), para o clique duplo não pagar duas vezes.
 const emAndamento = new Map();
 
-function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = null, urlRetorno = null, forcar = false }) {
+function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = null, urlRetorno = null, forcar = false, tipo = 'completa' }) {
+  tipo = ['renainf', 'resumida'].includes(tipo) ? tipo : 'completa';
   const p = multas.placaLimpa(placa);
   if (!/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(p)) throw new ErroNegocio('Informe uma placa válida (ex.: ABC1D23).', 422);
   if (!configurado()) throw new ErroNegocio('A consulta de multas ainda não foi ligada: falta contratar o serviço de consulta (DETRAN/SENATRAN).', 422);
@@ -251,6 +308,7 @@ function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = nul
   // Consultada com sucesso nas últimas 24 h: devolve na hora o resultado guardado (sem esperar o DETRAN e sem pagar de novo).
   if (!forcar) {
     const recente = db.prepare(`SELECT id, criado_em FROM multas_consultas WHERE placa = ? AND status = 'ok' AND erro IS NULL AND resultado NOT LIKE '%"homolog":true%'
+      AND (resultado LIKE '%"tipo":"${tipo}"%' ${tipo === 'completa' ? "OR resultado NOT LIKE '%\"tipo\":%'" : ''})
       AND criado_em > ? ${empresaId ? 'AND empresa_id = ?' : ''} ORDER BY id DESC LIMIT 1`).get(...[p, new Date(Date.now() - 24 * 3600_000).toISOString(), ...(empresaId ? [empresaId] : [])]);
     if (recente) return { id: recente.id, status: 'ok', placa: p, guardada: true, consultado_em: recente.criado_em, pronto: Promise.resolve() };
   }
@@ -259,11 +317,13 @@ function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = nul
   const fim = (campos) => db.prepare(`UPDATE multas_consultas SET status = ?, multas = ?, apontamentos = ?, novas = ?, resultado = ?, erro = ? WHERE id = ?`)
     .run(campos.erro ? 'erro' : 'ok', campos.multas ?? 0, campos.apontamentos ?? 0, campos.novas ?? 0, campos.resultado ? JSON.stringify(campos.resultado) : null, campos.erro ?? null, id);
   // Roda em segundo plano: a resposta do serviço pode demorar; a tela acompanha pelo id. O resultado é guardado mesmo se chegar tarde.
-  const pronto = perguntar(p, ren ?? veic?.renavam, { urlRetorno }).then((r) => {
+  const inicio = Date.now();
+  const pronto = perguntar(p, ren ?? veic?.renavam, { urlRetorno, tipo }).then((r) => {
     // Em teste (homologação) os dados são de exemplo: nunca entram na central.
     const imp = veic && !r.homolog ? importar(db, veic.empresa_id, p, r.multas) : { novas: 0, resultado: r.multas.map((m) => ({ ...m, na_central: false, nova: false })) };
     if (veic) db.prepare('UPDATE veiculos SET multas_consulta_em = ? WHERE id = ?').run(agora(), veic.id);
-    const resultado = { placa: p, veiculo_da_frota: Boolean(veic), multas: imp.resultado, apontamentos: r.apontamentos, novas: imp.novas, consultado_em: agora(), custo: r.custo ?? null, homolog: r.homolog ?? false, pdf: r.pdf ?? null };
+    const resultado = { placa: p, veiculo_da_frota: Boolean(veic), multas: imp.resultado, apontamentos: r.apontamentos, novas: imp.novas, consultado_em: agora(), custo: r.custo ?? null, homolog: r.homolog ?? false, pdf: r.pdf ?? null,
+      tipo, resumida: r.resumida ?? false, duracao_s: Math.round((Date.now() - inicio) / 1000), estrutura: r.estrutura ?? undefined };
     fim({ multas: r.multas.length, apontamentos: r.apontamentos.length, novas: imp.novas, resultado });
   }).catch((err) => { fim({ erro: err.message }); }).finally(() => emAndamento.delete(id));
   emAndamento.set(id, pronto);
@@ -334,4 +394,4 @@ function definirIntervalo(db, dias) {
   return d;
 }
 
-module.exports = { limparHistorico, iniciarConsulta, traduzirApiBrasil, definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };
+module.exports = { lerResumida, lerRenainf, limparHistorico, iniciarConsulta, traduzirApiBrasil, definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };
