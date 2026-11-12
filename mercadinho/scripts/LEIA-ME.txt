@@ -68,8 +68,36 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
 
 6) CÓPIA DE SEGURANÇA
    Todo o sistema está em data/: o banco (mercadinho.db) e as fotos dos produtos
-   (data/fotos). Copie a pasta "data" inteira todo dia
-   (ex.: cron com "cp -a data /backup/mercadinho-$(date +%F)").
+   (data/fotos). Para copiar, use o comando pronto — ele grava uma cópia inteira
+   mesmo com o mercadinho aberto e vendendo (copiar o arquivo na mão pode pegar o
+   banco no meio de uma gravação):
+
+       cd /home/SEU-USUARIO/mercadinho
+       node --env-file=.env scripts/backup.js
+
+   A cópia vai para backups/AAAA-MM-DD-HH-MM-SS, com o banco e as fotos, e o
+   comando confere a cópia no fim. Guarda as 30 últimas e apaga as mais antigas.
+   Para gravar em outro lugar (pendrive, disco de rede), passe a pasta:
+
+       node --env-file=.env scripts/backup.js /mnt/backup
+
+   Todo dia de madrugada, no crontab do servidor ("crontab -e"):
+
+       15 3 * * * cd /home/SEU-USUARIO/mercadinho && node --env-file=.env scripts/backup.js >> backups/backup.log 2>&1
+
+   Para conferir uma cópia antiga:
+       node --env-file=.env scripts/backup.js --verificar backups/2026-11-12-03-07-21
+
+   PARA RESTAURAR (trocar de servidor ou voltar atrás):
+     1. Pare o serviço:            systemctl stop mercadinho
+     2. Apague o banco atual:      rm data/mercadinho.db data/mercadinho.db-shm data/mercadinho.db-wal
+     3. Copie o da cópia:          cp backups/<data>/mercadinho.db data/
+     4. Copie as fotos:            rm -rf data/fotos && cp -a backups/<data>/fotos data/
+     5. Suba de novo:              systemctl start mercadinho
+
+     ATENÇÃO: depois de restaurar, a senha do administrador é a do sistema de
+     ONDE veio a cópia, não a que está no .env desta máquina. O MERCADO_ADMIN_SENHA
+     só vale quando o banco é criado do zero.
 
 
 6b) FOTOS DOS PRODUTOS

@@ -263,6 +263,26 @@ conta dos moradores, dia de vencimento da fatura, aviso de validade, margem suge
 deixar vender sem saldo em estoque e **as formas que o terminal aceita**. Em **Configurações › Terminais**
 ficam os aparelhos do balcão.
 
+### Cópia de segurança
+
+```
+npm run backup                      # grava em ./backups/AAAA-MM-DD-HH-MM-SS
+npm run backup /mnt/pendrive        # grava onde você mandar
+npm run backup -- --verificar backups/2026-11-12-03-07-21
+```
+
+O banco é copiado com `VACUUM INTO`, não com `cp`: a cópia sai inteira mesmo com o mercadinho aberto e
+vendendo. As fotos vão junto, o comando confere a cópia no fim (integridade e contagem de produtos, vendas e
+moradores) e guarda as 30 últimas. Para rodar todo dia, ponha no crontab:
+
+```
+15 3 * * * cd /caminho/do/mercadinho && node --env-file=.env scripts/backup.js >> backups/backup.log 2>&1
+```
+
+Para **restaurar**: pare o serviço, apague `data/mercadinho.db` (e os arquivos `-shm`/`-wal`), copie o
+`mercadinho.db` da cópia para `data/`, copie a pasta `fotos` e suba de novo. Depois de restaurar, a senha do
+administrador é a do sistema de onde veio a cópia — `MERCADO_ADMIN_SENHA` só vale quando o banco nasce do zero.
+
 ### Em produção
 
 ```

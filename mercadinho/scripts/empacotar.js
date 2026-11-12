@@ -19,7 +19,7 @@ for (const item of ['server', 'public', 'package.json', 'package-lock.json', 'Do
   fs.cpSync(path.join(raiz, item), path.join(pasta, item), { recursive: true });
 }
 fs.mkdirSync(path.join(pasta, 'scripts'), { recursive: true });
-for (const script of ['ponte-maquininha.js', 'importar-fotos.js']) {
+for (const script of ['ponte-maquininha.js', 'importar-produtos.js', 'importar-fotos.js', 'backup.js']) {
   fs.copyFileSync(path.join(raiz, 'scripts', script), path.join(pasta, 'scripts', script));
 }
 
