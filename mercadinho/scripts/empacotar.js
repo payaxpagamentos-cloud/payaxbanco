@@ -19,7 +19,9 @@ for (const item of ['server', 'public', 'package.json', 'package-lock.json', 'Do
   fs.cpSync(path.join(raiz, item), path.join(pasta, item), { recursive: true });
 }
 fs.mkdirSync(path.join(pasta, 'scripts'), { recursive: true });
-fs.copyFileSync(path.join(raiz, 'scripts', 'ponte-maquininha.js'), path.join(pasta, 'scripts', 'ponte-maquininha.js'));
+for (const script of ['ponte-maquininha.js', 'importar-fotos.js']) {
+  fs.copyFileSync(path.join(raiz, 'scripts', script), path.join(pasta, 'scripts', script));
+}
 
 // Dependências só de produção (todas em JavaScript: o mesmo pacote serve para Linux e Windows).
 execFileSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], { cwd: pasta, stdio: 'inherit' });
@@ -43,7 +45,7 @@ MERCADO_TRUST_PROXY=1
 `;
 fs.writeFileSync(path.join(pasta, '.env'), env, { mode: 0o600 });
 fs.copyFileSync(path.join(raiz, 'scripts', 'LEIA-ME.txt'), path.join(pasta, 'LEIA-ME.txt'));
-fs.mkdirSync(path.join(pasta, 'data'), { recursive: true });
+fs.mkdirSync(path.join(pasta, 'data', 'fotos'), { recursive: true });
 
 const zip = path.join(saida, 'mercadinho.zip');
 execFileSync('zip', ['-qr', zip, 'mercadinho'], { cwd: saida });

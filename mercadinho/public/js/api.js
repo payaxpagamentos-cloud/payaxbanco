@@ -46,8 +46,25 @@ async function chamar(metodo, caminho, corpo) {
   return resp.json();
 }
 
+/** Envia um arquivo (a foto do produto vai como imagem mesmo, sem base64 no meio). */
+async function enviarArquivo(caminho, blob) {
+  const s = sessao.get();
+  const resp = await fetch(`${BASE}/api${caminho}`, {
+    method: 'POST',
+    headers: { 'Content-Type': blob.type || 'application/octet-stream', ...(s?.token ? { Authorization: `Bearer ${s.token}` } : {}) },
+    body: blob,
+  });
+  if (!resp.ok) {
+    let msg = `Erro ${resp.status}`;
+    try { msg = (await resp.json()).erro || msg; } catch { /* sem corpo */ }
+    throw new ErroApi(msg, resp.status);
+  }
+  return resp.json();
+}
+
 export const api = {
   get: (c) => chamar('GET', c),
+  enviarArquivo,
   post: (c, b = {}) => chamar('POST', c, b),
   patch: (c, b = {}) => chamar('PATCH', c, b),
   delete: (c) => chamar('DELETE', c),

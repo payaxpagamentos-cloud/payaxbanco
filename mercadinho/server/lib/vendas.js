@@ -13,8 +13,9 @@ const venda = (db, id) => db.prepare(`SELECT v.*, u.nome AS operador, t.nome AS 
   FROM vendas v LEFT JOIN usuarios u ON u.id = v.usuario_id LEFT JOIN terminais t ON t.id = v.terminal_id
   LEFT JOIN moradores m ON m.id = v.morador_id WHERE v.id = ?`).get(id);
 
-const itens = (db, venda_id) => db.prepare(`SELECT i.*, p.unidade, p.pesavel, p.codigo_barras FROM venda_itens i
-  JOIN produtos p ON p.id = i.produto_id WHERE i.venda_id = ? ORDER BY i.id`).all(venda_id);
+const itens = (db, venda_id) => db.prepare(`SELECT i.*, p.unidade, p.pesavel, p.codigo_barras, p.foto, c.cor AS categoria_cor
+  FROM venda_itens i JOIN produtos p ON p.id = i.produto_id LEFT JOIN categorias c ON c.id = p.categoria_id
+  WHERE i.venda_id = ? ORDER BY i.id`).all(venda_id);
 
 const pagamentos = (db, venda_id) => db.prepare(`SELECT pg.*, t.nsu, t.bandeira, t.status AS transacao_status FROM pagamentos pg
   LEFT JOIN transacoes_cartao t ON t.id = pg.transacao_id WHERE pg.venda_id = ? ORDER BY pg.id`).all(venda_id);

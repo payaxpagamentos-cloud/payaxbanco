@@ -65,8 +65,17 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
 
 
 6) CÓPIA DE SEGURANÇA
-   Todo o sistema está no arquivo data/mercadinho.db. Copie a pasta "data" todo dia
+   Todo o sistema está em data/: o banco (mercadinho.db) e as fotos dos produtos
+   (data/fotos). Copie a pasta "data" inteira todo dia
    (ex.: cron com "cp -a data /backup/mercadinho-$(date +%F)").
+
+
+6b) FOTOS DOS PRODUTOS
+   Se vocês já tiverem as fotos numa pasta, dá para subir todas de uma vez:
+       node scripts/importar-fotos.js /caminho/das-fotos
+   O nome de cada arquivo deve ser o código de barras, o id ou o nome do produto
+   (ex.: 7891000053508.jpg, 12.png, banana-prata-kg.jpg).
+   Uma a uma, use Produtos > editar > Escolher foto, direto no painel.
 
 
 7) LEITOR DE CÓDIGO DE BARRAS

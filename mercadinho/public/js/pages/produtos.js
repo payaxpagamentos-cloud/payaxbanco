@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { el, $, limpar, dinheiro, emReais, qtd, percentual, dataBr, dataHora, icone, tabela, modal, toast, acao, etiqueta, lerForm, opcoes, UNIDADES } from '../ui.js';
+import { el, $, limpar, dinheiro, emReais, qtd, percentual, dataBr, dataHora, icone, tabela, modal, toast, acao, etiqueta, lerForm, opcoes, fotoProduto, reduzirImagem, UNIDADES } from '../ui.js';
 
 /** Cadastro de produtos, categorias e fornecedores. */
 export default async function produtos({ alvo, usuario, definirTitulo }) {
@@ -57,8 +57,10 @@ export default async function produtos({ alvo, usuario, definirTitulo }) {
           el('select', { style: 'width: auto', onchange: (e) => { filtros.ordem = e.target.value; recarregar(); } },
             opcoes([{ id: 'nome', nome: 'Por nome' }, { id: 'estoque', nome: 'Por estoque' }, { id: 'preco', nome: 'Por preço' }, { id: 'recentes', nome: 'Mais recentes' }], { selecionado: filtros.ordem }))),
         tabela([
-          { titulo: 'Produto', celula: (p) => el('span', {}, el('div', { class: 'destaque' }, p.nome),
-            el('div', { class: 'pequeno mudo' }, `${p.codigo_barras ?? 'sem código'}${p.categoria ? ` · ${p.categoria}` : ''}`)) },
+          { titulo: 'Produto', celula: (p) => el('span', { class: 'linha', style: 'flex-wrap: nowrap' },
+            fotoProduto(p, { classe: 'foto-produto miniatura' }),
+            el('span', {}, el('div', { class: 'destaque' }, p.nome),
+              el('div', { class: 'pequeno mudo' }, `${p.codigo_barras ?? 'sem código'}${p.categoria ? ` · ${p.categoria}` : ''}`))) },
           { titulo: 'Estoque', direita: true, celula: (p) => el('span', { class: p.estoque_mil <= p.estoque_minimo_mil ? 'negativo' : '' }, qtd(p.estoque_mil, p.unidade)) },
           { titulo: 'Custo', direita: true, celula: (p) => dinheiro(p.custo_centavos) },
           { titulo: 'Venda', direita: true, celula: (p) => el('strong', {}, dinheiro(p.preco_centavos)) },
@@ -71,6 +73,12 @@ export default async function produtos({ alvo, usuario, definirTitulo }) {
   async function ficha(produto) {
     const p = await api.get(`/produtos/${produto.id}`);
     await modal(p.nome, (fechar) => [
+      el('div', { class: 'linha', style: 'align-items: flex-start' },
+        fotoProduto(p, { classe: 'foto-produto grande' }),
+        el('div', { class: 'crescer pequeno mudo' },
+          el('div', {}, p.codigo_barras ?? 'sem código de barras'),
+          el('div', {}, [p.categoria, p.fornecedor].filter(Boolean).join(' · ') || 'sem categoria'),
+          p.foto ? null : el('div', { class: 'etiqueta aviso', style: 'margin-top: 8px' }, 'sem foto cadastrada'))),
       el('div', { class: 'grade' },
         el('div', { class: 'cartao indicador sem-brilho' }, el('span', { class: 'rotulo' }, 'Preço de venda'), el('span', { class: 'valor' }, dinheiro(p.preco_centavos))),
         el('div', { class: 'cartao indicador sem-brilho' }, el('span', { class: 'rotulo' }, 'Custo médio'), el('span', { class: 'valor' }, dinheiro(p.custo_centavos)),
@@ -99,6 +107,44 @@ export default async function produtos({ alvo, usuario, definirTitulo }) {
 
   /* ---------- formulários ---------- */
   const editarProduto = (p = null) => modal(p ? 'Editar produto' : 'Novo produto', (fechar) => {
+    // A foto é enviada depois de salvar (um produto novo só tem id depois de criado).
+    let novaFoto = null;
+    let removerFoto = false;
+    const previa = el('div', { class: 'previa-foto' }, fotoProduto(p ?? {}, { classe: 'foto-produto grande' }));
+    const escolher = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp', class: 'oculto', onchange: async (e) => {
+      const arquivo = e.target.files?.[0];
+      e.target.value = '';
+      if (!arquivo) return;
+      try {
+        novaFoto = await reduzirImagem(arquivo);
+        removerFoto = false;
+        limpar(previa, el('img', { class: 'foto-produto grande', src: URL.createObjectURL(novaFoto), alt: '' }));
+        pintarBotoes();
+      } catch (err) {
+        toast(err.message, 'erro');
+      }
+    } });
+    const botoes = el('div', { class: 'linha' });
+    const pintarBotoes = () => limpar(botoes,
+      el('button', { type: 'button', class: 'btn pequeno', onclick: () => escolher.click() }, icone('produtos'), novaFoto || (p?.foto && !removerFoto) ? 'Trocar foto' : 'Escolher foto'),
+      (novaFoto || (p?.foto && !removerFoto)) ? el('button', { type: 'button', class: 'btn pequeno perigo', onclick: () => {
+        novaFoto = null;
+        removerFoto = Boolean(p?.foto);
+        limpar(previa, fotoProduto({ nome: p?.nome }, { classe: 'foto-produto grande' }));
+        pintarBotoes();
+      } }, 'Remover') : null);
+    pintarBotoes();
+    const campoFoto = el('div', { class: 'linha', style: 'align-items: center' }, previa,
+      el('div', { class: 'crescer' },
+        el('div', { class: 'pequeno mudo', style: 'margin-bottom: 8px' }, 'A foto aparece no terminal do cliente e nesta lista. A imagem é reduzida automaticamente antes de subir.'),
+        botoes, escolher));
+
+    /** Depois de salvar o cadastro, envia ou apaga a foto. */
+    const salvarFoto = async (id) => {
+      if (novaFoto) await api.enviarArquivo(`/produtos/${id}/foto`, novaFoto);
+      else if (removerFoto) await api.delete(`/produtos/${id}/foto`);
+    };
+
     const custo = el('input', { name: 'custo', inputmode: 'decimal', value: p ? emReais(p.custo_centavos) : '' });
     const preco = el('input', { name: 'preco', inputmode: 'decimal', value: p ? emReais(p.preco_centavos) : '', required: true });
     const sugerir = async () => {
@@ -113,13 +159,14 @@ export default async function produtos({ alvo, usuario, definirTitulo }) {
       d.controla_validade = e.target.controla_validade.checked;
       if (p) d.ativo = e.target.ativo.checked;
       await acao(e.target.querySelector('button[type=submit]'), async () => {
-        if (p) await api.patch(`/produtos/${p.id}`, d);
-        else await api.post('/produtos', d);
+        const salvo = p ? await api.patch(`/produtos/${p.id}`, d) : await api.post('/produtos', d);
+        await salvarFoto(salvo.id ?? p.id);
         toast(p ? 'Produto atualizado.' : 'Produto cadastrado.');
         fechar();
         recarregar();
       });
     } },
+    campoFoto,
     el('label', { class: 'campo' }, 'Nome', el('input', { name: 'nome', required: true, value: p?.nome ?? '', autofocus: true, placeholder: 'Ex.: Arroz branco tipo 1 - 5 kg' })),
     el('div', { class: 'duas' },
       el('label', { class: 'campo' }, 'Código de barras', el('input', { name: 'codigo_barras', inputmode: 'numeric', value: p?.codigo_barras ?? '', placeholder: 'bipe aqui' })),

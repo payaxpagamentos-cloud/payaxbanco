@@ -70,6 +70,28 @@ a compra na fatura do mês.
 no escuro do logo e o verde só nas ações. O painel da equipe continua no tema de vidro — são duas telas com
 públicos diferentes, e cada uma tem a sua folha de estilo (`public/css/terminal.css` e `public/css/vidro.css`).
 
+**Fotos dos produtos.** O terminal mostra a foto no carrinho (o cliente confere o que passou no leitor) e na
+vitrine de produtos sem código de barras — é pela foto que se escolhe a banana ou o pão. Produto sem foto
+aparece com um quadrado na cor da categoria e as iniciais do nome, para a tela não ficar com buracos.
+
+As fotos entram de dois jeitos:
+
+* **Uma a uma**, em *Produtos › editar › Escolher foto*. O navegador reduz a imagem (800 px, JPEG) antes de
+  subir, então dá para fotografar com o celular sem pensar em tamanho.
+* **Em lote**, com o importador, quando já existe uma pasta de fotos:
+
+  ```
+  node scripts/importar-fotos.js ./minhas-fotos            # pula quem já tem foto
+  node scripts/importar-fotos.js ./minhas-fotos --forcar   # troca as existentes
+  ```
+
+  O nome do arquivo diz a qual produto ele pertence: o **código de barras** (`7891000053508.jpg`), o **id**
+  (`12.png`) ou o **nome do produto** (`banana-prata-kg.jpg` — acentos, espaços e maiúsculas não importam).
+  No fim ele lista o que não encontrou produto e quantos ainda estão sem foto.
+
+Os arquivos ficam em `data/fotos`, ao lado do banco — a mesma cópia de segurança leva tudo. O servidor aceita
+JPEG, PNG e WebP até 2 MB e confere os primeiros bytes do arquivo antes de gravar.
+
 **Logo da loja.** O terminal mostra `public/img/binho-logo.png` no topo e na tela de espera, e
 `public/img/binho-simbolo.png` como ícone da aba e da tela inicial do tablet. Para trocar, substitua os dois
 arquivos mantendo os nomes. O logo precisa ter **fundo transparente**: ele assenta direto sobre o fundo escuro
@@ -210,6 +232,8 @@ Tudo em `.env` (veja [`.env.exemplo`](.env.exemplo)):
 | `MERCADO_LIMITE_LOGIN` | Tentativas de login por minuto, por IP |
 | `MERCADO_MAQUININHA_TIMEOUT_MS` / `MERCADO_MAQUININHA_EXPIRAR_MIN` | Espera e expiração das cobranças no cartão |
 | `MERCADO_TERMINAL_TTL_DIAS` | Dias de validade do pareamento do terminal (padrão 365) |
+| `MERCADO_FOTOS` | Pasta das fotos dos produtos (padrão `data/fotos`) |
+| `MERCADO_FOTO_MAX_BYTES` | Tamanho máximo de cada foto (padrão 2 MB) |
 
 Dentro do sistema (**Configurações › Loja**): nome e endereço do mercadinho, chave PIX, limite padrão da
 conta dos moradores, dia de vencimento da fatura, aviso de validade, margem sugerida nas compras, a opção de
@@ -243,7 +267,7 @@ server/
   api.js          monta as rotas e decide o perfil que entra em cada uma
   auth.js         token assinado (HMAC) e controle de perfil
   db.js           schema SQLite, configurações e transações
-  lib/            as regras: estoque, vendas, terminal, caixa, compras, financeiro, moradores, maquininha, pix, relatórios
+  lib/            as regras: estoque, vendas, terminal, caixa, compras, financeiro, moradores, maquininha, fotos, pix, relatórios
   routes/         as rotas HTTP, uma por assunto
 public/
   css/vidro.css   o tema de vidro (claro e escuro)

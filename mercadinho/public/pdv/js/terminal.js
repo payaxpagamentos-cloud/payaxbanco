@@ -1,5 +1,5 @@
 import { api, pareamento } from './api.js';
-import { el, $, limpar, dinheiro, qtd, icone, toast, acao } from '../../js/ui.js';
+import { el, $, limpar, dinheiro, qtd, icone, toast, acao, fotoProduto } from '../../js/ui.js';
 
 /**
  * Terminal do balcão — a única tela que o cliente usa.
@@ -152,6 +152,7 @@ function telaCompra() {
           el('span', { class: 'mudo' }, `${itens.length} item(ns)`)),
         el('div', { class: 'itens' }, itens.length
           ? itens.map((i, indice) => el('div', { class: `item-compra${indice === itens.length - 1 ? ' item-novo' : ''}` },
+            fotoProduto(i, { classe: 'foto-produto' }),
             el('div', { class: 'crescer' },
               el('div', { class: 'nome' }, i.descricao),
               el('div', { class: 'detalhe' }, `${qtd(i.qtd_mil, i.unidade)} × ${dinheiro(i.preco_centavos)}`)),
@@ -185,6 +186,7 @@ async function telaSemCodigo() {
         el('button', { class: 'btn grande', style: 'width: auto', onclick: montar }, icone('voltar'), 'Voltar')),
       produtos.length
         ? el('div', { class: 'grade-produtos' }, produtos.map((p) => el('button', { class: 'cartao-produto', onclick: () => escolherProduto(p) },
+          fotoProduto(p, { classe: 'foto-produto vitrine' }),
           el('span', { class: 'cat' }, p.categoria ?? 'Outros'),
           el('span', { class: 'nome' }, p.nome),
           el('span', { class: 'preco' }, `${dinheiro(p.preco_centavos)}${p.pesavel ? ` / ${p.unidade}` : ''}`))))
@@ -197,6 +199,7 @@ async function escolherProduto(produto) {
   teclado({
     titulo: produto.nome,
     descricao: `${dinheiro(produto.preco_centavos)} por ${produto.unidade}. Digite o peso indicado na balança.`,
+    acima: fotoProduto(produto, { classe: 'foto-produto grande' }),
     decimal: true,
     sufixo: produto.unidade,
     aoConfirmar: (valor) => acaoSegura(() => adicionarProduto(produto, valor)),
@@ -363,7 +366,7 @@ function confirmarConta(morador) {
 }
 
 /* ---------- teclado numérico ---------- */
-function teclado({ titulo, descricao, aoConfirmar, aoVoltar, senha = false, decimal = false, sufixo = '' }) {
+function teclado({ titulo, descricao, aoConfirmar, aoVoltar, acima = null, senha = false, decimal = false, sufixo = '' }) {
   let valor = '';
   const visor = el('div', { class: 'visor vazio' });
   const pontos = el('div', { class: 'pontos-pin' });
@@ -386,6 +389,7 @@ function teclado({ titulo, descricao, aoConfirmar, aoVoltar, senha = false, deci
 
   desenhar();
   pintar(topo('Pagamento'), el('div', { class: 'terminal-corpo' }, el('div', { class: 'cartao painel-pagar' },
+    acima,
     el('h1', { style: 'margin: 0' }, titulo),
     el('p', { class: 'mudo', style: 'margin: 0' }, descricao),
     senha ? pontos : visor,

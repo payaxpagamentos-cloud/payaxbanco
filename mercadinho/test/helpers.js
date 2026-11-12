@@ -1,8 +1,15 @@
 'use strict';
 
+const os = require('node:os');
+const fs = require('node:fs');
+const path = require('node:path');
+
 process.env.NODE_ENV = 'test';
 process.env.MERCADO_SECRET = 'segredo-de-teste-com-mais-de-32-caracteres';
 process.env.MERCADO_LIMITE_LOGIN = '1000';
+// As fotos dos testes vão para uma pasta temporária, longe do data/ do projeto.
+process.env.MERCADO_FOTOS = fs.mkdtempSync(path.join(os.tmpdir(), 'mercadinho-fotos-'));
+process.on('exit', () => { try { fs.rmSync(process.env.MERCADO_FOTOS, { recursive: true, force: true }); } catch { /* já foi */ } });
 
 const { abrir } = require('../server/db');
 const { criarApp } = require('../server/app');
@@ -39,8 +46,21 @@ async function iniciar() {
     return { usuario: r.dados, token: await login(email, senha) };
   }
 
+  /** Envia um arquivo (a foto do produto vai como imagem mesmo, sem JSON no meio). */
+  async function enviarArquivo(caminho, buffer, tipo, tk) {
+    const resp = await fetch(base + caminho, {
+      method: 'POST',
+      headers: { 'Content-Type': tipo, ...(tk ? { Authorization: `Bearer ${tk}` } : {}) },
+      body: buffer,
+    });
+    const texto = await resp.text();
+    let dados = texto;
+    try { dados = JSON.parse(texto); } catch { /* vazio */ }
+    return { status: resp.status, dados };
+  }
+
   return {
-    db, raiz, req, login, criarUsuario,
+    db, raiz, req, login, criarUsuario, enviarArquivo,
     get: (c, tk) => req('GET', c, undefined, tk),
     post: (c, b, tk) => req('POST', c, b ?? {}, tk),
     patch: (c, b, tk) => req('PATCH', c, b, tk),

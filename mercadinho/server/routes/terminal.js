@@ -44,11 +44,11 @@ module.exports = (db) => {
 
   /** Busca de produto pelo código bipado ou pelo nome (só o que está à venda). */
   r.get('/produtos', (req, res) => res.json(produtos.buscarParaVenda(db, req.query.termo).map((p) => ({
-    id: p.id, nome: p.nome, codigo_barras: p.codigo_barras, unidade: p.unidade, pesavel: p.pesavel, preco_centavos: p.preco_centavos,
+    id: p.id, nome: p.nome, codigo_barras: p.codigo_barras, unidade: p.unidade, pesavel: p.pesavel, preco_centavos: p.preco_centavos, foto: p.foto,
   }))));
 
   /** Produtos sem código de barras (hortifrúti, padaria, granel): o cliente escolhe na tela. */
-  r.get('/produtos/sem-codigo', (_req, res) => res.json(db.prepare(`SELECT p.id, p.nome, p.unidade, p.pesavel, p.preco_centavos, c.nome AS categoria, c.cor AS cor
+  r.get('/produtos/sem-codigo', (_req, res) => res.json(db.prepare(`SELECT p.id, p.nome, p.unidade, p.pesavel, p.preco_centavos, p.foto, c.nome AS categoria, c.cor AS cor
     FROM produtos p LEFT JOIN categorias c ON c.id = p.categoria_id
     WHERE p.ativo = 1 AND (p.codigo_barras IS NULL OR p.codigo_barras = '') ORDER BY c.nome, p.nome LIMIT 80`).all()));
 

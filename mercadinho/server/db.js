@@ -82,6 +82,8 @@ CREATE TABLE IF NOT EXISTS produtos (
   estoque_mil INTEGER NOT NULL DEFAULT 0,
   estoque_minimo_mil INTEGER NOT NULL DEFAULT 0 CHECK (estoque_minimo_mil >= 0),
   controla_validade INTEGER NOT NULL DEFAULT 0,
+  -- Nome do arquivo da foto em data/fotos (ex.: "12-a1b2c3d4.jpg"). NULL mostra o desenho de reserva.
+  foto TEXT,
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL,
   atualizado_em TEXT NOT NULL
@@ -407,6 +409,7 @@ const agora = () => new Date().toISOString();
 
 /** Colunas acrescentadas depois da primeira versão: entram sozinhas em bancos que já existem. */
 const COLUNAS_NOVAS = [
+  ['produtos', 'foto', 'TEXT'],
   ['moradores', 'pin_hash', 'TEXT'],
   ['vendas', 'terminal_id', 'INTEGER REFERENCES terminais(id)'],
   ['pagamentos', 'conferido_em', 'TEXT'],

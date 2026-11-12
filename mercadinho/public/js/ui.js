@@ -14,6 +14,9 @@ export function el(tag, attrs = {}, ...filhos) {
   return e;
 }
 
+/** Endereço base do sistema, deduzido de onde este arquivo foi carregado (serve ao painel e ao terminal). */
+export const RAIZ = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+
 export const $ = (s, raiz = document) => raiz.querySelector(s);
 export const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 export const limpar = (e, ...filhos) => { e.replaceChildren(...filhos.flat(Infinity).filter((f) => f !== null && f !== undefined && f !== false)); return e; };
@@ -32,7 +35,10 @@ export const hojeLocal = () => new Date().toLocaleDateString('en-CA');
 export const somarDias = (d, n) => { const x = new Date(`${d}T12:00:00`); x.setDate(x.getDate() + n); return x.toLocaleDateString('en-CA'); };
 export const competenciaAtual = () => hojeLocal().slice(0, 7);
 export const mesPorExtenso = (comp) => new Date(`${comp}-15T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-export const iniciais = (nome) => String(nome ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+/** Iniciais para avatares e fotos de reserva. Ignora pedaços sem letra ("Batata - kg" vira "BK"). */
+export const iniciais = (nome) => String(nome ?? '?').split(/[\s-]+/)
+  .map((parte) => parte.match(/[\p{L}\p{N}]/u)?.[0])
+  .filter(Boolean).slice(0, 2).join('').toUpperCase();
 /** Converte o que o usuário digitou ("12,90") em centavos. */
 export const paraCentavos = (texto) => Math.round(Number(String(texto ?? '0').replace(/\./g, '').replace(',', '.')) * 100) || 0;
 export const emReais = (centavos) => ((centavos ?? 0) / 100).toFixed(2).replace('.', ',');
@@ -86,6 +92,38 @@ export function icone(nome, classe) {
   path.setAttribute('d', ICONES[nome] ?? ICONES.painel);
   svg.append(path);
   return svg;
+}
+
+/* ---------- fotos dos produtos ---------- */
+/**
+ * Foto do produto. Sem foto cadastrada, desenha um quadrado com a cor da categoria e as iniciais —
+ * assim a lista não fica cheia de buracos e o produto continua reconhecível.
+ */
+export function fotoProduto(produto, { classe = 'foto-produto' } = {}) {
+  const nome = produto.nome ?? produto.descricao ?? '?';
+  if (produto.foto) return el('img', { class: classe, src: `${RAIZ}/fotos/${produto.foto}`, alt: '', loading: 'lazy' });
+  return el('span', {
+    class: `${classe} sem-foto`, 'aria-hidden': 'true',
+    style: `--cor-foto: ${produto.categoria_cor ?? produto.cor ?? '#8694A7'}`,
+  }, iniciais(nome));
+}
+
+/**
+ * Reduz a imagem escolhida antes de enviar: o servidor não precisa guardar a foto de 4000 px
+ * que a câmera do celular tira, e a tela do balcão carrega mais rápido.
+ */
+export async function reduzirImagem(arquivo, { lado = 800, qualidade = 0.82 } = {}) {
+  const bitmap = await createImageBitmap(arquivo, { imageOrientation: 'from-image' }).catch(() => createImageBitmap(arquivo));
+  const escala = Math.min(1, lado / Math.max(bitmap.width, bitmap.height));
+  const tela = document.createElement('canvas');
+  tela.width = Math.max(1, Math.round(bitmap.width * escala));
+  tela.height = Math.max(1, Math.round(bitmap.height * escala));
+  const ctx = tela.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, tela.width, tela.height); // PNG com transparência vira fundo branco, não preto
+  ctx.drawImage(bitmap, 0, 0, tela.width, tela.height);
+  bitmap.close?.();
+  return new Promise((resolve, reject) => tela.toBlob((b) => (b ? resolve(b) : reject(new Error('Não foi possível ler a imagem.'))), 'image/jpeg', qualidade));
 }
 
 /* ---------- peças prontas ---------- */

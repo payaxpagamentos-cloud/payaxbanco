@@ -241,6 +241,15 @@ input[type="color"]{ padding: 4px; }
 .etiqueta.info{ background: var(--info-bg); color: var(--info); border-color: rgba(111,194,255,.3); }
 .ponto{ width: 9px; height: 9px; border-radius: 99px; background: currentColor; display: inline-block; box-shadow: 0 0 10px currentColor; }
 
+/* ---------- fotos dos produtos ---------- */
+.foto-produto{ display: grid; place-items: center; object-fit: cover; background: var(--vidro-forte);
+  border: 1px solid var(--vidro-borda); border-radius: 12px; width: 44px; height: 44px; flex: none; overflow: hidden; }
+.foto-produto.sem-foto{ color: var(--texto-2); font-weight: 800; font-size: 13px; letter-spacing: -.02em;
+  background: color-mix(in srgb, var(--cor-foto) 26%, transparent); border-color: color-mix(in srgb, var(--cor-foto) 40%, transparent); }
+.foto-produto.miniatura{ width: 40px; height: 40px; border-radius: 11px; }
+.foto-produto.grande{ width: 104px; height: 104px; border-radius: 18px; font-size: 28px; }
+.previa-foto{ flex: none; }
+
 /* ---------- tabelas ---------- */
 .tabela-rolagem{ overflow-x: auto; }
 .cartao > .tabela-rolagem, .painel > .tabela-rolagem{ margin: 0 -20px -20px; padding: 0 4px; }

@@ -26,6 +26,9 @@ module.exports = {
   basePath,
   port: Number(process.env.PORT) || 3300,
   dbFile: process.env.MERCADO_DB || path.join(__dirname, '..', 'data', 'mercadinho.db'),
+  // Fotos dos produtos: ficam ao lado do banco (a mesma pasta que entra na cópia de segurança).
+  fotosDir: process.env.MERCADO_FOTOS || path.join(path.dirname(process.env.MERCADO_DB || path.join(__dirname, '..', 'data', 'mercadinho.db')), 'fotos'),
+  fotoMaximoBytes: Number(process.env.MERCADO_FOTO_MAX_BYTES) || 2 * 1024 * 1024,
   secret,
   tokenTtlSeconds: 12 * 60 * 60,
   // O terminal do balcão fica pareado por um ano (a administração pode desativá-lo a qualquer momento).

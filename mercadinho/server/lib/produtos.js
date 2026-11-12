@@ -5,7 +5,7 @@ const { ErroNegocio, naoEncontrado } = require('./erros');
 const v = require('./validacao');
 
 const CAMPOS = `p.id, p.codigo_barras, p.nome, p.categoria_id, p.fornecedor_id, p.unidade, p.pesavel, p.preco_centavos,
-  p.custo_centavos, p.estoque_mil, p.estoque_minimo_mil, p.controla_validade, p.ativo, p.criado_em, p.atualizado_em,
+  p.custo_centavos, p.estoque_mil, p.estoque_minimo_mil, p.controla_validade, p.foto, p.ativo, p.criado_em, p.atualizado_em,
   c.nome AS categoria, c.cor AS categoria_cor, f.nome AS fornecedor`;
 const JUNCOES = 'FROM produtos p LEFT JOIN categorias c ON c.id = p.categoria_id LEFT JOIN fornecedores f ON f.id = p.fornecedor_id';
 

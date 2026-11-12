@@ -5,10 +5,11 @@ const express = require('express');
 const config = require('./config');
 const { criarApi, tratarErro } = require('./api');
 const { limitar } = require('./lib/limitador');
+const { pasta: pastaFotos } = require('./lib/fotos');
 
 // Tudo é servido pelo próprio servidor: nenhum script, fonte ou imagem vem de fora.
 const CSP = [
-  "default-src 'self'", "img-src 'self' data:", "style-src 'self' 'unsafe-inline'", "font-src 'self'",
+  "default-src 'self'", "img-src 'self' data: blob:", "style-src 'self' 'unsafe-inline'", "font-src 'self'",
   "script-src 'self'", "connect-src 'self'", "frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'",
 ].join('; ');
 
@@ -38,6 +39,8 @@ function criarApp(db) {
   // "/pdv" sem a barra final leva a "/pdv/" (a tela do terminal usa caminhos relativos à pasta).
   // A rota casa com as duas formas, então só redireciona quando a barra realmente falta.
   r.get('/pdv', (req, res, next) => (req.originalUrl.split('?')[0].endsWith('/') ? next() : res.redirect(`${req.baseUrl}/pdv/`)));
+  // Fotos dos produtos: arquivos simples, servidos para as telas (o <img> do navegador não manda token).
+  r.use('/fotos', express.static(pastaFotos(), { maxAge: '30d', immutable: true, index: false, fallthrough: true }));
   r.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: config.producao ? '1h' : 0 }));
 
   if (config.basePath) {

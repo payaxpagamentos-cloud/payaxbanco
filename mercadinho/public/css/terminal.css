@@ -139,6 +139,20 @@ input:focus{ outline: none; border-color: var(--marca-forte); box-shadow: 0 0 0 
 .etiqueta.ok{ background: var(--marca-suave); color: var(--marca-forte); }
 .etiqueta.aviso{ background: var(--aviso-suave); color: var(--aviso); }
 
+/* ---------- fotos dos produtos ---------- */
+.foto-produto{
+  display: grid; place-items: center; object-fit: cover; flex: none; overflow: hidden;
+  width: 64px; height: 64px; border-radius: 16px; background: #EDF1F6; border: 1px solid var(--borda);
+}
+.foto-produto.sem-foto{
+  font-weight: 800; font-size: 19px; letter-spacing: -.02em; color: var(--texto-2);
+  background: color-mix(in srgb, var(--cor-foto) 22%, #fff);
+  border-color: color-mix(in srgb, var(--cor-foto) 38%, #fff);
+}
+.foto-produto.grande{ width: 110px; height: 110px; border-radius: 26px; font-size: 32px; }
+/* Na vitrine a foto ocupa a largura do cartão: é ela que o cliente usa para achar o produto. */
+.foto-produto.vitrine{ width: 100%; height: 130px; border-radius: 14px; font-size: 30px; margin-bottom: 4px; }
+
 /* ---------- carrinho ---------- */
 .compra{ flex: 1; display: grid; grid-template-columns: 1fr 380px; gap: 22px; min-height: 0; }
 @media (max-width: 1000px){ .compra{ grid-template-columns: 1fr; } }

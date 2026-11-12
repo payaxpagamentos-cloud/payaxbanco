@@ -2,7 +2,9 @@
 
 const { Router } = require('express');
 const { agora } = require('../db');
+const express = require('express');
 const produtos = require('../lib/produtos');
+const fotos = require('../lib/fotos');
 const { naoEncontrado, ErroNegocio } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const v = require('../lib/validacao');
@@ -112,6 +114,29 @@ module.exports = (db, { estoque }) => {
     const p = produtos.atualizar(db, Number(req.params.id), req.body);
     registrar(db, req, 'produto_alterado', p.nome);
     res.json(p);
+  });
+
+  /**
+   * Foto do produto. O navegador manda a imagem já reduzida, como arquivo mesmo (sem JSON no meio),
+   * e o servidor confere os primeiros bytes antes de gravar — o cabeçalho enviado não é prova de nada.
+   */
+  r.post('/:id/foto', estoque, express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '3mb' }), (req, res) => {
+    const id = v.inteiro(req.params.id, 'o produto', { min: 1 });
+    const atual = db.prepare('SELECT foto FROM produtos WHERE id = ?').get(id);
+    if (!atual) throw naoEncontrado('Produto');
+    const nome = fotos.guardar(req.body, id, atual.foto);
+    db.prepare('UPDATE produtos SET foto = ?, atualizado_em = ? WHERE id = ?').run(nome, agora(), id);
+    registrar(db, req, 'produto_foto', `#${id}`);
+    res.status(201).json({ foto: nome });
+  });
+
+  r.delete('/:id/foto', estoque, (req, res) => {
+    const id = v.inteiro(req.params.id, 'o produto', { min: 1 });
+    const atual = db.prepare('SELECT foto FROM produtos WHERE id = ?').get(id);
+    if (!atual) throw naoEncontrado('Produto');
+    if (atual.foto) fotos.apagar(atual.foto);
+    db.prepare('UPDATE produtos SET foto = NULL, atualizado_em = ? WHERE id = ?').run(agora(), id);
+    res.json({ foto: null });
   });
 
   /** Reajuste de preço em lote (por categoria ou por fornecedor), com percentual positivo ou negativo. */
