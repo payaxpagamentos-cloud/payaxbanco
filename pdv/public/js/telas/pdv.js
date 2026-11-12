@@ -221,7 +221,7 @@ export async function telaPdv(ctx) {
       }, icone(ICONE_FORMA[forma]), FORMAS_CURTAS[forma]))));
     }
 
-    const finalizar = el('button', { class: 'btn primario largo', style: 'margin-top:12px;min-height:46px', disabled: !(t > 0 && restante === 0) }, 'Finalizar recebimento');
+    const finalizar = el('button', { class: 'btn dinheiro largo', style: 'margin-top:12px;min-height:46px', disabled: !(t > 0 && restante === 0) }, 'Finalizar recebimento');
     finalizar.addEventListener('click', () => acao(finalizar, concluir));
     c.append(finalizar);
     if (t > 0) c.append(el('button', { class: 'btn', style: 'width:100%;margin-top:8px', onclick: () => limparAtendimento() }, 'Cancelar atendimento'));

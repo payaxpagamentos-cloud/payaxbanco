@@ -13,27 +13,29 @@
   --text: #0F1B2D;
   --text-2: #55627A;
   --text-3: #8592A6;
-  --azul: #2563EB;            /* destaque */
-  --azul-forte: #1D4ED8;
-  --destaque-bg: rgba(37, 99, 235, .09);
-  --destaque-borda: rgba(37, 99, 235, .3);
+  --azul: #0B57B8;            /* azul da marca */
+  --azul-forte: #0A4C9E;
+  --laranja: #F2801E;         /* laranja da marca, para a ação principal do atendimento */
+  --laranja-forte: #DD6F12;
+  --destaque-bg: rgba(11, 87, 184, .09);
+  --destaque-borda: rgba(11, 87, 184, .3);
   --amarelo: #F59E0B;
-  --azul-pizza: #2563EB;
+  --azul-pizza: #0B57B8;
   --ok: #15803D;
   --ok-bg: #E7F6EC;
   --erro: #DC2626;
   --erro-bg: #FDECEC;
   --aviso: #B45309;
   --aviso-bg: #FEF3C7;
-  --info-bg: #E8EFFE;
+  --info-bg: #E6F0FB;
   --barra-fundo: #E6ECF4;
-  --barra: #2563EB;
+  --barra: #0B57B8;
   --radius: 14px;
   --radius-sm: 9px;
   --shadow: 0 1px 2px rgba(15, 27, 45, .04), 0 4px 16px -8px rgba(15, 27, 45, .08);
   --shadow-flutuante: 0 18px 50px -12px rgba(15, 27, 45, .25), 0 0 0 1px var(--border);
   /* Menu lateral: azul-marinho nos dois temas */
-  --lateral: linear-gradient(180deg, #0C1F4A 0%, #0A1838 100%);
+  --lateral: linear-gradient(180deg, #0A3F96 0%, #06224F 100%);
   --lateral-texto: #C5D0E6;
   --lateral-fraco: #7F8DAB;
   --lateral-hover: rgba(255, 255, 255, .06);
@@ -52,22 +54,24 @@
   --text: #E8EDF6;
   --text-2: #9AA8C2;
   --text-3: #6B7A97;
-  --azul: #4F8BFF;
-  --azul-forte: #2F6BF0;
-  --destaque-bg: rgba(79, 139, 255, .14);
-  --destaque-borda: rgba(79, 139, 255, .4);
+  --azul: #4F9BFF;
+  --azul-forte: #2F7FE8;
+  --laranja: #F2801E;
+  --laranja-forte: #DD6F12;
+  --destaque-bg: rgba(79, 155, 255, .14);
+  --destaque-borda: rgba(79, 155, 255, .4);
   --ok: #34D399;
   --ok-bg: rgba(52, 211, 153, .13);
   --erro: #F87171;
   --erro-bg: rgba(248, 113, 113, .13);
   --aviso: #FBBF24;
   --aviso-bg: rgba(251, 191, 36, .13);
-  --info-bg: rgba(79, 139, 255, .14);
+  --info-bg: rgba(79, 155, 255, .14);
   --barra-fundo: #1E2A42;
-  --barra: #4F8BFF;
+  --barra: #4F9BFF;
   --shadow: 0 1px 0 rgba(255,255,255,.02) inset;
   --shadow-flutuante: 0 18px 50px -12px rgba(0,0,0,.7), 0 0 0 1px var(--border);
-  --lateral: linear-gradient(180deg, #08142E 0%, #060F22 100%);
+  --lateral: linear-gradient(180deg, #072a62 0%, #04152F 100%);
   color-scheme: dark;
 }
 *{ box-sizing: border-box; }
@@ -171,7 +175,7 @@ a{ color: var(--azul); }
 .indicador.com-icone .valor{ margin-top: 0; }
 .indicador .ic{ width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; flex: none; }
 .indicador .ic svg{ width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.ic.azul{ background: #E8EFFE; color: #2563EB; } .ic.verde{ background: #E5F7EC; color: #16A34A; } .ic.roxo{ background: #F0EBFE; color: #7C3AED; }
+.ic.azul{ background: var(--info-bg); color: var(--azul); } .ic.verde{ background: #E5F7EC; color: #16A34A; } .ic.roxo{ background: #F0EBFE; color: #7C3AED; }
 .ic.laranja{ background: #FEF1E2; color: #EA7A0B; } .ic.vermelho{ background: #FDECEC; color: #DC2626; } .ic.ciano{ background: #E3F5FD; color: #0284C7; }
 :root[data-tema="escuro"] .ic{ background: var(--surface-2) !important; }
 .indicador .rotulo{ font-size: 12.5px; color: var(--text-2); font-weight: 500; }
@@ -184,8 +188,11 @@ a{ color: var(--azul); }
 .btn{ white-space: nowrap; }
 .btn:hover{ background: var(--hover); }
 .btn:disabled{ opacity: .5; cursor: default; }
-.btn.primario{ background: #2563EB; border-color: transparent; color: #fff; box-shadow: 0 1px 0 rgba(255,255,255,.15) inset, 0 6px 16px -8px rgba(37, 99, 235, .8); }
-.btn.primario:hover{ background: #1D4ED8; }
+.btn.primario{ background: var(--azul); border-color: transparent; color: #fff; box-shadow: 0 1px 0 rgba(255,255,255,.15) inset, 0 6px 16px -8px rgba(11, 87, 184, .8); }
+.btn.primario:hover{ background: var(--azul-forte); }
+/* Ação que move dinheiro (finalizar recebimento, receber): o mesmo laranja da tela do cliente. */
+.btn.dinheiro{ background: var(--laranja); border-color: transparent; color: #fff; box-shadow: 0 1px 0 rgba(255,255,255,.2) inset, 0 6px 16px -8px rgba(242, 128, 30, .9); }
+.btn.dinheiro:hover{ background: var(--laranja-forte); }
 .btn.perigo{ color: var(--erro); }
 .btn.perigo:hover{ background: var(--erro-bg); }
 .btn.pequeno{ min-height: 30px; padding: 4px 11px; font-size: 12.5px; border-radius: 8px; }
@@ -363,10 +370,10 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   --vidro-sombra: 0 8px 32px -12px rgba(30, 58, 138, .22);
   --vidro-desfoque: blur(18px) saturate(170%);
   --vidro-campo: rgba(255, 255, 255, .7);
-  --vidro-lateral: linear-gradient(180deg, rgba(12, 31, 74, .93) 0%, rgba(10, 24, 56, .95) 100%);
-  --luz-1: rgba(59, 130, 246, .36);
-  --luz-2: rgba(139, 92, 246, .28);
-  --luz-3: rgba(14, 165, 233, .26);
+  --vidro-lateral: linear-gradient(180deg, rgba(10, 63, 150, .93) 0%, rgba(6, 34, 79, .95) 100%);
+  --luz-1: rgba(47, 168, 255, .36);
+  --luz-2: rgba(242, 128, 30, .22);
+  --luz-3: rgba(11, 87, 184, .3);
 }
 :root[data-tema="escuro"]{
   --vidro: rgba(17, 26, 43, .55);
@@ -375,7 +382,7 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, .06);
   --vidro-sombra: 0 10px 36px -12px rgba(0, 0, 0, .6);
   --vidro-campo: rgba(14, 22, 38, .6);
-  --vidro-lateral: linear-gradient(180deg, rgba(8, 20, 46, .78) 0%, rgba(6, 15, 34, .82) 100%);
+  --vidro-lateral: linear-gradient(180deg, rgba(7, 42, 98, .8) 0%, rgba(4, 21, 47, .84) 100%);
   --luz-1: rgba(37, 99, 235, .35);
   --luz-2: rgba(124, 58, 237, .28);
   --luz-3: rgba(14, 165, 233, .22);
@@ -420,9 +427,9 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 
   /* Entrada: cartão de vidro sobre o azul-marinho */
   .entrada{ background:
-      radial-gradient(36rem 26rem at 20% 10%, rgba(59, 130, 246, .45), transparent 70%),
-      radial-gradient(30rem 24rem at 85% 85%, rgba(139, 92, 246, .35), transparent 70%),
-      linear-gradient(180deg, #0C1F4A, #0A1838); }
+      radial-gradient(40rem 28rem at 15% 5%, rgba(47, 168, 255, .5), transparent 68%),
+      radial-gradient(32rem 24rem at 88% 88%, rgba(242, 128, 30, .3), transparent 68%),
+      linear-gradient(170deg, #0A3F96 0%, #0A2A6B 48%, #06224F 100%); }
   .entrada .cartao{ background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .2); color: #fff;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 24px 60px -20px rgba(0, 0, 0, .6);
     -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
@@ -430,7 +437,7 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .entrada .marca{ color: #fff; }
   .entrada input{ background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .25); color: #fff; }
   .entrada input::placeholder{ color: rgba(255, 255, 255, .55); }
-  .entrada input:focus{ border-color: #93C5FD; box-shadow: 0 0 0 3px rgba(147, 197, 253, .25); }
+  .entrada input:focus{ border-color: #8FD0FF; box-shadow: 0 0 0 3px rgba(143, 208, 255, .25); }
 
   /* Celular: menu do topo em vidro */
   @media (max-width: 860px){
