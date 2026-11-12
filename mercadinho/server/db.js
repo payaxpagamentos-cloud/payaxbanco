@@ -365,7 +365,7 @@ CREATE TABLE IF NOT EXISTS configuracoes (
   valor TEXT NOT NULL
 );
 
--- Vídeos e imagens que passam na vitrine (TV e tablet parado). O arquivo fica em data/vitrine.
+-- Vídeos e imagens que passam na vitrine (TV e terminal de autoatendimento parado). O arquivo fica em data/vitrine.
 CREATE TABLE IF NOT EXISTS vitrine_midias (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tipo TEXT NOT NULL CHECK (tipo IN ('video','imagem')),
@@ -420,7 +420,7 @@ const CONFIG_PADRAO = {
   pix_chave: '',
   pix_recebedor: 'MERCADINHO DO CONDOMINIO',
   pix_cidade: 'SAO PAULO',
-  // Vitrine: o que passa na TV e no tablet parado.
+  // Vitrine: o que passa na TV e no terminal de autoatendimento parado.
   vitrine_mais_vendidos: '1',
   vitrine_mais_lucrativos: '1',
   vitrine_ofertas: '1',
@@ -469,7 +469,7 @@ function abrir(arquivo = config.dbFile) {
       .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha), agora());
   }
   if (!db.prepare('SELECT 1 FROM maquininhas LIMIT 1').get()) {
-    db.prepare(`INSERT INTO maquininhas (nome, provedor, identificador, criada_em) VALUES ('Maquininha do caixa', 'simulado', 'DEMO-0001', ?)`).run(agora());
+    db.prepare(`INSERT INTO maquininhas (nome, provedor, identificador, criada_em) VALUES ('Maquininha do balcão', 'simulado', 'DEMO-0001', ?)`).run(agora());
   }
   return db;
 }

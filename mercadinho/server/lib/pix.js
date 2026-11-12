@@ -2,7 +2,7 @@
 
 /**
  * PIX "copia e cola" (BR Code estático com valor), no padrão EMV do Banco Central.
- * O valor cai direto na chave PIX do mercadinho; a confirmação é do operador do caixa.
+ * O valor cai direto na chave PIX do mercadinho; quem confere o recebimento é a administração (Vendas do terminal > Conferência de PIX).
  */
 const campo = (id, valor) => `${id}${String(valor.length).padStart(2, '0')}${valor}`;
 

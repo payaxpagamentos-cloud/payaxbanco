@@ -11,7 +11,7 @@ const { emOferta, precoVigente } = require('./produtos');
 const relatorios = require('./relatorios');
 
 /**
- * Vitrine: o que passa na TV da loja e no tablet do caixa quando ninguém está comprando.
+ * Vitrine: o que passa na TV da loja e no terminal de autoatendimento quando nenhum cliente está comprando.
  *
  * Junta quatro fontes, intercaladas: ofertas marcadas à mão, os mais vendidos e os mais lucrativos dos
  * últimos 30 dias (escolhidos sozinhos) e os vídeos e imagens que a administração sobe.

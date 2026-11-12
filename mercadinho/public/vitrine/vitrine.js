@@ -2,7 +2,7 @@ import { el, limpar, dinheiro, iniciais, RAIZ } from '../js/ui.js';
 
 /**
  * Vitrine: produtos, ofertas, vídeos e imagens passando sozinhos.
- * O mesmo módulo roda na TV da loja (página /vitrine/) e no tablet do caixa quando ninguém está comprando.
+ * O mesmo módulo roda na TV da loja (página /vitrine/) e no terminal de autoatendimento quando nenhum cliente está comprando.
  *
  * A sequência vem pronta do servidor (api/vitrine). No fim de cada volta ela é buscada de novo, então
  * oferta nova, vídeo novo ou mudança de preço aparecem sem precisar recarregar a TV.

@@ -125,7 +125,7 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
    administração desativar o terminal ou se os dados do navegador forem apagados.
 
 
-9) VITRINE (TV DA LOJA E TABLET PARADO)
+9) VITRINE (TV DA LOJA E TERMINAL DE AUTOATENDIMENTO)
    Ofertas, mais vendidos, mais lucrativos e os vídeos e imagens de vocês passando
    sozinhos. Configure em Gestão > Vitrine (lá também se enviam os vídeos).
 
@@ -133,8 +133,9 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
    computador ligado nela) e toque em "Tela cheia". Não pede login: mostra só nome,
    foto e preço. A cada volta busca de novo o que mudou.
 
-   No tablet do caixa: com a tela de espera parada pelo tempo configurado, a vitrine
-   aparece sozinha. Some com um toque ou ao passar um produto no leitor.
+   No terminal de autoatendimento: sem cliente comprando pelo tempo configurado, a
+   vitrine aparece sozinha. Some assim que o cliente toca na tela ou passa um produto
+   no leitor (e aí a compra já começa).
 
    Vídeos: MP4 (H.264) ou WebM, até 80 MB, de preferência deitados (16:9). Tocam sem
    som, porque o navegador só deixa tocar sozinho assim. Imagens: JPEG, PNG ou WebP,

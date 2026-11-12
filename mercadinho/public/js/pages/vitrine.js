@@ -2,7 +2,7 @@ import { api } from '../api.js';
 import { el, limpar, dinheiro, emReais, dataBr, icone, indicador, modal, toast, acao, lerForm, etiqueta, confirmar, RAIZ, hojeLocal } from '../ui.js';
 
 /**
- * Gestão da vitrine: o que passa na TV da loja e no tablet do caixa quando ninguém está comprando.
+ * Gestão da vitrine: o que passa na TV da loja e no terminal de autoatendimento quando nenhum cliente está comprando.
  * Ofertas, mais vendidos e mais lucrativos entram sozinhos; vídeos e imagens a administração sobe aqui.
  */
 const TIPOS_ACEITOS = 'video/mp4,video/webm,image/jpeg,image/png,image/webp';
@@ -11,7 +11,7 @@ const mb = (bytes) => (bytes < 1024 * 1024
   : `${(bytes / 1024 / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`);
 
 export default async function vitrine({ alvo, definirTitulo }) {
-  definirTitulo('Vitrine', 'Ofertas, produtos e vídeos na TV e no tablet do caixa');
+  definirTitulo('Vitrine', 'Ofertas, produtos e vídeos na TV e no terminal de autoatendimento');
   const enderecoTv = `${location.origin}${RAIZ}/vitrine/`;
 
   async function desenhar() {
@@ -74,8 +74,8 @@ export default async function vitrine({ alvo, definirTitulo }) {
         el('label', { class: 'campo' }, 'Produtos de cada lista', el('input', { name: 'vitrine_qtd_produtos', type: 'number', min: 1, max: 30, value: cfg.vitrine_qtd_produtos })),
         el('label', { class: 'campo' }, 'Segundos por produto', el('input', { name: 'vitrine_segundos_produto', type: 'number', min: 3, max: 60, value: cfg.vitrine_segundos_produto }))),
       el('hr', { class: 'divisor' }),
-      chave('vitrine_tablet', 'Mostrar também no tablet do caixa', 'Quando a tela de espera fica parada. Some com um toque ou ao passar um produto no leitor.'),
-      el('label', { class: 'campo' }, 'Segundos parado até aparecer no tablet', el('input', { name: 'vitrine_tablet_ocioso', type: 'number', min: 10, max: 600, value: cfg.vitrine_tablet_ocioso })),
+      chave('vitrine_tablet', 'Mostrar também no terminal de autoatendimento', 'Quando nenhum cliente está comprando. Some assim que o cliente toca na tela ou passa um produto no leitor.'),
+      el('label', { class: 'campo' }, 'Segundos sem cliente até aparecer no terminal', el('input', { name: 'vitrine_tablet_ocioso', type: 'number', min: 10, max: 600, value: cfg.vitrine_tablet_ocioso })),
       el('div', { class: 'linha fim' }, el('button', { class: 'btn primario', type: 'submit' }, icone('check'), 'Salvar'))));
   }
 

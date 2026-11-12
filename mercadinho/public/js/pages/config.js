@@ -199,8 +199,8 @@ export default async function configuracoes({ alvo, usuario, definirTitulo }) {
       campoSerie.classList.toggle('oculto', p === 'ponte');
       campoToken.classList.toggle('oculto', p === 'simulado');
       ajuda.textContent = {
-        simulado: 'Toda cobrança é aprovada na hora. Use para treinar a equipe e testar o fluxo do caixa.',
-        ponte: 'O sistema chama um agente HTTP instalado no computador do caixa, que conversa com o pinpad. O protocolo esperado está no README.',
+        simulado: 'Toda cobrança é aprovada na hora. Use para testar o autoatendimento antes de ligar a maquininha de verdade.',
+        ponte: 'O sistema chama um agente HTTP instalado no computador do balcão, que conversa com o pinpad. O protocolo esperado está no README.',
         mercadopago: 'Informe o número de série da Point e o token de acesso da conta. A cobrança aparece na tela da maquininha.',
       }[p];
     };

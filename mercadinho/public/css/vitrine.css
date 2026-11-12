@@ -1,5 +1,5 @@
 /*
- * Vitrine — o que passa na TV da loja e no tablet parado.
+ * Vitrine — o que passa na TV da loja e no terminal de autoatendimento parado.
  * Feita para ser vista de longe: letras grandes, preço em destaque, pouca coisa por quadro.
  * As medidas acompanham a tela (vw/vh), então a mesma folha serve para TV, monitor e tablet.
  */
@@ -122,5 +122,5 @@ body.tela-tv.sem-cursor{ cursor: none; }
 }
 body.sem-cursor .tv-cheia{ opacity: 0; pointer-events: none; }
 
-/* ---------- no tablet do caixa: por cima da tela de espera ---------- */
+/* ---------- no terminal de autoatendimento: por cima da tela de espera ---------- */
 .vitrine-sobre{ position: fixed; inset: 0; z-index: 80; cursor: pointer; animation: vt-entra .5s ease both; }

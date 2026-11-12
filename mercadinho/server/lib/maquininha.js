@@ -11,7 +11,7 @@ const { hoje, somarDias } = require('./datas');
  *
  *  • simulado    — para testes e demonstração: aprova na hora e gera NSU falso.
  *  • ponte       — maquininha ligada ao caixa (pinpad TEF: PayGo, Elgin, Stone SDK...). O sistema conversa por HTTP
- *                  com um agente instalado na máquina do caixa, que fala com o pinpad. Protocolo esperado:
+ *                  com um agente instalado no computador do balcão, que fala com o pinpad. Protocolo esperado:
  *                    POST {url}/pagamento   { valor_centavos, forma, parcelas, referencia }
  *                       -> { id, status: "pendente"|"aprovada"|"negada", nsu, autorizacao, bandeira, mensagem }
  *                    GET  {url}/pagamento/{id}       -> mesmo formato
