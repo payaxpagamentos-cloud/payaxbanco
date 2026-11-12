@@ -357,37 +357,34 @@ td.direita, th.direita{ text-align: right; }
 }
 
 /* ---------- entrada (login) ----------
- * A tela de entrada é a vitrine do sistema: fica sempre no escuro da marca, mesmo com o
- * tema claro escolhido, porque a arte da loja foi feita sobre esse fundo. */
+ * A foto da loja ocupa a tela inteira e o cartão de acesso flutua sobre ela.
+ * Fica sempre no escuro da marca, mesmo com o tema claro escolhido. */
 .entrada{
-  min-height: 100vh; display: grid; align-items: center;
-  padding: 24px clamp(16px, 3.5vw, 52px);
+  min-height: 100vh; display: grid; align-items: center; justify-items: end;
+  padding: clamp(16px, 4vh, 40px) clamp(16px, 5vw, 72px);
+  background: #011829; color: #E7F4F1;
+}
+/* A foto em tamanho natural à esquerda, com um véu que a dissolve no escuro da marca
+ * antes de chegar ao cartão — assim não há corte visível nem deformação da loja. */
+.entrada::before{
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(760px 520px at 5% -8%, rgba(2,150,125,.40), transparent 62%),
-    radial-gradient(1040px 700px at 27% 80%, rgba(9,58,76,.72), transparent 66%),
-    radial-gradient(720px 540px at 94% 16%, rgba(4,62,82,.42), transparent 62%),
-    #011829;
-  color: #E7F4F1;
+    linear-gradient(96deg, rgba(1,18,30,.06) 0%, rgba(1,18,30,.20) 45%, rgba(1,18,30,.42) 80%),
+    url("../img/loja.webp") left center / auto 100% no-repeat;
 }
-.entrada .painel-entrada{
-  width: 100%; max-width: 1480px; margin: 0 auto;
-  display: grid; grid-template-columns: 1.5fr minmax(360px, 440px);
-  gap: clamp(16px, 3vw, 48px); align-items: center;
-}
+.entrada .painel-entrada{ position: relative; z-index: 1; width: 100%; max-width: 432px; }
 
-/* --- coluna da esquerda: a loja, do tamanho que a coluna permitir --- */
-.entrada .vitrine{ min-width: 0; }
-.entrada .loja{ display: block; width: 100%; height: auto; margin: 0 auto; }
-
-/* --- coluna da direita: o cartão de acesso --- */
 .entrada .caixa{
-  width: 100%; max-width: 440px; margin: 0 auto; padding: 32px 32px 26px;
-  border-color: rgba(39,227,182,.22);
-  box-shadow: 0 30px 80px rgba(0,0,0,.45), 0 0 70px rgba(39,227,182,.07);
+  width: 100%; padding: 32px 32px 26px;
+  border-color: rgba(39,227,182,.26);
+  background: linear-gradient(150deg, rgba(14,52,66,.62), rgba(3,24,38,.70));
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  box-shadow: 0 34px 90px rgba(0,0,0,.55), 0 0 70px rgba(39,227,182,.08);
 }
 .entrada .selo-entrada{
   width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; margin: 0 auto;
-  background: rgba(39,227,182,.12); border: 1px solid rgba(39,227,182,.30); color: var(--acento);
+  background: rgba(39,227,182,.14); border: 1px solid rgba(39,227,182,.32); color: var(--acento);
 }
 .entrada .selo-entrada svg{ width: 26px; height: 26px; }
 .entrada .caixa h2{ font-size: clamp(27px, 2.4vw, 34px); margin: 16px 0 22px; text-align: center; }
@@ -395,6 +392,7 @@ td.direita, th.direita{ text-align: right; }
   font-size: 14px; font-weight: 650; gap: 8px;
   text-transform: none; letter-spacing: normal; color: var(--texto);
 }
+.entrada .caixa input{ background-color: rgba(255,255,255,.07); }
 
 /* Campo com ícone fixo à esquerda (e o olho da senha à direita). */
 .campo-icone{ position: relative; display: flex; align-items: center; }
@@ -405,7 +403,7 @@ td.direita, th.direita{ text-align: right; }
   position: absolute; right: 7px; width: 36px; height: 36px; display: grid; place-items: center;
   border: 0; background: none; border-radius: 11px; color: var(--texto-3); cursor: pointer;
 }
-.campo-icone .ver-senha:hover{ color: var(--acento); background: rgba(255,255,255,.06); }
+.campo-icone .ver-senha:hover{ color: var(--acento); background: rgba(255,255,255,.08); }
 .campo-icone .ver-senha svg{ width: 20px; height: 20px; }
 
 .entrada .opcoes{ display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -415,18 +413,24 @@ td.direita, th.direita{ text-align: right; }
 .elo:hover{ text-decoration: underline; }
 
 .entrada .ajuda{
-  margin: 20px 0 0; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.09);
+  margin: 20px 0 0; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.12);
   text-align: center; font-size: 14px; color: var(--texto-2);
 }
-@media (max-width: 980px){
-  .entrada .painel-entrada{ grid-template-columns: 1fr; gap: 24px; justify-items: center; }
-  .entrada .caixa{ order: 1; }
-  .entrada .vitrine{ order: 2; width: 100%; }
-  .entrada .loja{ max-width: 520px; }
+
+/* Em tela estreita a loja não cabe ao lado: o cartão vai para o meio e o véu fecha mais. */
+@media (max-width: 760px){
+  .entrada{ justify-items: center; }
+  .entrada::before{
+    background:
+      linear-gradient(180deg, rgba(1,18,30,.34) 0%, rgba(1,18,30,.70) 48%, #011829 92%),
+      url("../img/loja.webp") 42% 62% / auto 140% no-repeat;
+  }
+  .entrada .painel-entrada{ max-width: 420px; }
 }
 @media (max-width: 560px){
   .entrada{ padding: 20px 16px; }
   .entrada .caixa{ padding: 26px 20px 22px; }
+}
 }
 }
 }

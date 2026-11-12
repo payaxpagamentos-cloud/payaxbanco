@@ -102,9 +102,6 @@ function telaLogin(erro) {
 
   limpar($('#app'), el('div', { class: 'entrada' },
     el('div', { class: 'painel-entrada' },
-      el('div', { class: 'vitrine' },
-        el('img', { class: 'loja', src: `${RAIZ}/img/loja.webp`, alt: '', 'aria-hidden': 'true' })),
-
       el('div', { class: 'cartao caixa' },
         el('span', { class: 'selo-entrada' }, icone('entrar')),
         el('h2', {}, 'Bem-vindo'),
