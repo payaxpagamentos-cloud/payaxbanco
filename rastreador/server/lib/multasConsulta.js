@@ -16,7 +16,8 @@
  *   Resposta: { multas: [{ auto_infracao, orgao, codigo, descricao, gravidade, pontos, valor, data_hora, local, municipio, prazo_indicacao, vencimento }],
  *               apontamentos: [{ tipo, descricao, valor, situacao }] }
  */
-const { agora } = require('../db');
+const { agora, transacao } = require('../db');
+const creditos = require('./creditos');
 const { ErroNegocio } = require('./erros');
 const multas = require('./multas');
 const { avisar } = require('./notificacoes');
@@ -302,10 +303,23 @@ function iniciarConsulta(db, { empresaId = null, placa, renavam, usuarioId = nul
       AND criado_em > ? ${empresaId ? 'AND empresa_id = ?' : ''} ORDER BY id DESC LIMIT 1`).get(...[p, new Date(Date.now() - 24 * 3600_000).toISOString(), ...(empresaId ? [empresaId] : [])]);
     if (recente) return { id: recente.id, status: 'ok', placa: p, guardada: true, consultado_em: recente.criado_em, pronto: Promise.resolve() };
   }
-  const id = Number(db.prepare(`INSERT INTO multas_consultas (empresa_id, placa, renavam, usuario_id, status, criado_em) VALUES (?, ?, ?, ?, 'consultando', ?)`)
-    .run(empresaId ?? veic?.empresa_id ?? null, p, ren ?? veic?.renavam ?? null, usuarioId, agora()).lastInsertRowid);
-  const fim = (campos) => db.prepare(`UPDATE multas_consultas SET status = ?, multas = ?, apontamentos = ?, novas = ?, resultado = ?, erro = ? WHERE id = ?`)
-    .run(campos.erro ? 'erro' : 'ok', campos.multas ?? 0, campos.apontamentos ?? 0, campos.novas ?? 0, campos.resultado ? JSON.stringify(campos.resultado) : null, campos.erro ?? null, id);
+  // Consulta da empresa (não do master, nem em teste): desconta o preço de venda do crédito antes; sem saldo, não consulta.
+  const cobrar = Boolean(empresaId) && !HOMOLOG();
+  const id = transacao(db, () => {
+    const novo = Number(db.prepare(`INSERT INTO multas_consultas (empresa_id, placa, renavam, usuario_id, status, criado_em) VALUES (?, ?, ?, ?, 'consultando', ?)`)
+      .run(empresaId ?? veic?.empresa_id ?? null, p, ren ?? veic?.renavam ?? null, usuarioId, agora()).lastInsertRowid);
+    if (cobrar) {
+      const valor = creditos.debitarConsulta(db, empresaId, { tipo, placa: p, consultaId: novo, usuarioId });
+      db.prepare('UPDATE multas_consultas SET cobrado_centavos = ? WHERE id = ?').run(valor, novo);
+    }
+    return novo;
+  });
+  const fim = (campos) => {
+    db.prepare(`UPDATE multas_consultas SET status = ?, multas = ?, apontamentos = ?, novas = ?, resultado = ?, erro = ? WHERE id = ?`)
+      .run(campos.erro ? 'erro' : 'ok', campos.multas ?? 0, campos.apontamentos ?? 0, campos.novas ?? 0, campos.resultado ? JSON.stringify(campos.resultado) : null, campos.erro ?? null, id);
+    // Não concluiu: o valor volta para o crédito.
+    if (campos.erro && cobrar) creditos.estornarConsulta(db, empresaId, id);
+  };
   // Roda em segundo plano: a resposta do serviço pode demorar; a tela acompanha pelo id. O resultado é guardado mesmo se chegar tarde.
   const inicio = Date.now();
   const pronto = perguntar(p, ren ?? veic?.renavam, { urlRetorno, tipo }).then((r) => {

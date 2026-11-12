@@ -81,6 +81,74 @@ export async function fichaMulta(m, { placaTxt, origem, condutor } = {}) {
   janela.document.getElementById('fechar')?.addEventListener('click', () => janela.close());
 }
 
+// ---------- Créditos (produto): saldo, preços de venda, recarga por PIX e extrato ----------
+const reaisTxt = (c) => dinheiro(c ?? 0);
+const NOMES_TIPO = { completa: 'Completa', renainf: 'Rápida', resumida: 'Simples' };
+
+async function recarregar(ctx, aoTerminar) {
+  const base = `/empresas/${ctx.empresaId}/multas/creditos`;
+  modal('Adicionar crédito por PIX', (fechar) => {
+    const corpo = el('div');
+    const outro = campo('Outro valor (R$)', { name: 'outro', inputmode: 'decimal', placeholder: 'mínimo 10,00' });
+    const gerar = async (centavosValor) => {
+      if (!centavosValor || centavosValor < 1000) return toast('Escolha um valor a partir de R$ 10,00.', true);
+      limpar(corpo, el('div', { class: 'carregando-linha' }));
+      try {
+        const c = await api.post(`${base}/pix`, { valor_centavos: centavosValor });
+        const qr = el('div', { style: 'width:220px;margin:0 auto' });
+        qr.innerHTML = c.qr_svg; // SVG gerado pelo próprio servidor a partir do código PIX
+        const copia = el('textarea', { readonly: true, rows: 3, style: 'width:100%;font-family:monospace;font-size:12px' });
+        copia.value = c.copia_cola;
+        limpar(corpo,
+          el('p', { style: 'margin:0 0 8px;text-align:center' }, 'Pague ', el('strong', {}, reaisTxt(c.valor_centavos)), ' pelo app do seu banco (PIX → ler QR code ou copia e cola).'),
+          qr, el('label', { class: 'campo' }, 'PIX copia e cola', copia),
+          el('div', { class: 'linha entre', style: 'gap:8px;flex-wrap:wrap;margin-top:8px' },
+            botao('Copiar código', '', () => navigator.clipboard?.writeText(c.copia_cola).then(() => toast('Código PIX copiado.'), () => { copia.select(); toast('Selecione e copie o código.'); })),
+            botao('Já paguei', 'primario', async () => {
+              await api.post(`${base}/pix/${c.id}/informar`, {});
+              toast('Pagamento informado. Assim que confirmado, o crédito entra na hora.');
+              fechar(); aoTerminar?.();
+            })),
+          el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' }, `Identificador: ${c.txid}. O crédito entra assim que o pagamento é confirmado.`));
+      } catch (err) { limpar(corpo, el('p', { class: 'aviso erro' }, err.message)); }
+    };
+    limpar(corpo,
+      el('p', { class: 'mudo', style: 'margin:0 0 10px' }, 'Escolha o valor. O sistema gera o PIX com o valor certo.'),
+      el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap' }, [5000, 10000, 20000, 50000].map((v) => botao(reaisTxt(v), '', () => gerar(v)))),
+      el('div', { class: 'linha', style: 'gap:8px;align-items:flex-end;margin-top:10px' }, outro, botao('Gerar PIX', 'primario', () => gerar(centavos(outro.querySelector('input').value)))));
+    return [corpo];
+  });
+}
+
+async function verExtrato(ctx) {
+  const d = await api.get(`/empresas/${ctx.empresaId}/multas/creditos`);
+  const TIPO = { recarga: ['Recarga', 'ok'], consulta: ['Consulta', ''], estorno: ['Estorno', 'info'], ajuste: ['Ajuste', 'aviso'] };
+  modal('Extrato do crédito', () => [
+    el('p', { style: 'margin:0 0 10px' }, 'Saldo atual: ', el('strong', {}, reaisTxt(d.saldo_centavos))),
+    tabela(['Quando', 'Movimento', 'Descrição', '>Valor', '>Saldo'], d.extrato.map((x) => el('tr', {}, td(dataHora(x.criado_em)), td(etiqueta(TIPO[x.tipo]?.[0] ?? x.tipo, TIPO[x.tipo]?.[1] ?? '')),
+      td(x.descricao ?? '—'), td(el('strong', { style: `color:${x.valor_centavos < 0 ? 'var(--erro)' : 'var(--ok)'}` }, `${x.valor_centavos < 0 ? '−' : '+'} ${reaisTxt(Math.abs(x.valor_centavos))}`), 'dir num'),
+      td(reaisTxt(x.saldo_centavos), 'dir num'))), 'Nenhum movimento ainda.'),
+    d.recargas.length ? el('h4', { style: 'margin:16px 0 6px' }, 'Recargas por PIX') : null,
+    d.recargas.length ? tabela(['Quando', '>Valor', 'Situação'], d.recargas.map((x) => el('tr', {}, td(dataHora(x.criado_em)), td(reaisTxt(x.valor_centavos), 'dir num'),
+      td(etiqueta({ pendente: 'aguardando pagamento', informado: 'pagamento informado', pago: 'creditado', cancelado: 'cancelado' }[x.status], x.status === 'pago' ? 'ok' : x.status === 'cancelado' ? '' : 'aviso'))))) : null,
+  ], { largo: true });
+}
+
+/** Faixa do crédito no topo da central: saldo, preço de cada consulta, Adicionar crédito e Extrato. */
+async function faixaCredito(ctx, alvo) {
+  const d = await api.get(`/empresas/${ctx.empresaId}/multas/creditos`);
+  const pode = !ctx.somenteLeitura;
+  limpar(alvo, el('section', { class: 'cartao', style: 'display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;margin-bottom:14px' },
+    el('div', {}, el('div', { class: 'pequeno mudo' }, 'Crédito para consultas'),
+      el('div', { style: `font-size:28px;font-weight:800;color:${d.saldo_centavos > 0 ? 'var(--ok)' : 'var(--erro)'}` }, reaisTxt(d.saldo_centavos))),
+    el('div', { class: 'linha', style: 'gap:6px;flex-wrap:wrap' }, Object.entries(d.precos).map(([t, v]) => etiqueta(`${NOMES_TIPO[t]}: ${reaisTxt(v)}`, ''))),
+    el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap' },
+      botao('Extrato', '', () => verExtrato(ctx)),
+      pode ? (d.pix ? botao([icone('carteira'), 'Adicionar crédito (PIX)'], 'primario', () => recarregar(ctx, () => faixaCredito(ctx, alvo)))
+        : el('span', { class: 'pequeno mudo' }, 'Recarga por PIX: fale com o suporte.')) : null)));
+  return d;
+}
+
 const INTERVALO = { 0: 'desligada', 1: 'todo dia', 7: 'uma vez por semana', 15: 'a cada 15 dias', 30: 'uma vez por mês' };
 const prazoTexto = (dias, data_) => (dias === null || dias === undefined ? '—' : dias < 0 ? `venceu (${data(data_)})` : dias === 0 ? 'hoje' : `${dias} dia(s) · ${data(data_)}`);
 const paraLocal = (iso) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
@@ -216,7 +284,7 @@ async function telaMultas(ctx, { master = false } = {}) {
               if (await formMulta(ctx, dados)) { toast('Multa cadastrada.'); carregar(); }
             }) : null)),
         el('p', { class: 'pequeno mudo', style: 'margin:0 0 10px' }, dados.consulta_automatica
-          ? (dados.automatica?.intervalo_dias ? `Consulta automática ligada (DETRAN-${dados.automatica.uf}): os veículos são consultados ${INTERVALO[dados.automatica.intervalo_dias]}.` : `Consulta ligada ao DETRAN-${dados.automatica?.uf ?? 'SP'} no modo manual: use "Consultar agora" ou a aba Consultar multas.`)
+          ? (dados.automatica?.intervalo_dias ? `Consulta automática ligada (DETRAN-${dados.automatica.uf}): os veículos são consultados ${INTERVALO[dados.automatica.intervalo_dias]}.` : `Consulta ligada ao DETRAN-${dados.automatica?.uf ?? 'SP'} no modo manual: use "Consultar agora" ou a aba Consultar débitos.`)
           : 'Consulta automática (DETRAN/SENATRAN): aguardando a contratação do serviço de consulta. Por enquanto, cadastre as multas com a notificação.'),
         tabela(['Data', 'Placa', master ? 'Empresa' : null, 'Infração', '>Valor', 'Condutor', '^Situação', 'Indicar até', '^'].filter(Boolean), dados.multas.map((m) => el('tr', { style: 'cursor:pointer', onclick: () => detalheMulta(ctx, dados, m.id, { master, gestor, aoMudar: carregar }) },
           td(quandoMulta(m)), td(el('strong', {}, placa(m.placa))), master ? td(m.empresa) : null,
@@ -227,7 +295,9 @@ async function telaMultas(ctx, { master = false } = {}) {
           el('td', { class: 'acoes' }, botaoIcone('multa', 'Abrir a multa', (e) => { e?.stopPropagation?.(); detalheMulta(ctx, dados, m.id, { master, gestor, aoMudar: carregar }); }))))
           .filter(Boolean), 'Nenhuma multa por aqui.')));
   }
-  limpar(ctx.conteudo, corpo);
+  const credito = el('div');
+  limpar(ctx.conteudo, master ? null : credito, corpo);
+  if (!master) faixaCredito(ctx, credito).catch(() => {});
   await carregar();
 }
 
@@ -287,10 +357,13 @@ async function telaConsultar(ctx, { master = false } = {}) {
         })))), 'Nenhuma consulta feita ainda.')));
     return d;
   }
-  const d = await (async () => { limpar(ctx.conteudo, situacaoEl); return carregar(); })();
+  const credito = el('div');
+  const d = await (async () => { limpar(ctx.conteudo, master ? null : credito, situacaoEl); return carregar(); })();
+  const cred = master ? null : await faixaCredito(ctx, credito).catch(() => null);
+  const preco = (t, custo) => (cred ? reaisTxt(cred.precos[t]) : custo);
   const selVeic = escolha('Veículo da frota', 'veiculo', { '': '— digitar a placa —', ...Object.fromEntries((d.veiculos ?? []).map((v) => [v.id, `${placa(v.placa)}${v.descricao ? ` · ${v.descricao}` : ''}`])) }, '');
-  const selTipo = escolha('Tipo de consulta', 'tipo', { completa: 'Completa — multas, IPVA, licenciamento e restrições (R$ 8,00)', renainf: 'Rápida — só multas do Renainf (R$ 3,45)',
-    resumida: 'Simples — só se tem débito e o total (R$ 3,78)' }, (() => { try { return localStorage.getItem('rastreador.multas.tipo') || 'completa'; } catch { return 'completa'; } })());
+  const selTipo = escolha('Tipo de consulta', 'tipo', { completa: `Completa — multas, IPVA, licenciamento e restrições (${preco('completa', 'R$ 8,00')})`, renainf: `Rápida — só multas do Renainf (${preco('renainf', 'R$ 3,45')})`,
+    resumida: `Simples — só se tem débito e o total (${preco('resumida', 'R$ 3,78')})` }, (() => { try { return localStorage.getItem('rastreador.multas.tipo') || 'completa'; } catch { return 'completa'; } })());
   selTipo.querySelector('select').addEventListener('change', (e) => { try { localStorage.setItem('rastreador.multas.tipo', e.target.value); } catch { /* sem armazenamento */ } });
   const inPlaca = campo('Placa', { name: 'placa', maxlength: 8, placeholder: 'ABC1D23', style: 'text-transform:uppercase' });
   const inRenavam = campo('RENAVAM (opcional, alguns estados exigem)', { name: 'renavam', inputmode: 'numeric', maxlength: 11 });
@@ -335,7 +408,7 @@ async function telaConsultar(ctx, { master = false } = {}) {
       if (c.resultado.novas) toast(`${c.resultado.novas} multa(s) nova(s) adicionada(s) à central.`);
     } catch (err) {
       limpar(resultado, el('p', { class: 'aviso erro' }, err.message));
-    } finally { botaoConsultar.disabled = !podeConsultar; carregar(); }
+    } finally { botaoConsultar.disabled = !podeConsultar; carregar(); if (!master) faixaCredito(ctx, credito).catch(() => {}); }
   }
   const form = el('form', { class: 'form', onsubmit: (e) => { e.preventDefault(); consultar(false); } },
     master ? null : selVeic,
@@ -377,9 +450,69 @@ async function telaConsultar(ctx, { master = false } = {}) {
   }
   desenharAuto();
   ctx.conteudo.append(
-    cartao('Consultar multas', el('p', { class: 'mudo', style: 'margin:0 0 12px' }, 'Veja na hora se um veículo tem multas ou algum apontamento (IPVA, licenciamento, restrição, roubo/furto). As multas dos veículos da frota entram sozinhas na central.'), form),
+    cartao('Consultar débitos', el('p', { class: 'mudo', style: 'margin:0 0 12px' }, 'Veja na hora se um veículo tem multas ou outros débitos e apontamentos (IPVA, licenciamento, restrição, roubo/furto). As multas dos veículos da frota entram sozinhas na central.'), form),
     resultado, autoEl, historicoEl);
 }
 
+// ---------- Master: créditos e preços (o produto) ----------
+async function telaCreditosMaster(ctx) {
+  const corpo = el('div');
+  const reaisEm = (c) => (c === null || c === undefined ? '' : (c / 100).toFixed(2).replace('.', ','));
+  async function carregar() {
+    const d = await api.get('/master/multas/creditos');
+    const abertas = d.recargas.filter((x) => ['pendente', 'informado'].includes(x.status));
+    const cfgForm = el('form', { class: 'form', onsubmit: async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      await api.put('/master/multas/creditos/config', { pix_chave: f.pix_chave.value, pix_nome: f.pix_nome.value, pix_cidade: f.pix_cidade.value,
+        precos: { completa: centavos(f.p_completa.value), renainf: centavos(f.p_renainf.value), resumida: centavos(f.p_resumida.value) } });
+      toast('Configuração salva.'); carregar();
+    } },
+      el('div', { class: 'tres' },
+        campo('Chave PIX que recebe as recargas', { name: 'pix_chave', maxlength: 77, value: d.config.pix_chave ?? '', placeholder: 'CNPJ, e-mail, telefone ou chave aleatória' }),
+        campo('Nome do recebedor', { name: 'pix_nome', maxlength: 25, value: d.config.pix_nome ?? '' }),
+        campo('Cidade', { name: 'pix_cidade', maxlength: 15, value: d.config.pix_cidade ?? 'SAO PAULO' })),
+      el('div', { class: 'tres' },
+        campo('Preço de venda padrão — Completa (R$)', { name: 'p_completa', inputmode: 'decimal', value: reaisEm(d.config.precos.completa) }),
+        campo('Rápida — Renainf (R$)', { name: 'p_renainf', inputmode: 'decimal', value: reaisEm(d.config.precos.renainf) }),
+        campo('Simples — resumida (R$)', { name: 'p_resumida', inputmode: 'decimal', value: reaisEm(d.config.precos.resumida) })),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Custo na API Brasil: Completa R$ 8,00 · Rápida R$ 3,45 · Simples R$ 3,78. O preço de venda é o que sai do crédito da empresa.'),
+      el('div', { class: 'linha', style: 'justify-content:flex-end' }, el('button', { class: 'btn primario' }, 'Salvar')));
+    limpar(corpo,
+      abertas.length ? cartao(`Recargas para confirmar (${abertas.length})`, tabela(['Quando', 'Empresa', '>Valor', 'Identificador', 'Situação', '^'], abertas.map((x) => el('tr', {},
+        td(dataHora(x.criado_em)), td(el('strong', {}, x.empresa)), td(dinheiro(x.valor_centavos), 'dir num'), td(el('span', { class: 'mono pequeno' }, x.txid)),
+        td(etiqueta(x.status === 'informado' ? 'cliente informou que pagou' : 'aguardando pagamento', x.status === 'informado' ? 'aviso' : '')),
+        el('td', { class: 'acoes' },
+          botao('Confirmar pagamento', 'primario', async () => {
+            if (!await confirmar('Confirmar recarga', `Confira no extrato do banco o PIX de ${dinheiro(x.valor_centavos)} (${x.txid}) de ${x.empresa}. O crédito entra na hora.`, 'Confirmar')) return;
+            await api.post(`/master/multas/creditos/pix/${x.id}/confirmar`, {}); toast('Crédito liberado.'); carregar();
+          }),
+          botao('Cancelar', '', async () => { await api.post(`/master/multas/creditos/pix/${x.id}/cancelar`, {}); toast('Recarga cancelada.'); carregar(); })))))) : null,
+      cartao('Empresas: crédito e preços', tabela(['Empresa', '>Crédito', 'Completa', 'Rápida', 'Simples', '^'], d.empresas.map((e) => el('tr', {},
+        td(el('strong', {}, e.nome)), td(el('strong', { style: `color:${e.saldo_centavos > 0 ? 'var(--ok)' : 'var(--text-3)'}` }, dinheiro(e.saldo_centavos)), 'dir num'),
+        ...['completa', 'renainf', 'resumida'].map((t) => td([dinheiro(e.precos[t]), e[`multas_preco_${t}`] === null ? el('div', { class: 'pequeno mudo' }, 'padrão') : null])),
+        el('td', { class: 'acoes' },
+          botao('Preços', '', async () => {
+            const r = await formModal(`Preços de venda · ${e.nome}`, () => [
+              el('p', { class: 'mudo', style: 'margin:0' }, 'Deixe em branco para usar o preço padrão.'),
+              el('div', { class: 'tres' }, ...['completa', 'renainf', 'resumida'].map((t) => campo(`${NOMES_TIPO[t]} (R$)`, { name: t, inputmode: 'decimal', value: reaisEm(e[`multas_preco_${t}`]), placeholder: reaisEm(d.config.precos[t]) }))),
+            ], (f) => api.put(`/master/multas/creditos/empresas/${e.id}/precos`, { completa: centavos(f.completa) ?? null, renainf: centavos(f.renainf) ?? null, resumida: centavos(f.resumida) ?? null }));
+            if (r) { toast('Preços salvos.'); carregar(); }
+          }),
+          botao('Lançar crédito', '', async () => {
+            const r = await formModal(`Lançar crédito · ${e.nome}`, () => [
+              el('p', { class: 'mudo', style: 'margin:0' }, 'Use valor negativo para descontar (ex.: -10,00).'),
+              campo('Valor (R$)', { name: 'valor', inputmode: 'decimal', required: true }), campo('Descrição', { name: 'descricao', maxlength: 120, placeholder: 'Ex.: cortesia, pagamento em dinheiro…' }),
+            ], (f) => api.post(`/master/multas/creditos/empresas/${e.id}/ajuste`, { valor_centavos: String(f.valor).trim().startsWith('-') ? -centavos(String(f.valor).replace('-', '')) : centavos(f.valor), descricao: f.descricao || undefined }));
+            if (r) { toast('Crédito lançado.'); carregar(); }
+          })))), 'Nenhuma empresa.')),
+      cartao('Recarga por PIX e preços padrão', cfgForm),
+      cartao('Últimas recargas', tabela(['Quando', 'Empresa', '>Valor', 'Situação'], d.recargas.slice(0, 20).map((x) => el('tr', {}, td(dataHora(x.criado_em)), td(x.empresa), td(dinheiro(x.valor_centavos), 'dir num'),
+        td(etiqueta({ pendente: 'aguardando', informado: 'informado', pago: 'creditado', cancelado: 'cancelado' }[x.status], x.status === 'pago' ? 'ok' : x.status === 'cancelado' ? '' : 'aviso')))), 'Nenhuma recarga ainda.')));
+  }
+  limpar(ctx.conteudo, corpo);
+  await carregar();
+}
+
 export const TELAS_MULTAS = { multas: (ctx) => telaMultas(ctx), 'multas-consultar': (ctx) => telaConsultar(ctx) };
-export const TELAS_MULTAS_MASTER = { multas: (ctx) => telaMultas(ctx, { master: true }), 'multas-consultar': (ctx) => telaConsultar(ctx, { master: true }) };
+export const TELAS_MULTAS_MASTER = { multas: (ctx) => telaMultas(ctx, { master: true }), 'multas-consultar': (ctx) => telaConsultar(ctx, { master: true }), 'multas-creditos': telaCreditosMaster };

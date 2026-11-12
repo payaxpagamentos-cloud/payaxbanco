@@ -694,6 +694,35 @@ CREATE TABLE IF NOT EXISTS multas_consultas (
   status TEXT NOT NULL DEFAULT 'ok'
 );
 CREATE INDEX IF NOT EXISTS ix_multas_consultas ON multas_consultas (empresa_id, id);
+-- Créditos da central de multas: o extrato de cada empresa (recargas +, consultas −, estornos +, ajustes do master).
+CREATE TABLE IF NOT EXISTS multas_creditos (
+  id INTEGER PRIMARY KEY,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('recarga','consulta','estorno','ajuste')),
+  valor_centavos INTEGER NOT NULL,
+  saldo_centavos INTEGER NOT NULL,
+  descricao TEXT,
+  consulta_id INTEGER,
+  pix_id INTEGER,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_multas_creditos ON multas_creditos (empresa_id, id);
+-- Recargas por PIX: o código gerado com o valor; o master confirma o pagamento (ou o intermediário, quando houver).
+CREATE TABLE IF NOT EXISTS pix_cobrancas (
+  id INTEGER PRIMARY KEY,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  valor_centavos INTEGER NOT NULL,
+  txid TEXT NOT NULL,
+  copia_cola TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','informado','pago','cancelado')),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  informado_em TEXT,
+  pago_em TEXT,
+  confirmado_por INTEGER REFERENCES usuarios(id)
+);
+CREATE INDEX IF NOT EXISTS ix_pix_cobrancas ON pix_cobrancas (status, id);
 CREATE TABLE IF NOT EXISTS multa_arquivos (
   id INTEGER PRIMARY KEY,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
@@ -738,8 +767,15 @@ const CONFIG_PADRAO = {
   gt06_cmd_reiniciar: 'RESET#',
   // Consulta automática de multas: a cada quantos dias cada veículo é consultado (0 = manual, só pelo Consultar multas; 1, 7 ou 15 dias).
   multas_consulta_dias: '0',
+  // Central de multas como produto: preço de venda padrão de cada consulta (centavos) e a chave PIX que recebe as recargas.
+  multas_preco_completa: '1200',
+  multas_preco_renainf: '600',
+  multas_preco_resumida: '600',
+  pix_chave: '',
+  pix_nome: '',
+  pix_cidade: 'SAO PAULO',
 };
-const CONFIG_TEXTO = ['nome_plataforma', 'gt06_cmd_bloquear', 'gt06_cmd_desbloquear', 'gt06_cmd_localizar', 'gt06_cmd_reiniciar'];
+const CONFIG_TEXTO = ['pix_chave', 'pix_nome', 'pix_cidade', 'nome_plataforma', 'gt06_cmd_bloquear', 'gt06_cmd_desbloquear', 'gt06_cmd_localizar', 'gt06_cmd_reiniciar'];
 
 const agora = () => new Date().toISOString();
 
@@ -783,7 +819,8 @@ function migrar(db) {
     veiculos: { multas_auto: 'INTEGER NOT NULL DEFAULT 0', renavam: 'TEXT', multas_consulta_em: 'TEXT', teste_bloqueio_ok: 'INTEGER', teste_bloqueio_em: 'TEXT', consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
     empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0',
       plano_nome: 'TEXT', plano_valor_centavos: 'INTEGER', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT',
-      multas_auto_dias: 'INTEGER NOT NULL DEFAULT 0', multas_auto_tipo: "TEXT NOT NULL DEFAULT 'completa'" },
+      multas_auto_dias: 'INTEGER NOT NULL DEFAULT 0', multas_auto_tipo: "TEXT NOT NULL DEFAULT 'completa'",
+      multas_credito_centavos: 'INTEGER NOT NULL DEFAULT 0', multas_preco_completa: 'INTEGER', multas_preco_renainf: 'INTEGER', multas_preco_resumida: 'INTEGER' },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
     motoristas: { senha_hash: 'TEXT', app_ultimo_acesso: 'TEXT' },
     rastreadores: { rele_invertido: 'INTEGER NOT NULL DEFAULT 0', sinal_gsm: 'INTEGER', firmware: 'TEXT', perfil: "TEXT NOT NULL DEFAULT 'padrao'", saude: 'TEXT', saude_em: 'TEXT' },
@@ -793,7 +830,7 @@ function migrar(db) {
     seguros_tipos: { custo_centavos: 'INTEGER' },
     empresa_seguros: { margem_percent: 'REAL NOT NULL DEFAULT 0' },
     seguros_contratacoes: { custo_centavos: 'INTEGER', margem_percent: 'REAL', usuario_final_id: 'INTEGER' },
-    multas_consultas: { status: "TEXT NOT NULL DEFAULT 'ok'" },
+    multas_consultas: { status: "TEXT NOT NULL DEFAULT 'ok'", cobrado_centavos: 'INTEGER NOT NULL DEFAULT 0' },
     multas: { sem_hora: 'INTEGER NOT NULL DEFAULT 0' },
   };
   for (const [tabela, cols] of Object.entries(NOVAS)) {
