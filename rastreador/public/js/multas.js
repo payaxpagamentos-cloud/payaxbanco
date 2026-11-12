@@ -235,11 +235,13 @@ async function telaMultas(ctx, { master = false } = {}) {
 const TIPO_APONT = { ipva: 'IPVA', licenciamento: 'Licenciamento', dpvat: 'DPVAT', restricao: 'Restrição', roubo_furto: 'Roubo / furto', recall: 'Recall',
   gravame: 'Gravame (financiamento)', renajud: 'RENAJUD (judicial)', bloqueio: 'Bloqueio' };
 
+const TIPOS_CONSULTA = { completa: 'Completa', renainf: 'Rápida (Renainf)', resumida: 'Simples (resumida)' };
 function resultadoConsulta(r) {
   const nada = !r.multas.length && !r.apontamentos.length;
   return el('div', { class: 'coluna', style: 'gap:12px' },
     el('div', { class: 'linha entre', style: 'flex-wrap:wrap;gap:8px' },
-      el('div', {}, el('strong', { style: 'font-size:20px' }, placa(r.placa)), el('div', { class: 'pequeno mudo' }, `Consultado em ${dataHora(r.consultado_em)}${r.veiculo_da_frota ? ' · veículo da frota' : ' · fora da frota'}`)),
+      el('div', {}, el('strong', { style: 'font-size:20px' }, placa(r.placa)), el('div', { class: 'pequeno mudo' },
+        `${TIPOS_CONSULTA[r.tipo ?? 'completa']} · consultado em ${dataHora(r.consultado_em)}${r.duracao_s != null ? ` · levou ${r.duracao_s} s` : ''}${r.veiculo_da_frota ? ' · veículo da frota' : ' · fora da frota'}`)),
       el('div', { class: 'linha', style: 'gap:6px;flex-wrap:wrap' }, r.homolog ? etiqueta('TESTE · dados de exemplo, sem cobrança', 'info') : null,
         r.custo ? etiqueta(`custo: R$ ${r.custo}`, '') : null,
         nada ? etiqueta('Nada consta', 'ok') : etiqueta(`${r.multas.length} multa(s) · ${r.apontamentos.length} apontamento(s)`, 'erro'),
@@ -250,8 +252,8 @@ function resultadoConsulta(r) {
       td(m.valor_centavos !== null ? dinheiro(m.valor_centavos) : '—', 'dir num'),
       td(m.nova ? etiqueta('nova · adicionada', 'aviso') : m.na_central ? etiqueta('já na central', 'ok') : etiqueta(r.homolog ? 'teste' : r.veiculo_da_frota ? 'não adicionada' : 'fora da frota', ''), 'centro'),
       el('td', { class: 'acoes' }, botao([icone('multa'), 'Ver multa'], '', () => fichaMulta(m, { placaTxt: r.placa, origem: `Consulta ${r.homolog ? 'de teste ' : ''}feita em ${dataHora(r.consultado_em)} (DETRAN / prefeitura / Renainf).` }))))))) : null,
-    r.apontamentos.length ? cartao(`Apontamentos (${r.apontamentos.length})`, tabela(['Tipo', 'Descrição', '>Valor', 'Situação'], r.apontamentos.map((a) => el('tr', {},
-      td(el('strong', {}, TIPO_APONT[a.tipo] ?? a.tipo)), td(a.descricao || '—'), td(a.valor_centavos !== null ? dinheiro(a.valor_centavos) : '—', 'dir num'), td(a.situacao ?? '—'))))) : null);
+    r.apontamentos.length ? cartao(r.resumida ? 'Resumo dos débitos (consulta simples, sem a lista das multas)' : `Apontamentos (${r.apontamentos.length})`, tabela(['Tipo', 'Descrição', '>Valor', 'Situação'], r.apontamentos.map((a) => el('tr', {},
+      td(el('strong', {}, a.tipo === 'resumo' ? 'Resumo' : TIPO_APONT[a.tipo] ?? a.tipo)), td(a.descricao || '—'), td(a.valor_centavos !== null ? dinheiro(a.valor_centavos) : '—', 'dir num'), td(a.situacao ?? '—'))))) : null);
 }
 
 async function telaConsultar(ctx, { master = false } = {}) {
@@ -291,6 +293,9 @@ async function telaConsultar(ctx, { master = false } = {}) {
   }
   const d = await (async () => { limpar(ctx.conteudo, situacaoEl); return carregar(); })();
   const selVeic = escolha('Veículo da frota', 'veiculo', { '': '— digitar a placa —', ...Object.fromEntries((d.veiculos ?? []).map((v) => [v.id, `${placa(v.placa)}${v.descricao ? ` · ${v.descricao}` : ''}`])) }, '');
+  const selTipo = escolha('Tipo de consulta', 'tipo', { completa: 'Completa — multas, IPVA, licenciamento e restrições (R$ 8,00)', renainf: 'Rápida — só multas do Renainf (R$ 3,45)',
+    resumida: 'Simples — só se tem débito e o total (R$ 3,78)' }, (() => { try { return localStorage.getItem('rastreador.multas.tipo') || 'completa'; } catch { return 'completa'; } })());
+  selTipo.querySelector('select').addEventListener('change', (e) => { try { localStorage.setItem('rastreador.multas.tipo', e.target.value); } catch { /* sem armazenamento */ } });
   const inPlaca = campo('Placa', { name: 'placa', maxlength: 8, placeholder: 'ABC1D23', style: 'text-transform:uppercase' });
   const inRenavam = campo('RENAVAM (opcional, alguns estados exigem)', { name: 'renavam', inputmode: 'numeric', maxlength: 11 });
   selVeic.querySelector('select')?.addEventListener('change', (e) => {
@@ -307,7 +312,7 @@ async function telaConsultar(ctx, { master = false } = {}) {
     limpar(resultado, el('div', { class: 'carregando-linha' }), texto,
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Pode levar alguns minutos (o DETRAN às vezes demora). Pode sair desta tela: o resultado fica guardado em "Consultas feitas".'));
     try {
-      const ini = await api.post(`${base}/consultar-placa`, { placa: placaTxt, renavam: inRenavam.querySelector('input').value, forcar });
+      const ini = await api.post(`${base}/consultar-placa`, { placa: placaTxt, renavam: inRenavam.querySelector('input').value, forcar, tipo: selTipo.querySelector('select').value });
       const t0 = Date.now();
       let c;
       if (ini.guardada) {
@@ -317,7 +322,7 @@ async function telaConsultar(ctx, { master = false } = {}) {
         limpar(resultado,
           el('div', { class: 'linha entre', style: 'gap:10px;flex-wrap:wrap;padding:10px 14px;border-radius:12px;background:var(--surface-2);margin-bottom:10px' },
             el('span', { class: 'pequeno' }, `⚡ Resultado guardado da consulta de ${dataHora(ini.consultado_em)} (há ${horas < 2 ? 'menos de 2' : horas} h) — aberto na hora, sem custo.`),
-            botao([icone('lupa'), 'Consultar de novo agora (R$ 8)'], '', () => consultar(true))),
+            botao([icone('lupa'), 'Consultar de novo agora'], '', () => consultar(true))),
           resultadoConsulta(c.resultado));
         return;
       }
@@ -339,6 +344,7 @@ async function telaConsultar(ctx, { master = false } = {}) {
   const form = el('form', { class: 'form', onsubmit: (e) => { e.preventDefault(); consultar(false); } },
     master ? null : selVeic,
     el('div', { class: 'duas' }, inPlaca, inRenavam),
+    selTipo,
     el('div', { class: 'linha', style: 'justify-content:flex-end' }, botaoConsultar));
   ctx.conteudo.append(
     cartao('Consultar multas', el('p', { class: 'mudo', style: 'margin:0 0 12px' }, 'Veja na hora se um veículo tem multas ou algum apontamento (IPVA, licenciamento, restrição, roubo/furto). As multas dos veículos da frota entram sozinhas na central.'), form),

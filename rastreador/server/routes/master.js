@@ -524,7 +524,7 @@ module.exports = (db, extras = {}) => {
   r.get('/multas/consultas/:id', (req, res) => res.json(consultaMultas.consulta(db, nid(req))));
   r.post('/multas/consultar-placa', async (req, res, next) => {
     try {
-      const { pronto: _p, ...r2 } = consultaMultas.iniciarConsulta(db, { placa: req.body.placa, renavam: req.body.renavam, usuarioId: req.usuario.id, forcar: Boolean(req.body.forcar),
+      const { pronto: _p, ...r2 } = consultaMultas.iniciarConsulta(db, { placa: req.body.placa, renavam: req.body.renavam, usuarioId: req.usuario.id, forcar: Boolean(req.body.forcar), tipo: req.body.tipo,
         urlRetorno: `${config.urlPublica || `${req.protocol}://${req.get('host')}${config.basePath}`}/api/publico/multas-retorno` });
       registrar(db, req, 'multas_consulta', { placa: r2.placa });
       res.status(202).json(r2);

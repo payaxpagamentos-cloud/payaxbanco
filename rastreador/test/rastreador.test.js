@@ -115,6 +115,21 @@ test('API Brasil (Débitos V4): tradução da resposta', () => {
   assert.throws(() => traduzirApiBrasil({ error: true, message: 'Placa inválida' }), /Placa inválida/);
 });
 
+test('API Brasil: consultas rápida (Renainf) e simples (resumida), lidas de forma flexível', () => {
+  const { lerRenainf, lerResumida } = require('../server/lib/multasConsulta');
+  const r = lerRenainf({ error: false, data: { renainf: { infracoes: [{ numero_auto: 'B123', orgao_autuador: 'PRF', descricao_infracao: 'Velocidade até 20%', valor: 'R$ 130,16', data_infracao: '10/11/2026 08:15', municipio: 'SAO PAULO' }] } } });
+  assert.equal(r.multas.length, 1);
+  assert.equal(r.multas[0].auto_infracao, 'B123');
+  assert.equal(r.multas[0].valor_centavos, 13016);
+  assert.equal(r.multas[0].ocorrida_em, '2026-11-10T08:15:00-03:00');
+  assert.deepEqual(r.estrutura.campos_item.slice(0, 2), ['numero_auto', 'orgao_autuador']);
+  assert.deepEqual(lerRenainf({ error: false, data: { mensagem: 'Nada consta' } }).multas, []);
+  const s2 = lerResumida({ error: false, data: { possui_debito: true, valor: '1.234,56', multas: { total: 2 } } });
+  assert.ok(s2.resumida);
+  assert.ok(s2.apontamentos.some((x) => x.valor_centavos === 123456));
+  assert.ok(s2.apontamentos.some((x) => /possui debito: sim/.test(x.descricao)));
+});
+
 test('viagens, paradas, cercas, horário e manutenção', () => {
   const t0 = Date.parse('2026-10-20T10:00:00Z');
   const p = (m, metros, vel, ignicao = 1) => ({ ...norte(-23.5, -46.6, metros), velocidade_kmh: vel, ignicao, gps_em: min(m, t0) });
