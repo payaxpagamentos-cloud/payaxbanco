@@ -158,7 +158,7 @@ async function perguntarAssincrona(placa, { urlRetorno } = {}) {
   const job = ini?.data?.['job-id'] ?? ini?.['job-id'];
   if (!job) throw new ErroNegocio(`API Brasil: ${ini?.data?.msg || ini?.message || 'a consulta não foi aceita'}.`, 502);
   const intervalo = Number(process.env.RASTREADOR_MULTAS_INTERVALO_MS) || 5000;
-  const limite = Date.now() + (Number(process.env.RASTREADOR_MULTAS_LIMITE_MS) || 10 * 60_000);
+  const limite = Date.now() + (Number(process.env.RASTREADOR_MULTAS_LIMITE_MS) || 5 * 60_000);
   while (Date.now() < limite) {
     await espera(intervalo);
     let j;
@@ -173,7 +173,7 @@ async function perguntarAssincrona(placa, { urlRetorno } = {}) {
     }
     if (['failed', 'error', 'erro', 'falhou', 'cancelled', 'canceled'].includes(st)) throw new ErroNegocio(`API Brasil: ${d.msg || d.payload?.msg || 'a consulta falhou'}.`, 502);
   }
-  throw new ErroNegocio('A consulta na API Brasil passou de 10 minutos sem terminar. Veja em "Consultas feitas" mais tarde ou tente de novo.', 504);
+  throw new ErroNegocio('O DETRAN passou de 5 minutos sem responder. Veja em "Consultas feitas" mais tarde ou tente de novo.', 504);
 }
 
 /** Cadastra na central as multas que ainda não estão lá (pelo número do auto). Devolve cada multa com { na_central, nova }. */
