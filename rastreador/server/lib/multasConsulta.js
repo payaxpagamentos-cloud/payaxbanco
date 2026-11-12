@@ -16,7 +16,7 @@
  *   Resposta: { multas: [{ auto_infracao, orgao, codigo, descricao, gravidade, pontos, valor, data_hora, local, municipio, prazo_indicacao, vencimento }],
  *               apontamentos: [{ tipo, descricao, valor, situacao }] }
  */
-const { agora, lerConfig } = require('../db');
+const { agora } = require('../db');
 const { ErroNegocio } = require('./erros');
 const multas = require('./multas');
 const { avisar } = require('./notificacoes');
@@ -33,10 +33,8 @@ const URL_ASYNC = () => process.env.RASTREADOR_MULTAS_URL_ASYNC || 'https://gate
 const espera = (ms) => new Promise((ok) => { setTimeout(ok, ms); });
 const configurado = () => Boolean(URL_SERVICO() && CHAVE());
 const POR_RODADA = 10; // veículos por minuto (o serviço cobra por consulta e tem limite de pedidos)
-const intervaloDias = (db) => ([0, 1, 7, 15].includes(lerConfig(db).multas_consulta_dias) ? lerConfig(db).multas_consulta_dias : 0);
 // Estado do DETRAN consultado (os veículos da operação são de SP).
 const UF = () => (process.env.RASTREADOR_MULTAS_UF || 'SP').toUpperCase();
-const intervaloMs = (db) => intervaloDias(db) * 24 * 3600_000;
 const reaisParaCentavos = (x) => (x === undefined || x === null || x === '' ? null : Math.round(Number(String(x).replace(/\./g, '').replace(',', '.')) * 100));
 
 function traduzir(x) {
@@ -279,14 +277,6 @@ function importar(db, empresaId, placa, lista, { avisarNovas = true } = {}) {
   return { novas, resultado };
 }
 
-async function consultarVeiculo(db, veic) {
-  const r = await perguntar(veic.placa, veic.renavam);
-  if (r.homolog) return 0;
-  const { novas } = importar(db, veic.empresa_id, veic.placa, r.multas);
-  db.prepare('UPDATE veiculos SET multas_consulta_em = ? WHERE id = ?').run(agora(), veic.id);
-  return novas;
-}
-
 /**
  * "Consultar multas" na hora: uma placa (da frota ou não). As multas de veículos da empresa entram na central; tudo fica
  * registrado no histórico de consultas.
@@ -356,20 +346,53 @@ function consulta(db, id, { empresaId = null } = {}) {
   return { ...c, resultado: c.resultado ? JSON.parse(c.resultado) : null };
 }
 
-/** Rodada da manutenção: consulta os veículos ativos cuja última consulta passou do intervalo (semanal por padrão), poucos por vez. */
+// Preço de cada tipo (API Brasil), para a estimativa de custo da consulta automática.
+const PRECOS = { completa: 800, renainf: 345, resumida: 378 };
+const FREQUENCIAS = [0, 7, 15, 30];
+// A consulta automática roda de madrugada (horário de Brasília), quando ninguém está esperando a resposta.
+const madrugada = (d = new Date()) => { const h = (d.getUTCHours() + 21) % 24; return h >= 1 && h < 5; };
+
+/** Configuração da consulta automática da empresa: frequência, tipo e os carros escolhidos, com a estimativa de custo por mês. */
+function automatica(db, empresaId) {
+  const e = db.prepare('SELECT multas_auto_dias AS dias, multas_auto_tipo AS tipo FROM empresas WHERE id = ?').get(empresaId) ?? { dias: 0, tipo: 'completa' };
+  const veiculos = db.prepare('SELECT id, placa, descricao, multas_auto, multas_consulta_em FROM veiculos WHERE empresa_id = ? AND ativo = 1 ORDER BY placa').all(empresaId);
+  const marcados = veiculos.filter((v) => v.multas_auto).length;
+  const porMes = e.dias ? Math.round((30 / e.dias) * 10) / 10 : 0;
+  return { dias: e.dias, tipo: e.tipo, veiculos, marcados, consultas_mes: Math.round(marcados * porMes), custo_mes_centavos: Math.round(marcados * porMes * (PRECOS[e.tipo] ?? 800)), precos: PRECOS };
+}
+
+function definirAutomatica(db, empresaId, { dias, tipo, veiculos }) {
+  const d = Number(dias ?? 0);
+  if (!FREQUENCIAS.includes(d)) throw new ErroNegocio('Escolha a frequência: desligada, semanal, quinzenal ou mensal.', 422);
+  const t = PRECOS[tipo] ? tipo : 'completa';
+  const ids = [...new Set((Array.isArray(veiculos) ? veiculos : []).map(Number).filter(Number.isInteger))];
+  db.prepare('UPDATE empresas SET multas_auto_dias = ?, multas_auto_tipo = ? WHERE id = ?').run(d, t, empresaId);
+  db.prepare('UPDATE veiculos SET multas_auto = 0 WHERE empresa_id = ?').run(empresaId);
+  if (ids.length) db.prepare(`UPDATE veiculos SET multas_auto = 1 WHERE empresa_id = ? AND id IN (${ids.map(() => '?').join(',')})`).run(empresaId, ...ids);
+  return automatica(db, empresaId);
+}
+
+/**
+ * Rodada da manutenção: de madrugada, consulta os carros escolhidos de cada empresa cuja última consulta passou da frequência,
+ * um por vez (cada consulta fica no histórico como "automática"). `forcar` (botão "Consultar agora") roda na hora os escolhidos.
+ */
 let rodando = false;
 async function rodada(db, { empresaId = null, forcar = false } = {}) {
-  // Manual (intervalo 0): só o "Consultar multas" e o "Consultar agora" (forcar) consultam.
-  if (!configurado() || rodando || (!forcar && intervaloDias(db) === 0)) return { configurado: configurado(), consultados: 0, novas: 0 };
+  if (!configurado() || rodando || (!forcar && !madrugada())) return { configurado: configurado(), consultados: 0, novas: 0 };
   rodando = true;
   try {
-    const corte = forcar ? agora() : new Date(Date.now() - intervaloMs(db)).toISOString();
-    const lista = db.prepare(`SELECT v.id, v.empresa_id, v.placa, v.renavam FROM veiculos v JOIN empresas e ON e.id = v.empresa_id
-      WHERE v.ativo = 1 AND e.status = 'ativa' ${empresaId ? 'AND v.empresa_id = ?' : ''} AND (v.multas_consulta_em IS NULL OR v.multas_consulta_em < ?)
-      ORDER BY v.multas_consulta_em LIMIT ?`).all(...[...(empresaId ? [empresaId] : []), corte, forcar ? 200 : POR_RODADA]);
+    const lista = db.prepare(`SELECT v.id, v.empresa_id, v.placa, v.renavam, e.multas_auto_dias AS dias, e.multas_auto_tipo AS tipo FROM veiculos v JOIN empresas e ON e.id = v.empresa_id
+      WHERE v.ativo = 1 AND v.multas_auto = 1 AND e.status = 'ativa' ${empresaId ? 'AND v.empresa_id = ?' : 'AND e.multas_auto_dias > 0'}
+      ORDER BY v.multas_consulta_em`).all(...(empresaId ? [empresaId] : []))
+      .filter((v) => forcar || !v.multas_consulta_em || Date.parse(v.multas_consulta_em) < Date.now() - v.dias * 86_400_000 + 3600_000)
+      .slice(0, forcar ? 200 : POR_RODADA);
     let novas = 0;
-    for (const veic of lista) {
-      try { novas += await consultarVeiculo(db, veic); } catch (err) { console.error(`[Rastreador] Consulta de multas (${veic.placa}): ${err.message}`); }
+    for (const v of lista) {
+      try {
+        const { id, pronto } = iniciarConsulta(db, { empresaId: v.empresa_id, placa: v.placa, renavam: v.renavam, forcar: true, tipo: v.tipo });
+        await pronto;
+        novas += consulta(db, id).resultado?.novas ?? 0;
+      } catch (err) { console.error(`[Rastreador] Consulta automática de multas (${v.placa}): ${err.message}`); }
     }
     return { configurado: true, consultados: lista.length, novas };
   } finally {
@@ -377,21 +400,11 @@ async function rodada(db, { empresaId = null, forcar = false } = {}) {
   }
 }
 
-/** Situação da consulta automática para a tela: ligada? última rodada? veículos consultados hoje? */
+/** Situação da consulta para a tela: ligada, fornecedor e a configuração automática da empresa. */
 function situacao(db, empresaId = null) {
-  const onde = empresaId ? 'AND empresa_id = ?' : '';
-  const p = empresaId ? [empresaId] : [];
-  const tot = db.prepare(`SELECT COUNT(*) AS n, SUM(multas_consulta_em >= ?) AS em_dia, MAX(multas_consulta_em) AS ultima FROM veiculos WHERE ativo = 1 ${onde}`)
-    .get(new Date(Date.now() - (intervaloMs(db) || 7 * 86_400_000)).toISOString(), ...p);
-  return { ligada: configurado(), fornecedor: FORNECEDOR(), homolog: HOMOLOG(), uf: UF(), intervalo_dias: intervaloDias(db), veiculos: tot.n, em_dia: tot.em_dia ?? 0, ultima: tot.ultima };
+  const a = empresaId ? automatica(db, empresaId) : null;
+  const tot = db.prepare(`SELECT COUNT(*) AS n, MAX(multas_consulta_em) AS ultima FROM veiculos WHERE ativo = 1 AND multas_auto = 1 ${empresaId ? 'AND empresa_id = ?' : ''}`).get(...(empresaId ? [empresaId] : []));
+  return { ligada: configurado(), fornecedor: FORNECEDOR(), homolog: HOMOLOG(), uf: UF(), intervalo_dias: a?.dias ?? 0, tipo: a?.tipo ?? null, veiculos: tot.n, em_dia: tot.n, ultima: tot.ultima };
 }
 
-/** O master escolhe o intervalo da consulta automática: 1 (diária), 7 (semanal) ou 15 (quinzenal). */
-function definirIntervalo(db, dias) {
-  const d = Number(dias);
-  if (![0, 1, 7, 15].includes(d)) throw new ErroNegocio('Escolha manual, diária, semanal ou quinzenal.', 422);
-  db.prepare('INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor').run('multas_consulta_dias', String(d));
-  return d;
-}
-
-module.exports = { lerResumida, lerRenainf, limparHistorico, iniciarConsulta, traduzirApiBrasil, definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };
+module.exports = { automatica, definirAutomatica, lerResumida, lerRenainf, limparHistorico, iniciarConsulta, traduzirApiBrasil, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };

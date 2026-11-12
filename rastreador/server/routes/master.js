@@ -511,16 +511,6 @@ module.exports = (db, extras = {}) => {
   const consultaMultas = require('../lib/multasConsulta');
   r.get('/multas/consultas', (req, res) => res.json({ ligada: consultaMultas.configurado(), automatica: consultaMultas.situacao(db),
     consultas: consultaMultas.historico(db, { limite: 50 }), veiculos: [] }));
-  r.put('/multas/intervalo', soMaster, (req, res) => {
-    const d = consultaMultas.definirIntervalo(db, req.body.dias);
-    registrar(db, req, 'multas_intervalo', { dias: d });
-    res.json({ intervalo_dias: d });
-  });
-  r.delete('/multas/consultas/limpar', (req, res) => {
-    const n = consultaMultas.limparHistorico(db);
-    registrar(db, req, 'multas_consultas_limpas', { apagadas: n });
-    res.json({ apagadas: n });
-  });
   r.get('/multas/consultas/:id', (req, res) => res.json(consultaMultas.consulta(db, nid(req))));
   r.post('/multas/consultar-placa', async (req, res, next) => {
     try {

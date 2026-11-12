@@ -6,7 +6,7 @@
 
 /** Central de multas: lista com resumo, cadastro com a notificação, detalhe com o cruzamento do rastreamento e a indicação do condutor. */
 import { api } from './api.js';
-import { el, limpar, toast, formModal, modal, confirmar, campo, area, escolha, etiqueta, placa, dinheiro, dataHora, data, kmh, centavos, reaisCampo, icone } from './ui.js';
+import { el, limpar, toast, formModal, modal, confirmar, campo, area, escolha, marcar, etiqueta, placa, dinheiro, dataHora, data, kmh, centavos, reaisCampo, icone } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone } from './comum.js';
 import { linkGoogle, configPublica } from './mapa.js';
 
@@ -81,7 +81,7 @@ export async function fichaMulta(m, { placaTxt, origem, condutor } = {}) {
   janela.document.getElementById('fechar')?.addEventListener('click', () => janela.close());
 }
 
-const INTERVALO = { 0: 'só quando alguém consultar (manual)', 1: 'todo dia', 7: 'uma vez por semana', 15: 'a cada 15 dias' };
+const INTERVALO = { 0: 'desligada', 1: 'todo dia', 7: 'uma vez por semana', 15: 'a cada 15 dias', 30: 'uma vez por mês' };
 const prazoTexto = (dias, data_) => (dias === null || dias === undefined ? '—' : dias < 0 ? `venceu (${data(data_)})` : dias === 0 ? 'hoje' : `${dias} dia(s) · ${data(data_)}`);
 const paraLocal = (iso) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 
@@ -267,14 +267,10 @@ async function telaConsultar(ctx, { master = false } = {}) {
     const a = d.automatica;
     limpar(situacaoEl, el('div', { class: `aviso-faixa ${d.ligada ? 'ok' : 'aviso'}`, style: 'padding:12px 14px;border-radius:12px;margin-bottom:14px;background:var(--surface-2)' },
       d.ligada
-        ? (a.intervalo_dias === 0
-          ? el('div', {}, el('strong', {}, `● Consulta ligada${a.fornecedor === 'apibrasil' ? ' à API Brasil' : ''} (${a.uf}), no modo manual${a.homolog ? ' — EM TESTE, dados de exemplo e sem cobrança' : ''}. `), 'Consulte um veículo quando quiser abaixo; as multas encontradas dos veículos da frota entram na central.')
-          : el('div', {}, el('strong', {}, `● Consulta automática ligada (DETRAN-${a.uf}). `), `O sistema consulta sozinho os veículos ativos ${INTERVALO[a.intervalo_dias]} (${a.em_dia} de ${a.veiculos} em dia${a.ultima ? `, a última em ${dataHora(a.ultima)}` : ''}). Multas novas entram na central e geram aviso.`))
-        : el('div', {}, el('strong', {}, '● Consulta aguardando o serviço. '), `Quando o serviço de consulta (DETRAN-${a.uf}) for contratado e ligado no servidor, esta consulta passa a funcionar${a.intervalo_dias ? ` e os veículos são consultados sozinhos ${INTERVALO[a.intervalo_dias]}` : ''}.`),
-      master ? el('div', { class: 'linha', style: 'gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap' }, el('span', { class: 'pequeno' }, 'Consultar cada veículo:'),
-        ...[[0, 'Manual'], [1, 'Diária'], [7, 'Semanal'], [15, 'Quinzenal']].map(([dias, rot]) => el('button', { type: 'button', class: `btn pequeno${a.intervalo_dias === dias ? ' primario' : ''}`, onclick: async () => {
-          await api.put('/master/multas/intervalo', { dias }); toast(dias ? `Consulta automática: ${rot.toLowerCase()}.` : 'Consulta manual: só quando alguém consultar.'); carregar();
-        } }, rot)), el('span', { class: 'pequeno mudo' }, 'manual: paga só as consultas feitas')) : null));
+        ? el('div', {}, el('strong', {}, `● Consulta ligada${a.fornecedor === 'apibrasil' ? ' à API Brasil' : ''} (${a.uf})${a.homolog ? ' — EM TESTE, dados de exemplo e sem cobrança' : ''}. `),
+          a.intervalo_dias ? `Automática ${INTERVALO[a.intervalo_dias]}, de madrugada, em ${a.veiculos} carro(s) escolhido(s)${a.ultima ? ` (última em ${dataHora(a.ultima)})` : ''}; e consulta na hora quando quiser, abaixo.`
+            : 'Consulte um veículo quando quiser abaixo; as multas dos veículos da frota entram na central.')
+        : el('div', {}, el('strong', {}, '● Consulta aguardando o serviço. '), 'Quando o serviço de consulta (DETRAN) for ligado no servidor, a consulta passa a funcionar.')));
     const temLixo = d.consultas.some((c) => c.erro || c.status === 'erro');
     limpar(historicoEl, cartao('Consultas feitas',
       podeConsultar ? el('div', { class: 'linha', style: 'justify-content:flex-end;margin:-6px 0 8px' }, botao('Limpar erros e testes', temLixo ? 'perigo' : '', async () => {
@@ -346,9 +342,43 @@ async function telaConsultar(ctx, { master = false } = {}) {
     el('div', { class: 'duas' }, inPlaca, inRenavam),
     selTipo,
     el('div', { class: 'linha', style: 'justify-content:flex-end' }, botaoConsultar));
+  // Consulta automática: o gestor escolhe os carros, a frequência e o tipo; roda de madrugada.
+  const autoEl = el('div');
+  async function desenharAuto() {
+    if (master) return;
+    const a = await api.get(`${base}/automatica`);
+    const checks = a.veiculos.map((v) => marcar(`${placa(v.placa)}${v.descricao ? ` · ${v.descricao}` : ''}${v.multas_consulta_em ? ` — última consulta ${dataHora(v.multas_consulta_em)}` : ''}`, { value: v.id, checked: Boolean(v.multas_auto) }));
+    const selDias = escolha('Frequência', 'dias', { 0: 'Desligada', 7: 'Semanal', 15: 'Quinzenal', 30: 'Mensal' }, a.dias);
+    const selT = escolha('Tipo de consulta', 'tipo', { completa: `Completa (R$ ${(a.precos.completa / 100).toFixed(2).replace('.', ',')})`, renainf: `Rápida — Renainf (R$ ${(a.precos.renainf / 100).toFixed(2).replace('.', ',')})`,
+      resumida: `Simples — resumida (R$ ${(a.precos.resumida / 100).toFixed(2).replace('.', ',')})` }, a.tipo);
+    const estimativa = el('p', { class: 'pequeno', style: 'margin:8px 0 0' });
+    const calcular = () => {
+      const n = checks.filter((c) => c.querySelector('input').checked).length;
+      const dias = Number(selDias.querySelector('select').value);
+      const preco = a.precos[selT.querySelector('select').value];
+      const porMes = dias ? 30 / dias : 0;
+      estimativa.textContent = dias && n ? `≈ ${Math.round(n * porMes)} consulta(s) por mês · custo estimado ${dinheiro(Math.round(n * porMes * preco))}/mês (de madrugada, entre 1h e 5h).` : dias ? 'Marque os carros que serão consultados.' : 'Desligada: só a consulta na hora, quando alguém pedir.';
+    };
+    [...checks.map((c) => c.querySelector('input')), selDias.querySelector('select'), selT.querySelector('select')].forEach((x) => x.addEventListener('change', calcular));
+    const todos = el('button', { type: 'button', class: 'btn pequeno', onclick: () => { const marcar_ = !checks.every((c) => c.querySelector('input').checked); checks.forEach((c) => { c.querySelector('input').checked = marcar_; }); calcular(); } }, 'Marcar / desmarcar todos');
+    calcular();
+    limpar(autoEl, cartao('Consulta automática',
+      el('p', { class: 'mudo', style: 'margin:0 0 12px' }, 'Escolha os carros que o sistema consulta sozinho, de madrugada. As multas novas entram na central e geram aviso.'),
+      el('div', { class: 'duas' }, selDias, selT),
+      el('div', { class: 'linha entre', style: 'margin:10px 0 6px;flex-wrap:wrap;gap:8px' }, el('strong', { class: 'pequeno' }, `Carros (${a.veiculos.length})`), podeConsultar ? todos : null),
+      a.veiculos.length ? el('div', { class: 'lista-marcar' }, checks) : el('p', { class: 'mudo' }, 'Nenhum veículo ativo.'),
+      estimativa,
+      podeConsultar ? el('div', { class: 'linha', style: 'justify-content:flex-end;margin-top:10px' }, botao('Salvar', 'primario', async () => {
+        const r2 = await api.put(`${base}/automatica`, { dias: Number(selDias.querySelector('select').value), tipo: selT.querySelector('select').value,
+          veiculos: checks.filter((c) => c.querySelector('input').checked).map((c) => Number(c.querySelector('input').value)) });
+        toast(r2.dias ? `Consulta automática salva: ${r2.marcados} carro(s), ${INTERVALO[r2.dias]}.` : 'Consulta automática desligada.');
+        carregar(); desenharAuto();
+      })) : null));
+  }
+  desenharAuto();
   ctx.conteudo.append(
     cartao('Consultar multas', el('p', { class: 'mudo', style: 'margin:0 0 12px' }, 'Veja na hora se um veículo tem multas ou algum apontamento (IPVA, licenciamento, restrição, roubo/furto). As multas dos veículos da frota entram sozinhas na central.'), form),
-    resultado, historicoEl);
+    resultado, autoEl, historicoEl);
 }
 
 export const TELAS_MULTAS = { multas: (ctx) => telaMultas(ctx), 'multas-consultar': (ctx) => telaConsultar(ctx) };
