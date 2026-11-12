@@ -238,7 +238,7 @@ async function telaConsultar(ctx, { master = false } = {}) {
         c = await api.get(`${base}/consultas/${ini.id}`);
         if (c.status !== 'consultando') break;
         texto.textContent = `Consultando ${ini.placa} no DETRAN, na prefeitura e no Renainf… ${Math.round((Date.now() - t0) / 1000)} s`;
-        if (Date.now() - t0 > 660_000) throw new Error('A consulta está demorando mais que o normal. O resultado aparece em "Consultas feitas" quando chegar.');
+        if (Date.now() - t0 > 330_000) throw new Error('A consulta está demorando mais que o normal. O resultado aparece em "Consultas feitas" quando chegar.');
       }
       if (c.status === 'erro') throw new Error(c.erro);
       limpar(resultado, resultadoConsulta(c.resultado));
