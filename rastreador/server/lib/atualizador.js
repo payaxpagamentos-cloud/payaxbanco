@@ -69,8 +69,13 @@ function aplicar(bufferZip) {
     fs.cpSync(path.join(RAIZ, 'public'), path.join(bkp, 'public'), { recursive: true });
 
     // Aplica SÓ server/ e public/ (nunca .env, data/ ou node_modules).
+    const gt06 = require('./servicoGt06');
+    const sit = gt06.ler();
+    const antes = sit?.arquivos ? gt06.digital(sit.arquivos) : null;
     fs.cpSync(path.join(base, 'server'), path.join(RAIZ, 'server'), { recursive: true });
     fs.cpSync(path.join(base, 'public'), path.join(RAIZ, 'public'), { recursive: true });
+    // Serviço GT06 separado: só reinicia (e os rastreadores reconectam) se o código que ele usa mudou.
+    if (antes && gt06.digital(sit.arquivos) !== antes) gt06.pedirReinicio();
 
     limparBackupsAntigos();
     return { versao: novaVersao, anterior };
@@ -85,8 +90,12 @@ function reverter() {
   if (!lista.length) throw new ErroNegocio('Não há backup guardado para reverter.', 400);
   const de = versaoAtual();
   const bkp = path.join(DIR_BACKUP, lista[0]);
+  const gt06 = require('./servicoGt06');
+  const sit = gt06.ler();
+  const antes = sit?.arquivos ? gt06.digital(sit.arquivos) : null;
   fs.cpSync(path.join(bkp, 'server'), path.join(RAIZ, 'server'), { recursive: true });
   fs.cpSync(path.join(bkp, 'public'), path.join(RAIZ, 'public'), { recursive: true });
+  if (antes && gt06.digital(sit.arquivos) !== antes) gt06.pedirReinicio();
   return { de, versao: versaoAtual() };
 }
 

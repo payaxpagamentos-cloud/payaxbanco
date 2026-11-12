@@ -16,7 +16,12 @@ require('./lib/licenca').exigir();
 
 const db = abrir();
 const extras = {};
-if (config.portaGt06 > 0) {
+// Com o serviço GT06 separado no ar, ele cuida dos rastreadores (e eles não caem quando o painel reinicia numa atualização).
+const servicoGt06 = require('./lib/servicoGt06');
+if (config.portaGt06 > 0 && servicoGt06.ativo()) {
+  extras.gt06 = servicoGt06.ponte();
+  console.log('[Rastreador] GT06: rastreadores atendidos pelo serviço separado (rastreador-gt06).');
+} else if (config.portaGt06 > 0) {
   extras.gt06 = iniciarGt06(db, config.portaGt06);
   extras.gt06.servidor.on('listening', () => console.log(`[Rastreador] GT06 (TCP): porta ${config.portaGt06}`));
   extras.gt06.servidor.on('error', (err) => console.error(`[Rastreador] Servidor GT06 não iniciou na porta ${config.portaGt06}: ${err.message}`));

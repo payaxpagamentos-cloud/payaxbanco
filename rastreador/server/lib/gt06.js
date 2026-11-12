@@ -269,6 +269,13 @@ function iniciarGt06(db, porta, { host } = {}) {
     servidor,
     conectados: () => conexoes.size,
     conectado: (imei) => conexoes.has(imei),
+    imeis: () => [...conexoes.keys()],
+    // Entrega os comandos pendentes dos aparelhos conectados (o painel cria o comando em outro processo e grava no banco).
+    entregarPendentes: () => {
+      const comPendente = db.prepare(`SELECT DISTINCT r.imei FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id
+        WHERE c.status = 'pendente' AND r.protocolo = 'gt06'`).all();
+      for (const { imei } of comPendente) if (conexoes.has(imei)) entregar(imei);
+    },
     fechar: () => new Promise((r) => { for (const cx of conexoes.values()) cx.socket.destroy(); servidor.close(r); }),
   };
 }

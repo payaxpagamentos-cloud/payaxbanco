@@ -14,7 +14,8 @@
     "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/seed.js",
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
     "empacotar": "node scripts/empacotar.js",
-    "simular": "node scripts/simular-j16.js"
+    "simular": "node scripts/simular-j16.js",
+    "gt06": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/gt06-servico.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
