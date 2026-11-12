@@ -59,6 +59,7 @@ const extrato = (db, empresaId, limite = 50) => db.prepare(`SELECT c.id, c.tipo,
   FROM multas_creditos c LEFT JOIN usuarios u ON u.id = c.usuario_id WHERE c.empresa_id = ? ORDER BY c.id DESC LIMIT ${Number(limite)}`).all(empresaId);
 
 // ---------- PIX ----------
+const cobranca = (db, id) => db.prepare('SELECT p.*, e.nome AS empresa FROM pix_cobrancas p JOIN empresas e ON e.id = p.empresa_id WHERE p.id = ?').get(Number(id));
 const pixConfigurado = (db) => Boolean(lerConfig(db).pix_chave);
 
 function criarPix(db, empresaId, valorCentavos, usuarioId) {
@@ -73,7 +74,6 @@ function criarPix(db, empresaId, valorCentavos, usuarioId) {
   db.prepare('UPDATE pix_cobrancas SET txid = ?, copia_cola = ? WHERE id = ?').run(txid, codigo, id);
   return cobranca(db, id);
 }
-const cobranca = (db, id) => db.prepare('SELECT p.*, e.nome AS empresa FROM pix_cobrancas p JOIN empresas e ON e.id = p.empresa_id WHERE p.id = ?').get(Number(id));
 
 function informarPix(db, empresaId, id) {
   const c = cobranca(db, id);
