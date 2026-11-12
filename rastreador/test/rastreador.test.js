@@ -558,12 +558,17 @@ test('Rastreador', async (t) => {
       assert.equal((await api.get(`${base()}/multas/consultas/${forcada.dados.id}`, cliente)).dados.resultado.multas[0].na_central, true, 'segunda vez: já na central');
       const hist = (await api.get(`${base()}/multas/consultas`, operador)).dados;
       assert.equal(hist.ligada, true);
-      assert.equal(hist.automatica.intervalo_dias, 0, 'manual por padrão');
+      assert.equal(hist.automatica.intervalo_dias, 0, 'automática desligada por padrão');
       assert.equal(hist.automatica.uf, 'SP');
-      assert.equal((await api.put('/master/multas/intervalo', { dias: 3 }, master)).status, 422);
-      assert.equal((await api.put('/master/multas/intervalo', { dias: 15 }, master)).dados.intervalo_dias, 15);
-      assert.equal((await api.get(`${base()}/multas/consultas`, cliente)).dados.automatica.intervalo_dias, 15);
-      assert.equal((await api.put('/master/multas/intervalo', { dias: 0 }, master)).status, 200);
+      // Consulta automática: o gestor escolhe os carros, a frequência e o tipo; a estimativa de custo acompanha.
+      assert.equal((await api.put(`${base()}/multas/automatica`, { dias: 3, veiculos: [] }, cliente)).status, 422);
+      assert.equal((await api.put(`${base()}/multas/automatica`, { dias: 7, tipo: 'renainf', veiculos: [veiculo] }, operador)).status, 403);
+      const au = (await api.put(`${base()}/multas/automatica`, { dias: 7, tipo: 'renainf', veiculos: [veiculo] }, cliente)).dados;
+      assert.equal(au.marcados, 1);
+      assert.equal(au.consultas_mes, 4);
+      assert.equal(au.custo_mes_centavos, Math.round(4.3 * 345), 'cerca de 4,3 consultas por mês a R$ 3,45');
+      assert.equal((await api.get(`${base()}/multas/automatica`, operador)).dados.veiculos.find((x) => x.id === veiculo).multas_auto, 1);
+      assert.equal((await api.put(`${base()}/multas/automatica`, { dias: 0, veiculos: [] }, cliente)).dados.marcados, 0);
       assert.ok(hist.consultas.length >= 2);
       assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, operador)).status, 403, 'operador não consulta');
       // A fonte fora do ar (504) duas vezes e depois responde: o sistema tenta de novo sozinho.

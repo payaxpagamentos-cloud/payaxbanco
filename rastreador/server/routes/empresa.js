@@ -896,6 +896,13 @@ module.exports = (db, extras = {}) => {
     registrar(db, req, 'multas_consultas_limpas', { apagadas: n });
     res.json({ apagadas: n });
   });
+  // Consulta automática: os carros escolhidos, a frequência e o tipo (roda de madrugada).
+  r.get('/multas/automatica', (req, res) => res.json(consultaMultas.automatica(db, eid(req))));
+  r.put('/multas/automatica', gestor, (req, res) => {
+    const a = consultaMultas.definirAutomatica(db, eid(req), req.body);
+    registrar(db, req, 'multas_automatica', { dias: a.dias, tipo: a.tipo, carros: a.marcados });
+    res.json(a);
+  });
   r.get('/multas/consultas/:id', (req, res) => res.json(consultaMultas.consulta(db, nid(req), { empresaId: eid(req) })));
   r.post('/multas/consultar-placa', gestor, async (req, res, next) => {
     try {
@@ -929,6 +936,7 @@ module.exports = (db, extras = {}) => {
   r.post('/multas/consultar', gestor, async (req, res, next) => {
     try {
       v.exigir(consultaMultas.configurado(), 'A consulta automática ainda não foi ligada: falta contratar o serviço de consulta de multas.');
+      v.exigir(db.prepare('SELECT 1 FROM veiculos WHERE empresa_id = ? AND ativo = 1 AND multas_auto = 1').get(eid(req)), 'Escolha os carros da consulta automática em Consultar multas.');
       res.json(await consultaMultas.rodada(db, { empresaId: eid(req), forcar: true }));
     } catch (err) { next(err); }
   });

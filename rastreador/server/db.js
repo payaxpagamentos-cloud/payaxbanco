@@ -780,9 +780,10 @@ function abrir(arquivo = config.dbFile) {
 function migrar(db) {
   const colunas = (t) => new Set(db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name));
   const NOVAS = {
-    veiculos: { renavam: 'TEXT', multas_consulta_em: 'TEXT', teste_bloqueio_ok: 'INTEGER', teste_bloqueio_em: 'TEXT', consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
+    veiculos: { multas_auto: 'INTEGER NOT NULL DEFAULT 0', renavam: 'TEXT', multas_consulta_em: 'TEXT', teste_bloqueio_ok: 'INTEGER', teste_bloqueio_em: 'TEXT', consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
     empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0',
-      plano_nome: 'TEXT', plano_valor_centavos: 'INTEGER', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT' },
+      plano_nome: 'TEXT', plano_valor_centavos: 'INTEGER', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT',
+      multas_auto_dias: 'INTEGER NOT NULL DEFAULT 0', multas_auto_tipo: "TEXT NOT NULL DEFAULT 'completa'" },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
     motoristas: { senha_hash: 'TEXT', app_ultimo_acesso: 'TEXT' },
     rastreadores: { rele_invertido: 'INTEGER NOT NULL DEFAULT 0', sinal_gsm: 'INTEGER', firmware: 'TEXT', perfil: "TEXT NOT NULL DEFAULT 'padrao'", saude: 'TEXT', saude_em: 'TEXT' },
