@@ -21,8 +21,12 @@ const { ErroNegocio } = require('./erros');
 const multas = require('./multas');
 const { avisar } = require('./notificacoes');
 
-const URL_SERVICO = () => process.env.RASTREADOR_MULTAS_URL || '';
+// Fornecedor: "apibrasil" (API Brasil · Débitos V4) ou "generico" (o formato do adaptador abaixo, com RASTREADOR_MULTAS_URL).
+const FORNECEDOR = () => (process.env.RASTREADOR_MULTAS_FORNECEDOR || (process.env.RASTREADOR_MULTAS_URL ? 'generico' : 'apibrasil')).toLowerCase();
+const URL_SERVICO = () => process.env.RASTREADOR_MULTAS_URL || (FORNECEDOR() === 'apibrasil' ? 'https://gateway.apibrasil.io/api/v2/consulta/veiculos/credits' : '');
 const CHAVE = () => process.env.RASTREADOR_MULTAS_CHAVE || '';
+// Homologação da API Brasil: responde com dados de exemplo e não cobra (para testar a ligação).
+const HOMOLOG = () => process.env.RASTREADOR_MULTAS_HOMOLOG === '1';
 const configurado = () => Boolean(URL_SERVICO() && CHAVE());
 const POR_RODADA = 10; // veículos por minuto (o serviço cobra por consulta e tem limite de pedidos)
 const intervaloDias = (db) => ([0, 1, 7, 15].includes(lerConfig(db).multas_consulta_dias) ? lerConfig(db).multas_consulta_dias : 0);
@@ -46,6 +50,37 @@ const traduzirApontamento = (x) => {
   return { tipo: String(x.tipo ?? 'apontamento'), descricao: String(x.descricao ?? x.tipo ?? ''), valor_centavos: Number.isFinite(valor) ? valor : null, situacao: x.situacao ?? null };
 };
 
+/**
+ * API Brasil (Débitos V4, tipo "debitos-v4"): data.debitosMultas.ocorrencia[] com dataHoraMulta, dataVencimento, descricao, fonte,
+ * identificador, local, uf, valor; e totais de IPVA, licenciamento, DPVAT, outros e as restrições. O erro vem com HTTP 200 e error=true.
+ */
+function traduzirApiBrasil(j) {
+  if (j?.error) throw new ErroNegocio(`API Brasil: ${j.message || 'a consulta falhou'}.`, 502);
+  const d = j?.data ?? {};
+  const listaMultas = d.debitosMultas?.ocorrencia ?? [];
+  const hora = (x) => (x ? `${String(x).replace(' ', 'T')}${String(x).length <= 16 ? ':00' : ''}-03:00` : null);
+  const multas = listaMultas.map((m) => ({
+    auto_infracao: m.identificador ?? null, orgao: m.fonte ?? null, infracao_codigo: null, descricao: m.descricao || 'Infração de trânsito', gravidade: null, pontos: null,
+    valor_centavos: Number.isFinite(Number(m.valor)) ? Math.round(Number(m.valor) * 100) : null, ocorrida_em: hora(m.dataHoraMulta), local_texto: m.local ?? null,
+    municipio: m.uf ? `(${m.uf})` : null, prazo_indicacao: null, vencimento: m.dataVencimento ?? null,
+  }));
+  const apontamentos = [];
+  const total = (blk, tipo, rot) => {
+    const v = Number(blk?.totalDebito ?? 0);
+    const itens = Array.isArray(blk?.ocorrencia) ? blk.ocorrencia : [];
+    if (itens.length) for (const it of itens) apontamentos.push({ tipo, descricao: it.descricao ?? it.exercicio ?? rot, valor_centavos: Number.isFinite(Number(it.valor)) ? Math.round(Number(it.valor) * 100) : null, situacao: it.situacao ?? 'em aberto' });
+    else if (v > 0) apontamentos.push({ tipo, descricao: rot, valor_centavos: Math.round(v * 100), situacao: 'em aberto' });
+  };
+  total(d.debitosIPVA, 'ipva', 'IPVA em aberto');
+  total(d.debitosLicenciamento, 'licenciamento', 'Licenciamento em aberto');
+  total(d.debitosDPVAT, 'dpvat', 'DPVAT em aberto');
+  total(d.outrosDebitos, 'outros', 'Outros débitos');
+  const restr = d.restricoes;
+  if (Array.isArray(restr)) for (const r of restr) apontamentos.push({ tipo: 'restricao', descricao: typeof r === 'string' ? r : (r.descricao ?? r.tipo ?? JSON.stringify(r)), valor_centavos: null, situacao: r.situacao ?? 'ativa' });
+  else if (restr && typeof restr === 'object') for (const [k, val] of Object.entries(restr)) if (val && val !== 'NADA CONSTA') apontamentos.push({ tipo: 'restricao', descricao: `${k}: ${typeof val === 'string' ? val : JSON.stringify(val)}`, valor_centavos: null, situacao: 'ativa' });
+  return { multas, apontamentos, custo: j.valor_consulta ?? null, homolog: Boolean(j.homolog) };
+}
+
 /** Pergunta ao serviço contratado: devolve { multas, apontamentos } já traduzidos. */
 async function perguntar(placa, renavam) {
   if (!configurado()) throw new ErroNegocio('A consulta de multas ainda não foi ligada: falta contratar o serviço de consulta (DETRAN/SENATRAN).', 422);
@@ -53,13 +88,17 @@ async function perguntar(placa, renavam) {
   try {
     r = await fetch(URL_SERVICO(), {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${CHAVE()}` },
-      body: JSON.stringify({ placa, renavam: renavam || undefined, uf: UF() }), signal: AbortSignal.timeout(25_000),
+      body: JSON.stringify(FORNECEDOR() === 'apibrasil' ? { tipo: 'debitos-v4', placa, homolog: HOMOLOG() } : { placa, renavam: renavam || undefined, uf: UF() }),
+      signal: AbortSignal.timeout(40_000),
     });
   } catch (err) {
     throw new ErroNegocio(`O serviço de consulta de multas não respondeu (${err.name === 'TimeoutError' ? 'demorou demais' : 'sem conexão'}). Tente de novo.`, 502);
   }
+  if (r.status === 402) throw new ErroNegocio('Sem saldo no serviço de consulta de multas: recarregue a conta (API Brasil → Recarregar).', 402);
+  if (r.status === 401 || r.status === 403) throw new ErroNegocio('A chave do serviço de consulta de multas foi recusada: confira o token no .env do servidor.', 502);
   if (!r.ok) throw new ErroNegocio(`O serviço de consulta de multas recusou o pedido (${r.status}).`, 502);
   const j = await r.json().catch(() => ({}));
+  if (FORNECEDOR() === 'apibrasil') return traduzirApiBrasil(j);
   return { multas: (j.multas ?? []).map(traduzir), apontamentos: (j.apontamentos ?? []).map(traduzirApontamento) };
 }
 
@@ -83,6 +122,7 @@ function importar(db, empresaId, placa, lista, { avisarNovas = true } = {}) {
 
 async function consultarVeiculo(db, veic) {
   const r = await perguntar(veic.placa, veic.renavam);
+  if (r.homolog) return 0;
   const { novas } = importar(db, veic.empresa_id, veic.placa, r.multas);
   db.prepare('UPDATE veiculos SET multas_consulta_em = ? WHERE id = ?').run(agora(), veic.id);
   return novas;
@@ -108,9 +148,10 @@ async function consultarPlaca(db, { empresaId = null, placa, renavam, usuarioId 
     reg({ erro: err.message });
     throw err;
   }
-  const imp = veic ? importar(db, veic.empresa_id, p, r.multas) : { novas: 0, resultado: r.multas.map((m) => ({ ...m, na_central: false, nova: false })) };
+  // Em teste (homologação) os dados são de exemplo: nunca entram na central.
+  const imp = veic && !r.homolog ? importar(db, veic.empresa_id, p, r.multas) : { novas: 0, resultado: r.multas.map((m) => ({ ...m, na_central: false, nova: false })) };
   if (veic) db.prepare('UPDATE veiculos SET multas_consulta_em = ? WHERE id = ?').run(agora(), veic.id);
-  const resultado = { placa: p, veiculo_da_frota: Boolean(veic), multas: imp.resultado, apontamentos: r.apontamentos, novas: imp.novas, consultado_em: agora() };
+  const resultado = { placa: p, veiculo_da_frota: Boolean(veic), multas: imp.resultado, apontamentos: r.apontamentos, novas: imp.novas, consultado_em: agora(), custo: r.custo ?? null, homolog: r.homolog ?? false };
   const id = reg({ multas: r.multas.length, apontamentos: r.apontamentos.length, novas: imp.novas, resultado });
   return { id: Number(id), ...resultado };
 }
@@ -153,7 +194,7 @@ function situacao(db, empresaId = null) {
   const p = empresaId ? [empresaId] : [];
   const tot = db.prepare(`SELECT COUNT(*) AS n, SUM(multas_consulta_em >= ?) AS em_dia, MAX(multas_consulta_em) AS ultima FROM veiculos WHERE ativo = 1 ${onde}`)
     .get(new Date(Date.now() - (intervaloMs(db) || 7 * 86_400_000)).toISOString(), ...p);
-  return { ligada: configurado(), uf: UF(), intervalo_dias: intervaloDias(db), veiculos: tot.n, em_dia: tot.em_dia ?? 0, ultima: tot.ultima };
+  return { ligada: configurado(), fornecedor: FORNECEDOR(), homolog: HOMOLOG(), uf: UF(), intervalo_dias: intervaloDias(db), veiculos: tot.n, em_dia: tot.em_dia ?? 0, ultima: tot.ultima };
 }
 
 /** O master escolhe o intervalo da consulta automática: 1 (diária), 7 (semanal) ou 15 (quinzenal). */
@@ -164,4 +205,4 @@ function definirIntervalo(db, dias) {
   return d;
 }
 
-module.exports = { definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };
+module.exports = { traduzirApiBrasil, definirIntervalo, configurado, rodada, traduzir, consultarPlaca, historico, consulta, situacao, importar };

@@ -170,12 +170,14 @@ function resultadoConsulta(r) {
   return el('div', { class: 'coluna', style: 'gap:12px' },
     el('div', { class: 'linha entre', style: 'flex-wrap:wrap;gap:8px' },
       el('div', {}, el('strong', { style: 'font-size:20px' }, placa(r.placa)), el('div', { class: 'pequeno mudo' }, `Consultado em ${dataHora(r.consultado_em)}${r.veiculo_da_frota ? ' · veículo da frota' : ' · fora da frota'}`)),
-      nada ? etiqueta('Nada consta', 'ok') : etiqueta(`${r.multas.length} multa(s) · ${r.apontamentos.length} apontamento(s)`, 'erro')),
+      el('div', { class: 'linha', style: 'gap:6px;flex-wrap:wrap' }, r.homolog ? etiqueta('TESTE · dados de exemplo, sem cobrança', 'info') : null,
+        r.custo ? etiqueta(`custo: R$ ${r.custo}`, '') : null,
+        nada ? etiqueta('Nada consta', 'ok') : etiqueta(`${r.multas.length} multa(s) · ${r.apontamentos.length} apontamento(s)`, 'erro'))),
     nada ? el('div', { class: 'cartao', style: 'text-align:center;padding:22px' }, el('div', { style: 'font-size:34px' }, '✅'), el('strong', {}, 'Nenhuma multa e nenhum apontamento para esta placa.')) : null,
     r.multas.length ? cartao(`Multas (${r.multas.length})`, tabela(['Data', 'Infração', '>Valor', '^Central'], r.multas.map((m) => el('tr', {},
       td(m.ocorrida_em ? dataHora(m.ocorrida_em) : '—'), td([m.descricao, el('div', { class: 'pequeno mudo' }, [m.auto_infracao, m.orgao, m.gravidade ? GRAV[m.gravidade] : null].filter(Boolean).join(' · '))]),
       td(m.valor_centavos !== null ? dinheiro(m.valor_centavos) : '—', 'dir num'),
-      td(m.nova ? etiqueta('nova · adicionada', 'aviso') : m.na_central ? etiqueta('já na central', 'ok') : etiqueta(r.veiculo_da_frota ? 'não adicionada' : 'fora da frota', ''), 'centro'))))) : null,
+      td(m.nova ? etiqueta('nova · adicionada', 'aviso') : m.na_central ? etiqueta('já na central', 'ok') : etiqueta(r.homolog ? 'teste' : r.veiculo_da_frota ? 'não adicionada' : 'fora da frota', ''), 'centro'))))) : null,
     r.apontamentos.length ? cartao(`Apontamentos (${r.apontamentos.length})`, tabela(['Tipo', 'Descrição', '>Valor', 'Situação'], r.apontamentos.map((a) => el('tr', {},
       td(el('strong', {}, TIPO_APONT[a.tipo] ?? a.tipo)), td(a.descricao || '—'), td(a.valor_centavos !== null ? dinheiro(a.valor_centavos) : '—', 'dir num'), td(a.situacao ?? '—'))))) : null);
 }
@@ -192,7 +194,7 @@ async function telaConsultar(ctx, { master = false } = {}) {
     limpar(situacaoEl, el('div', { class: `aviso-faixa ${d.ligada ? 'ok' : 'aviso'}`, style: 'padding:12px 14px;border-radius:12px;margin-bottom:14px;background:var(--surface-2)' },
       d.ligada
         ? (a.intervalo_dias === 0
-          ? el('div', {}, el('strong', {}, `● Consulta ligada ao DETRAN-${a.uf}, no modo manual. `), 'Consulte um veículo quando quiser abaixo; as multas encontradas dos veículos da frota entram na central.')
+          ? el('div', {}, el('strong', {}, `● Consulta ligada${a.fornecedor === 'apibrasil' ? ' à API Brasil' : ''} (${a.uf}), no modo manual${a.homolog ? ' — EM TESTE, dados de exemplo e sem cobrança' : ''}. `), 'Consulte um veículo quando quiser abaixo; as multas encontradas dos veículos da frota entram na central.')
           : el('div', {}, el('strong', {}, `● Consulta automática ligada (DETRAN-${a.uf}). `), `O sistema consulta sozinho os veículos ativos ${INTERVALO[a.intervalo_dias]} (${a.em_dia} de ${a.veiculos} em dia${a.ultima ? `, a última em ${dataHora(a.ultima)}` : ''}). Multas novas entram na central e geram aviso.`))
         : el('div', {}, el('strong', {}, '● Consulta aguardando o serviço. '), `Quando o serviço de consulta (DETRAN-${a.uf}) for contratado e ligado no servidor, esta consulta passa a funcionar${a.intervalo_dias ? ` e os veículos são consultados sozinhos ${INTERVALO[a.intervalo_dias]}` : ''}.`),
       master ? el('div', { class: 'linha', style: 'gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap' }, el('span', { class: 'pequeno' }, 'Consultar cada veículo:'),
