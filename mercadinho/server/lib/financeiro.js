@@ -2,7 +2,7 @@
 
 const { agora, transacao } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('./erros');
-const { hoje, somarDias, diasDaCompetencia, intervalo, competencia: competenciaDe } = require('./datas');
+const { hoje, somarDias, diasDaCompetencia, intervalo, deslocamentoSql, competencia: competenciaDe } = require('./datas');
 
 const CATEGORIAS = ['Mercadorias', 'Conta de morador', 'Cartão', 'Energia', 'Água', 'Internet e telefone', 'Rateio do condomínio',
   'Manutenção', 'Pessoal', 'Impostos e taxas', 'Embalagens', 'Outros'];
@@ -101,9 +101,9 @@ function resumo(db) {
  */
 function fluxo(db, { de, ate }) {
   const [inicio, fim] = intervalo(de, ate);
-  const vendas = db.prepare(`SELECT date(v.fechada_em) AS dia, COALESCE(SUM(pg.valor_centavos - pg.troco_centavos), 0) AS total
+  const vendas = db.prepare(`SELECT date(v.fechada_em, ?) AS dia, COALESCE(SUM(pg.valor_centavos - pg.troco_centavos), 0) AS total
     FROM pagamentos pg JOIN vendas v ON v.id = pg.venda_id
-    WHERE v.status = 'paga' AND pg.forma IN ('dinheiro','pix') AND v.fechada_em >= ? AND v.fechada_em < ? GROUP BY dia`).all(inicio, fim);
+    WHERE v.status = 'paga' AND pg.forma IN ('dinheiro','pix') AND v.fechada_em >= ? AND v.fechada_em < ? GROUP BY dia`).all(deslocamentoSql(), inicio, fim);
   const recebidos = db.prepare(`SELECT pago_em AS dia, COALESCE(SUM(pago_centavos), 0) AS total FROM lancamentos
     WHERE tipo = 'receber' AND status = 'pago' AND pago_em BETWEEN ? AND ? GROUP BY dia`).all(de, ate);
   const pagos = db.prepare(`SELECT pago_em AS dia, COALESCE(SUM(pago_centavos), 0) AS total FROM lancamentos

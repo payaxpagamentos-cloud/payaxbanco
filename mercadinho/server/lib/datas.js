@@ -47,4 +47,18 @@ function inicioDia(data) {
 /** Intervalo [início, fim) em ISO UTC dos dias locais de..até (inclusive). */
 const intervalo = (de, ate) => [inicioDia(de), inicioDia(somarDias(ate, 1))];
 
-module.exports = { local, hoje, competencia, somarDias, somarMeses, diasDaCompetencia, inicioDia, intervalo };
+/**
+ * Modificador do SQLite que converte um carimbo UTC para a hora local do mercadinho,
+ * para date() e strftime() agruparem pelo dia certo (ex.: '-180 minutes').
+ * O Brasil não usa horário de verão, então o deslocamento do momento vale para o período todo.
+ */
+function deslocamentoSql(instante = new Date()) {
+  const base = new Date(instante);
+  base.setMilliseconds(0);
+  const l = local(base);
+  const comoUtc = Date.UTC(Number(l.data.slice(0, 4)), Number(l.data.slice(5, 7)) - 1, Number(l.data.slice(8, 10)), l.hora, l.minuto, l.segundo);
+  const minutos = Math.round((comoUtc - base.getTime()) / 60_000);
+  return `${minutos >= 0 ? '+' : '-'}${Math.abs(minutos)} minutes`;
+}
+
+module.exports = { local, hoje, competencia, somarDias, somarMeses, diasDaCompetencia, inicioDia, intervalo, deslocamentoSql };

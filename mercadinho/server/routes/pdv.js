@@ -88,17 +88,15 @@ module.exports = (db, { gestao }) => {
   });
 
   r.post('/vendas/:id/cancelar', (req, res) => {
-    const venda = db.prepare('SELECT status FROM vendas WHERE id = ?').get(req.params.id);
-    // Cancelar uma venda já paga mexe em estoque e dinheiro: só a gestão pode.
-    const finalizar = () => {
-      const cancelada = vendas.cancelar(db, idDaRota(req), { motivo: v.texto(req.body.motivo, 'o motivo', 300), usuario_id: req.usuario.id });
-      registrar(db, req, 'venda_cancelada', `#${cancelada.id}: ${req.body.motivo}`);
-      res.json(cancelada);
-    };
+    const id = idDaRota(req);
+    const venda = db.prepare('SELECT status FROM vendas WHERE id = ?').get(id);
+    // Cancelar uma venda já paga mexe em estoque e em dinheiro: só a gestão pode.
     if (venda?.status === 'paga' && !['admin', 'gerente'].includes(req.usuario.perfil)) {
       throw new ErroNegocio('Só a gestão pode cancelar uma venda já finalizada.', 403);
     }
-    finalizar();
+    const cancelada = vendas.cancelar(db, id, { motivo: v.texto(req.body.motivo, 'o motivo', 300), usuario_id: req.usuario.id });
+    registrar(db, req, 'venda_cancelada', `#${cancelada.id}: ${cancelada.motivo_cancelamento}`);
+    res.json(cancelada);
   });
 
   /** PIX "copia e cola" com o valor que falta na venda, e o QR Code em imagem. */

@@ -397,3 +397,31 @@ test('PIX copia e cola com o valor da venda', async (t) => {
   assert.match(pix.dados.copia_e_cola, /54049\.00/);
   assert.match(pix.dados.qrcode, /^data:image\/png;base64,/);
 });
+
+test('relatório diário respeita o fuso do mercadinho (venda da noite não vai para o dia seguinte)', async (t) => {
+  const app = await iniciar();
+  t.after(() => app.fechar());
+  const admin = await app.login();
+  const agua = await produto(app, admin, { nome: 'Água com gás 500ml', preco: '4,00', custo: '2,00', estoque: '20' });
+  await app.post('/caixa/abrir', { abertura: '0,00' }, admin);
+
+  const venda = (await app.post('/pdv/venda', {}, admin)).dados;
+  await app.post(`/pdv/vendas/${venda.id}/itens`, { produto_id: agua.id, quantidade: 2 }, admin);
+  await app.post(`/pdv/vendas/${venda.id}/finalizar`, { pagamentos: [{ forma: 'dinheiro', valor: '8,00' }] }, admin);
+
+  // 12/11 às 01:30 UTC é 11/11 às 22:30 em São Paulo: a venda é do dia 11.
+  app.db.prepare("UPDATE vendas SET criada_em = ?, fechada_em = ? WHERE id = ?")
+    .run('2026-11-12T01:30:00.000Z', '2026-11-12T01:30:00.000Z', venda.id);
+
+  const noDia11 = await app.get('/relatorios/vendas?de=2026-11-11&ate=2026-11-11', admin);
+  assert.equal(noDia11.dados.vendas, 1);
+  assert.equal(noDia11.dados.por_dia[0].dia, '2026-11-11');
+  assert.equal(noDia11.dados.por_hora[0].hora, 22);
+
+  const noDia12 = await app.get('/relatorios/vendas?de=2026-11-12&ate=2026-11-12', admin);
+  assert.equal(noDia12.dados.vendas, 0);
+
+  // O fluxo de caixa agrupa pelo mesmo dia local.
+  const fluxo = await app.get('/financeiro/fluxo?de=2026-11-01&ate=2026-11-30', admin);
+  assert.equal(fluxo.dados.dias.find((d) => d.dia === '2026-11-11')?.vendas, 800);
+});

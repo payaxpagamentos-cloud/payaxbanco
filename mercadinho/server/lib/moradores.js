@@ -2,7 +2,7 @@
 
 const { agora, lerConfig, transacao } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('./erros');
-const { hoje, competencia: competenciaDe, somarMeses, diasDaCompetencia } = require('./datas');
+const { hoje, competencia: competenciaDe, somarMeses, diasDaCompetencia, deslocamentoSql } = require('./datas');
 
 /** Saldo da conta: positivo o morador deve, negativo tem crédito. */
 const saldo = (db, morador_id) => db.prepare('SELECT COALESCE(SUM(valor_centavos), 0) AS saldo FROM conta_morador WHERE morador_id = ?').get(morador_id).saldo;
@@ -86,16 +86,17 @@ function fecharCompetencia(db, competencia, usuario_id) {
   const [inicio, fim] = diasDaCompetencia(competencia);
   const vencimento = `${somarMeses(competencia, 1)}-${String(cfg.vencimento_fatura_dia).padStart(2, '0')}`;
   return transacao(db, () => {
+    const fuso = deslocamentoSql();
     const linhas = db.prepare(`SELECT morador_id, COUNT(*) AS compras, SUM(valor_centavos) AS total FROM conta_morador
-      WHERE tipo IN ('compra','estorno') AND fatura_id IS NULL AND date(criado_em) BETWEEN ? AND ? AND morador_id IS NOT NULL
-      GROUP BY morador_id HAVING total > 0`).all(inicio, fim);
+      WHERE tipo IN ('compra','estorno') AND fatura_id IS NULL AND date(criado_em, ?) BETWEEN ? AND ? AND morador_id IS NOT NULL
+      GROUP BY morador_id HAVING total > 0`).all(fuso, inicio, fim);
     const criadas = [];
     for (const l of linhas) {
       if (db.prepare('SELECT 1 FROM faturas WHERE morador_id = ? AND competencia = ?').get(l.morador_id, competencia)) continue;
       const id = Number(db.prepare(`INSERT INTO faturas (morador_id, competencia, compras, valor_centavos, vencimento, criada_em, criada_por)
         VALUES (?, ?, ?, ?, ?, ?, ?)`).run(l.morador_id, competencia, l.compras, l.total, vencimento, agora(), usuario_id).lastInsertRowid);
       db.prepare(`UPDATE conta_morador SET fatura_id = ? WHERE morador_id = ? AND fatura_id IS NULL AND tipo IN ('compra','estorno')
-        AND date(criado_em) BETWEEN ? AND ?`).run(id, l.morador_id, inicio, fim);
+        AND date(criado_em, ?) BETWEEN ? AND ?`).run(id, l.morador_id, fuso, inicio, fim);
       const m = db.prepare('SELECT nome, bloco, unidade FROM moradores WHERE id = ?').get(l.morador_id);
       db.prepare(`INSERT INTO lancamentos (tipo, descricao, categoria, morador_id, fatura_id, valor_centavos, vencimento, criado_em, criado_por)
         VALUES ('receber', ?, 'Conta de morador', ?, ?, ?, ?, ?, ?)`)
@@ -129,7 +130,7 @@ function receber(db, morador_id, { valor_centavos, forma = 'dinheiro', observaca
 const consumoDoMes = (db, morador_id, competencia = competenciaDe()) => {
   const [inicio, fim] = diasDaCompetencia(competencia);
   return db.prepare(`SELECT COUNT(*) AS compras, COALESCE(SUM(valor_centavos), 0) AS total_centavos FROM conta_morador
-    WHERE morador_id = ? AND tipo = 'compra' AND date(criado_em) BETWEEN ? AND ?`).get(morador_id, inicio, fim);
+    WHERE morador_id = ? AND tipo = 'compra' AND date(criado_em, ?) BETWEEN ? AND ?`).get(morador_id, deslocamentoSql(), inicio, fim);
 };
 
 module.exports = { listar, obter, criar, atualizar, saldo, limiteDe, lancar, conferirLimite, extrato, faturas, fecharCompetencia, receber, consumoDoMes };

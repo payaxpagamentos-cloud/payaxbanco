@@ -1,18 +1,19 @@
 'use strict';
 
-const { intervalo } = require('./datas');
+const { intervalo, deslocamentoSql } = require('./datas');
 
 /** Vendas do período: totais, ticket médio e a série por dia. */
 function vendas(db, { de, ate }) {
   const [inicio, fim] = intervalo(de, ate);
   const total = db.prepare(`SELECT COUNT(*) AS vendas, COALESCE(SUM(total_centavos), 0) AS total, COALESCE(SUM(custo_centavos), 0) AS custo,
     COALESCE(SUM(desconto_centavos), 0) AS descontos FROM vendas WHERE status = 'paga' AND fechada_em >= ? AND fechada_em < ?`).get(inicio, fim);
-  const porDia = db.prepare(`SELECT date(fechada_em) AS dia, COUNT(*) AS vendas, COALESCE(SUM(total_centavos), 0) AS total,
-    COALESCE(SUM(custo_centavos), 0) AS custo FROM vendas WHERE status = 'paga' AND fechada_em >= ? AND fechada_em < ? GROUP BY dia ORDER BY dia`).all(inicio, fim);
+  const fuso = deslocamentoSql();
+  const porDia = db.prepare(`SELECT date(fechada_em, ?) AS dia, COUNT(*) AS vendas, COALESCE(SUM(total_centavos), 0) AS total,
+    COALESCE(SUM(custo_centavos), 0) AS custo FROM vendas WHERE status = 'paga' AND fechada_em >= ? AND fechada_em < ? GROUP BY dia ORDER BY dia`).all(fuso, inicio, fim);
   const porForma = db.prepare(`SELECT pg.forma, COUNT(*) AS quantidade, COALESCE(SUM(pg.valor_centavos), 0) AS total FROM pagamentos pg
     JOIN vendas v ON v.id = pg.venda_id WHERE v.status = 'paga' AND v.fechada_em >= ? AND v.fechada_em < ? GROUP BY pg.forma ORDER BY total DESC`).all(inicio, fim);
-  const porHora = db.prepare(`SELECT CAST(strftime('%H', fechada_em, 'localtime') AS INTEGER) AS hora, COUNT(*) AS vendas,
-    COALESCE(SUM(total_centavos), 0) AS total FROM vendas WHERE status = 'paga' AND fechada_em >= ? AND fechada_em < ? GROUP BY hora ORDER BY hora`).all(inicio, fim);
+  const porHora = db.prepare(`SELECT CAST(strftime('%H', fechada_em, ?) AS INTEGER) AS hora, COUNT(*) AS vendas,
+    COALESCE(SUM(total_centavos), 0) AS total FROM vendas WHERE status = 'paga' AND fechada_em >= ? AND fechada_em < ? GROUP BY hora ORDER BY hora`).all(fuso, inicio, fim);
   return {
     de, ate,
     vendas: total.vendas,
