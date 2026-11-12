@@ -227,7 +227,7 @@ async function telaConsultar(ctx, { master = false } = {}) {
     botaoConsultar.disabled = true;
     const texto = el('p', { class: 'mudo' }, `Consultando ${placaTxt.toUpperCase()} no DETRAN, na prefeitura e no Renainf…`);
     limpar(resultado, el('div', { class: 'carregando-linha' }), texto,
-      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Pode levar até 2 minutos. Pode sair desta tela: o resultado fica guardado em "Consultas feitas".'));
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Pode levar alguns minutos (o DETRAN às vezes demora). Pode sair desta tela: o resultado fica guardado em "Consultas feitas".'));
     try {
       const ini = await api.post(`${base}/consultar-placa`, { placa: placaTxt, renavam: inRenavam.querySelector('input').value });
       const t0 = Date.now();
@@ -238,7 +238,7 @@ async function telaConsultar(ctx, { master = false } = {}) {
         c = await api.get(`${base}/consultas/${ini.id}`);
         if (c.status !== 'consultando') break;
         texto.textContent = `Consultando ${ini.placa} no DETRAN, na prefeitura e no Renainf… ${Math.round((Date.now() - t0) / 1000)} s`;
-        if (Date.now() - t0 > 240_000) throw new Error('A consulta está demorando mais que o normal. O resultado aparece em "Consultas feitas" quando chegar.');
+        if (Date.now() - t0 > 660_000) throw new Error('A consulta está demorando mais que o normal. O resultado aparece em "Consultas feitas" quando chegar.');
       }
       if (c.status === 'erro') throw new Error(c.erro);
       limpar(resultado, resultadoConsulta(c.resultado));
