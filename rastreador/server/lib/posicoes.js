@@ -193,12 +193,21 @@ function receber(db, m) {
     }
     // O aparelho informa se o relé está acionado em toda mensagem de estado (também sem GPS, como o sinal de vida);
     // com o relé ligado ao contrário (sentido invertido), acionado = liberado.
-    if (estadoAtual && typeof m.bloqueado === 'boolean') mudar.bloqueado = (r.rele_invertido ? !m.bloqueado : m.bloqueado) ? 1 : 0;
+    const confiaNoBit = require('./comandos').modeloDe(r.modelo)?.estadoRele !== false;
+    if (estadoAtual && confiaNoBit && typeof m.bloqueado === 'boolean') mudar.bloqueado = (r.rele_invertido ? !m.bloqueado : m.bloqueado) ? 1 : 0;
     if (mudar.bloqueado !== undefined) {
       // O aparelho já está no estado pedido: o bloqueio/desbloqueio enviado fica confirmado (mesmo sem a resposta em texto).
       const alvo = mudar.bloqueado ? 'bloquear' : 'desbloquear';
       const enviado = db.prepare("SELECT id FROM comandos WHERE veiculo_id = ? AND status = 'enviado' AND tipo = ? ORDER BY id DESC LIMIT 1").get(v.id, alvo);
       if (enviado) require('./comandos').responder(db, enviado.id, { sucesso: true, resposta: `Confirmado pelo estado do aparelho (${mudar.bloqueado ? 'bloqueado' : 'desbloqueado'}).` });
+    }
+    // Corte que o aparelho adiou ("executa com GPS e abaixo de 20 km/h"): chegou posição nova com GPS e devagar = o J16 cortou agora.
+    if (status === 'gravada' && nova && velocidade < 20) {
+      const adiado = db.prepare("SELECT id FROM comandos WHERE veiculo_id = ? AND status = 'enviado' AND tipo = 'bloquear' AND resposta IS NOT NULL ORDER BY id DESC LIMIT 1").get(v.id);
+      if (adiado) {
+        require('./comandos').responder(db, adiado.id, { sucesso: true, resposta: 'Corte executado pelo aparelho (GPS fixo e abaixo de 20 km/h).' });
+        mudar.bloqueado = 1;
+      }
     }
     if (evento && (estadoAtual || status === 'gravada')) alertarEvento(db, v, evento, pos);
 
