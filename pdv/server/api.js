@@ -4,6 +4,7 @@ const express = require('express');
 const { autenticar, acessoEmpresa } = require('./auth');
 const { ErroNegocio } = require('./lib/erros');
 const { lerConfig } = require('./db');
+const { hoje } = require('./lib/datas');
 
 function criarApi(db) {
   const api = express.Router();
@@ -13,7 +14,8 @@ function criarApi(db) {
     db.prepare('SELECT 1').get();
     res.json({ ok: true });
   });
-  api.get('/publico', (_req, res) => res.json({ nome: lerConfig(db).nome_plataforma }));
+  // `hoje` é o dia no fuso do servidor: o painel usa essa data nos filtros, não a do computador do balcão.
+  api.get('/publico', (_req, res) => res.json({ nome: lerConfig(db).nome_plataforma, hoje: hoje() }));
 
   api.use('/auth', require('./routes/auth')(db, autenticado));
   // Maquininhas: autenticadas pela chave do terminal, não por usuário.

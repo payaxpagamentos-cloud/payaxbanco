@@ -13,7 +13,11 @@ module.exports = (db) => {
   // Primeira chamada do painel: quem é a empresa, o que está configurado e como está o caixa de quem entrou.
   r.get('/', (req, res) => {
     const e = req.empresa;
-    const caixa = caixaDoOperador(db, e.id, req.usuario.id);
+    const aberto = caixaDoOperador(db, e.id, req.usuario.id);
+    const caixa = aberto ? {
+      ...aberto,
+      ...db.prepare('SELECT p.nome AS pdv_nome, l.nome AS loja_nome FROM pdvs p JOIN lojas l ON l.id = p.loja_id WHERE p.id = ?').get(aberto.pdv_id),
+    } : null;
     const totaisHoje = db.prepare(`SELECT COUNT(*) AS quantidade, COALESCE(SUM(valor_centavos), 0) AS total_centavos
       FROM recebimentos WHERE empresa_id = ? AND data = ? AND status = 'confirmado'`).get(e.id, hoje());
     res.json({

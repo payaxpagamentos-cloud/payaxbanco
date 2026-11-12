@@ -1,0 +1,111 @@
+import { api } from '../api.js';
+import { el, limpar, campo, area, marcar, lerForm, toast, acao, icone, FORMAS, dataHora } from '../ui.js';
+
+const FORMAS_LISTA = Object.keys(FORMAS);
+
+/** Configurações da empresa: ligação com o IXC, multa e juros, desconto, caixa e comprovante. */
+export async function telaConfiguracoes(ctx) {
+  const base = `/empresas/${ctx.empresaId}`;
+  const cartaoIxc = el('div', { class: 'cartao' });
+  const cartaoRegras = el('div', { class: 'cartao' });
+  const cartaoComprovante = el('div', { class: 'cartao' });
+  const cartaoAuditoria = el('div', { class: 'cartao' });
+  limpar(ctx.conteudo, el('div', { class: 'coluna' }, cartaoIxc, cartaoRegras, cartaoComprovante, cartaoAuditoria));
+  const somenteLeitura = !ctx.administra;
+
+  async function carregar() {
+    const c = await api.get(`${base}/configuracoes`);
+
+    // ---- IXC ----
+    const formIxc = el('form', { class: 'form' },
+      el('div', { class: 'duas' },
+        campo('Endereço do IXC', { name: 'ixc_url', value: c.ixc_url ?? '', placeholder: 'https://ixc.seuprovedor.com.br', disabled: somenteLeitura }),
+        campo(c.ixc_token_definido ? 'Token (deixe vazio para manter o atual)' : 'Token do IXC (id:hash)',
+          { name: 'ixc_token', type: 'password', autocomplete: 'new-password', disabled: somenteLeitura })),
+      el('div', { class: 'duas' },
+        campo('Conta/caixa no IXC (id, opcional)', { name: 'ixc_conta_id', value: c.ixc_conta_id ?? '', disabled: somenteLeitura }),
+        marcar('Integração ligada', { name: 'ixc_ativo', checked: c.ixc_ativo, disabled: somenteLeitura })),
+      marcar('Baixar a fatura no IXC assim que o recebimento é confirmado', { name: 'baixa_automatica', checked: c.baixa_automatica, disabled: somenteLeitura }),
+      el('fieldset', {}, el('legend', {}, 'Tipo de recebimento no IXC por forma de pagamento'),
+        el('p', { class: 'pequeno mudo' }, 'Informe o id do tipo de recebimento cadastrado no IXC. Em branco, a baixa vai sem o tipo.'),
+        el('div', { class: 'tres' }, FORMAS_LISTA.map((f) => campo(FORMAS[f], { name: `tipo_${f}`, value: c.ixc_tipos_recebimento[f] ?? '', maxlength: 20, disabled: somenteLeitura })))));
+
+    const salvarIxc = el('button', { class: 'btn primario' }, 'Salvar IXC');
+    const testar = el('button', { class: 'btn', type: 'button' }, icone('sincronizar'), 'Testar conexão');
+    testar.addEventListener('click', () => acao(testar, async () => {
+      const r = await api.post(`${base}/configuracoes/ixc/testar`, {});
+      toast(r.mensagem);
+    }));
+    formIxc.append(el('div', { class: 'linha entre' }, testar, somenteLeitura ? null : salvarIxc));
+    formIxc.addEventListener('submit', (e) => {
+      e.preventDefault();
+      acao(salvarIxc, async () => {
+        const d = lerForm(formIxc);
+        await api.patch(`${base}/configuracoes`, {
+          ixc_url: d.ixc_url, ixc_ativo: d.ixc_ativo, ixc_conta_id: d.ixc_conta_id, baixa_automatica: d.baixa_automatica,
+          ...(d.ixc_token ? { ixc_token: d.ixc_token } : {}),
+          ixc_tipos_recebimento: Object.fromEntries(FORMAS_LISTA.map((f) => [f, d[`tipo_${f}`]])),
+        });
+        toast('Configuração do IXC salva.');
+        await carregar();
+      });
+    });
+    limpar(cartaoIxc, el('h2', {}, 'IXC Provedor'),
+      el('p', { class: 'mudo' }, 'O PDV consulta clientes e faturas no IXC e devolve a baixa de cada título recebido. O token é de um usuário do IXC criado só para o PDV (Configurações › Usuários › Token) e fica guardado cifrado.'),
+      formIxc);
+
+    // ---- Regras do balcão ----
+    const formRegras = el('form', { class: 'form' },
+      el('div', { class: 'tres' },
+        campo('Multa por atraso (%)', { name: 'multa_percentual', inputmode: 'decimal', value: c.multa_percentual, disabled: somenteLeitura }),
+        campo('Juros ao mês (%)', { name: 'juros_mes_percentual', inputmode: 'decimal', value: c.juros_mes_percentual, disabled: somenteLeitura }),
+        campo('Desconto máximo (%)', { name: 'desconto_max_percentual', inputmode: 'decimal', value: c.desconto_max_percentual, disabled: somenteLeitura })),
+      marcar('Exigir caixa aberto para receber', { name: 'exigir_caixa', checked: c.exigir_caixa, disabled: somenteLeitura }),
+      marcar('Permitir recebimento sem fatura do IXC (avulso)', { name: 'permitir_avulso', checked: c.permitir_avulso, disabled: somenteLeitura }));
+    const salvarRegras = el('button', { class: 'btn primario' }, 'Salvar regras');
+    if (!somenteLeitura) formRegras.append(el('div', { class: 'linha entre' }, el('span', {}), salvarRegras));
+    formRegras.addEventListener('submit', (e) => {
+      e.preventDefault();
+      acao(salvarRegras, async () => {
+        await api.patch(`${base}/configuracoes`, lerForm(formRegras));
+        toast('Regras salvas.');
+        await carregar();
+      });
+    });
+    limpar(cartaoRegras, el('h2', {}, 'Regras do balcão'),
+      el('p', { class: 'mudo' }, 'A multa entra uma vez e os juros são proporcionais aos dias de atraso. O PDV mostra o valor já corrigido na hora de receber.'),
+      formRegras);
+
+    // ---- Comprovante ----
+    const formComp = el('form', { class: 'form' },
+      area('Cabeçalho (nome e dados que saem no topo)', { name: 'comprovante_cabecalho', rows: 3, maxlength: 300, disabled: somenteLeitura }, c.comprovante_cabecalho ?? ''),
+      area('Rodapé', { name: 'comprovante_rodape', rows: 2, maxlength: 300, disabled: somenteLeitura }, c.comprovante_rodape ?? ''));
+    const salvarComp = el('button', { class: 'btn primario' }, 'Salvar comprovante');
+    if (!somenteLeitura) formComp.append(el('div', { class: 'linha entre' }, el('span', {}), salvarComp));
+    formComp.addEventListener('submit', (e) => {
+      e.preventDefault();
+      acao(salvarComp, async () => {
+        await api.patch(`${base}/configuracoes`, lerForm(formComp));
+        toast('Comprovante salvo.');
+        await carregar();
+      });
+    });
+    limpar(cartaoComprovante, el('h2', {}, 'Comprovante do balcão'), el('p', { class: 'mudo' }, 'Texto impresso na bobina acima e abaixo dos valores.'), formComp);
+
+    // ---- Auditoria ----
+    if (ctx.supervisiona) {
+      const { itens } = await api.get(`${base}/configuracoes/auditoria?limite=80`);
+      limpar(cartaoAuditoria, el('h2', {}, 'Últimas ações no sistema'),
+        el('table', { class: 'tabela' }, el('tbody', {}, itens.map((a) => el('tr', {},
+          el('td', { class: 'pequeno mudo' }, dataHora(a.criado_em)),
+          el('td', {}, a.usuario_nome ?? 'sistema'),
+          el('td', {}, a.acao.replace(/_/g, ' ')),
+          el('td', { class: 'pequeno mudo' }, a.detalhes ? JSON.stringify(a.detalhes) : ''))))));
+    } else {
+      limpar(cartaoAuditoria);
+    }
+    if (c.atualizado_em) cartaoIxc.append(el('p', { class: 'pequeno mudo' }, `Última alteração: ${dataHora(c.atualizado_em)}`));
+  }
+
+  await carregar();
+}

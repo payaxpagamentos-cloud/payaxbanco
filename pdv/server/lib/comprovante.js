@@ -31,6 +31,17 @@ function comprovante(db, empresa, recebimentoId, { colunas = 42, via = 'Cliente'
     return espaco > 0 ? esq + ' '.repeat(espaco) + dir : `${esq} ${dir}`;
   };
   const quebrar = (t) => String(t ?? '').match(new RegExp(`.{1,${L}}`, 'g')) ?? [];
+  /** Linha secundária (indentada), quebrada em palavras para não cortar NSU nem autorização. */
+  const linhaDetalhe = (t) => {
+    const saida = [];
+    let atual = ' ';
+    for (const palavra of String(t).split(' ')) {
+      if (`${atual} ${palavra}`.length > L) { saida.push(atual); atual = ' '; }
+      atual = `${atual} ${palavra}`;
+    }
+    if (atual.trim()) saida.push(atual);
+    return saida;
+  };
 
   for (const l of String(cfg.comprovante_cabecalho ?? empresa.nome).split('\n').slice(0, 5)) linhas.push(centro(l));
   if (empresa.documento) linhas.push(centro(`CNPJ ${empresa.documento}`));
@@ -52,7 +63,7 @@ function comprovante(db, empresa, recebimentoId, { colunas = 42, via = 'Cliente'
     const nome = t.fatura_ixc_id ? `Fatura ${t.fatura_ixc_id}` : (t.descricao ?? 'Recebimento');
     linhas.push(par(nome.slice(0, L - 12), dinheiro(t.valor_centavos)));
     const detalhes = [t.vencimento ? `venc. ${dataBr(t.vencimento)}` : null, t.documento ? `doc. ${t.documento}` : null].filter(Boolean).join(' · ');
-    if (detalhes) linhas.push(`  ${detalhes}`.slice(0, L));
+    if (detalhes) linhas.push(...linhaDetalhe(detalhes));
     if (t.acrescimo_centavos) linhas.push(par('  multa e juros', dinheiro(t.acrescimo_centavos)));
     if (t.desconto_centavos) linhas.push(par('  desconto', `-${dinheiro(t.desconto_centavos)}`));
   }
@@ -67,7 +78,7 @@ function comprovante(db, empresa, recebimentoId, { colunas = 42, via = 'Cliente'
     linhas.push(par(rotulo, dinheiro(p.valor_centavos)));
     const extra = [p.bandeira, p.cartao_final ? `final ${p.cartao_final}` : null, p.nsu ? `NSU ${p.nsu}` : null, p.autorizacao ? `AUT ${p.autorizacao}` : null]
       .filter(Boolean).join(' · ');
-    if (extra) linhas.push(`  ${extra}`.slice(0, L));
+    if (extra) linhas.push(...linhaDetalhe(extra));
   }
   if (r.troco_centavos) linhas.push(par('Troco', dinheiro(r.troco_centavos)));
   if (r.status === 'cancelado') {
