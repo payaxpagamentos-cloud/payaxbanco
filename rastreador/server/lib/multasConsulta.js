@@ -62,9 +62,18 @@ function traduzirApiBrasil(j) {
   if (j?.error) throw new ErroNegocio(`API Brasil: ${j.message || 'a consulta falhou'}.`, 502);
   const d = j?.data ?? {};
   const listaMultas = d.debitosMultas?.ocorrencia ?? [];
-  const hora = (x) => (x ? `${String(x).replace(' ', 'T')}${String(x).length <= 16 ? ':00' : ''}-03:00` : null);
+  // "2026-09-23 10:45" → com hora; "2026-09-23" (sem hora) → meio-dia de Brasília, marcado como sem_hora (a tela mostra só a data).
+  const hora = (x) => {
+    const t = String(x ?? '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return `${t}T12:00:00-03:00`;
+    const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(:\d{2})?/.exec(t);
+    return m ? `${m[1]}T${m[2]}${m[3] ?? ':00'}-03:00` : null;
+  };
+  const semHora = (x) => /^\d{4}-\d{2}-\d{2}$/.test(String(x ?? '').trim());
+  // "Multa - 7RA1502937 - TRANSITAR ..." → "TRANSITAR ..." (o número já vai no auto de infração).
+  const limparDescricao = (d, id) => String(d ?? '').replace(new RegExp(`^\\s*multa\\s*-\\s*${String(id ?? '').replace(/[^\w]/g, '')}\\s*-\\s*`, 'i'), '').replace(/^\s*multa\s*-\s*/i, '').trim();
   const multas = listaMultas.map((m) => ({
-    auto_infracao: m.identificador ?? null, orgao: m.fonte ?? null, infracao_codigo: null, descricao: m.descricao || 'Infração de trânsito', gravidade: null, pontos: null,
+    auto_infracao: m.identificador ?? null, orgao: m.fonte ?? null, infracao_codigo: null, descricao: limparDescricao(m.descricao, m.identificador) || 'Infração de trânsito', gravidade: null, pontos: null, sem_hora: semHora(m.dataHoraMulta),
     valor_centavos: Number.isFinite(Number(m.valor)) ? Math.round(Number(m.valor) * 100) : null, ocorrida_em: hora(m.dataHoraMulta), local_texto: m.local ?? null,
     municipio: m.uf ? `(${m.uf})` : null, prazo_indicacao: null, vencimento: m.dataVencimento ?? null,
   }));
