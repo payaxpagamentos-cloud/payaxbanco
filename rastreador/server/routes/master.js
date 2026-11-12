@@ -501,6 +501,20 @@ module.exports = (db, extras = {}) => {
     res.json({ habilitados: port.map((t) => t.id) });
   });
 
+  // ---------- Central de multas: todas as empresas ----------
+  const multas = require('../lib/multas');
+  r.get('/multas', (req, res) => {
+    const lista = multas.listar(db, { empresaId: req.query.empresa_id ? Number(req.query.empresa_id) : undefined, situacao: req.query.situacao || undefined, limite: 1000 });
+    res.json({ resumo: multas.resumo(lista), multas: lista, consulta_automatica: require('../lib/multasConsulta').configurado(), situacoes: multas.SITUACOES,
+      gravidades: multas.GRAVIDADES, empresas: db.prepare("SELECT id, nome FROM empresas WHERE status <> 'excluida' ORDER BY nome").all() });
+  });
+  r.get('/multas/arquivos/:id', (req, res) => {
+    const a = multas.arquivo(db, null, req.params.id);
+    if (!a) throw new ErroNegocio('Arquivo não encontrado.', 404);
+    res.set({ 'Content-Type': a.tipo, 'Cache-Control': 'private, max-age=86400' }).sendFile(a.caminho);
+  });
+  r.get('/multas/:id', (req, res) => res.json(multas.detalhe(db, nid(req))));
+
   // ---------- Seguros: contratações de todas as empresas ----------
   r.get('/seguros/contratacoes', (req, res) => res.json(seg.contratacoes(db, {
     empresaId: req.query.empresa_id ? Number(req.query.empresa_id) : null,

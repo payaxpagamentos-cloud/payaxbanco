@@ -33,6 +33,7 @@ const TIPOS_AVISO = {
   deslocamento: 'Deslocamento (alarme do aparelho)',
   relatorios: 'Relatórios programados',
   app_motorista: 'App do motorista (checklist com problema e avarias)',
+  multas: 'Multas (nova multa encontrada ou cadastrada)',
 };
 const SEGURANCA = new Set(['roubo', 'estacionado_violado', 'sumico_suspeito', 'panico', 'bateria_desconectada', 'violacao', 'liberacao']);
 // Tipo de alerta → tipo de aviso.

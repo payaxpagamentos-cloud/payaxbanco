@@ -58,6 +58,22 @@ module.exports = (db) => {
     });
   });
 
+  const multasPublico = (m) => ({ id: m.id, placa: m.placa, descricao: m.descricao, orgao: m.orgao, auto_infracao: m.auto_infracao, gravidade: m.gravidade,
+    pontos: m.pontos, valor_centavos: m.valor_centavos, ocorrida_em: m.ocorrida_em, local_texto: m.local_texto, municipio: m.municipio, situacao: m.situacao,
+    prazo_indicacao: m.prazo_indicacao, vencimento: m.vencimento, dias_indicacao: m.dias_indicacao, dias_vencimento: m.dias_vencimento, arquivos: m.arquivos });
+  // Minhas multas: as multas em que ele é o condutor (indicado pela empresa ou no volante no horário).
+  r.get('/multas', autenticado, (req, res) => {
+    const multas = require('../lib/multas');
+    res.json({ situacoes: multas.SITUACOES, multas: multas.listar(db, { empresaId: req.motorista.empresa_id, motoristaId: req.motorista.id })
+      .map((m) => ({ ...multasPublico(m), arquivos: db.prepare('SELECT id, tipo FROM multa_arquivos WHERE multa_id = ? ORDER BY id').all(m.id) })) });
+  });
+  r.get('/multas/arquivos/:id', autenticado, (req, res) => {
+    const a = require('../lib/multas').arquivo(db, req.motorista.empresa_id, req.params.id);
+    const dele = a && db.prepare('SELECT 1 FROM multas WHERE id = ? AND motorista_id = ?').get(a.multa_id, req.motorista.id);
+    if (!dele) return res.status(404).json({ erro: 'Arquivo não encontrado.' });
+    res.set({ 'Content-Type': a.tipo, 'Cache-Control': 'private, max-age=3600' }).sendFile(a.caminho);
+  });
+
   r.post('/liberacoes', autenticado, (req, res) => {
     const x = condutores.doMotorista(db, req.motorista, req.body.veiculo_id);
     res.status(201).json(agenda.pedirLiberacao(db, req.motorista, x, req.body.horas));

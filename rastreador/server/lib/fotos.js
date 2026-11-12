@@ -15,26 +15,29 @@ const { ErroNegocio } = require('./erros');
 /** Fotos do app do motorista. Chegam reduzidas pelo celular (JPEG de ~200 KB) e ficam no disco do servidor, por empresa. */
 const MAX_FOTOS = 4;
 const MAX_BYTES = 1_500_000;
+const MAX_BYTES_DOC = 4_000_000; // notificação de multa (PDF ou foto)
 const TIPOS = [
   ['image/jpeg', 'jpg', (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff],
   ['image/png', 'png', (b) => b.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]))],
   ['image/webp', 'webp', (b) => b.subarray(0, 4).toString() === 'RIFF' && b.subarray(8, 12).toString() === 'WEBP'],
+  ['application/pdf', 'pdf', (b) => b.subarray(0, 5).toString() === '%PDF-'],
 ];
 
-function decodificar(texto) {
-  const m = /^data:image\/[\w+.-]+;base64,(.+)$/s.exec(String(texto ?? ''));
+function decodificar(texto, { pdf = false } = {}) {
+  const m = /^data:(?:image|application)\/[\w+.-]+;base64,(.+)$/s.exec(String(texto ?? ''));
   const b = Buffer.from(m ? m[1] : String(texto ?? ''), 'base64');
-  const tipo = TIPOS.find(([, , ok]) => b.length > 12 && ok(b));
-  if (!tipo) throw new ErroNegocio('Foto inválida: envie JPEG, PNG ou WEBP.', 422);
-  if (b.length > MAX_BYTES) throw new ErroNegocio('Foto grande demais (máximo 1,5 MB).', 422);
+  const tipo = TIPOS.find(([t, , ok]) => b.length > 12 && ok(b) && (pdf || t !== 'application/pdf'));
+  if (!tipo) throw new ErroNegocio(pdf ? 'Arquivo inválido: envie foto (JPEG, PNG, WEBP) ou PDF.' : 'Foto inválida: envie JPEG, PNG ou WEBP.', 422);
+  const max = pdf ? MAX_BYTES_DOC : MAX_BYTES;
+  if (b.length > max) throw new ErroNegocio(`Arquivo grande demais (máximo ${max / 1_000_000} MB).`, 422);
   return { buffer: b, tipo: tipo[0], extensao: tipo[1] };
 }
 
 /** Confere as fotos antes de gravar o registro (assim um erro não deixa registro sem foto). */
-function conferir(lista) {
+function conferir(lista, { pdf = false } = {}) {
   const fotos = [].concat(lista ?? []).filter(Boolean);
-  if (fotos.length > MAX_FOTOS) throw new ErroNegocio(`No máximo ${MAX_FOTOS} fotos.`, 422);
-  return fotos.map(decodificar);
+  if (fotos.length > MAX_FOTOS) throw new ErroNegocio(`No máximo ${MAX_FOTOS} arquivos.`, 422);
+  return fotos.map((f) => decodificar(f, { pdf }));
 }
 
 function salvar(db, empresaId, origem, origemId, fotos) {
@@ -60,4 +63,4 @@ function arquivo(db, empresaId, id) {
   return fs.existsSync(completo) ? { caminho: completo, tipo: f.tipo } : null;
 }
 
-module.exports = { conferir, salvar, ids, arquivo, MAX_FOTOS };
+module.exports = { conferir, salvar, ids, arquivo, MAX_FOTOS, decodificar };

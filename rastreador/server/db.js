@@ -648,6 +648,45 @@ CREATE TABLE IF NOT EXISTS testes_bloqueio (
   criado_em TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_testes_bloqueio_veiculo ON testes_bloqueio (veiculo_id, id);
+
+-- Central de multas: a consulta automática (DETRAN/SENATRAN, por um serviço contratado) ou o cadastro manual.
+CREATE TABLE IF NOT EXISTS multas (
+  id INTEGER PRIMARY KEY,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER REFERENCES veiculos(id),
+  placa TEXT NOT NULL,
+  auto_infracao TEXT,
+  orgao TEXT,
+  infracao_codigo TEXT,
+  descricao TEXT NOT NULL,
+  gravidade TEXT CHECK (gravidade IN ('leve','media','grave','gravissima')),
+  pontos INTEGER,
+  valor_centavos INTEGER,
+  ocorrida_em TEXT NOT NULL,
+  local_texto TEXT,
+  municipio TEXT,
+  prazo_indicacao TEXT,
+  vencimento TEXT,
+  situacao TEXT NOT NULL DEFAULT 'notificada' CHECK (situacao IN ('notificada','condutor_indicado','em_recurso','a_pagar','paga','cancelada')),
+  motorista_id INTEGER REFERENCES motoristas(id),
+  fonte TEXT NOT NULL DEFAULT 'manual' CHECK (fonte IN ('manual','consulta')),
+  observacao TEXT,
+  criada_por INTEGER REFERENCES usuarios(id),
+  criada_em TEXT NOT NULL,
+  atualizada_em TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_multas_empresa ON multas (empresa_id, ocorrida_em);
+CREATE INDEX IF NOT EXISTS ix_multas_veiculo ON multas (veiculo_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_multas_auto ON multas (empresa_id, auto_infracao) WHERE auto_infracao IS NOT NULL;
+CREATE TABLE IF NOT EXISTS multa_arquivos (
+  id INTEGER PRIMARY KEY,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  multa_id INTEGER NOT NULL REFERENCES multas(id) ON DELETE CASCADE,
+  arquivo TEXT NOT NULL,
+  tipo TEXT NOT NULL,
+  tamanho INTEGER NOT NULL,
+  criado_em TEXT NOT NULL
+);
 `;
 
 const CONFIG_PADRAO = {
@@ -723,7 +762,7 @@ function abrir(arquivo = config.dbFile) {
 function migrar(db) {
   const colunas = (t) => new Set(db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name));
   const NOVAS = {
-    veiculos: { teste_bloqueio_ok: 'INTEGER', teste_bloqueio_em: 'TEXT', consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
+    veiculos: { renavam: 'TEXT', multas_consulta_em: 'TEXT', teste_bloqueio_ok: 'INTEGER', teste_bloqueio_em: 'TEXT', consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
     empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0',
       plano_nome: 'TEXT', plano_valor_centavos: 'INTEGER', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT' },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },

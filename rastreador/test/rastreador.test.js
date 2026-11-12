@@ -454,6 +454,50 @@ test('Rastreador', async (t) => {
     assert.ok((await i.get(`/alertas?desde=${min(-600)}`)).dados.length >= 4);
   });
 
+  await t.test('central de multas: cadastro com notificação, cruzamento com o rastreamento, motorista e cliente', async () => {
+    const db = api.db;
+    const mot = (await api.post(`${base()}/motoristas`, { nome: 'Motorista da Multa', cpf: '111.444.777-35' }, cliente)).dados;
+    const quando = new Date(Date.now() - 3 * 3600_000);
+    quando.setSeconds(0, 0);
+    // Uma posição do veículo 2 minutos antes da infração, a 87 km/h, e o motorista com check-in pelo QR naquele horário.
+    db.prepare('INSERT OR IGNORE INTO posicoes (veiculo_id, lat, lng, velocidade_kmh, ignicao, gps_em, recebido_em) VALUES (?, ?, ?, ?, 1, ?, ?)')
+      .run(veiculo, -23.5611, -46.6559, 87, new Date(quando.getTime() - 120_000).toISOString(), new Date().toISOString());
+    db.prepare('INSERT INTO condutores (empresa_id, veiculo_id, motorista_id, inicio, fim) VALUES (?, ?, ?, ?, ?)')
+      .run(empresa, veiculo, mot.id, new Date(quando.getTime() - 3600_000).toISOString(), new Date(quando.getTime() + 3600_000).toISOString());
+    const pdf = `data:application/pdf;base64,${Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF').toString('base64')}`;
+    const nova = { placa: 'ABC-1D23', auto_infracao: 'SP12345678', orgao: 'DER-SP', infracao_codigo: '74550', descricao: 'Transitar em velocidade superior à máxima permitida em até 20%',
+      gravidade: 'media', valor_centavos: 13016, ocorrida_em: quando.toISOString(), local_texto: 'Av. Paulista, 1000', municipio: 'São Paulo', prazo_indicacao: '2099-01-01', arquivos: [pdf] };
+    assert.equal((await api.post(`${base()}/multas`, nova, operador)).status, 403, 'operador não cadastra');
+    const r = await api.post(`${base()}/multas`, nova, cliente);
+    assert.equal(r.status, 201);
+    assert.equal(r.dados.pontos, 4, 'pontos pela gravidade');
+    assert.equal(r.dados.motorista_id, mot.id, 'quem dirigia no horário já vem como condutor');
+    assert.equal(r.dados.cruzamento.condutor.origem, 'check-in pelo QR code do veículo');
+    assert.equal(r.dados.cruzamento.posicao.velocidade_kmh, 87);
+    assert.equal(r.dados.cruzamento.posicao.diferenca_min, 2);
+    assert.equal(r.dados.arquivos.length, 1);
+    assert.equal((await api.post(`${base()}/multas`, nova, cliente)).status, 409, 'o mesmo auto não entra duas vezes');
+    const arq = await fetch(`${api.raiz}/api${base()}/multas/arquivos/${r.dados.arquivos[0].id}`, { headers: { Authorization: `Bearer ${cliente}` } });
+    assert.equal(arq.headers.get('content-type'), 'application/pdf');
+    const lista = (await api.get(`${base()}/multas`, operador)).dados;
+    assert.equal(lista.resumo.em_aberto, 1);
+    assert.equal(lista.resumo.valor_aberto_centavos, 13016);
+    assert.equal(lista.consulta_automatica, false, 'sem o serviço contratado');
+    assert.equal((await api.put(`${base()}/multas/${r.dados.id}`, { situacao: 'condutor_indicado' }, cliente)).dados.situacao, 'condutor_indicado');
+    // Master vê; outra empresa não vê.
+    assert.equal((await api.get('/master/multas', master)).dados.multas.length >= 1, true);
+    assert.equal((await api.get(`/empresas/${outra}/multas/${r.dados.id}`, master)).status, 404);
+    // App do motorista: Minhas multas.
+    assert.equal((await api.put(`${base()}/motoristas/${mot.id}/app`, { senha: '4321' }, cliente)).status, 204);
+    const tk = (await api.post('/motorista/login', { cpf: '111.444.777-35', senha: '4321' })).dados.token;
+    const minhas = (await api.get('/motorista/multas', tk)).dados.multas;
+    assert.deepEqual(minhas.map((m) => m.auto_infracao), ['SP12345678']);
+    assert.ok(!('observacao' in minhas[0]));
+    db.prepare('DELETE FROM condutores WHERE veiculo_id = ? AND motorista_id = ?').run(veiculo, mot.id);
+    db.prepare('UPDATE multas SET motorista_id = NULL WHERE motorista_id = ?').run(mot.id);
+    assert.equal((await api.del(`${base()}/motoristas/${mot.id}`, undefined, cliente)).status, 204);
+  });
+
   await t.test('link de localização compartilhada', async () => {
     const r = await api.post(`${base()}/veiculos/${veiculo}/compartilhar`, { horas: 2 }, cliente);
     assert.equal(r.status, 201);
