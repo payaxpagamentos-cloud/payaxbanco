@@ -896,10 +896,27 @@ module.exports = (db, extras = {}) => {
     registrar(db, req, 'multas_consultas_limpas', { apagadas: n });
     res.json({ apagadas: n });
   });
+  // Créditos da central de multas: saldo, preços de venda, extrato e recarga por PIX.
+  const creditos = require('../lib/creditos');
+  r.get('/multas/creditos', (req, res) => res.json({ saldo_centavos: creditos.saldo(db, eid(req)), precos: creditos.precos(db, eid(req)),
+    extrato: creditos.extrato(db, eid(req)), recargas: creditos.cobrancas(db, { empresaId: eid(req), limite: 10 }), pix: creditos.pixConfigurado(db) }));
+  r.post('/multas/creditos/pix', gestor, async (req, res, next) => {
+    try {
+      const c = creditos.criarPix(db, eid(req), req.body.valor_centavos, req.usuario.id);
+      registrar(db, req, 'multas_recarga_pix', { id: c.id, valor: c.valor_centavos });
+      res.status(201).json({ ...c, qr_svg: await QRCode.toString(c.copia_cola, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) });
+    } catch (err) { next(err); }
+  });
+  r.post('/multas/creditos/pix/:id/informar', gestor, (req, res) => {
+    const c = creditos.informarPix(db, eid(req), nid(req));
+    registrar(db, req, 'multas_recarga_informada', { id: c.id, valor: c.valor_centavos });
+    require('../lib/notificacoes').avisar(db, eid(req), 'multas', { titulo: 'Recarga PIX informada', texto: `${c.empresa} informou o pagamento de R$ ${(c.valor_centavos / 100).toFixed(2).replace('.', ',')} (${c.txid}). Confirme no master.` });
+    res.json(c);
+  });
   // Consulta automática: os carros escolhidos, a frequência e o tipo (roda de madrugada).
-  r.get('/multas/automatica', (req, res) => res.json(consultaMultas.automatica(db, eid(req))));
+  r.get('/multas/automatica', (req, res) => res.json({ ...consultaMultas.automatica(db, eid(req)), precos: require('../lib/creditos').precos(db, eid(req)) }));
   r.put('/multas/automatica', gestor, (req, res) => {
-    const a = consultaMultas.definirAutomatica(db, eid(req), req.body);
+    const a = { ...consultaMultas.definirAutomatica(db, eid(req), req.body), precos: require('../lib/creditos').precos(db, eid(req)) };
     registrar(db, req, 'multas_automatica', { dias: a.dias, tipo: a.tipo, carros: a.marcados });
     res.json(a);
   });
@@ -936,7 +953,7 @@ module.exports = (db, extras = {}) => {
   r.post('/multas/consultar', gestor, async (req, res, next) => {
     try {
       v.exigir(consultaMultas.configurado(), 'A consulta automática ainda não foi ligada: falta contratar o serviço de consulta de multas.');
-      v.exigir(db.prepare('SELECT 1 FROM veiculos WHERE empresa_id = ? AND ativo = 1 AND multas_auto = 1').get(eid(req)), 'Escolha os carros da consulta automática em Consultar multas.');
+      v.exigir(db.prepare('SELECT 1 FROM veiculos WHERE empresa_id = ? AND ativo = 1 AND multas_auto = 1').get(eid(req)), 'Escolha os carros da consulta automática em Consultar débitos.');
       res.json(await consultaMultas.rodada(db, { empresaId: eid(req), forcar: true }));
     } catch (err) { next(err); }
   });

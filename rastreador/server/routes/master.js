@@ -509,6 +509,51 @@ module.exports = (db, extras = {}) => {
       gravidades: multas.GRAVIDADES, empresas: db.prepare("SELECT id, nome FROM empresas WHERE status <> 'excluida' ORDER BY nome").all() });
   });
   const consultaMultas = require('../lib/multasConsulta');
+  // ---------- Créditos da central de multas (produto): preços, saldo de cada empresa, recargas PIX ----------
+  const creditos = require('../lib/creditos');
+  r.get('/multas/creditos', (req, res) => {
+    const cfg = lerConfig(db);
+    res.json({ config: { pix_chave: cfg.pix_chave, pix_nome: cfg.pix_nome, pix_cidade: cfg.pix_cidade, precos: Object.fromEntries(creditos.TIPOS.map((t) => [t, cfg[`multas_preco_${t}`]])) },
+      empresas: db.prepare("SELECT id, nome, multas_credito_centavos AS saldo_centavos, multas_preco_completa, multas_preco_renainf, multas_preco_resumida FROM empresas WHERE status <> 'excluida' ORDER BY nome").all()
+        .map((e) => ({ ...e, precos: creditos.precos(db, e.id) })),
+      recargas: creditos.cobrancas(db, { limite: 50 }) });
+  });
+  r.put('/multas/creditos/config', soMaster, (req, res) => {
+    const d = req.body ?? {};
+    const grava = db.prepare('INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor');
+    if (d.pix_chave !== undefined) grava.run('pix_chave', v.texto(d.pix_chave, 'a chave PIX', 77));
+    if (d.pix_nome !== undefined) grava.run('pix_nome', String(d.pix_nome ?? '').slice(0, 25));
+    if (d.pix_cidade !== undefined) grava.run('pix_cidade', String(d.pix_cidade ?? '').slice(0, 15) || 'SAO PAULO');
+    for (const t of creditos.TIPOS) if (d.precos?.[t] !== undefined) grava.run(`multas_preco_${t}`, String(v.inteiro(d.precos[t], 'o preço', { min: 0, max: 100_000 })));
+    registrar(db, req, 'multas_creditos_config', { pix: Boolean(d.pix_chave) });
+    res.json({ ok: true });
+  });
+  r.put('/multas/creditos/empresas/:id/precos', soMaster, (req, res) => {
+    const e = empresa(nid(req));
+    const val = (x) => (x === null || x === '' || x === undefined ? null : v.inteiro(x, 'o preço', { min: 0, max: 100_000 }));
+    db.prepare('UPDATE empresas SET multas_preco_completa = ?, multas_preco_renainf = ?, multas_preco_resumida = ? WHERE id = ?')
+      .run(val(req.body.completa), val(req.body.renainf), val(req.body.resumida), e.id);
+    registrar(db, req, 'multas_precos_empresa', req.body, e.id);
+    res.json({ precos: creditos.precos(db, e.id) });
+  });
+  r.post('/multas/creditos/empresas/:id/ajuste', soMaster, (req, res) => {
+    const e = empresa(nid(req));
+    const valor = Number(req.body.valor_centavos);
+    v.exigir(Number.isInteger(valor) && valor !== 0 && Math.abs(valor) <= 10_000_000, 'Informe o valor do ajuste.');
+    const saldo = creditos.lancar(db, e.id, { tipo: valor > 0 ? 'ajuste' : 'ajuste', valor, descricao: String(req.body.descricao ?? (valor > 0 ? 'Crédito lançado pelo suporte' : 'Débito lançado pelo suporte')).slice(0, 120), usuarioId: req.usuario.id });
+    registrar(db, req, 'multas_credito_ajuste', { valor }, e.id);
+    res.json({ saldo_centavos: saldo });
+  });
+  r.post('/multas/creditos/pix/:id/confirmar', soMaster, (req, res) => {
+    const c = creditos.confirmarPix(db, nid(req), req.usuario.id);
+    registrar(db, req, 'multas_recarga_confirmada', { id: c.id, valor: c.valor_centavos }, c.empresa_id);
+    res.json(c);
+  });
+  r.post('/multas/creditos/pix/:id/cancelar', soMaster, (req, res) => {
+    const c = creditos.cancelarPix(db, nid(req));
+    registrar(db, req, 'multas_recarga_cancelada', { id: c.id }, c.empresa_id);
+    res.json(c);
+  });
   r.get('/multas/consultas', (req, res) => res.json({ ligada: consultaMultas.configurado(), automatica: consultaMultas.situacao(db),
     consultas: consultaMultas.historico(db, { limite: 50 }), veiculos: [] }));
   r.get('/multas/consultas/:id', (req, res) => res.json(consultaMultas.consulta(db, nid(req))));

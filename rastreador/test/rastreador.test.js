@@ -525,6 +525,9 @@ test('Rastreador', async (t) => {
     assert.ok(!('observacao' in minhas[0]));
     // Consultar multas na hora (serviço de consulta simulado): multa nova entra na central; apontamentos aparecem; erro sem serviço.
     assert.equal((await api.post(`${base()}/multas/consultar-placa`, { placa: 'ABC1D23' }, cliente)).status, 422, 'sem o serviço contratado');
+    // Créditos: o master lança crédito para a empresa poder consultar.
+    assert.equal((await api.post(`/master/multas/creditos/empresas/${empresa}/ajuste`, { valor_centavos: 20000 }, cliente)).status, 403);
+    assert.equal((await api.post(`/master/multas/creditos/empresas/${empresa}/ajuste`, { valor_centavos: 20000, descricao: 'Crédito inicial' }, master)).dados.saldo_centavos, 20000);
     // A consulta roda em segundo plano: o POST devolve o id e a tela acompanha até sair do "consultando".
     const consultar = async (placaC) => {
       const ini = await api.post(`${base()}/multas/consultar-placa`, { placa: placaC }, cliente);
@@ -588,6 +591,29 @@ test('Rastreador', async (t) => {
       assert.equal(c4.status, 'erro');
       assert.match(c4.erro, /DETRAN não respondeu/);
       instavel.close(); delete process.env.RASTREADOR_MULTAS_ESPERA_MS;
+      // A consulta que falhou devolveu o valor; as que deram certo descontaram o preço de venda.
+      const cr = (await api.get(`${base()}/multas/creditos`, cliente)).dados;
+      assert.ok(cr.extrato.some((x) => x.tipo === 'estorno' && x.valor_centavos === 1200), 'estorno da consulta que falhou');
+      assert.ok(cr.extrato.some((x) => x.tipo === 'consulta' && x.valor_centavos === -1200));
+      assert.equal(cr.precos.completa, 1200);
+      // Sem saldo: a consulta não roda.
+      assert.equal((await api.put(`/master/multas/creditos/empresas/${empresa}/precos`, { completa: 99999 }, master)).dados.precos.completa, 99999);
+      const semSaldo = await api.post(`${base()}/multas/consultar-placa`, { placa: 'ZZZ1Z11' }, cliente);
+      assert.equal(semSaldo.status, 402);
+      assert.match(semSaldo.dados.erro, /Crédito insuficiente/);
+      assert.equal((await api.put(`/master/multas/creditos/empresas/${empresa}/precos`, { completa: null }, master)).dados.precos.completa, 1200);
+      // Recarga por PIX: código com o valor; a empresa informa; o master confirma e o crédito entra (uma vez só).
+      assert.equal((await api.post(`${base()}/multas/creditos/pix`, { valor_centavos: 5000 }, cliente)).status, 422, 'sem chave PIX configurada');
+      assert.equal((await api.put('/master/multas/creditos/config', { pix_chave: 'financeiro@rastreador.com.br', pix_nome: 'Rastreador Ltda', pix_cidade: 'São Paulo' }, master)).status, 200);
+      assert.equal((await api.post(`${base()}/multas/creditos/pix`, { valor_centavos: 500 }, cliente)).status, 422, 'mínimo R$ 10');
+      const px = (await api.post(`${base()}/multas/creditos/pix`, { valor_centavos: 5000 }, cliente)).dados;
+      assert.match(px.copia_cola, /^000201.*br\.gov\.bcb\.pix.*540550\.00.*6304[0-9A-F]{4}$/);
+      assert.match(px.qr_svg, /<svg/);
+      assert.equal((await api.post(`${base()}/multas/creditos/pix/${px.id}/informar`, {}, cliente)).dados.status, 'informado');
+      const antesPix = (await api.get(`${base()}/multas/creditos`, cliente)).dados.saldo_centavos;
+      assert.equal((await api.post(`/master/multas/creditos/pix/${px.id}/confirmar`, {}, master)).dados.status, 'pago');
+      assert.equal((await api.get(`${base()}/multas/creditos`, cliente)).dados.saldo_centavos, antesPix + 5000);
+      assert.equal((await api.post(`/master/multas/creditos/pix/${px.id}/confirmar`, {}, master)).status, 409, 'não credita duas vezes');
       // Limpar o histórico: saem os erros (e os testes); ficam as que deram certo.
       assert.equal((await api.del(`${base()}/multas/consultas/limpar`, undefined, operador)).status, 403);
       const limpo = await api.del(`${base()}/multas/consultas/limpar`, undefined, cliente);

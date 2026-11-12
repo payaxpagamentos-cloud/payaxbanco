@@ -34,7 +34,8 @@ const MENU_MASTER = [
   ['usuarios', 'Permissões e usuários', 'usuarios', ['master']],
   ['multas', 'Central de multas', 'multa', ['master', 'suporte'], [
     ['multas', 'Central', 'multa', 'Multas de todas as empresas, prazos e quem dirigia', ['master', 'suporte']],
-    ['multas-consultar', 'Consultar multas', 'lupa', 'Ver na hora se um veículo tem multa ou apontamento', ['master', 'suporte']],
+    ['multas-consultar', 'Consultar débitos', 'lupa', 'Multas, IPVA, licenciamento e restrições de um veículo', ['master', 'suporte']],
+    ['multas-creditos', 'Créditos e preços', 'carteira', 'Crédito de cada empresa, preços de venda e recargas PIX', ['master']],
   ]],
   ['seguros', 'Seguros', 'seguro', ['master', 'suporte'], [
     ['seguros-tipos', 'Tipos', 'seguro', 'Catálogo dos seguros oferecidos', ['master', 'suporte']],
@@ -64,7 +65,7 @@ const MENU_EMPRESA = [
   ['cercas', 'Cercas', 'cercas'],
   ['multas', 'Central de multas', 'multa', null, [
     ['multas', 'Central', 'multa', 'Multas, prazos, notificação e quem dirigia'],
-    ['multas-consultar', 'Consultar multas', 'lupa', 'Ver na hora se um veículo tem multa ou apontamento'],
+    ['multas-consultar', 'Consultar débitos', 'lupa', 'Multas, IPVA, licenciamento e restrições de um veículo'],
   ]],
   ['frota', 'Frota', 'veiculos', null, [
     ['veiculos', 'Veículos', 'veiculos', 'Cadastro, rastreador e motorista fixo'],
