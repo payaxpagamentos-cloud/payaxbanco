@@ -66,6 +66,7 @@ export async function fichaMulta(m, { placaTxt, origem, condutor } = {}) {
       ${linha('Vencimento', m.vencimento ? data(m.vencimento) : '')}
       ${linha('Indicar o condutor até', m.prazo_indicacao ? data(m.prazo_indicacao) : '')}
       ${linha('Condutor', condutor)}
+      ${linha('Linha digitável (para pagar)', m.linha_digitavel)}
       ${linha('Situação', m.situacao ? ({ notificada: 'Notificada', condutor_indicado: 'Condutor indicado', em_recurso: 'Em recurso', a_pagar: 'A pagar', paga: 'Paga', cancelada: 'Cancelada' }[m.situacao] ?? m.situacao) : '')}
     </table>
   </div>
@@ -237,7 +238,8 @@ function resultadoConsulta(r) {
       el('div', {}, el('strong', { style: 'font-size:20px' }, placa(r.placa)), el('div', { class: 'pequeno mudo' }, `Consultado em ${dataHora(r.consultado_em)}${r.veiculo_da_frota ? ' · veículo da frota' : ' · fora da frota'}`)),
       el('div', { class: 'linha', style: 'gap:6px;flex-wrap:wrap' }, r.homolog ? etiqueta('TESTE · dados de exemplo, sem cobrança', 'info') : null,
         r.custo ? etiqueta(`custo: R$ ${r.custo}`, '') : null,
-        nada ? etiqueta('Nada consta', 'ok') : etiqueta(`${r.multas.length} multa(s) · ${r.apontamentos.length} apontamento(s)`, 'erro'))),
+        nada ? etiqueta('Nada consta', 'ok') : etiqueta(`${r.multas.length} multa(s) · ${r.apontamentos.length} apontamento(s)`, 'erro'),
+      r.pdf ? el('a', { class: 'btn pequeno', href: r.pdf, target: '_blank', rel: 'noopener noreferrer' }, icone('multa'), 'PDF da consulta') : null)),
     nada ? el('div', { class: 'cartao', style: 'text-align:center;padding:22px' }, el('div', { style: 'font-size:34px' }, '✅'), el('strong', {}, 'Nenhuma multa e nenhum apontamento para esta placa.')) : null,
     r.multas.length ? cartao(`Multas (${r.multas.length})`, tabela(['Data', 'Infração', '>Valor', '^Central', '^'], r.multas.map((m) => el('tr', {},
       td(quandoMulta(m)), td([m.descricao, el('div', { class: 'pequeno mudo' }, [m.auto_infracao, m.orgao, m.gravidade ? GRAV[m.gravidade] : null].filter(Boolean).join(' · '))]),
@@ -267,7 +269,14 @@ async function telaConsultar(ctx, { master = false } = {}) {
         ...[[0, 'Manual'], [1, 'Diária'], [7, 'Semanal'], [15, 'Quinzenal']].map(([dias, rot]) => el('button', { type: 'button', class: `btn pequeno${a.intervalo_dias === dias ? ' primario' : ''}`, onclick: async () => {
           await api.put('/master/multas/intervalo', { dias }); toast(dias ? `Consulta automática: ${rot.toLowerCase()}.` : 'Consulta manual: só quando alguém consultar.'); carregar();
         } }, rot)), el('span', { class: 'pequeno mudo' }, 'manual: paga só as consultas feitas')) : null));
-    limpar(historicoEl, cartao('Consultas feitas', tabela(['Quando', 'Placa', master ? 'Empresa' : null, '^Multas', '^Apontamentos', '^Novas', 'Por', '^'].filter(Boolean),
+    const temLixo = d.consultas.some((c) => c.erro || c.status === 'erro');
+    limpar(historicoEl, cartao('Consultas feitas',
+      podeConsultar ? el('div', { class: 'linha', style: 'justify-content:flex-end;margin:-6px 0 8px' }, botao('Limpar erros e testes', temLixo ? 'perigo' : '', async () => {
+        if (!await confirmar('Limpar o histórico', 'Apaga as consultas com erro e as de teste. As que deram certo ficam.', 'Limpar')) return;
+        const x = await api.del(`${base}/consultas/limpar`);
+        toast(`${x.apagadas} consulta(s) apagada(s).`); carregar();
+      })) : null,
+      tabela(['Quando', 'Placa', master ? 'Empresa' : null, '^Multas', '^Apontamentos', '^Novas', 'Por', '^'].filter(Boolean),
       d.consultas.map((c) => el('tr', {}, td(dataHora(c.criado_em)), td(el('strong', {}, placa(c.placa))), master ? td(c.empresa ?? '—') : null,
         td(c.status === 'consultando' ? etiqueta('consultando…', 'aviso') : c.erro ? etiqueta('erro', 'erro') : String(c.multas), 'centro'), td(c.erro || c.status === 'consultando' ? '—' : String(c.apontamentos), 'centro'), td(String(c.novas), 'centro'), td(c.usuario ?? 'automática'),
         el('td', { class: 'acoes' }, c.status === 'consultando' ? null : c.erro ? el('span', { class: 'pequeno mudo', title: c.erro }, 'falhou') : botaoIcone('olho', 'Ver o resultado', async () => {
@@ -286,8 +295,7 @@ async function telaConsultar(ctx, { master = false } = {}) {
     inRenavam.querySelector('input').value = v?.renavam ?? '';
   });
   const botaoConsultar = el('button', { class: 'btn primario', type: 'submit', disabled: !podeConsultar }, icone('lupa'), 'Consultar');
-  const form = el('form', { class: 'form', onsubmit: async (e) => {
-    e.preventDefault();
+  async function consultar(forcar = false) {
     const placaTxt = inPlaca.querySelector('input').value.trim();
     if (!placaTxt) return toast('Informe a placa.', true);
     botaoConsultar.disabled = true;
@@ -295,11 +303,22 @@ async function telaConsultar(ctx, { master = false } = {}) {
     limpar(resultado, el('div', { class: 'carregando-linha' }), texto,
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Pode levar alguns minutos (o DETRAN às vezes demora). Pode sair desta tela: o resultado fica guardado em "Consultas feitas".'));
     try {
-      const ini = await api.post(`${base}/consultar-placa`, { placa: placaTxt, renavam: inRenavam.querySelector('input').value });
+      const ini = await api.post(`${base}/consultar-placa`, { placa: placaTxt, renavam: inRenavam.querySelector('input').value, forcar });
       const t0 = Date.now();
       let c;
+      if (ini.guardada) {
+        // Já consultada nas últimas 24 h: mostra na hora, sem esperar nem pagar de novo.
+        c = await api.get(`${base}/consultas/${ini.id}`);
+        const horas = Math.max(1, Math.round((Date.now() - Date.parse(ini.consultado_em)) / 3_600_000));
+        limpar(resultado,
+          el('div', { class: 'linha entre', style: 'gap:10px;flex-wrap:wrap;padding:10px 14px;border-radius:12px;background:var(--surface-2);margin-bottom:10px' },
+            el('span', { class: 'pequeno' }, `⚡ Resultado guardado da consulta de ${dataHora(ini.consultado_em)} (há ${horas < 2 ? 'menos de 2' : horas} h) — aberto na hora, sem custo.`),
+            botao([icone('lupa'), 'Consultar de novo agora (R$ 8)'], '', () => consultar(true))),
+          resultadoConsulta(c.resultado));
+        return;
+      }
       for (;;) {
-        await new Promise((ok) => { setTimeout(ok, 2500); });
+        await new Promise((ok) => { setTimeout(ok, 1500); });
         if (!resultado.isConnected) return; // saiu da tela: o resultado fica no histórico
         c = await api.get(`${base}/consultas/${ini.id}`);
         if (c.status !== 'consultando') break;
@@ -312,7 +331,8 @@ async function telaConsultar(ctx, { master = false } = {}) {
     } catch (err) {
       limpar(resultado, el('p', { class: 'aviso erro' }, err.message));
     } finally { botaoConsultar.disabled = !podeConsultar; carregar(); }
-  } },
+  }
+  const form = el('form', { class: 'form', onsubmit: (e) => { e.preventDefault(); consultar(false); } },
     master ? null : selVeic,
     el('div', { class: 'duas' }, inPlaca, inRenavam),
     el('div', { class: 'linha', style: 'justify-content:flex-end' }, botaoConsultar));
