@@ -110,7 +110,7 @@ module.exports = (db, extras = {}) => {
   r.get('/veiculos', (req, res) => {
     const cfg = lerConfig(db);
     const lista = db.prepare(`SELECT v.*, r.imei, r.protocolo, r.modelo AS rastreador_modelo, m.nome AS motorista, mc.nome AS condutor, ca.inicio AS condutor_desde,
-      (SELECT c.tipo FROM comandos c WHERE c.veiculo_id = v.id AND c.tipo IN ('bloquear','desbloquear') AND (c.status = 'pendente' OR (c.status = 'enviado' AND c.enviado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes'))) ORDER BY c.id DESC LIMIT 1) AS rele_pendente
+      (SELECT c.tipo FROM comandos c WHERE c.veiculo_id = v.id AND c.tipo IN ('bloquear','desbloquear') AND (c.status = 'pendente' OR (c.status = 'enviado' AND (c.resposta IS NOT NULL OR c.enviado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes')))) ORDER BY c.id DESC LIMIT 1) AS rele_pendente
       FROM veiculos v LEFT JOIN rastreadores r ON r.id = v.rastreador_id LEFT JOIN motoristas m ON m.id = v.motorista_id
       LEFT JOIN condutores ca ON ca.veiculo_id = v.id AND ca.fim IS NULL LEFT JOIN motoristas mc ON mc.id = ca.motorista_id
       WHERE v.empresa_id = ? ORDER BY v.ativo DESC, v.placa`).all(eid(req));
@@ -236,6 +236,11 @@ module.exports = (db, extras = {}) => {
         registrar(db, req, 'bloqueio_inteligente', { placa: x.placa });
         return res.status(201).json({ ocorrencia_id: oc, status: 'aguardando_velocidade', velocidade_segura_kmh: roubo.limiteSeguro(db) });
       }
+    }
+    if (req.body.tipo === 'desbloquear') {
+      const aberta = db.prepare("SELECT tipo FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada' AND tipo <> 'manual'").get(x.id);
+      v.exigir(!aberta, aberta?.tipo === 'roubo' ? 'O veículo está em Modo Roubo: encerre a ocorrência em Segurança → Roubo para desbloquear.'
+        : 'O veículo está no bloqueio programado: libere em Segurança → Liberações (código do motorista) ou encerre o bloqueio.');
     }
     if (req.body.tipo === 'desbloquear' && roubo.desbloquearManual(db, x, req.usuario.id)) {
       registrar(db, req, 'comando_criado', { placa: x.placa, tipo: 'desbloquear' });
@@ -805,6 +810,8 @@ module.exports = (db, extras = {}) => {
       if (ajuste === 'rele_invertido') {
         v.exigir(plataforma, 'Só a equipe da plataforma muda o sentido do relé.');
         db.prepare('UPDATE rastreadores SET rele_invertido = ? WHERE id = ?').run(v.booleano(req.body.valor) ? 1 : 0, rr.id);
+        // Corte/desbloqueio ainda na fila foi escrito no sentido antigo: cancela (envie de novo pelo botão).
+        db.prepare("UPDATE comandos SET status = 'cancelado', respondido_em = ? WHERE rastreador_id = ? AND status = 'pendente' AND tipo IN ('bloquear','desbloquear')").run(agora(), rr.id);
         return;
       }
       if (Object.hasOwn(equip.CONSULTAS, ajuste)) {

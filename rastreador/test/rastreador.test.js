@@ -83,6 +83,23 @@ test('protocolo GT06: CRC, quadros e decodificação', () => {
   assert.equal(gt.extrair(longo).quadros[0].protocolo, 0x94);
 });
 
+test('GT06 4G: sinal de vida 0x23, resposta 0x21 e corte adiado', () => {
+  // Quadro de teste do Traccar: sinal de vida 0x23 com 2,90 V e sinal 4.
+  const [hb] = gt.extrair(Buffer.from('78780B23C00122040001000818720D0A', 'hex')).quadros;
+  const d = gt.decodificar(hb);
+  assert.equal(d.mensagem.tensao, 2.9);
+  assert.equal(d.mensagem.sinal, 4);
+  // Resposta 0x21 em ASCII (codificação 1).
+  const txt = Buffer.from('DYD=Success!', 'latin1');
+  const r21 = gt.decodificar({ protocolo: 0x21, conteudo: Buffer.concat([Buffer.from([0, 0, 0, 7, 1]), txt]) });
+  assert.equal(r21.texto, 'DYD=Success!');
+  const r21b = gt.decodificar({ protocolo: 0x21, conteudo: Buffer.concat([Buffer.from([0, 0, 0, 7, 2]), Buffer.from(txt.toString('latin1'), 'utf16le').swap16()]) });
+  assert.equal(r21b.texto, 'DYD=Success!', 'UTF-16 big-endian');
+  const com = require('../server/lib/comandos');
+  assert.ok(com.respostaAdiada('Cut off the fuel supply will be executed after GPS fixed and speed less than 20km/h!'));
+  assert.ok(!com.respostaAdiada('Cut off the fuel supply: Success! Speed: 0km/h.'));
+});
+
 test('viagens, paradas, cercas, horário e manutenção', () => {
   const t0 = Date.parse('2026-10-20T10:00:00Z');
   const p = (m, metros, vel, ignicao = 1) => ({ ...norte(-23.5, -46.6, metros), velocidade_kmh: vel, ignicao, gps_em: min(m, t0) });
@@ -495,6 +512,15 @@ test('Rastreador', async (t) => {
     receber(db, { imei: IMEI, protocolo: 'gt06', bloqueado: true, ignicao: true });
     assert.equal(db.prepare('SELECT status FROM comandos WHERE id = ?').get(cid).status, 'confirmado', 'o estado do aparelho confirma o desbloqueio');
     assert.equal(bloq(), 0);
+    // Alarme (SOS) com a mesma posição da última: a posição não duplica, mas o alarme e a ignição valem.
+    const fix = { imei: IMEI, protocolo: 'gt06', lat: antes.lat, lng: antes.lng, velocidade_kmh: 0, gps_em: new Date().toISOString() };
+    assert.equal(receber(db, { ...fix, ignicao: true }).status, 'gravada');
+    const nAlertas = () => db.prepare("SELECT COUNT(*) AS n FROM alertas WHERE veiculo_id = ? AND tipo = 'panico'").get(veiculo).n;
+    db.prepare("DELETE FROM alertas WHERE veiculo_id = ? AND tipo = 'panico'").run(veiculo); // um SOS de outro teste há pouco seria agrupado
+    const antesSos = nAlertas();
+    assert.equal(receber(db, { ...fix, ignicao: false, evento: 'panico' }).status, 'repetida');
+    assert.equal(nAlertas(), antesSos + 1, 'o SOS repetindo a posição gera o alerta');
+    assert.equal(db.prepare('SELECT ignicao FROM veiculos WHERE id = ?').get(veiculo).ignicao, 0);
     db.prepare('UPDATE rastreadores SET rele_invertido = 0 WHERE id = ?').run(rid);
     const cols = Object.keys(antes).filter((k) => k !== 'id');
     db.prepare(`UPDATE veiculos SET ${cols.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...cols.map((k) => antes[k]), veiculo);

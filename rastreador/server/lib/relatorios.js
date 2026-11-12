@@ -149,7 +149,7 @@ function veiculosMapa(db, empresaId = null) {
       (SELECT o.id FROM ocorrencias o WHERE o.veiculo_id = v.id AND o.status <> 'encerrada') AS ocorrencia_id,
       EXISTS (SELECT 1 FROM estacionamentos s WHERE s.veiculo_id = v.id AND s.desarmado_em IS NULL) AS estacionado,
       r.sinal_gsm, r.modelo AS rastreador_modelo,
-      (SELECT c.tipo FROM comandos c WHERE c.veiculo_id = v.id AND c.tipo IN ('bloquear','desbloquear') AND (c.status = 'pendente' OR (c.status = 'enviado' AND c.enviado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes'))) ORDER BY c.id DESC LIMIT 1) AS rele_pendente
+      (SELECT c.tipo FROM comandos c WHERE c.veiculo_id = v.id AND c.tipo IN ('bloquear','desbloquear') AND (c.status = 'pendente' OR (c.status = 'enviado' AND (c.resposta IS NOT NULL OR c.enviado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes')))) ORDER BY c.id DESC LIMIT 1) AS rele_pendente
     FROM veiculos v JOIN empresas e ON e.id = v.empresa_id LEFT JOIN motoristas m ON m.id = v.motorista_id LEFT JOIN rastreadores r ON r.id = v.rastreador_id
     LEFT JOIN condutores ca ON ca.veiculo_id = v.id AND ca.fim IS NULL LEFT JOIN motoristas mc ON mc.id = ca.motorista_id
     WHERE v.ativo = 1 AND e.status <> 'excluida' ${empresaId ? 'AND v.empresa_id = ?' : ''} ORDER BY v.placa`)

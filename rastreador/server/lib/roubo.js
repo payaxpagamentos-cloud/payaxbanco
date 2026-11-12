@@ -51,7 +51,9 @@ function enviarCorte(db, oc, veiculo, motivo, pos) {
 function seguroAgora(v, limite) {
   const recente = v.posicao_em && Date.now() - Date.parse(v.posicao_em) <= POSICAO_RECENTE_MS;
   if (recente && (v.velocidade_kmh ?? 0) < limite) return `Velocidade de ${kmh(v.velocidade_kmh)}, abaixo de ${kmh(limite)}: corte enviado.`;
-  if (v.ignicao === 0) return 'Ignição desligada (veículo parado): corte enviado.';
+  // Ignição desligada só vale com o aparelho falando agora: um aviso antigo (horas sem sinal) não garante que o veículo segue parado.
+  const falouAgora = v.comunicacao_em && Date.now() - Date.parse(v.comunicacao_em) <= POSICAO_RECENTE_MS;
+  if (v.ignicao === 0 && falouAgora) return 'Ignição desligada (veículo parado): corte enviado.';
   return null;
 }
 
