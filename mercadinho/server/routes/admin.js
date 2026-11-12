@@ -16,7 +16,7 @@ const NUMERICAS = {
   vitrine_qtd_produtos: [1, 30], vitrine_segundos_produto: [3, 60], vitrine_tablet_ocioso: [10, 600],
 };
 const BOOLEANAS = ['permitir_estoque_negativo', 'terminal_pix', 'terminal_cartao', 'terminal_conta',
-  'vitrine_mais_vendidos', 'vitrine_mais_lucrativos', 'vitrine_ofertas', 'vitrine_midias', 'vitrine_tablet'];
+  'vitrine_mais_vendidos', 'vitrine_mais_lucrativos', 'vitrine_ofertas', 'vitrine_midias', 'vitrine_tablet', 'vitrine_sincronizar'];
 
 /** Configurações da loja, maquininhas, usuários e auditoria. */
 module.exports = (db, { admin }) => {

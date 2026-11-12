@@ -22,7 +22,16 @@ const relatorios = require('./relatorios');
  */
 const SELOS = { oferta: 'Oferta', vendido: 'Mais vendido', lucrativo: 'Destaque da casa' };
 const DIAS_RANKING = 30;
-const VIDEO_MAX_SEG = 180;
+const VIDEO_SEM_DURACAO_MS = 180_000; // vídeo enviado antes de a duração ser guardada
+const IMAGEM_PADRAO_SEG = 12;
+
+/** As três artes aprovadas do Mercado Binho: entram sozinhas na vitrine na primeira vez. */
+const ARTES_INICIAIS = [
+  ['01-mercado-perto.webp', 'Seu mercado, pertinho de você'],
+  ['02-lanches.webp', 'Bateu a fome? Seu lanche está aqui'],
+  ['03-essenciais.webp', 'Faltou em casa? Os essenciais estão aqui'],
+];
+const PASTA_ARTES = path.join(__dirname, '..', 'vitrine-padrao');
 
 /* ---------- arquivos de mídia ---------- */
 const FORMATOS = {
@@ -47,7 +56,7 @@ function formatoDe(buffer) {
 const nomeSeguro = (nome) => typeof nome === 'string' && /^[\w.-]+$/.test(nome);
 const caminho = (nome) => (nomeSeguro(nome) ? path.join(config.vitrineDir, nome) : null);
 
-function guardarMidia(db, buffer, { titulo = '', duracao_seg = 10 } = {}) {
+function guardarMidia(db, buffer, { titulo = '', duracao_seg = IMAGEM_PADRAO_SEG, duracao_video_ms = null } = {}) {
   if (!Buffer.isBuffer(buffer) || !buffer.length) throw new ErroNegocio('Envie um vídeo ou uma imagem.', 422);
   const ext = formatoDe(buffer);
   if (!ext) throw new ErroNegocio('Formato não aceito. Use vídeo MP4 ou WebM, ou imagem JPEG, PNG ou WebP.', 422);
@@ -59,9 +68,31 @@ function guardarMidia(db, buffer, { titulo = '', duracao_seg = 10 } = {}) {
   const arquivo = `${tipo}-${crypto.randomBytes(6).toString('hex')}.${ext}`;
   fs.writeFileSync(path.join(pasta(), arquivo), buffer, { mode: 0o644 });
   const ordem = (db.prepare('SELECT COALESCE(MAX(ordem), 0) AS m FROM vitrine_midias').get().m) + 1;
-  const r = db.prepare(`INSERT INTO vitrine_midias (tipo, arquivo, titulo, duracao_seg, tamanho_bytes, ordem, ativa, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, 1, ?)`).run(tipo, arquivo, String(titulo ?? '').trim().slice(0, 80), duracao_seg, buffer.length, ordem, agora());
+  const r = db.prepare(`INSERT INTO vitrine_midias (tipo, arquivo, titulo, duracao_seg, duracao_video_ms, tamanho_bytes, ordem, ativa, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`).run(tipo, arquivo, String(titulo ?? '').trim().slice(0, 80), duracao_seg,
+    tipo === 'video' ? duracao_video_ms : null, buffer.length, ordem, agora());
   return obterMidia(db, Number(r.lastInsertRowid));
+}
+
+/**
+ * Na primeira vez que o sistema sobe com a vitrine, cadastra as artes aprovadas. Fica anotado que já
+ * foi feito: se a administração apagar alguma depois, ela não volta sozinha.
+ */
+function semearArtesIniciais(db) {
+  const feito = db.prepare("SELECT valor FROM configuracoes WHERE chave = 'vitrine_artes_iniciais'").get();
+  if (feito) return 0;
+  let n = 0;
+  for (const [arquivo, titulo] of ARTES_INICIAIS) {
+    const origem = path.join(PASTA_ARTES, arquivo);
+    if (!fs.existsSync(origem)) continue;
+    guardarMidia(db, fs.readFileSync(origem), { titulo, duracao_seg: IMAGEM_PADRAO_SEG });
+    n += 1;
+  }
+  // Quem já tinha a vitrine ficou com 8 s por produto (o padrão anterior, não uma escolha). O pedido
+  // da loja é 12 s, como as artes. Só troca se ainda estiver no padrão antigo.
+  db.prepare("UPDATE configuracoes SET valor = '12' WHERE chave = 'vitrine_segundos_produto' AND valor = '8'").run();
+  db.prepare("INSERT INTO configuracoes (chave, valor) VALUES ('vitrine_artes_iniciais', '1')").run();
+  return n;
 }
 
 const obterMidia = (db, id) => db.prepare('SELECT * FROM vitrine_midias WHERE id = ?').get(id);
@@ -133,12 +164,24 @@ function montarSequencia(db) {
     : [];
   const midias = !cfg.vitrine_midias ? [] : db.prepare('SELECT * FROM vitrine_midias WHERE ativa = 1 ORDER BY ordem, id').all()
     .filter((m) => fs.existsSync(path.join(config.vitrineDir, m.arquivo)))
-    .map((m) => ({ tipo: m.tipo, id: m.id, arquivo: m.arquivo, titulo: m.titulo, duracao_seg: m.tipo === 'imagem' ? m.duracao_seg : VIDEO_MAX_SEG }));
+    .map((m) => ({
+      tipo: m.tipo, id: m.id, arquivo: m.arquivo, titulo: m.titulo,
+      duracao_ms: m.tipo === 'imagem' ? m.duracao_seg * 1000 : (m.duracao_video_ms || VIDEO_SEM_DURACAO_MS),
+    }));
 
-  // Intercala as fontes para a TV não passar cinco produtos seguidos e depois três vídeos.
-  const fontes = [ofertas, vendidos, midias, lucrativos];
+  // Produtos intercalados entre si (oferta, mais vendido, destaque...) e as artes/vídeos espalhados por
+  // igual no meio deles, começando por uma arte — assim nenhum trecho da volta fica só de produto.
+  const fontes = [ofertas, vendidos, lucrativos];
+  const produtos = [];
+  for (let i = 0; fontes.some((f) => i < f.length); i += 1) for (const f of fontes) if (i < f.length) produtos.push(f[i]);
   const slides = [];
-  for (let i = 0; fontes.some((f) => i < f.length); i += 1) for (const f of fontes) if (i < f.length) slides.push(f[i]);
+  if (!midias.length) slides.push(...produtos);
+  else {
+    const passo = Math.ceil(produtos.length / midias.length);
+    midias.forEach((m, i) => slides.push(m, ...produtos.slice(i * passo, (i + 1) * passo)));
+  }
+  // Toda tela sabe quanto dura cada quadro: com isso, várias TVs calculam o mesmo quadro pela hora.
+  for (const s of slides) if (s.tipo === 'produto') s.duracao_ms = cfg.vitrine_segundos_produto * 1000;
   return { cfg, slides, contagem: { ofertas: ofertas.length, vendidos: vendidos.length, lucrativos: lucrativos.length, midias: midias.length }, semFoto };
 }
 
@@ -148,6 +191,7 @@ function playlist(db) {
   return {
     mercado: { nome: cfg.nome_mercado, condominio: cfg.condominio },
     segundos_produto: cfg.vitrine_segundos_produto,
+    sincronizar: cfg.vitrine_sincronizar,
     tablet: { ligada: cfg.vitrine_tablet, ocioso_segundos: cfg.vitrine_tablet_ocioso },
     slides,
     gerada_em: agora(),
@@ -160,4 +204,4 @@ function resumo(db) {
   return { contagem, sem_foto: semFoto, dias_ranking: DIAS_RANKING };
 }
 
-module.exports = { playlist, resumo, guardarMidia, apagarMidia, listarMidias, obterMidia, ordenarMidias, formatoDe, caminho, pasta, SELOS };
+module.exports = { playlist, resumo, guardarMidia, semearArtesIniciais, apagarMidia, listarMidias, obterMidia, ordenarMidias, formatoDe, caminho, pasta, SELOS };

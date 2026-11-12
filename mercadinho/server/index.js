@@ -7,6 +7,8 @@ const { expirarPendentes } = require('./lib/maquininha');
 const { expirarAbandonadas } = require('./lib/vendas');
 
 const db = abrir();
+// Primeira vez com a vitrine: cadastra as artes aprovadas (não faz nada nas vezes seguintes).
+require('./lib/vitrine').semearArtesIniciais(db);
 criarApp(db).listen(config.port, () => {
   console.log(`[Mercadinho] No ar em http://localhost:${config.port}${config.basePath}/`);
 });

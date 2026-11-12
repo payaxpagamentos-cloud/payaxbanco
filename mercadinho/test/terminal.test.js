@@ -202,3 +202,52 @@ test('terminal: cartão na maquininha e compra de outro terminal fora de alcance
   assert.equal(require('../server/lib/vendas').expirarAbandonadas(app.db), 1);
   assert.equal((await app.get('/terminal/venda', token)).dados, null);
 });
+
+test('terminal: catálogo da tela de compras com oferta, esgotado e categorias', async (t) => {
+  const app = await iniciar();
+  t.after(() => app.fechar());
+  const { admin, cafe, agua, token } = await comTerminal(app);
+  const sem = (await app.post('/produtos', { nome: 'Sabão', preco: '5,00', custo: '3,00', estoque: '0', categoria_id: 2 }, admin)).dados;
+  await app.patch(`/produtos/${agua.id}`, { oferta_preco: '2,99' }, admin);
+
+  // Só o terminal pareado lê o catálogo; a equipe usa as rotas dela.
+  assert.equal((await app.get('/terminal/catalogo')).status, 401);
+  const { dados } = await app.get('/terminal/catalogo', token);
+  const porNome = Object.fromEntries(dados.produtos.map((p) => [p.nome, p]));
+
+  // Oferta: o preço que vale é o da oferta, e o normal vem junto para riscar.
+  assert.equal(porNome['Água 1,5L'].preco_centavos, 299);
+  assert.equal(porNome['Água 1,5L'].preco_cheio_centavos, 399);
+  assert.equal(porNome['Café 500g'].preco_cheio_centavos, null);
+  // Sem estoque aparece, mas marcado como esgotado (sem como adicionar).
+  assert.equal(porNome['Sabão'].esgotado, true);
+  assert.equal(porNome['Café 500g'].esgotado, false);
+  // Custo nunca vai para a tela do cliente.
+  assert.doesNotMatch(JSON.stringify(dados), /custo|lucro|margem|estoque_mil/i);
+  // Categorias: só as que têm produto, sem repetir.
+  assert.deepEqual(dados.categorias.map((c) => c.id).sort(), [...new Set([cafe.categoria_id, agua.categoria_id, sem.categoria_id])].sort());
+
+  // O mais vendido sobe para o começo da grade.
+  const venda = await app.post('/terminal/venda', {}, token);
+  await app.post(`/terminal/venda/${venda.dados.id}/itens`, { produto_id: agua.id, quantidade: 3 }, token);
+  app.db.prepare("UPDATE vendas SET status = 'paga', fechada_em = ? WHERE id = ?").run(new Date().toISOString(), venda.dados.id);
+  const depois = (await app.get('/terminal/catalogo', token)).dados.produtos;
+  assert.equal(depois[0].nome, 'Água 1,5L');
+});
+
+test('terminal: − e + mudam a quantidade; zerar tira o item', async (t) => {
+  const app = await iniciar();
+  t.after(() => app.fechar());
+  const { cafe, token } = await comTerminal(app);
+  const venda = (await app.post('/terminal/venda', {}, token)).dados;
+  let v = (await app.post(`/terminal/venda/${venda.id}/itens`, { produto_id: cafe.id, quantidade: 1 }, token)).dados;
+  // Dois toques no + do mesmo produto somam na mesma linha.
+  v = (await app.post(`/terminal/venda/${venda.id}/itens`, { produto_id: cafe.id, quantidade: 1 }, token)).dados;
+  assert.equal(v.itens.length, 1);
+  assert.equal(v.itens[0].qtd_mil, 2000);
+  v = (await app.patch(`/terminal/venda/${venda.id}/itens/${v.itens[0].id}`, { quantidade: 3 }, token)).dados;
+  assert.equal(v.total_centavos, 6570);
+  v = (await app.del(`/terminal/venda/${venda.id}/itens/${v.itens[0].id}`, token)).dados;
+  assert.equal(v.itens.length, 0);
+  assert.equal(v.total_centavos, 0);
+});

@@ -118,11 +118,17 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
    o tempo todo.
 
 
-8) O TABLET DO BALCÃO
+8) O TERMINAL DE AUTOATENDIMENTO (QUEM USA É O CLIENTE)
    Abra https://SEU-DOMINIO/mercadinho/pdv/ no navegador, em tela cheia (no Android:
    menu do Chrome > "Adicionar à tela inicial"; no iPad: Compartilhar > "Adicionar à
    Tela de Início"). O pareamento fica salvo no aparelho: só é pedido de novo se a
    administração desativar o terminal ou se os dados do navegador forem apagados.
+
+   Tela de compras: o cliente bipa no leitor ou toca no + do produto (com busca por
+   nome e categorias), confere a lista "Sua compra" à direita (− e + mudam a
+   quantidade) e toca em "Ir para pagamento". Fruta, pão e granel ficam na mesma
+   grade; os vendidos por peso pedem o peso da balança. Os mais vendidos aparecem
+   primeiro, e produto sem estoque aparece como "Esgotado".
 
 
 9) VITRINE (TV DA LOJA E TERMINAL DE AUTOATENDIMENTO)
@@ -132,13 +138,23 @@ As dependências já estão instaladas (pasta node_modules): não precisa rodar 
    Na TV: abra https://SEU-DOMINIO/mercadinho/vitrine/ no navegador da TV (ou do
    computador ligado nela) e toque em "Tela cheia". Não pede login: mostra só nome,
    foto e preço. A cada volta busca de novo o que mudou.
+   As três artes aprovadas do Mercado Binho já vêm cadastradas (12 s cada, troca
+   suave de 0,8 s). Controles: Tela cheia, Pausar, ← e → (somem sozinhos depois de
+   4,5 s). Atalhos: F = tela cheia · espaço = pausar/retomar · setas = anterior/próxima.
+
+   Várias TVs: com "TVs alinhadas" ligado (Gestão > Vitrine), todas mostram o mesmo
+   quadro e trocam juntas, pelo relógio de cada aparelho — deixe a data e a hora das
+   TVs certas (de preferência pela internet). A precisão é a do relógio, não quadro
+   a quadro. Para abrir sozinha ao ligar, configure o modo quiosque da TV/TV box com
+   esse endereço (isso é feito no aparelho, não no sistema).
 
    No terminal de autoatendimento: sem cliente comprando pelo tempo configurado, a
    vitrine aparece sozinha. Some assim que o cliente toca na tela ou passa um produto
    no leitor (e aí a compra já começa).
 
    Vídeos: MP4 (H.264) ou WebM, até 80 MB, de preferência deitados (16:9). Tocam sem
-   som, porque o navegador só deixa tocar sozinho assim. Imagens: JPEG, PNG ou WebP,
+   som, porque o navegador só deixa tocar sozinho assim. Envie pelo painel: ele lê a
+   duração do vídeo antes de enviar, e é ela que mantém as TVs alinhadas. Imagens: JPEG, PNG ou WebP,
    até 8 MB. Os arquivos ficam em data/vitrine e entram na cópia de segurança.
 
    Ofertas: em Produtos > editar (campo "Oferta") ou em Gestão > Vitrine > Nova oferta.

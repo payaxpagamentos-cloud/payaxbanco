@@ -7,7 +7,7 @@ import { criarVitrine } from '../../vitrine/vitrine.js';
  * Ele passa os produtos no leitor, confere o que pegou e paga (PIX, cartão ou conta do morador).
  * Não há login, não há menu e não há como chegar ao resto do sistema por aqui.
  */
-const estado = { inicio: null, venda: null, tela: 'espera', dados: null };
+const estado = { inicio: null, venda: null, tela: 'loja', dados: null, catalogo: null, categoria: 'todas', busca: '', destaque: null };
 const SEGUNDOS_INATIVO = 90;
 const SEGUNDOS_AVISO = 20;
 
@@ -99,7 +99,11 @@ function abrirVitrine() {
 document.addEventListener('keydown', () => { if (sobreposicao) fecharVitrine(); agendarVitrine(); }, true);
 document.addEventListener('pointerdown', () => { if (!sobreposicao) agendarVitrine(); });
 // Parado e sem a vitrine na tela, de tempos em tempos confere se a administração mudou algo.
-setInterval(() => { if (!sobreposicao) vitrine.carregar().then(agendarVitrine); }, 5 * 60 * 1000);
+setInterval(() => {
+  if (sobreposicao || estado.venda?.itens?.length) return;
+  vitrine.carregar().then(agendarVitrine);
+  atualizarCatalogo();
+}, 5 * 60 * 1000);
 
 /* ---------- leitor de código de barras ---------- */
 let buffer = '';
@@ -127,22 +131,28 @@ async function garantirVenda() {
   return estado.venda;
 }
 
-async function adicionarPorCodigo(codigo) {
+function adicionarPorCodigo(codigo) {
+  return naFila(async () => {
   try {
     await garantirVenda();
     estado.venda = await api.post(`/venda/${estado.venda.id}/itens`, { codigo });
-    estado.tela = 'compra';
+    estado.destaque = estado.venda.itens.at(-1)?.produto_id ?? null;
+    estado.tela = 'loja';
     montar();
   } catch (err) {
     toast(err.message, 'erro');
   }
+  });
 }
 
-async function adicionarProduto(produto, quantidade = 1) {
+function adicionarProduto(produto, quantidade = 1) {
+  return naFila(async () => {
   await garantirVenda();
   estado.venda = await api.post(`/venda/${estado.venda.id}/itens`, { produto_id: produto.id, quantidade });
-  estado.tela = 'compra';
+  estado.destaque = produto.id;
+  estado.tela = 'loja';
   montar();
+  });
 }
 
 async function cancelarCompra({ silencioso = false } = {}) {
@@ -150,7 +160,7 @@ async function cancelarCompra({ silencioso = false } = {}) {
     try { await api.post(`/venda/${estado.venda.id}/cancelar`, {}); } catch { /* já encerrada */ }
   }
   estado.venda = null;
-  estado.tela = 'espera';
+  estado.tela = 'loja';
   montar();
   if (!silencioso) toast('Compra cancelada.');
 }
@@ -175,69 +185,202 @@ function telaPareamento(erro) {
       el('button', { class: 'btn primario grande' }, 'Parear terminal'))))));
 }
 
-function telaEspera() {
-  pintar(topo('Passo 1 de 2'),
-    el('div', { class: 'terminal-corpo' },
-      el('div', { class: 'espera' }, el('div', { class: 'conteudo-espera' },
-        el('div', { class: 'alvo-leitor' }, icone('codigobarras')),
-        el('h1', {}, 'Passe o produto no ', el('em', {}, 'leitor')),
-        el('p', {}, 'Um de cada vez. O que você passar aparece aqui na tela — no fim, é só escolher como pagar.'),
-        el('button', { class: 'btn grande', style: 'max-width: 380px', onclick: telaSemCodigo }, icone('produtos'), 'Produto sem código de barras')))));
-  naEspera = true;
-  agendarVitrine();
+/* ---------- tela de compras: catálogo + "Sua compra" na mesma tela ---------- */
+/**
+ * O cliente bipa no leitor ou toca no + do produto; a lista da direita mostra o que já pegou, com − e +.
+ * É uma tela só, do primeiro produto até "Ir para pagamento". Sem cliente, a vitrine cobre a tela.
+ */
+const semAcento = (t) => String(t ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+const ehCodigo = (t) => /^\d{4,14}$/.test(String(t).trim());
+/**
+ * Tudo o que mexe na compra entra numa fila: dois toques rápidos no + viram dois itens, um depois do
+ * outro — e nunca duas compras abertas ao mesmo tempo.
+ */
+let fila = Promise.resolve();
+const naFila = (fn) => { fila = fila.then(fn, fn); return fila; };
+
+const contarItens = (itens) => itens.reduce((n, i) => n + (i.pesavel ? 1 : Math.round(i.qtd_mil / 1000)), 0);
+const formasAceitas = () => {
+  const f = estado.inicio?.formas ?? {};
+  return [f.pix && 'Pix', f.debito && 'Débito', f.credito && 'Crédito', f.fiado && 'Minha conta'].filter(Boolean).join(' • ');
+};
+
+function telaLoja() {
+  // Já montada: só a lista da compra muda (a grade não pisca a cada produto).
+  if (document.querySelector('.loja')) return atualizarCarrinho();
+
+  const busca = el('input', {
+    type: 'search', class: 'campo-busca', placeholder: 'Bipe o produto ou busque pelo nome', autocomplete: 'off', enterkeyhint: 'search', 'aria-label': 'Buscar produto',
+    oninput: () => { estado.busca = busca.value; desenharGrade(); },
+    onkeydown: (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const texto = busca.value.trim();
+      // O leitor também "digita" aqui quando o campo está selecionado: número comprido é código de barras.
+      if (ehCodigo(texto)) { busca.value = ''; estado.busca = ''; desenharGrade(); adicionarPorCodigo(texto); return; }
+      const achados = filtrar();
+      if (achados.length === 1 && !achados[0].esgotado) escolherProduto(achados[0]);
+    },
+  });
+
+  pintar(
+    el('header', { class: 'loja-topo' },
+      logo('logo-topo'),
+      el('h1', {}, 'Escolha seus produtos'),
+      el('button', { class: 'btn-ajuda', type: 'button', onclick: abrirAjuda }, icone('ajuda'), 'Ajuda')),
+    el('div', { class: 'loja' },
+      el('section', { class: 'loja-catalogo' },
+        el('label', { class: 'busca-loja' },
+          el('span', { class: 'ico-leitor' }, icone('codigobarras')),
+          el('span', { class: 'divisoria', 'aria-hidden': 'true' }),
+          icone('busca'), busca),
+        el('div', { class: 'chips', id: 'chips' }),
+        el('div', { class: 'grade-loja', id: 'grade' })),
+      el('aside', { class: 'painel-compra', id: 'carrinho' })));
+  desenharChips();
+  desenharGrade();
+  atualizarCarrinho();
 }
 
-function telaCompra() {
+function filtrar() {
+  const lista = estado.catalogo?.produtos ?? [];
+  const termo = semAcento(estado.busca).trim();
+  return lista.filter((p) => (estado.categoria === 'todas' || p.categoria_id === estado.categoria)
+    && (!termo || semAcento(p.nome).includes(termo) || (p.codigo_barras ?? '').startsWith(termo)));
+}
+
+function desenharChips() {
+  const caixa = $('#chips');
+  if (!caixa) return;
+  const chip = (id, nome) => el('button', {
+    type: 'button', class: `chip${estado.categoria === id ? ' ativa' : ''}`,
+    onclick: () => { estado.categoria = id; desenharChips(); desenharGrade(); $('#grade').scrollTop = 0; },
+  }, nome);
+  limpar(caixa, chip('todas', 'Todos'), (estado.catalogo?.categorias ?? []).map((c) => chip(c.id, c.nome)));
+}
+
+function desenharGrade() {
+  const grade = $('#grade');
+  if (!grade) return;
+  const lista = filtrar();
+  limpar(grade, lista.length
+    ? lista.map((p) => el('div', {
+      class: `card-loja${p.esgotado ? ' esgotado' : ''}`, role: 'button', tabindex: p.esgotado ? -1 : 0, 'aria-label': `${p.nome}, ${dinheiro(p.preco_centavos)}`,
+      onclick: () => { if (!p.esgotado) escolherProduto(p); },
+    },
+    el('div', { class: 'card-foto' }, fotoProduto(p, { classe: 'foto-produto cartaz' })),
+    el('div', { class: 'card-info' },
+      el('div', { class: 'card-nome' }, p.nome),
+      el('div', { class: 'card-sub' }, p.pesavel ? `preço por ${p.unidade}` : (p.categoria ?? ''))),
+    // Preço e + numa faixa na largura toda do cartão: cabe mesmo com três colunas numa tela de 1366 px.
+    el('div', { class: 'card-rodape' },
+      el('div', { class: 'card-preco' },
+        p.preco_cheio_centavos ? el('s', {}, dinheiro(p.preco_cheio_centavos)) : null,
+        el('strong', { class: p.preco_cheio_centavos ? 'oferta' : '' }, dinheiro(p.preco_centavos), p.pesavel ? el('small', {}, `/${p.unidade}`) : null)),
+      p.esgotado
+        ? el('span', { class: 'tag-esgotado' }, 'Esgotado')
+        : el('span', { class: 'mais', 'aria-hidden': 'true' }, icone('mais')))))
+    : el('div', { class: 'vazio' }, estado.busca ? `Nenhum produto com "${estado.busca}".` : 'Nenhum produto nesta categoria.'));
+}
+
+function atualizarCarrinho() {
+  const painel = $('#carrinho');
+  if (!painel) return;
   const venda = estado.venda;
   const itens = venda?.itens ?? [];
-  pintar(topo('Passo 1 de 2'),
-    el('div', { class: 'terminal-corpo' }, el('div', { class: 'compra' },
-      el('section', { class: 'cartao lista' },
-        el('div', { class: 'cabecalho' },
-          el('h2', { style: 'margin: 0' }, 'Sua compra'),
-          el('span', { class: 'mudo' }, `${itens.length} item(ns)`)),
-        el('div', { class: 'itens' }, itens.length
-          ? itens.map((i, indice) => el('div', { class: `item-compra${indice === itens.length - 1 ? ' item-novo' : ''}` },
-            fotoProduto(i, { classe: 'foto-produto' }),
-            el('div', { class: 'crescer' },
-              el('div', { class: 'nome' }, i.descricao),
-              el('div', { class: 'detalhe' }, `${qtd(i.qtd_mil, i.unidade)} × ${dinheiro(i.preco_centavos)}`)),
-            el('span', { class: 'valor' }, dinheiro(i.total_centavos)),
-            el('button', { class: 'btn icone perigo', 'aria-label': `Tirar ${i.descricao}`, onclick: async (e) => {
-              await acao(e.currentTarget, async () => {
-                estado.venda = await api.delete(`/venda/${venda.id}/itens/${i.id}`);
-                if (!estado.venda.itens.length) { estado.tela = 'espera'; }
-                montar();
-              });
-            } }, icone('lixeira'))))
-          : el('div', { class: 'vazio' }, 'Passe o primeiro produto no leitor.'))),
+  const n = contarItens(itens);
 
-      el('aside', { class: 'resumo' },
-        el('div', { class: 'cartao caixa-total' },
-          el('div', { class: 'rotulo-total' }, 'Total a pagar'),
-          el('div', { class: 'valor-total' }, dinheiro(venda?.total_centavos ?? 0))),
-        el('button', { class: 'btn primario enorme', disabled: !itens.length, onclick: () => { estado.tela = 'pagamento'; montar(); } }, icone('dinheiro'), 'Pagar'),
-        el('button', { class: 'btn grande', onclick: telaSemCodigo }, icone('produtos'), 'Produto sem código'),
-        el('button', { class: 'btn grande perigo', onclick: () => cancelarCompra() }, 'Cancelar compra'),
-        el('p', { class: 'pequeno mudo centro' }, 'Continue passando os produtos no leitor para incluir mais itens.')))));
+  const passo = (i) => el('div', { class: 'passo-qtd' },
+    el('button', { type: 'button', 'aria-label': `Tirar um ${i.descricao}`, onclick: () => mudarQuantidade(i, -1) }, '−'),
+    el('span', { class: 'num' }, String(Math.round(i.qtd_mil / 1000))),
+    el('button', { type: 'button', 'aria-label': `Mais um ${i.descricao}`, onclick: () => mudarQuantidade(i, 1) }, '+'));
+
+  limpar(painel,
+    el('div', { class: 'painel-cabecalho' },
+      el('h2', {}, 'Sua compra'),
+      n ? el('span', { class: 'contador-itens' }, `${n} ${n === 1 ? 'item' : 'itens'}`) : null),
+    el('div', { class: 'lista-carrinho' }, itens.length
+      ? itens.map((i) => el('div', { class: `item-carrinho${i.produto_id === estado.destaque ? ' item-novo' : ''}` },
+        fotoProduto(i, { classe: 'foto-produto' }),
+        el('div', { class: 'crescer' },
+          el('div', { class: 'nome' }, i.descricao),
+          el('div', { class: 'detalhe' }, i.pesavel ? `${qtd(i.qtd_mil, i.unidade)} × ${dinheiro(i.preco_centavos)}` : `${dinheiro(i.preco_centavos)} cada`),
+          i.pesavel
+            ? el('button', { type: 'button', class: 'tirar', onclick: () => mudarQuantidade(i, -Infinity) }, 'Tirar')
+            : passo(i)),
+        el('span', { class: 'valor num' }, dinheiro(i.total_centavos))))
+      : el('div', { class: 'carrinho-vazio' }, el('span', { class: 'alvo-leitor' }, icone('codigobarras')),
+        el('p', {}, 'Passe o código de barras no leitor ou toque no ', el('strong', {}, '+'), ' do produto.'))),
+    el('div', { class: 'painel-rodape' },
+      el('div', { class: 'linha-total' }, el('span', {}, 'Total'), el('strong', { class: 'num' }, dinheiro(venda?.total_centavos ?? 0))),
+      el('button', { class: 'btn primario enorme', disabled: !itens.length, onclick: () => { estado.tela = 'pagamento'; montar(); } },
+        'Ir para pagamento', icone('seta-direita')),
+      el('p', { class: 'formas-aceitas' }, formasAceitas()),
+      el('button', { type: 'button', class: 'cancelar-compra', disabled: !itens.length, onclick: confirmarCancelamento }, 'Cancelar compra')));
+
+  painel.querySelector('.item-novo')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  estado.destaque = null;
+  // Carrinho vazio = ninguém comprando: a vitrine pode voltar depois do tempo configurado.
+  naEspera = !itens.length;
+  if (naEspera) agendarVitrine(); else clearTimeout(timerVitrine);
 }
 
-/** Hortifrúti, padaria e granel: o cliente escolhe na tela, porque não há código para bipar. */
-async function telaSemCodigo() {
-  const produtos = await api.get('/produtos/sem-codigo');
-  pintar(topo('Escolher produto'),
-    el('div', { class: 'terminal-corpo' },
-      el('div', { class: 'linha entre' },
-        el('h1', {}, 'Produtos sem código'),
-        el('button', { class: 'btn grande', style: 'width: auto', onclick: montar }, icone('voltar'), 'Voltar')),
-      produtos.length
-        ? el('div', { class: 'grade-produtos' }, produtos.map((p) => el('button', { class: 'cartao-produto', onclick: () => escolherProduto(p) },
-          fotoProduto(p, { classe: 'foto-produto vitrine' }),
-          el('span', { class: 'cat' }, p.categoria ?? 'Outros'),
-          el('span', { class: 'nome' }, p.nome),
-          p.preco_cheio_centavos ? el('s', { class: 'preco-cheio' }, dinheiro(p.preco_cheio_centavos)) : null,
-          el('span', { class: `preco${p.preco_cheio_centavos ? ' oferta' : ''}` }, `${dinheiro(p.preco_centavos)}${p.pesavel ? ` / ${p.unidade}` : ''}`))))
-        : el('div', { class: 'cartao' }, el('div', { class: 'vazio' }, 'Todos os produtos têm código de barras. Passe no leitor.'))));
+function mudarQuantidade(item, delta) {
+  return naFila(async () => {
+  try {
+    // A quantidade vem da compra atual (e não do botão), porque outro toque na fila pode ter mudado.
+    const atual = estado.venda?.itens?.find((i) => i.id === item.id);
+    if (!atual) return;
+    const nova = Math.round(atual.qtd_mil / 1000) + delta;
+    estado.destaque = nova > 0 ? item.produto_id : null;
+    estado.venda = nova > 0 && !item.pesavel
+      ? await api.patch(`/venda/${estado.venda.id}/itens/${item.id}`, { quantidade: nova })
+      : await api.delete(`/venda/${estado.venda.id}/itens/${item.id}`);
+    montar();
+  } catch (err) {
+    toast(err.message, 'erro');
+  }
+  });
+}
+
+/** Janela por cima da tela (ajuda e confirmação). Toque fora fecha. */
+function janela(conteudo) {
+  const fechar = () => caixa.remove();
+  const caixa = el('div', { class: 'sobreposicao', onclick: (e) => { if (e.target === caixa) fechar(); } },
+    el('div', { class: 'cartao janela' }, ...conteudo(fechar)));
+  document.body.append(caixa);
+  return fechar;
+}
+
+function abrirAjuda() {
+  janela((fechar) => [
+    el('h2', {}, 'Como comprar'),
+    el('ol', { class: 'passos-ajuda' },
+      el('li', {}, 'Passe o código de barras do produto no leitor. Ele entra sozinho na sua compra.'),
+      el('li', {}, 'Fruta, pão ou granel? Ache na lista e toque no +. Se for por peso, digite o que a balança mostrou.'),
+      el('li', {}, 'Confira a lista à direita. Use − e + para mudar a quantidade.'),
+      el('li', {}, `Toque em "Ir para pagamento" e pague: ${formasAceitas()}.`)),
+    el('p', { class: 'mudo' }, 'Algum problema? Fale com a administração do condomínio.'),
+    el('button', { class: 'btn primario grande', type: 'button', onclick: fechar }, 'Entendi'),
+  ]);
+}
+
+function confirmarCancelamento() {
+  janela((fechar) => [
+    el('h2', {}, 'Cancelar a compra?'),
+    el('p', { class: 'mudo' }, 'Todos os itens saem da lista. Nada é cobrado.'),
+    el('div', { class: 'linha', style: 'justify-content: center' },
+      el('button', { class: 'btn grande', style: 'width: auto', type: 'button', onclick: fechar }, 'Continuar comprando'),
+      el('button', { class: 'btn grande perigo', style: 'width: auto', type: 'button', onclick: () => { fechar(); cancelarCompra(); } }, 'Cancelar compra')),
+  ]);
+}
+
+/** Recarrega o catálogo (preço, oferta e estoque mudam ao longo do dia). Falhou? Fica com o que tinha. */
+async function atualizarCatalogo() {
+  try {
+    estado.catalogo = await api.get('/catalogo');
+    if (document.querySelector('.loja')) { desenharChips(); desenharGrade(); }
+  } catch { /* segue com o catálogo anterior */ }
 }
 
 async function escolherProduto(produto) {
@@ -249,8 +392,9 @@ async function escolherProduto(produto) {
     acima: fotoProduto(produto, { classe: 'foto-produto grande' }),
     decimal: true,
     sufixo: produto.unidade,
+    passo: 'Peso na balança',
     aoConfirmar: (valor) => acaoSegura(() => adicionarProduto(produto, valor)),
-    aoVoltar: telaSemCodigo,
+    aoVoltar: montar,
   });
 }
 
@@ -278,7 +422,7 @@ function telaPagamento() {
         el('div', {},
           el('h1', { style: 'margin-bottom: 6px' }, 'Como você quer pagar?'),
           el('p', { class: 'mudo', style: 'margin: 0; font-size: 19px' }, `Total de ${dinheiro(estado.venda.total_centavos)}`)),
-        el('button', { class: 'btn grande', style: 'width: auto', onclick: () => { estado.tela = 'compra'; montar(); } }, icone('voltar'), 'Voltar')),
+        el('button', { class: 'btn grande', style: 'width: auto', onclick: () => { estado.tela = 'loja'; montar(); } }, icone('voltar'), 'Voltar')),
       opcoes.length
         ? el('div', { class: 'escolha-pagamento' }, opcoes.map((o) => el('button', { class: 'opcao-pagamento', onclick: o.aoTocar },
           el('span', { class: 'circulo' }, icone(o.simbolo)), o.rotulo, el('small', {}, o.nota))))
@@ -413,7 +557,7 @@ function confirmarConta(morador) {
 }
 
 /* ---------- teclado numérico ---------- */
-function teclado({ titulo, descricao, aoConfirmar, aoVoltar, acima = null, senha = false, decimal = false, sufixo = '' }) {
+function teclado({ titulo, descricao, aoConfirmar, aoVoltar, acima = null, senha = false, decimal = false, sufixo = '', passo = 'Pagamento' }) {
   let valor = '';
   const visor = el('div', { class: 'visor vazio' });
   const pontos = el('div', { class: 'pontos-pin' });
@@ -435,18 +579,20 @@ function teclado({ titulo, descricao, aoConfirmar, aoVoltar, acima = null, senha
   } }, t.rotulo);
 
   desenhar();
-  pintar(topo('Pagamento'), el('div', { class: 'terminal-corpo' }, el('div', { class: 'cartao painel-pagar' },
-    acima,
-    el('h1', { style: 'margin: 0' }, titulo),
-    el('p', { class: 'mudo', style: 'margin: 0' }, descricao),
-    senha ? pontos : visor,
+  // Deitado, as informações ficam à esquerda e o teclado à direita: tudo cabe sem rolar.
+  pintar(topo(passo), el('div', { class: 'terminal-corpo' }, el('div', { class: 'cartao painel-teclado' },
+    el('div', { class: 'teclado-info' },
+      acima,
+      el('h1', { style: 'margin: 0' }, titulo),
+      el('p', { class: 'mudo', style: 'margin: 0' }, descricao),
+      senha ? pontos : visor,
+      decimal ? el('button', { class: 'btn primario enorme', onclick: () => valor && aoConfirmar(valor) }, 'Confirmar') : null,
+      el('button', { class: 'btn grande', onclick: aoVoltar }, icone('voltar'), 'Voltar')),
     el('div', { class: 'teclado-numerico' },
       ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((n) => tecla({ rotulo: n, valor: n })),
       decimal ? tecla({ rotulo: ',', valor: ',' }) : tecla({ rotulo: '←', valor: 'apagar', classe: 'apagar' }),
       tecla({ rotulo: '0', valor: '0' }),
-      decimal ? tecla({ rotulo: '←', valor: 'apagar', classe: 'apagar' }) : tecla({ rotulo: 'OK', valor: 'ok', classe: 'confirmar' })),
-    decimal ? el('button', { class: 'btn primario enorme', style: 'max-width: 340px', onclick: () => valor && aoConfirmar(valor) }, 'Confirmar') : null,
-    el('button', { class: 'btn grande', style: 'max-width: 340px', onclick: aoVoltar }, icone('voltar'), 'Voltar'))));
+      decimal ? tecla({ rotulo: '←', valor: 'apagar', classe: 'apagar' }) : tecla({ rotulo: 'OK', valor: 'ok', classe: 'confirmar' })))));
 }
 
 /* ---------- fim ---------- */
@@ -487,8 +633,11 @@ function telaFim() {
 function voltarAoInicio() {
   clearInterval(timerAviso);
   estado.dados = null;
-  estado.tela = 'espera';
+  estado.tela = 'loja';
+  estado.busca = '';
+  estado.categoria = 'todas';
   montar();
+  atualizarCatalogo(); // estoque e preços mudaram com a venda
 }
 
 async function verCupom() {
@@ -516,18 +665,16 @@ function montar() {
   reiniciarRelogio();
   if (estado.tela === 'fim') return telaFim();
   if (estado.tela === 'pagamento') return telaPagamento();
-  if (estado.venda?.itens?.length) return telaCompra();
-  return telaEspera();
+  return telaLoja();
 }
 
 async function iniciar() {
   if (!pareamento.get()?.token) return telaPareamento();
   try {
-    estado.inicio = await api.get('/inicio');
-    vitrine.carregar().then(agendarVitrine); // sem esperar: a vitrine não pode atrasar o caixa
-    document.title = `Caixa — ${estado.inicio.mercado.nome}`;
-    estado.venda = await api.get('/venda');
-    estado.tela = estado.venda?.itens?.length ? 'compra' : 'espera';
+    [estado.inicio, estado.catalogo, estado.venda] = await Promise.all([api.get('/inicio'), api.get('/catalogo'), api.get('/venda')]);
+    vitrine.carregar().then(agendarVitrine); // sem esperar: a vitrine não pode atrasar a compra
+    document.title = `Autoatendimento — ${estado.inicio.mercado.nome}`;
+    estado.tela = 'loja';
     montar();
   } catch (err) {
     if (!pareamento.get()?.token) return telaPareamento(err.message);

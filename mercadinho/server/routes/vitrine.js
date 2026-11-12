@@ -26,8 +26,11 @@ module.exports = (db, { autenticado, gestao }) => {
   const tiposAceitos = ['video/mp4', 'video/webm', 'image/jpeg', 'image/png', 'image/webp', 'application/octet-stream'];
   g.post('/midias', express.raw({ type: tiposAceitos, limit: config.vitrineVideoMaxBytes + 1024 }), (req, res) => {
     const titulo = v.opcional(req.query.titulo, 'o título', 80) ?? '';
-    const duracao_seg = req.query.duracao ? v.inteiro(req.query.duracao, 'a duração', { min: 3, max: 120 }) : 10;
-    const m = vitrine.guardarMidia(db, req.body, { titulo, duracao_seg });
+    const duracao_seg = req.query.duracao ? v.inteiro(req.query.duracao, 'a duração', { min: 3, max: 120 }) : undefined;
+    // O painel lê a duração do vídeo no próprio navegador antes de enviar (em segundos, com fração).
+    const segundosVideo = Number(req.query.duracao_video);
+    const duracao_video_ms = Number.isFinite(segundosVideo) && segundosVideo > 0 ? Math.round(Math.min(segundosVideo, 3600) * 1000) : null;
+    const m = vitrine.guardarMidia(db, req.body, { titulo, duracao_seg, duracao_video_ms });
     registrar(db, req, 'vitrine_midia_enviada', `${m.tipo} #${m.id}`);
     res.status(201).json(m);
   });

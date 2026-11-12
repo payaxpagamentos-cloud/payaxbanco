@@ -57,6 +57,7 @@ export default async function vitrine({ alvo, definirTitulo }) {
         const d = {
           vitrine_ofertas: f.vitrine_ofertas.checked, vitrine_mais_vendidos: f.vitrine_mais_vendidos.checked,
           vitrine_mais_lucrativos: f.vitrine_mais_lucrativos.checked, vitrine_midias: f.vitrine_midias.checked, vitrine_tablet: f.vitrine_tablet.checked,
+          vitrine_sincronizar: f.vitrine_sincronizar.checked,
           vitrine_qtd_produtos: Number(f.vitrine_qtd_produtos.value), vitrine_segundos_produto: Number(f.vitrine_segundos_produto.value),
           vitrine_tablet_ocioso: Number(f.vitrine_tablet_ocioso.value),
         };
@@ -73,6 +74,7 @@ export default async function vitrine({ alvo, definirTitulo }) {
       el('div', { class: 'duas' },
         el('label', { class: 'campo' }, 'Produtos de cada lista', el('input', { name: 'vitrine_qtd_produtos', type: 'number', min: 1, max: 30, value: cfg.vitrine_qtd_produtos })),
         el('label', { class: 'campo' }, 'Segundos por produto', el('input', { name: 'vitrine_segundos_produto', type: 'number', min: 3, max: 60, value: cfg.vitrine_segundos_produto }))),
+      chave('vitrine_sincronizar', 'TVs alinhadas', 'Todas as TVs mostram o mesmo quadro ao mesmo tempo, pelo relógio de cada aparelho (deixe o relógio das TVs certo).'),
       el('hr', { class: 'divisor' }),
       chave('vitrine_tablet', 'Mostrar também no terminal de autoatendimento', 'Quando nenhum cliente está comprando. Some assim que o cliente toca na tela ou passa um produto no leitor.'),
       el('label', { class: 'campo' }, 'Segundos sem cliente até aparecer no terminal', el('input', { name: 'vitrine_tablet_ocioso', type: 'number', min: 10, max: 600, value: cfg.vitrine_tablet_ocioso })),
@@ -101,12 +103,26 @@ export default async function vitrine({ alvo, definirTitulo }) {
     entrada.click();
   }
 
-  function enviar(arquivo) {
+  /** Lê a duração do vídeo aqui mesmo, antes de enviar: é com ela que as TVs ficam alinhadas. */
+  const duracaoDoVideo = (arquivo) => new Promise((resolve) => {
+    if (!arquivo.type.startsWith('video/')) return resolve(null);
+    const url = URL.createObjectURL(arquivo);
+    const v = document.createElement('video');
+    const fim = (d) => { URL.revokeObjectURL(url); resolve(Number.isFinite(d) && d > 0 ? d : null); };
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => fim(v.duration);
+    v.onerror = () => fim(null);
+    setTimeout(() => fim(null), 8000);
+    v.src = url;
+  });
+
+  async function enviar(arquivo) {
     const titulo = arquivo.name.replace(/\.[^.]+$/, '').slice(0, 80);
+    const segundos = await duracaoDoVideo(arquivo);
     const barra = el('span');
     const texto = el('p', { class: 'mudo' }, `${arquivo.name} · ${mb(arquivo.size)}`);
     modal('Enviando para a vitrine', (fechar) => {
-      api.enviarComProgresso(`/vitrine/gestao/midias?titulo=${encodeURIComponent(titulo)}`, arquivo, (p) => {
+      api.enviarComProgresso(`/vitrine/gestao/midias?titulo=${encodeURIComponent(titulo)}${segundos ? `&duracao_video=${segundos.toFixed(2)}` : ''}`, arquivo, (p) => {
         barra.style.width = `${Math.round(p * 100)}%`;
         texto.textContent = `${arquivo.name} · ${mb(arquivo.size)} · ${Math.round(p * 100)}%`;
       }).then(async () => {
@@ -134,7 +150,7 @@ export default async function vitrine({ alvo, definirTitulo }) {
         : el('img', { src: `${RAIZ}/vitrine-midia/${m.arquivo}`, alt: '' })),
       el('div', { class: 'crescer' },
         el('div', { class: 'destaque' }, m.titulo || (m.tipo === 'video' ? 'Vídeo sem título' : 'Imagem sem título')),
-        el('div', { class: 'pequeno mudo' }, `${m.tipo === 'video' ? 'Vídeo · toca até o fim' : `Imagem · ${m.duracao_seg} s na tela`} · ${mb(m.tamanho_bytes)}`)),
+        el('div', { class: 'pequeno mudo' }, `${m.tipo === 'video' ? `Vídeo · ${m.duracao_video_ms ? `${Math.round(m.duracao_video_ms / 1000)} s` : 'toca até o fim'}` : `Imagem · ${m.duracao_seg} s na tela`} · ${mb(m.tamanho_bytes)}`)),
       m.ativa ? etiqueta('passando', 'ok') : etiqueta('pausado'),
       el('div', { class: 'linha', style: 'gap: 4px' },
         el('button', { class: 'btn icone fantasma', title: 'Subir', disabled: i === 0, onclick: mover(i, -1) }, icone('seta-cima')),

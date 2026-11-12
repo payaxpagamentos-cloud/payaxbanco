@@ -171,3 +171,34 @@ test('vitrine: envio de vídeo e imagem, validação, ordem e quem pode mexer', 
   assert.equal((await app.del(`/vitrine/gestao/midias/${video.dados.id}`, admin)).status, 204);
   assert.equal(fs.existsSync(arquivo), false);
 });
+
+test('vitrine: as artes aprovadas entram uma vez só, com duração de 12 s', async (t) => {
+  const { app } = await preparar(t);
+  const vitrine = require('../server/lib/vitrine');
+  assert.equal(vitrine.semearArtesIniciais(app.db), 3);
+  const midias = vitrine.listarMidias(app.db);
+  assert.deepEqual(midias.map((m) => m.titulo), ['Seu mercado, pertinho de você', 'Bateu a fome? Seu lanche está aqui', 'Faltou em casa? Os essenciais estão aqui']);
+  assert.ok(midias.every((m) => m.tipo === 'imagem' && m.duracao_seg === 12));
+  // Rodar de novo (servidor reiniciado) não duplica…
+  assert.equal(vitrine.semearArtesIniciais(app.db), 0);
+  // …e se a administração apagar uma, ela não volta sozinha.
+  vitrine.apagarMidia(app.db, midias[0].id);
+  assert.equal(vitrine.semearArtesIniciais(app.db), 0);
+  assert.equal(vitrine.listarMidias(app.db).length, 2);
+
+  // Cada quadro leva a duração: é com ela que várias TVs se alinham pelo relógio.
+  const { slides, sincronizar } = (await app.get('/vitrine')).dados;
+  assert.equal(sincronizar, true);
+  assert.ok(slides.every((s) => s.duracao_ms >= 3000));
+  // As artes ficam espalhadas, começando por uma delas.
+  assert.equal(slides[0].tipo, 'imagem');
+});
+
+test('vitrine: vídeo guarda a duração real lida no envio', async (t) => {
+  const { app, admin } = await preparar(t);
+  const r = await app.enviarArquivo('/vitrine/gestao/midias?titulo=Comercial&duracao_video=15.4', MP4, 'video/mp4', admin);
+  assert.equal(r.status, 201);
+  assert.equal(r.dados.duracao_video_ms, 15400);
+  const video = (await app.get('/vitrine')).dados.slides.find((s) => s.tipo === 'video');
+  assert.equal(video.duracao_ms, 15400);
+});

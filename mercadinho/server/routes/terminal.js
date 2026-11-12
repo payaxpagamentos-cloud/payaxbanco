@@ -7,6 +7,8 @@ const { emitirTokenTerminal, autenticarTerminal } = require('../auth');
 const terminalLib = require('../lib/terminal');
 const vendas = require('../lib/vendas');
 const produtos = require('../lib/produtos');
+const relatorios = require('../lib/relatorios');
+const { hoje, somarDias } = require('../lib/datas');
 const maquininha = require('../lib/maquininha');
 const pix = require('../lib/pix');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
@@ -47,6 +49,33 @@ module.exports = (db) => {
     id: p.id, nome: p.nome, codigo_barras: p.codigo_barras, unidade: p.unidade, pesavel: p.pesavel, foto: p.foto,
     preco_centavos: p.preco_vigente_centavos, preco_cheio_centavos: p.em_oferta ? p.preco_centavos : null,
   }))));
+
+  /**
+   * Catálogo da tela de compras: tudo o que está à venda, com o preço de agora (oferta aplicada), as
+   * categorias que têm produto e os mais vendidos dos últimos 30 dias primeiro — o que o cliente mais
+   * procura aparece sem rolar. Esgotado aparece, mas sem como adicionar.
+   */
+  r.get('/catalogo', (_req, res) => {
+    const cfg = lerConfig(db);
+    const dia = hoje();
+    const ranking = new Map(relatorios.maisVendidos(db, { de: somarDias(dia, -29), ate: dia, limite: 2000 }).map((l, i) => [l.id, i]));
+    const lista = db.prepare(`SELECT p.id, p.nome, p.unidade, p.pesavel, p.foto, p.codigo_barras, p.preco_centavos, p.oferta_preco_centavos,
+        p.oferta_ate, p.estoque_mil, p.categoria_id, c.nome AS categoria, c.cor AS cor
+      FROM produtos p LEFT JOIN categorias c ON c.id = p.categoria_id
+      WHERE p.ativo = 1 ORDER BY p.nome LIMIT 3000`).all();
+    const itens = lista.map((p) => {
+      const oferta = produtos.emOferta(p, dia);
+      return {
+        id: p.id, nome: p.nome, unidade: p.unidade, pesavel: p.pesavel, foto: p.foto, codigo_barras: p.codigo_barras,
+        categoria_id: p.categoria_id, categoria: p.categoria, cor: p.cor,
+        preco_centavos: oferta ? p.oferta_preco_centavos : p.preco_centavos, preco_cheio_centavos: oferta ? p.preco_centavos : null,
+        esgotado: !cfg.permitir_estoque_negativo && p.estoque_mil <= 0,
+      };
+    }).sort((a, b) => (ranking.get(a.id) ?? Infinity) - (ranking.get(b.id) ?? Infinity) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const categorias = [...new Map(itens.filter((p) => p.categoria_id).map((p) => [p.categoria_id, { id: p.categoria_id, nome: p.categoria, cor: p.cor }])).values()]
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    res.json({ categorias, produtos: itens });
+  });
 
   /** Produtos sem código de barras (hortifrúti, padaria, granel): o cliente escolhe na tela. */
   r.get('/produtos/sem-codigo', (_req, res) => res.json(db.prepare(`SELECT p.id, p.nome, p.unidade, p.pesavel, p.preco_centavos, p.foto,

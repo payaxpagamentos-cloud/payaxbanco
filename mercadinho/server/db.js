@@ -374,6 +374,8 @@ CREATE TABLE IF NOT EXISTS vitrine_midias (
   -- Quanto tempo a imagem fica na tela. O vídeo toca até o fim.
   duracao_seg INTEGER NOT NULL DEFAULT 10 CHECK (duracao_seg BETWEEN 3 AND 120),
   tamanho_bytes INTEGER NOT NULL DEFAULT 0,
+  -- Duração real do vídeo, lida pelo navegador no envio. É ela que deixa várias TVs alinhadas.
+  duracao_video_ms INTEGER,
   ordem INTEGER NOT NULL DEFAULT 0,
   ativa INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL
@@ -426,7 +428,9 @@ const CONFIG_PADRAO = {
   vitrine_ofertas: '1',
   vitrine_midias: '1',
   vitrine_qtd_produtos: '6',
-  vitrine_segundos_produto: '8',
+  vitrine_segundos_produto: '12',
+  // Todas as TVs mostram o mesmo quadro ao mesmo tempo (pelo relógio de cada aparelho).
+  vitrine_sincronizar: '1',
   vitrine_tablet: '1',
   vitrine_tablet_ocioso: '45',
 };
@@ -442,6 +446,7 @@ const COLUNAS_NOVAS = [
   ['pagamentos', 'conferido_por', 'INTEGER REFERENCES usuarios(id)'],
   ['produtos', 'oferta_preco_centavos', 'INTEGER'],
   ['produtos', 'oferta_ate', 'TEXT'],
+  ['vitrine_midias', 'duracao_video_ms', 'INTEGER'],
 ];
 
 function migrar(db) {
@@ -518,6 +523,7 @@ function lerConfig(db) {
     vitrine_midias: c.vitrine_midias === '1',
     vitrine_qtd_produtos: Number(c.vitrine_qtd_produtos),
     vitrine_segundos_produto: Number(c.vitrine_segundos_produto),
+    vitrine_sincronizar: c.vitrine_sincronizar === '1',
     vitrine_tablet: c.vitrine_tablet === '1',
     vitrine_tablet_ocioso: Number(c.vitrine_tablet_ocioso),
   };
