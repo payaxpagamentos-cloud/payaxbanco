@@ -31,6 +31,8 @@ module.exports = {
   fotoMaximoBytes: Number(process.env.MERCADO_FOTO_MAX_BYTES) || 2 * 1024 * 1024,
   secret,
   tokenTtlSeconds: 12 * 60 * 60,
+  // "Manter conectado" na tela de entrada: sessão mais longa, por opção de quem entra.
+  tokenTtlLembrarSeconds: Number(process.env.MERCADO_TTL_LEMBRAR_DIAS || 7) * 24 * 60 * 60,
   // O terminal do balcão fica pareado por um ano (a administração pode desativá-lo a qualquer momento).
   terminalTtlSeconds: Number(process.env.MERCADO_TERMINAL_TTL_DIAS || 365) * 24 * 60 * 60,
   trustProxy: process.env.MERCADO_TRUST_PROXY ?? 'loopback',

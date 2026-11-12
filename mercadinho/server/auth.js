@@ -6,9 +6,13 @@ const { ErroNegocio } = require('./lib/erros');
 
 const assinar = (dados) => crypto.createHmac('sha256', config.secret).update(dados).digest('base64url');
 
-/** Token assinado (HMAC) com o id do usuário e a validade. O perfil é sempre lido do banco. */
-function emitirToken(usuario) {
-  const payload = Buffer.from(JSON.stringify({ sub: usuario.id, aud: 'mercadinho', exp: Math.floor(Date.now() / 1000) + config.tokenTtlSeconds })).toString('base64url');
+/**
+ * Token assinado (HMAC) com o id do usuário e a validade. O perfil é sempre lido do banco.
+ * Com `lembrar`, a sessão dura mais (opção "Manter conectado" da tela de entrada).
+ */
+function emitirToken(usuario, { lembrar = false } = {}) {
+  const ttl = lembrar ? config.tokenTtlLembrarSeconds : config.tokenTtlSeconds;
+  const payload = Buffer.from(JSON.stringify({ sub: usuario.id, aud: 'mercadinho', exp: Math.floor(Date.now() / 1000) + ttl })).toString('base64url');
   return `${payload}.${assinar(payload)}`;
 }
 

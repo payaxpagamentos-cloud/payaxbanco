@@ -59,7 +59,7 @@ test('terminal: cliente monta o carrinho e paga no PIX', async (t) => {
   assert.equal(inicio.dados.formas.credito, true);
   // De fábrica o terminal não vende na conta do morador.
   assert.equal(inicio.dados.formas.fiado, false);
-  assert.equal(inicio.dados.mercado.nome, 'Mercadinho do Condomínio');
+  assert.equal(inicio.dados.mercado.nome, 'Mercado Binho');
 
   // Começa sem compra na tela.
   assert.equal((await app.get('/terminal/venda', token)).dados, null);

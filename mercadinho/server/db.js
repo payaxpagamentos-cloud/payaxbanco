@@ -380,7 +380,7 @@ const CATEGORIAS_PADRAO = [
 ];
 
 const CONFIG_PADRAO = {
-  nome_mercado: 'Mercadinho do Condomínio',
+  nome_mercado: 'Mercado Binho',
   condominio: '',
   cnpj: '',
   endereco: '',

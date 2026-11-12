@@ -356,20 +356,93 @@ td.direita, th.direita{ text-align: right; }
   .cartao > .tabela-rolagem, .painel > .tabela-rolagem{ margin: 0 -16px -16px; }
 }
 
-/* ---------- entrada (login) ---------- */
-.entrada{ min-height: 100vh; display: grid; place-items: center; padding: 28px 20px; }
-.entrada .caixa{ width: 100%; max-width: 400px; padding: 40px 32px 32px; text-align: center; }
-.entrada .logo-entrada{ display: block; width: 100%; max-width: 236px; height: auto; margin: 0 auto 12px; }
-/* O logo tem o "Binho" em branco: no tema claro entra a versão de tinta escura. */
-.entrada .logo-entrada.no-claro{ display: none; }
-[data-tema="claro"] .entrada .logo-entrada.no-escuro{ display: none; }
-[data-tema="claro"] .entrada .logo-entrada.no-claro{ display: block; }
-.entrada .erp{ font-family: var(--display); font-size: 11px; font-weight: 600; letter-spacing: .18em;
-  text-transform: uppercase; color: var(--texto-2); margin: 0 0 28px; }
-.entrada .form{ text-align: left; }
-@media (max-width: 520px){
-  .entrada .caixa{ padding: 30px 22px 24px; }
-  .entrada .logo-entrada{ max-width: 200px; }
+/* ---------- entrada (login) ----------
+ * A tela de entrada é a vitrine do sistema: fica sempre no escuro da marca, mesmo com o
+ * tema claro escolhido, porque a arte da loja foi feita sobre esse fundo. */
+.entrada{
+  min-height: 100vh; display: flex; flex-direction: column; gap: 12px;
+  padding: 26px clamp(16px, 3.5vw, 52px) 18px;
+  background:
+    radial-gradient(760px 520px at 5% -8%, rgba(2,150,125,.40), transparent 62%),
+    radial-gradient(1040px 700px at 27% 80%, rgba(9,58,76,.72), transparent 66%),
+    radial-gradient(720px 540px at 94% 16%, rgba(4,62,82,.42), transparent 62%),
+    #011829;
+  color: #E7F4F1;
+}
+.entrada .topo-entrada{ flex: none; }
+.entrada .topo-entrada .logo{ display: block; width: clamp(150px, 15vw, 206px); height: auto; }
+
+.entrada .painel-entrada{
+  flex: 1; width: 100%; max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 1.06fr .94fr; gap: clamp(18px, 3.5vw, 54px); align-items: center;
+}
+
+/* --- coluna da esquerda: chamada, atalhos e a arte da loja --- */
+.entrada .vitrine{ text-align: center; }
+.entrada .chamada{ font-size: clamp(16px, 1.5vw, 21px); font-weight: 650; color: #EAF6F3; margin: 0 0 18px; }
+.entrada .pilulas{ display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.entrada .pilula{
+  display: inline-flex; align-items: center; gap: 9px; padding: 11px 20px; border-radius: 999px;
+  border: 1px solid rgba(39,227,182,.34); background: rgba(5,42,54,.45);
+  font-size: 14px; font-weight: 650; color: #DFF6F0;
+}
+.entrada .pilula svg{ width: 18px; height: 18px; color: var(--acento); }
+.entrada .loja{ display: block; width: 100%; max-width: 680px; height: auto; margin: 4px auto 0; }
+
+/* --- coluna da direita: o cartão de acesso --- */
+.entrada .caixa{
+  width: 100%; max-width: 440px; margin: 0 auto; padding: 32px 32px 26px;
+  border-color: rgba(39,227,182,.22);
+  box-shadow: 0 30px 80px rgba(0,0,0,.45), 0 0 70px rgba(39,227,182,.07);
+}
+.entrada .selo-entrada{
+  width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center;
+  background: rgba(39,227,182,.12); border: 1px solid rgba(39,227,182,.30); color: var(--acento);
+}
+.entrada .selo-entrada svg{ width: 26px; height: 26px; }
+.entrada .caixa h2{ font-size: clamp(27px, 2.4vw, 34px); margin: 16px 0 22px; }
+.entrada .caixa label.campo{
+  font-size: 14px; font-weight: 650; gap: 8px;
+  text-transform: none; letter-spacing: normal; color: var(--texto);
+}
+
+/* Campo com ícone fixo à esquerda (e o olho da senha à direita). */
+.campo-icone{ position: relative; display: flex; align-items: center; }
+.campo-icone > svg:first-child{ position: absolute; left: 15px; width: 20px; height: 20px; color: var(--acento); pointer-events: none; }
+.campo-icone input{ padding-left: 48px; }
+.campo-icone input[type="password"], .campo-icone input[type="text"]{ padding-right: 48px; }
+.campo-icone .ver-senha{
+  position: absolute; right: 7px; width: 36px; height: 36px; display: grid; place-items: center;
+  border: 0; background: none; border-radius: 11px; color: var(--texto-3); cursor: pointer;
+}
+.campo-icone .ver-senha:hover{ color: var(--acento); background: rgba(255,255,255,.06); }
+.campo-icone .ver-senha svg{ width: 20px; height: 20px; }
+
+.entrada .opcoes{ display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.entrada .lembrar{ display: inline-flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; color: var(--texto-2); cursor: pointer; }
+.entrada .lembrar input{ width: 18px; height: 18px; min-height: 0; padding: 0; accent-color: var(--acento); cursor: pointer; }
+.elo{ border: 0; background: none; padding: 0; font: inherit; font-size: 14px; font-weight: 650; color: var(--acento); cursor: pointer; }
+.elo:hover{ text-decoration: underline; }
+
+.entrada .ajuda{
+  margin: 20px 0 0; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.09);
+  text-align: center; font-size: 14px; color: var(--texto-2);
+}
+.entrada .rodape-entrada{ flex: none; text-align: center; font-size: 13px; color: rgba(222,240,236,.45); }
+
+@media (max-width: 980px){
+  .entrada .painel-entrada{ grid-template-columns: 1fr; gap: 26px; justify-items: center; }
+  .entrada .caixa{ order: 1; }
+  .entrada .vitrine{ order: 2; }
+  .entrada .loja{ max-width: 480px; }
+}
+@media (max-width: 560px){
+  .entrada{ padding: 20px 16px 14px; }
+  .entrada .caixa{ padding: 26px 20px 22px; }
+  .entrada .chamada{ margin-bottom: 14px; }
+  .entrada .pilula{ padding: 9px 15px; font-size: 13px; }
+  .entrada .pilula svg{ width: 16px; height: 16px; }
+}
 }
 }
 

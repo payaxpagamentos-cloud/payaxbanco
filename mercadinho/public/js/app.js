@@ -45,19 +45,53 @@ function aplicarTema(tema) {
 aplicarTema(temaSalvo() ?? 'escuro');
 
 /* ---------- entrada ---------- */
+
+/** Não há envio de e-mail no sistema: quem redefine a senha é um administrador, em Usuários. */
+const esqueciSenha = () => modal('Esqueci minha senha', (fechar) => [
+  el('p', { class: 'mudo' }, 'O sistema não envia e-mail de recuperação. Procure a administração do mercado: '
+    + 'quem tem perfil de administrador abre Configurações → Usuários, escolhe o seu nome e define uma senha nova.'),
+  el('p', { class: 'mudo' }, 'Depois de entrar com ela, troque por uma senha sua em Minha conta.'),
+  el('div', { class: 'linha fim' }, el('button', { class: 'btn primario', onclick: () => fechar() }, 'Entendi')),
+]);
+
+const falarComSuporte = () => modal('Precisa de ajuda?', (fechar) => [
+  el('p', { class: 'mudo' }, `O ${estado.publico.nome_mercado} é operado pela própria administração do condomínio — `
+    + 'é com ela que se resolve acesso, cadastro de produto, preço e conta de morador.'),
+  el('p', { class: 'mudo' }, 'Se o sistema estiver fora do ar ou apresentando erro, avise quem cuida da instalação.'),
+  el('div', { class: 'linha fim' }, el('button', { class: 'btn primario', onclick: () => fechar() }, 'Entendi')),
+]);
+
 function telaLogin(erro) {
+  const campoSenha = el('input', { name: 'senha', type: 'password', autocomplete: 'current-password', required: true, placeholder: 'Digite sua senha' });
+  const olho = el('button', { type: 'button', class: 'ver-senha', 'aria-label': 'Mostrar senha', onclick: alternarSenha }, icone('olho'));
+  const lembrar = el('input', { type: 'checkbox' });
+
+  function alternarSenha() {
+    const mostrar = campoSenha.type === 'password';
+    campoSenha.type = mostrar ? 'text' : 'password';
+    olho.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+    limpar(olho, icone(mostrar ? 'olho-fechado' : 'olho'));
+    campoSenha.focus();
+  }
+
   const form = el('form', { class: 'form', onsubmit: entrar },
-    el('label', { class: 'campo' }, 'E-mail', el('input', { name: 'email', type: 'email', autocomplete: 'username', required: true, placeholder: 'voce@mercadobinho.com.br' })),
-    el('label', { class: 'campo' }, 'Senha', el('input', { name: 'senha', type: 'password', autocomplete: 'current-password', required: true, placeholder: '••••••••' })),
+    el('label', { class: 'campo' }, 'E-mail',
+      el('div', { class: 'campo-icone' }, icone('email'),
+        el('input', { name: 'email', type: 'email', autocomplete: 'username', required: true, placeholder: 'Digite seu e-mail' }))),
+    el('label', { class: 'campo' }, 'Senha',
+      el('div', { class: 'campo-icone' }, icone('cadeado'), campoSenha, olho)),
     erro ? el('p', { class: 'etiqueta erro' }, erro) : null,
-    el('button', { class: 'btn primario grande' }, 'Entrar'));
+    el('div', { class: 'opcoes' },
+      el('label', { class: 'lembrar' }, lembrar, 'Manter conectado'),
+      el('button', { type: 'button', class: 'elo', onclick: esqueciSenha }, 'Esqueci minha senha')),
+    el('button', { class: 'btn primario grande' }, 'Entrar no sistema', icone('seta-direita')));
 
   async function entrar(e) {
     e.preventDefault();
     const dados = lerForm(e.target);
-    const botao = e.target.querySelector('button');
+    const botao = e.target.querySelector('button[class*="primario"]');
     await acao(botao, async () => {
-      const r = await api.post('/auth/login', dados);
+      const r = await api.post('/auth/login', { ...dados, lembrar: lembrar.checked });
       sessao.set(r);
       estado.usuario = r.usuario;
       location.hash = `#/${rotaPadrao()}`;
@@ -66,12 +100,27 @@ function telaLogin(erro) {
     });
   }
 
+  const pilula = (simbolo, texto) => el('span', { class: 'pilula' }, icone(simbolo), texto);
+  const nome = estado.publico.nome_mercado || 'Mercado Binho';
+
   limpar($('#app'), el('div', { class: 'entrada' },
-    el('div', { class: 'cartao caixa' },
-      el('img', { class: 'logo-entrada no-escuro', src: `${RAIZ}/img/binho-logo.png`, alt: estado.publico.nome_mercado || 'Mercado Binho' }),
-      el('img', { class: 'logo-entrada no-claro', src: `${RAIZ}/img/binho-logo-escuro.png`, alt: '', 'aria-hidden': 'true' }),
-      el('p', { class: 'erp' }, 'ERP Mercado Binho'),
-      form)));
+    el('header', { class: 'topo-entrada' },
+      el('img', { class: 'logo', src: `${RAIZ}/img/binho-logo.png`, alt: nome })),
+
+    el('div', { class: 'painel-entrada' },
+      el('div', { class: 'vitrine' },
+        el('p', { class: 'chamada' }, 'Vendas, estoque e financeiro em um só lugar.'),
+        el('div', { class: 'pilulas' }, pilula('pdv', 'PDV'), pilula('produtos', 'Estoque'), pilula('financeiro', 'Financeiro')),
+        el('img', { class: 'loja', src: `${RAIZ}/img/loja.webp`, alt: '', 'aria-hidden': 'true' })),
+
+      el('div', { class: 'cartao caixa' },
+        el('span', { class: 'selo-entrada' }, icone('entrar')),
+        el('h2', {}, 'Bem-vindo'),
+        form,
+        el('p', { class: 'ajuda' }, 'Precisa de ajuda? ',
+          el('button', { type: 'button', class: 'elo', onclick: falarComSuporte }, 'Fale com o suporte')))),
+
+    el('footer', { class: 'rodape-entrada' }, `${nome} · Gestão do seu mercado`)));
 }
 
 /* ---------- layout ---------- */

@@ -19,7 +19,7 @@ module.exports = (db, autenticado) => {
     if (!u.ativo) throw new ErroNegocio('Conta desativada. Fale com a administração.', 403);
     db.prepare('UPDATE usuarios SET ultimo_acesso = ? WHERE id = ?').run(agora(), u.id);
     registrar(db, { ...req, usuario: u }, 'login', u.email);
-    res.json({ token: emitirToken(u), usuario: publico(u) });
+    res.json({ token: emitirToken(u, { lembrar: req.body.lembrar === true }), usuario: publico(u) });
   });
 
   r.get('/me', autenticado, (req, res) => res.json({ usuario: publico(req.usuario) }));
