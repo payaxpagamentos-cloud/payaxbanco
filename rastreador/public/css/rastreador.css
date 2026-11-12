@@ -914,7 +914,11 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 /* Largura do menu por tamanho de tela (no celular ele vira a barra de cima, e o conteúdo ocupa a tela toda). */
 @media (min-width: 1101px){ .casca{ grid-template-columns: 220px minmax(0, 1fr); } }
 @media (max-width: 1100px) and (min-width: 861px){ .casca{ grid-template-columns: 196px minmax(0, 1fr); } }
-@media (max-width: 860px){ .casca, .casca.recolhida{ grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 860px){
+  .casca, .casca.recolhida{ grid-template-columns: minmax(0, 1fr); }
+  /* Tela com pouco conteúdo: a sobra de altura vai para o conteúdo, não para a barra do topo (que crescia e virava uma faixa escura). */
+  .casca{ grid-template-rows: auto minmax(0, 1fr); align-content: start; }
+}
 .casca.recolhida{ grid-template-columns: 72px minmax(0, 1fr); }
 @media (max-width: 860px){ .casca.recolhida{ grid-template-columns: minmax(0, 1fr); } }
 /* No mapa (Mapa ao vivo, Histórico, Cercas), o menu recolhe para sobrar tela e volta ao chegar com o cursor
