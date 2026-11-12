@@ -298,15 +298,12 @@ td.direita, th.direita{ text-align: right; }
   backdrop-filter: var(--desfoque); -webkit-backdrop-filter: var(--desfoque);
   border-right: 1px solid var(--vidro-borda);
 }
-.marca{ display: flex; align-items: center; gap: 10px; padding: 4px 6px 14px; font-weight: 700; }
-.marca .selo{
-  width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; color: var(--tinta); flex: none;
-  background: linear-gradient(145deg, #6BF7D0, var(--acento) 45%, var(--acento-2));
-  box-shadow: 0 12px 30px -12px var(--acento), inset 0 1px 0 rgba(255,255,255,.55);
-}
-.marca .selo svg{ width: 20px; height: 20px; }
-.marca .nome{ font-family: var(--display); font-size: 13px; line-height: 1.2; letter-spacing: -.035em; font-weight: 600; }
-.marca .sub{ font-size: 11px; color: var(--texto-3); font-weight: 600; }
+.marca{ display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 4px 6px 14px; }
+.marca .logo-marca{ display: block; width: 100%; max-width: 168px; height: auto; }
+.marca .logo-marca.no-claro{ display: none; }
+[data-tema="claro"] .marca .logo-marca.no-escuro{ display: none; }
+[data-tema="claro"] .marca .logo-marca.no-claro{ display: block; }
+.marca .sub{ font-size: 11px; color: var(--texto-3); font-weight: 600; line-height: 1.3; }
 .menu .secao{ font-size: 10px; text-transform: uppercase; letter-spacing: .16em; color: var(--texto-3); font-weight: 800; padding: 12px 10px 4px; }
 .menu a{
   position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 11px;

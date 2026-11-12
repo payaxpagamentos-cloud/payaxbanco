@@ -114,7 +114,7 @@ function telaLogin(erro) {
 function desenharLayout() {
   const u = estado.usuario;
   const menu = el('aside', { class: 'menu', id: 'menu' },
-    marca(estado.publico.nome_mercado, estado.publico.condominio || 'do Condomínio'),
+    marca(estado.publico.nome_mercado, estado.publico.condominio),
     el('nav', { id: 'navegacao' }),
     el('div', { class: 'rodape' }, `${estado.publico.nome_mercado} · v${estado.publico.versao ?? '1.0'}`));
 

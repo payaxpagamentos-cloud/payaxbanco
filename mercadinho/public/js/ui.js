@@ -258,6 +258,8 @@ export function repetir(fn, ms) {
 }
 
 /** Marca (logotipo) do sistema. */
-export const marca = (nome = 'Mercadinho', sub = 'do Condomínio') => el('div', { class: 'marca' },
-  el('span', { class: 'selo' }, icone('pdv')),
-  el('span', {}, el('div', { class: 'nome' }, nome), el('div', { class: 'sub' }, sub)));
+/** Cabeçalho do menu: o logo da loja (versão de tinta escura no tema claro, onde o "Binho" branco sumiria). */
+export const marca = (nome = 'Mercado Binho', sub = '') => el('div', { class: 'marca' },
+  el('img', { class: 'logo-marca no-escuro', src: `${RAIZ}/img/binho-logo.png`, alt: nome }),
+  el('img', { class: 'logo-marca no-claro', src: `${RAIZ}/img/binho-logo-escuro.png`, alt: '', 'aria-hidden': 'true' }),
+  sub ? el('div', { class: 'sub' }, sub) : null);
