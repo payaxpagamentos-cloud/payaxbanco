@@ -247,5 +247,5 @@ Configuração: veja [`.env.exemplo`](.env.exemplo). Instalação em servidor (P
 - O protocolo GT06 não tem autenticação: só o IMEI cadastrado é aceito, e cada IMEI tem uma conexão por vez.
 - Bloquear exige digitar a placa. Todo corte passa pelo **bloqueio inteligente**: andando acima da velocidade segura (20 km/h), o corte
   espera e sai sozinho quando o veículo diminui ou desliga. Forçar o corte em movimento só pelo Modo Roubo, com a placa e um aviso de risco.
-- As chaves (Evolution, Anthropic, Google) ficam só no `.env` do servidor. O assistente só lê os dados da empresa de quem pergunta, tem limite
+- As chaves (Evolution, IA, Google) ficam só no `.env` do servidor. O assistente só lê os dados da empresa de quem pergunta, tem limite
   diário e não envia comandos. A senha do app do motorista é guardada com hash e nunca sai do servidor.

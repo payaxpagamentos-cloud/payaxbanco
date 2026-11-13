@@ -99,7 +99,7 @@ module.exports = {
   },
   // Endereço público do painel (ex.: https://seu-dominio/rastreador), usado nos links das mensagens.
   urlPublica: String(process.env.RASTREADOR_URL_PUBLICA || '').replace(/\/+$/, ''),
-  // Assistente com IA (Anthropic). Sem chave, o assistente fica desligado.
+  // Assistente com IA. Sem chave, o assistente fica desligado.
   ia: {
     chave: process.env.RASTREADOR_IA_CHAVE || '',
     modelo: process.env.RASTREADOR_IA_MODELO || 'claude-opus-5-5',
