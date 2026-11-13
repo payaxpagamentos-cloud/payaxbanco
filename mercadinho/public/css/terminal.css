@@ -328,10 +328,10 @@ body.terminal{ font-size: 17px; }
 .card-foto{ min-width: 0; align-self: start; }
 /* Quadrada, do tamanho da coluna — sem altura em porcentagem, que o navegador não resolve dentro do cartão. */
 .foto-produto.cartaz{ width: 100%; height: auto; aspect-ratio: 1; max-width: 140px; border: 0; border-radius: 14px; object-fit: contain; background: #fff; font-size: 30px; }
-.foto-produto.cartaz.sem-foto{ /* sem foto: iniciais na cor da categoria (precisa vencer o fundo branco do cartaz) */
-  color: #fff;
-  background: linear-gradient(145deg, var(--cor-foto), color-mix(in srgb, var(--cor-foto) 55%, #0B1928));
-}
+/* Sem foto real: o desenho do produto, sobre o mesmo fundo branco das fotos. */
+/* margem em px: em %, ela seria medida pela largura da linha inteira e engoliria o desenho */
+.foto-produto.ilustracao{ background: #fff; object-fit: contain; padding: 4px; }
+.foto-produto.cartaz.ilustracao{ padding: 6px; }
 .card-info{ display: flex; flex-direction: column; min-width: 0; }
 .card-nome{ font-weight: 800; font-size: 20px; line-height: 1.18; text-wrap: balance; letter-spacing: -.015em; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

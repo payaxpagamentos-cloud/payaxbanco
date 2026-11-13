@@ -1,3 +1,4 @@
+import { ilustracaoDe } from './ilustracoes.js';
 /** Criação de elementos e formatação. Texto vindo da API entra sempre como texto, nunca como HTML. */
 export function el(tag, attrs = {}, ...filhos) {
   const e = document.createElement(tag);
@@ -109,16 +110,12 @@ export function icone(nome, classe) {
 
 /* ---------- fotos dos produtos ---------- */
 /**
- * Foto do produto. Sem foto cadastrada, desenha um quadrado com a cor da categoria e as iniciais —
- * assim a lista não fica cheia de buracos e o produto continua reconhecível.
+ * Foto do produto. Sem foto cadastrada, entra um desenho do produto (garrafa, lata, pacote, fruta…),
+ * escolhido pelo nome ou pela categoria — a tela fica com cara de loja mesmo antes das fotos reais.
  */
 export function fotoProduto(produto, { classe = 'foto-produto' } = {}) {
-  const nome = produto.nome ?? produto.descricao ?? '?';
   if (produto.foto) return el('img', { class: classe, src: `${RAIZ}/fotos/${produto.foto}`, alt: '', loading: 'lazy' });
-  return el('span', {
-    class: `${classe} sem-foto`, 'aria-hidden': 'true',
-    style: `--cor-foto: ${produto.categoria_cor ?? produto.cor ?? '#8694A7'}`,
-  }, iniciais(nome));
+  return el('img', { class: `${classe} ilustracao`, src: ilustracaoDe(produto, RAIZ), alt: '', loading: 'lazy' });
 }
 
 /**

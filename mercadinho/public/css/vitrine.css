@@ -80,12 +80,6 @@
   box-shadow: 0 3vh 7vh rgba(0,0,0,.45);
 }
 .vt-foto img{ width: 100%; height: 100%; object-fit: contain; padding: 6%; }
-.vt-sem-foto{
-  width: 100%; height: 100%; display: grid; place-items: center;
-  background: linear-gradient(145deg, var(--cor), color-mix(in srgb, var(--cor) 45%, #0B1928));
-  font-weight: 800; font-size: 16vh; letter-spacing: -.04em; color: rgba(255,255,255,.95);
-}
-
 /* Sem nada cadastrado ainda: fica a marca. */
 .vt-vazio{ display: grid; place-content: center; justify-items: center; gap: 4vh; text-align: center; padding: 6vw; }
 .vt-vazio img{ width: min(56vw, 720px); height: auto; }

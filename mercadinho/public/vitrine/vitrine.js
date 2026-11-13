@@ -1,4 +1,5 @@
-import { el, limpar, dinheiro, iniciais, RAIZ } from '../js/ui.js';
+import { el, limpar, dinheiro, RAIZ } from '../js/ui.js';
+import { ilustracaoDe } from '../js/ilustracoes.js';
 
 /**
  * Vitrine: artes, vídeos, ofertas e produtos passando sozinhos, em tela cheia.
@@ -80,9 +81,8 @@ export function criarVitrine({ modo = 'tv', aoMudar = null } = {}) {
         s.oferta_ate ? el('p', { class: 'vt-validade' }, `Oferta válida até ${dataCurta(s.oferta_ate)}`) : null),
       el('div', { class: 'vt-destaque-produto' },
         el('div', { class: 'vt-pedestal', 'aria-hidden': 'true' }),
-        el('div', { class: 'vt-foto' }, s.foto
-          ? el('img', { src: `${RAIZ}/fotos/${s.foto}`, alt: '' })
-          : el('div', { class: 'vt-sem-foto', style: `--cor: ${s.categoria_cor || '#27E3B6'}` }, iniciais(s.nome)))),
+        // Sem foto real, o desenho do produto (o mesmo do terminal).
+        el('div', { class: 'vt-foto' }, el('img', { src: s.foto ? `${RAIZ}/fotos/${s.foto}` : ilustracaoDe(s, RAIZ), alt: '' }))),
       el('span', { class: 'vt-assinatura' }, nome));
   }
 
@@ -108,7 +108,7 @@ export function criarVitrine({ modo = 'tv', aoMudar = null } = {}) {
 
   /** Baixa a imagem do próximo quadro enquanto este está no ar, para a troca não piscar. */
   function adiantar(s) {
-    if (s?.tipo === 'produto' && s.foto) new Image().src = `${RAIZ}/fotos/${s.foto}`;
+    if (s?.tipo === 'produto') new Image().src = s.foto ? `${RAIZ}/fotos/${s.foto}` : ilustracaoDe(s, RAIZ);
     if (s?.tipo === 'imagem') new Image().src = `${RAIZ}/vitrine-midia/${s.arquivo}`;
   }
 
