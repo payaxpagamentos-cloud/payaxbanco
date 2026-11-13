@@ -284,15 +284,42 @@ teclando ("digite 1 para sim ou 2 para não", "digite os três primeiros número
 - Tecla que não existe repete as opções; na terceira vez, passa para uma pessoa.
 - Na conversa, o atendente vê qual tecla foi apertada ("O cliente digitou 1 (segunda via)").
 
-A central chama três rotas da API de integração (chave `atd_…`, cabeçalho `X-Api-Key`):
+### Passagem para o atendente
+
+Quando a ZOE transfere a ligação, quem atende **não começa do zero**. Três coisas acontecem:
+
+1. **Sussurro.** Antes de o cliente entrar na linha, a central fala no ouvido do atendente uma
+   frase curta: *"Ligação da ZOE: Ana Paula, identidade confirmada. Assunto: minha internet está
+   caindo toda noite. Já feito: consultou a situação do contrato e testou a conexão."* Funciona
+   mesmo para quem está sem o painel aberto. `ZOE_SUSSURRO=0` no Asterisk desliga.
+2. **O painel abre sozinho.** Cada pessoa tem o seu ramal em `Usuários › Ramal`. A ligação
+   atendida no ramal 201 passa para quem tem o 201 e abre, em qualquer tela do painel, a
+   **passagem**: quem é o cliente, se a identidade foi confirmada, o que ele disse, por que veio
+   para a equipe, o que a ZOE já fez no IXC ("não precisa repetir") e o diálogo. Com a aba em
+   segundo plano, o título pisca.
+3. **O que pede atenção vem primeiro**: identidade não confirmada, pedido de cancelamento,
+   Procon/Anatel, falas que a ZOE não entendeu, ações que falharam no IXC.
+
+Tudo sai do que ficou registrado (mensagens, ações no IXC, chamados, Ouvidoria), não de um texto
+livre da IA: funciona igual com ou sem IA e não inventa. A mesma passagem aparece no painel
+lateral de qualquer conversa transferida, do WhatsApp também.
+
+Para isso, o plano de discagem precisa de duas linhas a mais (exemplo completo no topo de
+`pabx/scripts/zoe-agi.js`): o 8º parâmetro do `Queue` roda `zoe-agi.js atendeu` no canal do
+ramal, e o `h` roda `zoe-agi.js fim`. A conversa transferida só fecha quando o cliente desliga de
+verdade; desligou na fila, antes de alguém atender, conta como **abandono**. Se o `h` não estiver
+configurado, a ligação nova do mesmo número fecha a anterior, e nenhuma fica aberta mais de 4 h.
+
+A central chama estas rotas da API de integração (chave `atd_…`, cabeçalho `X-Api-Key`):
 
 | Rota | Quando |
 |---|---|
 | `POST /api/integracao/voz/ligacoes` `{ uid, telefone }` | a ligação chegou — devolve a saudação |
 | `POST /api/integracao/voz/ligacoes/:uid/turno` `{ texto \| digitos \| audio_base64, turno_id }` | o cliente falou |
+| `POST /api/integracao/voz/ligacoes/:uid/atendida` `{ ramal }` | a fila tocou e um ramal atendeu |
 | `POST /api/integracao/voz/ligacoes/:uid/fim` | desligou |
 
-Cada resposta traz `fala` (o que falar) e `acao`: `ouvir`, `transferir` (com `fila` e `resumo`)
+Cada resposta traz `fala` (o que falar) e `acao`: `ouvir`, `transferir` (com `fila`, `resumo` e `sussurro`)
 ou `encerrar`. Em `ouvir`, `aguardar` diz se a central grava a fala (`fala`) ou lê teclas
 (`digitos`, com `max_digitos`). O script do Asterisk que faz isso está em `pabx/scripts/zoe-agi.js` (modo
 conversado). Testado de ponta a ponta com áudio de telefone (8 kHz) e o whisper real: "estou

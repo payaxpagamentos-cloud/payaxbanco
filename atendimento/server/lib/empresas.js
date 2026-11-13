@@ -80,14 +80,28 @@ function criarUsuario(db, empresaId, dados) {
     }
   }
   const senha = dados.senha ? v.senha(dados.senha) : `atende${crypto.randomInt(1000, 9999)}`;
-  const id = Number(db.prepare(`INSERT INTO usuarios (nome, email, senha_hash, perfil, empresa_id, max_simultaneas, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(v.texto(dados.nome, 'o nome', 160), v.email(dados.email), hashSenha(senha), perfil, empresaId,
-    dados.max_simultaneas === undefined ? 5 : v.inteiro(dados.max_simultaneas, 'o máximo de conversas ao mesmo tempo', { min: 1, max: 50 }), agora()).lastInsertRowid);
+  const ramal = lerRamal(db, empresaId, dados.ramal);
+  const id = Number(db.prepare(`INSERT INTO usuarios (nome, email, senha_hash, perfil, empresa_id, max_simultaneas, ramal, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(v.texto(dados.nome, 'o nome', 160), v.email(dados.email), hashSenha(senha), perfil, empresaId,
+    dados.max_simultaneas === undefined ? 5 : v.inteiro(dados.max_simultaneas, 'o máximo de conversas ao mesmo tempo', { min: 1, max: 50 }), ramal, agora()).lastInsertRowid);
   // Atendente novo já entra em todas as filas ativas; o administrador ajusta depois.
   for (const f of db.prepare('SELECT id FROM filas WHERE empresa_id = ? AND ativa = 1').all(empresaId)) {
     db.prepare('INSERT OR IGNORE INTO fila_usuarios (fila_id, usuario_id) VALUES (?, ?)').run(f.id, id);
   }
-  return { usuario: db.prepare('SELECT id, nome, email, perfil, empresa_id, max_simultaneas FROM usuarios WHERE id = ?').get(id), senha_provisoria: senha };
+  return { usuario: db.prepare('SELECT id, nome, email, perfil, empresa_id, max_simultaneas, ramal FROM usuarios WHERE id = ?').get(id), senha_provisoria: senha };
+}
+
+/**
+ * O ramal da pessoa na central (só números). Vazio tira o ramal. Dois usuários da mesma empresa
+ * não podem ter o mesmo: a ligação abriria no painel de quem não atendeu.
+ */
+function lerRamal(db, empresaId, valor, { usuarioId = null } = {}) {
+  if (valor === undefined || valor === null || String(valor).trim() === '') return null;
+  const r = String(valor).trim();
+  v.exigir(/^\d{2,8}$/.test(r), 'O ramal tem só números, de 2 a 8 dígitos (ex.: 201).');
+  const dono = db.prepare('SELECT nome FROM usuarios WHERE empresa_id = ? AND ramal = ? AND id IS NOT ?').get(empresaId, r, usuarioId);
+  v.exigir(!dono, `O ramal ${r} já é de ${dono?.nome}.`);
+  return r;
 }
 
 /** Cadastra ou atualiza o número de WhatsApp da empresa (Cloud API). */
@@ -136,4 +150,5 @@ function criarChaveApi(db, empresaId, nome) {
   return { id, chave, prefixo: chave.slice(0, 12) };
 }
 
-module.exports = { criar, criarUsuario, salvarNumero, numeroPublico, criarChaveApi, FILAS_PADRAO, ETIQUETAS_PADRAO, INTENCOES_PADRAO };
+module.exports = {
+  lerRamal, criar, criarUsuario, salvarNumero, numeroPublico, criarChaveApi, FILAS_PADRAO, ETIQUETAS_PADRAO, INTENCOES_PADRAO };

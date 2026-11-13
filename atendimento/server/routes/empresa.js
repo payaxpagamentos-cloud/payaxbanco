@@ -7,6 +7,7 @@ const { exigirAdminEmpresa, administraEmpresa, exigirPermissao } = require('../a
 const permissoesLib = require('../lib/permissoes');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const conversasLib = require('../lib/conversas');
+const passagemLib = require('../lib/passagem');
 const filasLib = require('../lib/filas');
 const envio = require('../lib/envio');
 const empresasLib = require('../lib/empresas');
@@ -62,7 +63,27 @@ module.exports = function rotasEmpresa(db) {
 
   r.get('/conversas/:id', exigirPermissao('atendimentos.ver'), (req, res) => {
     const d = conversasLib.detalhe(db, req.empresa.id, Number(req.params.id));
-    res.json({ ...d, documento: permissoesLib.mascararDocumento(d.documento, req.pode('cliente.documento')), documento_visivel: req.pode('cliente.documento') });
+    const doc = (x) => permissoesLib.mascararDocumento(x, req.pode('cliente.documento'));
+    const p = passagemLib.montar(db, d.id);
+    res.json({ ...d, documento: doc(d.documento), documento_visivel: req.pode('cliente.documento'),
+      passagem: p ? { ...p, cliente: { ...p.cliente, documento: doc(p.cliente.documento) } } : null });
+  });
+
+  /**
+   * A ligação que acabou de tocar no ramal de quem está logado. O painel pergunta a cada poucos
+   * segundos e, quando vem uma, abre a passagem na hora — em qualquer tela.
+   */
+  r.get('/ligacoes/para-mim', (req, res) => {
+    const c = db.prepare(`SELECT id FROM conversas WHERE empresa_id = ? AND atendente_id = ? AND canal = 'telefone'
+        AND estado = 'humano' AND ligacao_atendida_em IS NOT NULL AND passagem_vista_em IS NULL
+      ORDER BY ligacao_atendida_em DESC LIMIT 1`).get(req.empresa.id, req.usuario.id);
+    const p = c ? passagemLib.montar(db, c.id) : null;
+    res.json({ passagem: p ? { ...p, cliente: { ...p.cliente, documento: permissoesLib.mascararDocumento(p.cliente.documento, req.pode('cliente.documento')) } } : null });
+  });
+  r.post('/conversas/:id/passagem-vista', (req, res) => {
+    db.prepare('UPDATE conversas SET passagem_vista_em = ? WHERE id = ? AND empresa_id = ? AND atendente_id = ?')
+      .run(agora(), Number(req.params.id), req.empresa.id, req.usuario.id);
+    res.json({ ok: true });
   });
 
   /** Envia uma mensagem como atendente. Fora da janela de 24 h, só com template aprovado. */
@@ -424,7 +445,7 @@ module.exports = function rotasEmpresa(db) {
 
   // ---------- Equipe da empresa ----------
   r.get('/usuarios', exigirPermissao('usuarios.ver', 'atendimentos.transferir'), (req, res) => res.json({
-    itens: db.prepare(`SELECT id, nome, email, perfil, ativo, disponivel, max_simultaneas, visto_em, ultimo_acesso, criado_em,
+    itens: db.prepare(`SELECT id, nome, email, perfil, ativo, disponivel, max_simultaneas, ramal, visto_em, ultimo_acesso, criado_em,
         (SELECT COUNT(*) FROM conversas c WHERE c.atendente_id = usuarios.id AND c.estado = 'humano') AS em_atendimento,
         (SELECT COUNT(*) FROM usuario_permissoes p WHERE p.usuario_id = usuarios.id) AS ajustes
       FROM usuarios WHERE empresa_id = ? ORDER BY ativo DESC, nome`).all(req.empresa.id)
@@ -453,6 +474,7 @@ module.exports = function rotasEmpresa(db) {
         .run(d.nome === undefined ? u.nome : v.texto(d.nome, 'o nome', 160),
           d.perfil === undefined ? u.perfil : v.opcao(d.perfil, 'o perfil', ['cliente', 'supervisor', 'atendente']), ativo,
           d.max_simultaneas === undefined ? u.max_simultaneas : v.inteiro(d.max_simultaneas, 'o máximo de conversas', { min: 1, max: 50 }), u.id);
+      if (d.ramal !== undefined) db.prepare('UPDATE usuarios SET ramal = ? WHERE id = ?').run(empresasLib.lerRamal(db, req.empresa.id, d.ramal, { usuarioId: u.id }), u.id);
       if (d.senha) db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(require('../lib/senha').hashSenha(v.senha(d.senha)), u.id);
       // Desativado ou sem ser mais atendente: devolve as conversas dele para a fila.
       if (!ativo) {
@@ -461,7 +483,7 @@ module.exports = function rotasEmpresa(db) {
         }
       }
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'alterou usuário', alvo: u.email, ip: req.ip });
-      res.json(db.prepare('SELECT id, nome, email, perfil, ativo, max_simultaneas FROM usuarios WHERE id = ?').get(u.id));
+      res.json(db.prepare('SELECT id, nome, email, perfil, ativo, max_simultaneas, ramal FROM usuarios WHERE id = ?').get(u.id));
     } catch (err) { next(err); }
   });
 

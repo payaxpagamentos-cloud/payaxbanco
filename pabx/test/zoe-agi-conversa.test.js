@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { PassThrough } = require('node:stream');
-const { criarAgi, criarApiCerebro, conversar, escolherModo } = require('../scripts/zoe-agi');
+const { criarAgi, criarApiCerebro, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal } = require('../scripts/zoe-agi');
 
 const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-agi-falas-'));
 // Um WAV com cara de fala de verdade: cabeçalho + 1 s de áudio 8 kHz.
@@ -19,7 +19,7 @@ const WAV_FALA = Buffer.concat([Buffer.from('RIFF....WAVEfmt '), Buffer.alloc(16
  *   'silencio'   → grava quase nada;
  *   { tecla, resto } → o cliente aperta uma tecla (e o GET DATA seguinte lê o resto).
  */
-function asterisk(falas, { desligarNoRecord = Infinity, teclas = [] } = {}) {
+function asterisk(falas, { desligarNoRecord = Infinity, teclas = [], canal = {} } = {}) {
   const deAsterisk = new PassThrough();
   const paraAsterisk = new PassThrough();
   const comandos = [];
@@ -55,6 +55,12 @@ function asterisk(falas, { desligarNoRecord = Infinity, teclas = [] } = {}) {
         }
         fs.writeFileSync(arquivo, f === 'audio' ? WAV_FALA : Buffer.from('RIFF....WAVE'));
         deAsterisk.write('200 result=0 (silence) endpos=8000\n');
+        continue;
+      }
+      const gv = cmd.match(/^GET VARIABLE (\w+)$/);
+      if (gv) {
+        const val = variaveis[gv[1]] ?? variaveis[`__${gv[1]}`] ?? canal[gv[1]];
+        deAsterisk.write(val ? `200 result=1 (${val})\n` : '200 result=0\n');
         continue;
       }
       if (cmd.startsWith('GET DATA')) {
@@ -95,7 +101,8 @@ const ENV = { agi_uniqueid: '1700000099.7', agi_callerid: '11988887777' };
 test('conversa: ouve, manda a fala para o cérebro e transfere para a fila que ele escolheu', async (t) => {
   const zoe = await cerebroFalso([
     { acao: 'ouvir', fala: 'Entendi. Para sua segurança, me diga os três primeiros números do CPF.' },
-    { acao: 'transferir', fala: 'Vou te passar para o suporte.', fila: { id: 3, nome: 'Suporte' }, resumo: 'Internet caindo; já reiniciou o roteador.' },
+    { acao: 'transferir', fala: 'Vou te passar para o suporte.', fila: { id: 3, nome: 'Suporte' }, resumo: 'Internet caindo; já reiniciou o roteador.',
+      sussurro: 'Ligação da ZOE: Ana Souza, identidade confirmada. Assunto: internet caindo.' },
   ]);
   t.after(() => zoe.fechar());
   const a = asterisk(['audio', { tecla: '1', resto: '23' }]);
@@ -112,13 +119,61 @@ test('conversa: ouve, manda a fala para o cérebro e transfere para a fila que e
     'Vou te passar para o suporte.',
   ]);
 
-  const [inicio, turno1, turno2, fim] = zoe.pedidos;
+  assert.equal(a.variaveis.__ZOE_UID, ENV.agi_uniqueid, 'herdável: o canal do ramal sabe de qual ligação se trata');
+  assert.match(a.variaveis.__ZOE_SUSSURRO, /Ana Souza/);
+
+  const [inicio, turno1, turno2, ...resto] = zoe.pedidos;
   assert.equal(inicio.chave, 'atd_teste');
   assert.deepEqual(inicio.dados, { uid: ENV.agi_uniqueid, telefone: ENV.agi_callerid });
   assert.equal(Buffer.from(turno1.dados.audio_base64, 'base64').length, WAV_FALA.length, 'a fala gravada vai inteira para ser transcrita lá');
   assert.equal(turno2.dados.digitos, '123', 'apertou 1 e digitou 23: o CPF vai pelo teclado');
-  assert.match(fim.url, /\/fim$/);
+  assert.equal(resto.length, 0, 'transferida, a ligação continua com uma pessoa: quem fecha a conversa é o "h"');
   assert.ok(a.gravados.every((f) => !fs.existsSync(f)), 'nenhuma gravação de cliente fica no disco');
+});
+
+test('atendeu: o ramal que pegou a ligação avisa o painel e ouve o sussurro antes do cliente', async (t) => {
+  const zoe = await cerebroFalso([]);
+  t.after(() => zoe.fechar());
+  const a = asterisk([], { canal: { ZOE_UID: '1700000099.7', ZOE_SUSSURRO: 'Ligação da ZOE: Ana Souza, identidade confirmada.' } });
+
+  const r = await atendeu(a.agi, { agi_channel: 'PJSIP/201-0000002a' }, criarApiCerebro(zoe.url, 'atd_teste'), { tts: 'Flite' });
+  assert.equal(r, 'avisado');
+  assert.equal(zoe.pedidos.length, 1);
+  assert.match(zoe.pedidos[0].url, /\/voz\/ligacoes\/1700000099\.7\/atendida$/);
+  assert.deepEqual(zoe.pedidos[0].dados, { ramal: '201' });
+  assert.deepEqual(a.faladas, ['Ligação da ZOE: Ana Souza, identidade confirmada.']);
+});
+
+test('atendeu: ligação que não passou pela ZOE não chama nada', async (t) => {
+  const zoe = await cerebroFalso([]);
+  t.after(() => zoe.fechar());
+  const a = asterisk([]);
+  assert.equal(await atendeu(a.agi, { agi_channel: 'PJSIP/202-01' }, criarApiCerebro(zoe.url, 'k'), { tts: 'Flite' }), 'sem-zoe');
+  assert.equal(zoe.pedidos.length, 0);
+  assert.deepEqual(a.faladas, []);
+});
+
+test('atendeu: ZOE Atende fora do ar não segura o atendente — o sussurro sai mesmo assim', async (t) => {
+  const zoe = await cerebroFalso([], { quebrarNoInicio: true });
+  t.after(() => zoe.fechar());
+  const a = asterisk([], { canal: { ZOE_UID: 'x1', ZOE_SUSSURRO: 'Ligação da ZOE.' } });
+  assert.equal(await atendeu(a.agi, { agi_channel: 'SIP/203-9' }, criarApiCerebro(zoe.url, 'k'), { tts: 'Flite' }), 'avisado');
+  assert.deepEqual(a.faladas, ['Ligação da ZOE.']);
+});
+
+test('fim: o "h" do plano de discagem fecha a conversa pela ligação certa', async (t) => {
+  const zoe = await cerebroFalso([]);
+  t.after(() => zoe.fechar());
+  const a = asterisk([], { canal: { ZOE_UID: '1700000099.7' } });
+  await fimDaLigacao(a.agi, { agi_uniqueid: 'outro' }, criarApiCerebro(zoe.url, 'k'));
+  assert.match(zoe.pedidos[0].url, /1700000099\.7\/fim$/);
+});
+
+test('ramal do canal: PJSIP, SIP e Local', () => {
+  assert.equal(ramalDoCanal('PJSIP/201-0000002a'), '201');
+  assert.equal(ramalDoCanal('SIP/3005-00ab'), '3005');
+  assert.equal(ramalDoCanal('Local/202@from-queue-00000001;2'), '202');
+  assert.equal(ramalDoCanal('DAHDI/1-1'), '');
 });
 
 test('por teclas: lê quantas teclas a ZOE pediu, em vez de gravar fala', async (t) => {

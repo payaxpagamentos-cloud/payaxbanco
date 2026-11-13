@@ -120,8 +120,9 @@ describe('ligação atendida pela ZOE', () => {
     const c = db.prepare("SELECT * FROM conversas WHERE ligacao_uid = '1700000005.1'").get();
     assert.equal(c.estado, 'encerrada');
     assert.ok(['ia', 'abandono'].includes(c.resolvida_por));
+    // Transferida e desligada antes de algum ramal atender: abandono na fila, não "resolvida por pessoa".
     const transferida = await chamar('/voz/ligacoes/1700000002.1/fim');
-    assert.equal(transferida.dados.resolvida_por, 'humano', 'a ligação transferida foi resolvida por uma pessoa');
+    assert.equal(transferida.dados.resolvida_por, 'abandono');
   });
 
   test('o administrador escolhe teclas e escreve o menu pela configuração da ZOE', async () => {

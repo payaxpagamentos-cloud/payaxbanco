@@ -34,11 +34,21 @@
  *   ZOE_TTS_APP  aplicação de texto para voz do Asterisk (ex.: Flite). Vazio: toca os áudios gravados em sounds/zoe/.
  *
  * Exemplo (extensions.conf):
+ *   [zoe-entrada]
  *   exten => s,1,Answer()
  *    same => n,AGI(/opt/zoe/zoe-agi.js)
  *    same => n,GotoIf($["${ZOE_STATUS}" = "transferir" | "${ZOE_STATUS}" = "indisponivel"]?fila)
  *    same => n,Hangup()
- *    same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?atendimento:${ZOE_FILA_NOME})})
+ *    same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
+ *   ; O cliente desligou (na fila, com o atendente ou com a ZOE): fecha a conversa no ZOE Atende.
+ *   exten => h,1,AGI(/opt/zoe/zoe-agi.js,fim)
+ *
+ *   ; Roda no canal do RAMAL quando ele atende (8º parâmetro do Queue). Abre a passagem no painel
+ *   ; de quem tem esse ramal (Usuários › Ramal) e sussurra o resumo antes de ligar o cliente.
+ *   ; ZOE_SUSSURRO=0 desliga o sussurro e mantém só o painel.
+ *   [zoe-atendeu]
+ *   exten => s,1,AGI(/opt/zoe/zoe-agi.js,atendeu)
+ *    same => n,Return()
  */
 
 class Desligou extends Error {}
@@ -75,14 +85,23 @@ function criarAgi(entrada, saida) {
     },
     /** Envia um comando e devolve o result=. Canal desligado: Desligou. */
     async comando(cmd) {
+      return (await this.resposta(cmd)).result;
+    },
+    /** Como `comando`, mas devolve também o valor entre parênteses ("200 result=1 (PJSIP/201)"). */
+    async resposta(cmd) {
       saida.write(`${cmd}\n`);
       let l = await lerLinha();
       while (l !== null && l.startsWith('HANGUP')) l = await lerLinha(); // aviso de desligamento (AGI assíncrono)
       if (l === null || l.startsWith('511')) throw new Desligou();
-      const m = l.match(/^200 result=(-?\d*)/);
+      const m = l.match(/^200 result=(-?\d*)(?: \((.*)\))?/);
       if (!m) throw new Error(`Resposta AGI inesperada: ${l}`);
       if (m[1] === '-1') throw new Desligou();
-      return m[1];
+      return { result: m[1], valor: m[2] ?? '' };
+    },
+    /** Valor de uma variável do canal ('' quando não existe). */
+    async variavel(nome) {
+      const r = await this.resposta(`GET VARIABLE ${nome}`);
+      return r.result === '1' ? r.valor : '';
     },
   };
 }
@@ -245,6 +264,7 @@ function criarApiCerebro(base, chave) {
     iniciar: (corpo) => chamar('', corpo, 8000),
     turno: (uid, corpo) => chamar(`/${encodeURIComponent(uid)}/turno`, corpo),
     fim: (uid) => chamar(`/${encodeURIComponent(uid)}/fim`, {}, 5000),
+    atendida: (uid, corpo) => chamar(`/${encodeURIComponent(uid)}/atendida`, corpo, 3000),
   };
 }
 
@@ -299,6 +319,10 @@ async function conversar(agi, cerebro, env, o = {}) {
         await set('ZOE_FILA_ID', r.fila?.id ?? '');
         await set('ZOE_FILA_NOME', r.fila?.nome ?? '');
         await set('ZOE_RESUMO', r.resumo ?? '');
+        // Com dois sublinhados a variável passa para o canal do ramal que a fila chamar: é por ela
+        // que o "atendeu" (gosub da fila) sabe de qual ligação se trata e o que sussurrar.
+        await set('__ZOE_UID', uid);
+        await set('__ZOE_SUSSURRO', r.sussurro ?? '');
         break;
       }
       if (r.acao === 'encerrar') break;
@@ -312,15 +336,43 @@ async function conversar(agi, cerebro, env, o = {}) {
     await set('ZOE_STATUS', status);
     return status;
   } catch (err) {
-    if (err instanceof Desligou) return 'desligou';
+    if (err instanceof Desligou) return (status = 'desligou');
     // O cérebro caiu no meio da ligação: a pessoa vai para a fila, não para o silêncio.
     await set('ZOE_STATUS', iniciado ? 'transferir' : 'indisponivel').catch(() => {});
     if (!iniciado) err.naoIniciou = true;
     if (!iniciado) throw err;
-    return 'transferir';
+    return (status = 'transferir');
   } finally {
-    if (iniciado) await cerebro.fim(uid).catch(() => {});
+    // Transferida, a ligação continua — agora com uma pessoa. Quem fecha a conversa é o "h" do
+    // plano de discagem (zoe-agi.js fim), quando o cliente desligar de verdade.
+    if (iniciado && status !== 'transferir') await cerebro.fim(uid).catch(() => {});
   }
+}
+
+/** "PJSIP/201-0000002a", "SIP/201-…", "Local/201@from-queue-…" → "201". */
+const ramalDoCanal = (canal) => String(canal ?? '').match(/^[A-Za-z]+\/(\d{2,8})(?:\b|[-@/])/)?.[1] ?? '';
+
+/**
+ * Roda no canal do RAMAL, quando ele atende uma ligação da fila (gosub do Queue). Avisa o
+ * ZOE Atende — o painel de quem tem esse ramal abre com a passagem — e sussurra no ouvido do
+ * atendente quem é o cliente e o que ele quer, antes de o cliente entrar na linha.
+ * Nada aqui pode segurar a ligação: o aviso tem 3 s, e qualquer falha só é ignorada.
+ */
+async function atendeu(agi, env, cerebro, { tts = '', sussurrar = true } = {}) {
+  const uid = await agi.variavel('ZOE_UID').catch(() => '');
+  if (!uid) return 'sem-zoe'; // ligação que não passou pela ZOE: nada a fazer
+  const ramal = ramalDoCanal(env.agi_channel);
+  if (cerebro && ramal) await cerebro.atendida(uid, { ramal }).catch(() => {});
+  const frase = sussurrar && tts ? await agi.variavel('ZOE_SUSSURRO').catch(() => '') : '';
+  if (frase) await agi.comando(`EXEC ${tts} ${aspas(frase)}`).catch(() => {});
+  return 'avisado';
+}
+
+/** Roda no "h" do plano de discagem: o cliente desligou, a conversa fecha no ZOE Atende. */
+async function fimDaLigacao(agi, env, cerebro) {
+  const uid = (await agi.variavel('ZOE_UID').catch(() => '')) || env.agi_uniqueid;
+  if (cerebro && uid) await cerebro.fim(uid).catch(() => {});
+  return 'encerrado';
 }
 
 /**
@@ -344,6 +396,17 @@ async function escolherModo(agi, env, { cerebro = null, teclas = null, tts = '',
 async function principal() {
   const agi = criarAgi(process.stdin, process.stdout);
   const env = await agi.ambiente();
+  const cerebroDe = () => (process.env.ZOE_CEREBRO && process.env.ZOE_CEREBRO_CHAVE
+    ? criarApiCerebro(process.env.ZOE_CEREBRO, process.env.ZOE_CEREBRO_CHAVE) : null);
+  // AGI(zoe-agi.js,atendeu) no gosub da fila e AGI(zoe-agi.js,fim) no "h": ver o exemplo no topo.
+  if (env.agi_arg_1 === 'atendeu') {
+    await atendeu(agi, env, cerebroDe(), { tts: process.env.ZOE_TTS_APP || '', sussurrar: process.env.ZOE_SUSSURRO !== '0' }).catch(() => {});
+    process.exit(0);
+  }
+  if (env.agi_arg_1 === 'fim') {
+    await fimDaLigacao(agi, env, cerebroDe()).catch(() => {});
+    process.exit(0);
+  }
   const base = env.agi_arg_1 || process.env.ZOE_API;
   const chave = env.agi_arg_2 || process.env.ZOE_CHAVE;
   const tts = process.env.ZOE_TTS_APP || '';
@@ -355,4 +418,4 @@ async function principal() {
 
 if (require.main === module) principal();
 
-module.exports = { criarAgi, criarApiZoe, criarApiCerebro, atender, conversar, escolherModo, Desligou };
+module.exports = { criarAgi, criarApiZoe, criarApiCerebro, atender, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal, Desligou };

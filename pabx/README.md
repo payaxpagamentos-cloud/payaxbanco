@@ -57,7 +57,30 @@ de discagem não muda. **Os nomes das filas precisam ser iguais** no ZOE Atende 
 ZOE_CEREBRO=https://SEU-DOMINIO/atendimento
 ZOE_CEREBRO_CHAVE=atd_...
 ZOE_TTS_APP=Flite            # ou a aplicação de voz instalada no Asterisk
+ZOE_SUSSURRO=1               # 0 desliga o resumo falado no ouvido do atendente
 ```
+
+**Passagem para o atendente.** Na transferência a ZOE deixa `__ZOE_UID` e `__ZOE_SUSSURRO`, que
+passam para o canal do ramal que a fila chamar. Com o gosub no `Queue`, quando o ramal atende:
+o atendente ouve o resumo antes de o cliente entrar, e o painel de quem tem aquele ramal
+(`Usuários › Ramal` no ZOE Atende) abre com tudo o que o cliente disse e o que a ZOE já fez.
+
+```
+exten => s,1,Answer()
+ same => n,AGI(/opt/zoe/zoe-agi.js)
+ same => n,GotoIf($["${ZOE_STATUS}" = "transferir" | "${ZOE_STATUS}" = "indisponivel"]?fila)
+ same => n,Hangup()
+ same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
+exten => h,1,AGI(/opt/zoe/zoe-agi.js,fim)
+
+[zoe-atendeu]
+exten => s,1,AGI(/opt/zoe/zoe-agi.js,atendeu)
+ same => n,Return()
+```
+
+O `h` fecha a conversa no ZOE Atende quando o cliente desliga — inclusive depois de falar com o
+atendente. Nada disso segura a ligação: se o ZOE Atende não responder em 3 s, o atendente atende
+normalmente.
 
 ### URA inteligente
 

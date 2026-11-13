@@ -571,6 +571,37 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .resumo-ia p{ margin:0; font-size:13.5px; line-height:1.55 }
 .resumo-ia .motivo{ color:var(--text-2); font-size:12.5px }
 
+/* Passagem de bastão da ZOE para a pessoa (painel da conversa e aviso da ligação). */
+.passagem{
+  background:var(--destaque-bg); border:1px solid var(--destaque-borda); border-radius:var(--radius);
+  padding:13px 14px; display:flex; flex-direction:column; gap:10px; font-size:13.5px;
+}
+.passagem-topo{ display:flex; align-items:center; justify-content:space-between; gap:8px }
+.passagem h3{ margin:0; display:flex; align-items:center; gap:6px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--azul) }
+.passagem h3 svg{ width:15px; height:15px }
+.passagem-quem{ display:flex; flex-direction:column; gap:3px; align-items:flex-start }
+.passagem-quem strong{ font-size:15px }
+.passagem-quem .etiqueta{ white-space:normal; max-width:100%; line-height:1.35 }
+.passagem-atencao{
+  display:flex; gap:8px; align-items:flex-start; background:var(--aviso-bg, rgba(245,158,11,.12));
+  border:1px solid var(--aviso-borda, rgba(245,158,11,.35)); border-radius:9px; padding:8px 10px;
+}
+.passagem-atencao svg{ width:16px; height:16px; flex:none; margin-top:2px; color:var(--amarelo) }
+.passagem-bloco{ display:flex; flex-direction:column; gap:6px }
+.passagem-bloco p{ margin:0; line-height:1.5 }
+.passagem small{ display:block; color:var(--text-3); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:2px }
+.passagem-lista{ margin:0; padding-left:18px; display:flex; flex-direction:column; gap:3px; line-height:1.45 }
+.passagem-lista.atencao{ padding-left:14px }
+.passagem-lista.feito li::marker{ content:'✓  '; color:var(--ok) }
+.passagem-resumo{ margin:0; color:var(--text-2); font-size:12.5px; line-height:1.5 }
+.passagem-dialogo summary{ cursor:pointer; font-size:12.5px; color:var(--text-2) }
+.passagem-dialogo ol{ list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:260px; overflow:auto }
+.passagem-dialogo li{ padding:6px 9px; border-radius:9px; background:var(--surface); border:1px solid var(--border); max-width:88% }
+.passagem-dialogo li.cliente{ align-self:flex-start }
+.passagem-dialogo li.zoe, .passagem-dialogo li.equipe{ align-self:flex-end; background:var(--destaque-bg) }
+.passagem-dialogo li small{ text-transform:none; letter-spacing:0 }
+.passagem.completa{ background:transparent; border:0; padding:0 }
+
 .notas{ display:flex; flex-direction:column; gap:7px }
 .nota-item{ background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--amarelo); border-radius:8px; padding:8px 10px }
 .nota-item p{ margin:0 0 3px; font-size:13px; white-space:pre-wrap }

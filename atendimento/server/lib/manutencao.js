@@ -31,6 +31,20 @@ function encerrarAbandonadas(db) {
   return encerradas;
 }
 
+/**
+ * Ligação que ficou aberta porque a central não avisou o fim (o "h" do plano de discagem não está
+ * configurado, ou o servidor caiu no meio). Nenhuma ligação dura quatro horas: fecha, para não
+ * prender o atendente nem a conversa do cliente.
+ */
+function encerrarLigacoesEsquecidas(db, { horas = 4 } = {}) {
+  const corte = new Date(Date.now() - horas * 3_600_000).toISOString();
+  const alvos = db.prepare("SELECT * FROM conversas WHERE canal = 'telefone' AND estado <> 'encerrada' AND aberta_em < ?").all(corte);
+  for (const c of alvos) {
+    conversas.encerrar(db, c, { resolvidaPor: c.ligacao_atendida_em || c.estado === 'humano' ? 'humano' : 'abandono', avisar: false, pedirCsat: false });
+  }
+  return alvos.map((c) => c.id);
+}
+
 /** Quem ficou disponível recebe o que estava esperando. */
 function distribuirPendentes(db) {
   const entregues = [];
@@ -65,6 +79,7 @@ function limpar(db) {
 async function manutencao(db) {
   const r = {};
   try { r.abandonadas = encerrarAbandonadas(db); } catch (err) { console.error('[ZOE Atende] abandono:', err.message); }
+  try { r.ligacoes = encerrarLigacoesEsquecidas(db); } catch (err) { console.error('[ZOE Atende] ligações:', err.message); }
   try { r.ausentes = soltarAtendentesAusentes(db); } catch (err) { console.error('[ZOE Atende] ausentes:', err.message); }
   try { r.entregues = distribuirPendentes(db); } catch (err) { console.error('[ZOE Atende] distribuição:', err.message); }
   // A limpeza roda uma vez por hora, não a cada minuto.
@@ -72,4 +87,4 @@ async function manutencao(db) {
   return r;
 }
 
-module.exports = { manutencao, encerrarAbandonadas, distribuirPendentes, soltarAtendentesAusentes, limpar };
+module.exports = { manutencao, encerrarAbandonadas, encerrarLigacoesEsquecidas, distribuirPendentes, soltarAtendentesAusentes, limpar };

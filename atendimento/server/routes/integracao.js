@@ -183,6 +183,10 @@ module.exports = function rotasIntegracao(db) {
   r.post('/voz/ligacoes/:uid/turno', async (req, res, next) => {
     try { res.json(await voz.turno(db, req.empresa, req.params.uid, req.body ?? {})); } catch (err) { next(err); }
   });
+  // A fila tocou e alguém atendeu: o painel daquele ramal abre com a passagem.
+  r.post('/voz/ligacoes/:uid/atendida', (req, res, next) => {
+    try { res.json(voz.atendida(db, req.empresa, req.params.uid, req.body ?? {})); } catch (err) { next(err); }
+  });
   r.post('/voz/ligacoes/:uid/fim', (req, res, next) => {
     try { res.json(voz.encerrar(db, req.empresa, req.params.uid)); } catch (err) { next(err); }
   });

@@ -10,6 +10,7 @@ import {
   etiquetaMensagem, ESTADOS, AUTORES, TIPOS_MENSAGEM, PRIORIDADES, RESOLVIDA_POR, repetir,
 } from './ui.js';
 import {botao, botaoIcone, campoBusca, seletor, vazio} from './comum.js';
+import {cartaoPassagem} from './passagem.js';
 
 const CAIXAS = {
   minhas: 'Minhas conversas', aguardando: 'Na fila', bot: 'Com a ZOE', abertas: 'Todas em aberto', encerradas: 'Encerradas',
@@ -115,7 +116,7 @@ export async function telaCaixa(ctx) {
         etiquetaEstado(d.estado),
         // A ficha 360°: quem é este cliente, o risco de perder e a vida toda dele.
         ctx.pode('cliente.ficha') ? botao('Ficha do cliente', 'pequeno', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)) : null,
-        d.estado !== 'encerrada' && !d.janela_aberta ? el('span', { class: 'etiqueta aviso', title: 'Passaram-se mais de 24 h desde a última mensagem do cliente: o WhatsApp só aceita template aprovado.' }, 'Janela fechada') : null,
+        !ligacao && d.estado !== 'encerrada' && !d.janela_aberta ? el('span', { class: 'etiqueta aviso', title: 'Passaram-se mais de 24 h desde a última mensagem do cliente: o WhatsApp só aceita template aprovado.' }, 'Janela fechada') : null,
         ...acoesConversa(d, { minha, posso })));
 
     const mensagens = el('div', { class: 'mensagens' }, d.mensagens.map((m) => bolha(m, d)));
@@ -314,8 +315,9 @@ export async function telaCaixa(ctx) {
     const dado = (rotulo, valor) => el('div', { class: 'dado' }, el('small', {}, rotulo), el('span', {}, valor ?? '—'));
 
     limpar(lateralEl,
-      // O resumo da ZOE é a primeira coisa que o atendente deve ler.
-      d.resumo ? el('div', { class: 'resumo-ia' },
+      // A passagem da ZOE é a primeira coisa que o atendente deve ler: quem é, o que pediu, o que
+      // ela já fez e o que pede atenção. Sem transferência, vale o resumo simples.
+      d.passagem ? cartaoPassagem(d.passagem) : d.resumo ? el('div', { class: 'resumo-ia' },
         el('h3', {}, icone('robo'), 'A ZOE passou assim'),
         el('p', {}, d.resumo),
         d.motivo_transferencia ? el('p', { class: 'motivo' }, el('strong', {}, 'Motivo: '), d.motivo_transferencia) : null) : null,
@@ -398,6 +400,8 @@ export async function telaCaixa(ctx) {
   document.body.append(el('datalist', { id: 'atendentes-lista' }, equipe.map((u) => el('option', { value: u.id }, `${u.nome}${u.disponivel ? '' : ' (indisponível)'}`))));
 
   await carregarLista();
+  // Veio por um link com ?conversa= (o aviso da ligação, a ficha do cliente): abre aquela.
+  if (estado.selecionada) await abrir(estado.selecionada).catch((err) => toast(err.message, true));
   // A lista se atualiza sozinha: conversa nova na fila aparece sem recarregar a página.
   const pararLista = repetir(() => carregarLista({ silencioso: true }), 10_000);
   ctx.parar(() => { pararLista(); paradaAtual?.(); $('#atendentes-lista')?.remove(); });

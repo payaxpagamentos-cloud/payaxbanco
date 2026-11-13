@@ -173,12 +173,13 @@ async function equipe(ctx) {
   const lista = el('div');
   const recarregar = async () => {
     const { itens } = await api.get(`/empresas/${ctx.empresaId}/usuarios`);
-    limpar(lista, cartao(null, tabela(['Pessoa', 'Perfil', '^Disponível', '^Em atendimento', 'Máx.', 'Último acesso', '^Ativo', ''],
+    limpar(lista, cartao(null, tabela(['Pessoa', 'Perfil', '^Ramal', '^Disponível', '^Em atendimento', 'Máx.', 'Último acesso', '^Ativo', ''],
       itens.map((u) => el('tr', {},
         td(el('span', { class: 'pessoa' }, el('span', { class: 'iniciais' }, iniciais(u.nome)), el('span', {}, u.nome, el('div', { class: 'pequeno mudo' }, u.email)))),
         td(el('div', {},
           PERFIS[u.perfil],
           u.permissoes_ajustadas ? el('div', { class: 'pequeno mudo' }, 'permissões ajustadas') : null)),
+        td(u.ramal ?? el('span', { class: 'mudo' }, '—'), 'centro num'),
         td(['atendente', 'cliente'].includes(u.perfil) ? el('span', { class: `situacao ${u.disponivel ? 'ok' : ''}` }, u.disponivel ? 'sim' : 'não') : '—', 'centro'),
         td(inteiro(u.em_atendimento), 'centro num'),
         td(inteiro(u.max_simultaneas), 'centro num'),
@@ -194,9 +195,12 @@ async function equipe(ctx) {
     campo('E-mail (é o login)', { name: 'email', type: 'email', required: true }),
     escolha('Perfil', 'perfil', { atendente: PERFIS.atendente, cliente: PERFIS.cliente, supervisor: PERFIS.supervisor }, 'atendente'),
     campo('Máximo de conversas ao mesmo tempo', { name: 'max_simultaneas', type: 'number', value: 5, min: 1, max: 50 }),
+    campo('Ramal na central telefônica (opcional)', { name: 'ramal', inputmode: 'numeric', pattern: '\\d{2,8}', maxlength: 8, placeholder: 'ex.: 201' }),
+    el('p', { class: 'mudo pequeno', style: 'margin:-4px 0 4px' }, 'Quando uma ligação que passou pela ZOE for atendida neste ramal, o painel desta pessoa abre sozinho com tudo o que o cliente já disse.'),
     campo('Senha (vazio gera uma provisória)', { name: 'senha', type: 'password', minlength: 8, autocomplete: 'new-password' }),
   ], async (d) => {
     if (!d.senha) delete d.senha;
+    if (!d.ramal) delete d.ramal;
     const r = await api.post(`/empresas/${ctx.empresaId}/usuarios`, d);
     await recarregar();
     if (r.senha_provisoria) {
@@ -213,6 +217,8 @@ async function equipe(ctx) {
     campo('Nome', { name: 'nome', value: u.nome, required: true, maxlength: 160 }),
     escolha('Perfil', 'perfil', { atendente: PERFIS.atendente, cliente: PERFIS.cliente, supervisor: PERFIS.supervisor }, u.perfil),
     campo('Máximo de conversas ao mesmo tempo', { name: 'max_simultaneas', type: 'number', value: u.max_simultaneas, min: 1, max: 50 }),
+    campo('Ramal na central telefônica (opcional)', { name: 'ramal', value: u.ramal ?? '', inputmode: 'numeric', pattern: '\\d{2,8}', maxlength: 8, placeholder: 'ex.: 201' }),
+    el('p', { class: 'mudo pequeno', style: 'margin:-4px 0 4px' }, 'Quando uma ligação que passou pela ZOE for atendida neste ramal, o painel desta pessoa abre sozinho com tudo o que o cliente já disse.'),
     campo('Nova senha (vazio mantém)', { name: 'senha', type: 'password', minlength: 8, autocomplete: 'new-password' }),
     marcar('Ativo', { name: 'ativo', checked: u.ativo }),
     u.em_atendimento ? el('p', { class: 'mudo pequeno' }, `Desativar devolve as ${u.em_atendimento} conversa(s) dele para a fila.`) : null,

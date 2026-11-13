@@ -2,6 +2,7 @@ import { api, sessao } from './api.js';
 import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, PERFIS } from './ui.js';
 import { TELAS_MASTER } from './master.js';
 import { TELAS_EMPRESA } from './empresa.js';
+import { vigiarLigacoes } from './passagem.js';
 
 const raiz = $('#app');
 let pararTela = null;
@@ -64,6 +65,22 @@ const SUBTITULOS = {
 };
 
 let pararSaude = null;
+// O aviso de ligação vive fora das telas: trocar de tela não pode perder uma ligação tocando.
+let pararVigia = null;
+let vigiaDe = null;
+function vigiar(u, empresaId) {
+  // Só quem atende pelo ramal: a equipe da plataforma visitando a empresa não recebe ligação.
+  const chave = empresaId && !PLATAFORMA.includes(u.perfil) && pode(u, 'atendimentos.atender') ? `${u.id}:${empresaId}` : null;
+  if (chave === vigiaDe) return;
+  pararVigia?.();
+  pararVigia = null;
+  vigiaDe = chave;
+  if (chave) {
+    pararVigia = vigiarLigacoes(empresaId, {
+      abrirConversa: (id) => { location.hash = `${link(empresaId, 'caixa')}?conversa=${id}`; },
+    });
+  }
+}
 
 window.addEventListener('atend:sair', () => desenhar());
 window.addEventListener('hashchange', () => desenhar());
@@ -82,7 +99,7 @@ async function desenhar() {
   pararTela?.();
   pararTela = null;
   const s = sessao.get();
-  if (!s?.token) { pararSaude?.(); pararSaude = null; return telaEntrada(); }
+  if (!s?.token) { pararSaude?.(); pararSaude = null; vigiar({}, null); return telaEntrada(); }
   const u = s.usuario;
   let { empresaId, tela } = rota();
   // Usuário de empresa fica sempre no painel da própria empresa.
@@ -121,6 +138,7 @@ async function desenhar() {
     }
   }
 
+  vigiar(u, empresaId);
   const conteudo = el('main', { class: `conteudo${tela === 'caixa' ? ' cheio' : ''}` });
   let recolhida = false;
   try { recolhida = localStorage.getItem('atend.menu') === 'recolhido'; } catch { /* padrão */ }

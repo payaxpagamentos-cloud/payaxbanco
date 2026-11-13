@@ -144,6 +144,8 @@ function proximoPasso(db, c, fala, { modo = 'fala', noMenu = false } = {}) {
       fila: fila ? { id: fila.id, nome: fila.nome } : null,
       // O que o atendente que pegar a ligação precisa saber, para não perguntar tudo de novo.
       resumo: [c.resumo, c.motivo_transferencia].filter(Boolean).join(' — ') || null,
+      // A frase que a central fala no ouvido do atendente antes de ligar o cliente.
+      sussurro: require('./passagem').montar(db, c.id)?.sussurro ?? null,
       conversa_id: c.id,
     };
   }
@@ -166,6 +168,16 @@ function iniciar(db, empresa, { uid, telefone = null } = {}) {
 
   const { conversa, contato } = transacao(db, () => {
     const ct = conversas.garantirContato(db, empresa.id, tel, null);
+    // Ligação anterior do mesmo número ainda aberta: a central não avisou o fim dela (o "h" do
+    // plano de discagem não rodou, ou o servidor caiu). Uma ligação nova não pode ser recusada por
+    // isso — a antiga é fechada e fica registrado o porquê.
+    const velha = db.prepare("SELECT * FROM conversas WHERE contato_id = ? AND canal = 'telefone' AND estado <> 'encerrada'").get(ct.id);
+    if (velha) {
+      envio.registrarSistema(db, velha, 'Encerrada porque o cliente ligou de novo: a central não avisou o fim desta ligação.');
+      conversas.encerrar(db, velha, {
+        resolvidaPor: velha.ligacao_atendida_em || velha.estado === 'humano' ? 'humano' : 'abandono', avisar: false, pedirCsat: false,
+      });
+    }
     const c = conversas.abrir(db, { empresa, numero, contato: ct, canal: 'telefone' });
     db.prepare("UPDATE conversas SET ligacao_uid = ?, assunto = COALESCE(assunto, 'Ligação') WHERE id = ?").run(id, c.id);
     envio.registrarSistema(db, { ...c, canal: 'telefone' }, `Ligação recebida${tel.startsWith('anon') ? ' de número oculto' : ` de ${tel}`}.`);
@@ -309,19 +321,57 @@ function naoEntendidasSeguidas(db, conversaId) {
 }
 
 /**
+ * A ligação transferida foi atendida num ramal. A central avisa (zoe-agi.js atendeu, no gosub da
+ * fila) e a conversa passa para a pessoa daquele ramal: o painel dela abre sozinho com a passagem
+ * — o que o cliente disse e o que a ZOE já fez. Ramal sem usuário ligado fica registrado, e
+ * qualquer pessoa da fila pode abrir a conversa.
+ */
+function atendida(db, empresa, uid, { ramal } = {}) {
+  const c = porUid(db, empresa.id, uid);
+  if (!c) throw naoEncontrado('Ligação');
+  const r = normalizarRamal(ramal);
+  if (!r) throw new ErroNegocio('Informe o ramal que atendeu a ligação.', 422);
+  if (c.estado === 'encerrada') return { ok: true, encerrada: true };
+  const u = db.prepare("SELECT id, nome FROM usuarios WHERE empresa_id = ? AND ramal = ? AND ativo = 1").get(empresa.id, r);
+  // A central repete o aviso (rede instável, ou o mesmo ramal pegou de novo): não duplica.
+  if (c.ligacao_ramal === r && c.ligacao_atendida_em) return { ok: true, atendente: u?.nome ?? null, repetido: true };
+  transacao(db, () => {
+    db.prepare(`UPDATE conversas SET ligacao_ramal = ?, ligacao_atendida_em = ?, passagem_vista_em = NULL,
+        estado = CASE WHEN ? IS NULL THEN estado ELSE 'humano' END,
+        atendente_id = COALESCE(?, atendente_id), assumida_em = CASE WHEN ? IS NULL THEN assumida_em ELSE COALESCE(assumida_em, ?) END
+      WHERE id = ?`).run(r, agora(), u?.id ?? null, u?.id ?? null, u?.id ?? null, agora(), c.id);
+    envio.registrarSistema(db, c, u
+      ? `${u.nome} atendeu a ligação no ramal ${r}.`
+      : `Ligação atendida no ramal ${r}, que não está ligado a nenhum usuário (Usuários › Ramal).`, { usuarioId: u?.id ?? null });
+  });
+  return { ok: true, atendente: u?.nome ?? null };
+}
+
+/** "PJSIP/201-0000002a", "SIP/201", "Local/201@from-queue/n" ou só "201" → "201". */
+function normalizarRamal(x) {
+  const t = String(x ?? '').trim();
+  const m = t.match(/^(?:[A-Za-z]+\/)?(\d{2,8})(?:\b|[-@/])/) ?? t.match(/^(\d{2,8})$/);
+  return m ? m[1] : null;
+}
+
+/**
  * Desligou. A ligação vira uma conversa encerrada no histórico do cliente, junto com o WhatsApp.
  * Se a ZOE falou por último, conta como resolvida por ela; se a pessoa desligou esperando
- * resposta, é abandono. Transferida para a equipe, quem atendeu foi uma pessoa.
+ * resposta, é abandono. Transferida e atendida num ramal, quem resolveu foi uma pessoa;
+ * transferida e desligada antes de alguém atender, é abandono na fila.
  */
 function encerrar(db, empresa, uid) {
   const c = porUid(db, empresa.id, uid);
   if (!c) throw naoEncontrado('Ligação');
   if (c.estado === 'encerrada') return { ok: true, ja_encerrada: true };
   const ultima = db.prepare("SELECT direcao, autor FROM mensagens WHERE conversa_id = ? AND tipo <> 'sistema' ORDER BY id DESC LIMIT 1").get(c.id);
-  const resolvidaPor = c.estado !== 'bot' ? 'humano' : ultima?.direcao === 'saida' && ultima.autor === 'ia' ? 'ia' : 'abandono';
+  const naFila = c.estado === 'aguardando' && !c.ligacao_atendida_em;
+  const resolvidaPor = c.estado === 'bot'
+    ? (ultima?.direcao === 'saida' && ultima.autor === 'ia' ? 'ia' : 'abandono')
+    : naFila ? 'abandono' : 'humano';
   transacao(db, () => conversas.encerrar(db, c, { resolvidaPor, avisar: false, pedirCsat: false }));
-  envio.registrarSistema(db, c, 'Ligação encerrada.');
+  envio.registrarSistema(db, c, naFila ? 'O cliente desligou na fila, antes de alguém atender.' : 'Ligação encerrada.');
   return { ok: true, resolvida_por: resolvidaPor };
 }
 
-module.exports = { iniciar, turno, encerrar, paraFala, telefoneDaBina, quantasTeclas, falaDoMenu, menuDa, MENU_PADRAO, MAX_NAO_ENTENDI };
+module.exports = { iniciar, turno, atendida, encerrar, normalizarRamal, paraFala, telefoneDaBina, quantasTeclas, falaDoMenu, menuDa, MENU_PADRAO, MAX_NAO_ENTENDI };

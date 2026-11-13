@@ -47,11 +47,15 @@ CREATE TABLE IF NOT EXISTS usuarios (
   -- O atendente só entra na distribuição quando está disponível (botão no painel) e com vaga livre.
   disponivel INTEGER NOT NULL DEFAULT 0,
   max_simultaneas INTEGER NOT NULL DEFAULT 5 CHECK (max_simultaneas > 0),
+  -- Ramal da pessoa na central telefônica. Quando uma ligação que passou pela ZOE toca e é atendida
+  -- neste ramal, o painel dela abre sozinho com tudo o que o cliente já disse.
+  ramal TEXT,
   visto_em TEXT,
   ultimo_acesso TEXT,
   criado_em TEXT NOT NULL,
   CHECK ((perfil IN ('master','suporte')) = (empresa_id IS NULL))
 );
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_ramal ON usuarios(empresa_id, ramal) WHERE ramal IS NOT NULL;
 
 -- Números de WhatsApp da empresa na Cloud API da Meta. O token e o segredo do app ficam cifrados.
 CREATE TABLE IF NOT EXISTS numeros (
@@ -130,6 +134,11 @@ CREATE TABLE IF NOT EXISTS conversas (
   ligacao_uid TEXT,
   -- Ligação por teclas: 1 enquanto o cliente está no menu principal (a próxima tecla é uma opção dele).
   voz_no_menu INTEGER NOT NULL DEFAULT 0,
+  -- Ligação transferida: em que ramal foi atendida e quando. passagem_vista_em marca que o atendente
+  -- já viu a passagem (o que o cliente disse e o que a ZOE fez), para o aviso não abrir de novo.
+  ligacao_ramal TEXT,
+  ligacao_atendida_em TEXT,
+  passagem_vista_em TEXT,
   fila_id INTEGER REFERENCES filas(id),
   atendente_id INTEGER REFERENCES usuarios(id),
   assunto TEXT,
