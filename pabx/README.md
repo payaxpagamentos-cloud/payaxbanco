@@ -37,6 +37,43 @@ Servidor próprio (Node.js + SQLite), sem depender do Ativa BPO nem do APP Táxi
   transferidas, boletos e desbloqueios do mês, motivos das ligações, o que a ZOE fez em cada ligação e a configuração.
 - **Dashboard**: os cartões Utilização, Chamadas Simultâneas, Ramais, Uso mês atual, Recursos de voz e texto (TTS/STT) e Limites.
 - **Supervisão de campanhas**: progresso de cada campanha e cada agente (livre, em chamada, offline), atualizando sozinha.
+### URA inteligente
+
+A URA comum pergunta a mesma coisa para todo mundo. A inteligente consulta o IXC pelo número que
+ligou e **abre pelo motivo mais provável daquela pessoa**:
+
+| Situação | Ordem | O que ela oferece |
+|---|---|---|
+| Falha em massa na região | 1ª | avisa que já sabemos e **não abre chamado** |
+| Acesso bloqueado por atraso | 2ª | desbloqueio de confiança na hora |
+| Fatura vencida | 3ª | segunda via |
+| Fatura perto do vencimento | 4ª | segunda via |
+| Conexão fora do ar agora | 5ª | suporte técnico |
+
+Cada uma liga, desliga e tem a fala reescrita pelo provedor, em `PABX › URA › Inteligência`.
+
+**A regra de privacidade.** Bina se falsifica, então reconhecer o número **não é** confirmar a
+identidade. A URA trabalha em dois momentos:
+
+- **antes de confirmar**: a situação só muda a ORDEM do menu. Nada de nome, valor, vencimento ou
+  bloqueio. A única exceção é a falha na região, que é informação da rede e não do contrato — e é
+  justamente ela que evita a ligação virar mais um chamado do mesmo problema;
+- **depois de confirmar** (três primeiros do CPF/CNPJ ou data de nascimento): aí sim fala tudo e
+  oferece a solução.
+
+**Nunca prende o cliente.** Toda abertura tem a tecla do atendente. Se o IXC cair, se houver dois
+cadastros no mesmo telefone ou se o número for desconhecido, a URA cai no menu normal em vez de
+deixar a ligação no vazio.
+
+**Os alertas de rede vêm do ZOE Atende**, que é onde a equipe os cadastra, por
+`GET /api/integracao/alertas`. Guardar uma cópia aqui criaria duas verdades sobre a mesma falha —
+e, no dia em que divergissem, a ZOE do WhatsApp e a do telefone contariam histórias diferentes
+para o mesmo cliente.
+
+A central telefônica conversa com ela por duas rotas:
+`POST /api/integracao/ura/:id/atender` (a ligação chegou) e
+`POST /api/integracao/ura/:id/confirmado` (a identidade foi confirmada).
+
 - **Campanhas** (discador): modo, fila que atende, canais e tentativas; importação de contatos ("nome;telefone"), ativar, pausar e encerrar.
 - **Pessoas / Ramais**: cadastro dentro do limite contratado, gravação por ramal, situação do registro e os dados SIP para configurar o telefone.
 - **Chamadas**: lista com filtros (período, direção, status, ramal, número ou contato), detalhe e CSV.

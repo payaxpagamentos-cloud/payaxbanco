@@ -273,8 +273,15 @@ async function telaNumeros(ctx) {
   await carregar();
 }
 
-// ---------- Recursos PABX: filas e URAs ----------
-async function telaRecursos(ctx) {
+// ---------- Filas de atendimento e URA ----------
+/**
+ * As duas vivem na mesma função porque a URA aponta para filas e a fila aponta para ramais:
+ * editar uma sem ver a outra leva a destino quebrado. `so` escolhe o que a tela mostra.
+ */
+const telaFilas = (ctx) => telaRecursos(ctx, 'filas');
+const telaUras = (ctx) => telaRecursos(ctx, 'uras');
+
+async function telaRecursos(ctx, so = null) {
   const corpo = el('div', { class: 'coluna' });
   limpar(ctx.conteudo, corpo);
   const ESTRATEGIAS = { todos: 'Tocar todos', sequencial: 'Em sequência', aleatorio: 'Aleatório', menos_chamadas: 'Quem atendeu menos' };
@@ -325,17 +332,28 @@ async function telaRecursos(ctx) {
       carregar();
     };
 
-    limpar(corpo,
+    const cartaoFilas = () =>
       cartao('Filas de atendimento', tabela(['Fila', 'Distribuição', '^Espera máx.', 'Ramais', '^Ações'], filas.map((f) => el('tr', {},
         td(f.nome), td(ESTRATEGIAS[f.estrategia]), td(`${f.espera_maxima_s} s`, 'centro num'), td(f.ramais.map((r) => r.numero).join(', ') || '—'),
         el('td', { class: 'acoes' }, pode(ctx) ? [botaoIcone('editar', 'Editar', async () => { if (await formFila(f)) { toast('Fila salva.'); carregar(); } }),
           botaoIcone('lixo', 'Excluir', excluir('filas', f), 'perigo')] : null))), 'Nenhuma fila. A fila toca nos ramais escolhidos até alguém atender.'),
-      pode(ctx) ? el('div', { style: 'margin-top:12px' }, botao('Nova fila', 'primario', async () => { if (await formFila()) { toast('Fila criada.'); carregar(); } })) : null),
-      cartao('URAs (menu de atendimento)', tabela(['URA', 'Mensagem', 'Opções', '^Ações'], uras.map((u) => el('tr', {},
-        td(u.nome), td(el('span', { class: 'pequeno' }, u.mensagem)), td(u.opcoes.map((o) => el('div', { class: 'pequeno' }, `${o.digito} → ${nomeDestino(o)}`))),
-        el('td', { class: 'acoes' }, pode(ctx) ? [botaoIcone('editar', 'Editar', async () => { if (await formUra(u)) { toast('URA salva.'); carregar(); } }),
-          botaoIcone('lixo', 'Excluir', excluir('uras', u), 'perigo')] : null))), 'Nenhuma URA. A URA fala uma mensagem e envia a chamada conforme a tecla.'),
-      pode(ctx) ? el('div', { style: 'margin-top:12px' }, botao('Nova URA', 'primario', async () => { if (await formUra()) { toast('URA criada.'); carregar(); } })) : null));
+      pode(ctx) ? el('div', { style: 'margin-top:12px' }, botao('Nova fila', 'primario', async () => { if (await formFila()) { toast('Fila criada.'); carregar(); } })) : null);
+
+    const cartaoUras = () =>
+      cartao('URAs (menu de atendimento)', tabela(['URA', 'Tipo', 'Mensagem', 'Opções', '^Ações'], uras.map((u) => el('tr', {},
+        td(u.nome),
+        td(u.tipo === 'inteligente'
+          ? el('span', { class: 'etiqueta ok' }, 'inteligente')
+          : el('span', { class: 'etiqueta' }, 'clássica')),
+        td(el('span', { class: 'pequeno' }, u.mensagem)), td(u.opcoes.map((o) => el('div', { class: 'pequeno' }, `${o.digito} → ${nomeDestino(o)}`))),
+        el('td', { class: 'acoes' }, pode(ctx) ? [
+          botaoIcone('zoe', 'Inteligência da URA', () => inteligenciaUra(ctx, u, filas, carregar)),
+          botaoIcone('editar', 'Editar', async () => { if (await formUra(u)) { toast('URA salva.'); carregar(); } }),
+          botaoIcone('lixo', 'Excluir', excluir('uras', u), 'perigo')] : null))),
+        'Nenhuma URA. A URA fala uma mensagem e envia a chamada conforme a tecla.'),
+      pode(ctx) ? el('div', { style: 'margin-top:12px' }, botao('Nova URA', 'primario', async () => { if (await formUra()) { toast('URA criada.'); carregar(); } })) : null);
+
+    limpar(corpo, so === 'uras' ? cartaoUras() : so === 'filas' ? cartaoFilas() : [cartaoFilas(), cartaoUras()]);
   }
   await carregar();
 }
@@ -543,5 +561,67 @@ function lerZoe(f) {
 
 export const TELAS_EMPRESA = {
   dashboard: telaDashboard, supervisao: telaSupervisao, campanhas: telaCampanhas, ramais: telaRamais, chamadas: telaChamadas, crm: telaCrm,
-  terminacao: telaTerminacao, numeros: telaNumeros, recursos: telaRecursos, relatorios: telaRelatorios, configuracoes: telaConfiguracoes, integracoes: telaIntegracoes, zoe: telaZoe,
+  terminacao: telaTerminacao, numeros: telaNumeros, recursos: telaRecursos, filas: telaFilas, uras: telaUras, relatorios: telaRelatorios, configuracoes: telaConfiguracoes, integracoes: telaIntegracoes, zoe: telaZoe,
 };
+
+/**
+ * A inteligência da URA.
+ *
+ * A URA clássica pergunta a mesma coisa para todo mundo. A inteligente consulta o IXC pelo
+ * número que ligou e abre pelo motivo mais provável daquela pessoa. Aqui o provedor escolhe
+ * quais situações ela reconhece e escreve, com as palavras da empresa, o que ela fala em cada uma.
+ */
+async function inteligenciaUra(ctx, u, filas, depois) {
+  const d = await api.get(`${base(ctx)}/uras/${u.id}/inteligencia`);
+  const campos = new Map();
+  let tipo = d.ura.tipo;
+
+  const bloco = (si) => {
+    const liga = el('input', { type: 'checkbox', checked: si.ativa, name: `a_${si.chave}` });
+    const fala = el('textarea', { rows: 2, maxlength: 600, name: `f_${si.chave}` });
+    fala.value = si.fala;
+    campos.set(si.chave, { liga, fala });
+    return el('div', { class: 'situacao-ura' },
+      el('label', { class: 'marcar' }, liga, el('strong', {}, si.nome)),
+      el('p', { class: 'pequeno mudo', style: 'margin:2px 0 6px' },
+        `${si.explicacao} ${d.acoes[si.acao] ?? ''}.`
+        + (si.antes_de_confirmar ? ' Esta pode ser dita antes de confirmar a identidade: é informação da rede, não do contrato.' : '')),
+      fala);
+  };
+
+  const selTipo = escolha('Como esta URA atende', 'tipo', {
+    classica: 'Clássica — fala a mensagem e espera a tecla, igual para todos',
+    inteligente: 'Inteligente — consulta o IXC e abre pelo motivo de quem ligou',
+  }, tipo);
+  const selFila = escolha('Fila de quem pede atendente', 'fila_padrao_id',
+    { '': '— escolha —', ...Object.fromEntries(filas.map((f) => [f.id, f.nome])) }, d.ura.fila_padrao_id ?? '');
+
+  const avisoTipo = el('p', { class: 'pequeno mudo' });
+  const pintar = () => {
+    tipo = selTipo.querySelector('select').value;
+    limpar(avisoTipo, tipo === 'inteligente'
+      ? 'Antes de a identidade ser confirmada, a URA nunca diz nome, valor, vencimento nem que o contrato está bloqueado — Bina se falsifica.'
+      : 'A URA clássica ignora as situações abaixo.');
+  };
+  selTipo.querySelector('select').addEventListener('change', pintar);
+  queueMicrotask(pintar);
+
+  return formModal(`Inteligência da URA ${u.nome}`, () => [
+    selTipo, avisoTipo, selFila,
+    el('div', { class: 'duas' },
+      campo('Tecla que sempre leva a uma pessoa', { name: 'tecla_atendente', value: d.ura.tecla_atendente, maxlength: 1 }),
+      campo('Tentativas antes de transferir', { name: 'max_tentativas', type: 'number', min: 1, max: 5, value: d.ura.max_tentativas })),
+    el('fieldset', {}, el('legend', {}, 'O que ela reconhece, da mais urgente para a menos'),
+      el('div', { class: 'coluna', style: 'gap:10px' }, d.situacoes.map(bloco))),
+  ], async () => {
+    const corpo = {
+      tipo, fila_padrao_id: selFila.querySelector('select').value || null,
+      tecla_atendente: document.querySelector('[name=tecla_atendente]').value,
+      max_tentativas: Number(document.querySelector('[name=max_tentativas]').value),
+      situacoes: Object.fromEntries([...campos.entries()].map(([k, x]) => [k, { ativa: x.liga.checked, fala: x.fala.value }])),
+    };
+    await api.put(`${base(ctx)}/uras/${u.id}/inteligencia`, corpo);
+    toast('Inteligência salva.');
+    await depois();
+  }, { largo: true });
+}

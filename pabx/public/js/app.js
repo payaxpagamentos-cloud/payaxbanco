@@ -14,14 +14,19 @@ const PLATAFORMA = ['master', 'suporte'];
 const MENU_MASTER = [
   ['dashboard', 'Dashboard', 'dashboard'], ['empresas', 'Empresas', 'empresas'], ['chamadas', 'Chamadas', 'chamadas'],
   ['usuarios', 'Permissões e usuários', 'usuarios', ['master']], ['seguranca', 'Segurança', 'seguranca', ['master']], ['relatorios', 'Relatórios', 'relatorios'],
-  ['terminacao', 'Terminação', 'terminacao'], ['diagnostico', 'Diagnóstico', 'diagnostico'], ['configuracoes', 'Configurações', 'configuracoes', ['master']],
+  ['terminacao', 'Terminação', 'terminacao', null, [['rotas', 'Rotas de saída'], ['dids', 'Números (DIDs)']]],
+  ['diagnostico', 'Diagnóstico', 'diagnostico'], ['configuracoes', 'Configurações', 'configuracoes', ['master']],
   ['integracoes', 'Integrações', 'integracoes'],
 ];
 const MENU_EMPRESA = [
   ['dashboard', 'Dashboard', 'dashboard', null, [['dashboard', 'Dashboard'], ['supervisao', 'Supervisão de campanhas']]],
   ['zoe', 'ZOE', 'zoe'],
-  ['campanhas', 'Campanhas', 'campanhas'], ['ramais', 'Pessoas / Ramais', 'pessoas'], ['chamadas', 'Chamadas', 'chamadas'], ['crm', 'CRM', 'crm'],
-  ['terminacao', 'Terminação', 'terminacao'], ['numeros', 'Números Entrantes', 'numeros'], ['recursos', 'Recursos PABX', 'recursos'],
+  ['campanhas', 'Campanhas', 'campanhas'], ['chamadas', 'Chamadas', 'chamadas'], ['crm', 'CRM', 'crm'],
+  // O PABX num grupo só: cada peça com o nome que o provedor usa, em vez de escondida em "Recursos".
+  ['pabx', 'PABX', 'terminacao', null, [
+    ['ramais', 'Ramais'], ['filas', 'Filas de atendimento'], ['uras', 'URA'],
+    ['numeros', 'Números entrantes'], ['terminacao', 'Rota de saída'],
+  ]],
   ['relatorios', 'Relatórios', 'relatorios'], ['configuracoes', 'Configurações', 'configuracoes'],
   ['integracoes', 'Integrações', 'integracoes', ['master', 'suporte', 'cliente']],
 ];
@@ -29,9 +34,10 @@ const MENU_EMPRESA = [
 // Frase sob o título de cada tela.
 const SUBTITULOS = {
   dashboard: 'Visão geral da telefonia', supervisao: 'Campanhas e agentes em tempo real', zoe: 'Atendente virtual ligada ao IXC',
-  campanhas: 'Discador: listas, filas e andamento', ramais: 'Gerencie os ramais e as pessoas da sua empresa', chamadas: 'Histórico de ligações com filtros e exportação',
-  crm: 'Contatos e histórico de ligações', terminacao: 'Rota de saída, tarifação e consumo', numeros: 'Para onde vai cada número que recebe ligações',
-  recursos: 'Filas de atendimento e URAs (menus de atendimento)', relatorios: 'Acompanhe o desempenho da sua telefonia', configuracoes: 'Dados da empresa, plano e usuários',
+  campanhas: 'Discador: listas, filas e andamento', ramais: 'Os ramais da empresa e quem fala em cada um', chamadas: 'Histórico de ligações com filtros e exportação',
+  crm: 'Contatos e histórico de ligações', terminacao: 'Por onde saem as ligações, a tarifação e o consumo', numeros: 'Para onde vai cada número que recebe ligações',
+  recursos: 'Filas de atendimento e URAs (menus de atendimento)',
+  filas: 'Para onde a ligação vai quando precisa de uma pessoa', uras: 'O que o cliente ouve quando liga — e o que a ZOE já resolve antes da fila', relatorios: 'Acompanhe o desempenho da sua telefonia', configuracoes: 'Dados da empresa, plano e usuários',
   integracoes: 'Chaves de API para a central telefônica', empresas: 'Empresas clientes da plataforma', usuarios: 'Quem acessa o painel e com qual perfil',
   seguranca: 'Acessos recusados, IPs bloqueados e atividades', diagnostico: 'Verificações da plataforma e das rotas',
 };

@@ -163,6 +163,47 @@ module.exports = function rotasIntegracao(db) {
     } catch (err) { next(err); }
   });
 
+  // ---------- Alertas de rede (é por aqui que a URA do PABX lê) ----------
+  /**
+   * Os alertas que valem para um cliente. A URA do telefone usa isto para dizer "já sabemos da
+   * falha na sua região" em vez de abrir mais um chamado do mesmo problema.
+   *
+   * Os alertas são cadastrados aqui, no ZOE Atende, porque é aqui que a equipe os declara.
+   * Quem precisa deles lê daqui, em vez de guardar uma cópia — duas cópias viram duas verdades.
+   */
+  r.get('/alertas', async (req, res, next) => {
+    try {
+      const alertas = require('../lib/alertas');
+      const documento = String(req.query.documento ?? '').replace(/\D/g, '');
+      const clienteId = String(req.query.cliente ?? '').trim();
+
+      // Sem identificação, só os alertas que valem para a base inteira.
+      if (!documento && !clienteId) {
+        return res.json({ alertas: alertas.paraCliente(db, req.empresa.id, null).map(publicoDoAlerta) });
+      }
+
+      const ixc = require('../ia/ferramentas-ixc').clienteIxc(db, req.empresa.id);
+      if (!ixc) return res.json({ alertas: alertas.paraCliente(db, req.empresa.id, null).map(publicoDoAlerta), aviso: 'IXC não configurado: só os alertas gerais.' });
+
+      let cadastro = null;
+      try {
+        cadastro = clienteId ? await ixc.clientePorId(clienteId) : (await ixc.clientesPorDocumento(documento))[0] ?? null;
+      } catch { cadastro = null; }
+      if (!cadastro) return res.json({ alertas: alertas.paraCliente(db, req.empresa.id, null).map(publicoDoAlerta) });
+
+      const dados = { cadastro, contratos: [], logins: [] };
+      for (const [chave, buscar] of [['contratos', () => ixc.contratos(cadastro.id)], ['logins', () => ixc.logins(cadastro.id)]]) {
+        try { const valor = await buscar(); if (Array.isArray(valor)) dados[chave] = valor; } catch { /* segue sem */ }
+      }
+      const aplicaveis = alertas.paraCliente(db, req.empresa.id, dados);
+      alertas.marcarAvisado(db, aplicaveis.map((a) => a.id));
+      res.json({ cliente: String(cadastro.id), alertas: aplicaveis.map(publicoDoAlerta) });
+    } catch (err) { next(err); }
+  });
+
+  // Só o que quem avisa o cliente precisa saber — nada da configuração interna do alerta.
+  const publicoDoAlerta = (a) => ({ tipo: a.tipo, tipo_nome: a.tipo_nome, mensagem: a.mensagem, previsao: a.previsao ?? null, desde: a.inicio, previsto_ate: a.fim, abre_chamado: a.abre_chamado });
+
   // ---------- Custo da conta da Meta (é por aqui que o Manager lê) ----------
   /**
    * O custo do WhatsApp num formato que a gestão consome direto: o mês corrente em aberto, os

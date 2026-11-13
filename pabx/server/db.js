@@ -102,6 +102,18 @@ CREATE TABLE IF NOT EXISTS uras (
   mensagem TEXT NOT NULL,
   -- [{ "digito": "1", "destino_tipo": "ramal"|"fila"|"ura", "destino_id": 3 }]
   opcoes TEXT NOT NULL DEFAULT '[]',
+  -- 'classica': fala a mensagem e espera a tecla, sempre igual.
+  -- 'inteligente': consulta o IXC pelo número que ligou e abre pelo motivo mais provável
+  --   daquela pessoa — bloqueado por atraso, fatura vencida, falha na região.
+  tipo TEXT NOT NULL DEFAULT 'classica' CHECK (tipo IN ('classica','inteligente')),
+  -- Situações ligadas e a fala de cada uma: { "bloqueado": { "ativa": 1, "fala": "..." }, ... }
+  situacoes TEXT NOT NULL DEFAULT '{}',
+  -- Para onde vai quem pede atendente, não escolhe nada ou erra demais.
+  fila_padrao_id INTEGER REFERENCES filas(id) ON DELETE SET NULL,
+  -- Tecla que sempre leva a uma pessoa. Nenhuma URA pode prender o cliente.
+  tecla_atendente TEXT NOT NULL DEFAULT '0',
+  -- Depois de N erros ou silêncios, transfere em vez de repetir o menu.
+  max_tentativas INTEGER NOT NULL DEFAULT 3 CHECK (max_tentativas BETWEEN 1 AND 5),
   criada_em TEXT NOT NULL
 );
 
@@ -245,6 +257,10 @@ CREATE TABLE IF NOT EXISTS zoe_config (
   fila_financeiro_id INTEGER REFERENCES filas(id) ON DELETE SET NULL,
   fila_suporte_id INTEGER REFERENCES filas(id) ON DELETE SET NULL,
   fila_comercial_id INTEGER REFERENCES filas(id) ON DELETE SET NULL,
+  -- Alertas de rede (falha em massa, manutenção) vêm do ZOE Atende, que é onde a equipe os
+  -- cadastra. Guardar uma cópia aqui criaria duas verdades sobre a mesma falha.
+  alertas_url TEXT,
+  alertas_chave_cifrada TEXT,
   atualizado_em TEXT NOT NULL
 );
 

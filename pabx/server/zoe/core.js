@@ -478,8 +478,17 @@ function encerrar(db, empresa, uid) {
   });
 }
 
+/** A config com os segredos já decifrados, para quem precisa chamar o IXC e o ZOE Atende. */
+const configComSegredos = (db, empresaId) => {
+  const c = lerConfigZoe(db, empresaId);
+  return { ...c, alertas_chave: c.alertas_chave_cifrada ? decifrar(c.alertas_chave_cifrada) : null };
+};
+
+/** O cliente do IXC desta empresa, ou null quando a integração não está ligada. */
+const ixcOuNulo = (cfg, uid) => { try { return ixcDa(cfg, uid); } catch { return null; } };
+
 module.exports = {
-  lerConfigZoe, configPublica, salvarConfig, testarIxc,
+  lerConfigZoe, configComSegredos, ixcDa, ixcOuNulo, configPublica, salvarConfig, testarIxc,
   iniciar, informarDocumento, confirmar, faturas, enviarBoleto, desbloquear, transferir, encerrar,
   falarValor, falarData, MOTIVOS,
 };

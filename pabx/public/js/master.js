@@ -225,7 +225,11 @@ async function telaRelatorios(ctx) {
 }
 
 // ---------- Terminação: rotas e números ----------
-async function telaTerminacao(ctx) {
+/** Rota e número vivem juntos (o número chega por uma rota); `so` escolhe o que a tela mostra. */
+const telaRotas = (ctx) => telaTerminacao(ctx, 'rotas');
+const telaDids = (ctx) => telaTerminacao(ctx, 'numeros');
+
+async function telaTerminacao(ctx, so = null) {
   const corpo = el('div', { class: 'coluna' });
   limpar(ctx.conteudo, corpo);
   const formTronco = (t) => formModal(t ? `Editar ${t.nome}` : 'Nova rota de saída', () => [
@@ -265,7 +269,7 @@ async function telaTerminacao(ctx) {
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Trocar a empresa apaga o destino configurado; a nova empresa escolhe para onde as chamadas vão.'),
     ], (d) => api.patch(`/master/numeros/${n.id}`, { empresa_id: d.empresa_id || null, tronco_id: d.tronco_id || null, descricao: d.descricao }));
 
-    limpar(corpo,
+    const cartaoRotas = () => [
       cartao('Rotas de saída (operadoras)', tabela(['Nome', 'Endereço', '^Canais', '^Agora', '^Hoje', '^Empresas', '>Custo fixo/móvel/intern.', 'Situação', '^Ações'], troncos.map((t) => el('tr', {},
         td(t.nome), td(el('span', { class: 'mono pequeno' }, `${t.usuario ? `${t.usuario}@` : ''}${t.host}:${t.porta}`)), td(t.canais, 'centro num'), td(t.em_curso, 'centro num'),
         td(t.chamadas_hoje, 'centro num'), td(t.empresas, 'centro num'),
@@ -279,7 +283,9 @@ async function telaTerminacao(ctx) {
             toast('Rota excluída.');
             carregar();
           }, 'perigo')] : null))), 'Nenhuma rota cadastrada. Cadastre a operadora que faz as ligações para fora.'),
-      ctx.soMaster ? el('div', { style: 'margin-top:12px' }, botao('Nova rota', 'primario', async () => { if (await formTronco()) { toast('Rota criada.'); carregar(); } })) : null),
+      ctx.soMaster ? el('div', { style: 'margin-top:12px' }, botao('Nova rota', 'primario', async () => { if (await formTronco()) { toast('Rota criada.'); carregar(); } })) : null)];
+
+    const cartaoDids = () => [
       cartao('Números (DIDs)', tabela(['Número', 'Descrição', 'Rota', 'Empresa', 'Destino', '^Ações'], numeros.map((n) => el('tr', {},
         td(telefone(n.numero), 'num'), td(n.descricao ?? '—'), td(n.tronco ?? '—'), td(n.empresa ?? el('span', { class: 'etiqueta' }, 'estoque')),
         td(n.empresa ? (n.destino_tipo ? el('span', { class: 'etiqueta ok' }, n.destino_tipo) : el('span', { class: 'etiqueta aviso' }, 'sem destino')) : '—'),
@@ -291,7 +297,9 @@ async function telaTerminacao(ctx) {
             toast('Número excluído.');
             carregar();
           }, 'perigo')] : null))), 'Nenhum número cadastrado.'),
-      ctx.soMaster ? el('div', { style: 'margin-top:12px' }, botao('Adicionar números', 'primario', async () => { if (await formNumeros()) carregar(); })) : null));
+      ctx.soMaster ? el('div', { style: 'margin-top:12px' }, botao('Adicionar números', 'primario', async () => { if (await formNumeros()) carregar(); })) : null)];
+
+    limpar(corpo, so === 'rotas' ? cartaoRotas() : so === 'numeros' ? cartaoDids() : [cartaoRotas(), cartaoDids()]);
   }
   await carregar();
 }
@@ -358,5 +366,5 @@ async function telaIntegracoes(ctx) {
 
 export const TELAS_MASTER = {
   dashboard: telaDashboard, empresas: telaEmpresas, chamadas: telaChamadas, usuarios: telaUsuarios, seguranca: telaSeguranca, relatorios: telaRelatorios,
-  terminacao: telaTerminacao, diagnostico: telaDiagnostico, configuracoes: telaConfiguracoes, integracoes: telaIntegracoes,
+  terminacao: telaTerminacao, rotas: telaRotas, dids: telaDids, diagnostico: telaDiagnostico, configuracoes: telaConfiguracoes, integracoes: telaIntegracoes,
 };

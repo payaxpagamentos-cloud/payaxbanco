@@ -7,6 +7,8 @@ const { lerChave } = require('../lib/contas');
 const cham = require('../lib/chamadas');
 const { inicioMes, intervalo, hoje } = require('../lib/datas');
 const v = require('../lib/validacao');
+const uraLib = require('../lib/ura');
+const uraAtendimento = require('../lib/ura-atendimento');
 
 /**
  * API usada pela central telefônica (Asterisk, FreeSWITCH etc.), autenticada pela chave da empresa no cabeçalho X-Api-Key.
@@ -59,6 +61,39 @@ module.exports = (db) => {
     db.prepare('UPDATE ramais SET online = ?, registro_em = ?, registro_ip = COALESCE(?, registro_ip), registro_agente = COALESCE(?, registro_agente) WHERE id = ?')
       .run(online && x.ativo ? 1 : 0, agora(), req.body.ip ? String(req.body.ip).slice(0, 45) : null, req.body.agente ? String(req.body.agente).slice(0, 120) : null, x.id);
     res.json({ ok: true, ativo: Boolean(x.ativo) });
+  });
+
+  // ---------- URA ----------
+  /**
+   * A ligação chegou numa URA: a central pergunta o que falar.
+   *
+   * Numa URA clássica devolve a mensagem e as teclas de sempre. Numa inteligente, consulta o
+   * IXC pelo número que ligou e abre pelo motivo mais provável daquela pessoa — sem dizer nada
+   * do contrato antes de a identidade ser confirmada.
+   */
+  r.post('/ura/:id/atender', async (req, res, next) => {
+    try {
+      const ura = uraLib.buscar(db, req.empresa.id, Number(req.params.id));
+      const zoe = require('../zoe/core');
+      const cfg = zoe.configComSegredos(db, req.empresa.id);
+      const ixc = cfg.ativo ? zoe.ixcOuNulo(cfg, req.body?.uid ? String(req.body.uid) : undefined) : null;
+      res.json(await uraAtendimento.atender(db, req.empresa, ura, {
+        telefone: req.body?.telefone ? v.digitos(req.body.telefone) : null, cfg, ixc,
+      }));
+    } catch (err) { next(err); }
+  });
+
+  /** A identidade foi confirmada: agora a URA pode falar do contrato e oferecer a solução. */
+  r.post('/ura/:id/confirmado', async (req, res, next) => {
+    try {
+      const ura = uraLib.buscar(db, req.empresa.id, Number(req.params.id));
+      const zoe = require('../zoe/core');
+      const cfg = zoe.configComSegredos(db, req.empresa.id);
+      const ixc = cfg.ativo ? zoe.ixcOuNulo(cfg, req.body?.uid ? String(req.body.uid) : undefined) : null;
+      res.json(await uraAtendimento.aposConfirmar(db, req.empresa, ura, {
+        clienteId: v.texto(req.body?.cliente_id, 'o id do cliente', 40), cfg, ixc,
+      }));
+    } catch (err) { next(err); }
   });
 
   /** Uso de texto para voz (TTS) ou voz para texto (STT), recusado acima do limite do mês. */

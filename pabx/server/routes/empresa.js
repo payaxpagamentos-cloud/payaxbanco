@@ -11,6 +11,7 @@ const { periodo, listarChamadas, csv, reais, enviarCsv, COLUNAS_CHAMADAS } = req
 const { criarUsuario, alterarUsuario, criarChave, senhaSip } = require('../lib/contas');
 const { inicioMes, intervalo, hoje } = require('../lib/datas');
 const v = require('../lib/validacao');
+const uraLib = require('../lib/ura');
 const config = require('../config');
 
 const DESTINOS = ['ramal', 'fila', 'ura'];
@@ -362,7 +363,19 @@ module.exports = (db) => {
   });
 
   r.get('/uras', (req, res) => res.json(db.prepare('SELECT * FROM uras WHERE empresa_id = ? ORDER BY nome').all(eid(req))
-    .map((u) => ({ ...u, opcoes: JSON.parse(u.opcoes) }))));
+    .map((u) => uraLib.comoPublica(u))));
+
+  /** O catálogo de situações que a URA inteligente reconhece, com a fala de cada uma. */
+  r.get('/uras/:id/inteligencia', (req, res) => {
+    const u = uraLib.buscar(db, eid(req), Number(req.params.id));
+    res.json({ ura: u, situacoes: uraLib.catalogo(u), acoes: uraLib.ACOES });
+  });
+
+  r.put('/uras/:id/inteligencia', administra, (req, res) => {
+    const u = uraLib.salvarInteligencia(db, eid(req), Number(req.params.id), req.body ?? {});
+    registrar(db, req, 'ura_inteligencia', { id: u.id, tipo: u.tipo });
+    res.json({ ura: u, situacoes: uraLib.catalogo(u), acoes: uraLib.ACOES });
+  });
   const salvarUra = (req, atual) => {
     const d = req.body;
     const nome = v.texto(d.nome ?? atual?.nome, 'o nome da URA', 80);

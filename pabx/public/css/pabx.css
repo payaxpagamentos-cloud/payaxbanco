@@ -502,3 +502,15 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   }
 }
 @media (prefers-reduced-motion: reduce){ *{ animation: none !important; transition: none !important; } }
+
+/* ---------------------------------------------------------------------------
+   Inteligência da URA
+   Cada situação é um bloco com o interruptor, a explicação e a fala que o
+   provedor escreve. A fala é um campo grande de propósito: é o que o cliente
+   vai ouvir, e tem de dar para ler inteiro sem rolar.
+   --------------------------------------------------------------------------- */
+.situacao-ura{ border:1px solid var(--borda); border-radius:10px; padding:10px 12px; background:var(--fundo-2, transparent) }
+.situacao-ura:hover{ border-color:var(--azul) }
+.situacao-ura textarea{ width:100%; resize:vertical; min-height:52px }
+.situacao-ura .marcar{ display:flex; align-items:center; gap:8px }
+.situacao-ura .marcar input{ width:16px; height:16px; accent-color:var(--azul) }
