@@ -73,6 +73,16 @@ test('acesso: perfis, audiências e isolamento entre clientes', async (t) => {
     assert.equal(dois.headers.get('idempotent-replay'), 'true');
   });
 
+  await t.test('a sessão do administrador leva o coringa, para a tela mostrar os botões dele', async () => {
+    const adm = (await api.get('/api/auth/eu', tk.admin)).dados.usuario;
+    assert.ok(adm.permissoes.includes('*'), 'sem isso a tela esconde do admin o que só ele pode fazer');
+    assert.ok(adm.permissoes.includes('precos.editar'));
+    const fin = (await api.get('/api/auth/eu', tk.financeiro)).dados.usuario;
+    assert.equal(fin.permissoes.includes('*'), false);
+    // E o servidor continua barrando quem não é administrador.
+    assert.equal((await api.post('/api/contas', { apelido: 'X' }, tk.financeiro)).status, 403);
+  });
+
   await t.test('margem e custo do banco só para quem tem a permissão', async () => {
     const comMargem = (await api.get('/api/painel', tk.financeiro)).dados;
     const semMargem = (await api.get('/api/painel', tk.operacao)).dados;

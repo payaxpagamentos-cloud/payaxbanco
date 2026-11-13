@@ -6,6 +6,12 @@ process.env.PAYAX_LIMITE_LOGIN = '1000';
 process.env.PAYAX_BANCO_MODO = 'simulador';
 process.env.PAYAX_IXC_REDE_INTERNA = '1'; // o IXC falso dos testes roda em 127.0.0.1
 
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+process.env.PAYAX_BACKUPS = fs.mkdtempSync(path.join(os.tmpdir(), 'payax-backups-'));
+process.env.PAYAX_BACKUP = '0'; // nos testes o backup é chamado direto, não por rotina
+
 const { abrir, agora } = require('../server/db');
 const { criarApp } = require('../server/app');
 const { hashSenha } = require('../server/lib/senha');

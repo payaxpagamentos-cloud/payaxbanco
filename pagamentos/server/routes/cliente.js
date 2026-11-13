@@ -8,7 +8,7 @@ const express = require('express');
 const config = require('../config');
 const { agora } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
-const { emitirToken, sessaoCliente, exigir } = require('../auth');
+const { emitirToken, emitirDesafio, lerDesafio, sessaoCliente, exigir } = require('../auth');
 const { hashSenha, verificarSenha } = require('../lib/senha');
 const { csv, listaPaginada } = require('../lib/http');
 const v = require('../lib/validacao');
@@ -22,6 +22,7 @@ const impressao = require('../lib/impressao');
 const sincronismo = require('../lib/sincronismo');
 const auditoria = require('../lib/auditoria');
 const contaInterna = require('../lib/contaInterna');
+const dois = require('../lib/doisfatores');
 const { detalhe, assinaturaFicha } = require('./boletos');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
@@ -51,15 +52,48 @@ module.exports = (db, autenticado) => {
       throw new ErroNegocio('E-mail ou senha inválidos.', 401);
     }
     if (u.cliente_situacao === 'encerrado') throw new ErroNegocio('Conta encerrada. Fale com o seu gerente.', 403);
+    if (u.totp_ativo) return res.json({ precisa_2fa: true, desafio: emitirDesafio(u.id, 'cliente') });
+    return concluirLogin(req, res, u);
+  });
+
+  /** Segunda etapa do login do cliente. */
+  r.post('/auth/2fa', (req, res) => {
+    const d = lerDesafio(req.body?.desafio, 'cliente');
+    if (!d) throw new ErroNegocio('A verificação expirou. Entre de novo.', 401);
+    const u = db.prepare(`SELECT uc.*, c.situacao AS cliente_situacao, c.razao_social, c.nome_fantasia, c.cnpj
+      FROM usuarios_cliente uc JOIN clientes c ON c.id = uc.cliente_id WHERE uc.id = ?`).get(d.sub);
+    if (!u || !u.ativo) throw new ErroNegocio('Acesso inativo.', 401);
+    if (!dois.conferir(db, 'cliente', u.id, req.body?.codigo)) {
+      throw new ErroNegocio('Código inválido. Confira o horário do celular e tente de novo.', 401);
+    }
+    return concluirLogin(req, res, u);
+  });
+
+  function concluirLogin(req, res, u) {
     db.prepare('UPDATE usuarios_cliente SET ultimo_acesso = ? WHERE id = ?').run(agora(), u.id);
     auditoria.registrar(db, { ...req, usuario: u, usuarioTipo: 'cliente' },
       { acao: 'cliente.login', entidade: 'usuario_cliente', entidade_id: u.id, cliente_id: u.cliente_id });
-    res.json({ token: emitirToken(u.id, 'payax-cliente'), usuario: sessaoCliente(u) });
-  });
+    return res.json({ token: emitirToken(u.id, 'payax-cliente'), usuario: sessaoCliente(u) });
+  }
 
   r.use(autenticado);
 
   r.get('/auth/eu', (req, res) => res.json({ usuario: sessaoCliente(req.usuario) }));
+
+  // ---------------------------------------------------------------- 2FA do cliente
+  r.post('/auth/2fa/iniciar', async (req, res) => res.json(await dois.iniciar(db, 'cliente', req.usuario, req.usuario.email)));
+
+  r.post('/auth/2fa/ativar', (req, res) => {
+    dois.ativar(db, 'cliente', req.usuario, req.body?.codigo);
+    auditoria.registrar(db, req, { acao: 'cliente.2fa.ativada', entidade: 'usuario_cliente', entidade_id: req.usuario.id, cliente_id: req.clienteId });
+    res.json({ ok: true });
+  });
+
+  r.post('/auth/2fa/desativar', (req, res) => {
+    dois.desativar(db, 'cliente', req.usuario.id, req.body?.senha, req.body?.codigo);
+    auditoria.registrar(db, req, { acao: 'cliente.2fa.desativada', entidade: 'usuario_cliente', entidade_id: req.usuario.id, cliente_id: req.clienteId });
+    res.json({ ok: true });
+  });
 
   // Consulta de CEP e CNPJ para preencher os dados do pagador.
   r.use('/consultas', require('./consultas')(db));

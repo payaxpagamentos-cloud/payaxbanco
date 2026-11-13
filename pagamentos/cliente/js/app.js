@@ -1,5 +1,6 @@
 import { criarApi } from '../comum/api.js';
 import { el, $, limpar, icone, iniciais, toast, modal, campo, lerForm, acao, aviso } from '../comum/ui.js';
+import { formularioDesafio, blocoDoisFatores } from '../comum/doisfatores.js';
 
 export const api = criarApi({
   base: new URL('..', import.meta.url).pathname.replace(/\/$/, ''),
@@ -108,6 +109,15 @@ function menuConta() {
         el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Empresa'), el('span', { class: 'val' }, u.cliente_nome)),
         el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Perfil'), el('span', { class: 'val' }, u.perfil_nome))),
       el('hr', { style: 'border:0;border-top:1px solid var(--borda)' }),
+      el('h3', { style: 'font-size:14px;margin-bottom:8px' }, 'Autenticação em duas etapas'),
+      blocoDoisFatores(api, {
+        ativo: Boolean(u.totp_ativo),
+        aoMudar: (ativo) => {
+          const sess = api.sessao.get();
+          api.sessao.set({ ...sess, usuario: { ...sess.usuario, totp_ativo: ativo } });
+        },
+      }),
+      el('hr', { style: 'border:0;border-top:1px solid var(--borda)' }),
       formularioSenha(() => m.fechar()),
     ],
     acoes: [el('button', { class: 'botao sec', onclick: () => { api.sessao.limpar(); location.hash = ''; window.dispatchEvent(new CustomEvent('payax:sair')); } }, icone('sair'), 'Sair')],
@@ -140,6 +150,18 @@ function trocarSenha() {
     formularioSenha(() => desenhar()))));
 }
 
+/** Segunda etapa do login. */
+function telaDesafio(desafio) {
+  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'INTERNET BANK'))),
+    el('h1', {}, 'Verificação em duas etapas'),
+    formularioDesafio(api, {
+      desafio,
+      aoEntrar: (d) => { api.sessao.set(d); location.hash = '#/inicio'; desenhar(); },
+      aoVoltar: () => telaEntrada(),
+    }))));
+}
+
 function telaEntrada() {
   const form = el('form', { onsubmit: (e) => { e.preventDefault(); entrar(); } },
     el('div', { style: 'display:grid;gap:12px' },
@@ -148,9 +170,10 @@ function telaEntrada() {
   const botao = el('button', { class: 'botao', style: 'width:100%;justify-content:center', onclick: () => entrar() }, 'Entrar');
   const entrar = () => acao(botao, async () => {
     const d = await api.post('/auth/login', lerForm(form));
+    if (d.precisa_2fa) return telaDesafio(d.desafio);
     api.sessao.set(d);
     location.hash = '#/inicio';
-    desenhar();
+    return desenhar();
   });
   limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
     el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'INTERNET BANK'))),

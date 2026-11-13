@@ -407,6 +407,36 @@ INSERT INTO contas_internas (agencia, nome, proxima, limite, criada_em)
   VALUES ('001', 'Agência principal', 1, 9999, datetime('now'));
 `,
   },
+  {
+    versao: 4,
+    nome: 'seguranca',
+    sql: `
+-- Autenticação em duas etapas por aplicativo (TOTP), para a equipe e para o Internet Bank.
+ALTER TABLE usuarios ADD COLUMN totp_segredo TEXT;
+ALTER TABLE usuarios ADD COLUMN totp_ativo INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE usuarios ADD COLUMN totp_ultimo_passo INTEGER;
+ALTER TABLE usuarios_cliente ADD COLUMN totp_segredo TEXT;
+ALTER TABLE usuarios_cliente ADD COLUMN totp_ativo INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE usuarios_cliente ADD COLUMN totp_ultimo_passo INTEGER;
+
+-- Histórico dos backups, com o resultado da conferência de cada um.
+-- Um backup de livro-razão que ninguém conferiu não serve de nada.
+CREATE TABLE backups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  tamanho INTEGER NOT NULL,
+  integridade TEXT NOT NULL,              -- 'ok' ou o erro devolvido pelo integrity_check
+  lancamentos INTEGER,                    -- quantos lançamentos a cópia tem
+  soma_centavos INTEGER,                  -- soma do razão na cópia
+  confere INTEGER NOT NULL DEFAULT 0,     -- os totais batem com o banco em uso
+  divergencia TEXT,
+  automatico INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id)
+);
+CREATE INDEX idx_backups_data ON backups(criado_em DESC);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

@@ -1,23 +1,112 @@
 import { api, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
 import {
-  el, montar, cartao, tabela, paginacao, campo, lerForm, modal, toast, acao, selo,
-  dataHora, data, hojeIso, somarDias, R, icone
+  el, montar, cartao, tabela, paginacao, campo, lerForm, modal, confirmar, toast, acao, aviso, selo,
+  numero, dataHora, data, hojeIso, somarDias, R, icone,
 } from '../../comum/ui.js';
 
-/** Usuários da equipe e registro de auditoria. */
+/** Usuários da equipe, segurança (backups e 2FA) e registro de auditoria. */
 export default async function admin({ alvo, query, recarregar, ir }) {
-  const aba = query.aba ?? (pode('*') ? 'usuarios' : 'auditoria');
-  montar(alvo, 
-    el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Usuários e auditoria'),
-      el('p', {}, 'Quem acessa o backoffice e o que foi feito no sistema.'))),
+  const aba = query.aba ?? (pode('*') ? 'usuarios' : 'seguranca');
+  montar(alvo,
+    el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Segurança e usuários'),
+      el('p', {}, 'Quem acessa o backoffice, os backups do banco e o que foi feito no sistema.'))),
     el('div', { class: 'abas' },
       pode('*') ? el('button', { class: aba === 'usuarios' ? 'ativa' : '', onclick: () => ir('#/admin?aba=usuarios') }, 'Usuários') : null,
+      el('button', { class: aba === 'seguranca' ? 'ativa' : '', onclick: () => ir('#/admin?aba=seguranca') }, 'Segurança e backups'),
       el('button', { class: aba === 'auditoria' ? 'ativa' : '', onclick: () => ir('#/admin?aba=auditoria') }, 'Auditoria')),
     el('div', { id: 'corpo' }));
   const corpo = alvo.querySelector('#corpo');
   if (aba === 'usuarios' && pode('*')) await telaUsuarios(corpo, recarregar);
+  else if (aba === 'seguranca') await telaSeguranca(corpo, recarregar);
   else await telaAuditoria(corpo, query, ir);
+}
+
+/** Backups do banco e autenticação em duas etapas. */
+async function telaSeguranca(alvo, recarregar) {
+  const d = await api.get('/seguranca');
+  const b = d.backups;
+  const tamanho = (n) => `${(n / 1024 / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
+
+  montar(alvo,
+    !b.ultimo ? aviso('Nenhum backup foi gerado ainda. A conta gráfica é o livro-razão do dinheiro dos clientes — gere o primeiro agora.', 'erro')
+      : !b.ultimo.confere ? aviso(`O último backup NÃO conferiu: ${b.ultimo.divergencia}`, 'erro')
+        : b.atrasado ? aviso(`O último backup foi há ${b.horas_desde} h. O esperado é a cada ${b.intervalo_horas} h.`, 'aviso')
+          : aviso(`Último backup há ${b.horas_desde} h, conferido. Guardando os ${b.manter} mais recentes.`, 'ok'),
+
+    el('div', { style: 'margin-top:14px' }, cartao('Backups do banco',
+      el('div', {},
+        el('p', { style: 'color:var(--texto-2);font-size:13px;margin-bottom:12px' },
+          'Cada cópia é conferida logo depois de gerada: integridade do arquivo e se o total do razão bate com o banco em uso.'),
+        tabela({
+          colunas: [
+            { titulo: 'Arquivo', conteudo: (x) => el('span', {}, el('span', { class: 'forte num' }, x.nome),
+              el('span', { class: 'sub' }, `${x.automatico ? 'automático' : `manual · ${x.criado_por_nome ?? '—'}`}`)) },
+            { titulo: 'Quando', conteudo: (x) => dataHora(x.criado_em) },
+            { titulo: 'Tamanho', dir: true, conteudo: (x) => tamanho(x.tamanho) },
+            { titulo: 'Lançamentos', dir: true, conteudo: (x) => numero(x.lancamentos) },
+            { titulo: 'Conferência', conteudo: (x) => el('span', {}, selo(x.confere ? 'ok' : 'falhou', { ok: ['Conferido', 'ok'], falhou: ['Não conferiu', 'erro'] }),
+              x.divergencia ? el('span', { class: 'sub' }, x.divergencia) : null) },
+            { titulo: '', dir: true, conteudo: (x) => (x.disponivel && pode('*')
+              ? el('button', { class: 'botao sutil pequeno', onclick: (e) => acao(e.currentTarget, () => api.baixar(`/seguranca/backups/${x.nome}`, x.nome)) }, icone('baixar'), 'Baixar')
+              : el('span', { class: 'sub' }, x.disponivel ? '' : 'arquivo removido')) },
+          ],
+          itens: b.historico,
+          vazio: 'Nenhum backup ainda.',
+        })),
+      pode('*') ? el('button', { class: 'botao', onclick: (e) => acao(e.currentTarget, async () => {
+        const out = await api.post('/seguranca/backups', {});
+        toast(`Backup ${out.nome} gerado e conferido.`, 'ok');
+        recarregar();
+      }) }, icone('baixar'), 'Gerar backup agora') : null)),
+
+    el('div', { style: 'margin-top:18px' }, cartao('Autenticação em duas etapas',
+      el('div', {},
+        el('div', { class: 'pares' },
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Obrigatória para a equipe'),
+            el('span', { class: 'val' }, d.exigir_2fa_equipe ? 'Sim' : 'Não')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Usuários ativos sem 2FA'),
+            el('span', { class: 'val' }, numero(d.sem_2fa))),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Logins recusados em 24 h'),
+            el('span', { class: 'val' }, numero(d.logins_recusados_24h)))),
+        el('p', { style: 'margin-top:10px;color:var(--texto-2);font-size:13px' },
+          'Quem aprova e envia repasse movimenta dinheiro de terceiros. Com a exigência ligada, ninguém da equipe trabalha sem configurar.'),
+        el('div', { style: 'margin-top:14px' }, tabela({
+          colunas: [
+            { titulo: 'Pessoa', conteudo: (u) => el('span', {}, el('span', { class: 'forte' }, u.nome), el('span', { class: 'sub' }, u.email)) },
+            { titulo: 'Perfil', conteudo: (u) => R.perfilEquipe[u.perfil] ?? u.perfil },
+            { titulo: 'Duas etapas', conteudo: (u) => selo(u.totp_ativo ? 'ok' : 'nao', { ok: ['Ativa', 'ok'], nao: ['Sem 2FA', 'aviso'] }) },
+            { titulo: 'Último acesso', conteudo: (u) => (u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou') },
+            { titulo: '', dir: true, conteudo: (u) => (u.totp_ativo && pode('*')
+              ? el('button', { class: 'botao sutil pequeno', onclick: async (e) => {
+                const ok = await confirmar({ titulo: 'Redefinir duas etapas', texto: `${u.nome} vai precisar configurar de novo no próximo acesso. Use quando a pessoa trocar de celular.`, confirmarTexto: 'Redefinir', perigo: true });
+                if (ok) acao(e.currentTarget, async () => { await api.post(`/seguranca/equipe/${u.id}/redefinir-2fa`, {}); toast('Redefinida.'); recarregar(); });
+              } }, 'Redefinir') : null) },
+          ],
+          itens: d.equipe,
+        }))),
+      pode('*') ? el('button', { class: d.exigir_2fa_equipe ? 'botao sec' : 'botao', onclick: (e) => acao(e.currentTarget, async () => {
+        await api.put('/seguranca/exigir-2fa', { exigir: !d.exigir_2fa_equipe });
+        toast(d.exigir_2fa_equipe ? 'A exigência foi desligada.' : 'Agora a equipe precisa usar duas etapas.', 'ok');
+        recarregar();
+      }) }, icone('escudo'), d.exigir_2fa_equipe ? 'Deixar de exigir' : 'Exigir de toda a equipe') : null)),
+
+    el('div', { style: 'margin-top:18px' }, cartao('Acessos dos clientes ao Internet Bank', tabela({
+      colunas: [
+        { titulo: 'Cliente', conteudo: (u) => u.cliente },
+        { titulo: 'Pessoa', conteudo: (u) => el('span', {}, u.nome, el('span', { class: 'sub' }, u.email)) },
+        { titulo: 'Duas etapas', conteudo: (u) => selo(u.totp_ativo ? 'ok' : 'nao', { ok: ['Ativa', 'ok'], nao: ['Sem 2FA', 'neutra'] }) },
+        { titulo: 'Último acesso', conteudo: (u) => (u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou') },
+        { titulo: '', dir: true, conteudo: (u) => (u.totp_ativo
+          ? el('button', { class: 'botao sutil pequeno', onclick: async (e) => {
+            const ok = await confirmar({ titulo: 'Redefinir duas etapas', texto: `${u.nome} (${u.cliente}) vai configurar de novo no próximo acesso.`, confirmarTexto: 'Redefinir', perigo: true });
+            if (ok) acao(e.currentTarget, async () => { await api.post(`/seguranca/acessos/${u.id}/redefinir-2fa`, {}); toast('Redefinida.'); recarregar(); });
+          } }, 'Redefinir') : null) },
+      ],
+      itens: d.acessos_clientes,
+      vazio: 'Nenhum acesso de cliente criado.',
+    }))),
+  );
 }
 
 async function telaUsuarios(alvo, recarregar) {

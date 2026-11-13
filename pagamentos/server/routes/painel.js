@@ -6,6 +6,7 @@ const datas = require('../lib/datas');
 const razao = require('../lib/razao');
 const consultas = require('../lib/consultas');
 const { podeEquipe } = require('../lib/permissoes');
+const backup = require('../lib/backup');
 
 /** Visão geral da plataforma: o que entrou, quanto ficou conosco e o que está pendente. */
 module.exports = (db) => {
@@ -73,5 +74,11 @@ function alertas(db, hoje) {
   if (faixa && faixa.restam < 1000) lista.push({ tipo: 'faixa_nosso_numero', severidade: 'aviso', texto: `Faixa de nosso número quase no fim na conta ${faixa.apelido} (restam ${faixa.restam})` });
   const vencidos = db.prepare("SELECT COUNT(*) AS n FROM boletos WHERE situacao = 'registrado' AND vencimento < ?").get(hoje).n;
   if (vencidos) lista.push({ tipo: 'vencidos', severidade: 'info', quantidade: vencidos, texto: `${vencidos} título(s) vencidos em aberto` });
+
+  // O razão é o dinheiro dos clientes: backup atrasado ou que não conferiu é assunto urgente.
+  const b = backup.situacao(db);
+  if (!b.ultimo) lista.push({ tipo: 'backup', severidade: 'erro', texto: 'Nenhum backup do banco foi gerado ainda' });
+  else if (!b.ultimo.confere) lista.push({ tipo: 'backup', severidade: 'erro', texto: `O último backup não conferiu: ${b.ultimo.divergencia}` });
+  else if (b.atrasado) lista.push({ tipo: 'backup', severidade: 'aviso', texto: `O último backup foi há ${b.horas_desde} h` });
   return lista;
 }

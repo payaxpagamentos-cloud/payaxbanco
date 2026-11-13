@@ -31,7 +31,12 @@ const CLIENTE = {
   consulta: ['painel.ver', 'boletos.ver', 'razao.ver', 'repasses.ver', 'relatorios.ver', 'cadastro.ver'],
 };
 
-const lista = (tabela, perfil) => (tabela[perfil]?.includes('*') ? todas(tabela) : tabela[perfil] ?? []);
+/**
+ * Permissões que a sessão leva para a tela. O perfil com '*' recebe todas E o próprio '*' —
+ * sem ele, a tela escondia do administrador os botões que só ele pode usar (o servidor liberava,
+ * mas o botão nem aparecia).
+ */
+const lista = (tabela, perfil) => (tabela[perfil]?.includes('*') ? ['*', ...todas(tabela)] : tabela[perfil] ?? []);
 const todas = (tabela) => [...new Set(Object.values(tabela).flat().filter((p) => p !== '*'))];
 
 const pode = (tabela, perfil, permissao) => {

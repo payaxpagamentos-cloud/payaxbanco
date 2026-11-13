@@ -49,7 +49,8 @@ conferência da nossa equipe.
 | 7 | **Conciliação** | Cada aviso do banco é **guardado antes de ser processado** (corpo inteiro), com o resultado de cada um: liquidado, repetido, ignorado ou erro. Liquidação idempotente: o mesmo aviso duas vezes não credita em dobro. Baixa manual e consulta ao banco para o que não chegou. |
 | 8 | **Integrações** | **Bradesco** (Cobrança Registrada, Boleto Híbrido e PIX de repasse) com credenciais cifradas em AES-256-GCM, e **um IXC por cliente**, nos dois sentidos: importa os títulos em aberto, emite o boleto, grava a linha digitável de volta no título e dá baixa quando o boleto é pago. |
 | 9 | **Relatórios** | Faturamento por período e por cliente: emitido, recebido, comissão, tarifas, receita, **margem** (receita − custo do banco) e repassado, com CSV e impressão. Taxa de conversão emitido → pago. |
-| 10 | **Segurança e histórico** | Perfis por função, senha provisória trocada no primeiro acesso, idempotência nos comandos POST, controle de versão otimista nos cadastros e auditoria com valor antes e depois. |
+| 10 | **Segurança e histórico** | Perfis por função, **autenticação em duas etapas** por aplicativo (opcionalmente obrigatória para a equipe), senha provisória trocada no primeiro acesso, idempotência nos comandos POST, controle de versão otimista nos cadastros e auditoria com valor antes e depois. |
+| 11 | **Backup conferido** | Cópia do banco a cada N horas e sob demanda, com **conferência automática**: integridade do arquivo e se o total do razão bate com o banco em uso. Histórico, download registrado na auditoria e alerta no painel quando atrasa ou não confere. |
 
 ### Perfis
 
@@ -177,6 +178,25 @@ sobrescrito por uma consulta; o que veio de uma consulta anterior, sim.
 > Só os campos do cadastro são guardados. O **quadro societário** que a fonte devolve é descartado — não é dado
 > que o sistema precisa. As consultas saem com um nome genérico de cliente, sem identificar a operação.
 
+## Backup e duas etapas
+
+A tabela `lancamentos` é o livro-razão do dinheiro dos clientes: se o arquivo se perder, não existe como
+reconstruir quanto cada um tem a receber. Por isso o backup aqui não é higiene de TI, é parte da operação.
+
+- Uma cópia (`VACUUM INTO`, consistente mesmo com o sistema em uso) a cada **12 horas** e sempre que a equipe pedir.
+- **Cada cópia é conferida logo depois de gerada**: integridade do arquivo e se o total do razão na cópia bate com
+  o do banco em uso. O resultado fica no histórico — backup que ninguém conferiu não é backup.
+- Guarda as 30 mais recentes. O painel avisa quando o último atrasou ou não conferiu.
+- O download fica registrado na auditoria: é uma cópia do razão saindo do servidor.
+
+> O backup cobre o banco. Se um dia o sistema passar a guardar arquivos enviados, a pasta deles entra no backup do
+> servidor à parte.
+
+**Autenticação em duas etapas** (TOTP, por aplicativo) vale para a equipe e para o Internet Bank. O administrador
+pode **exigir** de toda a equipe — quem ainda não tem configura antes de trabalhar, e ninguém desliga o próprio
+enquanto a exigência estiver ligada. Quem troca de celular pede ao administrador para redefinir; fica na auditoria.
+Para ligar a exigência, o próprio administrador precisa ter 2FA ativo: não dá para trancar a porta com a chave dentro.
+
 ## Configuração
 
 | Variável | Padrão | Descrição |
@@ -191,6 +211,10 @@ sobrescrito por uma consulta; o que veio de uma consulta anterior, sim.
 | `PAYAX_BANCO_MODO` | `simulador` (`bradesco` em produção) | Modo do conector do banco. |
 | `PAYAX_BANCO_AMBIENTE` | `homologacao` | `homologacao` ou `producao`. |
 | `PAYAX_ROTINAS` | ligado | Rotinas automáticas (repasses, baixas no IXC, importação). `0` desliga. |
+| `PAYAX_BACKUP` | ligado | Backup automático do banco. `0` desliga (só manual). |
+| `PAYAX_BACKUP_HORAS` | `12` | Intervalo entre backups automáticos. |
+| `PAYAX_BACKUP_MANTER` | `30` | Quantas cópias manter na pasta. |
+| `PAYAX_BACKUPS` | `data/backups` | Pasta das cópias. **Leve para fora do servidor** (o backup local não protege contra perda da máquina). |
 | `PAYAX_ROTINA_MIN` | `15` | Intervalo das rotinas, em minutos. |
 | `PAYAX_FUSO` | `America/Sao_Paulo` | Fuso usado nas datas de negócio. |
 | `PAYAX_SESSAO_HORAS` | `8` | Validade da sessão. |

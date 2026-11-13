@@ -1,5 +1,6 @@
 import { criarApi } from '../comum/api.js';
 import { el, $, limpar, icone, iniciais, toast, modal, campo, lerForm, acao, aviso, R } from '../comum/ui.js';
+import { formularioDesafio, blocoDoisFatores } from '../comum/doisfatores.js';
 
 export const api = criarApi({
   base: new URL('..', import.meta.url).pathname.replace(/\/$/, ''),
@@ -23,7 +24,7 @@ const MENU = [
     ['relatorios', 'Relatórios', 'relatorio', 'relatorios.ver', () => import('./telas/relatorios.js')],
     ['contas', 'Contas e preços', 'banco', 'precos.ver', () => import('./telas/contas.js')],
     ['integracoes', 'Integrações', 'plugue', 'integracoes.ver', () => import('./telas/integracoes.js')],
-    ['admin', 'Usuários e auditoria', 'escudo', 'auditoria.ver', () => import('./telas/admin.js')],
+    ['admin', 'Segurança e usuários', 'escudo', 'auditoria.ver', () => import('./telas/admin.js')],
   ]],
 ];
 const ROTAS = Object.fromEntries(MENU.flatMap(([, itens]) => itens).map(([rota, rotulo, ic, perm, mod]) => [rota, { rotulo, ic, perm, mod }]));
@@ -47,6 +48,8 @@ async function desenhar() {
   for (const m of document.querySelectorAll('.modal-fundo')) m.remove();
   if (!api.sessao.get()?.token) return telaEntrada();
   if (usuario()?.senha_provisoria) return trocarSenhaObrigatoria();
+  // Com a exigência ligada, não se trabalha sem a segunda etapa configurada.
+  if (api.sessao.get()?.configurar_2fa && !usuario()?.totp_ativo) return configurarDoisFatoresObrigatorio();
 
   let { rota, params, query } = rotaAtual();
   if (!ROTAS[rota] || !permitido(ROTAS[rota].perm)) {
@@ -111,6 +114,16 @@ function menuConta() {
         el('div', { class: 'par' }, el('span', { class: 'rot' }, 'E-mail'), el('span', { class: 'val' }, u.email)),
         el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Perfil'), el('span', { class: 'val' }, u.perfil_nome))),
       el('hr', { style: 'border:0;border-top:1px solid var(--borda)' }),
+      el('h3', { style: 'font-size:14px;margin-bottom:8px' }, 'Autenticação em duas etapas'),
+      blocoDoisFatores(api, {
+        ativo: Boolean(u.totp_ativo),
+        exigido: Boolean(api.sessao.get()?.configurar_2fa) || Boolean(u.totp_ativo && api.sessao.get()?.exige_2fa),
+        aoMudar: (ativo) => {
+          const sess = api.sessao.get();
+          api.sessao.set({ ...sess, usuario: { ...sess.usuario, totp_ativo: ativo }, configurar_2fa: false });
+        },
+      }),
+      el('hr', { style: 'border:0;border-top:1px solid var(--borda)' }),
       formularioSenha(() => m.fechar()),
     ],
     acoes: [el('button', { class: 'botao sec', onclick: () => { api.sessao.limpar(); location.hash = ''; window.dispatchEvent(new CustomEvent('payax:sair')); } }, icone('sair'), 'Sair da conta')],
@@ -143,6 +156,35 @@ function trocarSenhaObrigatoria() {
     formularioSenha(() => desenhar()))));
 }
 
+/** Tela de configuração obrigatória, quando o administrador exige 2FA da equipe. */
+function configurarDoisFatoresObrigatorio() {
+  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
+    el('h1', {}, 'Proteja o seu acesso'),
+    blocoDoisFatores(api, {
+      ativo: false,
+      exigido: true,
+      aoMudar: () => {
+        const sess = api.sessao.get();
+        api.sessao.set({ ...sess, usuario: { ...sess.usuario, totp_ativo: true }, configurar_2fa: false });
+        desenhar();
+      },
+    }),
+    el('button', { class: 'botao sutil', onclick: () => { api.sessao.limpar(); desenhar(); } }, icone('sair'), 'Sair'))));
+}
+
+/** Segunda etapa do login. */
+function telaDesafio(desafio) {
+  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
+    el('h1', {}, 'Verificação em duas etapas'),
+    formularioDesafio(api, {
+      desafio,
+      aoEntrar: (d) => { api.sessao.set(d); location.hash = '#/visao'; desenhar(); },
+      aoVoltar: () => telaEntrada(),
+    }))));
+}
+
 function telaEntrada() {
   const form = el('form', { onsubmit: (e) => { e.preventDefault(); entrar(); } },
     el('div', { style: 'display:grid;gap:12px' },
@@ -151,9 +193,10 @@ function telaEntrada() {
   const botao = el('button', { class: 'botao', style: 'width:100%;justify-content:center', onclick: () => entrar() }, 'Entrar');
   const entrar = () => acao(botao, async () => {
     const d = await api.post('/auth/login', lerForm(form));
+    if (d.precisa_2fa) return telaDesafio(d.desafio);
     api.sessao.set(d);
     location.hash = '#/visao';
-    desenhar();
+    return desenhar();
   });
   limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
     el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),

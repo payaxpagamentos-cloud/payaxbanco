@@ -74,6 +74,12 @@ module.exports = {
     // Permite apontar o IXC para endereços da rede interna (evita SSRF quando desligado).
     redeInterna: process.env.PAYAX_IXC_REDE_INTERNA === '1',
   },
+  // Backup do banco: a conta gráfica é o livro-razão do dinheiro dos clientes.
+  backupDir: process.env.PAYAX_BACKUPS || path.join(dados, 'backups'),
+  backupManter: Number(process.env.PAYAX_BACKUP_MANTER) || 30,
+  backupIntervaloHoras: Number(process.env.PAYAX_BACKUP_HORAS) || 12,
+  backupAutomatico: process.env.PAYAX_BACKUP !== '0' && !teste,
+
   // Rotinas automáticas (liberação de saldo, repasses, sincronismo e cobrança de vencidos).
   rotinas: process.env.PAYAX_ROTINAS !== '0' && !teste,
   rotinaIntervaloMin: Number(process.env.PAYAX_ROTINA_MIN) || 15,
