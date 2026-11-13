@@ -245,7 +245,7 @@ describe('ouvidoria', () => {
   });
 });
 
-describe('a atendente virtual e a ouvidoria', () => {
+describe('a ZOE e a ouvidoria', () => {
   let meta;
   beforeEach(() => { meta = h.fingirMeta(); });
   afterEach(() => { meta.restaurar(); });

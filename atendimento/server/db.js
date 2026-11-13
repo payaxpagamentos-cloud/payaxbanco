@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS numeros (
 );
 CREATE INDEX IF NOT EXISTS idx_numeros_empresa ON numeros(empresa_id);
 
--- Filas (departamentos): para onde a atendente virtual transfere o que não resolve.
+-- Filas (departamentos): para onde a ZOE transfere o que não resolve.
 CREATE TABLE IF NOT EXISTS filas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS contatos (
 );
 CREATE INDEX IF NOT EXISTS idx_contatos_empresa ON contatos(empresa_id, ultimo_contato_em DESC);
 
--- O atendimento. 'bot': a atendente virtual está conduzindo. 'aguardando': na fila, esperando um humano.
+-- O atendimento. 'bot': a ZOE está conduzindo. 'aguardando': na fila, esperando um humano.
 -- 'humano': um atendente assumiu. 'encerrada': terminou.
 CREATE TABLE IF NOT EXISTS conversas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -222,7 +222,7 @@ CREATE TABLE IF NOT EXISTS respostas_rapidas (
   UNIQUE (empresa_id, atalho)
 );
 
--- Configuração da atendente virtual, por empresa.
+-- Configuração da ZOE, por empresa.
 CREATE TABLE IF NOT EXISTS ia_config (
   empresa_id INTEGER PRIMARY KEY REFERENCES empresas(id) ON DELETE CASCADE,
   ativa INTEGER NOT NULL DEFAULT 1,
@@ -323,7 +323,7 @@ CREATE TABLE IF NOT EXISTS ixc_config (
   atualizado_em TEXT
 );
 
--- O que a atendente virtual fez no IXC: auditoria para o provedor e base do limite de desbloqueios.
+-- O que a ZOE fez no IXC: auditoria para o provedor e base do limite de desbloqueios.
 CREATE TABLE IF NOT EXISTS ixc_acoes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
@@ -339,7 +339,7 @@ CREATE TABLE IF NOT EXISTS ixc_acoes (
 CREATE INDEX IF NOT EXISTS idx_ixc_acoes_empresa ON ixc_acoes(empresa_id, criado_em);
 CREATE INDEX IF NOT EXISTS idx_ixc_acoes_cliente ON ixc_acoes(empresa_id, ixc_cliente_id, tipo, criado_em);
 
--- Base de conhecimento: o que a atendente virtual usa para responder sozinha.
+-- Base de conhecimento: o que a ZOE usa para responder sozinha.
 CREATE TABLE IF NOT EXISTS conhecimento (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
@@ -389,7 +389,7 @@ CREATE TABLE IF NOT EXISTS ferramentas (
   UNIQUE (empresa_id, nome)
 );
 
--- Chamados abertos pela atendente virtual quando não há solução imediata.
+-- Chamados abertos pela ZOE quando não há solução imediata.
 CREATE TABLE IF NOT EXISTS chamados (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
@@ -409,7 +409,7 @@ CREATE TABLE IF NOT EXISTS chamados (
 );
 CREATE INDEX IF NOT EXISTS idx_chamados_empresa ON chamados(empresa_id, status, id DESC);
 
--- O que a atendente virtual fez em cada passo: dá para auditar e medir custo.
+-- O que a ZOE fez em cada passo: dá para auditar e medir custo.
 CREATE TABLE IF NOT EXISTS ia_eventos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),

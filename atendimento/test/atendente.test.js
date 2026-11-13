@@ -5,10 +5,10 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 
 /**
- * O comportamento que define o produto: a atendente virtual faz o primeiro atendimento e só o que
+ * O comportamento que define o produto: a ZOE faz o primeiro atendimento e só o que
  * ela não resolve vai para a equipe humana.
  */
-describe('atendente virtual', () => {
+describe('ZOE', () => {
   let meta;
   beforeEach(() => { meta = h.fingirMeta(); });
   afterEach(() => { meta.restaurar(); });

@@ -19,7 +19,7 @@ const MENU_MASTER = [
 const MENU_EMPRESA = [
   ['caixa', 'Atendimentos', 'caixa'],
   ['dashboard', 'Dashboard', 'dashboard'],
-  ['ia', 'Atendente virtual', 'ia'],
+  ['ia', 'ZOE', 'ia'],
   ['ouvidoria', 'Ouvidoria', 'alerta'],
   ['contatos', 'Contatos', 'contatos'],
   ['chamados', 'Chamados', 'chamados'],
@@ -31,15 +31,15 @@ const MENU_EMPRESA = [
 ];
 
 const SUBTITULOS = {
-  caixa: 'A atendente virtual resolve o que dá; aqui fica o que precisa de gente',
+  caixa: 'A ZOE resolve o que dá; aqui fica o que precisa de gente',
   dashboard: 'Como está o atendimento agora e no mês',
   ia: 'O que ela sabe, o que ela faz e quando ela chama a equipe',
   ouvidoria: 'Reclamação, cancelamento, Procon e Anatel — com protocolo, prazo e desfecho',
   contatos: 'Quem já falou com a sua empresa pelo WhatsApp',
   chamados: 'Pedidos registrados que não tinham solução na hora',
-  filas: 'Os departamentos que recebem o que a atendente virtual não resolve',
+  filas: 'Os departamentos que recebem o que a ZOE não resolve',
   equipe: 'Quem atende, com qual perfil e quantas conversas ao mesmo tempo',
-  relatorios: 'Quanto a atendente virtual resolve e onde a equipe é necessária',
+  relatorios: 'Quanto a ZOE resolve e onde a equipe é necessária',
   configuracoes: 'Número de WhatsApp, respostas rápidas e etiquetas',
   integracoes: 'Chaves de API para o seu sistema conversar com a plataforma',
   empresas: 'Empresas clientes da plataforma',

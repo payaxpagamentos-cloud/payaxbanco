@@ -272,7 +272,7 @@ function montarLinhaDoTempo({ local, ixc }) {
   };
 
   for (const c of local.conversas) {
-    const comoTerminou = { ia: 'resolvida pela atendente virtual', humano: 'resolvida pela equipe', cliente: 'o cliente se despediu', abandono: 'o cliente parou de responder' };
+    const comoTerminou = { ia: 'resolvida pela ZOE', humano: 'resolvida pela equipe', cliente: 'o cliente se despediu', abandono: 'o cliente parou de responder' };
     add(c.aberta_em, 'conversa', c.assunto || c.intencao || 'Conversa no WhatsApp',
       c.encerrada_em ? comoTerminou[c.resolvida_por] ?? null : 'em aberto', { conversa_id: c.id, csat: c.csat_nota });
     if (c.motivo_transferencia) add(c.aberta_em, 'transferencia', 'Passou para a equipe', c.motivo_transferencia, { conversa_id: c.id });

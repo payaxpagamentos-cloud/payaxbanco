@@ -34,7 +34,7 @@ module.exports = function rotasOuvidoria(db) {
     try { res.json(await ouvidoriaLib.detalhe(db, req.empresa.id, Number(req.params.id))); } catch (err) { next(err); }
   });
 
-  /** Abertura manual pela equipe (a atendente virtual abre sozinha pela ferramenta). */
+  /** Abertura manual pela equipe (a ZOE abre sozinha pela ferramenta). */
   r.post('/', async (req, res, next) => {
     try {
       const d = req.body ?? {};

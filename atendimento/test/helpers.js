@@ -15,7 +15,7 @@ const PHONE_ID = '123456789012345';
 const TELEFONE_CLIENTE = '5511988887777';
 
 /**
- * Ambiente pronto: uma empresa com número, filas, um atendente disponível e a atendente virtual ligada.
+ * Ambiente pronto: uma empresa com número, filas, um atendente disponível e a ZOE ligada.
  * `semIa: true` deixa a empresa sem IA ligada (para testar o caminho das regras e do menu).
  */
 function criarAmbiente({ comExemplos = false, iaAtiva = true, atendenteDisponivel = true, vinteQuatroHoras = true } = {}) {

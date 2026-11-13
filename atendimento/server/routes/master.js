@@ -209,7 +209,7 @@ module.exports = function rotasMaster(db) {
 
     const config = require('../config');
     if (config.ia.chave) ok('Chave da Claude API', `configurada · modelo ${config.ia.modelo} · esforço ${config.ia.esforco}`);
-    else aviso('Chave da Claude API', 'não configurada: as atendentes virtuais rodam só com intenções e base de conhecimento');
+    else aviso('Chave da Claude API', 'não configurada: as ZOEs rodam só com intenções e base de conhecimento');
 
     const semSegredo = db.prepare('SELECT COUNT(*) AS n FROM numeros WHERE ativo = 1 AND app_secret_cifrado IS NULL').get();
     if (Number(semSegredo.n)) erro('Segredo do app (webhook)', `${semSegredo.n} número(s) ativo(s) sem App secret: o webhook deles recusa todo evento`);

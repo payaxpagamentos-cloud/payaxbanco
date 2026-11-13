@@ -1,5 +1,5 @@
 /**
- * Telas da atendente virtual: o que ela sabe (base de conhecimento), o que ela faz sem pensar
+ * Telas da ZOE: o que ela sabe (base de conhecimento), o que ela faz sem pensar
  * (intenções), o que ela pode consultar (ferramentas), como ela fala (configuração) e o teste.
  */
 import {api, qs} from './api.js';
@@ -11,7 +11,7 @@ import {cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, filt
 
 const ESFORCOS = { '': 'Padrão do servidor', low: 'Baixo — responde rápido e custa menos', medium: 'Médio', high: 'Alto', xhigh: 'Muito alto', max: 'Máximo' };
 
-// ---------- Tela principal da atendente virtual ----------
+// ---------- Tela principal da ZOE ----------
 
 export async function telaIa(ctx) {
   const abas = el('div', { class: 'abas' });
@@ -57,15 +57,15 @@ async function desempenho(ctx, alvo) {
       el('div', { class: 'grade-2' },
         cartao('Ferramentas mais usadas',
           tabela(['Ferramenta', '>Usos'], d.ia.ferramentas.map((f) => el('tr', {}, td(f.nome), td(inteiro(f.usos), 'dir num'))), 'A IA ainda não usou ferramenta no período')),
-        cartao('Intenções que resolveram antes da IA',
+        cartao('Intenções que resolveram antes da ZOE',
           tabela(['Intenção', '>Usos'], d.ia.intencoes.map((i) => el('tr', {}, td(i.nome), td(inteiro(i.usos), 'dir num'))), 'Nenhuma intenção acionada no período'))),
       cartao('Artigos da base: quais puxam o atendimento',
         tabela(['Artigo', '^Ativo', '>Usos'], d.ia.conhecimento.map((a) => el('tr', {},
           td(a.titulo), td(a.ativo ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'), td(inteiro(a.usos), 'dir num'))),
-        'A base está vazia: a atendente virtual não tem como responder nada sozinha'),
+        'A base está vazia: a ZOE não tem como responder nada sozinha'),
         el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' },
           'Artigo com zero uso costuma estar com título ou perguntas de exemplo fora do jeito que o cliente escreve.')),
-      d.ia.erros.length ? cartao('Falhas da IA no período',
+      d.ia.erros.length ? cartao('Falhas da ZOE no período',
         tabela(['Falha', 'Detalhe', '^Vezes', 'Última'], d.ia.erros.map((e) => el('tr', {},
           td(e.nome), td(el('span', { class: 'pequeno' }, String(e.detalhe ?? '').slice(0, 120))), td(inteiro(e.vezes), 'centro num'), td(dataHora(e.ultimo)))))) : null,
       cartaoMotivos(d.motivos));
@@ -90,14 +90,14 @@ async function conhecimento(ctx, alvo) {
           ctx.soAdmin ? botaoIcone('lixo', 'Excluir', () => excluir(a), 'perigo') : null)),
       el('p', {}, a.resposta),
       a.perguntas ? el('div', { class: 'perguntas' }, String(a.perguntas).split('\n').filter(Boolean).map((q) => el('span', { class: 'etiqueta' }, q))) : null)))
-      : vazio('A base de conhecimento está vazia.', 'Sem base, a atendente virtual não responde nada sozinha: ela transfere tudo. Comece pelas 5 perguntas que a sua equipe mais recebe.'));
+      : vazio('A base de conhecimento está vazia.', 'Sem base, a ZOE não responde nada sozinha: ela transfere tudo. Comece pelas 5 perguntas que a sua equipe mais recebe.'));
   };
 
   const form = (a = {}) => [
     el('p', { class: 'mudo pequeno', style: 'margin:0 0 8px' },
       'O título deve ser o assunto como o cliente pensa. Nas perguntas de exemplo, escreva do jeito que ele escreve — é o que faz a busca acertar.'),
     campo('Título', { name: 'titulo', value: a.titulo ?? '', required: true, maxlength: 160, placeholder: 'Segunda via do boleto' }),
-    area('Resposta (a atendente virtual usa este texto)', { name: 'resposta', rows: 5, required: true, maxlength: 4000 }, a.resposta ?? ''),
+    area('Resposta (a ZOE usa este texto)', { name: 'resposta', rows: 5, required: true, maxlength: 4000 }, a.resposta ?? ''),
     area('Perguntas de exemplo (uma por linha)', { name: 'perguntas', rows: 4, maxlength: 2000, placeholder: 'preciso da segunda via\nboleto vencido\nnão recebi a fatura' }, a.perguntas ?? ''),
     marcar('Ativo', { name: 'ativo', checked: a.id ? Boolean(a.ativo) : true }),
   ];
@@ -115,7 +115,7 @@ async function conhecimento(ctx, alvo) {
   }, { largo: true });
 
   const excluir = async (a) => {
-    if (!await confirmar('Excluir artigo', `"${a.titulo}" sai da base e a atendente virtual deixa de responder isso.`, 'Excluir')) return;
+    if (!await confirmar('Excluir artigo', `"${a.titulo}" sai da base e a ZOE deixa de responder isso.`, 'Excluir')) return;
     await api.del(`/empresas/${ctx.empresaId}/ia/conhecimento/${a.id}`);
     toast('Artigo excluído.');
     await recarregar();
@@ -132,10 +132,10 @@ async function conhecimento(ctx, alvo) {
         const { achados } = await api.get(`/empresas/${ctx.empresaId}/ia/conhecimento/buscar${qs(lerForm(f))}`);
         limpar(resultado, achados.length
           ? tabela(['Artigo', '>Pontos'], achados.map((a) => el('tr', {}, td(a.titulo), td(a.pontos, 'dir num'))))
-          : el('p', { class: 'mudo' }, 'Nada na base responde isso — a atendente virtual transferiria. Vale criar um artigo.'));
+          : el('p', { class: 'mudo' }, 'Nada na base responde isso — a ZOE transferiria. Vale criar um artigo.'));
       });
     });
-    return [el('p', { class: 'mudo pequeno', style: 'margin:0 0 8px' }, 'Mostra o que a atendente virtual encontraria, com a pontuação de cada artigo.'), f, resultado,
+    return [el('p', { class: 'mudo pequeno', style: 'margin:0 0 8px' }, 'Mostra o que a ZOE encontraria, com a pontuação de cada artigo.'), f, resultado,
       el('div', { class: 'linha entre', style: 'margin-top:12px' }, el('span'), el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar'))];
   }, { largo: true });
 
@@ -222,7 +222,7 @@ async function ferramentas(ctx, alvo) {
           td(f.ativa ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
           td(ctx.soAdmin ? el('div', { class: 'linha', style: 'gap:4px' },
             botaoIcone('teste', 'Testar', () => testar(f)), botaoIcone('editar', 'Editar', () => editar(f)), botaoIcone('lixo', 'Excluir', () => excluir(f), 'perigo')) : null, 'dir'))),
-        'Nenhuma ferramenta da empresa. Com uma, a atendente virtual consulta fatura, pedido ou contrato no seu sistema e resolve sem passar para a equipe.'),
+        'Nenhuma ferramenta da empresa. Com uma, a ZOE consulta fatura, pedido ou contrato no seu sistema e resolve sem passar para a equipe.'),
         el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' },
           'A plataforma manda os parâmetros escolhidos pela IA mais um bloco "contato" com telefone, nome, documento e código do cliente — '
           + 'a identificação vem do nosso banco, nunca do modelo.')));
@@ -256,7 +256,7 @@ async function ferramentas(ctx, alvo) {
   }, { largo: true });
 
   const excluir = async (f) => {
-    if (!await confirmar('Excluir ferramenta', `A atendente virtual deixa de consultar "${f.nome}".`, 'Excluir')) return;
+    if (!await confirmar('Excluir ferramenta', `A ZOE deixa de consultar "${f.nome}".`, 'Excluir')) return;
     await api.del(`/empresas/${ctx.empresaId}/ia/ferramentas/${f.id}`);
     toast('Ferramenta excluída.');
     await recarregar();
@@ -285,7 +285,7 @@ async function configuracao(ctx, alvo) {
 
   const f = el('form', { class: 'form colunas' },
     cartao('Identidade e tom',
-      marcar('Atendente virtual ligada (ela faz o primeiro atendimento)', { name: 'ativa', checked: cfg.ativa }),
+      marcar('ZOE ligada (ela faz o primeiro atendimento)', { name: 'ativa', checked: cfg.ativa }),
       campo('Nome dela', { name: 'nome_assistente', value: cfg.nome_assistente ?? 'ZOE', maxlength: 40 }),
       area('Saudação (primeira mensagem da conversa)', { name: 'saudacao', rows: 3, maxlength: 1000, placeholder: 'Vazio usa uma saudação padrão. Use {cliente}, {empresa} e {assistente}.' }, cfg.saudacao ?? ''),
       area('Como ela deve falar', { name: 'tom', rows: 6, maxlength: 3000, placeholder: 'Vazio usa o tom padrão: português do Brasil, você, mensagens curtas, sem formalidade de ofício.' }, cfg.tom ?? ''),
@@ -309,7 +309,7 @@ async function configuracao(ctx, alvo) {
       cfg.chave_no_servidor
         ? el('div', { class: 'aviso-caixa ok' }, icone('ok'), el('span', {}, `A chave da Claude API está configurada no servidor. Modelo em uso: ${cfg.modelo_efetivo}.`))
         : el('div', { class: 'aviso-caixa aviso' }, icone('alerta'), el('span', {},
-          'O servidor está sem a chave da Claude API (ATEND_IA_CHAVE). Sem ela a atendente virtual funciona só com as intenções e a base de conhecimento, '
+          'O servidor está sem a chave da Claude API (ATEND_IA_CHAVE). Sem ela a ZOE funciona só com as intenções e a base de conhecimento, '
           + 'e o que não casar vai para o menu de departamentos.')),
       campo('Modelo (vazio = padrão do servidor)', { name: 'modelo', value: cfg.modelo ?? '', maxlength: 60, placeholder: cfg.modelo_efetivo }),
       escolha('Esforço de raciocínio', 'esforco', ESFORCOS, cfg.esforco ?? ''),
@@ -323,13 +323,13 @@ async function configuracao(ctx, alvo) {
     e.preventDefault();
     acao(f.querySelector('button[type=submit], .btn.primario'), async () => {
       await api.patch(`/empresas/${ctx.empresaId}/ia`, lerForm(f));
-      toast('Atendente virtual salva.');
+      toast('ZOE salva.');
     });
   });
 
   async function verPrompt() {
     const p = await api.get(`/empresas/${ctx.empresaId}/ia/prompt`);
-    modal('O prompt da atendente virtual', (fechar) => [
+    modal('O prompt da ZOE', (fechar) => [
       el('p', { class: 'mudo pequeno', style: 'margin:0 0 8px' },
         'É exatamente o que vai para o modelo em toda conversa, montado a partir desta configuração, das suas filas e da base de conhecimento.'),
       el('pre', { class: 'json', style: 'max-height:50vh' }, p.sistema),
@@ -359,7 +359,7 @@ async function provedorIxc(ctx, alvo) {
         c.ativo && c.token_configurado
           ? el('div', { class: 'aviso-caixa ok' }, icone('ok'), el('span', {}, `Integração ligada em ${c.url}.`))
           : el('div', { class: 'aviso-caixa aviso' }, icone('alerta'), el('span', {},
-            'Integração desligada. Sem ela a atendente virtual responde dúvidas gerais, mas não consulta contrato, fatura nem conexão.')),
+            'Integração desligada. Sem ela a ZOE responde dúvidas gerais, mas não consulta contrato, fatura nem conexão.')),
         marcar('Integração ligada', { name: 'ativo', checked: c.ativo }),
         campo('Endereço do IXC', { name: 'url', value: c.url ?? '', placeholder: 'https://ixc.seuprovedor.com.br', required: false }),
         campo(c.token_configurado ? 'Token (vazio mantém o atual)' : 'Token do IXC', { name: 'token', type: 'password', autocomplete: 'off', placeholder: '12:a1b2c3d4...' }),
@@ -409,7 +409,7 @@ async function provedorIxc(ctx, alvo) {
 
   const cartaoSonda = (c) => cartao('O que funciona nesta instância do IXC',
     el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
-      'O IXC muda de versão para versão. A sonda testa cada consulta no SEU servidor e a atendente virtual passa a receber '
+      'O IXC muda de versão para versão. A sonda testa cada consulta no SEU servidor e a ZOE passa a receber '
       + 'só as ferramentas que funcionam aqui — em vez de tentar e errar na frente do cliente. A sonda só lê: não abre chamado nem desbloqueia nada.'),
     c.capacidades
       ? tabela(['Capacidade', 'Recurso no IXC', '^Funciona'], Object.entries(c.capacidades).map(([chave, x]) => el('tr', {},
@@ -420,7 +420,7 @@ async function provedorIxc(ctx, alvo) {
     c.testado_em ? el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' }, `Último teste: ${dataHora(c.testado_em)}`) : null,
     c.ferramentas.length
       ? el('div', { style: 'margin-top:12px' },
-        el('strong', { class: 'pequeno' }, 'Ferramentas que a atendente virtual tem hoje: '),
+        el('strong', { class: 'pequeno' }, 'Ferramentas que a ZOE tem hoje: '),
         el('div', { class: 'perguntas', style: 'margin-top:6px' }, c.ferramentas.map((n) => el('span', { class: 'etiqueta ok' }, n))))
       : null,
     ctx.soAdmin ? el('div', { style: 'margin-top:12px' }, botao('Testar agora', 'primario', sondar)) : null);
@@ -446,9 +446,9 @@ async function provedorIxc(ctx, alvo) {
           td(a.sucesso ? icone('ok') : el('span', { class: 'etiqueta erro' }, 'falhou'), 'centro'),
           td(el('span', { class: 'pequeno' }, String(a.detalhe ?? '').slice(0, 120))),
           td(inteiro(a.ms), 'dir num'))),
-        'A atendente virtual ainda não consultou o IXC.'));
+        'A ZOE ainda não consultou o IXC.'));
     }).catch((e) => limpar(lista, el('p', { class: 'mudo' }, e.message)));
-    return cartao('O que a atendente virtual fez no IXC (auditoria)', lista);
+    return cartao('O que a ZOE fez no IXC (auditoria)', lista);
   };
 
   limpar(alvo, conteudo);
@@ -477,7 +477,7 @@ async function teste(ctx, alvo) {
   });
 
   limpar(alvo,
-    cartao('Testar a atendente virtual',
+    cartao('Testar a ZOE',
       el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
         'Roda a atendente de verdade — mesmo prompt, mesma base, mesmas ferramentas — num contato de teste. Nada é enviado para o WhatsApp.'),
       f,
@@ -504,7 +504,7 @@ function resultadoTeste(pergunta, r) {
       el('strong', {}, `Foi para a fila ${r.fila ?? '—'}`),
       r.motivo_transferencia ? el('div', { class: 'pequeno' }, `Motivo: ${r.motivo_transferencia}`) : null,
       r.resumo ? el('div', { class: 'pequeno' }, `Resumo para o atendente: ${r.resumo}`) : null)) : null,
-    r.eventos.length ? el('details', {}, el('summary', {}, `${r.eventos.length} passo(s) da atendente virtual`),
+    r.eventos.length ? el('details', {}, el('summary', {}, `${r.eventos.length} passo(s) da ZOE`),
       el('ol', { class: 'passos-ia' }, r.eventos.map((ev) => el('li', {},
         el('strong', {}, ev.tipo === 'ferramenta' ? ev.nome : ev.tipo),
         ev.detalhe ? el('div', { class: 'pequeno mudo' }, String(ev.detalhe).slice(0, 400)) : null,

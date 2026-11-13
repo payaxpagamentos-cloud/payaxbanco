@@ -1,11 +1,11 @@
 /** Ouvidoria: reclamação, cancelamento, Procon e Anatel — com protocolo, prazo e desfecho. */
-import { api, qs } from './api.js';
+import {api, qs} from './api.js';
 import {
-  el, limpar, icone, toast, acao, formModal, modal, campo, area, escolha, marcar,
-  inteiro, porcento, dinheiro, dataHora, desde, duracao, repetir,
+  el, limpar, icone, toast, formModal, modal, campo, area, escolha, marcar, inteiro, porcento, dinheiro,
+  dataHora, desde, repetir,
 } from './ui.js';
-import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, campoBusca, seletor } from './comum.js';
-import { corpoDaFicha } from './ficha.js';
+import {cartao, indicador, tabela, td, botao, acoesTopo, vazio, campoBusca, seletor} from './comum.js';
+import {corpoDaFicha} from './ficha.js';
 
 const TIPOS = { reclamacao: 'Reclamação', cancelamento: 'Cancelamento', procon: 'Procon', anatel: 'Anatel', elogio: 'Elogio', sugestao: 'Sugestão' };
 const STATUS = { aberta: ['Aberta', 'aviso'], em_tratativa: ['Em tratativa', 'info'], resolvida: ['Resolvida', 'ok'], improcedente: ['Improcedente', ''] };
@@ -42,7 +42,7 @@ export async function telaOuvidoria(ctx) {
               : el('span', { class: o.horas_para_o_prazo <= 6 ? 'situacao aviso' : 'situacao' }, `${o.horas_para_o_prazo}h`)),
           td(etiquetaStatus(o.status), 'centro'),
           td(o.responsavel_nome ?? el('span', { class: 'mudo' }, 'ninguém')))))
-      : vazio('Nenhum caso aqui.', 'A atendente virtual abre o caso sozinha quando o cliente fala em cancelar, reclamar ou acionar o Procon.')));
+      : vazio('Nenhum caso aqui.', 'A ZOE abre o caso sozinha quando o cliente fala em cancelar, reclamar ou acionar o Procon.')));
   };
 
   const abrirCaso = async (id) => {
@@ -53,7 +53,7 @@ export async function telaOuvidoria(ctx) {
       el('div', { class: 'linha entre', style: 'margin-bottom:12px' },
         el('div', {},
           el('strong', {}, o.assunto),
-          el('div', { class: 'pequeno mudo' }, `Aberta ${dataHora(o.aberta_em)} · ${o.origem === 'ia' ? 'pela atendente virtual' : 'pela equipe'}`
+          el('div', { class: 'pequeno mudo' }, `Aberta ${dataHora(o.aberta_em)} · ${o.origem === 'ia' ? 'pela ZOE' : 'pela equipe'}`
             + `${o.responsavel_nome ? ` · com ${o.responsavel_nome}` : ''}`)),
         el('div', { class: 'linha', style: 'gap:6px' },
           etiquetaStatus(o.status),

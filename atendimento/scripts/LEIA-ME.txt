@@ -1,7 +1,7 @@
 ZOE Atende — atendimento ao cliente por WhatsApp
 ================================================
 
-A atendente virtual faz o primeiro atendimento e resolve o que dá. Só o que ela não consegue
+A ZOE faz o primeiro atendimento e resolve o que dá. Só o que ela não consegue
 resolver vai para a equipe humana, com um resumo pronto do caso.
 
 Esta pasta já vem com o código e as dependências instaladas. Requisito: Node.js 22.13 ou maior.
@@ -56,7 +56,7 @@ Abra https://SEU-DOMINIO/atendimento/ e entre com o e-mail e a senha do master q
 Troque a senha no primeiro acesso (clique no seu nome, no topo).
 
 Depois, em Empresas, crie a empresa cliente. Ela já nasce com duas filas (Atendimento e Financeiro),
-etiquetas e a atendente virtual ligada.
+etiquetas e a ZOE ligada.
 
 
 3. LIGAR O WHATSAPP (Cloud API da Meta)
@@ -97,9 +97,9 @@ A atendente funciona em dois níveis:
                      (platform.claude.com) e reinicie o servidor.
 
 O que mais muda o resultado é a BASE DE CONHECIMENTO. Comece pelas cinco perguntas que a sua equipe
-mais recebe: menu Atendente virtual > Base de conhecimento. Use a aba Testar para ver como ela responde.
+mais recebe: menu ZOE > Base de conhecimento. Use a aba Testar para ver como ela responde.
 
-Em Atendente virtual > Desempenho, a lista "Por que foi para a equipe" mostra exatamente onde falta
+Em ZOE > Desempenho, a lista "Por que foi para a equipe" mostra exatamente onde falta
 conteúdo: cada motivo repetido vira um artigo novo e deixa de ocupar a equipe.
 
 
@@ -120,7 +120,7 @@ número de novo. Guarde o .env junto com o backup.
   O App secret do número está errado ou em branco. Veja no painel do master, em Segurança: os eventos
   recusados aparecem com o motivo.
 
-"A atendente virtual não responde nada"
+"A ZOE não responde nada"
   Confira em Diagnóstico se a chave da Claude API está configurada, e se a empresa tem fila cadastrada
   (sem fila ela não tem para onde transferir).
 

@@ -2,7 +2,7 @@
 
 Plataforma de atendimento ao cliente por **WhatsApp**, publicada em `/atendimento`.
 
-A **atendente virtual faz o primeiro atendimento, de imediato, em todas as conversas**. Ela resolve o que
+A **ZOE faz o primeiro atendimento, de imediato, em todas as conversas**. Ela resolve o que
 dá para resolver na hora — dúvida de horário, segunda via, prazo, status — e **só o que ela não consegue
 resolver vai para a equipe humana**, já com um resumo pronto do caso, na fila certa e com o motivo
 registrado.
@@ -11,7 +11,7 @@ registrado.
 |---|---|
 | **Master** | A plataforma inteira: empresas, usuários, segurança, relatórios, diagnóstico e configurações. Entra no painel de qualquer empresa pela lista de Empresas. |
 | **Suporte** | Como o master, sem usuários, segurança e configurações da plataforma. |
-| **Cliente** (administrador da empresa) | Todo o painel da própria empresa: atendimentos, atendente virtual, filas, equipe, contatos, chamados, relatórios, configurações e integrações. Também atende. |
+| **Cliente** (administrador da empresa) | Todo o painel da própria empresa: atendimentos, ZOE, filas, equipe, contatos, chamados, relatórios, configurações e integrações. Também atende. |
 | **Supervisor** | O painel da empresa só para consulta (não altera nada e não vê segredos). |
 | **Atendente** | A caixa de entrada: as conversas das filas que ele atende e as que assumiu. Não administra a empresa. |
 
@@ -57,17 +57,17 @@ nunca fica sem resposta.
 
 ### Empresa
 
-- **Atendimentos**: a caixa de entrada. Abas `Minhas conversas`, `Na fila`, `Com a atendente virtual`,
+- **Atendimentos**: a caixa de entrada. Abas `Minhas conversas`, `Na fila`, `Com a ZOE`,
   `Todas em aberto` e `Encerradas`; busca por nome, telefone ou documento; filtro por fila.
-  Na conversa: histórico completo (incluindo o que a atendente virtual falou), áudio, foto e documento
+  Na conversa: histórico completo (incluindo o que a ZOE falou), áudio, foto e documento
   do cliente, **respostas rápidas** (`/atalho`), envio de **template**, notas internas, etiquetas,
   prioridade, **assumir**, **transferir** (para fila ou direto para um colega), **devolver para a fila**,
-  **devolver para a atendente virtual** e **encerrar** (com assunto, resumo e pedido de avaliação).
-  À direita, em destaque, **o resumo que a atendente virtual deixou** e os passos que ela deu.
+  **devolver para a ZOE** e **encerrar** (com assunto, resumo e pedido de avaliação).
+  À direita, em destaque, **o resumo que a ZOE deixou** e os passos que ela deu.
   A lista e a conversa se atualizam sozinhas.
 - **Dashboard**: quantas conversas estão com a IA, na fila e com a equipe agora; filas com espera;
   resolução da IA, tempos médios e custo da IA hoje e no mês.
-- **Atendente virtual**: seis abas —
+- **ZOE**: seis abas —
   - *Desempenho*: quanto ela resolveu sozinha, ferramentas e intenções mais usadas, artigos que mais
     puxam atendimento, falhas e **por que ela transferiu** (a lista que mostra onde falta conteúdo).
   - *Base de conhecimento*: os artigos que ela usa para responder, com perguntas de exemplo e um
@@ -79,7 +79,7 @@ nunca fica sem resposta.
   - *Testar*: conversa de teste com a atendente de verdade, sem enviar nada para o WhatsApp.
 - **Ouvidoria**: o que não pode se perder numa conversa — reclamação formal, pedido de cancelamento,
   Procon e Anatel. Cada caso tem protocolo, prazo, responsável, tratativas e um desfecho que diz se o
-  cliente **ficou ou foi embora**, com a receita anual em jogo. A atendente virtual abre o caso sozinha
+  cliente **ficou ou foi embora**, com a receita anual em jogo. A ZOE abre o caso sozinha
   e transfere já com a ficha e o score prontos. Indicadores: casos no mês, fora do prazo, **taxa de
   retenção** e **receita salva**.
 - **Ficha 360° do cliente** (abre da conversa e do caso): a vida inteira do cliente numa tela —
@@ -88,8 +88,8 @@ nunca fica sem resposta.
   conversas, pagamentos, atrasos, chamados técnicos e ouvidorias em ordem.
 - **Contatos**: quem já falou com a empresa, com CPF/CNPJ, código no sistema, observações, bloqueio,
   opt-out de mensagens ativas e o botão de iniciar conversa.
-- **Chamados**: o que a atendente virtual registrou quando não havia solução na hora, com protocolo.
-- **Filas**: os departamentos, com horário por dia da semana, equipe e **"quando a atendente virtual
+- **Chamados**: o que a ZOE registrou quando não havia solução na hora, com protocolo.
+- **Filas**: os departamentos, com horário por dia da semana, equipe e **"quando a ZOE
   deve mandar para cá"** — esse texto entra no prompt e é o que faz ela escolher a fila certa.
 - **Equipe**: quem atende, perfil, disponibilidade, conversas ao mesmo tempo e último acesso.
 - **Relatórios**: resolução pela IA, desfechos, tempos, volume por dia e por hora, custo da IA,
@@ -148,7 +148,7 @@ App secret cadastrado recusa tudo, e a recusa aparece em Segurança.
 aprovado por ela pode ser enviado. A plataforma respeita isso em todos os caminhos (painel, atendente
 virtual e API) e explica o motivo quando recusa.
 
-## Ligar a atendente virtual
+## Ligar a ZOE
 
 Com `ATEND_IA_CHAVE` (chave da Claude API) a atendente entende texto livre e usa ferramentas.
 **Sem a chave ela continua funcionando**: resolve pelas intenções e pela base de conhecimento e
@@ -208,7 +208,7 @@ pedido, contrato, rastreio) com os parâmetros em JSON Schema e cabeçalhos cifr
 essa URL e **monta a identificação do cliente a partir do nosso banco** (telefone, nome, documento,
 código no sistema) — ela nunca vem do modelo, mesmo que ele tente informar outra.
 
-O que mais muda o resultado é a **base de conhecimento**. Em *Atendente virtual > Desempenho*, a lista
+O que mais muda o resultado é a **base de conhecimento**. Em *ZOE > Desempenho*, a lista
 "Por que foi para a equipe" mostra onde falta conteúdo: cada motivo repetido vira um artigo novo e
 deixa de ocupar a equipe.
 
@@ -223,7 +223,7 @@ Base: `https://SEU-DOMINIO/atendimento/api/integracao` · Cabeçalho: `Authoriza
 | `GET /conversas/:id` | A conversa com o histórico (sem as notas internas da equipe). |
 | `POST /contatos` | Cria ou atualiza o contato (nome, documento, e-mail, código no sistema). |
 | `POST /mensagens` | Envia mensagem. Dentro da janela de 24 h aceita texto; fora dela exige template. |
-| `GET /chamados` | Os chamados, inclusive os que a atendente virtual abriu. |
+| `GET /chamados` | Os chamados, inclusive os que a ZOE abriu. |
 | `PATCH /chamados/:protocolo` | Atualiza a situação e a resolução, e pode avisar o cliente pelo WhatsApp. |
 
 ```bash
@@ -232,7 +232,7 @@ curl -X POST https://SEU-DOMINIO/atendimento/api/integracao/mensagens \
   -d '{"telefone":"11988887777","template":"aviso_fatura","parametros":["João","10/12"]}'
 ```
 
-A conversa aberta assim **não passa pela atendente virtual** (aviso automático não é atendimento): ela
+A conversa aberta assim **não passa pela ZOE** (aviso automático não é atendimento): ela
 entra direto na fila da equipe, a menos que você mande `"com_ia": true`.
 
 ## Ouvidoria e a ficha 360° do cliente
@@ -308,6 +308,17 @@ O servidor **precisa estar acessível por https:// pela internet** — é a Meta
 | `ATEND_HTTP` | — | `1` permite ferramentas da empresa em `http://` (só rede interna; o padrão exige `https://`). |
 
 Produção com Docker: `docker build -t zoe-atende .` e rode com um volume em `/app/data`.
+
+## Visual
+
+Tema claro e escuro, com **efeito vidro**: superfícies translúcidas com desfoque sobre um fundo de luzes
+de cor. Vale para tudo — cartões, caixa de entrada, bolhas da conversa, gráficos, a ficha do cliente e as
+janelas. Num navegador sem `backdrop-filter`, as mesmas telas aparecem sólidas, sem perder nada de
+funcionalidade.
+
+Uma escala só de espaçamento, raio e peso em todas as telas: cartões da mesma altura dentro de cada
+grade, campos com a largura do que guardam, tabelas com a mesma altura de linha. O menu lateral é fixo e
+o conteúdo rola por dentro; na caixa de entrada, quem rola é a lista e a conversa, nunca a página.
 
 ## Tecnologia e arquitetura
 

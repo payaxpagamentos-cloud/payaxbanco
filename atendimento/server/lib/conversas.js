@@ -55,7 +55,7 @@ const nomeContato = (c) => c?.nome?.trim() || c?.nome_perfil?.trim() || c?.telef
 
 const abertaDoContato = (db, contatoId) => db.prepare("SELECT * FROM conversas WHERE contato_id = ? AND estado <> 'encerrada'").get(contatoId);
 
-/** Abre a conversa (estado 'bot': quem atende primeiro é sempre a atendente virtual). */
+/** Abre a conversa (estado 'bot': quem atende primeiro é sempre a ZOE). */
 function abrir(db, { empresa, numero, contato }) {
   const id = Number(db.prepare(`INSERT INTO conversas (empresa_id, contato_id, numero_id, estado, aberta_em, ultima_mensagem_em, janela_expira_em)
     VALUES (?, ?, ?, 'bot', ?, ?, ?)`).run(empresa.id, contato.id, numero.id, agora(), agora(), new Date(Date.now() + JANELA_MS).toISOString()).lastInsertRowid);
@@ -86,7 +86,7 @@ function registrarEntrada(db, conversa, { tipo = 'texto', texto = null, waId = n
 // ---------- Transferência para a equipe humana ----------
 
 /**
- * Tira a conversa da atendente virtual e põe na fila. É o caminho de saída da IA:
+ * Tira a conversa da ZOE e põe na fila. É o caminho de saída da IA:
  * ela chama isto quando não resolve, quando o cliente pede uma pessoa ou quando o assunto exige decisão humana.
  * Avisa o cliente, entrega ao atendente mais livre e, fora do horário, diz que a equipe responde depois.
  */
@@ -105,7 +105,7 @@ function transferir(db, conversa, { fila = null, motivo = null, resumo = null, a
     envio.enfileirar(db, conversa, { autor: 'ia', tipo: 'texto', texto: aberta ? mensagemDe(cfg, 'transferencia') : mensagemDe(cfg, 'fora_horario') });
   }
   envio.registrarSistema(db, conversa, por === 'ia'
-    ? `A atendente virtual transferiu para a fila ${destino.nome}${motivo ? `: ${motivo}` : '.'}`
+    ? `A ZOE transferiu para a fila ${destino.nome}${motivo ? `: ${motivo}` : '.'}`
     : `${usuario?.nome ?? 'A equipe'} transferiu para a fila ${destino.nome}${motivo ? `: ${motivo}` : '.'}`, { usuarioId: usuario?.id ?? null });
   db.prepare("INSERT INTO ia_eventos (empresa_id, conversa_id, tipo, nome, detalhe, criado_em) VALUES (?, ?, 'transferencia', ?, ?, ?)")
     .run(conversa.empresa_id, conversa.id, destino.nome, motivo, agora());
@@ -141,11 +141,11 @@ function devolver(db, conversa, usuario, motivo = null) {
   return filas.atribuir(db, atual);
 }
 
-/** Devolve a conversa para a atendente virtual (ex.: o cliente só queria uma informação simples). */
+/** Devolve a conversa para a ZOE (ex.: o cliente só queria uma informação simples). */
 function voltarParaIa(db, conversa, usuario) {
   if (conversa.estado === 'encerrada') throw new ErroNegocio('Esta conversa já foi encerrada.');
   db.prepare("UPDATE conversas SET estado = 'bot', atendente_id = NULL, fila_id = NULL, assumida_em = NULL WHERE id = ?").run(conversa.id);
-  envio.registrarSistema(db, conversa, `${usuario.nome} devolveu o atendimento para a atendente virtual.`, { usuarioId: usuario.id });
+  envio.registrarSistema(db, conversa, `${usuario.nome} devolveu o atendimento para a ZOE.`, { usuarioId: usuario.id });
   return db.prepare('SELECT * FROM conversas WHERE id = ?').get(conversa.id);
 }
 
@@ -170,7 +170,7 @@ function encerrar(db, conversa, { resolvidaPor = 'humano', usuario = null, mensa
     .run(resolvidaPor, agora(), comCsat ? agora() : null, conversa.id);
   envio.registrarSistema(db, conversa, usuario ? `${usuario.nome} encerrou o atendimento.`
     : resolvidaPor === 'abandono' ? 'Encerrada automaticamente: o cliente parou de responder.'
-      : resolvidaPor === 'ia' ? 'A atendente virtual resolveu e encerrou o atendimento.' : 'Atendimento encerrado.', { usuarioId: usuario?.id ?? null });
+      : resolvidaPor === 'ia' ? 'A ZOE resolveu e encerrou o atendimento.' : 'Atendimento encerrado.', { usuarioId: usuario?.id ?? null });
   if (resolvidaPor === 'ia') {
     db.prepare("INSERT INTO ia_eventos (empresa_id, conversa_id, tipo, nome, criado_em) VALUES (?, ?, 'encerramento', 'resolvida pela IA', ?)")
       .run(conversa.empresa_id, conversa.id, agora());
@@ -231,7 +231,7 @@ function enriquecer(db, c) {
 }
 
 /**
- * Caixa de entrada. `caixa`: 'minhas' (do atendente), 'aguardando' (na fila), 'bot' (com a atendente virtual),
+ * Caixa de entrada. `caixa`: 'minhas' (do atendente), 'aguardando' (na fila), 'bot' (com a ZOE),
  * 'abertas' (tudo que não encerrou) ou 'encerradas'.
  */
 function listar(db, empresaId, { caixa = 'abertas', usuario = null, filaId = null, atendenteId = null, busca = '', de = null, ate = null,

@@ -77,7 +77,7 @@ module.exports = function rotasIntegracao(db) {
   // ---------- Envio de mensagem ----------
   /**
    * Manda uma mensagem para um cliente. Dentro da janela de 24 h aceita texto livre; fora dela,
-   * só template aprovado (regra da Meta). A conversa criada assim já nasce com a atendente virtual
+   * só template aprovado (regra da Meta). A conversa criada assim já nasce com a ZOE
    * desligada, a menos que `com_ia: true` — aviso automático não deve virar atendimento.
    */
   r.post('/mensagens', (req, res, next) => {

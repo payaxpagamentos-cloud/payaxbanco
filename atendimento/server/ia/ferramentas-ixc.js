@@ -9,7 +9,7 @@ const wa = require('../lib/whatsapp');
 const ixcLib = require('./ixc');
 
 /**
- * As ferramentas que ligam a atendente virtual ao IXC — o "cérebro" do bot de provedor.
+ * As ferramentas que ligam a ZOE ao IXC — o "cérebro" do bot de provedor.
  *
  * REGRA DE OURO: a identidade é verificada pela PLATAFORMA, nunca pelo modelo.
  * Toda ferramenta que toca dado de contrato começa por `exigirIdentidade()`. Mesmo que o cliente
@@ -414,14 +414,14 @@ const FERRAMENTAS = {
       const c = atual(db, conversa);
       const cfg = lerConfig(db, c.empresa_id);
       if (!cfg?.chamado_ativo) {
-        return { ok: false, erro: 'A abertura de chamado pela atendente virtual está desligada nesta empresa.', instrucao: 'Chame transferir_para_humano para o time técnico.' };
+        return { ok: false, erro: 'A abertura de chamado pela ZOE está desligada nesta empresa.', instrucao: 'Chame transferir_para_humano para o time técnico.' };
       }
       const r = await comIxc(db, conversa, contato, 'chamado', (ixc) => ixc.abrirChamado({
         clienteId: c.ixc_cliente_id,
         contratoId: c.ixc_contrato_id,
         assuntoId: cfg.assunto_chamado_id,
         titulo: entrada.titulo,
-        mensagem: `${entrada.relato}\n\n— Aberto pela atendente virtual no WhatsApp (conversa ${c.id}).`,
+        mensagem: `${entrada.relato}\n\n— Aberto pela ZOE no WhatsApp (conversa ${c.id}).`,
       }), { registrarAcao: false });
       if (!r.ok) return r;
       registrar(db, { conversa, contato, tipo: 'chamado', detalhe: r.valor });

@@ -40,13 +40,13 @@ export const vazio = (texto, sub = null) => el('div', { class: 'vazio' }, icone(
 // ---------- Indicadores do atendimento ----------
 
 /**
- * Os quatro números que contam a história: quanto a atendente virtual resolveu sozinha,
+ * Os quatro números que contam a história: quanto a ZOE resolveu sozinha,
  * quanto foi para a equipe, quanto tempo o cliente esperou e como ele avaliou.
  */
 export function indicadoresAtendimento(r) {
   const resolvidas = r.resolvidas_ia + r.resolvidas_cliente;
   return [
-    indicador('Resolvidas pela atendente virtual', porcento(r.taxa_resolucao_ia),
+    indicador('Resolvidas pela ZOE', porcento(r.taxa_resolucao_ia),
       `${inteiro(resolvidas)} de ${inteiro(r.encerradas)} encerradas`, 'robo', 'verde'),
     indicador('Conversas', inteiro(r.conversas), `${inteiro(r.em_aberto)} em aberto agora`, 'conversa', 'azul'),
     indicador('Foram para a equipe', inteiro(r.transferidas), `${porcento(r.taxa_transferencia)} do total`, 'pessoa', 'laranja'),
@@ -57,7 +57,7 @@ export function indicadoresAtendimento(r) {
 
 /** Como as conversas terminaram. */
 export const cartaoDesfechos = (r) => cartao('Como terminaram', pizza([
-  { rotulo: 'Resolvidas pela IA', valor: r.resolvidas_ia, cor: CORES.verde },
+  { rotulo: 'Resolvidas pela ZOE', valor: r.resolvidas_ia, cor: CORES.verde },
   { rotulo: 'Cliente se despediu', valor: r.resolvidas_cliente, cor: CORES.ciano },
   { rotulo: 'Resolvidas pela equipe', valor: r.resolvidas_humano, cor: CORES.azul },
   { rotulo: 'Cliente parou de responder', valor: r.abandonadas, cor: CORES.cinza },
@@ -67,10 +67,10 @@ export const cartaoDesfechos = (r) => cartao('Como terminaram', pizza([
 export function cartaoTempos(r) {
   const linha = (rotulo, valor, nota) => el('tr', {}, el('td', {}, rotulo, nota ? el('div', { class: 'pequeno mudo' }, nota) : null), td(valor === null ? '—' : duracao(valor), 'dir num'));
   return cartao('Tempos médios', el('table', { class: 'tabela tabela-utilizacao' }, el('tbody', {},
-    linha('Primeira resposta', r.primeira_resposta_s, 'a atendente virtual responde na hora'),
+    linha('Primeira resposta', r.primeira_resposta_s, 'a ZOE responde na hora'),
     linha('Espera na fila', r.espera_fila_s, 'da transferência até um atendente assumir'),
     linha('Duração do atendimento', r.duracao_s, 'da primeira à última mensagem'),
-    linha('Quando a IA resolve', r.duracao_ia_s, 'sem ocupar ninguém da equipe'))));
+    linha('Quando a ZOE resolve', r.duracao_ia_s, 'sem ocupar ninguém da equipe'))));
 }
 
 /** Volume por dia: conversas, resolvidas pela IA e transferidas. */
@@ -85,7 +85,7 @@ export function cartaoPorDia(serie) {
     el('span', { class: 'humano', style: `height:${(d.transferidas / max) * 100}%` })),
   el('small', {}, d.data.slice(8))))),
   el('div', { class: 'legenda', style: 'margin-top:10px' },
-    el('span', {}, el('i', { style: `background:${CORES.verde}` }), 'Resolvidas pela atendente virtual'),
+    el('span', {}, el('i', { style: `background:${CORES.verde}` }), 'Resolvidas pela ZOE'),
     el('span', {}, el('i', { style: `background:${CORES.azul}` }), 'Transferidas para a equipe')));
 }
 
@@ -95,17 +95,17 @@ export const cartaoPorHora = (horas) => cartao('Movimento por hora',
   el('div', { class: 'pequeno mudo', style: 'display:flex;justify-content:space-between;margin-top:6px' },
     el('span', {}, '00h'), el('span', {}, '06h'), el('span', {}, '12h'), el('span', {}, '18h'), el('span', {}, '23h')));
 
-/** Por que a atendente virtual transferiu: a lista de onde a base de conhecimento está faltando. */
+/** Por que a ZOE transferiu: a lista de onde a base de conhecimento está faltando. */
 export const cartaoMotivos = (motivos) => cartao('Por que foi para a equipe',
   tabela(['Motivo', 'Fila', '>Conversas'], motivos.map((m) => el('tr', {},
     td(m.motivo), td(m.fila), td(inteiro(m.conversas), 'dir num'))), 'Nenhuma transferência no período'),
   motivos.length ? el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' },
-    'Motivo que se repete é oportunidade: um artigo novo na base de conhecimento faz a atendente virtual resolver isso sozinha.') : null);
+    'Motivo que se repete é oportunidade: um artigo novo na base de conhecimento faz a ZOE resolver isso sozinha.') : null);
 
 /** Custo e uso da IA no período. */
 export function cartaoCustoIa(ia) {
   const linha = (rotulo, valor) => el('tr', {}, el('td', {}, rotulo), td(valor, 'dir num'));
-  return cartao('Atendente virtual no período', el('table', { class: 'tabela tabela-utilizacao' }, el('tbody', {},
+  return cartao('ZOE no período', el('table', { class: 'tabela tabela-utilizacao' }, el('tbody', {},
     linha('Respostas geradas', inteiro(ia.respostas)),
     linha('Ferramentas usadas', inteiro(ia.ferramentas)),
     linha('Tempo médio da resposta', ia.ms_medio === null ? '—' : `${inteiro(ia.ms_medio)} ms`),
@@ -113,7 +113,7 @@ export function cartaoCustoIa(ia) {
     linha('Tokens lidos do cache', inteiro(ia.tokens_cache)),
     linha('Tokens de saída', inteiro(ia.tokens_saida)),
     linha('Custo estimado', dinheiro(ia.custo_centavos)),
-    ia.erros ? linha('Falhas da IA', inteiro(ia.erros)) : null)),
+    ia.erros ? linha('Falhas da ZOE', inteiro(ia.erros)) : null)),
   el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' },
     'Custo estimado pelos preços cadastrados pelo master em Configurações. Toda conversa transferida que a IA passar a resolver sozinha sai bem mais barata que um atendimento humano.'));
 }

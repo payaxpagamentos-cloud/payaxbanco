@@ -4,7 +4,7 @@ const { lerConfig } = require('../db');
 const { intervalo, hoje, inicioMes, local, somarDias } = require('./datas');
 
 /**
- * Os números do atendimento. O indicador que interessa é a **taxa de resolução da atendente virtual**:
+ * Os números do atendimento. O indicador que interessa é a **taxa de resolução da ZOE**:
  * de cada 100 conversas, quantas ela fechou sozinha, sem ocupar ninguém da equipe.
  */
 
@@ -37,7 +37,7 @@ function resumo(db, { empresaId = null, de = hoje(), ate = hoje() } = {}) {
         THEN (julianday(c.encerrada_em) - julianday(c.aberta_em)) * 86400 END) AS duracao_ia_s
     FROM conversas c WHERE ${e.onde} AND c.aberta_em >= ? AND c.aberta_em < ?`).get(...args);
 
-  // Primeira resposta da atendente virtual: o tempo que o cliente espera para ter alguma resposta.
+  // Primeira resposta da ZOE: o tempo que o cliente espera para ter alguma resposta.
   const primeira = db.prepare(`SELECT AVG(d) AS media_s FROM (
       SELECT (julianday(MIN(m.criada_em)) - julianday(c.aberta_em)) * 86400 AS d
       FROM conversas c JOIN mensagens m ON m.conversa_id = c.id AND m.direcao = 'saida' AND m.tipo <> 'sistema'
@@ -56,7 +56,7 @@ function resumo(db, { empresaId = null, de = hoje(), ate = hoje() } = {}) {
     resolvidas_humano: Number(base.resolvidas_humano ?? 0),
     abandonadas: Number(base.abandonadas ?? 0),
     transferidas: Number(base.transferidas ?? 0),
-    // De cada 100 conversas encerradas, quantas a atendente virtual fechou sem passar para a equipe.
+    // De cada 100 conversas encerradas, quantas a ZOE fechou sem passar para a equipe.
     taxa_resolucao_ia: encerradas ? Number(((resolvidasIa / encerradas) * 100).toFixed(1)) : 0,
     taxa_transferencia: conversas ? Number(((Number(base.transferidas ?? 0) / conversas) * 100).toFixed(1)) : 0,
     avaliacoes: Number(base.avaliacoes ?? 0),
@@ -132,7 +132,7 @@ function porHora(db, { empresaId = null, de, ate }) {
   return horas;
 }
 
-/** Por que a atendente virtual transferiu: mostra onde vale investir na base de conhecimento. */
+/** Por que a ZOE transferiu: mostra onde vale investir na base de conhecimento. */
 function motivosTransferencia(db, { empresaId = null, de, ate, limite = 15 }) {
   const [inicio, fim] = intervalo(de, ate);
   const e = ESCOPO(empresaId);

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Camada determinística da atendente virtual. Roda antes da IA e resolve o que não precisa de modelo:
+ * Camada determinística da ZOE. Roda antes da IA e resolve o que não precisa de modelo:
  * saudação, pedido explícito de falar com uma pessoa, intenções por palavra-chave cadastradas pela empresa
  * e o menu de departamentos. É barata, previsível e fica registrada em `ia_eventos` como 'intencao'.
  */

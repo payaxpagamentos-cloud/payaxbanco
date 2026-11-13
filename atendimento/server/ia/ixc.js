@@ -7,13 +7,13 @@ const { ErroNegocio } = require('../lib/erros');
  *
  * Autenticação: token de um usuário técnico só do bot ("id:hash", em Configurações > Usuários > Token),
  * em Basic. Consultas levam o cabeçalho `ixcsoft: listar`. Toda chamada tem limite de tempo: se o IXC
- * não responder, a atendente virtual avisa o cliente e transfere — nunca inventa a resposta.
+ * não responder, a ZOE avisa o cliente e transfere — nunca inventa a resposta.
  *
  * NOMES DE RECURSO E CAMPO VARIAM ENTRE VERSÕES DO IXC. Por isso:
  *   1. estão todos no mapa RECURSOS, num lugar só;
  *   2. a empresa pode sobrescrever cada um na configuração, sem mexer no código;
  *   3. `diagnosticar()` testa cada capacidade na instância do provedor e diz o que funciona ali —
- *      a atendente virtual só recebe as ferramentas que a sonda aprovou.
+ *      a ZOE só recebe as ferramentas que a sonda aprovou.
  */
 
 const RECURSOS = {

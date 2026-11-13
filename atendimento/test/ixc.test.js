@@ -242,7 +242,7 @@ describe('IXC: o que a atendente resolve sozinha', () => {
     assert.match(r.instrucao, /Não prometa prazo/);
     const aberto = ixc.chamadas.find((x) => x.recurso === 'su_oss_chamado' && !x.corpo.qtype);
     assert.equal(aberto.corpo.id_cliente, '501');
-    assert.match(aberto.corpo.mensagem, /atendente virtual no WhatsApp/);
+    assert.match(aberto.corpo.mensagem, /ZOE no WhatsApp/);
   });
 
   test('tudo fica registrado em ixc_acoes, para o provedor auditar', async () => {

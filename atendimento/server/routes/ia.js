@@ -15,7 +15,7 @@ const claude = require('../ia/claude');
 const config = require('../config');
 const v = require('../lib/validacao');
 
-/** A atendente virtual: configuração, base de conhecimento, intenções, ferramentas e o teste. */
+/** A ZOE: configuração, base de conhecimento, intenções, ferramentas e o teste. */
 module.exports = function rotasIa(db) {
   const r = express.Router();
 
@@ -60,7 +60,7 @@ module.exports = function rotasIa(db) {
           d.modelo === undefined ? atual.modelo : v.opcional(d.modelo, 'o modelo', 60),
           d.esforco === undefined ? atual.esforco : (d.esforco ? v.opcao(d.esforco, 'o esforço', ['low', 'medium', 'high', 'xhigh', 'max']) : null),
           agora(), req.empresa.id);
-      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'alterou a atendente virtual', detalhe: { antes: atual, depois: d }, ip: req.ip });
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'alterou a ZOE', detalhe: { antes: atual, depois: d }, ip: req.ip });
       res.json(comoPublica(cfgDa(req.empresa.id)));
     } catch (err) { next(err); }
   });
@@ -266,7 +266,7 @@ module.exports = function rotasIa(db) {
     } catch (err) { next(err); }
   });
 
-  // ---------- Teste da atendente virtual ----------
+  // ---------- Teste da ZOE ----------
   /**
    * Conversa de teste: roda a atendente de verdade (mesmo prompt, mesmas ferramentas) contra um
    * contato de teste, sem mandar nada para o WhatsApp. As mensagens ficam numa conversa marcada no histórico.

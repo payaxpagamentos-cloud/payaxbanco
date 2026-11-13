@@ -4,7 +4,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const config = require('../config');
 
 /**
- * Camada de IA da atendente virtual: Claude API (Messages) com as ferramentas do arquivo ferramentas.js.
+ * Camada de IA da ZOE: Claude API (Messages) com as ferramentas do arquivo ferramentas.js.
  *
  * O laço de ferramentas é escrito aqui de propósito, em vez de usar o tool runner do SDK: cada passo é
  * gravado em `ia_eventos` (auditoria e custo), roda dentro da transação do atendimento e tem limite de

@@ -4,9 +4,9 @@
  *
  * O score é mostrado SEMPRE com os porquês. Um número sozinho não ajuda ninguém a decidir.
  */
-import { api } from './api.js';
-import { el, limpar, icone, modal, toast, inteiro, porcento, dataHora, desde, estrelas, telefone as formatarTelefone, iniciais } from './ui.js';
-import { cartao, tabela, td } from './comum.js';
+import {api} from './api.js';
+import {el, icone, modal, toast, inteiro, porcento, dataHora, estrelas, telefone as formatarTelefone, iniciais} from './ui.js';
+import {cartao, tabela, td} from './comum.js';
 
 const FAIXA = { alto: ['Risco alto', 'vermelho'], medio: ['Risco médio', 'laranja'], baixo: ['Risco baixo', 'verde'] };
 const CLASSE = { A: ['Cliente A', 'verde'], B: ['Cliente B', 'azul'], C: ['Cliente C', 'cinza'] };

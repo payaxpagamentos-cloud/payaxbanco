@@ -9,7 +9,7 @@ const { processarFila } = require('./lib/envio');
 const db = abrir();
 criarApp(db).listen(config.port, () => {
   console.log(`[ZOE Atende] Painel: http://localhost:${config.port}${config.basePath}/`);
-  if (!config.ia.chave) console.log('[ZOE Atende] Sem ATEND_IA_CHAVE: a atendente virtual roda só com as intenções e a base de conhecimento.');
+  if (!config.ia.chave) console.log('[ZOE Atende] Sem ATEND_IA_CHAVE: a ZOE roda só com as intenções e a base de conhecimento.');
 });
 
 // A fila de saída também gira sozinha: uma mensagem que falhou volta a ser tentada mesmo sem ninguém no painel.

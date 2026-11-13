@@ -12,7 +12,7 @@ import {
 import {botao, botaoIcone, campoBusca, seletor, vazio} from './comum.js';
 
 const CAIXAS = {
-  minhas: 'Minhas conversas', aguardando: 'Na fila', bot: 'Com a atendente virtual', abertas: 'Todas em aberto', encerradas: 'Encerradas',
+  minhas: 'Minhas conversas', aguardando: 'Na fila', bot: 'Com a ZOE', abertas: 'Todas em aberto', encerradas: 'Encerradas',
 };
 
 export async function telaCaixa(ctx) {
@@ -109,10 +109,10 @@ export async function telaCaixa(ctx) {
         el('strong', {}, d.nome),
         el('div', { class: 'pequeno mudo' }, formatarTelefone(d.telefone.replace(/^55/, '')),
           d.contato?.documento ? ` · ${d.contato.documento}` : '', d.fila_nome ? ` · ${d.fila_nome}` : '')),
-      el('div', { class: 'linha', style: 'gap:6px;margin-left:auto' },
-        // A ficha 360°: quem é este cliente, o risco de perder e a vida toda dele.
-        botao('Ficha do cliente', 'primario pequeno', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)),
+      el('div', { class: 'acoes-chat' },
         etiquetaEstado(d.estado),
+        // A ficha 360°: quem é este cliente, o risco de perder e a vida toda dele.
+        botao('Ficha do cliente', 'pequeno', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)),
         d.estado !== 'encerrada' && !d.janela_aberta ? el('span', { class: 'etiqueta aviso', title: 'Passaram-se mais de 24 h desde a última mensagem do cliente: o WhatsApp só aceita template aprovado.' }, 'Janela fechada') : null,
         ...acoesConversa(d, { minha, posso })));
 
@@ -134,7 +134,7 @@ export async function telaCaixa(ctx) {
     if (posso) {
       itens.push(botaoIcone('transferir', 'Transferir', () => transferir(d)));
       if (d.estado === 'humano') itens.push(botaoIcone('voltar', 'Devolver para a fila', () => devolver(d)));
-      if (d.estado !== 'bot') itens.push(botaoIcone('robo', 'Devolver para a atendente virtual', () => voltarParaIa(d)));
+      if (d.estado !== 'bot') itens.push(botaoIcone('robo', 'Devolver para a ZOE', () => voltarParaIa(d)));
       itens.push(botaoIcone('encerrar', 'Encerrar atendimento', () => encerrar(d), 'perigo'));
     }
     return itens;
@@ -279,9 +279,9 @@ export async function telaCaixa(ctx) {
   };
 
   const voltarParaIa = async (d) => {
-    if (!await confirmar('Devolver para a atendente virtual', 'A atendente virtual volta a responder este cliente. Use quando o pedido for simples e ela puder resolver.', 'Devolver')) return;
+    if (!await confirmar('Devolver para a ZOE', 'A ZOE volta a responder este cliente. Use quando o pedido for simples e ela puder resolver.', 'Devolver')) return;
     await api.post(`/empresas/${ctx.empresaId}/conversas/${d.id}/voltar-ia`);
-    toast('A atendente virtual assumiu de volta.');
+    toast('A ZOE assumiu de volta.');
     await recarregar(d.id);
   };
 
@@ -303,9 +303,9 @@ export async function telaCaixa(ctx) {
     const dado = (rotulo, valor) => el('div', { class: 'dado' }, el('small', {}, rotulo), el('span', {}, valor ?? '—'));
 
     limpar(lateralEl,
-      // O resumo da atendente virtual é a primeira coisa que o atendente deve ler.
+      // O resumo da ZOE é a primeira coisa que o atendente deve ler.
       d.resumo ? el('div', { class: 'resumo-ia' },
-        el('h3', {}, icone('robo'), 'A atendente virtual passou assim'),
+        el('h3', {}, icone('robo'), 'A ZOE passou assim'),
         el('p', {}, d.resumo),
         d.motivo_transferencia ? el('p', { class: 'motivo' }, el('strong', {}, 'Motivo: '), d.motivo_transferencia) : null) : null,
 
@@ -362,7 +362,7 @@ export async function telaCaixa(ctx) {
           await abrir(d.id);
         })),
 
-      d.eventos_ia.length ? bloco('O que a atendente virtual fez', el('ol', { class: 'passos-ia' }, d.eventos_ia.map((ev) => el('li', {},
+      d.eventos_ia.length ? bloco('O que a ZOE fez', el('ol', { class: 'passos-ia' }, d.eventos_ia.map((ev) => el('li', {},
         el('strong', {}, ev.tipo === 'ferramenta' ? ev.nome : ev.tipo === 'resposta' ? 'respondeu' : `${ev.tipo}${ev.nome ? `: ${ev.nome}` : ''}`),
         ev.detalhe ? el('div', { class: 'pequeno mudo' }, String(ev.detalhe).slice(0, 160)) : null,
         ev.ms ? el('small', {}, `${inteiro(ev.ms)} ms`) : null)))) : null);

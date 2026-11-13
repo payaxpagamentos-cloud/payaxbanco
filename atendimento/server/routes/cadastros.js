@@ -183,7 +183,7 @@ module.exports = function rotasCadastros(db) {
         'GET  /conversas/:id        — a conversa com o histórico',
         'POST /mensagens            — envia mensagem (telefone + texto na janela de 24 h, ou template fora dela)',
         'POST /contatos             — cria ou atualiza o contato (nome, documento, e-mail, código no sistema)',
-        'GET  /chamados             — chamados abertos pela atendente virtual',
+        'GET  /chamados             — chamados abertos pela ZOE',
         'PATCH /chamados/:protocolo — atualiza a situação e a resolução de um chamado',
       ],
     },

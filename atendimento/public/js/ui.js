@@ -41,7 +41,7 @@ export function telefone(t) {
 }
 
 export const ESTADOS = {
-  bot: ['Atendente virtual', 'info'], aguardando: ['Na fila', 'aviso'], humano: ['Com atendente', 'ok'], encerrada: ['Encerrada', ''],
+  bot: ['ZOE', 'info'], aguardando: ['Na fila', 'aviso'], humano: ['Com atendente', 'ok'], encerrada: ['Encerrada', ''],
 };
 export const RESOLVIDA_POR = {
   ia: 'Resolvida pela IA', cliente: 'Cliente se despediu', humano: 'Resolvida pela equipe', abandono: 'Cliente parou de responder',
@@ -54,7 +54,7 @@ export const STATUS_MENSAGEM = {
   recebida: ['Recebida', ''], fila: ['Enviando…', 'info'], enviada: ['Enviada', ''], entregue: ['Entregue', ''],
   lida: ['Lida', 'ok'], falhou: ['Falhou', 'erro'],
 };
-export const AUTORES = { cliente: 'Cliente', ia: 'Atendente virtual', atendente: 'Atendente', sistema: 'Sistema' };
+export const AUTORES = { cliente: 'Cliente', ia: 'ZOE', atendente: 'Atendente', sistema: 'Sistema' };
 export const TIPOS_MENSAGEM = {
   texto: 'Texto', imagem: 'Imagem', audio: 'Áudio', video: 'Vídeo', documento: 'Documento', figurinha: 'Figurinha',
   localizacao: 'Localização', contato: 'Contato', botao: 'Opção escolhida', template: 'Template', sistema: 'Sistema', nao_suportado: 'Não suportado',
@@ -252,7 +252,7 @@ export function icone(nome) {
   return el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
     el('path', { d: P[nome] ?? '' }));
 }
-/** Marca: balão de conversa com um brilho (a atendente virtual) + nome. */
+/** Marca: balão de conversa com um brilho (a ZOE) + nome. */
 export function marca(nome = 'ZOE Atende') {
   const [principal, ...resto] = String(nome).trim().split(/\s+/);
   const svg = el('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.9', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },

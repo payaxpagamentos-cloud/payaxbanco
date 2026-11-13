@@ -87,25 +87,17 @@ a{ color: var(--azul); }
 .mono{ font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
 .linha{ display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .linha.entre{ justify-content: space-between; }
-.coluna{ display: flex; flex-direction: column; gap: 16px; }
-.grade{ display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 /* Fileira de números em destaque e grade de dois cartões, usadas nos painéis do atendimento. */
 .indicadores{ display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
 .grade-2{ display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
 .conteudo > * + *{ margin-top: 16px; }
 @media (max-width: 720px){ .indicadores{ grid-template-columns: repeat(2, minmax(0, 1fr)); } .grade-2{ grid-template-columns: 1fr; } }
-.grade-dash{ display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); }
-.grade-dash > .c3{ grid-column: span 3; } .grade-dash > .c4{ grid-column: span 4; } .grade-dash > .c5{ grid-column: span 5; } .grade-dash > .c6{ grid-column: span 6; }
-.grade-dash > .c7{ grid-column: span 7; } .grade-dash > .c8{ grid-column: span 8; } .grade-dash > .c12{ grid-column: span 12; }
-@media (max-width: 1100px){ .grade-dash > *{ grid-column: span 12 !important; } }
 /* Cartões lado a lado com a mesma altura */
-.grade-dash > div > .cartao:only-child{ height: 100%; }
 
 /* Marca: ondas de voz + nome */
 .marca{ display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; color: var(--text); text-decoration: none; min-width: 0; }
 .marca .simbolo{ width: 34px; height: 34px; flex: none; display: grid; place-items: center; color: #3B82F6; }
 .marca .simbolo svg{ width: 34px; height: 34px; }
-.marca .simbolo rect:nth-child(odd){ fill: #60A5FA; }
 .marca .texto{ display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
 .marca .texto strong{ font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
 .marca .texto small{ font-size: 13px; font-weight: 600; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
@@ -167,7 +159,6 @@ a{ color: var(--azul); }
 
 /* Cartões */
 .cartao{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); min-width: 0; }
-.cartao.plano{ box-shadow: none; }
 .cartao.grande{ padding: 28px 36px; }
 .cartao h2{ margin-bottom: 16px; font-size: 15px; font-weight: 700; }
 .indicador{ padding: 16px 18px; }
@@ -238,8 +229,6 @@ select{ appearance: none; padding-right: 34px; cursor: pointer;
 .etiqueta.erro{ background: var(--erro-bg); color: var(--erro); }
 .etiqueta.aviso{ background: var(--aviso-bg); color: var(--aviso); padding: 2px 8px; border-radius: 6px; font-size: 11.5px; }
 .etiqueta.info{ background: var(--info-bg); color: var(--azul); }
-.bolinha{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--text-3); }
-.bolinha.ok{ background: var(--ok); } .bolinha.erro{ background: var(--erro); } .bolinha.aviso{ background: var(--aviso); }
 .aviso{ border-radius: 12px; padding: 11px 14px; background: var(--aviso-bg); color: var(--text); font-size: 13px; border: 1px solid color-mix(in srgb, var(--aviso) 25%, transparent); margin: 0; }
 .aviso.erro{ background: var(--erro-bg); color: var(--erro); border-color: color-mix(in srgb, var(--erro) 25%, transparent); }
 .aviso.ok{ background: var(--ok-bg); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
@@ -261,7 +250,6 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 13px; }
 .tabela tr.clicavel:hover td:last-child{ box-shadow: 12px 0 0 var(--hover); }
 .tabela .acoes{ white-space: nowrap; text-align: center; }
 .tabela-utilizacao td, .tabela-utilizacao th{ padding: 13px 8px; }
-.paginacao{ display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 
 .pessoa{ display: inline-flex; align-items: center; gap: 10px; }
 .pessoa .iniciais{ width: 30px; height: 30px; border-radius: 50%; background: var(--info-bg); color: var(--azul); font-size: 11px; font-weight: 800; display: grid; place-items: center; flex: none; }
@@ -344,7 +332,6 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .topo{ padding: 16px 16px 2px; }
   .conteudo{ padding: 12px 16px 28px; }
   .cartao{ padding: 16px; }
-  .grade{ grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .indicador .valor{ font-size: 22px; }
   .rolagem{ margin: 0 -16px; padding: 0 16px; }
   .cartao.grande{ padding: 20px; }
@@ -358,63 +345,8 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .ferramentas .usuario{ padding: 3px; margin-left: 4px; }
   .menu-usuario{ right: 16px; top: 56px; }
 }
-@media print{ .lateral, .ferramentas, .filtros, .btn{ display: none !important; } .casca{ display: block; } .cartao{ border: 0; } }
-/* Telefone do painel: botão no canto, teclado e aviso de ligação recebida */
-.telefone{ position: fixed; right: 24px; bottom: 24px; z-index: 1500; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
-.telefone-botao{ position: relative; width: 58px; height: 58px; border-radius: 50%; border: 0; cursor: pointer; color: #fff; display: grid; place-items: center;
-  background: linear-gradient(135deg, #3B82F6, #1D4ED8); box-shadow: 0 12px 28px -8px rgba(29, 78, 216, .65); transition: transform .15s; }
-.telefone-botao:hover{ transform: translateY(-2px); }
-.telefone-botao svg{ width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.telefone-botao.em-chamada{ background: linear-gradient(135deg, #22C55E, #15803D); box-shadow: 0 12px 28px -8px rgba(21, 128, 61, .65); }
-.telefone-botao .ponto{ position: absolute; right: 3px; top: 3px; width: 13px; height: 13px; border-radius: 50%; border: 2.5px solid var(--bg); background: #94A3B8; }
-.telefone-botao .ponto.online{ background: #22C55E; } .telefone-botao .ponto.erro, .telefone-botao .ponto.offline{ background: #EF4444; }
-.telefone-botao .ponto.carregando{ background: #F59E0B; } .telefone-botao .ponto.em-chamada{ background: #fff; }
-.telefone-painel{ width: 300px; max-width: calc(100vw - 32px); background: var(--surface); border-radius: 18px; padding: 16px; box-shadow: var(--shadow-flutuante); animation: subir .16s ease-out; }
-.telefone-painel header{ display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.telefone-painel header > div{ flex: 1; min-width: 0; line-height: 1.25; }
-.telefone-painel header .icone-btn{ font-size: 20px; line-height: 1; padding: 2px 8px; }
-.telefone-aviso{ width: 100%; border: 1px dashed var(--destaque-borda); background: var(--destaque-bg); color: var(--azul); border-radius: 10px; padding: 8px 10px; font-size: 12px;
-  font-weight: 600; cursor: pointer; margin-bottom: 12px; }
-.telefone .visor{ display: flex; align-items: center; gap: 4px; margin-bottom: 12px; }
-.telefone .visor input{ border: 0; background: none; box-shadow: none; font-size: 24px; font-weight: 700; text-align: center; letter-spacing: .04em; padding: 6px 4px; min-height: 0; }
-.telefone .visor input:focus{ box-shadow: none; }
-.teclado{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; justify-items: center; margin: 4px 0 14px; }
-.tecla{ width: 64px; height: 64px; border-radius: 50%; border: 0; background: var(--surface-2); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  line-height: 1; transition: background .1s; color: var(--text); }
-.tecla:hover{ background: var(--hover); } .tecla:active{ background: var(--destaque-bg); }
-.tecla span{ font-size: 24px; font-weight: 600; } .tecla small{ font-size: 9px; font-weight: 700; letter-spacing: .12em; color: var(--text-3); margin-top: 3px; }
-.acao-ligar, .acao-desligar{ display: grid; place-items: center; width: 62px; height: 62px; border-radius: 50%; border: 0; cursor: pointer; color: #fff; margin: 0 auto; }
-.acao-ligar{ background: #22C55E; box-shadow: 0 10px 22px -10px rgba(34, 197, 94, .9); } .acao-ligar:hover{ background: #16A34A; }
-.acao-desligar{ background: #EF4444; box-shadow: 0 10px 22px -10px rgba(239, 68, 68, .9); } .acao-desligar:hover{ background: #DC2626; }
-.acao-desligar svg{ transform: rotate(135deg); }
-.acao-ligar:disabled{ opacity: .4; cursor: not-allowed; box-shadow: none; }
-.acao-ligar svg, .acao-desligar svg{ width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.telefone .em-chamada .quem{ text-align: center; padding: 6px 0 14px; }
-.telefone .em-chamada .quem strong{ display: block; font-size: 19px; margin-top: 10px; }
-.telefone .em-chamada .tempo{ margin-top: 4px; color: var(--text-2); font-size: 14px; }
-.telefone .controles{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.telefone .controle{ flex: 1; border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; padding: 9px 6px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
-.telefone .controle.on{ background: var(--destaque-bg); border-color: var(--destaque-borda); color: var(--azul); }
-.telefone .controle:disabled{ opacity: .45; cursor: default; }
-.telefone .controles .acao-desligar{ margin: 0 0 0 4px; width: 54px; height: 54px; flex: none; }
-.avatar-chamada{ width: 64px; height: 64px; border-radius: 50%; margin: 0 auto; display: grid; place-items: center; background: var(--info-bg); color: var(--azul); }
-.avatar-chamada svg{ width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.avatar-chamada.tocando{ width: 84px; height: 84px; background: #22C55E; color: #fff; animation: tocar 1.4s ease-out infinite; }
-.avatar-chamada.tocando svg{ width: 36px; height: 36px; animation: tremer 1.4s ease-in-out infinite; }
-@keyframes tocar{ 0%{ box-shadow: 0 0 0 0 rgba(34, 197, 94, .55); } 100%{ box-shadow: 0 0 0 26px rgba(34, 197, 94, 0); } }
-@keyframes tremer{ 0%, 60%, 100%{ transform: rotate(0); } 10%, 30%, 50%{ transform: rotate(-14deg); } 20%, 40%{ transform: rotate(14deg); } }
-.telefone-chamada{ position: fixed; inset: 0; z-index: 2500; display: grid; place-items: center; padding: 16px; background: rgba(8, 15, 32, .55); backdrop-filter: blur(6px);
-  animation: aparecer .15s ease-out; }
-.cartao-chamada{ background: var(--surface); border-radius: 22px; padding: 30px 28px 26px; width: min(360px, 100%); text-align: center; box-shadow: var(--shadow-flutuante);
-  display: flex; flex-direction: column; gap: 4px; animation: subir .2s ease-out; }
-.cartao-chamada .avatar-chamada{ margin-bottom: 16px; }
-.cartao-chamada .quem-liga{ font-size: 24px; font-weight: 800; letter-spacing: -.01em; margin: 2px 0; }
-.cartao-chamada .botoes{ display: flex; justify-content: center; gap: 48px; margin-top: 24px; }
-.cartao-chamada .grande{ width: 70px; height: 70px; position: relative; overflow: visible; }
-.cartao-chamada .grande span{ position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); color: var(--text-2); font-size: 12.5px; font-weight: 600; }
-.cartao-chamada .botoes{ padding-bottom: 22px; }
-@media (max-width: 860px){ .telefone{ right: 16px; bottom: 16px; } .telefone-botao{ width: 54px; height: 54px; } }
-@media print{ .telefone, .telefone-chamada{ display: none !important; } }
+@media print{ .lateral, .ferramentas, .filtros, .btn, .compositor, .abas, .abas-caixa{ display: none !important; }
+  .casca{ display: block; } .cartao{ border: 0; box-shadow: none; } }
 /* ==========================================================================
    Efeito vidro: superfícies translúcidas com desfoque sobre um fundo com luzes de cor.
    Sem suporte a backdrop-filter, o navegador fica com as superfícies sólidas acima.
@@ -427,7 +359,6 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   --vidro-sombra: 0 8px 32px -12px rgba(30, 58, 138, .22);
   --vidro-desfoque: blur(18px) saturate(170%);
   --vidro-campo: rgba(255, 255, 255, .7);
-  --vidro-telefone: rgba(255, 255, 255, .9);
   --vidro-lateral: linear-gradient(180deg, rgba(12, 31, 74, .93) 0%, rgba(10, 24, 56, .95) 100%);
   --luz-1: rgba(59, 130, 246, .36);
   --luz-2: rgba(139, 92, 246, .28);
@@ -440,7 +371,6 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, .06);
   --vidro-sombra: 0 10px 36px -12px rgba(0, 0, 0, .6);
   --vidro-campo: rgba(14, 22, 38, .6);
-  --vidro-telefone: rgba(17, 26, 43, .92);
   --vidro-lateral: linear-gradient(180deg, rgba(8, 20, 46, .78) 0%, rgba(6, 15, 34, .82) 100%);
   --luz-1: rgba(37, 99, 235, .35);
   --luz-2: rgba(124, 58, 237, .28);
@@ -455,13 +385,13 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
       var(--bg);
     background-attachment: fixed; }
 
-  .cartao, .modal, .telefone-painel, .cartao-chamada, .menu-usuario, .status-sistema, .toast, .ferramentas .usuario:hover, .btn:not(.primario){
+  .cartao, .modal, .menu-usuario, .status-sistema, .toast, .ferramentas .usuario:hover, .btn:not(.primario){
     background: var(--vidro);
     -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque);
     border: 1px solid var(--vidro-borda);
     box-shadow: var(--vidro-brilho), var(--vidro-sombra);
   }
-  .modal, .telefone-painel, .cartao-chamada, .menu-usuario, .toast{ background: var(--vidro-forte); }
+  .modal, .menu-usuario, .toast{ background: var(--vidro-forte); }
   .btn:not(.primario){ box-shadow: var(--vidro-brilho); }
   .btn:not(.primario):hover{ background: var(--vidro-forte); }
 
@@ -470,13 +400,8 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
     border-right: 1px solid rgba(255, 255, 255, .08); box-shadow: inset -1px 0 0 rgba(255, 255, 255, .04); }
   .lateral a.item.on{ background: linear-gradient(135deg, rgba(59, 130, 246, .95), rgba(37, 99, 235, .95)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 8px 20px -8px rgba(37, 99, 235, .9); }
 
-  /* Campos e teclas levemente translúcidos */
+  /* Campos levemente translúcidos */
   input:not([type="checkbox"]), select, textarea{ background-color: var(--vidro-campo); }
-  /* Telefone: vidro mais fosco (o teclado precisa ficar legível sobre os gráficos) */
-  .telefone-painel{ background: var(--vidro-telefone); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); }
-  .tecla{ background: var(--surface-2); border: 1px solid var(--vidro-borda); box-shadow: var(--vidro-brilho); }
-  .tecla:hover{ background: var(--hover); }
-  .telefone .controle{ background: var(--vidro); border-color: var(--vidro-borda); }
 
   /* Ícones dos indicadores e etiquetas com um toque de vidro */
   .indicador .ic{ box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 0 0 1px rgba(255, 255, 255, .35); }
@@ -486,10 +411,6 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 
   /* Fundos atrás das janelas: desfoque mais forte */
   .modal-fundo{ background: rgba(8, 15, 32, .35); -webkit-backdrop-filter: blur(8px) saturate(140%); backdrop-filter: blur(8px) saturate(140%); }
-  .telefone-chamada{ background: rgba(8, 15, 32, .3); -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%); }
-
-  /* Botão do telefone com brilho de vidro */
-  .telefone-botao{ box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 12px 28px -8px rgba(29, 78, 216, .65); }
 
   /* Entrada: cartão de vidro sobre o azul-marinho */
   .entrada{ background:
@@ -501,6 +422,11 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
     -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
   .entrada .cartao .mudo, .entrada label.campo, .entrada .marca .texto small{ color: rgba(255, 255, 255, .78); }
   .entrada .marca{ color: #fff; }
+  /* O símbolo precisa de contraste próprio: sobre o azul-marinho ele sumia. */
+  .entrada .marca .simbolo{
+    background: rgba(255, 255, 255, .16); color: #fff; border-radius: 12px; padding: 4px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
   .entrada input{ background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .25); color: #fff; }
   .entrada input::placeholder{ color: rgba(255, 255, 255, .55); }
   .entrada input:focus{ border-color: #93C5FD; box-shadow: 0 0 0 3px rgba(147, 197, 253, .25); }
@@ -535,7 +461,7 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .abas-caixa .aba.on, .abas .aba.on{ background:var(--destaque-bg); border-color:var(--destaque-borda); color:var(--azul) }
 .abas-caixa .conta{ background:var(--azul); color:#fff; border-radius:999px; padding:0 6px; font-size:11px; min-width:18px; text-align:center }
 .abas{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:12px }
-.filtros-lista{ display:grid; grid-template-columns:1fr; gap:8px }
+.filtros-lista{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px }
 .filtros-lista .campo{ margin:0 }
 
 .lista-conversas{ overflow-y:auto; flex:1; min-height:0; display:flex; flex-direction:column }
@@ -562,7 +488,14 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 
 /* Conversa */
 .chat{ display:flex; flex-direction:column; flex:1; min-width:0; min-height:0 }
-.cabecalho-chat{ display:flex; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--surface); flex-wrap:wrap }
+.cabecalho-chat{
+  display:flex; gap:12px; align-items:center; padding:11px 16px;
+  border-bottom:1px solid var(--border); background:var(--surface); flex-wrap:wrap; row-gap:8px;
+}
+.cabecalho-chat .quem-chat{ min-width:0; flex:1 1 180px }
+.cabecalho-chat .quem-chat strong{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+/* As ações ficam juntas no fim e nunca se separam do bloco. */
+.cabecalho-chat .acoes-chat{ display:flex; align-items:center; gap:6px; margin-left:auto; flex-wrap:wrap; justify-content:flex-end }
 .quem-chat strong{ font-size:15px }
 .mensagens{ flex:1; overflow-y:auto; padding:18px 18px 10px; display:flex; flex-direction:column; gap:10px; background:var(--bg) }
 .mensagens.compacta{ max-height:none; padding:10px 0; background:transparent }
@@ -814,3 +747,214 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .medidor .nota strong{ font-size:32px }
   .numeros-ficha{ grid-template-columns:repeat(2, minmax(0, 1fr)) }
 }
+
+/* ==========================================================================
+   ACABAMENTO — simetria
+   Uma escala só de espaço, raio e peso, aplicada em todas as telas. Tudo que é
+   superfície usa os mesmos valores, para nada ficar "quase alinhado".
+   ========================================================================== */
+:root{
+  --esp-1: 6px;   --esp-2: 10px;  --esp-3: 16px;  --esp-4: 24px;
+  --radius-lg: 18px;
+  --ease: cubic-bezier(.2, .8, .3, 1);
+}
+
+/* A barra de ações do topo: filtros à esquerda, botão alinhado com a base do último campo. */
+.conteudo > .linha.entre:first-child{ align-items: flex-end; gap: var(--esp-3); flex-wrap: wrap }
+.conteudo > .linha.entre:first-child > .filtros{ margin-bottom: 0; flex: 1 1 auto }
+.conteudo > .linha.entre:first-child > .btn{ flex: 0 0 auto }
+
+/* Filtros: cada campo com a largura do que ele guarda, não esticado até o fim da tela. */
+.filtros.livre{ align-items: flex-end }
+.filtros.livre > label.campo{ flex: 0 1 auto; min-width: 150px }
+.filtros.livre > label.campo:has(input[type="date"]){ flex: 0 0 auto; min-width: 0; width: 168px }
+.filtros.livre > label.campo:has(input[type="search"]){ flex: 1 1 220px; max-width: 340px }
+.filtros.livre > label.campo:has(select){ flex: 0 0 auto; min-width: 160px }
+.filtros.livre > .linha{ flex: 0 0 auto; align-self: flex-end; padding-bottom: 1px }
+
+/* Gráfico dentro de um cartão alto fica centrado, em vez de grudado no topo. */
+.cartao > .pizza, .cartao > .serie-dias, .cartao > .barras, .cartao > .grafico{ flex: 1; align-self: center; width: 100% }
+.cartao > .pizza{ display: flex; align-items: center; justify-content: center; gap: 28px }
+.cartao > .pizza:not(.lado){ flex-direction: column; gap: 14px }
+
+/* Cartões: mesma altura dentro de cada grade, mesmo respiro por dentro. */
+.indicadores, .grade-2, .cartoes-conhecimento, .verificacoes{ align-items: stretch }
+.indicadores > *, .grade-2 > *, .cartoes-conhecimento > *{ height: 100% }
+/* Só os cartões comuns viram coluna: o indicador com ícone continua em linha. */
+.grade-2 > .cartao:not(.indicador){ display: flex; flex-direction: column }
+.cartao > h2{ margin: 0 0 var(--esp-3); font-size: 15px; font-weight: 700; letter-spacing: -.01em }
+.cartao > h2:only-child{ margin-bottom: 0 }
+.cartao > * + *:not(h2){ margin-top: var(--esp-3) }
+.cartao .rolagem + p, .cartao p.pequeno:last-child{ margin-bottom: 0 }
+
+/* Os indicadores ficam todos com a mesma caixa, venham de onde vierem. */
+.indicador.com-icone{ display: flex; flex-direction: row; align-items: center; gap: var(--esp-3); padding: var(--esp-3) 18px }
+.indicador .corpo{ display: flex; flex-direction: column; gap: 1px }
+.indicador .valor{ margin-top: 0 }
+
+/* Tabelas: mesma altura de linha em todas as telas. */
+.tabela th, .tabela td{ padding-top: 11px; padding-bottom: 11px; vertical-align: middle }
+.tabela td > div:only-child{ min-width: 0 }
+
+/* Formulários: um respiro só entre campos, em qualquer tela. */
+.form{ gap: var(--esp-2) }
+.form.colunas{ gap: var(--esp-3) }
+.form .grade-2{ gap: var(--esp-2) }
+label.campo{ gap: 5px }
+
+/* Botões e etiquetas com a mesma altura óptica. */
+.etiqueta{ display: inline-flex; align-items: center; gap: 5px; min-height: 22px }
+.linha{ display: flex; align-items: center; gap: var(--esp-2) }
+.linha.entre{ justify-content: space-between }
+
+/* Movimento curto e igual em tudo que responde ao mouse. */
+.cartao, .btn, .item-conversa, .tag-escolha, .aba, .icone-btn, .item-rapida, .anexo, .disponivel{
+  transition: background .16s var(--ease), border-color .16s var(--ease), box-shadow .16s var(--ease), transform .16s var(--ease);
+}
+.tabela tr.clicavel{ transition: background .14s var(--ease) }
+
+/* ==========================================================================
+   ACABAMENTO — vidro em todas as superfícies
+   Vem por último de propósito: assim vale sobre as telas criadas depois do
+   bloco de vidro original. Sem backdrop-filter, tudo acima continua sólido.
+   ========================================================================== */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+
+  /* ---- Caixa de entrada: três colunas de vidro sobre o fundo com luz ---- */
+  .caixa{ background: transparent }
+  .coluna-lista, .painel-conversa{
+    background: var(--vidro);
+    -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque);
+  }
+  .coluna-lista{ border-right: 1px solid var(--vidro-borda) }
+  .painel-conversa{ border-left: 1px solid var(--vidro-borda) }
+  .topo-lista, .cabecalho-chat, .compositor{
+    background: var(--vidro-forte);
+    -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%);
+  }
+  .cabecalho-chat{ border-bottom: 1px solid var(--vidro-borda) }
+  .compositor{ border-top: 1px solid var(--vidro-borda) }
+  .topo-lista{ border-bottom: 1px solid var(--vidro-borda) }
+  .mensagens{ background: transparent }
+  .lista-conversas{ background: transparent }
+  .item-conversa{ border-bottom: 1px solid var(--vidro-borda); background: transparent }
+  .item-conversa:hover{ background: var(--vidro-forte) }
+  .item-conversa.on{
+    background: linear-gradient(90deg, rgba(37, 99, 235, .14), rgba(37, 99, 235, .05));
+    box-shadow: inset 3px 0 0 var(--azul), var(--vidro-brilho);
+  }
+  .avatar-contato{ background: var(--vidro-forte); border: 1px solid var(--vidro-borda); box-shadow: var(--vidro-brilho) }
+
+  /* ---- Bolhas da conversa ---- */
+  .corpo-bolha{
+    background: var(--vidro-forte);
+    -webkit-backdrop-filter: blur(12px) saturate(150%); backdrop-filter: blur(12px) saturate(150%);
+    border: 1px solid var(--vidro-borda);
+    box-shadow: var(--vidro-brilho), 0 4px 16px -8px rgba(15, 27, 45, .22);
+  }
+  .bolha.ia .corpo-bolha{ background: linear-gradient(135deg, rgba(79, 139, 255, .18), rgba(79, 139, 255, .08)); border-color: var(--destaque-borda) }
+  .bolha.atendente .corpo-bolha{ background: linear-gradient(135deg, rgba(14, 165, 233, .16), rgba(14, 165, 233, .07)) }
+  .aviso-sistema{
+    background: var(--vidro); border: 1px solid var(--vidro-borda);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: var(--vidro-brilho);
+  }
+  .anexo, .item-rapida, .nota-item{
+    background: var(--vidro); border: 1px solid var(--vidro-borda);
+    -webkit-backdrop-filter: blur(10px) saturate(140%); backdrop-filter: blur(10px) saturate(140%);
+    box-shadow: var(--vidro-brilho);
+  }
+  .anexo:hover, .item-rapida:hover{ background: var(--vidro-forte); transform: translateY(-1px) }
+  .linha-compositor textarea{ background: var(--vidro-campo); border-color: var(--vidro-borda) }
+
+  /* ---- O resumo da ZOE: o cartão que o atendente lê primeiro ---- */
+  .resumo-ia{
+    background: linear-gradient(135deg, rgba(79, 139, 255, .2), rgba(139, 92, 246, .1));
+    border: 1px solid var(--destaque-borda);
+    -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: var(--vidro-brilho), 0 8px 24px -12px rgba(37, 99, 235, .4);
+  }
+
+  /* ---- Abas, etiquetas e pastilhas ---- */
+  .abas, .abas-caixa{ background: transparent }
+  .abas{ border-bottom: 1px solid var(--vidro-borda) }
+  .abas .aba.on, .abas-caixa .aba.on{
+    background: var(--vidro-forte); border-color: var(--vidro-borda);
+    box-shadow: var(--vidro-brilho), 0 2px 10px -4px rgba(37, 99, 235, .4);
+  }
+  .etiqueta{ box-shadow: var(--vidro-brilho) }
+  .tag-escolha:not(.on){ background: var(--vidro); border-color: var(--vidro-borda); box-shadow: var(--vidro-brilho) }
+  .tag-escolha.on{ box-shadow: var(--vidro-brilho), 0 4px 12px -6px currentColor }
+  .dias i{ background: var(--vidro); border-color: var(--vidro-borda) }
+  .disponivel{ background: var(--vidro); border-color: var(--vidro-borda); box-shadow: var(--vidro-brilho) }
+  .disponivel.on{ background: linear-gradient(135deg, rgba(34, 197, 94, .22), rgba(34, 197, 94, .1)) }
+
+  /* ---- Caixas de aviso, código e verificações ---- */
+  .aviso-caixa, .verificacao, .json{
+    -webkit-backdrop-filter: blur(12px) saturate(150%); backdrop-filter: blur(12px) saturate(150%);
+    box-shadow: var(--vidro-brilho);
+  }
+  .verificacao{ background: var(--vidro); border-color: var(--vidro-borda) }
+  .json{ background: var(--vidro); border-color: var(--vidro-borda) }
+
+  /* ---- Ficha do cliente ---- */
+  .medidor .trilho{ background: rgba(148, 163, 184, .22); box-shadow: inset 0 1px 2px rgba(15, 27, 45, .12) }
+  .medidor .trilho span{ box-shadow: 0 0 12px -2px currentColor }
+  .medidor.vermelho .trilho span{ color: var(--erro) }
+  .medidor.laranja .trilho span{ color: var(--amarelo) }
+  .medidor.verde .trilho span{ color: var(--ok) }
+  .fatores .peso{ box-shadow: var(--vidro-brilho) }
+  .linha-tempo .ponto{
+    background: var(--vidro-forte); border-color: var(--vidro-borda);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: var(--vidro-brilho);
+  }
+  .linha-tempo .evento:not(:last-child)::before{ background: var(--vidro-borda) }
+
+  /* ---- Gráficos: translúcidos, com brilho e sem perder a leitura ---- */
+  .rosca .fatia{ filter: drop-shadow(0 2px 6px rgba(15, 27, 45, .2)) }
+  .trilho-rosca{ stroke: rgba(148, 163, 184, .2) }
+  .rosca .centro{
+    background: radial-gradient(circle, var(--vidro-forte) 55%, transparent 75%);
+    border-radius: 50%;
+  }
+  .barras .barra{
+    background: linear-gradient(180deg, var(--azul), rgba(37, 99, 235, .55));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 2px 8px -3px rgba(37, 99, 235, .5);
+    border-radius: 5px 5px 2px 2px;
+  }
+  .coluna-dia .pilha .ia{
+    background: linear-gradient(180deg, #22C55E, rgba(22, 163, 74, .6));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4);
+  }
+  .coluna-dia .pilha .humano{
+    background: linear-gradient(180deg, rgba(37, 99, 235, .9), rgba(37, 99, 235, .55));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25);
+  }
+  .coluna-dia:hover .pilha span{ filter: brightness(1.12) }
+  .grafico .area{ opacity: .5 }
+  .grafico .grade-linha{ stroke: var(--vidro-borda) }
+  .uso .trilho{ background: rgba(148, 163, 184, .22) }
+  .uso .trilho span{ box-shadow: 0 0 10px -2px var(--barra) }
+
+  /* ---- Cartão clicável sobe de leve ---- */
+  .cartao.indicador:hover{ transform: translateY(-2px); box-shadow: var(--vidro-brilho), 0 14px 38px -14px rgba(30, 58, 138, .32) }
+  .artigo:hover{ transform: translateY(-2px) }
+
+  /* ---- Barras de rolagem combinando com o vidro ---- */
+  .mensagens, .lista-conversas, .painel-conversa, .json, .modal.largo .ficha, .rolagem{ scrollbar-width: thin; scrollbar-color: var(--border-forte) transparent }
+  .mensagens::-webkit-scrollbar, .lista-conversas::-webkit-scrollbar, .painel-conversa::-webkit-scrollbar,
+  .json::-webkit-scrollbar, .modal.largo .ficha::-webkit-scrollbar, .rolagem::-webkit-scrollbar{ width: 9px; height: 9px }
+  .mensagens::-webkit-scrollbar-thumb, .lista-conversas::-webkit-scrollbar-thumb, .painel-conversa::-webkit-scrollbar-thumb,
+  .json::-webkit-scrollbar-thumb, .modal.largo .ficha::-webkit-scrollbar-thumb, .rolagem::-webkit-scrollbar-thumb{
+    background: var(--vidro-borda); border-radius: 999px; border: 2px solid transparent; background-clip: content-box;
+  }
+  .mensagens::-webkit-scrollbar-thumb:hover, .lista-conversas::-webkit-scrollbar-thumb:hover{ background: var(--border-forte); background-clip: content-box }
+  .mensagens::-webkit-scrollbar-track, .lista-conversas::-webkit-scrollbar-track{ background: transparent }
+}
+
+/* Tema escuro: o vidro precisa de um pouco mais de contraste nas bolhas e nas colunas. */
+:root[data-tema="escuro"] .corpo-bolha{ box-shadow: var(--vidro-brilho), 0 4px 18px -8px rgba(0, 0, 0, .7) }
+:root[data-tema="escuro"] .coluna-lista, :root[data-tema="escuro"] .painel-conversa{ background: rgba(17, 26, 43, .62) }
+:root[data-tema="escuro"] .medidor .trilho, :root[data-tema="escuro"] .uso .trilho{ background: rgba(255, 255, 255, .08) }
+:root[data-tema="escuro"] .trilho-rosca{ stroke: rgba(255, 255, 255, .08) }
+:root[data-tema="escuro"] .fatores li.sobe .peso{ background: rgba(239, 68, 68, .16) }
+:root[data-tema="escuro"] .fatores li.desce .peso{ background: rgba(52, 211, 153, .16) }

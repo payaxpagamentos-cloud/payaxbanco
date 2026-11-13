@@ -22,7 +22,7 @@ async function dashboard(ctx) {
     const a = d.agora;
     limpar(conteudo,
       el('div', { class: 'indicadores' },
-        indicador('Com a atendente virtual', inteiro(a.com_ia), 'ela está conduzindo agora', 'robo', 'verde'),
+        indicador('Com a ZOE', inteiro(a.com_ia), 'ela está conduzindo agora', 'robo', 'verde'),
         indicador('Esperando na fila', inteiro(a.aguardando), a.aguardando ? 'alguém precisa assumir' : 'ninguém esperando', 'relogio', a.aguardando ? 'vermelho' : 'azul'),
         indicador('Com a equipe', inteiro(a.com_humano), `${inteiro(a.atendentes_disponiveis)} de ${inteiro(a.atendentes)} atendente(s) disponível(is)`, 'pessoa', 'azul'),
         indicador('Chamados abertos', inteiro(Number(d.chamados.abertos ?? 0) + Number(d.chamados.andamento ?? 0)), `${inteiro(d.chamados.abertos ?? 0)} aguardando`, 'chamados', 'laranja')),
@@ -37,7 +37,7 @@ async function dashboard(ctx) {
       el('div', { class: 'grade-2' }, cartaoDesfechos(d.mes), cartaoCustoIa(d.mes.ia)),
       cartao('No mês',
         el('p', { class: 'mudo', style: 'margin:0 0 10px' },
-          `${inteiro(d.mes.conversas)} conversa(s) no mês. A atendente virtual resolveu ${porcento(d.mes.taxa_resolucao_ia)} sozinha`
+          `${inteiro(d.mes.conversas)} conversa(s) no mês. A ZOE resolveu ${porcento(d.mes.taxa_resolucao_ia)} sozinha`
           + `${d.mes.csat_medio === null ? '' : `, com satisfação média de ${d.mes.csat_medio.toLocaleString('pt-BR')} de 5`}.`),
         el('div', { class: 'indicadores embutidos' }, indicadoresAtendimento(d.mes))));
   };
@@ -69,13 +69,13 @@ async function filas(ctx) {
           botaoIcone('equipe', 'Quem atende', () => escolherAtendentes(f)),
           botaoIcone('editar', 'Editar', () => editar(f)),
           botaoIcone('lixo', 'Excluir', () => excluir(f), 'perigo')) : null, 'dir'))),
-    'Nenhuma fila. Sem fila, a atendente virtual não tem para onde transferir.')));
+    'Nenhuma fila. Sem fila, a ZOE não tem para onde transferir.')));
   };
 
   const form = (f = {}) => [
     campo('Nome', { name: 'nome', value: f.nome ?? '', required: true, maxlength: 60, placeholder: 'Financeiro' }),
     campo('Descrição', { name: 'descricao', value: f.descricao ?? '', maxlength: 300 }),
-    area('Quando a atendente virtual deve mandar para cá', { name: 'quando_usar', rows: 3, maxlength: 500, placeholder: 'boleto, fatura, pagamento, cobrança, atraso, negociação' }, f.quando_usar ?? ''),
+    area('Quando a ZOE deve mandar para cá', { name: 'quando_usar', rows: 3, maxlength: 500, placeholder: 'boleto, fatura, pagamento, cobrança, atraso, negociação' }, f.quando_usar ?? ''),
     el('p', { class: 'mudo pequeno', style: 'margin:0' }, 'Este texto entra no prompt da IA: é assim que ela escolhe a fila certa.'),
     el('div', { class: 'grade-2' },
       campo('Abre', { name: 'abre', type: 'time', value: f.abre ?? '08:00', required: true }),
@@ -247,11 +247,11 @@ async function chamados(ctx) {
         td(el('div', {}, el('strong', {}, ch.assunto), ch.descricao ? el('div', { class: 'pequeno mudo' }, String(ch.descricao).slice(0, 90)) : null)),
         td(el('div', {}, ch.contato_nome ?? '—', el('div', { class: 'pequeno mudo' }, formatarTelefone(String(ch.telefone).replace(/^55/, ''))))),
         td(ch.fila_nome ?? '—'),
-        td(ch.aberto_por === 'ia' ? el('span', { class: 'etiqueta info' }, 'atendente virtual') : (ch.usuario_nome ?? 'equipe')),
+        td(ch.aberto_por === 'ia' ? el('span', { class: 'etiqueta info' }, 'ZOE') : (ch.usuario_nome ?? 'equipe')),
         td(dataHora(ch.criado_em)),
         td(etiquetaChamado(ch.status), 'centro'),
         td(ctx.somenteLeitura ? null : botaoIcone('editar', 'Atualizar', () => editar(ch)), 'dir'))),
-    'Nenhum chamado. A atendente virtual abre um sempre que o pedido é legítimo mas não tem solução na hora.')));
+    'Nenhum chamado. A ZOE abre um sempre que o pedido é legítimo mas não tem solução na hora.')));
   };
 
   const editar = (ch) => formModal(`Chamado ${ch.protocolo}`, () => [
@@ -395,7 +395,7 @@ async function integracoes(ctx) {
     limpar(conteudo,
       cartao('Chaves de API',
         el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
-          'Com uma chave, o seu sistema envia mensagem pelo WhatsApp, consulta as conversas e fecha os chamados que a atendente virtual abriu. '
+          'Com uma chave, o seu sistema envia mensagem pelo WhatsApp, consulta as conversas e fecha os chamados que a ZOE abriu. '
           + 'Guardamos só o hash da chave: ela aparece uma única vez.'),
         tabela(['Nome', 'Prefixo', 'Último uso', 'Criada', '^Ativa', ''], d.itens.map((c) => el('tr', {},
           td(c.nome), td(el('code', {}, `${c.prefixo}…`)), td(c.ultimo_uso ? desde(c.ultimo_uso) : 'nunca'),

@@ -16,7 +16,7 @@ const cliente360 = require('../lib/cliente360');
 const prompt = require('./prompt');
 
 /**
- * A atendente virtual. Recebe a mensagem que acabou de chegar e decide o que fazer, nesta ordem:
+ * A ZOE. Recebe a mensagem que acabou de chegar e decide o que fazer, nesta ordem:
  *
  *   1. Regras  — pedido explícito de humano, escolha de menu, intenção por palavra-chave, despedida.
  *   2. IA      — Claude com as ferramentas (conhecimento, cadastro, chamado, API da empresa).
@@ -60,7 +60,7 @@ function conteudoDoCliente(m) {
 }
 
 /**
- * Histórico no formato da Claude API. O cliente é 'user'; a atendente virtual e os atendentes humanos
+ * Histórico no formato da Claude API. O cliente é 'user'; a ZOE e os atendentes humanos
  * são 'assistant' (para a IA, o que a equipe já disse também é contexto). Mensagens de sistema ficam fora.
  */
 function historico(db, conversa) {
@@ -219,15 +219,15 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
 
   if (!cfg.ativa) {
     registrarEvento(db, conversa, { tipo: 'desligada', nome: 'ia desligada' });
-    return semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo: 'A atendente virtual está desligada nesta empresa.' });
+    return semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo: 'A ZOE está desligada nesta empresa.' });
   }
 
   if (Number(conversa.mensagens_ia) >= Number(cfg.max_turnos)) {
     registrarEvento(db, conversa, { tipo: 'limite', nome: 'max_turnos', detalhe: `${conversa.mensagens_ia} mensagens` });
     if (lista.length) {
       const r = transferirCom(db, conversa, {
-        motivo: `A atendente virtual chegou ao limite de ${cfg.max_turnos} mensagens sem resolver.`,
-        resumo: conversa.resumo ?? 'A conversa passou do limite de mensagens da atendente virtual sem chegar a uma solução.',
+        motivo: `A ZOE chegou ao limite de ${cfg.max_turnos} mensagens sem resolver.`,
+        resumo: conversa.resumo ?? 'A conversa passou do limite de mensagens da ZOE sem chegar a uma solução.',
       });
       return { acao: 'transferida', detalhe: r.fila.nome };
     }

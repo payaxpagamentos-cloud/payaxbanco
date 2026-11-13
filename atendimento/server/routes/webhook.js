@@ -15,7 +15,7 @@ const recepcao = require('../lib/recepcao');
  * Quem autentica o POST é a assinatura do app (X-Hub-Signature-256) sobre o corpo cru, com o segredo
  * do app cadastrado no número. Sem segredo cadastrado, o evento é recusado — nunca aceito "no escuro".
  *
- * A Meta reenvia o evento se não receber 200 em poucos segundos, e a atendente virtual pode levar
+ * A Meta reenvia o evento se não receber 200 em poucos segundos, e a ZOE pode levar
  * mais que isso para pensar. Por isso o 200 vai na hora e o atendimento roda em seguida; o que ele
  * responder sai pela fila de mensagens.
  */

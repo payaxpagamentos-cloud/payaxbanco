@@ -186,7 +186,7 @@ describe('avaliação do atendimento (CSAT)', () => {
       conversas.encerrar(db, db.prepare('SELECT * FROM conversas WHERE id = ?').get(c.id), { resolvidaPor: 'humano' });
       await h.conversar(db, 'na verdade tenho outra dúvida');
       assert.equal(Number(db.prepare('SELECT COUNT(*) AS n FROM conversas WHERE empresa_id = ?').get(empresa.id).n), 2);
-      assert.equal(h.conversaDoCliente(db).estado, 'bot', 'a conversa nova começa com a atendente virtual');
+      assert.equal(h.conversaDoCliente(db).estado, 'bot', 'a conversa nova começa com a ZOE');
     } finally { sem.restaurar(); }
   });
 });

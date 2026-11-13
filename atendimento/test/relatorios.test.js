@@ -99,7 +99,7 @@ describe('relatórios', () => {
   });
 });
 
-describe('segurança da atendente virtual', () => {
+describe('segurança da ZOE', () => {
   let meta;
   beforeEach(() => { meta = h.fingirMeta(); });
   afterEach(() => { meta.restaurar(); });

@@ -5,7 +5,7 @@ const { local } = require('./datas');
 const { ErroNegocio } = require('./erros');
 
 /**
- * Filas são os departamentos que recebem o que a atendente virtual não resolve
+ * Filas são os departamentos que recebem o que a ZOE não resolve
  * (Financeiro, Suporte, Comercial...). Cada uma tem horário próprio e a sua equipe.
  */
 

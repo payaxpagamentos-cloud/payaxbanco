@@ -6,7 +6,7 @@ const { preencher } = require('./regras');
 const ixcTools = require('./ferramentas-ixc');
 
 /**
- * Monta o prompt do sistema da atendente virtual. É estável durante a conversa (vai cacheado na
+ * Monta o prompt do sistema da ZOE. É estável durante a conversa (vai cacheado na
  * Claude API), então aqui não entra nada que mude a cada mensagem: nem data, nem id, nem contador.
  */
 

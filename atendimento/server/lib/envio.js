@@ -5,7 +5,7 @@ const wa = require('./whatsapp');
 const { ErroNegocio } = require('./erros');
 
 /**
- * Fila de saída. Quem escreve uma mensagem (a atendente virtual, um atendente humano ou a API da empresa)
+ * Fila de saída. Quem escreve uma mensagem (a ZOE, um atendente humano ou a API da empresa)
  * só grava a linha em `mensagens` com status 'fila' — dentro da transação do atendimento. O envio pela rede
  * acontece depois, fora da transação, com novas tentativas. Assim uma falha da Meta nunca perde a conversa.
  */

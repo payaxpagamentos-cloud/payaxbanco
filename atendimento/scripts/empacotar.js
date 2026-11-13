@@ -49,7 +49,7 @@ ATEND_TRUST_PROXY=1
 # Fuso do horário de atendimento e dos relatórios.
 # ATEND_FUSO=America/Sao_Paulo
 
-# Chave da Claude API: liga a camada de IA da atendente virtual.
+# Chave da Claude API: liga a camada de IA da ZOE.
 # Sem ela, a atendente usa só as intenções e a base de conhecimento, e oferece o menu de departamentos.
 # ATEND_IA_CHAVE=sk-ant-...
 # ATEND_IA_MODELO=claude-opus-5-5

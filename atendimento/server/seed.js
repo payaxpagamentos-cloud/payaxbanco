@@ -2,7 +2,7 @@
 
 /**
  * Dados de demonstração: uma empresa com equipe, base de conhecimento, intenções e cerca de dois meses
- * de atendimentos — resolvidos pela atendente virtual, transferidos, abandonados e avaliados.
+ * de atendimentos — resolvidos pela ZOE, transferidos, abandonados e avaliados.
  * Não roda em cima de um banco que já tem empresa cadastrada (não estraga instalação em uso).
  *
  *   npm run seed
@@ -130,7 +130,7 @@ function semear(db) {
       }
     }
 
-    // Atendente virtual com o tom da empresa.
+    // ZOE com o tom da empresa.
     db.prepare(`UPDATE ia_config SET nome_assistente = 'ZOE', fila_padrao_id = ?, max_turnos = 12, pedir_csat = 1,
         saudacao = ?, regras = ?, atualizada_em = ? WHERE empresa_id = ?`)
       .run(filaId.get('Atendimento'),
@@ -199,7 +199,7 @@ function semear(db) {
         const sorte = crypto.randomInt(100);
 
         if (sorte < 62) {
-          // Resolvida pela atendente virtual.
+          // Resolvida pela ZOE.
           const [pergunta, artigo, resposta] = sorteio(PERGUNTAS_RESOLVIDAS);
           const id = novaConversa(contato, abertaEm);
           entrada(id, pergunta, abertaEm);
@@ -210,7 +210,7 @@ function semear(db) {
           const fim = somar(abertaEm, inteiro(40, 300));
           saida(id, 'Atendimento encerrado. Se precisar de mais alguma coisa, é só mandar mensagem. Obrigado!', fim);
           evento(id, 'encerramento', 'resolvida pela IA', fim);
-          sistema(id, 'A atendente virtual resolveu e encerrou o atendimento.', fim);
+          sistema(id, 'A ZOE resolveu e encerrou o atendimento.', fim);
           const comCsat = crypto.randomInt(100) < 45;
           db.prepare(`UPDATE conversas SET estado = 'encerrada', resolvida_por = 'ia', assunto = ?, intencao = ?, mensagens_ia = ?,
               encerrada_em = ?, ultima_mensagem_em = ?, csat_pedido_em = ?, csat_nota = ? WHERE id = ?`)
@@ -226,7 +226,7 @@ function semear(db) {
           const transferidaEm = somar(abertaEm, inteiro(8, 60));
           evento(id, 'transferencia', fila, transferidaEm, { detalhe: motivo });
           saida(id, 'Vou te transferir para um de nossos atendentes. Só um momento, por favor.', transferidaEm);
-          sistema(id, `A atendente virtual transferiu para a fila ${fila}: ${motivo}`, transferidaEm);
+          sistema(id, `A ZOE transferiu para a fila ${fila}: ${motivo}`, transferidaEm);
           const assumidaEm = somar(transferidaEm, inteiro(20, 900));
           sistema(id, `${atendente.nome} assumiu o atendimento.`, assumidaEm, atendente.id);
           let t = assumidaEm;
@@ -260,7 +260,7 @@ function semear(db) {
 
     // ---------- Conversas vivas, para o painel não nascer vazio ----------
     const vivos = contatos.slice(0, 5);
-    // Uma com a atendente virtual agora.
+    // Uma com a ZOE agora.
     {
       const abertaEm = new Date(Date.now() - 4 * 60_000).toISOString();
       const id = novaConversa(vivos[0], abertaEm);
@@ -281,7 +281,7 @@ function semear(db) {
       saida(id, saudacao, somar(abertaEm, 2));
       const transferidaEm = somar(abertaEm, 25);
       saida(id, 'Vou te transferir para um de nossos atendentes. Só um momento, por favor.', transferidaEm);
-      sistema(id, `A atendente virtual transferiu para a fila ${fila}: ${motivo}`, transferidaEm);
+      sistema(id, `A ZOE transferiu para a fila ${fila}: ${motivo}`, transferidaEm);
       evento(id, 'transferencia', fila, transferidaEm, { detalhe: motivo });
       db.prepare(`UPDATE conversas SET estado = 'aguardando', fila_id = ?, assunto = ?, motivo_transferencia = ?, resumo = ?,
           transferida_em = ?, mensagens_ia = 1, prioridade = ? WHERE id = ?`)
@@ -297,7 +297,7 @@ function semear(db) {
       entrada(id, pergunta, abertaEm);
       saida(id, saudacao, somar(abertaEm, 2));
       const transferidaEm = somar(abertaEm, 30);
-      sistema(id, `A atendente virtual transferiu para a fila ${fila}: ${motivo}`, transferidaEm);
+      sistema(id, `A ZOE transferiu para a fila ${fila}: ${motivo}`, transferidaEm);
       evento(id, 'transferencia', fila, transferidaEm, { detalhe: motivo });
       const assumidaEm = somar(transferidaEm, 120);
       sistema(id, `${atendente.nome} assumiu o atendimento.`, assumidaEm, atendente.id);
@@ -339,7 +339,7 @@ function semear(db) {
           encerrada ? (retido === 1 ? 'Ofereceu-se a troca do roteador e o cliente aceitou ficar.' : retido === 0 ? 'Cliente optou por sair; contrato encerrado sem multa.' : 'Pedido de desculpas e reagendamento com prioridade.') : null,
           retido, mensalidade * 12, abertaEm, encerrada ? somar(abertaEm, 1800) : null, resolvidaEm).lastInsertRowid);
       db.prepare("INSERT INTO ouvidoria_eventos (ouvidoria_id, tipo, texto, criado_em) VALUES (?, 'abertura', ?, ?)")
-        .run(id, `Caso aberto pela atendente virtual: ${assunto}`, abertaEm);
+        .run(id, `Caso aberto pela ZOE: ${assunto}`, abertaEm);
       db.prepare("INSERT INTO ouvidoria_eventos (ouvidoria_id, tipo, texto, criado_em) VALUES (?, 'abertura', ?, ?)")
         .run(id, `Na abertura: risco ${risco}/100 (${risco >= 60 ? 'alto' : risco >= 30 ? 'medio' : 'baixo'}), cliente classe ${classe}.`, abertaEm);
       if (resolvidaEm) {
@@ -348,14 +348,14 @@ function semear(db) {
       }
     }
 
-    // Chamados abertos pela atendente virtual.
+    // Chamados abertos pela ZOE.
     for (const [i, contato] of contatos.slice(0, 6).entries()) {
       const criadoEm = quando(inteiro(0, 20));
       db.prepare(`INSERT INTO chamados (empresa_id, contato_id, protocolo, assunto, descricao, fila_id, status, aberto_por, criado_em, atualizado_em)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'ia', ?, ?)`)
         .run(empresa.id, contato.id, `${new Date().toISOString().slice(0, 7).replace('-', '')}-${String(i + 1).padStart(5, '0')}`,
           sorteio(['Internet oscilando à noite', 'Pedido de visita técnica', 'Troca de equipamento', 'Mudança de vencimento', 'Cobrança a conferir']),
-          'Relato do cliente registrado pela atendente virtual.', filaId.get(sorteio(['Suporte técnico', 'Financeiro'])),
+          'Relato do cliente registrado pela ZOE.', filaId.get(sorteio(['Suporte técnico', 'Financeiro'])),
           sorteio(['aberto', 'aberto', 'andamento', 'resolvido']), criadoEm, criadoEm);
     }
 

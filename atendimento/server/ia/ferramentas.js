@@ -10,7 +10,7 @@ const ouvidoriaLib = require('../lib/ouvidoria');
 const cliente360 = require('../lib/cliente360');
 
 /**
- * O que a atendente virtual pode fazer. Cada ferramenta é uma função do servidor: a IA escolhe e
+ * O que a ZOE pode fazer. Cada ferramenta é uma função do servidor: a IA escolhe e
  * preenche os parâmetros, mas a execução, as permissões e os dados são sempre nossos.
  *
  * Duas delas terminam o atendimento da IA e são o núcleo da regra do produto:

@@ -14,7 +14,7 @@ const v = require('./validacao');
  *
  * A diferença para um atendimento comum: o caso tem protocolo, prazo, responsável, histórico de
  * tratativas e um desfecho que diz se o cliente ficou ou foi embora — e quanto isso vale por ano.
- * A atendente virtual abre o caso sozinha quando reconhece o assunto e entrega para a pessoa com a
+ * A ZOE abre o caso sozinha quando reconhece o assunto e entrega para a pessoa com a
  * ficha e o score já calculados, em vez de passar um "cliente quer cancelar" sem contexto.
  */
 
@@ -80,7 +80,7 @@ function abrir(db, { empresa, contato, conversa = null, tipo, assunto, relato = 
 
     evento(db, id, {
       tipo: 'abertura',
-      texto: origem === 'ia' ? `Caso aberto pela atendente virtual: ${assunto}` : `Caso aberto por ${usuario?.nome ?? 'a equipe'}: ${assunto}`,
+      texto: origem === 'ia' ? `Caso aberto pela ZOE: ${assunto}` : `Caso aberto por ${usuario?.nome ?? 'a equipe'}: ${assunto}`,
       usuarioId: usuario?.id ?? null,
     });
     if (ficha) {

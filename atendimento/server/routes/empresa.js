@@ -157,7 +157,7 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  /** Devolve a conversa para a atendente virtual. */
+  /** Devolve a conversa para a ZOE. */
   r.post('/conversas/:id/voltar-ia', (req, res, next) => {
     try {
       const c = conversaDa(req);

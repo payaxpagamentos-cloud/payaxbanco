@@ -76,7 +76,7 @@ async function empresas(ctx) {
 
   const criar = () => formModal('Nova empresa', () => [
     el('p', { class: 'mudo pequeno', style: 'margin:0 0 8px' },
-      'A empresa nasce com duas filas (Atendimento e Financeiro), etiquetas e a atendente virtual ligada. '
+      'A empresa nasce com duas filas (Atendimento e Financeiro), etiquetas e a ZOE ligada. '
       + 'Depois é só cadastrar o número de WhatsApp e a base de conhecimento.'),
     ...form(),
   ], async (d) => {
@@ -285,7 +285,7 @@ async function configuracoes(ctx) {
 // ---------- Relatórios ----------
 
 const relatorios = (ctx) => telaRelatorios(ctx, '/master/relatorios', {
-  extras: (d) => [cartao('Por empresa', tabela(['Empresa', '>Conversas', '>Resolvidas pela IA', '>Transferidas', '>CSAT'],
+  extras: (d) => [cartao('Por empresa', tabela(['Empresa', '>Conversas', '>Resolvidas pela ZOE', '>Transferidas', '>CSAT'],
     d.por_empresa.map((e) => el('tr', {}, td(e.nome), td(inteiro(e.conversas), 'dir num'), td(inteiro(e.resolvidas_ia), 'dir num'),
       td(inteiro(e.transferidas), 'dir num'), td(e.csat === null ? '—' : e.csat.toLocaleString('pt-BR'), 'dir num'))))) ],
 });

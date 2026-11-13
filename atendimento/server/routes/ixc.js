@@ -34,7 +34,7 @@ module.exports = function rotasIxc(db) {
     fila_tecnica_id: c?.fila_tecnica_id ?? null,
     capacidades: c?.capacidades ? JSON.parse(c.capacidades) : null,
     testado_em: c?.testado_em ?? null,
-    // O que a atendente virtual ganha hoje com esta configuração.
+    // O que a ZOE ganha hoje com esta configuração.
     ferramentas: ixcTools.montar(db, empresaId).tools.map((t) => t.name),
   });
 
@@ -94,7 +94,7 @@ module.exports = function rotasIxc(db) {
 
   /**
    * Sonda: só de leitura. Testa cada capacidade nesta instância do IXC e guarda o resultado —
-   * a atendente virtual passa a receber apenas as ferramentas que funcionam aqui.
+   * a ZOE passa a receber apenas as ferramentas que funcionam aqui.
    */
   r.post('/sonda', exigirAdminEmpresa, async (req, res, next) => {
     try {
@@ -127,7 +127,7 @@ module.exports = function rotasIxc(db) {
     } catch (err) { next(ixcLib.comoErroNegocio(err)); }
   });
 
-  /** O que a atendente virtual fez no IXC: a auditoria que o provedor precisa ter. */
+  /** O que a ZOE fez no IXC: a auditoria que o provedor precisa ter. */
   r.get('/acoes', (req, res) => {
     const onde = ['a.empresa_id = ?'];
     const args = [req.empresa.id];

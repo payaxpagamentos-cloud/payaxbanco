@@ -8,7 +8,7 @@ const wa = require('./whatsapp');
 const { atender } = require('../ia/atendente');
 
 /**
- * Tradução dos eventos do webhook da Meta para o modelo da plataforma, e o gatilho da atendente virtual.
+ * Tradução dos eventos do webhook da Meta para o modelo da plataforma, e o gatilho da ZOE.
  *
  * A Meta reenvia o mesmo evento quando não recebe 200 rápido, então tudo aqui é idempotente: o id da
  * mensagem (wa_id) é único em `mensagens` e fica registrado em `webhook_vistos`. O webhook responde 200
@@ -95,7 +95,7 @@ function primeiraVez(db, waId) {
 }
 
 /**
- * Processa uma mensagem recebida: grava, marca como lida, baixa a mídia e chama a atendente virtual.
+ * Processa uma mensagem recebida: grava, marca como lida, baixa a mídia e chama a ZOE.
  * Devolve { conversa_id, acao } — o que o atendimento fez.
  */
 async function receberMensagem(db, { numero, empresa, mensagem, perfil }) {
