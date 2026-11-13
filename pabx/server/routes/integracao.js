@@ -28,10 +28,15 @@ module.exports = (db) => {
   // ZOE: etapas da ligação atendida pela atendente virtual (identificar, confirmar, boleto, desbloqueio, transferir).
   r.use('/zoe', require('../zoe/rotas').rotasIntegracao(db));
 
-  /** Configuração completa da empresa para a central telefônica montar o plano de discagem. */
+  /**
+   * Configuração completa da empresa para a central telefônica montar o plano de discagem.
+   * A rota de saída vai sem usuário e senha: o tronco é da plataforma (várias empresas usam o
+   * mesmo) e a credencial dele fica só na configuração da central, nunca numa resposta da API —
+   * com ela, quem tem a chave discaria direto pela operadora, sem passar pela tarifação.
+   */
   r.get('/config', (req, res) => {
     const e = req.empresa;
-    const t = e.tronco_id ? db.prepare('SELECT id, nome, host, porta, usuario, senha, prefixo, canais, ativo FROM troncos WHERE id = ?').get(e.tronco_id) : null;
+    const t = e.tronco_id ? db.prepare('SELECT id, nome, host, porta, prefixo, canais, ativo FROM troncos WHERE id = ?').get(e.tronco_id) : null;
     const filas = db.prepare('SELECT id, nome, estrategia, espera_maxima_s FROM filas WHERE empresa_id = ?').all(e.id);
     const membros = db.prepare('SELECT r.numero FROM fila_ramais fr JOIN ramais r ON r.id = fr.ramal_id WHERE fr.fila_id = ? AND r.ativo = 1 ORDER BY r.numero');
     res.json({
@@ -79,19 +84,26 @@ module.exports = (db) => {
       const ixc = cfg.ativo ? zoe.ixcOuNulo(cfg, req.body?.uid ? String(req.body.uid) : undefined) : null;
       res.json(await uraAtendimento.atender(db, req.empresa, ura, {
         telefone: req.body?.telefone ? v.digitos(req.body.telefone) : null, cfg, ixc,
+        // O uid amarra o cliente reconhecido a esta ligação; sem ele a URA não reconhece ninguém.
+        uid: req.body?.uid ? v.texto(req.body.uid, 'o uid da ligação', 120) : null,
       }));
     } catch (err) { next(err); }
   });
 
-  /** A identidade foi confirmada: agora a URA pode falar do contrato e oferecer a solução. */
+  /**
+   * O cliente digitou os três primeiros do CPF/CNPJ: o servidor confere contra o cadastro do
+   * cliente que o /atender reconheceu nesta ligação (uid). Só com o código certo a URA fala do
+   * contrato. A central não manda o cliente — não há como escolher de quem é a ligação.
+   */
   r.post('/ura/:id/confirmado', async (req, res, next) => {
     try {
       const ura = uraLib.buscar(db, req.empresa.id, Number(req.params.id));
+      const uid = v.texto(req.body?.uid, 'o uid da ligação', 120);
       const zoe = require('../zoe/core');
       const cfg = zoe.configComSegredos(db, req.empresa.id);
-      const ixc = cfg.ativo ? zoe.ixcOuNulo(cfg, req.body?.uid ? String(req.body.uid) : undefined) : null;
-      res.json(await uraAtendimento.aposConfirmar(db, req.empresa, ura, {
-        clienteId: v.texto(req.body?.cliente_id, 'o id do cliente', 40), cfg, ixc,
+      const ixc = cfg.ativo ? zoe.ixcOuNulo(cfg, uid) : null;
+      res.json(await uraAtendimento.confirmar(db, req.empresa, ura, {
+        uid, codigo: String(req.body?.codigo ?? ''), cfg, ixc,
       }));
     } catch (err) { next(err); }
   });

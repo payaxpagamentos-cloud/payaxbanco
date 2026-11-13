@@ -7,11 +7,27 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { PassThrough } = require('node:stream');
-const { criarAgi, criarApiCerebro, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal } = require('../scripts/zoe-agi');
+const { criarAgi, criarApiCerebro, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal, textoApp, nomeFila } = require('../scripts/zoe-agi');
 
 const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-agi-falas-'));
 // Um WAV com cara de fala de verdade: cabeçalho + 1 s de áudio 8 kHz.
 const WAV_FALA = Buffer.concat([Buffer.from('RIFF....WAVEfmt '), Buffer.alloc(16000, 1)]);
+
+/**
+ * Como o Asterisk lê o texto de um EXEC: o AGI tira um nível de barra invertida (\X → X) e a
+ * aplicação separa os argumentos nas vírgulas que não estão escapadas.
+ */
+function argumentosDaApp(entreAspas) {
+  let agi = '';
+  for (let i = 0; i < entreAspas.length; i++) agi += entreAspas[i] === '\\' && i + 1 < entreAspas.length ? entreAspas[++i] : entreAspas[i];
+  const args = [''];
+  for (let i = 0; i < agi.length; i++) {
+    if (agi[i] === '\\' && i + 1 < agi.length) args[args.length - 1] += agi[++i];
+    else if (agi[i] === ',') args.push('');
+    else args[args.length - 1] += agi[i];
+  }
+  return args;
+}
 
 /**
  * Asterisk de mentira. `falas`: o que acontece em cada RECORD FILE —
@@ -40,11 +56,18 @@ function asterisk(falas, { desligarNoRecord = Infinity, teclas = [], canal = {} 
       const sv = cmd.match(/^SET VARIABLE (\w+) "(.*)"$/);
       if (sv) variaveis[sv[1]] = sv[2];
       const ex = cmd.match(/^EXEC \w+ "(.*)"$/);
-      if (ex) faladas.push(ex[1]);
+      // O que a aplicação de TTS recebe de verdade: se a vírgula separou argumentos, vem uma lista.
+      if (ex) { const args = argumentosDaApp(ex[1]); faladas.push(args.length === 1 ? args[0] : args); }
       const rec = cmd.match(/^RECORD FILE (\S+) wav/);
       if (rec) {
         gravacoes++;
-        if (gravacoes > desligarNoRecord) { deAsterisk.write('200 result=-1\n'); continue; }
+        if (gravacoes > desligarNoRecord) {
+          // Como o Asterisk: o que já foi gravado fica no arquivo, e a resposta avisa o desligamento.
+          fs.writeFileSync(`${rec[1]}.wav`, WAV_FALA);
+          gravados.push(`${rec[1]}.wav`);
+          deAsterisk.write('200 result=-1 (hangup) endpos=4000\n');
+          continue;
+        }
         const f = falas.shift() ?? 'silencio';
         const arquivo = `${rec[1]}.wav`;
         gravados.push(arquivo);
@@ -211,6 +234,68 @@ test('desligou no meio: avisa o cérebro e para', async (t) => {
   const status = await conversar(a.agi, criarApiCerebro(zoe.url, 'k'), ENV, { tts: 'Flite', gravacoes: pasta });
   assert.equal(status, 'desligou');
   assert.match(zoe.pedidos.at(-1).url, /\/fim$/, 'a ligação é encerrada no histórico do cliente');
+  assert.equal(a.gravados.length, 2);
+  for (const f of a.gravados) assert.equal(fs.existsSync(f), false, `a fala gravada não fica no disco (${path.basename(f)})`);
+});
+
+test('fim: no modo por teclas o "h" também encerra o atendimento da ZOE no PABX', async () => {
+  const a = asterisk([]);
+  const pedidos = [];
+  const teclas = { post: async (uid, etapa) => { pedidos.push([uid, etapa]); return {}; } };
+  await fimDaLigacao(a.agi, { agi_uniqueid: '1700000100.1' }, null, teclas);
+  assert.deepEqual(pedidos, [['1700000100.1', 'fim']]);
+  // Fora do ar ou já encerrado: o "h" não pode quebrar.
+  assert.equal(await fimDaLigacao(a.agi, { agi_uniqueid: 'x' }, null, { post: async () => { throw new Error('404'); } }), 'encerrado');
+});
+
+test('texto para o TTS: vírgula não vira argumento da aplicação e nada é avaliado', () => {
+  assert.deepEqual(argumentosDaApp(textoApp('Obrigada, Maria. Para segunda via, tecle 1.').slice(1, -1)), ['Obrigada, Maria. Para segunda via, tecle 1.']);
+  const t = textoApp('a "b" | c ${SHELL(rm)} $[1+1]\nEXEC System x');
+  assert.doesNotMatch(t, /\n|\$\{|\$\[|\|/);
+  assert.equal(t.split('"').length, 3, 'só as aspas de fora');
+  assert.equal(nomeFila('Suporte, N1 (noite)'), 'Suporte_ N1 _noite_');
+  assert.equal(nomeFila('Financeiro'), 'Financeiro');
+  assert.equal(nomeFila(undefined), '');
+});
+
+test('SIGHUP do Asterisk ao desligar não mata o script: o fim chega à API', async (t) => {
+  const { spawn } = require('node:child_process');
+  const pedidos = [];
+  const pabx = http.createServer((req, res) => {
+    let c = '';
+    req.on('data', (x) => { c += x; });
+    req.on('end', () => {
+      pedidos.push(req.url);
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(req.url.endsWith('/atendimentos') ? { uid: 'u', etapa: 'documento', fala: 'Digite o CPF.' } : { ok: true }));
+    });
+  });
+  await new Promise((r) => pabx.listen(0, '127.0.0.1', r));
+  t.after(() => new Promise((r) => pabx.close(r)));
+  const filho = spawn(process.execPath, [path.join(__dirname, '..', 'scripts', 'zoe-agi.js')], {
+    env: { ...process.env, ZOE_API: `http://127.0.0.1:${pabx.address().port}/api/integracao`, ZOE_CHAVE: 'pbx_x', ZOE_CEREBRO: '', ZOE_TTS_APP: '' },
+    stdio: ['pipe', 'pipe', 'inherit'],
+  });
+  const saiu = new Promise((r) => filho.on('exit', (code, sinal) => r({ code, sinal })));
+  let buffer = '';
+  filho.stdout.setEncoding('utf8');
+  filho.stdout.on('data', (p) => {
+    buffer += p;
+    let i;
+    while ((i = buffer.indexOf('\n')) >= 0) {
+      const cmd = buffer.slice(0, i);
+      buffer = buffer.slice(i + 1);
+      if (cmd.startsWith('GET DATA')) {
+        // O cliente desliga enquanto digita: o Asterisk manda SIGHUP e depois responde -1.
+        filho.kill('SIGHUP');
+        setTimeout(() => filho.stdin.write('200 result=-1\n'), 100);
+      } else filho.stdin.write('200 result=0\n');
+    }
+  });
+  filho.stdin.write('agi_uniqueid: 1700000200.1\nagi_callerid: 11988887777\n\n');
+  const fim = await saiu;
+  assert.deepEqual(fim, { code: 0, sinal: null }, 'o script termina sozinho, não morto pelo sinal');
+  assert.ok(pedidos.some((u) => /1700000200\.1\/fim$/.test(u)), 'o atendimento da ZOE é encerrado no PABX');
 });
 
 test('cérebro fora do ar no início: a mesma ligação segue pela URA de teclas', async (t) => {

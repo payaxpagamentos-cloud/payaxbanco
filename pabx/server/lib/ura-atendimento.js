@@ -39,7 +39,7 @@ async function alertasDoCliente(cfg, { documento = null, clienteId = null }, { b
  * `ixc` é o cliente já pronto (ou null quando a integração está desligada). Sem IXC, a URA
  * inteligente se comporta como a clássica, em vez de deixar a ligação no vazio.
  */
-async function atender(db, empresa, ura, { telefone = null, cfg = null, ixc = null, hoje = undefined } = {}) {
+async function atender(db, empresa, ura, { telefone = null, cfg = null, ixc = null, hoje = undefined, uid = null } = {}) {
   if (ura.tipo !== 'inteligente' || !ixc) {
     return { ...uraLib.abertura(ura, { identificado: false, situacoes: [] }), ura: { id: ura.id, nome: ura.nome }, identificado: false };
   }
@@ -53,9 +53,14 @@ async function atender(db, empresa, ura, { telefone = null, cfg = null, ixc = nu
     cliente = null;
   }
 
-  if (!cliente) {
+  // Sem o uid da ligação não há como amarrar a confirmação a este cliente: segue como desconhecido.
+  if (!cliente || !uid) {
     return { ...uraLib.abertura(ura, { identificado: false, situacoes: [] }), ura: { id: ura.id, nome: ura.nome }, identificado: false };
   }
+
+  // O cliente fica amarrado à ligação. Repetir o /atender não troca o cliente nem zera as tentativas.
+  db.prepare(`INSERT INTO ura_ligacoes (empresa_id, uid, ura_id, cliente_id, criada_em) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT (empresa_id, uid) DO NOTHING`).run(empresa.id, String(uid), ura.id, String(cliente.id), new Date().toISOString());
 
   const dados = await lerSituacao(cliente, { cfg, ixc });
   const situacoes = uraLib.detectar(dados, hoje ? { hoje } : {});
@@ -96,4 +101,47 @@ async function aposConfirmar(db, empresa, ura, { clienteId, cfg = null, ixc = nu
   };
 }
 
-module.exports = { atender, aposConfirmar, alertasDoCliente, lerSituacao };
+const MAX_TENTATIVAS = 3;
+
+/**
+ * A central manda o que o cliente digitou (três primeiros do CPF/CNPJ) e o uid da ligação. Quem
+ * confere é o servidor, contra o cadastro do IXC do cliente que o /atender reconheceu nesta mesma
+ * ligação — a central não escolhe o cliente nem sabe o CPF. Três erros: vai para o atendente.
+ * Só depois de conferido a resposta traz nome, situação e a oferta (aposConfirmar).
+ */
+async function confirmar(db, empresa, ura, { uid, codigo, cfg = null, ixc = null, hoje = undefined } = {}) {
+  const { codigoConfere } = require('../zoe/core');
+  const lig = db.prepare('SELECT * FROM ura_ligacoes WHERE empresa_id = ? AND uid = ?').get(empresa.id, String(uid));
+  if (!lig) throw new ErroNegocio('Esta ligação não foi reconhecida pela URA: não há identidade a confirmar.', 409);
+  const paraAtendente = (fala) => ({
+    confirmado: false, fase: 'fila', fala, ura: { id: ura.id, nome: ura.nome },
+    opcoes: [{ digito: ura.tecla_atendente, rotulo: 'Falar com um atendente', acao: 'fila', destino_id: ura.fila_padrao_id }],
+    destino_id: ura.fila_padrao_id,
+  });
+  if (!lig.confirmada_em) {
+    // Reserva a tentativa antes de consultar o IXC: duas requisições ao mesmo tempo não ganham tentativas a mais.
+    const reservou = db.prepare('UPDATE ura_ligacoes SET tentativas = tentativas + 1 WHERE id = ? AND confirmada_em IS NULL AND tentativas < ?')
+      .run(lig.id, MAX_TENTATIVAS).changes;
+    if (!reservou) return paraAtendente('Não consegui confirmar seus dados. Vou transferir para um atendente.');
+    if (!ixc) return paraAtendente('Não consigo confirmar seus dados agora. Vou transferir para um atendente.');
+    let cliente;
+    try {
+      cliente = await ixc.clientePorId(lig.cliente_id);
+    } catch {
+      return paraAtendente('Estou com dificuldade para consultar seu cadastro agora. Vou transferir para um atendente.');
+    }
+    if (!codigoConfere(cliente, 'cpf3', codigo)) {
+      const restantes = MAX_TENTATIVAS - lig.tentativas - 1;
+      if (restantes <= 0) return paraAtendente('Não consegui confirmar seus dados. Vou transferir para um atendente.');
+      return {
+        confirmado: false, fase: 'confirmar', ura: { id: ura.id, nome: ura.nome }, tentativas_restantes: restantes,
+        fala: 'Os números não conferem. Digite de novo os três primeiros números do CPF ou CNPJ do titular.',
+        opcoes: [{ digito: ura.tecla_atendente, rotulo: 'Falar com um atendente', acao: 'fila', destino_id: ura.fila_padrao_id }],
+      };
+    }
+    db.prepare('UPDATE ura_ligacoes SET confirmada_em = ? WHERE id = ?').run(new Date().toISOString(), lig.id);
+  }
+  return { confirmado: true, ...await aposConfirmar(db, empresa, ura, { clienteId: lig.cliente_id, cfg, ixc, hoje }) };
+}
+
+module.exports = { atender, aposConfirmar, confirmar, alertasDoCliente, lerSituacao, MAX_TENTATIVAS };

@@ -40,7 +40,7 @@ test('ZOE', async (t) => {
   const base = `/empresas/${empresa}/zoe`;
   const filaFin = (await api.post(`/empresas/${empresa}/filas`, { nome: 'Financeiro' }, gestor)).dados.id;
   const filaSup = (await api.post(`/empresas/${empresa}/filas`, { nome: 'Suporte' }, gestor)).dados.id;
-  const chave = (await api.post(`/empresas/${empresa}/chaves`, { nome: 'Asterisk' }, gestor)).dados.chave;
+  const chave = (await api.post(`/empresas/${empresa}/chaves`, { nome: 'Asterisk' }, master)).dados.chave;
   const central = api.central(chave);
   const zoe = (uid, etapa, corpo) => central.post(`/zoe/atendimentos/${uid}/${etapa}`, corpo);
 
@@ -194,5 +194,47 @@ test('ZOE', async (t) => {
     assert.equal((await api.put(base, { ativo: false }, sup)).status, 403);
     const outra = (await api.post('/master/empresas', { nome: 'Outra' }, master)).dados.id;
     assert.equal((await api.get(`/empresas/${outra}/zoe/atendimentos/${c1.id}`, master)).status, 404);
+  });
+
+  await t.test('alertas de rede: endereço e chave do ZOE Atende ficam salvos, a chave cifrada e fora do painel', async () => {
+    const r = await api.put(base, { alertas_url: 'https://zoe.exemplo/atendimento/', alertas_chave: 'atd_chave-secreta-de-alertas' }, gestor);
+    assert.equal(r.status, 200);
+    assert.equal(r.dados.alertas_url, 'https://zoe.exemplo/atendimento');
+    assert.equal(r.dados.alertas_chave_configurada, true);
+    assert.ok(!('alertas_chave_cifrada' in r.dados), 'nem a chave cifrada vai para o painel');
+    assert.ok(!JSON.stringify((await api.get(base, gestor)).dados).includes('chave-secreta'));
+    const guardada = api.db.prepare('SELECT alertas_chave_cifrada FROM zoe_config WHERE empresa_id = ?').get(empresa).alertas_chave_cifrada;
+    assert.ok(guardada && !guardada.includes('secreta'), 'cifrada no banco');
+    // Quem chama o ZOE Atende recebe a chave decifrada.
+    const cfg = require('../server/zoe/core').configComSegredos(api.db, empresa);
+    assert.equal(cfg.alertas_chave, 'atd_chave-secreta-de-alertas');
+    // Salvar outra coisa (chave em branco) não apaga a chave guardada.
+    assert.equal((await api.put(base, { desbloqueio_limite: 1 }, gestor)).dados.alertas_chave_configurada, true);
+    assert.equal((await api.put(base, { alertas_url: 'ftp://x' }, gestor)).status, 422);
+  });
+
+  await t.test('URA inteligente: a central não escolhe o cliente — o servidor confere os três dígitos da ligação', async () => {
+    const filaUra = (await api.post(`/empresas/${empresa}/filas`, { nome: 'Atendimento' }, gestor)).dados.id;
+    const ura = (await api.post(`/empresas/${empresa}/uras`, { nome: 'Inteligente', mensagem: 'Digite 1 para suporte.', opcoes: [{ digito: '1', destino_tipo: 'fila', destino_id: filaUra }] }, gestor)).dados.id;
+    assert.equal((await api.put(`/empresas/${empresa}/uras/${ura}/inteligencia`, { tipo: 'inteligente', fila_padrao_id: filaUra }, gestor)).status, 200);
+    const a = await central.post(`/ura/${ura}/atender`, { uid: 'ura-1', telefone: '11987654321' });
+    assert.equal(a.status, 200);
+    assert.equal(a.dados.identificado, true);
+    assert.equal(a.dados.fase, 'confirmar');
+    assert.doesNotMatch(JSON.stringify(a.dados), /MARIA|Maria/);
+    // O jeito antigo (cliente_id sem código) não entrega mais nada.
+    assert.equal((await central.post(`/ura/${ura}/confirmado`, { cliente_id: '10' })).status, 422);
+    assert.equal((await central.post(`/ura/${ura}/confirmado`, { uid: 'outra-ligacao', codigo: '529' })).status, 409);
+    const errado = await central.post(`/ura/${ura}/confirmado`, { uid: 'ura-1', codigo: '111' });
+    assert.equal(errado.status, 200);
+    assert.equal(errado.dados.confirmado, false);
+    assert.doesNotMatch(JSON.stringify(errado.dados), /Maria|suspenso/i);
+    const certo = await central.post(`/ura/${ura}/confirmado`, { uid: 'ura-1', codigo: '529' });
+    assert.equal(certo.dados.confirmado, true);
+    assert.match(certo.dados.fala, /^Oi, Maria!/i);
+    // Outra empresa não usa a ligação desta.
+    const outraEmp = (await api.post('/master/empresas', { nome: 'Terceira' }, master)).dados.id;
+    const outraChave = (await api.post(`/empresas/${outraEmp}/chaves`, { nome: 'X' }, master)).dados.chave;
+    assert.equal((await api.central(outraChave).post(`/ura/${ura}/confirmado`, { uid: 'ura-1', codigo: '529' })).status, 404);
   });
 });

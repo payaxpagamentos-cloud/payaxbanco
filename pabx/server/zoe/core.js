@@ -63,18 +63,20 @@ const enderecoIxc = (valor) => endereco(valor, 'o endereço do IXC').replace(/\/
 const PADRAO = {
   ativo: 0, ixc_url: null, ixc_token_cifrado: null, desbloqueio_ativo: 1, desbloqueio_limite: 1, desbloqueio_periodo_dias: 30,
   canal_email: 1, canal_sms: 1, canal_whatsapp: 0, whatsapp_webhook: null, fila_financeiro_id: null, fila_suporte_id: null, fila_comercial_id: null,
+  alertas_url: null, alertas_chave_cifrada: null,
 };
 const lerConfigZoe = (db, empresaId) => ({ ...PADRAO, ...(db.prepare('SELECT * FROM zoe_config WHERE empresa_id = ?').get(empresaId) ?? {}), empresa_id: empresaId });
 
 /** Configuração para o painel (sem o token). */
 function configPublica(db, empresaId) {
   const c = lerConfigZoe(db, empresaId);
-  const { ixc_token_cifrado: tk, ...resto } = c;
+  const { ixc_token_cifrado: tk, alertas_chave_cifrada: ak, ...resto } = c;
   return {
     ...resto,
     ativo: Boolean(c.ativo), desbloqueio_ativo: Boolean(c.desbloqueio_ativo),
     canal_email: Boolean(c.canal_email), canal_sms: Boolean(c.canal_sms), canal_whatsapp: Boolean(c.canal_whatsapp),
     token_configurado: Boolean(tk && decifrar(tk)),
+    alertas_chave_configurada: Boolean(ak && decifrar(ak)),
   };
 }
 
@@ -103,6 +105,11 @@ function salvarConfig(db, empresaId, d) {
     fila_financeiro_id: fila('fila_financeiro_id'),
     fila_suporte_id: fila('fila_suporte_id'),
     fila_comercial_id: fila('fila_comercial_id'),
+    // Alertas de rede lidos do ZOE Atende (endereço + chave de API de lá, cifrada como o token do IXC).
+    // Chave vazia não apaga a guardada (o painel não a mostra de volta); null apaga.
+    alertas_url: d.alertas_url !== undefined ? (d.alertas_url ? endereco(d.alertas_url, 'o endereço do ZOE Atende') : null) : a.alertas_url,
+    alertas_chave_cifrada: d.alertas_chave === null ? null
+      : d.alertas_chave ? cifrar(v.texto(d.alertas_chave, 'a chave do ZOE Atende', 300)) : a.alertas_chave_cifrada,
   };
   v.exigir(!n.canal_whatsapp || n.whatsapp_webhook, 'Para enviar boleto por WhatsApp, informe o endereço do envio (webhook do seu WhatsApp).');
   v.exigir(!n.ativo || (n.ixc_url && n.ixc_token_cifrado), 'Para ligar a ZOE, informe o endereço e o token do IXC.');
@@ -310,6 +317,18 @@ function nascimento(c) {
   return `${m[3]}${m[2]}${m[1]}`;
 }
 
+/**
+ * O código digitado confere com o cadastro do IXC? `cpf3`: três primeiros do CPF/CNPJ;
+ * `nascimento`: DDMMAAAA. Comparação em tempo constante. Usado pela ZOE e pela URA inteligente.
+ */
+function codigoConfere(cliente, metodo, codigoDigitado) {
+  if (!cliente) return false;
+  const codigo = v.digitos(codigoDigitado);
+  const esperado = metodo === 'cpf3' ? v.digitos(cliente.cnpj_cpf).slice(0, 3) : metodo === 'nascimento' ? nascimento(cliente) : null;
+  return Boolean(esperado && esperado.length && codigo.length === esperado.length
+    && crypto.timingSafeEqual(Buffer.from(codigo), Buffer.from(esperado)));
+}
+
 async function confirmar(db, empresa, uid, d) {
   const cfg = configAtiva(db, empresa);
   const at = carregar(db, empresa, uid);
@@ -317,10 +336,7 @@ async function confirmar(db, empresa, uid, d) {
   const x = await comIxc(db, at, cfg, (ixc) => ixc.clientePorId(at.cliente_id));
   if (!x.ok) return x.resposta;
   const c = x.valor;
-  const codigo = v.digitos(d.codigo);
-  const esperado = c ? (at.metodo_confirmacao === 'cpf3' ? v.digitos(c.cnpj_cpf).slice(0, 3) : nascimento(c)) : null;
-  const ok = Boolean(esperado && codigo.length === esperado.length
-    && crypto.timingSafeEqual(Buffer.from(codigo), Buffer.from(esperado)));
+  const ok = codigoConfere(c, at.metodo_confirmacao, d.codigo);
   acao(db, at, 'confirmacao', { metodo: at.metodo_confirmacao }, ok);
   if (ok) {
     atualizar(db, at, { etapa: 'menu', cliente_nome: String(c.razao ?? c.fantasia ?? '').trim().slice(0, 160) || null, tentativas: 0 });
@@ -490,5 +506,5 @@ const ixcOuNulo = (cfg, uid) => { try { return ixcDa(cfg, uid); } catch { return
 module.exports = {
   lerConfigZoe, configComSegredos, ixcDa, ixcOuNulo, configPublica, salvarConfig, testarIxc,
   iniciar, informarDocumento, confirmar, faturas, enviarBoleto, desbloquear, transferir, encerrar,
-  falarValor, falarData, MOTIVOS,
+  falarValor, falarData, MOTIVOS, codigoConfere, MAX_TENTATIVAS_CONFIRMACAO,
 };

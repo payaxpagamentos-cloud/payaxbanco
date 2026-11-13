@@ -383,10 +383,13 @@ module.exports = (db) => {
     const lista = d.opcoes ?? (atual ? JSON.parse(atual.opcoes) : []);
     v.exigir(Array.isArray(lista) && lista.length <= 12, 'Opções inválidas (até 12).');
     const vistos = new Set();
+    // A tecla do atendente entra em todo menu da URA: uma opção na mesma tecla ficaria ambígua.
+    const teclaAtendente = atual?.tecla_atendente ?? '0';
     const opcoes = lista.map((o) => {
       const digito = String(o?.digito ?? '');
       v.exigir(/^[0-9*#]$/.test(digito), 'Cada opção usa uma tecla: 0 a 9, * ou #.');
       v.exigir(!vistos.has(digito), `A tecla ${digito} está repetida.`);
+      v.exigir(digito !== teclaAtendente, `A tecla ${digito} é a do atendente nesta URA: escolha outra para a opção.`);
       vistos.add(digito);
       v.exigir(!(o.destino_tipo === 'ura' && atual && Number(o.destino_id) === atual.id), 'A URA não pode apontar para ela mesma.');
       return { digito, destino_tipo: o.destino_tipo, destino_id: destino(eid(req), o.destino_tipo, o.destino_id) };
@@ -505,7 +508,12 @@ module.exports = (db) => {
   // ---------- Integrações (chaves da API) ----------
   r.get('/chaves', administra, (req, res) => res.json(db.prepare(`SELECT k.id, k.nome, k.prefixo, k.criada_em, k.ultimo_uso, k.revogada_em, u.nome AS criada_por
     FROM chaves_api k LEFT JOIN usuarios u ON u.id = k.criada_por WHERE k.empresa_id = ? ORDER BY k.id DESC`).all(eid(req))));
-  r.post('/chaves', administra, (req, res) => {
+  /**
+   * A chave é da central telefônica: com ela se informa o início e o fim das chamadas (a base da
+   * tarifação) e se lê a configuração da empresa. Por isso só a equipe da plataforma cria; o
+   * administrador da empresa vê e revoga.
+   */
+  r.post('/chaves', permitir('master', 'suporte'), (req, res) => {
     const k = criarChave(db, eid(req), req.body.nome, req.usuario.id);
     registrar(db, req, 'chave_criada', { id: k.id, prefixo: k.prefixo });
     res.status(201).json(k);

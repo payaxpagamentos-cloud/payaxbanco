@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
   ativo INTEGER NOT NULL DEFAULT 1,
   ultimo_acesso TEXT,
   criado_em TEXT NOT NULL,
+  -- Ramal que o usuário usa no telefone do painel.
+  ramal_id INTEGER REFERENCES ramais(id) ON DELETE SET NULL,
   CHECK ((perfil IN ('master','suporte')) = (empresa_id IS NULL))
 );
 
@@ -193,6 +195,10 @@ CREATE TABLE IF NOT EXISTS chamadas (
 CREATE INDEX IF NOT EXISTS idx_chamadas_empresa ON chamadas(empresa_id, inicio);
 CREATE INDEX IF NOT EXISTS idx_chamadas_inicio ON chamadas(inicio);
 CREATE INDEX IF NOT EXISTS idx_chamadas_em_curso ON chamadas(empresa_id) WHERE fim IS NULL;
+-- Histórico de um contato do CRM (origem ou destino = telefone) e a supervisão por ramal.
+CREATE INDEX IF NOT EXISTS idx_chamadas_origem ON chamadas(empresa_id, origem);
+CREATE INDEX IF NOT EXISTS idx_chamadas_destino ON chamadas(empresa_id, destino);
+CREATE INDEX IF NOT EXISTS idx_chamadas_ramal ON chamadas(ramal_id, inicio);
 
 -- Uso de texto para voz (TTS) e voz para texto (STT), informado pela central telefônica.
 CREATE TABLE IF NOT EXISTS uso_recursos (
@@ -298,6 +304,21 @@ CREATE TABLE IF NOT EXISTS zoe_acoes (
 );
 CREATE INDEX IF NOT EXISTS idx_zoe_acoes ON zoe_acoes(atendimento_id);
 CREATE INDEX IF NOT EXISTS idx_zoe_acoes_cliente ON zoe_acoes(empresa_id, cliente_id, tipo, criado_em);
+
+-- Ligação que passou por uma URA inteligente e foi reconhecida pelo número: o cliente do IXC fica
+-- amarrado ao uid da central. A identidade só vale depois que o servidor confere o código digitado
+-- (três primeiros do CPF/CNPJ) — a central nunca diz de quem é a ligação.
+CREATE TABLE IF NOT EXISTS ura_ligacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  uid TEXT NOT NULL,
+  ura_id INTEGER NOT NULL REFERENCES uras(id) ON DELETE CASCADE,
+  cliente_id TEXT NOT NULL,
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  confirmada_em TEXT,
+  criada_em TEXT NOT NULL,
+  UNIQUE (empresa_id, uid)
+);
 `;
 
 const CONFIG_PADRAO = {
@@ -320,16 +341,60 @@ const CONFIG_PADRAO = {
 
 const agora = () => new Date().toISOString();
 
+/**
+ * Banco criado por uma versão anterior: o CREATE TABLE IF NOT EXISTS não mexe em tabela que já
+ * existe, então cada coluna que o SCHEMA tem e a tabela ainda não tem é acrescentada aqui
+ * (ALTER TABLE ADD COLUMN). Tabela que não existe fica para o SCHEMA criar. Devolve o que acrescentou.
+ */
+function atualizarEsquema(db) {
+  const existentes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all().map((t) => t.name);
+  if (!existentes.length) return [];
+  const modelo = new DatabaseSync(':memory:');
+  modelo.exec(SCHEMA);
+  const criadas = [];
+  for (const { name: tabela, sql } of modelo.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all()) {
+    if (!existentes.includes(tabela)) continue;
+    const tem = new Set(db.prepare(`PRAGMA table_info("${tabela}")`).all().map((c) => c.name));
+    for (const definicao of colunasDoCreate(sql)) {
+      const nome = definicao.match(/^"?(\w+)"?/)[1];
+      if (tem.has(nome)) continue;
+      db.exec(`ALTER TABLE "${tabela}" ADD COLUMN ${definicao}`);
+      criadas.push(`${tabela}.${nome}`);
+    }
+  }
+  modelo.close();
+  return criadas;
+}
+
+/** As definições de coluna de um CREATE TABLE (sem comentários e sem as restrições da tabela). */
+function colunasDoCreate(sql) {
+  const limpo = sql.replace(/--[^\n]*/g, '');
+  const corpo = limpo.slice(limpo.indexOf('(') + 1);
+  const itens = [];
+  let nivel = 0;
+  let atual = '';
+  let aspas = null;
+  for (const ch of corpo) {
+    if (aspas) { atual += ch; if (ch === aspas) aspas = null; continue; }
+    if (ch === "'" || ch === '"') { aspas = ch; atual += ch; continue; }
+    if (ch === '(') nivel++;
+    if (ch === ')') { if (nivel === 0) break; nivel--; }
+    if (ch === ',' && nivel === 0) { itens.push(atual); atual = ''; continue; }
+    atual += ch;
+  }
+  itens.push(atual);
+  return itens.map((i) => i.replace(/\s+/g, ' ').trim()).filter(Boolean)
+    .filter((i) => !/^(CONSTRAINT|CHECK|PRIMARY|UNIQUE|FOREIGN)\b/i.test(i));
+}
+
 function abrir(arquivo = config.dbFile) {
   if (arquivo !== ':memory:') fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   const db = new DatabaseSync(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
+  // Banco de uma versão anterior ganha as colunas novas antes do SCHEMA (os índices novos dependem delas).
+  const novas = atualizarEsquema(db);
+  if (novas.length && process.env.NODE_ENV !== 'test') console.log(`[ZOE PABX] Banco atualizado: ${novas.length} coluna(s) nova(s) (${novas.join(', ')}).`);
   db.exec(SCHEMA);
-
-  // Migração: ramal usado pelo usuário no telefone do painel.
-  if (!db.prepare('PRAGMA table_info(usuarios)').all().some((c) => c.name === 'ramal_id')) {
-    db.exec('ALTER TABLE usuarios ADD COLUMN ramal_id INTEGER REFERENCES ramais(id) ON DELETE SET NULL');
-  }
 
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);
@@ -367,4 +432,4 @@ function lerConfig(db) {
   return Object.fromEntries(Object.keys(CONFIG_PADRAO).map((k) => [k, k === 'nome_plataforma' ? c[k] : Number(c[k])]));
 }
 
-module.exports = { abrir, transacao, lerConfig, agora, CONFIG_PADRAO };
+module.exports = { abrir, transacao, lerConfig, agora, CONFIG_PADRAO, atualizarEsquema };

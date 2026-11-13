@@ -262,6 +262,10 @@ function salvarInteligencia(db, empresaId, id, dados = {}) {
   }
   const tecla = d.tecla_atendente === undefined ? u.tecla_atendente : String(d.tecla_atendente).trim();
   v.exigir(/^[0-9*#]$/.test(tecla), 'A tecla do atendente tem de ser um dígito, * ou #.');
+  // A tecla do atendente entra em todo menu: não pode coincidir com uma opção da URA nem, na
+  // inteligente, com o 1 e o 2 que a oferta e o aviso usam.
+  v.exigir(!(u.opcoes ?? []).some((o) => String(o.digito) === tecla), `A tecla ${tecla} já é uma opção do menu desta URA.`);
+  if (tipo === 'inteligente') v.exigir(!['1', '2'].includes(tecla), 'Na URA inteligente, o 1 e o 2 são da oferta: escolha outra tecla para o atendente.');
   // Sem fila de escape, uma URA inteligente pode deixar o cliente sem saída quando o IXC cair.
   if (tipo === 'inteligente') v.exigir(filaId, 'Escolha a fila que recebe quem pede atendente: a URA não pode prender ninguém.');
 

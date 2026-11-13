@@ -421,6 +421,8 @@ async function telaIntegracoes(ctx) {
     listar: () => api.get(`${base(ctx)}/chaves`),
     criar: (d) => api.post(`${base(ctx)}/chaves`, d),
     revogar: (id) => api.del(`${base(ctx)}/chaves/${id}`),
+    // Criar chave é da equipe da plataforma (a chave informa as chamadas que viram cobrança); a empresa vê e revoga.
+    podeCriar: ctx.master, podeRevogar: true,
   });
 }
 
@@ -522,6 +524,12 @@ async function telaZoe(ctx) {
         escolha('Financeiro', 'fila_financeiro_id', filas, c.fila_financeiro_id ?? '', { disabled: dis }),
         escolha('Suporte técnico', 'fila_suporte_id', filas, c.fila_suporte_id ?? '', { disabled: dis }),
         escolha('Comercial', 'fila_comercial_id', filas, c.fila_comercial_id ?? '', { disabled: dis })),
+      el('h3', { style: 'margin:8px 0 0' }, 'Alertas de rede (ZOE Atende)'),
+      el('div', { class: 'duas' },
+        campo('Endereço do ZOE Atende', { name: 'alertas_url', type: 'url', placeholder: 'https://seudominio.com.br/atendimento', value: c.alertas_url ?? '', disabled: dis }),
+        campo(c.alertas_chave_configurada ? 'Chave de API (configurada — deixe em branco para manter)' : 'Chave de API do ZOE Atende',
+          { name: 'alertas_chave', type: 'password', autocomplete: 'off', placeholder: c.alertas_chave_configurada ? '••••••••' : 'atd_…', disabled: dis })),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'A URA inteligente avisa da falha na região cadastrada no ZOE Atende (Integrações → Nova chave). A chave fica cifrada e não aparece de novo.'),
       admin ? el('div', { class: 'linha', style: 'gap:10px;flex-wrap:wrap' },
         el('button', { class: 'btn primario largo' }, 'Salvar'),
         botao('Testar conexão com o IXC', '', async () => {
@@ -556,6 +564,7 @@ function lerZoe(f) {
   const d = Object.fromEntries(new FormData(f));
   for (const k of ['ativo', 'desbloqueio_ativo', 'canal_email', 'canal_sms', 'canal_whatsapp']) d[k] = f.querySelector(`[name=${k}]`).checked;
   if (!d.ixc_token) delete d.ixc_token;
+  if (!d.alertas_chave) delete d.alertas_chave;
   return d;
 }
 

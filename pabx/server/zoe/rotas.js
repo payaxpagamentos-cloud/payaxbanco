@@ -54,7 +54,10 @@ function rotasPainel(db) {
 
   r.put('/', administra, (req, res) => {
     zoe.salvarConfig(db, req.empresa.id, req.body);
-    registrar(db, req, 'zoe_configuracao', { campos: Object.keys(req.body).filter((k) => k !== 'ixc_token'), token_alterado: Boolean(req.body.ixc_token) });
+    registrar(db, req, 'zoe_configuracao', {
+      campos: Object.keys(req.body).filter((k) => k !== 'ixc_token' && k !== 'alertas_chave'),
+      token_alterado: Boolean(req.body.ixc_token), chave_alertas_alterada: req.body.alertas_chave !== undefined,
+    });
     res.json(zoe.configPublica(db, req.empresa.id));
   });
 

@@ -161,17 +161,59 @@ describe('a URA no ar, com o IXC respondendo', () => {
     logins: async () => dados.logins ?? [],
   });
   const atend = require('../server/lib/ura-atendimento');
+  // Banco de verdade para a amarração ligação ↔ cliente (empresa 1, URA 1).
+  process.env.NODE_ENV = 'test';
+  const db = require('../server/db').abrir(':memory:');
+  db.prepare("INSERT INTO empresas (id, nome, criada_em) VALUES (1, 'Provedor', 'x')").run();
+  db.prepare("INSERT INTO uras (id, empresa_id, nome, mensagem, tipo, criada_em) VALUES (1, 1, 'Principal', 'Oi', 'inteligente', 'x')").run();
+  const ANA = { id: '900', razao: 'Ana Souza', cnpj_cpf: '529.982.247-25' };
 
   test('número reconhecido com contrato bloqueado: pede confirmação sem entregar nada', async () => {
-    const r = await atend.atender(null, { id: 1 }, URA, {
-      telefone: '11988887777',
-      ixc: ixcFalso({ clientes: [{ id: '900', razao: 'Ana Souza' }], contratos: [{ id: '1', acesso: 'bloqueio_automatico' }] }),
+    const r = await atend.atender(db, { id: 1 }, URA, {
+      telefone: '11988887777', uid: 'u-1',
+      ixc: ixcFalso({ clientes: [ANA], contratos: [{ id: '1', acesso: 'bloqueio_automatico' }] }),
     });
     assert.equal(r.identificado, true);
     assert.equal(r.cliente_id, '900');
     assert.deepEqual(r.situacoes, ['bloqueado']);
     assert.equal(r.fase, 'confirmar');
     assert.doesNotMatch(r.fala, /suspenso|Ana/, 'nem o nome sai antes de confirmar');
+  });
+
+  test('sem o uid da ligação não há como confirmar depois: segue como desconhecido', async () => {
+    const r = await atend.atender(db, { id: 1 }, URA, { telefone: '11988887777', ixc: ixcFalso({ clientes: [ANA] }) });
+    assert.equal(r.identificado, false);
+    assert.equal(r.fase, 'menu');
+  });
+
+  test('a confirmação é conferida no servidor, contra o cliente amarrado ao uid', async () => {
+    const ixc = ixcFalso({ clientes: [ANA], contratos: [{ id: '1', acesso: 'bloqueio_automatico' }] });
+    await atend.atender(db, { id: 1 }, URA, { telefone: '11988887777', uid: 'u-2', ixc });
+    // Ligação que a URA não reconheceu: a central não pode inventar o cliente.
+    await assert.rejects(atend.confirmar(db, { id: 1 }, URA, { uid: 'nao-existe', codigo: '529', ixc }), /não foi reconhecida/);
+    const errado = await atend.confirmar(db, { id: 1 }, URA, { uid: 'u-2', codigo: '111', ixc });
+    assert.equal(errado.confirmado, false);
+    assert.equal(errado.fase, 'confirmar');
+    assert.equal(errado.tentativas_restantes, 2);
+    assert.doesNotMatch(JSON.stringify(errado), /Ana|suspenso/, 'código errado não entrega nada');
+    const certo = await atend.confirmar(db, { id: 1 }, URA, { uid: 'u-2', codigo: '529', ixc });
+    assert.equal(certo.confirmado, true);
+    assert.equal(certo.fase, 'oferta');
+    assert.match(certo.fala, /^Oi, Ana!/);
+  });
+
+  test('três códigos errados: vai para o atendente e não aceita mais tentativa', async () => {
+    const ixc = ixcFalso({ clientes: [ANA] });
+    await atend.atender(db, { id: 1 }, URA, { telefone: '11988887777', uid: 'u-3', ixc });
+    assert.equal((await atend.confirmar(db, { id: 1 }, URA, { uid: 'u-3', codigo: '000', ixc })).fase, 'confirmar');
+    assert.equal((await atend.confirmar(db, { id: 1 }, URA, { uid: 'u-3', codigo: '000', ixc })).fase, 'confirmar');
+    const terceiro = await atend.confirmar(db, { id: 1 }, URA, { uid: 'u-3', codigo: '000', ixc });
+    assert.equal(terceiro.fase, 'fila');
+    assert.equal(terceiro.destino_id, URA.fila_padrao_id);
+    // Nem o código certo vale depois do limite.
+    const depois = await atend.confirmar(db, { id: 1 }, URA, { uid: 'u-3', codigo: '529', ixc });
+    assert.equal(depois.confirmado, false);
+    assert.equal(depois.fase, 'fila');
   });
 
   test('depois de confirmar, abre com a oferta de desbloqueio e o primeiro nome', async () => {

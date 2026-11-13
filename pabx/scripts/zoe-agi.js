@@ -30,7 +30,7 @@
  *
  * Variáveis de ambiente do modo por teclas (ou argumentos do AGI: AGI(zoe-agi.js,URL,CHAVE)):
  *   ZOE_API      https://SEU-DOMINIO/pabx/api/integracao
- *   ZOE_CHAVE    chave da empresa (Integrações → Nova chave)
+ *   ZOE_CHAVE    chave da empresa (criada pela equipe da plataforma em Integrações → Nova chave)
  *   ZOE_TTS_APP  aplicação de texto para voz do Asterisk (ex.: Flite). Vazio: toca os áudios gravados em sounds/zoe/.
  *
  * Exemplo (extensions.conf):
@@ -40,7 +40,10 @@
  *    same => n,GotoIf($["${ZOE_STATUS}" = "transferir" | "${ZOE_STATUS}" = "indisponivel"]?fila)
  *    same => n,Hangup()
  *    same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
- *   ; O cliente desligou (na fila, com o atendente ou com a ZOE): fecha a conversa no ZOE Atende.
+ *   ; ZOE_FILA_NOME chega sem vírgula, | , parênteses, $ e aspas (trocados por _): a fila no
+ *   ; Asterisk deve ter o nome da fila do painel com essa troca. Nomes simples evitam surpresa.
+ *   ; O cliente desligou (na fila, com o atendente ou com a ZOE): fecha a conversa no ZOE Atende
+ *   ; e o atendimento da ZOE no PABX (modo por teclas; URL e chave como no atendimento).
  *   exten => h,1,AGI(/opt/zoe/zoe-agi.js,fim)
  *
  *   ; Roda no canal do RAMAL quando ele atende (8º parâmetro do Queue). Abre a passagem no painel
@@ -106,7 +109,26 @@ function criarAgi(entrada, saida) {
   };
 }
 
-const aspas = (t) => `"${String(t).replace(/["\\\n]/g, ' ')}"`;
+const aspas = (t) => `"${String(t).replace(/["\\\r\n]/g, ' ')}"`;
+
+/**
+ * Texto livre para EXEC <aplicação de TTS>. O Asterisk entrega o texto à aplicação, que separa
+ * os argumentos por vírgula: "Obrigada, Maria. Para segunda via…" falava só "Obrigada", e o resto
+ * virava opção da aplicação. A vírgula vai escapada (\\, no AGI vira \, para a aplicação, que lê
+ * como vírgula); o | (separador antigo) sai; ${ e $[ ficam inertes caso AGIEXECFULL esteja ligado.
+ * Pressupõe o res_agi sem o modo de compatibilidade 1.4 (o padrão desde o Asterisk 1.6).
+ */
+const textoApp = (t) => `"${String(t)
+  .replace(/["\\\r\n|]/g, ' ')
+  .replace(/\$(?=[{[])/g, '$ ')
+  .replace(/,/g, '\\\\,')}"`;
+
+/**
+ * Nome da fila para o plano de discagem: ele entra em Queue(${ZOE_FILA_NOME},…), e uma vírgula
+ * no nome deslocaria os argumentos do Queue (opções, gosub). Separadores e agrupadores viram "_";
+ * a fila no Asterisk deve ter o mesmo nome com essa troca (ou use ZOE_FILA_ID).
+ */
+const nomeFila = (t) => String(t ?? '').replace(/[,|()[\]{}$"'\\;&\r\n]/g, '_');
 
 function criarApiZoe(base, chave) {
   const raiz = `${String(base).replace(/\/+$/, '')}/zoe/atendimentos`;
@@ -138,7 +160,7 @@ async function atender(agi, api, env, o = {}) {
   const set = (nome, valor) => agi.comando(`SET VARIABLE ${nome} ${aspas(valor ?? '')}`);
 
   const falar = async (texto, audios) => {
-    if (o.tts) return agi.comando(`EXEC ${o.tts} ${aspas(texto)}`);
+    if (o.tts) return agi.comando(`EXEC ${o.tts} ${textoApp(texto)}`);
     for (const a of audios) {
       if (typeof a === 'number') await agi.comando(`SAY NUMBER ${a} ""`);
       else await agi.comando(`STREAM FILE zoe/${a} ""`);
@@ -185,7 +207,7 @@ async function atender(agi, api, env, o = {}) {
         await falar(r.fala, ['transferindo']);
         status = 'transferir';
         await set('ZOE_FILA_ID', r.fila?.id ?? '');
-        await set('ZOE_FILA_NOME', r.fila?.nome ?? '');
+        await set('ZOE_FILA_NOME', nomeFila(r.fila?.nome));
         await set('ZOE_RESUMO', r.resumo ?? '');
         break;
       }
@@ -280,7 +302,7 @@ async function conversar(agi, cerebro, env, o = {}) {
   const uid = env.agi_uniqueid;
   const telefone = /^\+?\d{8,}$/.test(env.agi_callerid ?? '') ? env.agi_callerid : '';
   const set = (nome, valor) => agi.comando(`SET VARIABLE ${nome} ${aspas(valor ?? '')}`);
-  const falar = (texto) => (texto ? agi.comando(`EXEC ${o.tts} ${aspas(texto)}`) : null);
+  const falar = (texto) => (texto ? agi.comando(`EXEC ${o.tts} ${textoApp(texto)}`) : null);
   const pasta = o.gravacoes || '/tmp/zoe-falas';
   try { fs.mkdirSync(pasta, { recursive: true }); } catch { /* o RECORD FILE avisa se não der */ }
 
@@ -290,9 +312,11 @@ async function conversar(agi, cerebro, env, o = {}) {
    */
   const ouvir = async (n) => {
     const base = path.join(pasta, `${String(uid).replace(/[^\w.-]/g, '_')}-${n}`);
-    const r = Number(await agi.comando(`RECORD FILE ${base} wav "${DIGITOS}" 20000 0 s=2`));
     const arquivo = `${base}.wav`;
+    // O RECORD fica dentro do try: se o cliente desliga no meio da gravação, o Asterisk já
+    // escreveu parte do WAV (com a voz, às vezes o CPF falado) e ele tem de sair do disco também.
     try {
+      const r = Number(await agi.comando(`RECORD FILE ${base} wav "${DIGITOS}" 20000 0 s=2`));
       if (r > 0) {
         const primeira = String.fromCharCode(r);
         const resto = await agi.comando('GET DATA silence/1 4000 13');
@@ -303,7 +327,8 @@ async function conversar(agi, cerebro, env, o = {}) {
       if (!buffer || buffer.length < 8000) return { texto: '' };
       return { audio_base64: buffer.toString('base64') };
     } finally {
-      fs.rm(arquivo, { force: true }, () => {});
+      // Síncrono: logo depois do desligamento o processo termina e um rm assíncrono não chegaria a rodar.
+      try { fs.rmSync(arquivo, { force: true }); } catch { /* sem permissão: não há o que fazer aqui */ }
     }
   };
 
@@ -317,7 +342,7 @@ async function conversar(agi, cerebro, env, o = {}) {
       if (r.acao === 'transferir') {
         status = 'transferir';
         await set('ZOE_FILA_ID', r.fila?.id ?? '');
-        await set('ZOE_FILA_NOME', r.fila?.nome ?? '');
+        await set('ZOE_FILA_NOME', nomeFila(r.fila?.nome));
         await set('ZOE_RESUMO', r.resumo ?? '');
         // Com dois sublinhados a variável passa para o canal do ramal que a fila chamar: é por ela
         // que o "atendeu" (gosub da fila) sabe de qual ligação se trata e o que sussurrar.
@@ -364,14 +389,19 @@ async function atendeu(agi, env, cerebro, { tts = '', sussurrar = true } = {}) {
   const ramal = ramalDoCanal(env.agi_channel);
   if (cerebro && ramal) await cerebro.atendida(uid, { ramal }).catch(() => {});
   const frase = sussurrar && tts ? await agi.variavel('ZOE_SUSSURRO').catch(() => '') : '';
-  if (frase) await agi.comando(`EXEC ${tts} ${aspas(frase)}`).catch(() => {});
+  if (frase) await agi.comando(`EXEC ${tts} ${textoApp(frase)}`).catch(() => {});
   return 'avisado';
 }
 
-/** Roda no "h" do plano de discagem: o cliente desligou, a conversa fecha no ZOE Atende. */
-async function fimDaLigacao(agi, env, cerebro) {
+/**
+ * Roda no "h" do plano de discagem: o cliente desligou. Fecha a conversa no ZOE Atende (modo
+ * conversado) e o atendimento da ZOE no PABX (modo por teclas, que é o uid do próprio canal).
+ * Repetir o fim não faz mal: os dois lados ignoram o que já está encerrado ou não existe.
+ */
+async function fimDaLigacao(agi, env, cerebro, teclas = null) {
   const uid = (await agi.variavel('ZOE_UID').catch(() => '')) || env.agi_uniqueid;
   if (cerebro && uid) await cerebro.fim(uid).catch(() => {});
+  if (teclas && env.agi_uniqueid) await teclas.post(env.agi_uniqueid, 'fim').catch(() => {});
   return 'encerrado';
 }
 
@@ -394,6 +424,10 @@ async function escolherModo(agi, env, { cerebro = null, teclas = null, tts = '',
 }
 
 async function principal() {
+  // Quando o cliente desliga, o Asterisk manda SIGHUP ao script (a menos que AGISIGHUP=no). O
+  // padrão do Node é morrer na hora — sem o "fim" para a API e sem apagar a fala gravada. O
+  // desligamento já chega pelo próprio AGI (511 / result=-1), que vira Desligou e passa pelos finally.
+  process.on('SIGHUP', () => {});
   const agi = criarAgi(process.stdin, process.stdout);
   const env = await agi.ambiente();
   const cerebroDe = () => (process.env.ZOE_CEREBRO && process.env.ZOE_CEREBRO_CHAVE
@@ -404,7 +438,10 @@ async function principal() {
     process.exit(0);
   }
   if (env.agi_arg_1 === 'fim') {
-    await fimDaLigacao(agi, env, cerebroDe()).catch(() => {});
+    // AGI(zoe-agi.js,fim[,URL,CHAVE]): a URL e a chave do modo por teclas, como no atendimento.
+    const baseFim = env.agi_arg_2 || process.env.ZOE_API;
+    const chaveFim = env.agi_arg_3 || process.env.ZOE_CHAVE;
+    await fimDaLigacao(agi, env, cerebroDe(), baseFim && chaveFim ? criarApiZoe(baseFim, chaveFim) : null).catch(() => {});
     process.exit(0);
   }
   const base = env.agi_arg_1 || process.env.ZOE_API;
@@ -418,4 +455,4 @@ async function principal() {
 
 if (require.main === module) principal();
 
-module.exports = { criarAgi, criarApiZoe, criarApiCerebro, atender, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal, Desligou };
+module.exports = { criarAgi, criarApiZoe, criarApiCerebro, atender, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal, textoApp, nomeFila, Desligou };

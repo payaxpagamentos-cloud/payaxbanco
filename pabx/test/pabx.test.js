@@ -94,8 +94,19 @@ test('PABX', async (t) => {
     const outraFila = (await api.post(`/empresas/${outra}/filas`, { nome: 'De outra' }, master)).dados.id;
     assert.equal((await api.post(`/empresas/${empresa}/uras`, { nome: 'Menu', mensagem: 'Olá', opcoes: [{ digito: '1', destino_tipo: 'fila', destino_id: outraFila }] }, cliente)).status, 422);
     assert.equal((await api.post(`/empresas/${empresa}/uras`, { nome: 'Menu', mensagem: 'Olá', opcoes: [{ digito: '1', destino_tipo: 'fila', destino_id: fila }, { digito: '1', destino_tipo: 'ramal', destino_id: ramal1001 }] }, cliente)).status, 422);
+    // A tecla do atendente (padrão 0) entra em todo menu: uma opção nela ficaria ambígua.
+    const noZero = await api.post(`/empresas/${empresa}/uras`, { nome: 'Menu', mensagem: 'Olá', opcoes: [{ digito: '0', destino_tipo: 'fila', destino_id: fila }] }, cliente);
+    assert.equal(noZero.status, 422);
+    assert.match(noZero.dados.erro, /tecla 0 é a do atendente/);
     const ura = await api.post(`/empresas/${empresa}/uras`, { nome: 'Menu', mensagem: 'Olá', opcoes: [{ digito: '1', destino_tipo: 'fila', destino_id: fila }] }, cliente);
     assert.equal(ura.status, 201);
+    const intel = `/empresas/${empresa}/uras/${ura.dados.id}/inteligencia`;
+    assert.equal((await api.put(intel, { tecla_atendente: '1' }, cliente)).status, 422, 'o 1 já é opção do menu');
+    assert.equal((await api.put(intel, { tipo: 'inteligente', fila_padrao_id: fila, tecla_atendente: '2' }, cliente)).status, 422, 'o 2 é da oferta na inteligente');
+    assert.equal((await api.put(intel, { tecla_atendente: '9' }, cliente)).status, 200);
+    assert.equal((await api.put(`/empresas/${empresa}/uras/${ura.dados.id}`, { opcoes: [{ digito: '9', destino_tipo: 'fila', destino_id: fila }] }, cliente)).status, 422,
+      'trocar a tecla do atendente vale também ao editar as opções');
+    assert.equal((await api.put(intel, { tecla_atendente: '0' }, cliente)).status, 200);
     // Número: o master cadastra e atribui; a empresa escolhe o destino.
     assert.equal((await api.post('/master/numeros', { numeros: '1130001000\n1130001001', tronco_id: tronco, empresa_id: empresa }, master)).dados.criados, 2);
     const numeros = (await api.get(`/empresas/${empresa}/numeros`, cliente)).dados;
@@ -108,7 +119,9 @@ test('PABX', async (t) => {
   });
 
   await t.test('chave de API: criação, configuração e revogação', async () => {
-    const k = await api.post(`/empresas/${empresa}/chaves`, { nome: 'Asterisk' }, cliente);
+    // A chave informa as chamadas que viram cobrança: só a equipe da plataforma cria.
+    assert.equal((await api.post(`/empresas/${empresa}/chaves`, { nome: 'Minha' }, cliente)).status, 403);
+    const k = await api.post(`/empresas/${empresa}/chaves`, { nome: 'Asterisk' }, master);
     assert.equal(k.status, 201);
     chave = k.dados.chave;
     assert.match(chave, /^pbx_[0-9a-f]{8}_/);
@@ -118,8 +131,10 @@ test('PABX', async (t) => {
     assert.equal(cfg.empresa.id, empresa);
     assert.deepEqual(cfg.ramais.map((r) => r.numero), ['1001', '1002']);
     assert.equal(cfg.terminacao.host, 'sip.op.exemplo');
+    // A credencial do tronco é da plataforma: fica na configuração da central, não na resposta da API.
+    assert.ok(!('senha' in cfg.terminacao) && !('usuario' in cfg.terminacao), 'usuário e senha do tronco não saem pela API');
     assert.deepEqual(cfg.filas[0].ramais, ['1001']);
-    const tmp = (await api.post(`/empresas/${empresa}/chaves`, { nome: 'Temporária' }, cliente)).dados;
+    const tmp = (await api.post(`/empresas/${empresa}/chaves`, { nome: 'Temporária' }, master)).dados;
     assert.equal((await api.del(`/empresas/${empresa}/chaves/${tmp.id}`, undefined, cliente)).status, 204);
     assert.equal((await api.central(tmp.chave).get('/config')).status, 401);
   });

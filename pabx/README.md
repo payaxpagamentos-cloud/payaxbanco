@@ -116,8 +116,11 @@ e, no dia em que divergissem, a ZOE do WhatsApp e a do telefone contariam histó
 para o mesmo cliente.
 
 A central telefônica conversa com ela por duas rotas:
-`POST /api/integracao/ura/:id/atender` (a ligação chegou) e
-`POST /api/integracao/ura/:id/confirmado` (a identidade foi confirmada).
+`POST /api/integracao/ura/:id/atender` `{ uid, telefone }` (a ligação chegou) e
+`POST /api/integracao/ura/:id/confirmado` `{ uid, codigo }` (o que o cliente digitou). Quem confere
+o código é o servidor, contra o cliente que o `/atender` reconheceu naquele `uid`: a central nunca
+informa o cliente. Código errado devolve `fase: "confirmar"` (tente de novo); no terceiro erro,
+`fase: "fila"` (vai para o atendente). Sem `uid` no `/atender`, a ligação segue como desconhecida.
 
 - **Campanhas** (discador): modo, fila que atende, canais e tentativas; importação de contatos ("nome;telefone"), ativar, pausar e encerrar.
 - **Pessoas / Ramais**: cadastro dentro do limite contratado, gravação por ramal, situação do registro e os dados SIP para configurar o telefone.

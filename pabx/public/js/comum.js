@@ -194,14 +194,14 @@ export function painelRelatorios(alvo, caminho, { master = false } = {}) {
 
 // ---------- Integrações ----------
 /** Chaves da API e a documentação curta para a equipe que cuida da central telefônica. */
-export function painelIntegracoes(alvo, { listar, criar, revogar, empresas = null, podeCriar = true }) {
+export function painelIntegracoes(alvo, { listar, criar, revogar, empresas = null, podeCriar = true, podeRevogar = podeCriar }) {
   const lista = el('div');
   const carregar = async () => {
     const chaves = await listar();
     limpar(lista, tabela([empresas ? 'Empresa' : null, 'Nome', 'Chave', 'Criada', 'Último uso', 'Situação', '^Ações'].filter(Boolean), chaves.map((k) => el('tr', {},
       empresas ? td(k.empresa) : null, td(k.nome), td(el('span', { class: 'mono' }, `pbx_${k.prefixo}_…`)), td(dataHora(k.criada_em)), td(dataHora(k.ultimo_uso)),
       td(k.revogada_em ? el('span', { class: 'etiqueta erro' }, 'revogada') : el('span', { class: 'etiqueta ok' }, 'ativa')),
-      el('td', { class: 'acoes' }, !k.revogada_em && podeCriar ? botao('Revogar', 'perigo', async () => {
+      el('td', { class: 'acoes' }, !k.revogada_em && podeRevogar ? botao('Revogar', 'perigo', async () => {
         if (!await confirmar('Revogar chave', `A central telefônica que usa "${k.nome}" perde o acesso na hora. Continuar?`, 'Revogar')) return;
         await revogar(k.id);
         toast('Chave revogada.');

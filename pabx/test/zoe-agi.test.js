@@ -40,7 +40,7 @@ test('URA por teclas da ZOE (AGI)', async (t) => {
     nome: 'Provedor AGI', administrador: { nome: 'G', email: 'g@agi.net', senha: 'senha-do-g-agi' },
   }, master)).dados.id;
   const gestor = await api.login('g@agi.net', 'senha-do-g-agi');
-  const chave = (await api.post(`/empresas/${empresa}/chaves`, { nome: 'Asterisk' }, gestor)).dados.chave;
+  const chave = (await api.post(`/empresas/${empresa}/chaves`, { nome: 'Asterisk' }, master)).dados.chave;
   const base = `${api.base}/integracao`;
   const zoe = criarApiZoe(base, chave);
 
