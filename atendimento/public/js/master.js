@@ -324,4 +324,6 @@ const relatorios = (ctx) => telaRelatorios(ctx, '/master/relatorios', {
       td(inteiro(e.transferidas), 'dir num'), td(e.csat === null ? '—' : e.csat.toLocaleString('pt-BR'), 'dir num'))))) ],
 });
 
-export const TELAS_MASTER = { dashboard, empresas, usuarios, seguranca, diagnostico, relatorios, configuracoes };
+import { telaTelefoniaMaster } from './telefonia-master.js';
+
+export const TELAS_MASTER = { telefonia: telaTelefoniaMaster, dashboard, empresas, usuarios, seguranca, diagnostico, relatorios, configuracoes };

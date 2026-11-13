@@ -507,6 +507,8 @@ function semear(db) {
           sorteio(['aberto', 'aberto', 'andamento', 'resolvido']), criadoEm, criadoEm);
     }
 
+    const tel = require('./telefonia/demo').semearTelefonia(db, empresa.id, filaId, equipe);
+
     console.log(`[ZOE Atende] Empresa "${empresa.nome}" criada com ${FILAS.length} filas, ${EQUIPE.length} pessoas na equipe e ${CONHECIMENTO.length} artigos na base.`);
     console.log(`             Ouvidoria: ${OUVIDORIAS.length} casos, sendo ${OUVIDORIAS.filter((o) => o[0] === 'cancelamento').length} de cancelamento.`);
     console.log(`             Régua: ${disparosTotais.enviados} enviadas (${disparosTotais.janela} pela janela, de graça) e ${disparosTotais.pulados} puladas.`);
@@ -514,6 +516,7 @@ function semear(db) {
     console.log(`             Alertas de rede: ${db.prepare("SELECT COUNT(*) n FROM alertas WHERE empresa_id = ?").get(empresa.id).n} cadastrados, ${require('./lib/alertas').vigentes(db, empresa.id).length} em vigor agora.`);
     console.log(`             Orçamento: R$ 60,00/mês. Sala de espera: ${db.prepare("SELECT COUNT(*) n FROM pendencias WHERE status = 'esperando'").get().n} avisos esperando a janela.`);
     console.log(`             Fechamentos: ${db.prepare('SELECT COUNT(*) n FROM custos_mensais').get().n} meses, 1 divergente contra a fatura da Meta.`);
+    console.log(`             Telefonia: ${tel.ramais} ramais (um por pessoa da equipe), URA inteligente e ${tel.chamadas} chamadas no mês.`);
     console.log(`             Histórico: ${totais.ia} resolvidas pela IA, ${totais.humano} transferidas, ${totais.abandono} abandonadas e ${totais.abertas} em aberto agora.`);
   });
   return true;

@@ -1070,3 +1070,69 @@ label.campo{ gap: 5px }
     box-shadow: var(--vidro-brilho);
   }
 }
+
+/* Telefonia: painel em grade de 12 colunas */
+.grade{ display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.grade-dash{ display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); }
+.grade-dash > .c3{ grid-column: span 3; } .grade-dash > .c4{ grid-column: span 4; } .grade-dash > .c5{ grid-column: span 5; } .grade-dash > .c6{ grid-column: span 6; }
+.grade-dash > .c7{ grid-column: span 7; } .grade-dash > .c8{ grid-column: span 8; } .grade-dash > .c12{ grid-column: span 12; }
+.grade-dash > div > .cartao:only-child{ height: 100%; }
+.grade-dash .cartao{ margin: 0; }
+@media (max-width: 1100px){ .grade-dash > *{ grid-column: span 12 !important; } }
+
+/* Telefone do painel: botão no canto, teclado e aviso de ligação recebida */
+.telefone{ position: fixed; right: 24px; bottom: 24px; z-index: 1500; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+.telefone-botao{ position: relative; width: 58px; height: 58px; border-radius: 50%; border: 0; cursor: pointer; color: #fff; display: grid; place-items: center;
+  background: linear-gradient(135deg, #3B82F6, #1D4ED8); box-shadow: 0 12px 28px -8px rgba(29, 78, 216, .65); transition: transform .15s; }
+.telefone-botao:hover{ transform: translateY(-2px); }
+.telefone-botao svg{ width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.telefone-botao.em-chamada{ background: linear-gradient(135deg, #22C55E, #15803D); box-shadow: 0 12px 28px -8px rgba(21, 128, 61, .65); }
+.telefone-botao .ponto{ position: absolute; right: 3px; top: 3px; width: 13px; height: 13px; border-radius: 50%; border: 2.5px solid var(--bg); background: #94A3B8; }
+.telefone-botao .ponto.online{ background: #22C55E; } .telefone-botao .ponto.erro, .telefone-botao .ponto.offline{ background: #EF4444; }
+.telefone-botao .ponto.carregando{ background: #F59E0B; } .telefone-botao .ponto.em-chamada{ background: #fff; }
+.telefone-painel{ width: 300px; max-width: calc(100vw - 32px); background: var(--surface); border-radius: 18px; padding: 16px; box-shadow: var(--shadow-flutuante); animation: subir .16s ease-out; }
+.telefone-painel header{ display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.telefone-painel header > div{ flex: 1; min-width: 0; line-height: 1.25; }
+.telefone-painel header .icone-btn{ font-size: 20px; line-height: 1; padding: 2px 8px; }
+.telefone-aviso{ width: 100%; border: 1px dashed var(--destaque-borda); background: var(--destaque-bg); color: var(--azul); border-radius: 10px; padding: 8px 10px; font-size: 12px;
+  font-weight: 600; cursor: pointer; margin-bottom: 12px; }
+.telefone .visor{ display: flex; align-items: center; gap: 4px; margin-bottom: 12px; }
+.telefone .visor input{ border: 0; background: none; box-shadow: none; font-size: 24px; font-weight: 700; text-align: center; letter-spacing: .04em; padding: 6px 4px; min-height: 0; }
+.telefone .visor input:focus{ box-shadow: none; }
+.teclado{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; justify-items: center; margin: 4px 0 14px; }
+.tecla{ width: 64px; height: 64px; border-radius: 50%; border: 0; background: var(--surface-2); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  line-height: 1; transition: background .1s; color: var(--text); }
+.tecla:hover{ background: var(--hover); } .tecla:active{ background: var(--destaque-bg); }
+.tecla span{ font-size: 24px; font-weight: 600; } .tecla small{ font-size: 9px; font-weight: 700; letter-spacing: .12em; color: var(--text-3); margin-top: 3px; }
+.acao-ligar, .acao-desligar{ display: grid; place-items: center; width: 62px; height: 62px; border-radius: 50%; border: 0; cursor: pointer; color: #fff; margin: 0 auto; }
+.acao-ligar{ background: #22C55E; box-shadow: 0 10px 22px -10px rgba(34, 197, 94, .9); } .acao-ligar:hover{ background: #16A34A; }
+.acao-desligar{ background: #EF4444; box-shadow: 0 10px 22px -10px rgba(239, 68, 68, .9); } .acao-desligar:hover{ background: #DC2626; }
+.acao-desligar svg{ transform: rotate(135deg); }
+.acao-ligar:disabled{ opacity: .4; cursor: not-allowed; box-shadow: none; }
+.acao-ligar svg, .acao-desligar svg{ width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.telefone .em-chamada .quem{ text-align: center; padding: 6px 0 14px; }
+.telefone .em-chamada .quem strong{ display: block; font-size: 19px; margin-top: 10px; }
+.telefone .em-chamada .tempo{ margin-top: 4px; color: var(--text-2); font-size: 14px; }
+.telefone .controles{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.telefone .controle{ flex: 1; border: 1px solid var(--border); background: var(--surface-2); border-radius: 10px; padding: 9px 6px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.telefone .controle.on{ background: var(--destaque-bg); border-color: var(--destaque-borda); color: var(--azul); }
+.telefone .controle:disabled{ opacity: .45; cursor: default; }
+.telefone .controles .acao-desligar{ margin: 0 0 0 4px; width: 54px; height: 54px; flex: none; }
+.avatar-chamada{ width: 64px; height: 64px; border-radius: 50%; margin: 0 auto; display: grid; place-items: center; background: var(--info-bg); color: var(--azul); }
+.avatar-chamada svg{ width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.avatar-chamada.tocando{ width: 84px; height: 84px; background: #22C55E; color: #fff; animation: tocar 1.4s ease-out infinite; }
+.avatar-chamada.tocando svg{ width: 36px; height: 36px; animation: tremer 1.4s ease-in-out infinite; }
+@keyframes tocar{ 0%{ box-shadow: 0 0 0 0 rgba(34, 197, 94, .55); } 100%{ box-shadow: 0 0 0 26px rgba(34, 197, 94, 0); } }
+@keyframes tremer{ 0%, 60%, 100%{ transform: rotate(0); } 10%, 30%, 50%{ transform: rotate(-14deg); } 20%, 40%{ transform: rotate(14deg); } }
+.telefone-chamada{ position: fixed; inset: 0; z-index: 2500; display: grid; place-items: center; padding: 16px; background: rgba(8, 15, 32, .55); backdrop-filter: blur(6px);
+  animation: aparecer .15s ease-out; }
+.cartao-chamada{ background: var(--surface); border-radius: 22px; padding: 30px 28px 26px; width: min(360px, 100%); text-align: center; box-shadow: var(--shadow-flutuante);
+  display: flex; flex-direction: column; gap: 4px; animation: subir .2s ease-out; }
+.cartao-chamada .avatar-chamada{ margin-bottom: 16px; }
+.cartao-chamada .quem-liga{ font-size: 24px; font-weight: 800; letter-spacing: -.01em; margin: 2px 0; }
+.cartao-chamada .botoes{ display: flex; justify-content: center; gap: 48px; margin-top: 24px; }
+.cartao-chamada .grande{ width: 70px; height: 70px; position: relative; overflow: visible; }
+.cartao-chamada .grande span{ position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); color: var(--text-2); font-size: 12.5px; font-weight: 600; }
+.cartao-chamada .botoes{ padding-bottom: 22px; }
+@media (max-width: 860px){ .telefone{ right: 16px; bottom: 16px; } .telefone-botao{ width: 54px; height: 54px; } }
+@media print{ .telefone, .telefone-chamada{ display: none !important; } }

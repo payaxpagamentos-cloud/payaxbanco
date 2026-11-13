@@ -1,6 +1,7 @@
 import { api, sessao } from './api.js';
 import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, PERFIS } from './ui.js';
 import { TELAS_MASTER } from './master.js';
+import { iniciarTelefone, pararTelefone } from './telefone.js';
 import { TELAS_EMPRESA } from './empresa.js';
 import { vigiarLigacoes } from './passagem.js';
 
@@ -24,7 +25,7 @@ const semAcesso = (u) => el('div', { class: 'entrada' },
 
 // [rota, rótulo, ícone, permissão exigida (vazio = qualquer pessoa autenticada)]
 const MENU_MASTER = [
-  ['dashboard', 'Dashboard', 'dashboard'], ['empresas', 'Empresas', 'empresas'], ['relatorios', 'Relatórios', 'relatorios'],
+  ['dashboard', 'Dashboard', 'dashboard'], ['empresas', 'Empresas', 'empresas'], ['telefonia', 'Telefonia', 'telefone'], ['relatorios', 'Relatórios', 'relatorios'],
   ['usuarios', 'Usuários', 'equipe', ['master']], ['seguranca', 'Segurança', 'seguranca', ['master']],
   ['diagnostico', 'Diagnóstico', 'diagnostico'], ['configuracoes', 'Configurações', 'configuracoes', ['master']],
 ];
@@ -63,6 +64,7 @@ const SUBTITULOS = {
   empresas: 'Empresas clientes da plataforma',
   usuarios: 'Quem acessa a plataforma e com qual perfil',
   seguranca: 'Acessos recusados, IPs bloqueados e o registro de atividades',
+  telefonia: 'Ramais, filas no telefone, URA, números e chamadas',
   diagnostico: 'Verificações da plataforma e a conexão de cada número com a Meta',
 };
 
@@ -102,7 +104,7 @@ async function desenhar() {
   pararTela?.();
   pararTela = null;
   const s = sessao.get();
-  if (!s?.token) { pararSaude?.(); pararSaude = null; vigiar({}, null); return telaEntrada(); }
+  if (!s?.token) { pararSaude?.(); pararSaude = null; vigiar({}, null); pararTelefone(); return telaEntrada(); }
   const u = s.usuario;
   let { empresaId, tela } = rota();
   // Usuário de empresa fica sempre no painel da própria empresa.
@@ -145,8 +147,10 @@ async function desenhar() {
     return undefined;
   }
 
-
   vigiar(u, empresaId);
+  // Telefone do navegador: para quem atende pela empresa com a telefonia ligada (o ramal vem de Usuários).
+  if (empresaId && !PLATAFORMA.includes(u.perfil) && telefoniaLigada && pode(u, 'telefonia.softphone')) iniciarTelefone({ empresaId });
+  else pararTelefone();
   const conteudo = el('main', { class: `conteudo${tela === 'caixa' ? ' cheio' : ''}` });
   let recolhida = false;
   try { recolhida = localStorage.getItem('atend.menu') === 'recolhido'; } catch { /* padrão */ }
