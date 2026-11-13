@@ -42,5 +42,9 @@ fs.writeFileSync(path.join(pasta, 'VERSAO'), `${versao}\n${new Date().toISOStrin
 
 const arquivo = path.join(saida, 'zoe-instalacao.tar.gz');
 execFileSync('tar', ['czf', arquivo, '-C', saida, 'zoe']);
+// O mesmo pacote em .zip: abre com dois cliques no Windows e sobe por WinSCP/FileZilla sem conversão.
+const zip = path.join(saida, 'zoe-instalacao.zip');
+fs.rmSync(zip, { force: true });
+try { execFileSync('zip', ['-qr', '-X', zip, 'zoe'], { cwd: saida }); } catch { console.log('(zip não instalado: só o .tar.gz foi gerado)'); }
 fs.rmSync(pasta, { recursive: true, force: true });
 console.log(`Pacote: ${arquivo} (${(fs.statSync(arquivo).size / 1024 / 1024).toFixed(1)} MB, versão ${versao})`);
