@@ -46,7 +46,7 @@ async function main() {
       beneficiario_nome, beneficiario_documento, beneficiario_endereco, beneficiario_cidade, beneficiario_uf, beneficiario_cep,
       pix_chave, pix_tipo, custo_emissao_centavos, custo_liquidacao_centavos, custo_pix_centavos, padrao, criado_em)
     VALUES ('Bradesco · conta gráfica', '3391', '7', '0006688', '4', '1234567', '09',
-      'PayAx Pagamentos LTDA', '12345678000195', 'Av. Presidente Kennedy, 1200', 'Praia Grande', 'SP', '11704000',
+      'PAY AX Brasil Ltda', '12345678000195', 'Av. Presidente Kennedy, 1200', 'Praia Grande', 'SP', '11704000',
       '12345678000195', 'cnpj', 0, 190, 50, 1, ?) RETURNING id`).get(agora()).id;
 
   // Tabela padrão da plataforma

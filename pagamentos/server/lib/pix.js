@@ -31,7 +31,7 @@ function copiaECola({ chave, nome, cidade, valorCentavos, txid }) {
     + campo('53', '986')
     + (valorCentavos ? campo('54', (valorCentavos / 100).toFixed(2)) : '')
     + campo('58', 'BR')
-    + campo('59', semAcento(nome, 25) || 'PAYAX PAGAMENTOS')
+    + campo('59', semAcento(nome, 25) || 'PAY AX BRASIL')
     + campo('60', semAcento(cidade, 15) || 'SAO PAULO')
     + campo('62', campo('05', id))
     + '6304';

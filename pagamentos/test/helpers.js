@@ -63,7 +63,7 @@ async function iniciar() {
   api.conta = async (tk, extra = {}) => {
     const r = await api.post('/api/contas', {
       apelido: 'Bradesco teste', agencia: '3391', conta: '0006688', cedente: '1234567',
-      beneficiario_nome: 'PayAx Pagamentos LTDA', beneficiario_documento: CNPJ.payax,
+      beneficiario_nome: 'PAY AX Brasil Ltda', beneficiario_documento: CNPJ.payax,
       beneficiario_cidade: 'Praia Grande', pix_chave: CNPJ.payax, custo_liquidacao: '1,90', ...extra,
     }, tk);
     if (r.status !== 201) throw new Error(JSON.stringify(r.dados));

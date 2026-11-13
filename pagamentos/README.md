@@ -84,6 +84,16 @@ npm test          # 58 testes
 npm run migrar    # aplica as migrações sem subir o servidor
 ```
 
+## O beneficiário do boleto
+
+A razão social, o CNPJ e o endereço impressos no campo **Beneficiário** vêm do cadastro da conta bancária, em
+**Contas e preços → conta**. O cliente que originou a cobrança aparece logo abaixo como **Beneficiário final
+(sacador avalista)**, que é a prática do arranjo de conta gráfica.
+
+A demonstração já vem com **PAY AX Brasil Ltda**, mas com um **CNPJ fictício** (12.345.678/0001-95) e uma agência e
+conta de exemplo: troque pelos dados reais do convênio antes de emitir qualquer boleto de verdade. O mesmo nome é o
+que aparece no QR Code do Bolepix, abreviado para os 25 caracteres que o padrão EMV permite.
+
 ## O banco (Bradesco)
 
 O conector fica inteiro em [`server/lib/bradesco.js`](server/lib/bradesco.js), com dois modos:
