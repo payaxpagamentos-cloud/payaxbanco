@@ -1,0 +1,27 @@
+{
+  "name": "mercadinho-condominio",
+  "version": "1.0.0",
+  "description": "Mercadinho do Condomínio — PDV, estoque, compras, financeiro, conta dos moradores e maquininha de cartão.",
+  "main": "server/index.js",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "empacotar": "node scripts/empacotar.js",
+    "backup": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/backup.js",
+    "importar-produtos": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/importar-produtos.js",
+    "importar-fotos": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/importar-fotos.js",
+    "ponte": "node scripts/ponte-maquininha.js",
+    "apresentacao": "node apresentacao/gerar.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "qrcode": "^1.5.4"
+  }
+}

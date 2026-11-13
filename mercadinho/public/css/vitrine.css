@@ -1,0 +1,148 @@
+/*
+ * Vitrine — o que passa na TV da loja e no terminal de autoatendimento parado.
+ * Segue as artes aprovadas do Mercado Binho: fundo azul-marinho, ondas verdes nos cantos,
+ * logo no alto à esquerda, título grande em branco e o produto num pedestal verde à direita.
+ * As medidas acompanham a tela (vw/vh), então a mesma folha serve para TV, monitor e tablet.
+ */
+@font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+
+.vitrine{
+  --marca: #2EE6B5;
+  --marca-2: #18BE93;
+  --tinta: #0B1928;
+  --oferta: #FF5C7A;
+  --destaque: #FFC65C;
+  position: absolute; inset: 0; overflow: hidden;
+  background: var(--tinta); color: #fff;
+  font-family: "Manrope", system-ui, sans-serif;
+  -webkit-user-select: none; user-select: none;
+}
+.vt-palco{ position: absolute; inset: 0; overflow: hidden; }
+
+/* ---------- troca: esmaecimento de 800 ms ---------- */
+.vt-quadro{ position: absolute; inset: 0; opacity: 0; transition: opacity .8s ease; }
+.vt-quadro.ativo{ opacity: 1; }
+
+/* ---------- artes, imagens e vídeos: a tela inteira, sem cortar nada ---------- */
+.vt-midia{ background: var(--tinta); }
+.vt-midia img, .vt-midia video{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* ---------- produto, no padrão das artes ---------- */
+.vt-produto{ overflow: hidden; }
+/* Ondas verdes: uma no canto de cima à direita, outra subindo de baixo. */
+.vt-onda{ position: absolute; border-radius: 50%; pointer-events: none; }
+.vt-onda-cima{
+  width: 92vw; height: 70vh; right: -34vw; top: -44vh;
+  background: linear-gradient(200deg, var(--marca) 20%, var(--marca-2) 80%);
+  box-shadow: inset 0 -2vh 6vh rgba(0,0,0,.12);
+}
+.vt-onda-baixo{
+  width: 150vw; height: 92vh; left: 2vw; bottom: -70vh;
+  background: linear-gradient(170deg, var(--marca) 0%, var(--marca-2) 55%, #0E8F70 100%);
+}
+.vt-produto .vt-logo{ position: absolute; left: 5.6vw; top: 7.5vh; height: 15vh; width: auto; }
+.vt-texto{
+  position: absolute; left: 5.6vw; top: 31vh; width: 47vw;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1.8vh;
+}
+.vt-selo{ font-weight: 800; text-transform: uppercase; letter-spacing: .16em; font-size: 2.8vh; color: var(--marca); }
+.vt-oferta .vt-selo{ color: #fff; background: var(--oferta); padding: .45em 1em; border-radius: 999px; }
+.vt-lucrativo .vt-selo{ color: var(--destaque); }
+.vt-nome{
+  margin: 0; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; font-size: 9.4vh; color: #fff;
+  text-wrap: balance; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.vt-preco{ display: flex; flex-direction: column; gap: .6vh; margin-top: 1vh; }
+.vt-de{ font-size: 3.6vh; font-weight: 600; color: rgba(255,255,255,.75); }
+.vt-de s{ text-decoration-thickness: .09em; }
+.vt-preco strong{ font-weight: 800; letter-spacing: -.04em; line-height: 1; font-size: 14vh; color: var(--marca); font-variant-numeric: tabular-nums; }
+.vt-oferta .vt-preco strong{ color: #FFE27A; }
+.vt-preco small{ font-size: .34em; letter-spacing: 0; margin-left: .2em; color: rgba(255,255,255,.75); font-weight: 600; }
+.vt-validade{ margin: 0; font-size: 2.8vh; font-weight: 600; color: rgba(255,255,255,.75); }
+.vt-assinatura{ position: absolute; left: 5.6vw; bottom: 15vh; font-weight: 800; font-size: 3.6vh; color: var(--marca); }
+
+/* O produto em pé sobre o pedestal verde, à direita. */
+.vt-destaque-produto{ position: absolute; right: 5vw; bottom: 0; width: 40vw; height: 80vh; }
+.vt-pedestal{
+  position: absolute; left: 0; right: 0; bottom: -4vh; height: 24vh; border-radius: 50% / 34%;
+  background: linear-gradient(180deg, #34E9BC 0%, var(--marca-2) 55%, #0C7F63 100%);
+  box-shadow: inset 0 3vh 4vh rgba(255,255,255,.18), 0 -1vh 6vh rgba(0,0,0,.25);
+}
+.vt-pedestal::before{ /* tampo do pedestal */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 52%; border-radius: 50%;
+  background: linear-gradient(180deg, #48F0C6, #22CFA2);
+}
+.vt-foto{
+  position: absolute; left: 50%; bottom: 12vh; transform: translateX(-50%);
+  width: min(30vw, 54vh); aspect-ratio: 1; border-radius: 3.6vh; overflow: hidden;
+  background: #fff; display: grid; place-items: center;
+  box-shadow: 0 3vh 7vh rgba(0,0,0,.45);
+}
+.vt-foto img{ width: 100%; height: 100%; object-fit: contain; padding: 6%; }
+/* Sem nada cadastrado ainda: fica a marca. */
+.vt-vazio{ display: grid; place-content: center; justify-items: center; gap: 4vh; text-align: center; padding: 6vw; }
+.vt-vazio img{ width: min(56vw, 720px); height: auto; }
+.vt-vazio p{ margin: 0; font-size: clamp(18px, 4vh, 40px); color: rgba(255,255,255,.8); font-weight: 700; }
+
+/* ---------- tela em pé (TV ou tablet na vertical) ---------- */
+@media (orientation: portrait){
+  .vt-produto .vt-logo{ left: 50%; transform: translateX(-50%); top: 4vh; height: 8vh; }
+  .vt-texto{ left: 7vw; right: 7vw; width: auto; top: 15vh; align-items: center; text-align: center; }
+  .vt-nome{ font-size: 5.4vh; }
+  .vt-preco{ align-items: center; }
+  .vt-preco strong{ font-size: 8vh; }
+  .vt-destaque-produto{ left: 10vw; right: 10vw; width: auto; height: 46vh; }
+  .vt-foto{ width: min(60vw, 32vh); bottom: 9vh; }
+  .vt-pedestal{ height: 14vh; }
+  .vt-assinatura{ display: none; }
+  .vt-onda-cima{ width: 130vw; height: 40vh; top: -30vh; }
+}
+
+/* ---------- convite no terminal de autoatendimento ---------- */
+.vt-chamada{
+  position: absolute; left: 50%; bottom: 3.5vh; transform: translateX(-50%); z-index: 3;
+  display: flex; align-items: center; gap: .8em; white-space: nowrap;
+  padding: .9em 1.6em; border-radius: 999px; font-weight: 800; font-size: clamp(14px, 2.4vh, 24px);
+  background: rgba(6,22,33,.86); border: 1px solid rgba(255,255,255,.18); color: #fff;
+  box-shadow: 0 1vh 4vh rgba(0,0,0,.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.vt-pulso{ width: .75em; height: .75em; border-radius: 50%; background: var(--marca); flex: none; animation: vt-pulso 1.6s ease-out infinite; }
+@keyframes vt-pulso{ 0%{ box-shadow: 0 0 0 0 rgba(46,230,181,.7); } 100%{ box-shadow: 0 0 0 1.1em rgba(46,230,181,0); } }
+
+@media (prefers-reduced-motion: reduce){
+  .vt-quadro{ transition: none; }
+  .vt-pulso{ animation: none; }
+}
+
+/* ---------- página da TV ---------- */
+body.tela-tv{ margin: 0; background: #0B1928; overflow: hidden; min-height: 100vh; min-height: 100dvh; }
+body.tela-tv.parado{ cursor: none; }
+.tv-controles{
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20;
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px; max-width: calc(100% - 20px);
+  border-radius: 18px; border: 1px solid rgba(255,255,255,.2); background: rgba(6,22,33,.92);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 30px rgba(0,0,0,.35);
+  font-family: "Manrope", system-ui, sans-serif; color: #fff; transition: opacity .3s ease;
+}
+body.parado .tv-controles{ opacity: 0; pointer-events: none; }
+body.parado.teclado .tv-controles:focus-within{ opacity: 1; pointer-events: auto; }
+.tv-controles .marca{ font-weight: 800; font-size: 15px; white-space: nowrap; margin-right: 10px; }
+.tv-controles .marca small{ font-weight: 500; margin-left: 8px; color: #B2C9D1; }
+.tv-controles button{
+  font: 600 15px "Manrope", system-ui, sans-serif; color: #EAF8FF; background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.19); border-radius: 10px; padding: 11px 15px; min-height: 44px; white-space: nowrap; cursor: pointer;
+}
+.tv-controles button:hover{ background: rgba(46,230,181,.15); }
+.tv-controles button:focus-visible{ outline: 3px solid #2EE6B5; outline-offset: 3px; }
+.tv-controles button:disabled{ opacity: .4; cursor: default; }
+.tv-controles .tela-cheia{ background: #2EE6B5; color: #0B1928; font-weight: 800; border-color: transparent; }
+@media (max-width: 650px){
+  .tv-controles .marca{ display: none; }
+  .tv-controles{ bottom: 12px; gap: 6px; padding: 9px; }
+  .tv-controles button{ font-size: 13px; padding: 9px 11px; }
+}
+@media (prefers-reduced-motion: reduce){ .tv-controles{ transition: none; } }
+
+/* ---------- no terminal de autoatendimento: por cima da tela de compras ---------- */
+.vitrine-sobre{ position: fixed; inset: 0; z-index: 80; cursor: pointer; }

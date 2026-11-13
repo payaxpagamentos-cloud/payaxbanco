@@ -1,0 +1,10 @@
+node_modules/
+data/
+backups/
+*.db
+*.db-*
+.env
+dist/
+apresentacao/img/
+apresentacao/fontes/
+apresentacao/*.pdf

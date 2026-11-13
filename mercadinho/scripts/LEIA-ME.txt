@@ -1,0 +1,161 @@
+MERCADINHO DO CONDOMÍNIO — INSTALAÇÃO
+=====================================
+
+Endereços depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
+  Painel da equipe ........ https://SEU-DOMINIO/mercadinho/
+  Terminal do cliente ..... https://SEU-DOMINIO/mercadinho/pdv/
+
+O painel é usado pela equipe (estoque, compras, financeiro, moradores) e pelos
+moradores (cada um vê só a própria conta). O terminal é a tela do balcão em que
+o CLIENTE passa os produtos e paga sozinho: abra esse endereço no tablet do
+balcão, em tela cheia, e deixe ali. Tudo roda neste programa Node.js, nesta pasta.
+As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
+
+
+1) REQUISITO
+   Node.js 22.13 ou mais novo no servidor.  Confira com:   node -v
+
+
+2) ENVIAR OS ARQUIVOS
+   Envie a pasta "mercadinho" inteira para o servidor, FORA da pasta pública do site
+   (ex.: /home/SEU-USUARIO/mercadinho). O arquivo ".env" começa com ponto: confira se foi enviado.
+
+
+3) LIGAR
+   cd /home/SEU-USUARIO/mercadinho
+   node --disable-warning=ExperimentalWarning --env-file=.env server/index.js
+
+   Para subir junto com o servidor, crie um serviço systemd (exemplo):
+
+   [Unit]
+   Description=Mercadinho do Condominio
+   After=network.target
+
+   [Service]
+   WorkingDirectory=/home/SEU-USUARIO/mercadinho
+   ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning --env-file=.env server/index.js
+   Restart=always
+   User=SEU-USUARIO
+
+   [Install]
+   WantedBy=multi-user.target
+
+
+4) PUBLICAR NO DOMÍNIO (Nginx)
+   # Os vídeos da vitrine chegam a 80 MB: sem esta linha o nginx recusa o envio (limite padrão de 1 MB).
+   client_max_body_size 100m;
+
+   location /mercadinho/ {
+     proxy_pass http://127.0.0.1:3300/mercadinho/;
+     proxy_set_header Host $host;
+     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+     proxy_set_header X-Forwarded-Proto $scheme;
+   }
+
+   Use HTTPS (Let's Encrypt é gratuito: certbot --nginx -d SEU-DOMINIO).
+
+
+5) PRIMEIRO ACESSO
+   Entre com o e-mail e a senha do administrador que estão no arquivo .env e, na primeira vez:
+     - Configurações > Loja: nome, condomínio, chave PIX e limite padrão da conta dos moradores;
+     - Configurações > Usuários: crie a conta de cada pessoa da equipe (gerente, caixa, estoquista);
+     - Configurações > Maquininhas: cadastre a maquininha de cartão (veja o README);
+     - Configurações > Terminais: cadastre o terminal do balcão, anote o código que
+       aparece UMA vez e digite-o no aparelho ao abrir o endereço terminado em /pdv/;
+     - Moradores: defina a senha de 4 números de cada um (é com ela que o morador
+       lança a compra na conta pelo terminal);
+     - Produtos: monte o catálogo. Se vocês já têm uma planilha, use
+       Produtos > Importar planilha (ou node scripts/importar-produtos.js catalogo.csv)
+       — ele confere tudo antes de gravar. Depois suba as fotos (item 6b).
+
+
+6) CÓPIA DE SEGURANÇA
+   Todo o sistema está em data/: o banco (mercadinho.db) e as fotos dos produtos
+   (data/fotos). Para copiar, use o comando pronto — ele grava uma cópia inteira
+   mesmo com o mercadinho aberto e vendendo (copiar o arquivo na mão pode pegar o
+   banco no meio de uma gravação):
+
+       cd /home/SEU-USUARIO/mercadinho
+       node --env-file=.env scripts/backup.js
+
+   A cópia vai para backups/AAAA-MM-DD-HH-MM-SS, com o banco e as fotos, e o
+   comando confere a cópia no fim. Guarda as 30 últimas e apaga as mais antigas.
+   Para gravar em outro lugar (pendrive, disco de rede), passe a pasta:
+
+       node --env-file=.env scripts/backup.js /mnt/backup
+
+   Todo dia de madrugada, no crontab do servidor ("crontab -e"):
+
+       15 3 * * * cd /home/SEU-USUARIO/mercadinho && node --env-file=.env scripts/backup.js >> backups/backup.log 2>&1
+
+   Para conferir uma cópia antiga:
+       node --env-file=.env scripts/backup.js --verificar backups/2026-11-12-03-07-21
+
+   PARA RESTAURAR (trocar de servidor ou voltar atrás):
+     1. Pare o serviço:            systemctl stop mercadinho
+     2. Apague o banco atual:      rm data/mercadinho.db data/mercadinho.db-shm data/mercadinho.db-wal
+     3. Copie o da cópia:          cp backups/<data>/mercadinho.db data/
+     4. Copie as fotos:            rm -rf data/fotos && cp -a backups/<data>/fotos data/
+     5. Copie a vitrine:           rm -rf data/vitrine && cp -a backups/<data>/vitrine data/   (se a cópia tiver)
+     6. Suba de novo:              systemctl start mercadinho
+
+     ATENÇÃO: depois de restaurar, a senha do administrador é a do sistema de
+     ONDE veio a cópia, não a que está no .env desta máquina. O MERCADO_ADMIN_SENHA
+     só vale quando o banco é criado do zero.
+
+
+6b) FOTOS DOS PRODUTOS
+   Se vocês já tiverem as fotos numa pasta, dá para subir todas de uma vez:
+       node scripts/importar-fotos.js /caminho/das-fotos
+   O nome de cada arquivo deve ser o código de barras, o id ou o nome do produto
+   (ex.: 7891000053508.jpg, 12.png, banana-prata-kg.jpg).
+   Uma a uma, use Produtos > editar > Escolher foto, direto no painel.
+
+
+7) LEITOR DE CÓDIGO DE BARRAS
+   Qualquer leitor USB serve: ele digita o código e dá Enter, igual a um teclado.
+   No terminal não é preciso clicar em nada antes de bipar: a tela escuta o leitor
+   o tempo todo.
+
+
+8) O TERMINAL DE AUTOATENDIMENTO (QUEM USA É O CLIENTE)
+   Abra https://SEU-DOMINIO/mercadinho/pdv/ no navegador, em tela cheia (no Android:
+   menu do Chrome > "Adicionar à tela inicial"; no iPad: Compartilhar > "Adicionar à
+   Tela de Início"). O pareamento fica salvo no aparelho: só é pedido de novo se a
+   administração desativar o terminal ou se os dados do navegador forem apagados.
+
+   Tela de compras: o cliente bipa no leitor ou toca no + do produto (com busca por
+   nome e categorias), confere a lista "Sua compra" à direita (− e + mudam a
+   quantidade) e toca em "Ir para pagamento". Fruta, pão e granel ficam na mesma
+   grade; os vendidos por peso pedem o peso da balança. Os mais vendidos aparecem
+   primeiro, e produto sem estoque aparece como "Esgotado".
+
+
+9) VITRINE (TV DA LOJA E TERMINAL DE AUTOATENDIMENTO)
+   Ofertas, mais vendidos, mais lucrativos e os vídeos e imagens de vocês passando
+   sozinhos. Configure em Gestão > Vitrine (lá também se enviam os vídeos).
+
+   Na TV: abra https://SEU-DOMINIO/mercadinho/vitrine/ no navegador da TV (ou do
+   computador ligado nela) e toque em "Tela cheia". Não pede login: mostra só nome,
+   foto e preço. A cada volta busca de novo o que mudou.
+   As três artes aprovadas do Mercado Binho já vêm cadastradas (12 s cada, troca
+   suave de 0,8 s). Controles: Tela cheia, Pausar, ← e → (somem sozinhos depois de
+   4,5 s). Atalhos: F = tela cheia · espaço = pausar/retomar · setas = anterior/próxima.
+
+   Várias TVs: com "TVs alinhadas" ligado (Gestão > Vitrine), todas mostram o mesmo
+   quadro e trocam juntas, pelo relógio de cada aparelho — deixe a data e a hora das
+   TVs certas (de preferência pela internet). A precisão é a do relógio, não quadro
+   a quadro. Para abrir sozinha ao ligar, configure o modo quiosque da TV/TV box com
+   esse endereço (isso é feito no aparelho, não no sistema).
+
+   No terminal de autoatendimento: sem cliente comprando pelo tempo configurado, a
+   vitrine aparece sozinha. Some assim que o cliente toca na tela ou passa um produto
+   no leitor (e aí a compra já começa).
+
+   Vídeos: MP4 (H.264) ou WebM, até 80 MB, de preferência deitados (16:9). Tocam sem
+   som, porque o navegador só deixa tocar sozinho assim. Envie pelo painel: ele lê a
+   duração do vídeo antes de enviar, e é ela que mantém as TVs alinhadas. Imagens: JPEG, PNG ou WebP,
+   até 8 MB. Os arquivos ficam em data/vitrine e entram na cópia de segurança.
+
+   Ofertas: em Produtos > editar (campo "Oferta") ou em Gestão > Vitrine > Nova oferta.
+   O preço da oferta é o cobrado no terminal, até a data informada (o último dia conta).

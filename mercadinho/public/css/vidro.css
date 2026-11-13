@@ -1,0 +1,597 @@
+/* Mercadinho do Condomínio — tema "vidro": painéis translúcidos sobre um fundo de aurora. */
+@font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: "Unbounded"; src: url("../fonts/unbounded.woff2") format("woff2"); font-weight: 300 800; font-display: swap; }
+
+:root{
+  --acento: #2BE8B0;
+  --acento-2: #49C8FF;
+  --acento-3: #A974FF;
+  --acento-4: #FFC46B;
+  --tinta: #03150F;
+
+  --fundo: #05070F;
+  --fundo-2: #0A0F1E;
+  --vidro: rgba(255,255,255,.055);
+  --vidro-forte: rgba(255,255,255,.10);
+  --vidro-topo: rgba(255,255,255,.34);
+  --vidro-borda: rgba(255,255,255,.12);
+  --vidro-borda-forte: rgba(255,255,255,.28);
+  --texto: #F4F7FA;
+  --texto-2: #A9B6C8;
+  --texto-3: #74839A;
+
+  --ok: #3DEBA9;  --ok-bg: rgba(61,235,169,.14);
+  --erro: #FF8095; --erro-bg: rgba(255,128,149,.14);
+  --aviso: #FFC46B; --aviso-bg: rgba(255,196,107,.14);
+  --info: #6FC2FF; --info-bg: rgba(111,194,255,.14);
+
+  --raio: 18px;
+  --raio-p: 12px;
+  --sombra: 0 1px 2px rgba(0,0,0,.24), 0 24px 60px -30px rgba(0,0,0,.9);
+  --sombra-alta: 0 6px 18px rgba(0,0,0,.28), 0 40px 90px -40px rgba(0,0,0,1);
+  --brilho: inset 0 1px 0 var(--vidro-topo);
+  --desfoque: blur(26px) saturate(165%);
+  --display: "Unbounded", "Manrope", system-ui, sans-serif;
+  color-scheme: dark;
+  font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Tema claro: o mesmo vidro, agora sobre luz. */
+:root[data-tema="claro"]{
+  --fundo: #EDF1F9;
+  --fundo-2: #DFE7F4;
+  --vidro: rgba(255,255,255,.62);
+  --vidro-forte: rgba(255,255,255,.84);
+  --vidro-topo: rgba(255,255,255,.9);
+  --vidro-borda: rgba(13,27,50,.09);
+  --vidro-borda-forte: rgba(13,27,50,.20);
+  --texto: #0B1726;
+  --texto-2: #46586F;
+  --texto-3: #76859A;
+  --ok: #06976A; --ok-bg: rgba(6,151,106,.12);
+  --erro: #CE3A55; --erro-bg: rgba(206,58,85,.12);
+  --aviso: #A96B05; --aviso-bg: rgba(169,107,5,.14);
+  --info: #1F62E0; --info-bg: rgba(31,98,224,.12);
+  --sombra: 0 1px 2px rgba(13,27,50,.05), 0 22px 50px -32px rgba(13,27,50,.55);
+  --sombra-alta: 0 10px 24px rgba(13,27,50,.10), 0 40px 80px -40px rgba(13,27,50,.7);
+  color-scheme: light;
+}
+
+*{ box-sizing: border-box; }
+html, body{ margin: 0; min-height: 100%; }
+body{
+  background: var(--fundo);
+  color: var(--texto);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+/* As luzes de fundo: manchas de cor que o vidro desfoca por cima. */
+body::before{
+  content: "";
+  position: fixed;
+  inset: -14vmax;
+  z-index: -2;
+  background:
+    radial-gradient(62vmax 52vmax at 14% 4%, rgba(43,232,176,.46), transparent 72%),
+    radial-gradient(58vmax 48vmax at 90% 14%, rgba(73,200,255,.44), transparent 70%),
+    radial-gradient(66vmax 56vmax at 58% 96%, rgba(169,116,255,.46), transparent 72%),
+    radial-gradient(48vmax 42vmax at 46% 46%, rgba(73,200,255,.20), transparent 74%),
+    radial-gradient(32vmax 28vmax at 78% 62%, rgba(255,196,107,.16), transparent 70%),
+    linear-gradient(160deg, var(--fundo), var(--fundo-2));
+  animation: respirar 26s ease-in-out infinite alternate;
+}
+/* Grão fino: tira o aspecto "chapado" dos degradês. */
+body::after{
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .45;
+  background-image: radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+@keyframes respirar{ from{ transform: scale(1) translate3d(0,0,0); } to{ transform: scale(1.14) translate3d(2%, -3%, 0); } }
+
+h1, h2, h3{ margin: 0 0 .5em; line-height: 1.18; font-family: var(--display); font-weight: 600; letter-spacing: -.035em; }
+h1{ font-size: 21px; } h2{ font-size: 15px; } h3{ font-size: 13px; letter-spacing: -.02em; }
+a{ color: var(--acento); }
+input, select, textarea, button{ font: inherit; color: inherit; }
+::placeholder{ color: var(--texto-3); }
+::-webkit-scrollbar{ width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb{ background: var(--vidro-borda); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover{ background: var(--vidro-borda-forte); }
+::selection{ background: rgba(43,232,176,.3); }
+
+.oculto{ display: none !important; }
+.mudo{ color: var(--texto-2); }
+.pequeno{ font-size: 12px; }
+.num{ font-variant-numeric: tabular-nums; }
+.destaque{ font-weight: 700; letter-spacing: -.012em; }
+.display{ font-family: var(--display); letter-spacing: -.035em; }
+.linha{ display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.linha.entre{ justify-content: space-between; }
+.linha.fim{ justify-content: flex-end; }
+.coluna{ display: flex; flex-direction: column; gap: 12px; }
+.grade{ display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+/* Linha de indicadores: o número de colunas sai da quantidade de cartões, para a linha
+ * fechar certinho (4 vira 4 ou 2+2; 6 vira 3+3) em vez de sobrar um cartão sozinho embaixo. */
+.grade:has(> .indicador){ --colunas: 4; grid-template-columns: repeat(var(--colunas), minmax(0, 1fr)); }
+.grade:has(> .indicador:last-child:nth-child(1)){ --colunas: 1; }
+.grade:has(> .indicador:last-child:nth-child(2)){ --colunas: 2; }
+.grade:has(> .indicador:last-child:nth-child(3)){ --colunas: 3; }
+.grade:has(> .indicador:last-child:nth-child(5)){ --colunas: 5; }
+.grade:has(> .indicador:last-child:nth-child(6)){ --colunas: 3; }
+.grade:has(> .indicador:last-child:nth-child(9)){ --colunas: 3; }
+.grade:has(> .indicador:last-child:nth-child(10)){ --colunas: 5; }
+@media (max-width: 1100px){
+  .grade:has(> .indicador:last-child:nth-child(4)), .grade:has(> .indicador:last-child:nth-child(8)){ --colunas: 2; }
+  .grade:has(> .indicador:last-child:nth-child(5)), .grade:has(> .indicador:last-child:nth-child(10)){ --colunas: 3; }
+}
+/* No celular: quantidade par fica 2 por linha; ímpar empilha, para nenhuma linha ficar torta. */
+@media (max-width: 560px){
+  .grade:has(> .indicador){ --colunas: 2; }
+  .grade:has(> .indicador:last-child:nth-child(odd)){ --colunas: 1; }
+  .grade:has(> .indicador:last-child:nth-child(4)), .grade:has(> .indicador:last-child:nth-child(6)),
+  .grade:has(> .indicador:last-child:nth-child(8)), .grade:has(> .indicador:last-child:nth-child(10)){ --colunas: 2; }
+}
+.crescer{ flex: 1; min-width: 0; }
+.direita{ text-align: right; }
+.centro{ text-align: center; }
+.positivo{ color: var(--ok); } .negativo{ color: var(--erro); }
+
+/* ---------- vidro ---------- */
+/* A borda é um degradê: a luz bate mais forte no canto de cima e some embaixo. */
+.vidro, .cartao, .painel{
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  background-image:
+    linear-gradient(var(--vidro), var(--vidro)),
+    linear-gradient(145deg, var(--vidro-borda-forte), var(--vidro-borda) 42%, transparent 78%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  backdrop-filter: var(--desfoque);
+  -webkit-backdrop-filter: var(--desfoque);
+  box-shadow: var(--sombra), var(--brilho);
+}
+.cartao, .painel{ padding: 16px; }
+.cartao.sem-brilho{ box-shadow: none; }
+.cartao.clicavel{ cursor: pointer; transition: transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .18s ease; }
+.cartao.clicavel:hover{ transform: translateY(-3px); box-shadow: var(--sombra-alta), var(--brilho); }
+/* Reflexo diagonal, bem sutil, no topo dos cartões grandes. */
+.cartao::after{
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,.07), transparent 38%);
+}
+
+/* ---------- indicadores ---------- */
+.indicador{ display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; overflow: hidden; container-type: inline-size; }
+.indicador .rotulo{ font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--texto-2); font-weight: 700; }
+.indicador .valor{ font-family: var(--display); font-size: clamp(15px, 10.5cqi, 21px); font-weight: 600; letter-spacing: -.05em; font-variant-numeric: tabular-nums; line-height: 1.15; white-space: nowrap; }
+.indicador .nota{ font-size: 12px; color: var(--texto-2); }
+.indicador .valor.verde{ color: var(--ok); } .indicador .valor.vermelho{ color: var(--erro); }
+/* Selo colorido no canto, com o ícone do indicador. */
+.indicador .selo-icone{
+  position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 10px;
+  display: grid; place-items: center; color: var(--acento);
+  background: linear-gradient(145deg, rgba(43,232,176,.22), rgba(73,200,255,.12));
+  border: 1px solid var(--vidro-borda);
+}
+.indicador .selo-icone svg{ width: 16px; height: 16px; }
+.indicador.vermelho .selo-icone{ color: var(--erro); background: linear-gradient(145deg, rgba(255,128,149,.22), rgba(255,128,149,.07)); }
+.indicador.ambar .selo-icone{ color: var(--aviso); background: linear-gradient(145deg, rgba(255,196,107,.24), rgba(255,196,107,.08)); }
+.indicador.azul .selo-icone{ color: var(--info); background: linear-gradient(145deg, rgba(111,194,255,.24), rgba(111,194,255,.08)); }
+.indicador.roxo .selo-icone{ color: var(--acento-3); background: linear-gradient(145deg, rgba(169,116,255,.24), rgba(169,116,255,.08)); }
+.indicador:has(.selo-icone) .rotulo, .indicador:has(.selo-icone) .valor{ padding-right: 36px; }
+
+/* ---------- botões ---------- */
+.btn{
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--vidro-borda); background: var(--vidro-forte);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 700; cursor: pointer;
+  text-decoration: none; color: var(--texto); min-height: 38px; white-space: nowrap;
+  box-shadow: var(--brilho);
+  transition: transform .14s cubic-bezier(.2,.8,.3,1), border-color .14s ease, background .14s ease, box-shadow .14s ease;
+}
+.btn:hover{ border-color: var(--vidro-borda-forte); transform: translateY(-1px); }
+.btn:active{ transform: translateY(0) scale(.99); }
+.btn:disabled{ opacity: .45; cursor: default; transform: none; box-shadow: none; }
+.btn svg{ width: 18px; height: 18px; }
+.btn.primario{
+  background: linear-gradient(135deg, #5DF3C6, var(--acento) 48%, #0FBF93);
+  border-color: transparent; color: var(--tinta);
+  box-shadow: 0 10px 30px -12px rgba(43,232,176,.95), inset 0 1px 0 rgba(255,255,255,.45);
+}
+.btn.primario:hover{ filter: brightness(1.05); box-shadow: 0 14px 36px -12px rgba(43,232,176,1), inset 0 1px 0 rgba(255,255,255,.5); }
+.btn.azul{
+  background: linear-gradient(135deg, #8ED9FF, var(--acento-2) 50%, #2C86DF);
+  border-color: transparent; color: #03172B;
+  box-shadow: 0 10px 30px -14px rgba(73,200,255,.9), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.btn.perigo{ color: var(--erro); border-color: rgba(255,128,149,.38); background: var(--erro-bg); }
+.btn.fantasma{ background: transparent; box-shadow: none; }
+.btn.fantasma:hover{ background: var(--vidro-forte); }
+.btn.pequeno{ min-height: 34px; padding: 6px 14px; font-size: 13px; }
+.btn.pequeno svg{ width: 15px; height: 15px; }
+.btn.grande{ min-height: 56px; font-size: 16px; width: 100%; letter-spacing: -.01em; }
+.btn.icone{ padding: 8px; min-height: 38px; width: 38px; border-radius: 13px; }
+
+/* ---------- formulários ---------- */
+label.campo{ display: flex; flex-direction: column; gap: 6px; font-size: 11px; font-weight: 700; color: var(--texto-3); text-transform: uppercase; letter-spacing: .1em; }
+input, select, textarea{
+  border: 1px solid var(--vidro-borda); background-color: rgba(255,255,255,.045);
+  border-radius: var(--raio-p); padding: 9px 12px; min-height: 40px; width: 100%; font-size: 14px;
+  color: var(--texto); text-transform: none; letter-spacing: normal; font-weight: 500;
+  transition: border-color .14s ease, box-shadow .14s ease, background .14s ease;
+}
+:root[data-tema="claro"] input, :root[data-tema="claro"] select, :root[data-tema="claro"] textarea{ background-color: rgba(255,255,255,.8); }
+input:hover, select:hover, textarea:hover{ border-color: var(--vidro-borda-forte); }
+input:focus, select:focus, textarea:focus{
+  outline: none; border-color: var(--acento);
+  box-shadow: 0 0 0 3px rgba(43,232,176,.22), inset 0 1px 0 rgba(255,255,255,.12);
+  background-color: rgba(255,255,255,.07);
+}
+:root[data-tema="claro"] input:focus, :root[data-tema="claro"] select:focus, :root[data-tema="claro"] textarea:focus{ background-color: #fff; }
+select{ appearance: none; cursor: pointer; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% + 1px), calc(100% - 13px) calc(50% + 1px); background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 36px; }
+select option{ background: var(--fundo-2); color: var(--texto); }
+textarea{ min-height: 86px; resize: vertical; }
+input[type="checkbox"]{ width: 19px; height: 19px; min-height: 0; accent-color: var(--acento); }
+input[type="color"]{ padding: 4px; }
+.form{ display: flex; flex-direction: column; gap: 14px; }
+.form .duas{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grupo-oferta{ border: 1px dashed var(--vidro-borda-forte); border-radius: var(--raio-p); padding: 10px 14px 14px; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.grupo-oferta legend{ padding: 0 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: var(--acento); }
+.grupo-oferta p{ margin: 0; }
+.form .tres{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+@media (max-width: 560px){ .form .duas, .form .tres{ grid-template-columns: 1fr; } }
+/* Ação discreta no rótulo de um campo (ex.: "sugerir" o preço), sem alterar a altura da linha. */
+.acao-campo{ border: 0; background: none; padding: 0; min-height: 0; cursor: pointer; color: var(--acento);
+  font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.acao-campo:hover{ text-decoration: underline; }
+.marcador{ display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--texto-2); text-transform: none; letter-spacing: normal; cursor: pointer; }
+
+/* ---------- etiquetas ---------- */
+.etiqueta{ display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 700;
+  background: var(--vidro-forte); color: var(--texto-2); white-space: nowrap; border: 1px solid var(--vidro-borda); }
+.etiqueta.ok{ background: var(--ok-bg); color: var(--ok); border-color: rgba(61,235,169,.3); }
+.etiqueta.erro{ background: var(--erro-bg); color: var(--erro); border-color: rgba(255,128,149,.3); }
+.etiqueta.aviso{ background: var(--aviso-bg); color: var(--aviso); border-color: rgba(255,196,107,.3); }
+.etiqueta.info{ background: var(--info-bg); color: var(--info); border-color: rgba(111,194,255,.3); }
+.ponto{ width: 9px; height: 9px; border-radius: 99px; background: currentColor; display: inline-block; box-shadow: 0 0 10px currentColor; }
+
+/* ---------- fotos dos produtos ---------- */
+.foto-produto{ display: grid; place-items: center; object-fit: cover; background: var(--vidro-forte);
+  border: 1px solid var(--vidro-borda); border-radius: 12px; width: 44px; height: 44px; flex: none; overflow: hidden; }
+.foto-produto.sem-foto{ color: var(--texto-2); font-weight: 800; font-size: 13px; letter-spacing: -.02em;
+  background: color-mix(in srgb, var(--cor-foto) 26%, transparent); border-color: color-mix(in srgb, var(--cor-foto) 40%, transparent); }
+/* Sem foto real: o desenho do produto, em fundo branco como uma foto de catálogo. */
+/* margem em px: em %, ela seria medida pela largura da linha inteira e engoliria o desenho */
+.foto-produto.ilustracao{ background: #fff; object-fit: contain; padding: 3px; }
+.foto-produto.miniatura{ width: 34px; height: 34px; border-radius: 10px; font-size: 11px; }
+.foto-produto.grande{ width: 104px; height: 104px; border-radius: 18px; font-size: 28px; }
+.previa-foto{ flex: none; }
+
+/* ---------- tabelas ---------- */
+.tabela-rolagem{ overflow-x: auto; }
+.cartao > .tabela-rolagem, .painel > .tabela-rolagem{ margin: 0 -16px -16px; padding: 0 4px; }
+table{ width: 100%; border-collapse: collapse; font-size: 13px; }
+th{ text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(--texto-3); font-weight: 800; padding: 9px 14px; white-space: nowrap; }
+td{ padding: 8px 14px; border-top: 1px solid var(--vidro-borda); vertical-align: middle; }
+tbody tr{ transition: background .14s ease; }
+tbody tr:hover{ background: linear-gradient(90deg, rgba(43,232,176,.09), rgba(255,255,255,.03) 40%, transparent); }
+tr.clicavel{ cursor: pointer; }
+td.direita, th.direita{ text-align: right; }
+.vazio{ padding: 44px 16px; text-align: center; color: var(--texto-3); }
+.vazio .icone{ font-size: 32px; display: block; margin-bottom: 10px; opacity: .75; }
+
+/* ---------- barra de progresso ---------- */
+.barra{ height: 7px; border-radius: 99px; background: rgba(255,255,255,.11); overflow: hidden; }
+.barra > span{ display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--acento), var(--acento-2)); box-shadow: 0 0 12px -2px var(--acento); }
+.barra.alerta > span{ background: linear-gradient(90deg, var(--aviso), var(--erro)); box-shadow: 0 0 12px -2px var(--erro); }
+
+/* ---------- estrutura ---------- */
+.layout{ display: grid; grid-template-columns: 224px 1fr; min-height: 100vh; }
+.menu{
+  position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 2px;
+  padding: 16px 12px; overflow-y: auto;
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
+  backdrop-filter: var(--desfoque); -webkit-backdrop-filter: var(--desfoque);
+  border-right: 1px solid var(--vidro-borda);
+}
+.marca{ display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 4px 6px 14px; }
+.marca .logo-marca{ display: block; width: 100%; max-width: 128px; height: auto; }
+.marca .logo-marca.no-claro{ display: none; }
+[data-tema="claro"] .marca .logo-marca.no-escuro{ display: none; }
+[data-tema="claro"] .marca .logo-marca.no-claro{ display: block; }
+.marca .sub{ font-size: 11px; color: var(--texto-3); font-weight: 600; line-height: 1.3; }
+.menu .secao{ font-size: 10px; text-transform: uppercase; letter-spacing: .16em; color: var(--texto-3); font-weight: 800; padding: 12px 10px 4px; }
+.menu a{
+  position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 11px;
+  color: var(--texto-2); text-decoration: none; font-weight: 650; font-size: 13px; border: 1px solid transparent;
+  transition: background .14s ease, color .14s ease, transform .14s ease;
+}
+.menu a svg{ width: 17px; height: 17px; flex: none; opacity: .8; }
+.menu a:hover{ background: var(--vidro-forte); color: var(--texto); transform: translateX(2px); }
+.menu a.ativo{
+  background: linear-gradient(135deg, rgba(43,232,176,.24), rgba(73,200,255,.14) 60%, transparent);
+  color: var(--texto); border-color: var(--vidro-borda); box-shadow: var(--brilho);
+}
+.menu a.ativo svg{ opacity: 1; color: var(--acento); }
+/* Traço aceso à esquerda do item do menu que está aberto. */
+.menu a.ativo::before{
+  content: ""; position: absolute; left: -6px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 4px 4px 0; background: var(--acento); box-shadow: 0 0 16px var(--acento);
+}
+.menu .contador{ margin-left: auto; font-size: 11px; font-weight: 800; background: var(--erro-bg); color: var(--erro); padding: 1px 8px; border-radius: 99px; }
+.menu .rodape{ margin-top: auto; padding: 16px 12px 0; font-size: 11px; color: var(--texto-3); }
+
+.principal{ display: flex; flex-direction: column; min-width: 0; }
+.topo{
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 11px 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.035));
+  backdrop-filter: var(--desfoque); -webkit-backdrop-filter: var(--desfoque);
+  border-bottom: 1px solid var(--vidro-borda);
+}
+.topo h1{ margin: 0; font-size: 18px; }
+.topo .subtitulo{ font-size: 12px; color: var(--texto-3); }
+.topo .crescer{ overflow: hidden; }
+.topo h1, .topo .subtitulo{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.usuario{ display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.avatar{
+  width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 13px;
+  background: linear-gradient(145deg, var(--acento-3), var(--acento-2)); color: #07101F; border: 0; cursor: pointer;
+  box-shadow: 0 10px 26px -12px var(--acento-3), inset 0 1px 0 rgba(255,255,255,.45);
+  transition: transform .14s ease;
+}
+.avatar:hover{ transform: translateY(-1px) scale(1.03); }
+.conteudo{ padding: 18px 22px 48px; display: flex; flex-direction: column; gap: 14px; }
+/* As seções entram de baixo, uma depois da outra. */
+.conteudo > *{ animation: subir .42s cubic-bezier(.2,.8,.3,1) both; }
+.conteudo > *:nth-child(2){ animation-delay: .05s; }
+.conteudo > *:nth-child(3){ animation-delay: .1s; }
+.conteudo > *:nth-child(4){ animation-delay: .15s; }
+.conteudo > *:nth-child(n+5){ animation-delay: .2s; }
+@keyframes subir{ from{ opacity: 0; transform: translateY(14px); } to{ opacity: 1; transform: none; } }
+.menu-botao{ display: none; }
+
+@media (max-width: 960px){
+  .layout{ grid-template-columns: 1fr; }
+  .menu{ position: fixed; z-index: 60; width: 268px; transform: translateX(-100%); transition: transform .24s cubic-bezier(.2,.8,.3,1); }
+  .menu.aberto{ transform: none; box-shadow: var(--sombra-alta); }
+  .menu-botao{ display: inline-flex; }
+  .conteudo, .topo{ padding-left: 16px; padding-right: 16px; }
+  .conteudo{ padding-top: 16px; }
+  .oculto-celular{ display: none; }
+  .topo h1{ font-size: 18px; }
+  .topo{ gap: 8px; padding: 12px 16px; }
+  .usuario{ gap: 6px; }
+  .avatar{ width: 38px; height: 38px; border-radius: 13px; }
+  .grade:not(:has(> .indicador)){ grid-template-columns: 1fr; }
+  .total{ font-size: 38px; }
+  .modal{ padding: 20px; }
+  .cartao, .painel{ padding: 16px; }
+  .cartao > .tabela-rolagem, .painel > .tabela-rolagem{ margin: 0 -16px -16px; }
+}
+
+/* ---------- entrada (login) ----------
+ * A foto da loja ocupa a tela inteira e o cartão de acesso flutua sobre ela.
+ * Fica sempre no escuro da marca, mesmo com o tema claro escolhido. */
+.entrada{
+  position: relative;
+  min-height: 100vh; display: grid; align-items: center; justify-items: end;
+  padding: clamp(16px, 4vh, 40px) clamp(16px, 5vw, 72px);
+  background: #011829; color: #E7F4F1;
+}
+
+/* A foto em tamanho natural à esquerda, com um véu que a dissolve no escuro da marca
+ * antes de chegar ao cartão — assim não há corte visível nem deformação da loja. */
+.entrada::before{
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    linear-gradient(96deg, rgba(1,18,30,0) 0%, rgba(1,18,30,0) 58%, rgba(1,18,30,.22) 78%, rgba(1,18,30,.40) 100%),
+    url("../img/loja.webp") left center / auto 100% no-repeat;
+}
+.entrada .painel-entrada{ position: relative; z-index: 1; width: 100%; max-width: 432px; }
+
+.entrada .caixa{
+  width: 100%; padding: 32px 32px 26px;
+  border-color: rgba(39,227,182,.26);
+  background: linear-gradient(150deg, rgba(14,52,66,.62), rgba(3,24,38,.70));
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  box-shadow: 0 34px 90px rgba(0,0,0,.55), 0 0 70px rgba(39,227,182,.08);
+}
+.entrada .selo-entrada{
+  width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; margin: 0 auto;
+  background: rgba(39,227,182,.14); border: 1px solid rgba(39,227,182,.32); color: var(--acento);
+}
+.entrada .selo-entrada svg{ width: 26px; height: 26px; }
+.entrada .caixa h2{ font-size: clamp(27px, 2.4vw, 34px); margin: 16px 0 22px; text-align: center; }
+.entrada .caixa label.campo{
+  font-size: 14px; font-weight: 650; gap: 8px;
+  text-transform: none; letter-spacing: normal; color: var(--texto);
+}
+.entrada .caixa input{ background-color: rgba(255,255,255,.07); min-height: 46px; font-size: 15px; padding-top: 11px; padding-bottom: 11px; }
+
+/* Campo com ícone fixo à esquerda (e o olho da senha à direita). */
+.campo-icone{ position: relative; display: flex; align-items: center; }
+.campo-icone > svg:first-child{ position: absolute; left: 15px; width: 20px; height: 20px; color: var(--acento); pointer-events: none; }
+.campo-icone input{ padding-left: 48px; }
+.campo-icone input[type="password"], .campo-icone input[type="text"]{ padding-right: 48px; }
+.campo-icone .ver-senha{
+  position: absolute; right: 7px; width: 36px; height: 36px; display: grid; place-items: center;
+  border: 0; background: none; border-radius: 11px; color: var(--texto-3); cursor: pointer;
+}
+.campo-icone .ver-senha:hover{ color: var(--acento); background: rgba(255,255,255,.08); }
+.campo-icone .ver-senha svg{ width: 20px; height: 20px; }
+
+.entrada .opcoes{ display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.entrada .lembrar{ display: inline-flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; color: var(--texto-2); cursor: pointer; }
+.entrada .lembrar input{ width: 18px; height: 18px; min-height: 0; padding: 0; accent-color: var(--acento); cursor: pointer; }
+.elo{ border: 0; background: none; padding: 0; font: inherit; font-size: 14px; font-weight: 650; color: var(--acento); cursor: pointer; }
+.elo:hover{ text-decoration: underline; }
+
+.entrada .ajuda{
+  margin: 20px 0 0; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.12);
+  text-align: center; font-size: 14px; color: var(--texto-2);
+}
+
+/* No celular a foto da loja sai: sobra o cartão de acesso sobre o escuro da marca.
+ * Em tela pequena a loja apareceria em pedaços e só roubaria contraste do formulário. */
+@media (max-width: 760px){
+  .entrada{ justify-items: center; }
+  .entrada::before{
+    background:
+      radial-gradient(520px 420px at 12% 4%, rgba(2,150,125,.26), transparent 62%),
+      radial-gradient(620px 520px at 88% 96%, rgba(4,62,82,.40), transparent 64%),
+      #011829;
+  }
+  .entrada .painel-entrada{ max-width: 420px; }
+}
+@media (max-width: 560px){
+  .entrada{ padding: 20px 16px; }
+  .entrada .caixa{ padding: 26px 20px 22px; }
+}
+}
+}
+}
+
+/* ---------- PDV ---------- */
+.pdv{ display: grid; grid-template-columns: 1fr 390px; gap: 18px; align-items: start; }
+@media (max-width: 1100px){ .pdv{ grid-template-columns: 1fr; } }
+.pdv .leitor input{ font-size: 17px; min-height: 60px; padding-left: 50px; font-weight: 650; border-radius: 16px; }
+.pdv .leitor{ position: relative; }
+/* O cartão da busca sobe acima dos vizinhos: a lista de sugestões passa por cima do carrinho,
+   e não por baixo (o desfoque de fundo dos cartões cria contexto de empilhamento próprio). */
+.pdv .busca{ position: relative; z-index: 40; }
+.pdv .leitor svg{ position: absolute; left: 17px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--texto-3); pointer-events: none; }
+.pdv .itens{ max-height: 52vh; overflow-y: auto; }
+.pdv .itens tr{ animation: surgir .22s ease both; }
+.total{ font-family: var(--display); font-size: 46px; font-weight: 600; letter-spacing: -.055em; font-variant-numeric: tabular-nums; line-height: 1; }
+.total small{ font-family: "Manrope", sans-serif; font-size: 14px; font-weight: 700; color: var(--texto-3); display: block; letter-spacing: 0; margin-top: 8px; }
+.sugestoes{ position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 8px); max-height: 330px; overflow-y: auto; padding: 8px; }
+.sugestoes button{ display: flex; width: 100%; gap: 10px; align-items: center; text-align: left; background: transparent; border: 0; padding: 11px 13px; border-radius: 13px; cursor: pointer; }
+.sugestoes button:hover, .sugestoes button.marcado{ background: var(--vidro-forte); }
+.formas{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+/* Pagamento já lançado na venda. */
+.pago{ padding: 10px 14px; border-radius: var(--raio-p); background: var(--vidro-forte); border: 1px solid var(--vidro-borda); }
+.recebido{ display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-color: rgba(61,235,169,.35);
+  background-image: linear-gradient(140deg, rgba(61,235,169,.16), rgba(73,200,255,.07)), linear-gradient(145deg, rgba(61,235,169,.5), transparent 70%); }
+.recebido .marca-check{ width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; flex: none;
+  background: linear-gradient(145deg, #6BF7D0, var(--acento)); color: var(--tinta); box-shadow: 0 8px 22px -10px var(--acento); }
+.recebido .marca-check svg{ width: 22px; height: 22px; }
+.forma{
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 15px 8px; border-radius: 17px; cursor: pointer;
+  background: var(--vidro-forte); border: 1px solid var(--vidro-borda); font-weight: 700; font-size: 13px; color: var(--texto-2);
+  transition: transform .14s ease, border-color .14s ease, color .14s ease;
+}
+.forma svg{ width: 22px; height: 22px; opacity: .85; }
+.forma:hover{ border-color: var(--vidro-borda-forte); transform: translateY(-2px); color: var(--texto); }
+.forma.ativa{
+  background: linear-gradient(140deg, rgba(43,232,176,.3), rgba(73,200,255,.16)); border-color: var(--acento); color: var(--texto);
+  box-shadow: 0 10px 26px -14px var(--acento), var(--brilho);
+}
+.forma.ativa svg{ opacity: 1; color: var(--acento); }
+
+/* ---------- modal ---------- */
+.modal-fundo{ position: fixed; inset: 0; z-index: 100; background: rgba(3,6,14,.6); backdrop-filter: blur(8px);
+  display: grid; place-items: center; padding: 18px; animation: surgir .18s ease; }
+.modal{
+  width: 100%; max-width: 580px; max-height: 88vh; overflow-y: auto; padding: 26px;
+  display: flex; flex-direction: column; gap: 16px;
+  border: 1px solid var(--vidro-borda-forte); border-radius: var(--raio);
+  background: linear-gradient(165deg, rgba(255,255,255,.14), rgba(255,255,255,.07));
+  backdrop-filter: var(--desfoque); -webkit-backdrop-filter: var(--desfoque);
+  box-shadow: 0 40px 90px -36px rgba(0,0,0,1), var(--brilho);
+  animation: entrar-modal .26s cubic-bezier(.2,.8,.3,1) both;
+}
+:root[data-tema="claro"] .modal{ background: linear-gradient(165deg, rgba(255,255,255,.96), rgba(255,255,255,.88)); }
+.modal.largo{ max-width: 880px; }
+.modal h2{ font-size: 20px; margin: 0; }
+.modal > .form{ gap: 14px; }
+@keyframes surgir{ from{ opacity: 0; } to{ opacity: 1; } }
+@keyframes entrar-modal{ from{ opacity: 0; transform: translateY(18px) scale(.98); } to{ opacity: 1; transform: none; } }
+
+/* ---------- aviso (toast) ---------- */
+.toast{
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 200; max-width: 92vw;
+  padding: 14px 22px; border-radius: 999px; font-weight: 700; background: rgba(10,16,30,.9); color: #fff;
+  border: 1px solid var(--vidro-borda-forte); backdrop-filter: blur(14px);
+  box-shadow: 0 22px 50px -22px rgba(0,0,0,1), var(--brilho);
+  animation: subir-toast .24s cubic-bezier(.2,.8,.3,1) both;
+}
+.toast.erro{ background: rgba(104,20,36,.93); border-color: rgba(255,128,149,.4); }
+.toast.ok{ background: rgba(7,74,56,.93); border-color: rgba(61,235,169,.4); }
+@keyframes subir-toast{ from{ opacity: 0; transform: translate(-50%, 16px); } to{ opacity: 1; transform: translate(-50%, 0); } }
+
+/* ---------- gráficos simples ---------- */
+.colunas{ display: flex; align-items: flex-end; gap: 8px; height: 156px; }
+.colunas .col{ flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 7px; align-items: center; min-width: 0; }
+.colunas .barra-vertical{
+  width: 100%; border-radius: 9px 9px 5px 5px; min-height: 4px;
+  background: linear-gradient(180deg, var(--acento), rgba(73,200,255,.5));
+  box-shadow: 0 -4px 24px -8px var(--acento);
+  animation: crescer-barra .5s cubic-bezier(.2,.8,.3,1) both;
+  transform-origin: bottom;
+}
+.colunas .col:hover .barra-vertical{ filter: brightness(1.15); }
+.colunas .rotulo{ font-size: 10px; color: var(--texto-3); font-weight: 700; white-space: nowrap; }
+@keyframes crescer-barra{ from{ transform: scaleY(0); opacity: .4; } to{ transform: scaleY(1); opacity: 1; } }
+.rosca{ display: grid; place-items: center; width: 150px; height: 150px; border-radius: 50%; flex: none;
+  box-shadow: 0 18px 40px -22px rgba(0,0,0,.9), inset 0 0 0 1px var(--vidro-borda); }
+.rosca .buraco{ width: 96px; height: 96px; border-radius: 50%; background: var(--fundo-2); display: grid; place-items: center; text-align: center;
+  box-shadow: inset 0 1px 0 var(--vidro-topo); font-family: var(--display); letter-spacing: -.04em; font-size: 15px; }
+:root[data-tema="claro"] .rosca .buraco{ background: #F6F9FF; }
+.legenda{ display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.legenda .item{ display: flex; align-items: center; gap: 9px; }
+.legenda .cor{ width: 11px; height: 11px; border-radius: 4px; flex: none; }
+
+/* ---------- cupom ---------- */
+.cupom{ font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 13px; white-space: pre-wrap; line-height: 1.5;
+  background: rgba(255,255,255,.055); border: 1px dashed var(--vidro-borda-forte); border-radius: var(--raio-p); padding: 18px; }
+@media print{
+  body::before, body::after, .menu, .topo, .btn{ display: none !important; }
+  body{ background: #fff; color: #000; }
+  .modal-fundo{ position: static; background: none; padding: 0; backdrop-filter: none; }
+  .modal{ box-shadow: none; border: 0; background: #fff; max-width: none; animation: none; }
+  .cupom{ background: #fff; color: #000; border-color: #999; }
+}
+
+/* ---------- abas ---------- */
+.abas{ display: flex; gap: 4px; flex-wrap: wrap; padding: 4px; border-radius: 999px; width: fit-content; max-width: 100%;
+  background: var(--vidro); border: 1px solid var(--vidro-borda); backdrop-filter: blur(14px); box-shadow: var(--brilho); }
+.abas button{ border: 0; background: transparent; padding: 7px 14px; border-radius: 999px; font-weight: 700; font-size: 13px; color: var(--texto-2); cursor: pointer;
+  transition: background .14s ease, color .14s ease; }
+.abas button:hover{ color: var(--texto); }
+.abas button.ativa{ background: linear-gradient(135deg, rgba(43,232,176,.26), rgba(73,200,255,.16)); color: var(--texto); box-shadow: var(--brilho); }
+
+.carregando{ display: grid; place-items: center; padding: 70px; color: var(--texto-3); }
+.girando{ width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--vidro-borda); border-top-color: var(--acento); animation: girar .8s linear infinite; }
+@keyframes girar{ to{ transform: rotate(360deg); } }
+
+/* Quem pediu menos movimento no sistema recebe o visual sem animação. */
+@media (prefers-reduced-motion: reduce){
+  body::before{ animation: none; }
+  *, *::before, *::after{ animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+/* ---------- gestão da vitrine ---------- */
+.vt-opcao{ align-items: flex-start; padding: 6px 0; }
+.vt-opcao input{ margin-top: 3px; }
+.divisor{ border: 0; border-top: 1px solid var(--vidro-borda); margin: 4px 0; }
+.passos{ margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--texto-2); font-size: 13px; }
+.endereco-tv{ display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--raio-p); background: var(--vidro-forte); border: 1px solid var(--vidro-borda); margin-bottom: 10px; }
+.endereco-tv code{ flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; color: var(--acento); }
+.midia{ display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--raio-p); border: 1px solid var(--vidro-borda); background: rgba(255,255,255,.03); }
+.midia.desligada{ opacity: .55; }
+.miniatura-midia{ width: 96px; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #000; flex: none; }
+.miniatura-midia img, .miniatura-midia video{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.barra-envio{ height: 8px; border-radius: 99px; background: var(--vidro-forte); overflow: hidden; margin-top: 4px; }
+.barra-envio span{ display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--acento), var(--acento-2)); transition: width .2s ease; }
+@media (max-width: 560px){ .midia{ flex-wrap: wrap; } .miniatura-midia{ width: 72px; } }
