@@ -51,6 +51,7 @@ async function abaDados(alvo, recarregar) {
 
   montar(alvo, 
     cartao('Identificação', el('div', { class: 'pares' },
+      par('Sua conta PayAx', el('strong', {}, c.conta_payax ?? '—')),
       par('Razão social', c.razao_social),
       par('CNPJ', documento(c.cnpj)),
       par('Situação', selo(c.situacao, R.situacaoCliente)),

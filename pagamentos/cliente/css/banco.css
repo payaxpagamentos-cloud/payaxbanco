@@ -38,3 +38,7 @@
 .atalho { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie); cursor: pointer; text-align: left; font-size: 13.5px; font-weight: 600; color: var(--texto); }
 .atalho:hover { border-color: #2fae80; background: #f2fbf7; }
 .atalho svg { color: #2fae80; }
+
+/* Agência e conta do cliente, logo abaixo do saldo. */
+.saldo .conta-numero { display: flex; gap: 8px; align-items: baseline; margin-top: 6px; font-size: 12.5px; color: #a8cdbf; flex-wrap: wrap; }
+.saldo .conta-numero strong { color: #fff; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; margin-right: 8px; }

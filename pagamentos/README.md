@@ -40,7 +40,7 @@ conferência da nossa equipe.
 
 | # | Módulo | O que tem |
 |---|---|---|
-| 1 | **Clientes** | Cadastro com CNPJ validado, endereço do beneficiário, situação, chave PIX de repasse, janela de retenção (D+N), repasse automático, valor mínimo, limite sem aprovação e teto por boleto. Ficha com resumo, boletos, conta gráfica, repasses, preços e acessos. |
+| 1 | **Clientes** | Número de conta PayAx sequencial (agência 001 · conta 0001-3) com dígito verificador. Cadastro com CNPJ validado, endereço do beneficiário, situação, chave PIX de repasse, janela de retenção (D+N), repasse automático, valor mínimo, limite sem aprovação e teto por boleto. Ficha com resumo, boletos, conta gráfica, repasses, preços e acessos. |
 | 2 | **Preços** | Tabela padrão da plataforma e tabela por cliente, **com vigência**: tarifa de emissão, tarifa de liquidação (repassada), comissão percentual com piso e teto, e tarifa do repasse. O histórico fica guardado. |
 | 3 | **Boletos** | Emissão avulsa, por importação do IXC ou por API. **Boleto** e **Bolepix** (mesmo título com QR Code PIX). Nosso número reservado de forma atômica, código de barras e linha digitável no padrão FEBRABAN com o campo livre do Bradesco. Juros ao mês (pro rata die), multa, desconto por antecipação e prazo de baixa. Baixa, estorno e consulta ao banco. |
 | 4 | **Ficha de compensação** | Recibo do pagador + ficha, em HTML pronto para imprimir ou salvar em PDF pelo navegador, com código de barras Interleaved 2 of 5 nas medidas do padrão (103 × 13 mm) e QR Code do Bolepix. **Link público assinado** para enviar ao pagador, sem login. |
@@ -83,6 +83,29 @@ Com a demonstração, o Internet Bank fica em `http://localhost:3600/cliente/` c
 npm test          # 58 testes
 npm run migrar    # aplica as migrações sem subir o servidor
 ```
+
+## A conta do cliente na PayAx
+
+Cada cliente recebe, no cadastro, um número de conta **sequencial**: agência `001` com contas `0001`, `0002`,
+`0003`… Ao chegar em `9999`, a agência `002` abre sozinha e a numeração continua. O número é atribuído uma vez e
+**nunca muda**, nem quando o cadastro é alterado.
+
+```
+Agência 001 · Conta 0001-3
+                       └── dígito verificador (módulo 11 sobre agência + conta)
+```
+
+O dígito existe para pegar erro de digitação quando alguém informa a conta — inclusive a troca de dois dígitos de
+lugar, o engano mais comum ao ditar um número. O cliente vê a conta no alto do Internet Bank e em Cadastro; a
+equipe vê na lista, na ficha, e **busca por ela** (`0002` ou `001/0003` encontram o cliente).
+
+> **Não confundir com a agência e a conta do Bradesco.** Aquelas são do convênio, vão dentro do código de barras
+> (posições 20-23 e 37-43) e é por elas que o banco identifica para onde o dinheiro vai. Esta é nossa, identifica a
+> conta gráfica do cliente e **não entra no boleto**. Um teste garante que a conta interna nunca aparece no código
+> de barras.
+
+Clientes cadastrados antes desta numeração recebem o número no primeiro start, na ordem de cadastro — não é preciso
+fazer nada.
 
 ## O beneficiário do boleto
 

@@ -15,6 +15,7 @@ const consultas = require('../lib/consultas');
 const repasses = require('../lib/repasses');
 const auditoria = require('../lib/auditoria');
 const { podeEquipe } = require('../lib/permissoes');
+const contaInterna = require('../lib/contaInterna');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 
@@ -72,11 +73,14 @@ module.exports = (db) => {
     const p = [];
     if (req.query.situacao) { cond.push('c.situacao = ?'); p.push(req.query.situacao); }
     if (req.query.busca) {
-      cond.push("(c.razao_social LIKE ? ESCAPE '\\' OR c.nome_fantasia LIKE ? ESCAPE '\\' OR c.cnpj LIKE ?)");
-      p.push(like(req.query.busca), like(req.query.busca), `%${String(req.query.busca).replace(/\D/g, '') || '@'}%`);
+      const d = String(req.query.busca).replace(/\D/g, '');
+      cond.push(`(c.razao_social LIKE ? ESCAPE '\\' OR c.nome_fantasia LIKE ? ESCAPE '\\' OR c.cnpj LIKE ?
+        OR c.conta_interna = ? OR (c.agencia_interna || c.conta_interna) = ?)`);
+      p.push(like(req.query.busca), like(req.query.busca), `%${d || '@'}%`, d.padStart(4, '0'), d.slice(0, 7));
     }
     const data = hoje();
     const sql = `SELECT c.*,
+        c.agencia_interna || ' · ' || c.conta_interna || '-' || c.conta_interna_dv AS conta_payax,
         (SELECT COUNT(*) FROM boletos b WHERE b.cliente_id = c.id AND b.situacao = 'registrado') AS boletos_abertos,
         (SELECT IFNULL(SUM(l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND l.data_liberacao <= '${data}') AS disponivel_centavos,
         (SELECT IFNULL(SUM(l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND l.data_liberacao > '${data}') AS a_liberar_centavos
@@ -88,8 +92,13 @@ module.exports = (db) => {
     const d = corpoCliente(req.body ?? {}, { novo: true });
     if (db.prepare('SELECT 1 FROM clientes WHERE cnpj = ?').get(d.cnpj)) throw new ErroNegocio('Já existe um cliente com este CNPJ.', 409);
     const campos = Object.keys(d);
-    const id = db.prepare(`INSERT INTO clientes (${campos.join(', ')}, criado_em, criado_por) VALUES (${campos.map(() => '?').join(', ')}, ?, ?) RETURNING id`)
-      .get(...campos.map((k) => d[k]), agora(), req.usuario.id).id;
+    const id = transacao(db, () => {
+      const novo = db.prepare(`INSERT INTO clientes (${campos.join(', ')}, criado_em, criado_por) VALUES (${campos.map(() => '?').join(', ')}, ?, ?) RETURNING id`)
+        .get(...campos.map((k) => d[k]), agora(), req.usuario.id).id;
+      // Número da conta PayAx: sequencial, atribuído uma vez e nunca alterado.
+      contaInterna.atribuir(db, novo);
+      return novo;
+    });
     auditoria.registrar(db, req, { acao: 'cliente.criado', entidade: 'cliente', entidade_id: id, cliente_id: id, depois: d });
     res.status(201).json(buscar(id));
   });
@@ -99,6 +108,8 @@ module.exports = (db) => {
     const data = hoje();
     res.json({
       ...c,
+      conta_payax: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
+      conta_payax_curta: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv, { curto: true }),
       saldo: razao.saldo(db, c.id, data),
       preco: precos.vigente(db, c.id, data),
       agenda: razao.agenda(db, c.id, data, 30),

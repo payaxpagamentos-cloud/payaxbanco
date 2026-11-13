@@ -21,6 +21,7 @@ const consultas = require('../lib/consultas');
 const impressao = require('../lib/impressao');
 const sincronismo = require('../lib/sincronismo');
 const auditoria = require('../lib/auditoria');
+const contaInterna = require('../lib/contaInterna');
 const { detalhe, assinaturaFicha } = require('./boletos');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
@@ -81,7 +82,13 @@ module.exports = (db, autenticado) => {
     res.json({
       hoje: data,
       periodo: p,
-      cliente: { razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, cnpj: c.cnpj, situacao: c.situacao, retencao_dias: c.retencao_dias },
+      cliente: {
+        razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, cnpj: c.cnpj, situacao: c.situacao,
+        retencao_dias: c.retencao_dias,
+        agencia: c.agencia_interna,
+        conta: c.conta_interna && `${c.conta_interna}-${c.conta_interna_dv}`,
+        conta_payax: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
+      },
       saldo: razao.saldo(db, c.id, data),
       agenda: razao.agenda(db, c.id, data, 30),
       boletos: consultas.resumoBoletos(db, { ...p, clienteId: c.id, hoje: data }),
@@ -166,6 +173,9 @@ module.exports = (db, autenticado) => {
     const c = meuCliente(req);
     const data = hoje();
     res.json({
+      agencia: c.agencia_interna,
+      conta: c.conta_interna && `${c.conta_interna}-${c.conta_interna_dv}`,
+      conta_payax: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
       saldo: razao.saldo(db, c.id, data),
       agenda: razao.agenda(db, c.id, data, 60),
       disponivel: repassesLib.disponivel(db, c, data),
@@ -220,6 +230,9 @@ module.exports = (db, autenticado) => {
     const c = meuCliente(req);
     res.json({
       razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, cnpj: c.cnpj, email: c.email, telefone: c.telefone,
+      agencia: c.agencia_interna,
+      conta: c.conta_interna && `${c.conta_interna}-${c.conta_interna_dv}`,
+      conta_payax: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
       responsavel: c.responsavel, cep: c.cep, endereco: c.endereco, numero: c.numero, complemento: c.complemento,
       bairro: c.bairro, cidade: c.cidade, uf: c.uf, situacao: c.situacao, retencao_dias: c.retencao_dias,
       repasse_automatico: Boolean(c.repasse_automatico), limite_boleto_centavos: c.limite_boleto_centavos,

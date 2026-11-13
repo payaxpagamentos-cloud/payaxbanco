@@ -5,6 +5,7 @@ const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const config = require('./config');
 const { hashSenha } = require('./lib/senha');
+const contaInterna = require('./lib/contaInterna');
 
 /*
  * PayAx Pagamentos — convenções do banco:
@@ -383,6 +384,29 @@ ALTER TABLE integracoes_nova RENAME TO integracoes;
 CREATE UNIQUE INDEX idx_integracoes_escopo ON integracoes(escopo, IFNULL(cliente_id, 0), IFNULL(conta_id, 0));
 `,
   },
+  {
+    versao: 3,
+    nome: 'conta-interna',
+    sql: `
+-- Número da conta do cliente DENTRO da PayAx (identidade da conta gráfica).
+-- NÃO é a agência/conta do Bradesco: aquela identifica o convênio e vai no código de barras; esta, não.
+ALTER TABLE clientes ADD COLUMN agencia_interna TEXT;
+ALTER TABLE clientes ADD COLUMN conta_interna TEXT;
+ALTER TABLE clientes ADD COLUMN conta_interna_dv TEXT;
+CREATE UNIQUE INDEX idx_clientes_conta_interna ON clientes(agencia_interna, conta_interna);
+
+-- Agências internas e o próximo número livre de cada uma. Ao encher, a seguinte é aberta sozinha.
+CREATE TABLE contas_internas (
+  agencia TEXT PRIMARY KEY,
+  nome TEXT,
+  proxima INTEGER NOT NULL DEFAULT 1 CHECK (proxima >= 1),
+  limite INTEGER NOT NULL DEFAULT 9999 CHECK (limite >= 1),
+  criada_em TEXT NOT NULL
+);
+INSERT INTO contas_internas (agencia, nome, proxima, limite, criada_em)
+  VALUES ('001', 'Agência principal', 1, 9999, datetime('now'));
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();
@@ -421,6 +445,9 @@ function abrir(arquivo = config.dbFile) {
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   migrar(db);
   semear(db);
+  // Clientes cadastrados antes desta numeração recebem o número agora, na ordem de cadastro.
+  const numerados = contaInterna.garantirTodos(db);
+  if (numerados) console.log(`[PayAx] Número de conta interna atribuído a ${numerados} cliente(s).`);
   return db;
 }
 

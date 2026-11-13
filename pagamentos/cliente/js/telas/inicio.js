@@ -12,7 +12,11 @@ export default async function inicio({ alvo }) {
   const cartaoSaldo = el('div', { class: 'saldo' },
     el('div', {},
       el('div', { class: 'titulo' }, 'Saldo disponível'),
-      el('div', { class: 'valor' }, dinheiro(d.saldo.disponivel_centavos))),
+      el('div', { class: 'valor' }, dinheiro(d.saldo.disponivel_centavos)),
+      d.cliente.conta_payax && d.cliente.conta_payax !== '—'
+        ? el('div', { class: 'conta-numero' }, el('span', {}, 'Agência'), el('strong', {}, d.cliente.agencia),
+          el('span', {}, 'Conta'), el('strong', {}, d.cliente.conta))
+        : null),
     el('div', { class: 'linhas' },
       el('div', { class: 'linha' }, el('span', {}, `A liberar (D+${d.cliente.retencao_dias} útil)`), el('strong', {}, dinheiro(d.saldo.a_liberar_centavos))),
       el('div', { class: 'linha' }, el('span', {}, 'Recebido no mês'), el('strong', {}, dinheiro(l.bruto_centavos))),

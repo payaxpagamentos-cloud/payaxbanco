@@ -13,7 +13,7 @@ export default async function clientes({ alvo, params, query, recarregar }) {
   const filtros = { busca: query.busca ?? '', situacao: query.situacao ?? '', pagina: Number(query.pagina) || 1 };
   const lista = await api.get(`/clientes${qs(filtros)}`);
   const form = el('form', { class: 'filtros', onsubmit: (e) => { e.preventDefault(); ir(`#/clientes${qs({ ...filtros, ...lerForm(form), pagina: 1 })}`); } },
-    campo({ nome: 'busca', rotulo: 'Buscar', valor: filtros.busca, atributos: { placeholder: 'Razão social, fantasia ou CNPJ' } }),
+    campo({ nome: 'busca', rotulo: 'Buscar', valor: filtros.busca, atributos: { placeholder: 'Razão social, CNPJ ou conta (0001)' } }),
     campo({ nome: 'situacao', rotulo: 'Situação', tipo: 'select', valor: filtros.situacao,
       opcoes: [['', 'Todas'], ...Object.entries(R.situacaoCliente).map(([k, [t]]) => [k, t])] }),
     el('button', { class: 'botao', type: 'submit' }, icone('busca'), 'Filtrar'));
@@ -26,6 +26,7 @@ export default async function clientes({ alvo, params, query, recarregar }) {
     tabela({
       colunas: [
         { titulo: 'Cliente', conteudo: (c) => el('span', {}, el('span', { class: 'forte' }, c.nome_fantasia || c.razao_social), el('span', { class: 'sub' }, documento(c.cnpj))) },
+        { titulo: 'Conta PayAx', conteudo: (c) => el('span', { class: 'num' }, c.conta_payax ?? '—') },
         { titulo: 'Situação', conteudo: (c) => selo(c.situacao, R.situacaoCliente) },
         { titulo: 'Boletos em aberto', dir: true, conteudo: (c) => numero(c.boletos_abertos) },
         { titulo: 'Saldo disponível', dir: true, conteudo: (c) => el('strong', {}, dinheiro(c.disponivel_centavos)) },
@@ -56,7 +57,7 @@ async function ficha(alvo, id, aba, query, recarregar) {
       el('div', {},
         el('a', { class: 'botao sutil', href: '#/clientes' }, icone('voltar'), 'Clientes'),
         el('h1', {}, c.nome_fantasia || c.razao_social),
-        el('p', {}, `${documento(c.cnpj)} · `, selo(c.situacao, R.situacaoCliente))),
+        el('p', {}, `${documento(c.cnpj)} · conta PayAx ${c.conta_payax_curta} · `, selo(c.situacao, R.situacaoCliente))),
       el('div', { class: 'acoes' },
         pode('boletos.emitir') && c.situacao === 'ativo'
           ? el('button', { class: 'botao', onclick: async () => emitir([c], recarregar, c.id) }, icone('mais'), 'Emitir boleto') : null,
@@ -81,6 +82,7 @@ async function abaResumo(alvo, c, query, recarregar) {
         apoio: c.pode_ver_margem ? `margem ${dinheiro(c.liquidacoes_mes.margem_centavos)}` : 'comissão + tarifas', tom: 'positivo', ic: 'relatorio' })),
     el('div', { class: 'grade duas', style: 'margin-top:14px' },
       cartao('Cadastro', el('div', { class: 'pares' },
+        par('Conta PayAx', el('strong', {}, c.conta_payax ?? '—')),
         par('Razão social', c.razao_social),
         par('CNPJ', documento(c.cnpj)),
         par('Responsável', c.responsavel ?? '—'),

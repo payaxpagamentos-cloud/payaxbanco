@@ -12,6 +12,7 @@ const { hashSenha } = require('./lib/senha');
 const boletosLib = require('./lib/boletos');
 const repassesLib = require('./lib/repasses');
 const datas = require('./lib/datas');
+const contaInterna = require('./lib/contaInterna');
 
 if (config.producao) throw new Error('O gerador de demonstração não roda em produção.');
 
@@ -68,6 +69,7 @@ async function main() {
       VALUES (?, ?, ?, ?, ?, ?, '11700000', 'Rua das Palmeiras', '450', 'Centro', ?, ?, 'ativo', 'cnpj', ?, ?, ?, 1, 1, 5000, 2000000, 1000000, ?)
       RETURNING id`).get(c.razao, c.fantasia, c.cnpj, `financeiro@${c.fantasia.toLowerCase().replace(/\s/g, '')}.com.br`,
       '13991234567', 'Financeiro', c.cidade, c.uf, c.cnpj, c.razao, c.cnpj, agora()).id;
+    transacao(db, () => contaInterna.atribuir(db, id));
 
     if (c.preco) {
       db.prepare(`INSERT INTO precos (cliente_id, vigencia_inicio, tarifa_emissao_centavos, tarifa_liquidacao_centavos,
