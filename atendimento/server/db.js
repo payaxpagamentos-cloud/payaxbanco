@@ -23,6 +23,11 @@ CREATE TABLE IF NOT EXISTS empresas (
   orcamento_milesimos INTEGER NOT NULL DEFAULT 0 CHECK (orcamento_milesimos >= 0),
   -- Marketing tem orçamento próprio: é nove vezes mais caro e não pode comer o dinheiro da cobrança.
   orcamento_marketing_milesimos INTEGER NOT NULL DEFAULT 0 CHECK (orcamento_marketing_milesimos >= 0),
+  -- Em que moeda a Meta cobra a conta desta empresa. Em dólar, o custo de cada mensagem é guardado
+  -- também em dólar (exato), para conferir com a fatura sem câmbio no meio.
+  meta_moeda TEXT NOT NULL DEFAULT 'BRL' CHECK (meta_moeda IN ('BRL','USD')),
+  -- Cotação do mês (reais por dólar ×10000), para mostrar em reais e para o orçamento. Nula = a padrão.
+  cotacao_x10000 INTEGER CHECK (cotacao_x10000 IS NULL OR cotacao_x10000 > 0),
   motivo_bloqueio TEXT,
   criada_em TEXT NOT NULL
 );
@@ -197,6 +202,8 @@ CREATE TABLE IF NOT EXISTS mensagens (
   erro TEXT,
   -- Áudio do cliente vira texto aqui, sem tocar na coluna texto — assim fica registrado que a
   -- mensagem veio falada, e quem lê sabe que pode ter erro de transcrição.
+  -- Custo exato em milionésimos de dólar, quando a conta da Meta é em dólar.
+  custo_usd_micro INTEGER,
   transcricao TEXT,
   transcricao_status TEXT CHECK (transcricao_status IN ('pronta','falhou','longa','desligada')),
   transcricao_ms INTEGER,
@@ -647,6 +654,13 @@ CREATE TABLE IF NOT EXISTS custos_mensais (
   economia_milesimos INTEGER NOT NULL DEFAULT 0,
   sem_otimizacao_milesimos INTEGER NOT NULL DEFAULT 0,
   orcamento_milesimos INTEGER NOT NULL DEFAULT 0,
+  moeda TEXT NOT NULL DEFAULT 'BRL' CHECK (moeda IN ('BRL','USD')),
+  gasto_usd_micro INTEGER,
+  -- A cotação que valia quando o mês fechou: o número em reais não muda depois com o câmbio.
+  cotacao_x10000 INTEGER,
+  -- O que a Meta cobrou, na moeda da fatura. Em dólar: fatura_meta_usd_centavos; e o que saiu de
+  -- fato da conta, em reais (com IOF e spread), em fatura_meta_centavos.
+  fatura_meta_usd_centavos INTEGER,
   fatura_meta_centavos INTEGER,
   conferido_em TEXT,
   conferido_por TEXT,
@@ -703,6 +717,14 @@ const CONFIG_PADRAO = {
   wa_preco_utilidade: '35',
   wa_preco_autenticacao: '30',
   wa_preco_marketing: '320',
+  // A mesma tabela em dólar, como a Meta publica, em MILIONÉSIMOS de dólar (US$ 0,0068 = 6800):
+  // vale para as empresas cuja conta na Meta é cobrada em dólar. Confira a tabela do Brasil no
+  // painel da Meta — ela muda.
+  wa_preco_utilidade_usd: '6800',
+  wa_preco_autenticacao_usd: '6800',
+  wa_preco_marketing_usd: '62500',
+  // Cotação usada quando a empresa não informou a dela: reais por dólar, ×10000 (5,4000 = 54000).
+  wa_cotacao_padrao: '54000',
 };
 
 const agora = () => new Date().toISOString();

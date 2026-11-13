@@ -2,7 +2,7 @@
 import {api, qs} from './api.js';
 import {
   el, limpar, icone, toast, acao, confirmar, formModal, modal, campo, escolha, marcar, lerForm, inteiro,
-  porcento, dataHora, desde, dinheiro, PERFIS, repetir,
+  porcento, dataHora, desde, dinheiro, PERFIS, repetir, lerNumero,
 } from './ui.js';
 import {
   cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, campoBusca, seletor, cartaoDesfechos,
@@ -270,16 +270,50 @@ async function configuracoes(ctx) {
         campo('Entrada (por milhão de tokens)', { name: 'ia_preco_entrada_milhao', type: 'number', value: c.ia_preco_entrada_milhao, min: 0 }),
         campo('Saída (por milhão de tokens)', { name: 'ia_preco_saida_milhao', type: 'number', value: c.ia_preco_saida_milhao, min: 0 })),
       campo('Leitura do cache (por milhão de tokens)', { name: 'ia_preco_cache_milhao', type: 'number', value: c.ia_preco_cache_milhao, min: 0 })),
+    cartao('Preço da Meta por mensagem',
+      el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
+        'O que a Meta cobra por mensagem ENTREGUE que a empresa inicia. Serviço (o cliente escreveu e a resposta saiu em até 24 h) '
+        + 'é de graça e não entra aqui. A tabela em reais vale para as empresas cobradas em real; a em dólar, como a Meta publica, '
+        + 'para as cobradas em dólar. Confira a tabela do Brasil no painel da Meta — ela muda.'),
+      el('div', { class: 'grade-2' },
+        el('div', {},
+          el('strong', { class: 'pequeno' }, 'Em reais (R$)'),
+          campoPreco('Utilidade', 'meta_brl_utilidade', c.wa_preco_utilidade / 1000, 3),
+          campoPreco('Autenticação', 'meta_brl_autenticacao', c.wa_preco_autenticacao / 1000, 3),
+          campoPreco('Marketing', 'meta_brl_marketing', c.wa_preco_marketing / 1000, 3)),
+        el('div', {},
+          el('strong', { class: 'pequeno' }, 'Em dólar (US$)'),
+          campoPreco('Utilidade', 'meta_usd_utilidade', c.wa_preco_utilidade_usd / 1_000_000, 4),
+          campoPreco('Autenticação', 'meta_usd_autenticacao', c.wa_preco_autenticacao_usd / 1_000_000, 4),
+          campoPreco('Marketing', 'meta_usd_marketing', c.wa_preco_marketing_usd / 1_000_000, 4))),
+      campoPreco('Cotação padrão do dólar (R$), para empresas que não informaram a delas', 'meta_cotacao', c.wa_cotacao_padrao / 10_000, 4)),
     el('div', { class: 'linha entre' }, el('span'), el('button', { class: 'btn primario' }, 'Salvar')));
 
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(f.querySelector('.btn.primario'), async () => {
-      await api.patch('/master/configuracoes', lerForm(f));
+      const d = lerForm(f);
+      // Os preços entram como o humano escreve ("0,0068") e o servidor guarda inteiros:
+      // milésimos de real, milionésimos de dólar e a cotação ×10000.
+      const num = (x) => lerNumero(x);
+      const conv = { meta_brl_utilidade: ['wa_preco_utilidade', 1000], meta_brl_autenticacao: ['wa_preco_autenticacao', 1000],
+        meta_brl_marketing: ['wa_preco_marketing', 1000], meta_usd_utilidade: ['wa_preco_utilidade_usd', 1_000_000],
+        meta_usd_autenticacao: ['wa_preco_autenticacao_usd', 1_000_000], meta_usd_marketing: ['wa_preco_marketing_usd', 1_000_000],
+        meta_cotacao: ['wa_cotacao_padrao', 10_000] };
+      for (const [campo, [chave, fator]] of Object.entries(conv)) {
+        if (d[campo] !== undefined && d[campo] !== '') d[chave] = Math.round(num(d[campo]) * fator);
+        delete d[campo];
+      }
+      await api.patch('/master/configuracoes', d);
       toast('Configurações salvas. Recarregue para ver o nome novo no menu.');
     });
   });
   limpar(ctx.conteudo, f);
+}
+
+/** Campo de preço com casas decimais, escrito como a gente lê ("0,0068"). */
+function campoPreco(rotulo, nome, valor, casas) {
+  return campo(rotulo, { name: nome, inputmode: 'decimal', value: Number(valor ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas, useGrouping: false }) });
 }
 
 // ---------- Relatórios ----------

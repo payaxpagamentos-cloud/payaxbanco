@@ -34,14 +34,43 @@ const CATEGORIAS = {
 
 const LISTA = Object.keys(CATEGORIAS);
 
-/** Preço de uma categoria, em milésimos de real, com os valores que o master cadastrou. */
-function preco(db, categoria) {
+/**
+ * Em que moeda a Meta cobra esta empresa e a cotação do mês.
+ * A Meta publica a tabela do Brasil em dólar, e a conta de várias empresas vem em dólar: nesse
+ * caso o preço de verdade é o em dólar, e o valor em reais é só uma conversão para a gestão.
+ */
+function moedaDa(db, empresaId) {
+  const e = empresaId ? db.prepare('SELECT meta_moeda, cotacao_x10000 FROM empresas WHERE id = ?').get(empresaId) : null;
+  const padrao = Number(lerConfig(db).wa_cotacao_padrao) || 54000;
+  return {
+    moeda: e?.meta_moeda === 'USD' ? 'USD' : 'BRL',
+    cotacao_x10000: Number(e?.cotacao_x10000) || padrao,
+    cotacao_padrao: !e?.cotacao_x10000,
+  };
+}
+
+/** Preço em dólar, em milionésimos (US$ 0,0068 = 6800). Serviço é zero. */
+function precoUsd(db, categoria) {
   const c = CATEGORIAS[categoria];
   if (!c?.chave) return 0;
+  return Number(lerConfig(db)[`${c.chave}_usd`] ?? 0);
+}
+
+/**
+ * Preço de uma categoria em milésimos de real — a unidade com que o sistema todo trabalha
+ * (orçamento, régua, economia). Empresa cobrada em dólar: o preço em dólar convertido pela
+ * cotação do mês. Sem empresa: a tabela em reais que o master cadastrou.
+ */
+function preco(db, categoria, empresaId = null) {
+  const c = CATEGORIAS[categoria];
+  if (!c?.chave) return 0;
+  const m = moedaDa(db, empresaId);
+  if (m.moeda === 'USD') return Math.round((precoUsd(db, categoria) * m.cotacao_x10000) / 10_000_000);
   return Number(lerConfig(db)[c.chave] ?? 0);
 }
 
-const precos = (db) => Object.fromEntries(LISTA.map((k) => [k, preco(db, k)]));
+const precos = (db, empresaId = null) => Object.fromEntries(LISTA.map((k) => [k, preco(db, k, empresaId)]));
+const precosUsd = (db) => Object.fromEntries(LISTA.map((k) => [k, precoUsd(db, k)]));
 
 /**
  * Qual a categoria de uma mensagem que está saindo.
@@ -56,7 +85,10 @@ function classificar({ janelaAberta, template = false, categoriaDoTemplate = nul
   return 'utilidade';
 }
 
-const custoDe = (db, categoria) => preco(db, categoria);
+const custoDe = (db, categoria, empresaId = null) => preco(db, categoria, empresaId);
+
+/** O custo exato em dólar, quando a conta da Meta é em dólar; senão null. */
+const custoUsdDe = (db, categoria, empresaId) => (moedaDa(db, empresaId).moeda === 'USD' ? precoUsd(db, categoria) : null);
 
 /** Em reais, para mostrar na tela. */
 const emReais = (milesimos) => (Number(milesimos ?? 0) / 1000).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -68,9 +100,11 @@ const emReais = (milesimos) => (Number(milesimos ?? 0) / 1000).toLocaleString('p
 function resumo(db, empresaId, { de, ate }) {
   const { intervalo } = require('./datas');
   const [inicio, fim] = intervalo(de, ate);
-  const p = precos(db);
+  const p = precos(db, empresaId);
+  const m = moedaDa(db, empresaId);
 
-  const porCategoria = db.prepare(`SELECT categoria, COUNT(*) AS mensagens, SUM(custo_milesimos) AS custo
+  const porCategoria = db.prepare(`SELECT categoria, COUNT(*) AS mensagens, SUM(custo_milesimos) AS custo, SUM(custo_usd_micro) AS custo_usd,
+      SUM(CASE WHEN custo_usd_micro IS NULL THEN 1 ELSE 0 END) AS sem_usd
     FROM mensagens WHERE empresa_id = ? AND direcao = 'saida' AND status IN ('enviada','entregue','lida')
       AND categoria IS NOT NULL AND criada_em >= ? AND criada_em < ?
     GROUP BY categoria`).all(empresaId, inicio, fim);
@@ -113,6 +147,15 @@ function resumo(db, empresaId, { de, ate }) {
     }),
     mensagens: porCategoria.reduce((s, x) => s + Number(x.mensagens), 0),
     gasto_milesimos: gasto,
+    // Na conta em dólar, o gasto exato em dólar — é ele que se confere com a fatura da Meta.
+    moeda: m.moeda,
+    cotacao_x10000: m.cotacao_x10000,
+    // Mensagem enviada antes de a empresa passar para dólar não tem o custo em dólar gravado. O preço
+    // em dólar de cada categoria é o preço de verdade da Meta, então ela entra por ele — e não como zero.
+    gasto_usd_micro: m.moeda === 'USD'
+      ? porCategoria.reduce((s2, x) => s2 + Number(x.custo_usd ?? 0) + Number(x.sem_usd ?? 0) * precoUsd(db, x.categoria), 0)
+      : null,
+    precos_usd_micro: m.moeda === 'USD' ? precosUsd(db) : null,
     economia_milesimos: economiaServico + economiaRegua,
     economia: {
       por_janela_de_servico: { mensagens: servicoEspontaneo, milesimos: economiaServico },
@@ -142,4 +185,4 @@ function projecao(db, empresaId) {
   };
 }
 
-module.exports = { CATEGORIAS, LISTA, preco, precos, classificar, custoDe, emReais, resumo, projecao };
+module.exports = { CATEGORIAS, LISTA, preco, precos, precoUsd, precosUsd, moedaDa, classificar, custoDe, custoUsdDe, emReais, resumo, projecao };

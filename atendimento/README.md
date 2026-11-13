@@ -457,6 +457,27 @@ quanto disso pode ir para marketing. O teto **para** o gasto, não avisa depois:
 limite, mensagem paga não sai mais. Mensagem grátis continua saindo — o atendimento não para por
 causa de dinheiro que não é cobrado. Os marcos de 50%, 80% e 100% são registrados uma vez cada.
 
+### Conta em dólar
+
+A Meta publica a tabela do Brasil em dólar, e a conta de muitas empresas vem em dólar. Em
+`Centro de Custo › Orçamento e fechamento › Moeda da conta da Meta` cada empresa diz em que moeda é
+cobrada e a cotação do mês.
+
+- **Cada mensagem paga guarda o custo exato em dólar** (US$ 0,0068 por utilidade, por exemplo),
+  além do valor em reais pela cotação do mês.
+- **O fechamento confere dólar contra dólar**: a nossa conta exata contra a fatura da Meta, sem
+  câmbio no meio. Assim a diferença mostra erro de contagem ou de preço, e não oscilação do dólar.
+- **O que saiu de fato da conta em reais** entra à parte e mostra o câmbio efetivo, com IOF e spread.
+- **O orçamento continua em reais**, que é como a empresa pensa o dinheiro; o preço em dólar é
+  convertido pela cotação do mês.
+- Cada mês fechado guarda a moeda e a cotação daquele mês: mudar o câmbio depois não reescreve o
+  passado. Mensagem enviada antes de a empresa passar para dólar entra pelo preço em dólar da
+  categoria, não como zero.
+
+As duas tabelas de preço (em reais e em dólar) e a cotação padrão ficam em
+`Configurações › Preço da Meta por mensagem`, no painel do master. Os campos aceitam o número como
+se escreve: "0,0068", "0.0068", "655.00" e "1.234,56" são lidos certo.
+
 ### Quem vê o Centro de Custo
 
 `Centro de Custo` é tela de administrador da empresa e da plataforma. Atendente e supervisor não

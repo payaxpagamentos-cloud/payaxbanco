@@ -40,29 +40,46 @@ function fechar(db, empresaId, mes = mesAnterior()) {
 
   const linha = transacao(db, () => {
     db.prepare(`INSERT INTO custos_mensais
-        (empresa_id, mes, mensagens, por_categoria, gasto_milesimos, economia_milesimos, sem_otimizacao_milesimos, orcamento_milesimos, fechado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (empresa_id, mes, mensagens, por_categoria, gasto_milesimos, economia_milesimos, sem_otimizacao_milesimos, orcamento_milesimos,
+         moeda, gasto_usd_micro, cotacao_x10000, fechado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (empresa_id, mes) DO UPDATE SET
         mensagens = excluded.mensagens, por_categoria = excluded.por_categoria,
         gasto_milesimos = excluded.gasto_milesimos, economia_milesimos = excluded.economia_milesimos,
         sem_otimizacao_milesimos = excluded.sem_otimizacao_milesimos,
-        orcamento_milesimos = excluded.orcamento_milesimos, fechado_em = excluded.fechado_em`)
+        orcamento_milesimos = excluded.orcamento_milesimos, moeda = excluded.moeda,
+        gasto_usd_micro = excluded.gasto_usd_micro, cotacao_x10000 = excluded.cotacao_x10000, fechado_em = excluded.fechado_em`)
       .run(empresaId, mes, r.mensagens, JSON.stringify(r.por_categoria), r.gasto_milesimos,
-        r.economia_milesimos, r.sem_otimizacao_milesimos, Number(e?.orcamento_milesimos ?? 0), agora());
+        r.economia_milesimos, r.sem_otimizacao_milesimos, Number(e?.orcamento_milesimos ?? 0),
+        r.moeda, r.gasto_usd_micro, r.cotacao_x10000, agora());
     return db.prepare('SELECT * FROM custos_mensais WHERE empresa_id = ? AND mes = ?').get(empresaId, mes);
   });
   return { ...publico(linha), recalculado: Boolean(existente) };
 }
 
-/** Lança o valor que a Meta cobrou e congela o mês. Em centavos, como vem na fatura. */
-function conferir(db, empresaId, mes, { valor_centavos, observacao = null, usuario = null }) {
+/**
+ * Lança o valor que a Meta cobrou e congela o mês. Em centavos, como vem na fatura.
+ * Conta em dólar: `valor_usd_centavos` é a fatura (é com ela que se confere a nossa conta), e
+ * `valor_centavos`, opcional, é o que saiu de fato da conta em reais — com IOF e spread.
+ */
+function conferir(db, empresaId, mes, { valor_centavos = null, valor_usd_centavos = null, observacao = null, usuario = null }) {
   v.exigir(ehMesValido(mes), 'Informe o mês no formato AAAA-MM.');
   const linha = db.prepare('SELECT * FROM custos_mensais WHERE empresa_id = ? AND mes = ?').get(empresaId, mes)
     ?? (fechar(db, empresaId, mes) && db.prepare('SELECT * FROM custos_mensais WHERE empresa_id = ? AND mes = ?').get(empresaId, mes));
   if (!linha) throw naoEncontrado('Fechamento do mês');
-  const valor = v.inteiro(valor_centavos, 'o valor da fatura da Meta', { min: 0, max: 100_000_000 });
-  db.prepare('UPDATE custos_mensais SET fatura_meta_centavos = ?, observacao = ?, conferido_em = ?, conferido_por = ? WHERE id = ?')
-    .run(valor, v.opcional(observacao, 'a observação', 1000), agora(), usuario?.nome ?? null, linha.id);
+  const reais = valor_centavos === null || valor_centavos === undefined || valor_centavos === ''
+    ? null : v.inteiro(valor_centavos, 'o valor debitado em reais', { min: 0, max: 100_000_000 });
+  let dolares = null;
+  if (linha.moeda === 'USD') {
+    // Sem isto, um campo vazio virava US$ 0,00 e o mês ficava "conferido" sem ninguém digitar nada.
+    v.exigir(valor_usd_centavos !== null && valor_usd_centavos !== undefined && valor_usd_centavos !== '', 'Informe o valor da fatura da Meta em dólar.');
+    dolares = v.inteiro(valor_usd_centavos, 'o valor da fatura da Meta em dólar', { min: 0, max: 100_000_000 });
+  } else {
+    v.exigir(reais !== null, 'Informe o valor da fatura da Meta.');
+  }
+  db.prepare(`UPDATE custos_mensais SET fatura_meta_centavos = ?, fatura_meta_usd_centavos = ?, observacao = ?,
+      conferido_em = ?, conferido_por = ? WHERE id = ?`)
+    .run(reais, dolares, v.opcional(observacao, 'a observação', 1000), agora(), usuario?.nome ?? null, linha.id);
   return publico(db.prepare('SELECT * FROM custos_mensais WHERE id = ?').get(linha.id));
 }
 
@@ -71,7 +88,7 @@ function reabrir(db, empresaId, mes) {
   const linha = db.prepare('SELECT * FROM custos_mensais WHERE empresa_id = ? AND mes = ?').get(empresaId, mes);
   if (!linha) throw naoEncontrado('Fechamento do mês');
   if (!linha.conferido_em) throw new ErroNegocio('Este mês ainda não foi conferido.');
-  db.prepare('UPDATE custos_mensais SET fatura_meta_centavos = NULL, conferido_em = NULL, conferido_por = NULL WHERE id = ?').run(linha.id);
+  db.prepare('UPDATE custos_mensais SET fatura_meta_centavos = NULL, fatura_meta_usd_centavos = NULL, conferido_em = NULL, conferido_por = NULL WHERE id = ?').run(linha.id);
   return fechar(db, empresaId, mes);
 }
 
@@ -80,7 +97,10 @@ function publico(l) {
   if (!l) return null;
   const nosso = Math.round(Number(l.gasto_milesimos) / 10); // milésimos de real → centavos
   const meta = l.fatura_meta_centavos === null || l.fatura_meta_centavos === undefined ? null : Number(l.fatura_meta_centavos);
+  const emDolar = l.moeda === 'USD';
+  if (emDolar) return publicoEmDolar(l, nosso, meta);
   return {
+    moeda: 'BRL',
     mes: l.mes,
     mensagens: Number(l.mensagens),
     por_categoria: (() => { try { return JSON.parse(l.por_categoria); } catch { return []; } })(),
@@ -101,6 +121,42 @@ function publico(l) {
   };
 }
 
+/**
+ * O mês de uma conta cobrada em dólar. A conferência é dólar contra dólar — a nossa conta exata
+ * contra a fatura da Meta —, sem câmbio no meio: assim a diferença mostra erro de contagem ou de
+ * preço, e não oscilação do dólar. O que saiu em reais aparece à parte, com o câmbio efetivo.
+ */
+function publicoEmDolar(l, nossoReais, debitado) {
+  const nossoUsd = Math.round(Number(l.gasto_usd_micro ?? 0) / 10_000); // milionésimos → centavos de dólar
+  const fatura = l.fatura_meta_usd_centavos === null || l.fatura_meta_usd_centavos === undefined ? null : Number(l.fatura_meta_usd_centavos);
+  return {
+    moeda: 'USD',
+    mes: l.mes,
+    mensagens: Number(l.mensagens),
+    por_categoria: (() => { try { return JSON.parse(l.por_categoria); } catch { return []; } })(),
+    gasto_milesimos: Number(l.gasto_milesimos),
+    gasto_centavos: nossoReais,
+    gasto_usd_centavos: nossoUsd,
+    economia_milesimos: Number(l.economia_milesimos),
+    sem_otimizacao_milesimos: Number(l.sem_otimizacao_milesimos),
+    orcamento_milesimos: Number(l.orcamento_milesimos),
+    estourou_orcamento: Boolean(l.orcamento_milesimos && Number(l.gasto_milesimos) > Number(l.orcamento_milesimos)),
+    cotacao_x10000: l.cotacao_x10000 === null ? null : Number(l.cotacao_x10000),
+    fatura_meta_usd_centavos: fatura,
+    diferenca_usd_centavos: fatura === null ? null : fatura - nossoUsd,
+    // Acima de 5% (ou de US$ 1) não é arredondamento: é preço velho ou mensagem saindo por fora.
+    divergente: fatura === null ? null : Math.abs(fatura - nossoUsd) > Math.max(100, Math.round(nossoUsd * 0.05)),
+    // O que saiu de fato da conta da empresa, e o dólar que ficou pago — com IOF e spread.
+    fatura_meta_centavos: debitado,
+    cambio_efetivo: debitado !== null && fatura ? Math.round((debitado / fatura) * 10_000) / 10_000 : null,
+    diferenca_centavos: null,
+    conferido_em: l.conferido_em,
+    conferido_por: l.conferido_por,
+    observacao: l.observacao,
+    fechado_em: l.fechado_em,
+  };
+}
+
 /** Os últimos N meses fechados, do mais recente para o mais antigo, com o mês corrente em aberto. */
 function serie(db, empresaId, { meses = 12 } = {}) {
   const fechados = db.prepare('SELECT * FROM custos_mensais WHERE empresa_id = ? ORDER BY mes DESC LIMIT ?')
@@ -110,6 +166,8 @@ function serie(db, empresaId, { meses = 12 } = {}) {
     const r = custo.resumo(db, empresaId, { de: `${mesCorrente}-01`, ate: hoje() });
     const o = orcamento.estado(db, empresaId);
     return {
+      moeda: r.moeda, cotacao_x10000: r.cotacao_x10000,
+      gasto_usd_centavos: r.gasto_usd_micro === null ? null : Math.round(r.gasto_usd_micro / 10_000),
       mes: mesCorrente, mensagens: r.mensagens, por_categoria: r.por_categoria,
       gasto_milesimos: r.gasto_milesimos, gasto_centavos: Math.round(r.gasto_milesimos / 10),
       economia_milesimos: r.economia_milesimos, sem_otimizacao_milesimos: r.sem_otimizacao_milesimos,

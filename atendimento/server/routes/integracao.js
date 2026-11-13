@@ -252,7 +252,7 @@ module.exports = function rotasIntegracao(db) {
         gerado_em: agora(),
         moeda: 'BRL',
         // Preço por mensagem entregue, por categoria da Meta, como cadastrado na plataforma.
-        precos_milesimos: custo.precos(db),
+        precos_milesimos: custo.precos(db, req.empresa.id),
         mes_corrente: {
           mes: hoje().slice(0, 7),
           mensagens: mesCorrente.mensagens,

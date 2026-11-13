@@ -19,7 +19,7 @@ module.exports = function rotasRegua(db) {
     itens: reguaLib.listar(db, req.empresa.id),
     campos: reguaLib.listarCampos(),
     categorias: custo.CATEGORIAS,
-    precos: custo.precos(db),
+    precos: custo.precos(db, req.empresa.id),
   }));
 
   r.post('/', exigirPermissao('custos.editar'), (req, res, next) => {
@@ -123,6 +123,28 @@ module.exports = function rotasRegua(db) {
     } catch (err) { next(err); }
   });
 
+  // ---------- Moeda da conta da Meta ----------
+  /** Em que moeda a Meta cobra esta empresa, a cotação do mês e a tabela em dólar. */
+  r.get('/moeda', (req, res) => {
+    const m = custo.moedaDa(db, req.empresa.id);
+    res.json({ ...m, precos_usd_micro: custo.precosUsd(db), precos_milesimos: custo.precos(db, req.empresa.id) });
+  });
+
+  r.put('/moeda', exigirPermissao('custos.editar'), (req, res, next) => {
+    try {
+      const d = req.body ?? {};
+      const moeda = v.opcao(d.moeda, 'a moeda da conta da Meta', ['BRL', 'USD']);
+      // A cotação vem como "5,4321" ou 5.4321; guardada ×10000. Vazia = a cotação padrão do master.
+      const bruta = d.cotacao === undefined || d.cotacao === null || d.cotacao === '' ? null : Number(String(d.cotacao).replace(',', '.'));
+      v.exigir(bruta === null || (Number.isFinite(bruta) && bruta >= 0.5 && bruta <= 50), 'Cotação inválida: informe quantos reais vale um dólar (ex.: 5,45).');
+      const cot = bruta === null ? null : Math.round(bruta * 10_000);
+      db.prepare('UPDATE empresas SET meta_moeda = ?, cotacao_x10000 = ? WHERE id = ?').run(moeda, cot, req.empresa.id);
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'definiu a moeda da conta da Meta', detalhe: { moeda, cotacao: bruta }, ip: req.ip });
+      const m = custo.moedaDa(db, req.empresa.id);
+      res.json({ ...m, precos_usd_micro: custo.precosUsd(db), precos_milesimos: custo.precos(db, req.empresa.id) });
+    } catch (err) { next(err); }
+  });
+
   // ---------- Fechamento mensal e conferência com a fatura ----------
   r.get('/fechamentos', (req, res, next) => {
     try { res.json(fechamento.serie(db, req.empresa.id, { meses: Number(req.query.meses) || 12 })); } catch (err) { next(err); }
@@ -140,10 +162,12 @@ module.exports = function rotasRegua(db) {
   r.post('/fechamentos/:mes/fatura', exigirPermissao('custos.editar'), (req, res, next) => {
     try {
       const f = fechamento.conferir(db, req.empresa.id, String(req.params.mes), {
-        valor_centavos: req.body?.valor_centavos, observacao: req.body?.observacao, usuario: req.usuario,
+        valor_centavos: req.body?.valor_centavos, valor_usd_centavos: req.body?.valor_usd_centavos,
+        observacao: req.body?.observacao, usuario: req.usuario,
       });
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'lançou a fatura da Meta', alvo: f.mes,
-        detalhe: { fatura_centavos: f.fatura_meta_centavos, diferenca_centavos: f.diferenca_centavos }, ip: req.ip });
+        detalhe: { moeda: f.moeda, fatura_centavos: f.fatura_meta_centavos, fatura_usd_centavos: f.fatura_meta_usd_centavos ?? null,
+          diferenca_centavos: f.diferenca_centavos, diferenca_usd_centavos: f.diferenca_usd_centavos ?? null }, ip: req.ip });
       res.json(f);
     } catch (err) { next(err); }
   });

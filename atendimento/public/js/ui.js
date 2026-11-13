@@ -177,7 +177,20 @@ export function escolha(rotulo, nome, opcoes, valor, attrs = {}) {
 }
 /** Centavos ↔ reais nos campos de valor. */
 export const reaisCampo = (c) => (c === null || c === undefined ? '' : ((c ?? 0) / 100).toFixed(2).replace('.', ','));
-export const centavos = (txt) => (txt === '' || txt === undefined ? undefined : Math.round(Number(String(txt).replace(/\./g, '').replace(',', '.')) * 100));
+/**
+ * Lê um número como a pessoa digitou. "1.234,56" e "1234,56" são reais; "655.00" e "0.0068" são
+ * o jeito de escrever dólar. Tratar todo ponto como milhar transformava US$ 655.00 em 65.500.
+ */
+export function lerNumero(txt) {
+  const t = String(txt ?? '').trim().replace(/[^\d.,-]/g, '');
+  if (!t) return NaN;
+  if (t.includes(',')) return Number(t.replace(/\./g, '').replace(',', '.'));
+  const partes = t.split('.');
+  // Só ponto: um ponto com 1 ou 2 casas (ou começando em "0.") é decimal; senão é milhar.
+  if (partes.length === 2 && (partes[1].length !== 3 || partes[0] === '0' || partes[0] === '')) return Number(t);
+  return Number(t.replace(/\./g, ''));
+}
+export const centavos = (txt) => (txt === '' || txt === undefined ? undefined : Math.round(lerNumero(txt) * 100));
 
 /** Repete fn a cada ms enquanto a página está visível (consulta o servidor para atualizar a tela). */
 export function repetir(fn, ms) {

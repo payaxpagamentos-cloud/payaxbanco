@@ -72,7 +72,7 @@ function estado(db, empresaId, { mes = hoje().slice(0, 7) } = {}) {
  * Mensagem grátis nunca é barrada — não há o que frear num custo zero.
  */
 function permite(db, empresaId, categoria, { quantas = 1 } = {}) {
-  const preco = custo.preco(db, categoria);
+  const preco = custo.preco(db, categoria, empresaId);
   if (preco <= 0) return { ok: true, custo_milesimos: 0 };
 
   const st = estado(db, empresaId);

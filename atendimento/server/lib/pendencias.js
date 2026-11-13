@@ -53,7 +53,7 @@ function aproveitarJanela(db, contatoId, { prefixo = null, respeitarHumano = tru
   // o aviso continua esperando, e não custa nada ficar esperando.
   if (respeitarHumano && conversa.estado === 'humano') return null;
 
-  const precos = custo.precos(db);
+  const precos = custo.precos(db, conversa.empresa_id);
   return transacao(db, () => {
     const textos = lista.map((p) => String(p.texto).trim()).filter(Boolean);
     const juntos = textos.length === 1 ? textos[0] : textos.map((t) => `• ${t}`).join('\n');
@@ -91,7 +91,7 @@ function cancelar(db, pendenciaId, motivo) {
 
 /** Painel: o que está esperando, por quanto tempo, e quanto já deixou de ser gasto esperando. */
 function resumo(db, empresaId) {
-  const precos = custo.precos(db);
+  const precos = custo.precos(db, empresaId);
   const fila = db.prepare(`SELECT p.id, p.prazo, p.criada_em, p.referencia, r.nome AS regua, r.categoria,
       COALESCE(ct.nome, ct.nome_perfil) AS contato_nome, ct.telefone
     FROM pendencias p JOIN reguas r ON r.id = p.regua_id JOIN contatos ct ON ct.id = p.contato_id

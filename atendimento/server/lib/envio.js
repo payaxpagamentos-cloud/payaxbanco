@@ -35,11 +35,13 @@ function enfileirar(db, conversa, { autor, usuarioId = null, tipo = 'texto', tex
   });
   const id = Number(db.prepare(`INSERT INTO mensagens
       (conversa_id, empresa_id, direcao, autor, usuario_id, tipo, texto, payload, responde_wa_id, midia_arquivo, midia_nome, midia_mime, midia_bytes,
-       categoria, custo_milesimos, status, proxima_em, criada_em)
-    VALUES (?, ?, 'saida', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+       categoria, custo_milesimos, custo_usd_micro, status, proxima_em, criada_em)
+    VALUES (?, ?, 'saida', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(conversa.id, conversa.empresa_id, autor, usuarioId, tipo, texto === null ? null : String(texto).slice(0, 4096),
       payload === null ? null : JSON.stringify(payload), respondeWaId, midiaArquivo, midiaNome, midiaMime, midiaBytes,
-      categoria, falada ? 0 : custo.custoDe(db, categoria), falada ? 'falada' : 'fila', agora(), agora()).lastInsertRowid);
+      categoria, falada ? 0 : custo.custoDe(db, categoria, conversa.empresa_id),
+      falada ? null : custo.custoUsdDe(db, categoria, conversa.empresa_id),
+      falada ? 'falada' : 'fila', agora(), agora()).lastInsertRowid);
   db.prepare('UPDATE conversas SET ultima_mensagem_em = ? WHERE id = ?').run(agora(), conversa.id);
   return id;
 }

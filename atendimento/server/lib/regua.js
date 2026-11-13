@@ -191,7 +191,7 @@ function decidir(db, empresa, regua, alvo, { precos }) {
  * Nada é enviado e nada é gravado.
  */
 async function simular(db, empresa, regua, { referencia = hoje(), limite = 5000 } = {}) {
-  const precos = custo.precos(db);
+  const precos = custo.precos(db, empresa.id);
   const alvos = await destinatarios(db, empresa, regua, { referencia, limite });
   const contagem = { template: 0, janela: 0, pular: 0, esperar: 0 };
   const motivos = new Map();
@@ -227,7 +227,7 @@ async function executar(db, empresa, regua, { referencia = hoje(), limite = 5000
   const numero = db.prepare('SELECT * FROM numeros WHERE empresa_id = ? AND ativo = 1 ORDER BY id LIMIT 1').get(empresa.id);
   if (!numero) throw new ErroNegocio('A empresa não tem número de WhatsApp ativo.');
 
-  const precos = custo.precos(db);
+  const precos = custo.precos(db, empresa.id);
   const ixc = ixcTools.clienteIxc(db, empresa.id);
   const alvos = await destinatarios(db, empresa, regua, { referencia, limite });
   const resultado = { enviados: 0, pela_janela: 0, esperando: 0, pulados: 0, falhas: 0, custo_milesimos: 0, economia_milesimos: 0, teto_atingido: false };
@@ -348,14 +348,14 @@ const registrar = (db, { empresa, regua, alvo, contato = null, conversa = null, 
  * Só o que sobrar vira template pago — e aí foi pago no último momento útil, não três dias antes.
  */
 async function pagarVencidas(db, { limite = 500 } = {}) {
-  const precos = custo.precos(db);
   const resultado = { pagas: 0, pela_janela: 0, canceladas: 0, falhas: 0, custo_milesimos: 0, economia_milesimos: 0 };
 
   for (const p of pendencias.vencidas(db).slice(0, limite)) {
     const empresa = db.prepare("SELECT * FROM empresas WHERE id = ? AND status = 'ativa'").get(p.empresa_id);
     const contato = db.prepare('SELECT * FROM contatos WHERE id = ?').get(p.contato_id);
     const regua = db.prepare('SELECT * FROM reguas WHERE id = ?').get(p.regua_id);
-    const preco = precos[regua?.categoria ?? 'utilidade'] ?? 0;
+    // Esta varredura atravessa empresas: o preço é o de cada uma (uma pode ser cobrada em dólar).
+    const preco = custo.preco(db, regua?.categoria ?? 'utilidade', p.empresa_id);
     const desistir = (motivo) => {
       pendencias.cancelar(db, p.id, motivo);
       registrar(db, { empresa: { id: p.empresa_id }, regua: { id: p.regua_id }, alvo: { fatura_id: p.referencia }, contato, status: 'pulado', motivo, economia: preco });

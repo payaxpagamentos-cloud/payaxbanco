@@ -10,7 +10,7 @@
 import { api, qs } from './api.js';
 import {
   el, limpar, icone, toast, acao, confirmar, formModal, modal, campo, area, escolha, marcar,
-  inteiro, porcento, dataHora, desde, repetir,
+  inteiro, porcento, dataHora, desde, repetir, lerNumero,
 } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, seletor, filtroPeriodo } from './comum.js';
 
@@ -362,22 +362,59 @@ async function aEspera(ctx, alvo) {
 // ---------- Orçamento e fechamento ----------
 
 /** Reais digitados ("300" ou "300,50") para milésimos de real. */
-const paraMilesimos = (texto) => Math.round(Number(String(texto ?? '').replace(/\./g, '').replace(',', '.')) * 1000);
-const paraCentavos = (texto) => Math.round(Number(String(texto ?? '').replace(/\./g, '').replace(',', '.')) * 100);
+const paraMilesimos = (texto) => Math.round(lerNumero(texto) * 1000);
+const paraCentavos = (texto) => Math.round(lerNumero(texto) * 100);
 const emReais = (milesimos) => (Number(milesimos ?? 0) / 1000).toFixed(2).replace('.', ',');
 const centavosEmReais = (centavos) => (Number(centavos ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+/** Total em reais: arredonda para centavos. Três casas só fazem sentido em preço unitário (R$ 0,035). */
+const reaisTotal = (milesimos) => centavosEmReais(Math.round(Number(milesimos ?? 0) / 10));
+const dolares = (centavos) => `US$ ${(Number(centavos ?? 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 async function oControle(ctx, alvo) {
   const conteudo = el('div');
 
   const desenhar = async () => {
-    const [orc, fech] = await Promise.all([
+    const [orc, fech, moeda] = await Promise.all([
       api.get(`/empresas/${ctx.empresaId}/reguas/orcamento`),
       api.get(`/empresas/${ctx.empresaId}/reguas/fechamentos`),
+      api.get(`/empresas/${ctx.empresaId}/reguas/moeda`),
     ]);
+    const emDolar = moeda.moeda === 'USD';
+    const cotacaoTexto = (x10000) => (Number(x10000) / 10_000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
     limpar(conteudo,
       barraOrcamento(orc),
+
+      cartao('Moeda da conta da Meta',
+        el('div', { class: 'grade-2' },
+          el('div', {},
+            el('p', { class: 'pequeno mudo', style: 'margin:0 0 4px' }, 'A Meta cobra esta empresa em'),
+            el('strong', { style: 'font-size:20px' }, emDolar ? 'Dólar (US$)' : 'Real (R$)'),
+            el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' }, emDolar
+              ? 'Cada mensagem paga guarda o custo exato em dólar, e o fechamento confere dólar contra dólar com a fatura.'
+              : 'Os preços são os da tabela em reais cadastrada pela plataforma.')),
+          emDolar ? el('div', {},
+            el('p', { class: 'pequeno mudo', style: 'margin:0 0 4px' }, 'Cotação do mês'),
+            el('strong', { style: 'font-size:20px' }, `R$ ${cotacaoTexto(moeda.cotacao_x10000)}`),
+            el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' }, moeda.cotacao_padrao
+              ? 'Cotação padrão da plataforma. Informe a do mês para os valores em reais ficarem certos.'
+              : 'Usada para mostrar em reais e para o orçamento, que é em reais.')) : el('span')),
+        emDolar ? tabela(['Categoria', '>Em dólar', '>Em reais, a esta cotação'], ['utilidade', 'autenticacao', 'marketing'].map((k) => el('tr', {},
+          td({ utilidade: 'Utilidade', autenticacao: 'Autenticação', marketing: 'Marketing' }[k]),
+          td(`US$ ${(moeda.precos_usd_micro[k] / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`, 'dir num'),
+          td(reais(moeda.precos_milesimos[k]), 'dir num')))) : null,
+        ctx.pode('custos.editar') ? el('div', { style: 'margin-top:12px' }, botao('Mudar moeda e cotação', 'primario', () => formModal('Moeda da conta da Meta', () => [
+          escolha('A Meta cobra esta empresa em', 'moeda', { BRL: 'Real (R$)', USD: 'Dólar (US$)' }, moeda.moeda),
+          campo('Cotação do mês — quantos reais vale um dólar (vazio = padrão da plataforma)', {
+            name: 'cotacao', inputmode: 'decimal', placeholder: '5,45',
+            value: moeda.cotacao_padrao ? '' : cotacaoTexto(moeda.cotacao_x10000),
+          }),
+          el('p', { class: 'pequeno mudo' }, 'Mudar a cotação vale para as próximas mensagens. Mês já fechado guarda a cotação daquele mês.'),
+        ], async (d) => {
+          await api.put(`/empresas/${ctx.empresaId}/reguas/moeda`, { moeda: d.moeda, cotacao: d.cotacao || null });
+          toast('Moeda salva.');
+          await desenhar();
+        }))) : null),
 
       cartao('Teto de gasto',
         el('div', { class: 'grade-2' },
@@ -408,14 +445,26 @@ async function oControle(ctx, alvo) {
           fech.meses.map((m) => el('tr', m.divergente ? { class: 'linha-divergente' } : {},
             td(el('div', {},
               el('strong', {}, mesLongo(m.mes)),
-              m.em_aberto ? el('div', { class: 'pequeno mudo' }, `em aberto · projeção ${reais(m.projecao_milesimos)}`) : null,
+              m.em_aberto ? el('div', { class: 'pequeno mudo' }, `em aberto · projeção ${reaisTotal(m.projecao_milesimos)}`) : null,
               m.observacao ? el('div', { class: 'pequeno mudo' }, m.observacao) : null)),
             td(inteiro(m.mensagens), 'dir num'),
-            td(reais(m.gasto_milesimos), 'dir num'),
-            td(m.fatura_meta_centavos === null ? el('span', { class: 'mudo' }, '—') : centavosEmReais(m.fatura_meta_centavos), 'dir num'),
-            td(m.diferenca_centavos === null ? el('span', { class: 'mudo' }, '—')
-              : el('strong', { class: m.divergente ? 'erro-texto' : 'ok-texto' },
-                `${m.diferenca_centavos > 0 ? '+' : ''}${centavosEmReais(m.diferenca_centavos)}`), 'dir num'),
+            // Conta em dólar: a conferência é em dólar; o real aparece embaixo, como referência.
+            td(m.moeda === 'USD'
+              ? el('div', {}, dolares(m.gasto_usd_centavos), el('div', { class: 'pequeno mudo' }, `≈ ${reaisTotal(m.gasto_milesimos)}`))
+              : reaisTotal(m.gasto_milesimos), 'dir num'),
+            td(m.moeda === 'USD'
+              ? (m.fatura_meta_usd_centavos === null || m.fatura_meta_usd_centavos === undefined ? el('span', { class: 'mudo' }, '—')
+                : el('div', {}, dolares(m.fatura_meta_usd_centavos),
+                  m.fatura_meta_centavos !== null && m.fatura_meta_centavos !== undefined
+                    ? el('div', { class: 'pequeno mudo' }, `saiu ${centavosEmReais(m.fatura_meta_centavos)} · dólar a ${m.cambio_efetivo?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) ?? '—'}`)
+                    : null))
+              : (m.fatura_meta_centavos === null ? el('span', { class: 'mudo' }, '—') : centavosEmReais(m.fatura_meta_centavos)), 'dir num'),
+            td((() => {
+              const dif = m.moeda === 'USD' ? m.diferenca_usd_centavos : m.diferenca_centavos;
+              if (dif === null || dif === undefined) return el('span', { class: 'mudo' }, '—');
+              const fmt = m.moeda === 'USD' ? dolares : centavosEmReais;
+              return el('strong', { class: m.divergente ? 'erro-texto' : 'ok-texto' }, `${dif > 0 ? '+' : ''}${fmt(dif)}`);
+            })(), 'dir num'),
             td(m.em_aberto ? el('span', { class: 'etiqueta' }, 'em aberto')
               : m.conferido_em ? el('span', { class: `etiqueta ${m.divergente ? 'erro' : 'ok'}` }, m.divergente ? 'divergente' : 'conferido')
                 : el('span', { class: 'etiqueta aviso' }, 'fechado, não conferido')),
@@ -434,13 +483,22 @@ async function oControle(ctx, alvo) {
                     toast('Mês reaberto.');
                     await desenhar();
                   })
-                  : botaoIcone('dinheiro', 'Lançar a fatura da Meta', () => formModal(`Fatura da Meta — ${mesLongo(m.mes)}`, () => [
+                  : botaoIcone('dinheiro', 'Lançar a fatura da Meta', () => formModal(`Fatura da Meta — ${mesLongo(m.mes)}`, () => (m.moeda === 'USD' ? [
+                    el('p', { class: 'pequeno mudo' }, `Nossa conta para este mês: ${dolares(m.gasto_usd_centavos)} em ${inteiro(m.mensagens)} mensagem(ns).`),
+                    campo('Valor da fatura da Meta (US$)', { name: 'valor_usd', required: true, placeholder: '0,00', inputmode: 'decimal' }),
+                    campo('Quanto saiu da conta em reais (opcional, com IOF)', { name: 'valor', placeholder: '0,00', inputmode: 'decimal' }),
+                    el('p', { class: 'pequeno mudo' }, 'A conferência é dólar contra dólar. O valor em reais mostra o câmbio que ficou pago de verdade.'),
+                    area('Observação', { name: 'observacao', rows: 2, placeholder: 'Nota fiscal, ajuste…' }),
+                  ] : [
                     el('p', { class: 'pequeno mudo' }, `Nossa conta para este mês: ${reais(m.gasto_milesimos)} em ${inteiro(m.mensagens)} mensagem(ns).`),
                     campo('Valor cobrado pela Meta (R$)', { name: 'valor', required: true, placeholder: '0,00', inputmode: 'decimal' }),
                     area('Observação', { name: 'observacao', rows: 2, placeholder: 'Nota fiscal, câmbio, ajuste…' }),
-                  ], async (d) => {
-                    await api.post(`/empresas/${ctx.empresaId}/reguas/fechamentos/${m.mes}/fatura`,
-                      { valor_centavos: paraCentavos(d.valor), observacao: d.observacao || null });
+                  ]), async (d) => {
+                    await api.post(`/empresas/${ctx.empresaId}/reguas/fechamentos/${m.mes}/fatura`, {
+                      valor_centavos: d.valor ? paraCentavos(d.valor) : null,
+                      valor_usd_centavos: d.valor_usd ? paraCentavos(d.valor_usd) : null,
+                      observacao: d.observacao || null,
+                    });
                     toast('Fatura lançada.');
                     await desenhar();
                   }))))))),
