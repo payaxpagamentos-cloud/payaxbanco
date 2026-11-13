@@ -124,6 +124,28 @@ describe('ligação atendida pela ZOE', () => {
     assert.equal(transferida.dados.resolvida_por, 'humano', 'a ligação transferida foi resolvida por uma pessoa');
   });
 
+  test('o administrador escolhe teclas e escreve o menu pela configuração da ZOE', async () => {
+    const login = await (await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'carlos@fibramais.com.br', senha: 'senha12345' }) })).json();
+    const patch = (corpo) => fetch(`${base}/api/empresas/${empresa.id}/ia`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${login.token}` }, body: JSON.stringify(corpo),
+    });
+    const ok = await patch({ voz_modo: 'teclas', voz_menu: [{ tecla: '1', rotulo: 'boleto', pedido: 'Quero o boleto.' }, { tecla: '0', rotulo: 'atendente', pedido: 'Quero um atendente.' }] });
+    assert.equal(ok.status, 200);
+    const cfg = await ok.json();
+    assert.equal(cfg.voz_modo, 'teclas');
+    assert.deepEqual(cfg.voz_menu.map((o) => o.tecla), ['1', '0']);
+
+    const repetida = await patch({ voz_menu: [{ tecla: '1', rotulo: 'a', pedido: 'a' }, { tecla: '1', rotulo: 'b', pedido: 'b' }] });
+    assert.equal(repetida.status, 422);
+    assert.match((await repetida.json()).erro, /aparece duas vezes/);
+    const asterisco = await patch({ voz_menu: [{ tecla: '*', rotulo: 'a', pedido: 'a' }] });
+    assert.equal(asterisco.status, 422, 'o asterisco é reservado: repete o menu');
+
+    // Volta ao normal para os outros testes desta descrição.
+    await patch({ voz_modo: 'fala', voz_menu: null });
+  });
+
   test('ligação de outra empresa não aparece', async () => {
     const outra = empresasLib.criar(db, { nome: 'Outra' }, { comExemplos: false });
     const chaveOutra = empresasLib.criarChaveApi(db, outra.id, 'X').chave;
@@ -236,6 +258,121 @@ describe('segunda via pedida ao telefone', () => {
     const m = db.prepare("SELECT categoria, custo_milesimos FROM mensagens WHERE texto LIKE 'Segunda via%'").get();
     assert.equal(m.categoria, 'servico');
     assert.equal(m.custo_milesimos, 0, 'dentro da janela de 24 h é serviço: grátis');
+  });
+});
+
+describe('ligação por teclas', () => {
+  let ambiente;
+  let meta;
+  beforeEach(() => {
+    meta = h.fingirMeta();
+    ambiente = h.criarAmbiente();
+    ambiente.db.prepare("UPDATE ia_config SET voz_modo = 'teclas' WHERE empresa_id = ?").run(ambiente.empresa.id);
+  });
+  afterEach(() => meta.restaurar());
+
+  test('a ZOE atende com o menu numerado e pede uma tecla só', () => {
+    const { db, empresa } = ambiente;
+    const r = voz.iniciar(db, empresa, { uid: 'T1', telefone: '11977770001' });
+    assert.match(r.fala, /Digite 1 para segunda via da fatura, 2 para liberar o acesso, 3 para problema na internet ou 0 para falar com um atendente/);
+    assert.match(r.fala, /asterisco/);
+    assert.equal(r.aguardar, 'digitos');
+    assert.equal(r.max_digitos, 1, 'esperar 14 dígitos para quem só aperta "1" deixaria a pessoa esperando');
+    assert.doesNotMatch(r.fala, /me conta|como posso ajudar/i, 'não pede o que o cliente não tem como fazer por teclas');
+  });
+
+  test('a tecla vira o pedido e passa pelo mesmo cérebro', async () => {
+    const { db, empresa } = ambiente;
+    voz.iniciar(db, empresa, { uid: 'T2', telefone: '11977770002' });
+    const sem = h.semIa();
+    let r;
+    try { r = await voz.turno(db, empresa, 'T2', { digitos: '0' }); } finally { sem.restaurar(); }
+    assert.equal(r.acao, 'transferir', '0 = "quero falar com um atendente", e a regra de pedido de humano vale igual');
+    const c = db.prepare("SELECT id FROM conversas WHERE ligacao_uid = 'T2'").get();
+    const msgs = db.prepare('SELECT direcao, tipo, texto FROM mensagens WHERE conversa_id = ? ORDER BY id').all(c.id);
+    assert.ok(msgs.some((m) => m.direcao === 'entrada' && m.texto === 'Quero falar com um atendente.'));
+    assert.ok(msgs.some((m) => m.tipo === 'sistema' && /digitou 0 \(falar com um atendente\)/.test(m.texto)), 'o atendente vê qual tecla foi');
+  });
+
+  test('a IA sabe que o cliente só tem o teclado', async () => {
+    const { db, empresa } = ambiente;
+    voz.iniciar(db, empresa, { uid: 'T3', telefone: '11977770003' });
+    const claude = h.fingirClaude([{ texto: 'Para sua segurança, digite os três primeiros números do CPF do titular.' }]);
+    let r;
+    try { r = await voz.turno(db, empresa, 'T3', { digitos: '1' }); } finally { claude.restaurar(); }
+    const notas = claude.pedidos[0].messages.filter((m) => m.role === 'system').map((m) => m.content).join(' ');
+    assert.match(notas, /responde SÓ pelo teclado/);
+    assert.doesNotMatch(notas, /chega transcrita/, 'por teclas não há fala para transcrever');
+    assert.equal(r.max_digitos, 3, 'pediu os três primeiros do CPF: espera três teclas');
+  });
+
+  test('depois de escolher no menu, os números vão para a ZOE como resposta', async () => {
+    const { db, empresa } = ambiente;
+    voz.iniciar(db, empresa, { uid: 'T4', telefone: '11977770004' });
+    const claude = h.fingirClaude([
+      { texto: 'Digite os três primeiros números do CPF.' },
+      { texto: 'Obrigada, confirmei.' },
+    ]);
+    try {
+      await voz.turno(db, empresa, 'T4', { digitos: '1' });
+      await voz.turno(db, empresa, 'T4', { digitos: '123#' });
+    } finally { claude.restaurar(); }
+    const c = db.prepare("SELECT id FROM conversas WHERE ligacao_uid = 'T4'").get();
+    const entradas = db.prepare("SELECT texto FROM mensagens WHERE conversa_id = ? AND direcao = 'entrada' ORDER BY id").all(c.id).map((m) => m.texto);
+    assert.deepEqual(entradas, ['Quero a segunda via da minha fatura.', '123'], 'o "123" não foi lido como opção 1 do menu, e o # sai');
+  });
+
+  test('tecla que não existe repete as opções; na terceira, chama uma pessoa', async () => {
+    const { db, empresa } = ambiente;
+    voz.iniciar(db, empresa, { uid: 'T5', telefone: '11977770005' });
+    const r1 = await voz.turno(db, empresa, 'T5', { digitos: '7' });
+    assert.match(r1.fala, /Não recebi uma opção válida\. Digite 1 para/);
+    assert.equal(r1.max_digitos, 1);
+    await voz.turno(db, empresa, 'T5', { digitos: '' });
+    const r3 = await voz.turno(db, empresa, 'T5', { digitos: '8' });
+    assert.equal(r3.acao, 'transferir');
+  });
+
+  test('asterisco repete o menu a qualquer momento', async () => {
+    const { db, empresa } = ambiente;
+    voz.iniciar(db, empresa, { uid: 'T6', telefone: '11977770006' });
+    const claude = h.fingirClaude([{ texto: 'Digite os três primeiros números do CPF.' }]);
+    try { await voz.turno(db, empresa, 'T6', { digitos: '1' }); } finally { claude.restaurar(); }
+    const r = await voz.turno(db, empresa, 'T6', { digitos: '*' });
+    assert.match(r.fala, /^Digite 1 para segunda via/);
+    assert.equal(r.max_digitos, 1, 'de volta ao menu: a próxima tecla é uma opção');
+  });
+
+  test('o menu escrito pela empresa substitui o padrão', () => {
+    const { db, empresa } = ambiente;
+    db.prepare('UPDATE ia_config SET voz_menu = ? WHERE empresa_id = ?').run(JSON.stringify([
+      { tecla: '1', rotulo: 'financeiro', pedido: 'Quero falar sobre pagamento.' },
+      { tecla: '9', rotulo: 'ouvir as novidades', pedido: 'Quero saber dos planos novos.' },
+    ]), empresa.id);
+    const r = voz.iniciar(db, empresa, { uid: 'T7', telefone: '11977770007' });
+    assert.match(r.fala, /Digite 1 para financeiro ou 9 para ouvir as novidades/);
+  });
+
+  test('menu de botões das regras vira "digite 1 para…", na ordem das filas', () => {
+    const payload = { interactive: { action: { buttons: [{ reply: { title: 'Suporte' } }, { reply: { title: 'Financeiro' } }] } } };
+    assert.equal(voz.paraFala({ tipo: 'botao', texto: 'Com qual time?', payload }, { teclas: true }), 'Com qual time? Digite 1 para Suporte ou 2 para Financeiro.');
+  });
+
+  test('o modo fala continua esperando fala', () => {
+    const { db, empresa } = ambiente;
+    db.prepare("UPDATE ia_config SET voz_modo = 'fala' WHERE empresa_id = ?").run(empresa.id);
+    const r = voz.iniciar(db, empresa, { uid: 'T8', telefone: '11977770008' });
+    assert.equal(r.aguardar, 'fala');
+    assert.doesNotMatch(r.fala, /Digite 1/);
+  });
+});
+
+describe('quantas teclas esperar', () => {
+  test('pelo que a ZOE pediu', () => {
+    assert.equal(voz.quantasTeclas('Digite os três primeiros números do CPF.'), 3);
+    assert.equal(voz.quantasTeclas('Digite a data de nascimento do titular, com oito dígitos.'), 8);
+    assert.equal(voz.quantasTeclas('Digite o CPF do titular e depois a tecla jogo da velha.'), 14);
+    assert.equal(voz.quantasTeclas('Digite 1 para sim ou 2 para não.'), 1);
   });
 });
 

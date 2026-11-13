@@ -15,6 +15,28 @@ const claude = require('../ia/claude');
 const config = require('../config');
 const v = require('../lib/validacao');
 
+/**
+ * O menu principal da ligação por teclas. Null volta ao padrão.
+ * O asterisco é reservado (repete o menu) e cada tecla aparece uma vez só.
+ */
+function validarMenuDeVoz(lista) {
+  if (lista === null || (Array.isArray(lista) && !lista.length)) return null;
+  v.exigir(Array.isArray(lista) && lista.length <= 9, 'O menu da ligação tem de ter de 1 a 9 opções.');
+  const vistas = new Set();
+  const itens = lista.map((o) => {
+    const tecla = String(o?.tecla ?? '').trim();
+    v.exigir(/^[0-9]$/.test(tecla), 'Cada opção do menu usa uma tecla de 0 a 9 (o asterisco repete o menu).');
+    v.exigir(!vistas.has(tecla), `A tecla ${tecla} aparece duas vezes no menu.`);
+    vistas.add(tecla);
+    return {
+      tecla,
+      rotulo: v.texto(o.rotulo, `o nome da opção ${tecla}`, 60),
+      pedido: v.texto(o.pedido, `o pedido da opção ${tecla}`, 300),
+    };
+  });
+  return JSON.stringify(itens);
+}
+
 /** A ZOE: configuração, base de conhecimento, intenções, ferramentas e o teste. */
 module.exports = function rotasIa(db) {
   const r = express.Router();
@@ -32,6 +54,10 @@ module.exports = function rotasIa(db) {
     chave_no_servidor: claude.disponivel(),
     // Se os áudios do cliente estão virando texto. Sem caminho de arquivo nem endereço interno.
     transcricao: require('../lib/transcricao').situacao(),
+    voz_modo: cfg.voz_modo === 'teclas' ? 'teclas' : 'fala',
+    // O menu que vale de fato: o da empresa ou o padrão.
+    voz_menu: require('../lib/voz').menuDa(cfg),
+    voz_menu_padrao: require('../lib/voz').MENU_PADRAO,
     padroes: conversasLib.MSG,
   });
 
@@ -62,6 +88,12 @@ module.exports = function rotasIa(db) {
           d.modelo === undefined ? atual.modelo : v.opcional(d.modelo, 'o modelo', 60),
           d.esforco === undefined ? atual.esforco : (d.esforco ? v.opcao(d.esforco, 'o esforço', ['low', 'medium', 'high', 'xhigh', 'max']) : null),
           agora(), req.empresa.id);
+      // Ligações: fala ou teclas, e o menu principal do modo teclas.
+      if (d.voz_modo !== undefined || d.voz_menu !== undefined) {
+        const modo = d.voz_modo === undefined ? (atual.voz_modo ?? 'fala') : v.opcao(d.voz_modo, 'o jeito de atender ligações', ['fala', 'teclas']);
+        const menu = d.voz_menu === undefined ? atual.voz_menu : validarMenuDeVoz(d.voz_menu);
+        db.prepare('UPDATE ia_config SET voz_modo = ?, voz_menu = ? WHERE empresa_id = ?').run(modo, menu, req.empresa.id);
+      }
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'alterou a ZOE', detalhe: { antes: atual, depois: d }, ip: req.ip });
       res.json(comoPublica(cfgDa(req.empresa.id)));
     } catch (err) { next(err); }

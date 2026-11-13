@@ -849,6 +849,11 @@ label.campo{ gap: 5px }
 .transcricao.mudo{ border-left-color:var(--borda); color:var(--text-2) }
 .rotulo-transcricao{ font-size:11px; font-weight:600; letter-spacing:.02em; text-transform:uppercase; color:var(--text-2) }
 
+/* Menu da ligação por teclas: tecla, o que a ZOE fala, o que a tecla significa. */
+.linha-menu-voz{ display:grid; grid-template-columns:110px minmax(140px,1fr) minmax(200px,2fr) 36px; gap:8px; align-items:center }
+.linha-menu-voz.cabecalho{ margin-top:4px }
+@media (max-width: 720px){ .linha-menu-voz{ grid-template-columns:1fr } .linha-menu-voz.cabecalho{ display:none } }
+
 /* ==========================================================================
    ACABAMENTO — vidro em todas as superfícies
    Vem por último de propósito: assim vale sobre as telas criadas depois do

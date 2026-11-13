@@ -22,6 +22,13 @@ const v = require('./validacao');
  * e o que a ZOE responderia por escrito volta como texto para a central falar. A diferença entre
  * os canais mora em um lugar só: na hora de entregar a resposta (envio.enfileirar marca "falada").
  *
+ * Dois jeitos de o cliente responder, escolhidos em ZOE › Como ela atende:
+ *   fala   → o cliente diz o que quer ("minha internet caiu"); o teclado vale para números;
+ *   teclas → menu numerado ("digite 1 para segunda via…"). Cada tecla do menu principal vira o
+ *            pedido equivalente e passa pelo MESMO cérebro, como se tivesse sido dito. Não é a
+ *            URA de teclas antiga: aquela era outra ZOE, com regras próprias.
+ * A central não decide nada: cada resposta diz se ela deve ouvir fala ou ler teclas, e quantas.
+ *
  * A central telefônica conversa com isto por três chamadas:
  *   iniciar  → a ligação chegou: devolve a saudação;
  *   turno    → o cliente falou (texto, teclas ou o áudio, que é transcrito aqui com o mesmo
@@ -33,6 +40,45 @@ const MAX_AUDIO_BYTES = 1_500_000;
 // Depois de tantas falas seguidas que não deu para entender, passa para uma pessoa em vez de
 // ficar repetindo "pode repetir?" — ninguém aguenta a terceira vez.
 const MAX_NAO_ENTENDI = 3;
+
+/** O menu principal do modo teclas, quando a empresa não escreveu o dela. */
+const MENU_PADRAO = [
+  { tecla: '1', rotulo: 'segunda via da fatura', pedido: 'Quero a segunda via da minha fatura.' },
+  { tecla: '2', rotulo: 'liberar o acesso', pedido: 'Minha internet foi bloqueada. Quero o desbloqueio de confiança.' },
+  { tecla: '3', rotulo: 'problema na internet', pedido: 'Minha internet está com problema.' },
+  { tecla: '0', rotulo: 'falar com um atendente', pedido: 'Quero falar com um atendente.' },
+];
+
+const modoDa = (cfg) => (cfg?.voz_modo === 'teclas' ? 'teclas' : 'fala');
+
+function menuDa(cfg) {
+  try {
+    const m = JSON.parse(cfg?.voz_menu ?? 'null');
+    if (Array.isArray(m) && m.length) return m;
+  } catch { /* usa o padrão */ }
+  return MENU_PADRAO;
+}
+
+/** "Digite 1 para…, 2 para… ou 0 para…". O zero vai por último, que é onde o ouvido espera. */
+function falaDoMenu(menu) {
+  const ordem = [...menu].sort((a, b) => (a.tecla === '0') - (b.tecla === '0') || a.tecla.localeCompare(b.tecla));
+  const itens = ordem.map((o) => `${o.tecla} para ${o.rotulo}`);
+  const lista = itens.length > 1 ? `${itens.slice(0, -1).join(', ')} ou ${itens.at(-1)}` : itens[0];
+  return `Digite ${lista}. Para ouvir de novo, digite asterisco.`;
+}
+
+/**
+ * Quantas teclas esperar, pelo que a ZOE acabou de pedir. Esperar 14 dígitos quando a pessoa só
+ * precisa apertar "1" a deixaria esperando o tempo inteiro; esperar 1 quando ela digita o CPF
+ * cortaria o número no primeiro dígito.
+ */
+function quantasTeclas(fala) {
+  const t = String(fala ?? '').toLowerCase();
+  if (/tr[eê]s primeiros/.test(t)) return 3;
+  if (/nascimento/.test(t)) return 8;
+  if (/\bcpf\b|\bcnpj\b|protocolo/.test(t)) return 14;
+  return 1;
+}
 
 /** Telefone da Bina no formato dos contatos (com 55). Sem Bina, a ligação ainda é atendida. */
 function telefoneDaBina(bruto, uid) {
@@ -47,7 +93,7 @@ function telefoneDaBina(bruto, uid) {
  * O texto que vai virar voz. Tira o que não se fala (formatação, emoji, link) e transforma um
  * menu de botões em opções faladas — no telefone não há botão para apertar.
  */
-function paraFala(m) {
+function paraFala(m, { teclas = false } = {}) {
   let t = String(m.texto ?? '');
   if (m.tipo === 'botao' && m.payload) {
     try {
@@ -57,7 +103,11 @@ function paraFala(m) {
         ...(acao.buttons ?? []).map((b) => b.reply?.title),
         ...(acao.sections ?? []).flatMap((s) => (s.rows ?? []).map((r) => r.title)),
       ].filter(Boolean);
-      if (opcoes.length) t = `${t} Você pode dizer: ${opcoes.length > 1 ? `${opcoes.slice(0, -1).join(', ')} ou ${opcoes.at(-1)}` : opcoes[0]}.`;
+      const juntar = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} ou ${xs.at(-1)}` : xs[0]);
+      // Por teclas, a opção vira número na mesma ordem do menu — e as regras já entendem "1" como a primeira.
+      if (opcoes.length) t = teclas
+        ? `${t} Digite ${juntar(opcoes.map((o, i) => `${i + 1} para ${o}`))}.`
+        : `${t} Você pode dizer: ${juntar(opcoes)}.`;
     } catch { /* fala só o texto */ }
   }
   return t
@@ -74,16 +124,16 @@ const porUid = (db, empresaId, uid) =>
   db.prepare("SELECT * FROM conversas WHERE empresa_id = ? AND ligacao_uid = ? AND canal = 'telefone'").get(empresaId, String(uid));
 
 /** As respostas faladas criadas depois de `marca`, já prontas para virar voz. */
-function falasDesde(db, conversaId, marca) {
+function falasDesde(db, conversaId, marca, { teclas = false } = {}) {
   return db.prepare(`SELECT tipo, texto, payload FROM mensagens
     WHERE conversa_id = ? AND id > ? AND direcao = 'saida' AND status = 'falada' ORDER BY id`).all(conversaId, marca)
-    .map(paraFala).filter(Boolean).join(' ');
+    .map((m) => paraFala(m, { teclas })).filter(Boolean).join(' ');
 }
 
 const ultimaId = (db, conversaId) => Number(db.prepare('SELECT COALESCE(MAX(id), 0) AS n FROM mensagens WHERE conversa_id = ?').get(conversaId).n);
 
 /** O que a central deve fazer agora, pelo estado da conversa. */
-function proximoPasso(db, c, fala) {
+function proximoPasso(db, c, fala, { modo = 'fala', noMenu = false } = {}) {
   if (c.estado === 'encerrada') return { acao: 'encerrar', fala };
   if (c.estado === 'aguardando' || c.estado === 'humano') {
     const fila = c.fila_id ? filas.buscar(db, c.empresa_id, c.fila_id) : null;
@@ -97,14 +147,18 @@ function proximoPasso(db, c, fala) {
       conversa_id: c.id,
     };
   }
-  return { acao: 'ouvir', fala };
+  // A central obedece: grava a fala, ou lê o número de teclas que faz sentido para o que foi pedido.
+  if (modo === 'teclas') return { acao: 'ouvir', fala, aguardar: 'digitos', max_digitos: noMenu ? 1 : quantasTeclas(fala) };
+  return { acao: 'ouvir', fala, aguardar: 'fala' };
 }
 
 /** A ligação chegou. Abre a conversa (ou devolve a mesma, se a central repetir o pedido). */
 function iniciar(db, empresa, { uid, telefone = null } = {}) {
   const id = v.texto(uid, 'o identificador da ligação', 120);
+  const cfgVoz = conversas.cfgIa(db, empresa.id);
+  const modo = modoDa(cfgVoz);
   const ja = porUid(db, empresa.id, id);
-  if (ja) return { conversa_id: ja.id, repetida: true, ...proximoPasso(db, ja, null) };
+  if (ja) return { conversa_id: ja.id, repetida: true, ...proximoPasso(db, ja, null, { modo, noMenu: Boolean(ja.voz_no_menu) }) };
 
   const numero = db.prepare('SELECT * FROM numeros WHERE empresa_id = ? ORDER BY ativo DESC, id LIMIT 1').get(empresa.id);
   if (!numero) throw new ErroNegocio('A empresa ainda não tem número cadastrado.', 409);
@@ -122,11 +176,20 @@ function iniciar(db, empresa, { uid, telefone = null } = {}) {
   const cfg = conversas.cfgIa(db, empresa.id);
   const prompt = require('../ia/prompt');
   const regras = require('../ia/regras');
-  const saudacao = prompt.saudacaoDe(cfg, { empresa, contato, nomeCliente: contato.nome ?? contato.nome_perfil })
-    || regras.saudacao(cfg, { nomeAssistente: cfg.nome_assistente, nomeEmpresa: empresa.nome, nomeCliente: contato.nome ?? contato.nome_perfil });
+  // Por teclas, a saudação padrão ("me conta o que você precisa") pediria algo que o cliente não
+  // tem como fazer. Sem saudação escrita pela empresa, vai uma curta, e o menu vem logo depois.
+  const saudacao = modo === 'teclas' && !cfg.saudacao?.trim()
+    ? `Olá! Eu sou a ${cfg.nome_assistente || 'ZOE'}, atendente virtual da ${empresa.nome}.`
+    : prompt.saudacaoDe(cfg, { empresa, contato, nomeCliente: contato.nome ?? contato.nome_perfil })
+      || regras.saudacao(cfg, { nomeAssistente: cfg.nome_assistente, nomeEmpresa: empresa.nome, nomeCliente: contato.nome ?? contato.nome_perfil });
   const marca = ultimaId(db, conversa.id);
   envio.enfileirar(db, conversa, { autor: 'ia', tipo: 'texto', texto: saudacao });
-  return { conversa_id: conversa.id, ...proximoPasso(db, conversa, falasDesde(db, conversa.id, marca)) };
+  // Por teclas, a saudação já vem com o menu principal: o cliente não tem como "dizer o que quer".
+  if (modo === 'teclas') {
+    envio.enfileirar(db, conversa, { autor: 'ia', tipo: 'texto', texto: falaDoMenu(menuDa(cfgVoz)) });
+    db.prepare('UPDATE conversas SET voz_no_menu = 1 WHERE id = ?').run(conversa.id);
+  }
+  return { conversa_id: conversa.id, ...proximoPasso(db, conversa, falasDesde(db, conversa.id, marca), { modo, noMenu: modo === 'teclas' }) };
 }
 
 /**
@@ -136,11 +199,28 @@ function iniciar(db, empresa, { uid, telefone = null } = {}) {
 async function turno(db, empresa, uid, { texto = null, digitos = null, audio_base64: audio = null, turno_id: turnoId = null } = {}) {
   const c = porUid(db, empresa.id, uid);
   if (!c) throw naoEncontrado('Ligação');
-  if (c.estado !== 'bot') return proximoPasso(db, c, null);
+  const cfgVoz = conversas.cfgIa(db, c.empresa_id);
+  const modo = modoDa(cfgVoz);
+  const teclas = modo === 'teclas';
+  const passo = (conv, fala) => proximoPasso(db, conv, fala, { modo, noMenu: Boolean(conv.voz_no_menu) });
+  if (c.estado !== 'bot') return passo(c, null);
 
-  let dito = texto ? String(texto).trim().slice(0, 2000) : digitos ? String(digitos).replace(/[^\d*#]/g, '').slice(0, 30) : null;
+  let dito = texto ? String(texto).trim().slice(0, 2000) : digitos ? String(digitos).replace(/[^\d*#]/g, '').replace(/#$/, '').slice(0, 30) : null;
   let entrada = { tipo: 'texto', texto: dito };
   let ouvido = null;
+  let opcao = null;
+
+  // Por teclas: asterisco repete o menu principal, e a tecla dada no menu vira o pedido dela.
+  if (teclas && dito === '*') {
+    db.prepare('UPDATE conversas SET voz_no_menu = 1 WHERE id = ?').run(c.id);
+    return proximoPasso(db, { ...c, voz_no_menu: 1 }, falaDoMenu(menuDa(cfgVoz)), { modo, noMenu: true });
+  }
+  if (teclas && c.voz_no_menu && dito) {
+    opcao = menuDa(cfgVoz).find((o) => o.tecla === dito.slice(0, 1)) ?? null;
+    // Tecla que não existe no menu conta como "não entendi" — na terceira, chama uma pessoa.
+    dito = opcao ? opcao.pedido : null;
+    entrada = { tipo: 'texto', texto: dito };
+  }
 
   if (!dito && audio) {
     const buffer = Buffer.from(String(audio), 'base64');
@@ -159,7 +239,12 @@ async function turno(db, empresa, uid, { texto = null, digitos = null, audio_bas
     ...entrada, waId: turnoId ? `voz:${c.id}:${String(turnoId).slice(0, 40)}` : null,
   });
   // Mesmo turno repetido pela central (rede instável): não responde duas vezes.
-  if (!mensagemId) return proximoPasso(db, c, null);
+  if (!mensagemId) return passo(c, null);
+  if (opcao) {
+    // O atendente que ler a conversa vê qual tecla foi, não só o pedido que ela representa.
+    envio.registrarSistema(db, c, `O cliente digitou ${opcao.tecla} (${opcao.rotulo}).`);
+    db.prepare('UPDATE conversas SET voz_no_menu = 0 WHERE id = ?').run(c.id);
+  }
   if (ouvido) {
     db.prepare('UPDATE mensagens SET transcricao = ?, transcricao_status = ?, transcricao_ms = ? WHERE id = ?')
       .run(ouvido.texto, ouvido.status, ouvido.ms ?? 0, mensagemId);
@@ -173,9 +258,14 @@ async function turno(db, empresa, uid, { texto = null, digitos = null, audio_bas
     if (seguidas >= MAX_NAO_ENTENDI) {
       const marca = ultimaId(db, c.id);
       transacao(db, () => conversas.transferir(db, c, { por: 'ia', motivo: 'Não foi possível entender o cliente na ligação.' }));
-      return proximoPasso(db, db.prepare('SELECT * FROM conversas WHERE id = ?').get(c.id), falasDesde(db, c.id, marca));
+      return passo(db.prepare('SELECT * FROM conversas WHERE id = ?').get(c.id), falasDesde(db, c.id, marca, { teclas }));
     }
-    return { acao: 'ouvir', fala: 'Desculpe, não consegui entender. Pode repetir, por favor?' };
+    if (teclas) {
+      // Por teclas, o jeito de ajudar é repetir as opções — "pode repetir?" não diz o que digitar.
+      db.prepare('UPDATE conversas SET voz_no_menu = 1 WHERE id = ?').run(c.id);
+      return proximoPasso(db, { ...c, voz_no_menu: 1 }, `Não recebi uma opção válida. ${falaDoMenu(menuDa(cfgVoz))}`, { modo, noMenu: true });
+    }
+    return passo(c, 'Desculpe, não consegui entender. Pode repetir, por favor?');
   }
 
   const marca = ultimaId(db, c.id);
@@ -193,9 +283,15 @@ async function turno(db, empresa, uid, { texto = null, digitos = null, audio_bas
   }
 
   const depois = db.prepare('SELECT * FROM conversas WHERE id = ?').get(c.id);
-  const fala = falasDesde(db, c.id, marca);
+  const fala = falasDesde(db, c.id, marca, { teclas });
+  // A ZOE não disse nada (raro, mas acontece sem IA): no modo teclas o menu volta, e a próxima
+  // tecla vale como opção dele; no modo fala, só avisa que está ouvindo.
+  if (!fala && depois.estado === 'bot' && teclas) {
+    db.prepare('UPDATE conversas SET voz_no_menu = 1 WHERE id = ?').run(c.id);
+    return { ...proximoPasso(db, { ...depois, voz_no_menu: 1 }, falaDoMenu(menuDa(cfgVoz)), { modo, noMenu: true }), ...(ouvido ? { ouvi: dito } : {}) };
+  }
   return {
-    ...proximoPasso(db, depois, fala || (depois.estado === 'bot' ? 'Pode falar, estou ouvindo.' : null)),
+    ...passo(depois, fala || (depois.estado === 'bot' ? 'Pode falar, estou ouvindo.' : null)),
     ...(ouvido ? { ouvi: dito } : {}),
   };
 }
@@ -228,4 +324,4 @@ function encerrar(db, empresa, uid) {
   return { ok: true, resolvida_por: resolvidaPor };
 }
 
-module.exports = { iniciar, turno, encerrar, paraFala, telefoneDaBina, MAX_NAO_ENTENDI };
+module.exports = { iniciar, turno, encerrar, paraFala, telefoneDaBina, quantasTeclas, falaDoMenu, menuDa, MENU_PADRAO, MAX_NAO_ENTENDI };

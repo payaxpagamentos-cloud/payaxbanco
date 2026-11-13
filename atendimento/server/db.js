@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS conversas (
   canal TEXT NOT NULL DEFAULT 'whatsapp' CHECK (canal IN ('whatsapp','telefone')),
   -- O identificador da ligação na central telefônica (uniqueid do Asterisk), quando é telefone.
   ligacao_uid TEXT,
+  -- Ligação por teclas: 1 enquanto o cliente está no menu principal (a próxima tecla é uma opção dele).
+  voz_no_menu INTEGER NOT NULL DEFAULT 0,
   fila_id INTEGER REFERENCES filas(id),
   atendente_id INTEGER REFERENCES usuarios(id),
   assunto TEXT,
@@ -269,6 +271,12 @@ CREATE TABLE IF NOT EXISTS ia_config (
   -- Modelo e esforço: em branco usa o padrão do servidor.
   modelo TEXT,
   esforco TEXT CHECK (esforco IN ('low','medium','high','xhigh','max')),
+  -- Como o cliente responde numa ligação: falando ('fala') ou pelo teclado ('teclas').
+  -- Nos dois modos é a mesma ZOE; muda só a forma de perguntar e de ouvir.
+  voz_modo TEXT NOT NULL DEFAULT 'fala' CHECK (voz_modo IN ('fala','teclas')),
+  -- Menu principal do modo teclas: [{ "tecla": "1", "rotulo": "Segunda via", "pedido": "Quero a segunda via..." }].
+  -- Vazio usa o menu padrão. Cada tecla vira o pedido, que passa pelo cérebro como se fosse dito.
+  voz_menu TEXT,
   atualizada_em TEXT
 );
 

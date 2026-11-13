@@ -285,7 +285,48 @@ async function configuracao(ctx, alvo) {
   const filas = (await api.get(`/empresas/${ctx.empresaId}/filas`)).itens;
 
   const t = cfg.transcricao;
+
+  // ---------- Ligações: fala ou teclas ----------
+  // As linhas do menu não têm "name": o lerForm não as pega, e o menu vai montado no salvar.
+  const linhasMenu = el('div', { class: 'coluna', style: 'gap:8px' });
+  const linhaMenu = (o = {}) => {
+    const tecla = el('select', { 'aria-label': 'Tecla' }, ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map((x) => el('option', { value: x }, `Tecla ${x}`)));
+    tecla.value = o.tecla ?? String(linhasMenu.children.length + 1);
+    const rotulo = el('input', { value: o.rotulo ?? '', maxlength: 60, placeholder: 'segunda via da fatura', 'aria-label': 'O que a ZOE fala' });
+    const pedido = el('input', { value: o.pedido ?? '', maxlength: 300, placeholder: 'Quero a segunda via da minha fatura.', 'aria-label': 'O que essa tecla significa' });
+    const linha = el('div', { class: 'linha-menu-voz' }, tecla, rotulo, pedido,
+      el('button', { type: 'button', class: 'icone-btn perigo', title: 'Remover', onclick: () => linha.remove() }, icone('lixo')));
+    linha.ler = () => ({ tecla: tecla.value, rotulo: rotulo.value.trim(), pedido: pedido.value.trim() });
+    linhasMenu.append(linha);
+  };
+  for (const o of cfg.voz_menu ?? []) linhaMenu(o);
+
+  const blocoMenu = el('div', {},
+    el('p', { class: 'pequeno mudo', style: 'margin:8px 0' },
+      'Menu principal da ligação. "O que ela fala" entra em "digite 1 para…"; "o que significa" é o pedido que a tecla representa — '
+      + 'ele passa pela ZOE como se o cliente tivesse dito, com as mesmas regras e ferramentas. O asterisco sempre repete o menu.'),
+    el('div', { class: 'linha-menu-voz cabecalho pequeno mudo' }, el('span', {}, 'Tecla'), el('span', {}, 'O que ela fala'), el('span', {}, 'O que significa'), el('span')),
+    linhasMenu,
+    el('div', { class: 'linha', style: 'gap:8px;margin-top:8px' },
+      el('button', { type: 'button', class: 'btn pequeno', onclick: () => linhaMenu() }, 'Adicionar opção'),
+      el('button', { type: 'button', class: 'btn pequeno', onclick: () => { limpar(linhasMenu); for (const o of cfg.voz_menu_padrao) linhaMenu(o); } },
+        'Voltar ao menu padrão')));
+
+  const selModo = escolha('Como o cliente responde', 'voz_modo', {
+    fala: 'Falando — ele diz o que quer, e o teclado vale para números',
+    teclas: 'Pelo teclado — menu numerado ("digite 1 para…")',
+  }, cfg.voz_modo ?? 'fala');
+  const mostrarMenu = () => { blocoMenu.hidden = selModo.querySelector('select').value !== 'teclas'; };
+  selModo.querySelector('select').addEventListener('change', mostrarMenu);
+  queueMicrotask(mostrarMenu);
+
   const f = el('form', { class: 'form colunas' },
+    cartao('Ligações',
+      selModo,
+      el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' },
+        'Nos dois jeitos é a mesma ZOE: mesmas regras, ferramentas, confirmação de identidade, alertas e Ouvidoria. '
+        + 'Muda só como ela pergunta e como o cliente responde.'),
+      blocoMenu),
     t ? cartao('Áudios do cliente',
       el('p', { style: 'margin:0 0 6px' },
         el('span', { class: `etiqueta ${t.ligada ? 'ok' : ''}` }, t.ligada ? 'Transcrição ligada' : 'Transcrição desligada')),
@@ -333,7 +374,9 @@ async function configuracao(ctx, alvo) {
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(f.querySelector('button[type=submit], .btn.primario'), async () => {
-      await api.patch(`/empresas/${ctx.empresaId}/ia`, lerForm(f));
+      const dados = lerForm(f);
+      if (dados.voz_modo === 'teclas') dados.voz_menu = [...linhasMenu.children].map((l) => l.ler()).filter((o) => o.rotulo || o.pedido);
+      await api.patch(`/empresas/${ctx.empresaId}/ia`, dados);
       toast('ZOE salva.');
     });
   });

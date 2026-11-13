@@ -133,11 +133,19 @@ function notaDaConversa(db, conversa) {
  * em cache); o canal entra aqui, na nota, porque é dado desta conversa e não da empresa.
  */
 function notaDaLigacao(db, conversa) {
-  const partes = ['Canal: LIGAÇÃO TELEFÔNICA. Tudo o que você escrever será FALADO por voz para o cliente. '
+  // Por teclas, o cliente não fala: só aperta números. A ZOE pergunta de um jeito que dê para responder assim.
+  const porTeclas = conversas.cfgIa(db, conversa.empresa_id).voz_modo === 'teclas';
+  const teclado = porTeclas
+    ? ['O cliente responde SÓ pelo teclado do telefone, não fala. Quando oferecer escolhas, numere e diga '
+      + '"digite 1 para…, 2 para…" (no máximo quatro opções). Para sim ou não, "digite 1 para sim ou 2 para não". '
+      + 'Ao pedir números (CPF, data de nascimento), diga quantos dígitos são. Nunca peça para o cliente falar. '
+      + 'A resposta dele chega como os números que ele digitou.']
+    : [];
+  const partes = [...teclado, 'Canal: LIGAÇÃO TELEFÔNICA. Tudo o que você escrever será FALADO por voz para o cliente. '
     + 'Frases curtas e naturais, uma pergunta por vez. Nada de listas, links, emojis, asteriscos ou formatação. '
     + 'Não peça para o cliente clicar, ler ou abrir nada na tela. '
-    + 'A fala do cliente chega transcrita automaticamente e pode ter erros: confirme números (CPF, datas, valores) repetindo-os. '
-    + 'Para os três primeiros números do CPF, ele pode falar ou digitar no teclado do telefone. '
+    + (porTeclas ? '' : 'A fala do cliente chega transcrita automaticamente e pode ter erros: confirme números (CPF, datas, valores) repetindo-os. '
+      + 'Para os três primeiros números do CPF, ele pode falar ou digitar no teclado do telefone. ')
     + 'A segunda via não aparece na ligação: enviar_segunda_via manda pelo WhatsApp dele ou por SMS e e-mail — diga por onde foi.'];
 
   // Mesma pessoa, outro canal: se ela falou com a gente pelo WhatsApp há pouco, a ZOE já sabe.

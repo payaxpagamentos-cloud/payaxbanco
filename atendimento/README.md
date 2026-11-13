@@ -262,6 +262,28 @@ O que isso entrega:
   cérebro no meio da ligação transfere; se o ZOE Atende estiver fora do ar quando a ligação chega,
   o Asterisk segue pela URA de teclas do PABX.
 
+### Fala ou teclas
+
+Em `ZOE › Como ela atende › Ligações` a empresa escolhe como o cliente responde:
+
+| Modo | Como funciona |
+|---|---|
+| **Falando** | o cliente diz o que quer ("minha internet caiu"); o teclado vale para números, como o CPF |
+| **Pelo teclado** | menu numerado: "digite 1 para segunda via, 2 para liberar o acesso, 3 para problema na internet ou 0 para falar com um atendente" |
+
+Nos dois é a **mesma ZOE**. No modo teclado, cada tecla do menu principal vira o pedido que ela
+representa ("1" vira "quero a segunda via da minha fatura") e passa pelo cérebro como se tivesse
+sido dito — com as mesmas regras, ferramentas e confirmação de identidade. Não é a URA de teclas
+antiga, que era outra ZOE. Depois do menu, a ZOE pergunta de um jeito que dá para responder
+teclando ("digite 1 para sim ou 2 para não", "digite os três primeiros números do CPF").
+
+- O menu é escrito pela empresa (tecla, o que a ZOE fala, o que a tecla significa); vazio usa o
+  padrão. O asterisco sempre repete o menu.
+- A central espera só as teclas que fazem sentido: uma no menu, três para o começo do CPF, oito
+  para a data de nascimento. Assim ninguém fica esperando à toa depois de apertar "1".
+- Tecla que não existe repete as opções; na terceira vez, passa para uma pessoa.
+- Na conversa, o atendente vê qual tecla foi apertada ("O cliente digitou 1 (segunda via)").
+
 A central chama três rotas da API de integração (chave `atd_…`, cabeçalho `X-Api-Key`):
 
 | Rota | Quando |
@@ -271,7 +293,8 @@ A central chama três rotas da API de integração (chave `atd_…`, cabeçalho 
 | `POST /api/integracao/voz/ligacoes/:uid/fim` | desligou |
 
 Cada resposta traz `fala` (o que falar) e `acao`: `ouvir`, `transferir` (com `fila` e `resumo`)
-ou `encerrar`. O script do Asterisk que faz isso está em `pabx/scripts/zoe-agi.js` (modo
+ou `encerrar`. Em `ouvir`, `aguardar` diz se a central grava a fala (`fala`) ou lê teclas
+(`digitos`, com `max_digitos`). O script do Asterisk que faz isso está em `pabx/scripts/zoe-agi.js` (modo
 conversado). Testado de ponta a ponta com áudio de telefone (8 kHz) e o whisper real: "estou
 pensando em cancelar" abriu a Ouvidoria e foi para a fila Retenção em ~5 s; "quero falar com um
 atendente" foi transferido em ~3,7 s.

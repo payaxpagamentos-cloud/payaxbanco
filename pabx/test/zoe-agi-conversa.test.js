@@ -19,7 +19,7 @@ const WAV_FALA = Buffer.concat([Buffer.from('RIFF....WAVEfmt '), Buffer.alloc(16
  *   'silencio'   → grava quase nada;
  *   { tecla, resto } → o cliente aperta uma tecla (e o GET DATA seguinte lê o resto).
  */
-function asterisk(falas, { desligarNoRecord = Infinity } = {}) {
+function asterisk(falas, { desligarNoRecord = Infinity, teclas = [] } = {}) {
   const deAsterisk = new PassThrough();
   const paraAsterisk = new PassThrough();
   const comandos = [];
@@ -57,7 +57,12 @@ function asterisk(falas, { desligarNoRecord = Infinity } = {}) {
         deAsterisk.write('200 result=0 (silence) endpos=8000\n');
         continue;
       }
-      if (cmd.startsWith('GET DATA')) { deAsterisk.write(`200 result=${restoPendente ?? ''}\n`); restoPendente = null; continue; }
+      if (cmd.startsWith('GET DATA')) {
+        const r = restoPendente ?? teclas.shift() ?? '';
+        restoPendente = null;
+        deAsterisk.write(`200 result=${r}\n`);
+        continue;
+      }
       deAsterisk.write('200 result=0\n');
     }
   });
@@ -65,7 +70,7 @@ function asterisk(falas, { desligarNoRecord = Infinity } = {}) {
 }
 
 /** O ZOE Atende de mentira: responde cada turno com o próximo passo do roteiro. */
-async function cerebroFalso(roteiro, { quebrarNoInicio = false } = {}) {
+async function cerebroFalso(roteiro, { quebrarNoInicio = false, inicio = null } = {}) {
   const pedidos = [];
   const s = http.createServer((req, res) => {
     let corpo = '';
@@ -75,7 +80,7 @@ async function cerebroFalso(roteiro, { quebrarNoInicio = false } = {}) {
       pedidos.push({ url: req.url, chave: req.headers['x-api-key'], dados });
       if (quebrarNoInicio) { res.writeHead(503, { 'content-type': 'application/json' }); res.end('{"erro":"fora"}'); return; }
       let resposta = { ok: true };
-      if (req.url.endsWith('/voz/ligacoes')) resposta = { acao: 'ouvir', fala: 'Olá! Sou a ZOE. Como posso ajudar?' };
+      if (req.url.endsWith('/voz/ligacoes')) resposta = inicio ?? { acao: 'ouvir', fala: 'Olá! Sou a ZOE. Como posso ajudar?' };
       else if (req.url.endsWith('/turno')) resposta = roteiro.shift() ?? { acao: 'encerrar', fala: 'Até mais!' };
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(resposta));
@@ -114,6 +119,25 @@ test('conversa: ouve, manda a fala para o cérebro e transfere para a fila que e
   assert.equal(turno2.dados.digitos, '123', 'apertou 1 e digitou 23: o CPF vai pelo teclado');
   assert.match(fim.url, /\/fim$/);
   assert.ok(a.gravados.every((f) => !fs.existsSync(f)), 'nenhuma gravação de cliente fica no disco');
+});
+
+test('por teclas: lê quantas teclas a ZOE pediu, em vez de gravar fala', async (t) => {
+  const zoe = await cerebroFalso([
+    { acao: 'ouvir', fala: 'Digite os três primeiros números do CPF.', aguardar: 'digitos', max_digitos: 3 },
+    { acao: 'transferir', fala: 'Vou te passar para o financeiro.', fila: { id: 2, nome: 'Financeiro' }, resumo: 'Segunda via.' },
+  ], { inicio: { acao: 'ouvir', fala: 'Digite 1 para segunda via ou 0 para atendente.', aguardar: 'digitos', max_digitos: 1 } });
+  t.after(() => zoe.fechar());
+  const a = asterisk([], { teclas: ['1', '123'] });
+
+  const status = await conversar(a.agi, criarApiCerebro(zoe.url, 'k'), ENV, { tts: 'Flite', gravacoes: pasta });
+
+  assert.equal(status, 'transferir');
+  assert.equal(a.variaveis.ZOE_FILA_NOME, 'Financeiro');
+  const leituras = a.comandos.filter((c) => c.startsWith('GET DATA'));
+  assert.deepEqual(leituras, ['GET DATA silence/1 6000 1', 'GET DATA silence/1 10000 3'],
+    'uma tecla no menu (sem esperar à toa); três para o começo do CPF');
+  assert.equal(a.comandos.filter((c) => c.startsWith('RECORD FILE')).length, 0, 'no modo teclas nada é gravado');
+  assert.deepEqual(zoe.pedidos.slice(1, 3).map((p) => p.dados.digitos), ['1', '123']);
 });
 
 test('silêncio vai como fala vazia: quem decide repetir ou transferir é o cérebro', async (t) => {

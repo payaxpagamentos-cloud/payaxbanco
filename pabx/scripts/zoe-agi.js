@@ -18,6 +18,9 @@
  *   rede e Ouvidoria. O que ela responderia por escrito, o TTS fala. Digitar no teclado continua
  *   valendo (os três primeiros números do CPF, por exemplo).
  *
+ *   Se a empresa escolheu atender por teclas (ZOE › Como ela atende), é a mesma ZOE com menu
+ *   numerado: cada resposta diz se a central grava a fala ou lê teclas, e quantas.
+ *
  *   POR TECLAS (sem ZOE_CEREBRO, ou se ele cair): a URA de teclas de sempre, pela API do PABX.
  *   Fica como reserva — uma ligação nunca termina no silêncio porque um servidor caiu.
  *
@@ -299,7 +302,11 @@ async function conversar(agi, cerebro, env, o = {}) {
         break;
       }
       if (r.acao === 'encerrar') break;
-      const fala = await ouvir(n);
+      // Quem decide como ouvir é a ZOE: no modo teclas ela pede dígitos, e diz quantos — uma tecla
+      // para escolher no menu, três para o começo do CPF. O # encerra antes, se o cliente quiser.
+      const fala = r.aguardar === 'digitos'
+        ? { digitos: (await agi.comando(`GET DATA silence/1 ${(r.max_digitos ?? 1) > 1 ? 10000 : 6000} ${r.max_digitos ?? 1}`)) ?? '' }
+        : await ouvir(n);
       r = await cerebro.turno(uid, { ...fala, turno_id: String(n) });
     }
     await set('ZOE_STATUS', status);
