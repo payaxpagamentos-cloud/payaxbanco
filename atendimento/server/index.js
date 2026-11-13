@@ -53,6 +53,21 @@ setInterval(() => {
     .catch((err) => console.error('[ZOE Atende] Falha ao varrer a sala de espera:', err.message));
 }, 600_000).unref();
 
+// O dólar do dia: busca a PTAX no Banco Central ao subir e de hora em hora. O boletim sai por volta
+// das 13h; até lá vale o do último dia útil. Se o Banco Central não responder, segue com o guardado.
+const cotacao = require('./lib/cotacao');
+let ultimoBoletim = null;
+const buscarDolar = () => cotacao.atualizar(db)
+  .then((c) => {
+    if (c && c.data !== ultimoBoletim) {
+      ultimoBoletim = c.data;
+      console.log(`[ZOE Atende] Dólar do dia (PTAX de venda, ${c.data}): R$ ${(c.venda_x10000 / 10_000).toFixed(4).replace(".", ",")}`);
+    }
+  })
+  .catch((err) => console.error('[ZOE Atende] Não consegui buscar o dólar no Banco Central:', err.message));
+buscarDolar();
+setInterval(buscarDolar, 3_600_000).unref();
+
 // Orçamento: marca 50%, 80% e 100% uma vez por mês, para a gestão ver antes de estourar.
 // E no dia 1º fecha o mês anterior de todas as empresas, para o número parar de se mover.
 setInterval(() => {

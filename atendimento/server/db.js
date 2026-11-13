@@ -26,7 +26,9 @@ CREATE TABLE IF NOT EXISTS empresas (
   -- Em que moeda a Meta cobra a conta desta empresa. Em dólar, o custo de cada mensagem é guardado
   -- também em dólar (exato), para conferir com a fatura sem câmbio no meio.
   meta_moeda TEXT NOT NULL DEFAULT 'BRL' CHECK (meta_moeda IN ('BRL','USD')),
-  -- Cotação do mês (reais por dólar ×10000), para mostrar em reais e para o orçamento. Nula = a padrão.
+  -- 1: usa o dólar do dia (PTAX de venda do Banco Central, buscado sozinho). 0: usa a cotação informada à mão.
+  cotacao_auto INTEGER NOT NULL DEFAULT 1,
+  -- Cotação informada à mão (reais por dólar ×10000). Também é a reserva se o Banco Central não responder.
   cotacao_x10000 INTEGER CHECK (cotacao_x10000 IS NULL OR cotacao_x10000 > 0),
   motivo_bloqueio TEXT,
   criada_em TEXT NOT NULL
@@ -566,6 +568,16 @@ CREATE TABLE IF NOT EXISTS ips_bloqueados (
   ip TEXT PRIMARY KEY,
   motivo TEXT,
   criado_em TEXT NOT NULL
+);
+
+-- O dólar do dia: PTAX do Banco Central, um boletim por dia útil. Guardar o histórico permite
+-- fechar o mês pela média do mês, e não pelo dólar do dia em que alguém clicou em "fechar".
+CREATE TABLE IF NOT EXISTS cotacoes (
+  data TEXT PRIMARY KEY,
+  venda_x10000 INTEGER NOT NULL CHECK (venda_x10000 > 0),
+  compra_x10000 INTEGER NOT NULL CHECK (compra_x10000 > 0),
+  boletim_em TEXT NOT NULL,
+  obtida_em TEXT NOT NULL
 );
 
 -- Ajustes de permissão por pessoa.

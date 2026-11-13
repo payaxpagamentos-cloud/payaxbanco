@@ -127,21 +127,36 @@ module.exports = function rotasRegua(db) {
   /** Em que moeda a Meta cobra esta empresa, a cotação do mês e a tabela em dólar. */
   r.get('/moeda', (req, res) => {
     const m = custo.moedaDa(db, req.empresa.id);
-    res.json({ ...m, precos_usd_micro: custo.precosUsd(db), precos_milesimos: custo.precos(db, req.empresa.id) });
+    const cot = require('../lib/cotacao');
+    res.json({ ...m, dolar_do_dia: cot.publico(cot.doDia(db)), precos_usd_micro: custo.precosUsd(db), precos_milesimos: custo.precos(db, req.empresa.id) });
+  });
+
+  /** Busca o dólar no Banco Central agora, sem esperar a próxima hora. */
+  r.post('/moeda/atualizar', exigirPermissao('custos.editar'), async (req, res, next) => {
+    try {
+      const cot = require('../lib/cotacao');
+      const c = await cot.atualizar(db);
+      res.json({ ...custo.moedaDa(db, req.empresa.id), dolar_do_dia: cot.publico(c), precos_usd_micro: custo.precosUsd(db), precos_milesimos: custo.precos(db, req.empresa.id) });
+    } catch (err) {
+      next(new (require('../lib/erros').ErroNegocio)(`O Banco Central não respondeu agora (${err.message}). Seguimos com a última cotação guardada.`, 502));
+    }
   });
 
   r.put('/moeda', exigirPermissao('custos.editar'), (req, res, next) => {
     try {
       const d = req.body ?? {};
       const moeda = v.opcao(d.moeda, 'a moeda da conta da Meta', ['BRL', 'USD']);
+      // Dólar do dia (PTAX) por padrão; a cotação à mão vale quando desligado, e como reserva.
+      const automatica = d.automatica === undefined ? true : v.booleano(d.automatica);
       // A cotação vem como "5,4321" ou 5.4321; guardada ×10000. Vazia = a cotação padrão do master.
       const bruta = d.cotacao === undefined || d.cotacao === null || d.cotacao === '' ? null : Number(String(d.cotacao).replace(',', '.'));
       v.exigir(bruta === null || (Number.isFinite(bruta) && bruta >= 0.5 && bruta <= 50), 'Cotação inválida: informe quantos reais vale um dólar (ex.: 5,45).');
       const cot = bruta === null ? null : Math.round(bruta * 10_000);
-      db.prepare('UPDATE empresas SET meta_moeda = ?, cotacao_x10000 = ? WHERE id = ?').run(moeda, cot, req.empresa.id);
-      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'definiu a moeda da conta da Meta', detalhe: { moeda, cotacao: bruta }, ip: req.ip });
+      db.prepare('UPDATE empresas SET meta_moeda = ?, cotacao_auto = ?, cotacao_x10000 = ? WHERE id = ?').run(moeda, automatica ? 1 : 0, cot, req.empresa.id);
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'definiu a moeda da conta da Meta', detalhe: { moeda, automatica, cotacao: bruta }, ip: req.ip });
       const m = custo.moedaDa(db, req.empresa.id);
-      res.json({ ...m, precos_usd_micro: custo.precosUsd(db), precos_milesimos: custo.precos(db, req.empresa.id) });
+      const cotLib = require('../lib/cotacao');
+      res.json({ ...m, dolar_do_dia: cotLib.publico(cotLib.doDia(db)), precos_usd_micro: custo.precosUsd(db), precos_milesimos: custo.precos(db, req.empresa.id) });
     } catch (err) { next(err); }
   });
 

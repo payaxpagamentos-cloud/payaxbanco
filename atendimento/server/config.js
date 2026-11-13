@@ -80,6 +80,11 @@ module.exports = {
     maxSegundos: Number(process.env.ATEND_WHISPER_MAX_SEGUNDOS) || 180,
     timeoutMs: Number(process.env.ATEND_WHISPER_TIMEOUT_MS) || 60_000,
   },
+  // O dólar do dia vem da PTAX do Banco Central: pública, gratuita, sem chave.
+  ptax: {
+    url: (process.env.ATEND_PTAX_URL || 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata').replace(/\/+$/, ''),
+    timeoutMs: Number(process.env.ATEND_PTAX_TIMEOUT_MS) || 15_000,
+  },
   admin: {
     nome: process.env.ATEND_ADMIN_NOME || 'Master',
     email: process.env.ATEND_ADMIN_EMAIL || 'master@atendimento.com.br',

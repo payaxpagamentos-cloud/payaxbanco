@@ -461,15 +461,25 @@ causa de dinheiro que não é cobrado. Os marcos de 50%, 80% e 100% são registr
 
 A Meta publica a tabela do Brasil em dólar, e a conta de muitas empresas vem em dólar. Em
 `Centro de Custo › Orçamento e fechamento › Moeda da conta da Meta` cada empresa diz em que moeda é
-cobrada e a cotação do mês.
+cobrada e de onde vem a cotação.
+
+**Dólar do dia, automático.** Por padrão a cotação é a **PTAX de venda do Banco Central** — a
+referência oficial que os bancos usam para fechar câmbio. O sistema busca na API pública do Banco
+Central (sem chave, sem custo) ao subir e de hora em hora; fim de semana e feriado não têm boletim,
+então vale o último dia útil. Se o Banco Central estiver fora do ar, segue valendo a última cotação
+guardada. O botão **Buscar o dólar agora** força a busca. Quem preferir pode desligar o automático e
+digitar a cotação à mão; sem nenhuma das duas, vale a cotação padrão do master.
 
 - **Cada mensagem paga guarda o custo exato em dólar** (US$ 0,0068 por utilidade, por exemplo),
-  além do valor em reais pela cotação do mês.
+  além do valor em reais convertido pelo dólar do dia em que ela saiu.
 - **O fechamento confere dólar contra dólar**: a nossa conta exata contra a fatura da Meta, sem
   câmbio no meio. Assim a diferença mostra erro de contagem ou de preço, e não oscilação do dólar.
 - **O que saiu de fato da conta em reais** entra à parte e mostra o câmbio efetivo, com IOF e spread.
 - **O orçamento continua em reais**, que é como a empresa pensa o dinheiro; o preço em dólar é
-  convertido pela cotação do mês.
+  convertido pelo dólar do dia.
+- **O mês fecha pela média da PTAX do mês**, e não pelo dólar do dia do clique: fechar outubro
+  em novembro não usa o dólar de novembro. O cartão da empresa cobra IOF e spread por cima, por isso
+  o câmbio efetivo da fatura costuma ficar um pouco acima da PTAX.
 - Cada mês fechado guarda a moeda e a cotação daquele mês: mudar o câmbio depois não reescreve o
   passado. Mensagem enviada antes de a empresa passar para dólar entra pelo preço em dólar da
   categoria, não como zero.
@@ -564,6 +574,7 @@ O servidor **precisa estar acessível por https:// pela internet** — é a Meta
 | `ATEND_IA_ESFORCO` | `low` | Esforço de raciocínio: `low`…`max`. Atendimento curto vai bem com `low`. |
 | `ATEND_IA_MAX_TOKENS` | `2048` | Teto da resposta. Mensagem de WhatsApp é curta de propósito. |
 | `ATEND_IA_MAX_PASSOS` | `6` | Idas e voltas de ferramenta por mensagem. |
+| `ATEND_PTAX_URL` | API do Banco Central | Endereço da API PTAX (OData) de onde vem o dólar do dia. Só muda para apontar a um espelho. |
 | `ATEND_WHISPER_URL` | — | Endereço do `whisper-server` (recomendado), ex.: `http://127.0.0.1:8178`. |
 | `ATEND_WHISPER_BIN` / `ATEND_WHISPER_MODELO` | — | Alternativa sem servidor: o `whisper-cli` e o arquivo do modelo. |
 | `ATEND_TRANSCRICAO` | `auto` | `desligada` desliga a transcrição de propósito. |

@@ -40,12 +40,21 @@ const LISTA = Object.keys(CATEGORIAS);
  * caso o preço de verdade é o em dólar, e o valor em reais é só uma conversão para a gestão.
  */
 function moedaDa(db, empresaId) {
-  const e = empresaId ? db.prepare('SELECT meta_moeda, cotacao_x10000 FROM empresas WHERE id = ?').get(empresaId) : null;
+  const e = empresaId ? db.prepare('SELECT meta_moeda, cotacao_auto, cotacao_x10000 FROM empresas WHERE id = ?').get(empresaId) : null;
   const padrao = Number(lerConfig(db).wa_cotacao_padrao) || 54000;
+  const automatica = e ? Boolean(e.cotacao_auto) : true;
+  // O dólar do dia (PTAX do Banco Central) quando a empresa quer automático e já há boletim guardado.
+  // Senão, a cotação informada à mão; na falta dela, a padrão da plataforma.
+  const dia = automatica ? require('./cotacao').doDia(db) : null;
+  const fonte = dia ? 'ptax' : e?.cotacao_x10000 ? 'manual' : 'padrao';
   return {
     moeda: e?.meta_moeda === 'USD' ? 'USD' : 'BRL',
-    cotacao_x10000: Number(e?.cotacao_x10000) || padrao,
-    cotacao_padrao: !e?.cotacao_x10000,
+    cotacao_x10000: dia ? dia.venda_x10000 : (Number(e?.cotacao_x10000) || padrao),
+    automatica,
+    fonte,
+    cotacao_data: dia?.data ?? null,
+    boletim_em: dia?.boletim_em ?? null,
+    cotacao_padrao: fonte === 'padrao',
   };
 }
 

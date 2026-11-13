@@ -51,10 +51,22 @@ function fechar(db, empresaId, mes = mesAnterior()) {
         gasto_usd_micro = excluded.gasto_usd_micro, cotacao_x10000 = excluded.cotacao_x10000, fechado_em = excluded.fechado_em`)
       .run(empresaId, mes, r.mensagens, JSON.stringify(r.por_categoria), r.gasto_milesimos,
         r.economia_milesimos, r.sem_otimizacao_milesimos, Number(e?.orcamento_milesimos ?? 0),
-        r.moeda, r.gasto_usd_micro, r.cotacao_x10000, agora());
+        r.moeda, r.gasto_usd_micro, cotacaoDoFechamento(db, empresaId, mes, r), agora());
     return db.prepare('SELECT * FROM custos_mensais WHERE empresa_id = ? AND mes = ?').get(empresaId, mes);
   });
   return { ...publico(linha), recalculado: Boolean(existente) };
+}
+
+/**
+ * A cotação que o mês guarda. Com o dólar do dia ligado, é a MÉDIA da PTAX do mês: cada mensagem já
+ * foi convertida pelo dólar do dia em que saiu, e a média é o número honesto para o mês inteiro —
+ * não o dólar do dia em que alguém clicou em "fechar".
+ */
+function cotacaoDoFechamento(db, empresaId, mes, r) {
+  if (r.moeda !== 'USD') return r.cotacao_x10000;
+  const e = db.prepare('SELECT cotacao_auto FROM empresas WHERE id = ?').get(empresaId);
+  if (!e?.cotacao_auto) return r.cotacao_x10000;
+  return require('./cotacao').mediaDoMes(db, mes)?.media_x10000 ?? r.cotacao_x10000;
 }
 
 /**

@@ -394,27 +394,44 @@ async function oControle(ctx, alvo) {
               ? 'Cada mensagem paga guarda o custo exato em dólar, e o fechamento confere dólar contra dólar com a fatura.'
               : 'Os preços são os da tabela em reais cadastrada pela plataforma.')),
           emDolar ? el('div', {},
-            el('p', { class: 'pequeno mudo', style: 'margin:0 0 4px' }, 'Cotação do mês'),
+            el('p', { class: 'pequeno mudo', style: 'margin:0 0 4px' }, moeda.fonte === 'ptax' ? 'Dólar do dia' : 'Cotação usada'),
             el('strong', { style: 'font-size:20px' }, `R$ ${cotacaoTexto(moeda.cotacao_x10000)}`),
-            el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' }, moeda.cotacao_padrao
-              ? 'Cotação padrão da plataforma. Informe a do mês para os valores em reais ficarem certos.'
-              : 'Usada para mostrar em reais e para o orçamento, que é em reais.')) : el('span')),
+            el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' }, {
+              ptax: `PTAX de venda do Banco Central, boletim de ${dataHora(moeda.boletim_em)}. Atualiza sozinho de hora em hora; `
+                + 'cada mensagem é convertida pelo dólar do dia em que saiu, e o mês fecha pela média do mês.',
+              manual: moeda.automatica
+                ? 'O Banco Central ainda não respondeu: usando a cotação informada à mão até o primeiro boletim chegar.'
+                : 'Cotação informada à mão pela empresa.',
+              padrao: moeda.automatica
+                ? 'O Banco Central ainda não respondeu: usando a cotação padrão da plataforma até o primeiro boletim chegar.'
+                : 'Cotação padrão da plataforma. Informe a do mês para os valores em reais ficarem certos.',
+            }[moeda.fonte])) : el('span')),
         emDolar ? tabela(['Categoria', '>Em dólar', '>Em reais, a esta cotação'], ['utilidade', 'autenticacao', 'marketing'].map((k) => el('tr', {},
           td({ utilidade: 'Utilidade', autenticacao: 'Autenticação', marketing: 'Marketing' }[k]),
           td(`US$ ${(moeda.precos_usd_micro[k] / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`, 'dir num'),
           td(reais(moeda.precos_milesimos[k]), 'dir num')))) : null,
-        ctx.pode('custos.editar') ? el('div', { style: 'margin-top:12px' }, botao('Mudar moeda e cotação', 'primario', () => formModal('Moeda da conta da Meta', () => [
-          escolha('A Meta cobra esta empresa em', 'moeda', { BRL: 'Real (R$)', USD: 'Dólar (US$)' }, moeda.moeda),
-          campo('Cotação do mês — quantos reais vale um dólar (vazio = padrão da plataforma)', {
-            name: 'cotacao', inputmode: 'decimal', placeholder: '5,45',
-            value: moeda.cotacao_padrao ? '' : cotacaoTexto(moeda.cotacao_x10000),
-          }),
-          el('p', { class: 'pequeno mudo' }, 'Mudar a cotação vale para as próximas mensagens. Mês já fechado guarda a cotação daquele mês.'),
-        ], async (d) => {
-          await api.put(`/empresas/${ctx.empresaId}/reguas/moeda`, { moeda: d.moeda, cotacao: d.cotacao || null });
-          toast('Moeda salva.');
-          await desenhar();
-        }))) : null),
+        ctx.pode('custos.editar') ? el('div', { class: 'linha', style: 'margin-top:12px;gap:8px' },
+          botao('Mudar moeda e cotação', 'primario', () => formModal('Moeda da conta da Meta', () => [
+            escolha('A Meta cobra esta empresa em', 'moeda', { BRL: 'Real (R$)', USD: 'Dólar (US$)' }, moeda.moeda),
+            escolha('Cotação do dólar', 'automatica', {
+              sim: 'Dólar do dia — PTAX do Banco Central, atualizada sozinha',
+              nao: 'Informar à mão',
+            }, moeda.automatica ? 'sim' : 'nao'),
+            campo('Cotação à mão — quantos reais vale um dólar (no automático, vale só se o Banco Central não responder)', {
+              name: 'cotacao', inputmode: 'decimal', placeholder: '5,45',
+              value: moeda.fonte === 'manual' || (!moeda.automatica && !moeda.cotacao_padrao) ? cotacaoTexto(moeda.cotacao_x10000) : '',
+            }),
+            el('p', { class: 'pequeno mudo' }, 'A cotação vale para as próximas mensagens. Mês já fechado guarda a cotação daquele mês.'),
+          ], async (d) => {
+            await api.put(`/empresas/${ctx.empresaId}/reguas/moeda`, { moeda: d.moeda, automatica: d.automatica === 'sim', cotacao: d.cotacao || null });
+            toast('Moeda salva.');
+            await desenhar();
+          })),
+          emDolar && moeda.automatica ? botao('Buscar o dólar agora', '', async () => {
+            const r = await api.post(`/empresas/${ctx.empresaId}/reguas/moeda/atualizar`, {});
+            toast(r.dolar_do_dia ? `Dólar do dia: R$ ${cotacaoTexto(r.dolar_do_dia.venda_x10000)} (${r.dolar_do_dia.data.split('-').reverse().join('/')}).` : 'Sem boletim novo.');
+            await desenhar();
+          }) : null) : null),
 
       cartao('Teto de gasto',
         el('div', { class: 'grade-2' },
