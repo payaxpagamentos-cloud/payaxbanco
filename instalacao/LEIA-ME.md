@@ -49,7 +49,7 @@ O instalador faz o seguinte:
   | `/zoe/copias` | a cópia diária do banco |
 
   Para outra pasta, use `--pasta /outro/lugar`;
-- gera um `.env` para cada sistema, com **segredos novos e a senha do master**, que aparece **uma vez** no final (anote);
+- gera um `.env` para cada sistema, com **segredos novos** e **uma senha de master, a mesma nos três sistemas**, que aparece **uma vez** no final (anote);
 - cria os serviços `zoe-atendimento`, `zoe-pabx` e `zoe-network`, que sobem sozinhos com o servidor;
 - configura o Nginx e a cópia diária do banco;
 - confere se tudo respondeu.

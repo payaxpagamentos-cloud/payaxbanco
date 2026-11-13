@@ -106,8 +106,9 @@ printf 'ZOE_PASTA=%s\nZOE_MODULOS="%s"\n' "$DESTINO" "$MODULOS" > /etc/zoe.conf
 gerar_env() {
   local m="$1" arq="$DESTINO/$1/.env" senha
   if [ -f "$arq" ]; then echo "$m: .env mantido (segredos e senha não mudam)"; return; fi
-  senha="$(aleatorio 12 base64url)"
-  SENHAS+=("${NOME[$m]}: $EMAIL / $senha")
+  # Uma senha de master só para os três sistemas, gerada uma vez.
+  senha="$SENHA_MASTER"
+  SENHAS+=("${NOME[$m]}")
   case "$m" in
     atendimento) cat > "$arq" <<ENV
 # ZOE Atende — gerado pelo instalador em $(date '+%d/%m/%Y %H:%M'). NÃO troque o ATEND_SECRET depois de instalado:
@@ -170,6 +171,10 @@ ENV
 }
 
 SENHAS=()
+# A mesma senha de master nos três sistemas. Se algum já estiver instalado (ex.: --modulos para
+# acrescentar um sistema depois), reaproveita a dele; senão, gera uma nova.
+SENHA_MASTER="$(grep -h -m1 -E '^(ATEND|PABX|NETWORK)_ADMIN_SENHA=' "$DESTINO"/atendimento/.env "$DESTINO"/pabx/.env "$DESTINO"/network/.env 2>/dev/null | head -1 | cut -d= -f2- || true)"
+[ -n "$SENHA_MASTER" ] || SENHA_MASTER="$(aleatorio 12 base64url)"
 for m in $MODULOS; do
   passo "${NOME[$m]} (/$m, porta ${PORTA[$m]})"
   mkdir -p "$DESTINO/$m" "$DADOS/$m"
@@ -293,8 +298,10 @@ echo "==========================================================================
 for m in $MODULOS; do echo "   ${NOME[$m]}: https://${DOMINIO:-SEU-DOMINIO}/$m/"; done
 if [ ${#SENHAS[@]} -gt 0 ]; then
   echo
-  echo " Acesso master (anote agora — a senha não aparece de novo; troque no primeiro acesso):"
-  for s in "${SENHAS[@]}"; do echo "   $s"; done
+  echo " Acesso master — o mesmo em: $(printf '%s, ' "${SENHAS[@]}" | sed 's/, $//')"
+  echo "   E-mail: $EMAIL"
+  echo "   Senha:  $SENHA_MASTER"
+  echo " Anote agora: a senha não aparece de novo. Ao trocar, troque nos três painéis."
 fi
 echo
 echo " Próximos passos: instalacao/LEIA-ME.md (HTTPS, chave de IA, Meta, IXC, Asterisk)."
