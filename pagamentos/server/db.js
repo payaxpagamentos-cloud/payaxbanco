@@ -437,6 +437,61 @@ CREATE TABLE backups (
 CREATE INDEX idx_backups_data ON backups(criado_em DESC);
 `,
   },
+  {
+    versao: 5,
+    nome: 'cnab400',
+    sql: `
+-- Arquivos de remessa que mandamos ao banco.
+CREATE TABLE remessas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conta_id INTEGER NOT NULL REFERENCES contas_bancarias(id),
+  sequencial INTEGER NOT NULL,
+  nome TEXT NOT NULL,
+  titulos INTEGER NOT NULL DEFAULT 0,
+  valor_centavos INTEGER NOT NULL DEFAULT 0,
+  situacao TEXT NOT NULL DEFAULT 'gerada' CHECK (situacao IN ('gerada','entregue','falha')),
+  caminho TEXT,
+  erro TEXT,
+  automatica INTEGER NOT NULL DEFAULT 1,
+  entregue_em TEXT,
+  criado_em TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id)
+);
+CREATE INDEX idx_remessas_data ON remessas(criado_em DESC);
+
+-- Arquivos de retorno que o banco devolve. A impressão digital impede processar o mesmo arquivo duas vezes.
+CREATE TABLE retornos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  impressao TEXT NOT NULL,
+  origem TEXT NOT NULL DEFAULT 'pasta' CHECK (origem IN ('pasta','upload')),
+  gerado_em TEXT,
+  credito_em TEXT,
+  registros INTEGER NOT NULL DEFAULT 0,
+  liquidados INTEGER NOT NULL DEFAULT 0,
+  confirmados INTEGER NOT NULL DEFAULT 0,
+  baixados INTEGER NOT NULL DEFAULT 0,
+  rejeitados INTEGER NOT NULL DEFAULT 0,
+  nao_tratados INTEGER NOT NULL DEFAULT 0,
+  sem_titulo INTEGER NOT NULL DEFAULT 0,
+  erro TEXT,
+  detalhe TEXT,
+  processado_em TEXT,
+  criado_em TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id)
+);
+CREATE UNIQUE INDEX idx_retornos_impressao ON retornos(impressao);
+
+-- Em qual remessa o título foi, se o banco confirmou o registro e por que recusou.
+ALTER TABLE boletos ADD COLUMN remessa_id INTEGER REFERENCES remessas(id);
+ALTER TABLE boletos ADD COLUMN confirmado_em TEXT;
+ALTER TABLE boletos ADD COLUMN motivo_rejeicao TEXT;
+-- Instrução que ainda precisa ir ao banco na próxima remessa (02 = baixa, 06 = alteração de vencimento).
+ALTER TABLE boletos ADD COLUMN comando_pendente TEXT;
+CREATE INDEX idx_boletos_remessa ON boletos(remessa_id);
+CREATE INDEX idx_boletos_aguardando ON boletos(situacao, remessa_id);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

@@ -47,10 +47,11 @@ conferência da nossa equipe.
 | 5 | **Split e conta gráfica** | Razão de lançamentos por cliente com saldo acumulado, disponível × a liberar, agenda de liberação dos próximos dias, extrato em tela e em CSV, e ajuste manual com motivo. |
 | 6 | **Repasses** | Saque pelo Internet Bank ou pela nossa equipe, rotina automática diária, limite de aprovação por cliente, envio por PIX com end-to-end guardado, cancelamento e estorno automático em caso de falha. |
 | 7 | **Conciliação** | Cada aviso do banco é **guardado antes de ser processado** (corpo inteiro), com o resultado de cada um: liquidado, repetido, ignorado ou erro. Liquidação idempotente: o mesmo aviso duas vezes não credita em dobro. Baixa manual e consulta ao banco para o que não chegou. |
-| 8 | **Integrações** | **Bradesco** (Cobrança Registrada, Boleto Híbrido e PIX de repasse) com credenciais cifradas em AES-256-GCM, e **um IXC por cliente**, nos dois sentidos: importa os títulos em aberto, emite o boleto, grava a linha digitável de volta no título e dá baixa quando o boleto é pago. |
-| 9 | **Relatórios** | Faturamento por período e por cliente: emitido, recebido, comissão, tarifas, receita, **margem** (receita − custo do banco) e repassado, com CSV e impressão. Taxa de conversão emitido → pago. |
-| 10 | **Segurança e histórico** | Perfis por função, **autenticação em duas etapas** por aplicativo (opcionalmente obrigatória para a equipe), senha provisória trocada no primeiro acesso, idempotência nos comandos POST, controle de versão otimista nos cadastros e auditoria com valor antes e depois. |
-| 11 | **Backup conferido** | Cópia do banco a cada N horas e sob demanda, com **conferência automática**: integridade do arquivo e se o total do razão bate com o banco em uso. Histórico, download registrado na auditoria e alerta no painel quando atrasa ou não confere. |
+| 8 | **CNAB 400 automático** | Remessa gerada sozinha com os títulos emitidos e escrita na pasta de saída; pasta de entrada varrida de tempos em tempos e cada retorno aplicado na hora — entrada confirmada, liquidação com split, baixa ou rejeição com o motivo traduzido. Pedido de baixa vai como ocorrência 02 na remessa seguinte. Ninguém gera nem importa arquivo na mão. |
+| 9 | **Integrações** | **Bradesco** (Cobrança Registrada, Boleto Híbrido e PIX de repasse) com credenciais cifradas em AES-256-GCM, e **um IXC por cliente**, nos dois sentidos: importa os títulos em aberto, emite o boleto, grava a linha digitável de volta no título e dá baixa quando o boleto é pago. |
+| 10 | **Relatórios** | Faturamento por período e por cliente: emitido, recebido, comissão, tarifas, receita, **margem** (receita − custo do banco) e repassado, com CSV e impressão. Taxa de conversão emitido → pago. |
+| 11 | **Segurança e histórico** | Perfis por função, **autenticação em duas etapas** por aplicativo (opcionalmente obrigatória para a equipe), senha provisória trocada no primeiro acesso, idempotência nos comandos POST, controle de versão otimista nos cadastros e auditoria com valor antes e depois. |
+| 12 | **Backup conferido** | Cópia do banco a cada N horas e sob demanda, com **conferência automática**: integridade do arquivo e se o total do razão bate com o banco em uso. Histórico, download registrado na auditoria e alerta no painel quando atrasa ou não confere. |
 
 ### Perfis
 
@@ -108,6 +109,40 @@ equipe vê na lista, na ficha, e **busca por ela** (`0002` ou `001/0003` encontr
 Clientes cadastrados antes desta numeração recebem o número no primeiro start, na ordem de cadastro — não é preciso
 fazer nada.
 
+## O banco por arquivo (CNAB 400)
+
+Quando o convênio é por arquivo em vez de API, o ciclo roda sozinho:
+
+```
+emitiu o boleto  →  entra na próxima REMESSA  →  pasta de saída  →  o banco registra
+                                                                          ↓
+conta gráfica ← split ← liquidação ← RETORNO aplicado ← pasta de entrada ←┘
+```
+
+- A remessa sai sozinha em dia útil com os títulos que estão esperando (ou na hora, pelo botão).
+- A pasta de entrada é varrida a cada ciclo. Cada retorno novo é lido e aplicado: **entrada confirmada**
+  (o título sai de "registrando"), **liquidação** (com o split na conta gráfica e a baixa no IXC do cliente),
+  **baixa** ou **rejeição**, com o motivo do banco traduzido (`16 Data de vencimento inválida`, e assim por diante).
+- Arquivo processado sai da pasta de entrada. O **mesmo arquivo duas vezes não credita em dobro**: ele é
+  reconhecido pelo conteúdo (SHA-256), e a liquidação em si já é idempotente.
+- Pedido de baixa vira ocorrência 02 na remessa seguinte — ninguém precisa lembrar de mandar nada.
+- Retorno que não bate com nenhum título é contado e registrado, sem quebrar o resto do arquivo.
+
+Quem leva e traz os arquivos é o agente de transferência do banco, apontado para as pastas de
+`PAYAX_CNAB_REMESSA` e `PAYAX_CNAB_RETORNO`. Se um dia for por SFTP, só o transporte muda.
+
+Para emergência (rede fora, arquivo que chegou por e-mail, reprocesso) a tela de Conciliação aceita o envio
+manual de um retorno e o download de qualquer remessa.
+
+> **No modo arquivo o PIX do repasse continua pela API.** O CNAB cobre a cobrança, não o pagamento: sem as
+> credenciais da API do Bradesco, o repasse falha com essa mensagem em vez de fingir que saiu.
+
+> **Confira o layout antes de produção.** As posições de cada campo estão declaradas em
+> [`server/lib/cnab400.js`](server/lib/cnab400.js), em um lugar só. O layout do Bradesco é estável, mas cada
+> convênio tem particularidades: gere uma remessa de teste, mande homologar e ajuste ali — nenhuma outra parte
+> do sistema precisa mudar. O sistema recusa qualquer registro que não tenha exatamente 400 posições, porque um
+> byte fora faz o banco rejeitar o arquivo inteiro.
+
 ## O beneficiário do boleto
 
 A razão social, o CNPJ e o endereço impressos no campo **Beneficiário** vêm do cadastro da conta bancária, em
@@ -126,6 +161,7 @@ O conector fica inteiro em [`server/lib/bradesco.js`](server/lib/bradesco.js), c
 |---|---|
 | `simulador` (padrão fora de produção) | Registra o título **localmente**: calcula o código de barras pelo padrão FEBRABAN e o BR Code pelo padrão EMV do Banco Central. Nada sai do servidor. É o modo para desenvolver e homologar internamente. |
 | `bradesco` | Fala com a API do banco: OAuth2 com JWT assinado pelo certificado + mTLS. |
+| `cnab` | Registra por **arquivo de remessa** e concilia pelo **retorno** (CNAB 400), tudo automático. Veja a seção do CNAB. |
 
 Ao receber as credenciais, cadastre-as em **Integrações → Bradesco** (certificado e chave privada são cifrados antes
 de serem gravados e nunca voltam para a tela) e suba o servidor com `PAYAX_BANCO_MODO=bradesco`.
@@ -215,6 +251,11 @@ Para ligar a exigência, o próprio administrador precisa ter 2FA ativo: não d�
 | `PAYAX_BACKUP_HORAS` | `12` | Intervalo entre backups automáticos. |
 | `PAYAX_BACKUP_MANTER` | `30` | Quantas cópias manter na pasta. |
 | `PAYAX_BACKUPS` | `data/backups` | Pasta das cópias. **Leve para fora do servidor** (o backup local não protege contra perda da máquina). |
+| `PAYAX_CNAB_REMESSA` | `data/cnab/remessa` | Pasta onde a remessa é escrita (o agente do banco busca aqui). |
+| `PAYAX_CNAB_RETORNO` | `data/cnab/retorno` | Pasta onde o banco deposita o retorno (varrida a cada ciclo). |
+| `PAYAX_CNAB_PROCESSADOS` | `data/cnab/processados` | Para onde o retorno vai depois de aplicado. |
+| `PAYAX_CNAB_REMESSA_AUTO` | ligado | Gera a remessa sozinho em dia útil. `0` deixa só o botão. |
+| `PAYAX_CNAB_TITULOS` | `500` | Máximo de títulos por arquivo de remessa. |
 | `PAYAX_ROTINA_MIN` | `15` | Intervalo das rotinas, em minutos. |
 | `PAYAX_FUSO` | `America/Sao_Paulo` | Fuso usado nas datas de negócio. |
 | `PAYAX_SESSAO_HORAS` | `8` | Validade da sessão. |

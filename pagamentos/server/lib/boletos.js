@@ -117,8 +117,10 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
 
   let registro = null;
   let erro = null;
+  let porArquivo = false;
   try {
     const banco = criarBanco(conta, credenciaisDaConta(db, conta.id));
+    porArquivo = banco.modo === 'cnab';
     registro = await banco.registrar(boleto);
   } catch (err) {
     erro = err.message || 'Falha ao registrar no banco.';
@@ -147,7 +149,7 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
       entrada.valor_centavos, entrada.emissao, entrada.vencimento, entrada.juros_mes_ppm, entrada.multa_ppm,
       entrada.desconto_centavos, entrada.desconto_ate, entrada.dias_baixa, entrada.mensagem,
       registro.codigo_barras, registro.linha_digitavel, registro.pix_txid ?? null, registro.pix_emv ?? null,
-      erro ? 'falha' : 'registrado', erro, erro ? null : agora(),
+      erro ? 'falha' : porArquivo ? 'registrando' : 'registrado', erro, erro || porArquivo ? null : agora(),
       congelado.preco_id, congelado.tarifa_emissao_centavos, congelado.tarifa_liquidacao_centavos, congelado.percentual_ppm,
       congelado.comissao_minima_centavos, congelado.comissao_maxima_centavos, congelado.custo_liquidacao_centavos,
       agora(), usuario?.id ?? null, usuarioCliente?.id ?? null,
@@ -240,18 +242,23 @@ async function baixar(db, boletoId, motivo, { usuario = null } = {}) {
   if (b.situacao === 'baixado' || b.situacao === 'cancelado') return { ja_baixado: true, boleto_id: b.id };
   const conta = db.prepare('SELECT * FROM contas_bancarias WHERE id = ?').get(b.conta_id);
   let erro = null;
-  if (b.situacao === 'registrado') {
+  let porArquivo = false;
+  if (b.situacao === 'registrado' || b.situacao === 'registrando') {
     try {
       const banco = criarBanco(conta, credenciaisDaConta(db, conta.id));
+      porArquivo = banco.modo === 'cnab';
       await banco.baixar(b.nosso_numero, motivo ?? 'Baixa solicitada pelo beneficiário');
     } catch (err) {
       erro = err.message;
     }
   }
   if (erro) throw new ErroNegocio(`O banco recusou a baixa: ${erro}`, 502);
-  db.prepare("UPDATE boletos SET situacao = 'baixado', baixado_em = ?, motivo_baixa = ?, versao = versao + 1 WHERE id = ?")
-    .run(agora(), v.opcional(motivo, 'o motivo', 160), b.id);
-  return { boleto_id: b.id, situacao: 'baixado' };
+  // No modo arquivo o pedido de baixa vai na próxima remessa (ocorrência 02), sem ninguém gerar nada.
+  db.prepare(`UPDATE boletos SET situacao = 'baixado', baixado_em = ?, motivo_baixa = ?,
+      comando_pendente = CASE WHEN ? AND remessa_id IS NOT NULL THEN '02' ELSE comando_pendente END,
+      versao = versao + 1 WHERE id = ?`)
+    .run(agora(), v.opcional(motivo, 'o motivo', 160), porArquivo ? 1 : 0, b.id);
+  return { boleto_id: b.id, situacao: 'baixado', instrucao_na_proxima_remessa: porArquivo };
 }
 
 /**

@@ -12,6 +12,7 @@ const config = require('./../config');
 const datas = require('./datas');
 const repasses = require('./repasses');
 const sincronismo = require('./sincronismo');
+const arquivosBanco = require('./arquivosBanco');
 
 let ultimoRepasse = null;
 let ultimaImportacao = null;
@@ -31,6 +32,18 @@ async function rodar(db, { forcar = false } = {}) {
     } catch (err) {
       console.error('[PayAx] Falha na rotina de repasses:', err.message);
     }
+  }
+
+  // Troca de arquivos com o banco (CNAB 400): manda o que está esperando e lê o que chegou.
+  try {
+    out.banco = await arquivosBanco.rodar(db);
+    const lidos = out.banco.retorno?.processados?.filter((x) => !x.erro && !x.ja_processado) ?? [];
+    for (const r of lidos) {
+      console.log(`[PayAx] Retorno ${r.nome}: ${r.liquidados} liquidado(s), ${r.confirmados} confirmado(s), ${r.rejeitados} rejeitado(s).`);
+    }
+    if (out.banco.remessa?.id) console.log(`[PayAx] Remessa ${out.banco.remessa.nome} gerada com ${out.banco.remessa.titulos} título(s).`);
+  } catch (err) {
+    console.error('[PayAx] Falha na troca de arquivos com o banco:', err.message);
   }
 
   // Baixas pendentes no IXC: a cada ciclo.

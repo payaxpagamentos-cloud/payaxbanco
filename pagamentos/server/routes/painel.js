@@ -7,6 +7,7 @@ const razao = require('../lib/razao');
 const consultas = require('../lib/consultas');
 const { podeEquipe } = require('../lib/permissoes');
 const backup = require('../lib/backup');
+const arquivosBanco = require('../lib/arquivosBanco');
 
 /** Visão geral da plataforma: o que entrou, quanto ficou conosco e o que está pendente. */
 module.exports = (db) => {
@@ -74,6 +75,20 @@ function alertas(db, hoje) {
   if (faixa && faixa.restam < 1000) lista.push({ tipo: 'faixa_nosso_numero', severidade: 'aviso', texto: `Faixa de nosso número quase no fim na conta ${faixa.apelido} (restam ${faixa.restam})` });
   const vencidos = db.prepare("SELECT COUNT(*) AS n FROM boletos WHERE situacao = 'registrado' AND vencimento < ?").get(hoje).n;
   if (vencidos) lista.push({ tipo: 'vencidos', severidade: 'info', quantidade: vencidos, texto: `${vencidos} título(s) vencidos em aberto` });
+
+  // Troca de arquivos com o banco: título que foi na remessa e nunca voltou confirmado é título
+  // que o banco pode não ter registrado — o pagador recebeu um boleto que não existe lá.
+  if (config.banco.modo === 'cnab') {
+    const a = arquivosBanco.situacao(db);
+    if (a.nao_confirmados) {
+      lista.push({ tipo: 'cnab_sem_confirmacao', severidade: 'erro', quantidade: a.nao_confirmados,
+        texto: `${a.nao_confirmados} título(s) na remessa há mais de 2 dias sem confirmação do banco` });
+    }
+    if (a.aguardando_remessa.titulos > 0 && !datas.ehDiaUtil(hoje)) {
+      lista.push({ tipo: 'cnab_aguardando', severidade: 'info', quantidade: a.aguardando_remessa.titulos,
+        texto: `${a.aguardando_remessa.titulos} título(s) esperando a remessa do próximo dia útil` });
+    }
+  }
 
   // O razão é o dinheiro dos clientes: backup atrasado ou que não conferiu é assunto urgente.
   const b = backup.situacao(db);

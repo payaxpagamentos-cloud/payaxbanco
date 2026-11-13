@@ -30,6 +30,8 @@ function criarApp(db) {
   // ------------------------------------------------- Backoffice PayAx
   const equipe = express.Router();
   equipe.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  // O retorno do banco chega como arquivo (corpo bruto); o resto da API é JSON.
+  equipe.use('/api/arquivos/retornos', express.raw({ type: () => true, limit: '10mb' }));
   equipe.use(express.json({ limit: '1mb' }));
   equipe.use('/api', criarApi(db));
   equipe.use('/comum', express.static(path.join(__dirname, '..', 'comum'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));

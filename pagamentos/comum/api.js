@@ -20,14 +20,18 @@ export function criarApi({ base, chave, evento }) {
     limpar() { memoria = null; try { localStorage.removeItem(chave); } catch { /* ignora */ } },
   };
 
-  async function chamar(metodo, caminho, corpo, { bruto = false, idempotente = metodo === 'POST' } = {}) {
+  async function chamar(metodo, caminho, corpo, { bruto = false, arquivo = null, idempotente = metodo === 'POST' } = {}) {
     const headers = {};
     const s = sessao.get();
     if (s?.token) headers.Authorization = `Bearer ${s.token}`;
     // Cada comando POST leva uma chave de idempotência: clique duplo não emite dois boletos.
     if (idempotente) headers['Idempotency-Key'] = novaChave();
     let body;
-    if (corpo !== undefined) {
+    if (arquivo) {
+      body = arquivo;
+      headers['X-Nome-Arquivo'] = encodeURIComponent(arquivo.name || 'arquivo');
+      headers['Content-Type'] = 'application/octet-stream';
+    } else if (corpo !== undefined) {
       headers['Content-Type'] = 'application/json';
       body = JSON.stringify(corpo);
     }
@@ -58,6 +62,8 @@ export function criarApi({ base, chave, evento }) {
     post: (c, b = {}) => chamar('POST', c, b),
     patch: (c, b) => chamar('PATCH', c, b),
     put: (c, b) => chamar('PUT', c, b),
+    /** Envia um arquivo como corpo bruto (retorno do banco). */
+    enviarArquivo: (caminho, arquivo) => chamar('POST', caminho, undefined, { arquivo }),
     /** Abre uma página do servidor (ficha de compensação) numa aba nova, levando a sessão. */
     async abrirPagina(caminho) {
       const resp = await chamar('GET', caminho, undefined, { bruto: true, idempotente: false });

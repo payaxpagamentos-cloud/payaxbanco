@@ -28,6 +28,7 @@ function criarApi(db) {
   api.use('/repasses', require('./routes/repasses')(db));
   api.use('/contas', require('./routes/contas')(db));
   api.use('/integracoes', require('./routes/integracoes')(db));
+  api.use('/arquivos', require('./routes/arquivos')(db));
   api.use('/relatorios', require('./routes/relatorios')(db));
   api.use('/seguranca', require('./routes/seguranca')(db));
   api.use('/admin', require('./routes/admin')(db));

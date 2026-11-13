@@ -336,16 +336,46 @@ function apiBradesco(conta, credenciais, opcoes = {}) {
 }
 
 /**
+ * Modo arquivo (CNAB 400): o código de barras é calculado aqui, igual ao simulador, mas o registro
+ * acontece pela REMESSA e a confirmação chega pelo RETORNO. A baixa também vira instrução na remessa.
+ * O PIX do repasse não passa por arquivo: usa a API quando houver credencial.
+ */
+function porArquivo(conta, credenciais) {
+  const local = simulador(conta);
+  return {
+    ...local,
+    modo: 'cnab',
+    async testar() {
+      return { ok: true, mensagem: 'Modo arquivo (CNAB 400): o registro vai na remessa e a conciliação vem do retorno.' };
+    },
+    async registrar(boleto) {
+      // Sem chamada ao banco: o título entra na próxima remessa e fica aguardando a confirmação.
+      return { ...(await local.registrar(boleto)), protocolo: 'CNAB', aguardando_remessa: true };
+    },
+    async baixar() {
+      return { ok: true, por_arquivo: true };
+    },
+    async pagarPix(dados) {
+      if (!credenciais?.client_id) {
+        throw new ErroNegocio('O repasse por PIX precisa das credenciais da API do Bradesco (Integrações → Banco). O arquivo CNAB cobre só a cobrança.', 409);
+      }
+      return apiBradesco(conta, credenciais).pagarPix(dados);
+    },
+  };
+}
+
+/**
  * Devolve o conector da conta. `credenciais` vem decifrada da tabela integracoes.
  * Sem credenciais em modo 'bradesco', recusa — nunca cai em silêncio para o simulador em produção.
  */
 function criarBanco(conta, credenciais = null, opcoes = {}) {
   const modo = opcoes.modo || config.banco.modo;
   if (modo === 'simulador') return simulador(conta);
+  if (modo === 'cnab') return porArquivo(conta, credenciais);
   if (!credenciais?.client_id) {
     throw new ErroNegocio('A integração com o Bradesco ainda não foi configurada (Integrações → Banco).', 409);
   }
   return apiBradesco(conta, credenciais, opcoes);
 }
 
-module.exports = { criarBanco, simulador, apiBradesco, ErroBanco, situacaoDaApi, HOSTS, ENDPOINTS };
+module.exports = { criarBanco, simulador, porArquivo, apiBradesco, ErroBanco, situacaoDaApi, HOSTS, ENDPOINTS };

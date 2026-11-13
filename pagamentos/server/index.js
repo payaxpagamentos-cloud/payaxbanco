@@ -13,6 +13,14 @@ criarApp(db).listen(config.port, () => {
   console.log(`[PayAx] Banco: modo ${config.banco.modo} (${config.banco.ambiente}).`);
 });
 
+if (config.banco.modo === 'cnab') {
+  // As pastas precisam existir antes do primeiro arquivo: é para elas que o agente do banco aponta.
+  for (const p of [config.cnab.pastaRemessa, config.cnab.pastaRetorno, config.cnab.pastaProcessados]) {
+    require('node:fs').mkdirSync(p, { recursive: true });
+  }
+  console.log(`[PayAx] CNAB 400 — remessa em ${config.cnab.pastaRemessa}, retorno em ${config.cnab.pastaRetorno}.`);
+}
+
 if (config.rotinas) rotinas.agendar(db);
 
 // Backup automático do banco: a conta gráfica é o livro-razão do dinheiro dos clientes.

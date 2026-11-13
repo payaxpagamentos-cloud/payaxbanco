@@ -50,10 +50,26 @@ module.exports = {
 
   banco: {
     // 'simulador' registra os títulos localmente (desenvolvimento e homologação interna);
-    // 'bradesco' fala com a API de Cobrança Registrada / Boleto Híbrido do Bradesco.
+    // 'bradesco'  fala com a API de Cobrança Registrada / Boleto Híbrido;
+    // 'cnab'      registra por arquivo de remessa e concilia pelo retorno (CNAB 400).
     modo: process.env.PAYAX_BANCO_MODO || (producao ? 'bradesco' : 'simulador'),
     ambiente: process.env.PAYAX_BANCO_AMBIENTE || 'homologacao',
     timeoutMs: Number(process.env.PAYAX_BANCO_TIMEOUT_MS) || 20_000,
+  },
+
+  /*
+   * Troca de arquivos com o banco (CNAB 400), sem ninguém gerando arquivo na mão:
+   * escrevemos a remessa na pasta de saída e varremos a pasta de entrada atrás de retornos novos.
+   * Quem leva e traz os arquivos é o agente de transferência do banco, apontado para essas pastas.
+   */
+  cnab: {
+    pastaRemessa: process.env.PAYAX_CNAB_REMESSA || path.join(dados, 'cnab', 'remessa'),
+    pastaRetorno: process.env.PAYAX_CNAB_RETORNO || path.join(dados, 'cnab', 'retorno'),
+    pastaProcessados: process.env.PAYAX_CNAB_PROCESSADOS || path.join(dados, 'cnab', 'processados'),
+    // Gera a remessa sozinho quando há títulos esperando (em dia útil).
+    remessaAutomatica: process.env.PAYAX_CNAB_REMESSA_AUTO !== '0',
+    // Quantos títulos no máximo por arquivo.
+    titulosPorRemessa: Number(process.env.PAYAX_CNAB_TITULOS) || 500,
   },
   // Consulta de CEP e CNPJ para preencher os cadastros sozinho.
   dados: {

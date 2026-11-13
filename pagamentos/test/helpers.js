@@ -10,6 +10,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 process.env.PAYAX_BACKUPS = fs.mkdtempSync(path.join(os.tmpdir(), 'payax-backups-'));
+const baseCnab = fs.mkdtempSync(path.join(os.tmpdir(), 'payax-cnab-'));
+process.env.PAYAX_CNAB_REMESSA = path.join(baseCnab, 'remessa');
+process.env.PAYAX_CNAB_RETORNO = path.join(baseCnab, 'retorno');
+process.env.PAYAX_CNAB_PROCESSADOS = path.join(baseCnab, 'processados');
+for (const d of [process.env.PAYAX_CNAB_REMESSA, process.env.PAYAX_CNAB_RETORNO, process.env.PAYAX_CNAB_PROCESSADOS]) fs.mkdirSync(d, { recursive: true });
 process.env.PAYAX_BACKUP = '0'; // nos testes o backup é chamado direto, não por rotina
 
 const { abrir, agora } = require('../server/db');
@@ -26,10 +31,16 @@ async function iniciar() {
   const raiz = `http://127.0.0.1:${servidor.address().port}`;
 
   async function req(metodo, caminho, corpo, tk, cabecalhos = {}) {
+    // Buffer vai como corpo bruto (arquivo de retorno); o resto vai como JSON.
+    const bruto = Buffer.isBuffer(corpo);
     const resp = await fetch(raiz + caminho, {
       method: metodo,
-      headers: { 'Content-Type': 'application/json', ...(tk ? { Authorization: `Bearer ${tk}` } : {}), ...cabecalhos },
-      body: corpo === undefined ? undefined : JSON.stringify(corpo),
+      headers: {
+        ...(bruto ? { 'Content-Type': 'application/octet-stream' } : { 'Content-Type': 'application/json' }),
+        ...(tk ? { Authorization: `Bearer ${tk}` } : {}),
+        ...cabecalhos,
+      },
+      body: corpo === undefined ? undefined : bruto ? corpo : JSON.stringify(corpo),
     });
     const texto = await resp.text();
     let dados = texto;
