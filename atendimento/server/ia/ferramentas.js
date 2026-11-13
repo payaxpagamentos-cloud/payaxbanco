@@ -253,7 +253,13 @@ const INTERNAS = {
       tipo: txt('Um destes: cancelamento, reclamacao, procon, anatel, elogio, sugestao.'),
       assunto: txt('O caso em uma frase, do jeito que a pessoa que for tratar precisa ler (até 200 caracteres).'),
       relato: txt('O que o cliente contou, com as palavras dele: o motivo, desde quando, o que já tentou.'),
-    }, ['tipo', 'assunto', 'relato']),
+      ameacou_sair: { type: 'boolean', description: 'true se o cliente falou em cancelar, sair, trocar de provedor ou ir para a concorrência — mesmo numa reclamação ou no Procon. É o que leva o caso para a retenção.' },
+      motivo_saida: {
+        type: ['string', 'null'],
+        enum: ['preco', 'qualidade', 'atendimento', 'mudanca', 'concorrente', 'financeiro', 'sem_uso', 'outro', null],
+        description: 'Se ameaçou sair, por quê, pelo que ele disse: preco (acha caro), qualidade (lenta, cai), atendimento, mudanca (vai mudar de endereço), concorrente (recebeu oferta), financeiro (não consegue pagar), sem_uso. null se não disse.',
+      },
+    }, ['tipo', 'assunto', 'relato', 'ameacou_sair', 'motivo_saida']),
     terminal: true,
     executar: async ({ db, empresa, conversa, contato, entrada }) => {
       const tipos = Object.keys(ouvidoriaLib.TIPOS);
@@ -269,6 +275,7 @@ const INTERNAS = {
       const { ouvidoria, ja_existia: jaExistia } = ouvidoriaLib.abrir(db, {
         empresa, contato, conversa: atualConversa, tipo,
         assunto: String(entrada.assunto).slice(0, 200), relato: entrada.relato, origem: 'ia', ficha,
+        ameacaSaida: entrada.ameacou_sair === true, motivoSaida: entrada.motivo_saida ?? null,
       });
 
       // Elogio e sugestão não precisam ocupar ninguém: ficam registrados e o atendimento segue.

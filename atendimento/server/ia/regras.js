@@ -73,6 +73,26 @@ const OUVIDORIA = [
   ['sugestao', ['tenho uma sugestao', 'quero sugerir', 'sugestao de melhoria']],
 ];
 
+// O cliente falou em ir embora — numa reclamação ou no Procon também. Leva o caso para a retenção.
+const SAIDA = ['cancelar', 'cancelamento', 'trocar de provedor', 'mudar de provedor', 'outro provedor', 'outra operadora',
+  'vou sair', 'nao quero mais', 'rescindir', 'rescisao', 'concorrente', 'vou embora da', 'tirar a internet'];
+const ameacaDeSaida = (texto) => { const t = normalizar(texto); return Boolean(t) && SAIDA.some((x) => contem(t, x)); };
+
+// Pistas do motivo, pelas palavras do cliente. Na dúvida, fica sem motivo e a equipe preenche.
+const PISTAS_MOTIVO = [
+  ['mudanca', ['vou me mudar', 'mudar de cidade', 'mudar de endereco', 'mudando de casa', 'mudei de casa', 'vou mudar']],
+  ['concorrente', ['concorrente', 'outro provedor', 'outra operadora', 'oferta melhor', 'mais barato em outro', 'vivo fibra', 'claro net', 'oi fibra']],
+  ['preco', ['caro', 'muito caro', 'preco', 'valor alto', 'reajuste', 'aumentou']],
+  ['qualidade', ['lenta', 'lento', 'caindo', 'cai toda', 'sem internet', 'instavel', 'nao funciona', 'oscilando', 'travando']],
+  ['financeiro', ['nao consigo pagar', 'desempregado', 'sem dinheiro', 'apertado', 'dificuldade financeira']],
+  ['atendimento', ['pessimo atendimento', 'ninguem resolve', 'descaso', 'atendimento ruim']],
+  ['sem_uso', ['nao uso mais', 'nao estou usando', 'nao preciso mais']],
+];
+function motivoDeSaida(texto) {
+  const t = normalizar(texto);
+  return PISTAS_MOTIVO.find(([, termos]) => termos.some((x) => contem(t, x)))?.[0] ?? null;
+}
+
 /** O que o cliente escreveu é assunto de ouvidoria? Devolve { tipo, termo } ou null. */
 function assuntoDeOuvidoria(texto) {
   const t = normalizar(texto);
@@ -141,5 +161,5 @@ function escolhaDeMenu(filas, texto, { idResposta = null } = {}) {
   return filas.find((f) => normalizar(f.nome) === t) ?? null;
 }
 
-module.exports = { normalizar, contem, pedidoDeHumano, temAssuntoAlemDoPedido, assuntoDeOuvidoria, ehCumprimento, ehDespedida, casarIntencao, saudacao, primeiroNome, preencher, menu,
+module.exports = { normalizar, contem, pedidoDeHumano, temAssuntoAlemDoPedido, ameacaDeSaida, motivoDeSaida, assuntoDeOuvidoria, ehCumprimento, ehDespedida, casarIntencao, saudacao, primeiroNome, preencher, menu,
   escolhaDeMenu, PEDE_HUMANO, DESPEDIDA, CUMPRIMENTO, OUVIDORIA };

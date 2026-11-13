@@ -200,9 +200,12 @@ describe('ouvidoria', () => {
 
     // Cancelamento exige dizer se reteve: sem isso, não encerra.
     assert.throws(() => ouvidoriaLib.encerrar(db, empresa.id, ouvidoria.id, atendente, { status: 'resolvida', desfecho: 'conversamos' }),
-      /foi retido ou não/);
+      /ficou \(foi retido\) ou não/);
+    // E o motivo da saída também: é o que mostra onde a empresa perde clientes.
+    assert.throws(() => ouvidoriaLib.encerrar(db, empresa.id, ouvidoria.id, atendente, { status: 'resolvida', desfecho: 'x', retido: true }),
+      /por que o cliente queria sair/);
 
-    const fechada = ouvidoriaLib.encerrar(db, empresa.id, ouvidoria.id, atendente, { status: 'resolvida', desfecho: 'Aceitou o upgrade e ficou.', retido: true });
+    const fechada = ouvidoriaLib.encerrar(db, empresa.id, ouvidoria.id, atendente, { status: 'resolvida', desfecho: 'Aceitou o upgrade e ficou.', retido: true, motivo_saida: 'preco' });
     assert.equal(fechada.status, 'resolvida');
     assert.equal(fechada.retido, 1);
     assert.ok(fechada.resolvida_em);
@@ -219,7 +222,7 @@ describe('ouvidoria', () => {
         empresa, contato: c, tipo: 'cancelamento', assunto: 'Cancelamento',
         ficha: { risco: { nota: 50, faixa: 'medio', aumentam: [] }, valor: { classe: 'B' }, resumo: { mensalidade_centavos: mensalidade }, recomendacao: { texto: 'x' } },
       });
-      ouvidoriaLib.encerrar(db, empresa.id, ouvidoria.id, atendente, { status: 'resolvida', desfecho: 'ok', retido });
+      ouvidoriaLib.encerrar(db, empresa.id, ouvidoria.id, atendente, { status: 'resolvida', desfecho: 'ok', retido, motivo_saida: 'qualidade' });
     };
     abrirEFechar('5511900000001', true, 10000);
     abrirEFechar('5511900000002', true, 20000);
@@ -321,5 +324,129 @@ describe('a ZOE e a ouvidoria', () => {
       assert.equal(o.tipo, 'procon');
       assert.equal(o.prioridade, 'alta');
     } finally { sem.restaurar(); }
+  });
+});
+
+describe('retenção: não é só cancelamento', () => {
+  const ficha = (mensalidade) => ({ risco: { nota: 50, faixa: 'medio', aumentam: [] }, valor: { classe: 'B' }, resumo: { mensalidade_centavos: mensalidade }, recomendacao: { texto: 'x' } });
+
+  test('reclamação com "vou trocar de provedor" entra na retenção; reclamação comum não', () => {
+    const { db, empresa, atendente } = h.criarAmbiente();
+    const c1 = conversasLib.garantirContato(db, empresa.id, '5511900000011', null);
+    const c2 = conversasLib.garantirContato(db, empresa.id, '5511900000012', null);
+    const ameaca = ouvidoriaLib.abrir(db, { empresa, contato: c1, tipo: 'reclamacao', assunto: 'Internet caindo, vai trocar de provedor', ameacaSaida: true, ficha: ficha(10000) }).ouvidoria;
+    const comum = ouvidoriaLib.abrir(db, { empresa, contato: c2, tipo: 'reclamacao', assunto: 'Técnico atrasou', ficha: ficha(10000) }).ouvidoria;
+    assert.equal(ameaca.ameaca_saida, 1);
+    assert.equal(comum.ameaca_saida, 0);
+    assert.throws(() => ouvidoriaLib.encerrar(db, empresa.id, ameaca.id, atendente, { status: 'resolvida', desfecho: 'x', motivo_saida: 'qualidade' }), /ficou/,
+      'ameaçou sair: tem de dizer se ficou, mesmo sendo reclamação');
+    // Reclamação comum encerra sem pergunta de retenção.
+    assert.equal(ouvidoriaLib.encerrar(db, empresa.id, comum.id, atendente, { status: 'resolvida', desfecho: 'Pedimos desculpas.' }).retido, null);
+    // E a equipe pode marcar depois que o cliente ameaçou sair.
+    assert.equal(ouvidoriaLib.marcarAmeaca(db, empresa.id, ameaca.id, { ameaca_saida: true, motivo_saida: 'qualidade' }, atendente).motivo_saida, 'qualidade');
+  });
+
+  test('ofertas: fazer, responder, e o encerramento resolve as pendentes', () => {
+    const { db, empresa, atendente } = h.criarAmbiente();
+    const c = conversasLib.garantirContato(db, empresa.id, '5511900000013', null);
+    const o = ouvidoriaLib.abrir(db, { empresa, contato: c, tipo: 'procon', assunto: 'Vai ao Procon e cancelar', ficha: ficha(12000) }).ouvidoria;
+    const desconto = ouvidoriaLib.ofertar(db, empresa.id, o.id, { tipo: 'desconto', descricao: '20% por 3 meses', valor_mensal_centavos: 2400, meses: 3 }, atendente);
+    const visita = ouvidoriaLib.ofertar(db, empresa.id, o.id, { tipo: 'visita_tecnica' }, atendente);
+    assert.equal(ouvidoriaLib.buscar(db, empresa.id, o.id).ameaca_saida, 1, 'fazer oferta já é retenção');
+    ouvidoriaLib.responderOferta(db, empresa.id, o.id, visita, true, atendente);
+    ouvidoriaLib.encerrar(db, empresa.id, o.id, atendente, { status: 'resolvida', desfecho: 'Ficou.', retido: true, motivo_saida: 'qualidade', ofertas_aceitas: [desconto] });
+    const ofertas = db.prepare('SELECT tipo, aceita FROM ouvidoria_ofertas WHERE ouvidoria_id = ? ORDER BY id').all(o.id);
+    assert.deepEqual(ofertas.map((x) => [x.tipo, x.aceita]), [['desconto', 1], ['visita_tecnica', 1]]);
+    assert.ok(db.prepare("SELECT 1 FROM ouvidoria_eventos WHERE ouvidoria_id = ? AND tipo = 'proposta' AND texto LIKE '%R$ 24,00/mês por 3%'").get(o.id));
+  });
+
+  test('o relatório cruza motivo, oferta e resultado — e mostra a melhor oferta por motivo', () => {
+    const { db, empresa, atendente } = h.criarAmbiente();
+    const { hoje } = require('../server/lib/datas');
+    let n = 20;
+    const caso = (motivo, ofertas, retido, mensalidade = 10000) => {
+      const c = conversasLib.garantirContato(db, empresa.id, `55119000000${n++}`, null);
+      const o = ouvidoriaLib.abrir(db, { empresa, contato: c, tipo: 'cancelamento', assunto: 'x', ficha: ficha(mensalidade) }).ouvidoria;
+      const aceitas = [];
+      for (const [tipo, aceita, valor = 0, meses = 0] of ofertas) {
+        const id = ouvidoriaLib.ofertar(db, empresa.id, o.id, { tipo, valor_mensal_centavos: valor, meses }, atendente);
+        if (aceita) aceitas.push(id);
+      }
+      ouvidoriaLib.encerrar(db, empresa.id, o.id, atendente, { status: 'resolvida', desfecho: 'x', retido, motivo_saida: motivo, ofertas_aceitas: aceitas });
+    };
+    // Preço: desconto segura; upgrade não.
+    caso('preco', [['desconto', true, 2000, 6]], true);
+    caso('preco', [['desconto', true, 2000, 6]], true);
+    caso('preco', [['upgrade', false], ['desconto', false]], false);
+    caso('preco', [['upgrade', false]], false);
+    // Qualidade: visita técnica segura.
+    caso('qualidade', [['visita_tecnica', true]], true);
+    caso('qualidade', [['visita_tecnica', true], ['isencao', true]], true);
+    // Mudança: ninguém ofereceu nada e foi embora.
+    caso('mudanca', [], false, 15000);
+
+    const r = ouvidoriaLib.retencao(db, empresa.id, { de: hoje(), ate: hoje() });
+    assert.equal(r.casos, 7);
+    assert.equal(r.retidos, 4);
+    assert.equal(r.perdidos_sem_oferta, 1, 'saiu sem ninguém oferecer nada');
+    const preco = r.por_motivo.find((m) => m.motivo === 'preco');
+    assert.deepEqual([preco.casos, preco.retidos, preco.taxa], [4, 2, 50]);
+    const desconto = r.por_oferta.find((o) => o.oferta === 'desconto');
+    assert.deepEqual([desconto.oferecidas, desconto.aceitas, desconto.seguraram], [3, 2, 2]);
+    assert.equal(desconto.custo_centavos, 24000, 'R$ 20 × 6 meses × 2 clientes');
+    assert.equal(desconto.receita_salva_centavos, 240000, 'R$ 100 × 12 × 2 clientes');
+    const melhor = Object.fromEntries(r.melhor_por_motivo.map((m) => [m.motivo, m.oferta]));
+    assert.equal(melhor.preco, 'desconto');
+    assert.equal(melhor.qualidade, 'visita_tecnica');
+
+    const i = ouvidoriaLib.indicadores(db, empresa.id, { de: hoje(), ate: hoje() });
+    assert.equal(i.custo_retencao_centavos, 24000);
+    // 4 clientes ficaram com oferta aceita, R$ 1.200/ano cada: cada um conta uma vez.
+    assert.equal(r.receita_salva_com_oferta_centavos, 480000);
+  });
+
+  test('quem só vê a Ouvidoria não mexe nela', async () => {
+    const { db, empresa } = h.criarAmbiente();
+    const { criarApp } = require('../server/app');
+    const servidor = criarApp(db).listen(0);
+    await new Promise((r) => servidor.once('listening', r));
+    try {
+      const base = `http://127.0.0.1:${servidor.address().port}/api`;
+      const marina = db.prepare("SELECT id FROM usuarios WHERE email = 'marina@fibramais.com.br'").get();
+      db.prepare("INSERT OR REPLACE INTO usuario_permissoes (usuario_id, permissao, concedida) VALUES (?, 'ouvidoria.ver', 1)").run(marina.id);
+      db.prepare("INSERT OR REPLACE INTO usuario_permissoes (usuario_id, permissao, concedida) VALUES (?, 'ouvidoria.editar', 0)").run(marina.id);
+      const { token } = await (await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'marina@fibramais.com.br', senha: 'senha12345' }) })).json();
+      const ver = await fetch(`${base}/empresas/${empresa.id}/ouvidoria/retencao`, { headers: { Authorization: `Bearer ${token}` } });
+      assert.equal(ver.status, 200);
+      const c = conversasLib.garantirContato(db, empresa.id, '5511900000099', null);
+      const abrir = await fetch(`${base}/empresas/${empresa.id}/ouvidoria`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ contato_id: c.id, tipo: 'reclamacao', assunto: 'x' }),
+      });
+      assert.equal(abrir.status, 403);
+    } finally { await new Promise((r) => servidor.close(r)); }
+  });
+});
+
+describe('a ZOE já leva a ameaça de saída e o motivo', () => {
+  let meta;
+  beforeEach(() => { meta = h.fingirMeta(); });
+  afterEach(() => meta.restaurar());
+
+  test('pelas regras: Procon com "vou trocar de provedor, está muito caro" vira retenção por preço', async () => {
+    const { db } = h.criarAmbiente();
+    const sem = h.semIa();
+    try { await h.conversar(db, 'vou no procon e vou trocar de provedor, está muito caro'); } finally { sem.restaurar(); }
+    const o = db.prepare('SELECT tipo, ameaca_saida, motivo_saida FROM ouvidoria ORDER BY id DESC LIMIT 1').get();
+    assert.deepEqual([o.tipo, o.ameaca_saida, o.motivo_saida], ['procon', 1, 'preco']);
+  });
+
+  test('pela IA: a ferramenta diz se ameaçou sair e por quê', async () => {
+    const { db } = h.criarAmbiente();
+    const ia = h.fingirClaude([{ ferramenta: 'abrir_ouvidoria', entrada: {
+      tipo: 'reclamacao', assunto: 'Internet cai toda noite; recebeu oferta da concorrência', relato: 'Cai toda noite há 2 semanas. A Vivo ofereceu 500 mega.',
+      ameacou_sair: true, motivo_saida: 'concorrente' } }]);
+    try { await h.conversar(db, 'minha internet cai toda noite e a vivo me ofereceu 500 mega'); } finally { ia.restaurar(); }
+    const o = db.prepare('SELECT tipo, ameaca_saida, motivo_saida FROM ouvidoria ORDER BY id DESC LIMIT 1').get();
+    assert.deepEqual([o.tipo, o.ameaca_saida, o.motivo_saida], ['reclamacao', 1, 'concorrente']);
   });
 });

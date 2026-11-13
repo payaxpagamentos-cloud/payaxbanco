@@ -381,6 +381,11 @@ CREATE TABLE IF NOT EXISTS ouvidoria (
   risco_na_abertura INTEGER,
   valor_na_abertura TEXT,
   mensalidade_centavos INTEGER NOT NULL DEFAULT 0,
+  -- Retenção: todo caso em que o cliente ameaçou sair (não só o pedido de cancelamento — também a
+  -- reclamação ou o Procon com "vou trocar de provedor"). O motivo diz por que ele queria sair.
+  ameaca_saida INTEGER NOT NULL DEFAULT 0,
+  motivo_saida TEXT CHECK (motivo_saida IN ('preco','qualidade','atendimento','mudanca','concorrente','financeiro','sem_uso','outro')),
+  motivo_detalhe TEXT,
   -- Desfecho: o cliente ficou? Quanto de receita anual foi salvo (ou perdido)?
   desfecho TEXT,
   retido INTEGER,
@@ -392,6 +397,24 @@ CREATE TABLE IF NOT EXISTS ouvidoria (
 );
 CREATE INDEX IF NOT EXISTS idx_ouvidoria_empresa ON ouvidoria(empresa_id, status, aberta_em DESC);
 CREATE INDEX IF NOT EXISTS idx_ouvidoria_contato ON ouvidoria(contato_id, aberta_em DESC);
+
+-- As ofertas feitas para o cliente ficar, e se ele aceitou. É daqui que sai qual oferta segura
+-- mais cliente para cada motivo de saída — e quanto a retenção custou.
+CREATE TABLE IF NOT EXISTS ouvidoria_ofertas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ouvidoria_id INTEGER NOT NULL REFERENCES ouvidoria(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL CHECK (tipo IN ('desconto','upgrade','visita_tecnica','isencao','troca_equipamento','downgrade','pausa','outro')),
+  descricao TEXT,
+  -- Quanto a oferta custa por mês (desconto) e por quantos meses; isenção é valor único em meses = 1.
+  valor_mensal_centavos INTEGER NOT NULL DEFAULT 0,
+  meses INTEGER NOT NULL DEFAULT 0,
+  -- null: o cliente ainda não respondeu.
+  aceita INTEGER,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criada_em TEXT NOT NULL,
+  respondida_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ouvidoria_ofertas ON ouvidoria_ofertas(ouvidoria_id);
 
 -- Cada tratativa do caso: quem falou o quê e quando.
 CREATE TABLE IF NOT EXISTS ouvidoria_eventos (

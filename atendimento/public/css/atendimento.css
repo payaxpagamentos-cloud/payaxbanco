@@ -571,6 +571,14 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .resumo-ia p{ margin:0; font-size:13.5px; line-height:1.55 }
 .resumo-ia .motivo{ color:var(--text-2); font-size:12.5px }
 
+/* Retenção */
+.melhores-ofertas{ display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px }
+.melhor-oferta{ display:flex; flex-direction:column; gap:3px; padding:11px 13px; border-radius:var(--radius); border:1px solid var(--border); border-left:3px solid var(--ok); background:var(--surface) }
+.melhor-oferta small{ color:var(--text-3); font-size:11px; text-transform:uppercase; letter-spacing:.04em }
+.melhor-oferta strong{ font-size:15px }
+.grupo-retencao[hidden]{ display:none }
+.grupo-retencao{ display:flex; flex-direction:column; gap:8px; padding:10px 12px; border:1px dashed var(--border); border-radius:var(--radius) }
+
 /* Aprendizado da ZOE */
 .motivos-aprendizado{ display:flex; flex-wrap:wrap; gap:8px }
 .motivo-aprendizado{ display:flex; align-items:baseline; gap:6px; padding:7px 11px; border-radius:9px; background:var(--surface); border:1px solid var(--border); font-size:13px }

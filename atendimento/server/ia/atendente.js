@@ -438,6 +438,8 @@ async function abrirOuvidoriaPelasRegras(db, { empresa, conversa, contato, tipo,
     empresa, contato, conversa, tipo, origem: 'ia', ficha,
     assunto: `${ouvidoriaLib.TIPOS[tipo]} ${ligacao ? 'por telefone' : 'pelo WhatsApp'}`,
     relato: `O cliente ${ligacao ? 'disse na ligação' : 'escreveu'}: "${String(texto).slice(0, 500)}".`,
+    // "Claro" e "vivo" são palavras comuns: o motivo só é lido quando o cliente falou em sair.
+    ameacaSaida: regras.ameacaDeSaida(texto), motivoSaida: regras.ameacaDeSaida(texto) || tipo === 'cancelamento' ? regras.motivoDeSaida(texto) : null,
   });
   registrarEvento(db, conversa, { tipo: 'intencao', nome: `ouvidoria: ${tipo}`, detalhe: `casou com "${termo}"` });
 

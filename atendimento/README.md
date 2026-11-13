@@ -613,6 +613,31 @@ novo para o mais antigo.
 Sem o IXC — ou com ele fora do ar — a ficha sai assim mesmo, **marcada como incompleta**: o score usa
 o que a plataforma sabe e avisa na tela que os números do contrato não entraram.
 
+### Retenção: não é só o pedido de cancelamento
+
+A Ouvidoria trata Procon e Anatel **e** retenção. Entra na retenção todo caso em que o cliente falou
+em sair — o pedido de cancelamento, mas também a reclamação ou o Procon com "vou trocar de provedor".
+A ZOE já abre o caso marcando a ameaça de saída e, quando o cliente diz, o motivo; a equipe pode
+marcar depois ("O cliente ameaçou sair").
+
+Em cada caso de retenção ficam registrados:
+
+- **Por que ele queria sair**: preço, qualidade da internet, atendimento, mudança de endereço, oferta
+  da concorrência, dificuldade financeira, não usa mais.
+- **Cada oferta feita** (desconto, upgrade, visita técnica, isenção, troca de equipamento, plano mais
+  barato, pausa), com o custo por mês e por quantos meses, e se o cliente **aceitou ou recusou**.
+- **Se ele ficou.** Para encerrar um caso de retenção, ficou/saiu e o motivo são obrigatórios: são os
+  números que importam.
+
+`Ouvidoria › Retenção` cruza tudo no período:
+
+- quantos ficaram, a **receita salva** (cada cliente contado uma vez) e **quanto custou** em ofertas;
+- **quantos saíram sem que ninguém oferecesse nada** — dinheiro deixado na mesa;
+- por motivo: casos, quantos ficaram e a receita perdida;
+- por oferta: feitas, aceitas e quantas **seguraram** (aceita por cliente que ficou), com o custo;
+- **a oferta que mais segura cada motivo** ("preço → desconto, segurou 67%"), avisando quando ainda
+  há pouca amostra para virar regra.
+
 ## Instalação no servidor (/atendimento)
 
 ```bash
