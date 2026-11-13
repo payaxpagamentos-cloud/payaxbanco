@@ -28,7 +28,7 @@ const { detalhe, assinaturaFicha } = require('./boletos');
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 const periodo = (q) => ({ de: q.de || datas.primeiroDiaMes(hoje()), ate: q.ate || hoje() });
 
-/** O cliente vê o que paga (tarifa bancária e tarifa PayAx), nunca o nosso custo com o banco nem a margem. */
+/** O cliente vê o que paga (tarifa bancária e tarifa PAY AX), nunca o nosso custo com o banco nem a margem. */
 const semMargem = (d) => ({
   ...d,
   custo_liquidacao_centavos: undefined,
@@ -128,7 +128,7 @@ module.exports = (db, autenticado) => {
       boletos: consultas.resumoBoletos(db, { ...p, clienteId: c.id, hoje: data }),
       liquidacoes: (() => {
         const l = consultas.resumoLiquidacoes(db, { ...p, clienteId: c.id });
-        // O cliente vê o que pagou de tarifa bancária e tarifa PayAx, não o nosso custo nem a margem.
+        // O cliente vê o que pagou de tarifa bancária e tarifa PAY AX, não o nosso custo nem a margem.
         return { titulos: l.titulos, bruto_centavos: l.bruto_centavos, comissao_centavos: l.comissao_centavos,
           tarifa_banco_centavos: l.tarifa_banco_centavos, tarifa_emissao_centavos: l.tarifa_emissao_centavos,
           liquido_centavos: l.liquido_cliente_centavos, repassado_centavos: l.repassado_centavos };
@@ -275,7 +275,7 @@ module.exports = (db, autenticado) => {
     });
   });
 
-  /** O cliente atualiza contato e endereço. A chave PIX do repasse só muda pela equipe PayAx. */
+  /** O cliente atualiza contato e endereço. A chave PIX do repasse só muda pela equipe PAY AX. */
   r.patch('/cadastro', exigir('cadastro.editar'), (req, res) => {
     const c = meuCliente(req);
     const b = req.body ?? {};
@@ -291,7 +291,7 @@ module.exports = (db, autenticado) => {
     if (b.bairro !== undefined) d.bairro = v.opcional(b.bairro, 'o bairro', 60);
     if (b.cidade !== undefined) d.cidade = v.opcional(b.cidade, 'a cidade', 60);
     if (b.uf !== undefined) d.uf = v.ufOpcional(b.uf);
-    if (b.pix_chave !== undefined) throw new ErroNegocio('A chave PIX de repasse é alterada pela equipe PayAx, por segurança. Fale com o seu gerente de conta.', 403);
+    if (b.pix_chave !== undefined) throw new ErroNegocio('A chave PIX de repasse é alterada pela equipe PAY AX, por segurança. Fale com o seu gerente de conta.', 403);
     if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
     const campos = Object.keys(d);
     db.prepare(`UPDATE clientes SET ${campos.map((k) => `${k} = ?`).join(', ')}, versao = versao + 1 WHERE id = ?`).run(...campos.map((k) => d[k]), c.id);

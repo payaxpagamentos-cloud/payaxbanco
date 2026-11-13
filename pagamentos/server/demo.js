@@ -120,12 +120,12 @@ async function main() {
         liquidados += 1;
       }
     }
-    console.log(`[PayAx] ${c.fantasia}: ${c.titulos} boletos, ${liquidados} liquidados.`);
+    console.log(`[PAY AX] ${c.fantasia}: ${c.titulos} boletos, ${liquidados} liquidados.`);
   }
 
   // Repasses: roda a rotina para os saldos já liberados e deixa um esperando aprovação.
   const r = await repassesLib.rotinaAutomatica(db);
-  console.log(`[PayAx] Repasses: ${r.enviados} enviado(s), ${r.aguardando} aguardando aprovação.`);
+  console.log(`[PAY AX] Repasses: ${r.enviados} enviado(s), ${r.aguardando} aguardando aprovação.`);
 
   console.log('\nAcesse:');
   console.log(`  Backoffice      http://localhost:${config.port}${config.basePath}/     admin@payax.local / ${config.admin.senha}`);

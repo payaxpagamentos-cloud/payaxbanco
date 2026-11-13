@@ -4,13 +4,13 @@
  * Tabela de preços e cálculo do split.
  *
  * Em cada título LIQUIDADO o valor pago é dividido assim:
- *   valor pago  −  tarifa bancária (repassada ao cliente)  −  tarifa PayAx  =  líquido do cliente
+ *   valor pago  −  tarifa bancária (repassada ao cliente)  −  tarifa PAY AX  =  líquido do cliente
  *
- * A tarifa PayAx é um percentual do valor pago (ppm: 1% = 10.000) com piso e teto opcionais, e nada além:
+ * A tarifa PAY AX é um percentual do valor pago (ppm: 1% = 10.000) com piso e teto opcionais, e nada além:
  * a tarifa de emissão, quando existe, é cobrada no registro do boleto, não na liquidação.
  *
  * Nos campos e no banco ela continua se chamando `comissao` (comissao_centavos, comissao_minima_centavos…):
- * é só o nome interno, que ficou de antes da troca do vocabulário do produto. Na tela, é "Tarifa PayAx".
+ * é só o nome interno, que ficou de antes da troca do vocabulário do produto. Na tela, é "Tarifa PAY AX".
  *
  * O preço é congelado no boleto no momento da emissão: mudar a tabela não altera títulos já emitidos.
  */
@@ -36,7 +36,7 @@ function vigente(db, clienteId, data) {
 }
 
 /**
- * Divide o valor pago entre tarifa bancária, tarifa PayAx e o líquido do cliente.
+ * Divide o valor pago entre tarifa bancária, tarifa PAY AX e o líquido do cliente.
  * Trabalha só com inteiros; a soma das partes é sempre exatamente o valor pago.
  */
 function calcularSplit({ valorPagoCentavos, preco, custoLiquidacaoCentavos = 0 }) {
@@ -52,7 +52,7 @@ function calcularSplit({ valorPagoCentavos, preco, custoLiquidacaoCentavos = 0 }
   if (maxima !== null && comissao > maxima) comissao = maxima;
 
   // Trava de segurança: o cliente nunca fica devendo por uma liquidação. A tarifa do banco tem prioridade
-  // (nós já a pagamos), a tarifa PayAx cede o que faltar.
+  // (nós já a pagamos), a tarifa PAY AX cede o que faltar.
   if (tarifa > bruto) tarifa = bruto;
   if (comissao > bruto - tarifa) comissao = bruto - tarifa;
 
@@ -63,7 +63,7 @@ function calcularSplit({ valorPagoCentavos, preco, custoLiquidacaoCentavos = 0 }
     tarifa_banco_centavos: tarifa,
     comissao_centavos: comissao,
     liquido_centavos: liquido,
-    // O que sobra para nós: a tarifa PayAx mais a diferença entre a tarifa bancária cobrada e o custo real.
+    // O que sobra para nós: a tarifa PAY AX mais a diferença entre a tarifa bancária cobrada e o custo real.
     custo_banco_centavos: custo,
     receita_centavos: comissao + tarifa,
     margem_centavos: comissao + tarifa - custo,

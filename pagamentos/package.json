@@ -1,7 +1,7 @@
 {
   "name": "payax-pagamentos",
   "version": "1.0.0",
-  "description": "PayAx Pagamentos — emissão de boletos e Bolepix pelo Bradesco, split de pagamento, conta gráfica e repasse automático, com Internet Bank para o cliente final e integração com o IXC.",
+  "description": "PAY AX Pagamentos — emissão de boletos e Bolepix pelo Bradesco, split de pagamento, conta gráfica e repasse automático, com Internet Bank para o cliente final e integração com o IXC.",
   "main": "server/index.js",
   "private": true,
   "type": "commonjs",

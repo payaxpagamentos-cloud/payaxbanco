@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Número da conta do cliente DENTRO da PayAx (a identidade da conta gráfica).
+ * Número da conta do cliente DENTRO da PAY AX (a identidade da conta gráfica).
  *
  * ATENÇÃO — não confundir com a agência e a conta do Bradesco:
  *   - `contas_bancarias.agencia` / `.conta` são do banco, vão no código de barras e identificam o convênio;

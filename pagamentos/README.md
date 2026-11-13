@@ -1,6 +1,6 @@
-# PayAx Pagamentos
+# PAY AX Pagamentos
 
-Sistema de meios de pagamento da PayAx: **emissão de boletos e Bolepix pelo Bradesco**, **split de pagamento**,
+Sistema de meios de pagamento da PAY AX: **emissão de boletos e Bolepix pelo Bradesco**, **split de pagamento**,
 **conta gráfica por cliente** e **repasse automático por PIX**, com integração ao **IXC Provedor**.
 
 Dois acessos, com servidores de sessão separados:
@@ -22,7 +22,7 @@ nossa conta e o sistema mantém uma conta corrente interna por cliente.
 Boleto de R$ 268,12 pago
         │
         ├─ (−) tarifa bancária ............ R$ 2,50   → repassada ao cliente
-        ├─ (−) tarifa PayAx 2,35% ......... R$ 6,30   → nossa receita
+        ├─ (−) tarifa PAY AX 2,35% ......... R$ 6,30   → nossa receita
         └─ (=) líquido do cliente ......... R$ 259,32 → entra "a liberar" e vira saldo em D+N dias úteis
 ```
 
@@ -40,8 +40,8 @@ conferência da nossa equipe.
 
 | # | Módulo | O que tem |
 |---|---|---|
-| 1 | **Clientes** | Número de conta PayAx sequencial (agência 001 · conta 0001-3) com dígito verificador. Cadastro com CNPJ validado, endereço do beneficiário, situação, chave PIX de repasse, janela de retenção (D+N), repasse automático, valor mínimo, limite sem aprovação e teto por boleto. Ficha com resumo, boletos, conta gráfica, repasses, preços e acessos. |
-| 2 | **Preços** | Tabela padrão da plataforma e tabela por cliente, **com vigência**: tarifa de emissão, tarifa de liquidação (repassada), tarifa PayAx percentual com piso e teto, e tarifa do repasse. O histórico fica guardado. |
+| 1 | **Clientes** | Número de conta PAY AX sequencial (agência 001 · conta 0001-3) com dígito verificador. Cadastro com CNPJ validado, endereço do beneficiário, situação, chave PIX de repasse, janela de retenção (D+N), repasse automático, valor mínimo, limite sem aprovação e teto por boleto. Ficha com resumo, boletos, conta gráfica, repasses, preços e acessos. |
+| 2 | **Preços** | Tabela padrão da plataforma e tabela por cliente, **com vigência**: tarifa de emissão, tarifa de liquidação (repassada), tarifa PAY AX percentual com piso e teto, e tarifa do repasse. O histórico fica guardado. |
 | 3 | **Boletos** | Emissão avulsa, por importação do IXC ou por API. **Boleto** e **Bolepix** (mesmo título com QR Code PIX). Nosso número reservado de forma atômica, código de barras e linha digitável no padrão FEBRABAN com o campo livre do Bradesco. Juros ao mês (pro rata die), multa, desconto por antecipação e prazo de baixa. Baixa, estorno e consulta ao banco. |
 | 4 | **Ficha de compensação** | Recibo do pagador + ficha, em HTML pronto para imprimir ou salvar em PDF pelo navegador, com código de barras Interleaved 2 of 5 nas medidas do padrão (103 × 13 mm) e QR Code do Bolepix. **Link público assinado** para enviar ao pagador, sem login. |
 | 5 | **Split e conta gráfica** | Razão de lançamentos por cliente com saldo acumulado, disponível × a liberar, agenda de liberação dos próximos dias, extrato em tela e em CSV, e ajuste manual com motivo. |
@@ -49,7 +49,7 @@ conferência da nossa equipe.
 | 7 | **Conciliação** | Cada aviso do banco é **guardado antes de ser processado** (corpo inteiro), com o resultado de cada um: liquidado, repetido, ignorado ou erro. Liquidação idempotente: o mesmo aviso duas vezes não credita em dobro. Baixa manual e consulta ao banco para o que não chegou. |
 | 8 | **CNAB 400 automático** | Remessa gerada sozinha com os títulos emitidos e escrita na pasta de saída; pasta de entrada varrida de tempos em tempos e cada retorno aplicado na hora — entrada confirmada, liquidação com split, baixa ou rejeição com o motivo traduzido. Pedido de baixa vai como ocorrência 02 na remessa seguinte. Ninguém gera nem importa arquivo na mão. |
 | 9 | **Integrações** | **Bradesco** (Cobrança Registrada, Boleto Híbrido e PIX de repasse) com credenciais cifradas em AES-256-GCM, e **um IXC por cliente**, nos dois sentidos: importa os títulos em aberto, emite o boleto, grava a linha digitável de volta no título e dá baixa quando o boleto é pago. |
-| 10 | **Relatórios** | Faturamento por período e por cliente: emitido, recebido, tarifa PayAx, tarifas bancárias, receita, **margem** (receita − custo do banco) e repassado, com CSV e impressão. Taxa de conversão emitido → pago. |
+| 10 | **Relatórios** | Faturamento por período e por cliente: emitido, recebido, tarifa PAY AX, tarifas bancárias, receita, **margem** (receita − custo do banco) e repassado, com CSV e impressão. Taxa de conversão emitido → pago. |
 | 11 | **Segurança e histórico** | Perfis por função, **autenticação em duas etapas** por aplicativo (opcionalmente obrigatória para a equipe), senha provisória trocada no primeiro acesso, idempotência nos comandos POST, controle de versão otimista nos cadastros e auditoria com valor antes e depois. |
 | 12 | **Backup conferido** | Cópia do banco a cada N horas e sob demanda, com **conferência automática**: integridade do arquivo e se o total do razão bate com o banco em uso. Histórico, download registrado na auditoria e alerta no painel quando atrasa ou não confere. |
 
@@ -65,7 +65,7 @@ conferência da nossa equipe.
 | **Operador** (cliente) | Emite boletos e consulta; não solicita repasse. |
 | **Consulta** (cliente) | Só leitura. |
 
-A chave PIX de destino do repasse **só a equipe PayAx altera** — o cliente consulta, mas não muda sozinho.
+A chave PIX de destino do repasse **só a equipe PAY AX altera** — o cliente consulta, mas não muda sozinho.
 
 ## Como executar
 
@@ -86,7 +86,7 @@ npm test          # 58 testes
 npm run migrar    # aplica as migrações sem subir o servidor
 ```
 
-## A conta do cliente na PayAx
+## A conta do cliente na PAY AX
 
 Cada cliente recebe, no cadastro, um número de conta **sequencial**: agência `001` com contas `0001`, `0002`,
 `0003`… Ao chegar em `9999`, a agência `002` abre sozinha e a numeração continua. O número é atribuído uma vez e
@@ -145,7 +145,7 @@ manual de um retorno e o download de qualquer remessa.
 
 ## Vocabulário
 
-O que cobramos do cliente a cada título pago chama-se **tarifa PayAx** em toda a interface, nos relatórios e no
+O que cobramos do cliente a cada título pago chama-se **tarifa PAY AX** em toda a interface, nos relatórios e no
 extrato. No banco de dados e nos campos da API o nome antigo continua: `comissao`, `comissao_centavos`,
 `comissao_minima_centavos`. É só a chave interna — renomear a coluna exigiria reconstruir a tabela que guarda o
 razão do dinheiro dos clientes, sem mudar nada do que se vê na tela.
@@ -154,7 +154,7 @@ As quatro cobranças do produto, para não confundir:
 
 | Nome na tela | O que é | Quando |
 |---|---|---|
-| **Tarifa PayAx** | o nosso percentual sobre o valor pago, com piso e teto | em cada título liquidado |
+| **Tarifa PAY AX** | o nosso percentual sobre o valor pago, com piso e teto | em cada título liquidado |
 | **Tarifa bancária** | o que o banco cobra, repassado ao cliente | em cada título liquidado |
 | **Tarifa de emissão** | cobrada por boleto registrado, pago ou não | no registro |
 | **Tarifa do repasse** | custo do PIX que leva o dinheiro ao cliente | em cada transferência |
@@ -192,7 +192,7 @@ processamento, então nada se perde se algo falhar — e reprocessar não duplic
 
 ## O IXC (um por cliente)
 
-Cada cliente cadastra o endereço e o token (`id:hash`, de um usuário técnico só da PayAx) em **Integrações → IXC**.
+Cada cliente cadastra o endereço e o token (`id:hash`, de um usuário técnico só da PAY AX) em **Integrações → IXC**.
 O conector fica em [`server/lib/ixc.js`](server/lib/ixc.js) e os nomes de recurso e campo estão reunidos em
 `RECURSOS` e `CAMPOS`, para ajustar à versão de cada provedor em um lugar só.
 
@@ -294,11 +294,29 @@ Para ligar a exigência, o próprio administrador precisa ter 2FA ativo: não d�
   exige um provedor de mensagens.
 - **Débito automático, cartão e PIX cobrança com vencimento**: fora do escopo desta etapa, que é só boleto e Bolepix.
 
+## A marca
+
+O logotipo não é imagem: está desenhado em vetor em `comum/marca.js`, por isso fica nítido em qualquer
+tamanho, acompanha a cor do tema e não depende de nenhum arquivo externo.
+
+| Peça | Onde aparece |
+|---|---|
+| `letreiro()` | PAY em branco (ou marinho) e AX no degradê ciano→azul; com `tagline`, a frase "O FUTURO EM CADA TRANSAÇÃO." |
+| `simbolo()` | o anel, quando não cabe o letreiro: menu, canto do cartão da conta, favicon |
+| `marcaMenu()` / `marcaEntrada()` | as duas combinações prontas — menu lateral e tela de entrada |
+| `faviconSvg()` | o desenho dos dois `img/favicon.svg` (a versão com fundo leva também as faixas diagonais) |
+
+As cores vivem nos tokens de `comum/base.css` (`--marca` marinho `#0a1526`, `--azul` das ações, `--ciano`
+do anel) e em `cliente/css/banco.css`. Mudar a marca é mudar esses dois lugares — nenhuma tela tem cor escrita na mão.
+
+Em texto, o nome da empresa é **PAY AX**, com espaço. `payax` minúsculo continua sendo só identificador
+interno (chaves de `localStorage`, variáveis `PAYAX_*`, nome de arquivo, prefixo de txid do PIX).
+
 ## Estrutura
 
 ```
 pagamentos/
-  comum/        base.css, ui.js, api.js e graficos.js — compartilhados pelas duas áreas
+  comum/        base.css, ui.js, api.js, graficos.js e marca.js — compartilhados pelas duas áreas
   public/       Backoffice (telas em js/telas/)
   cliente/      Internet Bank (telas em js/telas/)
   server/

@@ -22,7 +22,7 @@ export default async function extrato({ alvo, query, recarregar }) {
     campo({ nome: 'ate', rotulo: 'Até', tipo: 'date', valor: p.ate }),
     campo({ nome: 'tipo', rotulo: 'Mostrar', tipo: 'select', valor: p.tipo, opcoes: [
       ['', 'Tudo'], ['credito_liquidacao', 'Só recebimentos'], ['repasse', 'Só transferências'],
-      ['comissao', 'Tarifa PayAx'], ['tarifa_banco', 'Tarifas bancárias'], ['tarifa_emissao', 'Tarifas de emissão'],
+      ['comissao', 'Tarifa PAY AX'], ['tarifa_banco', 'Tarifas bancárias'], ['tarifa_emissao', 'Tarifas de emissão'],
       ['estorno', 'Estornos'], ['ajuste', 'Ajustes']] }),
     el('button', { class: 'botao', type: 'submit' }, icone('busca'), 'Filtrar'),
     el('button', { class: 'botao sec', type: 'button', onclick: (ev) => acao(ev.currentTarget, () => api.baixar(`/conta/extrato.csv${qs(p)}`, `extrato-${p.de}-a-${p.ate}.csv`)) }, icone('baixar'), 'CSV'),

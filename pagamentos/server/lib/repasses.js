@@ -134,7 +134,7 @@ async function enviar(db, id, { usuario = null } = {}) {
       chave: r.pix_chave,
       tipo_chave: r.pix_tipo,
       valor_centavos: r.valor_liquido_centavos,
-      descricao: `PayAx repasse ${r.id}`,
+      descricao: `PAY AX repasse ${r.id}`,
       documento_titular: r.titular_documento,
     });
     db.prepare(`UPDATE repasses SET situacao = ?, end_to_end = ?, confirmado_em = ?, versao = versao + 1 WHERE id = ?`)

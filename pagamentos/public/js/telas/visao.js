@@ -25,7 +25,7 @@ export default async function visao({ alvo }) {
 
     el('div', { class: 'grade kpis' },
       kpi({ rotulo: 'Recebido no período', valor: dinheiro(l.bruto_centavos), apoio: `${numero(l.titulos)} título(s) liquidado(s)`, tom: 'destaque', ic: 'dinheiro' }),
-      kpi({ rotulo: 'Nossa receita', valor: dinheiro(l.receita_centavos), apoio: `Tarifa PayAx ${dinheiro(l.comissao_centavos)} + tarifas bancárias ${dinheiro(l.tarifa_banco_centavos + l.tarifa_emissao_centavos)}`, tom: 'positivo', ic: 'relatorio' }),
+      kpi({ rotulo: 'Nossa receita', valor: dinheiro(l.receita_centavos), apoio: `Tarifa PAY AX ${dinheiro(l.comissao_centavos)} + tarifas bancárias ${dinheiro(l.tarifa_banco_centavos + l.tarifa_emissao_centavos)}`, tom: 'positivo', ic: 'relatorio' }),
       d.pode_ver_margem
         ? kpi({ rotulo: 'Margem (receita − custo do banco)', valor: dinheiro(l.margem_centavos), apoio: `Custo do banco ${dinheiro(l.custo_banco_centavos)}`, ic: 'banco' })
         : null,
@@ -49,11 +49,11 @@ export default async function visao({ alvo }) {
             partes: [
               { rotulo: 'Líquido dos clientes', valor: l.liquido_cliente_centavos },
               { rotulo: 'Tarifa bancária', valor: l.tarifa_banco_centavos },
-              { rotulo: 'Tarifa PayAx', valor: l.comissao_centavos },
+              { rotulo: 'Tarifa PAY AX', valor: l.comissao_centavos },
             ],
           }),
           el('p', { style: 'margin-top:10px;color:var(--texto-2);font-size:13px' },
-            `De ${dinheiro(l.bruto_centavos)} recebidos no período, ${dinheiro(l.receita_centavos)} ficaram com a PayAx. `
+            `De ${dinheiro(l.bruto_centavos)} recebidos no período, ${dinheiro(l.receita_centavos)} ficaram com a PAY AX. `
             + `No mesmo período saíram ${dinheiro(l.repassado_centavos)} em repasses aos clientes (inclui saldo de datas anteriores).`))
         : el('p', { class: 'vazio' }, 'Nenhum título liquidado no período.')),
     ),

@@ -69,13 +69,13 @@ function solicitar(disp, recarregar) {
     const r = await api.post('/repasses', lerForm(form));
     m.fechar();
     toast(r.situacao === 'aguardando_aprovacao'
-      ? 'Pedido registrado. Acima do seu limite, a PayAx confere antes de enviar.'
+      ? 'Pedido registrado. Acima do seu limite, a PAY AX confere antes de enviar.'
       : 'Transferência solicitada.', 'ok');
     recarregar();
   }));
   const m = modal({
     titulo: 'Transferir para a minha conta',
-    corpo: [aviso('O PIX vai para a chave cadastrada da sua empresa. Para trocar a chave, fale com o seu gerente de conta — por segurança, só a PayAx altera o destino.', 'info'), form, resumo],
+    corpo: [aviso('O PIX vai para a chave cadastrada da sua empresa. Para trocar a chave, fale com o seu gerente de conta — por segurança, só a PAY AX altera o destino.', 'info'), form, resumo],
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao],
   });
 }

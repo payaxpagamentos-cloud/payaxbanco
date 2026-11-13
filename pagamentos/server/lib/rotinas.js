@@ -27,10 +27,10 @@ async function rodar(db, { forcar = false } = {}) {
     try {
       out.repasses = await repasses.rotinaAutomatica(db);
       if (out.repasses.criados || out.repasses.enviados) {
-        console.log(`[PayAx] Repasses automáticos: ${out.repasses.enviados} enviados, ${out.repasses.aguardando} aguardando aprovação.`);
+        console.log(`[PAY AX] Repasses automáticos: ${out.repasses.enviados} enviados, ${out.repasses.aguardando} aguardando aprovação.`);
       }
     } catch (err) {
-      console.error('[PayAx] Falha na rotina de repasses:', err.message);
+      console.error('[PAY AX] Falha na rotina de repasses:', err.message);
     }
   }
 
@@ -39,18 +39,18 @@ async function rodar(db, { forcar = false } = {}) {
     out.banco = await arquivosBanco.rodar(db);
     const lidos = out.banco.retorno?.processados?.filter((x) => !x.erro && !x.ja_processado) ?? [];
     for (const r of lidos) {
-      console.log(`[PayAx] Retorno ${r.nome}: ${r.liquidados} liquidado(s), ${r.confirmados} confirmado(s), ${r.rejeitados} rejeitado(s).`);
+      console.log(`[PAY AX] Retorno ${r.nome}: ${r.liquidados} liquidado(s), ${r.confirmados} confirmado(s), ${r.rejeitados} rejeitado(s).`);
     }
-    if (out.banco.remessa?.id) console.log(`[PayAx] Remessa ${out.banco.remessa.nome} gerada com ${out.banco.remessa.titulos} título(s).`);
+    if (out.banco.remessa?.id) console.log(`[PAY AX] Remessa ${out.banco.remessa.nome} gerada com ${out.banco.remessa.titulos} título(s).`);
   } catch (err) {
-    console.error('[PayAx] Falha na troca de arquivos com o banco:', err.message);
+    console.error('[PAY AX] Falha na troca de arquivos com o banco:', err.message);
   }
 
   // Baixas pendentes no IXC: a cada ciclo.
   try {
     out.baixas = await sincronismo.reprocessarBaixas(db, 50);
   } catch (err) {
-    console.error('[PayAx] Falha ao reprocessar baixas no IXC:', err.message);
+    console.error('[PAY AX] Falha ao reprocessar baixas no IXC:', err.message);
   }
 
   // Importação automática do IXC, para os clientes que pediram.
@@ -74,8 +74,8 @@ async function rodar(db, { forcar = false } = {}) {
 
 function agendar(db) {
   const intervalo = Math.max(1, config.rotinaIntervaloMin) * 60_000;
-  setTimeout(() => rodar(db).catch((err) => console.error('[PayAx] Rotina:', err.message)), 30_000).unref();
-  setInterval(() => rodar(db).catch((err) => console.error('[PayAx] Rotina:', err.message)), intervalo).unref();
+  setTimeout(() => rodar(db).catch((err) => console.error('[PAY AX] Rotina:', err.message)), 30_000).unref();
+  setInterval(() => rodar(db).catch((err) => console.error('[PAY AX] Rotina:', err.message)), intervalo).unref();
 }
 
 module.exports = { rodar, agendar };

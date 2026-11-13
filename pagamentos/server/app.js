@@ -27,7 +27,7 @@ function criarApp(db) {
     next();
   });
 
-  // ------------------------------------------------- Backoffice PayAx
+  // ------------------------------------------------- Backoffice PAY AX
   const equipe = express.Router();
   equipe.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // O retorno do banco chega como arquivo (corpo bruto); o resto da API é JSON.

@@ -208,7 +208,7 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
     razao.lancar(db, { ...comum, tipo: 'tarifa_banco', valor_centavos: -split.tarifa_banco_centavos,
       descricao: `Tarifa bancária ${ref}` });
     razao.lancar(db, { ...comum, tipo: 'comissao', valor_centavos: -split.comissao_centavos,
-      descricao: `Tarifa PayAx ${precos.percentualTexto(b.percentual_ppm)} ${ref}` });
+      descricao: `Tarifa PAY AX ${precos.percentualTexto(b.percentual_ppm)} ${ref}` });
 
     return { boleto_id: b.id, cliente_id: b.cliente_id, pago_em: pagoEm, liberacao, origem, ...split };
   });

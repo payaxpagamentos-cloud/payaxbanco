@@ -1,4 +1,4 @@
-# PayAx Pagamentos — imagem de produção
+# PAY AX Pagamentos — imagem de produção
 ARG BASE=node:22-slim
 FROM ${BASE}
 

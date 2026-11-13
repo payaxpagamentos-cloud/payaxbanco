@@ -95,7 +95,7 @@ module.exports = (db) => {
     const id = transacao(db, () => {
       const novo = db.prepare(`INSERT INTO clientes (${campos.join(', ')}, criado_em, criado_por) VALUES (${campos.map(() => '?').join(', ')}, ?, ?) RETURNING id`)
         .get(...campos.map((k) => d[k]), agora(), req.usuario.id).id;
-      // Número da conta PayAx: sequencial, atribuído uma vez e nunca alterado.
+      // Número da conta PAY AX: sequencial, atribuído uma vez e nunca alterado.
       contaInterna.atribuir(db, novo);
       return novo;
     });

@@ -1,6 +1,7 @@
 import { criarApi } from '../comum/api.js';
 import { el, $, limpar, icone, iniciais, toast, modal, campo, lerForm, acao, aviso, R } from '../comum/ui.js';
 import { formularioDesafio, blocoDoisFatores } from '../comum/doisfatores.js';
+import { marcaMenu, marcaEntrada } from '../comum/marca.js';
 
 export const api = criarApi({
   base: new URL('..', import.meta.url).pathname.replace(/\/$/, ''),
@@ -68,20 +69,13 @@ async function desenhar() {
   }
 }
 
-function simbolo() {
-  const s = icone('dinheiro', 'marca-simbolo');
-  s.setAttribute('viewBox', '0 0 32 32');
-  s.innerHTML = '<path d="M9 23V9h6.5a4.2 4.2 0 0 1 0 8.4H12" stroke-width="2.6"/><path d="m18.5 23 5-14" stroke-width="2.6"/>';
-  return s;
-}
-
 function estrutura(rota, principal) {
   const u = usuario();
   const menu = el('aside', { class: 'menu', id: 'menu', 'aria-label': 'Menu principal' });
   const fundo = el('div', { class: 'fundo-menu', hidden: true, onclick: () => alternar(false) });
   const alternar = (abrir) => { menu.classList.toggle('aberto', abrir); fundo.hidden = !abrir; };
   menu.append(
-    el('a', { class: 'marca', href: '#/visao' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
+    el('a', { class: 'marca', href: '#/visao' }, marcaMenu('PAGAMENTOS')),
     el('div', { class: 'contexto' }, el('span', { class: 'logo' }, 'BO'),
       el('div', {}, el('strong', {}, 'Backoffice'), el('small', {}, u.perfil_nome))),
   );
@@ -97,7 +91,7 @@ function estrutura(rota, principal) {
 
   const topo = el('header', { class: 'topo' },
     el('button', { class: 'botao-icone abrir-menu', 'aria-label': 'Abrir menu', 'aria-controls': 'menu', onclick: () => alternar(!menu.classList.contains('aberto')) }, icone('menu')),
-    el('div', { class: 'caminho' }, el('span', {}, 'PayAx'), el('span', { class: 'sep' }, '/'), el('strong', {}, ROTAS[rota]?.rotulo ?? '')),
+    el('div', { class: 'caminho' }, el('span', {}, 'PAY AX'), el('span', { class: 'sep' }, '/'), el('strong', {}, ROTAS[rota]?.rotulo ?? '')),
     el('div', { class: 'topo-acoes' },
       pode('boletos.emitir') ? el('a', { class: 'botao', href: '#/boletos?novo=1' }, icone('mais'), 'Emitir boleto') : null));
   return el('div', { class: 'app' }, el('a', { class: 'sr', href: '#conteudo' }, 'Ir para o conteúdo'), menu, fundo,
@@ -150,7 +144,7 @@ function formularioSenha(aoConcluir) {
 
 function trocarSenhaObrigatoria() {
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
+    marcaEntrada('PAGAMENTOS'),
     el('h1', {}, 'Defina uma senha'),
     el('p', { class: 'apoio' }, 'O seu acesso está com senha provisória. Escolha uma senha antes de continuar.'),
     formularioSenha(() => desenhar()))));
@@ -159,7 +153,7 @@ function trocarSenhaObrigatoria() {
 /** Tela de configuração obrigatória, quando o administrador exige 2FA da equipe. */
 function configurarDoisFatoresObrigatorio() {
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
+    marcaEntrada('PAGAMENTOS'),
     el('h1', {}, 'Proteja o seu acesso'),
     blocoDoisFatores(api, {
       ativo: false,
@@ -176,7 +170,7 @@ function configurarDoisFatoresObrigatorio() {
 /** Segunda etapa do login. */
 function telaDesafio(desafio) {
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
+    marcaEntrada('PAGAMENTOS'),
     el('h1', {}, 'Verificação em duas etapas'),
     formularioDesafio(api, {
       desafio,
@@ -199,9 +193,9 @@ function telaEntrada() {
     return desenhar();
   });
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
+    marcaEntrada('PAGAMENTOS'),
     el('h1', {}, 'Backoffice'),
-    el('p', { class: 'apoio' }, 'Acesso da equipe PayAx. O Internet Bank dos clientes fica em outro endereço.'),
+    el('p', { class: 'apoio' }, 'Acesso da equipe PAY AX. O Internet Bank dos clientes fica em outro endereço.'),
     form, botao)));
   form.querySelector('input')?.focus();
 }

@@ -8,9 +8,9 @@ const backup = require('./lib/backup');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
-  console.log(`[PayAx] Backoffice em http://localhost:${config.port}${config.basePath}/`);
-  console.log(`[PayAx] Internet Bank do cliente em http://localhost:${config.port}${config.clientePath}/`);
-  console.log(`[PayAx] Banco: modo ${config.banco.modo} (${config.banco.ambiente}).`);
+  console.log(`[PAY AX] Backoffice em http://localhost:${config.port}${config.basePath}/`);
+  console.log(`[PAY AX] Internet Bank do cliente em http://localhost:${config.port}${config.clientePath}/`);
+  console.log(`[PAY AX] Banco: modo ${config.banco.modo} (${config.banco.ambiente}).`);
 });
 
 if (config.banco.modo === 'cnab') {
@@ -18,7 +18,7 @@ if (config.banco.modo === 'cnab') {
   for (const p of [config.cnab.pastaRemessa, config.cnab.pastaRetorno, config.cnab.pastaProcessados]) {
     require('node:fs').mkdirSync(p, { recursive: true });
   }
-  console.log(`[PayAx] CNAB 400 — remessa em ${config.cnab.pastaRemessa}, retorno em ${config.cnab.pastaRetorno}.`);
+  console.log(`[PAY AX] CNAB 400 — remessa em ${config.cnab.pastaRemessa}, retorno em ${config.cnab.pastaRetorno}.`);
 }
 
 if (config.rotinas) rotinas.agendar(db);
@@ -28,10 +28,10 @@ if (config.backupAutomatico) {
   const fazer = () => {
     try {
       const b = backup.gerar(db, { automatico: true });
-      if (b.confere) console.log(`[PayAx] Backup gerado e conferido: ${b.nome} (${b.lancamentos} lançamentos).`);
-      else console.error(`[PayAx] ATENÇÃO — backup ${b.nome} NÃO conferiu: ${b.divergencia}`);
+      if (b.confere) console.log(`[PAY AX] Backup gerado e conferido: ${b.nome} (${b.lancamentos} lançamentos).`);
+      else console.error(`[PAY AX] ATENÇÃO — backup ${b.nome} NÃO conferiu: ${b.divergencia}`);
     } catch (err) {
-      console.error('[PayAx] Falha ao gerar backup:', err.message);
+      console.error('[PAY AX] Falha ao gerar backup:', err.message);
     }
   };
   setInterval(fazer, config.backupIntervaloHoras * 3_600_000).unref();

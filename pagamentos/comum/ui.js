@@ -1,4 +1,4 @@
-/** Componentes e formatação do PayAx. Texto vindo do servidor entra sempre como texto, nunca como HTML. */
+/** Componentes e formatação do PAY AX. Texto vindo do servidor entra sempre como texto, nunca como HTML. */
 
 const ICONES = {
   painel: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',

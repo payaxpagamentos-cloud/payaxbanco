@@ -4,22 +4,15 @@
  *  - o CARTÃO DA CONTA é a primeira coisa da tela, com o saldo grande e o número da conta,
  *    e tem o botão de esconder o saldo (todo banco tem, e não é enfeite: serve para olhar em público);
  *  - a LINHA DO TEMPO junta os lançamentos de um mesmo recebimento num movimento só. Em vez de três
- *    linhas crípticas ("crédito 100", "tarifa bancária -2,50", "tarifa PayAx -1,00"), um movimento: "Você recebeu
+ *    linhas crípticas ("crédito 100", "tarifa bancária -2,50", "tarifa PAY AX -1,00"), um movimento: "Você recebeu
  *    R$ 96,50", e quem quiser abre e vê de onde veio e o que saiu. É o split explicado, não escondido.
  */
 import { el, icone, dinheiro, data, R, selo } from '../comum/ui.js';
+import { letreiro, simbolo } from '../comum/marca.js';
 
 const CHAVE_SALDO = 'payax.saldo.oculto';
 const oculto = () => { try { return localStorage.getItem(CHAVE_SALDO) === '1'; } catch { return false; } };
 const guardarOculto = (v) => { try { localStorage.setItem(CHAVE_SALDO, v ? '1' : '0'); } catch { /* sem armazenamento */ } };
-
-/** Marca da PayAx desenhada, para o canto do cartão. */
-function simboloCartao() {
-  const s = icone('dinheiro');
-  s.setAttribute('viewBox', '0 0 32 32');
-  s.innerHTML = '<path d="M9 23V9h6.5a4.2 4.2 0 0 1 0 8.4H12" stroke-width="2.6"/><path d="m18.5 23 5-14" stroke-width="2.6"/>';
-  return s;
-}
 
 /**
  * Cartão da conta: saldo, o que está retido, número da conta e o botão de esconder.
@@ -41,7 +34,7 @@ export function cartaoConta({ saldo, disponivel, agencia, conta, retencao_dias, 
 
   const item = (rotulo, conteudo) => el('div', { class: 'item' }, el('span', {}, rotulo), el('strong', {}, conteudo));
 
-  return el('section', { class: 'cartao-conta', 'aria-label': 'Sua conta na PayAx' },
+  return el('section', { class: 'cartao-conta', 'aria-label': 'Sua conta na PAY AX' },
     el('div', { class: 'topo-cartao' },
       el('div', {},
         el('div', { class: 'rotulo' }, 'Saldo disponível'),
@@ -55,7 +48,9 @@ export function cartaoConta({ saldo, disponivel, agencia, conta, retencao_dias, 
       ? el('div', { class: 'numero-conta' },
         el('div', {}, 'Agência', el('strong', {}, agencia)),
         el('div', {}, 'Conta', el('strong', {}, conta)),
-        el('div', { class: 'marca-cartao' }, simboloCartao(), 'PAYAX'))
+        el('div', { class: 'marca-cartao' },
+          simbolo({ tamanho: 22, cor: '#6fd3fb' }),
+          letreiro({ altura: 13, cor: 'rgba(255,255,255,0.92)', degrade: ['#8fe3fb', '#3ea8f5'] })))
       : null,
     acoes.length ? el('div', { style: 'margin-top:18px;display:flex;gap:8px;flex-wrap:wrap' }, acoes) : null);
 }

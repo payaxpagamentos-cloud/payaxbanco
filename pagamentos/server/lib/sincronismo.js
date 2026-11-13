@@ -136,7 +136,7 @@ async function avisarBaixa(db, boletoId) {
     await ixc.cliente.baixarTitulo(b.ixc_receber_id, {
       data_recebimento: b.pago_em,
       valor_centavos: b.pago_valor_centavos ?? b.valor_centavos,
-      observacao: `Baixa automática PayAx · boleto ${b.nosso_numero}-${b.nosso_numero_dv}`,
+      observacao: `Baixa automática PAY AX · boleto ${b.nosso_numero}-${b.nosso_numero_dv}`,
     });
     db.prepare("UPDATE sincronismos SET fim = ?, lidos = 1, criados = 1, detalhe = ? WHERE id = ?")
       .run(agora(), JSON.stringify({ boleto_id: b.id, ixc_id: b.ixc_receber_id }), sincId);

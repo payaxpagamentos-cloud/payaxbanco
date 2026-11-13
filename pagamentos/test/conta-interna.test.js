@@ -111,7 +111,7 @@ test('conta interna: numeração sequencial dos clientes', async (t) => {
     assert.equal(ci.garantirTodos(api.db), 0, 'rodar de novo não renumera');
   });
 
-  await t.test('a conta PayAx não vaza para o boleto: lá vão a agência e a conta do banco', async () => {
+  await t.test('a conta PAY AX não vaza para o boleto: lá vão a agência e a conta do banco', async () => {
     const b2 = await api.boleto(tk.admin, a.id, { valor: '100,00', vencimento: '2026-12-20' });
     const det = (await api.get(`/api/boletos/${b2.id}`, tk.admin)).dados;
     assert.equal(det.conta.agencia, '3391', 'a agência do boleto é a do Bradesco');

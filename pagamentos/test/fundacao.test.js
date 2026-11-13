@@ -59,7 +59,7 @@ test('acesso: perfis, audiências e isolamento entre clientes', async (t) => {
   await t.test('o cliente não troca a chave PIX de destino sozinho', async () => {
     const r = await api.patch('/cliente/api/cadastro', { pix_chave: '99999999000199' }, a.token);
     assert.equal(r.status, 403);
-    assert.match(r.dados.erro, /equipe PayAx/i);
+    assert.match(r.dados.erro, /equipe PAY AX/i);
   });
 
   await t.test('idempotência: o mesmo comando com a mesma chave não emite dois boletos', async () => {

@@ -1,5 +1,5 @@
 /*
- * Internet Bank PayAx — identidade própria.
+ * Internet Bank PAY AX — identidade própria.
  *
  * A régua aqui não é "painel administrativo": é aplicativo de banco. O que isso muda, na prática:
  *   - o saldo é o primeiro elemento da tela e o maior, com as ações à mão logo abaixo;
@@ -10,48 +10,49 @@
  * Herda a estrutura de comum/base.css e redefine o que precisa.
  */
 :root {
-  --tinta: #061411;
-  --verde-900: #0c2a22;
-  --verde-800: #12372c;
-  --verde-700: #17493a;
-  --verde-500: #1d6b57;
-  --menta: #3ddc97;
-  --menta-clara: #8df3c6;
-  --menta-fundo: #eafaf3;
+  /* Mesma marca do Backoffice, com mais presença: é a cara que o cliente vê. */
+  --tinta: #050c18;
+  --marinho-900: #0a1526;
+  --marinho-800: #0f1f36;
+  --marinho-700: #15304f;
+  --azul-500: #1f74cf;
+  --azul-marca: #3ea8f5;
+  --ciano: #6fd3fb;
+  --ciano-fundo: #e8f5fe;
 
-  --marca: var(--verde-900);
-  --marca-2: var(--verde-700);
-  --fundo: #f5f8f7;
+  --marca: var(--marinho-900);
+  --marca-2: var(--marinho-700);
+  --fundo: #f4f7fb;
   --superficie: #ffffff;
-  --superficie-2: #f0f5f3;
-  --texto: #0b1a16;
-  --texto-2: #4a5e58;
-  --texto-3: #7b8d87;
-  --borda: #e3ece8;
-  --borda-forte: #cfdcd7;
+  --superficie-2: #f1f5fa;
+  --texto: #0a1422;
+  --texto-2: #495768;
+  --texto-3: #7a8798;
+  --borda: #e3e9f1;
+  --borda-forte: #ccd6e2;
 
   --raio-g: 22px;
   --raio: 16px;
   --raio-ctl: 12px;
-  --sombra: 0 1px 2px rgba(6, 20, 17, 0.04), 0 8px 24px rgba(6, 20, 17, 0.05);
-  --sombra-alta: 0 24px 60px rgba(6, 20, 17, 0.22);
+  --sombra: 0 1px 2px rgba(5, 12, 24, 0.04), 0 8px 24px rgba(5, 12, 24, 0.05);
+  --sombra-alta: 0 24px 60px rgba(5, 12, 24, 0.22);
   --menu-largura: 248px;
 }
 
 body { background: var(--fundo); }
-.marca-simbolo { color: var(--menta); }
-.link-menu.ativo { border-left-color: var(--menta); background: var(--verde-700); }
-.link-menu:hover { background: var(--verde-800); }
-.botao { background: var(--verde-700); border-radius: var(--raio-ctl); }
-.botao:hover { background: var(--verde-800); }
-.botao.sec { color: var(--verde-700); border-color: var(--borda-forte); }
-.botao.sutil { color: var(--verde-700); }
-.botao.sutil:hover { background: var(--menta-fundo); }
-a { color: var(--verde-700); }
-:focus-visible { outline-color: var(--verde-500); }
-.selo.ok { background: var(--menta-fundo); color: #0a6b45; border-color: #bdeed9; }
+.marca-simbolo { color: var(--azul-marca); }
+.link-menu.ativo { border-left-color: var(--azul-marca); background: var(--azul-500); }
+.link-menu:hover { background: var(--marinho-800); }
+.botao { background: var(--azul-500); border-radius: var(--raio-ctl); }
+.botao:hover { background: var(--marinho-800); }
+.botao.sec { color: var(--azul-500); border-color: var(--borda-forte); }
+.botao.sutil { color: var(--azul-500); }
+.botao.sutil:hover { background: var(--ciano-fundo); }
+a { color: var(--azul-500); }
+:focus-visible { outline-color: var(--azul-500); }
+.selo.ok { background: var(--ciano-fundo); color: #0a6b45; border-color: #bdeed9; }
 .selo.info { background: #eef4ff; color: #1f4f9c; border-color: #cfe0fb; }
-.tela-entrada { background: radial-gradient(1200px 520px at 50% -15%, var(--verde-700) 0%, var(--tinta) 70%); }
+.tela-entrada { background: radial-gradient(1200px 520px at 50% -15%, var(--azul-500) 0%, var(--tinta) 70%); }
 .tela-entrada-caixa { border-radius: var(--raio-g); padding: 32px; }
 main { padding: 26px 28px 96px; }
 .topo { border-bottom: 1px solid var(--borda); }
@@ -67,16 +68,25 @@ main { padding: 26px 28px 96px; }
   padding: 26px 28px 24px;
   color: #fff;
   background:
-    radial-gradient(900px 420px at 88% -40%, rgba(61, 220, 151, 0.28), transparent 60%),
-    linear-gradient(142deg, var(--verde-800) 0%, var(--tinta) 72%);
-  box-shadow: 0 2px 4px rgba(6, 20, 17, 0.1), 0 22px 44px rgba(6, 20, 17, 0.22);
+    radial-gradient(760px 380px at 86% -30%, rgba(62, 168, 245, 0.32), transparent 62%),
+    linear-gradient(142deg, var(--marinho-700) 0%, var(--marinho-900) 48%, var(--tinta) 100%);
+  box-shadow: 0 2px 4px rgba(5, 12, 24, 0.12), 0 22px 46px rgba(5, 12, 24, 0.26);
 }
-/* Traço diagonal discreto: dá textura sem virar enfeite. */
+/* Faixas diagonais do logotipo: textura, não enfeite. */
 .cartao-conta::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(118deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 26px);
+  background: repeating-linear-gradient(118deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 26px);
+  pointer-events: none;
+}
+/* O anel luminoso, saindo pela direita como no logotipo. */
+.cartao-conta::before {
+  content: '';
+  position: absolute; top: 50%; right: -120px; width: 360px; height: 360px;
+  transform: translateY(-50%); border-radius: 50%;
+  border: 1.5px solid rgba(111, 211, 251, 0.3);
+  box-shadow: 0 0 46px rgba(62, 168, 245, 0.18);
   pointer-events: none;
 }
 .cartao-conta > * { position: relative; z-index: 1; }
@@ -94,8 +104,8 @@ main { padding: 26px 28px 96px; }
   border-radius: 50%; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; margin-left: auto;
 }
 .cartao-conta .olho:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
-.cartao-conta .marca-cartao { margin-left: auto; opacity: 0.85; display: flex; align-items: center; gap: 7px; font-size: 12px; letter-spacing: 0.12em; }
-.cartao-conta .marca-cartao svg { width: 22px; height: 22px; color: var(--menta); }
+.cartao-conta .marca-cartao { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+.cartao-conta .marca-cartao svg { display: block; }
 
 .cartao-conta .faixa {
   display: flex; gap: 28px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px;
@@ -118,11 +128,11 @@ main { padding: 26px 28px 96px; }
   font-size: 13.5px; font-weight: 600; text-decoration: none !important; box-shadow: var(--sombra);
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
-.acao-rapida:hover { transform: translateY(-2px); border-color: var(--menta); box-shadow: 0 10px 26px rgba(6, 20, 17, 0.09); }
+.acao-rapida:hover { transform: translateY(-2px); border-color: var(--azul-marca); box-shadow: 0 10px 26px rgba(5, 12, 24, 0.09); }
 .acao-rapida[aria-disabled='true'] { opacity: 0.5; pointer-events: none; }
 .acao-rapida .bolha {
   width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
-  background: var(--menta-fundo); color: var(--verde-700);
+  background: var(--ciano-fundo); color: var(--azul-500);
 }
 .acao-rapida .bolha svg { width: 19px; height: 19px; }
 .acao-rapida small { display: block; font-weight: 400; color: var(--texto-3); font-size: 11.5px; }
@@ -146,8 +156,8 @@ main { padding: 26px 28px 96px; }
 .mov.abrivel:hover { border-color: var(--borda-forte); box-shadow: var(--sombra); }
 .mov .icone-mov { width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; flex-shrink: 0; }
 .mov .icone-mov svg { width: 19px; height: 19px; }
-.mov .icone-mov.tela-entrada { background: var(--menta-fundo); color: #0a6b45; }
-.mov .icone-mov.debito { background: #fdeeee; color: #a83232; }
+.mov .icone-mov.tela-entrada { background: var(--ciano-fundo); color: #0a6b45; }
+.mov .icone-mov.debito { background: #fdeef0; color: #a83232; }
 .mov .icone-mov.taxa { background: #fff4e5; color: #8a5c00; }
 .mov .icone-mov.neutro { background: var(--superficie-2); color: var(--texto-2); }
 .mov .corpo { flex: 1; min-width: 0; }
@@ -175,7 +185,7 @@ main { padding: 26px 28px 96px; }
 
 /* ---------------------------------------------------------------- Faixa "a liberar" */
 .a-liberar {
-  display: flex; align-items: center; gap: 12px; background: var(--menta-fundo); border: 1px solid #c6edda;
+  display: flex; align-items: center; gap: 12px; background: var(--ciano-fundo); border: 1px solid #c6edda;
   border-radius: var(--raio); padding: 13px 16px; font-size: 13.5px; color: #0a5e3f; margin-top: 14px;
 }
 .a-liberar svg { width: 19px; height: 19px; flex-shrink: 0; }
@@ -189,7 +199,7 @@ main { padding: 26px 28px 96px; }
   color: var(--texto-2); cursor: pointer; white-space: nowrap; font-weight: 500;
 }
 .abas button:hover { color: var(--texto); }
-.abas button.ativa { color: var(--verde-700); border-bottom-color: var(--menta); font-weight: 650; }
+.abas button.ativa { color: var(--azul-500); border-bottom-color: var(--azul-marca); font-weight: 650; }
 
 .pares { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 20px; }
 .par { display: grid; gap: 2px; }
@@ -215,7 +225,7 @@ main { padding: 26px 28px 96px; }
     color: var(--texto-3); text-decoration: none !important; border-radius: 12px;
   }
   .barra-inferior a svg { width: 21px; height: 21px; }
-  .barra-inferior a.ativo { color: var(--verde-700); background: var(--menta-fundo); }
+  .barra-inferior a.ativo { color: var(--azul-500); background: var(--ciano-fundo); }
   .cartao-conta { padding: 22px 20px 20px; border-radius: var(--raio); }
   .acoes-rapidas { gap: 8px; }
   .acao-rapida { flex-basis: calc(50% - 4px); min-width: 0; }

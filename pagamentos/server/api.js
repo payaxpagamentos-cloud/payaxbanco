@@ -6,7 +6,7 @@ const { autenticarEquipe, autenticarCliente } = require('./auth');
 const { ErroNegocio } = require('./lib/erros');
 const { idempotencia } = require('./lib/http');
 
-/** API da equipe PayAx (backoffice). */
+/** API da equipe PAY AX (backoffice). */
 function criarApi(db) {
   const api = express.Router();
   const autenticado = autenticarEquipe(db);
@@ -51,7 +51,7 @@ function tratarErro(err, req, res) {
   if (err.type === 'entity.too.large') return res.status(413).json({ erro: 'Requisição grande demais.', request_id: req.requestId });
   if (/UNIQUE constraint failed/i.test(err.message)) return res.status(409).json({ erro: 'Já existe um registro com esses dados.', request_id: req.requestId });
   if (/constraint failed/i.test(err.message)) return res.status(409).json({ erro: 'Operação viola uma restrição de integridade.', request_id: req.requestId });
-  console.error(`[PayAx] ${req.requestId}`, err);
+  console.error(`[PAY AX] ${req.requestId}`, err);
   return res.status(500).json({ erro: 'Erro interno do servidor.', request_id: req.requestId });
 }
 

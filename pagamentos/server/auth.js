@@ -42,7 +42,7 @@ const tokenDoPedido = (req) => {
   return c.startsWith('Bearer ') ? c.slice(7) : null;
 };
 
-/** Sessão da equipe PayAx. */
+/** Sessão da equipe PAY AX. */
 function autenticarEquipe(db) {
   const buscar = db.prepare('SELECT id, nome, email, perfil, ativo, senha_provisoria, totp_ativo FROM usuarios WHERE id = ?');
   return (req, _res, next) => {

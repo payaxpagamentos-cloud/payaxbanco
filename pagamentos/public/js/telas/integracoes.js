@@ -162,7 +162,7 @@ function configurarIxc(cliente, atual, recarregar) {
     recarregar();
   }));
   const m = modal({ titulo: `IXC de ${cliente.nome_fantasia || cliente.razao_social}`, largo: true,
-    corpo: [aviso('O token é cifrado antes de ser gravado. Use um usuário técnico só para a PayAx no IXC.', 'info'), form],
+    corpo: [aviso('O token é cifrado antes de ser gravado. Use um usuário técnico só para a PAY AX no IXC.', 'info'), form],
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 

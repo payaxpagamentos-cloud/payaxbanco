@@ -1,5 +1,5 @@
 /*
- * PayAx Pagamentos — base visual compartilhada pelo Backoffice e pelo Internet Bank.
+ * PAY AX Pagamentos — base visual compartilhada pelo Backoffice e pelo Internet Bank.
  * Cada aplicativo acrescenta só a própria marca (cor do menu e símbolo) no CSS seguinte.
  *
  * Cores dos gráficos: paleta categórica validada (separação para daltonismo, contraste e banda de
@@ -7,20 +7,26 @@
  * viram "série 4"; sempre acompanham rótulo, nunca informam só pela cor.
  */
 :root {
-  --fundo: #f4f6f8;
+  /* Marca PAY AX: marinho profundo, azul de ação e o ciano do anel. */
+  --tinta: #050c18;
+  --marca: #0a1526;
+  --marca-2: #13243d;
+  --menu-ativo: #17304f;
+  --ciano: #6fd3fb;
+  --azul-marca: #3ea8f5;
+
+  --fundo: #f4f7fa;
   --superficie: #ffffff;
-  --superficie-2: #f8fafb;
-  --marca: #0e1a2b;
-  --marca-2: #16263d;
-  --menu-ativo: #1e3350;
-  --texto: #0b1420;
-  --texto-2: #4a5663;
-  --texto-3: #7b8694;
-  --borda: #e3e8ee;
-  --borda-forte: #cdd5df;
-  --azul: #2a78d6;
-  --azul-escuro: #1c5cab;
-  --azul-suave: #eaf2fd;
+  --superficie-2: #f7fafc;
+  --texto: #0a1422;
+  --texto-2: #495768;
+  --texto-3: #7a8798;
+  --borda: #e2e8f0;
+  --borda-forte: #ccd6e2;
+  /* Azul das ações: escuro o bastante para texto branco em cima passar no contraste. */
+  --azul: #0f5fbf;
+  --azul-escuro: #0b4a96;
+  --azul-suave: #eaf3fe;
   --verde: #0ca30c;
   --verde-texto: #006300;
   --verde-suave: #e9f7e9;
@@ -64,10 +70,12 @@ p { margin: 0; }
   position: fixed; inset: 0 auto 0 0; width: var(--menu-largura); background: var(--marca); color: #c9d4e2;
   display: flex; flex-direction: column; padding: 20px 14px 14px; z-index: 40; overflow-y: auto;
 }
-.marca { display: flex; align-items: center; gap: 10px; color: #fff; padding: 0 6px 16px; text-decoration: none !important; }
-.marca-simbolo { width: 32px; height: 32px; }
-.marca-texto { font-size: 21px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
-.marca-texto small { display: block; font-size: 8.5px; font-weight: 600; letter-spacing: 0.34em; color: #8fa3bd; margin-top: 5px; }
+.marca { display: flex; align-items: center; gap: 11px; color: #fff; padding: 0 6px 16px; text-decoration: none !important; }
+.marca-simbolo { width: 30px; height: 30px; flex-shrink: 0; }
+.marca-texto { line-height: 1; }
+.marca-texto svg { display: block; }
+/* A linha do produto acompanha a largura do letreiro, não a da caixa. */
+.marca-texto small { display: block; font-size: 8.5px; font-weight: 600; letter-spacing: 0.3em; color: #8fa3bd; margin-top: 6px; }
 .contexto { display: flex; align-items: center; gap: 10px; border-top: 1px solid #22344e; border-bottom: 1px solid #22344e; padding: 11px 6px; margin-bottom: 14px; }
 .contexto .logo { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #35496a; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #cfdcec; flex-shrink: 0; }
 .contexto strong { display: block; color: #fff; font-size: 12.5px; font-weight: 600; }
@@ -215,10 +223,30 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 .falha { background: var(--vermelho-suave); color: #a52f2f; padding: 14px; border-radius: var(--raio); }
 
 /* ---------------------------------------------------------------- Entrada (login) */
-.tela-entrada { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: radial-gradient(1200px 500px at 50% -10%, #1b2f4d 0%, var(--marca) 60%); }
+/* Tela de entrada: o fundo do logotipo — marinho, faixas diagonais e o anel luminoso. */
+.tela-entrada {
+  position: relative; min-height: 100vh; display: grid; place-items: center; padding: 20px; overflow: hidden;
+  background: radial-gradient(1100px 620px at 50% 42%, #112a47 0%, var(--marca) 55%, var(--tinta) 100%);
+}
+.tela-entrada::before {
+  content: ''; position: absolute; inset: -20%;
+  background:
+    repeating-linear-gradient(118deg, rgba(62, 168, 245, 0.055) 0 46px, transparent 46px 190px),
+    repeating-linear-gradient(118deg, rgba(111, 211, 251, 0.03) 0 14px, transparent 14px 120px);
+  pointer-events: none;
+}
+/* O anel. Fica atrás da caixa, como no logotipo. */
+.tela-entrada::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: min(78vh, 620px); aspect-ratio: 1;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  border: 1.5px solid rgba(111, 211, 251, 0.55);
+  box-shadow: 0 0 60px rgba(62, 168, 245, 0.28), inset 0 0 90px rgba(62, 168, 245, 0.1);
+  pointer-events: none;
+}
+.tela-entrada-caixa { position: relative; z-index: 1; }
+.marca-entrada { display: grid; justify-items: center; gap: 9px; padding-bottom: 2px; }
+.marca-entrada small { font-size: 8.5px; font-weight: 600; letter-spacing: 0.3em; color: var(--texto-3); }
 .tela-entrada-caixa { background: var(--superficie); border-radius: 16px; box-shadow: var(--sombra-alta); width: min(410px, 100%); padding: 28px; display: grid; gap: 15px; }
-.tela-entrada-caixa .marca { color: var(--marca); padding-bottom: 4px; }
-.tela-entrada-caixa .marca-texto small { color: var(--texto-3); }
 .tela-entrada-caixa h1 { font-size: 17px; }
 .tela-entrada-caixa p.apoio { color: var(--texto-2); font-size: 13px; }
 

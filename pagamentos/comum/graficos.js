@@ -1,5 +1,5 @@
 /*
- * Gráficos do PayAx, em SVG, sem biblioteca externa.
+ * Gráficos do PAY AX, em SVG, sem biblioteca externa.
  *
  * Regras seguidas (paleta validada para daltonismo e contraste):
  *  - uma série não leva legenda (o título já a nomeia); duas ou mais sempre levam;

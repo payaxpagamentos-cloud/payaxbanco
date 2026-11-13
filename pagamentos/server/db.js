@@ -8,7 +8,7 @@ const { hashSenha } = require('./lib/senha');
 const contaInterna = require('./lib/contaInterna');
 
 /*
- * PayAx Pagamentos — convenções do banco:
+ * PAY AX Pagamentos — convenções do banco:
  * - Dinheiro sempre em CENTAVOS inteiros. Nunca ponto flutuante.
  * - Percentuais em ppm (partes por milhão da fração): 1% = 10.000 ppm; comissão = valor * ppm / 1.000.000.
  * - Datas de negócio em 'AAAA-MM-DD' (fuso da operação); carimbos de tempo em ISO 8601 UTC.
@@ -21,7 +21,7 @@ const MIGRACOES = [
     versao: 1,
     nome: 'fundacao',
     sql: `
--- ---------------------------------------------------------------- Equipe PayAx
+-- ---------------------------------------------------------------- Equipe PAY AX
 CREATE TABLE usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nome TEXT NOT NULL,
@@ -116,7 +116,7 @@ CREATE TABLE precos (
   tarifa_emissao_centavos INTEGER NOT NULL DEFAULT 0 CHECK (tarifa_emissao_centavos >= 0),
   -- Tarifa bancária repassada ao cliente a cada título LIQUIDADO.
   tarifa_liquidacao_centavos INTEGER NOT NULL DEFAULT 0 CHECK (tarifa_liquidacao_centavos >= 0),
-  -- Tarifa PayAx sobre o valor pago, em ppm (1% = 10.000). As colunas mantêm o nome antigo: comissao.
+  -- Tarifa PAY AX sobre o valor pago, em ppm (1% = 10.000). As colunas mantêm o nome antigo: comissao.
   percentual_ppm INTEGER NOT NULL DEFAULT 0 CHECK (percentual_ppm >= 0 AND percentual_ppm <= 1000000),
   comissao_minima_centavos INTEGER NOT NULL DEFAULT 0 CHECK (comissao_minima_centavos >= 0),
   comissao_maxima_centavos INTEGER,
@@ -388,7 +388,7 @@ CREATE UNIQUE INDEX idx_integracoes_escopo ON integracoes(escopo, IFNULL(cliente
     versao: 3,
     nome: 'conta-interna',
     sql: `
--- Número da conta do cliente DENTRO da PayAx (identidade da conta gráfica).
+-- Número da conta do cliente DENTRO da PAY AX (identidade da conta gráfica).
 -- NÃO é a agência/conta do Bradesco: aquela identifica o convênio e vai no código de barras; esta, não.
 ALTER TABLE clientes ADD COLUMN agencia_interna TEXT;
 ALTER TABLE clientes ADD COLUMN conta_interna TEXT;
@@ -521,7 +521,7 @@ function semear(db) {
   if (db.prepare('SELECT COUNT(*) AS n FROM usuarios').get().n) return;
   db.prepare('INSERT INTO usuarios (nome, email, senha_hash, perfil, senha_provisoria, criado_em) VALUES (?, ?, ?, ?, 1, ?)')
     .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha), 'admin', agora());
-  console.log(`[PayAx] Administrador criado: ${config.admin.email}`);
+  console.log(`[PAY AX] Administrador criado: ${config.admin.email}`);
 }
 
 function abrir(arquivo = config.dbFile) {
@@ -532,7 +532,7 @@ function abrir(arquivo = config.dbFile) {
   semear(db);
   // Clientes cadastrados antes desta numeração recebem o número agora, na ordem de cadastro.
   const numerados = contaInterna.garantirTodos(db);
-  if (numerados) console.log(`[PayAx] Número de conta interna atribuído a ${numerados} cliente(s).`);
+  if (numerados) console.log(`[PAY AX] Número de conta interna atribuído a ${numerados} cliente(s).`);
   return db;
 }
 

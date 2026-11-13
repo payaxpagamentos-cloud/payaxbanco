@@ -51,7 +51,7 @@ async function abaDados(alvo, recarregar) {
 
   montar(alvo, 
     cartao('Identificação', el('div', { class: 'pares' },
-      par('Sua conta PayAx', el('strong', {}, c.conta_payax ?? '—')),
+      par('Sua conta PAY AX', el('strong', {}, c.conta_payax ?? '—')),
       par('Razão social', c.razao_social),
       par('CNPJ', documento(c.cnpj)),
       par('Situação', selo(c.situacao, R.situacaoCliente)),
@@ -65,7 +65,7 @@ async function abaDados(alvo, recarregar) {
           par('Repasse automático', c.repasse_automatico ? 'Sim, a cada dia útil' : 'Não (sob demanda)'),
           par('Retenção', `D+${c.retencao_dias} dia(s) útil(eis) após o pagamento`)),
         el('div', { style: 'margin-top:12px' },
-          aviso('Por segurança, a chave PIX de destino só é alterada pela equipe PayAx. Fale com o seu gerente de conta.', 'info'))))),
+          aviso('Por segurança, a chave PIX de destino só é alterada pela equipe PAY AX. Fale com o seu gerente de conta.', 'info'))))),
 
     editavel
       ? el('div', { style: 'margin-top:14px' }, cartao('Contato e endereço', form, botao))
@@ -129,7 +129,7 @@ async function abaIxc(alvo, recarregar) {
             par('Endereço', d.config.url ?? '—'),
             par('Tipo do boleto', R.tipoBoleto[d.config.tipo_padrao] ?? '—'),
             par('Importação automática', d.config.importacao_automatica ? 'Ligada (todo dia)' : 'Desligada'))
-          : aviso('O seu IXC ainda não está ligado à PayAx. Peça ao seu gerente de conta para configurar o endereço e o token — depois disso, os títulos em aberto viram boletos aqui com um clique.', 'info'),
+          : aviso('O seu IXC ainda não está ligado à PAY AX. Peça ao seu gerente de conta para configurar o endereço e o token — depois disso, os títulos em aberto viram boletos aqui com um clique.', 'info'),
         d.ultimo_erro ? el('div', { style: 'margin-top:10px' }, aviso(d.ultimo_erro, 'erro')) : null),
       d.configurada ? el('div', { style: 'display:flex;gap:8px' },
         pode('ixc.configurar') ? el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {

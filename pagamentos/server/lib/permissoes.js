@@ -3,7 +3,7 @@
 /*
  * Permissões por perfil.
  *
- * Equipe PayAx:
+ * Equipe PAY AX:
  *   admin      — tudo, inclusive usuários, contas bancárias, preços e credenciais.
  *   financeiro — opera o dinheiro: aprova e envia repasses, ajusta razão, concilia, vê margem.
  *   operacao   — cuida dos clientes e dos boletos (emite, baixa, sincroniza IXC), não move dinheiro.

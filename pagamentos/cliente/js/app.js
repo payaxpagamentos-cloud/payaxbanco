@@ -1,6 +1,7 @@
 import { criarApi } from '../comum/api.js';
 import { el, $, limpar, icone, iniciais, toast, modal, campo, lerForm, acao, aviso } from '../comum/ui.js';
 import { formularioDesafio, blocoDoisFatores } from '../comum/doisfatores.js';
+import { marcaMenu, marcaEntrada } from '../comum/marca.js';
 
 export const api = criarApi({
   base: new URL('..', import.meta.url).pathname.replace(/\/$/, ''),
@@ -60,20 +61,13 @@ async function desenhar() {
   }
 }
 
-function simbolo() {
-  const s = icone('dinheiro', 'marca-simbolo');
-  s.setAttribute('viewBox', '0 0 32 32');
-  s.innerHTML = '<path d="M9 23V9h6.5a4.2 4.2 0 0 1 0 8.4H12" stroke-width="2.6"/><path d="m18.5 23 5-14" stroke-width="2.6"/>';
-  return s;
-}
-
 function estrutura(rota, principal) {
   const u = usuario();
   const menu = el('aside', { class: 'menu', id: 'menu', 'aria-label': 'Menu principal' });
   const fundo = el('div', { class: 'fundo-menu', hidden: true, onclick: () => alternar(false) });
   const alternar = (abrir) => { menu.classList.toggle('aberto', abrir); fundo.hidden = !abrir; };
   menu.append(
-    el('a', { class: 'marca', href: '#/inicio' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'INTERNET BANK'))),
+    el('a', { class: 'marca', href: '#/inicio' }, marcaMenu('INTERNET BANK')),
     el('div', { class: 'contexto' }, el('span', { class: 'logo' }, iniciais(u.cliente_nome)),
       el('div', {}, el('strong', {}, u.cliente_nome), el('small', {}, u.perfil_nome))));
   for (const [grupo, itens] of MENU) {
@@ -155,7 +149,7 @@ function formularioSenha(aoConcluir) {
 
 function trocarSenha() {
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'INTERNET BANK'))),
+    marcaEntrada('INTERNET BANK'),
     el('h1', {}, 'Crie a sua senha'),
     el('p', { class: 'apoio' }, 'Você entrou com a senha provisória. Escolha uma senha sua para continuar.'),
     formularioSenha(() => desenhar()))));
@@ -164,7 +158,7 @@ function trocarSenha() {
 /** Segunda etapa do login. */
 function telaDesafio(desafio) {
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'INTERNET BANK'))),
+    marcaEntrada('INTERNET BANK'),
     el('h1', {}, 'Verificação em duas etapas'),
     formularioDesafio(api, {
       desafio,
@@ -187,9 +181,9 @@ function telaEntrada() {
     return desenhar();
   });
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'INTERNET BANK'))),
+    marcaEntrada('INTERNET BANK'),
     el('h1', {}, 'Acesse a sua conta'),
-    el('p', { class: 'apoio' }, 'Use o e-mail e a senha que a PayAx enviou. Na primeira entrada você troca a senha.'),
+    el('p', { class: 'apoio' }, 'Use o e-mail e a senha que a PAY AX enviou. Na primeira entrada você troca a senha.'),
     form, botao)));
   form.querySelector('input')?.focus();
 }

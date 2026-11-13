@@ -8,16 +8,16 @@ const teste = process.env.NODE_ENV === 'test';
 
 const secret = process.env.PAYAX_SECRET || crypto.randomBytes(32).toString('hex');
 if (!process.env.PAYAX_SECRET && !teste) {
-  console.warn('[PayAx] PAYAX_SECRET não definido: usando segredo temporário (as sessões expiram ao reiniciar).');
+  console.warn('[PAY AX] PAYAX_SECRET não definido: usando segredo temporário (as sessões expiram ao reiniciar).');
 }
 
 // Em produção, recusa iniciar sem os segredos — o sistema movimenta dinheiro de terceiros.
 if (producao) {
   const faltando = ['PAYAX_SECRET', 'PAYAX_ADMIN_SENHA', 'PAYAX_CHAVE_CREDENCIAIS'].filter((k) => !process.env[k]);
-  if (faltando.length) throw new Error(`[PayAx] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
-  if (process.env.PAYAX_SECRET.length < 32) throw new Error('[PayAx] PAYAX_SECRET deve ter pelo menos 32 caracteres.');
-  if (process.env.PAYAX_ADMIN_SENHA.length < 12) throw new Error('[PayAx] PAYAX_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
-  if (!/^[0-9a-f]{64}$/i.test(process.env.PAYAX_CHAVE_CREDENCIAIS)) throw new Error('[PayAx] PAYAX_CHAVE_CREDENCIAIS deve ter 64 caracteres hexadecimais (32 bytes).');
+  if (faltando.length) throw new Error(`[PAY AX] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
+  if (process.env.PAYAX_SECRET.length < 32) throw new Error('[PAY AX] PAYAX_SECRET deve ter pelo menos 32 caracteres.');
+  if (process.env.PAYAX_ADMIN_SENHA.length < 12) throw new Error('[PAY AX] PAYAX_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
+  if (!/^[0-9a-f]{64}$/i.test(process.env.PAYAX_CHAVE_CREDENCIAIS)) throw new Error('[PAY AX] PAYAX_CHAVE_CREDENCIAIS deve ter 64 caracteres hexadecimais (32 bytes).');
 }
 
 // Cifra as credenciais do banco e dos IXC guardadas no banco de dados (AES-256-GCM). Fora de produção, deriva do segredo.
@@ -32,7 +32,7 @@ const dados = process.env.PAYAX_DADOS || path.join(__dirname, '..', 'data');
 module.exports = {
   producao,
   teste,
-  // Backoffice PayAx (nossa área) e Internet Bank do cliente final, em endereços diferentes.
+  // Backoffice PAY AX (nossa área) e Internet Bank do cliente final, em endereços diferentes.
   basePath,
   clientePath: process.env.PAYAX_CLIENTE_PATH ? caminho(process.env.PAYAX_CLIENTE_PATH) : `${basePath}/cliente`,
   port: Number(process.env.PORT) || 3600,

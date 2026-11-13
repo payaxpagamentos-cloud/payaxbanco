@@ -44,7 +44,7 @@ function verificar(segredo, informado, ultimoPasso = null, agora = Date.now()) {
   return null;
 }
 
-const uri = (segredo, conta, emissor = 'PayAx') =>
+const uri = (segredo, conta, emissor = 'PAY AX') =>
   `otpauth://totp/${encodeURIComponent(`${emissor}:${conta}`)}?secret=${segredo}&issuer=${encodeURIComponent(emissor)}&algorithm=SHA1&digits=6&period=${PASSO}`;
 
 module.exports = { novoSegredo, codigo, passoAtual, verificar, uri, base32, deBase32 };

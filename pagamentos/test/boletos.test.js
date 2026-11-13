@@ -39,7 +39,7 @@ test('FEBRABAN: código de barras, linha digitável e nosso número do Bradesco'
   });
 
   await t.test('o BR Code do Bolepix tem CRC válido e o valor certo', () => {
-    const emv = pix.copiaECola({ chave: '12345678000195', nome: 'PayAx Pagamentos', cidade: 'Praia Grande', valorCentavos: 29990, txid: 'PAYAX00000000042' });
+    const emv = pix.copiaECola({ chave: '12345678000195', nome: 'PAY AX Pagamentos', cidade: 'Praia Grande', valorCentavos: 29990, txid: 'PAYAX00000000042' });
     assert.ok(pix.valido(emv));
     assert.equal(pix.ler(emv)['54'], '299.90');
     assert.equal(pix.ler(emv)['53'], '986');

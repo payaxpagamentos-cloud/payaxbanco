@@ -4,7 +4,7 @@
  * Ficha de compensação para o pagador: recibo + boleto, em HTML pronto para imprimir ou salvar em PDF
  * pelo próprio navegador (sem depender de biblioteca de PDF).
  *
- * No modelo de conta gráfica quem consta como BENEFICIÁRIO é a PayAx (dona do convênio); o cliente
+ * No modelo de conta gráfica quem consta como BENEFICIÁRIO é a PAY AX (dona do convênio); o cliente
  * aparece como BENEFICIÁRIO FINAL (sacador avalista), como manda a prática para esse arranjo.
  */
 const QRCode = require('qrcode');
