@@ -53,12 +53,20 @@ const nomeContato = (c) => c?.nome?.trim() || c?.nome_perfil?.trim() || c?.telef
 
 // ---------- Abertura ----------
 
-const abertaDoContato = (db, contatoId) => db.prepare("SELECT * FROM conversas WHERE contato_id = ? AND estado <> 'encerrada'").get(contatoId);
+/**
+ * A conversa aberta do contato NUM CANAL. O padrão é o WhatsApp: régua, sala de espera, carona e
+ * alertas só fazem sentido lá, e uma ligação em andamento não pode virar destino de mensagem.
+ */
+const abertaDoContato = (db, contatoId, { canal = 'whatsapp' } = {}) =>
+  db.prepare("SELECT * FROM conversas WHERE contato_id = ? AND canal = ? AND estado <> 'encerrada'").get(contatoId, canal);
 
 /** Abre a conversa (estado 'bot': quem atende primeiro é sempre a ZOE). */
-function abrir(db, { empresa, numero, contato }) {
-  const id = Number(db.prepare(`INSERT INTO conversas (empresa_id, contato_id, numero_id, estado, aberta_em, ultima_mensagem_em, janela_expira_em)
-    VALUES (?, ?, ?, 'bot', ?, ?, ?)`).run(empresa.id, contato.id, numero.id, agora(), agora(), new Date(Date.now() + JANELA_MS).toISOString()).lastInsertRowid);
+function abrir(db, { empresa, numero, contato, canal = 'whatsapp' }) {
+  // O canal nasce certo: o mesmo cliente pode estar no WhatsApp e ligar ao mesmo tempo.
+  // Ligação não tem janela de 24 h — a Meta não está no meio.
+  const janela = canal === 'whatsapp' ? new Date(Date.now() + JANELA_MS).toISOString() : null;
+  const id = Number(db.prepare(`INSERT INTO conversas (empresa_id, contato_id, numero_id, canal, estado, aberta_em, ultima_mensagem_em, janela_expira_em)
+    VALUES (?, ?, ?, ?, 'bot', ?, ?, ?)`).run(empresa.id, contato.id, numero.id, canal, agora(), agora(), janela).lastInsertRowid);
   return db.prepare('SELECT * FROM conversas WHERE id = ?').get(id);
 }
 
@@ -111,7 +119,9 @@ function transferir(db, conversa, { fila = null, motivo = null, resumo = null, a
     .run(conversa.empresa_id, conversa.id, destino.nome, motivo, agora());
 
   const atual = db.prepare('SELECT * FROM conversas WHERE id = ?').get(conversa.id);
-  const quem = aberta ? filas.atribuir(db, atual) : null;
+  // Ligação transferida vai para a fila da central telefônica, que toca nos ramais. Entregar a um
+  // atendente do WhatsApp deixaria a pessoa esperando no telefone por alguém que está no chat.
+  const quem = aberta && atual.canal !== 'telefone' ? filas.atribuir(db, atual) : null;
   return { fila: destino, dentro_horario: aberta, atendente: quem };
 }
 
@@ -208,7 +218,7 @@ function registrarComentarioCsat(db, conversa, texto) {
 
 // ---------- Leitura para o painel ----------
 
-const COLUNAS_LISTA = `c.id, c.estado, c.fila_id, c.atendente_id, c.assunto, c.intencao, c.prioridade, c.resolvida_por, c.motivo_transferencia,
+const COLUNAS_LISTA = `c.id, c.estado, c.canal, c.fila_id, c.atendente_id, c.assunto, c.intencao, c.prioridade, c.resolvida_por, c.motivo_transferencia,
   c.aberta_em, c.transferida_em, c.assumida_em, c.encerrada_em, c.ultima_mensagem_em, c.ultima_mensagem_cliente_em, c.janela_expira_em, c.csat_nota,
   ct.id AS contato_id, ct.telefone, ct.nome AS contato_nome, ct.nome_perfil, ct.documento,
   f.nome AS fila_nome, u.nome AS atendente_nome`;

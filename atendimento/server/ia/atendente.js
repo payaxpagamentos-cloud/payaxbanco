@@ -113,6 +113,7 @@ function historico(db, conversa) {
  */
 function notaDaConversa(db, conversa) {
   const partes = [];
+  if (conversa.canal === 'telefone') partes.push(...notaDaLigacao(db, conversa));
   const doIxc = ferramentasIxc.notaDeEstado(db, conversa);
   if (doIxc) partes.push(doIxc);
 
@@ -125,6 +126,36 @@ function notaDaConversa(db, conversa) {
       + (gerais.length ? ` ${gerais.length} deles vale(m) para todos os clientes.` : ''));
   }
   return partes.length ? partes.join('\n\n') : null;
+}
+
+/**
+ * O que muda quando a conversa é uma ligação. O prompt da ZOE é o mesmo nos dois canais (e fica
+ * em cache); o canal entra aqui, na nota, porque é dado desta conversa e não da empresa.
+ */
+function notaDaLigacao(db, conversa) {
+  const partes = ['Canal: LIGAÇÃO TELEFÔNICA. Tudo o que você escrever será FALADO por voz para o cliente. '
+    + 'Frases curtas e naturais, uma pergunta por vez. Nada de listas, links, emojis, asteriscos ou formatação. '
+    + 'Não peça para o cliente clicar, ler ou abrir nada na tela. '
+    + 'A fala do cliente chega transcrita automaticamente e pode ter erros: confirme números (CPF, datas, valores) repetindo-os. '
+    + 'Para os três primeiros números do CPF, ele pode falar ou digitar no teclado do telefone. '
+    + 'A segunda via não aparece na ligação: enviar_segunda_via manda pelo WhatsApp dele ou por SMS e e-mail — diga por onde foi.'];
+
+  // Mesma pessoa, outro canal: se ela falou com a gente pelo WhatsApp há pouco, a ZOE já sabe.
+  // Ninguém deveria ter de explicar de novo no telefone o que acabou de escrever.
+  const ontem = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const recente = db.prepare(`SELECT id, assunto, resumo, estado, ultima_mensagem_em FROM conversas
+    WHERE contato_id = ? AND canal = 'whatsapp' AND ultima_mensagem_em >= ? ORDER BY ultima_mensagem_em DESC LIMIT 1`)
+    .get(conversa.contato_id, ontem);
+  if (recente) {
+    const ultimas = db.prepare(`SELECT direcao, COALESCE(texto, transcricao) AS t FROM mensagens
+      WHERE conversa_id = ? AND tipo NOT IN ('sistema') AND COALESCE(texto, transcricao) IS NOT NULL ORDER BY id DESC LIMIT 4`)
+      .all(recente.id).reverse().map((m) => `${m.direcao === 'entrada' ? 'Cliente' : 'Empresa'}: ${String(m.t).slice(0, 200)}`);
+    partes.push(`Este mesmo cliente conversou pelo WhatsApp nas últimas 24 horas`
+      + `${recente.assunto ? ` (assunto: ${recente.assunto})` : ''}${recente.resumo ? `. Resumo: ${recente.resumo}` : ''}.`
+      + (ultimas.length ? ` Últimas mensagens de lá:\n${ultimas.join('\n')}` : '')
+      + '\nUse isso para não fazer o cliente repetir o que já contou.');
+  }
+  return partes;
 }
 
 /**
@@ -146,6 +177,10 @@ function comEstado(mensagens, nota) {
     ...mensagens.slice(ultimoDoCliente + 1),
   ];
 }
+
+/** O resumo para quem vai atender: "escreveu" no WhatsApp, "disse" na ligação. */
+const oQueDisse = (conversa, texto) =>
+  `O cliente ${conversa.canal === 'telefone' ? 'disse na ligação' : 'escreveu'}: "${String(texto).trim().slice(0, 300)}".`;
 
 // ---------- Saídas ----------
 
@@ -198,8 +233,8 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
 
   // ---------- 1. Regras ----------
 
-  // Saudação: só na primeira mensagem da conversa.
-  if (primeira) {
+  // Saudação: só na primeira mensagem da conversa. Na ligação a ZOE já cumprimentou ao atender.
+  if (primeira && conversa.canal !== 'telefone') {
     const saudacao = prompt.saudacaoDe(cfg, { empresa, contato, nomeCliente: contato.nome ?? contato.nome_perfil })
       || regras.saudacao(cfg, { nomeAssistente: cfg.nome_assistente, nomeEmpresa: empresa.nome, nomeCliente: contato.nome ?? contato.nome_perfil });
     responder(db, conversa, saudacao);
@@ -233,7 +268,7 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
     registrarEvento(db, conversa, { tipo: 'intencao', nome: 'pedido de humano', detalhe: pedido });
     const r = transferirCom(db, conversa, {
       motivo: `O cliente pediu atendimento humano ("${pedido}").`,
-      resumo: conversa.resumo ?? `O cliente escreveu: "${String(texto).slice(0, 300)}".`,
+      resumo: conversa.resumo ?? oQueDisse(conversa, texto),
     });
     return { acao: 'transferida', detalhe: r.fila.nome };
   }
@@ -249,7 +284,7 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
       const r = transferirCom(db, conversa, {
         fila: filas.buscar(db, empresa.id, intencao.fila_id), assunto: intencao.nome,
         motivo: `Intenção "${intencao.nome}" (o cliente escreveu "${termo}").`,
-        resumo: `O cliente escreveu: "${String(texto).slice(0, 300)}".`,
+        resumo: oQueDisse(conversa, texto),
       });
       return { acao: 'transferida', detalhe: r.fila.nome };
     }
@@ -347,7 +382,7 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
   };
   const motivo = motivos[desfecho.desfecho] ?? 'A IA não conseguiu concluir.';
   if (lista.length && cfg.transferir_sem_resposta) {
-    const r = transferirCom(db, conversa, { motivo, resumo: conversa.resumo ?? `O cliente escreveu: "${String(texto).slice(0, 300)}".`, avisar: desfecho.textos.length === 0 });
+    const r = transferirCom(db, conversa, { motivo, resumo: conversa.resumo ?? oQueDisse(conversa, texto), avisar: desfecho.textos.length === 0 });
     return { acao: 'transferida', detalhe: motivo };
   }
   return semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo });
@@ -360,10 +395,11 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
 async function abrirOuvidoriaPelasRegras(db, { empresa, conversa, contato, tipo, texto, termo }) {
   let ficha = null;
   try { ficha = await cliente360.ficha(db, empresa.id, contato.id, { ixcClienteId: conversa.ixc_cliente_id }); } catch { ficha = null; }
+  const ligacao = conversa.canal === 'telefone';
   const { ouvidoria } = ouvidoriaLib.abrir(db, {
     empresa, contato, conversa, tipo, origem: 'ia', ficha,
-    assunto: `${ouvidoriaLib.TIPOS[tipo]} pelo WhatsApp`,
-    relato: `O cliente escreveu: "${String(texto).slice(0, 500)}".`,
+    assunto: `${ouvidoriaLib.TIPOS[tipo]} ${ligacao ? 'por telefone' : 'pelo WhatsApp'}`,
+    relato: `O cliente ${ligacao ? 'disse na ligação' : 'escreveu'}: "${String(texto).slice(0, 500)}".`,
   });
   registrarEvento(db, conversa, { tipo: 'intencao', nome: `ouvidoria: ${tipo}`, detalhe: `casou com "${termo}"` });
 
@@ -371,7 +407,9 @@ async function abrirOuvidoriaPelasRegras(db, { empresa, conversa, contato, tipo,
     responder(db, conversa, `Obrigado pelo retorno! Registrei com o protocolo ${ouvidoria.protocolo} e vou encaminhar para a equipe.`);
     return { acao: 'respondeu', detalhe: `ouvidoria ${ouvidoria.protocolo}` };
   }
-  responder(db, conversa, `Registrei sua solicitação com o protocolo ${ouvidoria.protocolo}. Vou te passar para a equipe que trata isso.`);
+  // Só o protocolo: a transferência logo em seguida já diz "vou te transferir". Dizer as duas
+  // coisas soava repetido no WhatsApp e, na ligação, era a mesma frase falada duas vezes.
+  responder(db, conversa, `Registrei sua solicitação com o protocolo ${ouvidoria.protocolo}.`);
   const r = transacao(db, () => ouvidoriaLib.encaminhar(db, { conversa, ouvidoria, ficha }));
   return r ? { acao: 'transferida', detalhe: `ouvidoria ${ouvidoria.protocolo} → ${r.fila.nome}` } : null;
 }
@@ -397,7 +435,7 @@ function semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo }) {
     registrarEvento(db, conversa, { tipo: 'transferencia', nome: 'menu', detalhe: motivo });
     return { acao: 'menu', detalhe: motivo };
   }
-  const r = transferirCom(db, conversa, { motivo, resumo: `O cliente escreveu: "${String(texto).slice(0, 300)}".` });
+  const r = transferirCom(db, conversa, { motivo, resumo: oQueDisse(conversa, texto) });
   return { acao: 'transferida', detalhe: r.fila.nome };
 }
 

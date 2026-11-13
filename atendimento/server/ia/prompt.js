@@ -24,7 +24,10 @@ function montar(db, { empresa, cfg, contato }) {
 
   const partes = [];
 
-  partes.push(`Você é ${nome}, a atendente virtual da ${empresa.nome}, falando com um cliente pelo WhatsApp.`);
+  // O prompt é o mesmo nos dois canais (assim fica em cache uma vez só); o canal de cada conversa
+  // vem na nota de estado, que diz quando é ligação e como falar nela.
+  partes.push(`Você é ${nome}, a atendente virtual da ${empresa.nome}, atendendo clientes pelo WhatsApp e por telefone. `
+    + 'Por padrão a conversa é pelo WhatsApp; quando for uma ligação, a nota de estado avisa.');
   partes.push(`Você é o primeiro atendimento: resolve o que dá para resolver na hora e passa para a equipe humana o que não dá.`);
 
   if (cfg.tom?.trim()) partes.push(`## Como falar\n${cfg.tom.trim()}`);

@@ -16,7 +16,11 @@ const v = require('../lib/validacao');
  */
 module.exports = function rotasIntegracao(db) {
   const r = express.Router();
-  r.use(limitar({ janelaMs: 60_000, maximo: 120 }));
+  // A voz tem limite próprio: a central telefônica inteira sai de um IP só, e cada fala do cliente
+  // é uma chamada — 20 ligações ao mesmo tempo estourariam o limite das outras rotas em minutos.
+  const limiteGeral = limitar({ janelaMs: 60_000, maximo: 120 });
+  const limiteVoz = limitar({ janelaMs: 60_000, maximo: 1200 });
+  r.use((req, res, next) => (req.path.startsWith('/voz/') ? limiteVoz : limiteGeral)(req, res, next));
 
   // ---------- Autenticação por chave ----------
   r.use((req, _res, next) => {
@@ -161,6 +165,26 @@ module.exports = function rotasIntegracao(db) {
       }
       res.json({ ...db.prepare('SELECT protocolo, status, resolucao, atualizado_em FROM chamados WHERE id = ?').get(ch.id), aviso });
     } catch (err) { next(err); }
+  });
+
+  // ---------- Voz: a ZOE atendendo ligação, com o mesmo cérebro do WhatsApp ----------
+  /**
+   * A central telefônica (Asterisk) chama isto em cada etapa da ligação. A ZOE é a mesma do
+   * WhatsApp — mesmas regras, ferramentas, portão de identidade, alertas e Ouvidoria. Só a
+   * entrega muda: em vez de mandar mensagem, devolve o texto para a central falar.
+   */
+  const voz = require('../lib/voz');
+  r.post('/voz/ligacoes', (req, res, next) => {
+    try {
+      const x = voz.iniciar(db, req.empresa, req.body ?? {});
+      res.status(x.repetida ? 200 : 201).json(x);
+    } catch (err) { next(err); }
+  });
+  r.post('/voz/ligacoes/:uid/turno', async (req, res, next) => {
+    try { res.json(await voz.turno(db, req.empresa, req.params.uid, req.body ?? {})); } catch (err) { next(err); }
+  });
+  r.post('/voz/ligacoes/:uid/fim', (req, res, next) => {
+    try { res.json(voz.encerrar(db, req.empresa, req.params.uid)); } catch (err) { next(err); }
   });
 
   // ---------- Alertas de rede (é por aqui que a URA do PABX lê) ----------

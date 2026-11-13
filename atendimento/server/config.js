@@ -68,6 +68,11 @@ module.exports = {
     ffmpeg: process.env.ATEND_FFMPEG_BIN || 'ffmpeg',
     ffprobe: process.env.ATEND_FFPROBE_BIN || 'ffprobe',
     idioma: process.env.ATEND_WHISPER_IDIOMA || 'pt',
+    // Vocabulário do assunto, passado ao whisper como prompt inicial. Medido aqui num áudio de
+    // telefone (8 kHz): sem ele "quero falar com um atendente" saiu "com uma pendeinte"; com ele,
+    // "atendente". Não faz milagre, mas puxa as palavras que mais importam para as regras.
+    prompt: process.env.ATEND_WHISPER_PROMPT ?? 'Atendimento de provedor de internet. Atendente, boleto, segunda via, fatura, '
+      + 'roteador, reiniciei o roteador, internet, cancelar, suporte, financeiro, desbloqueio, CPF, Wi-Fi, fibra.',
     threads: Number(process.env.ATEND_WHISPER_THREADS) || 4,
     // Quantos áudios ao mesmo tempo. Um por vez não trava a máquina quando chega uma rajada.
     simultaneos: Number(process.env.ATEND_WHISPER_SIMULTANEOS) || 1,

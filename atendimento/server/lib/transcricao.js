@@ -100,6 +100,7 @@ async function viaServidor(wav, cfg) {
   corpo.append('response_format', 'json');
   corpo.append('language', cfg.idioma);
   corpo.append('temperature', '0.0');
+  if (cfg.prompt) corpo.append('prompt', cfg.prompt);
   const r = await fetch(`${cfg.url}/inference`, { method: 'POST', body: corpo, signal: AbortSignal.timeout(cfg.timeoutMs) });
   if (!r.ok) throw new Error(`o servidor do whisper respondeu ${r.status}`);
   const d = await r.json();
@@ -107,7 +108,9 @@ async function viaServidor(wav, cfg) {
 }
 
 async function viaLocal(wav, cfg) {
-  const out = await exec(cfg.bin, ['-m', cfg.modelo, '-f', wav, '-l', cfg.idioma, '-t', String(cfg.threads), '-nt', '-np'], { timeout: cfg.timeoutMs });
+  const args = ['-m', cfg.modelo, '-f', wav, '-l', cfg.idioma, '-t', String(cfg.threads), '-nt', '-np'];
+  if (cfg.prompt) args.push('--prompt', cfg.prompt);
+  const out = await exec(cfg.bin, args, { timeout: cfg.timeoutMs });
   return out;
 }
 

@@ -37,6 +37,28 @@ Servidor próprio (Node.js + SQLite), sem depender do Ativa BPO nem do APP Táxi
   transferidas, boletos e desbloqueios do mês, motivos das ligações, o que a ZOE fez em cada ligação e a configuração.
 - **Dashboard**: os cartões Utilização, Chamadas Simultâneas, Ramais, Uso mês atual, Recursos de voz e texto (TTS/STT) e Limites.
 - **Supervisão de campanhas**: progresso de cada campanha e cada agente (livre, em chamada, offline), atualizando sozinha.
+### ZOE conversando no telefone
+
+O `scripts/zoe-agi.js` tem dois modos:
+
+- **Conversado** (com `ZOE_CEREBRO`, `ZOE_CEREBRO_CHAVE` e `ZOE_TTS_APP`): a ligação fala com a
+  **mesma ZOE do WhatsApp**, no ZOE Atende. O cliente fala o que quer; o Asterisk grava até 2 s de
+  silêncio (`RECORD FILE`), manda a fala para o ZOE Atende, que transcreve com o mesmo whisper e
+  responde com as mesmas regras e ferramentas; o TTS fala a resposta. Apertar uma tecla interrompe
+  a gravação e lê o número pelo teclado. As gravações são apagadas na hora.
+- **Por teclas** (sem `ZOE_CEREBRO`, ou se ele estiver fora do ar quando a ligação chega): a URA de
+  teclas de sempre, pela API do PABX. Fica como reserva.
+
+Os dois deixam no canal as mesmas variáveis (`ZOE_STATUS`, `ZOE_FILA_NOME`, `ZOE_RESUMO`): o plano
+de discagem não muda. **Os nomes das filas precisam ser iguais** no ZOE Atende e no Asterisk, porque
+é pelo nome que a ligação cai na fila certa (`Queue(${ZOE_FILA_NOME})`).
+
+```
+ZOE_CEREBRO=https://SEU-DOMINIO/atendimento
+ZOE_CEREBRO_CHAVE=atd_...
+ZOE_TTS_APP=Flite            # ou a aplicação de voz instalada no Asterisk
+```
+
 ### URA inteligente
 
 A URA comum pergunta a mesma coisa para todo mundo. A inteligente consulta o IXC pelo número que

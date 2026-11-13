@@ -236,6 +236,49 @@ curl -X POST https://SEU-DOMINIO/atendimento/api/integracao/mensagens \
 A conversa aberta assim **não passa pela ZOE** (aviso automático não é atendimento): ela
 entra direto na fila da equipe, a menos que você mande `"com_ia": true`.
 
+## A ZOE no telefone (o mesmo cérebro)
+
+Antes existiam duas ZOEs: a do WhatsApp e a do telefone, uma URA de teclas com regras próprias.
+Agora a ligação é **só mais uma conversa**, com canal `telefone`, e passa pelas **mesmas** regras,
+ferramentas, portão de identidade, alertas de rede, Ouvidoria e ficha 360°. A única diferença mora
+num lugar só: a resposta, em vez de virar mensagem, volta como texto para a central falar.
+
+O que isso entrega:
+
+- **Uma pessoa, uma história.** O telefone da Bina é o mesmo contato do WhatsApp. Se o cliente
+  escreveu há pouco e depois ligou, a ZOE do telefone recebe as últimas mensagens de lá e não faz
+  a pessoa repetir tudo.
+- **Fala, não tecla.** O cliente diz o que quer; a fala é transcrita pelo mesmo whisper dos áudios
+  do WhatsApp. O teclado continua valendo (os três primeiros números do CPF, por exemplo).
+- **Nada da ligação passa pela Meta.** As respostas são gravadas como "falada": não entram na
+  fila do WhatsApp e não custam nada.
+- **Segunda via ao telefone** vai pelo WhatsApp do cliente se a conversa de lá estiver com a janela
+  aberta (de graça); senão o próprio IXC manda por SMS e e-mail. Template pago fica de fora de
+  propósito: a ZOE não gasta dinheiro sozinha no telefone.
+- **Transferência vai para a fila do telefone**, com o nome da fila e um resumo para quem atender —
+  incluindo o protocolo da Ouvidoria e o risco da ficha 360°, quando for o caso. Não é entregue a
+  um atendente do WhatsApp.
+- **Nunca o silêncio.** Três falas que não deu para entender passam para uma pessoa; falha do
+  cérebro no meio da ligação transfere; se o ZOE Atende estiver fora do ar quando a ligação chega,
+  o Asterisk segue pela URA de teclas do PABX.
+
+A central chama três rotas da API de integração (chave `atd_…`, cabeçalho `X-Api-Key`):
+
+| Rota | Quando |
+|---|---|
+| `POST /api/integracao/voz/ligacoes` `{ uid, telefone }` | a ligação chegou — devolve a saudação |
+| `POST /api/integracao/voz/ligacoes/:uid/turno` `{ texto \| digitos \| audio_base64, turno_id }` | o cliente falou |
+| `POST /api/integracao/voz/ligacoes/:uid/fim` | desligou |
+
+Cada resposta traz `fala` (o que falar) e `acao`: `ouvir`, `transferir` (com `fila` e `resumo`)
+ou `encerrar`. O script do Asterisk que faz isso está em `pabx/scripts/zoe-agi.js` (modo
+conversado). Testado de ponta a ponta com áudio de telefone (8 kHz) e o whisper real: "estou
+pensando em cancelar" abriu a Ouvidoria e foi para a fila Retenção em ~5 s; "quero falar com um
+atendente" foi transferido em ~3,7 s.
+
+Na caixa de atendimento a ligação aparece marcada como **Ligação**, com tudo o que foi falado, e
+sem caixa de resposta — ela aconteceu por voz.
+
 ## Áudios do cliente
 
 Cliente de provedor manda áudio o tempo todo. A ZOE transcreve com o **whisper.cpp na própria
@@ -483,6 +526,7 @@ O servidor **precisa estar acessível por https:// pela internet** — é a Meta
 | `ATEND_WHISPER_SIMULTANEOS` | `1` | Quantos áudios são transcritos ao mesmo tempo. |
 | `ATEND_WHISPER_MAX_SEGUNDOS` | `180` | Áudio mais longo que isso não é transcrito (a ZOE pede resumo escrito). |
 | `ATEND_WHISPER_THREADS` | `4` | Núcleos usados pelo `whisper-cli` no modo local. |
+| `ATEND_WHISPER_PROMPT` | vocabulário de provedor | Palavras do assunto passadas ao whisper. Vazio desliga. |
 | `ATEND_GRAPH_VERSAO` | `v23.0` | Versão da Graph API da Meta. |
 | `ATEND_HTTP` | — | `1` permite ferramentas da empresa em `http://` (só rede interna; o padrão exige `https://`). |
 

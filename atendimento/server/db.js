@@ -116,6 +116,11 @@ CREATE TABLE IF NOT EXISTS conversas (
   contato_id INTEGER NOT NULL REFERENCES contatos(id),
   numero_id INTEGER NOT NULL REFERENCES numeros(id),
   estado TEXT NOT NULL DEFAULT 'bot' CHECK (estado IN ('bot','aguardando','humano','encerrada')),
+  -- Por onde a conversa acontece. A ZOE é uma só nos dois canais: mesmas regras, mesmas ferramentas,
+  -- mesmo portão de identidade. Muda só a forma de entregar a resposta (mensagem ou fala).
+  canal TEXT NOT NULL DEFAULT 'whatsapp' CHECK (canal IN ('whatsapp','telefone')),
+  -- O identificador da ligação na central telefônica (uniqueid do Asterisk), quando é telefone.
+  ligacao_uid TEXT,
   fila_id INTEGER REFERENCES filas(id),
   atendente_id INTEGER REFERENCES usuarios(id),
   assunto TEXT,
@@ -155,9 +160,11 @@ CREATE INDEX IF NOT EXISTS idx_conversas_empresa ON conversas(empresa_id, estado
 CREATE INDEX IF NOT EXISTS idx_conversas_contato ON conversas(contato_id, aberta_em DESC);
 CREATE INDEX IF NOT EXISTS idx_conversas_atendente ON conversas(atendente_id, estado);
 -- Um contato tem no máximo uma conversa aberta por vez.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_conversa_aberta ON conversas(contato_id) WHERE estado <> 'encerrada';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversa_aberta ON conversas(contato_id, canal) WHERE estado <> 'encerrada';
 
 -- Todas as mensagens, nos dois sentidos. As de saída passam pela fila de envio (status 'fila').
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversas_ligacao ON conversas (empresa_id, ligacao_uid) WHERE ligacao_uid IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS mensagens (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   conversa_id INTEGER NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
@@ -183,7 +190,8 @@ CREATE TABLE IF NOT EXISTS mensagens (
   -- Identificadores da Meta: o da mensagem e o da mensagem respondida.
   wa_id TEXT,
   responde_wa_id TEXT,
-  status TEXT NOT NULL DEFAULT 'recebida' CHECK (status IN ('recebida','fila','enviada','entregue','lida','falhou')),
+  -- 'falada': resposta dada por voz numa ligação. Nunca entra na fila de envio do WhatsApp.
+  status TEXT NOT NULL DEFAULT 'recebida' CHECK (status IN ('recebida','fila','enviada','entregue','lida','falhou','falada')),
   erro TEXT,
   -- Áudio do cliente vira texto aqui, sem tocar na coluna texto — assim fica registrado que a
   -- mensagem veio falada, e quem lê sabe que pode ter erro de transcrição.

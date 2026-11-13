@@ -101,12 +101,14 @@ export async function telaCaixa(ctx) {
 
   function desenharChat(d) {
     const minha = d.atendente_id === ctx.usuario.id;
-    const posso = ctx.pode('atendimentos.atender') && d.estado !== 'encerrada' && (ctx.master || ctx.pode('filas.editar') || minha || !d.atendente_id);
+    // Ligação aconteceu por voz: não há chat para responder. O atendente lê o que foi falado.
+    const ligacao = d.canal === 'telefone';
+    const posso = !ligacao && ctx.pode('atendimentos.atender') && d.estado !== 'encerrada' && (ctx.master || ctx.pode('filas.editar') || minha || !d.atendente_id);
 
     const cabecalho = el('div', { class: 'cabecalho-chat' },
       el('span', { class: 'avatar-contato grande' }, iniciais(d.nome)),
       el('div', { class: 'quem-chat' },
-        el('strong', {}, d.nome),
+        el('strong', {}, d.nome, ligacao ? el('span', { class: 'etiqueta info', style: 'margin-left:8px' }, 'Ligação') : null),
         el('div', { class: 'pequeno mudo' }, formatarTelefone(d.telefone.replace(/^55/, '')),
           d.contato?.documento ? ` · ${d.contato.documento}` : '', d.fila_nome ? ` · ${d.fila_nome}` : '')),
       el('div', { class: 'acoes-chat' },
@@ -118,10 +120,12 @@ export async function telaCaixa(ctx) {
 
     const mensagens = el('div', { class: 'mensagens' }, d.mensagens.map((m) => bolha(m, d)));
     const rodape = posso ? compositor(d) : el('div', { class: 'compositor fechado' },
-      el('p', { class: 'mudo', style: 'margin:0' }, d.estado === 'encerrada'
+      el('p', { class: 'mudo', style: 'margin:0' }, ligacao
+        ? 'Esta conversa foi uma ligação: o que está acima é o que foi falado. Para escrever ao cliente, abra uma conversa de WhatsApp em Contatos.'
+        : d.estado === 'encerrada'
         ? `Atendimento encerrado${d.resolvida_por ? ` · ${RESOLVIDA_POR[d.resolvida_por]}` : ''}. Para falar com o cliente, abra uma conversa nova em Contatos.`
         : !ctx.pode('atendimentos.atender') ? 'Seu acesso não inclui responder conversas.' : `Esta conversa está com ${d.atendente_nome ?? 'outro atendente'}.`),
-      d.estado === 'aguardando' && posso === false && ctx.pode('atendimentos.atender') ? botao('Assumir', 'primario', () => assumir(d.id)) : null);
+      !ligacao && d.estado === 'aguardando' && posso === false && ctx.pode('atendimentos.atender') ? botao('Assumir', 'primario', () => assumir(d.id)) : null);
 
     limpar(chatEl, cabecalho, mensagens, rodape);
     mensagens.scrollTop = mensagens.scrollHeight;

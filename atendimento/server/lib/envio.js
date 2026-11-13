@@ -22,8 +22,13 @@ const LIVRES = new Set(['texto', 'imagem', 'audio', 'video', 'documento', 'figur
  */
 function enfileirar(db, conversa, { autor, usuarioId = null, tipo = 'texto', texto = null, payload = null, respondeWaId = null,
   midiaArquivo = null, midiaNome = null, midiaMime = null, midiaBytes = null, categoriaTemplate = null } = {}) {
+  // Numa ligação a resposta é FALADA: não vai para a fila do WhatsApp, não passa pela Meta e
+  // não custa nada. A API de voz recolhe estas mensagens e devolve o texto para a central falar.
+  // Esse é o ponto único que faz a mesma ZOE servir aos dois canais.
+  const falada = (conversa.canal ?? db.prepare('SELECT canal FROM conversas WHERE id = ?').get(conversa.id)?.canal) === 'telefone';
+
   // O que a Meta vai cobrar por esta mensagem. Dentro da janela de 24 h, mensagem livre é de graça.
-  const categoria = custo.classificar({
+  const categoria = falada ? null : custo.classificar({
     janelaAberta: wa.janelaAberta(conversa),
     template: tipo === 'template',
     categoriaDoTemplate: categoriaTemplate,
@@ -31,10 +36,10 @@ function enfileirar(db, conversa, { autor, usuarioId = null, tipo = 'texto', tex
   const id = Number(db.prepare(`INSERT INTO mensagens
       (conversa_id, empresa_id, direcao, autor, usuario_id, tipo, texto, payload, responde_wa_id, midia_arquivo, midia_nome, midia_mime, midia_bytes,
        categoria, custo_milesimos, status, proxima_em, criada_em)
-    VALUES (?, ?, 'saida', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'fila', ?, ?)`)
+    VALUES (?, ?, 'saida', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(conversa.id, conversa.empresa_id, autor, usuarioId, tipo, texto === null ? null : String(texto).slice(0, 4096),
       payload === null ? null : JSON.stringify(payload), respondeWaId, midiaArquivo, midiaNome, midiaMime, midiaBytes,
-      categoria, custo.custoDe(db, categoria), agora(), agora()).lastInsertRowid);
+      categoria, falada ? 0 : custo.custoDe(db, categoria), falada ? 'falada' : 'fila', agora(), agora()).lastInsertRowid);
   db.prepare('UPDATE conversas SET ultima_mensagem_em = ? WHERE id = ?').run(agora(), conversa.id);
   return id;
 }

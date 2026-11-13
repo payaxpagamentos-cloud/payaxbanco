@@ -283,6 +283,9 @@ const FERRAMENTAS = {
       const fatura = r.valor.find((f) => f.id === String(entrada.fatura_id));
       if (!fatura) return { ok: false, erro: 'Essa fatura não está em aberto neste cliente.', instrucao: 'Chame faturas_em_aberto e use um id da lista.' };
 
+      // Na ligação, a segunda via não tem onde "aparecer": PIX copia-e-cola não se fala ao telefone.
+      if (c.canal === 'telefone') return segundaViaPelaLigacao(db, { conversa: c, contato, fatura });
+
       const b = await comIxc(db, conversa, contato, 'boleto', (ixc) => ixc.boleto(fatura.id, 'arquivo'), { registrarAcao: false });
       if (!b.ok) return b;
 
@@ -502,6 +505,42 @@ async function identificarPeloTelefone(db, { conversa, contato }) {
  * Fica fora do prompt do sistema de propósito: o prompt é cacheado e precisa ser estável,
  * e este canal é o que a Claude API recomenda para instrução de operador no meio do diálogo.
  */
+/**
+ * A segunda via pedida numa ligação. Ordem de preferência, da mais barata para a mais cara:
+ *   1. o WhatsApp do cliente, se a conversa de lá estiver com a janela de 24 h aberta — de graça;
+ *   2. o SMS e o e-mail cadastrados no IXC, que o próprio IXC envia — sem custo de Meta.
+ * Template pago no WhatsApp fica de fora de propósito: a ZOE não gasta dinheiro sozinha no telefone.
+ */
+async function segundaViaPelaLigacao(db, { conversa, contato, fatura }) {
+  const dados = { vencimento: dataBr(fatura.vencimento), valor: reais(fatura.valor_centavos) };
+  const doWhats = require('../lib/conversas').abertaDoContato(db, contato.id, { canal: 'whatsapp' });
+  if (doWhats && wa.janelaAberta(doWhats)) {
+    const b = await comIxc(db, conversa, contato, 'boleto', (ixc) => ixc.boleto(fatura.id, 'arquivo'), { registrarAcao: false });
+    const partes = [`Segunda via da fatura que vence em ${dados.vencimento}, no valor de ${dados.valor}, como combinamos na ligação.`];
+    const pix = fatura.pix ?? (b.ok ? (b.valor?.pix ?? b.valor?.pix_copia_cola) : null);
+    const linha = fatura.linha_digitavel ?? (b.ok ? (b.valor?.linha_digitavel ?? b.valor?.linhaDigitavel) : null);
+    if (pix) partes.push(`PIX copia e cola:\n${pix}`);
+    if (linha) partes.push(`Linha digitável:\n${linha}`);
+    envio.enfileirar(db, doWhats, { autor: 'ia', tipo: 'texto', texto: partes.join('\n\n') });
+    registrar(db, { conversa, contato, tipo: 'boleto', detalhe: { fatura: fatura.id, por: 'whatsapp' } });
+    return { ok: true, enviado_por: ['WhatsApp'], ...dados,
+      instrucao: 'Diga que mandou a segunda via no WhatsApp dele agora, com o PIX. Fale o valor e o vencimento.' };
+  }
+
+  const canais = [];
+  for (const [tipo, nome] of [['sms', 'SMS'], ['mail', 'e-mail']]) {
+    const r = await comIxc(db, conversa, contato, 'boleto', (ixc) => ixc.boleto(fatura.id, tipo), { registrarAcao: false });
+    if (r.ok) canais.push(nome);
+  }
+  registrar(db, { conversa, contato, tipo: 'boleto', sucesso: canais.length > 0, detalhe: { fatura: fatura.id, por: canais } });
+  if (!canais.length) {
+    return { ok: false, erro: 'Não consegui enviar a segunda via por nenhum canal.', ...dados,
+      instrucao: 'Diga o valor e o vencimento, peça desculpas e ofereça transferir para o financeiro.' };
+  }
+  return { ok: true, enviado_por: canais, ...dados,
+    instrucao: `Diga que enviou a segunda via por ${canais.join(' e ')} para os contatos cadastrados. Fale o valor e o vencimento.` };
+}
+
 function notaDeEstado(db, conversa) {
   if (!configurado(db, conversa.empresa_id)) return null;
   const c = atual(db, conversa);

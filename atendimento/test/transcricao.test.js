@@ -95,6 +95,8 @@ describe('transcrever', () => {
     // O áudio chega ao whisper já convertido para WAV, e pedindo português.
     assert.match(whisper.estado.corpos[0], /RIFF.*WAVE/s);
     assert.match(whisper.estado.corpos[0], /name="language"\r\n\r\npt/);
+    // O vocabulário do provedor vai junto: puxa "atendente", "boleto", "roteador".
+    assert.match(whisper.estado.corpos[0], /name="prompt"\r\n\r\nAtendimento de provedor de internet/);
   });
 
   comAudio('áudio longo demais não é transcrito', async () => {
