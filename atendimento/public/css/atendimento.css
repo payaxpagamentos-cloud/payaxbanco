@@ -958,3 +958,20 @@ label.campo{ gap: 5px }
 :root[data-tema="escuro"] .trilho-rosca{ stroke: rgba(255, 255, 255, .08) }
 :root[data-tema="escuro"] .fatores li.sobe .peso{ background: rgba(239, 68, 68, .16) }
 :root[data-tema="escuro"] .fatores li.desce .peso{ background: rgba(52, 211, 153, .16) }
+
+/* Origens da economia: cada bloco explica de onde veio o dinheiro que não foi gasto. */
+.economia-origens{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--esp-3) }
+.origem-economia{
+  display: flex; flex-direction: column; gap: 3px;
+  border: 1px solid var(--border); border-left: 3px solid var(--ok);
+  border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-2);
+}
+.origem-economia .valor-economia{ font-weight: 800; font-size: 17px; color: var(--ok); white-space: nowrap }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+  .origem-economia{
+    background: linear-gradient(135deg, rgba(34, 197, 94, .12), rgba(34, 197, 94, .04));
+    border-color: var(--vidro-borda); border-left-color: var(--ok);
+    -webkit-backdrop-filter: blur(12px) saturate(150%); backdrop-filter: blur(12px) saturate(150%);
+    box-shadow: var(--vidro-brilho);
+  }
+}

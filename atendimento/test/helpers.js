@@ -149,7 +149,7 @@ function comIxc(db, empresaId, extra = {}) {
  * `falhar: true` faz toda chamada cair (para testar a degradação).
  * Devolve { chamadas, restaurar } — `chamadas` tem { recurso, corpo } de cada requisição.
  */
-function fingirIxc(dados = {}, { falhar = false, demorar = false } = {}) {
+function fingirIxc(dados = {}, { falhar = false, demorar = false, pagasNaConsultaIndividual = [] } = {}) {
   const original = global.fetch;
   const chamadas = [];
   const registros = (lista) => new Response(JSON.stringify({ page: '1', total: lista.length, registros: lista }),
@@ -178,7 +178,15 @@ function fingirIxc(dados = {}, { falhar = false, demorar = false } = {}) {
         return registros(filtrar(lista('clientes'), campo));
       }
       case 'cliente_contrato': return registros(filtrar(lista('contratos'), String(corpo.qtype ?? '').split('.')[1] ?? 'id'));
-      case 'fn_areceber': return registros(filtrar(lista('faturas'), String(corpo.qtype ?? '').split('.')[1] ?? 'id'));
+      case 'fn_areceber': {
+        const campo = String(corpo.qtype ?? '').split('.')[1] ?? 'id';
+        let itens = filtrar(lista('faturas'), campo);
+        // Simula o cliente que pagou DEPOIS de a régua montar a lista: na consulta por id, já aparece paga.
+        if (campo === 'id' && pagasNaConsultaIndividual.includes(String(corpo.query))) {
+          itens = itens.map((f) => ({ ...f, status: 'R', data_pagamento: new Date().toISOString().slice(0, 10) }));
+        }
+        return registros(itens);
+      }
       case 'radusuarios': return registros(filtrar(lista('logins'), String(corpo.qtype ?? '').split('.')[1] ?? 'id'));
       case 'su_oss_chamado':
         // Sem qtype é abertura de chamado; com qtype é consulta.

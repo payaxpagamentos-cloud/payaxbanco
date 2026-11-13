@@ -171,6 +171,10 @@ CREATE TABLE IF NOT EXISTS mensagens (
   midia_bytes INTEGER,
   -- Corpo pronto da Cloud API quando a mensagem não é texto simples (botões, lista, template, mídia).
   payload TEXT,
+  -- O que a Meta cobra por esta mensagem. 'servico' é de graça (o cliente falou primeiro e a
+  -- resposta saiu dentro de 24 h); as outras custam, em milésimos de real.
+  categoria TEXT CHECK (categoria IN ('servico','utilidade','autenticacao','marketing')),
+  custo_milesimos INTEGER NOT NULL DEFAULT 0,
   -- Identificadores da Meta: o da mensagem e o da mensagem respondida.
   wa_id TEXT,
   responde_wa_id TEXT,
@@ -249,6 +253,60 @@ CREATE TABLE IF NOT EXISTS ia_config (
   esforco TEXT CHECK (esforco IN ('low','medium','high','xhigh','max')),
   atualizada_em TEXT
 );
+
+-- Régua: mensagens que a empresa dispara (cobrança, manutenção, campanha). É onde a conta da Meta
+-- é feita ou desfeita, porque toda mensagem ativa é cobrada.
+CREATE TABLE IF NOT EXISTS reguas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'cobranca' CHECK (tipo IN ('cobranca','manutencao','aviso','campanha')),
+  categoria TEXT NOT NULL DEFAULT 'utilidade' CHECK (categoria IN ('utilidade','marketing','autenticacao')),
+  template TEXT NOT NULL,
+  idioma TEXT NOT NULL DEFAULT 'pt_BR',
+  -- Como preencher as variáveis do template: lista de campos ({{1}}, {{2}}...), um por linha.
+  -- Campos: nome, primeiro_nome, vencimento, valor, plano, dias_atraso, protocolo, empresa.
+  parametros TEXT,
+  -- Texto equivalente para quando a janela de 24 h estiver aberta (sai de graça, como serviço).
+  texto_janela TEXT,
+  -- Quando dispara, em relação ao vencimento da fatura.
+  gatilho TEXT NOT NULL DEFAULT 'dias_antes_vencimento'
+    CHECK (gatilho IN ('dias_antes_vencimento','no_vencimento','dias_apos_vencimento','manual')),
+  dias INTEGER NOT NULL DEFAULT 3 CHECK (dias >= 0),
+  hora TEXT NOT NULL DEFAULT '09:00',
+  dias_semana TEXT NOT NULL DEFAULT '0111110',
+  -- As decisões que derrubam a conta. Todas ligadas por padrão.
+  preferir_janela INTEGER NOT NULL DEFAULT 1,
+  pular_se_conversa_aberta INTEGER NOT NULL DEFAULT 1,
+  pular_se_pago INTEGER NOT NULL DEFAULT 1,
+  repetir_apos_dias INTEGER NOT NULL DEFAULT 5 CHECK (repetir_apos_dias >= 0),
+  -- Teto de gasto por execução, em milésimos de real (0 = sem teto).
+  teto_milesimos INTEGER NOT NULL DEFAULT 0 CHECK (teto_milesimos >= 0),
+  ativa INTEGER NOT NULL DEFAULT 0,
+  ultima_execucao_em TEXT,
+  criada_em TEXT NOT NULL,
+  UNIQUE (empresa_id, nome)
+);
+
+-- Cada destinatário de cada execução: o que foi feito, quanto custou e quanto deixou de custar.
+CREATE TABLE IF NOT EXISTS disparos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  regua_id INTEGER REFERENCES reguas(id) ON DELETE SET NULL,
+  contato_id INTEGER REFERENCES contatos(id),
+  conversa_id INTEGER REFERENCES conversas(id) ON DELETE SET NULL,
+  mensagem_id INTEGER REFERENCES mensagens(id) ON DELETE SET NULL,
+  referencia TEXT,
+  categoria TEXT CHECK (categoria IN ('servico','utilidade','autenticacao','marketing')),
+  status TEXT NOT NULL CHECK (status IN ('enviado','pulado','falhou')),
+  motivo TEXT,
+  custo_milesimos INTEGER NOT NULL DEFAULT 0,
+  economia_milesimos INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_disparos_empresa ON disparos(empresa_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_disparos_regua ON disparos(regua_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_disparos_contato ON disparos(contato_id, regua_id, criado_em);
 
 -- Ouvidoria: reclamação, cancelamento, Procon, Anatel. Caso com protocolo, prazo e desfecho.
 -- É o lugar onde o provedor trata o que não pode se perder numa conversa de WhatsApp.
@@ -500,6 +558,12 @@ const CONFIG_PADRAO = {
   ia_preco_entrada_milhao: '2160',
   ia_preco_saida_milhao: '10800',
   ia_preco_cache_milhao: '108',
+  // Preço da Meta por mensagem ENTREGUE, em milésimos de real (R$ 0,035 = 35).
+  // Serviço (o cliente falou primeiro, resposta em até 24 h) não entra: é de graça.
+  // Confira a tabela do Brasil no painel da Meta — ela muda.
+  wa_preco_utilidade: '35',
+  wa_preco_autenticacao: '30',
+  wa_preco_marketing: '320',
 };
 
 const agora = () => new Date().toISOString();

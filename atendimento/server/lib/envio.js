@@ -2,6 +2,7 @@
 
 const { agora } = require('../db');
 const wa = require('./whatsapp');
+const custo = require('./custo');
 const { ErroNegocio } = require('./erros');
 
 /**
@@ -20,12 +21,20 @@ const LIVRES = new Set(['texto', 'imagem', 'audio', 'video', 'documento', 'figur
  * `tipo` 'texto' usa `texto`; os outros usam `payload` (corpo pronto da Cloud API, sem o `to`).
  */
 function enfileirar(db, conversa, { autor, usuarioId = null, tipo = 'texto', texto = null, payload = null, respondeWaId = null,
-  midiaArquivo = null, midiaNome = null, midiaMime = null, midiaBytes = null } = {}) {
+  midiaArquivo = null, midiaNome = null, midiaMime = null, midiaBytes = null, categoriaTemplate = null } = {}) {
+  // O que a Meta vai cobrar por esta mensagem. Dentro da janela de 24 h, mensagem livre é de graça.
+  const categoria = custo.classificar({
+    janelaAberta: wa.janelaAberta(conversa),
+    template: tipo === 'template',
+    categoriaDoTemplate: categoriaTemplate,
+  });
   const id = Number(db.prepare(`INSERT INTO mensagens
-      (conversa_id, empresa_id, direcao, autor, usuario_id, tipo, texto, payload, responde_wa_id, midia_arquivo, midia_nome, midia_mime, midia_bytes, status, proxima_em, criada_em)
-    VALUES (?, ?, 'saida', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'fila', ?, ?)`)
+      (conversa_id, empresa_id, direcao, autor, usuario_id, tipo, texto, payload, responde_wa_id, midia_arquivo, midia_nome, midia_mime, midia_bytes,
+       categoria, custo_milesimos, status, proxima_em, criada_em)
+    VALUES (?, ?, 'saida', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'fila', ?, ?)`)
     .run(conversa.id, conversa.empresa_id, autor, usuarioId, tipo, texto === null ? null : String(texto).slice(0, 4096),
-      payload === null ? null : JSON.stringify(payload), respondeWaId, midiaArquivo, midiaNome, midiaMime, midiaBytes, agora(), agora()).lastInsertRowid);
+      payload === null ? null : JSON.stringify(payload), respondeWaId, midiaArquivo, midiaNome, midiaMime, midiaBytes,
+      categoria, custo.custoDe(db, categoria), agora(), agora()).lastInsertRowid);
   db.prepare('UPDATE conversas SET ultima_mensagem_em = ? WHERE id = ?').run(agora(), conversa.id);
   return id;
 }

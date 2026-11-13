@@ -87,6 +87,7 @@ module.exports = function rotasEmpresa(db) {
           mensagemId = envio.enfileirar(db, c, {
             autor: 'atendente', usuarioId: req.usuario.id, tipo: 'template',
             texto: `[template ${nome}${d.parametros?.length ? `: ${[].concat(d.parametros).join(' | ')}` : ''}]`, payload,
+            categoriaTemplate: d.categoria ? v.opcao(d.categoria, 'a categoria do template', ['utilidade', 'marketing', 'autenticacao']) : 'utilidade',
           });
         } else {
           v.exigir(texto, 'Escreva a mensagem.');
@@ -457,6 +458,7 @@ module.exports = function rotasEmpresa(db) {
   r.use('/ia', require('./ia')(db));
   r.use('/ixc', require('./ixc')(db));
   r.use('/ouvidoria', require('./ouvidoria')(db));
+  r.use('/reguas', require('./regua')(db));
   r.use('/', require('./cadastros')(db));
 
   // ---------- Relatórios ----------

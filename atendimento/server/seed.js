@@ -174,8 +174,9 @@ function semear(db) {
     const entrada = (conversaId, texto, em) => db.prepare(`INSERT INTO mensagens (conversa_id, empresa_id, direcao, autor, tipo, texto, wa_id, status, criada_em)
       VALUES (?, ?, 'entrada', 'cliente', 'texto', ?, ?, 'recebida', ?)`).run(conversaId, empresa.id, texto, proximoWa(), em);
 
-    const saida = (conversaId, texto, em, autor = 'ia', usuarioId = null) => db.prepare(`INSERT INTO mensagens (conversa_id, empresa_id, direcao, autor, usuario_id, tipo, texto, wa_id, status, criada_em, enviada_em)
-      VALUES (?, ?, 'saida', ?, ?, 'texto', ?, ?, 'lida', ?, ?)`).run(conversaId, empresa.id, autor, usuarioId, texto, proximoWa(), em, somar(em, 1));
+    // Toda resposta saiu dentro da janela de 24 h: categoria "serviço", sem custo.
+    const saida = (conversaId, texto, em, autor = 'ia', usuarioId = null) => db.prepare(`INSERT INTO mensagens (conversa_id, empresa_id, direcao, autor, usuario_id, tipo, texto, wa_id, categoria, custo_milesimos, status, criada_em, enviada_em)
+      VALUES (?, ?, 'saida', ?, ?, 'texto', ?, ?, 'servico', 0, 'lida', ?, ?)`).run(conversaId, empresa.id, autor, usuarioId, texto, proximoWa(), em, somar(em, 1));
 
     const sistema = (conversaId, texto, em, usuarioId = null) => db.prepare(`INSERT INTO mensagens (conversa_id, empresa_id, direcao, autor, usuario_id, tipo, texto, status, criada_em)
       VALUES (?, ?, 'saida', 'sistema', ?, 'sistema', ?, 'enviada', ?)`).run(conversaId, empresa.id, usuarioId, texto, em);
@@ -348,6 +349,76 @@ function semear(db) {
       }
     }
 
+    // ---------- Régua de cobrança e a conta da Meta ----------
+    const regua = Number(db.prepare(`INSERT INTO reguas
+        (empresa_id, nome, tipo, categoria, template, idioma, parametros, texto_janela, gatilho, dias, hora, dias_semana,
+         preferir_janela, pular_se_conversa_aberta, pular_se_pago, repetir_apos_dias, ativa, ultima_execucao_em, criada_em)
+      VALUES (?, 'Lembrete 3 dias antes', 'cobranca', 'utilidade', 'aviso_fatura', 'pt_BR', ?, ?, 'dias_antes_vencimento', 3, '09:00', '0111110', 1, 1, 1, 5, 1, ?, ?)`)
+      .run(empresa.id, 'primeiro_nome\nvencimento\nvalor',
+        'Oi {primeiro_nome}! Sua fatura de {valor} vence em {vencimento}. Quer que eu mande o PIX por aqui?',
+        quando(1), quando(DIAS)).lastInsertRowid);
+    const reguaAtraso = Number(db.prepare(`INSERT INTO reguas
+        (empresa_id, nome, tipo, categoria, template, idioma, parametros, texto_janela, gatilho, dias, hora, dias_semana,
+         preferir_janela, pular_se_conversa_aberta, pular_se_pago, repetir_apos_dias, ativa, ultima_execucao_em, criada_em)
+      VALUES (?, 'Fatura vencida há 5 dias', 'cobranca', 'utilidade', 'fatura_vencida', 'pt_BR', ?, ?, 'dias_apos_vencimento', 5, '10:00', '0111110', 1, 1, 1, 7, 1, ?, ?)`)
+      .run(empresa.id, 'primeiro_nome\ndias_atraso\nvalor',
+        'Oi {primeiro_nome}, sua fatura de {valor} está em aberto. Posso mandar o PIX para você quitar agora?',
+        quando(1), quando(DIAS)).lastInsertRowid);
+
+    // Trinta dias de disparos, com as decisões que a régua toma na vida real.
+    const MOTIVOS_PULO = [
+      ['a fatura já foi paga', 46], ['o cliente pediu para não receber mensagens ativas', 8],
+      ['o cliente já está em atendimento com a equipe', 11], ['já recebeu esta régua nos últimos 5 dias', 15],
+    ];
+    let disparosTotais = { enviados: 0, janela: 0, pulados: 0, custo: 0, economia: 0 };
+    for (let dia = 29; dia >= 0; dia--) {
+      const diaSemana = new Date(quando(dia)).getUTCDay();
+      if ([0, 6].includes(diaSemana)) continue;
+      for (const [id, preco] of [[regua, 35], [reguaAtraso, 35]]) {
+        const alvos = inteiro(28, 52);
+        for (let i = 0; i < alvos; i++) {
+          const contato = sorteio(contatos);
+          const sorte = crypto.randomInt(100);
+          const em = quando(dia, 9, inteiro(0, 50));
+          if (sorte < 26) {
+            // Pulado: a régua não gastou a mensagem.
+            const [motivo] = sorteio(MOTIVOS_PULO);
+            db.prepare(`INSERT INTO disparos (empresa_id, regua_id, contato_id, status, motivo, custo_milesimos, economia_milesimos, criado_em)
+              VALUES (?, ?, ?, 'pulado', ?, 0, ?, ?)`).run(empresa.id, id, contato.id, motivo, preco, em);
+            disparosTotais.pulados++;
+            disparosTotais.economia += preco;
+          } else if (sorte < 44) {
+            // Janela de 24 h aberta: foi como serviço, de graça.
+            db.prepare(`INSERT INTO disparos (empresa_id, regua_id, contato_id, categoria, status, motivo, custo_milesimos, economia_milesimos, criado_em)
+              VALUES (?, ?, ?, 'servico', 'enviado', 'a janela de 24 h está aberta: vai como serviço, sem custo', 0, ?, ?)`)
+              .run(empresa.id, id, contato.id, preco, em);
+            const conversaAberta = Number(db.prepare('SELECT id FROM conversas WHERE contato_id = ? ORDER BY id DESC LIMIT 1').get(contato.id)?.id ?? 0);
+            if (conversaAberta) {
+              db.prepare(`INSERT INTO mensagens (conversa_id, empresa_id, direcao, autor, tipo, texto, wa_id, categoria, custo_milesimos, status, criada_em, enviada_em)
+                VALUES (?, ?, 'saida', 'sistema', 'texto', 'Oi! Sua fatura vence em 3 dias. Quer o PIX por aqui?', ?, 'servico', 0, 'entregue', ?, ?)`)
+                .run(conversaAberta, empresa.id, proximoWa(), em, em);
+            }
+            disparosTotais.enviados++;
+            disparosTotais.janela++;
+            disparosTotais.economia += preco;
+          } else {
+            // Template de utilidade: aqui a Meta cobra.
+            db.prepare(`INSERT INTO disparos (empresa_id, regua_id, contato_id, categoria, status, custo_milesimos, economia_milesimos, criado_em)
+              VALUES (?, ?, ?, 'utilidade', 'enviado', ?, 0, ?)`).run(empresa.id, id, contato.id, preco, em);
+            // A mensagem cobrada também entra no histórico, para a conta por categoria bater.
+            const conversaId = Number(db.prepare('SELECT id FROM conversas WHERE contato_id = ? ORDER BY id DESC LIMIT 1').get(contato.id)?.id ?? 0);
+            if (conversaId) {
+              db.prepare(`INSERT INTO mensagens (conversa_id, empresa_id, direcao, autor, tipo, texto, wa_id, categoria, custo_milesimos, status, criada_em, enviada_em)
+                VALUES (?, ?, 'saida', 'sistema', 'template', '[Lembrete] template aviso_fatura', ?, 'utilidade', ?, 'entregue', ?, ?)`)
+                .run(conversaId, empresa.id, proximoWa(), preco, em, em);
+            }
+            disparosTotais.enviados++;
+            disparosTotais.custo += preco;
+          }
+        }
+      }
+    }
+
     // Chamados abertos pela ZOE.
     for (const [i, contato] of contatos.slice(0, 6).entries()) {
       const criadoEm = quando(inteiro(0, 20));
@@ -361,6 +432,8 @@ function semear(db) {
 
     console.log(`[ZOE Atende] Empresa "${empresa.nome}" criada com ${FILAS.length} filas, ${EQUIPE.length} pessoas na equipe e ${CONHECIMENTO.length} artigos na base.`);
     console.log(`             Ouvidoria: ${OUVIDORIAS.length} casos, sendo ${OUVIDORIAS.filter((o) => o[0] === 'cancelamento').length} de cancelamento.`);
+    console.log(`             Régua: ${disparosTotais.enviados} enviadas (${disparosTotais.janela} pela janela, de graça) e ${disparosTotais.pulados} puladas.`);
+    console.log(`             Conta da Meta no período: gasto R$ ${(disparosTotais.custo / 1000).toFixed(2)} · economia R$ ${(disparosTotais.economia / 1000).toFixed(2)}.`);
     console.log(`             Histórico: ${totais.ia} resolvidas pela IA, ${totais.humano} transferidas, ${totais.abandono} abandonadas e ${totais.abertas} em aberto agora.`);
   });
   return true;

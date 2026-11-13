@@ -249,6 +249,31 @@ function criarIxc({ url, token, timeoutMs = 8000, cacheMs = 60_000, recursos = {
         .sort((a, b) => b.vencimento.localeCompare(a.vencimento));
     },
 
+    /**
+     * Faturas em aberto com vencimento numa data exata. É o que a régua de cobrança consulta:
+     * "quem vence daqui a 3 dias" ou "quem venceu há 5 dias", numa consulta só para a base inteira.
+     */
+    async faturasComVencimento(data) {
+      const lista = await listar(escopo, R.receber, 'fn_areceber.data_vencimento', data, { rp: 2000, sortname: 'fn_areceber.id' });
+      return lista
+        .filter((f) => f.status === 'A')
+        .map((f) => ({
+          id: String(f.id),
+          cliente_id: String(f.id_cliente),
+          contrato_id: f.id_contrato ? String(f.id_contrato) : null,
+          vencimento: soData(f.data_vencimento),
+          valor_centavos: centavos(f.valor_aberto ?? f.valor),
+          linha_digitavel: f.linha_digitavel ?? null,
+          pix: f.pix_copia_cola ?? null,
+        }));
+    },
+
+    /** Uma fatura ainda está em aberto? A régua confere antes de cobrar quem já pagou. */
+    async faturaEmAberto(faturaId) {
+      const f = (await listar(escopo, R.receber, 'fn_areceber.id', String(faturaId), { rp: 1 }))[0];
+      return f ? f.status === 'A' : null;
+    },
+
     /** Todos os chamados do período (abertos e fechados): quantos problemas este cliente teve. */
     async historicoChamados(clienteId, { meses = 6 } = {}) {
       const lista = await listar(escopo, R.chamado, 'su_oss_chamado.id_cliente', String(clienteId), { rp: 200, sortname: 'su_oss_chamado.id', sortorder: 'desc' });
