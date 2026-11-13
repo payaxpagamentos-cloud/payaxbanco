@@ -55,6 +55,20 @@ module.exports = {
     ambiente: process.env.PAYAX_BANCO_AMBIENTE || 'homologacao',
     timeoutMs: Number(process.env.PAYAX_BANCO_TIMEOUT_MS) || 20_000,
   },
+  // Consulta de CEP e CNPJ para preencher os cadastros sozinho.
+  dados: {
+    // 'publica' (ViaCEP / BrasilAPI, sem custo) ou 'apibrasil' (consome crédito da conta contratada).
+    // O CEP é consultado em toda emissão de boleto; o CNPJ, só ao cadastrar. Daí os padrões diferentes.
+    cepFonte: process.env.PAYAX_CEP_FONTE || 'publica',
+    cnpjFonte: process.env.PAYAX_CNPJ_FONTE || 'apibrasil',
+    timeoutMs: Number(process.env.PAYAX_DADOS_TIMEOUT_MS) || 8000,
+    cacheCepDias: Number(process.env.PAYAX_CACHE_CEP_DIAS) || 180,
+    cacheCnpjDias: Number(process.env.PAYAX_CACHE_CNPJ_DIAS) || 30,
+    // Endereços das fontes, reunidos aqui para apontar a outro provedor sem mexer no resto.
+    urlApiBrasil: process.env.PAYAX_APIBRASIL_URL || 'https://gateway.apibrasil.io/api/v2/dados',
+    urlViaCep: process.env.PAYAX_VIACEP_URL || 'https://viacep.com.br/ws',
+    urlBrasilApi: process.env.PAYAX_BRASILAPI_URL || 'https://brasilapi.com.br/api',
+  },
   ixc: {
     timeoutMs: Number(process.env.PAYAX_IXC_TIMEOUT_MS) || 15_000,
     // Permite apontar o IXC para endereços da rede interna (evita SSRF quando desligado).

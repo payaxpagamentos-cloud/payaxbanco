@@ -237,3 +237,8 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
   body { background: #fff; }
   .cartao, .tabela-caixa, .kpi { box-shadow: none; border-color: #bbb; break-inside: avoid; }
 }
+
+/* Aviso do preenchimento automático (CEP e CNPJ), logo abaixo do campo. */
+.auto-busca { font-size: 11.5px; color: var(--texto-3); min-height: 15px; display: block; }
+.auto-busca.ok { color: var(--verde-texto); }
+.auto-busca.erro { color: var(--vermelho); }

@@ -128,6 +128,32 @@ O conector fica em [`server/lib/ixc.js`](server/lib/ixc.js) e os nomes de recurs
 Endereços de rede interna são recusados por padrão (proteção contra SSRF); libere com `PAYAX_IXC_REDE_INTERNA=1`
 apenas se o IXC estiver no mesmo servidor.
 
+## Consulta de CEP e CNPJ
+
+Os formulários se preenchem sozinhos: digitou o CEP, vem o endereço; digitou o CNPJ, vem razão social, nome
+fantasia e endereço completo. Vale no cadastro de clientes (Backoffice) e nos dados do pagador, nas duas áreas.
+
+Duas fontes, escolhidas **por tipo de consulta**, porque o custo é bem diferente:
+
+| Consulta | Quando acontece | Padrão | Por quê |
+|---|---|---|---|
+| **CEP** | em **toda** emissão de boleto | `publica` (ViaCEP) | volume alto; a fonte pública responde em ~0,4 s e não consome crédito |
+| **CNPJ** | só ao cadastrar um cliente ou um pagador PJ | `apibrasil` | volume baixo e o dado da API Brasil é mais completo |
+
+Trocar é um parâmetro: `PAYAX_CEP_FONTE` e `PAYAX_CNPJ_FONTE` aceitam `publica` ou `apibrasil`.
+
+O token da API Brasil é cadastrado em **Integrações → API Brasil** (cifrado antes de gravar, nunca volta para a
+tela). Sem token, a escolha `apibrasil` **cai automaticamente para a fonte pública** — e, se a API Brasil falhar no
+meio (saldo, token, instabilidade), a consulta também cai para a pública e avisa na tela. Nada trava o cadastro:
+a consulta é conveniência, e quem digita sempre pode preencher à mão.
+
+Toda resposta fica em `consultas_cache` (CEP por 180 dias, CNPJ por 30, configuráveis): o mesmo CEP ou CNPJ não é
+perguntado duas vezes, o que economiza crédito e responde na hora. O que a pessoa digitou à mão nunca é
+sobrescrito por uma consulta; o que veio de uma consulta anterior, sim.
+
+> Só os campos do cadastro são guardados. O **quadro societário** que a fonte devolve é descartado — não é dado
+> que o sistema precisa. As consultas saem com um nome genérico de cliente, sem identificar a operação.
+
 ## Configuração
 
 | Variável | Padrão | Descrição |
@@ -149,9 +175,15 @@ apenas se o IXC estiver no mesmo servidor.
 | `PAYAX_TRUST_PROXY` | `loopback` | Proxies confiáveis para obter o IP real. |
 | `PAYAX_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
 | `PAYAX_IXC_REDE_INTERNA` | desligado | Permite que o IXC aponte para a rede interna. |
+| `PAYAX_CEP_FONTE` | `publica` | Fonte da consulta de CEP: `publica` (ViaCEP) ou `apibrasil`. |
+| `PAYAX_CNPJ_FONTE` | `apibrasil` | Fonte da consulta de CNPJ: `apibrasil` ou `publica` (BrasilAPI). |
+| `PAYAX_CACHE_CEP_DIAS` / `PAYAX_CACHE_CNPJ_DIAS` | `180` / `30` | Validade do cache das consultas. |
+| `PAYAX_DADOS_TIMEOUT_MS` | `8000` | Tempo máximo de espera das consultas de CEP e CNPJ. |
 
 ## O que depende de terceiros (não incluído)
 
+- **Saída de rede para as consultas**: `viacep.com.br`, `brasilapi.com.br` e `gateway.apibrasil.io` precisam estar
+  liberados no servidor. Sem eles o sistema funciona igual, só sem o preenchimento automático.
 - **Credenciamento no Bradesco**: convênio de cobrança registrada, faixa de nosso número, certificado da API e
   contrato de PIX para pagamento (o repasse). Sem isso, o sistema roda no modo simulador.
 - **Envio do boleto por e-mail ou WhatsApp ao pagador**: hoje o sistema gera o link e a ficha; o disparo em massa

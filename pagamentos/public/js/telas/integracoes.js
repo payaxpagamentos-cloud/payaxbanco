@@ -32,6 +32,35 @@ export default async function integracoes({ alvo, recarregar }) {
         }) }, icone('atualizar'), 'Testar conexão'),
         pode('*') ? el('button', { class: 'botao', onclick: () => configurarBanco(d.banco, recarregar) }, icone('config'), 'Configurar') : null)),
 
+    el('div', { style: 'margin-top:18px' }, cartao('Consulta de CEP e CNPJ (API Brasil)',
+      el('div', {},
+        el('p', { style: 'color:var(--texto-2);font-size:13px;margin-bottom:12px' },
+          'Preenche sozinho o cadastro de clientes e os dados do pagador. O resultado fica em cache, então o mesmo CEP ou CNPJ não é consultado duas vezes.'),
+        el('div', { class: 'pares' },
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Token da API Brasil'),
+            el('span', { class: 'val' }, d.dados.apibrasil_configurada ? 'cadastrado' : 'não cadastrado')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Fonte do CEP'),
+            el('span', { class: 'val' }, d.dados.cep.fonte === 'apibrasil' ? 'API Brasil (consome crédito)' : 'Consulta pública (sem custo)')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Fonte do CNPJ'),
+            el('span', { class: 'val' }, d.dados.cnpj.fonte === 'apibrasil' ? 'API Brasil (consome crédito)' : 'Consulta pública (sem custo)')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Em cache'),
+            el('span', { class: 'val' }, d.dados.cache.map((x) => `${numero(x.n)} ${x.tipo.toUpperCase()}`).join(' · ') || 'nada ainda')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Último teste'),
+            el('span', { class: 'val' }, d.dados.ultimo_teste ? dataHora(d.dados.ultimo_teste) : '—'))),
+        d.dados.cnpj.escolhida === 'apibrasil' && d.dados.cnpj.fonte !== 'apibrasil'
+          ? el('div', { style: 'margin-top:10px' }, aviso('O CNPJ está configurado para a API Brasil, mas não há token: as consultas estão saindo pela fonte pública.', 'aviso'))
+          : null,
+        d.dados.ultimo_erro ? el('div', { style: 'margin-top:10px' }, aviso(d.dados.ultimo_erro, 'erro')) : null,
+        el('p', { style: 'margin-top:10px;color:var(--texto-3);font-size:12.5px' },
+          'A fonte de cada tipo é escolhida no servidor, em PAYAX_CEP_FONTE e PAYAX_CNPJ_FONTE (publica ou apibrasil).')),
+      el('div', { style: 'display:flex;gap:8px' },
+        el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
+          const r = await api.post('/integracoes/dados/testar', {});
+          toast(r.mensagem, 'ok');
+          recarregar();
+        }) }, icone('atualizar'), 'Testar consulta'),
+        pode('*') ? el('button', { class: 'botao', onclick: () => configurarDados(d.dados, recarregar) }, icone('config'), 'Token da API Brasil') : null))),
+
     el('div', { style: 'margin-top:18px' }, cartao('IXC dos clientes', tabela({
       colunas: [
         { titulo: 'Cliente', conteudo: (c) => el('span', {}, el('span', { class: 'forte' }, c.nome_fantasia || c.razao_social),
@@ -92,6 +121,22 @@ function configurarBanco(atual, recarregar) {
   }));
   const m = modal({ titulo: 'Credenciais do Bradesco', largo: true,
     corpo: [aviso('O certificado e a chave privada são cifrados (AES-256-GCM) antes de serem gravados e nunca voltam para a tela.', 'info'), form],
+    acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
+}
+
+function configurarDados(atual, recarregar) {
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    campo({ nome: 'token', rotulo: 'Token da API Brasil', tipo: 'password',
+      ajuda: atual.apibrasil_configurada ? 'Deixe vazio para remover o token (volta à fonte pública)' : 'O mesmo Bearer token da sua conta na API Brasil' }));
+  const botao = el('button', { class: 'botao' }, 'Salvar token');
+  botao.addEventListener('click', () => acao(botao, async () => {
+    await api.put('/integracoes/dados', lerForm(form));
+    m.fechar();
+    toast('Token salvo.', 'ok');
+    recarregar();
+  }));
+  const m = modal({ titulo: 'API Brasil · consulta de CEP e CNPJ',
+    corpo: [aviso('O token é cifrado antes de ser gravado e nunca volta para a tela. Sem token, as consultas usam a fonte pública, que não tem custo.', 'info'), form],
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 

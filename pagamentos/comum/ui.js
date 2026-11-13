@@ -269,3 +269,90 @@ export async function copiar(texto, mensagem = 'Copiado para a área de transfer
     toast('Não foi possível copiar automaticamente. Selecione o texto e copie.', 'erro');
   }
 }
+
+// ---------------------------------------------------------------- Preenchimento automático (CEP e CNPJ)
+/**
+ * Liga a consulta de CEP ou CNPJ a um formulário: ao completar o campo, busca e preenche os outros.
+ *
+ * Regras de convivência com quem digita:
+ *  - o que a pessoa escreveu NÃO é sobrescrito; só campos vazios (ou preenchidos por uma busca anterior) mudam;
+ *  - a busca nunca trava o formulário: se a fonte falhar, aparece um aviso discreto e a digitação segue.
+ *
+ * @param {HTMLElement} raiz      elemento que contém os campos
+ * @param {object} api            cliente da API (precisa de api.get)
+ * @param {{tipo:'cep'|'cnpj', campo:string, mapa:Record<string,string>, aoBuscar?:Function}} opcoes
+ *        `mapa`: nome do campo no formulário → chave da resposta.
+ */
+export function autoPreencher(raiz, api, { tipo, campo: nomeCampo, mapa, aoBuscar = null }) {
+  const entrada = raiz.querySelector(`[name="${nomeCampo}"]`);
+  if (!entrada) return;
+  const tamanho = tipo === 'cep' ? 8 : 14;
+  const situacao = el('small', { class: 'auto-busca' });
+  entrada.insertAdjacentElement('afterend', situacao);
+
+  // Registro compartilhado pelo formulário: o que veio de uma busca (de qualquer campo) pode ser
+  // trocado por outra busca; o que a pessoa digitou, não. Editar um campo o devolve para ela.
+  if (!raiz.__autoPreenchidos) raiz.__autoPreenchidos = new Set();
+  const preenchidos = raiz.__autoPreenchidos;
+  let ultimo = null;
+  let emCurso = false;
+  let escrevendo = false;
+
+  const campos = () => Object.fromEntries(Object.keys(mapa).map((n) => [n, raiz.querySelector(`[name="${n}"]`)]));
+
+  for (const nome of Object.keys(mapa)) {
+    raiz.querySelector(`[name="${nome}"]`)?.addEventListener('input', () => {
+      if (!escrevendo) preenchidos.delete(nome);
+    });
+  }
+
+  async function buscar() {
+    const valor = String(entrada.value ?? '').replace(/\D/g, '');
+    if (valor.length !== tamanho || valor === ultimo || emCurso) return;
+    ultimo = valor;
+    emCurso = true;
+    situacao.textContent = 'Buscando…';
+    situacao.className = 'auto-busca';
+    try {
+      const d = await api.get(`/consultas/${tipo}/${valor}`);
+      const alvos = campos();
+      let mudou = 0;
+      for (const [nome, chave] of Object.entries(mapa)) {
+        const alvo = alvos[nome];
+        const novo = d[chave];
+        if (!alvo || novo === null || novo === undefined || novo === '') continue;
+        // Respeita o que foi digitado à mão; troca o que veio de uma busca anterior.
+        if (alvo.value && !preenchidos.has(nome)) continue;
+        escrevendo = true;
+        alvo.value = novo;
+        alvo.dispatchEvent(new Event('input', { bubbles: true }));
+        escrevendo = false;
+        preenchidos.add(nome);
+        mudou += 1;
+      }
+      situacao.className = 'auto-busca ok';
+      situacao.textContent = d.aviso
+        ? d.aviso
+        : mudou
+          ? `${tipo === 'cep' ? 'Endereço preenchido' : 'Dados preenchidos'}${d.do_cache ? '' : ` (${d.fonte === 'apibrasil' ? 'API Brasil' : 'consulta pública'})`}.`
+          : 'Encontrado — os campos já estavam preenchidos.';
+      aoBuscar?.(d);
+    } catch (err) {
+      situacao.className = 'auto-busca erro';
+      situacao.textContent = err.status === 404
+        ? `${tipo === 'cep' ? 'CEP' : 'CNPJ'} não encontrado — preencha à mão.`
+        : err.message;
+      ultimo = null; // deixa tentar de novo
+    } finally {
+      emCurso = false;
+    }
+  }
+
+  entrada.addEventListener('blur', buscar);
+  entrada.addEventListener('input', () => {
+    const d = String(entrada.value ?? '').replace(/\D/g, '');
+    if (d.length === tamanho) buscar();
+    else if (situacao.textContent) situacao.textContent = '';
+  });
+  return { buscar };
+}

@@ -60,6 +60,9 @@ module.exports = (db, autenticado) => {
 
   r.get('/auth/eu', (req, res) => res.json({ usuario: sessaoCliente(req.usuario) }));
 
+  // Consulta de CEP e CNPJ para preencher os dados do pagador.
+  r.use('/consultas', require('./consultas')(db));
+
   r.post('/auth/senha', (req, res) => {
     const u = db.prepare('SELECT * FROM usuarios_cliente WHERE id = ?').get(req.usuario.id);
     if (!verificarSenha(String(req.body?.senha_atual ?? ''), u.senha_hash)) throw new ErroNegocio('Senha atual incorreta.', 401);

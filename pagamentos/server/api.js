@@ -21,6 +21,7 @@ function criarApi(db) {
 
   api.use('/auth', require('./routes/auth')(db, autenticado));
   api.use(autenticado, idempotencia(db));
+  api.use('/consultas', require('./routes/consultas')(db));
   api.use('/painel', require('./routes/painel')(db));
   api.use('/clientes', require('./routes/clientes')(db));
   api.use('/boletos', require('./routes/boletos')(db));

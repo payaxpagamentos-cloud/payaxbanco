@@ -1,8 +1,7 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
 import {
-  el, montar,
-   cartao, tabela, paginacao, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
+  el, montar, cartao, tabela, paginacao, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar, autoPreencher,
   dinheiro, numero, data, documento, linhaDigitavel, hojeIso, somarDias, primeiroDiaMes, R, icone,
 } from '../../comum/ui.js';
 import { barraSplit } from '../../comum/graficos.js';
@@ -92,6 +91,16 @@ export function emitir(clientes, recarregar, clienteFixo = null) {
       campo({ nome: 'desconto_ate', rotulo: 'Desconto até', tipo: 'date' })),
     el('div', { style: 'margin-top:12px' }, campo({ nome: 'mensagem', rotulo: 'Mensagem no boleto', atributos: { maxlength: 160 } })),
     el('div', { style: 'margin-top:14px' }, previa));
+
+
+  // Consulta automática: CEP preenche o endereço; CNPJ do pagador traz razão social e endereço.
+  autoPreencher(form, api, { tipo: 'cep', campo: 'pagador_cep', mapa: {
+    pagador_endereco: 'endereco', pagador_bairro: 'bairro', pagador_cidade: 'cidade', pagador_uf: 'uf',
+  } });
+  autoPreencher(form, api, { tipo: 'cnpj', campo: 'pagador_documento', mapa: {
+    pagador_nome: 'razao_social', pagador_cep: 'cep', pagador_endereco: 'endereco', pagador_numero: 'numero',
+    pagador_bairro: 'bairro', pagador_cidade: 'cidade', pagador_uf: 'uf',
+  } });
 
   let pendente = null;
   const atualizarPrevia = async () => {

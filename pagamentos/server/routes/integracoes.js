@@ -11,6 +11,7 @@ const v = require('../lib/validacao');
 const sincronismo = require('../lib/sincronismo');
 const boletosLib = require('../lib/boletos');
 const { criarBanco } = require('../lib/bradesco');
+const consultaDados = require('../lib/consultaDados');
 const auditoria = require('../lib/auditoria');
 
 /** Guarda credenciais cifradas de um escopo. */
@@ -44,7 +45,38 @@ module.exports = (db) => {
         WHERE i.escopo = 'ixc' ORDER BY c.razao_social`).all().map((i) => ({ ...semSegredo(i), razao_social: i.razao_social, nome_fantasia: i.nome_fantasia })),
       sincronismos: db.prepare(`SELECT s.*, c.razao_social FROM sincronismos s JOIN clientes c ON c.id = s.cliente_id
         ORDER BY s.id DESC LIMIT 30`).all(),
+      dados: {
+        ...semSegredo(db.prepare("SELECT * FROM integracoes WHERE escopo = 'dados' ORDER BY id LIMIT 1").get()),
+        ...consultaDados.estado(db),
+      },
     });
+  });
+
+  // ---------------------------------------------------------------- API Brasil (CEP e CNPJ)
+  r.put('/dados', exigir('*'), (req, res) => {
+    const token = req.body?.token ? v.texto(req.body.token, 'o token da API Brasil', 500) : null;
+    const id = gravar(db, { escopo: 'dados', credenciais: token ? { token } : null, cfg: {}, usuario: req.usuario });
+    auditoria.registrar(db, req, { acao: 'integracao.dados.configurada', entidade: 'integracao', entidade_id: id });
+    res.json({ ...semSegredo(db.prepare('SELECT * FROM integracoes WHERE id = ?').get(id)), ...consultaDados.estado(db) });
+  });
+
+  /** Testa consultando um CNPJ conhecido (o da própria Receita Federal). */
+  r.post('/dados/testar', exigir('integracoes.ver', '*'), async (req, res) => {
+    const i = db.prepare("SELECT * FROM integracoes WHERE escopo = 'dados' ORDER BY id LIMIT 1").get();
+    try {
+      const cnpj = await consultaDados.consultarCnpj(db, req.body?.cnpj || '00394460000141');
+      const cep = await consultaDados.consultarCep(db, req.body?.cep || '70150900');
+      if (i) db.prepare("UPDATE integracoes SET estado = 'conectada', ultimo_teste = ?, ultimo_erro = NULL WHERE id = ?").run(agora(), i.id);
+      res.json({
+        ok: true,
+        mensagem: `CNPJ consultado pela fonte "${cnpj.fonte}" e CEP pela fonte "${cep.fonte}".`,
+        cnpj: { razao_social: cnpj.razao_social, cidade: cnpj.cidade, uf: cnpj.uf, fonte: cnpj.fonte },
+        cep: { cidade: cep.cidade, uf: cep.uf, fonte: cep.fonte },
+      });
+    } catch (err) {
+      if (i) db.prepare("UPDATE integracoes SET estado = 'falha', ultimo_teste = ?, ultimo_erro = ? WHERE id = ?").run(agora(), err.message, i.id);
+      throw err;
+    }
   });
 
   // ---------------------------------------------------------------- Bradesco

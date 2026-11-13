@@ -1,8 +1,7 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
 import {
-  el, montar,
-   cartao, tabela, paginacao, kpi, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
+  el, montar, autoPreencher, cartao, tabela, paginacao, kpi, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
   dinheiro, numero, percentual, data, dataHora, documento, telefone, hojeIso, primeiroDiaMes, R, icone,
 } from '../../comum/ui.js';
 import { agendaLiberacao } from '../../comum/graficos.js';
@@ -340,8 +339,20 @@ function camposCadastro(c = {}) {
     el('div', { style: 'margin-top:12px' }, campo({ nome: 'observacoes', rotulo: 'Observações', tipo: 'textarea', valor: c.observacoes ?? '' })));
 }
 
+/** Liga CNPJ e CEP à consulta automática no formulário de cadastro. */
+function ligarConsultas(form) {
+  autoPreencher(form, api, { tipo: 'cnpj', campo: 'cnpj', mapa: {
+    razao_social: 'razao_social', nome_fantasia: 'nome_fantasia', cep: 'cep', endereco: 'endereco',
+    numero: 'numero', complemento: 'complemento', bairro: 'bairro', cidade: 'cidade', uf: 'uf',
+  } });
+  autoPreencher(form, api, { tipo: 'cep', campo: 'cep', mapa: {
+    endereco: 'endereco', bairro: 'bairro', cidade: 'cidade', uf: 'uf',
+  } });
+}
+
 function novoCliente(recarregar) {
   const form = el('form', { onsubmit: (e) => e.preventDefault() }, camposCadastro());
+  ligarConsultas(form);
   const botao = el('button', { class: 'botao' }, 'Cadastrar cliente');
   botao.addEventListener('click', () => acao(botao, async () => {
     const c = await api.post('/clientes', lerForm(form));
@@ -356,6 +367,7 @@ function novoCliente(recarregar) {
 
 function editarCliente(c, recarregar) {
   const form = el('form', { onsubmit: (e) => e.preventDefault() }, camposCadastro(c));
+  ligarConsultas(form);
   const botao = el('button', { class: 'botao' }, 'Salvar');
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.patch(`/clientes/${c.id}`, { ...lerForm(form), versao: c.versao });

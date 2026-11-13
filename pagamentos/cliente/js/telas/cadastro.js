@@ -1,6 +1,6 @@
 import { api, ir, pode, usuario } from '../app.js';
 import {
-  el, montar, cartao, tabela, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
+  el, montar, cartao, tabela, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar, autoPreencher,
   dinheiro, numero, dataHora, data, documento, telefone, hojeIso, somarDias, R, icone
 } from '../../comum/ui.js';
 
@@ -39,6 +39,9 @@ async function abaDados(alvo, recarregar) {
       campo({ nome: 'bairro', rotulo: 'Bairro', valor: c.bairro ?? '' }),
       campo({ nome: 'cidade', rotulo: 'Cidade', valor: c.cidade ?? '' }),
       campo({ nome: 'uf', rotulo: 'UF', valor: c.uf ?? '', atributos: { maxlength: 2 } })));
+  autoPreencher(form, api, { tipo: 'cep', campo: 'cep', mapa: {
+    endereco: 'endereco', bairro: 'bairro', cidade: 'cidade', uf: 'uf',
+  } });
   const botao = el('button', { class: 'botao' }, 'Salvar alterações');
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.patch('/cadastro', lerForm(form));
