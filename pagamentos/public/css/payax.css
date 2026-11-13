@@ -1,6 +1,6 @@
 /* Backoffice PayAx — ajustes de marca sobre a base compartilhada. */
 .marca-simbolo { color: #4e9bf0; }
-.entrada { background: radial-gradient(1100px 480px at 50% -10%, #1b3252 0%, #0e1a2b 62%); }
+.tela-entrada { background: radial-gradient(1100px 480px at 50% -10%, #1b3252 0%, #0e1a2b 62%); }
 
 /* Ficha do cliente: abas. */
 .abas { display: flex; gap: 4px; border-bottom: 1px solid var(--borda); margin-bottom: 16px; overflow-x: auto; }

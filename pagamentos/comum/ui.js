@@ -31,6 +31,8 @@ const ICONES = {
   cofre: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="4"/><path d="M12 8v1m0 6v1m4-4h-1m-6 0H8"/>',
   importar: '<path d="M12 15V3m-4 8 4 4 4-4M4 17v4h16v-4"/>',
   olho: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  'olho-fechado': '<path d="M3 3l18 18M10.6 10.6a3 3 0 0 0 4.2 4.2M9.4 5.3A9.6 9.6 0 0 1 12 5c6 0 10 7 10 7a18 18 0 0 1-3.2 4M6.2 7.2A18 18 0 0 0 2 12s4 7 10 7a9.7 9.7 0 0 0 3.5-.6"/>',
+  casa: '<path d="m3 11 9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z"/>',
   lista: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
 };
 

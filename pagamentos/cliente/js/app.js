@@ -94,8 +94,19 @@ function estrutura(rota, principal) {
     el('div', { class: 'caminho' }, el('span', {}, u.cliente_nome), el('span', { class: 'sep' }, '/'), el('strong', {}, ROTAS[rota]?.rotulo ?? '')),
     el('div', { class: 'topo-acoes' },
       pode('boletos.emitir') ? el('a', { class: 'botao', href: '#/boletos?novo=1' }, icone('mais'), 'Novo boleto') : null));
+  // No celular, as quatro telas do dia a dia ficam na barra de baixo — é onde a mão alcança.
+  const BAIXO = [
+    ['inicio', 'Início', 'casa', 'painel.ver'],
+    ['boletos', 'Boletos', 'boleto', 'boletos.ver'],
+    ['extrato', 'Extrato', 'lista', 'razao.ver'],
+    ['repasses', 'Transferir', 'pix', 'repasses.ver'],
+  ].filter(([, , , perm]) => permitido(perm));
+  const barra = el('nav', { class: 'barra-inferior', 'aria-label': 'Navegação principal' },
+    BAIXO.map(([r, rot, ic]) => el('a', { class: r === rota ? 'ativo' : '', href: `#/${r}`, 'aria-current': r === rota ? 'page' : null },
+      icone(ic), el('span', {}, rot))));
+
   return el('div', { class: 'app' }, el('a', { class: 'sr', href: '#conteudo' }, 'Ir para o conteúdo'), menu, fundo,
-    el('div', { class: 'principal' }, topo, principal));
+    el('div', { class: 'principal' }, topo, principal), barra);
 }
 
 function menuConta() {
@@ -143,7 +154,7 @@ function formularioSenha(aoConcluir) {
 }
 
 function trocarSenha() {
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
     el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'INTERNET BANK'))),
     el('h1', {}, 'Crie a sua senha'),
     el('p', { class: 'apoio' }, 'Você entrou com a senha provisória. Escolha uma senha sua para continuar.'),
@@ -152,7 +163,7 @@ function trocarSenha() {
 
 /** Segunda etapa do login. */
 function telaDesafio(desafio) {
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
     el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'INTERNET BANK'))),
     el('h1', {}, 'Verificação em duas etapas'),
     formularioDesafio(api, {
@@ -175,7 +186,7 @@ function telaEntrada() {
     location.hash = '#/inicio';
     return desenhar();
   });
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
     el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'INTERNET BANK'))),
     el('h1', {}, 'Acesse a sua conta'),
     el('p', { class: 'apoio' }, 'Use o e-mail e a senha que a PayAx enviou. Na primeira entrada você troca a senha.'),

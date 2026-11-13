@@ -149,7 +149,7 @@ function formularioSenha(aoConcluir) {
 }
 
 function trocarSenhaObrigatoria() {
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
     el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
     el('h1', {}, 'Defina uma senha'),
     el('p', { class: 'apoio' }, 'O seu acesso está com senha provisória. Escolha uma senha antes de continuar.'),
@@ -158,7 +158,7 @@ function trocarSenhaObrigatoria() {
 
 /** Tela de configuração obrigatória, quando o administrador exige 2FA da equipe. */
 function configurarDoisFatoresObrigatorio() {
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
     el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
     el('h1', {}, 'Proteja o seu acesso'),
     blocoDoisFatores(api, {
@@ -175,7 +175,7 @@ function configurarDoisFatoresObrigatorio() {
 
 /** Segunda etapa do login. */
 function telaDesafio(desafio) {
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
     el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
     el('h1', {}, 'Verificação em duas etapas'),
     formularioDesafio(api, {
@@ -198,7 +198,7 @@ function telaEntrada() {
     location.hash = '#/visao';
     return desenhar();
   });
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'entrada-caixa' },
+  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
     el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'PayAx', el('small', {}, 'PAGAMENTOS'))),
     el('h1', {}, 'Backoffice'),
     el('p', { class: 'apoio' }, 'Acesso da equipe PayAx. O Internet Bank dos clientes fica em outro endereço.'),
