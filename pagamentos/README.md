@@ -306,8 +306,23 @@ tamanho, acompanha a cor do tema e não depende de nenhum arquivo externo.
 | `marcaMenu()` / `marcaEntrada()` | as duas combinações prontas — menu lateral e tela de entrada |
 | `faviconSvg()` | o desenho dos dois `img/favicon.svg` (a versão com fundo leva também as faixas diagonais) |
 
-As cores vivem nos tokens de `comum/base.css` (`--marca` marinho `#0a1526`, `--azul` das ações, `--ciano`
-do anel) e em `cliente/css/banco.css`. Mudar a marca é mudar esses dois lugares — nenhuma tela tem cor escrita na mão.
+As cores e a régua (canto, sombra, espaçamento) vivem num lugar só: os tokens de `comum/base.css`
+— `--marca` marinho `#0a1526`, `--azul` das ações, `--ciano` do anel, `--raio`, `--sombra`.
+Mudar a marca é mudar esse arquivo; nenhuma tela tem cor escrita na mão.
+
+## As duas áreas falam a mesma língua
+
+Backoffice e Internet Bank usam as mesmas peças, de `comum/componentes.js`:
+
+| Peça | No Internet Bank | No Backoffice |
+|---|---|---|
+| cartão de destaque | `cartaoConta()` — o saldo do cliente, com o botão de esconder | `cartaoPainel()` — a posição da plataforma no período |
+| `acoesRapidas()` | emitir, transferir, extrato, relatórios | emitir, repasses, conciliação, relatórios |
+| `linhaTempo()` + `agruparMovimentos()` | o extrato, com o split aberto em cada recebimento | — |
+
+A diferença entre as duas áreas é de conteúdo, não de linguagem: o cliente vê a conta dele, a equipe vê
+a plataforma inteira. Sobra em `cliente/css/banco.css` só a barra de navegação do celular, e em
+`public/css/payax.css` só a lista de alertas do painel.
 
 Em texto, o nome da empresa é **PAY AX**, com espaço. `payax` minúsculo continua sendo só identificador
 interno (chaves de `localStorage`, variáveis `PAYAX_*`, nome de arquivo, prefixo de txid do PIX).
@@ -316,7 +331,8 @@ interno (chaves de `localStorage`, variáveis `PAYAX_*`, nome de arquivo, prefix
 
 ```
 pagamentos/
-  comum/        base.css, ui.js, api.js, graficos.js e marca.js — compartilhados pelas duas áreas
+  comum/        base.css, ui.js, api.js, graficos.js, marca.js e componentes.js
+                — tudo compartilhado pelas duas áreas
   public/       Backoffice (telas em js/telas/)
   cliente/      Internet Bank (telas em js/telas/)
   server/

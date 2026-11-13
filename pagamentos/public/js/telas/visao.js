@@ -3,11 +3,14 @@ import {
   el, montar, kpi, cartao, tabela, dinheiro, numero, data, selo, icone, R, aviso
 } from '../../comum/ui.js';
 import { barrasPorDia, barraSplit } from '../../comum/graficos.js';
+import { cartaoPainel, acoesRapidas } from '../../comum/componentes.js';
 
 /** Visão geral da plataforma: o que entrou, quanto ficou conosco e o que precisa de ação. */
 export default async function visao({ alvo }) {
   const d = await api.get('/painel');
   const l = d.liquidacoes;
+
+  const aguardando = d.alertas.find((a) => a.tipo === 'repasses_aprovacao')?.quantidade ?? 0;
 
   const alertas = d.alertas.length
     ? cartao('Precisa de atenção', el('div', { class: 'alertas' }, d.alertas.map((a) => el('div', { class: `alerta-item ${a.severidade}` },
@@ -18,21 +21,38 @@ export default async function visao({ alvo }) {
           : a.tipo === 'sem_conta' ? el('a', { class: 'botao sec pequeno', href: '#/contas' }, 'Cadastrar conta') : null))))
     : null;
 
-  montar(alvo, 
+  // Os atalhos são os da equipe, não os do cliente: o que se faz todo dia neste painel.
+  const atalhos = acoesRapidas([
+    pode('boletos.emitir') ? { ic: 'mais', titulo: 'Emitir boleto', descricao: 'Para um cliente', href: '#/boletos?novo=1' } : null,
+    pode('repasses.ver') ? { ic: 'troca', titulo: 'Repasses', descricao: aguardando ? `${numero(aguardando)} aguardando você` : 'Nada pendente', href: '#/repasses' } : null,
+    pode('conciliacao.ver') ? { ic: 'cofre', titulo: 'Conciliação', descricao: 'Remessa e retorno', href: '#/conciliacao' } : null,
+    pode('relatorios.ver') ? { ic: 'relatorio', titulo: 'Relatórios', descricao: 'Fechar o mês', href: '#/relatorios' } : null,
+  ]);
+
+  montar(alvo,
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Visão geral'),
-        el('p', {}, `Movimento de ${data(d.periodo.de)} a ${data(d.periodo.ate)} · hoje ${data(d.hoje)}`))),
+        el('p', {}, `Movimento de ${data(d.periodo.de)} a ${data(d.periodo.ate)}`))),
 
-    el('div', { class: 'grade kpis' },
-      kpi({ rotulo: 'Recebido no período', valor: dinheiro(l.bruto_centavos), apoio: `${numero(l.titulos)} título(s) liquidado(s)`, tom: 'destaque', ic: 'dinheiro' }),
-      kpi({ rotulo: 'Nossa receita', valor: dinheiro(l.receita_centavos), apoio: `Tarifa PAY AX ${dinheiro(l.comissao_centavos)} + tarifas bancárias ${dinheiro(l.tarifa_banco_centavos + l.tarifa_emissao_centavos)}`, tom: 'positivo', ic: 'relatorio' }),
-      d.pode_ver_margem
-        ? kpi({ rotulo: 'Margem (receita − custo do banco)', valor: dinheiro(l.margem_centavos), apoio: `Custo do banco ${dinheiro(l.custo_banco_centavos)}`, ic: 'banco' })
-        : null,
-      kpi({ rotulo: 'Saldo dos clientes', valor: dinheiro(d.saldo_clientes.disponivel_centavos), apoio: `${dinheiro(d.saldo_clientes.a_liberar_centavos)} a liberar`, ic: 'cofre' }),
-    ),
+    // O cartão de destaque é o mesmo do Internet Bank. Lá mostra o saldo do cliente;
+    // aqui, a posição da plataforma no período.
+    cartaoPainel({
+      rotulo: 'Recebido no período',
+      valor: dinheiro(l.bruto_centavos),
+      apoio: `${numero(l.titulos)} título(s) liquidado(s)`,
+      canto: el('div', {}, 'Hoje', el('strong', {}, data(d.hoje))),
+      itens: [
+        ['Nossa receita', dinheiro(l.receita_centavos)],
+        ...(d.pode_ver_margem ? [['Margem', dinheiro(l.margem_centavos)]] : []),
+        ['Saldo dos clientes', dinheiro(d.saldo_clientes.disponivel_centavos)],
+        ['A liberar', dinheiro(d.saldo_clientes.a_liberar_centavos)],
+        ['Repassado no período', dinheiro(l.repassado_centavos)],
+      ],
+    }),
 
-    el('div', { class: 'grade kpis', style: 'margin-top:14px' },
+    atalhos,
+
+    el('div', { class: 'grade kpis', style: 'margin-top:20px' },
       kpi({ rotulo: 'Boletos emitidos', valor: numero(d.boletos.emitidos), apoio: dinheiro(d.boletos.valor_emitido_centavos), menor: true, ic: 'boleto' }),
       kpi({ rotulo: 'Em aberto a vencer', valor: numero(d.boletos.a_vencer), apoio: 'aguardando pagamento', menor: true, ic: 'relogio' }),
       kpi({ rotulo: 'Vencidos em aberto', valor: numero(d.vencidos_total.titulos), apoio: `${dinheiro(d.vencidos_total.valor_centavos)} · todos os períodos`, menor: true, tom: d.vencidos_total.titulos ? 'negativo' : '', ic: 'alerta' }),
@@ -53,8 +73,8 @@ export default async function visao({ alvo }) {
             ],
           }),
           el('p', { style: 'margin-top:10px;color:var(--texto-2);font-size:13px' },
-            `De ${dinheiro(l.bruto_centavos)} recebidos no período, ${dinheiro(l.receita_centavos)} ficaram com a PAY AX. `
-            + `No mesmo período saíram ${dinheiro(l.repassado_centavos)} em repasses aos clientes (inclui saldo de datas anteriores).`))
+            `Cada R$ 100 recebidos devolvem ${dinheiro(Math.round((l.liquido_cliente_centavos / l.bruto_centavos) * 10000))} ao cliente `
+            + `e deixam ${dinheiro(Math.round((l.receita_centavos / l.bruto_centavos) * 10000))} conosco, já descontado o que o banco cobra.`))
         : el('p', { class: 'vazio' }, 'Nenhum título liquidado no período.')),
     ),
 

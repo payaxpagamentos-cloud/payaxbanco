@@ -1,7 +1,7 @@
 import { api, ir, pode } from '../app.js';
 import { el, montar, cartao, tabela, dinheiro, numero, data, selo, icone, aviso, hojeIso, R } from '../../comum/ui.js';
 import { barrasPorDia } from '../../comum/graficos.js';
-import { cartaoConta, acoesRapidas, linhaTempo } from '../componentes.js';
+import { cartaoConta, acoesRapidas, linhaTempo } from '../../comum/componentes.js';
 
 /**
  * Tela inicial, no formato de banco: a conta primeiro, o que fazer logo em seguida,

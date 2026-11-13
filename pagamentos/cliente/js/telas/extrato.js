@@ -5,7 +5,7 @@ import {
   hojeIso, primeiroDiaMes, icone, aviso,
 } from '../../comum/ui.js';
 import { agendaLiberacao } from '../../comum/graficos.js';
-import { cartaoConta, linhaTempo } from '../componentes.js';
+import { cartaoConta, linhaTempo } from '../../comum/componentes.js';
 
 const CHAVE_VISAO = 'payax.extrato.visao';
 const visaoGuardada = () => { try { return localStorage.getItem(CHAVE_VISAO) || 'tempo'; } catch { return 'tempo'; } };

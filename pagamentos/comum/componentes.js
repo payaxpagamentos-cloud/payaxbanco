@@ -1,5 +1,5 @@
 /*
- * Peças do Internet Bank. O que distingue daqui para um painel administrativo:
+ * Peças de banco, usadas pelas duas áreas. O que distingue de um painel administrativo:
  *
  *  - o CARTÃO DA CONTA é a primeira coisa da tela, com o saldo grande e o número da conta,
  *    e tem o botão de esconder o saldo (todo banco tem, e não é enfeite: serve para olhar em público);
@@ -7,12 +7,17 @@
  *    linhas crípticas ("crédito 100", "tarifa bancária -2,50", "tarifa PAY AX -1,00"), um movimento: "Você recebeu
  *    R$ 96,50", e quem quiser abre e vê de onde veio e o que saiu. É o split explicado, não escondido.
  */
-import { el, icone, dinheiro, data, R, selo } from '../comum/ui.js';
-import { letreiro, simbolo } from '../comum/marca.js';
+import { el, icone, dinheiro, data, R, selo } from './ui.js';
+import { letreiro, simbolo } from './marca.js';
 
 const CHAVE_SALDO = 'payax.saldo.oculto';
 const oculto = () => { try { return localStorage.getItem(CHAVE_SALDO) === '1'; } catch { return false; } };
 const guardarOculto = (v) => { try { localStorage.setItem(CHAVE_SALDO, v ? '1' : '0'); } catch { /* sem armazenamento */ } };
+
+/** A marca no canto do cartão, como num cartão de verdade. */
+const marcaCartao = () => el('div', { class: 'marca-cartao' },
+  simbolo({ tamanho: 22, cor: '#6fd3fb' }),
+  letreiro({ altura: 13, cor: 'rgba(255,255,255,0.92)', degrade: ['#8fe3fb', '#3ea8f5'] }));
 
 /**
  * Cartão da conta: saldo, o que está retido, número da conta e o botão de esconder.
@@ -48,11 +53,29 @@ export function cartaoConta({ saldo, disponivel, agencia, conta, retencao_dias, 
       ? el('div', { class: 'numero-conta' },
         el('div', {}, 'Agência', el('strong', {}, agencia)),
         el('div', {}, 'Conta', el('strong', {}, conta)),
-        el('div', { class: 'marca-cartao' },
-          simbolo({ tamanho: 22, cor: '#6fd3fb' }),
-          letreiro({ altura: 13, cor: 'rgba(255,255,255,0.92)', degrade: ['#8fe3fb', '#3ea8f5'] })))
+        marcaCartao())
       : null,
-    acoes.length ? el('div', { style: 'margin-top:18px;display:flex;gap:8px;flex-wrap:wrap' }, acoes) : null);
+    acoes.length ? el('div', { class: 'acoes-cartao' }, acoes) : null);
+}
+
+/**
+ * Cartão de destaque sem o olho: no Backoffice o número não é saldo de ninguém, é a posição
+ * da plataforma no período — esconder não faz sentido, e o cartão é o mesmo.
+ * @param {{rotulo, valor, apoio?, canto?, itens?: [string, any][], acoes?}} d
+ */
+export function cartaoPainel({ rotulo, valor, apoio = null, canto = null, itens = [], acoes = [] }) {
+  return el('section', { class: 'cartao-conta', 'aria-label': rotulo },
+    el('div', { class: 'topo-cartao' },
+      el('div', {},
+        el('div', { class: 'rotulo' }, rotulo),
+        el('div', { class: 'saldo-valor num' }, valor),
+        apoio ? el('div', { class: 'apoio-cartao' }, apoio) : null),
+      canto ? el('div', { class: 'canto-cartao' }, canto) : null),
+    itens.length
+      ? el('div', { class: 'faixa' }, itens.map(([r, v]) => el('div', { class: 'item' }, el('span', {}, r), el('strong', {}, v))))
+      : null,
+    el('div', { class: 'numero-conta' }, marcaCartao()),
+    acoes.length ? el('div', { class: 'acoes-cartao' }, acoes) : null);
 }
 
 /** Linha de atalhos — as três ou quatro coisas que a pessoa realmente veio fazer. */

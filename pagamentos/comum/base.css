@@ -14,14 +14,18 @@
   --menu-ativo: #17304f;
   --ciano: #6fd3fb;
   --azul-marca: #3ea8f5;
+  --ciano-fundo: #e8f5fe;
+  --marinho-900: #0a1526;
+  --marinho-800: #0f1f36;
+  --marinho-700: #15304f;
 
-  --fundo: #f4f7fa;
+  --fundo: #f4f7fb;
   --superficie: #ffffff;
-  --superficie-2: #f7fafc;
+  --superficie-2: #f1f5fa;
   --texto: #0a1422;
   --texto-2: #495768;
   --texto-3: #7a8798;
-  --borda: #e2e8f0;
+  --borda: #e3e9f1;
   --borda-forte: #ccd6e2;
   /* Azul das ações: escuro o bastante para texto branco em cima passar no contraste. */
   --azul: #0f5fbf;
@@ -42,11 +46,14 @@
   --serie-3: #1baf7a;
   --grade: #e1e0d9;
   --eixo: #c3c2b7;
-  --raio: 12px;
-  --raio-ctl: 8px;
-  --sombra: 0 1px 2px rgba(11, 20, 32, 0.04), 0 4px 16px rgba(11, 20, 32, 0.05);
-  --sombra-alta: 0 18px 50px rgba(11, 20, 32, 0.18);
-  --menu-largura: 236px;
+  /* Régua de banco, não de ERP: canto mais redondo, sombra mais macia, mais respiro.
+     Vale nas duas áreas — o Backoffice é a mesma casa, vista por dentro. */
+  --raio-g: 22px;
+  --raio: 16px;
+  --raio-ctl: 12px;
+  --sombra: 0 1px 2px rgba(5, 12, 24, 0.04), 0 8px 24px rgba(5, 12, 24, 0.05);
+  --sombra-alta: 0 24px 60px rgba(5, 12, 24, 0.22);
+  --menu-largura: 248px;
   --fonte: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color-scheme: light;
 }
@@ -86,8 +93,9 @@ p { margin: 0; }
   text-decoration: none !important; border-left: 3px solid transparent; margin-bottom: 2px; transition: background 0.18s, color 0.18s;
 }
 .link-menu svg { width: 18px; height: 18px; opacity: 0.85; }
-.link-menu:hover { background: var(--marca-2); color: #fff; }
-.link-menu.ativo { background: var(--marca-2); color: #fff; border-left-color: var(--azul); font-weight: 600; }
+.link-menu:hover { background: var(--marinho-800); color: #fff; }
+/* O item ativo é bloco de cor cheia, não um fundo mais claro: lê-se de longe. */
+.link-menu.ativo { background: var(--azul); color: #fff; border-left-color: var(--azul-marca); font-weight: 600; }
 .link-menu .contador { margin-left: auto; font-size: 11px; background: var(--vermelho); color: #fff; border-radius: 99px; padding: 1px 7px; font-weight: 600; }
 .menu-rodape { margin-top: auto; padding-top: 14px; display: grid; gap: 10px; }
 .selo-ambiente { border: 1px solid #35496a; border-radius: 10px; padding: 9px 11px; font-size: 11.5px; color: #d3dfed; }
@@ -106,7 +114,7 @@ p { margin: 0; }
 .caminho .sep { color: var(--borda-forte); }
 .topo-acoes { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .abrir-menu { display: none; }
-main { padding: 22px 26px 60px; flex: 1; min-width: 0; }
+main { padding: 26px 28px 70px; flex: 1; min-width: 0; }
 .cabecalho-tela { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
 .cabecalho-tela h1 { font-size: 20px; font-weight: 650; }
 .cabecalho-tela p { color: var(--texto-2); font-size: 13px; margin-top: 3px; }
@@ -246,9 +254,171 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 .tela-entrada-caixa { position: relative; z-index: 1; }
 .marca-entrada { display: grid; justify-items: center; gap: 9px; padding-bottom: 2px; }
 .marca-entrada small { font-size: 8.5px; font-weight: 600; letter-spacing: 0.3em; color: var(--texto-3); }
-.tela-entrada-caixa { background: var(--superficie); border-radius: 16px; box-shadow: var(--sombra-alta); width: min(410px, 100%); padding: 28px; display: grid; gap: 15px; }
+.tela-entrada-caixa { background: var(--superficie); border-radius: var(--raio-g); box-shadow: var(--sombra-alta); width: min(410px, 100%); padding: 32px; display: grid; gap: 15px; }
 .tela-entrada-caixa h1 { font-size: 17px; }
 .tela-entrada-caixa p.apoio { color: var(--texto-2); font-size: 13px; }
+
+/* ---------------------------------------------------------------- Cartão de destaque
+   A peça de assinatura das duas áreas: no Internet Bank é o saldo do cliente; no Backoffice,
+   a posição da plataforma no período. Mesmo desenho, mesmo marinho, mesmo anel. */
+.cartao-conta {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--raio-g);
+  padding: 26px 28px 24px;
+  color: #fff;
+  background:
+    radial-gradient(760px 380px at 86% -30%, rgba(62, 168, 245, 0.32), transparent 62%),
+    linear-gradient(142deg, var(--marinho-700) 0%, var(--marinho-900) 48%, var(--tinta) 100%);
+  box-shadow: 0 2px 4px rgba(5, 12, 24, 0.12), 0 22px 46px rgba(5, 12, 24, 0.26);
+}
+/* Faixas diagonais do logotipo: textura, não enfeite. */
+.cartao-conta::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(118deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 26px);
+  pointer-events: none;
+}
+/* O anel luminoso, saindo pela direita como no logotipo. O centro fica exatamente sobre a
+   borda direita do cartão, então entra sempre meia circunferência — em cartão largo e baixo
+   (Backoffice) ou alto e estreito (Internet Bank), a curva se lê igual. */
+.cartao-conta::before {
+  content: '';
+  position: absolute; top: 50%; right: 0; height: 132%; aspect-ratio: 1;
+  transform: translate(50%, -50%); border-radius: 50%;
+  border: 1.5px solid rgba(111, 211, 251, 0.26);
+  box-shadow: 0 0 46px rgba(62, 168, 245, 0.14);
+  pointer-events: none;
+}
+.cartao-conta > * { position: relative; z-index: 1; }
+.cartao-conta .topo-cartao { display: flex; align-items: flex-start; gap: 14px; }
+.cartao-conta .rotulo {
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.62);
+}
+.cartao-conta .saldo-valor {
+  font-size: clamp(32px, 6vw, 44px); font-weight: 650; letter-spacing: -0.03em; line-height: 1.05; margin-top: 4px;
+  font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 10px;
+}
+.cartao-conta .saldo-valor.oculto { letter-spacing: 0.06em; }
+.cartao-conta .olho {
+  background: rgba(255, 255, 255, 0.12); border: 0; color: rgba(255, 255, 255, 0.85); width: 34px; height: 34px;
+  border-radius: 50%; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; margin-left: auto;
+}
+.cartao-conta .olho:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.cartao-conta .apoio-cartao { margin-top: 7px; font-size: 12.5px; color: rgba(255, 255, 255, 0.6); }
+.cartao-conta .canto-cartao { margin-left: auto; text-align: right; font-size: 12.5px; color: rgba(255, 255, 255, 0.62); }
+.cartao-conta .canto-cartao strong { display: block; color: #fff; font-size: 14px; font-weight: 600; margin-top: 2px; }
+.cartao-conta .acoes-cartao { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+/* Botões sobre o marinho: o azul da marca sumiria no fundo. */
+.cartao-conta .acoes-cartao .botao { background: rgba(255, 255, 255, 0.14); color: #fff; border-color: transparent; }
+.cartao-conta .acoes-cartao .botao:hover { background: rgba(255, 255, 255, 0.24); }
+.cartao-conta .marca-cartao { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+.cartao-conta .marca-cartao svg { display: block; }
+
+.cartao-conta .faixa {
+  display: flex; gap: 28px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+.cartao-conta .faixa .item span { display: block; font-size: 11.5px; color: rgba(255, 255, 255, 0.58); margin-bottom: 2px; }
+.cartao-conta .faixa .item strong { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cartao-conta .numero-conta {
+  margin-top: 18px; display: flex; gap: 22px; flex-wrap: wrap; font-size: 12px; color: rgba(255, 255, 255, 0.55);
+}
+.cartao-conta .numero-conta strong {
+  display: block; color: #fff; font-size: 15px; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- Ações rápidas */
+.acoes-rapidas { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+.acao-rapida {
+  flex: 1 1 128px; min-width: 112px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio);
+  padding: 15px 14px; display: grid; gap: 9px; justify-items: start; cursor: pointer; text-align: left; color: var(--texto);
+  font-size: 13.5px; font-weight: 600; text-decoration: none !important; box-shadow: var(--sombra);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.acao-rapida:hover { transform: translateY(-2px); border-color: var(--azul-marca); box-shadow: 0 10px 26px rgba(5, 12, 24, 0.09); }
+.acao-rapida[aria-disabled='true'] { opacity: 0.5; pointer-events: none; }
+.acao-rapida .bolha {
+  width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--ciano-fundo); color: var(--azul);
+}
+.acao-rapida .bolha svg { width: 19px; height: 19px; }
+.acao-rapida small { display: block; font-weight: 400; color: var(--texto-3); font-size: 11.5px; }
+
+/* ---------------------------------------------------------------- Linha do tempo de movimentos
+   Os modificadores aqui são "credito"/"debito" de propósito: nomes genéricos como "entrada"
+   colidem com classes de página (a tela de login já usava .entrada com min-height: 100vh). */
+.linha-tempo { display: grid; }
+.dia-tempo {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 18px 2px 8px; font-size: 12px; color: var(--texto-3); font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.dia-tempo .saldo-dia { font-variant-numeric: tabular-nums; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.mov {
+  display: flex; align-items: center; gap: 14px; padding: 13px 16px; background: var(--superficie);
+  border: 1px solid var(--borda); border-radius: var(--raio); margin-bottom: 8px; width: 100%; text-align: left;
+  cursor: default; color: inherit; font: inherit; transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.mov.abrivel { cursor: pointer; }
+.mov.abrivel:hover { border-color: var(--borda-forte); box-shadow: var(--sombra); }
+.mov .icone-mov { width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; flex-shrink: 0; }
+.mov .icone-mov svg { width: 19px; height: 19px; }
+.mov .icone-mov.credito { background: var(--ciano-fundo); color: #0a6b45; }
+.mov .icone-mov.debito { background: #fdeef0; color: #a83232; }
+.mov .icone-mov.taxa { background: #fff4e5; color: #8a5c00; }
+.mov .icone-mov.neutro { background: var(--superficie-2); color: var(--texto-2); }
+.mov .corpo { flex: 1; min-width: 0; }
+.mov .corpo strong { display: block; font-size: 14px; font-weight: 600; }
+.mov .corpo small { display: block; color: var(--texto-3); font-size: 12.5px; margin-top: 1px; }
+.mov .valor { font-size: 15.5px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mov .valor.credito { color: #0a6b45; }
+.mov .valor.debito { color: var(--texto); }
+.mov .seta { color: var(--texto-3); transition: transform 0.18s ease; }
+.mov[aria-expanded='true'] .seta { transform: rotate(90deg); }
+
+/* O detalhe do split: de onde veio o dinheiro e o que foi descontado. */
+.detalhe-mov {
+  background: var(--superficie-2); border: 1px solid var(--borda); border-top: 0;
+  border-radius: 0 0 var(--raio) var(--raio); margin: -9px 0 10px; padding: 14px 16px 15px;
+}
+.detalhe-mov .trilha { display: grid; gap: 8px; }
+.detalhe-mov .passo { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.detalhe-mov .passo .marca-passo { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
+.detalhe-mov .passo .texto { color: var(--texto-2); }
+.detalhe-mov .passo .num { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
+.detalhe-mov .passo.total { border-top: 1px dashed var(--borda-forte); padding-top: 9px; margin-top: 2px; }
+.detalhe-mov .passo.total .texto { color: var(--texto); font-weight: 600; }
+.detalhe-mov .rodape { margin-top: 11px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------- Faixa "a liberar" */
+.a-liberar {
+  display: flex; align-items: center; gap: 12px; background: var(--ciano-fundo); border: 1px solid #c3e2f8;
+  border-radius: var(--raio); padding: 13px 16px; font-size: 13.5px; color: #0b4a96; margin-top: 14px;
+}
+.a-liberar svg { width: 19px; height: 19px; flex-shrink: 0; }
+.a-liberar strong { font-variant-numeric: tabular-nums; }
+.a-liberar .quando { margin-left: auto; font-size: 12.5px; color: #3f6c9c; white-space: nowrap; }
+
+/* ---------------------------------------------------------------- Abas e pares */
+.abas { gap: 2px; border-bottom: 1px solid var(--borda); margin-bottom: 18px; overflow-x: auto; display: flex; }
+.abas button {
+  background: none; border: 0; border-bottom: 2px solid transparent; padding: 11px 14px; font-size: 13.5px;
+  color: var(--texto-2); cursor: pointer; white-space: nowrap; font-weight: 500;
+}
+.abas button:hover { color: var(--texto); }
+.abas button.ativa { color: var(--azul); border-bottom-color: var(--azul-marca); font-weight: 650; }
+
+.pares { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 20px; }
+.par { display: grid; gap: 2px; }
+.par .rot { font-size: 11px; color: var(--texto-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.par .val { font-size: 14.5px; }
+.par .val.grande { font-size: 20px; font-weight: 650; }
+.codigo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--superficie-2);
+  border: 1px solid var(--borda); border-radius: var(--raio-ctl); padding: 9px 11px; word-break: break-all;
+}
 
 /* ---------------------------------------------------------------- Responsivo */
 @media (max-width: 920px) {
@@ -270,3 +440,28 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 .auto-busca { font-size: 11.5px; color: var(--texto-3); min-height: 15px; display: block; }
 .auto-busca.ok { color: var(--verde-texto); }
 .auto-busca.erro { color: var(--vermelho); }
+
+/* As peças compartilhadas no celular. A barra de navegação em si é do Internet Bank. */
+@media (max-width: 920px) {
+  main { padding: 16px 14px 60px; }
+  .cartao-conta { padding: 22px 20px 20px; border-radius: var(--raio); }
+  .acoes-rapidas { gap: 8px; }
+  .acao-rapida { flex-basis: calc(50% - 4px); min-width: 0; }
+  /* Dois indicadores por linha em vez de um: no celular, rolagem é o que mais custa. */
+  .grade.kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .kpi { padding: 12px 13px; }
+  .kpi .valor { font-size: 21px; }
+  .kpi .rotulo { font-size: 11.5px; }
+  /* O nome de quem pagou é o que importa: sobra mais largura para ele. */
+  .mov { gap: 11px; padding: 12px 13px; }
+  .mov .icone-mov { width: 36px; height: 36px; border-radius: 11px; }
+  .mov .corpo strong { font-size: 13.5px; }
+  .mov .valor { font-size: 14.5px; }
+  .mov .seta { display: none; }
+  .dia-tempo { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acao-rapida, .mov, .mov .seta { transition: none; }
+  .acao-rapida:hover { transform: none; }
+}
