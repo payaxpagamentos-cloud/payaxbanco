@@ -45,7 +45,7 @@ const comConhecimento = (db, empresaId, titulo, resposta, perguntas = null) =>
  * Troca o fetch global por um dublê da Graph API. Devolve { enviadas, chamadas, restaurar }.
  * `enviadas` recebe { tipo, texto, para, corpo } de cada mensagem que a plataforma tentou mandar.
  */
-function fingirMeta({ falharEm = () => null } = {}) {
+function fingirMeta({ falharEm = () => null, midia = null } = {}) {
   const original = global.fetch;
   const enviadas = [];
   const chamadas = [];
@@ -71,10 +71,11 @@ function fingirMeta({ falharEm = () => null } = {}) {
     }
     // Consulta de mídia e do número.
     if (/\/\d+$|fields=/.test(endereco)) {
-      return new Response(JSON.stringify({ url: 'https://exemplo/midia.bin', mime_type: 'image/jpeg', file_size: 1024, display_phone_number: '+55 11 3333-4444' }),
+      return new Response(JSON.stringify({ url: 'https://exemplo/midia.bin', mime_type: midia?.mime ?? 'image/jpeg', file_size: midia?.buffer?.length ?? 1024, display_phone_number: '+55 11 3333-4444' }),
         { status: 200, headers: { 'content-type': 'application/json' } });
     }
-    return new Response(Buffer.from('conteudo-binario'), { status: 200, headers: { 'content-type': 'image/jpeg' } });
+    // `midia` deixa o teste entregar um arquivo de verdade (um áudio, por exemplo).
+    return new Response(midia?.buffer ?? Buffer.from('conteudo-binario'), { status: 200, headers: { 'content-type': midia?.mime ?? 'image/jpeg' } });
   };
   return { enviadas, chamadas, restaurar: () => { global.fetch = original; } };
 }

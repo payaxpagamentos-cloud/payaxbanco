@@ -185,6 +185,11 @@ CREATE TABLE IF NOT EXISTS mensagens (
   responde_wa_id TEXT,
   status TEXT NOT NULL DEFAULT 'recebida' CHECK (status IN ('recebida','fila','enviada','entregue','lida','falhou')),
   erro TEXT,
+  -- Áudio do cliente vira texto aqui, sem tocar na coluna texto — assim fica registrado que a
+  -- mensagem veio falada, e quem lê sabe que pode ter erro de transcrição.
+  transcricao TEXT,
+  transcricao_status TEXT CHECK (transcricao_status IN ('pronta','falhou','longa','desligada')),
+  transcricao_ms INTEGER,
   tentativas INTEGER NOT NULL DEFAULT 0,
   proxima_em TEXT,
   criada_em TEXT NOT NULL,

@@ -65,6 +65,16 @@ async function guardarMidia(db, numero, mensagemId, midiaId) {
   }
 }
 
+/** Transcreve o áudio recebido e guarda o resultado na própria mensagem. Nunca derruba a conversa. */
+async function transcreverAudio(db, mensagemId, guardada) {
+  const transcricao = require('./transcricao');
+  const caminho = guardada?.arquivo ? midia.caminho(guardada.arquivo) : null;
+  const r = caminho ? await transcricao.transcrever(caminho) : { status: transcricao.modo() === 'desligada' ? 'desligada' : 'falhou', texto: null, ms: 0 };
+  db.prepare('UPDATE mensagens SET transcricao = ?, transcricao_status = ?, transcricao_ms = ? WHERE id = ?')
+    .run(r.texto, r.status, r.ms ?? 0, mensagemId);
+  return r;
+}
+
 /** Avisos de entrega e leitura: atualizam a mensagem que saiu. */
 function aplicarStatus(db, statuses) {
   const ORDEM = { enviada: 1, entregue: 2, lida: 3 };
@@ -135,7 +145,11 @@ async function receberMensagem(db, { numero, empresa, mensagem, perfil }) {
   }
   if (!preparo.mensagemId) return { repetida: true, conversa_id: preparo.conversa.id };
 
-  if (dados.midiaId) await guardarMidia(db, numero, preparo.mensagemId, dados.midiaId);
+  const guardada = dados.midiaId ? await guardarMidia(db, numero, preparo.mensagemId, dados.midiaId) : null;
+
+  // Áudio vira texto antes de a ZOE pensar: assim ela responde ao que a pessoa FALOU, em vez de
+  // pedir para escrever. O "digitando…" já está na tela do cliente enquanto isso acontece.
+  if (dados.tipo === 'audio') await transcreverAudio(db, preparo.mensagemId, guardada);
 
   let resultado = { acao: 'sem_resposta' };
   if (!dados.semResposta) {

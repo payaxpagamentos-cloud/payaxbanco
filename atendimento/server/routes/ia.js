@@ -30,6 +30,8 @@ module.exports = function rotasIa(db) {
     modelo_efetivo: cfg.modelo || config.ia.modelo,
     esforco_efetivo: cfg.esforco || config.ia.esforco,
     chave_no_servidor: claude.disponivel(),
+    // Se os áudios do cliente estão virando texto. Sem caminho de arquivo nem endereço interno.
+    transcricao: require('../lib/transcricao').situacao(),
     padroes: conversasLib.MSG,
   });
 

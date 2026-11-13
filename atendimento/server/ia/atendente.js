@@ -33,7 +33,9 @@ const IMAGEM_MAX_BYTES = 3 * 1024 * 1024;
 const IMAGENS_ACEITAS = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 const DESCRICAO_MIDIA = {
-  audio: '[o cliente enviou um áudio]', video: '[o cliente enviou um vídeo]',
+  // Quando o áudio não pôde ser transcrito: a ZOE precisa saber que existe um áudio que ela não
+  // ouviu, para pedir com educação que a pessoa escreva — e não fingir que entendeu.
+  audio: '[o cliente enviou um áudio que não foi possível transcrever — peça com gentileza para escrever]', video: '[o cliente enviou um vídeo]',
   documento: '[o cliente enviou um documento]', figurinha: '[o cliente enviou uma figurinha]',
   localizacao: '[o cliente enviou uma localização]', contato: '[o cliente enviou um contato]',
   imagem: '[o cliente enviou uma imagem]', nao_suportado: '[o cliente enviou algo que não conseguimos abrir]',
@@ -47,8 +49,23 @@ const registrarEvento = (db, conversa, { tipo, nome = null, detalhe = null, uso 
       Number(uso?.cache_read_input_tokens ?? 0) + Number(uso?.cache_creation_input_tokens ?? 0), ms, agora());
 
 /** Conteúdo de uma mensagem do cliente no formato da API (texto e, quando dá, a imagem). */
+/**
+ * O áudio transcrito entra como texto, marcado como transcrição. A marca importa: o whisper erra
+ * nome próprio e palavra rara ("roteador" pode virar outra coisa), e a ZOE precisa saber que,
+ * se algo não fizer sentido, o certo é confirmar com o cliente em vez de agir em cima do erro.
+ */
+const textoDoAudio = (m) => {
+  if (m.transcricao_status === 'pronta' && m.transcricao) return `[áudio do cliente, transcrito automaticamente — pode ter erros]: ${m.transcricao}`;
+  if (m.transcricao_status === 'longa') return '[o cliente enviou um áudio longo demais para transcrever — peça um resumo por escrito]';
+  return null;
+};
+
 function conteudoDoCliente(m) {
   const blocos = [];
+  if (m.tipo === 'audio') {
+    const t = textoDoAudio(m);
+    if (t) return [{ type: 'text', text: t }];
+  }
   if (m.tipo === 'imagem' && m.midia_arquivo && IMAGENS_ACEITAS.has(String(m.midia_mime).split(';')[0]) && Number(m.midia_bytes) <= IMAGEM_MAX_BYTES) {
     const caminho = midia.caminho(m.midia_arquivo);
     if (caminho && fs.existsSync(caminho)) {
@@ -65,7 +82,7 @@ function conteudoDoCliente(m) {
  * são 'assistant' (para a IA, o que a equipe já disse também é contexto). Mensagens de sistema ficam fora.
  */
 function historico(db, conversa) {
-  const linhas = db.prepare(`SELECT direcao, autor, tipo, texto, midia_arquivo, midia_mime, midia_bytes, usuario_id,
+  const linhas = db.prepare(`SELECT direcao, autor, tipo, texto, transcricao, transcricao_status, midia_arquivo, midia_mime, midia_bytes, usuario_id,
       (SELECT nome FROM usuarios WHERE id = mensagens.usuario_id) AS usuario_nome
     FROM mensagens WHERE conversa_id = ? AND tipo <> 'sistema' AND NOT (direcao = 'saida' AND status = 'falhou')
     ORDER BY id DESC LIMIT ?`).all(conversa.id, HISTORICO_MAX).reverse();
@@ -162,7 +179,9 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
 
   const cfg = conversas.cfgIa(db, empresa.id);
   const lista = filas.listar(db, empresa.id);
-  const texto = mensagem?.texto ?? '';
+  // O áudio transcrito passa pelas mesmas regras do texto: "quero falar com um atendente"
+  // dito em voz alta tem de valer igual ao escrito.
+  const texto = mensagem?.texto ?? (mensagem?.transcricao_status === 'pronta' ? mensagem.transcricao : null) ?? '';
   const primeira = Number(db.prepare("SELECT COUNT(*) AS n FROM mensagens WHERE conversa_id = ? AND direcao = 'entrada'").all(conversa.id)[0].n) <= 1;
 
   // Na fila esperando gente: só confirma a espera uma vez e não deixa a IA responder.

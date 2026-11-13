@@ -220,7 +220,7 @@ const JUNCOES = `FROM conversas c
 
 /** Última mensagem e quantas não foram lidas pela equipe (as do cliente depois da última resposta). */
 function enriquecer(db, c) {
-  const ultima = db.prepare("SELECT tipo, texto, autor, criada_em FROM mensagens WHERE conversa_id = ? AND tipo <> 'sistema' ORDER BY id DESC LIMIT 1").get(c.id);
+  const ultima = db.prepare("SELECT tipo, COALESCE(texto, transcricao) AS texto, autor, criada_em FROM mensagens WHERE conversa_id = ? AND tipo <> 'sistema' ORDER BY id DESC LIMIT 1").get(c.id);
   return {
     ...c,
     nome: c.contato_nome?.trim() || c.nome_perfil?.trim() || c.telefone,
@@ -282,6 +282,7 @@ function detalhe(db, empresaId, conversaId, { limiteMensagens = 300 } = {}) {
     WHERE c.id = ? AND c.empresa_id = ?`).get(conversaId, empresaId);
   if (!c) throw naoEncontrado('Conversa');
   const mensagens = db.prepare(`SELECT id, direcao, autor, usuario_id, tipo, texto, midia_arquivo, midia_nome, midia_mime, midia_bytes,
+      transcricao, transcricao_status, transcricao_ms,
       wa_id, responde_wa_id, status, erro, criada_em, enviada_em,
       (SELECT nome FROM usuarios WHERE id = mensagens.usuario_id) AS usuario_nome
     FROM mensagens WHERE conversa_id = ? ORDER BY id DESC LIMIT ?`).all(conversaId, limiteMensagens).reverse();

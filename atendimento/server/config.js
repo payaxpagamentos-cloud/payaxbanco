@@ -52,6 +52,29 @@ module.exports = {
     timeoutMs: Number(process.env.ATEND_IA_TIMEOUT_MS) || 60_000,
     baseUrl: process.env.ATEND_IA_BASE_URL || null,
   },
+  // Transcrição dos áudios do cliente com o whisper.cpp, na própria máquina: não custa nada por
+  // áudio, só CPU. Dois jeitos de rodar:
+  //   - servidor (recomendado): o whisper-server fica no ar com o modelo carregado, e cada áudio
+  //     leva uns 3 s. Basta ATEND_WHISPER_URL=http://127.0.0.1:8178.
+  //   - local: o whisper-cli é chamado a cada áudio e recarrega o modelo toda vez (~1,5 s a mais).
+  //     Basta ATEND_WHISPER_BIN e ATEND_WHISPER_MODELO apontarem para os arquivos.
+  // Sem nenhum dos dois, fica desligada e a ZOE pede para o cliente escrever.
+  // ATEND_TRANSCRICAO=desligada desliga de propósito (máquina apertada, por exemplo).
+  transcricao: {
+    modo: process.env.ATEND_TRANSCRICAO || 'auto',
+    url: (process.env.ATEND_WHISPER_URL || '').replace(/\/+$/, '') || null,
+    bin: process.env.ATEND_WHISPER_BIN || null,
+    modelo: process.env.ATEND_WHISPER_MODELO || null,
+    ffmpeg: process.env.ATEND_FFMPEG_BIN || 'ffmpeg',
+    ffprobe: process.env.ATEND_FFPROBE_BIN || 'ffprobe',
+    idioma: process.env.ATEND_WHISPER_IDIOMA || 'pt',
+    threads: Number(process.env.ATEND_WHISPER_THREADS) || 4,
+    // Quantos áudios ao mesmo tempo. Um por vez não trava a máquina quando chega uma rajada.
+    simultaneos: Number(process.env.ATEND_WHISPER_SIMULTANEOS) || 1,
+    // Áudio mais longo que isso não é transcrito: a ZOE pede um resumo por escrito.
+    maxSegundos: Number(process.env.ATEND_WHISPER_MAX_SEGUNDOS) || 180,
+    timeoutMs: Number(process.env.ATEND_WHISPER_TIMEOUT_MS) || 60_000,
+  },
   admin: {
     nome: process.env.ATEND_ADMIN_NOME || 'Master',
     email: process.env.ATEND_ADMIN_EMAIL || 'master@atendimento.com.br',

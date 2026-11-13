@@ -842,6 +842,13 @@ label.campo{ gap: 5px }
 .permissao strong{ font-weight:600 }
 @media (min-width: 900px){ .permissoes{ grid-template-columns:1fr 1fr } }
 
+/* Transcrição do áudio, embaixo do player: o atendente lê sem dar play. */
+.transcricao{ margin-top:6px; padding:8px 10px; border-left:3px solid var(--azul); border-radius:6px;
+  background:var(--surface-2); font-size:13px; line-height:1.45; max-width:420px }
+.transcricao p{ margin:2px 0 0 }
+.transcricao.mudo{ border-left-color:var(--borda); color:var(--text-2) }
+.rotulo-transcricao{ font-size:11px; font-weight:600; letter-spacing:.02em; text-transform:uppercase; color:var(--text-2) }
+
 /* ==========================================================================
    ACABAMENTO — vidro em todas as superfícies
    Vem por último de propósito: assim vale sobre as telas criadas depois do

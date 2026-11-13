@@ -171,7 +171,14 @@ export async function telaCaixa(ctx) {
     if (m.tipo === 'audio') {
       const audio = el('audio', { controls: true, class: 'midia-audio' });
       carregarComSessao(comSessao).then((b) => { if (b) audio.src = b; }).catch(() => {});
-      return audio;
+      // O atendente lê o que foi falado sem precisar dar play — e sabe que é transcrição.
+      const nota = {
+        pronta: m.transcricao ? el('div', { class: 'transcricao' },
+          el('span', { class: 'rotulo-transcricao' }, 'Transcrição automática'), el('p', {}, m.transcricao)) : null,
+        longa: el('div', { class: 'transcricao mudo' }, 'Áudio longo demais para transcrever.'),
+        falhou: el('div', { class: 'transcricao mudo' }, 'Não foi possível transcrever este áudio.'),
+      }[m.transcricao_status] ?? null;
+      return nota ? el('div', {}, audio, nota) : audio;
     }
     if (m.tipo === 'video') {
       const video = el('video', { controls: true, class: 'midia-video' });

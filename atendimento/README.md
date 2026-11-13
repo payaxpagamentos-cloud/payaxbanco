@@ -236,6 +236,40 @@ curl -X POST https://SEU-DOMINIO/atendimento/api/integracao/mensagens \
 A conversa aberta assim **não passa pela ZOE** (aviso automático não é atendimento): ela
 entra direto na fila da equipe, a menos que você mande `"com_ia": true`.
 
+## Áudios do cliente
+
+Cliente de provedor manda áudio o tempo todo. A ZOE transcreve com o **whisper.cpp na própria
+máquina** e responde ao que a pessoa **falou**. Não custa nada por áudio, e não passa pela Meta
+nem por terceiros — só usa CPU. Por isso não tem permissão: fica sempre ligada.
+
+Medido num servidor de 4 núcleos, modelo `small`, áudios de 7 a 13 s:
+
+| Modo | Tempo por áudio |
+|---|---|
+| `whisper-server` (modelo sempre carregado) — **recomendado** | ~2,6 a 3,7 s |
+| `whisper-cli` (recarrega o modelo a cada áudio) | ~4,5 a 5 s |
+
+O cliente vê o "digitando…" enquanto isso acontece.
+
+**Instalar:** `sudo ./scripts/instalar-whisper.sh` compila o whisper.cpp, baixa o modelo em
+português (~490 MB) e mostra o comando do servidor e a variável a configurar
+(`ATEND_WHISPER_URL=http://127.0.0.1:8178`). Precisa de `git`, `cmake`, `g++`, `make` e `ffmpeg`.
+
+Como funciona:
+
+- O áudio vira texto **antes** de a ZOE pensar, e entra marcado como transcrição automática. A
+  marca importa: o whisper erra palavra rara ("reiniciei o roteador" pode sair torto), e a ZOE
+  sabe que, se algo não fizer sentido, o certo é confirmar com o cliente.
+- As regras ouvem o áudio igual ao texto: "quero falar com um atendente" dito em voz alta
+  transfere na hora; "estou pensando em cancelar" abre o caso na Ouvidoria.
+- O atendente lê a transcrição embaixo do player, sem dar play.
+- Um áudio por vez (`ATEND_WHISPER_SIMULTANEOS`): uma rajada de 30 áudios não trava a máquina.
+- Acima de 3 minutos (`ATEND_WHISPER_MAX_SEGUNDOS`) não transcreve: a ZOE pede um resumo escrito.
+- Whisper fora do ar ou desinstalado nunca derruba a conversa: a ZOE pede com gentileza para o
+  cliente escrever. `ATEND_TRANSCRICAO=desligada` desliga de propósito, se a máquina apertar.
+
+O estado aparece em `ZOE › Como ela atende › Áudios do cliente`.
+
 ## Usuários e permissões
 
 O perfil é o **ponto de partida**, não uma cerca. Cada pessoa recebe o conjunto do perfil dela e,
@@ -443,6 +477,12 @@ O servidor **precisa estar acessível por https:// pela internet** — é a Meta
 | `ATEND_IA_ESFORCO` | `low` | Esforço de raciocínio: `low`…`max`. Atendimento curto vai bem com `low`. |
 | `ATEND_IA_MAX_TOKENS` | `2048` | Teto da resposta. Mensagem de WhatsApp é curta de propósito. |
 | `ATEND_IA_MAX_PASSOS` | `6` | Idas e voltas de ferramenta por mensagem. |
+| `ATEND_WHISPER_URL` | — | Endereço do `whisper-server` (recomendado), ex.: `http://127.0.0.1:8178`. |
+| `ATEND_WHISPER_BIN` / `ATEND_WHISPER_MODELO` | — | Alternativa sem servidor: o `whisper-cli` e o arquivo do modelo. |
+| `ATEND_TRANSCRICAO` | `auto` | `desligada` desliga a transcrição de propósito. |
+| `ATEND_WHISPER_SIMULTANEOS` | `1` | Quantos áudios são transcritos ao mesmo tempo. |
+| `ATEND_WHISPER_MAX_SEGUNDOS` | `180` | Áudio mais longo que isso não é transcrito (a ZOE pede resumo escrito). |
+| `ATEND_WHISPER_THREADS` | `4` | Núcleos usados pelo `whisper-cli` no modo local. |
 | `ATEND_GRAPH_VERSAO` | `v23.0` | Versão da Graph API da Meta. |
 | `ATEND_HTTP` | — | `1` permite ferramentas da empresa em `http://` (só rede interna; o padrão exige `https://`). |
 

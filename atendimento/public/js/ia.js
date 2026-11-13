@@ -284,7 +284,17 @@ async function configuracao(ctx, alvo) {
   const cfg = await api.get(`/empresas/${ctx.empresaId}/ia`);
   const filas = (await api.get(`/empresas/${ctx.empresaId}/filas`)).itens;
 
+  const t = cfg.transcricao;
   const f = el('form', { class: 'form colunas' },
+    t ? cartao('Áudios do cliente',
+      el('p', { style: 'margin:0 0 6px' },
+        el('span', { class: `etiqueta ${t.ligada ? 'ok' : ''}` }, t.ligada ? 'Transcrição ligada' : 'Transcrição desligada')),
+      el('p', { class: 'mudo', style: 'margin:0' }, t.descricao),
+      el('p', { class: 'pequeno mudo', style: 'margin:6px 0 0' },
+        t.ligada
+          ? `A ZOE responde ao que o cliente falou, e o atendente lê a transcrição embaixo do áudio. ${t.custo} `
+            + `Áudios acima de ${Math.round(t.max_segundos / 60)} min não são transcritos: a ZOE pede um resumo por escrito.`
+          : 'Quando o cliente manda áudio, a ZOE pede com gentileza para ele escrever.')) : null,
     cartao('Identidade e tom',
       marcar('ZOE ligada (ela faz o primeiro atendimento)', { name: 'ativa', checked: cfg.ativa }),
       campo('Nome dela', { name: 'nome_assistente', value: cfg.nome_assistente ?? 'ZOE', maxlength: 40 }),
