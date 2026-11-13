@@ -1,7 +1,7 @@
 'use strict';
 
 const express = require('express');
-const { agora, auditar, lerConfig, CONFIG_PADRAO } = require('../db');
+const { agora, auditar, lerConfig, transacao, CONFIG_PADRAO } = require('../db');
 const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { hashSenha } = require('../lib/senha');
@@ -96,9 +96,16 @@ module.exports = function rotasMaster(db) {
         throw new ErroNegocio('Digite o nome exato da empresa para confirmar a exclusão.');
       }
       // Exclusão lógica: o histórico de atendimento fica, mas ninguém mais entra nem recebe mensagem.
-      db.prepare("UPDATE empresas SET status = 'excluida' WHERE id = ?").run(id);
-      db.prepare('UPDATE usuarios SET ativo = 0 WHERE empresa_id = ?').run(id);
-      db.prepare('UPDATE numeros SET ativo = 0 WHERE empresa_id = ?').run(id);
+      transacao(db, () => {
+        db.prepare("UPDATE empresas SET status = 'excluida', telefonia_ativa = 0 WHERE id = ?").run(id);
+        db.prepare('UPDATE usuarios SET ativo = 0 WHERE empresa_id = ?').run(id);
+        db.prepare('UPDATE numeros SET ativo = 0 WHERE empresa_id = ?').run(id);
+        db.prepare('UPDATE chaves_api SET ativa = 0 WHERE empresa_id = ?').run(id);
+        // Telefonia: ramais desligados, campanhas encerradas e os números de telefone voltam ao estoque.
+        db.prepare('UPDATE pabx_ramais SET ativo = 0, online = 0 WHERE empresa_id = ?').run(id);
+        db.prepare("UPDATE pabx_campanhas SET status = 'encerrada' WHERE empresa_id = ?").run(id);
+        db.prepare('UPDATE pabx_numeros SET empresa_id = NULL, destino_tipo = NULL, destino_id = NULL WHERE empresa_id = ?').run(id);
+      });
       auditar(db, { usuario: req.usuario, empresaId: id, acao: 'excluiu a empresa', alvo: empresa.nome, ip: req.ip });
       res.json({ ok: true });
     } catch (err) { next(err); }

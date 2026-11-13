@@ -6,9 +6,10 @@ const config = require('./config');
 const { criarApi, tratarErro } = require('./api');
 const { limitar } = require('./lib/limitador');
 
-// media-src/img-src com blob: para tocar os áudios e abrir as imagens que o cliente manda pelo WhatsApp.
+// media-src/img-src com blob: para tocar os áudios e abrir as imagens que o cliente manda pelo WhatsApp;
+// mediastream: e o wss:// do Asterisk para o telefone do painel (WebRTC), quando configurado.
 const CSP = "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; "
-  + "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'";
+  + `media-src 'self' blob: mediastream:; connect-src 'self'${config.webrtc.origem ? ` ${config.webrtc.origem}` : ''}; frame-ancestors 'none'`;
 
 function criarApp(db) {
   const app = express();

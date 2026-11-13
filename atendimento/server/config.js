@@ -81,6 +81,20 @@ module.exports = {
     timeoutMs: Number(process.env.ATEND_WHISPER_TIMEOUT_MS) || 60_000,
   },
   // O dólar do dia vem da PTAX do Banco Central: pública, gratuita, sem chave.
+  // Telefone do painel (WebRTC): o endereço wss:// do Asterisk e o domínio SIP. Sem WSS, fica desligado.
+  webrtc: (() => {
+    const wss = String(process.env.ATEND_WEBRTC_WSS || process.env.PABX_WEBRTC_WSS || '').trim();
+    let url = null;
+    try { url = wss ? new URL(wss) : null; } catch { url = null; }
+    if (wss && (!url || url.protocol !== 'wss:')) console.warn('[ZOE] ATEND_WEBRTC_WSS deve começar com wss://; o telefone do painel ficará desligado.');
+    const ok = url && url.protocol === 'wss:';
+    return {
+      wss: ok ? url.toString() : null,
+      origem: ok ? `wss://${url.host}` : null,
+      dominio: process.env.ATEND_SIP_DOMINIO || process.env.PABX_SIP_DOMINIO || (ok ? url.hostname : null),
+      stun: String(process.env.ATEND_STUN ?? process.env.PABX_STUN ?? 'stun:stun.l.google.com:19302').split(',').map((x) => x.trim()).filter(Boolean),
+    };
+  })(),
   ptax: {
     url: (process.env.ATEND_PTAX_URL || 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata').replace(/\/+$/, ''),
     timeoutMs: Number(process.env.ATEND_PTAX_TIMEOUT_MS) || 15_000,

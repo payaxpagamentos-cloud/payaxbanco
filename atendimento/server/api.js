@@ -24,6 +24,9 @@ function criarApi(db) {
 
   api.use('/auth', require('./routes/auth')(db, autenticado));
   api.use('/integracao', require('./routes/integracao')(db));
+  // A central telefônica (Asterisk): chamadas, ramais, URA e campanhas, com a chave de escopo "central".
+  api.use('/central', require('./telefonia/rotas-central')(db));
+  api.use('/master/telefonia', autenticado, require('./telefonia/rotas-master')(db));
   api.use('/master', autenticado, require('./routes/master')(db));
   api.use('/empresas/:eid', autenticado, acessoEmpresa(db), require('./routes/empresa')(db));
   api.use((_req, _res, next) => next(new ErroNegocio('Rota não encontrada.', 404)));

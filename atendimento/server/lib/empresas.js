@@ -144,11 +144,17 @@ const numeroPublico = (n) => n && ({
 });
 
 /** Gera uma chave de API para a empresa. A chave em claro aparece uma única vez. */
-function criarChaveApi(db, empresaId, nome) {
-  const chave = `atd_${crypto.randomBytes(24).toString('base64url')}`;
-  const id = Number(db.prepare('INSERT INTO chaves_api (empresa_id, nome, prefixo, chave_hash, criada_em) VALUES (?, ?, ?, ?, ?)')
-    .run(empresaId, v.texto(nome, 'o nome da chave', 80), chave.slice(0, 12), crypto.createHash('sha256').update(chave).digest('hex'), agora()).lastInsertRowid);
-  return { id, chave, prefixo: chave.slice(0, 12) };
+/**
+ * Chave de API. Escopo "integracao" (atd_…): sistemas da empresa. Escopo "central" (cen_…): a
+ * central telefônica — informa as chamadas que viram cobrança, por isso só a equipe da plataforma
+ * cria. A chave aparece uma vez só; o banco guarda o hash.
+ */
+function criarChaveApi(db, empresaId, nome, { escopo = 'integracao', usuarioId = null } = {}) {
+  const chave = `${escopo === 'central' ? 'cen' : 'atd'}_${crypto.randomBytes(24).toString('base64url')}`;
+  const id = Number(db.prepare('INSERT INTO chaves_api (empresa_id, nome, prefixo, chave_hash, escopo, criada_por, criada_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(empresaId, v.texto(nome, 'o nome da chave', 80), chave.slice(0, 12), crypto.createHash('sha256').update(chave).digest('hex'),
+      escopo, usuarioId, agora()).lastInsertRowid);
+  return { id, chave, prefixo: chave.slice(0, 12), escopo };
 }
 
 module.exports = {

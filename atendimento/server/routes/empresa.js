@@ -578,6 +578,8 @@ module.exports = function rotasEmpresa(db) {
   // O Centro de Custo é de administrador da empresa e da plataforma. Esconder o menu não basta:
   // a rota precisa recusar, senão qualquer atendente lê a conta pela API.
   r.use('/reguas', exigirPermissao('custos.ver'), require('./regua')(db));
+  // Telefonia (o PABX dentro da ZOE): ramais, filas no telefone, URA, números, campanhas e chamadas.
+  r.use('/telefonia', require('../telefonia/rotas-empresa')(db));
   r.use('/', require('./cadastros')(db));
 
   // ---------- Relatórios ----------

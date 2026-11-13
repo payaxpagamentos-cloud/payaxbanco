@@ -30,6 +30,19 @@ CREATE TABLE IF NOT EXISTS empresas (
   cotacao_auto INTEGER NOT NULL DEFAULT 1,
   -- Cotação informada à mão (reais por dólar ×10000). Também é a reserva se o Banco Central não responder.
   cotacao_x10000 INTEGER CHECK (cotacao_x10000 IS NULL OR cotacao_x10000 > 0),
+  -- Telefonia (o PABX dentro da ZOE): ligada por empresa, com limites e tarifas por minuto.
+  telefonia_ativa INTEGER NOT NULL DEFAULT 0,
+  telefonia_tipo TEXT NOT NULL DEFAULT 'pabx' CHECK (telefonia_tipo IN ('pabx','discador','callcenter')),
+  limite_ramais INTEGER NOT NULL DEFAULT 10 CHECK (limite_ramais >= 0),
+  limite_canais INTEGER NOT NULL DEFAULT 10 CHECK (limite_canais >= 0),
+  disco_mb INTEGER NOT NULL DEFAULT 1024 CHECK (disco_mb >= 0),
+  tts_limite INTEGER NOT NULL DEFAULT 0 CHECK (tts_limite >= 0),
+  stt_limite INTEGER NOT NULL DEFAULT 0 CHECK (stt_limite >= 0),
+  tarifa_fixo_centavos INTEGER NOT NULL DEFAULT 0 CHECK (tarifa_fixo_centavos >= 0),
+  tarifa_movel_centavos INTEGER NOT NULL DEFAULT 0 CHECK (tarifa_movel_centavos >= 0),
+  tarifa_internacional_centavos INTEGER NOT NULL DEFAULT 0 CHECK (tarifa_internacional_centavos >= 0),
+  tronco_id INTEGER REFERENCES pabx_troncos(id),
+  gravar_chamadas INTEGER NOT NULL DEFAULT 1,
   motivo_bloqueio TEXT,
   criada_em TEXT NOT NULL
 );
@@ -87,6 +100,9 @@ CREATE TABLE IF NOT EXISTS filas (
   fecha TEXT NOT NULL DEFAULT '18:00',
   ordem INTEGER NOT NULL DEFAULT 0,
   ativa INTEGER NOT NULL DEFAULT 1,
+  -- No telefone: como a fila toca os ramais dela e quanto tempo o cliente espera.
+  estrategia TEXT NOT NULL DEFAULT 'todos' CHECK (estrategia IN ('todos','sequencial','aleatorio','menos_chamadas')),
+  espera_maxima_s INTEGER NOT NULL DEFAULT 120 CHECK (espera_maxima_s BETWEEN 10 AND 3600),
   criada_em TEXT NOT NULL,
   UNIQUE (empresa_id, nome)
 );
@@ -594,6 +610,11 @@ CREATE TABLE IF NOT EXISTS chaves_api (
   prefixo TEXT NOT NULL,
   chave_hash TEXT NOT NULL,
   ativa INTEGER NOT NULL DEFAULT 1,
+  -- 'integracao': sistemas da empresa (criada pelo administrador dela).
+  -- 'central': a central telefônica — informa as chamadas que viram cobrança, por isso só a equipe
+  -- da plataforma cria.
+  escopo TEXT NOT NULL DEFAULT 'integracao' CHECK (escopo IN ('integracao','central')),
+  criada_por INTEGER REFERENCES usuarios(id),
   ultimo_uso TEXT,
   criada_em TEXT NOT NULL
 );
@@ -756,6 +777,177 @@ CREATE TABLE IF NOT EXISTS orcamento_avisos (
   UNIQUE (empresa_id, mes, marco)
 );
 
+-- ================= Telefonia (PABX) =================
+-- Ramais, URAs, números, campanhas e chamadas. As filas, empresas e usuários são os mesmos do
+-- resto da ZOE: a fila "Suporte" é a mesma no WhatsApp e no telefone.
+
+CREATE TABLE IF NOT EXISTS pabx_troncos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  host TEXT NOT NULL,
+  porta INTEGER NOT NULL DEFAULT 5060,
+  usuario TEXT,
+  senha TEXT,
+  prefixo TEXT,
+  canais INTEGER NOT NULL DEFAULT 30 CHECK (canais > 0),
+  custo_fixo_centavos INTEGER NOT NULL DEFAULT 0 CHECK (custo_fixo_centavos >= 0),
+  custo_movel_centavos INTEGER NOT NULL DEFAULT 0 CHECK (custo_movel_centavos >= 0),
+  custo_internacional_centavos INTEGER NOT NULL DEFAULT 0 CHECK (custo_internacional_centavos >= 0),
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pabx_ramais (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  numero TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  email TEXT,
+  senha_sip TEXT NOT NULL,
+  gravar INTEGER NOT NULL DEFAULT 1,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  online INTEGER NOT NULL DEFAULT 0,
+  registro_em TEXT,
+  registro_ip TEXT,
+  registro_agente TEXT,
+  criado_em TEXT NOT NULL,
+  UNIQUE (empresa_id, numero)
+);
+
+CREATE TABLE IF NOT EXISTS pabx_fila_ramais (
+  fila_id INTEGER NOT NULL REFERENCES filas(id) ON DELETE CASCADE,
+  ramal_id INTEGER NOT NULL REFERENCES pabx_ramais(id) ON DELETE CASCADE,
+  PRIMARY KEY (fila_id, ramal_id)
+);
+
+CREATE TABLE IF NOT EXISTS pabx_uras (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  mensagem TEXT NOT NULL,
+  -- [{ "digito": "1", "destino_tipo": "ramal"|"fila"|"ura", "destino_id": 3 }]
+  opcoes TEXT NOT NULL DEFAULT '[]',
+  -- 'classica': fala a mensagem e espera a tecla, sempre igual.
+  -- 'inteligente': consulta o IXC pelo número que ligou e abre pelo motivo mais provável
+  --   daquela pessoa — bloqueado por atraso, fatura vencida, falha na região.
+  tipo TEXT NOT NULL DEFAULT 'classica' CHECK (tipo IN ('classica','inteligente')),
+  -- Situações ligadas e a fala de cada uma: { "bloqueado": { "ativa": 1, "fala": "..." }, ... }
+  situacoes TEXT NOT NULL DEFAULT '{}',
+  -- Para onde vai quem pede atendente, não escolhe nada ou erra demais.
+  fila_padrao_id INTEGER REFERENCES filas(id) ON DELETE SET NULL,
+  -- Tecla que sempre leva a uma pessoa. Nenhuma URA pode prender o cliente.
+  tecla_atendente TEXT NOT NULL DEFAULT '0',
+  -- Depois de N erros ou silêncios, transfere em vez de repetir o menu.
+  max_tentativas INTEGER NOT NULL DEFAULT 3 CHECK (max_tentativas BETWEEN 1 AND 5),
+  criada_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pabx_numeros (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  numero TEXT NOT NULL UNIQUE,
+  descricao TEXT,
+  tronco_id INTEGER REFERENCES pabx_troncos(id),
+  empresa_id INTEGER REFERENCES empresas(id),
+  destino_tipo TEXT CHECK (destino_tipo IN ('ramal','fila','ura')),
+  destino_id INTEGER,
+  criado_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pabx_contatos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  telefone TEXT NOT NULL,
+  email TEXT,
+  organizacao TEXT,
+  observacoes TEXT,
+  criado_em TEXT NOT NULL,
+  UNIQUE (empresa_id, telefone)
+);
+
+CREATE TABLE IF NOT EXISTS pabx_campanhas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  modo TEXT NOT NULL DEFAULT 'progressivo' CHECK (modo IN ('preditivo','progressivo','preview')),
+  status TEXT NOT NULL DEFAULT 'rascunho' CHECK (status IN ('rascunho','ativa','pausada','encerrada')),
+  fila_id INTEGER REFERENCES filas(id),
+  canais INTEGER NOT NULL DEFAULT 1 CHECK (canais > 0),
+  tentativas_max INTEGER NOT NULL DEFAULT 3 CHECK (tentativas_max BETWEEN 1 AND 10),
+  criada_em TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pabx_campanha_contatos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campanha_id INTEGER NOT NULL REFERENCES pabx_campanhas(id) ON DELETE CASCADE,
+  nome TEXT,
+  telefone TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','discando','atendido','nao_atendido','ocupado','falha')),
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  ultima_tentativa TEXT,
+  UNIQUE (campanha_id, telefone)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pabx_campanha_contatos ON pabx_campanha_contatos(campanha_id, status);
+
+CREATE TABLE IF NOT EXISTS pabx_chamadas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  uid TEXT NOT NULL,
+  direcao TEXT NOT NULL CHECK (direcao IN ('entrada','saida','interna')),
+  origem TEXT NOT NULL,
+  destino TEXT NOT NULL,
+  tipo_destino TEXT NOT NULL DEFAULT 'interno' CHECK (tipo_destino IN ('interno','fixo','movel','internacional')),
+  ramal_id INTEGER REFERENCES pabx_ramais(id),
+  numero_id INTEGER REFERENCES pabx_numeros(id),
+  campanha_id INTEGER REFERENCES pabx_campanhas(id),
+  campanha_contato_id INTEGER REFERENCES pabx_campanha_contatos(id),
+  tronco_id INTEGER REFERENCES pabx_troncos(id),
+  status TEXT NOT NULL DEFAULT 'em_curso' CHECK (status IN ('em_curso','atendida','nao_atendida','ocupado','falha')),
+  inicio TEXT NOT NULL,
+  atendida_em TEXT,
+  fim TEXT,
+  duracao_s INTEGER NOT NULL DEFAULT 0,
+  tarifado_s INTEGER NOT NULL DEFAULT 0,
+  custo_centavos INTEGER NOT NULL DEFAULT 0,
+  gravacao_bytes INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (empresa_id, uid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pabx_chamadas_empresa ON pabx_chamadas(empresa_id, inicio);
+
+CREATE INDEX IF NOT EXISTS idx_pabx_chamadas_inicio ON pabx_chamadas(inicio);
+
+CREATE INDEX IF NOT EXISTS idx_pabx_chamadas_em_curso ON pabx_chamadas(empresa_id) WHERE fim IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_pabx_chamadas_origem ON pabx_chamadas(empresa_id, origem);
+
+CREATE INDEX IF NOT EXISTS idx_pabx_chamadas_destino ON pabx_chamadas(empresa_id, destino);
+
+CREATE INDEX IF NOT EXISTS idx_pabx_chamadas_ramal ON pabx_chamadas(ramal_id, inicio);
+
+CREATE TABLE IF NOT EXISTS pabx_uso_recursos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  recurso TEXT NOT NULL CHECK (recurso IN ('tts','stt')),
+  quantidade INTEGER NOT NULL CHECK (quantidade > 0),
+  criado_em TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_pabx_uso_recursos ON pabx_uso_recursos(empresa_id, recurso, criado_em);
+
+CREATE TABLE IF NOT EXISTS pabx_ura_ligacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  uid TEXT NOT NULL,
+  ura_id INTEGER NOT NULL REFERENCES pabx_uras(id) ON DELETE CASCADE,
+  cliente_id TEXT NOT NULL,
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  confirmada_em TEXT,
+  criada_em TEXT NOT NULL,
+  UNIQUE (empresa_id, uid)
+);
+
 CREATE TABLE IF NOT EXISTS configuracoes (
   chave TEXT PRIMARY KEY,
   valor TEXT NOT NULL
@@ -800,6 +992,21 @@ const CONFIG_PADRAO = {
   wa_preco_marketing_usd: '62500',
   // Cotação usada quando a empresa não informou a dela: reais por dólar, ×10000 (5,4000 = 54000).
   wa_cotacao_padrao: '54000',
+  // ---- Telefonia ----
+  // Tarifação: cobra no mínimo `cadencia_inicial_s` e depois em blocos de `cadencia_s` (padrão 30/6).
+  cadencia_inicial_s: '30',
+  cadencia_s: '6',
+  // Tarifas por minuto sugeridas para as empresas novas.
+  tarifa_fixo_centavos: '8',
+  tarifa_movel_centavos: '25',
+  tarifa_internacional_centavos: '150',
+  limite_ramais_padrao: '10',
+  limite_canais_padrao: '10',
+  disco_mb_padrao: '1024',
+  // Chamadas em curso há mais tempo que isso são encerradas como falha (a central telefônica não avisou o fim).
+  chamada_max_horas: '6',
+  // Ramal sem novo registro há mais tempo que isso passa a contar como offline.
+  registro_expira_min: '10',
 };
 
 const agora = () => new Date().toISOString();

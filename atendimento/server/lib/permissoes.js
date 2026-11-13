@@ -43,6 +43,11 @@ const CATALOGO = [
   ['zoe.alertas', 'ZOE', 'Cadastrar alertas de rede', 'Declarar falha em massa e manutenção programada.'],
   ['zoe.testar', 'ZOE', 'Testar a ZOE', 'Conversar com ela sem gastar mensagem com cliente.'],
 
+  // ---------- Telefonia ----------
+  ['telefonia.ver', 'Telefonia', 'Ver a telefonia', 'Ramais, filas no telefone, URA, chamadas, campanhas e supervisão.'],
+  ['telefonia.editar', 'Telefonia', 'Configurar a telefonia', 'Criar ramal, montar URA, apontar número e importar campanha.'],
+  ['telefonia.softphone', 'Telefonia', 'Usar o telefone do painel', 'Fazer e atender ligação pelo navegador, no próprio ramal.'],
+
   // ---------- Dinheiro ----------
   ['custos.ver', 'Centro de Custo', 'Ver a conta da Meta', 'Gasto, economia, orçamento e fechamento.'],
   ['custos.editar', 'Centro de Custo', 'Mexer em réguas e orçamento', 'Criar régua, disparar, definir teto e lançar a fatura.'],
@@ -79,12 +84,12 @@ const PADRAO = {
   cliente: TODAS,
   supervisor: [
     'atendimentos.ver', 'cliente.ver', 'chamados.ver', 'ouvidoria.ver',
-    'zoe.ver', 'custos.ver', 'filas.ver', 'relatorios.ver', 'usuarios.ver', 'configuracoes.ver',
+    'zoe.ver', 'custos.ver', 'filas.ver', 'relatorios.ver', 'usuarios.ver', 'configuracoes.ver', 'telefonia.ver',
   ],
   atendente: [
     'atendimentos.ver', 'atendimentos.atender', 'atendimentos.transferir', 'atendimentos.notas', 'atendimentos.etiquetas',
     'cliente.ver', 'cliente.editar', 'cliente.financeiro',
-    'chamados.ver', 'chamados.editar', 'ouvidoria.ver',
+    'chamados.ver', 'chamados.editar', 'ouvidoria.ver', 'telefonia.softphone',
   ],
 };
 

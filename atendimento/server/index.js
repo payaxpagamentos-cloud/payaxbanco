@@ -18,6 +18,11 @@ criarApp(db).listen(config.port, () => {
 // A fila de saída também gira sozinha: uma mensagem que falhou volta a ser tentada mesmo sem ninguém no painel.
 setInterval(() => { processarFila(db).catch((err) => console.error('[ZOE Atende] Falha na fila de envio:', err.message)); }, 20_000).unref();
 
+// Telefonia: encerra chamadas presas e marca offline os ramais que pararam de se registrar.
+setInterval(() => {
+  try { require('./telefonia/chamadas').manutencao(db); } catch (err) { console.error('[ZOE] Falha na manutenção da telefonia:', err.message); }
+}, 60_000).unref();
+
 // Encerra conversas abandonadas, cobra o CSAT e limpa os registros antigos.
 setInterval(() => {
   manutencao(db).catch((err) => console.error('[ZOE Atende] Falha na manutenção:', err.message));

@@ -168,5 +168,20 @@ function objeto(v, nome) {
 
 const booleano = (v) => v === true || v === 1 || v === '1' || v === 'true' || v === 'on';
 
-module.exports = { digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data, dataHora,
+/** Ramal: 2 a 6 dígitos. */
+function ramal(v) {
+  const r = String(v ?? '').trim();
+  exigir(/^\d{2,6}$/.test(r), 'Ramal inválido (use de 2 a 6 dígitos).');
+  return r;
+}
+
+/** Número de telefone (DID, destino de campanha): só dígitos, de 8 a 15, com o + opcional removido. */
+function numeroTelefone(v, nome = 'o número') {
+  const t = digitos(v);
+  exigir(t.length >= 8 && t.length <= 15, `${nome[0].toUpperCase()}${nome.slice(1)} inválido.`);
+  return t;
+}
+
+module.exports = {
+  ramal, numeroTelefone, digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data, dataHora,
   numeroTelefone, whatsapp, horario, diasSemana, lista, endereco, nomeFerramenta, objeto, booleano };
