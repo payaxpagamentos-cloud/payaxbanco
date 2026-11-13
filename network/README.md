@@ -90,7 +90,11 @@ Migrações: aplicadas automaticamente no start, em ordem e numa transação cad
 
 ## Integrações
 
-### ZOE Atende — custo do WhatsApp (conectado de verdade)
+### ZOE Atende — custo do WhatsApp (pronto, porém DESLIGADO)
+
+> O custo do WhatsApp vai para outro Manager, não para este. O conector existe, testado, mas fica
+> fora do ar até o destino certo ser definido: ligue com `NETWORK_CUSTO_WHATSAPP=1` e o cartão de
+> integração, a rota `/api/custos` e a tela voltam a aparecer. Nada precisa ser reescrito.
 
 Usa a API de integração do `atendimento/` (`atendimento/server/routes/integracao.js`):
 `GET <base>/api/integracao/custos?meses=12` com `X-Api-Key`.

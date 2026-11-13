@@ -1,5 +1,8 @@
 /**
- * Mensagens ativas e a conta da Meta.
+ * Centro de Custo: a conta da Meta e as réguas de mensagens ativas.
+ *
+ * Tela de administrador da empresa e da plataforma. Atendente e supervisor não entram aqui:
+ * orçamento e fatura são decisão de quem responde pelo dinheiro.
  *
  * A tela foi feita em torno de uma pergunta: quanto a gente deixou de gastar? Por isso a economia
  * aparece do lado do gasto, e cada régua mostra quantas mensagens ela não precisou mandar.

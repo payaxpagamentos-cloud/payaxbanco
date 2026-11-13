@@ -4,7 +4,7 @@ import { el, limpar, icone, pode, cabecalho, painel, tabela, etqDe, dataHora, de
 export default async function integracoes({ alvo }) {
   const corpo = el('div');
   limpar(alvo, cabecalho({ sobretitulo: 'Fontes de dados', titulo: 'Integrações',
-    descricao: 'Rastreador, ZOE Atende, monitoramento da rede e Downdetector. Credenciais ficam só no servidor (cifradas) e nunca voltam para a tela. Cada fonte mostra o último sucesso, o erro e o ID para diagnóstico.' }), corpo);
+    descricao: 'Rastreador, monitoramento da rede e Downdetector. Credenciais ficam só no servidor (cifradas) e nunca voltam para a tela. Cada fonte mostra o último sucesso, o erro e o ID para diagnóstico.' }), corpo);
   const atualizar = () => carregar(corpo, () => api.get('/integracoes'), (d) => {
     const ra = d.integracoes.find((x) => x.tipo === 'rastreador');
     const dd = d.integracoes.find((x) => x.tipo === 'downdetector');
@@ -13,10 +13,14 @@ export default async function integracoes({ alvo }) {
       cartao('Rastreador de Veículos', 'carro', ra, 'Posições, trajetos e dispositivos pela API de integração do rastreador (chave da empresa, cabeçalho X-Api-Key).', [
         pode('integracoes.editar') ? botao('Configurar', () => configurarRastreador(ra, atualizar), { tipo: 'secundario pequeno' }) : null,
         pode('integracoes.editar') && ra.credencial_configurada ? botao('Testar conexão', () => testar('rastreador', atualizar), { tipo: 'pequeno' }) : null]),
-      cartao('ZOE Atende — custo do WhatsApp', 'dinheiro', at, 'O que a Meta cobra por mensagem, o que a régua deixou de gastar e os meses fechados, pela API de integração do ZOE Atende (chave da empresa, cabeçalho X-Api-Key).', [
-        pode('integracoes.editar') ? botao('Configurar', () => configurarAtendimento(at, atualizar), { tipo: 'secundario pequeno' }) : null,
-        pode('integracoes.editar') && at.credencial_configurada ? botao('Testar conexão', () => testar('atendimento', atualizar), { tipo: 'pequeno' }) : null,
-        el('a', { class: 'botao fantasma pequeno', href: '#/custos' }, 'Ver a conta', icone('seta'))]),
+      // O ZOE Atende só aparece quando o servidor devolve o tipo, isto é, quando o destino
+      // do custo do WhatsApp estiver definido (NETWORK_CUSTO_WHATSAPP=1).
+      at
+        ? cartao('ZOE Atende — custo do WhatsApp', 'dinheiro', at, 'O que a Meta cobra por mensagem, o que a régua deixou de gastar e os meses fechados, pela API de integração do ZOE Atende (chave da empresa, cabeçalho X-Api-Key).', [
+          pode('integracoes.editar') ? botao('Configurar', () => configurarAtendimento(at, atualizar), { tipo: 'secundario pequeno' }) : null,
+          pode('integracoes.editar') && at.credencial_configurada ? botao('Testar conexão', () => testar('atendimento', atualizar), { tipo: 'pequeno' }) : null,
+          el('a', { class: 'botao fantasma pequeno', href: '#/custos' }, 'Ver a conta', icone('seta'))])
+        : null,
       cartao('Downdetector', 'globo', dd, 'Contexto externo de serviços. Requer acesso autorizado à API; endpoints e campos vêm da documentação do seu contrato.', [
         pode('integracoes.editar') ? botao('Configurar', () => configurarDowndetector(dd, atualizar), { tipo: 'secundario pequeno' }) : null,
         pode('integracoes.editar') ? botao('Serviços acompanhados', () => servicos(atualizar), { tipo: 'secundario pequeno' }) : null,
@@ -37,7 +41,7 @@ export default async function integracoes({ alvo }) {
         { titulo: 'Fonte', valor: (s) => s.tipo }, { titulo: 'Início', valor: (s) => dataHora(s.iniciado_em, { segundos: true }) }, { titulo: 'Resultado', valor: (s) => etqDe('estadoIntegracao', s.resultado === 'ok' ? 'conectada' : s.resultado) },
         { titulo: 'Itens', valor: (s) => s.itens, classe: 'num' }, { titulo: 'Tempo', valor: (s) => `${s.duracao_ms ?? '—'} ms`, classe: 'num' },
         { titulo: 'Erro', valor: (s) => (s.erro ? el('span', { class: 'fraco' }, `${s.erro}${s.erro_id ? ` · ID ${s.erro_id}` : ''}`) : '—') },
-      ], [...ra.sincronizacoes, ...dd.sincronizacoes, ...at.sincronizacoes].sort((a, b) => b.id - a.id).slice(0, 15), { vazioTexto: 'Nenhuma coleta executada ainda.' }), { semCorpo: true }));
+      ], [...ra.sincronizacoes, ...dd.sincronizacoes, ...(at?.sincronizacoes ?? [])].sort((a, b) => b.id - a.id).slice(0, 15), { vazioTexto: 'Nenhuma coleta executada ainda.' }), { semCorpo: true }));
   });
   atualizar();
 }

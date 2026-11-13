@@ -21,6 +21,7 @@ export async function telaIa(ctx) {
     conhecimento: ['Base de conhecimento', conhecimento],
     intencoes: ['Intenções', intencoes],
     ferramentas: ['Ferramentas', ferramentas],
+    alertas: ['Alertas de rede', alertasDeRede],
     configuracao: ['Como ela atende', configuracao],
     ixc: ['Provedor (IXC)', provedorIxc],
     teste: ['Testar', teste],
@@ -512,3 +513,186 @@ function resultadoTeste(pergunta, r) {
 }
 
 export { telaIa as default };
+
+// ---------- Alertas de rede ----------
+
+// O rótulo longo explica a escolha no formulário; o curto é o que cabe numa coluna de tabela
+// sem repetir a mesma frase em toda linha.
+const ABRANGENCIAS = {
+  chave: 'Só quem está na área (bairro, cidade, OLT, caixa)',
+  clientes: 'Só uma lista de clientes',
+  todos: 'Todos os clientes da base',
+};
+const ABRANGENCIA_CURTA = { chave: 'Por área', clientes: 'Por lista', todos: 'Toda a base' };
+const SITUACOES = {
+  vigente: ['Em vigor', 'ok'], agendado: ['Agendado', 'info'],
+  encerrado: ['Encerrado', ''], desligado: ['Desligado', ''],
+};
+
+/** ISO para o que o <input type="datetime-local"> entende, no fuso de quem está olhando. */
+const paraCampoLocal = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
+const deCampoLocal = (v) => (v ? new Date(v).toISOString() : null);
+
+async function alertasDeRede(ctx, alvo) {
+  const conteudo = el('div');
+
+  const desenhar = async () => {
+    const d = await api.get(`/empresas/${ctx.empresaId}/alertas`);
+    const vigentes = d.itens.filter((a) => a.situacao === 'vigente');
+
+    limpar(conteudo,
+      cartao('Por que isto existe',
+        el('p', { class: 'mudo', style: 'margin:0' },
+          'O cadastro do IXC nem sempre está atualizado. Se a ZOE decidir sozinha, pelo cadastro, que existe falha na '
+          + 'região do cliente, ela vai afirmar coisa errada — e afirmar errado com confiança é pior do que não saber. '
+          + 'Aqui a equipe escreve o que está acontecendo de verdade, com período e área, e a ZOE só conta para quem '
+          + 'está dentro. Enquanto o cadastro não estiver confiável, quem sabe da falha é você.')),
+
+      vigentes.length
+        ? cartao(`Em vigor agora (${vigentes.length})`,
+          el('p', { class: 'pequeno mudo', style: 'margin:0 0 10px' },
+            'A ZOE confere estes alertas antes de diagnosticar conexão e antes de abrir chamado técnico.'),
+          el('div', { class: 'economia-origens' }, vigentes.map((a) => el('div', { class: 'origem-economia' },
+            el('strong', {}, a.titulo),
+            el('p', { class: 'pequeno', style: 'margin:4px 0' }, `"${a.mensagem}"`),
+            el('p', { class: 'pequeno mudo', style: 'margin:0' },
+              `${a.tipo_nome} · ${ABRANGENCIAS[a.abrangencia]} · até ${dataHora(a.fim)}`
+              + (a.avisados ? ` · ${inteiro(a.avisados)} cliente(s) já avisado(s)` : ' · ninguém avisado ainda'))))))
+        : null,
+
+      cartao('Todos os alertas',
+        d.itens.length
+          ? tabela(['Alerta', 'Tipo', 'Abrange', 'Período', '>Avisados', 'Situação', ''],
+            d.itens.map((a) => el('tr', {},
+              td(el('div', {},
+                el('strong', {}, a.titulo),
+                el('div', { class: 'pequeno mudo' }, a.mensagem.length > 90 ? `${a.mensagem.slice(0, 90)}…` : a.mensagem))),
+              td(a.tipo_nome),
+              td(el('div', {},
+                el('span', {}, ABRANGENCIA_CURTA[a.abrangencia] ?? a.abrangencia),
+                a.abrangencia === 'chave' && a.chaves.length
+                  ? el('div', { class: 'pequeno mudo' }, a.chaves.slice(0, 3).join(', ') + (a.chaves.length > 3 ? ` +${a.chaves.length - 3}` : ''))
+                  : a.abrangencia === 'clientes'
+                    ? el('div', { class: 'pequeno mudo' }, `${inteiro(a.clientes.length)} cliente(s)`)
+                    : null)),
+              td(el('div', {}, dataHora(a.inicio), el('div', { class: 'pequeno mudo' }, `até ${dataHora(a.fim)}`))),
+              td(inteiro(a.avisados), 'dir num'),
+              td(el('span', { class: `etiqueta ${SITUACOES[a.situacao]?.[1] ?? ''}` }, SITUACOES[a.situacao]?.[0] ?? a.situacao)),
+              td(ctx.somenteLeitura ? null : el('div', { class: 'linha', style: 'gap:4px;justify-content:flex-end' },
+                ctx.soAdmin ? botaoIcone('teste', 'Testar em um cliente', () => testarAlerta(ctx, a)) : null,
+                ctx.soAdmin ? botaoIcone(a.ativo ? 'encerrar' : 'ok', a.ativo ? 'Desligar' : 'Ligar', async () => {
+                  await api.patch(`/empresas/${ctx.empresaId}/alertas/${a.id}`, { ativo: !a.ativo });
+                  toast(a.ativo ? 'Alerta desligado.' : 'Alerta ligado.');
+                  await desenhar();
+                }) : null,
+                ctx.soAdmin ? botaoIcone('editar', 'Editar', () => editarAlerta(ctx, d, a, desenhar)) : null,
+                ctx.soAdmin ? botaoIcone('lixo', 'Excluir', async () => {
+                  if (!await confirmar('Excluir alerta', `"${a.titulo}" será removido. O histórico de quem já foi avisado se perde.`)) return;
+                  await api.delete(`/empresas/${ctx.empresaId}/alertas/${a.id}`);
+                  toast('Alerta excluído.');
+                  await desenhar();
+                }, 'perigo') : null), 'dir'))))
+          : vazio('Nenhum alerta cadastrado.',
+            'Quando houver uma falha em massa ou uma manutenção programada, cadastre aqui: a ZOE passa a avisar quem está na área, '
+            + 'em vez de abrir dezenas de chamados do mesmo problema.')));
+  };
+
+  limpar(alvo,
+    ctx.soAdmin
+      ? acoesTopo(botao('Novo alerta', 'primario', async () => {
+        const d = await api.get(`/empresas/${ctx.empresaId}/alertas`);
+        editarAlerta(ctx, d, null, desenhar);
+      }))
+      : null,
+    conteudo);
+  await desenhar();
+}
+
+function editarAlerta(ctx, dados, a, depois) {
+  const agora = new Date();
+  const emSeisHoras = new Date(Date.now() + 6 * 3600_000);
+  let abrangencia = a?.abrangencia ?? 'chave';
+
+  const campoChaves = area('Área afetada — um valor por linha', {
+    name: 'chaves', rows: 5,
+    placeholder: 'Centro\nJardim América\nOLT-03\nCTO-14',
+  }, (a?.chaves ?? []).join('\n'));
+  const campoClientes = area('Códigos de cliente ou contrato no IXC — um por linha', {
+    name: 'clientes', rows: 5, placeholder: '1042\n1177\n1189',
+  }, (a?.clientes ?? []).join('\n'));
+  const campoCampos = area('Campos do cadastro a comparar — um por linha (vazio = os padrões)', {
+    name: 'campos', rows: 3, placeholder: dados.campos_padrao.slice(0, 4).join('\n'),
+  }, (a?.campos ?? []).join('\n'));
+
+  const blocoChave = el('div', {}, campoChaves, campoCampos,
+    el('p', { class: 'pequeno mudo' },
+      `A comparação é exata, sem acento e sem diferenciar maiúscula: "Centro" NÃO pega "Centro Novo". `
+      + `Campos padrão: ${dados.campos_padrao.join(', ')}.`));
+  const blocoClientes = el('div', {}, campoClientes);
+  const aplicar = () => {
+    blocoChave.hidden = abrangencia !== 'chave';
+    blocoClientes.hidden = abrangencia !== 'clientes';
+  };
+
+  return formModal(a ? `Editar "${a.titulo}"` : 'Novo alerta de rede', () => {
+    const sel = escolha('Quem recebe este aviso', 'abrangencia', ABRANGENCIAS, abrangencia);
+    sel.querySelector('select').addEventListener('change', (e) => { abrangencia = e.target.value; aplicar(); });
+    queueMicrotask(aplicar);
+    return [
+      campo('Título (só a equipe vê)', { name: 'titulo', required: true, maxlength: 120, placeholder: 'Rompimento de fibra no Centro', value: a?.titulo ?? '' }),
+      area('O que a ZOE vai dizer ao cliente', { name: 'mensagem', rows: 3, required: true, maxlength: 1000,
+        placeholder: 'Já identificamos uma falha que afeta a sua região e a equipe técnica está no local.' }, a?.mensagem ?? ''),
+      escolha('Tipo', 'tipo', Object.fromEntries(Object.entries(dados.tipos).map(([k, v]) => [k, v.nome])), a?.tipo ?? 'massiva'),
+      sel,
+      blocoChave,
+      blocoClientes,
+      campo('Previsão de normalização (opcional)', { name: 'previsao', maxlength: 200, placeholder: 'até as 18h de hoje', value: a?.previsao ?? '' }),
+      el('div', { class: 'grade-2' },
+        campo('Começa em', { name: 'inicio', type: 'datetime-local', required: true, value: paraCampoLocal(a?.inicio) || paraCampoLocal(agora.toISOString()) }),
+        campo('Termina em', { name: 'fim', type: 'datetime-local', required: true, value: paraCampoLocal(a?.fim) || paraCampoLocal(emSeisHoras.toISOString()) })),
+      marcar('Abrir chamado técnico mesmo assim', { name: 'abre_chamado', checked: Boolean(a?.abre_chamado) }),
+      el('p', { class: 'pequeno mudo' },
+        'Em falha em massa, o normal é NÃO abrir: seriam dezenas de chamados do mesmo problema, e a equipe já está tratando.'),
+      marcar('Alerta ligado', { name: 'ativo', checked: a ? Boolean(a.ativo) : true }),
+    ];
+  }, async (d) => {
+    const corpo = {
+      titulo: d.titulo, mensagem: d.mensagem, tipo: d.tipo, abrangencia: d.abrangencia,
+      chaves: d.chaves ?? '', clientes: d.clientes ?? '', campos: d.campos ?? '',
+      previsao: d.previsao || null, abre_chamado: Boolean(d.abre_chamado), ativo: Boolean(d.ativo),
+      inicio: deCampoLocal(d.inicio), fim: deCampoLocal(d.fim),
+    };
+    if (a) await api.patch(`/empresas/${ctx.empresaId}/alertas/${a.id}`, corpo);
+    else await api.post(`/empresas/${ctx.empresaId}/alertas`, corpo);
+    toast(a ? 'Alerta alterado.' : 'Alerta criado.');
+    await depois();
+  });
+}
+
+/** Prova em quem o alerta pega antes de confiar nele. */
+function testarAlerta(ctx, a) {
+  return formModal(`Testar "${a.titulo}"`, () => [
+    el('p', { class: 'pequeno mudo' },
+      'Informe um cliente e veja se ele está dentro deste alerta — e, se não estiver, quais valores do cadastro dele foram comparados.'),
+    campo('CPF, CNPJ ou código do cliente no IXC', { name: 'cliente', required: true, autofocus: true }),
+  ], async (d) => {
+    const r = await api.post(`/empresas/${ctx.empresaId}/alertas/${a.id}/testar`, { cliente: d.cliente });
+    if (!r.ok) { toast(r.erro, true); return; }
+    modal(`${r.cliente}`, el('div', {},
+      el('p', {},
+        r.dentro_do_alerta
+          ? el('span', { class: 'etiqueta ok' }, 'Está dentro do alerta')
+          : el('span', { class: 'etiqueta' }, 'Fora do alerta: a ZOE não vai avisar esta pessoa')),
+      r.aviso ? el('p', { class: 'pequeno mudo' }, r.aviso) : null,
+      cartao('Chaves do alerta', el('p', { class: 'pequeno', style: 'margin:0' }, r.chaves_do_alerta.join(' · ') || '—')),
+      cartao('Valores encontrados no cadastro deste cliente',
+        el('p', { class: 'pequeno', style: 'margin:0;word-break:break-word' }, r.valores_do_cliente.join(' · ') || '—'),
+        el('p', { class: 'pequeno mudo', style: 'margin:8px 0 0' },
+          'Para o alerta pegar, uma chave tem de ser igual a um destes valores — sem acento e sem diferenciar maiúscula.'))));
+  });
+}

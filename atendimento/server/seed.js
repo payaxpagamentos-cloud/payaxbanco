@@ -419,6 +419,26 @@ function semear(db) {
       }
     }
 
+    // ---------- Alertas de rede ----------
+    // Um em vigor (a ZOE já está avisando), um agendado e um encerrado, para a tela mostrar
+    // os três estados sem ninguém precisar esperar o relógio.
+    const ALERTAS = [
+      ['Rompimento de fibra no Centro', 'Já identificamos uma falha de fibra que afeta a sua região. A equipe técnica está no local agora.',
+        'massiva', 'chave', 'Centro\nCentro Histórico', 'até as 18h de hoje', 0, -3, 6, 1, 47],
+      ['Manutenção programada na OLT-07', 'Vamos fazer uma manutenção programada na sua região, e a conexão pode oscilar durante o período.',
+        'manutencao', 'chave', 'OLT-07\nJardim América', 'das 2h às 5h de amanhã', 0, 20, 27, 1, 0],
+      ['Queda de energia no POP Vila Nova', 'Houve uma queda de energia que afetou a sua região. O fornecimento já foi normalizado.',
+        'massiva', 'chave', 'Vila Nova', null, 0, -72, -60, 1, 134],
+    ];
+    for (const [titulo, mensagem, tipo, abrangencia, chaves, previsao, abreChamado, deH, ateH, ativo, avisados] of ALERTAS) {
+      db.prepare(`INSERT INTO alertas (empresa_id, titulo, mensagem, tipo, abrangencia, chaves, previsao, abre_chamado,
+          inicio, fim, ativo, avisados, criado_por, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Beatriz Nunes', ?)`)
+        .run(empresa.id, titulo, mensagem, tipo, abrangencia, chaves, previsao, abreChamado,
+          new Date(Date.now() + deH * 3_600_000).toISOString(), new Date(Date.now() + ateH * 3_600_000).toISOString(),
+          ativo, avisados, quando(1));
+    }
+
     // ---------- Orçamento, sala de espera e meses fechados ----------
     // Teto de R$ 60,00/mês: dá para a tela mostrar a barra num nível de atenção de verdade.
     db.prepare('UPDATE empresas SET orcamento_milesimos = ?, orcamento_marketing_milesimos = ? WHERE id = ?')
@@ -491,6 +511,7 @@ function semear(db) {
     console.log(`             Ouvidoria: ${OUVIDORIAS.length} casos, sendo ${OUVIDORIAS.filter((o) => o[0] === 'cancelamento').length} de cancelamento.`);
     console.log(`             Régua: ${disparosTotais.enviados} enviadas (${disparosTotais.janela} pela janela, de graça) e ${disparosTotais.pulados} puladas.`);
     console.log(`             Conta da Meta no período: gasto R$ ${(disparosTotais.custo / 1000).toFixed(2)} · economia R$ ${(disparosTotais.economia / 1000).toFixed(2)}.`);
+    console.log(`             Alertas de rede: ${db.prepare("SELECT COUNT(*) n FROM alertas WHERE empresa_id = ?").get(empresa.id).n} cadastrados, ${require('./lib/alertas').vigentes(db, empresa.id).length} em vigor agora.`);
     console.log(`             Orçamento: R$ 60,00/mês. Sala de espera: ${db.prepare("SELECT COUNT(*) n FROM pendencias WHERE status = 'esperando'").get().n} avisos esperando a janela.`);
     console.log(`             Fechamentos: ${db.prepare('SELECT COUNT(*) n FROM custos_mensais').get().n} meses, 1 divergente contra a fatura da Meta.`);
     console.log(`             Histórico: ${totais.ia} resolvidas pela IA, ${totais.humano} transferidas, ${totais.abandono} abandonadas e ${totais.abertas} em aberto agora.`);

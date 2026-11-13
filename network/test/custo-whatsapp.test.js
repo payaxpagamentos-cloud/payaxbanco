@@ -3,6 +3,9 @@
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
+// O conector fica desligado por padrão (o custo vai para outro Manager, ainda a definir).
+// O teste liga o interruptor para provar que, quando o destino certo chegar, tudo funciona.
+process.env.NETWORK_CUSTO_WHATSAPP = '1';
 const h = require('./helpers');
 const atendimento = require('../server/conectores/atendimento');
 

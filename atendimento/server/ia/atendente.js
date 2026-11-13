@@ -11,6 +11,7 @@ const conhecimento = require('./conhecimento');
 const ferramentas = require('./ferramentas');
 const claude = require('./claude');
 const ferramentasIxc = require('./ferramentas-ixc');
+const alertas = require('../lib/alertas');
 const ouvidoriaLib = require('../lib/ouvidoria');
 const cliente360 = require('../lib/cliente360');
 const prompt = require('./prompt');
@@ -86,12 +87,47 @@ function historico(db, conversa) {
 }
 
 /**
- * Acrescenta a nota de estado como mensagem de sistema, depois da última mensagem do cliente.
- * A API exige que ela siga uma mensagem de usuário e feche a lista — é exatamente onde ela entra.
+ * A nota de estado desta conversa: o que a ZOE precisa saber e que não cabe no prompt fixo.
+ *
+ * São duas coisas: em que pé está a identificação do cliente no IXC, e se a equipe declarou
+ * algum alerta de rede. O alerta aparece aqui apenas como lembrete de conferir — o conteúdo vem
+ * da ferramenta, depois de saber quem é o cliente, porque alerta de área só vale para quem está
+ * na área, e afirmar isso por engano é pior do que não dizer nada.
+ */
+function notaDaConversa(db, conversa) {
+  const partes = [];
+  const doIxc = ferramentasIxc.notaDeEstado(db, conversa);
+  if (doIxc) partes.push(doIxc);
+
+  const vigentes = alertas.vigentes(db, conversa.empresa_id);
+  if (vigentes.length) {
+    const gerais = vigentes.filter((a) => a.abrangencia === 'todos');
+    partes.push(`A equipe do provedor tem ${vigentes.length} alerta(s) de rede em vigor agora. `
+      + 'Em QUALQUER assunto de internet lenta, caindo ou sem conexão, chame alertas_da_regiao ANTES de '
+      + 'diagnostico_de_conexao e antes de abrir chamado.'
+      + (gerais.length ? ` ${gerais.length} deles vale(m) para todos os clientes.` : ''));
+  }
+  return partes.length ? partes.join('\n\n') : null;
+}
+
+/**
+ * Acrescenta a nota de estado como mensagem de sistema, logo depois da ÚLTIMA mensagem do cliente.
+ * A API exige que ela siga uma mensagem de usuário, e é por isso que a posição importa.
+ *
+ * Nem sempre a última mensagem da lista é do cliente: quando a ZOE manda a saudação antes de
+ * pensar, o histórico termina com uma fala dela. Se a nota só entrasse no fim, ela sumiria
+ * calada justo na primeira mensagem de cada conversa — que é quando a instrução de identidade
+ * mais faz falta.
  */
 function comEstado(mensagens, nota) {
-  if (!nota || !mensagens.length || mensagens.at(-1).role !== 'user') return mensagens;
-  return [...mensagens, { role: 'system', content: nota }];
+  if (!nota || !mensagens.length) return mensagens;
+  const ultimoDoCliente = mensagens.map((m) => m.role).lastIndexOf('user');
+  if (ultimoDoCliente < 0) return mensagens;
+  return [
+    ...mensagens.slice(0, ultimoDoCliente + 1),
+    { role: 'system', content: nota },
+    ...mensagens.slice(ultimoDoCliente + 1),
+  ];
 }
 
 // ---------- Saídas ----------
@@ -261,7 +297,7 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
       sistema: prompt.montar(db, { empresa, cfg, contato }),
       // A nota de estado do IXC vai como mensagem de sistema no meio da conversa: é o canal que a
       // Claude API indica para instrução de operador, e não derruba o cache do prompt.
-      historico: comEstado(historico(db, conversa), ferramentasIxc.notaDeEstado(db, conversa)),
+      historico: comEstado(historico(db, conversa), notaDaConversa(db, conversa)),
       tools: kit.tools,
       modelo: cfg.modelo || undefined,
       esforco: cfg.esforco || undefined,

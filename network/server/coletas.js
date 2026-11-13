@@ -1,11 +1,13 @@
 'use strict';
 
 const { agora } = require('./db');
+const config = require('./config');
 const rastreador = require('./conectores/rastreador');
 const downdetector = require('./conectores/downdetector');
 const atendimento = require('./conectores/atendimento');
 
-const CONECTORES = { rastreador, downdetector, atendimento };
+// O ZOE Atende só entra na agenda quando o destino do custo estiver definido (config.custoWhatsapp).
+const CONECTORES = { rastreador, downdetector, ...(config.custoWhatsapp ? { atendimento } : {}) };
 
 /**
  * Agenda das coletas: a cada 15 s, roda as integrações habilitadas cuja próxima tentativa chegou (cada coleta define a
@@ -21,6 +23,7 @@ function iniciarColetas(db) {
       const k = `${x.organizacao_id}:${x.tipo}`;
       if (rodando.has(k)) continue;
       rodando.add(k);
+      if (!CONECTORES[x.tipo]) continue;
       CONECTORES[x.tipo].coletar(db, x.organizacao_id).catch(() => { /* estado e erro ficam registrados na integração */ }).finally(() => rodando.delete(k));
     }
   };

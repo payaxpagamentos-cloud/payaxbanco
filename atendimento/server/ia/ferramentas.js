@@ -8,6 +8,7 @@ const conhecimento = require('./conhecimento');
 const ixc = require('./ferramentas-ixc');
 const ouvidoriaLib = require('../lib/ouvidoria');
 const cliente360 = require('../lib/cliente360');
+const alertas = require('../lib/alertas');
 
 /**
  * O que a ZOE pode fazer. Cada ferramenta é uma função do servidor: a IA escolhe e
@@ -28,7 +29,81 @@ const esquema = (properties, required) => ({ type: 'object', properties, require
 
 // ---------- Ferramentas internas ----------
 
+/** O alerta como a ZOE o recebe: o que dizer, não como ele foi configurado. */
+const resumoAlerta = (a) => ({
+  tipo: a.tipo_nome,
+  mensagem: a.mensagem,
+  previsao: a.previsao ?? null,
+  desde: a.inicio,
+  previsto_ate: a.fim,
+});
+
 const INTERNAS = {
+  alertas_da_regiao: {
+    descricao: 'Verifica se a equipe do provedor registrou falha em massa, manutenção programada ou aviso que atinja ESTE '
+      + 'cliente agora. Chame SEMPRE antes de diagnostico_de_conexao e antes de abrir chamado técnico, em qualquer assunto '
+      + 'de internet lenta, caindo ou sem conexão. O que vier daqui é a informação correta, acima do que o cadastro disser.',
+    entrada: esquema({}, []),
+    executar: async ({ db, conversa, contato }) => {
+      const c = db.prepare('SELECT * FROM conversas WHERE id = ?').get(conversa.id);
+
+      // Sem cliente confirmado só dá para falar dos alertas que valem para a base inteira.
+      // Dizer que alguém está numa área sem saber onde essa pessoa está é exatamente o erro
+      // que estes alertas existem para evitar.
+      if (!c.identidade_confirmada || !c.ixc_cliente_id) {
+        const gerais = alertas.paraCliente(db, conversa.empresa_id, null);
+        alertas.marcarAvisado(db, gerais.map((a) => a.id));
+        return {
+          ok: true, identificado: false, alertas: gerais.map(resumoAlerta),
+          instrucao: gerais.length
+            ? 'Estes alertas valem para todos os clientes, então pode contar. Para saber se há falha na ÁREA desta pessoa, '
+              + 'identifique e confirme a identidade primeiro.'
+            : 'Não há alerta geral em vigor. Para conferir a área desta pessoa, identifique e confirme a identidade primeiro.',
+        };
+      }
+
+      // Com a identidade confirmada, junta o que o IXC sabe sobre onde o cliente está.
+      // Endereço e bairro vêm do cadastro; OLT e caixa vivem no login, não no cliente.
+      const dados = { cadastro: null, contratos: [], logins: [] };
+      const buscas = [
+        ['cadastro', (x) => x.clientePorId(c.ixc_cliente_id)],
+        ['contratos', (x) => x.contratos(c.ixc_cliente_id)],
+        ['logins', (x) => x.logins(c.ixc_cliente_id)],
+      ];
+      const cliente = ixc.clienteIxc(db, conversa.empresa_id);
+      if (cliente) {
+        for (const [chave, buscar] of buscas) {
+          try {
+            const valor = await buscar(cliente);
+            if (chave === 'cadastro') dados.cadastro = valor;
+            else if (Array.isArray(valor)) dados[chave] = valor;
+          } catch { /* um recurso indisponível não impede os outros */ }
+        }
+      }
+
+      const aplicaveis = alertas.paraCliente(db, conversa.empresa_id, dados.cadastro ? dados : null);
+      alertas.marcarAvisado(db, aplicaveis.map((a) => a.id));
+      ixc.registrar(db, { conversa, contato, tipo: 'alerta', detalhe: `${aplicaveis.length} alerta(s) para o cliente` });
+
+      if (!aplicaveis.length) {
+        return {
+          ok: true, identificado: true, alertas: [],
+          instrucao: 'Nenhum alerta atinge este cliente. Siga o atendimento normal: chame diagnostico_de_conexao e, se for o caso, '
+            + 'abra o chamado. NÃO diga que existe falha na região — não há nenhuma registrada para ele.',
+        };
+      }
+      const abreChamado = aplicaveis.some((a) => a.abre_chamado);
+      return {
+        ok: true, identificado: true, alertas: aplicaveis.map(resumoAlerta), abrir_chamado: abreChamado,
+        instrucao: 'A equipe já registrou isto. Conte ao cliente com naturalidade, usando a mensagem acima, e diga a previsão se houver. '
+          + (abreChamado
+            ? 'Se o cliente quiser registrar assim mesmo, abra o chamado. '
+            : 'NÃO abra chamado técnico por este motivo: seriam dezenas de chamados do mesmo problema. ')
+          + 'Não invente detalhe que não esteja escrito no alerta.',
+      };
+    },
+  },
+
   buscar_conhecimento: {
     descricao: 'Procura a resposta na base de conhecimento da empresa. Use SEMPRE antes de responder qualquer dúvida sobre produtos, '
       + 'prazos, preços, horários, procedimentos ou políticas. Nunca responda esse tipo de pergunta de memória.',
@@ -306,7 +381,14 @@ function comoTool(f) {
  */
 function montar(db, { empresaId, semTransferencia = false }) {
   const externas = db.prepare('SELECT * FROM ferramentas WHERE empresa_id = ? AND ativa = 1 ORDER BY nome').all(empresaId);
-  const internas = Object.entries(INTERNAS).filter(([nome]) => !(semTransferencia && nome === 'transferir_para_humano'));
+  // Sem alerta em vigor, a ferramenta de alertas sai do kit: ela só responderia "não há nada",
+  // e toda descrição de ferramenta custa token em toda conversa.
+  const temAlerta = alertas.vigentes(db, empresaId).length > 0;
+  const internas = Object.entries(INTERNAS).filter(([nome]) => {
+    if (semTransferencia && nome === 'transferir_para_humano') return false;
+    if (nome === 'alertas_da_regiao' && !temAlerta) return false;
+    return true;
+  });
   // As do IXC entram quando a integração está ligada; só as capacidades que a sonda aprovou na instância.
   const doIxc = ixc.montar(db, empresaId);
   const tools = [

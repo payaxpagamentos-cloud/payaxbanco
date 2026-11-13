@@ -456,9 +456,15 @@ module.exports = function rotasEmpresa(db) {
   });
 
   r.use('/ia', require('./ia')(db));
+  r.use('/alertas', require('./alertas')(db));
   r.use('/ixc', require('./ixc')(db));
   r.use('/ouvidoria', require('./ouvidoria')(db));
-  r.use('/reguas', require('./regua')(db));
+  // O Centro de Custo é de administrador da empresa e da plataforma. Esconder o menu não basta:
+  // a rota precisa recusar, senão qualquer atendente lê a conta pela API.
+  r.use('/reguas', (req, _res, next) => (administraEmpresa(req.usuario)
+    ? next()
+    : next(new ErroNegocio('O Centro de Custo é restrito ao administrador da empresa.', 403))),
+  require('./regua')(db));
   r.use('/', require('./cadastros')(db));
 
   // ---------- Relatórios ----------

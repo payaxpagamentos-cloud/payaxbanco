@@ -10,7 +10,10 @@ const downdetector = require('../conectores/downdetector');
 const atendimento = require('../conectores/atendimento');
 const v = require('../lib/validacao');
 
-const CONECTORES = { rastreador, downdetector, atendimento };
+const config = require('../config');
+
+// atendimento (custo do WhatsApp) fica fora enquanto config.custoWhatsapp estiver desligado.
+const CONECTORES = { rastreador, downdetector, ...(config.custoWhatsapp ? { atendimento } : {}) };
 
 /** Configuração validada por tipo. Nenhum endpoint do Downdetector é presumido: caminho e campos vêm da documentação do acesso. */
 function validarConfig(tipo, c = {}) {

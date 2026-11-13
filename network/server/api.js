@@ -47,7 +47,7 @@ function criarApi(db, extras = {}) {
   api.use('/noc', require('./routes/noc')(db));
   api.use('/rastreamento', require('./routes/rastreamento')(db, extras));
   api.use('/integracoes', require('./routes/integracoes')(db, extras));
-  api.use('/custos', require('./routes/custos')(db));
+  if (require('./config').custoWhatsapp) api.use('/custos', require('./routes/custos')(db));
   api.use((_req, _res, next) => next(new ErroNegocio('Rota não encontrada.', 404)));
   return api;
 }

@@ -236,6 +236,38 @@ curl -X POST https://SEU-DOMINIO/atendimento/api/integracao/mensagens \
 A conversa aberta assim **não passa pela ZOE** (aviso automático não é atendimento): ela
 entra direto na fila da equipe, a menos que você mande `"com_ia": true`.
 
+## Alertas de rede
+
+O cadastro do IXC nem sempre está atualizado. Se a ZOE decidir sozinha, pelo cadastro, que existe
+falha na região do cliente, ela vai afirmar coisa errada — e afirmar errado com confiança é pior do
+que não saber. Então quem declara a falha é a equipe, em `ZOE › Alertas de rede`, e a ZOE só conta
+para quem está dentro da área declarada.
+
+Cada alerta tem **período** (começa e termina) e **abrangência**:
+
+| Abrangência | Quem recebe |
+|---|---|
+| Por área | só quem bate com uma das chaves: bairro, cidade, OLT, caixa, condomínio |
+| Por lista | só os códigos de cliente ou contrato informados |
+| Toda a base | todos os clientes |
+
+A comparação é **exata**, sem acento e sem diferenciar maiúscula. Exata de propósito: "Centro" não
+pode pegar "Centro Novo", porque um bairro a mais no alerta faz a ZOE afirmar falha para quem está
+com a internet funcionando. As chaves são comparadas contra o cadastro, os contratos e os logins —
+a OLT e a caixa moram no login, não no cliente. Dá para restringir quais campos são comparados.
+
+Antes de ligar um alerta, o botão **Testar em um cliente** mostra se aquela pessoa está dentro e
+quais valores do cadastro dela foram comparados — assim dá para ver por que pegou ou por que não.
+
+Na conversa: em qualquer assunto de internet lenta, caindo ou sem conexão, a ZOE consulta os
+alertas **antes** de diagnosticar a conexão e antes de abrir chamado. Com alerta em vigor para
+aquele cliente, ela conta o que a equipe escreveu e normalmente **não abre chamado** — seriam
+dezenas de chamados do mesmo problema. Sem alerta, segue o atendimento normal e não inventa falha
+nenhuma. Sem nenhum alerta em vigor, a ferramenta nem entra no kit da conversa.
+
+Isto é a ponte até a correlação automática de massiva: enquanto o cadastro não estiver confiável,
+quem sabe da falha é a equipe, e o cliente já recebe o atendimento certo.
+
 ## A conta da Meta
 
 Conversa não custa. O que custa é mensagem que a empresa **inicia**.
@@ -292,6 +324,12 @@ quanto disso pode ir para marketing. O teto **para** o gasto, não avisa depois:
 limite, mensagem paga não sai mais. Mensagem grátis continua saindo — o atendimento não para por
 causa de dinheiro que não é cobrado. Os marcos de 50%, 80% e 100% são registrados uma vez cada.
 
+### Quem vê o Centro de Custo
+
+`Centro de Custo` é tela de administrador da empresa e da plataforma. Atendente e supervisor não
+entram: orçamento e fatura são decisão de quem responde pelo dinheiro. A rota do servidor recusa
+do mesmo jeito — esconder o menu não é permissão.
+
 ### Fechamento e conferência
 
 No dia 1º o mês anterior é fechado num registro que não muda mais. A gestão lança o valor que a
@@ -299,8 +337,9 @@ Meta cobrou de verdade e o sistema mostra a diferença. Acima de 5% a linha fica
 divergente — não é arredondamento: ou o preço cadastrado está velho, ou mensagem está saindo por
 fora do sistema.
 
-O custo também é publicado para o **Manager Network** (`network/`), em `Operação › Custo do
-WhatsApp`, pela API de integração: lá a gestão vê a conta junto do resto da operação.
+O custo pode ser publicado para fora por `GET /api/integracao/custos`. O conector para o
+**Manager Network** (`network/`) está pronto, porém **desligado**: o destino certo do custo ainda
+será definido. Para ligar, `NETWORK_CUSTO_WHATSAPP=1` no Manager.
 
 ## Ouvidoria e a ficha 360° do cliente
 

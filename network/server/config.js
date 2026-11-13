@@ -30,8 +30,14 @@ const dados = process.env.NETWORK_DADOS || path.join(__dirname, '..', 'data');
 const lat = Number(process.env.NETWORK_MAPA_LAT);
 const lng = Number(process.env.NETWORK_MAPA_LNG);
 
+// O conector do ZOE Atende fica pronto, porém DESLIGADO: o custo do WhatsApp vai para outro
+// Manager, não para este. Quando o destino certo estiver definido, basta NETWORK_CUSTO_WHATSAPP=1
+// (ou apontar o conector para lá) — nada precisa ser reescrito.
+const custoWhatsapp = process.env.NETWORK_CUSTO_WHATSAPP === '1';
+
 module.exports = {
   producao,
+  custoWhatsapp,
   teste,
   basePath,
   port: Number(process.env.PORT) || 3500,

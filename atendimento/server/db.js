@@ -397,7 +397,7 @@ CREATE TABLE IF NOT EXISTS ixc_acoes (
   conversa_id INTEGER REFERENCES conversas(id) ON DELETE SET NULL,
   contato_id INTEGER REFERENCES contatos(id),
   ixc_cliente_id TEXT,
-  tipo TEXT NOT NULL CHECK (tipo IN ('identificacao','confirmacao','contrato','faturas','boleto','desbloqueio','conexao','chamado','erro')),
+  tipo TEXT NOT NULL CHECK (tipo IN ('identificacao','confirmacao','contrato','faturas','boleto','desbloqueio','conexao','chamado','alerta','erro')),
   sucesso INTEGER NOT NULL DEFAULT 1,
   detalhe TEXT,
   ms INTEGER NOT NULL DEFAULT 0,
@@ -539,6 +539,44 @@ CREATE TABLE IF NOT EXISTS ips_bloqueados (
   motivo TEXT,
   criado_em TEXT NOT NULL
 );
+
+-- Alertas de rede cadastrados à mão pela equipe.
+--
+-- O IXC nem sempre está atualizado, e a ZOE não pode afirmar o que o cadastro diz errado.
+-- Aqui a equipe escreve o que está acontecendo de verdade, com período e abrangência, e a ZOE
+-- só conta para quem está dentro do alerta. É a ponte até a correlação automática de massiva:
+-- enquanto o cadastro não estiver confiável, quem sabe da falha é a equipe, não o sistema.
+CREATE TABLE IF NOT EXISTS alertas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  -- Título é interno (a equipe vê); mensagem é o que a ZOE fala com o cliente.
+  titulo TEXT NOT NULL,
+  mensagem TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'massiva' CHECK (tipo IN ('massiva','manutencao','aviso')),
+  -- 'todos': a base inteira. 'chave': só quem bate com uma das chaves (bairro, OLT, CTO...).
+  -- 'clientes': só os códigos listados.
+  abrangencia TEXT NOT NULL DEFAULT 'chave' CHECK (abrangencia IN ('todos','chave','clientes')),
+  -- Campos do cadastro do IXC a comparar, um por linha. Vazio = a lista padrão.
+  campos TEXT,
+  -- Valores que definem a área afetada, um por linha.
+  chaves TEXT,
+  -- Códigos de cliente ou de contrato, um por linha.
+  clientes TEXT,
+  -- Previsão de normalização, em texto curto ("até as 18h de hoje").
+  previsao TEXT,
+  -- Mesmo com alerta, ainda abre chamado? Em massiva confirmada normalmente não: são 40 chamados
+  -- do mesmo problema. Em manutenção programada também não.
+  abre_chamado INTEGER NOT NULL DEFAULT 0,
+  inicio TEXT NOT NULL,
+  fim TEXT NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  -- Quantas vezes a ZOE já usou este alerta: mostra se ele está pegando gente de verdade.
+  avisados INTEGER NOT NULL DEFAULT 0,
+  criado_por TEXT,
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_alertas_vigencia ON alertas (empresa_id, ativo, inicio, fim);
 
 -- A sala de espera da janela: avisos que têm folga ficam aqui em vez de virar template pago.
 -- Quando o cliente escreve qualquer coisa, a janela abre e o aviso sai de graça, de carona.

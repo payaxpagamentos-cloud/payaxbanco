@@ -88,6 +88,18 @@ const data = (v, nome) => {
   return v;
 };
 
+/**
+ * Instante em ISO 8601. Aceita o que o <input type="datetime-local"> manda
+ * ('2026-11-13T14:30') e devolve sempre em UTC, como todo carimbo de tempo aqui.
+ */
+const dataHora = (v, nome) => {
+  const t = String(v ?? '').trim();
+  exigir(t.length >= 16, `${nome[0].toUpperCase()}${nome.slice(1)} inválido (informe data e hora).`);
+  const d = new Date(/[zZ]$|[+-]\d{2}:?\d{2}$/.test(t) ? t : `${t}${t.length === 16 ? ':00' : ''}Z`);
+  exigir(!Number.isNaN(d.getTime()), `${nome[0].toUpperCase()}${nome.slice(1)} inválido.`);
+  return d.toISOString();
+};
+
 /** Número de telefone: só dígitos, de 8 a 15, com o + opcional removido. */
 function numeroTelefone(v, nome = 'o número') {
   const t = digitos(v);
@@ -156,5 +168,5 @@ function objeto(v, nome) {
 
 const booleano = (v) => v === true || v === 1 || v === '1' || v === 'true' || v === 'on';
 
-module.exports = { digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data,
+module.exports = { digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data, dataHora,
   numeroTelefone, whatsapp, horario, diasSemana, lista, endereco, nomeFerramenta, objeto, booleano };
