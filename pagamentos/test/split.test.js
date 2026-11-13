@@ -7,7 +7,7 @@ const { calcularSplit } = require('../server/lib/precos');
 const { somarDiasUteis, ehDiaUtil } = require('../server/lib/datas');
 
 test('split: o cálculo fecha sempre em inteiros', async (t) => {
-  await t.test('bruto = tarifa + comissão + líquido', () => {
+  await t.test('bruto = tarifa bancária + tarifa PayAx + líquido', () => {
     for (const valor of [500, 999, 1234, 10000, 29990, 123456, 1000000]) {
       const r = calcularSplit({ valorPagoCentavos: valor, preco: { tarifa_liquidacao_centavos: 250, percentual_ppm: 23500, comissao_minima_centavos: 100, comissao_maxima_centavos: null } });
       assert.equal(r.tarifa_banco_centavos + r.comissao_centavos + r.liquido_centavos, valor, `falhou em ${valor}`);
@@ -15,7 +15,7 @@ test('split: o cálculo fecha sempre em inteiros', async (t) => {
     }
   });
 
-  await t.test('piso e teto da comissão', () => {
+  await t.test('piso e teto da tarifa PayAx', () => {
     const preco = { tarifa_liquidacao_centavos: 0, percentual_ppm: 10000, comissao_minima_centavos: 500, comissao_maxima_centavos: 2000 };
     assert.equal(calcularSplit({ valorPagoCentavos: 1000, preco }).comissao_centavos, 500, 'piso');
     assert.equal(calcularSplit({ valorPagoCentavos: 1000000, preco }).comissao_centavos, 2000, 'teto');

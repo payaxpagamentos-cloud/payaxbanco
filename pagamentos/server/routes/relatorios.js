@@ -63,7 +63,7 @@ module.exports = (db) => {
   r.get('/faturamento.csv', exigir('relatorios.ver'), (req, res) => {
     const p = periodo(req.query);
     const linhas = [['Cliente', 'CNPJ', 'Emitidos', 'Valor emitido (R$)', 'Liquidados', 'Valor recebido (R$)',
-      'Comissão (R$)', 'Tarifas (R$)', 'Receita (R$)', 'Repassado (R$)']];
+      'Tarifa PayAx (R$)', 'Tarifas bancárias (R$)', 'Receita (R$)', 'Repassado (R$)']];
     for (const c of porCliente(db, p)) {
       const reais = (x) => (x / 100).toFixed(2).replace('.', ',');
       linhas.push([c.razao_social, c.cnpj, c.emitidos, reais(c.valor_emitido_centavos), c.liquidados, reais(c.bruto_centavos),

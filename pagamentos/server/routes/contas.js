@@ -107,8 +107,8 @@ module.exports = (db) => {
       tarifa_emissao_centavos: v.centavos(b.tarifa_emissao ?? 0, 'a tarifa de emissão'),
       tarifa_liquidacao_centavos: v.centavos(b.tarifa_liquidacao ?? 0, 'a tarifa de liquidação'),
       percentual_ppm: b.percentual === undefined || b.percentual === '' ? 0 : v.percentual(b.percentual, 'o percentual', { max: 50 }),
-      comissao_minima_centavos: v.centavos(b.comissao_minima ?? 0, 'a comissão mínima'),
-      comissao_maxima_centavos: v.centavosOpcional(b.comissao_maxima, 'a comissão máxima'),
+      comissao_minima_centavos: v.centavos(b.comissao_minima ?? 0, 'a tarifa mínima'),
+      comissao_maxima_centavos: v.centavosOpcional(b.comissao_maxima, 'a tarifa máxima'),
       tarifa_repasse_centavos: v.centavos(b.tarifa_repasse ?? 0, 'a tarifa de repasse'),
       observacao: v.opcional(b.observacao, 'a observação', 200),
     };

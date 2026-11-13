@@ -28,7 +28,7 @@ const { detalhe, assinaturaFicha } = require('./boletos');
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 const periodo = (q) => ({ de: q.de || datas.primeiroDiaMes(hoje()), ate: q.ate || hoje() });
 
-/** O cliente vê o que paga (tarifa e comissão), nunca o nosso custo com o banco nem a nossa margem. */
+/** O cliente vê o que paga (tarifa bancária e tarifa PayAx), nunca o nosso custo com o banco nem a margem. */
 const semMargem = (d) => ({
   ...d,
   custo_liquidacao_centavos: undefined,
@@ -128,7 +128,7 @@ module.exports = (db, autenticado) => {
       boletos: consultas.resumoBoletos(db, { ...p, clienteId: c.id, hoje: data }),
       liquidacoes: (() => {
         const l = consultas.resumoLiquidacoes(db, { ...p, clienteId: c.id });
-        // O cliente vê o que pagou de tarifa e comissão, não o nosso custo nem a nossa margem.
+        // O cliente vê o que pagou de tarifa bancária e tarifa PayAx, não o nosso custo nem a margem.
         return { titulos: l.titulos, bruto_centavos: l.bruto_centavos, comissao_centavos: l.comissao_centavos,
           tarifa_banco_centavos: l.tarifa_banco_centavos, tarifa_emissao_centavos: l.tarifa_emissao_centavos,
           liquido_centavos: l.liquido_cliente_centavos, repassado_centavos: l.repassado_centavos };

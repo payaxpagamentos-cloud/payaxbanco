@@ -43,9 +43,9 @@ export default async function contas({ alvo, recarregar }) {
         el('div', { class: 'pares' },
           par('Tarifa de emissão', dinheiro(v.tarifa_emissao_centavos)),
           par('Tarifa de liquidação', dinheiro(v.tarifa_liquidacao_centavos)),
-          par('Comissão', percentual(v.percentual_ppm)),
-          par('Comissão mínima', dinheiro(v.comissao_minima_centavos)),
-          par('Comissão máxima', v.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(v.comissao_maxima_centavos)),
+          par('Tarifa PayAx', percentual(v.percentual_ppm)),
+          par('Tarifa mínima', dinheiro(v.comissao_minima_centavos)),
+          par('Tarifa máxima', v.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(v.comissao_maxima_centavos)),
           par('Tarifa do repasse', dinheiro(v.tarifa_repasse_centavos)),
           par('Vigente desde', data(v.vigencia_inicio)))),
       pode('precos.editar') ? el('button', { class: 'botao', onclick: () => editarPrecoPadrao(v, recarregar) }, 'Nova tabela padrão') : null)),
@@ -105,9 +105,9 @@ function editarPrecoPadrao(atual, recarregar) {
     campo({ nome: 'vigencia_inicio', rotulo: 'Vigente a partir de', tipo: 'date', valor: hojeIso(), obrigatorio: true }),
     campo({ nome: 'tarifa_emissao', rotulo: 'Tarifa de emissão (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_emissao_centavos) }),
     campo({ nome: 'tarifa_liquidacao', rotulo: 'Tarifa de liquidação (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_liquidacao_centavos) }),
-    campo({ nome: 'percentual', rotulo: 'Comissão (%)', valor: ((atual.percentual_ppm || 0) / 10000).toString().replace('.', ',') }),
-    campo({ nome: 'comissao_minima', rotulo: 'Comissão mínima (R$)', tipo: 'dinheiro', valor: reais(atual.comissao_minima_centavos) }),
-    campo({ nome: 'comissao_maxima', rotulo: 'Comissão máxima (R$)', tipo: 'dinheiro', valor: reais(atual.comissao_maxima_centavos) }),
+    campo({ nome: 'percentual', rotulo: 'Tarifa PayAx (%)', valor: ((atual.percentual_ppm || 0) / 10000).toString().replace('.', ',') }),
+    campo({ nome: 'comissao_minima', rotulo: 'Tarifa mínima (R$)', tipo: 'dinheiro', valor: reais(atual.comissao_minima_centavos) }),
+    campo({ nome: 'comissao_maxima', rotulo: 'Tarifa máxima (R$)', tipo: 'dinheiro', valor: reais(atual.comissao_maxima_centavos) }),
     campo({ nome: 'tarifa_repasse', rotulo: 'Tarifa do repasse (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_repasse_centavos) }));
   const botao = el('button', { class: 'botao' }, 'Salvar tabela padrão');
   botao.addEventListener('click', () => acao(botao, async () => {

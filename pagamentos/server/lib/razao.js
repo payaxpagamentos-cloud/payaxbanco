@@ -17,7 +17,7 @@ const { agora } = require('../db');
 const TIPOS = {
   credito_liquidacao: 'Crédito de liquidação',
   tarifa_banco: 'Tarifa bancária',
-  comissao: 'Comissão PayAx',
+  comissao: 'Tarifa PayAx',
   tarifa_emissao: 'Tarifa de emissão',
   repasse: 'Repasse ao cliente',
   taxa_repasse: 'Tarifa do repasse',

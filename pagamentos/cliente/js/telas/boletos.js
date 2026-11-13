@@ -102,7 +102,7 @@ function emitir(recarregar) {
             partes: [
               { rotulo: 'Você recebe', valor: s.liquido_centavos },
               { rotulo: 'Tarifa bancária', valor: s.tarifa_banco_centavos },
-              { rotulo: 'Comissão PayAx', valor: s.comissao_centavos },
+              { rotulo: 'Tarifa PayAx', valor: s.comissao_centavos },
             ],
           })));
       } catch { /* valor incompleto */ }
@@ -176,7 +176,7 @@ async function detalhe(alvo, id, recarregar) {
           partes: [
             { rotulo: 'Você recebe', valor: b.split.liquido_centavos },
             { rotulo: 'Tarifa bancária', valor: b.split.tarifa_banco_centavos },
-            { rotulo: 'Comissão PayAx', valor: b.split.comissao_centavos },
+            { rotulo: 'Tarifa PayAx', valor: b.split.comissao_centavos },
           ],
         }),
         b.lancamentos.length ? el('div', { style: 'margin-top:12px' }, tabela({

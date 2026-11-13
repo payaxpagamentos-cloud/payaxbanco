@@ -4,7 +4,7 @@
  *  - o CARTÃO DA CONTA é a primeira coisa da tela, com o saldo grande e o número da conta,
  *    e tem o botão de esconder o saldo (todo banco tem, e não é enfeite: serve para olhar em público);
  *  - a LINHA DO TEMPO junta os lançamentos de um mesmo recebimento num movimento só. Em vez de três
- *    linhas crípticas ("crédito 100", "tarifa -2,50", "comissão -1,00"), um movimento: "Você recebeu
+ *    linhas crípticas ("crédito 100", "tarifa bancária -2,50", "tarifa PayAx -1,00"), um movimento: "Você recebeu
  *    R$ 96,50", e quem quiser abre e vê de onde veio e o que saiu. É o split explicado, não escondido.
  */
 import { el, icone, dinheiro, data, R, selo } from '../comum/ui.js';
@@ -75,7 +75,7 @@ const ORDEM_DESCONTO = { tarifa_banco: 1, tarifa_emissao: 2, taxa_repasse: 3, co
 const porOrdem = (a, b) => (ORDEM_DESCONTO[a.tipo] ?? 9) - (ORDEM_DESCONTO[b.tipo] ?? 9);
 
 /**
- * Junta os lançamentos num movimento por fato: um recebimento (crédito + tarifa + comissão) vira
+ * Junta os lançamentos num movimento por fato: um recebimento (crédito + as duas tarifas) vira
  * um item só; uma transferência (repasse + tarifa) também. O resto fica como está.
  */
 export function agruparMovimentos(lancamentos) {
@@ -189,7 +189,7 @@ function movimento(m, { aoAbrirBoleto = null, hoje }) {
  */
 export function linhaTempo({ lancamentos, hoje, aoAbrirBoleto = null, limite = null, vazio = 'Nenhum movimento no período.' }) {
   // Agrupa primeiro e corta depois: cortar lançamentos soltos partiria um recebimento ao meio,
-  // deixando a comissão órfã na tela sem o crédito que a originou.
+  // deixando a tarifa órfã na tela sem o crédito que a originou.
   let movimentos = agruparMovimentos(lancamentos);
   if (limite) movimentos = movimentos.slice(0, limite);
   if (!movimentos.length) return el('p', { class: 'vazio' }, vazio);

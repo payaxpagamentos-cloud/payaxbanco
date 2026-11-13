@@ -116,7 +116,7 @@ CREATE TABLE precos (
   tarifa_emissao_centavos INTEGER NOT NULL DEFAULT 0 CHECK (tarifa_emissao_centavos >= 0),
   -- Tarifa bancária repassada ao cliente a cada título LIQUIDADO.
   tarifa_liquidacao_centavos INTEGER NOT NULL DEFAULT 0 CHECK (tarifa_liquidacao_centavos >= 0),
-  -- Nossa comissão sobre o valor pago, em ppm (1% = 10.000).
+  -- Tarifa PayAx sobre o valor pago, em ppm (1% = 10.000). As colunas mantêm o nome antigo: comissao.
   percentual_ppm INTEGER NOT NULL DEFAULT 0 CHECK (percentual_ppm >= 0 AND percentual_ppm <= 1000000),
   comissao_minima_centavos INTEGER NOT NULL DEFAULT 0 CHECK (comissao_minima_centavos >= 0),
   comissao_maxima_centavos INTEGER,

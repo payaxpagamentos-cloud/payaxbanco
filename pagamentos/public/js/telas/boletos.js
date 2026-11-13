@@ -119,7 +119,7 @@ export function emitir(clientes, recarregar, clienteFixo = null) {
             partes: [
               { rotulo: 'Líquido do cliente', valor: s.liquido_centavos },
               { rotulo: 'Tarifa bancária', valor: s.tarifa_banco_centavos },
-              { rotulo: 'Comissão PayAx', valor: s.comissao_centavos },
+              { rotulo: 'Tarifa PayAx', valor: s.comissao_centavos },
             ],
           })));
       } catch { /* valor ainda incompleto */ }
@@ -220,7 +220,7 @@ async function detalheBoleto(alvo, id, recarregar) {
             partes: [
               { rotulo: 'Líquido do cliente', valor: b.split.liquido_centavos },
               { rotulo: 'Tarifa bancária', valor: b.split.tarifa_banco_centavos },
-              { rotulo: 'Comissão PayAx', valor: b.split.comissao_centavos },
+              { rotulo: 'Tarifa PayAx', valor: b.split.comissao_centavos },
             ],
           }),
           b.lancamentos.length

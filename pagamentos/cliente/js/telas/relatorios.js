@@ -30,7 +30,7 @@ export default async function relatorios({ alvo, query }) {
       kpi({ rotulo: 'Recebido', valor: dinheiro(l.bruto_centavos), apoio: `${numero(l.titulos)} título(s) pago(s)`, tom: 'destaque', ic: 'dinheiro' }),
       kpi({ rotulo: 'Líquido para você', valor: dinheiro(l.liquido_centavos), tom: 'positivo', ic: 'cofre' }),
       kpi({ rotulo: 'Descontos', valor: dinheiro(l.comissao_centavos + l.tarifa_banco_centavos + l.tarifa_emissao_centavos),
-        apoio: `comissão ${dinheiro(l.comissao_centavos)} + tarifas ${dinheiro(l.tarifa_banco_centavos + l.tarifa_emissao_centavos)}`, menor: true, ic: 'relatorio' }),
+        apoio: `tarifa PayAx ${dinheiro(l.comissao_centavos)} + tarifas bancárias ${dinheiro(l.tarifa_banco_centavos + l.tarifa_emissao_centavos)}`, menor: true, ic: 'relatorio' }),
       kpi({ rotulo: 'Transferido para você', valor: dinheiro(l.repassado_centavos), menor: true, ic: 'troca' })),
 
     el('div', { class: 'grade duas', style: 'margin-top:14px' },
@@ -40,7 +40,7 @@ export default async function relatorios({ alvo, query }) {
         partes: [
           { rotulo: 'Líquido para você', valor: l.liquido_centavos },
           { rotulo: 'Tarifa bancária', valor: l.tarifa_banco_centavos + l.tarifa_emissao_centavos },
-          { rotulo: 'Comissão PayAx', valor: l.comissao_centavos },
+          { rotulo: 'Tarifa PayAx', valor: l.comissao_centavos },
         ],
       }) : el('p', { class: 'vazio' }, 'Nada recebido no período.'))),
 
@@ -59,9 +59,9 @@ export default async function relatorios({ alvo, query }) {
     }))),
 
     el('div', { style: 'margin-top:14px' }, cartao('A sua tabela de preços', el('div', { class: 'pares' },
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Comissão sobre o valor pago'), el('span', { class: 'val' }, d.preco.percentual_texto)),
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Comissão mínima'), el('span', { class: 'val' }, dinheiro(d.preco.comissao_minima_centavos))),
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Comissão máxima'), el('span', { class: 'val' }, d.preco.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(d.preco.comissao_maxima_centavos))),
+      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa PayAx sobre o valor pago'), el('span', { class: 'val' }, d.preco.percentual_texto)),
+      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa mínima'), el('span', { class: 'val' }, dinheiro(d.preco.comissao_minima_centavos))),
+      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa máxima'), el('span', { class: 'val' }, d.preco.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(d.preco.comissao_maxima_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por título pago'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_liquidacao_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por boleto emitido'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_emissao_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por transferência'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_repasse_centavos)))))),

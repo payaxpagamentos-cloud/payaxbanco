@@ -22,7 +22,7 @@ nossa conta e o sistema mantém uma conta corrente interna por cliente.
 Boleto de R$ 268,12 pago
         │
         ├─ (−) tarifa bancária ............ R$ 2,50   → repassada ao cliente
-        ├─ (−) comissão PayAx 2,35% ....... R$ 6,30   → nossa receita
+        ├─ (−) tarifa PayAx 2,35% ......... R$ 6,30   → nossa receita
         └─ (=) líquido do cliente ......... R$ 259,32 → entra "a liberar" e vira saldo em D+N dias úteis
 ```
 
@@ -41,7 +41,7 @@ conferência da nossa equipe.
 | # | Módulo | O que tem |
 |---|---|---|
 | 1 | **Clientes** | Número de conta PayAx sequencial (agência 001 · conta 0001-3) com dígito verificador. Cadastro com CNPJ validado, endereço do beneficiário, situação, chave PIX de repasse, janela de retenção (D+N), repasse automático, valor mínimo, limite sem aprovação e teto por boleto. Ficha com resumo, boletos, conta gráfica, repasses, preços e acessos. |
-| 2 | **Preços** | Tabela padrão da plataforma e tabela por cliente, **com vigência**: tarifa de emissão, tarifa de liquidação (repassada), comissão percentual com piso e teto, e tarifa do repasse. O histórico fica guardado. |
+| 2 | **Preços** | Tabela padrão da plataforma e tabela por cliente, **com vigência**: tarifa de emissão, tarifa de liquidação (repassada), tarifa PayAx percentual com piso e teto, e tarifa do repasse. O histórico fica guardado. |
 | 3 | **Boletos** | Emissão avulsa, por importação do IXC ou por API. **Boleto** e **Bolepix** (mesmo título com QR Code PIX). Nosso número reservado de forma atômica, código de barras e linha digitável no padrão FEBRABAN com o campo livre do Bradesco. Juros ao mês (pro rata die), multa, desconto por antecipação e prazo de baixa. Baixa, estorno e consulta ao banco. |
 | 4 | **Ficha de compensação** | Recibo do pagador + ficha, em HTML pronto para imprimir ou salvar em PDF pelo navegador, com código de barras Interleaved 2 of 5 nas medidas do padrão (103 × 13 mm) e QR Code do Bolepix. **Link público assinado** para enviar ao pagador, sem login. |
 | 5 | **Split e conta gráfica** | Razão de lançamentos por cliente com saldo acumulado, disponível × a liberar, agenda de liberação dos próximos dias, extrato em tela e em CSV, e ajuste manual com motivo. |
@@ -49,7 +49,7 @@ conferência da nossa equipe.
 | 7 | **Conciliação** | Cada aviso do banco é **guardado antes de ser processado** (corpo inteiro), com o resultado de cada um: liquidado, repetido, ignorado ou erro. Liquidação idempotente: o mesmo aviso duas vezes não credita em dobro. Baixa manual e consulta ao banco para o que não chegou. |
 | 8 | **CNAB 400 automático** | Remessa gerada sozinha com os títulos emitidos e escrita na pasta de saída; pasta de entrada varrida de tempos em tempos e cada retorno aplicado na hora — entrada confirmada, liquidação com split, baixa ou rejeição com o motivo traduzido. Pedido de baixa vai como ocorrência 02 na remessa seguinte. Ninguém gera nem importa arquivo na mão. |
 | 9 | **Integrações** | **Bradesco** (Cobrança Registrada, Boleto Híbrido e PIX de repasse) com credenciais cifradas em AES-256-GCM, e **um IXC por cliente**, nos dois sentidos: importa os títulos em aberto, emite o boleto, grava a linha digitável de volta no título e dá baixa quando o boleto é pago. |
-| 10 | **Relatórios** | Faturamento por período e por cliente: emitido, recebido, comissão, tarifas, receita, **margem** (receita − custo do banco) e repassado, com CSV e impressão. Taxa de conversão emitido → pago. |
+| 10 | **Relatórios** | Faturamento por período e por cliente: emitido, recebido, tarifa PayAx, tarifas bancárias, receita, **margem** (receita − custo do banco) e repassado, com CSV e impressão. Taxa de conversão emitido → pago. |
 | 11 | **Segurança e histórico** | Perfis por função, **autenticação em duas etapas** por aplicativo (opcionalmente obrigatória para a equipe), senha provisória trocada no primeiro acesso, idempotência nos comandos POST, controle de versão otimista nos cadastros e auditoria com valor antes e depois. |
 | 12 | **Backup conferido** | Cópia do banco a cada N horas e sob demanda, com **conferência automática**: integridade do arquivo e se o total do razão bate com o banco em uso. Histórico, download registrado na auditoria e alerta no painel quando atrasa ou não confere. |
 
@@ -142,6 +142,22 @@ manual de um retorno e o download de qualquer remessa.
 > convênio tem particularidades: gere uma remessa de teste, mande homologar e ajuste ali — nenhuma outra parte
 > do sistema precisa mudar. O sistema recusa qualquer registro que não tenha exatamente 400 posições, porque um
 > byte fora faz o banco rejeitar o arquivo inteiro.
+
+## Vocabulário
+
+O que cobramos do cliente a cada título pago chama-se **tarifa PayAx** em toda a interface, nos relatórios e no
+extrato. No banco de dados e nos campos da API o nome antigo continua: `comissao`, `comissao_centavos`,
+`comissao_minima_centavos`. É só a chave interna — renomear a coluna exigiria reconstruir a tabela que guarda o
+razão do dinheiro dos clientes, sem mudar nada do que se vê na tela.
+
+As quatro cobranças do produto, para não confundir:
+
+| Nome na tela | O que é | Quando |
+|---|---|---|
+| **Tarifa PayAx** | o nosso percentual sobre o valor pago, com piso e teto | em cada título liquidado |
+| **Tarifa bancária** | o que o banco cobra, repassado ao cliente | em cada título liquidado |
+| **Tarifa de emissão** | cobrada por boleto registrado, pago ou não | no registro |
+| **Tarifa do repasse** | custo do PIX que leva o dinheiro ao cliente | em cada transferência |
 
 ## O beneficiário do boleto
 
