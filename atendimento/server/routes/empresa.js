@@ -315,6 +315,25 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
+  /** A ficha 360° do cliente: histórico, linha do tempo e score. Abre da conversa ou da ouvidoria. */
+  r.get('/contatos/:id/ficha', async (req, res, next) => {
+    try {
+      const ficha = await require('../lib/cliente360').ficha(db, req.empresa.id, Number(req.params.id),
+        { ixcClienteId: req.query.ixc_cliente_id || null });
+      if (!ficha) throw naoEncontrado('Contato');
+      res.json(ficha);
+    } catch (err) { next(err); }
+  });
+
+  r.get('/conversas/:id/ficha', async (req, res, next) => {
+    try {
+      const c = conversaDa(req);
+      const ficha = await require('../lib/cliente360').ficha(db, req.empresa.id, c.contato_id, { ixcClienteId: c.ixc_cliente_id });
+      if (!ficha) throw naoEncontrado('Contato');
+      res.json(ficha);
+    } catch (err) { next(err); }
+  });
+
   // ---------- Filas ----------
   r.get('/filas', (req, res) => res.json({
     itens: filasLib.listar(db, req.empresa.id, { todas: true }).map((f) => ({
@@ -437,6 +456,7 @@ module.exports = function rotasEmpresa(db) {
 
   r.use('/ia', require('./ia')(db));
   r.use('/ixc', require('./ixc')(db));
+  r.use('/ouvidoria', require('./ouvidoria')(db));
   r.use('/', require('./cadastros')(db));
 
   // ---------- Relatórios ----------

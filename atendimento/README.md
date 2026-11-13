@@ -77,6 +77,15 @@ nunca fica sem resposta.
   - *Como ela atende*: nome, saudação, tom de voz, regras da empresa, quando transferir, mensagens
     automáticas, modelo e esforço — e o botão **Ver o prompt que ela recebe**, exatamente como vai ao modelo.
   - *Testar*: conversa de teste com a atendente de verdade, sem enviar nada para o WhatsApp.
+- **Ouvidoria**: o que não pode se perder numa conversa — reclamação formal, pedido de cancelamento,
+  Procon e Anatel. Cada caso tem protocolo, prazo, responsável, tratativas e um desfecho que diz se o
+  cliente **ficou ou foi embora**, com a receita anual em jogo. A atendente virtual abre o caso sozinha
+  e transfere já com a ficha e o score prontos. Indicadores: casos no mês, fora do prazo, **taxa de
+  retenção** e **receita salva**.
+- **Ficha 360° do cliente** (abre da conversa e do caso): a vida inteira do cliente numa tela —
+  **risco de perder o cliente (0 a 100)** e **valor dele (A, B ou C)**, com *cada fator explicado*,
+  uma recomendação do que fazer, os números do contrato e do pagamento, e a **linha do tempo** com
+  conversas, pagamentos, atrasos, chamados técnicos e ouvidorias em ordem.
 - **Contatos**: quem já falou com a empresa, com CPF/CNPJ, código no sistema, observações, bloqueio,
   opt-out de mensagens ativas e o botão de iniciar conversa.
 - **Chamados**: o que a atendente virtual registrou quando não havia solução na hora, com protocolo.
@@ -226,6 +235,43 @@ curl -X POST https://SEU-DOMINIO/atendimento/api/integracao/mensagens \
 A conversa aberta assim **não passa pela atendente virtual** (aviso automático não é atendimento): ela
 entra direto na fila da equipe, a menos que você mande `"com_ia": true`.
 
+## Ouvidoria e a ficha 360° do cliente
+
+O pedido de cancelamento é o momento em que o provedor mais perde dinheiro por falta de informação:
+quem atende não sabe se aquele cliente paga em dia há três anos ou se entrou há dois meses e já deve
+duas faturas. A ficha resolve isso.
+
+**Risco de perder o cliente (0 a 100)** — soma de fatores, cada um com peso e explicação:
+
+| Fator | Peso |
+|---|---|
+| Já pediu cancelamento antes | +30 (nos últimos 6 meses) ou +15 |
+| Reclamação formal (Procon/Anatel) | +25 · reclamação na ouvidoria: até +18 |
+| Chamados técnicos nos últimos 90 dias | até +22 |
+| Avaliou o atendimento abaixo de 3 | +15 · avaliou 4 ou 5: −8 |
+| Cliente novo (menos de 3 meses) | +14 · mais de 2 anos de casa: −12 |
+| Fatura vencida | +6 a +20, conforme o atraso |
+| Atrasa com frequência | +10 · paga sempre em dia: −10 |
+| Sem conectar há mais de um dia | +12 |
+| Usou 2 ou mais desbloqueios de confiança | +8 |
+
+**Valor do cliente (A, B ou C)** cruza mensalidade, tempo de casa e pontualidade, e mostra **quanto a
+empresa deixa de faturar por ano** se perder aquele contrato.
+
+Do cruzamento sai a **recomendação**, que é o que a pessoa lê primeiro: cliente A com risco alto vale
+escutar e reter; inadimplente há mais de 30 dias com risco alto pede tratar o financeiro antes de
+qualquer oferta — desconto para quem já não paga costuma virar prejuízo em dobro.
+
+O score é **transparente de propósito**: nada de caixa-preta. Quem vai decidir em 30 segundos se
+oferece retenção precisa saber por quê, e precisa poder discordar do número.
+
+A **linha do tempo** junta o que o IXC sabe (virou cliente, pagamentos, atrasos, chamados técnicos)
+com o que a plataforma sabe (conversas, transferências, avaliações, ouvidorias) numa lista só, do mais
+novo para o mais antigo.
+
+Sem o IXC — ou com ele fora do ar — a ficha sai assim mesmo, **marcada como incompleta**: o score usa
+o que a plataforma sabe e avisa na tela que os números do contrato não entraram.
+
 ## Instalação no servidor (/atendimento)
 
 ```bash
@@ -281,6 +327,8 @@ atendimento/
     lib/conversas.js     # ciclo bot → aguardando → humano → encerrada, transferência, CSAT
     lib/filas.js         # horário de atendimento e distribuição por carga
     lib/manutencao.js    # abandono, atendentes ausentes, entrega do que ficou na fila, limpeza
+    lib/ouvidoria.js     # casos com protocolo, prazo, tratativas, desfecho e taxa de retenção
+    lib/cliente360.js    # ficha do cliente: score de risco e valor, com os fatores, e a linha do tempo
     lib/relatorios.js    # resolução da IA, tempos, CSAT, custo e CSV
     lib/empresas.js      # cadastro, equipe, números e chaves de API
     lib/cifra.js         # AES-256-GCM dos tokens e cabeçalhos

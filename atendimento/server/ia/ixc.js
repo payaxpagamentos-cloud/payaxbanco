@@ -195,6 +195,11 @@ function criarIxc({ url, token, timeoutMs = 8000, cacheMs = 60_000, recursos = {
         explicacao: EXPLICACAO_ACESSO[ACESSO[c.status_internet]] ?? null,
         ativo: c.status === 'A',
         endereco: [c.endereco, c.numero, c.bairro, c.cidade].filter(Boolean).join(', ') || null,
+        // Para a ficha do cliente: desde quando ele é cliente e quanto paga por mês.
+        ativado_em: soData(c.data_ativacao ?? c.data_cadastro ?? c.data) || null,
+        cancelado_em: soData(c.data_cancelamento) || null,
+        mensalidade_centavos: centavos(c.valor ?? c.valor_plano ?? c.aviso_aux_valor ?? 0),
+        motivo_cancelamento: c.obs_cancelamento ?? null,
       }));
     },
 
@@ -216,6 +221,49 @@ function criarIxc({ url, token, timeoutMs = 8000, cacheMs = 60_000, recursos = {
           pix: f.pix_copia_cola ?? f.gateway_link ?? null,
         }))
         .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+    },
+
+    /**
+     * Histórico de faturas do período, pagas e em aberto. É daqui que sai a pontualidade do cliente:
+     * quantas pagou, quantas pagou com atraso e quantos dias em média.
+     */
+    async historicoFaturas(clienteId, { meses = 12 } = {}) {
+      const lista = await listar(escopo, R.receber, 'fn_areceber.id_cliente', String(clienteId), { rp: 300, sortname: 'fn_areceber.data_vencimento', sortorder: 'desc' });
+      const corte = new Date(Date.now() - meses * 30 * 86_400_000).toISOString().slice(0, 10);
+      const atraso = (venc, pago) => (venc && pago && pago > venc
+        ? Math.round((Date.parse(`${pago}T12:00:00Z`) - Date.parse(`${venc}T12:00:00Z`)) / 86_400_000) : 0);
+      return lista
+        .filter((f) => soData(f.data_vencimento) >= corte && f.status !== 'C')
+        .map((f) => {
+          const vencimento = soData(f.data_vencimento);
+          const pagamento = soData(f.data_pagamento ?? f.data_recebimento) || null;
+          return {
+            id: String(f.id),
+            vencimento,
+            pagamento,
+            paga: f.status === 'R' || Boolean(pagamento),
+            valor_centavos: centavos(f.valor ?? f.valor_aberto),
+            dias_atraso_no_pagamento: atraso(vencimento, pagamento),
+          };
+        })
+        .sort((a, b) => b.vencimento.localeCompare(a.vencimento));
+    },
+
+    /** Todos os chamados do período (abertos e fechados): quantos problemas este cliente teve. */
+    async historicoChamados(clienteId, { meses = 6 } = {}) {
+      const lista = await listar(escopo, R.chamado, 'su_oss_chamado.id_cliente', String(clienteId), { rp: 200, sortname: 'su_oss_chamado.id', sortorder: 'desc' });
+      const corte = new Date(Date.now() - meses * 30 * 86_400_000).toISOString().slice(0, 10);
+      return lista
+        .map((c) => ({
+          id: String(c.id),
+          protocolo: c.protocolo ?? String(c.id),
+          assunto: c.titulo ?? c.mensagem ?? null,
+          status: c.status,
+          aberto: ['A', 'AN', 'EN', 'AG'].includes(String(c.status)),
+          aberto_em: soData(c.data_abertura ?? c.data),
+          fechado_em: soData(c.data_fechamento) || null,
+        }))
+        .filter((c) => c.aberto_em >= corte);
     },
 
     /**

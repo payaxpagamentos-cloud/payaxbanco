@@ -310,6 +310,44 @@ function semear(db) {
       totais.abertas++;
     }
 
+    // Ouvidoria: casos de cancelamento, reclamação e Procon, com desfecho.
+    const OUVIDORIAS = [
+      ['cancelamento', 'Quer cancelar: internet caindo há 3 semanas', 'Disse que cai toda noite e já perdeu reunião de trabalho. Avaliou mudar para a concorrência.', 'resolvida', 1, 72, 'A'],
+      ['cancelamento', 'Quer cancelar por preço', 'Recebeu oferta de R$ 89,90 de outro provedor pelo mesmo plano.', 'resolvida', 0, 41, 'B'],
+      ['cancelamento', 'Mudança de cidade sem cobertura', 'Vai se mudar para uma cidade onde não temos cobertura.', 'resolvida', 0, 22, 'B'],
+      ['reclamacao', 'Técnico não compareceu na visita agendada', 'Esperou a tarde toda em casa e ninguém apareceu nem avisou.', 'resolvida', null, 58, 'A'],
+      ['reclamacao', 'Cobrança de taxa não combinada', 'Veio uma taxa de religação que o cliente diz não ter sido avisada.', 'em_tratativa', null, 47, 'B'],
+      ['procon', 'Notificação do Procon sobre velocidade', 'Reclamação registrada no Procon: alega receber menos da metade da velocidade contratada.', 'aberta', null, 81, 'A'],
+      ['elogio', 'Elogiou o atendimento da Marina', 'Disse que foi o melhor atendimento que já teve em provedor.', 'resolvida', null, 8, 'A'],
+    ];
+    for (const [i, [tipo, assunto, relato, status, retido, risco, classe]] of OUVIDORIAS.entries()) {
+      const contato = contatos[i % contatos.length];
+      const abertaEm = quando(inteiro(1, 25));
+      const mensalidade = sorteio([9990, 12990, 17990]);
+      const protocolo = `OUV-${new Date().toISOString().slice(0, 7).replace('-', '')}-${String(i + 1).padStart(4, '0')}`;
+      const encerrada = ['resolvida', 'improcedente'].includes(status);
+      const resolvidaEm = encerrada ? somar(abertaEm, inteiro(3600, 160_000)) : null;
+      const id = Number(db.prepare(`INSERT INTO ouvidoria
+          (empresa_id, protocolo, contato_id, ixc_cliente_id, tipo, origem, assunto, relato, status, prioridade, prazo_em,
+           responsavel_id, risco_na_abertura, valor_na_abertura, mensalidade_centavos, desfecho, retido, valor_anual_centavos, aberta_em, assumida_em, resolvida_em)
+        VALUES (?, ?, ?, ?, ?, 'ia', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(empresa.id, protocolo, contato.id, String(500 + i), tipo, assunto, relato, status,
+          ['procon', 'anatel', 'cancelamento'].includes(tipo) ? 'alta' : 'normal',
+          somar(abertaEm, tipo === 'procon' ? 86_400 : 172_800),
+          encerrada || status === 'em_tratativa' ? sorteio(equipe).id : null,
+          risco, classe, mensalidade,
+          encerrada ? (retido === 1 ? 'Ofereceu-se a troca do roteador e o cliente aceitou ficar.' : retido === 0 ? 'Cliente optou por sair; contrato encerrado sem multa.' : 'Pedido de desculpas e reagendamento com prioridade.') : null,
+          retido, mensalidade * 12, abertaEm, encerrada ? somar(abertaEm, 1800) : null, resolvidaEm).lastInsertRowid);
+      db.prepare("INSERT INTO ouvidoria_eventos (ouvidoria_id, tipo, texto, criado_em) VALUES (?, 'abertura', ?, ?)")
+        .run(id, `Caso aberto pela atendente virtual: ${assunto}`, abertaEm);
+      db.prepare("INSERT INTO ouvidoria_eventos (ouvidoria_id, tipo, texto, criado_em) VALUES (?, 'abertura', ?, ?)")
+        .run(id, `Na abertura: risco ${risco}/100 (${risco >= 60 ? 'alto' : risco >= 30 ? 'medio' : 'baixo'}), cliente classe ${classe}.`, abertaEm);
+      if (resolvidaEm) {
+        db.prepare("INSERT INTO ouvidoria_eventos (ouvidoria_id, usuario_id, tipo, texto, criado_em) VALUES (?, ?, 'desfecho', ?, ?)")
+          .run(id, sorteio(equipe).id, retido === 1 ? 'Encerrada como resolvida — cliente RETIDO.' : retido === 0 ? 'Encerrada como resolvida — cliente PERDIDO.' : 'Encerrada como resolvida.', resolvidaEm);
+      }
+    }
+
     // Chamados abertos pela atendente virtual.
     for (const [i, contato] of contatos.slice(0, 6).entries()) {
       const criadoEm = quando(inteiro(0, 20));
@@ -322,6 +360,7 @@ function semear(db) {
     }
 
     console.log(`[ZOE Atende] Empresa "${empresa.nome}" criada com ${FILAS.length} filas, ${EQUIPE.length} pessoas na equipe e ${CONHECIMENTO.length} artigos na base.`);
+    console.log(`             Ouvidoria: ${OUVIDORIAS.length} casos, sendo ${OUVIDORIAS.filter((o) => o[0] === 'cancelamento').length} de cancelamento.`);
     console.log(`             Histórico: ${totais.ia} resolvidas pela IA, ${totais.humano} transferidas, ${totais.abandono} abandonadas e ${totais.abertas} em aberto agora.`);
   });
   return true;

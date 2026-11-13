@@ -6,6 +6,8 @@ const conversas = require('../lib/conversas');
 const filas = require('../lib/filas');
 const conhecimento = require('./conhecimento');
 const ixc = require('./ferramentas-ixc');
+const ouvidoriaLib = require('../lib/ouvidoria');
+const cliente360 = require('../lib/cliente360');
 
 /**
  * O que a atendente virtual pode fazer. Cada ferramenta é uma função do servidor: a IA escolhe e
@@ -149,6 +151,58 @@ const INTERNAS = {
         dentro_horario: r.dentro_horario,
         atendente: r.atendente?.nome ?? null,
         mensagem: 'O cliente já foi avisado da transferência. Não escreva mais nada.',
+      };
+    },
+  },
+
+  abrir_ouvidoria: {
+    descricao: 'Abre um caso de OUVIDORIA e passa para quem trata isso. Use quando o cliente: pedir para CANCELAR o contrato; '
+      + 'fizer uma reclamação formal (não uma dúvida, mas uma queixa sobre o serviço ou o atendimento); citar PROCON, Anatel, '
+      + 'advogado ou processo; ou quando quiser registrar um elogio ou uma sugestão. '
+      + 'Isso gera protocolo e prazo, e leva para a pessoa certa a ficha do cliente com o histórico e o risco já calculados. '
+      + 'NÃO tente reverter o cancelamento você mesma e NÃO ofereça desconto: quem negocia é gente.',
+    entrada: esquema({
+      tipo: txt('Um destes: cancelamento, reclamacao, procon, anatel, elogio, sugestao.'),
+      assunto: txt('O caso em uma frase, do jeito que a pessoa que for tratar precisa ler (até 200 caracteres).'),
+      relato: txt('O que o cliente contou, com as palavras dele: o motivo, desde quando, o que já tentou.'),
+    }, ['tipo', 'assunto', 'relato']),
+    terminal: true,
+    executar: async ({ db, empresa, conversa, contato, entrada }) => {
+      const tipos = Object.keys(ouvidoriaLib.TIPOS);
+      const tipo = tipos.includes(String(entrada.tipo).toLowerCase()) ? String(entrada.tipo).toLowerCase() : 'reclamacao';
+      const atualConversa = db.prepare('SELECT * FROM conversas WHERE id = ?').get(conversa.id);
+
+      // A ficha é calculada ANTES de transferir: quem recebe já abre a conversa sabendo com quem fala.
+      let ficha = null;
+      try {
+        ficha = await cliente360.ficha(db, empresa.id, contato.id, { ixcClienteId: atualConversa.ixc_cliente_id });
+      } catch { ficha = null; }
+
+      const { ouvidoria, ja_existia: jaExistia } = ouvidoriaLib.abrir(db, {
+        empresa, contato, conversa: atualConversa, tipo,
+        assunto: String(entrada.assunto).slice(0, 200), relato: entrada.relato, origem: 'ia', ficha,
+      });
+
+      // Elogio e sugestão não precisam ocupar ninguém: ficam registrados e o atendimento segue.
+      if (['elogio', 'sugestao'].includes(tipo)) {
+        return {
+          controle: null, ok: true, protocolo: ouvidoria.protocolo, registrado: true,
+          instrucao: `Agradeça de verdade e diga que o registro ficou com o protocolo ${ouvidoria.protocolo}. O atendimento continua normalmente.`,
+        };
+      }
+
+      const r = ouvidoriaLib.encaminhar(db, { conversa: atualConversa, ouvidoria, ficha });
+      if (!r) {
+        return { ok: false, erro: 'A empresa não tem fila para receber a ouvidoria.', instrucao: 'Informe o protocolo ao cliente e chame transferir_para_humano.' };
+      }
+      return {
+        controle: 'transferida',
+        ok: true,
+        protocolo: ouvidoria.protocolo,
+        ja_existia: jaExistia,
+        fila: r.fila.nome,
+        dentro_horario: r.dentro_horario,
+        instrucao: `Informe o protocolo ${ouvidoria.protocolo} ao cliente e diga que a ouvidoria vai tratar. A plataforma já avisou da transferência. Não escreva mais nada depois disso.`,
       };
     },
   },

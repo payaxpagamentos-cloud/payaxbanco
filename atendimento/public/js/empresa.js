@@ -11,6 +11,7 @@ import {
 } from './comum.js';
 import {telaCaixa} from './caixa.js';
 import {telaIa} from './ia.js';
+import {telaOuvidoria} from './ouvidoria.js';
 
 // ---------- Dashboard ----------
 
@@ -450,5 +451,5 @@ const relatorios = (ctx) => telaRelatorios(ctx, `/empresas/${ctx.empresaId}/rela
 });
 
 export const TELAS_EMPRESA = {
-  dashboard, caixa: telaCaixa, ia: telaIa, filas, equipe, contatos, chamados, relatorios, configuracoes, integracoes,
+  dashboard, caixa: telaCaixa, ia: telaIa, ouvidoria: telaOuvidoria, filas, equipe, contatos, chamados, relatorios, configuracoes, integracoes,
 };

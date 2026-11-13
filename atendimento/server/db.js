@@ -250,6 +250,51 @@ CREATE TABLE IF NOT EXISTS ia_config (
   atualizada_em TEXT
 );
 
+-- Ouvidoria: reclamação, cancelamento, Procon, Anatel. Caso com protocolo, prazo e desfecho.
+-- É o lugar onde o provedor trata o que não pode se perder numa conversa de WhatsApp.
+CREATE TABLE IF NOT EXISTS ouvidoria (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  protocolo TEXT NOT NULL,
+  contato_id INTEGER NOT NULL REFERENCES contatos(id),
+  conversa_id INTEGER REFERENCES conversas(id) ON DELETE SET NULL,
+  ixc_cliente_id TEXT,
+  tipo TEXT NOT NULL CHECK (tipo IN ('reclamacao','cancelamento','procon','anatel','elogio','sugestao')),
+  origem TEXT NOT NULL DEFAULT 'ia' CHECK (origem IN ('ia','atendente','api')),
+  assunto TEXT NOT NULL,
+  relato TEXT,
+  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','em_tratativa','resolvida','improcedente')),
+  prioridade TEXT NOT NULL DEFAULT 'normal' CHECK (prioridade IN ('baixa','normal','alta')),
+  -- Prazo de resposta (SLA): Procon e Anatel têm prazo legal; os outros, o que a empresa definir.
+  prazo_em TEXT,
+  responsavel_id INTEGER REFERENCES usuarios(id),
+  -- Fotografia do score no momento da abertura: depois o cliente muda, mas a decisão foi tomada com estes números.
+  risco_na_abertura INTEGER,
+  valor_na_abertura TEXT,
+  mensalidade_centavos INTEGER NOT NULL DEFAULT 0,
+  -- Desfecho: o cliente ficou? Quanto de receita anual foi salvo (ou perdido)?
+  desfecho TEXT,
+  retido INTEGER,
+  valor_anual_centavos INTEGER NOT NULL DEFAULT 0,
+  aberta_em TEXT NOT NULL,
+  assumida_em TEXT,
+  resolvida_em TEXT,
+  UNIQUE (empresa_id, protocolo)
+);
+CREATE INDEX IF NOT EXISTS idx_ouvidoria_empresa ON ouvidoria(empresa_id, status, aberta_em DESC);
+CREATE INDEX IF NOT EXISTS idx_ouvidoria_contato ON ouvidoria(contato_id, aberta_em DESC);
+
+-- Cada tratativa do caso: quem falou o quê e quando.
+CREATE TABLE IF NOT EXISTS ouvidoria_eventos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ouvidoria_id INTEGER NOT NULL REFERENCES ouvidoria(id) ON DELETE CASCADE,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  tipo TEXT NOT NULL DEFAULT 'tratativa' CHECK (tipo IN ('abertura','tratativa','contato','proposta','desfecho','prazo')),
+  texto TEXT NOT NULL,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ouvidoria_eventos ON ouvidoria_eventos(ouvidoria_id, id);
+
 -- Integração com o IXC Provedor, por empresa. O token fica cifrado.
 CREATE TABLE IF NOT EXISTS ixc_config (
   empresa_id INTEGER PRIMARY KEY REFERENCES empresas(id) ON DELETE CASCADE,
@@ -445,6 +490,10 @@ const CONFIG_PADRAO = {
   abandono_min: '180',
   // Minutos na fila sem ninguém assumir que acendem o alerta de espera no painel.
   alerta_espera_min: '10',
+  // Prazo de resposta da ouvidoria, em horas, por tipo de caso.
+  // Procon e Anatel seguem o prazo legal da notificação; aqui fica o alerta interno.
+  ouvidoria_prazo_horas: '48',
+  ouvidoria_prazo_horas_formal: '24',
   // Preço da IA em centavos de real por milhão de tokens, para o custo estimado dos relatórios.
   // Padrão do claude-opus-5-5 (US$ 4,00 / US$ 20,00 / US$ 0,20 por milhão) a ~R$ 5,40 o dólar.
   // O master ajusta no painel quando a tabela da Anthropic ou o câmbio mudarem.

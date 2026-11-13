@@ -11,6 +11,8 @@ const conhecimento = require('./conhecimento');
 const ferramentas = require('./ferramentas');
 const claude = require('./claude');
 const ferramentasIxc = require('./ferramentas-ixc');
+const ouvidoriaLib = require('../lib/ouvidoria');
+const cliente360 = require('../lib/cliente360');
 const prompt = require('./prompt');
 
 /**
@@ -161,9 +163,18 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
     return { acao: 'transferida', detalhe: r.fila.nome };
   }
 
+  // Assunto de ouvidoria (cancelamento, Procon, reclamação formal): vira caso com protocolo.
+  // Com a IA ligada, deixa ela conduzir e chamar abrir_ouvidoria — ela escreve um relato de verdade.
+  // Sem IA, as regras abrem o caso aqui mesmo, para o assunto não se perder.
+  const daOuvidoria = regras.assuntoDeOuvidoria(texto);
+  if (daOuvidoria && lista.length && !(cfg.ativa && claude.disponivel())) {
+    const r = await abrirOuvidoriaPelasRegras(db, { empresa, conversa, contato, tipo: daOuvidoria.tipo, texto, termo: daOuvidoria.termo });
+    if (r) return r;
+  }
+
   // Pediu uma pessoa: transfere na hora, sem insistir.
   const pedido = regras.pedidoDeHumano(texto);
-  if (pedido && lista.length) {
+  if (pedido && !daOuvidoria && lista.length) {
     registrarEvento(db, conversa, { tipo: 'intencao', nome: 'pedido de humano', detalhe: pedido });
     const r = transferirCom(db, conversa, {
       motivo: `O cliente pediu atendimento humano ("${pedido}").`,
@@ -285,6 +296,29 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
     return { acao: 'transferida', detalhe: motivo };
   }
   return semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo });
+}
+
+/**
+ * Abre a ouvidoria pelas regras, quando a IA não está disponível para escrever o relato.
+ * O relato fica sendo o que o cliente escreveu — menos rico, mas o caso não se perde.
+ */
+async function abrirOuvidoriaPelasRegras(db, { empresa, conversa, contato, tipo, texto, termo }) {
+  let ficha = null;
+  try { ficha = await cliente360.ficha(db, empresa.id, contato.id, { ixcClienteId: conversa.ixc_cliente_id }); } catch { ficha = null; }
+  const { ouvidoria } = ouvidoriaLib.abrir(db, {
+    empresa, contato, conversa, tipo, origem: 'ia', ficha,
+    assunto: `${ouvidoriaLib.TIPOS[tipo]} pelo WhatsApp`,
+    relato: `O cliente escreveu: "${String(texto).slice(0, 500)}".`,
+  });
+  registrarEvento(db, conversa, { tipo: 'intencao', nome: `ouvidoria: ${tipo}`, detalhe: `casou com "${termo}"` });
+
+  if (['elogio', 'sugestao'].includes(tipo)) {
+    responder(db, conversa, `Obrigado pelo retorno! Registrei com o protocolo ${ouvidoria.protocolo} e vou encaminhar para a equipe.`);
+    return { acao: 'respondeu', detalhe: `ouvidoria ${ouvidoria.protocolo}` };
+  }
+  responder(db, conversa, `Registrei sua solicitação com o protocolo ${ouvidoria.protocolo}. Vou te passar para a equipe que trata isso.`);
+  const r = transacao(db, () => ouvidoriaLib.encaminhar(db, { conversa, ouvidoria, ficha }));
+  return r ? { acao: 'transferida', detalhe: `ouvidoria ${ouvidoria.protocolo} → ${r.fila.nome}` } : null;
 }
 
 /**

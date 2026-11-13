@@ -110,6 +110,8 @@ export async function telaCaixa(ctx) {
         el('div', { class: 'pequeno mudo' }, formatarTelefone(d.telefone.replace(/^55/, '')),
           d.contato?.documento ? ` · ${d.contato.documento}` : '', d.fila_nome ? ` · ${d.fila_nome}` : '')),
       el('div', { class: 'linha', style: 'gap:6px;margin-left:auto' },
+        // A ficha 360°: quem é este cliente, o risco de perder e a vida toda dele.
+        botao('Ficha do cliente', 'primario pequeno', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)),
         etiquetaEstado(d.estado),
         d.estado !== 'encerrada' && !d.janela_aberta ? el('span', { class: 'etiqueta aviso', title: 'Passaram-se mais de 24 h desde a última mensagem do cliente: o WhatsApp só aceita template aprovado.' }, 'Janela fechada') : null,
         ...acoesConversa(d, { minha, posso })));
@@ -314,7 +316,9 @@ export async function telaCaixa(ctx) {
         dado('E-mail', d.contato?.email),
         dado('Código no sistema', d.contato?.codigo_externo),
         d.contato?.observacoes ? el('p', { class: 'pequeno', style: 'margin:8px 0 0' }, d.contato.observacoes) : null,
-        ctx.somenteLeitura ? null : botao('Editar contato', '', () => editarContato(d))),
+        el('div', { class: 'linha', style: 'gap:6px;flex-wrap:wrap' },
+          botao('Ver ficha completa', '', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)),
+          ctx.somenteLeitura ? null : botao('Editar contato', '', () => editarContato(d)))),
 
       bloco('Atendimento',
         dado('Aberta', dataHora(d.aberta_em)),
