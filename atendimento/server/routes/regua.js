@@ -2,7 +2,7 @@
 
 const express = require('express');
 const { auditar } = require('../db');
-const { exigirAdminEmpresa } = require('../auth');
+const { exigirPermissao } = require('../auth');
 const reguaLib = require('../lib/regua');
 const custo = require('../lib/custo');
 const orcamento = require('../lib/orcamento');
@@ -22,7 +22,7 @@ module.exports = function rotasRegua(db) {
     precos: custo.precos(db),
   }));
 
-  r.post('/', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/', exigirPermissao('custos.editar'), (req, res, next) => {
     try {
       const nova = reguaLib.salvar(db, req.empresa.id, req.body ?? {});
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'criou régua', alvo: nova.nome, detalhe: nova.categoria, ip: req.ip });
@@ -30,7 +30,7 @@ module.exports = function rotasRegua(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/:id', exigirPermissao('custos.editar'), (req, res, next) => {
     try {
       const alterada = reguaLib.salvar(db, req.empresa.id, req.body ?? {}, { id: Number(req.params.id) });
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'alterou régua', alvo: alterada.nome, ip: req.ip });
@@ -38,7 +38,7 @@ module.exports = function rotasRegua(db) {
     } catch (err) { next(err); }
   });
 
-  r.delete('/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.delete('/:id', exigirPermissao('custos.editar'), (req, res, next) => {
     try {
       const x = reguaLib.buscar(db, req.empresa.id, Number(req.params.id));
       db.prepare('DELETE FROM reguas WHERE id = ?').run(x.id);
@@ -56,7 +56,7 @@ module.exports = function rotasRegua(db) {
   });
 
   /** Disparo manual (o automático roda pelo horário da régua). */
-  r.post('/:id/executar', exigirAdminEmpresa, async (req, res, next) => {
+  r.post('/:id/executar', exigirPermissao('custos.editar'), async (req, res, next) => {
     try {
       const x = reguaLib.buscar(db, req.empresa.id, Number(req.params.id));
       const resultado = await reguaLib.executar(db, req.empresa, x, {
@@ -99,7 +99,7 @@ module.exports = function rotasRegua(db) {
   });
 
   /** Paga agora o que já venceu o prazo de espera (o agendador faz isso de hora em hora). */
-  r.post('/pendencias/varrer', exigirAdminEmpresa, async (req, res, next) => {
+  r.post('/pendencias/varrer', exigirPermissao('custos.editar'), async (req, res, next) => {
     try {
       const resultado = await reguaLib.pagarVencidas(db);
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'varreu a sala de espera', detalhe: resultado, ip: req.ip });
@@ -114,7 +114,7 @@ module.exports = function rotasRegua(db) {
     } catch (err) { next(err); }
   });
 
-  r.put('/orcamento', exigirAdminEmpresa, (req, res, next) => {
+  r.put('/orcamento', exigirPermissao('custos.editar'), (req, res, next) => {
     try {
       const estado = orcamento.definir(db, req.empresa.id, req.body ?? {});
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'definiu o orçamento da Meta',
@@ -128,7 +128,7 @@ module.exports = function rotasRegua(db) {
     try { res.json(fechamento.serie(db, req.empresa.id, { meses: Number(req.query.meses) || 12 })); } catch (err) { next(err); }
   });
 
-  r.post('/fechamentos/:mes/fechar', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/fechamentos/:mes/fechar', exigirPermissao('custos.editar'), (req, res, next) => {
     try {
       const f = fechamento.fechar(db, req.empresa.id, String(req.params.mes));
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'fechou o mês da conta da Meta', alvo: f.mes, detalhe: { gasto_milesimos: f.gasto_milesimos }, ip: req.ip });
@@ -137,7 +137,7 @@ module.exports = function rotasRegua(db) {
   });
 
   /** A gestão lança o valor da fatura da Meta; o sistema mostra a diferença contra o que contou. */
-  r.post('/fechamentos/:mes/fatura', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/fechamentos/:mes/fatura', exigirPermissao('custos.editar'), (req, res, next) => {
     try {
       const f = fechamento.conferir(db, req.empresa.id, String(req.params.mes), {
         valor_centavos: req.body?.valor_centavos, observacao: req.body?.observacao, usuario: req.usuario,
@@ -148,7 +148,7 @@ module.exports = function rotasRegua(db) {
     } catch (err) { next(err); }
   });
 
-  r.post('/fechamentos/:mes/reabrir', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/fechamentos/:mes/reabrir', exigirPermissao('custos.editar'), (req, res, next) => {
     try {
       const f = fechamento.reabrir(db, req.empresa.id, String(req.params.mes));
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'reabriu o mês da conta da Meta', alvo: f.mes, ip: req.ip });

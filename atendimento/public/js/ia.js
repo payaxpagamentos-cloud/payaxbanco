@@ -87,8 +87,8 @@ async function conhecimento(ctx, alvo) {
         el('div', { class: 'linha', style: 'gap:4px' },
           el('span', { class: 'etiqueta' }, `${inteiro(a.usos)} uso(s)`),
           a.ativo ? null : el('span', { class: 'etiqueta aviso' }, 'Desativado'),
-          ctx.soAdmin ? botaoIcone('editar', 'Editar', () => editar(a)) : null,
-          ctx.soAdmin ? botaoIcone('lixo', 'Excluir', () => excluir(a), 'perigo') : null)),
+          ctx.pode('zoe.alertas') ? botaoIcone('editar', 'Editar', () => editar(a)) : null,
+          ctx.pode('zoe.alertas') ? botaoIcone('lixo', 'Excluir', () => excluir(a), 'perigo') : null)),
       el('p', {}, a.resposta),
       a.perguntas ? el('div', { class: 'perguntas' }, String(a.perguntas).split('\n').filter(Boolean).map((q) => el('span', { class: 'etiqueta' }, q))) : null)))
       : vazio('A base de conhecimento está vazia.', 'Sem base, a ZOE não responde nada sozinha: ela transfere tudo. Comece pelas 5 perguntas que a sua equipe mais recebe.'));
@@ -142,7 +142,7 @@ async function conhecimento(ctx, alvo) {
 
   limpar(alvo, acoesTopo(
     el('div', { class: 'linha', style: 'gap:8px' }, botao('Testar a busca', '', testarBusca)),
-    ctx.soAdmin ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Novo artigo') : null), lista);
+    ctx.pode('zoe.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Novo artigo') : null), lista);
   await recarregar();
 }
 
@@ -164,7 +164,7 @@ async function intencoes(ctx, alvo) {
         td(i.fila_nome ?? '—'),
         td(inteiro(i.usos), 'dir num'),
         td(i.ativa ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
-        td(ctx.soAdmin ? el('div', { class: 'linha', style: 'gap:4px' }, botaoIcone('editar', 'Editar', () => editar(i)), botaoIcone('lixo', 'Excluir', () => excluir(i), 'perigo')) : null, 'dir'))),
+        td(ctx.pode('zoe.editar') ? el('div', { class: 'linha', style: 'gap:4px' }, botaoIcone('editar', 'Editar', () => editar(i)), botaoIcone('lixo', 'Excluir', () => excluir(i), 'perigo')) : null, 'dir'))),
     'Nenhuma intenção cadastrada. Sem elas, tudo passa pela IA — o que funciona, mas custa mais.')));
   };
 
@@ -200,7 +200,7 @@ async function intencoes(ctx, alvo) {
     await recarregar();
   };
 
-  limpar(alvo, acoesTopo(el('span'), ctx.soAdmin ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova intenção') : null), lista);
+  limpar(alvo, acoesTopo(el('span'), ctx.pode('zoe.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova intenção') : null), lista);
   await recarregar();
 }
 
@@ -221,7 +221,7 @@ async function ferramentas(ctx, alvo) {
             f.cabecalhos_nomes.length ? el('div', { class: 'pequeno mudo' }, `cabeçalhos: ${f.cabecalhos_nomes.join(', ')}`) : null)),
           td(inteiro(f.usos), 'dir num'),
           td(f.ativa ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
-          td(ctx.soAdmin ? el('div', { class: 'linha', style: 'gap:4px' },
+          td(ctx.pode('zoe.editar') ? el('div', { class: 'linha', style: 'gap:4px' },
             botaoIcone('teste', 'Testar', () => testar(f)), botaoIcone('editar', 'Editar', () => editar(f)), botaoIcone('lixo', 'Excluir', () => excluir(f), 'perigo')) : null, 'dir'))),
         'Nenhuma ferramenta da empresa. Com uma, a ZOE consulta fatura, pedido ou contrato no seu sistema e resolve sem passar para a equipe.'),
         el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' },
@@ -274,7 +274,7 @@ async function ferramentas(ctx, alvo) {
     return false;
   }, { rotulo: 'Chamar', largo: true });
 
-  limpar(alvo, acoesTopo(el('span'), ctx.soAdmin ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova ferramenta') : null), lista);
+  limpar(alvo, acoesTopo(el('span'), ctx.pode('zoe.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova ferramenta') : null), lista);
   await recarregar();
 }
 
@@ -318,7 +318,7 @@ async function configuracao(ctx, alvo) {
         'Esforço maior pensa mais, erra menos em caso difícil e custa mais. Para atendimento de WhatsApp, o baixo costuma bastar.'),
       botao('Ver o prompt que ela recebe', '', verPrompt)),
 
-    el('div', { class: 'linha entre' }, el('span'), el('button', { class: 'btn primario', disabled: !ctx.soAdmin }, 'Salvar')));
+    el('div', { class: 'linha entre' }, el('span'), el('button', { class: 'btn primario', disabled: !ctx.pode('zoe.editar') }, 'Salvar')));
 
   f.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -392,7 +392,7 @@ async function provedorIxc(ctx, alvo) {
         escolha('Assuntos financeiros', 'fila_financeira_id', { '': '— fila padrão —', ...Object.fromEntries(filas.map((x) => [x.id, x.nome])) }, c.fila_financeira_id ?? ''),
         escolha('Assuntos técnicos', 'fila_tecnica_id', { '': '— fila padrão —', ...Object.fromEntries(filas.map((x) => [x.id, x.nome])) }, c.fila_tecnica_id ?? '')),
 
-      el('div', { class: 'linha entre' }, el('span'), el('button', { class: 'btn primario', disabled: !ctx.soAdmin }, 'Salvar')));
+      el('div', { class: 'linha entre' }, el('span'), el('button', { class: 'btn primario', disabled: !ctx.pode('zoe.editar') }, 'Salvar')));
 
     f.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -424,7 +424,7 @@ async function provedorIxc(ctx, alvo) {
         el('strong', { class: 'pequeno' }, 'Ferramentas que a ZOE tem hoje: '),
         el('div', { class: 'perguntas', style: 'margin-top:6px' }, c.ferramentas.map((n) => el('span', { class: 'etiqueta ok' }, n))))
       : null,
-    ctx.soAdmin ? el('div', { style: 'margin-top:12px' }, botao('Testar agora', 'primario', sondar)) : null);
+    ctx.pode('zoe.editar') ? el('div', { style: 'margin-top:12px' }, botao('Testar agora', 'primario', sondar)) : null);
 
   const sondar = async () => {
     const r = await api.post(`/empresas/${ctx.empresaId}/ixc/sonda`, {});
@@ -583,15 +583,15 @@ async function alertasDeRede(ctx, alvo) {
               td(el('div', {}, dataHora(a.inicio), el('div', { class: 'pequeno mudo' }, `até ${dataHora(a.fim)}`))),
               td(inteiro(a.avisados), 'dir num'),
               td(el('span', { class: `etiqueta ${SITUACOES[a.situacao]?.[1] ?? ''}` }, SITUACOES[a.situacao]?.[0] ?? a.situacao)),
-              td(ctx.somenteLeitura ? null : el('div', { class: 'linha', style: 'gap:4px;justify-content:flex-end' },
-                ctx.soAdmin ? botaoIcone('teste', 'Testar em um cliente', () => testarAlerta(ctx, a)) : null,
-                ctx.soAdmin ? botaoIcone(a.ativo ? 'encerrar' : 'ok', a.ativo ? 'Desligar' : 'Ligar', async () => {
+              td(!ctx.pode('zoe.alertas') ? null : el('div', { class: 'linha', style: 'gap:4px;justify-content:flex-end' },
+                ctx.pode('zoe.alertas') ? botaoIcone('teste', 'Testar em um cliente', () => testarAlerta(ctx, a)) : null,
+                ctx.pode('zoe.alertas') ? botaoIcone(a.ativo ? 'encerrar' : 'ok', a.ativo ? 'Desligar' : 'Ligar', async () => {
                   await api.patch(`/empresas/${ctx.empresaId}/alertas/${a.id}`, { ativo: !a.ativo });
                   toast(a.ativo ? 'Alerta desligado.' : 'Alerta ligado.');
                   await desenhar();
                 }) : null,
-                ctx.soAdmin ? botaoIcone('editar', 'Editar', () => editarAlerta(ctx, d, a, desenhar)) : null,
-                ctx.soAdmin ? botaoIcone('lixo', 'Excluir', async () => {
+                ctx.pode('zoe.alertas') ? botaoIcone('editar', 'Editar', () => editarAlerta(ctx, d, a, desenhar)) : null,
+                ctx.pode('zoe.alertas') ? botaoIcone('lixo', 'Excluir', async () => {
                   if (!await confirmar('Excluir alerta', `"${a.titulo}" será removido. O histórico de quem já foi avisado se perde.`)) return;
                   await api.delete(`/empresas/${ctx.empresaId}/alertas/${a.id}`);
                   toast('Alerta excluído.');
@@ -603,7 +603,7 @@ async function alertasDeRede(ctx, alvo) {
   };
 
   limpar(alvo,
-    ctx.soAdmin
+    ctx.pode('zoe.alertas')
       ? acoesTopo(botao('Novo alerta', 'primario', async () => {
         const d = await api.get(`/empresas/${ctx.empresaId}/alertas`);
         editarAlerta(ctx, d, null, desenhar);

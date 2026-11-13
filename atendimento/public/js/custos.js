@@ -157,12 +157,12 @@ async function asReguas(ctx, alvo) {
           td(reais(r.custo_milesimos), 'dir num'),
           td(el('strong', { class: 'ok-texto' }, reais(r.economia_milesimos)), 'dir num'),
           td(r.ativa ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
-          td(ctx.somenteLeitura ? null : el('div', { class: 'linha', style: 'gap:4px' },
+          td(!ctx.pode('custos.editar') && !ctx.pode('custos.ver') ? null : el('div', { class: 'linha', style: 'gap:4px' },
             botaoIcone('teste', 'Simular (não envia nada)', () => simular(r)),
-            ctx.soAdmin ? botaoIcone('enviar', 'Disparar agora', () => disparar(r)) : null,
+            ctx.pode('custos.editar') ? botaoIcone('enviar', 'Disparar agora', () => disparar(r)) : null,
             botaoIcone('relatorios', 'Histórico', () => historico(r)),
-            ctx.soAdmin ? botaoIcone('editar', 'Editar', () => editar(r, d)) : null,
-            ctx.soAdmin ? botaoIcone('lixo', 'Excluir', () => excluir(r), 'perigo') : null), 'dir')))))
+            ctx.pode('custos.editar') ? botaoIcone('editar', 'Editar', () => editar(r, d)) : null,
+            ctx.pode('custos.editar') ? botaoIcone('lixo', 'Excluir', () => excluir(r), 'perigo') : null), 'dir')))))
       : vazio('Nenhuma régua cadastrada.',
         'A régua é o que dispara boleto, lembrete de atraso e aviso de manutenção — e é onde a conta da Meta é feita. '
         + 'Com ela, o aviso vai de graça para quem falou com você nas últimas 24 h e não vai para quem já pagou.'));
@@ -243,7 +243,7 @@ async function asReguas(ctx, alvo) {
         ? cartao('Por que alguns não recebem', tabela(['Motivo', '>Clientes'], s.motivos.map((m) => el('tr', {}, td(m.motivo), td(inteiro(m.quantos), 'dir num')))))
         : null,
       el('div', { class: 'linha entre', style: 'margin-top:12px' },
-        ctx.soAdmin ? botao('Disparar agora', 'primario', async () => { fechar(); await disparar(r); }) : el('span'),
+        ctx.pode('custos.editar') ? botao('Disparar agora', 'primario', async () => { fechar(); await disparar(r); }) : el('span'),
         el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
     ], { largo: true });
   };
@@ -278,7 +278,7 @@ async function asReguas(ctx, alvo) {
     ], { largo: true });
   };
 
-  limpar(alvo, acoesTopo(el('span'), ctx.soAdmin ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova régua') : null), lista);
+  limpar(alvo, acoesTopo(el('span'), ctx.pode('custos.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova régua') : null), lista);
   await recarregar();
 }
 

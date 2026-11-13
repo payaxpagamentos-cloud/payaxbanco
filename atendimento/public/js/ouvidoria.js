@@ -61,7 +61,7 @@ export async function telaOuvidoria(ctx) {
 
       o.relato ? el('div', { class: 'aviso-caixa info' }, icone('conversa'), el('div', {}, el('strong', {}, 'O que o cliente disse: '), o.relato)) : null,
 
-      ctx.somenteLeitura || encerrado ? null : el('div', { class: 'linha', style: 'gap:8px;margin:12px 0' },
+      !ctx.pode('ouvidoria.editar') || encerrado ? null : el('div', { class: 'linha', style: 'gap:8px;margin:12px 0' },
         minha ? null : botao('Assumir o caso', 'primario', async () => {
           await api.post(`/empresas/${ctx.empresaId}/ouvidoria/${o.id}/assumir`);
           toast('Caso assumido.');
@@ -137,7 +137,7 @@ export async function telaOuvidoria(ctx) {
         seletor('Situação', { abertas: 'Em aberto', '': 'Todas', resolvida: 'Resolvidas', improcedente: 'Improcedentes' }, estado.status, (v) => { estado.status = v; recarregar(); }),
         seletor('Tipo', { '': 'Todos', ...TIPOS }, estado.tipo, (v) => { estado.tipo = v; recarregar(); }),
         campoBusca(estado.busca, (t) => { estado.busca = t; recarregar(); }, 'Protocolo, nome, telefone ou CPF')),
-      ctx.somenteLeitura ? null : el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Abrir caso')),
+      !ctx.pode('ouvidoria.editar') ? null : el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Abrir caso')),
     lista);
 
   await recarregar();

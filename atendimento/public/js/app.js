@@ -10,25 +10,38 @@ const nomesEmpresa = new Map();
 
 const PLATAFORMA = ['master', 'suporte'];
 
-// [rota, rótulo, ícone, perfis que veem (vazio = todos)]
+/** O que esta pessoa pode. Vem do servidor no login; o master tem tudo. */
+const pode = (u, permissao) => u?.perfil === 'master' || (u?.permissoes ?? []).includes(permissao);
+
+/** Pessoa sem nenhuma tela liberada: melhor dizer isso do que piscar entre telas vazias. */
+const semAcesso = (u) => el('div', { class: 'entrada' },
+  el('div', { class: 'cartao', style: 'max-width:420px;text-align:center' },
+    el('h2', {}, 'Sem acesso a nenhuma tela'),
+    el('p', { class: 'mudo' }, `${u.nome}, seu usuário existe mas não tem permissão para abrir nada ainda. `
+      + 'Peça a quem administra a empresa para liberar o que você precisa em Usuários.'),
+    el('button', { class: 'btn', onclick: () => { sessao.limpar(); location.hash = ''; location.reload(); } }, 'Sair')));
+
+// [rota, rótulo, ícone, permissão exigida (vazio = qualquer pessoa autenticada)]
 const MENU_MASTER = [
   ['dashboard', 'Dashboard', 'dashboard'], ['empresas', 'Empresas', 'empresas'], ['relatorios', 'Relatórios', 'relatorios'],
   ['usuarios', 'Usuários', 'equipe', ['master']], ['seguranca', 'Segurança', 'seguranca', ['master']],
   ['diagnostico', 'Diagnóstico', 'diagnostico'], ['configuracoes', 'Configurações', 'configuracoes', ['master']],
 ];
+// Cada item do menu da empresa pede uma permissão. Quem não tem, não vê — e, mais importante,
+// a rota correspondente também recusa no servidor. Esconder o menu nunca foi permissão.
 const MENU_EMPRESA = [
-  ['caixa', 'Atendimentos', 'caixa'],
-  ['dashboard', 'Dashboard', 'dashboard'],
-  ['ia', 'ZOE', 'ia'],
-  ['ouvidoria', 'Ouvidoria', 'alerta'],
-  ['contatos', 'Contatos', 'contatos'],
-  ['chamados', 'Chamados', 'chamados'],
-  ['custos', 'Centro de Custo', 'dinheiro', ['master', 'suporte', 'cliente']],
-  ['filas', 'Filas', 'filas', ['master', 'suporte', 'cliente', 'supervisor']],
-  ['equipe', 'Equipe', 'equipe', ['master', 'suporte', 'cliente', 'supervisor']],
-  ['relatorios', 'Relatórios', 'relatorios', ['master', 'suporte', 'cliente', 'supervisor']],
-  ['configuracoes', 'Configurações', 'configuracoes', ['master', 'suporte', 'cliente', 'supervisor']],
-  ['integracoes', 'Integrações', 'integracoes', ['master', 'suporte', 'cliente']],
+  ['caixa', 'Atendimentos', 'caixa', 'atendimentos.ver'],
+  ['dashboard', 'Dashboard', 'dashboard', 'atendimentos.ver'],
+  ['ia', 'ZOE', 'ia', 'zoe.ver'],
+  ['ouvidoria', 'Ouvidoria', 'alerta', 'ouvidoria.ver'],
+  ['contatos', 'Contatos', 'contatos', 'cliente.ver'],
+  ['chamados', 'Chamados', 'chamados', 'chamados.ver'],
+  ['custos', 'Centro de Custo', 'dinheiro', 'custos.ver'],
+  ['filas', 'Filas', 'filas', 'filas.ver'],
+  ['equipe', 'Usuários', 'equipe', 'usuarios.ver'],
+  ['relatorios', 'Relatórios', 'relatorios', 'relatorios.ver'],
+  ['configuracoes', 'Configurações', 'configuracoes', 'configuracoes.ver'],
+  ['integracoes', 'Integrações', 'integracoes', 'integracoes.ver'],
 ];
 
 const SUBTITULOS = {
@@ -79,8 +92,20 @@ async function desenhar() {
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
   const telas = empresaId ? TELAS_EMPRESA : TELAS_MASTER;
-  const item = menu.find(([k, , , perfis]) => k === tela && (!perfis || perfis.includes(u.perfil)));
-  if (!item || !telas[tela]) return ir(empresaId, empresaId ? 'caixa' : 'dashboard');
+  // O menu do master ainda é por perfil (a plataforma tem só dois); o da empresa, por permissão.
+  const visivel = ([, , , exige]) => {
+    if (!exige) return true;
+    return Array.isArray(exige) ? exige.includes(u.perfil) : pode(u, exige);
+  };
+  const item = menu.find((x) => x[0] === tela && visivel(x));
+  if (!item || !telas[tela]) {
+    // Sem permissão para a tela pedida, abre a primeira que a pessoa pode ver — em vez de
+    // mandá-la sempre para a caixa, que ela também pode não ter.
+    const primeira = menu.find((x) => visivel(x) && telas[x[0]]);
+    if (!primeira) return limpar(raiz, semAcesso(u));
+    if (primeira[0] !== tela) return ir(empresaId, primeira[0]);
+    return undefined;
+  }
 
   let nomeEmpresa = null;
   if (empresaId) {
@@ -102,7 +127,7 @@ async function desenhar() {
   // `cheia`: a tela ocupa a altura da janela e rola por dentro (caixa de entrada), em vez de alongar a página.
   const casca = el('div', { class: `casca${recolhida ? ' recolhida' : ''}${tela === 'caixa' ? ' cheia' : ''}` });
 
-  const itens = menu.filter(([, , , perfis]) => !perfis || perfis.includes(u.perfil)).map(([k, rotulo, ic]) =>
+  const itens = menu.filter(visivel).map(([k, rotulo, ic]) =>
     el('a', { class: `item${k === tela ? ' on' : ''}`, href: link(empresaId, k), title: rotulo }, icone(ic), el('span', { class: 'rotulo' }, rotulo)));
 
   const lateral = el('nav', { class: 'lateral', 'aria-label': 'Menu' },
@@ -130,6 +155,9 @@ async function desenhar() {
     // Quem administra a empresa: a equipe da plataforma e o administrador da empresa.
     soAdmin: PLATAFORMA.includes(u.perfil) || u.perfil === 'cliente',
     somenteLeitura: u.perfil === 'supervisor',
+    // A pergunta que as telas fazem daqui para a frente. O perfil continua existindo, mas é só
+    // o ponto de partida das permissões — quem manda é o que a pessoa realmente tem.
+    pode: (p) => pode(u, p),
     parar: (fn) => { pararTela = fn; },
     ir: (tela2, eid = empresaId) => ir(eid, tela2),
     renomearEmpresa: (id, nome) => nomesEmpresa.set(id, nome),

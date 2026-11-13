@@ -66,7 +66,7 @@ async function filas(ctx) {
           : el('span', { class: 'etiqueta erro' }, 'ninguém')),
         td(inteiro(f.aguardando), 'centro num'),
         td(f.ativa ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
-        td(ctx.soAdmin ? el('div', { class: 'linha', style: 'gap:4px' },
+        td(ctx.pode('filas.editar') ? el('div', { class: 'linha', style: 'gap:4px' },
           botaoIcone('equipe', 'Quem atende', () => escolherAtendentes(f)),
           botaoIcone('editar', 'Editar', () => editar(f)),
           botaoIcone('lixo', 'Excluir', () => excluir(f), 'perigo')) : null, 'dir'))),
@@ -118,11 +118,56 @@ async function filas(ctx) {
     await recarregar();
   });
 
-  limpar(ctx.conteudo, acoesTopo(el('span'), ctx.soAdmin ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova fila') : null), lista);
+  limpar(ctx.conteudo, acoesTopo(el('span'), ctx.pode('filas.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova fila') : null), lista);
   await recarregar();
 }
 
 // ---------- Equipe ----------
+
+/**
+ * O que esta pessoa vê e faz.
+ *
+ * O perfil continua existindo como ponto de partida; aqui se afina item a item, inclusive
+ * dentro das telas (ver o CPF inteiro, abrir a ficha de risco, ver valores do cliente).
+ * O que foi mexido à mão fica marcado, para dar para voltar ao padrão sem adivinhar.
+ */
+async function permissoesDe(ctx, u, depois) {
+  const d = await api.get(`/empresas/${ctx.empresaId}/usuarios/${u.id}/permissoes`);
+  const marcados = new Map();
+  const caixas = [];
+
+  const bloco = (g) => cartao(g.grupo, el('div', { class: 'permissoes' }, g.itens.map((i) => {
+    const entrada = el('input', { type: 'checkbox', checked: i.ativa });
+    marcados.set(i.chave, entrada);
+    caixas.push({ entrada, padrao: i.do_perfil });
+    const marca = el('span', { class: 'pequeno mudo' });
+    const pintar = () => {
+      const mudou = entrada.checked !== i.do_perfil;
+      limpar(marca, mudou ? (entrada.checked ? 'liberado além do perfil' : 'tirado do perfil') : '');
+    };
+    entrada.addEventListener('change', pintar);
+    queueMicrotask(pintar);
+    return el('label', { class: 'permissao' }, entrada,
+      el('span', {}, el('strong', {}, i.rotulo), el('div', { class: 'pequeno mudo' }, i.ajuda), marca));
+  })));
+
+  modal(`Permissões de ${u.nome}`, (fechar) => [
+    el('p', { class: 'mudo' },
+      `Perfil: ${d.perfil_nome}. O perfil é o ponto de partida — o que você marcar aqui vale acima dele. `
+      + 'Cada item também é conferido no servidor, então desmarcar fecha a porta de verdade, não só esconde o botão.'),
+    ...d.grupos.map(bloco),
+    el('div', { class: 'linha entre', style: 'margin-top:12px' },
+      el('button', { class: 'btn', onclick: () => { for (const c of caixas) c.entrada.checked = c.padrao; for (const c of caixas) c.entrada.dispatchEvent(new Event('change')); } },
+        'Voltar ao padrão do perfil'),
+      el('button', { class: 'btn primario', onclick: async () => {
+        const escolhidas = [...marcados.entries()].filter(([, e]) => e.checked).map(([k]) => k);
+        await api.put(`/empresas/${ctx.empresaId}/usuarios/${u.id}/permissoes`, { permissoes: escolhidas });
+        toast('Permissões salvas.');
+        fechar();
+        await depois();
+      } }, 'Salvar')),
+  ], { largo: true });
+}
 
 async function equipe(ctx) {
   const lista = el('div');
@@ -131,16 +176,20 @@ async function equipe(ctx) {
     limpar(lista, cartao(null, tabela(['Pessoa', 'Perfil', '^Disponível', '^Em atendimento', 'Máx.', 'Último acesso', '^Ativo', ''],
       itens.map((u) => el('tr', {},
         td(el('span', { class: 'pessoa' }, el('span', { class: 'iniciais' }, iniciais(u.nome)), el('span', {}, u.nome, el('div', { class: 'pequeno mudo' }, u.email)))),
-        td(PERFIS[u.perfil]),
+        td(el('div', {},
+          PERFIS[u.perfil],
+          u.permissoes_ajustadas ? el('div', { class: 'pequeno mudo' }, 'permissões ajustadas') : null)),
         td(['atendente', 'cliente'].includes(u.perfil) ? el('span', { class: `situacao ${u.disponivel ? 'ok' : ''}` }, u.disponivel ? 'sim' : 'não') : '—', 'centro'),
         td(inteiro(u.em_atendimento), 'centro num'),
         td(inteiro(u.max_simultaneas), 'centro num'),
         td(u.ultimo_acesso ? desde(u.ultimo_acesso) : 'nunca entrou'),
         td(u.ativo ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
-        td(ctx.soAdmin ? botaoIcone('editar', 'Editar', () => editar(u)) : null, 'dir'))))));
+        td(ctx.pode('usuarios.editar') ? el('div', { class: 'linha', style: 'gap:4px;justify-content:flex-end' },
+          botaoIcone('seguranca', 'Permissões', () => permissoesDe(ctx, u, recarregar)),
+          botaoIcone('editar', 'Editar', () => editar(u))) : null, 'dir'))))));
   };
 
-  const criar = () => formModal('Nova pessoa na equipe', () => [
+  const criar = () => formModal('Novo usuário', () => [
     campo('Nome', { name: 'nome', required: true, maxlength: 160 }),
     campo('E-mail (é o login)', { name: 'email', type: 'email', required: true }),
     escolha('Perfil', 'perfil', { atendente: PERFIS.atendente, cliente: PERFIS.cliente, supervisor: PERFIS.supervisor }, 'atendente'),
@@ -174,7 +223,7 @@ async function equipe(ctx) {
     await recarregar();
   });
 
-  limpar(ctx.conteudo, acoesTopo(el('span'), ctx.soAdmin ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova pessoa') : null), lista);
+  limpar(ctx.conteudo, acoesTopo(el('span'), ctx.pode('usuarios.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Novo usuário') : null), lista);
   await recarregar();
 }
 
@@ -194,7 +243,7 @@ async function contatos(ctx) {
         td(c.documento ?? '—'),
         td(el('span', {}, inteiro(c.conversas), c.abertas ? el('span', { class: 'etiqueta info', style: 'margin-left:6px' }, 'em aberto') : null), 'centro'),
         td(c.ultimo_contato_em ? desde(c.ultimo_contato_em) : '—'),
-        td(ctx.somenteLeitura ? null : el('div', { class: 'linha', style: 'gap:4px' },
+        td(!ctx.pode('cliente.editar') ? null : el('div', { class: 'linha', style: 'gap:4px' },
           botaoIcone('conversa', c.abertas ? 'Abrir a conversa' : 'Iniciar conversa', () => conversar(c)),
           botaoIcone('editar', 'Editar', () => editar(c))), 'dir'))),
     'Nenhum contato ainda. Eles aparecem aqui assim que alguém mandar mensagem para o seu WhatsApp.')));
@@ -251,7 +300,7 @@ async function chamados(ctx) {
         td(ch.aberto_por === 'ia' ? el('span', { class: 'etiqueta info' }, 'ZOE') : (ch.usuario_nome ?? 'equipe')),
         td(dataHora(ch.criado_em)),
         td(etiquetaChamado(ch.status), 'centro'),
-        td(ctx.somenteLeitura ? null : botaoIcone('editar', 'Atualizar', () => editar(ch)), 'dir'))),
+        td(!ctx.pode('chamados.editar') ? null : botaoIcone('editar', 'Atualizar', () => editar(ch)), 'dir'))),
     'Nenhum chamado. A ZOE abre um sempre que o pedido é legítimo mas não tem solução na hora.')));
   };
 
@@ -295,29 +344,29 @@ async function configuracoes(ctx) {
             td(n.ativo ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
             td(el('div', { class: 'linha', style: 'gap:4px' },
               botaoIcone('ok', 'Testar a conexão com a Meta', () => testarNumero(n)),
-              ctx.soAdmin ? botaoIcone('editar', 'Editar', () => editarNumero(n)) : null), 'dir'))))
+              ctx.pode('integracoes.editar') ? botaoIcone('editar', 'Editar', () => editarNumero(n)) : null), 'dir'))))
           : vazio('Nenhum número cadastrado.', 'Sem número, nada entra nem sai do WhatsApp.'),
         el('div', { class: 'aviso-caixa info', style: 'margin-top:12px' }, icone('integracoes'), el('div', {},
           el('strong', {}, 'No painel da Meta, use este endereço de callback:'),
           el('pre', { class: 'json', style: 'margin:6px 0' }, numeros.webhook.url),
           el('div', { class: 'pequeno' }, numeros.webhook.instrucoes))),
-        ctx.soAdmin ? el('div', { style: 'margin-top:12px' }, el('button', { class: 'btn primario', onclick: () => editarNumero(null) }, icone('mais'), 'Cadastrar número')) : null),
+        ctx.pode('integracoes.editar') ? el('div', { style: 'margin-top:12px' }, el('button', { class: 'btn primario', onclick: () => editarNumero(null) }, icone('mais'), 'Cadastrar número')) : null),
 
       cartao('Respostas rápidas',
         el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' }, 'Na conversa, o atendente digita /atalho e o texto entra pronto.'),
         tabela(['Atalho', 'Título', 'Texto', '>Usos', '^Ativa', ''], rapidas.itens.map((rr) => el('tr', {},
           td(el('code', {}, `/${rr.atalho}`)), td(rr.titulo), td(el('span', { class: 'pequeno' }, rr.texto.slice(0, 90))),
           td(inteiro(rr.usos), 'dir num'), td(rr.ativa ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
-          td(ctx.somenteLeitura ? null : el('div', { class: 'linha', style: 'gap:4px' },
+          td(!ctx.pode('configuracoes.editar') ? null : el('div', { class: 'linha', style: 'gap:4px' },
             botaoIcone('editar', 'Editar', () => editarRapida(rr)), botaoIcone('lixo', 'Excluir', () => excluirRapida(rr), 'perigo')), 'dir'))),
         'Nenhuma resposta rápida.'),
-        ctx.somenteLeitura ? null : el('div', { style: 'margin-top:12px' }, el('button', { class: 'btn', onclick: () => editarRapida(null) }, icone('mais'), 'Nova resposta rápida'))),
+        !ctx.pode('configuracoes.editar') ? null : el('div', { style: 'margin-top:12px' }, el('button', { class: 'btn', onclick: () => editarRapida(null) }, icone('mais'), 'Nova resposta rápida'))),
 
       cartao('Etiquetas',
         el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap' }, etiquetas.itens.map((e) => el('span', { class: `tag-escolha ${e.cor} on` },
           e.nome, el('small', { style: 'margin-left:6px;opacity:.7' }, inteiro(e.usos)),
-          ctx.soAdmin ? botaoIcone('lixo', 'Excluir', () => excluirEtiqueta(e)) : null))),
-        ctx.somenteLeitura ? null : el('div', { style: 'margin-top:12px' }, el('button', { class: 'btn', onclick: () => criarEtiqueta(etiquetas.cores) }, icone('mais'), 'Nova etiqueta'))));
+          ctx.pode('configuracoes.editar') ? botaoIcone('lixo', 'Excluir', () => excluirEtiqueta(e)) : null))),
+        !ctx.pode('configuracoes.editar') ? null : el('div', { style: 'margin-top:12px' }, el('button', { class: 'btn', onclick: () => criarEtiqueta(etiquetas.cores) }, icone('mais'), 'Nova etiqueta'))));
   };
 
   const editarNumero = (n) => formModal(n ? `Editar ${n.nome}` : 'Cadastrar número de WhatsApp', () => [

@@ -3,7 +3,7 @@
 const express = require('express');
 const crypto = require('node:crypto');
 const { agora, auditar, transacao } = require('../db');
-const { exigirAdminEmpresa } = require('../auth');
+const { exigirPermissao } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { cifrar, decifrar } = require('../lib/cifra');
 const conversasLib = require('../lib/conversas');
@@ -35,7 +35,7 @@ module.exports = function rotasIa(db) {
 
   r.get('/', (req, res) => res.json(comoPublica(cfgDa(req.empresa.id))));
 
-  r.patch('/', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const atual = cfgDa(req.empresa.id);
       const d = req.body ?? {};
@@ -78,7 +78,7 @@ module.exports = function rotasIa(db) {
   // ---------- Base de conhecimento ----------
   r.get('/conhecimento', (req, res) => res.json({ itens: conhecimentoLib.listar(db, req.empresa.id, { todos: true }).map((a) => ({ ...a, ativo: Boolean(a.ativo) })) }));
 
-  r.post('/conhecimento', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/conhecimento', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const d = req.body ?? {};
       const id = conhecimentoLib.salvar(db, req.empresa.id, {
@@ -90,7 +90,7 @@ module.exports = function rotasIa(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/conhecimento/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/conhecimento/:id', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const atual = db.prepare('SELECT * FROM conhecimento WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!atual) throw naoEncontrado('Artigo');
@@ -106,7 +106,7 @@ module.exports = function rotasIa(db) {
     } catch (err) { next(err); }
   });
 
-  r.delete('/conhecimento/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.delete('/conhecimento/:id', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const a = db.prepare('SELECT * FROM conhecimento WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!a) throw naoEncontrado('Artigo');
@@ -144,7 +144,7 @@ module.exports = function rotasIa(db) {
     };
   };
 
-  r.post('/intencoes', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/intencoes', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const i = dadosIntencao(db, req.empresa.id, req.body ?? {});
       v.exigir(i.palavras, 'Informe pelo menos uma palavra-chave.');
@@ -155,7 +155,7 @@ module.exports = function rotasIa(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/intencoes/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/intencoes/:id', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const atual = db.prepare('SELECT * FROM intencoes WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!atual) throw naoEncontrado('Intenção');
@@ -166,7 +166,7 @@ module.exports = function rotasIa(db) {
     } catch (err) { next(err); }
   });
 
-  r.delete('/intencoes/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.delete('/intencoes/:id', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const i = db.prepare('SELECT * FROM intencoes WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!i) throw naoEncontrado('Intenção');
@@ -218,7 +218,7 @@ module.exports = function rotasIa(db) {
     return Object.keys(o).length ? cifrar(JSON.stringify(o), 'ferramenta') : null;
   };
 
-  r.post('/ferramentas', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/ferramentas', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const d = req.body ?? {};
       const f = dadosFerramenta(d);
@@ -230,7 +230,7 @@ module.exports = function rotasIa(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/ferramentas/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/ferramentas/:id', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const atual = db.prepare('SELECT * FROM ferramentas WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!atual) throw naoEncontrado('Ferramenta');
@@ -243,7 +243,7 @@ module.exports = function rotasIa(db) {
     } catch (err) { next(err); }
   });
 
-  r.delete('/ferramentas/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.delete('/ferramentas/:id', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
       const f = db.prepare('SELECT * FROM ferramentas WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!f) throw naoEncontrado('Ferramenta');
@@ -254,7 +254,7 @@ module.exports = function rotasIa(db) {
   });
 
   /** Chama a ferramenta da empresa com os parâmetros de teste, para conferir a integração. */
-  r.post('/ferramentas/:id/testar', exigirAdminEmpresa, async (req, res, next) => {
+  r.post('/ferramentas/:id/testar', exigirPermissao('zoe.editar'), async (req, res, next) => {
     try {
       const f = db.prepare('SELECT * FROM ferramentas WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!f) throw naoEncontrado('Ferramenta');
@@ -271,7 +271,7 @@ module.exports = function rotasIa(db) {
    * Conversa de teste: roda a atendente de verdade (mesmo prompt, mesmas ferramentas) contra um
    * contato de teste, sem mandar nada para o WhatsApp. As mensagens ficam numa conversa marcada no histórico.
    */
-  r.post('/testar', exigirAdminEmpresa, async (req, res, next) => {
+  r.post('/testar', exigirPermissao('zoe.testar'), async (req, res, next) => {
     try {
       const texto = v.texto(req.body?.texto, 'a mensagem de teste', 1000);
       const numero = db.prepare('SELECT * FROM numeros WHERE empresa_id = ? ORDER BY id LIMIT 1').get(req.empresa.id);

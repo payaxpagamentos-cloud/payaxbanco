@@ -2,7 +2,7 @@
 
 const express = require('express');
 const { auditar } = require('../db');
-const { exigirAdminEmpresa } = require('../auth');
+const { exigirPermissao } = require('../auth');
 const alertas = require('../lib/alertas');
 
 /**
@@ -22,7 +22,7 @@ module.exports = function rotasAlertas(db) {
     campos_padrao: alertas.CAMPOS_PADRAO,
   }));
 
-  r.post('/', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/', exigirPermissao('zoe.alertas'), (req, res, next) => {
     try {
       const novo = alertas.salvar(db, req.empresa.id, req.body ?? {}, { usuario: req.usuario });
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'criou alerta de rede', alvo: novo.titulo,
@@ -31,7 +31,7 @@ module.exports = function rotasAlertas(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/:id', exigirPermissao('zoe.alertas'), (req, res, next) => {
     try {
       const x = alertas.salvar(db, req.empresa.id, req.body ?? {}, { id: Number(req.params.id), usuario: req.usuario });
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'alterou alerta de rede', alvo: x.titulo, detalhe: { ativo: x.ativo }, ip: req.ip });
@@ -39,7 +39,7 @@ module.exports = function rotasAlertas(db) {
     } catch (err) { next(err); }
   });
 
-  r.delete('/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.delete('/:id', exigirPermissao('zoe.alertas'), (req, res, next) => {
     try {
       const x = alertas.excluir(db, req.empresa.id, Number(req.params.id));
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'excluiu alerta de rede', alvo: x.titulo, ip: req.ip });
@@ -52,7 +52,7 @@ module.exports = function rotasAlertas(db) {
    * Recebe o CPF/CNPJ ou o código do cliente no IXC e responde se ele está dentro — com os
    * valores que foram comparados, para quem configurou enxergar por que deu certo ou errado.
    */
-  r.post('/:id/testar', exigirAdminEmpresa, async (req, res, next) => {
+  r.post('/:id/testar', exigirPermissao('zoe.alertas'), async (req, res, next) => {
     try {
       const alerta = alertas.buscar(db, req.empresa.id, Number(req.params.id));
       const ixc = require('../ia/ferramentas-ixc').clienteIxc(db, req.empresa.id);

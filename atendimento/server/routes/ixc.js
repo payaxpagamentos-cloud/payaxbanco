@@ -2,7 +2,7 @@
 
 const express = require('express');
 const { agora, auditar } = require('../db');
-const { exigirAdminEmpresa } = require('../auth');
+const { exigirPermissao } = require('../auth');
 const { ErroNegocio } = require('../lib/erros');
 const { cifrar, decifrar } = require('../lib/cifra');
 const filasLib = require('../lib/filas');
@@ -40,7 +40,7 @@ module.exports = function rotasIxc(db) {
 
   r.get('/', (req, res) => res.json(publica(ler(req.empresa.id), req.empresa.id)));
 
-  r.patch('/', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/', exigirPermissao('integracoes.editar'), (req, res, next) => {
     try {
       const atual = ler(req.empresa.id) ?? {};
       const d = req.body ?? {};
@@ -96,7 +96,7 @@ module.exports = function rotasIxc(db) {
    * Sonda: só de leitura. Testa cada capacidade nesta instância do IXC e guarda o resultado —
    * a ZOE passa a receber apenas as ferramentas que funcionam aqui.
    */
-  r.post('/sonda', exigirAdminEmpresa, async (req, res, next) => {
+  r.post('/sonda', exigirPermissao('integracoes.editar'), async (req, res, next) => {
     try {
       const c = ler(req.empresa.id);
       const token = decifrar(c?.token_cifrado, 'ixc');

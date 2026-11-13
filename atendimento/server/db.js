@@ -540,6 +540,19 @@ CREATE TABLE IF NOT EXISTS ips_bloqueados (
   criado_em TEXT NOT NULL
 );
 
+-- Ajustes de permissão por pessoa.
+--
+-- Guarda só a DIFERENÇA contra o padrão do perfil: 1 concede algo que o perfil não dá,
+-- 0 tira algo que o perfil dava. Guardando a diferença, mudar o padrão de um perfil alcança
+-- todo mundo que nunca foi ajustado à mão — se guardássemos a lista inteira, cada pessoa
+-- ficaria congelada no dia em que foi cadastrada.
+CREATE TABLE IF NOT EXISTS usuario_permissoes (
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  permissao TEXT NOT NULL,
+  concedida INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (usuario_id, permissao)
+);
+
 -- Alertas de rede cadastrados à mão pela equipe.
 --
 -- O IXC nem sempre está atualizado, e a ZOE não pode afirmar o que o cadastro diz errado.

@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const config = require('./config');
 const { agora } = require('./db');
 const { ErroNegocio } = require('./lib/erros');
+const permissoes = require('./lib/permissoes');
 
 const assinar = (dados) => crypto.createHmac('sha256', config.secret).update(dados).digest('base64url');
 
@@ -45,6 +46,10 @@ function autenticar(db) {
     if (!usuario || !usuario.ativo) return next(new ErroNegocio('Usuário inativo.', 401));
     if (usuario.empresa_id && usuario.empresa_status !== 'ativa') return next(new ErroNegocio('Empresa bloqueada. Fale com o suporte.', 401));
     req.usuario = usuario;
+    // As permissões efetivas são calculadas a cada requisição, do banco. Guardá-las no token
+    // faria com que tirar um acesso de alguém só valesse depois que a sessão dele expirasse.
+    req.permissoes = permissoes.efetivas(db, usuario);
+    req.pode = (p) => req.permissoes.has(p);
     // "Visto em" alimenta a lista de atendentes online do painel; grava no máximo a cada minuto.
     if (!usuario.visto_em || Date.now() - Date.parse(usuario.visto_em) > 60_000) { try { visto.run(agora(), usuario.id); } catch { /* leitura não deve falhar por isso */ } }
     next();
@@ -73,9 +78,19 @@ function acessoEmpresa(db) {
   };
 }
 
+/**
+ * Exige uma permissão do catálogo. É isto que fecha a porta de verdade: esconder o item no
+ * menu só tira da vista, e a API continua respondendo para quem souber o endereço.
+ */
+const exigirPermissao = (...quais) => (req, _res, next) => {
+  if (quais.some((p) => req.pode?.(p))) return next();
+  const nomes = quais.map((p) => permissoes.DESCRICAO.get(p)?.rotulo ?? p);
+  return next(new ErroNegocio(`Seu acesso não inclui: ${nomes.join(' ou ')}.`, 403));
+};
+
 /** Quem pode administrar a empresa (configurações, filas, IA, usuários, números): não o atendente. */
 const administraEmpresa = (u) => PLATAFORMA.includes(u.perfil) || u.perfil === 'cliente';
 const exigirAdminEmpresa = (req, _res, next) =>
   administraEmpresa(req.usuario) ? next() : next(new ErroNegocio('Só o administrador da empresa pode alterar esta configuração.', 403));
 
-module.exports = { emitirToken, lerToken, autenticar, permitir, acessoEmpresa, administraEmpresa, exigirAdminEmpresa, PLATAFORMA, SO_LEITURA };
+module.exports = { emitirToken, lerToken, autenticar, permitir, acessoEmpresa, administraEmpresa, exigirAdminEmpresa, exigirPermissao, PLATAFORMA, SO_LEITURA };

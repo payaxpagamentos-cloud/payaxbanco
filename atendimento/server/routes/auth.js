@@ -14,11 +14,15 @@ module.exports = function rotasAuth(db, autenticado) {
     db.prepare('INSERT INTO acessos_recusados (email, ip, motivo, criado_em) VALUES (?, ?, ?, ?)').run(email ?? null, ip ?? null, motivo, agora());
   };
 
+  const permissoes = require('../lib/permissoes');
   const comoSessao = (u) => ({
     token: emitirToken(u),
     usuario: {
       id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, empresa_id: u.empresa_id,
       empresa_nome: u.empresa_nome ?? null, disponivel: Boolean(u.disponivel), max_simultaneas: u.max_simultaneas,
+      // O painel desenha o menu e os botões a partir daqui. É conveniência de tela:
+      // quem decide de verdade é a rota, que confere a mesma permissão no servidor.
+      permissoes: [...permissoes.efetivas(db, u)],
     },
   });
 

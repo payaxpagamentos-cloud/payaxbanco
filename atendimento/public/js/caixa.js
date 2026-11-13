@@ -101,7 +101,7 @@ export async function telaCaixa(ctx) {
 
   function desenharChat(d) {
     const minha = d.atendente_id === ctx.usuario.id;
-    const posso = !ctx.somenteLeitura && d.estado !== 'encerrada' && (ctx.master || ctx.soAdmin || minha || !d.atendente_id);
+    const posso = ctx.pode('atendimentos.atender') && d.estado !== 'encerrada' && (ctx.master || ctx.pode('filas.editar') || minha || !d.atendente_id);
 
     const cabecalho = el('div', { class: 'cabecalho-chat' },
       el('span', { class: 'avatar-contato grande' }, iniciais(d.nome)),
@@ -112,7 +112,7 @@ export async function telaCaixa(ctx) {
       el('div', { class: 'acoes-chat' },
         etiquetaEstado(d.estado),
         // A ficha 360°: quem é este cliente, o risco de perder e a vida toda dele.
-        botao('Ficha do cliente', 'pequeno', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)),
+        ctx.pode('cliente.ficha') ? botao('Ficha do cliente', 'pequeno', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)) : null,
         d.estado !== 'encerrada' && !d.janela_aberta ? el('span', { class: 'etiqueta aviso', title: 'Passaram-se mais de 24 h desde a última mensagem do cliente: o WhatsApp só aceita template aprovado.' }, 'Janela fechada') : null,
         ...acoesConversa(d, { minha, posso })));
 
@@ -120,15 +120,15 @@ export async function telaCaixa(ctx) {
     const rodape = posso ? compositor(d) : el('div', { class: 'compositor fechado' },
       el('p', { class: 'mudo', style: 'margin:0' }, d.estado === 'encerrada'
         ? `Atendimento encerrado${d.resolvida_por ? ` · ${RESOLVIDA_POR[d.resolvida_por]}` : ''}. Para falar com o cliente, abra uma conversa nova em Contatos.`
-        : ctx.somenteLeitura ? 'Seu perfil só consulta.' : `Esta conversa está com ${d.atendente_nome ?? 'outro atendente'}.`),
-      d.estado === 'aguardando' && posso === false && !ctx.somenteLeitura ? botao('Assumir', 'primario', () => assumir(d.id)) : null);
+        : !ctx.pode('atendimentos.atender') ? 'Seu acesso não inclui responder conversas.' : `Esta conversa está com ${d.atendente_nome ?? 'outro atendente'}.`),
+      d.estado === 'aguardando' && posso === false && ctx.pode('atendimentos.atender') ? botao('Assumir', 'primario', () => assumir(d.id)) : null);
 
     limpar(chatEl, cabecalho, mensagens, rodape);
     mensagens.scrollTop = mensagens.scrollHeight;
   }
 
   function acoesConversa(d, { minha, posso }) {
-    if (ctx.somenteLeitura || d.estado === 'encerrada') return [];
+    if (!ctx.pode('atendimentos.atender') || d.estado === 'encerrada') return [];
     const itens = [];
     if (d.estado === 'aguardando' || (!minha && !d.atendente_id)) itens.push(botao('Assumir', 'primario pequeno', () => assumir(d.id)));
     if (posso) {
@@ -317,8 +317,8 @@ export async function telaCaixa(ctx) {
         dado('Código no sistema', d.contato?.codigo_externo),
         d.contato?.observacoes ? el('p', { class: 'pequeno', style: 'margin:8px 0 0' }, d.contato.observacoes) : null,
         el('div', { class: 'linha', style: 'gap:6px;flex-wrap:wrap' },
-          botao('Ver ficha completa', '', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)),
-          ctx.somenteLeitura ? null : botao('Editar contato', '', () => editarContato(d)))),
+          ctx.pode('cliente.ficha') ? botao('Ver ficha completa', '', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)) : null,
+          ctx.pode('cliente.editar') ? botao('Editar contato', '', () => editarContato(d)) : null)),
 
       bloco('Atendimento',
         dado('Aberta', dataHora(d.aberta_em)),
@@ -330,7 +330,7 @@ export async function telaCaixa(ctx) {
         dado('Mensagens da IA', inteiro(d.mensagens_ia)),
         d.csat_nota ? el('div', { class: 'dado' }, el('small', {}, 'Avaliação'), estrelas(d.csat_nota)) : null,
         d.csat_comentario ? el('p', { class: 'pequeno', style: 'margin:4px 0 0' }, `"${d.csat_comentario}"`) : null,
-        ctx.somenteLeitura || d.estado === 'encerrada' ? null : el('label', { class: 'campo' }, 'Prioridade',
+        !ctx.pode('atendimentos.atender') || d.estado === 'encerrada' ? null : el('label', { class: 'campo' }, 'Prioridade',
           (() => {
             const s = escolha(null, 'prioridade', PRIORIDADES, d.prioridade);
             s.addEventListener('change', () => acao(s, async () => {
@@ -347,7 +347,7 @@ export async function telaCaixa(ctx) {
           await api.put(`/empresas/${ctx.empresaId}/conversas/${d.id}/etiquetas`, { etiquetas: ids });
           await abrir(d.id);
         });
-        return el('button', { class: `tag-escolha ${e.cor}${marcada ? ' on' : ''}`, type: 'button', disabled: ctx.somenteLeitura, onclick: trocar }, e.nome);
+        return el('button', { class: `tag-escolha ${e.cor}${marcada ? ' on' : ''}`, type: 'button', disabled: !ctx.pode('atendimentos.etiquetas'), onclick: trocar }, e.nome);
       }))) : null,
 
       d.chamados.length ? bloco('Chamados', d.chamados.map((ch) => el('div', { class: 'dado' }, el('small', {}, ch.protocolo), el('span', {}, ch.assunto)))) : null,
@@ -355,7 +355,7 @@ export async function telaCaixa(ctx) {
       bloco('Notas internas',
         d.notas.length ? el('div', { class: 'notas' }, d.notas.map((n) => el('div', { class: 'nota-item' },
           el('p', {}, n.texto), el('small', {}, `${n.usuario_nome ?? 'equipe'} · ${dataHora(n.criada_em)}`)))) : el('p', { class: 'mudo pequeno', style: 'margin:0' }, 'Nenhuma nota.'),
-        ctx.somenteLeitura ? null : botao('Adicionar nota', '', async () => {
+        !ctx.pode('atendimentos.notas') ? null : botao('Adicionar nota', '', async () => {
           const texto = await perguntar('Nota interna', 'O cliente não vê esta nota');
           if (!texto) return;
           await api.post(`/empresas/${ctx.empresaId}/conversas/${d.id}/notas`, { texto });

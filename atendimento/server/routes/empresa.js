@@ -3,7 +3,8 @@
 const express = require('express');
 const fs = require('node:fs');
 const { agora, auditar, transacao } = require('../db');
-const { exigirAdminEmpresa, administraEmpresa } = require('../auth');
+const { exigirAdminEmpresa, administraEmpresa, exigirPermissao } = require('../auth');
+const permissoesLib = require('../lib/permissoes');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const conversasLib = require('../lib/conversas');
 const filasLib = require('../lib/filas');
@@ -43,10 +44,10 @@ module.exports = function rotasEmpresa(db) {
     status: req.empresa.status, limite_atendentes: req.empresa.limite_atendentes, limite_ia_mes: req.empresa.limite_ia_mes,
   }));
 
-  r.get('/painel', (req, res) => res.json(relatorios.painel(db, req.empresa.id)));
+  r.get('/painel', exigirPermissao('atendimentos.ver', 'relatorios.ver'), (req, res) => res.json(relatorios.painel(db, req.empresa.id)));
 
   // ---------- Caixa de entrada ----------
-  r.get('/conversas', (req, res) => res.json(conversasLib.listar(db, req.empresa.id, {
+  r.get('/conversas', exigirPermissao('atendimentos.ver'), (req, res) => res.json(conversasLib.listar(db, req.empresa.id, {
     caixa: req.query.caixa ?? 'abertas',
     usuario: req.usuario,
     filaId: req.query.fila_id || null,
@@ -59,10 +60,13 @@ module.exports = function rotasEmpresa(db) {
     porPagina: Math.min(100, Number(req.query.por_pagina) || 30),
   })));
 
-  r.get('/conversas/:id', (req, res) => res.json(conversasLib.detalhe(db, req.empresa.id, Number(req.params.id))));
+  r.get('/conversas/:id', exigirPermissao('atendimentos.ver'), (req, res) => {
+    const d = conversasLib.detalhe(db, req.empresa.id, Number(req.params.id));
+    res.json({ ...d, documento: permissoesLib.mascararDocumento(d.documento, req.pode('cliente.documento')), documento_visivel: req.pode('cliente.documento') });
+  });
 
   /** Envia uma mensagem como atendente. Fora da janela de 24 h, só com template aprovado. */
-  r.post('/conversas/:id/mensagens', (req, res, next) => {
+  r.post('/conversas/:id/mensagens', exigirPermissao('atendimentos.atender'), (req, res, next) => {
     try {
       const c = conversaDa(req);
       exigirDono(req, c);
@@ -113,14 +117,14 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.post('/conversas/:id/assumir', (req, res, next) => {
+  r.post('/conversas/:id/assumir', exigirPermissao('atendimentos.atender'), (req, res, next) => {
     try {
       const c = conversasLib.assumir(db, req.empresa.id, Number(req.params.id), req.usuario);
       res.json(conversasLib.resumo(db, req.empresa.id, c.id));
     } catch (err) { next(err); }
   });
 
-  r.post('/conversas/:id/devolver', (req, res, next) => {
+  r.post('/conversas/:id/devolver', exigirPermissao('atendimentos.atender'), (req, res, next) => {
     try {
       const c = conversaDa(req);
       exigirDono(req, c);
@@ -130,7 +134,7 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.post('/conversas/:id/transferir', (req, res, next) => {
+  r.post('/conversas/:id/transferir', exigirPermissao('atendimentos.transferir'), (req, res, next) => {
     try {
       const c = conversaDa(req);
       exigirDono(req, c);
@@ -159,7 +163,7 @@ module.exports = function rotasEmpresa(db) {
   });
 
   /** Devolve a conversa para a ZOE. */
-  r.post('/conversas/:id/voltar-ia', (req, res, next) => {
+  r.post('/conversas/:id/voltar-ia', exigirPermissao('atendimentos.transferir'), (req, res, next) => {
     try {
       const c = conversaDa(req);
       exigirDono(req, c);
@@ -167,7 +171,7 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.post('/conversas/:id/encerrar', (req, res, next) => {
+  r.post('/conversas/:id/encerrar', exigirPermissao('atendimentos.transferir'), (req, res, next) => {
     try {
       const c = conversaDa(req);
       exigirDono(req, c);
@@ -185,7 +189,7 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/conversas/:id', (req, res, next) => {
+  r.patch('/conversas/:id', exigirPermissao('atendimentos.atender'), (req, res, next) => {
     try {
       const c = conversaDa(req);
       exigirDono(req, c);
@@ -199,7 +203,7 @@ module.exports = function rotasEmpresa(db) {
   });
 
   // Notas internas.
-  r.post('/conversas/:id/notas', (req, res, next) => {
+  r.post('/conversas/:id/notas', exigirPermissao('atendimentos.notas'), (req, res, next) => {
     try {
       const c = conversaDa(req);
       const id = Number(db.prepare('INSERT INTO notas (conversa_id, usuario_id, texto, criada_em) VALUES (?, ?, ?, ?)')
@@ -209,7 +213,7 @@ module.exports = function rotasEmpresa(db) {
   });
 
   // Etiquetas da conversa.
-  r.put('/conversas/:id/etiquetas', (req, res, next) => {
+  r.put('/conversas/:id/etiquetas', exigirPermissao('atendimentos.etiquetas'), (req, res, next) => {
     try {
       const c = conversaDa(req);
       const ids = [].concat(req.body?.etiquetas ?? []).map((x) => Number(x)).filter(Number.isInteger);
@@ -224,12 +228,12 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.post('/mensagens/:id/reenviar', (req, res, next) => {
+  r.post('/mensagens/:id/reenviar', exigirPermissao('atendimentos.atender'), (req, res, next) => {
     try { res.json(envio.reenviar(db, Number(req.params.id), req.empresa.id)); } catch (err) { next(err); }
   });
 
   /** Baixa a mídia que o cliente mandou. Sempre como anexo, nunca executada pelo navegador. */
-  r.get('/mensagens/:id/midia', (req, res, next) => {
+  r.get('/mensagens/:id/midia', exigirPermissao('atendimentos.ver'), (req, res, next) => {
     try {
       const m = db.prepare('SELECT * FROM mensagens WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!m?.midia_arquivo) throw naoEncontrado('Arquivo');
@@ -247,7 +251,7 @@ module.exports = function rotasEmpresa(db) {
   });
 
   // ---------- Contatos ----------
-  r.get('/contatos', (req, res) => {
+  r.get('/contatos', exigirPermissao('cliente.ver'), (req, res) => {
     const busca = String(req.query.busca ?? '').trim();
     const args = [req.empresa.id];
     let onde = 'ct.empresa_id = ?';
@@ -255,16 +259,21 @@ module.exports = function rotasEmpresa(db) {
     res.json({
       itens: db.prepare(`SELECT ct.*, (SELECT COUNT(*) FROM conversas c WHERE c.contato_id = ct.id) AS conversas,
           (SELECT COUNT(*) FROM conversas c WHERE c.contato_id = ct.id AND c.estado <> 'encerrada') AS abertas
-        FROM contatos ct WHERE ${onde} ORDER BY COALESCE(ct.ultimo_contato_em, ct.primeiro_contato_em) DESC LIMIT 200`).all(...args),
+        FROM contatos ct WHERE ${onde} ORDER BY COALESCE(ct.ultimo_contato_em, ct.primeiro_contato_em) DESC LIMIT 200`).all(...args)
+        .map((c) => ({ ...c, documento: permissoesLib.mascararDocumento(c.documento, req.pode('cliente.documento')) })),
+      // A tela precisa saber se está vendo o documento inteiro, para não oferecer edição do que está mascarado.
+      documento_visivel: req.pode('cliente.documento'),
     });
   });
 
-  r.patch('/contatos/:id', (req, res, next) => {
+  r.patch('/contatos/:id', exigirPermissao('cliente.editar'), (req, res, next) => {
     try {
       const c = db.prepare('SELECT * FROM contatos WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!c) throw naoEncontrado('Contato');
       const d = req.body ?? {};
-      const documento = d.documento === undefined ? c.documento : (d.documento ? v.digitos(d.documento) : null);
+      const podeDocumento = req.pode('cliente.documento');
+      // Quem vê mascarado não altera o documento: salvaria os pontinhos por cima do número real.
+      const documento = d.documento === undefined || !podeDocumento ? c.documento : (d.documento ? v.digitos(d.documento) : null);
       if (documento) v.exigir((documento.length === 11 && v.cpfValido(documento)) || (documento.length === 14 && v.cnpjValido(documento)), 'CPF ou CNPJ inválido.');
       db.prepare('UPDATE contatos SET nome = ?, documento = ?, email = ?, codigo_externo = ?, observacoes = ?, bloqueado = ?, aceita_ativo = ? WHERE id = ?')
         .run(d.nome === undefined ? c.nome : v.opcional(d.nome, 'o nome', 160), documento,
@@ -282,7 +291,7 @@ module.exports = function rotasEmpresa(db) {
    * Inicia uma conversa com o cliente (mensagem ativa). Fora da janela de 24 h é obrigatório
    * um template aprovado — regra da Meta, não nossa.
    */
-  r.post('/contatos/:id/conversar', (req, res, next) => {
+  r.post('/contatos/:id/conversar', exigirPermissao('atendimentos.atender'), (req, res, next) => {
     try {
       const contato = db.prepare('SELECT * FROM contatos WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!contato) throw naoEncontrado('Contato');
@@ -317,7 +326,7 @@ module.exports = function rotasEmpresa(db) {
   });
 
   /** A ficha 360° do cliente: histórico, linha do tempo e score. Abre da conversa ou da ouvidoria. */
-  r.get('/contatos/:id/ficha', async (req, res, next) => {
+  r.get('/contatos/:id/ficha', exigirPermissao('cliente.ficha'), async (req, res, next) => {
     try {
       const ficha = await require('../lib/cliente360').ficha(db, req.empresa.id, Number(req.params.id),
         { ixcClienteId: req.query.ixc_cliente_id || null });
@@ -326,7 +335,7 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.get('/conversas/:id/ficha', async (req, res, next) => {
+  r.get('/conversas/:id/ficha', exigirPermissao('cliente.ficha'), async (req, res, next) => {
     try {
       const c = conversaDa(req);
       const ficha = await require('../lib/cliente360').ficha(db, req.empresa.id, c.contato_id, { ixcClienteId: c.ixc_cliente_id });
@@ -336,7 +345,7 @@ module.exports = function rotasEmpresa(db) {
   });
 
   // ---------- Filas ----------
-  r.get('/filas', (req, res) => res.json({
+  r.get('/filas', exigirPermissao('filas.ver', 'atendimentos.ver'), (req, res) => res.json({
     itens: filasLib.listar(db, req.empresa.id, { todas: true }).map((f) => ({
       ...f, ativa: Boolean(f.ativa), dentro_horario: filasLib.dentroHorario(f),
       atendentes: db.prepare(`SELECT u.id, u.nome, u.disponivel FROM fila_usuarios fu JOIN usuarios u ON u.id = fu.usuario_id
@@ -357,7 +366,7 @@ module.exports = function rotasEmpresa(db) {
     ativa: d.ativa === undefined ? (atual.ativa ?? 1) : (v.booleano(d.ativa) ? 1 : 0),
   });
 
-  r.post('/filas', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/filas', exigirPermissao('filas.editar'), (req, res, next) => {
     try {
       const f = dadosFila(req.body ?? {});
       const id = Number(db.prepare('INSERT INTO filas (empresa_id, nome, descricao, quando_usar, dias, abre, fecha, ordem, ativa, criada_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -367,7 +376,7 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/filas/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/filas/:id', exigirPermissao('filas.editar'), (req, res, next) => {
     try {
       const atual = filasLib.buscar(db, req.empresa.id, req.params.id);
       if (!atual) throw naoEncontrado('Fila');
@@ -379,7 +388,7 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.delete('/filas/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.delete('/filas/:id', exigirPermissao('filas.editar'), (req, res, next) => {
     try {
       const fila = filasLib.buscar(db, req.empresa.id, req.params.id);
       if (!fila) throw naoEncontrado('Fila');
@@ -397,7 +406,7 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.put('/filas/:id/atendentes', exigirAdminEmpresa, (req, res, next) => {
+  r.put('/filas/:id/atendentes', exigirPermissao('filas.editar'), (req, res, next) => {
     try {
       const fila = filasLib.buscar(db, req.empresa.id, req.params.id);
       if (!fila) throw naoEncontrado('Fila');
@@ -414,14 +423,15 @@ module.exports = function rotasEmpresa(db) {
   });
 
   // ---------- Equipe da empresa ----------
-  r.get('/usuarios', (req, res) => res.json({
+  r.get('/usuarios', exigirPermissao('usuarios.ver', 'atendimentos.transferir'), (req, res) => res.json({
     itens: db.prepare(`SELECT id, nome, email, perfil, ativo, disponivel, max_simultaneas, visto_em, ultimo_acesso, criado_em,
-        (SELECT COUNT(*) FROM conversas c WHERE c.atendente_id = usuarios.id AND c.estado = 'humano') AS em_atendimento
+        (SELECT COUNT(*) FROM conversas c WHERE c.atendente_id = usuarios.id AND c.estado = 'humano') AS em_atendimento,
+        (SELECT COUNT(*) FROM usuario_permissoes p WHERE p.usuario_id = usuarios.id) AS ajustes
       FROM usuarios WHERE empresa_id = ? ORDER BY ativo DESC, nome`).all(req.empresa.id)
-      .map((u) => ({ ...u, ativo: Boolean(u.ativo), disponivel: Boolean(u.disponivel) })),
+      .map(({ ajustes, ...u }) => ({ ...u, ativo: Boolean(u.ativo), disponivel: Boolean(u.disponivel), permissoes_ajustadas: ajustes > 0 })),
   }));
 
-  r.post('/usuarios', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/usuarios', exigirPermissao('usuarios.editar'), (req, res, next) => {
     try {
       const criado = empresasLib.criarUsuario(db, req.empresa.id, req.body ?? {});
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'criou usuário', alvo: criado.usuario.email, detalhe: criado.usuario.perfil, ip: req.ip });
@@ -429,7 +439,7 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/usuarios/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/usuarios/:id', exigirPermissao('usuarios.editar'), (req, res, next) => {
     try {
       const u = db.prepare('SELECT * FROM usuarios WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!u) throw naoEncontrado('Usuário');
@@ -455,20 +465,63 @@ module.exports = function rotasEmpresa(db) {
     } catch (err) { next(err); }
   });
 
-  r.use('/ia', require('./ia')(db));
-  r.use('/alertas', require('./alertas')(db));
-  r.use('/ixc', require('./ixc')(db));
-  r.use('/ouvidoria', require('./ouvidoria')(db));
+  // ---------- Permissões de uma pessoa ----------
+  /** O catálogo inteiro, com o que vem do perfil e o que está valendo para ela agora. */
+  r.get('/usuarios/:id/permissoes', exigirPermissao('usuarios.ver'), (req, res, next) => {
+    try {
+      const u = db.prepare('SELECT * FROM usuarios WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
+      if (!u) throw naoEncontrado('Usuário');
+      res.json(permissoesLib.paraEditor(db, u));
+    } catch (err) { next(err); }
+  });
+
+  r.put('/usuarios/:id/permissoes', exigirPermissao('usuarios.editar'), (req, res, next) => {
+    try {
+      const u = db.prepare('SELECT * FROM usuarios WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
+      if (!u) throw naoEncontrado('Usuário');
+      if (permissoesLib.PLATAFORMA.includes(u.perfil)) throw new ErroNegocio('As permissões da equipe da plataforma não se mexem por aqui.', 403);
+
+      const pedidas = [].concat(req.body?.permissoes ?? []).map(String);
+      // Nunca deixar a empresa sem quem administre: se esta pessoa é o último administrador
+      // ativo, ela não pode perder o acesso a usuários — ninguém conseguiria devolver depois.
+      if (u.perfil === 'cliente' && u.ativo && !pedidas.includes('usuarios.editar')) {
+        const outros = Number(db.prepare(`SELECT COUNT(*) AS n FROM usuarios
+          WHERE empresa_id = ? AND perfil = 'cliente' AND ativo = 1 AND id <> ?`).get(req.empresa.id, u.id).n);
+        if (!outros) throw new ErroNegocio('Esta é a última pessoa que administra a empresa: ela não pode perder "Cadastrar e editar usuários".');
+      }
+      // Ninguém tira o próprio acesso a usuários e fica trancado do lado de fora.
+      if (u.id === req.usuario.id && !pedidas.includes('usuarios.editar')) {
+        throw new ErroNegocio('Você não pode tirar de si mesmo o acesso a usuários — outra pessoa com esse acesso pode fazer isso.');
+      }
+
+      permissoesLib.definir(db, u.id, u.perfil, pedidas);
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'ajustou permissões', alvo: u.email,
+        detalhe: { perfil: u.perfil, permissoes: pedidas }, ip: req.ip });
+      res.json(permissoesLib.paraEditor(db, u));
+    } catch (err) { next(err); }
+  });
+
+  /** O catálogo cru, para a tela desenhar o formulário de um usuário novo. */
+  r.get('/permissoes', exigirPermissao('usuarios.ver'), (_req, res) => res.json({
+    grupos: permissoesLib.GRUPOS.map((grupo) => ({
+      grupo,
+      itens: permissoesLib.CATALOGO.filter(([, g]) => g === grupo).map(([chave, , rotulo, ajuda]) => ({ chave, rotulo, ajuda })),
+    })),
+    perfis: permissoesLib.PERFIS,
+    padrao: Object.fromEntries(Object.entries(permissoesLib.PADRAO).map(([k, v2]) => [k, v2])),
+  }));
+
+  r.use('/ia', exigirPermissao('zoe.ver'), require('./ia')(db));
+  r.use('/alertas', exigirPermissao('zoe.ver'), require('./alertas')(db));
+  r.use('/ixc', exigirPermissao('integracoes.ver'), require('./ixc')(db));
+  r.use('/ouvidoria', exigirPermissao('ouvidoria.ver'), require('./ouvidoria')(db));
   // O Centro de Custo é de administrador da empresa e da plataforma. Esconder o menu não basta:
   // a rota precisa recusar, senão qualquer atendente lê a conta pela API.
-  r.use('/reguas', (req, _res, next) => (administraEmpresa(req.usuario)
-    ? next()
-    : next(new ErroNegocio('O Centro de Custo é restrito ao administrador da empresa.', 403))),
-  require('./regua')(db));
+  r.use('/reguas', exigirPermissao('custos.ver'), require('./regua')(db));
   r.use('/', require('./cadastros')(db));
 
   // ---------- Relatórios ----------
-  r.get('/relatorios', (req, res) => {
+  r.get('/relatorios', exigirPermissao('relatorios.ver'), (req, res) => {
     const { de, ate } = periodo(req);
     const empresaId = req.empresa.id;
     res.json({
@@ -483,7 +536,7 @@ module.exports = function rotasEmpresa(db) {
     });
   });
 
-  r.get('/relatorios/conversas.csv', (req, res) => {
+  r.get('/relatorios/conversas.csv', exigirPermissao('relatorios.ver'), (req, res) => {
     const { de, ate } = periodo(req);
     res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="conversas-${de}-a-${ate}.csv"` });
     res.send(`﻿${relatorios.csvConversas(db, { empresaId: req.empresa.id, de, ate })}`);

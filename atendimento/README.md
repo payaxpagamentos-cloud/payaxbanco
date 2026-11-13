@@ -236,6 +236,39 @@ curl -X POST https://SEU-DOMINIO/atendimento/api/integracao/mensagens \
 A conversa aberta assim **não passa pela ZOE** (aviso automático não é atendimento): ela
 entra direto na fila da equipe, a menos que você mande `"com_ia": true`.
 
+## Usuários e permissões
+
+O perfil é o **ponto de partida**, não uma cerca. Cada pessoa recebe o conjunto do perfil dela e,
+em `Usuários › Permissões`, ganha ou perde item a item — inclusive **dentro das telas**.
+
+| Perfil | De fábrica |
+|---|---|
+| Administrador da empresa | tudo dentro da empresa |
+| Supervisor | vê quase tudo, não muda nada |
+| Atendente | atende, trata chamado, vê contato e faturas — não vê dinheiro, nem configura, nem abre a ficha de risco |
+
+São 29 permissões em 7 grupos. As que mais importam são as de dentro da tela:
+
+- **Ver CPF/CNPJ completo** — sem ela o documento sai do servidor já mascarado (`123••••••09`).
+  O fim fica visível porque o atendente precisa conferir com o cliente sem ver o documento
+  inteiro. Quem vê mascarado também não consegue **gravar** o documento: salvaria os pontinhos
+  por cima do número real.
+- **Ver a ficha 360° e o risco** — a ficha existe para decidir retenção, não para ficar aberta
+  na mesa de todo mundo.
+- **Ver faturas e valores**, **Escrever notas internas**, **Marcar etiquetas**, **Transferir e
+  encerrar**: cada uma separada, porque na prática elas não andam juntas.
+
+Duas travas: ninguém tira de si mesmo o acesso a usuários, e a última pessoa que administra a
+empresa não pode perdê-lo — senão a empresa fica sem quem devolva.
+
+O ajuste guarda só a **diferença** contra o perfil. Assim, mudar o padrão de um perfil alcança
+quem nunca foi ajustado à mão; se guardasse a lista inteira, cada pessoa ficaria congelada no dia
+em que foi cadastrada.
+
+As permissões são lidas do banco **a cada chamada**, não do token: tirar um acesso vale na hora,
+não quando a sessão da pessoa expirar. E cada permissão é conferida na rota do servidor —
+esconder o menu nunca foi permissão.
+
 ## Alertas de rede
 
 O cadastro do IXC nem sempre está atualizado. Se a ZOE decidir sozinha, pelo cadastro, que existe

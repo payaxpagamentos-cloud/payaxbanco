@@ -2,7 +2,7 @@
 
 const express = require('express');
 const { agora, auditar } = require('../db');
-const { exigirAdminEmpresa } = require('../auth');
+const { exigirPermissao } = require('../auth');
 const { naoEncontrado } = require('../lib/erros');
 const empresasLib = require('../lib/empresas');
 const ferramentasLib = require('../ia/ferramentas');
@@ -16,7 +16,7 @@ module.exports = function rotasCadastros(db) {
   const r = express.Router();
 
   // ---------- Números de WhatsApp (Cloud API) ----------
-  r.get('/numeros', (req, res) => {
+  r.get('/numeros', exigirPermissao('integracoes.ver'), (req, res) => {
     const base = config.basePath || '';
     res.json({
       itens: db.prepare('SELECT * FROM numeros WHERE empresa_id = ? ORDER BY id').all(req.empresa.id).map(empresasLib.numeroPublico),
@@ -30,7 +30,7 @@ module.exports = function rotasCadastros(db) {
     });
   });
 
-  r.post('/numeros', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/numeros', exigirPermissao('integracoes.editar'), (req, res, next) => {
     try {
       const n = empresasLib.salvarNumero(db, req.empresa.id, req.body ?? {});
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'cadastrou número de WhatsApp', alvo: n.telefone, ip: req.ip });
@@ -38,7 +38,7 @@ module.exports = function rotasCadastros(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/numeros/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.patch('/numeros/:id', exigirPermissao('integracoes.editar'), (req, res, next) => {
     try {
       const n = empresasLib.salvarNumero(db, req.empresa.id, req.body ?? {}, { id: Number(req.params.id) });
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'alterou número de WhatsApp', alvo: n.telefone, ip: req.ip });
@@ -47,7 +47,7 @@ module.exports = function rotasCadastros(db) {
   });
 
   /** Confere com a Meta se o token e o Phone number ID funcionam. */
-  r.get('/numeros/:id/situacao', async (req, res, next) => {
+  r.get('/numeros/:id/situacao', exigirPermissao('integracoes.ver'), async (req, res, next) => {
     try {
       const n = db.prepare('SELECT * FROM numeros WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!n) throw naoEncontrado('Número');
@@ -56,7 +56,7 @@ module.exports = function rotasCadastros(db) {
   });
 
   // ---------- Chamados ----------
-  r.get('/chamados', (req, res) => {
+  r.get('/chamados', exigirPermissao('chamados.ver'), (req, res) => {
     const onde = ['ch.empresa_id = ?'];
     const args = [req.empresa.id];
     if (req.query.status) { onde.push('ch.status = ?'); args.push(v.opcao(req.query.status, 'a situação', ['aberto', 'andamento', 'resolvido', 'cancelado'])); }
@@ -69,7 +69,7 @@ module.exports = function rotasCadastros(db) {
     });
   });
 
-  r.post('/chamados', (req, res, next) => {
+  r.post('/chamados', exigirPermissao('chamados.editar'), (req, res, next) => {
     try {
       const d = req.body ?? {};
       const contato = db.prepare('SELECT * FROM contatos WHERE id = ? AND empresa_id = ?').get(Number(d.contato_id), req.empresa.id);
@@ -84,7 +84,7 @@ module.exports = function rotasCadastros(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/chamados/:id', (req, res, next) => {
+  r.patch('/chamados/:id', exigirPermissao('chamados.editar'), (req, res, next) => {
     try {
       const ch = db.prepare('SELECT * FROM chamados WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!ch) throw naoEncontrado('Chamado');
@@ -102,7 +102,7 @@ module.exports = function rotasCadastros(db) {
   });
 
   // ---------- Respostas rápidas ----------
-  r.get('/respostas-rapidas', (req, res) => res.json({
+  r.get('/respostas-rapidas', exigirPermissao('atendimentos.ver'), (req, res) => res.json({
     itens: db.prepare('SELECT * FROM respostas_rapidas WHERE empresa_id = ? ORDER BY atalho').all(req.empresa.id).map((x) => ({ ...x, ativa: Boolean(x.ativa) })),
   }));
 
@@ -112,7 +112,7 @@ module.exports = function rotasCadastros(db) {
     return t;
   };
 
-  r.post('/respostas-rapidas', (req, res, next) => {
+  r.post('/respostas-rapidas', exigirPermissao('configuracoes.editar'), (req, res, next) => {
     try {
       const d = req.body ?? {};
       const id = Number(db.prepare('INSERT INTO respostas_rapidas (empresa_id, atalho, titulo, texto, criada_em) VALUES (?, ?, ?, ?, ?)')
@@ -121,7 +121,7 @@ module.exports = function rotasCadastros(db) {
     } catch (err) { next(err); }
   });
 
-  r.patch('/respostas-rapidas/:id', (req, res, next) => {
+  r.patch('/respostas-rapidas/:id', exigirPermissao('configuracoes.editar'), (req, res, next) => {
     try {
       const atual = db.prepare('SELECT * FROM respostas_rapidas WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!atual) throw naoEncontrado('Resposta rápida');
@@ -135,7 +135,7 @@ module.exports = function rotasCadastros(db) {
     } catch (err) { next(err); }
   });
 
-  r.delete('/respostas-rapidas/:id', (req, res, next) => {
+  r.delete('/respostas-rapidas/:id', exigirPermissao('configuracoes.editar'), (req, res, next) => {
     try {
       const x = db.prepare('SELECT id FROM respostas_rapidas WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!x) throw naoEncontrado('Resposta rápida');
@@ -147,13 +147,13 @@ module.exports = function rotasCadastros(db) {
   // ---------- Etiquetas ----------
   const CORES = ['azul', 'verde', 'roxo', 'laranja', 'vermelho', 'ciano', 'cinza'];
 
-  r.get('/etiquetas', (req, res) => res.json({
+  r.get('/etiquetas', exigirPermissao('atendimentos.ver'), (req, res) => res.json({
     itens: db.prepare(`SELECT e.*, (SELECT COUNT(*) FROM conversa_etiquetas ce WHERE ce.etiqueta_id = e.id) AS usos
       FROM etiquetas e WHERE e.empresa_id = ? ORDER BY e.nome`).all(req.empresa.id),
     cores: CORES,
   }));
 
-  r.post('/etiquetas', (req, res, next) => {
+  r.post('/etiquetas', exigirPermissao('atendimentos.etiquetas'), (req, res, next) => {
     try {
       const d = req.body ?? {};
       const id = Number(db.prepare('INSERT INTO etiquetas (empresa_id, nome, cor, criada_em) VALUES (?, ?, ?, ?)')
@@ -162,7 +162,7 @@ module.exports = function rotasCadastros(db) {
     } catch (err) { next(err); }
   });
 
-  r.delete('/etiquetas/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.delete('/etiquetas/:id', exigirPermissao('configuracoes.editar'), (req, res, next) => {
     try {
       const e = db.prepare('SELECT id FROM etiquetas WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!e) throw naoEncontrado('Etiqueta');
@@ -172,7 +172,7 @@ module.exports = function rotasCadastros(db) {
   });
 
   // ---------- Chaves de API (integração com o sistema da empresa) ----------
-  r.get('/chaves', exigirAdminEmpresa, (req, res) => res.json({
+  r.get('/chaves', exigirPermissao('integracoes.editar'), (req, res) => res.json({
     itens: db.prepare('SELECT id, nome, prefixo, ativa, ultimo_uso, criada_em FROM chaves_api WHERE empresa_id = ? ORDER BY id DESC').all(req.empresa.id)
       .map((c) => ({ ...c, ativa: Boolean(c.ativa) })),
     guia: {
@@ -189,7 +189,7 @@ module.exports = function rotasCadastros(db) {
     },
   }));
 
-  r.post('/chaves', exigirAdminEmpresa, (req, res, next) => {
+  r.post('/chaves', exigirPermissao('integracoes.editar'), (req, res, next) => {
     try {
       const nova = empresasLib.criarChaveApi(db, req.empresa.id, req.body?.nome ?? 'Integração');
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'gerou chave de API', alvo: nova.prefixo, ip: req.ip });
@@ -198,7 +198,7 @@ module.exports = function rotasCadastros(db) {
     } catch (err) { next(err); }
   });
 
-  r.delete('/chaves/:id', exigirAdminEmpresa, (req, res, next) => {
+  r.delete('/chaves/:id', exigirPermissao('integracoes.editar'), (req, res, next) => {
     try {
       const c = db.prepare('SELECT * FROM chaves_api WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);
       if (!c) throw naoEncontrado('Chave');

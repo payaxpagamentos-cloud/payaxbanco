@@ -829,6 +829,19 @@ label.campo{ gap: 5px }
 /* Mês cuja fatura da Meta não bate com a nossa conta: tem que saltar aos olhos. */
 .tabela tr.linha-divergente td{ background:var(--erro-bg) }
 
+/* ---------------------------------------------------------------------------
+   Editor de permissões
+   Uma coluna por grupo, com o texto de ajuda do lado: a pessoa que marca
+   precisa saber o que está liberando sem abrir a documentação.
+   --------------------------------------------------------------------------- */
+.permissoes{ display:grid; gap:10px }
+.permissao{ display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start;
+  padding:10px 12px; border:1px solid var(--borda); border-radius:var(--radius-lg, 10px); background:var(--superficie-2, transparent) }
+.permissao:hover{ border-color:var(--azul) }
+.permissao input{ margin-top:3px; width:16px; height:16px; accent-color:var(--azul) }
+.permissao strong{ font-weight:600 }
+@media (min-width: 900px){ .permissoes{ grid-template-columns:1fr 1fr } }
+
 /* ==========================================================================
    ACABAMENTO — vidro em todas as superfícies
    Vem por último de propósito: assim vale sobre as telas criadas depois do
