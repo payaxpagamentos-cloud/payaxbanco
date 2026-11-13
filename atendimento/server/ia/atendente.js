@@ -10,6 +10,7 @@ const regras = require('./regras');
 const conhecimento = require('./conhecimento');
 const ferramentas = require('./ferramentas');
 const claude = require('./claude');
+const ferramentasIxc = require('./ferramentas-ixc');
 const prompt = require('./prompt');
 
 /**
@@ -80,6 +81,15 @@ function historico(db, conversa) {
   // A API exige começar por 'user'.
   while (msgs.length && msgs[0].role !== 'user') msgs.shift();
   return msgs;
+}
+
+/**
+ * Acrescenta a nota de estado como mensagem de sistema, depois da última mensagem do cliente.
+ * A API exige que ela siga uma mensagem de usuário e feche a lista — é exatamente onde ela entra.
+ */
+function comEstado(mensagens, nota) {
+  if (!nota || !mensagens.length || mensagens.at(-1).role !== 'user') return mensagens;
+  return [...mensagens, { role: 'system', content: nota }];
 }
 
 // ---------- Saídas ----------
@@ -226,13 +236,21 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
 
   // ---------- 3. IA ----------
 
+  // Antes de pensar: a plataforma procura o telefone no sistema do provedor. Não confirma nada —
+  // só descobre quem provavelmente é, para a IA pedir 3 dígitos em vez do CPF inteiro.
+  if (ferramentasIxc.configurado(db, empresa.id)) {
+    try { await ferramentasIxc.identificarPeloTelefone(db, { conversa, contato }); } catch { /* o IXC fora do ar não trava o atendimento */ }
+  }
+
   const kit = ferramentas.montar(db, { empresaId: empresa.id, semTransferencia: lista.length === 0 });
   const contexto = { db, empresa, numero, conversa, contato, ferramentas: kit };
   let desfecho;
   try {
     desfecho = await claude.conversar({
       sistema: prompt.montar(db, { empresa, cfg, contato }),
-      historico: historico(db, conversa),
+      // A nota de estado do IXC vai como mensagem de sistema no meio da conversa: é o canal que a
+      // Claude API indica para instrução de operador, e não derruba o cache do prompt.
+      historico: comEstado(historico(db, conversa), ferramentasIxc.notaDeEstado(db, conversa)),
       tools: kit.tools,
       modelo: cfg.modelo || undefined,
       esforco: cfg.esforco || undefined,
@@ -300,4 +318,4 @@ const ultimaFoiMenu = (db, conversa) => {
   return m?.tipo === 'botao';
 };
 
-module.exports = { atender, historico, semIa, mandarMenu, registrarEvento, HISTORICO_MAX };
+module.exports = { atender, historico, comEstado, semIa, mandarMenu, registrarEvento, HISTORICO_MAX };

@@ -436,6 +436,7 @@ module.exports = function rotasEmpresa(db) {
   });
 
   r.use('/ia', require('./ia')(db));
+  r.use('/ixc', require('./ixc')(db));
   r.use('/', require('./cadastros')(db));
 
   // ---------- Relatórios ----------

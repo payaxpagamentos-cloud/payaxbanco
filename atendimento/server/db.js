@@ -123,6 +123,15 @@ CREATE TABLE IF NOT EXISTS conversas (
   -- Resumo que a IA entrega ao atendente ao transferir.
   resumo TEXT,
   prioridade TEXT NOT NULL DEFAULT 'normal' CHECK (prioridade IN ('baixa','normal','alta')),
+  -- Identificação no sistema do provedor (IXC). identidade_confirmada é o portão: enquanto for 0,
+  -- nenhuma ferramenta conta nada do contrato, por mais que o cliente (ou o modelo) insista.
+  ixc_cliente_id TEXT,
+  ixc_contrato_id TEXT,
+  ixc_cliente_nome TEXT,
+  identidade_confirmada INTEGER NOT NULL DEFAULT 0,
+  identidade_metodo TEXT CHECK (identidade_metodo IN ('cpf3','nascimento','documento')),
+  identidade_tentativas INTEGER NOT NULL DEFAULT 0,
+  identidade_em TEXT,
   -- Janela de 24 h da Cloud API: fora dela, só template aprovado.
   janela_expira_em TEXT,
   mensagens_ia INTEGER NOT NULL DEFAULT 0,
@@ -240,6 +249,50 @@ CREATE TABLE IF NOT EXISTS ia_config (
   esforco TEXT CHECK (esforco IN ('low','medium','high','xhigh','max')),
   atualizada_em TEXT
 );
+
+-- Integração com o IXC Provedor, por empresa. O token fica cifrado.
+CREATE TABLE IF NOT EXISTS ixc_config (
+  empresa_id INTEGER PRIMARY KEY REFERENCES empresas(id) ON DELETE CASCADE,
+  ativo INTEGER NOT NULL DEFAULT 0,
+  url TEXT,
+  token_cifrado TEXT,
+  timeout_ms INTEGER NOT NULL DEFAULT 8000 CHECK (timeout_ms BETWEEN 1000 AND 30000),
+  -- Nomes de recurso sobrescritos (JSON), para versões do IXC que usam outros.
+  recursos TEXT,
+  -- Identificação: quantos dígitos do documento pedir quando o telefone já está no cadastro.
+  confirmar_por TEXT NOT NULL DEFAULT 'cpf3' CHECK (confirmar_por IN ('cpf3','nascimento')),
+  max_tentativas INTEGER NOT NULL DEFAULT 3 CHECK (max_tentativas BETWEEN 1 AND 6),
+  -- Desbloqueio de confiança: liga/desliga e o limite por cliente no período.
+  desbloqueio_ativo INTEGER NOT NULL DEFAULT 1,
+  desbloqueio_limite INTEGER NOT NULL DEFAULT 1 CHECK (desbloqueio_limite >= 0),
+  desbloqueio_periodo_dias INTEGER NOT NULL DEFAULT 30 CHECK (desbloqueio_periodo_dias > 0),
+  -- A IA pode abrir chamado técnico no IXC?
+  chamado_ativo INTEGER NOT NULL DEFAULT 1,
+  assunto_chamado_id TEXT,
+  -- Filas para onde transferir quando o assunto é do IXC.
+  fila_financeira_id INTEGER REFERENCES filas(id),
+  fila_tecnica_id INTEGER REFERENCES filas(id),
+  -- Resultado da última sonda de capacidades (JSON) e quando ela rodou.
+  capacidades TEXT,
+  testado_em TEXT,
+  atualizado_em TEXT
+);
+
+-- O que a atendente virtual fez no IXC: auditoria para o provedor e base do limite de desbloqueios.
+CREATE TABLE IF NOT EXISTS ixc_acoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  conversa_id INTEGER REFERENCES conversas(id) ON DELETE SET NULL,
+  contato_id INTEGER REFERENCES contatos(id),
+  ixc_cliente_id TEXT,
+  tipo TEXT NOT NULL CHECK (tipo IN ('identificacao','confirmacao','contrato','faturas','boleto','desbloqueio','conexao','chamado','erro')),
+  sucesso INTEGER NOT NULL DEFAULT 1,
+  detalhe TEXT,
+  ms INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ixc_acoes_empresa ON ixc_acoes(empresa_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_ixc_acoes_cliente ON ixc_acoes(empresa_id, ixc_cliente_id, tipo, criado_em);
 
 -- Base de conhecimento: o que a atendente virtual usa para responder sozinha.
 CREATE TABLE IF NOT EXISTS conhecimento (

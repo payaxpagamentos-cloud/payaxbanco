@@ -22,6 +22,7 @@ export async function telaIa(ctx) {
     intencoes: ['Intenções', intencoes],
     ferramentas: ['Ferramentas', ferramentas],
     configuracao: ['Como ela atende', configuracao],
+    ixc: ['Provedor (IXC)', provedorIxc],
     teste: ['Testar', teste],
   };
   let atual = 'desempenho';
@@ -339,6 +340,119 @@ async function configuracao(ctx, alvo) {
   }
 
   limpar(alvo, f);
+}
+
+// ---------- Provedor (IXC) ----------
+
+/**
+ * A integração que transforma a atendente num atendente de provedor de verdade: ela consulta o IXC
+ * na hora. A sonda testa cada capacidade NESTA instância e a atendente só recebe o que funciona lá.
+ */
+async function provedorIxc(ctx, alvo) {
+  const filas = (await api.get(`/empresas/${ctx.empresaId}/filas`)).itens;
+  const conteudo = el('div');
+
+  const desenhar = async () => {
+    const c = await api.get(`/empresas/${ctx.empresaId}/ixc`);
+    const f = el('form', { class: 'form colunas' },
+      cartao('Conexão com o IXC',
+        c.ativo && c.token_configurado
+          ? el('div', { class: 'aviso-caixa ok' }, icone('ok'), el('span', {}, `Integração ligada em ${c.url}.`))
+          : el('div', { class: 'aviso-caixa aviso' }, icone('alerta'), el('span', {},
+            'Integração desligada. Sem ela a atendente virtual responde dúvidas gerais, mas não consulta contrato, fatura nem conexão.')),
+        marcar('Integração ligada', { name: 'ativo', checked: c.ativo }),
+        campo('Endereço do IXC', { name: 'url', value: c.url ?? '', placeholder: 'https://ixc.seuprovedor.com.br', required: false }),
+        campo(c.token_configurado ? 'Token (vazio mantém o atual)' : 'Token do IXC', { name: 'token', type: 'password', autocomplete: 'off', placeholder: '12:a1b2c3d4...' }),
+        el('p', { class: 'pequeno mudo', style: 'margin:0' },
+          'O token fica em Configurações > Usuários > Token, no IXC, no formato "id:hash". Use um usuário técnico só para o bot, '
+          + 'com permissão de leitura e, se for usar, de desbloqueio e abertura de chamado. Ele é guardado cifrado e nunca volta para esta tela.'),
+        campo('Tempo limite por consulta (ms)', { name: 'timeout_ms', type: 'number', value: c.timeout_ms, min: 1000, max: 30000 })),
+
+      cartao('Identificação do cliente',
+        el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
+          'Nenhum dado de contrato sai antes da confirmação — isso é garantido pela plataforma, não pelo texto do prompt. '
+          + 'Quando o telefone já está no cadastro do IXC, a atendente pede só a confirmação curta.'),
+        escolha('Confirmar quem é pelo', 'confirmar_por', {
+          cpf3: 'Três primeiros números do CPF/CNPJ (mais rápido)',
+          nascimento: 'Data de nascimento do titular (mais rígido)',
+        }, c.confirmar_por),
+        campo('Tentativas antes de transferir', { name: 'max_tentativas', type: 'number', value: c.max_tentativas, min: 1, max: 6 })),
+
+      cartao('O que ela pode fazer sozinha',
+        marcar('Desbloqueio de confiança (liberar acesso de quem está em atraso)', { name: 'desbloqueio_ativo', checked: c.desbloqueio_ativo }),
+        el('div', { class: 'grade-2' },
+          campo('Máximo por cliente no período', { name: 'desbloqueio_limite', type: 'number', value: c.desbloqueio_limite, min: 0, max: 20 }),
+          campo('Período (dias)', { name: 'desbloqueio_periodo_dias', type: 'number', value: c.desbloqueio_periodo_dias, min: 1, max: 365 })),
+        el('p', { class: 'pequeno mudo', style: 'margin:0 0 10px' }, 'Estourado o limite, ela explica ao cliente e transfere para o financeiro.'),
+        marcar('Abrir chamado técnico (ordem de serviço) no IXC', { name: 'chamado_ativo', checked: c.chamado_ativo }),
+        campo('Id do assunto padrão do chamado (opcional)', { name: 'assunto_chamado_id', value: c.assunto_chamado_id ?? '', placeholder: 'deixe vazio para o padrão do IXC' })),
+
+      cartao('Para onde transferir',
+        escolha('Assuntos financeiros', 'fila_financeira_id', { '': '— fila padrão —', ...Object.fromEntries(filas.map((x) => [x.id, x.nome])) }, c.fila_financeira_id ?? ''),
+        escolha('Assuntos técnicos', 'fila_tecnica_id', { '': '— fila padrão —', ...Object.fromEntries(filas.map((x) => [x.id, x.nome])) }, c.fila_tecnica_id ?? '')),
+
+      el('div', { class: 'linha entre' }, el('span'), el('button', { class: 'btn primario', disabled: !ctx.soAdmin }, 'Salvar')));
+
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      acao(f.querySelector('.btn.primario'), async () => {
+        const d = lerForm(f);
+        if (!d.token) delete d.token;
+        await api.patch(`/empresas/${ctx.empresaId}/ixc`, d);
+        toast('Integração salva.');
+        await desenhar();
+      });
+    });
+
+    limpar(conteudo, f, cartaoSonda(c), cartaoAcoes());
+  };
+
+  const cartaoSonda = (c) => cartao('O que funciona nesta instância do IXC',
+    el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
+      'O IXC muda de versão para versão. A sonda testa cada consulta no SEU servidor e a atendente virtual passa a receber '
+      + 'só as ferramentas que funcionam aqui — em vez de tentar e errar na frente do cliente. A sonda só lê: não abre chamado nem desbloqueia nada.'),
+    c.capacidades
+      ? tabela(['Capacidade', 'Recurso no IXC', '^Funciona'], Object.entries(c.capacidades).map(([chave, x]) => el('tr', {},
+        td(el('div', {}, el('strong', {}, x.nome ?? chave), x.erro ? el('div', { class: 'pequeno erro-bolha' }, x.erro) : null)),
+        td(el('code', {}, x.recurso ?? '—')),
+        td(x.ok ? icone('ok') : el('span', { class: 'etiqueta erro' }, 'não'), 'centro'))))
+      : el('p', { class: 'mudo', style: 'margin:0' }, 'Ainda não testado.'),
+    c.testado_em ? el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' }, `Último teste: ${dataHora(c.testado_em)}`) : null,
+    c.ferramentas.length
+      ? el('div', { style: 'margin-top:12px' },
+        el('strong', { class: 'pequeno' }, 'Ferramentas que a atendente virtual tem hoje: '),
+        el('div', { class: 'perguntas', style: 'margin-top:6px' }, c.ferramentas.map((n) => el('span', { class: 'etiqueta ok' }, n))))
+      : null,
+    ctx.soAdmin ? el('div', { style: 'margin-top:12px' }, botao('Testar agora', 'primario', sondar)) : null);
+
+  const sondar = async () => {
+    const r = await api.post(`/empresas/${ctx.empresaId}/ixc/sonda`, {});
+    toast(r.conectado ? `Conectado em ${r.ms} ms. ${r.resumo.length} capacidade(s) funcionando.` : 'Não foi possível conectar ao IXC.', !r.conectado);
+    await desenhar();
+  };
+
+  const cartaoAcoes = () => {
+    const lista = el('div', { class: 'mudo' }, 'Carregando…');
+    api.get(`/empresas/${ctx.empresaId}/ixc/acoes`).then((d) => {
+      limpar(lista,
+        d.resumo.length
+          ? el('div', { class: 'perguntas', style: 'margin-bottom:12px' }, d.resumo.map((x) =>
+            el('span', { class: `etiqueta ${x.falhas ? 'aviso' : ''}` }, `${x.tipo}: ${inteiro(x.total)}${x.falhas ? ` (${x.falhas} falha(s))` : ''}`)))
+          : null,
+        tabela(['Quando', 'Cliente', 'Ação', '^OK', 'Detalhe', '>ms'], d.itens.slice(0, 60).map((a) => el('tr', {},
+          td(dataHora(a.criado_em)),
+          td(el('div', {}, a.contato_nome ?? a.telefone ?? '—', a.ixc_cliente_id ? el('div', { class: 'pequeno mudo' }, `IXC ${a.ixc_cliente_id}`) : null)),
+          td(a.tipo),
+          td(a.sucesso ? icone('ok') : el('span', { class: 'etiqueta erro' }, 'falhou'), 'centro'),
+          td(el('span', { class: 'pequeno' }, String(a.detalhe ?? '').slice(0, 120))),
+          td(inteiro(a.ms), 'dir num'))),
+        'A atendente virtual ainda não consultou o IXC.'));
+    }).catch((e) => limpar(lista, el('p', { class: 'mudo' }, e.message)));
+    return cartao('O que a atendente virtual fez no IXC (auditoria)', lista);
+  };
+
+  limpar(alvo, conteudo);
+  await desenhar();
 }
 
 // ---------- Teste ----------

@@ -5,6 +5,7 @@ const { decifrar } = require('../lib/cifra');
 const conversas = require('../lib/conversas');
 const filas = require('../lib/filas');
 const conhecimento = require('./conhecimento');
+const ixc = require('./ferramentas-ixc');
 
 /**
  * O que a atendente virtual pode fazer. Cada ferramenta é uma função do servidor: a IA escolhe e
@@ -252,12 +253,16 @@ function comoTool(f) {
 function montar(db, { empresaId, semTransferencia = false }) {
   const externas = db.prepare('SELECT * FROM ferramentas WHERE empresa_id = ? AND ativa = 1 ORDER BY nome').all(empresaId);
   const internas = Object.entries(INTERNAS).filter(([nome]) => !(semTransferencia && nome === 'transferir_para_humano'));
+  // As do IXC entram quando a integração está ligada; só as capacidades que a sonda aprovou na instância.
+  const doIxc = ixc.montar(db, empresaId);
   const tools = [
     ...internas.map(([nome, f]) => ({ name: nome, description: f.descricao, input_schema: f.entrada, strict: true })),
+    ...doIxc.tools,
     ...externas.map(comoTool),
   ];
   const porNome = new Map([
     ...internas.map(([nome, f]) => [nome, { tipo: 'interna', def: f }]),
+    ...doIxc.porNome,
     ...externas.map((f) => [f.nome, { tipo: 'externa', def: f }]),
   ]);
   return { tools, porNome };
@@ -272,6 +277,9 @@ async function executar(nome, entrada, contexto) {
       const resultado = await alvo.def.executar({ ...contexto, entrada });
       return { resultado, terminal: Boolean(alvo.def.terminal) && resultado?.ok !== false };
     }
+    if (alvo.tipo === 'ixc') {
+      return { resultado: await ixc.executar(alvo.def, { ...contexto, entrada }), terminal: false };
+    }
     contexto.db.prepare('UPDATE ferramentas SET usos = usos + 1 WHERE id = ?').run(alvo.def.id);
     return { resultado: await executarExterna(alvo.def, { ...contexto, entrada }), terminal: false };
   } catch (err) {
@@ -279,4 +287,4 @@ async function executar(nome, entrada, contexto) {
   }
 }
 
-module.exports = { INTERNAS, montar, executar, comoTool, executarExterna, gerarProtocolo };
+module.exports = { INTERNAS, montar, executar, comoTool, executarExterna, gerarProtocolo, ixc };

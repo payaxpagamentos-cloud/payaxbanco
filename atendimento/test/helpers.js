@@ -125,6 +125,93 @@ function semIa() {
   return { restaurar: () => { require('../server/config').ia.chave = antes; } };
 }
 
+// ---------- Dublê do IXC ----------
+
+const IXC_URL = 'https://ixc.provedor.teste';
+
+/** Liga a integração com o IXC nesta empresa e devolve a configuração aplicada. */
+function comIxc(db, empresaId, extra = {}) {
+  const { cifrar } = require('../server/lib/cifra');
+  const campos = {
+    ativo: 1, url: IXC_URL, token_cifrado: cifrar('99:tokendeteste', 'ixc'), confirmar_por: 'cpf3',
+    max_tentativas: 3, desbloqueio_ativo: 1, desbloqueio_limite: 1, desbloqueio_periodo_dias: 30, chamado_ativo: 1,
+    ...extra,
+  };
+  const colunas = Object.keys(campos);
+  db.prepare(`INSERT OR REPLACE INTO ixc_config (empresa_id, ${colunas.join(', ')}, atualizado_em)
+    VALUES (?, ${colunas.map(() => '?').join(', ')}, ?)`).run(empresaId, ...colunas.map((k) => campos[k]), agora());
+  return campos;
+}
+
+/**
+ * Dublê da API do IXC. `dados` define o que a instância responde:
+ *   { clientes: [...], contratos: [...], faturas: [...], logins: [...], chamados: [...] }
+ * `falhar: true` faz toda chamada cair (para testar a degradação).
+ * Devolve { chamadas, restaurar } — `chamadas` tem { recurso, corpo } de cada requisição.
+ */
+function fingirIxc(dados = {}, { falhar = false, demorar = false } = {}) {
+  const original = global.fetch;
+  const chamadas = [];
+  const registros = (lista) => new Response(JSON.stringify({ page: '1', total: lista.length, registros: lista }),
+    { status: 200, headers: { 'content-type': 'application/json' } });
+
+  global.fetch = async (url, opcoes = {}) => {
+    const endereco = String(url);
+    if (!endereco.startsWith(IXC_URL)) return original(url, opcoes);
+    const recurso = endereco.split('/webservice/v1/')[1];
+    const corpo = opcoes.body ? JSON.parse(opcoes.body) : {};
+    chamadas.push({ recurso, corpo });
+    if (falhar) throw new TypeError('fetch failed');
+    if (demorar) { const e = new Error('tempo'); e.name = 'TimeoutError'; throw e; }
+
+    const lista = (chave) => dados[chave] ?? [];
+    const filtrar = (itens, campo) => {
+      const alvo = String(corpo.query ?? '');
+      if (corpo.oper === 'L') return itens.filter((x) => String(x[campo] ?? '').replace(/\D/g, '').includes(alvo.replace(/\D/g, '')));
+      if (corpo.oper === '>') return itens;
+      return itens.filter((x) => String(x[campo] ?? '') === alvo || String(x[campo] ?? '').replace(/\D/g, '') === alvo.replace(/\D/g, ''));
+    };
+
+    switch (recurso) {
+      case 'cliente': {
+        const campo = String(corpo.qtype ?? '').split('.')[1] ?? 'id';
+        return registros(filtrar(lista('clientes'), campo));
+      }
+      case 'cliente_contrato': return registros(filtrar(lista('contratos'), String(corpo.qtype ?? '').split('.')[1] ?? 'id'));
+      case 'fn_areceber': return registros(filtrar(lista('faturas'), String(corpo.qtype ?? '').split('.')[1] ?? 'id'));
+      case 'radusuarios': return registros(filtrar(lista('logins'), String(corpo.qtype ?? '').split('.')[1] ?? 'id'));
+      case 'su_oss_chamado':
+        // Sem qtype é abertura de chamado; com qtype é consulta.
+        if (!corpo.qtype) return new Response(JSON.stringify({ type: 'success', id: 9001, protocolo: '2026110001', mensagem: 'Chamado aberto com sucesso.' }),
+          { status: 200, headers: { 'content-type': 'application/json' } });
+        return registros(filtrar(lista('chamados'), String(corpo.qtype ?? '').split('.')[1] ?? 'id'));
+      case 'su_oss_assunto': return registros(lista('assuntos'));
+      case 'get_boleto':
+        return new Response(JSON.stringify({ base64: Buffer.from('%PDF-1.4 boleto de teste'.repeat(10)).toString('base64'), linha_digitavel: '34191790010104351004791020150008291070026000' }),
+          { status: 200, headers: { 'content-type': 'application/json' } });
+      case 'desbloqueio_confianca':
+        return new Response(JSON.stringify({ type: 'success', mensagem: 'Desbloqueio de confiança liberado por 3 dias.' }),
+          { status: 200, headers: { 'content-type': 'application/json' } });
+      default:
+        return new Response(JSON.stringify({ type: 'error', message: `recurso ${recurso} não existe nesta instância` }),
+          { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+  };
+  return { chamadas, restaurar: () => { global.fetch = original; } };
+}
+
+/** Cadastro de exemplo coerente: cliente, contrato bloqueado por atraso, fatura vencida e login offline. */
+const CADASTRO = {
+  clientes: [{ id: '501', razao: 'Ana Clara Ribeiro', cnpj_cpf: '123.456.789-09', data_nascimento: '1990-03-05', ativo: 'S',
+    telefone_celular: '(11) 98888-7777', fone: '', whatsapp: '', email: 'ana@exemplo.com.br' }],
+  contratos: [{ id: '77', id_cliente: '501', contrato: 'Fibra 600 Mega', status: 'A', status_internet: 'CA', endereco: 'Rua das Flores', numero: '100', bairro: 'Centro', cidade: 'São Paulo' }],
+  faturas: [{ id: '9001', id_cliente: '501', id_contrato: '77', status: 'A', data_vencimento: '2026-10-10', valor_aberto: '129.90' },
+    { id: '9002', id_cliente: '501', id_contrato: '77', status: 'A', data_vencimento: '2026-11-10', valor_aberto: '129.90' }],
+  logins: [{ id: '301', id_cliente: '501', id_contrato: '77', login: 'ana.ribeiro', online: 'N', ip: '', ultima_conexao_inicial: '2026-11-12 22:14:00' }],
+  chamados: [],
+  assuntos: [{ id: '4', assunto: 'Sem conexão', ativo: 'S' }],
+};
+
 // ---------- Webhook ----------
 
 /** Monta o corpo de um webhook de mensagem recebida, igual ao da Meta. */
@@ -178,7 +265,7 @@ const mensagensDe = (db, conversaId) =>
   db.prepare('SELECT direcao, autor, tipo, texto, status FROM mensagens WHERE conversa_id = ? ORDER BY id').all(conversaId);
 
 module.exports = {
-  APP_SECRET, PHONE_ID, TELEFONE_CLIENTE,
-  criarAmbiente, comConhecimento, fingirMeta, fingirClaude, semIa,
+  APP_SECRET, PHONE_ID, TELEFONE_CLIENTE, IXC_URL, CADASTRO,
+  criarAmbiente, comConhecimento, fingirMeta, fingirClaude, semIa, comIxc, fingirIxc,
   corpoWebhook, mensagemTexto, assinar, entregar, conversar, conversaDoCliente, mensagensDe,
 };
