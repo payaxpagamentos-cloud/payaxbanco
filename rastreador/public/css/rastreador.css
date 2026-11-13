@@ -431,7 +431,7 @@ pre.codigo{ font-family: ui-monospace, Menlo, monospace; font-size: 12px; backgr
 
 
 /* =====================================================================================================================
-   Visual aprovado (referência Rastreador_Layout_Claude): menu azul-marinho com detalhe verde-menta, painéis claros com bordas
+   Visual aprovado (referência de layout do Rastreador): menu azul-marinho com detalhe verde-menta, painéis claros com bordas
    sutis, destaques em azul-elétrico, ciano e menta, bloco de destaque com gradiente fluido e órbita (só nos dashboards),
    entrada de página em 380 ms e cards que sobem 4 px. Os efeitos contínuos podem ser pausados no botão do topo e ficam
    parados com "reduzir movimento" no sistema.

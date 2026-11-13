@@ -5,7 +5,7 @@
  criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
 */
 
-const Anthropic = require('@anthropic-ai/sdk');
+const ClienteIA = require('@anthropic-ai/sdk');
 const config = require('../config');
 const { lerConfig } = require('../db');
 const rel = require('./relatorios');
@@ -18,19 +18,19 @@ const { ErroNegocio } = require('./erros');
 /**
  * Assistente da frota: responde perguntas em português sobre os dados da empresa ("onde estava o ABC1D23 ontem às 15h?",
  * "quem dirigiu pior este mês?", "quanto gastei de combustível?"). Só consulta: as ferramentas leem os dados da própria empresa
- * e nenhuma envia comando ao veículo. Usa a API da Anthropic com a chave de RASTREADOR_IA_CHAVE.
+ * e nenhuma envia comando ao veículo. Usa a API de IA com a chave de RASTREADOR_IA_CHAVE.
  */
 const MAX_VOLTAS = 8;
 const MAX_HISTORICO = 10;
 const MAX_TEXTO = 2000;
 const MAX_LISTA = 40;
-// Se o modelo recusar um pedido, a API tenta de novo num modelo reserva indicado pela Anthropic.
+// Se o modelo recusar um pedido, a API tenta de novo num modelo reserva indicado pelo provedor.
 const BETA_RESERVA = 'server-side-fallback-2026-07-01';
 
 let clienteAtual = null;
 const configurado = () => Boolean(config.ia.chave) || Boolean(clienteAtual);
 function cliente() {
-  if (!clienteAtual) clienteAtual = new Anthropic({ apiKey: config.ia.chave, timeout: 60_000, maxRetries: 2 });
+  if (!clienteAtual) clienteAtual = new ClienteIA({ apiKey: config.ia.chave, timeout: 60_000, maxRetries: 2 });
   return clienteAtual;
 }
 /** Para os testes: troca o cliente da API por um falso. */
@@ -335,12 +335,12 @@ async function perguntar(db, empresa, { pergunta, historico } = {}) {
       messages.push({ role: 'user', content: resultados });
     }
   } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+    if (err instanceof ClienteIA.AuthenticationError || err instanceof ClienteIA.PermissionDeniedError) {
       console.error('[Rastreador] Assistente: a chave da IA foi recusada (confira RASTREADOR_IA_CHAVE).');
       throw new ErroNegocio('O assistente está com a chave recusada. Avise o suporte.', 503);
     }
-    if (err instanceof Anthropic.RateLimitError) throw new ErroNegocio('Muitas perguntas ao mesmo tempo. Tente de novo em instantes.', 429);
-    if (err instanceof Anthropic.APIError) {
+    if (err instanceof ClienteIA.RateLimitError) throw new ErroNegocio('Muitas perguntas ao mesmo tempo. Tente de novo em instantes.', 429);
+    if (err instanceof ClienteIA.APIError) {
       console.error('[Rastreador] Assistente: erro da API', err.status, err.message);
       throw new ErroNegocio('O assistente não respondeu agora. Tente de novo em instantes.', 502);
     }

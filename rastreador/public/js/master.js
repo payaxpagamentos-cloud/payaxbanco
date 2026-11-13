@@ -485,7 +485,7 @@ async function telaAssistenteIa(ctx) {
       indicador('Perguntas hoje', inteiro(d.uso.reduce((s, u) => s + u.hoje, 0)), `limite de ${inteiro(c.ia_limite_dia)} por empresa`, '', 'atividade'),
       indicador('Perguntas no mês', inteiro(d.uso.reduce((s, u) => s + u.mes, 0)), `${inteiro(d.uso.length)} empresa(s) usando`, '', 'dashboard')),
     d.configurado ? null : cartao('Como ligar', el('p', { class: 'mudo', style: 'margin-top:0' },
-      'Crie a chave na conta da Anthropic (console) e coloque no arquivo .env do servidor (nunca no chat). Depois reinicie o Rastreador. A chave tem custo por uso, por isso o limite diário por empresa.'),
+      'Crie a chave no console do provedor de IA e coloque no arquivo .env do servidor (nunca no chat). Depois reinicie o Rastreador. A chave tem custo por uso, por isso o limite diário por empresa.'),
     el('pre', { class: 'codigo' }, 'RASTREADOR_IA_CHAVE=sk-ant-...')),
     el('div', { class: 'grade-dash' },
       el('div', { class: 'c4' }, cartao('Limite', el('div', { class: 'form' },
