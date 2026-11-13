@@ -1,0 +1,22 @@
+{
+  "name": "payax-atendimento",
+  "version": "1.0.0",
+  "description": "ZOE Atende — plataforma de atendimento ao cliente por WhatsApp: a atendente virtual resolve o primeiro atendimento e transfere para a equipe humana só o que não conseguir resolver.",
+  "main": "server/index.js",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "empacotar": "node scripts/empacotar.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "express": "^5.2.1"
+  }
+}

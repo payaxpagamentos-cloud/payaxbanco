@@ -1,0 +1,132 @@
+ZOE Atende — atendimento ao cliente por WhatsApp
+================================================
+
+A atendente virtual faz o primeiro atendimento e resolve o que dá. Só o que ela não consegue
+resolver vai para a equipe humana, com um resumo pronto do caso.
+
+Esta pasta já vem com o código e as dependências instaladas. Requisito: Node.js 22.13 ou maior.
+
+
+1. SUBIR O SERVIDOR
+-------------------
+
+Antes de tudo, abra o arquivo .env e confira:
+  - ATEND_URL_PUBLICA: o endereço público do servidor (vai no callback da Meta).
+  - ATEND_BASE_PATH:   onde o painel fica publicado (ex.: /atendimento).
+  - ATEND_SECRET:      já gerado. NÃO TROQUE depois de instalado (veja a seção 5).
+  - ATEND_IA_CHAVE:    a chave da Claude API, se for usar a camada de IA (veja a seção 4).
+
+   a) Direto (teste rápido)
+      node --env-file-if-exists=.env server/index.js
+
+   b) PM2 (recomendado em VPS)
+      npm install -g pm2
+      pm2 start server/index.js --name zoe-atende --node-args="--env-file-if-exists=.env"
+      pm2 save && pm2 startup
+
+   c) Docker
+      docker build -t zoe-atende .
+      docker run -d --name zoe-atende -p 3600:3600 \
+        -v /srv/zoe-atende/data:/app/data --env-file .env zoe-atende
+
+   d) cPanel (Setup Node.js App)
+      Application root: esta pasta · Startup file: server/index.js
+      Em "Environment variables", copie as linhas do .env.
+
+Nginx (exemplo):
+  location /atendimento/ {
+    proxy_pass http://127.0.0.1:3600;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+Apache (exemplo):
+  ProxyPreserveHost On
+  ProxyPass        /atendimento/ http://127.0.0.1:3600/atendimento/
+  ProxyPassReverse /atendimento/ http://127.0.0.1:3600/atendimento/
+
+O servidor PRECISA estar acessível em https:// pela internet: é a Meta quem chama o webhook.
+
+
+2. PRIMEIRO ACESSO
+------------------
+
+Abra https://SEU-DOMINIO/atendimento/ e entre com o e-mail e a senha do master que estão no .env.
+Troque a senha no primeiro acesso (clique no seu nome, no topo).
+
+Depois, em Empresas, crie a empresa cliente. Ela já nasce com duas filas (Atendimento e Financeiro),
+etiquetas e a atendente virtual ligada.
+
+
+3. LIGAR O WHATSAPP (Cloud API da Meta)
+---------------------------------------
+
+Você precisa de uma conta no WhatsApp Business Platform (developers.facebook.com) com um número
+verificado. No painel do ZOE Atende, entre na empresa e vá em Configurações > Cadastrar número:
+
+  - Phone number ID  → no app da Meta, em WhatsApp > Configuração da API.
+  - Token de acesso  → use um token PERMANENTE (de usuário do sistema), não o temporário de 24 h.
+  - App secret       → em Configurações do app > Básico.
+  - Token de verificação → deixe em branco que o sistema gera um.
+
+Guarde e, no app da Meta, em WhatsApp > Configuração > Webhook:
+
+  - URL de callback:      https://SEU-DOMINIO/atendimento/api/webhook
+  - Token de verificação: o que aparece na tela do número
+  - Assine o campo:       messages
+
+O endereço exato aparece na própria tela de Configurações, pronto para copiar.
+
+Confira com o botão "Testar a conexão com a Meta" na linha do número, e em Diagnóstico (painel do master).
+
+IMPORTANTE — a regra das 24 horas é da Meta, não nossa: fora das 24 h desde a última mensagem do
+cliente, só um template aprovado por ela pode ser enviado. O painel avisa e oferece o envio de template.
+
+
+4. LIGAR A ATENDENTE VIRTUAL
+----------------------------
+
+A atendente funciona em dois níveis:
+
+  Sem chave de IA  → responde pelas intenções (palavras-chave) e pela base de conhecimento, e oferece
+                     o menu de departamentos para o que não casar. Já resolve bastante e não custa nada.
+
+  Com chave de IA  → entende texto livre, consulta a base, usa as ferramentas da empresa, abre chamado
+                     e decide sozinha quando chamar uma pessoa. Ponha a chave em ATEND_IA_CHAVE
+                     (platform.claude.com) e reinicie o servidor.
+
+O que mais muda o resultado é a BASE DE CONHECIMENTO. Comece pelas cinco perguntas que a sua equipe
+mais recebe: menu Atendente virtual > Base de conhecimento. Use a aba Testar para ver como ela responde.
+
+Em Atendente virtual > Desempenho, a lista "Por que foi para a equipe" mostra exatamente onde falta
+conteúdo: cada motivo repetido vira um artigo novo e deixa de ocupar a equipe.
+
+
+5. BACKUP E SEGREDO
+-------------------
+
+Copie a pasta data/ inteira: ela tem o banco (atendimento.db) e os arquivos recebidos no WhatsApp.
+
+ATEND_SECRET protege os tokens do WhatsApp e os cabeçalhos das ferramentas, que ficam cifrados no
+banco. Se você trocar o segredo, esses dados não são mais lidos e será preciso informar o token do
+número de novo. Guarde o .env junto com o backup.
+
+
+6. PROBLEMAS COMUNS
+-------------------
+
+"O webhook recusa tudo (401)"
+  O App secret do número está errado ou em branco. Veja no painel do master, em Segurança: os eventos
+  recusados aparecem com o motivo.
+
+"A atendente virtual não responde nada"
+  Confira em Diagnóstico se a chave da Claude API está configurada, e se a empresa tem fila cadastrada
+  (sem fila ela não tem para onde transferir).
+
+"As mensagens ficam como 'Falhou'"
+  Abra Diagnóstico: se o token da Meta expirou ou está errado, o erro aparece ali com o texto da Meta.
+
+"Ninguém recebe as conversas da fila"
+  O atendente precisa estar com o botão "Disponível" ligado no topo do painel e fazer parte da fila
+  (menu Filas > ícone de equipe).

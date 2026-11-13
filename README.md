@@ -8,6 +8,8 @@ usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 > E o **PABX** (pasta [`pabx/`](pabx/README.md), publicado em `/pabx`): painel do master e das empresas para ramais, chamadas, campanhas, números entrantes, terminação e integração com a central telefônica, com servidor próprio.
 >
 > E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
+>
+> E o **ZOE Atende** (pasta [`atendimento/`](atendimento/README.md), publicado em `/atendimento`): atendimento ao cliente por WhatsApp em que a **atendente virtual faz o primeiro atendimento e resolve o que dá**, transferindo para a equipe humana só o que ela não resolve — com um resumo pronto do caso, na fila certa. Painel do master e das empresas, caixa de entrada ao vivo, base de conhecimento, filas por horário, chamados, relatórios de resolução e custo, e API de integração. Servidor próprio, WhatsApp Cloud API da Meta e Claude API (opcional).
 
 ## Módulos
 
