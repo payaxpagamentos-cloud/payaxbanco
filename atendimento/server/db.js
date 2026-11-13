@@ -18,6 +18,11 @@ CREATE TABLE IF NOT EXISTS empresas (
   telefone TEXT,
   limite_atendentes INTEGER NOT NULL DEFAULT 5 CHECK (limite_atendentes >= 0),
   limite_ia_mes INTEGER NOT NULL DEFAULT 2000 CHECK (limite_ia_mes >= 0),
+  -- Quanto esta empresa aceita gastar com a Meta por mês, em milésimos de real (0 = sem teto).
+  -- Estourado o teto, só sai mensagem grátis: a conta não passa do que a gestão aprovou.
+  orcamento_milesimos INTEGER NOT NULL DEFAULT 0 CHECK (orcamento_milesimos >= 0),
+  -- Marketing tem orçamento próprio: é nove vezes mais caro e não pode comer o dinheiro da cobrança.
+  orcamento_marketing_milesimos INTEGER NOT NULL DEFAULT 0 CHECK (orcamento_marketing_milesimos >= 0),
   motivo_bloqueio TEXT,
   criada_em TEXT NOT NULL
 );
@@ -280,6 +285,9 @@ CREATE TABLE IF NOT EXISTS reguas (
   pular_se_conversa_aberta INTEGER NOT NULL DEFAULT 1,
   pular_se_pago INTEGER NOT NULL DEFAULT 1,
   repetir_apos_dias INTEGER NOT NULL DEFAULT 5 CHECK (repetir_apos_dias >= 0),
+  -- Horas que vale esperar pela janela de 24 h antes de gastar um template (0 = manda agora).
+  -- Aviso que tem folga não precisa ser pago: se o cliente escrever antes do prazo, sai de graça.
+  esperar_janela_h INTEGER NOT NULL DEFAULT 0 CHECK (esperar_janela_h BETWEEN 0 AND 168),
   -- Teto de gasto por execução, em milésimos de real (0 = sem teto).
   teto_milesimos INTEGER NOT NULL DEFAULT 0 CHECK (teto_milesimos >= 0),
   ativa INTEGER NOT NULL DEFAULT 0,
@@ -298,7 +306,8 @@ CREATE TABLE IF NOT EXISTS disparos (
   mensagem_id INTEGER REFERENCES mensagens(id) ON DELETE SET NULL,
   referencia TEXT,
   categoria TEXT CHECK (categoria IN ('servico','utilidade','autenticacao','marketing')),
-  status TEXT NOT NULL CHECK (status IN ('enviado','pulado','falhou')),
+  -- 'esperando': foi para a sala de espera da janela em vez de virar template pago agora.
+  status TEXT NOT NULL CHECK (status IN ('enviado','pulado','falhou','esperando')),
   motivo TEXT,
   custo_milesimos INTEGER NOT NULL DEFAULT 0,
   economia_milesimos INTEGER NOT NULL DEFAULT 0,
@@ -531,6 +540,61 @@ CREATE TABLE IF NOT EXISTS ips_bloqueados (
   criado_em TEXT NOT NULL
 );
 
+-- A sala de espera da janela: avisos que têm folga ficam aqui em vez de virar template pago.
+-- Quando o cliente escreve qualquer coisa, a janela abre e o aviso sai de graça, de carona.
+-- Chegando o prazo sem o cliente escrever, aí sim paga o template.
+CREATE TABLE IF NOT EXISTS pendencias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  regua_id INTEGER NOT NULL REFERENCES reguas(id),
+  contato_id INTEGER NOT NULL REFERENCES contatos(id),
+  -- Id da fatura (ou a data alvo): evita duas pendências para a mesma coisa.
+  referencia TEXT NOT NULL,
+  dados TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  prazo TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'esperando' CHECK (status IN ('esperando','entregue','vencida','cancelada')),
+  resolucao TEXT,
+  resolvida_em TEXT,
+  disparo_id INTEGER REFERENCES disparos(id),
+  criada_em TEXT NOT NULL,
+  UNIQUE (regua_id, contato_id, referencia)
+);
+CREATE INDEX IF NOT EXISTS idx_pendencias_espera ON pendencias (status, prazo);
+CREATE INDEX IF NOT EXISTS idx_pendencias_contato ON pendencias (contato_id, status);
+
+-- Fechamento do mês: foto do que foi gasto, imutável depois de fechada, e o espaço para
+-- lançar o valor que a Meta cobrou de verdade. Sem essa conferência o número é só nosso.
+CREATE TABLE IF NOT EXISTS custos_mensais (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  mes TEXT NOT NULL,
+  mensagens INTEGER NOT NULL DEFAULT 0,
+  por_categoria TEXT NOT NULL,
+  gasto_milesimos INTEGER NOT NULL DEFAULT 0,
+  economia_milesimos INTEGER NOT NULL DEFAULT 0,
+  sem_otimizacao_milesimos INTEGER NOT NULL DEFAULT 0,
+  orcamento_milesimos INTEGER NOT NULL DEFAULT 0,
+  fatura_meta_centavos INTEGER,
+  conferido_em TEXT,
+  conferido_por TEXT,
+  observacao TEXT,
+  fechado_em TEXT NOT NULL,
+  UNIQUE (empresa_id, mes)
+);
+
+-- Cada marco do orçamento é avisado uma vez só (50%, 80%, 100%).
+CREATE TABLE IF NOT EXISTS orcamento_avisos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  mes TEXT NOT NULL,
+  marco INTEGER NOT NULL CHECK (marco IN (50,80,100)),
+  gasto_milesimos INTEGER NOT NULL,
+  orcamento_milesimos INTEGER NOT NULL,
+  criado_em TEXT NOT NULL,
+  UNIQUE (empresa_id, mes, marco)
+);
+
 CREATE TABLE IF NOT EXISTS configuracoes (
   chave TEXT PRIMARY KEY,
   valor TEXT NOT NULL
@@ -539,6 +603,9 @@ CREATE TABLE IF NOT EXISTS configuracoes (
 
 const CONFIG_PADRAO = {
   nome_plataforma: 'ZOE Atende',
+  // Quantas mensagens PAGAS um mesmo contato pode receber por dia, somando todas as réguas.
+  // Duas réguas que caem no mesmo cliente no mesmo dia pagam duas vezes pelo mesmo recado.
+  wa_max_pagas_contato_dia: 1,
   // Padrões aplicados a cada empresa nova.
   limite_atendentes_padrao: '5',
   limite_ia_mes_padrao: '2000',

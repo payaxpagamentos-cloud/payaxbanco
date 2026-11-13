@@ -225,6 +225,7 @@ Base: `https://SEU-DOMINIO/atendimento/api/integracao` · Cabeçalho: `Authoriza
 | `POST /mensagens` | Envia mensagem. Dentro da janela de 24 h aceita texto; fora dela exige template. |
 | `GET /chamados` | Os chamados, inclusive os que a ZOE abriu. |
 | `PATCH /chamados/:protocolo` | Atualiza a situação e a resolução, e pode avisar o cliente pelo WhatsApp. |
+| `GET /custos` | A conta da Meta: mês corrente, orçamento, economia em andamento e os meses fechados. É por aqui que o Manager Network lê. |
 
 ```bash
 curl -X POST https://SEU-DOMINIO/atendimento/api/integracao/mensagens \
@@ -234,6 +235,72 @@ curl -X POST https://SEU-DOMINIO/atendimento/api/integracao/mensagens \
 
 A conversa aberta assim **não passa pela ZOE** (aviso automático não é atendimento): ela
 entra direto na fila da equipe, a menos que você mande `"com_ia": true`.
+
+## A conta da Meta
+
+Conversa não custa. O que custa é mensagem que a empresa **inicia**.
+
+| Categoria | Quando se aplica | Preço |
+|---|---|---|
+| Serviço | o cliente falou primeiro e a resposta saiu em até 24 h | **grátis e ilimitado** |
+| Utilidade | aviso sobre algo que o cliente já contratou (fatura, manutenção) | ~R$ 0,035 |
+| Autenticação | código de verificação | ~R$ 0,030 |
+| Marketing | oferta, promoção ou reativação | ~R$ 0,32 |
+
+Marketing custa **nove vezes** uma utilidade pelo mesmo texto. Mandar um boleto como marketing
+em 7.000 assinantes custa R$ 2.240,00; como utilidade, R$ 245,00.
+
+Os preços ficam em `Configurações` (do master, em milésimos de real — R$ 0,035 não cabe em
+centavos) e precisam acompanhar a tabela do Brasil no painel da Meta, que muda.
+
+### As oito decisões antes de gastar
+
+Toda mensagem ativa passa por estas perguntas, nesta ordem. Cada "sim" economiza um template:
+
+1. O cliente pediu para não receber mensagem ativa? → pula
+2. Já pagou esta fatura? → pula (confere no IXC na hora do disparo)
+3. Já está conversando com a equipe? → pula (não atropela o atendimento)
+4. Já recebeu esta régua há poucos dias? → pula
+5. A janela de 24 h está aberta? → manda **texto livre, de graça**
+6. O aviso tem folga de prazo? → **espera** a janela abrir
+7. Já recebeu uma mensagem paga hoje? → pula (um recado pago por pessoa por dia)
+8. O orçamento do mês acabou? → pula
+
+Cada decisão vira uma linha em `disparos`, com o custo, a economia e o motivo escrito em
+português. A economia na tela é soma de registros, não promessa.
+
+### A sala de espera (a regra que mais economiza)
+
+Um aviso de vencimento com três dias de folga não precisa ser pago hoje. Com
+`esperar_janela_h` ligado, ele fica numa sala de espera com prazo. Então:
+
+- **o cliente escreve qualquer coisa antes do prazo** → a janela abre e o aviso sai junto da
+  resposta da ZOE, de graça. Vários avisos do mesmo cliente saem numa mensagem só.
+- **o prazo chega sem ele escrever** → aí paga o template, no último momento útil, e só se ainda
+  fizer sentido: fatura paga, contato bloqueado ou orçamento esgotado cancelam o envio.
+
+Num provedor, boa parte da base fala no WhatsApp em qualquer semana. Essa parte passa a receber
+os avisos de graça, sem ninguém fazer nada diferente.
+
+Conversa com atendente humano na linha não recebe cobrança por cima: o aviso continua esperando,
+e esperar não custa nada.
+
+### Orçamento com freio
+
+`Mensagens ativas › Orçamento e fechamento` define quanto a empresa aceita gastar por mês, e
+quanto disso pode ir para marketing. O teto **para** o gasto, não avisa depois: atingido o
+limite, mensagem paga não sai mais. Mensagem grátis continua saindo — o atendimento não para por
+causa de dinheiro que não é cobrado. Os marcos de 50%, 80% e 100% são registrados uma vez cada.
+
+### Fechamento e conferência
+
+No dia 1º o mês anterior é fechado num registro que não muda mais. A gestão lança o valor que a
+Meta cobrou de verdade e o sistema mostra a diferença. Acima de 5% a linha fica marcada como
+divergente — não é arredondamento: ou o preço cadastrado está velho, ou mensagem está saindo por
+fora do sistema.
+
+O custo também é publicado para o **Manager Network** (`network/`), em `Operação › Custo do
+WhatsApp`, pela API de integração: lá a gestão vê a conta junto do resto da operação.
 
 ## Ouvidoria e a ficha 360° do cliente
 

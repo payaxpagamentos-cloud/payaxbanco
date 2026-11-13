@@ -814,6 +814,73 @@ CREATE TABLE amostras_servico_externo (
 CREATE INDEX idx_amostras_servico ON amostras_servico_externo(servico_id, id DESC);
 `,
   },
+  {
+    versao: 2,
+    nome: 'custo_whatsapp',
+    sql: `
+-- O CHECK de 'tipo' só conhecia rastreador e downdetector, e o SQLite não altera CHECK:
+-- a tabela é refeita com o tipo novo, preservando o que já estava configurado.
+CREATE TABLE integracoes_nova (
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('rastreador','downdetector','atendimento')),
+  habilitada INTEGER NOT NULL DEFAULT 0,
+  config TEXT NOT NULL DEFAULT '{}',
+  segredo_cifrado TEXT,
+  estado TEXT NOT NULL DEFAULT 'nao_configurada' CHECK (estado IN ('nao_configurada','testando','conectada','parcial','desatualizada','sem_permissao','limite_atingido','falha','desabilitada')),
+  ultimo_sucesso TEXT,
+  ultima_tentativa TEXT,
+  ultimo_erro TEXT,
+  erro_id TEXT,
+  proxima_tentativa TEXT,
+  falhas_consecutivas INTEGER NOT NULL DEFAULT 0,
+  atualizado_em TEXT NOT NULL,
+  PRIMARY KEY (organizacao_id, tipo)
+);
+INSERT INTO integracoes_nova SELECT * FROM integracoes;
+DROP TABLE integracoes;
+ALTER TABLE integracoes_nova RENAME TO integracoes;
+
+-- O que o WhatsApp custa, lido do ZOE Atende pela API de integração dele.
+-- A gestão acompanha aqui o custo da Meta junto do resto da operação, sem abrir outro sistema.
+-- Valores em centavos, como todo dinheiro neste banco.
+CREATE TABLE custos_whatsapp (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  mes TEXT NOT NULL,
+  mensagens INTEGER NOT NULL DEFAULT 0,
+  gasto_centavos INTEGER NOT NULL DEFAULT 0,
+  economia_centavos INTEGER NOT NULL DEFAULT 0,
+  sem_otimizacao_centavos INTEGER NOT NULL DEFAULT 0,
+  orcamento_centavos INTEGER NOT NULL DEFAULT 0,
+  -- O que a Meta cobrou de verdade, quando a gestão já lançou a fatura lá no ZOE Atende.
+  fatura_meta_centavos INTEGER,
+  divergente INTEGER NOT NULL DEFAULT 0,
+  em_aberto INTEGER NOT NULL DEFAULT 0,
+  por_categoria TEXT,
+  atualizado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, mes)
+);
+
+-- Uma linha por organização: a foto de agora (orçamento, ritmo, fila de espera).
+CREATE TABLE custo_whatsapp_estado (
+  organizacao_id INTEGER PRIMARY KEY REFERENCES organizacoes(id),
+  empresa TEXT,
+  mes TEXT NOT NULL,
+  gasto_centavos INTEGER NOT NULL DEFAULT 0,
+  economia_centavos INTEGER NOT NULL DEFAULT 0,
+  projecao_centavos INTEGER NOT NULL DEFAULT 0,
+  orcamento_centavos INTEGER NOT NULL DEFAULT 0,
+  percentual REAL NOT NULL DEFAULT 0,
+  situacao TEXT NOT NULL DEFAULT 'sem_teto',
+  projecao_estoura INTEGER NOT NULL DEFAULT 0,
+  avisos_esperando INTEGER NOT NULL DEFAULT 0,
+  valor_em_risco_centavos INTEGER NOT NULL DEFAULT 0,
+  avisos_salvos INTEGER NOT NULL DEFAULT 0,
+  precos TEXT,
+  atualizado_em TEXT NOT NULL
+);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

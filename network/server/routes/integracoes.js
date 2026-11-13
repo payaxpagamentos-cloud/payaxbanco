@@ -7,14 +7,23 @@ const { registrar } = require('../lib/auditoria');
 const base = require('../conectores/base');
 const rastreador = require('../conectores/rastreador');
 const downdetector = require('../conectores/downdetector');
+const atendimento = require('../conectores/atendimento');
 const v = require('../lib/validacao');
 
-const CONECTORES = { rastreador, downdetector };
+const CONECTORES = { rastreador, downdetector, atendimento };
 
 /** Configuração validada por tipo. Nenhum endpoint do Downdetector é presumido: caminho e campos vêm da documentação do acesso. */
 function validarConfig(tipo, c = {}) {
   const url = v.texto(c.url_base, 'o endereço base', 300);
   if (tipo === 'rastreador') return { url_base: url.replace(/\/+$/, ''), intervalo_s: v.inteiro(c.intervalo_s ?? 60, 'o intervalo', { min: 30, max: 3600 }) };
+  // ZOE Atende: só o endereço, de quanto em quanto tempo ler e quantos meses trazer.
+  if (tipo === 'atendimento') {
+    return {
+      url_base: url.replace(/\/+$/, ''),
+      intervalo_s: v.inteiro(c.intervalo_s ?? 900, 'o intervalo', { min: 120, max: 86400 }),
+      meses: v.inteiro(c.meses ?? 12, 'os meses do histórico', { min: 1, max: 60 }),
+    };
+  }
   return {
     url_base: url.replace(/\/+$/, ''), caminho: v.texto(c.caminho, 'o caminho da consulta', 300), cabecalho_auth: v.opcional(c.cabecalho_auth, 'o cabeçalho', 60) ?? 'Authorization',
     prefixo_auth: c.prefixo_auth === undefined ? 'Bearer' : String(c.prefixo_auth).slice(0, 20), campo_relatos: v.texto(c.campo_relatos, 'o campo do volume de relatos', 120),

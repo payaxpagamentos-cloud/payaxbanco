@@ -1,11 +1,13 @@
 'use strict';
 
-const { agora, transacao } = require('../db');
+const { agora, transacao, lerConfig } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('./erros');
 const { local, hoje, somarDias } = require('./datas');
 const conversas = require('./conversas');
 const envio = require('./envio');
 const custo = require('./custo');
+const orcamento = require('./orcamento');
+const pendencias = require('./pendencias');
 const wa = require('./whatsapp');
 const ixcTools = require('../ia/ferramentas-ixc');
 const v = require('./validacao');
@@ -21,6 +23,9 @@ const v = require('./validacao');
  *   3. Ele já está conversando com a equipe agora?                 → pula (não atropela o atendimento)
  *   4. Já mandamos isso para ele há poucos dias?                   → pula
  *   5. A janela de 24 h dele está aberta?                          → manda TEXTO LIVRE, de graça
+ *   6. O aviso tem folga de prazo?                                 → ESPERA a janela abrir (grátis)
+ *   7. Ele já recebeu uma mensagem paga hoje?                      → pula (um recado pago por dia)
+ *   8. O orçamento do mês acabou?                                  → pula (o freio, não o aviso)
  *   senão                                                          → manda o template, e aí sim paga
  *
  * Cada decisão vira uma linha em `disparos` com o quanto custou e o quanto deixou de custar, para a
@@ -114,6 +119,30 @@ async function destinatarios(db, empresa, regua, { referencia = hoje(), limite =
   return lista;
 }
 
+/** Quantas mensagens PAGAS este contato já recebeu hoje, somando todas as réguas. */
+function pagasHoje(db, contatoId) {
+  const r = db.prepare(`SELECT COUNT(*) AS n FROM disparos
+    WHERE contato_id = ? AND status = 'enviado' AND custo_milesimos > 0 AND criado_em >= ?`)
+    .get(contatoId, `${hoje()}T00:00:00.000Z`);
+  return Number(r?.n ?? 0);
+}
+
+/**
+ * Até quando vale esperar pela janela. Nunca passa do momento em que o aviso perde sentido:
+ * um "3 dias antes do vencimento" entregue depois do vencimento não é aviso, é cobrança atrasada.
+ */
+function prazoDeEspera(regua, alvo, instante = new Date()) {
+  const horas = Number(regua.esperar_janela_h ?? 0);
+  if (horas <= 0) return null;
+  const porHoras = new Date(instante.getTime() + horas * 3_600_000).toISOString();
+  if (regua.gatilho === 'dias_antes_vencimento' && alvo?.vencimento) {
+    // Último momento útil: a véspera do vencimento, no fim do dia.
+    const limite = `${somarDias(alvo.vencimento, -1)}T23:59:59.000Z`;
+    return porHoras < limite ? porHoras : limite;
+  }
+  return porHoras;
+}
+
 /**
  * Decide o que fazer com um destinatário, SEM mandar nada.
  * É a mesma função usada na simulação e no envio de verdade — o que o painel mostra é o que acontece.
@@ -135,6 +164,25 @@ function decidir(db, empresa, regua, alvo, { precos }) {
   if (regua.preferir_janela && aberta && wa.janelaAberta(aberta) && regua.texto_janela?.trim()) {
     return { acao: 'janela', motivo: 'a janela de 24 h está aberta: vai como serviço, sem custo', economia: precoTemplate, contato, conversa: aberta };
   }
+
+  // Tem folga de prazo? Então não paga agora: espera o cliente escrever. A maioria escreve.
+  const prazo = regua.texto_janela?.trim() ? prazoDeEspera(regua, alvo) : null;
+  if (prazo && prazo > agora()) {
+    return { acao: 'esperar', prazo, motivo: `tem folga até ${prazo.slice(0, 16).replace('T', ' ')}: espera a janela abrir antes de pagar`,
+      economia: precoTemplate, contato, conversa: aberta };
+  }
+
+  // Um recado pago por dia por pessoa. Duas réguas que caem no mesmo cliente no mesmo dia
+  // não podem pagar duas vezes pelo mesmo assunto.
+  const maxPagas = Number(lerConfig(db).wa_max_pagas_contato_dia ?? 1);
+  if (contato && maxPagas > 0 && pagasHoje(db, contato.id) >= maxPagas) {
+    return { acao: 'pular', motivo: `já recebeu ${maxPagas === 1 ? 'uma mensagem paga' : `${maxPagas} mensagens pagas`} hoje`, economia: precoTemplate, contato, conversa: aberta };
+  }
+
+  // O freio do orçamento. Mensagem grátis nunca passa por aqui.
+  const freio = orcamento.permite(db, empresa.id, regua.categoria);
+  if (!freio.ok) return { acao: 'pular', motivo: freio.motivo, economia: precoTemplate, contato, conversa: aberta };
+
   return { acao: 'template', motivo: null, custo: precoTemplate, contato, conversa: aberta };
 }
 
@@ -145,7 +193,7 @@ function decidir(db, empresa, regua, alvo, { precos }) {
 async function simular(db, empresa, regua, { referencia = hoje(), limite = 5000 } = {}) {
   const precos = custo.precos(db);
   const alvos = await destinatarios(db, empresa, regua, { referencia, limite });
-  const contagem = { template: 0, janela: 0, pular: 0 };
+  const contagem = { template: 0, janela: 0, pular: 0, esperar: 0 };
   const motivos = new Map();
   let gasto = 0;
   let economia = 0;
@@ -162,6 +210,7 @@ async function simular(db, empresa, regua, { referencia = hoje(), limite = 5000 
     vao_receber: contagem.template + contagem.janela,
     por_template: contagem.template,
     pela_janela: contagem.janela,
+    esperando: contagem.esperar,
     pulados: contagem.pular,
     motivos: [...motivos.entries()].map(([motivo, quantos]) => ({ motivo, quantos })).sort((a, b) => b.quantos - a.quantos),
     custo_milesimos: gasto,
@@ -181,7 +230,7 @@ async function executar(db, empresa, regua, { referencia = hoje(), limite = 5000
   const precos = custo.precos(db);
   const ixc = ixcTools.clienteIxc(db, empresa.id);
   const alvos = await destinatarios(db, empresa, regua, { referencia, limite });
-  const resultado = { enviados: 0, pela_janela: 0, pulados: 0, falhas: 0, custo_milesimos: 0, economia_milesimos: 0, teto_atingido: false };
+  const resultado = { enviados: 0, pela_janela: 0, esperando: 0, pulados: 0, falhas: 0, custo_milesimos: 0, economia_milesimos: 0, teto_atingido: false };
 
   for (const alvo of alvos) {
     // Confere no IXC se a fatura continua em aberto: cobrar quem já pagou custa dinheiro e irrita.
@@ -201,6 +250,30 @@ async function executar(db, empresa, regua, { referencia = hoje(), limite = 5000
       registrar(db, { empresa, regua, alvo, contato: d.contato, status: 'pulado', motivo: d.motivo, economia: d.economia });
       resultado.pulados++;
       resultado.economia_milesimos += d.economia;
+      continue;
+    }
+
+    // Sala de espera: o aviso tem folga, então nada é pago agora. Se o cliente escrever
+    // antes do prazo, sai de graça; se não escrever, o varredor paga o template no fim.
+    if (d.acao === 'esperar') {
+      try {
+        const guardada = transacao(db, () => {
+          const contato = d.contato ?? conversas.garantirContato(db, empresa.id, alvo.telefone, null);
+          db.prepare('UPDATE contatos SET codigo_externo = COALESCE(codigo_externo, ?), nome = COALESCE(nome, ?) WHERE id = ?')
+            .run(alvo.cliente_id, alvo.nome, contato.id);
+          const pend = pendencias.guardar(db, {
+            empresa, regua, contato, alvo, prazo: d.prazo,
+            texto: preencherTexto(regua.texto_janela, alvo),
+          });
+          if (pend) registrar(db, { empresa, regua, alvo, contato, status: 'esperando', motivo: d.motivo });
+          return pend;
+        });
+        if (guardada) resultado.esperando++;
+        else resultado.pulados++;
+      } catch (err) {
+        registrar(db, { empresa, regua, alvo, contato: d.contato, status: 'falhou', motivo: String(err.message).slice(0, 300) });
+        resultado.falhas++;
+      }
       continue;
     }
 
@@ -269,6 +342,91 @@ const registrar = (db, { empresa, regua, alvo, contato = null, conversa = null, 
     .run(empresa.id, regua.id, contato?.id ?? null, conversa?.id ?? null, mensagemId, alvo?.fatura_id ?? null,
       categoria, status, motivo, c, economia, agora());
 
+/**
+ * O prazo da espera acabou. Para cada pendência vencida, a última chance de não pagar:
+ * a janela pode ter aberto agora, a fatura pode ter sido paga, o orçamento pode ter acabado.
+ * Só o que sobrar vira template pago — e aí foi pago no último momento útil, não três dias antes.
+ */
+async function pagarVencidas(db, { limite = 500 } = {}) {
+  const precos = custo.precos(db);
+  const resultado = { pagas: 0, pela_janela: 0, canceladas: 0, falhas: 0, custo_milesimos: 0, economia_milesimos: 0 };
+
+  for (const p of pendencias.vencidas(db).slice(0, limite)) {
+    const empresa = db.prepare("SELECT * FROM empresas WHERE id = ? AND status = 'ativa'").get(p.empresa_id);
+    const contato = db.prepare('SELECT * FROM contatos WHERE id = ?').get(p.contato_id);
+    const regua = db.prepare('SELECT * FROM reguas WHERE id = ?').get(p.regua_id);
+    const preco = precos[regua?.categoria ?? 'utilidade'] ?? 0;
+    const desistir = (motivo) => {
+      pendencias.cancelar(db, p.id, motivo);
+      registrar(db, { empresa: { id: p.empresa_id }, regua: { id: p.regua_id }, alvo: { fatura_id: p.referencia }, contato, status: 'pulado', motivo, economia: preco });
+      resultado.canceladas++;
+      resultado.economia_milesimos += preco;
+    };
+
+    if (!empresa || !contato || !regua) { desistir('a empresa, o contato ou a régua não existe mais'); continue; }
+    if (!regua.ativa) { desistir('a régua foi desligada enquanto o aviso esperava'); continue; }
+    if (contato.bloqueado) { desistir('contato bloqueado'); continue; }
+    if (!contato.aceita_ativo) { desistir('o cliente pediu para não receber mensagens ativas'); continue; }
+
+    // A janela pode ter aberto no último minuto: então sai de graça, e nem precisa do template.
+    const deGraca = pendencias.aproveitarJanela(db, contato.id);
+    if (deGraca) {
+      resultado.pela_janela += deGraca.pendencias;
+      resultado.economia_milesimos += deGraca.economia_milesimos;
+      continue;
+    }
+
+    // A fatura pode ter sido paga enquanto o aviso esperava.
+    const dados = (() => { try { return JSON.parse(p.dados); } catch { return {}; } })();
+    if (regua.pular_se_pago && dados.fatura_id) {
+      const ixc = ixcTools.clienteIxc(db, empresa.id);
+      let aberta = null;
+      try { aberta = ixc ? await ixc.faturaEmAberto(dados.fatura_id) : null; } catch { aberta = null; }
+      if (aberta === false) { desistir('a fatura foi paga enquanto o aviso esperava'); continue; }
+    }
+
+    const maxPagas = Number(lerConfig(db).wa_max_pagas_contato_dia ?? 1);
+    if (maxPagas > 0 && pagasHoje(db, contato.id) >= maxPagas) { desistir(`já recebeu ${maxPagas === 1 ? 'uma mensagem paga' : `${maxPagas} mensagens pagas`} hoje`); continue; }
+
+    const freio = orcamento.permite(db, empresa.id, regua.categoria);
+    if (!freio.ok) { desistir(freio.motivo); continue; }
+
+    const numero = db.prepare('SELECT * FROM numeros WHERE empresa_id = ? AND ativo = 1 ORDER BY id LIMIT 1').get(empresa.id);
+    if (!numero) { desistir('a empresa não tem número de WhatsApp ativo'); continue; }
+
+    try {
+      const enviado = transacao(db, () => {
+        const conversa = conversas.abertaDoContato(db, contato.id) ?? abrirParaAviso(db, { empresa, numero, contato, regua });
+        const atual = db.prepare('SELECT * FROM conversas WHERE id = ?').get(conversa.id);
+        const corpo = wa.corpos.template('', regua.template, regua.idioma, montarParametros(regua, dados));
+        const { to: _to, recipient_type: _rt, ...payload } = corpo;
+        const mensagemId = envio.enfileirar(db, atual, {
+          autor: 'sistema', tipo: 'template', texto: `[${regua.nome}] template ${regua.template}`,
+          payload, categoriaTemplate: regua.categoria,
+        });
+        const m = db.prepare('SELECT categoria, custo_milesimos FROM mensagens WHERE id = ?').get(mensagemId);
+        const disparo = db.prepare(`INSERT INTO disparos
+            (empresa_id, regua_id, contato_id, conversa_id, mensagem_id, referencia, categoria, status, motivo, custo_milesimos, economia_milesimos, criado_em)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'enviado', ?, ?, 0, ?)`)
+          .run(empresa.id, regua.id, contato.id, atual.id, mensagemId, p.referencia, m.categoria,
+            'o prazo da espera acabou sem o cliente escrever: pagou o template', m.custo_milesimos, agora());
+        db.prepare(`UPDATE pendencias SET status = 'entregue', resolucao = 'template', resolvida_em = ?, disparo_id = ? WHERE id = ?`)
+          .run(agora(), Number(disparo.lastInsertRowid), p.id);
+        return Number(m.custo_milesimos);
+      });
+      resultado.pagas++;
+      resultado.custo_milesimos += enviado;
+    } catch (err) {
+      db.prepare(`UPDATE pendencias SET status = 'vencida', resolucao = ?, resolvida_em = ? WHERE id = ?`)
+        .run(String(err.message).slice(0, 300), agora(), p.id);
+      registrar(db, { empresa, regua, alvo: dados, contato, status: 'falhou', motivo: String(err.message).slice(0, 300) });
+      resultado.falhas++;
+    }
+  }
+  envio.girar(db);
+  return resultado;
+}
+
 /** As réguas que devem rodar agora (hora e dia da semana batendo, e ainda não rodaram hoje). */
 function devemRodar(db, instante = new Date()) {
   const l = local(instante);
@@ -316,6 +474,7 @@ function salvar(db, empresaId, dados, { id = null } = {}) {
     hora: d.hora === undefined ? (atual.hora ?? '09:00') : v.horario(d.hora, 'a hora do disparo'),
     dias_semana: d.dias_semana === undefined ? (atual.dias_semana ?? '0111110') : v.diasSemana(d.dias_semana),
     preferir_janela: bool('preferir_janela', 1),
+    esperar_janela_h: d.esperar_janela_h === undefined ? (atual.esperar_janela_h ?? 0) : v.inteiro(d.esperar_janela_h, 'as horas de espera pela janela', { min: 0, max: 168 }),
     pular_se_conversa_aberta: bool('pular_se_conversa_aberta', 1),
     pular_se_pago: bool('pular_se_pago', 1),
     repetir_apos_dias: d.repetir_apos_dias === undefined ? (atual.repetir_apos_dias ?? 5) : v.inteiro(d.repetir_apos_dias, 'o intervalo entre repetições', { min: 0, max: 365 }),
@@ -324,6 +483,7 @@ function salvar(db, empresaId, dados, { id = null } = {}) {
   };
   v.exigir(campos.nome && campos.template, 'Informe o nome da régua e o template aprovado na Meta.');
   if (campos.preferir_janela) v.exigir(campos.texto_janela, 'Para usar a janela de 24 h, escreva o texto livre equivalente — é ele que sai de graça.');
+  if (campos.esperar_janela_h) v.exigir(campos.texto_janela, 'Para esperar pela janela, escreva o texto livre equivalente — é ele que sai de graça quando o cliente escrever.');
 
   const colunas = Object.keys(campos);
   if (id) {
@@ -335,4 +495,4 @@ function salvar(db, empresaId, dados, { id = null } = {}) {
   return buscar(db, empresaId, novo);
 }
 
-module.exports = { CAMPOS, listarCampos, listar, buscar, salvar, simular, executar, decidir, destinatarios, dataAlvo, devemRodar, historico, montarParametros, preencherTexto };
+module.exports = { CAMPOS, listarCampos, listar, buscar, salvar, simular, executar, decidir, destinatarios, dataAlvo, devemRodar, historico, montarParametros, preencherTexto, prazoDeEspera, pagasHoje, pagarVencidas };

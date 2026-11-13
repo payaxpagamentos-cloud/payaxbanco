@@ -3,8 +3,9 @@
 const { agora } = require('./db');
 const rastreador = require('./conectores/rastreador');
 const downdetector = require('./conectores/downdetector');
+const atendimento = require('./conectores/atendimento');
 
-const CONECTORES = { rastreador, downdetector };
+const CONECTORES = { rastreador, downdetector, atendimento };
 
 /**
  * Agenda das coletas: a cada 15 s, roda as integrações habilitadas cuja próxima tentativa chegou (cada coleta define a

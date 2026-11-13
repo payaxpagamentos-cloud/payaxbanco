@@ -813,6 +813,22 @@ label.campo{ gap: 5px }
 }
 .tabela tr.clicavel{ transition: background .14s var(--ease) }
 
+/* ---------------------------------------------------------------------------
+   Orçamento da conta da Meta
+   A barra existe para responder de longe: já passou da metade?
+   --------------------------------------------------------------------------- */
+.linha-orcamento{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:8px }
+.barra-orcamento{ height:10px; border-radius:999px; background:var(--surface-2); overflow:hidden; border:1px solid var(--borda) }
+.barra-orcamento .preenchida{ height:100%; border-radius:999px; transition:width var(--ease, .2s ease) }
+.barra-orcamento .preenchida.verde{ background:var(--ok) }
+.barra-orcamento .preenchida.azul{ background:var(--azul) }
+.barra-orcamento .preenchida.roxo{ background:var(--roxo, var(--azul)) }
+.barra-orcamento .preenchida.laranja{ background:var(--aviso) }
+.barra-orcamento .preenchida.vermelho{ background:var(--erro) }
+.erro-texto{ color:var(--erro) }
+/* Mês cuja fatura da Meta não bate com a nossa conta: tem que saltar aos olhos. */
+.tabela tr.linha-divergente td{ background:var(--erro-bg) }
+
 /* ==========================================================================
    ACABAMENTO — vidro em todas as superfícies
    Vem por último de propósito: assim vale sobre as telas criadas depois do

@@ -3,6 +3,7 @@
 const { agora, transacao } = require('../db');
 const conversas = require('./conversas');
 const envio = require('./envio');
+const pendencias = require('./pendencias');
 const midia = require('./midia');
 const wa = require('./whatsapp');
 const { atender } = require('../ia/atendente');
@@ -145,8 +146,17 @@ async function receberMensagem(db, { numero, empresa, mensagem, perfil }) {
       mensagem: mensagemGravada, idResposta: dados.idResposta ?? null,
     });
   }
+  // A janela acabou de abrir: o que estava na sala de espera sai agora, de graça, depois da
+  // resposta. É o mesmo aviso que custaria R$ 0,035 em template — e vai junto, sem incomodar.
+  let carona = null;
+  try {
+    carona = pendencias.aproveitarJanela(db, preparo.contato.id, { prefixo: 'Aproveitando que você está por aqui:' });
+  } catch (err) {
+    console.error('[ZOE Atende] Falha ao entregar aviso pela janela:', err);
+  }
+
   envio.girar(db);
-  return { conversa_id: preparo.conversa.id, ...resultado };
+  return { conversa_id: preparo.conversa.id, ...resultado, ...(carona ? { avisos_pela_janela: carona.pendencias } : {}) };
 }
 
 /**

@@ -199,7 +199,21 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .tabela tr.clicavel { cursor: pointer; }
 .tabela tr.clicavel:hover td { background: #fafbf8; }
 .tabela .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Texto secundário. Estava escrito só dentro da tabela, mas as telas já o usavam
+   solto (admin, chamados): fora dela o texto saía com o mesmo peso do principal. */
+.fraco { color: var(--texto-3); font-size: 12.5px; }
 .tabela .fraco { color: var(--texto-3); font-size: 12.5px; }
+.texto-ok { color: var(--verde); }
+.texto-erro { color: var(--vermelho); }
+.linha-entre { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+/* Quanto do orçamento do mês já foi. Tem que ser legível de longe, sem ler número. */
+.barra-custo { height: 10px; border-radius: 999px; background: var(--azul-suave); border: 1px solid var(--borda); overflow: hidden; margin: 6px 0 10px; }
+.barra-custo .cheia { height: 100%; border-radius: 999px; background: var(--verde); transition: width .2s ease; }
+.barra-custo .cheia.info { background: var(--verde-vivo); }
+.barra-custo .cheia.aviso { background: var(--laranja); }
+.barra-custo .cheia.erro { background: var(--vermelho); }
+.barra-custo .cheia.neutra { background: var(--borda-forte); }
+.stats.compactos { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 14px; }
 .tabela .forte { font-weight: 600; }
 .paginacao { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; font-size: 12.5px; color: var(--texto-3); border-top: 1px solid var(--borda); }
 
@@ -360,7 +374,7 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .busca-topo { width: 200px; }
 }
 @media (max-width: 1100px) {
-  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats, .stats.compactos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grade.tres { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grade.principal-lateral { grid-template-columns: minmax(0, 1fr); }
   .modo-tv .tv-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }

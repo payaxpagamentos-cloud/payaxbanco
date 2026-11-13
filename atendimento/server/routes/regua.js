@@ -5,6 +5,9 @@ const { auditar } = require('../db');
 const { exigirAdminEmpresa } = require('../auth');
 const reguaLib = require('../lib/regua');
 const custo = require('../lib/custo');
+const orcamento = require('../lib/orcamento');
+const pendencias = require('../lib/pendencias');
+const fechamento = require('../lib/fechamento');
 const { hoje, inicioMes } = require('../lib/datas');
 const v = require('../lib/validacao');
 
@@ -86,6 +89,70 @@ module.exports = function rotasRegua(db) {
           WHERE r.empresa_id = ? GROUP BY r.id ORDER BY custo_milesimos DESC`)
           .all(require('../lib/datas').intervalo(de, ate)[0], req.empresa.id),
       });
+    } catch (err) { next(err); }
+  });
+
+  // ---------- Sala de espera da janela ----------
+  /** O que está esperando o cliente escrever em vez de virar template pago. */
+  r.get('/pendencias', (req, res, next) => {
+    try { res.json(pendencias.resumo(db, req.empresa.id)); } catch (err) { next(err); }
+  });
+
+  /** Paga agora o que já venceu o prazo de espera (o agendador faz isso de hora em hora). */
+  r.post('/pendencias/varrer', exigirAdminEmpresa, async (req, res, next) => {
+    try {
+      const resultado = await reguaLib.pagarVencidas(db);
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'varreu a sala de espera', detalhe: resultado, ip: req.ip });
+      res.json(resultado);
+    } catch (err) { next(err); }
+  });
+
+  // ---------- Orçamento do mês ----------
+  r.get('/orcamento', (req, res, next) => {
+    try {
+      res.json({ ...orcamento.estado(db, req.empresa.id), avisos: orcamento.avisos(db, req.empresa.id) });
+    } catch (err) { next(err); }
+  });
+
+  r.put('/orcamento', exigirAdminEmpresa, (req, res, next) => {
+    try {
+      const estado = orcamento.definir(db, req.empresa.id, req.body ?? {});
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'definiu o orçamento da Meta',
+        detalhe: { total: estado.orcamento_milesimos, marketing: estado.orcamento_marketing_milesimos }, ip: req.ip });
+      res.json(estado);
+    } catch (err) { next(err); }
+  });
+
+  // ---------- Fechamento mensal e conferência com a fatura ----------
+  r.get('/fechamentos', (req, res, next) => {
+    try { res.json(fechamento.serie(db, req.empresa.id, { meses: Number(req.query.meses) || 12 })); } catch (err) { next(err); }
+  });
+
+  r.post('/fechamentos/:mes/fechar', exigirAdminEmpresa, (req, res, next) => {
+    try {
+      const f = fechamento.fechar(db, req.empresa.id, String(req.params.mes));
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'fechou o mês da conta da Meta', alvo: f.mes, detalhe: { gasto_milesimos: f.gasto_milesimos }, ip: req.ip });
+      res.json(f);
+    } catch (err) { next(err); }
+  });
+
+  /** A gestão lança o valor da fatura da Meta; o sistema mostra a diferença contra o que contou. */
+  r.post('/fechamentos/:mes/fatura', exigirAdminEmpresa, (req, res, next) => {
+    try {
+      const f = fechamento.conferir(db, req.empresa.id, String(req.params.mes), {
+        valor_centavos: req.body?.valor_centavos, observacao: req.body?.observacao, usuario: req.usuario,
+      });
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'lançou a fatura da Meta', alvo: f.mes,
+        detalhe: { fatura_centavos: f.fatura_meta_centavos, diferenca_centavos: f.diferenca_centavos }, ip: req.ip });
+      res.json(f);
+    } catch (err) { next(err); }
+  });
+
+  r.post('/fechamentos/:mes/reabrir', exigirAdminEmpresa, (req, res, next) => {
+    try {
+      const f = fechamento.reabrir(db, req.empresa.id, String(req.params.mes));
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'reabriu o mês da conta da Meta', alvo: f.mes, ip: req.ip });
+      res.json(f);
     } catch (err) { next(err); }
   });
 

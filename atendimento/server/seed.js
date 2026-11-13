@@ -419,6 +419,63 @@ function semear(db) {
       }
     }
 
+    // ---------- Orçamento, sala de espera e meses fechados ----------
+    // Teto de R$ 60,00/mês: dá para a tela mostrar a barra num nível de atenção de verdade.
+    db.prepare('UPDATE empresas SET orcamento_milesimos = ?, orcamento_marketing_milesimos = ? WHERE id = ?')
+      .run(60_000, 10_000, empresa.id);
+
+    // Avisos esperando a janela abrir: nada foi pago por eles ainda.
+    for (let i = 0; i < 14; i++) {
+      const contato = sorteio(contatos);
+      const vence = somar(quando(-inteiro(1, 4)), 0).slice(0, 10);
+      try {
+        db.prepare(`INSERT INTO pendencias (empresa_id, regua_id, contato_id, referencia, dados, texto, prazo, status, criada_em)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'esperando', ?)`)
+          .run(empresa.id, sorteio([regua, reguaAtraso]), contato.id, `fat-${900 + i}`,
+            JSON.stringify({ nome: contato.nome, vencimento: vence, valor_centavos: 12990 }),
+            `Sua fatura de R$ 129,90 vence em ${vence.split('-').reverse().join('/')}. Quer que eu mande o PIX por aqui?`,
+            quando(-inteiro(1, 3), 9, 0), quando(inteiro(0, 2)));
+      } catch { /* mesma régua e contato: a chave única já barrou */ }
+    }
+    // E alguns que já foram salvos pela janela, para o indicador não nascer zerado.
+    for (let i = 0; i < 9; i++) {
+      const contato = sorteio(contatos);
+      try {
+        db.prepare(`INSERT INTO pendencias (empresa_id, regua_id, contato_id, referencia, dados, texto, prazo, status, resolucao, resolvida_em, criada_em)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'entregue', 'janela', ?, ?)`)
+          .run(empresa.id, regua, contato.id, `fat-salva-${i}`, '{}', 'Aviso entregue pela janela.',
+            quando(5 + i), quando(6 + i), quando(8 + i));
+      } catch { /* idem */ }
+    }
+
+    // Três meses fechados: um conferido e batendo, um conferido e divergente, um sem conferência.
+    const MESES_FECHADOS = [
+      { atras: 3, gasto: 41_300, fatura: 4130, obs: null },
+      { atras: 2, gasto: 52_800, fatura: 6150, obs: 'A Meta reclassificou parte dos avisos como marketing.' },
+      { atras: 1, gasto: 38_900, fatura: null, obs: null },
+    ];
+    for (const m of MESES_FECHADOS) {
+      const d = new Date(quando(0));
+      d.setUTCDate(1);
+      d.setUTCMonth(d.getUTCMonth() - m.atras);
+      const mes = d.toISOString().slice(0, 7);
+      const utilidades = Math.round(m.gasto / 35);
+      const servicos = utilidades * 4;
+      const economia = Math.round(m.gasto * 1.3);
+      db.prepare(`INSERT INTO custos_mensais
+          (empresa_id, mes, mensagens, por_categoria, gasto_milesimos, economia_milesimos, sem_otimizacao_milesimos,
+           orcamento_milesimos, fatura_meta_centavos, conferido_em, conferido_por, observacao, fechado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(empresa.id, mes, utilidades + servicos, JSON.stringify([
+          { categoria: 'servico', nome: 'Serviço', preco_milesimos: 0, mensagens: servicos, custo_milesimos: 0 },
+          { categoria: 'utilidade', nome: 'Utilidade', preco_milesimos: 35, mensagens: utilidades, custo_milesimos: m.gasto },
+          { categoria: 'autenticacao', nome: 'Autenticação', preco_milesimos: 30, mensagens: 0, custo_milesimos: 0 },
+          { categoria: 'marketing', nome: 'Marketing', preco_milesimos: 320, mensagens: 0, custo_milesimos: 0 },
+        ]), m.gasto, economia, m.gasto + economia, 60_000,
+        m.fatura, m.fatura ? quando(m.atras * 28 - 20) : null, m.fatura ? 'Beatriz Nunes' : null, m.obs,
+        quando(m.atras * 28 - 25));
+    }
+
     // Chamados abertos pela ZOE.
     for (const [i, contato] of contatos.slice(0, 6).entries()) {
       const criadoEm = quando(inteiro(0, 20));
@@ -434,6 +491,8 @@ function semear(db) {
     console.log(`             Ouvidoria: ${OUVIDORIAS.length} casos, sendo ${OUVIDORIAS.filter((o) => o[0] === 'cancelamento').length} de cancelamento.`);
     console.log(`             Régua: ${disparosTotais.enviados} enviadas (${disparosTotais.janela} pela janela, de graça) e ${disparosTotais.pulados} puladas.`);
     console.log(`             Conta da Meta no período: gasto R$ ${(disparosTotais.custo / 1000).toFixed(2)} · economia R$ ${(disparosTotais.economia / 1000).toFixed(2)}.`);
+    console.log(`             Orçamento: R$ 60,00/mês. Sala de espera: ${db.prepare("SELECT COUNT(*) n FROM pendencias WHERE status = 'esperando'").get().n} avisos esperando a janela.`);
+    console.log(`             Fechamentos: ${db.prepare('SELECT COUNT(*) n FROM custos_mensais').get().n} meses, 1 divergente contra a fatura da Meta.`);
     console.log(`             Histórico: ${totais.ia} resolvidas pela IA, ${totais.humano} transferidas, ${totais.abandono} abandonadas e ${totais.abertas} em aberto agora.`);
   });
   return true;

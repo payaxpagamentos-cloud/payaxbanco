@@ -163,6 +163,62 @@ module.exports = function rotasIntegracao(db) {
     } catch (err) { next(err); }
   });
 
+  // ---------- Custo da conta da Meta (é por aqui que o Manager lê) ----------
+  /**
+   * O custo do WhatsApp num formato que a gestão consome direto: o mês corrente em aberto, os
+   * meses fechados, o orçamento e a economia. Valores em milésimos de real (R$ 0,035 = 35) e
+   * também em centavos, para quem só quer somar na planilha.
+   */
+  r.get('/custos', (req, res, next) => {
+    try {
+      const custo = require('../lib/custo');
+      const orcamento = require('../lib/orcamento');
+      const fechamento = require('../lib/fechamento');
+      const pendencias = require('../lib/pendencias');
+      const { hoje, inicioMes } = require('../lib/datas');
+
+      const meses = Math.min(60, Math.max(1, Number(req.query.meses) || 12));
+      const mesCorrente = custo.resumo(db, req.empresa.id, { de: inicioMes(), ate: hoje() });
+      const o = orcamento.estado(db, req.empresa.id);
+      const espera = pendencias.resumo(db, req.empresa.id);
+
+      res.json({
+        empresa: req.empresa.nome,
+        gerado_em: agora(),
+        moeda: 'BRL',
+        // Preço por mensagem entregue, por categoria da Meta, como cadastrado na plataforma.
+        precos_milesimos: custo.precos(db),
+        mes_corrente: {
+          mes: hoje().slice(0, 7),
+          mensagens: mesCorrente.mensagens,
+          por_categoria: mesCorrente.por_categoria,
+          gasto_milesimos: mesCorrente.gasto_milesimos,
+          gasto_centavos: Math.round(mesCorrente.gasto_milesimos / 10),
+          economia_milesimos: mesCorrente.economia_milesimos,
+          sem_otimizacao_milesimos: mesCorrente.sem_otimizacao_milesimos,
+          projecao_milesimos: o.projecao_milesimos,
+          projecao_centavos: Math.round(o.projecao_milesimos / 10),
+        },
+        orcamento: {
+          mensal_milesimos: o.orcamento_milesimos,
+          marketing_milesimos: o.orcamento_marketing_milesimos,
+          gasto_milesimos: o.gasto_milesimos,
+          restante_milesimos: o.restante_milesimos,
+          percentual: o.percentual,
+          status: o.status,
+          projecao_estoura: o.projecao_estoura,
+          avisos: orcamento.avisos(db, req.empresa.id),
+        },
+        economia_em_andamento: {
+          avisos_esperando_a_janela: espera.esperando,
+          valor_em_risco_milesimos: espera.em_risco_milesimos,
+          avisos_salvos_pela_janela: espera.salvas_pela_janela,
+        },
+        meses: fechamento.serie(db, req.empresa.id, { meses }).meses,
+      });
+    } catch (err) { next(err); }
+  });
+
   r.get('/saude', (req, res) => res.json({ ok: true, empresa: req.empresa.nome }));
 
   r.use((_req, _res, next) => next(new ErroNegocio('Rota da integração não encontrada.', 404)));

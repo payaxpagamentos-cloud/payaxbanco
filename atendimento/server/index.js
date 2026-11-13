@@ -5,6 +5,8 @@ const { abrir } = require('./db');
 const { criarApp } = require('./app');
 const { manutencao } = require('./lib/manutencao');
 const regua = require('./lib/regua');
+const orcamento = require('./lib/orcamento');
+const fechamento = require('./lib/fechamento');
 const { processarFila } = require('./lib/envio');
 
 const db = abrir();
@@ -21,6 +23,7 @@ setInterval(() => {
   manutencao(db).catch((err) => console.error('[ZOE Atende] Falha na manutenção:', err.message));
 }, 60_000).unref();
 
+
 // Réguas de mensagens ativas: cada uma roda na hora que a empresa marcou, uma vez por dia.
 setInterval(async () => {
   for (const r of regua.devemRodar(db)) {
@@ -28,7 +31,7 @@ setInterval(async () => {
     try {
       const resultado = await regua.executar(db, empresa, r);
       console.log(`[ZOE Atende] Régua "${r.nome}" (${r.empresa_nome}): ${resultado.enviados} enviada(s), `
-        + `${resultado.pela_janela} pela janela, ${resultado.pulados} pulada(s), `
+        + `${resultado.pela_janela} pela janela, ${resultado.esperando} esperando a janela, ${resultado.pulados} pulada(s), `
         + `custo ${(resultado.custo_milesimos / 1000).toFixed(2)}, economia ${(resultado.economia_milesimos / 1000).toFixed(2)}`
         + `${resultado.teto_atingido ? ' — PAROU NO TETO DE GASTO' : ''}`);
     } catch (err) {
@@ -36,3 +39,39 @@ setInterval(async () => {
     }
   }
 }, 60_000).unref();
+
+// A sala de espera da janela: de dez em dez minutos, o que venceu o prazo é pago — e só o que
+// ainda fizer sentido pagar. Até aqui, cada aviso que esperou e saiu pela janela foi de graça.
+setInterval(() => {
+  regua.pagarVencidas(db)
+    .then((r) => {
+      if (r.pagas || r.pela_janela || r.canceladas) {
+        console.log(`[ZOE Atende] Sala de espera: ${r.pela_janela} saiu pela janela (grátis), ${r.pagas} pagou template, `
+          + `${r.canceladas} cancelada(s) — custo ${(r.custo_milesimos / 1000).toFixed(2)}, economia ${(r.economia_milesimos / 1000).toFixed(2)}`);
+      }
+    })
+    .catch((err) => console.error('[ZOE Atende] Falha ao varrer a sala de espera:', err.message));
+}, 600_000).unref();
+
+// Orçamento: marca 50%, 80% e 100% uma vez por mês, para a gestão ver antes de estourar.
+// E no dia 1º fecha o mês anterior de todas as empresas, para o número parar de se mover.
+setInterval(() => {
+  try {
+    for (const e of db.prepare("SELECT id, nome FROM empresas WHERE status = 'ativa'").all()) {
+      for (const aviso of orcamento.conferirMarcos(db, e.id)) {
+        console.log(`[ZOE Atende] Orçamento de "${e.nome}": ${aviso.marco}% do mês `
+          + `(${(aviso.gasto_milesimos / 1000).toFixed(2)} de ${(aviso.orcamento_milesimos / 1000).toFixed(2)})`
+          + `${aviso.marco === 100 ? ' — a partir daqui só sai mensagem grátis' : ''}`);
+      }
+    }
+    const hojeData = require('./lib/datas').hoje();
+    if (hojeData.slice(8, 10) === '01') {
+      for (const f of fechamento.fecharTodas(db)) {
+        if (f.erro) console.error(`[ZOE Atende] Falha ao fechar o mês de "${f.empresa}":`, f.erro);
+        else if (!f.recalculado) console.log(`[ZOE Atende] Mês ${f.mes} fechado para "${f.empresa}": gasto ${(f.gasto_milesimos / 1000).toFixed(2)}.`);
+      }
+    }
+  } catch (err) {
+    console.error('[ZOE Atende] Falha no controle de orçamento:', err.message);
+  }
+}, 900_000).unref();

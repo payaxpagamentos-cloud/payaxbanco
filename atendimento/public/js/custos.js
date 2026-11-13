@@ -11,7 +11,16 @@ import {
 } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, seletor, filtroPeriodo } from './comum.js';
 
-const reais = (milesimos) => (Number(milesimos ?? 0) / 1000).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+/**
+ * Dinheiro em milésimos de real. Um preço da Meta não cabe em centavos — R$ 0,035 arredondado
+ * para R$ 0,04 esconde exatamente o número que esta tela existe para mostrar. Então valores que
+ * não fecham em centavo redondo saem com três casas.
+ */
+const reais = (milesimos) => {
+  const m = Number(milesimos ?? 0);
+  const casas = m % 10 === 0 ? 2 : 3;
+  return (m / 1000).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: casas, maximumFractionDigits: casas });
+};
 const GATILHOS = {
   dias_antes_vencimento: 'Dias ANTES do vencimento',
   no_vencimento: 'No dia do vencimento',
@@ -24,7 +33,12 @@ const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sáb
 export async function telaCustos(ctx) {
   const abas = el('div', { class: 'abas' });
   const corpo = el('div');
-  const TELAS = { conta: ['A conta da Meta', aConta], reguas: ['Réguas', asReguas] };
+  const TELAS = {
+    conta: ['A conta da Meta', aConta],
+    reguas: ['Réguas', asReguas],
+    espera: ['Sala de espera', aEspera],
+    controle: ['Orçamento e fechamento', oControle],
+  };
   let atual = 'conta';
   const trocar = async (k) => {
     atual = k;
@@ -46,7 +60,11 @@ async function aConta(ctx, alvo) {
   const conteudo = el('div');
 
   const desenhar = async () => {
-    const d = await api.get(`/empresas/${ctx.empresaId}/reguas/custos/resumo${qs(estado)}`);
+    const [d, orc, espera] = await Promise.all([
+      api.get(`/empresas/${ctx.empresaId}/reguas/custos/resumo${qs(estado)}`),
+      api.get(`/empresas/${ctx.empresaId}/reguas/orcamento`),
+      api.get(`/empresas/${ctx.empresaId}/reguas/pendencias`),
+    ]);
     const p = d.projecao;
     const economiaPct = d.sem_otimizacao_milesimos ? (d.economia_milesimos / d.sem_otimizacao_milesimos) * 100 : 0;
 
@@ -56,6 +74,18 @@ async function aConta(ctx, alvo) {
         indicador('Deixou de gastar', reais(d.economia_milesimos), `${porcento(economiaPct)} do que seria a conta cheia`, 'raio', 'verde'),
         indicador('Projeção do mês', reais(p.projecao_milesimos), `dia ${p.dia} de ${p.dias_no_mes}`, 'relogio', 'roxo'),
         indicador('Sem as economias', reais(d.sem_otimizacao_milesimos), 'se tudo virasse template', 'alerta', 'laranja')),
+
+      barraOrcamento(orc),
+
+      espera.esperando
+        ? cartao('Esperando a janela abrir',
+          el('div', { class: 'economia-origens' },
+            origem(`${inteiro(espera.esperando)} aviso(s) na fila`, 'nada foi pago por eles ainda', espera.em_risco_milesimos,
+              'Cada um desses avisos tem prazo. Se o cliente escrever antes, sai de graça pela janela de 24 h; '
+              + 'se o prazo chegar sem ele escrever, aí paga o template. O valor ao lado é o que está em jogo.'),
+            origem('Já salvos pela janela', `${inteiro(espera.salvas_pela_janela)} aviso(s)`, null,
+              'Avisos que esperaram, o cliente escreveu e saíram sem custo.')))
+        : null,
 
       cartao('De onde veio a economia',
         el('div', { class: 'economia-origens' },
@@ -250,3 +280,175 @@ async function asReguas(ctx, alvo) {
 }
 
 export { reais };
+
+// ---------- Orçamento ----------
+
+/** A barra do orçamento: o que foi aprovado, o que já foi e onde o mês termina nesse ritmo. */
+function barraOrcamento(o) {
+  if (!o.orcamento_milesimos) {
+    return cartao('Orçamento do mês',
+      el('p', { class: 'mudo' }, 'Nenhum teto definido. Sem teto, o gasto com a Meta não tem freio — defina um em "Orçamento e fechamento".'));
+  }
+  const cor = { ok: 'verde', atencao: 'laranja', critico: 'laranja', estourado: 'vermelho', sem_teto: 'azul' }[o.status] ?? 'azul';
+  const largura = Math.min(100, o.percentual);
+  return cartao('Orçamento do mês',
+    el('div', { class: 'linha-orcamento' },
+      el('div', {},
+        el('strong', {}, reais(o.gasto_milesimos)),
+        el('span', { class: 'mudo' }, ` de ${reais(o.orcamento_milesimos)} aprovados`)),
+      el('span', { class: `etiqueta ${o.status === 'estourado' ? 'erro' : o.status === 'critico' || o.status === 'atencao' ? 'aviso' : 'ok'}` },
+        `${porcento(o.percentual)} usado`)),
+    el('div', { class: 'barra-orcamento' }, el('div', { class: `preenchida ${cor}`, style: `width:${largura}%` })),
+    el('p', { class: 'pequeno mudo', style: 'margin:8px 0 0' },
+      o.status === 'estourado'
+        ? 'O teto foi atingido: até virar o mês, só sai mensagem grátis (janela de 24 h e serviço). A cobrança não para, ela espera a janela.'
+        : o.projecao_estoura
+          ? `Neste ritmo o mês fecha em ${reais(o.projecao_milesimos)} e estoura o teto no dia ${Math.max(1, Math.floor(o.dias_no_mes * (o.orcamento_milesimos / Math.max(1, o.projecao_milesimos))))}.`
+          : `Neste ritmo o mês fecha em ${reais(o.projecao_milesimos)}, dentro do teto.`),
+    o.avisos?.length
+      ? el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' },
+        `Marcos avisados: ${o.avisos.map((a) => `${a.marco}% em ${dataHora(a.criado_em).slice(0, 10)}`).join(' · ')}`)
+      : null);
+}
+
+// ---------- Sala de espera ----------
+
+async function aEspera(ctx, alvo) {
+  const conteudo = el('div');
+  const desenhar = async () => {
+    const d = await api.get(`/empresas/${ctx.empresaId}/reguas/pendencias`);
+    limpar(conteudo,
+      el('div', { class: 'indicadores' },
+        indicador('Esperando a janela', inteiro(d.esperando), 'avisos que ainda não custaram nada', 'relogio', 'azul'),
+        indicador('Em jogo', reais(d.em_risco_milesimos), 'o que custaria se ninguém escrever', 'dinheiro', 'laranja'),
+        indicador('Salvos pela janela', inteiro(d.salvas_pela_janela), 'avisos entregues de graça', 'raio', 'verde')),
+
+      cartao('Como funciona',
+        el('p', { class: 'mudo', style: 'margin:0' },
+          'Um aviso de vencimento com três dias de folga não precisa ser pago hoje. Ele fica aqui com um prazo. '
+          + 'Se o cliente escrever qualquer coisa antes do prazo, a janela de 24 h abre e o aviso sai junto da resposta, '
+          + 'de graça. Se o prazo chegar sem ele escrever, aí o template é pago — no último momento útil, e só se '
+          + 'ainda fizer sentido: fatura paga, contato bloqueado ou orçamento esgotado cancelam o envio.')),
+
+      d.fila.length
+        ? cartao('Na fila', tabela(['Cliente', 'Régua', 'Categoria', 'Prazo', '>Vale'], d.fila.map((x) => el('tr', {},
+          td(el('div', {}, el('strong', {}, x.contato_nome ?? x.telefone), el('div', { class: 'pequeno mudo' }, x.telefone))),
+          td(x.regua), td(x.categoria),
+          td(el('div', {}, dataHora(x.prazo), el('div', { class: 'pequeno mudo' }, desde(x.criada_em) + ' esperando'))),
+          td(reais(x.preco_milesimos), 'dir num')))))
+        : cartao('Na fila', vazio('Nenhum aviso esperando agora.')),
+
+      d.por_fim.length
+        ? cartao('Como terminaram', tabela(['Desfecho', '>Quantos'], d.por_fim.map((x) => el('tr', {},
+          td(({ janela: 'Saiu de graça pela janela', template: 'Pagou o template no fim do prazo' })[x.resolucao] ?? x.resolucao ?? '—'),
+          td(inteiro(x.quantos), 'dir num')))))
+        : null);
+  };
+
+  limpar(alvo,
+    acoesTopo(botao('Varrer agora', 'primario', async () => {
+      if (!await confirmar('Varrer a sala de espera', 'O que já passou do prazo será pago agora, se ainda fizer sentido. O resto continua esperando.')) return;
+      const r = await api.post(`/empresas/${ctx.empresaId}/reguas/pendencias/varrer`, {});
+      toast(`${r.pela_janela} saiu pela janela, ${r.pagas} pagou template, ${r.canceladas} cancelada(s).`);
+      await desenhar();
+    })),
+    conteudo);
+  await desenhar();
+}
+
+// ---------- Orçamento e fechamento ----------
+
+/** Reais digitados ("300" ou "300,50") para milésimos de real. */
+const paraMilesimos = (texto) => Math.round(Number(String(texto ?? '').replace(/\./g, '').replace(',', '.')) * 1000);
+const paraCentavos = (texto) => Math.round(Number(String(texto ?? '').replace(/\./g, '').replace(',', '.')) * 100);
+const emReais = (milesimos) => (Number(milesimos ?? 0) / 1000).toFixed(2).replace('.', ',');
+const centavosEmReais = (centavos) => (Number(centavos ?? 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+async function oControle(ctx, alvo) {
+  const conteudo = el('div');
+
+  const desenhar = async () => {
+    const [orc, fech] = await Promise.all([
+      api.get(`/empresas/${ctx.empresaId}/reguas/orcamento`),
+      api.get(`/empresas/${ctx.empresaId}/reguas/fechamentos`),
+    ]);
+
+    limpar(conteudo,
+      barraOrcamento(orc),
+
+      cartao('Teto de gasto',
+        el('div', { class: 'grade-2' },
+          el('div', {},
+            el('p', { class: 'pequeno mudo', style: 'margin:0 0 4px' }, 'Orçamento do mês'),
+            el('strong', { style: 'font-size:20px' }, orc.orcamento_milesimos ? reais(orc.orcamento_milesimos) : 'sem teto'),
+            el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' }, 'Atingido o teto, só sai mensagem grátis.')),
+          el('div', {},
+            el('p', { class: 'pequeno mudo', style: 'margin:0 0 4px' }, 'Dentro dele, para marketing'),
+            el('strong', { style: 'font-size:20px' }, orc.orcamento_marketing_milesimos ? reais(orc.orcamento_marketing_milesimos) : 'sem teto próprio'),
+            el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' }, 'Marketing custa 9× uma utilidade: teto próprio evita que uma campanha coma a cobrança.'))),
+        el('div', { style: 'margin-top:12px' },
+          botao('Definir o teto', 'primario', () => formModal('Orçamento do mês', () => [
+            campo('Quanto esta empresa aceita gastar por mês (R$)', { name: 'total', value: emReais(orc.orcamento_milesimos), placeholder: '0,00', inputmode: 'decimal' }),
+            campo('Dentro disso, no máximo para marketing (R$)', { name: 'marketing', value: emReais(orc.orcamento_marketing_milesimos), placeholder: '0,00', inputmode: 'decimal' }),
+            el('p', { class: 'pequeno mudo' }, 'Zero significa sem teto. O freio vale para mensagem paga; a janela de 24 h e o atendimento nunca param.'),
+          ], async (d) => {
+            await api.put(`/empresas/${ctx.empresaId}/reguas/orcamento`, {
+              orcamento_milesimos: paraMilesimos(d.total || '0'),
+              orcamento_marketing_milesimos: paraMilesimos(d.marketing || '0'),
+            });
+            toast('Orçamento definido.');
+            await desenhar();
+          })))),
+
+      cartao('Mês a mês, conferido com a fatura da Meta',
+        tabela(['Mês', '>Mensagens', '>Nossa conta', '>Fatura da Meta', '>Diferença', 'Situação', ''],
+          fech.meses.map((m) => el('tr', m.divergente ? { class: 'linha-divergente' } : {},
+            td(el('div', {},
+              el('strong', {}, mesLongo(m.mes)),
+              m.em_aberto ? el('div', { class: 'pequeno mudo' }, `em aberto · projeção ${reais(m.projecao_milesimos)}`) : null,
+              m.observacao ? el('div', { class: 'pequeno mudo' }, m.observacao) : null)),
+            td(inteiro(m.mensagens), 'dir num'),
+            td(reais(m.gasto_milesimos), 'dir num'),
+            td(m.fatura_meta_centavos === null ? el('span', { class: 'mudo' }, '—') : centavosEmReais(m.fatura_meta_centavos), 'dir num'),
+            td(m.diferenca_centavos === null ? el('span', { class: 'mudo' }, '—')
+              : el('strong', { class: m.divergente ? 'erro-texto' : 'ok-texto' },
+                `${m.diferenca_centavos > 0 ? '+' : ''}${centavosEmReais(m.diferenca_centavos)}`), 'dir num'),
+            td(m.em_aberto ? el('span', { class: 'etiqueta' }, 'em aberto')
+              : m.conferido_em ? el('span', { class: `etiqueta ${m.divergente ? 'erro' : 'ok'}` }, m.divergente ? 'divergente' : 'conferido')
+                : el('span', { class: 'etiqueta aviso' }, 'fechado, não conferido')),
+            td(el('div', { class: 'linha', style: 'gap:4px;justify-content:flex-end' },
+              m.em_aberto
+                ? botaoIcone('ok', 'Fechar este mês', async () => {
+                  if (!await confirmar('Fechar o mês', `Fechar ${mesLongo(m.mes)} agora congela o número para conferência. Pode fechar de novo enquanto não houver fatura lançada.`)) return;
+                  await api.post(`/empresas/${ctx.empresaId}/reguas/fechamentos/${m.mes}/fechar`, {});
+                  toast('Mês fechado.');
+                  await desenhar();
+                })
+                : m.conferido_em
+                  ? botaoIcone('voltar', 'Reabrir para lançar de novo', async () => {
+                    if (!await confirmar('Reabrir o mês', 'O valor da fatura lançado será apagado e a conta recalculada.')) return;
+                    await api.post(`/empresas/${ctx.empresaId}/reguas/fechamentos/${m.mes}/reabrir`, {});
+                    toast('Mês reaberto.');
+                    await desenhar();
+                  })
+                  : botaoIcone('dinheiro', 'Lançar a fatura da Meta', () => formModal(`Fatura da Meta — ${mesLongo(m.mes)}`, () => [
+                    el('p', { class: 'pequeno mudo' }, `Nossa conta para este mês: ${reais(m.gasto_milesimos)} em ${inteiro(m.mensagens)} mensagem(ns).`),
+                    campo('Valor cobrado pela Meta (R$)', { name: 'valor', required: true, placeholder: '0,00', inputmode: 'decimal' }),
+                    area('Observação', { name: 'observacao', rows: 2, placeholder: 'Nota fiscal, câmbio, ajuste…' }),
+                  ], async (d) => {
+                    await api.post(`/empresas/${ctx.empresaId}/reguas/fechamentos/${m.mes}/fatura`,
+                      { valor_centavos: paraCentavos(d.valor), observacao: d.observacao || null });
+                    toast('Fatura lançada.');
+                    await desenhar();
+                  }))))))),
+        el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' },
+          'Diferença acima de 5% não é arredondamento: ou o preço cadastrado está velho, ou mensagem está saindo por fora do sistema. '
+          + 'Nos dois casos vale conferir antes de pagar.')));
+  };
+
+  limpar(alvo, conteudo);
+  await desenhar();
+}
+
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const mesLongo = (mes) => `${MESES[Number(String(mes).slice(5, 7)) - 1] ?? mes} de ${String(mes).slice(0, 4)}`;

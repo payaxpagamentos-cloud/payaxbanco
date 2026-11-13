@@ -90,6 +90,27 @@ Migrações: aplicadas automaticamente no start, em ordem e numa transação cad
 
 ## Integrações
 
+### ZOE Atende — custo do WhatsApp (conectado de verdade)
+
+Usa a API de integração do `atendimento/` (`atendimento/server/routes/integracao.js`):
+`GET <base>/api/integracao/custos?meses=12` com `X-Api-Key`.
+
+1. No ZOE Atende: **Integrações → Nova chave** (gera `atd_…`).
+2. No Network: **Integrações → ZOE Atende → Configurar**: endereço (ex.: `https://seu-dominio/atendimento`; no mesmo
+   servidor, `http://127.0.0.1:3600` com `NETWORK_CONECTOR_REDE_INTERNA=1`) e a chave. **Testar conexão**.
+3. A conta aparece em **Operação → Custo do WhatsApp**.
+
+A leitura roda a cada 15 minutos (configurável) e regrava o estado do mês e os meses fechados. Os valores chegam em
+milésimos de real, porque o preço da Meta (R$ 0,035 por mensagem de utilidade) não cabe em centavos, e são convertidos
+para centavos aqui — como todo dinheiro neste banco.
+
+A tela responde três coisas: quanto vai custar este mês, quanto deixou de ser gasto, e se a fatura da Meta bateu com a
+conta do sistema. Mês com diferença acima de 5% aparece como **divergente**.
+
+Orçamento estourado e fatura divergente **não** derrubam a integração para "parcial": são problemas do negócio, não da
+conexão, e aparecem na tela de custo, que é onde se age sobre eles. O ZOE Atende é quem decide o que enviar e o que
+segurar; aqui só se olha.
+
 ### Rastreador de Veículos (conectado de verdade)
 
 Usa a API de integração do `rastreador/` (`rastreador/server/routes/integracao.js`):

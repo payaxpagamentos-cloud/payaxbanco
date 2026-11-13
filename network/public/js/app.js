@@ -9,6 +9,7 @@ const MENU = [
     ['rede', 'Rede óptica', 'rede', 'rede.ver', () => import('./telas/rede.js')],
     ['chamados', 'Chamados técnicos', 'chamado', 'chamados.ver', () => import('./telas/chamados.js')],
     ['equipe', 'Equipe e comissões', 'equipe', ['equipe.ver', 'comissoes.ver'], () => import('./telas/equipe.js')],
+    ['custos', 'Custo do WhatsApp', 'dinheiro', 'painel.ver', () => import('./telas/custos.js')],
   ]],
   ['Gestão de frota', [
     ['veiculos', 'Veículos', 'carro', 'frota.ver', () => import('./telas/veiculos.js')],
