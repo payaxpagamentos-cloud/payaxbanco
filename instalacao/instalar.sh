@@ -2,28 +2,26 @@
 # =============================================================================================
 #  ZOE — instalação (e atualização) no servidor
 #
-#  Instala, no mesmo servidor, os três sistemas da ZOE:
-#     ZOE Atende ...... /atendimento   (porta 3600)  WhatsApp + telefone, atendente virtual
-#     ZOE PABX ........ /pabx          (porta 3300)  ramais, filas, URA e a ligação com o Asterisk
-#     Manager Network . /network       (porta 3500)  rede, NOC, chamados técnicos, frota
+#  A ZOE é um sistema só: WhatsApp, telefone (ramais, filas, URA, números, discador), a
+#  atendente virtual, a Ouvidoria e os relatórios — um painel, um login, um banco.
+#  Endereço: https://<domínio>/atendimento/   (serviço "zoe", porta interna 3600)
 #
 #  Uso (como root, de dentro da pasta extraída do pacote):
 #     sudo ./instalacao/instalar.sh --dominio atende.seuprovedor.com.br --email voce@seuprovedor.com.br
 #
 #  Opções:
 #     --dominio D        domínio público (obrigatório na primeira instalação com Nginx)
-#     --email E          e-mail do usuário master dos três sistemas (padrão: master@<domínio>)
+#     --email E          e-mail do usuário master (padrão: master@<domínio>)
 #     --sem-nginx        não mexe no Nginx (use se o proxy for outro: Apache, Caddy, balanceador)
 #     --com-whisper      compila e liga a transcrição de áudio local (whisper.cpp, ~1 GB de RAM)
-#     --modulos "a b"    só alguns: atendimento pabx network (padrão: os três)
 #     --pasta P          onde tudo fica no servidor (padrão: /zoe)
 #
 #  Tudo fica numa pasta só (padrão /zoe):
-#     /zoe/atendimento  /zoe/pabx  /zoe/network   o código e o .env de cada sistema
-#     /zoe/dados                                  os bancos e os arquivos recebidos
-#     /zoe/copias                                 a cópia diária do banco (14 dias)
+#     /zoe/atendimento   o código e o .env
+#     /zoe/dados         o banco e os arquivos recebidos
+#     /zoe/copias        a cópia diária do banco (14 dias)
 #
-#  Rodar de novo ATUALIZA: troca o código e mantém .env, banco, arquivos e senhas.
+#  Rodar de novo ATUALIZA: troca o código e mantém .env, banco, arquivos e senha.
 #  Nada aqui apaga dados.
 # =============================================================================================
 set -euo pipefail
@@ -35,7 +33,7 @@ DOMINIO=""
 EMAIL=""
 NGINX=1
 WHISPER=0
-MODULOS="atendimento pabx network"
+PORTA=3600
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -43,13 +41,13 @@ while [ $# -gt 0 ]; do
     --email) EMAIL="$2"; shift 2 ;;
     --sem-nginx) NGINX=0; shift ;;
     --com-whisper) WHISPER=1; shift ;;
-    --modulos) MODULOS="$2"; shift 2 ;;
     --pasta) DESTINO="${2%/}"; shift 2 ;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
     *) echo "Opção desconhecida: $1 (use --help)"; exit 1 ;;
   esac
 done
 
+CODIGO="$DESTINO/atendimento"
 DADOS="$DESTINO/dados"
 COPIAS="$DESTINO/copias"
 
@@ -60,15 +58,17 @@ aleatorio() { node -e "process.stdout.write(require('crypto').randomBytes($1).to
 
 [ "$(id -u)" -eq 0 ] || falha "Rode como root (sudo)."
 command -v apt-get >/dev/null || falha "Este instalador é para Ubuntu/Debian (apt). Em outro sistema, siga o LEIA-ME manualmente."
-for m in $MODULOS; do [ -d "$ORIGEM/$m/server" ] || falha "Não achei $ORIGEM/$m — rode de dentro da pasta extraída do pacote."; done
-PRIMEIRA=1; [ -d "$DESTINO/atendimento" ] || [ -d "$DESTINO/pabx" ] || [ -d "$DESTINO/network" ] && PRIMEIRA=0
+[ -d "$ORIGEM/atendimento/server" ] || falha "Não achei $ORIGEM/atendimento — rode de dentro da pasta extraída do pacote."
+PRIMEIRA=1; [ -f "$CODIGO/.env" ] && PRIMEIRA=0
+# Atualização sem --dominio: o domínio é o que já está no .env.
+if [ -z "$DOMINIO" ] && [ -f "$CODIGO/.env" ]; then
+  DOMINIO="$(sed -n 's|^ATEND_URL_PUBLICA=https\?://||p' "$CODIGO/.env" | head -1)"
+  [ "$DOMINIO" = SEU-DOMINIO ] && DOMINIO=""
+fi
 if [ "$NGINX" = 1 ] && [ -z "$DOMINIO" ] && [ ! -f /etc/nginx/sites-available/zoe.conf ]; then
   falha "Informe o domínio: --dominio atende.seuprovedor.com.br (ou --sem-nginx)."
 fi
 [ -n "$EMAIL" ] || EMAIL="master@${DOMINIO:-zoe.local}"
-
-declare -A PORTA=([atendimento]=3600 [pabx]=3300 [network]=3500)
-declare -A NOME=([atendimento]="ZOE Atende" [pabx]="ZOE PABX" [network]="Manager Network")
 
 # ---------------------------------------------------------------------------------------------
 passo "Pacotes do sistema"
@@ -93,119 +93,87 @@ echo "Node $(node -v)"
 
 passo "Usuário e pastas"
 id "$USUARIO" >/dev/null 2>&1 || useradd --system --home-dir "$DESTINO" --shell /usr/sbin/nologin "$USUARIO"
-mkdir -p "$DESTINO" "$DADOS" "$COPIAS"
-# A pasta é do root; o usuário zoe só atravessa até o código e os dados de cada sistema.
+mkdir -p "$CODIGO" "$DADOS/atendimento" "$COPIAS"
+# A pasta é do root; o usuário zoe só atravessa até o código e os dados.
 chown root:"$USUARIO" "$DESTINO" "$DADOS"
 chmod 750 "$DESTINO" "$DADOS"
 chown root:root "$COPIAS"
 chmod 700 "$COPIAS"
 # Os scripts de cópia e de verificação leem daqui onde a ZOE está.
-printf 'ZOE_PASTA=%s\nZOE_MODULOS="%s"\n' "$DESTINO" "$MODULOS" > /etc/zoe.conf
+printf 'ZOE_PASTA=%s\n' "$DESTINO" > /etc/zoe.conf
+
+# Instalação antiga com o PABX à parte: ele agora é a Telefonia dentro da ZOE.
+if [ -f /etc/systemd/system/zoe-pabx.service ]; then
+  aviso "Achei o PABX antigo (zoe-pabx) instalado à parte: ele foi desligado — a telefonia agora fica dentro da ZOE."
+  aviso "Os dados dele continuam em $DADOS/pabx (nada foi apagado)."
+  systemctl disable --now zoe-pabx >/dev/null 2>&1 || true
+fi
+# O serviço antigo se chamava zoe-atendimento: agora é só "zoe".
+if [ -f /etc/systemd/system/zoe-atendimento.service ]; then
+  systemctl disable --now zoe-atendimento >/dev/null 2>&1 || true
+  rm -f /etc/systemd/system/zoe-atendimento.service
+fi
 
 # ---------------------------------------------------------------------------------------------
-gerar_env() {
-  local m="$1" arq="$DESTINO/$1/.env" senha
-  if [ -f "$arq" ]; then echo "$m: .env mantido (segredos e senha não mudam)"; return; fi
-  # Uma senha de master só para os três sistemas, gerada uma vez.
-  senha="$SENHA_MASTER"
-  SENHAS+=("${NOME[$m]}")
-  case "$m" in
-    atendimento) cat > "$arq" <<ENV
-# ZOE Atende — gerado pelo instalador em $(date '+%d/%m/%Y %H:%M'). NÃO troque o ATEND_SECRET depois de instalado:
+passo "ZOE (/atendimento, porta $PORTA)"
+# Código novo; .env, dados e dependências já instaladas ficam.
+rsync -a --delete --exclude '.env' --exclude 'data/' --exclude 'node_modules/' --exclude 'test/' "$ORIGEM/atendimento/" "$CODIGO/"
+if [ -d "$ORIGEM/atendimento/node_modules" ]; then
+  rsync -a --delete "$ORIGEM/atendimento/node_modules/" "$CODIGO/node_modules/"
+else
+  (cd "$CODIGO" && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
+fi
+
+SENHA_NOVA=""
+if [ -f "$CODIGO/.env" ]; then
+  echo ".env mantido (segredos e senha não mudam)"
+else
+  SENHA_NOVA="$(aleatorio 12 base64url)"
+  cat > "$CODIGO/.env" <<ENV
+# ZOE — gerado pelo instalador em $(date '+%d/%m/%Y %H:%M'). NÃO troque o ATEND_SECRET depois de instalado:
 # ele cifra os tokens do WhatsApp e os segredos das ferramentas.
 NODE_ENV=production
-PORT=${PORTA[atendimento]}
+PORT=$PORTA
 ATEND_BASE_PATH=/atendimento
 ATEND_URL_PUBLICA=https://${DOMINIO:-SEU-DOMINIO}
 ATEND_SECRET=$(aleatorio 32 hex)
 ATEND_ADMIN_EMAIL=$EMAIL
-ATEND_ADMIN_SENHA=$senha
+ATEND_ADMIN_SENHA=$SENHA_NOVA
 ATEND_ADMIN_NOME=Master
 ATEND_DB=$DADOS/atendimento/atendimento.db
 ATEND_ARQUIVOS=$DADOS/atendimento/arquivos
 ATEND_FUSO=America/Sao_Paulo
-# Inteligência da ZOE: cole a chave de IA e reinicie (systemctl restart zoe-atendimento).
+# Inteligência da ZOE: cole a chave de IA e reinicie (systemctl restart zoe).
 # Sem ela, a ZOE atende só com intenções e base de conhecimento.
 # ATEND_IA_CHAVE=
 # O IXC (ou uma ferramenta da empresa) fica na rede interna do provedor (10.x, 192.168.x)? Libere com:
 # ATEND_REDE_INTERNA=1
 # Transcrição de áudio (whisper.cpp local, sem custo por áudio):
 # ATEND_WHISPER_URL=http://127.0.0.1:8178
+# Telefone no navegador (ramal WebRTC): o endereço wss:// do Asterisk e o domínio SIP.
+# ATEND_WEBRTC_WSS=wss://central.seuprovedor.com.br:8089/ws
+# ATEND_SIP_DOMINIO=central.seuprovedor.com.br
 ENV
-    ;;
-    pabx) cat > "$arq" <<ENV
-# ZOE PABX — gerado pelo instalador em $(date '+%d/%m/%Y %H:%M'). NÃO troque o PABX_SECRET depois de instalado.
-NODE_ENV=production
-PORT=${PORTA[pabx]}
-PABX_BASE_PATH=/pabx
-PABX_SECRET=$(aleatorio 32 hex)
-PABX_ADMIN_EMAIL=$EMAIL
-PABX_ADMIN_SENHA=$senha
-PABX_ADMIN_NOME=Master
-PABX_DB=$DADOS/pabx/pabx.db
-PABX_FUSO=America/Sao_Paulo
-# Ramal no navegador (WebRTC): o endereço wss:// da central e o domínio SIP.
-# PABX_WEBRTC_WSS=wss://central.seuprovedor.com.br:8089/ws
-# PABX_SIP_DOMINIO=central.seuprovedor.com.br
-ENV
-    ;;
-    network) cat > "$arq" <<ENV
-# Manager Network — gerado pelo instalador em $(date '+%d/%m/%Y %H:%M').
-# NÃO troque NETWORK_SECRET nem NETWORK_CHAVE_CREDENCIAIS depois de instalado (cifram as credenciais dos conectores).
-NODE_ENV=production
-PORT=${PORTA[network]}
-NETWORK_BASE_PATH=/network
-NETWORK_SECRET=$(aleatorio 32 hex)
-NETWORK_CHAVE_CREDENCIAIS=$(aleatorio 32 hex)
-NETWORK_ADMIN_EMAIL=$EMAIL
-NETWORK_ADMIN_SENHA=$senha
-NETWORK_ADMIN_NOME=Master
-NETWORK_DADOS=$DADOS/network
-NETWORK_FUSO=America/Sao_Paulo
-# O custo do WhatsApp vindo do ZOE Atende fica DESLIGADO até ser ligado no Manager certo.
-# NETWORK_CUSTO_WHATSAPP=
-ENV
-    ;;
-  esac
-  echo "$m: .env novo gerado"
-}
+  echo ".env novo gerado"
+fi
+# O código é do root e só é lido pelo serviço; o serviço escreve apenas nos próprios dados.
+chown -R root:"$USUARIO" "$CODIGO"
+chmod -R u=rwX,g=rX,o= "$CODIGO"
+chmod 640 "$CODIGO/.env"
+chmod 755 "$CODIGO/scripts/zoe-agi.js"
+chown -R "$USUARIO:$USUARIO" "$DADOS/atendimento"
 
-SENHAS=()
-# A mesma senha de master nos três sistemas. Se algum já estiver instalado (ex.: --modulos para
-# acrescentar um sistema depois), reaproveita a dele; senão, gera uma nova.
-SENHA_MASTER="$(grep -h -m1 -E '^(ATEND|PABX|NETWORK)_ADMIN_SENHA=' "$DESTINO"/atendimento/.env "$DESTINO"/pabx/.env "$DESTINO"/network/.env 2>/dev/null | head -1 | cut -d= -f2- || true)"
-[ -n "$SENHA_MASTER" ] || SENHA_MASTER="$(aleatorio 12 base64url)"
-for m in $MODULOS; do
-  passo "${NOME[$m]} (/$m, porta ${PORTA[$m]})"
-  mkdir -p "$DESTINO/$m" "$DADOS/$m"
-  # Código novo; .env, dados e dependências já instaladas ficam.
-  rsync -a --delete --exclude '.env' --exclude 'data/' --exclude 'node_modules/' --exclude 'test/' "$ORIGEM/$m/" "$DESTINO/$m/"
-  if [ -d "$ORIGEM/$m/node_modules" ]; then
-    rsync -a --delete "$ORIGEM/$m/node_modules/" "$DESTINO/$m/node_modules/"
-  else
-    (cd "$DESTINO/$m" && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
-  fi
-  gerar_env "$m"
-  # O código é do root e só é lido pelo serviço; o serviço escreve apenas nos próprios dados.
-  chown -R root:"$USUARIO" "$DESTINO/$m"
-  chmod -R u=rwX,g=rX,o= "$DESTINO/$m"
-  chmod 640 "$DESTINO/$m/.env"
-  chown -R "$USUARIO:$USUARIO" "$DADOS/$m"
-  if [ "$m" = network ]; then
-    (cd "$DESTINO/network" && runuser -u "$USUARIO" -- node --disable-warning=ExperimentalWarning --env-file=.env server/migrar.js)
-  fi
-
-  cat > "/etc/systemd/system/zoe-$m.service" <<UNIT
+cat > /etc/systemd/system/zoe.service <<UNIT
 [Unit]
-Description=${NOME[$m]}
+Description=ZOE — atendimento por WhatsApp e telefone
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 User=$USUARIO
 Group=$USUARIO
-WorkingDirectory=$DESTINO/$m
-ExecStart=$(command -v node) --disable-warning=ExperimentalWarning --env-file=$DESTINO/$m/.env server/index.js
+WorkingDirectory=$CODIGO
+ExecStart=$(command -v node) --disable-warning=ExperimentalWarning --env-file=$CODIGO/.env server/index.js
 Restart=always
 RestartSec=3
 # Proteções: o processo só escreve nos próprios dados.
@@ -213,16 +181,15 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=$DADOS/$m
+ReadWritePaths=$DADOS/atendimento
 
 [Install]
 WantedBy=multi-user.target
 UNIT
-done
 
-if [ "$WHISPER" = 1 ] && [[ " $MODULOS " == *" atendimento "* ]]; then
+if [ "$WHISPER" = 1 ]; then
   passo "Transcrição de áudio (whisper.cpp)"
-  bash "$DESTINO/atendimento/scripts/instalar-whisper.sh" "$DESTINO/whisper"
+  bash "$CODIGO/scripts/instalar-whisper.sh" "$DESTINO/whisper"
   cat > /etc/systemd/system/zoe-whisper.service <<UNIT
 [Unit]
 Description=ZOE — transcrição de áudio (whisper.cpp)
@@ -236,17 +203,15 @@ Restart=always
 [Install]
 WantedBy=multi-user.target
 UNIT
-  sed -i 's|^# ATEND_WHISPER_URL=|ATEND_WHISPER_URL=|' "$DESTINO/atendimento/.env"
+  sed -i 's|^# ATEND_WHISPER_URL=|ATEND_WHISPER_URL=|' "$CODIGO/.env"
   systemctl daemon-reload
   systemctl enable --now zoe-whisper >/dev/null
 fi
 
-passo "Serviços"
+passo "Serviço"
 systemctl daemon-reload
-for m in $MODULOS; do
-  systemctl enable "zoe-$m" >/dev/null 2>&1
-  systemctl restart "zoe-$m"
-done
+systemctl enable zoe >/dev/null 2>&1
+systemctl restart zoe
 
 if [ "$NGINX" = 1 ]; then
   passo "Nginx"
@@ -254,26 +219,25 @@ if [ "$NGINX" = 1 ]; then
   ALVO="$SITE"
   # Configuração que alguém já ajustou (certificado, outros sites) não é sobrescrita.
   [ -f "$SITE" ] && ALVO="$SITE.novo"
-  {
-    echo "# ZOE — gerado pelo instalador. HTTPS: certbot --nginx -d ${DOMINIO}"
-    echo "server {"
-    echo "  listen 80;"
-    echo "  server_name ${DOMINIO};"
-    echo "  client_max_body_size 20m;"
-    for m in $MODULOS; do
-      echo "  location /$m/ {"
-      echo "    proxy_pass http://127.0.0.1:${PORTA[$m]};"
-      echo "    proxy_http_version 1.1;"
-      echo "    proxy_set_header Host \$host;"
-      echo "    proxy_set_header X-Real-IP \$remote_addr;"
-      echo "    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"
-      echo "    proxy_set_header X-Forwarded-Proto \$scheme;"
-      echo "    proxy_read_timeout 120s;"
-      echo "  }"
-      echo "  location = /$m { return 301 /$m/; }"
-    done
-    echo "}"
-  } > "$ALVO"
+  cat > "$ALVO" <<NGINX
+# ZOE — gerado pelo instalador. HTTPS: certbot --nginx -d ${DOMINIO}
+server {
+  listen 80;
+  server_name ${DOMINIO};
+  client_max_body_size 20m;
+  location /atendimento/ {
+    proxy_pass http://127.0.0.1:${PORTA};
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 120s;
+  }
+  location = /atendimento { return 301 /atendimento/; }
+  location = / { return 302 /atendimento/; }
+}
+NGINX
   if [ "$ALVO" = "$SITE" ]; then
     ln -sf "$SITE" /etc/nginx/sites-enabled/zoe.conf
     nginx -t && systemctl reload nginx
@@ -290,19 +254,18 @@ echo "Todo dia às 03:17 em $COPIAS (14 dias guardados)."
 
 passo "Conferindo"
 sleep 3
-/usr/local/sbin/zoe-verificar || aviso "Algo não respondeu: veja acima e em  journalctl -u zoe-<sistema> -n 50"
+/usr/local/sbin/zoe-verificar || aviso "Algo não respondeu: veja acima e em  journalctl -u zoe -n 50"
 
 echo
 echo "============================================================================"
-[ "$PRIMEIRA" = 1 ] && echo " Instalação concluída." || echo " Atualização concluída (dados, .env e senhas mantidos)."
-for m in $MODULOS; do echo "   ${NOME[$m]}: https://${DOMINIO:-SEU-DOMINIO}/$m/"; done
-if [ ${#SENHAS[@]} -gt 0 ]; then
+[ "$PRIMEIRA" = 1 ] && echo " Instalação concluída." || echo " Atualização concluída (dados, .env e senha mantidos)."
+echo "   ZOE: https://${DOMINIO:-SEU-DOMINIO}/atendimento/"
+if [ -n "$SENHA_NOVA" ]; then
   echo
-  echo " Acesso master — o mesmo em: $(printf '%s, ' "${SENHAS[@]}" | sed 's/, $//')"
+  echo " Acesso master (anote agora — a senha não aparece de novo; troque no primeiro acesso):"
   echo "   E-mail: $EMAIL"
-  echo "   Senha:  $SENHA_MASTER"
-  echo " Anote agora: a senha não aparece de novo. Ao trocar, troque nos três painéis."
+  echo "   Senha:  $SENHA_NOVA"
 fi
 echo
-echo " Próximos passos: instalacao/LEIA-ME.md (HTTPS, chave de IA, Meta, IXC, Asterisk)."
+echo " Próximos passos: instalacao/LEIA-ME.md (HTTPS, chave de IA, Meta, IXC, telefonia/Asterisk)."
 echo "============================================================================"

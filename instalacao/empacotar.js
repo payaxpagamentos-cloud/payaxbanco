@@ -1,7 +1,7 @@
 'use strict';
 
-// Gera o pacote de instalação da ZOE: dist/zoe-instalacao.tar.gz com os três sistemas (ZOE Atende,
-// ZOE PABX e Manager Network), as dependências de produção já instaladas e o instalador.
+// Gera o pacote de instalação da ZOE: dist/zoe-instalacao.tar.gz com o sistema (WhatsApp, telefonia,
+// atendente virtual, Ouvidoria), as dependências de produção já instaladas e o instalador.
 // Uso (na raiz do repositório):  node instalacao/empacotar.js [pasta de saída]
 // No servidor:  tar xzf zoe-instalacao.tar.gz && cd zoe && sudo ./instalacao/instalar.sh --dominio ...
 //
@@ -14,7 +14,7 @@ const { execFileSync } = require('node:child_process');
 const raiz = path.join(__dirname, '..');
 const saida = path.resolve(process.argv[2] || path.join(raiz, 'dist'));
 const pasta = path.join(saida, 'zoe');
-const MODULOS = ['atendimento', 'pabx', 'network'];
+const MODULOS = ['atendimento'];
 const LEVAR = ['server', 'public', 'scripts', 'package.json', 'package-lock.json', 'README.md', 'Dockerfile', '.env.exemplo'];
 
 fs.rmSync(pasta, { recursive: true, force: true });
@@ -34,7 +34,7 @@ fs.cpSync(path.join(raiz, 'instalacao'), path.join(pasta, 'instalacao'), {
 });
 for (const s of ['instalar.sh', 'backup.sh', 'verificar.sh']) fs.chmodSync(path.join(pasta, 'instalacao', s), 0o755);
 fs.chmodSync(path.join(pasta, 'atendimento', 'scripts', 'instalar-whisper.sh'), 0o755);
-fs.chmodSync(path.join(pasta, 'pabx', 'scripts', 'zoe-agi.js'), 0o755);
+fs.chmodSync(path.join(pasta, 'atendimento', 'scripts', 'zoe-agi.js'), 0o755);
 
 let versao = 'local';
 try { versao = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: raiz }).toString().trim(); } catch { /* fora do git */ }

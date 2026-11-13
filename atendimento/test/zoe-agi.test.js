@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { PassThrough } = require('node:stream');
-const { criarAgi, criarApiCerebro, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal, textoApp, nomeFila } = require('../scripts/zoe-agi');
+const { criarAgi, criarApiCerebro, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal, textoApp, nomeFila, lerConf } = require('../scripts/zoe-agi');
 
 const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-agi-falas-'));
 // Um WAV com cara de fala de verdade: cabeçalho + 1 s de áudio 8 kHz.
@@ -238,16 +238,6 @@ test('desligou no meio: avisa o cérebro e para', async (t) => {
   for (const f of a.gravados) assert.equal(fs.existsSync(f), false, `a fala gravada não fica no disco (${path.basename(f)})`);
 });
 
-test('fim: no modo por teclas o "h" também encerra o atendimento da ZOE no PABX', async () => {
-  const a = asterisk([]);
-  const pedidos = [];
-  const teclas = { post: async (uid, etapa) => { pedidos.push([uid, etapa]); return {}; } };
-  await fimDaLigacao(a.agi, { agi_uniqueid: '1700000100.1' }, null, teclas);
-  assert.deepEqual(pedidos, [['1700000100.1', 'fim']]);
-  // Fora do ar ou já encerrado: o "h" não pode quebrar.
-  assert.equal(await fimDaLigacao(a.agi, { agi_uniqueid: 'x' }, null, { post: async () => { throw new Error('404'); } }), 'encerrado');
-});
-
 test('texto para o TTS: vírgula não vira argumento da aplicação e nada é avaliado', () => {
   assert.deepEqual(argumentosDaApp(textoApp('Obrigada, Maria. Para segunda via, tecle 1.').slice(1, -1)), ['Obrigada, Maria. Para segunda via, tecle 1.']);
   const t = textoApp('a "b" | c ${SHELL(rm)} $[1+1]\nEXEC System x');
@@ -258,22 +248,12 @@ test('texto para o TTS: vírgula não vira argumento da aplicação e nada é av
   assert.equal(nomeFila(undefined), '');
 });
 
-test('SIGHUP do Asterisk ao desligar não mata o script: o fim chega à API', async (t) => {
+test('SIGHUP do Asterisk ao desligar não mata o script: o fim chega à ZOE', async (t) => {
   const { spawn } = require('node:child_process');
-  const pedidos = [];
-  const pabx = http.createServer((req, res) => {
-    let c = '';
-    req.on('data', (x) => { c += x; });
-    req.on('end', () => {
-      pedidos.push(req.url);
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(req.url.endsWith('/atendimentos') ? { uid: 'u', etapa: 'documento', fala: 'Digite o CPF.' } : { ok: true }));
-    });
-  });
-  await new Promise((r) => pabx.listen(0, '127.0.0.1', r));
-  t.after(() => new Promise((r) => pabx.close(r)));
+  const zoe = await cerebroFalso([]);
+  t.after(() => zoe.fechar());
   const filho = spawn(process.execPath, [path.join(__dirname, '..', 'scripts', 'zoe-agi.js')], {
-    env: { ...process.env, ZOE_API: `http://127.0.0.1:${pabx.address().port}/api/integracao`, ZOE_CHAVE: 'pbx_x', ZOE_CEREBRO: '', ZOE_TTS_APP: '' },
+    env: { ...process.env, ZOE_URL: zoe.url, ZOE_CHAVE: 'cen_x', ZOE_TTS_APP: 'Flite', ZOE_GRAVACOES: pasta, ZOE_AGI_CONF: '/nao/existe' },
     stdio: ['pipe', 'pipe', 'inherit'],
   });
   const saiu = new Promise((r) => filho.on('exit', (code, sinal) => r({ code, sinal })));
@@ -285,8 +265,8 @@ test('SIGHUP do Asterisk ao desligar não mata o script: o fim chega à API', as
     while ((i = buffer.indexOf('\n')) >= 0) {
       const cmd = buffer.slice(0, i);
       buffer = buffer.slice(i + 1);
-      if (cmd.startsWith('GET DATA')) {
-        // O cliente desliga enquanto digita: o Asterisk manda SIGHUP e depois responde -1.
+      if (cmd.startsWith('RECORD FILE')) {
+        // O cliente desliga enquanto fala: o Asterisk manda SIGHUP e depois responde -1.
         filho.kill('SIGHUP');
         setTimeout(() => filho.stdin.write('200 result=-1\n'), 100);
       } else filho.stdin.write('200 result=0\n');
@@ -295,27 +275,24 @@ test('SIGHUP do Asterisk ao desligar não mata o script: o fim chega à API', as
   filho.stdin.write('agi_uniqueid: 1700000200.1\nagi_callerid: 11988887777\n\n');
   const fim = await saiu;
   assert.deepEqual(fim, { code: 0, sinal: null }, 'o script termina sozinho, não morto pelo sinal');
-  assert.ok(pedidos.some((u) => /1700000200\.1\/fim$/.test(u)), 'o atendimento da ZOE é encerrado no PABX');
+  assert.ok(zoe.pedidos.some((p) => /1700000200\.1\/fim$/.test(p.url)), 'a conversa é encerrada na ZOE');
+  assert.equal(zoe.pedidos[0].chave, 'cen_x', 'usa a chave da central');
 });
 
-test('cérebro fora do ar no início: a mesma ligação segue pela URA de teclas', async (t) => {
+test('ZOE fora do ar no início: indisponível, e o plano de discagem manda para a fila', async (t) => {
   const zoe = await cerebroFalso([], { quebrarNoInicio: true });
   t.after(() => zoe.fechar());
   const a = asterisk([]);
-  let usouTeclas = false;
-  const teclas = { iniciar: async () => { usouTeclas = true; throw new Error('sem pabx neste teste'); } };
-  await escolherModo(a.agi, ENV, { cerebro: criarApiCerebro(zoe.url, 'k'), teclas, tts: 'Flite', gravacoes: pasta });
-  assert.equal(usouTeclas, true, 'caiu para a reserva em vez de deixar a pessoa no silêncio');
+  const status = await escolherModo(a.agi, ENV, { cerebro: criarApiCerebro(zoe.url, 'k'), tts: 'Flite', gravacoes: pasta });
+  assert.equal(status, 'indisponivel');
+  assert.equal(a.variaveis.ZOE_STATUS, 'indisponivel');
 });
 
-test('sem TTS não dá para falar texto livre: fica na URA de teclas', async (t) => {
+test('sem TTS não dá para falar texto livre: vai direto para a fila', async (t) => {
   const zoe = await cerebroFalso([]);
   t.after(() => zoe.fechar());
   const a = asterisk([]);
-  let usouTeclas = false;
-  const teclas = { iniciar: async () => { usouTeclas = true; throw new Error('x'); } };
-  await escolherModo(a.agi, ENV, { cerebro: criarApiCerebro(zoe.url, 'k'), teclas, tts: '' });
-  assert.equal(usouTeclas, true);
+  assert.equal(await escolherModo(a.agi, ENV, { cerebro: criarApiCerebro(zoe.url, 'k'), tts: '' }), 'indisponivel');
   assert.equal(zoe.pedidos.length, 0);
 });
 
@@ -324,6 +301,19 @@ test('nada configurado: indisponível, e o plano de discagem manda para a fila',
   const status = await escolherModo(a.agi, ENV, {});
   assert.equal(status, 'indisponivel');
   assert.equal(a.variaveis.ZOE_STATUS, 'indisponivel');
+});
+
+test('configuração: zoe-agi.conf, com as variáveis de ambiente por cima', (t) => {
+  const arq = path.join(pasta, 'zoe-agi.conf');
+  fs.writeFileSync(arq, '# central\nZOE_URL=https://zoe.exemplo/atendimento\nZOE_CHAVE="cen_abc"\nZOE_TTS_APP=Flite\nZOE_SUSSURRO=0\n');
+  const antes = { ...process.env };
+  t.after(() => { for (const k of Object.keys(process.env)) if (!(k in antes)) delete process.env[k]; Object.assign(process.env, antes); });
+  for (const k of ['ZOE_URL', 'ZOE_CHAVE', 'ZOE_TTS_APP', 'ZOE_SUSSURRO', 'ZOE_CEREBRO', 'ZOE_CEREBRO_CHAVE', 'ZOE_GRAVACOES']) delete process.env[k];
+  assert.deepEqual(lerConf(arq), { url: 'https://zoe.exemplo/atendimento', chave: 'cen_abc', tts: 'Flite', gravacoes: '', sussurrar: false });
+  process.env.ZOE_CHAVE = 'cen_env';
+  assert.equal(lerConf(arq).chave, 'cen_env');
+  delete process.env.ZOE_URL;
+  assert.equal(lerConf('/nao/existe').url, '');
 });
 
 test.after(() => fs.rmSync(pasta, { recursive: true, force: true }));

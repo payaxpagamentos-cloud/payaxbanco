@@ -15,7 +15,8 @@ registrado.
 | **Supervisor** | O painel da empresa só para consulta (não altera nada e não vê segredos). |
 | **Atendente** | A caixa de entrada: as conversas das filas que ele atende e as que assumiu. Não administra a empresa. |
 
-Servidor próprio (Node.js 22 + SQLite), sem depender do Ativa BPO, do APP Táxi nem do PABX.
+Servidor próprio (Node.js 22 + SQLite), sem depender do Ativa BPO nem do APP Táxi. A telefonia (o antigo PABX)
+fica dentro da ZOE: mesmo painel, mesmo login, mesmo banco e as mesmas filas do WhatsApp — ver **Telefonia** abaixo.
 Tema claro e escuro no botão do topo.
 
 ## Como funciona o atendimento
@@ -304,7 +305,7 @@ O que isso entrega:
   um atendente do WhatsApp.
 - **Nunca o silêncio.** Três falas que não deu para entender passam para uma pessoa; falha do
   cérebro no meio da ligação transfere; se o ZOE Atende estiver fora do ar quando a ligação chega,
-  o Asterisk segue pela URA de teclas do PABX.
+  o Asterisk manda a ligação direto para a fila.
 
 ### Fala ou teclas
 
@@ -349,12 +350,12 @@ livre da IA: funciona igual com ou sem IA e não inventa. A mesma passagem apare
 lateral de qualquer conversa transferida, do WhatsApp também.
 
 Para isso, o plano de discagem precisa de duas linhas a mais (exemplo completo no topo de
-`pabx/scripts/zoe-agi.js`): o 8º parâmetro do `Queue` roda `zoe-agi.js atendeu` no canal do
+`scripts/zoe-agi.js`): o 8º parâmetro do `Queue` roda `zoe-agi.js atendeu` no canal do
 ramal, e o `h` roda `zoe-agi.js fim`. A conversa transferida só fecha quando o cliente desliga de
 verdade; desligou na fila, antes de alguém atender, conta como **abandono**. Se o `h` não estiver
 configurado, a ligação nova do mesmo número fecha a anterior, e nenhuma fica aberta mais de 4 h.
 
-A central chama estas rotas da API de integração (chave `atd_…`, cabeçalho `X-Api-Key`):
+A central chama estas rotas da API de integração (chave da central `cen_…` ou de integração `atd_…`, cabeçalho `X-Api-Key`):
 
 | Rota | Quando |
 |---|---|
@@ -365,13 +366,30 @@ A central chama estas rotas da API de integração (chave `atd_…`, cabeçalho 
 
 Cada resposta traz `fala` (o que falar) e `acao`: `ouvir`, `transferir` (com `fila`, `resumo` e `sussurro`)
 ou `encerrar`. Em `ouvir`, `aguardar` diz se a central grava a fala (`fala`) ou lê teclas
-(`digitos`, com `max_digitos`). O script do Asterisk que faz isso está em `pabx/scripts/zoe-agi.js` (modo
-conversado). Testado de ponta a ponta com áudio de telefone (8 kHz) e o whisper real: "estou
+(`digitos`, com `max_digitos`). O script do Asterisk que faz isso está em `scripts/zoe-agi.js`. Testado de ponta a ponta com áudio de telefone (8 kHz) e o whisper real: "estou
 pensando em cancelar" abriu a Ouvidoria e foi para a fila Retenção em ~5 s; "quero falar com um
 atendente" foi transferido em ~3,7 s.
 
 Na caixa de atendimento a ligação aparece marcada como **Ligação**, com tudo o que foi falado, e
 sem caixa de resposta — ela aconteceu por voz.
+
+### Telefonia (ramais, filas, URA, números, discador)
+
+O PABX é parte da ZOE (tabelas `pabx_*` no mesmo banco). Empresas, usuários, permissões, **filas** e
+auditoria são os mesmos: a fila "Suporte técnico" atende o WhatsApp e o telefone.
+
+- **Master › Telefonia**: liga a telefonia por empresa (tipo PABX, discador ou call center; limites de ramais,
+  chamadas simultâneas e disco; tarifas por minuto; rota de saída), cadastra operadoras e números (DIDs),
+  mostra as chamadas e o faturamento de todas as empresas, a situação da central e as **chaves da central**
+  (`cen_…`, só servem para telefonia).
+- **Empresa › Telefonia** (só aparece com a telefonia ligada): painel, supervisão ao vivo, ramais, filas no
+  telefone (ramais e estratégia de cada fila), URA clássica ou inteligente (IXC), números, campanhas do
+  discador, chamadas, agenda, relatórios e tarifas. Permissões `telefonia.ver`, `telefonia.editar` e
+  `telefonia.softphone`.
+- **Telefone no navegador**: com `ATEND_WEBRTC_WSS` e `ATEND_SIP_DOMINIO`, quem tem ramal (o mesmo número de
+  `Usuários › Ramal` cadastrado em `Telefonia › Ramais`) liga e atende pelo painel.
+- **Central** (`/api/central`, chave `cen_…`): configuração, chamadas (início, atendida, fim, tarifação),
+  registro dos ramais, uso de TTS/STT, discador e a URA inteligente.
 
 ## Áudios do cliente
 

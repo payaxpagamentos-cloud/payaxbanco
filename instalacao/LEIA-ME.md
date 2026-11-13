@@ -1,12 +1,15 @@
 # ZOE — instalação no servidor
 
-Um pacote, um comando: instala no mesmo servidor os três sistemas da ZOE.
+Um pacote, um comando. A ZOE é **um sistema só**: WhatsApp, telefonia (ramais, filas, URA, números, discador,
+telefone no navegador), a atendente virtual, Ouvidoria e retenção, Centro de Custo e relatórios. Tudo fica em
+um painel, com um login e um banco de dados.
 
-| Sistema | Endereço | Porta interna |
-|---|---|---|
-| **ZOE Atende**: WhatsApp e telefone, a atendente virtual, Ouvidoria, Centro de Custo | `https://SEU-DOMINIO/atendimento/` | 3600 |
-| **ZOE PABX**: ramais, filas, URA e a ligação com o Asterisk | `https://SEU-DOMINIO/pabx/` | 3300 |
-| **Manager Network**: rede, NOC, chamados técnicos, equipe, frota | `https://SEU-DOMINIO/network/` | 3500 |
+| | |
+|---|---|
+| Endereço | `https://SEU-DOMINIO/atendimento/` (a raiz do domínio leva para lá) |
+| Serviço | `zoe` (porta interna 3600) |
+
+A integração com o **Manager** que vocês já usam vem depois. Este pacote não instala nada dele.
 
 ## 1. Antes de começar
 
@@ -44,17 +47,17 @@ O instalador faz o seguinte:
 
   | Pasta | Conteúdo |
   |---|---|
-  | `/zoe/atendimento`, `/zoe/pabx`, `/zoe/network` | o código e o `.env` de cada sistema |
-  | `/zoe/dados` | os bancos e os arquivos recebidos |
+  | `/zoe/atendimento` | o código e o `.env` |
+  | `/zoe/dados` | o banco e os arquivos recebidos |
   | `/zoe/copias` | a cópia diária do banco |
 
   Para outra pasta, use `--pasta /outro/lugar`;
-- gera um `.env` para cada sistema, com **segredos novos** e **uma senha de master, a mesma nos três sistemas**, que aparece **uma vez** no final (anote);
-- cria os serviços `zoe-atendimento`, `zoe-pabx` e `zoe-network`, que sobem sozinhos com o servidor;
+- gera o `.env` com **segredos novos** e **a senha do master**, que aparece **uma vez** no final (anote);
+- cria o serviço `zoe`, que sobe sozinho com o servidor;
 - configura o Nginx e a cópia diária do banco;
 - confere se tudo respondeu.
 
-**HTTPS** (obrigatório para a Meta):
+**HTTPS** (obrigatório para a Meta e para o telefone no navegador):
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
@@ -63,13 +66,13 @@ sudo certbot --nginx -d atende.seuprovedor.com.br
 
 ## 3. Depois de instalar: validar
 
-`sudo zoe-verificar` mostra os serviços e se o servidor alcança a Meta, o Banco Central e a IA.
+`sudo zoe-verificar` mostra o serviço e se o servidor alcança a Meta, o Banco Central e a IA.
 
 Valide nesta ordem:
 
-1. **Entrar** nos três painéis com o e-mail e a senha do master e **trocar a senha**.
+1. **Entrar** com o e-mail e a senha do master e **trocar a senha**.
 2. **Inteligência da ZOE**: ponha a chave de IA em `ATEND_IA_CHAVE` no arquivo `/zoe/atendimento/.env` e rode
-   `sudo systemctl restart zoe-atendimento`. Em *Diagnóstico* deve aparecer "Inteligência da ZOE: configurada".
+   `sudo systemctl restart zoe`. Em *Diagnóstico* deve aparecer "Inteligência da ZOE: configurada".
 3. **Empresa e WhatsApp (API oficial da Meta)**: crie a empresa e, em *Configurações › Número de WhatsApp*, cadastre o
    Phone number ID, o token permanente e o App Secret. O painel mostra a **URL do webhook** e o
    **token de verificação** para colar no app da Meta (*WhatsApp › Configuração › Webhook*). Assine o campo
@@ -83,41 +86,58 @@ Valide nesta ordem:
    mais as permissões de segunda via e desbloqueio, se for usar). O botão de teste mostra o que está liberado.
 7. **Usuários e ramais**: em *Usuários*, cadastre a equipe, as permissões e o **ramal** de cada atendente.
 
-## 4. Telefone (Asterisk)
+## 4. Telefonia (Asterisk)
 
-O script da central é `/zoe/pabx/scripts/zoe-agi.js`. Se o Asterisk estiver em outra máquina, copie
-para lá (precisa de Node 22). No Asterisk, configure estas variáveis de ambiente:
+A telefonia é ligada **por empresa** pelo master. As **filas são as mesmas do WhatsApp**: a ligação que a ZOE
+transfere cai na mesma fila e na mesma equipe.
 
-```
-ZOE_CEREBRO=https://atende.seuprovedor.com.br/atendimento
-ZOE_CEREBRO_CHAVE=atd_...        # ZOE Atende › Integrações › Nova chave
-ZOE_TTS_APP=...                  # a aplicação de voz instalada no Asterisk
-```
+1. **Master › Telefonia**:
+   - *Rotas de saída*: cadastre a operadora (host, usuário, custo por minuto);
+   - *Números*: cadastre os números (DIDs) e entregue-os à empresa;
+   - *Empresas*: ligue a telefonia da empresa (limites, tarifas e rota de saída);
+   - *Chave da central*: crie a chave da empresa (`cen_…`). Ela aparece **uma vez**.
+2. **Na empresa › Telefonia**, cadastre os ramais com o **mesmo número** do campo *Ramal* em *Usuários*. Escolha
+   os ramais de cada fila, monte a URA e diga para onde vai cada número.
+3. **No Asterisk**, use o script `/zoe/atendimento/scripts/zoe-agi.js`. Se o Asterisk estiver em outra máquina,
+   copie o script para lá (ele precisa de Node 22). Depois crie o arquivo `/etc/asterisk/zoe-agi.conf`:
 
-O plano de discagem completo, com a passagem para o atendente e o fecho da ligação, está no topo do
-`zoe-agi.js` e no README do PABX. Os **nomes das filas** têm de ser iguais no ZOE Atende e no Asterisk.
+   ```
+   ZOE_URL=https://atende.seuprovedor.com.br/atendimento
+   ZOE_CHAVE=cen_...            # a chave da central do passo 1
+   ZOE_TTS_APP=...              # a aplicação de voz instalada no Asterisk (ex.: Flite)
+   # ZOE_SUSSURRO=0             # desliga o resumo sussurrado ao atendente
+   ```
+
+   O plano de discagem completo está no topo do `zoe-agi.js`. Ele cobre a conversa com a ZOE, a fila, a
+   passagem para o atendente e o fecho da ligação. Os **nomes das filas** têm de ser iguais na ZOE e no Asterisk.
+
+   Se a ZOE estiver fora do ar, a ligação vai **direto para a fila**. Nenhuma ligação fica no silêncio.
+4. **Telefone no navegador (opcional)**: no `/zoe/atendimento/.env`, preencha `ATEND_WEBRTC_WSS`, que é o
+   endereço `wss://` do Asterisk, e `ATEND_SIP_DOMINIO`. Depois rode `sudo systemctl restart zoe`. O botão de telefone
+   aparece no canto do painel de quem tem ramal.
 
 ## 5. Dia a dia
 
 | Tarefa | Comando |
 |---|---|
 | Ver se está tudo no ar | `sudo zoe-verificar` |
-| Ver o log de um sistema | `journalctl -u zoe-atendimento -n 100 -f` |
-| Reiniciar depois de mudar o `.env` | `sudo systemctl restart zoe-atendimento` |
-| **Atualizar** para uma versão nova | extrair o pacote novo e rodar o mesmo `instalar.sh`. Código novo; `.env`, banco e senhas ficam. O banco se atualiza sozinho ao subir. |
+| Ver o log | `journalctl -u zoe -n 100 -f` |
+| Reiniciar depois de mudar o `.env` | `sudo systemctl restart zoe` |
+| **Atualizar** para uma versão nova | extrair o pacote novo e rodar o mesmo `instalar.sh`. Código novo; `.env`, banco e senha ficam. O banco se atualiza sozinho ao subir. |
 | Cópia do banco | automática, todo dia às 03:17, em `/zoe/copias` (14 dias). À mão: `sudo zoe-backup` |
-| Restaurar uma cópia | `systemctl stop zoe-atendimento`, depois `gunzip -c /zoe/copias/DIA/atendimento.db.gz > /zoe/dados/atendimento/atendimento.db`, depois `chown zoe: /zoe/dados/atendimento/atendimento.db` e por fim `systemctl start zoe-atendimento` |
+| Restaurar uma cópia | `systemctl stop zoe`, depois `gunzip -c /zoe/copias/DIA/atendimento.db.gz > /zoe/dados/atendimento/atendimento.db`, depois `chown zoe: /zoe/dados/atendimento/atendimento.db` e por fim `systemctl start zoe` |
 
-**Não troque** `ATEND_SECRET`, `PABX_SECRET`, `NETWORK_SECRET` nem `NETWORK_CHAVE_CREDENCIAIS` depois de
-instalado. Eles cifram os tokens do WhatsApp e as credenciais guardadas, e trocar torna esses dados ilegíveis.
-Guarde uma cópia dos arquivos `.env` fora do servidor.
+**Não troque** o `ATEND_SECRET` depois de instalado. Ele cifra os tokens do WhatsApp e as credenciais guardadas,
+e trocar torna esses dados ilegíveis. Guarde uma cópia do `.env` fora do servidor.
 
 ## 6. Se algo não funcionar
 
 | Sintoma | Onde olhar |
 |---|---|
-| Painel não abre | `sudo zoe-verificar`, depois `journalctl -u zoe-<sistema> -n 50`, depois `sudo nginx -t` |
+| Painel não abre | `sudo zoe-verificar`, depois `journalctl -u zoe -n 50`, depois `sudo nginx -t` |
 | WhatsApp não chega | *Diagnóstico* no painel do master; na Meta, o webhook tem de estar verificado e com `messages` assinado |
 | ZOE só responde com menu | falta a chave de IA (item 3.2) ou a empresa passou do limite de IA do mês |
 | Áudio não vira texto | `systemctl status zoe-whisper` e `ATEND_WHISPER_URL` no `.env` |
-| Ligação não abre a passagem no painel | ramal cadastrado em *Usuários*? `zoe-atendeu` no plano de discagem? |
+| Ligação não chega à ZOE | *Master › Telefonia › Situação*; a chave da central no `zoe-agi.conf`; `asterisk -rx "agi set debug on"` |
+| Ligação não abre a passagem no painel | o ramal está em *Usuários* e em *Telefonia › Ramais* com o mesmo número? O `zoe-atendeu` está no plano de discagem? |
+| Telefone do navegador "desconectado" | `ATEND_WEBRTC_WSS` no `.env`, o certificado do `wss://` e o ramal cadastrado em *Telefonia › Ramais* |

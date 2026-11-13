@@ -2,55 +2,45 @@
 'use strict';
 
 /**
- * ZOE — URA por teclas para Asterisk/Issabel (fase 1).
+ * ZOE no telefone — AGI para Asterisk/Issabel.
  *
- * Roda como AGI no plano de discagem e conduz a ligação pela API da ZOE (identificar, confirmar,
- * segunda via, desbloqueio de confiança, transferir). Ao terminar, deixa no canal:
+ * A ligação fala com a MESMA ZOE do WhatsApp: o cliente fala o que quer, a fala é gravada,
+ * transcrita pelo mesmo whisper dos áudios do WhatsApp e passa pelas mesmas regras, ferramentas,
+ * portão de identidade, alertas de rede e Ouvidoria. O que ela responderia por escrito, o TTS fala.
+ * Digitar no teclado continua valendo (os três primeiros números do CPF, por exemplo). Se a empresa
+ * escolheu atender por teclas (ZOE › Como ela atende), é a mesma ZOE com menu numerado: cada
+ * resposta diz se a central grava a fala ou lê teclas, e quantas.
+ *
+ * Ao terminar, deixa no canal:
  *   ZOE_STATUS   = resolvido | transferir | indisponivel | desligou
  *   ZOE_FILA_ID  / ZOE_FILA_NOME = fila para onde transferir (quando ZOE_STATUS = transferir)
  *   ZOE_RESUMO   = resumo da conversa para o atendente
+ * Se a ZOE estiver fora do ar, ZOE_STATUS = indisponivel e o plano de discagem manda para a fila:
+ * uma ligação nunca termina no silêncio porque um servidor caiu.
  *
- * Dois modos:
- *
- *   CONVERSADO (com ZOE_CEREBRO e ZOE_TTS_APP): a ligação fala com a MESMA ZOE do WhatsApp, no
- *   ZOE Atende. O cliente fala o que quer, a fala é gravada, transcrita lá pelo mesmo whisper dos
- *   áudios do WhatsApp, e passa pelas mesmas regras, ferramentas, portão de identidade, alertas de
- *   rede e Ouvidoria. O que ela responderia por escrito, o TTS fala. Digitar no teclado continua
- *   valendo (os três primeiros números do CPF, por exemplo).
- *
- *   Se a empresa escolheu atender por teclas (ZOE › Como ela atende), é a mesma ZOE com menu
- *   numerado: cada resposta diz se a central grava a fala ou lê teclas, e quantas.
- *
- *   POR TECLAS (sem ZOE_CEREBRO, ou se ele cair): a URA de teclas de sempre, pela API do PABX.
- *   Fica como reserva — uma ligação nunca termina no silêncio porque um servidor caiu.
- *
- *   ZOE_CEREBRO        https://SEU-DOMINIO/atendimento   (o ZOE Atende)
- *   ZOE_CEREBRO_CHAVE  chave de API da empresa no ZOE Atende (Integrações → Nova chave, atd_…)
- *   ZOE_GRAVACOES      pasta temporária das falas gravadas (padrão /tmp/zoe-falas)
- *
- * Variáveis de ambiente do modo por teclas (ou argumentos do AGI: AGI(zoe-agi.js,URL,CHAVE)):
- *   ZOE_API      https://SEU-DOMINIO/pabx/api/integracao
- *   ZOE_CHAVE    chave da empresa (criada pela equipe da plataforma em Integrações → Nova chave)
- *   ZOE_TTS_APP  aplicação de texto para voz do Asterisk (ex.: Flite). Vazio: toca os áudios gravados em sounds/zoe/.
+ * Configuração (/etc/asterisk/zoe-agi.conf ou variáveis de ambiente):
+ *   ZOE_URL      https://SEU-DOMINIO/atendimento
+ *   ZOE_CHAVE    chave da central (master › Telefonia › Chave da central, cen_…)
+ *   ZOE_TTS_APP  aplicação de texto para voz do Asterisk (ex.: Flite). Obrigatória: a ZOE fala texto livre.
+ *   ZOE_GRAVACOES  pasta temporária das falas gravadas (padrão /tmp/zoe-falas)
+ *   ZOE_SUSSURRO=0 desliga o resumo sussurrado ao atendente (o painel abre do mesmo jeito)
  *
  * Exemplo (extensions.conf):
  *   [zoe-entrada]
  *   exten => s,1,Answer()
- *    same => n,AGI(/zoe/pabx/scripts/zoe-agi.js)
+ *    same => n,AGI(/zoe/atendimento/scripts/zoe-agi.js)
  *    same => n,GotoIf($["${ZOE_STATUS}" = "transferir" | "${ZOE_STATUS}" = "indisponivel"]?fila)
  *    same => n,Hangup()
- *    same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
+ *    same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?Atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
  *   ; ZOE_FILA_NOME chega sem vírgula, | , parênteses, $ e aspas (trocados por _): a fila no
  *   ; Asterisk deve ter o nome da fila do painel com essa troca. Nomes simples evitam surpresa.
- *   ; O cliente desligou (na fila, com o atendente ou com a ZOE): fecha a conversa no ZOE Atende
- *   ; e o atendimento da ZOE no PABX (modo por teclas; URL e chave como no atendimento).
- *   exten => h,1,AGI(/zoe/pabx/scripts/zoe-agi.js,fim)
+ *   ; O cliente desligou (na fila, com o atendente ou com a ZOE): fecha a conversa na ZOE.
+ *   exten => h,1,AGI(/zoe/atendimento/scripts/zoe-agi.js,fim)
  *
  *   ; Roda no canal do RAMAL quando ele atende (8º parâmetro do Queue). Abre a passagem no painel
  *   ; de quem tem esse ramal (Usuários › Ramal) e sussurra o resumo antes de ligar o cliente.
- *   ; ZOE_SUSSURRO=0 desliga o sussurro e mantém só o painel.
  *   [zoe-atendeu]
- *   exten => s,1,AGI(/zoe/pabx/scripts/zoe-agi.js,atendeu)
+ *   exten => s,1,AGI(/zoe/atendimento/scripts/zoe-agi.js,atendeu)
  *    same => n,Return()
  */
 
@@ -130,142 +120,6 @@ const textoApp = (t) => `"${String(t)
  */
 const nomeFila = (t) => String(t ?? '').replace(/[,|()[\]{}$"'\\;&\r\n]/g, '_');
 
-function criarApiZoe(base, chave) {
-  const raiz = `${String(base).replace(/\/+$/, '')}/zoe/atendimentos`;
-  const chamar = async (metodo, caminho, corpo) => {
-    const resp = await fetch(raiz + caminho, {
-      method: metodo,
-      headers: { 'X-Api-Key': chave, 'Content-Type': 'application/json' },
-      body: corpo === undefined ? undefined : JSON.stringify(corpo),
-      signal: AbortSignal.timeout(8000),
-    });
-    const dados = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw Object.assign(new Error(dados.erro || `HTTP ${resp.status}`), { status: resp.status });
-    return dados;
-  };
-  return {
-    iniciar: (corpo) => chamar('POST', '', corpo),
-    get: (uid, etapa) => chamar('GET', `/${encodeURIComponent(uid)}/${etapa}`),
-    post: (uid, etapa, corpo = {}) => chamar('POST', `/${encodeURIComponent(uid)}/${etapa}`, corpo),
-  };
-}
-
-/**
- * Conduz uma ligação. `o.tts`: aplicação de TTS do Asterisk (fala o texto que a API devolve);
- * sem ela, toca os áudios gravados (zoe/<nome>) e fala números com SAY NUMBER.
- */
-async function atender(agi, api, env, o = {}) {
-  const uid = env.agi_uniqueid;
-  const telefone = /^\+?\d{8,}$/.test(env.agi_callerid ?? '') ? env.agi_callerid : '';
-  const set = (nome, valor) => agi.comando(`SET VARIABLE ${nome} ${aspas(valor ?? '')}`);
-
-  const falar = async (texto, audios) => {
-    if (o.tts) return agi.comando(`EXEC ${o.tts} ${textoApp(texto)}`);
-    for (const a of audios) {
-      if (typeof a === 'number') await agi.comando(`SAY NUMBER ${a} ""`);
-      else await agi.comando(`STREAM FILE zoe/${a} ""`);
-    }
-    return null;
-  };
-  /** Fala e espera as teclas (# encerra). */
-  const pedir = async (texto, audio, max, tempo = 6000) => {
-    if (o.tts) {
-      await falar(texto);
-      return agi.comando(`GET DATA silence/1 ${tempo} ${max}`);
-    }
-    return agi.comando(`GET DATA zoe/${audio} ${tempo} ${max}`);
-  };
-
-  let iniciado = false;
-  let status = 'resolvido';
-  try {
-    let r;
-    try {
-      r = await api.iniciar({ uid, telefone });
-      iniciado = true;
-    } catch {
-      await set('ZOE_STATUS', 'indisponivel');
-      return 'indisponivel';
-    }
-    let invalidas = 0;
-    // Com TTS o aviso já vem na primeira fala; com áudios gravados, toca antes.
-    if (!o.tts) await falar(null, ['aviso']);
-
-    for (let passo = 0; passo < 30; passo++) {
-      if (r.etapa === 'documento') {
-        const d = await pedir(r.fala, 'digite-documento', 14, 15000);
-        r = await api.post(uid, 'documento', { documento: d });
-        continue;
-      }
-      if (r.etapa === 'confirmar') {
-        const cpf3 = r.metodo === 'cpf3';
-        const d = await pedir(r.fala, cpf3 ? 'digite-cpf3' : 'digite-nascimento', cpf3 ? 3 : 8, 10000);
-        r = await api.post(uid, 'confirmar', { codigo: d });
-        continue;
-      }
-      if (r.etapa === 'transferir') {
-        await falar(r.fala, ['transferindo']);
-        status = 'transferir';
-        await set('ZOE_FILA_ID', r.fila?.id ?? '');
-        await set('ZOE_FILA_NOME', nomeFila(r.fila?.nome));
-        await set('ZOE_RESUMO', r.resumo ?? '');
-        break;
-      }
-      if (r.etapa !== 'menu') break;
-
-      const opcao = r.opcao ?? await pedir(r.fala, 'menu', 1);
-      delete r.opcao;
-      if (opcao === '1') {
-        const f = await api.get(uid, 'faturas');
-        if (f.etapa !== 'menu') { r = f; continue; }
-        if (!f.faturas.length) { await falar(f.fala, ['sem-faturas']); break; }
-        if (!f.canais.length) { r = await api.post(uid, 'transferir', { motivo: 'financeiro' }); continue; }
-        const x = f.faturas[0];
-        const audios = ['faturas-abertas', f.faturas.length, 'vence-em', Number(x.vencimento.slice(8, 10)), `mes-${x.vencimento.slice(5, 7)}`,
-          'valor-de', Math.floor(x.valor_centavos / 100), 'reais', ...(x.valor_centavos % 100 ? ['e', x.valor_centavos % 100, 'centavos'] : [])];
-        await falar(f.fala.replace(/ Para receber.*$/, ''), audios);
-        const canalTexto = f.fala.slice(f.fala.indexOf('Para receber'));
-        const escolha = o.tts ? await pedir(canalTexto, null, 1) : await (async () => {
-          for (const [i, c] of f.canais.entries()) await falar(null, [`canal-${c.canal}`, i + 1]);
-          return agi.comando('GET DATA silence/1 6000 1');
-        })();
-        const canal = f.canais[Number(escolha) - 1];
-        if (!canal) { if (++invalidas >= 3) { r = await api.post(uid, 'transferir', { motivo: 'financeiro' }); continue; } r.opcao = '1'; continue; }
-        const b = await api.post(uid, 'boleto', { canal: canal.canal, fatura_id: x.id });
-        if (b.etapa !== 'menu') { r = b; continue; }
-        await falar(b.fala, ['boleto-enviado']);
-        break;
-      }
-      if (opcao === '2') {
-        const d = await api.post(uid, 'desbloqueio');
-        if (d.etapa !== 'menu') { r = d; continue; }
-        const audio = d.liberado ? 'liberado' : { limite: 'desbloqueio-limite', ja_liberado: 'ja-liberado' }[d.motivo] ?? 'desbloqueio-negado';
-        const prox = await pedir(d.fala, audio, 1);
-        if (prox === '1') { r.opcao = '1'; continue; }
-        if (prox === '0') { r = await api.post(uid, 'transferir', { motivo: 'financeiro' }); continue; }
-        if (prox === '3') { r = await api.post(uid, 'transferir', { motivo: 'suporte' }); continue; }
-        break;
-      }
-      if (['3', '4', '0'].includes(opcao)) {
-        r = await api.post(uid, 'transferir', { motivo: { 3: 'suporte', 4: 'comercial', 0: 'outro' }[opcao] });
-        continue;
-      }
-      // Nada ou tecla inválida: repete o menu; na terceira vez, transfere.
-      if (++invalidas >= 3) r = await api.post(uid, 'transferir', { motivo: 'outro' });
-    }
-    if (status === 'resolvido') await falar('Obrigada por ligar!', ['obrigada']).catch(() => {});
-    await set('ZOE_STATUS', status);
-    return status;
-  } catch (err) {
-    if (err instanceof Desligou) return 'desligou';
-    // Falha da API no meio da ligação: a ligação segue para o atendimento.
-    await set('ZOE_STATUS', 'indisponivel').catch(() => {});
-    return 'indisponivel';
-  } finally {
-    if (iniciado) await api.post(uid, 'fim').catch(() => {});
-  }
-}
-
 // ---------- Modo conversado: o mesmo cérebro do WhatsApp ----------
 
 function criarApiCerebro(base, chave) {
@@ -293,8 +147,8 @@ function criarApiCerebro(base, chave) {
 const DIGITOS = '0123456789*#';
 
 /**
- * Conduz a ligação conversando. Devolve o status deixado no canal (mesmo contrato do modo por
- * teclas: resolvido | transferir | indisponivel | desligou), para o plano de discagem não mudar.
+ * Conduz a ligação conversando. Devolve o status deixado no canal (resolvido | transferir |
+ * indisponivel | desligou), para o plano de discagem não mudar.
  */
 async function conversar(agi, cerebro, env, o = {}) {
   const fs = require('node:fs');
@@ -394,33 +248,48 @@ async function atendeu(agi, env, cerebro, { tts = '', sussurrar = true } = {}) {
 }
 
 /**
- * Roda no "h" do plano de discagem: o cliente desligou. Fecha a conversa no ZOE Atende (modo
- * conversado) e o atendimento da ZOE no PABX (modo por teclas, que é o uid do próprio canal).
- * Repetir o fim não faz mal: os dois lados ignoram o que já está encerrado ou não existe.
+ * Roda no "h" do plano de discagem: o cliente desligou. Fecha a conversa na ZOE.
+ * Repetir o fim não faz mal: a ZOE ignora o que já está encerrado ou não existe.
  */
-async function fimDaLigacao(agi, env, cerebro, teclas = null) {
+async function fimDaLigacao(agi, env, cerebro) {
   const uid = (await agi.variavel('ZOE_UID').catch(() => '')) || env.agi_uniqueid;
   if (cerebro && uid) await cerebro.fim(uid).catch(() => {});
-  if (teclas && env.agi_uniqueid) await teclas.post(env.agi_uniqueid, 'fim').catch(() => {});
   return 'encerrado';
 }
 
-/**
- * Conversado quando dá (cérebro configurado e TTS para falar texto livre); por teclas como reserva.
- * Se o cérebro não responder logo no início, a mesma ligação segue pela URA de teclas.
- */
-async function escolherModo(agi, env, { cerebro = null, teclas = null, tts = '', gravacoes } = {}) {
+/** Conversa quando dá (ZOE configurada e TTS para falar texto livre); senão, a fila. */
+async function escolherModo(agi, env, { cerebro = null, tts = '', gravacoes } = {}) {
   if (cerebro && tts) {
     try {
       return await conversar(agi, cerebro, env, { tts, gravacoes });
     } catch (err) {
       if (!err.naoIniciou) throw err;
-      // Cérebro fora do ar antes de atender: cai para as teclas, sem a pessoa perceber.
+      // ZOE fora do ar antes de atender: o ZOE_STATUS já ficou "indisponivel" e a pessoa vai para a fila.
+      return 'indisponivel';
     }
   }
-  if (teclas) return atender(agi, teclas, env, { tts });
   await agi.comando('SET VARIABLE ZOE_STATUS "indisponivel"').catch(() => {});
   return 'indisponivel';
+}
+
+/** Lê /etc/asterisk/zoe-agi.conf (CHAVE=valor); as variáveis de ambiente têm prioridade. */
+function lerConf(arquivo = process.env.ZOE_AGI_CONF || '/etc/asterisk/zoe-agi.conf') {
+  const conf = {};
+  try {
+    for (const linha of require('node:fs').readFileSync(arquivo, 'utf8').split('\n')) {
+      const m = linha.match(/^\s*(ZOE_[A-Z_]+)\s*=\s*(.*?)\s*$/);
+      if (m) conf[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    }
+  } catch { /* sem arquivo: só as variáveis de ambiente */ }
+  const v = (k) => process.env[k] || conf[k] || '';
+  return {
+    // ZOE_CEREBRO / ZOE_CEREBRO_CHAVE: nomes antigos, ainda aceitos.
+    url: v('ZOE_URL') || v('ZOE_CEREBRO'),
+    chave: v('ZOE_CHAVE') || v('ZOE_CEREBRO_CHAVE'),
+    tts: v('ZOE_TTS_APP'),
+    gravacoes: v('ZOE_GRAVACOES'),
+    sussurrar: v('ZOE_SUSSURRO') !== '0',
+  };
 }
 
 async function principal() {
@@ -430,29 +299,15 @@ async function principal() {
   process.on('SIGHUP', () => {});
   const agi = criarAgi(process.stdin, process.stdout);
   const env = await agi.ambiente();
-  const cerebroDe = () => (process.env.ZOE_CEREBRO && process.env.ZOE_CEREBRO_CHAVE
-    ? criarApiCerebro(process.env.ZOE_CEREBRO, process.env.ZOE_CEREBRO_CHAVE) : null);
+  const c = lerConf();
+  const cerebro = c.url && c.chave ? criarApiCerebro(c.url, c.chave) : null;
   // AGI(zoe-agi.js,atendeu) no gosub da fila e AGI(zoe-agi.js,fim) no "h": ver o exemplo no topo.
-  if (env.agi_arg_1 === 'atendeu') {
-    await atendeu(agi, env, cerebroDe(), { tts: process.env.ZOE_TTS_APP || '', sussurrar: process.env.ZOE_SUSSURRO !== '0' }).catch(() => {});
-    process.exit(0);
-  }
-  if (env.agi_arg_1 === 'fim') {
-    // AGI(zoe-agi.js,fim[,URL,CHAVE]): a URL e a chave do modo por teclas, como no atendimento.
-    const baseFim = env.agi_arg_2 || process.env.ZOE_API;
-    const chaveFim = env.agi_arg_3 || process.env.ZOE_CHAVE;
-    await fimDaLigacao(agi, env, cerebroDe(), baseFim && chaveFim ? criarApiZoe(baseFim, chaveFim) : null).catch(() => {});
-    process.exit(0);
-  }
-  const base = env.agi_arg_1 || process.env.ZOE_API;
-  const chave = env.agi_arg_2 || process.env.ZOE_CHAVE;
-  const tts = process.env.ZOE_TTS_APP || '';
-  const cerebro = process.env.ZOE_CEREBRO && process.env.ZOE_CEREBRO_CHAVE
-    ? criarApiCerebro(process.env.ZOE_CEREBRO, process.env.ZOE_CEREBRO_CHAVE) : null;
-  await escolherModo(agi, env, { cerebro, teclas: base && chave ? criarApiZoe(base, chave) : null, tts, gravacoes: process.env.ZOE_GRAVACOES });
+  if (env.agi_arg_1 === 'atendeu') await atendeu(agi, env, cerebro, { tts: c.tts, sussurrar: c.sussurrar }).catch(() => {});
+  else if (env.agi_arg_1 === 'fim') await fimDaLigacao(agi, env, cerebro).catch(() => {});
+  else await escolherModo(agi, env, { cerebro, tts: c.tts, gravacoes: c.gravacoes }).catch(() => {});
   process.exit(0);
 }
 
 if (require.main === module) principal();
 
-module.exports = { criarAgi, criarApiZoe, criarApiCerebro, atender, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal, textoApp, nomeFila, Desligou };
+module.exports = { criarAgi, criarApiCerebro, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal, textoApp, nomeFila, lerConf, Desligou };
