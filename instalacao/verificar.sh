@@ -5,9 +5,12 @@ set -u
 ok() { printf '  \033[32m✔\033[0m %s\n' "$*"; }
 ruim() { printf '  \033[31m✘\033[0m %s\n' "$*"; FALHOU=1; }
 FALHOU=0
+ZOE_PORTA=3600
+# shellcheck disable=SC1091
+[ -f /etc/zoe.conf ] && . /etc/zoe.conf
 echo "Serviço:"
 if systemctl is-active --quiet zoe; then
-  if curl -fsS -m 5 "http://127.0.0.1:3600/atendimento/api/saude" >/dev/null; then ok "zoe no ar (porta 3600)"
+  if curl -fsS -m 5 "http://127.0.0.1:$ZOE_PORTA/atendimento/api/saude" >/dev/null; then ok "zoe no ar (porta $ZOE_PORTA)"
   else ruim "zoe ativo, mas /atendimento/api/saude não respondeu — journalctl -u zoe -n 50"; fi
 else
   ruim "zoe parado — journalctl -u zoe -n 50"

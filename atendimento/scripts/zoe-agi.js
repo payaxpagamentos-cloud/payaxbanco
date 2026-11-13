@@ -28,19 +28,19 @@
  * Exemplo (extensions.conf):
  *   [zoe-entrada]
  *   exten => s,1,Answer()
- *    same => n,AGI(/zoe/atendimento/scripts/zoe-agi.js)
+ *    same => n,AGI(/usr/local/bin/zoe-agi)
  *    same => n,GotoIf($["${ZOE_STATUS}" = "transferir" | "${ZOE_STATUS}" = "indisponivel"]?fila)
  *    same => n,Hangup()
  *    same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?Atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
  *   ; ZOE_FILA_NOME chega sem vírgula, | , parênteses, $ e aspas (trocados por _): a fila no
  *   ; Asterisk deve ter o nome da fila do painel com essa troca. Nomes simples evitam surpresa.
  *   ; O cliente desligou (na fila, com o atendente ou com a ZOE): fecha a conversa na ZOE.
- *   exten => h,1,AGI(/zoe/atendimento/scripts/zoe-agi.js,fim)
+ *   exten => h,1,AGI(/usr/local/bin/zoe-agi,fim)
  *
  *   ; Roda no canal do RAMAL quando ele atende (8º parâmetro do Queue). Abre a passagem no painel
  *   ; de quem tem esse ramal (Usuários › Ramal) e sussurra o resumo antes de ligar o cliente.
  *   [zoe-atendeu]
- *   exten => s,1,AGI(/zoe/atendimento/scripts/zoe-agi.js,atendeu)
+ *   exten => s,1,AGI(/usr/local/bin/zoe-agi,atendeu)
  *    same => n,Return()
  */
 

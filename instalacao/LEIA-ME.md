@@ -98,8 +98,9 @@ transfere cai na mesma fila e na mesma equipe.
    - *Chave da central*: crie a chave da empresa (`cen_…`). Ela aparece **uma vez**.
 2. **Na empresa › Telefonia**, cadastre os ramais com o **mesmo número** do campo *Ramal* em *Usuários*. Escolha
    os ramais de cada fila, monte a URA e diga para onde vai cada número.
-3. **No Asterisk**, use o script `/zoe/atendimento/scripts/zoe-agi.js`. Se o Asterisk estiver em outra máquina,
-   copie o script para lá (ele precisa de Node 22). Depois crie o arquivo `/etc/asterisk/zoe-agi.conf`:
+3. **No Asterisk**, use o comando `/usr/local/bin/zoe-agi`, que o instalador cria. Se o Asterisk estiver em outra
+   máquina, copie `/usr/local/lib/zoe/zoe-agi.js` para lá (precisa de Node 18 ou mais novo) e crie o mesmo comando,
+   como mostra o `ATIVACAO.md`. Depois crie o arquivo `/etc/asterisk/zoe-agi.conf`:
 
    ```
    ZOE_URL=https://atende.seuprovedor.com.br/atendimento

@@ -26,6 +26,23 @@ nslookup DOMINIO
 
 ---
 
+## 0.1 O servidor já tem outro sistema? Rode a checagem primeiro
+
+A instalação da ZOE convive com o que já está lá:
+- não troca o Node do servidor: se ele for outro, a ZOE usa um Node 22 só dela;
+- não instala o Nginx se a porta 80 for de outro servidor web, como o Apache;
+- recusa uma porta ocupada;
+- não mexe em outros sites.
+
+Depois de enviar e extrair o pacote (passos 1 e 2, até o `cd zoe`), rode **antes** do instalador:
+
+```bash
+sudo ./instalacao/checar-servidor.sh
+```
+
+Ela **só lê, não altera nada**. Mande o resultado inteiro para mim e eu digo se dá para instalar direto ou se precisa
+de algum ajuste. Por exemplo, `--porta 3610` se a 3600 estiver ocupada, ou o caminho do Apache.
+
 ## 1. Enviar o pacote para o servidor
 
 Rode no seu computador, na pasta onde salvou o `zoe-instalacao.tar.gz`. O comando é o mesmo no Windows (PowerShell), no Mac e no Linux:
@@ -58,6 +75,9 @@ sudo certbot --nginx -d DOMINIO
 ```
 
 Quando ele perguntar, escolha redirecionar HTTP para HTTPS.
+
+Se o servidor usa **Apache**, o instalador mostra no fim os comandos para ligar o site da ZOE no Apache. Nesse caso, use
+`sudo apt install -y python3-certbot-apache` e `sudo certbot --apache -d DOMINIO`.
 
 ## 4. Colocar a chave de IA
 
@@ -122,17 +142,10 @@ Se o IXC estiver na rede interna (10.x, 192.168.x), acrescente `ATEND_REDE_INTER
 
 **No servidor do Asterisk:**
 
+Se o Asterisk estiver **no mesmo servidor da ZOE**, o instalador já deixou o comando `/usr/local/bin/zoe-agi` pronto.
+Só crie a configuração:
+
 ```bash
-# Node 22 (se o Asterisk estiver em outra máquina)
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
-sudo apt install -y nodejs
-
-# o script da ZOE (se o Asterisk estiver em outra máquina)
-sudo mkdir -p /zoe/atendimento/scripts
-sudo scp root@IP-DO-SERVIDOR:/zoe/atendimento/scripts/zoe-agi.js /zoe/atendimento/scripts/
-sudo chmod 755 /zoe/atendimento/scripts/zoe-agi.js
-
-# configuração
 sudo tee /etc/asterisk/zoe-agi.conf >/dev/null <<'CONF'
 ZOE_URL=https://DOMINIO/atendimento
 ZOE_CHAVE=COLE-AQUI-A-CHAVE-cen
@@ -142,19 +155,30 @@ sudo chmod 640 /etc/asterisk/zoe-agi.conf
 sudo chown root:asterisk /etc/asterisk/zoe-agi.conf
 ```
 
+Se o Asterisk estiver **em outra máquina**, rode isto nela antes de criar a configuração acima:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -   # só se ela não tiver Node 18+
+sudo apt install -y nodejs
+sudo mkdir -p /usr/local/lib/zoe
+sudo scp root@IP-DO-SERVIDOR:/usr/local/lib/zoe/zoe-agi.js /usr/local/lib/zoe/
+printf '#!/bin/sh\nexec node /usr/local/lib/zoe/zoe-agi.js "$@"\n' | sudo tee /usr/local/bin/zoe-agi >/dev/null
+sudo chmod 755 /usr/local/bin/zoe-agi /usr/local/lib/zoe/zoe-agi.js
+```
+
 Ainda no Asterisk, acrescente isto ao `extensions.conf` e aponte o número de entrada para o contexto `zoe-entrada`:
 
 ```
 [zoe-entrada]
 exten => s,1,Answer()
- same => n,AGI(/zoe/atendimento/scripts/zoe-agi.js)
+ same => n,AGI(/usr/local/bin/zoe-agi)
  same => n,GotoIf($["${ZOE_STATUS}" = "transferir" | "${ZOE_STATUS}" = "indisponivel"]?fila)
  same => n,Hangup()
  same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?Atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
-exten => h,1,AGI(/zoe/atendimento/scripts/zoe-agi.js,fim)
+exten => h,1,AGI(/usr/local/bin/zoe-agi,fim)
 
 [zoe-atendeu]
-exten => s,1,AGI(/zoe/atendimento/scripts/zoe-agi.js,atendeu)
+exten => s,1,AGI(/usr/local/bin/zoe-agi,atendeu)
  same => n,Return()
 ```
 
