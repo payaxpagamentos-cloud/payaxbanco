@@ -1,0 +1,40 @@
+/* Internet Bank — a mesma base, com a identidade do lado do cliente (verde). */
+:root {
+  --marca: #12322a;
+  --marca-2: #1b4538;
+}
+.marca-simbolo { color: #4bd7a0; }
+.link-menu.ativo { border-left-color: #4bd7a0; }
+.entrada { background: radial-gradient(1100px 480px at 50% -10%, #1d4c3d 0%, #12322a 62%); }
+
+/* Cartão de saldo, o primeiro bloco da tela inicial. */
+.saldo {
+  background: linear-gradient(135deg, #12322a 0%, #1d4c3d 100%); color: #fff; border-radius: var(--raio);
+  padding: 20px 22px; box-shadow: var(--sombra); display: grid; gap: 14px;
+}
+.saldo .titulo { font-size: 12.5px; color: #a8cdbf; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+.saldo .valor { font-size: 34px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.saldo .linhas { display: flex; gap: 26px; flex-wrap: wrap; border-top: 1px solid rgba(255, 255, 255, 0.16); padding-top: 13px; }
+.saldo .linha { display: grid; gap: 1px; }
+.saldo .linha span { font-size: 11.5px; color: #a8cdbf; }
+.saldo .linha strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.saldo .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.saldo .botao { background: #4bd7a0; color: #0a241c; }
+.saldo .botao:hover { background: #3cc48f; }
+.saldo .botao.sec { background: rgba(255, 255, 255, 0.12); color: #fff; border-color: rgba(255, 255, 255, 0.22); }
+.saldo .botao.sec:hover { background: rgba(255, 255, 255, 0.2); }
+
+.abas { display: flex; gap: 4px; border-bottom: 1px solid var(--borda); margin-bottom: 16px; overflow-x: auto; }
+.abas button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 13px; font-size: 13.5px; color: var(--texto-2); cursor: pointer; white-space: nowrap; }
+.abas button.ativa { color: #12322a; border-bottom-color: #2fae80; font-weight: 650; }
+
+.pares { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 18px; }
+.par { display: grid; gap: 2px; }
+.par .rot { font-size: 11.5px; color: var(--texto-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.par .val { font-size: 14px; }
+.par .val.grande { font-size: 19px; font-weight: 650; }
+.codigo { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--superficie-2); border: 1px solid var(--borda); border-radius: 6px; padding: 7px 9px; word-break: break-all; }
+.atalhos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.atalho { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie); cursor: pointer; text-align: left; font-size: 13.5px; font-weight: 600; color: var(--texto); }
+.atalho:hover { border-color: #2fae80; background: #f2fbf7; }
+.atalho svg { color: #2fae80; }

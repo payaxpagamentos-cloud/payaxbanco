@@ -32,6 +32,7 @@ function criarApp(db) {
   equipe.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   equipe.use(express.json({ limit: '1mb' }));
   equipe.use('/api', criarApi(db));
+  equipe.use('/comum', express.static(path.join(__dirname, '..', 'comum'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   equipe.use(express.static(path.join(__dirname, '..', 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
   // ------------------------------------------------- Internet Bank do cliente final
@@ -39,6 +40,7 @@ function criarApp(db) {
   cliente.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   cliente.use(express.json({ limit: '1mb' }));
   cliente.use('/api', criarApiCliente(db));
+  cliente.use('/comum', express.static(path.join(__dirname, '..', 'comum'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   cliente.use('/js/boleto.js', express.static(path.join(__dirname, '..', 'public', 'js', 'boleto.js')));
   cliente.use(express.static(path.join(__dirname, '..', 'cliente'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 

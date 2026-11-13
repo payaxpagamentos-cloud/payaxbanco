@@ -66,7 +66,7 @@ module.exports = (db) => {
   r.get('/:id/link', exigir('boletos.ver'), (req, res) => {
     const b = db.prepare('SELECT id, nosso_numero FROM boletos WHERE id = ?').get(Number(req.params.id));
     if (!b) throw naoEncontrado('Boleto');
-    const caminho = `${config.basePath}/publico/boleto/${b.id}/${assinaturaFicha(b.id, b.nosso_numero)}`;
+    const caminho = `${config.basePath}/api/publico/boleto/${b.id}/${assinaturaFicha(b.id, b.nosso_numero)}`;
     res.json({ caminho, url: config.urlPublica ? `${config.urlPublica}${caminho}` : null });
   });
 

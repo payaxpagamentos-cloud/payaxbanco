@@ -48,7 +48,10 @@ function proximoNossoNumero(db, conta) {
 /** Valida e normaliza os dados de um boleto novo. */
 function validarEntrada(dados, cliente) {
   const tipo = v.opcao(dados.tipo ?? 'bolepix', 'o tipo', ['boleto', 'bolepix']);
-  const valor = v.centavos(dados.valor, 'o valor');
+  // `valor` vem da tela em reais ("1.234,56"); `valor_centavos` vem de integrações (IXC, API), já em inteiros.
+  const valor = dados.valor_centavos !== undefined && dados.valor_centavos !== null && dados.valor_centavos !== ''
+    ? v.inteiro(dados.valor_centavos, 'o valor', { min: 1 })
+    : v.centavos(dados.valor, 'o valor');
   if (valor < 500) throw new ErroNegocio('O valor mínimo de um boleto é R$ 5,00.', 422);
   if (valor > cliente.limite_boleto_centavos) {
     throw new ErroNegocio(`Valor acima do limite por boleto deste cliente (${(cliente.limite_boleto_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`, 422);

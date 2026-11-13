@@ -24,15 +24,24 @@ const igual = (a, b) => {
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 };
 
+/**
+ * Valor do aviso em centavos inteiros, aceitando as formas que os bancos usam:
+ *   "1.234,56" (pt-BR) · "1234.56" (ponto decimal) · 123456 ou "123456" (centavos) · 1234.56 (número).
+ */
+function valorEmCentavos(v) {
+  if (v === undefined || v === null || v === '') return 0;
+  if (typeof v === 'number') return Number.isInteger(v) ? v : Math.round(v * 100);
+  const t = String(v).trim().replace(/^R\$\s*/, '');
+  if (t.includes(',')) return Math.round(Number(t.replace(/\./g, '').replace(',', '.')) * 100) || 0;
+  if (/\.\d{1,2}$/.test(t)) return Math.round(Number(t) * 100) || 0;
+  return Math.round(Number(t.replace(/\./g, ''))) || 0;
+}
+
 /** Extrai nosso número, valor e data de pagamento de um aviso do banco, aceitando as variações de nome de campo. */
 function lerAviso(p) {
   const pega = (...nomes) => nomes.map((n) => p?.[n]).find((x) => x !== undefined && x !== null && x !== '');
   const nossoNumero = String(pega('nossoNumero', 'nosso_numero', 'eNumeroTitulo', 'numeroTitulo', 'identificacaoBoleto') ?? '').replace(/\D/g, '');
-  const valorBruto = pega('valorPago', 'vlPagoTitulo', 'valor_pago', 'valor');
-  // Aceita centavos inteiros ou reais com decimais.
-  const centavos = typeof valorBruto === 'number' && Number.isInteger(valorBruto) && String(valorBruto).length > 4
-    ? valorBruto
-    : Math.round(Number(String(valorBruto ?? '0').replace(/\./g, '').replace(',', '.')) * (String(valorBruto ?? '').includes(',') || String(valorBruto ?? '').includes('.') ? 100 : 1));
+  const centavos = valorEmCentavos(pega('valorPago', 'vlPagoTitulo', 'valor_pago', 'valor'));
   const dataBruta = String(pega('dataCredito', 'dtCreditoTitulo', 'data_pagamento', 'dataPagamento', 'pago_em') ?? '');
   const dataPagamento = /^\d{4}-\d{2}-\d{2}/.test(dataBruta) ? dataBruta.slice(0, 10)
     : /^\d{2}[./]\d{2}[./]\d{4}$/.test(dataBruta) ? dataBruta.replace(/\./g, '/').split('/').reverse().join('-')
@@ -99,3 +108,4 @@ module.exports = (db) => {
 };
 
 module.exports.lerAviso = lerAviso;
+module.exports.valorEmCentavos = valorEmCentavos;

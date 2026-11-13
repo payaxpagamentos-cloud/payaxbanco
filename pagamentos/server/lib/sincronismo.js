@@ -80,7 +80,7 @@ async function importar(db, cliente, { de, ate, limite = 200, usuario = null } =
           usuario,
           dados: {
             tipo: ixc.config.tipo_padrao === 'boleto' ? 'boleto' : 'bolepix',
-            valor: t.valor_centavos,
+            valor_centavos: t.valor_centavos,
             vencimento: t.vencimento,
             seu_numero: t.documento || `IXC-${t.ixc_id}`,
             pagador_nome: p.nome,
