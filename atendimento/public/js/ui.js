@@ -215,6 +215,7 @@ export function barraUso(usado, limite, { formato = (x) => String(x), sufixo = '
 
 // Ícones de traço (fixos, não vêm da API).
 const P = {
+  telefone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
   dashboard: 'M3 3v18h18M7 15l4-4 3 3 6-6',
   caixa: 'M3 12h4l2 3h6l2-3h4M3 12l2.5-7h13L21 12v7H3z',
   conversa: 'M21 12a8 8 0 0 1-8 8H8l-5 2 1.6-4.3A8 8 0 1 1 21 12z',

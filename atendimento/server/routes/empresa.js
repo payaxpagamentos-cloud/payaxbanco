@@ -70,6 +70,7 @@ module.exports = function rotasEmpresa(db) {
   r.get('/', (req, res) => res.json({
     id: req.empresa.id, nome: req.empresa.nome, documento: req.empresa.documento, email: req.empresa.email, telefone: req.empresa.telefone,
     status: req.empresa.status, limite_atendentes: req.empresa.limite_atendentes, limite_ia_mes: req.empresa.limite_ia_mes,
+    telefonia_ativa: Boolean(req.empresa.telefonia_ativa),
   }));
 
   r.get('/painel', exigirPermissao('atendimentos.ver', 'relatorios.ver'), (req, res) => res.json(relatorios.painel(db, req.empresa.id)));

@@ -39,6 +39,8 @@ const MENU_EMPRESA = [
   ['chamados', 'Chamados', 'chamados', 'chamados.ver'],
   ['custos', 'Centro de Custo', 'dinheiro', 'custos.ver'],
   ['filas', 'Filas', 'filas', 'filas.ver'],
+  // Só aparece com a telefonia ligada para a empresa (o master liga).
+  ['telefonia', 'Telefonia', 'telefone', 'telefonia.ver'],
   ['equipe', 'Usuários', 'equipe', 'usuarios.ver'],
   ['relatorios', 'Relatórios', 'relatorios', 'relatorios.ver'],
   ['configuracoes', 'Configurações', 'configuracoes', 'configuracoes.ver'],
@@ -65,6 +67,7 @@ const SUBTITULOS = {
 };
 
 let pararSaude = null;
+let telefoniaLigada = false;
 // O aviso de ligação vive fora das telas: trocar de tela não pode perder uma ligação tocando.
 let pararVigia = null;
 let vigiaDe = null;
@@ -109,8 +112,26 @@ async function desenhar() {
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
   const telas = empresaId ? TELAS_EMPRESA : TELAS_MASTER;
+  // A empresa (nome e o que está ligado para ela) vem antes do menu: a Telefonia só aparece ligada.
+  let nomeEmpresa = null;
+  if (empresaId) {
+    let info = nomesEmpresa.get(empresaId);
+    if (!info) {
+      try {
+        const e = await api.get(`/empresas/${empresaId}`);
+        info = { nome: e.nome, telefonia: e.telefonia_ativa };
+        nomesEmpresa.set(empresaId, info);
+      } catch (err) {
+        toast(err.message, true);
+        return PLATAFORMA.includes(u.perfil) ? ir(null, 'empresas') : undefined;
+      }
+    }
+    nomeEmpresa = info.nome;
+    telefoniaLigada = Boolean(info.telefonia);
+  }
   // O menu do master ainda é por perfil (a plataforma tem só dois); o da empresa, por permissão.
-  const visivel = ([, , , exige]) => {
+  const visivel = ([chave, , , exige]) => {
+    if (chave === 'telefonia' && empresaId && !telefoniaLigada) return false;
     if (!exige) return true;
     return Array.isArray(exige) ? exige.includes(u.perfil) : pode(u, exige);
   };
@@ -124,19 +145,6 @@ async function desenhar() {
     return undefined;
   }
 
-  let nomeEmpresa = null;
-  if (empresaId) {
-    nomeEmpresa = nomesEmpresa.get(empresaId);
-    if (!nomeEmpresa) {
-      try {
-        nomeEmpresa = (await api.get(`/empresas/${empresaId}`)).nome;
-        nomesEmpresa.set(empresaId, nomeEmpresa);
-      } catch (err) {
-        toast(err.message, true);
-        return PLATAFORMA.includes(u.perfil) ? ir(null, 'empresas') : undefined;
-      }
-    }
-  }
 
   vigiar(u, empresaId);
   const conteudo = el('main', { class: `conteudo${tela === 'caixa' ? ' cheio' : ''}` });
@@ -178,7 +186,9 @@ async function desenhar() {
     pode: (p) => pode(u, p),
     parar: (fn) => { pararTela = fn; },
     ir: (tela2, eid = empresaId) => ir(eid, tela2),
-    renomearEmpresa: (id, nome) => nomesEmpresa.set(id, nome),
+    renomearEmpresa: (id, nome) => nomesEmpresa.set(id, { ...(nomesEmpresa.get(id) ?? {}), nome }),
+    // O master ligou/desligou a telefonia: o menu se refaz na próxima tela.
+    esquecerEmpresa: (id) => nomesEmpresa.delete(id),
   };
   try {
     await telas[tela](ctx);

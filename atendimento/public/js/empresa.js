@@ -1,5 +1,6 @@
 /** Telas do painel da empresa. */
 import {api, qs} from './api.js';
+import { telaTelefonia } from './telefonia.js';
 import {
   el, limpar, icone, toast, confirmar, formModal, modal, campo, area, escolha, marcar, inteiro, porcento,
   duracao, dataHora, desde, espera, diasSemana, telefone as formatarTelefone, etiquetaChamado, PERFIS, repetir,
@@ -507,5 +508,6 @@ const relatorios = (ctx) => telaRelatorios(ctx, `/empresas/${ctx.empresaId}/rela
 });
 
 export const TELAS_EMPRESA = {
+  telefonia: telaTelefonia,
   dashboard, caixa: telaCaixa, ia: telaIa, ouvidoria: telaOuvidoria, custos: telaCustos, filas, equipe, contatos, chamados, relatorios, configuracoes, integracoes,
 };
