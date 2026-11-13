@@ -780,6 +780,33 @@ test('Rastreador', async (t) => {
     assert.equal(cortes().length, 0, 'encerrar cancela o corte ainda não entregue');
   });
 
+  await t.test('bloqueio desativado no cadastro: nada de corte ou desbloqueio até reativar', async () => {
+    const db = api.db;
+    const placaV = db.prepare('SELECT placa FROM veiculos WHERE id = ?').get(veiculo).placa;
+    db.prepare("UPDATE comandos SET status = 'cancelado' WHERE veiculo_id = ? AND status IN ('pendente','enviado')").run(veiculo);
+    db.prepare('UPDATE veiculos SET bloqueado = 1 WHERE id = ?').run(veiculo);
+    // Um desbloqueio esperando o aparelho: desativar o bloqueio cancela.
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'desbloquear' }, cliente)).status, 201);
+    assert.equal((await api.put(`${base()}/veiculos/${veiculo}`, { bloqueio_desativado: true }, operador)).status, 403, 'operador não muda o cadastro');
+    assert.equal((await api.put(`${base()}/veiculos/${veiculo}`, { bloqueio_desativado: true }, cliente)).status, 204);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM comandos WHERE veiculo_id = ? AND tipo IN ('bloquear','desbloquear') AND status = 'pendente'").get(veiculo).n, 0);
+    const recusa = await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'bloquear', confirmacao: placaV }, cliente);
+    assert.equal(recusa.status, 422);
+    assert.match(recusa.dados.erro, /desativado/);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'desbloquear' }, cliente)).status, 422);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/roubo`, { confirmacao: placaV }, cliente)).status, 422, 'Modo Roubo não corta');
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'localizar' }, cliente)).status, 201, 'os outros comandos continuam');
+    assert.equal((await api.get(`${base()}/mapa`, cliente)).dados.veiculos.find((x) => x.id === veiculo).bloqueio_desativado, 1);
+    // A posição continua sendo gravada normalmente.
+    const p = db.prepare('SELECT lat, lng FROM veiculos WHERE id = ?').get(veiculo);
+    assert.equal(require('../server/lib/posicoes').receber(db, { imei: IMEI, protocolo: 'gt06', lat: p.lat + 0.01, lng: p.lng, velocidade_kmh: 5, ignicao: true, gps_em: new Date().toISOString() }).status, 'gravada');
+    // Reativado: volta a aceitar.
+    assert.equal((await api.put(`${base()}/veiculos/${veiculo}`, { bloqueio_desativado: false }, cliente)).status, 204);
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'desbloquear' }, cliente)).status, 201);
+    db.prepare("UPDATE comandos SET status = 'cancelado' WHERE veiculo_id = ? AND status IN ('pendente','enviado')").run(veiculo);
+    db.prepare('UPDATE veiculos SET bloqueado = 0 WHERE id = ?').run(veiculo);
+  });
+
   await t.test('segurança: estacionado, sumiço suspeito, bloqueio programado com código do motorista e WhatsApp', async () => {
     const http = require('node:http');
     const config = require('../server/config');

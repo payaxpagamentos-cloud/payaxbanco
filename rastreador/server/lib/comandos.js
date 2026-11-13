@@ -60,6 +60,9 @@ function criar(db, veiculo, d, usuarioId) {
   const r = db.prepare('SELECT * FROM rastreadores WHERE id = ?').get(veiculo.rastreador_id);
   v.exigir(r.protocolo !== 'osmand', 'Este rastreador (aplicativo no celular) não recebe comandos.');
   const tipo = v.opcao(d.tipo, 'o comando', Object.keys(TIPOS));
+  if ((tipo === 'bloquear' || tipo === 'desbloquear') && db.prepare('SELECT bloqueio_desativado FROM veiculos WHERE id = ?').get(veiculo.id)?.bloqueio_desativado) {
+    throw new ErroNegocio('O bloqueio deste veículo está desativado (instalação do relé em revisão). Para usar, reative em Veículos → Editar.', 422);
+  }
   if (tipo === 'bloquear') {
     const digitada = String(d.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '');
     if (digitada !== veiculo.placa) throw new ErroNegocio('Para bloquear, digite a placa do veículo para confirmar.', 422);

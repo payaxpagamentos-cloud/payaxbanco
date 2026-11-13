@@ -152,9 +152,11 @@ module.exports = (db, extras = {}) => {
       consumo_km_l: d.consumo_km_l !== undefined ? (d.consumo_km_l === '' || d.consumo_km_l === null ? null
         : v.numero(String(d.consumo_km_l).replace(',', '.'), 'o consumo médio', { min: 0.5, max: 80 })) : atual?.consumo_km_l ?? null,
       estacionado_auto: d.estacionado_auto !== undefined ? (v.booleano(d.estacionado_auto) ? 1 : 0) : atual?.estacionado_auto ?? 0,
+      // Instalação do relé em revisão: nenhum bloqueio ou desbloqueio sai para o aparelho (nem manual, nem automático).
+      bloqueio_desativado: d.bloqueio_desativado !== undefined ? (v.booleano(d.bloqueio_desativado) ? 1 : 0) : atual?.bloqueio_desativado ?? 0,
     };
   };
-  const CAMPOS_VEICULO = ['placa', 'descricao', 'marca', 'modelo', 'cor', 'renavam', 'ano', 'tipo', 'rastreador_id', 'motorista_id', 'limite_velocidade_kmh', 'ativo', 'consumo_km_l', 'estacionado_auto'];
+  const CAMPOS_VEICULO = ['placa', 'descricao', 'marca', 'modelo', 'cor', 'renavam', 'ano', 'tipo', 'rastreador_id', 'motorista_id', 'limite_velocidade_kmh', 'ativo', 'consumo_km_l', 'estacionado_auto', 'bloqueio_desativado'];
   const exigirLimite = (req, extra = 1) => {
     const n = db.prepare('SELECT COUNT(*) AS n FROM veiculos WHERE empresa_id = ? AND ativo = 1').get(eid(req)).n;
     if (n + extra > req.empresa.limite_veiculos) throw new ErroNegocio(`Limite de ${req.empresa.limite_veiculos} veículos ativos do plano atingido. Fale com o suporte.`, 422);
@@ -191,7 +193,19 @@ module.exports = (db, extras = {}) => {
     if (d.ativo && !atual.ativo) exigirLimite(req);
     // Desativado, o veículo libera o rastreador para outro.
     if (!d.ativo) d.rastreador_id = null;
-    db.prepare(`UPDATE veiculos SET ${CAMPOS_VEICULO.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...CAMPOS_VEICULO.map((k) => d[k]), atual.id);
+    const desativando = d.bloqueio_desativado && !atual.bloqueio_desativado;
+    if (desativando) {
+      const aberta = db.prepare("SELECT tipo FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(atual.id);
+      v.exigir(!aberta, aberta?.tipo === 'roubo' ? 'O veículo está em Modo Roubo: encerre a ocorrência antes de desativar o bloqueio.'
+        : 'Há um bloqueio em andamento neste veículo: encerre ou cancele antes de desativar o bloqueio.');
+    }
+    transacao(db, () => {
+      db.prepare(`UPDATE veiculos SET ${CAMPOS_VEICULO.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...CAMPOS_VEICULO.map((k) => d[k]), atual.id);
+      // Bloqueio/desbloqueio que ainda não saiu não sai mais.
+      if (desativando) db.prepare(`UPDATE comandos SET status = 'cancelado', respondido_em = ? WHERE veiculo_id = ? AND tipo IN ('bloquear','desbloquear')
+        AND (status = 'pendente' OR (status = 'enviado' AND resposta IS NULL))`).run(agora(), atual.id);
+    });
+    if (d.bloqueio_desativado !== atual.bloqueio_desativado) registrar(db, req, d.bloqueio_desativado ? 'bloqueio_desativado' : 'bloqueio_reativado', { placa: d.placa });
     registrar(db, req, 'veiculo_alterado', { placa: d.placa, campos: CAMPOS_VEICULO.filter((k) => d[k] !== atual[k]) });
     res.status(204).end();
   });

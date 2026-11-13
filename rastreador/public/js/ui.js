@@ -91,6 +91,7 @@ export const etiquetaSituacao = (s) => etiqueta(SITUACOES[s]?.[0] ?? s, SITUACOE
  * depois "bloqueado" ou "desbloqueado". Só para veículos com rastreador que recebe comandos (GT06).
  */
 export const etiquetaRele = (v) => {
+  if (v.bloqueio_desativado) return etiqueta('bloqueio desativado', 'aviso');
   if (v.rele_pendente) return etiqueta(v.rele_pendente === 'bloquear' ? 'bloqueando…' : 'desbloqueando…', 'aviso');
   if (v.bloqueado) return etiqueta('bloqueado', 'erro');
   return v.protocolo === 'gt06' ? etiqueta('desbloqueado', 'ok') : null;

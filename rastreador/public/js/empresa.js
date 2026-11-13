@@ -110,6 +110,8 @@ async function telaMapa(ctx) {
 /** Por que o veículo não recebe comandos (para mostrar no lugar do botão Bloquear), ou null se recebe. */
 const semComandos = (v) => (!v.imei ? 'Sem rastreador instalado: cadastre um em Veículos para poder bloquear.'
   : v.protocolo === 'osmand' ? 'Celular (Traccar Client) não recebe comandos de bloqueio.' : null);
+/** Bloqueio desligado no cadastro (instalação do relé em revisão): some Bloquear, Desbloquear, Modo Roubo e o teste. */
+const semBloqueio = (v) => Boolean(v.bloqueio_desativado);
 
 /**
  * Faixa do veículo escolhido no mapa, com as ações (bloquear e desbloquear primeiro). Também usada no Mapa geral do master:
@@ -118,6 +120,7 @@ const semComandos = (v) => (!v.imei ? 'Sem rastreador instalado: cadastre um em 
 export function detalheVeiculo(ctx, v, painel, fechar, { mostrarEmpresa = false } = {}) {
   const motivo = semComandos(v);
   const comComandos = pode(ctx) && !motivo;
+  const comBloqueio = comComandos && !semBloqueio(v);
   const emRoubo = v.ocorrencia_tipo === 'roubo';
   const corteEsperando = v.ocorrencia_tipo === 'manual' && v.roubo === 'aguardando';
   const linkEmpresa = (tela) => `#/empresa/${ctx.empresaId}/${tela}`;
@@ -133,19 +136,19 @@ export function detalheVeiculo(ctx, v, painel, fechar, { mostrarEmpresa = false 
       v.alertas_pendentes ? el('a', { class: 'etiqueta aviso', href: linkEmpresa('alertas'), style: 'text-decoration:none' }, `${v.alertas_pendentes} alerta(s)`) : null],
     acoes: [
       // Segurança primeiro: Modo Roubo, Estacionar e Bloquear.
-      comComandos ? (emRoubo
+      comComandos && (emRoubo || comBloqueio) ? (emRoubo
         ? el('a', { class: 'btn pequeno perigo roubo', href: linkEmpresa('roubo') }, icone('sos'), 'Acompanhar a ocorrência')
         : botao([icone('sos'), 'Modo Roubo'], 'perigo roubo', () => acionarRoubo(ctx, v))) : null,
       pode(ctx) && v.imei && v.protocolo !== 'api' ? (v.estacionado
         ? botao([icone('alvo'), 'Desarmar estacionado'], '', () => desarmar(ctx, v))
         : botao([icone('alvo'), 'Estacionar'], '', () => estacionar(ctx, v))) : null,
-      comComandos ? (corteEsperando
+      comBloqueio ? (corteEsperando
         ? botao('Cancelar o bloqueio', '', () => enviarComando(ctx, v, 'desbloquear'))
         : v.bloqueado
           ? botao([icone('aberto'), 'Desbloquear'], 'desbloquear', () => enviarComando(ctx, v, 'desbloquear'))
           : emRoubo ? null : botao([icone('cadeado'), 'Bloquear'], 'bloquear', () => enviarComando(ctx, v, 'bloquear'))) : null,
       comComandos ? botao('Pedir posição', '', () => enviarComando(ctx, v, 'localizar')) : null,
-      comComandos && pode(ctx) && v.protocolo === 'gt06' && !emRoubo ? botao([icone('check'), 'Testar bloqueio'], '', () => testarBloqueio(ctx, v)) : null,
+      comBloqueio && v.protocolo === 'gt06' && !emRoubo ? botao([icone('check'), 'Testar bloqueio'], '', () => testarBloqueio(ctx, v)) : null,
       v.imei && v.protocolo === 'gt06' ? botao([icone('rastreadores'), 'Equipamento'], '', () => abrirFicha(ctx, v.id)) : null,
       el('button', { class: 'btn pequeno', onclick: () => { veiculoHistorico = v.id; ctx.ir('historico', ctx.empresaId); } }, icone('historico'), 'Histórico'),
       pode(ctx) ? botao('Compartilhar', '', () => compartilhar(ctx, v)) : null,
@@ -375,6 +378,8 @@ async function formVeiculo(ctx, x, aoSalvar) {
     escolha('Motorista', 'motorista_id', { '': 'Sem motorista fixo', ...Object.fromEntries(motoristas.filter((m) => m.ativo).map((m) => [m.id, m.nome])) }, x?.motorista_id ?? ''),
     x ? null : campo('Hodômetro atual (km)', { name: 'hodometro_km', type: 'number', min: 0, step: '0.1', value: 0 }),
     x ? marcar('Veículo ativo (inativo não conta no limite do plano e libera o rastreador)', { name: 'ativo', checked: Boolean(x.ativo) }) : null,
+    x?.rastreador_id ? marcar('Bloqueio desativado: a instalação do relé está em revisão (nenhum bloqueio ou desbloqueio é enviado, nem pelo Modo Roubo ou bloqueio programado)',
+      { name: 'bloqueio_desativado', checked: Boolean(x.bloqueio_desativado) }) : null,
     det?.compartilhamentos.length ? el('fieldset', {}, el('legend', {}, 'Links de localização ativos'), det.compartilhamentos.map((c) => {
       const linha = el('div', { class: 'linha entre' }, el('span', { class: 'pequeno' }, `Criado ${dataHora(c.criado_em)} · vale até ${dataHora(c.expira_em)}`));
       linha.append(botao('Cancelar link', 'perigo', async () => { await api.del(`${base(ctx)}/compartilhamentos/${c.id}`); toast('Link cancelado.'); linha.remove(); }));
@@ -411,14 +416,14 @@ async function telaVeiculos(ctx) {
         td(x.limite_velocidade_kmh ? kmh(x.limite_velocidade_kmh) : '—', 'dir num'), td(km(x.hodometro_m), 'dir num'),
         td([etiquetaSituacao(x.situacao), etiquetaRele(x), etiquetaTeste(x)]),
         el('td', { class: 'acoes' },
-          pode(ctx) && x.ativo && !semComandos(x) ? (x.bloqueado
+          pode(ctx) && x.ativo && !semComandos(x) && !semBloqueio(x) ? (x.bloqueado
             ? botaoIcone('aberto', 'Desbloquear o veículo', async () => { await enviarComando(ctx, x, 'desbloquear'); carregar(); }, 'desbloquear')
             : botaoIcone('cadeado', 'Bloquear o veículo', async () => { await enviarComando(ctx, x, 'bloquear'); carregar(); }, 'bloquear')) : null,
-          pode(ctx) && x.ativo && !semComandos(x) ? botaoIcone('sos', 'Modo Roubo (SOS)', async () => {
+          pode(ctx) && x.ativo && !semComandos(x) && !semBloqueio(x) ? botaoIcone('sos', 'Modo Roubo (SOS)', async () => {
             const v = (await api.get(`${base(ctx)}/mapa`)).veiculos.find((y) => y.id === x.id);
             if (v) await acionarRoubo(ctx, v);
           }, 'roubo') : null,
-          pode(ctx) && x.ativo && x.protocolo === 'gt06' ? botaoIcone('check', 'Testar bloqueio (instalação)', () => testarBloqueio(ctx, x, carregar)) : null,
+          pode(ctx) && x.ativo && x.protocolo === 'gt06' && !semBloqueio(x) ? botaoIcone('check', 'Testar bloqueio (instalação)', () => testarBloqueio(ctx, x, carregar)) : null,
           x.imei && x.protocolo === 'gt06' ? botaoIcone('rastreadores', 'Equipamento (J16)', () => abrirFicha(ctx, x.id)) : null,
           x.ativo ? botaoIcone('qr', 'QR code do veículo (app do motorista)', () => qrVeiculo(ctx, x), 'qr') : null,
           botaoIcone('historico', 'Histórico', () => { veiculoHistorico = x.id; ctx.ir('historico'); }),

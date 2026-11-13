@@ -116,6 +116,7 @@ function voltarPerfil(db, veiculo, usuarioId) {
  */
 function abrirInterno(db, veiculo, { tipo, usuarioId = null, observacao = null }) {
   v_exigir(veiculo.rastreador_id, 'O veículo não tem rastreador instalado.');
+  v_exigir(!veiculo.bloqueio_desativado, 'O bloqueio deste veículo está desativado (instalação do relé em revisão). Para usar, reative em Veículos → Editar.');
   const r = db.prepare('SELECT protocolo FROM rastreadores WHERE id = ?').get(veiculo.rastreador_id);
   v_exigir(r && r.protocolo !== 'osmand', 'Este rastreador (aplicativo no celular) não recebe o comando de bloqueio.');
   const limite = limiteSeguro(db);
@@ -149,6 +150,7 @@ function aoReceber(db, veiculoId) {
   const oc = db.prepare("SELECT * FROM ocorrencias WHERE veiculo_id = ? AND status = 'aguardando'").get(veiculoId);
   if (!oc) return;
   const veiculo = db.prepare('SELECT * FROM veiculos WHERE id = ?').get(veiculoId);
+  if (veiculo.bloqueio_desativado) return; // nunca derruba a gravação da posição
   const pos = { lat: veiculo.lat, lng: veiculo.lng, velocidade_kmh: veiculo.velocidade_kmh };
   const limite = limiteSeguro(db);
   const motivo = seguroAgora(veiculo, limite);

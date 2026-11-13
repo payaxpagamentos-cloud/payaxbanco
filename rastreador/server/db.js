@@ -816,7 +816,7 @@ function abrir(arquivo = config.dbFile) {
 function migrar(db) {
   const colunas = (t) => new Set(db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name));
   const NOVAS = {
-    veiculos: { multas_auto: 'INTEGER NOT NULL DEFAULT 0', renavam: 'TEXT', multas_consulta_em: 'TEXT', teste_bloqueio_ok: 'INTEGER', teste_bloqueio_em: 'TEXT', consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
+    veiculos: { bloqueio_desativado: 'INTEGER NOT NULL DEFAULT 0', multas_auto: 'INTEGER NOT NULL DEFAULT 0', renavam: 'TEXT', multas_consulta_em: 'TEXT', teste_bloqueio_ok: 'INTEGER', teste_bloqueio_em: 'TEXT', consumo_km_l: 'REAL', sumico_alertado: 'INTEGER NOT NULL DEFAULT 0', estacionado_auto: 'INTEGER NOT NULL DEFAULT 0', codigo_qr: 'TEXT' },
     empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0',
       plano_nome: 'TEXT', plano_valor_centavos: 'INTEGER', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT',
       multas_auto_dias: 'INTEGER NOT NULL DEFAULT 0', multas_auto_tipo: "TEXT NOT NULL DEFAULT 'completa'",

@@ -200,7 +200,8 @@ function iniciarGt06(db, porta, { host } = {}) {
     const r = db.prepare('SELECT id FROM rastreadores WHERE imei = ?').get(imei);
     if (!r) return;
     // Corte/desbloqueio enviado numa conexão que caiu sem resposta: vai de novo (o J16 ignora se já estiver no estado).
-    if (reenviar) db.prepare("UPDATE comandos SET status = 'pendente' WHERE rastreador_id = ? AND status = 'enviado' AND resposta IS NULL AND tipo IN ('bloquear','desbloquear')").run(r.id);
+    if (reenviar) db.prepare(`UPDATE comandos SET status = 'pendente' WHERE rastreador_id = ? AND status = 'enviado' AND resposta IS NULL AND tipo IN ('bloquear','desbloquear')
+      AND veiculo_id NOT IN (SELECT id FROM veiculos WHERE bloqueio_desativado = 1)`).run(r.id);
     for (const c of com.pendentes(db, r.id)) {
       cx.serial = (cx.serial + 1) & 0xffff;
       cx.socket.write(quadroComando(c.id, c.texto, cx.serial));

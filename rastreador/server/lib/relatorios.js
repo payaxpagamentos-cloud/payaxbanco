@@ -141,7 +141,7 @@ function veiculosMapa(db, empresaId = null) {
   const cfg = lerConfig(db);
   const agoraMs = Date.now();
   return db.prepare(`SELECT v.id, v.empresa_id, e.nome AS empresa, v.placa, v.descricao, v.tipo, v.lat, v.lng, v.velocidade_kmh, v.curso, v.ignicao, v.tensao,
-      v.bloqueado, v.teste_bloqueio_ok, v.teste_bloqueio_em, v.posicao_em, v.comunicacao_em, v.limite_velocidade_kmh, v.hodometro_m, COALESCE(mc.nome, m.nome) AS motorista,
+      v.bloqueado, v.bloqueio_desativado, v.teste_bloqueio_ok, v.teste_bloqueio_em, v.posicao_em, v.comunicacao_em, v.limite_velocidade_kmh, v.hodometro_m, COALESCE(mc.nome, m.nome) AS motorista,
       COALESCE(mc.telefone, m.telefone) AS motorista_telefone, ca.inicio AS condutor_desde,
       r.imei, r.protocolo, (SELECT COUNT(*) FROM alertas a WHERE a.veiculo_id = v.id AND a.tratado_em IS NULL) AS alertas_pendentes,
       (SELECT o.status FROM ocorrencias o WHERE o.veiculo_id = v.id AND o.status <> 'encerrada') AS roubo,
