@@ -16,16 +16,20 @@
 #     --sem-nginx        não mexe no Nginx (use se o proxy for outro: Apache, Caddy, balanceador)
 #     --com-whisper      compila e liga a transcrição de áudio local (whisper.cpp, ~1 GB de RAM)
 #     --modulos "a b"    só alguns: atendimento pabx network (padrão: os três)
+#     --pasta P          onde tudo fica no servidor (padrão: /zoe)
+#
+#  Tudo fica numa pasta só (padrão /zoe):
+#     /zoe/atendimento  /zoe/pabx  /zoe/network   o código e o .env de cada sistema
+#     /zoe/dados                                  os bancos e os arquivos recebidos
+#     /zoe/copias                                 a cópia diária do banco (14 dias)
 #
 #  Rodar de novo ATUALIZA: troca o código e mantém .env, banco, arquivos e senhas.
-#  Nada aqui apaga dados. O banco fica em /var/lib/zoe e a cópia diária em /var/backups/zoe.
+#  Nada aqui apaga dados.
 # =============================================================================================
 set -euo pipefail
 
 ORIGEM="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DESTINO=/opt/zoe
-DADOS=/var/lib/zoe
-COPIAS=/var/backups/zoe
+DESTINO=/zoe
 USUARIO=zoe
 DOMINIO=""
 EMAIL=""
@@ -40,10 +44,14 @@ while [ $# -gt 0 ]; do
     --sem-nginx) NGINX=0; shift ;;
     --com-whisper) WHISPER=1; shift ;;
     --modulos) MODULOS="$2"; shift 2 ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    --pasta) DESTINO="${2%/}"; shift 2 ;;
+    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
     *) echo "Opção desconhecida: $1 (use --help)"; exit 1 ;;
   esac
 done
+
+DADOS="$DESTINO/dados"
+COPIAS="$DESTINO/copias"
 
 passo() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 aviso() { printf '\033[1;33m[aviso]\033[0m %s\n' "$*"; }
@@ -53,7 +61,7 @@ aleatorio() { node -e "process.stdout.write(require('crypto').randomBytes($1).to
 [ "$(id -u)" -eq 0 ] || falha "Rode como root (sudo)."
 command -v apt-get >/dev/null || falha "Este instalador é para Ubuntu/Debian (apt). Em outro sistema, siga o LEIA-ME manualmente."
 for m in $MODULOS; do [ -d "$ORIGEM/$m/server" ] || falha "Não achei $ORIGEM/$m — rode de dentro da pasta extraída do pacote."; done
-PRIMEIRA=1; [ -d "$DESTINO" ] && PRIMEIRA=0
+PRIMEIRA=1; [ -d "$DESTINO/atendimento" ] || [ -d "$DESTINO/pabx" ] || [ -d "$DESTINO/network" ] && PRIMEIRA=0
 if [ "$NGINX" = 1 ] && [ -z "$DOMINIO" ] && [ ! -f /etc/nginx/sites-available/zoe.conf ]; then
   falha "Informe o domínio: --dominio atende.seuprovedor.com.br (ou --sem-nginx)."
 fi
@@ -86,10 +94,13 @@ echo "Node $(node -v)"
 passo "Usuário e pastas"
 id "$USUARIO" >/dev/null 2>&1 || useradd --system --home-dir "$DESTINO" --shell /usr/sbin/nologin "$USUARIO"
 mkdir -p "$DESTINO" "$DADOS" "$COPIAS"
-# O usuário zoe precisa atravessar /var/lib/zoe para chegar ao banco de cada sistema.
-chown root:"$USUARIO" "$DADOS"
-chmod 750 "$DADOS"
+# A pasta é do root; o usuário zoe só atravessa até o código e os dados de cada sistema.
+chown root:"$USUARIO" "$DESTINO" "$DADOS"
+chmod 750 "$DESTINO" "$DADOS"
+chown root:root "$COPIAS"
 chmod 700 "$COPIAS"
+# Os scripts de cópia e de verificação leem daqui onde a ZOE está.
+printf 'ZOE_PASTA=%s\nZOE_MODULOS="%s"\n' "$DESTINO" "$MODULOS" > /etc/zoe.conf
 
 # ---------------------------------------------------------------------------------------------
 gerar_env() {
@@ -155,7 +166,6 @@ NETWORK_FUSO=America/Sao_Paulo
 ENV
     ;;
   esac
-  chmod 600 "$arq"
   echo "$m: .env novo gerado"
 }
 
@@ -171,7 +181,11 @@ for m in $MODULOS; do
     (cd "$DESTINO/$m" && npm ci --omit=dev --no-audit --no-fund --loglevel=error)
   fi
   gerar_env "$m"
-  chown -R "$USUARIO:$USUARIO" "$DESTINO/$m" "$DADOS/$m"
+  # O código é do root e só é lido pelo serviço; o serviço escreve apenas nos próprios dados.
+  chown -R root:"$USUARIO" "$DESTINO/$m"
+  chmod -R u=rwX,g=rX,o= "$DESTINO/$m"
+  chmod 640 "$DESTINO/$m/.env"
+  chown -R "$USUARIO:$USUARIO" "$DADOS/$m"
   if [ "$m" = network ]; then
     (cd "$DESTINO/network" && runuser -u "$USUARIO" -- node --disable-warning=ExperimentalWarning --env-file=.env server/migrar.js)
   fi
@@ -191,7 +205,7 @@ Restart=always
 RestartSec=3
 # Proteções: o processo só escreve nos próprios dados.
 NoNewPrivileges=true
-ProtectSystem=full
+ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 ReadWritePaths=$DADOS/$m
@@ -203,7 +217,7 @@ done
 
 if [ "$WHISPER" = 1 ] && [[ " $MODULOS " == *" atendimento "* ]]; then
   passo "Transcrição de áudio (whisper.cpp)"
-  bash "$DESTINO/atendimento/scripts/instalar-whisper.sh" /opt/whisper
+  bash "$DESTINO/atendimento/scripts/instalar-whisper.sh" "$DESTINO/whisper"
   cat > /etc/systemd/system/zoe-whisper.service <<UNIT
 [Unit]
 Description=ZOE — transcrição de áudio (whisper.cpp)
@@ -211,7 +225,7 @@ After=network.target
 
 [Service]
 User=$USUARIO
-ExecStart=/opt/whisper/src/build/bin/whisper-server -m /opt/whisper/ggml-small.bin -l pt -t $(nproc) --host 127.0.0.1 --port 8178
+ExecStart=$DESTINO/whisper/src/build/bin/whisper-server -m $DESTINO/whisper/ggml-small.bin -l pt -t $(nproc) --host 127.0.0.1 --port 8178
 Restart=always
 
 [Install]

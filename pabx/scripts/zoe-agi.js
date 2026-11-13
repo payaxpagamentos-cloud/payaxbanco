@@ -36,7 +36,7 @@
  * Exemplo (extensions.conf):
  *   [zoe-entrada]
  *   exten => s,1,Answer()
- *    same => n,AGI(/opt/zoe/zoe-agi.js)
+ *    same => n,AGI(/zoe/pabx/scripts/zoe-agi.js)
  *    same => n,GotoIf($["${ZOE_STATUS}" = "transferir" | "${ZOE_STATUS}" = "indisponivel"]?fila)
  *    same => n,Hangup()
  *    same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
@@ -44,13 +44,13 @@
  *   ; Asterisk deve ter o nome da fila do painel com essa troca. Nomes simples evitam surpresa.
  *   ; O cliente desligou (na fila, com o atendente ou com a ZOE): fecha a conversa no ZOE Atende
  *   ; e o atendimento da ZOE no PABX (modo por teclas; URL e chave como no atendimento).
- *   exten => h,1,AGI(/opt/zoe/zoe-agi.js,fim)
+ *   exten => h,1,AGI(/zoe/pabx/scripts/zoe-agi.js,fim)
  *
  *   ; Roda no canal do RAMAL quando ele atende (8º parâmetro do Queue). Abre a passagem no painel
  *   ; de quem tem esse ramal (Usuários › Ramal) e sussurra o resumo antes de ligar o cliente.
  *   ; ZOE_SUSSURRO=0 desliga o sussurro e mantém só o painel.
  *   [zoe-atendeu]
- *   exten => s,1,AGI(/opt/zoe/zoe-agi.js,atendeu)
+ *   exten => s,1,AGI(/zoe/pabx/scripts/zoe-agi.js,atendeu)
  *    same => n,Return()
  */
 

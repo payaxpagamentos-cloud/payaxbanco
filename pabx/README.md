@@ -67,14 +67,14 @@ o atendente ouve o resumo antes de o cliente entrar, e o painel de quem tem aque
 
 ```
 exten => s,1,Answer()
- same => n,AGI(/opt/zoe/zoe-agi.js)
+ same => n,AGI(/zoe/pabx/scripts/zoe-agi.js)
  same => n,GotoIf($["${ZOE_STATUS}" = "transferir" | "${ZOE_STATUS}" = "indisponivel"]?fila)
  same => n,Hangup()
  same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
-exten => h,1,AGI(/opt/zoe/zoe-agi.js,fim)
+exten => h,1,AGI(/zoe/pabx/scripts/zoe-agi.js,fim)
 
 [zoe-atendeu]
-exten => s,1,AGI(/opt/zoe/zoe-agi.js,atendeu)
+exten => s,1,AGI(/zoe/pabx/scripts/zoe-agi.js,atendeu)
  same => n,Return()
 ```
 
@@ -224,7 +224,7 @@ crie uma chave em Integrações e mande as ligações para ele:
 ; extensions.conf
 exten => s,1,Answer()
  same => n,Set(ZOE_STATUS=)
- same => n,AGI(/opt/zoe/zoe-agi.js,https://SEU-DOMINIO/pabx/api/integracao,pbx_SUA_CHAVE)
+ same => n,AGI(/zoe/pabx/scripts/zoe-agi.js,https://SEU-DOMINIO/pabx/api/integracao,pbx_SUA_CHAVE)
  same => n,GotoIf($["${ZOE_STATUS}" = "resolvido"]?fim)
  same => n,Queue(${IF($["${ZOE_FILA_NOME}" = ""]?atendimento:${ZOE_FILA_NOME})})
  same => n(fim),Hangup()

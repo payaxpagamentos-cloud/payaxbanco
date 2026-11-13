@@ -40,7 +40,15 @@ sudo ./instalacao/instalar.sh --dominio atende.seuprovedor.com.br --email voce@s
 O instalador faz o seguinte:
 
 - instala o Node 22, o ffmpeg e o Nginx;
-- cria o usuário de sistema `zoe` e põe o código em `/opt/zoe` e os bancos em `/var/lib/zoe`;
+- cria o usuário de sistema `zoe` e põe **tudo na pasta `/zoe`**:
+
+  | Pasta | Conteúdo |
+  |---|---|
+  | `/zoe/atendimento`, `/zoe/pabx`, `/zoe/network` | o código e o `.env` de cada sistema |
+  | `/zoe/dados` | os bancos e os arquivos recebidos |
+  | `/zoe/copias` | a cópia diária do banco |
+
+  Para outra pasta, use `--pasta /outro/lugar`;
 - gera um `.env` para cada sistema, com **segredos novos e a senha do master**, que aparece **uma vez** no final (anote);
 - cria os serviços `zoe-atendimento`, `zoe-pabx` e `zoe-network`, que sobem sozinhos com o servidor;
 - configura o Nginx e a cópia diária do banco;
@@ -60,7 +68,7 @@ sudo certbot --nginx -d atende.seuprovedor.com.br
 Valide nesta ordem:
 
 1. **Entrar** nos três painéis com o e-mail e a senha do master e **trocar a senha**.
-2. **Inteligência da ZOE**: ponha a chave de IA em `ATEND_IA_CHAVE` no arquivo `/opt/zoe/atendimento/.env` e rode
+2. **Inteligência da ZOE**: ponha a chave de IA em `ATEND_IA_CHAVE` no arquivo `/zoe/atendimento/.env` e rode
    `sudo systemctl restart zoe-atendimento`. Em *Diagnóstico* deve aparecer "Inteligência da ZOE: configurada".
 3. **Empresa e WhatsApp (API oficial da Meta)**: crie a empresa e, em *Configurações › Número de WhatsApp*, cadastre o
    Phone number ID, o token permanente e o App Secret. O painel mostra a **URL do webhook** e o
@@ -77,7 +85,7 @@ Valide nesta ordem:
 
 ## 4. Telefone (Asterisk)
 
-O script da central é `/opt/zoe/pabx/scripts/zoe-agi.js`. Se o Asterisk estiver em outra máquina, copie
+O script da central é `/zoe/pabx/scripts/zoe-agi.js`. Se o Asterisk estiver em outra máquina, copie
 para lá (precisa de Node 22). No Asterisk, configure estas variáveis de ambiente:
 
 ```
@@ -97,8 +105,8 @@ O plano de discagem completo, com a passagem para o atendente e o fecho da liga�
 | Ver o log de um sistema | `journalctl -u zoe-atendimento -n 100 -f` |
 | Reiniciar depois de mudar o `.env` | `sudo systemctl restart zoe-atendimento` |
 | **Atualizar** para uma versão nova | extrair o pacote novo e rodar o mesmo `instalar.sh`. Código novo; `.env`, banco e senhas ficam. O banco se atualiza sozinho ao subir. |
-| Cópia do banco | automática, todo dia às 03:17, em `/var/backups/zoe` (14 dias). À mão: `sudo zoe-backup` |
-| Restaurar uma cópia | `systemctl stop zoe-atendimento`, depois `gunzip -c /var/backups/zoe/DIA/atendimento.db.gz > /var/lib/zoe/atendimento/atendimento.db`, depois `chown zoe: /var/lib/zoe/atendimento/atendimento.db` e por fim `systemctl start zoe-atendimento` |
+| Cópia do banco | automática, todo dia às 03:17, em `/zoe/copias` (14 dias). À mão: `sudo zoe-backup` |
+| Restaurar uma cópia | `systemctl stop zoe-atendimento`, depois `gunzip -c /zoe/copias/DIA/atendimento.db.gz > /zoe/dados/atendimento/atendimento.db`, depois `chown zoe: /zoe/dados/atendimento/atendimento.db` e por fim `systemctl start zoe-atendimento` |
 
 **Não troque** `ATEND_SECRET`, `PABX_SECRET`, `NETWORK_SECRET` nem `NETWORK_CHAVE_CREDENCIAIS` depois de
 instalado. Eles cifram os tokens do WhatsApp e as credenciais guardadas, e trocar torna esses dados ilegíveis.
