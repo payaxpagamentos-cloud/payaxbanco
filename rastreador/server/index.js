@@ -85,5 +85,13 @@ function encerrar(codigo = 0) {
     .then(() => new Promise((ok) => { http.close(() => ok()); http.closeAllConnections?.(); }))
     .then(fim, fim);
 }
+// Se o processo que nos iniciou (PM2) sumir, ficamos órfãos segurando as portas: encerra para o PM2 subir um novo.
+const paiInicial = process.ppid;
+setInterval(() => {
+  if (process.ppid !== paiInicial && !encerrando) {
+    console.error('[Rastreador] Ficou sem o processo que o iniciou; encerrando.');
+    encerrar(0);
+  }
+}, 5000).unref();
 process.on('SIGTERM', () => encerrar(0));
 process.on('SIGINT', () => encerrar(0));
