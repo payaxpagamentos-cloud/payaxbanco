@@ -26,6 +26,18 @@ if (config.portaGt06 > 0 && servicoGt06.ativo()) {
   extras.gt06.servidor.on('listening', () => console.log(`[Rastreador] GT06 (TCP): porta ${config.portaGt06}`));
   extras.gt06.servidor.on('error', (err) => console.error(`[Rastreador] Servidor GT06 não iniciou na porta ${config.portaGt06}: ${err.message}`));
 }
+// Se o painel pegou a porta (o serviço estava reiniciando quando o painel subiu) e o serviço voltou: devolve a porta.
+if (extras.gt06 && !extras.gt06.separado) {
+  const timerDevolver = setInterval(() => {
+    if (!servicoGt06.ativo()) return;
+    clearInterval(timerDevolver);
+    const proprio = extras.gt06;
+    extras.gt06 = servicoGt06.ponte();
+    Promise.resolve(proprio.fechar()).catch(() => {});
+    console.log('[Rastreador] GT06: serviço separado no ar; o painel devolveu a porta a ele.');
+  }, 5000);
+  timerDevolver.unref();
+}
 const http = criarApp(db, extras).listen(config.port, () => {
   console.log(`[Rastreador] Painel: http://localhost:${config.port}${config.basePath}/`);
 });

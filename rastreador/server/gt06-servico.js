@@ -22,20 +22,44 @@ const db = abrir();
 let gt06 = null;
 let tentativa = null;
 
-// Um serviço GT06 antigo que ficou para trás (órfão de um reinício) segura a porta e não atende ninguém: encerra ele.
-// Só mexe num processo que seja comprovadamente este mesmo serviço (linha de comando com gt06-servico.js).
-function encerrarAntigo() {
+// Quem está com a porta TCP (Linux): procura o socket em escuta em /proc/net e o processo dono dele.
+function donoDaPorta() {
   try {
-    const { pid } = JSON.parse(fs.readFileSync(servico.SITUACAO, 'utf8'));
-    if (!pid || pid === process.pid) return false;
+    const hex = porta.toString(16).toUpperCase().padStart(4, '0');
+    const inodes = new Set();
+    for (const f of ['/proc/net/tcp', '/proc/net/tcp6']) {
+      let linhas = [];
+      try { linhas = fs.readFileSync(f, 'utf8').split('\n').slice(1); } catch { /* sem IPv6 */ }
+      for (const l of linhas) {
+        const c = l.trim().split(/\s+/);
+        if (c.length > 9 && c[1].endsWith(`:${hex}`) && c[3] === '0A') inodes.add(`socket:[${c[9]}]`);
+      }
+    }
+    if (!inodes.size) return null;
+    for (const pid of fs.readdirSync('/proc').filter((x) => /^\d+$/.test(x))) {
+      if (Number(pid) === process.pid) continue;
+      let fds = [];
+      try { fds = fs.readdirSync(`/proc/${pid}/fd`); } catch { continue; }
+      for (const fd of fds) {
+        try { if (inodes.has(fs.readlinkSync(`/proc/${pid}/fd/${fd}`))) return Number(pid); } catch { /* fechou */ }
+      }
+    }
+  } catch { /* sem /proc */ }
+  return null;
+}
+
+// Um serviço GT06 antigo que ficou para trás (órfão de um reinício) segura a porta e não atende ninguém: encerra ele.
+// Só mexe num processo que seja comprovadamente este mesmo serviço (linha de comando com gt06-servico.js). Se for o
+// painel, ele mesmo devolve a porta ao ver este serviço no ar.
+function encerrarAntigo() {
+  const pid = donoDaPorta();
+  if (!pid) return;
+  try {
     const cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8');
-    if (!cmd.includes('gt06-servico.js')) return false;
+    if (!cmd.includes('gt06-servico.js')) return;
     process.kill(pid, 'SIGTERM');
     console.error(`[Rastreador] Serviço GT06: processo antigo (pid ${pid}) segurava a porta ${porta}; encerrado.`);
-    return true;
-  } catch {
-    return false;
-  }
+  } catch { /* já saiu */ }
 }
 
 // O painel pode estar com a porta (ele a usa quando o serviço não existe): tenta de novo até conseguir, avisando no log.
@@ -64,12 +88,12 @@ function subir() {
 // Situação para o painel (aparelhos conectados) e o código carregado (para o atualizador saber se precisa reiniciar).
 const meusArquivos = () => Object.keys(require.cache).filter((a) => a.startsWith(__dirname));
 function situacao() {
-  if (!gt06) return; // sem a porta, não se anuncia: o painel não pode achar que os rastreadores estão sendo atendidos
   try { servico.gravar({ porta: gt06 ? porta : null, imeis: gt06 ? gt06.imeis() : [], digital: servico.digital(meusArquivos()), arquivos: meusArquivos() }); }
   catch (err) { console.error('[Rastreador] Serviço GT06 (situação):', err.message); }
 }
 subir();
-setInterval(situacao, 5000);
+situacao();
+setInterval(situacao, 5000); // anuncia mesmo esperando a porta: o painel vê e devolve a porta se estiver com ela
 
 // Se o processo que nos iniciou (PM2) sumir, ficamos órfãos segurando a porta: encerra para o PM2 subir um novo.
 const paiInicial = process.ppid;
