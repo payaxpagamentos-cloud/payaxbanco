@@ -141,7 +141,7 @@ textarea { min-height: 76px; resize: vertical; }
 .cartao > header h2 { font-size: 14.5px; font-weight: 650; }
 .cartao > header .acoes { margin-left: auto; display: flex; gap: 6px; }
 .cartao > .corpo { padding: 14px 16px; }
-.grade { display: grid; gap: 14px; }
+.grade { display: grid; gap: 14px; align-items: start; }
 .grade.kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .grade.duas { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 .grade.tres { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }

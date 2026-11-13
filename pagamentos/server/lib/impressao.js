@@ -85,8 +85,9 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   .pagador { border-top: 1px solid #000; padding: 4px 5px; font-size: 11px; }
   .pagador strong { font-size: 11.5px; }
   .pagador small { display: block; color: #333; }
+  /* Medidas do padrão FEBRABAN: barra fina de 0,254 mm (103 mm no total) por 13 mm de altura. */
   .barras { margin-top: 10px; display: flex; align-items: flex-end; gap: 16px; }
-  .barras svg { height: 50px; }
+  .barras svg { width: 103mm; height: 13mm; }
   .corte { border-top: 1px dashed #666; margin: 14px 0 10px; position: relative; }
   .corte span { position: absolute; top: -8px; left: 0; background: #fff; padding-right: 6px; font-size: 9px; color: #666; }
   .pix { border: 1px solid #000; padding: 6px; display: flex; gap: 10px; align-items: center; margin-top: 8px; }

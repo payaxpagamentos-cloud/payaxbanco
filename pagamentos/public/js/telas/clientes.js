@@ -1,7 +1,8 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
 import {
-  el, cartao, tabela, paginacao, kpi, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
+  el, montar,
+   cartao, tabela, paginacao, kpi, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
   dinheiro, numero, percentual, data, dataHora, documento, telefone, hojeIso, primeiroDiaMes, R, icone,
 } from '../../comum/ui.js';
 import { agendaLiberacao } from '../../comum/graficos.js';
@@ -18,7 +19,7 @@ export default async function clientes({ alvo, params, query, recarregar }) {
       opcoes: [['', 'Todas'], ...Object.entries(R.situacaoCliente).map(([k, [t]]) => [k, t])] }),
     el('button', { class: 'botao', type: 'submit' }, icone('busca'), 'Filtrar'));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Clientes'), el('p', {}, `${numero(lista.total)} cliente(s) na plataforma`)),
       pode('clientes.editar') ? el('div', { class: 'acoes' }, el('button', { class: 'botao', onclick: () => novoCliente(recarregar) }, icone('mais'), 'Novo cliente')) : null),
@@ -51,7 +52,7 @@ async function ficha(alvo, id, aba, query, recarregar) {
     ['acessos', 'Acessos e IXC'],
   ];
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {},
         el('a', { class: 'botao sutil', href: '#/clientes' }, icone('voltar'), 'Clientes'),
@@ -72,12 +73,13 @@ async function ficha(alvo, id, aba, query, recarregar) {
 
 async function abaResumo(alvo, c, query, recarregar) {
   const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'grade kpis' },
       kpi({ rotulo: 'Saldo disponível', valor: dinheiro(c.saldo.disponivel_centavos), apoio: 'pronto para repasse', tom: 'destaque', ic: 'cofre' }),
       kpi({ rotulo: 'A liberar', valor: dinheiro(c.saldo.a_liberar_centavos), apoio: `retenção de D+${c.retencao_dias} dia(s) útil(eis)`, ic: 'relogio' }),
       kpi({ rotulo: 'Recebido no mês', valor: dinheiro(c.liquidacoes_mes.bruto_centavos), apoio: `${numero(c.liquidacoes_mes.titulos)} título(s)`, ic: 'dinheiro' }),
-      kpi({ rotulo: 'Nossa receita no mês', valor: dinheiro(c.liquidacoes_mes.receita_centavos), apoio: `margem ${dinheiro(c.liquidacoes_mes.margem_centavos)}`, tom: 'positivo', ic: 'relatorio' })),
+      kpi({ rotulo: 'Nossa receita no mês', valor: dinheiro(c.liquidacoes_mes.receita_centavos),
+        apoio: c.pode_ver_margem ? `margem ${dinheiro(c.liquidacoes_mes.margem_centavos)}` : 'comissão + tarifas', tom: 'positivo', ic: 'relatorio' })),
     el('div', { class: 'grade duas', style: 'margin-top:14px' },
       cartao('Cadastro', el('div', { class: 'pares' },
         par('Razão social', c.razao_social),
@@ -106,7 +108,7 @@ async function abaResumo(alvo, c, query, recarregar) {
 
 async function abaBoletos(alvo, c, query) {
   const lista = await api.get(`/clientes/${c.id}/boletos${qs({ ...query, por_pagina: 50 })}`);
-  alvo.append(tabela({
+  montar(alvo, tabela({
     colunas: [
       { titulo: 'Nosso número', conteudo: (b) => el('span', { class: 'num' }, b.nosso_numero_formatado) },
       { titulo: 'Pagador', conteudo: (b) => el('span', {}, b.pagador_nome, el('span', { class: 'sub' }, documento(b.pagador_documento))) },
@@ -131,7 +133,7 @@ async function abaExtrato(alvo, c, query, recarregar) {
     el('button', { class: 'botao sec', type: 'button', onclick: (ev) => acao(ev.currentTarget, () => api.baixar(`/clientes/${c.id}/extrato.csv${qs({ de, ate })}`, `extrato-${c.cnpj}.csv`)) }, icone('baixar'), 'CSV'),
     pode('razao.ajustar') ? el('button', { class: 'botao sec', type: 'button', onclick: () => ajustar(c, recarregar) }, 'Lançar ajuste') : null);
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'grade kpis' },
       kpi({ rotulo: 'Saldo disponível', valor: dinheiro(e.saldo.disponivel_centavos), tom: 'destaque' }),
       kpi({ rotulo: 'A liberar', valor: dinheiro(e.saldo.a_liberar_centavos), menor: true }),
@@ -172,7 +174,7 @@ function ajustar(c, recarregar) {
 
 async function abaRepasses(alvo, c, query, recarregar) {
   const d = await api.get(`/clientes/${c.id}/repasses`);
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'grade kpis' },
       kpi({ rotulo: 'Disponível para repasse', valor: dinheiro(d.disponivel.disponivel_centavos), tom: 'destaque' }),
       kpi({ rotulo: 'Tarifa do repasse', valor: dinheiro(d.disponivel.taxa_repasse_centavos), menor: true }),
@@ -205,7 +207,7 @@ async function abaPrecos(alvo, c, query, recarregar) {
   const p = await api.get(`/clientes/${c.id}/precos`);
   const v = p.vigente;
   const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
-  alvo.append(
+  montar(alvo, 
     cartao(v.id ? 'Tabela do cliente (vigente)' : 'Usando a tabela padrão da plataforma',
       el('div', { class: 'pares' },
         par('Tarifa de emissão', dinheiro(v.tarifa_emissao_centavos)),
@@ -253,7 +255,7 @@ function novoPreco(c, atual, recarregar) {
 }
 
 async function abaAcessos(alvo, c, query, recarregar) {
-  alvo.append(
+  montar(alvo, 
     cartao('Acessos ao Internet Bank', tabela({
       colunas: [
         { titulo: 'Nome', conteudo: (a) => el('span', {}, a.nome, el('span', { class: 'sub' }, a.email)) },

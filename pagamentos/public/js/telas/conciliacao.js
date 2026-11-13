@@ -1,7 +1,9 @@
 import { api, ir } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, cartao, tabela, kpi, campo, lerForm, selo, dinheiro, numero, dataHora, data,
-  hojeIso, primeiroDiaMes, aviso, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, kpi, campo, lerForm, selo, dinheiro, numero, dataHora, data,
+  hojeIso, primeiroDiaMes, aviso, icone
+} from '../../comum/ui.js';
 
 /** Avisos do banco e o que o sistema fez com cada um. */
 export default async function conciliacao({ alvo, query }) {
@@ -15,7 +17,7 @@ export default async function conciliacao({ alvo, query }) {
 
   const tom = { liquidado: 'ok', repetido: 'info', ignorado: 'neutra', erro: 'erro', pendente: 'aviso' };
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Conciliação'),
       el('p', {}, 'Cada aviso do banco é guardado antes de ser processado — nada se perde se algo falhar.'))),
     el('div', { class: 'grade kpis' },

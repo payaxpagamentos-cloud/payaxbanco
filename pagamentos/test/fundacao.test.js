@@ -73,6 +73,22 @@ test('acesso: perfis, audiências e isolamento entre clientes', async (t) => {
     assert.equal(dois.headers.get('idempotent-replay'), 'true');
   });
 
+  await t.test('margem e custo do banco só para quem tem a permissão', async () => {
+    const comMargem = (await api.get('/api/painel', tk.financeiro)).dados;
+    const semMargem = (await api.get('/api/painel', tk.operacao)).dados;
+    assert.equal(comMargem.pode_ver_margem, true);
+    assert.equal(semMargem.pode_ver_margem, false);
+    assert.equal(typeof comMargem.liquidacoes.margem_centavos, 'number');
+    assert.equal(semMargem.liquidacoes.margem_centavos, undefined);
+    assert.equal(semMargem.liquidacoes.custo_banco_centavos, undefined);
+    assert.equal(typeof semMargem.liquidacoes.receita_centavos, 'number', 'a receita continua visível');
+
+    const ficha = (await api.get(`/api/clientes/${a.cliente.id}`, tk.operacao)).dados;
+    assert.equal(ficha.liquidacoes_mes.margem_centavos, undefined);
+    const relatorio = (await api.get('/api/relatorios/faturamento', tk.operacao)).dados;
+    assert.equal(relatorio.totais.margem_centavos, undefined);
+  });
+
   await t.test('sempre sobra um administrador ativo', async () => {
     const r = await api.patch('/api/admin/usuarios/1', { ativo: false }, tk.admin);
     assert.equal(r.status, 409);

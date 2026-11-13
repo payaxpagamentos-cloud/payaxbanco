@@ -1,7 +1,9 @@
 import { api, ir } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, cartao, tabela, kpi, campo, lerForm, acao, dinheiro, numero, percentual, data,
-  hojeIso, primeiroDiaMes, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, kpi, campo, lerForm, acao, dinheiro, numero, percentual, data,
+  hojeIso, primeiroDiaMes, icone
+} from '../../comum/ui.js';
 import { barrasPorDia, barraSplit } from '../../comum/graficos.js';
 
 /** Resumo do período: emitido, recebido, descontado e repassado. */
@@ -19,7 +21,7 @@ export default async function relatorios({ alvo, query }) {
     el('button', { class: 'botao sec', type: 'button', onclick: (e) => acao(e.currentTarget, () => api.baixar(`/conta/extrato.csv${qs(p)}`, `extrato-${p.de}-a-${p.ate}.csv`)) }, icone('baixar'), 'Extrato em CSV'),
     el('button', { class: 'botao sec', type: 'button', onclick: () => window.print() }, icone('imprimir'), 'Imprimir'));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Relatórios'),
       el('p', {}, `De ${data(p.de)} a ${data(p.ate)}`))),
     form,

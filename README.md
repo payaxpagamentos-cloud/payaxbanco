@@ -8,6 +8,8 @@ usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 > E o **PABX** (pasta [`pabx/`](pabx/README.md), publicado em `/pabx`): painel do master e das empresas para ramais, chamadas, campanhas, números entrantes, terminação e integração com a central telefônica, com servidor próprio.
 >
 > E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
+>
+> E o **PayAx Pagamentos** (pasta [`pagamentos/`](pagamentos/README.md), publicado em `/pagamentos` e `/payax-cliente`): emissão de boletos e Bolepix pelo Bradesco, split de pagamento, conta gráfica por cliente e repasse automático por PIX, com Internet Bank para o cliente final e integração com o **IXC Provedor**. Servidor próprio.
 
 ## Módulos
 

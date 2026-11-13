@@ -92,7 +92,10 @@ const serieDiaria = (db, { de, ate, clienteId = null }) => db.prepare(`SELECT b.
   FROM boletos b WHERE ${clienteId ? 'b.cliente_id = ? AND' : ''} b.situacao = 'liquidado' AND b.pago_em BETWEEN ? AND ?
   GROUP BY b.pago_em ORDER BY b.pago_em`).all(...(clienteId ? [clienteId] : []), de, ate);
 
-module.exports = { listarBoletos, resumoBoletos, resumoLiquidacoes, serieDiaria, SELECT_BOLETO };
+/** Remove o custo com o banco e a margem de um resumo, para quem não tem permissão de ver a margem. */
+const semMargem = (r) => ({ ...r, custo_banco_centavos: undefined, margem_centavos: undefined });
+
+module.exports = { listarBoletos, resumoBoletos, resumoLiquidacoes, serieDiaria, semMargem, SELECT_BOLETO };
 
 /** Boleto com a conta e o cliente, para a ficha de compensação e a tela de detalhe. */
 function boletoCompleto(db, id, { clienteId = null } = {}) {

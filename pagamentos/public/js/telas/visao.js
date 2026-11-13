@@ -1,5 +1,7 @@
 import { api, ir, pode } from '../app.js';
-import { el, kpi, cartao, tabela, dinheiro, numero, data, selo, icone, R, aviso } from '../../comum/ui.js';
+import {
+  el, montar, kpi, cartao, tabela, dinheiro, numero, data, selo, icone, R, aviso
+} from '../../comum/ui.js';
 import { barrasPorDia, barraSplit } from '../../comum/graficos.js';
 
 /** Visão geral da plataforma: o que entrou, quanto ficou conosco e o que precisa de ação. */
@@ -16,7 +18,7 @@ export default async function visao({ alvo }) {
           : a.tipo === 'sem_conta' ? el('a', { class: 'botao sec pequeno', href: '#/contas' }, 'Cadastrar conta') : null))))
     : null;
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Visão geral'),
         el('p', {}, `Movimento de ${data(d.periodo.de)} a ${data(d.periodo.ate)} · hoje ${data(d.hoje)}`))),
@@ -24,14 +26,16 @@ export default async function visao({ alvo }) {
     el('div', { class: 'grade kpis' },
       kpi({ rotulo: 'Recebido no período', valor: dinheiro(l.bruto_centavos), apoio: `${numero(l.titulos)} título(s) liquidado(s)`, tom: 'destaque', ic: 'dinheiro' }),
       kpi({ rotulo: 'Nossa receita', valor: dinheiro(l.receita_centavos), apoio: `Comissão ${dinheiro(l.comissao_centavos)} + tarifas ${dinheiro(l.tarifa_banco_centavos + l.tarifa_emissao_centavos)}`, tom: 'positivo', ic: 'relatorio' }),
-      kpi({ rotulo: 'Margem (receita − custo do banco)', valor: dinheiro(l.margem_centavos), apoio: `Custo do banco ${dinheiro(l.custo_banco_centavos)}`, ic: 'banco' }),
+      d.pode_ver_margem
+        ? kpi({ rotulo: 'Margem (receita − custo do banco)', valor: dinheiro(l.margem_centavos), apoio: `Custo do banco ${dinheiro(l.custo_banco_centavos)}`, ic: 'banco' })
+        : null,
       kpi({ rotulo: 'Saldo dos clientes', valor: dinheiro(d.saldo_clientes.disponivel_centavos), apoio: `${dinheiro(d.saldo_clientes.a_liberar_centavos)} a liberar`, ic: 'cofre' }),
     ),
 
     el('div', { class: 'grade kpis', style: 'margin-top:14px' },
       kpi({ rotulo: 'Boletos emitidos', valor: numero(d.boletos.emitidos), apoio: dinheiro(d.boletos.valor_emitido_centavos), menor: true, ic: 'boleto' }),
       kpi({ rotulo: 'Em aberto a vencer', valor: numero(d.boletos.a_vencer), apoio: 'aguardando pagamento', menor: true, ic: 'relogio' }),
-      kpi({ rotulo: 'Vencidos', valor: numero(d.boletos.vencidos), apoio: dinheiro(d.boletos.valor_vencido_centavos), menor: true, tom: d.boletos.vencidos ? 'negativo' : '', ic: 'alerta' }),
+      kpi({ rotulo: 'Vencidos em aberto', valor: numero(d.vencidos_total.titulos), apoio: `${dinheiro(d.vencidos_total.valor_centavos)} · todos os períodos`, menor: true, tom: d.vencidos_total.titulos ? 'negativo' : '', ic: 'alerta' }),
       kpi({ rotulo: 'Clientes ativos', valor: numero(d.clientes.por_situacao?.ativo ?? 0), apoio: `${numero(d.clientes.total)} no total`, menor: true, ic: 'pessoas' }),
     ),
 
@@ -49,7 +53,8 @@ export default async function visao({ alvo }) {
             ],
           }),
           el('p', { style: 'margin-top:10px;color:var(--texto-2);font-size:13px' },
-            `De ${dinheiro(l.bruto_centavos)} recebidos, ${dinheiro(l.receita_centavos)} ficaram com a PayAx e ${dinheiro(l.repassado_centavos)} já foram repassados.`))
+            `De ${dinheiro(l.bruto_centavos)} recebidos no período, ${dinheiro(l.receita_centavos)} ficaram com a PayAx. `
+            + `No mesmo período saíram ${dinheiro(l.repassado_centavos)} em repasses aos clientes (inclui saldo de datas anteriores).`))
         : el('p', { class: 'vazio' }, 'Nenhum título liquidado no período.')),
     ),
 

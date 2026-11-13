@@ -1,7 +1,9 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, cartao, tabela, paginacao, kpi, campo, lerForm, confirmar, toast, acao, aviso, selo,
-  dinheiro, numero, dataHora, documento, R, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, paginacao, kpi, campo, lerForm, confirmar, toast, acao, aviso, selo,
+  dinheiro, numero, dataHora, documento, R, icone
+} from '../../comum/ui.js';
 
 /** Fila de repasses: aprovar o que passou do limite, enviar e acompanhar o PIX. */
 export default async function repasses({ alvo, query, recarregar }) {
@@ -18,7 +20,7 @@ export default async function repasses({ alvo, query, recarregar }) {
     el('button', { class: 'botao', type: 'submit' }, 'Filtrar'),
     el('button', { class: 'botao sec', type: 'button', onclick: (e) => acao(e.currentTarget, () => api.baixar(`/repasses/export.csv${qs(filtros)}`, 'repasses.csv')) }, icone('baixar'), 'CSV'));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Repasses'), el('p', {}, 'O líquido da conta gráfica de cada cliente saindo por PIX')),
       pode('repasses.enviar') ? el('div', { class: 'acoes' },

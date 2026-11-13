@@ -1,5 +1,7 @@
 import { api, ir, pode } from '../app.js';
-import { el, kpi, cartao, tabela, dinheiro, numero, data, selo, icone, aviso, R } from '../../comum/ui.js';
+import {
+  el, montar, kpi, cartao, tabela, dinheiro, numero, data, selo, icone, aviso, R
+} from '../../comum/ui.js';
 import { barrasPorDia, agendaLiberacao, barraSplit } from '../../comum/graficos.js';
 
 /** Tela inicial: saldo em destaque, o que está por vir e o que precisa de atenção. */
@@ -21,7 +23,7 @@ export default async function inicio({ alvo }) {
       pode('boletos.emitir') ? el('a', { class: 'botao sec', href: '#/boletos?novo=1' }, icone('mais'), 'Emitir boleto') : null,
       el('a', { class: 'botao sec', href: '#/extrato' }, icone('lista'), 'Ver extrato')));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, `Olá, ${d.cliente.nome_fantasia || d.cliente.razao_social}`),
         el('p', {}, `Movimento de ${data(d.periodo.de)} a ${data(d.periodo.ate)}`))),

@@ -1,7 +1,9 @@
 import { api, ir } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, cartao, tabela, kpi, campo, lerForm, acao, dinheiro, numero, data,
-  hojeIso, primeiroDiaMes, icone, aviso } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, kpi, campo, lerForm, acao, dinheiro, numero, data,
+  hojeIso, primeiroDiaMes, icone, aviso
+} from '../../comum/ui.js';
 import { agendaLiberacao } from '../../comum/graficos.js';
 
 /** Extrato da conta: cada crédito, cada desconto e cada repasse, com saldo acumulado. */
@@ -20,7 +22,7 @@ export default async function extrato({ alvo, query }) {
     el('button', { class: 'botao sec', type: 'button', onclick: (ev) => acao(ev.currentTarget, () => api.baixar(`/conta/extrato.csv${qs(p)}`, `extrato-${p.de}-a-${p.ate}.csv`)) }, icone('baixar'), 'CSV'),
     el('button', { class: 'botao sec', type: 'button', onclick: () => window.print() }, icone('imprimir'), 'Imprimir'));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Extrato'),
       el('p', {}, 'Tudo que entrou, o que foi descontado e o que já foi transferido para você.'))),
     el('div', { class: 'grade kpis' },

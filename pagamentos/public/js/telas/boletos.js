@@ -1,7 +1,8 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
 import {
-  el, cartao, tabela, paginacao, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
+  el, montar,
+   cartao, tabela, paginacao, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
   dinheiro, numero, data, documento, linhaDigitavel, hojeIso, somarDias, primeiroDiaMes, R, icone,
 } from '../../comum/ui.js';
 import { barraSplit } from '../../comum/graficos.js';
@@ -31,7 +32,7 @@ export default async function boletos({ alvo, params, query, recarregar }) {
     campo({ nome: 'ate', rotulo: 'Até', tipo: 'date', valor: filtros.ate }),
     el('button', { class: 'botao', type: 'submit' }, icone('busca'), 'Filtrar'));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Boletos'), el('p', {}, `${numero(lista.total)} título(s) encontrado(s)`)),
       el('div', { class: 'acoes' },
@@ -165,7 +166,7 @@ async function detalheBoleto(alvo, id, recarregar) {
       }) }, icone('atualizar'), 'Consultar no banco')
       : null);
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {},
         el('a', { class: 'botao sutil', href: '#/boletos' }, icone('voltar'), 'Boletos'),

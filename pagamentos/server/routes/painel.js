@@ -5,12 +5,16 @@ const config = require('../config');
 const datas = require('../lib/datas');
 const razao = require('../lib/razao');
 const consultas = require('../lib/consultas');
+const { podeEquipe } = require('../lib/permissoes');
 
 /** Visão geral da plataforma: o que entrou, quanto ficou conosco e o que está pendente. */
 module.exports = (db) => {
   const r = express.Router();
 
   r.get('/', (req, res) => {
+    // Custo com o banco e margem só para quem tem relatorios.margem (administrador e financeiro).
+    const comMargem = podeEquipe(req.usuario.perfil, 'relatorios.margem');
+    const talvez = (x) => (comMargem ? x : consultas.semMargem(x));
     const hoje = datas.dataLocal(config.fusoPadrao);
     const inicioMes = datas.primeiroDiaMes(hoje);
     const periodo = { de: req.query.de || inicioMes, ate: req.query.ate || hoje };
@@ -28,8 +32,12 @@ module.exports = (db) => {
         por_situacao: Object.fromEntries(clientes.map((c) => [c.situacao, c.n])),
       },
       boletos: consultas.resumoBoletos(db, { ...periodo, hoje }),
-      liquidacoes: consultas.resumoLiquidacoes(db, periodo),
-      hoje_liquidado: consultas.resumoLiquidacoes(db, { de: hoje, ate: hoje }),
+      // Títulos vencidos em aberto de TODOS os períodos (é o que a operação precisa olhar, não só o mês).
+      vencidos_total: db.prepare(`SELECT COUNT(*) AS titulos, IFNULL(SUM(valor_centavos), 0) AS valor_centavos
+        FROM boletos WHERE situacao = 'registrado' AND vencimento < ?`).get(hoje),
+      pode_ver_margem: comMargem,
+      liquidacoes: talvez(consultas.resumoLiquidacoes(db, periodo)),
+      hoje_liquidado: talvez(consultas.resumoLiquidacoes(db, { de: hoje, ate: hoje })),
       serie: consultas.serieDiaria(db, { de: datas.somarDias(hoje, -29), ate: hoje }),
       saldo_clientes: {
         disponivel_centavos: saldos.reduce((s, c) => s + c.disponivel_centavos, 0),

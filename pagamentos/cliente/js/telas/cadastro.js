@@ -1,11 +1,13 @@
 import { api, ir, pode, usuario } from '../app.js';
-import { el, cartao, tabela, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
-  dinheiro, numero, dataHora, data, documento, telefone, hojeIso, somarDias, R, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
+  dinheiro, numero, dataHora, data, documento, telefone, hojeIso, somarDias, R, icone
+} from '../../comum/ui.js';
 
 /** Dados da empresa, acessos e a integração com o IXC. */
 export default async function cadastro({ alvo, query, recarregar, ir: navegar }) {
   const aba = query.aba ?? 'dados';
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Cadastro e acessos'),
       el('p', {}, 'Os dados da sua empresa, quem acessa este painel e a ligação com o seu IXC.'))),
     el('div', { class: 'abas' },
@@ -44,7 +46,7 @@ async function abaDados(alvo, recarregar) {
     recarregar();
   }));
 
-  alvo.append(
+  montar(alvo, 
     cartao('Identificação', el('div', { class: 'pares' },
       par('Razão social', c.razao_social),
       par('CNPJ', documento(c.cnpj)),
@@ -73,7 +75,7 @@ async function abaDados(alvo, recarregar) {
 async function abaUsuarios(alvo, recarregar) {
   const itens = await api.get('/usuarios');
   const eu = usuario();
-  alvo.append(cartao('Quem acessa o Internet Bank', tabela({
+  montar(alvo, cartao('Quem acessa o Internet Bank', tabela({
     colunas: [
       { titulo: 'Nome', conteudo: (u) => el('span', {}, el('span', { class: 'forte' }, u.nome, u.id === eu.id ? ' (você)' : ''), el('span', { class: 'sub' }, u.email)) },
       { titulo: 'Perfil', conteudo: (u) => R.perfilCliente[u.perfil] ?? u.perfil },
@@ -114,7 +116,7 @@ function editar(u, recarregar) {
 async function abaIxc(alvo, recarregar) {
   const d = await api.get('/ixc');
   const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
-  alvo.append(
+  montar(alvo, 
     cartao('Integração com o IXC',
       el('div', {},
         d.configurada

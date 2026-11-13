@@ -14,6 +14,7 @@ const precos = require('../lib/precos');
 const consultas = require('../lib/consultas');
 const repasses = require('../lib/repasses');
 const auditoria = require('../lib/auditoria');
+const { podeEquipe } = require('../lib/permissoes');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 
@@ -107,7 +108,11 @@ module.exports = (db) => {
         return i ? { estado: i.estado, ...(JSON.parse(i.config || '{}')), ultimo_teste: i.ultimo_teste, ultimo_erro: i.ultimo_erro } : { estado: 'nao_configurada' };
       })(),
       resumo_mes: consultas.resumoBoletos(db, { de: datas.primeiroDiaMes(data), ate: data, clienteId: c.id, hoje: data }),
-      liquidacoes_mes: consultas.resumoLiquidacoes(db, { de: datas.primeiroDiaMes(data), ate: data, clienteId: c.id }),
+      pode_ver_margem: podeEquipe(req.usuario.perfil, 'relatorios.margem'),
+      liquidacoes_mes: (() => {
+        const l = consultas.resumoLiquidacoes(db, { de: datas.primeiroDiaMes(data), ate: data, clienteId: c.id });
+        return podeEquipe(req.usuario.perfil, 'relatorios.margem') ? l : consultas.semMargem(l);
+      })(),
     });
   });
 

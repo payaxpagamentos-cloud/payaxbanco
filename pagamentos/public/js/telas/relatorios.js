@@ -1,7 +1,9 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, cartao, tabela, kpi, campo, lerForm, acao, dinheiro, numero, percentual, data,
-  documento, hojeIso, primeiroDiaMes, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, kpi, campo, lerForm, acao, dinheiro, numero, percentual, data,
+  documento, hojeIso, primeiroDiaMes, icone
+} from '../../comum/ui.js';
 import { barrasPorDia, barraSplit } from '../../comum/graficos.js';
 
 /** Faturamento da plataforma: quanto entrou por cliente, quanto ficou conosco e qual a margem. */
@@ -18,7 +20,7 @@ export default async function relatorios({ alvo, query }) {
     el('button', { class: 'botao sec', type: 'button', onclick: (e) => acao(e.currentTarget, () => api.baixar(`/relatorios/faturamento.csv${qs(p)}`, `faturamento-${p.de}-a-${p.ate}.csv`)) }, icone('baixar'), 'CSV'),
     el('button', { class: 'botao sec', type: 'button', onclick: () => window.print() }, icone('imprimir'), 'Imprimir'));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Relatórios'),
       el('p', {}, `Faturamento de ${data(p.de)} a ${data(p.ate)}`))),
     form,

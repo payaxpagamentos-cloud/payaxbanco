@@ -29,12 +29,25 @@ function mostrarDica(evento, conteudo) {
 }
 const esconderDica = () => { if (dica) dica.style.display = 'none'; };
 
-/** Escala "bonita" para o eixo: 1, 2 ou 5 × 10^n acima do máximo. */
-function topoEscala(max) {
-  if (max <= 0) return 1;
-  const exp = 10 ** Math.floor(Math.log10(max));
-  for (const m of [1, 1.5, 2, 3, 5, 7.5, 10]) if (max <= m * exp) return m * exp;
-  return 10 * exp;
+/**
+ * Escala do eixo com passo "redondo": o topo é um múltiplo exato do passo, para que os rótulos
+ * saiam em valores limpos (R$ 200, R$ 400…) em vez de R$ 166,67.
+ */
+function escala(max, divisoes = 3) {
+  if (max <= 0) return { topo: divisoes, passo: 1 };
+  const bruto = max / divisoes;
+  const exp = 10 ** Math.floor(Math.log10(bruto));
+  const norm = bruto / exp;
+  const passo = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * exp;
+  return { topo: passo * divisoes, passo };
+}
+
+/** Rótulo do eixo: sem centavos quando o passo é redondo; abreviado a partir de mil. */
+function rotuloEixo(centavos) {
+  const v = centavos / 100;
+  if (Math.abs(v) >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
+  if (Math.abs(v) >= 1000) return `R$ ${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil`;
+  return `R$ ${v.toLocaleString('pt-BR', { maximumFractionDigits: centavos % 100 ? 2 : 0 })}`;
 }
 
 /**
@@ -44,10 +57,10 @@ function topoEscala(max) {
 export function barrasPorDia({ dados, altura = 170, rotuloValor = dinheiro, vazio = 'Sem movimento no período.' }) {
   if (!dados?.length || !dados.some((d) => d.valor > 0)) return el('p', { class: 'vazio' }, vazio);
   const larg = 760;
-  const margem = { topo: 18, dir: 8, baixo: 24, esq: 54 };
+  const margem = { topo: 18, dir: 10, baixo: 24, esq: 76 };
   const areaL = larg - margem.esq - margem.dir;
   const areaA = altura - margem.topo - margem.baixo;
-  const max = topoEscala(Math.max(...dados.map((d) => d.valor)));
+  const { topo: max, passo: passoEixo } = escala(Math.max(...dados.map((d) => d.valor)));
   const passo = areaL / dados.length;
   const larguraBarra = Math.max(3, Math.min(26, passo - 2)); // 2 px de respiro entre as marcas
   const maiorIndice = dados.reduce((m, d, i) => (d.valor > dados[m].valor ? i : m), 0);
@@ -56,11 +69,12 @@ export function barrasPorDia({ dados, altura = 170, rotuloValor = dinheiro, vazi
     'aria-label': `Gráfico de barras: ${dados.length} dias, maior valor ${rotuloValor(dados[maiorIndice].valor)} em ${dataCurta(dados[maiorIndice].data)}` });
 
   // Grade recessiva com o eixo de valores.
-  for (let i = 0; i <= 3; i++) {
-    const y = margem.topo + areaA - (areaA * i) / 3;
+  for (let i = 0; i * passoEixo <= max; i++) {
+    const valor = i * passoEixo;
+    const y = margem.topo + areaA - (areaA * valor) / max;
     svg.append(svgEl('line', { x1: margem.esq, x2: larg - margem.dir, y1: y, y2: y, stroke: i === 0 ? 'var(--eixo)' : 'var(--grade)', 'stroke-width': 1 }));
     const t = svgEl('text', { x: margem.esq - 8, y: y + 4, 'text-anchor': 'end', fill: 'var(--texto-3)', 'font-size': '10.5' });
-    t.textContent = dinheiroCurto((max * i) / 3);
+    t.textContent = rotuloEixo(valor);
     svg.append(t);
   }
 

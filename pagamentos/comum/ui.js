@@ -65,6 +65,11 @@ export function el(tag, attrs = {}, ...filhos) {
   return e;
 }
 export const $ = (s, r = document) => r.querySelector(s);
+/** Acrescenta filhos ao elemento ignorando null/undefined/false — alvo.append(null) escreveria "null" na tela. */
+export const montar = (alvo, ...filhos) => {
+  alvo.append(...filhos.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false));
+  return alvo;
+};
 export const limpar = (e, ...f) => { e.replaceChildren(...f.flat(Infinity).filter((x) => x !== null && x !== undefined && x !== false)); return e; };
 
 // ---------------------------------------------------------------- Formatação

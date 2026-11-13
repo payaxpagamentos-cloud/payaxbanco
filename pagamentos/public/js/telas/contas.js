@@ -1,6 +1,8 @@
 import { api, pode } from '../app.js';
-import { el, cartao, tabela, campo, lerForm, modal, toast, acao, aviso, selo, dinheiro, numero,
-  percentual, data, documento, hojeIso, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, campo, lerForm, modal, toast, acao, aviso, selo, dinheiro, numero,
+  percentual, data, documento, hojeIso, icone
+} from '../../comum/ui.js';
 
 /** Nossas contas no banco e a tabela de preços padrão da plataforma. */
 export default async function contas({ alvo, recarregar }) {
@@ -8,7 +10,7 @@ export default async function contas({ alvo, recarregar }) {
   const v = p.vigente;
   const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Contas e preços'),
         el('p', {}, 'Os boletos de todos os clientes são registrados na nossa conta (modelo de conta gráfica).')),

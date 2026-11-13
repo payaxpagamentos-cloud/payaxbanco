@@ -1,7 +1,9 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, cartao, tabela, paginacao, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
-  dinheiro, numero, data, documento, linhaDigitavel, hojeIso, somarDias, R, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, paginacao, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
+  dinheiro, numero, data, documento, linhaDigitavel, hojeIso, somarDias, R, icone
+} from '../../comum/ui.js';
 import { barraSplit } from '../../comum/graficos.js';
 
 export default async function boletos({ alvo, params, query, recarregar }) {
@@ -20,7 +22,7 @@ export default async function boletos({ alvo, params, query, recarregar }) {
     campo({ nome: 'ate', rotulo: 'Até', tipo: 'date', valor: f.ate }),
     el('button', { class: 'botao', type: 'submit' }, icone('busca'), 'Filtrar'));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Meus boletos'), el('p', {}, `${numero(lista.total)} título(s)`)),
       el('div', { class: 'acoes' },
@@ -114,7 +116,7 @@ async function detalhe(alvo, id, recarregar) {
   const b = await api.get(`/boletos/${id}`);
   const par = (rot, val, classe = '') => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: `val ${classe}` }, val));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {},
         el('a', { class: 'botao sutil', href: '#/boletos' }, icone('voltar'), 'Meus boletos'),

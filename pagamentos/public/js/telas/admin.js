@@ -1,12 +1,14 @@
 import { api, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, cartao, tabela, paginacao, campo, lerForm, modal, toast, acao, selo,
-  dataHora, data, hojeIso, somarDias, R, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, paginacao, campo, lerForm, modal, toast, acao, selo,
+  dataHora, data, hojeIso, somarDias, R, icone
+} from '../../comum/ui.js';
 
 /** Usuários da equipe e registro de auditoria. */
 export default async function admin({ alvo, query, recarregar, ir }) {
   const aba = query.aba ?? (pode('*') ? 'usuarios' : 'auditoria');
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Usuários e auditoria'),
       el('p', {}, 'Quem acessa o backoffice e o que foi feito no sistema.'))),
     el('div', { class: 'abas' },
@@ -20,7 +22,7 @@ export default async function admin({ alvo, query, recarregar, ir }) {
 
 async function telaUsuarios(alvo, recarregar) {
   const itens = await api.get('/admin/usuarios');
-  alvo.append(cartao(null, tabela({
+  montar(alvo, cartao(null, tabela({
     colunas: [
       { titulo: 'Nome', conteudo: (u) => el('span', {}, el('span', { class: 'forte' }, u.nome), el('span', { class: 'sub' }, u.email)) },
       { titulo: 'Perfil', conteudo: (u) => R.perfilEquipe[u.perfil] ?? u.perfil },
@@ -63,7 +65,7 @@ async function telaAuditoria(alvo, query, ir) {
     campo({ nome: 'ate', rotulo: 'Até', tipo: 'date', valor: f.ate }),
     campo({ nome: 'acao', rotulo: 'Ação começa com', valor: f.acao, atributos: { placeholder: 'boleto. · repasse. · cliente.' } }),
     el('button', { class: 'botao', type: 'submit' }, 'Filtrar'));
-  alvo.append(form, tabela({
+  montar(alvo, form, tabela({
     colunas: [
       { titulo: 'Quando', conteudo: (a) => dataHora(a.criado_em) },
       { titulo: 'Quem', conteudo: (a) => el('span', {}, a.usuario_nome ?? 'sistema', el('span', { class: 'sub' }, a.usuario_tipo)) },

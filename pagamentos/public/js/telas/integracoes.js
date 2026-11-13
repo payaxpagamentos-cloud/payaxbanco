@@ -1,6 +1,8 @@
 import { api, ir, pode } from '../app.js';
-import { el, cartao, tabela, campo, lerForm, modal, toast, acao, aviso, selo, copiar,
-  numero, dataHora, data, hojeIso, somarDias, R, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, campo, lerForm, modal, toast, acao, aviso, selo, copiar,
+  numero, dataHora, data, hojeIso, somarDias, R, icone
+} from '../../comum/ui.js';
 
 /** Banco (Bradesco) e o IXC de cada cliente. */
 export default async function integracoes({ alvo, recarregar }) {
@@ -8,7 +10,7 @@ export default async function integracoes({ alvo, recarregar }) {
   const clientes = (await api.get('/clientes?por_pagina=200')).itens;
   const porCliente = Object.fromEntries(d.ixc.map((i) => [i.cliente_id, i]));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Integrações'),
       el('p', {}, 'O banco que registra os boletos e o IXC de cada cliente.'))),
 

@@ -1,7 +1,9 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, cartao, tabela, paginacao, kpi, campo, lerForm, modal, confirmar, toast, acao, aviso, selo,
-  dinheiro, numero, dataHora, data, R, icone } from '../../comum/ui.js';
+import {
+  el, montar, cartao, tabela, paginacao, kpi, campo, lerForm, modal, confirmar, toast, acao, aviso, selo,
+  dinheiro, numero, dataHora, data, R, icone
+} from '../../comum/ui.js';
 
 /** Transferência do saldo para a conta do cliente. */
 export default async function repasses({ alvo, query, recarregar }) {
@@ -23,7 +25,7 @@ export default async function repasses({ alvo, query, recarregar }) {
         ? el('button', { class: 'botao', disabled: disp.sacavel_centavos <= disp.taxa_repasse_centavos, onclick: () => solicitar(disp, recarregar) }, icone('pix'), 'Transferir agora')
         : null));
 
-  alvo.append(
+  montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Repasses'),
       el('p', {}, 'O saldo liberado vai por PIX para a conta cadastrada da sua empresa.'))),
     caixa,
