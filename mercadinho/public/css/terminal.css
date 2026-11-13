@@ -355,7 +355,7 @@ body.terminal{ font-size: 17px; }
 .painel-cabecalho{ display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .painel-cabecalho h2{ margin: 0; font-size: 32px; letter-spacing: -.03em; }
 .contador-itens{ padding: 6px 16px; border-radius: 999px; border: 1px solid var(--borda-forte); font-weight: 700; font-size: 17px; color: var(--texto-2); }
-.lista-carrinho{ flex: 1; min-height: 0; overflow-y: auto; margin: 0 -6px; padding: 0 6px; }
+.lista-carrinho{ flex: 1; min-height: 0; overflow-y: auto; margin: 0 -6px; padding: 0 6px; display: flex; flex-direction: column; }
 .item-carrinho{ display: flex; align-items: center; gap: 14px; padding: 14px 6px; border-bottom: 1px solid var(--borda); border-radius: 12px; }
 .item-carrinho .foto-produto{ width: 78px; height: 78px; border-radius: 14px; }
 .item-carrinho .nome{ font-weight: 700; font-size: 18px; line-height: 1.2; overflow-wrap: anywhere; text-wrap: balance; }
@@ -367,9 +367,13 @@ body.terminal{ font-size: 17px; }
 .passo-qtd button:active{ background: var(--marca-suave); }
 .passo-qtd span{ min-width: 30px; text-align: center; font-weight: 800; font-size: 19px; }
 .tirar{ border: 1px solid var(--borda-forte); background: transparent; color: var(--erro); border-radius: 12px; padding: 8px 16px; font-weight: 700; cursor: pointer; }
-.carrinho-vazio{ display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center; padding: 40px 14px; color: var(--texto-2); font-size: 19px; }
-.carrinho-vazio .alvo-leitor{ width: 104px; height: 104px; }
-.carrinho-vazio .alvo-leitor svg{ width: 46px; height: 46px; }
+/* Carrinho vazio: encolhe com a altura da tela para nunca passar da área (senão aparece barra de rolagem à toa). */
+.carrinho-vazio{
+  margin: auto 0; display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: clamp(8px, 2.2vh, 18px); padding: clamp(6px, 2.5vh, 40px) 14px; color: var(--texto-2); font-size: clamp(15px, 2.3vh, 19px);
+}
+.carrinho-vazio .alvo-leitor{ width: clamp(56px, 11vh, 104px); height: clamp(56px, 11vh, 104px); }
+.carrinho-vazio .alvo-leitor svg{ width: 45%; height: 45%; }
 .carrinho-vazio p{ margin: 0; max-width: 24ch; }
 .carrinho-vazio strong{ color: var(--marca); }
 .painel-rodape{ flex: none; display: flex; flex-direction: column; gap: 14px; padding-top: 16px; }
@@ -409,4 +413,24 @@ body.terminal{ font-size: 17px; }
   .teclado-info{ align-items: flex-start; max-width: none; }
   .teclado-info .visor{ text-align: left; }
   .painel-teclado .teclado-numerico{ width: 100%; }
+}
+
+/* Rolagem do terminal: quando precisa (muitos itens ou muitos produtos), um traço fino nas cores da marca
+ * no lugar da barra cinza do Windows. No tablet, o dedo rola do mesmo jeito. */
+.lista-carrinho, .grade-loja, .terminal-corpo{ scrollbar-width: thin; scrollbar-color: rgba(46,230,181,.35) transparent; }
+.lista-carrinho::-webkit-scrollbar, .grade-loja::-webkit-scrollbar, .terminal-corpo::-webkit-scrollbar{ width: 6px; }
+.lista-carrinho::-webkit-scrollbar-track, .grade-loja::-webkit-scrollbar-track, .terminal-corpo::-webkit-scrollbar-track{ background: transparent; }
+.lista-carrinho::-webkit-scrollbar-thumb, .grade-loja::-webkit-scrollbar-thumb, .terminal-corpo::-webkit-scrollbar-thumb{ background: rgba(46,230,181,.35); border-radius: 99px; }
+.lista-carrinho::-webkit-scrollbar-button, .grade-loja::-webkit-scrollbar-button, .terminal-corpo::-webkit-scrollbar-button{ display: none; }
+
+/* Tela baixa (notebook com Windows em 150%): o rodapé da compra fica mais compacto e sobra lugar para a lista. */
+@media (max-height: 760px){
+  .painel-compra{ padding: 20px 20px 14px; }
+  .painel-cabecalho h2{ font-size: 28px; }
+  .painel-rodape{ gap: 10px; padding-top: 12px; }
+  .linha-total span{ font-size: 26px; }
+  .painel-rodape .btn.enorme{ min-height: 66px; font-size: 21px; }
+  .cancelar-compra{ padding-top: 10px; }
+  .loja-topo{ padding-top: 14px; }
+  .loja-topo .logo-topo{ height: 48px; }
 }
