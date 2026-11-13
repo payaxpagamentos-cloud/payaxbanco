@@ -171,6 +171,8 @@ fi
 SENHA_NOVA=""
 if [ -f "$CODIGO/.env" ]; then
   echo ".env mantido (segredos e senha não mudam)"
+  # Instalações antigas escutavam em todas as interfaces: fecha para só dentro do servidor.
+  grep -q '^ATEND_HOST=' "$CODIGO/.env" || printf '\n# Só dentro do servidor (Nginx/Apache ou túnel SSH na frente).\nATEND_HOST=127.0.0.1\n' >> "$CODIGO/.env"
 else
   SENHA_NOVA="$(aleatorio 12 base64url)"
   cat > "$CODIGO/.env" <<ENV
@@ -178,6 +180,8 @@ else
 # ele cifra os tokens do WhatsApp e os segredos das ferramentas.
 NODE_ENV=production
 PORT=$PORTA
+# Só dentro do servidor: o acesso de fora passa pelo Nginx/Apache (ou por um túnel SSH).
+ATEND_HOST=127.0.0.1
 ATEND_BASE_PATH=/atendimento
 ATEND_URL_PUBLICA=https://${DOMINIO:-SEU-DOMINIO}
 ATEND_SECRET=$(aleatorio 32 hex)
@@ -329,7 +333,12 @@ sleep 3
 echo
 echo "============================================================================"
 [ "$PRIMEIRA" = 1 ] && echo " Instalação concluída." || echo " Atualização concluída (dados, .env e senha mantidos)."
-echo "   ZOE: https://${DOMINIO:-SEU-DOMINIO}/atendimento/"
+if [ -n "$DOMINIO" ]; then echo "   ZOE: https://$DOMINIO/atendimento/"
+else
+  echo "   Sem domínio ainda: abra pelo seu computador com um túnel SSH (deixe a janela aberta):"
+  echo "     ssh -L $PORTA:127.0.0.1:$PORTA root@IP-DO-SERVIDOR"
+  echo "   e no navegador:  http://localhost:$PORTA/atendimento/"
+fi
 if [ -n "$SENHA_NOVA" ]; then
   echo
   echo " Acesso master (anote agora — a senha não aparece de novo; troque no primeiro acesso):"

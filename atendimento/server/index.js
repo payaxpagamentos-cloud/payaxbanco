@@ -10,7 +10,7 @@ const fechamento = require('./lib/fechamento');
 const { processarFila } = require('./lib/envio');
 
 const db = abrir();
-criarApp(db).listen(config.port, () => {
+criarApp(db).listen(config.port, config.host, () => {
   console.log(`[ZOE Atende] Painel: http://localhost:${config.port}${config.basePath}/`);
   if (!config.ia.chave) console.log('[ZOE Atende] Sem ATEND_IA_CHAVE: a ZOE roda só com as intenções e a base de conhecimento.');
 });

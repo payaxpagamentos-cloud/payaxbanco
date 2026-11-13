@@ -25,6 +25,8 @@ module.exports = {
   producao,
   basePath,
   port: Number(process.env.PORT) || 3600,
+  // Em produção, atrás do Nginx/Apache: 127.0.0.1 (o instalador põe). Vazio escuta em todas as interfaces (Docker).
+  host: process.env.ATEND_HOST || undefined,
   dbFile: process.env.ATEND_DB || path.join(__dirname, '..', 'data', 'atendimento.db'),
   arquivos: process.env.ATEND_ARQUIVOS || path.join(__dirname, '..', 'data', 'arquivos'),
   arquivoMaxMb: Number(process.env.ATEND_ARQUIVO_MAX_MB) || 16,
