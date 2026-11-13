@@ -277,6 +277,9 @@ CREATE TABLE IF NOT EXISTS ia_config (
   max_turnos INTEGER NOT NULL DEFAULT 12 CHECK (max_turnos > 0),
   -- Transferir quando a IA não souber responder (em vez de insistir).
   transferir_sem_resposta INTEGER NOT NULL DEFAULT 1,
+  -- Resolver antes de transferir: quando o cliente pede uma pessoa sem dizer o assunto, a ZOE
+  -- pergunta o assunto UMA vez e tenta resolver. Pediu de novo, transfere na hora.
+  tentar_antes INTEGER NOT NULL DEFAULT 1,
   -- Fila usada quando a IA transfere sem escolher uma.
   fila_padrao_id INTEGER REFERENCES filas(id),
   pedir_csat INTEGER NOT NULL DEFAULT 1,
@@ -446,6 +449,32 @@ CREATE INDEX IF NOT EXISTS idx_ixc_acoes_empresa ON ixc_acoes(empresa_id, criado
 CREATE INDEX IF NOT EXISTS idx_ixc_acoes_cliente ON ixc_acoes(empresa_id, ixc_cliente_id, tipo, criado_em);
 
 -- Base de conhecimento: o que a ZOE usa para responder sozinha.
+-- O que a ZOE não conseguiu resolver sozinha: cada transferência feita por ela vira uma lacuna,
+-- com o tema, o motivo e o que faltou. Quem atendeu conta como resolveu, e as lacunas do mesmo
+-- tema viram um artigo na base de conhecimento — é assim que ela aprende para os próximos casos.
+CREATE TABLE IF NOT EXISTS lacunas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  conversa_id INTEGER REFERENCES conversas(id) ON DELETE SET NULL,
+  canal TEXT NOT NULL DEFAULT 'whatsapp',
+  tema TEXT NOT NULL,
+  -- O tema normalizado, para juntar "Mudança de endereço" e "mudanca de endereco".
+  tema_chave TEXT NOT NULL,
+  categoria TEXT NOT NULL CHECK (categoria IN ('nao_sabia','precisa_de_pessoa','regra_da_empresa','sistema_falhou',
+    'cliente_pediu','nao_entendeu','limite','outro')),
+  pergunta TEXT,
+  motivo TEXT,
+  o_que_faltou TEXT,
+  solucao TEXT,
+  solucao_por INTEGER REFERENCES usuarios(id),
+  solucao_em TEXT,
+  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','ensinada','ignorada')),
+  conhecimento_id INTEGER REFERENCES conhecimento(id) ON DELETE SET NULL,
+  criada_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_lacunas_empresa ON lacunas(empresa_id, status, tema_chave);
+CREATE INDEX IF NOT EXISTS idx_lacunas_conversa ON lacunas(conversa_id);
+
 CREATE TABLE IF NOT EXISTS conhecimento (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),

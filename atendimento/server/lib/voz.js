@@ -269,7 +269,7 @@ async function turno(db, empresa, uid, { texto = null, digitos = null, audio_bas
     const seguidas = naoEntendidasSeguidas(db, c.id);
     if (seguidas >= MAX_NAO_ENTENDI) {
       const marca = ultimaId(db, c.id);
-      transacao(db, () => conversas.transferir(db, c, { por: 'ia', motivo: 'Não foi possível entender o cliente na ligação.' }));
+      transacao(db, () => conversas.transferir(db, c, { por: 'ia', motivo: 'Não foi possível entender o cliente na ligação.', lacuna: { categoria: 'nao_entendeu' } }));
       return passo(db.prepare('SELECT * FROM conversas WHERE id = ?').get(c.id), falasDesde(db, c.id, marca, { teclas }));
     }
     if (teclas) {
@@ -291,7 +291,7 @@ async function turno(db, empresa, uid, { texto = null, digitos = null, audio_bas
     // O cérebro falhou no meio da ligação: a pessoa não pode ficar no silêncio. Vai para a fila.
     console.error('[ZOE Atende] Falha no turno da ligação:', err);
     const atual = db.prepare('SELECT * FROM conversas WHERE id = ?').get(c.id);
-    if (atual.estado === 'bot') transacao(db, () => conversas.transferir(db, atual, { por: 'ia', motivo: 'Falha técnica durante a ligação.' }));
+    if (atual.estado === 'bot') transacao(db, () => conversas.transferir(db, atual, { por: 'ia', motivo: 'Falha técnica durante a ligação.', lacuna: { categoria: 'sistema_falhou' } }));
   }
 
   const depois = db.prepare('SELECT * FROM conversas WHERE id = ?').get(c.id);

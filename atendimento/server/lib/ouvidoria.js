@@ -111,6 +111,8 @@ function encaminhar(db, { conversa, ouvidoria, ficha = null, fila = null }) {
     resumo: linhas.join(' '),
     assunto: `${TIPOS[ouvidoria.tipo]} — ${ouvidoria.assunto}`.slice(0, 160),
     por: 'ia',
+    // Cancelamento, Procon e reclamação formal ficam com a equipe por regra: não é falta de conhecimento.
+    lacuna: { categoria: ['elogio', 'sugestao'].includes(ouvidoria.tipo) ? 'outro' : 'precisa_de_pessoa', tema: TIPOS[ouvidoria.tipo] },
   });
 }
 

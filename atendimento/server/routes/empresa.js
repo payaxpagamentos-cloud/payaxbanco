@@ -8,6 +8,7 @@ const permissoesLib = require('../lib/permissoes');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const conversasLib = require('../lib/conversas');
 const passagemLib = require('../lib/passagem');
+const aprendizado = require('../lib/aprendizado');
 const filasLib = require('../lib/filas');
 const envio = require('../lib/envio');
 const empresasLib = require('../lib/empresas');
@@ -66,7 +67,17 @@ module.exports = function rotasEmpresa(db) {
     const doc = (x) => permissoesLib.mascararDocumento(x, req.pode('cliente.documento'));
     const p = passagemLib.montar(db, d.id);
     res.json({ ...d, documento: doc(d.documento), documento_visivel: req.pode('cliente.documento'),
-      passagem: p ? { ...p, cliente: { ...p.cliente, documento: doc(p.cliente.documento) } } : null });
+      passagem: p ? { ...p, cliente: { ...p.cliente, documento: doc(p.cliente.documento) } } : null,
+      // O que a ZOE não resolveu nesta conversa: o painel pede a quem atendeu que conte como resolveu.
+      lacuna: aprendizado.daConversa(db, d.id) });
+  });
+
+  /** Quem atendeu conta como resolveu — é com isso que a ZOE aprende a resolver o próximo igual. */
+  r.post('/conversas/:id/como-resolveu', exigirPermissao('atendimentos.atender'), (req, res, next) => {
+    try {
+      const c = conversaDa(req);
+      res.json(aprendizado.comoResolveu(db, req.empresa.id, c.id, req.usuario, (req.body ?? {}).texto));
+    } catch (err) { next(err); }
   });
 
   /**
@@ -200,6 +211,7 @@ module.exports = function rotasEmpresa(db) {
       const fechada = transacao(db, () => {
         if (d.assunto) db.prepare('UPDATE conversas SET assunto = ? WHERE id = ?').run(v.texto(d.assunto, 'o assunto', 160), c.id);
         if (d.resumo) db.prepare('UPDATE conversas SET resumo = ? WHERE id = ?').run(v.texto(d.resumo, 'o resumo', 2000), c.id);
+        if (d.como_resolveu && aprendizado.daConversa(db, c.id)) aprendizado.comoResolveu(db, req.empresa.id, c.id, req.usuario, d.como_resolveu);
         return conversasLib.encerrar(db, db.prepare('SELECT * FROM conversas WHERE id = ?').get(c.id), {
           resolvidaPor: 'humano', usuario: req.usuario, mensagem: v.opcional(d.mensagem, 'a mensagem de encerramento', 1000),
           avisar: v.booleano(d.avisar_cliente ?? true), pedirCsat: d.pedir_csat === undefined ? null : v.booleano(d.pedir_csat),

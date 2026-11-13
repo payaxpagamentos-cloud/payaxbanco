@@ -18,6 +18,7 @@ export async function telaIa(ctx) {
   const corpo = el('div');
   const TELAS = {
     desempenho: ['Desempenho', desempenho],
+    aprendizado: ['Aprendizado', aprendizado],
     conhecimento: ['Base de conhecimento', conhecimento],
     intencoes: ['Intenções', intencoes],
     ferramentas: ['Ferramentas', ferramentas],
@@ -37,6 +38,97 @@ export async function telaIa(ctx) {
   };
   limpar(ctx.conteudo, abas, corpo);
   await trocar(atual);
+}
+
+// ---------- Aprendizado ----------
+
+/**
+ * O que a ZOE não conseguiu resolver, agrupado por tema, com o que os clientes perguntaram e como
+ * a equipe resolveu. "Ensinar a ZOE" transforma isso num artigo da base — e o próximo caso igual
+ * ela resolve sozinha.
+ */
+async function aprendizado(ctx, alvo) {
+  const estado = { dias: 30, mostrar: 'abertas' };
+  const conteudo = el('div');
+  const podeEnsinar = ctx.pode('zoe.editar');
+
+  const desenhar = async () => {
+    const d = await api.get(`/empresas/${ctx.empresaId}/ia/aprendizado${qs({ dias: estado.dias })}`);
+    const r = d.resolucao;
+    const variacao = r.taxa !== null && r.anterior !== null ? Number((r.taxa - r.anterior).toFixed(1)) : null;
+    const temas = d.temas.filter((t) => (estado.mostrar === 'abertas' ? t.abertas > 0 && t.aprende : true));
+
+    limpar(conteudo,
+      el('div', { class: 'indicadores' },
+        indicador('Resolveu sozinha', r.taxa === null ? '—' : porcento(r.taxa),
+          variacao === null ? `${inteiro(r.zoe)} de ${inteiro(r.zoe + r.equipe)} conversas` : `${variacao >= 0 ? '+' : ''}${variacao.toLocaleString('pt-BR')} ponto(s) contra os ${d.dias} dias anteriores`,
+          'robo', variacao === null || variacao >= 0 ? 'verde' : 'laranja'),
+        indicador('Passou para a equipe', inteiro(d.transferencias), `nos últimos ${d.dias} dias`, 'pessoa', 'laranja'),
+        indicador('Para ensinar', inteiro(d.abertas), d.sem_solucao_registrada ? `${inteiro(d.sem_solucao_registrada)} sem "como resolveu"` : 'todas com a solução da equipe', 'alerta', d.abertas ? 'azul' : 'verde'),
+        indicador('Já ensinadas', inteiro(d.ensinadas), 'viraram artigo da base', 'ok', 'roxo')),
+
+      d.por_categoria.length ? cartao('Por que ela não resolveu',
+        el('div', { class: 'motivos-aprendizado' }, d.por_categoria.map((c) => el('div', { class: 'motivo-aprendizado' },
+          el('strong', {}, inteiro(c.casos)), el('span', {}, c.nome))))) : null,
+
+      cartao(null,
+        el('div', { class: 'linha entre', style: 'margin-bottom:10px;flex-wrap:wrap;gap:8px' },
+          el('h3', { style: 'margin:0' }, 'Temas que escaparam da ZOE'),
+          el('div', { class: 'linha', style: 'gap:6px' },
+            ...[['abertas', 'Para ensinar'], ['todas', 'Todos']].map(([k, rot]) => el('button', {
+              class: `btn pequeno${estado.mostrar === k ? ' primario' : ''}`, type: 'button', onclick: () => { estado.mostrar = k; desenhar(); },
+            }, rot)))),
+        temas.length ? el('div', { class: 'temas-aprendizado' }, temas.map((t) => cartaoTema(t)))
+          : vazio(estado.mostrar === 'abertas' ? 'Nada para ensinar agora.' : 'Nenhuma transferência no período.',
+            'Cada vez que a ZOE passar um cliente para a equipe, o motivo aparece aqui.')));
+  };
+
+  const cartaoTema = (t) => el('article', { class: `tema-aprendizado ${t.situacao}` },
+    el('div', { class: 'linha entre', style: 'gap:8px;align-items:flex-start' },
+      el('div', {},
+        el('strong', { class: 'titulo-tema' }, t.tema),
+        el('div', { class: 'pequeno mudo' }, `${inteiro(t.casos)} caso(s) · ${t.categoria_nome} · último ${dataHora(t.ultima_em)}`)),
+      el('span', { class: `etiqueta ${t.situacao === 'aberta' ? (t.aprende ? 'aviso' : '') : 'ok'}` },
+        t.situacao === 'aberta' ? (t.aprende ? 'para ensinar' : 'fica com a equipe') : t.situacao === 'ensinada' ? 'ensinada' : 'ignorada')),
+    t.perguntas.length ? el('div', { class: 'bloco-tema' }, el('small', {}, 'O que os clientes perguntaram'),
+      el('ul', {}, t.perguntas.slice(0, 3).map((q) => el('li', {}, `“${q}”`)))) : null,
+    t.faltou.length ? el('div', { class: 'bloco-tema' }, el('small', {}, 'O que a ZOE disse que faltou'),
+      el('ul', {}, t.faltou.map((f) => el('li', {}, f)))) : null,
+    t.solucoes.length ? el('div', { class: 'bloco-tema' }, el('small', {}, 'Como a equipe resolveu'),
+      el('ul', {}, t.solucoes.slice(0, 3).map((x) => el('li', {}, x.texto, el('span', { class: 'pequeno mudo' }, ` — ${x.por ?? 'equipe'}`)))))
+      : t.aprende && t.abertas ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Ninguém contou ainda como resolveu. O atendente registra isso ao encerrar a conversa.') : null,
+    el('p', { class: 'pequeno', style: 'margin:0;color:var(--text-2)' }, t.acao),
+    podeEnsinar && t.abertas ? el('div', { class: 'linha', style: 'gap:6px;justify-content:flex-end' },
+      botao('Não é para a ZOE', 'pequeno', () => ignorar(t)),
+      t.aprende ? botao('Ensinar a ZOE', 'primario pequeno', () => ensinar(t)) : null) : null);
+
+  const ensinar = (t) => formModal(`Ensinar a ZOE: ${t.tema}`, () => [
+    el('p', { class: 'mudo pequeno', style: 'margin:0 0 8px' },
+      'Vira um artigo da base de conhecimento. A ZOE passa a responder isso sozinha — com as palavras abaixo, do jeito que os clientes perguntam.'),
+    campo('Título', { name: 'titulo', value: t.tema.charAt(0).toUpperCase() + t.tema.slice(1), required: true, maxlength: 160 }),
+    area('A resposta que a ZOE vai dar', { name: 'resposta', rows: 6, required: true, maxlength: 4000,
+      placeholder: 'Escreva como você responderia ao cliente: valores, prazos e o que ele precisa fazer.' },
+      // Começa pela solução mais completa da equipe; quem ensina ajusta o texto para falar com o cliente.
+      [...t.solucoes].sort((x, y) => y.texto.length - x.texto.length)[0]?.texto ?? ''),
+    area('Perguntas de exemplo (uma por linha)', { name: 'perguntas', rows: 4, maxlength: 2000 }, t.perguntas.join('\n')),
+    t.solucoes.length > 1 ? el('details', {}, el('summary', { class: 'pequeno' }, `Outras ${t.solucoes.length - 1} solução(ões) da equipe`),
+      el('ul', { class: 'pequeno' }, t.solucoes.slice(1).map((x) => el('li', {}, x.texto)))) : null,
+  ], async (dados) => {
+    const r = await api.post(`/empresas/${ctx.empresaId}/ia/aprendizado/ensinar`, { ...dados, tema_chave: t.tema_chave });
+    toast(`A ZOE aprendeu "${dados.titulo}" (${r.lacunas} caso(s)).`);
+    await desenhar();
+  }, { rotulo: 'Ensinar', largo: true });
+
+  const ignorar = async (t) => {
+    if (!await confirmar('Não é para a ZOE', `"${t.tema}" sai da lista de pendências. Os próximos casos do tema voltam a aparecer.`, 'Tirar da lista')) return;
+    await api.post(`/empresas/${ctx.empresaId}/ia/aprendizado/ignorar`, { tema_chave: t.tema_chave });
+    await desenhar();
+  };
+
+  const periodo = escolha(null, 'dias', { 7: 'Últimos 7 dias', 30: 'Últimos 30 dias', 90: 'Últimos 90 dias' }, String(estado.dias));
+  periodo.addEventListener('change', () => { estado.dias = Number(periodo.value); desenhar().catch((e) => toast(e.message, true)); });
+  limpar(alvo, el('label', { class: 'campo', style: 'margin-bottom:12px;max-width:260px' }, 'Período', periodo), conteudo);
+  await desenhar();
 }
 
 // ---------- Desempenho ----------
@@ -346,6 +438,10 @@ async function configuracao(ctx, alvo) {
     cartao('Quando passar para a equipe',
       campo('Máximo de mensagens antes de transferir', { name: 'max_turnos', type: 'number', value: cfg.max_turnos, min: 1, max: 60 }),
       marcar('Transferir quando ela não souber responder (recomendado)', { name: 'transferir_sem_resposta', checked: cfg.transferir_sem_resposta }),
+      marcar('Resolver antes de transferir: quando o cliente pede uma pessoa sem dizer o assunto, ela pergunta o assunto uma vez e tenta resolver (recomendado)',
+        { name: 'tentar_antes', checked: cfg.tentar_antes }),
+      el('p', { class: 'pequeno mudo', style: 'margin:-4px 0 4px' },
+        'Se o cliente pedir uma pessoa de novo, ela transfere na hora, sem discutir: falar com um atendente é direito do consumidor (Decreto do SAC).'),
       escolha('Fila padrão (quando ela não escolhe uma)', 'fila_padrao_id', { '': '— primeira fila ativa —', ...Object.fromEntries(filas.map((x) => [x.id, x.nome])) }, cfg.fila_padrao_id ?? ''),
       campo('Encerrar por abandono depois de (minutos, 0 = nunca)', { name: 'encerrar_apos_min', type: 'number', value: cfg.encerrar_apos_min, min: 0, max: 10080 }),
       marcar('Pedir avaliação de 1 a 5 no fim', { name: 'pedir_csat', checked: cfg.pedir_csat })),

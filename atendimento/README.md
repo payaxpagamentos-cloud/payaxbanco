@@ -236,6 +236,50 @@ curl -X POST https://SEU-DOMINIO/atendimento/api/integracao/mensagens \
 A conversa aberta assim **não passa pela ZOE** (aviso automático não é atendimento): ela
 entra direto na fila da equipe, a menos que você mande `"com_ia": true`.
 
+## A ZOE resolve primeiro, e aprende com o que não resolveu
+
+**Resolver antes de transferir.** O trabalho da ZOE é resolver; transferir é o último recurso.
+Antes de passar para a equipe ela busca na base com outras palavras, consulta o que o IXC mostra
+(contrato, faturas, conexão, alertas) e, se for técnico, abre o chamado. Quando o cliente pede uma
+pessoa:
+
+| Situação | O que a ZOE faz |
+|---|---|
+| Pediu uma pessoa sem dizer o assunto ("quero um atendente") | pergunta o assunto **uma vez**: "muita coisa eu resolvo na hora — e se não der, quem te atender já recebe tudo" |
+| Pediu uma pessoa e disse o assunto ("atendente, quero a segunda via") | tenta resolver, em no máximo duas trocas, avisando que passa se não resolver |
+| Pediu de novo, ou já tinha contado o problema e ela já tentou | **transfere na hora**, sem discutir |
+| Cancelamento, Procon, Anatel | abre a Ouvidoria e vai para a Retenção (é da equipe por regra) |
+| Ligação por teclas, "0 para atendente" | transfere direto: é escolha explícita |
+
+Falar com um atendente é direito do consumidor (Decreto do SAC, 11.034/2022): a ZOE nunca prende
+o cliente nem dificulta — pergunta uma vez e obedece. Dá para desligar em
+`ZOE › Como ela atende › Resolver antes de transferir`.
+
+**O aprendizado.** Toda vez que a ZOE passa um cliente para a equipe, fica registrado **por quê**:
+
+| Motivo | Dá para ensinar? |
+|---|---|
+| Não sabia a resposta | sim — vira artigo da base |
+| O cliente quis uma pessoa | sim — ensinando o assunto, ela resolve antes de ele pedir |
+| Não entendeu o cliente | sim — as palavras dele entram como perguntas de exemplo |
+| Passou do limite de mensagens | sim — um artigo mais direto costuma resolver |
+| Precisa de uma pessoa (negociação, exceção, cancelamento) | não — fica com a equipe |
+| A empresa mandou transferir (intenção) | não — mude a intenção se quiser |
+| Sistema fora do ar | não — é técnico |
+
+Quando a IA transfere, ela mesma diz o tema ("mudança de endereço") e **o que faltou** para resolver
+sozinha ("a taxa e o prazo da mudança"). Quem atendeu conta **como resolveu** — no painel da
+conversa ("Ensine a ZOE") ou ao encerrar. Em `ZOE › Aprendizado` a equipe vê:
+
+- a **taxa de resolução da ZOE** e quanto ela subiu contra o período anterior;
+- os **temas que mais escapam dela**, juntos mesmo quando escritos diferente, com as perguntas reais
+  dos clientes, o que ela disse que faltou e como a equipe resolveu;
+- o botão **Ensinar a ZOE**, que transforma a solução da equipe num artigo da base, com as
+  perguntas dos clientes como exemplos. Do próximo caso igual em diante, ela resolve sozinha.
+
+O aprendizado passa por uma pessoa de propósito: a ZOE não ensina a si mesma. Um atendente que
+resolveu "dando um desconto por fora" não vira regra sem alguém aprovar.
+
 ## A ZOE no telefone (o mesmo cérebro)
 
 Antes existiam duas ZOEs: a do WhatsApp e a do telefone, uma URA de teclas com regras próprias.

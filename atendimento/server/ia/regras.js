@@ -18,6 +18,7 @@ const normalizar = (t) => String(t ?? '')
 const PEDE_HUMANO = [
   'atendente', 'atendente humano', 'falar com atendente', 'quero um atendente', 'me transfere', 'transferir',
   'falar com alguem', 'falar com uma pessoa', 'falar com humano', 'humano', 'pessoa de verdade', 'gente de verdade',
+  'uma pessoa', 'com alguem', 'quero alguem', 'pessoa real', 'ser humano',
   'nao quero falar com robo', 'nao quero robo', 'sair do robo', 'chama alguem', 'chamar alguem',
   'preciso de ajuda de verdade', 'quero falar com o suporte', 'me liga', 'supervisor', 'reclamacao', 'reclamar',
   'cancelar contrato', 'cancelamento', 'procon', 'advogado',
@@ -39,6 +40,22 @@ function pedidoDeHumano(texto) {
   if (!t) return null;
   // Do termo mais específico para o mais genérico, para o motivo sair bonito no painel.
   return [...PEDE_HUMANO].sort((a, b) => b.length - a.length).find((p) => contem(t, p)) ?? null;
+}
+
+// Palavras que acompanham o pedido de uma pessoa sem dizer o assunto ("quero falar com um
+// atendente agora, por favor").
+const SO_PEDIDO = new Set(('quero queria preciso gostaria pode poderia falar com um uma o a de da do me por favor pf pfv agora '
+  + 'urgente rapido ja logo sim oi ola alo bom dia boa tarde noite moca moco amigo senhor senhora '
+  + 'atendente atendimento humano pessoa alguem gente verdade real robo bot nao passa passar transfere transferir '
+  + 'chama chamar ajuda ajudar suporte').split(' '));
+
+/**
+ * O cliente pediu uma pessoa E disse o assunto? ("quero falar com um atendente sobre a minha
+ * fatura" tem assunto; "atendente, por favor" não tem.) Com assunto, a ZOE tenta resolver primeiro.
+ */
+function temAssuntoAlemDoPedido(texto) {
+  const resto = normalizar(texto).split(' ').filter((p) => p.length >= 3 && !SO_PEDIDO.has(p));
+  return resto.length >= 1 && resto.join('').length >= 4;
 }
 
 /**
@@ -124,5 +141,5 @@ function escolhaDeMenu(filas, texto, { idResposta = null } = {}) {
   return filas.find((f) => normalizar(f.nome) === t) ?? null;
 }
 
-module.exports = { normalizar, contem, pedidoDeHumano, assuntoDeOuvidoria, ehCumprimento, ehDespedida, casarIntencao, saudacao, primeiroNome, preencher, menu,
+module.exports = { normalizar, contem, pedidoDeHumano, temAssuntoAlemDoPedido, assuntoDeOuvidoria, ehCumprimento, ehDespedida, casarIntencao, saudacao, primeiroNome, preencher, menu,
   escolhaDeMenu, PEDE_HUMANO, DESPEDIDA, CUMPRIMENTO, OUVIDORIA };

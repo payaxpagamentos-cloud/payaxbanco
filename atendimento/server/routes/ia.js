@@ -47,6 +47,7 @@ module.exports = function rotasIa(db) {
     ...cfg,
     ativa: Boolean(cfg.ativa),
     transferir_sem_resposta: Boolean(cfg.transferir_sem_resposta),
+    tentar_antes: Boolean(cfg.tentar_antes),
     pedir_csat: Boolean(cfg.pedir_csat),
     // O que vale de fato, somando o que está no servidor.
     modelo_efetivo: cfg.modelo || config.ia.modelo,
@@ -74,14 +75,14 @@ module.exports = function rotasIa(db) {
       if (d.fila_padrao_id && !fila) throw naoEncontrado('Fila');
 
       db.prepare(`UPDATE ia_config SET ativa = ?, nome_assistente = ?, saudacao = ?, tom = ?, regras = ?, max_turnos = ?,
-          transferir_sem_resposta = ?, fila_padrao_id = ?, pedir_csat = ?, encerrar_apos_min = ?,
+          transferir_sem_resposta = ?, tentar_antes = ?, fila_padrao_id = ?, pedir_csat = ?, encerrar_apos_min = ?,
           mensagem_transferencia = ?, mensagem_fora_horario = ?, mensagem_encerramento = ?, mensagem_csat = ?,
           modelo = ?, esforco = ?, atualizada_em = ? WHERE empresa_id = ?`)
         .run(bool('ativa'),
           d.nome_assistente === undefined ? atual.nome_assistente : v.texto(d.nome_assistente, 'o nome da atendente', 40),
           texto('saudacao', 'a saudação', 1000), texto('tom', 'o tom de voz', 3000), texto('regras', 'as regras da empresa', 5000),
           d.max_turnos === undefined ? atual.max_turnos : v.inteiro(d.max_turnos, 'o limite de mensagens da IA', { min: 1, max: 60 }),
-          bool('transferir_sem_resposta'), fila, bool('pedir_csat'),
+          bool('transferir_sem_resposta'), bool('tentar_antes'), fila, bool('pedir_csat'),
           d.encerrar_apos_min === undefined ? atual.encerrar_apos_min : v.inteiro(d.encerrar_apos_min, 'o tempo para encerrar por abandono', { min: 0, max: 10_080 }),
           texto('mensagem_transferencia', 'a mensagem de transferência', 1000), texto('mensagem_fora_horario', 'a mensagem de fora do horário', 1000),
           texto('mensagem_encerramento', 'a mensagem de encerramento', 1000), texto('mensagem_csat', 'a mensagem da avaliação', 1000),
@@ -110,6 +111,25 @@ module.exports = function rotasIa(db) {
   });
 
   // ---------- Base de conhecimento ----------
+  // ---------- Aprendizado: o que a ZOE não resolveu, e o que a equipe ensina a ela ----------
+  const aprendizado = require('../lib/aprendizado');
+  r.get('/aprendizado', (req, res, next) => {
+    try {
+      const dias = req.query.dias ? v.inteiro(req.query.dias, 'o período', { min: 1, max: 365 }) : 30;
+      res.json(aprendizado.painel(db, req.empresa.id, { dias }));
+    } catch (err) { next(err); }
+  });
+  r.post('/aprendizado/ensinar', exigirPermissao('zoe.editar'), (req, res, next) => {
+    try {
+      const r2 = aprendizado.ensinar(db, req.empresa.id, req.body ?? {}, req.usuario);
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'ensinou a ZOE', alvo: (req.body ?? {}).titulo, detalhe: r2, ip: req.ip });
+      res.status(201).json(r2);
+    } catch (err) { next(err); }
+  });
+  r.post('/aprendizado/ignorar', exigirPermissao('zoe.editar'), (req, res, next) => {
+    try { res.json(aprendizado.ignorar(db, req.empresa.id, (req.body ?? {}).tema_chave)); } catch (err) { next(err); }
+  });
+
   r.get('/conhecimento', (req, res) => res.json({ itens: conhecimentoLib.listar(db, req.empresa.id, { todos: true }).map((a) => ({ ...a, ativo: Boolean(a.ativo) })) }));
 
   r.post('/conhecimento', exigirPermissao('zoe.editar'), (req, res, next) => {

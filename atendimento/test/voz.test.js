@@ -72,8 +72,13 @@ describe('ligação atendida pela ZOE', () => {
     await chamar('/voz/ligacoes', { uid: '1700000002.1', telefone: '11966665555' });
     const sem = h.semIa();
     let r;
-    try { r = await chamar('/voz/ligacoes/1700000002.1/turno', { texto: 'quero falar com um atendente' }); } finally { sem.restaurar(); }
-    assert.equal(r.dados.acao, 'transferir');
+    try {
+      const antes = await chamar('/voz/ligacoes/1700000002.1/turno', { texto: 'quero falar com um atendente' });
+      assert.equal(antes.dados.acao, 'ouvir', 'primeiro a ZOE pergunta o assunto, uma vez');
+      assert.match(antes.dados.fala, /me diz em poucas palavras/);
+      r = await chamar('/voz/ligacoes/1700000002.1/turno', { texto: 'quero um atendente' });
+    } finally { sem.restaurar(); }
+    assert.equal(r.dados.acao, 'transferir', 'pediu de novo: transfere');
     assert.ok(r.dados.fila?.nome, 'a central usa o nome para escolher a fila de ramais');
     assert.ok(r.dados.fala, 'avisa antes de transferir');
     const c = db.prepare("SELECT * FROM conversas WHERE ligacao_uid = '1700000002.1'").get();

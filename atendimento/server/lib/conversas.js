@@ -98,7 +98,7 @@ function registrarEntrada(db, conversa, { tipo = 'texto', texto = null, waId = n
  * ela chama isto quando não resolve, quando o cliente pede uma pessoa ou quando o assunto exige decisão humana.
  * Avisa o cliente, entrega ao atendente mais livre e, fora do horário, diz que a equipe responde depois.
  */
-function transferir(db, conversa, { fila = null, motivo = null, resumo = null, assunto = null, por = 'ia', usuario = null, avisar = true } = {}) {
+function transferir(db, conversa, { fila = null, motivo = null, resumo = null, assunto = null, por = 'ia', usuario = null, avisar = true, lacuna = null } = {}) {
   if (conversa.estado === 'encerrada') throw new ErroNegocio('Esta conversa já foi encerrada.');
   const destino = fila ?? filas.buscar(db, conversa.empresa_id, conversa.fila_id) ?? filas.filaPadrao(db, conversa.empresa_id);
   if (!destino) throw new ErroNegocio('A empresa não tem nenhuma fila de atendimento cadastrada.');
@@ -119,6 +119,9 @@ function transferir(db, conversa, { fila = null, motivo = null, resumo = null, a
     .run(conversa.empresa_id, conversa.id, destino.nome, motivo, agora());
 
   const atual = db.prepare('SELECT * FROM conversas WHERE id = ?').get(conversa.id);
+  // Toda vez que a ZOE passa o cliente adiante, fica registrado por quê — é a matéria-prima do
+  // aprendizado dela. Transferência entre pessoas da equipe não é lacuna da ZOE.
+  if (por === 'ia') require('./aprendizado').registrar(db, atual, { categoria: 'outro', motivo, ...(lacuna ?? {}) });
   // Ligação transferida vai para a fila da central telefônica, que toca nos ramais. Entregar a um
   // atendente do WhatsApp deixaria a pessoa esperando no telefone por alguém que está no chat.
   const quem = aberta && atual.canal !== 'telefone' ? filas.atribuir(db, atual) : null;

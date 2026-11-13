@@ -306,6 +306,7 @@ describe('a ZOE e a ouvidoria', () => {
     const sem = h.semIa();
     try {
       await h.conversar(db, 'quero falar com um atendente');
+      await h.conversar(db, 'atendente');
       assert.equal(Number(db.prepare('SELECT COUNT(*) AS n FROM ouvidoria WHERE empresa_id = ?').get(empresa.id).n), 0);
       assert.equal(h.conversaDoCliente(db).estado, 'humano');
     } finally { sem.restaurar(); }

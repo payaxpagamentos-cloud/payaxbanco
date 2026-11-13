@@ -200,9 +200,9 @@ describe('o áudio na conversa', () => {
     const sem = h.semIa();
     try { await mandarAudio(db); } finally { sem.restaurar(); }
     const conversa = db.prepare('SELECT * FROM conversas ORDER BY id DESC LIMIT 1').get();
-    // Fila ou direto para um atendente livre: o que importa é que saiu da ZOE na hora.
-    assert.ok(['aguardando', 'humano'].includes(conversa.estado), `estado: ${conversa.estado}`);
-    const evento = db.prepare("SELECT * FROM ia_eventos WHERE conversa_id = ? AND nome = 'pedido de humano'").get(conversa.id);
+    // Igual ao texto: sem dizer o assunto, a ZOE pergunta o assunto uma vez antes de transferir.
+    assert.equal(conversa.estado, 'bot');
+    const evento = db.prepare("SELECT * FROM ia_eventos WHERE conversa_id = ? AND nome LIKE 'pedido de humano%'").get(conversa.id);
     assert.ok(evento, 'a regra de pedido de humano reconheceu a frase dita em voz alta');
   });
 

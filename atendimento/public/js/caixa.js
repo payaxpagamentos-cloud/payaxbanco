@@ -300,6 +300,10 @@ export async function telaCaixa(ctx) {
   const encerrar = (d) => formModal('Encerrar atendimento', () => [
     campo('Assunto (para o relatório)', { name: 'assunto', value: d.assunto ?? '', maxlength: 160 }),
     area('Resumo do que foi feito', { name: 'resumo', rows: 3, maxlength: 2000 }, d.resumo ?? ''),
+    d.lacuna?.aprende && d.lacuna.status === 'aberta' && !d.lacuna.solucao
+      ? area('Como você resolveu? (a ZOE aprende com isso — opcional)', { name: 'como_resolveu', rows: 3, maxlength: 2000,
+        placeholder: 'Ex.: a mudança de endereço custa R$ 80 e é feita em até 5 dias úteis; agenda pelo financeiro.' })
+      : null,
     area('Mensagem de despedida (vazio usa a padrão da empresa)', { name: 'mensagem', rows: 2, maxlength: 1000 }),
     marcar('Avisar o cliente', { name: 'avisar_cliente', checked: true }),
     marcar('Pedir avaliação (nota de 1 a 5)', { name: 'pedir_csat', checked: true }),
@@ -321,6 +325,8 @@ export async function telaCaixa(ctx) {
         el('h3', {}, icone('robo'), 'A ZOE passou assim'),
         el('p', {}, d.resumo),
         d.motivo_transferencia ? el('p', { class: 'motivo' }, el('strong', {}, 'Motivo: '), d.motivo_transferencia) : null) : null,
+
+      ensineAZoe(d),
 
       bloco('Contato',
         dado('Nome', d.contato?.nome ?? d.contato?.nome_perfil),
@@ -380,6 +386,33 @@ export async function telaCaixa(ctx) {
         ev.detalhe ? el('div', { class: 'pequeno mudo' }, String(ev.detalhe).slice(0, 160)) : null,
         ev.ms ? el('small', {}, `${inteiro(ev.ms)} ms`) : null)))) : null);
   }
+
+  /**
+   * A ZOE não resolveu esta conversa: quem atendeu conta como resolveu. É com isso que ela aprende
+   * (ZOE › Aprendizado). Só aparece quando o motivo é algo que dá para ensinar.
+   */
+  function ensineAZoe(d) {
+    const l = d.lacuna;
+    if (!l || !l.aprende || l.status !== 'aberta' || d.estado === 'bot') return null;
+    if (l.solucao) {
+      return el('div', { class: 'ensine-zoe' }, el('h3', {}, 'A ZOE vai aprender com isto'),
+        el('p', {}, l.solucao), el('p', { class: 'pequeno mudo' }, 'Vai para ZOE › Aprendizado, onde o administrador transforma em resposta da ZOE.'));
+    }
+    return el('div', { class: 'ensine-zoe' },
+      el('h3', {}, 'Ensine a ZOE'),
+      el('p', {}, `Ela não resolveu: ${l.categoria_nome.toLowerCase()}${l.o_que_faltou ? ` — faltou ${l.o_que_faltou.replace(/^\w/, (c) => c.toLowerCase()).replace(/[.\s]+$/, '')}` : ''}.`),
+      ctx.pode('atendimentos.atender') ? botao('Contar como resolvi', 'pequeno', () => contarComoResolveu(d)) : null);
+  }
+
+  const contarComoResolveu = (d) => formModal('Como você resolveu?', () => [
+    el('p', { class: 'mudo pequeno', style: 'margin:0 0 8px' },
+      'Escreva o que respondeu ou fez, como se fosse explicar para a ZOE: valores, prazos, onde clicar. Sem dados do cliente.'),
+    area('Como resolveu', { name: 'texto', rows: 5, required: true, maxlength: 2000 }),
+  ], async (dados) => {
+    await api.post(`/empresas/${ctx.empresaId}/conversas/${d.id}/como-resolveu`, dados);
+    toast('Obrigado! A ZOE vai aprender com isso.');
+    await abrir(d.id);
+  });
 
   const editarContato = (d) => formModal('Editar contato', () => [
     campo('Nome', { name: 'nome', value: d.contato?.nome ?? '', maxlength: 160 }),

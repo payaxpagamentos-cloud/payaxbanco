@@ -113,6 +113,11 @@ function historico(db, conversa) {
  */
 function notaDaConversa(db, conversa) {
   const partes = [];
+  if (conversa.estado === 'bot' && jaPediuPessoa(db, conversa)) {
+    partes.push('O cliente pediu para falar com uma pessoa nesta conversa. Tente resolver agora, de forma direta, em no máximo '
+      + 'duas trocas — e diga que, se não resolver, já passa para alguém. Se ele pedir uma pessoa de novo, ou não quiser '
+      + 'tentar, chame transferir_para_humano na hora, sem argumentar.');
+  }
   if (conversa.canal === 'telefone') partes.push(...notaDaLigacao(db, conversa));
   const doIxc = ferramentasIxc.notaDeEstado(db, conversa);
   if (doIxc) partes.push(doIxc);
@@ -257,7 +262,9 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
   const escolhida = lista.length ? regras.escolhaDeMenu(lista, texto, { idResposta }) : null;
   if (escolhida && ultimaFoiMenu(db, conversa)) {
     registrarEvento(db, conversa, { tipo: 'intencao', nome: 'menu', detalhe: escolhida.nome });
-    const r = transferirCom(db, conversa, { fila: escolhida, motivo: `O cliente escolheu ${escolhida.nome} no menu.`, assunto: escolhida.nome });
+    // O menu só aparece quando a ZOE não achou resposta: escolher um time ali é uma lacuna dela.
+    const r = transferirCom(db, conversa, { fila: escolhida, motivo: `O cliente escolheu ${escolhida.nome} no menu.`, assunto: escolhida.nome,
+      lacuna: { categoria: 'nao_sabia' } });
     return { acao: 'transferida', detalhe: r.fila.nome };
   }
 
@@ -270,15 +277,35 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
     if (r) return r;
   }
 
-  // Pediu uma pessoa: transfere na hora, sem insistir.
+  // Pediu uma pessoa. A ZOE tenta resolver antes — mas uma vez só: pediu de novo, transfere na
+  // hora, sem discutir. Falar com um atendente é direito do consumidor (Decreto do SAC); o que ela
+  // faz é poupar a espera de quem tem um pedido simples.
   const pedido = regras.pedidoDeHumano(texto);
   if (pedido && !daOuvidoria && lista.length) {
-    registrarEvento(db, conversa, { tipo: 'intencao', nome: 'pedido de humano', detalhe: pedido });
-    const r = transferirCom(db, conversa, {
-      motivo: `O cliente pediu atendimento humano ("${pedido}").`,
-      resumo: conversa.resumo ?? oQueDisse(conversa, texto),
-    });
-    return { acao: 'transferida', detalhe: r.fila.nome };
+    const jaPediu = jaPediuPessoa(db, conversa);
+    // No telefone por teclas, o "0 para falar com um atendente" é escolha explícita: não pergunta nada.
+    const teclado = conversa.canal === 'telefone' && cfg.voz_modo === 'teclas';
+    // O cliente já tinha contado o problema e a ZOE já tentou: agora pedir uma pessoa é insistir.
+    const jaTentou = jaDisseOAssunto(db, conversa, mensagem?.id);
+    if (cfg.tentar_antes && !jaPediu && !teclado && !jaTentou) {
+      if (!regras.temAssuntoAlemDoPedido(texto)) {
+        registrarEvento(db, conversa, { tipo: 'intencao', nome: 'pedido de humano: perguntou o assunto', detalhe: pedido });
+        responder(db, conversa, conversa.canal === 'telefone'
+          ? 'Claro, eu te passo para uma pessoa. Antes, me diz em poucas palavras o que você precisa? Muita coisa eu resolvo na hora, e se não der, quem te atender já fica sabendo de tudo.'
+          : 'Claro, eu te passo para uma pessoa. Antes, me conta em poucas palavras o que você precisa? Muita coisa eu resolvo na hora — e se não der, quem te atender já recebe tudo o que você me disse.');
+        return { acao: 'perguntou_assunto' };
+      }
+      // Disse o assunto junto: segue para as regras e a IA tentarem, já avisadas do pedido.
+      registrarEvento(db, conversa, { tipo: 'intencao', nome: 'pedido de humano: vai tentar', detalhe: pedido });
+    } else {
+      registrarEvento(db, conversa, { tipo: 'intencao', nome: 'pedido de humano', detalhe: pedido });
+      const r = transferirCom(db, conversa, {
+        motivo: jaPediu ? `O cliente pediu atendimento humano de novo ("${pedido}").` : `O cliente pediu atendimento humano ("${pedido}").`,
+        resumo: conversa.resumo ?? oQueDisse(conversa, texto),
+        lacuna: { categoria: 'cliente_pediu' },
+      });
+      return { acao: 'transferida', detalhe: r.fila.nome };
+    }
   }
 
   // Intenção cadastrada pela empresa.
@@ -293,6 +320,7 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
         fila: filas.buscar(db, empresa.id, intencao.fila_id), assunto: intencao.nome,
         motivo: `Intenção "${intencao.nome}" (o cliente escreveu "${termo}").`,
         resumo: oQueDisse(conversa, texto),
+        lacuna: { categoria: 'regra_da_empresa', tema: intencao.nome },
       });
       return { acao: 'transferida', detalhe: r.fila.nome };
     }
@@ -326,6 +354,7 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
       const r = transferirCom(db, conversa, {
         motivo: `A ZOE chegou ao limite de ${cfg.max_turnos} mensagens sem resolver.`,
         resumo: conversa.resumo ?? 'A conversa passou do limite de mensagens da ZOE sem chegar a uma solução.',
+        lacuna: { categoria: 'limite' },
       });
       return { acao: 'transferida', detalhe: r.fila.nome };
     }
@@ -390,7 +419,8 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
   };
   const motivo = motivos[desfecho.desfecho] ?? 'A IA não conseguiu concluir.';
   if (lista.length && cfg.transferir_sem_resposta) {
-    const r = transferirCom(db, conversa, { motivo, resumo: conversa.resumo ?? oQueDisse(conversa, texto), avisar: desfecho.textos.length === 0 });
+    const r = transferirCom(db, conversa, { motivo, resumo: conversa.resumo ?? oQueDisse(conversa, texto), avisar: desfecho.textos.length === 0,
+      lacuna: { categoria: desfecho.desfecho === 'limite_passos' ? 'limite' : 'sistema_falhou' } });
     return { acao: 'transferida', detalhe: motivo };
   }
   return semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo });
@@ -443,9 +473,25 @@ function semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo }) {
     registrarEvento(db, conversa, { tipo: 'transferencia', nome: 'menu', detalhe: motivo });
     return { acao: 'menu', detalhe: motivo };
   }
-  const r = transferirCom(db, conversa, { motivo, resumo: oQueDisse(conversa, texto) });
+  const r = transferirCom(db, conversa, { motivo, resumo: oQueDisse(conversa, texto), lacuna: { categoria: 'nao_sabia' } });
   return { acao: 'transferida', detalhe: r.fila.nome };
 }
+
+/** Antes desta mensagem, o cliente já tinha dito o que queria (e a ZOE respondeu)? */
+function jaDisseOAssunto(db, conversa, mensagemId) {
+  const respondeu = db.prepare("SELECT 1 FROM mensagens WHERE conversa_id = ? AND direcao = 'saida' AND autor = 'ia' AND tipo <> 'sistema' LIMIT 1").get(conversa.id);
+  if (!respondeu) return false;
+  return db.prepare(`SELECT texto, transcricao, transcricao_status FROM mensagens
+    WHERE conversa_id = ? AND direcao = 'entrada' AND id <> ? ORDER BY id`).all(conversa.id, mensagemId ?? -1)
+    .some((m) => {
+      const t = String(m.texto || (m.transcricao_status === 'pronta' ? m.transcricao : '') || '').trim();
+      return t && !/^\d{1,14}$/.test(t) && !regras.ehCumprimento(t) && (!regras.pedidoDeHumano(t) || regras.temAssuntoAlemDoPedido(t));
+    });
+}
+
+/** O cliente já pediu uma pessoa nesta conversa (e a ZOE tentou antes)? */
+const jaPediuPessoa = (db, conversa) => Boolean(db.prepare(`SELECT 1 FROM ia_eventos
+  WHERE conversa_id = ? AND tipo = 'intencao' AND nome LIKE 'pedido de humano%' LIMIT 1`).get(conversa.id));
 
 /** A última coisa que a atendente mandou foi o menu? (para interpretar "1", "2" como escolha). */
 const ultimaFoiMenu = (db, conversa) => {

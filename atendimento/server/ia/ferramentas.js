@@ -204,20 +204,33 @@ const INTERNAS = {
   },
 
   transferir_para_humano: {
-    descricao: 'Passa o atendimento para a equipe humana. Use quando: o cliente pedir uma pessoa; o assunto envolver '
-      + 'cancelamento, reclamação formal, negociação, exceção de regra ou dado sensível; a base de conhecimento não responder; '
-      + 'ou você já tentou duas vezes e o cliente continua insatisfeito. É melhor transferir do que arriscar uma resposta errada.',
+    descricao: 'Passa o atendimento para a equipe humana. É o ÚLTIMO recurso: antes, tente resolver com buscar_conhecimento '
+      + '(com mais de um jeito de perguntar) e com as ferramentas do provedor que se aplicam. Use quando: o cliente pedir uma '
+      + 'pessoa de novo depois de você tentar; o assunto exigir decisão humana (negociação, desconto, estorno, multa, exceção de '
+      + 'regra); a base de conhecimento e as ferramentas não tiverem a resposta (nunca invente); uma ferramenta falhar; ou o '
+      + 'cliente continuar insatisfeito depois da sua tentativa. Diga com honestidade por que não resolveu e o que faltou: é com '
+      + 'isso que a equipe te ensina para o próximo caso.',
     entrada: esquema({
       fila: txtOuNulo('Nome do time que deve atender.'),
       motivo: txt('Por que está transferindo, em uma frase (vai para o painel da equipe).'),
       resumo: txt('Resumo do caso para o atendente: quem é o cliente, o que ele quer, o que você já verificou e o que falta.'),
-    }, ['fila', 'motivo', 'resumo']),
+      tema: txt('O assunto em 2 a 5 palavras, sem dados do cliente. Ex.: "mudança de endereço", "troca de plano", "senha do Wi-Fi".'),
+      por_que_nao_resolvi: {
+        type: 'string',
+        enum: ['nao_sabia', 'precisa_de_pessoa', 'sistema_falhou', 'cliente_pediu', 'nao_entendeu', 'outro'],
+        description: 'nao_sabia: a base e as ferramentas não tinham a resposta. precisa_de_pessoa: exige decisão ou autorização '
+          + 'humana. sistema_falhou: uma ferramenta deu erro. cliente_pediu: o cliente insistiu em uma pessoa. nao_entendeu: não '
+          + 'entendeu o que o cliente queria.',
+      },
+      o_que_faltou: txtOuNulo('O que você precisaria saber ou poder fazer para resolver sozinha da próxima vez. Ex.: "a taxa e o prazo da mudança de endereço".'),
+    }, ['fila', 'motivo', 'resumo', 'tema', 'por_que_nao_resolvi', 'o_que_faltou']),
     terminal: true,
     executar: ({ db, conversa, entrada }) => {
       const fila = entrada.fila ? filas.porNome(db, conversa.empresa_id, entrada.fila) : null;
       const r = conversas.transferir(db, conversa, {
         fila, motivo: String(entrada.motivo).slice(0, 300), resumo: String(entrada.resumo).slice(0, 2000),
-        assunto: conversa.assunto ?? String(entrada.motivo).slice(0, 120), por: 'ia',
+        assunto: conversa.assunto ?? String(entrada.tema || entrada.motivo).slice(0, 120), por: 'ia',
+        lacuna: { categoria: entrada.por_que_nao_resolvi, tema: entrada.tema ? String(entrada.tema).slice(0, 120) : null, oQueFaltou: entrada.o_que_faltou },
       });
       return {
         controle: 'transferida',

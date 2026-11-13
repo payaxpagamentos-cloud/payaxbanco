@@ -571,6 +571,21 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .resumo-ia p{ margin:0; font-size:13.5px; line-height:1.55 }
 .resumo-ia .motivo{ color:var(--text-2); font-size:12.5px }
 
+/* Aprendizado da ZOE */
+.motivos-aprendizado{ display:flex; flex-wrap:wrap; gap:8px }
+.motivo-aprendizado{ display:flex; align-items:baseline; gap:6px; padding:7px 11px; border-radius:9px; background:var(--surface); border:1px solid var(--border); font-size:13px }
+.motivo-aprendizado strong{ font-size:16px }
+.temas-aprendizado{ display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:12px }
+.tema-aprendizado{ border:1px solid var(--border); border-left:3px solid var(--azul); border-radius:var(--radius); padding:12px 14px; display:flex; flex-direction:column; gap:9px; background:var(--surface) }
+.tema-aprendizado.ensinada{ border-left-color:var(--ok) }
+.tema-aprendizado.ignorada{ border-left-color:var(--border); opacity:.75 }
+.titulo-tema{ font-size:14.5px }
+.bloco-tema small{ display:block; color:var(--text-3); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px }
+.bloco-tema ul{ margin:0; padding-left:18px; font-size:13px; display:flex; flex-direction:column; gap:3px }
+.ensine-zoe{ border:1px dashed var(--destaque-borda); border-radius:var(--radius); padding:11px 13px; display:flex; flex-direction:column; gap:8px; font-size:13px }
+.ensine-zoe h3{ margin:0; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--azul) }
+.ensine-zoe p{ margin:0 }
+
 /* Passagem de bastão da ZOE para a pessoa (painel da conversa e aviso da ligação). */
 .passagem{
   background:var(--destaque-bg); border:1px solid var(--destaque-borda); border-radius:var(--radius);

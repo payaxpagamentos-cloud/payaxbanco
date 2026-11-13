@@ -32,18 +32,66 @@ describe('ZOE', () => {
     } finally { ia.restaurar(); }
   });
 
-  test('transfere na hora quando o cliente pede uma pessoa, sem chamar a IA', async () => {
-    const { db, atendente } = h.criarAmbiente();
+  test('pediu uma pessoa sem dizer o assunto: a ZOE pergunta o assunto uma vez', async () => {
+    const { db } = h.criarAmbiente();
     const ia = h.fingirClaude([{ texto: 'não deveria ser chamada' }]);
     try {
       await h.conversar(db, 'quero falar com um atendente humano');
       const c = h.conversaDoCliente(db);
+      assert.equal(c.estado, 'bot', 'ainda com a ZOE');
+      assert.match(meta.enviadas.at(-1).texto, /me conta em poucas palavras o que você precisa/);
+      assert.equal(ia.pedidos.length, 0, 'a pergunta é da regra, não da IA');
+    } finally { ia.restaurar(); }
+  });
+
+  test('pediu uma pessoa de novo: transfere na hora, sem chamar a IA nem discutir', async () => {
+    const { db, atendente } = h.criarAmbiente();
+    const ia = h.fingirClaude([{ texto: 'não deveria ser chamada' }]);
+    try {
+      await h.conversar(db, 'quero falar com um atendente humano');
+      await h.conversar(db, 'já disse, quero uma pessoa');
+      const c = h.conversaDoCliente(db);
       assert.equal(c.estado, 'humano', 'foi direto para o atendente disponível');
       assert.equal(c.atendente_id, atendente.id);
-      assert.match(c.motivo_transferencia, /pediu atendimento humano/);
-      assert.equal(ia.pedidos.length, 0, 'a IA não foi chamada: a regra resolveu antes');
+      assert.match(c.motivo_transferencia, /pediu atendimento humano de novo/);
+      assert.equal(ia.pedidos.length, 0);
       assert.match(meta.enviadas.map((m) => m.texto).join(' '), /transferir/i);
+      const l = db.prepare('SELECT categoria FROM lacunas WHERE conversa_id = ?').get(c.id);
+      assert.equal(l.categoria, 'cliente_pediu');
     } finally { ia.restaurar(); }
+  });
+
+  test('pediu uma pessoa e disse o assunto junto: a ZOE tenta resolver primeiro', async () => {
+    const { db } = h.criarAmbiente();
+    const ia = h.fingirClaude([{ texto: 'Consigo sim! Sua segunda via está aqui.' }]);
+    try {
+      await h.conversar(db, 'quero falar com um atendente sobre a segunda via da fatura');
+      const c = h.conversaDoCliente(db);
+      assert.equal(c.estado, 'bot', 'não transferiu: a ZOE respondeu');
+      assert.equal(ia.pedidos.length, 1);
+      const nota = JSON.stringify(ia.pedidos[0]);
+      assert.match(nota, /pediu para falar com uma pessoa/, 'a IA sabe do pedido e transfere se ele insistir');
+    } finally { ia.restaurar(); }
+  });
+
+  test('já contou o problema e a ZOE já tentou: pedir uma pessoa transfere direto', async () => {
+    const { db } = h.criarAmbiente();
+    const ia = h.fingirClaude([{ texto: 'Vamos ver: já tentou reiniciar o roteador?' }]);
+    try {
+      await h.conversar(db, 'minha internet está lenta à noite');
+      await h.conversar(db, 'quero falar com um atendente');
+      assert.notEqual(h.conversaDoCliente(db).estado, 'bot');
+    } finally { ia.restaurar(); }
+  });
+
+  test('a empresa pode desligar o "resolver antes": aí transfere no primeiro pedido', async () => {
+    const { db, empresa } = h.criarAmbiente();
+    db.prepare('UPDATE ia_config SET tentar_antes = 0 WHERE empresa_id = ?').run(empresa.id);
+    const sem = h.semIa();
+    try {
+      await h.conversar(db, 'quero falar com um atendente');
+      assert.equal(h.conversaDoCliente(db).estado, 'humano');
+    } finally { sem.restaurar(); }
   });
 
   test('transfere com resumo quando a IA chama a ferramenta', async () => {
@@ -68,6 +116,7 @@ describe('ZOE', () => {
     const ia = h.fingirClaude([{ texto: 'x' }]);
     try {
       await h.conversar(db, 'preciso falar com uma pessoa');
+      await h.conversar(db, 'uma pessoa, por favor');
       let c = h.conversaDoCliente(db);
       assert.equal(c.estado, 'aguardando');
       assert.equal(c.atendente_id, null);
@@ -85,6 +134,7 @@ describe('ZOE', () => {
     const ia = h.fingirClaude([{ texto: 'não deveria falar' }]);
     try {
       await h.conversar(db, 'quero falar com alguém');
+      await h.conversar(db, 'com alguém, por favor');
       const c = h.conversaDoCliente(db);
       assert.equal(c.estado, 'humano');
       const antes = meta.enviadas.length;

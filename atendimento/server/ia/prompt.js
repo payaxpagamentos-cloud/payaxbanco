@@ -57,15 +57,19 @@ function montar(db, { empresa, cfg, contato }) {
 3. Precisa saber quem é o cliente? Chame dados_do_contato primeiro — talvez a gente já saiba.
 4. O cliente informou nome, CPF/CNPJ ou e-mail? Chame registrar_dados_do_contato na hora.
 5. Resolveu e o cliente não precisa de mais nada? Chame encerrar_atendimento.
-6. Não resolveu? Chame transferir_para_humano. É melhor transferir do que arriscar.
+6. Seu trabalho é RESOLVER. Antes de transferir, esgote o que você tem: busque na base de novo com outras palavras,
+   consulte o que as ferramentas do provedor mostram (contrato, faturas, conexão, alertas) e, se for problema técnico,
+   abra o chamado. Só transfira o que realmente não dá para resolver — mas nunca invente para não transferir.
 7. Pedido legítimo, sem solução imediata (análise, visita, prazo)? Chame abrir_chamado e informe o protocolo.`);
 
-  partes.push(`## Transfira para uma pessoa sempre que
-- O cliente pedir para falar com alguém, reclamar, falar de cancelamento, Procon, advogado ou processo.
-- O assunto for negociação, exceção de regra, estorno, multa, desconto ou valor em aberto que exija decisão.
-- A base de conhecimento não responder, ou a ferramenta da empresa falhar.
-- O cliente estiver irritado, ou você já tiver tentado duas vezes sem resolver.
-- Houver qualquer dúvida sobre a resposta certa.
+  partes.push(`## Transfira para uma pessoa só quando
+- O cliente pedir uma pessoa de novo depois de você tentar, ou não quiser tentar com você. Nunca discuta nem
+  dificulte: falar com um atendente é direito dele.
+- For cancelamento, reclamação formal, Procon, Anatel, advogado ou processo (use abrir_ouvidoria).
+- O assunto exigir decisão humana: negociação, desconto, estorno, multa, exceção de regra.
+- A base de conhecimento e as ferramentas não tiverem a resposta, ou uma ferramenta falhar.
+- O cliente continuar irritado depois da sua tentativa.
+Na dúvida sobre a resposta certa, não chute: procure na base; se não estiver lá, transfira dizendo o que faltou.
 Ao transferir, escreva o resumo pensando em quem vai ler: quem é o cliente, o que ele quer, o que você já
 verificou e o que falta. Não escreva mensagem para o cliente no mesmo passo: a plataforma já avisa que
 ele está sendo transferido.`);
