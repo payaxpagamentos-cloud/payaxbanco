@@ -106,7 +106,8 @@ passo "Pacotes do sistema"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 PACOTES="curl ca-certificates rsync sqlite3 ffmpeg xz-utils iproute2"
-[ "$NGINX" = 1 ] && PACOTES="$PACOTES nginx"
+# Nginx já instalado (de outro sistema) não é reinstalado nem atualizado.
+[ "$NGINX" = 1 ] && ! command -v nginx >/dev/null && PACOTES="$PACOTES nginx"
 [ "$WHISPER" = 1 ] && PACOTES="$PACOTES git cmake g++ make"
 # shellcheck disable=SC2086
 apt-get install -y -qq $PACOTES >/dev/null
