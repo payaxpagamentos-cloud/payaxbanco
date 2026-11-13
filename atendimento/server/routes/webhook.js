@@ -1,10 +1,10 @@
 'use strict';
 
 const express = require('express');
-const { agora } = require('../db');
 const { iguais } = require('../lib/cifra');
 const wa = require('../lib/whatsapp');
 const recepcao = require('../lib/recepcao');
+const { limitar, registrarRecusa } = require('../lib/limitador');
 
 /**
  * Webhook da WhatsApp Cloud API. Dois endereços, os dois públicos (sem sessão):
@@ -23,6 +23,8 @@ const recepcao = require('../lib/recepcao');
 module.exports = function rotasWebhook(db) {
   const r = express.Router();
   const pendentes = new Set();
+  // Público por natureza: limite largo por IP (a Meta manda muito, mas de muitos IPs) e recusas amostradas.
+  r.use(limitar({ janelaMs: 60_000, maximo: 3000, todos: true }));
 
   const numeroPorPhoneId = (phoneId) => {
     const numero = db.prepare('SELECT * FROM numeros WHERE phone_number_id = ?').get(String(phoneId));
@@ -40,7 +42,7 @@ module.exports = function rotasWebhook(db) {
     // O token de verificação é escolhido pela empresa ao cadastrar o número; vale o de qualquer número ativo.
     const confere = db.prepare('SELECT verify_token FROM numeros WHERE ativo = 1').all().some((n) => iguais(n.verify_token, token));
     if (!confere) {
-      db.prepare("INSERT INTO acessos_recusados (ip, motivo, criado_em) VALUES (?, 'webhook: token de verificação inválido', ?)").run(req.ip, agora());
+      registrarRecusa(db, req.ip, 'webhook: token de verificação inválido');
       return res.sendStatus(403);
     }
     return res.type('text/plain').send(desafio);
@@ -57,22 +59,25 @@ module.exports = function rotasWebhook(db) {
 
     if (!alvos.length) {
       // Número desconhecido: responde 200 para a Meta não ficar reenviando, mas registra.
-      db.prepare("INSERT INTO acessos_recusados (ip, motivo, criado_em) VALUES (?, 'webhook: número não cadastrado', ?)").run(req.ip, agora());
+      registrarRecusa(db, req.ip, 'webhook: número não cadastrado');
       return res.json({ ok: true, ignorado: 'número não cadastrado' });
     }
 
     const assinatura = req.get('x-hub-signature-256');
-    const valida = alvos.some(({ numero }) => wa.assinaturaValida(numero, assinatura, cru));
+    // Só vale o que a assinatura cobre: cada número tem o segredo do próprio app. Um evento assinado
+    // com o segredo da empresa A não pode trazer junto uma entrada com o número da empresa B.
+    const assinados = new Set(alvos.filter(({ numero }) => wa.assinaturaValida(numero, assinatura, cru)).map(({ numero }) => numero.phone_number_id));
+    const valida = assinados.size > 0;
     if (!valida) {
       const semSegredo = alvos.every(({ numero }) => !wa.segredoApp(numero));
-      db.prepare('INSERT INTO acessos_recusados (ip, motivo, criado_em) VALUES (?, ?, ?)')
-        .run(req.ip, semSegredo ? 'webhook: número sem segredo do app cadastrado' : 'webhook: assinatura inválida', agora());
+      registrarRecusa(db, req.ip, semSegredo ? 'webhook: número sem segredo do app cadastrado' : 'webhook: assinatura inválida');
       return res.status(401).json({ erro: 'Assinatura inválida.' });
     }
 
     // 200 agora; o atendimento roda em seguida.
     res.json({ ok: true });
-    const tarefa = recepcao.processar(db, corpo, { numeroPorPhoneId })
+    const soAssinados = (id) => (assinados.has(String(id)) ? numeroPorPhoneId(id) : null);
+    const tarefa = recepcao.processar(db, corpo, { numeroPorPhoneId: soAssinados })
       .catch((err) => console.error('[ZOE Atende] Falha no webhook:', err))
       .finally(() => pendentes.delete(tarefa));
     pendentes.add(tarefa);

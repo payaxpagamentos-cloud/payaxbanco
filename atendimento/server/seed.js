@@ -207,7 +207,7 @@ function semear(db) {
           saida(id, saudacao, somar(abertaEm, 2));
           evento(id, 'ferramenta', 'buscar_conhecimento', somar(abertaEm, 3), { detalhe: artigo, ms: inteiro(90, 400) });
           saida(id, resposta, somar(abertaEm, inteiro(4, 9)));
-          evento(id, 'resposta', 'claude-opus-5-5', somar(abertaEm, 5), { entradaTk: inteiro(900, 1600), saidaTk: inteiro(60, 180), cache: inteiro(800, 1400), ms: inteiro(1200, 4200) });
+          evento(id, 'resposta', config.ia.modelo, somar(abertaEm, 5), { entradaTk: inteiro(900, 1600), saidaTk: inteiro(60, 180), cache: inteiro(800, 1400), ms: inteiro(1200, 4200) });
           const fim = somar(abertaEm, inteiro(40, 300));
           saida(id, 'Atendimento encerrado. Se precisar de mais alguma coisa, é só mandar mensagem. Obrigado!', fim);
           evento(id, 'encerramento', 'resolvida pela IA', fim);
@@ -269,7 +269,7 @@ function semear(db) {
       saida(id, saudacao, somar(abertaEm, 2));
       saida(id, 'Antes de abrir um chamado, faz um teste para mim? Desliga o roteador da tomada por 30 segundos, liga de novo e testa por cabo. Me conta o que deu.', somar(abertaEm, 18));
       evento(id, 'ferramenta', 'buscar_conhecimento', somar(abertaEm, 10), { detalhe: 'Internet lenta: o que fazer antes de abrir chamado', ms: 180 });
-      evento(id, 'resposta', 'claude-opus-5-5', somar(abertaEm, 16), { entradaTk: 1420, saidaTk: 96, cache: 1180, ms: 2600 });
+      evento(id, 'resposta', config.ia.modelo, somar(abertaEm, 16), { entradaTk: 1420, saidaTk: 96, cache: 1180, ms: 2600 });
       db.prepare('UPDATE conversas SET assunto = ?, intencao = ?, mensagens_ia = 1 WHERE id = ?').run('Internet lenta', 'Suporte técnico', id);
       totais.abertas++;
     }

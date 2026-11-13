@@ -112,10 +112,15 @@ function criarIxc({ url, token, timeoutMs = 8000, cacheMs = 60_000, recursos = {
   const cache = new Map();
 
   async function chamar(recurso, corpo, { listar = false } = {}) {
+    // O endereço do IXC é cadastrado pela empresa: confere que não aponta para a rede interna.
+    try {
+      await require('../lib/rede').validarDestino(base, { oQue: 'O endereço do IXC' });
+    } catch (err) { throw new ErroIxc(err.message, { recurso }); }
     let resp;
     try {
       resp = await fetch(`${base}/${recurso}`, {
         method: 'POST',
+        redirect: 'error',
         headers: { Authorization: autorizacao, 'Content-Type': 'application/json', ...(listar ? { ixcsoft: 'listar' } : {}) },
         body: JSON.stringify(corpo),
         signal: AbortSignal.timeout(timeoutMs),

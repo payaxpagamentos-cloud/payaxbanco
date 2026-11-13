@@ -74,11 +74,11 @@ function expirarReservas(db, ativoId) {
  * Inferência sobre CTOs passivas a partir de um evento de equipamento ativo (OLT/PON/ONU): marca as CTOs ligadas àquele
  * equipamento/PON com a origem "inferência" e a evidência (equipamento, ponto, valor medido, instante). Não é medição da caixa.
  */
-function inferirCtos(db, { organizacaoId, equipamentoId, ponto, status, evidencia }) {
+function inferirCtos(db, { organizacaoId, equipamentoId, ponto, status, evidencia, ignorar = null }) {
   const p = [organizacaoId, equipamentoId];
   let f = "organizacao_id = ? AND equipamento_id = ? AND tipo = 'cto' AND ativo = 1";
   if (ponto) { f += ' AND pon = ?'; p.push(ponto); }
-  const ctos = db.prepare(`SELECT id FROM ativos_rede WHERE ${f}`).all(...p);
+  const ctos = db.prepare(`SELECT id FROM ativos_rede WHERE ${f}`).all(...p).filter((c) => !ignorar?.has(c.id));
   for (const c of ctos) {
     db.prepare("UPDATE ativos_rede SET status_operacional = ?, status_origem = 'inferencia', status_evidencia = ?, status_em = ?, status_por = NULL WHERE id = ?")
       .run(status, evidencia, agora(), c.id);

@@ -14,7 +14,7 @@ Antes de tudo, abra o arquivo .env e confira:
   - ATEND_URL_PUBLICA: o endereço público do servidor (vai no callback da Meta).
   - ATEND_BASE_PATH:   onde o painel fica publicado (ex.: /atendimento).
   - ATEND_SECRET:      já gerado. NÃO TROQUE depois de instalado (veja a seção 5).
-  - ATEND_IA_CHAVE:    a chave da Claude API, se for usar a camada de IA (veja a seção 4).
+  - ATEND_IA_CHAVE:    a chave de IA da ZOE, se for usar a camada de IA (veja a seção 4).
 
    a) Direto (teste rápido)
       node --env-file-if-exists=.env server/index.js
@@ -94,7 +94,7 @@ A atendente funciona em dois níveis:
 
   Com chave de IA  → entende texto livre, consulta a base, usa as ferramentas da empresa, abre chamado
                      e decide sozinha quando chamar uma pessoa. Ponha a chave em ATEND_IA_CHAVE
-                     (platform.claude.com) e reinicie o servidor.
+                     (console do provedor de IA) e reinicie o servidor.
 
 O que mais muda o resultado é a BASE DE CONHECIMENTO. Comece pelas cinco perguntas que a sua equipe
 mais recebe: menu ZOE > Base de conhecimento. Use a aba Testar para ver como ela responde.
@@ -121,7 +121,7 @@ número de novo. Guarde o .env junto com o backup.
   recusados aparecem com o motivo.
 
 "A ZOE não responde nada"
-  Confira em Diagnóstico se a chave da Claude API está configurada, e se a empresa tem fila cadastrada
+  Confira em Diagnóstico se a inteligência da ZOE (chave de IA) está configurada, e se a empresa tem fila cadastrada
   (sem fila ela não tem para onde transferir).
 
 "As mensagens ficam como 'Falhou'"

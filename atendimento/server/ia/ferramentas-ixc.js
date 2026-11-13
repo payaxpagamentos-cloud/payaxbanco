@@ -142,8 +142,9 @@ const FERRAMENTAS = {
       }
       const c = lista[0];
       const nasc = ixcLib.nascimentoDe(c);
+      // As tentativas NÃO voltam a zero ao trocar de cadastro: senão bastaria reidentificar para chutar de novo.
       db.prepare(`UPDATE conversas SET ixc_cliente_id = ?, ixc_cliente_nome = ?, identidade_confirmada = 0,
-          identidade_metodo = ?, identidade_tentativas = 0 WHERE id = ?`)
+          identidade_metodo = ? WHERE id = ?`)
         .run(String(c.id), c.razao ?? c.fantasia ?? null, nasc ? 'nascimento' : 'documento', conversa.id);
       db.prepare('UPDATE contatos SET codigo_externo = COALESCE(codigo_externo, ?) WHERE id = ?').run(String(c.id), contato.id);
 
@@ -174,6 +175,19 @@ const FERRAMENTAS = {
       if (!c.ixc_cliente_id) return { ok: false, erro: 'Ainda não sei quem é o cliente.', instrucao: 'Chame identificar_cliente com o CPF/CNPJ primeiro.' };
 
       const cfg = lerConfig(db, c.empresa_id);
+      // O limite vale para a plataforma, não só para a conversa: conta os erros deste cadastro nas
+      // últimas 24 h em qualquer conversa (no telefone cada ligação é uma conversa nova, e a Bina se
+      // falsifica). Passou do limite, nem compara: quem confirma agora é uma pessoa.
+      const limite = Number(cfg?.max_tentativas ?? 3);
+      const errosRecentes = Number(db.prepare(`SELECT COUNT(*) AS n FROM ixc_acoes WHERE empresa_id = ? AND ixc_cliente_id = ?
+        AND tipo = 'confirmacao' AND sucesso = 0 AND criado_em >= ?`).get(c.empresa_id, String(c.ixc_cliente_id), new Date(Date.now() - 86_400_000).toISOString()).n);
+      if (Number(c.identidade_tentativas) >= limite || errosRecentes >= limite) {
+        return {
+          ok: false, bloqueado: 'limite de tentativas',
+          erro: 'O limite de tentativas de confirmação deste cadastro acabou.',
+          instrucao: 'Chame transferir_para_humano dizendo que não foi possível confirmar a identidade. Não peça o dado de novo.',
+        };
+      }
       const r = await comIxc(db, conversa, contato, 'confirmacao', (ixc) => ixc.clientePorId(c.ixc_cliente_id), { registrarAcao: false });
       if (!r.ok) return r;
       const cadastro = r.valor;
@@ -194,16 +208,15 @@ const FERRAMENTAS = {
       if (!confere) {
         const tentativas = Number(c.identidade_tentativas) + 1;
         db.prepare('UPDATE conversas SET identidade_tentativas = ? WHERE id = ?').run(tentativas, conversa.id);
-        registrar(db, { conversa, contato, tipo: 'confirmacao', sucesso: false, detalhe: `tentativa ${tentativas} por ${metodo}` });
-        const limite = Number(cfg?.max_tentativas ?? 3);
-        if (tentativas >= limite) {
+        registrar(db, { conversa: c, contato, tipo: 'confirmacao', sucesso: false, detalhe: `tentativa ${tentativas} por ${metodo}` });
+        if (tentativas >= limite || errosRecentes + 1 >= limite) {
           return {
             ok: false, erro: 'Os dados não conferem e o limite de tentativas acabou.',
             instrucao: 'Chame transferir_para_humano dizendo que não foi possível confirmar a identidade. Não tente de novo.',
           };
         }
         return {
-          ok: false, confere: false, tentativas_restantes: limite - tentativas,
+          ok: false, confere: false, tentativas_restantes: Math.max(0, limite - Math.max(tentativas, errosRecentes + 1)),
           erro: 'Os dados não conferem com o cadastro.',
           instrucao: 'Peça com educação para o cliente conferir e repetir. Não diga qual é o dado certo, nem dê dicas.',
         };
@@ -454,7 +467,7 @@ const FERRAMENTAS = {
 };
 
 /**
- * As ferramentas do IXC disponíveis nesta empresa, no formato da Claude API.
+ * As ferramentas do IXC disponíveis nesta empresa, no formato da API de IA.
  * Só entram as capacidades que a sonda aprovou na instância do provedor.
  */
 function montar(db, empresaId) {
@@ -503,7 +516,7 @@ async function identificarPeloTelefone(db, { conversa, contato }) {
 /**
  * A nota de estado que vai ao modelo como mensagem de sistema no meio da conversa.
  * Fica fora do prompt do sistema de propósito: o prompt é cacheado e precisa ser estável,
- * e este canal é o que a Claude API recomenda para instrução de operador no meio do diálogo.
+ * e este canal é o que a API de IA recomenda para instrução de operador no meio do diálogo.
  */
 /**
  * A segunda via pedida numa ligação. Ordem de preferência, da mais barata para a mais cara:

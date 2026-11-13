@@ -192,21 +192,21 @@ describe('a ZOE e os alertas', () => {
     novoAlerta(db, empresa.id, { abrangencia: 'todos', chaves: [], titulo: 'Falha geral',
       mensagem: 'Estamos com uma instabilidade que afeta vários clientes e a equipe já está tratando.' });
 
-    const claude = h.fingirClaude([
+    const iaFalsa = h.fingirIa([
       { ferramenta: 'alertas_da_regiao', entrada: {} },
       { texto: 'Oi! Estamos com uma instabilidade que afeta vários clientes e a equipe já está tratando. '
         + 'Assim que normalizar sua conexão volta sozinha.' },
     ]);
     try {
       await h.conversar(db, 'minha internet está caindo toda hora');
-    } finally { claude.restaurar(); }
+    } finally { iaFalsa.restaurar(); }
 
     const conversa = db.prepare('SELECT * FROM conversas ORDER BY id DESC LIMIT 1').get();
     const respostas = h.mensagensDe(db, conversa.id).filter((m) => m.direcao === 'saida');
     assert.ok(respostas.some((m) => /instabilidade/.test(m.texto)), 'a ZOE repassou o alerta');
 
     // A nota de estado mandou conferir: é por isso que ela chamou a ferramenta.
-    const pedido = claude.pedidos.at(0);
+    const pedido = iaFalsa.pedidos.at(0);
     const sistemaNoMeio = (pedido.messages ?? []).filter((m) => m.role === 'system').map((m) => m.content).join(' ');
     // A nota entra logo depois da fala do cliente, mesmo quando a saudação da ZOE veio por último.
     const papeis = (pedido.messages ?? []).map((m) => m.role);

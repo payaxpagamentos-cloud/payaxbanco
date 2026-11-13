@@ -33,17 +33,17 @@ function exigirDisponivel(db, veiculo) {
   return d;
 }
 
-/** Chamados ativos do mesmo veículo ou técnico no mesmo dia (conflito de agenda). */
+/** Chamados ativos do mesmo veículo ou técnico no mesmo dia local (conflito de agenda). `dia`: { inicio, fim } em UTC (datas.limitesDoDia). */
 function conflitosAgenda(db, org, { veiculoId, tecnicoId, dia, ignorarChamado }) {
   if (!dia) return [];
   const f = [];
-  const p = [org, `${dia}%`, ignorarChamado ?? -1];
+  const p = [];
   if (veiculoId) { f.push('veiculo_id = ?'); p.push(veiculoId); }
   if (tecnicoId) { f.push('tecnico_id = ?'); p.push(tecnicoId); }
   if (!f.length) return [];
   return db.prepare(`SELECT id, numero, titulo, status, agendado_para, veiculo_id, tecnico_id FROM chamados WHERE organizacao_id = ?
-    AND agendado_para LIKE ? AND id <> ? AND status IN (${ATIVOS_OS.map(() => '?').join(',')}) AND (${f.join(' OR ')})`)
-    .all(p[0], p[1], p[2], ...ATIVOS_OS, ...p.slice(3));
+    AND agendado_para >= ? AND agendado_para < ? AND id <> ? AND status IN (${ATIVOS_OS.map(() => '?').join(',')}) AND (${f.join(' OR ')})`)
+    .all(org, dia.inicio, dia.fim, ignorarChamado ?? -1, ...ATIVOS_OS, ...p);
 }
 
 /** Atualiza o odômetro do veículo quando a nova leitura é maior (leituras menores não regridem o valor). */

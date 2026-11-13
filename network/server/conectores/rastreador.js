@@ -37,7 +37,15 @@ function gravarPosicao(db, org, veiculoId, dispositivo, p) {
   return 'gravada';
 }
 
-const valido = (x) => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180 && !(x.lat === 0 && x.lng === 0);
+const valido = (x) => Number.isFinite(x.lat) && Number.isFinite(x.lng) && Math.abs(x.lat) <= 90 && Math.abs(x.lng) <= 180 && !(x.lat === 0 && x.lng === 0)
+  && x.observado_em !== null;
+
+/** Horário da fonte em ISO (UTC); data inválida vira null (o item conta como inválido em vez de derrubar a coleta). */
+function instanteDaFonte(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
 
 /** Converte um item de GET /veiculos do rastreador no evento interno de posição (campos ausentes continuam nulos). */
 function normalizarVeiculo(x) {
@@ -46,7 +54,7 @@ function normalizarVeiculo(x) {
     posicao: x.posicao_em && x.lat !== null && x.lat !== undefined ? {
       lat: Number(x.lat), lng: Number(x.lng), velocidade_kmh: typeof x.velocidade_kmh === 'number' ? x.velocidade_kmh : null,
       ignicao: typeof x.ignicao === 'boolean' ? x.ignicao : null, odometro_km: typeof x.hodometro_km === 'number' ? x.hodometro_km : null,
-      observado_em: new Date(x.posicao_em).toISOString(),
+      observado_em: instanteDaFonte(x.posicao_em),
     } : null,
     comunicacao_em: x.comunicacao_em ?? null,
   };
@@ -64,6 +72,7 @@ async function coletar(db, org) {
     let invalidas = 0;
     transacao(db, () => {
       for (const item of dados) {
+        if (!item || typeof item !== 'object') { invalidas++; continue; }
         const n = normalizarVeiculo(item);
         if (!n.dispositivo_id) { invalidas++; continue; }
         db.prepare(`INSERT INTO dispositivos_externos (organizacao_id, fonte, dispositivo_id, placa, descricao, ultimo_visto) VALUES (?, 'rastreador', ?, ?, ?, ?)
@@ -92,8 +101,8 @@ async function trajeto(db, org, veiculoId, de, ate) {
   const q = new URLSearchParams({ de, ate });
   const pontos = await base.buscarJson(`${urlBase(x.config)}/api/integracao/veiculos/${encodeURIComponent(lig.placa)}/posicoes?${q}`, { 'X-Api-Key': chave });
   if (!Array.isArray(pontos)) throw new base.ErroConector('Formato inesperado das posições.');
-  const lista = pontos.map((p) => ({ lat: Number(p.lat), lng: Number(p.lng), velocidade_kmh: typeof p.velocidade_kmh === 'number' ? p.velocidade_kmh : null,
-    ignicao: p.ignicao === 1 || p.ignicao === true ? true : p.ignicao === 0 || p.ignicao === false ? false : null, observado_em: new Date(p.gps_em).toISOString() })).filter(valido);
+  const lista = pontos.filter((p) => p && typeof p === 'object').map((p) => ({ lat: Number(p.lat), lng: Number(p.lng), velocidade_kmh: typeof p.velocidade_kmh === 'number' ? p.velocidade_kmh : null,
+    ignicao: p.ignicao === 1 || p.ignicao === true ? true : p.ignicao === 0 || p.ignicao === false ? false : null, observado_em: instanteDaFonte(p.gps_em) })).filter(valido);
   transacao(db, () => { for (const p of lista) gravarPosicao(db, org, veiculoId, lig.dispositivo_id, p); });
   return lista;
 }

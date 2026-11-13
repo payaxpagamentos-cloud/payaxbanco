@@ -34,7 +34,7 @@ const PLATAFORMA = ['master', 'suporte'];
 const SO_LEITURA = ['supervisor'];
 
 function autenticar(db) {
-  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.empresa_id, u.ativo, u.disponivel, u.max_simultaneas,
+  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.empresa_id, u.ativo, u.disponivel, u.max_simultaneas, u.visto_em,
       e.nome AS empresa_nome, e.status AS empresa_status
     FROM usuarios u LEFT JOIN empresas e ON e.id = u.empresa_id WHERE u.id = ?`);
   const visto = db.prepare('UPDATE usuarios SET visto_em = ? WHERE id = ?');

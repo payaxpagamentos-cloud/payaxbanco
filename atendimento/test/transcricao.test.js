@@ -174,18 +174,18 @@ describe('o áudio na conversa', () => {
     whisper = await fingirWhisper({ texto: 'Minha internet está caindo toda hora desde ontem.' });
     Object.assign(config.transcricao, { modo: 'servidor', url: whisper.url });
 
-    const claude = h.fingirClaude([{ texto: 'Poxa, vou verificar a sua conexão agora.' }]);
+    const iaFalsa = h.fingirIa([{ texto: 'Poxa, vou verificar a sua conexão agora.' }]);
     try {
       await mandarAudio(db);
       await require('../server/lib/envio').processarFila(db);
-    } finally { claude.restaurar(); }
+    } finally { iaFalsa.restaurar(); }
 
     const m = db.prepare("SELECT * FROM mensagens WHERE tipo = 'audio' ORDER BY id DESC LIMIT 1").get();
     assert.equal(m.transcricao_status, 'pronta');
     assert.equal(m.transcricao, 'Minha internet está caindo toda hora desde ontem.');
     assert.equal(m.texto, null, 'a coluna texto continua vazia: fica registrado que veio falado');
 
-    const enviado = JSON.stringify(claude.pedidos[0].messages);
+    const enviado = JSON.stringify(iaFalsa.pedidos[0].messages);
     assert.match(enviado, /transcrito automaticamente — pode ter erros/);
     assert.match(enviado, /Minha internet está caindo toda hora/);
     assert.doesNotMatch(enviado, /não foi possível transcrever/);
@@ -211,14 +211,14 @@ describe('o áudio na conversa', () => {
     meta = h.fingirMeta({ midia: { buffer: Buffer.from('ogg'), mime: 'audio/ogg' } });
     Object.assign(config.transcricao, { modo: 'desligada' });
 
-    const claude = h.fingirClaude([{ texto: 'Não consegui ouvir o seu áudio. Pode escrever, por favor?' }]);
+    const iaFalsa = h.fingirIa([{ texto: 'Não consegui ouvir o seu áudio. Pode escrever, por favor?' }]);
     try {
       await mandarAudio(db);
-    } finally { claude.restaurar(); }
+    } finally { iaFalsa.restaurar(); }
 
     const m = db.prepare("SELECT * FROM mensagens WHERE tipo = 'audio' ORDER BY id DESC LIMIT 1").get();
     assert.equal(m.transcricao_status, 'desligada');
-    assert.match(JSON.stringify(claude.pedidos[0].messages), /áudio que não foi possível transcrever — peça com gentileza para escrever/);
+    assert.match(JSON.stringify(iaFalsa.pedidos[0].messages), /áudio que não foi possível transcrever — peça com gentileza para escrever/);
   });
 
   comAudio('o atendente vê a transcrição no detalhe da conversa', async () => {

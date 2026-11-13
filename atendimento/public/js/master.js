@@ -264,8 +264,8 @@ async function configuracoes(ctx) {
       campo('Guardar conversas encerradas por (dias, 0 = para sempre)', { name: 'retencao_dias', type: 'number', value: c.retencao_dias, min: 0 })),
     cartao('Preço da IA (para o custo estimado nos relatórios)',
       el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
-        'Em centavos de real por milhão de tokens. Os padrões seguem a tabela do claude-opus-5-5 convertida em reais; '
-        + 'ajuste quando o preço do modelo ou o câmbio mudarem. Isso não altera a cobrança da Anthropic, só o cálculo mostrado aqui.'),
+        'Em centavos de real por milhão de tokens. Os padrões seguem a tabela do modelo de IA padrão convertida em reais; '
+        + 'ajuste quando o preço do modelo ou o câmbio mudarem. Isso não altera a cobrança do provedor de IA, só o cálculo mostrado aqui.'),
       el('div', { class: 'grade-2' },
         campo('Entrada (por milhão de tokens)', { name: 'ia_preco_entrada_milhao', type: 'number', value: c.ia_preco_entrada_milhao, min: 0 }),
         campo('Saída (por milhão de tokens)', { name: 'ia_preco_saida_milhao', type: 'number', value: c.ia_preco_saida_milhao, min: 0 })),

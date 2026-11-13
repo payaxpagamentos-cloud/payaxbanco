@@ -9,7 +9,7 @@ const midia = require('../lib/midia');
 const regras = require('./regras');
 const conhecimento = require('./conhecimento');
 const ferramentas = require('./ferramentas');
-const claude = require('./claude');
+const motor = require('./motor');
 const ferramentasIxc = require('./ferramentas-ixc');
 const alertas = require('../lib/alertas');
 const ouvidoriaLib = require('../lib/ouvidoria');
@@ -20,7 +20,7 @@ const prompt = require('./prompt');
  * A ZOE. Recebe a mensagem que acabou de chegar e decide o que fazer, nesta ordem:
  *
  *   1. Regras  — pedido explícito de humano, escolha de menu, intenção por palavra-chave, despedida.
- *   2. IA      — Claude com as ferramentas (conhecimento, cadastro, chamado, API da empresa).
+ *   2. IA      — o modelo de linguagem com as ferramentas (conhecimento, cadastro, chamado, API da empresa).
  *   3. Saída   — resolveu e encerra, ou transfere para a fila com um resumo pronto.
  *
  * Nada aqui envia mensagem direto para a Meta: tudo entra na fila de `mensagens` e sai no envio.js.
@@ -78,7 +78,7 @@ function conteudoDoCliente(m) {
 }
 
 /**
- * Histórico no formato da Claude API. O cliente é 'user'; a ZOE e os atendentes humanos
+ * Histórico no formato da API de IA. O cliente é 'user'; a ZOE e os atendentes humanos
  * são 'assistant' (para a IA, o que a equipe já disse também é contexto). Mensagens de sistema ficam fora.
  */
 function historico(db, conversa) {
@@ -272,7 +272,7 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
   // Com a IA ligada, deixa ela conduzir e chamar abrir_ouvidoria — ela escreve um relato de verdade.
   // Sem IA, as regras abrem o caso aqui mesmo, para o assunto não se perder.
   const daOuvidoria = regras.assuntoDeOuvidoria(texto);
-  if (daOuvidoria && lista.length && !(cfg.ativa && claude.disponivel())) {
+  if (daOuvidoria && lista.length && !(cfg.ativa && motor.disponivel())) {
     const r = await abrirOuvidoriaPelasRegras(db, { empresa, conversa, contato, tipo: daOuvidoria.tipo, texto, termo: daOuvidoria.termo });
     if (r) return r;
   }
@@ -361,15 +361,15 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
   }
 
   const gastoMes = Number(db.prepare(`SELECT COUNT(*) AS n FROM ia_eventos WHERE empresa_id = ? AND tipo = 'resposta' AND criado_em >= ?`)
-    .all(empresa.id, `${new Date().toISOString().slice(0, 7)}-01T00:00:00.000Z`)[0].n);
+    .all(empresa.id, require('../lib/datas').inicioDia(require('../lib/datas').inicioMes()))[0].n);
   if (empresa.limite_ia_mes > 0 && gastoMes >= empresa.limite_ia_mes) {
     registrarEvento(db, conversa, { tipo: 'limite', nome: 'limite_ia_mes', detalhe: `${gastoMes}/${empresa.limite_ia_mes} no mês` });
     return semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo: 'A empresa chegou ao limite de mensagens da IA no mês.' });
   }
 
-  if (!claude.disponivel()) {
+  if (!motor.disponivel()) {
     registrarEvento(db, conversa, { tipo: 'desligada', nome: 'sem chave', detalhe: 'ATEND_IA_CHAVE não configurada no servidor' });
-    return semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo: 'O servidor está sem chave da Claude API.' });
+    return semIa(db, { empresa, conversa, contato, cfg, lista, texto, motivo: 'O servidor está sem a chave de IA da ZOE.' });
   }
 
   // ---------- 3. IA ----------
@@ -384,10 +384,10 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
   const contexto = { db, empresa, numero, conversa, contato, ferramentas: kit };
   let desfecho;
   try {
-    desfecho = await claude.conversar({
+    desfecho = await motor.conversar({
       sistema: prompt.montar(db, { empresa, cfg, contato }),
       // A nota de estado do IXC vai como mensagem de sistema no meio da conversa: é o canal que a
-      // Claude API indica para instrução de operador, e não derruba o cache do prompt.
+      // API de IA indica para instrução de operador, e não derruba o cache do prompt.
       historico: comEstado(historico(db, conversa), notaDaConversa(db, conversa)),
       tools: kit.tools,
       modelo: cfg.modelo || undefined,

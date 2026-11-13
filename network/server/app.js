@@ -32,9 +32,9 @@ function criarApp(db, extras = {}) {
   });
   const r = express.Router();
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
-  // Arquivos chegam como corpo bruto (até o limite configurado); o resto, JSON.
-  r.use('/api/anexos', express.raw({ type: () => true, limit: config.arquivoMaxBytes + 1024 }));
-  r.use(express.json({ limit: '1mb' }));
+  // Arquivos chegam como corpo bruto, lido só depois da autenticação (em api.js); o resto, JSON.
+  const json = express.json({ limit: '1mb' });
+  r.use((req, res, next) => (/^\/api\/anexos(\/|$)/.test(req.path) ? next() : json(req, res, next)));
   r.use('/api', criarApi(db, extras));
   r.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));
   r.use('/vendor/markercluster', express.static(path.dirname(require.resolve('leaflet.markercluster/dist/leaflet.markercluster.js')), { maxAge: '7d' }));

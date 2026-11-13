@@ -453,13 +453,14 @@ async function configuracao(ctx, alvo) {
       area('Ao encerrar', { name: 'mensagem_encerramento', rows: 2, maxlength: 1000, placeholder: cfg.padroes.encerramento }, cfg.mensagem_encerramento ?? ''),
       area('Ao pedir a avaliação', { name: 'mensagem_csat', rows: 2, maxlength: 1000, placeholder: cfg.padroes.csat }, cfg.mensagem_csat ?? '')),
 
-    cartao('Modelo',
+    cartao('Inteligência',
       cfg.chave_no_servidor
-        ? el('div', { class: 'aviso-caixa ok' }, icone('ok'), el('span', {}, `A chave da Claude API está configurada no servidor. Modelo em uso: ${cfg.modelo_efetivo}.`))
+        ? el('div', { class: 'aviso-caixa ok' }, icone('ok'), el('span', {}, `A inteligência da ZOE está ligada no servidor.${ctx.master ? ` Modelo em uso: ${cfg.modelo_efetivo}.` : ''}`))
         : el('div', { class: 'aviso-caixa aviso' }, icone('alerta'), el('span', {},
-          'O servidor está sem a chave da Claude API (ATEND_IA_CHAVE). Sem ela a ZOE funciona só com as intenções e a base de conhecimento, '
+          'O servidor está sem a chave de IA da ZOE (ATEND_IA_CHAVE). Sem ela a ZOE funciona só com as intenções e a base de conhecimento, '
           + 'e o que não casar vai para o menu de departamentos.')),
-      campo('Modelo (vazio = padrão do servidor)', { name: 'modelo', value: cfg.modelo ?? '', maxlength: 60, placeholder: cfg.modelo_efetivo }),
+      // O modelo é ajuste técnico da plataforma: só a equipe do master mexe.
+      ctx.master ? campo('Modelo de IA (vazio = padrão do servidor)', { name: 'modelo', value: cfg.modelo ?? '', maxlength: 60, placeholder: cfg.modelo_efetivo }) : null,
       escolha('Esforço de raciocínio', 'esforco', ESFORCOS, cfg.esforco ?? ''),
       el('p', { class: 'pequeno mudo', style: 'margin:8px 0 0' },
         'Esforço maior pensa mais, erra menos em caso difícil e custa mais. Para atendimento de WhatsApp, o baixo costuma bastar.'),

@@ -1,6 +1,9 @@
 'use strict';
 
 process.env.NODE_ENV = 'test';
+// Os hosts dos testes (ixc.provedor.teste, api.empresa.teste) não existem no DNS: resolvem para um
+// IP público de documentação. A trava de rede interna tem teste próprio.
+require('../server/lib/rede').resolver = async () => [{ address: '203.0.113.10', family: 4 }];
 process.env.ATEND_SECRET = process.env.ATEND_SECRET || 'segredo-de-teste-com-mais-de-32-caracteres';
 process.env.ATEND_FUSO = process.env.ATEND_FUSO || 'America/Sao_Paulo';
 process.env.ATEND_ARQUIVOS = process.env.ATEND_ARQUIVOS || require('node:path').join(require('node:os').tmpdir(), `atend-teste-${process.pid}`);
@@ -8,7 +11,7 @@ process.env.ATEND_ARQUIVOS = process.env.ATEND_ARQUIVOS || require('node:path').
 const crypto = require('node:crypto');
 const { abrir, agora } = require('../server/db');
 const empresas = require('../server/lib/empresas');
-const claude = require('../server/ia/claude');
+const motor = require('../server/ia/motor');
 
 const APP_SECRET = 'segredo-do-app-de-teste';
 const PHONE_ID = '123456789012345';
@@ -80,17 +83,17 @@ function fingirMeta({ falharEm = () => null, midia = null } = {}) {
   return { enviadas, chamadas, restaurar: () => { global.fetch = original; } };
 }
 
-// ---------- Dublê da Claude API ----------
+// ---------- Dublê da API de IA ----------
 
 /**
- * Dublê do cliente da Claude API. `roteiro` é uma lista de respostas, uma por chamada:
+ * Dublê do cliente da API de IA. `roteiro` é uma lista de respostas, uma por chamada:
  *   { texto }                                  → o modelo só escreveu
  *   { ferramenta: 'nome', entrada: {...} }     → o modelo chamou uma ferramenta
  *   { recusa: 'cyber' }                        → recusa de política
  *   { erro: Error }                            → falha da API
  * Devolve { pedidos, restaurar }: `pedidos` guarda cada corpo enviado à API.
  */
-function fingirClaude(roteiro) {
+function fingirIa(roteiro) {
   const pedidos = [];
   let i = 0;
   const responder = async (corpo) => {
@@ -113,10 +116,10 @@ function fingirClaude(roteiro) {
     }
     return { stop_reason: 'end_turn', content: [{ type: 'text', text: passo.texto ?? '' }], usage: { input_tokens: 120, output_tokens: 30 } };
   };
-  claude.usarCliente({ messages: { create: responder }, beta: { messages: { create: responder } } });
+  motor.usarCliente({ messages: { create: responder }, beta: { messages: { create: responder } } });
   process.env.ATEND_IA_CHAVE = 'sk-ant-teste';
   require('../server/config').ia.chave = 'sk-ant-teste';
-  return { pedidos, restaurar: () => { claude.usarCliente(null); require('../server/config').ia.chave = null; delete process.env.ATEND_IA_CHAVE; } };
+  return { pedidos, restaurar: () => { motor.usarCliente(null); require('../server/config').ia.chave = null; delete process.env.ATEND_IA_CHAVE; } };
 }
 
 /** Desliga a IA no servidor (sem chave): a atendente cai nas regras e no menu. */
@@ -275,6 +278,6 @@ const mensagensDe = (db, conversaId) =>
 
 module.exports = {
   APP_SECRET, PHONE_ID, TELEFONE_CLIENTE, IXC_URL, CADASTRO,
-  criarAmbiente, comConhecimento, fingirMeta, fingirClaude, semIa, comIxc, fingirIxc,
+  criarAmbiente, comConhecimento, fingirMeta, fingirIa, semIa, comIxc, fingirIxc,
   corpoWebhook, mensagemTexto, assinar, entregar, conversar, conversaDoCliente, mensagensDe,
 };

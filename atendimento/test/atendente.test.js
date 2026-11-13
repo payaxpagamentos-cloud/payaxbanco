@@ -16,7 +16,7 @@ describe('ZOE', () => {
   test('resolve sozinha com a base de conhecimento e encerra, sem ocupar ninguém', async () => {
     const { db, empresa } = h.criarAmbiente();
     h.comConhecimento(db, empresa.id, 'Horário de atendimento', 'De segunda a sexta, das 8h às 18h.', 'que horas vocês abrem?');
-    const ia = h.fingirClaude([
+    const ia = h.fingirIa([
       { ferramenta: 'buscar_conhecimento', entrada: { pergunta: 'horário de atendimento' } },
       { texto: 'A gente atende de segunda a sexta, das 8h às 18h.', ferramenta: 'encerrar_atendimento', entrada: { resumo: 'Cliente quis saber o horário.', despedida: null } },
     ]);
@@ -34,7 +34,7 @@ describe('ZOE', () => {
 
   test('pediu uma pessoa sem dizer o assunto: a ZOE pergunta o assunto uma vez', async () => {
     const { db } = h.criarAmbiente();
-    const ia = h.fingirClaude([{ texto: 'não deveria ser chamada' }]);
+    const ia = h.fingirIa([{ texto: 'não deveria ser chamada' }]);
     try {
       await h.conversar(db, 'quero falar com um atendente humano');
       const c = h.conversaDoCliente(db);
@@ -46,7 +46,7 @@ describe('ZOE', () => {
 
   test('pediu uma pessoa de novo: transfere na hora, sem chamar a IA nem discutir', async () => {
     const { db, atendente } = h.criarAmbiente();
-    const ia = h.fingirClaude([{ texto: 'não deveria ser chamada' }]);
+    const ia = h.fingirIa([{ texto: 'não deveria ser chamada' }]);
     try {
       await h.conversar(db, 'quero falar com um atendente humano');
       await h.conversar(db, 'já disse, quero uma pessoa');
@@ -63,7 +63,7 @@ describe('ZOE', () => {
 
   test('pediu uma pessoa e disse o assunto junto: a ZOE tenta resolver primeiro', async () => {
     const { db } = h.criarAmbiente();
-    const ia = h.fingirClaude([{ texto: 'Consigo sim! Sua segunda via está aqui.' }]);
+    const ia = h.fingirIa([{ texto: 'Consigo sim! Sua segunda via está aqui.' }]);
     try {
       await h.conversar(db, 'quero falar com um atendente sobre a segunda via da fatura');
       const c = h.conversaDoCliente(db);
@@ -76,7 +76,7 @@ describe('ZOE', () => {
 
   test('já contou o problema e a ZOE já tentou: pedir uma pessoa transfere direto', async () => {
     const { db } = h.criarAmbiente();
-    const ia = h.fingirClaude([{ texto: 'Vamos ver: já tentou reiniciar o roteador?' }]);
+    const ia = h.fingirIa([{ texto: 'Vamos ver: já tentou reiniciar o roteador?' }]);
     try {
       await h.conversar(db, 'minha internet está lenta à noite');
       await h.conversar(db, 'quero falar com um atendente');
@@ -96,7 +96,7 @@ describe('ZOE', () => {
 
   test('transfere com resumo quando a IA chama a ferramenta', async () => {
     const { db, atendente, filas } = h.criarAmbiente();
-    const ia = h.fingirClaude([
+    const ia = h.fingirIa([
       { ferramenta: 'buscar_conhecimento', entrada: { pergunta: 'desconto na fatura' } },
       { ferramenta: 'transferir_para_humano', entrada: { fila: 'Financeiro', motivo: 'Pedido de desconto exige decisão humana.', resumo: 'Cliente pede 50% de desconto na fatura de outubro. Não há regra na base.' } },
     ]);
@@ -113,7 +113,7 @@ describe('ZOE', () => {
 
   test('fica na fila quando não há atendente disponível e avisa o cliente uma única vez', async () => {
     const { db } = h.criarAmbiente({ atendenteDisponivel: false });
-    const ia = h.fingirClaude([{ texto: 'x' }]);
+    const ia = h.fingirIa([{ texto: 'x' }]);
     try {
       await h.conversar(db, 'preciso falar com uma pessoa');
       await h.conversar(db, 'uma pessoa, por favor');
@@ -131,7 +131,7 @@ describe('ZOE', () => {
   test('a IA não fala por cima quando um humano já assumiu', async () => {
     const { db, empresa, atendente } = h.criarAmbiente();
     const conversas = require('../server/lib/conversas');
-    const ia = h.fingirClaude([{ texto: 'não deveria falar' }]);
+    const ia = h.fingirIa([{ texto: 'não deveria falar' }]);
     try {
       await h.conversar(db, 'quero falar com alguém');
       await h.conversar(db, 'com alguém, por favor');
@@ -152,7 +152,7 @@ describe('ZOE', () => {
   test('erro, recusa ou resposta vazia da IA viram transferência, não silêncio', async () => {
     for (const passo of [{ erro: new Error('timeout da API') }, { recusa: 'general_harms' }, { texto: '' }]) {
       const { db } = h.criarAmbiente();
-      const ia = h.fingirClaude([passo]);
+      const ia = h.fingirIa([passo]);
       try {
         await h.conversar(db, 'uma pergunta qualquer sobre o meu contrato');
         const c = h.conversaDoCliente(db);
@@ -165,7 +165,7 @@ describe('ZOE', () => {
   test('respeita o limite de mensagens da IA por conversa', async () => {
     const { db, empresa } = h.criarAmbiente();
     db.prepare('UPDATE ia_config SET max_turnos = 2 WHERE empresa_id = ?').run(empresa.id);
-    const ia = h.fingirClaude([{ texto: 'Pode me dar mais detalhes?' }]);
+    const ia = h.fingirIa([{ texto: 'Pode me dar mais detalhes?' }]);
     try {
       await h.conversar(db, 'tenho um problema');
       await h.conversar(db, 'é complicado de explicar');
@@ -199,7 +199,7 @@ describe('ZOE', () => {
     const { db, empresa, filas } = h.criarAmbiente();
     db.prepare("INSERT INTO intencoes (empresa_id, nome, palavras, acao, resposta, ordem, criada_em) VALUES (?, 'Rastreio', 'rastrear\nonde está meu pedido', 'responder', 'Acompanhe pelo link que enviamos no e-mail.', 1, ?)")
       .run(empresa.id, new Date().toISOString());
-    const ia = h.fingirClaude([{ texto: 'não deveria ser chamada' }]);
+    const ia = h.fingirIa([{ texto: 'não deveria ser chamada' }]);
     try {
       await h.conversar(db, 'quero rastrear meu pedido');
       assert.equal(ia.pedidos.length, 0);
@@ -214,7 +214,7 @@ describe('ZOE', () => {
 
   test('abre chamado com protocolo quando não há solução imediata', async () => {
     const { db, empresa } = h.criarAmbiente();
-    const ia = h.fingirClaude([
+    const ia = h.fingirIa([
       { ferramenta: 'abrir_chamado', entrada: { assunto: 'Internet oscilando à noite', descricao: 'Cai todo dia depois das 22h há uma semana.', fila: null } },
       { texto: 'Abri o chamado 202611-00001 para o time técnico. Você recebe a atualização por aqui.' },
     ]);

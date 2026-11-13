@@ -10,6 +10,7 @@ const { pode } = require('../lib/permissoes');
 const { totalCentavos, precoMedio, ciclos, resumoCiclos } = require('../lib/combustivel');
 const { vincular } = require('../lib/anexos');
 const frota = require('../lib/frota');
+const { limitesDoDia } = require('../lib/datas');
 const v = require('../lib/validacao');
 
 const COMBUSTIVEIS = ['gasolina', 'etanol', 'diesel', 'gnv', 'eletrico'];
@@ -41,6 +42,13 @@ module.exports = (db) => {
     }
   }
 
+  /** Filtro ?de=&ate= (datas de calendário inclusivas) pelo dia local da operação, não pelo dia UTC. */
+  function periodo(req, f, p) {
+    const fuso = req.usuario.fuso;
+    if (req.query.de) { f.push('a.data_hora >= ?'); p.push(limitesDoDia(fuso, v.data(req.query.de, 'a data inicial')).inicio); }
+    if (req.query.ate) { f.push('a.data_hora < ?'); p.push(limitesDoDia(fuso, v.data(req.query.ate, 'a data final')).fim); }
+  }
+
   const comAnexos = (x) => ({ ...x, comprovantes: db.prepare("SELECT id, nome, mime FROM anexos WHERE recurso = 'abastecimento' AND recurso_id = ?").all(x.id) });
 
   r.get('/abastecimentos', exigir('combustivel.ver'), (req, res) => {
@@ -49,8 +57,7 @@ module.exports = (db) => {
     if (ehTecnico(req)) { f.push('a.tecnico_id = ?'); p.push(req.usuario.tecnico_id ?? -1); }
     if (req.query.veiculo_id) { f.push('a.veiculo_id = ?'); p.push(Number(req.query.veiculo_id)); }
     if (req.query.tecnico_id) { f.push('a.tecnico_id = ?'); p.push(Number(req.query.tecnico_id)); }
-    if (req.query.de) { f.push('a.data_hora >= ?'); p.push(v.instante(`${v.data(req.query.de, 'a data inicial')}T00:00:00Z`, 'de')); }
-    if (req.query.ate) { f.push('a.data_hora < ?'); p.push(new Date(Date.parse(`${v.data(req.query.ate, 'a data final')}T00:00:00Z`) + 86400_000).toISOString()); }
+    periodo(req, f, p);
     const lista = listaPaginada(db, `SELECT a.*, v.placa, v.modelo, t.nome AS tecnico_nome, COALESCE(f.nome, a.posto) AS posto_nome,
       (SELECT COUNT(*) FROM abastecimento_correcoes c WHERE c.abastecimento_id = a.id) AS correcoes,
       (SELECT COUNT(*) FROM anexos x WHERE x.recurso = 'abastecimento' AND x.recurso_id = a.id) AS comprovantes
@@ -136,8 +143,7 @@ module.exports = (db) => {
     v.exigir(!ehTecnico(req), 'Resumo disponível para a gestão da frota.');
     const f = ['a.organizacao_id = ?'];
     const p = [req.org];
-    if (req.query.de) { f.push('a.data_hora >= ?'); p.push(`${v.data(req.query.de, 'a data inicial')}T00:00:00.000Z`); }
-    if (req.query.ate) { f.push('a.data_hora < ?'); p.push(new Date(Date.parse(`${v.data(req.query.ate, 'a data final')}T00:00:00Z`) + 86400_000).toISOString()); }
+    periodo(req, f, p);
     if (req.query.veiculo_id) { f.push('a.veiculo_id = ?'); p.push(Number(req.query.veiculo_id)); }
     const lista = db.prepare(`SELECT a.*, v.placa, v.modelo, t.nome AS tecnico_nome, COALESCE(fo.nome, a.posto, 'Não informado') AS posto_nome FROM abastecimentos a
       JOIN veiculos v ON v.id = a.veiculo_id LEFT JOIN tecnicos t ON t.id = a.tecnico_id LEFT JOIN fornecedores fo ON fo.id = a.fornecedor_id

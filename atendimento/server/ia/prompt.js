@@ -7,7 +7,7 @@ const ixcTools = require('./ferramentas-ixc');
 
 /**
  * Monta o prompt do sistema da ZOE. É estável durante a conversa (vai cacheado na
- * Claude API), então aqui não entra nada que mude a cada mensagem: nem data, nem id, nem contador.
+ * API de IA), então aqui não entra nada que mude a cada mensagem: nem data, nem id, nem contador.
  */
 
 const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];

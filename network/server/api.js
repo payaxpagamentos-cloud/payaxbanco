@@ -36,7 +36,8 @@ function criarApi(db, extras = {}) {
   api.use('/auth', require('./routes/auth')(db, autenticado));
   api.use(autenticado, idempotencia(db));
   api.use('/organizacao', require('./routes/organizacao')(db));
-  api.use('/anexos', require('./routes/anexos')(db));
+  // O corpo do arquivo (até o limite configurado) só é lido depois da autenticação: anônimo não ocupa memória com upload.
+  api.use('/anexos', express.raw({ type: () => true, limit: config.arquivoMaxBytes + 1024 }), require('./routes/anexos')(db));
   api.use('/painel', exigir('painel.ver'), require('./routes/painel')(db));
   api.use('/frota', require('./routes/frota')(db));
   api.use('/manutencao', require('./routes/manutencao')(db));

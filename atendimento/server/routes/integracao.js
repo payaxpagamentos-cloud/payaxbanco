@@ -4,7 +4,7 @@ const express = require('express');
 const crypto = require('node:crypto');
 const { agora, transacao } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
-const { limitar } = require('../lib/limitador');
+const { limitar, registrarRecusa } = require('../lib/limitador');
 const conversasLib = require('../lib/conversas');
 const envio = require('../lib/envio');
 const wa = require('../lib/whatsapp');
@@ -18,8 +18,9 @@ module.exports = function rotasIntegracao(db) {
   const r = express.Router();
   // A voz tem limite próprio: a central telefônica inteira sai de um IP só, e cada fala do cliente
   // é uma chamada — 20 ligações ao mesmo tempo estourariam o limite das outras rotas em minutos.
-  const limiteGeral = limitar({ janelaMs: 60_000, maximo: 120 });
-  const limiteVoz = limitar({ janelaMs: 60_000, maximo: 1200 });
+  // Todos os métodos contam: chave errada num GET também é tentativa.
+  const limiteGeral = limitar({ janelaMs: 60_000, maximo: 300, todos: true });
+  const limiteVoz = limitar({ janelaMs: 60_000, maximo: 1200, todos: true });
   r.use((req, res, next) => (req.path.startsWith('/voz/') ? limiteVoz : limiteGeral)(req, res, next));
 
   // ---------- Autenticação por chave ----------
@@ -31,7 +32,7 @@ module.exports = function rotasIntegracao(db) {
     const registro = db.prepare(`SELECT c.*, e.nome AS empresa_nome, e.status AS empresa_status FROM chaves_api c
       JOIN empresas e ON e.id = c.empresa_id WHERE c.chave_hash = ? AND c.ativa = 1`).get(hash);
     if (!registro) {
-      db.prepare("INSERT INTO acessos_recusados (ip, motivo, criado_em) VALUES (?, 'integração: chave de API inválida', ?)").run(req.ip, agora());
+      registrarRecusa(db, req.ip, 'integração: chave de API inválida');
       return next(new ErroNegocio('Chave de API inválida ou revogada.', 401));
     }
     if (registro.empresa_status !== 'ativa') return next(new ErroNegocio('Empresa bloqueada.', 403));
@@ -154,7 +155,7 @@ module.exports = function rotasIntegracao(db) {
       // Avisar o cliente pelo WhatsApp, se a janela estiver aberta e o sistema pedir.
       let aviso = null;
       if (d.avisar_cliente && ch.conversa_id) {
-        const conversa = db.prepare('SELECT * FROM conversas WHERE id = ?').get(ch.conversa_id);
+        const conversa = db.prepare('SELECT * FROM conversas WHERE id = ? AND empresa_id = ?').get(ch.conversa_id, req.empresa.id);
         if (conversa && conversa.estado !== 'encerrada' && wa.janelaAberta(conversa)) {
           envio.enfileirar(db, conversa, { autor: 'sistema', tipo: 'texto', texto: v.texto(d.aviso ?? `Atualização do chamado ${ch.protocolo}: ${status}.`, 'o aviso', 1000) });
           envio.girar(db);

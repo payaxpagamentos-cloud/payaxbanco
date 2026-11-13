@@ -79,7 +79,8 @@ function criarUsuario(db, empresaId, dados) {
       throw new ErroNegocio(`A empresa já tem ${usados} atendente(s), o limite do plano. Fale com o suporte para aumentar.`);
     }
   }
-  const senha = dados.senha ? v.senha(dados.senha) : `atende${crypto.randomInt(1000, 9999)}`;
+  // Provisória forte (12 caracteres aleatórios): "atende" + 4 dígitos seriam só 9 mil chutes.
+  const senha = dados.senha ? v.senha(dados.senha) : crypto.randomBytes(9).toString('base64url');
   const ramal = lerRamal(db, empresaId, dados.ramal);
   const id = Number(db.prepare(`INSERT INTO usuarios (nome, email, senha_hash, perfil, empresa_id, max_simultaneas, ramal, criado_em)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(v.texto(dados.nome, 'o nome', 160), v.email(dados.email), hashSenha(senha), perfil, empresaId,

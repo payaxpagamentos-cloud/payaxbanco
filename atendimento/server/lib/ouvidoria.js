@@ -277,14 +277,16 @@ function listar(db, empresaId, { status = '', tipo = '', responsavelId = '', bus
 }
 
 /** O caso com as tratativas e a ficha do cliente calculada agora. */
-async function detalhe(db, empresaId, id) {
+async function detalhe(db, empresaId, id, { comFicha = true } = {}) {
   const o = buscar(db, empresaId, id);
   return {
     ...enriquecer(db.prepare(`SELECT ${COLUNAS} ${JUNCOES} WHERE o.id = ?`).get(o.id)),
     ofertas: ofertasDo(db, o.id),
     eventos: db.prepare(`SELECT e.id, e.tipo, e.texto, e.criado_em, u.nome AS usuario_nome
       FROM ouvidoria_eventos e LEFT JOIN usuarios u ON u.id = e.usuario_id WHERE e.ouvidoria_id = ? ORDER BY e.id`).all(o.id),
-    ficha: await cliente360.ficha(db, empresaId, o.contato_id, { ixcClienteId: o.ixc_cliente_id }),
+    // A ficha (risco, faturas, pagamentos) é da permissão "Ver a ficha do cliente", não da Ouvidoria.
+    ficha: comFicha ? await cliente360.ficha(db, empresaId, o.contato_id, { ixcClienteId: o.ixc_cliente_id }) : null,
+    ficha_restrita: !comFicha,
   };
 }
 

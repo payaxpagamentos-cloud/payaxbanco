@@ -160,7 +160,9 @@ const INTERNAS = {
         if (d.length === 11 && !v.cpfValido(d)) return { ok: false, erro: 'CPF inválido. Confirme o número com o cliente.' };
         if (d.length === 14 && !v.cnpjValido(d)) return { ok: false, erro: 'CNPJ inválido. Confirme o número com o cliente.' };
         if (d.length !== 11 && d.length !== 14) return { ok: false, erro: 'Documento deve ter 11 (CPF) ou 14 (CNPJ) dígitos.' };
-        campos.push('documento = ?');
+        // O documento que o cliente DIZ ser dele não substitui o que já está no cadastro: senão bastaria
+        // dizer o CPF de outra pessoa para a ferramenta da empresa responder com os dados dela.
+        campos.push('documento = COALESCE(documento, ?)');
         args.push(d);
       }
       if (entrada.email) {
@@ -340,12 +342,16 @@ function gerarProtocolo(db, empresaId) {
  */
 async function executarExterna(ferramenta, { contato, conversa, entrada }) {
   const cabecalhos = JSON.parse(decifrar(ferramenta.cabecalhos_cifrados, 'ferramenta') ?? '{}');
+  // Documento só vai como identidade quando foi CONFIRMADO no IXC nesta conversa. O que o cliente
+  // apenas informou segue em campo separado, para o sistema da empresa saber que não foi conferido.
+  const confirmado = Boolean(conversa.identidade_confirmada);
   const corpo = {
     ...entrada,
     contato: {
       telefone: contato.telefone,
       nome: contato.nome ?? contato.nome_perfil ?? null,
-      documento: contato.documento ?? null,
+      documento: confirmado ? contato.documento ?? null : null,
+      documento_informado_nao_conferido: confirmado ? null : contato.documento ?? null,
       email: contato.email ?? null,
       codigo_externo: contato.codigo_externo ?? null,
     },
@@ -357,15 +363,23 @@ async function executarExterna(ferramenta, { contato, conversa, entrada }) {
     const u = new URL(url);
     for (const [k, val] of Object.entries(entrada ?? {})) if (val !== null && val !== undefined) u.searchParams.set(k, String(val));
     u.searchParams.set('telefone', contato.telefone);
-    if (contato.documento) u.searchParams.set('documento', contato.documento);
+    if (contato.documento && confirmado) u.searchParams.set('documento', contato.documento);
+    else if (contato.documento) u.searchParams.set('documento_informado_nao_conferido', contato.documento);
     url = u.toString();
   } else {
     body = JSON.stringify(corpo);
+  }
+  try {
+    await require('../lib/rede').validarDestino(url, { oQue: 'O endereço da ferramenta' });
+  } catch (err) {
+    return { ok: false, erro: `${err.message} Avise o cliente e transfira para um atendente.` };
   }
   let resp;
   try {
     resp = await fetch(url, {
       method: ferramenta.metodo,
+      // Redirecionamento poderia levar a chamada para a rede interna depois da conferência.
+      redirect: 'error',
       headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}), ...cabecalhos },
       body,
       signal: AbortSignal.timeout(ferramenta.timeout_ms),
@@ -380,7 +394,7 @@ async function executarExterna(ferramenta, { contato, conversa, entrada }) {
   return { ok: true, dados: dados ?? {} };
 }
 
-/** Converte a ferramenta cadastrada no formato de tool da Claude API. */
+/** Converte a ferramenta cadastrada no formato de ferramenta da API de IA. */
 function comoTool(f) {
   let parametros;
   try { parametros = JSON.parse(f.parametros); } catch { parametros = null; }
@@ -396,7 +410,7 @@ function comoTool(f) {
 // ---------- Montagem ----------
 
 /**
- * Lista das ferramentas disponíveis nesta conversa, no formato da Claude API, e o executor.
+ * Lista das ferramentas disponíveis nesta conversa, no formato da API de IA, e o executor.
  * `semTransferencia` tira a transferência quando a empresa não tem fila cadastrada.
  */
 function montar(db, { empresaId, semTransferencia = false }) {

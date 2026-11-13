@@ -208,8 +208,8 @@ module.exports = function rotasMaster(db) {
     try { db.prepare('SELECT 1').get(); ok('Banco de dados', 'respondendo'); } catch (e) { erro('Banco de dados', e.message); }
 
     const config = require('../config');
-    if (config.ia.chave) ok('Chave da Claude API', `configurada · modelo ${config.ia.modelo} · esforço ${config.ia.esforco}`);
-    else aviso('Chave da Claude API', 'não configurada: as ZOEs rodam só com intenções e base de conhecimento');
+    if (config.ia.chave) ok('Inteligência da ZOE', `chave de IA configurada · modelo ${config.ia.modelo} · esforço ${config.ia.esforco}`);
+    else aviso('Inteligência da ZOE', 'chave de IA não configurada: as ZOEs rodam só com intenções e base de conhecimento');
 
     const semSegredo = db.prepare('SELECT COUNT(*) AS n FROM numeros WHERE ativo = 1 AND app_secret_cifrado IS NULL').get();
     if (Number(semSegredo.n)) erro('Segredo do app (webhook)', `${semSegredo.n} número(s) ativo(s) sem App secret: o webhook deles recusa todo evento`);

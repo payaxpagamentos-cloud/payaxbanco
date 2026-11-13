@@ -8,6 +8,7 @@ const { registrar } = require('../lib/auditoria');
 const { listaPaginada, like, conferirVersao } = require('../lib/http');
 const frota = require('../lib/frota');
 const { vincular } = require('../lib/anexos');
+const { dataLocal, somarDias } = require('../lib/datas');
 const v = require('../lib/validacao');
 
 const CATEGORIAS = ['passeio', 'utilitario', 'picape', 'van', 'caminhao', 'moto', 'outro'];
@@ -175,7 +176,7 @@ module.exports = (db) => {
 
   r.get('/documentos/vencendo', exigir('frota.documentos'), (req, res) => {
     const dias = Math.min(365, Number(req.query.dias) || 30);
-    const limite = new Date(Date.now() + dias * 86400_000).toISOString().slice(0, 10);
+    const limite = somarDias(dataLocal(req.usuario.fuso), dias);
     res.json(db.prepare(`SELECT d.*, v.placa, v.modelo FROM veiculo_documentos d JOIN veiculos v ON v.id = d.veiculo_id
       WHERE d.organizacao_id = ? AND d.vencimento IS NOT NULL AND d.vencimento <= ? ORDER BY d.vencimento`).all(req.org, limite));
   });

@@ -43,11 +43,15 @@ function gerarComissoes(db, req, chamado) {
       db.prepare("INSERT INTO comissao_eventos (comissao_id, de, para, motivo, usuario_id, em) VALUES (?, NULL, 'aguardando_aprovacao', 'Chamado aprovado', ?, ?)").run(id, req.usuario.id, agora());
       geradas.push(id);
     } else {
-      const c = db.prepare('SELECT id, status FROM comissoes WHERE chamado_id = ? AND tecnico_id = ? AND regra_id = ?').get(chamado.id, p.tecnico_id, versao.regra_id);
+      const c = db.prepare('SELECT id, status, valor_centavos, quantidade FROM comissoes WHERE chamado_id = ? AND tecnico_id = ? AND regra_id = ?')
+        .get(chamado.id, p.tecnico_id, versao.regra_id);
       if (c?.status === 'suspensa') {
-        db.prepare("UPDATE comissoes SET status = 'aguardando_aprovacao' WHERE id = ?").run(c.id);
-        db.prepare("INSERT INTO comissao_eventos (comissao_id, de, para, motivo, usuario_id, em) VALUES (?, 'suspensa', 'aguardando_aprovacao', 'Chamado aprovado novamente', ?, ?)")
-          .run(c.id, req.usuario.id, agora());
+        // Reabertura corrigida: a comissão é recalculada com a versão vigente, a quantidade e o rateio desta aprovação.
+        db.prepare(`UPDATE comissoes SET status = 'aguardando_aprovacao', versao_id = ?, base = ?, quantidade = ?, percentual_rateio = ?, valor_centavos = ?,
+          aprovado_por = NULL, aprovado_em = NULL WHERE id = ?`).run(versao.id, base, quantidade, p.percentual, p.valor, c.id);
+        const mudou = c.valor_centavos !== p.valor ? ` Valor recalculado de ${c.valor_centavos} para ${p.valor} centavos (quantidade ${c.quantidade} → ${quantidade}).` : '';
+        db.prepare("INSERT INTO comissao_eventos (comissao_id, de, para, motivo, usuario_id, em) VALUES (?, 'suspensa', 'aguardando_aprovacao', ?, ?, ?)")
+          .run(c.id, `Chamado aprovado novamente.${mudou}`, req.usuario.id, agora());
       }
     }
   }

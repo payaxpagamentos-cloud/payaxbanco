@@ -181,6 +181,7 @@ module.exports = (db) => {
     const evidencia = v.texto(req.body?.evidencia, 'a evidência da recuperação', 1000);
     db.prepare("UPDATE incidentes SET status = 'resolvido', resolvido_em = ?, resolvido_por = ?, resolucao = 'manual', atualizado_em = ? WHERE id = ?").run(agora(), req.usuario.id, agora(), i.id);
     noc.evento(db, i.id, 'resolvido', `Resolução manual: ${evidencia}`, req.usuario.id);
+    noc.promoverFilhos(db, i, req.usuario.id);
     if (i.regra_id) db.prepare('UPDATE alvo_estado SET violacoes = 0, recuperacoes = 0 WHERE regra_id = ? AND equipamento_id = ? AND ponto = ?').run(i.regra_id, i.equipamento_id, i.ponto ?? '');
     return { status: 'resolvido', evidencia };
   });

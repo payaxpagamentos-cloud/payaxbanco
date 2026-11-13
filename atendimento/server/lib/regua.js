@@ -2,7 +2,7 @@
 
 const { agora, transacao, lerConfig } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('./erros');
-const { local, hoje, somarDias } = require('./datas');
+const { local, hoje, somarDias, inicioDia } = require('./datas');
 const conversas = require('./conversas');
 const envio = require('./envio');
 const custo = require('./custo');
@@ -123,7 +123,7 @@ async function destinatarios(db, empresa, regua, { referencia = hoje(), limite =
 function pagasHoje(db, contatoId) {
   const r = db.prepare(`SELECT COUNT(*) AS n FROM disparos
     WHERE contato_id = ? AND status = 'enviado' AND custo_milesimos > 0 AND criado_em >= ?`)
-    .get(contatoId, `${hoje()}T00:00:00.000Z`);
+    .get(contatoId, inicioDia(hoje()));
   return Number(r?.n ?? 0);
 }
 
@@ -227,6 +227,9 @@ async function executar(db, empresa, regua, { referencia = hoje(), limite = 5000
   const numero = db.prepare('SELECT * FROM numeros WHERE empresa_id = ? AND ativo = 1 ORDER BY id LIMIT 1').get(empresa.id);
   if (!numero) throw new ErroNegocio('A empresa não tem número de WhatsApp ativo.');
 
+  // Marca o início ANTES de trabalhar: uma régua de milhares de clientes leva mais que um minuto, e
+  // o relógio da próxima volta não pode achar que ela "ainda não rodou hoje" e começar de novo.
+  db.prepare('UPDATE reguas SET ultima_execucao_em = ? WHERE id = ?').run(agora(), regua.id);
   const precos = custo.precos(db, empresa.id);
   const ixc = ixcTools.clienteIxc(db, empresa.id);
   const alvos = await destinatarios(db, empresa, regua, { referencia, limite });
@@ -439,7 +442,9 @@ function devemRodar(db, instante = new Date()) {
       const alvoMin = h * 60 + m;
       // Janela de 10 minutos a partir da hora marcada, e só uma vez por dia.
       if (agoraMin < alvoMin || agoraMin > alvoMin + 10) return false;
-      return !r.ultima_execucao_em || r.ultima_execucao_em.slice(0, 10) < l.data;
+      // Compara o DIA LOCAL da última execução: a data UTC vira à meia-noite de Greenwich (21 h no
+      // Brasil) e faria a régua das 21 h rodar dia sim, dia não.
+      return !r.ultima_execucao_em || local(r.ultima_execucao_em).data < l.data;
     });
 }
 

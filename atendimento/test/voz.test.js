@@ -171,10 +171,10 @@ describe('a ZOE fala diferente ao telefone', () => {
   test('a IA recebe a instrução de que está numa ligação', async () => {
     const { db, empresa } = ambiente;
     voz.iniciar(db, empresa, { uid: 'L1', telefone: '11922221111' });
-    const claude = h.fingirClaude([{ texto: 'Claro, posso te ajudar com isso.' }]);
+    const iaFalsa = h.fingirIa([{ texto: 'Claro, posso te ajudar com isso.' }]);
     let r;
-    try { r = await voz.turno(db, empresa, 'L1', { texto: 'minha internet está lenta' }); } finally { claude.restaurar(); }
-    const notas = claude.pedidos[0].messages.filter((m) => m.role === 'system').map((m) => m.content).join(' ');
+    try { r = await voz.turno(db, empresa, 'L1', { texto: 'minha internet está lenta' }); } finally { iaFalsa.restaurar(); }
+    const notas = iaFalsa.pedidos[0].messages.filter((m) => m.role === 'system').map((m) => m.content).join(' ');
     assert.match(notas, /LIGAÇÃO TELEFÔNICA/);
     assert.match(notas, /Nada de listas, links, emojis/);
     assert.equal(r.fala, 'Claro, posso te ajudar com isso.');
@@ -187,9 +187,9 @@ describe('a ZOE fala diferente ao telefone', () => {
     try { await h.conversar(db, 'minha internet caiu e já reiniciei o roteador duas vezes'); } finally { sem.restaurar(); }
     // …e depois ligou do mesmo número.
     voz.iniciar(db, empresa, { uid: 'L2', telefone: h.TELEFONE_CLIENTE.slice(2) });
-    const claude = h.fingirClaude([{ texto: 'Vi que você já reiniciou o roteador. Vou verificar a sua conexão.' }]);
-    try { await voz.turno(db, empresa, 'L2', { texto: 'alô, continuo sem internet' }); } finally { claude.restaurar(); }
-    const notas = claude.pedidos[0].messages.filter((m) => m.role === 'system').map((m) => m.content).join(' ');
+    const iaFalsa = h.fingirIa([{ texto: 'Vi que você já reiniciou o roteador. Vou verificar a sua conexão.' }]);
+    try { await voz.turno(db, empresa, 'L2', { texto: 'alô, continuo sem internet' }); } finally { iaFalsa.restaurar(); }
+    const notas = iaFalsa.pedidos[0].messages.filter((m) => m.role === 'system').map((m) => m.content).join(' ');
     assert.match(notas, /conversou pelo WhatsApp nas últimas 24 horas/);
     assert.match(notas, /reiniciei o roteador duas vezes/, 'ninguém deveria ter de explicar tudo de novo no telefone');
   });
@@ -206,9 +206,9 @@ describe('a ZOE fala diferente ao telefone', () => {
   test('a falha do cérebro no meio da ligação não deixa a pessoa no silêncio', async () => {
     const { db, empresa } = ambiente;
     voz.iniciar(db, empresa, { uid: 'L4', telefone: '11900009999' });
-    const claude = h.fingirClaude([{ erro: Object.assign(new Error('caiu'), { status: 500 }) }]);
+    const iaFalsa = h.fingirIa([{ erro: Object.assign(new Error('caiu'), { status: 500 }) }]);
     let r;
-    try { r = await voz.turno(db, empresa, 'L4', { texto: 'minha internet está lenta' }); } finally { claude.restaurar(); }
+    try { r = await voz.turno(db, empresa, 'L4', { texto: 'minha internet está lenta' }); } finally { iaFalsa.restaurar(); }
     assert.equal(r.acao, 'transferir');
   });
 });
@@ -303,10 +303,10 @@ describe('ligação por teclas', () => {
   test('a IA sabe que o cliente só tem o teclado', async () => {
     const { db, empresa } = ambiente;
     voz.iniciar(db, empresa, { uid: 'T3', telefone: '11977770003' });
-    const claude = h.fingirClaude([{ texto: 'Para sua segurança, digite os três primeiros números do CPF do titular.' }]);
+    const iaFalsa = h.fingirIa([{ texto: 'Para sua segurança, digite os três primeiros números do CPF do titular.' }]);
     let r;
-    try { r = await voz.turno(db, empresa, 'T3', { digitos: '1' }); } finally { claude.restaurar(); }
-    const notas = claude.pedidos[0].messages.filter((m) => m.role === 'system').map((m) => m.content).join(' ');
+    try { r = await voz.turno(db, empresa, 'T3', { digitos: '1' }); } finally { iaFalsa.restaurar(); }
+    const notas = iaFalsa.pedidos[0].messages.filter((m) => m.role === 'system').map((m) => m.content).join(' ');
     assert.match(notas, /responde SÓ pelo teclado/);
     assert.doesNotMatch(notas, /chega transcrita/, 'por teclas não há fala para transcrever');
     assert.equal(r.max_digitos, 3, 'pediu os três primeiros do CPF: espera três teclas');
@@ -315,14 +315,14 @@ describe('ligação por teclas', () => {
   test('depois de escolher no menu, os números vão para a ZOE como resposta', async () => {
     const { db, empresa } = ambiente;
     voz.iniciar(db, empresa, { uid: 'T4', telefone: '11977770004' });
-    const claude = h.fingirClaude([
+    const iaFalsa = h.fingirIa([
       { texto: 'Digite os três primeiros números do CPF.' },
       { texto: 'Obrigada, confirmei.' },
     ]);
     try {
       await voz.turno(db, empresa, 'T4', { digitos: '1' });
       await voz.turno(db, empresa, 'T4', { digitos: '123#' });
-    } finally { claude.restaurar(); }
+    } finally { iaFalsa.restaurar(); }
     const c = db.prepare("SELECT id FROM conversas WHERE ligacao_uid = 'T4'").get();
     const entradas = db.prepare("SELECT texto FROM mensagens WHERE conversa_id = ? AND direcao = 'entrada' ORDER BY id").all(c.id).map((m) => m.texto);
     assert.deepEqual(entradas, ['Quero a segunda via da minha fatura.', '123'], 'o "123" não foi lido como opção 1 do menu, e o # sai');
@@ -342,8 +342,8 @@ describe('ligação por teclas', () => {
   test('asterisco repete o menu a qualquer momento', async () => {
     const { db, empresa } = ambiente;
     voz.iniciar(db, empresa, { uid: 'T6', telefone: '11977770006' });
-    const claude = h.fingirClaude([{ texto: 'Digite os três primeiros números do CPF.' }]);
-    try { await voz.turno(db, empresa, 'T6', { digitos: '1' }); } finally { claude.restaurar(); }
+    const iaFalsa = h.fingirIa([{ texto: 'Digite os três primeiros números do CPF.' }]);
+    try { await voz.turno(db, empresa, 'T6', { digitos: '1' }); } finally { iaFalsa.restaurar(); }
     const r = await voz.turno(db, empresa, 'T6', { digitos: '*' });
     assert.match(r.fala, /^Digite 1 para segunda via/);
     assert.equal(r.max_digitos, 1, 'de volta ao menu: a próxima tecla é uma opção');

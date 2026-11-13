@@ -22,8 +22,34 @@ const v = require('../lib/validacao');
  * Painel da empresa: a caixa de entrada dos atendentes e a administração do atendimento.
  * `acessoEmpresa` já garantiu que o usuário pode entrar aqui e que o supervisor só faz GET.
  */
+// Campos que guardam CPF/CNPJ em qualquer resposta (contato, conversa, ficha, ouvidoria, passagem...).
+const CAMPOS_DOCUMENTO = new Set(['documento', 'cnpj_cpf', 'cpf', 'cnpj', 'documento_informado_nao_conferido']);
+
+/** Mascara o documento em toda a resposta, em qualquer profundidade. Profundidade limitada por segurança. */
+function mascararTudo(valor, profundidade = 0) {
+  if (profundidade > 8 || valor === null || typeof valor !== 'object') return valor;
+  if (Array.isArray(valor)) return valor.map((x) => mascararTudo(x, profundidade + 1));
+  const saida = {};
+  for (const [k, x] of Object.entries(valor)) {
+    // O que a rota já mascarou ("123••••••09") fica como está.
+    saida[k] = CAMPOS_DOCUMENTO.has(k) && (typeof x === 'string' || typeof x === 'number') && !String(x).includes('•')
+      ? permissoesLib.mascararDocumento(String(x), false)
+      : mascararTudo(x, profundidade + 1);
+  }
+  return saida;
+}
+
 module.exports = function rotasEmpresa(db) {
   const r = express.Router();
+
+  // LGPD: quem não tem "Ver CPF/CNPJ completo" não recebe o documento inteiro em NENHUMA resposta —
+  // não só nas telas que lembram de mascarar. Uma trava só, na saída, vale para as rotas futuras também.
+  r.use((req, res, next) => {
+    if (!req.pode || req.pode('cliente.documento')) return next();
+    const json = res.json.bind(res);
+    res.json = (corpo) => json(mascararTudo(corpo));
+    return next();
+  });
 
   const conversaDa = (req) => {
     const c = db.prepare('SELECT * FROM conversas WHERE id = ? AND empresa_id = ?').get(Number(req.params.id), req.empresa.id);

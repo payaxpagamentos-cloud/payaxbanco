@@ -225,6 +225,8 @@ CREATE TABLE IF NOT EXISTS mensagens (
 );
 CREATE INDEX IF NOT EXISTS idx_mensagens_conversa ON mensagens(conversa_id, id);
 CREATE INDEX IF NOT EXISTS idx_mensagens_fila ON mensagens(status, proxima_em);
+-- Gasto do mês por empresa (freio do orçamento, a cada destinatário de régua) e relatórios de custo.
+CREATE INDEX IF NOT EXISTS idx_mensagens_empresa_data ON mensagens(empresa_id, criada_em);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mensagens_wa ON mensagens(wa_id) WHERE wa_id IS NOT NULL;
 
 -- Notas internas da conversa (o cliente não vê).
@@ -551,7 +553,7 @@ CREATE TABLE IF NOT EXISTS ferramentas (
 CREATE TABLE IF NOT EXISTS chamados (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
-  conversa_id INTEGER REFERENCES conversas(id),
+  conversa_id INTEGER REFERENCES conversas(id) ON DELETE SET NULL,
   contato_id INTEGER NOT NULL REFERENCES contatos(id),
   protocolo TEXT NOT NULL,
   assunto TEXT NOT NULL,
@@ -571,7 +573,7 @@ CREATE INDEX IF NOT EXISTS idx_chamados_empresa ON chamados(empresa_id, status, 
 CREATE TABLE IF NOT EXISTS ia_eventos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   empresa_id INTEGER NOT NULL REFERENCES empresas(id),
-  conversa_id INTEGER REFERENCES conversas(id),
+  conversa_id INTEGER REFERENCES conversas(id) ON DELETE SET NULL,
   tipo TEXT NOT NULL CHECK (tipo IN ('intencao','conhecimento','ferramenta','resposta','transferencia','encerramento','limite','erro','desligada')),
   nome TEXT,
   detalhe TEXT,
@@ -779,7 +781,7 @@ const CONFIG_PADRAO = {
   ouvidoria_prazo_horas: '48',
   ouvidoria_prazo_horas_formal: '24',
   // Preço da IA em centavos de real por milhão de tokens, para o custo estimado dos relatórios.
-  // Padrão do claude-opus-5-5 (US$ 4,00 / US$ 20,00 / US$ 0,20 por milhão) a ~R$ 5,40 o dólar.
+  // Padrão do modelo de IA em uso (US$ 4,00 / US$ 20,00 / US$ 0,20 por milhão) a ~R$ 5,40 o dólar.
   // O master ajusta no painel quando a tabela da Anthropic ou o câmbio mudarem.
   ia_preco_entrada_milhao: '2160',
   ia_preco_saida_milhao: '10800',
@@ -802,10 +804,69 @@ const CONFIG_PADRAO = {
 
 const agora = () => new Date().toISOString();
 
+/**
+ * Atualização do banco numa instalação que já existe. O esquema é um só (SCHEMA, com CREATE ... IF
+ * NOT EXISTS): tabela nova nasce sozinha, mas coluna nova numa tabela que já existe, não. Aqui o
+ * esquema atual é montado num banco em memória e comparado tabela a tabela com o de verdade; cada
+ * coluna que falta é criada com a mesma definição (tipo, padrão, CHECK, REFERENCES). Roda antes do
+ * SCHEMA porque os índices novos podem usar as colunas novas. Devolve o que foi criado.
+ */
+function atualizarEsquema(db) {
+  const existentes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all().map((t) => t.name);
+  if (!existentes.length) return [];
+  const modelo = new DatabaseSync(':memory:');
+  modelo.exec(SCHEMA);
+  const criadas = [];
+  for (const { name: tabela, sql } of modelo.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all()) {
+    if (!existentes.includes(tabela)) continue;
+    const tem = new Set(db.prepare(`PRAGMA table_info("${tabela}")`).all().map((c) => c.name));
+    for (const definicao of colunasDoCreate(sql)) {
+      const nome = definicao.match(/^"?(\w+)"?/)[1];
+      if (tem.has(nome)) continue;
+      db.exec(`ALTER TABLE "${tabela}" ADD COLUMN ${definicao}`);
+      criadas.push(`${tabela}.${nome}`);
+    }
+  }
+  // Índice que mudou de definição (ex.: "uma conversa aberta por contato" virou "por contato e
+  // canal", quando chegou o telefone): o antigo sai e o SCHEMA cria o novo logo em seguida.
+  const normal = (t) => String(t ?? '').replace(/\s+/g, ' ').trim();
+  for (const { name, sql } of modelo.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL").all()) {
+    const real = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?").get(name);
+    if (real && normal(real.sql) !== normal(sql)) {
+      db.exec(`DROP INDEX "${name}"`);
+      criadas.push(`índice ${name}`);
+    }
+  }
+  modelo.close();
+  return criadas;
+}
+
+/** As definições de coluna de um CREATE TABLE (sem comentários, sem as restrições da tabela). */
+function colunasDoCreate(sql) {
+  const corpo = sql.replace(/--[^\n]*/g, '').slice(sql.replace(/--[^\n]*/g, '').indexOf('(') + 1);
+  const itens = [];
+  let nivel = 0;
+  let atual = '';
+  let aspas = null;
+  for (const ch of corpo) {
+    if (aspas) { atual += ch; if (ch === aspas) aspas = null; continue; }
+    if (ch === "'" || ch === '"') { aspas = ch; atual += ch; continue; }
+    if (ch === '(') nivel++;
+    if (ch === ')') { if (nivel === 0) break; nivel--; }
+    if (ch === ',' && nivel === 0) { itens.push(atual); atual = ''; continue; }
+    atual += ch;
+  }
+  itens.push(atual);
+  return itens.map((i) => i.replace(/\s+/g, ' ').trim()).filter(Boolean)
+    .filter((i) => !/^(CONSTRAINT|CHECK|PRIMARY|UNIQUE|FOREIGN)\b/i.test(i));
+}
+
 function abrir(arquivo = config.dbFile) {
   if (arquivo !== ':memory:') fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   const db = new DatabaseSync(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
+  const novas = atualizarEsquema(db);
+  if (novas.length) console.log(`[ZOE Atende] Banco atualizado: ${novas.length} mudança(s) (${novas.join(', ')}).`);
   db.exec(SCHEMA);
 
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
@@ -849,4 +910,4 @@ function auditar(db, { usuario, empresaId = null, acao, alvo = null, detalhe = n
       detalhe === null || typeof detalhe === 'string' ? detalhe : JSON.stringify(detalhe), ip, agora());
 }
 
-module.exports = { abrir, transacao, lerConfig, auditar, agora, CONFIG_PADRAO, SCHEMA };
+module.exports = { abrir, atualizarEsquema, colunasDoCreate, transacao, lerConfig, auditar, agora, CONFIG_PADRAO, SCHEMA };

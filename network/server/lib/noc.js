@@ -71,13 +71,35 @@ function correlacionar(db, inc) {
   }
 }
 
+/**
+ * Quando um incidente é resolvido, os incidentes ainda abertos que estavam organizados abaixo dele voltam a ser principais
+ * (sem pai), com um evento explicando: a falha que os explicava acabou, mas eles continuam acontecendo.
+ */
+function promoverFilhos(db, inc, usuarioId = null, em = agora()) {
+  const filhos = db.prepare("SELECT id FROM incidentes WHERE incidente_pai_id = ? AND status <> 'resolvido'").all(inc.id);
+  for (const f of filhos) {
+    db.prepare('UPDATE incidentes SET incidente_pai_id = NULL, confianca_correlacao = NULL, atualizado_em = ? WHERE id = ?').run(agora(), f.id);
+    evento(db, f.id, 'correlacao_encerrada', `O incidente #${inc.id} (${inc.titulo}) foi resolvido; este continua aberto e volta a ser principal.`, usuarioId, em);
+  }
+  return filhos.map((f) => f.id);
+}
+
+/** CTOs afetadas por outros incidentes ainda abertos da organização (a recuperação de um não as declara operacionais). */
+function ctosEmOutrosIncidentes(db, org, excetoId) {
+  const ids = new Set();
+  for (const i of db.prepare("SELECT * FROM incidentes WHERE organizacao_id = ? AND id <> ? AND status <> 'resolvido'").all(org, excetoId)) {
+    for (const a of ativosAfetados(db, i)) ids.add(a);
+  }
+  return ids;
+}
+
 const textoValor = (a) => `${Number(Number(a.valor).toFixed(2)).toLocaleString('pt-BR')}${a.unidade ? ` ${a.unidade}` : ''}`;
 const quando = (iso, fuso) => new Intl.DateTimeFormat('pt-BR', { timeZone: fuso, dateStyle: 'short', timeStyle: 'medium' }).format(new Date(iso));
 
-function inferirCtosDoIncidente(db, inc, eq, amostra, status, regra, texto, fuso = 'America/Sao_Paulo') {
+function inferirCtosDoIncidente(db, inc, eq, amostra, status, regra, texto, fuso = 'America/Sao_Paulo', ignorar = null) {
   const evid = `${texto}: ${NOMES_METRICA[amostra.metrica] ?? amostra.metrica} ${textoValor(amostra)} medido em ${eq.nome}${amostra.ponto ? ` · ${amostra.ponto}` : ''} `
     + `em ${quando(amostra.observado_em, fuso)} (amostra ${amostra.origem_evento_id}, regra "${regra.nome}" v${regra.versao}). Inferência pela topologia; não é medição da CTO.`;
-  const ids = rede.inferirCtos(db, { organizacaoId: inc.organizacao_id, equipamentoId: eq.id, ponto: amostra.ponto, status, evidencia: evid });
+  const ids = rede.inferirCtos(db, { organizacaoId: inc.organizacao_id, equipamentoId: eq.id, ponto: amostra.ponto, status, evidencia: evid, ignorar });
   if (ids.length) evento(db, inc.id, 'inferencia_cto', { ctos: ids, status, evidencia: evid });
 }
 
@@ -140,7 +162,9 @@ function processarAmostra(db, org, amostra, eq) {
       db.prepare(`UPDATE incidentes SET status = 'resolvido', resolvido_em = ?, resolucao = 'automatica', ultima_observacao = ?, atualizado_em = ? WHERE id = ?`)
         .run(amostra.observado_em, amostra.observado_em, agora(), aberto.id);
       evento(db, aberto.id, 'resolvido', `Recuperação confirmada em ${recuperacoes} amostra(s) ${regra.comparacao === 'menor' ? 'a partir de' : 'até'} ${regra.limiar_recuperacao}. Duração: ${Math.round((Date.parse(amostra.observado_em) - Date.parse(aberto.inicio)) / 60_000)} min.`, null, amostra.observado_em);
-      inferirCtosDoIncidente(db, aberto, eq, amostra, 'operacional', regra, 'Recuperação confirmada', organizacao.fuso);
+      promoverFilhos(db, aberto, null, amostra.observado_em);
+      // CTOs que outro incidente aberto ainda cobre (ex.: a PON que continua ruim) não passam a "operacional".
+      inferirCtosDoIncidente(db, aberto, eq, amostra, 'operacional', regra, 'Recuperação confirmada', organizacao.fuso, ctosEmOutrosIncidentes(db, org, aberto.id));
       resultado.push({ regra: regra.id, acao: 'resolvido', incidente: aberto.id });
     } else {
       resultado.push({ regra: regra.id, acao: viola ? 'aguardando_confirmacao' : 'normal' });
@@ -159,4 +183,4 @@ function disponibilidadeMedida(db, org) {
     equipamentos: linhas.length, ultima_coleta: linhas.map((l) => l.ultima).sort().at(-1), periodo: '24 h', fonte: [...new Set(linhas.map((l) => l.fonte))].join(', ') };
 }
 
-module.exports = { processarAmostra, impacto, ativosAfetados, correlacionar, disponibilidadeMedida, evento, NOMES_METRICA };
+module.exports = { processarAmostra, impacto, ativosAfetados, correlacionar, promoverFilhos, disponibilidadeMedida, evento, NOMES_METRICA };

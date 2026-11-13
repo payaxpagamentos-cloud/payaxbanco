@@ -46,7 +46,10 @@ module.exports = function rotasOuvidoria(db) {
   });
 
   r.get('/:id', async (req, res, next) => {
-    try { res.json(await ouvidoriaLib.detalhe(db, req.empresa.id, Number(req.params.id))); } catch (err) { next(err); }
+    try {
+      const d = await ouvidoriaLib.detalhe(db, req.empresa.id, Number(req.params.id), { comFicha: req.pode('cliente.ficha') });
+      res.json(d);
+    } catch (err) { next(err); }
   });
 
   /** Abertura manual pela equipe (a ZOE abre sozinha pela ferramenta). */

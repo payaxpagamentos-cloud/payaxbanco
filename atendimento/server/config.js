@@ -40,7 +40,7 @@ module.exports = {
     versao: process.env.ATEND_GRAPH_VERSAO || 'v23.0',
     timeoutMs: Number(process.env.ATEND_GRAPH_TIMEOUT_MS) || 20_000,
   },
-  // Claude API: a camada de IA da atendente. Sem chave, a atendente roda só com as regras e a base de conhecimento.
+  // Inteligência da ZOE (API de IA): a camada de IA da atendente. Sem chave, a atendente roda só com as regras e a base de conhecimento.
   ia: {
     chave: process.env.ATEND_IA_CHAVE || process.env.ANTHROPIC_API_KEY || null,
     modelo: process.env.ATEND_IA_MODELO || 'claude-opus-5-5',

@@ -4,7 +4,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const config = require('../config');
 
 /**
- * Camada de IA da ZOE: Claude API (Messages) com as ferramentas do arquivo ferramentas.js.
+ * O motor de IA da ZOE: a API de mensagens do provedor de IA, com as ferramentas do arquivo ferramentas.js.
  *
  * O laço de ferramentas é escrito aqui de propósito, em vez de usar o tool runner do SDK: cada passo é
  * gravado em `ia_eventos` (auditoria e custo), roda dentro da transação do atendimento e tem limite de
@@ -48,12 +48,12 @@ const ferramentasDe = (conteudo) => (conteudo ?? []).filter((b) => b.type === 't
 /** Mensagem de erro curta e em português para o painel e para a auditoria. */
 function descreverErro(err) {
   const A = Anthropic.default ?? Anthropic;
-  if (err instanceof A.AuthenticationError) return 'Chave da Claude API inválida ou sem permissão.';
-  if (err instanceof A.RateLimitError) return 'Limite de uso da Claude API atingido. Tente de novo em instantes.';
+  if (err instanceof A.AuthenticationError) return 'A chave de IA da ZOE é inválida ou está sem permissão.';
+  if (err instanceof A.RateLimitError) return 'Limite de uso da IA atingido. Tente de novo em instantes.';
   if (err instanceof A.NotFoundError) return `Modelo "${config.ia.modelo}" indisponível para esta chave.`;
-  if (err instanceof A.BadRequestError) return `A Claude API recusou o pedido: ${err.message}`;
-  if (err instanceof A.APIConnectionError) return 'Sem conexão com a Claude API (verifique a rede e o proxy do servidor).';
-  if (err instanceof A.APIError) return `Claude API respondeu ${err.status}: ${err.message}`;
+  if (err instanceof A.BadRequestError) return `O provedor de IA recusou o pedido: ${err.message}`;
+  if (err instanceof A.APIConnectionError) return 'Sem conexão com o provedor de IA (verifique a rede e o proxy do servidor).';
+  if (err instanceof A.APIError) return `O provedor de IA respondeu ${err.status}: ${err.message}`;
   return `Falha na IA: ${err.message}`;
 }
 

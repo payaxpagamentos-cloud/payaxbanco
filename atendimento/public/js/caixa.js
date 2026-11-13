@@ -25,6 +25,15 @@ export async function telaCaixa(ctx) {
   const etiquetasDaEmpresa = (await api.get(`/empresas/${ctx.empresaId}/etiquetas`)).itens;
   const rapidas = (await api.get(`/empresas/${ctx.empresaId}/respostas-rapidas`)).itens.filter((x) => x.ativa);
 
+  // Ao sair da tela, tudo o que atualiza sozinho para. Registrado logo no início (a tela tem um
+  // único "ao sair"), com variáveis que existem desde já — senão sair durante a carga quebrava.
+  let saiu = false;
+  let pararLista = null;
+  let paradaAtual = null;
+  let geracao = 0;
+  const doLink = estado.selecionada;
+  ctx.parar(() => { saiu = true; pararLista?.(); paradaAtual?.(); $('#atendentes-lista')?.remove(); });
+
   const listaEl = el('div', { class: 'lista-conversas' });
   const contadores = el('div', { class: 'abas-caixa' });
   const chatEl = el('div', { class: 'chat' });
@@ -82,22 +91,24 @@ export async function telaCaixa(ctx) {
   };
 
   // ---------- Conversa aberta ----------
-  let paradaAtual = null;
-
   async function abrir(id) {
+    // Cada abertura tem um número: resposta atrasada de uma abertura antiga não pinta por cima, e
+    // só a mais recente fica atualizando sozinha.
+    const minha = ++geracao;
     estado.selecionada = id;
     for (const b of listaEl.querySelectorAll('.item-conversa')) b.classList.remove('on');
     paradaAtual?.();
+    paradaAtual = null;
     const pintar = async () => {
       const d = await api.get(`/empresas/${ctx.empresaId}/conversas/${id}`);
-      if (estado.selecionada !== id) return;
+      if (minha !== geracao || saiu) return;
       desenharChat(d);
       desenharLateral(d);
     };
     await pintar();
+    if (minha !== geracao || saiu) return;
     // A conversa aberta atualiza sozinha: mensagem nova do cliente aparece sem recarregar.
     paradaAtual = repetir(pintar, 6000);
-    ctx.parar(() => { paradaAtual?.(); pararLista?.(); });
   }
 
   function desenharChat(d) {
@@ -137,10 +148,12 @@ export async function telaCaixa(ctx) {
     const itens = [];
     if (d.estado === 'aguardando' || (!minha && !d.atendente_id)) itens.push(botao('Assumir', 'primario pequeno', () => assumir(d.id)));
     if (posso) {
-      itens.push(botaoIcone('transferir', 'Transferir', () => transferir(d)));
+      // Os mesmos limites do servidor: transferir, devolver para a ZOE e encerrar pedem "transferir".
+      const transfere = ctx.pode('atendimentos.transferir');
+      if (transfere) itens.push(botaoIcone('transferir', 'Transferir', () => transferir(d)));
       if (d.estado === 'humano') itens.push(botaoIcone('voltar', 'Devolver para a fila', () => devolver(d)));
-      if (d.estado !== 'bot') itens.push(botaoIcone('robo', 'Devolver para a ZOE', () => voltarParaIa(d)));
-      itens.push(botaoIcone('encerrar', 'Encerrar atendimento', () => encerrar(d), 'perigo'));
+      if (transfere && d.estado !== 'bot') itens.push(botaoIcone('robo', 'Devolver para a ZOE', () => voltarParaIa(d)));
+      if (transfere) itens.push(botaoIcone('encerrar', 'Encerrar atendimento', () => encerrar(d), 'perigo'));
     }
     return itens;
   }
@@ -428,16 +441,17 @@ export async function telaCaixa(ctx) {
     await abrir(d.id);
   });
 
-  // Datalist dos atendentes para a transferência direta.
-  const equipe = (await api.get(`/empresas/${ctx.empresaId}/usuarios`)).itens.filter((u) => u.ativo && ['atendente', 'cliente'].includes(u.perfil));
+  // Datalist dos atendentes para a transferência direta. Sem permissão de ver a equipe, fica vazio
+  // (a transferência para a fila continua) em vez de derrubar a caixa inteira.
+  const equipe = await api.get(`/empresas/${ctx.empresaId}/usuarios`)
+    .then((r) => r.itens.filter((u) => u.ativo && ['atendente', 'cliente'].includes(u.perfil))).catch(() => []);
   document.body.append(el('datalist', { id: 'atendentes-lista' }, equipe.map((u) => el('option', { value: u.id }, `${u.nome}${u.disponivel ? '' : ' (indisponível)'}`))));
 
   await carregarLista();
   // Veio por um link com ?conversa= (o aviso da ligação, a ficha do cliente): abre aquela.
-  if (estado.selecionada) await abrir(estado.selecionada).catch((err) => toast(err.message, true));
+  if (doLink && !saiu) await abrir(doLink).catch((err) => toast(err.message, true));
   // A lista se atualiza sozinha: conversa nova na fila aparece sem recarregar a página.
-  const pararLista = repetir(() => carregarLista({ silencioso: true }), 10_000);
-  ctx.parar(() => { pararLista(); paradaAtual?.(); $('#atendentes-lista')?.remove(); });
+  if (!saiu) pararLista = repetir(() => carregarLista({ silencioso: true }), 10_000);
 }
 
 export { CAIXAS };

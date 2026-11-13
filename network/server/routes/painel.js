@@ -4,7 +4,7 @@ const { Router } = require('express');
 const { agora } = require('../db');
 const { pode } = require('../lib/permissoes');
 const { situacaoPlano } = require('../lib/manutencao');
-const { dataLocal } = require('../lib/datas');
+const { dataLocal, somarDias } = require('../lib/datas');
 const frota = require('../lib/frota');
 const noc = require('../lib/noc');
 
@@ -72,7 +72,7 @@ module.exports = (db) => {
         ORDER BY COALESCE(m.data_planejada, '9999'), m.id LIMIT 6`).all(org);
     }
     if (pode(p, 'frota.documentos')) {
-      const limite = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10);
+      const limite = somarDias(hoje, 30);
       for (const d of db.prepare('SELECT d.*, v.placa FROM veiculo_documentos d JOIN veiculos v ON v.id = d.veiculo_id WHERE d.organizacao_id = ? AND d.vencimento <= ? ORDER BY d.vencimento LIMIT 5').all(org, limite)) {
         out.alertas.push({ tipo: 'documento', id: d.veiculo_id, criticidade: d.vencimento < hoje ? 'alta' : 'baixa', titulo: `${d.tipo.toUpperCase()} ${d.vencimento < hoje ? 'vencido' : 'vencendo'} · ${d.placa}`,
           em: null, evidencia: `Vencimento ${d.vencimento.split('-').reverse().join('/')}`, link: `#/veiculos/${d.veiculo_id}` });

@@ -74,10 +74,14 @@ module.exports = function rotasCadastros(db) {
       const d = req.body ?? {};
       const contato = db.prepare('SELECT * FROM contatos WHERE id = ? AND empresa_id = ?').get(Number(d.contato_id), req.empresa.id);
       if (!contato) throw naoEncontrado('Contato');
+      // A conversa tem de ser desta empresa e deste contato: o aviso do chamado sai por ela.
+      const conversa = d.conversa_id
+        ? db.prepare('SELECT id FROM conversas WHERE id = ? AND empresa_id = ? AND contato_id = ?').get(Number(d.conversa_id), req.empresa.id, contato.id) : null;
+      if (d.conversa_id && !conversa) throw naoEncontrado('Conversa');
       const protocolo = ferramentasLib.gerarProtocolo(db, req.empresa.id);
       const id = Number(db.prepare(`INSERT INTO chamados (empresa_id, conversa_id, contato_id, protocolo, assunto, descricao, fila_id, aberto_por, usuario_id, criado_em)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'atendente', ?, ?)`)
-        .run(req.empresa.id, d.conversa_id ? Number(d.conversa_id) : null, contato.id, protocolo,
+        .run(req.empresa.id, conversa?.id ?? null, contato.id, protocolo,
           v.texto(d.assunto, 'o assunto', 160), v.opcional(d.descricao, 'a descrição', 4000),
           d.fila_id ? (filasLib.buscar(db, req.empresa.id, d.fila_id)?.id ?? null) : null, req.usuario.id, agora()).lastInsertRowid);
       res.status(201).json(db.prepare('SELECT * FROM chamados WHERE id = ?').get(id));

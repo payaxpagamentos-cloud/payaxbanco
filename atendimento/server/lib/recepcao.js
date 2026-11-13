@@ -76,14 +76,17 @@ async function transcreverAudio(db, mensagemId, guardada) {
 }
 
 /** Avisos de entrega e leitura: atualizam a mensagem que saiu. */
-function aplicarStatus(db, statuses) {
+function aplicarStatus(db, statuses, empresaId = null) {
   const ORDEM = { enviada: 1, entregue: 2, lida: 3 };
   const MAPA = { sent: 'enviada', delivered: 'entregue', read: 'lida', failed: 'falhou' };
   let aplicados = 0;
   for (const s of statuses ?? []) {
     const novo = MAPA[s.status];
     if (!novo || !s.id) continue;
-    const m = db.prepare('SELECT id, status FROM mensagens WHERE wa_id = ?').get(s.id);
+    // Só mensagens da empresa dona do número que recebeu o evento.
+    const m = empresaId === null
+      ? db.prepare('SELECT id, status FROM mensagens WHERE wa_id = ?').get(s.id)
+      : db.prepare('SELECT id, status FROM mensagens WHERE wa_id = ? AND empresa_id = ?').get(s.id, empresaId);
     if (!m) continue;
     if (novo === 'falhou') {
       const e = (s.errors ?? [])[0] ?? {};
@@ -188,7 +191,7 @@ async function processar(db, corpo, { numeroPorPhoneId }) {
       const { numero, empresa } = alvo;
       db.prepare('UPDATE numeros SET ultimo_evento_em = ? WHERE id = ?').run(agora(), numero.id);
 
-      if (valor.statuses?.length) feitos.push({ statuses: aplicarStatus(db, valor.statuses) });
+      if (valor.statuses?.length) feitos.push({ statuses: aplicarStatus(db, valor.statuses, empresa.id) });
 
       for (const m of valor.messages ?? []) {
         const perfil = (valor.contacts ?? []).find((c) => c.wa_id === m.from) ?? null;

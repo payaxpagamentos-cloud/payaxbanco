@@ -11,7 +11,7 @@ const filasLib = require('../lib/filas');
 const conhecimentoLib = require('../ia/conhecimento');
 const ferramentasLib = require('../ia/ferramentas');
 const promptLib = require('../ia/prompt');
-const claude = require('../ia/claude');
+const motor = require('../ia/motor');
 const config = require('../config');
 const v = require('../lib/validacao');
 
@@ -43,7 +43,12 @@ module.exports = function rotasIa(db) {
 
   const cfgDa = (empresaId) => db.prepare('SELECT * FROM ia_config WHERE empresa_id = ?').get(empresaId) ?? {};
 
-  const comoPublica = (cfg) => ({
+  // O modelo de IA é detalhe técnico da plataforma: a empresa vê a ZOE, não o fornecedor por trás.
+  const comoPublica = (cfg, req) => {
+    const { modelo, ...resto } = comoPublicaTudo(cfg);
+    return ['master', 'suporte'].includes(req.usuario?.perfil) ? { modelo, ...resto } : { ...resto, modelo: null, modelo_efetivo: null };
+  };
+  const comoPublicaTudo = (cfg) => ({
     ...cfg,
     ativa: Boolean(cfg.ativa),
     transferir_sem_resposta: Boolean(cfg.transferir_sem_resposta),
@@ -52,7 +57,7 @@ module.exports = function rotasIa(db) {
     // O que vale de fato, somando o que está no servidor.
     modelo_efetivo: cfg.modelo || config.ia.modelo,
     esforco_efetivo: cfg.esforco || config.ia.esforco,
-    chave_no_servidor: claude.disponivel(),
+    chave_no_servidor: motor.disponivel(),
     // Se os áudios do cliente estão virando texto. Sem caminho de arquivo nem endereço interno.
     transcricao: require('../lib/transcricao').situacao(),
     voz_modo: cfg.voz_modo === 'teclas' ? 'teclas' : 'fala',
@@ -62,7 +67,7 @@ module.exports = function rotasIa(db) {
     padroes: conversasLib.MSG,
   });
 
-  r.get('/', (req, res) => res.json(comoPublica(cfgDa(req.empresa.id))));
+  r.get('/', (req, res) => res.json(comoPublica(cfgDa(req.empresa.id), req)));
 
   r.patch('/', exigirPermissao('zoe.editar'), (req, res, next) => {
     try {
@@ -86,7 +91,8 @@ module.exports = function rotasIa(db) {
           d.encerrar_apos_min === undefined ? atual.encerrar_apos_min : v.inteiro(d.encerrar_apos_min, 'o tempo para encerrar por abandono', { min: 0, max: 10_080 }),
           texto('mensagem_transferencia', 'a mensagem de transferência', 1000), texto('mensagem_fora_horario', 'a mensagem de fora do horário', 1000),
           texto('mensagem_encerramento', 'a mensagem de encerramento', 1000), texto('mensagem_csat', 'a mensagem da avaliação', 1000),
-          d.modelo === undefined ? atual.modelo : v.opcional(d.modelo, 'o modelo', 60),
+          // O modelo é ajuste técnico da plataforma: só o master troca.
+          d.modelo === undefined || !['master', 'suporte'].includes(req.usuario.perfil) ? atual.modelo : v.opcional(d.modelo, 'o modelo', 60),
           d.esforco === undefined ? atual.esforco : (d.esforco ? v.opcao(d.esforco, 'o esforço', ['low', 'medium', 'high', 'xhigh', 'max']) : null),
           agora(), req.empresa.id);
       // Ligações: fala ou teclas, e o menu principal do modo teclas.
@@ -96,7 +102,7 @@ module.exports = function rotasIa(db) {
         db.prepare('UPDATE ia_config SET voz_modo = ?, voz_menu = ? WHERE empresa_id = ?').run(modo, menu, req.empresa.id);
       }
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'alterou a ZOE', detalhe: { antes: atual, depois: d }, ip: req.ip });
-      res.json(comoPublica(cfgDa(req.empresa.id)));
+      res.json(comoPublica(cfgDa(req.empresa.id), req));
     } catch (err) { next(err); }
   });
 

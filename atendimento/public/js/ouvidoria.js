@@ -85,7 +85,8 @@ export async function telaOuvidoria(ctx) {
       quadroRetencao(o, fechar, encerrado),
 
       // A ficha do cliente é o que a pessoa precisa ler antes de falar com ele.
-      o.ficha ? corpoDaFicha(o.ficha) : el('p', { class: 'mudo' }, 'Não foi possível montar a ficha do cliente.'),
+      o.ficha ? corpoDaFicha(o.ficha) : el('p', { class: 'mudo' }, o.ficha_restrita
+        ? 'Seu acesso não inclui a ficha do cliente (risco, faturas e pagamentos).' : 'Não foi possível montar a ficha do cliente.'),
 
       cartao('Tratativas', o.eventos.length
         ? el('ol', { class: 'linha-tempo' }, o.eventos.map((ev) => el('li', { class: `evento ${ev.tipo}` },

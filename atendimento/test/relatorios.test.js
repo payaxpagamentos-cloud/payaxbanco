@@ -119,26 +119,38 @@ describe('segurança da ZOE', () => {
       const contato = conversas.garantirContato(db, empresa.id, '5511988887777', 'Ana');
       db.prepare("UPDATE contatos SET documento = '12345678909', codigo_externo = 'ERP-1' WHERE id = ?").run(contato.id);
       const f = {
-        id: 1, nome: 'consultar_fatura', metodo: 'POST', url: 'http://api.cliente/faturas', timeout_ms: 5000, cabecalhos_cifrados: null,
+        id: 1, nome: 'consultar_fatura', metodo: 'POST', url: 'https://api.cliente/faturas', timeout_ms: 5000, cabecalhos_cifrados: null,
       };
       // O modelo tenta se passar por outro cliente nos parâmetros.
       await ferramentas.executarExterna(f, {
         contato: db.prepare('SELECT * FROM contatos WHERE id = ?').get(contato.id),
-        conversa: { id: 1 },
+        conversa: { id: 1, identidade_confirmada: 1 },
         entrada: { mes: '2026-11', telefone: '5511000000000', documento: '00000000000' },
       });
       assert.equal(recebido.contato.telefone, '5511988887777', 'o telefone vem do banco');
-      assert.equal(recebido.contato.documento, '12345678909', 'o documento vem do banco');
+      assert.equal(recebido.contato.documento, '12345678909', 'o documento vem do banco, confirmado no IXC');
       assert.equal(recebido.contato.codigo_externo, 'ERP-1');
       // O que o modelo mandou fica à parte, fora do bloco de identificação.
       assert.equal(recebido.telefone, '5511000000000');
       assert.equal(recebido.mes, '2026-11');
+
+      // Sem identidade confirmada, o documento que o cliente só DISSE não vai como identificação.
+      await ferramentas.executarExterna(f, { contato: db.prepare('SELECT * FROM contatos WHERE id = ?').get(contato.id), conversa: { id: 1 }, entrada: {} });
+      assert.equal(recebido.contato.documento, null);
+      assert.equal(recebido.contato.documento_informado_nao_conferido, '12345678909');
+
+      // Ferramenta apontada para a rede interna é recusada antes de qualquer chamada.
+      recebido = null;
+      const interna = await ferramentas.executarExterna({ ...f, url: 'https://169.254.169.254/latest/meta-data' }, { contato, conversa: { id: 1 }, entrada: {} });
+      assert.equal(interna.ok, false);
+      assert.match(interna.erro, /rede interna/);
+      assert.equal(recebido, null);
     } finally { global.fetch = originalFetch; }
   });
 
   test('contato bloqueado não é atendido', async () => {
     const { db, empresa } = h.criarAmbiente();
-    const ia = h.fingirClaude([{ texto: 'não deveria responder' }]);
+    const ia = h.fingirIa([{ texto: 'não deveria responder' }]);
     try {
       const contato = conversas.garantirContato(db, empresa.id, h.TELEFONE_CLIENTE, null);
       db.prepare('UPDATE contatos SET bloqueado = 1 WHERE id = ?').run(contato.id);
@@ -158,7 +170,7 @@ describe('segurança da ZOE', () => {
     assert.equal(kit.tools.some((t) => t.name === 'abrir_chamado'), true, 'ainda dá para registrar o pedido');
   });
 
-  test('toda ferramenta tem schema estrito, como a Claude API exige', () => {
+  test('toda ferramenta tem schema estrito, como a API de IA exige', () => {
     const { db, empresa } = h.criarAmbiente();
     for (const t of ferramentas.montar(db, { empresaId: empresa.id }).tools) {
       assert.equal(t.strict, true, `${t.name} precisa de strict`);

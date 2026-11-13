@@ -881,6 +881,23 @@ CREATE TABLE custo_whatsapp_estado (
 );
 `,
   },
+  {
+    versao: 3,
+    nome: 'indices_consultas_frequentes',
+    sql: `
+-- Consultas por linha nas listas do NOC, de chamados, de comissões e de abastecimentos, e os painéis que atualizam a cada 30 s.
+CREATE INDEX IF NOT EXISTS idx_incidentes_pai ON incidentes(incidente_pai_id) WHERE incidente_pai_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_incidentes_dedup_resolvido ON incidentes(organizacao_id, chave_dedup, resolvido_em);
+CREATE INDEX IF NOT EXISTS idx_chamados_incidente ON chamados(incidente_id) WHERE incidente_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_incidente_eventos ON incidente_eventos(incidente_id);
+CREATE INDEX IF NOT EXISTS idx_chamado_eventos ON chamado_eventos(chamado_id);
+CREATE INDEX IF NOT EXISTS idx_comissao_ajustes ON comissao_ajustes(comissao_id);
+CREATE INDEX IF NOT EXISTS idx_anexos_recurso_id ON anexos(recurso, recurso_id);
+-- Disponibilidade medida (24 h) e estado das fontes: a tabela de amostras é a que mais cresce.
+CREATE INDEX IF NOT EXISTS idx_amostras_metrica ON amostras(organizacao_id, metrica, observado_em, equipamento_id, valor, fonte);
+CREATE INDEX IF NOT EXISTS idx_amostras_recebido ON amostras(organizacao_id, recebido_em);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

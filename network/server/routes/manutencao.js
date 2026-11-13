@@ -7,7 +7,7 @@ const { ErroNegocio } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { listaPaginada, conferirVersao } = require('../lib/http');
 const { situacaoPlano, transicoes } = require('../lib/manutencao');
-const { dataLocal } = require('../lib/datas');
+const { dataLocal, limitesDoDia } = require('../lib/datas');
 const frota = require('../lib/frota');
 const v = require('../lib/validacao');
 
@@ -226,13 +226,18 @@ module.exports = (db) => {
   r.get('/custos', exigir('manutencao.ver'), (req, res) => {
     const de = v.dataOpcional(req.query.de, 'a data inicial') ?? '0000-01-01';
     const ate = v.dataOpcional(req.query.ate, 'a data final') ?? '9999-12-31';
+    // data_planejada é data local; criado_em e concluido_em são instantes UTC, comparados com os limites do dia local.
+    const ini = req.query.de ? limitesDoDia(fuso(req), de).inicio : '0000';
+    const fim = req.query.ate ? limitesDoDia(fuso(req), ate).fim : '9999';
+    const noPeriodo = '(m.concluido_em >= ? AND m.concluido_em < ?)';
     const porVeiculo = db.prepare(`SELECT v.id AS veiculo_id, v.placa, v.modelo,
-      SUM(CASE WHEN m.status <> 'cancelado' AND substr(COALESCE(m.data_planejada, m.criado_em), 1, 10) BETWEEN ? AND ? THEN COALESCE(m.custo_previsto_centavos, 0) ELSE 0 END) AS orcado_centavos,
-      SUM(CASE WHEN m.status = 'concluido' AND substr(m.concluido_em, 1, 10) BETWEEN ? AND ? THEN COALESCE(m.custo_realizado_centavos, 0) ELSE 0 END) AS realizado_centavos,
-      SUM(CASE WHEN m.status = 'concluido' AND m.tipo = 'lavagem' AND substr(m.concluido_em, 1, 10) BETWEEN ? AND ? THEN COALESCE(m.custo_realizado_centavos, 0) ELSE 0 END) AS lavagem_centavos,
-      SUM(CASE WHEN m.status = 'concluido' AND substr(m.concluido_em, 1, 10) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS concluidas
+      SUM(CASE WHEN m.status <> 'cancelado' AND (CASE WHEN m.data_planejada IS NOT NULL THEN m.data_planejada BETWEEN ? AND ? ELSE m.criado_em >= ? AND m.criado_em < ? END)
+        THEN COALESCE(m.custo_previsto_centavos, 0) ELSE 0 END) AS orcado_centavos,
+      SUM(CASE WHEN m.status = 'concluido' AND ${noPeriodo} THEN COALESCE(m.custo_realizado_centavos, 0) ELSE 0 END) AS realizado_centavos,
+      SUM(CASE WHEN m.status = 'concluido' AND m.tipo = 'lavagem' AND ${noPeriodo} THEN COALESCE(m.custo_realizado_centavos, 0) ELSE 0 END) AS lavagem_centavos,
+      SUM(CASE WHEN m.status = 'concluido' AND ${noPeriodo} THEN 1 ELSE 0 END) AS concluidas
       FROM veiculos v LEFT JOIN manutencoes m ON m.veiculo_id = v.id WHERE v.organizacao_id = ? GROUP BY v.id ORDER BY v.placa`)
-      .all(de, ate, de, ate, de, ate, de, ate, req.org);
+      .all(de, ate, ini, fim, ini, fim, ini, fim, ini, fim, req.org);
     const total = porVeiculo.reduce((a, x) => ({ orcado_centavos: a.orcado_centavos + x.orcado_centavos, realizado_centavos: a.realizado_centavos + x.realizado_centavos }),
       { orcado_centavos: 0, realizado_centavos: 0 });
     res.json({ de, ate, por_veiculo: porVeiculo, total, observacao: 'Orçado e realizado são grandezas distintas: não some as colunas.' });

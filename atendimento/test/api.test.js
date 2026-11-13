@@ -220,7 +220,7 @@ describe('API', () => {
   });
 
   test('o chamado aberto pela IA é fechado pelo sistema da empresa', async () => {
-    const ia = h.fingirClaude([{ ferramenta: 'abrir_chamado', entrada: { assunto: 'Visita técnica', descricao: 'Sem sinal desde ontem.', fila: null } }, { texto: 'Chamado aberto!' }]);
+    const ia = h.fingirIa([{ ferramenta: 'abrir_chamado', entrada: { assunto: 'Visita técnica', descricao: 'Sem sinal desde ontem.', fila: null } }, { texto: 'Chamado aberto!' }]);
     try {
       await h.conversar(db, 'minha internet não liga desde ontem', { telefone: '5511933332222' });
     } finally { ia.restaurar(); }

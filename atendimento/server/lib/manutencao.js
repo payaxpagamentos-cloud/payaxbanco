@@ -1,6 +1,6 @@
 'use strict';
 
-const { lerConfig } = require('../db');
+const { lerConfig, transacao } = require('../db');
 const conversas = require('./conversas');
 const filas = require('./filas');
 const midia = require('./midia');
@@ -20,10 +20,14 @@ function encerrarAbandonadas(db) {
     const minutos = Number(ia?.encerrar_apos_min ?? cfg.abandono_min);
     if (!minutos) continue;
     const corte = new Date(Date.now() - minutos * 60_000).toISOString();
-    const alvos = db.prepare(`SELECT * FROM conversas WHERE empresa_id = ? AND estado IN ('bot','aguardando')
-      AND COALESCE(ultima_mensagem_cliente_em, aberta_em) < ?`).all(e.id, corte);
+    // Na fila é diferente: o cliente foi transferido à noite e ouviu "a equipe responde quando abrir".
+    // Encerrar por silêncio dele em 3 h esconderia a conversa da equipe. Na fila, só depois de 48 h
+    // (a janela do WhatsApp já fechou há um dia). Ligação na fila tem regra própria (encerrarLigacoesEsquecidas).
+    const corteFila = new Date(Date.now() - Math.max(minutos, 48 * 60) * 60_000).toISOString();
+    const alvos = db.prepare(`SELECT * FROM conversas WHERE empresa_id = ? AND (
+        (estado = 'bot' AND COALESCE(ultima_mensagem_cliente_em, aberta_em) < ?)
+        OR (estado = 'aguardando' AND canal <> 'telefone' AND COALESCE(ultima_mensagem_cliente_em, aberta_em) < ?))`).all(e.id, corte, corteFila);
     for (const c of alvos) {
-      // Na fila, só encerra se ninguém assumiu e o cliente também desapareceu: a espera não é culpa dele.
       conversas.encerrar(db, c, { resolvidaPor: 'abandono', avisar: false });
       encerradas.push(c.id);
     }
@@ -67,11 +71,18 @@ function limpar(db) {
   resultado.acessos_recusados = Number(db.prepare('DELETE FROM acessos_recusados WHERE criado_em < ?').run(new Date(Date.now() - 90 * 86_400_000).toISOString()).changes);
   if (cfg.retencao_dias > 0) {
     const corte = new Date(Date.now() - cfg.retencao_dias * 86_400_000).toISOString();
-    // Apaga primeiro os arquivos; o banco cai em cascata pela conversa.
-    for (const m of db.prepare("SELECT midia_arquivo FROM mensagens WHERE midia_arquivo IS NOT NULL AND conversa_id IN (SELECT id FROM conversas WHERE estado = 'encerrada' AND encerrada_em < ?)").all(corte)) {
-      midia.apagar(m.midia_arquivo);
-    }
-    resultado.conversas = Number(db.prepare("DELETE FROM conversas WHERE estado = 'encerrada' AND encerrada_em < ?").run(corte).changes);
+    // Primeiro o banco, numa transação; os arquivos só depois que a exclusão deu certo — ao contrário,
+    // uma falha deixaria mensagens apontando para arquivos que já não existem.
+    const alvo = "SELECT id FROM conversas WHERE estado = 'encerrada' AND encerrada_em < ?";
+    const arquivos = db.prepare(`SELECT midia_arquivo FROM mensagens WHERE midia_arquivo IS NOT NULL AND conversa_id IN (${alvo})`).all(corte).map((m) => m.midia_arquivo);
+    resultado.conversas = transacao(db, () => {
+      // O histórico da IA (custo do mês) e os chamados ficam; só perdem o vínculo com a conversa.
+      // Feito à mão porque bancos instalados antes não têm o ON DELETE SET NULL nessas colunas.
+      db.prepare(`UPDATE ia_eventos SET conversa_id = NULL WHERE conversa_id IN (${alvo})`).run(corte);
+      db.prepare(`UPDATE chamados SET conversa_id = NULL WHERE conversa_id IN (${alvo})`).run(corte);
+      return Number(db.prepare("DELETE FROM conversas WHERE estado = 'encerrada' AND encerrada_em < ?").run(corte).changes);
+    });
+    for (const f of arquivos) midia.apagar(f);
   }
   return resultado;
 }

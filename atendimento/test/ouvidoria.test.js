@@ -255,7 +255,7 @@ describe('a ZOE e a ouvidoria', () => {
 
   test('a IA abre o caso, informa o protocolo e transfere com a ficha', async () => {
     const { db, empresa, atendente } = h.criarAmbiente();
-    const ia = h.fingirClaude([
+    const ia = h.fingirIa([
       { texto: 'Poxa, que pena. Posso saber o que aconteceu para você querer cancelar?' },
       { ferramenta: 'abrir_ouvidoria', entrada: { tipo: 'cancelamento', assunto: 'Quer cancelar por quedas constantes à noite', relato: 'O cliente diz que a internet cai toda noite há duas semanas e já perdeu reuniões.' } },
     ]);
@@ -277,7 +277,7 @@ describe('a ZOE e a ouvidoria', () => {
 
   test('elogio fica registrado e o atendimento continua, sem ocupar ninguém', async () => {
     const { db, empresa } = h.criarAmbiente();
-    const ia = h.fingirClaude([
+    const ia = h.fingirIa([
       { ferramenta: 'abrir_ouvidoria', entrada: { tipo: 'elogio', assunto: 'Elogiou a Marina', relato: 'Disse que foi muito bem atendido.' } },
       { texto: 'Que bom! Já registrei seu elogio, obrigado.' },
     ]);
@@ -442,7 +442,7 @@ describe('a ZOE já leva a ameaça de saída e o motivo', () => {
 
   test('pela IA: a ferramenta diz se ameaçou sair e por quê', async () => {
     const { db } = h.criarAmbiente();
-    const ia = h.fingirClaude([{ ferramenta: 'abrir_ouvidoria', entrada: {
+    const ia = h.fingirIa([{ ferramenta: 'abrir_ouvidoria', entrada: {
       tipo: 'reclamacao', assunto: 'Internet cai toda noite; recebeu oferta da concorrência', relato: 'Cai toda noite há 2 semanas. A Vivo ofereceu 500 mega.',
       ameacou_sair: true, motivo_saida: 'concorrente' } }]);
     try { await h.conversar(db, 'minha internet cai toda noite e a vivo me ofereceu 500 mega'); } finally { ia.restaurar(); }

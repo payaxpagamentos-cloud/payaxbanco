@@ -9,6 +9,7 @@ const { listaPaginada, like, conferirVersao } = require('../lib/http');
 const { pode } = require('../lib/permissoes');
 const { gerarComissoes } = require('../lib/comissoes');
 const frota = require('../lib/frota');
+const { dataLocal, limitesDoDia } = require('../lib/datas');
 const v = require('../lib/validacao');
 
 const TIPOS = ['instalacao', 'reparo', 'fusao', 'manutencao_rede', 'vistoria', 'retirada', 'outro'];
@@ -158,7 +159,8 @@ module.exports = (db) => {
       v.exigir(equipe.reduce((a, e) => a + e.percentual, 0) === 100, 'Os percentuais da equipe precisam somar 100.');
       for (const e of equipe) if (!db.prepare("SELECT 1 FROM tecnicos WHERE id = ? AND organizacao_id = ? AND status = 'ativo'").get(e.tecnico_id, req.org)) throw new ErroNegocio('Técnico da equipe não encontrado.', 422);
     }
-    const dia = agendado ? agendado.slice(0, 10) : null;
+    // "Mesmo dia" é o dia de calendário no fuso da operação, não o dia UTC.
+    const dia = agendado ? limitesDoDia(req.usuario.fuso, dataLocal(req.usuario.fuso, agendado)) : null;
     const conflitos = frota.conflitosAgenda(db, req.org, { veiculoId: veic?.id, tecnicoId: tec.id, dia, ignorarChamado: c.id });
     if (conflitos.length && b.aceitar_conflito !== true) {
       throw new ErroNegocio('Conflito de agenda: técnico ou veículo já tem chamado ativo neste dia. Confirme para manter.', 409, { conflitos });

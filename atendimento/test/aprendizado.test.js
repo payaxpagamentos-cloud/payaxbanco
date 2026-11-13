@@ -18,7 +18,7 @@ describe('o que a ZOE não resolveu vira aprendizado', () => {
 
   /** A ZOE com IA transfere dizendo o tema e o que faltou. */
   const transferePelaIa = async (db, texto, telefone, { tema = 'mudança de endereço', por = 'nao_sabia' } = {}) => {
-    const ia = h.fingirClaude([
+    const ia = h.fingirIa([
       { ferramenta: 'buscar_conhecimento', entrada: { pergunta: texto } },
       { ferramenta: 'transferir_para_humano', entrada: {
         fila: null, motivo: 'Não achei a regra de mudança de endereço.', resumo: 'Cliente vai se mudar e quer levar a internet.',

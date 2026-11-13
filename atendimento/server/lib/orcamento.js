@@ -1,7 +1,7 @@
 'use strict';
 
 const { agora } = require('../db');
-const { hoje, inicioMes, somarDias } = require('./datas');
+const { hoje, inicioMes, somarDias, inicioDia } = require('./datas');
 const custo = require('./custo');
 const v = require('./validacao');
 
@@ -20,8 +20,9 @@ const MARCOS = [50, 80, 100];
 
 /** Quanto esta empresa já gastou no mês corrente, por categoria e no total. */
 function gastoDoMes(db, empresaId, { mes = hoje().slice(0, 7) } = {}) {
-  const inicio = `${mes}-01`;
-  const fim = somarDias(`${mes}-01`, 31).slice(0, 8) + '01';
+  // Mês LOCAL: o gasto das 21 h às 24 h do último dia é do mês que acaba, como no fechamento.
+  const inicio = inicioDia(`${mes}-01`);
+  const fim = inicioDia(somarDias(`${mes}-01`, 31).slice(0, 8) + '01');
   const linhas = db.prepare(`SELECT categoria, COUNT(*) AS mensagens, COALESCE(SUM(custo_milesimos), 0) AS custo
     FROM mensagens WHERE empresa_id = ? AND direcao = 'saida' AND criada_em >= ? AND criada_em < ?
       AND status <> 'falhou' GROUP BY categoria`).all(empresaId, inicio, fim);

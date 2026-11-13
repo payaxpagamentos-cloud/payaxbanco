@@ -1,6 +1,9 @@
 'use strict';
 
 const dns = require('node:dns/promises');
+const dnsCb = require('node:dns');
+const http = require('node:http');
+const https = require('node:https');
 const net = require('node:net');
 const crypto = require('node:crypto');
 const config = require('../config');
@@ -18,15 +21,36 @@ class ErroConector extends Error {
   }
 }
 
-function ipPrivado(ip) {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number);
-    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
-  }
-  const x = ip.toLowerCase();
-  if (x.startsWith('::ffff:')) return ipPrivado(x.slice(7));
-  return x === '::1' || x === '::' || x.startsWith('fc') || x.startsWith('fd') || x.startsWith('fe80');
+// Faixas que um conector não alcança sem NETWORK_CONECTOR_REDE_INTERNA=1 (rede interna, loopback, link-local, multicast...).
+const PRIVADOS = new net.BlockList();
+for (const [rede, prefixo] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12],
+  ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 3]]) PRIVADOS.addSubnet(rede, prefixo, 'ipv4');
+// ::/96 cobre o não especificado (::), o loopback (::1) e os IPv4 compatíveis (::a.b.c.d); 64:ff9b::/96 é o NAT64.
+for (const [rede, prefixo] of [['::', 96], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8], ['64:ff9b::', 96]]) PRIVADOS.addSubnet(rede, prefixo, 'ipv6');
+
+/** IPv6 na forma canônica (a mesma da URL): '0:0:0:0:0:ffff:127.0.0.1' e '::ffff:127.0.0.1' viram '::ffff:7f00:1'. */
+function ipv6Canonico(ip) {
+  try { return new URL(`http://[${ip}]/`).hostname.slice(1, -1); } catch { return String(ip).toLowerCase(); }
 }
+
+/** IPv4 contido num IPv6 mapeado (::ffff:a.b.c.d, em qualquer escrita), ou null. */
+function ipv4Mapeado(ip) {
+  const m = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(ipv6Canonico(ip));
+  if (!m) return null;
+  const [a, b] = [parseInt(m[1], 16), parseInt(m[2], 16)];
+  return `${a >> 8}.${a & 255}.${b >> 8}.${b & 255}`;
+}
+
+/** O IP está numa faixa interna? IPv4 mapeado em IPv6 é conferido como o IPv4 que ele contém; texto que não é IP conta como interno. */
+function ipPrivado(ip) {
+  const x = String(ip ?? '').replace(/^\[|\]$/g, '').replace(/%.*$/, '');
+  if (net.isIPv4(x)) return PRIVADOS.check(x, 'ipv4');
+  if (!net.isIPv6(x)) return true;
+  const v4 = ipv4Mapeado(x);
+  return v4 ? PRIVADOS.check(v4, 'ipv4') : PRIVADOS.check(ipv6Canonico(x), 'ipv6');
+}
+
+const MSG_REDE_INTERNA = 'O endereço aponta para a rede interna. Para usar um serviço no mesmo servidor, defina NETWORK_CONECTOR_REDE_INTERNA=1.';
 
 /** Valida a URL configurada: http(s), sem usuário/senha embutidos e, salvo liberação, sem destino na rede interna (SSRF). */
 async function validarDestino(url) {
@@ -38,10 +62,49 @@ async function validarDestino(url) {
   if (config.conectorRedeInterna) return u;
   const host = u.hostname.replace(/^\[|\]$/g, '');
   const ips = net.isIP(host) ? [host] : (await dns.lookup(host, { all: true }).catch(() => { throw new ErroConector(`Não foi possível resolver ${host}.`); })).map((x) => x.address);
-  if (ips.some(ipPrivado)) {
-    throw new ErroConector('O endereço aponta para a rede interna. Para usar um serviço no mesmo servidor, defina NETWORK_CONECTOR_REDE_INTERNA=1.', 'falha', { permanente: true });
-  }
+  if (ips.some(ipPrivado)) throw new ErroConector(MSG_REDE_INTERNA, 'falha', { permanente: true });
   return u;
+}
+
+/**
+ * Resolução de nomes usada na conexão: o endereço conferido é o mesmo em que o socket conecta, então trocar o DNS entre a
+ * validação e a conexão (DNS rebinding) não leva o conector à rede interna.
+ */
+function lookupSeguro(hostname, opcoes, cb) {
+  dnsCb.lookup(hostname, { ...opcoes, all: true }, (err, enderecos) => {
+    if (err) return cb(err);
+    if (!config.conectorRedeInterna && enderecos.some((e) => ipPrivado(e.address))) {
+      return cb(Object.assign(new Error(MSG_REDE_INTERNA), { code: 'EREDEINTERNA' }));
+    }
+    if (opcoes.all) return cb(null, enderecos);
+    return cb(null, enderecos[0].address, enderecos[0].family);
+  });
+}
+
+const LIMITE_RESPOSTA = 5_000_000;
+
+/** GET simples (sem seguir redirecionamentos), conectando só ao endereço conferido por lookupSeguro. */
+function requisitar(url, cabecalhos) {
+  const u = new URL(url);
+  const modulo = u.protocol === 'https:' ? https : http;
+  return new Promise((resolve, reject) => {
+    let timer = null;
+    const falhar = (err) => { clearTimeout(timer); reject(err); };
+    const req = modulo.request(u, { method: 'GET', headers: cabecalhos, lookup: lookupSeguro }, (resp) => {
+      const partes = [];
+      let total = 0;
+      resp.on('data', (c) => {
+        total += c.length;
+        if (total > LIMITE_RESPOSTA) req.destroy(new ErroConector('Resposta grande demais.'));
+        else partes.push(c);
+      });
+      resp.on('end', () => { clearTimeout(timer); resolve({ status: resp.statusCode, headers: resp.headers, texto: Buffer.concat(partes).toString('utf8') }); });
+      resp.on('error', falhar);
+    });
+    timer = setTimeout(() => req.destroy(Object.assign(new Error('Tempo esgotado.'), { name: 'TimeoutError' })), config.conectorTimeoutMs);
+    req.on('error', falhar);
+    req.end();
+  });
 }
 
 /** GET JSON com timeout, sem seguir redirecionamentos, classificando o resultado no estado da integração. */
@@ -49,23 +112,22 @@ async function buscarJson(url, cabecalhos = {}) {
   await validarDestino(url);
   let resp;
   try {
-    resp = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'ManagerNetwork/1.0', ...cabecalhos }, redirect: 'manual',
-      signal: AbortSignal.timeout(config.conectorTimeoutMs) });
+    resp = await requisitar(url, { Accept: 'application/json', 'User-Agent': 'ManagerNetwork/1.0', ...cabecalhos });
   } catch (err) {
+    if (err instanceof ErroConector) throw err;
+    if (err.code === 'EREDEINTERNA') throw new ErroConector(MSG_REDE_INTERNA, 'falha', { permanente: true });
     if (err.name === 'TimeoutError') throw new ErroConector(`Tempo esgotado (${config.conectorTimeoutMs / 1000} s) aguardando a fonte.`);
-    throw new ErroConector(`Sem conexão com a fonte: ${err.cause?.code || err.message}.`);
+    throw new ErroConector(`Sem conexão com a fonte: ${err.code || err.message}.`);
   }
   if (resp.status === 401 || resp.status === 403) throw new ErroConector(`A fonte recusou a credencial (HTTP ${resp.status}).`, 'sem_permissao', { status: resp.status, permanente: true });
   if (resp.status === 429) {
-    const ra = Number(resp.headers.get('retry-after'));
+    const ra = Number(resp.headers['retry-after']);
     throw new ErroConector('Limite de consultas da fonte atingido.', 'limite_atingido', { status: 429, retryAfterS: Number.isFinite(ra) && ra > 0 ? ra : 300 });
   }
   if (resp.status >= 300 && resp.status < 400) throw new ErroConector(`A fonte respondeu com redirecionamento (HTTP ${resp.status}); confira o endereço.`, 'falha', { status: resp.status, permanente: true });
   if (resp.status === 404) throw new ErroConector('Recurso não encontrado na fonte (HTTP 404); confira o endereço e o caminho.', 'falha', { status: 404, permanente: true });
-  if (!resp.ok) throw new ErroConector(`A fonte respondeu HTTP ${resp.status}.`, 'falha', { status: resp.status });
-  const texto = await resp.text();
-  if (texto.length > 5_000_000) throw new ErroConector('Resposta grande demais.');
-  try { return JSON.parse(texto); } catch { throw new ErroConector('A fonte não respondeu JSON.', 'falha', { status: resp.status }); }
+  if (resp.status < 200 || resp.status >= 300) throw new ErroConector(`A fonte respondeu HTTP ${resp.status}.`, 'falha', { status: resp.status });
+  try { return JSON.parse(resp.texto); } catch { throw new ErroConector('A fonte não respondeu JSON.', 'falha', { status: resp.status }); }
 }
 
 // ---------------- Configuração e estado das integrações ----------------
@@ -128,4 +190,4 @@ function estadoAtual(x, desatualizadoMin, intervaloS) {
   return x.estado;
 }
 
-module.exports = { ErroConector, validarDestino, buscarJson, ler, publico, salvar, segredoDe, registrarResultado, estadoAtual, ipPrivado };
+module.exports = { ErroConector, validarDestino, buscarJson, lookupSeguro, ler, publico, salvar, segredoDe, registrarResultado, estadoAtual, ipPrivado };

@@ -8,6 +8,7 @@ const { registrar } = require('../lib/auditoria');
 const { listaPaginada } = require('../lib/http');
 const { saldo, versaoVigente } = require('../lib/comissoes');
 const { vincular } = require('../lib/anexos');
+const { dataLocal, somarDias, limitesDoDia } = require('../lib/datas');
 const v = require('../lib/validacao');
 
 const TIPOS_SERVICO = ['instalacao', 'reparo', 'fusao', 'manutencao_rede', 'vistoria', 'retirada', 'outro'];
@@ -62,9 +63,12 @@ module.exports = (db) => {
 
   /** Produtividade no período: concluídos, aprovados, tempo médio de atendimento, prazo cumprido e retrabalho. */
   r.get('/produtividade', exigir('equipe.ver'), (req, res) => {
-    const de = v.dataOpcional(req.query.de, 'a data inicial') ?? new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
-    const ate = v.dataOpcional(req.query.ate, 'a data final') ?? new Date().toISOString().slice(0, 10);
-    const fimExclusivo = new Date(Date.parse(`${ate}T00:00:00Z`) + 86400_000).toISOString();
+    // Período em dias de calendário do fuso da operação.
+    const hoje = dataLocal(req.usuario.fuso);
+    const de = v.dataOpcional(req.query.de, 'a data inicial') ?? somarDias(hoje, -30);
+    const ate = v.dataOpcional(req.query.ate, 'a data final') ?? hoje;
+    const inicio = limitesDoDia(req.usuario.fuso, de).inicio;
+    const fimExclusivo = limitesDoDia(req.usuario.fuso, ate).fim;
     const linhas = db.prepare(`SELECT t.id, t.nome, t.status,
       SUM(CASE WHEN c.concluido_em >= ? AND c.concluido_em < ? THEN 1 ELSE 0 END) AS concluidos,
       SUM(CASE WHEN c.status = 'aprovado' AND c.aprovado_em >= ? AND c.aprovado_em < ? THEN 1 ELSE 0 END) AS aprovados,
@@ -73,7 +77,7 @@ module.exports = (db) => {
       SUM(CASE WHEN c.concluido_em >= ? AND c.concluido_em < ? AND c.prazo IS NOT NULL AND c.concluido_em <= c.prazo THEN 1 ELSE 0 END) AS no_prazo,
       SUM(CASE WHEN c.concluido_em >= ? AND c.concluido_em < ? AND c.retrabalho > 0 THEN 1 ELSE 0 END) AS retrabalho
       FROM tecnicos t LEFT JOIN chamados c ON c.tecnico_id = t.id WHERE t.organizacao_id = ? GROUP BY t.id ORDER BY t.nome`)
-      .all(...Array(6).fill([`${de}T00:00:00.000Z`, fimExclusivo]).flat(), req.org);
+      .all(...Array(6).fill([inicio, fimExclusivo]).flat(), req.org);
     res.json({ de, ate, fonte: 'Chamados técnicos (concluído = conclusão técnica; aprovado = validação do gestor)', tecnicos: linhas.map((l) => ({
       ...l, minutos_medios: l.minutos_medios === null ? null : Math.round(l.minutos_medios), cumprimento_prazo: l.com_prazo ? Math.round((l.no_prazo / l.com_prazo) * 1000) / 10 : null,
     })) });

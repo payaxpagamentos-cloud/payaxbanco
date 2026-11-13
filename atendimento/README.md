@@ -35,7 +35,7 @@ mensagem do cliente no WhatsApp
                 │ não resolveu
                 ▼
 ┌───────────────────────────────────────────────┐
-│ 2. IA (Claude API, com ferramentas)           │
+│ 2. IA da ZOE (com ferramentas)                │
 │    • busca na base de conhecimento            │
 │    • consulta o sistema da empresa (HTTP)     │
 │    • registra dados do cliente                │
@@ -150,7 +150,7 @@ virtual e API) e explica o motivo quando recusa.
 
 ## Ligar a ZOE
 
-Com `ATEND_IA_CHAVE` (chave da Claude API) a atendente entende texto livre e usa ferramentas.
+Com `ATEND_IA_CHAVE` (a chave de IA da ZOE) a atendente entende texto livre e usa ferramentas.
 **Sem a chave ela continua funcionando**: resolve pelas intenções e pela base de conhecimento e
 oferece o menu de departamentos para o que não casar.
 
@@ -665,12 +665,13 @@ O servidor **precisa estar acessível por https:// pela internet** — é a Meta
 | `ATEND_TRUST_PROXY` | `loopback` | Proxies confiáveis para obter o IP real. |
 | `ATEND_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
 | `ATEND_FUSO` | `America/Sao_Paulo` | Fuso do horário de atendimento e dos relatórios. |
-| `ATEND_IA_CHAVE` | — | Chave da Claude API. Sem ela, a atendente roda só com intenções e base de conhecimento. |
-| `ATEND_IA_MODELO` | `claude-opus-5-5` | Modelo usado (ajustável por empresa no painel). |
+| `ATEND_IA_CHAVE` | — | Chave de IA da ZOE. Sem ela, a atendente roda só com intenções e base de conhecimento. |
+| `ATEND_IA_MODELO` | padrão do servidor | Modelo de IA usado (só o master troca, por empresa). |
 | `ATEND_IA_ESFORCO` | `low` | Esforço de raciocínio: `low`…`max`. Atendimento curto vai bem com `low`. |
 | `ATEND_IA_MAX_TOKENS` | `2048` | Teto da resposta. Mensagem de WhatsApp é curta de propósito. |
 | `ATEND_IA_MAX_PASSOS` | `6` | Idas e voltas de ferramenta por mensagem. |
 | `ATEND_PTAX_URL` | API do Banco Central | Endereço da API PTAX (OData) de onde vem o dólar do dia. Só muda para apontar a um espelho. |
+| `ATEND_REDE_INTERNA` | — | `1` libera chamadas para a rede interna (10.x, 172.16.x, 192.168.x) — para o IXC instalado na rede do provedor. Loopback e o endereço de metadados da nuvem continuam bloqueados. |
 | `ATEND_WHISPER_URL` | — | Endereço do `whisper-server` (recomendado), ex.: `http://127.0.0.1:8178`. |
 | `ATEND_WHISPER_BIN` / `ATEND_WHISPER_MODELO` | — | Alternativa sem servidor: o `whisper-cli` e o arquivo do modelo. |
 | `ATEND_TRANSCRICAO` | `auto` | `desligada` desliga a transcrição de propósito. |
@@ -697,7 +698,7 @@ o conteúdo rola por dentro; na caixa de entrada, quem rola é a lista e a conve
 ## Tecnologia e arquitetura
 
 Node.js 22 + Express, SQLite nativo (`node:sqlite`), telas em HTML/CSS/JS puros sem build,
-testes com `node:test`. Única dependência além do Express: o SDK oficial da Anthropic.
+testes com `node:test`. Única dependência além do Express: o SDK oficial do provedor de IA.
 Mensagens de saída **sempre** passam pela fila em `mensagens` (gravadas dentro da transação do
 atendimento e enviadas depois, com novas tentativas): uma falha da Meta nunca perde a conversa.
 
@@ -723,7 +724,7 @@ atendimento/
     ia/prompt.js         # o prompt do sistema, montado da configuração da empresa
     ia/ixc.js            # cliente do IXC Provedor + sonda de capacidades da instância
     ia/ferramentas-ixc.js# portão de identidade e as ferramentas do provedor (fatura, desbloqueio, conexão, OS)
-    ia/claude.js         # Claude API: laço de ferramentas, cache, fallback em recusa
+    ia/motor.js          # motor de IA: laço de ferramentas, cache, fallback em recusa
     ia/atendente.js      # o orquestrador: regras → limites → IA → resolver ou transferir
     routes/              # auth, master, empresa, ia, cadastros, webhook, integracao
   public/                # painel (SPA)
@@ -734,7 +735,7 @@ atendimento/
 
 - **Conta no WhatsApp Business Platform** com número verificado e **templates aprovados** pela Meta:
   sem template não há mensagem fora da janela de 24 h.
-- **Chave da Claude API** para a camada de IA. Sem ela a atendente funciona em modo reduzido
+- **Chave de IA da ZOE** para a camada de IA. Sem ela a atendente funciona em modo reduzido
   (intenções, base de conhecimento e menu).
 - **Integração com o sistema da empresa** (fatura, pedido, contrato): a plataforma chama a API do
   cliente; a API em si é de quem a mantém.
