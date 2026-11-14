@@ -8,3 +8,26 @@
 .alerta-item.aviso { background: var(--ambar-suave); border-color: #f5dca5; color: var(--ambar-texto); }
 .alerta-item.info { background: var(--azul-suave); border-color: #c9ddf7; color: var(--azul-escuro); }
 .alerta-item .botao { margin-left: auto; }
+
+/* Conformidade: cada regra com a faixa da situação à esquerda — a cor reforça o selo, não o substitui. */
+.regras { display: grid; gap: 10px; }
+.regra { border: 1px solid var(--borda); border-left: 4px solid var(--borda-forte); border-radius: var(--raio-ctl); padding: 12px 14px; display: grid; gap: 5px; background: var(--superficie); }
+.regra.fora { border-left-color: var(--vermelho); background: #fffafa; }
+.regra.atencao { border-left-color: var(--ambar); }
+.regra.ok { border-left-color: var(--verde); }
+.regra.em_andamento { border-left-color: var(--azul); }
+.regra-topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.regra-topo strong { font-size: 14px; font-weight: 650; }
+.regra-topo .botao { margin-left: auto; }
+.regra-tipo { font-size: 11px; color: var(--texto-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.regra-norma { font-size: 12px; color: var(--azul-escuro); font-weight: 600; }
+.regra-exige { font-size: 13px; color: var(--texto-2); }
+.regra-agora { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; background: var(--superficie-2); border-radius: 8px; padding: 8px 10px; flex-wrap: wrap; }
+.regra-agora > svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; color: var(--texto-2); }
+.regra.fora .regra-agora > svg { color: var(--vermelho); }
+.regra.ok .regra-agora > svg { color: var(--verde-texto); }
+.regra-meta { display: flex; gap: 6px 16px; flex-wrap: wrap; width: 100%; font-size: 12.5px; color: var(--texto-2); }
+.regra-meta b { font-weight: 600; color: var(--texto); }
+.regra-meta .vencido { color: #a52f2f; }
+.regra-obs { width: 100%; white-space: pre-wrap; }
+.regra-obs.sem-registro { color: var(--texto-3); }

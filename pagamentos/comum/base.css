@@ -141,6 +141,9 @@ main { padding: 26px 28px 70px; flex: 1; min-width: 0; }
 .campo-form { display: grid; gap: 5px; }
 .campo-form > span { font-size: 12px; color: var(--texto-2); font-weight: 600; }
 .campo-form > small { font-size: 11.5px; color: var(--texto-3); }
+/* Formulário de uma coluna, dentro de modal. */
+.form-grade { display: grid; gap: 13px; margin-top: 4px; }
+.form-grade textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--borda-forte); border-radius: var(--raio-ctl); font: inherit; resize: vertical; }
 input, select, textarea {
   width: 100%; padding: 9px 11px; border: 1px solid var(--borda-forte); border-radius: var(--raio-ctl); background: var(--superficie); font-size: 13.5px;
 }

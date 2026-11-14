@@ -305,6 +305,17 @@ Para ligar a exigência, o próprio administrador precisa ter 2FA ativo: não d�
 citada ao lado no código e um teste que falha se alguém a quebrar. Quando a norma não é clara, vale o
 limite mais conservador até o jurídico decidir.
 
+**Backoffice → Conformidade** monitora tudo isso ao vivo (catálogo em `server/lib/conformidade.js`):
+
+- **Verificação automática** — o sistema confere sozinho, a cada abertura da tela: tenta o que a regra
+  proíbe (multa de 2,01%, por exemplo) e espera ser barrado, e varre os boletos em aberto atrás de algo
+  que tenha escapado. Gera a remessa e a ficha de teste para conferir layout, nomes e expressões.
+- **Acompanhamento** — o que depende do Bradesco, do jurídico ou do provedor. O administrador registra
+  situação, responsável, prazo e observação; cada mudança vai para a auditoria.
+- Regra automática fora da norma vira alerta no painel; prazo de acompanhamento vencido também.
+- A equipe toda vê; só o administrador registra. Regra nova entra no catálogo, com teste em
+  `test/conformidade.test.js`.
+
 Legenda: ✅ atendido no sistema · 🏦 depende do Bradesco · ⚖️ depende de parecer jurídico · 🔧 falta construir
 
 | Norma | O que exige | Como o sistema atende | Situação |

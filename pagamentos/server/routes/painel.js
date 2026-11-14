@@ -8,12 +8,13 @@ const consultas = require('../lib/consultas');
 const { podeEquipe } = require('../lib/permissoes');
 const backup = require('../lib/backup');
 const arquivosBanco = require('../lib/arquivosBanco');
+const conformidade = require('../lib/conformidade');
 
 /** Visão geral da plataforma: o que entrou, quanto ficou conosco e o que está pendente. */
 module.exports = (db) => {
   const r = express.Router();
 
-  r.get('/', (req, res) => {
+  r.get('/', async (req, res) => {
     // Custo com o banco e margem só para quem tem relatorios.margem (administrador e financeiro).
     const comMargem = podeEquipe(req.usuario.perfil, 'relatorios.margem');
     const talvez = (x) => (comMargem ? x : consultas.semMargem(x));
@@ -50,7 +51,7 @@ module.exports = (db) => {
           IFNULL(SUM(b.pago_valor_centavos), 0) AS bruto_centavos
         FROM clientes c LEFT JOIN boletos b ON b.cliente_id = c.id AND b.situacao = 'liquidado' AND b.pago_em BETWEEN ? AND ?
         GROUP BY c.id ORDER BY bruto_centavos DESC LIMIT 8`).all(periodo.de, periodo.ate),
-      alertas: alertas(db, hoje),
+      alertas: await alertas(db, hoje),
     });
   });
 
@@ -58,7 +59,7 @@ module.exports = (db) => {
 };
 
 /** Pendências que exigem ação da equipe. */
-function alertas(db, hoje) {
+async function alertas(db, hoje) {
   const lista = [];
   const esperando = db.prepare("SELECT COUNT(*) AS n, IFNULL(SUM(valor_liquido_centavos),0) AS v FROM repasses WHERE situacao = 'aguardando_aprovacao'").get();
   if (esperando.n) lista.push({ tipo: 'repasses_aprovacao', severidade: 'aviso', quantidade: esperando.n, valor_centavos: esperando.v,
@@ -89,6 +90,16 @@ function alertas(db, hoje) {
         texto: `${a.aguardando_remessa.titulos} título(s) esperando a remessa do próximo dia útil` });
     }
   }
+
+  // Conformidade: regra fora da norma é o alerta mais grave do painel. Backup e registro no banco
+  // já têm alerta próprio neste painel, então não contam duas vezes.
+  const c = await conformidade.verificar(db);
+  const regras = c.grupos.flatMap((g) => g.regras);
+  const foraDaNorma = regras.filter((x) => x.situacao === 'fora' && !['backup', 'registro'].includes(x.id)).length;
+  if (foraDaNorma) lista.push({ tipo: 'conformidade', severidade: 'erro', quantidade: foraDaNorma,
+    texto: `${foraDaNorma} regra(s) de conformidade fora da norma` });
+  if (c.resumo.prazos_vencidos) lista.push({ tipo: 'conformidade_prazo', severidade: 'aviso', quantidade: c.resumo.prazos_vencidos,
+    texto: `${c.resumo.prazos_vencidos} pendência(s) de conformidade com prazo vencido` });
 
   // O razão é o dinheiro dos clientes: backup atrasado ou que não conferiu é assunto urgente.
   const b = backup.situacao(db);

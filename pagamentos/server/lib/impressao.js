@@ -258,4 +258,4 @@ ${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não e
 </html>`;
 }
 
-module.exports = { fichaCompensacao };
+module.exports = { fichaCompensacao, ROTULO_BENEFICIARIO_FINAL };

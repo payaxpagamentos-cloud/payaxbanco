@@ -510,6 +510,24 @@ UPDATE boletos SET
   beneficiario_final_documento = (SELECT c.cnpj FROM clientes c WHERE c.id = boletos.cliente_id);
 `,
   },
+  {
+    versao: 7,
+    nome: 'conformidade',
+    sql: `
+-- Regras de conformidade que dependem de alguém de fora (Bradesco, jurídico, provedor).
+-- As regras automáticas não ficam aqui: o sistema as verifica toda vez. O histórico de cada
+-- mudança fica na auditoria (acao conformidade.atualizada).
+CREATE TABLE conformidade_acompanhamento (
+  regra TEXT PRIMARY KEY,
+  situacao TEXT NOT NULL CHECK (situacao IN ('pendente', 'em_andamento', 'atendida', 'nao_se_aplica')),
+  responsavel TEXT,
+  prazo TEXT,
+  observacao TEXT,
+  atualizado_em TEXT NOT NULL,
+  atualizado_por INTEGER REFERENCES usuarios(id)
+);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();
