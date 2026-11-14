@@ -82,7 +82,7 @@ Com a demonstração, o Internet Bank fica em `http://localhost:3600/cliente/` c
 `financeiro@alfanet.com.br` / `cliente2026`.
 
 ```bash
-npm test          # 58 testes
+npm test          # 130 testes
 npm run migrar    # aplica as migrações sem subir o servidor
 ```
 
@@ -339,5 +339,5 @@ pagamentos/
     lib/        febraban, pix, codigobarras, impressao, precos (split), razao (conta gráfica),
                 boletos, repasses, bradesco, ixc, sincronismo, rotinas
     routes/     backoffice, cliente (Internet Bank) e publico (webhook + link do boleto)
-  test/         58 testes, com IXC falso
+  test/         130 testes, com IXC falso
 ```

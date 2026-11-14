@@ -3,14 +3,29 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { iniciar } = require('./helpers');
-const { dataLocal } = require('../server/lib/datas');
+const { dataLocal, somarDias, ehDiaUtil } = require('../server/lib/datas');
 
 const hoje = () => dataLocal('America/Sao_Paulo');
 
+/**
+ * Último dia útil até hoje (o próprio, se hoje for útil).
+ *
+ * Dinheiro só libera em dia útil: mesmo com retenção zero, o que é pago num sábado só fica
+ * disponível na segunda. Creditando no último dia útil, o saldo existe em qualquer dia em
+ * que a suíte rode — antes, estes testes falhavam todo fim de semana e feriado.
+ */
+function ultimoDiaUtil() {
+  let d = hoje();
+  for (let i = 0; i < 15 && !ehDiaUtil(d); i++) d = somarDias(d, -1);
+  return d;
+}
+
 /** Liquida um boleto com crédito já liberado (retenção zero), para ter saldo disponível agora. */
 async function creditar(api, tk, clienteId, valor) {
+  // O boleto nasce hoje (o vencimento não pode ser anterior à emissão), mas o pagamento
+  // entra no último dia útil, que é quando o dinheiro de fato libera.
   const b = await api.boleto(tk.admin, clienteId, { valor, vencimento: hoje() });
-  const r = await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: hoje(), valor_pago: valor }, tk.financeiro);
+  const r = await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: ultimoDiaUtil(), valor_pago: valor }, tk.financeiro);
   return r.dados;
 }
 
@@ -69,7 +84,7 @@ test('repasses: saldo, limite de aprovação, falha e rotina', async (t) => {
   });
 
   await t.test('o extrato mostra o repasse e a tarifa separados', async () => {
-    const e = (await api.get(`/cliente/api/conta/extrato?de=${hoje()}&ate=${hoje()}`, a.token)).dados;
+    const e = (await api.get(`/cliente/api/conta/extrato?de=${ultimoDiaUtil()}&ate=${hoje()}`, a.token)).dados;
     const tipos = e.itens.map((i) => i.tipo);
     assert.ok(tipos.includes('repasse'));
     assert.ok(tipos.includes('taxa_repasse'));
