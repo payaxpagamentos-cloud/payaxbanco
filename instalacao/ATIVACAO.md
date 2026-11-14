@@ -129,74 +129,79 @@ Se o IXC estiver na rede interna (10.x, 192.168.x), acrescente `ATEND_REDE_INTER
 
 ---
 
-## 8. Telefonia (quando for ligar o telefone)
+## 8. Telefonia com Asterisk (na mesma máquina da ZOE)
 
-**No painel da ZOE, como master, em Telefonia:**
+O instalador põe o Asterisk e a **ponte** `zoe-central`. A ponte escreve no Asterisk o que você cadastra no painel: ramais,
+filas, URA e números. Ela também manda para a ZOE cada ligação, para os relatórios e a tarifação, e mostra quais ramais
+estão online. **Você não edita nada no Asterisk à mão.**
 
-1. *Rotas de saída*: cadastre a operadora.
-2. *Números*: cadastre os números e escolha a empresa.
-3. *Empresas*: clique no lápis da empresa, marque "Telefonia ligada" e salve.
-4. *Chave da central*: clique em Nova chave e **copie a chave `cen_…`**, porque ela aparece uma vez só.
-
-**No painel da empresa, em Telefonia › Ramais:** crie os ramais com o mesmo número que está em *Usuários › Ramal*.
-
-**No servidor do Asterisk:**
-
-Se o Asterisk estiver **no mesmo servidor da ZOE**, o instalador já deixou o comando `/usr/local/bin/zoe-agi` pronto.
-Só crie a configuração:
+**1. Instalar.** Para instalar a ZOE e o Asterisk juntos, acrescente `--com-asterisk` no comando de instalação do passo 2:
 
 ```bash
-sudo tee /etc/asterisk/zoe-agi.conf >/dev/null <<'CONF'
-ZOE_URL=https://DOMINIO/atendimento
-ZOE_CHAVE=COLE-AQUI-A-CHAVE-cen
-ZOE_TTS_APP=Flite
-CONF
-sudo chmod 640 /etc/asterisk/zoe-agi.conf
-sudo chown root:asterisk /etc/asterisk/zoe-agi.conf
+sudo bash ./instalacao/instalar.sh --sem-nginx --email EMAIL --com-asterisk
 ```
 
-Se o Asterisk estiver **em outra máquina**, rode isto nela antes de criar a configuração acima:
+Se a ZOE já estiver instalada, rode só a parte do Asterisk:
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -   # só se ela não tiver Node 18+
-sudo apt install -y nodejs
-sudo mkdir -p /usr/local/lib/zoe
-sudo scp root@IP-DO-SERVIDOR:/usr/local/lib/zoe/zoe-agi.js /usr/local/lib/zoe/
-printf '#!/bin/sh\nexec node /usr/local/lib/zoe/zoe-agi.js "$@"\n' | sudo tee /usr/local/bin/zoe-agi >/dev/null
-sudo chmod 755 /usr/local/bin/zoe-agi /usr/local/lib/zoe/zoe-agi.js
+sudo bash ./instalacao/asterisk.sh
 ```
 
-Ainda no Asterisk, acrescente isto ao `extensions.conf` e aponte o número de entrada para o contexto `zoe-entrada`:
+**2. No painel, como master, em Telefonia:**
+1. *Empresas*: clique no lápis da empresa, marque **Telefonia ligada** e salve.
+2. *Rotas de saída*: cadastre a operadora (endereço e custo). O número da rota aparece na lista; ele é o `N` do passo 4.
+3. *Números*: cadastre os números (DIDs) e entregue-os à empresa.
+4. *Chave da central*: clique em **Nova chave** e **copie a chave `cen_…`**, que aparece uma vez só.
 
-```
-[zoe-entrada]
-exten => s,1,Answer()
- same => n,AGI(/usr/local/bin/zoe-agi)
- same => n,GotoIf($["${ZOE_STATUS}" = "transferir" | "${ZOE_STATUS}" = "indisponivel"]?fila)
- same => n,Hangup()
- same => n(fila),Queue(${IF($["${ZOE_FILA_NOME}" = ""]?Atendimento:${ZOE_FILA_NOME})},,,,,,,zoe-atendeu^s^1)
-exten => h,1,AGI(/usr/local/bin/zoe-agi,fim)
-
-[zoe-atendeu]
-exten => s,1,AGI(/usr/local/bin/zoe-agi,atendeu)
- same => n,Return()
-```
-
-Depois recarregue o plano de discagem:
+**3. Colar a chave no servidor:**
 
 ```bash
-sudo asterisk -rx "dialplan reload"
+sudo nano /etc/asterisk/zoe.conf
 ```
 
-As filas do Asterisk precisam ter **o mesmo nome** das filas da ZOE (Atendimento, Financeiro, Suporte técnico…).
+Na linha `ZOE_CHAVE=`, cole a chave depois do `=`. Salve com Ctrl+O e Enter, e saia com Ctrl+X. **Não precisa reiniciar nada**: em até
+30 segundos a ponte lê a chave e configura o Asterisk. Para conferir:
 
-Para ver a ligação passando pela ZOE: `sudo asterisk -rx "agi set debug on"`.
+```bash
+sudo zoe-central --teste
+sudo asterisk -rx "pjsip show endpoints"
+```
 
-**Telefone no navegador (opcional):** no `/zoe/atendimento/.env`, preencha `ATEND_WEBRTC_WSS=wss://...` e `ATEND_SIP_DOMINIO=...` e rode `sudo systemctl restart zoe`.
+**4. A conta da operadora** (se ela pedir usuário e senha) vai no mesmo `/etc/asterisk/zoe.conf`. Troque o `N` pelo número da rota:
 
-> Falta uma peça que ainda vou fazer: a ponte que cria no Asterisk os ramais e filas cadastrados no painel e
-> envia à ZOE o histórico das ligações (tarifação e relatórios). Até ela ficar pronta, a conversa com a ZOE e a
-> transferência funcionam, mas ramais e filas são configurados à mão no Asterisk e as telas de chamadas ficam vazias.
+```
+TRONCO_N_USUARIO=usuario-da-operadora
+TRONCO_N_SENHA=senha-da-operadora
+TRONCO_N_REGISTRO=1
+```
+
+Use `TRONCO_N_REGISTRO=1` só se a operadora pedir registro. Se ela libera pelo IP do servidor, deixe as três linhas de fora.
+
+**5. Na empresa › Telefonia:**
+- *Ramais*: crie os ramais com o mesmo número do campo *Ramal* em *Usuários*.
+- *Filas e URA*: escolha os ramais de cada fila e monte a URA.
+- *Números*: diga para onde vai cada número: **ZOE**, URA, fila ou ramal.
+
+**6. Os telefones** (aparelho IP ou softphone, como o Zoiper ou o MicroSIP) apontam para o servidor:
+
+| Campo | Valor |
+|---|---|
+| Servidor | `IP-DO-SERVIDOR` (porta 5060, UDP) |
+| Usuário | `<id da empresa>_<ramal>`, por exemplo `1_1001` |
+| Senha | a do ramal: em *Telefonia › Ramais*, botão **Telefone** do ramal |
+
+**7. Firewall.** Libere estas portas **só para os IPs da operadora e dos telefones**. Expor a 5060 para a internet inteira atrai robôs que testam senhas.
+
+| Porta | Uso |
+|---|---|
+| UDP 5060 | SIP |
+| UDP 10000 a 20000 | áudio |
+
+**A voz** da ZOE e da URA é gerada no próprio servidor (espeak-ng, português). Ela funciona, mas soa robótica. Depois dá
+para trocar por uma voz neural sem mudar mais nada: é só mudar a linha `ZOE_TTS_CMD` no `zoe.conf`.
+
+Para a ZOE **entender a fala** do cliente, instale a transcrição local: rode o instalador com `--com-whisper`. Sem ela, deixe a
+ZOE no modo **teclado**, em *ZOE › Como ela atende › Ligações*.
 
 ---
 
@@ -206,6 +211,7 @@ Para ver a ligação passando pela ZOE: `sudo asterisk -rx "agi set debug on"`.
 |---|---|
 | Está tudo no ar? | `sudo zoe-verificar` |
 | Ver o que está acontecendo | `journalctl -u zoe -f` |
+| Ver a ponte do Asterisk | `journalctl -u zoe-central -f` e `sudo zoe-central --teste` |
 | Reiniciar depois de mexer no `.env` | `sudo systemctl restart zoe` |
 | Fazer a cópia do banco agora | `sudo zoe-backup` |
 | Atualizar para um pacote novo | extrair o pacote novo e rodar o mesmo `instalar.sh`. Dados, `.env` e senha ficam. |

@@ -32,7 +32,7 @@ for (const m of MODULOS) {
 fs.cpSync(path.join(raiz, 'instalacao'), path.join(pasta, 'instalacao'), {
   recursive: true, filter: (f) => !f.endsWith('empacotar.js'),
 });
-for (const s of ['instalar.sh', 'backup.sh', 'verificar.sh', 'checar-servidor.sh']) fs.chmodSync(path.join(pasta, 'instalacao', s), 0o755);
+for (const s of ['instalar.sh', 'backup.sh', 'verificar.sh', 'checar-servidor.sh', 'asterisk.sh']) fs.chmodSync(path.join(pasta, 'instalacao', s), 0o755);
 fs.chmodSync(path.join(pasta, 'atendimento', 'scripts', 'instalar-whisper.sh'), 0o755);
 fs.chmodSync(path.join(pasta, 'atendimento', 'scripts', 'zoe-agi.js'), 0o755);
 

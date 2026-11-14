@@ -16,6 +16,7 @@
 #     --com-whisper      compila e liga a transcrição de áudio local (whisper.cpp, ~1 GB de RAM)
 #     --pasta P          onde tudo fica no servidor (padrão: /zoe)
 #     --porta N          porta interna (padrão: 3600; use outra se a 3600 estiver ocupada)
+#     --com-asterisk     instala também o Asterisk nesta máquina, já ligado à ZOE (instalacao/asterisk.sh)
 #
 #  Servidor que já tem outro sistema: a ZOE convive. Ela não troca o Node do servidor (usa um Node 22
 #  próprio em /usr/local/lib/zoe/node se o do sistema for outro), não instala o Nginx se a porta 80
@@ -39,6 +40,7 @@ DOMINIO=""
 EMAIL=""
 NGINX=1
 WHISPER=0
+ASTERISK=0
 PORTA=3600
 PORTA_INFORMADA=0
 LIB=/usr/local/lib/zoe
@@ -49,6 +51,7 @@ while [ $# -gt 0 ]; do
     --email) EMAIL="$2"; shift 2 ;;
     --sem-nginx) NGINX=0; shift ;;
     --com-whisper) WHISPER=1; shift ;;
+    --com-asterisk) ASTERISK=1; shift ;;
     --pasta) DESTINO="${2%/}"; shift 2 ;;
     --porta) PORTA="$2"; PORTA_INFORMADA=1; shift 2 ;;
     -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
@@ -318,6 +321,10 @@ if [ "$WEB" = apache ]; then
 </VirtualHost>
 APACHE
   echo "Site do Apache preparado em $SITE_A (ainda desligado)."
+fi
+
+if [ "$ASTERISK" = 1 ]; then
+  bash "$ORIGEM/instalacao/asterisk.sh" --porta "$PORTA" --node "$NODE"
 fi
 
 passo "Cópia diária do banco"

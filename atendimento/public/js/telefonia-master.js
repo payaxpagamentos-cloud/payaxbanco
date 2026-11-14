@@ -134,8 +134,8 @@ async function abaTerminacao(ctx, so) {
     ], (d) => api.patch(`${BASE}/numeros/${n.id}`, { empresa_id: d.empresa_id || null, tronco_id: d.tronco_id || null, descricao: d.descricao }).then(() => true));
 
     const cartaoRotas = () => cartao('Rotas de saída (operadoras)',
-      tabela(['Nome', 'Endereço', '^Canais', '^Agora', '^Hoje', '^Empresas', '>Custo fixo/móvel/intern.', 'Situação', '^Ações'], troncos.map((t) => el('tr', {},
-        td(t.nome), td(el('span', { class: 'mono pequeno' }, `${t.usuario ? `${t.usuario}@` : ''}${t.host}:${t.porta}`)), td(t.canais, 'centro num'), td(t.em_curso, 'centro num'),
+      tabela(['^Nº', 'Nome', 'Endereço', '^Canais', '^Agora', '^Hoje', '^Empresas', '>Custo fixo/móvel/intern.', 'Situação', '^Ações'], troncos.map((t) => el('tr', {},
+        td(t.id, 'centro num'), td(t.nome), td(el('span', { class: 'mono pequeno' }, `${t.usuario ? `${t.usuario}@` : ''}${t.host}:${t.porta}`)), td(t.canais, 'centro num'), td(t.em_curso, 'centro num'),
         td(t.chamadas_hoje, 'centro num'), td(t.empresas, 'centro num'),
         td(`${dinheiro(t.custo_fixo_centavos)} / ${dinheiro(t.custo_movel_centavos)} / ${dinheiro(t.custo_internacional_centavos)}`, 'dir num'),
         td(t.ativo ? el('span', { class: 'etiqueta ok' }, 'ativa') : el('span', { class: 'etiqueta erro' }, 'inativa')),

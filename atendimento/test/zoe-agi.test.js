@@ -308,8 +308,11 @@ test('configuração: zoe-agi.conf, com as variáveis de ambiente por cima', (t)
   fs.writeFileSync(arq, '# central\nZOE_URL=https://zoe.exemplo/atendimento\nZOE_CHAVE="cen_abc"\nZOE_TTS_APP=Flite\nZOE_SUSSURRO=0\n');
   const antes = { ...process.env };
   t.after(() => { for (const k of Object.keys(process.env)) if (!(k in antes)) delete process.env[k]; Object.assign(process.env, antes); });
-  for (const k of ['ZOE_URL', 'ZOE_CHAVE', 'ZOE_TTS_APP', 'ZOE_SUSSURRO', 'ZOE_CEREBRO', 'ZOE_CEREBRO_CHAVE', 'ZOE_GRAVACOES']) delete process.env[k];
-  assert.deepEqual(lerConf(arq), { url: 'https://zoe.exemplo/atendimento', chave: 'cen_abc', tts: 'Flite', gravacoes: '', sussurrar: false });
+  for (const k of ['ZOE_URL', 'ZOE_CHAVE', 'ZOE_TTS_APP', 'ZOE_TTS_CMD', 'ZOE_FALA_PASTA', 'ZOE_SUSSURRO', 'ZOE_CEREBRO', 'ZOE_CEREBRO_CHAVE', 'ZOE_GRAVACOES']) delete process.env[k];
+  assert.deepEqual(lerConf(arq), { url: 'https://zoe.exemplo/atendimento', chave: 'cen_abc', tts: 'Flite', ttsCmd: '', falaPasta: '', gravacoes: '', sussurrar: false });
+  fs.appendFileSync(arq, 'ZOE_CHAVE_7=cen_da_sete\n');
+  assert.equal(lerConf(arq, '7').chave, 'cen_da_sete', 'central com várias empresas: a chave de cada uma');
+  assert.equal(lerConf(arq, '9').chave, 'cen_abc', 'sem chave própria, usa a geral');
   process.env.ZOE_CHAVE = 'cen_env';
   assert.equal(lerConf(arq).chave, 'cen_env');
   delete process.env.ZOE_URL;
@@ -317,3 +320,14 @@ test('configuração: zoe-agi.conf, com as variáveis de ambiente por cima', (t)
 });
 
 test.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+
+test('configuração: aspas no meio do valor ficam (o comando de voz precisa delas)', (t) => {
+  const arq = path.join(pasta, 'zoe-aspas.conf');
+  fs.writeFileSync(arq, 'ZOE_TTS_CMD=espeak-ng -v pt-br --stdin -w "$ZOE_SAIDA"\nZOE_URL="https://z.exemplo"\n');
+  const antes = { ...process.env };
+  t.after(() => { for (const k of Object.keys(process.env)) if (!(k in antes)) delete process.env[k]; Object.assign(process.env, antes); });
+  delete process.env.ZOE_TTS_CMD; delete process.env.ZOE_URL;
+  const c = lerConf(arq);
+  assert.equal(c.ttsCmd, 'espeak-ng -v pt-br --stdin -w "$ZOE_SAIDA"');
+  assert.equal(c.url, 'https://z.exemplo');
+});

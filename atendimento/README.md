@@ -390,6 +390,12 @@ auditoria são os mesmos: a fila "Suporte técnico" atende o WhatsApp e o telefo
   `Usuários › Ramal` cadastrado em `Telefonia › Ramais`) liga e atende pelo painel.
 - **Central** (`/api/central`, chave `cen_…`): configuração, chamadas (início, atendida, fim, tarifação),
   registro dos ramais, uso de TTS/STT, discador e a URA inteligente.
+- **Ponte com o Asterisk** (`scripts/zoe-central.js`, instalada por `instalacao/asterisk.sh`): a cada minuto gera
+  `pjsip_zoe.conf`, `queues_zoe.conf` e `extensions_zoe.conf` a partir de `/api/central/config` e recarrega o Asterisk só
+  quando muda. O plano de discagem avisa cada ligação por `UserEvent` (ZoeInicio, ZoeAtendida, ZoeFim); a ponte escuta
+  pelo AMI e manda para a API, guardando e reenviando na ordem se a ZOE estiver fora. O limite de simultâneas é
+  conferido no próprio Asterisk (`GROUP_COUNT`). Um número pode ir para a **ZOE** (destino `zoe`), URA, fila ou ramal;
+  a URA roda pelo `zoe-agi ura,<id>` e as opções de segunda via e desbloqueio passam para a ZOE já com o pedido.
 
 ## Áudios do cliente
 

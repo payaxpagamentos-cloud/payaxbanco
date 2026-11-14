@@ -132,6 +132,12 @@ describe('telefonia dentro da ZOE', () => {
     const numeros = (await req('GET', tel('/numeros'), undefined, admin)).dados;
     assert.equal((await req('PATCH', tel(`/numeros/${numeros[0].id}`), { destino_tipo: 'ura', destino_id: ura.dados.id }, admin)).status, 204);
     assert.equal((await req('GET', tel('/numeros'), undefined, admin)).dados[0].destino_nome, 'Menu');
+    // O segundo número cai direto na ZOE; e a URA pode mandar para ela também.
+    assert.equal((await req('PATCH', tel(`/numeros/${numeros[1].id}`), { destino_tipo: 'zoe', destino_id: 999 }, admin)).status, 204);
+    const n2 = (await req('GET', tel('/numeros'), undefined, admin)).dados[1];
+    assert.deepEqual([n2.destino_tipo, n2.destino_id, n2.destino_nome], ['zoe', null, 'ZOE']);
+    const comZoe = await req('PUT', tel(`/uras/${ura.dados.id}`), { opcoes: [{ digito: '1', destino_tipo: 'fila', destino_id: fila }, { digito: '2', destino_tipo: 'zoe' }] }, admin);
+    assert.ok(comZoe.status < 300, JSON.stringify(comZoe.dados));
   });
 
   test('chave da central: só o master cria, e a de integração comum não informa chamadas', async () => {
@@ -146,6 +152,11 @@ describe('telefonia dentro da ZOE', () => {
     assert.deepEqual(cfg.ramais.map((r) => r.numero), ['1001', '1002']);
     assert.equal(cfg.terminacao.host, 'sip.op.exemplo');
     assert.ok(!('senha' in cfg.terminacao) && !('usuario' in cfg.terminacao), 'a credencial do tronco não sai pela API');
+    assert.deepEqual(cfg.numeros.map((n) => n.destino_tipo), ['ura', 'zoe']);
+    assert.deepEqual(cfg.uras[0].opcoes.at(-1), { digito: '2', destino_tipo: 'zoe', destino_id: null });
+    assert.equal(cfg.uras[0].tipo, 'classica');
+    assert.equal(cfg.uras[0].tecla_atendente, '0');
+    assert.equal(cfg.ramais[0].usuario_sip_web, `${empresa.id}_1001w`);
     assert.deepEqual(cfg.filas.find((f) => f.id === fila).ramais, ['1001']);
     // A mesma chave fala com o cérebro da ZOE (a ligação conversada).
     const voz = await req('POST', '/integracao/voz/ligacoes', { uid: 'c-1', telefone: '11977776666' }, null, { 'X-Api-Key': chave });
@@ -187,7 +198,7 @@ describe('telefonia dentro da ZOE', () => {
     db.prepare("UPDATE usuarios SET ramal = '1001' WHERE email = 'marina@fibramais.com.br'").run();
     const comRamal = (await req('GET', tel('/telefone'), undefined, atendente)).dados;
     assert.equal(comRamal.ramal.numero, '1001');
-    assert.equal(comRamal.ramal.usuario_sip, `${empresa.id}_1001`);
+    assert.equal(comRamal.ramal.usuario_sip, `${empresa.id}_1001w`, 'o navegador usa o cadastro WebRTC do ramal');
     assert.ok(comRamal.ramal.senha_sip.length >= 12);
   });
 

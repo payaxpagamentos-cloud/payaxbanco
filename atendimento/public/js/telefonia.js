@@ -246,9 +246,9 @@ async function telaNumeros(ctx) {
   const lista = el('div');
   const destinos = async () => {
     const [ramais, filas, uras] = await Promise.all([api.get(`${base(ctx)}/ramais`), api.get(`${base(ctx)}/filas`), api.get(`${base(ctx)}/uras`)]);
-    return { ramal: ramais.filter((r) => r.ativo).map((r) => [r.id, `${r.numero} · ${r.nome}`]), fila: filas.map((f) => [f.id, f.nome]), ura: uras.map((u) => [u.id, u.nome]) };
+    return { ramal: ramais.filter((r) => r.ativo).map((r) => [r.id, `${r.numero} · ${r.nome}`]), fila: filas.map((f) => [f.id, f.nome]), ura: uras.map((u) => [u.id, u.nome]), zoe: [] };
   };
-  const ROTULO = { ramal: 'Ramal', fila: 'Fila', ura: 'URA' };
+  const ROTULO = { zoe: 'ZOE (atendente virtual)', ramal: 'Ramal', fila: 'Fila', ura: 'URA' };
   const formDestino = async (n) => {
     const opcoes = await destinos();
     return formModal(`Número ${telefone(n.numero)}`, (f) => {
@@ -259,18 +259,18 @@ async function telaNumeros(ctx) {
         const s = alvo.querySelector('select');
         limpar(s, (opcoes[t] ?? []).map(([id, nome]) => el('option', { value: id }, nome)));
         if (t === n.destino_tipo) s.value = String(n.destino_id);
-        alvo.classList.toggle('oculto', !t);
+        alvo.classList.toggle('oculto', !t || t === 'zoe');
       };
       tipo.querySelector('select').addEventListener('change', preencher);
       queueMicrotask(preencher);
       return [campo('Descrição', { name: 'descricao', maxlength: 120, value: n.descricao ?? '' }), tipo, alvo];
-    }, (d) => api.patch(`${base(ctx)}/numeros/${n.id}`, { descricao: d.descricao, destino_tipo: d.destino_tipo || null, destino_id: d.destino_tipo ? d.destino_id : null }));
+    }, (d) => api.patch(`${base(ctx)}/numeros/${n.id}`, { descricao: d.descricao, destino_tipo: d.destino_tipo || null, destino_id: d.destino_tipo && d.destino_tipo !== 'zoe' ? d.destino_id : null }));
   };
   async function carregar() {
     const numeros = await api.get(`${base(ctx)}/numeros`);
     limpar(lista, tabela(['Número', 'Descrição', 'Destino', '^Chamadas recebidas', '^Ações'], numeros.map((n) => el('tr', {},
       td(el('strong', { class: 'num' }, telefone(n.numero))), td(n.descricao ?? '—'),
-      td(n.destino_tipo ? `${ROTULO[n.destino_tipo]}: ${n.destino_nome ?? '—'}` : etiqueta('sem destino', 'aviso')), td(inteiro(n.chamadas), 'centro num'),
+      td(n.destino_tipo === 'zoe' ? 'ZOE (atendente virtual)' : n.destino_tipo ? `${ROTULO[n.destino_tipo]}: ${n.destino_nome ?? '—'}` : etiqueta('sem destino', 'aviso')), td(inteiro(n.chamadas), 'centro num'),
       el('td', { class: 'acoes' }, pode(ctx) ? botaoIcone('editar', 'Configurar destino', async () => { if (await formDestino(n)) { toast('Destino salvo.'); carregar(); } }) : null))),
     'Nenhum número contratado. Fale com o suporte para receber chamadas de fora.'));
   }
@@ -303,7 +303,7 @@ async function telaRecursos(ctx, so = null) {
       return api.put(`${base(ctx)}/filas/${f.id}`, corpo2);
     }, { largo: true });
 
-    const opcoesDestino = { ...Object.fromEntries(ativos.map((r) => [`ramal:${r.id}`, `Ramal ${r.numero} · ${r.nome}`])),
+    const opcoesDestino = { 'zoe:null': 'ZOE (atendente virtual)', ...Object.fromEntries(ativos.map((r) => [`ramal:${r.id}`, `Ramal ${r.numero} · ${r.nome}`])),
       ...Object.fromEntries(filas.map((f) => [`fila:${f.id}`, `Fila ${f.nome}`])), ...Object.fromEntries(uras.map((u) => [`ura:${u.id}`, `URA ${u.nome}`])) };
     const formUra = (u) => formModal(u ? `URA ${u.nome}` : 'Nova URA', (form) => {
       const linhas = el('div', { class: 'coluna', style: 'gap:8px' });
@@ -314,7 +314,7 @@ async function telaRecursos(ctx, so = null) {
       for (const o of u?.opcoes ?? []) addLinha(o);
       form.lerOpcoes = () => [...linhas.querySelectorAll('.opcao-ura')].map((l) => {
         const [tipo, id] = l.querySelector('[name=destino]').value.split(':');
-        return { digito: l.querySelector('[name=digito]').value, destino_tipo: tipo, destino_id: Number(id) };
+        return { digito: l.querySelector('[name=digito]').value, destino_tipo: tipo, destino_id: tipo === 'zoe' ? null : Number(id) };
       });
       return [
         campo('Nome', { name: 'nome', required: true, maxlength: 80, value: u?.nome ?? '' }),

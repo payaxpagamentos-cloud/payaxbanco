@@ -16,7 +16,8 @@ const v = require('../lib/validacao');
 const uraLib = require('./ura');
 const config = require('../config');
 
-const DESTINOS = ['ramal', 'fila', 'ura'];
+// 'zoe': a ligação cai na ZOE (a mesma do WhatsApp), que resolve ou transfere para a fila certa.
+const DESTINOS = ['ramal', 'fila', 'ura', 'zoe'];
 const TABELA_DESTINO = { ramal: 'pabx_ramais', fila: 'filas', ura: 'pabx_uras' };
 
 /**
@@ -48,6 +49,7 @@ module.exports = (db) => {
   /** Destino (ramal, fila ou URA) que pertence à empresa. */
   const destino = (empresaId, tipo, id) => {
     v.opcao(tipo, 'o tipo de destino', DESTINOS);
+    if (tipo === 'zoe') return null;
     const x = db.prepare(`SELECT id FROM ${TABELA_DESTINO[tipo]} WHERE id = ? AND empresa_id = ?`).get(Number(id), empresaId);
     v.exigir(x, 'Destino não encontrado nesta empresa.');
     return x.id;
@@ -303,7 +305,7 @@ module.exports = (db) => {
   // ---------- Números entrantes ----------
   r.get('/numeros', (req, res) => res.json(db.prepare(`SELECT n.id, n.numero, n.descricao, n.destino_tipo, n.destino_id,
       CASE n.destino_tipo WHEN 'ramal' THEN (SELECT numero || ' · ' || nome FROM pabx_ramais WHERE id = n.destino_id)
-        WHEN 'fila' THEN (SELECT nome FROM filas WHERE id = n.destino_id) WHEN 'ura' THEN (SELECT nome FROM pabx_uras WHERE id = n.destino_id) END AS destino_nome,
+        WHEN 'fila' THEN (SELECT nome FROM filas WHERE id = n.destino_id) WHEN 'ura' THEN (SELECT nome FROM pabx_uras WHERE id = n.destino_id) WHEN 'zoe' THEN 'ZOE' END AS destino_nome,
       (SELECT COUNT(*) FROM pabx_chamadas c WHERE c.numero_id = n.id) AS chamadas
     FROM pabx_numeros n WHERE n.empresa_id = ? ORDER BY n.numero`).all(eid(req))));
 
@@ -464,7 +466,8 @@ module.exports = (db) => {
     res.json({
       configurado: Boolean(w.wss),
       wss: w.wss, dominio: w.dominio, stun: w.stun,
-      ramal: ramal ? { id: ramal.id, numero: ramal.numero, nome: ramal.nome, usuario_sip: `${eid(req)}_${ramal.numero}`, senha_sip: ramal.senha_sip } : null,
+      ramal: ramal ? { id: ramal.id, numero: ramal.numero, nome: ramal.nome, // O telefone do navegador registra no cadastro WebRTC do ramal (o aparelho SIP usa o sem "w").
+        usuario_sip: `${eid(req)}_${ramal.numero}w`, senha_sip: ramal.senha_sip } : null,
     });
   });
 

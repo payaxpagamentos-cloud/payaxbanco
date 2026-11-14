@@ -53,10 +53,11 @@ module.exports = (db) => {
       empresa: { id: e.id, nome: e.nome, status: e.status, limite_canais: e.limite_canais, gravar_chamadas: Boolean(e.gravar_chamadas) },
       terminacao: t && t.ativo ? t : null,
       ramais: db.prepare('SELECT id, numero, nome, senha_sip, gravar FROM pabx_ramais WHERE empresa_id = ? AND ativo = 1 ORDER BY numero').all(e.id)
-        .map((x) => ({ ...x, usuario_sip: `${e.id}_${x.numero}`, gravar: Boolean(x.gravar) })),
+        // Dois cadastros por ramal: o do aparelho SIP e o do telefone no navegador (WebRTC pede outra mídia).
+        .map((x) => ({ ...x, usuario_sip: `${e.id}_${x.numero}`, usuario_sip_web: `${e.id}_${x.numero}w`, gravar: Boolean(x.gravar) })),
       numeros: db.prepare('SELECT id, numero, destino_tipo, destino_id FROM pabx_numeros WHERE empresa_id = ?').all(e.id),
       filas: filas.map((f) => ({ ...f, ramais: membros.all(f.id).map((m) => m.numero) })),
-      uras: db.prepare('SELECT id, nome, mensagem, opcoes FROM pabx_uras WHERE empresa_id = ?').all(e.id).map((u) => ({ ...u, opcoes: JSON.parse(u.opcoes) })),
+      uras: db.prepare('SELECT id, nome, tipo, mensagem, opcoes, tecla_atendente, fila_padrao_id FROM pabx_uras WHERE empresa_id = ?').all(e.id).map((u) => ({ ...u, opcoes: JSON.parse(u.opcoes) })),
     });
   });
 

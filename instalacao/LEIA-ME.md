@@ -88,34 +88,18 @@ Valide nesta ordem:
 
 ## 4. Telefonia (Asterisk)
 
-A telefonia é ligada **por empresa** pelo master. As **filas são as mesmas do WhatsApp**: a ligação que a ZOE
-transfere cai na mesma fila e na mesma equipe.
+Use `--com-asterisk` no instalador, ou rode `sudo bash ./instalacao/asterisk.sh` depois. Ele instala o Asterisk na mesma máquina,
+a voz em português (espeak-ng) e a ponte **zoe-central**.
 
-1. **Master › Telefonia**:
-   - *Rotas de saída*: cadastre a operadora (host, usuário, custo por minuto);
-   - *Números*: cadastre os números (DIDs) e entregue-os à empresa;
-   - *Empresas*: ligue a telefonia da empresa (limites, tarifas e rota de saída);
-   - *Chave da central*: crie a chave da empresa (`cen_…`). Ela aparece **uma vez**.
-2. **Na empresa › Telefonia**, cadastre os ramais com o **mesmo número** do campo *Ramal* em *Usuários*. Escolha
-   os ramais de cada fila, monte a URA e diga para onde vai cada número.
-3. **No Asterisk**, use o comando `/usr/local/bin/zoe-agi`, que o instalador cria. Se o Asterisk estiver em outra
-   máquina, copie `/usr/local/lib/zoe/zoe-agi.js` para lá (precisa de Node 18 ou mais novo) e crie o mesmo comando,
-   como mostra o `ATIVACAO.md`. Depois crie o arquivo `/etc/asterisk/zoe-agi.conf`:
+A ponte cuida de duas coisas:
+- **Escreve a configuração do Asterisk** a partir do painel (ramais, filas, URA e números).
+- **Avisa a ZOE de cada ligação e do registro dos ramais.**
 
-   ```
-   ZOE_URL=https://atende.seuprovedor.com.br/atendimento
-   ZOE_CHAVE=cen_...            # a chave da central do passo 1
-   ZOE_TTS_APP=...              # a aplicação de voz instalada no Asterisk (ex.: Flite)
-   # ZOE_SUSSURRO=0             # desliga o resumo sussurrado ao atendente
-   ```
+Para ligar, crie a chave da central em *master › Telefonia › Chave da central* e cole em `/etc/asterisk/zoe.conf`
+(`ZOE_CHAVE=`). O passo a passo completo está no `ATIVACAO.md`, item 8.
 
-   O plano de discagem completo está no topo do `zoe-agi.js`. Ele cobre a conversa com a ZOE, a fila, a
-   passagem para o atendente e o fecho da ligação. Os **nomes das filas** têm de ser iguais na ZOE e no Asterisk.
-
-   Se a ZOE estiver fora do ar, a ligação vai **direto para a fila**. Nenhuma ligação fica no silêncio.
-4. **Telefone no navegador (opcional)**: no `/zoe/atendimento/.env`, preencha `ATEND_WEBRTC_WSS`, que é o
-   endereço `wss://` do Asterisk, e `ATEND_SIP_DOMINIO`. Depois rode `sudo systemctl restart zoe`. O botão de telefone
-   aparece no canto do painel de quem tem ramal.
+Um número pode ir direto para a **ZOE**, para uma URA (clássica ou inteligente, com o IXC), para uma fila ou para um ramal.
+Se a ZOE estiver fora do ar, a ligação vai para a fila padrão. Nenhuma ligação fica no silêncio.
 
 ## 5. Dia a dia
 
@@ -139,6 +123,6 @@ e trocar torna esses dados ilegíveis. Guarde uma cópia do `.env` fora do servi
 | WhatsApp não chega | *Diagnóstico* no painel do master; na Meta, o webhook tem de estar verificado e com `messages` assinado |
 | ZOE só responde com menu | falta a chave de IA (item 3.2) ou a empresa passou do limite de IA do mês |
 | Áudio não vira texto | `systemctl status zoe-whisper` e `ATEND_WHISPER_URL` no `.env` |
-| Ligação não chega à ZOE | *Master › Telefonia › Situação*; a chave da central no `zoe-agi.conf`; `asterisk -rx "agi set debug on"` |
+| Ligação não chega à ZOE | `sudo zoe-central --teste`; `journalctl -u zoe-central -n 50`; `asterisk -rx "agi set debug on"` |
 | Ligação não abre a passagem no painel | o ramal está em *Usuários* e em *Telefonia › Ramais* com o mesmo número? O `zoe-atendeu` está no plano de discagem? |
 | Telefone do navegador "desconectado" | `ATEND_WEBRTC_WSS` no `.env`, o certificado do `wss://` e o ramal cadastrado em *Telefonia › Ramais* |

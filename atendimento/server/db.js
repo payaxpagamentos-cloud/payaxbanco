@@ -848,7 +848,8 @@ CREATE TABLE IF NOT EXISTS pabx_numeros (
   descricao TEXT,
   tronco_id INTEGER REFERENCES pabx_troncos(id),
   empresa_id INTEGER REFERENCES empresas(id),
-  destino_tipo TEXT CHECK (destino_tipo IN ('ramal','fila','ura')),
+  -- 'zoe': a ligação cai direto na ZOE (a mesma do WhatsApp), sem destino_id.
+  destino_tipo TEXT CHECK (destino_tipo IN ('ramal','fila','ura','zoe')),
   destino_id INTEGER,
   criado_em TEXT NOT NULL
 );
@@ -1044,9 +1045,32 @@ function atualizarEsquema(db) {
       criadas.push(`índice ${name}`);
     }
   }
+  // Restrição (CHECK) que mudou: o SQLite não altera CHECK, então a tabela é refeita com os mesmos
+  // dados. Só as tabelas listadas, cada uma com o trecho que só a definição nova tem.
+  for (const [tabela, marca] of Object.entries(RECRIAR)) {
+    const real = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabela);
+    if (!real || real.sql.includes(marca)) continue;
+    const novo = modelo.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabela).sql;
+    const colunas = db.prepare(`PRAGMA table_info("${tabela}")`).all().map((c) => `"${c.name}"`).join(', ');
+    db.exec('PRAGMA foreign_keys = OFF');
+    try {
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.exec(novo.replace(/CREATE TABLE (IF NOT EXISTS )?"?\w+"?/, `CREATE TABLE "${tabela}__novo"`));
+        db.exec(`INSERT INTO "${tabela}__novo" (${colunas}) SELECT ${colunas} FROM "${tabela}"`);
+        db.exec(`DROP TABLE "${tabela}"`);
+        db.exec(`ALTER TABLE "${tabela}__novo" RENAME TO "${tabela}"`);
+        db.exec('COMMIT');
+      } catch (err) { db.exec('ROLLBACK'); throw err; }
+    } finally { db.exec('PRAGMA foreign_keys = ON'); }
+    criadas.push(`tabela ${tabela}`);
+  }
   modelo.close();
   return criadas;
 }
+
+/** Tabelas cuja restrição mudou → trecho que só a definição nova tem. */
+const RECRIAR = { pabx_numeros: "'ura','zoe')" };
 
 /** As definições de coluna de um CREATE TABLE (sem comentários, sem as restrições da tabela). */
 function colunasDoCreate(sql) {

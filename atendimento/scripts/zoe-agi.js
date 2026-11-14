@@ -156,8 +156,9 @@ async function conversar(agi, cerebro, env, o = {}) {
   const uid = env.agi_uniqueid;
   const telefone = /^\+?\d{8,}$/.test(env.agi_callerid ?? '') ? env.agi_callerid : '';
   const set = (nome, valor) => agi.comando(`SET VARIABLE ${nome} ${aspas(valor ?? '')}`);
-  const falar = (texto) => (texto ? agi.comando(`EXEC ${o.tts} ${textoApp(texto)}`) : null);
-  const pasta = o.gravacoes || '/tmp/zoe-falas';
+  const falar = o.falar ?? ((texto) => (texto ? agi.comando(`EXEC ${o.tts} ${textoApp(texto)}`) : null));
+  // Pasta do Asterisk: é ele quem grava a fala, e ele não escreve em qualquer lugar.
+  const pasta = o.gravacoes || '/var/spool/asterisk/zoe-falas';
   try { fs.mkdirSync(pasta, { recursive: true }); } catch { /* o RECORD FILE avisa se não der */ }
 
   /**
@@ -191,6 +192,8 @@ async function conversar(agi, cerebro, env, o = {}) {
   try {
     let r = await cerebro.iniciar({ uid, telefone });
     iniciado = true;
+    // Veio da URA com um pedido já escolhido (ex.: segunda via): a ZOE começa por ele, sem a saudação.
+    if (o.pedido) r = await cerebro.turno(uid, { texto: o.pedido, turno_id: '0' });
     for (let n = 1; n <= 40; n++) {
       await falar(r.fala);
       if (r.acao === 'transferir') {
@@ -237,13 +240,13 @@ const ramalDoCanal = (canal) => String(canal ?? '').match(/^[A-Za-z]+\/(\d{2,8})
  * atendente quem é o cliente e o que ele quer, antes de o cliente entrar na linha.
  * Nada aqui pode segurar a ligação: o aviso tem 3 s, e qualquer falha só é ignorada.
  */
-async function atendeu(agi, env, cerebro, { tts = '', sussurrar = true } = {}) {
+async function atendeu(agi, env, cerebro, { tts = '', falar = null, sussurrar = true } = {}) {
   const uid = await agi.variavel('ZOE_UID').catch(() => '');
   if (!uid) return 'sem-zoe'; // ligação que não passou pela ZOE: nada a fazer
   const ramal = ramalDoCanal(env.agi_channel);
   if (cerebro && ramal) await cerebro.atendida(uid, { ramal }).catch(() => {});
-  const frase = sussurrar && tts ? await agi.variavel('ZOE_SUSSURRO').catch(() => '') : '';
-  if (frase) await agi.comando(`EXEC ${tts} ${textoApp(frase)}`).catch(() => {});
+  const frase = sussurrar && (tts || falar) ? await agi.variavel('ZOE_SUSSURRO').catch(() => '') : '';
+  if (frase) await (falar ? falar(frase) : agi.comando(`EXEC ${tts} ${textoApp(frase)}`)).catch(() => {});
   return 'avisado';
 }
 
@@ -258,10 +261,10 @@ async function fimDaLigacao(agi, env, cerebro) {
 }
 
 /** Conversa quando dá (ZOE configurada e TTS para falar texto livre); senão, a fila. */
-async function escolherModo(agi, env, { cerebro = null, tts = '', gravacoes } = {}) {
-  if (cerebro && tts) {
+async function escolherModo(agi, env, { cerebro = null, tts = '', falar = null, gravacoes, pedido = '' } = {}) {
+  if (cerebro && (tts || falar)) {
     try {
-      return await conversar(agi, cerebro, env, { tts, gravacoes });
+      return await conversar(agi, cerebro, env, { tts, falar, gravacoes, pedido });
     } catch (err) {
       if (!err.naoIniciou) throw err;
       // ZOE fora do ar antes de atender: o ZOE_STATUS já ficou "indisponivel" e a pessoa vai para a fila.
@@ -272,21 +275,135 @@ async function escolherModo(agi, env, { cerebro = null, tts = '', gravacoes } = 
   return 'indisponivel';
 }
 
+// ---------- Fala por comando (espeak-ng, piper…) ----------
+
+/**
+ * Fala gerada por um programa de texto para voz no próprio servidor, quando o Asterisk não tem
+ * aplicação de TTS. ZOE_TTS_CMD recebe o texto na entrada e grava um WAV em $ZOE_SAIDA, por exemplo:
+ *   espeak-ng -v pt-br -s 165 --stdin -w "$ZOE_SAIDA"
+ * O áudio vai para 8 kHz (sox) e fica guardado pelo texto: a mesma frase não é gerada duas vezes.
+ * Devolve a tecla que o cliente apertou durante a fala ('' se nenhuma).
+ */
+function criarFalaPorComando(agi, comando, pasta = '/var/lib/asterisk/sounds/zoe-fala') {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { spawnSync } = require('node:child_process');
+  const crypto = require('node:crypto');
+  try { fs.mkdirSync(pasta, { recursive: true }); } catch { /* o STREAM FILE avisa */ }
+  return async (texto, { teclas = '' } = {}) => {
+    if (!texto) return '';
+    const base = path.join(pasta, crypto.createHash('sha1').update(`${comando}\n${texto}`).digest('hex'));
+    if (!fs.existsSync(`${base}.wav`)) {
+      const bruto = `${base}.bruto.wav`;
+      const r = spawnSync('sh', ['-c', comando], { input: String(texto), env: { ...process.env, ZOE_SAIDA: bruto }, timeout: 20000 });
+      if (r.status !== 0 || !fs.existsSync(bruto)) return '';
+      const s = spawnSync('sox', [bruto, '-r', '8000', '-c', '1', '-b', '16', `${base}.wav`], { timeout: 20000 });
+      if (s.status !== 0) fs.renameSync(bruto, `${base}.wav`); else fs.rmSync(bruto, { force: true });
+    }
+    const r = Number(await agi.comando(`STREAM FILE ${base} "${teclas}"`));
+    return r > 0 ? String.fromCharCode(r) : '';
+  };
+}
+
+/** A fala configurada: aplicação do Asterisk (ZOE_TTS_APP) ou comando (ZOE_TTS_CMD). null = sem fala. */
+function criarFala(agi, c) {
+  if (c.ttsCmd) return criarFalaPorComando(agi, c.ttsCmd, c.falaPasta || undefined);
+  if (c.tts) return async (texto) => { if (texto) await agi.comando(`EXEC ${c.tts} ${textoApp(texto)}`); return ''; };
+  return null;
+}
+
+// ---------- URA (clássica ou inteligente), pela API da central ----------
+
+function criarApiCentral(base, chave) {
+  const raiz = `${String(base).replace(/\/+$/, '')}/api/central`;
+  const post = async (caminho, corpo) => {
+    const resp = await fetch(raiz + caminho, {
+      method: 'POST', headers: { 'X-Api-Key': chave, 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo ?? {}), signal: AbortSignal.timeout(8000),
+    });
+    const dados = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw Object.assign(new Error(dados.erro || `HTTP ${resp.status}`), { status: resp.status });
+    return dados;
+  };
+  return {
+    atender: (id, corpo) => post(`/ura/${encodeURIComponent(id)}/atender`, corpo),
+    confirmado: (id, corpo) => post(`/ura/${encodeURIComponent(id)}/confirmado`, corpo),
+  };
+}
+
+const PEDIDOS = {
+  segunda_via: 'Quero a segunda via da minha fatura.',
+  desbloqueio: 'Quero liberar o meu acesso, o desbloqueio de confiança.',
+};
+
+/** Ação de uma opção → destino no plano de discagem (zoe-eN-destinos). */
+function destinoDaOpcao(o) {
+  if (!o) return { destino: 'padrao' };
+  if (o.acao === 'fila') return { destino: o.destino_id ? `fila-${o.destino_id}` : 'padrao' };
+  if (o.acao === 'ramal' || o.acao === 'ura') return { destino: o.destino_id ? `${o.acao}-${o.destino_id}` : 'padrao' };
+  if (o.acao === 'zoe') return { destino: 'zoe' };
+  if (o.acao === 'encerrar') return { destino: 'fim' };
+  if (PEDIDOS[o.acao]) return { destino: 'zoe', pedido: PEDIDOS[o.acao] };
+  return { destino: 'padrao' };
+}
+
+/**
+ * Conduz a URA: fala, lê a tecla e devolve o destino em ZOE_DESTINO (e ZOE_PEDIDO quando a opção
+ * é algo que a ZOE resolve, como a segunda via). Na URA inteligente, o cliente reconhecido pelo
+ * número confirma os três primeiros dígitos do CPF/CNPJ antes de ouvir qualquer coisa do contrato.
+ * Sem resposta três vezes, vai para o atendente. Sem fala ou sem a ZOE no ar, vai para a fila padrão.
+ */
+async function conduzirUra(agi, env, central, uraId, { falar = null } = {}) {
+  const set = (nome, valor) => agi.comando(`SET VARIABLE ${nome} ${aspas(valor ?? '')}`);
+  const fim = async ({ destino, pedido = '' }) => {
+    await set('ZOE_DESTINO', destino);
+    if (pedido) await set('ZOE_PEDIDO', pedido);
+    return destino;
+  };
+  const uid = (await agi.variavel('ZOE_CHAMADA').catch(() => '')) || env.agi_uniqueid;
+  const telefone = /^\+?\d{8,}$/.test(env.agi_callerid ?? '') ? env.agi_callerid : '';
+  if (!falar || !central) return fim({ destino: 'padrao' });
+  let r;
+  try { r = await central.atender(uraId, { uid, telefone }); } catch { return fim({ destino: 'padrao' }); }
+  const atendente = (x) => (x.opcoes ?? []).filter((o) => o.acao === 'fila').at(-1);
+  let erros = 0;
+  for (let passo = 0; passo < 15; passo++) {
+    const confirmar = r.fase === 'confirmar';
+    const max = confirmar ? 3 : 1;
+    let teclas = await falar(r.fala, { teclas: '0123456789*#' });
+    if (teclas.length < max) teclas += (await agi.comando(`GET DATA silence/1 ${confirmar ? 8000 : 6000} ${max - teclas.length}`)) ?? '';
+    const opcao = (r.opcoes ?? []).find((o) => o.digito === teclas);
+    if (opcao) return fim(destinoDaOpcao(opcao));
+    if (teclas === '*') continue; // repete
+    if (confirmar && /^\d{3}$/.test(teclas)) {
+      try { r = await central.confirmado(uraId, { uid, codigo: teclas }); } catch { return fim(destinoDaOpcao(atendente(r))); }
+      if (r.fase === 'fila') { await falar(r.fala); return fim(destinoDaOpcao({ acao: 'fila', destino_id: r.destino_id })); }
+      continue;
+    }
+    if (++erros >= 3) return fim(destinoDaOpcao(atendente(r)));
+  }
+  return fim(destinoDaOpcao(atendente(r)));
+}
+
 /** Lê /etc/asterisk/zoe-agi.conf (CHAVE=valor); as variáveis de ambiente têm prioridade. */
-function lerConf(arquivo = process.env.ZOE_AGI_CONF || '/etc/asterisk/zoe-agi.conf') {
+function lerConf(arquivo = process.env.ZOE_AGI_CONF || ['/etc/asterisk/zoe.conf', '/etc/asterisk/zoe-agi.conf'].find((a) => require('node:fs').existsSync(a)) || '/etc/asterisk/zoe.conf', empresa = '') {
   const conf = {};
   try {
     for (const linha of require('node:fs').readFileSync(arquivo, 'utf8').split('\n')) {
-      const m = linha.match(/^\s*(ZOE_[A-Z_]+)\s*=\s*(.*?)\s*$/);
-      if (m) conf[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      const m = linha.match(/^\s*(ZOE_[A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+      // Aspas só saem quando envolvem o valor inteiro: o comando de voz tem aspas no meio.
+      if (m) conf[m[1]] = m[2].replace(/^(["'])(.*)\1$/, '$2');
     }
   } catch { /* sem arquivo: só as variáveis de ambiente */ }
   const v = (k) => process.env[k] || conf[k] || '';
   return {
     // ZOE_CEREBRO / ZOE_CEREBRO_CHAVE: nomes antigos, ainda aceitos.
     url: v('ZOE_URL') || v('ZOE_CEREBRO'),
-    chave: v('ZOE_CHAVE') || v('ZOE_CEREBRO_CHAVE'),
+    // Uma central com várias empresas: ZOE_CHAVE_<id da empresa>; com uma só, ZOE_CHAVE.
+    chave: (empresa && v(`ZOE_CHAVE_${empresa}`)) || v('ZOE_CHAVE') || v('ZOE_CEREBRO_CHAVE'),
     tts: v('ZOE_TTS_APP'),
+    ttsCmd: v('ZOE_TTS_CMD'),
+    falaPasta: v('ZOE_FALA_PASTA'),
     gravacoes: v('ZOE_GRAVACOES'),
     sussurrar: v('ZOE_SUSSURRO') !== '0',
   };
@@ -299,15 +416,24 @@ async function principal() {
   process.on('SIGHUP', () => {});
   const agi = criarAgi(process.stdin, process.stdout);
   const env = await agi.ambiente();
-  const c = lerConf();
+  const empresa = await agi.variavel('ZOE_EMPRESA').catch(() => '');
+  const c = lerConf(undefined, empresa);
   const cerebro = c.url && c.chave ? criarApiCerebro(c.url, c.chave) : null;
-  // AGI(zoe-agi.js,atendeu) no gosub da fila e AGI(zoe-agi.js,fim) no "h": ver o exemplo no topo.
-  if (env.agi_arg_1 === 'atendeu') await atendeu(agi, env, cerebro, { tts: c.tts, sussurrar: c.sussurrar }).catch(() => {});
+  const falar = c.ttsCmd ? criarFala(agi, c) : null;
+  // AGI(zoe-agi,atendeu) no gosub da fila, AGI(zoe-agi,fim) no "h", AGI(zoe-agi,ura,ID) na URA.
+  if (env.agi_arg_1 === 'atendeu') await atendeu(agi, env, cerebro, { tts: c.tts, falar, sussurrar: c.sussurrar }).catch(() => {});
   else if (env.agi_arg_1 === 'fim') await fimDaLigacao(agi, env, cerebro).catch(() => {});
-  else await escolherModo(agi, env, { cerebro, tts: c.tts, gravacoes: c.gravacoes }).catch(() => {});
+  else if (env.agi_arg_1 === 'ura') {
+    await conduzirUra(agi, env, c.url && c.chave ? criarApiCentral(c.url, c.chave) : null, env.agi_arg_2, { falar: criarFala(agi, c) })
+      .catch(() => agi.comando('SET VARIABLE ZOE_DESTINO "padrao"').catch(() => {}));
+  } else {
+    const pedido = await agi.variavel('ZOE_PEDIDO').catch(() => '');
+    await escolherModo(agi, env, { cerebro, tts: c.tts, falar, gravacoes: c.gravacoes, pedido }).catch(() => {});
+  }
   process.exit(0);
 }
 
 if (require.main === module) principal();
 
-module.exports = { criarAgi, criarApiCerebro, conversar, escolherModo, atendeu, fimDaLigacao, ramalDoCanal, textoApp, nomeFila, lerConf, Desligou };
+module.exports = { criarAgi, criarApiCerebro, criarApiCentral, conversar, escolherModo, atendeu, fimDaLigacao, conduzirUra, destinoDaOpcao, criarFala, criarFalaPorComando,
+  ramalDoCanal, textoApp, nomeFila, lerConf, Desligou };
