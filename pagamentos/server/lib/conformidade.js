@@ -480,7 +480,7 @@ const REGRAS = [
     id: 'termos-instituicao-financeira',
     grupo: 'regulatorio',
     tipo: 'automatica',
-    titulo: 'Sem "banco", "bank" ou "agência" para o cliente',
+    titulo: 'Sem nome de banco e sem "agência" da PAY AX para o cliente',
     norma: 'Resolução Conjunta CMN/BCB nº 17/2025',
     exige: 'Não usar termos que sugiram atividade para a qual a PAY AX não tem autorização, como "banco", "bank" ou "agência". A Área do Cliente usa o código do cliente, não agência e conta.',
     verificar() {
@@ -493,10 +493,17 @@ const REGRAS = [
         path.join(raiz, 'comum', 'componentes.js'),
         ...fs.readdirSync(telas).filter((f) => f.endsWith('.js')).map((f) => path.join(telas, f)),
       ];
-      const proibido = /internet\s*bank|\bbank\b|ag[êe]ncia/i;
+      // "bank" em qualquer forma é nome de banco. "Agência" só é problema quando é a NOSSA: mostrar a
+      // agência da conta do cliente em outro banco é legítimo. Por isso a segunda checagem olha o
+      // cartão, onde fica o código do cliente.
+      const proibido = /internet\s*bank|\bbank\b/i;
       const achados = arquivos.filter((a) => proibido.test(fs.readFileSync(a, 'utf8'))).map((a) => path.relative(raiz, a));
       if (achados.length) return fora(`Termo de instituição financeira nas telas do cliente: ${achados.join(', ')}.`);
-      return ok(`Nenhuma das ${arquivos.length} telas da Área do Cliente usa "banco/bank" como nome nem "agência".`);
+      const cartao = fs.readFileSync(path.join(raiz, 'comum', 'componentes.js'), 'utf8');
+      if (/'Agência'|'Conta PAY AX'/.test(cartao) || !cartao.includes('Código do cliente')) {
+        return fora('O cartão da Área do Cliente apresenta o número da PAY AX como agência ou conta, e não como código do cliente.');
+      }
+      return ok(`Nenhuma das ${arquivos.length} telas da Área do Cliente usa "bank" no nome, e o número da PAY AX aparece como código do cliente.`);
     },
   },
   {
