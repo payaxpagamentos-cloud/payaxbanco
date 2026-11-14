@@ -64,6 +64,8 @@ function resumoCliente(db, cliente, data = hoje()) {
     transferido_mes_centavos: soma(datas.primeiroDiaMes(data)),
     taxa_repasse_centavos: d.taxa_repasse_centavos,
     chave_pix: contaDestino.descrever(cliente),
+    destino: contaDestino.descrever(cliente),
+    meio_entrega: contaDestino.meioAtual(db, cliente),
   };
 }
 

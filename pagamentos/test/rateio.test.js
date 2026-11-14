@@ -93,6 +93,11 @@ test('rateio de crédito no fluxo: emissão, liquidação e nada parado', async 
     assert.equal(repassesLib.parados(api.db).length, 0);
     const painel = (await api.get('/cliente/api/painel', c.token)).dados;
     assert.equal(painel.transferencias.transferido_hoje_centavos, 9801, 'o cliente vê o que o banco creditou');
+    const tela = (await api.get('/cliente/api/repasses', c.token)).dados;
+    assert.equal(tela.transferencias.meio_entrega, 'rateio');
+    assert.match(tela.transferencias.destino, /Bradesco · ag\. 1234-5/);
+    assert.equal(tela.total, 1, 'o crédito do banco aparece no histórico');
+    assert.deepEqual([tela.itens[0].meio, tela.itens[0].valor_liquido_centavos, tela.itens[0].nosso_numero], ['rateio', 9801, b.nosso_numero]);
   });
 
   await t.test('pago com juros: a parte do cliente é a que o banco informou no retorno', async () => {

@@ -468,7 +468,7 @@ const REGRAS = [
     exige: 'Cliente com conta Bradesco recebe pelo rateio de crédito do banco (o dinheiro não passa pela PAY AX). Os demais recebem por PIX na hora.',
     verificar(db) {
       const ativos = db.prepare("SELECT * FROM clientes WHERE situacao = 'ativo'").all();
-      const conta = db.prepare('SELECT * FROM contas_bancarias WHERE ativa = 1 ORDER BY padrao DESC, id LIMIT 1').get();
+      const conta = contaDestino.convenioAtual(db);
       const meios = ativos.map((c) => contaDestino.meioDeEntrega(c, conta, { modo: config.banco.modo }));
       const pelBanco = meios.filter((m) => m === 'rateio').length;
       const bradescoSemRateio = ativos.filter((c, i) => c.destino_banco === contaDestino.BRADESCO && meios[i] !== 'rateio').length;

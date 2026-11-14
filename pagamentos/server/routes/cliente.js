@@ -239,7 +239,17 @@ module.exports = (db, autenticado) => {
     const c = meuCliente(req);
     res.json({
       transferencias: repassesLib.resumoCliente(db, c, hoje()),
-      ...listaPaginada(db, 'SELECT * FROM repasses WHERE cliente_id = ? ORDER BY id DESC', [c.id], req.query),
+      // PIX enviados pela PAY AX + créditos que o próprio banco fez na conta do cliente (rateio).
+      ...listaPaginada(db, `SELECT * FROM (
+          SELECT 'pix' AS meio, id, criado_em, valor_liquido_centavos, taxa_centavos, pix_chave, destino_banco, destino_agencia,
+            destino_conta, titular_nome, situacao, end_to_end, erro, confirmado_em, NULL AS nosso_numero
+          FROM repasses WHERE cliente_id = ?
+          UNION ALL
+          SELECT 'rateio', l.id, l.criado_em, -l.valor_centavos, 0, NULL, NULL, NULL, NULL, NULL, 'confirmado', NULL, NULL,
+            l.criado_em, b.nosso_numero
+          FROM lancamentos l LEFT JOIN boletos b ON b.id = l.boleto_id
+          WHERE l.cliente_id = ? AND l.tipo = 'repasse' AND l.repasse_id IS NULL
+        ) ORDER BY criado_em DESC, id DESC`, [c.id, c.id], req.query),
     });
   });
   // Não existe pedido de repasse: o valor recebido vai sozinho para a conta do cliente.

@@ -95,4 +95,12 @@ function meioDeEntrega(cliente, conta, { modo = 'cnab' } = {}) {
   return 'pix';
 }
 
-module.exports = { BANCOS, BRADESCO, ler, temConta, temDestino, descrever, meioDeEntrega };
+/** Convênio em uso (o padrão ativo). */
+const convenioAtual = (db) => db.prepare('SELECT * FROM contas_bancarias WHERE ativa = 1 ORDER BY padrao DESC, id LIMIT 1').get();
+
+/** Como o dinheiro do cliente chega hoje, com o convênio e o modo de banco em uso. */
+function meioAtual(db, cliente) {
+  return meioDeEntrega(cliente, convenioAtual(db), { modo: require('../config').banco.modo });
+}
+
+module.exports = { BANCOS, BRADESCO, ler, temConta, temDestino, descrever, meioDeEntrega, convenioAtual, meioAtual };

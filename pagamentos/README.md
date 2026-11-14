@@ -413,6 +413,42 @@ Legenda: ✅ atendido no sistema · 🏦 depende do Bradesco · ⚖️ depende d
 | Prevenção à lavagem de dinheiro (Lei 9.613/1998) | Conhecer o cliente, monitorar operações atípicas, comunicar ao Coaf em 24 h sem dar ciência ao cliente | Módulo PLD: conheça seu cliente, 7 regras de monitoramento, análise, comunicação com prazo e protocolo, declaração anual | ✅ ⚖️ confirmar o enquadramento; cadastro no Coaf, política e lista de sanções são acompanhamento |
 | Regras da Anatel para cobrança de telecom | Documento de cobrança do provedor ao assinante | Responsabilidade do provedor; o boleto não substitui a fatura detalhada | ⚖️ do provedor |
 
+## Hoje empresa de tecnologia; amanhã instituição autorizada
+
+**Hoje**, a PAY AX é empresa de tecnologia: não pode manter saldo de cliente, não pode se chamar "banco" e não
+pode oferecer conta. Por isso o sistema funciona assim, e a Conformidade vigia cada ponto:
+
+| Regra de hoje | Onde está no sistema | Quem vigia |
+|---|---|---|
+| O dinheiro do cliente não fica com a PAY AX | rateio pelo banco ou PIX na hora em que o crédito cai; sem saque, mínimo nem aprovação | `repasse-imediato`, `split-pelo-banco` |
+| Sem nome de banco | "Área do Cliente" e "Código do cliente" — a PAY AX não dá agência nem conta a ninguém | `termos-instituicao-financeira` |
+| Cobrança registrada por banco autorizado | Bradesco é o beneficiário; o cliente, o beneficiário final | `beneficiario-final`, `registro` |
+
+**O que já está pronto para o dia em que a PAY AX for autorizada pelo Banco Central** (instituição de pagamento,
+Lei 12.865/2013 e Resolução BCB 80/2021; banco é outra autorização, bem mais exigente):
+
+- **Razão por cliente.** Cada centavo já entra e sai por lançamento (`lancamentos`), com data de competência e de
+  liberação, e o saldo de cada cliente fecha em zero. Uma conta de pagamento é exatamente esse razão, só que com
+  saldo permitido.
+- **Código do cliente.** É um número interno único, com dígito verificador, atribuído uma vez e que nunca muda:
+  pode virar o número da conta de pagamento sem renumerar ninguém.
+- **Separação do dinheiro.** O valor do cliente e a tarifa da PAY AX já são lançamentos distintos; numa
+  instituição de pagamento, o dinheiro dos clientes é patrimônio separado e fica aplicado conforme a regra do
+  Banco Central — o razão já sabe quanto é de cada um.
+- **PLD, LGPD, trilha de auditoria, duas etapas e credenciais cifradas**, que uma instituição autorizada precisa
+  ter desde o primeiro dia, já estão em funcionamento.
+- **Saída por PIX pelos dados da conta**, que é a mesma operação de uma transferência feita pelo cliente.
+
+**O que muda só depois da autorização** (e nunca antes — o sistema não tem chave para ligar isso hoje):
+
+1. Saldo em conta de pagamento, com transferência e saque pedidos pelo cliente — a regra `repasse-imediato` muda
+   de "nada parado" para "saldo conciliado com o patrimônio separado".
+2. Participação direta no PIX (ISPB próprio) e liquidação no SPB, em vez de depender do PIX do convênio.
+3. Agência e conta da PAY AX passam a existir, e a regra de nomenclatura troca a lista do que é proibido.
+4. Relatórios ao Banco Central, ouvidoria e as demais exigências da autorização.
+
+Antes de qualquer um desses passos: parecer jurídico e o pedido de autorização deferido.
+
 ## O que depende de terceiros (não incluído)
 
 - **Saída de rede para as consultas**: `viacep.com.br`, `brasilapi.com.br` e `gateway.apibrasil.io` precisam estar
