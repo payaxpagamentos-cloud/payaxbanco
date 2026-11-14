@@ -537,6 +537,60 @@ CREATE TABLE conformidade_acompanhamento (
 UPDATE contas_internas SET limite = 99999999;
 `,
   },
+  {
+    versao: 9,
+    nome: 'pld',
+    sql: `
+-- Prevenção à lavagem de dinheiro (Lei 9.613/1998). Nada aqui é apagado: a lei pede guarda de no
+-- mínimo cinco anos (art. 10, paragrafo 2), e o sigilo do art. 11 deixa isto fora da Área do Cliente.
+CREATE TABLE pld_alertas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  regra TEXT NOT NULL,
+  chave TEXT NOT NULL UNIQUE,              -- a mesma situação nunca gera dois alertas
+  cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+  boleto_id INTEGER REFERENCES boletos(id),
+  descricao TEXT NOT NULL,
+  valor_centavos INTEGER,
+  detalhes TEXT,                           -- JSON
+  situacao TEXT NOT NULL DEFAULT 'novo'
+    CHECK (situacao IN ('novo', 'em_analise', 'a_comunicar', 'comunicado', 'arquivado')),
+  prazo_analise TEXT NOT NULL,             -- política interna
+  analista_id INTEGER REFERENCES usuarios(id),
+  analise TEXT,                            -- justificativa do arquivamento ou fundamentação da comunicação
+  decidido_por INTEGER REFERENCES usuarios(id),
+  decidido_em TEXT,
+  prazo_comunicacao TEXT,                  -- 24 horas depois da decisão (art. 11, II)
+  coaf_protocolo TEXT,
+  comunicado_em TEXT,
+  comunicado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL
+);
+CREATE INDEX idx_pld_alertas_situacao ON pld_alertas(situacao, prazo_analise);
+CREATE INDEX idx_pld_alertas_cliente ON pld_alertas(cliente_id);
+
+-- Comunicação de não ocorrência (art. 11, III), uma por ano.
+CREATE TABLE pld_declaracoes (
+  ano INTEGER PRIMARY KEY,
+  protocolo TEXT NOT NULL,
+  enviado_em TEXT NOT NULL,
+  registrado_por INTEGER REFERENCES usuarios(id),
+  registrado_em TEXT NOT NULL
+);
+
+-- Conheça seu cliente (art. 10, I e paragrafo 1): sócios, representantes, situação na Receita, revisão.
+ALTER TABLE clientes ADD COLUMN kyc_socios TEXT;
+ALTER TABLE clientes ADD COLUMN kyc_representantes TEXT;
+ALTER TABLE clientes ADD COLUMN kyc_situacao_receita TEXT;
+ALTER TABLE clientes ADD COLUMN kyc_revisado_em TEXT;
+ALTER TABLE clientes ADD COLUMN kyc_revisado_por INTEGER REFERENCES usuarios(id);
+
+-- Suspensão de repasse por ordem legal: a única exceção ao repasse imediato.
+ALTER TABLE clientes ADD COLUMN bloqueio_repasse TEXT;
+ALTER TABLE clientes ADD COLUMN bloqueio_em TEXT;
+ALTER TABLE clientes ADD COLUMN bloqueio_por INTEGER REFERENCES usuarios(id);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

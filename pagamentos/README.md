@@ -314,6 +314,30 @@ Para ligar a exigência, o próprio administrador precisa ter 2FA ativo: não d�
 | `PAYAX_CACHE_CEP_DIAS` / `PAYAX_CACHE_CNPJ_DIAS` | `180` / `30` | Validade do cache das consultas. |
 | `PAYAX_DADOS_TIMEOUT_MS` | `8000` | Tempo máximo de espera das consultas de CEP e CNPJ. |
 
+## Prevenção à lavagem de dinheiro (PLD)
+
+A PAY AX recebe na conta dela o dinheiro dos clientes e o repassa: é *"intermediação de recursos financeiros de
+terceiros"* (Lei 9.613/1998, art. 9º, I). O sistema cumpre por padrão o que a lei pede a quem está nessa lista — o
+jurídico confirma o enquadramento (acompanhamento na Conformidade).
+
+| O que a lei pede | Como o sistema atende |
+|---|---|
+| Identificar o cliente e manter o cadastro atualizado; para empresa, quem a representa e os proprietários (art. 10, I e § 1º) | **PLD → Conheça seu cliente**: sócios (com busca na Receita), representantes, situação do CNPJ e revisão periódica |
+| Registrar as transações e guardar por 5 anos (art. 10, II e § 2º) | Boletos, lançamentos e alertas nunca são apagados |
+| Atenção especial às operações suspeitas (art. 11, I) | **Monitoramento** de hora em hora: valor alto, valor fora do padrão do cliente, fracionamento, volume do mês, cliente novo com volume alto, o cliente pagando a si mesmo, o mesmo pagador pagando vários clientes |
+| Comunicar ao Coaf em 24 horas, **sem dar ciência ao cliente** (art. 11, II) | Decidir "comunicar" abre o prazo de 24 h; vencido, vira alerta no painel e fora da norma na Conformidade. Protocolo do SISCOAF registrado no alerta. Só o administrador vê o PLD; nada chega à Área do Cliente; a auditoria guarda só a situação, nunca o texto da análise |
+| Comunicar a não ocorrência (art. 11, III) | Declaração anual registrada em PLD → Comunicações |
+
+Fluxo de um alerta: **novo → em análise → arquivado** (com justificativa) **ou a comunicar → comunicado** (com
+protocolo). Os limites das regras ficam em **PLD → Parâmetros** e devem sair da política de PLD da empresa.
+
+**Suspensão de repasse por ordem legal** (decisão judicial, indisponibilidade de ativos): a única exceção ao repasse
+imediato. Fica registrada com motivo e documento, e o valor aparece na Conformidade como "retido por ordem legal",
+à parte do "dinheiro parado". A lei de lavagem pede **comunicar**, não bloquear — a suspensão é para ordem legal.
+
+O que o sistema não faz sozinho, e está como acompanhamento na Conformidade: cadastro da PAY AX no Coaf, política de
+PLD aprovada, e a conferência dos clientes contra a lista de sanções do Conselho de Segurança da ONU (Lei 13.810/2019).
+
 ## Conformidade
 
 **Regra do projeto: nada no sistema fica fora das normas.** Toda regra legal implementada tem a fonte
@@ -344,7 +368,7 @@ Legenda: ✅ atendido no sistema · 🏦 depende do Bradesco · ⚖️ depende d
 | LGPD (Lei 13.709/2018) | Dados mínimos, segurança, transparência, direitos do titular | Senhas com scrypt, credenciais cifradas, auditoria, duas etapas, consulta de CNPJ sem dados de sócios | ✅ 🔧 faltam aviso de privacidade ao pagador, política de retenção e canal para pedidos do titular |
 | Arranjos e instituições de pagamento (Lei 12.865/2013 e regras do BCB) | Quem mantém saldo de terceiros (conta de pagamento) segue regras próprias | **Não há saldo guardado:** o valor vai ao cliente assim que o banco credita, e a Conformidade vigia isso sozinha | ✅ ⚖️ confirmar o enquadramento do recebimento em nome dos clientes e a contabilização com o contador |
 | Resolução Conjunta CMN/BCB nº 17/2025 | Sem termos que sugiram atividade sem autorização ("banco", "bank") no nome, nome fantasia e marca | "Área do Cliente" no lugar de "Internet Bank"; código do cliente no lugar de agência e conta; a Conformidade confere as telas | ✅ ⚖️ confirmar com o jurídico se a norma alcança a PAY AX |
-| Prevenção à lavagem de dinheiro (Lei 9.613/1998) | Conhecer o cliente, monitorar operações atípicas, comunicar ao COAF quando couber | Cadastro com CNPJ validado | ⚖️ 🔧 sem rotinas de monitoramento ainda |
+| Prevenção à lavagem de dinheiro (Lei 9.613/1998) | Conhecer o cliente, monitorar operações atípicas, comunicar ao Coaf em 24 h sem dar ciência ao cliente | Módulo PLD: conheça seu cliente, 7 regras de monitoramento, análise, comunicação com prazo e protocolo, declaração anual | ✅ ⚖️ confirmar o enquadramento; cadastro no Coaf, política e lista de sanções são acompanhamento |
 | Regras da Anatel para cobrança de telecom | Documento de cobrança do provedor ao assinante | Responsabilidade do provedor; o boleto não substitui a fatura detalhada | ⚖️ do provedor |
 
 ## O que depende de terceiros (não incluído)

@@ -13,8 +13,10 @@ const datas = require('./datas');
 const repasses = require('./repasses');
 const sincronismo = require('./sincronismo');
 const arquivosBanco = require('./arquivosBanco');
+const pld = require('./pld');
 
 let ultimaImportacao = null;
+let ultimoPld = 0;
 
 async function rodar(db, { forcar = false } = {}) {
   const hoje = datas.dataLocal(config.fusoPadrao);
@@ -42,6 +44,17 @@ async function rodar(db, { forcar = false } = {}) {
     }
   } catch (err) {
     console.error('[PAY AX] Falha na rodada de repasses:', err.message);
+  }
+
+  // PLD: as regras de operação atípica, de hora em hora (Lei 9.613/1998, art. 11, I).
+  if (forcar || Date.now() - ultimoPld > 3_600_000) {
+    ultimoPld = Date.now();
+    try {
+      out.pld = pld.monitorar(db);
+      if (out.pld.novos) console.log(`[PAY AX] PLD: ${out.pld.novos} alerta(s) novo(s) para análise.`);
+    } catch (err) {
+      console.error('[PAY AX] Falha no monitoramento de PLD:', err.message);
+    }
   }
 
   // Baixas pendentes no IXC: a cada ciclo.

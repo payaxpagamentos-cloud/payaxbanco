@@ -33,6 +33,7 @@ function criarApi(db) {
   api.use('/seguranca', require('./routes/seguranca')(db));
   api.use('/admin', require('./routes/admin')(db));
   api.use('/conformidade', require('./routes/conformidade')(db));
+  api.use('/pld', require('./routes/pld')(db));
   api.use((_req, _res, next) => next(new ErroNegocio('Rota não encontrada.', 404)));
   return api;
 }

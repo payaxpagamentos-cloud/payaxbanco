@@ -24,7 +24,17 @@ const escolher = (lista) => lista[aleatorio(0, lista.length - 1)];
 const NOMES = ['Ana Beatriz Ramos', 'Carlos Eduardo Lima', 'Marcos Vinícius Souza', 'Juliana Prado', 'Roberto Carvalho',
   'Fernanda Dias', 'Paulo Henrique Nunes', 'Camila Figueiredo', 'Ricardo Teixeira', 'Patrícia Moreira',
   'Sandro Almeida', 'Letícia Barbosa', 'Eduardo Vasques', 'Mariana Rocha', 'Thiago Marinho'];
-const CPFS = ['11144477735', '52998224725', '87748248800', '15350946056', '39053344705'];
+/** CPF válido a partir de 9 dígitos: cada cliente tem os próprios assinantes, sem repetir entre clientes. */
+function cpfDe(base) {
+  const d = String(base).padStart(9, '0').split('').map(Number);
+  const dv = (nums) => { const s = nums.reduce((acc, n, i) => acc + n * (nums.length + 1 - i), 0) % 11; return s < 2 ? 0 : 11 - s; };
+  d.push(dv(d)); d.push(dv(d));
+  return d.join('');
+}
+// Cada assinante paga com o mesmo CPF todo mês e é de um provedor só — como na vida real. (Antes os
+// nomes e CPFs eram sorteados separados, e o mesmo CPF aparecia em vários provedores com nomes
+// diferentes: o monitoramento de PLD acusava, com razão.)
+const assinantesDe = (indiceCliente) => NOMES.map((nome, j) => ({ nome, cpf: cpfDe(310000000 + indiceCliente * 1000 + j * 7) }));
 
 async function main() {
   if (db.prepare('SELECT COUNT(*) AS n FROM clientes').get().n) {
@@ -96,8 +106,7 @@ async function main() {
           tipo: Math.random() < 0.75 ? 'bolepix' : 'boleto',
           valor_centavos: valor, emissao, vencimento,
           seu_numero: `FAT-${String(1000 + i)}`,
-          pagador_nome: escolher(NOMES),
-          pagador_documento: escolher(CPFS),
+          ...(() => { const p = escolher(assinantesDe(CLIENTES.indexOf(c))); return { pagador_nome: p.nome, pagador_documento: p.cpf }; })(),
           pagador_cidade: c.cidade,
           pagador_uf: c.uf,
           pagador_bairro: 'Centro',
@@ -121,6 +130,21 @@ async function main() {
       }
     }
     console.log(`[PAY AX] ${c.fantasia}: ${c.titulos} boletos, ${liquidados} liquidados.`);
+  }
+
+  // PLD: um pagamento fora do perfil, para a tela de prevenção à lavagem de dinheiro ter o que mostrar.
+  {
+    const beta = db.prepare("SELECT * FROM clientes WHERE nome_fantasia = 'Beta Fibra'").get();
+    db.prepare("UPDATE clientes SET limite_boleto_centavos = 3000000 WHERE id = ?").run(beta.id);
+    const fora = await boletosLib.emitir(db, {
+      cliente: db.prepare('SELECT * FROM clientes WHERE id = ?').get(beta.id),
+      dados: { tipo: 'bolepix', valor: '14.800,00', vencimento: hoje, emissao: datas.somarDias(hoje, -2), pagador_nome: 'Comercial Horizonte Ltda',
+        pagador_documento: '45723174000110', pagador_cidade: 'Santos', pagador_uf: 'SP', pagador_cep: '11700000',
+        pagador_endereco: 'Av. Ana Costa', pagador_numero: '1200', juros_mes: '1', multa: '2', mensagem: 'Serviço de link dedicado.' },
+    });
+    boletosLib.liquidar(db, fora.id, { pago_em: hoje, valor_pago_centavos: 1_480_000, meio: 'pix' }, { origem: 'demonstracao' });
+    const r = require('./lib/pld').monitorar(db);
+    console.log(`[PAY AX] PLD: ${r.novos} alerta(s) de demonstração.`);
   }
 
   // Repasses: tudo o que o banco já creditou vai para os clientes — nada fica parado.

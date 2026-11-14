@@ -27,6 +27,9 @@ const EQUIPE = {
     'conformidade.ver'],
 };
 // conformidade.editar (registrar a situação das regras de acompanhamento): só o administrador, pelo '*'.
+// pld.ver e pld.analisar: só o administrador, pelo '*'. É sigilo de lei (Lei 9.613/1998, art. 11, II):
+// alerta e comunicação ao Coaf não podem chegar a quem não precisa saber. Para dar acesso a alguém
+// de compliance sem dar o resto, crie um perfil com só essas duas.
 
 const CLIENTE = {
   admin: ['painel.ver', 'boletos.ver', 'boletos.emitir', 'boletos.baixar', 'razao.ver', 'repasses.ver',

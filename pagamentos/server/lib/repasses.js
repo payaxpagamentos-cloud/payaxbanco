@@ -103,6 +103,7 @@ function criar(db, cliente, { usuario = null } = {}) {
 
 /** Repassa agora tudo o que está liberado para um cliente. Devolve o repasse (ou null). */
 async function repassar(db, cliente, { usuario = null } = {}) {
+  if (cliente.bloqueio_repasse) throw new ErroNegocio('Os repasses deste cliente estão suspensos por ordem legal (tela PLD).', 409);
   const r = criar(db, cliente, { usuario });
   if (!r) return null;
   return enviar(db, r.id, { usuario });
@@ -110,7 +111,7 @@ async function repassar(db, cliente, { usuario = null } = {}) {
 
 /** Atalho para quem acabou de dar baixa num título: repassa o cliente dele, se já houver crédito. */
 async function repassarCliente(db, clienteId) {
-  const c = db.prepare("SELECT * FROM clientes WHERE id = ? AND situacao <> 'encerrado' AND pix_chave IS NOT NULL").get(clienteId);
+  const c = db.prepare("SELECT * FROM clientes WHERE id = ? AND situacao <> 'encerrado' AND pix_chave IS NOT NULL AND bloqueio_repasse IS NULL").get(clienteId);
   if (!c) return null;
   return repassar(db, c);
 }
@@ -185,7 +186,8 @@ async function enviar(db, id, { usuario = null } = {}) {
  */
 async function rotinaAutomatica(db, { usuario = null } = {}) {
   const data = hoje();
-  const clientes = db.prepare("SELECT * FROM clientes WHERE situacao <> 'encerrado' AND pix_chave IS NOT NULL").all();
+  // Cliente com repasse suspenso por ordem legal fica de fora (a única exceção ao repasse imediato).
+  const clientes = db.prepare("SELECT * FROM clientes WHERE situacao <> 'encerrado' AND pix_chave IS NOT NULL AND bloqueio_repasse IS NULL").all();
   const resultado = { data, criados: 0, enviados: 0, falhas: 0, detalhes: [] };
   for (const c of clientes) {
     let r;
@@ -217,14 +219,19 @@ async function rotinaAutomatica(db, { usuario = null } = {}) {
  * Conta o saldo liberado ATÉ AGORA (com os repasses de hoje já descontados) e limita ao que foi
  * liberado antes de hoje: assim um crédito de ontem repassado hoje cedo não aparece como parado.
  */
-function parados(db, data = hoje()) {
-  return db.prepare(`SELECT c.id, COALESCE(c.nome_fantasia, c.razao_social) AS cliente, c.pix_chave,
+function parados(db, data = hoje(), { suspensos = false } = {}) {
+  return db.prepare(`SELECT c.id, COALESCE(c.nome_fantasia, c.razao_social) AS cliente, c.pix_chave, c.bloqueio_repasse,
       SUM(CASE WHEN l.data_liberacao <= ? THEN l.valor_centavos ELSE 0 END) AS ate_agora,
       SUM(CASE WHEN l.data_liberacao < ? THEN l.valor_centavos ELSE 0 END) AS antes_de_hoje
     FROM lancamentos l JOIN clientes c ON c.id = l.cliente_id
+    WHERE c.bloqueio_repasse IS ${suspensos ? 'NOT NULL' : 'NULL'}
     GROUP BY c.id`).all(data, data)
-    .map((x) => ({ id: x.id, cliente: x.cliente, pix_chave: x.pix_chave, valor_centavos: Math.min(x.ate_agora, x.antes_de_hoje) }))
+    .map((x) => ({ id: x.id, cliente: x.cliente, pix_chave: x.pix_chave, motivo: x.bloqueio_repasse,
+      valor_centavos: Math.min(x.ate_agora, x.antes_de_hoje) }))
     .filter((x) => x.valor_centavos > 0);
 }
 
-module.exports = { disponivel, resumoCliente, criar, repassar, repassarCliente, aprovar, cancelar, enviar, rotinaAutomatica, parados, destinoDe };
+/** Valor retido por ordem legal: não é "dinheiro parado", é cumprimento de ordem — aparece à parte. */
+const retidosPorOrdem = (db, data = hoje()) => parados(db, data, { suspensos: true });
+
+module.exports = { disponivel, resumoCliente, criar, repassar, repassarCliente, aprovar, cancelar, enviar, rotinaAutomatica, parados, retidosPorOrdem, destinoDe };

@@ -31,12 +31,14 @@ const backup = require('./backup');
 const dois = require('./doisfatores');
 const arquivosBanco = require('./arquivosBanco');
 const repasses = require('./repasses');
+const pld = require('./pld');
 
 const GRUPOS = [
   { id: 'boleto', titulo: 'Boleto e cobrança' },
   { id: 'banco', titulo: 'Banco (Bradesco)' },
   { id: 'dados', titulo: 'Dados e segurança (LGPD)' },
   { id: 'regulatorio', titulo: 'Regulatório' },
+  { id: 'pld', titulo: 'Prevenção à lavagem de dinheiro (PLD)' },
 ];
 
 /** Situações de uma regra de acompanhamento, como a equipe as registra. */
@@ -366,7 +368,11 @@ const REGRAS = [
           + `(R$ ${(total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}): ${lista.map((x) => x.cliente).join(', ')}.`
           + (semPix ? ` ${plural(semPix, 'deles está', 'deles estão')} sem chave PIX.` : ' Veja os repasses com falha.'));
       }
-      return ok('Todo valor creditado antes de hoje já foi repassado. O de hoje sai na rodada seguinte (a cada 15 minutos).');
+      const retidos = repasses.retidosPorOrdem(db);
+      const extra = retidos.length
+        ? ` Retido por ordem legal (não é dinheiro parado): ${retidos.map((x) => `${x.cliente}, R$ ${(x.valor_centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`).join('; ')}.`
+        : '';
+      return ok(`Todo valor creditado antes de hoje já foi repassado. O de hoje sai na rodada seguinte (a cada 15 minutos).${extra}`);
     },
   },
   {
@@ -420,13 +426,100 @@ const REGRAS = [
     responsavel: 'Jurídico',
   },
   {
-    id: 'pld',
-    grupo: 'regulatorio',
+    id: 'pld-monitoramento',
+    grupo: 'pld',
+    tipo: 'automatica',
+    titulo: 'Monitoramento de operações atípicas rodando',
+    norma: 'Lei 9.613/1998, art. 11, I',
+    exige: 'Dar especial atenção às operações que possam indicar lavagem de dinheiro: as regras de PLD rodam de hora em hora.',
+    verificar(db) {
+      const r = pld.resumo(db);
+      if (!r.ultimo_monitoramento) return atencao('O monitoramento ainda não rodou neste servidor. Ele roda sozinho de hora em hora, ou em PLD → Analisar agora.');
+      const horas = (Date.now() - Date.parse(r.ultimo_monitoramento)) / 3_600_000;
+      if (horas > 26) return fora(`O monitoramento não roda há ${Math.round(horas)} horas.`);
+      return ok(`Rodou há ${horas < 1 ? 'menos de 1 hora' : `${Math.round(horas)} hora(s)`}: ${pld.REGRAS.length} regras de operação atípica.`);
+    },
+  },
+  {
+    id: 'pld-prazos',
+    grupo: 'pld',
+    tipo: 'automatica',
+    titulo: 'Alertas analisados e comunicações ao Coaf no prazo',
+    norma: 'Lei 9.613/1998, art. 11, II (24 horas)',
+    exige: 'Decidida a comunicação, ela vai ao Coaf em 24 horas, sem dar ciência ao cliente. Alerta não fica sem análise além do prazo da política interna.',
+    verificar(db) {
+      const a = pld.atrasos(db);
+      if (a.comunicacao) return fora(`${plural(a.comunicacao, 'comunicação ao Coaf passou', 'comunicações ao Coaf passaram')} das 24 horas sem o protocolo registrado.`);
+      if (a.analise) return atencao(`${plural(a.analise, 'alerta está', 'alertas estão')} sem análise além do prazo da política interna.`);
+      return ok('Nenhuma comunicação atrasada e nenhum alerta além do prazo de análise.');
+    },
+  },
+  {
+    id: 'pld-conheca-cliente',
+    grupo: 'pld',
+    tipo: 'automatica',
+    titulo: 'Conheça seu cliente: sócios, representantes e revisão',
+    norma: 'Lei 9.613/1998, art. 10, I e § 1º',
+    exige: 'Identificar cada cliente e manter o cadastro atualizado; para empresa, quem a representa e os proprietários.',
+    verificar(db) {
+      const ativos = pld.listarKyc(db).filter((k) => k.situacao === 'ativo');
+      const pend = ativos.filter((k) => !k.completo);
+      if (pend.length) return fora(`${plural(pend.length, 'cliente ativo está', 'clientes ativos estão')} com o cadastro de PLD incompleto ou vencido: ${pend.slice(0, 5).map((k) => k.cliente).join(', ')}${pend.length > 5 ? '…' : ''}. Complete em PLD → Clientes.`);
+      return ok(ativos.length ? `Os ${ativos.length} clientes ativos têm sócios, representantes e revisão em dia.` : 'Nenhum cliente ativo.');
+    },
+  },
+  {
+    id: 'pld-nao-ocorrencia',
+    grupo: 'pld',
+    tipo: 'automatica',
+    titulo: 'Declaração de não ocorrência do ano anterior',
+    norma: 'Lei 9.613/1998, art. 11, III',
+    exige: 'Sem nenhuma comunicação ao Coaf no ano, declarar a não ocorrência, na periodicidade da regulamentação (confirmar o prazo com o jurídico).',
+    verificar(db) {
+      const ano = Number(datas.dataLocal(config.fusoPadrao).slice(0, 4)) - 1;
+      const operou = db.prepare("SELECT COUNT(*) AS n FROM boletos WHERE substr(emissao, 1, 4) = ?").get(String(ano)).n;
+      if (!operou) return ok(`Sem operação em ${ano}: não há o que declarar.`);
+      if (pld.comunicacoesNoAno(db, ano)) return ok(`Houve comunicação ao Coaf em ${ano}: a declaração de não ocorrência não se aplica.`);
+      const d = pld.declaracoes(db).find((x) => x.ano === ano);
+      if (d) return ok(`Declaração de ${ano} enviada em ${d.enviado_em} (protocolo ${d.protocolo}).`);
+      return atencao(`Registre a declaração de não ocorrência de ${ano} (PLD → Comunicações), depois de enviá-la no SISCOAF.`);
+    },
+  },
+  {
+    id: 'pld-enquadramento',
+    grupo: 'pld',
     tipo: 'acompanhamento',
-    titulo: 'Prevenção à lavagem de dinheiro',
-    norma: 'Lei 9.613/1998',
-    exige: 'Conhecer o cliente, monitorar operações fora do padrão e comunicar ao COAF quando couber.',
-    responsavel: 'Jurídico e compliance',
+    titulo: 'Enquadramento da PAY AX na lei de lavagem de dinheiro',
+    norma: 'Lei 9.613/1998, art. 9º, I ("intermediação de recursos financeiros de terceiros")',
+    exige: 'Confirmar que a PAY AX é pessoa obrigada e qual órgão a supervisiona (sem regulador próprio, o Coaf). O sistema já cumpre os arts. 10 e 11 como se fosse.',
+    responsavel: 'Jurídico',
+  },
+  {
+    id: 'pld-cadastro-coaf',
+    grupo: 'pld',
+    tipo: 'acompanhamento',
+    titulo: 'Cadastro da PAY AX no Coaf (SISCOAF)',
+    norma: 'Lei 9.613/1998, art. 10, IV',
+    exige: 'Cadastrar-se e manter o cadastro atualizado no Coaf, na falta de órgão regulador próprio. É pelo SISCOAF que as comunicações são feitas.',
+    responsavel: 'Compliance',
+  },
+  {
+    id: 'pld-politica',
+    grupo: 'pld',
+    tipo: 'acompanhamento',
+    titulo: 'Política de PLD aprovada e equipe treinada',
+    norma: 'Lei 9.613/1998, art. 10, III',
+    exige: 'Políticas, procedimentos e controles internos compatíveis com o porte. Os limites das regras do sistema (PLD → Parâmetros) devem sair dessa política.',
+    responsavel: 'Diretoria e compliance',
+  },
+  {
+    id: 'pld-sancoes',
+    grupo: 'pld',
+    tipo: 'acompanhamento',
+    titulo: 'Lista de sanções do Conselho de Segurança da ONU',
+    norma: 'Lei 13.810/2019 (indisponibilidade de ativos)',
+    exige: 'Conferir clientes contra a lista de sanções e cumprir a indisponibilidade sem demora. O sistema tem a suspensão de repasse por ordem legal; a conferência da lista ainda é manual.',
+    responsavel: 'Compliance',
   },
   {
     id: 'contrato-clientes',

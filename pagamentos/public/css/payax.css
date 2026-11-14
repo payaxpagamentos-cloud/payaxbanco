@@ -31,3 +31,6 @@
 .regra-meta .vencido { color: #a52f2f; }
 .regra-obs { width: 100%; white-space: pre-wrap; }
 .regra-obs.sem-registro { color: var(--texto-3); }
+
+/* Selo dentro de um par rótulo/valor: do tamanho do texto, não da coluna. */
+.par .val .selo { justify-self: start; width: fit-content; }

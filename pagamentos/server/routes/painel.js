@@ -9,6 +9,7 @@ const { podeEquipe } = require('../lib/permissoes');
 const backup = require('../lib/backup');
 const arquivosBanco = require('../lib/arquivosBanco');
 const conformidade = require('../lib/conformidade');
+const pld = require('../lib/pld');
 
 /** Visão geral da plataforma: o que entrou, quanto ficou conosco e o que está pendente. */
 module.exports = (db) => {
@@ -51,7 +52,7 @@ module.exports = (db) => {
           IFNULL(SUM(b.pago_valor_centavos), 0) AS bruto_centavos
         FROM clientes c LEFT JOIN boletos b ON b.cliente_id = c.id AND b.situacao = 'liquidado' AND b.pago_em BETWEEN ? AND ?
         GROUP BY c.id ORDER BY bruto_centavos DESC LIMIT 8`).all(periodo.de, periodo.ate),
-      alertas: await alertas(db, hoje),
+      alertas: await alertas(db, hoje, req.usuario.perfil),
     });
   });
 
@@ -59,7 +60,7 @@ module.exports = (db) => {
 };
 
 /** Pendências que exigem ação da equipe. */
-async function alertas(db, hoje) {
+async function alertas(db, hoje, perfil) {
   const lista = [];
   const esperando = db.prepare("SELECT COUNT(*) AS n, IFNULL(SUM(valor_liquido_centavos),0) AS v FROM repasses WHERE situacao = 'aguardando_aprovacao'").get();
   if (esperando.n) lista.push({ tipo: 'repasses_aprovacao', severidade: 'aviso', quantidade: esperando.n, valor_centavos: esperando.v,
@@ -100,6 +101,15 @@ async function alertas(db, hoje) {
     texto: `${foraDaNorma} regra(s) de conformidade fora da norma` });
   if (c.resumo.prazos_vencidos) lista.push({ tipo: 'conformidade_prazo', severidade: 'aviso', quantidade: c.resumo.prazos_vencidos,
     texto: `${c.resumo.prazos_vencidos} pendência(s) de conformidade com prazo vencido` });
+
+  // PLD: só para quem pode ver (sigilo da Lei 9.613/1998, art. 11, II).
+  if (podeEquipe(perfil, 'pld.ver')) {
+    const r = pld.resumo(db);
+    if (r.atrasos.comunicacao) lista.push({ tipo: 'pld_comunicacao', severidade: 'erro', quantidade: r.atrasos.comunicacao,
+      texto: `${r.atrasos.comunicacao} comunicação(ões) ao Coaf com o prazo de 24 horas vencido` });
+    if (r.abertos) lista.push({ tipo: 'pld', severidade: r.atrasos.analise ? 'erro' : 'aviso', quantidade: r.abertos,
+      texto: `${r.abertos} alerta(s) de PLD para analisar${r.atrasos.analise ? ` (${r.atrasos.analise} com prazo vencido)` : ''}` });
+  }
 
   // O razão é o dinheiro dos clientes: backup atrasado ou que não conferiu é assunto urgente.
   const b = backup.situacao(db);

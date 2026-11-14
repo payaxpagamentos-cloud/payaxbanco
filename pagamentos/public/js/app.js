@@ -26,6 +26,8 @@ const MENU = [
     ['contas', 'Contas e preços', 'banco', 'precos.ver', () => import('./telas/contas.js')],
     ['integracoes', 'Integrações', 'plugue', 'integracoes.ver', () => import('./telas/integracoes.js')],
     ['conformidade', 'Conformidade', 'balanca', 'conformidade.ver', () => import('./telas/conformidade.js')],
+    // PLD: só o administrador ('*'), por sigilo de lei. pld.ver serve para um perfil de compliance futuro.
+    ['pld', 'PLD', 'busca', ['pld.ver', '*'], () => import('./telas/pld.js')],
     ['admin', 'Segurança e usuários', 'escudo', 'auditoria.ver', () => import('./telas/admin.js')],
   ]],
 ];

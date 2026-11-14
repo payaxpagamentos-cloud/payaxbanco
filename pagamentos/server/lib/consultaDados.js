@@ -220,6 +220,33 @@ async function consultarCnpj(db, entrada) {
   return { ...saida, fonte: fonte.nome, do_cache: false };
 }
 
+/**
+ * Sócios (quadro societário) e situação na Receita, para o "conheça seu cliente" da PLD.
+ *
+ * Na consulta comum o quadro societário é descartado (LGPD: não é necessário para cadastrar).
+ * Aqui ele é necessário: a Lei 9.613/1998 (art. 10, § 1º) manda identificar os proprietários do
+ * cliente pessoa jurídica — é obrigação legal (LGPD, art. 7º, II). Por isso: sem cache, só nome e
+ * qualificação, e só a tela de PLD chama.
+ */
+async function consultarSocios(db, entrada) {
+  const cnpj = so(entrada);
+  v.exigir(cnpj.length === 14 && v.cnpjValido(cnpj), 'CNPJ inválido.');
+  const fonte = fonteDe(db, 'cnpj');
+  const bruto = fonte.nome === 'apibrasil'
+    ? await buscar(`${config.dados.urlApiBrasil}/cnpj`, { metodo: 'POST', corpo: { cnpj }, token: fonte.token }).catch(() => null)
+    : null;
+  const j = bruto?.data ?? bruto?.response ?? bruto ?? await buscar(`${config.dados.urlBrasilApi}/cnpj/v1/${cnpj}`);
+  const lista = j.qsa ?? j.socios ?? j.estabelecimento?.socios ?? [];
+  return {
+    cnpj,
+    situacao: texto(j.descricao_situacao_cadastral ?? j.situacao_cadastral ?? j.situacao),
+    socios: (Array.isArray(lista) ? lista : []).map((s) => ({
+      nome: texto(s.nome_socio ?? s.nome),
+      qualificacao: texto(s.qualificacao_socio ?? s.qualificacao?.descricao ?? s.qualificacao),
+    })).filter((s) => s.nome),
+  };
+}
+
 /** Estado das fontes, para a tela de Integrações. */
 const estado = (db) => ({
   cep: { fonte: fonteDe(db, 'cep').nome, escolhida: config.dados.cepFonte },
@@ -228,5 +255,5 @@ const estado = (db) => ({
   cache: db.prepare('SELECT tipo, COUNT(*) AS n FROM consultas_cache GROUP BY tipo').all(),
 });
 
-module.exports = { consultarCep, consultarCnpj, estado, tokenApiBrasil, fonteDe,
+module.exports = { consultarCep, consultarCnpj, consultarSocios, estado, tokenApiBrasil, fonteDe,
   lerCepPublico, lerCepApiBrasil, lerCnpjPublico, lerCnpjApiBrasil };

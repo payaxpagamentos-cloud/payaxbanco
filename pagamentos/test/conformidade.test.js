@@ -71,14 +71,14 @@ test('conformidade: o sistema confere as próprias regras', async (t) => {
   });
 
   await t.test('prazo vencido aparece no resumo e no painel', async () => {
-    await api.put('/api/conformidade/pld', { situacao: 'pendente', prazo: somarDias(hoje(), -3) }, tk.admin);
+    await api.put('/api/conformidade/pld-politica', { situacao: 'pendente', prazo: somarDias(hoje(), -3) }, tk.admin);
     const d = (await api.get('/api/conformidade', tk.admin)).dados;
-    assert.equal(regrasDe(d).pld.prazo_vencido, true);
+    assert.equal(regrasDe(d)['pld-politica'].prazo_vencido, true);
     assert.equal(d.resumo.prazos_vencidos, 1);
     const painel = (await api.get('/api/painel', tk.admin)).dados;
     assert.ok(painel.alertas.some((al) => al.tipo === 'conformidade_prazo'));
     // Atendida, o prazo deixa de contar.
-    await api.put('/api/conformidade/pld', { situacao: 'atendida', prazo: somarDias(hoje(), -3) }, tk.admin);
+    await api.put('/api/conformidade/pld-politica', { situacao: 'atendida', prazo: somarDias(hoje(), -3) }, tk.admin);
     assert.equal((await api.get('/api/conformidade', tk.admin)).dados.resumo.prazos_vencidos, 0);
   });
 
@@ -88,14 +88,14 @@ test('conformidade: o sistema confere as próprias regras', async (t) => {
   });
 
   await t.test('situação inválida e regra que não existe são recusadas', async () => {
-    assert.equal((await api.put('/api/conformidade/pld', { situacao: 'resolvida' }, tk.admin)).status, 422);
+    assert.equal((await api.put('/api/conformidade/pld-politica', { situacao: 'resolvida' }, tk.admin)).status, 422);
     assert.equal((await api.put('/api/conformidade/nao-existe', { situacao: 'pendente' }, tk.admin)).status, 404);
   });
 
   await t.test('a equipe vê; só o administrador registra', async () => {
     for (const perfil of ['financeiro', 'operacao', 'consulta']) {
       assert.equal((await api.get('/api/conformidade', tk[perfil])).status, 200, `${perfil} vê`);
-      assert.equal((await api.put('/api/conformidade/pld', { situacao: 'pendente' }, tk[perfil])).status, 403, `${perfil} não registra`);
+      assert.equal((await api.put('/api/conformidade/pld-politica', { situacao: 'pendente' }, tk[perfil])).status, 403, `${perfil} não registra`);
     }
   });
 });
