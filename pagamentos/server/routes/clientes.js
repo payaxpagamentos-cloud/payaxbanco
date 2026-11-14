@@ -11,6 +11,7 @@ const v = require('../lib/validacao');
 const datas = require('../lib/datas');
 const razao = require('../lib/razao');
 const precos = require('../lib/precos');
+const contaDestino = require('../lib/contaDestino');
 const consultas = require('../lib/consultas');
 const repasses = require('../lib/repasses');
 const auditoria = require('../lib/auditoria');
@@ -19,8 +20,8 @@ const contaInterna = require('../lib/contaInterna');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 
-/** Campos do cadastro que a equipe pode gravar. */
-function corpoCliente(body, { novo = false } = {}) {
+/** Campos do cadastro que a equipe pode gravar. `cnpjAtual`: o CNPJ já gravado (na edição). */
+function corpoCliente(body, { novo = false, cnpjAtual = null } = {}) {
   const d = {};
   if (novo || body.razao_social !== undefined) d.razao_social = v.texto(body.razao_social, 'a razão social', 120);
   if (novo || body.cnpj !== undefined) d.cnpj = v.cnpj(body.cnpj);
@@ -54,6 +55,8 @@ function corpoCliente(body, { novo = false } = {}) {
   }
   if (body.pix_titular !== undefined) d.pix_titular = v.opcional(body.pix_titular, 'o titular da chave PIX', 120);
   if (body.pix_documento !== undefined) d.pix_documento = body.pix_documento ? v.documento(body.pix_documento, 'o CPF/CNPJ do titular') : null;
+  // Conta para onde vai o valor de cada boleto pago — tem que ser da própria empresa (mesmo CNPJ).
+  Object.assign(d, contaDestino.ler(body, d.cnpj ?? cnpjAtual));
   return d;
 }
 
@@ -108,6 +111,8 @@ module.exports = (db) => {
     res.json({
       ...c,
       codigo_cliente: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
+      destino_descricao: contaDestino.descrever(c),
+      meio_entrega: contaDestino.meioDeEntrega(c, db.prepare('SELECT * FROM contas_bancarias WHERE ativa = 1 ORDER BY padrao DESC, id LIMIT 1').get()),
       saldo: razao.saldo(db, c.id, data),
       preco: precos.vigente(db, c.id, data),
       agenda: razao.agenda(db, c.id, data, 30),
@@ -128,7 +133,7 @@ module.exports = (db) => {
   r.patch('/:id', exigir('clientes.editar'), (req, res) => {
     const c = buscar(req.params.id);
     conferirVersao(c.versao, req.body?.versao);
-    const d = corpoCliente(req.body ?? {});
+    const d = corpoCliente(req.body ?? {}, { cnpjAtual: buscar(req.params.id).cnpj });
     if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
     if (d.cnpj && d.cnpj !== c.cnpj && db.prepare('SELECT 1 FROM clientes WHERE cnpj = ? AND id <> ?').get(d.cnpj, c.id)) {
       throw new ErroNegocio('Já existe outro cliente com este CNPJ.', 409);

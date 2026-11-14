@@ -59,7 +59,7 @@ export function cartaoConta({ transferencias: t, codigo = null, acoes = [] }) {
     el('div', { class: 'faixa' }, itens.map((i) => i.no)),
     el('div', { class: 'numero-conta' },
       codigo ? el('div', {}, 'Código do cliente', el('strong', {}, codigo)) : null,
-      t.chave_pix ? el('div', {}, 'Recebe na chave PIX', el('strong', { class: 'chave' }, t.chave_pix)) : null,
+      t.chave_pix ? el('div', {}, 'Recebe em', el('strong', { class: 'chave' }, t.chave_pix)) : null,
       marcaCartao()),
     acoes.length ? el('div', { class: 'acoes-cartao' }, acoes) : null);
 }

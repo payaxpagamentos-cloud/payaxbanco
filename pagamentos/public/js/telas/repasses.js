@@ -45,7 +45,7 @@ export default async function repasses({ alvo, query, recarregar }) {
       colunas: [
         { titulo: '#', conteudo: (r) => r.id },
         { titulo: 'Cliente', conteudo: (r) => el('span', {}, el('span', { class: 'forte' }, r.nome_fantasia || r.razao_social),
-          el('span', { class: 'sub' }, r.pix_chave)) },
+          el('span', { class: 'sub' }, r.pix_chave ?? `banco ${r.destino_banco} · ag. ${r.destino_agencia} · conta ${r.destino_conta}`)) },
         { titulo: 'Criado', conteudo: (r) => dataHora(r.criado_em) },
         { titulo: 'Líquido', dir: true, conteudo: (r) => el('span', {}, el('strong', {}, dinheiro(r.valor_liquido_centavos)),
           r.taxa_centavos ? el('span', { class: 'sub' }, `bruto ${dinheiro(r.valor_centavos)}`) : null) },

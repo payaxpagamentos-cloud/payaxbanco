@@ -92,8 +92,8 @@ function simulador(conta) {
     async baixar() {
       return { ok: true, protocolo: `SIM-BX-${Date.now().toString(36).toUpperCase()}` };
     },
-    async pagarPix({ chave, valor_centavos, descricao }) {
-      if (!chave) throw new ErroBanco('Repasse sem chave PIX de destino.');
+    async pagarPix({ chave, conta: destino, valor_centavos, descricao }) {
+      if (!chave && !destino?.conta) throw new ErroBanco('Repasse sem destino (nem chave PIX nem conta).');
       // Só no simulador: chave com "@recusa.teste" simula o banco recusando o PIX (para testar a nova tentativa).
       if (String(chave).endsWith('@recusa.teste')) throw new ErroBanco('Chave PIX não encontrada no DICT (simulado).');
       return {
@@ -337,15 +337,21 @@ function apiBradesco(conta, credenciais, opcoes = {}) {
       });
       return { ok: true, protocolo: String(resp?.nuProtocolo ?? '') };
     },
-    async pagarPix({ chave, tipo_chave, valor_centavos, descricao, documento_titular }) {
+    async pagarPix({ chave, tipo_chave, conta: destino, valor_centavos, descricao, documento_titular }) {
       const resp = await chamar(ENDPOINTS.pix_pagamento, {
         corpo: {
           contaDebito: { agencia: so(conta.agencia), conta: so(conta.conta) },
-          chaveDestino: chave,
-          tipoChave: tipo_chave,
+          // Por chave, ou pelos dados da conta (PIX "manual": ISPB, agência, conta e documento).
+          // Nomes de campo a confirmar na homologação, como o resto do contrato da API.
+          ...(chave ? { chaveDestino: chave, tipoChave: tipo_chave } : {
+            contaDestino: {
+              ispb: destino.ispb, agencia: so(destino.agencia), conta: so(destino.conta),
+              tipoConta: 'CACC', nomeTitular: semAcento(destino.titular).slice(0, 80),
+            },
+          }),
           valor: (valor_centavos / 100).toFixed(2),
           descricao: semAcento(descricao).slice(0, 140),
-          cpfCnpjRecebedor: so(documento_titular) || undefined,
+          cpfCnpjRecebedor: so(documento_titular ?? destino?.documento) || undefined,
         },
       });
       return {

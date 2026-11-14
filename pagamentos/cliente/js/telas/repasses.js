@@ -25,15 +25,16 @@ export default async function repasses({ alvo, query }) {
 
     el('div', { style: 'margin-top:14px' },
       t.chave_pix
-        ? aviso(`Destino: chave PIX ${t.chave_pix}. Para trocar, fale com o seu gerente de conta — por segurança, só a PAY AX altera o destino.`, 'info')
-        : aviso('A sua empresa ainda não tem chave PIX cadastrada. Sem ela não é possível emitir boletos: fale com o seu gerente de conta.', 'erro')),
+        ? aviso(`Destino: ${t.chave_pix}. Para trocar, fale com o seu gerente de conta — por segurança, só a PAY AX altera o destino, e só para conta da própria empresa.`, 'info')
+        : aviso('A sua empresa ainda não tem conta de destino cadastrada. Sem ela não é possível emitir boletos: fale com o seu gerente de conta.', 'erro')),
 
     el('div', { style: 'margin-top:14px' }, tabela({
       colunas: [
         { titulo: 'Data', conteudo: (r) => dataHora(r.criado_em) },
         { titulo: 'Valor transferido', dir: true, conteudo: (r) => el('span', {}, el('strong', {}, dinheiro(r.valor_liquido_centavos)),
           r.taxa_centavos ? el('span', { class: 'sub' }, `tarifa do PIX ${dinheiro(r.taxa_centavos)}`) : null) },
-        { titulo: 'Chave PIX', conteudo: (r) => el('span', {}, r.pix_chave, el('span', { class: 'sub' }, r.titular_nome ?? '')) },
+        { titulo: 'Destino', conteudo: (r) => el('span', {}, r.pix_chave ?? `banco ${r.destino_banco} · ag. ${r.destino_agencia} · conta ${r.destino_conta}`,
+          el('span', { class: 'sub' }, r.titular_nome ?? '')) },
         { titulo: 'Situação', conteudo: (r) => el('span', {}, selo(r.situacao, R.situacaoRepasse),
           r.end_to_end ? el('span', { class: 'sub num' }, r.end_to_end) : r.erro ? el('span', { class: 'sub' }, `${r.erro} — nova tentativa automática`) : null) },
         { titulo: 'Confirmado', conteudo: (r) => (r.confirmado_em ? dataHora(r.confirmado_em) : '—') },

@@ -106,3 +106,43 @@ test('repasse imediato: nenhum dinheiro de cliente parado', async (t) => {
     assert.equal(e.itens.at(-1).saldo_acumulado_centavos, 0);
   });
 });
+
+test('conta de destino: PIX pelos dados da conta, e só para conta da própria empresa', async (t) => {
+  const api = await iniciar();
+  t.after(() => api.fechar());
+  const tk = await api.equipe();
+  await api.conta(tk.admin);
+  await api.precoPadrao(tk.admin);
+  const conta = { destino_banco: '341', destino_agencia: '1234', destino_conta: '567890', destino_conta_dv: '1',
+    destino_tipo: 'corrente', destino_titular: 'Provedor Alfa LTDA' };
+
+  await t.test('conta de outra empresa é recusada', async () => {
+    const r = await api.post('/api/clientes', { razao_social: 'Provedor Alfa LTDA', cnpj: '11122233000183', situacao: 'ativo',
+      ...conta, destino_documento: '19131243000197' }, tk.admin);
+    assert.equal(r.status, 422);
+    assert.match(r.dados.erro, /própria empresa/);
+  });
+
+  await t.test('com a conta da própria empresa e sem chave PIX, emite e o repasse vai pelos dados da conta', async () => {
+    const a = await api.cliente(tk.admin, { pix_chave: '', ...conta });
+    assert.equal(a.cliente.destino_ispb, '60701190', 'ISPB do Itaú preenchido pelo código do banco');
+    const ficha = (await api.get(`/api/clientes/${a.cliente.id}`, tk.admin)).dados;
+    assert.match(ficha.destino_descricao, /Itaú Unibanco · ag\. 1234 · c\/c 567890-1/);
+    assert.equal(ficha.meio_entrega, 'pix', 'outro banco: PIX');
+
+    const b = await api.boleto(tk.admin, a.cliente.id, { valor: '100,00', vencimento: somarDias(hoje(), 5) });
+    await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: hoje(), valor_pago: '100,00', meio: 'pix' }, tk.financeiro);
+    const r = api.db.prepare('SELECT * FROM repasses WHERE cliente_id = ?').get(a.cliente.id);
+    assert.equal(r.situacao, 'confirmado');
+    assert.equal(r.pix_chave, null);
+    assert.deepEqual([r.destino_banco, r.destino_agencia, r.destino_conta], ['341', '1234', '567890-1']);
+  });
+
+  await t.test('sem conta e sem chave, não emite', async () => {
+    const s = await api.cliente(tk.admin, { razao_social: 'Sem Destino LTDA', cnpj: '22233344000183', pix_chave: '' });
+    const r = await api.post('/api/boletos', { cliente_id: s.cliente.id, valor: '10,00', vencimento: somarDias(hoje(), 5),
+      pagador_nome: 'X', pagador_documento: '52998224725' }, tk.admin);
+    assert.equal(r.status, 409);
+    assert.match(r.dados.erro, /conta de destino/);
+  });
+});

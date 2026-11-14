@@ -13,6 +13,7 @@ const v = require('./validacao');
 const datas = require('./datas');
 const febraban = require('./febraban');
 const cnab400 = require('./cnab400');
+const contaDestino = require('./contaDestino');
 const precos = require('./precos');
 const razao = require('./razao');
 const { criarBanco } = require('./bradesco');
@@ -150,8 +151,10 @@ function beneficiarioFinal(cliente) {
  */
 async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = null, origem = 'avulso', ixc = {} }) {
   if (cliente.situacao !== 'ativo') throw new ErroNegocio(`O cliente está ${cliente.situacao}: não é possível emitir boletos.`, 409);
-  // O dinheiro recebido vai direto para o cliente: sem chave PIX, ficaria parado na conta da PAY AX.
-  if (!cliente.pix_chave) throw new ErroNegocio('Cadastre a chave PIX do cliente antes de emitir: é para ela que o valor recebido vai, na hora.', 409);
+  // O dinheiro recebido vai direto para o cliente: sem conta de destino, ficaria parado na conta da PAY AX.
+  if (!contaDestino.temDestino(cliente)) {
+    throw new ErroNegocio('Cadastre a conta de destino do cliente antes de emitir (ou a chave PIX): é para ela que o valor recebido vai, na hora.', 409);
+  }
   const entrada = validarEntrada(dados, cliente);
   const conta = contaDe(db, dados.conta_id);
   if (entrada.tipo === 'bolepix' && !conta.pix_chave) {

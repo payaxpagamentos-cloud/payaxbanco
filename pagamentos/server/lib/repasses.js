@@ -26,6 +26,7 @@ const razao = require('./razao');
 const precos = require('./precos');
 const { criarBanco } = require('./bradesco');
 const { contaDe, credenciaisDaConta } = require('./boletos');
+const contaDestino = require('./contaDestino');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 const brl = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -59,18 +60,32 @@ function resumoCliente(db, cliente, data = hoje()) {
     transferido_hoje_centavos: soma(data),
     transferido_mes_centavos: soma(datas.primeiroDiaMes(data)),
     taxa_repasse_centavos: d.taxa_repasse_centavos,
-    chave_pix: cliente.pix_chave ?? null,
+    chave_pix: contaDestino.descrever(cliente),
   };
 }
 
-/** Confere se o cliente tem conta de destino cadastrada. */
+/**
+ * Para onde vai o PIX: a conta de destino cadastrada (pelos dados da conta, sem chave) ou, em
+ * cadastros antigos, a chave PIX.
+ */
 function destinoDe(cliente) {
-  if (!cliente.pix_chave) throw new ErroNegocio('O cliente não tem chave PIX cadastrada para receber o repasse.', 409);
+  if (contaDestino.temConta(cliente)) {
+    return {
+      pix_tipo: 'conta', pix_chave: null,
+      banco: cliente.destino_banco, ispb: cliente.destino_ispb,
+      agencia: cliente.destino_agencia, conta: `${cliente.destino_conta}${cliente.destino_conta_dv ? `-${cliente.destino_conta_dv}` : ''}`,
+      tipo_conta: cliente.destino_tipo ?? 'corrente',
+      titular_nome: cliente.destino_titular ?? cliente.razao_social,
+      titular_documento: cliente.destino_documento ?? cliente.cnpj,
+      descricao: contaDestino.descrever(cliente),
+    };
+  }
+  if (!cliente.pix_chave) throw new ErroNegocio('O cliente não tem conta de destino nem chave PIX cadastrada.', 409);
   return {
-    pix_tipo: cliente.pix_tipo,
-    pix_chave: cliente.pix_chave,
+    pix_tipo: cliente.pix_tipo, pix_chave: cliente.pix_chave,
     titular_nome: cliente.pix_titular ?? cliente.razao_social,
     titular_documento: cliente.pix_documento ?? cliente.cnpj,
+    descricao: `chave ${cliente.pix_chave}`,
   };
 }
 
@@ -86,13 +101,15 @@ function criar(db, cliente, { usuario = null } = {}) {
     const destino = destinoDe(cliente);
 
     const r = db.prepare(`INSERT INTO repasses (cliente_id, valor_centavos, taxa_centavos, valor_liquido_centavos, meio,
-        pix_tipo, pix_chave, titular_nome, titular_documento, situacao, automatico, solicitado_por, aprovado_por, aprovado_em, criado_em)
-      VALUES (?, ?, ?, ?, 'pix', ?, ?, ?, ?, 'aprovado', 1, ?, ?, ?, ?) RETURNING *`)
+        pix_tipo, pix_chave, titular_nome, titular_documento, destino_banco, destino_agencia, destino_conta,
+        situacao, automatico, solicitado_por, aprovado_por, aprovado_em, criado_em)
+      VALUES (?, ?, ?, ?, 'pix', ?, ?, ?, ?, ?, ?, ?, 'aprovado', 1, ?, ?, ?, ?) RETURNING *`)
       .get(cliente.id, valor, taxa, liquido, destino.pix_tipo, destino.pix_chave, destino.titular_nome, destino.titular_documento,
+        destino.banco ?? null, destino.agencia ?? null, destino.conta ?? null,
         usuario?.id ?? null, usuario?.id ?? null, agora(), agora());
 
     razao.lancar(db, { cliente_id: cliente.id, repasse_id: r.id, tipo: 'repasse', valor_centavos: -liquido,
-      descricao: `Repasse PIX #${r.id} · ${destino.pix_chave}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null });
+      descricao: `Repasse PIX #${r.id} · ${destino.descricao}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null });
     if (taxa) {
       razao.lancar(db, { cliente_id: cliente.id, repasse_id: r.id, tipo: 'taxa_repasse', valor_centavos: -taxa,
         descricao: `Tarifa do repasse #${r.id}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null });
@@ -111,7 +128,8 @@ async function repassar(db, cliente, { usuario = null } = {}) {
 
 /** Atalho para quem acabou de dar baixa num título: repassa o cliente dele, se já houver crédito. */
 async function repassarCliente(db, clienteId) {
-  const c = db.prepare("SELECT * FROM clientes WHERE id = ? AND situacao <> 'encerrado' AND pix_chave IS NOT NULL AND bloqueio_repasse IS NULL").get(clienteId);
+  const c = db.prepare(`SELECT * FROM clientes WHERE id = ? AND situacao <> 'encerrado' AND bloqueio_repasse IS NULL
+    AND (pix_chave IS NOT NULL OR destino_conta IS NOT NULL)`).get(clienteId);
   if (!c) return null;
   return repassar(db, c);
 }
@@ -163,6 +181,11 @@ async function enviar(db, id, { usuario = null } = {}) {
     const resp = await banco.pagarPix({
       chave: r.pix_chave,
       tipo_chave: r.pix_tipo,
+      // PIX pelos dados da conta, quando não há chave: banco (ISPB), agência, conta e tipo.
+      conta: r.destino_conta ? {
+        banco: r.destino_banco, ispb: contaDestino.BANCOS[r.destino_banco]?.ispb ?? null, agencia: r.destino_agencia,
+        conta: r.destino_conta, titular: r.titular_nome, documento: r.titular_documento,
+      } : null,
       valor_centavos: r.valor_liquido_centavos,
       descricao: `PAY AX repasse ${r.id}`,
       documento_titular: r.titular_documento,
@@ -187,7 +210,8 @@ async function enviar(db, id, { usuario = null } = {}) {
 async function rotinaAutomatica(db, { usuario = null } = {}) {
   const data = hoje();
   // Cliente com repasse suspenso por ordem legal fica de fora (a única exceção ao repasse imediato).
-  const clientes = db.prepare("SELECT * FROM clientes WHERE situacao <> 'encerrado' AND pix_chave IS NOT NULL AND bloqueio_repasse IS NULL").all();
+  const clientes = db.prepare(`SELECT * FROM clientes WHERE situacao <> 'encerrado' AND bloqueio_repasse IS NULL
+    AND (pix_chave IS NOT NULL OR destino_conta IS NOT NULL)`).all();
   const resultado = { data, criados: 0, enviados: 0, falhas: 0, detalhes: [] };
   for (const c of clientes) {
     let r;
@@ -220,7 +244,7 @@ async function rotinaAutomatica(db, { usuario = null } = {}) {
  * liberado antes de hoje: assim um crédito de ontem repassado hoje cedo não aparece como parado.
  */
 function parados(db, data = hoje(), { suspensos = false } = {}) {
-  return db.prepare(`SELECT c.id, COALESCE(c.nome_fantasia, c.razao_social) AS cliente, c.pix_chave, c.bloqueio_repasse,
+  return db.prepare(`SELECT c.id, COALESCE(c.nome_fantasia, c.razao_social) AS cliente, COALESCE(c.pix_chave, c.destino_conta) AS pix_chave, c.bloqueio_repasse,
       SUM(CASE WHEN l.data_liberacao <= ? THEN l.valor_centavos ELSE 0 END) AS ate_agora,
       SUM(CASE WHEN l.data_liberacao < ? THEN l.valor_centavos ELSE 0 END) AS antes_de_hoje
     FROM lancamentos l JOIN clientes c ON c.id = l.cliente_id

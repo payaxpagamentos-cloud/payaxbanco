@@ -90,10 +90,13 @@ async function abaResumo(alvo, c, query, recarregar) {
         par('Telefone', telefone(c.telefone)),
         par('Cidade', [c.cidade, c.uf].filter(Boolean).join('/') || '—'),
         par('Limite por boleto', dinheiro(c.limite_boleto_centavos)))),
-      cartao('Repasse', el('div', { class: 'pares' },
-        par('Chave PIX', c.pix_chave ? `${c.pix_chave} (${c.pix_tipo})` : el('span', { style: 'color:var(--vermelho)' }, 'não cadastrada')),
-        par('Titular', c.pix_titular ?? c.razao_social),
-        par('Quando', 'Na hora: assim que o banco credita, sem saque nem aprovação')))),
+      cartao('Para onde vai o dinheiro', el('div', { class: 'pares' },
+        par('Conta de destino', c.destino_descricao ?? el('span', { style: 'color:var(--vermelho)' }, 'não cadastrada — o cliente não emite')),
+        par('Titular', c.destino_titular ?? c.pix_titular ?? c.razao_social),
+        par('Como chega', c.meio_entrega === 'rateio'
+          ? 'Rateio de crédito: o Bradesco credita direto na conta, sem passar pela PAY AX'
+          : 'PIX pela PAY AX, na hora em que o banco credita'),
+        par('Quando', 'Na liquidação: sem saque nem aprovação')))),
     el('div', { class: 'grade duas', style: 'margin-top:14px' },
       cartao('Boletos do mês', el('div', { class: 'pares' },
         par('Emitidos', `${numero(c.resumo_mes.emitidos)} · ${dinheiro(c.resumo_mes.valor_emitido_centavos)}`),
@@ -179,7 +182,7 @@ async function abaRepasses(alvo, c, query, recarregar) {
       kpi({ rotulo: 'Em trânsito', valor: dinheiro(d.disponivel.em_transito_centavos), menor: true })),
     pode('repasses.aprovar') && d.disponivel.disponivel_centavos > 0
       ? el('div', { style: 'margin-top:14px' }, el('button', { class: 'botao', onclick: (e) => acao(e.currentTarget, async () => {
-        const r = await confirmar({ titulo: 'Repassar saldo', texto: `Repassar ${dinheiro(d.disponivel.disponivel_centavos)} para a chave PIX ${c.pix_chave ?? '(não cadastrada)'}?`, confirmarTexto: 'Repassar' });
+        const r = await confirmar({ titulo: 'Repassar agora', texto: `Repassar ${dinheiro(d.disponivel.disponivel_centavos)} para ${c.destino_descricao ?? 'a conta do cliente'}?`, confirmarTexto: 'Repassar' });
         if (!r) return;
         await api.post('/repasses', { cliente_id: c.id, valor: 'tudo', enviar_agora: true });
         toast('Repasse criado.', 'ok');
@@ -192,7 +195,7 @@ async function abaRepasses(alvo, c, query, recarregar) {
         { titulo: 'Criado', conteudo: (r) => dataHora(r.criado_em) },
         { titulo: 'Valor', dir: true, conteudo: (r) => el('span', {}, el('strong', {}, dinheiro(r.valor_liquido_centavos)),
           r.taxa_centavos ? el('span', { class: 'sub' }, `tarifa ${dinheiro(r.taxa_centavos)}`) : null) },
-        { titulo: 'Chave PIX', conteudo: (r) => r.pix_chave },
+        { titulo: 'Destino', conteudo: (r) => r.pix_chave ?? `banco ${r.destino_banco} · ag. ${r.destino_agencia} · conta ${r.destino_conta}` },
         { titulo: 'Situação', conteudo: (r) => selo(r.situacao, R.situacaoRepasse) },
       ],
       itens: d.itens,
@@ -328,13 +331,25 @@ function camposCadastro(c = {}) {
       campo({ nome: 'bairro', rotulo: 'Bairro', valor: c.bairro ?? '' }),
       campo({ nome: 'cidade', rotulo: 'Cidade', valor: c.cidade ?? '' }),
       campo({ nome: 'uf', rotulo: 'UF', valor: c.uf ?? '', atributos: { maxlength: 2, style: 'text-transform:uppercase' } })),
-    el('h3', { style: 'font-size:14px;margin:14px 0 8px' }, 'Repasse e limites'),
+    el('h3', { style: 'font-size:14px;margin:14px 0 4px' }, 'Conta para receber os pagamentos'),
+    el('p', { style: 'font-size:12.5px;color:var(--texto-3);margin:0 0 8px' },
+      'Obrigatória para emitir. Tem que ser da própria empresa (mesmo CNPJ). Conta no Bradesco, com rateio contratado no convênio: o banco credita direto. Outros bancos: PIX pelos dados da conta, na hora.'),
     el('div', { class: 'linha-form' },
-      campo({ nome: 'pix_chave', rotulo: 'Chave PIX do repasse', valor: c.pix_chave ?? '',
-        ajuda: 'Obrigatória para emitir: cada pagamento vai para ela assim que o banco credita' }),
+      campo({ nome: 'destino_banco', rotulo: 'Banco (código)', valor: c.destino_banco ?? '', ajuda: '237 Bradesco · 001 BB · 341 Itaú · 104 Caixa · 033 Santander · 756 Sicoob', atributos: { maxlength: 3, inputmode: 'numeric' } }),
+      campo({ nome: 'destino_agencia', rotulo: 'Agência', valor: c.destino_agencia ?? '', atributos: { maxlength: 5, inputmode: 'numeric' } }),
+      campo({ nome: 'destino_agencia_dv', rotulo: 'Dígito', valor: c.destino_agencia_dv ?? '', atributos: { maxlength: 1 } }),
+      campo({ nome: 'destino_conta', rotulo: 'Conta', valor: c.destino_conta ?? '', atributos: { maxlength: 20, inputmode: 'numeric' } }),
+      campo({ nome: 'destino_conta_dv', rotulo: 'Dígito', valor: c.destino_conta_dv ?? '', atributos: { maxlength: 2 } }),
+      campo({ nome: 'destino_tipo', rotulo: 'Tipo', tipo: 'select', valor: c.destino_tipo ?? 'corrente',
+        opcoes: [['corrente', 'Conta corrente'], ['pagamento', 'Conta de pagamento'], ['poupanca', 'Poupança']] }),
+      campo({ nome: 'destino_titular', rotulo: 'Titular (razão social)', valor: c.destino_titular ?? c.razao_social ?? '' }),
+      campo({ nome: 'destino_ispb', rotulo: 'ISPB (só se o banco não estiver na lista)', valor: c.destino_ispb ?? '', atributos: { maxlength: 8, inputmode: 'numeric' } })),
+    el('h3', { style: 'font-size:14px;margin:14px 0 8px' }, 'Limites e chave PIX (opcional)'),
+    el('div', { class: 'linha-form' },
+      campo({ nome: 'limite_boleto', rotulo: 'Limite por boleto (R$)', tipo: 'dinheiro', valor: reais(c.limite_boleto_centavos ?? 5000000) }),
+      campo({ nome: 'pix_chave', rotulo: 'Chave PIX (se não houver conta acima)', valor: c.pix_chave ?? '' }),
       campo({ nome: 'pix_titular', rotulo: 'Titular da chave', valor: c.pix_titular ?? '' }),
-      campo({ nome: 'pix_documento', rotulo: 'CPF/CNPJ do titular', valor: c.pix_documento ?? '' }),
-      campo({ nome: 'limite_boleto', rotulo: 'Limite por boleto (R$)', tipo: 'dinheiro', valor: reais(c.limite_boleto_centavos ?? 5000000) })),
+      campo({ nome: 'pix_documento', rotulo: 'CPF/CNPJ do titular da chave', valor: c.pix_documento ?? '' })),
     el('div', { style: 'margin-top:12px' }, campo({ nome: 'observacoes', rotulo: 'Observações', tipo: 'textarea', valor: c.observacoes ?? '' })));
 }
 
