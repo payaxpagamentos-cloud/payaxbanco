@@ -59,10 +59,10 @@ export default async function relatorios({ alvo, query }) {
     }))),
 
     el('div', { style: 'margin-top:14px' }, cartao('A sua tabela de preços', el('div', { class: 'pares' },
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa PAY AX sobre o valor pago'), el('span', { class: 'val' }, d.preco.percentual_texto)),
+      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa PAY AX'), el('span', { class: 'val' }, d.preco.tarifa_texto)),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa mínima'), el('span', { class: 'val' }, dinheiro(d.preco.comissao_minima_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa máxima'), el('span', { class: 'val' }, d.preco.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(d.preco.comissao_maxima_centavos))),
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por título pago'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_liquidacao_centavos))),
+      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa bancária por título pago'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_liquidacao_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por boleto emitido'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_emissao_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por transferência'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_repasse_centavos)))))),
   );

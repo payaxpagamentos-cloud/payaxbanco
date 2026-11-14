@@ -640,6 +640,38 @@ CREATE TABLE lgpd_incidentes (
 ALTER TABLE boletos ADD COLUMN anonimizado_em TEXT;
 `,
   },
+  {
+    versao: 11,
+    nome: 'split-direto',
+    sql: `
+-- Tarifa PAY AX fixa por boleto pago (ex.: R$ 1,99), somada ao percentual quando houver os dois.
+ALTER TABLE precos ADD COLUMN tarifa_fixa_centavos INTEGER NOT NULL DEFAULT 0 CHECK (tarifa_fixa_centavos >= 0);
+ALTER TABLE boletos ADD COLUMN comissao_fixa_centavos INTEGER NOT NULL DEFAULT 0;
+
+-- Conta do cliente para onde vai o valor de cada boleto pago (informada pela PAY AX no cadastro).
+ALTER TABLE clientes ADD COLUMN destino_banco TEXT;          -- código do banco (237 = Bradesco)
+ALTER TABLE clientes ADD COLUMN destino_ispb TEXT;           -- identificação do banco no PIX
+ALTER TABLE clientes ADD COLUMN destino_agencia TEXT;
+ALTER TABLE clientes ADD COLUMN destino_agencia_dv TEXT;
+ALTER TABLE clientes ADD COLUMN destino_conta TEXT;
+ALTER TABLE clientes ADD COLUMN destino_conta_dv TEXT;
+ALTER TABLE clientes ADD COLUMN destino_tipo TEXT CHECK (destino_tipo IN ('corrente', 'pagamento', 'poupanca'));
+ALTER TABLE clientes ADD COLUMN destino_titular TEXT;
+ALTER TABLE clientes ADD COLUMN destino_documento TEXT;
+
+-- Rateio de crédito do Bradesco (CNAB 400, registro tipo 3): o banco credita a parte do cliente
+-- direto na conta dele, na liquidação. Só com o serviço contratado no convênio, e só para conta Bradesco.
+ALTER TABLE contas_bancarias ADD COLUMN rateio_contratado INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE boletos ADD COLUMN rateio_ppm INTEGER;           -- parte do cliente sobre o valor cobrado (ppm)
+ALTER TABLE boletos ADD COLUMN rateio_destino TEXT;          -- conta do cliente no momento do registro (JSON)
+ALTER TABLE boletos ADD COLUMN rateado_em TEXT;              -- quando o banco confirmou o rateio
+
+-- Repasse por PIX também pelos dados da conta (sem chave): o destino fica registrado no repasse.
+ALTER TABLE repasses ADD COLUMN destino_banco TEXT;
+ALTER TABLE repasses ADD COLUMN destino_agencia TEXT;
+ALTER TABLE repasses ADD COLUMN destino_conta TEXT;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

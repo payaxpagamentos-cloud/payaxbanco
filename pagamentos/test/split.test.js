@@ -15,6 +15,17 @@ test('split: o cálculo fecha sempre em inteiros', async (t) => {
     }
   });
 
+  await t.test('tarifa fixa por boleto: o exemplo da Connect (R$ 1,99)', () => {
+    const connect = { tarifa_fixa_centavos: 199, percentual_ppm: 0, tarifa_liquidacao_centavos: 0 };
+    const r = calcularSplit({ valorPagoCentavos: 10000, preco: connect });
+    assert.deepEqual([r.comissao_centavos, r.tarifa_banco_centavos, r.liquido_centavos], [199, 0, 9801], 'R$ 100,00 → R$ 1,99 + R$ 98,01');
+    assert.equal(calcularSplit({ valorPagoCentavos: 8990, preco: connect }).liquido_centavos, 8791, 'R$ 89,90 → R$ 87,91');
+    // Fixa e percentual somam; piso e teto valem sobre o total.
+    const ambos = { tarifa_fixa_centavos: 100, percentual_ppm: 10000, comissao_maxima_centavos: 500 };
+    assert.equal(calcularSplit({ valorPagoCentavos: 20000, preco: ambos }).comissao_centavos, 300, 'R$ 1,00 + 1% de R$ 200,00');
+    assert.equal(calcularSplit({ valorPagoCentavos: 100000, preco: ambos }).comissao_centavos, 500, 'teto sobre o total');
+  });
+
   await t.test('piso e teto da tarifa PAY AX', () => {
     const preco = { tarifa_liquidacao_centavos: 0, percentual_ppm: 10000, comissao_minima_centavos: 500, comissao_maxima_centavos: 2000 };
     assert.equal(calcularSplit({ valorPagoCentavos: 1000, preco }).comissao_centavos, 500, 'piso');
@@ -88,4 +99,27 @@ test('liquidação: split, data de crédito e idempotência', async (t) => {
     const d = (await api.get(`/api/boletos/${depois.id}`, tk.admin)).dados;
     assert.equal(d.percentual_ppm, 100000, 'o boleto novo já nasce com a tabela nova');
   });
+});
+
+test('tarifa fixa congelada no boleto: muda a tabela depois, o boleto emitido não muda', async (t) => {
+  const { dataLocal, somarDias } = require('../server/lib/datas');
+  const api = await iniciar();
+  t.after(() => api.fechar());
+  const tk = await api.equipe();
+  await api.conta(tk.admin);
+  await api.precoPadrao(tk.admin);
+  const a = await api.cliente(tk.admin);
+  const hoje = dataLocal('America/Sao_Paulo');
+  const r = await api.post(`/api/clientes/${a.cliente.id}/precos`, { tarifa_fixa: '1,99', percentual: '0', tarifa_liquidacao: '0' }, tk.admin);
+  assert.equal(r.status, 201);
+
+  const b = await api.boleto(tk.admin, a.cliente.id, { valor: '100,00', vencimento: somarDias(hoje, 10) });
+  // A tabela muda depois da emissão: o título continua com R$ 1,99.
+  await api.post(`/api/clientes/${a.cliente.id}/precos`, { tarifa_fixa: '3,00', vigencia_inicio: hoje }, tk.admin);
+  const l = (await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: hoje, valor_pago: '100,00', meio: 'pix' }, tk.financeiro)).dados;
+  assert.equal(l.comissao_centavos, 199);
+  assert.equal(l.tarifa_banco_centavos, 0);
+  assert.equal(l.liquido_centavos, 9801);
+  const painel = (await api.get('/cliente/api/painel', a.token)).dados;
+  assert.equal(painel.preco.tarifa_texto.replace(/\s/g, ' '), 'R$ 3,00 por boleto pago', 'a tabela nova vale para os próximos');
 });

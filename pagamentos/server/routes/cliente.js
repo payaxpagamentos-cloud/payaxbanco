@@ -141,7 +141,8 @@ module.exports = (db, autenticado) => {
       transferencias: repassesLib.resumoCliente(db, c, data),
       preco: (() => {
         const pr = precos.vigente(db, c.id, data);
-        return { tarifa_emissao_centavos: pr.tarifa_emissao_centavos, tarifa_liquidacao_centavos: pr.tarifa_liquidacao_centavos,
+        return { tarifa_texto: precos.tarifaTexto(pr), tarifa_fixa_centavos: pr.tarifa_fixa_centavos ?? 0,
+          tarifa_emissao_centavos: pr.tarifa_emissao_centavos, tarifa_liquidacao_centavos: pr.tarifa_liquidacao_centavos,
           percentual_ppm: pr.percentual_ppm, percentual_texto: precos.percentualTexto(pr.percentual_ppm),
           comissao_minima_centavos: pr.comissao_minima_centavos, comissao_maxima_centavos: pr.comissao_maxima_centavos,
           tarifa_repasse_centavos: pr.tarifa_repasse_centavos };

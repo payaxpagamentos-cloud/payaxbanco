@@ -211,28 +211,8 @@ module.exports = (db) => {
     const c = buscar(req.params.id);
     const b = req.body ?? {};
     const inicio = b.vigencia_inicio ? v.data(b.vigencia_inicio, 'o início da vigência') : hoje();
-    const d = {
-      tarifa_emissao_centavos: v.centavos(b.tarifa_emissao ?? 0, 'a tarifa de emissão'),
-      tarifa_liquidacao_centavos: v.centavos(b.tarifa_liquidacao ?? 0, 'a tarifa de liquidação'),
-      percentual_ppm: b.percentual === undefined || b.percentual === '' ? 0 : v.percentual(b.percentual, 'o percentual', { max: 50 }),
-      comissao_minima_centavos: v.centavos(b.comissao_minima ?? 0, 'a tarifa mínima'),
-      comissao_maxima_centavos: v.centavosOpcional(b.comissao_maxima, 'a tarifa máxima'),
-      tarifa_repasse_centavos: v.centavos(b.tarifa_repasse ?? 0, 'a tarifa de repasse'),
-      observacao: v.opcional(b.observacao, 'a observação', 200),
-    };
-    if (d.comissao_maxima_centavos !== null && d.comissao_maxima_centavos < d.comissao_minima_centavos) {
-      throw new ErroNegocio('A tarifa máxima não pode ser menor que a mínima.', 422);
-    }
-    const id = transacao(db, () => {
-      // Encerra a vigência anterior no dia anterior ao início da nova.
-      db.prepare(`UPDATE precos SET vigencia_fim = date(?, '-1 day') WHERE cliente_id = ? AND vigencia_fim IS NULL AND vigencia_inicio < ?`)
-        .run(inicio, c.id, inicio);
-      return db.prepare(`INSERT INTO precos (cliente_id, vigencia_inicio, tarifa_emissao_centavos, tarifa_liquidacao_centavos,
-          percentual_ppm, comissao_minima_centavos, comissao_maxima_centavos, tarifa_repasse_centavos, observacao, criado_em, criado_por)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
-        .get(c.id, inicio, d.tarifa_emissao_centavos, d.tarifa_liquidacao_centavos, d.percentual_ppm,
-          d.comissao_minima_centavos, d.comissao_maxima_centavos, d.tarifa_repasse_centavos, d.observacao, agora(), req.usuario.id).id;
-    });
+    const d = precos.validarPreco(b);
+    const id = transacao(db, () => precos.gravarPreco(db, c.id, d, inicio, req.usuario.id, agora()));
     auditoria.registrar(db, req, { acao: 'preco.definido', entidade: 'preco', entidade_id: id, cliente_id: c.id, depois: { ...d, vigencia_inicio: inicio } });
     res.status(201).json(db.prepare('SELECT * FROM precos WHERE id = ?').get(id));
   });

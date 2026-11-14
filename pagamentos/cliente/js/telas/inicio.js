@@ -80,7 +80,7 @@ export default async function inicio({ alvo }) {
           par('Ficou para você', el('strong', {}, dinheiro(l.liquido_centavos))),
           par('Já transferido', dinheiro(l.repassado_centavos))),
         el('p', { style: 'margin-top:12px;color:var(--texto-3);font-size:12.5px' },
-          `Sua tabela: ${d.preco.percentual_texto} sobre o valor pago (mínimo ${dinheiro(d.preco.comissao_minima_centavos)}) + ${dinheiro(d.preco.tarifa_liquidacao_centavos)} por título pago.`)))
+          `Sua tabela: tarifa PAY AX de ${d.preco.tarifa_texto}${d.preco.tarifa_liquidacao_centavos ? ` + tarifa bancária de ${dinheiro(d.preco.tarifa_liquidacao_centavos)} por título pago` : ''}.`)))
       : null,
   );
 }

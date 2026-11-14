@@ -198,9 +198,9 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
         beneficiario_final_nome, beneficiario_final_fantasia, beneficiario_final_documento, especie,
         valor_centavos, emissao, vencimento, juros_mes_ppm, multa_ppm, desconto_centavos, desconto_ate, dias_baixa, mensagem,
         codigo_barras, linha_digitavel, pix_txid, pix_emv, situacao, erro_registro, registrado_em,
-        preco_id, tarifa_emissao_centavos, tarifa_liquidacao_centavos, percentual_ppm, comissao_minima_centavos,
+        preco_id, tarifa_emissao_centavos, tarifa_liquidacao_centavos, comissao_fixa_centavos, percentual_ppm, comissao_minima_centavos,
         comissao_maxima_centavos, custo_liquidacao_centavos, criado_em, criado_por, criado_por_cliente)
-      VALUES (${Array(49).fill('?').join(', ')})
+      VALUES (${Array(50).fill('?').join(', ')})
       RETURNING id`).get(
       cliente.id, conta.id, nossoNumero, registro.nosso_numero_dv, entrada.seu_numero, origem,
       ixc.receber_id ? String(ixc.receber_id) : null, ixc.cliente_id ? String(ixc.cliente_id) : null, entrada.tipo,
@@ -211,7 +211,7 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
       entrada.desconto_centavos, entrada.desconto_ate, entrada.dias_baixa, entrada.mensagem,
       registro.codigo_barras, registro.linha_digitavel, registro.pix_txid ?? null, registro.pix_emv ?? null,
       erro ? 'falha' : porArquivo ? 'registrando' : 'registrado', erro, erro || porArquivo ? null : agora(),
-      congelado.preco_id, congelado.tarifa_emissao_centavos, congelado.tarifa_liquidacao_centavos, congelado.percentual_ppm,
+      congelado.preco_id, congelado.tarifa_emissao_centavos, congelado.tarifa_liquidacao_centavos, congelado.comissao_fixa_centavos, congelado.percentual_ppm,
       congelado.comissao_minima_centavos, congelado.comissao_maxima_centavos, congelado.custo_liquidacao_centavos,
       agora(), usuario?.id ?? null, usuarioCliente?.id ?? null,
     ).id;
