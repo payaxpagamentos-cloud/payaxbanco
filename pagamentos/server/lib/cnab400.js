@@ -130,6 +130,21 @@ function headerRemessa(conta, { sequencial, hoje }) {
  * @param {object} b boleto já gravado, com o pagador
  * @param {object} conta conta bancária nossa
  */
+/**
+ * Posições 335-394 como sacador avalista, no formato do Bradesco:
+ *   335-349  CNPJ/CPF do sacador, com zeros à esquerda (15)
+ *   350-351  brancos (2)
+ *   352-394  nome do sacador (43)
+ * Aqui vai o cliente: o beneficiário final, em nome de quem o boleto cobra. Antes estas posições
+ * levavam o bairro e a cidade do pagador como "2ª mensagem" — o banco já tira isso do CEP.
+ * Sem cliente no título (não deveria acontecer), vão em branco, que o banco aceita.
+ */
+function sacadorAvalista(b) {
+  const docBf = so(b.beneficiario_final_documento);
+  if (!docBf) return ' '.repeat(60);
+  return numero(docBf, 15) + '  ' + texto(b.beneficiario_final_nome, 43);
+}
+
 function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoje }) {
   const docPagador = so(b.pagador_documento);
   const cep = so(b.pagador_cep).padStart(8, '0');
@@ -178,7 +193,7 @@ function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoj
     texto(b.mensagem, 12), // 315-326 1ª mensagem
     cep.slice(0, 5), // 327-331
     cep.slice(5, 8), // 332-334
-    texto(b.pagador_bairro ? `${b.pagador_bairro} ${b.pagador_cidade ?? ''} ${b.pagador_uf ?? ''}` : '', 60), // 335-394 sacador/mensagem
+    sacadorAvalista(b), // 335-394 sacador avalista (o cliente, beneficiário final)
     numero(sequencial, 6), // 395-400
   ];
   return conferir(partes.join(''), `título ${b.nosso_numero}`);

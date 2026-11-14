@@ -4,10 +4,17 @@
  * Ficha de compensação para o pagador: recibo + boleto, em HTML pronto para imprimir ou salvar em PDF
  * pelo próprio navegador (sem depender de biblioteca de PDF).
  *
- * No modelo de conta gráfica quem consta como BENEFICIÁRIO é a PAY AX (dona do convênio); o cliente
- * aparece como BENEFICIÁRIO FINAL (sacador avalista), como manda a prática para esse arranjo.
+ * Quem cobra é o CLIENTE, e é ele que o pagador precisa reconhecer: o nome do cliente abre a
+ * página, em destaque, e vai como BENEFICIÁRIO FINAL nas duas vias.
+ *
+ * No campo BENEFICIÁRIO fica a PAY AX, porque o título é registrado no convênio dela — e é esse
+ * o nome que o app do banco do pagador mostra ao ler o código. Se o papel dissesse outra coisa,
+ * o pagador veria um nome no boleto e outro no app, que é justamente o sinal que os bancos
+ * ensinam a desconfiar (golpe do boleto). Por isso o cliente também é registrado no banco como
+ * beneficiário final: o app mostra os dois, igual ao papel.
  */
 const QRCode = require('qrcode');
+const config = require('../config');
 const codigobarras = require('./codigobarras');
 const febraban = require('./febraban');
 const { valorAtualizado } = require('./boletos');
@@ -44,6 +51,15 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
     boleto.pix_emv ? 'Este boleto também pode ser pago pelo QR Code PIX (Bolepix).' : null,
   ].filter(Boolean);
 
+  const bfNome = boleto.beneficiario_final_nome || cliente.razao_social;
+  const bfFantasia = boleto.beneficiario_final_fantasia || cliente.nome_fantasia || bfNome;
+  const bfDoc = doc(boleto.beneficiario_final_documento || cliente.cnpj);
+  const beneficiarioFinal = `${bfNome} — CNPJ ${bfDoc}`;
+  const beneficiario = `${conta.beneficiario_nome} — CNPJ ${doc(conta.beneficiario_documento)}`;
+  const codigoBeneficiario = `${conta.agencia}${conta.agencia_dv ? `-${conta.agencia_dv}` : ''} / ${conta.conta}${conta.conta_dv ? `-${conta.conta_dv}` : ''}`;
+  // Boleto do simulador: o código tem formato válido, mas não está registrado em banco nenhum.
+  const teste = config.banco.modo === 'simulador';
+
   const enderecoPagador = [boleto.pagador_endereco, boleto.pagador_numero].filter(Boolean).join(', ');
   const cidadePagador = [boleto.pagador_bairro, [boleto.pagador_cidade, boleto.pagador_uf].filter(Boolean).join('/'),
     boleto.pagador_cep ? `CEP ${String(boleto.pagador_cep).replace(/(\d{5})(\d{3})/, '$1-$2')}` : null].filter(Boolean).join(' · ');
@@ -65,8 +81,26 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   body { font: 11px/1.3 Arial, Helvetica, sans-serif; color: #000; background: #e9eaec; margin: 0; padding: 16px; }
   .folha { background: #fff; max-width: 190mm; margin: 0 auto; padding: 10mm; }
   .acoes { max-width: 190mm; margin: 0 auto 12px; display: flex; gap: 8px; justify-content: flex-end; }
-  .acoes button { font: 600 13px/1 Arial; padding: 10px 16px; border: 0; border-radius: 6px; background: #0b3d2c; color: #fff; cursor: pointer; }
-  .acoes button.sec { background: #fff; color: #0b3d2c; border: 1px solid #0b3d2c; }
+  .acoes button { font: 600 13px/1 Arial; padding: 10px 16px; border: 0; border-radius: 6px; background: #0f5fbf; color: #fff; cursor: pointer; }
+  .acoes button.sec { background: #fff; color: #0f5fbf; border: 1px solid #0f5fbf; }
+  .folha { position: relative; }
+  /* Quem cobra, antes de tudo: é o nome que o pagador reconhece. */
+  .cobrador { display: flex; align-items: stretch; gap: 14px; border: 2px solid #000; border-radius: 4px; padding: 10px 12px; margin-bottom: 12px; }
+  .cobrador .quem { flex: 1; min-width: 0; }
+  .cobrador .rot { display: block; font-size: 8.5px; color: #333; text-transform: uppercase; letter-spacing: 0.06em; }
+  .cobrador .nome { display: block; font: 700 21px/1.15 Arial; margin: 2px 0 3px; word-break: break-word; }
+  .cobrador .doc { font-size: 11px; color: #222; }
+  .cobrador .para { margin-top: 6px; font-size: 11px; }
+  .cobrador .quanto { border-left: 1px solid #000; padding-left: 14px; display: grid; gap: 6px; align-content: center; text-align: right; min-width: 46mm; }
+  .cobrador .quanto strong { display: block; font: 700 17px/1.1 Arial; }
+  .intermediario { font-size: 9.5px; color: #333; margin: -6px 0 12px; }
+  .bf .val { font-weight: 700; }
+  .linha-bf { border-top: 1px solid #000; padding: 4px 5px; font-size: 11px; }
+  .linha-bf .rot { font-size: 8.5px; color: #333; display: block; }
+  .linha-bf strong { font-size: 11.5px; }
+  .aviso-teste { max-width: 190mm; margin: 0 auto 10px; background: #fff4d6; border: 1px solid #e0b100; color: #5c4400; padding: 8px 12px; font: 600 12px/1.35 Arial; border-radius: 4px; }
+  .marca-teste { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; overflow: hidden; }
+  .marca-teste span { transform: rotate(-28deg); font: 700 50px/1 Arial; color: rgba(204, 9, 47, 0.13); letter-spacing: 3px; white-space: nowrap; border: 6px solid rgba(204, 9, 47, 0.13); padding: 10px 26px; }
   .banco { display: flex; align-items: flex-end; gap: 10px; border-bottom: 2px solid #000; padding-bottom: 3px; }
   .logo { font: 700 22px/1 Arial; letter-spacing: -0.5px; color: #cc092f; }
   .cod { font: 700 17px/1 Arial; border-left: 2px solid #000; border-right: 2px solid #000; padding: 2px 8px; }
@@ -96,27 +130,46 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   .pix .texto strong { display: block; font-size: 12px; margin-bottom: 2px; }
   .pix .emv { font: 9px/1.25 monospace; word-break: break-all; color: #333; margin-top: 4px; max-width: 320px; }
   .rodape { margin-top: 8px; font-size: 9px; color: #555; display: flex; justify-content: space-between; }
-  @media print { body { background: #fff; padding: 0; } .folha { padding: 0; max-width: none; } .acoes { display: none; } }
+  @media print { body { background: #fff; padding: 0; } .folha { padding: 0; max-width: none; } .acoes, .aviso-teste { display: none; } }
 </style>
 </head>
 <body>
+${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não está registrado em banco nenhum e não pode ser pago.</div>` : ''}
 <div class="acoes">
   <button type="button" onclick="window.print()">Imprimir / salvar PDF</button>
   ${boleto.pix_emv ? '<button type="button" class="sec" id="copiar">Copiar código PIX</button>' : ''}
 </div>
 <div class="folha">
+  ${teste ? '<div class="marca-teste" aria-hidden="true"><span>TESTE · NÃO PAGUE</span></div>' : ''}
+
+  <div class="cobrador">
+    <div class="quem">
+      <span class="rot">Cobrança de</span>
+      <span class="nome">${esc(bfFantasia)}</span>
+      <span class="doc">${esc(bfNome)} · CNPJ ${esc(bfDoc)}</span>
+      <div class="para"><strong>Para:</strong> ${esc(boleto.pagador_nome)} — ${esc(doc(boleto.pagador_documento))}</div>
+    </div>
+    <div class="quanto">
+      <div><span class="rot">Valor</span><strong>R$ ${esc(brl(atual.valor_centavos))}</strong></div>
+      <div><span class="rot">Vencimento</span><strong>${esc(data(boleto.vencimento))}</strong></div>
+    </div>
+  </div>
+  <p class="intermediario">Pagamento processado por ${esc(conta.beneficiario_nome)} (CNPJ ${esc(doc(conta.beneficiario_documento))}). É esse o nome que o aplicativo do seu banco mostra como beneficiário: a ${esc(conta.beneficiario_nome)} recebe em nome de ${esc(bfFantasia)}.</p>
+
   ${cabecalho('Recibo do pagador')}
   <table class="ficha">
     <tr>
-      <td colspan="4">${campo('Beneficiário', `${conta.beneficiario_nome} — CNPJ ${doc(conta.beneficiario_documento)}`)}</td>
-      <td colspan="2">${campo('Agência / Código do beneficiário', `${conta.agencia}${conta.agencia_dv ? `-${conta.agencia_dv}` : ''} / ${conta.conta}${conta.conta_dv ? `-${conta.conta_dv}` : ''}`)}</td>
+      <td colspan="4">${campo('Beneficiário final', beneficiarioFinal, { classe: 'bf' })}</td>
+      <td colspan="2">${campo('Vencimento', data(boleto.vencimento))}</td>
     </tr>
     <tr>
-      <td colspan="2">${campo('Beneficiário final (sacador avalista)', `${cliente.razao_social} — CNPJ ${doc(cliente.cnpj)}`)}</td>
-      <td>${campo('Nosso número', nn)}</td>
-      <td>${campo('Nº do documento', boleto.seu_numero || '—')}</td>
-      <td>${campo('Vencimento', data(boleto.vencimento))}</td>
-      <td>${campo('Valor do documento', `R$ ${brl(boleto.valor_centavos)}`, { grande: true })}</td>
+      <td colspan="4">${campo('Beneficiário', beneficiario)}</td>
+      <td colspan="2">${campo('Agência / Código do beneficiário', codigoBeneficiario)}</td>
+    </tr>
+    <tr>
+      <td colspan="2">${campo('Nosso número', nn)}</td>
+      <td colspan="2">${campo('Nº do documento', boleto.seu_numero || '—')}</td>
+      <td colspan="2">${campo('Valor do documento', `R$ ${brl(boleto.valor_centavos)}`, { grande: true })}</td>
     </tr>
     <tr>
       <td colspan="6">
@@ -137,8 +190,8 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
       <td colspan="2">${campo('Vencimento', data(boleto.vencimento), { grande: true })}</td>
     </tr>
     <tr>
-      <td colspan="4">${campo('Beneficiário', `${conta.beneficiario_nome} — CNPJ ${doc(conta.beneficiario_documento)}`)}</td>
-      <td colspan="2">${campo('Agência / Código do beneficiário', `${conta.agencia}${conta.agencia_dv ? `-${conta.agencia_dv}` : ''} / ${conta.conta}${conta.conta_dv ? `-${conta.conta_dv}` : ''}`)}</td>
+      <td colspan="4">${campo('Beneficiário', beneficiario)}</td>
+      <td colspan="2">${campo('Agência / Código do beneficiário', codigoBeneficiario)}</td>
     </tr>
     <tr>
       <td>${campo('Data do documento', data(boleto.emissao))}</td>
@@ -173,8 +226,8 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
         <div class="pagador">
           <strong>Pagador:</strong> ${esc(boleto.pagador_nome)} — ${esc(doc(boleto.pagador_documento))}
           <small>${esc([enderecoPagador, cidadePagador].filter(Boolean).join(' · '))}</small>
-          <small><strong>Beneficiário final:</strong> ${esc(cliente.razao_social)} — ${esc(doc(cliente.cnpj))}</small>
         </div>
+        <div class="linha-bf"><span class="rot">Beneficiário final</span><strong>${esc(beneficiarioFinal)}</strong></div>
       </td>
     </tr>
   </table>
@@ -186,7 +239,7 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   <div class="barras">${barras}</div>
   <div class="rodape">
     <span>Nosso número ${esc(nn)} · ${esc(linha)}</span>
-    <span>Emitido por ${esc(conta.beneficiario_nome)} em nome de ${esc(cliente.razao_social)}</span>
+    <span>Cobrança de ${esc(bfNome)}, processada por ${esc(conta.beneficiario_nome)}</span>
   </div>
 </div>
 <script src="${esc(base)}/js/boleto.js"></script>

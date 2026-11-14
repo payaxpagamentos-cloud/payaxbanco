@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const bradesco = require('../server/lib/bradesco');
 const { iniciar, CPF } = require('./helpers');
 const febraban = require('../server/lib/febraban');
 const pix = require('../server/lib/pix');
@@ -118,6 +119,42 @@ test('boletos: emissão, validações e ciclo de vida', async (t) => {
     assert.match(r.dados, /<rect/, 'tem o código de barras desenhado');
     assert.match(r.dados, /Bolepix/, 'tem o QR do PIX');
     assert.ok(r.dados.includes(b.linha_digitavel.slice(0, 5)));
+  });
+
+  await t.test('o cliente é o beneficiário final: congelado no título e em destaque no boleto', async () => {
+    const b = await api.boleto(tk.admin, a.cliente.id, { valor: '89,90', vencimento: '2026-12-28' });
+    const ficha = (await api.get(`/api/boletos/${b.id}/ficha`, tk.admin)).dados;
+    // Abre a página com o nome que o pagador reconhece.
+    assert.match(ficha, /Cobrança de<\/span>\s*<span class="nome">Alfa Net</);
+    // Nas duas vias, com razão social e CNPJ.
+    assert.equal((ficha.match(/Beneficiário final/g) || []).length >= 2, true);
+    assert.ok(ficha.includes('Provedor Alfa LTDA — CNPJ 11.122.233/0001-83'));
+    // A PAY AX segue como beneficiário: é a dona do convênio e é o que o app do banco mostra.
+    assert.ok(ficha.includes('PAY AX Brasil Ltda — CNPJ'));
+    // Simulador: o boleto avisa que é teste.
+    assert.match(ficha, /TESTE · NÃO PAGUE/);
+
+    // Mudar o cadastro depois não muda o boleto já emitido: ele mostra o que foi registrado no banco.
+    const c = (await api.get(`/api/clientes/${a.cliente.id}`, tk.admin)).dados;
+    const mudou = await api.patch(`/api/clientes/${a.cliente.id}`, { razao_social: 'Alfa Telecom S.A.', versao: c.versao }, tk.admin);
+    assert.equal(mudou.status, 200, 'o cadastro mudou de verdade');
+    const depois = (await api.get(`/api/boletos/${b.id}/ficha`, tk.admin)).dados;
+    assert.ok(depois.includes('Provedor Alfa LTDA — CNPJ'), 'o título guarda o nome da emissão');
+    assert.ok(!depois.includes('Alfa Telecom S.A.'));
+  });
+
+  await t.test('na API do Bradesco o cliente segue como sacador avalista', () => {
+    const corpo = bradesco.paraApi({
+      nosso_numero: '00000000042', valor_centavos: 1000, emissao: '2026-11-13', vencimento: '2026-12-05',
+      pagador_nome: 'Fulano', pagador_documento: '12345678909',
+      beneficiario_final_nome: 'Connect Link Telecomunicações Ltda', beneficiario_final_documento: '11.222.333/0001-81',
+      beneficiario_final_endereco: { cep: '11704-000', endereco: 'Av. Brasil', numero: '100', bairro: 'Centro', cidade: 'Praia Grande', uf: 'sp' },
+    }, { beneficiario_documento: '12345678000195', agencia: '3391', conta: '0006688', carteira: '09', banco: '237' });
+    assert.match(corpo.nomeSacadorAvalista, /^Connect Link Telecomunica/i);
+    assert.equal(corpo.nuCpfcnpjSacadorAvalista, 11222333000181);
+    assert.equal(corpo.cdIndCpfcnpjSacadorAvalista, 2, 'pessoa jurídica');
+    assert.equal(corpo.cepSacadorAvalista, 11704);
+    assert.equal(corpo.ufSacadorAvalista, 'SP');
   });
 
   await t.test('o link público só abre com a assinatura certa', async () => {

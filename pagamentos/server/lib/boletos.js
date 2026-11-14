@@ -91,6 +91,26 @@ function validarEntrada(dados, cliente) {
 }
 
 /**
+ * O cliente como beneficiário final do título: em nome de quem o boleto cobra.
+ *
+ * O boleto é registrado no convênio da PAY AX — é ela o BENEFICIÁRIO, a dona da conta que recebe.
+ * O cliente vai como BENEFICIÁRIO FINAL: registrado no banco junto com o título (é o que o app do
+ * pagador mostra ao ler o código) e impresso no boleto. Nome e CNPJ ficam congelados no título.
+ * O endereço só segue para o registro, na hora da emissão.
+ */
+function beneficiarioFinal(cliente) {
+  return {
+    beneficiario_final_nome: cliente.razao_social,
+    beneficiario_final_fantasia: cliente.nome_fantasia || null,
+    beneficiario_final_documento: String(cliente.cnpj ?? '').replace(/\D/g, ''),
+    beneficiario_final_endereco: {
+      cep: cliente.cep, endereco: cliente.endereco, numero: cliente.numero, complemento: cliente.complemento,
+      bairro: cliente.bairro, cidade: cliente.cidade, uf: cliente.uf,
+    },
+  };
+}
+
+/**
  * Emite um boleto: reserva o nosso número, registra no banco e grava o título já com o preço congelado.
  * Em caso de falha no banco, o título fica como 'falha' com o motivo — o nosso número não é reaproveitado
  * (o banco pode tê-lo recebido), e a tela permite tentar de novo gerando outro.
@@ -113,7 +133,10 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
   }
 
   const nossoNumero = transacao(db, () => proximoNossoNumero(db, conta));
-  const boleto = { ...entrada, nosso_numero: nossoNumero, cliente_id: cliente.id, conta_id: conta.id };
+  const boleto = {
+    ...entrada, nosso_numero: nossoNumero, cliente_id: cliente.id, conta_id: conta.id,
+    ...beneficiarioFinal(cliente),
+  };
 
   let registro = null;
   let erro = null;
@@ -136,16 +159,18 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
         cliente_id, conta_id, nosso_numero, nosso_numero_dv, seu_numero, origem, ixc_receber_id, ixc_cliente_id, tipo,
         pagador_nome, pagador_documento, pagador_email, pagador_telefone, pagador_cep, pagador_endereco, pagador_numero,
         pagador_bairro, pagador_cidade, pagador_uf,
+        beneficiario_final_nome, beneficiario_final_fantasia, beneficiario_final_documento,
         valor_centavos, emissao, vencimento, juros_mes_ppm, multa_ppm, desconto_centavos, desconto_ate, dias_baixa, mensagem,
         codigo_barras, linha_digitavel, pix_txid, pix_emv, situacao, erro_registro, registrado_em,
         preco_id, tarifa_emissao_centavos, tarifa_liquidacao_centavos, percentual_ppm, comissao_minima_centavos,
         comissao_maxima_centavos, custo_liquidacao_centavos, criado_em, criado_por, criado_por_cliente)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (${Array(48).fill('?').join(', ')})
       RETURNING id`).get(
       cliente.id, conta.id, nossoNumero, registro.nosso_numero_dv, entrada.seu_numero, origem,
       ixc.receber_id ? String(ixc.receber_id) : null, ixc.cliente_id ? String(ixc.cliente_id) : null, entrada.tipo,
       entrada.pagador_nome, entrada.pagador_documento, entrada.pagador_email, entrada.pagador_telefone, entrada.pagador_cep,
       entrada.pagador_endereco, entrada.pagador_numero, entrada.pagador_bairro, entrada.pagador_cidade, entrada.pagador_uf,
+      boleto.beneficiario_final_nome, boleto.beneficiario_final_fantasia, boleto.beneficiario_final_documento,
       entrada.valor_centavos, entrada.emissao, entrada.vencimento, entrada.juros_mes_ppm, entrada.multa_ppm,
       entrada.desconto_centavos, entrada.desconto_ate, entrada.dias_baixa, entrada.mensagem,
       registro.codigo_barras, registro.linha_digitavel, registro.pix_txid ?? null, registro.pix_emv ?? null,
@@ -283,4 +308,4 @@ function situacaoVisivel(b, data = hoje()) {
   return b.situacao;
 }
 
-module.exports = { emitir, liquidar, estornarLiquidacao, baixar, valorAtualizado, situacaoVisivel, contaDe, credenciaisDaConta, proximoNossoNumero, validarEntrada, hoje };
+module.exports = { emitir, beneficiarioFinal, liquidar, estornarLiquidacao, baixar, valorAtualizado, situacaoVisivel, contaDe, credenciaisDaConta, proximoNossoNumero, validarEntrada, hoje };

@@ -22,6 +22,7 @@ test('CNAB 400: o arquivo de remessa sai no formato que o banco aceita', async (
     desconto_centavos: 0, dias_baixa: 60, mensagem: 'Plano de internet',
     pagador_nome: 'João da Silva Ação', pagador_documento: CPF, pagador_endereco: 'Rua das Acácias',
     pagador_numero: '349', pagador_bairro: 'Centro', pagador_cidade: 'Praia Grande', pagador_uf: 'SP', pagador_cep: '11704000',
+    beneficiario_final_nome: 'Connect Link Telecomunicações Ltda', beneficiario_final_documento: '11222333000181',
   };
 
   await t.test('todo registro tem exatamente 400 posições', () => {
@@ -50,6 +51,24 @@ test('CNAB 400: o arquivo de remessa sai no formato que o banco aceita', async (
     assert.equal(campo(221, 234), `000${CPF}`);
     assert.equal(campo(327, 334), '11704000');
     assert.equal(campo(395, 400), '000002');
+  });
+
+  await t.test('o cliente vai registrado no banco como beneficiário final (sacador avalista)', () => {
+    const l = cnab.gerarRemessa({ conta: CONTA, boletos: [boleto], sequencial: 1, hoje: '2026-11-13' })
+      .conteudo.split('\r\n')[1];
+    const campo = (de, ate) => l.slice(de - 1, ate);
+    assert.equal(campo(335, 349), '011222333000181', 'CNPJ do cliente em 15 posições');
+    assert.equal(campo(350, 351), '  ');
+    assert.equal(campo(352, 394).trim(), 'CONNECT LINK TELECOMUNICACOES LTDA', 'sem acento, como o banco aceita');
+    // O beneficiário continua sendo a PAY AX: o título é do convênio dela.
+    assert.equal(campo(4, 17), '12345678000195');
+  });
+
+  await t.test('título sem beneficiário final deixa o campo em branco (o banco aceita)', () => {
+    const semBf = { ...boleto, beneficiario_final_nome: null, beneficiario_final_documento: null };
+    const l = cnab.gerarRemessa({ conta: CONTA, boletos: [semBf], sequencial: 1, hoje: '2026-11-13' })
+      .conteudo.split('\r\n')[1];
+    assert.equal(l.slice(334, 394), ' '.repeat(60));
   });
 
   await t.test('acento e caractere fora da tabela não passam para o arquivo', () => {

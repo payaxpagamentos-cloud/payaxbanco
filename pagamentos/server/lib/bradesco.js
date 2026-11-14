@@ -150,6 +150,25 @@ function paraApi(boleto, conta) {
     prazoBaixaTitulo: boleto.dias_baixa ?? 60,
     primeiraInstrucao: semAcento(boleto.mensagem).slice(0, 80),
   };
+  // Beneficiário final (sacador avalista): o cliente em nome de quem cobramos. É o que o app do
+  // pagador mostra ao lado do beneficiário quando ele lê o código de barras.
+  const bf = boleto.beneficiario_final_documento ? so(boleto.beneficiario_final_documento) : '';
+  if (bf) {
+    const e = boleto.beneficiario_final_endereco ?? {};
+    Object.assign(p, {
+      nomeSacadorAvalista: semAcento(boleto.beneficiario_final_nome).slice(0, 40),
+      logradouroSacadorAvalista: semAcento(e.endereco).slice(0, 40),
+      nuLogradouroSacadorAvalista: String(e.numero ?? '').slice(0, 10),
+      complementoLogradouroSacadorAvalista: semAcento(e.complemento).slice(0, 15),
+      cepSacadorAvalista: Number(so(e.cep).slice(0, 5)) || 0,
+      complementoCepSacadorAvalista: Number(so(e.cep).slice(5)) || 0,
+      bairroSacadorAvalista: semAcento(e.bairro).slice(0, 40),
+      municipioSacadorAvalista: semAcento(e.cidade).slice(0, 40),
+      ufSacadorAvalista: String(e.uf ?? '').toUpperCase().slice(0, 2),
+      cdIndCpfcnpjSacadorAvalista: bf.length === 11 ? 1 : 2,
+      nuCpfcnpjSacadorAvalista: Number(bf),
+    });
+  }
   // Boleto híbrido: pede ao banco o QR Code PIX no mesmo título.
   if (boleto.tipo === 'bolepix') {
     p.cdTipoQrCode = 1;
@@ -378,4 +397,4 @@ function criarBanco(conta, credenciais = null, opcoes = {}) {
   return apiBradesco(conta, credenciais, opcoes);
 }
 
-module.exports = { criarBanco, simulador, porArquivo, apiBradesco, ErroBanco, situacaoDaApi, HOSTS, ENDPOINTS };
+module.exports = { criarBanco, simulador, porArquivo, apiBradesco, ErroBanco, situacaoDaApi, paraApi, HOSTS, ENDPOINTS };

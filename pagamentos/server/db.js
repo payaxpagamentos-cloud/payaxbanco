@@ -492,6 +492,24 @@ CREATE INDEX idx_boletos_remessa ON boletos(remessa_id);
 CREATE INDEX idx_boletos_aguardando ON boletos(situacao, remessa_id);
 `,
   },
+  {
+    versao: 6,
+    nome: 'beneficiario-final',
+    sql: `
+-- Beneficiário final: o cliente em nome de quem o boleto cobra. O título é registrado no
+-- convênio da PAY AX (que fica como beneficiário), e o cliente vai junto, registrado no banco
+-- e impresso no boleto, para o pagador saber a quem está pagando.
+-- Congelado na emissão, como o preço: o boleto continua mostrando quem cobrava naquele dia,
+-- igual ao que ficou registrado no banco, mesmo que o cadastro do cliente mude depois.
+ALTER TABLE boletos ADD COLUMN beneficiario_final_nome TEXT;
+ALTER TABLE boletos ADD COLUMN beneficiario_final_fantasia TEXT;
+ALTER TABLE boletos ADD COLUMN beneficiario_final_documento TEXT;
+UPDATE boletos SET
+  beneficiario_final_nome = (SELECT c.razao_social FROM clientes c WHERE c.id = boletos.cliente_id),
+  beneficiario_final_fantasia = (SELECT c.nome_fantasia FROM clientes c WHERE c.id = boletos.cliente_id),
+  beneficiario_final_documento = (SELECT c.cnpj FROM clientes c WHERE c.id = boletos.cliente_id);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();
