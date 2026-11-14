@@ -55,6 +55,7 @@ function corpoCliente(body, { novo = false, cnpjAtual = null } = {}) {
   }
   if (body.pix_titular !== undefined) d.pix_titular = v.opcional(body.pix_titular, 'o titular da chave PIX', 120);
   if (body.pix_documento !== undefined) d.pix_documento = body.pix_documento ? v.documento(body.pix_documento, 'o CPF/CNPJ do titular') : null;
+  if (body.entrega !== undefined) d.entrega = v.opcao(body.entrega || 'padrao', 'como o cliente recebe', ['padrao', 'pix']);
   // Conta para onde vai o valor de cada boleto pago — tem que ser da própria empresa (mesmo CNPJ).
   Object.assign(d, contaDestino.ler(body, d.cnpj ?? cnpjAtual));
   return d;

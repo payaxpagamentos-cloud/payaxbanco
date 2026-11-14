@@ -57,15 +57,17 @@ async function abaDados(alvo, recarregar) {
       par('Situação', selo(c.situacao, R.situacaoCliente)),
       par('Limite por boleto', dinheiro(c.limite_boleto_centavos)))),
 
-    el('div', { style: 'margin-top:14px' }, cartao('Conta para receber os repasses',
+    el('div', { style: 'margin-top:14px' }, cartao('Conta para receber os pagamentos',
       el('div', {},
         el('div', { class: 'pares' },
-          par('Chave PIX', c.pix ? `${c.pix.chave} (${c.pix.tipo})` : el('span', { style: 'color:var(--vermelho)' }, 'não cadastrada')),
-          par('Titular', c.pix?.titular ?? c.razao_social),
-          par('Repasse automático', c.repasse_automatico ? 'Sim, a cada dia útil' : 'Não (sob demanda)'),
-          par('Retenção', `D+${c.retencao_dias} dia(s) útil(eis) após o pagamento`)),
+          par('Conta de destino', c.destino ?? el('span', { style: 'color:var(--vermelho)' }, 'não cadastrada')),
+          par('Titular', c.destino_titular),
+          par('Como chega', c.meio_entrega === 'rateio'
+            ? 'Crédito feito pelo próprio Bradesco, na liquidação do boleto'
+            : 'PIX da PAY AX, assim que o banco credita'),
+          par('Quando', 'A cada pagamento, já sem a tarifa. Não precisa pedir.')),
         el('div', { style: 'margin-top:12px' },
-          aviso('Por segurança, a chave PIX de destino só é alterada pela equipe PAY AX. Fale com o seu gerente de conta.', 'info'))))),
+          aviso('Por segurança, a conta de destino só é alterada pela equipe PAY AX, e só para conta da própria empresa. Fale com o seu gerente de conta.', 'info'))))),
 
     editavel
       ? el('div', { style: 'margin-top:14px' }, cartao('Contato e endereço', form, botao))

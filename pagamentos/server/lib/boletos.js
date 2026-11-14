@@ -189,12 +189,17 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
     if (existente) return { ...existente, ja_existia: true };
   }
 
+  // Rateio pelo banco: o custo dele (tarifa do Bradesco por rateio) entra no custo do boleto, para a margem.
+  const rateio = rateioDe(cliente, conta, entrada.valor_centavos, congelado);
+  if (rateio.rateio_ppm && conta.custo_rateio_centavos) {
+    congelado.custo_liquidacao_centavos = (congelado.custo_liquidacao_centavos ?? 0) + conta.custo_rateio_centavos;
+  }
   const nossoNumero = transacao(db, () => proximoNossoNumero(db, conta));
   const boleto = {
     ...entrada, nosso_numero: nossoNumero, cliente_id: cliente.id, conta_id: conta.id,
     ...beneficiarioFinal(cliente),
     especie: cnab400.ESPECIE_PADRAO,
-    ...rateioDe(cliente, conta, entrada.valor_centavos, congelado),
+    ...rateio,
   };
 
   let registro = null;

@@ -702,6 +702,18 @@ ALTER TABLE retornos ADD COLUMN rateio_lido_centavos INTEGER;
 ALTER TABLE retornos ADD COLUMN rateio_lido_quantidade INTEGER;
 `,
   },
+  {
+    versao: 14,
+    nome: 'escolha-pix-rateio',
+    sql: `
+-- Como o cliente recebe, cliente a cliente:
+--   padrao = segue o convênio (rateio pelo banco para conta Bradesco, com PIX se não der certo)
+--   pix    = sempre PIX da PAY AX (ex.: quando a tarifa do rateio deixa o boleto mais caro)
+ALTER TABLE clientes ADD COLUMN entrega TEXT NOT NULL DEFAULT 'padrao' CHECK (entrega IN ('padrao', 'pix'));
+-- Quanto o banco cobra por rateio (custo da PAY AX, entra na margem do boleto com rateio).
+ALTER TABLE contas_bancarias ADD COLUMN custo_rateio_centavos INTEGER NOT NULL DEFAULT 0 CHECK (custo_rateio_centavos >= 0);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

@@ -22,6 +22,7 @@ const impressao = require('../lib/impressao');
 const sincronismo = require('../lib/sincronismo');
 const auditoria = require('../lib/auditoria');
 const contaInterna = require('../lib/contaInterna');
+const contaDestino = require('../lib/contaDestino');
 const dois = require('../lib/doisfatores');
 const { detalhe, assinaturaFicha } = require('./boletos');
 
@@ -264,6 +265,9 @@ module.exports = (db, autenticado) => {
       bairro: c.bairro, cidade: c.cidade, uf: c.uf, situacao: c.situacao,
       limite_boleto_centavos: c.limite_boleto_centavos,
       pix: c.pix_chave ? { tipo: c.pix_tipo, chave: c.pix_chave, titular: c.pix_titular, documento: c.pix_documento } : null,
+      destino: contaDestino.descrever(c),
+      destino_titular: c.destino_titular ?? c.pix_titular ?? c.razao_social,
+      meio_entrega: contaDestino.meioAtual(db, c),
       versao: c.versao,
     });
   });

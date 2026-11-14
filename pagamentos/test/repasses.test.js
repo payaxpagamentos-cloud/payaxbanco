@@ -129,6 +129,9 @@ test('conta de destino: PIX pelos dados da conta, e só para conta da própria e
     const ficha = (await api.get(`/api/clientes/${a.cliente.id}`, tk.admin)).dados;
     assert.match(ficha.destino_descricao, /Itaú Unibanco · ag\. 1234 · c\/c 567890-1/);
     assert.equal(ficha.meio_entrega, 'pix', 'outro banco: PIX');
+    const cad = (await api.get('/cliente/api/cadastro', a.token)).dados;
+    assert.match(cad.destino, /Itaú Unibanco · ag\. 1234 · c\/c 567890-1/, 'o cliente vê a conta de destino no cadastro');
+    assert.equal(cad.meio_entrega, 'pix');
 
     const b = await api.boleto(tk.admin, a.cliente.id, { valor: '100,00', vencimento: somarDias(hoje(), 5) });
     await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: hoje(), valor_pago: '100,00', meio: 'pix' }, tk.financeiro);

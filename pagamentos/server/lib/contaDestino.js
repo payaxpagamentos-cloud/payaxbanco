@@ -86,11 +86,14 @@ function descrever(c) {
 
 /**
  * Como o dinheiro chega ao cliente, dado o convênio usado: 'rateio' (pelo banco) ou 'pix'.
+ * Não existe "só rateio": se o banco não ratear, o valor cai na conta da PAY AX e precisa sair na hora
+ * — por isso o rateio sempre tem o PIX de reserva (plano B).
  * Rateio só pelo arquivo CNAB (e no simulador): o rateio pela API do Bradesco depende de campos que
  * só a documentação da API, na homologação, vai confirmar — até lá, quem registra pela API usa PIX.
  */
 function meioDeEntrega(cliente, conta, { modo = 'cnab' } = {}) {
   if (!['cnab', 'simulador'].includes(modo)) return 'pix';
+  if (cliente?.entrega === 'pix') return 'pix'; // escolha da PAY AX para este cliente
   if (conta?.rateio_contratado && temConta(cliente) && cliente.destino_banco === BRADESCO) return 'rateio';
   return 'pix';
 }

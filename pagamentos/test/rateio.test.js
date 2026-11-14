@@ -109,6 +109,33 @@ test('rateio de crédito no fluxo: emissão, liquidação e nada parado', async 
     assert.equal(out.comissao_centavos, 200, 'R$ 100,50 − R$ 98,50');
   });
 
+  await t.test('a PAY AX pode escolher PIX para um cliente com conta Bradesco (ex.: tarifa do rateio cara)', async () => {
+    const c = await api.cliente(tk.admin, { razao_social: 'Escolheu PIX Ltda', cnpj: '22233344000183', ...bradesco,
+      destino_titular: 'Escolheu PIX Ltda', entrega: 'pix' });
+    const ficha = (await api.get(`/api/clientes/${c.cliente.id}`, tk.admin)).dados;
+    assert.equal(ficha.entrega, 'pix');
+    assert.equal(ficha.meio_entrega, 'pix');
+    const b = await api.boleto(tk.admin, c.cliente.id, { valor: '100,00', vencimento: somarDias(hoje(), 5) });
+    assert.equal(api.db.prepare('SELECT rateio_ppm FROM boletos WHERE id = ?').get(b.id).rateio_ppm, null, 'sem rateio no título');
+    await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: hoje(), valor_pago: '100,00', meio: 'pix' }, tk.financeiro);
+    assert.equal(api.db.prepare('SELECT situacao FROM repasses WHERE cliente_id = ?').get(c.cliente.id).situacao, 'confirmado');
+    const regra = (await api.get('/api/conformidade', tk.admin)).dados.grupos.flatMap((g) => g.regras).find((x) => x.id === 'split-pelo-banco');
+    assert.equal(regra.situacao, 'ok', 'escolha da PAY AX não é pendência');
+    assert.match(regra.detalhe, /por escolha da PAY AX/);
+    const valor = (await api.get(`/api/clientes/${c.cliente.id}`, tk.admin)).dados.versao;
+    await api.patch(`/api/clientes/${c.cliente.id}`, { entrega: 'padrao', versao: valor }, tk.admin);
+    assert.equal((await api.get(`/api/clientes/${c.cliente.id}`, tk.admin)).dados.meio_entrega, 'rateio', 'volta ao padrão do convênio');
+  });
+
+  await t.test('a tarifa do rateio entra no custo do boleto (margem)', async () => {
+    const v = api.db.prepare('SELECT versao FROM contas_bancarias WHERE id = ?').get(conta.id).versao;
+    assert.equal((await api.patch(`/api/contas/${conta.id}`, { custo_rateio: '0,50', versao: v }, tk.admin)).status, 200);
+    const c = api.db.prepare("SELECT id FROM clientes WHERE razao_social = 'Connect Link Telecom Ltda'").get();
+    const custoBase = api.db.prepare('SELECT custo_liquidacao_centavos FROM contas_bancarias WHERE id = ?').get(conta.id).custo_liquidacao_centavos;
+    const b = await api.boleto(tk.admin, c.id, { valor: '100,00', vencimento: somarDias(hoje(), 5) });
+    assert.equal(api.db.prepare('SELECT custo_liquidacao_centavos FROM boletos WHERE id = ?').get(b.id).custo_liquidacao_centavos, custoBase + 50);
+  });
+
   await t.test('cliente com conta em outro banco: PIX pelos dados da conta, sem rateio', async () => {
     const c = await api.cliente(tk.admin, { razao_social: 'Outro Banco Ltda', cnpj: '19131243000197', pix_chave: '',
       destino_banco: '341', destino_agencia: '1234', destino_conta: '567890', destino_titular: 'Outro Banco Ltda' });

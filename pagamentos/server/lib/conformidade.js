@@ -471,12 +471,14 @@ const REGRAS = [
       const conta = contaDestino.convenioAtual(db);
       const meios = ativos.map((c) => contaDestino.meioDeEntrega(c, conta, { modo: config.banco.modo }));
       const pelBanco = meios.filter((m) => m === 'rateio').length;
-      const bradescoSemRateio = ativos.filter((c, i) => c.destino_banco === contaDestino.BRADESCO && meios[i] !== 'rateio').length;
+      const porEscolha = ativos.filter((c) => c.entrega === 'pix').length;
+      const bradescoSemRateio = ativos.filter((c, i) => c.destino_banco === contaDestino.BRADESCO && c.entrega !== 'pix' && meios[i] !== 'rateio').length;
       if (bradescoSemRateio) {
         return atencao(`${plural(bradescoSemRateio, 'cliente tem', 'clientes têm')} conta Bradesco e ainda ${bradescoSemRateio === 1 ? 'recebe' : 'recebem'} por PIX da PAY AX. `
           + (conta?.rateio_contratado ? 'Confira o modo do banco (o rateio vale no arquivo CNAB).' : 'Contrate o rateio de crédito no convênio e marque em Contas e preços.'));
       }
-      return ok(`${plural(pelBanco, 'cliente recebe', 'clientes recebem')} direto do banco; ${plural(ativos.length - pelBanco, 'recebe', 'recebem')} por PIX na hora.`);
+      return ok(`${plural(pelBanco, 'cliente recebe', 'clientes recebem')} direto do banco; ${plural(ativos.length - pelBanco, 'recebe', 'recebem')} por PIX na hora`
+        + `${porEscolha ? ` (${porEscolha} por escolha da PAY AX)` : ''}.`);
     },
   },
   {

@@ -94,8 +94,8 @@ async function abaResumo(alvo, c, query, recarregar) {
         par('Conta de destino', c.destino_descricao ?? el('span', { style: 'color:var(--vermelho)' }, 'não cadastrada — o cliente não emite')),
         par('Titular', c.destino_titular ?? c.pix_titular ?? c.razao_social),
         par('Como chega', c.meio_entrega === 'rateio'
-          ? 'Rateio de crédito: o Bradesco credita direto na conta, sem passar pela PAY AX'
-          : 'PIX pela PAY AX, na hora em que o banco credita'),
+          ? 'Rateio de crédito: o Bradesco credita direto na conta, sem passar pela PAY AX (PIX se o banco não ratear)'
+          : `PIX pela PAY AX, na hora em que o banco credita${c.entrega === 'pix' ? ' (escolhido para este cliente)' : ''}`),
         par('Quando', 'Na liquidação: sem saque nem aprovação')))),
     el('div', { class: 'grade duas', style: 'margin-top:14px' },
       cartao('Boletos do mês', el('div', { class: 'pares' },
@@ -344,6 +344,10 @@ function camposCadastro(c = {}) {
         opcoes: [['corrente', 'Conta corrente'], ['pagamento', 'Conta de pagamento'], ['poupanca', 'Poupança']] }),
       campo({ nome: 'destino_titular', rotulo: 'Titular (razão social)', valor: c.destino_titular ?? c.razao_social ?? '' }),
       campo({ nome: 'destino_ispb', rotulo: 'ISPB (só se o banco não estiver na lista)', valor: c.destino_ispb ?? '', atributos: { maxlength: 8, inputmode: 'numeric' } })),
+    el('div', { class: 'linha-form' },
+      campo({ nome: 'entrega', rotulo: 'Como recebe', tipo: 'select', valor: c.entrega ?? 'padrao',
+        opcoes: [['padrao', 'Padrão do convênio (rateio para conta Bradesco, PIX se não der certo)'], ['pix', 'Sempre PIX da PAY AX']],
+        ajuda: 'Use "Sempre PIX" quando a tarifa do rateio deixar o boleto mais caro para este cliente.' })),
     el('h3', { style: 'font-size:14px;margin:14px 0 8px' }, 'Limites e chave PIX (opcional)'),
     el('div', { class: 'linha-form' },
       campo({ nome: 'limite_boleto', rotulo: 'Limite por boleto (R$)', tipo: 'dinheiro', valor: reais(c.limite_boleto_centavos ?? 5000000) }),

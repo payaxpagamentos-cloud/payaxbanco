@@ -56,6 +56,17 @@ de face, a PAY AX fique exatamente com a tarifa — com juros ou desconto, os do
 sistema registra o valor que o banco informa no retorno. O rateio do Bradesco só credita **conta Bradesco**, e por
 enquanto só pelo **arquivo CNAB**: pela API, os campos de rateio dependem da documentação que chega na homologação.
 
+**Quem escolhe o caminho é a PAY AX**, em dois níveis:
+
+- **No convênio** (Contas e preços → "Como o cliente recebe"): *PIX da PAY AX* ou *Rateio pelo Bradesco, com PIX
+  se não der certo*. O custo do rateio cobrado pelo banco vai em "Por rateio (R$)" e entra na margem de cada boleto.
+- **No cliente** (cadastro → "Como recebe"): *Padrão do convênio* ou *Sempre PIX da PAY AX* — para quando a tarifa
+  do rateio deixa o boleto daquele cliente mais caro.
+
+Não existe "só rateio, sem PIX": se o banco não ratear, o valor cai na conta da PAY AX e tem que sair na hora. E
+o contrário (PIX que falha virar rateio) não é possível, porque o rateio é definido no registro do boleto; PIX que
+falha é tentado de novo sozinho a cada rodada.
+
 **Plano B — se o rateio não der certo, a PAY AX faz por PIX.** O banco diz, no registro 3 do retorno
 (posições 159-160), o que aconteceu com o rateio de cada título, e o sistema age sozinho:
 
@@ -138,7 +149,7 @@ Com a demonstração, a Área do Cliente fica em `http://localhost:3600/cliente/
 `financeiro@alfanet.com.br` / `cliente2026`.
 
 ```bash
-npm test          # 130 testes
+npm test          # suíte completa (node:test)
 npm run migrar    # aplica as migrações sem subir o servidor
 ```
 
