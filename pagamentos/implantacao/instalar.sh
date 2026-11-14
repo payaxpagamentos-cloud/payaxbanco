@@ -376,6 +376,37 @@ systemctl enable --now litestream payax-copia-pastas.timer
 systemctl restart litestream
 systemctl restart caddy
 
+if [[ -z "$ENDPOINT" ]]; then
+  # Vigilância de memória e disco (CloudWatch): os alarmes do guia avisam ANTES de faltar recurso.
+  passo "Vigilância de memória e disco (CloudWatch)"
+  if [[ ! -x /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl ]]; then
+    curl -fsSL -o /tmp/cwagent.deb "https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/$(dpkg --print-architecture)/latest/amazon-cloudwatch-agent.deb" \
+      && dpkg -i /tmp/cwagent.deb >/dev/null \
+      || echo "Aviso: não foi possível instalar o agente do CloudWatch; os alarmes de memória e disco ficam sem dados." >&2
+  fi
+  [[ -d /opt/aws/amazon-cloudwatch-agent/etc ]] && cat > /opt/aws/amazon-cloudwatch-agent/etc/payax.json <<'JSON'
+{
+  "agent": { "metrics_collection_interval": 60 },
+  "metrics": {
+    "namespace": "PAYAX",
+    "append_dimensions": { "InstanceId": "${aws:InstanceId}" },
+    "aggregation_dimensions": [["InstanceId"]],
+    "metrics_collected": {
+      "mem": { "measurement": ["mem_used_percent"] },
+      "disk": { "measurement": ["used_percent"], "resources": ["/"], "drop_device": true }
+    }
+  }
+}
+JSON
+  [[ -x /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl ]] && /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s \
+    -c file:/opt/aws/amazon-cloudwatch-agent/etc/payax.json >/dev/null \
+    || echo "Aviso: o agente do CloudWatch não iniciou (confira a política CloudWatchAgentServerPolicy do papel)." >&2
+fi
+
+passo "Atualizações de segurança automáticas"
+apt-get install -y -q unattended-upgrades >/dev/null
+printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
+
 passo "Conferindo a cópia contínua"
 copia_ok=0
 for _ in $(seq 1 12); do

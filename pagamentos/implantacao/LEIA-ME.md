@@ -91,6 +91,27 @@ restaura o banco de segundos atrás e sobe.
   Alterar tipo* (ex.: `t4g.medium`, 4 GB) e aumentar o disco em *Volumes → Modificar*. Minutos, sem perder nada.
 - A reserva da etapa 2, desligada, custa só o disco (poucos dólares).
 
+## Opção B: por que não trava
+
+| O que derruba um servidor | Como está coberto |
+|---|---|
+| CPU freada por falta de crédito | Crédito **ilimitado** (passo 4) |
+| Falta de memória | 2 GB + 2 GB de troca (o sistema usa uma fração) e alarme em 85% |
+| Disco cheio | 30 GB, backups com rodízio (30 cópias) e alarme em 80% |
+| Programa caiu | O serviço volta sozinho em 5 segundos |
+| Máquina travou | Alarme reinicia sozinho |
+| Hardware do AWS falhou | Alarme recupera sozinho, com o mesmo IP e o mesmo disco |
+| Atualização deu errado | Foto diária do disco (7 dias) |
+| Servidor perdido de vez | Cópia contínua do banco no S3 (segundos) + servidor novo com o mesmo instalador |
+| Falha de segurança no Ubuntu | Atualizações de segurança automáticas |
+| Ninguém percebeu | E-mail para a equipe em todos os casos acima |
+
+O que essa configuração **não** faz: trocar de servidor sozinha se a zona inteira do AWS cair (raro). Isso é a
+etapa 2 (reserva) — recomendada antes do primeiro cliente real em produção, por poucos dólares a mais.
+
+**Custo** depois dos créditos de conta nova: ~**US$ 30 por mês** (máquina ~US$ 20, disco ~US$ 5, IP fixo ~US$ 4,
+fotos do disco, alarmes e verificação ~US$ 1–2). Nos primeiros meses, os créditos cobrem.
+
 ## Opção B: o que ter em mãos
 
 1. CNPJ e cartão de crédito da PAY AX.
@@ -117,7 +138,8 @@ restaura o banco de segundos atrás e sobe.
 
 ### 3. Papel do servidor (permissões sem senha em disco)
 **IAM → Funções → Criar função** → *Serviço da AWS* → *EC2*:
-1. Anexe a política gerenciada **AmazonSSMManagedInstanceCore** (permite abrir o terminal pelo navegador).
+1. Anexe as políticas gerenciadas **AmazonSSMManagedInstanceCore** (terminal pelo navegador) e
+   **CloudWatchAgentServerPolicy** (envia memória e disco para os alarmes).
 2. Nome: **PayaxPagamentosServidor**. Crie.
 3. Abra a função → *Adicionar permissões* → *Criar política em linha* → aba JSON, cole o texto abaixo trocando
    `NOME-DO-BUCKET` e `NUMERO-DA-CONTA` (12 dígitos, no canto superior direito do console). Nome: `payax-pagamentos`.
@@ -142,7 +164,10 @@ restaura o banco de segundos atrás e sobe.
 - Par de chaves: *Prosseguir sem um par de chaves* — o acesso é pelo navegador (Session Manager), sem porta SSH aberta.
 - Rede: *Criar grupo de segurança* permitindo **HTTPS** e **HTTP** de qualquer lugar. **Desmarque o SSH.**
 - Armazenamento: **30 GB, gp3, criptografado** (dá para aumentar depois sem desligar).
-- Detalhes avançados: *Perfil de instância do IAM* = **PayaxPagamentosServidor**; *Proteção contra encerramento* = ativada.
+- Detalhes avançados:
+  - *Perfil de instância do IAM* = **PayaxPagamentosServidor**;
+  - *Especificação de crédito* = **Ilimitado** — a máquina nunca é freada por falta de crédito de CPU;
+  - *Proteção contra encerramento* e *Proteção contra interrupção* = ativadas (ninguém desliga ou apaga por engano).
 
 ### 5. IP fixo
 **EC2 → IPs elásticos → Alocar** → *Ações → Associar* à instância `payax-pagamentos-1`.
@@ -151,10 +176,24 @@ Esse é o IP que vai para o **Bradesco** (liberação da API ou da transmissão 
 ### 6. Endereço
 No DNS do domínio, crie um registro **A**: `pagamentos` → o IP fixo. (Pode levar alguns minutos para valer.)
 
-### 7. Recuperação automática
-**CloudWatch → Alarmes → Criar alarme** → métrica *EC2 → Por instância → StatusCheckFailed_System* da
-instância → maior que 0 por 2 minutos → ação do EC2 **Recuperar esta instância** + aviso por e-mail. Se o hardware
-do AWS falhar, a máquina volta sozinha, com o mesmo IP e o mesmo disco.
+### 7. Vigilância 24 horas (alarmes)
+Em **CloudWatch → Alarmes → Criar alarme**. No primeiro, crie o tópico de aviso *payax-alertas* com os e-mails da
+equipe (confirme o e-mail que chega); nos outros, use o mesmo tópico.
+
+| Alarme | Métrica | Condição | Ação |
+|---|---|---|---|
+| Hardware do AWS | EC2 → Por instância → `StatusCheckFailed_System` | > 0 por 2 min | **Recuperar esta instância** + e-mail |
+| Máquina travada | EC2 → Por instância → `StatusCheckFailed_Instance` | > 0 por 3 min | **Reinicializar esta instância** + e-mail |
+| Memória | PAYAX → InstanceId → `mem_used_percent` | > 85% por 10 min | e-mail |
+| Disco | PAYAX → InstanceId, path → `disk_used_percent` | > 80% | e-mail |
+| Sistema fora do ar | **Route 53 → Verificações de integridade** → HTTPS `pagamentos.payax.com.br`, caminho `/api/saude` | falhou | e-mail (ative o alarme na própria verificação) |
+
+As métricas PAYAX aparecem alguns minutos depois da instalação (passo 8).
+
+### 7b. Foto diária do disco
+**EC2 → Gerenciador de ciclo de vida → Criar política** → *Política de snapshot do EBS* → alvo: instâncias com a
+tag `Name` = `payax-pagamentos-1` → todo dia, às 06:00 UTC → guardar **7**. Se uma atualização der errado, volta-se
+o disco inteiro de ontem em minutos. (É uma camada a mais: a cópia contínua do banco continua sendo a principal.)
 
 ### 8. Instalar
 1. Envie o pacote para o bucket: **S3 → seu bucket → pasta `instalacao` → Carregar**.
@@ -176,8 +215,7 @@ Sem eles, as credenciais do banco gravadas no sistema não podem ser lidas por u
 1. `https://pagamentos.payax.com.br/` → entre com o e-mail e a senha inicial → troque a senha.
 2. Ative a **autenticação em duas etapas** e, em Segurança e usuários, **exija** para toda a equipe.
 3. Cadastre a equipe, o convênio Bradesco (Contas e preços), o encarregado de dados (LGPD) e as integrações.
-4. Configure um monitor externo de disponibilidade em `https://pagamentos.payax.com.br/api/saude` (ex.: *Route 53
-   → Verificações de integridade*, com aviso por e-mail).
+4. Confira que os alarmes do passo 7 estão **OK** (verde) e que o e-mail de teste do tópico chegou.
 
 ### Atualizar o sistema
 Gere o pacote novo, envie para a pasta `instalacao` e repita o passo 8.3 **no mesmo servidor**. O script mantém o
@@ -195,7 +233,7 @@ banco e os segredos, troca o programa e reinicia (alguns segundos fora do ar).
 ## Se o servidor principal cair
 
 **Etapa 2 (com reserva):**
-1. Console → `payax-pagamentos-1` → **Interromper** (se ainda responder). *Nunca deixe os dois ligados com o sistema ativo.*
+1. Console → `payax-pagamentos-1` → desative a *proteção contra interrupção* e **Interromper** (se ainda responder). *Nunca deixe os dois ligados com o sistema ativo.*
 2. Ligue `payax-pagamentos-2` → Conectar → Session Manager → `sudo /opt/payax/pagamentos/implantacao/assumir.sh`
    (pede para digitar ASSUMIR; restaura o banco de segundos atrás, confere a integridade e sobe).
 3. **IPs elásticos** → associar o IP fixo a `payax-pagamentos-2`. O endereço e o IP liberado no Bradesco continuam os mesmos.
