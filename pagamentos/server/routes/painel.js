@@ -10,6 +10,7 @@ const backup = require('../lib/backup');
 const arquivosBanco = require('../lib/arquivosBanco');
 const conformidade = require('../lib/conformidade');
 const pld = require('../lib/pld');
+const lgpd = require('../lib/lgpd');
 
 /** Visão geral da plataforma: o que entrou, quanto ficou conosco e o que está pendente. */
 module.exports = (db) => {
@@ -109,6 +110,15 @@ async function alertas(db, hoje, perfil) {
       texto: `${r.atrasos.comunicacao} comunicação(ões) ao Coaf com o prazo de 24 horas vencido` });
     if (r.abertos) lista.push({ tipo: 'pld', severidade: r.atrasos.analise ? 'erro' : 'aviso', quantidade: r.abertos,
       texto: `${r.abertos} alerta(s) de PLD para analisar${r.atrasos.analise ? ` (${r.atrasos.analise} com prazo vencido)` : ''}` });
+  }
+
+  // LGPD: pedidos de titular e incidentes têm prazo de lei.
+  if (podeEquipe(perfil, 'lgpd.ver')) {
+    const g = lgpd.resumo(db);
+    if (g.incidentes.atrasados) lista.push({ tipo: 'lgpd_incidente', severidade: 'erro', quantidade: g.incidentes.atrasados,
+      texto: `${g.incidentes.atrasados} incidente(s) de segurança sem comunicação à ANPD no prazo` });
+    if (g.pedidos.abertos) lista.push({ tipo: 'lgpd_pedidos', severidade: g.pedidos.vencidos ? 'erro' : 'aviso', quantidade: g.pedidos.abertos,
+      texto: `${g.pedidos.abertos} pedido(s) de titular (LGPD) para responder${g.pedidos.vencidos ? ` — ${g.pedidos.vencidos} fora do prazo de 15 dias` : ''}` });
   }
 
   // O razão é o dinheiro dos clientes: backup atrasado ou que não conferiu é assunto urgente.

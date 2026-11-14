@@ -250,7 +250,8 @@ ${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não e
   <div class="barras">${barras}</div>
   <div class="rodape">
     <span>Nosso número ${esc(nn)} · ${esc(linha)}</span>
-    <span>Cobrança de ${esc(bfNome)}, processada por ${esc(conta.beneficiario_nome)}</span>
+    <span>Cobrança de ${esc(bfNome)}, processada por ${esc(conta.beneficiario_nome)}.
+      Como tratamos seus dados: <a href="${esc(base)}/privacidade">${esc(`${config.urlPublica || ''}${base}/privacidade`)}</a></span>
   </div>
 </div>
 <script src="${esc(base)}/js/boleto.js"></script>

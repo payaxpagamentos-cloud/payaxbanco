@@ -14,9 +14,11 @@ const repasses = require('./repasses');
 const sincronismo = require('./sincronismo');
 const arquivosBanco = require('./arquivosBanco');
 const pld = require('./pld');
+const lgpd = require('./lgpd');
 
 let ultimaImportacao = null;
 let ultimoPld = 0;
+let ultimaRetencao = null;
 
 async function rodar(db, { forcar = false } = {}) {
   const hoje = datas.dataLocal(config.fusoPadrao);
@@ -54,6 +56,19 @@ async function rodar(db, { forcar = false } = {}) {
       if (out.pld.novos) console.log(`[PAY AX] PLD: ${out.pld.novos} alerta(s) novo(s) para análise.`);
     } catch (err) {
       console.error('[PAY AX] Falha no monitoramento de PLD:', err.message);
+    }
+  }
+
+  // LGPD: anonimiza o que passou do prazo de guarda, uma vez por dia.
+  if (forcar || ultimaRetencao !== hoje) {
+    ultimaRetencao = hoje;
+    try {
+      out.retencao = lgpd.aplicarRetencao(db);
+      if (out.retencao.boletos || out.retencao.ips) {
+        console.log(`[PAY AX] LGPD: ${out.retencao.boletos} título(s) anonimizado(s), ${out.retencao.ips} IP(s) apagado(s) da auditoria.`);
+      }
+    } catch (err) {
+      console.error('[PAY AX] Falha na retenção da LGPD:', err.message);
     }
   }
 

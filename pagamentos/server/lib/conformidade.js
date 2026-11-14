@@ -32,6 +32,7 @@ const dois = require('./doisfatores');
 const arquivosBanco = require('./arquivosBanco');
 const repasses = require('./repasses');
 const pld = require('./pld');
+const lgpd = require('./lgpd');
 
 const GRUPOS = [
   { id: 'boleto', titulo: 'Boleto e cobrança' },
@@ -333,22 +334,104 @@ const REGRAS = [
     },
   },
   {
+    id: 'lgpd-encarregado',
+    grupo: 'dados',
+    tipo: 'automatica',
+    titulo: 'Encarregado de dados designado e divulgado',
+    norma: 'LGPD (Lei 13.709/2018), art. 41, § 1º',
+    exige: 'Indicar o encarregado e divulgar publicamente a identidade e o contato dele.',
+    verificar(db) {
+      const e = lgpd.encarregado(db);
+      if (!e.nome || !e.email) return fora('Encarregado não cadastrado. Cadastre em LGPD → Encarregado: o nome e o e-mail vão para o aviso de privacidade.');
+      return ok(`${e.nome} (${e.email}), publicado no aviso de privacidade.`);
+    },
+  },
+  {
     id: 'lgpd-aviso',
     grupo: 'dados',
-    tipo: 'acompanhamento',
-    titulo: 'Aviso de privacidade ao pagador',
-    norma: 'LGPD (Lei 13.709/2018), art. 9º',
-    exige: 'O pagador tem direito a saber quais dados dele são tratados, para quê e por quem.',
-    responsavel: 'Jurídico (texto) e tecnologia (publicação)',
+    tipo: 'automatica',
+    titulo: 'Aviso de privacidade publicado e ligado ao boleto',
+    norma: 'LGPD (Lei 13.709/2018), arts. 9º e 18',
+    exige: 'Informar ao titular, de forma clara e ostensiva, finalidade, forma e duração do tratamento, quem é o controlador, com quem os dados são compartilhados e os direitos do art. 18.',
+    async verificar() {
+      const raiz = path.join(__dirname, '..', '..');
+      const ficha = await fichaExemplo();
+      if (!ficha.includes('/privacidade')) return fora('O boleto não traz o link do aviso de privacidade.');
+      const entrada = fs.readFileSync(path.join(raiz, 'cliente', 'js', 'app.js'), 'utf8');
+      if (!entrada.includes('privacidade')) return fora('A Área do Cliente não traz o link do aviso de privacidade.');
+      const faltam = lgpd.INVENTARIO.filter((x) => !x.finalidade || !x.base_legal || !x.retencao || !x.compartilhamento?.length).map((x) => x.titulo);
+      if (faltam.length) return fora(`Inventário incompleto: ${faltam.join(', ')}.`);
+      return ok(`Página pública /privacidade com ${lgpd.INVENTARIO.length} grupos de dados, os direitos do art. 18 e o formulário do titular; ligada no boleto e na Área do Cliente.`);
+    },
+  },
+  {
+    id: 'lgpd-pedidos',
+    grupo: 'dados',
+    tipo: 'automatica',
+    titulo: 'Pedidos dos titulares respondidos no prazo',
+    norma: 'LGPD (Lei 13.709/2018), arts. 18 e 19, II (15 dias)',
+    exige: 'Atender os pedidos do titular sem custo; a declaração completa sai em até 15 dias do pedido.',
+    verificar(db) {
+      const r = lgpd.resumo(db).pedidos;
+      if (r.vencidos) return fora(`${plural(r.vencidos, 'pedido passou', 'pedidos passaram')} do prazo de 15 dias sem resposta.`);
+      return ok(r.abertos ? `${plural(r.abertos, 'pedido aberto', 'pedidos abertos')}, dentro do prazo.` : `Nenhum pedido aberto (${r.total} no total).`);
+    },
+  },
+  {
+    id: 'lgpd-incidentes',
+    grupo: 'dados',
+    tipo: 'automatica',
+    titulo: 'Incidentes comunicados à ANPD no prazo',
+    norma: 'LGPD (Lei 13.709/2018), art. 48; Resolução CD/ANPD nº 15/2024 (3 dias úteis)',
+    exige: 'Incidente que possa causar risco ou dano relevante é comunicado à ANPD e aos titulares em 3 dias úteis da descoberta.',
+    verificar(db) {
+      const r = lgpd.resumo(db).incidentes;
+      if (r.atrasados) return fora(`${plural(r.atrasados, 'incidente está', 'incidentes estão')} sem comunicação à ANPD depois do prazo.`);
+      return ok(r.abertos ? `${plural(r.abertos, 'incidente aberto', 'incidentes abertos')}, dentro do prazo.` : 'Nenhum incidente aberto.');
+    },
   },
   {
     id: 'lgpd-retencao',
     grupo: 'dados',
+    tipo: 'automatica',
+    titulo: 'Dados anonimizados ao fim do prazo de guarda',
+    norma: 'LGPD (Lei 13.709/2018), arts. 15 e 16; Marco Civil da Internet, art. 15',
+    exige: 'Eliminar ou anonimizar quando a finalidade acaba, guardando só o que a lei manda (registros financeiros: 5 anos; IP de acesso: 6 meses).',
+    verificar(db) {
+      const r = lgpd.resumo(db).retencao;
+      if (r.pendente) return fora(`${plural(r.pendente, 'título passou', 'títulos passaram')} do prazo de guarda sem ser anonimizado.`);
+      if (!r.ultima) return atencao('A retenção ainda não rodou neste servidor. Ela roda sozinha todo dia, ou em LGPD → Retenção.');
+      const horas = (Date.now() - Date.parse(r.ultima.em)) / 3_600_000;
+      if (horas > 50) return atencao(`A retenção não roda há ${Math.round(horas)} horas.`);
+      return ok(`Rodou há ${Math.max(1, Math.round(horas))} hora(s). Guarda de ${r.anos} anos para registros financeiros; IP de acesso apagado depois de 6 meses.`);
+    },
+  },
+  {
+    id: 'lgpd-revisao-juridica',
+    grupo: 'dados',
     tipo: 'acompanhamento',
-    titulo: 'Retenção de dados e pedidos do titular',
-    norma: 'LGPD (Lei 13.709/2018), arts. 15, 16 e 18',
-    exige: 'Política de quanto tempo cada dado fica guardado e um canal para o titular pedir acesso, correção ou exclusão.',
+    titulo: 'Aviso de privacidade revisado e papéis com os provedores',
+    norma: 'LGPD (Lei 13.709/2018), arts. 9º, 37 e 39',
+    exige: 'Revisar o texto do aviso (é minuta técnica fiel ao sistema) e definir no contrato com cada provedor quem é controlador e quem é operador dos dados dos assinantes.',
     responsavel: 'Jurídico',
+  },
+  {
+    id: 'lgpd-operadores',
+    grupo: 'dados',
+    tipo: 'acompanhamento',
+    titulo: 'Contratos com quem trata dados para a PAY AX',
+    norma: 'LGPD (Lei 13.709/2018), art. 39',
+    exige: 'Banco, hospedagem do sistema e serviços de consulta (CEP/CNPJ) tratam dados seguindo instruções da PAY AX: cláusulas de proteção de dados nos contratos.',
+    responsavel: 'Jurídico',
+  },
+  {
+    id: 'lgpd-ripd',
+    grupo: 'dados',
+    tipo: 'acompanhamento',
+    titulo: 'Relatório de impacto à proteção de dados',
+    norma: 'LGPD (Lei 13.709/2018), art. 38',
+    exige: 'A ANPD pode pedir o relatório de impacto. Recomendável para o tratamento de dados financeiros e de PLD.',
+    responsavel: 'Encarregado',
   },
 
   // ------------------------------------------------ Regulatório

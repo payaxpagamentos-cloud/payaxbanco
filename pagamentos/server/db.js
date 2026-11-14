@@ -591,6 +591,55 @@ ALTER TABLE clientes ADD COLUMN bloqueio_em TEXT;
 ALTER TABLE clientes ADD COLUMN bloqueio_por INTEGER REFERENCES usuarios(id);
 `,
   },
+  {
+    versao: 10,
+    nome: 'lgpd',
+    sql: `
+-- Pedidos dos titulares (LGPD, arts. 18 e 19): protocolo, prazo de 15 dias, identidade conferida, resposta.
+CREATE TABLE lgpd_pedidos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  protocolo TEXT NOT NULL UNIQUE,
+  tipo TEXT NOT NULL,
+  titular_nome TEXT NOT NULL,
+  titular_documento TEXT NOT NULL,
+  titular_email TEXT NOT NULL,
+  mensagem TEXT,
+  situacao TEXT NOT NULL DEFAULT 'recebido' CHECK (situacao IN ('recebido', 'em_atendimento', 'atendido', 'recusado')),
+  prazo TEXT NOT NULL,
+  identidade_verificada_em TEXT,
+  identidade_como TEXT,
+  atendente_id INTEGER REFERENCES usuarios(id),
+  resposta TEXT,
+  respondido_em TEXT,
+  ip TEXT,
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL
+);
+CREATE INDEX idx_lgpd_pedidos_situacao ON lgpd_pedidos(situacao, prazo);
+
+-- Incidentes de segurança (LGPD, art. 48; Resolução CD/ANPD 15/2024: 3 dias úteis).
+CREATE TABLE lgpd_incidentes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  descoberto_em TEXT NOT NULL,
+  descricao TEXT NOT NULL,
+  dados_afetados TEXT NOT NULL,
+  titulares_estimados INTEGER,
+  risco TEXT NOT NULL DEFAULT 'em_avaliacao' CHECK (risco IN ('em_avaliacao', 'relevante', 'nao_relevante')),
+  medidas TEXT,
+  prazo_comunicacao TEXT NOT NULL,
+  anpd_comunicada_em TEXT,
+  anpd_protocolo TEXT,
+  titulares_comunicados_em TEXT,
+  encerrado_em TEXT,
+  registrado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL
+);
+
+-- Quando o pagador do título foi anonimizado, depois do prazo de guarda.
+ALTER TABLE boletos ADD COLUMN anonimizado_em TEXT;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

@@ -256,6 +256,9 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 }
 .tela-entrada-caixa { position: relative; z-index: 1; }
 .marca-entrada { display: grid; justify-items: center; gap: 9px; padding-bottom: 2px; }
+/* Link do aviso de privacidade (LGPD, art. 9º): na entrada e no rodapé do menu. */
+.link-privacidade { font-size: 12.5px; color: var(--texto-3); text-align: center; text-decoration: underline; }
+.link-privacidade.menu { display: block; color: #8fa3bd; text-align: left; padding: 0 6px; }
 .marca-entrada small { font-size: 8.5px; font-weight: 600; letter-spacing: 0.3em; color: var(--texto-3); }
 .tela-entrada-caixa { background: var(--superficie); border-radius: var(--raio-g); box-shadow: var(--sombra-alta); width: min(410px, 100%); padding: 32px; display: grid; gap: 15px; }
 .tela-entrada-caixa h1 { font-size: 17px; }

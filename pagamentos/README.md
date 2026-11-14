@@ -314,6 +314,25 @@ Para ligar a exigência, o próprio administrador precisa ter 2FA ativo: não d�
 | `PAYAX_CACHE_CEP_DIAS` / `PAYAX_CACHE_CNPJ_DIAS` | `180` / `30` | Validade do cache das consultas. |
 | `PAYAX_DADOS_TIMEOUT_MS` | `8000` | Tempo máximo de espera das consultas de CEP e CNPJ. |
 
+## Proteção de dados (LGPD)
+
+Tudo sai de um **inventário único** em `server/lib/lgpd.js` (registro das operações, art. 37): o que é tratado, de
+quem, para quê, com que base legal, com quem é compartilhado e por quanto tempo fica guardado. O aviso público e a
+tela interna leem dali — não há como um dizer uma coisa e o sistema fazer outra.
+
+| O que a lei pede | Como o sistema atende |
+|---|---|
+| Informar o titular de forma clara (art. 9º) | **Aviso de privacidade público** em `/privacidade` (e `/cliente/privacidade`), sem login, ligado no boleto, na entrada e no menu da Área do Cliente e na entrada do Backoffice |
+| Encarregado com identidade e contato públicos (art. 41) | **LGPD → Encarregado**; o nome e o e-mail vão para o aviso. Sem encarregado, a Conformidade acusa |
+| Direitos do titular (art. 18) e prazo de resposta (art. 19, II: 15 dias) | **Formulário no aviso**, com protocolo e prazo. A equipe confere a identidade antes de responder (confirmar a um desconhecido que um CPF paga um provedor já seria vazar dado), gera o relatório dos dados do titular e registra a resposta. Recusa exige motivo (art. 18, § 4º). Atraso vira alerta no painel |
+| Relatório de acesso sem violar sigilo de outra lei | O relatório **não traz** nada de PLD: a Lei 9.613/1998 (art. 11, II) proíbe dar ciência ao próprio titular |
+| Eliminar quando acaba a finalidade, guardando o que a lei manda (arts. 15 e 16) | **Retenção automática diária**: registros financeiros por 5 anos depois de concluídos (Lei 9.613/1998, art. 10, § 2º, e prazos fiscais), depois o pagador é anonimizado — boleto, lançamentos, avisos do banco, alertas de PLD encerrados, pedidos respondidos — e os arquivos CNAB antigos são apagados. Título em aberto nunca é tocado. IP da auditoria: 6 meses (Marco Civil, art. 15) |
+| Comunicar incidente à ANPD e aos titulares (art. 48; Resolução CD/ANPD nº 15/2024) | **LGPD → Incidentes**: o prazo de 3 dias úteis corre da descoberta; incidente de risco relevante só se encerra depois das duas comunicações |
+
+O que fica com o jurídico (acompanhamento na Conformidade): revisar o texto do aviso — é minuta técnica fiel ao
+sistema —, definir com cada provedor quem é controlador e quem é operador dos dados dos assinantes, contratos com
+quem trata dados para a PAY AX (banco, hospedagem, consultas) e o relatório de impacto (art. 38).
+
 ## Prevenção à lavagem de dinheiro (PLD)
 
 A PAY AX recebe na conta dela o dinheiro dos clientes e o repassa: é *"intermediação de recursos financeiros de
@@ -365,7 +384,7 @@ Legenda: ✅ atendido no sistema · 🏦 depende do Bradesco · ⚖️ depende d
 | Lei 5.474/1968 (duplicatas) | Duplicata de serviço para prestação de serviço | Espécie padrão DS (código 12 no CNAB 400) | ✅ 🏦 código da API a confirmar |
 | FEBRABAN, Comunicado FB-170/2005 | Boleto sem "taxa bancária" ou "tarifa bancária" | O boleto não usa essas expressões | ✅ |
 | Manual CNAB 400 do Bradesco (março de 2023) | Layout byte a byte; beneficiário final nas posições 335-394 | Posições conferidas contra o manual, com testes | ✅ 🏦 convênio precisa ser habilitado para beneficiário final |
-| LGPD (Lei 13.709/2018) | Dados mínimos, segurança, transparência, direitos do titular | Senhas com scrypt, credenciais cifradas, auditoria, duas etapas, consulta de CNPJ sem dados de sócios | ✅ 🔧 faltam aviso de privacidade ao pagador, política de retenção e canal para pedidos do titular |
+| LGPD (Lei 13.709/2018) | Transparência, encarregado, direitos do titular em 15 dias, retenção, incidentes, segurança | Aviso público ligado ao boleto, formulário com protocolo, retenção automática, registro de incidentes com prazo, senhas com scrypt, credenciais cifradas, auditoria, duas etapas | ✅ ⚖️ revisão jurídica do aviso e papéis com os provedores |
 | Arranjos e instituições de pagamento (Lei 12.865/2013 e regras do BCB) | Quem mantém saldo de terceiros (conta de pagamento) segue regras próprias | **Não há saldo guardado:** o valor vai ao cliente assim que o banco credita, e a Conformidade vigia isso sozinha | ✅ ⚖️ confirmar o enquadramento do recebimento em nome dos clientes e a contabilização com o contador |
 | Resolução Conjunta CMN/BCB nº 17/2025 | Sem termos que sugiram atividade sem autorização ("banco", "bank") no nome, nome fantasia e marca | "Área do Cliente" no lugar de "Internet Bank"; código do cliente no lugar de agência e conta; a Conformidade confere as telas | ✅ ⚖️ confirmar com o jurídico se a norma alcança a PAY AX |
 | Prevenção à lavagem de dinheiro (Lei 9.613/1998) | Conhecer o cliente, monitorar operações atípicas, comunicar ao Coaf em 24 h sem dar ciência ao cliente | Módulo PLD: conheça seu cliente, 7 regras de monitoramento, análise, comunicação com prazo e protocolo, declaração anual | ✅ ⚖️ confirmar o enquadramento; cadastro no Coaf, política e lista de sanções são acompanhamento |

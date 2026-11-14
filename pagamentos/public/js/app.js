@@ -28,6 +28,7 @@ const MENU = [
     ['conformidade', 'Conformidade', 'balanca', 'conformidade.ver', () => import('./telas/conformidade.js')],
     // PLD: só o administrador ('*'), por sigilo de lei. pld.ver serve para um perfil de compliance futuro.
     ['pld', 'PLD', 'busca', ['pld.ver', '*'], () => import('./telas/pld.js')],
+    ['lgpd', 'LGPD', 'olho', ['lgpd.ver', '*'], () => import('./telas/lgpd.js')],
     ['admin', 'Segurança e usuários', 'escudo', 'auditoria.ver', () => import('./telas/admin.js')],
   ]],
 ];
@@ -199,7 +200,8 @@ function telaEntrada() {
     marcaEntrada('PAGAMENTOS'),
     el('h1', {}, 'Backoffice'),
     el('p', { class: 'apoio' }, 'Acesso da equipe PAY AX. A Área do Cliente fica em outro endereço.'),
-    form, botao)));
+    form, botao,
+    el('a', { class: 'link-privacidade', href: 'privacidade', target: '_blank', rel: 'noopener' }, 'Privacidade e proteção de dados'))));
   form.querySelector('input')?.focus();
 }
 

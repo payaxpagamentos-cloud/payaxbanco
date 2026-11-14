@@ -33,6 +33,9 @@ function criarApp(db) {
   // O retorno do banco chega como arquivo (corpo bruto); o resto da API é JSON.
   equipe.use('/api/arquivos/retornos', express.raw({ type: () => true, limit: '10mb' }));
   equipe.use(express.json({ limit: '1mb' }));
+  // Aviso de privacidade e canal do titular (LGPD): públicos, sem login, nas duas áreas.
+  const privacidade = require('./routes/privacidade')(db);
+  equipe.use(privacidade);
   equipe.use('/api', criarApi(db));
   equipe.use('/comum', express.static(path.join(__dirname, '..', 'comum'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   equipe.use(express.static(path.join(__dirname, '..', 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
@@ -41,6 +44,7 @@ function criarApp(db) {
   const cliente = express.Router();
   cliente.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   cliente.use(express.json({ limit: '1mb' }));
+  cliente.use(privacidade);
   cliente.use('/api', criarApiCliente(db));
   cliente.use('/comum', express.static(path.join(__dirname, '..', 'comum'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   cliente.use('/js/boleto.js', express.static(path.join(__dirname, '..', 'public', 'js', 'boleto.js')));

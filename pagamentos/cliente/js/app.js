@@ -77,8 +77,9 @@ function estrutura(rota, principal) {
       el('a', { class: `link-menu${r === rota ? ' ativo' : ''}`, href: `#/${r}`, 'aria-current': r === rota ? 'page' : null, onclick: () => alternar(false) }, icone(ic), rot))));
   }
   menu.append(el('div', { class: 'menu-rodape' },
+    el('a', { class: 'link-privacidade menu', href: 'privacidade', target: '_blank', rel: 'noopener' }, 'Privacidade e os seus dados'),
     u.cliente_situacao !== 'ativo'
-      ? el('div', { class: 'selo-ambiente' }, `Conta ${u.cliente_situacao}`, el('small', {}, 'Fale com o seu gerente de conta'))
+      ? el('div', { class: 'selo-ambiente' }, `Cadastro ${u.cliente_situacao}`, el('small', {}, 'Fale com o seu gerente de conta'))
       : null,
     el('button', { class: 'perfil', onclick: menuConta }, el('span', { class: 'avatar' }, iniciais(u.nome)),
       el('div', {}, el('strong', {}, u.nome), el('small', {}, u.email)))));
@@ -182,9 +183,11 @@ function telaEntrada() {
   });
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
     marcaEntrada('ÁREA DO CLIENTE'),
-    el('h1', {}, 'Acesse a sua conta'),
+    el('h1', {}, 'Acesse a Área do Cliente'),
     el('p', { class: 'apoio' }, 'Use o e-mail e a senha que a PAY AX enviou. Na primeira entrada você troca a senha.'),
-    form, botao)));
+    form, botao,
+    // Aviso de privacidade (LGPD, art. 9º): página pública, abre sem login.
+    el('a', { class: 'link-privacidade', href: 'privacidade', target: '_blank', rel: 'noopener' }, 'Privacidade e os seus dados'))));
   form.querySelector('input')?.focus();
 }
 
