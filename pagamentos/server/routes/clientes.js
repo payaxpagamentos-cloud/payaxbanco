@@ -36,10 +36,8 @@ function corpoCliente(body, { novo = false } = {}) {
   if (body.cidade !== undefined) d.cidade = v.opcional(body.cidade, 'a cidade', 60);
   if (body.uf !== undefined) d.uf = v.ufOpcional(body.uf);
   if (body.situacao !== undefined) d.situacao = v.opcao(body.situacao, 'a situação', ['implantacao', 'ativo', 'suspenso', 'encerrado']);
-  if (body.retencao_dias !== undefined) d.retencao_dias = v.inteiro(body.retencao_dias, 'a retenção em dias', { min: 0, max: 30 });
-  if (body.repasse_automatico !== undefined) d.repasse_automatico = v.booleano(body.repasse_automatico) ? 1 : 0;
-  if (body.repasse_minimo !== undefined) d.repasse_minimo_centavos = v.centavos(body.repasse_minimo, 'o repasse mínimo');
-  if (body.repasse_limite_aprovacao !== undefined) d.repasse_limite_aprovacao_centavos = v.centavos(body.repasse_limite_aprovacao, 'o limite de aprovação');
+  // Retenção, repasse mínimo e limite de aprovação deixaram de existir: o valor recebido vai
+  // para o cliente assim que o banco credita. As colunas continuam no banco de dados, sem uso.
   if (body.limite_boleto !== undefined) {
     d.limite_boleto_centavos = v.centavos(body.limite_boleto, 'o limite por boleto');
     if (d.limite_boleto_centavos <= 0) throw new ErroNegocio('O limite por boleto precisa ser maior que zero.', 422);

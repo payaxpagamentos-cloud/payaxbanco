@@ -8,6 +8,7 @@ const { csv } = require('../lib/http');
 const v = require('../lib/validacao');
 const datas = require('../lib/datas');
 const boletosLib = require('../lib/boletos');
+const repassesLib = require('../lib/repasses');
 const precos = require('../lib/precos');
 const consultas = require('../lib/consultas');
 const impressao = require('../lib/impressao');
@@ -87,7 +88,11 @@ module.exports = (db) => {
       meio: req.body?.meio === 'pix' ? 'pix' : 'boleto',
     }, { usuario: req.usuario, origem: 'manual' });
     auditoria.registrar(db, req, { acao: 'boleto.liquidado.manual', entidade: 'boleto', entidade_id: Number(req.params.id), depois: out });
-    if (!out.ja_liquidado) await ixcLib.avisarBaixa(db, Number(req.params.id)).catch(() => null);
+    if (!out.ja_liquidado) {
+      await ixcLib.avisarBaixa(db, Number(req.params.id)).catch(() => null);
+      // Se o crédito já está na conta, o cliente recebe agora; senão, a rotina repassa no dia do crédito.
+      await repassesLib.repassarCliente(db, out.cliente_id).catch(() => null);
+    }
     res.json(out);
   });
 

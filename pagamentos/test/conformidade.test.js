@@ -56,7 +56,7 @@ test('conformidade: o sistema confere as próprias regras', async (t) => {
   });
 
   await t.test('o administrador registra o acompanhamento, e fica na auditoria', async () => {
-    const r = await api.put('/api/conformidade/recursos-terceiros', {
+    const r = await api.put('/api/conformidade/recebimento-terceiros', {
       situacao: 'em_andamento', responsavel: 'Dra. Fulana (advogada)', prazo: somarDias(hoje(), 30),
       observacao: 'Consulta enviada ao escritório.',
     }, tk.admin);
@@ -66,7 +66,7 @@ test('conformidade: o sistema confere as próprias regras', async (t) => {
     assert.equal(r.dados.prazo_vencido, false);
     const log = api.db.prepare("SELECT * FROM auditoria WHERE acao = 'conformidade.atualizada' ORDER BY id DESC LIMIT 1").get();
     assert.ok(log, 'registrado na auditoria');
-    assert.match(log.depois, /recursos-terceiros/);
+    assert.match(log.depois, /recebimento-terceiros/);
   });
 
   await t.test('prazo vencido aparece no resumo e no painel', async () => {

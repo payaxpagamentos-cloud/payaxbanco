@@ -10,7 +10,7 @@
 import { el, icone, dinheiro, data, R, selo } from './ui.js';
 import { letreiro, simbolo } from './marca.js';
 
-const CHAVE_SALDO = 'payax.saldo.oculto';
+const CHAVE_SALDO = 'payax.saldo.oculto'; // nome antigo da chave, mantido para não perder a preferência
 const oculto = () => { try { return localStorage.getItem(CHAVE_SALDO) === '1'; } catch { return false; } };
 const guardarOculto = (v) => { try { localStorage.setItem(CHAVE_SALDO, v ? '1' : '0'); } catch { /* sem armazenamento */ } };
 
@@ -20,41 +20,47 @@ const marcaCartao = () => el('div', { class: 'marca-cartao' },
   letreiro({ altura: 13, cor: 'rgba(255,255,255,0.92)', degrade: ['#8fe3fb', '#3ea8f5'] }));
 
 /**
- * Cartão da conta: saldo, o que está retido, número da conta e o botão de esconder.
- * @param {{saldo, disponivel, agencia, conta, retencao_dias, acoes}} d
+ * Cartão do cliente: o que já foi para a conta dele e o que está a caminho.
+ *
+ * Não existe "saldo" aqui: a PAY AX não guarda dinheiro de cliente. O valor recebido vai por PIX
+ * para a conta da empresa assim que o banco credita — o cartão mostra esse caminho, com o botão
+ * de esconder os valores (serve para olhar em público).
+ * @param {{transferencias, codigo?, acoes?}} d
  */
-export function cartaoConta({ saldo, disponivel, agencia, conta, retencao_dias, acoes = [] }) {
+export function cartaoConta({ transferencias: t, codigo = null, acoes = [] }) {
   const valor = el('div', { class: 'saldo-valor num' });
-  const olho = el('button', { class: 'olho', type: 'button', 'aria-label': 'Mostrar ou esconder o saldo' });
+  const olho = el('button', { class: 'olho', type: 'button', 'aria-label': 'Mostrar ou esconder os valores' });
+  const itens = [
+    ['A caminho da sua conta', t.a_caminho_centavos],
+    ['Em compensação no banco', t.a_compensar_centavos],
+    ['Transferido no mês', t.transferido_mes_centavos],
+  ].map(([rotulo, centavos]) => {
+    const forte = el('strong', {});
+    return { forte, centavos, no: el('div', { class: 'item' }, el('span', {}, rotulo), forte) };
+  });
 
   const pintar = () => {
     const esconder = oculto();
     valor.classList.toggle('oculto', esconder);
-    valor.textContent = esconder ? '•••••••' : dinheiro(saldo.disponivel_centavos);
+    valor.textContent = esconder ? '•••••••' : dinheiro(t.transferido_hoje_centavos);
+    for (const i of itens) i.forte.textContent = esconder ? '•••' : dinheiro(i.centavos);
     olho.replaceChildren(icone(esconder ? 'olho' : 'olho-fechado'));
     olho.setAttribute('aria-pressed', String(esconder));
   };
   olho.addEventListener('click', () => { guardarOculto(!oculto()); pintar(); });
   pintar();
 
-  const item = (rotulo, conteudo) => el('div', { class: 'item' }, el('span', {}, rotulo), el('strong', {}, conteudo));
-
-  return el('section', { class: 'cartao-conta', 'aria-label': 'Sua conta na PAY AX' },
+  return el('section', { class: 'cartao-conta', 'aria-label': 'Seus recebimentos na PAY AX' },
     el('div', { class: 'topo-cartao' },
       el('div', {},
-        el('div', { class: 'rotulo' }, 'Saldo disponível'),
+        el('div', { class: 'rotulo' }, 'Transferido para a sua conta hoje'),
         valor),
       olho),
-    el('div', { class: 'faixa' },
-      item(`A liberar (D+${retencao_dias ?? 1} útil)`, oculto() ? '•••' : dinheiro(saldo.a_liberar_centavos)),
-      disponivel ? item('Em transferência', oculto() ? '•••' : dinheiro(disponivel.em_transito_centavos)) : null,
-      item('Saldo total', oculto() ? '•••' : dinheiro(saldo.total_centavos))),
-    agencia && conta
-      ? el('div', { class: 'numero-conta' },
-        el('div', {}, 'Agência', el('strong', {}, agencia)),
-        el('div', {}, 'Conta', el('strong', {}, conta)),
-        marcaCartao())
-      : null,
+    el('div', { class: 'faixa' }, itens.map((i) => i.no)),
+    el('div', { class: 'numero-conta' },
+      codigo ? el('div', {}, 'Código do cliente', el('strong', {}, codigo)) : null,
+      t.chave_pix ? el('div', {}, 'Recebe na chave PIX', el('strong', { class: 'chave' }, t.chave_pix)) : null,
+      marcaCartao()),
     acoes.length ? el('div', { class: 'acoes-cartao' }, acoes) : null);
 }
 

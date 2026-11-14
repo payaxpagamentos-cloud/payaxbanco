@@ -13,6 +13,7 @@ const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const consultas = require('../lib/consultas');
 const impressao = require('../lib/impressao');
 const boletosLib = require('../lib/boletos');
+const repassesLib = require('../lib/repasses');
 const sincronismo = require('../lib/sincronismo');
 const datas = require('../lib/datas');
 const { assinaturaFicha } = require('./boletos');
@@ -92,11 +93,16 @@ module.exports = (db) => {
 
       const out = boletosLib.liquidar(db, b.id, {
         pago_em: aviso.pago_em ?? hoje(),
+        creditado_em: aviso.creditado_em ?? null,
         valor_pago_centavos: aviso.valor_centavos > 0 ? aviso.valor_centavos : b.valor_centavos,
         meio: aviso.meio,
       }, { origem: 'webhook' });
       concluir(out.ja_liquidado ? 'repetido' : 'liquidado', null, b.id);
-      if (!out.ja_liquidado) sincronismo.avisarBaixa(db, b.id).catch(() => null);
+      if (!out.ja_liquidado) {
+        sincronismo.avisarBaixa(db, b.id).catch(() => null);
+        // Crédito já na conta (PIX): o cliente recebe agora. Senão, a rotina repassa no dia do crédito.
+        repassesLib.repassarCliente(db, b.cliente_id).catch(() => null);
+      }
       res.json({ recebido: true, processado: !out.ja_liquidado });
     } catch (err) {
       concluir('erro', String(err.message).slice(0, 300), null);

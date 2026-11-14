@@ -150,6 +150,8 @@ function beneficiarioFinal(cliente) {
  */
 async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = null, origem = 'avulso', ixc = {} }) {
   if (cliente.situacao !== 'ativo') throw new ErroNegocio(`O cliente está ${cliente.situacao}: não é possível emitir boletos.`, 409);
+  // O dinheiro recebido vai direto para o cliente: sem chave PIX, ficaria parado na conta da PAY AX.
+  if (!cliente.pix_chave) throw new ErroNegocio('Cadastre a chave PIX do cliente antes de emitir: é para ela que o valor recebido vai, na hora.', 409);
   const entrada = validarEntrada(dados, cliente);
   const conta = contaDe(db, dados.conta_id);
   if (entrada.tipo === 'bolepix' && !conta.pix_chave) {
@@ -252,14 +254,20 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
       preco: precos.doBoleto(b),
       custoLiquidacaoCentavos: b.custo_liquidacao_centavos,
     });
-    // A retenção conta em dias úteis a partir do crédito: é quando o dinheiro de fato está na conta.
-    const liberacao = datas.somarDiasUteis(pagoEm, cliente.retencao_dias);
+    // Liberação = o dia em que o banco credita na conta da PAY AX. A partir daí o dinheiro é do
+    // cliente e segue para ele na rodada de repasse seguinte — não fica parado conosco.
+    //  - data de crédito informada pelo banco (retorno CNAB, aviso da API): vale ela;
+    //  - pago por PIX (Bolepix): crédito na hora;
+    //  - pago pelo código de barras, sem a data: o prazo de compensação do contrato.
+    const meio = pagamento.meio === 'pix' ? 'pix' : 'boleto';
+    const creditadoEm = pagamento.creditado_em ? v.data(pagamento.creditado_em, 'a data de crédito') : null;
+    const liberacao = creditadoEm ?? (meio === 'pix' ? pagoEm : datas.somarDiasUteis(pagoEm, config.banco.diasCredito));
     const ref = febraban.formatarNossoNumero(b.nosso_numero, b.nosso_numero_dv);
 
     db.prepare(`UPDATE boletos SET situacao = 'liquidado', pago_em = ?, pago_valor_centavos = ?, pago_juros_centavos = ?,
         pago_desconto_centavos = ?, pago_meio = ?, liquidado_em = ?, versao = versao + 1 WHERE id = ?`)
       .run(pagoEm, valorPago, Number(pagamento.juros_centavos ?? 0), Number(pagamento.desconto_centavos ?? 0),
-        pagamento.meio === 'pix' ? 'pix' : 'boleto', agora(), b.id);
+        meio, agora(), b.id);
 
     const comum = { cliente_id: b.cliente_id, boleto_id: b.id, data_competencia: pagoEm, data_liberacao: liberacao, criado_por: usuario?.id ?? null };
     razao.lancar(db, { ...comum, tipo: 'credito_liquidacao', valor_centavos: split.bruto_centavos,

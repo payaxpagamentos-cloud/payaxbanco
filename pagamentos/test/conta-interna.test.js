@@ -34,7 +34,7 @@ test('conta interna: numeração sequencial dos clientes', async (t) => {
   await api.conta(tk.admin);
   await api.precoPadrao(tk.admin);
 
-  const criar = async (razao, cnpj) => (await api.post('/api/clientes', { razao_social: razao, cnpj, situacao: 'ativo' }, tk.admin)).dados;
+  const criar = async (razao, cnpj) => (await api.post('/api/clientes', { razao_social: razao, cnpj, situacao: 'ativo', pix_chave: cnpj }, tk.admin)).dados;
 
   let a; let b; let c;
   await t.test('cada cliente novo recebe o próximo número da agência 001', async () => {

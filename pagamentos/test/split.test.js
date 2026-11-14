@@ -37,24 +37,24 @@ test('split: o cálculo fecha sempre em inteiros', async (t) => {
   });
 });
 
-test('liquidação: split na conta gráfica, retenção e idempotência', async (t) => {
+test('liquidação: split, data de crédito e idempotência', async (t) => {
   const api = await iniciar();
   t.after(() => api.fechar());
   const tk = await api.equipe();
   await api.conta(tk.admin);
   await api.precoPadrao(tk.admin);
-  const a = await api.cliente(tk.admin, { retencao_dias: 2 });
+  const a = await api.cliente(tk.admin);
 
   const boleto = await api.boleto(tk.admin, a.cliente.id, { valor: '1.000,00', vencimento: '2026-12-10' });
 
-  await t.test('o crédito entra retido e só depois fica disponível', async () => {
+  await t.test('pago pelo código de barras, libera no dia útil em que o banco credita', async () => {
     const r = await api.post(`/api/boletos/${boleto.id}/liquidar`, { pago_em: '2026-12-10', valor_pago: '1.000,00' }, tk.financeiro);
     assert.equal(r.status, 200);
     assert.equal(r.dados.bruto_centavos, 100000);
     assert.equal(r.dados.tarifa_banco_centavos, 250);
     assert.equal(r.dados.comissao_centavos, 2350);
     assert.equal(r.dados.liquido_centavos, 97400);
-    assert.equal(r.dados.liberacao, somarDiasUteis('2026-12-10', 2));
+    assert.equal(r.dados.liberacao, somarDiasUteis('2026-12-10', 1), 'prazo de compensação: 1 dia útil');
     assert.ok(ehDiaUtil(r.dados.liberacao), 'a liberação cai em dia útil');
 
     const extrato = (await api.get(`/api/clientes/${a.cliente.id}/extrato?de=2026-12-01&ate=2026-12-31`, tk.admin)).dados;

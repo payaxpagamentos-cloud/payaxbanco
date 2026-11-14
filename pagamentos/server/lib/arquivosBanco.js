@@ -110,7 +110,9 @@ function aplicar(db, registro, { creditoEm }) {
     case 'liquidado': {
       const pago = registro.pago_centavos > 0 ? registro.pago_centavos : registro.valor_centavos || b.valor_centavos;
       const out = boletosLib.liquidar(db, b.id, {
-        pago_em: registro.creditado_em ?? creditoEm ?? registro.ocorrido_em ?? hoje(),
+        // Pago no dia da ocorrência; creditado na nossa conta no dia que o banco informa.
+        pago_em: registro.ocorrido_em ?? registro.creditado_em ?? creditoEm ?? hoje(),
+        creditado_em: registro.creditado_em ?? creditoEm ?? null,
         valor_pago_centavos: pago,
         juros_centavos: registro.juros_centavos ?? 0,
         desconto_centavos: registro.desconto_centavos ?? 0,

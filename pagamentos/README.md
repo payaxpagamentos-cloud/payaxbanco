@@ -1,7 +1,7 @@
 # PAY AX Pagamentos
 
-Sistema de meios de pagamento da PAY AX: **emissão de boletos e Bolepix pelo Bradesco**, **split de pagamento**,
-**conta gráfica por cliente** e **repasse automático por PIX**, com integração ao **IXC Provedor**.
+Sistema de meios de pagamento da PAY AX: **emissão de boletos e Bolepix pelo Bradesco**, **split de pagamento**
+e **repasse imediato por PIX** — a PAY AX não guarda dinheiro de cliente —, com integração ao **IXC Provedor**.
 
 Dois acessos, com servidores de sessão separados:
 
@@ -15,37 +15,49 @@ Dois acessos, com servidores de sessão separados:
 
 ## Como o dinheiro se move
 
-O modelo é de **conta gráfica**: todos os boletos são registrados no **nosso convênio Bradesco**. O dinheiro cai na
-nossa conta e o sistema mantém uma conta corrente interna por cliente.
+Todos os boletos são registrados no **nosso convênio Bradesco**. **A PAY AX não guarda dinheiro de cliente:** quando o
+banco credita um pagamento na nossa conta, as tarifas saem e o resto vai **na hora**, por PIX, para a conta do cliente.
 
 ```
 Boleto de R$ 268,12 pago
         │
         ├─ (−) tarifa bancária ............ R$ 2,50   → repassada ao cliente
         ├─ (−) tarifa PAY AX 2,35% ......... R$ 6,30   → nossa receita
-        └─ (=) líquido do cliente ......... R$ 259,32 → entra "a liberar" e vira saldo em D+N dias úteis
+        └─ (=) líquido do cliente ......... R$ 259,32 → PIX para o cliente assim que o banco credita
 ```
 
 - A soma das três partes é **sempre exatamente** o valor pago: tudo em centavos inteiros, sem ponto flutuante.
 - Se o título for menor que a tarifa, o líquido vai a zero — **o cliente nunca fica devendo** por uma liquidação.
 - O preço fica **congelado no boleto** no momento da emissão: mudar a tabela não altera títulos já emitidos.
-- O **saldo nunca é um campo guardado**: é sempre a soma dos lançamentos. Nada é apagado; correções entram como
-  estorno ou ajuste, com motivo e auditoria.
+- Cada movimento fica registrado por cliente (crédito, tarifas, repasse): é o **registro de controle**, não uma
+  conta com saldo. A soma é sempre calculada, nunca guardada. Nada é apagado; correções entram como estorno ou
+  ajuste, com motivo e auditoria.
 
-Em D+N (dias úteis, pulando feriados nacionais bancários) o líquido vira **saldo disponível**. Uma rotina diária
-transforma esse saldo em **PIX para a conta do cliente**; acima do limite configurado, o repasse para e espera a
-conferência da nossa equipe.
+**Quando o repasse sai:**
+
+| Como o pagador pagou | Quando o banco credita na nossa conta | Quando o cliente recebe |
+|---|---|---|
+| PIX (QR do Bolepix) | na hora | logo após a baixa, no mesmo minuto |
+| Código de barras | no dia de crédito que o banco informa no retorno (normalmente o dia útil seguinte) | na primeira rodada desse dia |
+
+- A **rodada de repasse** roda a cada ciclo da rotina (15 minutos), **todos os dias** — PIX não fecha no fim de semana.
+- **Não existe saque, valor mínimo, retenção nem fila de aprovação.** Tudo isso deixaria dinheiro parado.
+- **Cliente sem chave PIX não emite boleto:** o dinheiro não teria para onde ir.
+- PIX recusado pelo banco é estornado, aparece no painel e **sai de novo na rodada seguinte**.
+- Sem a data de crédito no aviso, vale o prazo de compensação do contrato: `PAYAX_DIAS_CREDITO_BOLETO` (padrão 1
+  dia útil). Conferir esse prazo no contrato de cobrança.
+- **Backoffice → Conformidade** vigia isso sozinho: crédito de ontem ainda na nossa conta aparece como fora da norma.
 
 ## Módulos
 
 | # | Módulo | O que tem |
 |---|---|---|
-| 1 | **Clientes** | Número de conta PAY AX sequencial (agência 001 · conta 0001-3) com dígito verificador. Cadastro com CNPJ validado, endereço do beneficiário, situação, chave PIX de repasse, janela de retenção (D+N), repasse automático, valor mínimo, limite sem aprovação e teto por boleto. Ficha com resumo, boletos, conta gráfica, repasses, preços e acessos. |
+| 1 | **Clientes** | Número de conta PAY AX sequencial (agência 001 · conta 0001-3) com dígito verificador. Cadastro com CNPJ validado, endereço do beneficiário, situação, chave PIX de repasse (obrigatória para emitir) e teto por boleto. Ficha com resumo, boletos, registro de movimentos, repasses, preços e acessos. |
 | 2 | **Preços** | Tabela padrão da plataforma e tabela por cliente, **com vigência**: tarifa de emissão, tarifa de liquidação (repassada), tarifa PAY AX percentual com piso e teto, e tarifa do repasse. O histórico fica guardado. |
 | 3 | **Boletos** | Emissão avulsa, por importação do IXC ou por API. **Boleto** e **Bolepix** (mesmo título com QR Code PIX). Nosso número reservado de forma atômica, código de barras e linha digitável no padrão FEBRABAN com o campo livre do Bradesco. Juros ao mês (pro rata die), multa, desconto por antecipação e prazo de baixa. Baixa, estorno e consulta ao banco. |
 | 4 | **Ficha de compensação** | Recibo do pagador + ficha, em HTML pronto para imprimir ou salvar em PDF pelo navegador, com código de barras Interleaved 2 of 5 nas medidas do padrão (103 × 13 mm) e QR Code do Bolepix. **Link público assinado** para enviar ao pagador, sem login. |
-| 5 | **Split e conta gráfica** | Razão de lançamentos por cliente com saldo acumulado, disponível × a liberar, agenda de liberação dos próximos dias, extrato em tela e em CSV, e ajuste manual com motivo. |
-| 6 | **Repasses** | Saque pelo Internet Bank ou pela nossa equipe, rotina automática diária, limite de aprovação por cliente, envio por PIX com end-to-end guardado, cancelamento e estorno automático em caso de falha. |
+| 5 | **Split** | Registro de movimentos por cliente (crédito, tarifas, repasse), em compensação × creditado, agenda dos próximos créditos do banco, extrato em tela e em CSV, e ajuste manual com motivo. |
+| 6 | **Repasses** | Repasse imediato por PIX assim que o banco credita, a cada 15 minutos, sem saque nem aprovação. End-to-end guardado, estorno e nova tentativa automática em caso de falha. |
 | 7 | **Conciliação** | Cada aviso do banco é **guardado antes de ser processado** (corpo inteiro), com o resultado de cada um: liquidado, repetido, ignorado ou erro. Liquidação idempotente: o mesmo aviso duas vezes não credita em dobro. Baixa manual e consulta ao banco para o que não chegou. |
 | 8 | **CNAB 400 automático** | Remessa gerada sozinha com os títulos emitidos e escrita na pasta de saída; pasta de entrada varrida de tempos em tempos e cada retorno aplicado na hora — entrada confirmada, liquidação com split, baixa ou rejeição com o motivo traduzido. Pedido de baixa vai como ocorrência 02 na remessa seguinte. Ninguém gera nem importa arquivo na mão. |
 | 9 | **Integrações** | **Bradesco** (Cobrança Registrada, Boleto Híbrido e PIX de repasse) com credenciais cifradas em AES-256-GCM, e **um IXC por cliente**, nos dois sentidos: importa os títulos em aberto, emite o boleto, grava a linha digitável de volta no título e dá baixa quando o boleto é pago. |
@@ -58,7 +70,7 @@ conferência da nossa equipe.
 | Perfil | Acesso |
 |---|---|
 | **Administrador** (equipe) | Tudo, inclusive usuários, contas bancárias e credenciais do banco. |
-| **Financeiro** (equipe) | Opera o dinheiro: aprova e envia repasses, ajusta a conta gráfica, concilia e vê a margem. |
+| **Financeiro** (equipe) | Opera o dinheiro: acompanha e reenvia repasses, ajusta o registro de movimentos, concilia e vê a margem. |
 | **Operação** (equipe) | Clientes, boletos, baixas, IXC e acessos dos clientes. Não movimenta dinheiro. |
 | **Consulta** (equipe) | Só leitura, sem margem. |
 | **Administrador** (cliente) | O próprio painel: emite, saca, gerencia os usuários da empresa e o IXC. |
@@ -327,7 +339,7 @@ Legenda: ✅ atendido no sistema · 🏦 depende do Bradesco · ⚖️ depende d
 | FEBRABAN, Comunicado FB-170/2005 | Boleto sem "taxa bancária" ou "tarifa bancária" | O boleto não usa essas expressões | ✅ |
 | Manual CNAB 400 do Bradesco (março de 2023) | Layout byte a byte; beneficiário final nas posições 335-394 | Posições conferidas contra o manual, com testes | ✅ 🏦 convênio precisa ser habilitado para beneficiário final |
 | LGPD (Lei 13.709/2018) | Dados mínimos, segurança, transparência, direitos do titular | Senhas com scrypt, credenciais cifradas, auditoria, duas etapas, consulta de CNPJ sem dados de sócios | ✅ 🔧 faltam aviso de privacidade ao pagador, política de retenção e canal para pedidos do titular |
-| Arranjos e instituições de pagamento (Lei 12.865/2013 e regras do BCB) | Quem guarda e movimenta dinheiro de terceiros segue regras próprias | A conta gráfica guarda o dinheiro dos clientes até o repasse | ⚖️ **o ponto principal**: autorização, segregação dos recursos ou parceria com instituição autorizada |
+| Arranjos e instituições de pagamento (Lei 12.865/2013 e regras do BCB) | Quem mantém saldo de terceiros (conta de pagamento) segue regras próprias | **Não há saldo guardado:** o valor vai ao cliente assim que o banco credita, e a Conformidade vigia isso sozinha | ✅ ⚖️ confirmar o enquadramento do recebimento em nome dos clientes e a contabilização com o contador |
 | Uso de termos de instituição financeira | Só quem é autorizado se apresenta como banco | O sistema usa "Internet Bank" e "agência/conta" | ⚖️ confirmar; trocar os nomes é simples |
 | Prevenção à lavagem de dinheiro (Lei 9.613/1998) | Conhecer o cliente, monitorar operações atípicas, comunicar ao COAF quando couber | Cadastro com CNPJ validado | ⚖️ 🔧 sem rotinas de monitoramento ainda |
 | Regras da Anatel para cobrança de telecom | Documento de cobrança do provedor ao assinante | Responsabilidade do provedor; o boleto não substitui a fatura detalhada | ⚖️ do provedor |

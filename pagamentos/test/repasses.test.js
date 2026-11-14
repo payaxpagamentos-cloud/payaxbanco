@@ -3,123 +3,106 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { iniciar } = require('./helpers');
-const { dataLocal, somarDias, ehDiaUtil } = require('../server/lib/datas');
+const { dataLocal, somarDias } = require('../server/lib/datas');
+const repassesLib = require('../server/lib/repasses');
 
 const hoje = () => dataLocal('America/Sao_Paulo');
 
 /**
- * Último dia útil até hoje (o próprio, se hoje for útil).
- *
- * Dinheiro só libera em dia útil: mesmo com retenção zero, o que é pago num sábado só fica
- * disponível na segunda. Creditando no último dia útil, o saldo existe em qualquer dia em
- * que a suíte rode — antes, estes testes falhavam todo fim de semana e feriado.
+ * Regra da PAY AX: não guarda dinheiro de cliente. O banco creditou, a tarifa sai e o resto vai
+ * por PIX para o cliente na hora — sem saque, mínimo ou aprovação.
  */
-function ultimoDiaUtil() {
-  let d = hoje();
-  for (let i = 0; i < 15 && !ehDiaUtil(d); i++) d = somarDias(d, -1);
-  return d;
-}
-
-/** Liquida um boleto com crédito já liberado (retenção zero), para ter saldo disponível agora. */
-async function creditar(api, tk, clienteId, valor) {
-  // O boleto nasce hoje (o vencimento não pode ser anterior à emissão), mas o pagamento
-  // entra no último dia útil, que é quando o dinheiro de fato libera.
-  const b = await api.boleto(tk.admin, clienteId, { valor, vencimento: hoje() });
-  const r = await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: ultimoDiaUtil(), valor_pago: valor }, tk.financeiro);
-  return r.dados;
-}
-
-test('repasses: saldo, limite de aprovação, falha e rotina', async (t) => {
+test('repasse imediato: nenhum dinheiro de cliente parado', async (t) => {
   const api = await iniciar();
   t.after(() => api.fechar());
   const tk = await api.equipe();
   await api.conta(tk.admin);
   await api.precoPadrao(tk.admin, { tarifa_repasse: '1,00' });
-  const a = await api.cliente(tk.admin, { retencao_dias: 0, repasse_limite_aprovacao: '500,00', repasse_automatico: false });
+  const a = await api.cliente(tk.admin);
+  const venc = somarDias(hoje(), 10);
 
-  await creditar(api, tk, a.cliente.id, '1.000,00');
+  const emitir = (valor) => api.boleto(tk.admin, a.cliente.id, { valor, vencimento: venc });
+  const liquidar = (b, valor, meio) => api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: hoje(), valor_pago: valor, meio }, tk.financeiro);
+  const repassesDoCliente = () => api.db.prepare('SELECT * FROM repasses WHERE cliente_id = ? ORDER BY id').all(a.cliente.id);
 
-  await t.test('o cliente vê quanto pode sacar e quanto recebe', async () => {
+  await t.test('pago por PIX: o valor vai para o cliente na mesma hora, já sem as tarifas', async () => {
+    const b = await emitir('1.000,00');
+    assert.equal((await liquidar(b, '1.000,00', 'pix')).status, 200);
+    const [r] = repassesDoCliente();
+    assert.ok(r, 'repasse criado na hora da baixa');
+    assert.equal(r.situacao, 'confirmado');
+    // 1.000,00 − tarifa bancária 2,50 − tarifa PAY AX 23,50 = 974,00; − tarifa do PIX 1,00 = 973,00.
+    assert.equal(r.valor_centavos, 97400);
+    assert.equal(r.valor_liquido_centavos, 97300);
+    assert.match(r.end_to_end, /^E237/);
     const c = (await api.get('/cliente/api/conta', a.token)).dados;
-    assert.equal(c.saldo.disponivel_centavos, 97400);
-    assert.equal(c.disponivel.taxa_repasse_centavos, 100);
-    assert.equal(c.disponivel.liquido_se_sacar_tudo_centavos, 97300);
+    assert.equal(c.saldo.disponivel_centavos, 0, 'nada parado');
+    assert.equal(c.transferencias.transferido_hoje_centavos, 97300);
   });
 
-  await t.test('acima do limite do cliente, o repasse espera a nossa conferência', async () => {
-    const r = await api.post('/cliente/api/repasses', { valor: 'tudo' }, a.token);
-    assert.equal(r.status, 201);
-    assert.equal(r.dados.situacao, 'aguardando_aprovacao');
-    assert.equal(r.dados.valor_liquido_centavos, 97300);
-    // O saldo já sai na solicitação: o dinheiro fica comprometido.
+  await t.test('pago pelo código de barras: fica em compensação até o banco creditar, e não é "parado"', async () => {
+    const b = await emitir('500,00');
+    await liquidar(b, '500,00', 'boleto');
+    assert.equal(repassesDoCliente().length, 1, 'ainda não creditado: nenhum repasse novo');
     const c = (await api.get('/cliente/api/conta', a.token)).dados;
-    assert.equal(c.saldo.disponivel_centavos, 0);
-    assert.equal(c.disponivel.em_transito_centavos, 97400);
+    assert.ok(c.transferencias.a_compensar_centavos > 0, 'aparece em compensação no banco');
+    assert.equal(repassesLib.parados(api.db).length, 0, 'esperar o crédito do banco não é dinheiro parado');
   });
 
-  await t.test('não dá para sacar mais do que o saldo', async () => {
-    const r = await api.post('/cliente/api/repasses', { valor: '50,00' }, a.token);
+  await t.test('crédito de ontem ainda aqui é fora da norma; a rodada repassa e a regra volta a ficar em dia', async () => {
+    // Simula o dia seguinte: o banco creditou ontem e, por algum motivo, a rodada não passou.
+    api.db.prepare("UPDATE lancamentos SET data_liberacao = ? WHERE cliente_id = ? AND repasse_id IS NULL AND data_liberacao > ?")
+      .run(somarDias(hoje(), -1), a.cliente.id, hoje());
+    const parados = repassesLib.parados(api.db);
+    assert.equal(parados.length, 1);
+    const conf = (await api.get('/api/conformidade', tk.admin)).dados.grupos.flatMap((g) => g.regras).find((x) => x.id === 'repasse-imediato');
+    assert.equal(conf.situacao, 'fora');
+
+    const rodada = (await api.post('/api/repasses/rotina', {}, tk.financeiro)).dados;
+    assert.equal(rodada.enviados, 1);
+    assert.equal(repassesLib.parados(api.db).length, 0);
+    const depois = (await api.get('/api/conformidade', tk.admin)).dados.grupos.flatMap((g) => g.regras).find((x) => x.id === 'repasse-imediato');
+    assert.equal(depois.situacao, 'ok');
+  });
+
+  await t.test('PIX recusado: estorna, avisa, e a rodada seguinte tenta de novo', async () => {
+    const recusa = await api.cliente(tk.admin, { razao_social: 'Chave Errada LTDA', cnpj: '19131243000197', pix_chave: 'financeiro@recusa.teste' });
+    const b = await api.boleto(tk.admin, recusa.cliente.id, { valor: '200,00', vencimento: venc });
+    await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: hoje(), valor_pago: '200,00', meio: 'pix' }, tk.financeiro);
+    const falho = api.db.prepare('SELECT * FROM repasses WHERE cliente_id = ?').get(recusa.cliente.id);
+    assert.equal(falho.situacao, 'falhou');
+    assert.match(falho.erro, /DICT/);
+    const painel = (await api.get('/api/painel', tk.admin)).dados;
+    assert.ok(painel.alertas.some((al) => al.tipo === 'repasses_falha'), 'a falha aparece no painel');
+
+    // A equipe corrige a chave; a rodada seguinte leva o valor, sem ninguém pedir.
+    const c = (await api.get(`/api/clientes/${recusa.cliente.id}`, tk.admin)).dados;
+    await api.patch(`/api/clientes/${recusa.cliente.id}`, { pix_chave: '19131243000197', versao: c.versao }, tk.admin);
+    const rodada = (await api.post('/api/repasses/rotina', {}, tk.financeiro)).dados;
+    assert.equal(rodada.enviados, 1);
+    const ultimo = api.db.prepare('SELECT * FROM repasses WHERE cliente_id = ? ORDER BY id DESC LIMIT 1').get(recusa.cliente.id);
+    assert.equal(ultimo.situacao, 'confirmado');
+    assert.equal(ultimo.pix_chave, '19131243000197');
+  });
+
+  await t.test('cliente sem chave PIX não emite: o dinheiro não teria para onde ir', async () => {
+    const semPix = await api.cliente(tk.admin, { razao_social: 'Sem PIX LTDA', cnpj: '22233344000183', pix_chave: '' });
+    const r = await api.post('/api/boletos', { cliente_id: semPix.cliente.id, valor: '50,00', vencimento: venc,
+      pagador_nome: 'Fulano', pagador_documento: '52998224725' }, tk.admin);
     assert.equal(r.status, 409);
-    assert.match(r.dados.erro, /insuficiente/i);
+    assert.match(r.dados.erro, /chave PIX/);
   });
 
-  await t.test('cancelar devolve tudo ao saldo, inclusive a tarifa', async () => {
-    const pendente = (await api.get('/api/repasses?situacao=aguardando_aprovacao', tk.financeiro)).dados.itens[0];
-    const r = await api.post(`/api/repasses/${pendente.id}/cancelar`, { motivo: 'cliente pediu para segurar' }, tk.financeiro);
-    assert.equal(r.status, 200);
-    const c = (await api.get('/cliente/api/conta', a.token)).dados;
-    assert.equal(c.saldo.disponivel_centavos, 97400, 'voltou o valor cheio');
+  await t.test('não existe saque: o cliente não pede repasse', async () => {
+    const r = await api.post('/cliente/api/repasses', { valor: 'tudo' }, a.token);
+    assert.equal(r.status, 404);
   });
 
-  await t.test('aprovar e enviar confirma o PIX e guarda o end-to-end', async () => {
-    const pedido = (await api.post('/cliente/api/repasses', { valor: 'tudo' }, a.token)).dados;
-    assert.equal((await api.post(`/api/repasses/${pedido.id}/enviar`, {}, tk.financeiro)).status, 409, 'não envia sem aprovar');
-    await api.post(`/api/repasses/${pedido.id}/aprovar`, {}, tk.financeiro);
-    const enviado = await api.post(`/api/repasses/${pedido.id}/enviar`, {}, tk.financeiro);
-    assert.equal(enviado.status, 200);
-    assert.equal(enviado.dados.situacao, 'confirmado');
-    assert.match(enviado.dados.end_to_end, /^E237/);
-    const c = (await api.get('/cliente/api/conta', a.token)).dados;
-    assert.equal(c.saldo.disponivel_centavos, 0);
-  });
-
-  await t.test('o extrato mostra o repasse e a tarifa separados', async () => {
-    const e = (await api.get(`/cliente/api/conta/extrato?de=${ultimoDiaUtil()}&ate=${hoje()}`, a.token)).dados;
+  await t.test('o extrato mostra o repasse e a tarifa do PIX separados, e termina em zero', async () => {
+    const e = (await api.get(`/cliente/api/conta/extrato?de=${somarDias(hoje(), -2)}&ate=${somarDias(hoje(), 10)}`, a.token)).dados;
     const tipos = e.itens.map((i) => i.tipo);
     assert.ok(tipos.includes('repasse'));
     assert.ok(tipos.includes('taxa_repasse'));
     assert.equal(e.itens.at(-1).saldo_acumulado_centavos, 0);
-  });
-
-  await t.test('cliente sem chave PIX não consegue sacar', async () => {
-    const semPix = await api.cliente(tk.admin, { razao_social: 'Sem PIX LTDA', cnpj: '22233344000183', pix_chave: '', retencao_dias: 0 });
-    await creditar(api, tk, semPix.cliente.id, '200,00');
-    const r = await api.post('/cliente/api/repasses', { valor: 'tudo' }, semPix.token);
-    assert.equal(r.status, 409);
-    assert.match(r.dados.erro, /chave PIX/i);
-  });
-
-  await t.test('rotina automática: dentro do limite envia sozinho, acima espera aprovação', async () => {
-    const auto = await api.cliente(tk.admin, { razao_social: 'Auto LTDA', cnpj: '19131243000197', pix_chave: '19131243000197',
-      retencao_dias: 0, repasse_automatico: true, repasse_minimo: '10,00', repasse_limite_aprovacao: '100.000,00' });
-    const trava = await api.cliente(tk.admin, { razao_social: 'Trava LTDA', cnpj: '36602203000103', pix_chave: '36602203000103',
-      retencao_dias: 0, repasse_automatico: true, repasse_minimo: '10,00', repasse_limite_aprovacao: '10,00' });
-    await creditar(api, tk, auto.cliente.id, '300,00');
-    await creditar(api, tk, trava.cliente.id, '300,00');
-
-    const r = await api.post('/api/repasses/rotina', {}, tk.financeiro);
-    assert.equal(r.status, 200);
-    assert.equal(r.dados.enviados, 1, 'só o que está dentro do limite foi enviado');
-    assert.equal(r.dados.aguardando, 1, 'o outro ficou para conferência');
-    assert.equal((await api.get('/cliente/api/conta', auto.token)).dados.saldo.disponivel_centavos, 0);
-  });
-
-  await t.test('a rotina ignora saldo abaixo do mínimo', async () => {
-    const pequeno = await api.cliente(tk.admin, { razao_social: 'Pequeno LTDA', cnpj: '06990590000123', pix_chave: '06990590000123',
-      retencao_dias: 0, repasse_automatico: true, repasse_minimo: '500,00', repasse_limite_aprovacao: '100.000,00' });
-    await creditar(api, tk, pequeno.cliente.id, '50,00');
-    const antes = (await api.get('/cliente/api/conta', pequeno.token)).dados.saldo.disponivel_centavos;
-    await api.post('/api/repasses/rotina', {}, tk.financeiro);
-    assert.equal((await api.get('/cliente/api/conta', pequeno.token)).dados.saldo.disponivel_centavos, antes, 'o saldo acumula para o próximo dia');
   });
 });

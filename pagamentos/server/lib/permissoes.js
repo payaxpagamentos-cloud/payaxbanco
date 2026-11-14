@@ -10,8 +10,9 @@
  *   consulta   — só leitura.
  *
  * Cliente final (Internet Bank):
- *   admin    — emite, pede repasse, gerencia os próprios usuários.
- *   operador — emite boletos e consulta; não pede repasse nem mexe em usuários.
+ *   admin    — emite boletos e gerencia os próprios usuários.
+ *   operador — emite boletos e consulta; não mexe em usuários.
+ *   (Não existe "pedir repasse": o valor recebido vai sozinho para a conta do cliente.)
  *   consulta — só leitura.
  */
 const EQUIPE = {
@@ -28,7 +29,7 @@ const EQUIPE = {
 // conformidade.editar (registrar a situação das regras de acompanhamento): só o administrador, pelo '*'.
 
 const CLIENTE = {
-  admin: ['painel.ver', 'boletos.ver', 'boletos.emitir', 'boletos.baixar', 'razao.ver', 'repasses.ver', 'repasses.solicitar',
+  admin: ['painel.ver', 'boletos.ver', 'boletos.emitir', 'boletos.baixar', 'razao.ver', 'repasses.ver',
     'relatorios.ver', 'cadastro.ver', 'cadastro.editar', 'usuarios.gerenciar', 'ixc.configurar'],
   operador: ['painel.ver', 'boletos.ver', 'boletos.emitir', 'boletos.baixar', 'razao.ver', 'repasses.ver', 'relatorios.ver', 'cadastro.ver'],
   consulta: ['painel.ver', 'boletos.ver', 'razao.ver', 'repasses.ver', 'relatorios.ver', 'cadastro.ver'],

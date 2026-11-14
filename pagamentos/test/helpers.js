@@ -95,8 +95,7 @@ async function iniciar() {
   api.cliente = async (tk, dados = {}) => {
     const c = await api.post('/api/clientes', {
       razao_social: 'Provedor Alfa LTDA', nome_fantasia: 'Alfa Net', cnpj: CNPJ.alfa, situacao: 'ativo',
-      pix_chave: CNPJ.alfa, retencao_dias: 1, repasse_minimo: '10,00', repasse_limite_aprovacao: '50.000,00',
-      limite_boleto: '20.000,00', ...dados,
+      pix_chave: CNPJ.alfa, limite_boleto: '20.000,00', ...dados,
     }, tk);
     if (c.status !== 201) throw new Error(JSON.stringify(c.dados));
     const acesso = await api.post(`/api/clientes/${c.dados.id}/acessos`, {

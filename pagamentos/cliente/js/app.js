@@ -17,7 +17,7 @@ const MENU = [
     ['inicio', 'Início', 'painel', 'painel.ver', () => import('./telas/inicio.js')],
     ['boletos', 'Meus boletos', 'boleto', 'boletos.ver', () => import('./telas/boletos.js')],
     ['extrato', 'Extrato', 'lista', 'razao.ver', () => import('./telas/extrato.js')],
-    ['repasses', 'Repasses', 'troca', 'repasses.ver', () => import('./telas/repasses.js')],
+    ['repasses', 'Transferências', 'troca', 'repasses.ver', () => import('./telas/repasses.js')],
   ]],
   ['Gestão', [
     ['relatorios', 'Relatórios', 'relatorio', 'relatorios.ver', () => import('./telas/relatorios.js')],
@@ -93,7 +93,7 @@ function estrutura(rota, principal) {
     ['inicio', 'Início', 'casa', 'painel.ver'],
     ['boletos', 'Boletos', 'boleto', 'boletos.ver'],
     ['extrato', 'Extrato', 'lista', 'razao.ver'],
-    ['repasses', 'Transferir', 'pix', 'repasses.ver'],
+    ['repasses', 'Transferências', 'pix', 'repasses.ver'],
   ].filter(([, , , perm]) => permitido(perm));
   const barra = el('nav', { class: 'barra-inferior', 'aria-label': 'Navegação principal' },
     BAIXO.map(([r, rot, ic]) => el('a', { class: r === rota ? 'ativo' : '', href: `#/${r}`, 'aria-current': r === rota ? 'page' : null },

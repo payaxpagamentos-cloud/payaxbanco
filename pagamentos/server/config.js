@@ -55,6 +55,11 @@ module.exports = {
     modo: process.env.PAYAX_BANCO_MODO || (producao ? 'bradesco' : 'simulador'),
     ambiente: process.env.PAYAX_BANCO_AMBIENTE || 'homologacao',
     timeoutMs: Number(process.env.PAYAX_BANCO_TIMEOUT_MS) || 20_000,
+    // Em quantos dias úteis o banco credita na nossa conta o boleto pago pelo código de barras,
+    // quando o aviso não traz a data de crédito. PIX (Bolepix) é creditado na hora.
+    // Conferir no contrato de cobrança: é o que define quando o repasse ao cliente sai.
+    diasCredito: Number.isInteger(Number(process.env.PAYAX_DIAS_CREDITO_BOLETO)) && process.env.PAYAX_DIAS_CREDITO_BOLETO !== undefined
+      ? Number(process.env.PAYAX_DIAS_CREDITO_BOLETO) : 1,
   },
 
   /*

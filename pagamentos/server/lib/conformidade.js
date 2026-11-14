@@ -28,6 +28,7 @@ const impressao = require('./impressao');
 const backup = require('./backup');
 const dois = require('./doisfatores');
 const arquivosBanco = require('./arquivosBanco');
+const repasses = require('./repasses');
 
 const GRUPOS = [
   { id: 'boleto', titulo: 'Boleto e cobrança' },
@@ -348,13 +349,41 @@ const REGRAS = [
 
   // ------------------------------------------------ Regulatório
   {
-    id: 'recursos-terceiros',
+    id: 'repasse-imediato',
+    grupo: 'regulatorio',
+    tipo: 'automatica',
+    titulo: 'Nenhum dinheiro de cliente parado na conta da PAY AX',
+    norma: 'Modelo de operação da PAY AX — sem conta de pagamento pré-paga (Lei 12.865/2013)',
+    exige: 'O valor recebido segue para o cliente assim que o banco credita, já sem a tarifa. Sem saldo guardado, saque, mínimo ou aprovação.',
+    verificar(db) {
+      const lista = repasses.parados(db);
+      if (lista.length) {
+        const total = lista.reduce((s, x) => s + x.valor_centavos, 0);
+        const semPix = lista.filter((x) => !x.pix_chave).length;
+        return fora(`${plural(lista.length, 'cliente tem', 'clientes têm')} dinheiro creditado antes de hoje e ainda não repassado `
+          + `(R$ ${(total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}): ${lista.map((x) => x.cliente).join(', ')}.`
+          + (semPix ? ` ${plural(semPix, 'deles está', 'deles estão')} sem chave PIX.` : ' Veja os repasses com falha.'));
+      }
+      return ok('Todo valor creditado antes de hoje já foi repassado. O de hoje sai na rodada seguinte (a cada 15 minutos).');
+    },
+  },
+  {
+    id: 'recebimento-terceiros',
     grupo: 'regulatorio',
     tipo: 'acompanhamento',
-    titulo: 'Guarda do dinheiro dos clientes',
-    norma: 'Lei 12.865/2013 e regulamentação do Banco Central sobre instituições de pagamento',
-    exige: 'Quem guarda e movimenta dinheiro de terceiros segue regras próprias: autorização, separação dos recursos ou parceria com instituição autorizada. É o ponto principal: define se a conta gráfica pode operar como está.',
+    titulo: 'Recebimento em nome dos clientes',
+    norma: 'Lei 12.865/2013 e regulamentação do Banco Central sobre arranjos de pagamento (a confirmar com o jurídico)',
+    exige: 'O dinheiro passa pela conta da PAY AX entre o crédito do banco e o PIX ao cliente (minutos, ou até o crédito do dia útil seguinte). Confirmar o enquadramento desse arranjo.',
     responsavel: 'Jurídico',
+  },
+  {
+    id: 'contabil-terceiros',
+    grupo: 'regulatorio',
+    tipo: 'acompanhamento',
+    titulo: 'Contabilização dos valores dos clientes',
+    norma: 'Legislação contábil e tributária (a confirmar com o contador)',
+    exige: 'Só a tarifa é receita da PAY AX; o resto é valor de terceiros em trânsito. Registrar assim, para não pagar imposto sobre dinheiro que não é da PAY AX.',
+    responsavel: 'Contador',
   },
   {
     id: 'termos-banco',

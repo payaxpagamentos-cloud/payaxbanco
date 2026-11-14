@@ -118,7 +118,6 @@ module.exports = (db, autenticado) => {
       periodo: p,
       cliente: {
         razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, cnpj: c.cnpj, situacao: c.situacao,
-        retencao_dias: c.retencao_dias,
         agencia: c.agencia_interna,
         conta: c.conta_interna && `${c.conta_interna}-${c.conta_interna_dv}`,
         conta_payax: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
@@ -141,6 +140,7 @@ module.exports = (db, autenticado) => {
         FROM boletos WHERE cliente_id = ? AND situacao = 'registrado' AND vencimento < ?`).get(c.id, data),
       repasses: db.prepare('SELECT * FROM repasses WHERE cliente_id = ? ORDER BY id DESC LIMIT 5').all(c.id),
       disponivel: repassesLib.disponivel(db, c, data),
+      transferencias: repassesLib.resumoCliente(db, c, data),
       preco: (() => {
         const pr = precos.vigente(db, c.id, data);
         return { tarifa_emissao_centavos: pr.tarifa_emissao_centavos, tarifa_liquidacao_centavos: pr.tarifa_liquidacao_centavos,
@@ -213,8 +213,7 @@ module.exports = (db, autenticado) => {
       saldo: razao.saldo(db, c.id, data),
       agenda: razao.agenda(db, c.id, data, 60),
       disponivel: repassesLib.disponivel(db, c, data),
-      retencao_dias: c.retencao_dias,
-      repasse_automatico: Boolean(c.repasse_automatico),
+      transferencias: repassesLib.resumoCliente(db, c, data),
       pix: c.pix_chave ? { tipo: c.pix_tipo, chave: c.pix_chave, titular: c.pix_titular ?? c.razao_social } : null,
     });
   });
@@ -242,22 +241,11 @@ module.exports = (db, autenticado) => {
   r.get('/repasses', exigir('repasses.ver'), (req, res) => {
     const c = meuCliente(req);
     res.json({
-      disponivel: repassesLib.disponivel(db, c, hoje()),
+      transferencias: repassesLib.resumoCliente(db, c, hoje()),
       ...listaPaginada(db, 'SELECT * FROM repasses WHERE cliente_id = ? ORDER BY id DESC', [c.id], req.query),
     });
   });
-
-  r.post('/repasses', exigir('repasses.solicitar'), (req, res) => {
-    const c = meuCliente(req);
-    const d = repassesLib.disponivel(db, c, hoje());
-    const valor = req.body?.valor === undefined || req.body?.valor === '' || req.body?.valor === 'tudo'
-      ? d.disponivel_centavos
-      : v.centavos(req.body.valor, 'o valor');
-    const repasse = repassesLib.solicitar(db, c, { valor_centavos: valor }, { usuarioCliente: req.usuario });
-    auditoria.registrar(db, req, { acao: 'repasse.solicitado.cliente', entidade: 'repasse', entidade_id: repasse.id, cliente_id: c.id,
-      depois: { valor_centavos: valor, situacao: repasse.situacao } });
-    res.status(201).json(repasse);
-  });
+  // Não existe pedido de repasse: o valor recebido vai sozinho para a conta do cliente.
 
   // ---------------------------------------------------------------- cadastro e acessos
   r.get('/cadastro', exigir('cadastro.ver'), (req, res) => {
@@ -268,8 +256,8 @@ module.exports = (db, autenticado) => {
       conta: c.conta_interna && `${c.conta_interna}-${c.conta_interna_dv}`,
       conta_payax: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
       responsavel: c.responsavel, cep: c.cep, endereco: c.endereco, numero: c.numero, complemento: c.complemento,
-      bairro: c.bairro, cidade: c.cidade, uf: c.uf, situacao: c.situacao, retencao_dias: c.retencao_dias,
-      repasse_automatico: Boolean(c.repasse_automatico), limite_boleto_centavos: c.limite_boleto_centavos,
+      bairro: c.bairro, cidade: c.cidade, uf: c.uf, situacao: c.situacao,
+      limite_boleto_centavos: c.limite_boleto_centavos,
       pix: c.pix_chave ? { tipo: c.pix_tipo, chave: c.pix_chave, titular: c.pix_titular, documento: c.pix_documento } : null,
       versao: c.versao,
     });

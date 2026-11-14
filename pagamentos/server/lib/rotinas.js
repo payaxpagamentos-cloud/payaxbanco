@@ -14,25 +14,11 @@ const repasses = require('./repasses');
 const sincronismo = require('./sincronismo');
 const arquivosBanco = require('./arquivosBanco');
 
-let ultimoRepasse = null;
 let ultimaImportacao = null;
 
 async function rodar(db, { forcar = false } = {}) {
   const hoje = datas.dataLocal(config.fusoPadrao);
   const out = { hoje };
-
-  // Repasses: uma vez por dia útil.
-  if ((forcar || ultimoRepasse !== hoje) && datas.ehDiaUtil(hoje)) {
-    ultimoRepasse = hoje;
-    try {
-      out.repasses = await repasses.rotinaAutomatica(db);
-      if (out.repasses.criados || out.repasses.enviados) {
-        console.log(`[PAY AX] Repasses automáticos: ${out.repasses.enviados} enviados, ${out.repasses.aguardando} aguardando aprovação.`);
-      }
-    } catch (err) {
-      console.error('[PAY AX] Falha na rotina de repasses:', err.message);
-    }
-  }
 
   // Troca de arquivos com o banco (CNAB 400): manda o que está esperando e lê o que chegou.
   try {
@@ -44,6 +30,18 @@ async function rodar(db, { forcar = false } = {}) {
     if (out.banco.remessa?.id) console.log(`[PAY AX] Remessa ${out.banco.remessa.nome} gerada com ${out.banco.remessa.titulos} título(s).`);
   } catch (err) {
     console.error('[PAY AX] Falha na troca de arquivos com o banco:', err.message);
+  }
+
+  // Repasses: a cada ciclo, todos os dias. O que o banco creditou vai para o cliente agora —
+  // a PAY AX não guarda dinheiro de cliente. Roda depois da leitura do retorno, para os títulos
+  // pagos que acabaram de chegar já saírem nesta mesma rodada.
+  try {
+    out.repasses = await repasses.rotinaAutomatica(db);
+    if (out.repasses.criados || out.repasses.falhas) {
+      console.log(`[PAY AX] Repasses: ${out.repasses.enviados} enviado(s), ${out.repasses.falhas} falha(s).`);
+    }
+  } catch (err) {
+    console.error('[PAY AX] Falha na rodada de repasses:', err.message);
   }
 
   // Baixas pendentes no IXC: a cada ciclo.

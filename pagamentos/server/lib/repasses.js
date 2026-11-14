@@ -1,13 +1,22 @@
 'use strict';
 
 /*
- * Repasse: o líquido da conta gráfica indo para a conta do cliente por PIX.
+ * Repasse: o dinheiro do cliente indo para a conta dele por PIX, assim que cai na conta da PAY AX.
  *
- * O valor pedido é o que SAI do saldo. Dele descontamos a tarifa do repasse; o resto é o PIX enviado:
- *     valor (debitado do saldo) − tarifa = valor líquido transferido
+ * A PAY AX não guarda dinheiro de cliente. Quando o banco credita um pagamento na nossa conta, a
+ * tarifa sai e o resto segue para o cliente na rodada de repasse seguinte:
+ *   - pago por PIX (Bolepix): o crédito é na hora, e o repasse sai logo depois da baixa;
+ *   - pago pelo código de barras: no dia em que o banco credita (data de crédito do retorno, ou o
+ *     prazo de compensação do contrato, PAYAX_DIAS_CREDITO_BOLETO).
+ * A rodada acontece a cada ciclo da rotina (15 minutos), todos os dias: PIX não fecha no fim de semana.
  *
- * O saldo é debitado no momento da solicitação (o dinheiro fica comprometido). Se o repasse falhar ou for
- * cancelado, entra um estorno — nada é apagado.
+ * Não existe saque, valor mínimo nem fila de aprovação — tudo isso deixaria dinheiro parado.
+ * Cliente sem chave PIX não emite boleto: o dinheiro não teria para onde ir.
+ *
+ * Um repasse sempre leva TUDO o que está liberado:
+ *     liberado (créditos − tarifas) − tarifa do repasse = valor do PIX
+ * Se o PIX falhar, entra um estorno (nada é apagado) e a rodada seguinte tenta de novo; a falha
+ * aparece no painel e na tela de Conformidade.
  */
 const config = require('../config');
 const { transacao, agora } = require('../db');
@@ -21,18 +30,36 @@ const { contaDe, credenciaisDaConta } = require('./boletos');
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 const brl = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-/** O que o cliente pode sacar agora e qual seria a tarifa. */
+/**
+ * Onde está o dinheiro do cliente agora:
+ *   a_liberar_centavos  — pago, mas o banco ainda não creditou na nossa conta (compensação);
+ *   disponivel_centavos — creditado, esperando a rodada de repasse (minutos);
+ *   em_transito_centavos — PIX já enviado, esperando a confirmação do banco.
+ */
 function disponivel(db, cliente, data = hoje()) {
   const s = razao.saldo(db, cliente.id, data);
   const preco = precos.vigente(db, cliente.id, data);
   const taxa = preco.tarifa_repasse_centavos ?? 0;
-  const pendente = db.prepare("SELECT IFNULL(SUM(valor_centavos), 0) AS v FROM repasses WHERE cliente_id = ? AND situacao IN ('aguardando_aprovacao','aprovado','enviado')").get(cliente.id).v;
+  const pendente = db.prepare("SELECT IFNULL(SUM(valor_liquido_centavos), 0) AS v FROM repasses WHERE cliente_id = ? AND situacao IN ('aguardando_aprovacao','aprovado','enviado')").get(cliente.id).v;
   return {
     ...s,
     taxa_repasse_centavos: taxa,
     em_transito_centavos: pendente,
-    sacavel_centavos: Math.max(0, s.disponivel_centavos),
-    liquido_se_sacar_tudo_centavos: Math.max(0, s.disponivel_centavos - taxa),
+  };
+}
+
+/** Resumo para o cliente: o que está a caminho e o que já foi para a conta dele. */
+function resumoCliente(db, cliente, data = hoje()) {
+  const d = disponivel(db, cliente, data);
+  const soma = (de) => db.prepare(`SELECT IFNULL(SUM(valor_liquido_centavos), 0) AS v FROM repasses
+    WHERE cliente_id = ? AND situacao = 'confirmado' AND substr(confirmado_em, 1, 10) >= ?`).get(cliente.id, de).v;
+  return {
+    a_compensar_centavos: d.a_liberar_centavos,
+    a_caminho_centavos: Math.max(0, d.disponivel_centavos) + d.em_transito_centavos,
+    transferido_hoje_centavos: soma(data),
+    transferido_mes_centavos: soma(datas.primeiroDiaMes(data)),
+    taxa_repasse_centavos: d.taxa_repasse_centavos,
+    chave_pix: cliente.pix_chave ?? null,
   };
 }
 
@@ -47,43 +74,45 @@ function destinoDe(cliente) {
   };
 }
 
-/**
- * Cria o repasse e debita o saldo. Devolve o repasse já com a situação:
- * 'aprovado' quando está dentro do limite de aprovação automática do cliente; senão 'aguardando_aprovacao'.
- */
-function solicitar(db, cliente, { valor_centavos, automatico = false }, { usuario = null, usuarioCliente = null } = {}) {
+/** Cria o repasse de TUDO o que está liberado, já aprovado. Devolve null se não há o que repassar. */
+function criar(db, cliente, { usuario = null } = {}) {
   return transacao(db, () => {
     const data = hoje();
     const d = disponivel(db, cliente, data);
-    const valor = Number(valor_centavos);
-    if (!Number.isInteger(valor) || valor <= 0) throw new ErroNegocio('Valor do repasse inválido.', 422);
-    if (valor > d.disponivel_centavos) {
-      throw new ErroNegocio(`Saldo disponível insuficiente: ${brl(d.disponivel_centavos)} (pedido: ${brl(valor)}).`, 409);
-    }
+    const valor = d.disponivel_centavos;
     const taxa = d.taxa_repasse_centavos;
     const liquido = valor - taxa;
-    if (liquido <= 0) throw new ErroNegocio(`O valor precisa ser maior que a tarifa do repasse (${brl(taxa)}).`, 422);
+    if (liquido <= 0) return null;
     const destino = destinoDe(cliente);
 
-    // Dentro do limite do cliente, segue direto; acima dele, espera a conferência da nossa equipe.
-    const dentroDoLimite = valor <= cliente.repasse_limite_aprovacao_centavos && cliente.repasse_limite_aprovacao_centavos > 0;
-    const situacao = dentroDoLimite ? 'aprovado' : 'aguardando_aprovacao';
-
     const r = db.prepare(`INSERT INTO repasses (cliente_id, valor_centavos, taxa_centavos, valor_liquido_centavos, meio,
-        pix_tipo, pix_chave, titular_nome, titular_documento, situacao, automatico, solicitado_por, solicitado_por_cliente,
-        aprovado_por, aprovado_em, criado_em)
-      VALUES (?, ?, ?, ?, 'pix', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`)
+        pix_tipo, pix_chave, titular_nome, titular_documento, situacao, automatico, solicitado_por, aprovado_por, aprovado_em, criado_em)
+      VALUES (?, ?, ?, ?, 'pix', ?, ?, ?, ?, 'aprovado', 1, ?, ?, ?, ?) RETURNING *`)
       .get(cliente.id, valor, taxa, liquido, destino.pix_tipo, destino.pix_chave, destino.titular_nome, destino.titular_documento,
-        situacao, automatico ? 1 : 0, usuario?.id ?? null, usuarioCliente?.id ?? null,
-        dentroDoLimite && usuario ? usuario.id : null, dentroDoLimite ? agora() : null, agora());
+        usuario?.id ?? null, usuario?.id ?? null, agora(), agora());
 
     razao.lancar(db, { cliente_id: cliente.id, repasse_id: r.id, tipo: 'repasse', valor_centavos: -liquido,
       descricao: `Repasse PIX #${r.id} · ${destino.pix_chave}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null });
-    razao.lancar(db, { cliente_id: cliente.id, repasse_id: r.id, tipo: 'taxa_repasse', valor_centavos: -taxa,
-      descricao: `Tarifa do repasse #${r.id}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null });
-
+    if (taxa) {
+      razao.lancar(db, { cliente_id: cliente.id, repasse_id: r.id, tipo: 'taxa_repasse', valor_centavos: -taxa,
+        descricao: `Tarifa do repasse #${r.id}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null });
+    }
     return r;
   });
+}
+
+/** Repassa agora tudo o que está liberado para um cliente. Devolve o repasse (ou null). */
+async function repassar(db, cliente, { usuario = null } = {}) {
+  const r = criar(db, cliente, { usuario });
+  if (!r) return null;
+  return enviar(db, r.id, { usuario });
+}
+
+/** Atalho para quem acabou de dar baixa num título: repassa o cliente dele, se já houver crédito. */
+async function repassarCliente(db, clienteId) {
+  const c = db.prepare("SELECT * FROM clientes WHERE id = ? AND situacao <> 'encerrado' AND pix_chave IS NOT NULL").get(clienteId);
+  if (!c) return null;
+  return repassar(db, c);
 }
 
 function aprovar(db, id, usuario) {
@@ -95,7 +124,7 @@ function aprovar(db, id, usuario) {
   return db.prepare('SELECT * FROM repasses WHERE id = ?').get(id);
 }
 
-/** Devolve o valor ao saldo do cliente (falha no PIX ou cancelamento). */
+/** Devolve o valor ao registro do cliente (falha no PIX ou cancelamento); a próxima rodada tenta de novo. */
 function devolverAoSaldo(db, r, motivo, usuario = null) {
   const data = hoje();
   razao.lancar(db, { cliente_id: r.cliente_id, repasse_id: r.id, tipo: 'estorno', valor_centavos: r.valor_liquido_centavos,
@@ -151,30 +180,24 @@ async function enviar(db, id, { usuario = null } = {}) {
 }
 
 /**
- * Rotina diária: para cada cliente ativo com repasse automático e saldo acima do mínimo, cria e envia o repasse.
- * O que passar do limite de aprovação do cliente fica esperando a nossa equipe.
+ * Rodada de repasse: todo cliente com dinheiro liberado recebe agora. Roda a cada ciclo da rotina.
+ * Repasse que falhou (PIX recusado) foi estornado e entra de novo aqui.
  */
 async function rotinaAutomatica(db, { usuario = null } = {}) {
   const data = hoje();
-  const clientes = db.prepare("SELECT * FROM clientes WHERE situacao = 'ativo' AND repasse_automatico = 1 AND pix_chave IS NOT NULL").all();
-  const resultado = { data, criados: 0, enviados: 0, aguardando: 0, falhas: 0, detalhes: [] };
+  const clientes = db.prepare("SELECT * FROM clientes WHERE situacao <> 'encerrado' AND pix_chave IS NOT NULL").all();
+  const resultado = { data, criados: 0, enviados: 0, falhas: 0, detalhes: [] };
   for (const c of clientes) {
-    const d = disponivel(db, c, data);
-    if (d.disponivel_centavos < Math.max(c.repasse_minimo_centavos, d.taxa_repasse_centavos + 1)) continue;
     let r;
     try {
-      r = solicitar(db, c, { valor_centavos: d.disponivel_centavos, automatico: true }, { usuario });
-      resultado.criados += 1;
+      r = criar(db, c, { usuario });
     } catch (err) {
       resultado.falhas += 1;
       resultado.detalhes.push({ cliente_id: c.id, erro: err.message });
       continue;
     }
-    if (r.situacao !== 'aprovado') {
-      resultado.aguardando += 1;
-      resultado.detalhes.push({ cliente_id: c.id, repasse_id: r.id, situacao: r.situacao });
-      continue;
-    }
+    if (!r) continue;
+    resultado.criados += 1;
     try {
       const enviado = await enviar(db, r.id, { usuario });
       resultado.enviados += 1;
@@ -187,4 +210,21 @@ async function rotinaAutomatica(db, { usuario = null } = {}) {
   return resultado;
 }
 
-module.exports = { disponivel, solicitar, aprovar, cancelar, enviar, rotinaAutomatica, destinoDe };
+/**
+ * Dinheiro de cliente que já devia ter saído: creditado antes de hoje e ainda conosco.
+ * É o que a Conformidade vigia — o creditado hoje está, no máximo, esperando a rodada.
+ *
+ * Conta o saldo liberado ATÉ AGORA (com os repasses de hoje já descontados) e limita ao que foi
+ * liberado antes de hoje: assim um crédito de ontem repassado hoje cedo não aparece como parado.
+ */
+function parados(db, data = hoje()) {
+  return db.prepare(`SELECT c.id, COALESCE(c.nome_fantasia, c.razao_social) AS cliente, c.pix_chave,
+      SUM(CASE WHEN l.data_liberacao <= ? THEN l.valor_centavos ELSE 0 END) AS ate_agora,
+      SUM(CASE WHEN l.data_liberacao < ? THEN l.valor_centavos ELSE 0 END) AS antes_de_hoje
+    FROM lancamentos l JOIN clientes c ON c.id = l.cliente_id
+    GROUP BY c.id`).all(data, data)
+    .map((x) => ({ id: x.id, cliente: x.cliente, pix_chave: x.pix_chave, valor_centavos: Math.min(x.ate_agora, x.antes_de_hoje) }))
+    .filter((x) => x.valor_centavos > 0);
+}
+
+module.exports = { disponivel, resumoCliente, criar, repassar, repassarCliente, aprovar, cancelar, enviar, rotinaAutomatica, parados, destinoDe };

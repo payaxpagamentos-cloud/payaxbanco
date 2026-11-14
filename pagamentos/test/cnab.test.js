@@ -192,8 +192,9 @@ test('CNAB 400: ciclo completo — emite, manda a remessa, recebe o retorno', as
 
     const d2 = (await api.get(`/api/boletos/${b2.id}`, tk.admin)).dados;
     assert.equal(d2.situacao, 'liquidado');
-    assert.equal(d2.pago_em, '2026-12-08', 'vale a data do crédito, não a da ocorrência');
-    assert.equal(d2.lancamentos.length, 3, 'o split entrou na conta gráfica');
+    assert.equal(d2.pago_em, '2026-12-06', 'pago no dia da ocorrência');
+    assert.equal(d2.lancamentos.length, 3, 'o split entrou no registro do cliente');
+    assert.ok(d2.lancamentos.every((l) => l.data_liberacao === '2026-12-08'), 'liberado no dia em que o banco creditou');
 
     const d3 = (await api.get(`/api/boletos/${b3.id}`, tk.admin)).dados;
     assert.equal(d3.situacao, 'falha');

@@ -14,9 +14,7 @@ export default async function inicio({ alvo }) {
   ]);
   const hoje = d.hoje ?? hojeIso();
   const l = d.liquidacoes;
-  const podeSacar = pode('repasses.solicitar') && d.disponivel.sacavel_centavos > d.disponivel.taxa_repasse_centavos;
-
-  // O que o saldo retido vai liberar nos próximos dias.
+  // O próximo crédito do banco: no dia em que cair, segue para a conta do cliente.
   const proximaLiberacao = d.agenda?.[0];
 
   montar(alvo,
@@ -26,25 +24,18 @@ export default async function inicio({ alvo }) {
 
     d.cliente.situacao !== 'ativo' ? aviso(`A sua conta está com situação "${d.cliente.situacao}". Fale com o seu gerente.`, 'aviso') : null,
 
-    cartaoConta({
-      saldo: d.saldo,
-      disponivel: d.disponivel,
-      agencia: d.cliente.agencia,
-      conta: d.cliente.conta,
-      retencao_dias: d.cliente.retencao_dias,
-    }),
+    cartaoConta({ transferencias: d.transferencias, codigo: d.cliente.conta }),
 
     proximaLiberacao
       ? el('div', { class: 'a-liberar' }, icone('relogio'),
-        el('span', {}, 'Próxima liberação: ', el('strong', {}, dinheiro(proximaLiberacao.valor_centavos))),
+        el('span', {}, 'Próximo crédito do banco: ', el('strong', {}, dinheiro(proximaLiberacao.valor_centavos)),
+          ' — vai para a sua conta no mesmo dia'),
         el('span', { class: 'quando' }, data(proximaLiberacao.data)))
       : null,
 
     acoesRapidas([
       pode('boletos.emitir') ? { ic: 'boleto', titulo: 'Emitir boleto', descricao: 'Cobrar um cliente', href: '#/boletos?novo=1' } : null,
-      pode('repasses.solicitar')
-        ? { ic: 'pix', titulo: 'Transferir', descricao: podeSacar ? `${dinheiro(d.disponivel.sacavel_centavos)} disponível` : 'sem saldo agora', href: '#/repasses', desabilitado: !podeSacar }
-        : null,
+      pode('repasses.ver') ? { ic: 'pix', titulo: 'Transferências', descricao: 'O que foi para a sua conta', href: '#/repasses' } : null,
       { ic: 'lista', titulo: 'Extrato', descricao: 'Tudo que entrou e saiu', href: '#/extrato' },
       { ic: 'relatorio', titulo: 'Relatórios', descricao: 'Fechar o mês', href: '#/relatorios' },
     ]),

@@ -51,19 +51,13 @@ module.exports = (db) => {
     res.type('text/csv; charset=utf-8').attachment(`repasses-${hoje()}.csv`).send(csv(linhas));
   });
 
-  /** Repasse criado pela nossa equipe (fora da rotina automática). */
-  r.post('/', exigir('repasses.aprovar'), async (req, res) => {
+  /** Repassa agora tudo o que está liberado para um cliente, sem esperar a próxima rodada. */
+  r.post('/', exigir('repasses.enviar'), async (req, res) => {
     const cliente = buscarCliente(req.body?.cliente_id);
-    const d = repassesLib.disponivel(db, cliente, hoje());
-    const valor = req.body?.valor === undefined || req.body?.valor === '' || req.body?.valor === 'tudo'
-      ? d.disponivel_centavos
-      : v.centavos(req.body.valor, 'o valor');
-    const repasse = repassesLib.solicitar(db, cliente, { valor_centavos: valor }, { usuario: req.usuario });
-    auditoria.registrar(db, req, { acao: 'repasse.solicitado', entidade: 'repasse', entidade_id: repasse.id, cliente_id: cliente.id, depois: repasse });
-    if (repasse.situacao === 'aprovado' && v.booleano(req.body?.enviar_agora)) {
-      const enviado = await repassesLib.enviar(db, repasse.id, { usuario: req.usuario });
-      return res.status(201).json(enviado);
-    }
+    const repasse = await repassesLib.repassar(db, cliente, { usuario: req.usuario });
+    if (!repasse) throw new ErroNegocio('Não há valor liberado para repassar a este cliente agora.', 409);
+    auditoria.registrar(db, req, { acao: 'repasse.enviado', entidade: 'repasse', entidade_id: repasse.id, cliente_id: cliente.id,
+      depois: { situacao: repasse.situacao, valor_liquido_centavos: repasse.valor_liquido_centavos } });
     res.status(201).json(repasse);
   });
 
@@ -89,7 +83,7 @@ module.exports = (db) => {
   /** Roda agora a rotina que normalmente acontece sozinha (útil para fechar o dia na mão). */
   r.post('/rotina', exigir('repasses.enviar'), async (req, res) => {
     const out = await repassesLib.rotinaAutomatica(db, { usuario: req.usuario });
-    auditoria.registrar(db, req, { acao: 'repasse.rotina', depois: { criados: out.criados, enviados: out.enviados, aguardando: out.aguardando, falhas: out.falhas } });
+    auditoria.registrar(db, req, { acao: 'repasse.rotina', depois: { criados: out.criados, enviados: out.enviados, falhas: out.falhas } });
     res.json(out);
   });
 

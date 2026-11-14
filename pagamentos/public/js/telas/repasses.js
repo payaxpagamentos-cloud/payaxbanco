@@ -5,7 +5,11 @@ import {
   dinheiro, numero, dataHora, documento, R, icone
 } from '../../comum/ui.js';
 
-/** Fila de repasses: aprovar o que passou do limite, enviar e acompanhar o PIX. */
+/**
+ * Repasses: o dinheiro de cada cliente saindo por PIX assim que o banco credita.
+ * Não há fila de aprovação nem saque — a rotina repassa a cada ciclo. Aqui a equipe acompanha
+ * e age só na exceção: PIX que falhou (a rotina tenta de novo sozinha) ou repasse antigo pendente.
+ */
 export default async function repasses({ alvo, query, recarregar }) {
   const filtros = { situacao: query.situacao ?? '', de: query.de ?? '', ate: query.ate ?? '', pagina: Number(query.pagina) || 1 };
   const d = await api.get(`/repasses${qs(filtros)}`);
@@ -22,17 +26,17 @@ export default async function repasses({ alvo, query, recarregar }) {
 
   montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
-      el('div', {}, el('h1', {}, 'Repasses'), el('p', {}, 'O líquido da conta gráfica de cada cliente saindo por PIX')),
+      el('div', {}, el('h1', {}, 'Repasses'), el('p', {}, 'O valor de cada cliente saindo por PIX assim que o banco credita — nada fica parado na nossa conta')),
       pode('repasses.enviar') ? el('div', { class: 'acoes' },
         el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
           const r = await api.post('/repasses/rotina', {});
-          toast(`Rotina concluída: ${r.enviados} enviado(s), ${r.aguardando} aguardando aprovação, ${r.falhas} falha(s).`, r.falhas ? 'erro' : 'ok');
+          toast(`Rodada concluída: ${r.enviados} enviado(s), ${r.falhas} falha(s).`, r.falhas ? 'erro' : 'ok');
           recarregar();
-        }) }, icone('atualizar'), 'Rodar rotina agora')) : null),
+        }) }, icone('atualizar'), 'Repassar agora')) : null),
 
     el('div', { class: 'grade kpis' },
-      kpi({ rotulo: 'Aguardando aprovação', valor: numero(q('aguardando_aprovacao').quantidade), apoio: dinheiro(q('aguardando_aprovacao').valor_centavos), tom: q('aguardando_aprovacao').quantidade ? 'negativo' : '', ic: 'relogio' }),
-      kpi({ rotulo: 'Aprovados a enviar', valor: numero(q('aprovado').quantidade), apoio: dinheiro(q('aprovado').valor_centavos), menor: true, ic: 'troca' }),
+      kpi({ rotulo: 'Em envio', valor: numero(q('aprovado').quantidade + q('enviado').quantidade),
+        apoio: dinheiro(q('aprovado').valor_centavos + q('enviado').valor_centavos), menor: true, ic: 'troca' }),
       kpi({ rotulo: 'Confirmados', valor: numero(q('confirmado').quantidade), apoio: dinheiro(q('confirmado').valor_centavos), menor: true, tom: 'positivo', ic: 'ok' }),
       kpi({ rotulo: 'Com falha', valor: numero(q('falhou').quantidade), apoio: dinheiro(q('falhou').valor_centavos), menor: true, tom: q('falhou').quantidade ? 'negativo' : '', ic: 'alerta' })),
 
@@ -41,7 +45,7 @@ export default async function repasses({ alvo, query, recarregar }) {
       colunas: [
         { titulo: '#', conteudo: (r) => r.id },
         { titulo: 'Cliente', conteudo: (r) => el('span', {}, el('span', { class: 'forte' }, r.nome_fantasia || r.razao_social),
-          el('span', { class: 'sub' }, `${r.pix_chave} · ${r.automatico ? 'automático' : 'manual'}`)) },
+          el('span', { class: 'sub' }, r.pix_chave)) },
         { titulo: 'Criado', conteudo: (r) => dataHora(r.criado_em) },
         { titulo: 'Líquido', dir: true, conteudo: (r) => el('span', {}, el('strong', {}, dinheiro(r.valor_liquido_centavos)),
           r.taxa_centavos ? el('span', { class: 'sub' }, `bruto ${dinheiro(r.valor_centavos)}`) : null) },
@@ -64,7 +68,7 @@ export default async function repasses({ alvo, query, recarregar }) {
           ['aguardando_aprovacao', 'aprovado', 'falhou'].includes(r.situacao) && pode('repasses.aprovar')
             ? el('button', { class: 'botao sec pequeno', onclick: async (e) => {
               e.stopPropagation();
-              const c = await confirmar({ titulo: 'Cancelar repasse', texto: 'O valor volta para o saldo disponível do cliente como estorno.', confirmarTexto: 'Cancelar repasse', perigo: true, campoMotivo: true });
+              const c = await confirmar({ titulo: 'Cancelar repasse', texto: 'O valor é estornado e sai de novo na próxima rodada de repasse.', confirmarTexto: 'Cancelar repasse', perigo: true, campoMotivo: true });
               if (c) acao(e.currentTarget, async () => { await api.post(`/repasses/${r.id}/cancelar`, c); toast('Repasse cancelado.'); recarregar(); });
             } }, 'Cancelar') : null) },
       ],

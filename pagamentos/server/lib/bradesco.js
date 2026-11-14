@@ -94,6 +94,8 @@ function simulador(conta) {
     },
     async pagarPix({ chave, valor_centavos, descricao }) {
       if (!chave) throw new ErroBanco('Repasse sem chave PIX de destino.');
+      // Só no simulador: chave com "@recusa.teste" simula o banco recusando o PIX (para testar a nova tentativa).
+      if (String(chave).endsWith('@recusa.teste')) throw new ErroBanco('Chave PIX não encontrada no DICT (simulado).');
       return {
         end_to_end: `E${conta.banco}${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}${crypto.randomBytes(5).toString('hex').toUpperCase()}`,
         situacao: 'confirmado',
