@@ -56,6 +56,19 @@ de face, a PAY AX fique exatamente com a tarifa — com juros ou desconto, os do
 sistema registra o valor que o banco informa no retorno. O rateio do Bradesco só credita **conta Bradesco**, e por
 enquanto só pelo **arquivo CNAB**: pela API, os campos de rateio dependem da documentação que chega na homologação.
 
+**Plano B — se o rateio não der certo, a PAY AX faz por PIX.** O banco diz, no registro 3 do retorno
+(posições 159-160), o que aconteceu com o rateio de cada título, e o sistema age sozinho:
+
+| O banco disse | O que o sistema faz |
+|---|---|
+| Rateio aceito no registro (motivo 00) e, no pagamento, feito (38 ou 39) | Nada: o Bradesco creditou o cliente |
+| Recusou o rateio no registro (conta inválida, serviço não contratado, …) | O boleto vale; quando for pago, o valor do cliente vai por PIX |
+| No pagamento, não fez o rateio (40 a 43: conta bloqueada, encerrada, …) | O valor inteiro caiu na PAY AX: vai por PIX na hora |
+| **Não disse nada** (retorno sem o registro 3) | **Não presume.** Fica "a confirmar", com alerta no painel; a equipe confere no extrato e informa no boleto: "creditou" ou "não creditou — enviar por PIX". Mandar PIX de algo que o banco já pagou seria pagar duas vezes |
+
+A regra **Rateio que não deu certo** da Conformidade mostra as falhas dos últimos 30 dias e fica fora da norma se
+um "a confirmar" passar de um dia sem conferência.
+
 **Quando o repasse por PIX sai:**
 
 | Como o pagador pagou | Quando o banco credita na nossa conta | Quando o cliente recebe |

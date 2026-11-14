@@ -672,6 +672,20 @@ ALTER TABLE repasses ADD COLUMN destino_agencia TEXT;
 ALTER TABLE repasses ADD COLUMN destino_conta TEXT;
 `,
   },
+  {
+    versao: 12,
+    nome: 'rateio-plano-b',
+    sql: `
+-- O que o banco disse do rateio de cada título (retorno, registro 3, posições 159-160).
+--   aceito       = banco aceitou o rateio no registro, título aguardando pagamento
+--   recusado     = banco registrou o título mas recusou o rateio: o valor vai por PIX
+--   efetuado     = pago, e o banco creditou a parte do cliente
+--   nao_efetuado = pago, mas o banco não creditou o cliente: o valor vai por PIX
+--   a_confirmar  = pago, sem o banco dizer se rateou: a equipe confere no extrato antes de qualquer PIX
+ALTER TABLE boletos ADD COLUMN rateio_situacao TEXT CHECK (rateio_situacao IN ('aceito', 'recusado', 'efetuado', 'nao_efetuado', 'a_confirmar'));
+ALTER TABLE boletos ADD COLUMN rateio_motivo TEXT;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

@@ -68,14 +68,44 @@ function detalhe(r, sequencial) {
   return l;
 }
 
+/**
+ * Registro 3 do retorno (rateio de crédito), como o banco devolve logo depois do título.
+ * @param {{nosso_numero, nosso_numero_dv, valor_centavos?, motivo, credito_em?}} r  r.rateio = { valor_centavos, motivo, credito_em }
+ */
+function rateio(r, sequencial) {
+  const x = r.rateio;
+  const dataLonga = (iso) => (iso ? `${iso.slice(8, 10)}${iso.slice(5, 7)}${iso.slice(0, 4)}` : '00000000');
+  const l = [
+    '3', // 001
+    numero('0', 16), // 002-017
+    numero(r.nosso_numero, 11) + String(r.nosso_numero_dv ?? '0').slice(0, 1), // 018-029
+    '1', '1', // 030-031
+    ' '.repeat(12), // 032-043
+    '237', numero('1234', 5), '5', numero('98765', 12), '0', // 044-065
+    valor(x.valor_centavos ?? 0, 15), // 066-080
+    texto('CONNECT LINK TELECOM LTDA', 40), // 081-120
+    ' '.repeat(21), // 121-141
+    '000001', '000', // 142-150
+    dataLonga(x.credito_em), // 151-158
+    String(x.motivo).padStart(2, '0'), // 159-160
+    ' '.repeat(234), // 161-394
+    numero(sequencial, 6), // 395-400
+  ].join('');
+  if (l.length !== 400) throw new Error(`registro 3 do retorno com ${l.length} posições`);
+  return l;
+}
+
 const trailer = (sequencial) => `9${' '.repeat(393)}${numero(sequencial, 6)}`;
 
 /** @returns {string} conteúdo do arquivo */
 function gerarRetorno(conta, registros, { gerado_em = '2026-12-20', credito_em = '2026-12-20', sequencial = 1 } = {}) {
   const linhas = [header(conta, { gerado_em, credito_em, sequencial })];
-  registros.forEach((r, i) => linhas.push(detalhe(r, i + 2)));
+  for (const r of registros) {
+    linhas.push(detalhe(r, linhas.length + 1));
+    if (r.rateio) linhas.push(rateio(r, linhas.length + 1));
+  }
   linhas.push(trailer(linhas.length + 1));
   return `${linhas.join('\r\n')}\r\n`;
 }
 
-module.exports = { gerarRetorno, header, detalhe, trailer };
+module.exports = { gerarRetorno, header, detalhe, rateio, trailer };

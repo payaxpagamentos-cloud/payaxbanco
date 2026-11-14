@@ -55,8 +55,9 @@ function resumoCliente(db, cliente, data = hoje()) {
   // PIX confirmados + o que o banco creditou direto na conta do cliente (rateio de crédito).
   const soma = (de) => db.prepare(`SELECT IFNULL(SUM(valor_liquido_centavos), 0) AS v FROM repasses
     WHERE cliente_id = ? AND situacao = 'confirmado' AND substr(confirmado_em, 1, 10) >= ?`).get(cliente.id, de).v
-    + db.prepare(`SELECT IFNULL(-SUM(valor_centavos), 0) AS v FROM lancamentos
-      WHERE cliente_id = ? AND tipo = 'repasse' AND repasse_id IS NULL AND data_liberacao BETWEEN ? AND ?`).get(cliente.id, de, data).v;
+    + db.prepare(`SELECT IFNULL(-SUM(l.valor_centavos), 0) AS v FROM lancamentos l LEFT JOIN boletos b ON b.id = l.boleto_id
+      WHERE l.cliente_id = ? AND l.tipo = 'repasse' AND l.repasse_id IS NULL AND l.data_liberacao BETWEEN ? AND ?
+        AND IFNULL(b.rateio_situacao, '') <> 'nao_efetuado'`).get(cliente.id, de, data).v;
   return {
     a_compensar_centavos: d.a_liberar_centavos,
     a_caminho_centavos: Math.max(0, d.disponivel_centavos) + d.em_transito_centavos,

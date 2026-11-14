@@ -96,6 +96,15 @@ module.exports = (db) => {
     res.json(out);
   });
 
+  /** Rateio "a confirmar": a equipe informa o que viu no extrato do Bradesco. Não creditado → vai por PIX. */
+  r.post('/:id/rateio/conferir', exigir('conciliacao.operar'), async (req, res) => {
+    const creditado = ['true', '1', 'sim', true].includes(req.body?.creditado);
+    const out = boletosLib.conferirRateio(db, Number(req.params.id), { creditado, observacao: req.body?.observacao }, req.usuario);
+    auditoria.registrar(db, req, { acao: 'boleto.rateio.conferido', entidade: 'boleto', entidade_id: Number(req.params.id), depois: out });
+    if (out.rateio_situacao === 'nao_efetuado') await repassesLib.repassarCliente(db, out.cliente_id).catch(() => null);
+    res.json(out);
+  });
+
   r.post('/:id/estorno', exigir('conciliacao.operar'), (req, res) => {
     const motivo = v.texto(req.body?.motivo, 'o motivo do estorno', 160);
     const out = boletosLib.estornarLiquidacao(db, Number(req.params.id), motivo, req.usuario);

@@ -99,6 +99,12 @@ function aplicar(db, registro, { creditoEm }) {
     case 'confirmado': {
       db.prepare("UPDATE boletos SET situacao = CASE WHEN situacao = 'registrando' THEN 'registrado' ELSE situacao END, confirmado_em = ?, erro_registro = NULL WHERE id = ?")
         .run(agora(), b.id);
+      // O banco diz, no registro 3, se aceitou o rateio. Recusado: o título vale, e o valor irá por PIX.
+      if (b.rateio_ppm && registro.rateio) {
+        db.prepare('UPDATE boletos SET rateio_situacao = ?, rateio_motivo = ? WHERE id = ?')
+          .run(registro.rateio, cnab.textoMotivoRateio(registro.rateio_motivo), b.id);
+        return { resultado: 'confirmado', boleto_id: b.id, rateio: registro.rateio, ...(registro.rateio === 'recusado' ? { motivo: cnab.textoMotivoRateio(registro.rateio_motivo) } : {}) };
+      }
       return { resultado: 'confirmado', boleto_id: b.id };
     }
     case 'rejeitado': {
@@ -114,7 +120,9 @@ function aplicar(db, registro, { creditoEm }) {
         pago_em: registro.ocorrido_em ?? registro.creditado_em ?? creditoEm ?? hoje(),
         creditado_em: registro.creditado_em ?? creditoEm ?? null,
         // Rateio: o valor que o banco efetivamente creditou ao cliente (registro 3 do retorno).
-        rateio_centavos: Number.isInteger(registro.rateio_centavos) ? registro.rateio_centavos : null,
+        rateio_centavos: registro.rateio === 'efetuado' && Number.isInteger(registro.rateio_centavos) ? registro.rateio_centavos : null,
+        rateio: registro.rateio ?? null,
+        rateio_motivo: cnab.textoMotivoRateio(registro.rateio_motivo),
         valor_pago_centavos: pago,
         juros_centavos: registro.juros_centavos ?? 0,
         desconto_centavos: registro.desconto_centavos ?? 0,
@@ -171,7 +179,9 @@ function processarRetorno(db, conteudo, { nome, origem = 'pasta', usuario = null
     else if (r.resultado === 'rejeitado') contagem.rejeitados += 1;
     else if (r.resultado === 'sem_titulo') contagem.sem_titulo += 1;
     else if (r.resultado === 'nao_tratado' || r.resultado === 'erro') contagem.nao_tratados += 1;
-    if (['rejeitado', 'sem_titulo', 'nao_tratado', 'erro'].includes(r.resultado)) {
+    // Rateio que não deu certo também vai para o detalhe: a equipe precisa ver (e o PIX cobre).
+    const rateioComProblema = r.rateio === 'recusado' || r.split?.rateio_plano_b || r.split?.rateio_situacao === 'a_confirmar';
+    if (['rejeitado', 'sem_titulo', 'nao_tratado', 'erro'].includes(r.resultado) || rateioComProblema) {
       detalhe.push({ nosso_numero: registro.nosso_numero, ocorrencia: registro.ocorrencia, ...r });
     }
   }

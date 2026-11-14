@@ -293,6 +293,59 @@ function gerarRemessa({ conta, titulos, boletos, sequencial, hoje, comando = COM
 }
 
 // ---------------------------------------------------------------- Retorno
+/**
+ * Status/motivo do rateio no registro 3 do retorno (posições 159-160), conforme o manual.
+ * Na entrada (ocorrência 02), "00" é aceito e qualquer outro código é recusa do rateio.
+ * Na liquidação (06/15), 38 e 39 são rateio feito; 40 a 43 são rateio NÃO feito.
+ */
+const MOTIVOS_RATEIO = Object.freeze({
+  '00': 'Remessa para rateio aceita, título aguardando rateio',
+  '01': 'Conta do beneficiário inválida para o banco 237',
+  '02': 'Rateio rejeitado: posição 105 diferente de "R" e acompanha tipo 3',
+  '03': 'Rateio rejeitado: posição 105 igual a "R" e não acompanha tipo 3',
+  '04': 'Rateio rejeitado: posição 105 diferente de "R" ou branco',
+  '05': 'Empresa inativa para rateio (serviço não contratado no convênio)',
+  '06': 'Beneficiário inativo para rateio',
+  '08': 'Código de cálculo do rateio diferente de 1, 2 ou 3',
+  '09': 'Banco/agência/conta do beneficiário não numérico',
+  '11': 'Valor do rateio não numérico',
+  '12': 'Percentual do rateio não numérico',
+  '13': 'Tipo de valor informado diferente de 1 ou 2',
+  '14': 'Banco não participante do rateio (diferente de 237)',
+  '15': 'Informado percentual e valor no mesmo beneficiário',
+  '16': 'Dígito da agência do beneficiário não confere',
+  '17': 'Dígito da conta do beneficiário não confere',
+  '18': 'Banco/agência/conta do beneficiário igual a zeros',
+  '20': 'Nome do beneficiário não informado ou acima do limite',
+  '23': 'Floating do beneficiário superior a 30 dias',
+  '24': 'Cálculo pelo valor cobrado sem percentual',
+  '26': 'Beneficiários em percentual e outros em valor',
+  '27': 'Soma dos valores dos beneficiários excedeu o valor do título',
+  '28': 'Soma dos percentuais dos beneficiários excedeu 100%',
+  '32': 'Empresa bloqueada para rateio',
+  '33': 'Beneficiário bloqueado para rateio',
+  '37': 'Rateio cancelado por baixa do título',
+  '38': 'Rateio efetuado, beneficiário aguardando crédito',
+  '39': 'Rateio efetuado, beneficiário já creditado',
+  '40': 'Rateio não efetuado: conta do beneficiário bloqueada',
+  '41': 'Rateio não efetuado: conta do beneficiário encerrada',
+  '42': 'Rateio não efetuado: valor pago menor que o registrado',
+  '43': 'Ocorrência não possui rateio',
+  '44': 'Título já cadastrado para rateio',
+  '45': 'Número do título inválido',
+  '46': 'Conta do beneficiário inválida',
+});
+const RATEIO_EFETUADO = new Set(['38', '39']);
+
+/** O que o motivo diz: 'aceito' | 'recusado' (na entrada) ou 'efetuado' | 'nao_efetuado' (no pagamento). */
+function leituraRateio(motivo, acao) {
+  if (!motivo) return null;
+  if (acao === 'confirmado') return motivo === '00' ? 'aceito' : 'recusado';
+  if (acao === 'liquidado') return RATEIO_EFETUADO.has(motivo) ? 'efetuado' : 'nao_efetuado';
+  return null;
+}
+const textoMotivoRateio = (m) => (m ? `${m} ${MOTIVOS_RATEIO[m] ?? 'motivo não catalogado'}` : null);
+
 /** Lê o arquivo de retorno inteiro. Linhas com tamanho errado viram erro explícito, não silêncio. */
 function lerRetorno(conteudo) {
   const linhas = String(conteudo ?? '').split(/\r?\n/).filter((l) => l.trim().length);
@@ -321,7 +374,10 @@ function lerRetorno(conteudo) {
   for (const l of linhas.slice(1)) {
     // Registro 3: quanto o banco efetivamente creditou ao 1º beneficiário do rateio, do título anterior.
     if (l[0] === '3' && registros.length) {
-      registros.at(-1).rateio_centavos = Number(campo(l, 66, 80));
+      const r = registros.at(-1);
+      r.rateio_centavos = Number(campo(l, 66, 80));
+      r.rateio_motivo = campo(l, 159, 160).trim() || null;
+      r.rateio = leituraRateio(r.rateio_motivo, r.acao);
       continue;
     }
     if (l[0] !== '1') continue; // só os detalhes interessam (9 é o trailer)
@@ -356,5 +412,5 @@ function lerRetorno(conteudo) {
 /** Confere se um texto parece um retorno, sem lançar (usado ao varrer a pasta). */
 const pareceRetorno = (conteudo) => /^0.?2RETORNO/.test(String(conteudo ?? '').slice(0, 12));
 
-module.exports = { ESPECIES, ESPECIE_PADRAO, especieDe, gerarRemessa, lerRetorno, pareceRetorno, headerRemessa, detalheRemessa, rateioRemessa, trailerRemessa,
+module.exports = { MOTIVOS_RATEIO, leituraRateio, textoMotivoRateio, ESPECIES, ESPECIE_PADRAO, especieDe, gerarRemessa, lerRetorno, pareceRetorno, headerRemessa, detalheRemessa, rateioRemessa, trailerRemessa,
   COMANDO, OCORRENCIA, MOTIVO, texto, numero, valor, data, dataIso, identificacaoEmpresa };

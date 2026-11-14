@@ -184,6 +184,7 @@ async function detalheBoleto(alvo, id, recarregar) {
       acoes),
 
     b.situacao === 'falha' ? aviso(`O banco não registrou este título: ${b.erro_registro}`, 'erro') : null,
+    b.rateio_ppm ? avisoRateio(b, recarregar) : null,
 
     el('div', { class: 'grade duas', style: 'margin-top:4px' },
       cartao('Título', el('div', { class: 'pares' },
@@ -235,6 +236,41 @@ async function detalheBoleto(alvo, id, recarregar) {
             }))
             : el('p', { style: 'margin-top:10px;color:var(--texto-3);font-size:13px' }, 'Os lançamentos na conta gráfica do cliente são criados quando o título for liquidado.')))),
   );
+}
+
+/**
+ * Rateio de crédito: o Bradesco credita a parte do cliente direto na conta dele. Se não der certo, o
+ * valor vai por PIX (plano B). Se o banco não disse se rateou, a equipe confere no extrato e informa.
+ */
+function avisoRateio(b, recarregar) {
+  const motivo = b.rateio_motivo ? ` Motivo do banco: ${b.rateio_motivo}.` : '';
+  const textos = {
+    aceito: ['O banco aceitou o rateio: quando for pago, o próprio Bradesco credita a parte do cliente na conta dele.', 'info'],
+    recusado: [`O banco registrou o título mas recusou o rateio.${motivo} Quando for pago, o valor do cliente vai por PIX.`, 'aviso'],
+    efetuado: ['Rateio feito: o Bradesco creditou a parte do cliente direto na conta dele. Nenhum PIX da PAY AX.', 'ok'],
+    nao_efetuado: [`O banco não fez o rateio.${motivo} O valor do cliente foi por PIX (plano B).`, 'aviso'],
+    a_confirmar: ['Pago, mas o banco não disse se creditou o cliente. Confira no extrato do Bradesco se a parte dele caiu na conta dele e informe abaixo. Até lá, nenhum PIX sai — para não pagar duas vezes.', 'erro'],
+  };
+  const [texto, tom] = textos[b.rateio_situacao] ?? ['Rateio de crédito pedido ao banco: aguardando a confirmação do registro.', 'info'];
+  const conferir = (creditado) => async (e) => {
+    const r = await confirmar({
+      titulo: creditado ? 'O banco creditou o cliente' : 'O banco NÃO creditou o cliente',
+      texto: creditado ? 'Fica registrado como rateio feito. Nenhum PIX sai.' : 'O valor do cliente volta ao saldo dele e sai agora por PIX.',
+      confirmarTexto: creditado ? 'Confirmar' : 'Enviar por PIX', perigo: !creditado, campoMotivo: true,
+    });
+    if (r) acao(e.currentTarget, async () => {
+      await api.post(`/boletos/${b.id}/rateio/conferir`, { creditado: String(creditado), observacao: r.motivo });
+      toast(creditado ? 'Rateio confirmado.' : 'O valor segue por PIX para o cliente.', 'ok');
+      recarregar();
+    });
+  };
+  return el('div', {},
+    aviso(texto, tom),
+    b.rateio_situacao === 'a_confirmar' && pode('conciliacao.operar')
+      ? el('div', { class: 'acoes', style: 'margin:8px 0 4px' },
+        el('button', { class: 'botao sec', onclick: conferir(true) }, icone('ok'), 'Banco creditou o cliente'),
+        el('button', { class: 'botao perigo', onclick: conferir(false) }, 'Banco não creditou: enviar por PIX'))
+      : null);
 }
 
 function liquidarManual(b, recarregar) {

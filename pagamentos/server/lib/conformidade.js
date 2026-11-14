@@ -480,6 +480,28 @@ const REGRAS = [
     },
   },
   {
+    id: 'rateio-plano-b',
+    grupo: 'regulatorio',
+    tipo: 'automatica',
+    titulo: 'Rateio que não deu certo: o cliente recebe por PIX',
+    norma: 'Manual CNAB 400 do Bradesco, registro 3 do retorno (status/motivo do rateio, posições 159-160)',
+    exige: 'Banco recusou ou não fez o rateio: o valor vai por PIX na hora. Banco não informou: a equipe confere no extrato antes de qualquer PIX (para não pagar duas vezes).',
+    verificar(db) {
+      const aConfirmar = db.prepare("SELECT COUNT(*) AS n, MIN(liquidado_em) AS desde FROM boletos WHERE rateio_situacao = 'a_confirmar'").get();
+      const falhos = db.prepare(`SELECT COUNT(*) AS n FROM boletos WHERE rateio_situacao IN ('recusado', 'nao_efetuado')
+        AND COALESCE(liquidado_em, confirmado_em, criado_em) >= datetime('now', '-30 days')`).get().n;
+      const motivo = falhos ? db.prepare(`SELECT rateio_motivo AS m, COUNT(*) AS n FROM boletos WHERE rateio_situacao IN ('recusado', 'nao_efetuado')
+        AND rateio_motivo IS NOT NULL GROUP BY rateio_motivo ORDER BY n DESC LIMIT 1`).get()?.m : null;
+      if (aConfirmar.n) {
+        const texto = `${plural(aConfirmar.n, 'boleto pago está', 'boletos pagos estão')} sem o banco dizer se creditou o cliente. Confira no extrato do Bradesco e informe em Boletos.`;
+        // Mais de um dia sem conferir: ou o cliente está sem receber, ou o dinheiro dele está parado conosco.
+        return aConfirmar.desde < new Date(Date.now() - 24 * 3600_000).toISOString() ? fora(texto) : atencao(texto);
+      }
+      if (falhos) return atencao(`${plural(falhos, 'rateio não deu certo', 'rateios não deram certo')} nos últimos 30 dias e ${falhos === 1 ? 'foi' : 'foram'} por PIX. Motivo mais comum: ${motivo ?? 'não informado'}.`);
+      return ok('Nenhum rateio pendente de conferência nem com falha nos últimos 30 dias.');
+    },
+  },
+  {
     id: 'recebimento-terceiros',
     grupo: 'regulatorio',
     tipo: 'acompanhamento',

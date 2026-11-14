@@ -118,3 +118,111 @@ test('rateio de crédito no fluxo: emissão, liquidação e nada parado', async 
     assert.equal(api.db.prepare('SELECT situacao FROM repasses WHERE cliente_id = ?').get(c.cliente.id).situacao, 'confirmado');
   });
 });
+
+/**
+ * Plano B: o Bradesco faz o rateio; se não der certo, a PAY AX manda por PIX. Se o banco não disser
+ * nada, ninguém presume nada — a equipe confere no extrato, para não pagar duas vezes.
+ */
+test('rateio que não deu certo: o cliente recebe por PIX', async (t) => {
+  const api = await iniciar();
+  t.after(() => api.fechar());
+  const arquivos = require('../server/lib/arquivosBanco');
+  const tk = await api.equipe();
+  const conta = await api.conta(tk.admin);
+  await api.precoPadrao(tk.admin, { tarifa_fixa: '1,99', percentual: '0', tarifa_liquidacao: '0' });
+  const versao = api.db.prepare('SELECT versao FROM contas_bancarias WHERE id = ?').get(conta.id).versao;
+  await api.patch(`/api/contas/${conta.id}`, { rateio_contratado: '1', versao }, tk.admin);
+  const c = await api.cliente(tk.admin, { razao_social: 'Connect Link Telecom Ltda', pix_chave: '', destino_banco: '237', destino_agencia: '1234',
+    destino_agencia_dv: '5', destino_conta: '98765', destino_conta_dv: '0', destino_titular: 'Connect Link Telecom Ltda' });
+  const contaRow = api.db.prepare('SELECT * FROM contas_bancarias WHERE id = ?').get(conta.id);
+
+  let n = 0;
+  const retorno = (registros) => arquivos.processarRetorno(api.db, gerarRetorno(contaRow, registros, { gerado_em: hoje(), credito_em: hoje(), sequencial: ++n }), { nome: `ret-${n}` });
+  const emitir = async () => {
+    const b = await api.boleto(tk.admin, c.cliente.id, { valor: '100,00', vencimento: somarDias(hoje(), 5) });
+    return api.db.prepare('SELECT * FROM boletos WHERE id = ?').get(b.id);
+  };
+  const pago = (b, extra = {}) => ({ nosso_numero: b.nosso_numero, nosso_numero_dv: b.nosso_numero_dv, ocorrencia: '06', ocorrido_em: hoje(),
+    vencimento: b.vencimento, valor_centavos: 10000, pago_centavos: 10000, creditado_em: hoje(), ...extra });
+  const linha = (id) => api.db.prepare('SELECT rateio_situacao, rateio_motivo FROM boletos WHERE id = ?').get(id);
+  // O PIX que saiu por causa do boleto: o repasse criado depois da liquidação dele.
+  const pixDe = (boletoId) => api.db.prepare(`SELECT * FROM repasses WHERE cliente_id = ? AND id > IFNULL((SELECT MAX(id) FROM repasses
+    WHERE cliente_id = ? AND criado_em < (SELECT liquidado_em FROM boletos WHERE id = ?)), 0) ORDER BY id LIMIT 1`).get(c.cliente.id, c.cliente.id, boletoId);
+  const transferidoHoje = () => repassesLib.resumoCliente(api.db, api.db.prepare('SELECT * FROM clientes WHERE id = ?').get(c.cliente.id)).transferido_hoje_centavos;
+  const regra = async () => (await api.get('/api/conformidade', tk.admin)).dados.grupos.flatMap((g) => g.regras).find((x) => x.id === 'rateio-plano-b');
+
+  await t.test('banco aceitou e rateou: nenhum PIX', async () => {
+    const b = await emitir();
+    retorno([{ ...pago(b), ocorrencia: '02', rateio: { motivo: '00' } }]);
+    assert.equal(linha(b.id).rateio_situacao, 'aceito');
+    retorno([pago(b, { rateio: { valor_centavos: 9801, motivo: '39', credito_em: hoje() } })]);
+    assert.equal(linha(b.id).rateio_situacao, 'efetuado');
+    await repassesLib.rotinaAutomatica(api.db);
+    assert.equal(pixDe(b.id), undefined, 'o banco pagou: a PAY AX não manda nada');
+    assert.equal(transferidoHoje(), 9801);
+  });
+
+  await t.test('banco recusou o rateio no registro: o boleto vale, e o pagamento vai por PIX', async () => {
+    const b = await emitir();
+    const r = retorno([{ ...pago(b), ocorrencia: '02', rateio: { motivo: '17' } }]);
+    assert.equal(linha(b.id).rateio_situacao, 'recusado');
+    assert.match(linha(b.id).rateio_motivo, /^17 Dígito da conta/);
+    assert.ok(api.db.prepare('SELECT detalhe FROM retornos WHERE id = ?').get(r.id).detalhe.includes('recusado'), 'aparece no detalhe do retorno');
+    retorno([pago(b)]);
+    assert.equal(linha(b.id).rateio_situacao, 'nao_efetuado');
+    await repassesLib.rotinaAutomatica(api.db);
+    const pix = pixDe(b.id);
+    assert.equal(pix?.situacao, 'confirmado', 'plano B: PIX');
+    assert.equal(pix.valor_centavos, 9801);
+    assert.equal(transferidoHoje(), 9801 * 2);
+  });
+
+  await t.test('banco aceitou, mas no pagamento não rateou (conta encerrada): vai por PIX', async () => {
+    const b = await emitir();
+    retorno([pago(b, { rateio: { valor_centavos: 0, motivo: '41' } })]);
+    assert.equal(linha(b.id).rateio_situacao, 'nao_efetuado');
+    assert.equal(api.db.prepare("SELECT COUNT(*) AS n FROM lancamentos WHERE boleto_id = ? AND tipo = 'repasse'").get(b.id).n, 0);
+    await repassesLib.rotinaAutomatica(api.db);
+    assert.equal(pixDe(b.id)?.valor_centavos, 9801);
+    assert.equal((await regra()).situacao, 'atencao', 'a Conformidade mostra que o rateio falhou');
+  });
+
+  let semResposta;
+  await t.test('banco não disse se rateou: nada de PIX até a equipe conferir', async () => {
+    semResposta = await emitir();
+    retorno([pago(semResposta)]); // sem registro 3
+    assert.equal(linha(semResposta.id).rateio_situacao, 'a_confirmar');
+    await repassesLib.rotinaAutomatica(api.db);
+    assert.equal(pixDe(semResposta.id), undefined, 'não presume: PIX aqui podia ser pagamento em dobro');
+    const painel = (await api.get('/api/painel', tk.admin)).dados;
+    assert.ok(painel.alertas.some((a) => a.tipo === 'rateio_a_confirmar'));
+    assert.equal((await regra()).situacao, 'atencao');
+    api.db.prepare('UPDATE boletos SET liquidado_em = ? WHERE id = ?').run(new Date(Date.now() - 2 * 86400_000).toISOString(), semResposta.id);
+    assert.equal((await regra()).situacao, 'fora', 'mais de um dia sem conferir');
+  });
+
+  await t.test('conferido no extrato: não creditado → o valor vai por PIX, sem contar duas vezes', async () => {
+    const antes = transferidoHoje();
+    const r = await api.post(`/api/boletos/${semResposta.id}/rateio/conferir`, { creditado: 'false', observacao: 'Sem crédito na conta da Connect no extrato de hoje' }, tk.financeiro);
+    assert.equal(r.status, 200, JSON.stringify(r.dados));
+    assert.equal(r.dados.devolvido_centavos, 9801);
+    const pix = api.db.prepare("SELECT * FROM repasses WHERE cliente_id = ? ORDER BY id DESC LIMIT 1").get(c.cliente.id);
+    assert.equal(pix.situacao, 'confirmado');
+    assert.equal(pix.valor_centavos, 9801);
+    assert.equal(transferidoHoje(), antes, 'o crédito do banco que não houve sai da conta; entra o PIX');
+    assert.equal(linha(semResposta.id).rateio_situacao, 'nao_efetuado');
+    assert.equal((await api.post(`/api/boletos/${semResposta.id}/rateio/conferir`, { creditado: 'false', observacao: 'de novo' }, tk.financeiro)).status, 409);
+    const hist = (await api.get('/cliente/api/repasses', c.token)).dados;
+    assert.ok(!hist.itens.some((i) => i.meio === 'rateio' && i.nosso_numero === semResposta.nosso_numero), 'some do histórico como crédito do banco');
+  });
+
+  await t.test('conferido no extrato: creditado → fica como rateio feito', async () => {
+    const b = await emitir();
+    retorno([pago(b)]);
+    const r = await api.post(`/api/boletos/${b.id}/rateio/conferir`, { creditado: 'true', observacao: 'Crédito de R$ 98,01 na conta da Connect' }, tk.financeiro);
+    assert.equal(r.dados.rateio_situacao, 'efetuado');
+    await repassesLib.rotinaAutomatica(api.db);
+    assert.equal(pixDe(b.id), undefined);
+    assert.equal((await api.post(`/api/boletos/${b.id}/rateio/conferir`, { creditado: 'true', observacao: 'x' }, tk.consulta)).status, 403);
+  });
+});

@@ -70,6 +70,9 @@ async function alertas(db, hoje, perfil) {
   if (falhas) lista.push({ tipo: 'boletos_falha', severidade: 'erro', quantidade: falhas, texto: `${falhas} boleto(s) não registrados no banco` });
   const repasseFalho = db.prepare("SELECT COUNT(*) AS n FROM repasses WHERE situacao = 'falhou'").get().n;
   if (repasseFalho) lista.push({ tipo: 'repasses_falha', severidade: 'erro', quantidade: repasseFalho, texto: `${repasseFalho} repasse(s) com falha no envio` });
+  const rateioAConfirmar = db.prepare("SELECT COUNT(*) AS n FROM boletos WHERE rateio_situacao = 'a_confirmar'").get().n;
+  if (rateioAConfirmar) lista.push({ tipo: 'rateio_a_confirmar', severidade: 'erro', quantidade: rateioAConfirmar,
+    texto: `${rateioAConfirmar} boleto(s) pago(s) sem o banco dizer se creditou o cliente: confira no extrato` });
   const negativos = db.prepare(`SELECT COUNT(*) AS n FROM (SELECT cliente_id, SUM(valor_centavos) AS s FROM lancamentos GROUP BY cliente_id HAVING s < 0)`).get().n;
   if (negativos) lista.push({ tipo: 'saldo_negativo', severidade: 'aviso', quantidade: negativos, texto: `${negativos} cliente(s) com saldo negativo` });
   const semConta = db.prepare('SELECT COUNT(*) AS n FROM contas_bancarias WHERE ativa = 1').get().n;

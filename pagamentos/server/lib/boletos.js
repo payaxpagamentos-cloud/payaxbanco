@@ -280,7 +280,21 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
     });
     // Rateio de crédito: a parte do cliente é o que o BANCO creditou na conta dele (retorno, registro 3)
     // ou, sem o retorno, o percentual registrado aplicado ao valor pago. A PAY AX fica com o resto.
-    if (b.rateio_ppm) {
+    //
+    // Plano B: se o banco recusou o rateio no registro, ou disse no pagamento que não rateou, o valor
+    // inteiro caiu na conta da PAY AX — segue o caminho normal e vai por PIX para o cliente na hora.
+    // Se o banco não disse nada (retorno sem o registro 3), não se presume nada: fica "a confirmar"
+    // até a equipe conferir no extrato, porque mandar PIX de algo que o banco já pagou é pagar duas vezes.
+    const rateioFalhou = b.rateio_situacao === 'recusado' || pagamento.rateio === 'nao_efetuado';
+    let rateioSituacao = null;
+    if (b.rateio_ppm && rateioFalhou) {
+      rateioSituacao = 'nao_efetuado';
+      split.rateio_plano_b = true;
+    } else if (b.rateio_ppm) {
+      // Baixa lançada à mão no simulador: o próprio simulador é o banco, o rateio acontece. Retorno sem
+      // o registro 3, ou baixa à mão com banco de verdade: ninguém confirmou — "a confirmar".
+      const simulado = origem !== 'retorno' && config.banco.modo === 'simulador';
+      rateioSituacao = pagamento.rateio === 'efetuado' || simulado ? 'efetuado' : 'a_confirmar';
       const rateado = Number.isInteger(pagamento.rateio_centavos) ? pagamento.rateio_centavos : Math.round((valorPago * b.rateio_ppm) / 1_000_000);
       split.liquido_centavos = Math.max(0, Math.min(rateado, valorPago));
       split.comissao_centavos = Math.max(0, valorPago - split.tarifa_banco_centavos - split.liquido_centavos);
@@ -289,6 +303,7 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
       split.margem_centavos = split.receita_centavos - split.custo_banco_centavos;
       split.rateio = true;
     }
+    if (rateioSituacao) split.rateio_situacao = rateioSituacao;
     // Liberação = o dia em que o banco credita na conta da PAY AX. A partir daí o dinheiro é do
     // cliente e segue para ele na rodada de repasse seguinte — não fica parado conosco.
     //  - data de crédito informada pelo banco (retorno CNAB, aviso da API): vale ela;
@@ -318,8 +333,41 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
         descricao: `Creditado pelo Bradesco direto na conta do cliente (rateio de crédito) ${ref}` });
       db.prepare('UPDATE boletos SET rateado_em = ? WHERE id = ?').run(agora(), b.id);
     }
+    if (rateioSituacao) {
+      const motivo = pagamento.rateio_motivo ?? (b.rateio_situacao === 'recusado' ? b.rateio_motivo : null);
+      db.prepare('UPDATE boletos SET rateio_situacao = ?, rateio_motivo = ? WHERE id = ?').run(rateioSituacao, motivo, b.id);
+    }
 
     return { boleto_id: b.id, cliente_id: b.cliente_id, pago_em: pagoEm, liberacao, origem, ...split };
+  });
+}
+
+/**
+ * Rateio "a confirmar" (o banco não disse se creditou o cliente): a equipe confere no extrato do
+ * Bradesco e informa o que viu.
+ *  - creditado: o banco pagou o cliente; nada mais a fazer.
+ *  - não creditado: o valor está na conta da PAY AX. Um ajuste devolve a parte do cliente ao saldo
+ *    dele, liberada hoje, e a rodada de repasse leva por PIX — o plano B.
+ */
+function conferirRateio(db, boletoId, { creditado, observacao }, usuario = null) {
+  return transacao(db, () => {
+    const b = db.prepare('SELECT * FROM boletos WHERE id = ?').get(boletoId);
+    if (!b) throw naoEncontrado('Boleto');
+    if (b.rateio_situacao !== 'a_confirmar') throw new ErroNegocio('Este boleto não tem rateio a confirmar.', 409);
+    const obs = v.texto(observacao, 'o que foi conferido no extrato', 200);
+    if (creditado) {
+      db.prepare("UPDATE boletos SET rateio_situacao = 'efetuado', rateio_motivo = ? WHERE id = ?").run(`Conferido no extrato: ${obs}`, b.id);
+      return { boleto_id: b.id, rateio_situacao: 'efetuado' };
+    }
+    const saida = db.prepare("SELECT IFNULL(-SUM(valor_centavos), 0) AS v FROM lancamentos WHERE boleto_id = ? AND tipo = 'repasse' AND repasse_id IS NULL").get(b.id).v;
+    const data = hoje();
+    if (saida > 0) {
+      razao.lancar(db, { cliente_id: b.cliente_id, boleto_id: b.id, tipo: 'ajuste', valor_centavos: saida, data_competencia: data, data_liberacao: data,
+        criado_por: usuario?.id ?? null,
+        descricao: `O banco não creditou o rateio ${febraban.formatarNossoNumero(b.nosso_numero, b.nosso_numero_dv)}: o valor segue por PIX` });
+    }
+    db.prepare("UPDATE boletos SET rateio_situacao = 'nao_efetuado', rateio_motivo = ?, rateado_em = NULL WHERE id = ?").run(`Conferido no extrato: ${obs}`, b.id);
+    return { boleto_id: b.id, cliente_id: b.cliente_id, rateio_situacao: 'nao_efetuado', devolvido_centavos: saida };
   });
 }
 
@@ -392,4 +440,4 @@ function situacaoVisivel(b, data = hoje()) {
   return b.situacao;
 }
 
-module.exports = { emitir, encargos, LIMITES_ENCARGOS, beneficiarioFinal, liquidar, estornarLiquidacao, baixar, valorAtualizado, situacaoVisivel, contaDe, credenciaisDaConta, proximoNossoNumero, validarEntrada, hoje };
+module.exports = { emitir, encargos, LIMITES_ENCARGOS, beneficiarioFinal, liquidar, estornarLiquidacao, baixar, valorAtualizado, situacaoVisivel, contaDe, credenciaisDaConta, proximoNossoNumero, validarEntrada, hoje, conferirRateio };
