@@ -12,6 +12,7 @@ const { ErroNegocio, naoEncontrado } = require('./erros');
 const v = require('./validacao');
 const datas = require('./datas');
 const febraban = require('./febraban');
+const cnab400 = require('./cnab400');
 const precos = require('./precos');
 const razao = require('./razao');
 const { criarBanco } = require('./bradesco');
@@ -81,12 +82,44 @@ function validarEntrada(dados, cliente) {
     pagador_bairro: v.opcional(dados.pagador_bairro, 'o bairro', 40),
     pagador_cidade: v.opcional(dados.pagador_cidade, 'a cidade', 40),
     pagador_uf: v.ufOpcional(dados.pagador_uf),
-    juros_mes_ppm: dados.juros_mes === undefined || dados.juros_mes === null || dados.juros_mes === '' ? 0 : v.percentual(dados.juros_mes, 'os juros ao mês', { max: 10 }),
-    multa_ppm: dados.multa === undefined || dados.multa === null || dados.multa === '' ? 0 : v.percentual(dados.multa, 'a multa', { max: 10 }),
+    ...encargos(dados),
     desconto_centavos: desconto,
     desconto_ate: descontoAte,
     dias_baixa: v.inteiroOpcional(dados.dias_baixa, 'os dias para baixa', { min: 0, max: 999 }) ?? 60,
     mensagem: v.opcional(dados.mensagem, 'a mensagem', 160),
+  };
+}
+
+// ---------------------------------------------------------------- Encargos por atraso
+/**
+ * Tetos de multa e juros. O sistema não emite boleto acima deles.
+ *
+ *  - MULTA: 2% do valor. Código de Defesa do Consumidor, art. 52, § 1º: em relação de consumo,
+ *    a multa de mora não pode passar de 2%. Os clientes da PAY AX são provedores, e quem paga o
+ *    boleto é, quase sempre, o consumidor final.
+ *  - JUROS DE MORA: 1% ao mês, proporcional aos dias de atraso. É o teto usual em cobrança de
+ *    consumidor; qualquer valor acima precisa de análise jurídica antes de entrar aqui.
+ *
+ * Valem para todo pagador, pessoa física ou jurídica: na dúvida, o limite menor. Se o advogado
+ * liberar outro teto para cobrança entre empresas, é aqui que muda.
+ */
+const LIMITES_ENCARGOS = Object.freeze({ multa: 2, juros_mes: 1 });
+
+const vazio = (x) => x === undefined || x === null || x === '';
+
+/** Valida multa e juros contra os tetos. Devolve em ppm, como o título guarda. */
+function encargos(dados) {
+  const pct = (valor, nome, teto, mensagem) => {
+    if (vazio(valor)) return 0;
+    const ppm = v.percentual(valor, nome, { max: 100 });
+    if (ppm > teto * 10000) throw new ErroNegocio(mensagem, 422);
+    return ppm;
+  };
+  return {
+    multa_ppm: pct(dados.multa, 'a multa', LIMITES_ENCARGOS.multa,
+      `A multa não pode passar de ${LIMITES_ENCARGOS.multa}% (Código de Defesa do Consumidor, art. 52, § 1º).`),
+    juros_mes_ppm: pct(dados.juros_mes, 'os juros', LIMITES_ENCARGOS.juros_mes,
+      `Os juros não podem passar de ${LIMITES_ENCARGOS.juros_mes}% ao mês.`),
   };
 }
 
@@ -136,6 +169,7 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
   const boleto = {
     ...entrada, nosso_numero: nossoNumero, cliente_id: cliente.id, conta_id: conta.id,
     ...beneficiarioFinal(cliente),
+    especie: cnab400.ESPECIE_PADRAO,
   };
 
   let registro = null;
@@ -159,18 +193,18 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
         cliente_id, conta_id, nosso_numero, nosso_numero_dv, seu_numero, origem, ixc_receber_id, ixc_cliente_id, tipo,
         pagador_nome, pagador_documento, pagador_email, pagador_telefone, pagador_cep, pagador_endereco, pagador_numero,
         pagador_bairro, pagador_cidade, pagador_uf,
-        beneficiario_final_nome, beneficiario_final_fantasia, beneficiario_final_documento,
+        beneficiario_final_nome, beneficiario_final_fantasia, beneficiario_final_documento, especie,
         valor_centavos, emissao, vencimento, juros_mes_ppm, multa_ppm, desconto_centavos, desconto_ate, dias_baixa, mensagem,
         codigo_barras, linha_digitavel, pix_txid, pix_emv, situacao, erro_registro, registrado_em,
         preco_id, tarifa_emissao_centavos, tarifa_liquidacao_centavos, percentual_ppm, comissao_minima_centavos,
         comissao_maxima_centavos, custo_liquidacao_centavos, criado_em, criado_por, criado_por_cliente)
-      VALUES (${Array(48).fill('?').join(', ')})
+      VALUES (${Array(49).fill('?').join(', ')})
       RETURNING id`).get(
       cliente.id, conta.id, nossoNumero, registro.nosso_numero_dv, entrada.seu_numero, origem,
       ixc.receber_id ? String(ixc.receber_id) : null, ixc.cliente_id ? String(ixc.cliente_id) : null, entrada.tipo,
       entrada.pagador_nome, entrada.pagador_documento, entrada.pagador_email, entrada.pagador_telefone, entrada.pagador_cep,
       entrada.pagador_endereco, entrada.pagador_numero, entrada.pagador_bairro, entrada.pagador_cidade, entrada.pagador_uf,
-      boleto.beneficiario_final_nome, boleto.beneficiario_final_fantasia, boleto.beneficiario_final_documento,
+      boleto.beneficiario_final_nome, boleto.beneficiario_final_fantasia, boleto.beneficiario_final_documento, boleto.especie,
       entrada.valor_centavos, entrada.emissao, entrada.vencimento, entrada.juros_mes_ppm, entrada.multa_ppm,
       entrada.desconto_centavos, entrada.desconto_ate, entrada.dias_baixa, entrada.mensagem,
       registro.codigo_barras, registro.linha_digitavel, registro.pix_txid ?? null, registro.pix_emv ?? null,
@@ -308,4 +342,4 @@ function situacaoVisivel(b, data = hoje()) {
   return b.situacao;
 }
 
-module.exports = { emitir, beneficiarioFinal, liquidar, estornarLiquidacao, baixar, valorAtualizado, situacaoVisivel, contaDe, credenciaisDaConta, proximoNossoNumero, validarEntrada, hoje };
+module.exports = { emitir, encargos, LIMITES_ENCARGOS, beneficiarioFinal, liquidar, estornarLiquidacao, baixar, valorAtualizado, situacaoVisivel, contaDe, credenciaisDaConta, proximoNossoNumero, validarEntrada, hoje };

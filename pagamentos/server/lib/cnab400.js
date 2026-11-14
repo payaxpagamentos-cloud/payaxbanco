@@ -57,6 +57,22 @@ const identificacaoEmpresa = (conta, tamanho) => {
 
 // ---------------------------------------------------------------- Ocorrências
 /** Comandos que mandamos na remessa. */
+/**
+ * Espécie do título. Os clientes da PAY AX vendem serviço (internet), então o padrão é
+ * DUPLICATA DE SERVIÇO: emitir duplicata mercantil sem venda de mercadoria descreve errado
+ * a operação que deu origem à cobrança (Lei 5.474/1968 separa as duas).
+ *   cnab400: tabela do campo 148-149 no manual do Bradesco (versão de março de 2023, pág. 9).
+ *   api:     tabela FEBRABAN usada pela API de cobrança — confirmar na homologação, como o resto
+ *            do corpo da API.
+ * Títulos antigos guardam a espécie com que foram registrados e continuam saindo com ela.
+ */
+const ESPECIES = Object.freeze({
+  DS: { nome: 'Duplicata de serviço', cnab400: '12', api: 4 },
+  DM: { nome: 'Duplicata mercantil', cnab400: '01', api: 2 },
+});
+const ESPECIE_PADRAO = 'DS';
+const especieDe = (b) => ESPECIES[b?.especie] ?? ESPECIES[ESPECIE_PADRAO];
+
 const COMANDO = { registrar: '01', baixar: '02', abatimento: '04', alterar_vencimento: '06', protestar: '09', sustar_protesto: '18' };
 
 /**
@@ -131,18 +147,25 @@ function headerRemessa(conta, { sequencial, hoje }) {
  * @param {object} conta conta bancária nossa
  */
 /**
- * Posições 335-394 como sacador avalista, no formato do Bradesco:
- *   335-349  CNPJ/CPF do sacador, com zeros à esquerda (15)
+ * Posições 335-394, "Beneficiário Final ou 2ª Mensagem" (manual CNAB 400 do Bradesco, março de
+ * 2023, pág. 19). Aqui vai o cliente, em nome de quem o boleto cobra:
+ *   335-349  CNPJ/CPF (15), montado da direita para a esquerda: 2 de controle, 4 de filial,
+ *            9 de CNPJ/CPF. No CPF, a filial vai com zeros.
  *   350-351  brancos (2)
- *   352-394  nome do sacador (43)
- * Aqui vai o cliente, em nome de quem o boleto cobra. Antes estas posições
- * levavam o bairro e a cidade do pagador como "2ª mensagem" — o banco já tira isso do CEP.
- * Sem cliente no título (não deveria acontecer), vão em branco, que o banco aceita.
+ *   352-394  nome do beneficiário final (43)
+ * O banco só aceita o campo se o convênio estiver cadastrado para isso (condição "S" ou "A"),
+ * por pedido na agência. Sem cliente no título (não deveria acontecer), vai em branco.
  */
+function inscricaoBeneficiarioFinal(documento) {
+  const d = so(documento);
+  if (d.length === 11) return d.slice(0, 9) + '0000' + d.slice(9); // CPF: base, filial zerada, controle
+  return d.slice(0, -6).padStart(9, '0') + d.slice(-6, -2) + d.slice(-2); // CNPJ: base, filial, controle
+}
+
 function sacadorAvalista(b) {
   const docBf = so(b.beneficiario_final_documento);
   if (!docBf) return ' '.repeat(60);
-  return numero(docBf, 15) + '  ' + texto(b.beneficiario_final_nome, 43);
+  return inscricaoBeneficiarioFinal(docBf) + '  ' + texto(b.beneficiario_final_nome, 43);
 }
 
 function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoje }) {
@@ -176,7 +199,7 @@ function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoj
     valor(b.valor_centavos, 13), // 127-139
     '000', // 140-142 banco encarregado da cobrança
     '00000', // 143-147 agência depositária
-    '01', // 148-149 espécie do título (01 = duplicata mercantil)
+    especieDe(b).cnab400, // 148-149 espécie do título (12 = duplicata de serviço)
     'N', // 150 aceite
     data(b.emissao), // 151-156
     b.dias_baixa ? '00' : '00', // 157-158 1ª instrução
@@ -193,7 +216,7 @@ function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoj
     texto(b.mensagem, 12), // 315-326 1ª mensagem
     cep.slice(0, 5), // 327-331
     cep.slice(5, 8), // 332-334
-    sacadorAvalista(b), // 335-394 sacador avalista (o cliente)
+    sacadorAvalista(b), // 335-394 beneficiário final (o cliente)
     numero(sequencial, 6), // 395-400
   ];
   return conferir(partes.join(''), `título ${b.nosso_numero}`);
@@ -288,5 +311,5 @@ function lerRetorno(conteudo) {
 /** Confere se um texto parece um retorno, sem lançar (usado ao varrer a pasta). */
 const pareceRetorno = (conteudo) => /^0.?2RETORNO/.test(String(conteudo ?? '').slice(0, 12));
 
-module.exports = { gerarRemessa, lerRetorno, pareceRetorno, headerRemessa, detalheRemessa, trailerRemessa,
+module.exports = { ESPECIES, ESPECIE_PADRAO, especieDe, gerarRemessa, lerRetorno, pareceRetorno, headerRemessa, detalheRemessa, trailerRemessa,
   COMANDO, OCORRENCIA, MOTIVO, texto, numero, valor, data, dataIso, identificacaoEmpresa };

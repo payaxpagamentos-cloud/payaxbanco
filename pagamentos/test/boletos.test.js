@@ -80,6 +80,30 @@ test('boletos: emissão, validações e ciclo de vida', async (t) => {
     assert.equal((await ruim({ desconto: '10,00' })).status, 422, 'desconto sem data limite');
   });
 
+  await t.test('multa e juros acima do que a lei permite não viram boleto', async () => {
+    const { dataLocal, somarDias } = require('../server/lib/datas');
+    const venc = somarDias(dataLocal('America/Sao_Paulo'), 30);
+    const emitir = (extra) => api.post('/api/boletos', { cliente_id: a.cliente.id, valor: '100,00', vencimento: venc,
+      pagador_nome: 'Fulano de Tal', pagador_documento: CPF, ...extra }, tk.admin);
+
+    const multa = await emitir({ multa: '2,5', juros_mes: '1' });
+    assert.equal(multa.status, 422);
+    assert.match(multa.dados.erro, /multa não pode passar de 2%.*Defesa do Consumidor/);
+
+    const juros = await emitir({ multa: '2', juros_mes: '1,5' });
+    assert.equal(juros.status, 422);
+    assert.equal(juros.dados.erro, 'Os juros não podem passar de 1% ao mês.');
+
+    const noLimite = await emitir({ multa: '2', juros_mes: '1' });
+    assert.equal(noLimite.status, 201, 'no teto, emite');
+  });
+
+  await t.test('a configuração do IXC também não aceita encargo fora da lei', async () => {
+    const r = await api.put(`/api/integracoes/ixc/${a.cliente.id}`, { url: 'https://ixc.exemplo.com.br', multa: '10', juros_mes: '1' }, tk.admin);
+    assert.equal(r.status, 422);
+    assert.match(r.dados.erro, /multa não pode passar de 2%/);
+  });
+
   await t.test('cliente suspenso não emite', async () => {
     const c = (await api.get(`/api/clientes/${a.cliente.id}`, tk.admin)).dados;
     await api.patch(`/api/clientes/${a.cliente.id}`, { situacao: 'suspenso', versao: c.versao }, tk.admin);
@@ -132,6 +156,8 @@ test('boletos: emissão, validações e ciclo de vida', async (t) => {
     assert.ok(ficha.includes('Provedor Alfa LTDA — CNPJ 11.122.233/0001-83'));
     // A PAY AX segue como beneficiário: é a dona do convênio e é o que o app do banco mostra.
     assert.ok(ficha.includes('PAY AX Brasil Ltda — CNPJ'));
+    // Provedor vende serviço: duplicata de serviço, não mercantil.
+    assert.match(ficha, /Espécie doc\.<\/span><span class="val">DS</);
     // Simulador: o boleto avisa que é teste.
     assert.match(ficha, /TESTE · NÃO PAGUE/);
 

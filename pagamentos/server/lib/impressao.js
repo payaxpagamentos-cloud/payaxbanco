@@ -12,12 +12,14 @@
  * o pagador veria um nome no boleto e outro no app, que é justamente o sinal que os bancos
  * ensinam a desconfiar (golpe do boleto).
  *
- * Os rótulos seguem a nomenclatura que veio com as Circulares do Banco Central 3.598/2012,
- * 3.656/2013 e 3.956/2019: Cedente virou BENEFICIÁRIO, Sacado virou PAGADOR e Sacador/Avalista
- * virou BENEFICIÁRIO FINAL. É também como o Bradesco chama o campo no layout CNAB 240. O
- * CNAB 400, mais antigo, ainda descreve as posições 335-394 como "sacador avalista": é o mesmo
- * campo, com o nome de antes. A confirmação final é o modelo de ficha que o Bradesco aprovar na
- * homologação; trocar o rótulo é trocar a constante ROTULO_BENEFICIARIO_FINAL.
+ * Os rótulos seguem a nomenclatura das Circulares do Banco Central 3.598/2012, 3.656/2013 e
+ * 3.956/2019, como o próprio manual CNAB 400 do Bradesco registra (versão de março de 2023,
+ * pág. 4): Cedente virou BENEFICIÁRIO, Sacado virou PAGADOR e Sacador/Avalista virou
+ * BENEFICIÁRIO FINAL. Se o modelo de ficha aprovado na homologação vier diferente, trocar o
+ * rótulo é trocar a constante ROTULO_BENEFICIARIO_FINAL.
+ *
+ * Orientação FEBRABAN (Comunicado FB-170/2005, citada no manual do Bradesco): o boleto não
+ * usa as expressões "taxa bancária" nem "tarifa bancária". Não acrescentar.
  */
 const QRCode = require('qrcode');
 const config = require('../config');
@@ -205,7 +207,7 @@ ${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não e
     <tr>
       <td>${campo('Data do documento', data(boleto.emissao))}</td>
       <td>${campo('Nº do documento', boleto.seu_numero || '—')}</td>
-      <td>${campo('Espécie doc.', boleto.especie || 'DM')}</td>
+      <td>${campo('Espécie doc.', boleto.especie || 'DS')}</td>
       <td>${campo('Aceite', 'N')}</td>
       <td>${campo('Data processamento', data(hoje))}</td>
       <td>${campo('Nosso número', nn)}</td>

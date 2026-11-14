@@ -173,9 +173,12 @@ Os rótulos seguem a nomenclatura das Circulares do Banco Central 3.598/2012, 3.
 | Sacado | **Pagador** | quem paga a conta |
 | Sacador/Avalista | **Beneficiário final** | o cliente (Connect Link, por exemplo) |
 
-O layout CNAB 400 do Bradesco ainda chama as posições 335-394 de "sacador avalista" — é o mesmo campo,
-com o nome antigo. A confirmação final é o modelo de ficha que o Bradesco aprovar na homologação; para
-trocar o rótulo, basta mudar a constante `ROTULO_BENEFICIARIO_FINAL` em `server/lib/impressao.js`.
+O próprio manual CNAB 400 do Bradesco (março de 2023) registra essa troca de nomes e chama as posições
+335-394 de "Beneficiário Final ou 2ª Mensagem". Se o modelo de ficha aprovado na homologação vier
+diferente, basta mudar a constante `ROTULO_BENEFICIARIO_FINAL` em `server/lib/impressao.js`.
+
+**Atenção:** o Bradesco só aceita o beneficiário final se o convênio estiver cadastrado para isso
+(condição "S" ou "A"), por pedido na agência. Sem esse cadastro, o campo é ignorado ou recusado.
 
 A demonstração já vem com **PAY AX Brasil Ltda**, mas com um **CNPJ fictício** (12.345.678/0001-95) e uma agência e
 conta de exemplo: troque pelos dados reais do convênio antes de emitir qualquer boleto de verdade. O mesmo nome é o
@@ -295,6 +298,28 @@ Para ligar a exigência, o próprio administrador precisa ter 2FA ativo: não d�
 | `PAYAX_CNPJ_FONTE` | `apibrasil` | Fonte da consulta de CNPJ: `apibrasil` ou `publica` (BrasilAPI). |
 | `PAYAX_CACHE_CEP_DIAS` / `PAYAX_CACHE_CNPJ_DIAS` | `180` / `30` | Validade do cache das consultas. |
 | `PAYAX_DADOS_TIMEOUT_MS` | `8000` | Tempo máximo de espera das consultas de CEP e CNPJ. |
+
+## Conformidade
+
+**Regra do projeto: nada no sistema fica fora das normas.** Toda regra legal implementada tem a fonte
+citada ao lado no código e um teste que falha se alguém a quebrar. Quando a norma não é clara, vale o
+limite mais conservador até o jurídico decidir.
+
+Legenda: ✅ atendido no sistema · 🏦 depende do Bradesco · ⚖️ depende de parecer jurídico · 🔧 falta construir
+
+| Norma | O que exige | Como o sistema atende | Situação |
+|---|---|---|---|
+| Circulares BCB 3.598/2012, 3.656/2013 e 3.956/2019 | Identificação de beneficiário, pagador e beneficiário final, com a nomenclatura nova | Nomes e CNPJ/CPF das três partes impressos e registrados; CPF/CNPJ do pagador obrigatório | ✅ |
+| Código de Defesa do Consumidor, art. 52, § 1º | Multa de mora de no máximo 2% | Emissão e configuração do IXC recusam acima de 2% | ✅ |
+| Juros de mora | Teto usual de 1% ao mês em cobrança de consumidor | Emissão e configuração do IXC recusam acima de 1% ao mês | ✅ ⚖️ confirmar se pode ser outro entre empresas |
+| Lei 5.474/1968 (duplicatas) | Duplicata de serviço para prestação de serviço | Espécie padrão DS (código 12 no CNAB 400) | ✅ 🏦 código da API a confirmar |
+| FEBRABAN, Comunicado FB-170/2005 | Boleto sem "taxa bancária" ou "tarifa bancária" | O boleto não usa essas expressões | ✅ |
+| Manual CNAB 400 do Bradesco (março de 2023) | Layout byte a byte; beneficiário final nas posições 335-394 | Posições conferidas contra o manual, com testes | ✅ 🏦 convênio precisa ser habilitado para beneficiário final |
+| LGPD (Lei 13.709/2018) | Dados mínimos, segurança, transparência, direitos do titular | Senhas com scrypt, credenciais cifradas, auditoria, duas etapas, consulta de CNPJ sem dados de sócios | ✅ 🔧 faltam aviso de privacidade ao pagador, política de retenção e canal para pedidos do titular |
+| Arranjos e instituições de pagamento (Lei 12.865/2013 e regras do BCB) | Quem guarda e movimenta dinheiro de terceiros segue regras próprias | A conta gráfica guarda o dinheiro dos clientes até o repasse | ⚖️ **o ponto principal**: autorização, segregação dos recursos ou parceria com instituição autorizada |
+| Uso de termos de instituição financeira | Só quem é autorizado se apresenta como banco | O sistema usa "Internet Bank" e "agência/conta" | ⚖️ confirmar; trocar os nomes é simples |
+| Prevenção à lavagem de dinheiro (Lei 9.613/1998) | Conhecer o cliente, monitorar operações atípicas, comunicar ao COAF quando couber | Cadastro com CNPJ validado | ⚖️ 🔧 sem rotinas de monitoramento ainda |
+| Regras da Anatel para cobrança de telecom | Documento de cobrança do provedor ao assinante | Responsabilidade do provedor; o boleto não substitui a fatura detalhada | ⚖️ do provedor |
 
 ## O que depende de terceiros (não incluído)
 

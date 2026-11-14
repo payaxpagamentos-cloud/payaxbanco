@@ -16,6 +16,7 @@ const crypto = require('node:crypto');
 const https = require('node:https');
 const config = require('../config');
 const febraban = require('./febraban');
+const cnab = require('./cnab400');
 const pix = require('./pix');
 const { ErroNegocio } = require('./erros');
 
@@ -124,7 +125,7 @@ function paraApi(boleto, conta) {
     dtVencimentoTitulo: dataBr(boleto.vencimento),
     tpVencimento: 0,
     vlNominalTitulo: boleto.valor_centavos,
-    cdEspecieTitulo: 2, // 02 = duplicata mercantil
+    cdEspecieTitulo: cnab.especieDe(boleto).api, // duplicata de serviço; ver ESPECIES em cnab400.js
     tpProtestoAutomaticoNegativacao: 0,
     prazoProtestoAutomaticoNegativacao: 0,
     controleParticipante: String(boleto.seu_numero ?? '').slice(0, 25),

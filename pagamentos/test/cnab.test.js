@@ -64,6 +64,21 @@ test('CNAB 400: o arquivo de remessa sai no formato que o banco aceita', async (
     assert.equal(campo(4, 17), '12345678000195');
   });
 
+  await t.test('beneficiário final pessoa física: filial zerada no meio, como manda o manual', () => {
+    const pf = { ...boleto, beneficiario_final_nome: 'Maria Souza', beneficiario_final_documento: '123.456.789-09' };
+    const l = cnab.gerarRemessa({ conta: CONTA, boletos: [pf], sequencial: 1, hoje: '2026-11-13' })
+      .conteudo.split('\r\n')[1];
+    assert.equal(l.slice(334, 349), '123456789' + '0000' + '09');
+  });
+
+  await t.test('espécie: duplicata de serviço (12); título antigo mantém a espécie registrada', () => {
+    const linha = (b) => cnab.gerarRemessa({ conta: CONTA, boletos: [b], sequencial: 1, hoje: '2026-11-13' })
+      .conteudo.split('\r\n')[1].slice(147, 149);
+    assert.equal(linha(boleto), '12', 'padrão: provedor vende serviço');
+    assert.equal(linha({ ...boleto, especie: 'DS' }), '12');
+    assert.equal(linha({ ...boleto, especie: 'DM' }), '01', 'o que já foi registrado como mercantil continua igual');
+  });
+
   await t.test('título sem sacador avalista deixa o campo em branco (o banco aceita)', () => {
     const semBf = { ...boleto, beneficiario_final_nome: null, beneficiario_final_documento: null };
     const l = cnab.gerarRemessa({ conta: CONTA, boletos: [semBf], sequencial: 1, hoje: '2026-11-13' })

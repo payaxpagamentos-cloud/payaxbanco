@@ -126,8 +126,11 @@ module.exports = (db) => {
     const cfg = {
       url: b.url ? v.url(b.url, 'o endereço do IXC') : undefined,
       tipo_padrao: v.opcao(b.tipo_padrao ?? 'bolepix', 'o tipo padrão', ['boleto', 'bolepix']),
-      juros_mes: b.juros_mes === undefined || b.juros_mes === '' ? 1 : Number(String(b.juros_mes).replace(',', '.')),
-      multa: b.multa === undefined || b.multa === '' ? 2 : Number(String(b.multa).replace(',', '.')),
+      // Mesmos tetos da emissão: uma configuração fora da lei faria todo título importado falhar.
+      ...(() => {
+        const e = boletosLib.encargos({ juros_mes: b.juros_mes ?? 1, multa: b.multa ?? 2 });
+        return { juros_mes: e.juros_mes_ppm / 10000, multa: e.multa_ppm / 10000 };
+      })(),
       mensagem: v.opcional(b.mensagem, 'a mensagem do boleto', 160),
       anotar_no_ixc: b.anotar_no_ixc === undefined ? true : v.booleano(b.anotar_no_ixc),
       importacao_automatica: v.booleano(b.importacao_automatica),
