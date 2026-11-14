@@ -121,6 +121,24 @@ fotos do disco, alarmes e verificação ~US$ 1–2). Nos primeiros meses, os cr�
 
 ---
 
+## Opção B, jeito rápido: um script cria tudo (CloudShell)
+
+Em vez dos passos 2 a 7 abaixo, um script cria tudo de uma vez: bucket, papel, grupo de segurança, servidor,
+IP fixo, alertas, foto diária do disco e orçamento.
+
+1. Faça o passo 1 (conta, MFA) e escolha a região **São Paulo** no console.
+2. Abra o **CloudShell**: ícone **`>_`** no topo do console. Abre um terminal já conectado à conta.
+3. **Ações → Carregar arquivo** → envie o pacote `payax-pagamentos-AAAAMMDD-HHMM.tar.gz`.
+4. Cole (troque o e-mail):
+
+```bash
+tar xzf payax-pagamentos-*.tar.gz && cd payax-pagamentos-*/
+bash implantacao/criar-aws.sh --email-alertas ti@payax.com.br
+```
+
+No fim ele mostra o **IP fixo**, o **bucket** e o comando exato do passo 8 (instalar). Pode rodar de novo sem
+duplicar nada. Depois: confirme o e-mail de alertas, crie o registro no DNS (passo 6) e siga o passo 8.
+
 ## Opção B, passo a passo
 
 ### 1. Conta AWS
