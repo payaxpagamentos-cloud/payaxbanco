@@ -178,6 +178,13 @@ fi
 grep -q 'VERSION_ID="24.04"' /etc/os-release || echo "Aviso: testado para Ubuntu 24.04 LTS." >&2
 export DEBIAN_FRONTEND=noninteractive
 
+# Máquina pequena (2 GB): 2 GB de memória de troca evitam que a instalação das dependências falhe por falta de RAM.
+if ! swapon --show | grep -q . && [[ $(awk '/MemTotal/ {print $2}' /proc/meminfo) -lt 3000000 ]]; then
+  passo "Memória de troca (2 GB)"
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 passo "Pacotes do sistema"
 apt-get update -q
 apt-get install -y -q ca-certificates curl gnupg openssl rsync sqlite3 ufw caddy

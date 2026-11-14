@@ -24,9 +24,13 @@ Etapas 1 e 2 usam os mesmos scripts desta pasta. A 3 é um projeto à parte, qua
 - Tem tudo o que as três etapas precisam: servidor (EC2), armazenamento (S3), IP fixo, cofre de segredos e, na
   etapa 3, PostgreSQL gerenciado em duas zonas.
 - O AWS fatura clientes brasileiros em reais, com nota fiscal — confirme na contratação.
-- **Custo da etapa 1**, ordem de grandeza: algo como **US$ 60 a 100 por mês** (servidor `t3.medium`, disco de
-  80 GB, S3, IP fixo). Confira na calculadora do AWS (calculator.aws) antes de contratar. A reserva da etapa 2,
-  desligada, custa só o disco.
+- **Custo da etapa 1 (configuração de início)**, ordem de grandeza: **US$ 25 a 35 por mês** — servidor `t4g.small`
+  (2 vCPU, 2 GB, processador ARM, o mais barato que roda o sistema com folga), disco de 30 GB, IP fixo e as cópias
+  no S3 (centavos). Contas novas do AWS costumam ganhar créditos de boas-vindas. Confira na calculadora do AWS
+  (calculator.aws) antes de contratar.
+- **Crescer é trocar o tamanho, não reinstalar**: com a máquina desligada, *Ações → Configurações da instância →
+  Alterar tipo* (ex.: `t4g.medium`, 4 GB) e aumentar o disco em *Volumes → Modificar*. Minutos, sem perder nada.
+- A reserva da etapa 2, desligada, custa só o disco (poucos dólares).
 
 ## O que ter em mãos
 
@@ -43,7 +47,7 @@ Etapas 1 e 2 usam os mesmos scripts desta pasta. A 3 é um projeto à parte, qua
 1. Em **aws.amazon.com/pt**, *Criar uma conta da AWS*, com os dados da PAY AX (CNPJ).
 2. Entre como usuário raiz e ative a **MFA** (autenticação em duas etapas): canto superior direito → *Credenciais
    de segurança* → *Atribuir dispositivo de MFA*.
-3. Em **Billing → Budgets**, crie um orçamento mensal com alerta por e-mail (ex.: US$ 150). Evita surpresa na fatura.
+3. Em **Billing → Budgets**, crie um orçamento mensal com alerta por e-mail (ex.: US$ 50). Evita surpresa na fatura.
 4. No canto superior direito do console, escolha a região **América do Sul (São Paulo)**. Tudo abaixo é nela.
 
 ### 2. Bucket S3 (onde ficam as cópias)
@@ -74,11 +78,11 @@ Etapas 1 e 2 usam os mesmos scripts desta pasta. A 3 é um projeto à parte, qua
 ### 4. O servidor
 **EC2 → Executar instância**:
 - Nome: `payax-pagamentos-1`.
-- Imagem: **Ubuntu Server 24.04 LTS** (64 bits x86).
-- Tipo: **t3.medium** (2 vCPU, 4 GB).
+- Imagem: **Ubuntu Server 24.04 LTS**, arquitetura **64 bits (Arm)**.
+- Tipo: **t4g.small** (2 vCPU, 2 GB). Quando o volume pedir, troque para `t4g.medium` sem reinstalar.
 - Par de chaves: *Prosseguir sem um par de chaves* — o acesso é pelo navegador (Session Manager), sem porta SSH aberta.
 - Rede: *Criar grupo de segurança* permitindo **HTTPS** e **HTTP** de qualquer lugar. **Desmarque o SSH.**
-- Armazenamento: **80 GB, gp3, criptografado**.
+- Armazenamento: **30 GB, gp3, criptografado** (dá para aumentar depois sem desligar).
 - Detalhes avançados: *Perfil de instância do IAM* = **PayaxPagamentosServidor**; *Proteção contra encerramento* = ativada.
 
 ### 5. IP fixo
