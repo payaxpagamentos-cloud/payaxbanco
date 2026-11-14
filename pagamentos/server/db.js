@@ -496,7 +496,7 @@ CREATE INDEX idx_boletos_aguardando ON boletos(situacao, remessa_id);
     versao: 6,
     nome: 'beneficiario-final',
     sql: `
--- Sacador/avalista: o cliente em nome de quem o boleto cobra. O título é registrado no
+-- Beneficiário final (o antigo sacador/avalista): o cliente em nome de quem o boleto cobra. O título é registrado no
 -- convênio da PAY AX (que fica como beneficiário), e o cliente vai junto, registrado no banco
 -- e impresso no boleto, para o pagador saber a quem está pagando.
 -- Congelado na emissão, como o preço: o boleto continua mostrando quem cobrava naquele dia,

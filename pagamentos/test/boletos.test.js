@@ -121,14 +121,14 @@ test('boletos: emissão, validações e ciclo de vida', async (t) => {
     assert.ok(r.dados.includes(b.linha_digitavel.slice(0, 5)));
   });
 
-  await t.test('o cliente é o sacador/avalista: congelado no título e em destaque no boleto', async () => {
+  await t.test('o cliente é o beneficiário final: congelado no título e em destaque no boleto', async () => {
     const b = await api.boleto(tk.admin, a.cliente.id, { valor: '89,90', vencimento: '2026-12-28' });
     const ficha = (await api.get(`/api/boletos/${b.id}/ficha`, tk.admin)).dados;
     // Abre a página com o nome que o pagador reconhece.
     assert.match(ficha, /Cobrança de<\/span>\s*<span class="nome">Alfa Net</);
     // Nas duas vias, com razão social e CNPJ.
-    assert.ok((ficha.match(/Sacador\/Avalista/g) || []).length >= 2, 'nas duas vias');
-    assert.ok(!ficha.includes('Beneficiário final'), 'o termo do banco, não o apelido');
+    assert.ok((ficha.match(/Beneficiário final/g) || []).length >= 2, 'nas duas vias');
+    assert.ok(!/Sacador\/Avalista/.test(ficha), 'o nome atual, não o antigo');
     assert.ok(ficha.includes('Provedor Alfa LTDA — CNPJ 11.122.233/0001-83'));
     // A PAY AX segue como beneficiário: é a dona do convênio e é o que o app do banco mostra.
     assert.ok(ficha.includes('PAY AX Brasil Ltda — CNPJ'));

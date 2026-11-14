@@ -163,12 +163,19 @@ As quatro cobranças do produto, para não confundir:
 
 A razão social, o CNPJ e o endereço impressos no campo **Beneficiário** vêm do cadastro da conta bancária, em
 **Contas e preços → conta**. O cliente que originou a cobrança abre o boleto em destaque ("Cobrança de Connect Link") e vai no
-campo **Sacador/Avalista** das duas vias — e também é registrado assim no banco, na remessa CNAB e na API.
+campo **Beneficiário final** das duas vias — e também é registrado assim no banco, na remessa CNAB e na API.
 
-Os rótulos seguem os termos do layout do Bradesco: **Beneficiário** (a PAY AX, dona do convênio),
-**Pagador** e **Sacador/Avalista**. "Beneficiário final" é um nome popular para o sacador/avalista, mas
-não é o termo do banco. Quem decide o rótulo é o modelo de ficha que o Bradesco aprovar na homologação;
-para trocar, basta mudar a constante `ROTULO_SACADOR` em `server/lib/impressao.js`.
+Os rótulos seguem a nomenclatura das Circulares do Banco Central 3.598/2012, 3.656/2013 e 3.956/2019:
+
+| Nome antigo | Nome atual | No nosso boleto |
+|---|---|---|
+| Cedente | **Beneficiário** | PAY AX, dona do convênio |
+| Sacado | **Pagador** | quem paga a conta |
+| Sacador/Avalista | **Beneficiário final** | o cliente (Connect Link, por exemplo) |
+
+O layout CNAB 400 do Bradesco ainda chama as posições 335-394 de "sacador avalista" — é o mesmo campo,
+com o nome antigo. A confirmação final é o modelo de ficha que o Bradesco aprovar na homologação; para
+trocar o rótulo, basta mudar a constante `ROTULO_BENEFICIARIO_FINAL` em `server/lib/impressao.js`.
 
 A demonstração já vem com **PAY AX Brasil Ltda**, mas com um **CNPJ fictício** (12.345.678/0001-95) e uma agência e
 conta de exemplo: troque pelos dados reais do convênio antes de emitir qualquer boleto de verdade. O mesmo nome é o
