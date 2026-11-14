@@ -302,11 +302,13 @@ test('Rastreador', async (t) => {
     assert.equal(loc.dados.status, 'pendente');
 
     await enviar(loginGt06(IMEI, 1));
-    await esperar(() => gt.extrair(recebido).quadros.length >= 2);
+    // No login chegam o comando pendente e a configuração automática (dormir conectado + perfil de envio), uma vez só.
+    await esperar(() => gt.extrair(recebido).quadros.length >= 5);
     let qs = gt.extrair(recebido).quadros;
     assert.deepEqual([qs[0].protocolo, qs[0].serial], [0x01, 1], 'confirmação do login');
-    assert.equal(qs[1].protocolo, 0x80);
-    assert.equal(qs[1].conteudo.subarray(5, qs[1].conteudo.length - 2).toString(), 'WHERE#');
+    const textos = qs.slice(1).map((q) => { assert.equal(q.protocolo, 0x80); return q.conteudo.subarray(5, q.conteudo.length - 2).toString(); });
+    assert.deepEqual([...textos].sort(), ['HBT,30,300#', 'SZCS#SLPDISCONNECT=0', 'TIMER,30,300#', 'WHERE#']);
+    assert.ok(api.db.prepare('SELECT configurado_em FROM rastreadores WHERE imei = ?').get(IMEI).configurado_em);
     assert.equal(api.db.prepare('SELECT status FROM comandos WHERE id = ?').get(loc.dados.id).status, 'enviado');
     assert.ok(api.gt06.conectado(IMEI));
 
@@ -805,6 +807,30 @@ test('Rastreador', async (t) => {
     assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'desbloquear' }, cliente)).status, 201);
     db.prepare("UPDATE comandos SET status = 'cancelado' WHERE veiculo_id = ? AND status IN ('pendente','enviado')").run(veiculo);
     db.prepare('UPDATE veiculos SET bloqueado = 0 WHERE id = ?').run(veiculo);
+  });
+
+  await t.test('aparelho trocado na oficina: aparece como provável troca e o master troca o IMEI em um clique', async () => {
+    const { receber } = require('../server/lib/posicoes');
+    const db = api.db;
+    const NOVO = '860755518110002';
+    const p = db.prepare('SELECT lat, lng FROM veiculos WHERE id = ?').get(veiculo);
+    const fix = (imei) => receber(db, { imei, protocolo: 'gt06', lat: p.lat, lng: p.lng + 0.001, velocidade_kmh: 0, ignicao: false, gps_em: new Date().toISOString() });
+    db.prepare('UPDATE rastreadores SET ultima_comunicacao = ? WHERE id = ?').run(new Date(Date.now() - 3_600_000).toISOString(), rastreador);
+    assert.equal(fix(NOVO).status, 'desconhecido');
+    const desc = (await api.get('/master/desconhecidos', master)).dados.find((d) => d.imei === NOVO);
+    assert.equal(desc.sugestoes[0].id, rastreador, 'o rastreador que parou de falar antes é a troca provável');
+    assert.equal((await api.post(`/master/rastreadores/${rastreador}/trocar-imei`, { imei: NOVO }, cliente)).status, 403, 'só a plataforma');
+    assert.equal((await api.post(`/master/rastreadores/${rastreador}/trocar-imei`, { imei: '123' }, master)).status, 422);
+    assert.equal((await api.post(`/master/rastreadores/${rastreador}/trocar-imei`, { imei: NOVO }, master)).status, 204);
+    const r = db.prepare('SELECT imei, configurado_em FROM rastreadores WHERE id = ?').get(rastreador);
+    assert.equal(r.imei, NOVO);
+    assert.equal(r.configurado_em, null, 'o aparelho novo recebe a configuração automática');
+    assert.ok(!db.prepare('SELECT 1 FROM desconhecidos WHERE imei = ?').get(NOVO));
+    assert.notEqual(fix(NOVO).status, 'desconhecido', 'as posições do aparelho novo já caem no veículo');
+    assert.equal(veic().teste_bloqueio_ok, null, 'o aparelho novo precisa do teste de bloqueio');
+    // Volta o aparelho original para os próximos testes.
+    assert.equal((await api.post(`/master/rastreadores/${rastreador}/trocar-imei`, { imei: IMEI }, master)).status, 204);
+    db.prepare("UPDATE rastreadores SET configurado_em = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").run(rastreador);
   });
 
   await t.test('segurança: estacionado, sumiço suspeito, bloqueio programado com código do motorista e WhatsApp', async () => {

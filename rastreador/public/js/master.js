@@ -259,6 +259,21 @@ async function telaRastreadores(ctx) {
     return r ? api.put(`/master/rastreadores/${r.id}`, corpo) : api.post('/master/rastreadores', corpo);
   });
 
+  // O aparelho que apareceu substitui um rastreador cadastrado (mesmo veículo, mesmo histórico, IMEI novo).
+  async function trocarAparelho(x) {
+    const todos = (await api.get('/master/rastreadores?situacao=instalado')).filter((r) => r.protocolo === x.protocolo);
+    const sugeridos = new Set((x.sugestoes ?? []).map((s) => s.id));
+    const ordem = [...(x.sugestoes ?? []).map((s) => todos.find((r) => r.id === s.id)).filter(Boolean), ...todos.filter((r) => !sugeridos.has(r.id))];
+    // Chave em texto ("r12"): com número, o navegador reordenaria as opções e a troca provável deixaria de vir primeiro.
+    const opcoes = Object.fromEntries(ordem.map((r) => [`r${r.id}`, `${r.placa ? placa(r.placa) : 'sem veículo'} · ${r.empresa ?? ''} · IMEI ${r.imei} · ${r.ultima_comunicacao ? `última comunicação ${desde(r.ultima_comunicacao)}` : 'nunca comunicou'}${sugeridos.has(r.id) ? ' (provável)' : ''}`]));
+    if (!ordem.length) { toast('Nenhum rastreador instalado para trocar.', true); return; }
+    const r = await formModal(`Trocar aparelho · IMEI ${x.imei}`, () => [
+      el('p', { class: 'mudo', style: 'margin:0' }, 'Escolha o rastreador que este aparelho substitui. O veículo, o histórico e os comandos que esperavam continuam; o aparelho novo recebe a configuração automática e precisa do teste de bloqueio.'),
+      escolha('Substitui o rastreador', 'id', opcoes, `r${ordem[0].id}`),
+    ], (d) => api.post(`/master/rastreadores/${String(d.id).slice(1)}/trocar-imei`, { imei: x.imei }), { rotulo: 'Trocar aparelho' });
+    if (r) { toast('Aparelho trocado. Ele aparece no veículo na próxima mensagem.'); carregar(); }
+  }
+
   async function carregar() {
     const [rs, desc] = await Promise.all([api.get(`/master/rastreadores${qs(estado)}`), api.get('/master/desconhecidos')]);
     limpar(lista, tabela(['IMEI', 'Modelo', 'Protocolo', 'Chip', 'Empresa', 'Veículo', 'Última comunicação', '^Ações'], rs.map((r) => el('tr', {},
@@ -276,11 +291,13 @@ async function telaRastreadores(ctx) {
           carregar();
         }, 'perigo') : null))), 'Nenhum rastreador.'));
     limpar(desconhecidos, desc.length ? cartao('Equipamentos não cadastrados',
-      el('p', { class: 'mudo', style: 'margin-top:0' }, 'Tentaram enviar posições sem estar cadastrados. Cadastre para começar a receber.'),
+      el('p', { class: 'mudo', style: 'margin-top:0' }, 'Tentaram enviar posições sem estar cadastrados. Aparelho novo: Cadastrar. Aparelho trocado num veículo (oficina, defeito): Trocar aparelho, que mantém o veículo e o histórico.'),
       tabela(['IMEI', 'Protocolo', 'IP', 'Primeiro contato', 'Último contato', '>Mensagens', '^Ações'], desc.map((x) => el('tr', {},
-        td(el('span', { class: 'mono' }, x.imei)), td(PROTOCOLOS[x.protocolo] ?? x.protocolo), td(el('span', { class: 'mono pequeno' }, x.ip ?? '—')),
+        td([el('span', { class: 'mono' }, x.imei), x.sugestoes?.[0] ? el('div', { class: 'pequeno' }, etiqueta(`troca provável: ${placa(x.sugestoes[0].placa)}`, 'aviso')) : null]),
+        td(PROTOCOLOS[x.protocolo] ?? x.protocolo), td(el('span', { class: 'mono pequeno' }, x.ip ?? '—')),
         td(dataHora(x.primeiro_contato)), td(desde(x.ultimo_contato)), td(inteiro(x.mensagens), 'dir num'),
         el('td', { class: 'acoes' }, botao('Cadastrar', 'primario', async () => { if (await form(null, { imei: x.imei, protocolo: x.protocolo })) { toast('Rastreador cadastrado.'); carregar(); } }),
+          botao('Trocar aparelho', '', () => trocarAparelho(x)),
           botaoIcone('lixo', 'Ignorar', async () => { await api.del(`/master/desconhecidos/${encodeURIComponent(x.imei)}`); carregar(); }, 'perigo')))))) : null);
   }
   limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'gap:18px' },

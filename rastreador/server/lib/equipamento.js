@@ -86,4 +86,28 @@ const textoRele = (rastreador, tipo) => {
   return tipo === 'bloquear' ? corta : libera;
 };
 
-module.exports = { PERFIS, PERSEGUICAO, AJUSTES, AJUSTES_PLATAFORMA, CONSULTAS, lerResposta, textoRele };
+/**
+ * Primeira conexão de um rastreador instalado (ou depois de trocar o aparelho): manda a configuração que deixa os comandos
+ * rápidos. O aparelho de fábrica dorme desconectado quando parado (o comando espera ele acordar); aqui ele passa a dormir
+ * conectado e a enviar no perfil escolhido. Nunca atrapalha o login: qualquer erro só deixa para a próxima conexão.
+ */
+function configurarNovo(db, imei) {
+  try {
+    const r = db.prepare('SELECT * FROM rastreadores WHERE imei = ?').get(String(imei));
+    if (!r || r.protocolo !== 'gt06' || r.configurado_em) return 0;
+    const veiculo = db.prepare('SELECT * FROM veiculos WHERE rastreador_id = ? AND ativo = 1').get(r.id);
+    if (!veiculo) return 0; // no estoque: configura quando for instalado
+    // Em Modo Roubo o intervalo é o da perseguição: não mexe.
+    if (db.prepare("SELECT 1 FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(veiculo.id)) return 0;
+    const com = require('./comandos');
+    const ajustes = [...AJUSTES.sono('online'), ...AJUSTES.perfil(r.perfil)];
+    for (const c of ajustes) com.criar(db, veiculo, { tipo: 'personalizado', texto: c.texto, rotulo: `Configuração automática: ${c.rotulo}` }, null);
+    db.prepare("UPDATE rastreadores SET configurado_em = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").run(r.id);
+    return ajustes.length;
+  } catch (err) {
+    console.error('[Rastreador] Configuração automática do rastreador:', err.message);
+    return 0;
+  }
+}
+
+module.exports = { PERFIS, PERSEGUICAO, AJUSTES, AJUSTES_PLATAFORMA, CONSULTAS, lerResposta, textoRele, configurarNovo };

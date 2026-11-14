@@ -18,9 +18,17 @@ const db = abrir();
 const extras = {};
 // Com o serviço GT06 separado no ar, ele cuida dos rastreadores (e eles não caem quando o painel reinicia numa atualização).
 const servicoGt06 = require('./lib/servicoGt06');
+// Com o serviço separado, cada comando novo é avisado a ele na hora (ele entrega em milissegundos).
+let avisando = false;
+function avisarServico() {
+  if (avisando) return;
+  avisando = true;
+  require('./lib/comandos').canal.on('comando', ({ protocolo }) => { if (protocolo === 'gt06') servicoGt06.avisarComando(); });
+}
 if (config.portaGt06 > 0 && servicoGt06.ativo()) {
   extras.gt06 = servicoGt06.ponte();
   console.log('[Rastreador] GT06: rastreadores atendidos pelo serviço separado (rastreador-gt06).');
+  avisarServico();
 } else if (config.portaGt06 > 0) {
   extras.gt06 = iniciarGt06(db, config.portaGt06);
   extras.gt06.servidor.on('listening', () => console.log(`[Rastreador] GT06 (TCP): porta ${config.portaGt06}`));
@@ -33,6 +41,7 @@ if (extras.gt06 && !extras.gt06.separado) {
     clearInterval(timerDevolver);
     const proprio = extras.gt06;
     extras.gt06 = servicoGt06.ponte();
+    avisarServico();
     Promise.resolve(proprio.fechar()).catch(() => {});
     console.log('[Rastreador] GT06: serviço separado no ar; o painel devolveu a porta a ele.');
   }, 5000);

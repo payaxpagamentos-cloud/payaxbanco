@@ -286,7 +286,34 @@ module.exports = (db, extras = {}) => {
     res.status(204).end();
   });
 
-  r.get('/desconhecidos', (_req, res) => res.json(db.prepare('SELECT * FROM desconhecidos ORDER BY ultimo_contato DESC LIMIT 500').all()));
+  // Cada equipamento não cadastrado vem com as prováveis trocas: rastreadores instalados do mesmo protocolo que pararam de
+  // falar antes dele aparecer (o aparelho trocado na oficina, por exemplo), do mais recente para o mais antigo.
+  r.get('/desconhecidos', (_req, res) => {
+    const sugerir = db.prepare(`SELECT r.id, r.imei, r.modelo, r.ultima_comunicacao, v.placa, e.nome AS empresa FROM rastreadores r
+      JOIN veiculos v ON v.rastreador_id = r.id AND v.ativo = 1 JOIN empresas e ON e.id = v.empresa_id
+      WHERE r.protocolo = ? AND (r.ultima_comunicacao IS NULL OR r.ultima_comunicacao <= ?) ORDER BY r.ultima_comunicacao DESC LIMIT 3`);
+    res.json(db.prepare('SELECT * FROM desconhecidos ORDER BY ultimo_contato DESC LIMIT 500').all()
+      .map((x) => ({ ...x, sugestoes: sugerir.all(x.protocolo, x.primeiro_contato) })));
+  });
+
+  /**
+   * Aparelho trocado (oficina, defeito): o rastreador cadastrado passa a ser o aparelho novo (IMEI novo), no mesmo veículo,
+   * com o histórico e os comandos que ainda esperavam. Na próxima conexão ele recebe a configuração automática.
+   */
+  r.post('/rastreadores/:id/trocar-imei', (req, res) => {
+    const atual = rastreador(req.params.id);
+    const imei = String(req.body?.imei ?? '').replace(/\D/g, '');
+    v.exigir(/^\d{15}$/.test(imei), 'O IMEI tem 15 números.');
+    v.exigir(!db.prepare('SELECT 1 FROM rastreadores WHERE imei = ?').get(imei), 'Este IMEI já está cadastrado em outro rastreador.');
+    transacao(db, () => {
+      db.prepare('UPDATE rastreadores SET imei = ?, configurado_em = NULL, firmware = NULL, saude = NULL, saude_em = NULL WHERE id = ?').run(imei, atual.id);
+      db.prepare('DELETE FROM desconhecidos WHERE imei = ?').run(imei);
+      // O aparelho novo ainda não fez o teste de bloqueio.
+      db.prepare('UPDATE veiculos SET teste_bloqueio_ok = NULL, teste_bloqueio_em = NULL WHERE rastreador_id = ?').run(atual.id);
+    });
+    registrar(db, req, 'rastreador_imei_trocado', { de: atual.imei, para: imei }, atual.empresa_id);
+    res.status(204).end();
+  });
   r.delete('/desconhecidos/:imei', (req, res) => {
     db.prepare('DELETE FROM desconhecidos WHERE imei = ?').run(String(req.params.imei));
     res.status(204).end();

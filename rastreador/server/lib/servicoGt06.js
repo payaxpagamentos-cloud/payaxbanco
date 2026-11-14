@@ -17,6 +17,8 @@ const config = require('../config');
 const PASTA = path.dirname(config.dbFile);
 const SITUACAO = path.join(PASTA, 'gt06-servico.json');
 const REINICIAR = path.join(PASTA, 'gt06-reiniciar');
+// O painel grava aqui quando cria um comando: o serviço vê na hora (sem esperar a próxima conferência do banco).
+const AVISO_COMANDO = 'gt06-comando';
 const VIVO_MS = 15_000;
 
 function ler() {
@@ -54,5 +56,16 @@ function digital(arquivos) {
   return h.digest('hex');
 }
 const pedirReinicio = () => fs.writeFileSync(REINICIAR, new Date().toISOString());
+const avisarComando = () => { try { fs.writeFileSync(path.join(PASTA, AVISO_COMANDO), String(Date.now())); } catch { /* o serviço confere o banco de qualquer jeito */ } };
+/** No serviço: chama `fn` assim que o painel avisar de um comando novo. Devolve a função que para de vigiar. */
+function aoAvisoDeComando(fn) {
+  try {
+    const w = fs.watch(PASTA, (_ev, nome) => { if (nome === AVISO_COMANDO) fn(); });
+    w.on('error', () => {});
+    return () => w.close();
+  } catch {
+    return () => {};
+  }
+}
 
-module.exports = { ler, ativo, gravar, ponte, digital, pedirReinicio, SITUACAO, REINICIAR };
+module.exports = { ler, ativo, gravar, ponte, digital, pedirReinicio, avisarComando, aoAvisoDeComando, SITUACAO, REINICIAR };

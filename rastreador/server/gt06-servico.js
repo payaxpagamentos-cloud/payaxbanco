@@ -104,8 +104,10 @@ setInterval(() => {
   }
 }, 5000).unref();
 
-// Comandos criados pelo painel (outro processo) chegam pelo banco: entrega a cada segundo.
-setInterval(() => { try { gt06?.entregarPendentes(); } catch (err) { console.error('[Rastreador] Serviço GT06 (comandos):', err.message); } }, 1000);
+// Comandos criados pelo painel (outro processo) chegam pelo banco: o painel avisa na hora; a conferência a cada segundo é a reserva.
+const entregarAgora = () => { try { gt06?.entregarPendentes(); } catch (err) { console.error('[Rastreador] Serviço GT06 (comandos):', err.message); } };
+const pararAviso = servico.aoAvisoDeComando(entregarAgora);
+setInterval(entregarAgora, 1000);
 
 // O atualizador pede reinício só quando o código deste serviço mudou.
 setInterval(() => {
@@ -118,6 +120,7 @@ setInterval(() => {
 
 function encerrar() {
   clearTimeout(tentativa);
+  pararAviso();
   Promise.resolve(gt06?.fechar()).catch(() => {}).finally(() => {
     try { fs.unlinkSync(servico.SITUACAO); } catch { /* já apagado */ }
     try { db.close(); } catch { /* já fechado */ }

@@ -156,6 +156,11 @@ module.exports = (db, extras = {}) => {
       bloqueio_desativado: d.bloqueio_desativado !== undefined ? (v.booleano(d.bloqueio_desativado) ? 1 : 0) : atual?.bloqueio_desativado ?? 0,
     };
   };
+  // Rastreador instalado num veículo: recebe a configuração automática (dormir conectado e o perfil de envio).
+  const configurarInstalado = (rastreadorId) => {
+    const r = rastreadorId ? db.prepare('SELECT imei FROM rastreadores WHERE id = ?').get(rastreadorId) : null;
+    if (r) require('../lib/equipamento').configurarNovo(db, r.imei);
+  };
   const CAMPOS_VEICULO = ['placa', 'descricao', 'marca', 'modelo', 'cor', 'renavam', 'ano', 'tipo', 'rastreador_id', 'motorista_id', 'limite_velocidade_kmh', 'ativo', 'consumo_km_l', 'estacionado_auto', 'bloqueio_desativado'];
   const exigirLimite = (req, extra = 1) => {
     const n = db.prepare('SELECT COUNT(*) AS n FROM veiculos WHERE empresa_id = ? AND ativo = 1').get(eid(req)).n;
@@ -169,6 +174,7 @@ module.exports = (db, extras = {}) => {
       .run(eid(req), ...CAMPOS_VEICULO.map((k) => d[k]), Math.round(v.numero(req.body.hodometro_km || 0, 'o hodômetro', { min: 0, max: 10_000_000 }) * 1000), agora())
       .lastInsertRowid);
     registrar(db, req, 'veiculo_criado', { placa: d.placa });
+    configurarInstalado(d.rastreador_id);
     res.status(201).json({ id });
   });
 
@@ -205,6 +211,7 @@ module.exports = (db, extras = {}) => {
       if (desativando) db.prepare(`UPDATE comandos SET status = 'cancelado', respondido_em = ? WHERE veiculo_id = ? AND tipo IN ('bloquear','desbloquear')
         AND (status = 'pendente' OR (status = 'enviado' AND resposta IS NULL))`).run(agora(), atual.id);
     });
+    if (d.rastreador_id && d.rastreador_id !== atual.rastreador_id) configurarInstalado(d.rastreador_id);
     if (d.bloqueio_desativado !== atual.bloqueio_desativado) registrar(db, req, d.bloqueio_desativado ? 'bloqueio_desativado' : 'bloqueio_reativado', { placa: d.placa });
     registrar(db, req, 'veiculo_alterado', { placa: d.placa, campos: CAMPOS_VEICULO.filter((k) => d[k] !== atual[k]) });
     res.status(204).end();

@@ -245,6 +245,7 @@ function iniciarGt06(db, porta, { host } = {}) {
         if (anterior && anterior !== cx) anterior.socket.destroy();
         conexoes.set(d.imei, cx);
         receber(db, { imei: d.imei, protocolo: 'gt06', ip: socket.remoteAddress });
+        require('./equipamento').configurarNovo(db, d.imei);
         entregar(d.imei, { reenviar: true });
         return;
       }

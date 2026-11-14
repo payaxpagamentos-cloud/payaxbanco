@@ -187,21 +187,34 @@ export const reaisCampo = (c) => (c === null || c === undefined ? '' : ((c ?? 0)
 export const centavos = (txt) => (txt === '' || txt === undefined ? undefined : Math.round(Number(String(txt).replace(/\./g, '').replace(',', '.')) * 100));
 
 /** Repete fn a cada ms enquanto a página está visível (consulta o servidor para atualizar a tela). */
+// Depois de um comando, as telas que se repetem atualizam a cada segundo por um tempo (o resultado aparece na hora).
+const RAPIDO_MS = 1_000;
+const RAPIDO_POR_MS = 60_000;
+let rapidoAte = 0;
+window.addEventListener('rastreador:acelerar', () => { rapidoAte = Date.now() + RAPIDO_POR_MS; });
+
 export function repetir(fn, ms) {
   let parado = false;
   let timer;
   let primeira = true;
+  let rodando = false;
   const ciclo = async () => {
-    if (parado) return;
+    if (parado || rodando) return;
+    clearTimeout(timer);
+    rodando = true;
     if (document.visibilityState === 'visible') {
       // A primeira falha aparece (a tela ficaria em "Carregando…" sem explicação); as seguintes esperam a próxima tentativa.
       try { await fn(); } catch (err) { if (primeira) toast(err.message, true); }
       primeira = false;
     }
-    if (!parado) timer = setTimeout(ciclo, ms);
+    rodando = false;
+    if (!parado) timer = setTimeout(ciclo, Date.now() < rapidoAte ? Math.min(ms, RAPIDO_MS) : ms);
   };
+  // Comando enviado: atualiza já (mostra "bloqueando…") e segue no ritmo rápido.
+  const acelerar = () => { if (!parado) setTimeout(ciclo, 150); };
+  window.addEventListener('rastreador:acelerar', acelerar);
   ciclo();
-  return () => { parado = true; clearTimeout(timer); };
+  return () => { parado = true; clearTimeout(timer); window.removeEventListener('rastreador:acelerar', acelerar); };
 }
 
 /** Barra de uso (ex.: disco 0,42/1,00GB 42%). */

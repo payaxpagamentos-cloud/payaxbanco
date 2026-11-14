@@ -47,6 +47,11 @@ async function chamar(metodo, caminho, corpo, { bruto = false } = {}) {
     try { msg = (await resp.json()).erro || msg; } catch { /* sem corpo */ }
     throw new ErroApi(msg, resp.status);
   }
+  // Ação que mexe no veículo (comando, roubo, teste de bloqueio, liberação, estacionar): as telas abertas passam a se
+  // atualizar a cada segundo por um tempo, para o resultado aparecer assim que o aparelho responder.
+  if (metodo !== 'GET' && /\/(comandos|roubo|teste-bloqueio|liberacoes|estacionad|ficha|equipamento)/.test(caminho)) {
+    window.dispatchEvent(new CustomEvent('rastreador:acelerar'));
+  }
   if (bruto) return resp;
   if (resp.status === 204) return null;
   return resp.json();

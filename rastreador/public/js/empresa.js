@@ -131,6 +131,9 @@ export function detalheVeiculo(ctx, v, painel, fechar, { mostrarEmpresa = false 
       v.ocorrencia_tipo === 'manual' ? etiqueta(v.roubo === 'aguardando' ? 'corte aguardando velocidade segura' : STATUS_ROUBO[v.roubo]?.[0] ?? v.roubo, 'aviso') : null,
       v.ocorrencia_tipo === 'agenda' ? el('a', { class: 'etiqueta aviso', href: linkEmpresa('bloqueio-programado'), style: 'text-decoration:none' }, 'bloqueio programado') : null,
       !emRoubo ? etiquetaRele(v) : null,
+      // Comando esperando um aparelho que não fala há um tempo: diz o porquê da espera, em vez de só "bloqueando…".
+      v.rele_pendente && (!v.comunicacao_em || Date.now() - Date.parse(v.comunicacao_em) > 3 * 60_000)
+        ? etiqueta(`rastreador sem conexão ${v.comunicacao_em ? desde(v.comunicacao_em) : ''}: o comando sai quando ele conectar`, 'erro') : null,
       etiquetaTeste(v),
       v.estacionado ? el('a', { class: 'etiqueta info', href: linkEmpresa('estacionados'), style: 'text-decoration:none' }, 'estacionado') : null,
       v.alertas_pendentes ? el('a', { class: 'etiqueta aviso', href: linkEmpresa('alertas'), style: 'text-decoration:none' }, `${v.alertas_pendentes} alerta(s)`) : null],
