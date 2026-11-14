@@ -28,7 +28,7 @@ export default async function pld({ alvo, query, recarregar }) {
   montar(alvo,
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Prevenção à lavagem de dinheiro'),
-        el('p', {}, `Monitoramento de operações atípicas, análise e comunicação ao Coaf (Lei 9.613/1998). Última análise: ${r.ultimo_monitoramento ? dataHora(r.ultimo_monitoramento) : 'ainda não rodou'}.`)),
+        el('p', {}, `Monitoramento de operações atípicas e análise (Lei 9.613/1998). A comunicação ao Coaf é feita por uma pessoa, no SISCOAF, depois da análise — o sistema nunca envia nada sozinho. Última análise: ${r.ultimo_monitoramento ? dataHora(r.ultimo_monitoramento) : 'ainda não rodou'}.`)),
       analista() ? el('div', { class: 'acoes' },
         el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
           const out = await api.post('/pld/monitorar', {});
@@ -105,7 +105,7 @@ async function detalhe(id, recarregar) {
     }
     const arq = el('button', { class: 'botao sec' }, 'Arquivar');
     arq.addEventListener('click', () => executar(arq, 'arquivar', () => ({ justificativa: texto.value }), 'Alerta arquivado com a justificativa.'));
-    const com = el('button', { class: 'botao perigo' }, 'Comunicar ao Coaf');
+    const com = el('button', { class: 'botao perigo', title: 'Registra a decisão. O envio ao Coaf é feito por uma pessoa, no SISCOAF.' }, 'Decidir comunicar ao Coaf');
     com.addEventListener('click', () => executar(com, 'comunicar', () => ({ fundamentacao: texto.value }), 'Decisão registrada: comunique no SISCOAF em até 24 horas.'));
     acoes.push(arq, com);
   }

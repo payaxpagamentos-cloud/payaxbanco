@@ -371,7 +371,11 @@ jurídico confirma o enquadramento (acompanhamento na Conformidade).
 | Comunicar a não ocorrência (art. 11, III) | Declaração anual registrada em PLD → Comunicações |
 
 Fluxo de um alerta: **novo → em análise → arquivado** (com justificativa) **ou a comunicar → comunicado** (com
-protocolo). Os limites das regras ficam em **PLD → Parâmetros** e devem sair da política de PLD da empresa.
+protocolo).
+
+**A comunicação ao Coaf é manual, sempre depois da análise.** O monitoramento só levanta o alerta; quem decide é
+uma pessoa, e o envio é feito por ela no SISCOAF. O sistema **nunca envia nada ao Coaf sozinho**: ele guarda a
+análise e a decisão, conta as 24 horas, cobra no painel e registra o protocolo informado. Os limites das regras ficam em **PLD → Parâmetros** e devem sair da política de PLD da empresa.
 
 **Suspensão de repasse por ordem legal** (decisão judicial, indisponibilidade de ativos): a única exceção ao repasse
 imediato. Fica registrada com motivo e documento, e o valor aparece na Conformidade como "retido por ordem legal",
