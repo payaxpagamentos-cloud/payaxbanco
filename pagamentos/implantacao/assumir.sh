@@ -12,6 +12,9 @@ ETC=/etc/payax
 [[ -f "$ETC/pagamentos.env" && -f /etc/litestream.yml ]] || { echo "Este servidor não foi preparado como reserva (instalar.sh --reserva)." >&2; exit 1; }
 BUCKET="$(awk '/bucket:/ {print $2; exit}' /etc/litestream.yml)"
 REGIAO="$(awk '/region:/ {print $2; exit}' /etc/litestream.yml)"
+ENDPOINT="$(awk '/endpoint:/ {print $2; exit}' /etc/litestream.yml)"
+# Modo VPS: as chaves do armazenamento das cópias.
+if [[ -f "$ETC/copias.env" ]]; then set -a; . "$ETC/copias.env"; set +a; fi
 
 echo "Este servidor vai virar o PRINCIPAL. O principal antigo está DESLIGADO?"
 read -r -p "Digite ASSUMIR para continuar: " resposta
@@ -22,7 +25,7 @@ systemctl stop payax-pagamentos litestream 2>/dev/null || true
 if [[ -f "$DADOS/payax.db" ]]; then mv "$DADOS/payax.db" "$DADOS/payax.db.reserva-$(date +%Y%m%d%H%M%S)"; rm -f "$DADOS/payax.db-wal" "$DADOS/payax.db-shm"; fi
 litestream restore -config /etc/litestream.yml "$DADOS/payax.db" \
   || { echo "Falha ao restaurar. Nada foi iniciado: confira o acesso ao bucket $BUCKET." >&2; exit 1; }
-aws s3 sync "s3://$BUCKET/pagamentos/pastas" "$DADOS" --region "$REGIAO" --only-show-errors
+aws s3 sync "s3://$BUCKET/pagamentos/pastas" "$DADOS" --region "$REGIAO" ${ENDPOINT:+--endpoint-url "$ENDPOINT"} --only-show-errors
 chown -R payax:payax "$DADOS"
 sqlite3 "$DADOS/payax.db" 'PRAGMA integrity_check;' | grep -qx ok || { echo "O banco restaurado não passou na conferência de integridade. Nada foi iniciado." >&2; exit 1; }
 
@@ -35,5 +38,6 @@ systemctl enable --now litestream payax-copia-pastas.timer caddy
 systemctl restart caddy
 
 echo
-echo "Falta UM passo no console do AWS: EC2 → IPs elásticos → associar o IP da PAY AX a ESTE servidor."
-echo "Sem isso, o endereço continua apontando para o servidor antigo (guia, seção 'Se o servidor principal cair')."
+echo "Falta UM passo: apontar o endereço para ESTE servidor —"
+echo "  AWS: EC2 → IPs elásticos → associar o IP da PAY AX a este servidor;"
+echo "  VPS: no DNS, trocar o IP de pagamentos.payax.com.br pelo IP deste servidor e avisar o novo IP ao Bradesco e aos IXC."

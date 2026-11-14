@@ -18,7 +18,66 @@ pronta*, não dois ativos ao mesmo tempo. Os scripts recusam subir um segundo at
 
 Etapas 1 e 2 usam os mesmos scripts desta pasta. A 3 é um projeto à parte, quando chegar a hora.
 
-## Onde: AWS, região São Paulo
+## Onde: duas opções, o mesmo instalador
+
+| | **A — Econômica (recomendada para começar)** | **B — AWS** |
+|---|---|---|
+| Servidor | VPS com data center em **São Paulo** (ex.: Hostinger KVM 2: 2 vCPU, 8 GB, 100 GB) | EC2 `t4g.small` em São Paulo |
+| Cópias do banco | **Magalu Cloud Object Storage**, região `br-se1` (São Paulo) | S3 em São Paulo |
+| Segredos do sistema | Cifrados com uma **frase de recuperação** da PAY AX, guardados junto das cópias | Parameter Store do AWS |
+| Custo/mês (ordem de grandeza) | **~R$ 40 a 60** (VPS no plano anual + centavos de armazenamento) | ~US$ 25 a 35 |
+| Recuperação automática de hardware | Depende do provedor | Sim (alarme do passo 7) |
+| Crescer | Trocar de plano no painel do provedor | Trocar o tipo da máquina |
+
+**Os dois mantêm os dados no Brasil** — as cópias levam nome e CPF de pagadores, e guardar no exterior traria as
+exigências de transferência internacional da LGPD. Preços de VPS costumam ser promocionais no primeiro ciclo
+(plano anual) e subir na renovação: confira no site do provedor antes de contratar.
+
+Daqui a pouco, quando o volume e o caixa pedirem, migra-se para B sem reinstalar nada: o instalador é o mesmo e a
+cópia contínua leva o banco junto.
+
+---
+
+## Opção A, passo a passo
+
+### A1. Servidor (VPS)
+1. Contrate um VPS com **data center em São Paulo**, **Ubuntu 24.04**, pelo menos **2 vCPU e 4 GB** e **IPv4 dedicado**
+   (fixo) — é o IP que vai para o Bradesco e para os IXC.
+2. No painel do provedor: ative a **verificação em duas etapas** da conta e cadastre uma **chave SSH** para o acesso
+   (em vez de senha).
+3. No DNS do domínio, crie o registro **A**: `pagamentos` → o IP do VPS.
+
+### A2. Armazenamento das cópias (Magalu Cloud)
+1. Crie a conta em **magalu.cloud** com o CNPJ da PAY AX (cobrança em reais).
+2. **Object Storage → Criar bucket**, região **br-se1 (São Paulo)**, privado. Nome ex.: `payax-pagamentos-copias`.
+3. Crie uma **chave de API com acesso ao Object Storage** (leitura e gravação). O painel mostra a *Key ID* e a
+   *Key Secret* — tenha as duas à mão na instalação; não envie por e-mail nem mensagem.
+
+### A3. Instalar
+1. Envie o pacote para o servidor (pelo gerenciador de arquivos do painel do provedor, ou `scp`).
+2. Entre no servidor (terminal do painel ou SSH) e rode, trocando os valores:
+
+```bash
+cd /root && tar xzf payax-pagamentos-*.tar.gz && cd payax-pagamentos-*/
+sudo ./implantacao/instalar.sh --dominio pagamentos.payax.com.br --bucket payax-pagamentos-copias \
+  --email-admin ti@payax.com.br --endpoint https://br-se1.magaluobjects.com --regiao br-se1
+```
+
+O instalador pede:
+- a **Key ID** e a **Key Secret** do Magalu (ficam só no servidor, legíveis só pelo administrador);
+- uma **frase de recuperação** (mín. 16 caracteres), duas vezes. **Guarde num cofre da empresa**: sem ela, um servidor
+  novo não consegue ler as credenciais do banco gravadas no sistema.
+
+No fim ele **confere se a cópia do banco chegou** ao armazenamento e mostra a senha inicial do administrador.
+Depois, siga o *Primeiro acesso* (passo 9 da opção B — é igual).
+
+**Se o servidor cair (opção A):** contrate/recrie um VPS, aponte o DNS para o novo IP (e avise o Bradesco e os
+IXC), envie o pacote e rode o mesmo comando com **`--anterior-desligado`**. Ele pede a frase de recuperação,
+restaura o banco de segundos atrás e sobe.
+
+---
+
+## Opção B (AWS)
 
 - **São Paulo (`sa-east-1`)**: os dados ficam no Brasil e a latência até o Bradesco e os IXC é baixa.
 - Tem tudo o que as três etapas precisam: servidor (EC2), armazenamento (S3), IP fixo, cofre de segredos e, na
@@ -32,7 +91,7 @@ Etapas 1 e 2 usam os mesmos scripts desta pasta. A 3 é um projeto à parte, qua
   Alterar tipo* (ex.: `t4g.medium`, 4 GB) e aumentar o disco em *Volumes → Modificar*. Minutos, sem perder nada.
 - A reserva da etapa 2, desligada, custa só o disco (poucos dólares).
 
-## O que ter em mãos
+## Opção B: o que ter em mãos
 
 1. CNPJ e cartão de crédito da PAY AX.
 2. Acesso ao DNS do domínio (onde o `payax.com.br` está registrado), para criar `pagamentos.payax.com.br`.
@@ -41,7 +100,7 @@ Etapas 1 e 2 usam os mesmos scripts desta pasta. A 3 é um projeto à parte, qua
 
 ---
 
-## Etapa 1, passo a passo
+## Opção B, passo a passo
 
 ### 1. Conta AWS
 1. Em **aws.amazon.com/pt**, *Criar uma conta da AWS*, com os dados da PAY AX (CNPJ).
