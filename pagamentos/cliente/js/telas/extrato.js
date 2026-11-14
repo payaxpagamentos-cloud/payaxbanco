@@ -48,7 +48,7 @@ export default async function extrato({ alvo, query, recarregar }) {
       el('div', {}, el('h1', {}, 'Extrato'),
         el('p', {}, `De ${data(p.de)} a ${data(p.ate)} · ${numero(e.total)} lançamento(s)`))),
 
-    cartaoConta({ transferencias: conta.transferencias, codigo: conta.conta }),
+    cartaoConta({ transferencias: conta.transferencias, codigo: conta.codigo }),
 
     el('div', { style: 'margin-top:18px' }, form),
     abas,

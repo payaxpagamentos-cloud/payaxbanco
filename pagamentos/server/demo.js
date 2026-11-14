@@ -129,7 +129,7 @@ async function main() {
 
   console.log('\nAcesse:');
   console.log(`  Backoffice      http://localhost:${config.port}${config.basePath}/     admin@payax.local / ${config.admin.senha}`);
-  console.log(`  Internet Bank   http://localhost:${config.port}${config.clientePath}/  financeiro@alfanet.com.br / cliente2026`);
+  console.log(`  Área do Cliente   http://localhost:${config.port}${config.clientePath}/  financeiro@alfanet.com.br / cliente2026`);
   console.log('  Equipe: renata@ (financeiro), diego@ (operação), consulta@payax.local — senha payax2026');
 }
 

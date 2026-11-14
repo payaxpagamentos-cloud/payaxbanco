@@ -91,7 +91,7 @@ async function telaSeguranca(alvo, recarregar) {
         recarregar();
       }) }, icone('escudo'), d.exigir_2fa_equipe ? 'Deixar de exigir' : 'Exigir de toda a equipe') : null)),
 
-    el('div', { style: 'margin-top:18px' }, cartao('Acessos dos clientes ao Internet Bank', tabela({
+    el('div', { style: 'margin-top:18px' }, cartao('Acessos dos clientes à Área do Cliente', tabela({
       colunas: [
         { titulo: 'Cliente', conteudo: (u) => u.cliente },
         { titulo: 'Pessoa', conteudo: (u) => el('span', {}, u.nome, el('span', { class: 'sub' }, u.email)) },

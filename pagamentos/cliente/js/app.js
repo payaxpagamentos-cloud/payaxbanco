@@ -67,7 +67,7 @@ function estrutura(rota, principal) {
   const fundo = el('div', { class: 'fundo-menu', hidden: true, onclick: () => alternar(false) });
   const alternar = (abrir) => { menu.classList.toggle('aberto', abrir); fundo.hidden = !abrir; };
   menu.append(
-    el('a', { class: 'marca', href: '#/inicio' }, marcaMenu('INTERNET BANK')),
+    el('a', { class: 'marca', href: '#/inicio' }, marcaMenu('ÁREA DO CLIENTE')),
     el('div', { class: 'contexto' }, el('span', { class: 'logo' }, iniciais(u.cliente_nome)),
       el('div', {}, el('strong', {}, u.cliente_nome), el('small', {}, u.perfil_nome))));
   for (const [grupo, itens] of MENU) {
@@ -149,7 +149,7 @@ function formularioSenha(aoConcluir) {
 
 function trocarSenha() {
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('INTERNET BANK'),
+    marcaEntrada('ÁREA DO CLIENTE'),
     el('h1', {}, 'Crie a sua senha'),
     el('p', { class: 'apoio' }, 'Você entrou com a senha provisória. Escolha uma senha sua para continuar.'),
     formularioSenha(() => desenhar()))));
@@ -158,7 +158,7 @@ function trocarSenha() {
 /** Segunda etapa do login. */
 function telaDesafio(desafio) {
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('INTERNET BANK'),
+    marcaEntrada('ÁREA DO CLIENTE'),
     el('h1', {}, 'Verificação em duas etapas'),
     formularioDesafio(api, {
       desafio,
@@ -181,7 +181,7 @@ function telaEntrada() {
     return desenhar();
   });
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('INTERNET BANK'),
+    marcaEntrada('ÁREA DO CLIENTE'),
     el('h1', {}, 'Acesse a sua conta'),
     el('p', { class: 'apoio' }, 'Use o e-mail e a senha que a PAY AX enviou. Na primeira entrada você troca a senha.'),
     form, botao)));

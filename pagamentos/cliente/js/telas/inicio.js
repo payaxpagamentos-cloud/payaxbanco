@@ -20,11 +20,11 @@ export default async function inicio({ alvo }) {
   montar(alvo,
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, `Olá, ${d.cliente.nome_fantasia || d.cliente.razao_social}`),
-        el('p', {}, d.cliente.situacao === 'ativo' ? 'Tudo certo com a sua conta.' : `Situação da conta: ${d.cliente.situacao}.`))),
+        el('p', {}, d.cliente.situacao === 'ativo' ? 'Tudo certo com o seu cadastro.' : `Situação do cadastro: ${d.cliente.situacao}.`))),
 
-    d.cliente.situacao !== 'ativo' ? aviso(`A sua conta está com situação "${d.cliente.situacao}". Fale com o seu gerente.`, 'aviso') : null,
+    d.cliente.situacao !== 'ativo' ? aviso(`O seu cadastro está com situação "${d.cliente.situacao}". Fale com o seu gerente.`, 'aviso') : null,
 
-    cartaoConta({ transferencias: d.transferencias, codigo: d.cliente.conta }),
+    cartaoConta({ transferencias: d.transferencias, codigo: d.cliente.codigo }),
 
     proximaLiberacao
       ? el('div', { class: 'a-liberar' }, icone('relogio'),

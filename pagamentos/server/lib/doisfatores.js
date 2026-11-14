@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Autenticação em duas etapas por aplicativo (TOTP), igual para a equipe e para o Internet Bank.
+ * Autenticação em duas etapas por aplicativo (TOTP), igual para a equipe e para a Área do Cliente.
  * Quem aprova e envia repasse movimenta dinheiro de terceiros: uma senha só é pouco.
  */
 const QRCode = require('qrcode');

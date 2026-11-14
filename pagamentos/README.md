@@ -8,7 +8,7 @@ Dois acessos, com servidores de sessão separados:
 | Área | Endereço | Para quem |
 |---|---|---|
 | **Backoffice** | `/` (ou `/pagamentos`) | Nossa equipe: todos os clientes, todo o movimento, a receita e a margem. |
-| **Internet Bank** | `/cliente` (ou `/payax-cliente`) | O cliente final: os boletos dele, o saldo, o extrato e os repasses. |
+| **Área do Cliente** | `/cliente` (ou `/payax-cliente`) | O cliente final: os boletos dele, o extrato e as transferências para a conta dele. |
 
 > O token de uma área **não vale** na outra (audiências diferentes), e o cliente nunca enxerga o nosso custo com o
 > banco nem a nossa margem.
@@ -90,7 +90,7 @@ npm start        # http://localhost:3600
 ```
 
 Acesso inicial do Backoffice: `admin@payax.local` / `admin12345` (trocado no primeiro acesso).
-Com a demonstração, o Internet Bank fica em `http://localhost:3600/cliente/` com
+Com a demonstração, a Área do Cliente fica em `http://localhost:3600/cliente/` com
 `financeiro@alfanet.com.br` / `cliente2026`.
 
 ```bash
@@ -98,25 +98,28 @@ npm test          # 130 testes
 npm run migrar    # aplica as migrações sem subir o servidor
 ```
 
-## A conta do cliente na PAY AX
+## O código do cliente
 
-Cada cliente recebe, no cadastro, um número de conta **sequencial**: agência `001` com contas `0001`, `0002`,
-`0003`… Ao chegar em `9999`, a agência `002` abre sozinha e a numeração continua. O número é atribuído uma vez e
-**nunca muda**, nem quando o cadastro é alterado.
+Cada cliente recebe, no cadastro, um **código de controle sequencial**: `0001`, `0002`, `0003`… com dígito
+verificador. Depois de `9999` a sequência segue (`10000`, `10001`). O código é atribuído uma vez e **nunca muda**.
 
 ```
-Agência 001 · Conta 0001-3
-                       └── dígito verificador (módulo 11 sobre agência + conta)
+Código do cliente 0001-3
+                       └── dígito verificador (módulo 11)
 ```
 
-O dígito existe para pegar erro de digitação quando alguém informa a conta — inclusive a troca de dois dígitos de
-lugar, o engano mais comum ao ditar um número. O cliente vê a conta no alto do Internet Bank e em Cadastro; a
-equipe vê na lista, na ficha, e **busca por ela** (`0002` ou `001/0003` encontram o cliente).
+**Por que não é "agência e conta":** a PAY AX não é banco e não guarda saldo de cliente — o valor recebido vai na
+hora para a conta dele. Apresentar agência e conta, ou usar "banco"/"bank" no nome, sugeriria uma atividade que
+a PAY AX não exerce, e a Resolução Conjunta CMN/BCB nº 17/2025 veda termos que sugiram atividade sem autorização.
+Pelo mesmo motivo, a área do cliente se chama **Área do Cliente**. A Conformidade confere isso sozinha.
+
+O dígito existe para pegar erro de digitação quando alguém informa o código — inclusive a troca de dois dígitos de
+lugar, o engano mais comum ao ditar um número. O cliente vê o código no cartão da Área do Cliente e em Cadastro; a
+equipe vê na lista, na ficha, e **busca por ele** (`0002`, `2` ou `0002-8` encontram o cliente).
 
 > **Não confundir com a agência e a conta do Bradesco.** Aquelas são do convênio, vão dentro do código de barras
-> (posições 20-23 e 37-43) e é por elas que o banco identifica para onde o dinheiro vai. Esta é nossa, identifica a
-> conta gráfica do cliente e **não entra no boleto**. Um teste garante que a conta interna nunca aparece no código
-> de barras.
+> (posições 20-23 e 37-43) e é por elas que o banco identifica para onde o dinheiro vai. O código do cliente é
+> nosso, só de controle, e **não entra no boleto**. Um teste garante isso.
 
 Clientes cadastrados antes desta numeração recebem o número no primeiro start, na ordem de cadastro — não é preciso
 fazer nada.
@@ -271,7 +274,7 @@ reconstruir quanto cada um tem a receber. Por isso o backup aqui não é higiene
 > O backup cobre o banco. Se um dia o sistema passar a guardar arquivos enviados, a pasta deles entra no backup do
 > servidor à parte.
 
-**Autenticação em duas etapas** (TOTP, por aplicativo) vale para a equipe e para o Internet Bank. O administrador
+**Autenticação em duas etapas** (TOTP, por aplicativo) vale para a equipe e para a Área do Cliente. O administrador
 pode **exigir** de toda a equipe — quem ainda não tem configura antes de trabalhar, e ninguém desliga o próprio
 enquanto a exigência estiver ligada. Quem troca de celular pede ao administrador para redefinir; fica na auditoria.
 Para ligar a exigência, o próprio administrador precisa ter 2FA ativo: não dá para trancar a porta com a chave dentro.
@@ -282,7 +285,7 @@ Para ligar a exigência, o próprio administrador precisa ter 2FA ativo: não d�
 |---|---|---|
 | `PORT` | `3600` | Porta HTTP. |
 | `PAYAX_BASE_PATH` | (raiz) | Endereço do Backoffice, ex.: `/pagamentos`. |
-| `PAYAX_CLIENTE_PATH` | `<BASE_PATH>/cliente` | Endereço do Internet Bank, ex.: `/payax-cliente`. |
+| `PAYAX_CLIENTE_PATH` | `<BASE_PATH>/cliente` | Endereço da Área do Cliente, ex.: `/payax-cliente`. |
 | `PAYAX_DB` | `data/payax.db` | Arquivo do banco SQLite. |
 | `PAYAX_SECRET` | aleatório | Segredo das sessões (mín. 32 caracteres). **Obrigatório em produção.** |
 | `PAYAX_CHAVE_CREDENCIAIS` | derivada do segredo | Chave AES-256 (64 hex) que cifra as credenciais do banco e dos IXC. **Obrigatória em produção.** |
@@ -340,7 +343,7 @@ Legenda: ✅ atendido no sistema · 🏦 depende do Bradesco · ⚖️ depende d
 | Manual CNAB 400 do Bradesco (março de 2023) | Layout byte a byte; beneficiário final nas posições 335-394 | Posições conferidas contra o manual, com testes | ✅ 🏦 convênio precisa ser habilitado para beneficiário final |
 | LGPD (Lei 13.709/2018) | Dados mínimos, segurança, transparência, direitos do titular | Senhas com scrypt, credenciais cifradas, auditoria, duas etapas, consulta de CNPJ sem dados de sócios | ✅ 🔧 faltam aviso de privacidade ao pagador, política de retenção e canal para pedidos do titular |
 | Arranjos e instituições de pagamento (Lei 12.865/2013 e regras do BCB) | Quem mantém saldo de terceiros (conta de pagamento) segue regras próprias | **Não há saldo guardado:** o valor vai ao cliente assim que o banco credita, e a Conformidade vigia isso sozinha | ✅ ⚖️ confirmar o enquadramento do recebimento em nome dos clientes e a contabilização com o contador |
-| Uso de termos de instituição financeira | Só quem é autorizado se apresenta como banco | O sistema usa "Internet Bank" e "agência/conta" | ⚖️ confirmar; trocar os nomes é simples |
+| Resolução Conjunta CMN/BCB nº 17/2025 | Sem termos que sugiram atividade sem autorização ("banco", "bank") no nome, nome fantasia e marca | "Área do Cliente" no lugar de "Internet Bank"; código do cliente no lugar de agência e conta; a Conformidade confere as telas | ✅ ⚖️ confirmar com o jurídico se a norma alcança a PAY AX |
 | Prevenção à lavagem de dinheiro (Lei 9.613/1998) | Conhecer o cliente, monitorar operações atípicas, comunicar ao COAF quando couber | Cadastro com CNPJ validado | ⚖️ 🔧 sem rotinas de monitoramento ainda |
 | Regras da Anatel para cobrança de telecom | Documento de cobrança do provedor ao assinante | Responsabilidade do provedor; o boleto não substitui a fatura detalhada | ⚖️ do provedor |
 
@@ -372,16 +375,16 @@ Mudar a marca é mudar esse arquivo; nenhuma tela tem cor escrita na mão.
 
 ## As duas áreas falam a mesma língua
 
-Backoffice e Internet Bank usam as mesmas peças, de `comum/componentes.js`:
+Backoffice e Área do Cliente usam as mesmas peças, de `comum/componentes.js`:
 
-| Peça | No Internet Bank | No Backoffice |
+| Peça | Na Área do Cliente | No Backoffice |
 |---|---|---|
 | cartão de destaque | `cartaoConta()` — o saldo do cliente, com o botão de esconder | `cartaoPainel()` — a posição da plataforma no período |
 | `acoesRapidas()` | emitir, transferir, extrato, relatórios | emitir, repasses, conciliação, relatórios |
 | `linhaTempo()` + `agruparMovimentos()` | o extrato, com o split aberto em cada recebimento | — |
 
 A diferença entre as duas áreas é de conteúdo, não de linguagem: o cliente vê a conta dele, a equipe vê
-a plataforma inteira. Sobra em `cliente/css/banco.css` só a barra de navegação do celular, e em
+a plataforma inteira. Sobra em `cliente/css/area-cliente.css` só a barra de navegação do celular, e em
 `public/css/payax.css` só a lista de alertas do painel.
 
 Em texto, o nome da empresa é **PAY AX**, com espaço. `payax` minúsculo continua sendo só identificador
@@ -394,10 +397,10 @@ pagamentos/
   comum/        base.css, ui.js, api.js, graficos.js, marca.js e componentes.js
                 — tudo compartilhado pelas duas áreas
   public/       Backoffice (telas em js/telas/)
-  cliente/      Internet Bank (telas em js/telas/)
+  cliente/      Área do Cliente (telas em js/telas/)
   server/
     lib/        febraban, pix, codigobarras, impressao, precos (split), razao (conta gráfica),
                 boletos, repasses, bradesco, ixc, sincronismo, rotinas
-    routes/     backoffice, cliente (Internet Bank) e publico (webhook + link do boleto)
+    routes/     backoffice, cliente (Área do Cliente) e publico (webhook + link do boleto)
   test/         130 testes, com IXC falso
 ```

@@ -32,7 +32,7 @@ const dados = process.env.PAYAX_DADOS || path.join(__dirname, '..', 'data');
 module.exports = {
   producao,
   teste,
-  // Backoffice PAY AX (nossa área) e Internet Bank do cliente final, em endereços diferentes.
+  // Backoffice PAY AX (nossa área) e Área do Cliente do cliente final, em endereços diferentes.
   basePath,
   clientePath: process.env.PAYAX_CLIENTE_PATH ? caminho(process.env.PAYAX_CLIENTE_PATH) : `${basePath}/cliente`,
   port: Number(process.env.PORT) || 3600,

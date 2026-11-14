@@ -21,8 +21,7 @@ test('conta interna: dígito verificador e formatação', async (t) => {
   });
 
   await t.test('formatação para a tela', () => {
-    assert.equal(ci.formatar('001', '0001', '3'), '001 · 0001-3');
-    assert.equal(ci.formatar('001', '0001', '3', { curto: true }), '001/0001-3');
+    assert.equal(ci.formatar('001', '0001', '3'), '0001-3', 'código do cliente, sem agência');
     assert.equal(ci.formatar(null, null, null), '—');
   });
 });
@@ -37,7 +36,7 @@ test('conta interna: numeração sequencial dos clientes', async (t) => {
   const criar = async (razao, cnpj) => (await api.post('/api/clientes', { razao_social: razao, cnpj, situacao: 'ativo', pix_chave: cnpj }, tk.admin)).dados;
 
   let a; let b; let c;
-  await t.test('cada cliente novo recebe o próximo número da agência 001', async () => {
+  await t.test('cada cliente novo recebe o próximo código da sequência', async () => {
     a = await criar('Primeiro LTDA', CNPJ.alfa);
     b = await criar('Segundo LTDA', CNPJ.beta);
     c = await criar('Terceiro LTDA', '22233344000183');
@@ -46,26 +45,29 @@ test('conta interna: numeração sequencial dos clientes', async (t) => {
     assert.equal(a.conta_interna_dv, ci.dv('001', '0001'));
   });
 
-  await t.test('a ficha e a lista mostram o número pronto', async () => {
+  await t.test('a ficha e a lista mostram o código pronto, sem agência', async () => {
     const ficha = (await api.get(`/api/clientes/${a.id}`, tk.admin)).dados;
-    assert.equal(ficha.conta_payax, ci.formatar('001', '0001', a.conta_interna_dv));
+    assert.equal(ficha.codigo_cliente, `0001-${a.conta_interna_dv}`);
+    assert.equal(ficha.conta_payax, undefined, 'não existe mais "conta PAY AX"');
     const lista = (await api.get('/api/clientes', tk.admin)).dados;
-    assert.ok(lista.itens.every((x) => /^\d{3} · \d{4}-\d$/.test(x.conta_payax)));
+    assert.ok(lista.itens.every((x) => /^\d{4,}-\d$/.test(x.codigo_cliente)));
   });
 
-  await t.test('a busca encontra pelo número da conta', async () => {
-    const porConta = (await api.get('/api/clientes?busca=0002', tk.admin)).dados;
-    assert.equal(porConta.total, 1);
-    assert.equal(porConta.itens[0].id, b.id);
-    const porAgenciaConta = (await api.get('/api/clientes?busca=001/0003', tk.admin)).dados;
-    assert.equal(porAgenciaConta.itens[0].id, c.id);
+  await t.test('a busca encontra pelo código, com ou sem o dígito', async () => {
+    const porNumero = (await api.get('/api/clientes?busca=0002', tk.admin)).dados;
+    assert.equal(porNumero.total, 1);
+    assert.equal(porNumero.itens[0].id, b.id);
+    const comDigito = (await api.get(`/api/clientes?busca=0003-${c.conta_interna_dv}`, tk.admin)).dados;
+    assert.equal(comDigito.itens[0].id, c.id);
+    assert.equal(ci.clientePorNumero(api.db, `0003-${c.conta_interna_dv}`).id, c.id);
+    assert.equal(ci.clientePorNumero(api.db, `0003-${(Number(c.conta_interna_dv) + 1) % 10}`), null, 'dígito errado não acha');
   });
 
   await t.test('o número não muda ao editar o cadastro', async () => {
     const antes = (await api.get(`/api/clientes/${a.id}`, tk.admin)).dados;
     await api.patch(`/api/clientes/${a.id}`, { razao_social: 'Primeiro Renomeado LTDA', versao: antes.versao }, tk.admin);
     const depois = (await api.get(`/api/clientes/${a.id}`, tk.admin)).dados;
-    assert.equal(depois.conta_payax, antes.conta_payax);
+    assert.equal(depois.codigo_cliente, antes.codigo_cliente);
   });
 
   await t.test('dois cadastros ao mesmo tempo não repetem o número', async () => {
@@ -81,23 +83,26 @@ test('conta interna: numeração sequencial dos clientes', async (t) => {
     assert.deepEqual(repetidos, [], 'nenhum número repetido');
   });
 
-  await t.test('ao encher a agência, a próxima abre sozinha', async () => {
-    api.db.prepare("UPDATE contas_internas SET proxima = limite WHERE agencia = '001'").run();
-    const ultimo = await criar('Último da 001', '11444777000161');
-    const primeiro = await criar('Primeiro da 002', '33014556000196');
-    assert.deepEqual([ultimo.agencia_interna, ultimo.conta_interna], ['001', '9999']);
-    assert.deepEqual([primeiro.agencia_interna, primeiro.conta_interna], ['002', '0001']);
+  await t.test('depois de 9999 a sequência segue, sem abrir "outra agência"', async () => {
+    api.db.prepare("UPDATE contas_internas SET proxima = 9999 WHERE agencia = '001'").run();
+    const ultimo4 = await criar('Nove Mil LTDA', '11444777000161');
+    const cincoDigitos = await criar('Dez Mil LTDA', '33014556000196');
+    assert.deepEqual([ultimo4.agencia_interna, ultimo4.conta_interna], ['001', '9999']);
+    assert.deepEqual([cincoDigitos.agencia_interna, cincoDigitos.conta_interna], ['001', '10000']);
+    const ficha = (await api.get(`/api/clientes/${cincoDigitos.id}`, tk.admin)).dados;
+    assert.match(ficha.codigo_cliente, /^10000-\d$/);
   });
 
-  await t.test('o cliente vê a própria conta no Internet Bank', async () => {
+  await t.test('o cliente vê o próprio código na Área do Cliente, sem agência', async () => {
     const d = await api.cliente(tk.admin, { razao_social: 'Com Acesso LTDA', cnpj: '45543915000181' });
     const painel = (await api.get('/cliente/api/painel', d.token)).dados;
-    assert.match(painel.cliente.conta_payax, /^\d{3} · \d{4}-\d$/);
-    assert.equal(painel.cliente.agencia, d.cliente.agencia_interna);
+    assert.match(painel.cliente.codigo, /^\d{4,}-\d$/);
+    assert.equal(painel.cliente.agencia, undefined, 'a Área do Cliente não mostra agência');
     const conta = (await api.get('/cliente/api/conta', d.token)).dados;
-    assert.equal(conta.conta_payax, painel.cliente.conta_payax);
+    assert.equal(conta.codigo, painel.cliente.codigo);
+    assert.equal(conta.agencia, undefined);
     const cadastro = (await api.get('/cliente/api/cadastro', d.token)).dados;
-    assert.equal(cadastro.conta_payax, painel.cliente.conta_payax);
+    assert.equal(cadastro.codigo_cliente, painel.cliente.codigo);
   });
 
   await t.test('cliente cadastrado antes da numeração recebe número no start', () => {

@@ -91,7 +91,7 @@ async function iniciar() {
     tarifa_emissao: '0,00', tarifa_liquidacao: '2,50', percentual: '2,35', comissao_minima: '1,00', tarifa_repasse: '0,00', ...p,
   }, tk);
 
-  /** Cliente ativo com acesso ao Internet Bank. Devolve { cliente, token, senha }. */
+  /** Cliente ativo com acesso à Área do Cliente. Devolve { cliente, token, senha }. */
   api.cliente = async (tk, dados = {}) => {
     const c = await api.post('/api/clientes', {
       razao_social: 'Provedor Alfa LTDA', nome_fantasia: 'Alfa Net', cnpj: CNPJ.alfa, situacao: 'ativo',

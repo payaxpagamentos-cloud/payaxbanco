@@ -26,7 +26,7 @@ export default async function clientes({ alvo, params, query, recarregar }) {
     tabela({
       colunas: [
         { titulo: 'Cliente', conteudo: (c) => el('span', {}, el('span', { class: 'forte' }, c.nome_fantasia || c.razao_social), el('span', { class: 'sub' }, documento(c.cnpj))) },
-        { titulo: 'Conta PAY AX', conteudo: (c) => el('span', { class: 'num' }, c.conta_payax ?? '—') },
+        { titulo: 'Código', conteudo: (c) => el('span', { class: 'num' }, c.codigo_cliente ?? '—') },
         { titulo: 'Situação', conteudo: (c) => selo(c.situacao, R.situacaoCliente) },
         { titulo: 'Boletos em aberto', dir: true, conteudo: (c) => numero(c.boletos_abertos) },
         { titulo: 'Saldo disponível', dir: true, conteudo: (c) => el('strong', {}, dinheiro(c.disponivel_centavos)) },
@@ -57,7 +57,7 @@ async function ficha(alvo, id, aba, query, recarregar) {
       el('div', {},
         el('a', { class: 'botao sutil', href: '#/clientes' }, icone('voltar'), 'Clientes'),
         el('h1', {}, c.nome_fantasia || c.razao_social),
-        el('p', {}, `${documento(c.cnpj)} · conta PAY AX ${c.conta_payax_curta} · `, selo(c.situacao, R.situacaoCliente))),
+        el('p', {}, `${documento(c.cnpj)} · código ${c.codigo_cliente} · `, selo(c.situacao, R.situacaoCliente))),
       el('div', { class: 'acoes' },
         pode('boletos.emitir') && c.situacao === 'ativo'
           ? el('button', { class: 'botao', onclick: async () => emitir([c], recarregar, c.id) }, icone('mais'), 'Emitir boleto') : null,
@@ -82,7 +82,7 @@ async function abaResumo(alvo, c, query, recarregar) {
         apoio: c.pode_ver_margem ? `margem ${dinheiro(c.liquidacoes_mes.margem_centavos)}` : 'tarifa PAY AX + tarifas bancárias', tom: 'positivo', ic: 'relatorio' })),
     el('div', { class: 'grade duas', style: 'margin-top:14px' },
       cartao('Cadastro', el('div', { class: 'pares' },
-        par('Conta PAY AX', el('strong', {}, c.conta_payax ?? '—')),
+        par('Código do cliente', el('strong', {}, c.codigo_cliente ?? '—')),
         par('Razão social', c.razao_social),
         par('CNPJ', documento(c.cnpj)),
         par('Responsável', c.responsavel ?? '—'),
@@ -254,7 +254,7 @@ function novoPreco(c, atual, recarregar) {
 
 async function abaAcessos(alvo, c, query, recarregar) {
   montar(alvo, 
-    cartao('Acessos ao Internet Bank', tabela({
+    cartao('Acessos à Área do Cliente', tabela({
       colunas: [
         { titulo: 'Nome', conteudo: (a) => el('span', {}, a.nome, el('span', { class: 'sub' }, a.email)) },
         { titulo: 'Perfil', conteudo: (a) => R.perfilCliente[a.perfil] ?? a.perfil },
@@ -269,7 +269,7 @@ async function abaAcessos(alvo, c, query, recarregar) {
         }) }, 'Redefinir senha') },
       ],
       itens: c.acessos,
-      vazio: 'Nenhum acesso criado. O cliente ainda não consegue entrar no Internet Bank.',
+      vazio: 'Nenhum acesso criado. O cliente ainda não consegue entrar na Área do Cliente.',
     }), pode('clientes.editar') ? el('button', { class: 'botao', onclick: () => novoAcesso(c, recarregar) }, icone('mais'), 'Novo acesso') : null),
 
     el('div', { style: 'margin-top:14px' }, cartao('Integração com o IXC',
@@ -300,7 +300,7 @@ function novoAcesso(c, recarregar) {
     ], acoes: [el('button', { class: 'botao', onclick: () => copiar(out.senha_provisoria) }, icone('copiar'), 'Copiar senha')] });
     recarregar();
   }));
-  const m = modal({ titulo: 'Novo acesso ao Internet Bank', corpo: form,
+  const m = modal({ titulo: 'Novo acesso à Área do Cliente', corpo: form,
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 

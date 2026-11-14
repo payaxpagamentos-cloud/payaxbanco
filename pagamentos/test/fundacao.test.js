@@ -21,7 +21,7 @@ test('acesso: perfis, audiências e isolamento entre clientes', async (t) => {
     assert.equal(errada.dados.erro, inexistente.dados.erro);
   });
 
-  await t.test('o token da equipe não vale no Internet Bank e vice-versa', async () => {
+  await t.test('o token da equipe não vale na Área do Cliente e vice-versa', async () => {
     assert.equal((await api.get('/cliente/api/painel', tk.admin)).status, 401);
     assert.equal((await api.get('/api/painel', a.token)).status, 401);
   });

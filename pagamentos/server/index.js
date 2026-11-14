@@ -9,7 +9,7 @@ const backup = require('./lib/backup');
 const db = abrir();
 criarApp(db).listen(config.port, () => {
   console.log(`[PAY AX] Backoffice em http://localhost:${config.port}${config.basePath}/`);
-  console.log(`[PAY AX] Internet Bank do cliente em http://localhost:${config.port}${config.clientePath}/`);
+  console.log(`[PAY AX] Área do Cliente do cliente em http://localhost:${config.port}${config.clientePath}/`);
   console.log(`[PAY AX] Banco: modo ${config.banco.modo} (${config.banco.ambiente}).`);
 });
 

@@ -196,7 +196,7 @@ function telaEntrada() {
   limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
     marcaEntrada('PAGAMENTOS'),
     el('h1', {}, 'Backoffice'),
-    el('p', { class: 'apoio' }, 'Acesso da equipe PAY AX. O Internet Bank dos clientes fica em outro endereço.'),
+    el('p', { class: 'apoio' }, 'Acesso da equipe PAY AX. A Área do Cliente fica em outro endereço.'),
     form, botao)));
   form.querySelector('input')?.focus();
 }

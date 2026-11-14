@@ -1,5 +1,5 @@
 /*
- * Autenticação em duas etapas na tela, compartilhada pelo Backoffice e pelo Internet Bank —
+ * Autenticação em duas etapas na tela, compartilhada pelo Backoffice e pela Área do Cliente —
  * as rotas são as mesmas em cada área (/auth/2fa/...), só muda o endereço base da API.
  */
 import { el, campo, lerForm, acao, aviso, toast, icone, copiar } from './ui.js';

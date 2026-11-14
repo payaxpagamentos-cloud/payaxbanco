@@ -9,7 +9,7 @@
  *   operacao   — cuida dos clientes e dos boletos (emite, baixa, sincroniza IXC), não move dinheiro.
  *   consulta   — só leitura.
  *
- * Cliente final (Internet Bank):
+ * Cliente final (Área do Cliente):
  *   admin    — emite boletos e gerencia os próprios usuários.
  *   operador — emite boletos e consulta; não mexe em usuários.
  *   (Não existe "pedir repasse": o valor recebido vai sozinho para a conta do cliente.)

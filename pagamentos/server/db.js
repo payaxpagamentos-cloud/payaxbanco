@@ -246,7 +246,7 @@ CREATE TABLE repasses (
 CREATE INDEX idx_repasses_cliente ON repasses(cliente_id, situacao, criado_em DESC);
 CREATE INDEX idx_repasses_situacao ON repasses(situacao, criado_em);
 
--- ---------------------------------------------------------------- Acesso do cliente final (Internet Bank)
+-- ---------------------------------------------------------------- Acesso do cliente final (Área do Cliente)
 CREATE TABLE usuarios_cliente (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   cliente_id INTEGER NOT NULL REFERENCES clientes(id),
@@ -411,7 +411,7 @@ INSERT INTO contas_internas (agencia, nome, proxima, limite, criada_em)
     versao: 4,
     nome: 'seguranca',
     sql: `
--- Autenticação em duas etapas por aplicativo (TOTP), para a equipe e para o Internet Bank.
+-- Autenticação em duas etapas por aplicativo (TOTP), para a equipe e para a Área do Cliente.
 ALTER TABLE usuarios ADD COLUMN totp_segredo TEXT;
 ALTER TABLE usuarios ADD COLUMN totp_ativo INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE usuarios ADD COLUMN totp_ultimo_passo INTEGER;
@@ -526,6 +526,15 @@ CREATE TABLE conformidade_acompanhamento (
   atualizado_em TEXT NOT NULL,
   atualizado_por INTEGER REFERENCES usuarios(id)
 );
+`,
+  },
+  {
+    versao: 8,
+    nome: 'codigo-do-cliente',
+    sql: `
+-- O número de controle do cliente deixa de ter agência: é um código só ("0001-3"), sem termos de
+-- instituição financeira. A numeração segue na mesma sequência e não abre outra agência.
+UPDATE contas_internas SET limite = 99999999;
 `,
   },
 ];

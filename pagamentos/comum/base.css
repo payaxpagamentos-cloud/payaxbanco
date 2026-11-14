@@ -1,5 +1,5 @@
 /*
- * PAY AX Pagamentos — base visual compartilhada pelo Backoffice e pelo Internet Bank.
+ * PAY AX Pagamentos — base visual compartilhada pelo Backoffice e pela Área do Cliente.
  * Cada aplicativo acrescenta só a própria marca (cor do menu e símbolo) no CSS seguinte.
  *
  * Cores dos gráficos: paleta categórica validada (separação para daltonismo, contraste e banda de
@@ -262,7 +262,7 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 .tela-entrada-caixa p.apoio { color: var(--texto-2); font-size: 13px; }
 
 /* ---------------------------------------------------------------- Cartão de destaque
-   A peça de assinatura das duas áreas: no Internet Bank é o saldo do cliente; no Backoffice,
+   A peça de assinatura das duas áreas: na Área do Cliente é o saldo do cliente; no Backoffice,
    a posição da plataforma no período. Mesmo desenho, mesmo marinho, mesmo anel. */
 .cartao-conta {
   position: relative;
@@ -285,7 +285,7 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 }
 /* O anel luminoso, saindo pela direita como no logotipo. O centro fica exatamente sobre a
    borda direita do cartão, então entra sempre meia circunferência — em cartão largo e baixo
-   (Backoffice) ou alto e estreito (Internet Bank), a curva se lê igual. */
+   (Backoffice) ou alto e estreito (Área do Cliente), a curva se lê igual. */
 .cartao-conta::before {
   content: '';
   position: absolute; top: 50%; right: 0; height: 132%; aspect-ratio: 1;
@@ -445,7 +445,7 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 .auto-busca.ok { color: var(--verde-texto); }
 .auto-busca.erro { color: var(--vermelho); }
 
-/* As peças compartilhadas no celular. A barra de navegação em si é do Internet Bank. */
+/* As peças compartilhadas no celular. A barra de navegação em si é da Área do Cliente. */
 @media (max-width: 920px) {
   main { padding: 16px 14px 60px; }
   .cartao-conta { padding: 22px 20px 20px; border-radius: var(--raio); }

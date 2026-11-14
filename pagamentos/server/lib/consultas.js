@@ -1,6 +1,6 @@
 'use strict';
 
-/* Consultas usadas pelas duas áreas (backoffice e Internet Bank). O cliente_id é imposto pela rota do cliente. */
+/* Consultas usadas pelas duas áreas (backoffice e Área do Cliente). O cliente_id é imposto pela rota do cliente. */
 const { listaPaginada, like } = require('./http');
 const { situacaoVisivel, valorAtualizado } = require('./boletos');
 const { formatarNossoNumero } = require('./febraban');

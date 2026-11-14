@@ -37,7 +37,7 @@ function criarApi(db) {
   return api;
 }
 
-/** API do Internet Bank (cliente final), com audiência de token própria. */
+/** API da Área do Cliente (cliente final), com audiência de token própria. */
 function criarApiCliente(db) {
   const api = express.Router();
   api.get('/saude', (_req, res) => res.json({ ok: true }));

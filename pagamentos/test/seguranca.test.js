@@ -175,7 +175,7 @@ test('duas etapas: login, exigência e redefinição', async (t) => {
   });
 });
 
-test('duas etapas no Internet Bank do cliente', async (t) => {
+test('duas etapas na Área do Cliente do cliente', async (t) => {
   const api = await iniciar();
   t.after(() => api.fechar());
   const tk = await api.equipe();

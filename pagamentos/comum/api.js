@@ -1,4 +1,4 @@
-/** Comunicação com o servidor, compartilhada pelo Backoffice e pelo Internet Bank. */
+/** Comunicação com o servidor, compartilhada pelo Backoffice e pela Área do Cliente. */
 
 export class ErroApi extends Error {
   constructor(msg, status, dados) { super(msg); this.status = status; this.dados = dados; }

@@ -51,7 +51,7 @@ async function abaDados(alvo, recarregar) {
 
   montar(alvo, 
     cartao('Identificação', el('div', { class: 'pares' },
-      par('Sua conta PAY AX', el('strong', {}, c.conta_payax ?? '—')),
+      par('Código do cliente', el('strong', {}, c.codigo_cliente ?? '—')),
       par('Razão social', c.razao_social),
       par('CNPJ', documento(c.cnpj)),
       par('Situação', selo(c.situacao, R.situacaoCliente)),
@@ -79,7 +79,7 @@ async function abaDados(alvo, recarregar) {
 async function abaUsuarios(alvo, recarregar) {
   const itens = await api.get('/usuarios');
   const eu = usuario();
-  montar(alvo, cartao('Quem acessa o Internet Bank', tabela({
+  montar(alvo, cartao('Quem acessa a Área do Cliente', tabela({
     colunas: [
       { titulo: 'Nome', conteudo: (u) => el('span', {}, el('span', { class: 'forte' }, u.nome, u.id === eu.id ? ' (você)' : ''), el('span', { class: 'sub' }, u.email)) },
       { titulo: 'Perfil', conteudo: (u) => R.perfilCliente[u.perfil] ?? u.perfil },

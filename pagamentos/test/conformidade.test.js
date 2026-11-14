@@ -25,7 +25,8 @@ test('conformidade: o sistema confere as próprias regras', async (t) => {
     assert.equal(r.dados.resumo.total, REGRAS.length);
     const x = regrasDe(r.dados);
     for (const id of ['multa-cdc', 'juros-mora', 'especie-servico', 'beneficiario-final', 'nomenclatura',
-      'pagador-identificado', 'beneficiario-identificado', 'sem-tarifa-bancaria', 'registro', 'cnab-layout']) {
+      'pagador-identificado', 'beneficiario-identificado', 'sem-tarifa-bancaria', 'registro', 'cnab-layout',
+      'repasse-imediato', 'termos-instituicao-financeira']) {
       assert.equal(x[id].situacao, 'ok', `${id}: ${x[id].detalhe}`);
     }
     // Toda regra diz de qual norma vem.

@@ -1,15 +1,19 @@
 'use strict';
 
 /*
- * Número da conta do cliente DENTRO da PAY AX (a identidade da conta gráfica).
+ * CÓDIGO DO CLIENTE: número de controle interno da PAY AX, para identificar o cliente no
+ * atendimento, na Área do Cliente e na busca da equipe. Formato "0001-3" (número + dígito).
+ *
+ * Não é agência nem conta: a PAY AX não é banco e não guarda saldo de cliente. Termos de
+ * instituição financeira ficam de fora (Resolução Conjunta CMN/BCB nº 17/2025).
  *
  * ATENÇÃO — não confundir com a agência e a conta do Bradesco:
  *   - `contas_bancarias.agencia` / `.conta` são do banco, vão no código de barras e identificam o convênio;
- *   - `clientes.agencia_interna` / `.conta_interna` são nossas, servem para o cliente se identificar
- *     (Internet Bank, extrato, suporte) e NUNCA entram no boleto.
+ *   - o código do cliente é nosso e NUNCA entra no boleto.
  *
- * Numeração sequencial: agência 001 com contas 0001, 0002, 0003… Ao chegar no limite da agência,
- * a próxima conta abre a agência 002, e assim por diante. O número é atribuído uma vez e não muda.
+ * Por dentro, o número fica em `clientes.conta_interna` (com `agencia_interna` fixa em "001", que só
+ * entra no cálculo do dígito). A numeração é sequencial — 0001, 0002, 0003… — e não para em 9999:
+ * segue 10000, 10001. É atribuída uma vez e nunca muda.
  */
 const agora = () => new Date().toISOString();
 
@@ -31,21 +35,20 @@ function dv(agencia, conta) {
   return String(d > 9 ? 0 : d);
 }
 
-/** "001 · 0001-5" para a tela; `curto` devolve "001/0001-5". */
-const formatar = (agencia, conta, digito, { curto = false } = {}) => {
+/** Código do cliente para a tela: "0001-3". */
+const formatar = (agencia, conta, digito) => {
   if (!agencia || !conta) return '—';
-  const d = digito ?? dv(agencia, conta);
-  return curto ? `${agencia}/${conta}-${d}` : `${agencia} · ${conta}-${d}`;
+  return `${conta}-${digito ?? dv(agencia, conta)}`;
 };
 
-/** Confere um número informado (ex.: o cliente dita a conta no atendimento). */
+/** Confere um código informado (ex.: o cliente dita o código no atendimento). */
 function conferir(agencia, conta, digito) {
   return dv(agencia, conta) === String(digito ?? '').replace(/\D/g, '');
 }
 
 /**
- * Reserva o próximo número livre. Usa a agência aberta com vaga; se não houver, abre a seguinte.
- * Deve rodar dentro de uma transação — quem chama já está em uma.
+ * Reserva o próximo número livre. Deve rodar dentro de uma transação — quem chama já está em uma.
+ * (O limite por "agência" ficou alto o bastante para nunca abrir outra: o código é um número só.)
  */
 function proximoNumero(db) {
   let ag = db.prepare('SELECT * FROM contas_internas WHERE proxima <= limite ORDER BY agencia LIMIT 1').get();
@@ -53,7 +56,7 @@ function proximoNumero(db) {
     const ultima = db.prepare('SELECT agencia FROM contas_internas ORDER BY agencia DESC LIMIT 1').get();
     const nova = String((Number(ultima?.agencia ?? 0) || 0) + 1).padStart(3, '0');
     if (Number(nova) > 999) throw new Error('As agências internas acabaram (999). Aumente o limite por agência.');
-    db.prepare('INSERT INTO contas_internas (agencia, proxima, limite, criada_em) VALUES (?, 1, 9999, ?)').run(nova, agora());
+    db.prepare('INSERT INTO contas_internas (agencia, proxima, limite, criada_em) VALUES (?, 1, 99999999, ?)').run(nova, agora());
     ag = db.prepare('SELECT * FROM contas_internas WHERE agencia = ?').get(nova);
   }
   const numero = String(ag.proxima).padStart(4, '0');
@@ -92,18 +95,17 @@ function garantirTodos(db) {
   return pendentes.length;
 }
 
-/** Procura o cliente por um número informado ("0001", "001/0001", "001 0001-5"). */
+/** Procura o cliente por um código informado: "0001-3" (com o dígito) ou "0001" / "1" (sem). */
 function clientePorNumero(db, texto) {
-  const d = so(texto);
-  if (!d) return null;
-  if (d.length >= 7) {
-    const ag = d.slice(0, 3);
-    const conta = d.slice(3, 7);
-    return db.prepare('SELECT * FROM clientes WHERE agencia_interna = ? AND conta_interna = ?').get(ag, conta) ?? null;
+  const t = String(texto ?? '').trim();
+  if (!so(t)) return null;
+  const comDigito = t.match(/^(\d+)\s*-\s*(\d)$/);
+  if (comDigito) {
+    const conta = comDigito[1].padStart(4, '0');
+    const c = db.prepare('SELECT * FROM clientes WHERE conta_interna = ?').get(conta);
+    return c && String(c.conta_interna_dv) === comDigito[2] ? c : null;
   }
-  const conta = d.padStart(4, '0');
-  const achados = db.prepare('SELECT * FROM clientes WHERE conta_interna = ?').all(conta);
-  return achados.length === 1 ? achados[0] : null;
+  return db.prepare('SELECT * FROM clientes WHERE conta_interna = ?').get(so(t).padStart(4, '0')) ?? null;
 }
 
 /** Resumo das agências, para a tela de configuração. */

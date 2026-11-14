@@ -7,7 +7,7 @@ const { assinar } = require('./lib/cripto');
 const { podeEquipe, podeCliente, permissoesEquipe, permissoesCliente } = require('./lib/permissoes');
 
 /*
- * Dois tokens com audiências diferentes: o da nossa equipe ('payax') não vale no Internet Bank do cliente
+ * Dois tokens com audiências diferentes: o da nossa equipe ('payax') não vale na Área do Cliente do cliente
  * ('payax-cliente') e vice-versa. Perfil, situação e cliente são sempre lidos do banco a cada requisição —
  * o token carrega só o id e a validade.
  */
@@ -56,7 +56,7 @@ function autenticarEquipe(db) {
   };
 }
 
-/** Sessão do cliente final (Internet Bank): sempre amarrada ao cliente dono do usuário. */
+/** Sessão do cliente final (Área do Cliente): sempre amarrada ao cliente dono do usuário. */
 function autenticarCliente(db) {
   const buscar = db.prepare(`SELECT uc.id, uc.nome, uc.email, uc.perfil, uc.ativo, uc.senha_provisoria, uc.totp_ativo, uc.cliente_id,
       c.razao_social, c.nome_fantasia, c.cnpj, c.situacao AS cliente_situacao

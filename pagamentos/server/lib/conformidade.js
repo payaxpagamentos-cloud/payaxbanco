@@ -19,6 +19,8 @@
  *
  * Regra nova entra aqui, com teste em test/conformidade.test.js.
  */
+const fs = require('node:fs');
+const path = require('node:path');
 const config = require('../config');
 const datas = require('./datas');
 const v = require('./validacao');
@@ -386,12 +388,35 @@ const REGRAS = [
     responsavel: 'Contador',
   },
   {
-    id: 'termos-banco',
+    id: 'termos-instituicao-financeira',
+    grupo: 'regulatorio',
+    tipo: 'automatica',
+    titulo: 'Sem "banco", "bank" ou "agência" para o cliente',
+    norma: 'Resolução Conjunta CMN/BCB nº 17/2025',
+    exige: 'Não usar termos que sugiram atividade para a qual a PAY AX não tem autorização, como "banco", "bank" ou "agência". A Área do Cliente usa o código do cliente, não agência e conta.',
+    verificar() {
+      // Telas e marca que o cliente vê. O boleto fica de fora: lá a agência é a do Bradesco, e é obrigatória.
+      const raiz = path.join(__dirname, '..', '..');
+      const telas = path.join(raiz, 'cliente', 'js', 'telas');
+      const arquivos = [
+        path.join(raiz, 'cliente', 'index.html'),
+        path.join(raiz, 'cliente', 'js', 'app.js'),
+        path.join(raiz, 'comum', 'componentes.js'),
+        ...fs.readdirSync(telas).filter((f) => f.endsWith('.js')).map((f) => path.join(telas, f)),
+      ];
+      const proibido = /internet\s*bank|\bbank\b|ag[êe]ncia/i;
+      const achados = arquivos.filter((a) => proibido.test(fs.readFileSync(a, 'utf8'))).map((a) => path.relative(raiz, a));
+      if (achados.length) return fora(`Termo de instituição financeira nas telas do cliente: ${achados.join(', ')}.`);
+      return ok(`Nenhuma das ${arquivos.length} telas da Área do Cliente usa "banco/bank" como nome nem "agência".`);
+    },
+  },
+  {
+    id: 'nome-marca-dominio',
     grupo: 'regulatorio',
     tipo: 'acompanhamento',
-    titulo: 'Uso de "banco", "Internet Bank" e "agência"',
-    norma: 'Regras do sistema financeiro sobre termos de instituição autorizada (a confirmar com o jurídico)',
-    exige: 'Só quem é autorizado pode se apresentar como banco. O sistema usa "Internet Bank" e "agência/conta".',
+    titulo: 'Razão social, marca registrada e domínio',
+    norma: 'Resolução Conjunta CMN/BCB nº 17/2025',
+    exige: 'O que fica fora do sistema e o sistema não confere: razão social, marca no INPI, domínio de internet e nome do repositório. Confirmar com o jurídico o alcance da norma para a PAY AX.',
     responsavel: 'Jurídico',
   },
   {

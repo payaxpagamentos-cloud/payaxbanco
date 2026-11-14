@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * API do Internet Bank (cliente final). Toda consulta e todo comando são presos ao cliente da sessão:
+ * API da Área do Cliente (cliente final). Toda consulta e todo comando são presos ao cliente da sessão:
  * o cliente_id NUNCA vem do corpo da requisição — vem do token, resolvido no banco a cada chamada.
  */
 const express = require('express');
@@ -118,9 +118,7 @@ module.exports = (db, autenticado) => {
       periodo: p,
       cliente: {
         razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, cnpj: c.cnpj, situacao: c.situacao,
-        agencia: c.agencia_interna,
-        conta: c.conta_interna && `${c.conta_interna}-${c.conta_interna_dv}`,
-        conta_payax: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
+        codigo: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
       },
       saldo: razao.saldo(db, c.id, data),
       agenda: razao.agenda(db, c.id, data, 30),
@@ -207,9 +205,7 @@ module.exports = (db, autenticado) => {
     const c = meuCliente(req);
     const data = hoje();
     res.json({
-      agencia: c.agencia_interna,
-      conta: c.conta_interna && `${c.conta_interna}-${c.conta_interna_dv}`,
-      conta_payax: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
+      codigo: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
       saldo: razao.saldo(db, c.id, data),
       agenda: razao.agenda(db, c.id, data, 60),
       disponivel: repassesLib.disponivel(db, c, data),
@@ -252,9 +248,7 @@ module.exports = (db, autenticado) => {
     const c = meuCliente(req);
     res.json({
       razao_social: c.razao_social, nome_fantasia: c.nome_fantasia, cnpj: c.cnpj, email: c.email, telefone: c.telefone,
-      agencia: c.agencia_interna,
-      conta: c.conta_interna && `${c.conta_interna}-${c.conta_interna_dv}`,
-      conta_payax: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
+      codigo_cliente: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
       responsavel: c.responsavel, cep: c.cep, endereco: c.endereco, numero: c.numero, complemento: c.complemento,
       bairro: c.bairro, cidade: c.cidade, uf: c.uf, situacao: c.situacao,
       limite_boleto_centavos: c.limite_boleto_centavos,

@@ -37,7 +37,7 @@ function criarApp(db) {
   equipe.use('/comum', express.static(path.join(__dirname, '..', 'comum'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   equipe.use(express.static(path.join(__dirname, '..', 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
-  // ------------------------------------------------- Internet Bank do cliente final
+  // ------------------------------------------------- Área do Cliente do cliente final
   const cliente = express.Router();
   cliente.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   cliente.use(express.json({ limit: '1mb' }));
@@ -46,7 +46,7 @@ function criarApp(db) {
   cliente.use('/js/boleto.js', express.static(path.join(__dirname, '..', 'public', 'js', 'boleto.js')));
   cliente.use(express.static(path.join(__dirname, '..', 'cliente'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
-  // O Internet Bank precisa vir antes quando mora dentro do caminho do backoffice (ex.: /pagamentos/cliente).
+  // A Área do Cliente precisa vir antes quando mora dentro do caminho do backoffice (ex.: /pagamentos/cliente).
   app.use(config.clientePath || '/cliente', cliente);
   if (config.basePath) {
     app.get(config.basePath, (req, res, next) => (req.originalUrl.split('?')[0] === config.basePath ? res.redirect(`${config.basePath}/`) : next()));

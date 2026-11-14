@@ -116,7 +116,7 @@ test('consulta de CEP e CNPJ: fontes, cache e queda para a pública', async (t) 
     assert.equal(r.dados.cep.fonte, 'publica', 'o CEP segue na fonte sem custo');
   });
 
-  await t.test('o Internet Bank consulta pelos próprios dados do pagador', async () => {
+  await t.test('a Área do Cliente consulta pelos próprios dados do pagador', async () => {
     const r = await api.get('/cliente/api/consultas/cep/11704000', cliente.token);
     assert.equal(r.status, 200);
     assert.equal(r.dados.cidade, 'Praia Grande');

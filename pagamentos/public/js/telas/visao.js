@@ -35,7 +35,7 @@ export default async function visao({ alvo }) {
       el('div', {}, el('h1', {}, 'Visão geral'),
         el('p', {}, `Movimento de ${data(d.periodo.de)} a ${data(d.periodo.ate)}`))),
 
-    // O cartão de destaque é o mesmo do Internet Bank. Lá mostra o saldo do cliente;
+    // O cartão de destaque é o mesmo da Área do Cliente. Lá mostra o que foi transferido ao cliente;
     // aqui, a posição da plataforma no período.
     cartaoPainel({
       rotulo: 'Recebido no período',
