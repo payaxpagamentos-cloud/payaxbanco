@@ -155,8 +155,21 @@ test('rateio que não deu certo: o cliente recebe por PIX', async (t) => {
     const b = await emitir();
     retorno([{ ...pago(b), ocorrencia: '02', rateio: { motivo: '00' } }]);
     assert.equal(linha(b.id).rateio_situacao, 'aceito');
-    retorno([pago(b, { rateio: { valor_centavos: 9801, motivo: '39', credito_em: hoje() } })]);
+    const r = retorno([pago(b, { rateio: { valor_centavos: 9801, motivo: '39', credito_em: hoje() } })]);
     assert.equal(linha(b.id).rateio_situacao, 'efetuado');
+    // Visível mesmo sem passar pela PAY AX: quanto o banco creditou, quando, e o arquivo conferido.
+    const row = api.db.prepare('SELECT rateio_valor_centavos, rateio_credito_em FROM boletos WHERE id = ?').get(b.id);
+    assert.deepEqual([row.rateio_valor_centavos, row.rateio_credito_em], [9801, hoje()]);
+    const arq = api.db.prepare('SELECT * FROM retornos WHERE id = ?').get(r.id);
+    assert.deepEqual([arq.rateio_total_centavos, arq.rateio_quantidade, arq.rateio_lido_centavos, arq.rateio_lido_quantidade], [9801, 1, 9801, 1]);
+    const v = (await api.get('/api/repasses/rateios', tk.consulta)).dados;
+    assert.equal(v.resumo.creditado_hoje.valor_centavos, 9801);
+    assert.equal(v.itens[0].rateio_valor_centavos, 9801);
+    assert.equal(v.itens[0].tarifa_payax_centavos, 199);
+    assert.equal(v.itens[0].destino.conta, '98765');
+    assert.ok(v.arquivos[0].confere);
+    const cli = (await api.get('/cliente/api/repasses', c.token)).dados.itens.find((i) => i.meio === 'rateio');
+    assert.equal(cli.confirmado_em, hoje(), 'o cliente vê o dia em que o banco creditou');
     await repassesLib.rotinaAutomatica(api.db);
     assert.equal(pixDe(b.id), undefined, 'o banco pagou: a PAY AX não manda nada');
     assert.equal(transferidoHoje(), 9801);
@@ -185,6 +198,27 @@ test('rateio que não deu certo: o cliente recebe por PIX', async (t) => {
     await repassesLib.rotinaAutomatica(api.db);
     assert.equal(pixDe(b.id)?.valor_centavos, 9801);
     assert.equal((await regra()).situacao, 'atencao', 'a Conformidade mostra que o rateio falhou');
+  });
+
+  await t.test('rateio feito com crédito para amanhã: aparece como aguardando o crédito do banco', async () => {
+    const b = await emitir();
+    const amanha = somarDias(hoje(), 1);
+    retorno([pago(b, { rateio: { valor_centavos: 9801, motivo: '38', credito_em: amanha } })]);
+    assert.equal(api.db.prepare('SELECT rateio_credito_em FROM boletos WHERE id = ?').get(b.id).rateio_credito_em, amanha);
+    const v = (await api.get('/api/repasses/rateios', tk.admin)).dados;
+    assert.equal(v.resumo.aguardando_credito.valor_centavos, 9801);
+  });
+
+  await t.test('arquivo cujo total de rateios não bate com a soma lida: fora da norma', async () => {
+    const b = await emitir();
+    const regs = [pago(b, { rateio: { valor_centavos: 9801, motivo: '39', credito_em: hoje() } })];
+    regs.trailer = { rateio_total_centavos: 19602, rateio_quantidade: 2 }; // o banco declara dois; só veio um
+    retorno(regs);
+    const r = await regra();
+    assert.equal(r.situacao, 'fora');
+    assert.match(r.detalhe, /declara R\$ 196,02 em rateios e lemos R\$ 98,01/);
+    assert.equal((await api.get('/api/repasses/rateios', tk.admin)).dados.arquivos[0].confere, false);
+    api.db.prepare("UPDATE retornos SET rateio_total_centavos = rateio_lido_centavos, rateio_quantidade = rateio_lido_quantidade").run(); // conferido com o banco
   });
 
   let semResposta;

@@ -95,7 +95,8 @@ function rateio(r, sequencial) {
   return l;
 }
 
-const trailer = (sequencial) => `9${' '.repeat(393)}${numero(sequencial, 6)}`;
+const trailer = (sequencial, { rateio_total_centavos = 0, rateio_quantidade = 0 } = {}) =>
+  `9${' '.repeat(361)}${valor(rateio_total_centavos, 15)}${numero(rateio_quantidade, 8)}${' '.repeat(9)}${numero(sequencial, 6)}`;
 
 /** @returns {string} conteúdo do arquivo */
 function gerarRetorno(conta, registros, { gerado_em = '2026-12-20', credito_em = '2026-12-20', sequencial = 1 } = {}) {
@@ -104,7 +105,9 @@ function gerarRetorno(conta, registros, { gerado_em = '2026-12-20', credito_em =
     linhas.push(detalhe(r, linhas.length + 1));
     if (r.rateio) linhas.push(rateio(r, linhas.length + 1));
   }
-  linhas.push(trailer(linhas.length + 1));
+  const feitos = registros.filter((r) => r.rateio && ['38', '39'].includes(String(r.rateio.motivo)));
+  linhas.push(trailer(linhas.length + 1, {
+    rateio_total_centavos: feitos.reduce((s, r) => s + (r.rateio.valor_centavos ?? 0), 0), rateio_quantidade: feitos.length, ...(registros.trailer ?? {}) }));
   return `${linhas.join('\r\n')}\r\n`;
 }
 

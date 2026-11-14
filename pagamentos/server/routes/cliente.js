@@ -246,7 +246,7 @@ module.exports = (db, autenticado) => {
           FROM repasses WHERE cliente_id = ?
           UNION ALL
           SELECT 'rateio', l.id, l.criado_em, -l.valor_centavos, 0, NULL, NULL, NULL, NULL, NULL, 'confirmado', NULL, NULL,
-            l.criado_em, b.nosso_numero
+            COALESCE(b.rateio_credito_em, l.data_liberacao), b.nosso_numero
           FROM lancamentos l LEFT JOIN boletos b ON b.id = l.boleto_id
           WHERE l.cliente_id = ? AND l.tipo = 'repasse' AND l.repasse_id IS NULL AND IFNULL(b.rateio_situacao, '') <> 'nao_efetuado'
         ) ORDER BY criado_em DESC, id DESC`, [c.id, c.id], req.query),

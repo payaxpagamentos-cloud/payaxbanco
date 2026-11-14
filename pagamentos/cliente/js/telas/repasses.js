@@ -1,6 +1,6 @@
 import { api, ir } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, montar, tabela, paginacao, kpi, aviso, selo, dinheiro, dataHora, R } from '../../comum/ui.js';
+import { el, montar, tabela, paginacao, kpi, aviso, selo, dinheiro, data, dataHora, R } from '../../comum/ui.js';
 
 /**
  * Transferências para a conta do cliente.
@@ -41,7 +41,9 @@ export default async function repasses({ alvo, query }) {
           : el('span', {}, 'PIX', el('span', { class: 'sub' }, r.pix_chave ?? `banco ${r.destino_banco} · ag. ${r.destino_agencia} · conta ${r.destino_conta}`))) },
         { titulo: 'Situação', conteudo: (r) => el('span', {}, selo(r.situacao, R.situacaoRepasse),
           r.meio === 'rateio' ? null : r.end_to_end ? el('span', { class: 'sub num' }, r.end_to_end) : r.erro ? el('span', { class: 'sub' }, `${r.erro} — nova tentativa automática`) : null) },
-        { titulo: 'Confirmado', conteudo: (r) => (r.confirmado_em ? dataHora(r.confirmado_em) : '—') },
+        { titulo: 'Na sua conta', conteudo: (r) => (r.meio === 'rateio'
+          ? el('span', {}, data(r.confirmado_em), el('span', { class: 'sub' }, 'crédito do Bradesco'))
+          : r.confirmado_em ? dataHora(r.confirmado_em) : '—') },
       ],
       itens: d.itens,
       vazio: 'Nenhuma transferência ainda. Elas aparecem aqui assim que o primeiro pagamento for creditado.',

@@ -122,6 +122,7 @@ function aplicar(db, registro, { creditoEm }) {
         // Rateio: o valor que o banco efetivamente creditou ao cliente (registro 3 do retorno).
         rateio_centavos: registro.rateio === 'efetuado' && Number.isInteger(registro.rateio_centavos) ? registro.rateio_centavos : null,
         rateio: registro.rateio ?? null,
+        rateio_credito_em: registro.rateio_credito_em ?? null,
         rateio_motivo: cnab.textoMotivoRateio(registro.rateio_motivo),
         valor_pago_centavos: pago,
         juros_centavos: registro.juros_centavos ?? 0,
@@ -186,12 +187,17 @@ function processarRetorno(db, conteudo, { nome, origem = 'pasta', usuario = null
     }
   }
 
+  // Rateios do arquivo: o que lemos dos registros 3 contra o total que o banco declara no trailer.
+  const efetuados = lido.registros.filter((x) => x.rateio === 'efetuado');
+  const rateioLido = { centavos: efetuados.reduce((s, x) => s + (x.rateio_centavos || 0), 0), quantidade: efetuados.length };
   const id = db.prepare(`INSERT INTO retornos (nome, impressao, origem, gerado_em, credito_em, registros,
       liquidados, confirmados, baixados, rejeitados, nao_tratados, sem_titulo, detalhe, processado_em, criado_em, criado_por)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
     .get(nome ?? 'sem nome', impressao, origem, lido.header.gerado_em, lido.header.credito_em, lido.registros.length,
       contagem.liquidados, contagem.confirmados, contagem.baixados, contagem.rejeitados, contagem.nao_tratados,
       contagem.sem_titulo, detalhe.length ? JSON.stringify(detalhe.slice(0, 200)) : null, agora(), agora(), usuario?.id ?? null).id;
+  db.prepare('UPDATE retornos SET rateio_total_centavos = ?, rateio_quantidade = ?, rateio_lido_centavos = ?, rateio_lido_quantidade = ? WHERE id = ?')
+    .run(lido.trailer?.rateio_total_centavos ?? null, lido.trailer?.rateio_quantidade ?? null, rateioLido.centavos, rateioLido.quantidade, id);
 
   // Avisa o IXC de cada título liquidado — é o que faz a baixa aparecer no sistema do cliente.
   for (const boletoId of liquidadosIds) sincronismo.avisarBaixa(db, boletoId).catch(() => null);

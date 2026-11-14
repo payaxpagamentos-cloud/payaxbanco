@@ -492,6 +492,15 @@ const REGRAS = [
         AND COALESCE(liquidado_em, confirmado_em, criado_em) >= datetime('now', '-30 days')`).get().n;
       const motivo = falhos ? db.prepare(`SELECT rateio_motivo AS m, COUNT(*) AS n FROM boletos WHERE rateio_situacao IN ('recusado', 'nao_efetuado')
         AND rateio_motivo IS NOT NULL GROUP BY rateio_motivo ORDER BY n DESC LIMIT 1`).get()?.m : null;
+      // O banco declara no fim de cada arquivo o total de rateios; se a nossa leitura não bate, algo se perdeu.
+      const naoFecha = db.prepare(`SELECT nome, rateio_total_centavos AS banco, rateio_lido_centavos AS lido FROM retornos
+        WHERE (rateio_quantidade > 0 OR rateio_lido_quantidade > 0)
+          AND (rateio_total_centavos IS NOT rateio_lido_centavos OR rateio_quantidade IS NOT rateio_lido_quantidade)
+          AND criado_em >= datetime('now', '-30 days') ORDER BY id DESC LIMIT 1`).get();
+      if (naoFecha) {
+        return fora(`No arquivo ${naoFecha.nome}, o banco declara R$ ${(naoFecha.banco / 100).toFixed(2).replace('.', ',')} em rateios e lemos `
+          + `R$ ${(naoFecha.lido / 100).toFixed(2).replace('.', ',')}. Confira o arquivo com o banco antes de qualquer ajuste.`);
+      }
       if (aConfirmar.n) {
         const texto = `${plural(aConfirmar.n, 'boleto pago está', 'boletos pagos estão')} sem o banco dizer se creditou o cliente. Confira no extrato do Bradesco e informe em Boletos.`;
         // Mais de um dia sem conferir: ou o cliente está sem receber, ou o dinheiro dele está parado conosco.

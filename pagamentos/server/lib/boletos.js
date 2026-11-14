@@ -335,7 +335,11 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
     }
     if (rateioSituacao) {
       const motivo = pagamento.rateio_motivo ?? (b.rateio_situacao === 'recusado' ? b.rateio_motivo : null);
-      db.prepare('UPDATE boletos SET rateio_situacao = ?, rateio_motivo = ? WHERE id = ?').run(rateioSituacao, motivo, b.id);
+      // Quanto e quando o banco creditou o cliente. Sem a data do banco (baixa à mão no simulador), vale a liberação.
+      const feito = rateioSituacao !== 'nao_efetuado';
+      db.prepare('UPDATE boletos SET rateio_situacao = ?, rateio_motivo = ?, rateio_valor_centavos = ?, rateio_credito_em = ? WHERE id = ?')
+        .run(rateioSituacao, motivo, feito ? split.liquido_centavos : null,
+          rateioSituacao === 'efetuado' ? (pagamento.rateio_credito_em ?? liberacao) : null, b.id);
     }
 
     return { boleto_id: b.id, cliente_id: b.cliente_id, pago_em: pagoEm, liberacao, origem, ...split };
@@ -356,7 +360,8 @@ function conferirRateio(db, boletoId, { creditado, observacao }, usuario = null)
     if (b.rateio_situacao !== 'a_confirmar') throw new ErroNegocio('Este boleto não tem rateio a confirmar.', 409);
     const obs = v.texto(observacao, 'o que foi conferido no extrato', 200);
     if (creditado) {
-      db.prepare("UPDATE boletos SET rateio_situacao = 'efetuado', rateio_motivo = ? WHERE id = ?").run(`Conferido no extrato: ${obs}`, b.id);
+      db.prepare("UPDATE boletos SET rateio_situacao = 'efetuado', rateio_motivo = ?, rateio_credito_em = COALESCE(rateio_credito_em, ?) WHERE id = ?")
+        .run(`Conferido no extrato: ${obs}`, hoje(), b.id);
       return { boleto_id: b.id, rateio_situacao: 'efetuado' };
     }
     const saida = db.prepare("SELECT IFNULL(-SUM(valor_centavos), 0) AS v FROM lancamentos WHERE boleto_id = ? AND tipo = 'repasse' AND repasse_id IS NULL").get(b.id).v;
@@ -366,7 +371,7 @@ function conferirRateio(db, boletoId, { creditado, observacao }, usuario = null)
         criado_por: usuario?.id ?? null,
         descricao: `O banco não creditou o rateio ${febraban.formatarNossoNumero(b.nosso_numero, b.nosso_numero_dv)}: o valor segue por PIX` });
     }
-    db.prepare("UPDATE boletos SET rateio_situacao = 'nao_efetuado', rateio_motivo = ?, rateado_em = NULL WHERE id = ?").run(`Conferido no extrato: ${obs}`, b.id);
+    db.prepare("UPDATE boletos SET rateio_situacao = 'nao_efetuado', rateio_motivo = ?, rateado_em = NULL, rateio_valor_centavos = NULL WHERE id = ?").run(`Conferido no extrato: ${obs}`, b.id);
     return { boleto_id: b.id, cliente_id: b.cliente_id, rateio_situacao: 'nao_efetuado', devolvido_centavos: saida };
   });
 }

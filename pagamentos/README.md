@@ -69,6 +69,14 @@ enquanto só pelo **arquivo CNAB**: pela API, os campos de rateio dependem da do
 A regra **Rateio que não deu certo** da Conformidade mostra as falhas dos últimos 30 dias e fica fora da norma se
 um "a confirmar" passar de um dia sem conferência.
 
+**Como a PAY AX enxerga o rateio, se o dinheiro não passa por ela.** O banco conta tudo no arquivo de retorno:
+para cada boleto, o registro 3 traz **quanto** creditou ao cliente (posições 66-80), **em que dia** (151-158) e a
+**situação** (38 = aguardando crédito, 39 = já creditado). No fim do arquivo, o trailer declara o **total de rateios**
+feitos (363-385). O sistema guarda os três e mostra em **Repasses → Creditado pelo banco**: o creditado hoje e no
+mês, o que aguarda o crédito, cada boleto com pago / tarifa PAY AX / creditado ao cliente, e a conferência de cada
+arquivo (soma lida contra o total declarado — se não bater, a Conformidade acusa). O cliente vê o mesmo crédito,
+com a data, em Transferências. A única coisa que a PAY AX **não** vê é o extrato da conta do cliente, que é dele.
+
 **Quando o repasse por PIX sai:**
 
 | Como o pagador pagou | Quando o banco credita na nossa conta | Quando o cliente recebe |

@@ -686,6 +686,22 @@ ALTER TABLE boletos ADD COLUMN rateio_situacao TEXT CHECK (rateio_situacao IN ('
 ALTER TABLE boletos ADD COLUMN rateio_motivo TEXT;
 `,
   },
+  {
+    versao: 13,
+    nome: 'rateio-visivel',
+    sql: `
+-- O que o banco creditou ao cliente pelo rateio, e quando (retorno, registro 3: 66-80 e 151-158).
+ALTER TABLE boletos ADD COLUMN rateio_valor_centavos INTEGER;
+ALTER TABLE boletos ADD COLUMN rateio_credito_em TEXT;
+
+-- Conferência de cada arquivo: o total de rateios que o banco declara no trailer (363-385)
+-- contra a soma dos registros 3 que lemos.
+ALTER TABLE retornos ADD COLUMN rateio_total_centavos INTEGER;
+ALTER TABLE retornos ADD COLUMN rateio_quantidade INTEGER;
+ALTER TABLE retornos ADD COLUMN rateio_lido_centavos INTEGER;
+ALTER TABLE retornos ADD COLUMN rateio_lido_quantidade INTEGER;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

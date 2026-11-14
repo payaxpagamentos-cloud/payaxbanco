@@ -371,6 +371,7 @@ function lerRetorno(conteudo) {
   };
 
   const registros = [];
+  let trailer = null;
   for (const l of linhas.slice(1)) {
     // Registro 3: quanto o banco efetivamente creditou ao 1º beneficiário do rateio, do título anterior.
     if (l[0] === '3' && registros.length) {
@@ -378,7 +379,13 @@ function lerRetorno(conteudo) {
       r.rateio_centavos = Number(campo(l, 66, 80));
       r.rateio_motivo = campo(l, 159, 160).trim() || null;
       r.rateio = leituraRateio(r.rateio_motivo, r.acao);
+      const d = campo(l, 151, 158); // DDMMAAAA
+      r.rateio_credito_em = /^\d{8}$/.test(d) && d !== '00000000' ? `${d.slice(4, 8)}-${d.slice(2, 4)}-${d.slice(0, 2)}` : null;
       continue;
+    }
+    // Trailer: o total de rateios efetuados que o banco declara no arquivo — para conferir a nossa leitura.
+    if (l[0] === '9') {
+      trailer = { rateio_total_centavos: Number(campo(l, 363, 377)) || 0, rateio_quantidade: Number(campo(l, 378, 385)) || 0 };
     }
     if (l[0] !== '1') continue; // só os detalhes interessam (9 é o trailer)
     const codigo = campo(l, 109, 110);
@@ -406,7 +413,7 @@ function lerRetorno(conteudo) {
       sequencial: Number(campo(l, 395, 400)) || null,
     });
   }
-  return { header, registros, linhas: linhas.length };
+  return { header, registros, trailer, linhas: linhas.length };
 }
 
 /** Confere se um texto parece um retorno, sem lançar (usado ao varrer a pasta). */
