@@ -179,8 +179,18 @@ async function enviarComando(ctx, v, tipo, texto) {
     toast(`Bloqueio inteligente: o corte sai sozinho quando o ${placa(v.placa)} ficar abaixo de ${c.velocidade_segura_kmh} km/h ou desligar.`);
     return;
   }
-  const consulta = tipo === 'status' || tipo === 'parametros' ? ' A resposta do equipamento aparece em Comandos.' : '';
-  toast(`${c.status === 'pendente' ? `Comando "${TIPOS_COMANDO[tipo]}" na fila: vai assim que o rastreador conectar.` : `Comando "${TIPOS_COMANDO[tipo]}" enviado.`}${consulta}`);
+  toast(mensagemComando(TIPOS_COMANDO[tipo], c, tipo));
+}
+
+/** Mensagem curta e certa depois de um comando: saiu agora (rastreador conectado) ou ficou guardado (sem conexão). */
+export function mensagemComando(nome, c, tipo = '') {
+  const rele = tipo === 'bloquear' || tipo === 'desbloquear';
+  if (c?.conectado === false) return `Rastreador sem conexão agora. "${nome}" fica guardado e sai sozinho assim que ele conectar (até 24 h).`;
+  if (c?.conectado === true) {
+    return rele ? `"${nome}" enviado. A tela mostra ${tipo === 'bloquear' ? '"bloqueado"' : '"desbloqueado"'} assim que o rastreador confirmar.`
+      : `"${nome}" enviado ao rastreador.${tipo === 'status' || tipo === 'parametros' ? ' A resposta aparece em Comandos.' : ''}`;
+  }
+  return `"${nome}" enviado.`;
 }
 
 async function compartilhar(ctx, v) {
@@ -774,7 +784,7 @@ async function telaComandos(ctx) {
       return [escolha('Veículo', 'veiculo_id', Object.fromEntries(veiculos.map((x) => [x.id, `${placa(x.placa)} · ${x.rastreador_modelo ?? x.imei}`])), veiculos[0].id), tipo, texto,
         el('p', { class: 'pequeno fraco', style: 'margin:0' }, 'Para bloquear, use o botão Bloquear no mapa ao vivo (pede a placa para confirmar).')];
     }, (d) => api.post(`${base(ctx)}/veiculos/${d.veiculo_id}/comandos`, { tipo: d.tipo, texto: d.texto }), { rotulo: 'Enviar' });
-    if (r) { toast('Comando criado.'); carregar(); }
+    if (r) { toast(r === true ? 'Comando enviado.' : mensagemComando(TIPOS_COMANDO[r.tipo] ?? r.tipo, r, r.tipo)); carregar(); }
   } }, 'Enviar comando') : null;
   limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, 'Comandos enviados aos rastreadores e as respostas. Sem conexão, o comando espera o equipamento conectar (expira em 24 h).'), novo),
     cartao(null, lista));

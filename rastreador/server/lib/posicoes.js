@@ -157,6 +157,8 @@ function receber(db, m) {
         ON CONFLICT (veiculo_id, data) DO UPDATE SET distancia_m = distancia_m + excluded.distancia_m, ligado_s = ligado_s + excluded.ligado_s,
           velocidade_max_kmh = MAX(velocidade_max_kmh, excluded.velocidade_max_kmh), posicoes = posicoes + 1`)
         .run(v.id, local(gpsEm).data, somaM, ligadoS, velocidade);
+      // Posição atrasada (da memória do aparelho) de um dia já fechado: a nota daquele dia é recalculada na próxima consulta.
+      if (local(gpsEm).data !== local(t).data) db.prepare('DELETE FROM desempenho_dia WHERE veiculo_id = ? AND data = ?').run(v.id, local(gpsEm).data);
       if (nova) {
         Object.assign(mudar, { lat, lng, velocidade_kmh: velocidade, posicao_em: gpsEm, hodometro_m: v.hodometro_m + somaM, horimetro_s: v.horimetro_s + ligadoS });
         if (numeroOuNulo(m.curso) !== null) mudar.curso = Math.round(Number(m.curso)) % 360;

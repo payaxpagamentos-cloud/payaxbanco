@@ -442,8 +442,9 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
     enquadrar(pontos, zoomMax = 17) {
       if (!vivo) return;
       const p = pontos.filter((x) => x && Number.isFinite(x[0]) && Number.isFinite(x[1]));
-      if (p.length === 1) m.setView(p[0], zoomMax);
-      else if (p.length) m.fitBounds(L.latLngBounds(p), { padding: [40, 40], maxZoom: zoomMax });
+      // Sem animação: sair da tela no meio de um zoom animado quebrava o Leaflet ("reading '_leaflet_pos'").
+      if (p.length === 1) m.setView(p[0], zoomMax, { animate: false });
+      else if (p.length) m.fitBounds(L.latLngBounds(p), { padding: [40, 40], maxZoom: zoomMax, animate: false });
     },
     /** Marcador de veículo; atualizar(v) move e redesenha (situação, curso, placa). */
     veiculo(v, { aoClicar } = {}) {
@@ -480,7 +481,7 @@ export async function criarMapa(div, { zoom = 12, busca = true } = {}) {
       return { remover: () => camada.remove(), limites: () => camada.getBounds() };
     },
     // Ao sair da tela: solta o WebGL, os observadores e os listeners do documento (senão cada visita ao mapa ficava na memória).
-    remover: () => { if (!vivo) return; vivo = false; observadorTamanho.disconnect(); limparCheia(); div._limparFundo?.(); m.remove(); },
+    remover: () => { if (!vivo) return; vivo = false; observadorTamanho.disconnect(); limparCheia(); div._limparFundo?.(); m.stop(); m.remove(); },
   };
 }
 

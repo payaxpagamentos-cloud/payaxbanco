@@ -163,6 +163,18 @@ CREATE TABLE IF NOT EXISTS posicoes (
 CREATE INDEX IF NOT EXISTS idx_posicoes_gps ON posicoes(gps_em);
 
 -- Uso por dia (no fuso configurado): quilômetros, tempo ligado e velocidade máxima, somados a cada posição.
+-- Nota do motorista por veículo e dia já fechado (motor ligado parado, tempo acima do limite, variações bruscas): calculado uma
+-- vez das posições e reaproveitado. Uma posição atrasada daquele dia apaga a linha (é recalculada na próxima consulta).
+CREATE TABLE IF NOT EXISTS desempenho_dia (
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  data TEXT NOT NULL,
+  limite_kmh INTEGER NOT NULL,
+  ocioso_s INTEGER NOT NULL,
+  acima_s INTEGER NOT NULL,
+  bruscos INTEGER NOT NULL,
+  PRIMARY KEY (veiculo_id, data)
+);
+
 CREATE TABLE IF NOT EXISTS uso_diario (
   veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
   data TEXT NOT NULL,

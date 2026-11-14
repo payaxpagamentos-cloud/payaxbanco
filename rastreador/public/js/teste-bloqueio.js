@@ -35,13 +35,13 @@ export function testarBloqueio(ctx, v, aoTerminar) {
       if (c.status === 'aguardando_velocidade') return { ok: false, motivo: 'O veículo está andando. Pare o carro e comece o teste de novo.' };
       const inicio = Date.now();
       while (!cancelado && Date.now() - inicio < 120_000) {
-        await espera(1500);
+        await espera(700);
         const lista = await api.get(`${base}/comandos?veiculo_id=${v.id}`);
         const x = c.id ? lista.find((y) => y.id === c.id) : lista.find((y) => y.tipo === tipo);
         if (!x) continue;
         if (x.status === 'confirmado') return { ok: true, resposta: x.resposta, id: x.id };
         if (['falhou', 'expirado', 'cancelado'].includes(x.status)) return { ok: false, motivo: `O rastreador não aceitou o comando (${x.resposta ?? x.status}).`, id: x.id };
-        aguardando(x.status === 'pendente' ? 'Na fila: esperando o rastreador conectar…'
+        aguardando(x.status === 'pendente' ? (c.conectado === false ? 'O rastreador está sem conexão: o comando sai assim que ele conectar…' : 'Enviando ao rastreador…')
           : x.resposta ? 'O rastreador aceitou e vai cortar assim que tiver GPS (deixe o carro em lugar aberto)…' : 'Enviado: esperando o rastreador confirmar…');
       }
       return { ok: false, motivo: 'O rastreador não respondeu em 2 minutos. Confira se ele está conectado (Comunicação: agora).' };

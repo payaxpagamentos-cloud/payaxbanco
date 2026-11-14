@@ -5,7 +5,7 @@
  criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
 */
 
-const { intervalo } = require('./datas');
+const { intervalo, hoje, somarDias } = require('./datas');
 const { distancia } = require('./geo');
 const condutores = require('./condutores');
 
@@ -67,6 +67,32 @@ function kmPosicoes(pontos) {
 const ARRED = (x) => Math.round(x * 10) / 10;
 
 /**
+ * Motor ligado parado, tempo acima do limite e variações bruscas de um veículo num período de dias inteiros, somando os dias.
+ * Dia já fechado: calculado uma vez das posições e guardado (com 300 veículos e 30 dias, a tela abre na hora em vez de ler
+ * milhões de posições). O dia de hoje é sempre calculado na hora.
+ */
+function analisarDias(db, veiculoId, limite, de, ate) {
+  const guardado = db.prepare('SELECT * FROM desempenho_dia WHERE veiculo_id = ? AND data = ?');
+  const guardar = db.prepare(`INSERT INTO desempenho_dia (veiculo_id, data, limite_kmh, ocioso_s, acima_s, bruscos) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT (veiculo_id, data) DO UPDATE SET limite_kmh = excluded.limite_kmh, ocioso_s = excluded.ocioso_s, acima_s = excluded.acima_s, bruscos = excluded.bruscos`);
+  const doDia = db.prepare('SELECT velocidade_kmh, ignicao, gps_em FROM posicoes WHERE veiculo_id = ? AND gps_em >= ? AND gps_em < ? ORDER BY gps_em');
+  const comPosicao = new Set(db.prepare('SELECT data FROM uso_diario WHERE veiculo_id = ? AND data BETWEEN ? AND ?').all(veiculoId, de, ate).map((x) => x.data));
+  const agora = hoje();
+  const total = { ocioso_s: 0, acima_s: 0, bruscos: 0 };
+  for (let d = de; d <= ate; d = somarDias(d, 1)) {
+    if (!comPosicao.has(d)) continue; // dia sem posição: nada a somar
+    let r = d < agora ? guardado.get(veiculoId, d) : null;
+    if (!r || r.limite_kmh !== (limite || 0)) {
+      const [ini, fim] = intervalo(d, d);
+      r = analisarPosicoes(doDia.all(veiculoId, ini, fim), limite);
+      if (d < agora) guardar.run(veiculoId, d, limite || 0, r.ocioso_s, r.acima_s, r.bruscos);
+    }
+    total.ocioso_s += r.ocioso_s; total.acima_s += r.acima_s; total.bruscos += r.bruscos;
+  }
+  return total;
+}
+
+/**
  * Desempenho de cada veículo da empresa e o ranking dos motoristas. O motorista de cada trecho vem do QR code (quem assumiu o
  * veículo); sem registro, é o motorista fixo do cadastro. O consumo real sai dos abastecimentos lançados no app, quando houver.
  */
@@ -94,8 +120,7 @@ function calcular(db, empresaId, de, ate) {
   const lista = veiculos.map((x) => {
     const u = uso.get(x.id, de, ate);
     const al = Object.fromEntries(alertas.all(x.id, ini, fim).map((a) => [a.tipo, a.n]));
-    const pts = posicoes.all(x.id, ini, fim);
-    const p = analisarPosicoes(pts, x.limite_velocidade_kmh);
+    const p = analisarDias(db, x.id, x.limite_velocidade_kmh, de, ate);
     const n = nota({ excessos: al.velocidade ?? 0, acima_s: p.acima_s, fora_horario: al.fora_horario ?? 0, ocioso_s: p.ocioso_s, bruscos: p.bruscos });
     const km = u.m / 1000;
     const ab = abast.get(x.id, ini, fim);
@@ -109,6 +134,7 @@ function calcular(db, empresaId, de, ate) {
           ocioso_s: p.ocioso_s, bruscos: p.bruscos, custo_centavos: c.custo ? Math.round((c.custo.combustivel + c.custo.ocioso) * 100) : 0, ocorrencias: ocorr.all(x.id, ini, fim) });
       }
     } else {
+      const pts = posicoes.all(x.id, ini, fim); // vários motoristas no período: cada trecho é calculado das posições
       for (const t of tr.filter((y) => y.motorista_id)) {
         const ptsT = pts.filter((q) => q.gps_em >= t.inicio && q.gps_em < t.fim);
         const pt = analisarPosicoes(ptsT, x.limite_velocidade_kmh);
@@ -170,4 +196,18 @@ function dicas(m) {
   return lista.sort((a, b) => b.pontos - a.pontos);
 }
 
-module.exports = { calcular, analisarPosicoes, nota, dicas, kmPosicoes };
+/**
+ * Em segundo plano (a cada minuto): calcula alguns dias fechados que ainda não têm a nota guardada, do mais recente para o
+ * mais antigo, até 93 dias atrás. Assim a tela de Nota e ranking nunca precisa ler as posições de dias passados.
+ */
+function adiantar(db, max = 60) {
+  const agora = hoje();
+  const faltando = db.prepare(`SELECT u.veiculo_id, u.data, v.limite_velocidade_kmh FROM uso_diario u JOIN veiculos v ON v.id = u.veiculo_id
+    LEFT JOIN desempenho_dia d ON d.veiculo_id = u.veiculo_id AND d.data = u.data
+    WHERE u.data < ? AND u.data >= ? AND v.ativo = 1 AND (d.veiculo_id IS NULL OR d.limite_kmh <> v.limite_velocidade_kmh)
+    ORDER BY u.data DESC LIMIT ?`).all(agora, somarDias(agora, -93), max);
+  for (const f of faltando) analisarDias(db, f.veiculo_id, f.limite_velocidade_kmh, f.data, f.data);
+  return faltando.length;
+}
+
+module.exports = { calcular, analisarPosicoes, nota, dicas, kmPosicoes, adiantar };

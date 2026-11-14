@@ -151,7 +151,9 @@ export async function abrirFicha(ctx, veiculoId) {
   const corpo = el('div', { class: 'ficha' });
   const enviar = async (botaoEl, ajuste, valor, extra = {}) => acao(botaoEl, async () => {
     const r = await api.post(caminho, { ajuste, valor, ...extra });
-    toast(r.comandos?.length ? `${r.comandos.length} comando(s) na fila: vão assim que o rastreador conectar. A resposta aparece abaixo.` : 'Ajuste salvo.');
+    toast(!r.comandos?.length ? 'Ajuste salvo.' : r.conectado === false
+      ? `Rastreador sem conexão agora: ${r.comandos.length === 1 ? 'o ajuste fica guardado' : `os ${r.comandos.length} comandos ficam guardados`} e sai${r.comandos.length === 1 ? '' : 'em'} quando ele conectar.`
+      : `Ajuste enviado ao rastreador. A resposta aparece abaixo em segundos.`);
     f = await api.get(caminho);
     desenhar();
   });
@@ -241,7 +243,7 @@ export async function abrirFicha(ctx, veiculoId) {
             }); return b; })(),
             (() => { const b = el('button', { type: 'button', class: 'btn pequeno perigo' }, 'Padrão de fábrica'); b.addEventListener('click', async () => {
               const conf = await perguntar('Padrão de fábrica', `Apaga toda a configuração do aparelho. Digite a placa (${placa(v.placa)}) para confirmar:`);
-              if (conf) acao(b, async () => { await api.post(caminho, { ajuste: 'fabrica', confirmacao: conf }); toast('Comando na fila.'); f = await api.get(caminho); desenhar(); });
+              if (conf) acao(b, async () => { await api.post(caminho, { ajuste: 'fabrica', confirmacao: conf }); toast('Padrão de fábrica enviado ao rastreador.'); f = await api.get(caminho); desenhar(); });
             }); return b; })()))) : null,
       !plataforma && gt06 ? el('p', { class: 'aviso pequeno', style: 'margin:0' }, 'Intervalos, alarmes e instalação são ajustados pela equipe da plataforma. Peça ao suporte o que precisar.') : null,
       secao('Últimos comandos', tabela(['Quando', 'Comando', 'Situação', 'Resposta'], f.comandos.map((c) => el('tr', {},

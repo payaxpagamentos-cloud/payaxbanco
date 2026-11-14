@@ -54,6 +54,8 @@ function manutencao(db, { limpar = false } = {}) {
   relatoriosProgramados.executar(db).catch((err) => console.error('[Rastreador] Relatório programado:', err.message));
   // Multas: consulta automática (só com o serviço contratado ligado no .env), poucos veículos por minuto.
   require('./multasConsulta').rodada(db).catch((err) => console.error('[Rastreador] Consulta de multas:', err.message));
+  // Nota do motorista: adianta o cálculo dos dias fechados (a tela de ranking e custos abre na hora).
+  try { require('./desempenho').adiantar(db); } catch (err) { console.error('[Rastreador] Nota do motorista:', err.message); }
   const expirados = expirar(db, cfg.comando_expira_horas);
   // Corte do Modo Roubo que expirou sem resposta volta a esperar a próxima posição segura.
   // Também cobre o corte cancelado por outro comando (não só o expirado).

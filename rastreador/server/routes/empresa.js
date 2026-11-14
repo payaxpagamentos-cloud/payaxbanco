@@ -251,6 +251,12 @@ module.exports = (db, extras = {}) => {
   });
 
   // ---------- Comandos ----------
+  // O rastreador do veículo está conectado agora? (a tela diz "enviado" ou "fica guardado até ele conectar").
+  const conectadoAgora = (x) => {
+    if (!x.rastreador_id || !extras.gt06) return null;
+    const r = db.prepare('SELECT imei, protocolo FROM rastreadores WHERE id = ?').get(x.rastreador_id);
+    return r?.protocolo === 'gt06' ? Boolean(extras.gt06.conectado(r.imei)) : null;
+  };
   r.post('/veiculos/:id/comandos', gestor, (req, res) => {
     const x = veiculo(req, req.params.id);
     // Todo corte passa pelo bloqueio inteligente: andando acima da velocidade segura, o corte espera.
@@ -268,12 +274,12 @@ module.exports = (db, extras = {}) => {
     }
     if (req.body.tipo === 'desbloquear' && roubo.desbloquearManual(db, x, req.usuario.id)) {
       registrar(db, req, 'comando_criado', { placa: x.placa, tipo: 'desbloquear' });
-      return res.status(201).json({ tipo: 'desbloquear', status: 'pendente' });
+      return res.status(201).json({ tipo: 'desbloquear', status: 'pendente', conectado: conectadoAgora(x) });
     }
     const id = com.criar(db, x, req.body, req.usuario.id);
     registrar(db, req, 'comando_criado', { placa: x.placa, tipo: req.body.tipo });
     const c = db.prepare('SELECT id, tipo, status FROM comandos WHERE id = ?').get(id);
-    res.status(201).json(c);
+    res.status(201).json({ ...c, conectado: conectadoAgora(x) });
   });
 
   // ---------- Teste de bloqueio (instalação): o técnico confirma que o motor corta e volta ----------
@@ -876,7 +882,7 @@ module.exports = (db, extras = {}) => {
       for (const c of f(valor)) ids.push(com.criar(db, x, { tipo: 'personalizado', ...c }, req.usuario.id));
     });
     registrar(db, req, 'equipamento_ajustado', { placa: x.placa, ajuste });
-    res.status(201).json({ comandos: ids });
+    res.status(201).json({ comandos: ids, conectado: conectadoAgora(x) });
   });
 
   // ---------- App do motorista: checklists, abastecimentos, avarias, fotos e o QR code de cada veículo ----------
