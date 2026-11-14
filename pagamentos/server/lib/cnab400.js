@@ -135,7 +135,7 @@ function headerRemessa(conta, { sequencial, hoje }) {
  *   335-349  CNPJ/CPF do sacador, com zeros à esquerda (15)
  *   350-351  brancos (2)
  *   352-394  nome do sacador (43)
- * Aqui vai o cliente: o beneficiário final, em nome de quem o boleto cobra. Antes estas posições
+ * Aqui vai o cliente, em nome de quem o boleto cobra. Antes estas posições
  * levavam o bairro e a cidade do pagador como "2ª mensagem" — o banco já tira isso do CEP.
  * Sem cliente no título (não deveria acontecer), vão em branco, que o banco aceita.
  */
@@ -193,7 +193,7 @@ function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoj
     texto(b.mensagem, 12), // 315-326 1ª mensagem
     cep.slice(0, 5), // 327-331
     cep.slice(5, 8), // 332-334
-    sacadorAvalista(b), // 335-394 sacador avalista (o cliente, beneficiário final)
+    sacadorAvalista(b), // 335-394 sacador avalista (o cliente)
     numero(sequencial, 6), // 395-400
   ];
   return conferir(partes.join(''), `título ${b.nosso_numero}`);

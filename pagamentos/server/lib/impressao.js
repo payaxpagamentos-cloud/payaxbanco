@@ -5,16 +5,24 @@
  * pelo próprio navegador (sem depender de biblioteca de PDF).
  *
  * Quem cobra é o CLIENTE, e é ele que o pagador precisa reconhecer: o nome do cliente abre a
- * página, em destaque, e vai como BENEFICIÁRIO FINAL nas duas vias.
+ * página, em destaque ("Cobrança de"), e vai no campo SACADOR/AVALISTA das duas vias.
  *
  * No campo BENEFICIÁRIO fica a PAY AX, porque o título é registrado no convênio dela — e é esse
  * o nome que o app do banco do pagador mostra ao ler o código. Se o papel dissesse outra coisa,
  * o pagador veria um nome no boleto e outro no app, que é justamente o sinal que os bancos
- * ensinam a desconfiar (golpe do boleto). Por isso o cliente também é registrado no banco como
- * beneficiário final: o app mostra os dois, igual ao papel.
+ * ensinam a desconfiar (golpe do boleto).
+ *
+ * Os rótulos da ficha seguem os termos do banco: Beneficiário, Pagador e Sacador/Avalista.
+ * "Beneficiário final" é como muita gente chama o sacador/avalista, mas não é o termo do layout
+ * do Bradesco, e na plataforma de registro de boletos o nome pode designar outra coisa (quem fica
+ * com o crédito numa cessão). A palavra final é do modelo de ficha que o Bradesco aprovar na
+ * homologação; trocar um rótulo aqui é trocar a constante ROTULO_SACADOR.
  */
 const QRCode = require('qrcode');
 const config = require('../config');
+
+/** Rótulo do campo onde vai o cliente. Ajustar ao modelo de ficha do Bradesco, se for outro. */
+const ROTULO_SACADOR = 'Sacador/Avalista';
 const codigobarras = require('./codigobarras');
 const febraban = require('./febraban');
 const { valorAtualizado } = require('./boletos');
@@ -54,7 +62,7 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   const bfNome = boleto.beneficiario_final_nome || cliente.razao_social;
   const bfFantasia = boleto.beneficiario_final_fantasia || cliente.nome_fantasia || bfNome;
   const bfDoc = doc(boleto.beneficiario_final_documento || cliente.cnpj);
-  const beneficiarioFinal = `${bfNome} — CNPJ ${bfDoc}`;
+  const sacador = `${bfNome} — CNPJ ${bfDoc}`;
   const beneficiario = `${conta.beneficiario_nome} — CNPJ ${doc(conta.beneficiario_documento)}`;
   const codigoBeneficiario = `${conta.agencia}${conta.agencia_dv ? `-${conta.agencia_dv}` : ''} / ${conta.conta}${conta.conta_dv ? `-${conta.conta_dv}` : ''}`;
   // Boleto do simulador: o código tem formato válido, mas não está registrado em banco nenhum.
@@ -159,7 +167,7 @@ ${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não e
   ${cabecalho('Recibo do pagador')}
   <table class="ficha">
     <tr>
-      <td colspan="4">${campo('Beneficiário final', beneficiarioFinal, { classe: 'bf' })}</td>
+      <td colspan="4">${campo(ROTULO_SACADOR, sacador, { classe: 'bf' })}</td>
       <td colspan="2">${campo('Vencimento', data(boleto.vencimento))}</td>
     </tr>
     <tr>
@@ -227,7 +235,7 @@ ${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não e
           <strong>Pagador:</strong> ${esc(boleto.pagador_nome)} — ${esc(doc(boleto.pagador_documento))}
           <small>${esc([enderecoPagador, cidadePagador].filter(Boolean).join(' · '))}</small>
         </div>
-        <div class="linha-bf"><span class="rot">Beneficiário final</span><strong>${esc(beneficiarioFinal)}</strong></div>
+        <div class="linha-bf"><span class="rot">${ROTULO_SACADOR}</span><strong>${esc(sacador)}</strong></div>
       </td>
     </tr>
   </table>

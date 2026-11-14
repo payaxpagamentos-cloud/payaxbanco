@@ -53,7 +53,7 @@ test('CNAB 400: o arquivo de remessa sai no formato que o banco aceita', async (
     assert.equal(campo(395, 400), '000002');
   });
 
-  await t.test('o cliente vai registrado no banco como beneficiário final (sacador avalista)', () => {
+  await t.test('o cliente vai registrado no banco como sacador avalista', () => {
     const l = cnab.gerarRemessa({ conta: CONTA, boletos: [boleto], sequencial: 1, hoje: '2026-11-13' })
       .conteudo.split('\r\n')[1];
     const campo = (de, ate) => l.slice(de - 1, ate);
@@ -64,7 +64,7 @@ test('CNAB 400: o arquivo de remessa sai no formato que o banco aceita', async (
     assert.equal(campo(4, 17), '12345678000195');
   });
 
-  await t.test('título sem beneficiário final deixa o campo em branco (o banco aceita)', () => {
+  await t.test('título sem sacador avalista deixa o campo em branco (o banco aceita)', () => {
     const semBf = { ...boleto, beneficiario_final_nome: null, beneficiario_final_documento: null };
     const l = cnab.gerarRemessa({ conta: CONTA, boletos: [semBf], sequencial: 1, hoje: '2026-11-13' })
       .conteudo.split('\r\n')[1];

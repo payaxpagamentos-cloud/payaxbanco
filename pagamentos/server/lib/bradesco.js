@@ -150,8 +150,8 @@ function paraApi(boleto, conta) {
     prazoBaixaTitulo: boleto.dias_baixa ?? 60,
     primeiraInstrucao: semAcento(boleto.mensagem).slice(0, 80),
   };
-  // Beneficiário final (sacador avalista): o cliente em nome de quem cobramos. É o que o app do
-  // pagador mostra ao lado do beneficiário quando ele lê o código de barras.
+  // Sacador avalista: o cliente em nome de quem cobramos, registrado junto com o título.
+  // Se e como o app do pagador exibe esse campo depende do banco de cada pagador.
   const bf = boleto.beneficiario_final_documento ? so(boleto.beneficiario_final_documento) : '';
   if (bf) {
     const e = boleto.beneficiario_final_endereco ?? {};

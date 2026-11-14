@@ -91,12 +91,12 @@ function validarEntrada(dados, cliente) {
 }
 
 /**
- * O cliente como beneficiário final do título: em nome de quem o boleto cobra.
+ * O cliente como sacador/avalista do título: em nome de quem o boleto cobra.
  *
  * O boleto é registrado no convênio da PAY AX — é ela o BENEFICIÁRIO, a dona da conta que recebe.
- * O cliente vai como BENEFICIÁRIO FINAL: registrado no banco junto com o título (é o que o app do
- * pagador mostra ao ler o código) e impresso no boleto. Nome e CNPJ ficam congelados no título.
- * O endereço só segue para o registro, na hora da emissão.
+ * O cliente vai como SACADOR/AVALISTA: registrado no banco junto com o título e impresso no boleto.
+ * Nome e CNPJ ficam congelados no título. O endereço só segue para o registro, na hora da emissão.
+ * (As colunas se chamam beneficiario_final_*: nome interno, de antes de acertarmos o termo do banco.)
  */
 function beneficiarioFinal(cliente) {
   return {
