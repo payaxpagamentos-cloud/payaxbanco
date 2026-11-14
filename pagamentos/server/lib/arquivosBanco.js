@@ -113,6 +113,8 @@ function aplicar(db, registro, { creditoEm }) {
         // Pago no dia da ocorrência; creditado na nossa conta no dia que o banco informa.
         pago_em: registro.ocorrido_em ?? registro.creditado_em ?? creditoEm ?? hoje(),
         creditado_em: registro.creditado_em ?? creditoEm ?? null,
+        // Rateio: o valor que o banco efetivamente creditou ao cliente (registro 3 do retorno).
+        rateio_centavos: Number.isInteger(registro.rateio_centavos) ? registro.rateio_centavos : null,
         valor_pago_centavos: pago,
         juros_centavos: registro.juros_centavos ?? 0,
         desconto_centavos: registro.desconto_centavos ?? 0,

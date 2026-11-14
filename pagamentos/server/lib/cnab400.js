@@ -190,7 +190,7 @@ function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoj
     '2', // 093 condição de emissão: 2 = cliente emite (somos nós)
     'N', // 094 não emite boleto para débito automático
     ' '.repeat(10), // 095-104 identificação da operação no banco
-    ' ', // 105 indicador de rateio
+    b.rateio_ppm && comando === COMANDO.registrar ? 'R' : ' ', // 105 indicador de rateio de crédito
     '0', // 106 endereçamento para aviso de débito automático
     ' '.repeat(2), // 107-108
     comando, // 109-110 ocorrência
@@ -222,6 +222,41 @@ function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoj
   return conferir(partes.join(''), `título ${b.nosso_numero}`);
 }
 
+/**
+ * Registro tipo 3 — rateio de crédito (manual CNAB 400 do Bradesco, págs. 11-12 e 20-21).
+ * Vai logo depois do registro 1 do título. Um beneficiário só: o cliente, na conta Bradesco dele,
+ * com a parte dele em PERCENTUAL sobre o VALOR COBRADO (cálculo "1"), que o manual exige para esse
+ * cálculo — assim juros, multa e desconto se dividem na mesma proporção. Percentual com 3 casas.
+ * O banco credita o cliente direto na liquidação: o dinheiro dele não passa pela conta da PAY AX.
+ * Beneficiários 2 e 3 vão vazios (zeros nos números, brancos nos textos) — conferir na homologação.
+ */
+function rateioRemessa(b, conta, { sequencial }) {
+  const d = typeof b.rateio_destino === 'string' ? JSON.parse(b.rateio_destino) : b.rateio_destino;
+  const vazio = () => '000' + '00000' + ' ' + '0'.repeat(12) + ' ' + '0'.repeat(15) + ' '.repeat(40) + ' '.repeat(31) + '000000' + '000';
+  const partes = [
+    '3', // 001
+    identificacaoEmpresa(conta, 17).slice(1), // 002-017 carteira, agência, conta, dígito
+    numero(b.nosso_numero, 11) + String(b.nosso_numero_dv ?? '0').slice(0, 1), // 018-029 nosso número + dígito
+    '1', // 030 cálculo do rateio: 1 = valor cobrado
+    '1', // 031 tipo do valor: 1 = percentual
+    ' '.repeat(12), // 032-043
+    '237', // 044-046 banco do 1º beneficiário (só Bradesco)
+    numero(d.agencia, 5), // 047-051
+    String(d.agencia_dv || '0').slice(0, 1), // 052
+    numero(d.conta, 12), // 053-064
+    String(d.conta_dv || '0').slice(0, 1), // 065
+    numero(Math.round(Number(b.rateio_ppm) / 10), 15), // 066-080 percentual com 3 casas (98,010% → 98010)
+    texto(d.nome, 40), // 081-120
+    ' '.repeat(31), // 121-151
+    '000001', // 152-157 parcela
+    '000', // 158-160 floating: crédito no mesmo dia
+    vazio(), // 161-277 2º beneficiário
+    vazio(), // 278-394 3º beneficiário
+    numero(sequencial, 6), // 395-400
+  ];
+  return conferir(partes.join(''), `rateio do título ${b.nosso_numero}`);
+}
+
 /** Trailer da remessa (registro 9). */
 const trailerRemessa = (sequencial) => conferir(`9${' '.repeat(393)}${numero(sequencial, 6)}`, 'trailer da remessa');
 
@@ -243,7 +278,12 @@ function gerarRemessa({ conta, titulos, boletos, sequencial, hoje, comando = COM
   const lista = titulos ?? (boletos ?? []).map((b) => ({ boleto: b, comando }));
   if (!lista.length) throw new ErroNegocio('Nenhum título para enviar na remessa.', 422);
   const linhas = [headerRemessa(conta, { sequencial, hoje })];
-  lista.forEach((t, i) => linhas.push(detalheRemessa(t.boleto, conta, { sequencial: i + 2, comando: t.comando ?? comando, hoje })));
+  for (const t of lista) {
+    const cmd = t.comando ?? comando;
+    linhas.push(detalheRemessa(t.boleto, conta, { sequencial: linhas.length + 1, comando: cmd, hoje }));
+    // Rateio de crédito: o registro 3 vai logo depois do registro 1, só na entrada do título.
+    if (t.boleto.rateio_ppm && cmd === COMANDO.registrar) linhas.push(rateioRemessa(t.boleto, conta, { sequencial: linhas.length + 1 }));
+  }
   linhas.push(trailerRemessa(linhas.length + 1));
   return {
     conteudo: `${linhas.join('\r\n')}\r\n`,
@@ -279,6 +319,11 @@ function lerRetorno(conteudo) {
 
   const registros = [];
   for (const l of linhas.slice(1)) {
+    // Registro 3: quanto o banco efetivamente creditou ao 1º beneficiário do rateio, do título anterior.
+    if (l[0] === '3' && registros.length) {
+      registros.at(-1).rateio_centavos = Number(campo(l, 66, 80));
+      continue;
+    }
     if (l[0] !== '1') continue; // só os detalhes interessam (9 é o trailer)
     const codigo = campo(l, 109, 110);
     const oc = OCORRENCIA[codigo] ?? OCORRENCIA[String(Number(codigo))] ?? { acao: 'nao_tratado', texto: `Ocorrência ${codigo}` };
@@ -311,5 +356,5 @@ function lerRetorno(conteudo) {
 /** Confere se um texto parece um retorno, sem lançar (usado ao varrer a pasta). */
 const pareceRetorno = (conteudo) => /^0.?2RETORNO/.test(String(conteudo ?? '').slice(0, 12));
 
-module.exports = { ESPECIES, ESPECIE_PADRAO, especieDe, gerarRemessa, lerRetorno, pareceRetorno, headerRemessa, detalheRemessa, trailerRemessa,
+module.exports = { ESPECIES, ESPECIE_PADRAO, especieDe, gerarRemessa, lerRetorno, pareceRetorno, headerRemessa, detalheRemessa, rateioRemessa, trailerRemessa,
   COMANDO, OCORRENCIA, MOTIVO, texto, numero, valor, data, dataIso, identificacaoEmpresa };

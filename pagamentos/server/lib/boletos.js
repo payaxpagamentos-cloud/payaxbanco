@@ -125,6 +125,25 @@ function encargos(dados) {
 }
 
 /**
+ * Rateio de crédito pelo banco: quando o convênio tem o serviço e a conta do cliente é Bradesco, o
+ * título já sai dizendo ao banco qual parte é do cliente — em percentual do valor cobrado, calculado
+ * para que, no valor de face, a PAY AX fique exatamente com as tarifas da tabela congelada. O banco
+ * credita o cliente direto; o dinheiro dele não passa pela PAY AX. Percentual com 3 casas (10 ppm).
+ */
+function rateioDe(cliente, conta, valorCentavos, congelado) {
+  if (contaDestino.meioDeEntrega(cliente, conta, { modo: config.banco.modo }) !== 'rateio') return {};
+  const s = precos.calcularSplit({ valorPagoCentavos: valorCentavos, preco: precos.doBoleto(congelado) });
+  const ppm = Math.round((s.liquido_centavos / valorCentavos) * 100_000) * 10;
+  return {
+    rateio_ppm: ppm,
+    rateio_destino: JSON.stringify({
+      banco: cliente.destino_banco, agencia: cliente.destino_agencia, agencia_dv: cliente.destino_agencia_dv,
+      conta: cliente.destino_conta, conta_dv: cliente.destino_conta_dv, nome: cliente.destino_titular ?? cliente.razao_social,
+    }),
+  };
+}
+
+/**
  * O cliente como beneficiário final do título: em nome de quem o boleto cobra.
  *
  * O boleto é registrado no convênio da PAY AX — é ela o BENEFICIÁRIO, a dona da conta que recebe.
@@ -175,6 +194,7 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
     ...entrada, nosso_numero: nossoNumero, cliente_id: cliente.id, conta_id: conta.id,
     ...beneficiarioFinal(cliente),
     especie: cnab400.ESPECIE_PADRAO,
+    ...rateioDe(cliente, conta, entrada.valor_centavos, congelado),
   };
 
   let registro = null;
@@ -198,18 +218,19 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
         cliente_id, conta_id, nosso_numero, nosso_numero_dv, seu_numero, origem, ixc_receber_id, ixc_cliente_id, tipo,
         pagador_nome, pagador_documento, pagador_email, pagador_telefone, pagador_cep, pagador_endereco, pagador_numero,
         pagador_bairro, pagador_cidade, pagador_uf,
-        beneficiario_final_nome, beneficiario_final_fantasia, beneficiario_final_documento, especie,
+        beneficiario_final_nome, beneficiario_final_fantasia, beneficiario_final_documento, especie, rateio_ppm, rateio_destino,
         valor_centavos, emissao, vencimento, juros_mes_ppm, multa_ppm, desconto_centavos, desconto_ate, dias_baixa, mensagem,
         codigo_barras, linha_digitavel, pix_txid, pix_emv, situacao, erro_registro, registrado_em,
         preco_id, tarifa_emissao_centavos, tarifa_liquidacao_centavos, comissao_fixa_centavos, percentual_ppm, comissao_minima_centavos,
         comissao_maxima_centavos, custo_liquidacao_centavos, criado_em, criado_por, criado_por_cliente)
-      VALUES (${Array(50).fill('?').join(', ')})
+      VALUES (${Array(52).fill('?').join(', ')})
       RETURNING id`).get(
       cliente.id, conta.id, nossoNumero, registro.nosso_numero_dv, entrada.seu_numero, origem,
       ixc.receber_id ? String(ixc.receber_id) : null, ixc.cliente_id ? String(ixc.cliente_id) : null, entrada.tipo,
       entrada.pagador_nome, entrada.pagador_documento, entrada.pagador_email, entrada.pagador_telefone, entrada.pagador_cep,
       entrada.pagador_endereco, entrada.pagador_numero, entrada.pagador_bairro, entrada.pagador_cidade, entrada.pagador_uf,
       boleto.beneficiario_final_nome, boleto.beneficiario_final_fantasia, boleto.beneficiario_final_documento, boleto.especie,
+      boleto.rateio_ppm ?? null, boleto.rateio_destino ?? null,
       entrada.valor_centavos, entrada.emissao, entrada.vencimento, entrada.juros_mes_ppm, entrada.multa_ppm,
       entrada.desconto_centavos, entrada.desconto_ate, entrada.dias_baixa, entrada.mensagem,
       registro.codigo_barras, registro.linha_digitavel, registro.pix_txid ?? null, registro.pix_emv ?? null,
@@ -257,6 +278,17 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
       preco: precos.doBoleto(b),
       custoLiquidacaoCentavos: b.custo_liquidacao_centavos,
     });
+    // Rateio de crédito: a parte do cliente é o que o BANCO creditou na conta dele (retorno, registro 3)
+    // ou, sem o retorno, o percentual registrado aplicado ao valor pago. A PAY AX fica com o resto.
+    if (b.rateio_ppm) {
+      const rateado = Number.isInteger(pagamento.rateio_centavos) ? pagamento.rateio_centavos : Math.round((valorPago * b.rateio_ppm) / 1_000_000);
+      split.liquido_centavos = Math.max(0, Math.min(rateado, valorPago));
+      split.comissao_centavos = Math.max(0, valorPago - split.tarifa_banco_centavos - split.liquido_centavos);
+      split.tarifa_banco_centavos = valorPago - split.liquido_centavos - split.comissao_centavos;
+      split.receita_centavos = split.comissao_centavos + split.tarifa_banco_centavos;
+      split.margem_centavos = split.receita_centavos - split.custo_banco_centavos;
+      split.rateio = true;
+    }
     // Liberação = o dia em que o banco credita na conta da PAY AX. A partir daí o dinheiro é do
     // cliente e segue para ele na rodada de repasse seguinte — não fica parado conosco.
     //  - data de crédito informada pelo banco (retorno CNAB, aviso da API): vale ela;
@@ -278,7 +310,14 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
     razao.lancar(db, { ...comum, tipo: 'tarifa_banco', valor_centavos: -split.tarifa_banco_centavos,
       descricao: `Tarifa bancária ${ref}` });
     razao.lancar(db, { ...comum, tipo: 'comissao', valor_centavos: -split.comissao_centavos,
-      descricao: `Tarifa PAY AX ${precos.percentualTexto(b.percentual_ppm)} ${ref}` });
+      descricao: `Tarifa PAY AX ${precos.tarifaTexto(precos.doBoleto(b))} ${ref}` });
+    // Com rateio, o banco já creditou a parte do cliente na conta dele: registra a saída, e nada fica
+    // para a rodada de repasse (o saldo do cliente conosco volta a zero).
+    if (split.rateio && split.liquido_centavos > 0) {
+      razao.lancar(db, { ...comum, tipo: 'repasse', valor_centavos: -split.liquido_centavos,
+        descricao: `Creditado pelo Bradesco direto na conta do cliente (rateio de crédito) ${ref}` });
+      db.prepare('UPDATE boletos SET rateado_em = ? WHERE id = ?').run(agora(), b.id);
+    }
 
     return { boleto_id: b.id, cliente_id: b.cliente_id, pago_em: pagoEm, liberacao, origem, ...split };
   });

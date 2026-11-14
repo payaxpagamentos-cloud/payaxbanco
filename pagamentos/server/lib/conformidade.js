@@ -31,6 +31,7 @@ const backup = require('./backup');
 const dois = require('./doisfatores');
 const arquivosBanco = require('./arquivosBanco');
 const repasses = require('./repasses');
+const contaDestino = require('./contaDestino');
 const pld = require('./pld');
 const lgpd = require('./lgpd');
 
@@ -456,6 +457,26 @@ const REGRAS = [
         ? ` Retido por ordem legal (não é dinheiro parado): ${retidos.map((x) => `${x.cliente}, R$ ${(x.valor_centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`).join('; ')}.`
         : '';
       return ok(`Todo valor creditado antes de hoje já foi repassado. O de hoje sai na rodada seguinte (a cada 15 minutos).${extra}`);
+    },
+  },
+  {
+    id: 'split-pelo-banco',
+    grupo: 'regulatorio',
+    tipo: 'automatica',
+    titulo: 'Dinheiro do cliente pelo próprio banco, sempre que possível',
+    norma: 'Cuidado de empresa de tecnologia: quanto menos dinheiro de terceiros passa pela PAY AX, menor a exposição regulatória',
+    exige: 'Cliente com conta Bradesco recebe pelo rateio de crédito do banco (o dinheiro não passa pela PAY AX). Os demais recebem por PIX na hora.',
+    verificar(db) {
+      const ativos = db.prepare("SELECT * FROM clientes WHERE situacao = 'ativo'").all();
+      const conta = db.prepare('SELECT * FROM contas_bancarias WHERE ativa = 1 ORDER BY padrao DESC, id LIMIT 1').get();
+      const meios = ativos.map((c) => contaDestino.meioDeEntrega(c, conta, { modo: config.banco.modo }));
+      const pelBanco = meios.filter((m) => m === 'rateio').length;
+      const bradescoSemRateio = ativos.filter((c, i) => c.destino_banco === contaDestino.BRADESCO && meios[i] !== 'rateio').length;
+      if (bradescoSemRateio) {
+        return atencao(`${plural(bradescoSemRateio, 'cliente tem', 'clientes têm')} conta Bradesco e ainda ${bradescoSemRateio === 1 ? 'recebe' : 'recebem'} por PIX da PAY AX. `
+          + (conta?.rateio_contratado ? 'Confira o modo do banco (o rateio vale no arquivo CNAB).' : 'Contrate o rateio de crédito no convênio e marque em Contas e preços.'));
+      }
+      return ok(`${plural(pelBanco, 'cliente recebe', 'clientes recebem')} direto do banco; ${plural(ativos.length - pelBanco, 'recebe', 'recebem')} por PIX na hora.`);
     },
   },
   {

@@ -33,7 +33,30 @@ Boleto de R$ 268,12 pago
   conta com saldo. A soma é sempre calculada, nunca guardada. Nada é apagado; correções entram como estorno ou
   ajuste, com motivo e auditoria.
 
-**Quando o repasse sai:**
+**O exemplo da Connect** (tarifa PAY AX fixa de R$ 1,99 por boleto pago, sem percentual nem tarifa bancária
+repassada):
+
+```
+Boleto de R$ 100,00 pago
+        ├─ (−) tarifa PAY AX ............ R$  1,99 → fica com a PAY AX
+        └─ (=) Connect .................. R$ 98,01 → conta da Connect
+```
+
+**Como o dinheiro chega ao cliente** — a conta de destino é cadastrada pela PAY AX e tem que ser da própria empresa
+(mesmo CNPJ):
+
+| Conta do cliente | Como chega | Passa pela PAY AX? |
+|---|---|---|
+| **Bradesco**, com rateio de crédito contratado no convênio | **Rateio de crédito**: o título vai ao banco dizendo a parte do cliente (CNAB 400, registro tipo 3); na liquidação o **próprio Bradesco** credita a conta do cliente | **Não** |
+| Qualquer outro banco | **PIX pelos dados da conta** (agência e conta, sem precisar de chave), assim que o crédito cai | Por minutos, ou até o crédito do dia útil seguinte |
+
+O rateio é o caminho preferido para uma empresa de tecnologia: o dinheiro do cliente não entra na conta da PAY AX.
+Ele vai em **percentual sobre o valor cobrado** (o manual exige isso para esse cálculo), calculado para que, no valor
+de face, a PAY AX fique exatamente com a tarifa — com juros ou desconto, os dois lados variam na mesma proporção, e o
+sistema registra o valor que o banco informa no retorno. O rateio do Bradesco só credita **conta Bradesco**, e por
+enquanto só pelo **arquivo CNAB**: pela API, os campos de rateio dependem da documentação que chega na homologação.
+
+**Quando o repasse por PIX sai:**
 
 | Como o pagador pagou | Quando o banco credita na nossa conta | Quando o cliente recebe |
 |---|---|---|

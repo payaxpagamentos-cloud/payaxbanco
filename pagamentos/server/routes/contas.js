@@ -38,6 +38,8 @@ function corpoConta(b, { novo = false } = {}) {
   if (b.custo_liquidacao !== undefined) d.custo_liquidacao_centavos = v.centavos(b.custo_liquidacao, 'o custo de liquidação');
   if (b.custo_pix !== undefined) d.custo_pix_centavos = v.centavos(b.custo_pix, 'o custo do PIX');
   if (b.ativa !== undefined) d.ativa = v.booleano(b.ativa) ? 1 : 0;
+  // Rateio de crédito contratado no convênio: o banco credita a parte do cliente direto na conta dele.
+  if (b.rateio_contratado !== undefined) d.rateio_contratado = v.booleano(b.rateio_contratado) ? 1 : 0;
   return d;
 }
 
