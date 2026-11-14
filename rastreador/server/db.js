@@ -847,7 +847,15 @@ function migrar(db) {
   };
   for (const [tabela, cols] of Object.entries(NOVAS)) {
     const tem = colunas(tabela);
-    for (const [nome, def] of Object.entries(cols)) if (!tem.has(nome)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${nome} ${def}`);
+    for (const [nome, def] of Object.entries(cols)) {
+      if (tem.has(nome)) continue;
+      db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${nome} ${def}`);
+      // Os rastreadores que já estavam instalados não são reconfigurados sozinhos (o gestor pode ter escolhido outro sono ou
+      // perfil): a configuração automática vale só para aparelho novo ou trocado.
+      if (tabela === 'rastreadores' && nome === 'configurado_em') {
+        db.exec("UPDATE rastreadores SET configurado_em = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id IN (SELECT rastreador_id FROM veiculos WHERE rastreador_id IS NOT NULL)");
+      }
+    }
   }
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_veiculo_qr ON veiculos(codigo_qr) WHERE codigo_qr IS NOT NULL');
   const sqlAlertas = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'alertas'").get()?.sql ?? '';

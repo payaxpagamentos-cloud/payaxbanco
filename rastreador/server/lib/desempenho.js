@@ -6,6 +6,7 @@
 */
 
 const { intervalo, hoje, somarDias } = require('./datas');
+const { transacao } = require('../db');
 const { distancia } = require('./geo');
 const condutores = require('./condutores');
 
@@ -84,8 +85,12 @@ function analisarDias(db, veiculoId, limite, de, ate) {
     let r = d < agora ? guardado.get(veiculoId, d) : null;
     if (!r || r.limite_kmh !== (limite || 0)) {
       const [ini, fim] = intervalo(d, d);
-      r = analisarPosicoes(doDia.all(veiculoId, ini, fim), limite);
-      if (d < agora) guardar.run(veiculoId, d, limite || 0, r.ocioso_s, r.acima_s, r.bruscos);
+      // Ler e guardar juntos: uma posição atrasada que chegue no meio (pelo serviço GT06) não deixa o dia guardado errado.
+      r = transacao(db, () => {
+        const x = analisarPosicoes(doDia.all(veiculoId, ini, fim), limite);
+        if (d < agora) guardar.run(veiculoId, d, limite || 0, x.ocioso_s, x.acima_s, x.bruscos);
+        return x;
+      });
     }
     total.ocioso_s += r.ocioso_s; total.acima_s += r.acima_s; total.bruscos += r.bruscos;
   }

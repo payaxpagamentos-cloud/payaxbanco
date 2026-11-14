@@ -271,7 +271,7 @@ async function telaRastreadores(ctx) {
       el('p', { class: 'mudo', style: 'margin:0' }, 'Escolha o rastreador que este aparelho substitui. O veículo, o histórico e os comandos que esperavam continuam; o aparelho novo recebe a configuração automática e precisa do teste de bloqueio.'),
       escolha('Substitui o rastreador', 'id', opcoes, `r${ordem[0].id}`),
     ], (d) => api.post(`/master/rastreadores/${String(d.id).slice(1)}/trocar-imei`, { imei: x.imei }), { rotulo: 'Trocar aparelho' });
-    if (r) { toast('Aparelho trocado. Ele aparece no veículo na próxima mensagem.'); carregar(); }
+    if (r) { toast('Aparelho trocado: ele aparece no veículo na próxima mensagem. Bloqueios que esperavam o aparelho antigo foram cancelados; faça o Testar bloqueio.'); carregar(); }
   }
 
   async function carregar() {

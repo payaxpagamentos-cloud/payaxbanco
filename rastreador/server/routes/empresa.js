@@ -204,6 +204,12 @@ module.exports = (db, extras = {}) => {
       const aberta = db.prepare("SELECT tipo FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(atual.id);
       v.exigir(!aberta, aberta?.tipo === 'roubo' ? 'O veículo está em Modo Roubo: encerre a ocorrência antes de desativar o bloqueio.'
         : 'Há um bloqueio em andamento neste veículo: encerre ou cancele antes de desativar o bloqueio.');
+      // Desativado, some o botão Desbloquear: com o veículo bloqueado (ou um corte a caminho), ele ficaria preso.
+      v.exigir(!atual.bloqueado, 'O veículo está bloqueado. Desbloqueie primeiro e depois desative o bloqueio.');
+      // A caminho = enviado há pouco, ou aceito pelo aparelho para cortar depois ("executa com GPS e abaixo de 20 km/h").
+      v.exigir(!db.prepare(`SELECT 1 FROM comandos WHERE veiculo_id = ? AND tipo IN ('bloquear','desbloquear') AND status = 'enviado'
+        AND (resposta IS NOT NULL OR enviado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes'))`).get(atual.id),
+        'Há um bloqueio ou desbloqueio a caminho do rastreador. Espere a confirmação e tente de novo.');
     }
     transacao(db, () => {
       db.prepare(`UPDATE veiculos SET ${CAMPOS_VEICULO.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...CAMPOS_VEICULO.map((k) => d[k]), atual.id);
@@ -272,7 +278,13 @@ module.exports = (db, extras = {}) => {
       v.exigir(!aberta, aberta?.tipo === 'roubo' ? 'O veículo está em Modo Roubo: encerre a ocorrência em Segurança → Roubo para desbloquear.'
         : 'O veículo está no bloqueio programado: libere em Segurança → Liberações (código do motorista) ou encerre o bloqueio.');
     }
-    if (req.body.tipo === 'desbloquear' && roubo.desbloquearManual(db, x, req.usuario.id)) {
+    const manual = req.body.tipo === 'desbloquear' ? roubo.desbloquearManual(db, x, req.usuario.id) : false;
+    if (manual === 'cancelado') {
+      // O corte ainda esperava a velocidade baixar: nada foi ao rastreador, só o pedido foi cancelado.
+      registrar(db, req, 'bloqueio_cancelado', { placa: x.placa });
+      return res.status(201).json({ tipo: 'desbloquear', status: 'cancelado', cancelado: true });
+    }
+    if (manual) {
       registrar(db, req, 'comando_criado', { placa: x.placa, tipo: 'desbloquear' });
       return res.status(201).json({ tipo: 'desbloquear', status: 'pendente', conectado: conectadoAgora(x) });
     }
@@ -878,8 +890,10 @@ module.exports = (db, extras = {}) => {
       if (!plataforma) throw new ErroNegocio('Só a equipe da plataforma faz este ajuste. Peça ao suporte.', 403);
       if (ajuste === 'fabrica') v.exigir(String(v.simples(req.body.confirmacao) ?? '').toUpperCase().replace(/[\s-]/g, '') === x.placa, 'Digite a placa para confirmar o padrão de fábrica.');
       const valor = valorDoAjuste(ajuste, req.body.valor);
+      // O anti-jammer liga um corte automático no próprio aparelho: com o bloqueio desativado, não.
+      v.exigir(!(ajuste === 'anti_jammer' && valor && x.bloqueio_desativado), 'O bloqueio deste veículo está desativado: o anti-jammer (que corta sozinho) não pode ser ligado.');
       if (ajuste === 'perfil') db.prepare('UPDATE rastreadores SET perfil = ? WHERE id = ?').run(valor, rr.id);
-      for (const c of f(valor)) ids.push(com.criar(db, x, { tipo: 'personalizado', ...c }, req.usuario.id));
+      for (const c of f(valor)) ids.push(com.criar(db, x, { tipo: 'personalizado', texto: c.texto, rotulo: c.rotulo }, req.usuario.id, { doSistema: true }));
     });
     registrar(db, req, 'equipamento_ajustado', { placa: x.placa, ajuste });
     res.status(201).json({ comandos: ids, conectado: conectadoAgora(x) });

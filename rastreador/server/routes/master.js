@@ -239,8 +239,14 @@ module.exports = (db, extras = {}) => {
       .map((x) => ({ ...x, conectado: x.protocolo === 'gt06' && extras.gt06 ? extras.gt06.conectado(x.imei) : null })));
   });
 
+  // Identificador que o próprio aparelho mandou (está na lista de não cadastrados): vale como veio. Alguns lotes do J16 mandam
+  // um código de 15 dígitos que não é o IMEI da etiqueta e não passa no dígito verificador; recusar deixaria o aparelho fora.
+  const imeiDoAparelho = (valor) => {
+    const t = String(valor ?? '').replace(/^IMEI[:\s]*/i, '').trim();
+    return db.prepare('SELECT 1 FROM desconhecidos WHERE imei = ?').get(t) ? t : v.imei(valor);
+  };
   const dadosRastreador = (d, atual) => ({
-    imei: d.imei !== undefined || !atual ? v.imei(d.imei) : atual.imei,
+    imei: d.imei !== undefined || !atual ? imeiDoAparelho(d.imei) : atual.imei,
     modelo: d.modelo !== undefined ? v.opcional(d.modelo, 'o modelo', 60) : atual?.modelo ?? null,
     protocolo: v.opcao(d.protocolo ?? atual?.protocolo ?? 'gt06', 'o protocolo', PROTOCOLOS),
     chip_numero: d.chip_numero !== undefined ? (v.digitos(d.chip_numero) || null) : atual?.chip_numero ?? null,
@@ -302,11 +308,16 @@ module.exports = (db, extras = {}) => {
    */
   r.post('/rastreadores/:id/trocar-imei', (req, res) => {
     const atual = rastreador(req.params.id);
-    const imei = String(req.body?.imei ?? '').replace(/\D/g, '');
-    v.exigir(/^\d{15}$/.test(imei), 'O IMEI tem 15 números.');
+    const imei = imeiDoAparelho(req.body?.imei);
     v.exigir(!db.prepare('SELECT 1 FROM rastreadores WHERE imei = ?').get(imei), 'Este IMEI já está cadastrado em outro rastreador.');
+    const visto = db.prepare('SELECT protocolo FROM desconhecidos WHERE imei = ?').get(imei);
+    v.exigir(!visto || visto.protocolo === atual.protocolo, 'Este aparelho fala outro protocolo: ele não pode substituir este rastreador.');
     transacao(db, () => {
       db.prepare('UPDATE rastreadores SET imei = ?, configurado_em = NULL, firmware = NULL, saude = NULL, saude_em = NULL WHERE id = ?').run(imei, atual.id);
+      // Bloqueio/desbloqueio ainda não confirmado foi montado para o aparelho antigo (o sentido do relé pode mudar entre lotes):
+      // não vai para o novo. O operador manda de novo, já vendo o aparelho novo.
+      db.prepare(`UPDATE comandos SET status = 'cancelado', respondido_em = ? WHERE rastreador_id = ? AND tipo IN ('bloquear','desbloquear')
+        AND (status = 'pendente' OR (status = 'enviado' AND resposta IS NULL))`).run(agora(), atual.id);
       db.prepare('DELETE FROM desconhecidos WHERE imei = ?').run(imei);
       // O aparelho novo ainda não fez o teste de bloqueio.
       db.prepare('UPDATE veiculos SET teste_bloqueio_ok = NULL, teste_bloqueio_em = NULL WHERE rastreador_id = ?').run(atual.id);

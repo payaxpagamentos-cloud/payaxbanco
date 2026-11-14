@@ -786,11 +786,25 @@ test('Rastreador', async (t) => {
     const db = api.db;
     const placaV = db.prepare('SELECT placa FROM veiculos WHERE id = ?').get(veiculo).placa;
     db.prepare("UPDATE comandos SET status = 'cancelado' WHERE veiculo_id = ? AND status IN ('pendente','enviado')").run(veiculo);
+    // Bloqueado não desativa: o botão Desbloquear sumiria e o veículo ficaria preso.
     db.prepare('UPDATE veiculos SET bloqueado = 1 WHERE id = ?').run(veiculo);
-    // Um desbloqueio esperando o aparelho: desativar o bloqueio cancela.
-    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'desbloquear' }, cliente)).status, 201);
+    const preso = await api.put(`${base()}/veiculos/${veiculo}`, { bloqueio_desativado: true }, cliente);
+    assert.equal(preso.status, 422);
+    assert.match(preso.dados.erro, /Desbloqueie primeiro/);
+    db.prepare('UPDATE veiculos SET bloqueado = 0 WHERE id = ?').run(veiculo);
+    // Um bloqueio esperando o aparelho (na fila): desativar cancela.
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'localizar' }, cliente)).status, 201);
+    db.prepare(`INSERT INTO comandos (empresa_id, veiculo_id, rastreador_id, tipo, texto, status, criado_em) SELECT empresa_id, id, rastreador_id, 'bloquear', 'RELAY,1#', 'pendente', ?
+      FROM veiculos WHERE id = ?`).run(new Date().toISOString(), veiculo);
+    // Um corte já aceito pelo aparelho para depois ("executa com GPS"): espera a confirmação.
+    const adiado = db.prepare(`INSERT INTO comandos (empresa_id, veiculo_id, rastreador_id, tipo, texto, status, resposta, criado_em, enviado_em) SELECT empresa_id, id, rastreador_id, 'bloquear', 'RELAY,1#', 'enviado', 'will be executed after GPS fixed', ?, ?
+      FROM veiculos WHERE id = ?`).run(new Date().toISOString(), new Date().toISOString(), veiculo).lastInsertRowid;
+    assert.equal((await api.put(`${base()}/veiculos/${veiculo}`, { bloqueio_desativado: true }, cliente)).status, 422, 'corte a caminho');
+    db.prepare("UPDATE comandos SET status = 'cancelado' WHERE id = ?").run(adiado);
     assert.equal((await api.put(`${base()}/veiculos/${veiculo}`, { bloqueio_desativado: true }, operador)).status, 403, 'operador não muda o cadastro');
     assert.equal((await api.put(`${base()}/veiculos/${veiculo}`, { bloqueio_desativado: true }, cliente)).status, 204);
+    // O anti-jammer liga um corte automático no aparelho: com o bloqueio desativado, não.
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'anti_jammer', valor: true }, master)).status, 422);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM comandos WHERE veiculo_id = ? AND tipo IN ('bloquear','desbloquear') AND status = 'pendente'").get(veiculo).n, 0);
     const recusa = await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'bloquear', confirmacao: placaV }, cliente);
     assert.equal(recusa.status, 422);
@@ -802,9 +816,23 @@ test('Rastreador', async (t) => {
     // A posição continua sendo gravada normalmente.
     const p = db.prepare('SELECT lat, lng FROM veiculos WHERE id = ?').get(veiculo);
     assert.equal(require('../server/lib/posicoes').receber(db, { imei: IMEI, protocolo: 'gt06', lat: p.lat + 0.01, lng: p.lng, velocidade_kmh: 5, ignicao: true, gps_em: new Date().toISOString() }).status, 'gravada');
-    // Reativado: volta a aceitar.
+    // Reativado: volta a aceitar, e o anti-jammer (JAMRELAY montado pelo sistema) é aceito.
     assert.equal((await api.put(`${base()}/veiculos/${veiculo}`, { bloqueio_desativado: false }, cliente)).status, 204);
     assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'desbloquear' }, cliente)).status, 201);
+    const aj = await api.post(`${base()}/veiculos/${veiculo}/equipamento`, { ajuste: 'anti_jammer', valor: true }, master);
+    assert.equal(aj.status, 201, `anti-jammer: ${aj.dados?.erro}`);
+    assert.ok(db.prepare("SELECT 1 FROM comandos WHERE veiculo_id = ? AND texto LIKE 'JAMRELAY%'").get(veiculo));
+    // Digitado à mão, RELAY continua proibido.
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'personalizado', texto: 'JAMRELAY,1#' }, cliente)).status, 422);
+    // Bloquear andando espera a velocidade baixar; "Cancelar o bloqueio" antes do corte não manda nada ao rastreador.
+    db.prepare("UPDATE comandos SET status = 'cancelado' WHERE veiculo_id = ? AND status IN ('pendente','enviado')").run(veiculo);
+    const agoraIso = new Date().toISOString();
+    db.prepare('UPDATE veiculos SET velocidade_kmh = 70, ignicao = 1, posicao_em = ?, comunicacao_em = ?, bloqueado = 0 WHERE id = ?').run(agoraIso, agoraIso, veiculo);
+    const esp = await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'bloquear', confirmacao: placaV }, cliente);
+    assert.equal(esp.dados.status, 'aguardando_velocidade');
+    const canc = await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'desbloquear' }, cliente);
+    assert.equal(canc.dados.cancelado, true, 'cancelado antes do corte');
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM comandos WHERE veiculo_id = ? AND tipo IN ('bloquear','desbloquear') AND status = 'pendente'").get(veiculo).n, 0);
     db.prepare("UPDATE comandos SET status = 'cancelado' WHERE veiculo_id = ? AND status IN ('pendente','enviado')").run(veiculo);
     db.prepare('UPDATE veiculos SET bloqueado = 0 WHERE id = ?').run(veiculo);
   });
@@ -821,7 +849,11 @@ test('Rastreador', async (t) => {
     assert.equal(desc.sugestoes[0].id, rastreador, 'o rastreador que parou de falar antes é a troca provável');
     assert.equal((await api.post(`/master/rastreadores/${rastreador}/trocar-imei`, { imei: NOVO }, cliente)).status, 403, 'só a plataforma');
     assert.equal((await api.post(`/master/rastreadores/${rastreador}/trocar-imei`, { imei: '123' }, master)).status, 422);
-    assert.equal((await api.post(`/master/rastreadores/${rastreador}/trocar-imei`, { imei: NOVO }, master)).status, 204);
+    // Bloqueio que esperava o aparelho antigo não vai para o novo.
+    const velho = db.prepare(`INSERT INTO comandos (empresa_id, veiculo_id, rastreador_id, tipo, texto, status, criado_em) SELECT empresa_id, id, rastreador_id, 'bloquear', 'RELAY,1#', 'pendente', ?
+      FROM veiculos WHERE id = ?`).run(new Date().toISOString(), veiculo).lastInsertRowid;
+    assert.equal((await api.post(`/master/rastreadores/${rastreador}/trocar-imei`, { imei: NOVO }, master)).status, 204, 'o código que o aparelho manda vale como veio');
+    assert.equal(db.prepare('SELECT status FROM comandos WHERE id = ?').get(velho).status, 'cancelado');
     const r = db.prepare('SELECT imei, configurado_em FROM rastreadores WHERE id = ?').get(rastreador);
     assert.equal(r.imei, NOVO);
     assert.equal(r.configurado_em, null, 'o aparelho novo recebe a configuração automática');

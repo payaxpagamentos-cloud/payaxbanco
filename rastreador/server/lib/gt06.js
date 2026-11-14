@@ -188,7 +188,7 @@ function quadroHora(serial) {
  * Servidor TCP dos rastreadores GT06. Cada conexão se identifica pelo login (IMEI); as posições, estados e alarmes vão para receber().
  * Comandos pendentes são entregues no login e assim que são criados, se o equipamento estiver conectado.
  */
-function iniciarGt06(db, porta, { host } = {}) {
+function iniciarGt06(db, porta, { host, aoMudar = () => {} } = {}) {
   // Só o servidor usa o banco: a montagem e a leitura dos quadros (acima) servem também ao simulador, sem configuração.
   const { receber } = require('./posicoes');
   const com = require('./comandos');
@@ -218,7 +218,7 @@ function iniciarGt06(db, porta, { host } = {}) {
     socket.on('error', () => {});
     socket.on('close', () => {
       clearTimeout(semLogin);
-      if (cx.imei && conexoes.get(cx.imei) === cx) conexoes.delete(cx.imei);
+      if (cx.imei && conexoes.get(cx.imei) === cx) { conexoes.delete(cx.imei); aoMudar(); }
     });
     socket.on('data', (dados) => {
       buf = Buffer.concat([buf, dados]);
@@ -244,9 +244,11 @@ function iniciarGt06(db, porta, { host } = {}) {
         const anterior = conexoes.get(d.imei);
         if (anterior && anterior !== cx) anterior.socket.destroy();
         conexoes.set(d.imei, cx);
+        aoMudar(); // o painel fica sabendo na hora que o aparelho conectou
         receber(db, { imei: d.imei, protocolo: 'gt06', ip: socket.remoteAddress });
-        require('./equipamento').configurarNovo(db, d.imei);
         entregar(d.imei, { reenviar: true });
+        // Depois do reenvio: assim um bloqueio que esperava não sai duas vezes no primeiro login.
+        require('./equipamento').configurarNovo(db, d.imei);
         return;
       }
       if (d.tipo === 'hora') return socket.write(quadroHora(q.serial));

@@ -39,10 +39,17 @@ function gravar(dados) {
 
 /** Para o painel: o mesmo formato do servidor GT06 interno, lendo a situação do serviço separado. */
 function ponte() {
+  // Uma lista de 300 veículos pergunta "está conectado?" para cada um: lê o arquivo uma vez a cada meio segundo, não 300.
+  let cache = null;
+  let lidoEm = 0;
+  const atual = () => {
+    if (Date.now() - lidoEm > 500) { const s = ler(); cache = s ? { n: s.imeis?.length ?? 0, imeis: new Set(s.imeis ?? []) } : null; lidoEm = Date.now(); }
+    return cache;
+  };
   return {
     separado: true,
-    conectados: () => ler()?.imeis?.length ?? 0,
-    conectado: (imei) => Boolean(ler()?.imeis?.includes(imei)),
+    conectados: () => atual()?.n ?? 0,
+    conectado: (imei) => Boolean(atual()?.imeis.has(imei)),
     fechar: async () => {},
   };
 }

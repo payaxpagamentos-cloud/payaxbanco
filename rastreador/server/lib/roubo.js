@@ -195,7 +195,7 @@ function desbloquearManual(db, veiculo, usuarioId) {
   const oc = db.prepare("SELECT * FROM ocorrencias WHERE veiculo_id = ? AND tipo = 'manual' AND status <> 'encerrada'").get(veiculo.id);
   if (!oc) return false;
   encerrar(db, oc, { desbloquear: oc.status !== 'aguardando', texto: oc.status === 'aguardando' ? 'Bloqueio cancelado antes do corte.' : 'Desbloqueio pedido pelo painel.' }, usuarioId);
-  return true;
+  return oc.status === 'aguardando' ? 'cancelado' : 'desbloqueio';
 }
 
 /**

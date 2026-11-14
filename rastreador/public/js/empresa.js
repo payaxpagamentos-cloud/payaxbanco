@@ -185,6 +185,7 @@ async function enviarComando(ctx, v, tipo, texto) {
 /** Mensagem curta e certa depois de um comando: saiu agora (rastreador conectado) ou ficou guardado (sem conexão). */
 export function mensagemComando(nome, c, tipo = '') {
   const rele = tipo === 'bloquear' || tipo === 'desbloquear';
+  if (c?.cancelado) return 'Bloqueio cancelado antes do corte: nada foi enviado ao rastreador.';
   if (c?.conectado === false) return `Rastreador sem conexão agora. "${nome}" fica guardado e sai sozinho assim que ele conectar (até 24 h).`;
   if (c?.conectado === true) {
     return rele ? `"${nome}" enviado. A tela mostra ${tipo === 'bloquear' ? '"bloqueado"' : '"desbloqueado"'} assim que o rastreador confirmar.`

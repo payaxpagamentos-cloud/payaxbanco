@@ -55,7 +55,8 @@ function textoComando(cfg, tipo, rastreador, texto) {
  * Novo comando para o rastreador do veículo. Bloquear exige digitar a placa (corta o combustível ou a ignição do veículo).
  * Um bloqueio ou desbloqueio ainda não enviado é substituído pelo novo.
  */
-function criar(db, veiculo, d, usuarioId) {
+// `doSistema`: texto montado pelo próprio sistema (funções do equipamento, ex.: anti-jammer com JAMRELAY), nunca o digitado.
+function criar(db, veiculo, d, usuarioId, { doSistema = false } = {}) {
   v.exigir(veiculo.rastreador_id, 'O veículo não tem rastreador instalado.');
   const r = db.prepare('SELECT * FROM rastreadores WHERE id = ?').get(veiculo.rastreador_id);
   v.exigir(r.protocolo !== 'osmand', 'Este rastreador (aplicativo no celular) não recebe comandos.');
@@ -68,7 +69,7 @@ function criar(db, veiculo, d, usuarioId) {
     if (digitada !== veiculo.placa) throw new ErroNegocio('Para bloquear, digite a placa do veículo para confirmar.', 422);
   }
   // Corte e desbloqueio só pelos botões (placa, velocidade segura, relé invertido e o estado na tela); nunca por texto livre.
-  if (tipo === 'personalizado' && /(^|[^A-Z])(RELAY|DYD|HFYD|JAMRELAY)\b/i.test(String(d.texto ?? ''))) {
+  if (tipo === 'personalizado' && !doSistema && /(^|[^A-Z])(RELAY|DYD|HFYD|JAMRELAY)\b/i.test(String(d.texto ?? ''))) {
     throw new ErroNegocio('Para cortar ou liberar o veículo, use os botões Bloquear e Desbloquear.', 422);
   }
   const texto = textoComando(lerConfig(db), tipo, r, d.texto);

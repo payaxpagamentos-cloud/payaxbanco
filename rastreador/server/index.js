@@ -16,36 +16,45 @@ require('./lib/licenca').exigir();
 
 const db = abrir();
 const extras = {};
-// Com o serviço GT06 separado no ar, ele cuida dos rastreadores (e eles não caem quando o painel reinicia numa atualização).
+// Rastreadores GT06: quem atende a porta é o serviço separado (rastreador-gt06), que não cai quando o painel reinicia numa
+// atualização. O painel só atende a porta enquanto o serviço não estiver no ar, e devolve assim que ele voltar.
 const servicoGt06 = require('./lib/servicoGt06');
-// Com o serviço separado, cada comando novo é avisado a ele na hora (ele entrega em milissegundos).
-let avisando = false;
-function avisarServico() {
-  if (avisando) return;
-  avisando = true;
-  require('./lib/comandos').canal.on('comando', ({ protocolo }) => { if (protocolo === 'gt06') servicoGt06.avisarComando(); });
-}
-if (config.portaGt06 > 0 && servicoGt06.ativo()) {
+const SEM_SERVICO_MS = 30_000;
+// Comando novo: com o serviço separado, avisa ele na hora (ele entrega em milissegundos).
+require('./lib/comandos').canal.on('comando', ({ protocolo }) => { if (protocolo === 'gt06' && extras.gt06?.separado) servicoGt06.avisarComando(); });
+function usarServico() {
+  const proprio = extras.gt06 && !extras.gt06.separado ? extras.gt06 : null;
   extras.gt06 = servicoGt06.ponte();
-  console.log('[Rastreador] GT06: rastreadores atendidos pelo serviço separado (rastreador-gt06).');
-  avisarServico();
-} else if (config.portaGt06 > 0) {
-  extras.gt06 = iniciarGt06(db, config.portaGt06);
-  extras.gt06.servidor.on('listening', () => console.log(`[Rastreador] GT06 (TCP): porta ${config.portaGt06}`));
-  extras.gt06.servidor.on('error', (err) => console.error(`[Rastreador] Servidor GT06 não iniciou na porta ${config.portaGt06}: ${err.message}`));
-}
-// Se o painel pegou a porta (o serviço estava reiniciando quando o painel subiu) e o serviço voltou: devolve a porta.
-if (extras.gt06 && !extras.gt06.separado) {
-  const timerDevolver = setInterval(() => {
-    if (!servicoGt06.ativo()) return;
-    clearInterval(timerDevolver);
-    const proprio = extras.gt06;
-    extras.gt06 = servicoGt06.ponte();
-    avisarServico();
+  if (proprio) {
     Promise.resolve(proprio.fechar()).catch(() => {});
     console.log('[Rastreador] GT06: serviço separado no ar; o painel devolveu a porta a ele.');
-  }, 5000);
-  timerDevolver.unref();
+  } else {
+    console.log('[Rastreador] GT06: rastreadores atendidos pelo serviço separado (rastreador-gt06).');
+  }
+}
+function usarProprio(motivo) {
+  const g = iniciarGt06(db, config.portaGt06);
+  extras.gt06 = g;
+  g.servidor.on('listening', () => console.log(`[Rastreador] GT06 (TCP): porta ${config.portaGt06}, atendida pelo painel (${motivo}).`));
+  g.servidor.on('error', (err) => {
+    console.error(`[Rastreador] Servidor GT06 não iniciou na porta ${config.portaGt06}: ${err.message}`);
+    // Outro processo está com a porta: volta a esperar o serviço separado.
+    if (extras.gt06 === g) extras.gt06 = servicoGt06.ponte();
+    g.fechar().catch(() => {});
+  });
+}
+if (config.portaGt06 > 0) {
+  if (servicoGt06.ativo()) usarServico();
+  else usarProprio('o serviço separado não estava no ar');
+  let semServicoDesde = null;
+  setInterval(() => {
+    const ativo = servicoGt06.ativo();
+    if (!extras.gt06.separado) { if (ativo) usarServico(); return; }
+    if (ativo) { semServicoDesde = null; return; }
+    semServicoDesde ??= Date.now();
+    // O serviço sumiu (parado ou travado) por mais de 30 s: o painel atende, para nenhum rastreador ficar sem servidor.
+    if (Date.now() - semServicoDesde > SEM_SERVICO_MS) { semServicoDesde = null; usarProprio('o serviço separado parou'); }
+  }, 5000).unref();
 }
 const http = criarApp(db, extras).listen(config.port, () => {
   console.log(`[Rastreador] Painel: http://localhost:${config.port}${config.basePath}/`);
@@ -107,8 +116,9 @@ function encerrar(codigo = 0) {
     .then(fim, fim);
 }
 // Se o processo que nos iniciou (PM2) sumir, ficamos órfãos segurando as portas: encerra para o PM2 subir um novo.
+// Só vale no PM2: iniciado à mão (nohup, script de deploy), o processo pai some de propósito e o painel deve continuar.
 const paiInicial = process.ppid;
-setInterval(() => {
+if (process.env.pm_id !== undefined) setInterval(() => {
   if (process.ppid !== paiInicial && !encerrando) {
     console.error('[Rastreador] Ficou sem o processo que o iniciou; encerrando.');
     encerrar(0);

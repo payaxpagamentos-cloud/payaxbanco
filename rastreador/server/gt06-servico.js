@@ -48,6 +48,20 @@ function donoDaPorta() {
   return null;
 }
 
+// O processo (ou algum acima dele, até 6 níveis) é o PM2?
+function gerenciadoPeloPm2(pid) {
+  let atual = pid;
+  for (let i = 0; i < 6 && atual > 1; i++) {
+    try {
+      const pai = Number(fs.readFileSync(`/proc/${atual}/stat`, 'utf8').split(') ')[1].split(' ')[1]);
+      if (pai <= 1) return false;
+      if (/PM2|God Daemon/i.test(fs.readFileSync(`/proc/${pai}/cmdline`, 'utf8'))) return true;
+      atual = pai;
+    } catch { return false; }
+  }
+  return false;
+}
+
 // Um serviço GT06 antigo que ficou para trás (órfão de um reinício) segura a porta e não atende ninguém: encerra ele.
 // Só mexe num processo que seja comprovadamente este mesmo serviço (linha de comando com gt06-servico.js). Se for o
 // painel, ele mesmo devolve a porta ao ver este serviço no ar.
@@ -57,6 +71,11 @@ function encerrarAntigo() {
   try {
     const cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8');
     if (!cmd.includes('gt06-servico.js')) return;
+    // Uma cópia que o PM2 ainda gerencia não é encerrada (duas cópias se derrubariam em loop): só a órfã, sem o PM2 acima dela.
+    if (gerenciadoPeloPm2(pid)) {
+      console.error(`[Rastreador] Serviço GT06: a porta ${porta} está com outra cópia do serviço no PM2 (pid ${pid}). Deixe só uma: pm2 list.`);
+      return;
+    }
     process.kill(pid, 'SIGTERM');
     console.error(`[Rastreador] Serviço GT06: processo antigo (pid ${pid}) segurava a porta ${porta}; encerrado.`);
   } catch { /* já saiu */ }
@@ -66,7 +85,7 @@ function encerrarAntigo() {
 let ocupadaDesde = 0;
 let avisoEm = 0;
 function subir() {
-  const g = iniciarGt06(db, porta);
+  const g = iniciarGt06(db, porta, { aoMudar: anunciarLogo });
   g.servidor.once('listening', () => { gt06 = g; ocupadaDesde = 0; console.log(`[Rastreador] Serviço GT06 (TCP): porta ${porta}`); situacao(); });
   g.servidor.once('error', (err) => {
     g.fechar().catch(() => {});
@@ -88,16 +107,23 @@ function subir() {
 // Situação para o painel (aparelhos conectados) e o código carregado (para o atualizador saber se precisa reiniciar).
 const meusArquivos = () => Object.keys(require.cache).filter((a) => a.startsWith(__dirname));
 function situacao() {
-  try { servico.gravar({ porta: gt06 ? porta : null, imeis: gt06 ? gt06.imeis() : [], digital: servico.digital(meusArquivos()), arquivos: meusArquivos() }); }
+  try { servico.gravar({ porta: gt06 ? porta : null, imeis: gt06 ? gt06.imeis() : [], arquivos: meusArquivos() }); }
   catch (err) { console.error('[Rastreador] Serviço GT06 (situação):', err.message); }
+}
+// Aparelho conectou ou caiu: anuncia em seguida (juntando os que chegarem no mesmo instante), sem esperar os 5 s.
+let anuncio = null;
+function anunciarLogo() {
+  if (anuncio) return;
+  anuncio = setTimeout(() => { anuncio = null; situacao(); }, 100);
 }
 subir();
 situacao();
 setInterval(situacao, 5000); // anuncia mesmo esperando a porta: o painel vê e devolve a porta se estiver com ela
 
 // Se o processo que nos iniciou (PM2) sumir, ficamos órfãos segurando a porta: encerra para o PM2 subir um novo.
+// Só vale no PM2 (iniciado à mão, com nohup ou por um script, o processo pai some de propósito).
 const paiInicial = process.ppid;
-setInterval(() => {
+if (process.env.pm_id !== undefined) setInterval(() => {
   if (process.ppid !== paiInicial) {
     console.error('[Rastreador] Serviço GT06: ficou sem o processo que o iniciou; encerrando.');
     encerrar();
