@@ -134,6 +134,11 @@ com a data, em Transferências. A única coisa que a PAY AX **não** vê é o ex
 
 A chave PIX de destino do repasse **só a equipe PAY AX altera** — o cliente consulta, mas não muda sozinho.
 
+## Servidor de produção
+
+Contratação, instalação e redundância por etapas (AWS São Paulo, cópia contínua do banco, reserva pronta para
+assumir): veja **[implantacao/LEIA-ME.md](implantacao/LEIA-ME.md)**. Pacote de instalação: `npm run empacotar`.
+
 ## Como executar
 
 Requisitos: **Node.js 22.13+**.
