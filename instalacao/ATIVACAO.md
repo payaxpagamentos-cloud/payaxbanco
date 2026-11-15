@@ -45,7 +45,7 @@ de algum ajuste. Por exemplo, `--porta 3610` se a 3600 estiver ocupada, ou o cam
 
 ## 1. Enviar o pacote para o servidor
 
-Rode no seu computador, na pasta onde salvou o `zoe-instalacao.tar.gz`. O comando é o mesmo no Windows (PowerShell), no Mac e no Linux:
+Rode no seu computador, na pasta onde salvou o `zoe-instalacao.zip`. O comando é o mesmo no Windows (PowerShell), no Mac e no Linux:
 
 ```bash
 scp zoe-instalacao.zip root@IP-DO-SERVIDOR:/root/
