@@ -1521,7 +1521,7 @@ label.marcar + .ajuda, label.marcar + p.pequeno{ margin-left: 28px; }
 .av-extra{ color: var(--text-3); font-size: .9em; }
 .av-corpo-bloco{ min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: .8em; }
 .aovivo:not(.tv):not(:fullscreen) .av-corpo-bloco{ overflow: visible; }
-.av-corpo-bloco.transborda{ -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); }
+.av-corpo-bloco.transborda, .cl-col.transborda{ -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); }
 .av-vazio{ color: var(--text-3); margin: .2em 0; }
 .av-vazio.grande{ display: flex; align-items: center; justify-content: center; gap: .6em; padding: 1.6em .5em; color: var(--av-ok); font-weight: 600; font-size: 1.05em; }
 .av-vazio.grande svg{ width: 1.5em; height: 1.5em; }
@@ -1651,4 +1651,83 @@ body.pagina-tv.sem-cursor, body.pagina-tv.sem-cursor *{ cursor: none; }
   .av-relogio{ font-size: 1.5em; }
   .av-tag{ display: none; }
   .aovivo.tv, .aovivo:fullscreen{ padding: 1em; }
+}
+
+/* =====================================================================
+   AO VIVO — visual clean: tipografia grande e leve, sem cartões, cor só onde pede atenção.
+   ===================================================================== */
+.aovivo.clean{ --cl-linha: color-mix(in srgb, var(--text) 9%, transparent); gap: 1.6em; }
+.aovivo.clean.tv, .aovivo.clean:fullscreen{ padding: 2.6em 3.4em 2.2em; font-size: clamp(12px, .9vw, 32px); }
+.aovivo.clean .av-conteudo{ gap: 2em; }
+.aovivo.clean .av-ident .marca{ display: none; }
+.aovivo.clean .av-empresa{ padding-left: 0; border-left: 0; font-size: 1.5em; font-weight: 600; letter-spacing: -.01em; }
+.aovivo.clean .av-vivo{ background: none; padding: 0; font-size: .85em; letter-spacing: .14em; }
+.aovivo.clean .av-relogio{ font-size: 2.4em; font-weight: 300; letter-spacing: -.01em; }
+.aovivo.clean .av-data{ font-size: .9em; color: var(--text-3); }
+.aovivo.clean h2{ font-size: .82em; letter-spacing: .16em; color: var(--text-3); font-weight: 600; }
+
+/* Números grandes */
+.cl-hero{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border-top: 1px solid var(--cl-linha); border-bottom: 1px solid var(--cl-linha); }
+.cl-num{ display: flex; flex-direction: column; padding: 1.4em 1.6em 1.5em; min-width: 0; }
+.cl-num + .cl-num{ border-left: 1px solid var(--cl-linha); }
+.cl-num:first-child{ padding-left: 0; }
+.cl-rotulo{ font-size: .82em; letter-spacing: .16em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+.cl-num strong{ font-size: 6.2em; font-weight: 200; line-height: 1; letter-spacing: -.045em; margin: .16em 0 .12em; }
+.cl-num strong em{ font-style: normal; font-size: .42em; color: var(--text-3); letter-spacing: 0; margin-left: .08em; }
+.cl-num small{ color: var(--text-2); font-size: 1em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl-num.zoe strong{ color: var(--av-zoe); }
+.cl-num.atencao strong{ color: var(--av-atencao); }
+.cl-num.critico strong{ color: var(--av-critico); font-weight: 300; }
+
+/* Uma linha de alerta, só texto */
+.cl-alerta{ display: flex; align-items: center; gap: .7em; font-size: 1.25em; font-weight: 500; color: var(--text-2); }
+.cl-alerta i{ width: .55em; height: .55em; border-radius: 50%; background: var(--av-ok); flex: none; }
+.cl-alerta.critico{ color: var(--av-critico); } .cl-alerta.critico i{ background: var(--av-critico); animation: av-pulso 1.4s ease-in-out infinite; }
+.cl-alerta.atencao{ color: var(--av-atencao); } .cl-alerta.atencao i{ background: var(--av-atencao); }
+.cl-alerta small{ color: var(--text-3); font-size: .72em; font-weight: 500; margin-left: .4em; }
+
+/* Quem espera e a equipe: duas listas lado a lado */
+.cl-meio{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4em; min-height: 0; }
+.aovivo.clean.tv .cl-meio, .aovivo.clean:fullscreen .cl-meio{ flex: 1; }
+.cl-col{ display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.cl-col > header{ display: flex; align-items: baseline; justify-content: space-between; gap: 1em; padding-bottom: .8em; border-bottom: 1px solid var(--cl-linha); }
+.cl-filas{ display: flex; gap: 1.2em; flex-wrap: wrap; justify-content: flex-end; color: var(--text-3); font-size: .9em; }
+.cl-filas b{ color: var(--text); font-weight: 600; margin-left: .45em; }
+.cl-filas .critico b{ color: var(--av-critico); } .cl-filas .atencao b{ color: var(--av-atencao); }
+.cl-lista{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.cl-lista li{ display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: .78em 0; border-bottom: 1px solid var(--cl-linha); min-width: 0; }
+.cl-quem{ display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.cl-quem strong{ display: flex; align-items: center; gap: .6em; font-size: 1.3em; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl-quem small{ color: var(--text-3); font-size: .95em; margin-top: .15em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cl-lista .av-crono{ font-size: 1.6em; font-weight: 300; letter-spacing: -.01em; color: var(--text); }
+.cl-lista .av-crono.atencao{ color: var(--av-atencao); font-weight: 400; }
+.cl-lista .av-crono.critico{ color: var(--av-critico); font-weight: 400; }
+.cl-alta{ width: .45em; height: .45em; border-radius: 50%; background: var(--av-critico); flex: none; }
+.cl-ponto{ width: .5em; height: .5em; border-radius: 50%; background: var(--av-cor, var(--text-3)); flex: none; }
+.cl-situacao{ display: flex; align-items: baseline; gap: .7em; color: var(--text-2); font-size: 1.05em; white-space: nowrap; }
+.cl-situacao b{ font-weight: 500; color: var(--text); }
+.cl-situacao .av-crono{ font-size: 1.15em; color: var(--av-zoe); }
+.cl-lista li.livre .cl-situacao{ color: var(--av-ok); }
+.cl-lista li.lotado .cl-situacao{ color: var(--av-atencao); }
+.cl-vazio{ color: var(--text-3); font-size: 1.15em; margin: 1em 0 0; }
+.cl-mais{ color: var(--text-3); margin: .8em 0 0; }
+
+/* Rodapé: o dia numa linha */
+.cl-rodape{ display: flex; align-items: center; gap: 2.4em; padding-top: 1.1em; border-top: 1px solid var(--cl-linha); color: var(--text-3); flex-wrap: wrap; }
+.cl-hoje{ font-size: .82em; letter-spacing: .16em; text-transform: uppercase; font-weight: 600; }
+.cl-dado{ display: inline-flex; align-items: baseline; gap: .45em; white-space: nowrap; }
+.cl-dado b{ font-size: 1.35em; font-weight: 400; color: var(--text); }
+.cl-dado.zoe b{ color: var(--av-zoe); } .cl-dado.critico b{ color: var(--av-critico); }
+.cl-faisca{ margin-left: auto; display: flex; align-items: flex-end; gap: .25em; height: 2.4em; }
+.cl-faisca i{ width: .5em; border-radius: .12em; background: var(--text-3); opacity: .6; }
+.cl-faisca i.agora{ background: var(--azul); opacity: 1; }
+
+@media (max-width: 1100px){
+  .cl-hero{ grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cl-num{ padding: 1em 1em 1.1em 0; border-left: 0 !important; border-bottom: 1px solid var(--cl-linha); }
+  .cl-num strong{ font-size: 4em; }
+  .cl-meio{ grid-template-columns: minmax(0, 1fr); gap: 2em; }
+  .cl-col{ overflow: visible; -webkit-mask-image: none !important; mask-image: none !important; }
+  .cl-faisca{ margin-left: 0; }
+  .aovivo.clean.tv, .aovivo.clean:fullscreen{ padding: 1.2em; }
 }

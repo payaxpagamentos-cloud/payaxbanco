@@ -23,12 +23,22 @@ const aviso = (titulo, texto) => limpar(alvo, el('div', { class: 'entrada' }, el
 
 class ErroTv extends Error { constructor(m, status) { super(m); this.status = status; } }
 
+const GUARDA_VISUAL = 'zoe.tv.visual';
+/** Visual da TV: vem do link (&v=clean) e fica guardado, como a chave. */
+function lerVisual() {
+  const doLink = new URLSearchParams(location.hash.slice(1)).get('v');
+  if (doLink) { try { localStorage.setItem(GUARDA_VISUAL, doLink); } catch { /* só nesta aba */ } return doLink === 'clean' ? 'clean' : 'completo'; }
+  try { return localStorage.getItem(GUARDA_VISUAL) === 'clean' ? 'clean' : 'completo'; } catch { return 'completo'; }
+}
+
 const chave = lerChave();
 if (!chave) {
   aviso('Link de TV necessário', 'Abra o endereço completo que aparece em Ao vivo › Links de TV, no painel da ZOE.');
 } else {
-  montarPainel(alvo, {
+  let visual = lerVisual();
+  const painel = montarPainel(alvo, {
     tv: true,
+    visual,
     buscar: async () => {
       let r;
       try { r = await fetch(`${BASE}/api/tv/ao-vivo`, { headers: { Authorization: `Bearer ${chave}` }, cache: 'no-store' }); } catch { throw new ErroTv('Sem conexão com o servidor.', 0); }
@@ -59,6 +69,13 @@ if (!chave) {
   });
   // Recarrega de madrugada para pegar versões novas do painel sem ninguém mexer na TV.
   setInterval(() => { if (new Date().getHours() === 4 && performance.now() > 3_600_000) location.reload(); }, 600_000);
+  // Tecla V (no computador ligado na TV): alterna entre o visual completo e o clean, e guarda a escolha.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'v' && e.key !== 'V') return;
+    visual = visual === 'clean' ? 'completo' : 'clean';
+    try { localStorage.setItem(GUARDA_VISUAL, visual); } catch { /* só agora */ }
+    painel.trocarVisual(visual);
+  });
   // Duplo clique: tela cheia (no computador ligado na TV).
   document.addEventListener('dblclick', () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.()).catch?.(() => {}));
 }

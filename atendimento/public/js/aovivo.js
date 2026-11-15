@@ -1,4 +1,4 @@
-import { el, limpar, icone, iniciais, inteiro, porcento, marca, modal, formModal, confirmar, campo, toast, desde } from './ui.js';
+import { el, limpar, icone, iniciais, inteiro, porcento, marca, modal, formModal, confirmar, campo, escolha, toast, desde } from './ui.js';
 import { api, BASE } from './api.js';
 
 /**
@@ -204,17 +204,88 @@ function hoje(d) {
     porHora(d));
 }
 
+// ---------- Visual clean ----------
+// Só o essencial, para ler de longe: quatro (ou cinco) números grandes, uma linha de alerta, quem espera,
+// como está a equipe e uma linha com o dia. Sem cartões, sem ícones, cor só onde pede atenção.
+
+function cleanNumero(rotulo, valor, nota, tom = '') {
+  return el('div', { class: `cl-num ${tom}` }, el('span', { class: 'cl-rotulo' }, rotulo), el('strong', {}, valor), el('small', {}, nota ?? '\u00a0'));
+}
+
+function desenharClean(d) {
+  const a = d.agora;
+  const meta = d.metas.espera_s;
+  const tomFila = a.na_fila === 0 ? '' : a.maior_espera_s >= meta ? 'critico' : a.maior_espera_s >= meta / 2 ? 'atencao' : '';
+  const hero = el('div', { class: 'cl-hero' },
+    cleanNumero('Na fila', inteiro(a.na_fila), a.na_fila ? el('span', {}, 'maior espera ', cronometro(a.maior_espera_s, { meta })) : 'ninguém esperando', tomFila),
+    cleanNumero('Com a ZOE', inteiro(a.com_zoe), 'atendendo sozinha', 'zoe'),
+    cleanNumero('Com a equipe', inteiro(a.com_equipe), 'em atendimento'),
+    cleanNumero('Livres', el('span', {}, inteiro(a.equipe_livre), el('em', {}, `/${inteiro(a.equipe_total)}`)), 'da equipe',
+      a.equipe_livre === 0 && a.na_fila > 0 ? 'critico' : ''),
+    d.telefone ? cleanNumero('Ligações', inteiro(d.telefone.em_curso), d.telefone.tocando ? `${inteiro(d.telefone.tocando)} tocando` : 'em curso',
+      d.telefone.canais && d.telefone.em_curso >= d.telefone.canais ? 'critico' : '') : null);
+
+  const [primeiro, ...outros] = d.alertas;
+  const alerta = el('div', { class: `cl-alerta ${primeiro ? primeiro.nivel : 'ok'}` }, el('i'),
+    primeiro ? primeiro.texto : 'Tudo em dia',
+    outros.length ? el('small', {}, `+${outros.length} ${outros.length === 1 ? 'alerta' : 'alertas'}`) : null);
+
+  const filasComGente = d.filas.filter((f) => f.aguardando > 0);
+  const espera = el('section', { class: 'cl-col' },
+    el('header', {}, el('h2', {}, 'Esperando'),
+      el('span', { class: 'cl-filas' }, filasComGente.map((f) => el('span', { class: f.nivel }, f.nome, el('b', {}, inteiro(f.aguardando)))))),
+    d.esperando.length
+      ? el('ol', { class: 'cl-lista' }, d.esperando.slice(0, 7).map((c) => el('li', {},
+        el('span', { class: 'cl-quem' }, el('strong', {}, c.cliente, c.prioridade === 'alta' ? el('i', { class: 'cl-alta', title: 'Prioridade alta' }) : null),
+          el('small', {}, `${c.fila}${c.canal === 'telefone' ? ' · telefone' : ''}`)),
+        cronometro(c.espera_s, { meta }))))
+      : el('p', { class: 'cl-vazio' }, 'Ninguém esperando.'),
+    a.na_fila > 7 ? el('p', { class: 'cl-mais' }, `e mais ${inteiro(a.na_fila - 7)} na fila`) : null);
+
+  const pessoas = d.equipe.filter((p) => p.situacao !== 'ausente');
+  const ausentes = d.equipe.length - pessoas.length;
+  const equipe = el('section', { class: 'cl-col' },
+    el('header', {}, el('h2', {}, 'Equipe'), ausentes ? el('span', { class: 'cl-filas' }, `${ausentes} ${ausentes === 1 ? 'ausente' : 'ausentes'}`) : null),
+    pessoas.length
+      ? el('ul', { class: 'cl-lista' }, pessoas.slice(0, 9).map((p) => {
+        const [rotulo, tom] = SITUACOES[p.situacao];
+        return el('li', { class: tom },
+          el('span', { class: 'cl-quem' }, el('strong', {}, el('i', { class: 'cl-ponto' }), p.nome)),
+          el('span', { class: 'cl-situacao' }, rotulo,
+            p.situacao === 'em_ligacao' ? cronometro(p.desde_s) : ['atendendo', 'lotado'].includes(p.situacao) ? el('b', {}, `${p.atendendo}/${p.capacidade}`) : null));
+      }))
+      : el('p', { class: 'cl-vazio' }, 'Ninguém da equipe com o painel aberto.'),
+    pessoas.length > 9 ? el('p', { class: 'cl-mais' }, `e mais ${pessoas.length - 9}`) : null);
+
+  const h = d.hoje;
+  const dado = (rotulo, valor, tom = '') => el('span', { class: `cl-dado ${tom}` }, el('b', {}, valor), rotulo);
+  const horas = h.por_hora;
+  const max = Math.max(1, ...horas.map((x) => x.zoe + x.equipe));
+  const agoraH = h.hora_atual ?? new Date().getHours();
+  const rodape = el('footer', { class: 'cl-rodape' },
+    el('span', { class: 'cl-hoje' }, 'Hoje'),
+    dado('conversas', inteiro(h.conversas)),
+    dado('resolvidas pela ZOE', porcento(h.taxa_zoe), 'zoe'),
+    dado('espera média', tempo(h.espera_fila_s), h.espera_fila_s >= meta ? 'critico' : ''),
+    dado('assumidas em até 2 min', h.nivel_servico === null ? '—' : porcento(h.nivel_servico)),
+    h.csat_medio !== null ? dado('satisfação', `${h.csat_medio.toLocaleString('pt-BR')}★`) : null,
+    el('span', { class: 'cl-faisca', title: 'Conversas por hora' }, horas.slice(6, 24).map((x) =>
+      el('i', { class: x.hora === agoraH ? 'agora' : '', style: `height:${Math.max(6, ((x.zoe + x.equipe) / max) * 100)}%` }))));
+
+  return [hero, alerta, el('div', { class: 'cl-meio' }, espera, equipe), rodape];
+}
+
 /**
  * Monta o painel em `alvo`. `buscar()` devolve os dados (pela sessão ou pelo link da TV).
  * Devolve a função que para tudo (troca de tela).
  */
-export function montarPainel(alvo, { buscar, tv = false, aoFalhar = null }) {
+export function montarPainel(alvo, { buscar, tv = false, aoFalhar = null, visual = 'completo' }) {
   const relogioEl = el('strong', { class: 'av-relogio' });
   const dataEl = el('small', { class: 'av-data' });
   const estado = el('span', { class: 'av-vivo' }, el('i'), 'Ao vivo');
   const nome = el('span', { class: 'av-empresa' });
   const corpo = el('div', { class: 'av-conteudo' }, el('div', { class: 'av-carregando' }, 'Carregando o painel…'));
-  const raiz = el('div', { class: `aovivo${tv ? ' tv' : ''}` },
+  const raiz = el('div', { class: `aovivo${tv ? ' tv' : ''}${visual === 'clean' ? ' clean' : ''}` },
     el('header', { class: 'av-topo' },
       el('div', { class: 'av-ident' }, marca('ZOE'), nome),
       el('div', { class: 'av-hora-certa' }, estado, el('span', { class: 'av-quando' }, relogioEl, dataEl))),
@@ -226,16 +297,21 @@ export function montarPainel(alvo, { buscar, tv = false, aoFalhar = null }) {
   let parado = false;
   let timer = null;
 
+  let ultimo = null;
   const desenhar = (d) => {
+    ultimo = d;
     nome.textContent = d.empresa.nome;
-    limpar(corpo,
-      kpis(d),
-      alertas(d),
-      el('div', { class: 'av-grade' }, filas(d), esperando(d), el('div', { class: 'av-coluna' }, equipe(d), telefone(d))),
-      hoje(d));
+    if (visual === 'clean') limpar(corpo, desenharClean(d));
+    else {
+      limpar(corpo,
+        kpis(d),
+        alertas(d),
+        el('div', { class: 'av-grade' }, filas(d), esperando(d), el('div', { class: 'av-coluna' }, equipe(d), telefone(d))),
+        hoje(d));
+    }
     tique(raiz, recebidoEm);
     // Na TV a altura é fixa: o bloco que não coube inteiro ganha um esmaecido embaixo, em vez de cortar uma linha ao meio.
-    for (const b of raiz.querySelectorAll('.av-corpo-bloco')) b.classList.toggle('transborda', b.scrollHeight > b.clientHeight + 2);
+    for (const b of raiz.querySelectorAll('.av-corpo-bloco, .cl-col')) b.classList.toggle('transborda', b.scrollHeight > b.clientHeight + 2);
   };
 
   const ciclo = async () => {
@@ -276,16 +352,26 @@ export function montarPainel(alvo, { buscar, tv = false, aoFalhar = null }) {
     clearInterval(segundo);
     document.removeEventListener('visibilitychange', aoVoltar);
   };
-  return { raiz, parar };
+  /** Troca o visual na hora, com os últimos números (sem esperar a próxima busca). */
+  const trocarVisual = (v) => {
+    visual = v === 'clean' ? 'clean' : 'completo';
+    raiz.classList.toggle('clean', visual === 'clean');
+    if (ultimo) desenhar(ultimo);
+  };
+  return { raiz, parar, trocarVisual };
 }
 
 // ---------- Dentro do sistema: menu "Ao vivo" ----------
 
 /** Endereço da página da TV, com o link da tela no fragmento (#): o fragmento não vai para o servidor nem para os logs. */
-const enderecoTv = (base, chave) => `${location.origin}${base}/tv.html#k=${chave}`;
+const enderecoTv = (base, chave, visual) => `${location.origin}${base}/tv.html#k=${chave}${visual === 'clean' ? '&v=clean' : ''}`;
+
+const GUARDA_VISUAL = 'atend.aovivo.visual';
+const lerVisual = () => { try { return localStorage.getItem(GUARDA_VISUAL) === 'clean' ? 'clean' : 'completo'; } catch { return 'completo'; } };
 
 export async function telaAoVivo(ctx) {
-  const { raiz, parar } = montarPainel(ctx.conteudo, { buscar: () => api.get(`/empresas/${ctx.empresaId}/ao-vivo`) });
+  let visual = lerVisual();
+  const { raiz, parar, trocarVisual } = montarPainel(ctx.conteudo, { buscar: () => api.get(`/empresas/${ctx.empresaId}/ao-vivo`), visual });
   // Tela cheia: o painel ocupa o monitor inteiro com letras maiores, como na TV.
   const aoMudarTela = () => raiz.classList.toggle('tv', document.fullscreenElement === raiz);
   document.addEventListener('fullscreenchange', aoMudarTela);
@@ -317,11 +403,13 @@ export async function telaAoVivo(ctx) {
   };
   const novo = async () => {
     let criada = null;
+    let escolhido = 'clean';
     const ok = await formModal('Novo link de TV', () => [
       campo('Nome da tela (para você reconhecer)', { name: 'nome', required: true, maxlength: 80, value: 'TV da supervisão' }),
-    ], async (d) => { criada = await api.post(`/empresas/${ctx.empresaId}/telas-tv`, d); return true; }, { rotulo: 'Criar link' });
+      escolha('Visual', 'visual', { clean: 'Clean: só o essencial, números grandes', completo: 'Completo: filas, equipe, telefone e o dia' }, 'clean'),
+    ], async (d) => { escolhido = d.visual; criada = await api.post(`/empresas/${ctx.empresaId}/telas-tv`, { nome: d.nome }); return true; }, { rotulo: 'Criar link' });
     if (!ok || !criada) return;
-    const url = enderecoTv(BASE, criada.chave);
+    const url = enderecoTv(BASE, criada.chave, escolhido);
     modal('Link da TV criado', (fechar) => [
       el('p', { class: 'mudo', style: 'margin-top:0' }, 'Abra este endereço no navegador da TV (ou do computador ligado nela) e deixe em tela cheia (F11). '
         + 'Copie agora: por segurança, o link completo não aparece de novo.'),
@@ -332,7 +420,17 @@ export async function telaAoVivo(ctx) {
     ], { largo: 'medio' });
   };
 
+  // Completo ou clean: a escolha fica guardada neste navegador.
+  const seletorVisual = el('div', { class: 'segmentado', role: 'group', 'aria-label': 'Visual do painel' },
+    [['completo', 'Completo'], ['clean', 'Clean']].map(([v, rotulo]) => el('button', { class: `btn${visual === v ? ' on' : ''}`, type: 'button', dataset: { visual: v },
+      onclick: () => {
+        visual = v;
+        try { localStorage.setItem(GUARDA_VISUAL, v); } catch { /* vale só agora */ }
+        for (const b of seletorVisual.children) b.classList.toggle('on', b.dataset.visual === v);
+        trocarVisual(v);
+      } }, rotulo)));
   ctx.acoes(
+    seletorVisual,
     el('button', { class: 'btn', type: 'button', onclick: links }, icone('tv'), 'Links de TV'),
     el('button', { class: 'btn primario', type: 'button', onclick: () => raiz.requestFullscreen?.().catch(() => toast('O navegador não deixou abrir em tela cheia.', true)) },
       icone('tela-cheia'), 'Tela cheia'));

@@ -154,14 +154,16 @@ O menu **Ao vivo** mostra o atendimento acontecendo agora e se atualiza sozinho 
 
 Para deixar o painel numa TV, sem login:
 
-1. Em **Ao vivo**, clique em **Links de TV**, depois em **Novo link de TV**, e copie o link. Ele aparece uma vez só.
+1. Em **Ao vivo**, clique em **Links de TV**, depois em **Novo link de TV**, escolha o visual e copie o link. Ele aparece uma vez só.
+   - **Clean:** só o essencial em números grandes, para ler de longe.
+   - **Completo:** filas, equipe, telefone e o dia em detalhe.
 2. Na TV, ou no computador ligado nela, abra o link no navegador e aperte F11 (ou dê dois cliques na tela).
 3. O link abre só esse painel: não abre conversas nem mostra o telefone completo do cliente.
 4. Para desligar uma TV, use **Revogar** na mesma lista. A tela para na hora.
 
 Enquanto o endereço for pelo IP com o certificado próprio, o navegador da TV mostra o aviso de conexão não privada uma vez. Clique em *Avançado* e depois em *Continuar*.
 
-No computador do supervisor, o botão **Tela cheia** deixa o painel em letras grandes, como na TV.
+No computador do supervisor, o seletor **Completo / Clean** troca o visual e o botão **Tela cheia** deixa o painel em letras grandes, como na TV. Na TV, a tecla **V** alterna entre os dois visuais.
 
 ---
 
