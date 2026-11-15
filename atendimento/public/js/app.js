@@ -1,5 +1,5 @@
 import { api, sessao } from './api.js';
-import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, PERFIS, pl } from './ui.js';
+import { el, $, limpar, icone, marca, iniciais, toast, acao, campo, formModal, repetir, PERFIS, pl } from './ui.js';
 import { TELAS_MASTER } from './master.js';
 import { iniciarTelefone, pararTelefone } from './telefone.js';
 import { TELAS_EMPRESA } from './empresa.js';
@@ -288,24 +288,107 @@ function alterarSenha() {
   });
 }
 
+const GUARDA_EMAIL = 'atend.email';
+
+/**
+ * Tela de entrada. À esquerda, a ZOE se apresenta (uma conversa de verdade, do jeito que ela atende);
+ * à direita, o formulário. O erro aparece no próprio formulário, perto de onde a pessoa está olhando,
+ * e não num aviso que some no canto da tela.
+ */
 function telaEntrada() {
-  const f = el('form', { class: 'form' },
-    campo('E-mail', { name: 'email', type: 'email', autocomplete: 'username', required: true }),
-    campo('Senha', { name: 'senha', type: 'password', autocomplete: 'current-password', required: true }),
-    el('button', { class: 'btn primario', style: 'min-height:42px;margin-top:4px' }, 'Entrar'));
-  f.addEventListener('submit', (e) => {
+  let lembrado = '';
+  try { lembrado = localStorage.getItem(GUARDA_EMAIL) ?? ''; } catch { /* sem armazenamento */ }
+
+  const email = el('input', { name: 'email', type: 'email', autocomplete: 'username', required: true, placeholder: 'voce@empresa.com.br', value: lembrado });
+  const senha = el('input', { name: 'senha', type: 'password', autocomplete: 'current-password', required: true, placeholder: 'Sua senha' });
+  const olho = el('button', { type: 'button', class: 'login-olho', title: 'Mostrar a senha', 'aria-label': 'Mostrar a senha' }, icone('olho'));
+  olho.addEventListener('click', () => {
+    const ver = senha.type === 'password';
+    senha.type = ver ? 'text' : 'password';
+    olho.title = ver ? 'Esconder a senha' : 'Mostrar a senha';
+    olho.setAttribute('aria-label', olho.title);
+    limpar(olho, icone(ver ? 'olho-fechado' : 'olho'));
+    senha.focus();
+  });
+  const caps = el('small', { class: 'login-caps oculto', role: 'status' }, 'Caps Lock ligado');
+  senha.addEventListener('keyup', (e) => caps.classList.toggle('oculto', !e.getModifierState?.('CapsLock')));
+  const lembrar = el('input', { type: 'checkbox', name: 'lembrar', checked: Boolean(lembrado) });
+  const erro = el('div', { class: 'login-erro oculto', role: 'alert' });
+  const entrar = el('button', { class: 'btn primario login-botao', type: 'submit' }, el('span', {}, 'Entrar'), icone('entrar'));
+
+  const campoLogin = (rotulo, ic, input, extra = null) => el('label', { class: 'login-campo' },
+    el('span', { class: 'login-rotulo' }, rotulo),
+    el('span', { class: 'login-entrada' }, icone(ic), input, extra));
+
+  const f = el('form', { class: 'login-form', novalidate: true },
+    campoLogin('E-mail', 'email', email),
+    campoLogin('Senha', 'cadeado', senha, olho),
+    el('div', { class: 'login-linha' }, el('label', { class: 'marcar' }, lembrar, 'Lembrar meu e-mail'), caps),
+    erro,
+    entrar);
+
+  const mostrarErro = (texto) => { erro.textContent = texto; erro.classList.remove('oculto'); };
+  f.addEventListener('submit', async (e) => {
     e.preventDefault();
-    acao(f.querySelector('button'), async () => {
-      const r = await api.post('/auth/login', lerForm(f));
+    erro.classList.add('oculto');
+    if (!email.value.trim() || !senha.value) { mostrarErro('Preencha o e-mail e a senha.'); (email.value.trim() ? senha : email).focus(); return; }
+    entrar.disabled = true;
+    entrar.classList.add('carregando');
+    entrar.firstChild.textContent = 'Entrando…';
+    try {
+      const r = await api.post('/auth/login', { email: email.value.trim(), senha: senha.value });
+      try {
+        if (lembrar.checked) localStorage.setItem(GUARDA_EMAIL, email.value.trim());
+        else localStorage.removeItem(GUARDA_EMAIL);
+      } catch { /* ignora */ }
       sessao.set(r);
       desenhar();
-    });
+    } catch (err) {
+      mostrarErro(err.status === 401 ? 'E-mail ou senha não conferem. Confira e tente de novo.' : err.message);
+      senha.select();
+      entrar.disabled = false;
+      entrar.classList.remove('carregando');
+      entrar.firstChild.textContent = 'Entrar';
+    }
   });
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'cartao' },
-    marca(nomePlataforma),
-    el('h1', { style: 'margin:28px 0 4px;font-size:20px' }, 'Entrar no painel'),
-    el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'Use o e-mail e a senha que você recebeu.'), f)));
-  f.querySelector('input').focus();
+
+  // A conversa da vitrine: como a ZOE atende, em quatro falas.
+  const fala = (quem, texto, extra = null) => el('div', { class: `login-fala ${quem}` }, el('p', {}, texto), extra);
+  const vitrine = el('section', { class: 'login-vitrine', 'aria-hidden': 'true' },
+    el('div', { class: 'login-chat' },
+      el('div', { class: 'login-chat-topo' }, el('span', { class: 'login-avatar' }, icone('ia')),
+        el('span', {}, el('strong', {}, 'ZOE'), el('small', {}, 'online agora'))),
+      fala('cliente', 'Oi, preciso da 2ª via da minha fatura'),
+      fala('zoe', 'Claro! Confirma pra mim os 3 primeiros números do CPF do titular?'),
+      fala('cliente', '123'),
+      fala('zoe', 'Pronto, Joana! Te mandei o PIX de R$ 89,90 com vencimento em 20/11. 💙',
+        el('span', { class: 'login-selo' }, icone('ok'), 'Resolvido pela ZOE em 38 s'))));
+
+  const status = el('span', { class: 'login-status' }, el('i'), 'Verificando o sistema…');
+  api.get('/saude').then(() => { status.className = 'login-status ok'; status.lastChild.textContent = 'Sistema online'; })
+    .catch(() => { status.className = 'login-status erro'; status.lastChild.textContent = 'Sem conexão com o servidor'; });
+
+  limpar(raiz, el('div', { class: 'login' },
+    el('aside', { class: 'login-marca' },
+      el('div', { class: 'login-marca-topo' }, marca(nomePlataforma)),
+      el('div', { class: 'login-chamada' },
+        el('h1', {}, 'A atendente que resolve antes de chamar alguém.'),
+        el('p', {}, 'WhatsApp e telefone num lugar só. A ZOE atende, consulta o provedor e só passa para a equipe o que precisa de gente.'),
+        el('ul', { class: 'login-pontos' },
+          el('li', {}, icone('conversa'), 'WhatsApp e telefone com a mesma inteligência'),
+          el('li', {}, icone('dinheiro'), '2ª via, PIX e cobrança dentro da janela grátis'),
+          el('li', {}, icone('tv'), 'Supervisão ao vivo, na tela e na TV'))),
+      vitrine,
+      el('small', { class: 'login-rodape' }, `© ${new Date().getFullYear()} ${nomePlataforma}`)),
+    el('main', { class: 'login-painel' },
+      el('div', { class: 'login-caixa' },
+        el('div', { class: 'login-marca-celular' }, marca(nomePlataforma)),
+        el('h2', {}, 'Bem-vindo de volta'),
+        el('p', { class: 'login-sub' }, 'Entre com o e-mail e a senha que você recebeu.'),
+        f,
+        el('p', { class: 'login-ajuda' }, 'Esqueceu a senha? Peça ao administrador da sua empresa para criar uma nova em Usuários.'),
+        status))));
+  (lembrado ? senha : email).focus();
 }
 
 api.get('/publico').then((p) => { nomePlataforma = p.nome || 'ZOE Atende'; }).catch(() => {}).finally(desenhar);
