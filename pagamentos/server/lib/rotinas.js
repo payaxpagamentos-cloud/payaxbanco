@@ -79,9 +79,10 @@ async function rodar(db, { forcar = false } = {}) {
     console.error('[PAY AX] Falha ao reprocessar baixas no IXC:', err.message);
   }
 
-  // Importação automática do IXC, para os clientes que pediram: de hora em hora, para o título criado
-  // no IXC durante o dia virar boleto no mesmo dia (o que já foi importado é ignorado, sem custo).
-  if (forcar || Date.now() - (ultimaImportacao ?? 0) >= 3_600_000) {
+  // Importação automática do IXC, para os clientes que pediram: a cada ciclo (15 minutos), porque quando o
+  // IXC envia o boleto ao assinante ele precisa estar registrado no banco o quanto antes. O que já foi
+  // importado é ignorado, sem custo.
+  if (forcar || Date.now() - (ultimaImportacao ?? 0) >= 60_000) {
     ultimaImportacao = Date.now();
     const clientes = db.prepare(`SELECT c.* FROM clientes c JOIN integracoes i ON i.cliente_id = c.id AND i.escopo = 'ixc'
       WHERE c.situacao = 'ativo' AND i.estado <> 'desabilitada' AND json_extract(i.config, '$.importacao_automatica') = 1`).all();

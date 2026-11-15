@@ -170,8 +170,32 @@ module.exports = (db) => {
       mensagem: v.opcional(b.mensagem, 'a mensagem do boleto', 160),
       anotar_no_ixc: b.anotar_no_ixc === undefined ? true : v.booleano(b.anotar_no_ixc),
       importacao_automatica: v.booleano(b.importacao_automatica),
+      // Quem numera e monta o boleto que o assinante recebe: a PAY AX (ficha da PAY AX) ou o próprio IXC
+      // (layout do IXC; a PAY AX só registra, com o nosso número que o IXC deu, numa faixa reservada).
+      ...(() => {
+        const numeracao = v.opcao(b.numeracao || 'payax', 'quem monta o boleto', ['payax', 'ixc']);
+        if (numeracao === 'payax') return { numeracao };
+        const conta = boletosLib.contaDe(db, b.conta_id || null);
+        const ini = Number(String(b.faixa_inicio ?? '').replace(/\D/g, ''));
+        const fim = Number(String(b.faixa_fim ?? '').replace(/\D/g, ''));
+        if (!ini || !fim || fim < ini) throw new ErroNegocio('Informe a faixa de nosso número da carteira PAY AX no IXC (início e fim).', 422);
+        if (ini < conta.nosso_numero_inicial || fim > conta.nosso_numero_final) {
+          throw new ErroNegocio(`A faixa precisa estar dentro da faixa da conta no Bradesco (${conta.nosso_numero_inicial} a ${conta.nosso_numero_final}).`, 422);
+        }
+        if (ini <= conta.nosso_numero_atual) {
+          throw new ErroNegocio(`A faixa precisa começar depois do último número já usado pela PAY AX nesta conta (${conta.nosso_numero_atual}).`, 422);
+        }
+        const outra = db.prepare("SELECT cliente_id, config FROM integracoes WHERE escopo = 'ixc' AND cliente_id <> ?").all(cliente.id)
+          .map((i) => ({ id: i.cliente_id, c: JSON.parse(i.config || '{}') }))
+          .find((i) => i.c.numeracao === 'ixc' && Number(i.c.conta_id ?? conta.id) === conta.id && !(fim < Number(i.c.faixa_inicio) || ini > Number(i.c.faixa_fim)));
+        if (outra) throw new ErroNegocio('Esta faixa se sobrepõe à de outro cliente. Cada cliente precisa de uma faixa só dele.', 409);
+        return { numeracao, conta_id: conta.id, faixa_inicio: ini, faixa_fim: fim };
+      })(),
       dias_a_frente: v.inteiroOpcional(b.dias_a_frente, 'os dias à frente', { min: 1, max: 90 }) ?? 10,
     };
+    // Com o IXC enviando o boleto, o título precisa estar registrado desde que a fatura é gerada:
+    // por padrão, importa os vencimentos dos próximos 45 dias.
+    if (cfg.numeracao === 'ixc' && (b.dias_a_frente === undefined || b.dias_a_frente === '')) cfg.dias_a_frente = 45;
     const id = gravar(db, { escopo: 'ixc', cliente_id: cliente.id, credenciais, cfg, usuario: req.usuario });
     auditoria.registrar(db, req, { acao: 'integracao.ixc.configurada', entidade: 'integracao', entidade_id: id, cliente_id: cliente.id, depois: cfg });
     res.json(semSegredo(db.prepare('SELECT * FROM integracoes WHERE id = ?').get(id)));

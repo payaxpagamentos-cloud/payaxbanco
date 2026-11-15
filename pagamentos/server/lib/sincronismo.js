@@ -13,6 +13,19 @@ const { ErroNegocio } = require('./erros');
 const { decifrar } = require('./cripto');
 const { criarIxc } = require('./ixc');
 const boletos = require('./boletos');
+const febraban = require('./febraban');
+
+/**
+ * Nosso número que o IXC deu ao título ("00000012345", "12345-P", "000000123456"), em 11 dígitos + DV.
+ * Devolve null quando o IXC ainda não gerou o boleto (sem número).
+ */
+function nossoNumeroDoIxc(valor) {
+  const t = String(valor ?? '').toUpperCase().replace(/[^0-9P]/g, '');
+  if (!t) return null;
+  if (/^\d{1,11}$/.test(t)) return { numero: t.padStart(11, '0'), dv: null };
+  if (/^\d{1,11}[0-9P]$/.test(t) && t.length >= 2) return { numero: t.slice(0, -1).padStart(11, '0'), dv: t.slice(-1) };
+  throw new ErroNegocio(`nosso número do IXC em formato desconhecido: ${valor}`, 422);
+}
 const datas = require('./datas');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
@@ -84,13 +97,39 @@ async function importar(db, cliente, { de, ate, limite = 200, maxPaginas = 50, u
         const p = cacheClientes.get(t.ixc_cliente_id);
         if (!p?.documento) { resultado.ignorados += 1; resultado.detalhes.push({ ixc_id: t.ixc_id, motivo: 'pagador sem CPF/CNPJ no IXC' }); continue; }
 
+        // O IXC numera e imprime o boleto: registramos com o número dele, e só se o código que ele calculou
+        // for exatamente o que vai para o banco (senão o pagador teria um boleto que o banco não reconhece).
+        let nossoNumeroDefinido = null;
+        if (ixc.config.numeracao === 'ixc') {
+          const nn = nossoNumeroDoIxc(t.bruto?.nosso_numero);
+          if (!nn) { resultado.ignorados += 1; resultado.detalhes.push({ ixc_id: t.ixc_id, motivo: 'o IXC ainda não gerou o boleto (sem nosso número): entra na próxima rodada' }); continue; }
+          const n = Number(nn.numero);
+          if (!(n >= Number(ixc.config.faixa_inicio) && n <= Number(ixc.config.faixa_fim))) {
+            throw new ErroNegocio(`nosso número ${nn.numero} fora da faixa reservada para este cliente (${ixc.config.faixa_inicio} a ${ixc.config.faixa_fim}): confira a carteira PAY AX no IXC`, 422);
+          }
+          const conta = boletos.contaDe(db, ixc.config.conta_id ?? null);
+          const esperado = febraban.boletoBradesco({ agencia: conta.agencia, conta: conta.conta, carteira: conta.carteira,
+            nossoNumero: nn.numero, valorCentavos: t.valor_centavos, vencimento: t.vencimento });
+          if (nn.dv && nn.dv !== esperado.nosso_numero_dv) {
+            throw new ErroNegocio(`dígito do nosso número do IXC (${nn.dv}) diferente do Bradesco (${esperado.nosso_numero_dv}): confira a carteira (09) no IXC`, 422);
+          }
+          const linhaIxc = String(t.bruto?.linha_digitavel ?? '').replace(/\D/g, '');
+          if (linhaIxc && linhaIxc !== esperado.linha_digitavel.replace(/\D/g, '')) {
+            throw new ErroNegocio('a linha digitável do boleto do IXC não bate com a do registro: confira agência, conta e carteira da carteira PAY AX no IXC (nada foi registrado)', 422);
+          }
+          nossoNumeroDefinido = nn.numero;
+        }
+
         const out = await boletos.emitir(db, {
           cliente,
           origem: 'ixc',
           ixc: { receber_id: t.ixc_id, cliente_id: t.ixc_cliente_id },
+          nossoNumeroDefinido,
+          contaId: ixc.config.numeracao === 'ixc' ? ixc.config.conta_id ?? null : null,
           usuario,
           dados: {
-            tipo: ixc.config.tipo_padrao === 'boleto' ? 'boleto' : 'bolepix',
+            // Com o layout do IXC, o QR Code PIX do Bolepix não sairia no papel: registra como boleto comum.
+            tipo: ixc.config.numeracao === 'ixc' || ixc.config.tipo_padrao === 'boleto' ? 'boleto' : 'bolepix',
             valor_centavos: t.valor_centavos,
             vencimento: t.vencimento,
             seu_numero: t.documento || `IXC-${t.ixc_id}`,
@@ -112,7 +151,8 @@ async function importar(db, cliente, { de, ate, limite = 200, maxPaginas = 50, u
         if (out.ja_existia) { resultado.ignorados += 1; continue; }
         resultado.criados += 1;
         // Devolve ao IXC a linha digitável, para o provedor ver o boleto no título de origem.
-        if (ixc.config.anotar_no_ixc !== false) {
+        // Quando o IXC numera, o título já tem o número e a linha dele: nada a gravar de volta.
+        if (ixc.config.anotar_no_ixc !== false && ixc.config.numeracao !== 'ixc') {
           const b = db.prepare('SELECT linha_digitavel, nosso_numero, nosso_numero_dv FROM boletos WHERE id = ?').get(out.id);
           await ixc.cliente.anotarBoleto(t.ixc_id, { linha_digitavel: b.linha_digitavel, nosso_numero: `${b.nosso_numero}-${b.nosso_numero_dv}` })
             .catch((err) => resultado.detalhes.push({ ixc_id: t.ixc_id, aviso: `boleto emitido, mas não foi anotado no IXC: ${err.message}` }));
@@ -176,4 +216,4 @@ async function reprocessarBaixas(db, limite = 50) {
   return out;
 }
 
-module.exports = { ixcDoCliente, testar, importar, avisarBaixa, reprocessarBaixas, hoje };
+module.exports = { nossoNumeroDoIxc, ixcDoCliente, testar, importar, avisarBaixa, reprocessarBaixas, hoje };

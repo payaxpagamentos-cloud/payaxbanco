@@ -38,13 +38,30 @@ function credenciaisDaConta(db, contaId) {
 }
 
 /** Próximo nosso número da conta, reservado de forma atômica (não repete nem com dois pedidos ao mesmo tempo). */
+/**
+ * Faixas de nosso número reservadas na conta para quem numera no próprio sistema (IXC que imprime o boleto):
+ * a numeração da PAY AX pula essas faixas, para nunca usar um número que o IXC vai usar.
+ */
+function faixasReservadas(db, contaId) {
+  return db.prepare("SELECT config FROM integracoes WHERE escopo = 'ixc'").all()
+    .map((i) => { try { return JSON.parse(i.config || '{}'); } catch { return {}; } })
+    .filter((c) => c.numeracao === 'ixc' && c.faixa_inicio && c.faixa_fim && (!c.conta_id || Number(c.conta_id) === Number(contaId)))
+    .map((c) => [Number(c.faixa_inicio), Number(c.faixa_fim)]);
+}
+
 function proximoNossoNumero(db, conta) {
-  const r = db.prepare(`UPDATE contas_bancarias
-      SET nosso_numero_atual = MAX(nosso_numero_atual, nosso_numero_inicial - 1) + 1
-      WHERE id = ? AND MAX(nosso_numero_atual, nosso_numero_inicial - 1) + 1 <= nosso_numero_final
-      RETURNING nosso_numero_atual`).get(conta.id);
-  if (!r) throw new ErroNegocio('A faixa de nosso número desta conta acabou. Peça uma nova faixa ao banco e atualize a conta.', 409);
-  return String(r.nosso_numero_atual).padStart(11, '0');
+  const reservadas = faixasReservadas(db, conta.id);
+  for (;;) {
+    const r = db.prepare(`UPDATE contas_bancarias
+        SET nosso_numero_atual = MAX(nosso_numero_atual, nosso_numero_inicial - 1) + 1
+        WHERE id = ? AND MAX(nosso_numero_atual, nosso_numero_inicial - 1) + 1 <= nosso_numero_final
+        RETURNING nosso_numero_atual`).get(conta.id);
+    if (!r) throw new ErroNegocio('A faixa de nosso número desta conta acabou. Peça uma nova faixa ao banco e atualize a conta.', 409);
+    const faixa = reservadas.find(([i, f]) => r.nosso_numero_atual >= i && r.nosso_numero_atual <= f);
+    if (!faixa) return String(r.nosso_numero_atual).padStart(11, '0');
+    // Caiu numa faixa reservada: pula para depois dela e tenta de novo.
+    db.prepare('UPDATE contas_bancarias SET nosso_numero_atual = ? WHERE id = ?').run(faixa[1], conta.id);
+  }
 }
 
 /** Valida e normaliza os dados de um boleto novo. */
@@ -170,14 +187,18 @@ function beneficiarioFinal(cliente) {
  * Em caso de falha no banco, o título fica como 'falha' com o motivo — o nosso número não é reaproveitado
  * (o banco pode tê-lo recebido), e a tela permite tentar de novo gerando outro.
  */
-async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = null, origem = 'avulso', ixc = {} }) {
+/**
+ * Emite e registra um boleto. `nossoNumeroDefinido`: quando o sistema do cliente (IXC) numera e imprime o
+ * boleto, a PAY AX registra com o número que ele já usou, para o código impresso ser o registrado.
+ */
+async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = null, origem = 'avulso', ixc = {}, nossoNumeroDefinido = null, contaId = null }) {
   if (cliente.situacao !== 'ativo') throw new ErroNegocio(`O cliente está ${cliente.situacao}: não é possível emitir boletos.`, 409);
   // O dinheiro recebido vai direto para o cliente: sem conta de destino, ficaria parado na conta da PAY AX.
   if (!contaDestino.temDestino(cliente)) {
     throw new ErroNegocio('Cadastre a conta de destino do cliente antes de emitir (ou a chave PIX): é para ela que o valor recebido vai, na hora.', 409);
   }
   const entrada = validarEntrada(dados, cliente);
-  const conta = contaDe(db, dados.conta_id);
+  const conta = contaDe(db, contaId ?? dados.conta_id);
   if (entrada.tipo === 'bolepix' && !conta.pix_chave) {
     throw new ErroNegocio('A conta bancária não tem chave PIX cadastrada: só é possível emitir boleto comum.', 409);
   }
@@ -196,7 +217,16 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
   if (rateio.rateio_ppm && conta.custo_rateio_centavos) {
     congelado.custo_liquidacao_centavos = (congelado.custo_liquidacao_centavos ?? 0) + conta.custo_rateio_centavos;
   }
-  const nossoNumero = transacao(db, () => proximoNossoNumero(db, conta));
+  let nossoNumero;
+  if (nossoNumeroDefinido) {
+    nossoNumero = String(nossoNumeroDefinido).padStart(11, '0');
+    if (!/^\d{11}$/.test(nossoNumero)) throw new ErroNegocio('Nosso número inválido.', 422);
+    if (db.prepare('SELECT 1 FROM boletos WHERE conta_id = ? AND nosso_numero = ?').get(conta.id, nossoNumero)) {
+      throw new ErroNegocio(`O nosso número ${nossoNumero} já foi usado nesta conta.`, 409);
+    }
+  } else {
+    nossoNumero = transacao(db, () => proximoNossoNumero(db, conta));
+  }
   const boleto = {
     ...entrada, nosso_numero: nossoNumero, cliente_id: cliente.id, conta_id: conta.id,
     ...beneficiarioFinal(cliente),
