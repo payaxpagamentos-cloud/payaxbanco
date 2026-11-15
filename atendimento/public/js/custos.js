@@ -11,6 +11,8 @@ import { api, qs } from './api.js';
 import {
   el, limpar, icone, toast, acao, confirmar, formModal, modal, campo, area, escolha, marcar,
   inteiro, porcento, dataHora, desde, repetir, lerNumero,
+  telefone,
+  pl,
 } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, seletor, filtroPeriodo } from './comum.js';
 
@@ -84,26 +86,26 @@ async function aConta(ctx, alvo) {
       espera.esperando
         ? cartao('Esperando a janela abrir',
           el('div', { class: 'economia-origens' },
-            origem(`${inteiro(espera.esperando)} aviso(s) na fila`, 'nada foi pago por eles ainda', espera.em_risco_milesimos,
+            origem(`${inteiro(espera.esperando)} ${espera.esperando === 1 ? 'aviso' : 'avisos'} na fila`, 'nada foi pago por eles ainda', espera.em_risco_milesimos,
               'Cada um desses avisos tem prazo. Se o cliente escrever antes, sai de graça pela janela de 24 h; '
               + 'se o prazo chegar sem ele escrever, aí paga o template. O valor ao lado é o que está em jogo.'),
-            origem('Já salvos pela janela', `${inteiro(espera.salvas_pela_janela)} aviso(s)`, null,
+            origem('Já salvos pela janela', `${inteiro(espera.salvas_pela_janela)} ${espera.salvas_pela_janela === 1 ? 'aviso' : 'avisos'}`, null,
               'Avisos que esperaram, o cliente escreveu e saíram sem custo.')))
         : null,
 
       cartao('De onde veio a economia',
         el('div', { class: 'economia-origens' },
           origem('Atendimento dentro da janela de 24 h',
-            `${inteiro(d.economia.por_janela_de_servico.mensagens)} resposta(s) de serviço`,
+            `${pl(d.economia.por_janela_de_servico.mensagens, 'resposta(s) de serviço')}`,
             d.economia.por_janela_de_servico.milesimos,
             'Toda vez que a ZOE resolve no WhatsApp, a resposta sai de graça. Se o mesmo aviso tivesse que ir por template, '
             + 'cada um custaria o preço de utilidade.'),
           origem('Régua: usou a janela em vez de template',
-            `${inteiro(d.economia.pela_regua.pela_janela)} mensagem(ns)`,
+            `${pl(d.economia.pela_regua.pela_janela, 'mensagem(ns)')}`,
             d.economia.pela_regua.pela_janela_milesimos,
             'O cliente tinha falado nas últimas 24 h, então o aviso foi como texto livre — sem custo.'),
           origem('Régua: não disparou para quem não precisava',
-            `${inteiro(d.economia.pela_regua.pulados)} pulada(s)`,
+            `${pl(d.economia.pela_regua.pulados, 'pulada(s)')}`,
             d.economia.pela_regua.pulados_milesimos,
             'Já pagou, pediu para não receber, está em atendimento ou já tinha recebido.'))),
 
@@ -113,7 +115,7 @@ async function aConta(ctx, alvo) {
           td(el('span', { class: 'pequeno' }, c.explicacao)),
           td(c.preco_milesimos ? reais(c.preco_milesimos) : el('span', { class: 'etiqueta ok' }, 'grátis'), 'dir'),
           td(inteiro(c.mensagens), 'dir num'),
-          td(reais(c.custo_milesimos), 'dir num')))),
+          td(reaisTotal(c.custo_milesimos), 'dir num')))),
         el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' },
           'Os preços são os que o master cadastrou em Configurações. Confira a tabela do Brasil no painel da Meta: ela muda.')),
 
@@ -122,8 +124,8 @@ async function aConta(ctx, alvo) {
           d.por_regua.map((r) => el('tr', {},
             td(el('strong', {}, r.nome)), td(r.categoria),
             td(inteiro(r.enviados), 'dir num'), td(inteiro(r.pela_janela), 'dir num'), td(inteiro(r.pulados), 'dir num'),
-            td(reais(r.custo_milesimos), 'dir num'),
-            td(el('strong', { class: 'ok-texto' }, reais(r.economia_milesimos)), 'dir num')))))
+            td(reaisTotal(r.custo_milesimos), 'dir num'),
+            td(el('strong', { class: 'ok-texto' }, reaisTotal(r.economia_milesimos)), 'dir num')))))
         : null);
   };
 
@@ -134,7 +136,7 @@ async function aConta(ctx, alvo) {
 const origem = (titulo, quanto, milesimos, explicacao) => el('div', { class: 'origem-economia' },
   el('div', { class: 'linha entre' },
     el('strong', {}, titulo),
-    milesimos === null ? null : el('span', { class: 'valor-economia' }, reais(milesimos))),
+    milesimos === null ? null : el('span', { class: 'valor-economia' }, reaisTotal(milesimos))),
   el('div', { class: 'pequeno' }, quanto),
   el('div', { class: 'pequeno mudo' }, explicacao));
 
@@ -155,8 +157,8 @@ async function asReguas(ctx, alvo) {
           td(el('span', { class: `etiqueta ${r.categoria === 'marketing' ? 'aviso' : ''}` }, r.categoria)),
           td(inteiro(r.enviados), 'dir num'),
           td(inteiro(r.pulados), 'dir num'),
-          td(reais(r.custo_milesimos), 'dir num'),
-          td(el('strong', { class: 'ok-texto' }, reais(r.economia_milesimos)), 'dir num'),
+          td(reaisTotal(r.custo_milesimos), 'dir num'),
+          td(el('strong', { class: 'ok-texto' }, reaisTotal(r.economia_milesimos)), 'dir num'),
           td(r.ativa ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
           td(!ctx.pode('custos.editar') && !ctx.pode('custos.ver') ? null : el('div', { class: 'linha', style: 'gap:4px' },
             botaoIcone('teste', 'Simular (não envia nada)', () => simular(r)),
@@ -252,11 +254,11 @@ async function asReguas(ctx, alvo) {
   const disparar = async (r) => {
     const s = await api.post(`/empresas/${ctx.empresaId}/reguas/${r.id}/simular`, {});
     if (!await confirmar('Disparar agora',
-      `${inteiro(s.vao_receber)} cliente(s) vão receber e ${inteiro(s.pulados)} serão pulados. `
+      `${pl(s.vao_receber, 'cliente(s)')} ${s.vao_receber === 1 ? 'vai' : 'vão'} receber e ${pl(s.pulados, 'será(ão) pulado(s)').replace('será(ão)', s.pulados === 1 ? 'será' : 'serão')}. `
       + `Custo estimado: ${reais(s.custo_milesimos)}. Confirma?`, 'Disparar')) return;
     const x = await api.post(`/empresas/${ctx.empresaId}/reguas/${r.id}/executar`, {});
-    toast(`${x.enviados} enviada(s), ${x.pela_janela} pela janela, ${x.pulados} pulada(s). `
-      + `Custo ${reais(x.custo_milesimos)}, economia ${reais(x.economia_milesimos)}.`);
+    toast(`${pl(x.enviados, 'enviada(s)')}, ${x.pela_janela} pela janela, ${pl(x.pulados, 'pulada(s)')}. `
+      + `Custo ${reaisTotal(x.custo_milesimos)}, economia ${reaisTotal(x.economia_milesimos)}.`);
     await recarregar();
   };
 
@@ -274,7 +276,7 @@ async function asReguas(ctx, alvo) {
           td(x.contato_nome ?? x.telefone ?? '—'),
           td(el('span', { class: `etiqueta ${x.status === 'enviado' ? 'ok' : x.status === 'falhou' ? 'erro' : ''}` }, x.status)),
           td(el('span', { class: 'pequeno' }, x.motivo ?? '—')),
-          td(reais(x.custo_milesimos), 'dir num'))), 'Esta régua ainda não disparou.')),
+          td(reaisTotal(x.custo_milesimos), 'dir num'))), 'Esta régua ainda não disparou.')),
       el('div', { class: 'linha entre', style: 'margin-top:12px' }, el('span'), el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
     ], { largo: true });
   };
@@ -337,7 +339,7 @@ async function aEspera(ctx, alvo) {
 
       d.fila.length
         ? cartao('Na fila', tabela(['Cliente', 'Régua', 'Categoria', 'Prazo', '>Vale'], d.fila.map((x) => el('tr', {},
-          td(el('div', {}, el('strong', {}, x.contato_nome ?? x.telefone), el('div', { class: 'pequeno mudo' }, x.telefone))),
+          td(el('div', {}, el('strong', {}, x.contato_nome ?? telefone(x.telefone)), el('div', { class: 'pequeno mudo' }, telefone(x.telefone)))),
           td(x.regua), td(x.categoria),
           td(el('div', {}, dataHora(x.prazo), el('div', { class: 'pequeno mudo' }, desde(x.criada_em) + ' esperando'))),
           td(reais(x.preco_milesimos), 'dir num')))))
@@ -354,7 +356,7 @@ async function aEspera(ctx, alvo) {
   varrer.addEventListener('click', () => acao(varrer, async () => {
     if (!await confirmar('Varrer a sala de espera', 'O que já passou do prazo será pago agora, se ainda fizer sentido. O resto continua esperando.')) return;
     const r = await api.post(`/empresas/${ctx.empresaId}/reguas/pendencias/varrer`, {});
-    toast(`${r.pela_janela} saiu pela janela, ${r.pagas} pagou template, ${r.canceladas} cancelada(s).`);
+    toast(`${r.pela_janela} saiu pela janela, ${r.pagas} pagou template, ${pl(r.canceladas, 'cancelada(s)')}.`);
     await desenhar();
   }));
   ctx.acoes(varrer);
@@ -504,13 +506,13 @@ async function oControle(ctx, alvo) {
                     await desenhar();
                   })
                   : botaoIcone('dinheiro', 'Lançar a fatura da Meta', () => formModal(`Fatura da Meta — ${mesLongo(m.mes)}`, () => (m.moeda === 'USD' ? [
-                    el('p', { class: 'pequeno mudo' }, `Nossa conta para este mês: ${dolares(m.gasto_usd_centavos)} em ${inteiro(m.mensagens)} mensagem(ns).`),
+                    el('p', { class: 'pequeno mudo' }, `Nossa conta para este mês: ${dolares(m.gasto_usd_centavos)} em ${pl(m.mensagens, 'mensagem(ns)')}.`),
                     campo('Valor da fatura da Meta (US$)', { name: 'valor_usd', required: true, placeholder: '0,00', inputmode: 'decimal' }),
                     campo('Quanto saiu da conta em reais (opcional, com IOF)', { name: 'valor', placeholder: '0,00', inputmode: 'decimal' }),
                     el('p', { class: 'pequeno mudo' }, 'A conferência é dólar contra dólar. O valor em reais mostra o câmbio que ficou pago de verdade.'),
                     area('Observação', { name: 'observacao', rows: 2, placeholder: 'Nota fiscal, ajuste…' }),
                   ] : [
-                    el('p', { class: 'pequeno mudo' }, `Nossa conta para este mês: ${reais(m.gasto_milesimos)} em ${inteiro(m.mensagens)} mensagem(ns).`),
+                    el('p', { class: 'pequeno mudo' }, `Nossa conta para este mês: ${reais(m.gasto_milesimos)} em ${pl(m.mensagens, 'mensagem(ns)')}.`),
                     campo('Valor cobrado pela Meta (R$)', { name: 'valor', required: true, placeholder: '0,00', inputmode: 'decimal' }),
                     area('Observação', { name: 'observacao', rows: 2, placeholder: 'Nota fiscal, câmbio, ajuste…' }),
                   ]), async (d) => {

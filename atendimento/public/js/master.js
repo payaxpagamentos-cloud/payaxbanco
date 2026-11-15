@@ -2,7 +2,8 @@
 import {api, qs} from './api.js';
 import {
   el, limpar, icone, toast, acao, confirmar, formModal, modal, campo, escolha, marcar, lerForm, inteiro,
-  porcento, dataHora, desde, dinheiro, PERFIS, repetir, lerNumero, barraUso, situacao, pessoa, documento,
+  porcento, dataHora, desde, dinheiro, PERFIS, repetir, lerNumero, barraUso, situacao, pessoa, documento, telefone,
+  pl,
 } from './ui.js';
 import {
   cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, campoBusca, seletor, cartaoDesfechos,
@@ -17,10 +18,10 @@ async function dashboard(ctx) {
     const d = await api.get('/master/painel');
     limpar(conteudo,
       el('div', { class: 'indicadores' },
-        indicador('Empresas ativas', inteiro(d.totais.empresas_ativas), `${inteiro(d.totais.atendentes)} atendente(s) no total`, 'empresas', 'azul'),
+        indicador('Empresas ativas', inteiro(d.totais.empresas_ativas), `${pl(d.totais.atendentes, 'atendente(s) no total')}`, 'empresas', 'azul'),
         indicador('Conversas em aberto', inteiro(d.totais.conversas_abertas), 'agora, em todas as empresas', 'conversa', 'verde'),
         indicador('Conversas no mês', inteiro(d.totais.conversas_mes), `${porcento(d.mes.taxa_resolucao_ia)} resolvidas pela IA`, 'robo', 'roxo'),
-        indicador('Custo da IA no mês', dinheiro(d.mes.ia.custo_centavos), `${inteiro(d.mes.ia.respostas)} resposta(s) geradas`, 'dinheiro', 'laranja')),
+        indicador('Custo da IA no mês', dinheiro(d.mes.ia.custo_centavos), `${pl(d.mes.ia.respostas, 'resposta(s) gerada(s)')}`, 'dinheiro', 'laranja')),
       el('div', { class: 'grade-2' }, cartaoDesfechos(d.mes), cartaoTempos(d.mes)),
       cartao('Empresas', tabela(['Empresa', 'Situação', '>Em aberto', '>Conversas (mês)', '>IA (mês)', 'Uso da IA', '>Atendentes', 'Números'],
         d.empresas.map((e) => el('tr', { class: 'clicavel', onclick: () => ctx.ir('dashboard', e.id) },
@@ -239,7 +240,7 @@ async function diagnostico(ctx) {
         icone(ICONE[v.situacao]), el('div', {}, el('strong', {}, v.nome), el('div', { class: 'pequeno' }, v.detalhe)))))),
       cartao('Números de WhatsApp',
         tabela(['Número', 'Empresa', 'Situação', 'Nome verificado', 'Qualidade', 'Detalhe'], d.numeros.map((n) => el('tr', {},
-          td(el('div', {}, el('strong', {}, n.nome), el('div', { class: 'pequeno mudo' }, n.telefone))),
+          td(el('div', {}, el('strong', {}, n.nome), el('div', { class: 'pequeno mudo' }, telefone(n.telefone)))),
           td(n.empresa_nome ?? `Empresa ${n.empresa_id}`),
           td(el('span', { class: `etiqueta ${n.ok ? 'ok' : 'erro'}` }, n.estado)),
           td(n.nome_verificado ?? '—'), td(n.qualidade ?? '—'),
@@ -276,17 +277,14 @@ async function configuracoes(ctx) {
         campo('Saída (por milhão de tokens)', { name: 'ia_preco_saida_milhao', type: 'number', value: c.ia_preco_saida_milhao, min: 0 })),
       campo('Leitura do cache (por milhão de tokens)', { name: 'ia_preco_cache_milhao', type: 'number', value: c.ia_preco_cache_milhao, min: 0 })),
     cartao('Preço da Meta por mensagem',
-      el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
-        'O que a Meta cobra por mensagem ENTREGUE que a empresa inicia. Serviço (o cliente escreveu e a resposta saiu em até 24 h) '
-        + 'é de graça e não entra aqui. A tabela em reais vale para as empresas cobradas em real; a em dólar, como a Meta publica, '
-        + 'para as cobradas em dólar. Confira a tabela do Brasil no painel da Meta — ela muda.'),
+      el('p', { class: 'ajuda' }, 'Por mensagem entregue que a empresa inicia (a resposta em até 24 h é de graça). Confira a tabela do Brasil no painel da Meta: ela muda.'),
       el('div', { class: 'grade-2' },
-        el('div', {},
+        el('div', { class: 'coluna', style: 'gap:10px' },
           el('strong', { class: 'pequeno' }, 'Em reais (R$)'),
           campoPreco('Utilidade', 'meta_brl_utilidade', c.wa_preco_utilidade / 1000, 3),
           campoPreco('Autenticação', 'meta_brl_autenticacao', c.wa_preco_autenticacao / 1000, 3),
           campoPreco('Marketing', 'meta_brl_marketing', c.wa_preco_marketing / 1000, 3)),
-        el('div', {},
+        el('div', { class: 'coluna', style: 'gap:10px' },
           el('strong', { class: 'pequeno' }, 'Em dólar (US$)'),
           campoPreco('Utilidade', 'meta_usd_utilidade', c.wa_preco_utilidade_usd / 1_000_000, 4),
           campoPreco('Autenticação', 'meta_usd_autenticacao', c.wa_preco_autenticacao_usd / 1_000_000, 4),

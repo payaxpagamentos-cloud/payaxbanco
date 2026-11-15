@@ -3,6 +3,7 @@ import { api, baixar, qs } from './api.js';
 import {
   el, limpar, icone, acao, inteiro, duracao, dataHora, porcento, dinheiro, estrelas, desde, espera,
   etiquetaEstado, RESOLVIDA_POR, escolha, campo, hojeLocal, somarDias, toast,
+  pl,
 } from './ui.js';
 import { pizza, linhaDoDia, barras, CORES } from './graficos.js';
 
@@ -11,7 +12,7 @@ export const cartao = (titulo, ...conteudo) => el('section', { class: 'cartao' }
 /** Número em destaque: ícone colorido, valor, rótulo e uma nota. Cores: azul, verde, roxo, laranja, vermelho, ciano. */
 export const indicador = (rotulo, valor, nota, ic = null, cor = 'azul') => el('div', { class: `cartao indicador${ic ? ' com-icone' : ''}` },
   ic ? el('div', { class: `ic ${cor}` }, icone(ic)) : null,
-  el('div', { class: 'corpo' }, el('div', { class: 'valor num' }, valor), el('div', { class: 'rotulo' }, rotulo), nota ? el('div', { class: 'nota' }, nota) : null));
+  el('div', { class: 'corpo' }, el('div', { class: `valor num${typeof valor === 'string' && /[A-Za-zÀ-ú]{3}/.test(valor) && !/^R\$/.test(valor) ? ' texto' : ''}` }, valor), el('div', { class: 'rotulo' }, rotulo), nota ? el('div', { class: 'nota' }, nota) : null));
 
 export const td = (conteudo, classe = '') => el('td', { class: classe }, conteudo);
 
@@ -92,7 +93,7 @@ export function cartaoPorDia(serie) {
   const max = Math.max(1, ...serie.map((d) => d.conversas));
   return cartao('Conversas por dia', el('div', { class: 'serie-dias' }, serie.map((d) => el('div', {
     class: 'coluna-dia',
-    title: `${new Date(`${d.data}T12:00:00`).toLocaleDateString('pt-BR')}: ${d.conversas} conversa(s), ${d.resolvidas_ia} resolvida(s) pela IA, ${d.transferidas} transferida(s)`,
+    title: `${new Date(`${d.data}T12:00:00`).toLocaleDateString('pt-BR')}: ${pl(d.conversas, 'conversa(s)')}, ${pl(d.resolvidas_ia, 'resolvida(s) pela IA')}, ${pl(d.transferidas, 'transferida(s)')}`,
   },
   el('div', { class: 'pilha' },
     el('span', { class: 'ia', style: `height:${(d.resolvidas_ia / max) * 100}%` }),
@@ -105,7 +106,7 @@ export function cartaoPorDia(serie) {
 
 /** Conversas por hora do dia: mostra quando é preciso ter gente de plantão. */
 export const cartaoPorHora = (horas) => cartao('Movimento por hora',
-  barras(horas.map((h) => ({ rotulo: `${h.hora}h`, valor: h.conversas, titulo: `${String(h.hora).padStart(2, '0')}h: ${h.conversas} conversa(s)` }))),
+  barras(horas.map((h) => ({ rotulo: `${h.hora}h`, valor: h.conversas, titulo: `${String(h.hora).padStart(2, '0')}h: ${pl(h.conversas, 'conversa(s)')}` }))),
   el('div', { class: 'pequeno mudo', style: 'display:flex;justify-content:space-between;margin-top:6px' },
     el('span', {}, '00h'), el('span', {}, '06h'), el('span', {}, '12h'), el('span', {}, '18h'), el('span', {}, '23h')));
 

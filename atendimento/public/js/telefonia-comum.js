@@ -4,7 +4,7 @@
  */
 import { api, baixar, qs } from './api.js';
 import { el, limpar, dinheiro, dataHora, duracao, minutos, inteiro, telefone, etiqueta, barraUso, toast, acao, campo,
-  escolha, hojeLocal, somarDias, modal, formModal, confirmar, icone } from './ui.js';
+  escolha, hojeLocal, somarDias, modal, formModal, confirmar, icone, pl } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone } from './comum.js';
 import { pizza, linhaDoDia, barras, CORES } from './graficos.js';
 
@@ -97,7 +97,7 @@ export function painelChamadas(alvo, caminho, { master = false, empresas = [], f
   async function carregar() {
     const r = await api.get(`${caminho}${qs(estado)}`);
     aoAtualizar?.(r);
-    resumo.textContent = `${inteiro(r.total)} chamada(s) · ${duracao(r.duracao_s)} faladas · ${dinheiro(r.custo_centavos)} em ligações`;
+    resumo.textContent = `${pl(r.total, 'chamada(s)')} · ${duracao(r.duracao_s)} faladas · ${dinheiro(r.custo_centavos)} em ligações`;
     const paginas = Math.max(1, Math.ceil(r.total / r.por_pagina));
     limpar(lista,
       tabela(['Início', master ? 'Empresa' : null, 'Direção', 'Origem', 'Destino', master ? null : 'Ramal', 'Status', '>Duração', '>Custo'].filter(Boolean),
@@ -163,7 +163,7 @@ export function painelRelatorios(alvo, caminho, { master = false } = {}) {
         indicador('Atendidas', `${taxa}%`, `${inteiro(t.atendidas)} atendidas · ${inteiro(t.perdidas)} não`, 'ok', 'verde'),
         indicador('Tempo falado', duracao(t.duracao_s), `${minutos(t.tarifado_s)} tarifados`, 'relogio', 'laranja'),
         indicador(master ? 'Faturamento' : 'Custo das ligações', dinheiro(t.custo_centavos), t.realizadas ? `média ${dinheiro(t.custo_centavos / t.realizadas)} por ligação` : null, 'dinheiro', 'roxo')),
-      cartao('Chamadas por dia', r.por_dia.length ? barras(r.por_dia.map((d) => ({ rotulo: d.dia, valor: d.chamadas, titulo: `${d.dia.split('-').reverse().join('/')}: ${d.chamadas} chamada(s), ${dinheiro(d.custo_centavos)}` })))
+      cartao('Chamadas por dia', r.por_dia.length ? barras(r.por_dia.map((d) => ({ rotulo: d.dia, valor: d.chamadas, titulo: `${d.dia.split('-').reverse().join('/')}: ${pl(d.chamadas, 'chamada(s)')}, ${dinheiro(d.custo_centavos)}` })))
         : el('p', { class: 'mudo' }, 'Sem chamadas no período.')),
       // Uma tabela por linha: oito colunas não cabem lado a lado sem cortar o custo.
       cartao('Por tipo de destino', tabela(['Tipo', '>Ligações', '>Minutos', '>Custo'], r.por_tipo.map((x) =>

@@ -14,7 +14,7 @@ import {cartaoPassagem} from './passagem.js';
 
 const CAIXAS = {
   // Curtos: as cinco abas cabem numa linha da coluna da lista.
-  minhas: 'Minhas', aguardando: 'Na fila', bot: 'Com a ZOE', abertas: 'Abertas', encerradas: 'Encerradas',
+  minhas: 'Minhas', aguardando: 'Fila', bot: 'ZOE', abertas: 'Abertas', encerradas: 'Encerradas',
 };
 
 export async function telaCaixa(ctx) {
@@ -44,11 +44,13 @@ export async function telaCaixa(ctx) {
     el('div', { class: 'topo-lista' },
       contadores,
       el('div', { class: 'filtros-lista' },
-        campoBusca(estado.busca, (t) => { estado.busca = t; carregarLista(); }, 'Nome, telefone ou documento'),
+        campoBusca(estado.busca, (t) => { estado.busca = t; carregarLista(); }, 'Nome ou telefone'),
         filas.length > 1 ? seletor('Fila', { '': 'Todas', ...Object.fromEntries(filas.map((f) => [f.id, f.nome])) }, estado.fila_id, (v) => { estado.fila_id = v; carregarLista(); }) : null)),
     listaEl);
 
-  limpar(ctx.conteudo, el('div', { class: 'caixa' }, esquerda, el('div', { class: 'coluna-chat' }, chatEl), lateralEl));
+  // No celular é uma coisa por vez: a lista ou a conversa (com o botão de voltar).
+  const caixaEl = el('div', { class: 'caixa' }, esquerda, el('div', { class: 'coluna-chat' }, chatEl), lateralEl);
+  limpar(ctx.conteudo, caixaEl);
 
   // ---------- Lista ----------
   function desenharAbas(total) {
@@ -97,6 +99,7 @@ export async function telaCaixa(ctx) {
     // só a mais recente fica atualizando sozinha.
     const minha = ++geracao;
     estado.selecionada = id;
+    caixaEl.classList.add('com-conversa');
     for (const b of listaEl.querySelectorAll('.item-conversa')) b.classList.remove('on');
     paradaAtual?.();
     paradaAtual = null;
@@ -119,6 +122,8 @@ export async function telaCaixa(ctx) {
     const posso = !ligacao && ctx.pode('atendimentos.atender') && d.estado !== 'encerrada' && (ctx.master || ctx.pode('filas.editar') || minha || !d.atendente_id);
 
     const cabecalho = el('div', { class: 'cabecalho-chat' },
+      el('button', { type: 'button', class: 'icone-btn voltar-lista', title: 'Voltar à lista', 'aria-label': 'Voltar à lista',
+        onclick: () => caixaEl.classList.remove('com-conversa') }, icone('voltar')),
       el('span', { class: 'avatar-contato grande' }, iniciais(d.nome)),
       el('div', { class: 'quem-chat' },
         el('div', { class: 'nome-chat' }, el('strong', {}, d.nome), ligacao ? el('span', { class: 'etiqueta info' }, 'Ligação') : null, etiquetaEstado(d.estado)),

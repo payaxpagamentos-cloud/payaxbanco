@@ -5,7 +5,7 @@
  * O score é mostrado SEMPRE com os porquês. Um número sozinho não ajuda ninguém a decidir.
  */
 import {api} from './api.js';
-import {el, icone, modal, toast, inteiro, porcento, dataHora, estrelas, telefone as formatarTelefone, iniciais} from './ui.js';
+import {el, icone, modal, toast, inteiro, porcento, dataHora, estrelas, telefone as formatarTelefone, iniciais, pl } from './ui.js';
 import {cartao, tabela, td} from './comum.js';
 
 const FAIXA = { alto: ['Risco alto', 'vermelho'], medio: ['Risco médio', 'laranja'], baixo: ['Risco baixo', 'verde'] };
@@ -86,7 +86,7 @@ export function corpoDaFicha(f) {
       numero('Cliente há', r.tempo_casa_meses === null ? '—' : `${inteiro(r.tempo_casa_meses)} meses`, r.plano),
       numero('Mensalidade', r.mensalidade),
       numero('Pagamento em dia', r.pontualidade === null ? '—' : porcento(r.pontualidade)),
-      numero('Em aberto', r.total_em_aberto, r.faturas_vencidas ? `${r.faturas_vencidas} vencida(s)` : 'nada vencido'),
+      numero('Em aberto', r.total_em_aberto, r.faturas_vencidas ? `${pl(r.faturas_vencidas, 'vencida(s)')}` : 'nada vencido'),
       numero('Chamados (90 dias)', inteiro(r.chamados_90_dias)),
       numero('Conversas', inteiro(r.conversas)),
       numero('Ouvidorias', inteiro(r.ouvidorias)),

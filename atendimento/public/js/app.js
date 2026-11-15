@@ -1,5 +1,5 @@
 import { api, sessao } from './api.js';
-import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, PERFIS } from './ui.js';
+import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, PERFIS, pl } from './ui.js';
 import { TELAS_MASTER } from './master.js';
 import { iniciarTelefone, pararTelefone } from './telefone.js';
 import { TELAS_EMPRESA } from './empresa.js';
@@ -269,7 +269,7 @@ function botaoDisponivel(u) {
     b.classList.toggle('on', r.disponivel);
     b.querySelector('span').textContent = r.disponivel ? 'Disponível' : 'Indisponível';
     toast(r.disponivel
-      ? (r.recebidas ? `Você está disponível e recebeu ${r.recebidas} conversa(s) da fila.` : 'Você está disponível para receber conversas.')
+      ? (r.recebidas ? `Você está disponível e recebeu ${pl(r.recebidas, 'conversa(s) da fila')}.` : 'Você está disponível para receber conversas.')
       : 'Você saiu da distribuição de conversas.');
   }));
   return b;

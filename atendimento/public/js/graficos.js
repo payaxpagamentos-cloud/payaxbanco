@@ -1,5 +1,5 @@
 /** Gráficos simples em SVG (sem bibliotecas externas). */
-import { el } from './ui.js';
+import { el, pl } from './ui.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const svg = (tag, attrs = {}, ...filhos) => {
@@ -60,7 +60,7 @@ export function linhaDoDia(pontos, { passoMin = 15 } = {}) {
   const horario = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
   const porHora = 60 / passoMin;
   for (let h = 0; h < 24; h += 3) {
-    g.append(svg('text', { x: x(h * porHora), y: A - 6, 'text-anchor': h === 0 ? 'start' : 'middle' }, horario(h * 60)));
+    g.append(svg('text', { x: x(h * porHora), y: A - 6, 'text-anchor': h === 0 ? 'start' : 'middle', class: h % 6 ? 'eixo-x menor' : 'eixo-x' }, horario(h * 60)));
   }
   if (validos.length) {
     const d = validos.map(([i, v], k) => `${k ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
@@ -68,7 +68,7 @@ export function linhaDoDia(pontos, { passoMin = 15 } = {}) {
     g.append(svg('path', { d: `${d} L ${x(ultimo)} ${y(0)} L ${x(validos[0][0])} ${y(0)} Z`, class: 'area' }), svg('path', { d, class: 'serie' }));
     for (const [i, v] of validos) {
       if (!v) continue;
-      g.append(svg('circle', { cx: x(i), cy: y(v), r: 6, fill: 'transparent' }, svg('title', {}, `${horario(i * passoMin)}–${horario((i + 1) * passoMin)}: ${v} simultânea(s)`)));
+      g.append(svg('circle', { cx: x(i), cy: y(v), r: 6, fill: 'transparent' }, svg('title', {}, `${horario(i * passoMin)}–${horario((i + 1) * passoMin)}: ${pl(v, 'simultânea(s)')}`)));
     }
   }
   return g;
@@ -77,5 +77,10 @@ export function linhaDoDia(pontos, { passoMin = 15 } = {}) {
 /** Barras verticais: [{ rotulo, valor, titulo }]. */
 export function barras(itens) {
   const max = Math.max(1, ...itens.map((i) => i.valor));
-  return el('div', { class: 'barras' }, itens.map((i) => el('div', { class: 'barra', style: `height:${Math.max(1, (i.valor / max) * 100)}%`, title: i.titulo ?? `${i.rotulo}: ${i.valor}` })));
+  // Cada barra com o dia embaixo (de tantos em tantos, para não amontoar) e o número em cima.
+  const passo = Math.max(1, Math.ceil(itens.length / 12));
+  return el('div', { class: 'barras com-rotulos' }, itens.map((i, k) => el('div', { class: 'coluna-barra', title: i.titulo ?? `${i.rotulo}: ${i.valor}` },
+    el('small', { class: 'valor-barra num' }, i.valor ? String(i.valor) : ''),
+    el('div', { class: 'barra', style: `height:${Math.max(1, (i.valor / max) * 100)}%` }),
+    el('small', { class: 'rotulo-barra' }, k % passo === 0 ? String(i.rotulo).split('-').reverse().slice(0, 2).join('/') : ''))));
 }

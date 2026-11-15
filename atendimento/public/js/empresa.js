@@ -5,6 +5,7 @@ import {
   el, limpar, icone, toast, confirmar, formModal, modal, campo, area, escolha, marcar, inteiro, porcento,
   duracao, dataHora, desde, espera, diasSemana, telefone as formatarTelefone, etiquetaChamado, PERFIS, repetir,
   iniciais, situacao, documento,
+  pl,
 } from './ui.js';
 import {
   cartao, indicador, tabela, td, botaoIcone, acoesTopo, vazio, campoBusca, seletor, indicadoresAtendimento,
@@ -221,7 +222,7 @@ async function equipe(ctx) {
     el('p', { class: 'mudo pequeno', style: 'margin:-4px 0 4px' }, 'Quando uma ligação que passou pela ZOE for atendida neste ramal, o painel desta pessoa abre sozinho com tudo o que o cliente já disse.'),
     campo('Nova senha (vazio mantém)', { name: 'senha', type: 'password', minlength: 8, autocomplete: 'new-password' }),
     marcar('Ativo', { name: 'ativo', checked: u.ativo }),
-    u.em_atendimento ? el('p', { class: 'mudo pequeno' }, `Desativar devolve as ${u.em_atendimento} conversa(s) dele para a fila.`) : null,
+    u.em_atendimento ? el('p', { class: 'mudo pequeno' }, `Desativar devolve as ${pl(u.em_atendimento, 'conversa(s) dele para a fila')}.`) : null,
   ], async (d) => {
     if (!d.senha) delete d.senha;
     await api.patch(`/empresas/${ctx.empresaId}/usuarios/${u.id}`, d);
@@ -363,7 +364,7 @@ async function configuracoes(ctx) {
       cartao('Respostas rápidas',
         el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' }, 'Na conversa, o atendente digita /atalho e o texto entra pronto.'),
         tabela(['Atalho', 'Título', 'Texto', '>Usos', '^Ativa', ''], rapidas.itens.map((rr) => el('tr', {},
-          td(el('code', {}, `/${rr.atalho}`)), td(rr.titulo), td(el('span', { class: 'pequeno' }, rr.texto.slice(0, 90))),
+          td(el('code', {}, `/${rr.atalho}`)), td(rr.titulo), td(el('span', { class: 'pequeno corte-2 largo', title: rr.texto }, rr.texto)),
           td(inteiro(rr.usos), 'dir num'), td(rr.ativa ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
           td(!ctx.pode('configuracoes.editar') ? null : el('div', { class: 'linha', style: 'gap:4px' },
             botaoIcone('editar', 'Editar', () => editarRapida(rr)), botaoIcone('lixo', 'Excluir', () => excluirRapida(rr), 'perigo')), 'dir'))),

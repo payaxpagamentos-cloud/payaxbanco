@@ -5,7 +5,7 @@
  */
 import { api, qs } from './api.js';
 import { el, limpar, acao, dinheiro, dataHora, hora, duracao, minutos, inteiro, telefone, gb, barraUso, toast, campo, area, escolha, marcar, formModal, modal, confirmar,
-  repetir, etiqueta, pessoa, situacao } from './ui.js';
+  repetir, etiqueta, pessoa, situacao, icone, pl } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo } from './comum.js';
 import { cartaoUtilizacao, cartaoSimultaneas, cartaoRamais, cartaoUsoMes, cartaoRecursos, painelChamadas, painelRelatorios, cartaoStatusLigacoes,
   indicadoresTelefonia, etiquetaChamada, DIRECOES, TIPOS_DESTINO } from './telefonia-comum.js';
@@ -75,7 +75,7 @@ async function telaCampanhas(ctx) {
     area('Contatos', { name: 'linhas', required: true, rows: 10, placeholder: 'Maria Silva;11987654321\n1133224455' }),
   ], async (d) => {
     const r = await api.post(`${base(ctx)}/campanhas/${c.id}/contatos`, d);
-    toast(`${r.importados} contato(s) importado(s)${r.ignorados ? `, ${r.ignorados} repetido(s)` : ''}${r.linhas_invalidas.length ? `, ${r.linhas_invalidas.length} linha(s) inválida(s)` : ''}.`);
+    toast(`${pl(r.importados, 'contato(s) importado(s)')}${r.ignorados ? `, ${pl(r.ignorados, 'repetido(s)')}` : ''}${r.linhas_invalidas.length ? `, ${pl(r.linhas_invalidas.length, 'linha(s) inválida(s)')}` : ''}.`);
     return r;
   }, { rotulo: 'Importar' });
   const verContatos = async (c) => {
@@ -151,7 +151,7 @@ async function telaRamais(ctx) {
   async function carregar() {
     const ramais = await api.get(`${base(ctx)}/ramais`);
     const ativos = ramais.filter((r) => r.ativo);
-    resumo.textContent = `${ativos.length} ramal(is) ativo(s) · ${ativos.filter((r) => r.online).length} online`;
+    resumo.textContent = `${ativos.length === 1 ? "1 ramal ativo" : `${ativos.length} ramais ativos`} · ${ativos.filter((r) => r.online).length} online`;
     limpar(lista, tabela(['Ramal', 'Pessoa', 'Filas', 'Situação', 'Último registro', 'Gravação', ''], ramais.map((r) => el('tr', {},
       td(el('strong', { class: 'num' }, r.numero)), td(pessoa(r.nome, r.email)), td(r.filas ?? '—'),
       td(!r.ativo ? situacao('Desativado') : r.em_curso ? situacao('Em chamada', 'info') : r.online ? situacao('Online', 'ok') : situacao('Offline', 'erro')),
@@ -219,9 +219,9 @@ async function telaCrm(ctx) {
     'Nenhum contato. Os contatos aparecem com o nome na lista de chamadas.'));
   }
   busca.addEventListener('input', () => { clearTimeout(busca.timer); busca.timer = setTimeout(carregar, 300); });
-  limpar(ctx.conteudo, el('div', { class: 'filtros livre' }, el('label', { class: 'campo' }, 'Buscar', busca),
-    pode(ctx) ? el('button', { class: 'btn primario', onclick: async () => { if (await formContato()) { toast('Contato criado.'); carregar(); } } }, 'Novo contato') : null),
-  cartao(null, lista));
+  busca.type = 'search';
+  ctx.acoes(pode(ctx) ? el('button', { class: 'btn primario', type: 'button', onclick: async () => { if (await formContato()) { toast('Contato criado.'); carregar(); } } }, icone('mais'), 'Novo contato') : null);
+  limpar(ctx.conteudo, el('div', { class: 'filtros livre' }, el('label', { class: 'campo' }, 'Buscar', busca)), cartao(null, lista));
   await carregar();
 }
 
@@ -353,7 +353,8 @@ async function telaRecursos(ctx, so = null) {
           botaoIcone('editar', 'Editar', async () => { if (await formUra(u)) { toast('URA salva.'); carregar(); } }),
           botaoIcone('lixo', 'Excluir', excluir('uras', u), 'perigo')] : null))),
         'Nenhuma URA. A URA fala uma mensagem e envia a chamada conforme a tecla.'),
-      pode(ctx) ? el('div', { style: 'margin-top:12px' }, botao('Nova URA', 'primario', async () => { if (await formUra()) { toast('URA criada.'); carregar(); } })) : null);
+      null);
+    ctx.acoes(pode(ctx) ? el('button', { class: 'btn primario', type: 'button', onclick: async () => { if (await formUra()) { toast('URA criada.'); carregar(); } } }, icone('mais'), 'Nova URA') : null);
 
     limpar(corpo, so === 'uras' ? cartaoUras() : so === 'filas' ? cartaoFilas() : [cartaoFilas(), cartaoUras()]);
   }

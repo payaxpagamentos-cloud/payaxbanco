@@ -35,6 +35,21 @@ export const minutos = (s) => `${inteiro(Math.round((s ?? 0) / 60))} min`;
 export const gb = (bytes) => `${((bytes ?? 0) / 1024 ** 3).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GB`;
 /** Plural sem "(s)": plural(3, 'conversa', 'conversas') → "3 conversas". */
 export const plural = (n, um, varios) => `${(n ?? 0).toLocaleString('pt-BR')} ${n === 1 ? um : varios}`;
+/**
+ * Número + texto no singular ou no plural: pl(3, 'conversa(s) resolvida(s)') → "3 conversas resolvidas";
+ * pl(1, …) → "1 conversa resolvida". Marcas: (s), (is) ramal→ramais, (ões) ação→ações, (ns) mensagem→mensagens, (m).
+ */
+export function pl(n, texto) {
+  const um = Number(n) === 1;
+  const t = String(texto).replace(/(\S*?)\((s|is|ões|ns|m)\)/g, (_, base, suf) => {
+    if (um) return base;
+    if (suf === 'ns') return `${base.replace(/m$/, '')}ns`;
+    if (suf === 'ões') return base.replace(/ão$/, 'ões');
+    if (suf === 'is') return `${base.replace(/l$/, '')}is`;
+    return base + suf;
+  });
+  return `${(Number(n) || 0).toLocaleString('pt-BR')} ${t}`;
+}
 /** CPF ou CNPJ com pontuação (o guardado é só dígitos). */
 export function documento(d) {
   const x = String(d ?? '').replace(/\D/g, '');

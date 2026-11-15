@@ -7,6 +7,7 @@ import {
   el, limpar, icone, toast, acao, confirmar, formModal, modal, campo, area, escolha, marcar, lerForm, inteiro,
   porcento, dataHora, dinheiro,
   soLeitura,
+  pl,
 } from './ui.js';
 import {cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, filtroPeriodo, cartaoMotivos} from './comum.js';
 
@@ -63,7 +64,7 @@ async function aprendizado(ctx, alvo) {
     limpar(conteudo,
       el('div', { class: 'indicadores' },
         indicador('Resolveu sozinha', r.taxa === null ? '—' : porcento(r.taxa),
-          variacao === null ? `${inteiro(r.zoe)} de ${inteiro(r.zoe + r.equipe)} conversas` : `${variacao >= 0 ? '+' : ''}${variacao.toLocaleString('pt-BR')} ponto(s) contra os ${d.dias} dias anteriores`,
+          variacao === null ? `${inteiro(r.zoe)} de ${inteiro(r.zoe + r.equipe)} conversas` : `${variacao >= 0 ? '+' : ''}${variacao.toLocaleString('pt-BR')} ${Math.abs(variacao) === 1 ? 'ponto' : 'pontos'} contra os ${d.dias} dias anteriores`,
           'robo', variacao === null || variacao >= 0 ? 'verde' : 'laranja'),
         indicador('Passou para a equipe', inteiro(d.transferencias), `nos últimos ${d.dias} dias`, 'pessoa', 'laranja'),
         indicador('Para ensinar', inteiro(d.abertas), d.sem_solucao_registrada ? `${inteiro(d.sem_solucao_registrada)} sem "como resolveu"` : 'todas com a solução da equipe', 'alerta', d.abertas ? 'azul' : 'verde'),
@@ -89,7 +90,7 @@ async function aprendizado(ctx, alvo) {
     el('div', { class: 'linha entre', style: 'gap:8px;align-items:flex-start' },
       el('div', {},
         el('strong', { class: 'titulo-tema' }, t.tema),
-        el('div', { class: 'pequeno mudo' }, `${inteiro(t.casos)} caso(s) · ${t.categoria_nome} · último ${dataHora(t.ultima_em)}`)),
+        el('div', { class: 'pequeno mudo' }, `${pl(t.casos, 'caso(s)')} · ${t.categoria_nome} · último ${dataHora(t.ultima_em)}`)),
       el('span', { class: `etiqueta ${t.situacao === 'aberta' ? (t.aprende ? 'aviso' : '') : 'ok'}` },
         t.situacao === 'aberta' ? (t.aprende ? 'para ensinar' : 'fica com a equipe') : t.situacao === 'ensinada' ? 'ensinada' : 'ignorada')),
     t.perguntas.length ? el('div', { class: 'bloco-tema' }, el('small', {}, 'O que os clientes perguntaram'),
@@ -113,11 +114,11 @@ async function aprendizado(ctx, alvo) {
       // Começa pela solução mais completa da equipe; quem ensina ajusta o texto para falar com o cliente.
       [...t.solucoes].sort((x, y) => y.texto.length - x.texto.length)[0]?.texto ?? ''),
     area('Perguntas de exemplo (uma por linha)', { name: 'perguntas', rows: 4, maxlength: 2000 }, t.perguntas.join('\n')),
-    t.solucoes.length > 1 ? el('details', {}, el('summary', { class: 'pequeno' }, `Outras ${t.solucoes.length - 1} solução(ões) da equipe`),
+    t.solucoes.length > 1 ? el('details', {}, el('summary', { class: 'pequeno' }, `Outras ${pl(t.solucoes.length - 1, 'solução(ões) da equipe')}`),
       el('ul', { class: 'pequeno' }, t.solucoes.slice(1).map((x) => el('li', {}, x.texto)))) : null,
   ], async (dados) => {
     const r = await api.post(`/empresas/${ctx.empresaId}/ia/aprendizado/ensinar`, { ...dados, tema_chave: t.tema_chave });
-    toast(`A ZOE aprendeu "${dados.titulo}" (${r.lacunas} caso(s)).`);
+    toast(`A ZOE aprendeu "${dados.titulo}" (${pl(r.lacunas, 'caso(s)')}).`);
     await desenhar();
   }, { rotulo: 'Ensinar', largo: true });
 
@@ -147,7 +148,7 @@ async function desempenho(ctx, alvo) {
       el('div', { class: 'indicadores' },
         indicador('Resolveu sozinha', porcento(r.taxa_resolucao_ia), `${inteiro(resolvidas)} de ${inteiro(r.encerradas)} conversas`, 'robo', 'verde'),
         indicador('Passou para a equipe', inteiro(r.transferidas), porcento(r.taxa_transferencia), 'pessoa', 'laranja'),
-        indicador('Respostas geradas', inteiro(r.ia.respostas), `${inteiro(r.ia.ferramentas)} ferramenta(s) usada(s)`, 'raio', 'azul'),
+        indicador('Respostas geradas', inteiro(r.ia.respostas), `${pl(r.ia.ferramentas, 'ferramenta(s) usada(s)')}`, 'raio', 'azul'),
         indicador('Custo estimado', dinheiro(r.ia.custo_centavos), r.ia.ms_medio === null ? 'sem respostas' : `${inteiro(r.ia.ms_medio)} ms por resposta`, 'dinheiro', 'roxo')),
       el('div', { class: 'grade-2' },
         cartao('Ferramentas mais usadas',
@@ -234,9 +235,9 @@ async function conhecimento(ctx, alvo) {
       el('div', { class: 'linha entre', style: 'margin-top:12px' }, el('span'), el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar'))];
   }, { largo: true });
 
-  limpar(alvo, acoesTopo(
-    el('div', { class: 'linha', style: 'gap:8px' }, botao('Testar a busca', '', testarBusca)),
-    ctx.pode('zoe.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Novo artigo') : null), lista);
+  ctx.acoes(el('button', { class: 'btn', type: 'button', onclick: testarBusca }, icone('busca'), 'Testar a busca'),
+    ctx.pode('zoe.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Novo artigo') : null);
+  limpar(alvo, lista);
   await recarregar();
 }
 
@@ -584,7 +585,7 @@ async function provedorIxc(ctx, alvo) {
 
   const sondar = async () => {
     const r = await api.post(`/empresas/${ctx.empresaId}/ixc/sonda`, {});
-    toast(r.conectado ? `Conectado em ${r.ms} ms. ${r.resumo.length} capacidade(s) funcionando.` : 'Não foi possível conectar ao IXC.', !r.conectado);
+    toast(r.conectado ? `Conectado em ${r.ms} ms. ${pl(r.resumo.length, 'capacidade(s) funcionando')}.` : 'Não foi possível conectar ao IXC.', !r.conectado);
     await desenhar();
   };
 
@@ -594,7 +595,7 @@ async function provedorIxc(ctx, alvo) {
       limpar(lista,
         d.resumo.length
           ? el('div', { class: 'perguntas', style: 'margin-bottom:12px' }, d.resumo.map((x) =>
-            el('span', { class: `etiqueta ${x.falhas ? 'aviso' : ''}` }, `${x.tipo}: ${inteiro(x.total)}${x.falhas ? ` (${x.falhas} falha(s))` : ''}`)))
+            el('span', { class: `etiqueta ${x.falhas ? 'aviso' : ''}` }, `${x.tipo}: ${inteiro(x.total)}${x.falhas ? ` (${pl(x.falhas, 'falha(s)')})` : ''}`)))
           : null,
         tabela(['Quando', 'Cliente', 'Ação', '^OK', 'Detalhe', '>ms'], d.itens.slice(0, 60).map((a) => el('tr', {},
           td(dataHora(a.criado_em)),
@@ -661,7 +662,7 @@ function resultadoTeste(pergunta, r) {
       el('strong', {}, `Foi para a fila ${r.fila ?? '—'}`),
       r.motivo_transferencia ? el('div', { class: 'pequeno' }, `Motivo: ${r.motivo_transferencia}`) : null,
       r.resumo ? el('div', { class: 'pequeno' }, `Resumo para o atendente: ${r.resumo}`) : null)) : null,
-    r.eventos.length ? el('details', {}, el('summary', {}, `${r.eventos.length} passo(s) da ZOE`),
+    r.eventos.length ? el('details', {}, el('summary', {}, `${pl(r.eventos.length, 'passo(s) da ZOE')}`),
       el('ol', { class: 'passos-ia' }, r.eventos.map((ev) => el('li', {},
         el('strong', {}, ev.tipo === 'ferramenta' ? ev.nome : ev.tipo),
         ev.detalhe ? el('div', { class: 'pequeno mudo' }, String(ev.detalhe).slice(0, 400)) : null,
@@ -714,7 +715,7 @@ async function alertasDeRede(ctx, alvo) {
             el('p', { class: 'pequeno', style: 'margin:4px 0' }, `"${a.mensagem}"`),
             el('p', { class: 'pequeno mudo', style: 'margin:0' },
               `${a.tipo_nome} · ${ABRANGENCIAS[a.abrangencia]} · até ${dataHora(a.fim)}`
-              + (a.avisados ? ` · ${inteiro(a.avisados)} cliente(s) já avisado(s)` : ' · ninguém avisado ainda'))))))
+              + (a.avisados ? ` · ${pl(a.avisados, 'cliente(s) já avisado(s)')}` : ' · ninguém avisado ainda'))))))
         : null,
 
       cartao('Todos os alertas',
@@ -730,7 +731,7 @@ async function alertasDeRede(ctx, alvo) {
                 a.abrangencia === 'chave' && a.chaves.length
                   ? el('div', { class: 'pequeno mudo' }, a.chaves.slice(0, 3).join(', ') + (a.chaves.length > 3 ? ` +${a.chaves.length - 3}` : ''))
                   : a.abrangencia === 'clientes'
-                    ? el('div', { class: 'pequeno mudo' }, `${inteiro(a.clientes.length)} cliente(s)`)
+                    ? el('div', { class: 'pequeno mudo' }, `${pl(a.clientes.length, 'cliente(s)')}`)
                     : null)),
               td(el('div', {}, dataHora(a.inicio), el('div', { class: 'pequeno mudo' }, `até ${dataHora(a.fim)}`))),
               td(inteiro(a.avisados), 'dir num'),

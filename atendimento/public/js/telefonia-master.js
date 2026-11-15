@@ -5,7 +5,7 @@
  */
 import { api, qs, BASE as RAIZ } from './api.js';
 import { el, limpar, dinheiro, dataHora, inteiro, gb, barraUso, toast, campo, escolha, marcar, formModal, modal, confirmar, repetir, telefone,
-  reaisCampo, centavos, icone, situacao } from './ui.js';
+  reaisCampo, centavos, icone, situacao, pl } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, campoBusca, seletor } from './comum.js';
 import { cartaoUtilizacao, cartaoSimultaneas, cartaoRamais, cartaoUsoMes, cartaoRecursos, cartaoStatusLigacoes, indicadoresTelefonia,
   painelChamadas, painelRelatorios, situacaoDiag, TIPOS_EMPRESA } from './telefonia-comum.js';
@@ -121,7 +121,7 @@ async function abaTerminacao(ctx, so) {
       escolha('Empresa', 'empresa_id', { '': 'Deixar no estoque', ...nomesEmp }, ''),
     ], async (d) => {
       const r = await api.post(`${BASE}/numeros`, d);
-      toast(`${r.criados} número(s) adicionado(s)${r.repetidos ? `, ${r.repetidos} já existia(m)` : ''}.`);
+      toast(`${pl(r.criados, 'número(s) adicionado(s)')}${r.repetidos ? `, ${pl(r.repetidos, 'já existia(m)')}` : ''}.`);
       return true;
     });
     const formNumero = (n) => formModal(`Número ${telefone(n.numero)}`, () => [
@@ -253,7 +253,7 @@ async function abaCentral(ctx) {
         el('button', { class: 'btn', onclick: () => navigator.clipboard?.writeText(criada.chave).then(() => toast('Copiada.'), () => toast('Não foi possível copiar.', true)) }, 'Copiar'),
         el('button', { class: 'btn primario', onclick: () => fechar() }, 'Pronto')),
     ]);
-  } }, 'Nova chave') : null;
+  } }, icone('mais'), 'Nova chave') : null;
 
   const base = `${location.origin}${RAIZ}/api/central`;
   const doc = cartao('Como ligar a central telefônica',

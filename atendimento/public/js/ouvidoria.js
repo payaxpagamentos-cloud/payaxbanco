@@ -3,6 +3,7 @@ import {api, qs} from './api.js';
 import {
   el, limpar, icone, toast, formModal, modal, campo, area, escolha, marcar, inteiro, porcento, dinheiro,
   dataHora, desde, repetir, centavos,
+  pl,
 } from './ui.js';
 import {cartao, indicador, tabela, td, botao, acoesTopo, vazio, campoBusca, seletor} from './comum.js';
 import {corpoDaFicha} from './ficha.js';
@@ -29,10 +30,10 @@ export async function telaOuvidoria(ctx) {
     const i = d.indicadores;
     limpar(indicadores,
       indicador('Casos no mês', inteiro(i.casos), `${inteiro(i.em_aberto)} em aberto`, 'alerta', i.em_aberto ? 'laranja' : 'azul'),
-      indicador('Fora do prazo', inteiro(i.atrasadas), i.horas_medias === null ? 'sem casos encerrados' : `média de ${i.horas_medias}h para resolver`,
+      indicador('Fora do prazo', inteiro(i.atrasadas), i.horas_medias === null ? 'sem casos encerrados' : `média de ${Number(i.horas_medias).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} h para resolver`,
         'relogio', i.atrasadas ? 'vermelho' : 'verde'),
       indicador('Retenção', i.taxa_retencao === null ? '—' : porcento(i.taxa_retencao),
-        `${inteiro(i.retidos)} retido(s), ${inteiro(i.perdidos)} perdido(s)`, 'pessoa', 'roxo'),
+        `${pl(i.retidos, 'retido(s)')}, ${pl(i.perdidos, 'perdido(s)')}`, 'pessoa', 'roxo'),
       indicador('Receita salva', dinheiro(i.receita_salva_centavos),
         [i.custo_retencao_centavos ? `custou ${dinheiro(i.custo_retencao_centavos)} em ofertas` : null,
           i.receita_perdida_centavos ? `${dinheiro(i.receita_perdida_centavos)} perdidos` : 'nada perdido'].filter(Boolean).join(' · '), 'dinheiro', 'verde'));
@@ -47,7 +48,7 @@ export async function telaOuvidoria(ctx) {
           td(o.risco_na_abertura === null ? '—' : el('span', { class: `etiqueta ${o.risco_na_abertura >= 60 ? 'erro' : o.risco_na_abertura >= 30 ? 'aviso' : 'ok'}` }, inteiro(o.risco_na_abertura)), 'centro'),
           td(o.valor_na_abertura ?? '—', 'centro'),
           td(o.resolvida_em ? el('span', { class: 'mudo' }, 'encerrado')
-            : o.atrasada ? el('span', { class: 'etiqueta erro' }, `${Math.abs(o.horas_para_o_prazo)}h atrasado`)
+            : o.atrasada ? el('span', { class: 'etiqueta erro' }, (Math.abs(o.horas_para_o_prazo) >= 48 ? `${Math.round(Math.abs(o.horas_para_o_prazo) / 24)} dias atrasado` : `${Math.abs(o.horas_para_o_prazo)} h atrasado`))
               : el('span', { class: o.horas_para_o_prazo <= 6 ? 'situacao aviso' : 'situacao' }, `${o.horas_para_o_prazo}h`)),
           td(etiquetaStatus(o.status), 'centro'),
           td(o.responsavel_nome ?? el('span', { class: 'mudo' }, 'ninguém')))))
@@ -272,7 +273,7 @@ async function telaRetencao(ctx, alvo) {
         el('div', { class: 'melhores-ofertas' }, r.melhor_por_motivo.map((m) => el('div', { class: 'melhor-oferta' },
           el('small', {}, m.motivo_nome),
           el('strong', {}, m.oferta_nome),
-          el('span', { class: 'pequeno mudo' }, `segurou ${taxa(m.taxa_sucesso)} de ${inteiro(m.oferecidas)} oferta(s)${m.pouca_amostra ? ' — pouca amostra ainda' : ''}`))))) : null,
+          el('span', { class: 'pequeno mudo' }, `segurou ${taxa(m.taxa_sucesso)} de ${pl(m.oferecidas, 'oferta(s)')}${m.pouca_amostra ? ' — pouca amostra ainda' : ''}`))))) : null,
 
       el('div', { class: 'grade-2' },
         cartao('Por que querem sair',

@@ -1212,13 +1212,13 @@ textarea{ resize: vertical; }
 .filtros{ margin-bottom: 0; }
 .cartao > .filtros{ margin-bottom: var(--esp-3); }
 .filtros.livre{ gap: var(--esp-2) 12px; }
-.filtros.livre > label.campo:has(input[type="search"]){ flex: 1 1 260px; max-width: 380px; min-width: 220px; }
+.filtros.livre > label.campo:has(input[type="search"]){ flex: 1 1 200px; max-width: 380px; min-width: 180px; }
 .filtros.livre > .btn:first-of-type:not(.segmentado .btn){ margin-left: auto; }
 .acoes-topo:has(> .filtros, > label.campo){ flex-wrap: nowrap; }
 .acoes-topo > .filtros{ flex: 1 1 auto; }
 
 /* ---------- Etiquetas e avisos: a caixa de aviso não vaza para as etiquetas ---------- */
-.etiqueta.aviso, .situacao.aviso, .bolinha.aviso, .verificacao.aviso{ border: 0; }
+.etiqueta.aviso, .situacao.aviso, .bolinha.aviso{ border: 0; }
 .etiqueta.aviso{ padding: 2px 8px; }
 .situacao.aviso, .situacao.erro, .situacao.ok{ background: none; padding: 0; border-radius: 0; color: inherit; font-size: inherit; }
 .bolinha{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); margin-right: 8px; padding: 0 !important; vertical-align: 1px; }
@@ -1310,16 +1310,17 @@ body:has(.telefone) .casca.cheia .painel-conversa{ padding-bottom: 96px; }
   .segmentado{ width: 100%; } .segmentado .btn{ flex: 1; }
   /* Tabela vira lista de cartões: o nome da coluna em cima de cada valor. */
   .rolagem{ margin: 0; padding: 0; overflow: visible; }
-  .tabela thead{ display: none; }
-  .tabela, .tabela tbody{ display: block; }
-  .tabela tr{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
-  .tabela tbody tr:last-child{ border-bottom: 0; }
-  .tabela td{ border: 0 !important; padding: 0 !important; text-align: left !important; white-space: normal; min-width: 0; }
-  .tabela td[data-rotulo]::before{ content: attr(data-rotulo); display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); margin-bottom: 2px; }
-  .tabela td:first-child{ grid-column: 1 / -1; }
-  .tabela td:first-child::before{ display: none; }
-  .tabela td.acoes, .tabela td:last-child:has(> .icone-btn){ grid-column: 1 / -1; text-align: right !important; width: auto; }
-  .grafico text{ font-size: 22px; }
+  .tabela:not(.tabela-utilizacao) thead{ display: none; }
+  .tabela:not(.tabela-utilizacao), .tabela:not(.tabela-utilizacao) tbody{ display: block; }
+  .tabela:not(.tabela-utilizacao) tr{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .tabela:not(.tabela-utilizacao) tbody tr:last-child{ border-bottom: 0; }
+  .tabela:not(.tabela-utilizacao) td{ border: 0 !important; padding: 0 !important; text-align: left !important; white-space: normal; min-width: 0; }
+  .tabela:not(.tabela-utilizacao) td[data-rotulo]::before{ content: attr(data-rotulo); display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); margin-bottom: 2px; }
+  .tabela:not(.tabela-utilizacao) td:first-child{ grid-column: 1 / -1; }
+  .tabela:not(.tabela-utilizacao) td:first-child::before{ display: none; }
+  .tabela:not(.tabela-utilizacao) td.acoes, .tabela:not(.tabela-utilizacao) td:last-child:has(> .icone-btn){ grid-column: 1 / -1; text-align: right !important; width: auto; }
+  .grafico text{ font-size: 18px; }
+  .grafico .menor{ display: none; }
 }
 @media (pointer: coarse){
   .icone-btn{ min-width: 40px; min-height: 40px; }
@@ -1392,3 +1393,46 @@ div.campo{ display: flex; flex-direction: column; gap: 6px; }
 .form.colunas{ max-width: 1100px; }
 .form.colunas input:is([type="number"], [inputmode="numeric"]){ max-width: 220px; }
 .so-leitura :is(input, select, textarea):disabled{ opacity: 1; cursor: default; background: var(--surface-2); }
+
+/* Revisão: correções do que piorou e acabamentos que faltavam. */
+.caixa{ grid-template-columns: 340px minmax(0, 1fr) 320px; }
+.coluna-lista, .coluna-chat, .painel-conversa{ min-width: 0; }
+@media (max-width: 1280px){ .caixa{ grid-template-columns: 300px minmax(0, 1fr); } }
+@media (max-width: 900px){ .caixa{ grid-template-columns: minmax(0, 1fr); } }
+.abas-caixa .aba{ padding: 6px 9px; }
+.origem-economia p{ max-width: none; }
+.artigo > .rodape-artigo{ margin-top: auto; }
+.quem-chat{ flex: 1; min-width: 0; }
+.quem-chat > .pequeno{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bolha.sistema{ align-self: stretch; max-width: none; }
+.bolha.sistema .corpo-bolha{ width: min(520px, 100%); margin-inline: auto; }
+.acoes-topo > label.campo:has(input[type="search"]){ flex: 0 1 380px; min-width: 260px; }
+.cartao .form label.campo:has(> input[type="number"]){ max-width: 260px; }
+label.marcar > input{ margin: 0; }
+label.marcar + .ajuda, label.marcar + p.pequeno{ margin-left: 28px; }
+.cartao .form fieldset{ margin-top: var(--esp-3); }
+.cartao .form fieldset:first-of-type{ margin-top: 0; }
+/* Barras com o dia embaixo e o número em cima. */
+.barras.com-rotulos{ align-items: stretch; gap: 4px; height: 200px; padding-top: 0; }
+.coluna-barra{ flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 3px; }
+.coluna-barra .barra{ flex: none; width: 100%; max-height: calc(100% - 34px); }
+.valor-barra, .rotulo-barra{ font-size: 10.5px; color: var(--text-3); text-align: center; line-height: 1.2; min-height: 13px; white-space: nowrap; overflow: hidden; }
+.valor-barra{ color: var(--text-2); font-weight: 600; }
+/* Caixa no celular: a lista ou a conversa, nunca as duas espremidas. */
+.voltar-lista{ display: none; }
+@media (max-width: 900px){
+  .caixa{ grid-template-rows: minmax(0, 1fr) !important; }
+  .caixa.com-conversa .coluna-lista{ display: none; }
+  .caixa:not(.com-conversa) .coluna-chat, .caixa .painel-conversa{ display: none; }
+  .caixa .coluna-lista{ max-height: none; height: 100%; }
+  .voltar-lista{ display: inline-grid; margin-right: 2px; }
+}
+/* Abas da caixa: se não couberem, um degradê mostra que há mais à direita. */
+.abas-caixa{ -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); padding-right: 14px; }
+/* Mensagens automáticas: discretas e compactas, sem disputar com a conversa. */
+.bolha.sistema .corpo-bolha{ padding: 7px 12px; }
+.bolha.sistema .autor-bolha{ font-size: 10.5px; margin-bottom: 2px; }
+.bolha.sistema .corpo-bolha p{ margin: 0; font-size: 12.5px; }
+.bolha.sistema .pe-bolha{ margin-top: 2px; }
+/* Celular com a conversa aberta: o botão do telefone fica acima da caixa de resposta. */
+@media (max-width: 860px){ body:has(.casca.cheia) .telefone{ bottom: 168px; } }
