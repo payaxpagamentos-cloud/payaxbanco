@@ -14,6 +14,8 @@
 # Uso (como root, de dentro da pasta do pacote):
 #   ./implantacao/instalar.sh --dominio pagamentos.payax.com.br --bucket payax-pagamentos --email-admin ti@payax.com.br
 #   ./implantacao/instalar.sh ... --endpoint https://ID-DA-CONTA.r2.cloudflarestorage.com   (VPS + Cloudflare R2)
+#   ./implantacao/instalar.sh ... --sem-copia-externa   (só testes: sem cópia fora do servidor; ligar depois
+#                                                        rodando de novo com --bucket/--endpoint, sem reinstalar)
 #   ./implantacao/instalar.sh ... --hestia admin   (servidor que já tem HestiaCP: publica como domínio do Hestia,
 #                                                    sem Caddy e sem mexer no firewall, nos sites ou no e-mail)
 #   ./implantacao/instalar.sh ... --reserva
@@ -33,7 +35,7 @@ ETC=/etc/payax
 USUARIO=payax
 PORTA=3600
 
-REGIAO_INFORMADA=0 HESTIA_USUARIO="" ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
+SEM_COPIA=0 REGIAO_INFORMADA=0 HESTIA_USUARIO="" ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dominio) DOMINIO="$2"; shift 2 ;;
@@ -45,10 +47,12 @@ while [[ $# -gt 0 ]]; do
     --anterior-desligado) ANTERIOR_DESLIGADO=1; shift ;;
     --somente-gerar) SOMENTE_GERAR="$2"; shift 2 ;;
     --hestia) HESTIA_USUARIO="${2:-admin}"; shift 2 ;;
+    --sem-copia-externa) SEM_COPIA=1; shift ;;
     -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     *) echo "Opção desconhecida: $1" >&2; exit 2 ;;
   esac
 done
+[[ $SEM_COPIA -eq 1 && -z "$BUCKET" ]] && BUCKET="sem-copia-externa"
 [[ -n "$DOMINIO" && -n "$BUCKET" && -n "$EMAIL_ADMIN" ]] || { echo "Informe --dominio, --bucket e --email-admin (veja --help)." >&2; exit 2; }
 [[ "$DOMINIO" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || { echo "Domínio inválido: $DOMINIO" >&2; exit 2; }
 [[ "$BUCKET" =~ ^[a-z0-9.-]{3,63}$ ]] || { echo "Nome de bucket inválido: $BUCKET" >&2; exit 2; }
@@ -57,6 +61,8 @@ if [[ -n "$ENDPOINT" ]]; then
   [[ "$ENDPOINT" =~ ^https://[a-z0-9.-]+$ ]] || { echo "Endpoint inválido (use https://...): $ENDPOINT" >&2; exit 2; }
   [[ $REGIAO_INFORMADA -eq 1 ]] || REGIAO=auto
 fi
+# aws = servidor EC2 com papel; s3 = armazenamento compatível (--endpoint); local = sem cópia externa (só testes)
+MODO=aws; [[ -n "$ENDPOINT" ]] && MODO=s3; [[ $SEM_COPIA -eq 1 ]] && MODO=local
 COPIAS_ENV=$ETC/copias.env              # chaves do armazenamento das cópias (só no modo VPS)
 SEGREDOS_OBJ="pagamentos/segredos/pagamentos.env.enc"
 
@@ -261,6 +267,7 @@ if ! command -v node >/dev/null || ! node -e 'const [a,b]=process.versions.node.
 fi
 node -v
 
+if [[ $MODO != local ]]; then
 passo "AWS CLI e Litestream"
 command -v snap >/dev/null || apt-get install -y -q snapd
 command -v aws >/dev/null || snap install aws-cli --classic
@@ -289,6 +296,7 @@ if [[ -n "$ENDPOINT" ]]; then
 else
   aws sts get-caller-identity --region "$REGIAO" >/dev/null \
     || { echo "A máquina não tem acesso ao AWS. Confira o papel (IAM role) PayaxPagamentosServidor (guia, passo 3)." >&2; exit 1; }
+fi
 fi
 
 passo "Usuário e pastas"
@@ -335,7 +343,24 @@ segredos_guardar() {
   s3 cp "$ETC/segredos.enc" "s3://$BUCKET/$SEGREDOS_OBJ" --only-show-errors
   rm -f "$ETC/segredos.enc"
 }
-if segredos_ler; then
+segredos_remotos_existem() {
+  if [[ $MODO == aws ]]; then aws ssm get-parameter --name "$PARAMETRO" --region "$REGIAO" >/dev/null 2>&1
+  else [[ -n "$(s3 ls "s3://$BUCKET/$SEGREDOS_OBJ" 2>/dev/null)" ]]; fi
+}
+if [[ -f "$ETC/pagamentos.env" ]]; then
+  # Reinstalação ou atualização (ex.: ligando a cópia externa depois): os segredos deste servidor ficam.
+  echo "Segredos deste servidor mantidos."
+  cp "$ETC/pagamentos.env" "$ETC/pagamentos.env.tmp"
+  NOVO=0
+  if [[ $MODO != local ]] && ! segredos_remotos_existem; then
+    echo "Guardando agora a cópia cifrada dos segredos junto das cópias."
+    segredos_guardar
+  fi
+elif [[ $MODO == local ]]; then
+  echo "Primeira instalação, sem cópia externa: segredos gerados e guardados só neste servidor."
+  gerar_env principal > "$ETC/pagamentos.env.tmp"
+  NOVO=1
+elif segredos_ler; then
   echo "Segredos encontrados no AWS: este servidor usa os MESMOS do servidor anterior."
   NOVO=0
   if [[ $RESERVA -eq 0 && $ANTERIOR_DESLIGADO -eq 0 && ! -f "$DADOS/payax.db" ]]; then
@@ -356,9 +381,11 @@ rm -f "$ETC/pagamentos.env.tmp"
 
 passo "Serviços"
 gerar_servico > /etc/systemd/system/payax-pagamentos.service
-gerar_copia_arquivos > /etc/systemd/system/payax-copia-pastas.service
-gerar_copia_arquivos_timer > /etc/systemd/system/payax-copia-pastas.timer
-gerar_litestream > /etc/litestream.yml
+if [[ $MODO != local ]]; then
+  gerar_copia_arquivos > /etc/systemd/system/payax-copia-pastas.service
+  gerar_copia_arquivos_timer > /etc/systemd/system/payax-copia-pastas.timer
+  gerar_litestream > /etc/litestream.yml
+fi
 [[ -n "$HESTIA_USUARIO" ]] || gerar_caddy > /etc/caddy/Caddyfile
 systemctl daemon-reload
 
@@ -391,6 +418,8 @@ fi
 passo "Banco de dados"
 if [[ -f "$DADOS/payax.db" ]]; then
   echo "Banco já existe neste servidor: mantido."
+elif [[ $MODO == local ]]; then
+  echo "Primeira instalação: o sistema cria o banco."
 else
   # Se a restauração falhar, PARA: subir com banco vazio apagaria, na prática, o razão dos clientes.
   litestream restore -if-replica-exists -config /etc/litestream.yml "$DADOS/payax.db" \
@@ -411,8 +440,10 @@ passo "Subindo"
 systemctl enable payax-pagamentos && systemctl restart payax-pagamentos   # restart: na atualização, carrega o código novo
 for _ in $(seq 1 30); do curl -fsS "http://127.0.0.1:$PORTA/api/saude" >/dev/null 2>&1 && break; sleep 1; done
 curl -fsS "http://127.0.0.1:$PORTA/api/saude" && echo
-systemctl enable --now litestream payax-copia-pastas.timer
-systemctl restart litestream
+if [[ $MODO != local ]]; then
+  systemctl enable --now litestream payax-copia-pastas.timer
+  systemctl restart litestream
+fi
 if [[ -n "$HESTIA_USUARIO" ]]; then
   passo "Publicando pelo Hestia ($DOMINIO)"
   TPL=/usr/local/hestia/data/templates/web/nginx
@@ -463,7 +494,7 @@ else
   systemctl restart caddy
 fi
 
-if [[ -z "$ENDPOINT" ]]; then
+if [[ $MODO == aws ]]; then
   # Vigilância de memória e disco (CloudWatch): os alarmes do guia avisam ANTES de faltar recurso.
   passo "Vigilância de memória e disco (CloudWatch)"
   if [[ ! -x /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl ]]; then
@@ -494,6 +525,11 @@ passo "Atualizações de segurança automáticas"
 apt-get install -y -q unattended-upgrades >/dev/null
 printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
 
+if [[ $MODO == local ]]; then
+  printf '\n\033[1;33mSEM CÓPIA EXTERNA: o banco só existe neste servidor (backup conferido a cada 12 h, no mesmo disco).\033[0m\n'
+  echo "Use só para testes e homologação — nada de cliente real. Para ligar a cópia, rode de novo este instalador"
+  echo "com --bucket/--endpoint/--regiao no lugar de --sem-copia-externa: banco e segredos são mantidos."
+else
 passo "Conferindo a cópia contínua"
 copia_ok=0
 for _ in $(seq 1 12); do
@@ -506,6 +542,7 @@ else
   printf '\n\033[1;31mATENÇÃO: a cópia do banco ainda não apareceu em s3://%s/pagamentos/banco/.\033[0m\n' "$BUCKET"
   echo "O sistema está no ar, mas SEM cópia. Veja: journalctl -u litestream -n 50   — e não opere sem resolver."
 fi
+fi
 
 passo "Pronto"
 echo "Endereço: https://$DOMINIO/   (Área do Cliente: https://$DOMINIO/cliente/)"
@@ -513,4 +550,7 @@ echo "Saúde:    https://$DOMINIO/api/saude"
 if [[ $NOVO -eq 1 ]]; then
   echo "Administrador: $EMAIL_ADMIN"
   echo "Senha inicial: $(grep ^PAYAX_ADMIN_SENHA= "$ETC/pagamentos.env" | cut -d= -f2-)   ← anote; o sistema pede a troca no primeiro acesso."
+  if [[ $MODO == local ]]; then
+    echo "IMPORTANTE: guarde uma cópia de $ETC/pagamentos.env num cofre da empresa (tem a chave que cifra as credenciais do banco)."
+  fi
 fi
