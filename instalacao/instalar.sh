@@ -105,6 +105,8 @@ if [ "$NGINX" = 1 ] && [ -z "$DOMINIO" ] && [ -z "$IP_ACESSO" ] && [ ! -f /etc/n
   falha "Informe o domínio: --dominio atende.seuprovedor.com.br (ou --sem-nginx)."
 fi
 [ -n "$EMAIL" ] || EMAIL="master@${DOMINIO:-zoe.local}"
+# Exemplo copiado sem trocar (SEU-EMAIL) ou digitado errado: sem @ não dá nem para entrar no painel.
+[[ "$EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] || falha "E-mail inválido: \"$EMAIL\". Use o seu e-mail de verdade em --email (ex.: --email voce@seuprovedor.com.br)."
 # Acesso pelo IP: a porta web tem de estar livre (ou já ser do Nginx da ZOE).
 if [ -n "$IP_ACESSO" ]; then
   DONO_WEB="$(ss -ltnpH "sport = :$PORTA_WEB" 2>/dev/null | grep -o 'users:(("[^"]*' | head -1 | cut -d'"' -f2 || true)"
