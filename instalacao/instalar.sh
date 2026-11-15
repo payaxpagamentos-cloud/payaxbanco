@@ -204,7 +204,8 @@ SENHA_NOVA=""
 if [ -f "$CODIGO/.env" ]; then
   echo ".env mantido (segredos e senha não mudam)"
   # Instalações antigas escutavam em todas as interfaces: fecha para só dentro do servidor.
-  [ -n "$URL_IP" ] && sed -i "s|^ATEND_URL_PUBLICA=https://[0-9.]*\(:[0-9]*\)\?$|ATEND_URL_PUBLICA=https://$URL_IP|" "$CODIGO/.env"
+  # Pelo IP: o endereço público acompanha (também quando a primeira instalação ficou sem endereço).
+  [ -n "$URL_IP" ] && sed -i -E "s#^ATEND_URL_PUBLICA=https://([0-9.]+(:[0-9]+)?|SEU-DOMINIO)\$#ATEND_URL_PUBLICA=https://$URL_IP#" "$CODIGO/.env"
   grep -q '^ATEND_HOST=' "$CODIGO/.env" || printf '\n# Só dentro do servidor (Nginx/Apache ou túnel SSH na frente).\nATEND_HOST=127.0.0.1\n' >> "$CODIGO/.env"
 else
   SENHA_NOVA="$(aleatorio 12 base64url)"
@@ -299,6 +300,12 @@ systemctl daemon-reload
 systemctl enable zoe >/dev/null 2>&1
 systemctl restart zoe
 
+# Sem domínio e sem IP não há o que pôr no Nginx: um site sem nome quebraria o Nginx inteiro
+# (inclusive os sites de outros sistemas). O que já existe fica como está.
+if [ "$NGINX" = 1 ] && [ -z "$DOMINIO" ] && [ -z "$IP_ACESSO" ]; then
+  aviso "Sem --dominio nem --ip: o Nginx não foi alterado. Para abrir pelo IP: --ip IP-DO-SERVIDOR"
+  NGINX=0
+fi
 if [ "$NGINX" = 1 ]; then
   passo "Nginx"
   SITE=/etc/nginx/sites-available/zoe.conf
@@ -371,7 +378,13 @@ NGINX
   fi
   if [ "$ALVO" = "$SITE" ]; then
     ln -sf "$SITE" /etc/nginx/sites-enabled/zoe.conf
-    nginx -t && systemctl reload nginx
+    if nginx -t 2>/dev/null; then systemctl reload nginx
+    else
+      # Nunca deixar o Nginx com configuração inválida: o site da ZOE sai e o erro aparece.
+      rm -f /etc/nginx/sites-enabled/zoe.conf
+      nginx -t || true
+      falha "O Nginx recusou a configuração da ZOE (acima). O site da ZOE foi desligado; os outros sites não mudaram."
+    fi
   else
     aviso "Já existia $SITE: a versão nova ficou em $ALVO para você comparar."
   fi
