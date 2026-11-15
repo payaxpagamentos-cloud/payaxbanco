@@ -16,6 +16,7 @@
 #   ./implantacao/instalar.sh ... --endpoint https://ID-DA-CONTA.r2.cloudflarestorage.com   (VPS + Cloudflare R2)
 #   ./implantacao/instalar.sh ... --sem-copia-externa   (só testes: sem cópia fora do servidor; ligar depois
 #                                                        rodando de novo com --bucket/--endpoint, sem reinstalar)
+#   ./implantacao/instalar.sh ... --site payax.com.br   (site público com o acesso da Área do Cliente, e o www)
 #   ./implantacao/instalar.sh ... --hestia admin   (servidor que já tem HestiaCP: publica como domínio do Hestia,
 #                                                    sem Caddy e sem mexer no firewall, nos sites ou no e-mail)
 #   ./implantacao/instalar.sh ... --reserva
@@ -35,7 +36,7 @@ ETC=/etc/payax
 USUARIO=payax
 PORTA=3600
 
-SEM_COPIA=0 REGIAO_INFORMADA=0 HESTIA_USUARIO="" ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
+SITE="" SEM_COPIA=0 REGIAO_INFORMADA=0 HESTIA_USUARIO="" ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dominio) DOMINIO="$2"; shift 2 ;;
@@ -48,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     --somente-gerar) SOMENTE_GERAR="$2"; shift 2 ;;
     --hestia) HESTIA_USUARIO="${2:-admin}"; shift 2 ;;
     --sem-copia-externa) SEM_COPIA=1; shift ;;
+    --site) SITE="$2"; shift 2 ;;
     -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     *) echo "Opção desconhecida: $1" >&2; exit 2 ;;
   esac
@@ -55,6 +57,7 @@ done
 [[ $SEM_COPIA -eq 1 && -z "$BUCKET" ]] && BUCKET="sem-copia-externa"
 [[ -n "$DOMINIO" && -n "$BUCKET" && -n "$EMAIL_ADMIN" ]] || { echo "Informe --dominio, --bucket e --email-admin (veja --help)." >&2; exit 2; }
 [[ "$DOMINIO" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || { echo "Domínio inválido: $DOMINIO" >&2; exit 2; }
+[[ -z "$SITE" || "$SITE" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || { echo "Domínio do site inválido: $SITE" >&2; exit 2; }
 [[ "$BUCKET" =~ ^[a-z0-9.-]{3,63}$ ]] || { echo "Nome de bucket inválido: $BUCKET" >&2; exit 2; }
 
 if [[ -n "$ENDPOINT" ]]; then
@@ -143,6 +146,16 @@ $DOMINIO {
 	reverse_proxy 127.0.0.1:$PORTA
 }
 EOF
+  [[ -n "$SITE" ]] && cat <<EOF
+
+# Site público: $SITE (e www), com o acesso da Área do Cliente.
+$SITE, www.$SITE {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy 127.0.0.1:$PORTA
+}
+EOF
+  return 0
 }
 
 gerar_litestream() {
@@ -376,6 +389,9 @@ else
   NOVO=1
 fi
 if [[ $RESERVA -eq 1 ]]; then sed -i 's/^PAYAX_ROTINAS=.*/PAYAX_ROTINAS=0/' "$ETC/pagamentos.env.tmp"; else sed -i 's/^PAYAX_ROTINAS=.*/PAYAX_ROTINAS=1/' "$ETC/pagamentos.env.tmp"; fi
+# Site público: os domínios dele mostram o site e a Área do Cliente (o Backoffice não aparece neles).
+sed -i '/^PAYAX_SITE_HOSTS=/d' "$ETC/pagamentos.env.tmp"
+[[ -n "$SITE" ]] && echo "PAYAX_SITE_HOSTS=$SITE,www.$SITE" >> "$ETC/pagamentos.env.tmp"
 install -m 640 -o root -g "$USUARIO" "$ETC/pagamentos.env.tmp" "$ETC/pagamentos.env"
 rm -f "$ETC/pagamentos.env.tmp"
 
@@ -478,18 +494,25 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
       echo "}"
     } > "$TPL/payax.$ext"
   done
-  if ! v-list-web-domain "$HESTIA_USUARIO" "$DOMINIO" plain >/dev/null 2>&1; then
-    v-add-web-domain "$HESTIA_USUARIO" "$DOMINIO" "" no
-    v-delete-web-domain-alias "$HESTIA_USUARIO" "$DOMINIO" "www.$DOMINIO" no 2>/dev/null || true
-  fi
-  v-change-web-domain-proxy-tpl "$HESTIA_USUARIO" "$DOMINIO" payax "" yes
-  if v-add-letsencrypt-domain "$HESTIA_USUARIO" "$DOMINIO" 2>/dev/null || v-list-web-domain-ssl "$HESTIA_USUARIO" "$DOMINIO" plain 2>/dev/null | grep -q .; then
-    v-add-web-domain-ssl-force "$HESTIA_USUARIO" "$DOMINIO" 2>/dev/null || true
-    echo "HTTPS ativo (Let's Encrypt, renovado pelo Hestia)."
-  else
-    printf '\033[1;33mHTTPS ainda não emitido: o DNS de %s precisa apontar para este servidor.\033[0m\n' "$DOMINIO"
-    echo "Quando apontar, rode: v-add-letsencrypt-domain $HESTIA_USUARIO $DOMINIO && v-add-web-domain-ssl-force $HESTIA_USUARIO $DOMINIO"
-  fi
+  # $1 = domínio; $2 = "www" para manter o www como apelido (site público).
+  publicar() {
+    local dom="$1" www="$2"
+    if ! v-list-web-domain "$HESTIA_USUARIO" "$dom" plain >/dev/null 2>&1; then
+      v-add-web-domain "$HESTIA_USUARIO" "$dom" "" no
+      [[ "$www" == www ]] || v-delete-web-domain-alias "$HESTIA_USUARIO" "$dom" "www.$dom" no 2>/dev/null || true
+    fi
+    v-change-web-domain-proxy-tpl "$HESTIA_USUARIO" "$dom" payax "" yes
+    local apelidos=""; [[ "$www" == www ]] && apelidos="www.$dom"
+    if v-add-letsencrypt-domain "$HESTIA_USUARIO" "$dom" "$apelidos" 2>/dev/null || v-list-web-domain-ssl "$HESTIA_USUARIO" "$dom" plain 2>/dev/null | grep -q .; then
+      v-add-web-domain-ssl-force "$HESTIA_USUARIO" "$dom" 2>/dev/null || true
+      echo "HTTPS ativo em $dom (Let's Encrypt, renovado pelo Hestia)."
+    else
+      printf '\033[1;33mHTTPS ainda não emitido: o DNS de %s%s precisa apontar para este servidor.\033[0m\n' "$dom" "${apelidos:+ e $apelidos}"
+      echo "Quando apontar, rode: v-add-letsencrypt-domain $HESTIA_USUARIO $dom${apelidos:+ $apelidos} && v-add-web-domain-ssl-force $HESTIA_USUARIO $dom"
+    fi
+  }
+  publicar "$DOMINIO"
+  if [[ -n "$SITE" ]]; then passo "Publicando o site ($SITE e www.$SITE)"; publicar "$SITE" www; fi
 else
   systemctl restart caddy
 fi

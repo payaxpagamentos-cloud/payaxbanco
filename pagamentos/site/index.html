@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PAY AX · Pagamentos conectados à rotina da sua empresa</title>
+  <meta name="description" content="PAY AX: Pix, boletos, cobranças e conciliação conectados ao sistema da sua empresa.">
+  <link rel="icon" href="/site/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/site/site.css">
+  <script type="module" src="/site/site.js"></script>
+</head>
+<body>
+  <header class="topo">
+    <a class="logo" href="/" aria-label="PAY AX — início"><span id="logo"></span></a>
+
+    <!-- Acesso da Área do Cliente: entra aqui mesmo e segue para o painel. -->
+    <form class="acesso" id="acesso" novalidate>
+      <span class="acesso-titulo">Área do cliente</span>
+      <div class="acesso-linha" id="acesso-campos">
+        <label class="oculto" for="email">E-mail</label>
+        <input id="email" name="email" type="email" placeholder="E-mail" autocomplete="username" required>
+        <div class="senha">
+          <label class="oculto" for="senha">Senha</label>
+          <input id="senha" name="senha" type="password" placeholder="Senha" autocomplete="current-password" required>
+          <button type="button" class="olho" id="olho" aria-label="Mostrar a senha"></button>
+        </div>
+        <button type="submit" class="entrar" id="entrar">Entrar <span class="seta" aria-hidden="true"></span></button>
+      </div>
+      <div class="acesso-linha codigo" id="acesso-codigo" hidden>
+        <label class="oculto" for="codigo">Código do aplicativo</label>
+        <input id="codigo" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="Código de 6 dígitos">
+        <button type="submit" class="entrar">Confirmar <span class="seta" aria-hidden="true"></span></button>
+      </div>
+      <div class="acesso-pe">
+        <button type="button" class="link" id="esqueci">Esqueci minha senha</button>
+        <span class="mensagem" id="mensagem" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+    <a class="entrar-movel" href="/cliente/">Área do cliente <span class="seta" aria-hidden="true"></span></a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-texto">
+        <h1>Uma nova perspectiva para <span>o seu negócio.</span></h1>
+        <p>Bem-vindo à PAY AX.</p>
+        <div class="hero-botoes">
+          <a class="botao claro" href="#solucoes">Conhecer soluções</a>
+          <button type="button" class="botao contorno" data-contato>Falar com especialista</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="solucoes" id="solucoes">
+      <div class="solucoes-cab">
+        <div>
+          <span class="olho-secao">Soluções PAY AX</span>
+          <h2>Mais controle.<br>Novas possibilidades.</h2>
+        </div>
+        <p>Pagamentos conectados à rotina da sua empresa.</p>
+      </div>
+      <div class="cartoes" id="cartoes"></div>
+
+      <div class="faixa">
+        <div class="faixa-texto">
+          <h2>Sua operação, conectada.</h2>
+          <p>Tecnologia para aproximar sistemas e recebimentos.</p>
+          <button type="button" class="botao claro" data-detalhe="integracoes">Conhecer integrações</button>
+        </div>
+        <div class="faixa-arte" aria-hidden="true"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <nav>
+      <button type="button" class="link" data-contato>Atendimento</button>
+      <span aria-hidden="true">•</span>
+      <a href="/privacidade">Privacidade</a>
+    </nav>
+  </footer>
+
+  <dialog class="janela" id="janela">
+    <form method="dialog">
+      <h3 id="janela-titulo"></h3>
+      <div id="janela-corpo"></div>
+      <button class="botao escuro" value="ok">Entendi</button>
+    </form>
+  </dialog>
+</body>
+</html>

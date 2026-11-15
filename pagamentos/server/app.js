@@ -53,6 +53,19 @@ function criarApp(db) {
   cliente.use('/js/boleto.js', express.static(path.join(__dirname, '..', 'public', 'js', 'boleto.js')));
   cliente.use(express.static(path.join(__dirname, '..', 'cliente'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
+  // ------------------------------------------------- Site público (payax.com.br)
+  const pastaSite = path.join(__dirname, '..', 'site');
+  const site = express.Router();
+  site.get('/', (_req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(pastaSite, 'index.html')));
+  site.use('/site', express.static(pastaSite, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
+  app.use((req, res, next) => {
+    if (!config.siteHosts.includes(String(req.hostname || '').toLowerCase())) return next();
+    if (req.path === '/' || req.path.startsWith('/site/')) return site(req, res, next);
+    // No domínio do site: a Área do Cliente, o aviso de privacidade e os arquivos comuns. Nada do Backoffice.
+    if (/^\/(cliente|privacidade|comum)(\/|$)/.test(req.path)) return next();
+    return res.status(404).type('text').send('Página não encontrada.');
+  });
+
   // A Área do Cliente precisa vir antes quando mora dentro do caminho do backoffice (ex.: /pagamentos/cliente).
   app.use(config.clientePath || '/cliente', cliente);
   if (config.basePath) {

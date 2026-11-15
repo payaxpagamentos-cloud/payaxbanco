@@ -51,6 +51,9 @@ module.exports = {
   limite2faPorMinuto: Number(process.env.PAYAX_LIMITE_2FA) || 10,
   fusoPadrao: process.env.PAYAX_FUSO || 'America/Sao_Paulo',
   urlPublica: process.env.PAYAX_URL_PUBLICA || '',
+  // Domínios do site público (ex.: payax.com.br,www.payax.com.br): mostram o site e a Área do Cliente;
+  // o Backoffice não aparece neles.
+  siteHosts: String(process.env.PAYAX_SITE_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
 
   banco: {
     // 'simulador' registra os títulos localmente (desenvolvimento e homologação interna);
