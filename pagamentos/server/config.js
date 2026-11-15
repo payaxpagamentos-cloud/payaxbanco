@@ -36,6 +36,8 @@ module.exports = {
   basePath,
   clientePath: process.env.PAYAX_CLIENTE_PATH ? caminho(process.env.PAYAX_CLIENTE_PATH) : `${basePath}/cliente`,
   port: Number(process.env.PORT) || 3600,
+  // Em produção atrás de proxy: 127.0.0.1 — o sistema não fica exposto direto na internet.
+  host: process.env.PAYAX_HOST || undefined,
   dbFile: process.env.PAYAX_DB || path.join(dados, 'payax.db'),
   // Comprovantes, remessas e retornos: fora da pasta pública, com nome aleatório.
   arquivos: process.env.PAYAX_ARQUIVOS || path.join(dados, 'arquivos'),

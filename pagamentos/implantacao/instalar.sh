@@ -14,6 +14,8 @@
 # Uso (como root, de dentro da pasta do pacote):
 #   ./implantacao/instalar.sh --dominio pagamentos.payax.com.br --bucket payax-pagamentos --email-admin ti@payax.com.br
 #   ./implantacao/instalar.sh ... --endpoint https://ID-DA-CONTA.r2.cloudflarestorage.com   (VPS + Cloudflare R2)
+#   ./implantacao/instalar.sh ... --hestia admin   (servidor que já tem HestiaCP: publica como domínio do Hestia,
+#                                                    sem Caddy e sem mexer no firewall, nos sites ou no e-mail)
 #   ./implantacao/instalar.sh ... --reserva
 #   ./implantacao/instalar.sh ... --anterior-desligado   (servidor novo no lugar de um que caiu)
 #   ./implantacao/instalar.sh ... --somente-gerar /tmp/conferir   (só escreve as configurações numa pasta, sem instalar)
@@ -31,17 +33,18 @@ ETC=/etc/payax
 USUARIO=payax
 PORTA=3600
 
-ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
+REGIAO_INFORMADA=0 HESTIA_USUARIO="" ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dominio) DOMINIO="$2"; shift 2 ;;
     --bucket) BUCKET="$2"; shift 2 ;;
     --email-admin) EMAIL_ADMIN="$2"; shift 2 ;;
-    --regiao) REGIAO="$2"; shift 2 ;;
+    --regiao) REGIAO="$2"; REGIAO_INFORMADA=1; shift 2 ;;
     --endpoint) ENDPOINT="$2"; shift 2 ;;
     --reserva) RESERVA=1; shift ;;
     --anterior-desligado) ANTERIOR_DESLIGADO=1; shift ;;
     --somente-gerar) SOMENTE_GERAR="$2"; shift 2 ;;
+    --hestia) HESTIA_USUARIO="${2:-admin}"; shift 2 ;;
     -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     *) echo "Opção desconhecida: $1" >&2; exit 2 ;;
   esac
@@ -52,7 +55,7 @@ done
 
 if [[ -n "$ENDPOINT" ]]; then
   [[ "$ENDPOINT" =~ ^https://[a-z0-9.-]+$ ]] || { echo "Endpoint inválido (use https://...): $ENDPOINT" >&2; exit 2; }
-  [[ "$REGIAO" == sa-east-1 ]] && REGIAO=auto
+  [[ $REGIAO_INFORMADA -eq 1 ]] || REGIAO=auto
 fi
 COPIAS_ENV=$ETC/copias.env              # chaves do armazenamento das cópias (só no modo VPS)
 SEGREDOS_OBJ="pagamentos/segredos/pagamentos.env.enc"
@@ -73,6 +76,7 @@ NODE_ENV=production
 PORT=$PORTA
 PAYAX_DADOS=$DADOS
 PAYAX_URL_PUBLICA=https://$DOMINIO
+PAYAX_HOST=127.0.0.1
 PAYAX_TRUST_PROXY=loopback
 PAYAX_FUSO=America/Sao_Paulo
 PAYAX_SECRET=$(openssl rand -hex 32)
@@ -163,7 +167,7 @@ dbs:
         path: pagamentos/banco
         endpoint: $ENDPOINT
         region: $REGIAO
-        force-path-style: true
+$( [[ "$ENDPOINT" == *amazonaws.com* ]] || echo "        force-path-style: true" )
         sync-interval: 10s
         retention: 720h
         snapshot-interval: 24h
@@ -224,6 +228,14 @@ fi
 
 # Convivência: este servidor pode já ter outros serviços. Nada que esteja rodando é tocado sem aviso.
 passo "Conferindo o que já roda neste servidor"
+if [[ -n "$HESTIA_USUARIO" ]]; then
+  export HESTIA=/usr/local/hestia PATH="$PATH:/usr/local/hestia/bin"
+  [[ -x /usr/local/hestia/bin/v-list-users ]] || { echo "Este servidor não tem HestiaCP. Rode sem --hestia." >&2; exit 1; }
+  v-list-user "$HESTIA_USUARIO" plain >/dev/null 2>&1 || { echo "Usuário do Hestia '$HESTIA_USUARIO' não existe (veja: v-list-users)." >&2; exit 1; }
+  ss -Htlnp "( sport = :$PORTA )" | grep -qv node && { echo "A porta $PORTA já está em uso neste servidor." >&2; exit 1; } || true
+  echo "HestiaCP encontrado: o sistema será publicado como o domínio $DOMINIO do usuário $HESTIA_USUARIO."
+  echo "Sites, e-mail, firewall e painel do Hestia continuam como estão."
+else
 web="$(ss -Htlnp '( sport = :80 or sport = :443 )' 2>/dev/null | grep -v caddy || true)"
 if [[ -n "$web" ]]; then
   echo "As portas 80/443 já estão em uso por outro programa:" >&2; echo "$web" >&2
@@ -235,10 +247,12 @@ if [[ -f /etc/caddy/Caddyfile ]] && ! grep -q 'PAY AX\|/usr/share/caddy' /etc/ca
   exit 1
 fi
 echo "Ok: portas 80 e 443 livres; os demais serviços continuam como estão."
+fi
 
 passo "Pacotes do sistema"
 apt-get update -q
-apt-get install -y -q ca-certificates curl gnupg openssl rsync sqlite3 ufw caddy
+apt-get install -y -q ca-certificates curl gnupg openssl rsync sqlite3
+[[ -n "$HESTIA_USUARIO" ]] || apt-get install -y -q ufw caddy   # com Hestia, o nginx e o firewall são dele
 
 passo "Node.js 22"
 if ! command -v node >/dev/null || ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=13)?0:1)'; then
@@ -345,9 +359,13 @@ gerar_servico > /etc/systemd/system/payax-pagamentos.service
 gerar_copia_arquivos > /etc/systemd/system/payax-copia-pastas.service
 gerar_copia_arquivos_timer > /etc/systemd/system/payax-copia-pastas.timer
 gerar_litestream > /etc/litestream.yml
-gerar_caddy > /etc/caddy/Caddyfile
+[[ -n "$HESTIA_USUARIO" ]] || gerar_caddy > /etc/caddy/Caddyfile
 systemctl daemon-reload
 
+if [[ -n "$HESTIA_USUARIO" ]]; then
+  passo "Firewall"
+  echo "Mantido o firewall do Hestia. O sistema escuta só em 127.0.0.1:$PORTA — nenhuma porta nova aberta."
+else
 passo "Firewall"
 if ! ufw status | grep -q "Status: active"; then
   # Firewall desligado e outros serviços no ar: libera antes as portas que eles já usam, para nada cair.
@@ -360,10 +378,11 @@ ufw allow 80/tcp >/dev/null
 ufw allow 443/tcp >/dev/null
 ufw --force enable >/dev/null
 ufw status | head -12
+fi
 
 if [[ $RESERVA -eq 1 ]]; then
   systemctl disable --now payax-pagamentos litestream payax-copia-pastas.timer 2>/dev/null || true
-  systemctl stop caddy || true
+  [[ -n "$HESTIA_USUARIO" ]] || systemctl stop caddy || true
   passo "Reserva pronta e PARADA"
   echo "Para este servidor assumir: sudo $APP/implantacao/assumir.sh  (guia, seção 'Se o servidor principal cair')."
   exit 0
@@ -394,7 +413,55 @@ for _ in $(seq 1 30); do curl -fsS "http://127.0.0.1:$PORTA/api/saude" >/dev/nul
 curl -fsS "http://127.0.0.1:$PORTA/api/saude" && echo
 systemctl enable --now litestream payax-copia-pastas.timer
 systemctl restart litestream
-systemctl restart caddy
+if [[ -n "$HESTIA_USUARIO" ]]; then
+  passo "Publicando pelo Hestia ($DOMINIO)"
+  TPL=/usr/local/hestia/data/templates/web/nginx
+  # Modelo de proxy do Hestia: o nginx dele encaminha o domínio para o sistema, com HTTPS do próprio Hestia.
+  for ext in tpl stpl; do
+    {
+      echo "# PAY AX Pagamentos — modelo de proxy (gerado pelo instalador; não editar no painel)"
+      echo "server {"
+      if [[ $ext == tpl ]]; then
+        echo "    listen      %ip%:%proxy_port%;"
+        echo "    server_name %domain_idn% %alias_idn%;"
+        echo "    include %home%/%user%/conf/web/%domain%/nginx.forcessl.conf*;"
+      else
+        echo "    listen      %ip%:%proxy_ssl_port% ssl;"
+        echo "    server_name %domain_idn% %alias_idn%;"
+        echo "    ssl_certificate      %ssl_pem%;"
+        echo "    ssl_certificate_key  %ssl_key%;"
+        echo "    include %home%/%user%/conf/web/%domain%/nginx.hsts.conf*;"
+      fi
+      echo "    client_max_body_size 20m;"
+      echo "    location ~ /\\.(?!well-known\\/) { deny all; return 404; }"
+      echo "    location / {"
+      echo "        proxy_pass http://127.0.0.1:$PORTA;"
+      echo "        proxy_set_header Host \$host;"
+      echo "        proxy_set_header X-Real-IP \$remote_addr;"
+      echo "        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"
+      echo "        proxy_set_header X-Forwarded-Proto \$scheme;"
+      echo "        proxy_read_timeout 120s;"
+      echo "    }"
+      [[ $ext == tpl ]] && echo "    include %home%/%user%/conf/web/%domain%/nginx.conf_*;" \
+                        || echo "    include %home%/%user%/conf/web/%domain%/nginx.ssl.conf_*;"
+      echo "}"
+    } > "$TPL/payax.$ext"
+  done
+  if ! v-list-web-domain "$HESTIA_USUARIO" "$DOMINIO" plain >/dev/null 2>&1; then
+    v-add-web-domain "$HESTIA_USUARIO" "$DOMINIO" "" no
+    v-delete-web-domain-alias "$HESTIA_USUARIO" "$DOMINIO" "www.$DOMINIO" no 2>/dev/null || true
+  fi
+  v-change-web-domain-proxy-tpl "$HESTIA_USUARIO" "$DOMINIO" payax "" yes
+  if v-add-letsencrypt-domain "$HESTIA_USUARIO" "$DOMINIO" 2>/dev/null || v-list-web-domain-ssl "$HESTIA_USUARIO" "$DOMINIO" plain 2>/dev/null | grep -q .; then
+    v-add-web-domain-ssl-force "$HESTIA_USUARIO" "$DOMINIO" 2>/dev/null || true
+    echo "HTTPS ativo (Let's Encrypt, renovado pelo Hestia)."
+  else
+    printf '\033[1;33mHTTPS ainda não emitido: o DNS de %s precisa apontar para este servidor.\033[0m\n' "$DOMINIO"
+    echo "Quando apontar, rode: v-add-letsencrypt-domain $HESTIA_USUARIO $DOMINIO && v-add-web-domain-ssl-force $HESTIA_USUARIO $DOMINIO"
+  fi
+else
+  systemctl restart caddy
+fi
 
 if [[ -z "$ENDPOINT" ]]; then
   # Vigilância de memória e disco (CloudWatch): os alarmes do guia avisam ANTES de faltar recurso.

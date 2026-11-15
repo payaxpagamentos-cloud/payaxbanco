@@ -77,6 +77,26 @@ restaura o banco de segundos atrás e sobe.
 
 ---
 
+## Opção A2: servidor que já tem HestiaCP (ex.: VPS Hostinger com sites e e-mail)
+
+Use para começar/testar. Para produção com volume, o ideal é um VPS só para os pagamentos (sites e e-mail na
+mesma máquina aumentam o risco e dividem o processador).
+
+1. **Cópias no S3 da AWS (São Paulo):** no CloudShell da AWS, carregue e rode `bash criar-copias-aws.sh`. Ele cria
+   o bucket e uma chave que só lê e grava nele, e mostra a chave **uma vez** — digite no instalador, não envie a ninguém.
+2. **DNS:** registro **A** `pagamentos` → IP do servidor.
+3. **No servidor** (PuTTY, como root), com o pacote enviado para `/root` (WinSCP ou `pscp`):
+
+```bash
+cd /root && tar xzf payax-pagamentos-*.tar.gz && cd payax-pagamentos-*/
+./implantacao/instalar.sh --dominio pagamentos.payax.com.br --bucket NOME-DO-BUCKET --email-admin ti@payax.com.br \
+  --endpoint https://s3.sa-east-1.amazonaws.com --regiao sa-east-1 --hestia admin
+```
+
+O instalador **não toca** em sites, e-mail, firewall nem no painel do Hestia: cria o domínio no Hestia com um modelo
+de proxy próprio (`payax`), emite o HTTPS pelo Hestia (Let's Encrypt) e o sistema escuta só em `127.0.0.1`.
+Ele pede a chave das cópias e a frase de recuperação, e no fim confere se a cópia do banco chegou ao S3.
+
 ## Opção B (AWS)
 
 - **São Paulo (`sa-east-1`)**: os dados ficam no Brasil e a latência até o Bradesco e os IXC é baixa.
