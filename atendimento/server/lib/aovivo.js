@@ -36,7 +36,7 @@ function aoVivo(db, empresaId, { instante = new Date() } = {}) {
       COALESCE(SUM(estado = 'bot' AND canal = 'telefone'), 0) AS com_zoe_telefone,
       COALESCE(SUM(estado = 'aguardando'), 0) AS na_fila,
       COALESCE(SUM(estado = 'humano'), 0) AS com_equipe
-    FROM conversas WHERE empresa_id = ? AND estado <> 'encerrada'`).get(empresaId);
+    FROM conversas c WHERE empresa_id = ? AND estado <> 'encerrada' AND (c.aviso IS NULL OR c.ultima_mensagem_cliente_em IS NOT NULL)`).get(empresaId);
 
   // ---------- Equipe ----------
   const pessoas = db.prepare(`SELECT u.id, u.nome, u.disponivel, u.max_simultaneas, u.ramal, u.visto_em,
@@ -128,7 +128,7 @@ function aoVivo(db, empresaId, { instante = new Date() } = {}) {
     FROM conversas WHERE empresa_id = ? AND transferida_em IS NOT NULL AND assumida_em >= ? AND assumida_em < ?`)
     .get(META_ASSUMIR_S, empresaId, iniHoje, fimHoje);
   const porHora = Array.from({ length: 24 }, (_, h) => ({ hora: h, zoe: 0, equipe: 0 }));
-  for (const c of db.prepare('SELECT aberta_em, transferida_em FROM conversas WHERE empresa_id = ? AND aberta_em >= ? AND aberta_em < ?')
+  for (const c of db.prepare('SELECT aberta_em, transferida_em FROM conversas c WHERE empresa_id = ? AND aberta_em >= ? AND aberta_em < ? AND (c.aviso IS NULL OR c.ultima_mensagem_cliente_em IS NOT NULL)')
     .all(empresaId, iniHoje, fimHoje)) {
     porHora[local(c.aberta_em).hora][c.transferida_em ? 'equipe' : 'zoe']++;
   }

@@ -499,6 +499,9 @@ async function executar(def, contexto) {
  * Identificação automática pelo telefone, feita pela plataforma quando a conversa abre.
  * Não confirma nada: só guarda quem provavelmente é, para a IA pedir os 3 dígitos em vez do CPF inteiro.
  */
+/** Como a empresa confirma a identidade (3 dígitos do CPF ou data de nascimento). */
+const metodoConfirmacao = (db, empresaId) => lerConfig(db, empresaId)?.confirmar_por ?? 'cpf3';
+
 async function identificarPeloTelefone(db, { conversa, contato }) {
   if (!configurado(db, conversa.empresa_id)) return null;
   const c = atual(db, conversa);
@@ -572,7 +575,7 @@ function notaDeEstado(db, conversa) {
     + 'e chame identificar_cliente. Dúvidas gerais (horário, planos, cobertura) você pode responder sem identificar.';
 }
 
-module.exports = {
+module.exports = { metodoConfirmacao,
   FERRAMENTAS, montar, executar, configurado, clienteIxc, lerConfig, capacidades,
   identificarPeloTelefone, notaDeEstado, exigirIdentidade, registrar,
 };

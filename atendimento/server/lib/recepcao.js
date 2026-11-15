@@ -134,7 +134,8 @@ async function receberMensagem(db, { numero, empresa, mensagem, perfil }) {
       }
     }
 
-    const conversa = conversas.abrirOuRetomar(db, { empresa, numero, contato });
+    // Respondeu a um aviso cuja conversa já fechou: a conversa nova herda o aviso (de que fatura se trata).
+    const conversa = conversas.herdarAviso(db, conversas.abrirOuRetomar(db, { empresa, numero, contato }));
     conversas.tocarJanela(db, conversa, dados.criadaEm);
     const mensagemId = conversas.registrarEntrada(db, conversa, dados);
     // Comentário escrito depois da nota do CSAT.

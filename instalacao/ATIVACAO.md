@@ -141,6 +141,25 @@ journalctl -u zoe -n 80 --no-pager
 
 Se o IXC estiver na rede interna (10.x, 192.168.x), acrescente `ATEND_REDE_INTERNA=1` no `.env` e rode `sudo systemctl restart zoe`.
 
+### 7.0 Cobrança que volta pela janela (economia na conta da Meta)
+
+A cobrança tem dois caminhos:
+
+1. **A ida:** a mensagem de cobrança é a única paga (Utilidade, R$ 0,035), e só quando a janela de 24 h do cliente está fechada. Com a janela aberta, ela sai de graça, inclusive como template de Utilidade (regra da Meta desde julho de 2025).
+2. **A volta:** a resposta do cliente abre a janela de 24 h, e a conversa cai na **ZOE**, não na fila. Ela já sabe de qual fatura se trata e resolve a 2ª via, o PIX e o "já paguei" de graça. A equipe só recebe o que ela não resolve.
+
+Para o cliente responder com um toque, crie o template na Meta com **3 botões de Resposta rápida, nesta ordem**:
+
+| Ordem | Texto do botão |
+|---|---|
+| 1 | Pagar com PIX / 2ª via |
+| 2 | Já paguei |
+| 3 | Falar com atendente |
+
+Depois de aprovado, em **Centro de Custo › Réguas**, escolha esses botões no campo **Botões do template** e deixe marcado **A resposta do cliente vai para a ZOE**.
+
+O aviso que ninguém respondeu não aparece na caixa, no painel nem nos relatórios. Ele fecha sozinho em 3 dias, sem mandar nada ao cliente. Se o cliente responder depois disso, a conversa nova continua sabendo de qual fatura se trata.
+
 ### 7.1 Painel ao vivo na TV da supervisão
 
 O menu **Ao vivo** mostra o atendimento acontecendo agora e se atualiza sozinho a cada 5 segundos:

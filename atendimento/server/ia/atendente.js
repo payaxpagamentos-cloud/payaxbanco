@@ -119,6 +119,8 @@ function notaDaConversa(db, conversa) {
       + 'tentar, chame transferir_para_humano na hora, sem argumentar.');
   }
   if (conversa.canal === 'telefone') partes.push(...notaDaLigacao(db, conversa));
+  const aviso = conversas.lerAviso(conversa);
+  if (aviso) partes.push(notaDoAviso(aviso));
   const doIxc = ferramentasIxc.notaDeEstado(db, conversa);
   if (doIxc) partes.push(doIxc);
 
@@ -131,6 +133,26 @@ function notaDaConversa(db, conversa) {
       + (gerais.length ? ` ${gerais.length} deles vale(m) para todos os clientes.` : ''));
   }
   return partes.length ? partes.join('\n\n') : null;
+}
+
+/**
+ * A conversa veio de um aviso da régua (cobrança, manutenção...). A ZOE entra direto no assunto:
+ * o cliente está respondendo a uma mensagem que a empresa mandou, e a resposta dele abriu a janela
+ * de 24 h — tudo o que ela mandar agora sai de graça.
+ */
+function notaDoAviso(aviso) {
+  const valor = aviso.valor_centavos ? (aviso.valor_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null;
+  const venc = aviso.vencimento ? String(aviso.vencimento).split('-').reverse().join('/') : null;
+  const fatura = [aviso.fatura_id ? `fatura ${aviso.fatura_id}` : null, valor ? `de ${valor}` : null, venc ? `com vencimento em ${venc}` : null].filter(Boolean).join(' ');
+  return [
+    `Esta conversa começou com o aviso "${aviso.regua}" que a empresa enviou ao cliente${fatura ? ` (${fatura})` : ''}. `
+      + 'O cliente provavelmente está respondendo a ele: não cumprimente de novo nem pergunte "como posso ajudar"; entre direto no assunto.',
+    'Se ele pedir PIX, boleto ou 2ª via: confirme a identidade (portão do IXC) e chame enviar_segunda_via'
+      + (aviso.fatura_id ? ` para a fatura ${aviso.fatura_id}` : '') + '.',
+    'Se disser que já pagou: confirme a identidade e confira em faturas_em_aberto. Se ainda constar em aberto, explique que a baixa do '
+      + 'banco pode levar até 3 dias úteis e ofereça enviar o comprovante para a equipe conferir.',
+    'Se quiser negociar, parcelar ou contestar o valor, isso é decisão humana: transfira com o resumo.',
+  ].join(' ');
 }
 
 /**
@@ -246,8 +268,21 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
 
   // ---------- 1. Regras ----------
 
+  // Botão do aviso de cobrança. "Falar com atendente" vai direto para a fila, sem gastar IA; os
+  // outros ("Pagar com PIX / 2ª via", "Já paguei") seguem para a ZOE resolver dentro da janela.
+  const botaoAviso = /^zoe:(\w+):/.exec(String(idResposta ?? ''))?.[1] ?? null;
+  if (botaoAviso === 'atendente' && lista.length) {
+    registrarEvento(db, conversa, { tipo: 'intencao', nome: 'aviso: falar com atendente', detalhe: 'botão do template da régua' });
+    const r = transferirCom(db, conversa, {
+      motivo: 'O cliente tocou em "Falar com atendente" no aviso da régua.',
+      resumo: oQueDisse(conversa, texto),
+      lacuna: { categoria: 'cliente_pediu' },
+    });
+    return { acao: 'transferida', detalhe: r.fila.nome };
+  }
+
   // Saudação: só na primeira mensagem da conversa. Na ligação a ZOE já cumprimentou ao atender.
-  if (primeira && conversa.canal !== 'telefone') {
+  if (primeira && conversa.canal !== 'telefone' && !conversa.aviso) {
     const saudacao = prompt.saudacaoDe(cfg, { empresa, contato, nomeCliente: contato.nome ?? contato.nome_perfil })
       || regras.saudacao(cfg, { nomeAssistente: cfg.nome_assistente, nomeEmpresa: empresa.nome, nomeCliente: contato.nome ?? contato.nome_perfil });
     responder(db, conversa, saudacao);

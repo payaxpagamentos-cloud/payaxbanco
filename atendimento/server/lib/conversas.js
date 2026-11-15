@@ -73,6 +73,39 @@ function abrir(db, { empresa, numero, contato, canal = 'whatsapp' }) {
 /** Conversa aberta do contato, ou uma nova. */
 const abrirOuRetomar = (db, { empresa, numero, contato }) => abertaDoContato(db, contato.id) ?? abrir(db, { empresa, numero, contato });
 
+/**
+ * Conversa que é atendimento de verdade: não é só um aviso da régua esperando resposta.
+ * Use em toda contagem (painel, caixa, relatórios) com o apelido `c`.
+ */
+const ATENDIMENTO = '(c.aviso IS NULL OR c.ultima_mensagem_cliente_em IS NOT NULL)';
+
+/** Guarda na conversa de qual aviso se trata, para a ZOE saber do que o cliente está falando. */
+function marcarAviso(db, conversaId, { regua, alvo = {}, via }) {
+  const aviso = {
+    regua_id: regua.id, regua: regua.nome, tipo: regua.tipo ?? null, via,
+    fatura_id: alvo.fatura_id ?? null, vencimento: alvo.vencimento ?? null, valor_centavos: alvo.valor_centavos ?? null,
+    cliente_id: alvo.cliente_id ?? null, enviado_em: agora(),
+  };
+  db.prepare('UPDATE conversas SET aviso = ? WHERE id = ?').run(JSON.stringify(aviso), conversaId);
+  return aviso;
+}
+
+const lerAviso = (conversa) => { try { return conversa?.aviso ? JSON.parse(conversa.aviso) : null; } catch { return null; } };
+
+/**
+ * O cliente respondeu a um aviso depois que a conversa do aviso já tinha fechado (3 dias sem resposta):
+ * a conversa nova herda o aviso, para a ZOE continuar sabendo de que fatura se trata.
+ */
+function herdarAviso(db, conversa, { dias = 7 } = {}) {
+  if (conversa.aviso) return conversa;
+  const antiga = db.prepare(`SELECT aviso FROM conversas WHERE contato_id = ? AND id <> ? AND aviso IS NOT NULL
+    AND ultima_mensagem_cliente_em IS NULL AND aberta_em >= ? ORDER BY id DESC LIMIT 1`)
+    .get(conversa.contato_id, conversa.id, new Date(Date.now() - dias * 86_400_000).toISOString());
+  if (!antiga) return conversa;
+  db.prepare('UPDATE conversas SET aviso = ? WHERE id = ?').run(antiga.aviso, conversa.id);
+  return db.prepare('SELECT * FROM conversas WHERE id = ?').get(conversa.id);
+}
+
 /** Toda mensagem do cliente reabre a janela de 24 h da Meta. */
 function tocarJanela(db, conversa, instante = new Date()) {
   const ts = new Date(instante).toISOString();
@@ -256,6 +289,8 @@ function listar(db, empresaId, { caixa = 'abertas', usuario = null, filaId = nul
   else if (caixa === 'bot') onde.push("c.estado = 'bot'");
   else if (caixa === 'encerradas') onde.push("c.estado = 'encerrada'");
   else onde.push("c.estado <> 'encerrada'");
+  // Aviso da régua que o cliente não respondeu não é conversa: não entra na caixa de ninguém.
+  onde.push(ATENDIMENTO);
   if (filaId) { onde.push('c.fila_id = ?'); args.push(Number(filaId)); }
   if (atendenteId) { onde.push('c.atendente_id = ?'); args.push(Number(atendenteId)); }
   if (resolvidaPor) { onde.push('c.resolvida_por = ?'); args.push(resolvidaPor); }
@@ -315,7 +350,7 @@ function detalhe(db, empresaId, conversaId, { limiteMensagens = 300 } = {}) {
 
 module.exports = {
   JANELA_MS, CSAT_VALE_MIN, MSG, mensagemDe, cfgIa,
-  garantirContato, nomeContato, abertaDoContato, abrir, abrirOuRetomar, tocarJanela, registrarEntrada,
+  garantirContato, nomeContato, abertaDoContato, abrir, abrirOuRetomar, tocarJanela, registrarEntrada, ATENDIMENTO, marcarAviso, lerAviso, herdarAviso,
   transferir, assumir, devolver, voltarParaIa, encerrar, tentarCsat, registrarComentarioCsat,
   listar, detalhe, resumo, enriquecer,
 };

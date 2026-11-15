@@ -188,7 +188,11 @@ CREATE TABLE IF NOT EXISTS conversas (
   ultima_mensagem_cliente_em TEXT,
   csat_pedido_em TEXT,
   csat_nota INTEGER CHECK (csat_nota BETWEEN 1 AND 5),
-  csat_comentario TEXT
+  csat_comentario TEXT,
+  -- O aviso da régua que abriu (ou passou por) esta conversa: régua, fatura, vencimento, valor.
+  -- Conversa com aviso e sem nenhuma mensagem do cliente não é atendimento: fica fora do painel,
+  -- da caixa e dos relatórios até o cliente responder.
+  aviso TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_conversas_empresa ON conversas(empresa_id, estado, ultima_mensagem_em DESC);
 CREATE INDEX IF NOT EXISTS idx_conversas_contato ON conversas(contato_id, aberta_em DESC);
@@ -350,6 +354,12 @@ CREATE TABLE IF NOT EXISTS reguas (
   esperar_janela_h INTEGER NOT NULL DEFAULT 0 CHECK (esperar_janela_h BETWEEN 0 AND 168),
   -- Teto de gasto por execução, em milésimos de real (0 = sem teto).
   teto_milesimos INTEGER NOT NULL DEFAULT 0 CHECK (teto_milesimos >= 0),
+  -- Botões de resposta rápida do template, na ordem em que foram aprovados na Meta, um por linha:
+  -- segunda_via, ja_paguei, atendente. Vazio = o template não tem botões.
+  botoes TEXT,
+  -- 1: a resposta do cliente ao aviso vai para a ZOE (2ª via, PIX, "já paguei"), dentro da janela de
+  -- 24 h que a própria resposta abre — de graça. 0: vai direto para a fila da equipe.
+  retorno_zoe INTEGER NOT NULL DEFAULT 1,
   ativa INTEGER NOT NULL DEFAULT 0,
   ultima_execucao_em TEXT,
   criada_em TEXT NOT NULL,

@@ -45,6 +45,31 @@ const CAMPOS = {
 
 const listarCampos = () => Object.keys(CAMPOS);
 
+/**
+ * Botões de resposta rápida do template de cobrança. O toque do cliente é uma mensagem dele: abre a
+ * janela de 24 h, e tudo o que vem depois (2ª via, PIX, conferência do pagamento) sai de graça.
+ * A ordem tem de ser a mesma do template aprovado na Meta.
+ */
+const BOTOES = {
+  segunda_via: 'Pagar com PIX / 2ª via',
+  ja_paguei: 'Já paguei',
+  atendente: 'Falar com atendente',
+};
+const lerBotoes = (regua) => String(regua?.botoes ?? '').split('\n').map((x) => x.trim()).filter((x) => BOTOES[x]);
+
+/** Template da régua com os parâmetros e, se houver, o payload de cada botão (zoe:<ação>:<régua>). */
+function corpoTemplate(regua, dados) {
+  const corpo = wa.corpos.template('', regua.template, regua.idioma, montarParametros(regua, dados));
+  const { to: _to, recipient_type: _rt, ...payload } = corpo;
+  const botoes = lerBotoes(regua);
+  if (botoes.length) {
+    payload.template.components = [...(payload.template.components ?? []), ...botoes.map((acao, i) => ({
+      type: 'button', sub_type: 'quick_reply', index: String(i), parameters: [{ type: 'payload', payload: `zoe:${acao}:${regua.id}` }],
+    }))];
+  }
+  return payload;
+}
+
 /** Preenche os parâmetros do template (um campo por linha) com os dados do destinatário. */
 const montarParametros = (regua, dados) => String(regua.parametros ?? '')
   .split('\n').map((x) => x.trim()).filter(Boolean)
@@ -163,6 +188,12 @@ function decidir(db, empresa, regua, alvo, { precos }) {
   // A janela de 24 h aberta é a economia mais limpa que existe: o mesmo aviso, de graça.
   if (regua.preferir_janela && aberta && wa.janelaAberta(aberta) && regua.texto_janela?.trim()) {
     return { acao: 'janela', motivo: 'a janela de 24 h está aberta: vai como serviço, sem custo', economia: precoTemplate, contato, conversa: aberta };
+  }
+
+  // Sem texto livre, mas a janela está aberta e o template é de utilidade: a Meta não cobra
+  // (desde 1º/07/2025). Vai o próprio template, com os botões, de graça.
+  if (aberta && wa.janelaAberta(aberta) && regua.categoria === 'utilidade') {
+    return { acao: 'template', gratis: true, motivo: 'a janela de 24 h está aberta: template de utilidade sai de graça', economia: precoTemplate, custo: 0, contato, conversa: aberta };
   }
 
   // Tem folga de prazo? Então não paga agora: espera o cliente escrever. A maioria escreve.
@@ -292,19 +323,17 @@ async function executar(db, empresa, regua, { referencia = hoje(), limite = 5000
         const contato = d.contato ?? conversas.garantirContato(db, empresa.id, alvo.telefone, null);
         db.prepare('UPDATE contatos SET codigo_externo = COALESCE(codigo_externo, ?), nome = COALESCE(nome, ?) WHERE id = ?')
           .run(alvo.cliente_id, alvo.nome, contato.id);
-        const conversa = d.conversa ?? conversas.abertaDoContato(db, contato.id) ?? abrirParaAviso(db, { empresa, numero, contato, regua });
+        const conversa = d.conversa ?? conversas.abertaDoContato(db, contato.id) ?? abrirParaAviso(db, { empresa, numero, contato, regua, alvo });
         const atual = db.prepare('SELECT * FROM conversas WHERE id = ?').get(conversa.id);
 
         const mensagemId = d.acao === 'janela'
           ? envio.enfileirar(db, atual, { autor: 'sistema', tipo: 'texto', texto: preencherTexto(regua.texto_janela, alvo) })
-          : (() => {
-            const corpo = wa.corpos.template('', regua.template, regua.idioma, montarParametros(regua, alvo));
-            const { to: _to, recipient_type: _rt, ...payload } = corpo;
-            return envio.enfileirar(db, atual, {
-              autor: 'sistema', tipo: 'template', texto: `[${regua.nome}] template ${regua.template}`,
-              payload, categoriaTemplate: regua.categoria,
-            });
-          })();
+          : envio.enfileirar(db, atual, {
+            autor: 'sistema', tipo: 'template', texto: `[${regua.nome}] template ${regua.template}`,
+            payload: corpoTemplate(regua, alvo), categoriaTemplate: regua.categoria,
+          });
+        // A ZOE fica sabendo de que fatura se trata: se o cliente responder, ela já entra no assunto.
+        conversas.marcarAviso(db, atual.id, { regua, alvo, via: d.acao === 'janela' ? 'janela' : 'template' });
         return { contato, conversa: atual, mensagemId };
       });
 
@@ -312,11 +341,11 @@ async function executar(db, empresa, regua, { referencia = hoje(), limite = 5000
       registrar(db, {
         empresa, regua, alvo, contato: enviado.contato, conversa: enviado.conversa, mensagemId: enviado.mensagemId,
         status: 'enviado', categoria: categoria.categoria, custo: categoria.custo_milesimos,
-        motivo: d.acao === 'janela' ? d.motivo : null,
-        economia: d.acao === 'janela' ? d.economia : 0,
+        motivo: d.acao === 'janela' || d.gratis ? d.motivo : null,
+        economia: d.acao === 'janela' || d.gratis ? d.economia : 0,
       });
       resultado.enviados++;
-      if (d.acao === 'janela') { resultado.pela_janela++; resultado.economia_milesimos += d.economia; }
+      if (d.acao === 'janela' || d.gratis) { resultado.pela_janela++; resultado.economia_milesimos += d.economia; }
       resultado.custo_milesimos += Number(categoria.custo_milesimos);
     } catch (err) {
       registrar(db, { empresa, regua, alvo, contato: d.contato, status: 'falhou', motivo: String(err.message).slice(0, 300) });
@@ -329,12 +358,28 @@ async function executar(db, empresa, regua, { referencia = hoje(), limite = 5000
   return resultado;
 }
 
-/** Conversa aberta só para o aviso: nasce com a equipe, não com a ZOE (aviso não é atendimento). */
-function abrirParaAviso(db, { empresa, numero, contato, regua }) {
+/**
+ * Conversa aberta para o aviso. Com o retorno pela ZOE (o padrão), ela nasce com a ZOE e fica fora
+ * do painel e dos relatórios até o cliente responder: quando ele responde, a janela de 24 h abre e a
+ * ZOE resolve a 2ª via, o PIX ou o "já paguei" de graça, sem ninguém da equipe. Sem o retorno pela
+ * ZOE, cai na fila da equipe, como antes.
+ */
+function abrirParaAviso(db, { empresa, numero, contato, regua, alvo = {} }) {
   const c = conversas.abrir(db, { empresa, numero, contato });
-  db.prepare("UPDATE conversas SET estado = 'aguardando', janela_expira_em = NULL, assunto = ? WHERE id = ?").run(regua.nome.slice(0, 160), c.id);
-  const fila = require('./filas').filaPadrao(db, empresa.id);
-  if (fila) db.prepare('UPDATE conversas SET fila_id = ?, transferida_em = ? WHERE id = ?').run(fila.id, agora(), c.id);
+  if (regua.retorno_zoe ?? 1) {
+    db.prepare("UPDATE conversas SET estado = 'bot', janela_expira_em = NULL, assunto = ? WHERE id = ?").run(regua.nome.slice(0, 160), c.id);
+    // Já sabe quem é no IXC (veio da própria fatura), mas NÃO confirma: o portão de identidade
+    // continua pedindo os 3 dígitos do CPF antes de mostrar qualquer dado do contrato.
+    if (alvo.cliente_id) {
+      const metodo = require('../ia/ferramentas-ixc').metodoConfirmacao?.(db, empresa.id) ?? 'cpf3';
+      db.prepare('UPDATE conversas SET ixc_cliente_id = ?, ixc_cliente_nome = ?, identidade_metodo = ? WHERE id = ?')
+        .run(String(alvo.cliente_id), alvo.nome ?? null, metodo, c.id);
+    }
+  } else {
+    db.prepare("UPDATE conversas SET estado = 'aguardando', janela_expira_em = NULL, assunto = ? WHERE id = ?").run(regua.nome.slice(0, 160), c.id);
+    const fila = require('./filas').filaPadrao(db, empresa.id);
+    if (fila) db.prepare('UPDATE conversas SET fila_id = ?, transferida_em = ? WHERE id = ?').run(fila.id, agora(), c.id);
+  }
   envio.registrarSistema(db, c, `Conversa aberta pela régua "${regua.nome}".`);
   return db.prepare('SELECT * FROM conversas WHERE id = ?').get(c.id);
 }
@@ -399,14 +444,13 @@ async function pagarVencidas(db, { limite = 500 } = {}) {
 
     try {
       const enviado = transacao(db, () => {
-        const conversa = conversas.abertaDoContato(db, contato.id) ?? abrirParaAviso(db, { empresa, numero, contato, regua });
+        const conversa = conversas.abertaDoContato(db, contato.id) ?? abrirParaAviso(db, { empresa, numero, contato, regua, alvo: dados });
         const atual = db.prepare('SELECT * FROM conversas WHERE id = ?').get(conversa.id);
-        const corpo = wa.corpos.template('', regua.template, regua.idioma, montarParametros(regua, dados));
-        const { to: _to, recipient_type: _rt, ...payload } = corpo;
         const mensagemId = envio.enfileirar(db, atual, {
           autor: 'sistema', tipo: 'template', texto: `[${regua.nome}] template ${regua.template}`,
-          payload, categoriaTemplate: regua.categoria,
+          payload: corpoTemplate(regua, dados), categoriaTemplate: regua.categoria,
         });
+        conversas.marcarAviso(db, atual.id, { regua, alvo: dados, via: 'template' });
         const m = db.prepare('SELECT categoria, custo_milesimos FROM mensagens WHERE id = ?').get(mensagemId);
         const disparo = db.prepare(`INSERT INTO disparos
             (empresa_id, regua_id, contato_id, conversa_id, mensagem_id, referencia, categoria, status, motivo, custo_milesimos, economia_milesimos, criado_em)
@@ -484,12 +528,22 @@ function salvar(db, empresaId, dados, { id = null } = {}) {
     pular_se_pago: bool('pular_se_pago', 1),
     repetir_apos_dias: d.repetir_apos_dias === undefined ? (atual.repetir_apos_dias ?? 5) : v.inteiro(d.repetir_apos_dias, 'o intervalo entre repetições', { min: 0, max: 365 }),
     teto_milesimos: d.teto_milesimos === undefined ? (atual.teto_milesimos ?? 0) : v.inteiro(d.teto_milesimos, 'o teto de gasto', { min: 0, max: 100_000_000 }),
+    botoes: d.botoes === undefined ? (atual.botoes ?? null) : (() => {
+      const lista = (Array.isArray(d.botoes) ? d.botoes : String(d.botoes ?? '').split(/[\n,]/)).map((x) => String(x).trim()).filter(Boolean);
+      for (const b of lista) v.exigir(BOTOES[b], `Botão desconhecido: "${b}". Use: ${Object.keys(BOTOES).join(', ')}.`);
+      v.exigir(new Set(lista).size === lista.length && lista.length <= 3, 'Até 3 botões, sem repetir.');
+      return lista.join('\n') || null;
+    })(),
+    retorno_zoe: bool('retorno_zoe', 1),
     ativa: bool('ativa', 0),
   };
   v.exigir(campos.nome && campos.template, 'Informe o nome da régua e o template aprovado na Meta.');
   if (campos.preferir_janela) v.exigir(campos.texto_janela, 'Para usar a janela de 24 h, escreva o texto livre equivalente — é ele que sai de graça.');
   if (campos.esperar_janela_h) v.exigir(campos.texto_janela, 'Para esperar pela janela, escreva o texto livre equivalente — é ele que sai de graça quando o cliente escrever.');
 
+  // Campo opcional que não veio nem existia (régua nova sem texto da janela, por exemplo) vira NULL:
+  // o banco não aceita "undefined".
+  for (const k of Object.keys(campos)) if (campos[k] === undefined) campos[k] = null;
   const colunas = Object.keys(campos);
   if (id) {
     db.prepare(`UPDATE reguas SET ${colunas.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...colunas.map((k) => campos[k]), atual.id);
@@ -500,4 +554,4 @@ function salvar(db, empresaId, dados, { id = null } = {}) {
   return buscar(db, empresaId, novo);
 }
 
-module.exports = { CAMPOS, listarCampos, listar, buscar, salvar, simular, executar, decidir, destinatarios, dataAlvo, devemRodar, historico, montarParametros, preencherTexto, prazoDeEspera, pagasHoje, pagarVencidas };
+module.exports = { CAMPOS, BOTOES, lerBotoes, corpoTemplate, listarCampos, listar, buscar, salvar, simular, executar, decidir, destinatarios, dataAlvo, devemRodar, historico, montarParametros, preencherTexto, prazoDeEspera, pagasHoje, pagarVencidas };

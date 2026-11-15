@@ -8,7 +8,9 @@ const { intervalo, hoje, inicioMes, local, somarDias } = require('./datas');
  * de cada 100 conversas, quantas ela fechou sozinha, sem ocupar ninguém da equipe.
  */
 
-const ESCOPO = (empresaId) => (empresaId ? { onde: 'c.empresa_id = ?', args: [empresaId] } : { onde: '1 = 1', args: [] });
+// Toda contagem ignora o aviso da régua que o cliente não respondeu: aviso não é atendimento.
+const ATENDIMENTO = '(c.aviso IS NULL OR c.ultima_mensagem_cliente_em IS NOT NULL)';
+const ESCOPO = (empresaId) => (empresaId ? { onde: `c.empresa_id = ? AND ${ATENDIMENTO}`, args: [empresaId] } : { onde: ATENDIMENTO, args: [] });
 
 /** Resumo do período: volume, resolução pela IA, tempos e satisfação. */
 function resumo(db, { empresaId = null, de = hoje(), ate = hoje() } = {}) {
@@ -197,7 +199,7 @@ function painel(db, empresaId) {
       SUM(CASE WHEN estado = 'bot' THEN 1 ELSE 0 END) AS com_ia,
       SUM(CASE WHEN estado = 'aguardando' THEN 1 ELSE 0 END) AS aguardando,
       SUM(CASE WHEN estado = 'humano' THEN 1 ELSE 0 END) AS com_humano
-    FROM conversas WHERE empresa_id = ?`).get(empresaId);
+    FROM conversas c WHERE empresa_id = ? AND ${ATENDIMENTO}`).get(empresaId);
   const equipe = db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN disponivel = 1 THEN 1 ELSE 0 END) AS disponiveis
     FROM usuarios WHERE empresa_id = ? AND ativo = 1 AND perfil IN ('atendente','cliente')`).get(empresaId);
   return {
@@ -219,8 +221,8 @@ function painel(db, empresaId) {
 /** Painel do master: a plataforma inteira e as empresas que mais usam. */
 function painelMaster(db) {
   const empresas = db.prepare(`SELECT e.id, e.nome, e.status, e.limite_ia_mes,
-      (SELECT COUNT(*) FROM conversas c WHERE c.empresa_id = e.id AND c.estado <> 'encerrada') AS abertas,
-      (SELECT COUNT(*) FROM conversas c WHERE c.empresa_id = e.id AND c.aberta_em >= ?) AS conversas_mes,
+      (SELECT COUNT(*) FROM conversas c WHERE c.empresa_id = e.id AND c.estado <> 'encerrada' AND ${ATENDIMENTO}) AS abertas,
+      (SELECT COUNT(*) FROM conversas c WHERE c.empresa_id = e.id AND c.aberta_em >= ? AND ${ATENDIMENTO}) AS conversas_mes,
       (SELECT COUNT(*) FROM ia_eventos i WHERE i.empresa_id = e.id AND i.tipo = 'resposta' AND i.criado_em >= ?) AS ia_mes,
       (SELECT COUNT(*) FROM usuarios u WHERE u.empresa_id = e.id AND u.ativo = 1 AND u.perfil IN ('atendente','cliente')) AS atendentes,
       (SELECT COUNT(*) FROM numeros n WHERE n.empresa_id = e.id AND n.ativo = 1) AS numeros

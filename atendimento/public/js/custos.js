@@ -35,6 +35,14 @@ const GATILHOS = {
 const TIPOS = { cobranca: 'Cobrança', manutencao: 'Manutenção', aviso: 'Aviso', campanha: 'Campanha' };
 const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
+// Botões de resposta rápida do template de cobrança (os nomes iguais aos do servidor).
+const NOMES_BOTOES = { segunda_via: 'Pagar com PIX / 2ª via', ja_paguei: 'Já paguei', atendente: 'Falar com atendente' };
+const PRESETS_BOTOES = {
+  '': 'Sem botões',
+  'segunda_via\nja_paguei\natendente': 'Pagar com PIX / 2ª via · Já paguei · Falar com atendente',
+  'segunda_via\natendente': 'Pagar com PIX / 2ª via · Falar com atendente',
+};
+
 export async function telaCustos(ctx) {
   const abas = el('div', { class: 'abas' });
   const corpo = el('div');
@@ -175,7 +183,8 @@ async function asReguas(ctx, alvo) {
     el('div', { class: 'aviso-caixa info' }, icone('dinheiro'), el('div', {},
       el('strong', {}, 'Como a régua economiza: '),
       'quem tem a janela de 24 h aberta recebe o texto livre (grátis); quem já pagou, pediu para não receber, '
-      + 'está em atendimento ou já recebeu no período não recebe nada. O resto vai por template, e só esse custa.')),
+      + 'está em atendimento ou já recebeu no período não recebe nada. O resto vai por template, e só esse custa. '
+      + 'Quando o cliente responde à cobrança, a janela abre e a ZOE resolve a 2ª via, o PIX e o "já paguei" de graça.')),
     campo('Nome', { name: 'nome', value: r.nome ?? '', required: true, maxlength: 80, placeholder: 'Lembrete 3 dias antes' }),
     el('div', { class: 'grade-2' },
       escolha('Tipo', 'tipo', TIPOS, r.tipo ?? 'cobranca'),
@@ -197,6 +206,14 @@ async function asReguas(ctx, alvo) {
     el('label', { class: 'campo' }, 'Dias da semana',
       el('div', { class: 'escolha-dias' }, DIAS.map((dia, i) =>
         el('label', { class: 'marcar' }, el('input', { type: 'checkbox', name: `dia${i}`, checked: (r.dias_semana ?? '0111110')[i] === '1' }), dia.slice(0, 3))))),
+    escolha('Botões do template (na ordem aprovada na Meta)', 'botoes', {
+      ...PRESETS_BOTOES,
+      ...(r.botoes && !PRESETS_BOTOES[r.botoes] ? { [r.botoes]: r.botoes.split('\n').map((b) => NOMES_BOTOES[b] ?? b).join(' · ') } : {}),
+    }, r.botoes ?? ''),
+    el('p', { class: 'pequeno mudo', style: 'margin:0' },
+      'Com botões, o cliente responde com um toque, e essa resposta abre a janela de 24 h: a 2ª via, o PIX e a conferência do pagamento '
+      + 'saem de graça. Os botões precisam existir no template aprovado na Meta (tipo "Resposta rápida"), nesta mesma ordem.'),
+    marcar('A resposta do cliente vai para a ZOE (2ª via, PIX, "já paguei") — a equipe só recebe o que ela não resolver', { name: 'retorno_zoe', checked: r.id ? Boolean(r.retorno_zoe) : true }),
     marcar('Usar a janela de 24 h quando ela estiver aberta (grátis)', { name: 'preferir_janela', checked: r.id ? r.preferir_janela : true }),
     marcar('Não disparar para quem já pagou (confere no IXC na hora)', { name: 'pular_se_pago', checked: r.id ? r.pular_se_pago : true }),
     marcar('Não atropelar quem está em atendimento', { name: 'pular_se_conversa_aberta', checked: r.id ? r.pular_se_conversa_aberta : true }),

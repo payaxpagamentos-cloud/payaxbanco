@@ -25,10 +25,18 @@ function encerrarAbandonadas(db) {
     // (a janela do WhatsApp já fechou há um dia). Ligação na fila tem regra própria (encerrarLigacoesEsquecidas).
     const corteFila = new Date(Date.now() - Math.max(minutos, 48 * 60) * 60_000).toISOString();
     const alvos = db.prepare(`SELECT * FROM conversas WHERE empresa_id = ? AND (
-        (estado = 'bot' AND COALESCE(ultima_mensagem_cliente_em, aberta_em) < ?)
+        (estado = 'bot' AND NOT (aviso IS NOT NULL AND ultima_mensagem_cliente_em IS NULL) AND COALESCE(ultima_mensagem_cliente_em, aberta_em) < ?)
         OR (estado = 'aguardando' AND canal <> 'telefone' AND COALESCE(ultima_mensagem_cliente_em, aberta_em) < ?))`).all(e.id, corte, corteFila);
     for (const c of alvos) {
       conversas.encerrar(db, c, { resolvidaPor: 'abandono', avisar: false });
+      encerradas.push(c.id);
+    }
+    // Aviso da régua que ninguém respondeu: fica aberto 3 dias esperando a resposta (o template pago
+    // fica no celular do cliente) e depois fecha em silêncio. Não pede avaliação nem manda despedida.
+    const corteAviso = new Date(Date.now() - 72 * 3_600_000).toISOString();
+    for (const c of db.prepare(`SELECT * FROM conversas WHERE empresa_id = ? AND estado = 'bot' AND aviso IS NOT NULL
+        AND ultima_mensagem_cliente_em IS NULL AND aberta_em < ?`).all(e.id, corteAviso)) {
+      conversas.encerrar(db, c, { resolvidaPor: 'abandono', avisar: false, pedirCsat: false });
       encerradas.push(c.id);
     }
   }

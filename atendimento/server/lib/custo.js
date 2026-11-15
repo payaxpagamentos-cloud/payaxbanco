@@ -88,7 +88,9 @@ const precosUsd = (db) => Object.fromEntries(LISTA.map((k) => [k, precoUsd(db, k
 function classificar({ janelaAberta, template = false, categoriaDoTemplate = null }) {
   // Dentro da janela, qualquer mensagem livre é serviço — de graça.
   if (janelaAberta && !template) return 'servico';
-  // Template dentro da janela também é cobrado pela categoria dele (a Meta cobra o template).
+  // Template de UTILIDADE dentro da janela também é grátis (regra da Meta desde 1º/07/2025).
+  // Marketing e autenticação continuam pagos mesmo com a janela aberta.
+  if (template && janelaAberta && (categoriaDoTemplate ?? 'utilidade') === 'utilidade') return 'servico';
   if (template) return LISTA.includes(categoriaDoTemplate) && categoriaDoTemplate !== 'servico' ? categoriaDoTemplate : 'utilidade';
   // Fora da janela sem template a Meta recusa: a plataforma nem tenta (envio.js barra antes).
   return 'utilidade';
