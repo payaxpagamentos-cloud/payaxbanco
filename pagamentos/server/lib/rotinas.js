@@ -79,9 +79,10 @@ async function rodar(db, { forcar = false } = {}) {
     console.error('[PAY AX] Falha ao reprocessar baixas no IXC:', err.message);
   }
 
-  // Importação automática do IXC, para os clientes que pediram.
-  if (forcar || ultimaImportacao !== hoje) {
-    ultimaImportacao = hoje;
+  // Importação automática do IXC, para os clientes que pediram: de hora em hora, para o título criado
+  // no IXC durante o dia virar boleto no mesmo dia (o que já foi importado é ignorado, sem custo).
+  if (forcar || Date.now() - (ultimaImportacao ?? 0) >= 3_600_000) {
+    ultimaImportacao = Date.now();
     const clientes = db.prepare(`SELECT c.* FROM clientes c JOIN integracoes i ON i.cliente_id = c.id AND i.escopo = 'ixc'
       WHERE c.situacao = 'ativo' AND i.estado <> 'desabilitada' AND json_extract(i.config, '$.importacao_automatica') = 1`).all();
     out.importacoes = [];
@@ -100,8 +101,16 @@ async function rodar(db, { forcar = false } = {}) {
 
 function agendar(db) {
   const intervalo = Math.max(1, config.rotinaIntervaloMin) * 60_000;
-  setTimeout(() => rodar(db).catch((err) => console.error('[PAY AX] Rotina:', err.message)), 30_000).unref();
-  setInterval(() => rodar(db).catch((err) => console.error('[PAY AX] Rotina:', err.message)), intervalo).unref();
+  // Uma rodada por vez: uma importação grande (milhares de títulos registrados no banco) pode passar do
+  // intervalo, e duas rodadas juntas disputariam o mesmo trabalho.
+  let rodando = false;
+  const ciclo = async () => {
+    if (rodando) return;
+    rodando = true;
+    try { await rodar(db); } catch (err) { console.error('[PAY AX] Rotina:', err.message); } finally { rodando = false; }
+  };
+  setTimeout(ciclo, 30_000).unref();
+  setInterval(ciclo, intervalo).unref();
 }
 
 module.exports = { rodar, agendar };

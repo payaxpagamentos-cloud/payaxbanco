@@ -739,6 +739,35 @@ UPDATE lancamentos SET estorno_de = (SELECT o.tipo FROM lancamentos o WHERE o.bo
   WHERE tipo = 'estorno' AND estorno_de IS NULL AND descricao LIKE 'Estorno · %';
 `,
   },
+  {
+    versao: 17,
+    nome: 'resultado',
+    sql: `
+-- Resultado da PAY AX (lucro real): o custo do banco fica congelado em cada operação, como a tarifa,
+-- e as despesas da operação (servidor, equipe, contador...) são cadastradas para o demonstrativo do mês.
+ALTER TABLE boletos ADD COLUMN custo_emissao_centavos INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE repasses ADD COLUMN custo_banco_centavos INTEGER NOT NULL DEFAULT 0;
+UPDATE boletos SET custo_emissao_centavos = IFNULL((SELECT custo_emissao_centavos FROM contas_bancarias c WHERE c.id = boletos.conta_id), 0)
+  WHERE situacao NOT IN ('falha');
+UPDATE repasses SET custo_banco_centavos = IFNULL((SELECT custo_pix_centavos FROM contas_bancarias WHERE ativa = 1 ORDER BY padrao DESC, id LIMIT 1), 0)
+  WHERE situacao IN ('enviado','confirmado') AND meio = 'pix';
+CREATE TABLE despesas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  categoria TEXT NOT NULL CHECK (categoria IN ('infraestrutura','pessoal','servicos','software','impostos','bancario','marketing','outros')),
+  descricao TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  recorrencia TEXT NOT NULL CHECK (recorrencia IN ('mensal','unica')),
+  inicio TEXT NOT NULL,              -- AAAA-MM: primeiro mês (ou o único)
+  fim TEXT,                          -- AAAA-MM: último mês de uma despesa mensal (vazio = segue valendo)
+  observacao TEXT,
+  versao INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id),
+  atualizado_em TEXT
+);
+CREATE INDEX idx_despesas_inicio ON despesas(inicio);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

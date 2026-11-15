@@ -41,7 +41,9 @@ function criarIxcFalso({ titulos = null, clientes = null } = {}) {
       if (recurso === 'fn_areceber') {
         const [de, ate] = String(dados.query ?? '').split(',');
         const lista = baseTitulos.filter((x) => (!de || x.data_vencimento >= de) && (!ate || x.data_vencimento <= ate));
-        return res.end(JSON.stringify({ page: '1', total: lista.length, registros: lista }));
+        // Paginação como a do IXC: page (1, 2, ...) e rp (registros por página); total = todos os que casam.
+        const rp = Number(dados.rp || 100); const page = Number(dados.page || 1);
+        return res.end(JSON.stringify({ page: String(page), total: lista.length, registros: lista.slice((page - 1) * rp, page * rp) }));
       }
       res.statusCode = 404;
       res.end(JSON.stringify({ type: 'error', message: 'recurso desconhecido' }));

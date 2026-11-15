@@ -64,6 +64,7 @@ export function criarApi({ base, chave, evento }) {
     post: (c, b = {}) => chamar('POST', c, b),
     patch: (c, b) => chamar('PATCH', c, b),
     put: (c, b) => chamar('PUT', c, b),
+    del: (c) => chamar('DELETE', c, undefined),
     /** Envia um arquivo como corpo bruto (retorno do banco). */
     enviarArquivo: (caminho, arquivo) => chamar('POST', caminho, undefined, { arquivo }),
     /** Abre uma página do servidor (ficha de compensação) numa aba nova, levando a sessão. */

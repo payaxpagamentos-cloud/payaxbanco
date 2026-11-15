@@ -19,7 +19,7 @@ const EQUIPE = {
   admin: ['*'],
   financeiro: ['painel.ver', 'clientes.ver', 'clientes.editar', 'boletos.ver', 'boletos.emitir', 'boletos.baixar',
     'razao.ver', 'razao.ajustar', 'repasses.ver', 'repasses.aprovar', 'repasses.enviar', 'precos.ver', 'precos.editar',
-    'relatorios.ver', 'relatorios.margem', 'conciliacao.ver', 'conciliacao.operar', 'auditoria.ver', 'conformidade.ver'],
+    'relatorios.ver', 'relatorios.margem', 'resultado.ver', 'despesas.editar', 'conciliacao.ver', 'conciliacao.operar', 'auditoria.ver', 'conformidade.ver'],
   operacao: ['painel.ver', 'clientes.ver', 'clientes.editar', 'boletos.ver', 'boletos.emitir', 'boletos.baixar',
     'razao.ver', 'repasses.ver', 'precos.ver', 'relatorios.ver', 'conciliacao.ver', 'integracoes.ver', 'integracoes.ixc', 'acessos.gerenciar',
     'conformidade.ver'],

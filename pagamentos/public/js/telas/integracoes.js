@@ -159,9 +159,13 @@ function configurarIxc(cliente, atual, recarregar) {
       campo({ nome: 'juros_mes', rotulo: 'Juros ao mês (%)', valor: cfg.juros_mes ?? 1, ajuda: 'Máximo 1% ao mês' }),
       campo({ nome: 'multa', rotulo: 'Multa (%)', valor: cfg.multa ?? 2, ajuda: 'Máximo 2% (Código de Defesa do Consumidor)' }),
       campo({ nome: 'dias_a_frente', rotulo: 'Importar vencimentos até (dias)', tipo: 'number', valor: cfg.dias_a_frente ?? 10 }),
-      campo({ nome: 'importacao_automatica', rotulo: 'Importação automática', tipo: 'select', valor: cfg.importacao_automatica ? '1' : '0', opcoes: [['0', 'Desligada'], ['1', 'Ligada (todo dia)']] }),
+      campo({ nome: 'importacao_automatica', rotulo: 'Importação automática', tipo: 'select', valor: cfg.importacao_automatica ? '1' : '0', opcoes: [['0', 'Desligada'], ['1', 'Ligada (de hora em hora)']] }),
       campo({ nome: 'anotar_no_ixc', rotulo: 'Gravar o boleto no título do IXC', tipo: 'select', valor: cfg.anotar_no_ixc === false ? '0' : '1', opcoes: [['1', 'Sim'], ['0', 'Não']] })),
-    el('div', { style: 'margin-top:12px' }, campo({ nome: 'mensagem', rotulo: 'Mensagem padrão no boleto', valor: cfg.mensagem ?? '', atributos: { maxlength: 160 } })));
+    el('div', { class: 'linha-form', style: 'margin-top:12px' },
+      campo({ nome: 'carteiras', rotulo: 'Carteira de cobrança PAY AX no IXC (ID)', valor: (cfg.carteiras ?? []).join(', '),
+        ajuda: 'Só os títulos desta carteira viram boleto. Vazio = todas (cuidado se o provedor tiver outro banco ou gateway).',
+        atributos: { placeholder: 'Ex.: 12' } }),
+      campo({ nome: 'mensagem', rotulo: 'Mensagem padrão no boleto', valor: cfg.mensagem ?? '', atributos: { maxlength: 160 } })));
   const botao = el('button', { class: 'botao' }, 'Salvar');
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.put(`/integracoes/ixc/${cliente.id}`, lerForm(form));

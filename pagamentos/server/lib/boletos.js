@@ -247,6 +247,11 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
       agora(), usuario?.id ?? null, usuarioCliente?.id ?? null,
     ).id;
 
+    // Custo do registro no banco (para o resultado da PAY AX): congelado como a tarifa. Título recusado não custa.
+    if (!erro && conta.custo_emissao_centavos) {
+      db.prepare('UPDATE boletos SET custo_emissao_centavos = ? WHERE id = ?').run(conta.custo_emissao_centavos, id);
+    }
+
     // Tarifa de emissão: cobrada no registro, mesmo que o título não seja pago.
     if (!erro && congelado.tarifa_emissao_centavos > 0) {
       razao.lancar(db, {

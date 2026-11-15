@@ -115,6 +115,10 @@ function criar(db, cliente, { usuario = null } = {}) {
         destino.banco ?? null, destino.agencia ?? null, destino.conta ?? null, destino.ispb ?? null, destino.tipo_conta ?? null,
         usuario?.id ?? null, usuario?.id ?? null, agora(), agora());
 
+    // Custo do PIX no banco (resultado da PAY AX), congelado no repasse. PIX que falha não conta (ver resultado.js).
+    const custoPix = db.prepare('SELECT custo_pix_centavos FROM contas_bancarias WHERE ativa = 1 ORDER BY padrao DESC, id LIMIT 1').get()?.custo_pix_centavos ?? 0;
+    if (custoPix) db.prepare('UPDATE repasses SET custo_banco_centavos = ? WHERE id = ?').run(custoPix, r.id);
+
     razao.lancar(db, { cliente_id: cliente.id, repasse_id: r.id, tipo: 'repasse', valor_centavos: -liquido,
       descricao: `Repasse PIX #${r.id} · ${destino.descricao}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null });
     if (taxa) {

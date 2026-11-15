@@ -156,6 +156,12 @@ module.exports = (db) => {
       sistema: v.opcao(b.sistema || 'ixc', 'o sistema de gestão', Object.keys(SISTEMAS_HOMOLOGADOS)),
       url: b.url ? v.url(b.url, 'o endereço do IXC') : undefined,
       tipo_padrao: v.opcao(b.tipo_padrao ?? 'bolepix', 'o tipo padrão', ['boleto', 'bolepix']),
+      // IDs da carteira de cobrança "PAY AX" no IXC: só os títulos dela viram boleto.
+      carteiras: (() => {
+        const ids = String(b.carteiras ?? '').split(/[\s,;]+/).filter(Boolean);
+        if (ids.some((x) => !/^\d{1,10}$/.test(x))) throw new ErroNegocio('Informe o número (ID) da carteira de cobrança no IXC, ex.: 12 ou 12, 15.', 422);
+        return [...new Set(ids)];
+      })(),
       // Mesmos tetos da emissão: uma configuração fora da lei faria todo título importado falhar.
       ...(() => {
         const e = boletosLib.encargos({ juros_mes: b.juros_mes ?? 1, multa: b.multa ?? 2 });

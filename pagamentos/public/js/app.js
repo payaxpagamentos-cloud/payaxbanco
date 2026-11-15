@@ -24,6 +24,7 @@ const MENU = [
   ]],
   ['Gestão', [
     ['relatorios', 'Relatórios', 'relatorio', 'relatorios.ver', () => import('./telas/relatorios.js')],
+    ['resultado', 'Resultado', 'grafico', 'resultado.ver', () => import('./telas/resultado.js')],
     ['contas', 'Contas e preços', 'banco', 'precos.ver', () => import('./telas/contas.js')],
     ['integracoes', 'Integrações', 'plugue', 'integracoes.ver', () => import('./telas/integracoes.js')],
     ['conformidade', 'Conformidade', 'balanca', 'conformidade.ver', () => import('./telas/conformidade.js')],

@@ -30,6 +30,7 @@ function criarApi(db) {
   api.use('/integracoes', require('./routes/integracoes')(db));
   api.use('/arquivos', require('./routes/arquivos')(db));
   api.use('/relatorios', require('./routes/relatorios')(db));
+  api.use('/resultado', require('./routes/resultado')(db));
   api.use('/seguranca', require('./routes/seguranca')(db));
   api.use('/admin', require('./routes/admin')(db));
   api.use('/conformidade', require('./routes/conformidade')(db));

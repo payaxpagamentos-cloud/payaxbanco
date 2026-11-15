@@ -33,6 +33,7 @@ const CAMPOS = {
   observacao: 'obs',
   linhaDigitavel: 'linha_digitavel',
   nossoNumero: 'nosso_numero',
+  carteira: 'id_carteira_cobranca',
 };
 
 class ErroIxc extends Error {
@@ -126,6 +127,7 @@ function criarIxc({ url, token, timeoutMs = config.ixc.timeoutMs }) {
     valor_centavos: paraCentavos(t[CAMPOS.valor]),
     vencimento: paraData(t[CAMPOS.vencimento]),
     status: String(t[CAMPOS.status] ?? ''),
+    carteira: String(t[CAMPOS.carteira] ?? ''),
     bruto: t,
   });
 
@@ -162,6 +164,7 @@ function criarIxc({ url, token, timeoutMs = config.ixc.timeoutMs }) {
       });
       return {
         total: r.total,
+        recebidos: r.registros.length,   // da página, antes do filtro (para saber se há mais páginas)
         titulos: r.registros.map(traduzirTitulo).filter((t) => t.status === 'A' && t.valor_centavos > 0),
       };
     },

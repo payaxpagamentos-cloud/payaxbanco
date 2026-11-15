@@ -125,7 +125,7 @@ function aplicar(db, registro, { creditoEm }) {
       if (['liquidado', 'baixado', 'cancelado'].includes(b.situacao)) return { resultado: 'informativo', boleto_id: b.id, texto: registro.ocorrencia_texto };
       const motivo = registro.motivos.map((m) => `${m.codigo} ${m.texto}`).join('; ') || `Ocorrência ${registro.ocorrencia}`;
       transacao(db, () => {
-        db.prepare("UPDATE boletos SET situacao = 'falha', erro_registro = ?, motivo_rejeicao = ? WHERE id = ?")
+        db.prepare("UPDATE boletos SET situacao = 'falha', erro_registro = ?, motivo_rejeicao = ?, custo_emissao_centavos = 0 WHERE id = ?")
           .run(`O banco recusou o registro: ${motivo}`, motivo, b.id);
         // Boleto que o banco não registrou não existe: a tarifa de emissão cobrada volta para o cliente.
         const cobrado = db.prepare("SELECT IFNULL(-SUM(valor_centavos), 0) AS v FROM lancamentos WHERE boleto_id = ? AND tipo = 'tarifa_emissao'").get(b.id).v;

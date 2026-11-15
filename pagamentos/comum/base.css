@@ -463,6 +463,15 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 .abas button:hover { color: var(--texto); }
 .abas button.ativa { color: var(--azul); border-bottom-color: var(--azul-marca); font-weight: 650; }
 
+/* Demonstrativo (resultado do mês): linhas com valor à direita, subitens recuados e totais em destaque. */
+.dre { display: grid; }
+.dre .linha { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px dashed var(--borda); font-size: 13.5px; }
+.dre .linha > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dre .linha.sub { padding-left: 16px; color: var(--texto-2); font-size: 13px; }
+.dre .linha.total { font-weight: 650; border-bottom: 1px solid var(--borda-forte); }
+.dre .linha.final { font-size: 17px; font-weight: 700; border-bottom: 0; padding-top: 12px; }
+.dre .linha .negativo { color: var(--vermelho); }
+.dre .linha .positivo { color: var(--verde-texto); }
 .pares { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 20px; }
 /* Colunas fixas quando a quantidade de itens é conhecida: linhas completas, sem item sozinho no fim. */
 .pares.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

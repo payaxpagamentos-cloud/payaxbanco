@@ -50,7 +50,7 @@ async function testar(db, clienteId) {
  * Importa os títulos em aberto do IXC e emite um boleto para cada um.
  * Títulos já importados são ignorados (controle por ixc_receber_id), então pode rodar quantas vezes quiser.
  */
-async function importar(db, cliente, { de, ate, limite = 200, usuario = null } = {}) {
+async function importar(db, cliente, { de, ate, limite = 200, maxPaginas = 50, usuario = null } = {}) {
   const ixc = ixcDoCliente(db, cliente.id);
   if (!ixc) throw new ErroNegocio('O IXC deste cliente ainda não foi configurado.', 409);
   const inicio = agora();
@@ -59,11 +59,22 @@ async function importar(db, cliente, { de, ate, limite = 200, usuario = null } =
 
   const resultado = { lidos: 0, criados: 0, ignorados: 0, erros: 0, detalhes: [] };
   try {
-    const { titulos } = await ixc.cliente.titulosEmAberto({ de, ate, rp: limite });
+    // Todas as páginas do período (antes lia só a primeira: um provedor grande ficava sem boleto).
+    const titulos = [];
+    for (let pagina = 1; pagina <= maxPaginas; pagina++) {
+      const p = await ixc.cliente.titulosEmAberto({ de, ate, rp: limite, pagina });
+      titulos.push(...p.titulos);
+      if (!p.recebidos || p.recebidos < limite || pagina * limite >= p.total) break;
+      if (pagina === maxPaginas) resultado.detalhes.push({ aviso: `mais de ${maxPaginas * limite} títulos no período: o restante entra na próxima rodada` });
+    }
     resultado.lidos = titulos.length;
     const cacheClientes = new Map();
 
+    // Só a(s) carteira(s) de cobrança da PAY AX no IXC: título de outra carteira (outro banco, gateway)
+    // já tem boleto lá e não pode ganhar um segundo.
+    const carteiras = (ixc.config.carteiras ?? []).map(String);
     for (const t of titulos) {
+      if (carteiras.length && !carteiras.includes(t.carteira)) { resultado.ignorados += 1; continue; }
       if (!t.vencimento || t.valor_centavos <= 0) { resultado.ignorados += 1; continue; }
       const jaTem = db.prepare("SELECT id FROM boletos WHERE cliente_id = ? AND ixc_receber_id = ? AND situacao NOT IN ('cancelado','falha')")
         .get(cliente.id, t.ixc_id);

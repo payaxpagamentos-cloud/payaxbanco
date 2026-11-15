@@ -7,6 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { iniciar } = require('./helpers');
 const totp = require('../server/lib/totp');
+const { criarIxcFalso } = require('./ixc-falso');
 const boletosLib = require('../server/lib/boletos');
 const { dataLocal, somarDias } = require('../server/lib/datas');
 
@@ -145,5 +146,39 @@ test('revisão 2: acesso e horários', async (t) => {
     const s = api.db.prepare(`SELECT COUNT(*) AS n FROM (SELECT '{"boleto_id":12,"ixc_id":5}' AS detalhe) s
       WHERE (CASE WHEN json_valid(s.detalhe) THEN json_extract(s.detalhe, '$.boleto_id') END) = 1`).get().n;
     assert.equal(s, 0);
+  });
+});
+
+test('revisão 2: provedor grande no IXC', async (t) => {
+  const titulos = Array.from({ length: 450 }, (_, i) => ({
+    id: String(5000 + i), id_cliente: '9001', documento: `NF-${i}`, valor: '99,90', data_vencimento: '2026-12-15', status: 'A' }));
+  const ixc = criarIxcFalso({ titulos });
+  const url = await ixc.iniciar();
+  const api = await iniciar();
+  t.after(async () => { await api.fechar(); await ixc.fechar(); });
+  const tk = await api.equipe();
+  await api.conta(tk.admin);
+  await api.precoPadrao(tk.admin);
+  const a = await api.cliente(tk.admin);
+  await api.put(`/api/integracoes/ixc/${a.cliente.id}`, { url, token: '7:hash-de-teste', tipo_padrao: 'bolepix' }, tk.admin);
+
+  await t.test('a importação lê todas as páginas (antes parava nos 200 primeiros)', async () => {
+    const r = await api.post(`/api/integracoes/ixc/${a.cliente.id}/importar`, { de: '2026-12-01', ate: '2026-12-31' }, tk.operacao);
+    assert.equal(r.status, 200);
+    assert.equal(r.dados.lidos, 450);
+    assert.equal(r.dados.criados, 450);
+    const de_novo = await api.post(`/api/integracoes/ixc/${a.cliente.id}/importar`, { de: '2026-12-01', ate: '2026-12-31' }, tk.operacao);
+    assert.equal(de_novo.dados.criados, 0, 'rodar de novo não duplica');
+  });
+
+  await t.test('com a carteira PAY AX informada, título de outra carteira não vira boleto', async () => {
+    titulos.push({ id: '9990', id_cliente: '9001', documento: 'OUTRO', valor: '50,00', data_vencimento: '2026-12-16', status: 'A', id_carteira_cobranca: '3' },
+      { id: '9991', id_cliente: '9001', documento: 'PAYAX', valor: '50,00', data_vencimento: '2026-12-16', status: 'A', id_carteira_cobranca: '12' });
+    assert.equal((await api.put(`/api/integracoes/ixc/${a.cliente.id}`, { url, tipo_padrao: 'bolepix', carteiras: '12' }, tk.admin)).status, 200);
+    const r = await api.post(`/api/integracoes/ixc/${a.cliente.id}/importar`, { de: '2026-12-01', ate: '2026-12-31' }, tk.operacao);
+    assert.equal(r.dados.criados, 1);
+    const ids = api.db.prepare("SELECT ixc_receber_id FROM boletos WHERE ixc_receber_id IN ('9990','9991')").all().map((x) => x.ixc_receber_id);
+    assert.deepEqual(ids, ['9991']);
+    assert.equal((await api.put(`/api/integracoes/ixc/${a.cliente.id}`, { url, carteiras: 'abc' }, tk.admin)).status, 422);
   });
 });
