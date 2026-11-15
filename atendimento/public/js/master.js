@@ -292,7 +292,7 @@ async function configuracoes(ctx) {
           campoPreco('Autenticação', 'meta_usd_autenticacao', c.wa_preco_autenticacao_usd / 1_000_000, 4),
           campoPreco('Marketing', 'meta_usd_marketing', c.wa_preco_marketing_usd / 1_000_000, 4))),
       campoPreco('Cotação padrão do dólar (R$), para empresas que não informaram a delas', 'meta_cotacao', c.wa_cotacao_padrao / 10_000, 4)),
-    el('div', { class: 'linha entre' }, el('span'), el('button', { class: 'btn primario' }, 'Salvar')));
+    el('div', { class: 'barra-salvar' }, el('button', { class: 'btn primario' }, 'Salvar')));
 
   f.addEventListener('submit', (e) => {
     e.preventDefault();

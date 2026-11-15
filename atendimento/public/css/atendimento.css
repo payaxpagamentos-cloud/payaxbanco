@@ -1383,3 +1383,12 @@ div.campo{ display: flex; flex-direction: column; gap: 6px; }
 .filtros-lista label.campo > *{ font-size: 13.5px; }
 /* Lembretes automáticos iguais e seguidos viram uma linha só. */
 .bolha.sistema .vezes{ margin-left: 6px; font-weight: 700; color: var(--text-3); }
+
+/* Salvar de formulário longo: barra presa embaixo, sempre à mão, alinhada à direita. */
+.barra-salvar{ position: sticky; bottom: 16px; z-index: 5; display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; margin-top: 4px;
+  background: var(--vidro-forte); border: 1px solid var(--vidro-borda); border-radius: var(--radius); box-shadow: var(--vidro-sombra);
+  -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); }
+.barra-salvar .btn{ min-width: 120px; }
+.form.colunas{ max-width: 1100px; }
+.form.colunas input:is([type="number"], [inputmode="numeric"]){ max-width: 220px; }
+.so-leitura :is(input, select, textarea):disabled{ opacity: 1; cursor: default; background: var(--surface-2); }

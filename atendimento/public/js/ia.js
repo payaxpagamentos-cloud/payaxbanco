@@ -6,6 +6,7 @@ import {api, qs} from './api.js';
 import {
   el, limpar, icone, toast, acao, confirmar, formModal, modal, campo, area, escolha, marcar, lerForm, inteiro,
   porcento, dataHora, dinheiro,
+  soLeitura,
 } from './ui.js';
 import {cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, filtroPeriodo, cartaoMotivos} from './comum.js';
 
@@ -469,8 +470,9 @@ async function configuracao(ctx, alvo) {
         'Esforço maior pensa mais, erra menos em caso difícil e custa mais. Para atendimento de WhatsApp, o baixo costuma bastar.'),
       botao('Ver o prompt que ela recebe', '', verPrompt)),
 
-    el('div', { class: 'linha entre' }, el('span'), el('button', { class: 'btn primario', disabled: !ctx.pode('zoe.editar') }, 'Salvar')));
+    el('div', { class: 'barra-salvar' }, el('button', { class: 'btn primario' }, 'Salvar')));
 
+  soLeitura(f, !ctx.pode('zoe.editar'));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(f.querySelector('button[type=submit], .btn.primario'), async () => {
@@ -545,8 +547,9 @@ async function provedorIxc(ctx, alvo) {
         escolha('Assuntos financeiros', 'fila_financeira_id', { '': '— fila padrão —', ...Object.fromEntries(filas.map((x) => [x.id, x.nome])) }, c.fila_financeira_id ?? ''),
         escolha('Assuntos técnicos', 'fila_tecnica_id', { '': '— fila padrão —', ...Object.fromEntries(filas.map((x) => [x.id, x.nome])) }, c.fila_tecnica_id ?? '')),
 
-      el('div', { class: 'linha entre' }, el('span'), el('button', { class: 'btn primario', disabled: !ctx.pode('zoe.editar') }, 'Salvar')));
+      el('div', { class: 'barra-salvar' }, el('button', { class: 'btn primario' }, 'Salvar')));
 
+    soLeitura(f, !ctx.pode('zoe.editar'));
     f.addEventListener('submit', (e) => {
       e.preventDefault();
       acao(f.querySelector('.btn.primario'), async () => {

@@ -180,6 +180,18 @@ export const confirmar = (titulo, texto, rotulo = 'Confirmar') => modal(titulo, 
   el('div', { class: 'rodape-modal' }, el('button', { class: 'btn', onclick: () => fechar(false) }, 'Voltar'), el('button', { class: 'btn primario', onclick: () => fechar(true) }, rotulo)),
 ]);
 
+/**
+ * Formulário só para consulta (quem não tem permissão de editar): os campos ficam travados — sem
+ * cursor piscando onde não dá para salvar — e o botão de salvar some.
+ */
+export function soLeitura(form, travar = true) {
+  if (!travar) return form;
+  form.classList.add('so-leitura');
+  for (const c of form.querySelectorAll('input, select, textarea')) c.disabled = true;
+  for (const b of form.querySelectorAll('button[type=submit], .btn.primario')) b.remove();
+  return form;
+}
+
 /** Lê os campos nomeados de um formulário como objeto (caixas de marcar viram true/false). */
 export function lerForm(form) {
   const dados = Object.fromEntries([...new FormData(form)].map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v]));

@@ -208,7 +208,7 @@ async function abaTarifacao(ctx) {
     el('fieldset', {}, el('legend', {}, 'Central telefônica'),
       el('div', { class: 'duas' }, campo('Encerrar chamadas presas após (horas)', { name: 'chamada_max_horas', type: 'number', min: 1, max: 48, value: c.chamada_max_horas }),
         campo('Ramal offline sem registro há (minutos)', { name: 'registro_expira_min', type: 'number', min: 1, value: c.registro_expira_min }))),
-    el('div', {}, el('button', { class: 'btn primario largo' }, 'Salvar')));
+    el('div', { class: 'barra-salvar' }, el('button', { class: 'btn primario' }, 'Salvar')));
   f.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const d = Object.fromEntries(new FormData(f));

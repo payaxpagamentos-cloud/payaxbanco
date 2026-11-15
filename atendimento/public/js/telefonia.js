@@ -371,7 +371,7 @@ async function telaConfiguracoes(ctx) {
   const admin = pode(ctx);
   const f = el('form', { class: 'form' },
     marcar('Gravar as chamadas (cada ramal também pode ligar ou desligar)', { name: 'gravar_chamadas', checked: c.empresa.gravar_chamadas, disabled: !admin }),
-    admin ? el('div', {}, el('button', { class: 'btn primario' }, 'Salvar')) : null);
+    admin ? el('div', { class: 'barra-salvar' }, el('button', { class: 'btn primario' }, 'Salvar')) : null);
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(f.querySelector('button'), async () => {
