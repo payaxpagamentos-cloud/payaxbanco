@@ -70,7 +70,7 @@ async function alertas(db, hoje, perfil) {
   if (falhas) lista.push({ tipo: 'boletos_falha', severidade: 'erro', quantidade: falhas, texto: `${falhas} boleto(s) não registrados no banco` });
   const repasseFalho = db.prepare("SELECT COUNT(*) AS n FROM repasses WHERE situacao = 'falhou'").get().n;
   if (repasseFalho) lista.push({ tipo: 'repasses_falha', severidade: 'erro', quantidade: repasseFalho, texto: `${repasseFalho} repasse(s) com falha no envio` });
-  const semResposta = db.prepare("SELECT COUNT(*) AS n FROM repasses WHERE situacao = 'enviado' AND enviado_em < datetime('now', '-30 minutes')").get().n;
+  const semResposta = db.prepare("SELECT COUNT(*) AS n FROM repasses WHERE situacao = 'enviado' AND enviado_em < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes')").get().n;
   if (semResposta) lista.push({ tipo: 'repasses_sem_resposta', severidade: 'erro', quantidade: semResposta,
     texto: `${semResposta} PIX de repasse sem resposta do banco: confira no extrato se saiu (Repasses)` });
   const rateioAConfirmar = db.prepare("SELECT COUNT(*) AS n FROM boletos WHERE rateio_situacao = 'a_confirmar'").get().n;

@@ -13,7 +13,7 @@ const SELECT_BOLETO = `SELECT b.id, b.cliente_id, b.conta_id, b.nosso_numero, b.
   FROM boletos b JOIN clientes c ON c.id = b.cliente_id`;
 
 /** Lista de boletos com filtros. `situacao` aceita 'vencido' (registrado com vencimento passado). */
-function listarBoletos(db, query, hoje, { clienteId = null } = {}) {
+function listarBoletos(db, query, hoje, { clienteId = null, exportar = false } = {}) {
   const cond = [];
   const p = [];
   if (clienteId) { cond.push('b.cliente_id = ?'); p.push(clienteId); }
@@ -32,7 +32,10 @@ function listarBoletos(db, query, hoje, { clienteId = null } = {}) {
     p.push(like(t), like(t), `%${d || '@'}%`, d, `%${d || '@'}%`);
   }
   const sql = `${SELECT_BOLETO}${cond.length ? ` WHERE ${cond.join(' AND ')}` : ''} ORDER BY b.vencimento DESC, b.id DESC`;
-  const r = listaPaginada(db, sql, p, query, { padrao: 50, maximo: 200 });
+  // Exportação (CSV): tudo o que o filtro achar, numa página só, até um teto de segurança.
+  const r = exportar
+    ? listaPaginada(db, sql, p, { ...query, pagina: 1, por_pagina: 50000 }, { padrao: 50000, maximo: 50000 })
+    : listaPaginada(db, sql, p, query, { padrao: 50, maximo: 200 });
   return {
     ...r,
     itens: r.itens.map((b) => ({
@@ -68,11 +71,11 @@ function resumoLiquidacoes(db, { de, ate, clienteId = null }) {
   const r = db.prepare(`SELECT COUNT(*) AS titulos, IFNULL(SUM(b.pago_valor_centavos), 0) AS bruto_centavos
     FROM boletos b WHERE ${onde} b.situacao = 'liquidado' AND b.pago_em BETWEEN ? AND ?`).get(...p, de, ate);
   const l = db.prepare(`SELECT
-      IFNULL(SUM(CASE WHEN l.tipo = 'comissao' THEN -l.valor_centavos ELSE 0 END), 0) AS comissao_centavos,
-      IFNULL(SUM(CASE WHEN l.tipo = 'tarifa_banco' THEN -l.valor_centavos ELSE 0 END), 0) AS tarifa_banco_centavos,
-      IFNULL(SUM(CASE WHEN l.tipo = 'tarifa_emissao' THEN -l.valor_centavos ELSE 0 END), 0) AS tarifa_emissao_centavos,
-      IFNULL(SUM(CASE WHEN l.tipo = 'taxa_repasse' THEN -l.valor_centavos ELSE 0 END), 0) AS taxa_repasse_centavos,
-      IFNULL(SUM(CASE WHEN l.tipo = 'repasse' THEN -l.valor_centavos ELSE 0 END), 0) AS repassado_centavos
+      IFNULL(SUM(CASE WHEN IFNULL(l.estorno_de, l.tipo) = 'comissao' THEN -l.valor_centavos ELSE 0 END), 0) AS comissao_centavos,
+      IFNULL(SUM(CASE WHEN IFNULL(l.estorno_de, l.tipo) = 'tarifa_banco' THEN -l.valor_centavos ELSE 0 END), 0) AS tarifa_banco_centavos,
+      IFNULL(SUM(CASE WHEN IFNULL(l.estorno_de, l.tipo) = 'tarifa_emissao' THEN -l.valor_centavos ELSE 0 END), 0) AS tarifa_emissao_centavos,
+      IFNULL(SUM(CASE WHEN IFNULL(l.estorno_de, l.tipo) = 'taxa_repasse' THEN -l.valor_centavos ELSE 0 END), 0) AS taxa_repasse_centavos,
+      IFNULL(SUM(CASE WHEN IFNULL(l.estorno_de, l.tipo) = 'repasse' THEN -l.valor_centavos ELSE 0 END), 0) AS repassado_centavos
     FROM lancamentos l WHERE ${clienteId ? 'l.cliente_id = ? AND' : ''} l.data_competencia BETWEEN ? AND ?`).get(...p, de, ate);
   const custo = db.prepare(`SELECT IFNULL(SUM(b.custo_liquidacao_centavos), 0) AS custo_centavos
     FROM boletos b WHERE ${onde} b.situacao = 'liquidado' AND b.pago_em BETWEEN ? AND ?`).get(...p, de, ate);

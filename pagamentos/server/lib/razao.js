@@ -26,13 +26,16 @@ const TIPOS = {
 };
 
 /** Grava um lançamento. Valor positivo credita o cliente; negativo debita. */
-function lancar(db, { cliente_id, boleto_id = null, repasse_id = null, tipo, valor_centavos, descricao, data_competencia, data_liberacao, criado_por = null }) {
+/** `estorno_de`: num estorno, o tipo do lançamento desfeito (os relatórios somam o estorno junto dele). */
+function lancar(db, { cliente_id, boleto_id = null, repasse_id = null, tipo, valor_centavos, descricao, data_competencia, data_liberacao, criado_por = null, estorno_de = null }) {
   if (!TIPOS[tipo]) throw new ErroNegocio(`Tipo de lançamento desconhecido: ${tipo}.`, 422);
   if (!Number.isInteger(valor_centavos)) throw new ErroNegocio('Valor do lançamento deve ser inteiro (centavos).', 422);
   if (valor_centavos === 0) return null;
-  const r = db.prepare(`INSERT INTO lancamentos (cliente_id, boleto_id, repasse_id, tipo, valor_centavos, descricao, data_competencia, data_liberacao, criado_em, criado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
-    .get(cliente_id, boleto_id, repasse_id, tipo, valor_centavos, descricao, data_competencia, data_liberacao ?? data_competencia, agora(), criado_por);
+  if (tipo === 'estorno' && !estorno_de) throw new ErroNegocio('Estorno sem o lançamento de origem.', 500);
+  const r = db.prepare(`INSERT INTO lancamentos (cliente_id, boleto_id, repasse_id, tipo, valor_centavos, descricao, data_competencia, data_liberacao, criado_em, criado_por, estorno_de)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
+    .get(cliente_id, boleto_id, repasse_id, tipo, valor_centavos, descricao, data_competencia, data_liberacao ?? data_competencia, agora(), criado_por,
+      tipo === 'estorno' ? estorno_de : null);
   return r.id;
 }
 

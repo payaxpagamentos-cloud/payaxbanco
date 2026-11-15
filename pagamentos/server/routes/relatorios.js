@@ -19,9 +19,9 @@ function porCliente(db, { de, ate }) {
       (SELECT COUNT(*) FROM boletos b WHERE b.cliente_id = c.id AND b.situacao = 'liquidado' AND b.pago_em BETWEEN ?1 AND ?2) AS liquidados,
       (SELECT IFNULL(SUM(b.pago_valor_centavos), 0) FROM boletos b WHERE b.cliente_id = c.id AND b.situacao = 'liquidado' AND b.pago_em BETWEEN ?1 AND ?2) AS bruto_centavos,
       (SELECT IFNULL(SUM(b.custo_liquidacao_centavos), 0) FROM boletos b WHERE b.cliente_id = c.id AND b.situacao = 'liquidado' AND b.pago_em BETWEEN ?1 AND ?2) AS custo_banco_centavos,
-      (SELECT IFNULL(SUM(-l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND l.tipo = 'comissao' AND l.data_competencia BETWEEN ?1 AND ?2) AS comissao_centavos,
-      (SELECT IFNULL(SUM(-l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND l.tipo IN ('tarifa_banco','tarifa_emissao','taxa_repasse') AND l.data_competencia BETWEEN ?1 AND ?2) AS tarifas_centavos,
-      (SELECT IFNULL(SUM(-l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND l.tipo = 'repasse' AND l.data_competencia BETWEEN ?1 AND ?2) AS repassado_centavos
+      (SELECT IFNULL(SUM(-l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND IFNULL(l.estorno_de, l.tipo) = 'comissao' AND l.data_competencia BETWEEN ?1 AND ?2) AS comissao_centavos,
+      (SELECT IFNULL(SUM(-l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND IFNULL(l.estorno_de, l.tipo) IN ('tarifa_banco','tarifa_emissao','taxa_repasse') AND l.data_competencia BETWEEN ?1 AND ?2) AS tarifas_centavos,
+      (SELECT IFNULL(SUM(-l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND IFNULL(l.estorno_de, l.tipo) = 'repasse' AND l.data_competencia BETWEEN ?1 AND ?2) AS repassado_centavos
     FROM clientes c ORDER BY bruto_centavos DESC`).all(de, ate);
 }
 
@@ -80,9 +80,9 @@ module.exports = (db) => {
       eventos: db.prepare(`SELECT e.id, e.tipo, e.nosso_numero, e.origem, e.recebido_em, e.processado_em, e.resultado, e.erro,
           b.id AS boleto_id, b.pagador_nome, b.valor_centavos, c.razao_social
         FROM eventos_banco e LEFT JOIN boletos b ON b.id = e.boleto_id LEFT JOIN clientes c ON c.id = b.cliente_id
-        WHERE date(e.recebido_em) BETWEEN ? AND ? ORDER BY e.id DESC LIMIT 500`).all(p.de, p.ate),
+        WHERE date(e.recebido_em, '-3 hours') BETWEEN ? AND ? ORDER BY e.id DESC LIMIT 500`).all(p.de, p.ate),
       resumo: db.prepare(`SELECT IFNULL(resultado, 'pendente') AS resultado, COUNT(*) AS n FROM eventos_banco
-        WHERE date(recebido_em) BETWEEN ? AND ? GROUP BY IFNULL(resultado, 'pendente')`).all(p.de, p.ate),
+        WHERE date(recebido_em, '-3 hours') BETWEEN ? AND ? GROUP BY IFNULL(resultado, 'pendente')`).all(p.de, p.ate),
       sem_aviso: db.prepare(`SELECT COUNT(*) AS n FROM boletos WHERE situacao = 'registrado' AND vencimento < ?`).get(hoje()).n,
     });
   });

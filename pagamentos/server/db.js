@@ -724,6 +724,21 @@ ALTER TABLE repasses ADD COLUMN destino_ispb TEXT;
 ALTER TABLE repasses ADD COLUMN destino_tipo TEXT;
 `,
   },
+  {
+    versao: 16,
+    nome: 'estorno-com-origem',
+    sql: `
+-- Cada estorno diz o que está desfazendo. Os relatórios somam o estorno junto do tipo original (a receita
+-- de um boleto estornado volta a zero) e um título estornado pode ser liquidado de novo.
+ALTER TABLE lancamentos ADD COLUMN estorno_de TEXT;
+UPDATE lancamentos SET estorno_de = 'tarifa_emissao' WHERE tipo = 'estorno' AND descricao LIKE 'Tarifa de emissão devolvida%';
+UPDATE lancamentos SET estorno_de = 'taxa_repasse' WHERE tipo = 'estorno' AND descricao LIKE 'Estorno da tarifa do repasse%';
+UPDATE lancamentos SET estorno_de = 'repasse' WHERE tipo = 'estorno' AND descricao LIKE 'Estorno do repasse%';
+UPDATE lancamentos SET estorno_de = (SELECT o.tipo FROM lancamentos o WHERE o.boleto_id = lancamentos.boleto_id
+    AND o.tipo IN ('credito_liquidacao','tarifa_banco','comissao') AND 'Estorno · ' || o.descricao = lancamentos.descricao LIMIT 1)
+  WHERE tipo = 'estorno' AND estorno_de IS NULL AND descricao LIKE 'Estorno · %';
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

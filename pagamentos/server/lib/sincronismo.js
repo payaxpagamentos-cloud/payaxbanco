@@ -153,7 +153,7 @@ async function reprocessarBaixas(db, limite = 50) {
   const pendentes = db.prepare(`SELECT b.id FROM boletos b
     WHERE b.situacao = 'liquidado' AND b.origem = 'ixc' AND b.ixc_receber_id IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM sincronismos s WHERE s.cliente_id = b.cliente_id AND s.tipo = 'baixa'
-        AND s.erros = 0 AND s.detalhe LIKE '%"boleto_id":' || b.id || '%')
+        AND s.erros = 0 AND (CASE WHEN json_valid(s.detalhe) THEN json_extract(s.detalhe, '$.boleto_id') END) = b.id)
     ORDER BY b.liquidado_em DESC LIMIT ?`).all(limite);
   const out = { tentados: 0, ok: 0, falhas: 0 };
   for (const p of pendentes) {

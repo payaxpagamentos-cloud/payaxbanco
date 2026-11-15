@@ -20,7 +20,7 @@ export default async function boletos({ alvo, params, query, recarregar }) {
   const lista = await api.get(`/boletos${qs(filtros)}`);
 
   const form = el('form', { class: 'filtros', onsubmit: (e) => { e.preventDefault(); aplicar(lerForm(form)); } },
-    campo({ nome: 'busca', rotulo: 'Buscar', valor: filtros.busca, ajuda: 'Pagador, CPF/CNPJ, documento ou nosso número', atributos: { placeholder: 'Ex.: Maria, 123.456…' } }),
+    Object.assign(campo({ nome: 'busca', rotulo: 'Buscar', valor: filtros.busca, atributos: { placeholder: 'Pagador, CPF/CNPJ, documento ou nosso número', title: 'Pagador, CPF/CNPJ, documento ou nosso número' } }), { className: 'campo-form cresce' }),
     campo({ nome: 'cliente_id', rotulo: 'Cliente', tipo: 'select', valor: filtros.cliente_id,
       opcoes: [['', 'Todos'], ...clientes.map((c) => [c.id, c.nome_fantasia || c.razao_social])] }),
     campo({ nome: 'situacao', rotulo: 'Situação', tipo: 'select', valor: filtros.situacao,
@@ -191,8 +191,9 @@ async function detalheBoleto(alvo, id, recarregar) {
         par('Situação', selo(b.situacao_visivel)),
         par('Valor', dinheiro(b.valor_centavos), 'grande'),
         par('Vencimento', data(b.vencimento)),
-        par('Valor a pagar hoje', dinheiro(b.atualizado.valor_centavos)),
-        b.atualizado.dias_atraso ? par('Atraso', `${b.atualizado.dias_atraso} dia(s) · multa ${dinheiro(b.atualizado.multa_centavos)} + juros ${dinheiro(b.atualizado.juros_centavos)}`) : null,
+        // Só faz sentido para título em aberto: pago, baixado ou cancelado não tem "a pagar" nem atraso.
+        b.situacao === 'registrado' ? par('Valor a pagar hoje', dinheiro(b.atualizado.valor_centavos)) : null,
+        b.situacao === 'registrado' && b.atualizado.dias_atraso ? par('Atraso', `${b.atualizado.dias_atraso} dia(s) · multa ${dinheiro(b.atualizado.multa_centavos)} + juros ${dinheiro(b.atualizado.juros_centavos)}`) : null,
         b.pago_em ? par('Pago em', `${data(b.pago_em)} · ${dinheiro(b.pago_valor_centavos)} (${b.pago_meio === 'pix' ? 'PIX' : 'boleto'})`) : null,
         par('Documento', b.seu_numero ?? '—'),
         par('Origem', R.origem[b.origem] ?? b.origem))),

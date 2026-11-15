@@ -179,7 +179,9 @@ export function tabela({ colunas, itens, vazio = 'Nada por aqui ainda.', aoClica
       el('tbody', {}, itens.map((i) => el('tr', {
         class: aoClicar ? 'clicavel' : null,
         ...(aoClicar ? { onclick: () => aoClicar(i), tabindex: '0', onkeydown: (e) => { if (e.key === 'Enter') aoClicar(i); } } : {}),
-      }, colunas.map((c) => el('td', { class: [c.dir ? 'dir' : '', c.classe ?? ''].filter(Boolean).join(' ') || null },
+      }, colunas.map((c) => el('td', { class: [c.dir ? 'dir' : '', c.classe ?? ''].filter(Boolean).join(' ') || null,
+        // No celular a linha vira um cartão e cada valor leva o nome da coluna ao lado.
+        'data-rotulo': typeof c.titulo === 'string' && c.titulo ? c.titulo : null },
         c.conteudo ? c.conteudo(i) : i[c.campo] ?? '—')))))),
     rodape);
 }
@@ -241,8 +243,9 @@ export function confirmar({ titulo, texto, confirmarTexto = 'Confirmar', perigo 
           onclick: () => {
             const motivo = entrada?.querySelector('input')?.value.trim();
             if (campoMotivo && !motivo) { entrada.querySelector('input').focus(); return; }
-            m.fechar();
+            // Resolve antes de fechar: o fechar dispara aoFechar (= cancelado), e a promessa só vale a primeira resposta.
             resolve(campoMotivo ? { motivo } : {});
+            m.fechar();
           },
         }, confirmarTexto),
       ],

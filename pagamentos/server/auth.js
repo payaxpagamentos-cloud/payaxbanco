@@ -42,6 +42,8 @@ const tokenDoPedido = (req) => {
   return c.startsWith('Bearer ') ? c.slice(7) : null;
 };
 
+const LIBERADO_COM_PENDENCIA = /\/api\/auth\/(eu|senha|2fa\/iniciar|2fa\/ativar)\/?(\?|$)/;
+
 /** Sessão da equipe PAY AX. */
 function autenticarEquipe(db) {
   const buscar = db.prepare('SELECT id, nome, email, perfil, ativo, senha_provisoria, totp_ativo FROM usuarios WHERE id = ?');
@@ -50,6 +52,14 @@ function autenticarEquipe(db) {
     if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
     const u = buscar.get(dados.sub);
     if (!u || !u.ativo) return next(new ErroNegocio('Usuário inativo.', 401));
+    // Pendências do acesso valem no servidor, não só na tela: com senha provisória ou sem a verificação
+    // em duas etapas (quando o administrador exige), só dá para ver a sessão, trocar a senha e configurar o 2FA.
+    if (!LIBERADO_COM_PENDENCIA.test(req.originalUrl)) {
+      if (u.senha_provisoria) return next(new ErroNegocio('Defina a sua senha antes de continuar.', 403));
+      if (!u.totp_ativo && require('./lib/doisfatores').exigidaEquipe(db)) {
+        return next(new ErroNegocio('Configure a verificação em duas etapas antes de continuar.', 403));
+      }
+    }
     req.usuario = u;
     req.usuarioTipo = 'equipe';
     next();

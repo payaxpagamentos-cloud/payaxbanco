@@ -190,4 +190,29 @@ test('PIX de repasse sem resposta do banco: não estorna nem reenvia sozinho', a
     }
     void original;
   });
+
+  await t.test('erro 5xx do banco no PIX: também fica "enviado" (pode ter saído); recusa 4xx devolve ao saldo', async () => {
+    const { ErroBanco } = bradesco;
+    const lib = require('../server/lib/repasses');
+    const criar = bradesco.criarBanco;
+    try {
+      bradesco.criarBanco = () => ({ pagarPix: async () => { throw new ErroBanco('O Bradesco respondeu com erro 504: gateway', { status: 504, incerto: true }); } });
+      const b3 = await api.boleto(tk.admin, a.cliente.id, { valor: '100,00', vencimento: somarDias(hoje(), 5) });
+      await api.post(`/api/boletos/${b3.id}/liquidar`, { pago_em: hoje(), valor_pago: '100,00', meio: 'pix' }, tk.financeiro);
+      const r = api.db.prepare('SELECT * FROM repasses WHERE cliente_id = ? ORDER BY id DESC').get(a.cliente.id);
+      assert.equal(r.situacao, 'enviado');
+      const antes = api.db.prepare('SELECT COUNT(*) AS n FROM repasses').get().n;
+      await lib.rotinaAutomatica(api.db);
+      assert.equal(api.db.prepare('SELECT COUNT(*) AS n FROM repasses').get().n, antes, 'nenhum PIX repetido');
+      await api.post(`/api/repasses/${r.id}/confirmar`, { end_to_end: 'E237TESTE5XX' }, tk.financeiro);
+
+      bradesco.criarBanco = () => ({ pagarPix: async () => { throw new ErroBanco('O Bradesco recusou a operação: chave inválida', { status: 422 }); } });
+      const b4 = await api.boleto(tk.admin, a.cliente.id, { valor: '100,00', vencimento: somarDias(hoje(), 5) });
+      await api.post(`/api/boletos/${b4.id}/liquidar`, { pago_em: hoje(), valor_pago: '100,00', meio: 'pix' }, tk.financeiro);
+      const f = api.db.prepare('SELECT * FROM repasses WHERE cliente_id = ? ORDER BY id DESC').get(a.cliente.id);
+      assert.equal(f.situacao, 'falhou', 'recusa clara: volta ao saldo para nova tentativa');
+    } finally {
+      bradesco.criarBanco = criar;
+    }
+  });
 });

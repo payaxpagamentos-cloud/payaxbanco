@@ -153,10 +153,10 @@ function aprovar(db, id, usuario) {
 /** Devolve o valor ao registro do cliente (falha no PIX ou cancelamento); a próxima rodada tenta de novo. */
 function devolverAoSaldo(db, r, motivo, usuario = null) {
   const data = hoje();
-  razao.lancar(db, { cliente_id: r.cliente_id, repasse_id: r.id, tipo: 'estorno', valor_centavos: r.valor_liquido_centavos,
+  razao.lancar(db, { cliente_id: r.cliente_id, repasse_id: r.id, tipo: 'estorno', estorno_de: 'repasse', valor_centavos: r.valor_liquido_centavos,
     descricao: `Estorno do repasse #${r.id} · ${motivo}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null });
   if (r.taxa_centavos) {
-    razao.lancar(db, { cliente_id: r.cliente_id, repasse_id: r.id, tipo: 'estorno', valor_centavos: r.taxa_centavos,
+    razao.lancar(db, { cliente_id: r.cliente_id, repasse_id: r.id, tipo: 'estorno', estorno_de: 'taxa_repasse', valor_centavos: r.taxa_centavos,
       descricao: `Estorno da tarifa do repasse #${r.id}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null });
   }
 }
@@ -212,12 +212,14 @@ async function enviar(db, id, { usuario = null } = {}) {
       .run(resp.situacao === 'confirmado' ? 'confirmado' : 'enviado', resp.end_to_end ?? null,
         resp.situacao === 'confirmado' ? agora() : null, id);
   } catch (err) {
-    // Tempo esgotado: o banco pode ter efetivado o PIX. Estornar e reenviar na rodada seguinte seria
-    // arriscar pagar duas vezes. Fica "enviado", com o aviso, até a equipe conferir no extrato do banco.
-    if (err.tempoEsgotado) {
+    // Resposta incerta (sem resposta, conexão caída, erro 5xx do banco): o banco pode ter efetivado o PIX.
+    // Estornar e reenviar na rodada seguinte seria arriscar pagar duas vezes. Fica "enviado", com o aviso,
+    // até a equipe conferir no extrato do banco (o painel alerta depois de 30 minutos).
+    if (err.tempoEsgotado || err.incerto) {
+      const motivo = err.tempoEsgotado ? 'O banco não respondeu a tempo' : `Resposta incerta do banco (${String(err.message).slice(0, 120)})`;
       db.prepare("UPDATE repasses SET erro = ?, versao = versao + 1 WHERE id = ?")
-        .run('O banco não respondeu a tempo: confira no extrato se o PIX saiu antes de qualquer ação.', id);
-      throw new ErroNegocio('O banco não respondeu a tempo. O repasse ficou como "enviado": confira no extrato do banco se o PIX saiu.', 504);
+        .run(`${motivo}: confira no extrato se o PIX saiu antes de qualquer ação.`, id);
+      throw new ErroNegocio(`${motivo}. O repasse ficou como "enviado": confira no extrato do banco se o PIX saiu.`, 504);
     }
     transacao(db, () => {
       devolverAoSaldo(db, r, `falha no envio: ${err.message}`, usuario);

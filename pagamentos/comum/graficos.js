@@ -56,7 +56,26 @@ function rotuloEixo(centavos) {
  */
 export function barrasPorDia({ dados, altura = 170, rotuloValor = dinheiro, vazio = 'Sem movimento no período.' }) {
   if (!dados?.length || !dados.some((d) => d.valor > 0)) return el('p', { class: 'vazio' }, vazio);
-  const larg = 760;
+  // Desenha na largura real do cartão (e redesenha quando ela muda): assim o texto do eixo fica
+  // sempre no tamanho certo, em vez de encolher junto com um desenho de largura fixa.
+  const caixa = el('div', { class: 'gfx' });
+  let largAtual = 0;
+  const desenhar = (larg) => {
+    largAtual = larg;
+    caixa.replaceChildren(desenharBarras({ dados, altura, rotuloValor, larg }));
+  };
+  desenhar(760);
+  caixa.addEventListener('mouseleave', esconderDica);
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(([e]) => {
+      const larg = Math.round(e.contentRect.width);
+      if (larg > 0 && Math.abs(larg - largAtual) > 2) desenhar(larg);
+    }).observe(caixa);
+  }
+  return caixa;
+}
+
+function desenharBarras({ dados, altura, rotuloValor, larg }) {
   const margem = { topo: 18, dir: 10, baixo: 24, esq: 76 };
   const areaL = larg - margem.esq - margem.dir;
   const areaA = altura - margem.topo - margem.baixo;
@@ -103,7 +122,7 @@ export function barrasPorDia({ dados, altura = 170, rotuloValor = dinheiro, vazi
   const marcar = new Set([0, dados.length - 1]);
   for (const i of marcar) {
     const t = svgEl('text', { x: margem.esq + i * passo + passo / 2, y: altura - 7,
-      'text-anchor': i === 0 ? 'start' : 'end', fill: 'var(--texto-3)', 'font-size': '10.5' });
+      'text-anchor': dados.length === 1 ? 'middle' : i === 0 ? 'start' : 'end', fill: 'var(--texto-3)', 'font-size': '10.5' });
     t.textContent = dataCurta(dados[i].data);
     svg.append(t);
   }
@@ -114,10 +133,7 @@ export function barrasPorDia({ dados, altura = 170, rotuloValor = dinheiro, vazi
     t.textContent = dinheiroCurto(dados[maiorIndice].valor);
     svg.append(t);
   }
-
-  const caixa = el('div', { class: 'gfx' }, svg);
-  caixa.addEventListener('mouseleave', esconderDica);
-  return caixa;
+  return svg;
 }
 
 /**

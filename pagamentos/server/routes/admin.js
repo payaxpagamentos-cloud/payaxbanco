@@ -55,8 +55,8 @@ module.exports = (db) => {
     const p = [];
     if (req.query.cliente_id) { cond.push('a.cliente_id = ?'); p.push(Number(req.query.cliente_id)); }
     if (req.query.acao) { cond.push('a.acao LIKE ?'); p.push(`${req.query.acao}%`); }
-    if (req.query.de) { cond.push('date(a.criado_em) >= ?'); p.push(req.query.de); }
-    if (req.query.ate) { cond.push('date(a.criado_em) <= ?'); p.push(req.query.ate); }
+    if (req.query.de) { cond.push(`date(a.criado_em, '-3 hours') >= ?`); p.push(req.query.de); }
+    if (req.query.ate) { cond.push(`date(a.criado_em, '-3 hours') <= ?`); p.push(req.query.ate); }
     const sql = `SELECT a.*, c.razao_social FROM auditoria a LEFT JOIN clientes c ON c.id = a.cliente_id
       ${cond.length ? `WHERE ${cond.join(' AND ')}` : ''} ORDER BY a.id DESC`;
     res.json(listaPaginada(db, sql, p, req.query, { padrao: 100, maximo: 500 }));

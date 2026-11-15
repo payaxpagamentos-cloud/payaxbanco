@@ -6,6 +6,7 @@ const config = require('../config');
 const { agora } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { exigir } = require('../auth');
+const { podeEquipe } = require('../lib/permissoes');
 const { cifrar, decifrar } = require('../lib/cripto');
 const v = require('../lib/validacao');
 const sincronismo = require('../lib/sincronismo');
@@ -32,19 +33,25 @@ function gravar(db, { escopo, cliente_id = null, conta_id = null, credenciais, c
     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`).get(escopo, cliente_id, conta_id, cifradas, JSON.stringify(cfg ?? {}), agora(), usuario.id).id;
 }
 
+/** Sem credenciais e sem o token do aviso do banco (quem tem o token consegue "avisar" um pagamento). */
 const semSegredo = (i) => (i ? {
   id: i.id, escopo: i.escopo, cliente_id: i.cliente_id, conta_id: i.conta_id, estado: i.estado,
-  configurada: Boolean(i.credenciais), config: JSON.parse(i.config || '{}'),
+  configurada: Boolean(i.credenciais), config: (({ webhook_token: _token, ...publico }) => publico)(JSON.parse(i.config || '{}')),
   ultimo_teste: i.ultimo_teste, ultimo_erro: i.ultimo_erro, atualizado_em: i.atualizado_em,
 } : null);
 
 module.exports = (db) => {
   const r = express.Router();
 
-  r.get('/', exigir('integracoes.ver', 'precos.ver'), (_req, res) => {
+  r.get('/', exigir('integracoes.ver', 'precos.ver'), (req, res) => {
     const banco = db.prepare("SELECT * FROM integracoes WHERE escopo = 'banco' ORDER BY id LIMIT 1").get();
     res.json({
-      banco: { ...semSegredo(banco), modo: config.banco.modo, ambiente: config.banco.ambiente },
+      banco: {
+        ...semSegredo(banco), modo: config.banco.modo, ambiente: config.banco.ambiente,
+        // O endereço do aviso (com o token) só para o administrador, que é quem o cadastra no banco.
+        webhook_caminho: banco && podeEquipe(req.usuario.perfil, '*') && JSON.parse(banco.config || '{}').webhook_token
+          ? `${config.basePath}/api/publico/webhook/${JSON.parse(banco.config).webhook_token}` : undefined,
+      },
       ixc: db.prepare(`SELECT i.*, c.razao_social, c.nome_fantasia FROM integracoes i JOIN clientes c ON c.id = i.cliente_id
         WHERE i.escopo = 'ixc' ORDER BY c.razao_social`).all().map((i) => ({ ...semSegredo(i), razao_social: i.razao_social, nome_fantasia: i.nome_fantasia })),
       sistemas: Object.entries(SISTEMAS_HOMOLOGADOS).map(([id, nome]) => ({ id, nome })),

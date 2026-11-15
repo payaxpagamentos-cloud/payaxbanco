@@ -129,10 +129,10 @@ function aplicar(db, registro, { creditoEm }) {
           .run(`O banco recusou o registro: ${motivo}`, motivo, b.id);
         // Boleto que o banco não registrou não existe: a tarifa de emissão cobrada volta para o cliente.
         const cobrado = db.prepare("SELECT IFNULL(-SUM(valor_centavos), 0) AS v FROM lancamentos WHERE boleto_id = ? AND tipo = 'tarifa_emissao'").get(b.id).v;
-        const devolvido = db.prepare("SELECT IFNULL(SUM(valor_centavos), 0) AS v FROM lancamentos WHERE boleto_id = ? AND tipo = 'estorno' AND descricao LIKE 'Tarifa de emissão devolvida%'").get(b.id).v;
+        const devolvido = db.prepare("SELECT IFNULL(SUM(valor_centavos), 0) AS v FROM lancamentos WHERE boleto_id = ? AND tipo = 'estorno' AND estorno_de = 'tarifa_emissao'").get(b.id).v;
         if (cobrado - devolvido > 0) {
           const dia = datas.dataLocal(config.fusoPadrao);
-          razao.lancar(db, { cliente_id: b.cliente_id, boleto_id: b.id, tipo: 'estorno', valor_centavos: cobrado - devolvido,
+          razao.lancar(db, { cliente_id: b.cliente_id, boleto_id: b.id, tipo: 'estorno', estorno_de: 'tarifa_emissao', valor_centavos: cobrado - devolvido,
             descricao: `Tarifa de emissão devolvida: o banco não registrou o título ${b.nosso_numero}`, data_competencia: dia, data_liberacao: dia });
         }
       });
@@ -279,7 +279,7 @@ function situacao(db) {
     ultimo_retorno: ultimoRetorno ?? null,
     retornos_na_fila: naFila,
     nao_confirmados: db.prepare(`SELECT COUNT(*) AS n FROM boletos WHERE remessa_id IS NOT NULL AND confirmado_em IS NULL
-      AND situacao IN ('registrando','registrado') AND criado_em < datetime('now', '-2 days')`).get().n,
+      AND situacao IN ('registrando','registrado') AND criado_em < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 days')`).get().n,
   };
 }
 

@@ -25,8 +25,8 @@ module.exports = (db) => {
     const p = [];
     if (req.query.situacao) { cond.push('r.situacao = ?'); p.push(req.query.situacao); }
     if (req.query.cliente_id) { cond.push('r.cliente_id = ?'); p.push(Number(req.query.cliente_id)); }
-    if (req.query.de) { cond.push('date(r.criado_em) >= ?'); p.push(req.query.de); }
-    if (req.query.ate) { cond.push('date(r.criado_em) <= ?'); p.push(req.query.ate); }
+    if (req.query.de) { cond.push(`date(r.criado_em, '-3 hours') >= ?`); p.push(req.query.de); }
+    if (req.query.ate) { cond.push(`date(r.criado_em, '-3 hours') <= ?`); p.push(req.query.ate); }
     const sql = `SELECT r.*, c.razao_social, c.nome_fantasia, u.nome AS aprovado_por_nome
       FROM repasses r JOIN clientes c ON c.id = r.cliente_id LEFT JOIN usuarios u ON u.id = r.aprovado_por
       ${cond.length ? `WHERE ${cond.join(' AND ')}` : ''} ORDER BY r.id DESC`;
@@ -76,7 +76,7 @@ module.exports = (db) => {
 
   r.get('/export.csv', exigir('repasses.ver'), (req, res) => {
     const itens = db.prepare(`SELECT r.*, c.razao_social FROM repasses r JOIN clientes c ON c.id = r.cliente_id
-      WHERE (? IS NULL OR date(r.criado_em) >= ?) AND (? IS NULL OR date(r.criado_em) <= ?) AND (? IS NULL OR r.situacao = ?) ORDER BY r.id DESC`)
+      WHERE (? IS NULL OR date(r.criado_em, '-3 hours') >= ?) AND (? IS NULL OR date(r.criado_em, '-3 hours') <= ?) AND (? IS NULL OR r.situacao = ?) ORDER BY r.id DESC`)
       .all(req.query.de || null, req.query.de || null, req.query.ate || null, req.query.ate || null, req.query.situacao || null, req.query.situacao || null);
     const linhas = [['#', 'Cliente', 'Criado em', 'Valor (R$)', 'Tarifa (R$)', 'Líquido (R$)', 'Chave PIX', 'Situação', 'End-to-end']];
     for (const x of itens) {

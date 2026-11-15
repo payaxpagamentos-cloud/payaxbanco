@@ -23,7 +23,7 @@ module.exports = (db) => {
           COALESCE(c.nome_fantasia, c.razao_social) AS cliente
         FROM usuarios_cliente uc JOIN clientes c ON c.id = uc.cliente_id ORDER BY c.razao_social, uc.nome`).all(),
       logins_recusados_24h: db.prepare(`SELECT COUNT(*) AS n FROM auditoria
-        WHERE acao IN ('login.recusado', 'login.2fa.recusado') AND criado_em >= datetime('now', '-1 day')`).get().n,
+        WHERE acao IN ('login.recusado', 'login.2fa.recusado') AND criado_em >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')`).get().n,
       sem_2fa: db.prepare("SELECT COUNT(*) AS n FROM usuarios WHERE ativo = 1 AND totp_ativo = 0").get().n,
     });
   });

@@ -163,7 +163,7 @@ function lerCnpjApiBrasil(j) {
 
 // ---------------------------------------------------------------- Cache
 function doCache(db, tipo, chave, validadeDias) {
-  const c = db.prepare("SELECT * FROM consultas_cache WHERE tipo = ? AND chave = ? AND consultado_em > datetime('now', ?)")
+  const c = db.prepare("SELECT * FROM consultas_cache WHERE tipo = ? AND chave = ? AND consultado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?)")
     .get(tipo, chave, `-${validadeDias} days`);
   if (!c) return null;
   try { return { ...JSON.parse(c.dados), fonte: c.fonte, do_cache: true, consultado_em: c.consultado_em }; } catch { return null; }

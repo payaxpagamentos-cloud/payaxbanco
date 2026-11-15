@@ -149,8 +149,9 @@ async function detalhe(alvo, id, recarregar) {
         par('Situação', selo(b.situacao_visivel)),
         par('Valor', dinheiro(b.valor_centavos), 'grande'),
         par('Vencimento', data(b.vencimento)),
-        par('Valor a pagar hoje', dinheiro(b.atualizado.valor_centavos)),
-        b.atualizado.dias_atraso ? par('Atraso', `${b.atualizado.dias_atraso} dia(s)`) : null,
+        // Só faz sentido para título em aberto: pago, baixado ou cancelado não tem "a pagar" nem atraso.
+        b.situacao === 'registrado' ? par('Valor a pagar hoje', dinheiro(b.atualizado.valor_centavos)) : null,
+        b.situacao === 'registrado' && b.atualizado.dias_atraso ? par('Atraso', `${b.atualizado.dias_atraso} dia(s)`) : null,
         b.pago_em ? par('Pago em', `${data(b.pago_em)} · ${dinheiro(b.pago_valor_centavos)}`) : null,
         par('Documento', b.seu_numero ?? '—'))),
       cartao('Pagador', el('div', { class: 'pares' },

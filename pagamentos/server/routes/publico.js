@@ -92,8 +92,14 @@ module.exports = (db) => {
     try {
       if (!aviso.nosso_numero) { concluir('ignorado', 'aviso sem nosso número'); return res.json({ recebido: true, processado: false }); }
       // O aviso é da conta desta integração: o mesmo nosso número pode existir em outro convênio.
-      const b = db.prepare(`SELECT * FROM boletos WHERE nosso_numero = ? ${i?.conta_id ? 'AND conta_id = ?' : ''} ORDER BY id DESC LIMIT 1`)
-        .get(...[aviso.nosso_numero.padStart(11, '0'), ...(i?.conta_id ? [i.conta_id] : [])]);
+      const achados = db.prepare(`SELECT * FROM boletos WHERE nosso_numero = ? ${i?.conta_id ? 'AND conta_id = ?' : ''} ORDER BY id DESC`)
+        .all(...[aviso.nosso_numero.padStart(11, '0'), ...(i?.conta_id ? [i.conta_id] : [])]);
+      // Sem conta definida e o número existe em mais de uma: não adivinha qual cliente pagou.
+      if (achados.length > 1) {
+        concluir('erro', `nosso número ${aviso.nosso_numero} existe em ${achados.length} contas: conferir no banco e liquidar pela ficha do boleto`);
+        return res.json({ recebido: true, processado: false });
+      }
+      const b = achados[0];
       if (!b) { concluir('ignorado', 'título não encontrado'); return res.json({ recebido: true, processado: false }); }
       // Valor fora de qualquer proporção com o título (ex.: reais lidos como centavos): não liquida no automático.
       if (aviso.valor_centavos > 0 && (aviso.valor_centavos * 20 < b.valor_centavos || aviso.valor_centavos > b.valor_centavos * 20)) {

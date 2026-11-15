@@ -63,11 +63,16 @@ const ENDPOINTS = {
 };
 
 class ErroBanco extends Error {
-  constructor(mensagem, { status, codigo, tempoEsgotado = false, detalhes } = {}) {
+  /**
+   * `incerto`: o pedido pode ter chegado ao banco e sido executado (sem resposta, conexão caída no meio,
+   * erro 5xx do banco). Num PIX, isso NÃO é falha: reenviar arriscaria pagar duas vezes.
+   */
+  constructor(mensagem, { status, codigo, tempoEsgotado = false, incerto = false, detalhes } = {}) {
     super(mensagem);
     this.status = status;
     this.codigo = codigo;
     this.tempoEsgotado = tempoEsgotado;
+    this.incerto = incerto || tempoEsgotado;
     this.detalhes = detalhes;
   }
 }
@@ -290,7 +295,10 @@ function apiBradesco(conta, credenciais, opcoes = {}) {
       });
     } catch (err) {
       const tempo = err.name === 'TimeoutError' || err.name === 'AbortError';
-      throw new ErroBanco(tempo ? 'O Bradesco não respondeu a tempo.' : `Sem conexão com o Bradesco: ${err.message}`, { tempoEsgotado: tempo });
+      // Só é certo que nada foi executado quando a conexão nem abriu (endereço não achado ou recusado).
+      const naoSaiu = ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH'].includes(err.code ?? err.cause?.code);
+      throw new ErroBanco(tempo ? 'O Bradesco não respondeu a tempo.' : `Sem conexão com o Bradesco: ${err.message}`,
+        { tempoEsgotado: tempo, incerto: !naoSaiu });
     }
     const texto = await resp.text();
     let dados = null;
@@ -301,7 +309,9 @@ function apiBradesco(conta, credenciais, opcoes = {}) {
     }
     if (!resp.ok) {
       const msg = dados?.message ?? dados?.mensagem ?? dados?.erros?.[0]?.mensagem ?? `erro ${resp.status}`;
-      throw new ErroBanco(`O Bradesco recusou a operação: ${msg}`, { status: resp.status, codigo: dados?.codigo, detalhes: dados });
+      // 4xx: o banco recusou (nada foi feito). 5xx: erro do lado do banco — a operação pode ter saído.
+      throw new ErroBanco(resp.status >= 500 ? `O Bradesco respondeu com erro ${resp.status}: ${msg}` : `O Bradesco recusou a operação: ${msg}`,
+        { status: resp.status, codigo: dados?.codigo, detalhes: dados, incerto: resp.status >= 500 });
     }
     return dados;
   }

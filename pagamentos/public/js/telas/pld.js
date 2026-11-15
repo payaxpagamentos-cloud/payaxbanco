@@ -260,7 +260,7 @@ async function abaComunicacoes(alvo, { recarregar }) {
 // ---------------------------------------------------------------- Parâmetros
 async function abaParametros(alvo, { recarregar }) {
   const lista = await api.get('/pld/parametros');
-  const form = el('form', { class: 'linha-form', onsubmit: (e) => e.preventDefault() },
+  const form = el('form', { class: 'linha-form rotulos-longos', onsubmit: (e) => e.preventDefault() },
     lista.map((p) => campo({ nome: p.chave, rotulo: p.rotulo, tipo: p.dinheiro ? 'dinheiro' : 'number',
       valor: p.dinheiro ? (p.valor / 100).toFixed(2).replace('.', ',') : String(p.valor),
       ajuda: `padrão: ${p.dinheiro ? dinheiro(p.padrao) : p.padrao}`, atributos: analista() ? {} : { disabled: true } })));

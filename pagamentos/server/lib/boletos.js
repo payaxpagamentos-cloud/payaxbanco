@@ -274,7 +274,10 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
     if (!b) throw naoEncontrado('Boleto');
     if (b.situacao === 'liquidado') return { ja_liquidado: true, boleto_id: b.id };
     // Defesa contra creditar duas vezes: se o recebimento já está no razão, o título já foi liquidado.
-    const jaCreditado = db.prepare("SELECT 1 FROM lancamentos WHERE boleto_id = ? AND tipo = 'credito_liquidacao' LIMIT 1").get(b.id);
+    // Crédito estornado não conta: o título estornado volta a poder ser pago.
+    const jaCreditado = db.prepare(`SELECT
+        (SELECT COUNT(*) FROM lancamentos WHERE boleto_id = ?1 AND tipo = 'credito_liquidacao')
+      - (SELECT COUNT(*) FROM lancamentos WHERE boleto_id = ?1 AND tipo = 'estorno' AND estorno_de = 'credito_liquidacao') AS vivos`).get(b.id).vivos > 0;
     if (jaCreditado) return { ja_liquidado: true, boleto_id: b.id };
     if (b.situacao === 'cancelado') throw new ErroNegocio('Boleto cancelado não pode ser liquidado.', 409);
 
@@ -392,11 +395,13 @@ function estornarLiquidacao(db, boletoId, motivo, usuario = null) {
     const b = db.prepare('SELECT * FROM boletos WHERE id = ?').get(boletoId);
     if (!b) throw naoEncontrado('Boleto');
     if (b.situacao !== 'liquidado') throw new ErroNegocio('Só é possível estornar um título liquidado.', 409);
-    const lancs = db.prepare("SELECT * FROM lancamentos WHERE boleto_id = ? AND tipo IN ('credito_liquidacao','tarifa_banco','comissao')").all(b.id);
+    // Só os lançamentos da liquidação em vigor: os de uma liquidação já estornada não são estornados de novo.
+    const lancs = db.prepare(`SELECT * FROM lancamentos WHERE boleto_id = ?1 AND tipo IN ('credito_liquidacao','tarifa_banco','comissao')
+      AND id > IFNULL((SELECT MAX(id) FROM lancamentos WHERE boleto_id = ?1 AND tipo = 'estorno' AND estorno_de = 'credito_liquidacao'), 0)`).all(b.id);
     const data = hoje();
     for (const l of lancs) {
       razao.lancar(db, {
-        cliente_id: b.cliente_id, boleto_id: b.id, tipo: 'estorno', valor_centavos: -l.valor_centavos,
+        cliente_id: b.cliente_id, boleto_id: b.id, tipo: 'estorno', estorno_de: l.tipo, valor_centavos: -l.valor_centavos,
         descricao: `Estorno · ${l.descricao}`, data_competencia: data, data_liberacao: data, criado_por: usuario?.id ?? null,
       });
     }

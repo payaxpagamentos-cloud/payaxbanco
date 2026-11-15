@@ -186,12 +186,13 @@ function atualizarIncidente(i, recarregar) {
 
 // ---------------------------------------------------------------- Inventário
 function abaInventario(alvo, { d }) {
-  const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
+  const par = (rot, val, classe = '') => el('div', { class: `par ${classe}`.trim() }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
   montar(alvo,
     aviso('Registro das operações de tratamento (LGPD, art. 37). É a mesma fonte do aviso de privacidade público: mudar o que o sistema trata é mudar o inventário, no código, e o aviso acompanha.', 'info'),
-    ...d.inventario.map((x) => el('div', { style: 'margin-top:14px' }, cartao(x.titulo, el('div', { class: 'pares' },
+    ...d.inventario.map((x) => el('div', { style: 'margin-top:14px' }, cartao(x.titulo, el('div', { class: 'pares cols-4' },
+      // Duas linhas completas de quatro: "Dados" é o texto mais longo e ocupa duas colunas.
       par('Titulares', x.titulares),
-      par('Dados', x.dados.join('; ')),
+      par('Dados', x.dados.join('; '), 'span-2'),
       par('Finalidade', x.finalidade),
       par('Base legal', x.base_legal),
       par('Compartilhamento', x.compartilhamento.join('; ')),

@@ -28,7 +28,7 @@ module.exports = (db) => {
   r.get('/', exigir('boletos.ver'), (req, res) => res.json(consultas.listarBoletos(db, req.query, hoje())));
 
   r.get('/export.csv', exigir('boletos.ver'), (req, res) => {
-    const lista = consultas.listarBoletos(db, { ...req.query, por_pagina: 10000 }, hoje());
+    const lista = consultas.listarBoletos(db, req.query, hoje(), { exportar: true });
     const linhas = [['Cliente', 'Nosso número', 'Documento', 'Pagador', 'CPF/CNPJ', 'Emissão', 'Vencimento', 'Valor (R$)', 'Situação', 'Pago em', 'Valor pago (R$)']];
     for (const b of lista.itens) {
       linhas.push([b.razao_social, b.nosso_numero_formatado, b.seu_numero ?? '', b.pagador_nome, b.pagador_documento,
