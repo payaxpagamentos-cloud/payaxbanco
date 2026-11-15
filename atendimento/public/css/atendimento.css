@@ -1750,49 +1750,45 @@ body.pagina-tv.sem-cursor, body.pagina-tv.sem-cursor *{ cursor: none; }
   background-image: radial-gradient(rgba(255, 255, 255, .07) 1px, transparent 1px); background-size: 26px 26px;
   -webkit-mask-image: radial-gradient(ellipse at 50% 45%, #000 15%, transparent 70%); mask-image: radial-gradient(ellipse at 50% 45%, #000 15%, transparent 70%); }
 
-.lg-centro{ position: relative; z-index: 1; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 22px;
+.lg-centro{ position: relative; z-index: 1; width: min(400px, 100%); display: flex; flex-direction: column; align-items: center; gap: 26px;
   animation: lg-surge .7s cubic-bezier(.2, .7, .2, 1) both; }
 @keyframes lg-surge{ from{ opacity: 0; transform: translateY(14px); } to{ opacity: 1; transform: none; } }
 
-/* Marca */
-.lg-marca{ display: flex; align-items: center; gap: 14px; }
-.lg-orbe{ width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; color: #fff; position: relative; flex: none;
-  background: linear-gradient(140deg, #3B82F6 0%, #6366F1 55%, #8B5CF6 100%);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, .18) inset, 0 14px 40px -12px rgba(79, 70, 229, .9), 0 0 60px -12px rgba(59, 130, 246, .7); }
-.lg-orbe::after{ content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(255, 255, 255, .28), transparent 50%); }
-.lg-orbe svg{ width: 28px; height: 28px; position: relative; z-index: 1; }
-.lg-nome{ display: flex; flex-direction: column; line-height: 1; }
-.lg-nome strong{ font-size: 24px; font-weight: 800; letter-spacing: .12em; color: #fff; }
-.lg-nome small{ margin-top: 6px; font-size: 11px; letter-spacing: .26em; text-transform: uppercase; color: rgba(200, 212, 245, .6); font-weight: 600; }
-.lg-marca-celular{ display: none; }
-
-/* Palco: a vitrine da plataforma à esquerda, o cartão à direita */
-.lg-palco{ position: relative; z-index: 1; width: min(1240px, 100%); display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(360px, 420px);
-  gap: clamp(40px, 6vw, 110px); align-items: center; }
-.lg-apresenta{ display: flex; flex-direction: column; animation: lg-surge .8s cubic-bezier(.2, .7, .2, 1) both; }
-.lg-titulo{ margin: 44px 0 18px; font-size: clamp(40px, 4.6vw, 68px); line-height: 1.02; font-weight: 800; letter-spacing: -.045em; color: #fff; }
-.lg-titulo span{ background: linear-gradient(95deg, #60A5FA 0%, #818CF8 45%, #C084FC 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.lg-texto{ margin: 0 0 36px; max-width: 560px; font-size: 18px; line-height: 1.6; color: rgba(214, 223, 250, .72); }
-.lg-frentes{ list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.lg-frentes li{ display: flex; flex-direction: column; gap: 6px; padding: 16px 16px 15px; border-radius: 16px; min-width: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .025)); border: 1px solid rgba(255, 255, 255, .08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-  transition: transform .2s, border-color .2s, background .2s; animation: lg-surge .7s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(.25s + var(--i) * .07s); }
-.lg-frentes li:hover{ transform: translateY(-2px); border-color: rgba(129, 140, 248, .35); background: linear-gradient(180deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .035)); }
-.lg-icone{ width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; margin-bottom: 6px; color: #C7D2FE;
-  background: linear-gradient(140deg, rgba(59, 130, 246, .3), rgba(139, 92, 246, .3)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); }
-.lg-icone svg{ width: 18px; height: 18px; }
-.lg-frentes strong{ font-size: 14.5px; font-weight: 700; color: #fff; }
-.lg-frentes small{ font-size: 12.5px; line-height: 1.45; color: rgba(200, 212, 245, .62); }
+/* Marca: o símbolo grande, com anel de luz girando e ondas saindo dele */
+.lg-heroi{ display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 6px; }
+.lg-simbolo{ position: relative; width: 132px; height: 132px; display: grid; place-items: center; margin-bottom: 34px; }
+.lg-simbolo::before{ content: ""; position: absolute; inset: -140px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(99, 102, 241, .38) 0%, rgba(59, 130, 246, .16) 35%, transparent 68%); }
+.lg-anel{ position: absolute; inset: -18px; border-radius: 50%; padding: 2px;
+  background: conic-gradient(from 0deg, transparent 0 30%, #60A5FA 45%, #A78BFA 60%, #F0ABFC 68%, transparent 80% 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: lg-roda 4.5s linear infinite; filter: drop-shadow(0 0 10px rgba(129, 140, 248, .8)); }
+@keyframes lg-roda{ to{ transform: rotate(360deg); } }
+.lg-orbe{ position: relative; width: 118px; height: 118px; border-radius: 36px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(145deg, #3B82F6 0%, #6366F1 50%, #8B5CF6 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), inset 0 -10px 30px rgba(30, 27, 75, .35), 0 24px 70px -18px rgba(99, 102, 241, 1), 0 0 120px -20px rgba(59, 130, 246, .9); }
+.lg-orbe::after{ content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(180deg, rgba(255, 255, 255, .32), transparent 46%); pointer-events: none; }
+.lg-orbe svg{ width: 62px; height: 62px; position: relative; z-index: 1; filter: drop-shadow(0 4px 10px rgba(30, 27, 75, .45)); }
+/* Ondas: três círculos que saem do símbolo e somem, um atrás do outro */
+.lg-ondas{ position: absolute; inset: 0; pointer-events: none; }
+.lg-ondas i{ position: absolute; left: 50%; top: 50%; width: 132px; height: 132px; margin: -66px 0 0 -66px; border-radius: 50%;
+  border: 1px solid rgba(147, 160, 255, .35); animation: lg-onda 6s cubic-bezier(.2, .6, .3, 1) infinite; opacity: 0; }
+.lg-ondas i:nth-child(2){ animation-delay: 2s; } .lg-ondas i:nth-child(3){ animation-delay: 4s; }
+@keyframes lg-onda{ 0%{ transform: scale(1.1); opacity: .55; } 100%{ transform: scale(4); opacity: 0; } }
+.lg-palavra{ margin: 0; font-size: 64px; font-weight: 800; line-height: 1; letter-spacing: .22em; padding-left: .22em;
+  background: linear-gradient(100deg, #FFFFFF 20%, #C7D2FE 40%, #FFFFFF 50%, #DDD6FE 70%, #FFFFFF 85%); background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: lg-brilho 7s ease-in-out infinite;
+  filter: drop-shadow(0 6px 30px rgba(99, 102, 241, .45)); }
+@keyframes lg-brilho{ 0%, 100%{ background-position: 100% 0; } 50%{ background-position: 0 0; } }
+.lg-lema{ margin: 14px 0 0; font-size: 13px; letter-spacing: .42em; padding-left: .42em; text-transform: uppercase; color: rgba(200, 212, 245, .66); font-weight: 600; }
 
 /* Cartão de vidro */
-.lg-cartao{ width: 100%; padding: 36px 34px 32px; border-radius: 26px;
+.lg-cartao{ position: relative; z-index: 2; width: 100%; padding: 32px 32px 30px; border-radius: 26px;
   background: linear-gradient(180deg, rgba(255, 255, 255, .085), rgba(255, 255, 255, .035));
   border: 1px solid rgba(255, 255, 255, .11);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 40px 90px -30px rgba(0, 0, 0, .8);
   -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%); }
-.lg-cartao h2{ margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; color: #fff; text-transform: none; }
-.lg-sub{ margin: 0 0 24px; font-size: 14px; color: rgba(210, 220, 248, .66); }
+.lg-cartao h2{ margin: 0 0 22px; font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: #fff; text-transform: none; }
 .lg-form{ display: flex; flex-direction: column; gap: 14px; }
 .lg-form.treme{ animation: lg-treme .38s ease; }
 @keyframes lg-treme{ 20%{ transform: translateX(-6px); } 40%{ transform: translateX(6px); } 60%{ transform: translateX(-4px); } 80%{ transform: translateX(3px); } }
@@ -1846,17 +1842,29 @@ body.pagina-tv.sem-cursor, body.pagina-tv.sem-cursor *{ cursor: none; }
 .lg-status.ok i{ background: #34D399; box-shadow: 0 0 0 3px rgba(52, 211, 153, .18), 0 0 10px rgba(52, 211, 153, .7); }
 .lg-status.erro{ color: #FCA5A5; } .lg-status.erro i{ background: #F87171; }
 
-@media (prefers-reduced-motion: reduce){ .lg-aurora i, .lg-centro, .lg-form.treme{ animation: none; } }
-@media (max-width: 1080px){
-  .lg-palco{ grid-template-columns: minmax(0, 1fr); width: min(440px, 100%); }
-  .lg-apresenta{ display: none; }
-  .lg-marca-celular{ display: flex; flex-direction: column; text-align: center; gap: 14px; }
-  .lg-marca-celular .lg-orbe{ width: 68px; height: 68px; border-radius: 22px; }
-  .lg-marca-celular .lg-orbe svg{ width: 36px; height: 36px; }
-  .lg-marca-celular .lg-nome{ align-items: center; }
-  .lg-marca-celular .lg-nome strong{ font-size: 30px; padding-left: .12em; }
-}
+@media (prefers-reduced-motion: reduce){ .lg-aurora i, .lg-centro, .lg-form.treme, .lg-anel, .lg-ondas i, .lg-palavra{ animation: none; } .lg-ondas{ display: none; } }
 @media (max-width: 480px){
   .lg{ padding: 36px 16px; place-items: start center; }
   .lg-cartao{ padding: 26px 20px 24px; border-radius: 20px; }
+  .lg-simbolo{ width: 104px; height: 104px; margin-bottom: 24px; }
+  .lg-orbe{ width: 94px; height: 94px; border-radius: 29px; }
+  .lg-orbe svg{ width: 50px; height: 50px; }
+  .lg-palavra{ font-size: 48px; }
+}
+/* Telas baixas (notebook 1366×768, 1280×720): a marca encolhe para tudo caber sem rolar. */
+@media (max-height: 820px) and (min-width: 481px){
+  .lg{ padding-top: 28px; padding-bottom: 28px; }
+  .lg-centro{ gap: 20px; }
+  .lg-simbolo{ width: 96px; height: 96px; margin-bottom: 22px; }
+  .lg-orbe{ width: 86px; height: 86px; border-radius: 27px; }
+  .lg-orbe svg{ width: 46px; height: 46px; }
+  .lg-anel{ inset: -14px; }
+  .lg-palavra{ font-size: 46px; }
+  .lg-lema{ margin-top: 10px; }
+  .lg-cartao{ padding: 26px 28px 24px; }
+  .lg-cartao h2{ margin-bottom: 16px; }
+  .lg-form{ gap: 12px; }
+  .lg-campo input{ height: 54px; }
+  .lg-campo label{ top: 17px; }
+  .lg-olho{ top: 9px; }
 }

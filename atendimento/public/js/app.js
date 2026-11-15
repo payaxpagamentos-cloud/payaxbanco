@@ -360,36 +360,22 @@ function telaEntrada() {
     el('path', { d: 'M21 11.5a8 8 0 0 1-8 8H8.5L4 21.5l1.4-3.9A8 8 0 1 1 21 11.5z' }),
     el('path', { d: 'M12.2 6.6l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z', fill: 'currentColor', stroke: 'none' }));
 
-  // O que a plataforma é, de relance: as seis frentes que trabalham juntas.
-  const FRENTES = [
-    ['ia', 'ZOE, a inteligência', 'Resolve sozinha 2ª via, PIX, suporte e cadastro.'],
-    ['conversa', 'WhatsApp oficial', 'API da Meta com régua de cobrança que economiza.'],
-    ['telefone', 'Telefonia e URA', 'PABX, filas e ligação atendida pela própria ZOE.'],
-    ['integracoes', 'IXC integrado', 'Contrato, faturas e desbloqueio, na hora.'],
-    ['alerta', 'Ouvidoria e retenção', 'Protocolo, prazo e Anatel sob controle.'],
-    ['tv', 'Supervisão ao vivo', 'Filas e equipe em tempo real, até na TV.'],
-  ];
-  const marcaGrande = (classe) => el('div', { class: `lg-marca ${classe}` },
-    el('span', { class: 'lg-orbe' }, simbolo.cloneNode(true)),
-    el('span', { class: 'lg-nome' }, el('strong', {}, principal), el('small', {}, resto.length ? resto.join(' ') : 'Atendimento inteligente')));
-
   limpar(raiz, el('div', { class: 'lg' },
     el('div', { class: 'lg-aurora', 'aria-hidden': 'true' }, el('i'), el('i'), el('i')),
-    el('div', { class: 'lg-palco' },
-      el('section', { class: 'lg-apresenta' },
-        marcaGrande('lg-marca-topo'),
-        el('h1', { class: 'lg-titulo' }, 'Uma plataforma.', el('br'), el('span', {}, 'Todo o atendimento.')),
-        el('p', { class: 'lg-texto' }, 'Inteligência artificial, WhatsApp, telefonia e o sistema do seu provedor trabalhando juntos, em tempo real.'),
-        el('ul', { class: 'lg-frentes' }, FRENTES.map(([ic, titulo, texto], i) => el('li', { style: `--i:${i}` },
-          el('span', { class: 'lg-icone' }, icone(ic)), el('strong', {}, titulo), el('small', {}, texto))))),
     el('main', { class: 'lg-centro' },
-      marcaGrande('lg-marca-celular'),
+      // A marca é a protagonista: o símbolo com um anel de luz e ondas saindo dele, como sinal de conversa.
+      el('div', { class: 'lg-heroi' },
+        el('div', { class: 'lg-simbolo' },
+          el('span', { class: 'lg-ondas', 'aria-hidden': 'true' }, el('i'), el('i'), el('i')),
+          el('span', { class: 'lg-anel', 'aria-hidden': 'true' }),
+          el('span', { class: 'lg-orbe' }, simbolo)),
+        el('h1', { class: 'lg-palavra' }, principal),
+        el('p', { class: 'lg-lema' }, resto.length ? resto.join(' ') : 'Atendimento inteligente')),
       el('section', { class: 'lg-cartao' },
-        el('h2', {}, 'Entrar na plataforma'),
-        el('p', { class: 'lg-sub' }, 'Use o e-mail e a senha que você recebeu.'),
+        el('h2', {}, 'Acesse sua conta'),
         f),
       el('footer', { class: 'lg-rodape' }, status, el('span', { class: 'lg-sep' }, '·'),
-        el('span', { title: 'Peça ao administrador da sua empresa para criar uma nova senha em Usuários.' }, 'Esqueceu a senha? Fale com o administrador'))))));
+        el('span', { title: 'Peça ao administrador da sua empresa para criar uma nova senha em Usuários.' }, 'Esqueceu a senha? Fale com o administrador')))));
   (lembrado ? senha : email).focus();
 }
 
