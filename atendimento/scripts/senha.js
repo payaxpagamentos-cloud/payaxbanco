@@ -5,6 +5,8 @@
  *
  *   sudo zoe-senha                      → usuário master do .env (ATEND_ADMIN_EMAIL)
  *   sudo zoe-senha pessoa@empresa.com   → outro usuário
+ *   sudo zoe-senha SEU-EMAIL --novo-email voce@empresa.com.br
+ *                                       → troca o e-mail de entrada (e depois pede a senha)
  *
  * Pede a senha nova duas vezes, sem mostrar na tela. Para usar em script: echo "senha" | zoe-senha --stdin
  */
@@ -29,7 +31,10 @@ async function lerStdin() {
 
 async function principal() {
   const args = process.argv.slice(2);
-  const email = (args.find((a) => !a.startsWith('--')) || config.admin.email || '').trim().toLowerCase();
+  const iNovo = args.indexOf('--novo-email');
+  const novoEmail = iNovo >= 0 ? String(args[iNovo + 1] ?? '').trim().toLowerCase() : null;
+  const posicionais = args.filter((a, i) => !a.startsWith('--') && i !== iNovo + 1);
+  const email = (posicionais[0] || config.admin.email || '').trim().toLowerCase();
   const db = abrir();
   const u = db.prepare('SELECT id, nome, email, perfil, ativo FROM usuarios WHERE email = ? COLLATE NOCASE').get(email);
   if (!u) {
@@ -37,6 +42,16 @@ async function principal() {
     const masters = db.prepare("SELECT email FROM usuarios WHERE perfil = 'master'").all().map((x) => x.email);
     if (masters.length) console.error(`Usuário(s) master: ${masters.join(', ')}`);
     process.exit(1);
+  }
+  if (iNovo >= 0) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(novoEmail ?? '')) { console.error('Informe um e-mail válido depois de --novo-email. Nada foi alterado.'); process.exit(1); }
+    const outro = db.prepare('SELECT id FROM usuarios WHERE email = ? COLLATE NOCASE AND id <> ?').get(novoEmail, u.id);
+    if (outro) { console.error(`Já existe outro usuário com o e-mail ${novoEmail}. Nada foi alterado.`); process.exit(1); }
+    db.prepare('UPDATE usuarios SET email = ? WHERE id = ?').run(novoEmail, u.id);
+    try { auditar(db, { usuario: u, acao: `e-mail trocado no servidor (zoe-senha): ${u.email} → ${novoEmail}`, ip: 'servidor' }); } catch { /* registro opcional */ }
+    console.log(`E-mail de entrada trocado: ${u.email} → ${novoEmail}.`);
+    if (u.perfil === 'master') console.log(`Atualize também a linha ATEND_ADMIN_EMAIL=${novoEmail} em .env (o comando zoe-senha sem argumentos usa esse e-mail).`);
+    u.email = novoEmail;
   }
   let senha;
   if (args.includes('--stdin')) senha = await lerStdin();
