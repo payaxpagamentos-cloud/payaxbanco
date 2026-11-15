@@ -77,7 +77,7 @@ function estrutura(rota, principal) {
       el('a', { class: `link-menu${r === rota ? ' ativo' : ''}`, href: `#/${r}`, 'aria-current': r === rota ? 'page' : null, onclick: () => alternar(false) }, icone(ic), rot))));
   }
   menu.append(el('div', { class: 'menu-rodape' },
-    el('a', { class: 'link-privacidade menu', href: 'privacidade', target: '_blank', rel: 'noopener' }, 'Privacidade e os seus dados'),
+    el('a', { class: 'link-privacidade lateral', href: 'privacidade', target: '_blank', rel: 'noopener' }, 'Privacidade e os seus dados'),
     u.cliente_situacao !== 'ativo'
       ? el('div', { class: 'selo-ambiente' }, `Cadastro ${u.cliente_situacao}`, el('small', {}, 'Fale com o seu gerente de conta'))
       : null,

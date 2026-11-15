@@ -17,7 +17,7 @@ const guardarOculto = (v) => { try { localStorage.setItem(CHAVE_SALDO, v ? '1' :
 /** A marca no canto do cartão, como num cartão de verdade. */
 const marcaCartao = () => el('div', { class: 'marca-cartao' },
   simbolo({ tamanho: 22, cor: '#6fd3fb' }),
-  letreiro({ altura: 13, cor: 'rgba(255,255,255,0.92)', degrade: ['#8fe3fb', '#3ea8f5'] }));
+  letreiro({ altura: 13, cor: 'rgba(255,255,255,0.92)' }));
 
 /**
  * Cartão do cliente: o que já foi para a conta dele e o que está a caminho.
