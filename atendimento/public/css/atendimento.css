@@ -74,6 +74,9 @@
 html, body{ margin: 0; min-height: 100%; }
 body{ background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 input, select, textarea, button{ font: inherit; color: inherit; }
+/* O cursor de texto só pisca onde dá para escrever (com a navegação por cursor do navegador, F7, ele aparecia em qualquer texto). */
+body{ caret-color: transparent; }
+input, textarea, [contenteditable="true"]{ caret-color: var(--azul); }
 h1, h2, h3{ margin: 0 0 .5em; line-height: 1.25; letter-spacing: -.015em; }
 h1{ font-size: 22px; font-weight: 700; } h2{ font-size: 15px; font-weight: 700; } h3{ font-size: 13px; font-weight: 700; }
 a{ color: var(--azul); }
