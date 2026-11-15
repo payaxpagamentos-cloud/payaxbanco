@@ -291,49 +291,53 @@ function alterarSenha() {
 const GUARDA_EMAIL = 'atend.email';
 
 /**
- * Tela de entrada. Minimalista: o símbolo da ZOE, um cartão de vidro com o formulário e uma aurora
- * que se move devagar ao fundo. O erro aparece dentro do cartão, perto de onde a pessoa está olhando.
+ * Tela de entrada — o desenho aprovado do login (pacote ZOE_Login): a esfera em movimento à esquerda
+ * e o painel de acesso à direita. O que é da plataforma continua igual: o login de verdade
+ * (/auth/login), a sessão, a mensagem de erro e a ida para o painel depois de entrar.
+ * "Lembrar meu e-mail" guarda só o e-mail; a senha nunca é gravada no navegador.
  */
 function telaEntrada() {
+  const IMG = 'img/login';
   let lembrado = '';
   try { lembrado = localStorage.getItem(GUARDA_EMAIL) ?? ''; } catch { /* sem armazenamento */ }
 
-  // Rótulo flutuante: o placeholder vazio (" ") é o que permite ao CSS saber se o campo está preenchido.
-  const email = el('input', { id: 'login-email', name: 'email', type: 'email', autocomplete: 'username', required: true, placeholder: ' ', value: lembrado });
-  const senha = el('input', { id: 'login-senha', name: 'senha', type: 'password', autocomplete: 'current-password', required: true, placeholder: ' ' });
-  const olho = el('button', { type: 'button', class: 'lg-olho', title: 'Mostrar a senha', 'aria-label': 'Mostrar a senha' }, icone('olho'));
+  const svg = (d, extra = {}) => el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'aria-hidden': 'true', ...extra }, d);
+  const olhoAberto = () => svg([el('path', { d: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z' }), el('circle', { cx: '12', cy: '12', r: '3' })]);
+  const olhoFechado = () => svg([el('path', { d: 'M3 3l18 18M10.6 5.1A10.6 10.6 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4M6.6 6.6A17.6 17.6 0 0 0 2 12s3.6 7 10 7a10.4 10.4 0 0 0 5.4-1.4M9.9 9.9a3 3 0 0 0 4.2 4.2' })]);
+
+  const email = el('input', { id: 'zoe-email', name: 'email', type: 'email', placeholder: 'Seu e-mail', autocomplete: 'username', inputmode: 'email', autocapitalize: 'none', spellcheck: 'false', required: true, value: lembrado });
+  const senha = el('input', { id: 'zoe-password', name: 'password', type: 'password', placeholder: 'Sua senha', autocomplete: 'current-password', required: true });
+  const olho = el('button', { class: 'zoe-eye', type: 'button', 'aria-label': 'Mostrar senha', 'aria-pressed': 'false', 'aria-controls': 'zoe-password' }, olhoAberto());
   olho.addEventListener('click', () => {
-    const ver = senha.type === 'password';
-    senha.type = ver ? 'text' : 'password';
-    olho.title = ver ? 'Esconder a senha' : 'Mostrar a senha';
-    olho.setAttribute('aria-label', olho.title);
-    limpar(olho, icone(ver ? 'olho-fechado' : 'olho'));
-    senha.focus();
+    const mostrar = senha.type === 'password';
+    senha.type = mostrar ? 'text' : 'password';
+    olho.setAttribute('aria-pressed', String(mostrar));
+    olho.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+    limpar(olho, mostrar ? olhoFechado() : olhoAberto());
   });
-  const caps = el('small', { class: 'lg-caps oculto', role: 'status' }, 'Caps Lock ligado');
-  senha.addEventListener('keyup', (e) => caps.classList.toggle('oculto', !e.getModifierState?.('CapsLock')));
-  const lembrar = el('input', { type: 'checkbox', name: 'lembrar', checked: Boolean(lembrado) });
-  const erro = el('div', { class: 'lg-erro oculto', role: 'alert' });
-  const rotuloBotao = el('span', {}, 'Entrar');
-  const entrar = el('button', { class: 'lg-botao', type: 'submit' }, rotuloBotao, el('i', { class: 'lg-giro', 'aria-hidden': 'true' }));
+  const lembrar = el('input', { id: 'zoe-remember', name: 'rememberEmail', type: 'checkbox', checked: Boolean(lembrado) });
+  lembrar.addEventListener('change', () => { if (!lembrar.checked) { try { localStorage.removeItem(GUARDA_EMAIL); } catch { /* ignora */ } } });
+  const mensagem = el('p', { class: 'zoe-message', role: 'status', 'aria-live': 'polite' });
+  const rotulo = el('span', {}, 'Entrar');
+  const entrar = el('button', { class: 'zoe-submit', type: 'submit' }, rotulo,
+    el('i', { class: 'zoe-giro', 'aria-hidden': 'true' }),
+    svg([el('path', { d: 'M5 12h14m-6-6 6 6-6 6' })], { 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
 
-  const campoFlutuante = (input, rotulo, extra = null) => el('div', { class: 'lg-campo' }, input, el('label', { for: input.id }, rotulo), extra);
+  const form = el('form', { id: 'zoe-login-form', novalidate: true },
+    el('div', { class: 'zoe-fields' },
+      el('div', { class: 'zoe-field' }, el('label', { for: 'zoe-email' }, 'E-mail'), email),
+      el('div', { class: 'zoe-field' }, el('label', { for: 'zoe-password' }, 'Senha'), el('div', { class: 'zoe-password-wrap' }, senha, olho))),
+    el('label', { class: 'zoe-remember', for: 'zoe-remember' }, lembrar, el('span', {}, 'Lembrar meu e-mail')),
+    entrar,
+    mensagem);
 
-  const f = el('form', { class: 'lg-form', novalidate: true },
-    campoFlutuante(email, 'E-mail'),
-    campoFlutuante(senha, 'Senha', olho),
-    el('div', { class: 'lg-linha' }, el('label', { class: 'lg-lembrar' }, lembrar, el('span', {}, 'Lembrar meu e-mail')), caps),
-    erro,
-    entrar);
-
-  const mostrarErro = (texto) => { erro.textContent = texto; erro.classList.remove('oculto'); f.classList.remove('treme'); void f.offsetWidth; f.classList.add('treme'); };
-  f.addEventListener('submit', async (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    erro.classList.add('oculto');
-    if (!email.value.trim() || !senha.value) { mostrarErro('Preencha o e-mail e a senha.'); (email.value.trim() ? senha : email).focus(); return; }
+    mensagem.textContent = '';
+    if (!email.value.trim() || !senha.value) { mensagem.textContent = 'Preencha o e-mail e a senha.'; (email.value.trim() ? senha : email).focus(); return; }
     entrar.disabled = true;
     entrar.classList.add('carregando');
-    rotuloBotao.textContent = 'Entrando';
+    rotulo.textContent = 'Entrando';
     try {
       const r = await api.post('/auth/login', { email: email.value.trim(), senha: senha.value });
       try {
@@ -341,42 +345,74 @@ function telaEntrada() {
         else localStorage.removeItem(GUARDA_EMAIL);
       } catch { /* ignora */ }
       sessao.set(r);
+      pararVideo();
       desenhar();
     } catch (err) {
-      mostrarErro(err.status === 401 ? 'E-mail ou senha não conferem.' : err.message);
+      mensagem.textContent = err.status === 401 ? 'E-mail ou senha não conferem. Confira e tente de novo.' : err.message;
       senha.select();
       entrar.disabled = false;
       entrar.classList.remove('carregando');
-      rotuloBotao.textContent = 'Entrar';
+      rotulo.textContent = 'Entrar';
     }
   });
 
-  const status = el('span', { class: 'lg-status' }, el('i'), 'Verificando…');
-  api.get('/saude').then(() => { status.className = 'lg-status ok'; status.lastChild.textContent = 'Sistema online'; })
-    .catch(() => { status.className = 'lg-status erro'; status.lastChild.textContent = 'Sem conexão com o servidor'; });
+  // Recuperação de senha e contato: a plataforma não tem "esqueci a senha" por e-mail — quem cria
+  // a senha nova é o administrador (em Usuários) ou, no caso do master, o comando zoe-senha no servidor.
+  const textoAjuda = el('div');
+  const tituloAjuda = el('h2', { id: 'zoe-dialog-title' });
+  const ajuda = el('dialog', { 'aria-labelledby': 'zoe-dialog-title' }, tituloAjuda, textoAjuda,
+    el('form', { method: 'dialog' }, el('button', {}, 'Entendi')));
+  const abrirAjuda = (titulo, ...paragrafos) => { tituloAjuda.textContent = titulo; limpar(textoAjuda, paragrafos.map((t) => el('p', {}, t))); ajuda.showModal(); };
 
-  const [principal, ...resto] = String(nomePlataforma).trim().split(/\s+/);
-  const simbolo = el('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' },
-    el('path', { d: 'M21 11.5a8 8 0 0 1-8 8H8.5L4 21.5l1.4-3.9A8 8 0 1 1 21 11.5z' }),
-    el('path', { d: 'M12.2 6.6l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z', fill: 'currentColor', stroke: 'none' }));
+  const poster = el('img', { src: `${IMG}/zoe-orbita-poster.jpg`, alt: '', width: '986', height: '520' });
+  const video = el('video', { loop: true, muted: true, playsinline: true, preload: 'metadata', poster: `${IMG}/zoe-orbita-poster.jpg`, disablepictureinpicture: true, tabindex: '-1' },
+    el('source', { src: `${IMG}/zoe-orbita.mp4`, type: 'video/mp4' }));
+  video.muted = true;
 
-  limpar(raiz, el('div', { class: 'lg' },
-    el('div', { class: 'lg-aurora', 'aria-hidden': 'true' }, el('i'), el('i'), el('i')),
-    el('main', { class: 'lg-centro' },
-      // A marca é a protagonista: o símbolo com um anel de luz e ondas saindo dele, como sinal de conversa.
-      el('div', { class: 'lg-heroi' },
-        el('div', { class: 'lg-simbolo' },
-          el('span', { class: 'lg-ondas', 'aria-hidden': 'true' }, el('i'), el('i'), el('i')),
-          el('span', { class: 'lg-anel', 'aria-hidden': 'true' }),
-          el('span', { class: 'lg-orbe' }, simbolo)),
-        el('h1', { class: 'lg-palavra' }, principal),
-        el('p', { class: 'lg-lema' }, resto.length ? resto.join(' ') : 'Atendimento inteligente')),
-      el('section', { class: 'lg-cartao' },
-        el('h2', {}, 'Acesse sua conta'),
-        f),
-      el('footer', { class: 'lg-rodape' }, status, el('span', { class: 'lg-sep' }, '·'),
-        el('span', { title: 'Peça ao administrador da sua empresa para criar uma nova senha em Usuários.' }, 'Esqueceu a senha? Fale com o administrador')))));
-  (lembrado ? senha : email).focus();
+  limpar(raiz, el('main', { class: 'zoe-login' },
+    el('div', { class: 'zoe-ambient', 'aria-hidden': 'true' }),
+    el('div', { class: 'zoe-layout' },
+      el('section', { class: 'zoe-hero', 'aria-label': 'ZOE Atende' },
+        el('div', { class: 'zoe-brand', 'aria-label': 'ZOE Atende' },
+          el('img', { src: `${IMG}/zoe-mark.svg`, alt: '', width: '82', height: '82' }),
+          el('div', { class: 'zoe-wordmark' }, el('strong', {}, 'ZOE'), el('small', {}, 'ATENDE'))),
+        el('div', { class: 'zoe-hero-copy' },
+          el('h1', { class: 'zoe-headline' }, el('span', {}, 'Sua operação.'), el('span', { class: 'zoe-headline-accent' }, 'Em outro nível.')),
+          el('p', { class: 'zoe-tagline' }, 'Inteligência para conectar pessoas e negócios.')),
+        el('div', { class: 'zoe-orbit', 'aria-hidden': 'true' }, poster, video)),
+      el('section', { class: 'zoe-access', 'aria-labelledby': 'zoe-heading' },
+        el('img', { class: 'zoe-access-logo', src: `${IMG}/zoe-mark.svg`, alt: '', width: '74', height: '74' }),
+        el('h2', { id: 'zoe-heading' }, 'Bem-vindo'),
+        el('p', { class: 'zoe-access-intro' }, 'Acesse sua conta para continuar.'),
+        form,
+        el('div', { class: 'zoe-help' },
+          el('button', { type: 'button', onclick: () => abrirAjuda('Esqueceu sua senha?',
+            'Por segurança, a senha nova é criada pelo administrador da sua empresa, em Usuários.',
+            'Peça a ele e entre com a senha que receber. Depois, troque por uma sua clicando no seu nome, no alto do painel.') }, 'Esqueceu sua senha?'),
+          el('button', { type: 'button', onclick: () => abrirAjuda('Fale com o administrador',
+            'O administrador da sua empresa cuida dos acessos: cria usuários, libera permissões e define senhas novas.',
+            'Se você é o administrador da plataforma e perdeu o acesso, defina a senha direto no servidor com o comando zoe-senha.') }, 'Fale com o administrador')))),
+    el('footer', { class: 'zoe-page-footer' },
+      el('div', { class: 'zoe-footer-brand' }, el('strong', {}, 'ZOE ATENDE'), el('span', {}, 'Gestão de atendimento')),
+      el('span', {}, 'Acesso à plataforma')),
+    ajuda));
+
+  // A esfera: vídeo em loop, sem som. O poster fica enquanto carrega, se a reprodução falhar e
+  // quando o sistema pede menos movimento.
+  const menosMovimento = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const atualizarMovimento = () => {
+    if (!video.isConnected) return;
+    if (menosMovimento?.matches) { video.pause(); video.classList.remove('zoe-video-ready'); }
+    else video.play().catch(() => video.classList.remove('zoe-video-ready'));
+  };
+  video.addEventListener('playing', () => { if (!menosMovimento?.matches) video.classList.add('zoe-video-ready'); });
+  video.addEventListener('error', () => video.classList.remove('zoe-video-ready'));
+  video.addEventListener('canplay', atualizarMovimento);
+  menosMovimento?.addEventListener?.('change', atualizarMovimento);
+  const pararVideo = () => { menosMovimento?.removeEventListener?.('change', atualizarMovimento); video.pause(); };
+  atualizarMovimento();
+
+  (lembrado ? senha : email).focus({ preventScroll: true });
 }
 
 api.get('/publico').then((p) => { nomePlataforma = p.nome || 'ZOE Atende'; }).catch(() => {}).finally(desenhar);

@@ -1,0 +1,157 @@
+/* Login da ZOE Atende — desenho aprovado (pacote ZOE_Login). Tudo limitado a .zoe-login: não mexe nas outras telas. */
+.zoe-login {
+  --zoe-white: #f7f8ff;
+  --zoe-muted: #c2c7dc;
+  --zoe-blue: #2e80ff;
+  --zoe-violet: #8d32f4;
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  min-height: 100svh;
+  overflow: clip;
+  color: var(--zoe-white);
+  background: radial-gradient(ellipse at 23% -10%, #123365 0%, transparent 39%), radial-gradient(ellipse at 103% 2%, #38245e 0%, transparent 30%), #070f20;
+  font-family: "Manrope", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.zoe-login *, .zoe-login *::before, .zoe-login *::after { box-sizing: border-box; }
+.zoe-login button, .zoe-login input { font: inherit; }
+.zoe-login button, .zoe-login a, .zoe-login input { -webkit-tap-highlight-color: transparent; }
+.zoe-login button { cursor: pointer; }
+.zoe-login button:disabled { cursor: wait; }
+.zoe-login :focus-visible { outline: 3px solid #a9c8ff; outline-offset: 4px; }
+.zoe-ambient { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse at 45% 80%, #1e3e7b25, transparent 48%); }
+.zoe-layout { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 520px); gap: clamp(36px, 4vw, 76px); width: min(100% - 112px, 1488px); min-height: min(850px, calc(100svh - 50px)); margin-inline: auto; padding-top: 48px; padding-bottom: 92px; }
+.zoe-hero { position: relative; min-width: 0; min-height: 690px; }
+.zoe-brand { display: inline-flex; align-items: center; gap: 28px; position: relative; z-index: 2; text-decoration: none; color: inherit; }
+.zoe-brand img { width: 82px; height: 82px; flex: 0 0 auto; filter: drop-shadow(0 10px 30px #4975f02b); }
+.zoe-wordmark { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.zoe-wordmark strong { font-size: 45px; font-weight: 600; letter-spacing: .22em; line-height: 1; padding-left: .22em; }
+.zoe-wordmark small { font-size: 12px; letter-spacing: .48em; padding-left: .48em; color: #d3d9eb; }
+.zoe-hero-copy { position: relative; z-index: 2; margin-top: 42px; }
+.zoe-headline { margin: 0; font-size: clamp(46px, 4.7vw, 78px); line-height: 1.04; font-weight: 650; letter-spacing: -.045em; }
+.zoe-headline span { display: block; }
+.zoe-headline-accent { padding-bottom: .04em; color: #b8bdff; background: linear-gradient(95deg, #a9cfff, #bba3f6 92%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.zoe-tagline { margin: 17px 0 0; font-size: clamp(18px, 1.62vw, 27px); line-height: 1.45; font-weight: 400; color: var(--zoe-muted); letter-spacing: -.025em; }
+.zoe-orbit { position: absolute; z-index: 0; left: -56px; top: 348px; width: calc(100% + 102px); aspect-ratio: 986 / 520; pointer-events: none; -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 7%, #000 86%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0%, #000 7%, #000 86%, transparent 100%); }
+.zoe-orbit::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #070f20 0%, transparent 6%, transparent 93%, #070f20 100%); opacity: .65; }
+.zoe-orbit img, .zoe-orbit video { position: absolute; width: 100%; height: 100%; object-fit: cover; border: 0; }
+.zoe-orbit video { opacity: 0; transition: opacity .65s ease; }
+.zoe-orbit video.zoe-video-ready { opacity: 1; }
+.zoe-access { position: relative; z-index: 3; align-self: start; margin-top: 14px; border: 1px solid #a6b3db66; border-radius: 40px; padding: 42px 48px 40px; background: linear-gradient(152deg, #b0c9ff14 0%, #0d152bc9 38%, #15223a94 100%); box-shadow: inset 0 1px 0 #ffffff08, 0 25px 90px #02050c2e; backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
+.zoe-access-logo { display: block; width: 74px; height: 74px; margin: 0 auto 20px; }
+.zoe-access h2 { margin: 0; text-align: center; font-size: clamp(30px, 2.7vw, 42px); line-height: 1.2; font-weight: 650; letter-spacing: -.04em; }
+.zoe-access-intro { margin: 10px 0 30px; text-align: center; font-size: 18px; line-height: 1.5; color: #d0d3e3; letter-spacing: -.025em; }
+.zoe-fields { display: flex; flex-direction: column; gap: 20px; }
+.zoe-field label { display: block; margin-bottom: 8px; font-size: 17px; font-weight: 550; line-height: 1.4; }
+.zoe-field input { width: 100%; height: 54px; border: 1px solid #7e8aab99; border-radius: 12px; padding: 0 18px; color: #f6f8ff; background: #0c122459; box-shadow: inset 0 1px 4px #00000014; font-size: 17px; transition: border-color .18s ease, box-shadow .18s ease; }
+.zoe-field input::placeholder { color: #abb3cb; opacity: 1; }
+.zoe-field input:focus { outline: none; border-color: #8baaff; box-shadow: 0 0 0 3px #6885ec28; }
+.zoe-password-wrap { position: relative; }
+.zoe-password-wrap input { padding-right: 56px; }
+.zoe-eye { position: absolute; top: 3px; right: 5px; display: grid; place-items: center; width: 44px; height: 48px; border: 0; border-radius: 9px; background: transparent; color: #c5cbe3; }
+.zoe-eye:hover { color: white; background: #ffffff0a; }
+.zoe-eye svg { width: 22px; height: 22px; }
+.zoe-remember { display: flex; align-items: center; width: fit-content; gap: 11px; margin: 22px 0 24px; font-size: 17px; line-height: 1.4; color: #d3d7e8; cursor: pointer; }
+.zoe-remember input { appearance: none; -webkit-appearance: none; flex: 0 0 25px; width: 25px; height: 25px; margin: 0; border: 1px solid #8190b4aa; border-radius: 7px; background: #101a2d; display: grid; place-items: center; cursor: pointer; }
+.zoe-remember input::after { content: ""; width: 6px; height: 11px; margin-top: -3px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg) scale(0); transition: transform .12s ease; }
+.zoe-remember input:checked { border-color: #728eff; background: #526aef; }
+.zoe-remember input:checked::after { transform: rotate(45deg) scale(1); }
+.zoe-submit { position: relative; display: flex; align-items: center; justify-content: center; gap: 15px; width: 100%; min-height: 60px; border: 1px solid #a0b8ff17; border-radius: 14px; color: white; background: linear-gradient(105deg, #2d80ff 0%, #5258fb 49%, #9033f5 100%); font-size: 21px; font-weight: 650; box-shadow: 0 9px 27px #2863ed35, inset 0 1px 0 #ffffff0f; transition: filter .18s ease, transform .18s ease, box-shadow .18s ease; }
+.zoe-submit:hover:not(:disabled) { filter: brightness(1.09); box-shadow: 0 10px 32px #4d5bf04d; }
+.zoe-submit:active:not(:disabled) { transform: translateY(1px); }
+.zoe-submit:disabled { opacity: .7; }
+.zoe-submit svg { width: 23px; height: 23px; }
+.zoe-message { margin: 14px 0 0; font-size: 14px; line-height: 1.55; color: #ffccda; }
+.zoe-message:empty { display: none; }
+.zoe-help { display: flex; flex-direction: column; align-items: center; gap: 18px; margin-top: 34px; padding-top: 20px; border-top: 1px solid #8b96bc44; }
+.zoe-help a, .zoe-help button { padding: 0; border: 0; background: none; color: #79b3ff; text-decoration: underline; text-underline-offset: 3px; font-size: 17px; line-height: 1.4; }
+.zoe-help a:last-child, .zoe-help button:last-child { color: #d1d6e9; text-decoration: none; }
+.zoe-help a:hover, .zoe-help button:hover { color: white; }
+.zoe-page-footer { position: absolute; z-index: 2; bottom: 33px; left: max(46px, calc((100% - 1508px) / 2)); right: max(46px, calc((100% - 1508px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 24px; font-size: 15px; color: #b9c1d6; }
+.zoe-footer-brand { display: inline-flex; align-items: center; gap: 28px; }
+.zoe-footer-brand strong { color: #eef2ff; font-size: 16px; font-weight: 650; white-space: nowrap; }
+.zoe-footer-brand span { border-left: 1px solid #8695b77a; padding-left: 28px; }
+.zoe-login dialog { width: min(430px, calc(100% - 36px)); padding: 28px; border: 1px solid #849ac260; border-radius: 24px; background: #101b31; color: #f5f7ff; box-shadow: 0 24px 100px #0008; }
+.zoe-login dialog::backdrop { background: #030917b8; backdrop-filter: blur(5px); }
+.zoe-login dialog h2 { margin: 0 0 12px; font-size: 24px; }
+.zoe-login dialog p { line-height: 1.6; color: #d0d8e9; }
+.zoe-login dialog button { margin-top: 12px; min-height: 44px; padding: 0 20px; border: 1px solid #6582c8; border-radius: 10px; color: white; background: #355dc1; }
+@media (min-width: 1500px) { .zoe-layout { min-height: 900px; } }
+@media (max-height: 820px) and (min-width: 981px) {
+  .zoe-layout { padding-top: 32px; padding-bottom: 75px; min-height: 100svh; }
+  .zoe-hero { min-height: 640px; }
+  .zoe-brand img { width: 70px; height: 70px; }
+  .zoe-wordmark strong { font-size: 39px; }
+  .zoe-hero-copy { margin-top: 37px; }
+  .zoe-orbit { top: 305px; }
+  .zoe-access { margin-top: 0; padding: 30px 34px; border-radius: 32px; }
+  .zoe-access-logo { width: 62px; height: 62px; margin-bottom: 15px; }
+  .zoe-access-intro { margin-bottom: 25px; font-size: 16px; }
+  .zoe-fields { gap: 17px; }
+  .zoe-remember { margin: 18px 0 20px; font-size: 15px; }
+  .zoe-submit { min-height: 55px; font-size: 19px; }
+  .zoe-help { margin-top: 26px; gap: 14px; padding-top: 18px; }
+  .zoe-help a, .zoe-help button { font-size: 15px; }
+  .zoe-page-footer { bottom: 24px; font-size: 13px; }
+}
+@media (max-width: 1200px) and (min-width: 981px) {
+  .zoe-layout { width: calc(100% - 72px); grid-template-columns: minmax(0, 1fr) 390px; gap: 28px; }
+  .zoe-brand { gap: 20px; }
+  .zoe-headline { font-size: clamp(42px, 4.5vw, 58px); }
+  .zoe-tagline { max-width: 440px; font-size: 18px; }
+  .zoe-access { padding-inline: 28px; }
+  .zoe-access h2 { font-size: 33px; }
+  .zoe-orbit { width: calc(100% + 110px); }
+}
+@media (max-width: 980px) {
+  .zoe-layout { grid-template-columns: minmax(0, 1fr); gap: 30px; width: min(100% - 48px, 580px); padding-top: 30px; padding-bottom: 110px; }
+  .zoe-hero { min-height: 285px; }
+  .zoe-brand { gap: 18px; }
+  .zoe-brand img { width: 58px; height: 58px; }
+  .zoe-wordmark { gap: 6px; }
+  .zoe-wordmark strong { font-size: 31px; }
+  .zoe-wordmark small { font-size: 9px; }
+  .zoe-hero-copy { margin-top: 27px; }
+  .zoe-headline { max-width: 500px; font-size: clamp(37px, 7.5vw, 55px); line-height: 1.06; }
+  .zoe-tagline { max-width: 390px; font-size: 17px; margin-top: 12px; }
+  .zoe-orbit { left: 21%; top: 86px; width: 105%; opacity: .23; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20%, transparent 95%); mask-image: linear-gradient(to bottom, transparent, #000 20%, transparent 95%); }
+  .zoe-access { width: 100%; margin-top: 0; padding: 30px; border-radius: 30px; background: linear-gradient(145deg, #192745e8, #10192de8 60%); }
+  .zoe-access-logo { width: 58px; height: 58px; margin-bottom: 16px; }
+  .zoe-access h2 { font-size: 34px; }
+  .zoe-access-intro { font-size: 16px; margin-bottom: 26px; }
+  .zoe-page-footer { left: 24px; right: 24px; bottom: 27px; font-size: 12px; }
+  .zoe-footer-brand { gap: 14px; }
+  .zoe-footer-brand strong { font-size: 12px; }
+  .zoe-footer-brand span { padding-left: 14px; }
+}
+@media (max-width: 480px) {
+  .zoe-layout { width: calc(100% - 36px); gap: 17px; padding-top: 25px; }
+  .zoe-hero { min-height: 238px; }
+  .zoe-headline { font-size: clamp(32px, 8.5vw, 40px); }
+  .zoe-tagline { font-size: 15px; max-width: 310px; }
+  .zoe-access { padding: 26px 23px; border-radius: 26px; }
+  .zoe-access h2 { font-size: 31px; }
+  .zoe-access-intro { font-size: 14px; }
+  .zoe-field label, .zoe-remember, .zoe-help a, .zoe-help button { font-size: 15px; }
+  .zoe-help { margin-top: 27px; gap: 16px; }
+  .zoe-submit { min-height: 55px; font-size: 19px; }
+  .zoe-page-footer { flex-direction: column; gap: 12px; bottom: 23px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zoe-login *, .zoe-login *::before, .zoe-login *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .zoe-orbit video { display: none !important; }
+}
+/* Ajustes da integração: o CSS geral do painel não pode vazar para dentro do login. */
+.zoe-login .zoe-field input, .zoe-login .zoe-password-wrap input { min-height: 0; max-width: none; caret-color: #a9c8ff; }
+.zoe-login .zoe-field input:-webkit-autofill { -webkit-text-fill-color: #f6f8ff; -webkit-box-shadow: 0 0 0 40px #101830 inset; transition: background-color 9999s; }
+.zoe-login .zoe-submit .zoe-giro { display: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #ffffff59; border-top-color: #fff; animation: zoe-gira .7s linear infinite; }
+.zoe-login .zoe-submit.carregando .zoe-giro { display: inline-block; }
+.zoe-login .zoe-submit.carregando svg { display: none; }
+@keyframes zoe-gira { to { transform: rotate(360deg); } }
+.zoe-login dialog p { margin: 0 0 6px; }
+.zoe-login dialog code { font-size: 13px; background: #ffffff14; padding: 2px 6px; border-radius: 6px; }
+/* "font: inherit" dos botões tem prioridade sobre o tamanho do botão principal: reforça o tamanho aprovado. */
+.zoe-login .zoe-submit { font-size: 21px; font-weight: 650; }
+@media (max-height: 820px) and (min-width: 981px) { .zoe-login .zoe-submit { font-size: 19px; } }
+@media (max-width: 480px) { .zoe-login .zoe-submit { font-size: 19px; } }
