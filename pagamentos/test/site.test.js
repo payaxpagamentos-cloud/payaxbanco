@@ -24,9 +24,20 @@ test('site público em payax.com.br', async (t) => {
     const r = await pegar(api.raiz, '/', 'payax.com.br');
     assert.equal(r.status, 200);
     assert.match(r.corpo, /Uma nova perspectiva para/);
-    assert.match(r.corpo, /Área do cliente/);
-    assert.equal((await pegar(api.raiz, '/site/site.js', 'www.payax.com.br')).status, 200);
-    assert.equal((await pegar(api.raiz, '/site/img/globo.jpg', 'payax.com.br')).status, 200);
+    assert.match(r.corpo, /ÁREA DO CLIENTE/);
+    assert.match(r.corpo, /\/site\/config\.js/, 'o login liga no sistema pelo config.js');
+    for (const arq of ['/site/site.js', '/site/config.js', '/site/styles.css', '/site/assets/payax-logo.svg', '/site/assets/globo-poster.jpg',
+      '/site/assets/integracoes.jpg', '/site/assets/globo-loop.mp4']) {
+      assert.equal((await pegar(api.raiz, arq, 'www.payax.com.br')).status, 200, arq);
+    }
+  });
+
+  await t.test('o site não carrega nada de fora (a política de segurança bloquearia)', async () => {
+    const r = await pegar(api.raiz, '/', 'payax.com.br');
+    const css = await pegar(api.raiz, '/site/styles.css', 'payax.com.br');
+    assert.doesNotMatch(r.corpo, /(src|href)="(https?:)?\/\//);
+    assert.doesNotMatch(r.corpo, /<script(?![^>]*\ssrc=)/, 'sem script embutido');
+    assert.doesNotMatch(css.corpo, /url\((["']?)(https?:)?\/\//);
   });
 
   await t.test('no domínio do site, a Área do Cliente e a privacidade funcionam; o Backoffice não', async () => {

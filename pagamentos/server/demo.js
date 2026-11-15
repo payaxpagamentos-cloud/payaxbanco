@@ -104,7 +104,9 @@ async function main() {
         cliente,
         dados: {
           tipo: Math.random() < 0.75 ? 'bolepix' : 'boleto',
-          valor_centavos: valor, emissao, vencimento,
+          // A emissão é sempre hoje e não aceita vencimento passado: emite com vencimento válido e,
+          // só na demonstração, recua as datas abaixo para montar o histórico.
+          valor_centavos: valor, vencimento: vencimento < hoje ? hoje : vencimento,
           seu_numero: `FAT-${String(1000 + i)}`,
           ...(() => { const p = escolher(assinantesDe(CLIENTES.indexOf(c))); return { pagador_nome: p.nome, pagador_documento: p.cpf }; })(),
           pagador_cidade: c.cidade,
@@ -118,6 +120,9 @@ async function main() {
           mensagem: 'Referente ao plano de internet.',
         },
       });
+      db.prepare('UPDATE boletos SET emissao = ?, vencimento = ? WHERE id = ?').run(emissao, vencimento, out.id);
+      db.prepare("UPDATE lancamentos SET data_competencia = ?, data_liberacao = ? WHERE boleto_id = ? AND tipo = 'tarifa_emissao'")
+        .run(emissao, emissao, out.id);
       // Cerca de 70% dos títulos já vencidos foram pagos.
       if (vencimento <= hoje && Math.random() < 0.72) {
         const pago = datas.somarDias(vencimento, aleatorio(-3, 2));
@@ -138,7 +143,7 @@ async function main() {
     db.prepare("UPDATE clientes SET limite_boleto_centavos = 3000000 WHERE id = ?").run(beta.id);
     const fora = await boletosLib.emitir(db, {
       cliente: db.prepare('SELECT * FROM clientes WHERE id = ?').get(beta.id),
-      dados: { tipo: 'bolepix', valor: '14.800,00', vencimento: hoje, emissao: datas.somarDias(hoje, -2), pagador_nome: 'Comercial Horizonte Ltda',
+      dados: { tipo: 'bolepix', valor: '14.800,00', vencimento: hoje, pagador_nome: 'Comercial Horizonte Ltda',
         pagador_documento: '45723174000110', pagador_cidade: 'Santos', pagador_uf: 'SP', pagador_cep: '11700000',
         pagador_endereco: 'Av. Ana Costa', pagador_numero: '1200', juros_mes: '1', multa: '2', mensagem: 'Serviço de link dedicado.' },
     });
