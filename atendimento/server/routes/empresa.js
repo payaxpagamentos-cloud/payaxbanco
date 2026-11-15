@@ -2,6 +2,7 @@
 
 const express = require('express');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const { agora, auditar, transacao } = require('../db');
 const { exigirAdminEmpresa, administraEmpresa, exigirPermissao } = require('../auth');
 const permissoesLib = require('../lib/permissoes');
@@ -13,6 +14,7 @@ const filasLib = require('../lib/filas');
 const envio = require('../lib/envio');
 const empresasLib = require('../lib/empresas');
 const relatorios = require('../lib/relatorios');
+const { aoVivo } = require('../lib/aovivo');
 const midia = require('../lib/midia');
 const wa = require('../lib/whatsapp');
 const { hoje, inicioMes, intervalo } = require('../lib/datas');
@@ -74,6 +76,38 @@ module.exports = function rotasEmpresa(db) {
   }));
 
   r.get('/painel', exigirPermissao('atendimentos.ver', 'relatorios.ver'), (req, res) => res.json(relatorios.painel(db, req.empresa.id)));
+
+  // ---------- Ao vivo (supervisão e TV) ----------
+  r.get('/ao-vivo', exigirPermissao('relatorios.ver'), (req, res) => res.json(aoVivo(db, req.empresa.id)));
+
+  // Links de TV: abrem só o painel ao vivo, sem login. Quem cria é quem administra a empresa.
+  r.get('/telas-tv', exigirPermissao('relatorios.ver'), (req, res) => res.json(db.prepare(`SELECT t.id, t.nome, t.prefixo, t.ativa, t.ultimo_uso,
+      t.criada_em, u.nome AS criada_por FROM telas_tv t LEFT JOIN usuarios u ON u.id = t.criada_por
+    WHERE t.empresa_id = ? AND t.ativa = 1 ORDER BY t.id DESC`).all(req.empresa.id)));
+
+  r.post('/telas-tv', exigirPermissao('configuracoes.editar'), (req, res, next) => {
+    try {
+      const nome = v.texto(req.body?.nome || 'TV da supervisão', 'o nome da tela', 80);
+      v.exigir(db.prepare('SELECT COUNT(*) AS n FROM telas_tv WHERE empresa_id = ? AND ativa = 1').get(req.empresa.id).n < 20,
+        'Limite de 20 telas ativas. Revogue uma que não usa mais.');
+      const chave = `tv_${crypto.randomBytes(24).toString('base64url')}`;
+      const id = Number(db.prepare('INSERT INTO telas_tv (empresa_id, nome, prefixo, chave_hash, criada_por, criada_em) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(req.empresa.id, nome, chave.slice(0, 9), crypto.createHash('sha256').update(chave).digest('hex'), req.usuario.id, agora()).lastInsertRowid);
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'criou link de TV', alvo: nome, ip: req.ip });
+      // O link completo aparece uma única vez.
+      res.status(201).json({ id, nome, chave });
+    } catch (err) { next(err); }
+  });
+
+  r.delete('/telas-tv/:id', exigirPermissao('configuracoes.editar'), (req, res, next) => {
+    try {
+      const t = db.prepare('SELECT * FROM telas_tv WHERE id = ? AND empresa_id = ? AND ativa = 1').get(Number(req.params.id), req.empresa.id);
+      if (!t) throw naoEncontrado('Tela');
+      db.prepare('UPDATE telas_tv SET ativa = 0 WHERE id = ?').run(t.id);
+      auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'revogou link de TV', alvo: t.nome, ip: req.ip });
+      res.json({ ok: true });
+    } catch (err) { next(err); }
+  });
 
   // ---------- Caixa de entrada ----------
   r.get('/conversas', exigirPermissao('atendimentos.ver'), (req, res) => res.json(conversasLib.listar(db, req.empresa.id, {

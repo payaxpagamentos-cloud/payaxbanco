@@ -24,6 +24,8 @@ function criarApi(db) {
 
   api.use('/auth', require('./routes/auth')(db, autenticado));
   api.use('/integracao', require('./routes/integracao')(db));
+  // A TV da supervisão: só o painel ao vivo, com o link da tela (sem sessão).
+  api.use('/tv', require('./routes/tv')(db));
   // A central telefônica (Asterisk): chamadas, ramais, URA e campanhas, com a chave de escopo "central".
   api.use('/central', require('./telefonia/rotas-central')(db));
   api.use('/master/telefonia', autenticado, require('./telefonia/rotas-master')(db));

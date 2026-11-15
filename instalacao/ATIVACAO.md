@@ -141,6 +141,28 @@ journalctl -u zoe -n 80 --no-pager
 
 Se o IXC estiver na rede interna (10.x, 192.168.x), acrescente `ATEND_REDE_INTERNA=1` no `.env` e rode `sudo systemctl restart zoe`.
 
+### 7.1 Painel ao vivo na TV da supervisão
+
+O menu **Ao vivo** mostra o atendimento acontecendo agora e se atualiza sozinho a cada 5 segundos:
+
+- **Filas:** quem espera, a maior espera e quem está livre em cada fila.
+- **Esperando atendimento:** a lista de quem espera, com o tempo correndo. Fica amarelo na metade da meta de 5 minutos e vermelho ao passar dela.
+- **Equipe:** cada pessoa aparece como livre, atendendo, lotada, em ligação, em pausa ou ausente.
+- **Telefone:** as ligações em curso e os números do dia.
+- **Hoje:** quanto a ZOE resolveu, a espera média, as conversas abandonadas e o movimento por hora.
+- **Alertas:** sobem no topo quando há fila sem ninguém livre ou espera acima da meta.
+
+Para deixar o painel numa TV, sem login:
+
+1. Em **Ao vivo**, clique em **Links de TV**, depois em **Novo link de TV**, e copie o link. Ele aparece uma vez só.
+2. Na TV, ou no computador ligado nela, abra o link no navegador e aperte F11 (ou dê dois cliques na tela).
+3. O link abre só esse painel: não abre conversas nem mostra o telefone completo do cliente.
+4. Para desligar uma TV, use **Revogar** na mesma lista. A tela para na hora.
+
+Enquanto o endereço for pelo IP com o certificado próprio, o navegador da TV mostra o aviso de conexão não privada uma vez. Clique em *Avançado* e depois em *Continuar*.
+
+No computador do supervisor, o botão **Tela cheia** deixa o painel em letras grandes, como na TV.
+
 ---
 
 ## 8. Telefonia com Asterisk (na mesma máquina da ZOE)

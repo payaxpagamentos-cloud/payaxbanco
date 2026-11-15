@@ -314,6 +314,8 @@ const P = {
   busca: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3',
   raio: 'M13 2 4 14h7l-1 8 9-12h-7z',
   teste: 'M10 2h4v6l5 10a2 2 0 0 1-1.8 3H6.8A2 2 0 0 1 5 18l5-10zM9 14h6',
+  tv: 'M3 5h18v12H3zM8 21h8M12 17v4',
+  'tela-cheia': 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
 };
 export function icone(nome) {
   return el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },

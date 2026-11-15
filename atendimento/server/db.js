@@ -620,6 +620,23 @@ CREATE TABLE IF NOT EXISTS chaves_api (
 );
 CREATE INDEX IF NOT EXISTS idx_chaves_empresa ON chaves_api(empresa_id);
 
+-- Telas de TV (painel ao vivo da supervisão): um link que abre só o painel, sem login, para a TV
+-- da sala ficar ligada o dia todo. Fica separado das chaves de API de propósito: este link não
+-- pode servir para mais nada. O banco guarda o hash; o link aparece uma vez só.
+CREATE TABLE IF NOT EXISTS telas_tv (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  prefixo TEXT NOT NULL,
+  chave_hash TEXT NOT NULL UNIQUE,
+  ativa INTEGER NOT NULL DEFAULT 1,
+  criada_por INTEGER REFERENCES usuarios(id),
+  ultimo_uso TEXT,
+  ultimo_ip TEXT,
+  criada_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_telas_tv_empresa ON telas_tv(empresa_id);
+
 -- Eventos do webhook já processados (a Meta reenvia): evita responder duas vezes à mesma mensagem.
 CREATE TABLE IF NOT EXISTS webhook_vistos (
   wa_id TEXT PRIMARY KEY,

@@ -34,6 +34,8 @@ const MENU_MASTER = [
 const MENU_EMPRESA = [
   ['caixa', 'Atendimentos', 'caixa', 'atendimentos.ver'],
   ['dashboard', 'Dashboard', 'dashboard', 'atendimentos.ver'],
+  // Painel da supervisão: o atendimento acontecendo agora, para acompanhar (e para a TV da sala).
+  ['aovivo', 'Ao vivo', 'tv', 'relatorios.ver'],
   ['ia', 'ZOE', 'ia', 'zoe.ver'],
   ['ouvidoria', 'Ouvidoria', 'alerta', 'ouvidoria.ver'],
   ['contatos', 'Contatos', 'contatos', 'cliente.ver'],
@@ -62,6 +64,7 @@ const SUBTITULOS_MASTER = {
 const SUBTITULOS = {
   caixa: 'A ZOE resolve o que dá; aqui fica o que precisa de gente',
   dashboard: 'Como está o atendimento agora e no mês',
+  aovivo: 'Filas, equipe e telefone em tempo real',
   ia: 'O que ela sabe, o que ela faz e quando ela chama a equipe',
   ouvidoria: 'Reclamação, cancelamento, Procon e Anatel — com protocolo, prazo e desfecho',
   contatos: 'Quem já falou com a sua empresa pelo WhatsApp',

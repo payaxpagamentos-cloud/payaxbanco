@@ -12,6 +12,7 @@ import {
   cartaoDesfechos, cartaoTempos, cartaoCustoIa, telaRelatorios,
 } from './comum.js';
 import {telaCaixa} from './caixa.js';
+import { telaAoVivo } from './aovivo.js';
 import {telaIa} from './ia.js';
 import {telaOuvidoria} from './ouvidoria.js';
 import {telaCustos} from './custos.js';
@@ -511,5 +512,6 @@ const relatorios = (ctx) => telaRelatorios(ctx, `/empresas/${ctx.empresaId}/rela
 
 export const TELAS_EMPRESA = {
   telefonia: telaTelefonia,
+  aovivo: telaAoVivo,
   dashboard, caixa: telaCaixa, ia: telaIa, ouvidoria: telaOuvidoria, custos: telaCustos, filas, equipe, contatos, chamados, relatorios, configuracoes, integracoes,
 };

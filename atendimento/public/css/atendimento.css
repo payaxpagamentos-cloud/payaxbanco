@@ -1264,6 +1264,7 @@ code{ font-size: 12px; background: var(--surface-2); border: 1px solid var(--bor
 .modal.medio{ width: min(680px, 100%); }
 .rodape-modal{ display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
 .rodape-modal .btn{ min-width: 108px; }
+.acoes-pagina .btn{ white-space: nowrap; }
 .modal:focus{ outline: none; }
 .cartao .form fieldset, .modal .form fieldset{ border: 0; border-top: 1px solid var(--border); border-radius: 0; padding: 16px 0 0; }
 .cartao .form fieldset:first-of-type, .modal .form fieldset:first-of-type{ border-top: 0; padding-top: 0; }
@@ -1436,3 +1437,218 @@ label.marcar + .ajuda, label.marcar + p.pequeno{ margin-left: 28px; }
 .bolha.sistema .pe-bolha{ margin-top: 2px; }
 /* Celular com a conversa aberta: o botão do telefone fica acima da caixa de resposta. */
 @media (max-width: 860px){ body:has(.casca.cheia) .telefone{ bottom: 168px; } }
+
+/* =====================================================================
+   AO VIVO — painel da supervisão e da TV da sala.
+   Tamanhos em em: na TV (e em tela cheia) a letra de base cresce com a largura da tela e o resto acompanha.
+   ===================================================================== */
+.aovivo{
+  --av-zoe: #7C3AED; --av-zoe-bg: rgba(124, 58, 237, .1);
+  --av-ok: var(--ok); --av-atencao: var(--aviso); --av-critico: var(--erro);
+  --av-gap: 1.15em;
+  font-size: 14px; display: flex; flex-direction: column; gap: var(--av-gap); min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-tema="escuro"] .aovivo{ --av-zoe: #A78BFA; --av-zoe-bg: rgba(167, 139, 250, .14); }
+.aovivo.tv, .aovivo:fullscreen{
+  font-size: clamp(12px, .86vw, 30px); height: 100vh; padding: 1.4em 1.6em; background: var(--bg); overflow: hidden;
+}
+.aovivo.tv .av-conteudo{ flex: 1; min-height: 0; }
+.aovivo svg{ width: 1.15em; height: 1.15em; flex: none; }
+.aovivo h2{ font-size: 1em; margin: 0; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); font-weight: 700; }
+
+/* Topo: marca + empresa à esquerda, "ao vivo" e relógio à direita */
+.av-topo{ display: flex; align-items: center; justify-content: space-between; gap: 1em; flex-wrap: wrap; }
+.av-ident{ display: flex; align-items: center; gap: .9em; min-width: 0; }
+.av-ident .marca .simbolo, .av-ident .marca .simbolo svg{ width: 2.1em; height: 2.1em; }
+.av-ident .marca .texto strong{ font-size: 1.5em; }
+.av-empresa{ font-size: 1.35em; font-weight: 700; padding-left: .9em; border-left: 1px solid var(--border-forte); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aovivo:not(.tv) .av-ident .marca{ display: none; }
+.aovivo:not(.tv) .av-empresa{ padding-left: 0; border-left: 0; font-size: 1.15em; }
+.av-hora-certa{ display: flex; align-items: center; gap: 1.2em; }
+.av-quando{ display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.av-relogio{ font-size: 1.9em; font-weight: 700; letter-spacing: -.02em; }
+.av-data{ color: var(--text-2); font-size: .95em; }
+.av-vivo{ display: inline-flex; align-items: center; gap: .5em; padding: .35em .85em; border-radius: 99px; font-weight: 700; font-size: .9em;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--av-critico); background: var(--erro-bg); }
+.av-vivo i{ width: .6em; height: .6em; border-radius: 50%; background: currentColor; animation: av-pulso 1.6s ease-in-out infinite; }
+.av-vivo.erro{ color: var(--av-atencao); background: var(--aviso-bg); text-transform: none; letter-spacing: 0; }
+.av-vivo.erro i{ animation: none; }
+@keyframes av-pulso{ 0%, 100%{ opacity: 1; transform: scale(1); } 50%{ opacity: .35; transform: scale(.75); } }
+@media (prefers-reduced-motion: reduce){ .aovivo *{ animation: none !important; } }
+
+.av-conteudo{ display: flex; flex-direction: column; gap: var(--av-gap); min-width: 0; }
+.av-carregando{ padding: 4em 1em; text-align: center; color: var(--text-2); font-size: 1.1em; }
+.av-carregando.erro{ color: var(--av-critico); }
+
+/* Números de agora */
+.av-kpis{ display: grid; gap: var(--av-gap); grid-template-columns: repeat(var(--n, 6), minmax(0, 1fr)); }
+.av-kpi{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.05em 1.2em 1em; box-shadow: var(--shadow);
+  position: relative; overflow: hidden; min-width: 0; }
+.av-kpi::before{ content: ""; position: absolute; inset: 0 auto 0 0; width: .28em; background: var(--border-forte); }
+.av-kpi-rotulo{ display: flex; align-items: center; gap: .45em; color: var(--text-2); font-weight: 600; font-size: .95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-kpi-valor{ font-size: 3em; font-weight: 800; line-height: 1.1; letter-spacing: -.03em; margin: .12em 0 .05em; }
+.av-kpi-valor small{ font-size: .5em; color: var(--text-3); font-weight: 700; letter-spacing: 0; }
+.av-kpi-nota{ color: var(--text-2); font-size: .9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-kpi.ativo::before{ background: var(--azul); }
+.av-kpi.zoe::before{ background: var(--av-zoe); } .av-kpi.zoe .av-kpi-valor{ color: var(--av-zoe); }
+.av-kpi.bom::before{ background: var(--av-ok); } .av-kpi.bom .av-kpi-valor{ color: var(--av-ok); }
+.av-kpi.atencao::before{ background: var(--av-atencao); } .av-kpi.atencao .av-kpi-valor{ color: var(--av-atencao); }
+.av-kpi.critico{ border-color: color-mix(in srgb, var(--av-critico) 45%, var(--border)); background: color-mix(in srgb, var(--av-critico) 7%, var(--surface)); }
+.av-kpi.critico::before{ background: var(--av-critico); } .av-kpi.critico .av-kpi-valor{ color: var(--av-critico); }
+
+/* Alertas: uma faixa só, do mais grave para o menos */
+.av-alertas{ display: flex; gap: .6em; flex-wrap: wrap; }
+.av-chip{ display: inline-flex; align-items: center; gap: .5em; padding: .5em .95em; border-radius: 99px; font-weight: 600; border: 1px solid transparent; }
+.av-chip.ok{ color: var(--av-ok); background: var(--ok-bg); }
+.av-chip.atencao{ color: var(--av-atencao); background: var(--aviso-bg); }
+.av-chip.critico{ color: #fff; background: var(--av-critico); animation: av-alerta 2s ease-in-out infinite; }
+@keyframes av-alerta{ 0%, 100%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--av-critico) 50%, transparent); } 50%{ box-shadow: 0 0 0 .4em transparent; } }
+
+/* Grade principal. Na TV: filas | quem espera | equipe e telefone, lado a lado e na altura que sobra.
+   No painel: duas colunas (filas e espera em cima, equipe e telefone embaixo) e a página rola. */
+.av-grade{ display: grid; gap: var(--av-gap); grid-template-columns: repeat(2, minmax(0, 1fr)); min-height: 0; align-items: stretch; }
+.av-grade > .av-coluna{ grid-column: 1 / -1; }
+.aovivo.tv .av-grade, .aovivo:fullscreen .av-grade{ flex: 1; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1.05fr); align-items: stretch; }
+.aovivo.tv .av-grade > .av-coluna, .aovivo:fullscreen .av-grade > .av-coluna{ grid-column: auto; }
+.av-coluna{ display: flex; flex-direction: column; gap: var(--av-gap); min-width: 0; min-height: 0; }
+.av-bloco{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.05em 1.2em;
+  display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.aovivo.tv .av-coluna > .av-bloco:last-child, .aovivo:fullscreen .av-coluna > .av-bloco:last-child{ flex: 1; }
+.aovivo:not(.tv):not(:fullscreen) .av-coluna{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.aovivo:not(.tv):not(:fullscreen) .av-coluna > .av-bloco:only-child{ grid-column: 1 / -1; }
+.av-bloco > header{ display: flex; align-items: center; justify-content: space-between; gap: .8em; margin-bottom: .8em; flex-wrap: wrap; }
+.av-extra{ color: var(--text-3); font-size: .9em; }
+.av-corpo-bloco{ min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: .8em; }
+.aovivo:not(.tv):not(:fullscreen) .av-corpo-bloco{ overflow: visible; }
+.av-corpo-bloco.transborda{ -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 3em), transparent); }
+.av-vazio{ color: var(--text-3); margin: .2em 0; }
+.av-vazio.grande{ display: flex; align-items: center; justify-content: center; gap: .6em; padding: 1.6em .5em; color: var(--av-ok); font-weight: 600; font-size: 1.05em; }
+.av-vazio.grande svg{ width: 1.5em; height: 1.5em; }
+
+/* Cronômetros: ficam amarelos na metade da meta e vermelhos ao passar dela */
+.av-crono{ font-weight: 700; }
+.av-crono.atencao{ color: var(--av-atencao); }
+.av-crono.critico{ color: var(--av-critico); }
+.av-crono.grande{ font-size: 1.35em; min-width: 3.6em; text-align: right; }
+
+/* Filas */
+.av-tabela{ display: flex; flex-direction: column; }
+.av-linha{ display: grid; grid-template-columns: minmax(0, 2.2fr) repeat(4, minmax(0, 1fr)); align-items: center; gap: .6em; padding: .62em .4em; border-top: 1px solid var(--border); }
+.av-linha.cab{ border-top: 0; padding-top: 0; color: var(--text-3); font-size: .85em; font-weight: 600; }
+.av-linha.cab span:not(:first-child), .av-num{ text-align: right; }
+.av-num{ font-size: 1.2em; font-weight: 700; }
+.av-num.critico{ color: var(--av-critico); }
+.av-linha.critico{ background: color-mix(in srgb, var(--av-critico) 8%, transparent); border-radius: var(--radius-sm); }
+.av-linha.atencao{ background: color-mix(in srgb, var(--av-atencao) 8%, transparent); border-radius: var(--radius-sm); }
+.av-nome{ display: flex; align-items: center; gap: .55em; font-weight: 600; font-size: 1.05em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.av-nome small{ color: var(--text-3); font-weight: 600; font-size: .8em; }
+.av-ponto{ width: .6em; height: .6em; border-radius: 50%; flex: none; }
+.av-ponto.aberta{ background: var(--av-ok); } .av-ponto.fechada{ background: var(--text-3); }
+
+/* Quem está esperando */
+.av-espera{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.av-espera li{ display: flex; align-items: center; gap: .8em; padding: .55em .3em; border-top: 1px solid var(--border); min-width: 0; }
+.av-espera li:first-child{ border-top: 0; }
+.av-espera li.alta{ background: color-mix(in srgb, var(--av-critico) 6%, transparent); border-radius: var(--radius-sm); }
+.av-pos{ width: 1.8em; height: 1.8em; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--text-2); font-weight: 700; font-size: .85em; flex: none; }
+.av-canal{ width: 2.1em; height: 2.1em; border-radius: 50%; display: grid; place-items: center; flex: none; color: var(--azul); background: var(--destaque-bg); }
+.av-canal.c-whatsapp{ color: var(--av-ok); background: var(--ok-bg); }
+.av-quem{ display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.3; }
+.av-quem strong{ font-size: 1.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-quem small{ color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-tag{ font-size: .78em; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--av-critico); background: var(--erro-bg); padding: .2em .6em; border-radius: 99px; flex: none; }
+
+/* Equipe */
+.av-resumo{ display: flex; gap: .9em; flex-wrap: wrap; }
+.av-mini{ display: inline-flex; align-items: center; gap: .4em; color: var(--text-2); font-size: .95em; }
+.av-mini i, .av-dados small i{ width: .55em; height: .55em; border-radius: 50%; background: var(--av-cor, var(--text-3)); flex: none; }
+.av-equipe{ display: grid; gap: .6em; grid-template-columns: repeat(auto-fill, minmax(15em, 1fr)); align-content: start; }
+.av-pessoa{ --av-cor: var(--text-3); display: flex; align-items: center; gap: .7em; padding: .6em .7em; border-radius: var(--radius-sm); background: var(--surface-2);
+  border: 1px solid var(--border); min-width: 0; }
+.av-pessoa.mais{ justify-content: center; color: var(--text-2); font-weight: 600; }
+.av-avatar{ width: 2.4em; height: 2.4em; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: .9em; flex: none;
+  background: var(--surface); color: var(--text); box-shadow: 0 0 0 .18em var(--av-cor); }
+.av-dados{ display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.3; }
+.av-dados strong{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-dados small{ display: flex; align-items: center; gap: .4em; color: var(--text-2); white-space: nowrap; overflow: hidden; }
+.av-sep{ color: var(--text-3); }
+.av-feitas{ font-weight: 800; font-size: 1.15em; color: var(--text-2); min-width: 1.6em; text-align: right; }
+.aovivo .livre{ --av-cor: var(--av-ok); }
+.aovivo .atendendo{ --av-cor: var(--azul); }
+.aovivo .lotado{ --av-cor: var(--av-atencao); }
+.aovivo .ligacao{ --av-cor: var(--av-zoe); }
+.aovivo .pausa{ --av-cor: var(--text-3); }
+.aovivo .ausente{ --av-cor: var(--border-forte); }
+.av-pessoa.ausente{ opacity: .55; }
+.av-pessoa.ligacao .av-crono{ color: var(--av-zoe); }
+
+/* Telefone */
+.av-tel-numeros{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6em; }
+.av-tel-numeros div{ background: var(--surface-2); border-radius: var(--radius-sm); padding: .55em .7em; display: flex; flex-direction: column; min-width: 0; }
+.av-tel-numeros strong{ font-size: 1.45em; line-height: 1.15; }
+.av-tel-numeros small{ color: var(--text-2); }
+.av-tel-numeros .bom strong{ color: var(--av-ok); } .av-tel-numeros .critico strong{ color: var(--av-critico); }
+.av-chamadas{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.av-chamadas li{ display: flex; align-items: center; gap: .8em; padding: .5em .3em; border-top: 1px solid var(--border); }
+.av-chamadas li:first-child{ border-top: 0; }
+.av-chamadas li.tocando .av-dir{ animation: av-pulso 1s ease-in-out infinite; }
+.av-dir{ width: 1.9em; height: 1.9em; border-radius: 50%; display: grid; place-items: center; font-weight: 800; flex: none; background: var(--destaque-bg); color: var(--azul); }
+.av-dir.d-entrada{ background: var(--ok-bg); color: var(--av-ok); }
+
+/* Hoje: números do dia e o movimento por hora */
+.av-bloco:has(.av-dias) .av-corpo-bloco{ display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1.4em; align-items: stretch; overflow: visible; }
+.av-dias{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6em; }
+.av-dia{ background: var(--surface-2); border-radius: var(--radius-sm); padding: .65em .8em; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.av-dia strong{ font-size: 1.6em; line-height: 1.15; letter-spacing: -.02em; }
+.av-dia small{ color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-dia.zoe strong{ color: var(--av-zoe); } .av-dia.atencao strong{ color: var(--av-atencao); } .av-dia.critico strong{ color: var(--av-critico); }
+.av-horas{ display: flex; flex-direction: column; gap: .5em; min-width: 0; }
+.av-barras{ flex: 1; display: flex; align-items: stretch; gap: .35em; min-height: 7.5em; }
+.av-hora{ flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: .3em; min-width: 0; }
+.av-pilha{ width: 100%; max-width: 2.6em; display: flex; flex-direction: column; justify-content: flex-end; position: relative; min-height: 2px; border-radius: .3em .3em 0 0; overflow: visible; }
+.av-pilha i{ display: block; min-height: 0; }
+.av-pilha i.zoe{ background: var(--av-zoe); border-radius: 0; }
+.av-pilha i.equipe{ background: var(--azul); border-radius: .3em .3em 0 0; }
+.av-pilha i.zoe:first-of-type{ border-radius: .3em .3em 0 0; }
+.av-valor{ position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); font-size: .78em; font-weight: 700; color: var(--text-2); padding-bottom: .15em; }
+.av-h{ font-size: .78em; color: var(--text-3); }
+.av-hora.agora .av-h{ color: var(--text); font-weight: 700; }
+.av-hora:not(.agora) .av-pilha{ opacity: .8; }
+.av-legenda{ display: flex; gap: 1.2em; color: var(--text-2); font-size: .85em; }
+.av-legenda span{ display: inline-flex; align-items: center; gap: .4em; }
+.av-legenda i{ width: .8em; height: .8em; border-radius: .2em; }
+.av-legenda i.zoe{ background: var(--av-zoe); } .av-legenda i.equipe{ background: var(--azul); }
+
+/* Links de TV (modal) */
+.av-links{ display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.av-link{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; }
+.av-link + .av-link{ border-top: 1px solid var(--border); }
+.av-link > span{ display: flex; flex-direction: column; min-width: 0; }
+
+/* A página da TV */
+body.pagina-tv{ overflow: hidden; }
+body.pagina-tv.sem-cursor, body.pagina-tv.sem-cursor *{ cursor: none; }
+
+@media (max-width: 1500px){
+  .aovivo:not(.tv):not(:fullscreen) .av-kpis{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1100px){
+  .aovivo .av-grade, .aovivo .av-coluna, .aovivo .av-bloco:has(.av-dias) .av-corpo-bloco{ grid-template-columns: minmax(0, 1fr) !important; }
+  .aovivo .av-grade > *{ grid-column: auto !important; }
+  .aovivo .av-kpis{ grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  /* Tela pequena (tablet, celular): o painel rola em vez de espremer tudo numa altura só. */
+  .aovivo.tv, .aovivo:fullscreen{ height: auto; min-height: 100vh; overflow: visible; font-size: 14px; }
+  .aovivo .av-corpo-bloco{ overflow: visible !important; -webkit-mask-image: none !important; mask-image: none !important; }
+  body.pagina-tv{ overflow: auto; }
+}
+@media (max-width: 720px){
+  .aovivo .av-kpis{ grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .av-kpi-valor{ font-size: 2.3em; }
+  .av-dias, .av-tel-numeros{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .av-linha{ grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)); font-size: .9em; gap: .4em; }
+  .av-linha.cab{ font-size: .75em; }
+  .av-relogio{ font-size: 1.5em; }
+  .av-tag{ display: none; }
+  .aovivo.tv, .aovivo:fullscreen{ padding: 1em; }
+}
