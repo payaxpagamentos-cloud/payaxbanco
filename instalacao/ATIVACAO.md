@@ -228,6 +228,7 @@ ZOE no modo **teclado**, em *ZOE › Como ela atende › Ligações*.
 | Ver a ponte do Asterisk | `journalctl -u zoe-central -f` e `sudo zoe-central --teste` |
 | Reiniciar depois de mexer no `.env` | `sudo systemctl restart zoe` |
 | Fazer a cópia do banco agora | `sudo zoe-backup` |
+| Definir a senha de alguém (ex.: master esqueceu) | `sudo zoe-senha` (master) ou `sudo zoe-senha pessoa@empresa.com` |
 | Atualizar para um pacote novo | extrair o pacote novo e rodar o mesmo `instalar.sh`. Dados, `.env` e senha ficam. |
 
 **Guarde uma cópia do `/zoe/atendimento/.env` fora do servidor.** Sem ele, os tokens guardados não podem ser lidos.

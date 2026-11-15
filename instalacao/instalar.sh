@@ -418,6 +418,12 @@ fi
 passo "Cópia diária do banco"
 install -m 755 "$ORIGEM/instalacao/backup.sh" /usr/local/sbin/zoe-backup
 install -m 755 "$ORIGEM/instalacao/verificar.sh" /usr/local/sbin/zoe-verificar
+# Senha de um usuário direto no servidor (quando ninguém consegue entrar): sudo zoe-senha [e-mail]
+cat > /usr/local/sbin/zoe-senha <<SENHA
+#!/bin/sh
+exec runuser -u $USUARIO -- $NODE --disable-warning=ExperimentalWarning --env-file=$CODIGO/.env $CODIGO/scripts/senha.js "\$@"
+SENHA
+chmod 755 /usr/local/sbin/zoe-senha
 echo "17 3 * * * root /usr/local/sbin/zoe-backup >/dev/null 2>&1" > /etc/cron.d/zoe-backup
 echo "Todo dia às 03:17 em $COPIAS (14 dias guardados)."
 
