@@ -101,7 +101,7 @@ function configurarNovo(db, imei) {
     if (db.prepare("SELECT 1 FROM ocorrencias WHERE veiculo_id = ? AND status <> 'encerrada'").get(veiculo.id)) return 0;
     const com = require('./comandos');
     const ajustes = [...AJUSTES.sono('online'), ...AJUSTES.perfil(r.perfil)];
-    for (const c of ajustes) com.criar(db, veiculo, { tipo: 'personalizado', texto: c.texto, rotulo: `Configuração automática: ${c.rotulo}` }, null);
+    for (const c of ajustes) com.criar(db, veiculo, { tipo: 'personalizado', texto: c.texto, rotulo: `Configuração automática: ${c.rotulo}` }, null, { doSistema: true });
     db.prepare("UPDATE rastreadores SET configurado_em = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").run(r.id);
     return ajustes.length;
   } catch (err) {

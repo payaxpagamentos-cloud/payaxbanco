@@ -288,7 +288,7 @@ module.exports = (db, extras = {}) => {
       registrar(db, req, 'comando_criado', { placa: x.placa, tipo: 'desbloquear' });
       return res.status(201).json({ tipo: 'desbloquear', status: 'pendente', conectado: conectadoAgora(x) });
     }
-    const id = com.criar(db, x, req.body, req.usuario.id);
+    const id = com.criar(db, x, req.body, req.usuario.id, { plataforma: PLATAFORMA_PERFIS.includes(req.usuario.perfil) });
     registrar(db, req, 'comando_criado', { placa: x.placa, tipo: req.body.tipo });
     const c = db.prepare('SELECT id, tipo, status FROM comandos WHERE id = ?').get(id);
     res.status(201).json({ ...c, conectado: conectadoAgora(x) });
@@ -342,8 +342,10 @@ module.exports = (db, extras = {}) => {
     const onde = ['c.empresa_id = ?'];
     const p = [eid(req)];
     if (req.query.veiculo_id) { onde.push('c.veiculo_id = ?'); p.push(Number(req.query.veiculo_id)); }
-    res.json(db.prepare(`SELECT c.id, c.tipo, c.texto, c.status, c.criado_em, c.enviado_em, c.respondido_em, c.resposta, v.placa, u.nome AS usuario
-      FROM comandos c JOIN veiculos v ON v.id = c.veiculo_id LEFT JOIN usuarios u ON u.id = c.criado_por WHERE ${onde.join(' AND ')} ORDER BY c.id DESC LIMIT 200`).all(...p));
+    // Cada comando vem com a resposta em português claro (explicacao); a crua continua em `resposta`.
+    res.json(db.prepare(`SELECT c.id, c.tipo, c.texto, c.rotulo, c.status, c.criado_em, c.enviado_em, c.respondido_em, c.resposta, v.placa, u.nome AS usuario
+      FROM comandos c JOIN veiculos v ON v.id = c.veiculo_id LEFT JOIN usuarios u ON u.id = c.criado_por WHERE ${onde.join(' AND ')} ORDER BY c.id DESC LIMIT 200`).all(...p)
+      .map((c) => ({ ...c, explicacao: com.explicarResposta(c) })));
   });
 
   r.post('/comandos/:id/cancelar', gestor, (req, res) => {
@@ -848,7 +850,7 @@ module.exports = (db, extras = {}) => {
         ultima_comunicacao: rr.ultima_comunicacao, conectado: Boolean(extras.gt06?.conectado?.(rr.imei)) },
       perfis: equip.PERFIS,
       comandos: db.prepare(`SELECT id, tipo, texto, rotulo, status, criado_em, respondido_em, resposta FROM comandos WHERE veiculo_id = ? AND (tipo = 'personalizado' OR tipo IN ('status','parametros','reiniciar','bloquear','desbloquear'))
-        ORDER BY id DESC LIMIT 30`).all(x.id),
+        ORDER BY id DESC LIMIT 30`).all(x.id).map((c) => ({ ...c, explicacao: com.explicarResposta(c) })),
     });
   });
   /** O valor de cada ajuste do J16, conferido antes de virar comando (texto para o aparelho ou coluna no banco). */
@@ -881,7 +883,7 @@ module.exports = (db, extras = {}) => {
       }
       if (Object.hasOwn(equip.CONSULTAS, ajuste)) {
         const c = equip.CONSULTAS[ajuste];
-        ids.push(com.criar(db, x, { tipo: 'personalizado', texto: c.texto, rotulo: c.rotulo }, req.usuario.id));
+        ids.push(com.criar(db, x, { tipo: 'personalizado', texto: c.texto, rotulo: c.rotulo }, req.usuario.id, { doSistema: true }));
         return;
       }
       // A empresa consulta e reinicia; os ajustes (intervalos, alarmes, fuso, servidor) são da equipe da plataforma, porque um erro tira o aparelho do ar.

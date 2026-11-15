@@ -98,7 +98,7 @@ function perseguir(db, ocorrenciaId, veiculo, usuarioId) {
   const r = db.prepare('SELECT protocolo FROM rastreadores WHERE id = ?').get(veiculo.rastreador_id);
   if (!r || r.protocolo !== 'gt06') return;
   const [a, b] = require('./equipamento').PERSEGUICAO;
-  com.criar(db, veiculo, { tipo: 'personalizado', texto: `TIMER,${a},${b}#`, rotulo: 'Modo perseguição: posição a cada 10 s' }, usuarioId);
+  com.criar(db, veiculo, { tipo: 'personalizado', texto: `TIMER,${a},${b}#`, rotulo: 'Modo perseguição: posição a cada 10 s' }, usuarioId, { doSistema: true });
   db.prepare('UPDATE ocorrencias SET perseguicao = 1 WHERE id = ?').run(ocorrenciaId);
   evento(db, ocorrenciaId, 'Modo perseguição: o rastreador passa a mandar posição a cada 10 s.', {}, { avisar: false });
 }
@@ -107,7 +107,7 @@ function perseguir(db, ocorrenciaId, veiculo, usuarioId) {
 function voltarPerfil(db, veiculo, usuarioId) {
   const r = db.prepare('SELECT protocolo, perfil FROM rastreadores WHERE id = ?').get(veiculo.rastreador_id);
   if (!r || r.protocolo !== 'gt06') return;
-  for (const c of require('./equipamento').AJUSTES.perfil(r.perfil)) com.criar(db, veiculo, { tipo: 'personalizado', ...c }, usuarioId);
+  for (const c of require('./equipamento').AJUSTES.perfil(r.perfil)) com.criar(db, veiculo, { tipo: 'personalizado', ...c }, usuarioId, { doSistema: true });
 }
 
 /**

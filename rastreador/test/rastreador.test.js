@@ -100,6 +100,19 @@ test('GT06 4G: sinal de vida 0x23, resposta 0x21 e corte adiado', () => {
   assert.ok(!com.respostaAdiada('Cut off the fuel supply: Success! Speed: 0km/h.'));
 });
 
+test('respostas do rastreador: sucesso, falha e explicação em português', () => {
+  const com = require('../server/lib/comandos');
+  for (const t of ['Unknown command', 'Command not supported', 'Wrong password', 'Format error!', '执行失败']) assert.equal(com.respostaSucesso(t), false, t);
+  for (const t of ['RELAY 1 OK', 'OK', 'RESET OK', 'Battery:4.2V;GPRS:Online']) assert.equal(com.respostaSucesso(t), true, t);
+  const x = (tipo, status, resposta) => com.explicarResposta({ tipo, status, resposta });
+  assert.equal(x('bloquear', 'confirmado', 'RELAY 1 OK'), 'Bloqueio confirmado pelo rastreador.');
+  assert.match(x('bloquear', 'enviado', 'Command will be executed after GPS fixed'), /corta assim que tiver GPS/);
+  assert.match(x('status', 'confirmado', 'Battery:4.22V;GPRS:Online;GSM Signal Level:8;ACC:OFF;GPS:OFF;'), /^Bateria 4,2 V · internet ligada · sinal 8 de 31 \(fraco\) · ignição desligada · GPS sem posição\.$/);
+  assert.match(x('parametros', 'confirmado', 'TIMER:30,300;SERVER:0,1.2.3.4,5023,0;APN:zap.vivo.com.br'), /servidor 1\.2\.3\.4:5023 · APN zap\.vivo\.com\.br/);
+  assert.match(x('personalizado', 'falhou', 'Format error!'), /recusou/);
+  assert.equal(x('bloquear', 'pendente', null), 'Esperando o rastreador conectar para enviar.');
+});
+
 test('API Brasil (Débitos V4): tradução da resposta', () => {
   const { traduzirApiBrasil } = require('../server/lib/multasConsulta');
   const r = traduzirApiBrasil({ error: false, homolog: true, valor_consulta: '8,00', data: {

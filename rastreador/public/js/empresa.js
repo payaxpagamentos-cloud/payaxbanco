@@ -766,9 +766,10 @@ async function telaComandos(ctx) {
   async function carregar() {
     const l = await api.get(`${base(ctx)}/comandos`);
     limpar(lista, tabela(['Criado', 'Veículo', 'Comando', 'Situação', 'Resposta', 'Por', '^Ações'], l.map((c) => el('tr', {},
-      td(dataHora(c.criado_em)), td(placa(c.placa)), td([TIPOS_COMANDO[c.tipo], el('div', { class: 'pequeno mono mudo' }, c.texto)]),
+      td(dataHora(c.criado_em)), td(placa(c.placa)), td([c.rotulo ?? TIPOS_COMANDO[c.tipo], el('div', { class: 'pequeno mono mudo' }, c.texto)]),
       td([etiquetaComando(c.status), c.respondido_em ? el('div', { class: 'pequeno mudo' }, dataHora(c.respondido_em)) : null]),
-      td(c.resposta ?? '—'), td(c.usuario ?? '—'),
+      // A resposta em português claro; a crua do aparelho fica pequena embaixo, para o suporte.
+      td([el('div', {}, c.explicacao ?? c.resposta ?? '—'), c.resposta ? el('div', { class: 'pequeno mono mudo resposta' }, c.resposta) : null]), td(c.usuario ?? '—'),
       el('td', { class: 'acoes' }, c.status === 'pendente' && pode(ctx) ? botao('Cancelar', 'perigo', async () => {
         await api.post(`${base(ctx)}/comandos/${c.id}/cancelar`);
         carregar();

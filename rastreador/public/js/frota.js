@@ -5,7 +5,7 @@
 */
 /** Frota: nota dos motoristas e ranking, custo em reais e os equipamentos (a ficha do J16 com saúde, consultas e ajustes). */
 import { api, qs, baixar } from './api.js';
-import { el, limpar, dinheiro, dataHora, desde, km, kmh, placa, inteiro, toast, acao, modal, perguntar, repetir, etiqueta, icone,
+import { el, limpar, dinheiro, dataHora, desde, km, kmh, placa, inteiro, toast, acao, modal, perguntar, repetir, etiqueta, etiquetaComando, icone,
   hojeLocal, somarDias } from './ui.js';
 import { cartao, indicador, tabela, td, botao, acoesTopo, linhaDado } from './comum.js';
 import { cartaoAbastecimentos } from './diario.js';
@@ -248,8 +248,8 @@ export async function abrirFicha(ctx, veiculoId) {
       !plataforma && gt06 ? el('p', { class: 'aviso pequeno', style: 'margin:0' }, 'Intervalos, alarmes e instalação são ajustados pela equipe da plataforma. Peça ao suporte o que precisar.') : null,
       secao('Últimos comandos', tabela(['Quando', 'Comando', 'Situação', 'Resposta'], f.comandos.map((c) => el('tr', {},
         td(dataHora(c.criado_em)), td([c.rotulo ?? ({ bloquear: 'Bloquear', desbloquear: 'Desbloquear', status: 'Consultar estado', parametros: 'Consultar configuração', reiniciar: 'Reiniciar' }[c.tipo] ?? c.tipo), el('div', { class: 'pequeno mudo mono' }, c.texto ?? '')]),
-        td(etiqueta(c.status, c.status === 'confirmado' ? 'ok' : c.status === 'falhou' || c.status === 'expirado' ? 'erro' : 'aviso')),
-        td(c.resposta ? el('span', { class: 'pequeno mono resposta' }, c.resposta) : '—'))), 'Nenhum comando ainda.')));
+        td(etiquetaComando(c.status)),
+        td([el('div', {}, c.explicacao ?? c.resposta ?? '—'), c.resposta ? el('div', { class: 'pequeno mono mudo resposta' }, c.resposta) : null]))), 'Nenhum comando ainda.')));
   }
   desenhar();
   modal(`Equipamento · ${placa(f.veiculo.placa)}`, (fechar) => [corpo, el('div', { class: 'linha', style: 'justify-content:flex-end;margin-top:12px' },

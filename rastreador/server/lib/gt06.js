@@ -163,7 +163,7 @@ function decodificar(q, { fusoMin = 0 } = {}) {
     }
     case P.RESPOSTA2:
       // Codificação: 1 = ASCII; 2 = UTF-16 big-endian (o Node só lê little-endian: inverte os pares de bytes).
-      return { tipo: 'resposta', comando: c.readUInt32BE(0), texto: (c[4] === 1 ? c.subarray(5).toString('latin1') : Buffer.from(c.subarray(5)).swap16().toString('utf16le')).trim(), ack: false };
+      return { tipo: 'resposta', comando: c.readUInt32BE(0), texto: (c[4] === 1 ? c.subarray(5).toString('latin1') : Buffer.from(c.subarray(5, 5 + Math.floor((c.length - 5) / 2) * 2)).swap16().toString('utf16le')).trim(), ack: false };
     case P.HORA:
       return { tipo: 'hora', ack: false };
     default:
@@ -200,12 +200,14 @@ function iniciarGt06(db, porta, { host, aoMudar = () => {} } = {}) {
     const r = db.prepare('SELECT id FROM rastreadores WHERE imei = ?').get(imei);
     if (!r) return;
     // Corte/desbloqueio enviado numa conexão que caiu sem resposta: vai de novo (o J16 ignora se já estiver no estado).
+    // Só o último pedido de corte/desbloqueio do veículo (os anteriores já foram cancelados quando o novo foi criado).
     if (reenviar) db.prepare(`UPDATE comandos SET status = 'pendente' WHERE rastreador_id = ? AND status = 'enviado' AND resposta IS NULL AND tipo IN ('bloquear','desbloquear')
-      AND veiculo_id NOT IN (SELECT id FROM veiculos WHERE bloqueio_desativado = 1)`).run(r.id);
+      AND veiculo_id NOT IN (SELECT id FROM veiculos WHERE bloqueio_desativado = 1)
+      AND id = (SELECT MAX(c2.id) FROM comandos c2 WHERE c2.veiculo_id = comandos.veiculo_id AND c2.tipo IN ('bloquear','desbloquear'))`).run(r.id);
     for (const c of com.pendentes(db, r.id)) {
+      if (!com.marcarEnviado(db, c.id)) continue; // cancelado no último instante: não sai
       cx.serial = (cx.serial + 1) & 0xffff;
       cx.socket.write(quadroComando(c.id, c.texto, cx.serial));
-      com.marcarEnviado(db, c.id);
     }
   }
 
@@ -257,13 +259,30 @@ function iniciarGt06(db, porta, { host, aoMudar = () => {} } = {}) {
       if (d.tipo === 'resposta') {
         // Alguns aparelhos não devolvem o identificador do comando: aí a resposta vale para o comando enviado mais antigo dele.
         const c = db.prepare('SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id WHERE c.id = ? AND r.imei = ?').get(d.comando, cx.imei)
-          ?? db.prepare(`SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id WHERE r.imei = ? AND c.status = 'enviado' AND c.resposta IS NULL
-            AND c.enviado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes') AND (c.tipo IN ('bloquear','desbloquear')) = ? ORDER BY c.id LIMIT 1`)
-            .get(cx.imei, /fuel|relay|cut ?off|restore|oil|dyd|hfyd/i.test(d.texto) ? 1 : 0);
+          ?? casarResposta(cx.imei, d.texto);
         if (c) com.responder(db, c.id, { sucesso: com.respostaSucesso(d.texto), resposta: d.texto });
       }
     }
   });
+
+  /**
+   * Resposta sem o número do comando (alguns lotes): casa pelo que ela diz. "RELAY 1 / cut off" só vale para o comando que
+   * mandou RELAY,1; "RELAY 0 / restore" só para o RELAY,0; estado (bateria, GPRS, GSM) nunca é tomado por corte. Na dúvida,
+   * não casa (o comando espera a própria resposta ou expira).
+   */
+  function casarResposta(imei, texto) {
+    const t = String(texto ?? '');
+    const base = `SELECT c.id FROM comandos c JOIN rastreadores r ON r.id = c.rastreador_id WHERE r.imei = ? AND c.status = 'enviado' AND c.resposta IS NULL
+      AND c.enviado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes')`;
+    const estado = /battery|gprs|gsm|imei\s*:|timer\s*:|apn\s*:|server\s*:/i.test(t);
+    const liga = !estado && /relay\s*[=:,]?\s*1|cut ?off|\bdyd\b/i.test(t);
+    const solta = !estado && /relay\s*[=:,]?\s*0|restore|\bhfyd\b/i.test(t);
+    if (liga !== solta) return db.prepare(`${base} AND c.texto LIKE ? ORDER BY c.id DESC LIMIT 1`).get(imei, liga ? 'RELAY,1%' : 'RELAY,0%');
+    if (!estado && respostaAdiadaTexto(t)) return db.prepare(`${base} AND c.texto LIKE 'RELAY,1%' ORDER BY c.id DESC LIMIT 1`).get(imei);
+    if (liga || /relay|fuel|oil/i.test(t) && !estado) return null; // fala de relé sem dizer o sentido: não arrisca
+    return db.prepare(`${base} AND c.tipo NOT IN ('bloquear','desbloquear') ORDER BY c.id LIMIT 1`).get(imei);
+  }
+  const respostaAdiadaTexto = (t) => com.respostaAdiada(t);
 
   const novoComando = ({ imei, protocolo }) => { if (protocolo === 'gt06') entregar(imei); };
   com.canal.on('comando', novoComando);

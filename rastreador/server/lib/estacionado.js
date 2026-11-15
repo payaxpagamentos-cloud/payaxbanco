@@ -28,7 +28,7 @@ function armar(db, veiculo, { raio_m: raio, usuarioId = null, automatico = false
     const id = Number(db.prepare(`INSERT INTO estacionamentos (empresa_id, veiculo_id, lat, lng, raio_m, armado_em, armado_por, automatico)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(veiculo.empresa_id, veiculo.id, veiculo.lat, veiculo.lng, r, agora(), usuarioId, automatico ? 1 : 0).lastInsertRowid);
     if (ehGt06(db, veiculo)) {
-      com.criar(db, veiculo, { tipo: 'personalizado', texto: `MOVING,ON,${Math.max(100, Math.min(1000, r))},0#`, rotulo: 'Estacionado: alarme de deslocamento do aparelho' }, usuarioId);
+      com.criar(db, veiculo, { tipo: 'personalizado', texto: `MOVING,ON,${Math.max(100, Math.min(1000, r))},0#`, rotulo: 'Estacionado: alarme de deslocamento do aparelho' }, usuarioId, { doSistema: true });
     }
     return id;
   });
@@ -39,7 +39,7 @@ function desarmar(db, veiculo, usuarioId = null) {
   if (!e) return false;
   transacao(db, () => {
     db.prepare('UPDATE estacionamentos SET desarmado_em = ?, desarmado_por = ? WHERE id = ?').run(agora(), usuarioId, e.id);
-    if (ehGt06(db, veiculo)) com.criar(db, veiculo, { tipo: 'personalizado', texto: 'MOVING,OFF#', rotulo: 'Estacionado desarmado: alarme de deslocamento desligado' }, usuarioId);
+    if (ehGt06(db, veiculo)) com.criar(db, veiculo, { tipo: 'personalizado', texto: 'MOVING,OFF#', rotulo: 'Estacionado desarmado: alarme de deslocamento desligado' }, usuarioId, { doSistema: true });
   });
   return true;
 }

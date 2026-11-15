@@ -53,6 +53,8 @@ function criarApp(db, extras = {}) {
     next();
   });
   // Tudo é servido em RASTREADOR_BASE_PATH (ex.: /rastreador): o painel, a página de compartilhamento e a API em <endereço>/api.
+  // Compacta (gzip) telas, scripts e respostas da API: no 4G, o painel abre baixando uma fração do tamanho.
+  app.use(require('compression')({ threshold: 1024 }));
   const r = express.Router();
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   r.use('/api/motorista/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));

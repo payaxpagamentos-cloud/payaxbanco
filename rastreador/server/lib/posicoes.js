@@ -205,10 +205,12 @@ function receber(db, m) {
     }
     // Corte que o aparelho adiou ("executa com GPS e abaixo de 20 km/h"): chegou posição nova com GPS e devagar = o J16 cortou agora.
     if (status === 'gravada' && nova && velocidade < 20) {
-      const adiado = db.prepare("SELECT id FROM comandos WHERE veiculo_id = ? AND status = 'enviado' AND tipo = 'bloquear' AND resposta IS NOT NULL ORDER BY id DESC LIMIT 1").get(v.id);
+      // O J16 adia o RELAY,1 (acionar o relé): é o "Bloquear", ou o "Desbloquear" quando o relé está ligado ao contrário.
+      const adiado = db.prepare(`SELECT id, tipo FROM comandos WHERE veiculo_id = ? AND status = 'enviado' AND tipo IN ('bloquear','desbloquear')
+        AND texto LIKE 'RELAY,1%' AND resposta IS NOT NULL ORDER BY id DESC LIMIT 1`).get(v.id);
       if (adiado) {
-        require('./comandos').responder(db, adiado.id, { sucesso: true, resposta: 'Corte executado pelo aparelho (GPS fixo e abaixo de 20 km/h).' });
-        mudar.bloqueado = 1;
+        require('./comandos').responder(db, adiado.id, { sucesso: true, resposta: `${adiado.tipo === 'bloquear' ? 'Corte' : 'Desbloqueio'} executado pelo aparelho (GPS fixo e abaixo de 20 km/h).` });
+        mudar.bloqueado = adiado.tipo === 'bloquear' ? 1 : 0;
       }
     }
     if (evento && (estadoAtual || status === 'gravada')) alertarEvento(db, v, evento, pos);
