@@ -1,7 +1,8 @@
 import { criarApi } from '../comum/api.js';
 import { el, $, limpar, icone, iniciais, toast, modal, campo, lerForm, acao, aviso, R } from '../comum/ui.js';
 import { formularioDesafio, blocoDoisFatores } from '../comum/doisfatores.js';
-import { marcaMenu, marcaEntrada } from '../comum/marca.js';
+import { marcaMenu } from '../comum/marca.js';
+import { telaAcesso, formularioEntrada } from '../comum/acesso.js';
 
 export const api = criarApi({
   base: new URL('..', import.meta.url).pathname.replace(/\/$/, ''),
@@ -146,20 +147,22 @@ function formularioSenha(aoConcluir) {
   return el('div', {}, el('h3', { style: 'font-size:14px;margin-bottom:8px' }, 'Trocar senha'), form);
 }
 
+/** Moldura das telas de acesso desta área (arte da marca à esquerda, formulário à direita). */
+const acessoBase = {
+  area: 'BACKOFFICE',
+  restrito: 'Acesso restrito à equipe PAY AX',
+  ajuda: 'Problemas para entrar? Fale com o administrador do sistema PAY AX: ele pode conferir o seu acesso, gerar uma senha provisória ou redefinir a verificação em duas etapas.',
+  privacidade: 'Privacidade',
+};
+const telaDeAcesso = (titulo, subtitulo, conteudo) => limpar(raiz, telaAcesso({ ...acessoBase, titulo, subtitulo, conteudo }));
+
 function trocarSenhaObrigatoria() {
-  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('PAGAMENTOS'),
-    el('h1', {}, 'Defina uma senha'),
-    el('p', { class: 'apoio' }, 'O seu acesso está com senha provisória. Escolha uma senha antes de continuar.'),
-    formularioSenha(() => desenhar()))));
+  telaDeAcesso('Defina uma senha', 'O seu acesso está com senha provisória. Escolha uma senha antes de continuar.', [formularioSenha(() => desenhar())]);
 }
 
 /** Tela de configuração obrigatória, quando o administrador exige 2FA da equipe. */
 function configurarDoisFatoresObrigatorio() {
-  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('PAGAMENTOS'),
-    el('h1', {}, 'Proteja o seu acesso'),
-    blocoDoisFatores(api, {
+  telaDeAcesso('Proteja o seu acesso', null, [blocoDoisFatores(api, {
       ativo: false,
       exigido: true,
       aoMudar: () => {
@@ -168,41 +171,31 @@ function configurarDoisFatoresObrigatorio() {
         desenhar();
       },
     }),
-    el('button', { class: 'botao sutil', onclick: () => { api.sessao.limpar(); desenhar(); } }, icone('sair'), 'Sair'))));
+    el('button', { class: 'botao sutil', onclick: () => { api.sessao.limpar(); desenhar(); } }, icone('sair'), 'Sair')]);
 }
 
 /** Segunda etapa do login. */
 function telaDesafio(desafio) {
-  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('PAGAMENTOS'),
-    el('h1', {}, 'Verificação em duas etapas'),
-    formularioDesafio(api, {
+  telaDeAcesso('Verificação em duas etapas', null, [formularioDesafio(api, {
       desafio,
       aoEntrar: (d) => { api.sessao.set(d); location.hash = '#/visao'; desenhar(); },
       aoVoltar: () => telaEntrada(),
-    }))));
+    })]);
 }
 
 function telaEntrada() {
-  const form = el('form', { onsubmit: (e) => { e.preventDefault(); entrar(); } },
-    el('div', { style: 'display:grid;gap:12px' },
-      campo({ nome: 'email', rotulo: 'E-mail', tipo: 'email', obrigatorio: true, atributos: { autocomplete: 'username' } }),
-      campo({ nome: 'senha', rotulo: 'Senha', tipo: 'password', obrigatorio: true, atributos: { autocomplete: 'current-password' } })));
-  const botao = el('button', { class: 'botao', style: 'width:100%;justify-content:center', onclick: () => entrar() }, 'Entrar');
-  const entrar = () => acao(botao, async () => {
-    const d = await api.post('/auth/login', lerForm(form));
-    if (d.precisa_2fa) return telaDesafio(d.desafio);
-    api.sessao.set(d);
-    location.hash = '#/visao';
-    return desenhar();
+  const form = formularioEntrada({
+    placeholderEmail: 'Seu e-mail corporativo',
+    esqueci: 'Peça ao administrador do sistema para gerar uma senha provisória (Segurança e usuários → Usuários). Você troca por uma sua no primeiro acesso.',
+    entrar: async (dados) => {
+      const d = await api.post('/auth/login', dados);
+      if (d.precisa_2fa) return telaDesafio(d.desafio);
+      api.sessao.set(d);
+      location.hash = '#/visao';
+      return desenhar();
+    },
   });
-  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('PAGAMENTOS'),
-    el('h1', {}, 'Backoffice'),
-    el('p', { class: 'apoio' }, 'Acesso da equipe PAY AX. A Área do Cliente fica em outro endereço.'),
-    form, botao,
-    el('a', { class: 'link-privacidade', href: 'privacidade', target: '_blank', rel: 'noopener' }, 'Privacidade e proteção de dados'))));
-  form.querySelector('input')?.focus();
+  telaDeAcesso('Bem-vindo', 'Acesse sua operação PAY AX.', form);
 }
 
 desenhar();

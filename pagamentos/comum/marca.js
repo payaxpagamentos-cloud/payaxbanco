@@ -124,16 +124,3 @@ export function marcaMenu(produto) {
   caixa.append(linha);
   return [caixa];
 }
-
-/** Marca da tela de entrada: fundo claro, por isso o letreiro vem em marinho. */
-export function marcaEntrada(produto) {
-  const caixa = document.createElement('div');
-  caixa.className = 'marca-entrada';
-  caixa.append(
-    letreiro({ altura: 34, cor: '#0a1526', degrade: ['#00c3ef', '#1265d6'], sombra: '#0a4fb0' }),
-  );
-  const linha = document.createElement('small');
-  linha.textContent = produto;
-  caixa.append(linha);
-  return caixa;
-}

@@ -1,7 +1,8 @@
 import { criarApi } from '../comum/api.js';
 import { el, $, limpar, icone, iniciais, toast, modal, campo, lerForm, acao, aviso } from '../comum/ui.js';
 import { formularioDesafio, blocoDoisFatores } from '../comum/doisfatores.js';
-import { marcaMenu, marcaEntrada } from '../comum/marca.js';
+import { marcaMenu } from '../comum/marca.js';
+import { telaAcesso, formularioEntrada } from '../comum/acesso.js';
 
 export const api = criarApi({
   base: new URL('..', import.meta.url).pathname.replace(/\/$/, ''),
@@ -148,47 +149,41 @@ function formularioSenha(aoConcluir) {
   return el('div', {}, el('h3', { style: 'font-size:14px;margin-bottom:8px' }, 'Trocar senha'), form);
 }
 
+/** Moldura das telas de acesso desta área (arte da marca à esquerda, formulário à direita). */
+const acessoBase = {
+  area: 'ÁREA DO CLIENTE',
+  restrito: 'Acesso exclusivo para clientes PAY AX',
+  ajuda: 'Problemas para entrar? Fale com o seu gerente de conta PAY AX ou com o administrador do acesso da sua empresa.',
+  privacidade: 'Privacidade e os seus dados',
+};
+const telaDeAcesso = (titulo, subtitulo, conteudo) => limpar(raiz, telaAcesso({ ...acessoBase, titulo, subtitulo, conteudo }));
+
 function trocarSenha() {
-  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('ÁREA DO CLIENTE'),
-    el('h1', {}, 'Crie a sua senha'),
-    el('p', { class: 'apoio' }, 'Você entrou com a senha provisória. Escolha uma senha sua para continuar.'),
-    formularioSenha(() => desenhar()))));
+  telaDeAcesso('Crie a sua senha', 'Você entrou com a senha provisória. Escolha uma senha sua para continuar.', [formularioSenha(() => desenhar())]);
 }
 
 /** Segunda etapa do login. */
 function telaDesafio(desafio) {
-  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('ÁREA DO CLIENTE'),
-    el('h1', {}, 'Verificação em duas etapas'),
-    formularioDesafio(api, {
+  telaDeAcesso('Verificação em duas etapas', null, [formularioDesafio(api, {
       desafio,
       aoEntrar: (d) => { api.sessao.set(d); location.hash = '#/inicio'; desenhar(); },
       aoVoltar: () => telaEntrada(),
-    }))));
+    })]);
 }
 
 function telaEntrada() {
-  const form = el('form', { onsubmit: (e) => { e.preventDefault(); entrar(); } },
-    el('div', { style: 'display:grid;gap:12px' },
-      campo({ nome: 'email', rotulo: 'E-mail', tipo: 'email', obrigatorio: true, atributos: { autocomplete: 'username' } }),
-      campo({ nome: 'senha', rotulo: 'Senha', tipo: 'password', obrigatorio: true, atributos: { autocomplete: 'current-password' } })));
-  const botao = el('button', { class: 'botao', style: 'width:100%;justify-content:center', onclick: () => entrar() }, 'Entrar');
-  const entrar = () => acao(botao, async () => {
-    const d = await api.post('/auth/login', lerForm(form));
-    if (d.precisa_2fa) return telaDesafio(d.desafio);
-    api.sessao.set(d);
-    location.hash = '#/inicio';
-    return desenhar();
+  const form = formularioEntrada({
+    placeholderEmail: 'Seu e-mail',
+    esqueci: 'Peça ao administrador do acesso da sua empresa (Cadastro e acessos → Acessos) ou ao seu gerente de conta PAY AX para gerar uma senha provisória.',
+    entrar: async (dados) => {
+      const d = await api.post('/auth/login', dados);
+      if (d.precisa_2fa) return telaDesafio(d.desafio);
+      api.sessao.set(d);
+      location.hash = '#/inicio';
+      return desenhar();
+    },
   });
-  limpar(raiz, el('div', { class: 'tela-entrada' }, el('div', { class: 'tela-entrada-caixa' },
-    marcaEntrada('ÁREA DO CLIENTE'),
-    el('h1', {}, 'Acesse a Área do Cliente'),
-    el('p', { class: 'apoio' }, 'Use o e-mail e a senha que a PAY AX enviou. Na primeira entrada você troca a senha.'),
-    form, botao,
-    // Aviso de privacidade (LGPD, art. 9º): página pública, abre sem login.
-    el('a', { class: 'link-privacidade', href: 'privacidade', target: '_blank', rel: 'noopener' }, 'Privacidade e os seus dados'))));
-  form.querySelector('input')?.focus();
+  telaDeAcesso('Bem-vindo', 'Acompanhe seus boletos e recebimentos.', form);
 }
 
 desenhar();
