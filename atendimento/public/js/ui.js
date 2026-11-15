@@ -32,10 +32,20 @@ export function duracao(s) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(seg).padStart(2, '0')}` : `${m}:${String(seg).padStart(2, '0')}`;
 }
 export const minutos = (s) => `${inteiro(Math.round((s ?? 0) / 60))} min`;
-export const gb = (bytes) => `${((bytes ?? 0) / 1024 ** 3).toFixed(2)}GB`;
+export const gb = (bytes) => `${((bytes ?? 0) / 1024 ** 3).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} GB`;
+/** Plural sem "(s)": plural(3, 'conversa', 'conversas') → "3 conversas". */
+export const plural = (n, um, varios) => `${(n ?? 0).toLocaleString('pt-BR')} ${n === 1 ? um : varios}`;
+/** CPF ou CNPJ com pontuação (o guardado é só dígitos). */
+export function documento(d) {
+  const x = String(d ?? '').replace(/\D/g, '');
+  if (x.length === 11) return x.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  if (x.length === 14) return x.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  return d || '—';
+}
 /** Telefone com máscara simples para leitura (o valor guardado é só dígitos). */
 export function telefone(t) {
-  const d = String(t ?? '');
+  // Com o código do país (55…) vindo do WhatsApp: mostra no formato nacional.
+  const d = String(t ?? '').replace(/^55(?=\d{10,11}$)/, '');
   if (/^\d{10,11}$/.test(d)) return `(${d.slice(0, 2)}) ${d.slice(2, -4)}-${d.slice(-4)}`;
   return d;
 }
@@ -116,6 +126,11 @@ export async function acao(botao, fn) {
 }
 
 /** Janela modal; resolve com o valor passado a fechar() ou null ao cancelar. */
+/**
+ * Janela por cima da tela. `largo`: true (940px, para a ficha) ou 'medio' (680px, formulários).
+ * O foco só vai para o primeiro campo quando ele está vazio e há mouse: num formulário de edição
+ * (ou no celular) não aparece cursor piscando nem teclado aberto sem o usuário pedir.
+ */
 export function modal(titulo, conteudo, { largo = false } = {}) {
   return new Promise((resolve) => {
     const fundo = el('div', { class: 'modal-fundo' });
@@ -123,11 +138,16 @@ export function modal(titulo, conteudo, { largo = false } = {}) {
     const esc = (e) => { if (e.key === 'Escape') fechar(); };
     document.addEventListener('keydown', esc);
     fundo.addEventListener('mousedown', (e) => { if (e.target === fundo) fechar(); });
-    const caixa = el('div', { class: `modal${largo ? ' largo' : ''}`, role: 'dialog', 'aria-label': titulo }, el('h2', {}, titulo));
+    const tamanho = largo === 'medio' ? ' medio' : largo ? ' largo' : '';
+    const caixa = el('div', { class: `modal${tamanho}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': titulo, tabindex: '-1' },
+      el('div', { class: 'cabeca-modal' }, el('h2', {}, titulo),
+        el('button', { type: 'button', class: 'icone-btn fechar-modal', title: 'Fechar', 'aria-label': 'Fechar', onclick: () => fechar() }, icone('fechar'))));
     caixa.append(...[].concat(typeof conteudo === 'function' ? conteudo(fechar) : conteudo).flat(Infinity).filter((f) => f !== null && f !== undefined && f !== false));
     fundo.append(caixa);
     document.body.append(fundo);
-    caixa.querySelector('input:not([type=hidden]), select, textarea')?.focus();
+    const primeiro = caixa.querySelector('input:not([type=hidden]):not([type=checkbox]):not([readonly]), textarea');
+    const mouse = window.matchMedia?.('(pointer: fine)').matches;
+    (mouse && primeiro && !primeiro.value ? primeiro : caixa).focus({ preventScroll: true });
   });
 }
 
@@ -137,27 +157,27 @@ export function modal(titulo, conteudo, { largo = false } = {}) {
  */
 export const formModal = (titulo, campos, enviar, { rotulo = 'Salvar', largo = false } = {}) => modal(titulo, (fechar) => {
   const f = el('form', { class: 'form' });
-  const ok = el('button', { class: 'btn primario largo' }, rotulo);
+  const ok = el('button', { class: 'btn primario' }, rotulo);
   f.append(...[].concat(campos(f)).flat(Infinity).filter(Boolean),
-    el('div', { class: 'linha entre', style: 'margin-top:6px' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Cancelar'), ok));
+    el('div', { class: 'rodape-modal' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Cancelar'), ok));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(ok, async () => fechar((await enviar(lerForm(f), f)) ?? true));
   });
   return f;
-}, { largo });
+}, { largo: largo === 'largo' ? true : largo ? 'medio' : false });
 
 /** Pergunta um texto (ex.: motivo). */
 export const perguntar = (titulo, rotulo, { obrigatorio = true, valor = '' } = {}) => modal(titulo, (fechar) => {
   const campo = el('input', { value: valor, maxlength: 300 });
   return el('form', { class: 'form', onsubmit: (e) => { e.preventDefault(); if (obrigatorio && !campo.value.trim()) return campo.focus(); fechar(campo.value.trim()); } },
     el('label', { class: 'campo' }, rotulo, campo),
-    el('div', { class: 'linha entre' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Voltar'), el('button', { class: 'btn primario' }, 'Confirmar')));
+    el('div', { class: 'rodape-modal' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Voltar'), el('button', { class: 'btn primario' }, 'Confirmar')));
 });
 
 export const confirmar = (titulo, texto, rotulo = 'Confirmar') => modal(titulo, (fechar) => [
   el('p', { class: 'mudo' }, texto),
-  el('div', { class: 'linha entre' }, el('button', { class: 'btn', onclick: () => fechar(false) }, 'Voltar'), el('button', { class: 'btn primario', onclick: () => fechar(true) }, rotulo)),
+  el('div', { class: 'rodape-modal' }, el('button', { class: 'btn', onclick: () => fechar(false) }, 'Voltar'), el('button', { class: 'btn primario', onclick: () => fechar(true) }, rotulo)),
 ]);
 
 /** Lê os campos nomeados de um formulário como objeto (caixas de marcar viram true/false). */
@@ -209,12 +229,13 @@ export function repetir(fn, ms) {
 export function barraUso(usado, limite, { formato = (x) => String(x), sufixo = '' } = {}) {
   const pct = limite > 0 ? Math.min(100, Math.round((usado / limite) * 100)) : (usado > 0 ? 100 : 0);
   return el('div', { class: `uso${pct >= 100 && (limite > 0 || usado > 0) ? ' cheio' : ''}` },
-    el('div', { class: 'numeros' }, el('span', {}, `${formato(usado)}/${formato(limite)}${sufixo}`), el('span', {}, `${pct}%`)),
+    el('div', { class: 'numeros' }, el('span', {}, `${formato(usado)} / ${formato(limite)}${sufixo ? ` ${sufixo}` : ''}`), el('span', {}, `${pct}%`)),
     el('div', { class: 'trilho' }, el('span', { style: `width:${pct}%` })));
 }
 
 // Ícones de traço (fixos, não vêm da API).
 const P = {
+  fechar: 'M6 6l12 12M18 6L6 18',
   chamadas: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
   headset: 'M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H5a1 1 0 0 1-1-1zM20 14h-3v6h2a1 1 0 0 0 1-1zM17 20a4 4 0 0 1-4 2h-1',
   campanhas: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10zM12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z',

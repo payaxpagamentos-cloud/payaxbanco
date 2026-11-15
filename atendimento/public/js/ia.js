@@ -29,6 +29,7 @@ export async function telaIa(ctx) {
   };
   let atual = 'desempenho';
   const trocar = async (k) => {
+    ctx.acoes?.(); // cada aba põe a própria ação no topo
     atual = k;
     limpar(abas, Object.entries(TELAS).map(([chave, [rotulo]]) => el('button', {
       class: `aba${chave === atual ? ' on' : ''}`, type: 'button', onclick: () => trocar(chave),
@@ -72,11 +73,11 @@ async function aprendizado(ctx, alvo) {
           el('strong', {}, inteiro(c.casos)), el('span', {}, c.nome))))) : null,
 
       cartao(null,
-        el('div', { class: 'linha entre', style: 'margin-bottom:10px;flex-wrap:wrap;gap:8px' },
-          el('h3', { style: 'margin:0' }, 'Temas que escaparam da ZOE'),
-          el('div', { class: 'linha', style: 'gap:6px' },
+        el('div', { class: 'linha entre', style: 'flex-wrap:wrap;gap:8px' },
+          el('h2', { style: 'margin:0' }, 'Temas que escaparam da ZOE'),
+          el('div', { class: 'segmentado' },
             ...[['abertas', 'Para ensinar'], ['todas', 'Todos']].map(([k, rot]) => el('button', {
-              class: `btn pequeno${estado.mostrar === k ? ' primario' : ''}`, type: 'button', onclick: () => { estado.mostrar = k; desenhar(); },
+              class: `btn${estado.mostrar === k ? ' on' : ''}`, type: 'button', onclick: () => { estado.mostrar = k; desenhar(); },
             }, rot)))),
         temas.length ? el('div', { class: 'temas-aprendizado' }, temas.map((t) => cartaoTema(t)))
           : vazio(estado.mostrar === 'abertas' ? 'Nada para ensinar agora.' : 'Nenhuma transferência no período.',
@@ -174,15 +175,15 @@ async function conhecimento(ctx, alvo) {
   const recarregar = async () => {
     const { itens } = await api.get(`/empresas/${ctx.empresaId}/ia/conhecimento`);
     limpar(lista, itens.length ? el('div', { class: 'cartoes-conhecimento' }, itens.map((a) => el('article', { class: `cartao artigo${a.ativo ? '' : ' inativo'}` },
-      el('div', { class: 'linha entre' },
-        el('h3', {}, a.titulo),
-        el('div', { class: 'linha', style: 'gap:4px' },
-          el('span', { class: 'etiqueta' }, `${inteiro(a.usos)} uso(s)`),
-          a.ativo ? null : el('span', { class: 'etiqueta aviso' }, 'Desativado'),
-          ctx.pode('zoe.alertas') ? botaoIcone('editar', 'Editar', () => editar(a)) : null,
-          ctx.pode('zoe.alertas') ? botaoIcone('lixo', 'Excluir', () => excluir(a), 'perigo') : null)),
+      el('h3', {}, a.titulo),
       el('p', {}, a.resposta),
-      a.perguntas ? el('div', { class: 'perguntas' }, String(a.perguntas).split('\n').filter(Boolean).map((q) => el('span', { class: 'etiqueta' }, q))) : null)))
+      a.perguntas ? el('div', { class: 'perguntas' }, String(a.perguntas).split('\n').filter(Boolean).map((q) => el('span', { class: 'etiqueta' }, q))) : null,
+      el('div', { class: 'rodape-artigo' },
+        el('div', { class: 'linha', style: 'gap:6px' },
+          el('span', { class: 'pequeno mudo' }, a.usos === 1 ? '1 uso' : `${inteiro(a.usos)} usos`),
+          a.ativo ? null : el('span', { class: 'etiqueta aviso' }, 'Desativado')),
+        ctx.pode('zoe.alertas') ? el('div', { class: 'linha', style: 'gap:2px' },
+          botaoIcone('editar', 'Editar', () => editar(a)), botaoIcone('lixo', 'Excluir', () => excluir(a), 'perigo')) : null))))
       : vazio('A base de conhecimento está vazia.', 'Sem base, a ZOE não responde nada sozinha: ela transfere tudo. Comece pelas 5 perguntas que a sua equipe mais recebe.'));
   };
 
@@ -292,7 +293,8 @@ async function intencoes(ctx, alvo) {
     await recarregar();
   };
 
-  limpar(alvo, acoesTopo(el('span'), ctx.pode('zoe.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova intenção') : null), lista);
+  ctx.acoes(ctx.pode('zoe.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova intenção') : null);
+  limpar(alvo, lista);
   await recarregar();
 }
 
@@ -304,7 +306,7 @@ async function ferramentas(ctx, alvo) {
     const d = await api.get(`/empresas/${ctx.empresaId}/ia/ferramentas`);
     limpar(lista,
       cartao('Nativas da plataforma',
-        tabela(['Ferramenta', 'O que faz'], d.internas.map((f) => el('tr', {}, td(el('code', {}, f.nome)), td(el('span', { class: 'pequeno' }, f.descricao)))))),
+        tabela(['Ferramenta', 'O que faz'], d.internas.map((f) => el('tr', {}, td(el('code', {}, f.nome)), td(el('span', { class: 'pequeno corte-2 largo', title: f.descricao }, f.descricao.replace(/\s+/g, ' ').split(/(?<=\.)\s/)[0])))))),
       cartao('Da sua empresa (consultam o seu sistema)',
         tabela(['Ferramenta', 'Descrição', 'Endereço', '>Usos', '^Ativa', ''], d.itens.map((f) => el('tr', {},
           td(el('code', {}, f.nome)),
@@ -366,7 +368,8 @@ async function ferramentas(ctx, alvo) {
     return false;
   }, { rotulo: 'Chamar', largo: true });
 
-  limpar(alvo, acoesTopo(el('span'), ctx.pode('zoe.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova ferramenta') : null), lista);
+  ctx.acoes(ctx.pode('zoe.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova ferramenta') : null);
+  limpar(alvo, lista);
   await recarregar();
 }
 
@@ -696,18 +699,14 @@ async function alertasDeRede(ctx, alvo) {
     const vigentes = d.itens.filter((a) => a.situacao === 'vigente');
 
     limpar(conteudo,
-      cartao('Por que isto existe',
-        el('p', { class: 'mudo', style: 'margin:0' },
-          'O cadastro do IXC nem sempre está atualizado. Se a ZOE decidir sozinha, pelo cadastro, que existe falha na '
-          + 'região do cliente, ela vai afirmar coisa errada — e afirmar errado com confiança é pior do que não saber. '
-          + 'Aqui a equipe escreve o que está acontecendo de verdade, com período e área, e a ZOE só conta para quem '
-          + 'está dentro. Enquanto o cadastro não estiver confiável, quem sabe da falha é você.')),
+      el('p', { class: 'aviso-caixa info' }, icone('alerta'),
+        el('span', {}, 'A ZOE só fala de falha na região quando a equipe cadastra aqui: o cadastro do IXC nem sempre está atualizado, e afirmar errado é pior que não saber.')),
 
       vigentes.length
         ? cartao(`Em vigor agora (${vigentes.length})`,
           el('p', { class: 'pequeno mudo', style: 'margin:0 0 10px' },
             'A ZOE confere estes alertas antes de diagnosticar conexão e antes de abrir chamado técnico.'),
-          el('div', { class: 'economia-origens' }, vigentes.map((a) => el('div', { class: 'origem-economia' },
+          el('div', { class: 'economia-origens' }, vigentes.map((a) => el('div', { class: 'origem-economia alerta-vigente' },
             el('strong', {}, a.titulo),
             el('p', { class: 'pequeno', style: 'margin:4px 0' }, `"${a.mensagem}"`),
             el('p', { class: 'pequeno mudo', style: 'margin:0' },
@@ -752,14 +751,13 @@ async function alertasDeRede(ctx, alvo) {
             + 'em vez de abrir dezenas de chamados do mesmo problema.')));
   };
 
-  limpar(alvo,
-    ctx.pode('zoe.alertas')
-      ? acoesTopo(botao('Novo alerta', 'primario', async () => {
-        const d = await api.get(`/empresas/${ctx.empresaId}/alertas`);
-        editarAlerta(ctx, d, null, desenhar);
-      }))
-      : null,
-    conteudo);
+  ctx.acoes(ctx.pode('zoe.alertas')
+    ? el('button', { class: 'btn primario', type: 'button', onclick: async () => {
+      const d = await api.get(`/empresas/${ctx.empresaId}/alertas`);
+      editarAlerta(ctx, d, null, desenhar);
+    } }, icone('mais'), 'Novo alerta')
+    : null);
+  limpar(alvo, conteudo);
   await desenhar();
 }
 

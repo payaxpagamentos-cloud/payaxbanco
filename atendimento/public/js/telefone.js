@@ -8,6 +8,9 @@
 import { api, BASE } from './api.js';
 import { el, limpar, icone, toast, telefone as formatarTelefone } from './ui.js';
 
+// Com mouse o visor recebe o foco (dá para digitar o número); no toque, não abre o teclado do celular.
+const comMouse = () => window.matchMedia?.('(pointer: fine)').matches;
+
 const TECLAS = [['1', ''], ['2', 'ABC'], ['3', 'DEF'], ['4', 'GHI'], ['5', 'JKL'], ['6', 'MNO'], ['7', 'PQRS'], ['8', 'TUV'], ['9', 'WXYZ'], ['*', ''], ['0', '+'], ['#', '']];
 
 let atual = null; // telefone ativo (um por página)
@@ -96,7 +99,7 @@ export function iniciarTelefone({ empresaId }) {
     painel.classList.toggle('oculto');
     if (!painel.classList.contains('oculto')) {
       desenhar();
-      painel.querySelector('input.numero')?.focus();
+      if (comMouse()) painel.querySelector('input.numero')?.focus();
     }
   });
 
@@ -138,10 +141,10 @@ export function iniciarTelefone({ empresaId }) {
     const entrada = el('input', { class: 'numero', inputmode: 'tel', autocomplete: 'off', placeholder: 'Digite o número', value: estado.numero, 'aria-label': 'Número' });
     entrada.addEventListener('input', () => { estado.numero = entrada.value.replace(/[^\d*#+]/g, ''); entrada.value = estado.numero; });
     entrada.addEventListener('keydown', (e) => { if (e.key === 'Enter') ligar(); });
-    const apagar = el('button', { type: 'button', class: 'icone-btn', title: 'Apagar', onclick: () => { estado.numero = estado.numero.slice(0, -1); entrada.value = estado.numero; entrada.focus(); } }, '⌫');
+    const apagar = el('button', { type: 'button', class: 'icone-btn', title: 'Apagar', onclick: () => { estado.numero = estado.numero.slice(0, -1); entrada.value = estado.numero; if (comMouse()) entrada.focus(); } }, '⌫');
     return el('div', { class: 'discar' },
       el('div', { class: 'visor' }, entrada, apagar),
-      teclado((d) => { estado.numero += d; entrada.value = estado.numero; entrada.focus(); }),
+      teclado((d) => { estado.numero += d; entrada.value = estado.numero; if (comMouse()) entrada.focus(); }),
       el('button', { type: 'button', class: 'acao-ligar', title: 'Ligar', disabled: estado.situacao !== 'online', onclick: ligar }, icone('telefone')),
       estado.situacao !== 'online' && estado.situacao !== 'carregando'
         ? el('p', { class: 'pequeno mudo', style: 'margin:8px 0 0;text-align:center' }, 'O ramal não está conectado. Tentando de novo…') : null);

@@ -28,7 +28,7 @@ async function telaDashboard(ctx) {
       el('div', { class: 'c6' }, cartao('Limites', el('div', { class: 'coluna' },
         el('div', {}, el('div', { class: 'pequeno mudo' }, 'Ramais ativos'), barraUso(d.ramais.total, d.empresa.limite_ramais)),
         el('div', {}, el('div', { class: 'pequeno mudo' }, 'Chamadas simultâneas agora'), barraUso(d.em_curso, d.empresa.limite_canais)),
-        el('div', {}, el('div', { class: 'pequeno mudo' }, 'Disco das gravações'), barraUso(d.disco.usado_bytes, d.disco.limite_bytes, { formato: (b) => gb(b).replace('GB', ''), sufixo: 'GB' })))))));
+        el('div', {}, el('div', { class: 'pequeno mudo' }, 'Disco das gravações'), barraUso(d.disco.usado_bytes, d.disco.limite_bytes, { formato: (b) => gb(b).replace(' GB', ''), sufixo: 'GB' })))))));
   }, 10_000));
 }
 
@@ -42,14 +42,14 @@ async function telaSupervisao(ctx) {
         indicador('Agentes falando', `${falando.length}/${s.agentes.length}`, null, 'headset', 'verde'),
         indicador('Agentes online', inteiro(s.agentes.filter((a) => a.online).length), null, 'pessoas', 'roxo'),
         indicador('Campanhas ativas', inteiro(s.campanhas.filter((c) => c.status === 'ativa').length), null, 'campanhas', 'laranja')),
-      cartao('Campanhas', tabela(['Campanha', 'Status', 'Fila', '^Em curso', '^Pendentes', '^Atendidos', '^Sem sucesso', 'Progresso'], s.campanhas.map((c) => el('tr', {},
-        td(c.nome), td(etiqueta(c.status, c.status === 'ativa' ? 'ok' : 'aviso')), td(c.fila ?? '—'), td(c.em_curso, 'centro num'), td(c.pendentes, 'centro num'),
-        td(c.atendidos, 'centro num'), td(c.sem_sucesso, 'centro num'), el('td', { style: 'width:160px' }, barraUso(c.contatos - c.pendentes, c.contatos)))),
+      cartao('Campanhas', tabela(['Campanha', 'Status', 'Fila', '>Em curso', '>Pendentes', '>Atendidos', '>Sem sucesso', 'Progresso'], s.campanhas.map((c) => el('tr', {},
+        td(c.nome), td(etiqueta(c.status, c.status === 'ativa' ? 'ok' : 'aviso')), td(c.fila ?? '—'), td(c.em_curso, 'dir num'), td(c.pendentes, 'dir num'),
+        td(c.atendidos, 'dir num'), td(c.sem_sucesso, 'dir num'), el('td', { style: 'width:160px' }, barraUso(c.contatos - c.pendentes, c.contatos)))),
       'Nenhuma campanha ativa ou pausada.')),
-      cartao('Agentes (ramais)', tabela(['Ramal', 'Pessoa', 'Situação', 'Falando com', '^Desde', '^Chamadas hoje'], s.agentes.map((a) => el('tr', {},
+      cartao('Agentes (ramais)', tabela(['Ramal', 'Pessoa', 'Situação', 'Falando com', '>Desde', '>Chamadas hoje'], s.agentes.map((a) => el('tr', {},
         td(a.numero, 'num'), td(pessoa(a.nome)),
         td(a.falando_com ? situacao('Em chamada', 'info') : a.online ? situacao('Livre', 'ok') : situacao('Offline', 'erro')),
-        td(a.falando_com ? telefone(a.falando_com) : '—'), td(a.desde ? hora(a.desde) : '—', 'centro'), td(a.chamadas_hoje, 'centro num'))), 'Nenhum ramal ativo.'))));
+        td(a.falando_com ? telefone(a.falando_com) : '—'), td(a.desde ? hora(a.desde) : '—', 'dir num'), td(a.chamadas_hoje, 'dir num'))), 'Nenhum ramal ativo.'))));
   }, 5000));
 }
 
@@ -81,9 +81,9 @@ async function telaCampanhas(ctx) {
   const verContatos = async (c) => {
     const contatos = await api.get(`${base(ctx)}/campanhas/${c.id}/contatos`);
     modal(`Contatos · ${c.nome}`, (fechar) => [
-      tabela(['Nome', 'Telefone', 'Situação', '^Tentativas', 'Última'], contatos.map((x) => el('tr', {},
+      tabela(['Nome', 'Telefone', 'Situação', '>Tentativas', 'Última'], contatos.map((x) => el('tr', {},
         td(x.nome ?? '—'), td(telefone(x.telefone), 'num'), td(etiqueta(x.status.replace('_', ' '), { atendido: 'ok', discando: 'info', pendente: '' }[x.status] ?? 'aviso')),
-        td(x.tentativas, 'centro num'), td(dataHora(x.ultima_tentativa)))), 'Nenhum contato importado.'),
+        td(x.tentativas, 'dir num'), td(dataHora(x.ultima_tentativa)))), 'Nenhum contato importado.'),
       contatos.length >= 1000 ? el('p', { class: 'pequeno mudo' }, 'Mostrando os 1.000 primeiros.') : null,
       el('div', { class: 'linha', style: 'justify-content:flex-end;margin-top:12px' }, el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
     ], { largo: true });
@@ -97,8 +97,8 @@ async function telaCampanhas(ctx) {
 
   async function carregar() {
     const campanhas = await api.get(`${base(ctx)}/campanhas`);
-    limpar(lista, tabela(['Campanha', 'Modo', 'Fila', '^Canais', '^Contatos', 'Progresso', 'Status', '^Ações'], campanhas.map((c) => el('tr', {},
-      td(c.nome), td(MODOS[c.modo]), td(c.fila ?? el('span', { class: 'mudo' }, 'sem fila')), td(c.canais, 'centro num'), td(inteiro(c.contatos), 'centro num'),
+    limpar(lista, tabela(['Campanha', 'Modo', 'Fila', '>Canais', '>Contatos', 'Progresso', 'Status', ''], campanhas.map((c) => el('tr', {},
+      td(c.nome), td(MODOS[c.modo]), td(c.fila ?? el('span', { class: 'mudo' }, 'sem fila')), td(c.canais, 'dir num'), td(inteiro(c.contatos), 'dir num'),
       el('td', { style: 'width:150px' }, barraUso(c.contatos - c.pendentes, c.contatos)), td(etiqueta(c.status, corStatus[c.status])),
       el('td', { class: 'acoes' },
         botao('Contatos', '', () => verContatos(c)),
@@ -114,9 +114,8 @@ async function telaCampanhas(ctx) {
               carregar();
             }, 'perigo')] : null))), 'Nenhuma campanha. Crie uma, importe os contatos e ative.'));
   }
-  limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, 'O discador liga para os contatos e passa quem atende para a fila escolhida.'),
-    pode(ctx) ? el('button', { class: 'btn primario', onclick: async () => { if (await formCampanha()) { toast('Campanha criada.'); carregar(); } } }, 'Nova campanha') : null),
-  cartao(null, lista));
+  ctx.acoes(pode(ctx) ? el('button', { class: 'btn primario', type: 'button', onclick: async () => { if (await formCampanha()) { toast('Campanha criada.'); carregar(); } } }, icone('mais'), 'Nova campanha') : null);
+  limpar(ctx.conteudo, cartao('O discador liga para os contatos e passa quem atende para a fila escolhida', lista));
   await carregar();
 }
 
@@ -153,13 +152,13 @@ async function telaRamais(ctx) {
     const ramais = await api.get(`${base(ctx)}/ramais`);
     const ativos = ramais.filter((r) => r.ativo);
     resumo.textContent = `${ativos.length} ramal(is) ativo(s) · ${ativos.filter((r) => r.online).length} online`;
-    limpar(lista, tabela(['Ramal', 'Pessoa', 'Filas', 'Situação', 'Último registro', '^Gravação', '^Ações'], ramais.map((r) => el('tr', {},
+    limpar(lista, tabela(['Ramal', 'Pessoa', 'Filas', 'Situação', 'Último registro', 'Gravação', ''], ramais.map((r) => el('tr', {},
       td(el('strong', { class: 'num' }, r.numero)), td(pessoa(r.nome, r.email)), td(r.filas ?? '—'),
       td(!r.ativo ? situacao('Desativado') : r.em_curso ? situacao('Em chamada', 'info') : r.online ? situacao('Online', 'ok') : situacao('Offline', 'erro')),
       td(r.registro_em ? [dataHora(r.registro_em), el('div', { class: 'pequeno mudo' }, [r.registro_ip, r.registro_agente].filter(Boolean).join(' · '))] : '—'),
-      td(r.gravar ? 'sim' : 'não', 'centro'),
+      td(r.gravar ? situacao('Grava', 'ok') : el('span', { class: 'mudo' }, 'Não grava')),
       el('td', { class: 'acoes' }, admin ? [
-        botao('Telefone', '', () => verSip(r)),
+        botaoIcone('telefone', 'Dados para configurar o telefone', () => verSip(r)),
         botaoIcone('editar', 'Editar', async () => { if (await formRamal(r)) { toast('Ramal salvo.'); carregar(); } }),
         botaoIcone('lixo', 'Excluir', async () => {
           if (!await confirmar('Excluir ramal', `Excluir o ramal ${r.numero} (${r.nome})? Se ele já tiver chamadas, fica só desativado para manter o histórico.`, 'Excluir')) return;
@@ -168,8 +167,8 @@ async function telaRamais(ctx) {
           carregar();
         }, 'perigo')] : null))), 'Nenhum ramal cadastrado.'));
   }
-  limpar(ctx.conteudo, acoesTopo(resumo, admin ? el('button', { class: 'btn primario', onclick: async () => { if (await formRamal()) { toast('Ramal criado.'); carregar(); } } }, 'Novo ramal') : null),
-    cartao(null, lista));
+  ctx.acoes(admin ? el('button', { class: 'btn primario', type: 'button', onclick: async () => { if (await formRamal()) { toast('Ramal criado.'); carregar(); } } }, icone('mais'), 'Novo ramal') : null);
+  limpar(ctx.conteudo, cartao(null, el('div', { class: 'linha entre' }, resumo), lista));
   await carregar();
 }
 
@@ -215,8 +214,8 @@ async function telaCrm(ctx) {
   };
   async function carregar() {
     const contatos = await api.get(`${base(ctx)}/contatos${qs({ busca: busca.value })}`);
-    limpar(lista, tabela(['Nome', 'Telefone', 'Empresa', 'E-mail', '^Chamadas', 'Última chamada'], contatos.map((c) => el('tr', { class: 'clicavel', onclick: () => abrir(c.id) },
-      td(c.nome), td(telefone(c.telefone), 'num'), td(c.organizacao ?? '—'), td(c.email ?? '—'), td(inteiro(c.chamadas), 'centro num'), td(dataHora(c.ultima_chamada)))),
+    limpar(lista, tabela(['Nome', 'Telefone', 'Empresa', 'E-mail', '>Chamadas', 'Última chamada'], contatos.map((c) => el('tr', { class: 'clicavel', onclick: () => abrir(c.id) },
+      td(c.nome), td(telefone(c.telefone), 'num'), td(c.organizacao ?? '—'), td(c.email ?? '—'), td(inteiro(c.chamadas), 'dir num'), td(dataHora(c.ultima_chamada)))),
     'Nenhum contato. Os contatos aparecem com o nome na lista de chamadas.'));
   }
   busca.addEventListener('input', () => { clearTimeout(busca.timer); busca.timer = setTimeout(carregar, 300); });
@@ -268,13 +267,13 @@ async function telaNumeros(ctx) {
   };
   async function carregar() {
     const numeros = await api.get(`${base(ctx)}/numeros`);
-    limpar(lista, tabela(['Número', 'Descrição', 'Destino', '^Chamadas recebidas', '^Ações'], numeros.map((n) => el('tr', {},
+    limpar(lista, tabela(['Número', 'Descrição', 'Destino', '>Chamadas recebidas', ''], numeros.map((n) => el('tr', {},
       td(el('strong', { class: 'num' }, telefone(n.numero))), td(n.descricao ?? '—'),
-      td(n.destino_tipo === 'zoe' ? 'ZOE (atendente virtual)' : n.destino_tipo ? `${ROTULO[n.destino_tipo]}: ${n.destino_nome ?? '—'}` : etiqueta('sem destino', 'aviso')), td(inteiro(n.chamadas), 'centro num'),
+      td(n.destino_tipo === 'zoe' ? 'ZOE (atendente virtual)' : n.destino_tipo ? `${ROTULO[n.destino_tipo]}: ${n.destino_nome ?? '—'}` : etiqueta('sem destino', 'aviso')), td(inteiro(n.chamadas), 'dir num'),
       el('td', { class: 'acoes' }, pode(ctx) ? botaoIcone('editar', 'Configurar destino', async () => { if (await formDestino(n)) { toast('Destino salvo.'); carregar(); } }) : null))),
     'Nenhum número contratado. Fale com o suporte para receber chamadas de fora.'));
   }
-  limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, 'Os números que recebem ligações de fora e para onde cada um envia as chamadas.')), cartao(null, lista));
+  limpar(ctx.conteudo, cartao('Para onde vai cada número que recebe ligações de fora', lista));
   await carregar();
 }
 
@@ -336,14 +335,14 @@ async function telaRecursos(ctx, so = null) {
     };
 
     const cartaoFilas = () =>
-      cartao('Filas no telefone', tabela(['Fila', 'Distribuição', '^Espera máx.', 'Ramais', '^Ações'], filas.map((f) => el('tr', {},
-        td(f.nome), td(ESTRATEGIAS[f.estrategia]), td(`${f.espera_maxima_s} s`, 'centro num'), td(f.ramais.map((r) => r.numero).join(', ') || '—'),
+      cartao('Filas no telefone', tabela(['Fila', 'Distribuição', '>Espera máx.', 'Ramais', ''], filas.map((f) => el('tr', {},
+        td(f.nome), td(ESTRATEGIAS[f.estrategia]), td(`${f.espera_maxima_s} s`, 'dir num'), td(f.ramais.map((r) => r.numero).join(', ') || '—'),
         el('td', { class: 'acoes' }, pode(ctx) ? [botaoIcone('editar', 'Ramais da fila', async () => { if (await formFila(f)) { toast('Fila salva.'); carregar(); } })] : null))),
         'Nenhuma fila. Crie as filas na tela Filas: a mesma fila atende WhatsApp e telefone.'),
       el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' }, 'O nome da fila é o mesmo no Asterisk: é por ele que a ligação transferida pela ZOE cai na fila certa.'));
 
     const cartaoUras = () =>
-      cartao('URAs (menu de atendimento)', tabela(['URA', 'Tipo', 'Mensagem', 'Opções', '^Ações'], uras.map((u) => el('tr', {},
+      cartao('URAs (menu de atendimento)', tabela(['URA', 'Tipo', 'Mensagem', 'Opções', ''], uras.map((u) => el('tr', {},
         td(u.nome),
         td(u.tipo === 'inteligente'
           ? el('span', { class: 'etiqueta ok' }, 'inteligente')
@@ -481,6 +480,7 @@ export async function telaTelefonia(ctx) {
   const trocar = async (k) => {
     for (const p of paradas) p();
     paradas = [];
+    ctx.acoes?.(); // cada aba põe a própria ação no topo
     limpar(abas, Object.entries(ABAS).map(([chave, [rotulo]]) => el('button', {
       class: `aba${chave === k ? ' on' : ''}`, type: 'button', onclick: () => trocar(chave),
     }, rotulo)));

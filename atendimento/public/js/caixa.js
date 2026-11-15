@@ -13,7 +13,8 @@ import {botao, botaoIcone, campoBusca, seletor, vazio} from './comum.js';
 import {cartaoPassagem} from './passagem.js';
 
 const CAIXAS = {
-  minhas: 'Minhas conversas', aguardando: 'Na fila', bot: 'Com a ZOE', abertas: 'Todas em aberto', encerradas: 'Encerradas',
+  // Curtos: as cinco abas cabem numa linha da coluna da lista.
+  minhas: 'Minhas', aguardando: 'Na fila', bot: 'Com a ZOE', abertas: 'Abertas', encerradas: 'Encerradas',
 };
 
 export async function telaCaixa(ctx) {
@@ -73,7 +74,7 @@ export async function telaCaixa(ctx) {
 
   const itemLista = (c) => {
     const ultima = c.ultima_mensagem;
-    const previa = ultima ? (ultima.tipo === 'texto' || ultima.tipo === 'botao' ? ultima.texto : `📎 ${TIPOS_MENSAGEM[ultima.tipo] ?? ultima.tipo}`) : 'sem mensagens';
+    const previa = ultima ? (ultima.tipo === 'texto' || ultima.tipo === 'botao' ? ultima.texto : `Anexo · ${TIPOS_MENSAGEM[ultima.tipo] ?? ultima.tipo}`) : 'sem mensagens';
     return el('button', {
       class: `item-conversa${c.id === estado.selecionada ? ' on' : ''}${c.prioridade === 'alta' ? ' alta' : ''}`,
       type: 'button', onclick: () => abrir(c.id),
@@ -120,17 +121,23 @@ export async function telaCaixa(ctx) {
     const cabecalho = el('div', { class: 'cabecalho-chat' },
       el('span', { class: 'avatar-contato grande' }, iniciais(d.nome)),
       el('div', { class: 'quem-chat' },
-        el('strong', {}, d.nome, ligacao ? el('span', { class: 'etiqueta info', style: 'margin-left:8px' }, 'Ligação') : null),
+        el('div', { class: 'nome-chat' }, el('strong', {}, d.nome), ligacao ? el('span', { class: 'etiqueta info' }, 'Ligação') : null, etiquetaEstado(d.estado)),
         el('div', { class: 'pequeno mudo' }, formatarTelefone(d.telefone.replace(/^55/, '')),
           d.contato?.documento ? ` · ${d.contato.documento}` : '', d.fila_nome ? ` · ${d.fila_nome}` : '')),
       el('div', { class: 'acoes-chat' },
-        etiquetaEstado(d.estado),
         // A ficha 360°: quem é este cliente, o risco de perder e a vida toda dele.
-        ctx.pode('cliente.ficha') ? botao('Ficha do cliente', 'pequeno', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)) : null,
+        ctx.pode('cliente.ficha') ? botaoIcone('pessoa', 'Ficha do cliente', () => abrirFicha(ctx.empresaId, `/conversas/${d.id}/ficha`)) : null,
         !ligacao && d.estado !== 'encerrada' && !d.janela_aberta ? el('span', { class: 'etiqueta aviso', title: 'Passaram-se mais de 24 h desde a última mensagem do cliente: o WhatsApp só aceita template aprovado.' }, 'Janela fechada') : null,
         ...acoesConversa(d, { minha, posso })));
 
-    const mensagens = el('div', { class: 'mensagens' }, d.mensagens.map((m) => bolha(m, d)));
+    // Lembretes automáticos iguais e seguidos aparecem uma vez só, com quantas vezes saíram.
+    const grupos = [];
+    for (const m of d.mensagens) {
+      const ult = grupos.at(-1);
+      if (ult && m.autor === 'sistema' && ult.m.autor === 'sistema' && ult.m.texto === m.texto && ult.m.direcao === m.direcao) { ult.vezes += 1; ult.m = m; }
+      else grupos.push({ m, vezes: 1 });
+    }
+    const mensagens = el('div', { class: 'mensagens' }, grupos.map((g) => bolha(g.m, d, g.vezes)));
     const rodape = posso ? compositor(d) : el('div', { class: 'compositor fechado' },
       el('p', { class: 'mudo', style: 'margin:0' }, ligacao
         ? 'Esta conversa foi uma ligação: o que está acima é o que foi falado. Para escrever ao cliente, abra uma conversa de WhatsApp em Contatos.'
@@ -159,7 +166,7 @@ export async function telaCaixa(ctx) {
   }
 
   // ---------- Bolhas ----------
-  function bolha(m, d) {
+  function bolha(m, d, vezes = 1) {
     if (m.tipo === 'sistema') return el('div', { class: 'aviso-sistema' }, icone('ok'), el('span', {}, m.texto), el('small', {}, hora(m.criada_em)));
     const lado = m.direcao === 'entrada' ? 'cliente' : m.autor;
     const autor = m.autor === 'atendente' ? (m.usuario_nome ?? 'Atendente') : AUTORES[m.autor];
@@ -170,6 +177,7 @@ export async function telaCaixa(ctx) {
         m.texto ? el('p', {}, m.texto) : null,
         el('div', { class: 'pe-bolha' },
           el('small', {}, hora(m.criada_em)),
+          vezes > 1 ? el('span', { class: 'vezes', title: `Enviado ${vezes} vezes; a hora é a do último` }, `× ${vezes}`) : null,
           m.direcao === 'saida' ? etiquetaMensagem(m.status) : null,
           m.status === 'falhou' ? botao('Reenviar', '', () => reenviar(m.id)) : null),
         m.erro ? el('small', { class: 'erro-bolha', title: m.erro }, m.erro.slice(0, 120)) : null));
@@ -250,7 +258,7 @@ export async function telaCaixa(ctx) {
       el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap' },
         rapidas.length ? el('button', { class: 'btn pequeno', type: 'button', onclick: () => escolherRapida(texto) }, icone('raio'), 'Respostas rápidas') : null,
         el('button', { class: 'btn pequeno', type: 'button', onclick: () => enviarTemplate(d) }, 'Template'),
-        el('span', { class: 'pequeno mudo', style: 'margin-left:auto' }, 'Enter envia · Shift+Enter quebra a linha')));
+        el('span', { class: 'pequeno mudo dica-teclado', style: 'margin-left:auto' }, 'Enter envia · Shift+Enter quebra a linha')));
   }
 
   function escolherRapida(texto) {

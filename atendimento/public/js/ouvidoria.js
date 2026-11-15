@@ -40,7 +40,7 @@ export async function telaOuvidoria(ctx) {
     limpar(lista, cartao(null, d.itens.length
       ? tabela(['Protocolo', 'Cliente', 'Tipo', 'Assunto', '^Risco', '^Classe', 'Prazo', '^Situação', 'Responsável'],
         d.itens.map((o) => el('tr', { class: 'clicavel', onclick: () => abrirCaso(o.id) },
-          td(el('code', {}, o.protocolo)),
+          td(el('strong', { class: 'num' }, o.protocolo)),
           td(el('div', {}, el('strong', {}, o.contato_nome ?? o.telefone), el('div', { class: 'pequeno mudo' }, desde(o.aberta_em)))),
           td(el('span', { class: `etiqueta ${['procon', 'anatel'].includes(o.tipo) ? 'erro' : o.tipo === 'cancelamento' ? 'aviso' : ''}` }, o.tipo_nome)),
           td(el('span', { class: 'pequeno' }, String(o.assunto).slice(0, 70))),
@@ -232,13 +232,13 @@ export async function telaOuvidoria(ctx) {
 
   limpar(casos,
     indicadores,
-    acoesTopo(
-      el('div', { class: 'filtros livre' },
-        seletor('Situação', { abertas: 'Em aberto', '': 'Todas', resolvida: 'Resolvidas', improcedente: 'Improcedentes' }, estado.status, (v) => { estado.status = v; recarregar(); }),
-        seletor('Tipo', { '': 'Todos', ...TIPOS }, estado.tipo, (v) => { estado.tipo = v; recarregar(); }),
-        campoBusca(estado.busca, (t) => { estado.busca = t; recarregar(); }, 'Protocolo, nome, telefone ou CPF')),
-      !ctx.pode('ouvidoria.editar') ? null : el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Abrir caso')),
+    // Busca primeiro (é o que mais se usa); "Abrir caso" vai para o topo da página.
+    el('div', { class: 'filtros livre' },
+      campoBusca(estado.busca, (t) => { estado.busca = t; recarregar(); }, 'Protocolo, nome, telefone ou CPF'),
+      seletor('Situação', { abertas: 'Em aberto', '': 'Todas', resolvida: 'Resolvidas', improcedente: 'Improcedentes' }, estado.status, (v) => { estado.status = v; recarregar(); }),
+      seletor('Tipo', { '': 'Todos', ...TIPOS }, estado.tipo, (v) => { estado.tipo = v; recarregar(); })),
     lista);
+  ctx.acoes(!ctx.pode('ouvidoria.editar') ? null : el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Abrir caso'));
   limpar(ctx.conteudo, abas, casos, relatorio);
   mostrar('casos');
 

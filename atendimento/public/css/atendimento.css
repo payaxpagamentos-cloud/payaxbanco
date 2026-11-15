@@ -1139,3 +1139,247 @@ label.campo{ gap: 5px }
 .cartao-chamada .botoes{ padding-bottom: 22px; }
 @media (max-width: 860px){ .telefone{ right: 16px; bottom: 16px; } .telefone-botao{ width: 54px; height: 54px; } }
 @media print{ .telefone, .telefone-chamada{ display: none !important; } }
+
+/* ==========================================================================
+   ALTO PADRÃO — a camada final. Uma escala só de espaço, superfícies opacas e
+   legíveis, tabelas com hierarquia, controles da mesma altura e o celular
+   tratado como tela de verdade. Fica por último: vale sobre as camadas acima.
+   ========================================================================== */
+:root, :root[data-tema="claro"]{
+  --text-3: #67748A;                       /* notas com contraste legível */
+  --borda: var(--border); --superficie-2: var(--surface-2); --roxo: #7C3AED;
+  --aviso-borda: color-mix(in srgb, var(--aviso) 30%, transparent);
+  --esp-1: 4px; --esp-2: 8px; --esp-3: 16px; --esp-4: 24px; --esp-5: 32px;
+  --ctl: 38px;                             /* altura única de campo e botão */
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* Vidro discreto: a superfície é quase sólida, o fundo só tinge. */
+  --vidro: rgba(255, 255, 255, .9);
+  --vidro-forte: rgba(255, 255, 255, .97);
+  --vidro-borda: rgba(15, 27, 45, .08);
+  --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, .9);
+  --vidro-sombra: 0 1px 2px rgba(15, 27, 45, .04), 0 10px 30px -18px rgba(30, 58, 138, .28);
+  --vidro-campo: #FFFFFF;
+  --luz-1: rgba(59, 130, 246, .16); --luz-2: rgba(139, 92, 246, .1); --luz-3: rgba(14, 165, 233, .1);
+}
+:root[data-tema="escuro"]{
+  --text-3: #7F8DA8;
+  --vidro: rgba(17, 26, 43, .9); --vidro-forte: rgba(17, 26, 43, .98); --vidro-borda: rgba(255, 255, 255, .07);
+  --vidro-campo: var(--campo);
+  --luz-1: rgba(37, 99, 235, .2); --luz-2: rgba(124, 58, 237, .12); --luz-3: rgba(14, 165, 233, .1);
+}
+
+/* ---------- Ritmo vertical: cartões empilhados sempre com o mesmo respiro ---------- */
+.coluna{ display: flex; flex-direction: column; gap: var(--esp-3); min-width: 0; }
+.conteudo div:not([class]):not([hidden]):not(.cartao *):has(> :is(.cartao, .indicadores, .grade, .grade-2, .grade-dash, .cartoes-conhecimento, .acoes-topo, .coluna, .filtros, .abas, .vazio, .rolagem)){
+  display: flex; flex-direction: column; gap: var(--esp-3); min-width: 0; }
+.conteudo div:not(.cartao *):is(.coluna, :not([class])) > :is(.filtros, .acoes-topo){ margin: 0; }
+.acoes-topo{ margin: 0; align-items: flex-end; gap: var(--esp-3); }
+.acoes-topo > p.mudo{ max-width: 72ch; }
+.conteudo{ max-width: 1480px; margin-inline: auto; width: 100%; }
+
+/* ---------- Superfícies ---------- */
+.cartao{ border-color: var(--vidro-borda); }
+.cartao p{ max-width: 80ch; }
+.cartao.indicador:hover, .cartao.indicador:not(.clicavel):hover{ transform: none; }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
+  .btn:not(.primario){ background: var(--surface); border-color: var(--border-forte); box-shadow: none; }
+  .btn:not(.primario):hover{ background: var(--hover); }
+  .grafico .grade-linha{ stroke: var(--border); }
+  .modal{ background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .modal :is(input:not([type="checkbox"]), select, textarea){ background-color: var(--campo); }
+}
+
+/* ---------- Controles: tudo na mesma altura ---------- */
+input:not([type="checkbox"]):not([type="radio"]), select{ min-height: var(--ctl); }
+input[type="date"], input[type="time"]{ padding-block: 0; height: var(--ctl); }
+.btn{ min-height: var(--ctl); }
+.btn.pequeno{ min-height: 30px; }
+.filtros .btn, .acoes-topo > .btn{ min-height: var(--ctl); }
+.btn.perigo{ border-color: color-mix(in srgb, var(--erro) 35%, var(--border-forte)); }
+.icone-btn.perigo{ color: var(--text-3); }
+.icone-btn.perigo:hover{ color: var(--erro); background: var(--erro-bg); }
+textarea{ resize: vertical; }
+
+/* Atalhos de período: um controle segmentado, com o escolhido marcado. */
+.segmentado{ display: inline-flex; align-items: stretch; height: var(--ctl); padding: 3px; gap: 2px; border: 1px solid var(--border-forte);
+  border-radius: var(--radius-sm); background: var(--surface); flex: 0 0 auto !important; align-self: flex-end; }
+.segmentado .btn{ min-height: 0; height: 100%; padding: 0 12px; border: 0 !important; background: transparent !important; box-shadow: none !important;
+  font-size: 12.5px; color: var(--text-2); border-radius: 7px; }
+.segmentado .btn:hover{ color: var(--text); background: var(--hover) !important; }
+.segmentado .btn.on{ background: var(--destaque-bg) !important; color: var(--azul); }
+
+/* Filtros: uma linha só, campos com a largura do que guardam, ações empurradas para a direita. */
+.filtros{ margin-bottom: 0; }
+.cartao > .filtros{ margin-bottom: var(--esp-3); }
+.filtros.livre{ gap: var(--esp-2) 12px; }
+.filtros.livre > label.campo:has(input[type="search"]){ flex: 1 1 260px; max-width: 380px; min-width: 220px; }
+.filtros.livre > .btn:first-of-type:not(.segmentado .btn){ margin-left: auto; }
+.acoes-topo:has(> .filtros, > label.campo){ flex-wrap: nowrap; }
+.acoes-topo > .filtros{ flex: 1 1 auto; }
+
+/* ---------- Etiquetas e avisos: a caixa de aviso não vaza para as etiquetas ---------- */
+.etiqueta.aviso, .situacao.aviso, .bolinha.aviso, .verificacao.aviso{ border: 0; }
+.etiqueta.aviso{ padding: 2px 8px; }
+.situacao.aviso, .situacao.erro, .situacao.ok{ background: none; padding: 0; border-radius: 0; color: inherit; font-size: inherit; }
+.bolinha{ display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); margin-right: 8px; padding: 0 !important; vertical-align: 1px; }
+.bolinha.ok{ background: #22C55E; } .bolinha.aviso{ background: #F59E0B; } .bolinha.erro{ background: #EF4444; }
+
+/* ---------- Tabelas: cabeçalho discreto, números alinhados, ações estreitas à direita ---------- */
+.tabela th{ font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; padding-top: 9px; padding-bottom: 9px; }
+.tabela td{ color: var(--text-2); }
+.tabela td:first-child, .tabela td strong, .tabela td .pessoa{ color: var(--text); }
+.tabela td.dir, .tabela td.num{ font-variant-numeric: tabular-nums; }
+.tabela th.acoes, .tabela td.acoes, .tabela td:last-child:has(> .icone-btn){ width: 1%; white-space: nowrap; text-align: right; }
+.tabela td.acoes > *, .tabela td:last-child:has(> .icone-btn) > *{ vertical-align: middle; }
+.tabela td .linha{ flex-wrap: nowrap; }
+.tabela td.acoes .linha, .tabela td:last-child .linha:has(.icone-btn){ justify-content: flex-end; }
+code, .mono, pre.codigo, .segredo, .json{ font-family: var(--mono); }
+code{ font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; }
+.paginacao{ display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: var(--esp-3); padding-top: 14px; border-top: 1px solid var(--border); }
+.paginacao .linha{ gap: 8px; }
+
+/* Vazio: um bloco só, em qualquer tabela ou tela. */
+.vazio.compacto{ display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; padding: 14px 16px; margin: 0;
+  border: 1px dashed var(--border-forte); border-radius: var(--radius-sm); text-align: left; color: var(--text-2); }
+.vazio.compacto svg{ width: 18px; height: 18px; flex: none; color: var(--text-3); }
+.vazio.compacto p{ margin: 0; font-size: 13px; }
+
+/* ---------- Indicadores: o número sempre na mesma altura ---------- */
+.indicador.com-icone{ align-items: flex-start; min-height: 96px; }
+.indicador .corpo{ flex: 1; min-width: 0; }
+.indicador .ic{ margin-top: 2px; }
+.indicador .nota{ color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.indicador .valor.texto{ font-size: 18px; }
+
+/* ---------- Grades de painel: cartões em coluna, gráfico centrado, barras com altura fixa ---------- */
+.grade-dash > div > .cartao, .grade-dash > .cartao{ display: flex; flex-direction: column; height: 100%; }
+.cartao > .barras{ flex: 0 0 auto; height: 200px; margin-block: auto; }
+.grade-2:has(> .cartao .vazio.compacto){ align-items: start; }
+
+/* ---------- Modais: título com respiro, rodapé à direita, mais estreitos para formulários ---------- */
+.modal{ padding: 24px 26px; }
+.cabeca-modal{ display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -4px -6px 18px 0; }
+.cabeca-modal h2{ font-size: 17px; margin: 0; letter-spacing: -.015em; }
+.fechar-modal{ color: var(--text-3); flex: none; }
+.modal.medio{ width: min(680px, 100%); }
+.rodape-modal{ display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+.rodape-modal .btn{ min-width: 108px; }
+.modal:focus{ outline: none; }
+.cartao .form fieldset, .modal .form fieldset{ border: 0; border-top: 1px solid var(--border); border-radius: 0; padding: 16px 0 0; }
+.cartao .form fieldset:first-of-type, .modal .form fieldset:first-of-type{ border-top: 0; padding-top: 0; }
+.form legend{ padding: 0 0 6px; font-size: 13px; }
+
+/* ---------- Topo ---------- */
+.acoes-pagina{ display: flex; align-items: center; gap: 8px; margin-left: auto; margin-right: 8px; }
+.acoes-pagina:empty{ display: none; }
+@media (max-width: 860px){ .topo{ flex-wrap: wrap; } .acoes-pagina{ order: 3; width: 100%; margin: 6px 0 0; justify-content: flex-start; } }
+.ferramentas .disponivel{ display: inline-flex; align-items: center; gap: 8px; width: auto; height: 32px; padding: 0 12px; border: 1px solid var(--border-forte);
+  background: var(--surface); border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.ferramentas .disponivel:hover{ background: var(--hover); }
+.casca.cheia .topo{ padding-top: 14px; padding-bottom: 10px; }
+.casca.cheia .topo .subtitulo{ display: none; }
+
+/* ---------- Caixa de entrada ---------- */
+.linha-compositor textarea, .compositor textarea{ resize: none; }
+.bolha.sistema{ align-self: center; max-width: 80%; }
+.bolha.sistema .corpo-bolha{ background: transparent; border: 1px dashed var(--border-forte); box-shadow: none; color: var(--text-2); font-size: 12.5px; }
+.passagem-atencao .passagem-lista{ list-style: none; padding-left: 0; }
+
+/* O telefone flutuante não cobre o fim da página. */
+body:has(.telefone) .conteudo:not(.cheio){ padding-bottom: 96px; }
+body:has(.telefone) .casca.cheia .painel-conversa{ padding-bottom: 96px; }
+
+/* ---------- Telas médias e celular ---------- */
+@media (max-width: 860px){
+  .topo{ align-items: flex-start; }
+  .topo .subtitulo{ display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .abas{ flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+  .abas::-webkit-scrollbar{ display: none; }
+  .abas .aba{ flex: none; scroll-snap-align: start; }
+  .lateral{ -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+  body:has(.casca.cheia) .telefone{ bottom: 88px; }
+  .acoes-topo{ flex-wrap: wrap; }
+}
+@media (max-width: 720px){
+  .grade{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .indicador.com-icone{ flex-direction: column; gap: 10px; min-height: 0; }
+  .indicador .valor{ font-size: 20px; overflow-wrap: anywhere; }
+  .indicador .ic{ width: 34px; height: 34px; } .indicador .ic svg{ width: 18px; height: 18px; }
+  .filtros.livre > label.campo{ flex: 1 1 calc(50% - 6px) !important; width: auto !important; min-width: 0 !important; max-width: none !important; }
+  .filtros.livre > .btn:first-of-type:not(.segmentado .btn){ margin-left: 0; }
+  .segmentado{ width: 100%; } .segmentado .btn{ flex: 1; }
+  /* Tabela vira lista de cartões: o nome da coluna em cima de cada valor. */
+  .rolagem{ margin: 0; padding: 0; overflow: visible; }
+  .tabela thead{ display: none; }
+  .tabela, .tabela tbody{ display: block; }
+  .tabela tr{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .tabela tbody tr:last-child{ border-bottom: 0; }
+  .tabela td{ border: 0 !important; padding: 0 !important; text-align: left !important; white-space: normal; min-width: 0; }
+  .tabela td[data-rotulo]::before{ content: attr(data-rotulo); display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); margin-bottom: 2px; }
+  .tabela td:first-child{ grid-column: 1 / -1; }
+  .tabela td:first-child::before{ display: none; }
+  .tabela td.acoes, .tabela td:last-child:has(> .icone-btn){ grid-column: 1 / -1; text-align: right !important; width: auto; }
+  .grafico text{ font-size: 22px; }
+}
+@media (pointer: coarse){
+  .icone-btn{ min-width: 40px; min-height: 40px; }
+  .btn, .btn.pequeno{ min-height: 40px; }
+  .abas .aba{ min-height: 38px; }
+  .dica-teclado{ display: none; }
+}
+
+/* Indicadores dentro de um cartão: blocos lisos, sem cartão dentro de cartão. */
+.indicadores.embutidos{ gap: 12px; }
+.indicadores.embutidos > .cartao{ background: var(--surface-2) !important; border: 0 !important; box-shadow: none !important; border-radius: 12px; min-height: 0;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+/* Detalhe recolhível (ex.: consumo de tokens). */
+details.detalhes{ border-top: 1px solid var(--border); padding-top: 10px; }
+details.detalhes > summary{ cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--text-2); list-style: none; display: flex; align-items: center; gap: 6px; }
+details.detalhes > summary::before{ content: "›"; display: inline-block; transition: transform .15s; font-size: 15px; line-height: 1; }
+details.detalhes[open] > summary::before{ transform: rotate(90deg); }
+details.detalhes > summary::-webkit-details-marker{ display: none; }
+details.detalhes[open] > summary{ margin-bottom: 6px; }
+/* Pizza num cartão alto: centrada na altura, não perdida no meio do vazio. */
+.grade-2 > .cartao > .pizza{ margin-block: auto; }
+/* Cabeçalho da conversa: nome e situação numa linha, ações numa linha só. */
+.nome-chat{ display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.nome-chat strong{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cabecalho-chat, .acoes-chat{ flex-wrap: nowrap; }
+.abas-caixa{ flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.abas-caixa::-webkit-scrollbar{ display: none; }
+/* Texto de ajuda sob um campo: um estilo só em todos os formulários. */
+.ajuda{ margin: -2px 0 2px; font-size: 12px; color: var(--text-3); font-weight: 400; max-width: 72ch; }
+div.campo{ display: flex; flex-direction: column; gap: 6px; }
+.rotulo-campo{ font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+/* Dias da semana como botões de liga/desliga. */
+.escolha-dias{ display: flex; flex-wrap: wrap; gap: 6px; }
+.escolha-dias .marcar.dia{ position: relative; padding: 6px 12px; border: 1px solid var(--border-forte); border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  color: var(--text-2); background: var(--surface); gap: 0; user-select: none; }
+.escolha-dias .marcar.dia input{ position: absolute; opacity: 0; pointer-events: none; }
+.escolha-dias .marcar.dia:has(:checked){ background: var(--destaque-bg); border-color: var(--destaque-borda); color: var(--azul); }
+.escolha-dias .marcar.dia:has(:focus-visible){ outline: 2px solid var(--azul); outline-offset: 2px; }
+/* Texto longo numa célula: duas linhas e reticências (o texto inteiro fica no title). */
+.corte-2{ display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 46ch; }
+/* Dias da semana na tabela de filas: os de folga visíveis, só mais apagados. */
+.dias i{ background: var(--surface-2); border: 1px solid var(--border); }
+.dias i:not(.on){ opacity: .55; }
+/* Base de conhecimento: todos os cartões com o mesmo ritmo — título, resposta, perguntas e o rodapé no fim. */
+.artigo{ display: flex; flex-direction: column; gap: 10px; }
+.artigo > * + *:not(h2){ margin-top: 0; }
+.artigo > p{ margin: 0; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.rodape-artigo{ margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.artigo:hover{ transform: none; }
+.corte-2.largo{ max-width: 90ch; }
+/* Alerta de rede em vigor: tom de aviso, não de economia. */
+.origem-economia.alerta-vigente{ background: var(--aviso-bg) !important; border-color: var(--aviso-borda) !important; border-left-width: 1px !important; }
+/* Economia: cartão comum com um filete fino, sem gradiente pesado. */
+.origem-economia{ background: var(--surface-2) !important; border: 1px solid var(--border) !important; border-left: 3px solid var(--ok) !important; box-shadow: none !important; }
+
+/* Caixa de entrada: abas numa linha, filtros sem rótulo (o texto de dentro já diz o que é). */
+.abas-caixa{ flex-wrap: nowrap; gap: 2px; }
+.abas-caixa .aba{ flex: none; white-space: nowrap; padding: 6px 10px; }
+.filtros-lista{ grid-template-columns: minmax(0, 1fr) 128px; }
+.filtros-lista label.campo{ font-size: 0; gap: 0; }
+.filtros-lista label.campo > *{ font-size: 13.5px; }
+/* Lembretes automáticos iguais e seguidos viram uma linha só. */
+.bolha.sistema .vezes{ margin-left: 6px; font-weight: 700; color: var(--text-3); }

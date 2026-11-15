@@ -48,6 +48,17 @@ const MENU_EMPRESA = [
   ['integracoes', 'Integrações', 'integracoes', 'integracoes.ver'],
 ];
 
+// O master vê a plataforma inteira: os subtítulos dele falam disso, não da empresa.
+const SUBTITULOS_MASTER = {
+  dashboard: 'A plataforma agora e no mês, em todas as empresas',
+  empresas: 'Empresas clientes da plataforma',
+  telefonia: 'Telefonia por empresa, operadoras, números e faturamento',
+  relatorios: 'Resolução da ZOE e da equipe em todas as empresas',
+  usuarios: 'Quem acessa a plataforma e com qual perfil',
+  seguranca: 'Acessos recusados, IPs bloqueados e o registro de atividades',
+  diagnostico: 'Verificações da plataforma e a conexão de cada número com a Meta',
+  configuracoes: 'Nome da plataforma, atendimento e preços de IA e da Meta',
+};
 const SUBTITULOS = {
   caixa: 'A ZOE resolve o que dá; aqui fica o que precisa de gente',
   dashboard: 'Como está o atendimento agora e no mês',
@@ -89,6 +100,8 @@ function vigiar(u, empresaId) {
 
 window.addEventListener('atend:sair', () => desenhar());
 window.addEventListener('hashchange', () => desenhar());
+// Abas que rolam (celular): a escolhida desliza para o meio.
+document.addEventListener('click', (e) => { e.target.closest?.('.abas .aba')?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); });
 document.addEventListener('click', (e) => { if (!e.target.closest('.menu-usuario, .usuario')) document.querySelector('.menu-usuario')?.classList.add('oculto'); });
 
 /** Rota atual: { empresaId, tela } a partir de #/tela ou #/empresa/ID/tela. */
@@ -138,6 +151,7 @@ async function desenhar() {
     return Array.isArray(exige) ? exige.includes(u.perfil) : pode(u, exige);
   };
   const item = menu.find((x) => x[0] === tela && visivel(x));
+  const subtitulo = (empresaId ? SUBTITULOS : SUBTITULOS_MASTER)[tela];
   if (!item || !telas[tela]) {
     // Sem permissão para a tela pedida, abre a primeira que a pessoa pode ver — em vez de
     // mandá-la sempre para a caixa, que ela também pode não ter.
@@ -171,11 +185,15 @@ async function desenhar() {
   const trilha = el('div', { class: 'trilha' });
   if (empresaId && PLATAFORMA.includes(u.perfil)) trilha.append(el('a', { href: '#/empresas' }, 'Empresas'), el('span', { class: 'sep' }, '/'), el('a', { href: link(empresaId, 'caixa') }, nomeEmpresa));
 
+  // A ação principal da página (Nova fila, Novo usuário…) fica no topo, à direita do título.
+  const acoesPagina = el('div', { class: 'acoes-pagina' });
   const topo = el('header', { class: 'topo' },
-    el('div', {}, trilha, el('h1', { style: 'margin:0' }, item[1]), SUBTITULOS[tela] ? el('p', { class: 'subtitulo' }, SUBTITULOS[tela]) : null),
-    ferramentas(u, empresaId));
+    el('div', {}, trilha, el('h1', { style: 'margin:0' }, item[1]), subtitulo ? el('p', { class: 'subtitulo' }, subtitulo) : null),
+    acoesPagina, ferramentas(u, empresaId));
   casca.append(lateral, el('div', { class: 'principal' }, topo, conteudo));
   limpar(raiz, casca);
+  // No celular o menu é uma faixa que rola: o item da tela aberta fica à vista.
+  if (window.matchMedia?.('(max-width: 860px)').matches) lateral.querySelector('.item.on')?.scrollIntoView({ inline: 'center', block: 'nearest' });
   document.title = `${item[1]} · ${nomeEmpresa ? `${nomeEmpresa} · ` : ''}${nomePlataforma}`;
 
   const ctx = {
@@ -190,6 +208,7 @@ async function desenhar() {
     pode: (p) => pode(u, p),
     parar: (fn) => { pararTela = fn; },
     ir: (tela2, eid = empresaId) => ir(eid, tela2),
+    acoes: (...itens) => limpar(acoesPagina, ...itens),
     renomearEmpresa: (id, nome) => nomesEmpresa.set(id, { ...(nomesEmpresa.get(id) ?? {}), nome }),
     // O master ligou/desligou a telefonia: o menu se refaz na próxima tela.
     esquecerEmpresa: (id) => nomesEmpresa.delete(id),

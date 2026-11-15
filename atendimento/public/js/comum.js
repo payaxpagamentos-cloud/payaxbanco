@@ -15,11 +15,25 @@ export const indicador = (rotulo, valor, nota, ic = null, cor = 'azul') => el('d
 
 export const td = (conteudo, classe = '') => el('td', { class: classe }, conteudo);
 
-export const tabela = (colunas, linhas, vazio = 'Nada por aqui.') => (linhas.length
-  ? el('div', { class: 'rolagem' }, el('table', { class: 'tabela' },
-    el('thead', {}, el('tr', {}, colunas.filter(Boolean).map((c) => el('th', { class: c.startsWith('>') ? 'dir' : c.startsWith('^') ? 'centro' : '' }, c.replace(/^[>^]/, ''))))),
-    el('tbody', {}, linhas)))
-  : el('p', { class: 'mudo', style: 'margin:0' }, vazio));
+/**
+ * Tabela padrão. Cabeçalho: '>Valor' alinha à direita, '^Situação' ao centro, '' é a coluna de ações
+ * (estreita, à direita). Cada célula leva o nome da coluna em data-rotulo: no celular a linha vira um
+ * cartão com o rótulo em cima de cada valor.
+ */
+export const tabela = (colunas, linhas, vazioTexto = 'Nada por aqui.') => {
+  if (!linhas.length) return el('div', { class: 'vazio compacto' }, icone('caixa'), el('p', {}, vazioTexto));
+  const cols = colunas.filter((c) => c !== null && c !== undefined && c !== false).map(String);
+  const rotulos = cols.map((c) => c.replace(/^[>^]/, ''));
+  const corpo = el('tbody', {}, linhas);
+  for (const tr of corpo.children) {
+    [...tr.children].forEach((cel, i) => { if (rotulos[i] && !cel.dataset.rotulo) cel.dataset.rotulo = rotulos[i]; });
+  }
+  return el('div', { class: 'rolagem' }, el('table', { class: 'tabela' },
+    el('thead', {}, el('tr', {}, cols.map((c) => (c === ''
+      ? el('th', { class: 'acoes', 'aria-label': 'Ações' })
+      : el('th', { class: c.startsWith('>') ? 'dir' : c.startsWith('^') ? 'centro' : '' }, c.replace(/^[>^]/, '')))))),
+    corpo));
+};
 
 export const botao = (texto, classe, fn) => {
   const b = el('button', { class: `btn pequeno ${classe}`, type: 'button' }, texto);
@@ -33,7 +47,7 @@ export const botaoIcone = (nome, titulo, fn, classe = '') => {
   return b;
 };
 
-export const acoesTopo = (...itens) => el('div', { class: 'linha entre', style: 'margin-bottom:16px' }, ...itens);
+export const acoesTopo = (...itens) => el('div', { class: 'linha entre acoes-topo' }, ...itens);
 
 export const vazio = (texto, sub = null) => el('div', { class: 'vazio' }, icone('caixa'), el('p', {}, texto), sub ? el('small', {}, sub) : null);
 
@@ -51,7 +65,7 @@ export function indicadoresAtendimento(r) {
     indicador('Conversas', inteiro(r.conversas), `${inteiro(r.em_aberto)} em aberto agora`, 'conversa', 'azul'),
     indicador('Foram para a equipe', inteiro(r.transferidas), `${porcento(r.taxa_transferencia)} do total`, 'pessoa', 'laranja'),
     indicador('Satisfação (CSAT)', r.csat_medio === null ? '—' : r.csat_medio.toLocaleString('pt-BR'),
-      r.avaliacoes ? `${inteiro(r.avaliacoes)} avaliação(ões) · ${porcento(r.csat_satisfacao)} boas` : 'sem avaliações', 'estrela', 'roxo'),
+      r.avaliacoes ? `${inteiro(r.avaliacoes)} ${r.avaliacoes === 1 ? 'avaliação' : 'avaliações'} · ${porcento(r.csat_satisfacao)} boas` : 'sem avaliações', 'estrela', 'roxo'),
   ];
 }
 
@@ -105,17 +119,18 @@ export const cartaoMotivos = (motivos) => cartao('Por que foi para a equipe',
 /** Custo e uso da IA no período. */
 export function cartaoCustoIa(ia) {
   const linha = (rotulo, valor) => el('tr', {}, el('td', {}, rotulo), td(valor, 'dir num'));
+  // O que interessa ao gestor em cima; o consumo técnico (tokens) fica recolhido.
+  const segundos = ia.ms_medio === null ? '—' : `${(ia.ms_medio / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} s`;
   return cartao('ZOE no período', el('table', { class: 'tabela tabela-utilizacao' }, el('tbody', {},
     linha('Respostas geradas', inteiro(ia.respostas)),
     linha('Ferramentas usadas', inteiro(ia.ferramentas)),
-    linha('Tempo médio da resposta', ia.ms_medio === null ? '—' : `${inteiro(ia.ms_medio)} ms`),
-    linha('Tokens de entrada', inteiro(ia.tokens_entrada)),
-    linha('Tokens lidos do cache', inteiro(ia.tokens_cache)),
-    linha('Tokens de saída', inteiro(ia.tokens_saida)),
+    linha('Tempo médio da resposta', segundos),
     linha('Custo estimado', dinheiro(ia.custo_centavos)),
     ia.erros ? linha('Falhas da ZOE', inteiro(ia.erros)) : null)),
-  el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' },
-    'Custo estimado pelos preços cadastrados pelo master em Configurações. Toda conversa transferida que a IA passar a resolver sozinha sai bem mais barata que um atendimento humano.'));
+  el('details', { class: 'detalhes' }, el('summary', {}, 'Consumo de tokens'),
+    el('table', { class: 'tabela tabela-utilizacao' }, el('tbody', {},
+      linha('Entrada', inteiro(ia.tokens_entrada)), linha('Lidos do cache', inteiro(ia.tokens_cache)), linha('Saída', inteiro(ia.tokens_saida))))),
+  el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Pelos preços cadastrados em Configurações.'));
 }
 
 // ---------- Filtro de período ----------
@@ -128,15 +143,17 @@ export function filtroPeriodo(estado, aoMudar, extras = []) {
     i.addEventListener('change', () => { estado[nome] = i.value; aoMudar(estado); });
     return el('label', { class: 'campo' }, rotulo, i);
   };
-  const atalho = (rotulo, dias) => el('button', { class: 'btn pequeno', type: 'button', onclick: () => {
+  // Atalhos num controle segmentado, com o período escolhido marcado.
+  const ativo = (dias) => estado.ate === hoje && estado.de === (dias === 0 ? hoje : somarDias(hoje, -dias));
+  const grupo = el('div', { class: 'segmentado', role: 'group', 'aria-label': 'Período' });
+  const atalho = (rotulo, dias) => el('button', { class: `btn${ativo(dias) ? ' on' : ''}`, type: 'button', onclick: (e) => {
     estado.de = dias === 0 ? hoje : somarDias(hoje, -dias);
     estado.ate = hoje;
+    for (const b of grupo.children) b.classList.toggle('on', b === e.currentTarget);
     aoMudar(estado);
   } }, rotulo);
-  return el('div', { class: 'filtros livre' },
-    campoData('De', 'de'), campoData('Até', 'ate'),
-    el('div', { class: 'linha', style: 'gap:6px;align-items:flex-end' }, atalho('Hoje', 0), atalho('7 dias', 6), atalho('30 dias', 29)),
-    ...extras);
+  grupo.append(atalho('Hoje', 0), atalho('7 dias', 6), atalho('30 dias', 29));
+  return el('div', { class: 'filtros livre' }, campoData('De', 'de'), campoData('Até', 'ate'), grupo, ...extras);
 }
 
 /** Seletor que recarrega a tela ao mudar. */

@@ -2,7 +2,7 @@
 import {api, qs} from './api.js';
 import {
   el, limpar, icone, toast, acao, confirmar, formModal, modal, campo, escolha, marcar, lerForm, inteiro,
-  porcento, dataHora, desde, dinheiro, PERFIS, repetir, lerNumero,
+  porcento, dataHora, desde, dinheiro, PERFIS, repetir, lerNumero, barraUso, situacao, pessoa, documento,
 } from './ui.js';
 import {
   cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, vazio, campoBusca, seletor, cartaoDesfechos,
@@ -12,7 +12,7 @@ import {
 // ---------- Dashboard ----------
 
 async function dashboard(ctx) {
-  const conteudo = el('div');
+  const conteudo = el('div', { class: 'coluna' });
   const desenhar = async () => {
     const d = await api.get('/master/painel');
     limpar(conteudo,
@@ -22,16 +22,16 @@ async function dashboard(ctx) {
         indicador('Conversas no mês', inteiro(d.totais.conversas_mes), `${porcento(d.mes.taxa_resolucao_ia)} resolvidas pela IA`, 'robo', 'roxo'),
         indicador('Custo da IA no mês', dinheiro(d.mes.ia.custo_centavos), `${inteiro(d.mes.ia.respostas)} resposta(s) geradas`, 'dinheiro', 'laranja')),
       el('div', { class: 'grade-2' }, cartaoDesfechos(d.mes), cartaoTempos(d.mes)),
-      cartao('Empresas', tabela(['Empresa', '^Situação', '>Em aberto', '>Conversas (mês)', '>IA (mês)', 'Limite IA', '^Atendentes', '^Números'],
+      cartao('Empresas', tabela(['Empresa', 'Situação', '>Em aberto', '>Conversas (mês)', '>IA (mês)', 'Uso da IA', '>Atendentes', 'Números'],
         d.empresas.map((e) => el('tr', { class: 'clicavel', onclick: () => ctx.ir('dashboard', e.id) },
           td(el('strong', {}, e.nome)),
-          td(el('span', { class: `etiqueta ${e.status === 'ativa' ? 'ok' : 'erro'}` }, e.status), 'centro'),
+          td(el('span', { class: `etiqueta ${e.status === 'ativa' ? 'ok' : 'erro'}` }, e.status === 'ativa' ? 'Ativa' : 'Bloqueada')),
           td(inteiro(e.abertas), 'dir num'),
           td(inteiro(e.conversas_mes), 'dir num'),
           td(inteiro(e.ia_mes), 'dir num'),
-          td(e.limite_ia_mes ? `${porcento((e.ia_mes / e.limite_ia_mes) * 100)} de ${inteiro(e.limite_ia_mes)}` : 'sem limite'),
-          td(inteiro(e.atendentes), 'centro num'),
-          td(e.numeros ? icone('ok') : el('span', { class: 'etiqueta erro' }, 'falta'), 'centro'))),
+          el('td', { style: 'width:170px' }, e.limite_ia_mes ? barraUso(e.ia_mes, e.limite_ia_mes) : el('span', { class: 'mudo' }, 'sem limite')),
+          td(inteiro(e.atendentes), 'dir num'),
+          td(e.numeros ? situacao('Conectado', 'ok') : situacao('Falta', 'erro')))),
       'Nenhuma empresa cadastrada.')));
   };
   limpar(ctx.conteudo, conteudo);
@@ -46,21 +46,21 @@ async function empresas(ctx) {
   const lista = el('div');
   const recarregar = async () => {
     const { itens } = await api.get(`/master/empresas${qs(estado)}`);
-    limpar(lista, cartao(null, tabela(['Empresa', 'CNPJ/CPF', '^Situação', '^IA', '^Atendentes', '>Em aberto', '>Conversas (mês)', '>IA (mês)', ''],
+    limpar(lista, cartao(null, tabela(['Empresa', 'CNPJ/CPF', 'Situação', 'ZOE', '>Atendentes', '>Em aberto', '>Conversas (mês)', '>IA (mês)', ''],
       itens.map((e) => el('tr', { class: 'clicavel', onclick: () => ctx.ir('dashboard', e.id) },
         td(el('div', {}, el('strong', {}, e.nome), e.email ? el('div', { class: 'pequeno mudo' }, e.email) : null,
           e.motivo_bloqueio ? el('div', { class: 'pequeno' }, el('span', { class: 'etiqueta erro' }, e.motivo_bloqueio)) : null)),
-        td(e.documento ?? '—'),
-        td(el('span', { class: `etiqueta ${e.status === 'ativa' ? 'ok' : 'erro'}` }, e.status), 'centro'),
-        td(e.ia_ativa ? icone('robo') : el('span', { class: 'mudo' }, 'desligada'), 'centro'),
-        td(`${inteiro(e.atendentes)}/${inteiro(e.limite_atendentes)}`, 'centro'),
+        td(documento(e.documento), 'num'),
+        td(el('span', { class: `etiqueta ${e.status === 'ativa' ? 'ok' : 'erro'}` }, e.status === 'ativa' ? 'Ativa' : 'Bloqueada')),
+        td(e.ia_ativa ? situacao('Ligada', 'ok') : situacao('Desligada')),
+        td(`${inteiro(e.atendentes)} / ${inteiro(e.limite_atendentes)}`, 'dir num'),
         td(inteiro(e.conversas_abertas), 'dir num'),
         td(inteiro(e.conversas_mes), 'dir num'),
         td(e.limite_ia_mes ? `${inteiro(e.ia_mes)}/${inteiro(e.limite_ia_mes)}` : inteiro(e.ia_mes), 'dir num'),
         td(ctx.soMaster ? el('div', { class: 'linha', style: 'gap:4px' },
           botaoIcone('editar', 'Editar', () => editar(e)),
           botaoIcone(e.status === 'ativa' ? 'cadeado' : 'aberto', e.status === 'ativa' ? 'Bloquear' : 'Desbloquear', () => bloquear(e)),
-          botaoIcone('lixo', 'Excluir', () => excluir(e), 'perigo')) : null, 'dir'))),
+          botaoIcone('lixo', 'Excluir', () => excluir(e), 'perigo')) : null, 'acoes'))),
     'Nenhuma empresa.')));
   };
 
@@ -136,15 +136,15 @@ async function usuarios(ctx) {
 
   const recarregar = async () => {
     const { itens } = await api.get('/master/usuarios');
-    limpar(lista, cartao(null, tabela(['Pessoa', 'Empresa', 'Perfil', '^Disponível', 'Último acesso', '^Ativo', ''],
+    limpar(lista, cartao(null, tabela(['Pessoa', 'Empresa', 'Perfil', 'Disponível', 'Último acesso', 'Situação', ''],
       itens.map((u) => el('tr', {},
-        td(el('div', {}, el('strong', {}, u.nome), el('div', { class: 'pequeno mudo' }, u.email))),
-        td(u.empresa_nome ?? el('span', { class: 'etiqueta' }, 'plataforma')),
+        td(pessoa(u.nome, u.email)),
+        td(u.empresa_nome ?? el('span', { class: 'etiqueta info' }, 'Plataforma')),
         td(PERFIS[u.perfil]),
-        td(['atendente', 'cliente'].includes(u.perfil) ? el('span', { class: `situacao ${u.disponivel ? 'ok' : ''}` }, u.disponivel ? 'sim' : 'não') : '—', 'centro'),
-        td(u.ultimo_acesso ? desde(u.ultimo_acesso) : 'nunca'),
-        td(u.ativo ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
-        td(botaoIcone('editar', 'Editar', () => editar(u)), 'dir'))))));
+        td(['atendente', 'cliente'].includes(u.perfil) ? situacao(u.disponivel ? 'Disponível' : 'Ausente', u.disponivel ? 'ok' : '') : el('span', { class: 'mudo' }, '—')),
+        td(u.ultimo_acesso ? desde(u.ultimo_acesso) : el('span', { class: 'mudo' }, 'nunca entrou')),
+        td(u.ativo ? situacao('Ativo', 'ok') : situacao('Inativo')),
+        td(botaoIcone('editar', 'Editar', () => editar(u)), 'acoes'))))));
   };
 
   const criar = () => formModal('Novo usuário', () => {
@@ -182,29 +182,27 @@ async function usuarios(ctx) {
     await recarregar();
   });
 
-  limpar(ctx.conteudo, acoesTopo(el('span'), el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Novo usuário')), lista);
+  ctx.acoes(el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Novo usuário'));
+  limpar(ctx.conteudo, lista);
   await recarregar();
 }
 
 // ---------- Segurança ----------
 
 async function seguranca(ctx) {
-  const conteudo = el('div');
+  const conteudo = el('div', { class: 'coluna' });
   const recarregar = async () => {
     const d = await api.get('/master/seguranca');
     limpar(conteudo,
       cartao('Acessos recusados (24 h)',
         tabela(['Quando', 'E-mail', 'IP', 'Motivo'], d.recusados.map((r) => el('tr', {},
           td(dataHora(r.criado_em)), td(r.email ?? '—'), td(el('code', {}, r.ip ?? '—')), td(r.motivo))),
-        'Nenhum acesso recusado nas últimas 24 horas.'),
-        el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' },
-          'Aqui aparecem também os webhooks recusados por assinatura inválida — útil quando o App secret do número está errado.')),
+        'Nenhum acesso recusado nas últimas 24 horas. Inclui webhooks com assinatura inválida.')),
       cartao('IPs bloqueados',
         tabela(['IP', 'Motivo', 'Desde', ''], d.ips.map((i) => el('tr', {},
           td(el('code', {}, i.ip)), td(i.motivo ?? '—'), td(dataHora(i.criado_em)),
           td(botaoIcone('lixo', 'Desbloquear', async () => { await api.del(`/master/seguranca/ips/${encodeURIComponent(i.ip)}`); toast('IP desbloqueado.'); await recarregar(); }), 'dir'))),
-        'Nenhum IP bloqueado.'),
-        el('div', { style: 'margin-top:12px' }, el('button', { class: 'btn', onclick: bloquearIp }, icone('cadeado'), 'Bloquear IP'))),
+        'Nenhum IP bloqueado.')),
       cartao('Registro de atividades',
         tabela(['Quando', 'Quem', 'Empresa', 'Ação', 'Alvo', 'IP'], d.auditoria.map((a) => el('tr', {},
           td(dataHora(a.criado_em)), td(a.usuario_nome ?? '—'), td(a.empresa_nome ?? '—'), td(a.acao), td(a.alvo ?? '—'), td(el('code', {}, a.ip ?? '—')))),
@@ -221,6 +219,7 @@ async function seguranca(ctx) {
     await recarregar();
   });
 
+  ctx.acoes(el('button', { class: 'btn', type: 'button', onclick: bloquearIp }, icone('cadeado'), 'Bloquear IP'));
   limpar(ctx.conteudo, conteudo);
   await recarregar();
 }
@@ -228,23 +227,29 @@ async function seguranca(ctx) {
 // ---------- Diagnóstico ----------
 
 async function diagnostico(ctx) {
-  const conteudo = el('div', {}, el('p', { class: 'mudo' }, 'Verificando…'));
+  const conteudo = el('div', { class: 'coluna' }, el('p', { class: 'mudo' }, 'Verificando…'));
   const desenhar = async () => {
     const d = await api.get('/master/diagnostico');
     const ICONE = { ok: 'ok', aviso: 'alerta', erro: 'alerta' };
+    // Problemas primeiro, depois avisos, depois o que está certo.
+    const ordem = { erro: 0, aviso: 1, ok: 2 };
+    d.verificacoes.sort((a, b) => ordem[a.situacao] - ordem[b.situacao]);
     limpar(conteudo,
       cartao('Verificações', el('div', { class: 'verificacoes' }, d.verificacoes.map((v) => el('div', { class: `verificacao ${v.situacao}` },
         icone(ICONE[v.situacao]), el('div', {}, el('strong', {}, v.nome), el('div', { class: 'pequeno' }, v.detalhe)))))),
       cartao('Números de WhatsApp',
-        tabela(['Número', 'Empresa', '^Situação', 'Nome verificado', 'Qualidade', 'Detalhe'], d.numeros.map((n) => el('tr', {},
+        tabela(['Número', 'Empresa', 'Situação', 'Nome verificado', 'Qualidade', 'Detalhe'], d.numeros.map((n) => el('tr', {},
           td(el('div', {}, el('strong', {}, n.nome), el('div', { class: 'pequeno mudo' }, n.telefone))),
-          td(`#${n.empresa_id}`),
-          td(el('span', { class: `etiqueta ${n.ok ? 'ok' : 'erro'}` }, n.estado), 'centro'),
+          td(n.empresa_nome ?? `Empresa ${n.empresa_id}`),
+          td(el('span', { class: `etiqueta ${n.ok ? 'ok' : 'erro'}` }, n.estado)),
           td(n.nome_verificado ?? '—'), td(n.qualidade ?? '—'),
           td(el('span', { class: 'pequeno' }, n.erro ?? '—')))),
         'Nenhum número ativo na plataforma.')));
   };
-  limpar(ctx.conteudo, acoesTopo(el('span'), botao('Verificar de novo', 'primario', desenhar)), conteudo);
+  const verificar = el('button', { class: 'btn', type: 'button' }, icone('raio'), 'Verificar de novo');
+  verificar.addEventListener('click', () => acao(verificar, desenhar));
+  ctx.acoes(verificar);
+  limpar(ctx.conteudo, conteudo);
   await desenhar();
 }
 

@@ -26,7 +26,7 @@ export function cartaoUtilizacao(u) {
 export const cartaoSimultaneas = (s, emCurso) => cartao('Chamadas Simultâneas', linhaDoDia(s.pontos, { passoMin: s.passo_min }),
   el('div', { class: 'pequeno mudo', style: 'margin-top:6px' }, `Agora: ${emCurso} · pico de hoje: ${s.pico}`));
 export const cartaoRamais = (r) => cartao('Ramais', pizza([{ rotulo: 'Online', valor: r.online, cor: CORES.verde }, { rotulo: 'Offline', valor: r.offline, cor: CORES.cinza }],
-  { vazio: 'Nenhum ramal cadastrado', centro: { valor: inteiro(r.total), rotulo: 'Ramais' } }));
+  { vazio: 'Nenhum ramal cadastrado', centro: { valor: inteiro(r.total), rotulo: 'Ramais' }, lado: true }));
 /** Status das ligações de hoje: atendidas, perdidas e em curso, com o total no centro. */
 export function cartaoStatusLigacoes(hoje, emCurso) {
   const total = hoje.recebidas + hoje.realizadas + hoje.internas;
@@ -49,18 +49,17 @@ export function indicadoresTelefonia(d) {
 }
 export function cartaoUsoMes(uso) {
   const v = (k) => uso[k]?.tarifado_s ?? 0;
-  return cartao('Uso mês atual', pizza([
+  const gasto = ['fixo', 'movel', 'internacional'].reduce((s, k) => s + (uso[k]?.custo_centavos ?? 0), 0);
+  return cartao('Uso no mês', pizza([
     { rotulo: 'Móvel', valor: v('movel'), cor: CORES.amarelo },
     { rotulo: 'Fixo', valor: v('fixo'), cor: CORES.azul },
     { rotulo: 'Internacional', valor: v('internacional'), cor: CORES.verde },
-  ], { formato: minutos, vazio: 'Nenhuma ligação externa no mês' }),
-  el('div', { class: 'pequeno mudo', style: 'text-align:center;margin-top:8px' },
-    `Gasto no mês: ${dinheiro(['fixo', 'movel', 'internacional'].reduce((s, k) => s + (uso[k]?.custo_centavos ?? 0), 0))}`));
+  ], { formato: minutos, vazio: 'Nenhuma ligação externa no mês', centro: { valor: dinheiro(gasto), rotulo: 'no mês' }, lado: true }));
 }
 export function cartaoRecursos(r) {
-  const linha = (rotulo, x) => el('tr', {}, td(rotulo, 'centro'), el('td', { style: 'width:45%' }, barraUso(x.usado, x.limite)));
+  const linha = (rotulo, x) => el('tr', {}, td(rotulo), el('td', { style: 'width:50%' }, barraUso(x.usado, x.limite)));
   return cartao('Recursos de voz e texto', el('table', { class: 'tabela tabela-utilizacao' },
-    el('thead', {}, el('tr', {}, el('th', { class: 'centro' }, 'Recurso'), el('th', {}, 'Uso no mês'))),
+    el('thead', {}, el('tr', {}, el('th', {}, 'Recurso'), el('th', {}, 'Uso no mês'))),
     el('tbody', {}, linha('Texto para voz (TTS)', r.tts), linha('Voz para texto (STT)', r.stt))));
 }
 
@@ -90,9 +89,10 @@ export function painelChamadas(alvo, caminho, { master = false, empresas = [], f
     seletor('Direção', 'direcao', DIRECOES),
     seletor('Status', 'status', { em_curso: 'Em curso', atendida: 'Atendida', nao_atendida: 'Não atendida', ocupado: 'Ocupado', falha: 'Falha' }),
     master ? null : campoF('Ramal', 'ramal', { inputmode: 'numeric', placeholder: 'Todos' }),
-    campoF('Número ou contato', 'busca', { placeholder: 'Buscar…' }),
-    el('button', { class: 'btn', type: 'button', onclick: (e) => acao(e.currentTarget, () => baixar(`${caminho}.csv${qs({ ...estado, pagina: '' })}`, `chamadas-${estado.de}-a-${estado.ate}.csv`)) },
-      icone('baixar'), 'Exportar CSV'));
+    campoF('Número ou contato', 'busca', { type: 'search', placeholder: 'Buscar…' }));
+  // Exportar fica na linha do resumo, à direita: os filtros cabem numa linha só.
+  const exportar = el('button', { class: 'btn pequeno', type: 'button', onclick: (e) => acao(e.currentTarget, () => baixar(`${caminho}.csv${qs({ ...estado, pagina: '' })}`, `chamadas-${estado.de}-a-${estado.ate}.csv`)) },
+    icone('baixar'), 'Exportar CSV');
 
   async function carregar() {
     const r = await api.get(`${caminho}${qs(estado)}`);
@@ -104,7 +104,7 @@ export function painelChamadas(alvo, caminho, { master = false, empresas = [], f
         r.itens.map((c) => el('tr', { class: 'clicavel', onclick: () => detalheChamada(c) },
           td(dataHora(c.inicio)), master ? td(c.empresa_nome) : null, td(DIRECOES[c.direcao]),
           td(c.direcao === 'entrada' && c.contato ? [telefone(c.origem), el('div', { class: 'pequeno mudo' }, c.contato)] : telefone(c.origem)),
-          td(c.direcao !== 'entrada' && c.contato ? [telefone(c.destino), el('div', { class: 'pequeno mudo' }, c.contato)] : [telefone(c.destino), c.tipo_destino !== 'interno' ? el('div', { class: 'pequeno mudo' }, TIPOS_DESTINO[c.tipo_destino]) : null]),
+          td(c.direcao !== 'entrada' && c.contato ? [telefone(c.destino), el('div', { class: 'pequeno mudo' }, c.contato)] : el('span', { title: TIPOS_DESTINO[c.tipo_destino] }, telefone(c.destino))),
           master ? null : td(c.ramal ? `${c.ramal} · ${c.ramal_nome}` : '—'),
           td(etiquetaChamada(c.status)), td(c.fim ? duracao(c.duracao_s) : '—', 'dir num'), td(c.custo_centavos ? dinheiro(c.custo_centavos) : '—', 'dir num'))),
         'Nenhuma chamada no período.'),
@@ -112,7 +112,7 @@ export function painelChamadas(alvo, caminho, { master = false, empresas = [], f
         el('button', { class: 'btn pequeno', disabled: r.pagina <= 1, onclick: () => { estado.pagina--; carregar(); } }, 'Anterior'),
         el('button', { class: 'btn pequeno', disabled: r.pagina >= paginas, onclick: () => { estado.pagina++; carregar(); } }, 'Próxima'))) : null);
   }
-  limpar(alvo, filtros, cartao(null, el('div', { class: 'linha entre', style: 'margin-bottom:10px' }, resumo), lista));
+  limpar(alvo, el('div', { class: 'coluna' }, filtros, cartao(null, el('div', { class: 'linha entre' }, resumo, exportar), lista)));
   return carregar().catch((err) => toast(err.message, true));
 }
 
@@ -127,7 +127,6 @@ function detalheChamada(c) {
     linha('Duração falada', duracao(c.duracao_s)), linha('Tempo tarifado', c.tarifado_s ? duracao(c.tarifado_s) : '—'), linha('Custo', dinheiro(c.custo_centavos)),
     linha('Gravação', c.gravacao_bytes ? `${(c.gravacao_bytes / 1048576).toFixed(1)} MB` : 'sem gravação'),
     linha('Identificador', el('span', { class: 'mono pequeno' }, c.uid)),
-    el('div', { class: 'linha', style: 'justify-content:flex-end;margin-top:12px' }, el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
   ]);
 }
 
@@ -142,9 +141,11 @@ export function painelRelatorios(alvo, caminho, { master = false } = {}) {
     i.addEventListener('change', () => { estado[k] = i.value; carregar(); });
     return el('label', { class: 'campo' }, rotulo, i);
   };
-  const atalho = (rotulo, dias) => el('button', { class: 'btn', type: 'button', onclick: () => { estado.de = somarDias(hoje, -dias); estado.ate = hoje; desenharFiltros(); carregar(); } }, rotulo);
+  const ativo = (dias) => estado.ate === hoje && estado.de === somarDias(hoje, -dias);
+  const atalho = (rotulo, dias) => el('button', { class: `btn${ativo(dias) ? ' on' : ''}`, type: 'button', onclick: () => { estado.de = somarDias(hoje, -dias); estado.ate = hoje; desenharFiltros(); carregar(); } }, rotulo);
   const filtros = el('div', { class: 'filtros livre' });
-  const desenharFiltros = () => limpar(filtros, data('De', 'de'), data('Até', 'ate'), atalho('Hoje', 0), atalho('7 dias', 6), atalho('30 dias', 29),
+  const desenharFiltros = () => limpar(filtros, data('De', 'de'), data('Até', 'ate'),
+    el('div', { class: 'segmentado', role: 'group', 'aria-label': 'Período' }, atalho('Hoje', 0), atalho('7 dias', 6), atalho('30 dias', 29)),
     el('button', { class: 'btn', type: 'button', onclick: (e) => acao(e.currentTarget, () => baixar(`${caminho}.csv${qs(estado)}`, `relatorio-${estado.de}-a-${estado.ate}.csv`)) }, icone('baixar'), 'Exportar CSV'),
     el('button', { class: 'btn', type: 'button', onclick: () => print() }, 'Imprimir'));
   desenharFiltros();
@@ -164,13 +165,13 @@ export function painelRelatorios(alvo, caminho, { master = false } = {}) {
         indicador(master ? 'Faturamento' : 'Custo das ligações', dinheiro(t.custo_centavos), t.realizadas ? `média ${dinheiro(t.custo_centavos / t.realizadas)} por ligação` : null, 'dinheiro', 'roxo')),
       cartao('Chamadas por dia', r.por_dia.length ? barras(r.por_dia.map((d) => ({ rotulo: d.dia, valor: d.chamadas, titulo: `${d.dia.split('-').reverse().join('/')}: ${d.chamadas} chamada(s), ${dinheiro(d.custo_centavos)}` })))
         : el('p', { class: 'mudo' }, 'Sem chamadas no período.')),
-      el('div', { class: 'grade-dash' },
-        el('div', { class: 'c5' }, cartao('Por tipo de destino', tabela(['Tipo', '>Ligações', '>Minutos', '>Custo'], r.por_tipo.map((x) =>
-          el('tr', {}, td(TIPOS_DESTINO[x.tipo_destino]), td(inteiro(x.chamadas), 'dir num'), td(minutos(x.tarifado_s), 'dir num'), td(dinheiro(x.custo_centavos), 'dir num')))),
-          'Nenhuma ligação externa.')),
-        el('div', { class: 'c7' }, master
-          ? cartao('Por empresa', tabela(['Empresa', ...somas], r.por_empresa.map((x) => el('tr', {}, td(x.nome), ...celulas(x))), 'Nenhuma chamada.'))
-          : cartao('Por ramal', tabela(['Ramal', ...somas], r.por_ramal.map((x) => el('tr', {}, td(`${x.numero} · ${x.nome}`), ...celulas(x))), 'Nenhuma chamada.')))),
+      // Uma tabela por linha: oito colunas não cabem lado a lado sem cortar o custo.
+      cartao('Por tipo de destino', tabela(['Tipo', '>Ligações', '>Minutos', '>Custo'], r.por_tipo.map((x) =>
+        el('tr', {}, td(TIPOS_DESTINO[x.tipo_destino]), td(inteiro(x.chamadas), 'dir num'), td(minutos(x.tarifado_s), 'dir num'), td(dinheiro(x.custo_centavos), 'dir num'))),
+      'Nenhuma ligação externa.')),
+      master
+        ? cartao('Por empresa', tabela(['Empresa', ...somas], r.por_empresa.map((x) => el('tr', {}, td(x.nome), ...celulas(x))), 'Nenhuma chamada.'))
+        : cartao('Por ramal', tabela(['Ramal', ...somas], r.por_ramal.map((x) => el('tr', {}, td(`${x.numero} · ${x.nome}`), ...celulas(x))), 'Nenhuma chamada.')),
       cartao('Por dia', tabela(['Dia', ...somas], r.por_dia.map((d) => el('tr', {}, td(d.dia.split('-').reverse().join('/')), ...celulas(d))), 'Sem chamadas no período.')));
   }
   limpar(alvo, filtros, corpo);

@@ -5,8 +5,8 @@
  */
 import { api, qs, BASE as RAIZ } from './api.js';
 import { el, limpar, dinheiro, dataHora, inteiro, gb, barraUso, toast, campo, escolha, marcar, formModal, modal, confirmar, repetir, telefone,
-  reaisCampo, centavos } from './ui.js';
-import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo } from './comum.js';
+  reaisCampo, centavos, icone, situacao } from './ui.js';
+import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, campoBusca, seletor } from './comum.js';
 import { cartaoUtilizacao, cartaoSimultaneas, cartaoRamais, cartaoUsoMes, cartaoRecursos, cartaoStatusLigacoes, indicadoresTelefonia,
   painelChamadas, painelRelatorios, situacaoDiag, TIPOS_EMPRESA } from './telefonia-comum.js';
 
@@ -24,13 +24,13 @@ async function abaPainel(ctx) {
         indicador('Faturamento do mês', dinheiro(d.utilizacao.mes.gastos_centavos), `hoje: ${dinheiro(d.utilizacao.hoje.gastos_centavos)}`, 'dinheiro', 'laranja'))),
       el('div', { class: 'c8' }, cartaoSimultaneas(d.simultaneas, d.em_curso)),
       el('div', { class: 'c4' }, cartaoStatusLigacoes(d.utilizacao.hoje, d.em_curso)),
-      el('div', { class: 'c5' }, cartaoUtilizacao(d.utilizacao)),
-      el('div', { class: 'c3' }, cartaoRamais(d.ramais)),
+      el('div', { class: 'c4' }, cartaoUtilizacao(d.utilizacao)),
+      el('div', { class: 'c4' }, cartaoRamais(d.ramais)),
       el('div', { class: 'c4' }, cartaoUsoMes(d.uso_mes)),
-      el('div', { class: 'c7' }, cartao('Empresas com mais chamadas hoje', tabela(['Empresa', '>Chamadas', '>Agora', '>Valor'], d.top_empresas.map((e) =>
+      el('div', { class: 'c8' }, cartao('Empresas com mais chamadas hoje', tabela(['Empresa', '>Chamadas', '>Agora', '>Valor'], d.top_empresas.map((e) =>
         el('tr', {}, td(e.nome), td(inteiro(e.chamadas), 'dir num'), td(inteiro(e.em_curso), 'dir num'), td(dinheiro(e.custo_centavos), 'dir num'))),
       'Nenhuma chamada hoje.'))),
-      el('div', { class: 'c5' }, cartaoRecursos(d.recursos))));
+      el('div', { class: 'c4' }, cartaoRecursos(d.recursos))));
   }, 10_000));
 }
 
@@ -62,21 +62,17 @@ async function formTelefonia(e, troncos) {
 async function abaEmpresas(ctx) {
   const estado = { busca: '', tipo: '' };
   const lista = el('div');
-  const busca = el('input', { placeholder: 'Empresa...' });
-  const tipo = escolha(null, 'tipo', { '': 'Tipo', ...TIPOS_EMPRESA }, '');
-  const filtrar = () => { Object.assign(estado, { busca: busca.value, tipo: tipo.value }); carregar(); };
-  busca.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') filtrar(); });
 
   async function carregar() {
     const [empresas, troncos] = await Promise.all([listaEmpresas(estado), api.get(`${BASE}/troncos`)]);
-    limpar(lista, tabela(['Empresa', '^Telefonia', '^Tipo', '^Ramais', '^Agora / hoje', '^Uso do disco', '^Chave da central', '^Ações'], empresas.map((e) => el('tr', {},
-      td([e.nome, e.status === 'bloqueada' ? el('div', {}, el('span', { class: 'etiqueta erro', title: e.motivo_bloqueio ?? '' }, 'bloqueada')) : null]),
-      td(ligada(e), 'centro'),
-      td(e.telefonia_ativa ? TIPOS_EMPRESA[e.tipo] : '—', 'centro'),
-      td(e.telefonia_ativa ? `${e.ramais}/${e.limite_ramais}` : '—', 'centro num'),
-      td(e.telefonia_ativa ? `${e.chamadas_online} / ${e.chamadas_hoje}` : '—', 'centro num'),
-      el('td', { style: 'width:170px' }, e.telefonia_ativa ? barraUso(e.disco_bytes, e.disco_mb * 1048576, { formato: (b) => gb(b).replace('GB', ''), sufixo: 'GB' }) : '—'),
-      td(e.chaves_central ? el('span', { class: 'etiqueta ok' }, `${e.chaves_central} ativa(s)`) : e.telefonia_ativa ? el('span', { class: 'etiqueta aviso' }, 'falta') : '—', 'centro'),
+    limpar(lista, tabela(['Empresa', 'Telefonia', 'Tipo', '>Ramais', '>Agora / hoje', 'Uso do disco', 'Chave da central', ''], empresas.map((e) => el('tr', {},
+      td([el('strong', {}, e.nome), e.status === 'bloqueada' ? el('div', {}, el('span', { class: 'etiqueta erro', title: e.motivo_bloqueio ?? '' }, 'bloqueada')) : null]),
+      td(ligada(e)),
+      td(e.telefonia_ativa ? TIPOS_EMPRESA[e.tipo] : '—'),
+      td(e.telefonia_ativa ? `${e.ramais} / ${e.limite_ramais}` : '—', 'dir num'),
+      td(e.telefonia_ativa ? `${e.chamadas_online} / ${e.chamadas_hoje}` : '—', 'dir num'),
+      el('td', { style: 'width:170px' }, e.telefonia_ativa ? barraUso(e.disco_bytes, e.disco_mb * 1048576, { formato: (b) => gb(b).replace(' GB', ''), sufixo: 'GB' }) : '—'),
+      td(e.chaves_central ? situacao(e.chaves_central === 1 ? '1 ativa' : `${e.chaves_central} ativas`, 'ok') : e.telefonia_ativa ? situacao('Falta criar', 'aviso') : '—'),
       el('td', { class: 'acoes' }, botaoIcone('editar', 'Telefonia da empresa', async () => {
         if (!await formTelefonia(e, troncos)) return;
         ctx.esquecerEmpresa?.(e.id); // o menu da empresa mostra (ou esconde) a Telefonia
@@ -84,10 +80,12 @@ async function abaEmpresas(ctx) {
         carregar();
       })))), 'Nenhuma empresa encontrada. As empresas são criadas em Empresas.'));
   }
-  limpar(ctx.conteudo, el('section', { class: 'cartao grande' },
-    el('div', { class: 'filtros' }, busca, tipo, el('button', { class: 'btn primario largo', onclick: filtrar }, 'Filtrar')),
-    el('p', { class: 'pequeno mudo' }, 'Ligue a telefonia por empresa e defina os limites, as tarifas e a operadora. Ramais, filas, URA e números de cada empresa ficam no painel dela, em Telefonia.'),
-    lista));
+  // Filtros vivos (sem botão "Filtrar"), como em Empresas.
+  limpar(ctx.conteudo, el('div', { class: 'coluna' },
+    el('div', { class: 'filtros livre' },
+      campoBusca('', (t) => { estado.busca = t; carregar(); }, 'Nome da empresa'),
+      seletor('Tipo', { '': 'Todos', ...TIPOS_EMPRESA }, '', (v) => { estado.tipo = v; carregar(); })),
+    cartao(null, lista)));
   await carregar();
 }
 
@@ -134,11 +132,11 @@ async function abaTerminacao(ctx, so) {
     ], (d) => api.patch(`${BASE}/numeros/${n.id}`, { empresa_id: d.empresa_id || null, tronco_id: d.tronco_id || null, descricao: d.descricao }).then(() => true));
 
     const cartaoRotas = () => cartao('Rotas de saída (operadoras)',
-      tabela(['^Nº', 'Nome', 'Endereço', '^Canais', '^Agora', '^Hoje', '^Empresas', '>Custo fixo/móvel/intern.', 'Situação', '^Ações'], troncos.map((t) => el('tr', {},
-        td(t.id, 'centro num'), td(t.nome), td(el('span', { class: 'mono pequeno' }, `${t.usuario ? `${t.usuario}@` : ''}${t.host}:${t.porta}`)), td(t.canais, 'centro num'), td(t.em_curso, 'centro num'),
-        td(t.chamadas_hoje, 'centro num'), td(t.empresas, 'centro num'),
-        td(`${dinheiro(t.custo_fixo_centavos)} / ${dinheiro(t.custo_movel_centavos)} / ${dinheiro(t.custo_internacional_centavos)}`, 'dir num'),
-        td(t.ativo ? el('span', { class: 'etiqueta ok' }, 'ativa') : el('span', { class: 'etiqueta erro' }, 'inativa')),
+      tabela(['>Nº', 'Nome', 'Endereço', '>Canais', '>Agora', '>Hoje', '>Empresas', '>Fixo', '>Móvel', '>Intern.', 'Situação', ''], troncos.map((t) => el('tr', {},
+        td(t.id, 'dir num'), td(el('strong', {}, t.nome)), td(el('span', { class: 'mono pequeno' }, `${t.usuario ? `${t.usuario}@` : ''}${t.host}:${t.porta}`)), td(t.canais, 'dir num'), td(t.em_curso, 'dir num'),
+        td(t.chamadas_hoje, 'dir num'), td(t.empresas, 'dir num'),
+        td(dinheiro(t.custo_fixo_centavos), 'dir num'), td(dinheiro(t.custo_movel_centavos), 'dir num'), td(dinheiro(t.custo_internacional_centavos), 'dir num'),
+        td(t.ativo ? situacao('Ativa', 'ok') : situacao('Inativa', 'erro')),
         el('td', { class: 'acoes' }, ctx.soMaster ? [
           botaoIcone('editar', 'Editar', async () => { if (await formTronco(t)) { toast('Rota salva.'); carregar(); } }),
           botaoIcone('lixo', 'Excluir', async () => {
@@ -147,10 +145,11 @@ async function abaTerminacao(ctx, so) {
             toast('Rota excluída.');
             carregar();
           }, 'perigo')] : null))), 'Nenhuma rota cadastrada. Cadastre a operadora que faz as ligações para fora.'),
-      ctx.soMaster ? el('div', { style: 'margin-top:12px' }, botao('Nova rota', 'primario', async () => { if (await formTronco()) { toast('Rota criada.'); carregar(); } })) : null);
+      null);
+    if (so === 'rotas') ctx.acoes(ctx.soMaster ? el('button', { class: 'btn primario', type: 'button', onclick: async () => { if (await formTronco()) { toast('Rota criada.'); carregar(); } } }, icone('mais'), 'Nova rota') : null);
 
     const cartaoDids = () => cartao('Números (DIDs)',
-      tabela(['Número', 'Descrição', 'Rota', 'Empresa', 'Destino', '^Ações'], numeros.map((n) => el('tr', {},
+      tabela(['Número', 'Descrição', 'Rota', 'Empresa', 'Destino', ''], numeros.map((n) => el('tr', {},
         td(telefone(n.numero), 'num'), td(n.descricao ?? '—'), td(n.tronco ?? '—'), td(n.empresa ?? el('span', { class: 'etiqueta' }, 'estoque')),
         td(n.empresa ? (n.destino_tipo ? el('span', { class: 'etiqueta ok' }, n.destino_tipo) : el('span', { class: 'etiqueta aviso' }, 'sem destino')) : '—'),
         el('td', { class: 'acoes' }, ctx.soMaster ? [
@@ -161,7 +160,8 @@ async function abaTerminacao(ctx, so) {
             toast('Número excluído.');
             carregar();
           }, 'perigo')] : null))), 'Nenhum número cadastrado.'),
-      ctx.soMaster ? el('div', { style: 'margin-top:12px' }, botao('Adicionar números', 'primario', async () => { if (await formNumeros()) carregar(); })) : null);
+      null);
+    if (so !== 'rotas') ctx.acoes(ctx.soMaster ? el('button', { class: 'btn primario', type: 'button', onclick: async () => { if (await formNumeros()) carregar(); } }, icone('mais'), 'Adicionar números') : null);
 
     limpar(corpo, so === 'rotas' ? cartaoRotas() : cartaoDids());
   }
@@ -181,7 +181,7 @@ async function abaDiagnostico(ctx) {
     const d = await api.get(`${BASE}/diagnostico`);
     limpar(ctx.conteudo, el('div', { class: 'coluna' },
       cartao('Verificações', tabela(['Item', 'Situação', 'Detalhe'], d.verificacoes.map((x) => el('tr', {},
-        td(x.nome), td([el('span', { class: `bolinha ${situacaoDiag[x.situacao][0]}` }), situacaoDiag[x.situacao][1]]),
+        td(x.nome), td(situacao(situacaoDiag[x.situacao][1], situacaoDiag[x.situacao][0])),
         td(x.detalhe.replace(/(\d{4}-\d{2}-\d{2}T[\d:.]+Z)/, (m) => dataHora(m))))))),
       cartao('Rotas de saída', tabela(['Rota', '^Agora / canais', 'Última chamada', 'Situação'], d.troncos.map((t) => el('tr', {},
         td(t.nome), td(`${t.em_curso} / ${t.canais}`, 'centro num'), td(dataHora(t.ultima_chamada)),
@@ -193,7 +193,7 @@ async function abaDiagnostico(ctx) {
 async function abaTarifacao(ctx) {
   if (!ctx.soMaster) { limpar(ctx.conteudo, cartao('Tarifação', el('p', { class: 'mudo' }, 'Só o master altera a tarifação.'))); return; }
   const c = await api.get(`${BASE}/configuracoes`);
-  const f = el('form', { class: 'form', style: 'max-width:760px' },
+  const f = el('form', { class: 'form' },
     el('fieldset', {}, el('legend', {}, 'Cobrança por tempo'),
       el('div', { class: 'duas' }, campo('Cobrança mínima (segundos)', { name: 'cadencia_inicial_s', type: 'number', min: 1, value: c.cadencia_inicial_s }),
         campo('Depois, em blocos de (segundos)', { name: 'cadencia_s', type: 'number', min: 1, value: c.cadencia_s })),
@@ -267,8 +267,8 @@ async function abaCentral(ctx) {
       `POST ${base}/recursos                    { "recurso": "tts", "quantidade": 1 }`,
       `POST ${base}/campanhas/5/proximos`,
     ].join('\n')));
-  limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, 'Uma chave por empresa (ou por central). Só serve para telefonia.'), nova),
-    cartao(null, lista), el('div', { style: 'height:18px' }), doc);
+  ctx.acoes(nova);
+  limpar(ctx.conteudo, el('div', { class: 'coluna' }, cartao('Chaves (uma por empresa ou por central, só para telefonia)', lista), doc));
   await carregar();
 }
 
@@ -286,7 +286,7 @@ const ABAS = {
 
 export async function telaTelefoniaMaster(ctx) {
   const abas = el('div', { class: 'abas' });
-  const corpo = el('div');
+  const corpo = el('div', { class: 'coluna' });
   limpar(ctx.conteudo, abas, corpo);
   let paradas = [];
   const sub = { ...ctx, conteudo: corpo, parar: (fn) => { paradas.push(fn); } };
@@ -294,6 +294,7 @@ export async function telaTelefoniaMaster(ctx) {
   const trocar = async (k) => {
     for (const p of paradas) p();
     paradas = [];
+    ctx.acoes(); // cada aba põe a própria ação no topo
     limpar(abas, Object.entries(ABAS).map(([chave, [rotulo]]) => el('button', {
       class: `aba${chave === k ? ' on' : ''}`, type: 'button', onclick: () => trocar(chave),
     }, rotulo)));

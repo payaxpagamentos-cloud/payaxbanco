@@ -44,6 +44,7 @@ export async function telaCustos(ctx) {
   };
   let atual = 'conta';
   const trocar = async (k) => {
+    ctx.acoes?.(); // cada aba põe a própria ação no topo
     atual = k;
     limpar(abas, Object.entries(TELAS).map(([chave, [rotulo]]) => el('button', {
       class: `aba${chave === atual ? ' on' : ''}`, type: 'button', onclick: () => trocar(chave),
@@ -73,10 +74,10 @@ async function aConta(ctx, alvo) {
 
     limpar(conteudo,
       el('div', { class: 'indicadores' },
-        indicador('Gasto no período', reais(d.gasto_milesimos), `${inteiro(d.mensagens)} mensagem(ns) cobrada(s)`, 'dinheiro', 'azul'),
-        indicador('Deixou de gastar', reais(d.economia_milesimos), `${porcento(economiaPct)} do que seria a conta cheia`, 'raio', 'verde'),
-        indicador('Projeção do mês', reais(p.projecao_milesimos), `dia ${p.dia} de ${p.dias_no_mes}`, 'relogio', 'roxo'),
-        indicador('Sem as economias', reais(d.sem_otimizacao_milesimos), 'se tudo virasse template', 'alerta', 'laranja')),
+        indicador('Gasto no período', reaisTotal(d.gasto_milesimos), `${inteiro(d.mensagens)} ${d.mensagens === 1 ? 'mensagem cobrada' : 'mensagens cobradas'}`, 'dinheiro', 'azul'),
+        indicador('Deixou de gastar', reaisTotal(d.economia_milesimos), `${porcento(economiaPct)} do que seria a conta cheia`, 'raio', 'verde'),
+        indicador('Projeção do mês', reaisTotal(p.projecao_milesimos), `dia ${p.dia} de ${p.dias_no_mes}`, 'relogio', 'roxo'),
+        indicador('Sem as economias', reaisTotal(d.sem_otimizacao_milesimos), 'se tudo virasse template', 'alerta', 'laranja')),
 
       barraOrcamento(orc),
 
@@ -237,8 +238,8 @@ async function asReguas(ctx, alvo) {
       el('div', { class: 'indicadores' },
         indicador('Vão receber', inteiro(s.vao_receber), `${inteiro(s.por_template)} por template, ${inteiro(s.pela_janela)} pela janela`, 'enviar', 'azul'),
         indicador('Não vão receber', inteiro(s.pulados), 'e isso é economia', 'raio', 'verde'),
-        indicador('Vai custar', reais(s.custo_milesimos), `sem as economias: ${reais(s.sem_otimizacao_milesimos)}`, 'dinheiro', 'laranja'),
-        indicador('Economia', reais(s.economia_milesimos), s.teto_estourado ? 'ATENÇÃO: passa do teto' : 'neste disparo', 'ok', 'verde')),
+        indicador('Vai custar', reaisTotal(s.custo_milesimos), `sem as economias: ${reaisTotal(s.sem_otimizacao_milesimos)}`, 'dinheiro', 'laranja'),
+        indicador('Economia', reaisTotal(s.economia_milesimos), s.teto_estourado ? 'ATENÇÃO: passa do teto' : 'neste disparo', 'ok', 'verde')),
       s.motivos.length
         ? cartao('Por que alguns não recebem', tabela(['Motivo', '>Clientes'], s.motivos.map((m) => el('tr', {}, td(m.motivo), td(inteiro(m.quantos), 'dir num')))))
         : null,
@@ -278,7 +279,8 @@ async function asReguas(ctx, alvo) {
     ], { largo: true });
   };
 
-  limpar(alvo, acoesTopo(el('span'), ctx.pode('custos.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova régua') : null), lista);
+  ctx.acoes(ctx.pode('custos.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova régua') : null);
+  limpar(alvo, lista);
   await recarregar();
 }
 
@@ -323,7 +325,7 @@ async function aEspera(ctx, alvo) {
     limpar(conteudo,
       el('div', { class: 'indicadores' },
         indicador('Esperando a janela', inteiro(d.esperando), 'avisos que ainda não custaram nada', 'relogio', 'azul'),
-        indicador('Em jogo', reais(d.em_risco_milesimos), 'o que custaria se ninguém escrever', 'dinheiro', 'laranja'),
+        indicador('Em jogo', reaisTotal(d.em_risco_milesimos), 'o que custaria se ninguém escrever', 'dinheiro', 'laranja'),
         indicador('Salvos pela janela', inteiro(d.salvas_pela_janela), 'avisos entregues de graça', 'raio', 'verde')),
 
       cartao('Como funciona',
@@ -348,14 +350,15 @@ async function aEspera(ctx, alvo) {
         : null);
   };
 
-  limpar(alvo,
-    acoesTopo(botao('Varrer agora', 'primario', async () => {
-      if (!await confirmar('Varrer a sala de espera', 'O que já passou do prazo será pago agora, se ainda fizer sentido. O resto continua esperando.')) return;
-      const r = await api.post(`/empresas/${ctx.empresaId}/reguas/pendencias/varrer`, {});
-      toast(`${r.pela_janela} saiu pela janela, ${r.pagas} pagou template, ${r.canceladas} cancelada(s).`);
-      await desenhar();
-    })),
-    conteudo);
+  const varrer = el('button', { class: 'btn', type: 'button' }, icone('raio'), 'Varrer agora');
+  varrer.addEventListener('click', () => acao(varrer, async () => {
+    if (!await confirmar('Varrer a sala de espera', 'O que já passou do prazo será pago agora, se ainda fizer sentido. O resto continua esperando.')) return;
+    const r = await api.post(`/empresas/${ctx.empresaId}/reguas/pendencias/varrer`, {});
+    toast(`${r.pela_janela} saiu pela janela, ${r.pagas} pagou template, ${r.canceladas} cancelada(s).`);
+    await desenhar();
+  }));
+  ctx.acoes(varrer);
+  limpar(alvo, conteudo);
   await desenhar();
 }
 

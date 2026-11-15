@@ -4,7 +4,7 @@ import { telaTelefonia } from './telefonia.js';
 import {
   el, limpar, icone, toast, confirmar, formModal, modal, campo, area, escolha, marcar, inteiro, porcento,
   duracao, dataHora, desde, espera, diasSemana, telefone as formatarTelefone, etiquetaChamado, PERFIS, repetir,
-  iniciais,
+  iniciais, situacao, documento,
 } from './ui.js';
 import {
   cartao, indicador, tabela, td, botaoIcone, acoesTopo, vazio, campoBusca, seletor, indicadoresAtendimento,
@@ -18,7 +18,7 @@ import {telaCustos} from './custos.js';
 // ---------- Dashboard ----------
 
 async function dashboard(ctx) {
-  const conteudo = el('div');
+  const conteudo = el('div', { class: 'coluna' });
   const desenhar = async () => {
     const d = await api.get(`/empresas/${ctx.empresaId}/painel`);
     const a = d.agora;
@@ -26,22 +26,18 @@ async function dashboard(ctx) {
       el('div', { class: 'indicadores' },
         indicador('Com a ZOE', inteiro(a.com_ia), 'ela está conduzindo agora', 'robo', 'verde'),
         indicador('Esperando na fila', inteiro(a.aguardando), a.aguardando ? 'alguém precisa assumir' : 'ninguém esperando', 'relogio', a.aguardando ? 'vermelho' : 'azul'),
-        indicador('Com a equipe', inteiro(a.com_humano), `${inteiro(a.atendentes_disponiveis)} de ${inteiro(a.atendentes)} atendente(s) disponível(is)`, 'pessoa', 'azul'),
+        indicador('Com a equipe', inteiro(a.com_humano), `${inteiro(a.atendentes_disponiveis)} de ${inteiro(a.atendentes)} ${a.atendentes === 1 ? 'disponível' : 'disponíveis'}`, 'pessoa', 'azul'),
         indicador('Chamados abertos', inteiro(Number(d.chamados.abertos ?? 0) + Number(d.chamados.andamento ?? 0)), `${inteiro(d.chamados.abertos ?? 0)} aguardando`, 'chamados', 'laranja')),
 
       d.filas.some((f) => f.aguardando) ? cartao('Filas agora',
-        tabela(['Fila', '^Esperando', '>Espera da mais antiga'], d.filas.filter((f) => f.aguardando).map((f) => el('tr', { class: 'clicavel', onclick: () => ctx.ir('caixa') },
-          td(f.nome), td(inteiro(f.aguardando), 'centro num'), td(espera(f.espera_s), 'dir'))))) : null,
+        tabela(['Fila', '>Esperando', '>Espera da mais antiga'], d.filas.filter((f) => f.aguardando).map((f) => el('tr', { class: 'clicavel', onclick: () => ctx.ir('caixa') },
+          td(f.nome), td(inteiro(f.aguardando), 'dir num'), td(espera(f.espera_s), 'dir'))))) : null,
 
       el('div', { class: 'grade-2' },
         cartao('Hoje', el('div', { class: 'indicadores embutidos' }, indicadoresAtendimento(d.hoje))),
         cartaoTempos(d.hoje)),
       el('div', { class: 'grade-2' }, cartaoDesfechos(d.mes), cartaoCustoIa(d.mes.ia)),
-      cartao('No mês',
-        el('p', { class: 'mudo', style: 'margin:0 0 10px' },
-          `${inteiro(d.mes.conversas)} conversa(s) no mês. A ZOE resolveu ${porcento(d.mes.taxa_resolucao_ia)} sozinha`
-          + `${d.mes.csat_medio === null ? '' : `, com satisfação média de ${d.mes.csat_medio.toLocaleString('pt-BR')} de 5`}.`),
-        el('div', { class: 'indicadores embutidos' }, indicadoresAtendimento(d.mes))));
+      cartao('No mês', el('div', { class: 'indicadores embutidos' }, indicadoresAtendimento(d.mes))));
   };
   limpar(ctx.conteudo, conteudo);
   await desenhar();
@@ -56,21 +52,21 @@ async function filas(ctx) {
 
   const recarregar = async () => {
     const d = await api.get(`/empresas/${ctx.empresaId}/filas`);
-    limpar(lista, cartao(null, tabela(['Fila', 'Quando a IA usa', 'Horário', 'Atendentes', '^Esperando', '^Ativa', ''],
+    limpar(lista, cartao(null, tabela(['Fila', 'Quando a ZOE usa', 'Horário', 'Atendentes', '>Esperando', 'Situação', ''],
       d.itens.map((f) => el('tr', {},
         td(el('div', {}, el('strong', {}, f.nome), f.descricao ? el('div', { class: 'pequeno mudo' }, f.descricao) : null)),
-        td(el('span', { class: 'pequeno' }, f.quando_usar ?? '—')),
+        td(el('span', { class: 'pequeno corte-2', title: f.quando_usar ?? '' }, f.quando_usar ?? '—')),
         td(el('div', {}, diasSemana(f.dias), el('div', { class: 'pequeno mudo' }, `${f.abre} às ${f.fecha}`),
           el('div', { class: `pequeno ${f.dentro_horario ? 'ok-texto' : 'mudo'}` }, f.dentro_horario ? 'aberta agora' : 'fechada agora'))),
         td(f.atendentes.length
           ? el('div', { class: 'linha', style: 'gap:4px;flex-wrap:wrap' }, f.atendentes.map((u) => el('span', { class: `etiqueta ${u.disponivel ? 'ok' : ''}`, title: u.disponivel ? 'disponível' : 'indisponível' }, u.nome.split(' ')[0])))
           : el('span', { class: 'etiqueta erro' }, 'ninguém')),
-        td(inteiro(f.aguardando), 'centro num'),
-        td(f.ativa ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
+        td(inteiro(f.aguardando), 'dir num'),
+        td(f.ativa ? situacao('Ativa', 'ok') : situacao('Inativa')),
         td(ctx.pode('filas.editar') ? el('div', { class: 'linha', style: 'gap:4px' },
           botaoIcone('equipe', 'Quem atende', () => escolherAtendentes(f)),
           botaoIcone('editar', 'Editar', () => editar(f)),
-          botaoIcone('lixo', 'Excluir', () => excluir(f), 'perigo')) : null, 'dir'))),
+          botaoIcone('lixo', 'Excluir', () => excluir(f), 'perigo')) : null, 'acoes'))),
     'Nenhuma fila. Sem fila, a ZOE não tem para onde transferir.')));
   };
 
@@ -78,15 +74,17 @@ async function filas(ctx) {
     campo('Nome', { name: 'nome', value: f.nome ?? '', required: true, maxlength: 60, placeholder: 'Financeiro' }),
     campo('Descrição', { name: 'descricao', value: f.descricao ?? '', maxlength: 300 }),
     area('Quando a ZOE deve mandar para cá', { name: 'quando_usar', rows: 3, maxlength: 500, placeholder: 'boleto, fatura, pagamento, cobrança, atraso, negociação' }, f.quando_usar ?? ''),
-    el('p', { class: 'mudo pequeno', style: 'margin:0' }, 'Este texto entra no prompt da IA: é assim que ela escolhe a fila certa.'),
-    el('div', { class: 'grade-2' },
+    el('p', { class: 'ajuda' }, 'É assim que a ZOE escolhe a fila certa.'),
+    el('div', { class: 'duas' },
       campo('Abre', { name: 'abre', type: 'time', value: f.abre ?? '08:00', required: true }),
       campo('Fecha', { name: 'fecha', type: 'time', value: f.fecha ?? '18:00', required: true })),
-    el('label', { class: 'campo' }, 'Dias de atendimento',
+    // Dias como botões de liga/desliga (um rótulo dentro de outro deixava o clique confuso).
+    el('div', { class: 'campo' }, el('span', { class: 'rotulo-campo' }, 'Dias de atendimento'),
       el('div', { class: 'escolha-dias' }, ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'].map((dia, i) =>
-        el('label', { class: 'marcar' }, el('input', { type: 'checkbox', name: `dia${i}`, checked: (f.dias ?? '0111110')[i] === '1' }), dia.slice(0, 3))))),
-    campo('Ordem', { name: 'ordem', type: 'number', value: f.ordem ?? 0, min: 0, max: 999 }),
-    marcar('Ativa', { name: 'ativa', checked: f.id ? Boolean(f.ativa) : true }),
+        el('label', { class: 'marcar dia' }, el('input', { type: 'checkbox', name: `dia${i}`, checked: (f.dias ?? '0111110')[i] === '1' }), dia.slice(0, 3))))),
+    el('div', { class: 'duas', style: 'align-items:end' },
+      campo('Ordem', { name: 'ordem', type: 'number', value: f.ordem ?? 0, min: 0, max: 999 }),
+      marcar('Fila ativa', { name: 'ativa', checked: f.id ? Boolean(f.ativa) : true })),
   ];
 
   const comDias = (d) => ({ ...d, dias: [0, 1, 2, 3, 4, 5, 6].map((i) => (d[`dia${i}`] ? '1' : '0')).join('') });
@@ -119,7 +117,8 @@ async function filas(ctx) {
     await recarregar();
   });
 
-  limpar(ctx.conteudo, acoesTopo(el('span'), ctx.pode('filas.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova fila') : null), lista);
+  ctx.acoes(ctx.pode('filas.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Nova fila') : null);
+  limpar(ctx.conteudo, lista);
   await recarregar();
 }
 
@@ -174,21 +173,21 @@ async function equipe(ctx) {
   const lista = el('div');
   const recarregar = async () => {
     const { itens } = await api.get(`/empresas/${ctx.empresaId}/usuarios`);
-    limpar(lista, cartao(null, tabela(['Pessoa', 'Perfil', '^Ramal', '^Disponível', '^Em atendimento', 'Máx.', 'Último acesso', '^Ativo', ''],
+    limpar(lista, cartao(null, tabela(['Pessoa', 'Perfil', 'Ramal', 'Disponível', '>Atendendo', '>Máx.', 'Último acesso', 'Situação', ''],
       itens.map((u) => el('tr', {},
         td(el('span', { class: 'pessoa' }, el('span', { class: 'iniciais' }, iniciais(u.nome)), el('span', {}, u.nome, el('div', { class: 'pequeno mudo' }, u.email)))),
         td(el('div', {},
           PERFIS[u.perfil],
           u.permissoes_ajustadas ? el('div', { class: 'pequeno mudo' }, 'permissões ajustadas') : null)),
-        td(u.ramal ?? el('span', { class: 'mudo' }, '—'), 'centro num'),
-        td(['atendente', 'cliente'].includes(u.perfil) ? el('span', { class: `situacao ${u.disponivel ? 'ok' : ''}` }, u.disponivel ? 'sim' : 'não') : '—', 'centro'),
-        td(inteiro(u.em_atendimento), 'centro num'),
-        td(inteiro(u.max_simultaneas), 'centro num'),
-        td(u.ultimo_acesso ? desde(u.ultimo_acesso) : 'nunca entrou'),
-        td(u.ativo ? icone('ok') : el('span', { class: 'mudo' }, '—'), 'centro'),
+        td(u.ramal ?? el('span', { class: 'mudo' }, '—'), 'num'),
+        td(['atendente', 'cliente'].includes(u.perfil) ? situacao(u.disponivel ? 'Disponível' : 'Ausente', u.disponivel ? 'ok' : '') : el('span', { class: 'mudo' }, '—')),
+        td(inteiro(u.em_atendimento), 'dir num'),
+        td(inteiro(u.max_simultaneas), 'dir num'),
+        td(u.ultimo_acesso ? desde(u.ultimo_acesso) : el('span', { class: 'mudo' }, 'nunca entrou')),
+        td(u.ativo ? situacao('Ativo', 'ok') : situacao('Inativo')),
         td(ctx.pode('usuarios.editar') ? el('div', { class: 'linha', style: 'gap:4px;justify-content:flex-end' },
           botaoIcone('seguranca', 'Permissões', () => permissoesDe(ctx, u, recarregar)),
-          botaoIcone('editar', 'Editar', () => editar(u))) : null, 'dir'))))));
+          botaoIcone('editar', 'Editar', () => editar(u))) : null, 'acoes'))))));
   };
 
   const criar = () => formModal('Novo usuário', () => [
@@ -197,7 +196,7 @@ async function equipe(ctx) {
     escolha('Perfil', 'perfil', { atendente: PERFIS.atendente, cliente: PERFIS.cliente, supervisor: PERFIS.supervisor }, 'atendente'),
     campo('Máximo de conversas ao mesmo tempo', { name: 'max_simultaneas', type: 'number', value: 5, min: 1, max: 50 }),
     campo('Ramal na central telefônica (opcional)', { name: 'ramal', inputmode: 'numeric', pattern: '\\d{2,8}', maxlength: 8, placeholder: 'ex.: 201' }),
-    el('p', { class: 'mudo pequeno', style: 'margin:-4px 0 4px' }, 'Quando uma ligação que passou pela ZOE for atendida neste ramal, o painel desta pessoa abre sozinho com tudo o que o cliente já disse.'),
+    el('p', { class: 'ajuda' }, 'Ligação da ZOE atendida neste ramal abre o painel desta pessoa com tudo o que o cliente disse.'),
     campo('Senha (vazio gera uma provisória)', { name: 'senha', type: 'password', minlength: 8, autocomplete: 'new-password' }),
   ], async (d) => {
     if (!d.senha) delete d.senha;
@@ -230,7 +229,8 @@ async function equipe(ctx) {
     await recarregar();
   });
 
-  limpar(ctx.conteudo, acoesTopo(el('span'), ctx.pode('usuarios.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Novo usuário') : null), lista);
+  ctx.acoes(ctx.pode('usuarios.editar') ? el('button', { class: 'btn primario', onclick: criar }, icone('mais'), 'Novo usuário') : null);
+  limpar(ctx.conteudo, lista);
   await recarregar();
 }
 
@@ -241,18 +241,19 @@ async function contatos(ctx) {
   const lista = el('div');
   const recarregar = async () => {
     const { itens } = await api.get(`/empresas/${ctx.empresaId}/contatos${qs(estado)}`);
-    limpar(lista, cartao(null, tabela(['Contato', 'WhatsApp', 'CPF/CNPJ', '^Conversas', 'Último contato', ''],
+    limpar(lista, cartao(null, tabela(['Contato', 'WhatsApp', 'CPF/CNPJ', '>Conversas', 'Último contato', ''],
       itens.map((c) => el('tr', {},
         td(el('div', {}, el('strong', {}, c.nome ?? c.nome_perfil ?? '—'),
           c.bloqueado ? el('span', { class: 'etiqueta erro', style: 'margin-left:6px' }, 'bloqueado') : null,
-          c.aceita_ativo ? null : el('span', { class: 'etiqueta aviso', style: 'margin-left:6px' }, 'sem ativo'))),
+          c.aceita_ativo ? null : el('span', { class: 'etiqueta aviso', style: 'margin-left:6px' }, 'sem ativo'),
+          c.abertas ? el('span', { class: 'etiqueta info', style: 'margin-left:6px' }, 'em aberto') : null)),
         td(formatarTelefone(String(c.telefone).replace(/^55/, ''))),
-        td(c.documento ?? '—'),
-        td(el('span', {}, inteiro(c.conversas), c.abertas ? el('span', { class: 'etiqueta info', style: 'margin-left:6px' }, 'em aberto') : null), 'centro'),
+        td(c.documento ? documento(c.documento) : '—', 'num'),
+        td(inteiro(c.conversas), 'dir num'),
         td(c.ultimo_contato_em ? desde(c.ultimo_contato_em) : '—'),
         td(!ctx.pode('cliente.editar') ? null : el('div', { class: 'linha', style: 'gap:4px' },
           botaoIcone('conversa', c.abertas ? 'Abrir a conversa' : 'Iniciar conversa', () => conversar(c)),
-          botaoIcone('editar', 'Editar', () => editar(c))), 'dir'))),
+          botaoIcone('editar', 'Editar', () => editar(c))), 'acoes'))),
     'Nenhum contato ainda. Eles aparecem aqui assim que alguém mandar mensagem para o seu WhatsApp.')));
   };
 
@@ -286,7 +287,7 @@ async function contatos(ctx) {
     location.hash = `#/empresa/${ctx.empresaId}/caixa?conversa=${r.conversa_id}`;
   }, { rotulo: 'Enviar', largo: true });
 
-  limpar(ctx.conteudo, acoesTopo(campoBusca(estado.busca, (t) => { estado.busca = t; recarregar(); }, 'Nome, telefone ou CPF/CNPJ'), el('span')), lista);
+  limpar(ctx.conteudo, el('div', { class: 'filtros livre' }, campoBusca(estado.busca, (t) => { estado.busca = t; recarregar(); }, 'Nome, telefone ou CPF/CNPJ')), lista);
   await recarregar();
 }
 
@@ -298,16 +299,16 @@ async function chamados(ctx) {
   const lista = el('div');
   const recarregar = async () => {
     const { itens } = await api.get(`/empresas/${ctx.empresaId}/chamados${qs(estado)}`);
-    limpar(lista, cartao(null, tabela(['Protocolo', 'Assunto', 'Cliente', 'Fila', 'Aberto por', 'Criado', '^Situação', ''],
+    limpar(lista, cartao(null, tabela(['Protocolo', 'Assunto', 'Cliente', 'Fila', 'Aberto por', 'Criado', 'Situação', ''],
       itens.map((ch) => el('tr', {},
-        td(el('code', {}, ch.protocolo)),
-        td(el('div', {}, el('strong', {}, ch.assunto), ch.descricao ? el('div', { class: 'pequeno mudo' }, String(ch.descricao).slice(0, 90)) : null)),
+        td(el('strong', { class: 'num' }, ch.protocolo)),
+        td(el('div', {}, el('strong', {}, ch.assunto), ch.descricao && !/^Relato do cliente registrado pela ZOE\.?$/.test(String(ch.descricao).trim()) ? el('div', { class: 'pequeno mudo corte-2' }, ch.descricao) : null)),
         td(el('div', {}, ch.contato_nome ?? '—', el('div', { class: 'pequeno mudo' }, formatarTelefone(String(ch.telefone).replace(/^55/, ''))))),
         td(ch.fila_nome ?? '—'),
-        td(ch.aberto_por === 'ia' ? el('span', { class: 'etiqueta info' }, 'ZOE') : (ch.usuario_nome ?? 'equipe')),
+        td(ch.aberto_por === 'ia' ? el('span', { class: 'linha', style: 'gap:6px' }, icone('robo'), 'ZOE') : (ch.usuario_nome ?? 'Equipe')),
         td(dataHora(ch.criado_em)),
-        td(etiquetaChamado(ch.status), 'centro'),
-        td(!ctx.pode('chamados.editar') ? null : botaoIcone('editar', 'Atualizar', () => editar(ch)), 'dir'))),
+        td(etiquetaChamado(ch.status)),
+        td(!ctx.pode('chamados.editar') ? null : botaoIcone('editar', 'Atualizar', () => editar(ch)), 'acoes'))),
     'Nenhum chamado. A ZOE abre um sempre que o pedido é legítimo mas não tem solução na hora.')));
   };
 
@@ -496,14 +497,14 @@ const relatorios = (ctx) => telaRelatorios(ctx, `/empresas/${ctx.empresaId}/rela
     cartao('Por fila', tabela(['Fila', '>Conversas', '^Esperando', '>Espera média', '>Atendimento médio', '>CSAT'],
       d.por_fila.map((f) => el('tr', {}, td(f.nome), td(inteiro(f.conversas), 'dir num'), td(inteiro(f.aguardando), 'centro num'),
         td(f.espera_s === null ? '—' : duracao(f.espera_s), 'dir num'), td(f.atendimento_s === null ? '—' : duracao(f.atendimento_s), 'dir num'),
-        td(f.csat === null ? '—' : f.csat.toLocaleString('pt-BR'), 'dir num'))))),
+        td(f.csat === null ? '—' : f.csat.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }), 'dir num'))))),
     cartao('Por atendente', tabela(['Atendente', '^Disponível', '>Atendidas', '^Agora', '>1ª resposta', '>Atendimento médio', '>CSAT'],
       d.por_atendente.map((a) => el('tr', {}, td(a.nome),
         td(el('span', { class: `situacao ${a.disponivel ? 'ok' : ''}` }, a.disponivel ? 'sim' : 'não'), 'centro'),
         td(inteiro(a.atendidas), 'dir num'), td(inteiro(a.em_atendimento), 'centro num'),
         td(a.primeira_resposta_s === null ? '—' : duracao(a.primeira_resposta_s), 'dir num'),
         td(a.atendimento_s === null ? '—' : duracao(a.atendimento_s), 'dir num'),
-        td(a.csat === null ? '—' : `${a.csat.toLocaleString('pt-BR')} (${inteiro(a.avaliacoes)})`, 'dir num'))))),
+        td(a.csat === null ? '—' : `${a.csat.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} (${inteiro(a.avaliacoes)})`, 'dir num'))))),
   ],
 });
 
