@@ -16,8 +16,9 @@
 #     --com-whisper      compila e liga a transcrição de áudio local (whisper.cpp, ~1 GB de RAM)
 #     --pasta P          onde tudo fica no servidor (padrão: /zoe)
 #     --porta N          porta interna (padrão: 3600; use outra se a 3600 estiver ocupada)
-#     --ip IP            sem domínio ainda: abre em https://IP:8443/atendimento/ com certificado próprio
-#                        (o navegador avisa na primeira vez). --porta-web N troca a 8443.
+#     --ip IP            sem domínio ainda: abre em https://IP/atendimento/ com certificado próprio
+#                        (o navegador avisa na primeira vez). Usa a 443 se estiver livre; senão a 8443
+#                        (https://IP:8443/atendimento/). --porta-web N escolhe outra.
 #     --com-asterisk     instala também o Asterisk nesta máquina, já ligado à ZOE (instalacao/asterisk.sh)
 #
 #  Servidor que já tem outro sistema: a ZOE convive. Ela não troca o Node do servidor (usa um Node 22
@@ -40,7 +41,7 @@ DESTINO=/zoe
 USUARIO=zoe
 DOMINIO=""
 IP_ACESSO=""
-PORTA_WEB=8443
+PORTA_WEB=""   # pelo IP: 443 se estiver livre, senão 8443
 EMAIL=""
 NGINX=1
 WHISPER=0
@@ -87,11 +88,16 @@ if [ -z "$DOMINIO" ] && [ -f "$CODIGO/.env" ]; then
   [ "$DOMINIO" = SEU-DOMINIO ] && DOMINIO=""
   # Instalada pelo IP (https://IP:porta): continua pelo IP.
   if [[ "$DOMINIO" =~ ^([0-9]{1,3}(\.[0-9]{1,3}){3})(:([0-9]+))?$ ]]; then
-    IP_ACESSO="${BASH_REMATCH[1]}"; PORTA_WEB="${BASH_REMATCH[4]:-$PORTA_WEB}"; DOMINIO=""
+    IP_ACESSO="${BASH_REMATCH[1]}"; [ -n "$PORTA_WEB" ] || PORTA_WEB="${BASH_REMATCH[4]:-443}"; DOMINIO=""
   fi
 fi
 if [ -n "$IP_ACESSO" ]; then
   [[ "$IP_ACESSO" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || falha "IP inválido: $IP_ACESSO"
+  if [ -z "$PORTA_WEB" ]; then
+    # A 443 sem dono deixa o endereço sem porta. Se outro sistema já usa a 443, a ZOE fica na 8443
+    # para não tomar o lugar dele.
+    if [ -z "$(ss -ltnH 'sport = :443' 2>/dev/null)" ]; then PORTA_WEB=443; else PORTA_WEB=8443; fi
+  fi
   [[ "$PORTA_WEB" =~ ^[0-9]+$ ]] || falha "Porta web inválida: $PORTA_WEB"
   [ -n "$DOMINIO" ] && falha "Use --dominio ou --ip, não os dois."
 fi
@@ -105,6 +111,9 @@ if [ -n "$IP_ACESSO" ]; then
   [ -z "$DONO_WEB" ] || [ "$DONO_WEB" = nginx ] || falha "A porta $PORTA_WEB já está em uso por \"$DONO_WEB\". Use --porta-web 8444 (por exemplo)."
 fi
 [[ "$PORTA" =~ ^[0-9]+$ ]] || falha "Porta inválida: $PORTA"
+# Endereço pelo IP (sem ":443", que é o padrão do https).
+URL_IP=""
+[ -n "$IP_ACESSO" ] && URL_IP="$IP_ACESSO$([ "$PORTA_WEB" = 443 ] || echo ":$PORTA_WEB")"
 
 # Atualização: a porta é a que já está no .env.
 if [ "$PRIMEIRA" = 0 ] && [ "$PORTA_INFORMADA" = 0 ]; then
@@ -195,6 +204,7 @@ SENHA_NOVA=""
 if [ -f "$CODIGO/.env" ]; then
   echo ".env mantido (segredos e senha não mudam)"
   # Instalações antigas escutavam em todas as interfaces: fecha para só dentro do servidor.
+  [ -n "$URL_IP" ] && sed -i "s|^ATEND_URL_PUBLICA=https://[0-9.]*\(:[0-9]*\)\?$|ATEND_URL_PUBLICA=https://$URL_IP|" "$CODIGO/.env"
   grep -q '^ATEND_HOST=' "$CODIGO/.env" || printf '\n# Só dentro do servidor (Nginx/Apache ou túnel SSH na frente).\nATEND_HOST=127.0.0.1\n' >> "$CODIGO/.env"
 else
   SENHA_NOVA="$(aleatorio 12 base64url)"
@@ -206,7 +216,7 @@ PORT=$PORTA
 # Só dentro do servidor: o acesso de fora passa pelo Nginx/Apache (ou por um túnel SSH).
 ATEND_HOST=127.0.0.1
 ATEND_BASE_PATH=/atendimento
-ATEND_URL_PUBLICA=https://${DOMINIO:-${IP_ACESSO:+$IP_ACESSO:$PORTA_WEB}}
+ATEND_URL_PUBLICA=https://${DOMINIO:-$URL_IP}
 ATEND_SECRET=$(aleatorio 32 hex)
 ATEND_ADMIN_EMAIL=$EMAIL
 ATEND_ADMIN_SENHA=$SENHA_NOVA
@@ -294,7 +304,8 @@ if [ "$NGINX" = 1 ]; then
   SITE=/etc/nginx/sites-available/zoe.conf
   ALVO="$SITE"
   # Configuração que alguém já ajustou (certificado, outros sites) não é sobrescrita.
-  [ -f "$SITE" ] && ALVO="$SITE.novo"
+  # O site gerado pela própria ZOE é refeito; um que alguém ajustou (certbot, à mão) fica, e a versão nova vai ao lado.
+  if [ -f "$SITE" ] && { ! grep -q '^# ZOE — gerado pelo instalador' "$SITE" || grep -q 'managed by Certbot' "$SITE"; }; then ALVO="$SITE.novo"; fi
   if [ -n "$IP_ACESSO" ]; then
     # Sem domínio: HTTPS na porta própria, com certificado gerado aqui (válido para o IP). Login e
     # senhas vão criptografados; o navegador avisa na primeira vez porque o certificado não é de uma
@@ -308,12 +319,17 @@ if [ "$NGINX" = 1 ]; then
     cat > "$ALVO" <<NGINX
 # ZOE — gerado pelo instalador. Acesso pelo IP (sem domínio), HTTPS com certificado próprio.
 server {
-  listen ${PORTA_WEB} ssl;
+  listen ${PORTA_WEB} ssl http2;
   server_name ${IP_ACESSO};
   ssl_certificate /etc/zoe/certificado.crt;
   ssl_certificate_key /etc/zoe/certificado.key;
   ssl_protocols TLSv1.2 TLSv1.3;
   client_max_body_size 20m;
+  # O painel são módulos JavaScript: comprimidos, chegam bem mais rápido.
+  gzip on;
+  gzip_proxied any;
+  gzip_min_length 1024;
+  gzip_types text/css application/javascript text/javascript application/json image/svg+xml;
   location /atendimento/ {
     proxy_pass http://127.0.0.1:${PORTA};
     proxy_http_version 1.1;
@@ -334,6 +350,11 @@ server {
   listen 80;
   server_name ${DOMINIO};
   client_max_body_size 20m;
+  # O painel são módulos JavaScript: comprimidos, chegam bem mais rápido.
+  gzip on;
+  gzip_proxied any;
+  gzip_min_length 1024;
+  gzip_types text/css application/javascript text/javascript application/json image/svg+xml;
   location /atendimento/ {
     proxy_pass http://127.0.0.1:${PORTA};
     proxy_http_version 1.1;
@@ -396,7 +417,7 @@ echo "==========================================================================
 [ "$PRIMEIRA" = 1 ] && echo " Instalação concluída." || echo " Atualização concluída (dados, .env e senha mantidos)."
 if [ -n "$DOMINIO" ]; then echo "   ZOE: https://$DOMINIO/atendimento/"
 elif [ -n "$IP_ACESSO" ] && [ "$WEB" = nginx ] && [ "$NGINX" = 1 ]; then
-  echo "   ZOE: https://$IP_ACESSO:$PORTA_WEB/atendimento/"
+  echo "   ZOE: https://$URL_IP/atendimento/"
   echo "   O navegador avisa \"não seguro\" na primeira vez (certificado próprio): Avançado › Continuar."
   echo "   Libere a porta TCP $PORTA_WEB no firewall do servidor, se houver."
 else

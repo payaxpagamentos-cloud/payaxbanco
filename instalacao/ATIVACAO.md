@@ -60,14 +60,14 @@ apt install -y unzip
 rm -rf zoe && unzip -o zoe-instalacao.zip && cd zoe
 ```
 
-**Ainda sem domínio** (abre direto pelo IP, em `https://IP-DO-SERVIDOR:8443/atendimento/`):
+**Ainda sem domínio** (abre direto pelo IP, em `https://IP-DO-SERVIDOR/atendimento/`; se a porta 443 já for de outro sistema, fica `https://IP-DO-SERVIDOR:8443/atendimento/`):
 
 ```bash
 sudo bash ./instalacao/instalar.sh --ip IP-DO-SERVIDOR --email EMAIL --com-asterisk
 ```
 
 O navegador avisa "não seguro" na primeira vez, porque o certificado é do próprio servidor: clique em *Avançado* e depois em *Continuar*. A conexão é
-criptografada. Libere a porta **TCP 8443** no firewall do servidor, se houver. Neste modo, pule o passo 3 (HTTPS com certbot).
+criptografada. Libere a porta **TCP 443** (ou a 8443) no firewall do servidor, se houver. Neste modo, pule o passo 3 (HTTPS com certbot).
 
 **Com domínio:**
 
