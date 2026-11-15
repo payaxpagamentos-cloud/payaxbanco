@@ -48,7 +48,7 @@ de algum ajuste. Por exemplo, `--porta 3610` se a 3600 estiver ocupada, ou o cam
 Rode no seu computador, na pasta onde salvou o `zoe-instalacao.tar.gz`. O comando é o mesmo no Windows (PowerShell), no Mac e no Linux:
 
 ```bash
-scp zoe-instalacao.tar.gz root@IP-DO-SERVIDOR:/root/
+scp zoe-instalacao.zip root@IP-DO-SERVIDOR:/root/
 ```
 
 ## 2. Entrar no servidor e instalar
@@ -56,9 +56,23 @@ scp zoe-instalacao.tar.gz root@IP-DO-SERVIDOR:/root/
 ```bash
 ssh root@IP-DO-SERVIDOR
 cd /root
-tar xzf zoe-instalacao.tar.gz
-cd zoe
-sudo ./instalacao/instalar.sh --dominio DOMINIO --email EMAIL
+apt install -y unzip
+rm -rf zoe && unzip -o zoe-instalacao.zip && cd zoe
+```
+
+**Ainda sem domínio** (abre direto pelo IP, em `https://IP-DO-SERVIDOR:8443/atendimento/`):
+
+```bash
+sudo bash ./instalacao/instalar.sh --ip IP-DO-SERVIDOR --email EMAIL --com-asterisk
+```
+
+O navegador avisa "não seguro" na primeira vez, porque o certificado é do próprio servidor: clique em *Avançado* e depois em *Continuar*. A conexão é
+criptografada. Libere a porta **TCP 8443** no firewall do servidor, se houver. Neste modo, pule o passo 3 (HTTPS com certbot).
+
+**Com domínio:**
+
+```bash
+sudo bash ./instalacao/instalar.sh --dominio DOMINIO --email EMAIL --com-asterisk
 ```
 
 Para a transcrição de áudio local (whisper), acrescente `--com-whisper` no fim do último comando. Ela precisa de 4 vCPU e 8 GB de RAM.
@@ -138,7 +152,7 @@ estão online. **Você não edita nada no Asterisk à mão.**
 **1. Instalar.** Para instalar a ZOE e o Asterisk juntos, acrescente `--com-asterisk` no comando de instalação do passo 2:
 
 ```bash
-sudo bash ./instalacao/instalar.sh --sem-nginx --email EMAIL --com-asterisk
+sudo bash ./instalacao/instalar.sh --ip IP-DO-SERVIDOR --email EMAIL --com-asterisk
 ```
 
 Se a ZOE já estiver instalada, rode só a parte do Asterisk:

@@ -16,6 +16,8 @@
 #     --com-whisper      compila e liga a transcrição de áudio local (whisper.cpp, ~1 GB de RAM)
 #     --pasta P          onde tudo fica no servidor (padrão: /zoe)
 #     --porta N          porta interna (padrão: 3600; use outra se a 3600 estiver ocupada)
+#     --ip IP            sem domínio ainda: abre em https://IP:8443/atendimento/ com certificado próprio
+#                        (o navegador avisa na primeira vez). --porta-web N troca a 8443.
 #     --com-asterisk     instala também o Asterisk nesta máquina, já ligado à ZOE (instalacao/asterisk.sh)
 #
 #  Servidor que já tem outro sistema: a ZOE convive. Ela não troca o Node do servidor (usa um Node 22
@@ -37,6 +39,8 @@ ORIGEM="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DESTINO=/zoe
 USUARIO=zoe
 DOMINIO=""
+IP_ACESSO=""
+PORTA_WEB=8443
 EMAIL=""
 NGINX=1
 WHISPER=0
@@ -48,6 +52,8 @@ LIB=/usr/local/lib/zoe
 while [ $# -gt 0 ]; do
   case "$1" in
     --dominio) DOMINIO="$2"; shift 2 ;;
+    --ip) IP_ACESSO="$2"; shift 2 ;;
+    --porta-web) PORTA_WEB="$2"; shift 2 ;;
     --email) EMAIL="$2"; shift 2 ;;
     --sem-nginx) NGINX=0; shift ;;
     --com-whisper) WHISPER=1; shift ;;
@@ -79,11 +85,25 @@ PRIMEIRA=1; [ -f "$CODIGO/.env" ] && PRIMEIRA=0
 if [ -z "$DOMINIO" ] && [ -f "$CODIGO/.env" ]; then
   DOMINIO="$(sed -n 's|^ATEND_URL_PUBLICA=https\?://||p' "$CODIGO/.env" | head -1)"
   [ "$DOMINIO" = SEU-DOMINIO ] && DOMINIO=""
+  # Instalada pelo IP (https://IP:porta): continua pelo IP.
+  if [[ "$DOMINIO" =~ ^([0-9]{1,3}(\.[0-9]{1,3}){3})(:([0-9]+))?$ ]]; then
+    IP_ACESSO="${BASH_REMATCH[1]}"; PORTA_WEB="${BASH_REMATCH[4]:-$PORTA_WEB}"; DOMINIO=""
+  fi
 fi
-if [ "$NGINX" = 1 ] && [ -z "$DOMINIO" ] && [ ! -f /etc/nginx/sites-available/zoe.conf ]; then
+if [ -n "$IP_ACESSO" ]; then
+  [[ "$IP_ACESSO" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || falha "IP inválido: $IP_ACESSO"
+  [[ "$PORTA_WEB" =~ ^[0-9]+$ ]] || falha "Porta web inválida: $PORTA_WEB"
+  [ -n "$DOMINIO" ] && falha "Use --dominio ou --ip, não os dois."
+fi
+if [ "$NGINX" = 1 ] && [ -z "$DOMINIO" ] && [ -z "$IP_ACESSO" ] && [ ! -f /etc/nginx/sites-available/zoe.conf ]; then
   falha "Informe o domínio: --dominio atende.seuprovedor.com.br (ou --sem-nginx)."
 fi
 [ -n "$EMAIL" ] || EMAIL="master@${DOMINIO:-zoe.local}"
+# Acesso pelo IP: a porta web tem de estar livre (ou já ser do Nginx da ZOE).
+if [ -n "$IP_ACESSO" ]; then
+  DONO_WEB="$(ss -ltnpH "sport = :$PORTA_WEB" 2>/dev/null | grep -o 'users:(("[^"]*' | head -1 | cut -d'"' -f2 || true)"
+  [ -z "$DONO_WEB" ] || [ "$DONO_WEB" = nginx ] || falha "A porta $PORTA_WEB já está em uso por \"$DONO_WEB\". Use --porta-web 8444 (por exemplo)."
+fi
 [[ "$PORTA" =~ ^[0-9]+$ ]] || falha "Porta inválida: $PORTA"
 
 # Atualização: a porta é a que já está no .env.
@@ -186,7 +206,7 @@ PORT=$PORTA
 # Só dentro do servidor: o acesso de fora passa pelo Nginx/Apache (ou por um túnel SSH).
 ATEND_HOST=127.0.0.1
 ATEND_BASE_PATH=/atendimento
-ATEND_URL_PUBLICA=https://${DOMINIO:-SEU-DOMINIO}
+ATEND_URL_PUBLICA=https://${DOMINIO:-${IP_ACESSO:+$IP_ACESSO:$PORTA_WEB}}
 ATEND_SECRET=$(aleatorio 32 hex)
 ATEND_ADMIN_EMAIL=$EMAIL
 ATEND_ADMIN_SENHA=$SENHA_NOVA
@@ -275,7 +295,40 @@ if [ "$NGINX" = 1 ]; then
   ALVO="$SITE"
   # Configuração que alguém já ajustou (certificado, outros sites) não é sobrescrita.
   [ -f "$SITE" ] && ALVO="$SITE.novo"
-  cat > "$ALVO" <<NGINX
+  if [ -n "$IP_ACESSO" ]; then
+    # Sem domínio: HTTPS na porta própria, com certificado gerado aqui (válido para o IP). Login e
+    # senhas vão criptografados; o navegador avisa na primeira vez porque o certificado não é de uma
+    # autoridade. Com domínio, troque por --dominio e certbot.
+    mkdir -p /etc/zoe && chmod 700 /etc/zoe
+    if [ ! -f /etc/zoe/certificado.crt ] || ! openssl x509 -in /etc/zoe/certificado.crt -noout -text 2>/dev/null | grep -q "IP Address:$IP_ACESSO"; then
+      openssl req -x509 -newkey rsa:2048 -nodes -days 825 -subj "/CN=$IP_ACESSO/O=ZOE" \
+        -addext "subjectAltName=IP:$IP_ACESSO" -keyout /etc/zoe/certificado.key -out /etc/zoe/certificado.crt 2>/dev/null
+      chmod 600 /etc/zoe/certificado.key
+    fi
+    cat > "$ALVO" <<NGINX
+# ZOE — gerado pelo instalador. Acesso pelo IP (sem domínio), HTTPS com certificado próprio.
+server {
+  listen ${PORTA_WEB} ssl;
+  server_name ${IP_ACESSO};
+  ssl_certificate /etc/zoe/certificado.crt;
+  ssl_certificate_key /etc/zoe/certificado.key;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  client_max_body_size 20m;
+  location /atendimento/ {
+    proxy_pass http://127.0.0.1:${PORTA};
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 120s;
+  }
+  location = /atendimento { return 301 /atendimento/; }
+  location = / { return 302 /atendimento/; }
+}
+NGINX
+  else
+    cat > "$ALVO" <<NGINX
 # ZOE — gerado pelo instalador. HTTPS: certbot --nginx -d ${DOMINIO}
 server {
   listen 80;
@@ -294,6 +347,7 @@ server {
   location = / { return 302 /atendimento/; }
 }
 NGINX
+  fi
   if [ "$ALVO" = "$SITE" ]; then
     ln -sf "$SITE" /etc/nginx/sites-enabled/zoe.conf
     nginx -t && systemctl reload nginx
@@ -341,6 +395,10 @@ echo
 echo "============================================================================"
 [ "$PRIMEIRA" = 1 ] && echo " Instalação concluída." || echo " Atualização concluída (dados, .env e senha mantidos)."
 if [ -n "$DOMINIO" ]; then echo "   ZOE: https://$DOMINIO/atendimento/"
+elif [ -n "$IP_ACESSO" ] && [ "$WEB" = nginx ] && [ "$NGINX" = 1 ]; then
+  echo "   ZOE: https://$IP_ACESSO:$PORTA_WEB/atendimento/"
+  echo "   O navegador avisa \"não seguro\" na primeira vez (certificado próprio): Avançado › Continuar."
+  echo "   Libere a porta TCP $PORTA_WEB no firewall do servidor, se houver."
 else
   echo "   Sem domínio ainda: abra pelo seu computador com um túnel SSH (deixe a janela aberta):"
   echo "     ssh -L $PORTA:127.0.0.1:$PORTA root@IP-DO-SERVIDOR"
