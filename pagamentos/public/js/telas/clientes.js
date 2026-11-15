@@ -49,7 +49,7 @@ async function ficha(alvo, id, aba, query, recarregar) {
     ['extrato', 'Extrato'],
     ['repasses', 'Repasses'],
     ['precos', 'Preços'],
-    ['acessos', 'Acessos e IXC'],
+    ['acessos', 'Acessos e sistema'],
   ];
 
   montar(alvo, 
@@ -148,7 +148,7 @@ async function abaExtrato(alvo, c, query, recarregar) {
           l.data_liberacao > hojeIso() ? el('span', { class: 'sub' }, 'a liberar') : null) },
         { titulo: 'Lançamento', conteudo: (l) => el('span', {}, l.tipo_nome, el('span', { class: 'sub' }, l.descricao)) },
         { titulo: 'Valor', dir: true, conteudo: (l) => el('strong', { style: l.valor_centavos < 0 ? 'color:var(--vermelho)' : 'color:var(--verde-texto)' }, dinheiro(l.valor_centavos)) },
-        { titulo: 'Saldo', dir: true, conteudo: (l) => dinheiro(l.saldo_acumulado_centavos) },
+        { titulo: 'Saldo', dir: true, conteudo: (l) => (l.saldo_acumulado_centavos === null ? '—' : dinheiro(l.saldo_acumulado_centavos)) },
       ],
       itens: e.itens,
       vazio: 'Nenhum lançamento no período.',
@@ -209,7 +209,7 @@ async function abaPrecos(alvo, c, query, recarregar) {
   const v = p.vigente;
   const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
   montar(alvo, 
-    cartao(v.id ? 'Tabela do cliente (vigente)' : 'Usando a tabela padrão da plataforma',
+    cartao(v.cliente_id ? 'Tabela do cliente (vigente)' : 'Usando a tabela padrão da plataforma',
       el('div', { class: 'pares' },
         par('Tarifa de emissão', dinheiro(v.tarifa_emissao_centavos)),
         par('Tarifa bancária repassada', dinheiro(v.tarifa_liquidacao_centavos)),
@@ -259,14 +259,22 @@ function novoPreco(c, atual, recarregar) {
 }
 
 async function abaAcessos(alvo, c, query, recarregar) {
+  // Endereço da Área do Cliente, para passar ao cliente junto com o e-mail e a senha provisória.
+  const url = c.area_cliente_url.startsWith('http') ? c.area_cliente_url : `${location.origin}${c.area_cliente_url}`;
+  const sistemas = { ixc: 'IXC Provedor' };
   montar(alvo, 
-    cartao('Acessos à Área do Cliente', tabela({
+    cartao('Acessos à Área do Cliente', el('div', {},
+      el('div', { class: 'endereco-area' },
+        el('span', { class: 'rot' }, 'Endereço da Área do Cliente'),
+        el('a', { class: 'codigo', href: url, target: '_blank', rel: 'noopener' }, url),
+        el('button', { class: 'botao sec pequeno', onclick: () => copiar(url, 'Endereço da Área do Cliente copiado.') }, icone('copiar'), 'Copiar')),
+      tabela({
       colunas: [
         { titulo: 'Nome', conteudo: (a) => el('span', {}, a.nome, el('span', { class: 'sub' }, a.email)) },
         { titulo: 'Perfil', conteudo: (a) => R.perfilCliente[a.perfil] ?? a.perfil },
         { titulo: 'Último acesso', conteudo: (a) => (a.ultimo_acesso ? dataHora(a.ultimo_acesso) : 'nunca entrou') },
         { titulo: 'Situação', conteudo: (a) => selo(a.ativo ? 'ativo' : 'suspenso', R.situacaoCliente) },
-        { titulo: '', dir: true, conteudo: (a) => el('button', { class: 'botao sutil pequeno', onclick: (e) => acao(e.currentTarget, async () => {
+        { titulo: '', dir: true, conteudo: (a) => !pode('clientes.editar') ? null : el('button', { class: 'botao sutil pequeno', onclick: (e) => acao(e.currentTarget, async () => {
           const r = await confirmar({ titulo: 'Redefinir senha', texto: `Gerar nova senha provisória para ${a.nome}?`, confirmarTexto: 'Gerar' });
           if (!r) return;
           const out = await api.patch(`/clientes/${c.id}/acessos/${a.id}`, { redefinir_senha: true });
@@ -276,18 +284,19 @@ async function abaAcessos(alvo, c, query, recarregar) {
       ],
       itens: c.acessos,
       vazio: 'Nenhum acesso criado. O cliente ainda não consegue entrar na Área do Cliente.',
-    }), pode('clientes.editar') ? el('button', { class: 'botao', onclick: () => novoAcesso(c, recarregar) }, icone('mais'), 'Novo acesso') : null),
+    })), pode('clientes.editar') ? el('button', { class: 'botao', onclick: () => novoAcesso(c, recarregar) }, icone('mais'), 'Novo acesso') : null),
 
-    el('div', { style: 'margin-top:14px' }, cartao('Integração com o IXC',
+    el('div', { style: 'margin-top:14px' }, cartao('Sistema de gestão do cliente',
       el('div', {},
-        el('div', { class: 'pares' },
+        el('div', { class: 'pares cols-4' },
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Sistema'), el('span', { class: 'val' }, c.ixc.estado === 'nao_configurada' && !c.ixc.url ? '—' : sistemas[c.ixc.sistema ?? 'ixc'])),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Estado'), el('span', { class: 'val' }, selo(c.ixc.estado, R.estadoIntegracao))),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Importação automática'), el('span', { class: 'val' }, c.ixc.importacao_automatica ? 'Ligada' : 'Desligada')),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Último teste'), el('span', { class: 'val' }, c.ixc.ultimo_teste ? dataHora(c.ixc.ultimo_teste) : '—'))),
         c.ixc.ultimo_erro ? el('div', { style: 'margin-top:10px' }, aviso(c.ixc.ultimo_erro, 'erro')) : null,
         el('p', { style: 'margin-top:10px;color:var(--texto-2);font-size:13px' },
-          'A configuração do IXC deste cliente (endereço e token) fica em Integrações.')),
-      el('a', { class: 'botao sec', href: '#/integracoes' }, icone('plugue'), 'Abrir Integrações'))),
+          'Importa os títulos do sistema do cliente e dá baixa nele quando o boleto é pago. Só aparecem os sistemas homologados pela PAY AX (hoje, o IXC). A configuração (sistema, endereço e token) fica em Integrações.')),
+      el('a', { class: 'botao sec', href: '#/integracoes' }, icone('plugue'), 'Configurar'))),
   );
 }
 

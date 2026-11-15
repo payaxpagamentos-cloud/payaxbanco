@@ -87,7 +87,17 @@ export const dinheiroCurto = (c) => {
 };
 export const numero = (n, casas = 0) => (n === null || n === undefined ? '—' : Number(n).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }));
 export const percentual = (ppm) => `${((ppm || 0) / 10000).toLocaleString('pt-BR', { maximumFractionDigits: 4 })}%`;
-export const data = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('/') : '—');
+// Data pura (2026-11-15) é mostrada como está; com horário (UTC), vira o dia em Brasília — senão, depois
+// das 21h, aparecia o dia seguinte.
+export const data = (d) => {
+  if (!d) return '—';
+  const s = String(d);
+  if (/T\d{2}:|\d \d{2}:\d{2}/.test(s)) {
+    return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' })
+      .format(new Date(s.includes('T') ? s : `${s.replace(' ', 'T')}Z`));
+  }
+  return s.slice(0, 10).split('-').reverse().join('/');
+};
 export const dataCurta = (d) => (d ? String(d).slice(5, 10).split('-').reverse().join('/') : '—');
 export const dataHora = (iso) => (iso ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso.includes('T') ? iso : `${iso.replace(' ', 'T')}Z`)) : '—');
 export const documento = (d) => {

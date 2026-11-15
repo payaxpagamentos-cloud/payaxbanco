@@ -5,14 +5,18 @@ import {
 } from '../../comum/ui.js';
 
 /** Banco (Bradesco) e o IXC de cada cliente. */
+/** Sistemas de gestão homologados (vêm do servidor). */
+let SISTEMAS = [{ id: 'ixc', nome: 'IXC Provedor' }];
+
 export default async function integracoes({ alvo, recarregar }) {
   const d = await api.get('/integracoes');
+  if (d.sistemas?.length) SISTEMAS = d.sistemas;
   const clientes = (await api.get('/clientes?por_pagina=200')).itens;
   const porCliente = Object.fromEntries(d.ixc.map((i) => [i.cliente_id, i]));
 
   montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Integrações'),
-      el('p', {}, 'O banco que registra os boletos e o IXC de cada cliente.'))),
+      el('p', {}, 'O banco que registra os boletos e o sistema de gestão de cada cliente (homologados: IXC).'))),
 
     cartao('Bradesco — Cobrança Registrada e Bolepix',
       el('div', {},
@@ -61,17 +65,19 @@ export default async function integracoes({ alvo, recarregar }) {
         }) }, icone('atualizar'), 'Testar consulta'),
         pode('*') ? el('button', { class: 'botao', onclick: () => configurarDados(d.dados, recarregar) }, icone('config'), 'Token da API Brasil') : null))),
 
-    el('div', { style: 'margin-top:18px' }, cartao('IXC dos clientes', tabela({
+    el('div', { style: 'margin-top:18px' }, cartao('Sistema de gestão dos clientes', tabela({
       colunas: [
         { titulo: 'Cliente', conteudo: (c) => el('span', {}, el('span', { class: 'forte' }, c.nome_fantasia || c.razao_social),
           el('span', { class: 'sub' }, porCliente[c.id]?.config?.url ?? 'sem endereço configurado')) },
+        { titulo: 'Sistema', conteudo: (c) => (porCliente[c.id]?.config?.url
+          ? (SISTEMAS.find((x) => x.id === (porCliente[c.id].config.sistema ?? 'ixc'))?.nome ?? 'IXC Provedor') : '—') },
         { titulo: 'Estado', conteudo: (c) => selo(porCliente[c.id]?.estado ?? 'nao_configurada', R.estadoIntegracao) },
         { titulo: 'Importação automática', conteudo: (c) => (porCliente[c.id]?.config?.importacao_automatica ? 'Ligada' : 'Desligada') },
         { titulo: 'Último teste', conteudo: (c) => (porCliente[c.id]?.ultimo_teste ? dataHora(porCliente[c.id].ultimo_teste) : '—') },
         { titulo: '', dir: true, conteudo: (c) => el('div', { style: 'display:flex;gap:6px;justify-content:flex-end' },
           porCliente[c.id]?.configurada ? el('button', { class: 'botao sec pequeno', onclick: (e) => { e.stopPropagation(); acao(e.currentTarget, async () => {
             const r = await api.post(`/integracoes/ixc/${c.id}/testar`, {});
-            toast(`IXC conectado · ${numero(r.clientes)} cliente(s) na base.`, 'ok');
+            toast(`Sistema conectado · ${numero(r.clientes)} cliente(s) na base.`, 'ok');
             recarregar();
           }); } }, 'Testar') : null,
           porCliente[c.id]?.configurada ? el('button', { class: 'botao pequeno', onclick: (e) => { e.stopPropagation(); importar(c, recarregar); } }, icone('importar'), 'Importar') : null,
@@ -144,7 +150,9 @@ function configurarIxc(cliente, atual, recarregar) {
   const cfg = atual?.config ?? {};
   const form = el('form', { onsubmit: (e) => e.preventDefault() },
     el('div', { class: 'linha-form' },
-      campo({ nome: 'url', rotulo: 'Endereço do IXC', valor: cfg.url ?? '', obrigatorio: true, ajuda: 'Ex.: https://ixc.provedor.com.br' }),
+      campo({ nome: 'sistema', rotulo: 'Sistema de gestão', tipo: 'select', valor: cfg.sistema ?? 'ixc', opcoes: SISTEMAS.map((x) => [x.id, x.nome]),
+        ajuda: 'Só os sistemas homologados pela PAY AX' }),
+      campo({ nome: 'url', rotulo: 'Endereço do sistema', valor: cfg.url ?? '', obrigatorio: true, ajuda: 'Ex.: https://ixc.provedor.com.br' }),
       campo({ nome: 'token', rotulo: 'Token (id:hash)', tipo: 'password', ajuda: atual?.configurada ? 'Deixe vazio para manter o token atual' : 'Configurações → Usuários → Token, no IXC' })),
     el('div', { class: 'linha-form', style: 'margin-top:12px' },
       campo({ nome: 'tipo_padrao', rotulo: 'Tipo do boleto', tipo: 'select', valor: cfg.tipo_padrao ?? 'bolepix', opcoes: Object.entries(R.tipoBoleto) }),
@@ -158,11 +166,11 @@ function configurarIxc(cliente, atual, recarregar) {
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.put(`/integracoes/ixc/${cliente.id}`, lerForm(form));
     m.fechar();
-    toast('IXC configurado.', 'ok');
+    toast('Sistema do cliente configurado.', 'ok');
     recarregar();
   }));
-  const m = modal({ titulo: `IXC de ${cliente.nome_fantasia || cliente.razao_social}`, largo: true,
-    corpo: [aviso('O token é cifrado antes de ser gravado. Use um usuário técnico só para a PAY AX no IXC.', 'info'), form],
+  const m = modal({ titulo: `Sistema de gestão · ${cliente.nome_fantasia || cliente.razao_social}`, largo: true,
+    corpo: [aviso('O token é cifrado antes de ser gravado. Use um usuário técnico só para a PAY AX no sistema do cliente.', 'info'), form],
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 

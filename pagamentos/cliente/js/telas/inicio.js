@@ -75,7 +75,7 @@ export default async function inicio({ alvo }) {
       ? el('div', { style: 'margin-top:18px' }, cartao('O que a PAY AX cobrou no mês',
         el('div', { class: 'pares' },
           par('Você recebeu dos pagadores', dinheiro(l.bruto_centavos)),
-          par('Tarifa bancária', dinheiro(l.tarifa_banco_centavos + l.tarifa_emissao_centavos)),
+          par('Tarifa bancária', dinheiro(l.tarifa_banco_centavos)),
           par('Tarifa PAY AX', dinheiro(l.comissao_centavos)),
           par('Ficou para você', el('strong', {}, dinheiro(l.liquido_centavos))),
           par('Já transferido', dinheiro(l.repassado_centavos))),

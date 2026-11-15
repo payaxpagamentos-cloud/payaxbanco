@@ -8,7 +8,7 @@
  *    R$ 96,50", e quem quiser abre e vê de onde veio e o que saiu. É o split explicado, não escondido.
  */
 import { el, icone, dinheiro, data, R, selo } from './ui.js';
-import { letreiro, simbolo } from './marca.js';
+import { letreiro } from './marca.js';
 
 const CHAVE_SALDO = 'payax.saldo.oculto'; // nome antigo da chave, mantido para não perder a preferência
 const oculto = () => { try { return localStorage.getItem(CHAVE_SALDO) === '1'; } catch { return false; } };
@@ -16,8 +16,7 @@ const guardarOculto = (v) => { try { localStorage.setItem(CHAVE_SALDO, v ? '1' :
 
 /** A marca no canto do cartão, como num cartão de verdade. */
 const marcaCartao = () => el('div', { class: 'marca-cartao' },
-  simbolo({ tamanho: 22, cor: '#6fd3fb' }),
-  letreiro({ altura: 13, cor: 'rgba(255,255,255,0.92)' }));
+  letreiro({ altura: 15, cor: 'rgba(255,255,255,0.95)' }));
 
 /**
  * Cartão do cliente: o que já foi para a conta dele e o que está a caminho.

@@ -131,6 +131,8 @@ module.exports = (db) => {
       preco: precos.vigente(db, c.id, data),
       agenda: razao.agenda(db, c.id, data, 30),
       acessos: db.prepare('SELECT id, nome, email, perfil, ativo, senha_provisoria, ultimo_acesso FROM usuarios_cliente WHERE cliente_id = ? ORDER BY nome').all(c.id),
+      // Endereço que a equipe passa ao cliente junto com o acesso.
+      area_cliente_url: `${config.urlPublica || ''}${config.clientePath}/`,
       ixc: (() => {
         const i = db.prepare("SELECT estado, config, ultimo_teste, ultimo_erro FROM integracoes WHERE escopo = 'ixc' AND cliente_id = ?").get(c.id);
         return i ? { estado: i.estado, ...(JSON.parse(i.config || '{}')), ultimo_teste: i.ultimo_teste, ultimo_erro: i.ultimo_erro } : { estado: 'nao_configurada' };

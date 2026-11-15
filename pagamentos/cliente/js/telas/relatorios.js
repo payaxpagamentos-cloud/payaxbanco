@@ -30,7 +30,7 @@ export default async function relatorios({ alvo, query }) {
       kpi({ rotulo: 'Recebido', valor: dinheiro(l.bruto_centavos), apoio: `${numero(l.titulos)} título(s) pago(s)`, tom: 'destaque', ic: 'dinheiro' }),
       kpi({ rotulo: 'Líquido para você', valor: dinheiro(l.liquido_centavos), tom: 'positivo', ic: 'cofre' }),
       kpi({ rotulo: 'Descontos', valor: dinheiro(l.comissao_centavos + l.tarifa_banco_centavos + l.tarifa_emissao_centavos),
-        apoio: `tarifa PAY AX ${dinheiro(l.comissao_centavos)} + tarifas bancárias ${dinheiro(l.tarifa_banco_centavos + l.tarifa_emissao_centavos)}`, menor: true, ic: 'relatorio' }),
+        apoio: `tarifas PAY AX ${dinheiro(l.comissao_centavos + l.tarifa_emissao_centavos)} + tarifas bancárias ${dinheiro(l.tarifa_banco_centavos)}`, menor: true, ic: 'relatorio' }),
       kpi({ rotulo: 'Transferido para você', valor: dinheiro(l.repassado_centavos), menor: true, ic: 'troca' })),
 
     el('div', { class: 'grade duas', style: 'margin-top:14px' },
@@ -39,7 +39,7 @@ export default async function relatorios({ alvo, query }) {
         total: l.bruto_centavos,
         partes: [
           { rotulo: 'Líquido para você', valor: l.liquido_centavos },
-          { rotulo: 'Tarifa bancária', valor: l.tarifa_banco_centavos + l.tarifa_emissao_centavos },
+          { rotulo: 'Tarifa bancária', valor: l.tarifa_banco_centavos },
           { rotulo: 'Tarifa PAY AX', valor: l.comissao_centavos },
         ],
       }) : el('p', { class: 'vazio' }, 'Nada recebido no período.'))),

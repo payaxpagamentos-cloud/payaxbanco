@@ -97,7 +97,7 @@ async function telaSeguranca(alvo, recarregar) {
         { titulo: 'Pessoa', conteudo: (u) => el('span', {}, u.nome, el('span', { class: 'sub' }, u.email)) },
         { titulo: 'Duas etapas', conteudo: (u) => selo(u.totp_ativo ? 'ok' : 'nao', { ok: ['Ativa', 'ok'], nao: ['Sem 2FA', 'neutra'] }) },
         { titulo: 'Último acesso', conteudo: (u) => (u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou') },
-        { titulo: '', dir: true, conteudo: (u) => (u.totp_ativo
+        { titulo: '', dir: true, conteudo: (u) => (u.totp_ativo && (pode('*') || pode('acessos.gerenciar'))
           ? el('button', { class: 'botao sutil pequeno', onclick: async (e) => { const botao = e.currentTarget;
             const ok = await confirmar({ titulo: 'Redefinir duas etapas', texto: `${u.nome} (${u.cliente}) vai configurar de novo no próximo acesso.`, confirmarTexto: 'Redefinir', perigo: true });
             if (ok) acao(botao, async () => { await api.post(`/seguranca/acessos/${u.id}/redefinir-2fa`, {}); toast('Redefinida.'); recarregar(); });

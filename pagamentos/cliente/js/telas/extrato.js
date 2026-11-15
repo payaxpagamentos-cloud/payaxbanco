@@ -76,7 +76,7 @@ const comoTabela = (e, hoje) => tabela({
     { titulo: 'Liberação', conteudo: (l) => el('span', {}, data(l.data_liberacao),
       l.data_liberacao > hoje ? el('span', { class: 'sub' }, 'ainda retido') : null) },
     { titulo: 'Valor', dir: true, conteudo: (l) => el('strong', { style: l.valor_centavos < 0 ? 'color:var(--vermelho)' : 'color:#0a6b45' }, dinheiro(l.valor_centavos)) },
-    { titulo: 'Saldo', dir: true, conteudo: (l) => dinheiro(l.saldo_acumulado_centavos) },
+    { titulo: 'Saldo', dir: true, conteudo: (l) => (l.saldo_acumulado_centavos === null ? '—' : dinheiro(l.saldo_acumulado_centavos)) },
   ],
   itens: e.itens,
   vazio: 'Nenhum lançamento no período.',

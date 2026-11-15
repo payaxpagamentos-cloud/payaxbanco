@@ -1,6 +1,6 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
-import { el, montar, cartao, tabela, kpi, selo, icone, modal, campo, lerForm, acao, toast, aviso, data, dataHora, documento } from '../../comum/ui.js';
+import { el, montar, cartao, tabela, kpi, selo, icone, modal, campo, lerForm, acao, toast, aviso, data, dataHora, documento, hojeIso} from '../../comum/ui.js';
 
 /*
  * LGPD (Lei 13.709/2018): pedidos dos titulares, incidentes, inventário, retenção e encarregado.
@@ -157,7 +157,7 @@ async function abaIncidentes(alvo, { recarregar }) {
 
 function registrarIncidente(recarregar) {
   const form = el('form', { class: 'form-grade', onsubmit: (e) => e.preventDefault() },
-    campo({ nome: 'descoberto_em', rotulo: 'Descoberto em', tipo: 'date', valor: new Date().toISOString().slice(0, 10), obrigatorio: true }),
+    campo({ nome: 'descoberto_em', rotulo: 'Descoberto em', tipo: 'date', valor: hojeIso(), obrigatorio: true }),
     campo({ nome: 'descricao', rotulo: 'O que aconteceu', tipo: 'textarea', obrigatorio: true, atributos: { rows: 3, maxlength: 4000 } }),
     campo({ nome: 'dados_afetados', rotulo: 'Quais dados foram afetados', obrigatorio: true, atributos: { maxlength: 1000 } }),
     campo({ nome: 'titulares_estimados', rotulo: 'Quantos titulares (estimativa)', tipo: 'number' }),

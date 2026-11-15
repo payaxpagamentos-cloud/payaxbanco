@@ -14,11 +14,15 @@ const { criarBanco } = require('../lib/bradesco');
 const consultaDados = require('../lib/consultaDados');
 const auditoria = require('../lib/auditoria');
 
+/** Sistemas de gestão (ERP de provedor) homologados para importar títulos e dar baixa. Novos entram aqui. */
+const SISTEMAS_HOMOLOGADOS = Object.freeze({ ixc: 'IXC Provedor' });
+
 /** Guarda credenciais cifradas de um escopo. */
-function gravar(db, { escopo, cliente_id = null, conta_id = null, credenciais, cfg, usuario }) {
+function gravar(db, { escopo, cliente_id = null, conta_id = null, credenciais, cfg, usuario, limpar = false }) {
   const existente = db.prepare('SELECT * FROM integracoes WHERE escopo = ? AND IFNULL(cliente_id, 0) = ? AND IFNULL(conta_id, 0) = ?')
     .get(escopo, cliente_id ?? 0, conta_id ?? 0);
-  const cifradas = credenciais ? cifrar(JSON.stringify(credenciais)) : existente?.credenciais ?? null;
+  // credenciais null = mantém as que estão gravadas; limpar = apaga de propósito.
+  const cifradas = limpar ? null : credenciais ? cifrar(JSON.stringify(credenciais)) : existente?.credenciais ?? null;
   if (existente) {
     db.prepare("UPDATE integracoes SET credenciais = ?, config = ?, estado = 'nao_configurada', atualizado_em = ?, atualizado_por = ? WHERE id = ?")
       .run(cifradas, JSON.stringify(cfg ?? {}), agora(), usuario.id, existente.id);
@@ -43,6 +47,7 @@ module.exports = (db) => {
       banco: { ...semSegredo(banco), modo: config.banco.modo, ambiente: config.banco.ambiente },
       ixc: db.prepare(`SELECT i.*, c.razao_social, c.nome_fantasia FROM integracoes i JOIN clientes c ON c.id = i.cliente_id
         WHERE i.escopo = 'ixc' ORDER BY c.razao_social`).all().map((i) => ({ ...semSegredo(i), razao_social: i.razao_social, nome_fantasia: i.nome_fantasia })),
+      sistemas: Object.entries(SISTEMAS_HOMOLOGADOS).map(([id, nome]) => ({ id, nome })),
       sincronismos: db.prepare(`SELECT s.*, c.razao_social FROM sincronismos s JOIN clientes c ON c.id = s.cliente_id
         ORDER BY s.id DESC LIMIT 30`).all(),
       dados: {
@@ -55,7 +60,8 @@ module.exports = (db) => {
   // ---------------------------------------------------------------- API Brasil (CEP e CNPJ)
   r.put('/dados', exigir('*'), (req, res) => {
     const token = req.body?.token ? v.texto(req.body.token, 'o token da API Brasil', 500) : null;
-    const id = gravar(db, { escopo: 'dados', credenciais: token ? { token } : null, cfg: {}, usuario: req.usuario });
+    // Token vazio = remover (como a tela promete): as consultas voltam para a fonte pública.
+    const id = gravar(db, { escopo: 'dados', credenciais: token ? { token } : null, limpar: !token, cfg: {}, usuario: req.usuario });
     auditoria.registrar(db, req, { acao: 'integracao.dados.configurada', entidade: 'integracao', entidade_id: id });
     res.json({ ...semSegredo(db.prepare('SELECT * FROM integracoes WHERE id = ?').get(id)), ...consultaDados.estado(db) });
   });
@@ -95,7 +101,12 @@ module.exports = (db) => {
     }
     const cfg = {
       ambiente: v.opcao(b.ambiente ?? config.banco.ambiente, 'o ambiente', ['homologacao', 'producao']),
-      webhook_token: b.webhook_token ? v.texto(b.webhook_token, 'o token do webhook', 100) : crypto.randomBytes(24).toString('base64url'),
+      // O token do aviso já cadastrado no Bradesco se mantém: trocar a cada gravação invalidaria a URL lá.
+      webhook_token: b.webhook_token ? v.texto(b.webhook_token, 'o token do webhook', 100)
+        : (() => {
+          const atual = db.prepare("SELECT config FROM integracoes WHERE escopo = 'banco' AND IFNULL(conta_id, 0) = ?").get(Number(b.conta_id) || 0);
+          return JSON.parse(atual?.config || '{}').webhook_token || crypto.randomBytes(24).toString('base64url');
+        })(),
     };
     const id = gravar(db, { escopo: 'banco', conta_id: conta?.id ?? null, credenciais, cfg, usuario: req.usuario });
     auditoria.registrar(db, req, { acao: 'integracao.banco.configurada', entidade: 'integracao', entidade_id: id, depois: { ambiente: cfg.ambiente, conta_id: conta?.id ?? null } });
@@ -113,7 +124,8 @@ module.exports = (db) => {
       res.json({ ...out, modo: banco.modo });
     } catch (err) {
       if (i) db.prepare("UPDATE integracoes SET estado = 'falha', ultimo_teste = ?, ultimo_erro = ? WHERE id = ?").run(agora(), err.message, i.id);
-      throw new ErroNegocio(err.message, err.status === 401 ? 401 : 502);
+      // Credencial recusada pelo BANCO não é sessão nossa expirada: 502, para a tela não desconectar ninguém.
+      throw new ErroNegocio(err.message, 502);
     }
   });
 
@@ -122,8 +134,19 @@ module.exports = (db) => {
     const cliente = db.prepare('SELECT * FROM clientes WHERE id = ?').get(Number(req.params.clienteId));
     if (!cliente) throw naoEncontrado('Cliente');
     const b = req.body ?? {};
-    const credenciais = b.token ? { url: v.url(b.url, 'o endereço do IXC'), token: v.texto(b.token, 'o token', 200) } : null;
+    let credenciais = b.token ? { url: v.url(b.url, 'o endereço do IXC'), token: v.texto(b.token, 'o token', 200) } : null;
+    // Endereço novo sem redigitar o token: a conexão usa o endereço guardado nas credenciais, então ele
+    // é atualizado lá também (antes a tela mostrava o novo e a conexão seguia indo para o antigo).
+    if (!credenciais && b.url) {
+      const atual = db.prepare("SELECT credenciais FROM integracoes WHERE escopo = 'ixc' AND cliente_id = ?").get(cliente.id);
+      if (atual?.credenciais) {
+        const c = JSON.parse(decifrar(atual.credenciais));
+        credenciais = { ...c, url: v.url(b.url, 'o endereço do IXC') };
+      }
+    }
     const cfg = {
+      // Sistema de gestão do cliente: só os homologados pela PAY AX (hoje, o IXC).
+      sistema: v.opcao(b.sistema || 'ixc', 'o sistema de gestão', Object.keys(SISTEMAS_HOMOLOGADOS)),
       url: b.url ? v.url(b.url, 'o endereço do IXC') : undefined,
       tipo_padrao: v.opcao(b.tipo_padrao ?? 'bolepix', 'o tipo padrão', ['boleto', 'bolepix']),
       // Mesmos tetos da emissão: uma configuração fora da lei faria todo título importado falhar.

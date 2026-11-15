@@ -20,6 +20,7 @@ module.exports = (db, autenticado) => {
       usuario: sessaoEquipe(u),
       // Com a exigência ligada, quem ainda não tem 2FA precisa configurar antes de trabalhar.
       configurar_2fa: dois.exigidaEquipe(db) && !u.totp_ativo,
+      exige_2fa: dois.exigidaEquipe(db),
     });
   };
 
@@ -54,11 +55,12 @@ module.exports = (db, autenticado) => {
   r.get('/eu', autenticado, (req, res) => res.json({
     usuario: sessaoEquipe(req.usuario),
     configurar_2fa: dois.exigidaEquipe(db) && !req.usuario.totp_ativo,
+    exige_2fa: dois.exigidaEquipe(db),
   }));
 
   r.post('/senha', autenticado, (req, res) => {
     const u = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.usuario.id);
-    if (!verificarSenha(String(req.body?.senha_atual ?? ''), u.senha_hash)) throw new ErroNegocio('Senha atual incorreta.', 401);
+    if (!verificarSenha(String(req.body?.senha_atual ?? ''), u.senha_hash)) throw new ErroNegocio('Senha atual incorreta.', 422);
     const nova = v.senha(req.body?.senha_nova);
     if (nova === String(req.body?.senha_atual)) throw new ErroNegocio('A nova senha precisa ser diferente da atual.', 422);
     db.prepare('UPDATE usuarios SET senha_hash = ?, senha_provisoria = 0 WHERE id = ?').run(hashSenha(nova), u.id);

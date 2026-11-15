@@ -76,8 +76,8 @@ module.exports = (db) => {
 
   r.get('/export.csv', exigir('repasses.ver'), (req, res) => {
     const itens = db.prepare(`SELECT r.*, c.razao_social FROM repasses r JOIN clientes c ON c.id = r.cliente_id
-      WHERE (? IS NULL OR date(r.criado_em) >= ?) AND (? IS NULL OR date(r.criado_em) <= ?) ORDER BY r.id DESC`)
-      .all(req.query.de ?? null, req.query.de ?? null, req.query.ate ?? null, req.query.ate ?? null);
+      WHERE (? IS NULL OR date(r.criado_em) >= ?) AND (? IS NULL OR date(r.criado_em) <= ?) AND (? IS NULL OR r.situacao = ?) ORDER BY r.id DESC`)
+      .all(req.query.de || null, req.query.de || null, req.query.ate || null, req.query.ate || null, req.query.situacao || null, req.query.situacao || null);
     const linhas = [['#', 'Cliente', 'Criado em', 'Valor (R$)', 'Tarifa (R$)', 'Líquido (R$)', 'Chave PIX', 'Situação', 'End-to-end']];
     for (const x of itens) {
       linhas.push([x.id, x.razao_social, x.criado_em, (x.valor_centavos / 100).toFixed(2).replace('.', ','),

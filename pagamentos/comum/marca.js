@@ -1,9 +1,8 @@
 /*
  * Marca PAY AX, desenhada em vetor para funcionar em qualquer tamanho e sobre qualquer fundo.
  *
- * O logotipo tem três elementos: o letreiro PAYAX (PAY sólido, AX em degradê), o anel luminoso
- * e as faixas diagonais do fundo. Aqui estão os dois primeiros; as faixas ficam no CSS, porque são
- * fundo de tela, não parte do letreiro.
+ * O logotipo é o letreiro PAYAX (PAY sólido, AX em fitas com degradê). Onde não cabe o letreiro
+ * inteiro (ícone da aba do navegador), entra o "AX" dele, sozinho.
  *
  * As letras foram vetorizadas a partir do logotipo oficial. Se o arquivo vetorial do designer
  * (.svg/.ai) estiver disponível, trocar PAY, AX e SOMBRA aqui coloca o desenho dele no lugar —
@@ -76,52 +75,54 @@ export function letreiro({ altura = 28, cor = '#ffffff', degrade = ['#00f0fd', '
 }
 
 /**
- * Símbolo: o anel luminoso com as faixas diagonais atravessando — o que sobra do logotipo
- * quando não há espaço para o letreiro (favicon, avatar, canto do cartão).
+ * Símbolo: o "AX" do próprio logotipo (fitas em degradê), para onde não cabe o letreiro inteiro —
+ * ícone da aba do navegador, avatar. Com `fundo`, vem num quadrado arredondado.
  */
-export function simbolo({ tamanho = 32, cor = '#4fb8f5', degrade = null, fundo = null, faixas = null, classe = '' } = {}) {
-  const [claro, escuro] = degrade ?? ['#9fe4fc', cor];
-  // As faixas só aparecem na versão com fundo (favicon, avatar). Soltas sobre branco elas
-  // viram duas manchas cinzentas e roubam a figura do anel, que é o que se reconhece.
-  const comFaixas = faixas ?? Boolean(fundo);
+const AX_LARGURA = LARGURA - AX_INICIO;
+function caixaAx(fundo) {
+  const lado = AX_LARGURA + 90;
+  return { x: AX_INICIO - 45, y: 50 - lado / 2, lado };
+}
+export function simbolo({ tamanho = 32, degrade = ['#00f0fd', '#1784ee'], sombra = '#0b62cf', fundo = null, classe = '' } = {}) {
   sequencia += 1;
-  const id = `payax-anel-${sequencia}`;
-  const svg = criar('svg', { viewBox: '0 0 48 48', width: tamanho, height: tamanho, fill: 'none', 'aria-hidden': 'true', class: classe || null });
+  const id = `payax-ax-${sequencia}`;
+  const c = caixaAx(fundo);
+  const svg = criar('svg', { viewBox: `${c.x} ${c.y} ${c.lado} ${c.lado}`, width: tamanho, height: tamanho, fill: 'none', 'aria-hidden': 'true', class: classe || null });
   const defs = criar('defs');
-  const g = criar('linearGradient', { id, x1: '0', y1: '0', x2: '1', y2: '1' });
-  g.append(criar('stop', { offset: '0', 'stop-color': claro }), criar('stop', { offset: '1', 'stop-color': escuro }));
+  const g = criar('linearGradient', { id, gradientUnits: 'userSpaceOnUse', x1: AX_INICIO, y1: 100, x2: AX_INICIO + 150, y2: 0 });
+  g.append(criar('stop', { offset: '0', 'stop-color': degrade[1] }), criar('stop', { offset: '0.6', 'stop-color': degrade[0] }),
+    criar('stop', { offset: '1', 'stop-color': degrade[0] }));
   defs.append(g);
   svg.append(defs);
-  if (fundo) svg.append(criar('rect', { width: 48, height: 48, rx: 11, fill: fundo }));
-  if (comFaixas) {
-    svg.append(criar('path', { d: 'M33 1 L45 1 L21 47 L9 47 Z', fill: cor, opacity: '0.13' }));
-    svg.append(criar('path', { d: 'M42 9 L48 9 L31 47 L25 47 Z', fill: cor, opacity: '0.09' }));
-  }
-  // O anel luminoso, a parte reconhecível da marca.
-  svg.append(criar('circle', { cx: 24, cy: 24, r: 16, stroke: `url(#${id})`, 'stroke-width': '2.6' }));
+  if (fundo) svg.append(criar('rect', { x: c.x, y: c.y, width: c.lado, height: c.lado, rx: c.lado * 0.22, fill: fundo }));
+  svg.append(criar('path', { d: AX, fill: `url(#${id})`, 'fill-rule': 'evenodd' }), criar('path', { d: SOMBRA, fill: sombra }));
   return svg;
 }
 
-/** Versão em texto do símbolo e do letreiro, para quando só cabe string (favicon .svg, e-mail). */
-export const faviconSvg = (cor = '#4fb8f5', fundo = '#081426') => `<svg xmlns="${SVG}" viewBox="0 0 48 48">
-  <rect width="48" height="48" rx="11" fill="${fundo}"/>
-  <path d="M33 1 L45 1 L21 47 L9 47 Z" fill="${cor}" opacity=".13"/>
-  <path d="M42 9 L48 9 L31 47 L25 47 Z" fill="${cor}" opacity=".09"/>
-  <circle cx="24" cy="24" r="16" fill="none" stroke="${cor}" stroke-width="2.6"/>
+/** Versão em texto do símbolo (ícone da aba do navegador). */
+export const faviconSvg = (fundo = '#081426') => {
+  const c = caixaAx(fundo);
+  return `<svg xmlns="${SVG}" viewBox="${c.x} ${c.y} ${c.lado} ${c.lado}">
+  <defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="${AX_INICIO}" y1="100" x2="${AX_INICIO + 150}" y2="0">
+    <stop offset="0" stop-color="#1784ee"/><stop offset=".6" stop-color="#00f0fd"/><stop offset="1" stop-color="#00f0fd"/></linearGradient></defs>
+  <rect x="${c.x}" y="${c.y}" width="${c.lado}" height="${c.lado}" rx="${c.lado * 0.22}" fill="${fundo}"/>
+  <path d="${AX}" fill="url(#g)" fill-rule="evenodd"/><path d="${SOMBRA}" fill="#0b62cf"/>
 </svg>`;
+};
 
 /**
- * Marca do menu lateral: anel, letreiro e a linha do produto embaixo.
+ * Marca do menu lateral: o logotipo e a linha do produto embaixo.
  * Devolve os dois nós já prontos para entrar num `.marca`.
  */
 export function marcaMenu(produto) {
   const caixa = document.createElement('span');
   caixa.className = 'marca-texto';
-  caixa.append(letreiro({ altura: 19 }));
+  // Só o logotipo, como ele é: nada de símbolo ao lado.
+  caixa.append(letreiro({ altura: 23 }));
   const linha = document.createElement('small');
   linha.textContent = produto;
   caixa.append(linha);
-  return [simbolo({ tamanho: 30, classe: 'marca-simbolo' }), caixa];
+  return [caixa];
 }
 
 /** Marca da tela de entrada: fundo claro, por isso o letreiro vem em marinho. */
@@ -129,8 +130,7 @@ export function marcaEntrada(produto) {
   const caixa = document.createElement('div');
   caixa.className = 'marca-entrada';
   caixa.append(
-    simbolo({ tamanho: 38, cor: '#0b4a96', degrade: ['#3ea8f5', '#0b4a96'] }),
-    letreiro({ altura: 26, cor: '#0a1526', degrade: ['#00c3ef', '#1265d6'], sombra: '#0a4fb0' }),
+    letreiro({ altura: 34, cor: '#0a1526', degrade: ['#00c3ef', '#1265d6'], sombra: '#0a4fb0' }),
   );
   const linha = document.createElement('small');
   linha.textContent = produto;

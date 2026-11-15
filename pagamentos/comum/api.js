@@ -41,7 +41,9 @@ export function criarApi({ base, chave, evento }) {
     } catch (err) {
       throw new ErroApi(err.name === 'TimeoutError' ? 'O servidor demorou para responder. Tente de novo.' : 'Sem conexão com o servidor.', 0);
     }
-    if (resp.status === 401 && !caminho.startsWith('/auth/login')) {
+    // 401 de sessão desconecta. As rotas de autenticação (login, segunda etapa, senha) usam 401 para
+    // "credencial errada" e tratam o erro na própria tela — não podem derrubar a sessão nem o desafio.
+    if (resp.status === 401 && !caminho.startsWith('/auth/')) {
       sessao.limpar();
       window.dispatchEvent(new CustomEvent(evento));
     }

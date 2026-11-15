@@ -101,7 +101,7 @@ module.exports = (db, autenticado) => {
 
   r.post('/auth/senha', (req, res) => {
     const u = db.prepare('SELECT * FROM usuarios_cliente WHERE id = ?').get(req.usuario.id);
-    if (!verificarSenha(String(req.body?.senha_atual ?? ''), u.senha_hash)) throw new ErroNegocio('Senha atual incorreta.', 401);
+    if (!verificarSenha(String(req.body?.senha_atual ?? ''), u.senha_hash)) throw new ErroNegocio('Senha atual incorreta.', 422);
     const nova = v.senha(req.body?.senha_nova);
     if (nova === String(req.body?.senha_atual)) throw new ErroNegocio('A nova senha precisa ser diferente da atual.', 422);
     db.prepare('UPDATE usuarios_cliente SET senha_hash = ?, senha_provisoria = 0 WHERE id = ?').run(hashSenha(nova), u.id);
