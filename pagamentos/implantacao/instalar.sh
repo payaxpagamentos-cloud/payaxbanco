@@ -222,6 +222,20 @@ if ! swapon --show | grep -q . && [[ $(awk '/MemTotal/ {print $2}' /proc/meminfo
   grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
+# Convivência: este servidor pode já ter outros serviços. Nada que esteja rodando é tocado sem aviso.
+passo "Conferindo o que já roda neste servidor"
+web="$(ss -Htlnp '( sport = :80 or sport = :443 )' 2>/dev/null | grep -v caddy || true)"
+if [[ -n "$web" ]]; then
+  echo "As portas 80/443 já estão em uso por outro programa:" >&2; echo "$web" >&2
+  echo "Nada foi instalado. Me mande esta saída: o sistema precisa ser publicado junto do que já existe (proxy atual)." >&2
+  exit 1
+fi
+if [[ -f /etc/caddy/Caddyfile ]] && ! grep -q 'PAY AX\|/usr/share/caddy' /etc/caddy/Caddyfile; then
+  echo "Já existe uma configuração própria do Caddy (/etc/caddy/Caddyfile). Nada foi instalado, para não sobrescrevê-la." >&2
+  exit 1
+fi
+echo "Ok: portas 80 e 443 livres; os demais serviços continuam como estão."
+
 passo "Pacotes do sistema"
 apt-get update -q
 apt-get install -y -q ca-certificates curl gnupg openssl rsync sqlite3 ufw caddy
@@ -335,11 +349,17 @@ gerar_caddy > /etc/caddy/Caddyfile
 systemctl daemon-reload
 
 passo "Firewall"
+if ! ufw status | grep -q "Status: active"; then
+  # Firewall desligado e outros serviços no ar: libera antes as portas que eles já usam, para nada cair.
+  while read -r proto porta; do
+    [[ -n "$porta" && "$porta" != "$PORTA" ]] && ufw allow "$porta/$proto" >/dev/null && echo "Mantida aberta: $porta/$proto (serviço que já rodava)"
+  done < <(ss -Htuln | awk '{split($5,a,":"); p=a[length(a)]; addr=$5; if (addr !~ /^(127\.|\[::1\]|::1)/) print $1, p}' | sort -u)
+fi
 ufw allow OpenSSH >/dev/null
 ufw allow 80/tcp >/dev/null
 ufw allow 443/tcp >/dev/null
 ufw --force enable >/dev/null
-ufw status | head -8
+ufw status | head -12
 
 if [[ $RESERVA -eq 1 ]]; then
   systemctl disable --now payax-pagamentos litestream payax-copia-pastas.timer 2>/dev/null || true
