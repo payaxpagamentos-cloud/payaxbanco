@@ -1,4 +1,5 @@
 import { api, pode } from '../app.js';
+import { fichaPreco, formPreco } from './precos-comum.js';
 import {
   el, montar, cartao, tabela, campo, lerForm, modal, toast, acao, aviso, selo, dinheiro, numero,
   percentual, data, documento, hojeIso, icone
@@ -40,15 +41,7 @@ export default async function contas({ alvo, recarregar }) {
       el('div', {},
         el('p', { style: 'color:var(--texto-2);font-size:13px;margin-bottom:12px' },
           'Vale para os clientes que não têm tabela própria. Cada cliente pode ter a sua em Clientes → Preços.'),
-        el('div', { class: 'pares cols-4' },
-          par('Tarifa de emissão', dinheiro(v.tarifa_emissao_centavos)),
-          par('Tarifa bancária repassada', dinheiro(v.tarifa_liquidacao_centavos)),
-          par('Tarifa PAY AX fixa', dinheiro(v.tarifa_fixa_centavos ?? 0)),
-          par('Tarifa PAY AX %', percentual(v.percentual_ppm)),
-          par('Tarifa mínima', dinheiro(v.comissao_minima_centavos)),
-          par('Tarifa máxima', v.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(v.comissao_maxima_centavos)),
-          par('Tarifa do repasse', dinheiro(v.tarifa_repasse_centavos)),
-          par('Vigente desde', data(v.vigencia_inicio)))),
+        fichaPreco(v)),
       pode('precos.editar') ? el('button', { class: 'botao', onclick: () => editarPrecoPadrao(v, recarregar) }, 'Nova tabela padrão') : null)),
   );
 }
@@ -106,16 +99,7 @@ function editarConta(c, recarregar) {
 }
 
 function editarPrecoPadrao(atual, recarregar) {
-  const reais = (v) => (v === null || v === undefined ? '' : (v / 100).toFixed(2).replace('.', ','));
-  const form = el('form', { class: 'linha-form', onsubmit: (e) => e.preventDefault() },
-    campo({ nome: 'vigencia_inicio', rotulo: 'Vigente a partir de', tipo: 'date', valor: hojeIso(), obrigatorio: true }),
-    campo({ nome: 'tarifa_emissao', rotulo: 'Tarifa de emissão (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_emissao_centavos) }),
-    campo({ nome: 'tarifa_fixa', rotulo: 'Tarifa PAY AX fixa por boleto pago (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_fixa_centavos ?? 0), ajuda: 'Ex.: 1,99' }),
-    campo({ nome: 'percentual', rotulo: 'Tarifa PAY AX (%)', valor: ((atual.percentual_ppm || 0) / 10000).toString().replace('.', ','), ajuda: 'Soma com a fixa' }),
-    campo({ nome: 'tarifa_liquidacao', rotulo: 'Tarifa bancária repassada (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_liquidacao_centavos) }),
-    campo({ nome: 'comissao_minima', rotulo: 'Tarifa mínima (R$)', tipo: 'dinheiro', valor: reais(atual.comissao_minima_centavos) }),
-    campo({ nome: 'comissao_maxima', rotulo: 'Tarifa máxima (R$)', tipo: 'dinheiro', valor: reais(atual.comissao_maxima_centavos) }),
-    campo({ nome: 'tarifa_repasse', rotulo: 'Tarifa do repasse (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_repasse_centavos) }));
+  const form = formPreco(atual);
   const botao = el('button', { class: 'botao' }, 'Salvar tabela padrão');
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.post('/contas/precos-padrao', lerForm(form));

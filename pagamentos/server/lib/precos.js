@@ -30,6 +30,24 @@ const PADRAO = {
   tarifa_repasse_centavos: 0,
 };
 
+/** Campos que o Bolepix pode ter diferentes do boleto comum (a tarifa do repasse é uma só). */
+const CAMPOS_BOLEPIX = ['tarifa_emissao_centavos', 'tarifa_liquidacao_centavos', 'tarifa_fixa_centavos', 'percentual_ppm',
+  'comissao_minima_centavos', 'comissao_maxima_centavos'];
+
+/** Os preços próprios do Bolepix da tabela (objeto), ou null se o Bolepix segue o preço do boleto. */
+function bolepixDe(preco) {
+  if (!preco?.bolepix) return null;
+  try {
+    const o = typeof preco.bolepix === 'string' ? JSON.parse(preco.bolepix) : preco.bolepix;
+    return o && typeof o === 'object' ? Object.fromEntries(CAMPOS_BOLEPIX.filter((k) => k in o).map((k) => [k, o[k]])) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** O preço que vale para o tipo do título: no Bolepix, os campos próprios dele substituem os do boleto. */
+const paraTipo = (preco, tipo) => (tipo === 'bolepix' && bolepixDe(preco) ? { ...preco, ...bolepixDe(preco) } : preco);
+
 /** Preço vigente do cliente na data (cai para a tabela padrão da plataforma e, por fim, para zero). */
 function vigente(db, clienteId, data) {
   const busca = `SELECT * FROM precos WHERE cliente_id IS ? AND vigencia_inicio <= ? AND (vigencia_fim IS NULL OR vigencia_fim >= ?)
@@ -76,13 +94,15 @@ function calcularSplit({ valorPagoCentavos, preco, custoLiquidacaoCentavos = 0 }
 }
 
 /** Simula o split de um valor com o preço vigente do cliente (usado na tela antes de emitir). */
-function simular(db, clienteId, valorCentavos, data) {
-  const preco = vigente(db, clienteId, data);
+function simular(db, clienteId, valorCentavos, data, tipo = 'boleto') {
+  const preco = paraTipo(vigente(db, clienteId, data), tipo);
   return { preco, ...calcularSplit({ valorPagoCentavos: valorCentavos, preco }) };
 }
 
 /** Copia para o boleto os campos de preço que ficam congelados. */
-const congelar = (preco, conta) => ({
+const congelar = (precoTabela, conta, tipo = 'boleto') => {
+  const preco = paraTipo(precoTabela, tipo);
+  return {
   preco_id: preco.id ?? null,
   tarifa_emissao_centavos: preco.tarifa_emissao_centavos ?? 0,
   tarifa_liquidacao_centavos: preco.tarifa_liquidacao_centavos ?? 0,
@@ -91,7 +111,8 @@ const congelar = (preco, conta) => ({
   comissao_minima_centavos: preco.comissao_minima_centavos ?? 0,
   comissao_maxima_centavos: preco.comissao_maxima_centavos ?? null,
   custo_liquidacao_centavos: conta?.custo_liquidacao_centavos ?? 0,
-});
+  };
+};
 
 /** O preço congelado no boleto, no formato que `calcularSplit` espera. */
 const doBoleto = (b) => ({
@@ -135,6 +156,22 @@ function validarPreco(b = {}) {
   if (d.comissao_maxima_centavos !== null && d.comissao_maxima_centavos < d.comissao_minima_centavos) {
     throw new ErroNegocio('A tarifa máxima não pode ser menor que a mínima.', 422);
   }
+  // Bolepix com preço próprio: os mesmos campos, com o prefixo bolepix_ na tela.
+  d.bolepix = null;
+  if (v.booleano(b.bolepix_proprio)) {
+    const x = {
+      tarifa_emissao_centavos: v.centavos(b.bolepix_tarifa_emissao ?? 0, 'a tarifa de emissão do Bolepix'),
+      tarifa_liquidacao_centavos: v.centavos(b.bolepix_tarifa_liquidacao ?? 0, 'a tarifa bancária repassada do Bolepix'),
+      tarifa_fixa_centavos: v.centavos(b.bolepix_tarifa_fixa ?? 0, 'a tarifa PAY AX fixa do Bolepix'),
+      percentual_ppm: b.bolepix_percentual === undefined || b.bolepix_percentual === '' ? 0 : v.percentual(b.bolepix_percentual, 'o percentual do Bolepix', { max: 50 }),
+      comissao_minima_centavos: v.centavos(b.bolepix_comissao_minima ?? 0, 'a tarifa mínima do Bolepix'),
+      comissao_maxima_centavos: v.centavosOpcional(b.bolepix_comissao_maxima, 'a tarifa máxima do Bolepix'),
+    };
+    if (x.comissao_maxima_centavos !== null && x.comissao_maxima_centavos < x.comissao_minima_centavos) {
+      throw new ErroNegocio('No Bolepix, a tarifa máxima não pode ser menor que a mínima.', 422);
+    }
+    d.bolepix = JSON.stringify(x);
+  }
   return d;
 }
 
@@ -143,10 +180,10 @@ function gravarPreco(db, clienteId, d, inicio, usuarioId, agora) {
   db.prepare(`UPDATE precos SET vigencia_fim = date(?, '-1 day') WHERE cliente_id IS ? AND vigencia_fim IS NULL AND vigencia_inicio < ?`)
     .run(inicio, clienteId, inicio);
   return db.prepare(`INSERT INTO precos (cliente_id, vigencia_inicio, tarifa_emissao_centavos, tarifa_liquidacao_centavos, tarifa_fixa_centavos,
-      percentual_ppm, comissao_minima_centavos, comissao_maxima_centavos, tarifa_repasse_centavos, observacao, criado_em, criado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
+      percentual_ppm, comissao_minima_centavos, comissao_maxima_centavos, tarifa_repasse_centavos, observacao, criado_em, criado_por, bolepix)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
     .get(clienteId, inicio, d.tarifa_emissao_centavos, d.tarifa_liquidacao_centavos, d.tarifa_fixa_centavos, d.percentual_ppm,
-      d.comissao_minima_centavos, d.comissao_maxima_centavos, d.tarifa_repasse_centavos, d.observacao, agora, usuarioId).id;
+      d.comissao_minima_centavos, d.comissao_maxima_centavos, d.tarifa_repasse_centavos, d.observacao, agora, usuarioId, d.bolepix ?? null).id;
 }
 
-module.exports = { PADRAO, vigente, calcularSplit, simular, congelar, doBoleto, percentualTexto, tarifaTexto, validarPreco, gravarPreco };
+module.exports = { PADRAO, CAMPOS_BOLEPIX, bolepixDe, paraTipo, vigente, calcularSplit, simular, congelar, doBoleto, percentualTexto, tarifaTexto, validarPreco, gravarPreco };

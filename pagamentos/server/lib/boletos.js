@@ -182,7 +182,7 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
     throw new ErroNegocio('A conta bancária não tem chave PIX cadastrada: só é possível emitir boleto comum.', 409);
   }
   const preco = precos.vigente(db, cliente.id, entrada.emissao);
-  const congelado = precos.congelar(preco, conta);
+  const congelado = precos.congelar(preco, conta, entrada.tipo);
 
   // Evita duplicar o mesmo título vindo do IXC.
   if (origem === 'ixc' && ixc.receber_id) {

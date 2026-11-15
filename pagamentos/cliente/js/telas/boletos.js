@@ -93,7 +93,7 @@ function emitir(recarregar) {
     clearTimeout(pendente);
     pendente = setTimeout(async () => {
       try {
-        const s = await api.post('/boletos/simular', { valor: d.valor });
+        const s = await api.post('/boletos/simular', { valor: d.valor, tipo: d.tipo });
         previa.className = 'cartao';
         previa.replaceChildren(el('div', { class: 'corpo' },
           el('h3', { style: 'font-size:13.5px;margin-bottom:8px' }, `Se for pago, você recebe ${dinheiro(s.liquido_centavos)}`),
@@ -109,6 +109,7 @@ function emitir(recarregar) {
     }, 350);
   };
   form.addEventListener('input', atualizar);
+  form.addEventListener('change', atualizar);
 
   const botao = el('button', { class: 'botao' }, icone('boleto'), 'Emitir boleto');
   botao.addEventListener('click', () => acao(botao, async () => {

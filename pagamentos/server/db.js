@@ -768,6 +768,16 @@ CREATE TABLE despesas (
 CREATE INDEX idx_despesas_inicio ON despesas(inicio);
 `,
   },
+  {
+    versao: 18,
+    nome: 'bolepix-e-logo',
+    sql: `
+-- Preço próprio do Bolepix: JSON com os campos que mudam em relação ao boleto comum (vazio = mesmo preço).
+ALTER TABLE precos ADD COLUMN bolepix TEXT;
+-- Logo do cliente na ficha do boleto (imagem PNG ou JPEG pequena, guardada como data URI).
+ALTER TABLE clientes ADD COLUMN logo TEXT;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

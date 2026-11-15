@@ -43,7 +43,7 @@ module.exports = (db) => {
     const clienteId = Number(req.body?.cliente_id);
     const cliente = db.prepare('SELECT * FROM clientes WHERE id = ?').get(clienteId);
     if (!cliente) throw naoEncontrado('Cliente');
-    res.json(precos.simular(db, cliente.id, v.centavos(req.body?.valor, 'o valor'), hoje()));
+    res.json(precos.simular(db, cliente.id, v.centavos(req.body?.valor, 'o valor'), hoje(), req.body?.tipo === 'bolepix' ? 'bolepix' : 'boleto'));
   });
 
   r.post('/', exigir('boletos.emitir'), async (req, res) => {

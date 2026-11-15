@@ -6,6 +6,8 @@ import {
 } from '../../comum/ui.js';
 import { agendaLiberacao } from '../../comum/graficos.js';
 import { emitir } from './boletos.js';
+import { fichaPreco, formPreco, bolepixDe } from './precos-comum.js';
+import { blocoLogo } from '../../comum/logo.js';
 
 export default async function clientes({ alvo, params, query, recarregar }) {
   if (params[0]) return ficha(alvo, params[0], params[1] ?? 'resumo', query, recarregar);
@@ -207,17 +209,9 @@ async function abaRepasses(alvo, c, query, recarregar) {
 async function abaPrecos(alvo, c, query, recarregar) {
   const p = await api.get(`/clientes/${c.id}/precos`);
   const v = p.vigente;
-  const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
   montar(alvo, 
     cartao(v.cliente_id ? 'Tabela do cliente (vigente)' : 'Usando a tabela padrão da plataforma',
-      el('div', { class: 'pares' },
-        par('Tarifa de emissão', dinheiro(v.tarifa_emissao_centavos)),
-        par('Tarifa bancária repassada', dinheiro(v.tarifa_liquidacao_centavos)),
-        par('Tarifa PAY AX fixa', dinheiro(v.tarifa_fixa_centavos ?? 0)),
-        par('Tarifa PAY AX %', percentual(v.percentual_ppm)),
-        par('Tarifa mínima', dinheiro(v.comissao_minima_centavos)),
-        par('Tarifa máxima', v.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(v.comissao_maxima_centavos)),
-        par('Tarifa do repasse', dinheiro(v.tarifa_repasse_centavos))),
+      fichaPreco(v),
       pode('precos.editar') ? el('button', { class: 'botao', onclick: () => novoPreco(c, v, recarregar) }, 'Nova tabela') : null),
     el('div', { style: 'margin-top:14px' }, cartao('Histórico de preços', tabela({
       colunas: [
@@ -227,6 +221,7 @@ async function abaPrecos(alvo, c, query, recarregar) {
         { titulo: 'PAY AX fixa', dir: true, conteudo: (x) => dinheiro(x.tarifa_fixa_centavos ?? 0) },
         { titulo: 'PAY AX %', dir: true, conteudo: (x) => percentual(x.percentual_ppm) },
         { titulo: 'Mínima', dir: true, conteudo: (x) => dinheiro(x.comissao_minima_centavos) },
+        { titulo: 'Bolepix', conteudo: (x) => (bolepixDe(x) ? 'Preço próprio' : 'Igual ao boleto') },
       ],
       itens: p.historico,
       vazio: 'Sem tabela própria: vale a tabela padrão da plataforma.',
@@ -235,17 +230,7 @@ async function abaPrecos(alvo, c, query, recarregar) {
 }
 
 function novoPreco(c, atual, recarregar) {
-  const reais = (v) => (v === null || v === undefined ? '' : (v / 100).toFixed(2).replace('.', ','));
-  const form = el('form', { class: 'linha-form', onsubmit: (e) => e.preventDefault() },
-    campo({ nome: 'vigencia_inicio', rotulo: 'Vigente a partir de', tipo: 'date', valor: hojeIso(), obrigatorio: true }),
-    campo({ nome: 'tarifa_emissao', rotulo: 'Tarifa de emissão (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_emissao_centavos) }),
-    campo({ nome: 'tarifa_fixa', rotulo: 'Tarifa PAY AX fixa por boleto pago (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_fixa_centavos ?? 0), ajuda: 'Ex.: 1,99 — sai de cada boleto pago' }),
-    campo({ nome: 'percentual', rotulo: 'Tarifa PAY AX (%)', valor: ((atual.percentual_ppm || 0) / 10000).toString().replace('.', ','), ajuda: 'Sobre o valor pago; soma com a fixa' }),
-    campo({ nome: 'tarifa_liquidacao', rotulo: 'Tarifa bancária repassada (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_liquidacao_centavos), ajuda: 'Deixe 0 se a tarifa fixa já cobre o custo do banco' }),
-    campo({ nome: 'comissao_minima', rotulo: 'Tarifa mínima (R$)', tipo: 'dinheiro', valor: reais(atual.comissao_minima_centavos) }),
-    campo({ nome: 'comissao_maxima', rotulo: 'Tarifa máxima (R$)', tipo: 'dinheiro', valor: reais(atual.comissao_maxima_centavos), ajuda: 'Vazio = sem teto' }),
-    campo({ nome: 'tarifa_repasse', rotulo: 'Tarifa do repasse (R$)', tipo: 'dinheiro', valor: reais(atual.tarifa_repasse_centavos) }),
-    campo({ nome: 'observacao', rotulo: 'Observação' }));
+  const form = formPreco(atual);
   const botao = el('button', { class: 'botao' }, 'Salvar tabela');
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.post(`/clientes/${c.id}/precos`, lerForm(form));
@@ -285,6 +270,12 @@ async function abaAcessos(alvo, c, query, recarregar) {
       itens: c.acessos,
       vazio: 'Nenhum acesso criado. O cliente ainda não consegue entrar na Área do Cliente.',
     })), pode('clientes.editar') ? el('button', { class: 'botao', onclick: () => novoAcesso(c, recarregar) }, icone('mais'), 'Novo acesso') : null),
+
+    el('div', { style: 'margin-top:14px' }, cartao('Logo no boleto', blocoLogo({
+      atual: c.logo ?? null,
+      editavel: pode('clientes.editar'),
+      salvar: async (imagem) => { await api.put(`/clientes/${c.id}/logo`, { imagem }); recarregar(); },
+    }))),
 
     el('div', { style: 'margin-top:14px' }, cartao('Sistema de gestão do cliente',
       el('div', {},

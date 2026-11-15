@@ -29,6 +29,7 @@ const ROTULO_BENEFICIARIO_FINAL = 'Beneficiário final';
 const codigobarras = require('./codigobarras');
 const febraban = require('./febraban');
 const { valorAtualizado } = require('./boletos');
+const logoLib = require('./logo');
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const brl = (c) => (Number(c || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -98,6 +99,7 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   /* Quem cobra, antes de tudo: é o nome que o pagador reconhece. */
   .cobrador { display: flex; align-items: stretch; gap: 14px; border: 2px solid #000; border-radius: 4px; padding: 10px 12px; margin-bottom: 12px; }
   .cobrador .quem { flex: 1; min-width: 0; }
+  .cobrador .logo-cliente { display: block; max-height: 16mm; max-width: 60mm; object-fit: contain; margin-bottom: 6px; }
   .cobrador .rot { display: block; font-size: 8.5px; color: #333; text-transform: uppercase; letter-spacing: 0.06em; }
   .cobrador .nome { display: block; font: 700 21px/1.15 Arial; margin: 2px 0 3px; word-break: break-word; }
   .cobrador .doc { font-size: 11px; color: #222; }
@@ -155,6 +157,7 @@ ${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não e
 
   <div class="cobrador">
     <div class="quem">
+      ${logoLib.paraFicha(cliente.logo) ? `<img class="logo-cliente" src="${logoLib.paraFicha(cliente.logo)}" alt="${esc(bfFantasia)}">` : ''}
       <span class="rot">Cobrança de</span>
       <span class="nome">${esc(bfFantasia)}</span>
       <span class="doc">${esc(bfNome)} · CNPJ ${esc(bfDoc)}</span>

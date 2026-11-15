@@ -15,6 +15,7 @@ const v = require('../lib/validacao');
 const datas = require('../lib/datas');
 const razao = require('../lib/razao');
 const precos = require('../lib/precos');
+const logoLib = require('../lib/logo');
 const boletosLib = require('../lib/boletos');
 const repassesLib = require('../lib/repasses');
 const consultas = require('../lib/consultas');
@@ -146,7 +147,14 @@ module.exports = (db, autenticado) => {
           tarifa_emissao_centavos: pr.tarifa_emissao_centavos, tarifa_liquidacao_centavos: pr.tarifa_liquidacao_centavos,
           percentual_ppm: pr.percentual_ppm, percentual_texto: precos.percentualTexto(pr.percentual_ppm),
           comissao_minima_centavos: pr.comissao_minima_centavos, comissao_maxima_centavos: pr.comissao_maxima_centavos,
-          tarifa_repasse_centavos: pr.tarifa_repasse_centavos };
+          tarifa_repasse_centavos: pr.tarifa_repasse_centavos,
+          // Bolepix com preço próprio: a mesma ficha, com os valores dele (null = mesmo preço do boleto).
+          bolepix: precos.bolepixDe(pr) ? (() => {
+            const pb = precos.paraTipo(pr, 'bolepix');
+            return { tarifa_texto: precos.tarifaTexto(pb), tarifa_emissao_centavos: pb.tarifa_emissao_centavos,
+              tarifa_liquidacao_centavos: pb.tarifa_liquidacao_centavos, comissao_minima_centavos: pb.comissao_minima_centavos,
+              comissao_maxima_centavos: pb.comissao_maxima_centavos };
+          })() : null };
       })(),
     });
   });
@@ -166,7 +174,7 @@ module.exports = (db, autenticado) => {
   });
 
   r.post('/boletos/simular', exigir('boletos.ver'), (req, res) => {
-    const s = precos.simular(db, req.clienteId, v.centavos(req.body?.valor, 'o valor'), hoje());
+    const s = precos.simular(db, req.clienteId, v.centavos(req.body?.valor, 'o valor'), hoje(), req.body?.tipo === 'bolepix' ? 'bolepix' : 'boleto');
     res.json({ ...s, margem_centavos: undefined, custo_banco_centavos: undefined });
   });
 
@@ -269,8 +277,18 @@ module.exports = (db, autenticado) => {
       destino: contaDestino.descrever(c),
       destino_titular: c.destino_titular ?? c.pix_titular ?? c.razao_social,
       meio_entrega: contaDestino.meioAtual(db, c),
+      logo: c.logo ?? null,
       versao: c.versao,
     });
+  });
+
+  /** O cliente coloca o próprio logo na ficha do boleto (PNG ou JPEG; vazio remove). */
+  r.put('/cadastro/logo', exigir('cadastro.editar'), (req, res) => {
+    const c = meuCliente(req);
+    const logo = logoLib.validar(req.body?.imagem);
+    db.prepare('UPDATE clientes SET logo = ? WHERE id = ?').run(logo, c.id);
+    auditoria.registrar(db, req, { acao: logo ? 'cliente.logo.definido' : 'cliente.logo.removido', entidade: 'cliente', entidade_id: c.id, cliente_id: c.id });
+    res.json({ logo });
   });
 
   /** O cliente atualiza contato e endereço. A chave PIX do repasse só muda pela equipe PAY AX. */

@@ -11,6 +11,7 @@ const v = require('../lib/validacao');
 const datas = require('../lib/datas');
 const razao = require('../lib/razao');
 const precos = require('../lib/precos');
+const logoLib = require('../lib/logo');
 const contaDestino = require('../lib/contaDestino');
 const consultas = require('../lib/consultas');
 const repasses = require('../lib/repasses');
@@ -101,7 +102,9 @@ module.exports = (db) => {
         (SELECT IFNULL(SUM(l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND l.data_liberacao <= '${data}') AS disponivel_centavos,
         (SELECT IFNULL(SUM(l.valor_centavos), 0) FROM lancamentos l WHERE l.cliente_id = c.id AND l.data_liberacao > '${data}') AS a_liberar_centavos
       FROM clientes c${cond.length ? ` WHERE ${cond.join(' AND ')}` : ''} ORDER BY c.razao_social`;
-    res.json(listaPaginada(db, sql, p, req.query));
+    const lista = listaPaginada(db, sql, p, req.query);
+    // A imagem do logo fica fora da lista (só a ficha do cliente a traz).
+    res.json({ ...lista, itens: lista.itens.map(({ logo, ...x }) => ({ ...x, tem_logo: Boolean(logo) })) });
   });
 
   r.post('/', exigir('clientes.editar'), (req, res) => {
@@ -224,6 +227,15 @@ module.exports = (db) => {
   });
 
   // ------------------------------------------------------------------ preços
+  /** Logo do cliente na ficha do boleto (PNG ou JPEG; vazio remove). */
+  r.put('/:id/logo', exigir('clientes.editar'), (req, res) => {
+    const c = buscar(req.params.id);
+    const logo = logoLib.validar(req.body?.imagem);
+    db.prepare('UPDATE clientes SET logo = ? WHERE id = ?').run(logo, c.id);
+    auditoria.registrar(db, req, { acao: logo ? 'cliente.logo.definido' : 'cliente.logo.removido', entidade: 'cliente', entidade_id: c.id, cliente_id: c.id });
+    res.json({ logo });
+  });
+
   r.get('/:id/precos', exigir('precos.ver'), (req, res) => {
     const c = buscar(req.params.id);
     res.json({

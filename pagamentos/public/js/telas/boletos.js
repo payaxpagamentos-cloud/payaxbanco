@@ -110,7 +110,7 @@ export function emitir(clientes, recarregar, clienteFixo = null) {
     clearTimeout(pendente);
     pendente = setTimeout(async () => {
       try {
-        const s = await api.post('/boletos/simular', { cliente_id: Number(clienteId), valor: d.valor });
+        const s = await api.post('/boletos/simular', { cliente_id: Number(clienteId), valor: d.valor, tipo: d.tipo });
         previa.className = 'cartao';
         previa.replaceChildren(el('div', { class: 'corpo' },
           el('h3', { style: 'font-size:13.5px;margin-bottom:8px' }, 'Se este boleto for pago, o split fica assim'),

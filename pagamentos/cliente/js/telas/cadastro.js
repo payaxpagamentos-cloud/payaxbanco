@@ -1,4 +1,5 @@
 import { api, ir, pode, usuario } from '../app.js';
+import { blocoLogo } from '../../comum/logo.js';
 import {
   el, montar, cartao, tabela, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar, autoPreencher,
   dinheiro, numero, dataHora, data, documento, telefone, hojeIso, somarDias, R, icone
@@ -59,6 +60,12 @@ async function abaDados(alvo, recarregar) {
       par('CNPJ', documento(c.cnpj)),
       par('Situação', selo(c.situacao, R.situacaoCliente)),
       par('Limite por boleto', dinheiro(c.limite_boleto_centavos)))),
+
+    el('div', { style: 'margin-top:14px' }, cartao('Logo no boleto', blocoLogo({
+      atual: c.logo ?? null,
+      editavel,
+      salvar: async (imagem) => { await api.put('/cadastro/logo', { imagem }); recarregar(); },
+    }))),
 
     el('div', { style: 'margin-top:14px' }, cartao('Conta para receber os pagamentos',
       el('div', {},

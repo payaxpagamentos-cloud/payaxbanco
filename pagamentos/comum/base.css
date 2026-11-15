@@ -152,6 +152,7 @@ input, select, textarea {
 input:disabled, select:disabled { background: var(--superficie-2); color: var(--texto-3); }
 textarea { min-height: 76px; resize: vertical; }
 .linha-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.linha-form.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .linha-form.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .linha-form .span-2 { grid-column: span 2; }
 /* Rótulos longos (duas linhas): todos ocupam a mesma altura e os campos ficam alinhados na linha. */
@@ -507,7 +508,7 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
   .filtros .campo-form.cresce { flex-basis: 100%; }
   .filtros .campo-form input, .filtros .campo-form select { width: 100%; }
   /* Pares: no máximo duas colunas no celular. */
-  .pares.cols-3, .pares.cols-4, .linha-form.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pares.cols-3, .pares.cols-4, .linha-form.cols-3, .linha-form.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pares { grid-auto-flow: row dense; } /* item de duas colunas não deixa buraco */
 }
 /* Tabelas no celular: cada linha vira um cartão (nenhuma coluna fica escondida para fora da tela). */
