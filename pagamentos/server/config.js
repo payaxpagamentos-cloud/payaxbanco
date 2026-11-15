@@ -47,6 +47,8 @@ module.exports = {
   tokenTtlSeconds: Number(process.env.PAYAX_SESSAO_HORAS || 8) * 3600,
   trustProxy: process.env.PAYAX_TRUST_PROXY ?? 'loopback',
   limiteLoginPorMinuto: Number(process.env.PAYAX_LIMITE_LOGIN) || 10,
+  // Código de 6 dígitos da segunda etapa: limite próprio e baixo (força bruta).
+  limite2faPorMinuto: Number(process.env.PAYAX_LIMITE_2FA) || 10,
   fusoPadrao: process.env.PAYAX_FUSO || 'America/Sao_Paulo',
   urlPublica: process.env.PAYAX_URL_PUBLICA || '',
 

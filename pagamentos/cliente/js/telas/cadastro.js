@@ -32,10 +32,13 @@ async function abaDados(alvo, recarregar) {
       campo({ nome: 'responsavel', rotulo: 'Responsável', valor: c.responsavel ?? '' }),
       campo({ nome: 'email', rotulo: 'E-mail', tipo: 'email', valor: c.email ?? '' }),
       campo({ nome: 'telefone', rotulo: 'Telefone', valor: c.telefone ?? '' })),
-    el('div', { class: 'linha-form', style: 'margin-top:12px' },
+    // Endereço em duas linhas de quatro: CEP · endereço (largo) · número / complemento · bairro · cidade · UF.
+    el('div', { class: 'linha-form cols-4', style: 'margin-top:12px' },
       campo({ nome: 'cep', rotulo: 'CEP', valor: c.cep ?? '' }),
-      campo({ nome: 'endereco', rotulo: 'Endereço', valor: c.endereco ?? '' }),
-      campo({ nome: 'numero', rotulo: 'Número', valor: c.numero ?? '' }),
+      el('div', { class: 'span-2' }, campo({ nome: 'endereco', rotulo: 'Endereço', valor: c.endereco ?? '' })),
+      campo({ nome: 'numero', rotulo: 'Número', valor: c.numero ?? '' })),
+    el('div', { class: 'linha-form cols-4', style: 'margin-top:12px' },
+      campo({ nome: 'complemento', rotulo: 'Complemento', valor: c.complemento ?? '' }),
       campo({ nome: 'bairro', rotulo: 'Bairro', valor: c.bairro ?? '' }),
       campo({ nome: 'cidade', rotulo: 'Cidade', valor: c.cidade ?? '' }),
       campo({ nome: 'uf', rotulo: 'UF', valor: c.uf ?? '', atributos: { maxlength: 2 } })));

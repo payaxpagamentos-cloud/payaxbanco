@@ -153,18 +153,18 @@ async function detalheBoleto(alvo, id, recarregar) {
       await copiar(l.url ?? `${location.origin}${l.caminho}`, 'Link do boleto copiado — envie ao pagador.');
     }) }, icone('copiar'), 'Copiar link'),
     b.situacao === 'registrado' && pode('boletos.baixar')
-      ? el('button', { class: 'botao sec', onclick: async (e) => {
+      ? el('button', { class: 'botao sec', onclick: async (e) => { const botao = e.currentTarget;
         const r = await confirmar({ titulo: 'Baixar boleto', texto: 'O título deixa de poder ser pago. Esta ação é informada ao banco.', confirmarTexto: 'Baixar', perigo: true, campoMotivo: true });
-        if (r) acao(e.currentTarget, async () => { await api.post(`/boletos/${b.id}/baixa`, r); toast('Boleto baixado.', 'ok'); recarregar(); });
-      } }, 'Baixar')
+        if (r) acao(botao, async () => { await api.post(`/boletos/${b.id}/baixa`, r); toast('Boleto baixado.', 'ok'); recarregar(); });
+      } }, icone('fechar'), 'Baixar')
       : null,
     b.situacao !== 'liquidado' && pode('conciliacao.operar')
       ? el('button', { class: 'botao sec', onclick: () => liquidarManual(b, recarregar) }, icone('ok'), 'Registrar pagamento')
       : null,
     b.situacao === 'liquidado' && pode('conciliacao.operar')
-      ? el('button', { class: 'botao sec', onclick: async (e) => {
-        const r = await confirmar({ titulo: 'Estornar liquidação', texto: 'O crédito e os descontos voltam na conta gráfica do cliente como estorno.', confirmarTexto: 'Estornar', perigo: true, campoMotivo: true });
-        if (r) acao(e.currentTarget, async () => { await api.post(`/boletos/${b.id}/estorno`, r); toast('Liquidação estornada.', 'ok'); recarregar(); });
+      ? el('button', { class: 'botao sec', onclick: async (e) => { const botao = e.currentTarget;
+        const r = await confirmar({ titulo: 'Estornar liquidação', texto: 'O crédito e os descontos voltam no extrato do cliente como estorno.', confirmarTexto: 'Estornar', perigo: true, campoMotivo: true });
+        if (r) acao(botao, async () => { await api.post(`/boletos/${b.id}/estorno`, r); toast('Liquidação estornada.', 'ok'); recarregar(); });
       } }, 'Estornar')
       : null,
     pode('conciliacao.operar')
@@ -234,7 +234,7 @@ async function detalheBoleto(alvo, id, recarregar) {
               ],
               itens: b.lancamentos,
             }))
-            : el('p', { style: 'margin-top:10px;color:var(--texto-3);font-size:13px' }, 'Os lançamentos na conta gráfica do cliente são criados quando o título for liquidado.')))),
+            : el('p', { style: 'margin-top:10px;color:var(--texto-3);font-size:13px' }, 'Os lançamentos no extrato do cliente são criados quando o título for liquidado.')))),
   );
 }
 
@@ -252,13 +252,13 @@ function avisoRateio(b, recarregar) {
     a_confirmar: ['Pago, mas o banco não disse se creditou o cliente. Confira no extrato do Bradesco se a parte dele caiu na conta dele e informe abaixo. Até lá, nenhum PIX sai — para não pagar duas vezes.', 'erro'],
   };
   const [texto, tom] = textos[b.rateio_situacao] ?? ['Rateio de crédito pedido ao banco: aguardando a confirmação do registro.', 'info'];
-  const conferir = (creditado) => async (e) => {
+  const conferir = (creditado) => async (e) => { const botao = e.currentTarget;
     const r = await confirmar({
       titulo: creditado ? 'O banco creditou o cliente' : 'O banco NÃO creditou o cliente',
       texto: creditado ? 'Fica registrado como rateio feito. Nenhum PIX sai.' : 'O valor do cliente volta ao saldo dele e sai agora por PIX.',
       confirmarTexto: creditado ? 'Confirmar' : 'Enviar por PIX', perigo: !creditado, campoMotivo: true,
     });
-    if (r) acao(e.currentTarget, async () => {
+    if (r) acao(botao, async () => {
       await api.post(`/boletos/${b.id}/rateio/conferir`, { creditado: String(creditado), observacao: r.motivo });
       toast(creditado ? 'Rateio confirmado.' : 'O valor segue por PIX para o cliente.', 'ok');
       recarregar();

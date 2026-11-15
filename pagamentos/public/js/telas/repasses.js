@@ -72,11 +72,17 @@ export default async function repasses({ alvo, query, recarregar }) {
               toast('Repasse enviado.', 'ok');
               recarregar();
             }); } }, 'Enviar') : null,
-          ['aguardando_aprovacao', 'aprovado', 'falhou'].includes(r.situacao) && pode('repasses.aprovar')
-            ? el('button', { class: 'botao sec pequeno', onclick: async (e) => {
+          r.situacao === 'enviado' && pode('repasses.aprovar')
+            ? el('button', { class: 'botao pequeno', title: 'Conferi no extrato do banco: o PIX saiu', onclick: async (e) => {
+              e.stopPropagation(); const botao = e.currentTarget;
+              const c = await confirmar({ titulo: 'O PIX saiu?', texto: 'Confirme só depois de ver o PIX no extrato do banco. Informe a identificação (end-to-end) no motivo, se tiver.', confirmarTexto: 'Saiu: confirmar', campoMotivo: true });
+              if (c) acao(botao, async () => { await api.post(`/repasses/${r.id}/confirmar`, { end_to_end: c.motivo.replace(/\s/g, '').slice(0, 40) }); toast('Repasse confirmado.', 'ok'); recarregar(); });
+            } }, 'Saiu') : null,
+          ['aguardando_aprovacao', 'aprovado', 'falhou', 'enviado'].includes(r.situacao) && pode('repasses.aprovar')
+            ? el('button', { class: 'botao sec pequeno', onclick: async (e) => { const botao = e.currentTarget;
               e.stopPropagation();
-              const c = await confirmar({ titulo: 'Cancelar repasse', texto: 'O valor é estornado e sai de novo na próxima rodada de repasse.', confirmarTexto: 'Cancelar repasse', perigo: true, campoMotivo: true });
-              if (c) acao(e.currentTarget, async () => { await api.post(`/repasses/${r.id}/cancelar`, c); toast('Repasse cancelado.'); recarregar(); });
+              const c = await confirmar({ titulo: 'Cancelar repasse', texto: r.situacao === 'enviado' ? 'Só cancele se o PIX NÃO aparece no extrato do banco: o valor volta e sai de novo na próxima rodada — se ele tiver saído, o cliente recebe duas vezes.' : 'O valor é estornado e sai de novo na próxima rodada de repasse.', confirmarTexto: 'Cancelar repasse', perigo: true, campoMotivo: true });
+              if (c) acao(botao, async () => { await api.post(`/repasses/${r.id}/cancelar`, c); toast('Repasse cancelado.'); recarregar(); });
             } }, 'Cancelar') : null) },
       ],
       itens: d.itens,

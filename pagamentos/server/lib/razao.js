@@ -60,7 +60,7 @@ function agenda(db, clienteId, hoje, dias = 30) {
 }
 
 /** Extrato com saldo acumulado, em ordem cronológica de competência. */
-function extrato(db, clienteId, { de, ate, tipo = null, limite = 200, offset = 0 } = {}) {
+function extrato(db, clienteId, { de, ate, tipo = null, limite = 200, offset = 0, ordem = 'asc' } = {}) {
   const cond = ['l.cliente_id = ?'];
   const p = [clienteId];
   if (de) { cond.push('l.data_competencia >= ?'); p.push(de); }
@@ -72,15 +72,21 @@ function extrato(db, clienteId, { de, ate, tipo = null, limite = 200, offset = 0
   const anterior = de
     ? db.prepare('SELECT IFNULL(SUM(valor_centavos), 0) AS s FROM lancamentos WHERE cliente_id = ? AND data_competencia < ?').get(clienteId, de).s
     : 0;
-  const itens = db.prepare(`SELECT l.*, b.nosso_numero, b.seu_numero, b.pagador_nome, b.valor_centavos AS boleto_valor_centavos,
-      SUM(l.valor_centavos) OVER (ORDER BY l.data_competencia, l.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS acumulado
-    FROM lancamentos l LEFT JOIN boletos b ON b.id = l.boleto_id
-    WHERE ${onde} ORDER BY l.data_competencia, l.id LIMIT ? OFFSET ?`).all(...p, limite, offset);
+  // O saldo acumulado é calculado sobre o período inteiro, antes de paginar; "desc" traz os mais recentes.
+  const sentido = ordem === 'desc' ? 'DESC' : 'ASC';
+  const itens = db.prepare(`SELECT * FROM (
+      SELECT l.*, b.nosso_numero, b.seu_numero, b.pagador_nome, b.valor_centavos AS boleto_valor_centavos,
+        SUM(l.valor_centavos) OVER (ORDER BY l.data_competencia, l.id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS acumulado
+      FROM lancamentos l LEFT JOIN boletos b ON b.id = l.boleto_id
+      WHERE ${onde}
+    ) ORDER BY data_competencia ${sentido}, id ${sentido} LIMIT ? OFFSET ?`).all(...p, limite, offset);
+  // Filtrado por tipo, "saldo" não tem significado (soma só de uma parte): não é mostrado.
+  const comSaldo = !tipo;
   return {
-    itens: itens.map((i) => ({ ...i, tipo_nome: TIPOS[i.tipo] ?? i.tipo, saldo_acumulado_centavos: anterior + i.acumulado })),
+    itens: itens.map((i) => ({ ...i, tipo_nome: TIPOS[i.tipo] ?? i.tipo, saldo_acumulado_centavos: comSaldo ? anterior + i.acumulado : null })),
     total: total.n,
     soma_centavos: total.soma,
-    saldo_anterior_centavos: anterior,
+    saldo_anterior_centavos: comSaldo ? anterior : null,
   };
 }
 

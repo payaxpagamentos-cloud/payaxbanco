@@ -23,6 +23,7 @@ const cnab = require('./cnab400');
 const datas = require('./datas');
 const boletosLib = require('./boletos');
 const sincronismo = require('./sincronismo');
+const razao = require('./razao');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 const impressaoDigital = (texto) => crypto.createHash('sha256').update(texto).digest('hex');
@@ -83,9 +84,21 @@ function conteudoRemessa(db, id) {
 }
 
 // ---------------------------------------------------------------- Retorno
-/** Localiza o título de um registro do retorno pelo nosso número. */
-const acharBoleto = (db, registro) => db.prepare('SELECT * FROM boletos WHERE nosso_numero = ? ORDER BY id DESC LIMIT 1')
-  .get(String(registro.nosso_numero).padStart(11, '0'));
+/**
+ * Localiza o título de um registro do retorno. Cada convênio tem a sua faixa de nosso número, então o
+ * mesmo número pode existir em duas contas: a agência e a conta do registro (posições 25-36) decidem.
+ * Sem como decidir entre dois títulos, não aplica nada — liquidar o título errado é pagar o cliente errado.
+ */
+function acharBoleto(db, registro) {
+  const nn = String(registro.nosso_numero).padStart(11, '0');
+  const candidatos = db.prepare(`SELECT b.*, c.agencia AS conta_agencia, c.conta AS conta_numero FROM boletos b
+    JOIN contas_bancarias c ON c.id = b.conta_id WHERE b.nosso_numero = ? ORDER BY b.id DESC`).all(nn);
+  if (candidatos.length <= 1) return candidatos[0] ?? null;
+  const ag = Number(registro.empresa_agencia) || 0;
+  const ct = Number(registro.empresa_conta) || 0;
+  const daConta = candidatos.filter((b) => ag && ct && Number(b.conta_agencia) === ag && Number(b.conta_numero) === ct);
+  return daConta.length ? daConta[0] : { ambiguo: true };
+}
 
 /**
  * Aplica um registro do retorno ao título. Devolve o que foi feito.
@@ -94,6 +107,7 @@ const acharBoleto = (db, registro) => db.prepare('SELECT * FROM boletos WHERE no
 function aplicar(db, registro, { creditoEm }) {
   const b = acharBoleto(db, registro);
   if (!b) return { resultado: 'sem_titulo', nosso_numero: registro.nosso_numero };
+  if (b.ambiguo) return { resultado: 'nao_tratado', nosso_numero: registro.nosso_numero, motivo: 'nosso número existe em mais de uma conta e o registro não diz qual' };
 
   switch (registro.acao) {
     case 'confirmado': {
@@ -108,9 +122,20 @@ function aplicar(db, registro, { creditoEm }) {
       return { resultado: 'confirmado', boleto_id: b.id };
     }
     case 'rejeitado': {
+      if (['liquidado', 'baixado', 'cancelado'].includes(b.situacao)) return { resultado: 'informativo', boleto_id: b.id, texto: registro.ocorrencia_texto };
       const motivo = registro.motivos.map((m) => `${m.codigo} ${m.texto}`).join('; ') || `Ocorrência ${registro.ocorrencia}`;
-      db.prepare("UPDATE boletos SET situacao = 'falha', erro_registro = ?, motivo_rejeicao = ? WHERE id = ?")
-        .run(`O banco recusou o registro: ${motivo}`, motivo, b.id);
+      transacao(db, () => {
+        db.prepare("UPDATE boletos SET situacao = 'falha', erro_registro = ?, motivo_rejeicao = ? WHERE id = ?")
+          .run(`O banco recusou o registro: ${motivo}`, motivo, b.id);
+        // Boleto que o banco não registrou não existe: a tarifa de emissão cobrada volta para o cliente.
+        const cobrado = db.prepare("SELECT IFNULL(-SUM(valor_centavos), 0) AS v FROM lancamentos WHERE boleto_id = ? AND tipo = 'tarifa_emissao'").get(b.id).v;
+        const devolvido = db.prepare("SELECT IFNULL(SUM(valor_centavos), 0) AS v FROM lancamentos WHERE boleto_id = ? AND tipo = 'estorno' AND descricao LIKE 'Tarifa de emissão devolvida%'").get(b.id).v;
+        if (cobrado - devolvido > 0) {
+          const dia = datas.dataLocal(config.fusoPadrao);
+          razao.lancar(db, { cliente_id: b.cliente_id, boleto_id: b.id, tipo: 'estorno', valor_centavos: cobrado - devolvido,
+            descricao: `Tarifa de emissão devolvida: o banco não registrou o título ${b.nosso_numero}`, data_competencia: dia, data_liberacao: dia });
+        }
+      });
       return { resultado: 'rejeitado', boleto_id: b.id, motivo };
     }
     case 'liquidado': {
@@ -130,6 +155,11 @@ function aplicar(db, registro, { creditoEm }) {
         meio: 'boleto',
       }, { origem: 'retorno' });
       return { resultado: out.ja_liquidado ? 'repetido' : 'liquidado', boleto_id: b.id, ...(out.ja_liquidado ? {} : { split: out }) };
+    }
+    case 'instrucao_rejeitada': {
+      // O título segue como estava (inclusive liquidado): só fica registrado o motivo da recusa.
+      const motivo = registro.motivos.map((m) => `${m.codigo} ${m.texto}`).join('; ') || registro.ocorrencia_texto;
+      return { resultado: 'informativo', boleto_id: b.id, texto: `${registro.ocorrencia_texto}: ${motivo}` };
     }
     case 'baixado': {
       if (b.situacao === 'liquidado') return { resultado: 'repetido', boleto_id: b.id };

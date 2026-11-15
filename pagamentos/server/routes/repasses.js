@@ -116,6 +116,14 @@ module.exports = (db) => {
     res.json(out);
   });
 
+  /** O PIX saiu (conferido no extrato do banco depois de um tempo esgotado): confirma à mão. */
+  r.post('/:id/confirmar', exigir('repasses.aprovar'), (req, res) => {
+    const end = req.body?.end_to_end ? v.texto(req.body.end_to_end, 'a identificação do PIX (end-to-end)', 40) : null;
+    const out = repassesLib.confirmarEnvio(db, Number(req.params.id), { end_to_end: end }, req.usuario);
+    auditoria.registrar(db, req, { acao: 'repasse.confirmado.manual', entidade: 'repasse', entidade_id: out.id, cliente_id: out.cliente_id, depois: { end_to_end: end } });
+    res.json(out);
+  });
+
   /** Roda agora a rotina que normalmente acontece sozinha (útil para fechar o dia na mão). */
   r.post('/rotina', exigir('repasses.enviar'), async (req, res) => {
     const out = await repassesLib.rotinaAutomatica(db, { usuario: req.usuario });

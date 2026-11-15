@@ -100,8 +100,9 @@ const OCORRENCIA = {
   25: { acao: 'informativo', texto: 'Protesto sustado' },
   27: { acao: 'informativo', texto: 'Confirmação de alteração de dados' },
   28: { acao: 'tarifa', texto: 'Débito de tarifas ou custas' },
-  30: { acao: 'rejeitado', texto: 'Alteração de dados rejeitada' },
-  32: { acao: 'rejeitado', texto: 'Instrução rejeitada' },
+  // Recusa de INSTRUÇÃO (alterar, baixar...) não é recusa do título: ele continua valendo como estava.
+  30: { acao: 'instrucao_rejeitada', texto: 'Alteração de dados rejeitada' },
+  32: { acao: 'instrucao_rejeitada', texto: 'Instrução rejeitada' },
   35: { acao: 'informativo', texto: 'Confirmação de inclusão em banco de dados' },
 };
 
@@ -391,6 +392,8 @@ function lerRetorno(conteudo) {
     const codigo = campo(l, 109, 110);
     const oc = OCORRENCIA[codigo] ?? OCORRENCIA[String(Number(codigo))] ?? { acao: 'nao_tratado', texto: `Ocorrência ${codigo}` };
     registros.push({
+      empresa_agencia: campo(l, 25, 29),
+      empresa_conta: campo(l, 30, 36),
       nosso_numero: campo(l, 71, 81),
       nosso_numero_dv: campo(l, 82, 82),
       seu_numero: campo(l, 38, 62).trim(),
@@ -409,7 +412,7 @@ function lerRetorno(conteudo) {
       juros_centavos: Number(campo(l, 267, 279)),
       outros_centavos: Number(campo(l, 280, 292)),
       creditado_em: dataIso(campo(l, 296, 301)),
-      motivos: oc.acao === 'rejeitado' ? motivosDe(campo(l, 319, 328)) : [],
+      motivos: ['rejeitado', 'instrucao_rejeitada'].includes(oc.acao) ? motivosDe(campo(l, 319, 328)) : [],
       sequencial: Number(campo(l, 395, 400)) || null,
     });
   }

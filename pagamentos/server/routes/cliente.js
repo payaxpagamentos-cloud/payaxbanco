@@ -221,7 +221,8 @@ module.exports = (db, autenticado) => {
     res.json({
       periodo: p,
       saldo: razao.saldo(db, req.clienteId, hoje()),
-      ...razao.extrato(db, req.clienteId, { ...p, tipo: req.query.tipo || null, limite: Number(req.query.limite) || 500 }),
+      ...razao.extrato(db, req.clienteId, { ...p, tipo: req.query.tipo || null, limite: Number(req.query.limite) || 500,
+        ordem: req.query.ordem === 'desc' ? 'desc' : 'asc' }),
       totais: razao.totaisPorTipo(db, req.clienteId, p.de, p.ate),
     });
   });

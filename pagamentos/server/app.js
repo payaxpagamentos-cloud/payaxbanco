@@ -30,6 +30,8 @@ function criarApp(db) {
   // ------------------------------------------------- Backoffice PAY AX
   const equipe = express.Router();
   equipe.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  // Código de 6 dígitos: sem limite, dá para tentar todos dentro dos 5 minutos do desafio.
+  equipe.post('/api/auth/2fa', limitar({ janelaMs: 60_000, maximo: config.limite2faPorMinuto }));
   // O retorno do banco chega como arquivo (corpo bruto); o resto da API é JSON.
   equipe.use('/api/arquivos/retornos', express.raw({ type: () => true, limit: '10mb' }));
   equipe.use(express.json({ limit: '1mb' }));
@@ -43,6 +45,7 @@ function criarApp(db) {
   // ------------------------------------------------- Área do Cliente do cliente final
   const cliente = express.Router();
   cliente.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  cliente.post('/api/auth/2fa', limitar({ janelaMs: 60_000, maximo: config.limite2faPorMinuto }));
   cliente.use(express.json({ limit: '1mb' }));
   cliente.use(privacidade);
   cliente.use('/api', criarApiCliente(db));

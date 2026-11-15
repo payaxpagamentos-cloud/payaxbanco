@@ -24,7 +24,7 @@ const { ErroNegocio, naoEncontrado } = require('./erros');
 const datas = require('./datas');
 const razao = require('./razao');
 const precos = require('./precos');
-const { criarBanco } = require('./bradesco');
+const bradesco = require('./bradesco');
 const { contaDe, credenciaisDaConta } = require('./boletos');
 const contaDestino = require('./contaDestino');
 
@@ -53,8 +53,9 @@ function disponivel(db, cliente, data = hoje()) {
 function resumoCliente(db, cliente, data = hoje()) {
   const d = disponivel(db, cliente, data);
   // PIX confirmados + o que o banco creditou direto na conta do cliente (rateio de crédito).
+  // confirmado_em é UTC; a data que vale é a de Brasília (UTC−3, sem horário de verão desde 2019).
   const soma = (de) => db.prepare(`SELECT IFNULL(SUM(valor_liquido_centavos), 0) AS v FROM repasses
-    WHERE cliente_id = ? AND situacao = 'confirmado' AND substr(confirmado_em, 1, 10) >= ?`).get(cliente.id, de).v
+    WHERE cliente_id = ? AND situacao = 'confirmado' AND date(confirmado_em, '-3 hours') BETWEEN ? AND ?`).get(cliente.id, de, data).v
     + db.prepare(`SELECT IFNULL(-SUM(l.valor_centavos), 0) AS v FROM lancamentos l LEFT JOIN boletos b ON b.id = l.boleto_id
       WHERE l.cliente_id = ? AND l.tipo = 'repasse' AND l.repasse_id IS NULL AND l.data_liberacao BETWEEN ? AND ?
         AND IFNULL(b.rateio_situacao, '') <> 'nao_efetuado'`).get(cliente.id, de, data).v;
@@ -107,11 +108,11 @@ function criar(db, cliente, { usuario = null } = {}) {
     const destino = destinoDe(cliente);
 
     const r = db.prepare(`INSERT INTO repasses (cliente_id, valor_centavos, taxa_centavos, valor_liquido_centavos, meio,
-        pix_tipo, pix_chave, titular_nome, titular_documento, destino_banco, destino_agencia, destino_conta,
+        pix_tipo, pix_chave, titular_nome, titular_documento, destino_banco, destino_agencia, destino_conta, destino_ispb, destino_tipo,
         situacao, automatico, solicitado_por, aprovado_por, aprovado_em, criado_em)
-      VALUES (?, ?, ?, ?, 'pix', ?, ?, ?, ?, ?, ?, ?, 'aprovado', 1, ?, ?, ?, ?) RETURNING *`)
+      VALUES (?, ?, ?, ?, 'pix', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aprovado', 1, ?, ?, ?, ?) RETURNING *`)
       .get(cliente.id, valor, taxa, liquido, destino.pix_tipo, destino.pix_chave, destino.titular_nome, destino.titular_documento,
-        destino.banco ?? null, destino.agencia ?? null, destino.conta ?? null,
+        destino.banco ?? null, destino.agencia ?? null, destino.conta ?? null, destino.ispb ?? null, destino.tipo_conta ?? null,
         usuario?.id ?? null, usuario?.id ?? null, agora(), agora());
 
     razao.lancar(db, { cliente_id: cliente.id, repasse_id: r.id, tipo: 'repasse', valor_centavos: -liquido,
@@ -164,13 +165,24 @@ function cancelar(db, id, motivo, usuario) {
   return transacao(db, () => {
     const r = db.prepare('SELECT * FROM repasses WHERE id = ?').get(id);
     if (!r) throw naoEncontrado('Repasse');
-    if (!['aguardando_aprovacao', 'aprovado', 'falhou'].includes(r.situacao)) {
+    // "enviado" só se cancela depois de conferir no extrato do banco que o PIX NÃO saiu.
+    if (!['aguardando_aprovacao', 'aprovado', 'falhou', 'enviado'].includes(r.situacao)) {
       throw new ErroNegocio(`Repasse ${r.situacao} não pode ser cancelado.`, 409);
     }
     if (r.situacao !== 'falhou') devolverAoSaldo(db, r, motivo ?? 'cancelado pela equipe', usuario);
     db.prepare("UPDATE repasses SET situacao = 'cancelado', erro = ?, versao = versao + 1 WHERE id = ?").run(motivo ?? null, id);
     return db.prepare('SELECT * FROM repasses WHERE id = ?').get(id);
   });
+}
+
+/** O PIX saiu (conferido no extrato do banco): marca como confirmado, com a identificação informada. */
+function confirmarEnvio(db, id, { end_to_end }, usuario) {
+  const r = db.prepare('SELECT * FROM repasses WHERE id = ?').get(id);
+  if (!r) throw naoEncontrado('Repasse');
+  if (r.situacao !== 'enviado') throw new ErroNegocio('Só um repasse "enviado" pode ser confirmado à mão.', 409);
+  db.prepare("UPDATE repasses SET situacao = 'confirmado', end_to_end = COALESCE(?, end_to_end), confirmado_em = ?, erro = NULL, versao = versao + 1 WHERE id = ?")
+    .run(end_to_end || null, agora(), id);
+  return db.prepare('SELECT * FROM repasses WHERE id = ?').get(id);
 }
 
 /** Envia o PIX pelo banco. Falha devolve o valor ao saldo e deixa o motivo registrado. */
@@ -183,14 +195,14 @@ async function enviar(db, id, { usuario = null } = {}) {
   const conta = contaDe(db);
   db.prepare("UPDATE repasses SET situacao = 'enviado', enviado_em = ?, versao = versao + 1 WHERE id = ?").run(agora(), id);
   try {
-    const banco = criarBanco(conta, credenciaisDaConta(db, conta.id));
+    const banco = bradesco.criarBanco(conta, credenciaisDaConta(db, conta.id));
     const resp = await banco.pagarPix({
       chave: r.pix_chave,
       tipo_chave: r.pix_tipo,
       // PIX pelos dados da conta, quando não há chave: banco (ISPB), agência, conta e tipo.
       conta: r.destino_conta ? {
-        banco: r.destino_banco, ispb: contaDestino.BANCOS[r.destino_banco]?.ispb ?? null, agencia: r.destino_agencia,
-        conta: r.destino_conta, titular: r.titular_nome, documento: r.titular_documento,
+        banco: r.destino_banco, ispb: r.destino_ispb ?? contaDestino.BANCOS[r.destino_banco]?.ispb ?? null, agencia: r.destino_agencia,
+        conta: r.destino_conta, tipo: r.destino_tipo ?? 'corrente', titular: r.titular_nome, documento: r.titular_documento,
       } : null,
       valor_centavos: r.valor_liquido_centavos,
       descricao: `PAY AX repasse ${r.id}`,
@@ -200,6 +212,13 @@ async function enviar(db, id, { usuario = null } = {}) {
       .run(resp.situacao === 'confirmado' ? 'confirmado' : 'enviado', resp.end_to_end ?? null,
         resp.situacao === 'confirmado' ? agora() : null, id);
   } catch (err) {
+    // Tempo esgotado: o banco pode ter efetivado o PIX. Estornar e reenviar na rodada seguinte seria
+    // arriscar pagar duas vezes. Fica "enviado", com o aviso, até a equipe conferir no extrato do banco.
+    if (err.tempoEsgotado) {
+      db.prepare("UPDATE repasses SET erro = ?, versao = versao + 1 WHERE id = ?")
+        .run('O banco não respondeu a tempo: confira no extrato se o PIX saiu antes de qualquer ação.', id);
+      throw new ErroNegocio('O banco não respondeu a tempo. O repasse ficou como "enviado": confira no extrato do banco se o PIX saiu.', 504);
+    }
     transacao(db, () => {
       devolverAoSaldo(db, r, `falha no envio: ${err.message}`, usuario);
       db.prepare("UPDATE repasses SET situacao = 'falhou', erro = ?, versao = versao + 1 WHERE id = ?").run(String(err.message).slice(0, 300), id);
@@ -264,4 +283,4 @@ function parados(db, data = hoje(), { suspensos = false } = {}) {
 /** Valor retido por ordem legal: não é "dinheiro parado", é cumprimento de ordem — aparece à parte. */
 const retidosPorOrdem = (db, data = hoje()) => parados(db, data, { suspensos: true });
 
-module.exports = { disponivel, resumoCliente, criar, repassar, repassarCliente, aprovar, cancelar, enviar, rotinaAutomatica, parados, retidosPorOrdem, destinoDe };
+module.exports = { disponivel, resumoCliente, criar, repassar, repassarCliente, aprovar, cancelar, enviar, rotinaAutomatica, parados, retidosPorOrdem, destinoDe, confirmarEnvio };

@@ -58,7 +58,7 @@ export default async function relatorios({ alvo, query }) {
       ],
     }))),
 
-    el('div', { style: 'margin-top:14px' }, cartao('A sua tabela de preços', el('div', { class: 'pares' },
+    el('div', { style: 'margin-top:14px' }, cartao('A sua tabela de preços', el('div', { class: 'pares cols-3' },
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa PAY AX'), el('span', { class: 'val' }, d.preco.tarifa_texto)),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa mínima'), el('span', { class: 'val' }, dinheiro(d.preco.comissao_minima_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa máxima'), el('span', { class: 'val' }, d.preco.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(d.preco.comissao_maxima_centavos))),

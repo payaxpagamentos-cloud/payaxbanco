@@ -13,7 +13,7 @@ export default async function clientes({ alvo, params, query, recarregar }) {
   const filtros = { busca: query.busca ?? '', situacao: query.situacao ?? '', pagina: Number(query.pagina) || 1 };
   const lista = await api.get(`/clientes${qs(filtros)}`);
   const form = el('form', { class: 'filtros', onsubmit: (e) => { e.preventDefault(); ir(`#/clientes${qs({ ...filtros, ...lerForm(form), pagina: 1 })}`); } },
-    campo({ nome: 'busca', rotulo: 'Buscar', valor: filtros.busca, atributos: { placeholder: 'Razão social, CNPJ ou conta (0001)' } }),
+    campo({ nome: 'busca', rotulo: 'Buscar', valor: filtros.busca, atributos: { placeholder: 'Razão social, CNPJ ou código (0001)' } }),
     campo({ nome: 'situacao', rotulo: 'Situação', tipo: 'select', valor: filtros.situacao,
       opcoes: [['', 'Todas'], ...Object.entries(R.situacaoCliente).map(([k, [t]]) => [k, t])] }),
     el('button', { class: 'botao', type: 'submit' }, icone('busca'), 'Filtrar'));
@@ -46,7 +46,7 @@ async function ficha(alvo, id, aba, query, recarregar) {
   const abas = [
     ['resumo', 'Resumo'],
     ['boletos', 'Boletos'],
-    ['extrato', 'Conta gráfica'],
+    ['extrato', 'Extrato'],
     ['repasses', 'Repasses'],
     ['precos', 'Preços'],
     ['acessos', 'Acessos e IXC'],
@@ -165,7 +165,7 @@ function ajustar(c, recarregar) {
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.post(`/clientes/${c.id}/ajustes`, lerForm(form));
     m.fechar();
-    toast('Ajuste lançado na conta gráfica.', 'ok');
+    toast('Ajuste lançado no extrato do cliente.', 'ok');
     recarregar();
   }));
   const m = modal({ titulo: `Ajuste manual · ${c.razao_social}`,

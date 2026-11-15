@@ -150,6 +150,9 @@ input, select, textarea {
 input:disabled, select:disabled { background: var(--superficie-2); color: var(--texto-3); }
 textarea { min-height: 76px; resize: vertical; }
 .linha-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.linha-form.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.linha-form .span-2 { grid-column: span 2; }
+.linha-form .span-2 > * { width: 100%; }
 .filtros { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px; background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); padding: 12px 14px; }
 .filtros .campo-form { min-width: 140px; }
 .filtros .campo-form.cresce { flex: 1; min-width: 200px; }
@@ -164,6 +167,9 @@ textarea { min-height: 76px; resize: vertical; }
 .grade.kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .grade.duas { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 .grade.tres { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+/* Simetria: cartões lado a lado ficam com a mesma altura (o mais baixo acompanha o vizinho). */
+.grade.duas, .grade.tres { align-items: stretch; }
+.grade.duas > *, .grade.tres > * { min-width: 0; }
 
 /* Stat tile: o número é o protagonista; rótulo acima, contexto abaixo. */
 .kpi { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); padding: 14px 16px; box-shadow: var(--sombra); display: grid; gap: 3px; align-content: start; }
@@ -418,6 +424,10 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 .abas button.ativa { color: var(--azul); border-bottom-color: var(--azul-marca); font-weight: 650; }
 
 .pares { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 20px; }
+/* Colunas fixas quando a quantidade de itens é conhecida: linhas completas, sem item sozinho no fim. */
+.pares.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pares.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pares.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .par { display: grid; gap: 2px; }
 .par .rot { font-size: 11px; color: var(--texto-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 .par .val { font-size: 14.5px; }
@@ -435,6 +445,19 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
   .abrir-menu { display: grid; }
   main { padding: 16px 14px 50px; }
   .topo { padding: 0 14px; }
+  /* Topo: só o nome da tela, numa linha. */
+  .caminho > span:first-child, .caminho > .sep { display: none; }
+  .caminho strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Cabeçalho de cartão com botões: o título fica numa linha e os botões descem, sem vazar da tela. */
+  .cartao > header { flex-wrap: wrap; }
+  .cartao > header h2 { flex: 1 1 100%; }
+  .cartao > header .acoes { margin-left: 0; flex-wrap: wrap; }
+  /* Filtros ocupam a largura: dois campos por linha, a busca inteira. */
+  .filtros .campo-form { flex: 1 1 calc(50% - 8px); min-width: 0; }
+  .filtros .campo-form.cresce { flex-basis: 100%; }
+  .filtros .campo-form input, .filtros .campo-form select { width: 100%; }
+  /* Pares: no máximo duas colunas no celular. */
+  .pares.cols-3, .pares.cols-4, .linha-form.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media print {
   .menu, .topo, .cabecalho-tela .acoes, .filtros, .botao { display: none !important; }
@@ -456,6 +479,8 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
   .acao-rapida { flex-basis: calc(50% - 4px); min-width: 0; }
   /* Dois indicadores por linha em vez de um: no celular, rolagem é o que mais custa. */
   .grade.kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  /* Quantidade ímpar de indicadores: o último ocupa a linha inteira, para não ficar um buraco. */
+  .grade.kpis > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .kpi { padding: 12px 13px; }
   .kpi .valor { font-size: 21px; }
   .kpi .rotulo { font-size: 11.5px; }

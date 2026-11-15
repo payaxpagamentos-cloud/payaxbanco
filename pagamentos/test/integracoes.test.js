@@ -58,7 +58,11 @@ test('webhook do banco: liquida, não duplica e guarda tudo', async (t) => {
     assert.deepEqual(lerAviso({ nossoNumero: '00000000012', valorPago: '150,75', dataCredito: '15.12.2026' }),
       { nosso_numero: '00000000012', valor_centavos: 15075, pago_em: '2026-12-15', evento: 'liquidacao', meio: 'boleto' });
     assert.equal(lerAviso({ eNumeroTitulo: '12', vlPagoTitulo: '99.90', dtCreditoTitulo: '2026-12-15' }).valor_centavos, 9990);
-    assert.equal(lerAviso({ nosso_numero: '12', valor: 15075 }).valor_centavos, 15075, 'aceita centavos inteiros');
+    assert.equal(lerAviso({ nosso_numero: '12', valor: '15075' }).valor_centavos, 15075, 'texto só de dígitos = centavos');
+    assert.equal(lerAviso({ nosso_numero: '12', valorPago: 150 }).valor_centavos, 15000, 'número JSON é reais: 150 = R$ 150,00, não R$ 1,50');
+    assert.equal(lerAviso({ nosso_numero: '12', valorPago: 150.5 }).valor_centavos, 15050);
+    assert.equal(lerAviso({ nosso_numero: '12', tipoTitulo: 'BOLEPIX', pagador: 'Qrz Ltda' }).meio, 'boleto', 'BOLEPIX no tipo do título não é o meio de pagamento');
+    assert.equal(lerAviso({ nosso_numero: '12', meioPagamento: 'PIX' }).meio, 'pix');
   });
 
   await t.test('a conciliação mostra o que aconteceu com cada aviso', async () => {

@@ -58,6 +58,19 @@ function corpoCliente(body, { novo = false, cnpjAtual = null } = {}) {
   if (body.entrega !== undefined) d.entrega = v.opcao(body.entrega || 'padrao', 'como o cliente recebe', ['padrao', 'pix']);
   // Conta para onde vai o valor de cada boleto pago — tem que ser da própria empresa (mesmo CNPJ).
   Object.assign(d, contaDestino.ler(body, d.cnpj ?? cnpjAtual));
+  // A chave PIX também: titular = a própria empresa. Chave de CPF (pessoa física) ou CNPJ de outro, nunca.
+  if (d.pix_chave) {
+    const cnpj = d.cnpj ?? cnpjAtual;
+    const titular = d.pix_documento ?? body.pix_documento ?? cnpj;
+    if (cnpj && String(titular).replace(/\D/g, '') !== String(cnpj).replace(/\D/g, '')) {
+      throw new ErroNegocio('A chave PIX de repasse tem que ser da própria empresa (titular com o mesmo CNPJ do cliente).', 422);
+    }
+    if (d.pix_tipo === 'cpf') throw new ErroNegocio('Chave PIX de CPF é de pessoa física: o repasse vai só para conta da própria empresa.', 422);
+    if (d.pix_tipo === 'cnpj' && cnpj && d.pix_chave.replace(/\D/g, '') !== String(cnpj).replace(/\D/g, '')) {
+      throw new ErroNegocio('A chave PIX de CNPJ tem que ser o CNPJ do próprio cliente.', 422);
+    }
+    d.pix_documento = String(titular).replace(/\D/g, '');
+  }
   return d;
 }
 
@@ -136,6 +149,11 @@ module.exports = (db) => {
     conferirVersao(c.versao, req.body?.versao);
     const d = corpoCliente(req.body ?? {}, { cnpjAtual: buscar(req.params.id).cnpj });
     if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
+    // Trocar para onde vai o dinheiro é coisa de quem aprova repasse (financeiro/administrador).
+    const mexeNoDestino = Object.keys(d).some((k) => k.startsWith('pix_') || k.startsWith('destino_') || k === 'entrega');
+    if (mexeNoDestino && !podeEquipe(req.usuario.perfil, 'repasses.aprovar')) {
+      throw new ErroNegocio('Só o financeiro ou o administrador alteram a conta de destino do cliente.', 403);
+    }
     if (d.cnpj && d.cnpj !== c.cnpj && db.prepare('SELECT 1 FROM clientes WHERE cnpj = ? AND id <> ?').get(d.cnpj, c.id)) {
       throw new ErroNegocio('Já existe outro cliente com este CNPJ.', 409);
     }

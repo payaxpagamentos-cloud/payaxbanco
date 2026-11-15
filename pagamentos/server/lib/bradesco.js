@@ -14,6 +14,35 @@
  */
 const crypto = require('node:crypto');
 const https = require('node:https');
+const http = require('node:http');
+
+/**
+ * Requisição HTTP(S) com o certificado do cliente (mTLS). O fetch nativo do Node ignora a opção
+ * `agent` — com ele, o certificado da PAY AX nunca chegaria ao Bradesco. Devolve algo com a mesma
+ * forma de uma Response (ok, status, text(), json()). Tempo esgotado vira erro com name 'TimeoutError'.
+ */
+function pedir(url, { method = 'GET', headers = {}, body, timeoutMs = 30_000, agent } = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const corpo = body === undefined || body === null ? null : Buffer.from(String(body));
+    const req = (u.protocol === 'http:' ? http : https).request(u, {
+      method, agent, headers: { ...headers, ...(corpo ? { 'Content-Length': corpo.length } : {}) },
+    }, (res) => {
+      const partes = [];
+      res.on('data', (c) => partes.push(c));
+      res.on('end', () => {
+        const texto = Buffer.concat(partes).toString('utf8');
+        resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode,
+          text: async () => texto, json: async () => JSON.parse(texto) });
+      });
+      res.on('error', reject);
+    });
+    req.setTimeout(timeoutMs, () => { const e = new Error('tempo esgotado'); e.name = 'TimeoutError'; req.destroy(e); });
+    req.on('error', reject);
+    if (corpo) req.write(corpo);
+    req.end();
+  });
+}
 const config = require('../config');
 const febraban = require('./febraban');
 const cnab = require('./cnab400');
@@ -252,12 +281,12 @@ function apiBradesco(conta, credenciais, opcoes = {}) {
     if (autenticado) headers.Authorization = `Bearer ${await autenticar()}`;
     let resp;
     try {
-      resp = await fetch(`${base}${caminho}`, {
+      resp = await pedir(`${base}${caminho}`, {
         method: metodo,
         headers,
         body: corpo === undefined ? undefined : JSON.stringify(corpo),
-        signal: AbortSignal.timeout(timeoutMs),
-        ...(agente ? { dispatcher: undefined, agent: agente } : {}),
+        timeoutMs,
+        agent: agente,
       });
     } catch (err) {
       const tempo = err.name === 'TimeoutError' || err.name === 'AbortError';
@@ -285,12 +314,12 @@ function apiBradesco(conta, credenciais, opcoes = {}) {
     });
     let resp;
     try {
-      resp = await fetch(`${base}${ENDPOINTS.token}`, {
+      resp = await pedir(`${base}${ENDPOINTS.token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: corpo,
-        signal: AbortSignal.timeout(timeoutMs),
-        ...(agente ? { agent: agente } : {}),
+        body: corpo.toString(),
+        timeoutMs,
+        agent: agente,
       });
     } catch (err) {
       throw new ErroBanco(`Não foi possível autenticar no Bradesco: ${err.message}`, { tempoEsgotado: err.name === 'TimeoutError' });
@@ -346,7 +375,7 @@ function apiBradesco(conta, credenciais, opcoes = {}) {
           ...(chave ? { chaveDestino: chave, tipoChave: tipo_chave } : {
             contaDestino: {
               ispb: destino.ispb, agencia: so(destino.agencia), conta: so(destino.conta),
-              tipoConta: 'CACC', nomeTitular: semAcento(destino.titular).slice(0, 80),
+              tipoConta: { poupanca: 'SVGS', pagamento: 'TRAN' }[destino.tipo] ?? 'CACC', nomeTitular: semAcento(destino.titular).slice(0, 80),
             },
           }),
           valor: (valor_centavos / 100).toFixed(2),
@@ -406,4 +435,4 @@ function criarBanco(conta, credenciais = null, opcoes = {}) {
   return apiBradesco(conta, credenciais, opcoes);
 }
 
-module.exports = { criarBanco, simulador, porArquivo, apiBradesco, ErroBanco, situacaoDaApi, paraApi, HOSTS, ENDPOINTS };
+module.exports = { pedir, criarBanco, simulador, porArquivo, apiBradesco, ErroBanco, situacaoDaApi, paraApi, HOSTS, ENDPOINTS };

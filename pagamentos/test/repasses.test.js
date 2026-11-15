@@ -149,3 +149,45 @@ test('conta de destino: PIX pelos dados da conta, e só para conta da própria e
     assert.match(r.dados.erro, /conta de destino/);
   });
 });
+
+test('PIX de repasse sem resposta do banco: não estorna nem reenvia sozinho', async (t) => {
+  const api = await iniciar();
+  t.after(() => api.fechar());
+  const tk = await api.equipe();
+  await api.conta(tk.admin);
+  await api.precoPadrao(tk.admin);
+  const bradesco = require('../server/lib/bradesco');
+  const original = bradesco.simulador;
+  const a = await api.cliente(tk.admin, { pix_chave: '', destino_banco: '403', destino_ispb: '37880206', destino_agencia: '1', destino_conta: '123', destino_tipo: 'pagamento', destino_titular: 'Provedor Alfa LTDA' });
+  const b = await api.boleto(tk.admin, a.cliente.id, { valor: '100,00', vencimento: somarDias(hoje(), 5) });
+
+  await t.test('o repasse leva o ISPB e o tipo de conta do cadastro', async () => {
+    await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: hoje(), valor_pago: '100,00', meio: 'pix' }, tk.financeiro);
+    const r = api.db.prepare('SELECT * FROM repasses WHERE cliente_id = ?').get(a.cliente.id);
+    assert.deepEqual([r.destino_ispb, r.destino_tipo, r.situacao], ['37880206', 'pagamento', 'confirmado']);
+  });
+
+  await t.test('tempo esgotado: fica "enviado", sem estorno; a rodada não manda outro; a equipe confirma', async () => {
+    const b2 = await api.boleto(tk.admin, a.cliente.id, { valor: '100,00', vencimento: somarDias(hoje(), 5) });
+    const { ErroBanco } = bradesco;
+    // Banco que não responde a tempo.
+    const lib = require('../server/lib/repasses');
+    const criar = bradesco.criarBanco;
+    bradesco.criarBanco = () => ({ pagarPix: async () => { throw new ErroBanco('O Bradesco não respondeu a tempo.', { tempoEsgotado: true }); } });
+    try {
+      await api.post(`/api/boletos/${b2.id}/liquidar`, { pago_em: hoje(), valor_pago: '100,00', meio: 'pix' }, tk.financeiro);
+      const r = api.db.prepare('SELECT * FROM repasses WHERE cliente_id = ? ORDER BY id DESC').get(a.cliente.id);
+      assert.equal(r.situacao, 'enviado');
+      assert.match(r.erro, /confira no extrato/);
+      assert.equal(api.db.prepare("SELECT COUNT(*) AS n FROM lancamentos WHERE repasse_id = ? AND tipo = 'estorno'").get(r.id).n, 0, 'sem estorno');
+      const antes = api.db.prepare('SELECT COUNT(*) AS n FROM repasses').get().n;
+      await lib.rotinaAutomatica(api.db);
+      assert.equal(api.db.prepare('SELECT COUNT(*) AS n FROM repasses').get().n, antes, 'a rodada não manda outro PIX');
+      const ok = await api.post(`/api/repasses/${r.id}/confirmar`, { end_to_end: 'E237TESTE' }, tk.financeiro);
+      assert.equal(ok.dados.situacao, 'confirmado');
+    } finally {
+      bradesco.criarBanco = criar;
+    }
+    void original;
+  });
+});

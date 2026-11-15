@@ -29,7 +29,7 @@ async function telaSeguranca(alvo, recarregar) {
   const tamanho = (n) => `${(n / 1024 / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
 
   montar(alvo,
-    !b.ultimo ? aviso('Nenhum backup foi gerado ainda. A conta gráfica é o livro-razão do dinheiro dos clientes — gere o primeiro agora.', 'erro')
+    !b.ultimo ? aviso('Nenhum backup foi gerado ainda. O razão é o registro do dinheiro de cada cliente — gere o primeiro agora.', 'erro')
       : !b.ultimo.confere ? aviso(`O último backup NÃO conferiu: ${b.ultimo.divergencia}`, 'erro')
         : b.atrasado ? aviso(`O último backup foi há ${b.horas_desde} h. O esperado é a cada ${b.intervalo_horas} h.`, 'aviso')
           : aviso(`Último backup há ${b.horas_desde} h, conferido. Guardando os ${b.manter} mais recentes.`, 'ok'),
@@ -78,9 +78,9 @@ async function telaSeguranca(alvo, recarregar) {
             { titulo: 'Duas etapas', conteudo: (u) => selo(u.totp_ativo ? 'ok' : 'nao', { ok: ['Ativa', 'ok'], nao: ['Sem 2FA', 'aviso'] }) },
             { titulo: 'Último acesso', conteudo: (u) => (u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou') },
             { titulo: '', dir: true, conteudo: (u) => (u.totp_ativo && pode('*')
-              ? el('button', { class: 'botao sutil pequeno', onclick: async (e) => {
+              ? el('button', { class: 'botao sutil pequeno', onclick: async (e) => { const botao = e.currentTarget;
                 const ok = await confirmar({ titulo: 'Redefinir duas etapas', texto: `${u.nome} vai precisar configurar de novo no próximo acesso. Use quando a pessoa trocar de celular.`, confirmarTexto: 'Redefinir', perigo: true });
-                if (ok) acao(e.currentTarget, async () => { await api.post(`/seguranca/equipe/${u.id}/redefinir-2fa`, {}); toast('Redefinida.'); recarregar(); });
+                if (ok) acao(botao, async () => { await api.post(`/seguranca/equipe/${u.id}/redefinir-2fa`, {}); toast('Redefinida.'); recarregar(); });
               } }, 'Redefinir') : null) },
           ],
           itens: d.equipe,
@@ -98,9 +98,9 @@ async function telaSeguranca(alvo, recarregar) {
         { titulo: 'Duas etapas', conteudo: (u) => selo(u.totp_ativo ? 'ok' : 'nao', { ok: ['Ativa', 'ok'], nao: ['Sem 2FA', 'neutra'] }) },
         { titulo: 'Último acesso', conteudo: (u) => (u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca entrou') },
         { titulo: '', dir: true, conteudo: (u) => (u.totp_ativo
-          ? el('button', { class: 'botao sutil pequeno', onclick: async (e) => {
+          ? el('button', { class: 'botao sutil pequeno', onclick: async (e) => { const botao = e.currentTarget;
             const ok = await confirmar({ titulo: 'Redefinir duas etapas', texto: `${u.nome} (${u.cliente}) vai configurar de novo no próximo acesso.`, confirmarTexto: 'Redefinir', perigo: true });
-            if (ok) acao(e.currentTarget, async () => { await api.post(`/seguranca/acessos/${u.id}/redefinir-2fa`, {}); toast('Redefinida.'); recarregar(); });
+            if (ok) acao(botao, async () => { await api.post(`/seguranca/acessos/${u.id}/redefinir-2fa`, {}); toast('Redefinida.'); recarregar(); });
           } }, 'Redefinir') : null) },
       ],
       itens: d.acessos_clientes,

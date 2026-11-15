@@ -59,8 +59,10 @@ function validarEntrada(dados, cliente) {
     throw new ErroNegocio(`Valor acima do limite por boleto deste cliente (${(cliente.limite_boleto_centavos / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`, 422);
   }
   const vencimento = v.data(dados.vencimento, 'o vencimento');
-  const emissao = dados.emissao ? v.data(dados.emissao, 'a emissão') : hoje();
-  if (vencimento < emissao) throw new ErroNegocio('O vencimento não pode ser anterior à emissão.', 422);
+  // A emissão é sempre hoje: é ela que escolhe a tabela de preço vigente — data informada pelo usuário
+  // permitiria congelar uma tarifa antiga.
+  const emissao = hoje();
+  if (vencimento < emissao) throw new ErroNegocio('O vencimento não pode ser anterior a hoje.', 422);
   if (datas.diasEntre(emissao, vencimento) > 3650) throw new ErroNegocio('Vencimento distante demais (máximo de 10 anos).', 422);
   const descontoAte = v.dataOpcional(dados.desconto_ate, 'a data limite do desconto');
   const desconto = v.centavosOpcional(dados.desconto, 'o desconto') ?? 0;
@@ -271,6 +273,9 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
     const b = db.prepare('SELECT * FROM boletos WHERE id = ?').get(boletoId);
     if (!b) throw naoEncontrado('Boleto');
     if (b.situacao === 'liquidado') return { ja_liquidado: true, boleto_id: b.id };
+    // Defesa contra creditar duas vezes: se o recebimento já está no razão, o título já foi liquidado.
+    const jaCreditado = db.prepare("SELECT 1 FROM lancamentos WHERE boleto_id = ? AND tipo = 'credito_liquidacao' LIMIT 1").get(b.id);
+    if (jaCreditado) return { ja_liquidado: true, boleto_id: b.id };
     if (b.situacao === 'cancelado') throw new ErroNegocio('Boleto cancelado não pode ser liquidado.', 409);
 
     const cliente = db.prepare('SELECT * FROM clientes WHERE id = ?').get(b.cliente_id);
@@ -437,7 +442,10 @@ function valorAtualizado(b, data = hoje()) {
   if (b.desconto_centavos && b.desconto_ate && data <= b.desconto_ate) {
     return { valor_centavos: base - b.desconto_centavos, desconto_centavos: b.desconto_centavos, multa_centavos: 0, juros_centavos: 0 };
   }
-  if (data <= b.vencimento) return { valor_centavos: base, desconto_centavos: 0, multa_centavos: 0, juros_centavos: 0 };
+  // Vencimento em dia sem expediente (fim de semana, feriado): paga-se no dia útil seguinte sem encargos.
+  // Depois disso, o atraso conta desde o vencimento original.
+  const limiteSemEncargo = datas.proximoDiaUtil(b.vencimento);
+  if (data <= limiteSemEncargo) return { valor_centavos: base, desconto_centavos: 0, multa_centavos: 0, juros_centavos: 0 };
   const diasAtraso = datas.diasEntre(b.vencimento, data);
   const multa = Math.round((base * (b.multa_ppm || 0)) / 1_000_000);
   const juros = Math.round((base * (b.juros_mes_ppm || 0) * diasAtraso) / (1_000_000 * 30));

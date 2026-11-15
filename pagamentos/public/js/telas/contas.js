@@ -13,7 +13,7 @@ export default async function contas({ alvo, recarregar }) {
   montar(alvo, 
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Contas e preços'),
-        el('p', {}, 'Os boletos de todos os clientes são registrados na nossa conta (modelo de conta gráfica).')),
+        el('p', {}, 'Os boletos de todos os clientes são registrados no convênio da PAY AX no banco; cada um leva o cliente como beneficiário final.')),
       pode('*') ? el('div', { class: 'acoes' }, el('button', { class: 'botao', onclick: () => editarConta(null, recarregar) }, icone('mais'), 'Nova conta')) : null),
 
     c.modo_banco === 'simulador'
@@ -40,7 +40,7 @@ export default async function contas({ alvo, recarregar }) {
       el('div', {},
         el('p', { style: 'color:var(--texto-2);font-size:13px;margin-bottom:12px' },
           'Vale para os clientes que não têm tabela própria. Cada cliente pode ter a sua em Clientes → Preços.'),
-        el('div', { class: 'pares' },
+        el('div', { class: 'pares cols-4' },
           par('Tarifa de emissão', dinheiro(v.tarifa_emissao_centavos)),
           par('Tarifa bancária repassada', dinheiro(v.tarifa_liquidacao_centavos)),
           par('Tarifa PAY AX fixa', dinheiro(v.tarifa_fixa_centavos ?? 0)),

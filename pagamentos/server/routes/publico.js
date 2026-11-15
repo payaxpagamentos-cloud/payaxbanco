@@ -27,11 +27,12 @@ const igual = (a, b) => {
 
 /**
  * Valor do aviso em centavos inteiros, aceitando as formas que os bancos usam:
- *   "1.234,56" (pt-BR) · "1234.56" (ponto decimal) · 123456 ou "123456" (centavos) · 1234.56 (número).
+ *   "1.234,56" (pt-BR) · "1234.56" (ponto decimal) · "123456" (texto só de dígitos = centavos) · 1234.56 ou 150 (número = reais).
  */
 function valorEmCentavos(v) {
   if (v === undefined || v === null || v === '') return 0;
-  if (typeof v === 'number') return Number.isInteger(v) ? v : Math.round(v * 100);
+  // Número JSON é sempre reais (150 = R$ 150,00; 150.5 = R$ 150,50). Centavos só vêm como texto só de dígitos.
+  if (typeof v === 'number') return Math.round(v * 100);
   const t = String(v).trim().replace(/^R\$\s*/, '');
   if (t.includes(',')) return Math.round(Number(t.replace(/\./g, '').replace(',', '.')) * 100) || 0;
   if (/\.\d{1,2}$/.test(t)) return Math.round(Number(t) * 100) || 0;
@@ -48,7 +49,10 @@ function lerAviso(p) {
     : /^\d{2}[./]\d{2}[./]\d{4}$/.test(dataBruta) ? dataBruta.replace(/\./g, '/').split('/').reverse().join('-')
       : null;
   const evento = String(pega('evento', 'tipoEvento', 'tipo') ?? 'liquidacao').toLowerCase();
-  return { nosso_numero: nossoNumero, valor_centavos: centavos, pago_em: dataPagamento, evento, meio: /pix|qr/i.test(JSON.stringify(p ?? {})) ? 'pix' : 'boleto' };
+  // Meio de pagamento: só nos campos que dizem isso. Procurar "pix" no aviso inteiro confundia o tipo do
+  // título (BOLEPIX) com o meio usado — e PIX libera no mesmo dia, antes de o banco creditar.
+  const meio = /pix|qr/i.test(String(pega('meioPagamento', 'meio_pagamento', 'tipoPagamento', 'formaPagamento', 'canalPagamento', 'meio') ?? '')) ? 'pix' : 'boleto';
+  return { nosso_numero: nossoNumero, valor_centavos: centavos, pago_em: dataPagamento, evento, meio };
 }
 
 module.exports = (db) => {
@@ -87,8 +91,15 @@ module.exports = (db) => {
 
     try {
       if (!aviso.nosso_numero) { concluir('ignorado', 'aviso sem nosso número'); return res.json({ recebido: true, processado: false }); }
-      const b = db.prepare('SELECT * FROM boletos WHERE nosso_numero = ? ORDER BY id DESC LIMIT 1').get(aviso.nosso_numero.padStart(11, '0'));
+      // O aviso é da conta desta integração: o mesmo nosso número pode existir em outro convênio.
+      const b = db.prepare(`SELECT * FROM boletos WHERE nosso_numero = ? ${i?.conta_id ? 'AND conta_id = ?' : ''} ORDER BY id DESC LIMIT 1`)
+        .get(...[aviso.nosso_numero.padStart(11, '0'), ...(i?.conta_id ? [i.conta_id] : [])]);
       if (!b) { concluir('ignorado', 'título não encontrado'); return res.json({ recebido: true, processado: false }); }
+      // Valor fora de qualquer proporção com o título (ex.: reais lidos como centavos): não liquida no automático.
+      if (aviso.valor_centavos > 0 && (aviso.valor_centavos * 20 < b.valor_centavos || aviso.valor_centavos > b.valor_centavos * 20)) {
+        concluir('erro', `valor do aviso (${aviso.valor_centavos} centavos) incompatível com o título (${b.valor_centavos}): conferir`, b.id);
+        return res.json({ recebido: true, processado: false });
+      }
       if (!/liquid|pag|credit|baixa_por_pagamento/i.test(aviso.evento)) { concluir('ignorado', `evento ${aviso.evento}`, b.id); return res.json({ recebido: true, processado: false }); }
 
       const out = boletosLib.liquidar(db, b.id, {

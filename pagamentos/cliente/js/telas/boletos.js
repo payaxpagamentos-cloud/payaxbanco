@@ -139,9 +139,9 @@ async function detalhe(alvo, id, recarregar) {
           await copiar(l.url ?? `${location.origin}${l.caminho}`, 'Link copiado — é só enviar ao pagador.');
         }) }, icone('copiar'), 'Copiar link para o pagador'),
         b.situacao === 'registrado' && pode('boletos.baixar')
-          ? el('button', { class: 'botao sec', onclick: async (e) => {
+          ? el('button', { class: 'botao sec', onclick: async (e) => { const botao = e.currentTarget;
             const r = await confirmar({ titulo: 'Cancelar boleto', texto: 'O título deixa de poder ser pago. Não dá para desfazer.', confirmarTexto: 'Cancelar boleto', perigo: true, campoMotivo: true });
-            if (r) acao(e.currentTarget, async () => { await api.post(`/boletos/${b.id}/baixa`, r); toast('Boleto cancelado.', 'ok'); recarregar(); });
+            if (r) acao(botao, async () => { await api.post(`/boletos/${b.id}/baixa`, r); toast('Boleto cancelado.', 'ok'); recarregar(); });
           } }, 'Cancelar boleto') : null)),
 
     el('div', { class: 'grade duas' },

@@ -10,7 +10,7 @@ import { cartaoConta, acoesRapidas, linhaTempo } from '../../comum/componentes.j
 export default async function inicio({ alvo }) {
   const [d, extrato] = await Promise.all([
     api.get('/painel'),
-    api.get('/conta/extrato?limite=120'),
+    api.get('/conta/extrato?limite=120&ordem=desc'),   // os 120 mais recentes
   ]);
   const hoje = d.hoje ?? hojeIso();
   const l = d.liquidacoes;
@@ -49,7 +49,7 @@ export default async function inicio({ alvo }) {
     el('div', { class: 'grade duas', style: 'margin-top:18px' },
       cartao('Últimos movimentos',
         linhaTempo({
-          lancamentos: [...extrato.itens].reverse(),
+          lancamentos: extrato.itens,
           hoje,
           limite: 6,
           aoAbrirBoleto: (id) => ir(`#/boletos/${id}`),

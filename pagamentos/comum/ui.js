@@ -252,15 +252,18 @@ export const aviso = (texto, tom = 'info') => el('div', { class: `aviso ${tom ==
 
 /** Executa uma ação mostrando erro em toast e travando o botão enquanto roda. */
 export async function acao(botao, fn) {
-  const antes = botao.textContent;
-  botao.disabled = true;
+  // Sem botão (ex.: e.currentTarget lido depois de um await já é null), a ação roda mesmo assim.
+  const antes = botao?.textContent;
+  if (botao) botao.disabled = true;
   try {
     await fn();
   } catch (err) {
     toast(err.message || 'Não foi possível concluir a operação.', 'erro');
   } finally {
-    botao.disabled = false;
-    if (botao.textContent !== antes) botao.textContent = antes;
+    if (botao) {
+      botao.disabled = false;
+      if (botao.textContent !== antes) botao.textContent = antes;
+    }
   }
 }
 

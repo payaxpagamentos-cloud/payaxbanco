@@ -52,7 +52,7 @@ module.exports = (db) => {
       totais: esconderMargem ? { ...totais, custo_banco_centavos: undefined, margem_centavos: undefined } : totais,
       clientes: esconderMargem ? linhas.map((c) => ({ ...c, custo_banco_centavos: undefined, margem_centavos: undefined })) : linhas,
       serie: consultas.serieDiaria(db, p),
-      liquidacoes: consultas.resumoLiquidacoes(db, p),
+      liquidacoes: esconderMargem ? consultas.semMargem(consultas.resumoLiquidacoes(db, p)) : consultas.resumoLiquidacoes(db, p),
       taxa_conversao: (() => {
         const e = consultas.resumoBoletos(db, { ...p, hoje: hoje() });
         return e.emitidos ? Math.round((e.liquidados / e.emitidos) * 1000) / 10 : null;

@@ -714,6 +714,16 @@ ALTER TABLE clientes ADD COLUMN entrega TEXT NOT NULL DEFAULT 'padrao' CHECK (en
 ALTER TABLE contas_bancarias ADD COLUMN custo_rateio_centavos INTEGER NOT NULL DEFAULT 0 CHECK (custo_rateio_centavos >= 0);
 `,
   },
+  {
+    versao: 15,
+    nome: 'pix-destino-completo',
+    sql: `
+-- PIX pelos dados da conta: o ISPB e o tipo de conta do cadastro vão com o repasse (antes o ISPB vinha de
+-- uma tabela fixa de 10 bancos e o tipo saía sempre "corrente").
+ALTER TABLE repasses ADD COLUMN destino_ispb TEXT;
+ALTER TABLE repasses ADD COLUMN destino_tipo TEXT;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();
