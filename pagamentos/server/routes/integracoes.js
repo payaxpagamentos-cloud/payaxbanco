@@ -77,12 +77,17 @@ module.exports = (db) => {
   r.post('/dados/testar', exigir('integracoes.ver', '*'), async (req, res) => {
     const i = db.prepare("SELECT * FROM integracoes WHERE escopo = 'dados' ORDER BY id LIMIT 1").get();
     try {
-      const cnpj = await consultaDados.consultarCnpj(db, req.body?.cnpj || '00394460000141');
-      const cep = await consultaDados.consultarCep(db, req.body?.cep || '70150900');
-      if (i) db.prepare("UPDATE integracoes SET estado = 'conectada', ultimo_teste = ?, ultimo_erro = NULL WHERE id = ?").run(agora(), i.id);
+      // O teste consulta de verdade (sem cache): senão "passava" com uma resposta antiga.
+      const cnpj = await consultaDados.consultarCnpj(db, req.body?.cnpj || '00394460000141', { semCache: true });
+      const cep = await consultaDados.consultarCep(db, req.body?.cep || '70150900', { semCache: true });
+      // Com token, o CNPJ precisa ter vindo da API Brasil: se caiu para a fonte pública, o teste não passou.
+      const falhouApiBrasil = cnpj.aviso && i?.credenciais;
+      if (i) db.prepare("UPDATE integracoes SET estado = ?, ultimo_teste = ?, ultimo_erro = ? WHERE id = ?")
+        .run(falhouApiBrasil ? 'falha' : 'conectada', agora(), falhouApiBrasil ? cnpj.aviso : null, i.id);
       res.json({
-        ok: true,
-        mensagem: `CNPJ consultado pela fonte "${cnpj.fonte}" e CEP pela fonte "${cep.fonte}".`,
+        ok: !falhouApiBrasil,
+        aviso: cnpj.aviso ?? null,
+        mensagem: falhouApiBrasil ? cnpj.aviso : `CNPJ consultado pela fonte "${cnpj.fonte}" e CEP pela fonte "${cep.fonte}".`,
         cnpj: { razao_social: cnpj.razao_social, cidade: cnpj.cidade, uf: cnpj.uf, fonte: cnpj.fonte },
         cep: { cidade: cep.cidade, uf: cep.uf, fonte: cep.fonte },
       });

@@ -60,7 +60,7 @@ export default async function integracoes({ alvo, recarregar }) {
       el('div', { style: 'display:flex;gap:8px' },
         el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
           const r = await api.post('/integracoes/dados/testar', {});
-          toast(r.mensagem, 'ok');
+          toast(r.mensagem, r.ok ? 'ok' : 'erro');
           recarregar();
         }) }, icone('atualizar'), 'Testar consulta'),
         pode('*') ? el('button', { class: 'botao', onclick: () => configurarDados(d.dados, recarregar) }, icone('config'), 'Token da API Brasil') : null))),
@@ -133,7 +133,8 @@ function configurarBanco(atual, recarregar) {
 function configurarDados(atual, recarregar) {
   const form = el('form', { onsubmit: (e) => e.preventDefault() },
     campo({ nome: 'token', rotulo: 'Token da API Brasil', tipo: 'password',
-      ajuda: atual.apibrasil_configurada ? 'Deixe vazio para remover o token (volta à fonte pública)' : 'O mesmo Bearer token da sua conta na API Brasil' }));
+      ajuda: atual.apibrasil_configurada ? 'Deixe vazio para remover o token (volta à fonte pública)'
+        : 'O "Bearer Token" do painel da API Brasil (vale 1 ano). O DeviceToken não é usado nesta consulta.' }));
   const botao = el('button', { class: 'botao' }, 'Salvar token');
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.put('/integracoes/dados', lerForm(form));
@@ -142,7 +143,7 @@ function configurarDados(atual, recarregar) {
     recarregar();
   }));
   const m = modal({ titulo: 'API Brasil · consulta de CEP e CNPJ',
-    corpo: [aviso('O token é cifrado antes de ser gravado e nunca volta para a tela. Sem token, as consultas usam a fonte pública, que não tem custo.', 'info'), form],
+    corpo: [aviso('O token é cifrado antes de ser gravado e nunca volta para a tela. Sem token, as consultas usam a fonte pública, que não tem custo. Com token, o CNPJ sai pela API Brasil (crédito por consulta, guardado por 30 dias para não pagar duas vezes); o CEP continua na fonte pública.', 'info'), form],
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 

@@ -93,7 +93,7 @@ test('consulta de CEP e CNPJ: fontes, cache e queda para a pública', async (t) 
     assert.equal(r.dados.razao_social, 'OPEN KNOWLEDGE BRASIL');
     assert.equal(r.dados.endereco, 'AVENIDA PAULISTA');
     const ultima = fontes.chamadas.at(-1);
-    assert.match(ultima.url, /apibrasil\/cnpj$/);
+    assert.match(ultima.url, /apibrasil\/consulta\/juridico-empresa-cnpj\/credits$/);
     assert.equal(ultima.autorizacao, 'Bearer token-bom');
   });
 
@@ -105,6 +105,25 @@ test('consulta de CEP e CNPJ: fontes, cache e queda para a pública', async (t) 
     assert.equal(r.dados.fonte, 'publica');
     assert.match(r.dados.aviso, /API Brasil/);
     assert.equal(r.dados.razao_social, 'OPEN KNOWLEDGE BRASIL');
+  });
+
+  await t.test('resposta da API Brasil num formato desconhecido: cai para a fonte pública e diz os campos', async () => {
+    await api.put('/api/integracoes/dados', { token: 'token-bom' }, tk.admin);
+    fontes.formatoEstranho(true);
+    api.db.prepare('DELETE FROM consultas_cache').run();
+    const r = await api.get(`/api/consultas/cnpj/${CNPJ.beta}`, tk.operacao);
+    fontes.formatoEstranho(false);
+    assert.equal(r.status, 200);
+    assert.equal(r.dados.fonte, 'publica');
+    assert.match(r.dados.aviso, /campos recebidos: empresa_desconhecida, outro_campo/);
+    assert.equal(r.dados.razao_social, 'OPEN KNOWLEDGE BRASIL');
+  });
+
+  await t.test('o teste da integração não "passa" com cache nem com a fonte pública no lugar da API Brasil', async () => {
+    await api.put('/api/integracoes/dados', { token: 'token-errado' }, tk.admin);
+    const r = await api.post('/api/integracoes/dados/testar', { cnpj: CNPJ.beta, cep: '11704000' }, tk.operacao);
+    assert.equal(r.dados.ok, false);
+    assert.match(r.dados.mensagem, /API Brasil/);
   });
 
   await t.test('o teste da integração diz por qual fonte cada consulta saiu', async () => {

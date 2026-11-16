@@ -84,6 +84,15 @@ async function buscar(url, { metodo = 'GET', corpo, token } = {}) {
   return j ?? {};
 }
 
+/** O miolo da resposta da API Brasil (data.dados, data, response ou a própria raiz; lista = o primeiro item). */
+function miolo(j) {
+  let d = j?.data?.dados ?? j?.data ?? j?.response ?? j ?? {};
+  if (Array.isArray(d)) d = d[0] ?? {};
+  return d && typeof d === 'object' ? d : {};
+}
+const urlApiBrasil = (caminho) => `${config.dados.urlApiBrasil}${caminho}`;
+const consultaCnpjApiBrasil = (cnpj, token) => buscar(urlApiBrasil(config.dados.caminhoApiBrasilCnpj), { metodo: 'POST', corpo: { cnpj }, token });
+
 // ---------------------------------------------------------------- CEP
 function lerCepPublico(j) {
   if (j?.erro) throw new ErroNegocio('CEP não encontrado.', 404);
@@ -99,7 +108,8 @@ function lerCepPublico(j) {
 }
 
 function lerCepApiBrasil(j) {
-  const d = j?.data ?? j?.response ?? j ?? {};
+  let d = miolo(j);
+  if (Array.isArray(d.enderecos)) d = d.enderecos[0] ?? {};
   return {
     cep: so(d.cep),
     endereco: texto(d.logradouro ?? d.street ?? d.address),
@@ -137,7 +147,7 @@ function lerCnpjPublico(j) {
 }
 
 function lerCnpjApiBrasil(j) {
-  const d = j?.data ?? j?.response ?? j ?? {};
+  const d = miolo(j);
   const e = d.estabelecimento ?? d.endereco ?? d;
   const situacao = texto(d.situacao_cadastral ?? d.situacao ?? e.situacao_cadastral);
   return {
@@ -175,15 +185,15 @@ const guardar = (db, tipo, chave, fonte, dados) => db.prepare(`INSERT INTO consu
 
 // ---------------------------------------------------------------- Públicas
 /** Endereço pelo CEP. */
-async function consultarCep(db, entrada) {
+async function consultarCep(db, entrada, { semCache = false } = {}) {
   const cep = so(entrada);
   v.exigir(cep.length === 8, 'CEP inválido: informe os 8 dígitos.');
-  const cacheado = doCache(db, 'cep', cep, config.dados.cacheCepDias);
+  const cacheado = semCache ? null : doCache(db, 'cep', cep, config.dados.cacheCepDias);
   if (cacheado) return cacheado;
 
   const fonte = fonteDe(db, 'cep');
   const dados = fonte.nome === 'apibrasil'
-    ? lerCepApiBrasil(await buscar(`${config.dados.urlApiBrasil}/cep`, { metodo: 'POST', corpo: { cep }, token: fonte.token }))
+    ? lerCepApiBrasil(await buscar(urlApiBrasil(config.dados.caminhoApiBrasilCep), { metodo: 'POST', corpo: { tipo: 'busca-cep', cep }, token: fonte.token }))
     : lerCepPublico(await buscar(`${config.dados.urlViaCep}/${cep}/json/`));
 
   if (!dados.cidade) throw new ErroNegocio('CEP não encontrado.', 404);
@@ -193,25 +203,33 @@ async function consultarCep(db, entrada) {
 }
 
 /** Dados cadastrais pelo CNPJ. */
-async function consultarCnpj(db, entrada) {
+async function consultarCnpj(db, entrada, { semCache = false } = {}) {
   const cnpj = so(entrada);
   v.exigir(cnpj.length === 14 && v.cnpjValido(cnpj), 'CNPJ inválido.');
-  const cacheado = doCache(db, 'cnpj', cnpj, config.dados.cacheCnpjDias);
+  const cacheado = semCache ? null : doCache(db, 'cnpj', cnpj, config.dados.cacheCnpjDias);
   if (cacheado) return cacheado;
 
   const fonte = fonteDe(db, 'cnpj');
   let dados;
   try {
-    dados = fonte.nome === 'apibrasil'
-      ? lerCnpjApiBrasil(await buscar(`${config.dados.urlApiBrasil}/cnpj`, { metodo: 'POST', corpo: { cnpj }, token: fonte.token }))
-      : lerCnpjPublico(await buscar(`${config.dados.urlBrasilApi}/cnpj/v1/${cnpj}`));
+    if (fonte.nome === 'apibrasil') {
+      const bruto = await consultaCnpjApiBrasil(cnpj, fonte.token);
+      dados = lerCnpjApiBrasil(bruto);
+      // Resposta num formato que o sistema não reconhece: usa a fonte pública e diz quais campos vieram.
+      if (!dados.razao_social) {
+        const campos = Object.keys(miolo(bruto)).slice(0, 15).join(', ') || 'nenhum';
+        throw Object.assign(new ErroNegocio(`resposta sem a razão social (campos recebidos: ${campos})`, 502), { formato: true });
+      }
+    } else {
+      dados = lerCnpjPublico(await buscar(`${config.dados.urlBrasilApi}/cnpj/v1/${cnpj}`));
+    }
   } catch (err) {
     // Falha na API Brasil (saldo, token, instabilidade) não impede o cadastro: tenta a fonte pública.
     if (fonte.nome !== 'apibrasil' || err.status === 404) throw err;
     dados = lerCnpjPublico(await buscar(`${config.dados.urlBrasilApi}/cnpj/v1/${cnpj}`));
     const alternativa = { ...dados, cnpj: dados.cnpj || cnpj };
     guardar(db, 'cnpj', cnpj, 'publica', alternativa);
-    return { ...alternativa, fonte: 'publica', do_cache: false, aviso: `A API Brasil não respondeu (${err.message}); os dados vieram da fonte pública.` };
+    return { ...alternativa, fonte: 'publica', do_cache: false, aviso: `A API Brasil não atendeu (${err.message}); os dados vieram da fonte pública.` };
   }
 
   if (!dados.razao_social) throw new ErroNegocio('CNPJ não encontrado na Receita.', 404);
@@ -232,10 +250,8 @@ async function consultarSocios(db, entrada) {
   const cnpj = so(entrada);
   v.exigir(cnpj.length === 14 && v.cnpjValido(cnpj), 'CNPJ inválido.');
   const fonte = fonteDe(db, 'cnpj');
-  const bruto = fonte.nome === 'apibrasil'
-    ? await buscar(`${config.dados.urlApiBrasil}/cnpj`, { metodo: 'POST', corpo: { cnpj }, token: fonte.token }).catch(() => null)
-    : null;
-  const j = bruto?.data ?? bruto?.response ?? bruto ?? await buscar(`${config.dados.urlBrasilApi}/cnpj/v1/${cnpj}`);
+  const bruto = fonte.nome === 'apibrasil' ? await consultaCnpjApiBrasil(cnpj, fonte.token).catch(() => null) : null;
+  const j = bruto ? miolo(bruto) : await buscar(`${config.dados.urlBrasilApi}/cnpj/v1/${cnpj}`);
   const lista = j.qsa ?? j.socios ?? j.estabelecimento?.socios ?? [];
   return {
     cnpj,

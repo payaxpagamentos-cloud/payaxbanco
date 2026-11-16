@@ -93,7 +93,10 @@ module.exports = {
     cacheCepDias: Number(process.env.PAYAX_CACHE_CEP_DIAS) || 180,
     cacheCnpjDias: Number(process.env.PAYAX_CACHE_CNPJ_DIAS) || 30,
     // Endereços das fontes, reunidos aqui para apontar a outro provedor sem mexer no resto.
-    urlApiBrasil: process.env.PAYAX_APIBRASIL_URL || 'https://gateway.apibrasil.io/api/v2/dados',
+    // API Brasil (gateway v2): só o token, em "Authorization: Bearer" — o DeviceToken é só das APIs de WhatsApp.
+    urlApiBrasil: process.env.PAYAX_APIBRASIL_URL || 'https://gateway.apibrasil.io/api/v2',
+    caminhoApiBrasilCnpj: process.env.PAYAX_APIBRASIL_CNPJ || '/consulta/juridico-empresa-cnpj/credits',
+    caminhoApiBrasilCep: process.env.PAYAX_APIBRASIL_CEP || '/consulta/cpf/credits',
     urlViaCep: process.env.PAYAX_VIACEP_URL || 'https://viacep.com.br/ws',
     urlBrasilApi: process.env.PAYAX_BRASILAPI_URL || 'https://brasilapi.com.br/api',
   },

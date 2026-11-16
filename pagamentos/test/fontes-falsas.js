@@ -4,6 +4,7 @@
 const http = require('node:http');
 
 function criarFontes({ apiBrasilToken = 'token-bom', apiBrasilFora = false } = {}) {
+  let apiBrasilFormatoEstranho = false;
   const chamadas = [];
   const CEPS = {
     11704000: { cep: '11704-000', logradouro: 'Rua Martins Fontes', bairro: 'Tupi', localidade: 'Praia Grande', uf: 'SP', ibge: '3541000' },
@@ -35,25 +36,27 @@ function criarFontes({ apiBrasilToken = 'token-bom', apiBrasilFora = false } = {
       m = /^\/brasilapi\/cnpj\/v1\/(\d{14})$/.exec(req.url);
       if (m) return CNPJS[m[1]] ? responder(200, CNPJS[m[1]]) : responder(404, { message: 'CNPJ não encontrado' });
 
-      // API Brasil: POST /apibrasil/cep e /apibrasil/cnpj
+      // API Brasil (gateway v2): POST /apibrasil/consulta/cpf/credits (tipo busca-cep) e
+      // /apibrasil/consulta/juridico-empresa-cnpj/credits. Resposta em data.dados, como na CEP documentada.
       if (req.url.startsWith('/apibrasil/')) {
         if (apiBrasilFora) return responder(503, { error: true, message: 'fora do ar' });
         if (req.headers.authorization !== `Bearer ${apiBrasilToken}`) return responder(401, { error: true, message: 'Token inválido ou expirado.' });
-        if (req.url.endsWith('/cep')) {
+        if (req.url.endsWith('/consulta/cpf/credits') && dados.tipo === 'busca-cep') {
           const c = String(dados.cep ?? '').replace(/\D/g, '');
           return CEPS[c]
-            ? responder(200, { error: false, data: { cep: c, logradouro: CEPS[c].logradouro, bairro: CEPS[c].bairro, cidade: CEPS[c].localidade, uf: CEPS[c].uf } })
-            : responder(200, { error: true, message: 'CEP não localizado' });
+            ? responder(200, { error: false, data: { dados: { quantidade_enderecos: 1, enderecos: [{ cep: c, logradouro: CEPS[c].logradouro, bairro: CEPS[c].bairro, cidade: CEPS[c].localidade, uf: CEPS[c].uf }] } } })
+            : responder(404, { error: true, message: 'CEP não localizado' });
         }
-        if (req.url.endsWith('/cnpj')) {
+        if (req.url.endsWith('/consulta/juridico-empresa-cnpj/credits')) {
+          if (apiBrasilFormatoEstranho) return responder(200, { error: false, data: { dados: { empresa_desconhecida: 'x', outro_campo: 1 } } });
           const c = String(dados.cnpj ?? '').replace(/\D/g, '');
           if (!CNPJS[c]) return responder(200, { error: true, message: 'CNPJ não localizado' });
           const f = CNPJS[c];
-          return responder(200, { error: false, data: {
+          return responder(200, { error: false, data: { dados: {
             cnpj: f.cnpj, razao_social: f.razao_social, situacao_cadastral: 'ATIVA',
             estabelecimento: { nome_fantasia: f.nome_fantasia, tipo_logradouro: 'AVENIDA', logradouro: 'PAULISTA', numero: '37',
               bairro: f.bairro, cidade: { nome: 'SAO PAULO' }, estado: { sigla: 'SP' }, cep: f.cep, ddd1: '11', telefone1: '23851939' },
-          } });
+          } } });
         }
       }
       responder(404, { message: 'rota desconhecida' });
@@ -62,6 +65,8 @@ function criarFontes({ apiBrasilToken = 'token-bom', apiBrasilFora = false } = {
 
   return {
     chamadas,
+    /** A API Brasil passa a responder num formato que o sistema não conhece. */
+    formatoEstranho(sim) { apiBrasilFormatoEstranho = sim; },
     async iniciar() {
       servidor.listen(0, '127.0.0.1');
       await new Promise((r) => servidor.once('listening', r));
