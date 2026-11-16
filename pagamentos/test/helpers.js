@@ -89,9 +89,22 @@ async function iniciar() {
     return r.dados;
   };
 
-  api.precoPadrao = (tk, p = {}) => api.post('/api/contas/precos-padrao', {
-    tarifa_emissao: '0,00', tarifa_liquidacao: '2,50', percentual: '2,35', comissao_minima: '1,00', tarifa_repasse: '0,00', ...p,
-  }, tk);
+  /**
+   * Tabela padrão. Com valores do modelo antigo (%, mínimo, tarifa bancária...), grava direto no banco como
+   * uma "tabela antiga" — a tela e a API só aceitam valor fixo, mas tabelas antigas continuam valendo e o
+   * motor de cálculo precisa seguir testado com elas.
+   */
+  api.precoPadrao = async (tk, p = {}) => {
+    const corpo = { tarifa_emissao: '0,00', tarifa_liquidacao: '2,50', percentual: '2,35', comissao_minima: '1,00', tarifa_repasse: '0,00', ...p };
+    const antigo = ['tarifa_emissao', 'tarifa_liquidacao', 'percentual', 'comissao_minima', 'tarifa_repasse', 'comissao_maxima']
+      .some((k) => corpo[k] !== undefined && corpo[k] !== '' && !/^0+([.,]0+)?$/.test(String(corpo[k])));
+    if (!antigo) return api.post('/api/contas/precos-padrao', corpo, tk);
+    const precos = require('../server/lib/precos');
+    const d = precos.validarPreco(corpo, { legado: true });
+    const inicio = corpo.vigencia_inicio ?? new Date().toISOString().slice(0, 10);
+    precos.gravarPreco(db, null, d, '2000-01-01' > inicio ? inicio : '2000-01-01', null, agora());
+    return { status: 201, dados: {} };
+  };
 
   /** Cliente ativo com acesso à Área do Cliente. Devolve { cliente, token, senha }. */
   api.cliente = async (tk, dados = {}) => {

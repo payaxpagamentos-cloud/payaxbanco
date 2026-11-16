@@ -142,8 +142,15 @@ function tarifaTexto(p) {
   return `${partes.join(' + ')}${limites.length ? ` (${limites.join(', ')})` : ''}`;
 }
 
-/** Lê e valida uma tabela de preços vinda da tela (valores em reais). Usado na tabela padrão e na do cliente. */
-function validarPreco(b = {}) {
+/**
+ * Lê e valida uma tabela de preços vinda da tela (valores em reais). Usado na tabela padrão, na do cliente e
+ * na proposta do CRM.
+ *
+ * Modelo da PAY AX: só valor fixo — a Tarifa Boleto e a Tarifa Bolepix, por título pago. Porcentagem,
+ * mínimo, máximo, tarifa de emissão, tarifa bancária e tarifa de repasse são recusados numa tabela nova.
+ * `legado: true` aceita o modelo antigo (só para reproduzir tabelas antigas nos testes do motor de cálculo).
+ */
+function validarPreco(b = {}, { legado = false } = {}) {
   const d = {
     tarifa_emissao_centavos: v.centavos(b.tarifa_emissao ?? 0, 'a tarifa de emissão'),
     tarifa_liquidacao_centavos: v.centavos(b.tarifa_liquidacao ?? 0, 'a tarifa bancária repassada'),
@@ -173,6 +180,20 @@ function validarPreco(b = {}) {
     }
     d.bolepix = JSON.stringify(x);
   }
+  if (!legado) {
+    const bp = d.bolepix ? JSON.parse(d.bolepix) : {};
+    const sobra = [
+      [d.percentual_ppm || bp.percentual_ppm, 'porcentagem'],
+      [d.comissao_minima_centavos || bp.comissao_minima_centavos, 'tarifa mínima'],
+      [d.comissao_maxima_centavos !== null || (bp.comissao_maxima_centavos ?? null) !== null, 'tarifa máxima'],
+      [d.tarifa_emissao_centavos || bp.tarifa_emissao_centavos, 'tarifa de emissão'],
+      [d.tarifa_liquidacao_centavos || bp.tarifa_liquidacao_centavos, 'tarifa bancária'],
+      [d.tarifa_repasse_centavos, 'tarifa de repasse'],
+    ].filter(([x]) => x).map(([, n]) => n);
+    if (sobra.length) {
+      throw new ErroNegocio(`A tabela de preços é só valor fixo: Tarifa Boleto e Tarifa Bolepix. Tire: ${sobra.join(', ')}.`, 422);
+    }
+  }
   return d;
 }
 
@@ -187,4 +208,13 @@ function gravarPreco(db, clienteId, d, inicio, usuarioId, agora) {
       d.comissao_minima_centavos, d.comissao_maxima_centavos, d.tarifa_repasse_centavos, d.observacao, agora, usuarioId, d.bolepix ?? null).id;
 }
 
-module.exports = { PADRAO, CAMPOS_BOLEPIX, bolepixDe, paraTipo, vigente, calcularSplit, simular, congelar, doBoleto, percentualTexto, tarifaTexto, validarPreco, gravarPreco };
+/** Tabela do modelo antigo (com %, mínimo, máximo, emissão, tarifa bancária ou de repasse)? */
+function ehAntiga(p) {
+  if (!p) return false;
+  const bp = bolepixDe(p) ?? {};
+  return Boolean(p.percentual_ppm || bp.percentual_ppm || p.comissao_minima_centavos || bp.comissao_minima_centavos
+    || (p.comissao_maxima_centavos ?? null) !== null || (bp.comissao_maxima_centavos ?? null) !== null
+    || p.tarifa_emissao_centavos || bp.tarifa_emissao_centavos || p.tarifa_liquidacao_centavos || bp.tarifa_liquidacao_centavos || p.tarifa_repasse_centavos);
+}
+
+module.exports = { ehAntiga, PADRAO, CAMPOS_BOLEPIX, bolepixDe, paraTipo, vigente, calcularSplit, simular, congelar, doBoleto, percentualTexto, tarifaTexto, validarPreco, gravarPreco };

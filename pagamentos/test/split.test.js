@@ -91,13 +91,19 @@ test('liquidação: split, data de crédito e idempotência', async (t) => {
 
   await t.test('o preço fica congelado na emissão', async () => {
     const antes = await api.boleto(tk.admin, a.cliente.id, { valor: '200,00', vencimento: '2026-12-15' });
-    await api.post(`/api/clientes/${a.cliente.id}/precos`, { percentual: '10', tarifa_liquidacao: '9,90', comissao_minima: '0,00' }, tk.admin);
+    // A tela não aceita mais porcentagem: tentar é recusado com a explicação.
+    const recusada = await api.post(`/api/clientes/${a.cliente.id}/precos`, { percentual: '10', tarifa_liquidacao: '9,90' }, tk.admin);
+    assert.equal(recusada.status, 422);
+    assert.match(recusada.dados.erro, /só valor fixo/);
+    // Tabela nova (modelo atual, valor fixo) depois da emissão.
+    assert.equal((await api.post(`/api/clientes/${a.cliente.id}/precos`, { tarifa_fixa: '1,99', bolepix_proprio: '1', bolepix_tarifa_fixa: '2,49' }, tk.admin)).status, 201);
     const r = await api.post(`/api/boletos/${antes.id}/liquidar`, { pago_em: '2026-12-15', valor_pago: '200,00' }, tk.financeiro);
-    assert.equal(r.dados.comissao_centavos, 470, 'usou os 2,35% da emissão, não os 10% novos');
+    assert.equal(r.dados.comissao_centavos, 470, 'usou os 2,35% da tabela antiga, vigente na emissão');
     assert.equal(r.dados.tarifa_banco_centavos, 250);
     const depois = await api.boleto(tk.admin, a.cliente.id, { valor: '200,00', vencimento: '2026-12-16' });
     const d = (await api.get(`/api/boletos/${depois.id}`, tk.admin)).dados;
-    assert.equal(d.percentual_ppm, 100000, 'o boleto novo já nasce com a tabela nova');
+    assert.equal(d.percentual_ppm, 0, 'o boleto novo já nasce com a tabela nova');
+    assert.equal(d.comissao_fixa_centavos, 249, 'Bolepix com a Tarifa Bolepix');
   });
 });
 

@@ -59,8 +59,11 @@ export default async function relatorios({ alvo, query }) {
     }))),
 
     el('div', { style: 'margin-top:14px' }, cartao('A sua tabela de preços', el('div', { class: 'pares cols-3' },
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa Boleto'), el('span', { class: 'val' }, `${d.preco.tarifa_texto}`)),
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa Bolepix'), el('span', { class: 'val' }, `${d.preco.bolepix?.tarifa_texto ?? d.preco.tarifa_texto}`)),
+      // Valor fixo por título pago. (Tabela antiga, ainda com porcentagem: mostra a regra dela até ser trocada.)
+      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa Boleto'),
+        el('span', { class: 'val' }, d.preco.antiga ? d.preco.tarifa_texto : el('strong', {}, dinheiro(d.preco.tarifa_fixa_centavos)), el('span', { class: 'sub', style: 'display:block' }, 'por boleto pago'))),
+      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa Bolepix'),
+        el('span', { class: 'val' }, d.preco.antiga ? (d.preco.bolepix?.tarifa_texto ?? d.preco.tarifa_texto) : el('strong', {}, dinheiro(d.preco.tarifa_bolepix_centavos)), el('span', { class: 'sub', style: 'display:block' }, 'por Bolepix pago'))),
       // Tabelas antigas: o que ainda for cobrado aparece, para o cliente não ser surpreendido.
       d.preco.tarifa_emissao_centavos ? el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por boleto emitido'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_emissao_centavos))) : null,
       d.preco.tarifa_repasse_centavos ? el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por transferência'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_repasse_centavos))) : null))),

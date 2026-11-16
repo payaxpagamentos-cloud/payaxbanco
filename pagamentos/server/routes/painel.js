@@ -6,6 +6,7 @@ const datas = require('../lib/datas');
 const razao = require('../lib/razao');
 const consultas = require('../lib/consultas');
 const { podeEquipe } = require('../lib/permissoes');
+const precos = require('../lib/precos');
 const backup = require('../lib/backup');
 const arquivosBanco = require('../lib/arquivosBanco');
 const conformidade = require('../lib/conformidade');
@@ -116,6 +117,14 @@ async function alertas(db, hoje, perfil) {
       texto: `${r.atrasos.comunicacao} comunicação(ões) ao Coaf com o prazo de 24 horas vencido` });
     if (r.abertos) lista.push({ tipo: 'pld', severidade: r.atrasos.analise ? 'erro' : 'aviso', quantidade: r.abertos,
       texto: `${r.abertos} alerta(s) de PLD para analisar${r.atrasos.analise ? ` (${r.atrasos.analise} com prazo vencido)` : ''}` });
+  }
+
+  // Tabela de preço vigente ainda no modelo antigo (com %): a equipe salva uma nova, só com valor fixo.
+  if (podeEquipe(perfil, 'precos.editar')) {
+    const vigentes = db.prepare(`SELECT p.* FROM precos p WHERE p.vigencia_fim IS NULL AND p.vigencia_inicio <= ?`).all(hoje);
+    const antigas = vigentes.filter((p) => precos.ehAntiga(p)).length;
+    if (antigas) lista.push({ tipo: 'precos_antigos', severidade: 'aviso', quantidade: antigas,
+      texto: `${antigas} tabela(s) de preço ainda com porcentagem ou tarifas antigas: salve uma tabela nova só com Tarifa Boleto e Tarifa Bolepix` });
   }
 
   // Pedidos de abertura de conta vindos do site, esperando a equipe.

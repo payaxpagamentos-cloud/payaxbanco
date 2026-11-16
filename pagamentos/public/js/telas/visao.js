@@ -22,7 +22,8 @@ export default async function visao({ alvo }) {
             : a.tipo.startsWith('conformidade') ? el('a', { class: 'botao sec pequeno', href: '#/conformidade' }, 'Ver conformidade')
               : a.tipo.startsWith('pld') ? el('a', { class: 'botao sec pequeno', href: '#/pld' }, 'Ver PLD')
                 : a.tipo.startsWith('lgpd') ? el('a', { class: 'botao sec pequeno', href: '#/lgpd' }, 'Ver LGPD')
-                  : a.tipo === 'aberturas' ? el('a', { class: 'botao sec pequeno', href: '#/aberturas' }, 'Ver pedidos') : null))))
+                  : a.tipo === 'aberturas' ? el('a', { class: 'botao sec pequeno', href: '#/aberturas' }, 'Ver pedidos')
+                    : a.tipo === 'precos_antigos' ? el('a', { class: 'botao sec pequeno', href: '#/contas' }, 'Ver preços') : null))))
     : null;
 
   // Os atalhos são os da equipe, não os do cliente: o que se faz todo dia neste painel.

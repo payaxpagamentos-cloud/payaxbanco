@@ -61,14 +61,15 @@ async function main() {
       '12345678000195', 'cnpj', 0, 190, 50, 1, ?) RETURNING id`).get(agora()).id;
 
   // Tabela padrão da plataforma
-  db.prepare(`INSERT INTO precos (cliente_id, vigencia_inicio, tarifa_emissao_centavos, tarifa_liquidacao_centavos,
-      percentual_ppm, comissao_minima_centavos, tarifa_repasse_centavos, observacao, criado_em)
-    VALUES (NULL, ?, 0, 290, 25000, 150, 0, 'Tabela padrão da plataforma', ?)`)
-    .run(datas.somarDias(hoje, -120), agora());
+  // Modelo atual: só valor fixo por título pago (Tarifa Boleto e Tarifa Bolepix).
+  const bolepix = (c) => JSON.stringify({ tarifa_emissao_centavos: 0, tarifa_liquidacao_centavos: 0, tarifa_fixa_centavos: c, percentual_ppm: 0, comissao_minima_centavos: 0, comissao_maxima_centavos: null });
+  db.prepare(`INSERT INTO precos (cliente_id, vigencia_inicio, tarifa_fixa_centavos, bolepix, observacao, criado_em)
+    VALUES (NULL, ?, 249, ?, 'Tabela padrão da plataforma', ?)`)
+    .run(datas.somarDias(hoje, -120), bolepix(299), agora());
 
   const CLIENTES = [
-    { razao: 'Alfa Net Telecom LTDA', fantasia: 'Alfa Net', cnpj: '11122233000183', cidade: 'Praia Grande', uf: 'SP', titulos: 46, preco: { pct: 23500, tarifa: 250, min: 100 } },
-    { razao: 'Beta Fibra Provedor LTDA', fantasia: 'Beta Fibra', cnpj: '19131243000197', cidade: 'Santos', uf: 'SP', titulos: 28, preco: { pct: 19000, tarifa: 320, min: 200 } },
+    { razao: 'Alfa Net Telecom LTDA', fantasia: 'Alfa Net', cnpj: '11122233000183', cidade: 'Praia Grande', uf: 'SP', titulos: 46, preco: { boleto: 199, bolepix: 249 } },
+    { razao: 'Beta Fibra Provedor LTDA', fantasia: 'Beta Fibra', cnpj: '19131243000197', cidade: 'Santos', uf: 'SP', titulos: 28, preco: { boleto: 179, bolepix: 229 } },
     { razao: 'Gama Conecta Internet LTDA', fantasia: 'Gama Conecta', cnpj: '22233344000183', cidade: 'São Vicente', uf: 'SP', titulos: 17, preco: null },
   ];
 
@@ -82,10 +83,9 @@ async function main() {
     transacao(db, () => contaInterna.atribuir(db, id));
 
     if (c.preco) {
-      db.prepare(`INSERT INTO precos (cliente_id, vigencia_inicio, tarifa_emissao_centavos, tarifa_liquidacao_centavos,
-          percentual_ppm, comissao_minima_centavos, tarifa_repasse_centavos, observacao, criado_em)
-        VALUES (?, ?, 0, ?, ?, ?, 0, 'Tabela negociada', ?)`)
-        .run(id, datas.somarDias(hoje, -90), c.preco.tarifa, c.preco.pct, c.preco.min, agora());
+      db.prepare(`INSERT INTO precos (cliente_id, vigencia_inicio, tarifa_fixa_centavos, bolepix, observacao, criado_em)
+        VALUES (?, ?, ?, ?, 'Tabela negociada', ?)`)
+        .run(id, datas.somarDias(hoje, -90), c.preco.boleto, bolepix(c.preco.bolepix), agora());
     }
 
     db.prepare(`INSERT INTO usuarios_cliente (cliente_id, nome, email, senha_hash, perfil, senha_provisoria, criado_em)

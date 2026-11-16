@@ -132,7 +132,10 @@ test('abertura de conta pelo site', async (t) => {
       assert.equal((await api.put(`/api/aberturas/${id}/checklist/${item.chave}`, { feito: true }, tk.operacao)).status, 200);
     }
     // Proposta: tarifas e limites. Operação não mexe em preço.
-    const proposta = { tarifa_emissao: '0,50', tarifa_fixa: 'R$ 1,99', percentual: '0', tarifa_repasse: '0,00', comissao_minima: '0',
+    // Proposta com porcentagem ou tarifa de emissão é recusada: só valor fixo.
+    assert.equal((await api.put(`/api/aberturas/${id}/proposta`, { tarifa_fixa: '1,99', percentual: '2', limite_boleto: '3.000,00' }, tk.financeiro)).status, 422);
+    assert.equal((await api.put(`/api/aberturas/${id}/proposta`, { tarifa_fixa: '1,99', tarifa_emissao: '0,50', limite_boleto: '3.000,00' }, tk.financeiro)).status, 422);
+    const proposta = { tarifa_fixa: 'R$ 1,99',
       bolepix_proprio: '1', bolepix_tarifa_fixa: '2,49', limite_boleto: 'R$ 3.000,00', limite_mensal: 'R$ 150.000,00', entrega: 'pix',
       faturamento_mensal: 'R$ 200.000,00', boletos_mes: '1.500', sistema: 'ixc', observacao_proposta: 'Primeiros 3 meses sem tarifa de emissão.' };
     assert.equal((await api.put(`/api/aberturas/${id}/proposta`, proposta, tk.operacao)).status, 403);
@@ -163,7 +166,8 @@ test('abertura de conta pelo site', async (t) => {
     assert.equal(c.entrega, 'pix');
     const preco = api.db.prepare('SELECT * FROM precos WHERE cliente_id = ?').get(c.id);
     assert.equal(preco.tarifa_fixa_centavos, 199);
-    assert.equal(preco.tarifa_emissao_centavos, 50);
+    assert.equal(preco.tarifa_emissao_centavos, 0);
+    assert.equal(preco.percentual_ppm, 0);
     assert.equal(JSON.parse(preco.bolepix).tarifa_fixa_centavos, 249);
     assert.equal(JSON.parse(c.kyc_representantes)[0].documento, CPF);
     assert.equal(r.dados.acesso.email, 'financeiro@exemplo.com.br');

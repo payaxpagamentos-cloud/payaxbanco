@@ -79,7 +79,8 @@ export default async function inicio({ alvo }) {
           par('Ficou para você', el('strong', {}, dinheiro(l.liquido_centavos))),
           par('Já transferido', dinheiro(l.repassado_centavos))),
         el('p', { style: 'margin-top:12px;color:var(--texto-3);font-size:12.5px' },
-          `Sua tabela: tarifa PAY AX de ${d.preco.tarifa_texto}.`)))
+          d.preco.antiga ? `Sua tabela: tarifa PAY AX de ${d.preco.tarifa_texto}.`
+            : `Sua tabela: Tarifa Boleto ${dinheiro(d.preco.tarifa_fixa_centavos)} · Tarifa Bolepix ${dinheiro(d.preco.tarifa_bolepix_centavos)}, por título pago.`)))
       : null,
   );
 }
