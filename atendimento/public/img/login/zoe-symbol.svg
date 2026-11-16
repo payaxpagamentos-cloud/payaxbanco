@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="zoe-gradient" x1="9" y1="2" x2="56" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#42c9f5"/>
+      <stop offset=".44" stop-color="#536fff"/>
+      <stop offset="1" stop-color="#821dF0"/>
+    </linearGradient>
+    <linearGradient id="zoe-edge" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x=".5" y=".5" width="63" height="63" rx="17" fill="url(#zoe-gradient)" stroke="url(#zoe-edge)"/>
+  <path d="m18.5 45 2.3-8.4a13.8 13.8 0 1 1 6.1 5.8L18.5 45Z" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m37 17 1.65 5.65L44.3 24.3l-5.65 1.65L37 31.6l-1.65-5.65-5.65-1.65 5.65-1.65L37 17Z" fill="#fff"/>
+</svg>

@@ -1,233 +1,384 @@
-/* Login da ZOE Atende — desenho aprovado (pacote ZOE_Login). Tudo limitado a .zoe-login: não mexe nas outras telas. */
-.zoe-login {
-  --zoe-white: #f7f8ff;
-  --zoe-muted: #c2c7dc;
-  --zoe-blue: #2e80ff;
-  --zoe-violet: #8d32f4;
+/* Login ZOE 360 — pacote aprovado (claro, compacto, vidro). Tudo limitado a .zoe-login-page. */
+/* ZOE 360 — login claro e compacto. Todos os seletores são isolados. */
+.zoe-login-page {
+  --zoe-text: #101535;
+  --zoe-muted: #626a8a;
+  --zoe-blue: #227aff;
+  --zoe-violet: #8e2dff;
+  --zoe-border: rgba(135, 121, 218, 0.27);
   position: relative;
   isolation: isolate;
-  width: 100%;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
   min-height: 100svh;
-  overflow: clip;
-  color: var(--zoe-white);
-  background: radial-gradient(ellipse at 23% -10%, #123365 0%, transparent 39%), radial-gradient(ellipse at 103% 2%, #38245e 0%, transparent 30%), #070f20;
-  font-family: "Manrope", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: 40px 32px;
+  overflow: hidden;
+  color: var(--zoe-text);
+  background: #f3f1fc;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-.zoe-login *, .zoe-login *::before, .zoe-login *::after { box-sizing: border-box; }
-.zoe-login button, .zoe-login input { font: inherit; }
-.zoe-login button, .zoe-login a, .zoe-login input { -webkit-tap-highlight-color: transparent; }
-.zoe-login button { cursor: pointer; }
-.zoe-login button:disabled { cursor: wait; }
-.zoe-login :focus-visible { outline: 3px solid #a9c8ff; outline-offset: 4px; }
-.zoe-ambient { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse at 45% 80%, #1e3e7b25, transparent 48%); }
-.zoe-layout { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 520px); gap: clamp(36px, 4vw, 76px); width: min(100% - 112px, 1488px); min-height: min(850px, calc(100svh - 50px)); margin-inline: auto; padding-top: 48px; padding-bottom: 92px; }
-.zoe-hero { position: relative; min-width: 0; min-height: 690px; }
-.zoe-brand { display: inline-flex; align-items: center; gap: 28px; position: relative; z-index: 2; text-decoration: none; color: inherit; }
-.zoe-brand img { width: 82px; height: 82px; flex: 0 0 auto; filter: drop-shadow(0 10px 30px #4975f02b); }
-.zoe-wordmark { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.zoe-wordmark strong { font-size: 45px; font-weight: 600; letter-spacing: .22em; line-height: 1; padding-left: .22em; }
-.zoe-wordmark small { font-size: 12px; letter-spacing: .48em; padding-left: .48em; color: #d3d9eb; }
-.zoe-hero-copy { position: relative; z-index: 2; margin-top: 42px; }
-.zoe-headline { margin: 0; font-size: clamp(46px, 4.7vw, 78px); line-height: 1.04; font-weight: 650; letter-spacing: -.045em; }
-.zoe-headline span { display: block; }
-.zoe-headline-accent { padding-bottom: .04em; color: #b8bdff; background: linear-gradient(95deg, #a9cfff, #bba3f6 92%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-.zoe-tagline { margin: 17px 0 0; font-size: clamp(18px, 1.62vw, 27px); line-height: 1.45; font-weight: 400; color: var(--zoe-muted); letter-spacing: -.025em; }
-.zoe-orbit { position: absolute; z-index: 0; left: -56px; top: 348px; width: calc(100% + 102px); aspect-ratio: 986 / 520; pointer-events: none; -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 7%, #000 86%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0%, #000 7%, #000 86%, transparent 100%); }
-.zoe-orbit::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #070f20 0%, transparent 6%, transparent 93%, #070f20 100%); opacity: .65; }
-.zoe-orbit img, .zoe-orbit video { position: absolute; width: 100%; height: 100%; object-fit: cover; border: 0; }
-.zoe-orbit video { opacity: 0; transition: opacity .65s ease; }
-.zoe-orbit video.zoe-video-ready { opacity: 1; }
-.zoe-access { position: relative; z-index: 3; align-self: start; margin-top: 14px; border: 1px solid #a6b3db66; border-radius: 40px; padding: 42px 48px 40px; background: linear-gradient(152deg, #b0c9ff14 0%, #0d152bc9 38%, #15223a94 100%); box-shadow: inset 0 1px 0 #ffffff08, 0 25px 90px #02050c2e; backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
-.zoe-access-logo { display: block; width: 74px; height: 74px; margin: 0 auto 20px; }
-.zoe-access h2 { margin: 0; text-align: center; font-size: clamp(30px, 2.7vw, 42px); line-height: 1.2; font-weight: 650; letter-spacing: -.04em; }
-.zoe-access-intro { margin: 10px 0 30px; text-align: center; font-size: 18px; line-height: 1.5; color: #d0d3e3; letter-spacing: -.025em; }
-.zoe-fields { display: flex; flex-direction: column; gap: 20px; }
-.zoe-field label { display: block; margin-bottom: 8px; font-size: 17px; font-weight: 550; line-height: 1.4; }
-.zoe-field input { width: 100%; height: 54px; border: 1px solid #7e8aab99; border-radius: 12px; padding: 0 18px; color: #f6f8ff; background: #0c122459; box-shadow: inset 0 1px 4px #00000014; font-size: 17px; transition: border-color .18s ease, box-shadow .18s ease; }
-.zoe-field input::placeholder { color: #abb3cb; opacity: 1; }
-.zoe-field input:focus { outline: none; border-color: #8baaff; box-shadow: 0 0 0 3px #6885ec28; }
-.zoe-password-wrap { position: relative; }
-.zoe-password-wrap input { padding-right: 56px; }
-.zoe-eye { position: absolute; top: 3px; right: 5px; display: grid; place-items: center; width: 44px; height: 48px; border: 0; border-radius: 9px; background: transparent; color: #c5cbe3; }
-.zoe-eye:hover { color: white; background: #ffffff0a; }
-.zoe-eye svg { width: 22px; height: 22px; }
-.zoe-remember { display: flex; align-items: center; width: fit-content; gap: 11px; margin: 22px 0 24px; font-size: 17px; line-height: 1.4; color: #d3d7e8; cursor: pointer; }
-.zoe-remember input { appearance: none; -webkit-appearance: none; flex: 0 0 25px; width: 25px; height: 25px; margin: 0; border: 1px solid #8190b4aa; border-radius: 7px; background: #101a2d; display: grid; place-items: center; cursor: pointer; }
-.zoe-remember input::after { content: ""; width: 6px; height: 11px; margin-top: -3px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg) scale(0); transition: transform .12s ease; }
-.zoe-remember input:checked { border-color: #728eff; background: #526aef; }
-.zoe-remember input:checked::after { transform: rotate(45deg) scale(1); }
-.zoe-submit { position: relative; display: flex; align-items: center; justify-content: center; gap: 15px; width: 100%; min-height: 60px; border: 1px solid #a0b8ff17; border-radius: 14px; color: white; background: linear-gradient(105deg, #2d80ff 0%, #5258fb 49%, #9033f5 100%); font-size: 21px; font-weight: 650; box-shadow: 0 9px 27px #2863ed35, inset 0 1px 0 #ffffff0f; transition: filter .18s ease, transform .18s ease, box-shadow .18s ease; }
-.zoe-submit:hover:not(:disabled) { filter: brightness(1.09); box-shadow: 0 10px 32px #4d5bf04d; }
-.zoe-submit:active:not(:disabled) { transform: translateY(1px); }
-.zoe-submit:disabled { opacity: .7; }
-.zoe-submit svg { width: 23px; height: 23px; }
-.zoe-message { margin: 14px 0 0; font-size: 14px; line-height: 1.55; color: #ffccda; }
-.zoe-message:empty { display: none; }
-.zoe-help { display: flex; flex-direction: column; align-items: center; gap: 18px; margin-top: 34px; padding-top: 20px; border-top: 1px solid #8b96bc44; }
-.zoe-help a, .zoe-help button { padding: 0; border: 0; background: none; color: #79b3ff; text-decoration: underline; text-underline-offset: 3px; font-size: 17px; line-height: 1.4; }
-.zoe-help a:last-child, .zoe-help button:last-child { color: #d1d6e9; text-decoration: none; }
-.zoe-help a:hover, .zoe-help button:hover { color: white; }
-.zoe-page-footer { position: absolute; z-index: 2; bottom: 33px; left: max(46px, calc((100% - 1508px) / 2)); right: max(46px, calc((100% - 1508px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 24px; font-size: 15px; color: #b9c1d6; }
-.zoe-footer-brand { display: inline-flex; align-items: center; gap: 28px; }
-.zoe-footer-brand strong { color: #eef2ff; font-size: 16px; font-weight: 650; white-space: nowrap; }
-.zoe-footer-brand span { border-left: 1px solid #8695b77a; padding-left: 28px; }
-.zoe-login dialog { width: min(430px, calc(100% - 36px)); padding: 28px; border: 1px solid #849ac260; border-radius: 24px; background: #101b31; color: #f5f7ff; box-shadow: 0 24px 100px #0008; }
-.zoe-login dialog::backdrop { background: #030917b8; backdrop-filter: blur(5px); }
-.zoe-login dialog h2 { margin: 0 0 12px; font-size: 24px; }
-.zoe-login dialog p { line-height: 1.6; color: #d0d8e9; }
-.zoe-login dialog button { margin-top: 12px; min-height: 44px; padding: 0 20px; border: 1px solid #6582c8; border-radius: 10px; color: white; background: #355dc1; }
-@media (min-width: 1500px) { .zoe-layout { min-height: 900px; } }
-@media (max-height: 820px) and (min-width: 981px) {
-  .zoe-layout { padding-top: 32px; padding-bottom: 75px; min-height: 100svh; }
-  .zoe-hero { min-height: 640px; }
-  .zoe-brand img { width: 70px; height: 70px; }
-  .zoe-wordmark strong { font-size: 39px; }
-  .zoe-hero-copy { margin-top: 37px; }
-  .zoe-orbit { top: 305px; }
-  .zoe-access { margin-top: 0; padding: 30px 34px; border-radius: 32px; }
-  .zoe-access-logo { width: 62px; height: 62px; margin-bottom: 15px; }
-  .zoe-access-intro { margin-bottom: 25px; font-size: 16px; }
-  .zoe-fields { gap: 17px; }
-  .zoe-remember { margin: 18px 0 20px; font-size: 15px; }
-  .zoe-submit { min-height: 55px; font-size: 19px; }
-  .zoe-help { margin-top: 26px; gap: 14px; padding-top: 18px; }
-  .zoe-help a, .zoe-help button { font-size: 15px; }
-  .zoe-page-footer { bottom: 24px; font-size: 13px; }
+.zoe-login-page,
+.zoe-login-page *,
+.zoe-login-page *::before,
+.zoe-login-page *::after { box-sizing: border-box; }
+.zoe-login-page::before,
+.zoe-login-page::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
 }
-@media (max-width: 1200px) and (min-width: 981px) {
-  .zoe-layout { width: calc(100% - 72px); grid-template-columns: minmax(0, 1fr) 390px; gap: 28px; }
-  .zoe-brand { gap: 20px; }
-  .zoe-headline { font-size: clamp(42px, 4.5vw, 58px); }
-  .zoe-tagline { max-width: 440px; font-size: 18px; }
-  .zoe-access { padding-inline: 28px; }
-  .zoe-access h2 { font-size: 33px; }
-  .zoe-orbit { width: calc(100% + 110px); }
+.zoe-login-page::before {
+  inset: -12%;
+  background:
+    radial-gradient(ellipse at 15% 22%, rgba(120, 189, 255, 0.16), transparent 46%),
+    radial-gradient(ellipse at 84% 28%, rgba(193, 161, 255, 0.19), transparent 48%),
+    radial-gradient(ellipse at 50% 82%, rgba(168, 158, 255, 0.16), transparent 42%),
+    linear-gradient(125deg, #fafaff 0%, #f4f1fe 55%, #f4f2ff 100%);
+  animation: zoe-atmosphere 24s ease-in-out infinite alternate;
 }
-@media (max-width: 980px) {
-  .zoe-layout { grid-template-columns: minmax(0, 1fr); gap: 30px; width: min(100% - 48px, 580px); padding-top: 30px; padding-bottom: 110px; }
-  .zoe-hero { min-height: 285px; }
-  .zoe-brand { gap: 18px; }
-  .zoe-brand img { width: 58px; height: 58px; }
-  .zoe-wordmark { gap: 6px; }
-  .zoe-wordmark strong { font-size: 31px; }
-  .zoe-wordmark small { font-size: 9px; }
-  .zoe-hero-copy { margin-top: 27px; }
-  .zoe-headline { max-width: 500px; font-size: clamp(37px, 7.5vw, 55px); line-height: 1.06; }
-  .zoe-tagline { max-width: 390px; font-size: 17px; margin-top: 12px; }
-  .zoe-orbit { left: 21%; top: 86px; width: 105%; opacity: .23; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20%, transparent 95%); mask-image: linear-gradient(to bottom, transparent, #000 20%, transparent 95%); }
-  .zoe-access { width: 100%; margin-top: 0; padding: 30px; border-radius: 30px; background: linear-gradient(145deg, #192745e8, #10192de8 60%); }
-  .zoe-access-logo { width: 58px; height: 58px; margin-bottom: 16px; }
-  .zoe-access h2 { font-size: 34px; }
-  .zoe-access-intro { font-size: 16px; margin-bottom: 26px; }
-  .zoe-page-footer { left: 24px; right: 24px; bottom: 27px; font-size: 12px; }
-  .zoe-footer-brand { gap: 14px; }
-  .zoe-footer-brand strong { font-size: 12px; }
-  .zoe-footer-brand span { padding-left: 14px; }
+.zoe-login-page::after {
+  width: 880px;
+  height: 880px;
+  top: -720px;
+  left: calc(50% - 600px);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
 }
-@media (max-width: 480px) {
-  .zoe-layout { width: calc(100% - 36px); gap: 17px; padding-top: 25px; }
-  .zoe-hero { min-height: 238px; }
-  .zoe-headline { font-size: clamp(32px, 8.5vw, 40px); }
-  .zoe-tagline { font-size: 15px; max-width: 310px; }
-  .zoe-access { padding: 26px 23px; border-radius: 26px; }
-  .zoe-access h2 { font-size: 31px; }
-  .zoe-access-intro { font-size: 14px; }
-  .zoe-field label, .zoe-remember, .zoe-help a, .zoe-help button { font-size: 15px; }
-  .zoe-help { margin-top: 27px; gap: 16px; }
-  .zoe-submit { min-height: 55px; font-size: 19px; }
-  .zoe-page-footer { flex-direction: column; gap: 12px; bottom: 23px; }
+.zoe-shell {
+  width: 100%;
+  max-width: 960px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  align-items: center;
+  gap: 100px;
+  animation: zoe-enter 650ms ease-out both;
+}
+.zoe-hero { min-width: 0; }
+.zoe-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+}
+.zoe-brand img { display: block; width: 44px; height: 44px; }
+.zoe-wordmark {
+  font-size: 28px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -1.1px;
+  white-space: nowrap;
+}
+.zoe-wordmark span {
+  margin-left: 7px;
+  color: #6550f4;
+  background: linear-gradient(105deg, #248bff 0%, #922aff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.zoe-hero-title {
+  margin: 34px 0 12px;
+  font-size: clamp(32px, 3.05vw, 41px);
+  font-weight: 720;
+  line-height: 1.12;
+  letter-spacing: -1.8px;
+}
+.zoe-hero-title span { display: block; }
+.zoe-hero-description {
+  max-width: 440px;
+  margin: 0;
+  color: #444c6d;
+  font-size: 15px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+.zoe-orb-stage {
+  position: relative;
+  width: min(100%, 360px);
+  aspect-ratio: 4 / 3;
+  margin: 24px auto 10px;
+  perspective: 1000px;
+}
+.zoe-orb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  animation: zoe-orb-drift 13s ease-in-out infinite;
+}
+.zoe-copyright,
+.zoe-mobile-footer {
+  margin: 16px 0 0;
+  color: #68708d;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.zoe-copyright strong,
+.zoe-mobile-footer strong { color: #313957; font-weight: 650; }
+.zoe-mobile-footer { display: none; text-align: center; }
+.zoe-card {
+  position: relative;
+  width: 100%;
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.63);
+  box-shadow:
+    0 20px 65px -28px rgba(111, 82, 194, 0.29),
+    0 0 0 1px rgba(151, 124, 232, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .zoe-card {
+    background: linear-gradient(145deg, rgba(255,255,255,0.47), rgba(255,255,255,0.25));
+    -webkit-backdrop-filter: blur(24px) saturate(130%);
+    backdrop-filter: blur(24px) saturate(130%);
+  }
+}
+.zoe-card-header { margin-bottom: 24px; text-align: center; }
+.zoe-card-icon { display: block; width: 38px; height: 38px; margin: 0 auto 12px; }
+.zoe-card-title {
+  margin: 0 0 5px;
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.9px;
+}
+.zoe-card-description {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #505878;
+}
+.zoe-form { margin: 0; }
+.zoe-field { display: block; margin: 0 0 16px; }
+.zoe-label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.zoe-input-wrap { position: relative; }
+.zoe-login-page .zoe-input {
+  display: block;
+  width: 100%;
+  height: 42px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--zoe-border);
+  border-radius: 9px;
+  background: rgba(234, 233, 253, 0.27);
+  color: var(--zoe-text);
+  box-shadow: inset 0 1px 2px rgba(117, 103, 166, 0.025);
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 160ms, box-shadow 160ms, background 160ms;
+}
+.zoe-input::placeholder { color: #747a9a; opacity: 1; }
+.zoe-input:focus {
+  outline: 0;
+  border-color: #7471ec;
+  background: rgba(255,255,255,0.56);
+  box-shadow: 0 0 0 3px rgba(103, 100, 233, 0.12);
+}
+.zoe-input[aria-invalid="true"] { border-color: #ba3656; }
+.zoe-password-input { padding-right: 44px !important; }
+.zoe-login-page button { font-family: inherit; }
+.zoe-password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #454b73;
+  cursor: pointer;
+}
+.zoe-password-toggle svg { width: 18px; height: 18px; }
+.zoe-password-toggle .zoe-eye-off { display: none; }
+.zoe-password-toggle[aria-pressed="true"] .zoe-eye { display: none; }
+.zoe-password-toggle[aria-pressed="true"] .zoe-eye-off { display: block; }
+.zoe-password-toggle:hover { background: rgba(115, 104, 220, 0.07); }
+.zoe-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 19px;
+  color: #4c5474;
+  font-size: 12px;
+  cursor: pointer;
+}
+.zoe-remember input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #6e52f5;
+  cursor: pointer;
+}
+.zoe-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255,255,255,0.33);
+  border-radius: 10px;
+  background: linear-gradient(106deg, #18b9f0 0%, #3979ff 38%, #8a32ff 83%, #a526f5 100%);
+  box-shadow: 0 7px 20px -11px rgba(109, 56, 242, 0.65);
+  color: white;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: transform 180ms, box-shadow 180ms, filter 180ms;
+}
+.zoe-submit svg { width: 19px; height: 19px; transition: transform 180ms; }
+.zoe-submit:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow: 0 10px 24px -10px rgba(109, 56, 242, 0.55);
+}
+.zoe-submit:hover svg { transform: translateX(3px); }
+.zoe-submit:active { transform: translateY(0); }
+.zoe-login-page :where(button, input, a):focus-visible {
+  outline: 3px solid #7866e9;
+  outline-offset: 3px;
+}
+.zoe-login-page button:disabled { cursor: wait; opacity: 0.68; transform: none; }
+.zoe-login-page input:disabled { opacity: 0.7; }
+.zoe-card-links {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 22px;
+  padding-top: 17px;
+  border-top: 1px solid rgba(134, 119, 202, 0.18);
+}
+.zoe-text-button {
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #434b70;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.zoe-text-button:hover { color: #543cc4; }
+.zoe-text-button-primary { color: #4e48bb; text-decoration: underline; text-underline-offset: 3px; }
+.zoe-feedback {
+  margin: 14px 0 0;
+  padding: 10px 11px;
+  border: 1px solid rgba(171, 48, 77, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 238, 242, 0.75);
+  color: #8f2341;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.zoe-feedback[data-kind="preview"] {
+  border-color: rgba(107, 86, 203, 0.16);
+  background: rgba(241, 236, 255, 0.72);
+  color: #554578;
+}
+.zoe-feedback[hidden] { display: none; }
+.zoe-feedback:focus { outline: 0; }
+.zoe-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255,255,255,0.36);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: zoe-spin 800ms linear infinite;
+}
+@keyframes zoe-orb-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-1.1deg); }
+  50% { transform: translate3d(0, -8px, 0) rotate(1.1deg); }
+}
+@keyframes zoe-atmosphere {
+  from { transform: translate3d(-0.5%, -0.5%, 0); }
+  to { transform: translate3d(1%, 1.3%, 0); }
+}
+@keyframes zoe-enter {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes zoe-spin { to { transform: rotate(360deg); } }
+@media (max-width: 1100px) {
+  .zoe-shell { max-width: 870px; gap: 64px; grid-template-columns: minmax(0, 1fr) 350px; }
+  .zoe-hero-title { font-size: 36px; }
+}
+@media (max-height: 760px) and (min-width: 761px) {
+  .zoe-login-page { padding-top: 24px; padding-bottom: 24px; }
+  .zoe-hero-title { margin-top: 27px; font-size: 36px; }
+  .zoe-orb-stage { width: 310px; margin-top: 16px; }
+  .zoe-copyright { margin-top: 8px; }
+}
+@media (max-width: 760px) {
+  .zoe-login-page { padding: 30px 20px; }
+  .zoe-shell { max-width: 360px; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .zoe-hero { text-align: center; }
+  .zoe-brand { gap: 11px; }
+  .zoe-brand img { width: 40px; height: 40px; }
+  .zoe-wordmark { font-size: 27px; }
+  .zoe-hero-title,
+  .zoe-hero-description,
+  .zoe-orb-stage,
+  .zoe-copyright { display: none; }
+  .zoe-card { padding: 26px 24px; border-radius: 23px; }
+  .zoe-card-icon { display: none; }
+  .zoe-card-header { margin-bottom: 24px; }
+  .zoe-card-title { font-size: 26px; }
+  .zoe-card-description { font-size: 12px; }
+  .zoe-login-page .zoe-input { font-size: 16px; height: 44px; }
+  .zoe-password-toggle { height: 44px; }
+  .zoe-label { font-size: 13px; }
+  .zoe-remember,
+  .zoe-text-button { font-size: 13px; }
+  .zoe-submit { min-height: 46px; }
+  .zoe-mobile-footer { display: block; margin-top: 0; }
+}
+@media (max-width: 360px) {
+  .zoe-login-page { padding-left: 14px; padding-right: 14px; }
+  .zoe-card { padding-left: 20px; padding-right: 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .zoe-login *, .zoe-login *::before, .zoe-login *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-  .zoe-orbit video { display: none !important; }
-}
-/* Ajustes da integração: o CSS geral do painel não pode vazar para dentro do login. */
-.zoe-login .zoe-field input, .zoe-login .zoe-password-wrap input { min-height: 0; max-width: none; caret-color: #a9c8ff; }
-.zoe-login .zoe-field input:-webkit-autofill { -webkit-text-fill-color: #f6f8ff; -webkit-box-shadow: 0 0 0 40px #101830 inset; transition: background-color 9999s; }
-.zoe-login .zoe-submit .zoe-giro { display: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #ffffff59; border-top-color: #fff; animation: zoe-gira .7s linear infinite; }
-.zoe-login .zoe-submit.carregando .zoe-giro { display: inline-block; }
-.zoe-login .zoe-submit.carregando svg { display: none; }
-@keyframes zoe-gira { to { transform: rotate(360deg); } }
-.zoe-login dialog p { margin: 0 0 6px; }
-.zoe-login dialog code { font-size: 13px; background: #ffffff14; padding: 2px 6px; border-radius: 6px; }
-/* "font: inherit" dos botões tem prioridade sobre o tamanho do botão principal: reforça o tamanho aprovado. */
-.zoe-login .zoe-submit { font-size: 21px; font-weight: 650; }
-@media (max-height: 820px) and (min-width: 981px) { .zoe-login .zoe-submit { font-size: 19px; } }
-@media (max-width: 480px) { .zoe-login .zoe-submit { font-size: 19px; } }
-/* Marca ZOE 360°: o "360°" no mesmo degradê de "Em outro nível.", um pouco mais leve que o ZOE. */
-.zoe-login .zoe-wordmark strong { white-space: nowrap; }
-.zoe-login .zoe-360 { margin-left: .14em; letter-spacing: .06em; font-weight: 500; color: #b8bdff;
-  background: linear-gradient(95deg, #a9cfff, #bba3f6 92%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-/* Título "Sua operação. Em outro nível." um pouco menor (pedido: ~15% abaixo do desenho original). */
-.zoe-login .zoe-headline { font-size: clamp(40px, 4vw, 66px); }
-@media (max-width: 1200px) and (min-width: 981px) { .zoe-login .zoe-headline { font-size: clamp(38px, 3.9vw, 50px); } }
-@media (max-width: 980px) { .zoe-login .zoe-headline { font-size: clamp(32px, 6.4vw, 47px); } }
-@media (max-width: 480px) { .zoe-login .zoe-headline { font-size: clamp(28px, 7.3vw, 34px); } }
-/* Login no endereço de uma empresa (connectlink.zoe360.com.br): o nome dela acima do "Bem-vindo". */
-.zoe-login .zoe-empresa { display: table; margin: -4px auto 12px; padding: 6px 16px; border-radius: 99px; font-size: 15px; font-weight: 600;
-  letter-spacing: .01em; color: #e8ecff; background: #ffffff12; border: 1px solid #a6b3db40; }
-@media (max-height: 820px) and (min-width: 981px) {
-  .zoe-login .zoe-empresa { margin: -6px auto 8px; padding: 4px 13px; font-size: 13px; }
-  .zoe-login .zoe-access:has(.zoe-empresa) .zoe-access-logo { width: 50px; height: 50px; margin-bottom: 12px; }
-  .zoe-login .zoe-access:has(.zoe-empresa) .zoe-access-intro { margin-bottom: 20px; }
+  .zoe-login-page::before,
+  .zoe-shell,
+  .zoe-orb,
+  .zoe-spinner { animation: none !important; }
+  .zoe-login-page *,
+  .zoe-login-page *::before,
+  .zoe-login-page *::after { transition: none !important; scroll-behavior: auto !important; }
+  .zoe-submit:hover,
+  .zoe-submit:hover svg { transform: none; }
 }
 
-/* =====================================================================
-   Encaixe na altura da janela (computador). A área útil do navegador é menor que a tela: barra de
-   abas, de favoritos e a do Windows comem 130 a 250 px. Tudo o que é vertical acompanha a altura
-   da janela, para o login caber inteiro, sem barra de rolagem, de 620 px de altura para cima.
-   ===================================================================== */
-@media (min-width: 981px) {
-  .zoe-login { height: 100svh; min-height: 560px; }
-  .zoe-login .zoe-layout { min-height: 0; height: 100%; padding-top: clamp(18px, 4.2vh, 48px); padding-bottom: clamp(52px, 8.5vh, 92px); }
-  .zoe-login .zoe-hero { min-height: 0; }
-  .zoe-login .zoe-brand img { width: clamp(52px, 8vh, 82px); height: clamp(52px, 8vh, 82px); }
-  .zoe-login .zoe-wordmark strong { font-size: clamp(30px, 4.4vh, 45px); }
-  .zoe-login .zoe-hero-copy { margin-top: clamp(16px, 3.6vh, 42px); }
-  .zoe-login .zoe-headline { font-size: clamp(34px, min(4vw, 6.6vh), 66px); }
-  .zoe-login .zoe-tagline { font-size: clamp(15px, min(1.5vw, 2.4vh), 25px); margin-top: clamp(8px, 1.6vh, 17px); }
-  .zoe-login .zoe-orbit { top: clamp(220px, 38vh, 348px); }
-  .zoe-login .zoe-access { margin-top: 0; padding: clamp(20px, 3.4vh, 42px) clamp(28px, 3vw, 48px); border-radius: clamp(26px, 3.6vh, 40px); }
-  .zoe-login .zoe-access-logo { width: clamp(44px, 7vh, 74px); height: clamp(44px, 7vh, 74px); margin-bottom: clamp(10px, 1.8vh, 20px); }
-  .zoe-login .zoe-empresa { margin: 0 auto clamp(6px, 1.2vh, 12px); padding: clamp(3px, .5vh, 6px) 14px; font-size: clamp(12px, 1.6vh, 15px); }
-  .zoe-login .zoe-access h2 { font-size: clamp(26px, 4vh, 42px); }
-  .zoe-login .zoe-access-intro { font-size: clamp(14px, 1.9vh, 18px); margin: clamp(4px, .9vh, 10px) 0 clamp(14px, 2.8vh, 30px); }
-  .zoe-login .zoe-fields { gap: clamp(10px, 1.9vh, 20px); }
-  .zoe-login .zoe-field label { font-size: clamp(14px, 1.8vh, 17px); margin-bottom: clamp(4px, .8vh, 8px); }
-  .zoe-login .zoe-field input { height: clamp(42px, 5.4vh, 54px); font-size: clamp(15px, 1.8vh, 17px); }
-  .zoe-login .zoe-eye { top: 50%; transform: translateY(-50%); height: 40px; }
-  .zoe-login .zoe-remember { margin: clamp(10px, 2vh, 22px) 0 clamp(12px, 2.2vh, 24px); font-size: clamp(14px, 1.8vh, 17px); }
-  .zoe-login .zoe-remember input { width: 22px; height: 22px; flex-basis: 22px; }
-  .zoe-login .zoe-submit { min-height: clamp(46px, 6vh, 60px); font-size: clamp(17px, 2.2vh, 21px); }
-  .zoe-login .zoe-message { margin-top: clamp(8px, 1.2vh, 14px); }
-  .zoe-login .zoe-help { margin-top: clamp(14px, 3vh, 34px); padding-top: clamp(10px, 1.8vh, 20px); gap: clamp(8px, 1.6vh, 18px); }
-  .zoe-login .zoe-help button { font-size: clamp(14px, 1.8vh, 17px); }
-  .zoe-login .zoe-page-footer { bottom: clamp(14px, 3vh, 33px); font-size: clamp(12px, 1.6vh, 15px); }
-}
-@media (min-width: 981px) and (max-height: 660px) {
-  .zoe-login .zoe-access:has(.zoe-empresa) .zoe-access-logo { display: none; }
-}
-/* A barra de rolagem clássica do Windows aparecia por 1 ou 2 px de arredondamento: no computador, o login nunca rola. */
-@media (min-width: 981px) and (min-height: 560px) { html:has(.zoe-login), body:has(.zoe-login) { overflow: hidden; } }
-/* Mais compacto no computador (pedido: "está enorme"): cartão mais estreito e tudo ~15% menor. */
-@media (min-width: 981px) {
-  .zoe-login .zoe-layout { grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); }
-  .zoe-login .zoe-brand img { width: clamp(46px, 6.8vh, 68px); height: clamp(46px, 6.8vh, 68px); }
-  .zoe-login .zoe-wordmark strong { font-size: clamp(26px, 3.8vh, 38px); }
-  .zoe-login .zoe-wordmark small { font-size: 11px; }
-  .zoe-login .zoe-headline { font-size: clamp(30px, min(3.4vw, 5.6vh), 56px); }
-  .zoe-login .zoe-tagline { font-size: clamp(14px, min(1.25vw, 2.1vh), 20px); }
-  .zoe-login .zoe-access { padding: clamp(18px, 3vh, 36px) clamp(24px, 2.4vw, 38px); border-radius: clamp(22px, 3vh, 32px); }
-  .zoe-login .zoe-access-logo { width: clamp(38px, 5.6vh, 58px); height: clamp(38px, 5.6vh, 58px); }
-  .zoe-login .zoe-access h2 { font-size: clamp(22px, 3.3vh, 34px); }
-  .zoe-login .zoe-access-intro { font-size: clamp(13px, 1.6vh, 15px); }
-  .zoe-login .zoe-field label, .zoe-login .zoe-remember, .zoe-login .zoe-help button { font-size: clamp(13px, 1.55vh, 15px); }
-  .zoe-login .zoe-field input { height: clamp(40px, 4.8vh, 48px); font-size: 15px; border-radius: 10px; }
-  .zoe-login .zoe-remember input { width: 20px; height: 20px; flex-basis: 20px; border-radius: 6px; }
-  .zoe-login .zoe-submit { min-height: clamp(42px, 5.2vh, 52px); font-size: clamp(15px, 1.9vh, 18px); border-radius: 12px; }
-  .zoe-login .zoe-submit svg { width: 19px; height: 19px; }
-  .zoe-login .zoe-eye svg { width: 19px; height: 19px; }
-  .zoe-login .zoe-page-footer { font-size: clamp(11px, 1.4vh, 13px); }
-  .zoe-login .zoe-footer-brand strong { font-size: clamp(12px, 1.5vh, 14px); }
-}
+/* ---- Integração com a ZOE ---- */
+/* Nome da empresa no endereço próprio dela (connectlink.zoe360.com.br), acima do "Bem-vindo". */
+.zoe-login-page .zoe-empresa { display: table; margin: 0 auto 8px; padding: 3px 12px; border-radius: 99px; font-size: 12.5px; font-weight: 700;
+  color: #4b3fd6; background: rgba(99, 102, 241, .1); border: 1px solid rgba(99, 102, 241, .22); }
+/* Janela de ajuda (Esqueceu a senha / Fale com o administrador). */
+.zoe-login-page dialog { width: min(400px, calc(100% - 32px)); padding: 24px; border: 1px solid rgba(124, 108, 240, .25); border-radius: 20px;
+  background: rgba(255, 255, 255, .96); color: #1b1f3b; box-shadow: 0 24px 70px rgba(60, 48, 140, .22); }
+.zoe-login-page dialog::backdrop { background: rgba(40, 32, 90, .25); backdrop-filter: blur(4px); }
+.zoe-login-page dialog h2 { margin: 0 0 10px; font-size: 19px; }
+.zoe-login-page dialog p { margin: 0 0 8px; font-size: 14px; line-height: 1.55; color: #464c6b; }
+.zoe-login-page dialog button { margin-top: 10px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 10px; color: #fff; font-weight: 700;
+  background: linear-gradient(100deg, #2b9bf4, #5b5cf6 55%, #8b2cf0); cursor: pointer; }
