@@ -164,3 +164,11 @@
 @media (max-width: 1200px) and (min-width: 981px) { .zoe-login .zoe-headline { font-size: clamp(38px, 3.9vw, 50px); } }
 @media (max-width: 980px) { .zoe-login .zoe-headline { font-size: clamp(32px, 6.4vw, 47px); } }
 @media (max-width: 480px) { .zoe-login .zoe-headline { font-size: clamp(28px, 7.3vw, 34px); } }
+/* Login no endereço de uma empresa (connectlink.zoe360.com.br): o nome dela acima do "Bem-vindo". */
+.zoe-login .zoe-empresa { display: table; margin: -4px auto 12px; padding: 6px 16px; border-radius: 99px; font-size: 15px; font-weight: 600;
+  letter-spacing: .01em; color: #e8ecff; background: #ffffff12; border: 1px solid #a6b3db40; }
+@media (max-height: 820px) and (min-width: 981px) {
+  .zoe-login .zoe-empresa { margin: -6px auto 8px; padding: 4px 13px; font-size: 13px; }
+  .zoe-login .zoe-access:has(.zoe-empresa) .zoe-access-logo { width: 50px; height: 50px; margin-bottom: 12px; }
+  .zoe-login .zoe-access:has(.zoe-empresa) .zoe-access-intro { margin-bottom: 20px; }
+}

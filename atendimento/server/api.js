@@ -20,7 +20,12 @@ function criarApi(db) {
     db.prepare('SELECT 1').get();
     res.json({ ok: true });
   });
-  api.get('/publico', (_req, res) => res.json({ nome: lerConfig(db).nome_plataforma }));
+  // O que a tela de login pode saber sem sessão: o nome da plataforma e, no endereço de uma empresa
+  // (connectlink.zoe360.com.br), o nome dela. Nada além disso.
+  api.get('/publico', (req, res) => {
+    const e = require('./lib/empresas').porHost(db, req.hostname);
+    res.json({ nome: lerConfig(db).nome_plataforma, empresa: e && e.status === 'ativa' ? { id: e.id, nome: e.nome, subdominio: e.subdominio } : null });
+  });
 
   api.use('/auth', require('./routes/auth')(db, autenticado));
   api.use('/integracao', require('./routes/integracao')(db));

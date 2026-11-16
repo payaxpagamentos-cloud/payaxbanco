@@ -62,12 +62,13 @@ module.exports = function rotasMaster(db) {
         telefone: d.telefone === undefined ? atual.telefone : (d.telefone ? v.telefone(d.telefone) : null),
         limite_atendentes: d.limite_atendentes === undefined ? atual.limite_atendentes : v.inteiro(d.limite_atendentes, 'o limite de atendentes'),
         limite_ia_mes: d.limite_ia_mes === undefined ? atual.limite_ia_mes : v.inteiro(d.limite_ia_mes, 'o limite de mensagens da IA'),
+        subdominio: d.subdominio === undefined ? atual.subdominio : empresasLib.validarSubdominio(db, d.subdominio, { empresaId: id }),
       };
       if (campos.documento) {
         v.exigir((campos.documento.length === 14 && v.cnpjValido(campos.documento)) || (campos.documento.length === 11 && v.cpfValido(campos.documento)), 'CNPJ ou CPF inválido.');
       }
-      db.prepare('UPDATE empresas SET nome = ?, documento = ?, email = ?, telefone = ?, limite_atendentes = ?, limite_ia_mes = ? WHERE id = ?')
-        .run(campos.nome, campos.documento, campos.email, campos.telefone, campos.limite_atendentes, campos.limite_ia_mes, id);
+      db.prepare('UPDATE empresas SET nome = ?, documento = ?, email = ?, telefone = ?, limite_atendentes = ?, limite_ia_mes = ?, subdominio = ? WHERE id = ?')
+        .run(campos.nome, campos.documento, campos.email, campos.telefone, campos.limite_atendentes, campos.limite_ia_mes, campos.subdominio, id);
       auditar(db, { usuario: req.usuario, empresaId: id, acao: 'alterou a empresa', alvo: campos.nome, detalhe: { antes: atual, depois: campos }, ip: req.ip });
       res.json(db.prepare('SELECT * FROM empresas WHERE id = ?').get(id));
     } catch (err) { next(err); }

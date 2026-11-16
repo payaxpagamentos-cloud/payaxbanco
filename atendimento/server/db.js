@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS empresas (
   -- Cotação informada à mão (reais por dólar ×10000). Também é a reserva se o Banco Central não responder.
   cotacao_x10000 INTEGER CHECK (cotacao_x10000 IS NULL OR cotacao_x10000 > 0),
   -- Telefonia (o PABX dentro da ZOE): ligada por empresa, com limites e tarifas por minuto.
+  -- Endereço próprio da empresa: <subdominio>.<domínio da plataforma> (ex.: connectlink.zoe360.com.br).
+  -- Por ali, o login mostra o nome da empresa e só deixa entrar a equipe dela.
+  subdominio TEXT,
   telefonia_ativa INTEGER NOT NULL DEFAULT 0,
   telefonia_tipo TEXT NOT NULL DEFAULT 'pabx' CHECK (telefonia_tipo IN ('pabx','discador','callcenter')),
   limite_ramais INTEGER NOT NULL DEFAULT 10 CHECK (limite_ramais >= 0),
@@ -49,6 +52,8 @@ CREATE TABLE IF NOT EXISTS empresas (
 
 -- master e suporte: equipe da plataforma (empresa_id nulo).
 -- cliente (administrador da empresa), supervisor (só consulta) e atendente (atende conversas): da empresa.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_empresas_subdominio ON empresas(subdominio) WHERE subdominio IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nome TEXT NOT NULL,

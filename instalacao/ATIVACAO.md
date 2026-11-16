@@ -141,6 +141,18 @@ journalctl -u zoe -n 80 --no-pager
 
 Se o IXC estiver na rede interna (10.x, 192.168.x), acrescente `ATEND_REDE_INTERNA=1` no `.env` e rode `sudo systemctl restart zoe`.
 
+### 6.1 Endereço próprio de cada empresa (subdomínio)
+
+Cada empresa pode ter um endereço próprio, por exemplo `connectlink.zoe360.com.br`. Nele, o login mostra o nome da empresa e só entra a equipe dela, além do master e do suporte. O master entra por `app.zoe360.com.br`.
+
+1. No DNS do domínio, crie um registro **A** com o nome da empresa (`connectlink`) apontando para o IP do servidor.
+2. Instale ou atualize com `--dominio app.zoe360.com.br`. O instalador já deixa o nginx aceitar qualquer `*.zoe360.com.br`.
+3. Inclua o endereço da empresa no certificado. Liste todos os endereços a cada empresa nova:
+   ```bash
+   sudo certbot --nginx -d app.zoe360.com.br -d connectlink.zoe360.com.br
+   ```
+4. No painel, em **Empresas › Editar**, preencha **Subdomínio** com `connectlink`.
+
 ### 7.0 Cobrança que volta pela janela (economia na conta da Meta)
 
 A cobrança tem dois caminhos:

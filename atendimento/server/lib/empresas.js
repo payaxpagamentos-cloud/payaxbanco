@@ -37,12 +37,12 @@ function criar(db, dados, { comExemplos = true } = {}) {
     v.exigir((documento.length === 14 && v.cnpjValido(documento)) || (documento.length === 11 && v.cpfValido(documento)), 'CNPJ ou CPF inválido.');
   }
   return transacao(db, () => {
-    const id = Number(db.prepare(`INSERT INTO empresas (nome, documento, email, telefone, limite_atendentes, limite_ia_mes, criada_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(nome, documento, dados.email ? v.email(dados.email) : null,
+    const id = Number(db.prepare(`INSERT INTO empresas (nome, documento, email, telefone, limite_atendentes, limite_ia_mes, subdominio, criada_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(nome, documento, dados.email ? v.email(dados.email) : null,
       dados.telefone ? v.telefone(dados.telefone) : null,
       dados.limite_atendentes === undefined ? cfg.limite_atendentes_padrao : v.inteiro(dados.limite_atendentes, 'o limite de atendentes'),
       dados.limite_ia_mes === undefined ? cfg.limite_ia_mes_padrao : v.inteiro(dados.limite_ia_mes, 'o limite de mensagens da IA'),
-      agora()).lastInsertRowid);
+      validarSubdominio(db, dados.subdominio), agora()).lastInsertRowid);
 
     const filaId = new Map();
     for (const f of FILAS_PADRAO) {
@@ -157,5 +157,35 @@ function criarChaveApi(db, empresaId, nome, { escopo = 'integracao', usuarioId =
   return { id, chave, prefixo: chave.slice(0, 12), escopo };
 }
 
+// Nomes que não podem ser de empresa: são da plataforma, ou de serviços comuns de um domínio.
+const SUBDOMINIOS_RESERVADOS = new Set(['app', 'www', 'api', 'admin', 'master', 'painel', 'mail', 'smtp', 'ftp', 'ns1', 'ns2', 'suporte', 'status', 'static', 'cdn']);
+
+/** Valida o subdomínio da empresa: letras minúsculas, números e hífen, de 2 a 40 caracteres. Vazio = sem endereço próprio. */
+function validarSubdominio(db, valor, { empresaId = null } = {}) {
+  const s = String(valor ?? '').trim().toLowerCase();
+  if (!s) return null;
+  v.exigir(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(s) && s.length >= 2,
+    'Subdomínio inválido: use de 2 a 40 letras minúsculas, números ou hífen (sem acento, sem espaço, sem começar ou terminar com hífen).');
+  v.exigir(!SUBDOMINIOS_RESERVADOS.has(s), `O subdomínio "${s}" é reservado da plataforma. Escolha outro.`);
+  const outra = db.prepare('SELECT nome FROM empresas WHERE subdominio = ? AND id IS NOT ? AND status <> \'excluida\'').get(s, empresaId);
+  v.exigir(!outra, `O subdomínio "${s}" já é da empresa ${outra?.nome}.`);
+  return s;
+}
+
+/**
+ * A empresa do endereço acessado: connectlink.zoe360.com.br → a empresa de subdomínio "connectlink".
+ * IP, endereço de dois níveis (zoe360.com.br) e nomes reservados (app, www...) não são de empresa.
+ */
+function porHost(db, host) {
+  const h = String(host ?? '').trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
+  if (!h || /^[\d.]+$/.test(h) || h.includes(':')) return null;
+  const partes = h.split('.');
+  if (partes.length < 3) return null;
+  const sub = partes[0];
+  if (SUBDOMINIOS_RESERVADOS.has(sub)) return null;
+  return db.prepare("SELECT * FROM empresas WHERE subdominio = ? AND status <> 'excluida'").get(sub) ?? null;
+}
+
 module.exports = {
+  validarSubdominio, porHost, SUBDOMINIOS_RESERVADOS,
   lerRamal, criar, criarUsuario, salvarNumero, numeroPublico, criarChaveApi, FILAS_PADRAO, ETIQUETAS_PADRAO, INTENCOES_PADRAO };

@@ -70,6 +70,10 @@ async function empresas(ctx) {
     campo('CNPJ ou CPF', { name: 'documento', value: e.documento ?? '', inputmode: 'numeric' }),
     campo('E-mail', { name: 'email', value: e.email ?? '', type: 'email' }),
     campo('Telefone', { name: 'telefone', value: e.telefone ?? '' }),
+    campo(`Subdomínio (endereço próprio: <subdomínio>.${dominioBase()})`, { name: 'subdominio', value: e.subdominio ?? '', maxlength: 40,
+      placeholder: 'ex.: connectlink', autocapitalize: 'none', spellcheck: 'false', pattern: '[a-z0-9][a-z0-9-]*[a-z0-9]' }),
+    el('p', { class: 'pequeno mudo', style: 'margin:-4px 0 4px' },
+      'Por esse endereço, o login mostra o nome da empresa e só a equipe dela entra. Crie no DNS um registro A com esse nome apontando para o servidor, e inclua o endereço no certificado (certbot).'),
     el('div', { class: 'grade-2' },
       campo('Limite de atendentes', { name: 'limite_atendentes', type: 'number', value: e.limite_atendentes ?? 5, min: 0, max: 500 }),
       campo('Limite de mensagens da IA por mês (0 = sem limite)', { name: 'limite_ia_mes', type: 'number', value: e.limite_ia_mes ?? 2000, min: 0 })),
@@ -328,5 +332,12 @@ const relatorios = (ctx) => telaRelatorios(ctx, '/master/relatorios', {
 });
 
 import { telaTelefoniaMaster } from './telefonia-master.js';
+
+/** O domínio da plataforma, tirado do endereço aberto (app.zoe360.com.br → zoe360.com.br). Pelo IP, um exemplo. */
+function dominioBase() {
+  const h = location.hostname;
+  if (/^[\d.]+$/.test(h) || h.split('.').length < 3) return 'seu-dominio.com.br';
+  return h.split('.').slice(1).join('.');
+}
 
 export const TELAS_MASTER = { telefonia: telaTelefoniaMaster, dashboard, empresas, usuarios, seguranca, diagnostico, relatorios, configuracoes };

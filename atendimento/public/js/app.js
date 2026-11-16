@@ -8,6 +8,8 @@ import { vigiarLigacoes } from './passagem.js';
 const raiz = $('#app');
 let pararTela = null;
 let nomePlataforma = 'ZOE Atende';
+// A empresa do endereço aberto (connectlink.zoe360.com.br), quando há uma: o login mostra o nome dela.
+let empresaDoEndereco = null;
 const nomesEmpresa = new Map();
 
 const PLATAFORMA = ['master', 'suporte'];
@@ -123,6 +125,11 @@ async function desenhar() {
   if (!s?.token) { pararSaude?.(); pararSaude = null; vigiar({}, null); pararTelefone(); return telaEntrada(); }
   const u = s.usuario;
   let { empresaId, tela } = rota();
+  // A equipe da plataforma entrando pelo endereço de uma empresa (connectlink.zoe360.com.br) vai direto para ela.
+  if (PLATAFORMA.includes(u.perfil) && empresaDoEndereco?.id && !empresaId) {
+    history.replaceState(null, '', link(empresaDoEndereco.id, 'caixa'));
+    ({ empresaId, tela } = rota());
+  }
   // Usuário de empresa fica sempre no painel da própria empresa.
   if (!PLATAFORMA.includes(u.perfil) && empresaId !== u.empresa_id) {
     history.replaceState(null, '', link(u.empresa_id, empresaId ? tela : 'caixa'));
@@ -298,7 +305,7 @@ const GUARDA_EMAIL = 'atend.email';
  */
 function telaEntrada() {
   const IMG = 'img/login';
-  document.title = 'ZOE 360° · Entrar';
+  document.title = empresaDoEndereco ? `${empresaDoEndereco.nome} · ZOE 360°` : 'ZOE 360° · Entrar';
   let lembrado = '';
   try { lembrado = localStorage.getItem(GUARDA_EMAIL) ?? ''; } catch { /* sem armazenamento */ }
 
@@ -383,6 +390,7 @@ function telaEntrada() {
         el('div', { class: 'zoe-orbit', 'aria-hidden': 'true' }, poster, video)),
       el('section', { class: 'zoe-access', 'aria-labelledby': 'zoe-heading' },
         el('img', { class: 'zoe-access-logo', src: `${IMG}/zoe-mark.svg`, alt: '', width: '74', height: '74' }),
+        empresaDoEndereco ? el('p', { class: 'zoe-empresa' }, empresaDoEndereco.nome) : null,
         el('h2', { id: 'zoe-heading' }, 'Bem-vindo'),
         el('p', { class: 'zoe-access-intro' }, 'Acesse sua conta para continuar.'),
         form,
@@ -416,4 +424,4 @@ function telaEntrada() {
   (lembrado ? senha : email).focus({ preventScroll: true });
 }
 
-api.get('/publico').then((p) => { nomePlataforma = p.nome || 'ZOE Atende'; }).catch(() => {}).finally(desenhar);
+api.get('/publico').then((p) => { nomePlataforma = p.nome || 'ZOE Atende'; empresaDoEndereco = p.empresa ?? null; }).catch(() => {}).finally(desenhar);

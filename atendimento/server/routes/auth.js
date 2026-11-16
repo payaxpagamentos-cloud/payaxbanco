@@ -39,6 +39,13 @@ module.exports = function rotasAuth(db, autenticado) {
       }
       if (!u.ativo) { recusar(email, req.ip, 'usuário inativo'); throw new ErroNegocio('Usuário inativo. Fale com o administrador.', 401); }
       if (u.empresa_id && u.empresa_status !== 'ativa') { recusar(email, req.ip, 'empresa bloqueada'); throw new ErroNegocio('Empresa bloqueada. Fale com o suporte.', 401); }
+      // No endereço de uma empresa (connectlink.zoe360.com.br) só entra a equipe dela, além da equipe da
+      // plataforma. Para os outros, a mesma resposta de senha errada: o endereço não confirma quem existe.
+      const daCasa = require('../lib/empresas').porHost(db, req.hostname);
+      if (daCasa && u.empresa_id && u.empresa_id !== daCasa.id) {
+        recusar(email, req.ip, `entrou pelo endereço de outra empresa (${daCasa.subdominio})`);
+        throw new ErroNegocio('E-mail ou senha incorretos.', 401);
+      }
       db.prepare('UPDATE usuarios SET ultimo_acesso = ?, visto_em = ? WHERE id = ?').run(agora(), agora(), u.id);
       auditar(db, { usuario: u, acao: 'entrou no painel', ip: req.ip });
       res.json(comoSessao(u));

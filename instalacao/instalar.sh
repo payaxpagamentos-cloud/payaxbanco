@@ -353,11 +353,15 @@ server {
 }
 NGINX
   else
+    # Domínio da plataforma em app.<domínio> (ex.: app.zoe360.com.br): o mesmo site atende os endereços
+    # das empresas (connectlink.zoe360.com.br), e a ZOE descobre a empresa pelo nome.
+    NOMES="$DOMINIO"
+    case "$DOMINIO" in app.*.*) NOMES="$DOMINIO *.${DOMINIO#app.}" ;; esac
     cat > "$ALVO" <<NGINX
-# ZOE — gerado pelo instalador. HTTPS: certbot --nginx -d ${DOMINIO}
+# ZOE — gerado pelo instalador. HTTPS: certbot --nginx -d ${DOMINIO} (+ -d <empresa>.${DOMINIO#app.} para cada empresa)
 server {
   listen 80;
-  server_name ${DOMINIO};
+  server_name ${NOMES};
   client_max_body_size 20m;
   # O painel são módulos JavaScript: comprimidos, chegam bem mais rápido.
   gzip on;
