@@ -72,7 +72,7 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   // Boleto do simulador: o código tem formato válido, mas não está registrado em banco nenhum.
   const teste = config.banco.modo === 'simulador';
 
-  const enderecoPagador = [boleto.pagador_endereco, boleto.pagador_numero].filter(Boolean).join(', ');
+  const enderecoPagador = [boleto.pagador_endereco, boleto.pagador_numero, boleto.pagador_complemento].filter(Boolean).join(', ');
   const cidadePagador = [boleto.pagador_bairro, [boleto.pagador_cidade, boleto.pagador_uf].filter(Boolean).join('/'),
     boleto.pagador_cep ? `CEP ${String(boleto.pagador_cep).replace(/(\d{5})(\d{3})/, '$1-$2')}` : null].filter(Boolean).join(' · ');
 

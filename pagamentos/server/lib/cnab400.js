@@ -220,7 +220,7 @@ function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoj
     docPagador.length === 11 ? '01' : '02', // 219-220 tipo de inscrição do pagador
     numero(docPagador, 14), // 221-234
     texto(b.pagador_nome, 40), // 235-274
-    texto([b.pagador_endereco, b.pagador_numero].filter(Boolean).join(', '), 40), // 275-314
+    texto([b.pagador_endereco, b.pagador_numero, b.pagador_complemento].filter(Boolean).join(', '), 40), // 275-314
     texto(b.mensagem, 12), // 315-326 1ª mensagem
     cep.slice(0, 5), // 327-331
     cep.slice(5, 8), // 332-334

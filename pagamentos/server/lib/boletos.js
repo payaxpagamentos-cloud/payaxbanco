@@ -102,6 +102,7 @@ function validarEntrada(dados, cliente) {
     pagador_cep: dados.pagador_cep ? v.cep(dados.pagador_cep) : null,
     pagador_endereco: v.opcional(dados.pagador_endereco, 'o endereço do pagador', 60),
     pagador_numero: v.opcional(dados.pagador_numero, 'o número do endereço', 10),
+    pagador_complemento: v.opcional(dados.pagador_complemento, 'o complemento do endereço', 40),
     pagador_bairro: v.opcional(dados.pagador_bairro, 'o bairro', 40),
     pagador_cidade: v.opcional(dados.pagador_cidade, 'a cidade', 40),
     pagador_uf: v.ufOpcional(dados.pagador_uf),
@@ -282,18 +283,18 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
     const id = db.prepare(`INSERT INTO boletos (
         cliente_id, conta_id, nosso_numero, nosso_numero_dv, seu_numero, origem, ixc_receber_id, ixc_cliente_id, tipo,
         pagador_nome, pagador_documento, pagador_email, pagador_telefone, pagador_cep, pagador_endereco, pagador_numero,
-        pagador_bairro, pagador_cidade, pagador_uf,
+        pagador_complemento, pagador_bairro, pagador_cidade, pagador_uf,
         beneficiario_final_nome, beneficiario_final_fantasia, beneficiario_final_documento, especie, rateio_ppm, rateio_destino,
         valor_centavos, emissao, vencimento, juros_mes_ppm, multa_ppm, desconto_centavos, desconto_ate, dias_baixa, mensagem,
         codigo_barras, linha_digitavel, pix_txid, pix_emv, situacao, erro_registro, registrado_em,
         preco_id, tarifa_emissao_centavos, tarifa_liquidacao_centavos, comissao_fixa_centavos, percentual_ppm, comissao_minima_centavos,
         comissao_maxima_centavos, custo_liquidacao_centavos, criado_em, criado_por, criado_por_cliente)
-      VALUES (${Array(52).fill('?').join(', ')})
+      VALUES (${Array(53).fill('?').join(', ')})
       RETURNING id`).get(
       cliente.id, conta.id, nossoNumero, registro.nosso_numero_dv, entrada.seu_numero, origem,
       ixc.receber_id ? String(ixc.receber_id) : null, ixc.cliente_id ? String(ixc.cliente_id) : null, entrada.tipo,
       entrada.pagador_nome, entrada.pagador_documento, entrada.pagador_email, entrada.pagador_telefone, entrada.pagador_cep,
-      entrada.pagador_endereco, entrada.pagador_numero, entrada.pagador_bairro, entrada.pagador_cidade, entrada.pagador_uf,
+      entrada.pagador_endereco, entrada.pagador_numero, entrada.pagador_complemento ?? null, entrada.pagador_bairro, entrada.pagador_cidade, entrada.pagador_uf,
       boleto.beneficiario_final_nome, boleto.beneficiario_final_fantasia, boleto.beneficiario_final_documento, boleto.especie,
       boleto.rateio_ppm ?? null, boleto.rateio_destino ?? null,
       entrada.valor_centavos, entrada.emissao, entrada.vencimento, entrada.juros_mes_ppm, entrada.multa_ppm,

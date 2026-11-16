@@ -221,7 +221,7 @@ function dadosDoTitular(db, documento) {
   const doc = v.documento(documento, 'o CPF ou CNPJ');
   const boletos = db.prepare(`SELECT b.nosso_numero, b.seu_numero, b.emissao, b.vencimento, b.valor_centavos, b.situacao, b.pago_em,
       b.pago_valor_centavos, b.pagador_nome, b.pagador_email, b.pagador_telefone, b.pagador_endereco, b.pagador_numero,
-      b.pagador_bairro, b.pagador_cidade, b.pagador_uf, b.pagador_cep, b.anonimizado_em,
+      b.pagador_complemento, b.pagador_bairro, b.pagador_cidade, b.pagador_uf, b.pagador_cep, b.anonimizado_em,
       COALESCE(c.nome_fantasia, c.razao_social) AS provedor, c.razao_social AS provedor_razao_social, c.cnpj AS provedor_cnpj
     FROM boletos b JOIN clientes c ON c.id = b.cliente_id WHERE b.pagador_documento = ? ORDER BY b.emissao`).all(doc);
   return {
@@ -311,7 +311,7 @@ function aplicarRetencao(db, { data = hoje() } = {}) {
       AND COALESCE(pago_em, substr(baixado_em, 1, 10), substr(criado_em, 1, 10)) < ?`).all(corte).map((x) => x.id);
     for (const id of vencidos) {
       db.prepare(`UPDATE boletos SET pagador_nome = ?, pagador_documento = 'anonimizado', pagador_email = NULL, pagador_telefone = NULL,
-          pagador_cep = NULL, pagador_endereco = NULL, pagador_numero = NULL, pagador_bairro = NULL, pagador_cidade = NULL, pagador_uf = NULL,
+          pagador_cep = NULL, pagador_endereco = NULL, pagador_numero = NULL, pagador_complemento = NULL, pagador_bairro = NULL, pagador_cidade = NULL, pagador_uf = NULL,
           anonimizado_em = ? WHERE id = ?`).run(ANONIMO, agora(), id);
       out.lancamentos += db.prepare("UPDATE lancamentos SET descricao = 'Lançamento de título anonimizado (prazo de guarda vencido)' WHERE boleto_id = ?").run(id).changes;
       out.boletos += 1;

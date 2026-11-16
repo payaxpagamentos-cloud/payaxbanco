@@ -951,6 +951,14 @@ CREATE TRIGGER usuarios_cliente_revoga_sessao AFTER UPDATE ON usuarios_cliente
 UPDATE contas_bancarias SET rateio_contratado = 0;
 `,
   },
+  {
+    versao: 26,
+    nome: 'complemento-do-pagador',
+    sql: `
+-- Complemento do endereço do pagador (apto, bloco, sala): vai na ficha, na remessa e na API.
+ALTER TABLE boletos ADD COLUMN pagador_complemento TEXT;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

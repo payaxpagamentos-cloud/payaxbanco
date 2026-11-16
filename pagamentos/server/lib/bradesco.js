@@ -169,7 +169,8 @@ function paraApi(boleto, conta) {
     qtdePagamentoParcial: 0,
     // Pagador
     nomePagador: semAcento(boleto.pagador_nome).slice(0, 70),
-    logradouroPagador: semAcento(boleto.pagador_endereco).slice(0, 40),
+    // Complemento junto do logradouro (o campo próprio da API será conferido na homologação).
+    logradouroPagador: semAcento([boleto.pagador_endereco, boleto.pagador_complemento].filter(Boolean).join(' ')).slice(0, 40),
     nuLogradouroPagador: String(boleto.pagador_numero ?? '').slice(0, 10),
     complementoLogradouroPagador: '',
     cepPagador: Number(so(boleto.pagador_cep).slice(0, 5)) || 0,

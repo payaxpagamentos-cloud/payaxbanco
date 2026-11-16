@@ -150,6 +150,7 @@ function criarIxc({ url, token, timeoutMs = config.ixc.timeoutMs }) {
         cep: digitos(c.cep),
         endereco: c.endereco ?? null,
         numero: c.numero ?? null,
+        complemento: c.complemento ?? null,
         bairro: c.bairro ?? null,
         cidade: c.cidade_nome ?? c.cidade ?? null,
         uf: c.estado ?? c.uf ?? null,

@@ -389,6 +389,7 @@ function camposCadastro(c = {}) {
       campo({ nome: 'cep', rotulo: 'CEP', valor: c.cep ?? '' }),
       campo({ nome: 'endereco', rotulo: 'Endereço', valor: c.endereco ?? '' }),
       campo({ nome: 'numero', rotulo: 'Número', valor: c.numero ?? '' }),
+      campo({ nome: 'complemento', rotulo: 'Complemento', valor: c.complemento ?? '' }),
       campo({ nome: 'bairro', rotulo: 'Bairro', valor: c.bairro ?? '' }),
       campo({ nome: 'cidade', rotulo: 'Cidade', valor: c.cidade ?? '' }),
       campo({ nome: 'uf', rotulo: 'UF', valor: c.uf ?? '', atributos: { maxlength: 2, style: 'text-transform:uppercase' } })),

@@ -157,6 +157,7 @@ async function importarAgora(db, cliente, { de, ate, limite = 200, maxPaginas = 
             pagador_cep: p.cep,
             pagador_endereco: p.endereco,
             pagador_numero: p.numero,
+            pagador_complemento: p.complemento,
             pagador_bairro: p.bairro,
             pagador_cidade: p.cidade,
             pagador_uf: p.uf,

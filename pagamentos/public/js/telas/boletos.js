@@ -80,6 +80,7 @@ export function emitir(clientes, recarregar, clienteFixo = null) {
       campo({ nome: 'pagador_cep', rotulo: 'CEP' }),
       campo({ nome: 'pagador_endereco', rotulo: 'Endereço' }),
       campo({ nome: 'pagador_numero', rotulo: 'Número' }),
+      campo({ nome: 'pagador_complemento', rotulo: 'Complemento', atributos: { maxlength: 40, placeholder: 'Apto, bloco, sala' } }),
       campo({ nome: 'pagador_bairro', rotulo: 'Bairro' }),
       campo({ nome: 'pagador_cidade', rotulo: 'Cidade' }),
       campo({ nome: 'pagador_uf', rotulo: 'UF', atributos: { maxlength: 2, style: 'text-transform:uppercase' } })),
@@ -98,7 +99,7 @@ export function emitir(clientes, recarregar, clienteFixo = null) {
     pagador_endereco: 'endereco', pagador_bairro: 'bairro', pagador_cidade: 'cidade', pagador_uf: 'uf',
   } });
   autoPreencher(form, api, { tipo: 'cnpj', campo: 'pagador_documento', mapa: {
-    pagador_nome: 'razao_social', pagador_cep: 'cep', pagador_endereco: 'endereco', pagador_numero: 'numero',
+    pagador_nome: 'razao_social', pagador_cep: 'cep', pagador_endereco: 'endereco', pagador_numero: 'numero', pagador_complemento: 'complemento',
     pagador_bairro: 'bairro', pagador_cidade: 'cidade', pagador_uf: 'uf',
   } });
 
