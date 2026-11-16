@@ -63,7 +63,8 @@ conferir() {
   printf '\n\033[1m%s\033[0m\n' "$dom"
 
   # 1. O sistema, aqui dentro.
-  if curl -s --max-time 10 -H "Host: $dom" "http://127.0.0.1:$PORTA/" | grep -q "$marca"; then ok "o sistema responde $dom"
+  # Sem "curl | grep -q": o grep sai na primeira linha, o curl leva SIGPIPE e o pipefail acusa falha.
+  if grep -q "$marca" <<<"$(curl -s --max-time 10 -H "Host: $dom" "http://127.0.0.1:$PORTA/")"; then ok "o sistema responde $dom"
   else
     falha "o sistema não responde $dom (confira: systemctl status payax-pagamentos; PAYAX_SITE_HOSTS no $ENV)"
     return
@@ -94,7 +95,7 @@ conferir() {
   fi
 
   # 5. HTTPS: emite o certificado se faltar (só funciona com o DNS certo).
-  if curl -s --max-time 10 -o /dev/null -w '%{ssl_verify_result}' --resolve "$dom:443:$IP_NGINX" "https://$dom/" 2>/dev/null | grep -qx 0; then
+  if [[ "$(curl -s --max-time 10 -o /dev/null -w '%{ssl_verify_result}' --resolve "$dom:443:$IP_NGINX" "https://$dom/" 2>/dev/null)" == 0 ]]; then
     ok "HTTPS ativo em $dom"
   else
     local apelido=""; [[ "$www" == www && " $ips_www " == *" $IP_SERVIDOR "* ]] && apelido="www.$dom"
