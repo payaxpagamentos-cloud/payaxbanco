@@ -263,8 +263,7 @@ async function abaAcessos(alvo, c, query, recarregar) {
           const r = await confirmar({ titulo: 'Redefinir senha', texto: `Gerar nova senha provisória para ${a.nome}?`, confirmarTexto: 'Gerar' });
           if (!r) return;
           const out = await api.patch(`/clientes/${c.id}/acessos/${a.id}`, { redefinir_senha: true });
-          modal({ titulo: 'Senha provisória', corpo: [el('p', {}, `Entregue esta senha a ${a.nome}. Ela será trocada no primeiro acesso.`),
-            el('div', { class: 'codigo' }, out.senha_provisoria)], acoes: [el('button', { class: 'botao', onclick: () => copiar(out.senha_provisoria) }, 'Copiar')] });
+          mostrarAcesso(c, { nome: a.nome, email: a.email, senha: out.senha_provisoria }, 'Nova senha provisória');
         }) }, 'Redefinir senha') },
       ],
       itens: c.acessos,
@@ -311,6 +310,21 @@ async function abaAcessos(alvo, c, query, recarregar) {
   );
 }
 
+/** Dados de acesso prontos para mandar ao cliente: endereço, e-mail e senha provisória, com um botão para copiar tudo. */
+function mostrarAcesso(c, { nome, email, senha }, titulo) {
+  const url = c.area_cliente_url.startsWith('http') ? c.area_cliente_url : `${location.origin}${c.area_cliente_url}`;
+  const texto = `Olá, ${nome}! Seu acesso à Área do Cliente PAY AX:\n\nEndereço: ${url}\nE-mail: ${email}\nSenha provisória: ${senha}\n\nNo primeiro acesso, o sistema pede para você criar a sua própria senha.`;
+  const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
+  modal({ titulo, corpo: [
+    el('p', {}, `Mande estes dados para ${nome}. A senha provisória só aparece agora e é trocada no primeiro acesso.`),
+    el('div', { class: 'pares', style: 'margin-top:12px;grid-template-columns:1fr;gap:10px;overflow-wrap:anywhere' },
+      par('Endereço', url), par('E-mail (login)', email), par('Senha provisória', el('span', { class: 'codigo', style: 'font-size:15px' }, senha))),
+  ], acoes: [
+    el('button', { class: 'botao sec', onclick: () => copiar(senha, 'Senha copiada.') }, icone('copiar'), 'Copiar só a senha'),
+    el('button', { class: 'botao', onclick: () => copiar(texto, 'Mensagem copiada: é só colar no WhatsApp ou no e-mail.') }, icone('copiar'), 'Copiar mensagem para o cliente'),
+  ] });
+}
+
 function novoAcesso(c, recarregar) {
   const form = el('form', { class: 'linha-form', onsubmit: (e) => e.preventDefault() },
     campo({ nome: 'nome', rotulo: 'Nome', obrigatorio: true }),
@@ -320,10 +334,7 @@ function novoAcesso(c, recarregar) {
   botao.addEventListener('click', () => acao(botao, async () => {
     const out = await api.post(`/clientes/${c.id}/acessos`, lerForm(form));
     m.fechar();
-    modal({ titulo: 'Acesso criado', corpo: [
-      el('p', {}, `Entregue esta senha provisória a ${out.nome}. Ela será trocada no primeiro acesso.`),
-      el('div', { class: 'codigo' }, out.senha_provisoria),
-    ], acoes: [el('button', { class: 'botao', onclick: () => copiar(out.senha_provisoria) }, icone('copiar'), 'Copiar senha')] });
+    mostrarAcesso(c, { nome: out.nome, email: out.email, senha: out.senha_provisoria }, 'Acesso criado');
     recarregar();
   }));
   const m = modal({ titulo: 'Novo acesso à Área do Cliente', corpo: form,

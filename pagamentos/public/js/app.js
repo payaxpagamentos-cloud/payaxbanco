@@ -49,10 +49,15 @@ const rotaAtual = () => {
   return { rota: partes[0] || 'visao', params: partes.slice(1), query: Object.fromEntries(new URLSearchParams(busca)) };
 };
 
-async function desenhar() {
+/**
+ * Desenha a tela da rota atual. Ao trocar de tela, as janelas abertas saem; ao só recarregar a mesma tela
+ * depois de uma ação (manterJanelas), ficam — senão a janela com o resultado (ex.: a senha provisória
+ * de um acesso novo) sumia no mesmo instante em que aparecia.
+ */
+async function desenhar({ manterJanelas = false } = {}) {
   for (const f of limpeza) { try { f(); } catch { /* ignora */ } }
   limpeza = [];
-  for (const m of document.querySelectorAll('.modal-fundo')) m.remove();
+  if (!manterJanelas) for (const m of document.querySelectorAll('.modal-fundo')) m.remove();
   if (!api.sessao.get()?.token) return telaEntrada();
   if (usuario()?.senha_provisoria) return trocarSenhaObrigatoria();
   // Com a exigência ligada, não se trabalha sem a segunda etapa configurada.
@@ -68,7 +73,7 @@ async function desenhar() {
   limpar(raiz, estrutura(rota, principal));
   try {
     const mod = await ROTAS[rota].mod();
-    await mod.default({ alvo: principal, params, query, ir, aoSair: (f) => limpeza.push(f), recarregar: () => desenhar() });
+    await mod.default({ alvo: principal, params, query, ir, aoSair: (f) => limpeza.push(f), recarregar: () => desenhar({ manterJanelas: true }) });
   } catch (err) {
     console.error(err);
     limpar(principal, el('div', { class: 'falha' }, `Não foi possível abrir a tela: ${err.message}`));

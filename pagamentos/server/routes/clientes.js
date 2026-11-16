@@ -135,7 +135,8 @@ module.exports = (db) => {
       agenda: razao.agenda(db, c.id, data, 30),
       acessos: db.prepare('SELECT id, nome, email, perfil, ativo, senha_provisoria, ultimo_acesso FROM usuarios_cliente WHERE cliente_id = ? ORDER BY nome').all(c.id),
       // Endereço que a equipe passa ao cliente junto com o acesso.
-      area_cliente_url: `${config.urlPublica || ''}${config.clientePath}/`,
+      // O cliente entra pelo site (payax.com.br, login no topo); sem site configurado, pela Área do Cliente direta.
+      area_cliente_url: config.siteHosts.length ? `https://${config.siteHosts[0]}/` : `${config.urlPublica || ''}${config.clientePath}/`,
       // Sistema de gestão do cliente (hoje, o IXC): configuração (sem o token), status e os últimos sincronismos dele.
       ixc: (() => {
         const i = db.prepare("SELECT estado, config, credenciais, ultimo_teste, ultimo_erro FROM integracoes WHERE escopo = 'ixc' AND cliente_id = ?").get(c.id);
