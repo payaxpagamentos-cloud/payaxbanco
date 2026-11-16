@@ -152,6 +152,7 @@ input, select, textarea {
 input:disabled, select:disabled { background: var(--superficie-2); color: var(--texto-3); }
 textarea { min-height: 76px; resize: vertical; }
 .linha-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.linha-form.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .linha-form.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .linha-form.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .linha-form .span-2 { grid-column: span 2; }

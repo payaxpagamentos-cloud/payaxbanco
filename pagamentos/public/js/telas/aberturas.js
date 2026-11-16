@@ -9,7 +9,7 @@ import {
   toast, modal, dinheiro,
 } from '../../comum/ui.js';
 import { mostrarAtivacao } from './clientes.js';
-import { fichaPreco, formPreco } from './precos-comum.js';
+import { tarifaBoleto, tarifaBolepix } from './precos-comum.js';
 
 const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val || '—'));
 const TIPO_CONTA = { corrente: 'Conta corrente', pagamento: 'Conta de pagamento', poupanca: 'Poupança' };
@@ -17,8 +17,6 @@ const TIPO_PIX = { cnpj: 'CNPJ', email: 'E-mail', telefone: 'Celular', aleatoria
 const BANCOS = { 237: 'Bradesco', '001': 'Banco do Brasil', 104: 'Caixa', 341: 'Itaú', '033': 'Santander', '077': 'Inter', 260: 'Nubank', 336: 'C6 Bank', 748: 'Sicredi', 756: 'Sicoob' };
 const INTERACAO = { nota: 'Anotação', ligacao: 'Ligação', email: 'E-mail', whatsapp: 'WhatsApp', reuniao: 'Reunião', sistema: 'Sistema' };
 const ICONE_INTERACAO = { nota: 'relatorio', ligacao: 'fone', email: 'info', whatsapp: 'fone', reuniao: 'pessoas', sistema: 'relogio' };
-const SISTEMA = { nenhum: 'Não usa / emite pela PAY AX', ixc: 'IXC Provedor', outro: 'Outro sistema' };
-const ENTREGA = { padrao: 'Padrão do convênio (rateio pelo banco, PIX se não der)', pix: 'Sempre PIX da PAY AX' };
 const tamanho = (b) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const reais = (c) => (c === null || c === undefined ? '' : (c / 100).toFixed(2).replace('.', ','));
 const diasDesde = (iso) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
@@ -265,40 +263,32 @@ function blocoProposta(s, recarregar) {
     icone(p ? 'config' : 'mais'), p ? 'Alterar proposta' : 'Definir proposta') : null;
   if (!p) {
     return cartao('Proposta comercial', el('p', { class: 'sub' },
-      'Tarifas, limites e condições que valem para o cliente quando a conta abrir. Defina antes de aprovar.'), botao);
+      'A Tarifa Boleto, a Tarifa Bolepix e os limites que valem para o cliente quando a conta abrir. Defina antes de aprovar.'), botao);
   }
   return cartao('Proposta comercial', el('div', {},
-    fichaPreco(p.preco),
-    el('h3', { class: 'crm-sub' }, 'Limites e condições'),
-    el('div', { class: 'pares cols-3' },
+    el('div', { class: 'pares cols-4' },
+      par('Tarifa Boleto', el('strong', {}, dinheiro(tarifaBoleto(p.preco)))),
+      par('Tarifa Bolepix', el('strong', {}, dinheiro(tarifaBolepix(p.preco)))),
       par('Limite por boleto', dinheiro(p.limite_boleto_centavos)),
-      par('Limite de emissão no mês', p.limite_mensal_centavos ? dinheiro(p.limite_mensal_centavos) : 'sem limite'),
-      par('Como recebe', ENTREGA[p.entrega] ?? p.entrega),
-      par('Faturamento mensal informado', p.faturamento_mensal_centavos ? dinheiro(p.faturamento_mensal_centavos) : ''),
-      par('Boletos por mês (estimado)', p.boletos_mes !== null ? numero(p.boletos_mes) : ''),
-      par('Sistema de gestão', SISTEMA[p.sistema] ?? p.sistema)),
+      par('Limite no mês', p.limite_mensal_centavos ? dinheiro(p.limite_mensal_centavos) : 'sem limite')),
     p.observacao ? el('p', { class: 'crm-obs' }, p.observacao) : null,
     el('p', { class: 'sub', style: 'margin-top:10px' }, `Definida por ${p.definida_por} em ${dataHora(p.definida_em)}.`)), botao);
 }
 
+/** Proposta: só a Tarifa Boleto, a Tarifa Bolepix, os limites e o que foi combinado. */
 async function definirProposta(s, recarregar) {
   const p = s.proposta;
   const base = p?.preco ?? (await api.get('/contas/precos-padrao')).vigente;
-  const form = formPreco(base);
-  // A vigência é o dia em que a conta abrir; a observação da tabela fica na proposta.
-  form.querySelector('[name="vigencia_inicio"]')?.closest('.campo-form')?.remove();
-  form.append(
-    el('h3', { style: 'font-size:13px;font-weight:650;margin:18px 0 8px' }, 'Limites e condições'),
-    el('div', { class: 'linha-form cols-3' },
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    el('input', { type: 'hidden', name: 'bolepix_proprio', value: '1' }),
+    el('div', { class: 'linha-form cols-2' },
+      campo({ nome: 'tarifa_fixa', rotulo: 'Tarifa Boleto', tipo: 'dinheiro', valor: reais(tarifaBoleto(base)), obrigatorio: true, ajuda: 'Por boleto pago' }),
+      campo({ nome: 'bolepix_tarifa_fixa', rotulo: 'Tarifa Bolepix', tipo: 'dinheiro', valor: reais(tarifaBolepix(base)), obrigatorio: true, ajuda: 'Por Bolepix pago' })),
+    el('div', { class: 'linha-form cols-2', style: 'margin-top:12px' },
       campo({ nome: 'limite_boleto', rotulo: 'Limite por boleto', tipo: 'dinheiro', valor: reais(p?.limite_boleto_centavos ?? 5000000), obrigatorio: true }),
-      campo({ nome: 'limite_mensal', rotulo: 'Limite de emissão no mês', tipo: 'dinheiro', valor: reais(p?.limite_mensal_centavos), ajuda: 'Vazio = sem limite mensal' }),
-      campo({ nome: 'entrega', rotulo: 'Como recebe', tipo: 'select', valor: p?.entrega ?? 'padrao', opcoes: Object.entries(ENTREGA) })),
-    el('div', { class: 'linha-form cols-3', style: 'margin-top:12px' },
-      campo({ nome: 'faturamento_mensal', rotulo: 'Faturamento mensal informado', tipo: 'dinheiro', valor: reais(p?.faturamento_mensal_centavos), ajuda: 'Para o PLD: volume compatível' }),
-      campo({ nome: 'boletos_mes', rotulo: 'Boletos por mês (estimado)', valor: p?.boletos_mes ?? '', atributos: { inputmode: 'numeric' } }),
-      campo({ nome: 'sistema', rotulo: 'Sistema de gestão', tipo: 'select', valor: p?.sistema ?? 'nenhum', opcoes: Object.entries(SISTEMA) })),
-    el('div', { style: 'margin-top:12px' }, campo({ nome: 'observacao_proposta', rotulo: 'Condições combinadas', tipo: 'textarea', valor: p?.observacao ?? '',
-      atributos: { maxlength: 500, placeholder: 'Ex.: tarifa revisada em 6 meses conforme o volume.' } })));
+      campo({ nome: 'limite_mensal', rotulo: 'Limite de emissão no mês', tipo: 'dinheiro', valor: reais(p?.limite_mensal_centavos), ajuda: 'Vazio = sem limite' })),
+    el('div', { style: 'margin-top:12px' }, campo({ nome: 'observacao_proposta', rotulo: 'Condições combinadas (opcional)', tipo: 'textarea', valor: p?.observacao ?? '',
+      atributos: { maxlength: 500, rows: 2 } })));
   const botao = el('button', { class: 'botao' }, 'Salvar proposta');
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.put(`/aberturas/${s.id}/proposta`, lerForm(form));
@@ -306,7 +296,7 @@ async function definirProposta(s, recarregar) {
     toast('Proposta salva.', 'ok');
     recarregar();
   }));
-  const m = modal({ titulo: 'Proposta comercial: tarifas e limites', corpo: form, largo: true,
+  const m = modal({ titulo: 'Proposta comercial', corpo: form,
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 
