@@ -508,9 +508,12 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
   done
   # $1 = domínio; $2 = "www" para manter o www como apelido (site público).
   publicar() {
-    local dom="$1" www="$2"
-    # Domínio que já existe no Hestia (ex.: o site antigo, de outro usuário do painel): usa o dono dele.
-    local u; u="$(v-search-domain-owner "$dom" web 2>/dev/null || true)"; [[ -n "$u" ]] || u="$HESTIA_USUARIO"
+    local dom="$1" www="${2:-}"
+    # Domínio que já existe no Hestia (site, e-mail ou DNS de outro usuário do painel): usa o dono dele,
+    # porque o Hestia não deixa outro usuário criar o mesmo domínio.
+    local u; u="$(v-search-domain-owner "$dom" web 2>/dev/null || true)"
+    [[ -n "$u" ]] || u="$(v-search-domain-owner "$dom" 2>/dev/null || true)"
+    [[ -n "$u" ]] || u="$HESTIA_USUARIO"
     if ! v-list-web-domain "$u" "$dom" plain >/dev/null 2>&1; then
       v-add-web-domain "$u" "$dom" "" no
       [[ "$www" == www ]] || v-delete-web-domain-alias "$u" "$dom" "www.$dom" no 2>/dev/null || true
@@ -528,7 +531,7 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
     fi
   }
   publicar "$DOMINIO"
-  if [[ -n "$SITE" ]]; then passo "Publicando o site ($SITE e www.$SITE)"; publicar "$SITE" www; fi
+  if [[ -n "$SITE" ]]; then passo "Publicando o site ($SITE e www.$SITE)"; publicar "$SITE" www || echo "O site não foi publicado agora: a conferência abaixo tenta de novo."; fi
 else
   systemctl restart caddy
 fi
@@ -583,8 +586,12 @@ else
 fi
 fi
 
+# Confere cada endereço (sistema, site e www) e corrige o que der: domínio no Hestia, encaminhamento, HTTPS.
+[[ -n "$HESTIA_USUARIO" ]] && bash "$(dirname "$0")/verificar.sh" || true
+
 passo "Pronto"
 echo "Endereço: https://$DOMINIO/   (Área do Cliente: https://$DOMINIO/cliente/)"
+[[ -n "$SITE" ]] && echo "Site:     https://$SITE/   (com o acesso da Área do Cliente)"
 echo "Saúde:    https://$DOMINIO/api/saude"
 if [[ $NOVO -eq 1 ]]; then
   echo "Administrador: $EMAIL_ADMIN"
