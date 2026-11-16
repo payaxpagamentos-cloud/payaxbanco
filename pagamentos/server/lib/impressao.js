@@ -111,7 +111,7 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   .folha { position: relative; }
   /* Quem cobra, antes de tudo: é o nome que o pagador reconhece. */
   .topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-  .topo img { height: 9mm; width: auto; display: block; }
+  .topo img { height: 5.5mm; width: auto; display: block; }
   .topo span { font-size: 9.5px; color: #333; text-align: right; }
   .cobrador { display: flex; align-items: stretch; gap: 14px; border: 2px solid #000; border-radius: 4px; padding: 10px 12px; margin-bottom: 12px; }
   .cobrador .quem { flex: 1; min-width: 0; }
@@ -131,7 +131,7 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   .marca-teste { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; overflow: hidden; }
   .marca-teste span { transform: rotate(-28deg); font: 700 50px/1 Arial; color: rgba(204, 9, 47, 0.13); letter-spacing: 3px; white-space: nowrap; border: 6px solid rgba(204, 9, 47, 0.13); padding: 10px 26px; }
   .banco { display: flex; align-items: flex-end; gap: 10px; border-bottom: 2px solid #000; padding-bottom: 3px; }
-  .logo { font: 700 22px/1 Arial; letter-spacing: -0.5px; color: #cc092f; }
+  .logo { font: 700 20px/1 Arial; letter-spacing: -0.3px; color: #000; }
   .cod { font: 700 17px/1 Arial; border-left: 2px solid #000; border-right: 2px solid #000; padding: 2px 8px; }
   .linha-dig { font: 700 15px/1 Arial; margin-left: auto; letter-spacing: 0.2px; }
   .titulo-via { text-align: right; font-size: 10px; color: #444; padding: 2px 0 4px; }
