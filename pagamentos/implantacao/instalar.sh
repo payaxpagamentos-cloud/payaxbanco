@@ -17,7 +17,8 @@
 #   ./implantacao/instalar.sh ... --sem-copia-externa   (só testes: sem cópia fora do servidor; ligar depois
 #                                                        rodando de novo com --bucket/--endpoint, sem reinstalar)
 #   ./implantacao/instalar.sh ... --site payax.com.br   (site público com o acesso da Área do Cliente, e o www)
-#   ./implantacao/instalar.sh ... --hestia admin   (servidor que já tem HestiaCP: publica como domínio do Hestia,
+#   ./implantacao/instalar.sh ... --hestia auto    (servidor que já tem HestiaCP: publica como domínio do Hestia,
+#                                                    "auto" = o usuário dono do domínio; ou o nome do usuário;
 #                                                    sem Caddy e sem mexer no firewall, nos sites ou no e-mail)
 #   ./implantacao/instalar.sh ... --reserva
 #   ./implantacao/instalar.sh ... --anterior-desligado   (servidor novo no lugar de um que caiu)
@@ -250,7 +251,18 @@ passo "Conferindo o que já roda neste servidor"
 if [[ -n "$HESTIA_USUARIO" ]]; then
   export HESTIA=/usr/local/hestia PATH="$PATH:/usr/local/hestia/bin"
   [[ -x /usr/local/hestia/bin/v-list-users ]] || { echo "Este servidor não tem HestiaCP. Rode sem --hestia." >&2; exit 1; }
-  v-list-user "$HESTIA_USUARIO" plain >/dev/null 2>&1 || { echo "Usuário do Hestia '$HESTIA_USUARIO' não existe (veja: v-list-users)." >&2; exit 1; }
+  # Usuário do Hestia: "auto" (ou um nome que não existe) usa o dono do domínio do sistema, se ele já estiver no Hestia.
+  if [[ "$HESTIA_USUARIO" == auto ]] || ! v-list-user "$HESTIA_USUARIO" plain >/dev/null 2>&1; then
+    dono="$(v-search-domain-owner "$DOMINIO" web 2>/dev/null || true)"
+    if [[ -n "$dono" ]] && v-list-user "$dono" plain >/dev/null 2>&1; then
+      [[ "$HESTIA_USUARIO" == auto ]] || echo "Usuário do Hestia '$HESTIA_USUARIO' não existe; usando '$dono', dono de $DOMINIO."
+      HESTIA_USUARIO="$dono"
+    else
+      echo "Usuário do Hestia '$HESTIA_USUARIO' não existe. Usuários deste servidor:" >&2
+      v-list-users plain 2>/dev/null | cut -f1 >&2 || true
+      exit 1
+    fi
+  fi
   ss -Htlnp "( sport = :$PORTA )" | grep -qv node && { echo "A porta $PORTA já está em uso neste servidor." >&2; exit 1; } || true
   echo "HestiaCP encontrado: o sistema será publicado como o domínio $DOMINIO do usuário $HESTIA_USUARIO."
   echo "Sites, e-mail, firewall e painel do Hestia continuam como estão."
@@ -497,18 +509,22 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
   # $1 = domínio; $2 = "www" para manter o www como apelido (site público).
   publicar() {
     local dom="$1" www="$2"
-    if ! v-list-web-domain "$HESTIA_USUARIO" "$dom" plain >/dev/null 2>&1; then
-      v-add-web-domain "$HESTIA_USUARIO" "$dom" "" no
-      [[ "$www" == www ]] || v-delete-web-domain-alias "$HESTIA_USUARIO" "$dom" "www.$dom" no 2>/dev/null || true
+    # Domínio que já existe no Hestia (ex.: o site antigo, de outro usuário do painel): usa o dono dele.
+    local u; u="$(v-search-domain-owner "$dom" web 2>/dev/null || true)"; [[ -n "$u" ]] || u="$HESTIA_USUARIO"
+    if ! v-list-web-domain "$u" "$dom" plain >/dev/null 2>&1; then
+      v-add-web-domain "$u" "$dom" "" no
+      [[ "$www" == www ]] || v-delete-web-domain-alias "$u" "$dom" "www.$dom" no 2>/dev/null || true
     fi
-    v-change-web-domain-proxy-tpl "$HESTIA_USUARIO" "$dom" payax "" yes
+    # Site: o www precisa estar como apelido (para o nginx atender e o certificado cobrir).
+    [[ "$www" == www ]] && { v-add-web-domain-alias "$u" "$dom" "www.$dom" no 2>/dev/null || true; }
+    v-change-web-domain-proxy-tpl "$u" "$dom" payax "" yes
     local apelidos=""; [[ "$www" == www ]] && apelidos="www.$dom"
-    if v-add-letsencrypt-domain "$HESTIA_USUARIO" "$dom" "$apelidos" 2>/dev/null || v-list-web-domain-ssl "$HESTIA_USUARIO" "$dom" plain 2>/dev/null | grep -q .; then
-      v-add-web-domain-ssl-force "$HESTIA_USUARIO" "$dom" 2>/dev/null || true
+    if v-add-letsencrypt-domain "$u" "$dom" "$apelidos" 2>/dev/null || v-list-web-domain-ssl "$u" "$dom" plain 2>/dev/null | grep -q .; then
+      v-add-web-domain-ssl-force "$u" "$dom" 2>/dev/null || true
       echo "HTTPS ativo em $dom (Let's Encrypt, renovado pelo Hestia)."
     else
       printf '\033[1;33mHTTPS ainda não emitido: o DNS de %s%s precisa apontar para este servidor.\033[0m\n' "$dom" "${apelidos:+ e $apelidos}"
-      echo "Quando apontar, rode: v-add-letsencrypt-domain $HESTIA_USUARIO $dom${apelidos:+ $apelidos} && v-add-web-domain-ssl-force $HESTIA_USUARIO $dom"
+      echo "Quando apontar, rode: v-add-letsencrypt-domain $u $dom${apelidos:+ $apelidos} && v-add-web-domain-ssl-force $u $dom"
     fi
   }
   publicar "$DOMINIO"
