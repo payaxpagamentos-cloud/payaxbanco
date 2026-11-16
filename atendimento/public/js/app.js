@@ -304,7 +304,7 @@ const GUARDA_EMAIL = 'atend.email';
  */
 function telaEntrada() {
   const IMG = 'img/login';
-  document.title = empresaDoEndereco ? `${empresaDoEndereco.nome} · ZOE 360°` : 'ZOE 360° · Acesso';
+  document.title = empresaDoEndereco ? `${empresaDoEndereco.nome} · ZOE 360` : 'ZOE 360 — Acesso';
   let lembrado = '';
   try { lembrado = localStorage.getItem(GUARDA_EMAIL) ?? ''; } catch { /* sem armazenamento */ }
 
@@ -368,15 +368,15 @@ function telaEntrada() {
 
   limpar(raiz, el('div', { class: 'zoe-login-page' },
     el('main', { class: 'zoe-shell' },
-      el('section', { class: 'zoe-hero', 'aria-label': 'ZOE 360°' },
-        el('div', { class: 'zoe-brand', role: 'img', 'aria-label': 'ZOE 360°' },
+      el('section', { class: 'zoe-hero', 'aria-label': 'ZOE 360' },
+        el('div', { class: 'zoe-brand', role: 'img', 'aria-label': 'ZOE 360' },
           el('img', { src: `${IMG}/zoe-symbol.svg`, width: '44', height: '44', alt: '' }),
-          el('span', { class: 'zoe-wordmark', 'aria-hidden': 'true' }, 'ZOE', el('span', {}, '360°'))),
+          el('span', { class: 'zoe-wordmark', 'aria-hidden': 'true' }, 'ZOE', el('span', {}, '360'))),
         el('p', { class: 'zoe-hero-title' }, el('span', {}, 'Tudo conectado.'), el('span', {}, 'Você no controle.')),
         el('p', { class: 'zoe-hero-description' }, 'Inteligência para conectar pessoas e negócios.'),
         el('div', { class: 'zoe-orb-stage', 'aria-hidden': 'true' },
           el('img', { class: 'zoe-orb', src: `${IMG}/zoe-orb.png`, width: '1440', height: '1080', alt: '', draggable: 'false' })),
-        el('p', { class: 'zoe-copyright' }, `© ${ano} `, el('strong', {}, 'ZOE 360°'))),
+        el('p', { class: 'zoe-copyright' }, `© ${ano} `, el('strong', {}, 'ZOE 360'))),
       el('section', { class: 'zoe-card', 'aria-labelledby': 'login-title' },
         el('header', { class: 'zoe-card-header' },
           el('img', { class: 'zoe-card-icon', src: `${IMG}/zoe-symbol.svg`, width: '38', height: '38', alt: '' }),
@@ -390,7 +390,7 @@ function telaEntrada() {
             'Entre com a senha que receber e troque por uma sua clicando no seu nome, no alto do painel.') }, 'Esqueceu sua senha?'),
           el('button', { class: 'zoe-text-button', type: 'button', onclick: () => abrirAjuda('Fale com o administrador',
             'O administrador da sua empresa cuida dos acessos: cria usuários, libera permissões e define senhas novas.') }, 'Fale com o administrador'))),
-      el('footer', { class: 'zoe-mobile-footer' }, `© ${ano} `, el('strong', {}, 'ZOE 360°'))),
+      el('footer', { class: 'zoe-mobile-footer' }, `© ${ano} `, el('strong', {}, 'ZOE 360'))),
     ajuda));
   (lembrado ? senha : email).focus({ preventScroll: true });
 }
