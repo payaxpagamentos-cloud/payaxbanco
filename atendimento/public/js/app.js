@@ -298,6 +298,7 @@ const GUARDA_EMAIL = 'atend.email';
  */
 function telaEntrada() {
   const IMG = 'img/login';
+  document.title = 'ZOE 360° · Entrar';
   let lembrado = '';
   try { lembrado = localStorage.getItem(GUARDA_EMAIL) ?? ''; } catch { /* sem armazenamento */ }
 
@@ -372,10 +373,10 @@ function telaEntrada() {
   limpar(raiz, el('main', { class: 'zoe-login' },
     el('div', { class: 'zoe-ambient', 'aria-hidden': 'true' }),
     el('div', { class: 'zoe-layout' },
-      el('section', { class: 'zoe-hero', 'aria-label': 'ZOE Atende' },
-        el('div', { class: 'zoe-brand', 'aria-label': 'ZOE Atende' },
+      el('section', { class: 'zoe-hero', 'aria-label': 'ZOE 360°' },
+        el('div', { class: 'zoe-brand', 'aria-label': 'ZOE 360° Atende' },
           el('img', { src: `${IMG}/zoe-mark.svg`, alt: '', width: '82', height: '82' }),
-          el('div', { class: 'zoe-wordmark' }, el('strong', {}, 'ZOE'), el('small', {}, 'ATENDE'))),
+          el('div', { class: 'zoe-wordmark' }, el('strong', {}, 'ZOE', el('span', { class: 'zoe-360' }, '360°')), el('small', {}, 'ATENDE'))),
         el('div', { class: 'zoe-hero-copy' },
           el('h1', { class: 'zoe-headline' }, el('span', {}, 'Sua operação.'), el('span', { class: 'zoe-headline-accent' }, 'Em outro nível.')),
           el('p', { class: 'zoe-tagline' }, 'Inteligência para conectar pessoas e negócios.')),
@@ -393,7 +394,7 @@ function telaEntrada() {
             'O administrador da sua empresa cuida dos acessos: cria usuários, libera permissões e define senhas novas.',
             'Se você é o administrador da plataforma e perdeu o acesso, defina a senha direto no servidor com o comando zoe-senha.') }, 'Fale com o administrador')))),
     el('footer', { class: 'zoe-page-footer' },
-      el('div', { class: 'zoe-footer-brand' }, el('strong', {}, 'ZOE ATENDE'), el('span', {}, 'Gestão de atendimento')),
+      el('div', { class: 'zoe-footer-brand' }, el('strong', {}, 'ZOE 360°'), el('span', {}, 'Gestão de atendimento')),
       el('span', {}, 'Acesso à plataforma')),
     ajuda));
 

@@ -155,3 +155,7 @@
 .zoe-login .zoe-submit { font-size: 21px; font-weight: 650; }
 @media (max-height: 820px) and (min-width: 981px) { .zoe-login .zoe-submit { font-size: 19px; } }
 @media (max-width: 480px) { .zoe-login .zoe-submit { font-size: 19px; } }
+/* Marca ZOE 360°: o "360°" no mesmo degradê de "Em outro nível.", um pouco mais leve que o ZOE. */
+.zoe-login .zoe-wordmark strong { white-space: nowrap; }
+.zoe-login .zoe-360 { margin-left: .14em; letter-spacing: .06em; font-weight: 500; color: #b8bdff;
+  background: linear-gradient(95deg, #a9cfff, #bba3f6 92%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
