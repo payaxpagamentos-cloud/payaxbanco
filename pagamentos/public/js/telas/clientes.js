@@ -8,6 +8,7 @@ import { agendaLiberacao } from '../../comum/graficos.js';
 import { emitir } from './boletos.js';
 import { fichaPreco, formPreco, bolepixDe } from './precos-comum.js';
 import { blocoLogo } from '../../comum/logo.js';
+import { configurarSistema, importarSistema, testarSistema, nomeSistema } from './sistema-cliente.js';
 
 export default async function clientes({ alvo, params, query, recarregar }) {
   if (params[0]) return ficha(alvo, params[0], params[1] ?? 'resumo', query, recarregar);
@@ -246,7 +247,6 @@ function novoPreco(c, atual, recarregar) {
 async function abaAcessos(alvo, c, query, recarregar) {
   // Endereço da Área do Cliente, para passar ao cliente junto com o e-mail e a senha provisória.
   const url = c.area_cliente_url.startsWith('http') ? c.area_cliente_url : `${location.origin}${c.area_cliente_url}`;
-  const sistemas = { ixc: 'IXC Provedor' };
   montar(alvo, 
     cartao('Acessos à Área do Cliente', el('div', {},
       el('div', { class: 'endereco-area' },
@@ -279,15 +279,35 @@ async function abaAcessos(alvo, c, query, recarregar) {
 
     el('div', { style: 'margin-top:14px' }, cartao('Sistema de gestão do cliente',
       el('div', {},
-        el('div', { class: 'pares cols-4' },
-          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Sistema'), el('span', { class: 'val' }, c.ixc.estado === 'nao_configurada' && !c.ixc.url ? '—' : sistemas[c.ixc.sistema ?? 'ixc'])),
-          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Status'), el('span', { class: 'val' }, statusIntegracao({ estado: c.ixc.estado, configurada: Boolean(c.ixc.url) }))),
-          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Importação automática'), el('span', { class: 'val' }, c.ixc.importacao_automatica ? 'Ligada' : 'Desligada')),
+        el('div', { class: 'pares cols-3' },
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Sistema'), el('span', { class: 'val' }, c.ixc.configurada ? nomeSistema(c.ixc.config.sistema) : '—')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Status'), el('span', { class: 'val' }, statusIntegracao({ estado: c.ixc.estado, configurada: c.ixc.configurada }))),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Endereço'), el('span', { class: 'val' }, c.ixc.config.url ?? '—')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Importação automática'), el('span', { class: 'val' }, c.ixc.config.importacao_automatica ? 'Ligada (a cada 15 minutos)' : 'Desligada')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Quem monta o boleto'), el('span', { class: 'val' }, c.ixc.config.numeracao === 'ixc' ? 'O próprio sistema (a PAY AX registra)' : 'A PAY AX')),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Último teste'), el('span', { class: 'val' }, c.ixc.ultimo_teste ? dataHora(c.ixc.ultimo_teste) : '—'))),
         c.ixc.ultimo_erro ? el('div', { style: 'margin-top:10px' }, aviso(c.ixc.ultimo_erro, 'erro')) : null,
         el('p', { style: 'margin-top:10px;color:var(--texto-2);font-size:13px' },
-          'Importa os títulos do sistema do cliente e dá baixa nele quando o boleto é pago. Só aparecem os sistemas homologados pela PAY AX (hoje, o IXC). A configuração (sistema, endereço e token) fica em Integrações.')),
-      el('a', { class: 'botao sec', href: '#/integracoes' }, icone('plugue'), 'Configurar'))),
+          'Importa os títulos do sistema do cliente e dá baixa nele quando o boleto é pago. Só aparecem os sistemas homologados pela PAY AX.'),
+        c.ixc.sincronismos?.length ? el('div', { style: 'margin-top:12px' }, tabela({
+          colunas: [
+            { titulo: 'Quando', conteudo: (x) => dataHora(x.inicio) },
+            { titulo: 'O quê', conteudo: (x) => ({ importacao: 'Importação', baixa: 'Baixa no sistema', teste: 'Teste' }[x.tipo] ?? x.tipo) },
+            { titulo: 'Lidos', dir: true, conteudo: (x) => numero(x.lidos) },
+            { titulo: 'Boletos criados', dir: true, conteudo: (x) => numero(x.criados) },
+            { titulo: 'Ignorados', dir: true, conteudo: (x) => numero(x.ignorados) },
+            { titulo: 'Erros', dir: true, conteudo: (x) => el('span', { style: x.erros ? 'color:var(--vermelho);font-weight:600' : '' }, numero(x.erros)) },
+          ],
+          itens: c.ixc.sincronismos,
+          aoClicar: (x) => (x.detalhe ? modal({ titulo: 'Detalhe', corpo: el('div', { class: 'codigo' }, x.detalhe) }) : null),
+        })) : null),
+      el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
+        c.ixc.configurada && (pode('integracoes.ixc') || pode('*'))
+          ? el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, () => testarSistema(c, recarregar)) }, icone('atualizar'), 'Testar') : null,
+        c.ixc.configurada && pode('boletos.emitir')
+          ? el('button', { class: 'botao sec', onclick: () => importarSistema(c, recarregar) }, icone('importar'), 'Importar títulos') : null,
+        pode('integracoes.ixc') || pode('*')
+          ? el('button', { class: 'botao', onclick: () => configurarSistema(c, { config: c.ixc.config, configurada: c.ixc.configurada }, recarregar) }, icone('config'), 'Configurar') : null))),
   );
 }
 

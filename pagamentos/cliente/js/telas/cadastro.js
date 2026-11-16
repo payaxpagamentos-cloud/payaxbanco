@@ -5,16 +5,16 @@ import {
   dinheiro, numero, dataHora, data, documento, telefone, hojeIso, somarDias, R, icone
 } from '../../comum/ui.js';
 
-/** Dados da empresa, acessos e a integração com o IXC. */
+/** Dados da empresa, acessos e a ligação com o sistema de gestão da empresa. */
 export default async function cadastro({ alvo, query, recarregar, ir: navegar }) {
   const aba = query.aba ?? 'dados';
   montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Cadastro e acessos'),
-      el('p', {}, 'Os dados da sua empresa, quem acessa este painel e a ligação com o seu IXC.'))),
+      el('p', {}, 'Os dados da sua empresa, quem acessa este painel e a ligação com o seu sistema de gestão.'))),
     el('div', { class: 'abas' },
       el('button', { class: aba === 'dados' ? 'ativa' : '', onclick: () => navegar('#/cadastro?aba=dados') }, 'Dados da empresa'),
       pode('usuarios.gerenciar') ? el('button', { class: aba === 'usuarios' ? 'ativa' : '', onclick: () => navegar('#/cadastro?aba=usuarios') }, 'Acessos') : null,
-      el('button', { class: aba === 'ixc' ? 'ativa' : '', onclick: () => navegar('#/cadastro?aba=ixc') }, 'IXC')),
+      el('button', { class: aba === 'ixc' ? 'ativa' : '', onclick: () => navegar('#/cadastro?aba=ixc') }, 'Sistema')),
     el('div', { id: 'corpo' }));
   const corpo = alvo.querySelector('#corpo');
   if (aba === 'usuarios' && pode('usuarios.gerenciar')) await abaUsuarios(corpo, recarregar);
@@ -133,20 +133,22 @@ async function abaIxc(alvo, recarregar) {
   const d = await api.get('/ixc');
   const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
   montar(alvo, 
-    cartao('Integração com o IXC',
+    cartao('Sistema de gestão',
       el('div', {},
         d.configurada
-          ? el('div', { class: 'pares' },
+          ? el('div', { class: 'pares cols-3' },
+            par('Sistema', ({ ixc: 'IXC Provedor' })[d.config.sistema ?? 'ixc'] ?? '—'),
             par('Status', statusIntegracao({ estado: d.estado, configurada: d.configurada })),
             par('Endereço', d.config.url ?? '—'),
             par('Tipo do boleto', R.tipoBoleto[d.config.tipo_padrao] ?? '—'),
-            par('Importação automática', d.config.importacao_automatica ? 'Ligada (todo dia)' : 'Desligada'))
-          : aviso('O seu IXC ainda não está ligado à PAY AX. Peça ao seu gerente de conta para configurar o endereço e o token — depois disso, os títulos em aberto viram boletos aqui com um clique.', 'info'),
+            par('Importação automática', d.config.importacao_automatica ? 'Ligada (a cada 15 minutos)' : 'Desligada'),
+            par('Quem monta o boleto', d.config.numeracao === 'ixc' ? 'O próprio sistema (a PAY AX registra)' : 'A PAY AX'))
+          : aviso('O seu sistema de gestão ainda não está ligado à PAY AX. Peça ao seu gerente de conta para configurar o endereço e o token — depois disso, os títulos em aberto viram boletos aqui com um clique.', 'info'),
         d.ultimo_erro ? el('div', { style: 'margin-top:10px' }, aviso(d.ultimo_erro, 'erro')) : null),
       d.configurada ? el('div', { style: 'display:flex;gap:8px' },
         pode('ixc.configurar') ? el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
           const r = await api.post('/ixc/testar', {});
-          toast(`IXC respondeu · ${numero(r.clientes)} cliente(s) na base.`, 'ok');
+          toast(`Sistema respondeu · ${numero(r.clientes)} cliente(s) na base.`, 'ok');
           recarregar();
         }) }, icone('atualizar'), 'Testar conexão') : null,
         pode('boletos.emitir') ? el('button', { class: 'botao', onclick: () => importar(recarregar) }, icone('importar'), 'Importar títulos') : null) : null),
@@ -154,7 +156,7 @@ async function abaIxc(alvo, recarregar) {
     el('div', { style: 'margin-top:14px' }, cartao('Últimas importações e baixas', tabela({
       colunas: [
         { titulo: 'Quando', conteudo: (s) => dataHora(s.inicio) },
-        { titulo: 'Tipo', conteudo: (s) => ({ importacao: 'Importação', baixa: 'Baixa no IXC', teste: 'Teste' }[s.tipo] ?? s.tipo) },
+        { titulo: 'Tipo', conteudo: (s) => ({ importacao: 'Importação', baixa: 'Baixa no sistema', teste: 'Teste' }[s.tipo] ?? s.tipo) },
         { titulo: 'Lidos', dir: true, conteudo: (s) => numero(s.lidos) },
         { titulo: 'Boletos criados', dir: true, conteudo: (s) => numero(s.criados) },
         { titulo: 'Ignorados', dir: true, conteudo: (s) => numero(s.ignorados) },
@@ -177,7 +179,7 @@ function importar(recarregar) {
     toast(`${r.criados} boleto(s) emitido(s) · ${r.ignorados} já existiam · ${r.erros} erro(s).`, r.erros ? 'erro' : 'ok');
     recarregar();
   }));
-  const m = modal({ titulo: 'Importar títulos do IXC',
-    corpo: [aviso('Cada título em aberto no IXC com vencimento no período vira um boleto. Títulos já importados são ignorados.', 'info'), form],
+  const m = modal({ titulo: 'Importar títulos do sistema',
+    corpo: [aviso('Cada título em aberto no seu sistema com vencimento no período vira um boleto. Títulos já importados são ignorados.', 'info'), form],
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }

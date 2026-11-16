@@ -4,19 +4,17 @@ import {
   numero, dataHora, data, hojeIso, somarDias, R, icone
 } from '../../comum/ui.js';
 
-/** Banco (Bradesco) e o IXC de cada cliente. */
-/** Sistemas de gestão homologados (vêm do servidor). */
-let SISTEMAS = [{ id: 'ixc', nome: 'IXC Provedor' }];
+/**
+ * As APIs da PAY AX: o banco que registra os boletos (Bradesco) e a consulta de CEP e CNPJ (API Brasil).
+ * O sistema de gestão de cada cliente é do cliente: fica no cadastro dele (Clientes → Acessos e sistema).
+ */
 
 export default async function integracoes({ alvo, recarregar }) {
   const d = await api.get('/integracoes');
-  if (d.sistemas?.length) SISTEMAS = d.sistemas;
-  const clientes = (await api.get('/clientes?por_pagina=200')).itens;
-  const porCliente = Object.fromEntries(d.ixc.map((i) => [i.cliente_id, i]));
 
   montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Integrações'),
-      el('p', {}, 'O banco que registra os boletos e o sistema de gestão de cada cliente (homologados: IXC).'))),
+      el('p', {}, 'As APIs da PAY AX: o banco que registra os boletos e a consulta de CEP e CNPJ. O sistema de gestão de cada cliente fica no cadastro dele (Clientes → Acessos e sistema).'))),
 
     cartao(['Bradesco — Cobrança Registrada e Bolepix ', statusIntegracao({ ...d.banco, configurada: d.banco.configurada, modo: d.banco.modo }, { grande: true })],
       el('div', {},
@@ -66,42 +64,6 @@ export default async function integracoes({ alvo, recarregar }) {
         }) }, icone('atualizar'), 'Testar consulta'),
         pode('*') ? el('button', { class: 'botao', onclick: () => configurarDados(d.dados, recarregar) }, icone('config'), 'Token da API Brasil') : null))),
 
-    el('div', { style: 'margin-top:18px' }, cartao('Sistema de gestão dos clientes', tabela({
-      colunas: [
-        { titulo: 'Cliente', conteudo: (c) => el('span', {}, el('span', { class: 'forte' }, c.nome_fantasia || c.razao_social),
-          el('span', { class: 'sub' }, porCliente[c.id]?.config?.url ?? 'sem endereço configurado')) },
-        { titulo: 'Sistema', conteudo: (c) => (porCliente[c.id]?.config?.url
-          ? (SISTEMAS.find((x) => x.id === (porCliente[c.id].config.sistema ?? 'ixc'))?.nome ?? 'IXC Provedor') : '—') },
-        { titulo: 'Status', conteudo: (c) => statusIntegracao({ estado: porCliente[c.id]?.estado, configurada: Boolean(porCliente[c.id]?.configurada) }) },
-        { titulo: 'Importação automática', conteudo: (c) => (porCliente[c.id]?.config?.importacao_automatica ? 'Ligada' : 'Desligada') },
-        { titulo: 'Último teste', conteudo: (c) => (porCliente[c.id]?.ultimo_teste ? dataHora(porCliente[c.id].ultimo_teste) : '—') },
-        { titulo: '', dir: true, conteudo: (c) => el('div', { style: 'display:flex;gap:6px;justify-content:flex-end' },
-          porCliente[c.id]?.configurada ? el('button', { class: 'botao sec pequeno', onclick: (e) => { e.stopPropagation(); acao(e.currentTarget, async () => {
-            const r = await api.post(`/integracoes/ixc/${c.id}/testar`, {});
-            toast(`Sistema conectado · ${numero(r.clientes)} cliente(s) na base.`, 'ok');
-            recarregar();
-          }); } }, 'Testar') : null,
-          porCliente[c.id]?.configurada ? el('button', { class: 'botao pequeno', onclick: (e) => { e.stopPropagation(); importar(c, recarregar); } }, icone('importar'), 'Importar') : null,
-          el('button', { class: 'botao sec pequeno', onclick: (e) => { e.stopPropagation(); configurarIxc(c, porCliente[c.id], recarregar); } }, 'Configurar')) },
-      ],
-      itens: clientes,
-      vazio: 'Cadastre clientes para configurar o IXC de cada um.',
-    }))),
-
-    el('div', { style: 'margin-top:18px' }, cartao('Últimos sincronismos', tabela({
-      colunas: [
-        { titulo: 'Quando', conteudo: (s) => dataHora(s.inicio) },
-        { titulo: 'Cliente', conteudo: (s) => s.razao_social },
-        { titulo: 'Tipo', conteudo: (s) => ({ importacao: 'Importação', baixa: 'Baixa no IXC', teste: 'Teste' }[s.tipo] ?? s.tipo) },
-        { titulo: 'Lidos', dir: true, conteudo: (s) => numero(s.lidos) },
-        { titulo: 'Criados', dir: true, conteudo: (s) => numero(s.criados) },
-        { titulo: 'Ignorados', dir: true, conteudo: (s) => numero(s.ignorados) },
-        { titulo: 'Erros', dir: true, conteudo: (s) => el('span', { style: s.erros ? 'color:var(--vermelho);font-weight:600' : '' }, numero(s.erros)) },
-      ],
-      itens: d.sincronismos,
-      vazio: 'Nenhum sincronismo ainda.',
-      aoClicar: (s) => (s.detalhe ? modal({ titulo: 'Detalhe do sincronismo', corpo: el('div', { class: 'codigo' }, s.detalhe) }) : null),
-    }))),
   );
 }
 
@@ -174,57 +136,3 @@ function configurarDados(atual, recarregar) {
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 
-function configurarIxc(cliente, atual, recarregar) {
-  const cfg = atual?.config ?? {};
-  const form = el('form', { onsubmit: (e) => e.preventDefault() },
-    el('div', { class: 'linha-form' },
-      campo({ nome: 'sistema', rotulo: 'Sistema de gestão', tipo: 'select', valor: cfg.sistema ?? 'ixc', opcoes: SISTEMAS.map((x) => [x.id, x.nome]),
-        ajuda: 'Só os sistemas homologados pela PAY AX' }),
-      campo({ nome: 'url', rotulo: 'Endereço do sistema', valor: cfg.url ?? '', obrigatorio: true, ajuda: 'Ex.: https://ixc.provedor.com.br' }),
-      campo({ nome: 'token', rotulo: 'Token (id:hash)', tipo: 'password', ajuda: atual?.configurada ? 'Deixe vazio para manter o token atual' : 'Configurações → Usuários → Token, no IXC' })),
-    el('div', { class: 'linha-form cols-3', style: 'margin-top:12px' },
-      campo({ nome: 'tipo_padrao', rotulo: 'Tipo do boleto', tipo: 'select', valor: cfg.tipo_padrao ?? 'bolepix', opcoes: Object.entries(R.tipoBoleto) }),
-      campo({ nome: 'juros_mes', rotulo: 'Juros ao mês (%)', valor: cfg.juros_mes ?? 1, ajuda: 'Máximo 1% ao mês' }),
-      campo({ nome: 'multa', rotulo: 'Multa (%)', valor: cfg.multa ?? 2, ajuda: 'Máximo 2% (Código de Defesa do Consumidor)' }),
-      campo({ nome: 'dias_a_frente', rotulo: 'Importar vencimentos até (dias)', tipo: 'number', valor: cfg.dias_a_frente ?? 10 }),
-      campo({ nome: 'importacao_automatica', rotulo: 'Importação automática', tipo: 'select', valor: cfg.importacao_automatica ? '1' : '0', opcoes: [['0', 'Desligada'], ['1', 'Ligada (a cada 15 minutos)']] }),
-      campo({ nome: 'anotar_no_ixc', rotulo: 'Gravar o boleto no título do IXC', tipo: 'select', valor: cfg.anotar_no_ixc === false ? '0' : '1', opcoes: [['1', 'Sim'], ['0', 'Não']] })),
-    el('div', { class: 'linha-form cols-3', style: 'margin-top:12px' },
-      campo({ nome: 'numeracao', rotulo: 'Quem monta e envia o boleto', tipo: 'select', valor: cfg.numeracao ?? 'payax',
-        opcoes: [['ixc', 'O IXC (layout do IXC; a PAY AX só registra)'], ['payax', 'A PAY AX (ficha da PAY AX)']],
-        ajuda: 'No modo IXC, o boleto só é registrado se o código do IXC for igual ao do Bradesco.' }),
-      campo({ nome: 'faixa_inicio', rotulo: 'Nosso número: início da faixa do IXC', valor: cfg.faixa_inicio ?? '', ajuda: 'A mesma configurada na carteira PAY AX do IXC' }),
-      campo({ nome: 'faixa_fim', rotulo: 'Nosso número: fim da faixa do IXC', valor: cfg.faixa_fim ?? '', ajuda: 'Faixa só deste cliente' })),
-    el('div', { class: 'linha-form', style: 'margin-top:12px' },
-      campo({ nome: 'carteiras', rotulo: 'Carteira de cobrança PAY AX no IXC (ID)', valor: (cfg.carteiras ?? []).join(', '),
-        ajuda: 'Só os títulos desta carteira viram boleto. Vazio = todas (cuidado se o provedor tiver outro banco ou gateway).',
-        atributos: { placeholder: 'Ex.: 12' } }),
-      campo({ nome: 'mensagem', rotulo: 'Mensagem padrão no boleto', valor: cfg.mensagem ?? '', atributos: { maxlength: 160 } })));
-  const botao = el('button', { class: 'botao' }, 'Salvar');
-  botao.addEventListener('click', () => acao(botao, async () => {
-    await api.put(`/integracoes/ixc/${cliente.id}`, lerForm(form));
-    m.fechar();
-    toast('Sistema do cliente configurado.', 'ok');
-    recarregar();
-  }));
-  const m = modal({ titulo: `Sistema de gestão · ${cliente.nome_fantasia || cliente.razao_social}`, largo: true,
-    corpo: [aviso('O token é cifrado antes de ser gravado. Use um usuário técnico só para a PAY AX no sistema do cliente.', 'info'), form],
-    acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
-}
-
-function importar(cliente, recarregar) {
-  const form = el('form', { class: 'linha-form', onsubmit: (e) => e.preventDefault() },
-    campo({ nome: 'de', rotulo: 'Vencimento de', tipo: 'date', valor: hojeIso() }),
-    campo({ nome: 'ate', rotulo: 'até', tipo: 'date', valor: somarDias(hojeIso(), 10) }),
-    campo({ nome: 'limite', rotulo: 'Máximo de títulos', tipo: 'number', valor: 200 }));
-  const botao = el('button', { class: 'botao' }, icone('importar'), 'Importar e emitir');
-  botao.addEventListener('click', () => acao(botao, async () => {
-    const r = await api.post(`/integracoes/ixc/${cliente.id}/importar`, lerForm(form));
-    m.fechar();
-    toast(`${r.criados} boleto(s) emitido(s) · ${r.ignorados} ignorado(s) · ${r.erros} erro(s).`, r.erros ? 'erro' : 'ok');
-    recarregar();
-  }));
-  const m = modal({ titulo: `Importar títulos do IXC · ${cliente.nome_fantasia || cliente.razao_social}`,
-    corpo: [aviso('Cada título em aberto do IXC vira um boleto. Títulos já importados são ignorados, então pode rodar quantas vezes quiser.', 'info'), form],
-    acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
-}

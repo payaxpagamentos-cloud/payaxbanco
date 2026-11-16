@@ -136,9 +136,15 @@ module.exports = (db) => {
       acessos: db.prepare('SELECT id, nome, email, perfil, ativo, senha_provisoria, ultimo_acesso FROM usuarios_cliente WHERE cliente_id = ? ORDER BY nome').all(c.id),
       // Endereço que a equipe passa ao cliente junto com o acesso.
       area_cliente_url: `${config.urlPublica || ''}${config.clientePath}/`,
+      // Sistema de gestão do cliente (hoje, o IXC): configuração (sem o token), status e os últimos sincronismos dele.
       ixc: (() => {
-        const i = db.prepare("SELECT estado, config, ultimo_teste, ultimo_erro FROM integracoes WHERE escopo = 'ixc' AND cliente_id = ?").get(c.id);
-        return i ? { estado: i.estado, ...(JSON.parse(i.config || '{}')), ultimo_teste: i.ultimo_teste, ultimo_erro: i.ultimo_erro } : { estado: 'nao_configurada' };
+        const i = db.prepare("SELECT estado, config, credenciais, ultimo_teste, ultimo_erro FROM integracoes WHERE escopo = 'ixc' AND cliente_id = ?").get(c.id);
+        const cfg = JSON.parse(i?.config || '{}');
+        return {
+          estado: i?.estado ?? 'nao_configurada', configurada: Boolean(i?.credenciais), config: cfg, ...cfg,
+          ultimo_teste: i?.ultimo_teste ?? null, ultimo_erro: i?.ultimo_erro ?? null,
+          sincronismos: db.prepare('SELECT id, tipo, inicio, lidos, criados, ignorados, erros, detalhe FROM sincronismos WHERE cliente_id = ? ORDER BY id DESC LIMIT 8').all(c.id),
+        };
       })(),
       resumo_mes: consultas.resumoBoletos(db, { de: datas.primeiroDiaMes(data), ate: data, clienteId: c.id, hoje: data }),
       pode_ver_margem: podeEquipe(req.usuario.perfil, 'relatorios.margem'),

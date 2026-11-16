@@ -144,7 +144,7 @@ export const R = {
     nao_configurada: ['Não configurada', 'neutra'], conectada: ['Conectada', 'ok'], falha: ['Falha', 'erro'], desabilitada: ['Desabilitada', 'neutra'],
   },
   tipoBoleto: { boleto: 'Boleto', bolepix: 'Bolepix (boleto + QR PIX)' },
-  origem: { avulso: 'Avulso', ixc: 'IXC', api: 'API', lote: 'Lote' },
+  origem: { avulso: 'Avulso', ixc: 'Sistema do cliente', api: 'API', lote: 'Lote' },
   perfilEquipe: { admin: 'Administrador', financeiro: 'Financeiro', operacao: 'Operação', consulta: 'Consulta' },
   perfilCliente: { admin: 'Administrador', operador: 'Operador', consulta: 'Consulta' },
 };
