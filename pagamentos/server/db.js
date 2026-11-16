@@ -942,6 +942,15 @@ CREATE TRIGGER usuarios_cliente_revoga_sessao AFTER UPDATE ON usuarios_cliente
   BEGIN UPDATE usuarios_cliente SET sessao_versao = OLD.sessao_versao + 1 WHERE id = NEW.id; END;
 `,
   },
+  {
+    versao: 25,
+    nome: 'repasse-por-pix',
+    sql: `
+-- Repasse ao cliente sempre por PIX da PAY AX, por enquanto: o rateio de crédito do Bradesco depende de
+-- autorização no convênio. A opção continua na conta bancária, desligada, para ligar quando sair.
+UPDATE contas_bancarias SET rateio_contratado = 0;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

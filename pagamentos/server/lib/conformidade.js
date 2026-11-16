@@ -473,9 +473,14 @@ const REGRAS = [
       const pelBanco = meios.filter((m) => m === 'rateio').length;
       const porEscolha = ativos.filter((c) => c.entrega === 'pix').length;
       const bradescoSemRateio = ativos.filter((c, i) => c.destino_banco === contaDestino.BRADESCO && c.entrega !== 'pix' && meios[i] !== 'rateio').length;
+      // Rateio desligado (PIX da PAY AX como padrão, enquanto o Bradesco não autoriza): é um lembrete, não erro.
+      if (!conta?.rateio_contratado) {
+        return atencao('Repasse por PIX da PAY AX: o valor passa pela conta da PAY AX e sai na hora em que o banco credita. '
+          + 'Quando o Bradesco autorizar o rateio de crédito no convênio, ligue em Contas e preços: o dinheiro deixa de passar pela PAY AX.');
+      }
       if (bradescoSemRateio) {
         return atencao(`${plural(bradescoSemRateio, 'cliente tem', 'clientes têm')} conta Bradesco e ainda ${bradescoSemRateio === 1 ? 'recebe' : 'recebem'} por PIX da PAY AX. `
-          + (conta?.rateio_contratado ? 'Confira o modo do banco (o rateio vale no arquivo CNAB).' : 'Contrate o rateio de crédito no convênio e marque em Contas e preços.'));
+          + 'Confira o modo do banco (o rateio vale no arquivo CNAB).');
       }
       return ok(`${plural(pelBanco, 'cliente recebe', 'clientes recebem')} direto do banco; ${plural(ativos.length - pelBanco, 'recebe', 'recebem')} por PIX na hora`
         + `${porEscolha ? ` (${porEscolha} por escolha da PAY AX)` : ''}.`);
