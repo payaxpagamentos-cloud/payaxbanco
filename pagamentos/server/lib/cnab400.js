@@ -210,7 +210,7 @@ function detalheRemessa(b, conta, { sequencial, comando = COMANDO.registrar, hoj
     especieDe(b).cnab400, // 148-149 espécie do título (12 = duplicata de serviço)
     'N', // 150 aceite
     data(b.emissao), // 151-156
-    b.dias_baixa ? '00' : '00', // 157-158 1ª instrução
+    '00', // 157-158 1ª instrução (sem instrução: o prazo de baixa é o do convênio)
     '00', // 159-160 2ª instrução
     valor(jurosDia, 13), // 161-173 juros de mora por dia
     data(b.desconto_centavos ? b.desconto_ate : null), // 174-179 data limite do desconto

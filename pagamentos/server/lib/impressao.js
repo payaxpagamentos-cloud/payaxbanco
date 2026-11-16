@@ -72,7 +72,9 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
     boleto.multa_ppm ? `Após o vencimento, multa de ${pct(boleto.multa_ppm)}%.` : null,
     boleto.juros_mes_ppm ? `Após o vencimento, juros de ${pct(boleto.juros_mes_ppm)}% ao mês (pro rata die).` : null,
     boleto.desconto_centavos && boleto.desconto_ate ? `Desconto de R$ ${brl(boleto.desconto_centavos)} para pagamento até ${data(boleto.desconto_ate)}.` : null,
-    boleto.dias_baixa ? `Não receber após ${boleto.dias_baixa} dias do vencimento.` : null,
+    // Só promete o prazo que vai registrado: pela API o Bradesco recebe o prazo de baixa; no arquivo CNAB 400
+    // a PAY AX não manda instrução de baixa, e o prazo é o do convênio no banco.
+    boleto.dias_baixa && config.banco.modo !== 'cnab' ? `Não receber após ${boleto.dias_baixa} dias do vencimento.` : null,
     boleto.pix_emv ? 'Este boleto também pode ser pago pelo QR Code PIX (Bolepix).' : null,
   ].filter(Boolean);
 
