@@ -79,12 +79,12 @@
 
         <fieldset class="bloco">
           <legend><span class="num">3</span> Responsável financeiro</legend>
-          <p class="dica">Quem acompanha as cobranças e os repasses. Recebe o acesso à Área do Cliente quando a conta for aprovada.</p>
+          <p class="dica">Quem acompanha as cobranças e os repasses. Recebe por SMS o número do protocolo e, quando a conta for aprovada, o acesso à Área do Cliente.</p>
           <label class="marcar"><input type="checkbox" data-mesmo-responsavel><span>É a mesma pessoa do responsável legal</span></label>
           <div class="linha">
             <label class="campo c-6">Nome completo *<input name="financeiro.nome" maxlength="120" required></label>
             <label class="campo c-3">E-mail *<input name="financeiro.email" type="email" maxlength="160" autocapitalize="none" required></label>
-            <label class="campo c-3">Telefone *<input name="financeiro.telefone" inputmode="tel" data-mascara="telefone" placeholder="(00) 00000-0000" required></label>
+            <label class="campo c-3">Celular *<input name="financeiro.telefone" inputmode="tel" data-mascara="telefone" placeholder="(00) 90000-0000" required><small>Recebe o protocolo por SMS.</small></label>
           </div>
         </fieldset>
 
@@ -151,7 +151,7 @@
         <div class="enviado__selo" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
         <h2 id="enviado-titulo">Pedido recebido!</h2>
         <p>Protocolo <strong data-protocolo></strong></p>
-        <p>A equipe PAY AX vai analisar os dados e o contrato social e entra em contato pelo e-mail do responsável financeiro. Guarde o protocolo.</p>
+        <p>Enviamos o protocolo por SMS para o celular do responsável financeiro. A equipe PAY AX vai analisar os dados e o contrato social e entra em contato. Guarde o protocolo.</p>
         <a class="button button--primary" href="/">Voltar ao início</a>
       </section>
     </div>

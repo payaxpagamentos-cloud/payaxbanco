@@ -14,7 +14,7 @@ export default async function integracoes({ alvo, recarregar }) {
 
   montar(alvo, 
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Integrações'),
-      el('p', {}, 'As APIs da PAY AX: o banco que registra os boletos e a consulta de CEP e CNPJ. O sistema de gestão de cada cliente fica no cadastro dele (Clientes → Acessos e sistema).'))),
+      el('p', {}, 'As APIs da PAY AX: o banco que registra os boletos, a consulta de CEP e CNPJ e o SMS. O sistema de gestão de cada cliente fica no cadastro dele (Clientes → Acessos e sistema).'))),
 
     cartao([`${d.banco.nome} — Cobrança Registrada e Bolepix `, statusIntegracao({ ...d.banco, configurada: d.banco.configurada, modo: d.banco.modo }, { grande: true })],
       el('div', {},
@@ -64,7 +64,62 @@ export default async function integracoes({ alvo, recarregar }) {
         }) }, icone('atualizar'), 'Testar consulta'),
         pode('*') ? el('button', { class: 'botao', onclick: () => configurarDados(d.dados, recarregar) }, icone('config'), 'Token da API Brasil') : null))),
 
+    el('div', { style: 'margin-top:18px' }, cartao(['SMS (avisos ao cliente) ', statusIntegracao({ ...d.sms, configurada: Boolean(d.sms.configurada) }, { grande: true })],
+      el('div', {},
+        el('p', { style: 'color:var(--texto-2);font-size:13px;margin-bottom:12px' },
+          'Envia ao celular do responsável financeiro o protocolo do pedido de abertura de conta. Se o SMS não sair, o pedido entra do mesmo jeito e o motivo fica no histórico (com botão para reenviar).'),
+        el('div', { class: 'pares cols-3' },
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Operadora'),
+            el('span', { class: 'val' }, d.sms.provedores.find((p) => p.id === d.sms.config?.provedor)?.nome ?? 'não configurada')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Remetente'), el('span', { class: 'val' }, d.sms.config?.remetente ?? '—')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Último envio'), el('span', { class: 'val' }, d.sms.ultimo_teste ? dataHora(d.sms.ultimo_teste) : '—'))),
+        d.sms.ultimo_erro ? el('div', { style: 'margin-top:10px' }, aviso(d.sms.ultimo_erro, 'erro')) : null),
+      el('div', { style: 'display:flex;gap:8px' },
+        pode('*') && d.sms.configurada ? el('button', { class: 'botao sec', onclick: () => testarSms(recarregar) }, icone('atualizar'), 'Enviar teste') : null,
+        pode('*') ? el('button', { class: 'botao', onclick: () => configurarSms(d.sms, recarregar) }, icone('config'), 'Configurar') : null))),
   );
+}
+
+function configurarSms(atual, recarregar) {
+  const provedor = campo({ nome: 'provedor', rotulo: 'Operadora', tipo: 'select', valor: atual.config?.provedor ?? 'zenvia',
+    opcoes: atual.provedores.map((p) => [p.id, p.nome]) });
+  const sid = campo({ nome: 'conta_sid', rotulo: 'Account SID (Twilio)', ajuda: 'Começa com AC (painel da Twilio)' });
+  const remetente = campo({ nome: 'remetente', rotulo: 'Remetente', valor: atual.config?.remetente ?? '' });
+  const ajudaRemetente = remetente.querySelector('small') ?? remetente.appendChild(el('small', {}));
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    el('div', { class: 'linha-form' }, provedor, remetente),
+    el('div', { class: 'linha-form', style: 'margin-top:12px' }, sid,
+      campo({ nome: 'token', rotulo: 'Token', tipo: 'password', ajuda: atual.configurada ? 'Deixe vazio para manter o token atual' : 'O token da API da operadora' })));
+  const ajustar = () => {
+    const twilio = provedor.querySelector('select').value === 'twilio';
+    sid.hidden = !twilio;
+    ajudaRemetente.textContent = twilio ? 'Número de envio da Twilio (+55...) ou Messaging Service SID (MG...)' : 'O remetente (from) do canal de SMS na Zenvia';
+  };
+  provedor.querySelector('select').addEventListener('change', ajustar);
+  ajustar();
+  const botao = el('button', { class: 'botao' }, 'Salvar');
+  botao.addEventListener('click', () => acao(botao, async () => {
+    await api.put('/integracoes/sms', lerForm(form));
+    m.fechar();
+    toast('SMS configurado. Envie um teste para conferir.', 'ok');
+    recarregar();
+  }));
+  const m = modal({ titulo: 'SMS · operadora', largo: true,
+    corpo: [aviso('O token é cifrado antes de ser gravado e nunca volta para a tela. A conta na operadora (Zenvia ou Twilio) é contratada pela PAY AX.', 'info'), form],
+    acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
+}
+
+function testarSms(recarregar) {
+  const form = el('form', { onsubmit: (e) => e.preventDefault() },
+    campo({ nome: 'telefone', rotulo: 'Celular que recebe o teste', atributos: { placeholder: '(11) 99999-9999', inputmode: 'tel' } }));
+  const botao = el('button', { class: 'botao' }, 'Enviar teste');
+  botao.addEventListener('click', () => acao(botao, async () => {
+    const r = await api.post('/integracoes/sms/testar', lerForm(form));
+    m.fechar();
+    toast(r.mensagem, r.ok ? 'ok' : 'erro');
+    recarregar();
+  }));
+  const m = modal({ titulo: 'Enviar SMS de teste', corpo: form, acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 
 function configurarBanco(atual, recarregar) {

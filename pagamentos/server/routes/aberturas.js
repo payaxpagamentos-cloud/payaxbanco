@@ -18,7 +18,12 @@ const validarCadastro = (d) => corpoCliente(d, { novo: true });
 
 module.exports = (db) => {
   const r = express.Router();
-  const completo = (s) => ({ ...abertura.formatar(s, { validarCadastro }), interacoes: abertura.interacoes(db, s.id) });
+  const completo = (s) => ({
+    ...abertura.formatar(s, { validarCadastro }),
+    interacoes: abertura.interacoes(db, s.id),
+    sms: db.prepare("SELECT id, destino, situacao, erro, criado_em FROM sms_mensagens WHERE referencia_tipo = 'abertura' AND referencia_id = ? ORDER BY id DESC")
+      .all(s.id).map((m) => ({ ...m, destino: require('../lib/sms').mascarar(m.destino) })),
+  });
   const auditar = (req, acao, id, depois = null) => auditoria.registrar(db, req, { acao, entidade: 'abertura', entidade_id: Number(id), depois });
 
   /** Funil: os pedidos em aberto (todas as etapas) e a contagem de cada situação. */
@@ -145,6 +150,13 @@ module.exports = (db) => {
     db.prepare('INSERT INTO abertura_interacoes (solicitacao_id, tipo, texto, usuario_id, criado_em) VALUES (?, ?, ?, ?, ?)')
       .run(s.id, 'sistema', `Novo link de ativação gerado para ${out.email} por ${req.usuario.nome} (o anterior deixou de valer).`, req.usuario.id, new Date().toISOString());
     res.status(201).json({ ...out, protocolo: abertura.protocolo(s.id), conta: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv) });
+  });
+
+  /** Reenvia o SMS com o protocolo para o celular do responsável financeiro. */
+  r.post('/:id/sms', exigir('aberturas.editar'), async (req, res) => {
+    const r2 = await abertura.avisarProtocolo(db, req.params.id, req.usuario);
+    auditar(req, 'abertura.sms_reenviado', req.params.id, { situacao: r2.situacao });
+    res.json({ ...r2, pedido: completo(abertura.buscar(db, req.params.id)) });
   });
 
   r.post('/:id/recusar', exigir('aberturas.aprovar'), (req, res) => {

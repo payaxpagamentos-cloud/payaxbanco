@@ -21,6 +21,7 @@ const { agora, transacao } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('./erros');
 const v = require('./validacao');
 const ativacao = require('./ativacao');
+const sms = require('./sms');
 const contaInterna = require('./contaInterna');
 const precos = require('./precos');
 const datas = require('./datas');
@@ -126,6 +127,8 @@ function validarDados(dados, validarCadastro, extra = {}) {
   const representante = pessoaDe(dados.representante, 'responsável legal da empresa', { cpf: true });
   if (so(representante.cpf).length !== 11) throw new ErroNegocio('O responsável legal precisa ser pessoa física (CPF).', 422);
   const financeiro = pessoaDe(dados.financeiro, 'responsável financeiro');
+  // O protocolo e os avisos da abertura vão por SMS para o responsável financeiro: precisa ser celular.
+  if (!sms.celular(financeiro.telefone)) throw new ErroNegocio('Informe o celular do responsável financeiro, com DDD: é para ele que vai o SMS com o protocolo.', 422);
   return { empresa, representante, financeiro };
 }
 
@@ -199,6 +202,25 @@ function criarContato(db, b, usuario) {
   const obs = texto(b.observacao, 1000);
   if (obs) registrar(db, id, 'nota', obs, usuario.id);
   return buscar(db, id);
+}
+
+/**
+ * SMS com o número do protocolo para o celular do responsável financeiro. Não falha a operação: o resultado
+ * entra no histórico do pedido (e a equipe pode reenviar pela ficha).
+ */
+async function avisarProtocolo(db, id, usuario = null) {
+  const s = buscar(db, id);
+  const d = json(s.dados, {});
+  const nome = String(d.empresa?.nome_fantasia || s.razao_social).slice(0, 40);
+  const r = await sms.enviar(db, {
+    telefone: d.financeiro?.telefone,
+    texto: `PAY AX: recebemos o pedido de abertura de conta de ${nome}. Protocolo ${protocolo(s.id)}. Nossa equipe vai analisar e entrar em contato.`,
+    finalidade: 'abertura.protocolo', referenciaTipo: 'abertura', referenciaId: s.id,
+  });
+  registrar(db, s.id, 'sistema', r.situacao === 'enviado'
+    ? `SMS com o protocolo enviado para ${r.destino_mascarado}${usuario ? ` (reenviado por ${usuario.nome})` : ''}.`
+    : `SMS com o protocolo não enviado: ${r.erro}.`, usuario?.id ?? null);
+  return r;
 }
 
 // ------------------------------------------------------------------ leitura
@@ -436,6 +458,6 @@ function aplicarRetencao(db, { dias = 180 } = {}) {
 
 module.exports = {
   TIPOS_DOCUMENTO, MAX_BYTES, ETAPAS, ABERTAS, ROTULO, CHECKLIST, TIPOS_INTERACAO, SISTEMAS,
-  protocolo, normalizar, solicitar, criarContato, formatar, buscar, interacoes, arquivo, pendencias,
+  protocolo, normalizar, solicitar, avisarProtocolo, criarContato, formatar, buscar, interacoes, arquivo, pendencias,
   editarDados, anexar, mover, atribuir, interagir, marcar, definirProposta, aprovar, recusar, aplicarRetencao,
 };

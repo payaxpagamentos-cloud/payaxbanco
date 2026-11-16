@@ -145,6 +145,11 @@
     if (faltando.length) { faltando[0].focus(); return 'Preencha os campos marcados.'; }
     const emails = ['empresa.email', 'representante.email', 'financeiro.email'].map($).filter((i) => !i.checkValidity());
     if (emails.length) { emails[0].closest('.campo').classList.add('invalido'); emails[0].focus(); return 'Confira o e-mail informado.'; }
+    const cel = so($('financeiro.telefone').value);
+    if (!(cel.length === 11 && cel[2] === '9')) {
+      $('financeiro.telefone').closest('.campo').classList.add('invalido'); $('financeiro.telefone').focus();
+      return 'Informe o celular do responsável financeiro com DDD (ele recebe o protocolo por SMS).';
+    }
     if (!documentos.contrato_social) { form.querySelector('[data-arquivo="contrato_social"]').classList.add('invalido'); return 'Anexe o contrato social da empresa.'; }
     if (!$('aceite').checked) return 'Marque a declaração no fim do formulário.';
     return null;

@@ -183,7 +183,16 @@ async function ficha(alvo, id, recarregar) {
             par('E-mail', s.representante.email), par('Telefone', s.representante.telefone ? telefone(s.representante.telefone) : ''))),
           cartao('Responsável financeiro', el('div', { class: 'pares' },
             par('Nome', s.financeiro.nome), par('E-mail', s.financeiro.email), par('Telefone', s.financeiro.telefone ? telefone(s.financeiro.telefone) : ''),
-            par('Acesso', 'Administrador da Área do Cliente quando a conta abrir')))),
+            par('Acesso', 'Administrador da Área do Cliente quando a conta abrir'),
+            par('SMS do protocolo', s.sms.length
+              ? el('span', {}, selo(s.sms[0].situacao, { enviado: ['Enviado', 'ok'], falha: ['Não enviado', 'erro'], nao_configurado: ['SMS não configurado', 'aviso'] }),
+                el('span', { class: 'sub' }, `${s.sms[0].destino} · ${dataHora(s.sms[0].criado_em)}${s.sms[0].erro ? ` · ${s.sms[0].erro}` : ''}`))
+              : 'não enviado')),
+          editar() && s.situacao !== 'recusada' ? el('button', { class: 'botao sec pequeno', onclick: (ev) => acao(ev.currentTarget, async () => {
+            const r = await api.post(`/aberturas/${s.id}/sms`);
+            toast(r.situacao === 'enviado' ? `SMS enviado para ${r.destino_mascarado}.` : `SMS não enviado: ${r.erro}`, r.situacao === 'enviado' ? 'ok' : 'erro');
+            recarregar();
+          }) }, icone('fone'), s.sms.length ? 'Reenviar SMS' : 'Enviar SMS') : null)),
         cartao('Documentos', s.arquivos.length
           ? tabela({
             colunas: [

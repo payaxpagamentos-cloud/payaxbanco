@@ -510,6 +510,11 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
         echo "    server_name %domain_idn% %alias_idn%;"
         echo "    ssl_certificate      %ssl_pem%;"
         echo "    ssl_certificate_key  %ssl_key%;"
+        # Só TLS 1.2 e 1.3, com cifras modernas (sigilo futuro garantido, sem CBC nem RSA puro).
+        echo "    ssl_protocols TLSv1.2 TLSv1.3;"
+        echo "    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;"
+        echo "    ssl_prefer_server_ciphers off;"
+        echo "    ssl_session_tickets off;"
         echo "    include %home%/%user%/conf/web/%domain%/nginx.hsts.conf*;"
       fi
       echo "    client_max_body_size 30m;   # abertura de conta pelo site leva o contrato social"

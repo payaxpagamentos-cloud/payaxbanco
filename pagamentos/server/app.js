@@ -21,7 +21,8 @@ function criarApp(db) {
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Permissions-Policy': 'geolocation=(), camera=(), microphone=()',
-      ...(config.producao ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),
+      // HSTS de 2 anos: depois do primeiro acesso, o navegador só abre os endereços da PAY AX com cadeado.
+      ...(config.producao ? { 'Strict-Transport-Security': 'max-age=63072000; includeSubDomains' } : {}),
       'Content-Security-Policy': CSP,
     });
     next();

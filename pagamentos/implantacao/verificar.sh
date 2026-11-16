@@ -8,7 +8,9 @@
 #   4. o DNS aponta para este servidor;
 #   5. o HTTPS está ativo;
 #   6. quem entra por http:// é mandado para o https://;
-#   7. o certificado não está perto de vencer (o Hestia renova sozinho; aqui conferimos que renovou).
+#   7. o certificado não está perto de vencer (o Hestia renova sozinho; aqui conferimos que renovou);
+#   8. só protocolos seguros: TLS 1.3 aceito, TLS 1.0 e 1.1 recusados.
+# No fim, confere o registro CAA do domínio (diz quem pode emitir certificado para ele).
 # O que estiver errado e der para corrigir, corrige (refaz o domínio no Hestia, emite o certificado).
 #
 # Uso (como root):  bash implantacao/verificar.sh          — o instalador também roda no final.
@@ -140,6 +142,14 @@ conferir() {
   else
     aviso "não consegui ler a validade do certificado de $dom"
   fi
+
+  # 8. Protocolos: TLS 1.3 aceito; TLS 1.0 e 1.1 (quebrados) recusados.
+  local t13=0 antigo=0
+  echo | openssl s_client -tls1_3 -servername "$dom" -connect "$IP_NGINX:443" >/dev/null 2>&1 && t13=1
+  for p in -tls1 -tls1_1; do echo | openssl s_client "$p" -servername "$dom" -connect "$IP_NGINX:443" >/dev/null 2>&1 && antigo=1; done
+  if (( t13 == 1 && antigo == 0 )); then ok "só TLS 1.2 e 1.3 em $dom (TLS 1.0 e 1.1 recusados)"
+  elif (( antigo == 1 )); then falha "$dom ainda aceita TLS 1.0/1.1: rode o instalador de novo (o modelo payax desliga)"
+  else aviso "$dom não negociou TLS 1.3 (confira a versão do OpenSSL/nginx do servidor)"; fi
 }
 
 command -v dig >/dev/null || apt-get install -y -q dnsutils >/dev/null 2>&1 || true
@@ -149,6 +159,13 @@ printf '\033[1;34m== Conferindo os endereços (servidor %s)\033[0m\n' "$IP_SERVI
 conferir "$DOMINIO" ""
 [[ -n "$SITE" ]] && conferir "$SITE" www
 [[ -n "$ACESSO" ]] && conferir "$ACESSO" ""
+
+# CAA: diz no DNS que só a Let's Encrypt (a autoridade usada pelo Hestia) pode emitir certificado para o domínio.
+RAIZ="${SITE:-${DOMINIO#*.}}"
+printf '\n\033[1m%s (DNS)\033[0m\n' "$RAIZ"
+if dig +short CAA "$RAIZ" @8.8.8.8 2>/dev/null | grep -qi 'letsencrypt.org'; then ok "registro CAA de $RAIZ autoriza a Let's Encrypt"
+elif [[ -n "$(dig +short CAA "$RAIZ" @8.8.8.8 2>/dev/null)" ]]; then falha "o registro CAA de $RAIZ não autoriza a Let's Encrypt: o certificado não vai renovar"
+else aviso "sem registro CAA em $RAIZ (recomendado: CAA 0 issue \"letsencrypt.org\" no painel do DNS)"; fi
 echo
 if [[ $PROBLEMAS -eq 0 ]]; then printf '\033[1;32mTudo no ar.\033[0m\n'
 else printf '\033[1;31m%s problema(s) acima.\033[0m Mande um print desta tela para o suporte.\n' "$PROBLEMAS"; fi

@@ -157,6 +157,8 @@ module.exports = (db) => {
     const { corpoCliente } = require('./clientes');
     const out = abertura.solicitar(db, req.body ?? {}, { ip: req.ip, validarCadastro: (d) => corpoCliente(d, { novo: true }) });
     res.status(201).json({ protocolo: out.protocolo });
+    // SMS com o protocolo depois da resposta: a operadora lenta não segura a tela do cliente.
+    abertura.avisarProtocolo(db, out.id).catch((err) => console.error('[PAY AX] SMS do protocolo:', err.message));
   });
 
   // ------------------------------------------------------------ Ativação do acesso (acesso.payax.com.br)

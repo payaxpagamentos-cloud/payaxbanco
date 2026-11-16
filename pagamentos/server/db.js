@@ -873,6 +873,48 @@ CREATE TABLE ativacoes_acesso (
 CREATE INDEX idx_ativacoes_usuario ON ativacoes_acesso(usuario_cliente_id);
 `,
   },
+  {
+    versao: 22,
+    nome: 'sms',
+    sql: `
+-- Integração de SMS (avisos ao cliente, como o protocolo da abertura de conta). A tabela de integrações
+-- é refeita para aceitar o escopo 'sms' (o CHECK não é alterável no SQLite).
+CREATE TABLE integracoes_nova (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  escopo TEXT NOT NULL CHECK (escopo IN ('banco','ixc','dados','sms')),
+  cliente_id INTEGER REFERENCES clientes(id),
+  conta_id INTEGER REFERENCES contas_bancarias(id),
+  credenciais TEXT,
+  config TEXT,
+  estado TEXT NOT NULL DEFAULT 'nao_configurada'
+    CHECK (estado IN ('nao_configurada','conectada','falha','desabilitada')),
+  ultimo_teste TEXT,
+  ultimo_erro TEXT,
+  atualizado_em TEXT NOT NULL,
+  atualizado_por INTEGER REFERENCES usuarios(id)
+);
+INSERT INTO integracoes_nova SELECT * FROM integracoes;
+DROP TABLE integracoes;
+ALTER TABLE integracoes_nova RENAME TO integracoes;
+CREATE UNIQUE INDEX idx_integracoes_escopo ON integracoes(escopo, IFNULL(cliente_id, 0), IFNULL(conta_id, 0));
+
+-- Cada SMS enviado (ou que não pôde ser enviado), para conferência e reenvio.
+CREATE TABLE sms_mensagens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  destino TEXT NOT NULL,                 -- celular no formato +55DDNNNNNNNNN
+  texto TEXT NOT NULL,
+  finalidade TEXT NOT NULL,              -- ex.: abertura.protocolo, teste
+  referencia_tipo TEXT,
+  referencia_id INTEGER,
+  provedor TEXT,
+  situacao TEXT NOT NULL CHECK (situacao IN ('enviado','falha','nao_configurado')),
+  id_provedor TEXT,
+  erro TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX idx_sms_referencia ON sms_mensagens(referencia_tipo, referencia_id);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

@@ -108,6 +108,12 @@ module.exports = {
     urlViaCep: process.env.PAYAX_VIACEP_URL || 'https://viacep.com.br/ws',
     urlBrasilApi: process.env.PAYAX_BRASILAPI_URL || 'https://brasilapi.com.br/api',
   },
+  // SMS (avisos ao cliente). Operadoras aceitas: Zenvia e Twilio; o token fica cifrado em Integrações → SMS.
+  sms: {
+    timeoutMs: Number(process.env.PAYAX_SMS_TIMEOUT_MS) || 10_000,
+    urlZenvia: process.env.PAYAX_ZENVIA_URL || 'https://api.zenvia.com/v2/channels/sms/messages',
+    urlTwilio: process.env.PAYAX_TWILIO_URL || 'https://api.twilio.com/2010-04-01',
+  },
   ixc: {
     timeoutMs: Number(process.env.PAYAX_IXC_TIMEOUT_MS) || 15_000,
     // Permite apontar o IXC para endereços da rede interna (evita SSRF quando desligado).
