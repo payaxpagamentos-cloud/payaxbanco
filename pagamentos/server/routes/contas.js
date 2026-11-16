@@ -21,7 +21,7 @@ function corpoConta(b, { novo = false } = {}) {
   if (novo || b.apelido !== undefined) d.apelido = v.texto(b.apelido, 'o apelido da conta', 60);
   if (novo || b.agencia !== undefined) d.agencia = v.digitos(b.agencia).slice(0, 5) || v.falhar('Informe a agência.');
   if (novo || b.conta !== undefined) d.conta = v.digitos(b.conta).slice(0, 12) || v.falhar('Informe a conta.');
-  if (novo || b.cedente !== undefined) d.cedente = v.digitos(b.cedente).slice(0, 10) || v.falhar('Informe o código do beneficiário (cedente).');
+  if (novo || b.cedente !== undefined) d.cedente = v.digitos(b.cedente).slice(0, 20) || v.falhar('Informe o código do beneficiário (cedente).');
   if (novo || b.beneficiario_nome !== undefined) d.beneficiario_nome = v.texto(b.beneficiario_nome, 'o nome do beneficiário', 70);
   if (novo || b.beneficiario_documento !== undefined) d.beneficiario_documento = v.documento(b.beneficiario_documento, 'o CNPJ do beneficiário');
   if (b.agencia_dv !== undefined) d.agencia_dv = v.opcional(b.agencia_dv, 'o dígito da agência', 2);

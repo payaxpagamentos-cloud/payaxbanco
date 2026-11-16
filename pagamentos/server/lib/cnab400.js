@@ -49,8 +49,14 @@ function dataIso(ddmmaa) {
   return /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(iso) ? iso : null;
 }
 
-/** Identificação da empresa no banco (20 posições no header, 17 no detalhe). */
+/**
+ * Identificação da empresa no banco.
+ *  - header (027-046, 20 posições): o "Código da Empresa" que o Bradesco fornece ao liberar a cobrança por
+ *    arquivo — cadastrado na conta bancária como "Código do beneficiário"; numérico, com zeros à esquerda;
+ *  - detalhe (021-037, 17 posições): zero + carteira + agência + conta + dígito.
+ */
 const identificacaoEmpresa = (conta, tamanho) => {
+  if (tamanho === 20 && so(conta.cedente)) return numero(conta.cedente, 20);
   const base = `0${numero(conta.carteira, 3)}${numero(conta.agencia, 5)}${numero(conta.conta, 7)}${so(conta.conta_dv) || '0'}`;
   return tamanho === 20 ? `${base}   ` : base.slice(0, tamanho);
 };
