@@ -15,6 +15,11 @@
   let busy = false;
   submit.disabled = false;
 
+  // Topo fixo: ganha sombra quando a página rola, para separar do conteúdo.
+  const sombra = () => header.classList.toggle('rolou', window.scrollY > 4);
+  window.addEventListener('scroll', sombra, { passive: true });
+  sombra();
+
   mobile.addEventListener('click', () => {
     const open = header.classList.toggle('access-open');
     mobile.setAttribute('aria-expanded', String(open));
