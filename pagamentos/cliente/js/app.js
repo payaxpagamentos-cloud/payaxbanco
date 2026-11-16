@@ -45,6 +45,8 @@ const rotaAtual = () => {
  * de um acesso novo) sumia no mesmo instante em que aparecia.
  */
 async function desenhar({ manterJanelas = false } = {}) {
+  // Recarregar a mesma tela depois de uma ação não pode jogar a página para o topo.
+  const rolagem = manterJanelas ? window.scrollY : 0;
   for (const f of limpeza) { try { f(); } catch { /* ignora */ } }
   limpeza = [];
   if (!manterJanelas) for (const m of document.querySelectorAll('.modal-fundo')) m.remove();
@@ -61,6 +63,7 @@ async function desenhar({ manterJanelas = false } = {}) {
   try {
     const mod = await ROTAS[rota].mod();
     await mod.default({ alvo: principal, params, query, ir, aoSair: (f) => limpeza.push(f), recarregar: () => desenhar({ manterJanelas: true }) });
+    if (rolagem) window.scrollTo(0, rolagem);
   } catch (err) {
     console.error(err);
     limpar(principal, el('div', { class: 'falha' }, `Não foi possível abrir a tela: ${err.message}`));

@@ -359,9 +359,11 @@ function novoAcesso(c, recarregar) {
   const botao = el('button', { class: 'botao' }, 'Criar acesso');
   botao.addEventListener('click', () => acao(botao, async () => {
     const out = await api.post(`/clientes/${c.id}/acessos`, lerForm(form));
-    // O cliente cria a própria senha pelo link de ativação (a provisória gerada no cadastro não é mostrada).
-    const link = await api.post(`/clientes/${c.id}/acessos/${out.id}/ativacao`);
+    // Acesso criado: fecha já (repetir daria "e-mail já existe"). O link sai em seguida; se falhar,
+    // o botão "Link de ativação" da lista gera de novo.
     m.fechar();
+    recarregar();
+    const link = await api.post(`/clientes/${c.id}/acessos/${out.id}/ativacao`);
     mostrarAtivacao(link, 'Acesso criado: link de ativação');
     recarregar();
   }));
@@ -447,9 +449,16 @@ function novoCliente(recarregar) {
 function editarCliente(c, recarregar) {
   const form = el('form', { onsubmit: (e) => e.preventDefault() }, camposCadastro(c));
   ligarConsultas(form);
+  if (!pode('repasses.aprovar')) {
+    form.querySelectorAll('[name^="destino_"], [name^="pix_"], [name="entrega"]').forEach((i) => { i.disabled = true; i.title = 'Só o financeiro ou o administrador alteram'; });
+  }
   const botao = el('button', { class: 'botao' }, 'Salvar');
   botao.addEventListener('click', () => acao(botao, async () => {
-    await api.patch(`/clientes/${c.id}`, { ...lerForm(form), versao: c.versao });
+    const dados = lerForm(form);
+    // Conta de recebimento, chave PIX e forma de recebimento só mudam por quem aprova repasse: os demais
+    // perfis salvam o resto do cadastro sem esses campos (senão o servidor recusava a edição inteira).
+    if (!pode('repasses.aprovar')) for (const k of Object.keys(dados)) if (/^(destino_|pix_)|^entrega$/.test(k)) delete dados[k];
+    await api.patch(`/clientes/${c.id}`, { ...dados, versao: c.versao });
     m.fechar();
     toast('Cadastro atualizado.', 'ok');
     recarregar();

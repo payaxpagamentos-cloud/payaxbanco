@@ -147,7 +147,7 @@ async function detalheBoleto(alvo, id, recarregar) {
   const par = (rot, val, classe = '') => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: `val ${classe}` }, val));
 
   const acoes = el('div', { class: 'acoes' },
-    el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, () => api.abrirPagina(`/boletos/${b.id}/ficha`)) }, icone('imprimir'), 'Ficha / imprimir'),
+    el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, () => api.abrirFicha(b.id)) }, icone('imprimir'), 'Ficha / imprimir'),
     el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
       const l = await api.get(`/boletos/${b.id}/link`);
       await copiar(l.url ?? `${location.origin}${l.caminho}`, 'Link do boleto copiado — envie ao pagador.');

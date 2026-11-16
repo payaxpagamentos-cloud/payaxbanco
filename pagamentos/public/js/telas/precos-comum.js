@@ -26,11 +26,17 @@ const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' 
 function antigos(p) {
   const bp = bolepixDe(p) ?? {};
   const l = [];
-  const soma = (k) => (p?.[k] ?? 0) || (bp[k] ?? 0);
-  if (soma('tarifa_emissao_centavos')) l.push(['Tarifa de emissão', dinheiro(p.tarifa_emissao_centavos ?? 0)]);
-  if (soma('percentual_ppm')) l.push(['Tarifa %', percentual(p.percentual_ppm)]);
-  if (soma('tarifa_liquidacao_centavos')) l.push(['Tarifa bancária', dinheiro(p.tarifa_liquidacao_centavos ?? 0)]);
-  if (soma('comissao_minima_centavos')) l.push(['Tarifa mínima', dinheiro(p.comissao_minima_centavos ?? 0)]);
+  // Mostra o valor do boleto e, se o Bolepix tiver outro, os dois.
+  const par2 = (k, fmt) => {
+    const a = p?.[k] ?? 0; const b = bp[k] ?? a;
+    if (!a && !b) return null;
+    return a === b ? fmt(a) : `${fmt(a)} (Bolepix ${fmt(b)})`;
+  };
+  for (const [k, rot, fmt] of [['tarifa_emissao_centavos', 'Tarifa de emissão', dinheiro], ['percentual_ppm', 'Tarifa %', percentual],
+    ['tarifa_liquidacao_centavos', 'Tarifa bancária', dinheiro], ['comissao_minima_centavos', 'Tarifa mínima', dinheiro]]) {
+    const x = par2(k, fmt);
+    if (x) l.push([rot, x]);
+  }
   if (p?.comissao_maxima_centavos !== null && p?.comissao_maxima_centavos !== undefined) l.push(['Tarifa máxima', dinheiro(p.comissao_maxima_centavos)]);
   if (p?.tarifa_repasse_centavos) l.push(['Tarifa de repasse', dinheiro(p.tarifa_repasse_centavos)]);
   return l;

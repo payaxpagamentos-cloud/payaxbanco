@@ -163,6 +163,11 @@ function chavePix(v, tipo) {
     exigir(emailValido(t), 'Chave PIX de e-mail inválida.');
     return { tipo: 'email', chave: t.toLowerCase() };
   }
+  // Tipo informado como celular (ou com +55): é telefone, mesmo que os 11 dígitos passem como CPF.
+  if (tipo === 'telefone' || /^\+/.test(t)) {
+    exigir(d.length >= 10 && d.length <= 13, 'Chave PIX de celular inválida.');
+    return { tipo: 'telefone', chave: `+55${d.replace(/^55(?=\d{10,11}$)/, '')}` };
+  }
   if (d.length === 11 && cpfValido(d)) return { tipo: 'cpf', chave: d };
   if (d.length === 14) { exigir(cnpjValido(d), 'Chave PIX de CNPJ inválida.'); return { tipo: 'cnpj', chave: d }; }
   if (d.length >= 10 && d.length <= 13) return { tipo: 'telefone', chave: `+55${d.replace(/^55/, '')}` };

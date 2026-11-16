@@ -90,7 +90,7 @@ module.exports = (db) => {
     }
     if (d.boleto.situacao === 'cancelado') throw new ErroNegocio('Este boleto foi cancelado.', 410);
     res.set('Cache-Control', 'private, no-store');
-    res.type('html').send(await impressao.fichaCompensacao({ ...d, hoje: hoje(), base: config.basePath }));
+    res.type('html').send(await impressao.fichaCompensacao({ ...d, hoje: hoje(), base: config.clientePath }));
   });
 
   /**

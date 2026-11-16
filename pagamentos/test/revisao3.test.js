@@ -59,6 +59,13 @@ test('revisão geral: segurança, dinheiro e abertura de conta', async (t) => {
     assert.equal(await pedirComHost(api.raiz, '/js/app.js', { Host: 'payax.com.br', 'X-Forwarded-Host': 'pagamentos.payax.com.br' }), 404);
   });
 
+  await t.test('ficha do boleto pelo link assinado abre no endereço do site, com o script funcionando', async () => {
+    const b = await api.boleto(tk.admin, a.cliente.id, { valor: '50,00', vencimento: somarDias(hoje, 5) });
+    const { caminho } = (await api.get(`/cliente/api/boletos/${b.id}/link`, a.token)).dados;
+    assert.equal(await pedirComHost(api.raiz, caminho, { Host: 'payax.com.br' }), 200);
+    assert.equal(await pedirComHost(api.raiz, '/cliente/js/boleto.js', { Host: 'payax.com.br' }), 200);
+  });
+
   await t.test('senha provisória e link de ativação não ficam guardados na idempotência', async () => {
     const r = await api.post(`/api/clientes/${a.cliente.id}/acessos`, { nome: 'Novo', email: 'novo@alfa.test', perfil: 'operador' }, tk.admin, { 'Idempotency-Key': 'chave-teste-000001' });
     assert.equal(r.status, 201);

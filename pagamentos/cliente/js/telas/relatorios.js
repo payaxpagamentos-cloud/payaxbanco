@@ -29,8 +29,9 @@ export default async function relatorios({ alvo, query }) {
       kpi({ rotulo: 'Boletos emitidos', valor: numero(b.emitidos), apoio: dinheiro(b.valor_emitido_centavos), ic: 'boleto' }),
       kpi({ rotulo: 'Recebido', valor: dinheiro(l.bruto_centavos), apoio: `${numero(l.titulos)} título(s) pago(s)`, tom: 'destaque', ic: 'dinheiro' }),
       kpi({ rotulo: 'Líquido para você', valor: dinheiro(l.liquido_centavos), tom: 'positivo', ic: 'cofre' }),
-      kpi({ rotulo: 'Descontos', valor: dinheiro(l.comissao_centavos + l.tarifa_banco_centavos + l.tarifa_emissao_centavos),
-        apoio: `tarifas PAY AX ${dinheiro(l.comissao_centavos + l.tarifa_emissao_centavos)} + tarifas bancárias ${dinheiro(l.tarifa_banco_centavos)}`, menor: true, ic: 'relatorio' }),
+      // Uma tarifa só para o cliente: a Tarifa PAY AX (Boleto ou Bolepix), somando o que a tabela antiga ainda cobre.
+      kpi({ rotulo: 'Tarifa PAY AX', valor: dinheiro(l.comissao_centavos + l.tarifa_banco_centavos + l.tarifa_emissao_centavos),
+        apoio: `${numero(l.titulos)} título(s) pago(s)`, menor: true, ic: 'relatorio' }),
       kpi({ rotulo: 'Transferido para você', valor: dinheiro(l.repassado_centavos), menor: true, ic: 'troca' })),
 
     el('div', { class: 'grade duas', style: 'margin-top:14px' },

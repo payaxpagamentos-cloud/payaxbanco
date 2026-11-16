@@ -83,10 +83,13 @@
   const mesmo = form.querySelector('[data-mesmo-responsavel]');
   const copiar = () => {
     if (!mesmo.checked) return;
-    for (const c of ['nome', 'email', 'telefone']) $(`financeiro.${c}`).value = $(`representante.${c}`).value;
+    for (const c of ['nome', 'email']) $(`financeiro.${c}`).value = $(`representante.${c}`).value;
+    // O celular do financeiro recebe SMS: só copia se o telefone do responsável legal for celular.
+    const tel = so($('representante.telefone').value);
+    if (tel.length === 11 && tel[2] === '9') $('financeiro.telefone').value = $('representante.telefone').value;
   };
   mesmo.addEventListener('change', () => {
-    for (const c of ['nome', 'email', 'telefone']) $(`financeiro.${c}`).readOnly = mesmo.checked;
+    for (const c of ['nome', 'email']) $(`financeiro.${c}`).readOnly = mesmo.checked;
     copiar();
   });
   ['nome', 'email', 'telefone'].forEach((c) => $(`representante.${c}`).addEventListener('input', copiar));
@@ -126,6 +129,19 @@
     r.readAsDataURL(f);
   });
 
+  // ------------------------------------------------------------------ dígitos verificadores
+  function cpfValido(d) {
+    if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false;
+    const dv = (n) => { const s = [...d.slice(0, n)].reduce((a, x, i) => a + Number(x) * (n + 1 - i), 0) % 11; return s < 2 ? 0 : 11 - s; };
+    return dv(9) === Number(d[9]) && dv(10) === Number(d[10]);
+  }
+  function cnpjValido(d) {
+    if (!/^\d{14}$/.test(d) || /^(\d)\1{13}$/.test(d)) return false;
+    const dv = (n) => { const pesos = n === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+      const s = pesos.reduce((a, p, i) => a + Number(d[i]) * p, 0) % 11; return s < 2 ? 0 : 11 - s; };
+    return dv(12) === Number(d[12]) && dv(13) === Number(d[13]);
+  }
+
   // ------------------------------------------------------------------ envio
   const valor = (nome) => String($(nome)?.value ?? '').trim();
   function mostrarErro(msg) {
@@ -145,6 +161,12 @@
     if (faltando.length) { faltando[0].focus(); return 'Preencha os campos marcados.'; }
     const emails = ['empresa.email', 'representante.email', 'financeiro.email'].map($).filter((i) => !i.checkValidity());
     if (emails.length) { emails[0].closest('.campo').classList.add('invalido'); emails[0].focus(); return 'Confira o e-mail informado.'; }
+    // CNPJ e CPF conferidos aqui (dígitos verificadores): cada envio recusado conta no limite de tentativas.
+    const marcar = (nome, msg) => { $(nome).closest('.campo').classList.add('invalido'); $(nome).focus(); return msg; };
+    if (!cnpjValido(so($('empresa.cnpj').value))) return marcar('empresa.cnpj', 'Confira o CNPJ da empresa: os dígitos não conferem.');
+    if (!cpfValido(so($('representante.cpf').value))) return marcar('representante.cpf', 'Confira o CPF do responsável legal: os dígitos não conferem.');
+    if (so($('empresa.cep').value).length !== 8) return marcar('empresa.cep', 'Informe o CEP com 8 números.');
+    if (!/^[A-Za-z]{2}$/.test(valor('empresa.uf'))) return marcar('empresa.uf', 'Informe a UF com 2 letras (ex.: SP).');
     const cel = so($('financeiro.telefone').value);
     if (!(cel.length === 11 && cel[2] === '9')) {
       $('financeiro.telefone').closest('.campo').classList.add('invalido'); $('financeiro.telefone').focus();

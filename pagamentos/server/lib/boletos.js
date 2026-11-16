@@ -399,7 +399,7 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
     razao.lancar(db, { ...comum, tipo: 'credito_liquidacao', valor_centavos: split.bruto_centavos,
       descricao: `Recebimento ${ref} · ${b.pagador_nome}` });
     razao.lancar(db, { ...comum, tipo: 'tarifa_banco', valor_centavos: -split.tarifa_banco_centavos,
-      descricao: `Tarifa bancária ${ref}` });
+      descricao: `Tarifa (tabela antiga) ${ref}` });
     razao.lancar(db, { ...comum, tipo: 'comissao', valor_centavos: -split.comissao_centavos,
       descricao: `Tarifa PAY AX ${precos.tarifaTexto(precos.doBoleto(b))} ${ref}` });
     // Com rateio, o banco já creditou a parte do cliente na conta dele: registra a saída, e nada fica

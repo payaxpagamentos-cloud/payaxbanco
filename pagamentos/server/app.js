@@ -98,8 +98,8 @@ function criarApp(db) {
   app.use((req, res, next) => {
     if (!config.siteHosts.includes(hostDe(req))) return next();
     if (req.path === '/' || req.path === '/abrir-conta' || req.path.startsWith('/site/')) return site(req, res, next);
-    // O formulário de abertura de conta envia para a API pública (sem sessão).
-    if (req.path.startsWith('/api/publico/abertura')) return equipe(req, res, next);
+    // O formulário de abertura de conta e a ficha do boleto por link assinado (aberta pela Área do Cliente).
+    if (req.path.startsWith('/api/publico/abertura') || req.path.startsWith('/api/publico/boleto/')) return equipe(req, res, next);
     // No domínio do site: a Área do Cliente, o aviso de privacidade e os arquivos comuns. Nada do Backoffice.
     if (/^\/(cliente|privacidade|comum)(\/|$)/.test(req.path)) return next();
     return res.status(404).type('text').send('Página não encontrada.');

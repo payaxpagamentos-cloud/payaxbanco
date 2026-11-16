@@ -67,6 +67,21 @@ export function criarApi({ base, chave, evento }) {
     del: (c) => chamar('DELETE', c, undefined),
     /** Envia um arquivo como corpo bruto (retorno do banco). */
     enviarArquivo: (caminho, arquivo) => chamar('POST', caminho, undefined, { arquivo }),
+    /**
+     * Abre a ficha do boleto pelo link assinado (página de verdade, com o botão de copiar o PIX e os links
+     * funcionando). A aba é aberta ANTES de esperar o servidor: senão o Safari bloqueia como pop-up.
+     */
+    async abrirFicha(boletoId) {
+      const aba = window.open('', '_blank');
+      if (aba) aba.opener = null;
+      try {
+        const { caminho } = await chamar('GET', `/boletos/${boletoId}/link`, undefined, { idempotente: false });
+        if (aba) aba.location.href = caminho; else window.location.assign(caminho);
+      } catch (err) {
+        aba?.close();
+        throw err;
+      }
+    },
     /** Abre uma página do servidor (ficha de compensação) numa aba nova, levando a sessão. */
     async abrirPagina(caminho) {
       const resp = await chamar('GET', caminho, undefined, { bruto: true, idempotente: false });

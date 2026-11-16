@@ -186,7 +186,8 @@ async function ficha(alvo, id, recarregar) {
               ? el('span', {}, selo(s.sms[0].situacao, { enviado: ['Enviado', 'ok'], falha: ['Não enviado', 'erro'], nao_configurado: ['SMS não configurado', 'aviso'] }),
                 el('span', { class: 'sub' }, `${s.sms[0].destino} · ${dataHora(s.sms[0].criado_em)}${s.sms[0].erro ? ` · ${s.sms[0].erro}` : ''}`))
               : 'não enviado')),
-          editar() && s.situacao !== 'recusada' ? el('button', { class: 'botao sec pequeno', onclick: (ev) => acao(ev.currentTarget, async () => {
+          // Reenviar o protocolo só faz sentido com o pedido em andamento.
+          editar() && aberta ? el('button', { class: 'botao sec pequeno', onclick: (ev) => acao(ev.currentTarget, async () => {
             const r = await api.post(`/aberturas/${s.id}/sms`);
             toast(r.situacao === 'enviado' ? `SMS enviado para ${r.destino_mascarado}.` : `SMS não enviado: ${r.erro}`, r.situacao === 'enviado' ? 'ok' : 'erro');
             recarregar();
@@ -216,7 +217,7 @@ async function blocoResponsavel(s, podeEditar, recarregar) {
     opcoes: [['', 'Ninguém ainda'], ...equipe.map((u) => [u.id, u.nome])] });
   sel.querySelector('select').addEventListener('change', (ev) => {
     if (!ev.target.value) return;
-    acao(null, async () => { await api.put(`/aberturas/${s.id}/responsavel`, { usuario_id: ev.target.value }); toast('Responsável definido.'); recarregar(); });
+    acao(null, async () => { try { await api.put(`/aberturas/${s.id}/responsavel`, { usuario_id: ev.target.value }); toast('Responsável definido.'); } finally { recarregar(); } });
   });
   return cartao('Responsável', sel);
 }
@@ -232,7 +233,8 @@ function blocoChecklist(s, podeEditar, recarregar) {
   return cartao(`Análise · ${feitos}/${s.checklist.length}`, el('div', { class: 'checklist' },
     s.checklist.map((c) => el('label', { class: `check${c.feito ? ' feito' : ''}` },
       el('input', { type: 'checkbox', checked: c.feito, disabled: !podeEditar,
-        onchange: (ev) => acao(null, async () => { await api.put(`/aberturas/${s.id}/checklist/${c.chave}`, { feito: ev.target.checked }); recarregar(); }) }),
+        // Sempre recarrega (também quando falha): a caixa nunca fica marcada sem estar salva.
+        onchange: (ev) => acao(null, async () => { try { await api.put(`/aberturas/${s.id}/checklist/${c.chave}`, { feito: ev.target.checked }); } finally { recarregar(); } }) }),
       el('span', {}, c.rotulo, c.feito ? el('small', {}, `${c.por} · ${dataHora(c.em)}`) : null)))), consultar);
 }
 
@@ -318,10 +320,10 @@ function editarDados(s, recarregar) {
     titulo('Conta bancária e chave PIX (da própria empresa)'),
     el('div', { class: 'linha-form cols-4' },
       g('destino', 'banco', 'Banco (código)', { atributos: { placeholder: '237' } }), g('destino', 'ispb', 'ISPB (outros bancos)'),
-      g('destino', 'tipo', 'Tipo', { tipo: 'select', opcoes: Object.entries(TIPO_CONTA) }), g('destino', 'agencia', 'Agência')),
+      g('destino', 'tipo', 'Tipo', { tipo: 'select', opcoes: [['', '—'], ...Object.entries(TIPO_CONTA)] }), g('destino', 'agencia', 'Agência')),
     el('div', { class: 'linha-form cols-4', style: 'margin-top:12px' },
       g('destino', 'agencia_dv', 'Dígito da agência'), g('destino', 'conta', 'Conta'), g('destino', 'conta_dv', 'Dígito da conta'),
-      g('destino', 'pix_tipo', 'Tipo de chave', { tipo: 'select', opcoes: Object.entries(TIPO_PIX) })),
+      g('destino', 'pix_tipo', 'Tipo de chave', { tipo: 'select', opcoes: [['', '—'], ...Object.entries(TIPO_PIX)] })),
     el('div', { style: 'margin-top:12px' }, g('destino', 'pix_chave', 'Chave PIX')));
   const botao = el('button', { class: 'botao' }, 'Salvar dados');
   botao.addEventListener('click', () => acao(botao, async () => {

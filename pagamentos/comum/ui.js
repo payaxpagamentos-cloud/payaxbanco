@@ -272,13 +272,23 @@ export const lerForm = (form) => Object.fromEntries(new FormData(form).entries()
  * para ninguém perder um cadastro ou um boleto pela metade — a janela só pisca, mostrando onde está.
  * O Esc fecha apenas janelas sem campos de preenchimento (avisos, detalhes).
  */
+const janelas = [];
 export function modal({ titulo, corpo, acoes = [], largo = false, aoFechar = null }) {
   const fundo = el('div', { class: 'modal-fundo', onclick: (e) => { if (e.target === fundo) avisarFora(); } });
-  const fechar = () => { fundo.remove(); document.removeEventListener('keydown', esc); aoFechar?.(); };
+  // Ao fechar, o foco volta para quem abriu a janela (teclado e leitor de tela não se perdem).
+  const origem = document.activeElement;
+  const fechar = () => {
+    fundo.remove();
+    document.removeEventListener('keydown', esc);
+    const i = janelas.indexOf(fundo); if (i >= 0) janelas.splice(i, 1);
+    if (origem?.isConnected) origem.focus?.();
+    aoFechar?.();
+  };
   const temCampos = () => Boolean(caixa.querySelector('input:not([type=hidden]), select, textarea'));
   const avisarFora = () => { caixa.classList.remove('pisca'); void caixa.offsetWidth; caixa.classList.add('pisca'); };
   const esc = (e) => {
-    if (e.key !== 'Escape' || fundo !== document.querySelector('.modal-fundo:last-of-type')) return;
+    // Só a janela de cima responde ao Esc (pilha própria: o aviso flutuante no fim da página não atrapalha).
+    if (e.key !== 'Escape' || !fundo.isConnected || janelas.filter((j) => j.isConnected).at(-1) !== fundo) return;
     if (temCampos()) avisarFora(); else fechar();
   };
   document.addEventListener('keydown', esc);
@@ -288,6 +298,7 @@ export function modal({ titulo, corpo, acoes = [], largo = false, aoFechar = nul
     acoes.length ? el('footer', {}, acoes) : null);
   fundo.append(caixa);
   document.body.append(fundo);
+  janelas.push(fundo);
   caixa.querySelector('input, select, textarea, button')?.focus();
   return { fechar, caixa };
 }
@@ -318,8 +329,9 @@ export function confirmar({ titulo, texto, confirmarTexto = 'Confirmar', perigo 
 
 let caixaToasts = null;
 export function toast(texto, tom = '') {
-  if (!caixaToasts) { caixaToasts = el('div', { class: 'toasts' }); document.body.append(caixaToasts); }
-  const t = el('div', { class: `toast ${tom}`, role: 'status' }, texto);
+  // A região "viva" existe antes da mensagem: assim o leitor de tela anuncia cada aviso (inclusive os erros).
+  if (!caixaToasts) { caixaToasts = el('div', { class: 'toasts', role: 'status', 'aria-live': 'polite' }); document.body.append(caixaToasts); }
+  const t = el('div', { class: `toast ${tom}` }, texto);
   caixaToasts.append(t);
   setTimeout(() => t.remove(), tom === 'erro' ? 7000 : 4000);
 }

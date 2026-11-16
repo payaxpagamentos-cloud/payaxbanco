@@ -133,7 +133,7 @@ async function detalhe(alvo, id, recarregar) {
         el('h1', {}, `${b.pagador_nome}`),
         el('p', {}, `${R.tipoBoleto[b.tipo]} · nosso número ${b.nosso_numero_formatado} · emitido em ${data(b.emissao)}`)),
       el('div', { class: 'acoes' },
-        el('button', { class: 'botao', onclick: (e) => acao(e.currentTarget, () => api.abrirPagina(`/boletos/${b.id}/ficha`)) }, icone('imprimir'), 'Ver / imprimir boleto'),
+        el('button', { class: 'botao', onclick: (e) => acao(e.currentTarget, () => api.abrirFicha(b.id)) }, icone('imprimir'), 'Ver / imprimir boleto'),
         el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
           const l = await api.get(`/boletos/${b.id}/link`);
           await copiar(l.url ?? `${location.origin}${l.caminho}`, 'Link copiado — é só enviar ao pagador.');
