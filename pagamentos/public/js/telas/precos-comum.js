@@ -40,12 +40,12 @@ export function fichaPreco(v) {
 
 /** Os campos de tarifa do formulário, com prefixo (vazio para o boleto, "bolepix_" para o Bolepix). */
 const camposTarifas = (p, prefixo = '') => [
-  campo({ nome: `${prefixo}tarifa_emissao`, rotulo: 'Tarifa de emissão (R$)', tipo: 'dinheiro', valor: reais(p?.tarifa_emissao_centavos ?? 0), ajuda: 'Cobrada no registro' }),
-  campo({ nome: `${prefixo}tarifa_fixa`, rotulo: 'Tarifa PAY AX fixa (R$)', tipo: 'dinheiro', valor: reais(p?.tarifa_fixa_centavos ?? 0), ajuda: 'Por boleto pago. Ex.: 1,99' }),
+  campo({ nome: `${prefixo}tarifa_emissao`, rotulo: 'Tarifa de emissão', tipo: 'dinheiro', valor: reais(p?.tarifa_emissao_centavos ?? 0), ajuda: 'Cobrada no registro' }),
+  campo({ nome: `${prefixo}tarifa_fixa`, rotulo: 'Tarifa PAY AX fixa', tipo: 'dinheiro', valor: reais(p?.tarifa_fixa_centavos ?? 0), ajuda: 'Por boleto pago. Ex.: 1,99' }),
   campo({ nome: `${prefixo}percentual`, rotulo: 'Tarifa PAY AX (%)', valor: ((p?.percentual_ppm || 0) / 10000).toString().replace('.', ','), ajuda: 'Sobre o valor pago; soma com a fixa' }),
-  campo({ nome: `${prefixo}tarifa_liquidacao`, rotulo: 'Tarifa bancária repassada (R$)', tipo: 'dinheiro', valor: reais(p?.tarifa_liquidacao_centavos ?? 0), ajuda: '0 se a fixa já cobre o banco' }),
-  campo({ nome: `${prefixo}comissao_minima`, rotulo: 'Tarifa mínima (R$)', tipo: 'dinheiro', valor: reais(p?.comissao_minima_centavos ?? 0) }),
-  campo({ nome: `${prefixo}comissao_maxima`, rotulo: 'Tarifa máxima (R$)', tipo: 'dinheiro', valor: reais(p?.comissao_maxima_centavos), ajuda: 'Vazio = sem teto' }),
+  campo({ nome: `${prefixo}tarifa_liquidacao`, rotulo: 'Tarifa bancária repassada', tipo: 'dinheiro', valor: reais(p?.tarifa_liquidacao_centavos ?? 0), ajuda: '0 se a fixa já cobre o banco' }),
+  campo({ nome: `${prefixo}comissao_minima`, rotulo: 'Tarifa mínima', tipo: 'dinheiro', valor: reais(p?.comissao_minima_centavos ?? 0) }),
+  campo({ nome: `${prefixo}comissao_maxima`, rotulo: 'Tarifa máxima', tipo: 'dinheiro', valor: reais(p?.comissao_maxima_centavos), ajuda: 'Vazio = sem teto' }),
 ];
 
 /** Formulário da tabela nova, já preenchido com a atual. */
@@ -61,7 +61,7 @@ export function formPreco(atual) {
   return el('form', { onsubmit: (e) => e.preventDefault() },
     el('div', { class: 'linha-form cols-3' },
       campo({ nome: 'vigencia_inicio', rotulo: 'Vigente a partir de', tipo: 'date', valor: hojeIso(), obrigatorio: true }),
-      campo({ nome: 'tarifa_repasse', rotulo: 'Tarifa do repasse (R$)', tipo: 'dinheiro', valor: reais(atual?.tarifa_repasse_centavos ?? 0), ajuda: 'Vale para os dois tipos' }),
+      campo({ nome: 'tarifa_repasse', rotulo: 'Tarifa do repasse', tipo: 'dinheiro', valor: reais(atual?.tarifa_repasse_centavos ?? 0), ajuda: 'Vale para os dois tipos' }),
       campo({ nome: 'observacao', rotulo: 'Observação', valor: '' })),
     titulo('Boleto'),
     el('div', { class: 'linha-form cols-3' }, camposTarifas(atual)),

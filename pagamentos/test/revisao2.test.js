@@ -182,3 +182,11 @@ test('revisão 2: provedor grande no IXC', async (t) => {
     assert.equal((await api.put(`/api/integracoes/ixc/${a.cliente.id}`, { url, carteiras: 'abc' }, tk.admin)).status, 422);
   });
 });
+
+test('revisão 2: valores no padrão da tela (R$ 1.500,00)', () => {
+  const v = require('../server/lib/validacao');
+  assert.equal(v.centavos('R$ 1.500,00', 'o valor'), 150000);
+  assert.equal(v.centavos('R$ 0,09', 'o valor'), 9);
+  assert.equal(v.centavos('R$ 1.234.567,89', 'o valor'), 123456789);
+  assert.equal(v.centavosOpcional('', 'o valor'), null, 'campo apagado = vazio (ex.: tarifa máxima sem teto)');
+});

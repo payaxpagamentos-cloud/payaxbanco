@@ -67,7 +67,7 @@ export function emitir(clientes, recarregar, clienteFixo = null) {
       clienteFixo ? null : campo({ nome: 'cliente_id', rotulo: 'Cliente', tipo: 'select', obrigatorio: true,
         opcoes: clientes.filter((c) => c.situacao === 'ativo').map((c) => [c.id, c.nome_fantasia || c.razao_social]) }),
       campo({ nome: 'tipo', rotulo: 'Tipo', tipo: 'select', valor: 'bolepix', opcoes: Object.entries(R.tipoBoleto) }),
-      campo({ nome: 'valor', rotulo: 'Valor (R$)', tipo: 'dinheiro', obrigatorio: true, atributos: { placeholder: '0,00' } }),
+      campo({ nome: 'valor', rotulo: 'Valor', tipo: 'dinheiro', obrigatorio: true }),
       campo({ nome: 'vencimento', rotulo: 'Vencimento', tipo: 'date', valor: somarDias(hojeIso(), 7), obrigatorio: true }),
       campo({ nome: 'seu_numero', rotulo: 'Nº do documento', ajuda: 'O seu controle (opcional)' })),
     el('h3', { style: 'font-size:14px;margin:14px 0 8px' }, 'Pagador'),
@@ -87,7 +87,7 @@ export function emitir(clientes, recarregar, clienteFixo = null) {
     el('div', { class: 'linha-form' },
       campo({ nome: 'juros_mes', rotulo: 'Juros ao mês (%)', valor: '1', ajuda: 'Máximo 1% ao mês, proporcional aos dias de atraso' }),
       campo({ nome: 'multa', rotulo: 'Multa (%)', valor: '2', ajuda: 'Máximo 2% (Código de Defesa do Consumidor)' }),
-      campo({ nome: 'desconto', rotulo: 'Desconto (R$)', tipo: 'dinheiro' }),
+      campo({ nome: 'desconto', rotulo: 'Desconto', tipo: 'dinheiro' }),
       campo({ nome: 'desconto_ate', rotulo: 'Desconto até', tipo: 'date' })),
     el('div', { style: 'margin-top:12px' }, campo({ nome: 'mensagem', rotulo: 'Mensagem no boleto', atributos: { maxlength: 160 } })),
     el('div', { style: 'margin-top:14px' }, previa));
@@ -277,7 +277,7 @@ function avisoRateio(b, recarregar) {
 function liquidarManual(b, recarregar) {
   const form = el('form', { class: 'linha-form', onsubmit: (e) => e.preventDefault() },
     campo({ nome: 'pago_em', rotulo: 'Data do crédito', tipo: 'date', valor: hojeIso(), obrigatorio: true }),
-    campo({ nome: 'valor_pago', rotulo: 'Valor pago (R$)', tipo: 'dinheiro', valor: (b.valor_centavos / 100).toFixed(2).replace('.', ','), obrigatorio: true }),
+    campo({ nome: 'valor_pago', rotulo: 'Valor pago', tipo: 'dinheiro', valor: (b.valor_centavos / 100).toFixed(2).replace('.', ','), obrigatorio: true }),
     campo({ nome: 'meio', rotulo: 'Meio', tipo: 'select', valor: 'boleto', opcoes: [['boleto', 'Boleto'], ['pix', 'PIX (Bolepix)']] }));
   const botao = el('button', { class: 'botao' }, 'Registrar pagamento');
   botao.addEventListener('click', () => acao(botao, async () => {

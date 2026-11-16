@@ -136,7 +136,7 @@ function formDespesa({ categorias, mes, recarregar, atual = null }) {
     campo({ nome: 'descricao', rotulo: 'Descrição', valor: atual?.descricao ?? '', obrigatorio: true, atributos: { maxlength: 120, placeholder: 'Ex.: Servidor Hostinger KVM 2' } }),
     campo({ nome: 'categoria', rotulo: 'Categoria', tipo: 'select', valor: atual?.categoria ?? 'infraestrutura', opcoes: Object.entries(categorias) }),
     el('div', { class: 'linha-form' },
-      campo({ nome: 'valor', rotulo: 'Valor (R$)', tipo: 'dinheiro', valor: atual ? reais(atual.valor_centavos) : '', obrigatorio: true }),
+      campo({ nome: 'valor', rotulo: 'Valor', tipo: 'dinheiro', valor: atual ? reais(atual.valor_centavos) : '', obrigatorio: true }),
       campo({ nome: 'recorrencia', rotulo: 'Repete', tipo: 'select', valor: atual?.recorrencia ?? 'mensal', opcoes: [['mensal', 'Todo mês'], ['unica', 'Só uma vez']] })),
     el('div', { class: 'linha-form' },
       campo({ nome: 'inicio', rotulo: 'A partir de (ou o mês)', tipo: 'month', valor: atual?.inicio ?? mes, obrigatorio: true }),

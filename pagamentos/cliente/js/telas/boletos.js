@@ -51,7 +51,7 @@ function emitir(recarregar) {
   const form = el('form', { onsubmit: (e) => e.preventDefault() },
     el('div', { class: 'linha-form' },
       campo({ nome: 'tipo', rotulo: 'Tipo', tipo: 'select', valor: 'bolepix', opcoes: Object.entries(R.tipoBoleto) }),
-      campo({ nome: 'valor', rotulo: 'Valor (R$)', tipo: 'dinheiro', obrigatorio: true, atributos: { placeholder: '0,00' } }),
+      campo({ nome: 'valor', rotulo: 'Valor', tipo: 'dinheiro', obrigatorio: true }),
       campo({ nome: 'vencimento', rotulo: 'Vencimento', tipo: 'date', valor: somarDias(hojeIso(), 7), obrigatorio: true }),
       campo({ nome: 'seu_numero', rotulo: 'Nº do documento', ajuda: 'Seu controle (opcional)' })),
     el('h3', { style: 'font-size:14px;margin:14px 0 8px' }, 'Quem vai pagar'),
@@ -71,7 +71,7 @@ function emitir(recarregar) {
     el('div', { class: 'linha-form' },
       campo({ nome: 'juros_mes', rotulo: 'Juros ao mês (%)', valor: '1', ajuda: 'Máximo 1% ao mês' }),
       campo({ nome: 'multa', rotulo: 'Multa (%)', valor: '2', ajuda: 'Máximo 2% (Código de Defesa do Consumidor)' }),
-      campo({ nome: 'desconto', rotulo: 'Desconto por antecipação (R$)', tipo: 'dinheiro' }),
+      campo({ nome: 'desconto', rotulo: 'Desconto por antecipação', tipo: 'dinheiro' }),
       campo({ nome: 'desconto_ate', rotulo: 'Desconto até', tipo: 'date' })),
     el('div', { style: 'margin-top:12px' }, campo({ nome: 'mensagem', rotulo: 'Mensagem no boleto', atributos: { maxlength: 160 } })),
     el('div', { style: 'margin-top:14px' }, previa));

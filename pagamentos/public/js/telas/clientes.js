@@ -162,7 +162,7 @@ async function abaExtrato(alvo, c, query, recarregar) {
 function ajustar(c, recarregar) {
   const form = el('form', { class: 'linha-form', onsubmit: (e) => e.preventDefault() },
     campo({ nome: 'sentido', rotulo: 'Tipo', tipo: 'select', opcoes: [['credito', 'Crédito (aumenta o saldo)'], ['debito', 'Débito (reduz o saldo)']] }),
-    campo({ nome: 'valor', rotulo: 'Valor (R$)', tipo: 'dinheiro', obrigatorio: true }),
+    campo({ nome: 'valor', rotulo: 'Valor', tipo: 'dinheiro', obrigatorio: true }),
     campo({ nome: 'motivo', rotulo: 'Motivo', obrigatorio: true, atributos: { maxlength: 200 } }));
   const botao = el('button', { class: 'botao' }, 'Lançar ajuste');
   botao.addEventListener('click', () => acao(botao, async () => {
@@ -370,7 +370,7 @@ function camposCadastro(c = {}) {
         ajuda: 'Use "Sempre PIX" quando a tarifa do rateio deixar o boleto mais caro para este cliente.' })),
     el('h3', { style: 'font-size:14px;margin:14px 0 8px' }, 'Limites e chave PIX (opcional)'),
     el('div', { class: 'linha-form' },
-      campo({ nome: 'limite_boleto', rotulo: 'Limite por boleto (R$)', tipo: 'dinheiro', valor: reais(c.limite_boleto_centavos ?? 5000000) }),
+      campo({ nome: 'limite_boleto', rotulo: 'Limite por boleto', tipo: 'dinheiro', valor: reais(c.limite_boleto_centavos ?? 5000000) }),
       campo({ nome: 'pix_chave', rotulo: 'Chave PIX (se não houver conta acima)', valor: c.pix_chave ?? '' }),
       campo({ nome: 'pix_titular', rotulo: 'Titular da chave', valor: c.pix_titular ?? '' }),
       campo({ nome: 'pix_documento', rotulo: 'CPF/CNPJ do titular da chave', valor: c.pix_documento ?? '' })),

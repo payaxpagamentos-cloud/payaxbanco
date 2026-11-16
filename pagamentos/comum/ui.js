@@ -212,6 +212,36 @@ export function paginacao({ pagina, por_pagina, total }, aoMudar) {
 }
 
 // ---------------------------------------------------------------- Formulários
+/** Valor em reais no padrão brasileiro: "R$ 1.500,00". */
+export const formatarReais = (centavos) => `R$ ${(centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** Lê um valor já preenchido ("1,99", "10000,00", "1.500,00", "R$ 2,50", 15) em centavos; null se vazio. */
+function centavosDe(v) {
+  if (v === null || v === undefined || String(v).trim() === '') return null;
+  let t = String(v).replace(/[^\d,.-]/g, '');
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  const n = Number(t);
+  return Number.isFinite(n) ? Math.round(n * 100) : null;
+}
+
+/**
+ * Máscara de dinheiro, como nos aplicativos de banco: os dígitos entram pela direita (centavos) e o campo
+ * mostra sempre o padrão "R$ 1.500,00" — digitar 1 5 0 0 0 0 dá R$ 1.500,00. Apagar tudo deixa o campo vazio.
+ */
+function mascararDinheiro(entrada) {
+  const aplicar = () => {
+    const digitos = entrada.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 13);
+    entrada.value = digitos ? formatarReais(Number(digitos)) : '';
+  };
+  const inicial = centavosDe(entrada.value);
+  entrada.value = inicial === null ? '' : formatarReais(inicial);
+  entrada.addEventListener('input', () => {
+    aplicar();
+    entrada.setSelectionRange(entrada.value.length, entrada.value.length);
+  });
+  if (!entrada.placeholder) entrada.placeholder = 'R$ 0,00';
+}
+
 /** Campo de formulário. `tipo`: text, number, date, select, textarea, dinheiro… */
 export function campo({ nome, rotulo, tipo = 'text', valor = '', opcoes = null, ajuda = null, obrigatorio = false, atributos = {} }) {
   let entrada;
@@ -220,7 +250,8 @@ export function campo({ nome, rotulo, tipo = 'text', valor = '', opcoes = null, 
   } else if (tipo === 'textarea') {
     entrada = el('textarea', { name: nome, ...atributos }, valor ?? '');
   } else {
-    entrada = el('input', { name: nome, type: tipo === 'dinheiro' ? 'text' : tipo, value: valor ?? '', inputmode: tipo === 'dinheiro' ? 'decimal' : null, ...atributos });
+    entrada = el('input', { name: nome, type: tipo === 'dinheiro' ? 'text' : tipo, value: valor ?? '', inputmode: tipo === 'dinheiro' ? 'numeric' : null, ...atributos });
+    if (tipo === 'dinheiro') mascararDinheiro(entrada);
   }
   if (obrigatorio) entrada.required = true;
   return el('label', { class: 'campo-form' }, el('span', {}, rotulo), entrada, ajuda ? el('small', {}, ajuda) : null);
