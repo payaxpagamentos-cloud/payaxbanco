@@ -11,7 +11,7 @@ const { cifrar, decifrar } = require('../lib/cripto');
 const v = require('../lib/validacao');
 const sincronismo = require('../lib/sincronismo');
 const boletosLib = require('../lib/boletos');
-const { criarBanco } = require('../lib/bradesco');
+const { criarBanco, doBanco } = require('../lib/bancos');
 const consultaDados = require('../lib/consultaDados');
 const auditoria = require('../lib/auditoria');
 
@@ -48,6 +48,8 @@ module.exports = (db) => {
     res.json({
       banco: {
         ...semSegredo(banco), modo: config.banco.modo, ambiente: config.banco.ambiente,
+        // Nome do banco da conta padrão (a tela não deixa o nome do banco fixo).
+        nome: doBanco(db.prepare('SELECT banco FROM contas_bancarias WHERE ativa = 1 ORDER BY padrao DESC, id LIMIT 1').get()?.banco ?? '237')?.nome ?? 'Banco',
         // O endereço do aviso (com o token) só para o administrador, que é quem o cadastra no banco.
         webhook_caminho: banco && podeEquipe(req.usuario.perfil, '*') && JSON.parse(banco.config || '{}').webhook_token
           ? `${config.basePath}/api/publico/webhook/${JSON.parse(banco.config).webhook_token}` : undefined,
@@ -185,7 +187,7 @@ module.exports = (db) => {
         const fim = Number(String(b.faixa_fim ?? '').replace(/\D/g, ''));
         if (!ini || !fim || fim < ini) throw new ErroNegocio('Informe a faixa de nosso número da carteira PAY AX no IXC (início e fim).', 422);
         if (ini < conta.nosso_numero_inicial || fim > conta.nosso_numero_final) {
-          throw new ErroNegocio(`A faixa precisa estar dentro da faixa da conta no Bradesco (${conta.nosso_numero_inicial} a ${conta.nosso_numero_final}).`, 422);
+          throw new ErroNegocio(`A faixa precisa estar dentro da faixa da conta no banco (${conta.nosso_numero_inicial} a ${conta.nosso_numero_final}).`, 422);
         }
         if (ini <= conta.nosso_numero_atual) {
           throw new ErroNegocio(`A faixa precisa começar depois do último número já usado pela PAY AX nesta conta (${conta.nosso_numero_atual}).`, 422);

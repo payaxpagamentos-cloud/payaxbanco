@@ -1,0 +1,60 @@
+/* PAY AX — página de ativação do acesso (acesso.payax.com.br). Mesmas cores do site. */
+:root{color-scheme:light;--navy:#032733;--ink:#071d30;--mint:#a0f7ec;--paper:#f3f9fc;--muted:#4b6073;--line:#c9dde4;--ok:#137a52;--erro:#a3261a;--font:Inter,"Segoe UI",Arial,sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{min-height:100vh;display:flex;flex-direction:column;background:radial-gradient(ellipse at 20% 0%,rgba(86,217,231,.16),transparent 55%),var(--paper);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased;caret-color:transparent}
+input{caret-color:auto}
+button,input{font:inherit}
+button{cursor:pointer}
+svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+[hidden]{display:none!important}
+.topo{background:var(--navy);color:#fff}
+.faixa{width:min(560px,calc(100% - 32px));margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0}
+.faixa img{width:150px;height:auto;display:block}
+.selo-seguro{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#cff7f1}
+.selo-seguro svg{width:15px;height:15px}
+.palco{flex:1;width:min(560px,calc(100% - 32px));margin:0 auto;padding:32px 0 28px}
+.cartao{background:#fff;border:1px solid #d6e6ec;border-radius:18px;box-shadow:0 14px 34px rgba(16,70,86,.10);padding:30px}
+.carregando{margin:0;text-align:center;color:var(--muted)}
+.sobre{margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.22em;color:#04606f}
+h1{margin:0 0 10px;font-size:26px;line-height:1.15;letter-spacing:-.03em}
+.intro,.cartao>p{margin:0 0 18px;color:#364d60;font-size:15px;line-height:1.55}
+.dados{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 22px}
+.dados>div{padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#f7fcfd}
+.dados .largo{grid-column:1/-1}
+.dados dt{font-size:11.5px;font-weight:650;color:var(--muted);letter-spacing:.02em;margin-bottom:4px}
+.dados dd{margin:0;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:16px;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.copiar{flex:0 0 auto;border:1px solid #9fd6dd;border-radius:8px;background:#e9fbfb;color:#04505d;padding:5px 10px;font-size:12.5px;font-weight:650}
+.copiar:hover{background:#d6f6f6}
+.campo{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;font-size:13.5px;font-weight:600;color:#203b50}
+.campo input{width:100%;height:46px;padding:0 14px;border:1px solid #bdd3db;border-radius:10px;background:#fbfeff;color:var(--ink);font-size:16px;font-weight:400;outline:none}
+.campo input:focus{border-color:#00a3b5;box-shadow:0 0 0 3px rgba(0,163,181,.15);background:#fff}
+.campo small{font-weight:400;color:#557083;font-size:12.5px}
+.rotulo-linha{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gerar{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:#04606f;font-size:13px;font-weight:700;padding:4px 2px}
+.gerar svg{width:15px;height:15px}
+.gerar:hover{text-decoration:underline;text-underline-offset:3px}
+.senha{position:relative}
+.senha input{padding-right:48px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.olho{position:absolute;right:5px;top:5px;display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:8px;background:transparent;color:#173e4c}
+.olho:hover{background:#eef6f8}
+.gerada{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:10px;background:#fff8e6;border:1px solid #f1d9a0;color:#7a5200;font-size:12.5px;font-weight:500}
+.regras{display:flex;flex-wrap:wrap;gap:6px 14px;margin:2px 0 0;padding:0;list-style:none;font-size:12.5px;font-weight:500;color:#6a7f8d}
+.regras li::before{content:"○";margin-right:5px}
+.regras li.ok{color:var(--ok)}
+.regras li.ok::before{content:"●"}
+.aviso-erro{margin:0 0 14px;padding:11px 13px;border-radius:10px;background:#fff4f2;color:var(--erro);font-size:14px;line-height:1.45}
+.principal{display:flex;align-items:center;justify-content:center;width:100%;min-height:50px;padding:12px 18px;border:1px solid rgba(4,96,111,.25);border-radius:11px;background:linear-gradient(140deg,#bcfff4,#8bf4e6);color:#052f3b;font-size:15.5px;font-weight:700;text-decoration:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 18px rgba(76,239,219,.18)}
+.principal:hover{filter:brightness(1.03)}
+.principal:disabled{opacity:.65;cursor:wait}
+.nota{margin:14px 0 0;color:#6a7f8d;font-size:12.5px;line-height:1.5;text-align:center}
+.icone-grande{display:grid;place-items:center;width:62px;height:62px;margin:0 auto 16px;border-radius:50%}
+.icone-grande svg{width:30px;height:30px;stroke-width:2.4}
+.icone-grande.ok{background:#d8f3e6;color:var(--ok)}
+.icone-grande.erro{background:#fde9e6;color:var(--erro)}
+[data-pronto],[data-erro]{text-align:center}
+[data-pronto] .dados{text-align:left}
+.rodape{padding:0 0 22px;text-align:center;font-size:12px;color:#6a7f8d}
+.rodape a{color:#04606f}
+:focus-visible{outline:3px solid #008da4;outline-offset:2px}
+@media(max-width:520px){.cartao{padding:22px 18px;border-radius:16px}h1{font-size:23px}.dados{grid-template-columns:1fr}.palco{padding-top:20px}.faixa img{width:128px}}

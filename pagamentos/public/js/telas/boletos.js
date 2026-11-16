@@ -240,17 +240,17 @@ async function detalheBoleto(alvo, id, recarregar) {
 }
 
 /**
- * Rateio de crédito: o Bradesco credita a parte do cliente direto na conta dele. Se não der certo, o
+ * Rateio de crédito: o banco credita a parte do cliente direto na conta dele. Se não der certo, o
  * valor vai por PIX (plano B). Se o banco não disse se rateou, a equipe confere no extrato e informa.
  */
 function avisoRateio(b, recarregar) {
   const motivo = b.rateio_motivo ? ` Motivo do banco: ${b.rateio_motivo}.` : '';
   const textos = {
-    aceito: ['O banco aceitou o rateio: quando for pago, o próprio Bradesco credita a parte do cliente na conta dele.', 'info'],
+    aceito: ['O banco aceitou o rateio: quando for pago, o próprio banco credita a parte do cliente na conta dele.', 'info'],
     recusado: [`O banco registrou o título mas recusou o rateio.${motivo} Quando for pago, o valor do cliente vai por PIX.`, 'aviso'],
-    efetuado: ['Rateio feito: o Bradesco creditou a parte do cliente direto na conta dele. Nenhum PIX da PAY AX.', 'ok'],
+    efetuado: ['Rateio feito: o banco creditou a parte do cliente direto na conta dele. Nenhum PIX da PAY AX.', 'ok'],
     nao_efetuado: [`O banco não fez o rateio.${motivo} O valor do cliente foi por PIX (plano B).`, 'aviso'],
-    a_confirmar: ['Pago, mas o banco não disse se creditou o cliente. Confira no extrato do Bradesco se a parte dele caiu na conta dele e informe abaixo. Até lá, nenhum PIX sai — para não pagar duas vezes.', 'erro'],
+    a_confirmar: ['Pago, mas o banco não disse se creditou o cliente. Confira no extrato do banco se a parte dele caiu na conta dele e informe abaixo. Até lá, nenhum PIX sai — para não pagar duas vezes.', 'erro'],
   };
   const [texto, tom] = textos[b.rateio_situacao] ?? ['Rateio de crédito pedido ao banco: aguardando a confirmação do registro.', 'info'];
   const conferir = (creditado) => async (e) => { const botao = e.currentTarget;

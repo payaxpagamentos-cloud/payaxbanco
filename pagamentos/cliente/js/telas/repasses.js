@@ -17,7 +17,7 @@ export default async function repasses({ alvo, query }) {
   montar(alvo,
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Transferências'),
       el('p', {}, peloBanco
-        ? 'Cada pagamento é creditado pelo próprio Bradesco na sua conta, já sem a tarifa. Não precisa pedir.'
+        ? 'Cada pagamento é creditado pelo próprio banco na sua conta, já sem a tarifa. Não precisa pedir.'
         : 'Cada pagamento vai para a sua conta por PIX assim que o banco credita, já sem a tarifa. Não precisa pedir.'))),
 
     el('div', { class: 'grade kpis' },
@@ -42,7 +42,7 @@ export default async function repasses({ alvo, query }) {
         { titulo: 'Situação', conteudo: (r) => el('span', {}, selo(r.situacao, R.situacaoRepasse),
           r.meio === 'rateio' ? null : r.end_to_end ? el('span', { class: 'sub num' }, r.end_to_end) : r.erro ? el('span', { class: 'sub' }, `${r.erro} — nova tentativa automática`) : null) },
         { titulo: 'Na sua conta', conteudo: (r) => (r.meio === 'rateio'
-          ? el('span', {}, data(r.confirmado_em), el('span', { class: 'sub' }, 'crédito do Bradesco'))
+          ? el('span', {}, data(r.confirmado_em), el('span', { class: 'sub' }, 'crédito do banco'))
           : r.confirmado_em ? dataHora(r.confirmado_em) : '—') },
       ],
       itens: d.itens,

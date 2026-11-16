@@ -116,7 +116,7 @@ module.exports = (db) => {
   r.post('/:id/consultar', exigir('conciliacao.operar'), async (req, res) => {
     const d = consultas.boletoCompleto(db, req.params.id);
     if (!d) throw naoEncontrado('Boleto');
-    const { criarBanco } = require('../lib/bradesco');
+    const { criarBanco } = require('../lib/bancos');
     const banco = criarBanco(d.conta, boletosLib.credenciaisDaConta(db, d.conta.id));
     const resp = await banco.consultar(d.boleto.nosso_numero);
     if (resp.situacao === 'liquidado' && d.boleto.situacao !== 'liquidado') {

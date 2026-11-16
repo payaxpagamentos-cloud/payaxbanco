@@ -98,7 +98,7 @@ async function abaResumo(alvo, c, query, recarregar) {
         par('Conta de destino', c.destino_descricao ?? el('span', { style: 'color:var(--vermelho)' }, 'não cadastrada — o cliente não emite')),
         par('Titular', c.destino_titular ?? c.pix_titular ?? c.razao_social),
         par('Como chega', c.meio_entrega === 'rateio'
-          ? 'Rateio de crédito: o Bradesco credita direto na conta, sem passar pela PAY AX (PIX se o banco não ratear)'
+          ? 'Rateio de crédito: o banco credita direto na conta, sem passar pela PAY AX (PIX se o banco não ratear)'
           : `PIX pela PAY AX, na hora em que o banco credita${c.entrega === 'pix' ? ' (escolhido para este cliente)' : ''}`),
         par('Quando', 'Na liquidação: sem saque nem aprovação')))),
     el('div', { class: 'grade duas', style: 'margin-top:14px' },
@@ -260,12 +260,17 @@ async function abaAcessos(alvo, c, query, recarregar) {
         { titulo: 'Perfil', conteudo: (a) => R.perfilCliente[a.perfil] ?? a.perfil },
         { titulo: 'Último acesso', conteudo: (a) => (a.ultimo_acesso ? dataHora(a.ultimo_acesso) : 'nunca entrou') },
         { titulo: 'Situação', conteudo: (a) => selo(a.ativo ? 'ativo' : 'suspenso', R.situacaoCliente) },
-        { titulo: '', dir: true, conteudo: (a) => !pode('clientes.editar') ? null : el('button', { class: 'botao sutil pequeno', onclick: (e) => acao(e.currentTarget, async () => {
-          const r = await confirmar({ titulo: 'Redefinir senha', texto: `Gerar nova senha provisória para ${a.nome}?`, confirmarTexto: 'Gerar' });
-          if (!r) return;
-          const out = await api.patch(`/clientes/${c.id}/acessos/${a.id}`, { redefinir_senha: true });
-          mostrarAcesso(c, { nome: a.nome, email: a.email, senha: out.senha_provisoria }, 'Nova senha provisória');
-        }) }, 'Redefinir senha') },
+        { titulo: '', dir: true, conteudo: (a) => !pode('clientes.editar') ? null : el('span', { style: 'display:inline-flex;gap:4px' },
+          el('button', { class: 'botao sec pequeno', title: 'O cliente cria a própria senha em acesso.payax.com.br', onclick: (e) => acao(e.currentTarget, async () => {
+            const out = await api.post(`/clientes/${c.id}/acessos/${a.id}/ativacao`);
+            mostrarAtivacao(out, 'Link de ativação');
+          }) }, icone('cadeado'), 'Link de ativação'),
+          el('button', { class: 'botao sutil pequeno', onclick: (e) => acao(e.currentTarget, async () => {
+            const r = await confirmar({ titulo: 'Senha provisória', texto: `Gerar uma senha provisória para ${a.nome}? Prefira o link de ativação: nele o próprio cliente cria a senha.`, confirmarTexto: 'Gerar' });
+            if (!r) return;
+            const out = await api.patch(`/clientes/${c.id}/acessos/${a.id}`, { redefinir_senha: true });
+            mostrarAcesso(c, { nome: a.nome, email: a.email, senha: out.senha_provisoria }, 'Nova senha provisória');
+          }) }, 'Senha provisória')) },
       ],
       itens: c.acessos,
       vazio: 'Nenhum acesso criado. O cliente ainda não consegue entrar na Área do Cliente.',
@@ -311,6 +316,29 @@ async function abaAcessos(alvo, c, query, recarregar) {
   );
 }
 
+/**
+ * Link de ativação pronto para mandar ao cliente: nele o cliente vê o protocolo, o número da conta e o código
+ * do usuário, e cria a própria senha (ou gera uma). A PAY AX não vê a senha.
+ */
+export function mostrarAtivacao({ nome, email, link, expira_em: expira, protocolo, conta }, titulo = 'Link de ativação') {
+  const url = link.startsWith('http') ? link : `${location.origin}${link}`;
+  const validade = new Date(expira).toLocaleDateString('pt-BR');
+  const texto = `Olá, ${nome}! A conta da sua empresa na PAY AX está aberta.${protocolo ? `\n\nProtocolo: ${protocolo}` : ''}${conta ? `\nConta: ${conta}` : ''}`
+    + `\nCódigo do usuário (login): ${email}\n\nCrie a sua senha neste link (vale até ${validade} e só pode ser usado uma vez):\n${url}`
+    + '\n\nPara sua segurança, o site pede o CNPJ da empresa.';
+  const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
+  modal({ titulo, corpo: [
+    el('p', {}, `Mande este link para ${nome}. Lá o cliente cria a própria senha (ou gera uma) — ninguém da PAY AX vê a senha. O link vale até ${validade} e só pode ser usado uma vez; gerar outro cancela este.`),
+    el('div', { class: 'pares', style: 'margin-top:12px;grid-template-columns:1fr 1fr;gap:10px;overflow-wrap:anywhere' },
+      protocolo ? par('Protocolo', protocolo) : null, conta ? par('Conta', conta) : null,
+      el('div', { class: 'par', style: 'grid-column:1/-1' }, el('span', { class: 'rot' }, 'Código do usuário (login)'), el('span', { class: 'val' }, email)),
+      el('div', { class: 'par', style: 'grid-column:1/-1' }, el('span', { class: 'rot' }, 'Link de ativação'), el('span', { class: 'val codigo', style: 'font-size:12.5px' }, url))),
+  ], acoes: [
+    el('button', { class: 'botao sec', onclick: () => copiar(url, 'Link copiado.') }, icone('copiar'), 'Copiar só o link'),
+    el('button', { class: 'botao', onclick: () => copiar(texto, 'Mensagem copiada: é só colar no WhatsApp ou no e-mail.') }, icone('copiar'), 'Copiar mensagem para o cliente'),
+  ] });
+}
+
 /** Dados de acesso prontos para mandar ao cliente: endereço, e-mail e senha provisória, com um botão para copiar tudo. */
 export function mostrarAcesso(c, { nome, email, senha }, titulo) {
   const url = c.area_cliente_url.startsWith('http') ? c.area_cliente_url : `${location.origin}${c.area_cliente_url}`;
@@ -334,8 +362,10 @@ function novoAcesso(c, recarregar) {
   const botao = el('button', { class: 'botao' }, 'Criar acesso');
   botao.addEventListener('click', () => acao(botao, async () => {
     const out = await api.post(`/clientes/${c.id}/acessos`, lerForm(form));
+    // O cliente cria a própria senha pelo link de ativação (a provisória gerada no cadastro não é mostrada).
+    const link = await api.post(`/clientes/${c.id}/acessos/${out.id}/ativacao`);
     m.fechar();
-    mostrarAcesso(c, { nome: out.nome, email: out.email, senha: out.senha_provisoria }, 'Acesso criado');
+    mostrarAtivacao(link, 'Acesso criado: link de ativação');
     recarregar();
   }));
   const m = modal({ titulo: 'Novo acesso à Área do Cliente', corpo: form,
@@ -365,7 +395,7 @@ function camposCadastro(c = {}) {
       campo({ nome: 'uf', rotulo: 'UF', valor: c.uf ?? '', atributos: { maxlength: 2, style: 'text-transform:uppercase' } })),
     el('h3', { style: 'font-size:14px;margin:14px 0 4px' }, 'Conta para receber os pagamentos'),
     el('p', { style: 'font-size:12.5px;color:var(--texto-3);margin:0 0 8px' },
-      'Obrigatória para emitir. Tem que ser da própria empresa (mesmo CNPJ). Conta no Bradesco, com rateio contratado no convênio: o banco credita direto. Outros bancos: PIX pelos dados da conta, na hora.'),
+      'Obrigatória para emitir. Tem que ser da própria empresa (mesmo CNPJ). Conta no mesmo banco da PAY AX, com rateio contratado no convênio: o banco credita direto. Outros bancos: PIX pelos dados da conta, na hora.'),
     el('div', { class: 'linha-form' },
       campo({ nome: 'destino_banco', rotulo: 'Banco (código)', valor: c.destino_banco ?? '', ajuda: '237 Bradesco · 001 BB · 341 Itaú · 104 Caixa · 033 Santander · 756 Sicoob', atributos: { maxlength: 3, inputmode: 'numeric' } }),
       campo({ nome: 'destino_agencia', rotulo: 'Agência', valor: c.destino_agencia ?? '', atributos: { maxlength: 5, inputmode: 'numeric' } }),
@@ -378,7 +408,7 @@ function camposCadastro(c = {}) {
       campo({ nome: 'destino_ispb', rotulo: 'ISPB (só se o banco não estiver na lista)', valor: c.destino_ispb ?? '', atributos: { maxlength: 8, inputmode: 'numeric' } })),
     el('div', { class: 'linha-form' },
       campo({ nome: 'entrega', rotulo: 'Como recebe', tipo: 'select', valor: c.entrega ?? 'padrao',
-        opcoes: [['padrao', 'Padrão do convênio (rateio para conta Bradesco, PIX se não der certo)'], ['pix', 'Sempre PIX da PAY AX']],
+        opcoes: [['padrao', 'Padrão do convênio (rateio para conta no mesmo banco, PIX se não der certo)'], ['pix', 'Sempre PIX da PAY AX']],
         ajuda: 'Use "Sempre PIX" quando a tarifa do rateio deixar o boleto mais caro para este cliente.' })),
     el('h3', { style: 'font-size:14px;margin:14px 0 8px' }, 'Limites e chave PIX (opcional)'),
     el('div', { class: 'linha-form' },

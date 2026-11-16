@@ -60,7 +60,11 @@ module.exports = (db) => {
       FROM boletos WHERE rateio_ppm IS NOT NULL AND ${where}`).get(...args);
     res.json({
       ...lista,
-      itens: lista.itens.map((x) => ({ ...x, destino: x.rateio_destino ? JSON.parse(x.rateio_destino) : null, rateio_destino: undefined })),
+      itens: lista.itens.map((x) => {
+        const destino = x.rateio_destino ? JSON.parse(x.rateio_destino) : null;
+        if (destino) destino.banco_nome = require('../lib/contaDestino').BANCOS[String(destino.banco ?? '').padStart(3, '0')]?.nome ?? `Banco ${destino.banco}`;
+        return { ...x, destino, rateio_destino: undefined };
+      }),
       resumo: {
         creditado_hoje: soma("rateio_situacao = 'efetuado' AND rateio_credito_em = ?", data),
         creditado_mes: soma("rateio_situacao = 'efetuado' AND rateio_credito_em BETWEEN ? AND ?", datas.primeiroDiaMes(data), data),

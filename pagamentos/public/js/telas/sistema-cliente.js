@@ -33,7 +33,7 @@ export function configurarSistema(cliente, atual, recarregar) {
     el('div', { class: 'linha-form cols-3', style: 'margin-top:12px' },
       campo({ nome: 'numeracao', rotulo: 'Quem monta e envia o boleto', tipo: 'select', valor: cfg.numeracao ?? 'payax',
         opcoes: [['ixc', 'O sistema do cliente (layout dele; a PAY AX só registra)'], ['payax', 'A PAY AX (ficha da PAY AX)']],
-        ajuda: 'Pelo sistema do cliente, o boleto só é registrado se o código dele for igual ao do Bradesco.' }),
+        ajuda: 'Pelo sistema do cliente, o boleto só é registrado se o código dele for igual ao calculado pelo banco.' }),
       campo({ nome: 'faixa_inicio', rotulo: 'Nosso número: início da faixa', valor: cfg.faixa_inicio ?? '', ajuda: 'A mesma da carteira PAY AX no sistema' }),
       campo({ nome: 'faixa_fim', rotulo: 'Nosso número: fim da faixa', valor: cfg.faixa_fim ?? '', ajuda: 'Faixa só deste cliente' })),
     el('div', { class: 'linha-form', style: 'margin-top:12px' },

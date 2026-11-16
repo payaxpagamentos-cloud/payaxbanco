@@ -123,7 +123,7 @@ async function creditadoPeloBanco({ alvo, query }) {
   montar(alvo,
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Repasses'),
-        el('p', {}, 'No rateio, o próprio Bradesco credita o cliente: o dinheiro não passa pela PAY AX. O banco informa no arquivo de retorno quanto creditou e quando — é o que aparece aqui.'))),
+        el('p', {}, 'No rateio, o próprio banco credita o cliente: o dinheiro não passa pela PAY AX. O banco informa no arquivo de retorno quanto creditou e quando — é o que aparece aqui.'))),
     abas('banco'),
     el('div', { class: 'grade kpis' },
       kpi({ rotulo: 'Creditado pelo banco hoje', valor: dinheiro(r.creditado_hoje.valor_centavos), apoio: `${numero(r.creditado_hoje.quantidade)} boleto(s)`, tom: 'destaque', ic: 'banco' }),
@@ -138,7 +138,7 @@ async function creditadoPeloBanco({ alvo, query }) {
         { titulo: 'Boleto', conteudo: (x) => el('span', {}, el('span', { class: 'num forte', style: 'white-space:nowrap' }, `${x.nosso_numero}-${x.nosso_numero_dv}`),
           el('span', { class: 'sub' }, `pago em ${data(x.pago_em)}`)) },
         { titulo: 'Cliente', conteudo: (x) => el('span', {}, el('span', { class: 'forte' }, x.nome_fantasia || x.razao_social),
-          x.destino ? el('span', { class: 'sub' }, `Bradesco · ag. ${x.destino.agencia}${x.destino.agencia_dv ? `-${x.destino.agencia_dv}` : ''} · c/c ${x.destino.conta}${x.destino.conta_dv ? `-${x.destino.conta_dv}` : ''}`) : null) },
+          x.destino ? el('span', { class: 'sub' }, `${x.destino.banco_nome ?? 'Banco'} · ag. ${x.destino.agencia}${x.destino.agencia_dv ? `-${x.destino.agencia_dv}` : ''} · c/c ${x.destino.conta}${x.destino.conta_dv ? `-${x.destino.conta_dv}` : ''}`) : null) },
         { titulo: 'Pago', dir: true, conteudo: (x) => dinheiro(x.pago_valor_centavos) },
         { titulo: 'Tarifa PAY AX', dir: true, conteudo: (x) => dinheiro(x.tarifa_payax_centavos) },
         { titulo: 'Creditado ao cliente', dir: true, conteudo: (x) => {

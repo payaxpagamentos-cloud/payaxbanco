@@ -5,6 +5,8 @@ import {
   percentual, data, documento, hojeIso, icone
 } from '../../comum/ui.js';
 
+const nomeBanco = (lista, codigo) => lista.find((b) => b.codigo === String(codigo).padStart(3, '0'))?.nome ?? `Banco ${codigo}`;
+
 /** Nossas contas no banco e a tabela de preços padrão da plataforma. */
 export default async function contas({ alvo, recarregar }) {
   const [c, p] = await Promise.all([api.get('/contas'), api.get('/contas/precos-padrao')]);
@@ -15,16 +17,18 @@ export default async function contas({ alvo, recarregar }) {
     el('div', { class: 'cabecalho-tela' },
       el('div', {}, el('h1', {}, 'Contas e preços'),
         el('p', {}, 'Os boletos de todos os clientes são registrados no convênio da PAY AX no banco; cada um leva o cliente como beneficiário final.')),
-      pode('*') ? el('div', { class: 'acoes' }, el('button', { class: 'botao', onclick: () => editarConta(null, recarregar) }, icone('mais'), 'Nova conta')) : null),
+      pode('*') ? el('div', { class: 'acoes' }, el('button', { class: 'botao', onclick: () => editarConta(null, recarregar, c.bancos) }, icone('mais'), 'Nova conta')) : null),
 
     c.modo_banco === 'simulador'
-      ? aviso('O banco está em modo SIMULADOR: os boletos são registrados localmente, com código de barras e QR válidos, mas o Bradesco não é chamado. Configure as credenciais em Integrações para usar o ambiente real.', 'aviso')
-      : aviso(`Conectado ao Bradesco no ambiente de ${c.ambiente}.`, 'info'),
+      ? aviso('O banco está em modo SIMULADOR: os boletos são registrados localmente, com código de barras e QR válidos, mas o banco não é chamado. Configure as credenciais em Integrações para usar o ambiente real.', 'aviso')
+      : aviso(`Conectado ao banco no ambiente de ${c.ambiente}.`, 'info'),
+    el('p', { class: 'sub', style: 'margin-top:8px' }, 'Bancos homologados: ', c.bancos.filter((b) => b.homologado).map((b) => b.nome).join(', '),
+      '. Em homologação: ', c.bancos.filter((b) => !b.homologado).map((b) => b.nome).join(', '), '.'),
 
     el('div', { style: 'margin-top:14px' }, tabela({
       colunas: [
         { titulo: 'Conta', conteudo: (x) => el('span', {}, el('span', { class: 'forte' }, x.apelido),
-          el('span', { class: 'sub' }, `Ag. ${x.agencia}${x.agencia_dv ? `-${x.agencia_dv}` : ''} · C/C ${x.conta}${x.conta_dv ? `-${x.conta_dv}` : ''} · carteira ${x.carteira}`)) },
+          el('span', { class: 'sub' }, `${nomeBanco(c.bancos, x.banco)} · Ag. ${x.agencia}${x.agencia_dv ? `-${x.agencia_dv}` : ''} · C/C ${x.conta}${x.conta_dv ? `-${x.conta_dv}` : ''} · carteira ${x.carteira}`)) },
         { titulo: 'Beneficiário', conteudo: (x) => el('span', {}, x.beneficiario_nome, el('span', { class: 'sub' }, documento(x.beneficiario_documento))) },
         { titulo: 'Chave PIX (Bolepix)', conteudo: (x) => x.pix_chave ?? el('span', { style: 'color:var(--vermelho)' }, 'sem chave') },
         { titulo: 'Boletos', dir: true, conteudo: (x) => numero(x.boletos) },
@@ -34,7 +38,7 @@ export default async function contas({ alvo, recarregar }) {
       ],
       itens: c.itens,
       vazio: 'Nenhuma conta bancária cadastrada: sem ela não é possível emitir boletos.',
-      aoClicar: pode('*') ? (x) => editarConta(x, recarregar) : null,
+      aoClicar: pode('*') ? (x) => editarConta(x, recarregar, c.bancos) : null,
     })),
 
     el('div', { style: 'margin-top:18px' }, cartao('Tabela de preços padrão da plataforma',
@@ -46,11 +50,14 @@ export default async function contas({ alvo, recarregar }) {
   );
 }
 
-function editarConta(c, recarregar) {
+function editarConta(c, recarregar, bancos = []) {
   const novo = !c;
   const reais = (v) => (v === null || v === undefined ? '' : (v / 100).toFixed(2).replace('.', ','));
   const form = el('form', { onsubmit: (e) => e.preventDefault() },
     el('div', { class: 'linha-form' },
+      campo({ nome: 'banco', rotulo: 'Banco', tipo: 'select', valor: String(c?.banco ?? '237').padStart(3, '0'),
+        opcoes: bancos.map((b) => [b.codigo, b.homologado ? `${b.codigo} · ${b.nome}` : `${b.codigo} · ${b.nome} (em homologação)`]),
+        ajuda: 'Só bancos homologados pela PAY AX podem ser usados' }),
       campo({ nome: 'apelido', rotulo: 'Apelido da conta', valor: c?.apelido ?? '', obrigatorio: true }),
       campo({ nome: 'agencia', rotulo: 'Agência', valor: c?.agencia ?? '', obrigatorio: true }),
       campo({ nome: 'agencia_dv', rotulo: 'DV ag.', valor: c?.agencia_dv ?? '' }),
@@ -70,8 +77,8 @@ function editarConta(c, recarregar) {
     el('div', { class: 'linha-form' },
       campo({ nome: 'pix_chave', rotulo: 'Chave PIX da conta', valor: c?.pix_chave ?? '', ajuda: 'Usada no QR Code do Bolepix' }),
       campo({ nome: 'rateio_contratado', rotulo: 'Como o cliente recebe', tipo: 'select', valor: String(c?.rateio_contratado ?? 0),
-        opcoes: [['0', 'PIX da PAY AX, na hora em que o banco credita'], ['1', 'Rateio pelo Bradesco, com PIX se não der certo']],
-        ajuda: 'Rateio: só depois de o Bradesco confirmar o serviço no convênio, e só para cliente com conta Bradesco. Os demais recebem por PIX. Dá para forçar PIX cliente a cliente.' }),
+        opcoes: [['0', 'PIX da PAY AX, na hora em que o banco credita'], ['1', 'Rateio pelo banco, com PIX se não der certo']],
+        ajuda: 'Rateio: só depois de o banco confirmar o serviço no convênio, e só para cliente com conta no mesmo banco. Os demais recebem por PIX. Dá para forçar PIX cliente a cliente.' }),
       campo({ nome: 'nosso_numero_inicial', rotulo: 'Início da faixa', tipo: 'number', valor: c?.nosso_numero_inicial ?? 1 }),
       campo({ nome: 'nosso_numero_final', rotulo: 'Fim da faixa', tipo: 'number', valor: c?.nosso_numero_final ?? 99999999999 })),
     el('h3', { style: 'font-size:14px;margin:14px 0 8px' }, 'Custo que o banco nos cobra (base da margem)'),
@@ -80,11 +87,13 @@ function editarConta(c, recarregar) {
       campo({ nome: 'custo_liquidacao', rotulo: 'Por boleto liquidado', tipo: 'dinheiro', valor: reais(c?.custo_liquidacao_centavos ?? 0) }),
       campo({ nome: 'custo_pix', rotulo: 'Por PIX enviado', tipo: 'dinheiro', valor: reais(c?.custo_pix_centavos ?? 0) }),
       campo({ nome: 'custo_rateio', rotulo: 'Por rateio', tipo: 'dinheiro', valor: reais(c?.custo_rateio_centavos ?? 0),
-        ajuda: 'Tarifa do Bradesco pelo rateio de crédito, se houver' })),
+        ajuda: 'Tarifa do banco pelo rateio de crédito, se houver' })),
     novo ? null : el('div', { class: 'linha-form', style: 'margin-top:12px' },
       campo({ nome: 'ativa', rotulo: 'Situação', tipo: 'select', valor: String(c.ativa), opcoes: [['1', 'Ativa'], ['0', 'Inativa']] }),
       campo({ nome: 'padrao', rotulo: 'Conta padrão', tipo: 'select', valor: String(c.padrao), opcoes: [['0', 'Não'], ['1', 'Sim']] })));
 
+  // Banco ainda em homologação aparece na lista, mas não pode ser escolhido.
+  form.querySelectorAll('select[name="banco"] option').forEach((o) => { o.disabled = !bancos.find((b) => b.codigo === o.value)?.homologado; });
   const botao = el('button', { class: 'botao' }, novo ? 'Cadastrar conta' : 'Salvar');
   botao.addEventListener('click', () => acao(botao, async () => {
     const d = lerForm(form);

@@ -20,7 +20,7 @@ const config = require('../config');
 const { agora, transacao } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('./erros');
 const v = require('./validacao');
-const { hashSenha, senhaProvisoria } = require('./senha');
+const ativacao = require('./ativacao');
 const contaInterna = require('./contaInterna');
 const precos = require('./precos');
 const datas = require('./datas');
@@ -372,7 +372,6 @@ function aprovar(db, id, usuario, { validarCadastro }) {
   const { empresa: d, representante, financeiro: fin } = validarDados(dados, validarCadastro, { situacao: 'implantacao' });
   if (db.prepare('SELECT 1 FROM clientes WHERE cnpj = ?').get(d.cnpj)) throw new ErroNegocio('Já existe um cliente com este CNPJ.', 409);
   const emailEmUso = db.prepare('SELECT 1 FROM usuarios_cliente WHERE email = ?').get(fin.email);
-  const provisoria = senhaProvisoria();
 
   return transacao(db, () => {
     d.responsavel = fin.nome;
@@ -391,16 +390,22 @@ function aprovar(db, id, usuario, { validarCadastro }) {
     db.prepare('UPDATE clientes SET kyc_representantes = ? WHERE id = ?').run(JSON.stringify([{
       nome: representante.nome, qualificacao: representante.cargo || 'Responsável legal (informado na abertura)', documento: so(representante.cpf),
     }]), clienteId);
+    // O acesso nasce sem senha utilizável: o próprio cliente cria a dele pelo link de ativação.
     let acesso = null;
     if (!emailEmUso) {
       const acessoId = db.prepare(`INSERT INTO usuarios_cliente (cliente_id, nome, email, senha_hash, perfil, senha_provisoria, criado_em)
-        VALUES (?, ?, ?, ?, 'admin', 1, ?) RETURNING id`).get(clienteId, fin.nome, fin.email, hashSenha(provisoria), agora()).id;
-      acesso = { id: acessoId, nome: fin.nome, email: fin.email, senha_provisoria: provisoria };
+        VALUES (?, ?, ?, ?, 'admin', 1, ?) RETURNING id`).get(clienteId, fin.nome, fin.email, ativacao.senhaInutil(), agora()).id;
+      acesso = { id: acessoId, nome: fin.nome, email: fin.email };
     }
     db.prepare("UPDATE solicitacoes_abertura SET situacao = 'aprovada', analisado_por = ?, analisado_em = ?, cliente_id = ? WHERE id = ?")
       .run(usuario.id, agora(), clienteId, s.id);
     registrar(db, s.id, 'sistema', `Conta aberta por ${usuario.nome}: cliente criado em implantação com a proposta.`, usuario.id);
-    return { cliente_id: clienteId, acesso, aviso_acesso: emailEmUso ? `O e-mail ${fin.email} já tem acesso a outro cliente: crie o acesso com outro e-mail.` : null };
+    if (acesso) {
+      Object.assign(acesso, ativacao.gerar(db, acesso.id, { criadoPor: usuario.id, solicitacaoId: s.id }));
+      registrar(db, s.id, 'sistema', `Link de ativação do acesso gerado para ${fin.email} (vale até ${acesso.expira_em.slice(0, 10).split('-').reverse().join('/')}).`, usuario.id);
+    }
+    const cli = db.prepare('SELECT agencia_interna, conta_interna, conta_interna_dv FROM clientes WHERE id = ?').get(clienteId);
+    return { cliente_id: clienteId, protocolo: protocolo(s.id), conta: contaInterna.formatar(cli.agencia_interna, cli.conta_interna, cli.conta_interna_dv), acesso, aviso_acesso: emailEmUso ? `O e-mail ${fin.email} já tem acesso a outro cliente: crie o acesso com outro e-mail.` : null };
   });
 }
 

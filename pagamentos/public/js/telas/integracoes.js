@@ -16,7 +16,7 @@ export default async function integracoes({ alvo, recarregar }) {
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Integrações'),
       el('p', {}, 'As APIs da PAY AX: o banco que registra os boletos e a consulta de CEP e CNPJ. O sistema de gestão de cada cliente fica no cadastro dele (Clientes → Acessos e sistema).'))),
 
-    cartao(['Bradesco — Cobrança Registrada e Bolepix ', statusIntegracao({ ...d.banco, configurada: d.banco.configurada, modo: d.banco.modo }, { grande: true })],
+    cartao([`${d.banco.nome} — Cobrança Registrada e Bolepix `, statusIntegracao({ ...d.banco, configurada: d.banco.configurada, modo: d.banco.modo }, { grande: true })],
       el('div', {},
         d.banco.modo === 'simulador'
           ? aviso('Modo SIMULADOR ativo: os títulos são registrados localmente, com código de barras e BR Code válidos. Nenhuma chamada é feita ao banco. Para ligar o ambiente real, configure as credenciais abaixo e inicie o servidor com PAYAX_BANCO_MODO=bradesco.', 'aviso')
@@ -75,7 +75,7 @@ function configurarBanco(atual, recarregar) {
       campo({ nome: 'client_id', rotulo: 'client_id', obrigatorio: true })),
     el('div', { style: 'margin-top:12px;display:grid;gap:12px' },
       campo({ nome: 'client_secret', rotulo: 'client_secret', tipo: 'password' }),
-      campo({ nome: 'certificado_pem', rotulo: 'Certificado (PEM)', tipo: 'textarea', ajuda: 'Conteúdo do arquivo .pem fornecido pelo Bradesco' }),
+      campo({ nome: 'certificado_pem', rotulo: 'Certificado (PEM)', tipo: 'textarea', ajuda: 'Conteúdo do arquivo .pem fornecido pelo banco' }),
       campo({ nome: 'chave_privada_pem', rotulo: 'Chave privada (PEM)', tipo: 'textarea', ajuda: 'Começa com -----BEGIN PRIVATE KEY-----' }),
       campo({ nome: 'chave_senha', rotulo: 'Senha da chave privada', tipo: 'password' })));
   const botao = el('button', { class: 'botao' }, 'Salvar credenciais');
@@ -83,12 +83,12 @@ function configurarBanco(atual, recarregar) {
     const r = await api.put('/integracoes/banco', lerForm(form));
     m.fechar();
     modal({ titulo: 'Credenciais salvas',
-      corpo: [el('p', {}, 'Cadastre este endereço no portal do Bradesco para receber os avisos de liquidação:'),
+      corpo: [el('p', {}, 'Cadastre este endereço no portal do banco para receber os avisos de liquidação:'),
         el('div', { class: 'codigo' }, `${location.origin}${r.webhook_caminho}`)],
       acoes: [el('button', { class: 'botao', onclick: () => copiar(`${location.origin}${r.webhook_caminho}`) }, icone('copiar'), 'Copiar endereço')] });
     recarregar();
   }));
-  const m = modal({ titulo: 'Credenciais do Bradesco', largo: true,
+  const m = modal({ titulo: `Credenciais do ${atual.nome ?? "banco"}`, largo: true,
     corpo: [aviso('O certificado e a chave privada são cifrados (AES-256-GCM) antes de serem gravados e nunca voltam para a tela.', 'info'), form],
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }

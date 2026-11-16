@@ -37,6 +37,8 @@ function postarNoSite(raiz, caminho, corpo) {
   });
 }
 
+let ativacaoAprovada = null;
+
 test('abertura de conta pelo site', async (t) => {
   const api = await iniciar();
   t.after(() => api.fechar());
@@ -158,9 +160,11 @@ test('abertura de conta pelo site', async (t) => {
     assert.equal(JSON.parse(preco.bolepix).tarifa_fixa_centavos, 249);
     assert.equal(JSON.parse(c.kyc_representantes)[0].documento, CPF);
     assert.equal(r.dados.acesso.email, 'financeiro@exemplo.com.br');
-    assert.match(r.dados.acesso.senha_provisoria, /^[a-z2-9]{6}-[a-z2-9]{4}$/);
-    const login = await api.post('/cliente/api/auth/login', { email: 'financeiro@exemplo.com.br', senha: r.dados.acesso.senha_provisoria });
-    assert.equal(login.status, 200);
+    assert.equal(r.dados.acesso.senha_provisoria, undefined, 'a equipe não recebe senha: o cliente cria pelo link');
+    assert.match(r.dados.acesso.link, /\/ativar#t=[\w-]{40,}$/);
+    assert.match(r.dados.protocolo, /^AB-\d{6}$/);
+    assert.match(r.dados.conta, /\d/);
+    ativacaoAprovada = r.dados.acesso.link.split('#t=')[1];
     assert.equal((await api.post(`/api/aberturas/${id}/aprovar`, {}, tk.financeiro)).status, 409, 'não aprova duas vezes');
     // Já é cliente: o site não aceita novo pedido para o mesmo CNPJ.
     const de_novo = await api.post('/api/publico/abertura', pedido());
@@ -185,6 +189,54 @@ test('abertura de conta pelo site', async (t) => {
     assert.equal(s.dados, '{}');
     assert.equal(s.ip, null);
     assert.equal(api.db.prepare('SELECT COUNT(*) AS n FROM abertura_interacoes WHERE solicitacao_id = ?').get(idB).n, 0);
+  });
+
+  await t.test('ativação: o cliente cria a própria senha pelo link (acesso.payax.com.br)', async () => {
+    const tok = ativacaoAprovada;
+    const c = await api.post('/api/publico/ativacao/consultar', { token: tok });
+    assert.equal(c.status, 200, JSON.stringify(c.dados));
+    assert.match(c.dados.protocolo, /^AB-/);
+    assert.equal(c.dados.codigo_usuario, 'financeiro@exemplo.com.br');
+    assert.equal(c.dados.cnpj_mascarado, '11.***.***/****-81', 'o CNPJ inteiro não sai na consulta');
+    assert.equal((await api.post('/api/publico/ativacao/consultar', { token: 'x'.repeat(43) })).status, 404);
+    // CNPJ errado conta tentativa; senha fraca é recusada.
+    const errado = await api.post('/api/publico/ativacao', { token: tok, cnpj: '19.131.243/0001-97', senha: 'SenhaForte2026' });
+    assert.equal(errado.status, 422);
+    assert.match(errado.dados.erro, /Restam 4/);
+    assert.equal((await api.post('/api/publico/ativacao', { token: tok, cnpj: '11.222.333/0001-81', senha: 'curta1' })).status, 422);
+    assert.equal((await api.post('/api/publico/ativacao', { token: tok, cnpj: '11.222.333/0001-81', senha: 'semnumeroaqui' })).status, 422);
+    // Antes de ativar, nenhuma senha funciona.
+    assert.equal((await api.post('/cliente/api/auth/login', { email: 'financeiro@exemplo.com.br', senha: 'Kp7m-Rx4t-Zq9w-Hs3d' })).status, 401);
+    const ok = await api.post('/api/publico/ativacao', { token: tok, cnpj: '11.222.333/0001-81', senha: 'Kp7m-Rx4t-Zq9w-Hs3d' });
+    assert.equal(ok.status, 200, JSON.stringify(ok.dados));
+    assert.equal(ok.dados.codigo_usuario, 'financeiro@exemplo.com.br');
+    const login = await api.post('/cliente/api/auth/login', { email: 'financeiro@exemplo.com.br', senha: 'Kp7m-Rx4t-Zq9w-Hs3d' });
+    assert.equal(login.status, 200, JSON.stringify(login.dados));
+    assert.equal(login.dados.usuario?.senha_provisoria ?? false, false, 'não pede troca: a senha já é do cliente');
+    // Uso único; o token nunca é guardado em claro.
+    assert.equal((await api.post('/api/publico/ativacao/consultar', { token: tok })).status, 410);
+    assert.ok(!api.db.prepare('SELECT 1 FROM ativacoes_acesso WHERE token_hash = ?').get(tok));
+    assert.ok(api.db.prepare("SELECT 1 FROM auditoria WHERE acao = 'acesso.ativado'").get());
+    assert.ok(!JSON.stringify(api.db.prepare('SELECT * FROM auditoria').all()).includes(tok), 'o link não vai para a auditoria');
+  });
+
+  await t.test('novo link cancela o anterior; 5 CNPJs errados cancelam o link', async () => {
+    const s = api.db.prepare("SELECT id FROM solicitacoes_abertura WHERE situacao = 'aprovada' LIMIT 1").get();
+    const l1 = await api.post(`/api/aberturas/${s.id}/ativacao`, {}, tk.operacao);
+    assert.equal(l1.status, 201, JSON.stringify(l1.dados));
+    const l2 = await api.post(`/api/aberturas/${s.id}/ativacao`, {}, tk.operacao);
+    const t1 = l1.dados.link.split('#t=')[1];
+    const t2 = l2.dados.link.split('#t=')[1];
+    assert.equal((await api.post('/api/publico/ativacao/consultar', { token: t1 })).status, 410);
+    for (let i = 0; i < 4; i += 1) assert.equal((await api.post('/api/publico/ativacao', { token: t2, cnpj: '19131243000197', senha: 'OutraSenha123' })).status, 422);
+    const ultimo = await api.post('/api/publico/ativacao', { token: t2, cnpj: '19131243000197', senha: 'OutraSenha123' });
+    assert.equal(ultimo.status, 410);
+    assert.equal((await api.post('/api/publico/ativacao/consultar', { token: t2 })).status, 410);
+    // Pela ficha do cliente (aba Acessos) também sai o link.
+    const u = api.db.prepare('SELECT id, cliente_id FROM usuarios_cliente WHERE email = ?').get('financeiro@exemplo.com.br');
+    const l3 = await api.post(`/api/clientes/${u.cliente_id}/acessos/${u.id}/ativacao`, {}, tk.operacao);
+    assert.equal(l3.status, 201);
+    assert.equal((await api.post(`/api/clientes/${u.cliente_id}/acessos/${u.id}/ativacao`, {}, tk.consulta)).status, 403);
   });
 
   await t.test('contato pela equipe: prospecção, completar dados, anexar contrato', async () => {

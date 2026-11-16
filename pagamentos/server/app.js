@@ -57,6 +57,22 @@ function criarApp(db) {
   cliente.use('/js/boleto.js', express.static(path.join(__dirname, '..', 'public', 'js', 'boleto.js')));
   cliente.use(express.static(path.join(__dirname, '..', 'cliente'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
+  // ------------------------------------------------- Ativação do acesso (acesso.payax.com.br)
+  // Só a página de ativação e a API dela. Fora desse endereço, a mesma página fica em /ativar.
+  const pastaAcesso = path.join(__dirname, '..', 'acesso');
+  const paginaAcesso = (_req, res) => res.set('Cache-Control', 'no-store').sendFile(path.join(pastaAcesso, 'index.html'));
+  const estaticoAcesso = express.static(pastaAcesso, { index: false, setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') });
+  equipe.get('/ativar', paginaAcesso);
+  equipe.use('/acesso', estaticoAcesso);
+  app.use((req, res, next) => {
+    if (!config.acessoHosts.includes(String(req.hostname || '').toLowerCase())) return next();
+    if (req.path === '/' || req.path === '/ativar') return paginaAcesso(req, res);
+    if (req.path.startsWith('/acesso/')) { req.url = req.url.slice('/acesso'.length); return estaticoAcesso(req, res, () => res.status(404).type('text').send('Não encontrado.')); }
+    if (req.path.startsWith('/api/publico/ativacao')) return equipe(req, res, next);
+    if (/^\/privacidade(\/|$)/.test(req.path)) return next();
+    return res.status(404).type('text').send('Página não encontrada.');
+  });
+
   // ------------------------------------------------- Site público (payax.com.br)
   const pastaSite = path.join(__dirname, '..', 'site');
   const site = express.Router();

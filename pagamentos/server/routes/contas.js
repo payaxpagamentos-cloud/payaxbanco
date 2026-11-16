@@ -10,11 +10,14 @@ const v = require('../lib/validacao');
 const datas = require('../lib/datas');
 const precos = require('../lib/precos');
 const auditoria = require('../lib/auditoria');
+const bancos = require('../lib/bancos');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 
 function corpoConta(b, { novo = false } = {}) {
   const d = {};
+  // Banco da conta: só os homologados (lib/bancos.js). Os demais aparecem na tela como "em homologação".
+  if (novo || b.banco !== undefined) d.banco = bancos.exigirHomologado(b.banco || '237').codigo;
   if (novo || b.apelido !== undefined) d.apelido = v.texto(b.apelido, 'o apelido da conta', 60);
   if (novo || b.agencia !== undefined) d.agencia = v.digitos(b.agencia).slice(0, 5) || v.falhar('Informe a agência.');
   if (novo || b.conta !== undefined) d.conta = v.digitos(b.conta).slice(0, 12) || v.falhar('Informe a conta.');
@@ -54,6 +57,7 @@ module.exports = (db) => {
         FROM contas_bancarias c ORDER BY c.padrao DESC, c.apelido`).all(),
       modo_banco: config.banco.modo,
       ambiente: config.banco.ambiente,
+      bancos: bancos.listar(),
     });
   });
 

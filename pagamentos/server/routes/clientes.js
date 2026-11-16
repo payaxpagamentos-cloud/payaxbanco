@@ -18,6 +18,7 @@ const repasses = require('../lib/repasses');
 const auditoria = require('../lib/auditoria');
 const { podeEquipe } = require('../lib/permissoes');
 const contaInterna = require('../lib/contaInterna');
+const ativacaoLib = require('../lib/ativacao');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 
@@ -279,6 +280,17 @@ module.exports = (db) => {
       VALUES (?, ?, ?, ?, ?, 1, ?) RETURNING id`).get(c.id, nome, email, hashSenha(provisoria), perfil, agora()).id;
     auditoria.registrar(db, req, { acao: 'acesso.criado', entidade: 'usuario_cliente', entidade_id: id, cliente_id: c.id, depois: { nome, email, perfil } });
     res.status(201).json({ id, nome, email, perfil, senha_provisoria: provisoria });
+  });
+
+  /** Link de ativação: o próprio cliente cria a senha em acesso.payax.com.br (a equipe não vê a senha). */
+  r.post('/:id/acessos/:acessoId/ativacao', exigir('acessos.gerenciar', 'clientes.editar'), (req, res) => {
+    const c = buscar(req.params.id);
+    const a = db.prepare('SELECT * FROM usuarios_cliente WHERE id = ? AND cliente_id = ?').get(Number(req.params.acessoId), c.id);
+    if (!a) throw naoEncontrado('Acesso');
+    const out = ativacaoLib.gerar(db, a.id, { criadoPor: req.usuario.id });
+    auditoria.registrar(db, req, { acao: 'acesso.link_ativacao', entidade: 'usuario_cliente', entidade_id: a.id, cliente_id: c.id, depois: { email: a.email, expira_em: out.expira_em } });
+    res.status(201).json({ ...out, conta: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv),
+      protocolo: (() => { const s = db.prepare('SELECT id FROM solicitacoes_abertura WHERE cliente_id = ? ORDER BY id DESC LIMIT 1').get(c.id); return s ? `AB-${String(s.id).padStart(6, '0')}` : null; })() });
   });
 
   r.patch('/:id/acessos/:acessoId', exigir('acessos.gerenciar', 'clientes.editar'), (req, res) => {

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # PAY AX — confere se os endereços estão no ar e corrige o que for possível (servidor com HestiaCP).
 #
-# Para cada endereço (o sistema e, se houver, o site e o www) confere, em ordem:
+# Para cada endereço (o sistema, o site e o www e a ativação de acesso) confere, em ordem:
 #   1. o sistema responde aquele endereço aqui dentro;
 #   2. o domínio existe no Hestia e usa o modelo "payax" (que encaminha para o sistema);
 #   3. o nginx do servidor entrega o sistema (e não a página padrão "Sucesso!");
 #   4. o DNS aponta para este servidor;
-#   5. o HTTPS está ativo.
+#   5. o HTTPS está ativo;
+#   6. quem entra por http:// é mandado para o https://;
+#   7. o certificado não está perto de vencer (o Hestia renova sozinho; aqui conferimos que renovou).
 # O que estiver errado e der para corrigir, corrige (refaz o domínio no Hestia, emite o certificado).
 #
 # Uso (como root):  bash implantacao/verificar.sh          — o instalador também roda no final.
@@ -18,6 +20,8 @@ PORTA="$(grep -E '^PORT=' "$ENV" | cut -d= -f2)"; PORTA="${PORTA:-3600}"
 DOMINIO="$(grep -E '^PAYAX_URL_PUBLICA=' "$ENV" | cut -d= -f2- | sed 's#^https\?://##; s#/.*##')"
 SITE_HOSTS="$(grep -E '^PAYAX_SITE_HOSTS=' "$ENV" | cut -d= -f2- || true)"
 SITE="${SITE_HOSTS%%,*}"
+ACESSO_HOSTS="$(grep -E '^PAYAX_ACESSO_HOSTS=' "$ENV" | cut -d= -f2- || true)"
+ACESSO="${ACESSO_HOSTS%%,*}"
 TEM_HESTIA=0; [[ -x /usr/local/hestia/bin/v-list-users ]] && TEM_HESTIA=1
 IP_SERVIDOR="$(curl -s -4 --max-time 8 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
 # IP em que o nginx do Hestia escuta (o da interface do servidor); é por ele que testamos "por fora".
@@ -29,7 +33,11 @@ aviso() { printf '  \033[1;33mAVISO\033[0m  %s\n' "$*"; }
 PROBLEMAS=0
 
 # O que o sistema entrega em cada endereço: o site tem "Uma nova perspectiva"; o sistema, o Backoffice.
-marca_de() { [[ "$1" == "$SITE" || "$1" == "www.$SITE" ]] && echo 'Uma nova perspectiva' || echo 'PAY AX'; }
+marca_de() {
+  if [[ -n "$SITE" && ( "$1" == "$SITE" || "$1" == "www.$SITE" ) ]]; then echo 'Uma nova perspectiva'
+  elif [[ -n "$ACESSO" && "$1" == "$ACESSO" ]]; then echo 'Ative seu acesso'
+  else echo 'PAY AX'; fi
+}
 
 dono_de() { v-search-domain-owner "$1" web 2>/dev/null || true; }
 
@@ -104,7 +112,33 @@ conferir() {
       ok "HTTPS emitido agora em $dom${apelido:+ e $apelido}"
     else
       falha "sem HTTPS em $dom (o certificado só sai com o DNS apontando para cá; depois rode este script de novo)"
+      return
     fi
+  fi
+
+  # 6. http:// vai para https:// (ninguém digita senha sem cadeado).
+  local destino; destino="$(curl -s --max-time 10 -o /dev/null -w '%{redirect_url}' --resolve "$dom:80:$IP_NGINX" "http://$dom/" 2>/dev/null)"
+  if [[ "$destino" == https://* ]]; then ok "http://$dom vai para o HTTPS"
+  else
+    v-add-web-domain-ssl-force "$u" "$dom" >/dev/null 2>&1 || true
+    destino="$(curl -s --max-time 10 -o /dev/null -w '%{redirect_url}' --resolve "$dom:80:$IP_NGINX" "http://$dom/" 2>/dev/null)"
+    if [[ "$destino" == https://* ]]; then ok "corrigido: http://$dom agora vai para o HTTPS"
+    else aviso "http://$dom não redireciona para o HTTPS (rode: v-add-web-domain-ssl-force $u $dom)"; fi
+  fi
+
+  # 7. Validade do certificado (Let's Encrypt dura 90 dias; o Hestia renova uns 30 dias antes).
+  local fim dias
+  fim="$(echo | openssl s_client -servername "$dom" -connect "$IP_NGINX:443" 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)"
+  if [[ -n "$fim" ]]; then
+    dias=$(( ( $(date -d "$fim" +%s) - $(date +%s) ) / 86400 ))
+    if (( dias >= 15 )); then ok "certificado de $dom vale até $(date -d "$fim" +%d/%m/%Y) ($dias dias; o Hestia renova sozinho)"
+    elif (( dias >= 0 )); then
+      aviso "certificado de $dom vence em $dias dias: pedindo a renovação agora"
+      v-add-letsencrypt-domain "$u" "$dom" "$( [[ "$www" == www ]] && echo "www.$dom" )" >/dev/null 2>&1 && ok "certificado de $dom renovado" \
+        || falha "não consegui renovar o certificado de $dom (veja: v-list-web-domain-ssl $u $dom)"
+    else falha "certificado de $dom VENCIDO desde $(date -d "$fim" +%d/%m/%Y)"; fi
+  else
+    aviso "não consegui ler a validade do certificado de $dom"
   fi
 }
 
@@ -114,6 +148,7 @@ for _ in $(seq 1 30); do curl -s --max-time 2 "http://127.0.0.1:$PORTA/api/saude
 printf '\033[1;34m== Conferindo os endereços (servidor %s)\033[0m\n' "$IP_SERVIDOR"
 conferir "$DOMINIO" ""
 [[ -n "$SITE" ]] && conferir "$SITE" www
+[[ -n "$ACESSO" ]] && conferir "$ACESSO" ""
 echo
 if [[ $PROBLEMAS -eq 0 ]]; then printf '\033[1;32mTudo no ar.\033[0m\n'
 else printf '\033[1;31m%s problema(s) acima.\033[0m Mande um print desta tela para o suporte.\n' "$PROBLEMAS"; fi

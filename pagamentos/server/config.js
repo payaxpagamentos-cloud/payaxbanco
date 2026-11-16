@@ -49,6 +49,8 @@ module.exports = {
   limiteLoginPorMinuto: Number(process.env.PAYAX_LIMITE_LOGIN) || 10,
   // Pedidos de abertura de conta pelo site, por endereço IP, a cada 10 minutos.
   limiteAberturaPor10Min: Number(process.env.PAYAX_LIMITE_ABERTURA || 5),
+  // Ativação do acesso pelo link (consultar + criar a senha), por endereço IP, a cada 10 minutos.
+  limiteAtivacaoPor10Min: Number(process.env.PAYAX_LIMITE_ATIVACAO || 30),
   // Código de 6 dígitos da segunda etapa: limite próprio e baixo (força bruta).
   limite2faPorMinuto: Number(process.env.PAYAX_LIMITE_2FA) || 10,
   fusoPadrao: process.env.PAYAX_FUSO || 'America/Sao_Paulo',
@@ -56,6 +58,10 @@ module.exports = {
   // Domínios do site público (ex.: payax.com.br,www.payax.com.br): mostram o site e a Área do Cliente;
   // o Backoffice não aparece neles.
   siteHosts: String(process.env.PAYAX_SITE_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
+  // Página de ativação do acesso do cliente (ex.: acesso.payax.com.br): só ela e a API dela nesse endereço.
+  acessoHosts: String(process.env.PAYAX_ACESSO_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
+  // Validade do link de ativação, em dias.
+  ativacaoDias: Number(process.env.PAYAX_ATIVACAO_DIAS) || 7,
 
   banco: {
     // 'simulador' registra os títulos localmente (desenvolvimento e homologação interna);

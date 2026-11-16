@@ -17,6 +17,8 @@
 #   ./implantacao/instalar.sh ... --sem-copia-externa   (só testes: sem cópia fora do servidor; ligar depois
 #                                                        rodando de novo com --bucket/--endpoint, sem reinstalar)
 #   ./implantacao/instalar.sh ... --site payax.com.br   (site público com o acesso da Área do Cliente, e o www)
+#   ./implantacao/instalar.sh ... --acesso acesso.payax.com.br   (página em que o cliente ativa o acesso e cria a
+#                                                    senha; com --site e sem --acesso, usa acesso.<site>)
 #   ./implantacao/instalar.sh ... --hestia auto    (servidor que já tem HestiaCP: publica como domínio do Hestia,
 #                                                    "auto" = o usuário dono do domínio; ou o nome do usuário;
 #                                                    sem Caddy e sem mexer no firewall, nos sites ou no e-mail)
@@ -37,7 +39,7 @@ ETC=/etc/payax
 USUARIO=payax
 PORTA=3600
 
-SITE="" SEM_COPIA=0 REGIAO_INFORMADA=0 HESTIA_USUARIO="" ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
+ACESSO="" SITE="" SEM_COPIA=0 REGIAO_INFORMADA=0 HESTIA_USUARIO="" ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dominio) DOMINIO="$2"; shift 2 ;;
@@ -51,7 +53,8 @@ while [[ $# -gt 0 ]]; do
     --hestia) HESTIA_USUARIO="${2:-admin}"; shift 2 ;;
     --sem-copia-externa) SEM_COPIA=1; shift ;;
     --site) SITE="$2"; shift 2 ;;
-    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
+    --acesso) ACESSO="$2"; shift 2 ;;
+    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
     *) echo "Opção desconhecida: $1" >&2; exit 2 ;;
   esac
 done
@@ -59,6 +62,10 @@ done
 [[ -n "$DOMINIO" && -n "$BUCKET" && -n "$EMAIL_ADMIN" ]] || { echo "Informe --dominio, --bucket e --email-admin (veja --help)." >&2; exit 2; }
 [[ "$DOMINIO" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || { echo "Domínio inválido: $DOMINIO" >&2; exit 2; }
 [[ -z "$SITE" || "$SITE" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || { echo "Domínio do site inválido: $SITE" >&2; exit 2; }
+# Página de ativação do acesso: com o site, por padrão acesso.<site>. "--acesso nenhum" desliga.
+[[ -z "$ACESSO" && -n "$SITE" ]] && ACESSO="acesso.$SITE"
+[[ "$ACESSO" == nenhum ]] && ACESSO=""
+[[ -z "$ACESSO" || "$ACESSO" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || { echo "Domínio da ativação inválido: $ACESSO" >&2; exit 2; }
 [[ "$BUCKET" =~ ^[a-z0-9.-]{3,63}$ ]] || { echo "Nome de bucket inválido: $BUCKET" >&2; exit 2; }
 
 if [[ -n "$ENDPOINT" ]]; then
@@ -151,6 +158,15 @@ EOF
 
 # Site público: $SITE (e www), com o acesso da Área do Cliente.
 $SITE, www.$SITE {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy 127.0.0.1:$PORTA
+}
+EOF
+  [[ -n "$ACESSO" ]] && cat <<EOF
+
+# Ativação do acesso do cliente: $ACESSO.
+$ACESSO {
 	encode gzip
 	header Strict-Transport-Security "max-age=31536000"
 	reverse_proxy 127.0.0.1:$PORTA
@@ -404,6 +420,9 @@ if [[ $RESERVA -eq 1 ]]; then sed -i 's/^PAYAX_ROTINAS=.*/PAYAX_ROTINAS=0/' "$ET
 # Site público: os domínios dele mostram o site e a Área do Cliente (o Backoffice não aparece neles).
 sed -i '/^PAYAX_SITE_HOSTS=/d' "$ETC/pagamentos.env.tmp"
 [[ -n "$SITE" ]] && echo "PAYAX_SITE_HOSTS=$SITE,www.$SITE" >> "$ETC/pagamentos.env.tmp"
+# Página de ativação do acesso (acesso.payax.com.br): só ela nesse endereço.
+sed -i '/^PAYAX_ACESSO_HOSTS=/d' "$ETC/pagamentos.env.tmp"
+[[ -n "$ACESSO" ]] && echo "PAYAX_ACESSO_HOSTS=$ACESSO" >> "$ETC/pagamentos.env.tmp"
 install -m 640 -o root -g "$USUARIO" "$ETC/pagamentos.env.tmp" "$ETC/pagamentos.env"
 rm -f "$ETC/pagamentos.env.tmp"
 
@@ -544,6 +563,7 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
   }
   publicar "$DOMINIO"
   if [[ -n "$SITE" ]]; then passo "Publicando o site ($SITE e www.$SITE)"; publicar "$SITE" www || echo "O site não foi publicado agora: a conferência abaixo tenta de novo."; fi
+  if [[ -n "$ACESSO" ]]; then passo "Publicando a ativação de acesso ($ACESSO)"; publicar "$ACESSO" || echo "A ativação não foi publicada agora: a conferência abaixo tenta de novo."; fi
 else
   systemctl restart caddy
 fi
@@ -604,6 +624,7 @@ fi
 passo "Pronto"
 echo "Endereço: https://$DOMINIO/   (Área do Cliente: https://$DOMINIO/cliente/)"
 [[ -n "$SITE" ]] && echo "Site:     https://$SITE/   (com o acesso da Área do Cliente)"
+[[ -n "$ACESSO" ]] && echo "Ativação: https://$ACESSO/   (o cliente cria a senha pelo link que a equipe envia)"
 echo "Saúde:    https://$DOMINIO/api/saude"
 if [[ $NOVO -eq 1 ]]; then
   echo "Administrador: $EMAIL_ADMIN"

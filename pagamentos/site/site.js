@@ -74,7 +74,7 @@
   const fallback = {
     contact: ['Atendimento PAY AX', 'Fale com a equipe PAY AX que atende a sua empresa para conhecer as soluções e começar.'],
     recovery: ['Esqueci minha senha', 'Peça ao administrador do acesso da sua empresa (Cadastro e acessos → Acessos) ou ao seu gerente de conta PAY AX para gerar uma senha provisória. Você troca por uma sua no primeiro acesso.'],
-    integrations: ['Integrações', 'Importação automática dos títulos do sistema de gestão da sua empresa e baixa nele quando o boleto é pago. Sistema homologado hoje: IXC Provedor. Novos sistemas entram após homologação pela PAY AX.'],
+    integrations: ['Integrações', 'Importação automática dos títulos do sistema de gestão da sua empresa e baixa nele quando o boleto é pago. Os sistemas de gestão compatíveis são confirmados pela equipe PAY AX na contratação.'],
     privacy: ['Privacidade', 'Consulte a política de privacidade aplicável à sua conta junto à PAY AX.'],
     terms: ['Termos de uso', 'Os termos de uso são apresentados na contratação. Fale com a equipe PAY AX para receber a versão vigente.']
   };

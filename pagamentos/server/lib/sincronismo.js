@@ -14,6 +14,7 @@ const { decifrar } = require('./cripto');
 const { criarIxc } = require('./ixc');
 const boletos = require('./boletos');
 const febraban = require('./febraban');
+const bancos = require('./bancos');
 
 /**
  * Nosso número que o IXC deu ao título ("00000012345", "12345-P", "000000123456"), em 11 dígitos + DV.
@@ -108,10 +109,9 @@ async function importar(db, cliente, { de, ate, limite = 200, maxPaginas = 50, u
             throw new ErroNegocio(`nosso número ${nn.numero} fora da faixa reservada para este cliente (${ixc.config.faixa_inicio} a ${ixc.config.faixa_fim}): confira a carteira PAY AX no IXC`, 422);
           }
           const conta = boletos.contaDe(db, ixc.config.conta_id ?? null);
-          const esperado = febraban.boletoBradesco({ agencia: conta.agencia, conta: conta.conta, carteira: conta.carteira,
-            nossoNumero: nn.numero, valorCentavos: t.valor_centavos, vencimento: t.vencimento });
+          const esperado = bancos.calcularBoleto(conta, { nossoNumero: nn.numero, valorCentavos: t.valor_centavos, vencimento: t.vencimento });
           if (nn.dv && nn.dv !== esperado.nosso_numero_dv) {
-            throw new ErroNegocio(`dígito do nosso número do IXC (${nn.dv}) diferente do Bradesco (${esperado.nosso_numero_dv}): confira a carteira (09) no IXC`, 422);
+            throw new ErroNegocio(`dígito do nosso número do IXC (${nn.dv}) diferente do calculado pelo banco (${esperado.nosso_numero_dv}): confira a carteira (09) no IXC`, 422);
           }
           const linhaIxc = String(t.bruto?.linha_digitavel ?? '').replace(/\D/g, '');
           if (linhaIxc && linhaIxc !== esperado.linha_digitavel.replace(/\D/g, '')) {

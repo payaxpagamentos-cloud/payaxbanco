@@ -851,6 +851,28 @@ CREATE INDEX idx_abertura_interacoes ON abertura_interacoes(solicitacao_id, id);
 ALTER TABLE clientes ADD COLUMN limite_mensal_centavos INTEGER CHECK (limite_mensal_centavos IS NULL OR limite_mensal_centavos > 0);
 `,
   },
+  {
+    versao: 21,
+    nome: 'ativacao-de-acesso',
+    sql: `
+-- Link de ativação do acesso à Área do Cliente (acesso.payax.com.br): o próprio cliente cria a senha.
+-- Só o resumo SHA-256 do código do link fica guardado; o link vale por poucos dias e uma vez só.
+CREATE TABLE ativacoes_acesso (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usuario_cliente_id INTEGER NOT NULL REFERENCES usuarios_cliente(id),
+  solicitacao_id INTEGER REFERENCES solicitacoes_abertura(id),
+  token_hash TEXT NOT NULL UNIQUE,
+  criado_em TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id),
+  expira_em TEXT NOT NULL,
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  usado_em TEXT,
+  cancelado_em TEXT,
+  ip_uso TEXT
+);
+CREATE INDEX idx_ativacoes_usuario ON ativacoes_acesso(usuario_cliente_id);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

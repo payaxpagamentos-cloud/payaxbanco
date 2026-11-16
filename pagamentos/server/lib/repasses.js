@@ -24,7 +24,7 @@ const { ErroNegocio, naoEncontrado } = require('./erros');
 const datas = require('./datas');
 const razao = require('./razao');
 const precos = require('./precos');
-const bradesco = require('./bradesco');
+const bancos = require('./bancos');
 const { contaDe, credenciaisDaConta } = require('./boletos');
 const contaDestino = require('./contaDestino');
 
@@ -199,7 +199,7 @@ async function enviar(db, id, { usuario = null } = {}) {
   const conta = contaDe(db);
   db.prepare("UPDATE repasses SET situacao = 'enviado', enviado_em = ?, versao = versao + 1 WHERE id = ?").run(agora(), id);
   try {
-    const banco = bradesco.criarBanco(conta, credenciaisDaConta(db, conta.id));
+    const banco = bancos.criarBanco(conta, credenciaisDaConta(db, conta.id));
     const resp = await banco.pagarPix({
       chave: r.pix_chave,
       tipo_chave: r.pix_tipo,

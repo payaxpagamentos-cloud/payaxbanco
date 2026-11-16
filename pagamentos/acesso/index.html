@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR" translate="no" class="notranslate">
+<head>
+  <meta charset="utf-8">
+  <meta name="google" content="notranslate">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#032733">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Ative seu acesso | PAY AX</title>
+  <link rel="icon" href="acesso/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="acesso/acesso.css">
+  <script defer src="acesso/acesso.js"></script>
+</head>
+<body>
+  <header class="topo"><div class="faixa"><img src="acesso/payax-logo.svg" alt="PAY AX" width="170" height="29"><span class="selo-seguro"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/></svg>Conexão segura</span></div></header>
+
+  <main class="palco">
+    <section class="cartao" data-carregando aria-live="polite">
+      <p class="carregando">Conferindo o seu link…</p>
+    </section>
+
+    <section class="cartao" data-erro hidden>
+      <div class="icone-grande erro" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 8v5m0 3v.5"/><circle cx="12" cy="12" r="9"/></svg></div>
+      <h1>Não foi possível abrir</h1>
+      <p data-erro-texto></p>
+      <p class="nota">Se precisar, fale com a equipe PAY AX que atende a sua empresa e peça um novo link.</p>
+    </section>
+
+    <section class="cartao" data-ativar hidden>
+      <p class="sobre">ATIVAÇÃO DE ACESSO</p>
+      <h1>Olá, <span data-nome></span>!</h1>
+      <p class="intro">A conta da <strong data-empresa></strong> foi aberta. Crie a sua senha para começar a usar a Área do Cliente.</p>
+
+      <dl class="dados">
+        <div><dt>Protocolo do pedido</dt><dd data-protocolo></dd></div>
+        <div><dt>Número da conta</dt><dd data-conta></dd></div>
+        <div class="largo"><dt>Código do usuário (login)</dt><dd><span data-codigo></span><button type="button" class="copiar" data-copiar-codigo>Copiar</button></dd></div>
+      </dl>
+
+      <form data-form novalidate>
+        <label class="campo">Confirme o CNPJ da empresa
+          <input name="cnpj" inputmode="numeric" autocomplete="off" placeholder="00.000.000/0000-00" required>
+          <small>Para sua segurança. Começa com <span data-cnpj-dica></span>.</small>
+        </label>
+
+        <div class="campo">
+          <div class="rotulo-linha"><label for="senha">Senha</label><button type="button" class="gerar" data-gerar><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8a8 8 0 0 0-14-3L3 8m0-5v5h5M4 16a8 8 0 0 0 14 3l3-3m0 5v-5h-5"/></svg>Gerar senha</button></div>
+          <div class="senha"><input id="senha" name="senha" type="password" autocomplete="new-password" required maxlength="128"><button type="button" class="olho" data-olho aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg></button></div>
+          <div class="gerada" data-gerada hidden><span>Senha gerada. Guarde-a num lugar seguro antes de continuar.</span><button type="button" class="copiar" data-copiar-senha>Copiar senha</button></div>
+          <ul class="regras" aria-label="Regras da senha">
+            <li data-regra="tamanho">Pelo menos 10 caracteres</li>
+            <li data-regra="letra">Letras</li>
+            <li data-regra="numero">Números</li>
+          </ul>
+        </div>
+
+        <label class="campo">Repita a senha
+          <input name="confirmacao" type="password" autocomplete="new-password" required maxlength="128">
+        </label>
+
+        <p class="aviso-erro" data-msg role="alert" hidden></p>
+        <button class="principal" type="submit" data-enviar>Criar senha e ativar acesso</button>
+        <p class="nota">A PAY AX não vê nem guarda a sua senha. Este link vale até <span data-validade></span> e só pode ser usado uma vez.</p>
+      </form>
+    </section>
+
+    <section class="cartao" data-pronto hidden tabindex="-1">
+      <div class="icone-grande ok" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+      <h1>Acesso ativado!</h1>
+      <p>Entre na Área do Cliente com o seu código de usuário e a senha que você acabou de criar.</p>
+      <dl class="dados"><div class="largo"><dt>Código do usuário (login)</dt><dd data-codigo-final></dd></div></dl>
+      <a class="principal" data-entrar href="/">Entrar na Área do Cliente</a>
+    </section>
+  </main>
+  <footer class="rodape">PAY AX · <a href="/privacidade" target="_blank" rel="noopener">Privacidade</a></footer>
+</body>
+</html>

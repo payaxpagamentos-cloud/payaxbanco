@@ -18,6 +18,8 @@ const sincronismo = require('../lib/sincronismo');
 const datas = require('../lib/datas');
 const { assinaturaFicha } = require('./boletos');
 const abertura = require('../lib/abertura');
+const ativacao = require('../lib/ativacao');
+const auditoria = require('../lib/auditoria');
 const consultaDados = require('../lib/consultaDados');
 const { limitar } = require('../lib/limitador');
 
@@ -155,6 +157,17 @@ module.exports = (db) => {
     const { corpoCliente } = require('./clientes');
     const out = abertura.solicitar(db, req.body ?? {}, { ip: req.ip, validarCadastro: (d) => corpoCliente(d, { novo: true }) });
     res.status(201).json({ protocolo: out.protocolo });
+  });
+
+  // ------------------------------------------------------------ Ativação do acesso (acesso.payax.com.br)
+  // O código do link vem no corpo (nunca no endereço). Limite por IP contra tentativa e erro.
+  const limiteAtivacao = limitar({ janelaMs: 10 * 60_000, maximo: config.limiteAtivacaoPor10Min });
+  r.post('/ativacao/consultar', limiteAtivacao, (req, res) => res.json(ativacao.consultar(db, req.body?.token)));
+  r.post('/ativacao', limiteAtivacao, (req, res) => {
+    const out = ativacao.ativar(db, req.body?.token, { cnpj: req.body?.cnpj, senha: req.body?.senha, ip: req.ip });
+    auditoria.registrar(db, req, { acao: 'acesso.ativado', entidade: 'usuario_cliente', entidade_id: out.usuario_cliente_id, cliente_id: out.cliente_id,
+      depois: { codigo_usuario: out.codigo_usuario } });
+    res.json({ codigo_usuario: out.codigo_usuario, entrar_em: out.entrar_em });
   });
 
   return r;

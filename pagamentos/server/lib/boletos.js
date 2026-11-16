@@ -16,7 +16,7 @@ const cnab400 = require('./cnab400');
 const contaDestino = require('./contaDestino');
 const precos = require('./precos');
 const razao = require('./razao');
-const { criarBanco } = require('./bradesco');
+const { criarBanco, calcularBoleto } = require('./bancos');
 const { decifrar } = require('./cripto');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
@@ -254,10 +254,7 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
   } catch (err) {
     erro = err.message || 'Falha ao registrar no banco.';
     // Sem resposta do banco ainda calculamos o código: o título fica como falha e pode ser consultado depois.
-    registro = febraban.boletoBradesco({
-      agencia: conta.agencia, conta: conta.conta, carteira: conta.carteira,
-      nossoNumero, valorCentavos: entrada.valor_centavos, vencimento: entrada.vencimento,
-    });
+    registro = calcularBoleto(conta, { nossoNumero, valorCentavos: entrada.valor_centavos, vencimento: entrada.vencimento });
   }
 
   return transacao(db, () => {
@@ -388,7 +385,7 @@ function liquidar(db, boletoId, pagamento, { usuario = null, origem = 'webhook' 
     // para a rodada de repasse (o saldo do cliente conosco volta a zero).
     if (split.rateio && split.liquido_centavos > 0) {
       razao.lancar(db, { ...comum, tipo: 'repasse', valor_centavos: -split.liquido_centavos,
-        descricao: `Creditado pelo Bradesco direto na conta do cliente (rateio de crédito) ${ref}` });
+        descricao: `Creditado pelo banco direto na conta do cliente (rateio de crédito) ${ref}` });
       db.prepare('UPDATE boletos SET rateado_em = ? WHERE id = ?').run(agora(), b.id);
     }
     if (rateioSituacao) {

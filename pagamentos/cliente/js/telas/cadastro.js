@@ -73,7 +73,7 @@ async function abaDados(alvo, recarregar) {
           par('Conta de destino', c.destino ?? el('span', { style: 'color:var(--vermelho)' }, 'não cadastrada')),
           par('Titular', c.destino_titular),
           par('Como chega', c.meio_entrega === 'rateio'
-            ? 'Crédito feito pelo próprio Bradesco, na liquidação do boleto'
+            ? 'Crédito feito pelo próprio banco, na liquidação do boleto'
             : 'PIX da PAY AX, assim que o banco credita'),
           par('Quando', 'A cada pagamento, já sem a tarifa. Não precisa pedir.')),
         el('div', { style: 'margin-top:12px' },

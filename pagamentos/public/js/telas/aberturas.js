@@ -8,7 +8,7 @@ import {
   el, montar, cartao, tabela, paginacao, campo, lerForm, acao, selo, R, icone, numero, documento, telefone, dataHora, aviso, confirmar,
   toast, modal, dinheiro,
 } from '../../comum/ui.js';
-import { mostrarAcesso } from './clientes.js';
+import { mostrarAtivacao } from './clientes.js';
 import { fichaPreco, formPreco } from './precos-comum.js';
 
 const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val || '—'));
@@ -18,7 +18,7 @@ const BANCOS = { 237: 'Bradesco', '001': 'Banco do Brasil', 104: 'Caixa', 341: '
 const INTERACAO = { nota: 'Anotação', ligacao: 'Ligação', email: 'E-mail', whatsapp: 'WhatsApp', reuniao: 'Reunião', sistema: 'Sistema' };
 const ICONE_INTERACAO = { nota: 'relatorio', ligacao: 'fone', email: 'info', whatsapp: 'fone', reuniao: 'pessoas', sistema: 'relogio' };
 const SISTEMA = { nenhum: 'Não usa / emite pela PAY AX', ixc: 'IXC Provedor', outro: 'Outro sistema' };
-const ENTREGA = { padrao: 'Padrão do convênio (rateio Bradesco, PIX se não der)', pix: 'Sempre PIX da PAY AX' };
+const ENTREGA = { padrao: 'Padrão do convênio (rateio pelo banco, PIX se não der)', pix: 'Sempre PIX da PAY AX' };
 const tamanho = (b) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const reais = (c) => (c === null || c === undefined ? '' : (c / 100).toFixed(2).replace('.', ','));
 const diasDesde = (iso) => Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
@@ -152,6 +152,12 @@ async function ficha(alvo, id, recarregar) {
         aberta && pode('aberturas.aprovar') ? el('button', { class: 'botao sec', onclick: () => recusar(s, recarregar) }, icone('fechar'), 'Recusar') : null,
         aberta && pode('aberturas.aprovar') ? el('button', { class: 'botao', disabled: !prontos, title: prontos ? '' : 'Resolva as pendências primeiro',
           onclick: (ev) => aprovar(ev.currentTarget, s, recarregar) }, icone('ok'), 'Aprovar e abrir conta') : null,
+        s.cliente_id && editar() ? el('button', { class: 'botao sec', onclick: (ev) => acao(ev.currentTarget, async () => {
+          const ok = await confirmar({ titulo: 'Novo link de ativação', texto: 'Gerar um novo link para o cliente criar a senha? O link anterior deixa de valer.', confirmarTexto: 'Gerar link' });
+          if (!ok) return;
+          mostrarAtivacao(await api.post(`/aberturas/${s.id}/ativacao`), 'Novo link de ativação');
+          recarregar();
+        }) }, icone('cadeado'), 'Link de ativação') : null,
         s.cliente_id ? el('a', { class: 'botao', href: `#/clientes/${s.cliente_id}` }, icone('pessoas'), 'Abrir cliente') : null)),
     trilha,
     pendencias,
@@ -362,10 +368,8 @@ async function aprovar(botao, s, recarregar) {
   await acao(botao, async () => {
     const out = await api.post(`/aberturas/${s.id}/aprovar`);
     toast('Conta aberta: cliente criado em implantação.', 'ok');
-    if (out.acesso) {
-      const c = await api.get(`/clientes/${out.cliente_id}`);
-      mostrarAcesso(c, { nome: out.acesso.nome, email: out.acesso.email, senha: out.acesso.senha_provisoria }, 'Conta aberta: acesso criado');
-    } else if (out.aviso_acesso) toast(out.aviso_acesso, 'aviso');
+    if (out.acesso) mostrarAtivacao({ ...out.acesso, protocolo: out.protocolo, conta: out.conta }, 'Conta aberta: link de ativação do cliente');
+    else if (out.aviso_acesso) toast(out.aviso_acesso, 'aviso');
     recarregar();
   });
 }

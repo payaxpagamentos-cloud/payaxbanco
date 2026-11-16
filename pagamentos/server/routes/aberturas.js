@@ -10,6 +10,9 @@ const auditoria = require('../lib/auditoria');
 const abertura = require('../lib/abertura');
 const { listaPaginada } = require('../lib/http');
 const { corpoCliente } = require('./clientes');
+const ativacaoLib = require('../lib/ativacao');
+const contaInterna = require('../lib/contaInterna');
+const { ErroNegocio } = require('../lib/erros');
 
 const validarCadastro = (d) => corpoCliente(d, { novo: true });
 
@@ -126,6 +129,22 @@ module.exports = (db) => {
         depois: { nome: out.acesso.nome, email: out.acesso.email, perfil: 'admin' } });
     }
     res.json(out);
+  });
+
+  /** Novo link de ativação para o responsável financeiro de uma conta já aberta (o anterior deixa de valer). */
+  r.post('/:id/ativacao', exigir('aberturas.editar', 'acessos.gerenciar'), (req, res) => {
+    const s = abertura.buscar(db, req.params.id);
+    if (s.situacao !== 'aprovada' || !s.cliente_id) throw new ErroNegocio('O link de ativação sai depois que a conta é aberta.', 409);
+    const email = JSON.parse(s.dados || '{}').financeiro?.email;
+    const u = db.prepare('SELECT id FROM usuarios_cliente WHERE cliente_id = ? AND email = ?').get(s.cliente_id, email)
+      ?? db.prepare("SELECT id FROM usuarios_cliente WHERE cliente_id = ? AND perfil = 'admin' ORDER BY id LIMIT 1").get(s.cliente_id);
+    if (!u) throw new ErroNegocio('A conta não tem acesso de administrador: crie um em Clientes → Acessos.', 409);
+    const out = ativacaoLib.gerar(db, u.id, { criadoPor: req.usuario.id, solicitacaoId: s.id });
+    const c = db.prepare('SELECT agencia_interna, conta_interna, conta_interna_dv FROM clientes WHERE id = ?').get(s.cliente_id);
+    auditar(req, 'abertura.link_ativacao', s.id, { email: out.email, expira_em: out.expira_em });
+    db.prepare('INSERT INTO abertura_interacoes (solicitacao_id, tipo, texto, usuario_id, criado_em) VALUES (?, ?, ?, ?, ?)')
+      .run(s.id, 'sistema', `Novo link de ativação gerado para ${out.email} por ${req.usuario.nome} (o anterior deixou de valer).`, req.usuario.id, new Date().toISOString());
+    res.status(201).json({ ...out, protocolo: abertura.protocolo(s.id), conta: contaInterna.formatar(c.agencia_interna, c.conta_interna, c.conta_interna_dv) });
   });
 
   r.post('/:id/recusar', exigir('aberturas.aprovar'), (req, res) => {
