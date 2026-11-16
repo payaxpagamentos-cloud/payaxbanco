@@ -194,6 +194,7 @@ textarea { min-height: 76px; resize: vertical; }
 .selo.aviso { background: var(--ambar-suave); color: var(--ambar-texto); border-color: #f5dca5; }
 .selo.erro { background: var(--vermelho-suave); color: #a52f2f; border-color: #f3c9c9; }
 .selo.neutra { background: var(--superficie-2); color: var(--texto-2); border-color: var(--borda); }
+.selo.grande { font-size: 12px; padding: 3px 11px; margin-left: 8px; vertical-align: middle; }
 
 /* ---------------------------------------------------------------- Tabelas */
 .tabela-caixa { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; box-shadow: var(--sombra); }

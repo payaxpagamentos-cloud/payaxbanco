@@ -1,7 +1,7 @@
 import { api, ir, pode, usuario } from '../app.js';
 import { blocoLogo } from '../../comum/logo.js';
 import {
-  el, montar, cartao, tabela, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar, autoPreencher,
+  el, montar, cartao, tabela, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar, autoPreencher, statusIntegracao,
   dinheiro, numero, dataHora, data, documento, telefone, hojeIso, somarDias, R, icone
 } from '../../comum/ui.js';
 
@@ -137,7 +137,7 @@ async function abaIxc(alvo, recarregar) {
       el('div', {},
         d.configurada
           ? el('div', { class: 'pares' },
-            par('Estado', selo(d.estado, R.estadoIntegracao)),
+            par('Status', statusIntegracao({ estado: d.estado, configurada: d.configurada })),
             par('Endereço', d.config.url ?? '—'),
             par('Tipo do boleto', R.tipoBoleto[d.config.tipo_padrao] ?? '—'),
             par('Importação automática', d.config.importacao_automatica ? 'Ligada (todo dia)' : 'Desligada'))

@@ -1,7 +1,7 @@
 import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
 import {
-  el, montar, autoPreencher, cartao, tabela, paginacao, kpi, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar,
+  el, montar, autoPreencher, cartao, tabela, paginacao, kpi, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar, statusIntegracao,
   dinheiro, numero, percentual, data, dataHora, documento, telefone, hojeIso, primeiroDiaMes, R, icone,
 } from '../../comum/ui.js';
 import { agendaLiberacao } from '../../comum/graficos.js';
@@ -281,7 +281,7 @@ async function abaAcessos(alvo, c, query, recarregar) {
       el('div', {},
         el('div', { class: 'pares cols-4' },
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Sistema'), el('span', { class: 'val' }, c.ixc.estado === 'nao_configurada' && !c.ixc.url ? '—' : sistemas[c.ixc.sistema ?? 'ixc'])),
-          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Estado'), el('span', { class: 'val' }, selo(c.ixc.estado, R.estadoIntegracao))),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Status'), el('span', { class: 'val' }, statusIntegracao({ estado: c.ixc.estado, configurada: Boolean(c.ixc.url) }))),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Importação automática'), el('span', { class: 'val' }, c.ixc.importacao_automatica ? 'Ligada' : 'Desligada')),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Último teste'), el('span', { class: 'val' }, c.ixc.ultimo_teste ? dataHora(c.ixc.ultimo_teste) : '—'))),
         c.ixc.ultimo_erro ? el('div', { style: 'margin-top:10px' }, aviso(c.ixc.ultimo_erro, 'erro')) : null,

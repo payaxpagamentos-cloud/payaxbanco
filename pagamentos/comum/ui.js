@@ -155,6 +155,20 @@ export function selo(valor, tabela = R.situacaoBoleto) {
   return el('span', { class: `selo ${tom}` }, texto);
 }
 
+/**
+ * Status de uma integração (banco, sistema do cliente): verde quando o último teste passou, vermelho quando
+ * falhou, âmbar no simulador e cinza quando ainda não foi configurada ou testada. `grande`: para o título do cartão.
+ */
+export function statusIntegracao({ estado, configurada = true, modo = null } = {}, { grande = false } = {}) {
+  const [texto, tom] = modo === 'simulador' ? ['Simulador (sem banco real)', 'aviso']
+    : !configurada ? ['Não configurada', 'neutra']
+      : estado === 'conectada' ? ['Funcionando', 'ok']
+        : estado === 'falha' ? ['Com falha', 'erro']
+          : estado === 'desabilitada' ? ['Desabilitada', 'neutra']
+            : ['Não testada', 'neutra'];
+  return el('span', { class: `selo ${tom}${grande ? ' grande' : ''}` }, texto);
+}
+
 // ---------------------------------------------------------------- Blocos
 export function kpi({ rotulo, valor, apoio, tom = '', menor = false, ic = null }) {
   return el('div', { class: `kpi${tom === 'destaque' ? ' destaque' : ''}` },

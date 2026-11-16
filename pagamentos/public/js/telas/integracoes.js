@@ -1,6 +1,6 @@
 import { api, ir, pode } from '../app.js';
 import {
-  el, montar, cartao, tabela, campo, lerForm, modal, toast, acao, aviso, selo, copiar,
+  el, montar, cartao, tabela, campo, lerForm, modal, toast, acao, aviso, selo, copiar, statusIntegracao,
   numero, dataHora, data, hojeIso, somarDias, R, icone
 } from '../../comum/ui.js';
 
@@ -18,13 +18,13 @@ export default async function integracoes({ alvo, recarregar }) {
     el('div', { class: 'cabecalho-tela' }, el('div', {}, el('h1', {}, 'Integrações'),
       el('p', {}, 'O banco que registra os boletos e o sistema de gestão de cada cliente (homologados: IXC).'))),
 
-    cartao('Bradesco — Cobrança Registrada e Bolepix',
+    cartao(['Bradesco — Cobrança Registrada e Bolepix ', statusIntegracao({ ...d.banco, configurada: d.banco.configurada, modo: d.banco.modo }, { grande: true })],
       el('div', {},
         d.banco.modo === 'simulador'
           ? aviso('Modo SIMULADOR ativo: os títulos são registrados localmente, com código de barras e BR Code válidos. Nenhuma chamada é feita ao banco. Para ligar o ambiente real, configure as credenciais abaixo e inicie o servidor com PAYAX_BANCO_MODO=bradesco.', 'aviso')
           : aviso(`Modo real · ambiente de ${d.banco.ambiente}.`, 'info'),
         el('div', { class: 'pares', style: 'margin-top:12px' },
-          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Estado'), el('span', { class: 'val' }, selo(d.banco.estado ?? 'nao_configurada', R.estadoIntegracao))),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Status'), el('span', { class: 'val' }, statusIntegracao({ ...d.banco, modo: d.banco.modo }))),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Credenciais'), el('span', { class: 'val' }, d.banco.configurada ? 'cadastradas' : 'não cadastradas')),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Último teste'), el('span', { class: 'val' }, d.banco.ultimo_teste ? dataHora(d.banco.ultimo_teste) : '—'))),
         d.banco.ultimo_erro ? el('div', { style: 'margin-top:10px' }, aviso(d.banco.ultimo_erro, 'erro')) : null),
@@ -36,11 +36,12 @@ export default async function integracoes({ alvo, recarregar }) {
         }) }, icone('atualizar'), 'Testar conexão'),
         pode('*') ? el('button', { class: 'botao', onclick: () => configurarBanco(d.banco, recarregar) }, icone('config'), 'Configurar') : null)),
 
-    el('div', { style: 'margin-top:18px' }, cartao('Consulta de CEP e CNPJ (API Brasil)',
+    el('div', { style: 'margin-top:18px' }, cartao(['Consulta de CEP e CNPJ (API Brasil) ', statusApiBrasil(d.dados)],
       el('div', {},
         el('p', { style: 'color:var(--texto-2);font-size:13px;margin-bottom:12px' },
           'Preenche sozinho o cadastro de clientes e os dados do pagador. O resultado fica em cache, então o mesmo CEP ou CNPJ não é consultado duas vezes.'),
-        el('div', { class: 'pares' },
+        el('div', { class: 'pares cols-3' },
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Status da API'), el('span', { class: 'val' }, statusApiBrasil(d.dados, true))),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Token da API Brasil'),
             el('span', { class: 'val' }, d.dados.apibrasil_configurada ? 'cadastrado' : 'não cadastrado')),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Fonte do CEP'),
@@ -71,7 +72,7 @@ export default async function integracoes({ alvo, recarregar }) {
           el('span', { class: 'sub' }, porCliente[c.id]?.config?.url ?? 'sem endereço configurado')) },
         { titulo: 'Sistema', conteudo: (c) => (porCliente[c.id]?.config?.url
           ? (SISTEMAS.find((x) => x.id === (porCliente[c.id].config.sistema ?? 'ixc'))?.nome ?? 'IXC Provedor') : '—') },
-        { titulo: 'Estado', conteudo: (c) => selo(porCliente[c.id]?.estado ?? 'nao_configurada', R.estadoIntegracao) },
+        { titulo: 'Status', conteudo: (c) => statusIntegracao({ estado: porCliente[c.id]?.estado, configurada: Boolean(porCliente[c.id]?.configurada) }) },
         { titulo: 'Importação automática', conteudo: (c) => (porCliente[c.id]?.config?.importacao_automatica ? 'Ligada' : 'Desligada') },
         { titulo: 'Último teste', conteudo: (c) => (porCliente[c.id]?.ultimo_teste ? dataHora(porCliente[c.id].ultimo_teste) : '—') },
         { titulo: '', dir: true, conteudo: (c) => el('div', { style: 'display:flex;gap:6px;justify-content:flex-end' },
@@ -130,6 +131,25 @@ function configurarBanco(atual, recarregar) {
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 
+/**
+ * Status da API Brasil: verde quando o último teste passou, vermelho quando falhou.
+ * Sem token: âmbar se o CNPJ deveria sair por ela (está usando a fonte pública), cinza se não.
+ */
+function statusApiBrasil(dados, texto = false) {
+  const tabela = {
+    ok: ['Funcionando', 'ok'],
+    falha: ['Com falha', 'erro'],
+    nao_testada: ['Não testada: clique em Testar consulta', 'neutra'],
+    sem_token: ['Sem token: usando a fonte pública', 'aviso'],
+    publica: ['Fonte pública (sem token)', 'neutra'],
+  };
+  const chave = !dados.apibrasil_configurada ? (dados.cnpj?.escolhida === 'apibrasil' ? 'sem_token' : 'publica')
+    : dados.estado === 'conectada' ? 'ok' : dados.estado === 'falha' ? 'falha' : 'nao_testada';
+  const s = selo(chave, tabela);
+  if (!texto) s.classList.add('grande');
+  return s;
+}
+
 function configurarDados(atual, recarregar) {
   const form = el('form', { onsubmit: (e) => e.preventDefault() },
     campo({ nome: 'token', rotulo: 'Token da API Brasil', tipo: 'password',
@@ -137,9 +157,16 @@ function configurarDados(atual, recarregar) {
         : 'O "Bearer Token" do painel da API Brasil (vale 1 ano). O DeviceToken não é usado nesta consulta.' }));
   const botao = el('button', { class: 'botao' }, 'Salvar token');
   botao.addEventListener('click', () => acao(botao, async () => {
-    await api.put('/integracoes/dados', lerForm(form));
+    const dados = lerForm(form);
+    await api.put('/integracoes/dados', dados);
     m.fechar();
-    toast('Token salvo.', 'ok');
+    // Com token novo, testa na hora: o status já aparece verde (ou vermelho, com o motivo).
+    if (dados.token) {
+      const r = await api.post('/integracoes/dados/testar', {}).catch((err) => ({ ok: false, mensagem: err.message }));
+      toast(r.ok ? 'Token salvo e testado: a API Brasil está funcionando.' : `Token salvo, mas o teste falhou: ${r.mensagem}`, r.ok ? 'ok' : 'erro');
+    } else {
+      toast('Token removido: as consultas usam a fonte pública.', 'ok');
+    }
     recarregar();
   }));
   const m = modal({ titulo: 'API Brasil · consulta de CEP e CNPJ',
