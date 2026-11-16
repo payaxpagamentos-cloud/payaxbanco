@@ -20,6 +20,13 @@ const bancos = require('./bancos');
  * Nosso número que o IXC deu ao título ("00000012345", "12345-P", "000000123456"), em 11 dígitos + DV.
  * Devolve null quando o IXC ainda não gerou o boleto (sem número).
  */
+/** Link permanente do boleto PAY AX (o mesmo da Área do Cliente), gravado no "Link gateway" do título no IXC. */
+function linkPublico(id, nossoNumero) {
+  if (!config.urlPublica) return null;
+  const assinatura = require('./cripto').assinar(`ficha:${id}:${nossoNumero}`).slice(0, 32);
+  return `${config.urlPublica}${config.basePath}/api/publico/boleto/${id}/${assinatura}`;
+}
+
 function nossoNumeroDoIxc(valor) {
   const bruto = String(valor ?? '').toUpperCase().trim();
   // Com separador ("12345-6", "0000012345-P"): o que vem depois do traço é o dígito.
@@ -119,7 +126,7 @@ async function importarAgora(db, cliente, { de, ate, limite = 200, maxPaginas = 
         // for exatamente o que vai para o banco (senão o pagador teria um boleto que o banco não reconhece).
         let nossoNumeroDefinido = null;
         if (ixc.config.numeracao === 'ixc') {
-          const nn = nossoNumeroDoIxc(t.bruto?.nosso_numero);
+          const nn = nossoNumeroDoIxc(t.bruto?.nn_boleto ?? t.bruto?.nosso_numero);
           if (!nn) { resultado.ignorados += 1; resultado.detalhes.push({ ixc_id: t.ixc_id, motivo: 'o IXC ainda não gerou o boleto (sem nosso número): entra na próxima rodada' }); continue; }
           const n = Number(nn.numero);
           if (!(n >= Number(ixc.config.faixa_inicio) && n <= Number(ixc.config.faixa_fim))) {
@@ -178,7 +185,7 @@ async function importarAgora(db, cliente, { de, ate, limite = 200, maxPaginas = 
         // Quando o IXC numera, o título já tem o número e a linha dele: nada a gravar de volta.
         if (ixc.config.anotar_no_ixc !== false && ixc.config.numeracao !== 'ixc') {
           const b = db.prepare('SELECT linha_digitavel, nosso_numero, nosso_numero_dv FROM boletos WHERE id = ?').get(out.id);
-          await ixc.cliente.anotarBoleto(t.ixc_id, { linha_digitavel: b.linha_digitavel, nosso_numero: `${b.nosso_numero}-${b.nosso_numero_dv}` })
+          await ixc.cliente.anotarBoleto(t.ixc_id, { linha_digitavel: b.linha_digitavel, nosso_numero: `${b.nosso_numero}-${b.nosso_numero_dv}`, link: linkPublico(out.id, b.nosso_numero) })
             .catch((err) => resultado.detalhes.push({ ixc_id: t.ixc_id, aviso: `boleto emitido, mas não foi anotado no IXC: ${err.message}` }));
         }
       } catch (err) {

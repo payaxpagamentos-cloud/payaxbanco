@@ -18,6 +18,8 @@ const RECURSOS = {
   cliente: 'cliente',
   contrato: 'cliente_contrato',
   receber: 'fn_areceber',
+  // Edição de título já existente (o SAC da IXC indicou esta rota para alterar o nosso número).
+  alterarReceber: 'fn_areceber_altera',
 };
 
 const CAMPOS = {
@@ -32,7 +34,8 @@ const CAMPOS = {
   dataRecebimento: 'data_recebimento',
   observacao: 'obs',
   linhaDigitavel: 'linha_digitavel',
-  nossoNumero: 'nosso_numero',
+  nossoNumero: 'nn_boleto',     // "nosso número" do título (nome confirmado pelo SAC da IXC)
+  linkGateway: 'gateway_link',  // "Link gateway" do Contas a Receber: link do boleto externo
   carteira: 'id_carteira_cobranca',
 };
 
@@ -178,11 +181,12 @@ function criarIxc({ url, token, timeoutMs = config.ixc.timeoutMs }) {
     /**
      * Grava no IXC o código do boleto emitido, para o provedor ver no título de origem.
      */
-    async anotarBoleto(ixcId, { linha_digitavel, nosso_numero }) {
-      return chamar(RECURSOS.receber, {
+    async anotarBoleto(ixcId, { linha_digitavel, nosso_numero, link = null }) {
+      return chamar(RECURSOS.alterarReceber, {
         [CAMPOS.id]: String(ixcId),
         [CAMPOS.linhaDigitavel]: linha_digitavel,
         [CAMPOS.nossoNumero]: nosso_numero,
+        ...(link ? { [CAMPOS.linkGateway]: link } : {}),
       }, { metodo: 'PUT', sufixo: `/${ixcId}` });
     },
 
