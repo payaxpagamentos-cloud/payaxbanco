@@ -274,6 +274,8 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 .acesso-ajuda svg { width: 24px; height: 24px; }
 .acesso-caixa { width: min(400px, 100%); margin: auto; display: grid; gap: 4px; padding: 24px 0; }
 .acesso-area { font-size: 13px; font-weight: 700; letter-spacing: 0.34em; color: #0a1526; }
+/* Saudação centralizada (rótulo da área, Bem-vindo e a frase), como o rodapé; o formulário ocupa a largura. */
+.acesso-caixa > .acesso-area, .acesso-caixa > h1, .acesso-caixa > .acesso-sub { text-align: center; }
 .acesso-caixa h1 { font-size: clamp(28px, min(2.8vw, 5.6vh), 42px); line-height: 1.05; font-weight: 800; letter-spacing: -0.03em; color: #0a1526; margin-top: 6px; }
 .acesso-sub { font-size: 15px; color: var(--texto-2); margin-bottom: 14px; }
 .acesso-form { display: grid; gap: 14px; margin-top: 8px; }
