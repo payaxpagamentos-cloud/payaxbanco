@@ -66,7 +66,7 @@ function editarConta(c, recarregar, bancos = []) {
       campo({ nome: 'conta', rotulo: 'Conta', valor: c?.conta ?? '', obrigatorio: true }),
       campo({ nome: 'conta_dv', rotulo: 'DV conta', valor: c?.conta_dv ?? '' }),
       campo({ nome: 'cedente', rotulo: 'Código da Empresa (convênio)', valor: c?.cedente ?? '', obrigatorio: true,
-        ajuda: 'Fornecido pelo banco ao liberar a cobrança (no Bradesco, até 20 dígitos; vai no arquivo de remessa)' }),
+        ajuda: 'No Bradesco: o "acessório escritural" (convênio da cobrança), ex.: 6160339. Vai no cabeçalho da remessa.' }),
       campo({ nome: 'carteira', rotulo: 'Carteira', valor: c?.carteira ?? '09', ajuda: '09 = com registro' })),
     el('h3', { style: 'font-size:14px;margin:14px 0 8px' }, 'Beneficiário impresso no boleto'),
     el('div', { class: 'linha-form' },
