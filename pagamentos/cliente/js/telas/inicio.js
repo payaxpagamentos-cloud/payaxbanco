@@ -75,12 +75,11 @@ export default async function inicio({ alvo }) {
       ? el('div', { style: 'margin-top:18px' }, cartao('O que a PAY AX cobrou no mês',
         el('div', { class: 'pares' },
           par('Você recebeu dos pagadores', dinheiro(l.bruto_centavos)),
-          par('Tarifa bancária', dinheiro(l.tarifa_banco_centavos)),
-          par('Tarifa PAY AX', dinheiro(l.comissao_centavos)),
+          par('Tarifa PAY AX', dinheiro(l.comissao_centavos + (l.tarifa_banco_centavos ?? 0))),
           par('Ficou para você', el('strong', {}, dinheiro(l.liquido_centavos))),
           par('Já transferido', dinheiro(l.repassado_centavos))),
         el('p', { style: 'margin-top:12px;color:var(--texto-3);font-size:12.5px' },
-          `Sua tabela: tarifa PAY AX de ${d.preco.tarifa_texto}${d.preco.tarifa_liquidacao_centavos ? ` + tarifa bancária de ${dinheiro(d.preco.tarifa_liquidacao_centavos)} por título pago` : ''}.`)))
+          `Sua tabela: tarifa PAY AX de ${d.preco.tarifa_texto}.`)))
       : null,
   );
 }

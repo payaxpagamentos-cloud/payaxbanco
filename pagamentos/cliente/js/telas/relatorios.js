@@ -39,8 +39,7 @@ export default async function relatorios({ alvo, query }) {
         total: l.bruto_centavos,
         partes: [
           { rotulo: 'Líquido para você', valor: l.liquido_centavos },
-          { rotulo: 'Tarifa bancária', valor: l.tarifa_banco_centavos },
-          { rotulo: 'Tarifa PAY AX', valor: l.comissao_centavos },
+          { rotulo: 'Tarifa PAY AX', valor: l.comissao_centavos + (l.tarifa_banco_centavos ?? 0) },
         ],
       }) : el('p', { class: 'vazio' }, 'Nada recebido no período.'))),
 
@@ -60,17 +59,13 @@ export default async function relatorios({ alvo, query }) {
 
     el('div', { style: 'margin-top:14px' }, cartao('A sua tabela de preços', [el('div', { class: 'pares cols-3' },
       el('div', { class: 'par' }, el('span', { class: 'rot' }, d.preco.bolepix ? 'Tarifa PAY AX (boleto)' : 'Tarifa PAY AX'), el('span', { class: 'val' }, d.preco.tarifa_texto)),
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa mínima'), el('span', { class: 'val' }, dinheiro(d.preco.comissao_minima_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa máxima'), el('span', { class: 'val' }, d.preco.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(d.preco.comissao_maxima_centavos))),
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa bancária por título pago'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_liquidacao_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por boleto emitido'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_emissao_centavos))),
       el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por transferência'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_repasse_centavos)))),
       // Bolepix com preço próprio: as tarifas dele, na mesma ordem.
       d.preco.bolepix ? el('div', { class: 'pares cols-3', style: 'margin-top:16px;padding-top:14px;border-top:1px solid var(--borda)' },
         el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa PAY AX (Bolepix)'), el('span', { class: 'val' }, d.preco.bolepix.tarifa_texto)),
-        el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa mínima (Bolepix)'), el('span', { class: 'val' }, dinheiro(d.preco.bolepix.comissao_minima_centavos))),
         el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa máxima (Bolepix)'), el('span', { class: 'val' }, d.preco.bolepix.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(d.preco.bolepix.comissao_maxima_centavos))),
-        el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa bancária por título pago (Bolepix)'), el('span', { class: 'val' }, dinheiro(d.preco.bolepix.tarifa_liquidacao_centavos))),
         el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por Bolepix emitido'), el('span', { class: 'val' }, dinheiro(d.preco.bolepix.tarifa_emissao_centavos)))) : null])),
   );
 }

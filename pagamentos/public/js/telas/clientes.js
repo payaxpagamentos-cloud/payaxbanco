@@ -219,10 +219,8 @@ async function abaPrecos(alvo, c, query, recarregar) {
       colunas: [
         { titulo: 'Vigência', conteudo: (x) => `${data(x.vigencia_inicio)} → ${x.vigencia_fim ? data(x.vigencia_fim) : 'em diante'}` },
         { titulo: 'Emissão', dir: true, conteudo: (x) => dinheiro(x.tarifa_emissao_centavos) },
-        { titulo: 'Tarifa bancária', dir: true, conteudo: (x) => dinheiro(x.tarifa_liquidacao_centavos) },
         { titulo: 'PAY AX fixa', dir: true, conteudo: (x) => dinheiro(x.tarifa_fixa_centavos ?? 0) },
         { titulo: 'PAY AX %', dir: true, conteudo: (x) => percentual(x.percentual_ppm) },
-        { titulo: 'Mínima', dir: true, conteudo: (x) => dinheiro(x.comissao_minima_centavos) },
         { titulo: 'Bolepix', conteudo: (x) => (bolepixDe(x) ? 'Preço próprio' : 'Igual ao boleto') },
       ],
       itens: p.historico,

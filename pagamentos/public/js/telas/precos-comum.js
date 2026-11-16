@@ -13,15 +13,18 @@ export function bolepixDe(p) {
 const reais = (v) => (v === null || v === undefined ? '' : (v / 100).toFixed(2).replace('.', ','));
 const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));
 
-/** Os seis campos que podem mudar entre boleto e Bolepix. */
+/**
+ * As tarifas que podem mudar entre boleto e Bolepix. "Tarifa bancária repassada" e "Tarifa mínima" saíram da
+ * tela (o cliente vê uma tarifa só, a PAY AX); só aparecem se uma tabela antiga ainda tiver valor nelas.
+ */
 const paresTarifas = (p) => [
   par('Tarifa de emissão', dinheiro(p.tarifa_emissao_centavos ?? 0)),
-  par('Tarifa bancária repassada', dinheiro(p.tarifa_liquidacao_centavos ?? 0)),
   par('Tarifa PAY AX fixa', dinheiro(p.tarifa_fixa_centavos ?? 0)),
   par('Tarifa PAY AX %', percentual(p.percentual_ppm)),
-  par('Tarifa mínima', dinheiro(p.comissao_minima_centavos ?? 0)),
   par('Tarifa máxima', p.comissao_maxima_centavos === null || p.comissao_maxima_centavos === undefined ? 'sem teto' : dinheiro(p.comissao_maxima_centavos)),
-];
+  p.tarifa_liquidacao_centavos ? par('Tarifa bancária (tabela antiga)', dinheiro(p.tarifa_liquidacao_centavos)) : null,
+  p.comissao_minima_centavos ? par('Tarifa mínima (tabela antiga)', dinheiro(p.comissao_minima_centavos)) : null,
+].filter(Boolean);
 
 /** Ficha da tabela vigente: boleto, Bolepix (próprio ou "mesmo preço") e o que vale para os dois. */
 export function fichaPreco(v) {
@@ -43,9 +46,7 @@ const camposTarifas = (p, prefixo = '') => [
   campo({ nome: `${prefixo}tarifa_emissao`, rotulo: 'Tarifa de emissão', tipo: 'dinheiro', valor: reais(p?.tarifa_emissao_centavos ?? 0), ajuda: 'Cobrada no registro' }),
   campo({ nome: `${prefixo}tarifa_fixa`, rotulo: 'Tarifa PAY AX fixa', tipo: 'dinheiro', valor: reais(p?.tarifa_fixa_centavos ?? 0), ajuda: 'Por boleto pago. Ex.: 1,99' }),
   campo({ nome: `${prefixo}percentual`, rotulo: 'Tarifa PAY AX (%)', valor: ((p?.percentual_ppm || 0) / 10000).toString().replace('.', ','), ajuda: 'Sobre o valor pago; soma com a fixa' }),
-  campo({ nome: `${prefixo}tarifa_liquidacao`, rotulo: 'Tarifa bancária repassada', tipo: 'dinheiro', valor: reais(p?.tarifa_liquidacao_centavos ?? 0), ajuda: '0 se a fixa já cobre o banco' }),
-  campo({ nome: `${prefixo}comissao_minima`, rotulo: 'Tarifa mínima', tipo: 'dinheiro', valor: reais(p?.comissao_minima_centavos ?? 0) }),
-  campo({ nome: `${prefixo}comissao_maxima`, rotulo: 'Tarifa máxima', tipo: 'dinheiro', valor: reais(p?.comissao_maxima_centavos), ajuda: 'Vazio = sem teto' }),
+  campo({ nome: `${prefixo}comissao_maxima`, rotulo: 'Tarifa máxima', tipo: 'dinheiro', valor: reais(p?.comissao_maxima_centavos), ajuda: 'Teto da tarifa % · vazio = sem teto' }),
 ];
 
 /** Formulário da tabela nova, já preenchido com a atual. */
