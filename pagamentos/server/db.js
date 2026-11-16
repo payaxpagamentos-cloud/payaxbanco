@@ -778,6 +778,30 @@ ALTER TABLE precos ADD COLUMN bolepix TEXT;
 ALTER TABLE clientes ADD COLUMN logo TEXT;
 `,
   },
+  {
+    versao: 19,
+    nome: 'abertura-de-conta',
+    sql: `
+-- Pedidos de abertura de conta feitos pelo site. Não viram cliente sozinhos: a equipe confere o contrato
+-- social e os responsáveis (conheça seu cliente, Lei 9.613/1998) e aprova ou recusa.
+CREATE TABLE solicitacoes_abertura (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  situacao TEXT NOT NULL DEFAULT 'nova' CHECK (situacao IN ('nova','em_analise','aprovada','recusada')),
+  cnpj TEXT NOT NULL,
+  razao_social TEXT NOT NULL,
+  dados TEXT NOT NULL,               -- empresa, responsáveis e conta para receber (JSON)
+  arquivos TEXT NOT NULL DEFAULT '[]', -- documentos enviados: tipo, nome, tamanho, sha256, caminho (JSON)
+  ip TEXT,
+  criado_em TEXT NOT NULL,
+  analisado_por INTEGER REFERENCES usuarios(id),
+  analisado_em TEXT,
+  motivo TEXT,
+  cliente_id INTEGER REFERENCES clientes(id)
+);
+CREATE INDEX idx_abertura_situacao ON solicitacoes_abertura(situacao, id);
+CREATE INDEX idx_abertura_cnpj ON solicitacoes_abertura(cnpj);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

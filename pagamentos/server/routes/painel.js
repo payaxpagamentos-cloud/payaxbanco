@@ -118,6 +118,12 @@ async function alertas(db, hoje, perfil) {
       texto: `${r.abertos} alerta(s) de PLD para analisar${r.atrasos.analise ? ` (${r.atrasos.analise} com prazo vencido)` : ''}` });
   }
 
+  // Pedidos de abertura de conta vindos do site, esperando a equipe.
+  if (podeEquipe(perfil, 'aberturas.ver')) {
+    const ab = db.prepare("SELECT COUNT(*) AS n FROM solicitacoes_abertura WHERE situacao IN ('nova','em_analise')").get().n;
+    if (ab) lista.push({ tipo: 'aberturas', severidade: 'aviso', quantidade: ab, texto: `${ab} pedido(s) de abertura de conta pelo site para analisar` });
+  }
+
   // LGPD: pedidos de titular e incidentes têm prazo de lei.
   if (podeEquipe(perfil, 'lgpd.ver')) {
     const g = lgpd.resumo(db);

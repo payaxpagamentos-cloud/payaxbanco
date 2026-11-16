@@ -15,6 +15,7 @@ const sincronismo = require('./sincronismo');
 const arquivosBanco = require('./arquivosBanco');
 const pld = require('./pld');
 const lgpd = require('./lgpd');
+const abertura = require('./abertura');
 
 let ultimaImportacao = null;
 let ultimoPld = 0;
@@ -64,6 +65,7 @@ async function rodar(db, { forcar = false } = {}) {
     ultimaRetencao = hoje;
     try {
       out.retencao = lgpd.aplicarRetencao(db);
+      out.retencao.aberturas = abertura.aplicarRetencao(db);
       if (out.retencao.boletos || out.retencao.ips) {
         console.log(`[PAY AX] LGPD: ${out.retencao.boletos} título(s) anonimizado(s), ${out.retencao.ips} IP(s) apagado(s) da auditoria.`);
       }

@@ -34,6 +34,8 @@ function criarApp(db) {
   equipe.post('/api/auth/2fa', limitar({ janelaMs: 60_000, maximo: config.limite2faPorMinuto }));
   // O retorno do banco chega como arquivo (corpo bruto); o resto da API é JSON.
   equipe.use('/api/arquivos/retornos', express.raw({ type: () => true, limit: '10mb' }));
+  // Abertura de conta pelo site: leva o contrato social (até 8 MB, em base64) no próprio pedido.
+  equipe.use('/api/publico/abertura', express.json({ limit: '25mb' }));
   equipe.use(express.json({ limit: '1mb' }));
   // Aviso de privacidade e canal do titular (LGPD): públicos, sem login, nas duas áreas.
   const privacidade = require('./routes/privacidade')(db);
@@ -57,10 +59,13 @@ function criarApp(db) {
   const pastaSite = path.join(__dirname, '..', 'site');
   const site = express.Router();
   site.get('/', (_req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(pastaSite, 'index.html')));
+  site.get('/abrir-conta', (_req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(pastaSite, 'abrir-conta.html')));
   site.use('/site', express.static(pastaSite, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   app.use((req, res, next) => {
     if (!config.siteHosts.includes(String(req.hostname || '').toLowerCase())) return next();
-    if (req.path === '/' || req.path.startsWith('/site/')) return site(req, res, next);
+    if (req.path === '/' || req.path === '/abrir-conta' || req.path.startsWith('/site/')) return site(req, res, next);
+    // O formulário de abertura de conta envia para a API pública (sem sessão).
+    if (req.path.startsWith('/api/publico/abertura')) return equipe(req, res, next);
     // No domínio do site: a Área do Cliente, o aviso de privacidade e os arquivos comuns. Nada do Backoffice.
     if (/^\/(cliente|privacidade|comum)(\/|$)/.test(req.path)) return next();
     return res.status(404).type('text').send('Página não encontrada.');

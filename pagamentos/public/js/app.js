@@ -18,6 +18,7 @@ const MENU = [
   ['Operação', [
     ['visao', 'Visão geral', 'painel', 'painel.ver', () => import('./telas/visao.js')],
     ['clientes', 'Clientes', 'pessoas', 'clientes.ver', () => import('./telas/clientes.js')],
+    ['aberturas', 'Abertura de contas', 'pessoa-mais', 'aberturas.ver', () => import('./telas/aberturas.js')],
     ['boletos', 'Boletos', 'boleto', 'boletos.ver', () => import('./telas/boletos.js')],
     ['repasses', 'Repasses', 'troca', 'repasses.ver', () => import('./telas/repasses.js')],
     ['conciliacao', 'Conciliação', 'cofre', 'conciliacao.ver', () => import('./telas/conciliacao.js')],

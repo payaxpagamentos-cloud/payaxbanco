@@ -311,7 +311,7 @@ async function abaAcessos(alvo, c, query, recarregar) {
 }
 
 /** Dados de acesso prontos para mandar ao cliente: endereço, e-mail e senha provisória, com um botão para copiar tudo. */
-function mostrarAcesso(c, { nome, email, senha }, titulo) {
+export function mostrarAcesso(c, { nome, email, senha }, titulo) {
   const url = c.area_cliente_url.startsWith('http') ? c.area_cliente_url : `${location.origin}${c.area_cliente_url}`;
   const texto = `Olá, ${nome}! Seu acesso à Área do Cliente PAY AX:\n\nEndereço: ${url}\nE-mail: ${email}\nSenha provisória: ${senha}\n\nNo primeiro acesso, o sistema pede para você criar a sua própria senha.`;
   const par = (rot, val) => el('div', { class: 'par' }, el('span', { class: 'rot' }, rot), el('span', { class: 'val' }, val));

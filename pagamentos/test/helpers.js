@@ -3,6 +3,7 @@
 process.env.NODE_ENV = 'test';
 process.env.PAYAX_SECRET = 'segredo-de-teste-com-mais-de-32-caracteres';
 process.env.PAYAX_LIMITE_LOGIN = '1000';
+process.env.PAYAX_LIMITE_ABERTURA = process.env.PAYAX_LIMITE_ABERTURA || '1000';
 process.env.PAYAX_BANCO_MODO = 'simulador';
 process.env.PAYAX_IXC_REDE_INTERNA = '1'; // o IXC falso dos testes roda em 127.0.0.1
 

@@ -17,6 +17,9 @@ const repassesLib = require('../lib/repasses');
 const sincronismo = require('../lib/sincronismo');
 const datas = require('../lib/datas');
 const { assinaturaFicha } = require('./boletos');
+const abertura = require('../lib/abertura');
+const consultaDados = require('../lib/consultaDados');
+const { limitar } = require('../lib/limitador');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 const igual = (a, b) => {
@@ -125,6 +128,33 @@ module.exports = (db) => {
       concluir('erro', String(err.message).slice(0, 300), null);
       res.status(200).json({ recebido: true, processado: false, erro: err.message });
     }
+  });
+
+  // ------------------------------------------------------------ Abertura de conta pelo site
+  // Até 5 pedidos por IP a cada 10 minutos; a consulta de CNPJ/CEP só pela fonte gratuita, 20 por minuto.
+  const limitePedido = limitar({ janelaMs: 10 * 60_000, maximo: config.limiteAberturaPor10Min });
+  const consultasPorIp = new Map();
+  const limiteConsulta = (req, _res, next) => {
+    const n = Date.now();
+    const t = (consultasPorIp.get(req.ip) ?? []).filter((x) => x > n - 60_000);
+    t.push(n);
+    consultasPorIp.set(req.ip, t);
+    if (consultasPorIp.size > 5000) consultasPorIp.clear();
+    if (t.length > 20) return next(new ErroNegocio('Muitas consultas seguidas. Aguarde um instante.', 429));
+    next();
+  };
+  r.get('/abertura/cnpj/:cnpj', limiteConsulta, async (req, res) => {
+    const d = await consultaDados.consultarCnpj(db, req.params.cnpj, { somentePublica: true });
+    // Só o que preenche o formulário: sócios e dados de terceiros não saem por aqui.
+    res.json({ cnpj: d.cnpj, razao_social: d.razao_social, nome_fantasia: d.nome_fantasia, email: d.email, telefone: d.telefone,
+      cep: d.cep, endereco: d.endereco, numero: d.numero, complemento: d.complemento, bairro: d.bairro, cidade: d.cidade, uf: d.uf,
+      situacao: d.situacao ?? null });
+  });
+  r.get('/abertura/cep/:cep', limiteConsulta, async (req, res) => res.json(await consultaDados.consultarCep(db, req.params.cep, { somentePublica: true })));
+  r.post('/abertura', limitePedido, (req, res) => {
+    const { corpoCliente } = require('./clientes');
+    const out = abertura.solicitar(db, req.body ?? {}, { ip: req.ip, validarCadastro: (d) => corpoCliente(d, { novo: true }) });
+    res.status(201).json({ protocolo: out.protocolo });
   });
 
   return r;

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR" translate="no" class="notranslate">
+<head>
+  <meta charset="utf-8">
+  <meta name="google" content="notranslate">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#032733">
+  <meta name="description" content="Abra a conta da sua empresa na PAY AX.">
+  <title>Abra sua conta | PAY AX</title>
+  <link rel="icon" href="/site/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/site/styles.css">
+  <link rel="stylesheet" href="/site/abrir-conta.css">
+  <script defer src="/site/abrir-conta.js"></script>
+</head>
+<body class="pagina-abertura">
+  <a class="skip" href="#conteudo">Ir para o conteúdo</a>
+  <header class="header">
+    <div class="wrap header__inner">
+      <a class="brand" href="/" aria-label="PAY AX — início"><img src="/site/assets/payax-logo.svg" alt="PAY AX" width="491" height="84"></a>
+      <a class="voltar" href="/">Já é cliente? <strong>Acessar a conta</strong></a>
+    </div>
+  </header>
+
+  <main id="conteudo" class="abertura">
+    <div class="wrap abertura__grade">
+      <aside class="abertura__lado">
+        <p class="eyebrow">ABRA SUA CONTA</p>
+        <h1>Conta PAY AX para a sua empresa.</h1>
+        <p>Preencha os dados da empresa, dos responsáveis e da conta onde você quer receber os valores. Nossa equipe confere tudo e entra em contato.</p>
+        <ol class="passos" aria-label="Como funciona">
+          <li><strong>Você envia</strong> os dados e o contrato social.</li>
+          <li><strong>A PAY AX analisa</strong> o cadastro, como a lei exige de quem recebe por terceiros.</li>
+          <li><strong>Conta aprovada:</strong> o responsável financeiro recebe o acesso à Área do Cliente.</li>
+        </ol>
+        <p class="lado__nota">Tenha em mãos: CNPJ, contrato social (PDF ou foto), CPF do responsável legal e os dados da conta ou chave PIX da empresa.</p>
+      </aside>
+
+      <form class="ficha" data-abertura novalidate>
+        <!-- Campo isca: invisível para pessoas; robôs preenchem e o pedido é recusado. -->
+        <div class="isca" aria-hidden="true"><label>Site <input name="site" tabindex="-1" autocomplete="off"></label></div>
+
+        <fieldset class="bloco">
+          <legend><span class="num">1</span> Empresa</legend>
+          <div class="linha">
+            <label class="campo c-4">CNPJ *<span class="com-acao"><input name="empresa.cnpj" inputmode="numeric" autocomplete="off" placeholder="00.000.000/0000-00" data-mascara="cnpj" required><button type="button" class="mini" data-buscar-cnpj>Buscar</button></span><small data-cnpj-info></small></label>
+            <label class="campo c-8">Razão social *<input name="empresa.razao_social" maxlength="120" required></label>
+          </div>
+          <div class="linha">
+            <label class="campo c-4">Nome fantasia<input name="empresa.nome_fantasia" maxlength="120"></label>
+            <label class="campo c-4">E-mail da empresa *<input name="empresa.email" type="email" maxlength="160" autocapitalize="none" required></label>
+            <label class="campo c-4">Telefone *<input name="empresa.telefone" inputmode="tel" data-mascara="telefone" placeholder="(00) 00000-0000" required></label>
+          </div>
+          <div class="linha">
+            <label class="campo c-3">CEP *<input name="empresa.cep" inputmode="numeric" data-mascara="cep" placeholder="00000-000" required></label>
+            <label class="campo c-7">Endereço *<input name="empresa.endereco" maxlength="120" required></label>
+            <label class="campo c-2">Número *<input name="empresa.numero" maxlength="10" required></label>
+          </div>
+          <div class="linha">
+            <label class="campo c-3">Complemento<input name="empresa.complemento" maxlength="60"></label>
+            <label class="campo c-4">Bairro *<input name="empresa.bairro" maxlength="60" required></label>
+            <label class="campo c-3">Cidade *<input name="empresa.cidade" maxlength="60" required></label>
+            <label class="campo c-2">UF *<input name="empresa.uf" maxlength="2" autocapitalize="characters" required></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="bloco">
+          <legend><span class="num">2</span> Responsável legal da empresa</legend>
+          <p class="dica">Sócio ou administrador que assina pela empresa no contrato social.</p>
+          <div class="linha">
+            <label class="campo c-6">Nome completo *<input name="representante.nome" maxlength="120" autocomplete="name" required></label>
+            <label class="campo c-3">CPF *<input name="representante.cpf" inputmode="numeric" data-mascara="cpf" placeholder="000.000.000-00" required></label>
+            <label class="campo c-3">Cargo<input name="representante.cargo" maxlength="60" placeholder="Ex.: sócio-administrador"></label>
+          </div>
+          <div class="linha">
+            <label class="campo c-6">E-mail *<input name="representante.email" type="email" maxlength="160" autocapitalize="none" required></label>
+            <label class="campo c-6">Telefone *<input name="representante.telefone" inputmode="tel" data-mascara="telefone" placeholder="(00) 00000-0000" required></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="bloco">
+          <legend><span class="num">3</span> Responsável financeiro</legend>
+          <p class="dica">Quem acompanha as cobranças e os repasses. Recebe o acesso à Área do Cliente quando a conta for aprovada.</p>
+          <label class="marcar"><input type="checkbox" data-mesmo-responsavel><span>É a mesma pessoa do responsável legal</span></label>
+          <div class="linha">
+            <label class="campo c-6">Nome completo *<input name="financeiro.nome" maxlength="120" required></label>
+            <label class="campo c-3">E-mail *<input name="financeiro.email" type="email" maxlength="160" autocapitalize="none" required></label>
+            <label class="campo c-3">Telefone *<input name="financeiro.telefone" inputmode="tel" data-mascara="telefone" placeholder="(00) 00000-0000" required></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="bloco">
+          <legend><span class="num">4</span> Onde receber os valores</legend>
+          <p class="dica">O valor dos boletos pagos vai para uma conta <strong>da própria empresa</strong> (mesmo CNPJ). Conta de sócio ou de terceiros não é aceita.</p>
+          <div class="opcoes" role="radiogroup" aria-label="Forma de recebimento">
+            <label class="opcao"><input type="radio" name="destino.forma" value="conta" checked><span>Conta bancária</span></label>
+            <label class="opcao"><input type="radio" name="destino.forma" value="pix"><span>Chave PIX</span></label>
+          </div>
+          <div data-destino="conta">
+            <div class="linha">
+              <label class="campo c-5">Banco *<select name="destino.banco" data-banco>
+                <option value="">Escolha o banco</option>
+                <option value="237">237 · Bradesco</option><option value="001">001 · Banco do Brasil</option><option value="104">104 · Caixa Econômica Federal</option>
+                <option value="341">341 · Itaú Unibanco</option><option value="033">033 · Santander</option><option value="077">077 · Banco Inter</option>
+                <option value="260">260 · Nubank</option><option value="336">336 · C6 Bank</option><option value="748">748 · Sicredi</option><option value="756">756 · Sicoob</option>
+                <option value="outro">Outro banco</option>
+              </select></label>
+              <label class="campo c-4">Tipo de conta *<select name="destino.tipo"><option value="corrente">Conta corrente</option><option value="pagamento">Conta de pagamento</option><option value="poupanca">Poupança</option></select></label>
+            </div>
+            <div class="linha" data-outro-banco hidden>
+              <label class="campo c-3">Código do banco *<input name="destino.banco_outro" inputmode="numeric" maxlength="3" placeholder="000"></label>
+              <label class="campo c-4">ISPB do banco *<input name="destino.ispb" inputmode="numeric" maxlength="8" placeholder="8 dígitos"><small>Consta no extrato ou no site do banco.</small></label>
+            </div>
+            <div class="linha">
+              <label class="campo c-3">Agência *<input name="destino.agencia" inputmode="numeric" maxlength="5"></label>
+              <label class="campo c-2">Dígito<input name="destino.agencia_dv" maxlength="1"></label>
+              <label class="campo c-5">Conta *<input name="destino.conta" inputmode="numeric" maxlength="20"></label>
+              <label class="campo c-2">Dígito *<input name="destino.conta_dv" maxlength="2"></label>
+            </div>
+          </div>
+          <div data-destino="pix" hidden>
+            <div class="linha">
+              <label class="campo c-4">Tipo de chave *<select name="destino.pix_tipo"><option value="cnpj">CNPJ da empresa</option><option value="email">E-mail</option><option value="telefone">Celular</option><option value="aleatoria">Chave aleatória</option></select></label>
+              <label class="campo c-8">Chave PIX *<input name="destino.pix_chave" maxlength="77" autocapitalize="none"></label>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="bloco">
+          <legend><span class="num">5</span> Documentos</legend>
+          <p class="dica">PDF, JPG ou PNG, até 8 MB cada.</p>
+          <div class="linha">
+            <label class="arquivo c-6" data-arquivo="contrato_social">
+              <input type="file" accept="application/pdf,image/jpeg,image/png" required>
+              <span class="arquivo__icone" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 18v-6M9 15l3-3 3 3"/></svg></span>
+              <span class="arquivo__texto"><strong>Contrato social *</strong><span data-nome>Ou a última alteração consolidada</span></span>
+            </label>
+            <label class="arquivo c-6" data-arquivo="documento_responsavel">
+              <input type="file" accept="application/pdf,image/jpeg,image/png">
+              <span class="arquivo__icone" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="12" r="2.5"/><path d="M14 10h4M14 14h3"/></svg></span>
+              <span class="arquivo__texto"><strong>Documento do responsável legal</strong><span data-nome>RG ou CNH (opcional, agiliza a análise)</span></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="fim">
+          <label class="marcar"><input type="checkbox" name="aceite" required><span>Declaro que as informações são verdadeiras e que li o <a href="/privacidade" target="_blank" rel="noopener">aviso de privacidade</a>. Os dados serão usados para analisar a abertura da conta.</span></label>
+          <p class="erro" data-erro role="alert" hidden></p>
+          <button class="button button--primary enviar" type="submit" data-enviar>Enviar pedido de abertura</button>
+        </div>
+      </form>
+
+      <section class="ficha enviado" data-enviado hidden tabindex="-1" aria-labelledby="enviado-titulo">
+        <div class="enviado__selo" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+        <h2 id="enviado-titulo">Pedido recebido!</h2>
+        <p>Protocolo <strong data-protocolo></strong></p>
+        <p>A equipe PAY AX vai analisar os dados e o contrato social e entra em contato pelo e-mail do responsável financeiro. Guarde o protocolo.</p>
+        <a class="button button--primary" href="/">Voltar ao início</a>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

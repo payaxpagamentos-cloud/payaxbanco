@@ -73,6 +73,17 @@ const INVENTARIO = Object.freeze([
     papel: 'Controladora.',
   },
   {
+    id: 'abertura-de-conta',
+    titulo: 'Pedidos de abertura de conta (site)',
+    titulares: 'Responsáveis legais e financeiros das empresas que pedem conta pelo site payax.com.br',
+    dados: ['nome', 'CPF do responsável legal', 'cargo', 'e-mail', 'telefone', 'contrato social e documento enviados', 'endereço IP do envio'],
+    finalidade: 'Analisar o pedido de abertura de conta e identificar a empresa e quem a representa antes de aceitá-la como cliente.',
+    base_legal: 'Procedimentos preliminares de contrato a pedido do titular (art. 7º, V) e cumprimento de obrigação legal (art. 7º, II): Lei 9.613/1998, art. 10, I e § 1º.',
+    compartilhamento: ['Nenhum, salvo ordem judicial'],
+    retencao: 'Aprovado: vira o cadastro do cliente e segue a guarda dele. Recusado: documentos apagados e dados anonimizados em 180 dias.',
+    papel: 'Controladora.',
+  },
+  {
     id: 'contatos-clientes',
     titulo: 'Contatos das empresas clientes',
     titulares: 'Responsáveis e contatos indicados pelos provedores clientes',

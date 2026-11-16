@@ -28,3 +28,32 @@
 
 /* Cursor de digitação só onde se digita (com a "navegação por cursor" do navegador ligada, ele piscava em textos). */
 body{caret-color:transparent}input,textarea,select,[contenteditable]{caret-color:auto}
+
+/* Cabeçalho em linha: logo, menu, acesso compacto (e-mail | senha | entrar) e "Abra sua conta". */
+.header__inner{gap:30px;padding-block:14px 22px}.brand{width:172px}
+.menu{display:flex;align-items:center;gap:26px;margin-right:auto}.menu a,.menu button{padding:6px 0;border:0;background:none;color:#e8fbff;font-size:14px;font-weight:550;text-decoration:none;white-space:nowrap}.menu a:hover,.menu button:hover{color:var(--mint);text-decoration:underline;text-underline-offset:6px;text-decoration-thickness:2px}
+.header__acoes{display:flex;align-items:center;gap:14px;flex:0 0 auto}
+.auth{position:relative;width:auto;padding:0;border:0;border-radius:0;background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}.auth::before{display:none}
+.auth__title,.auth__submit-text{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.auth__fields{display:flex;align-items:center;gap:0;height:44px;padding:3px 3px 3px 8px;border:1px solid rgba(190,237,240,.55);border-radius:999px;background:rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.auth__fields:focus-within{border-color:var(--mint);box-shadow:0 0 0 3px rgba(115,250,234,.16)}
+.auth__field{width:165px}.auth__field+.auth__field{border-left:1px solid rgba(190,237,240,.35);width:140px}
+.auth input{height:36px;border:0;border-radius:999px;padding:0 12px;background:transparent;box-shadow:none;color:#fff;font-size:13.5px}.auth input:focus{border:0;box-shadow:none;background:rgba(255,255,255,.07)}.auth input::placeholder{color:rgba(225,250,252,.78)}
+.auth input:-webkit-autofill{-webkit-text-fill-color:#fff;-webkit-box-shadow:0 0 0 40px #0b3a47 inset;caret-color:#fff}
+.password-field input{padding-right:36px}.eye{top:2px;right:2px;width:32px;height:32px;border-radius:50%;color:#d9fff8}.eye:hover{background:rgba(255,255,255,.1)}
+.auth__submit{flex:0 0 auto;width:36px;height:36px;margin-left:4px;padding:0;border-radius:50%}.auth__submit .icon{width:18px;height:18px}
+.auth__recovery{position:absolute;right:46px;top:calc(100% + 4px);margin:0;font-size:11px;color:#cfeff3;text-decoration:none}.auth__recovery:hover{color:#fff;text-decoration:underline}
+.auth__status{position:absolute;right:0;top:calc(100% + 24px);z-index:5;width:340px;margin:0;padding:10px 13px;border-radius:10px;background:#fff4f2;color:#8a1c12;box-shadow:0 10px 26px rgba(0,20,30,.25)}
+.abrir-conta{display:inline-flex;align-items:center;height:44px;padding:0 20px;border:1.5px solid var(--mint);border-radius:999px;color:var(--mint);font-size:14px;font-weight:650;text-decoration:none;white-space:nowrap;transition:background .2s,color .2s}.abrir-conta:hover{background:var(--mint);color:#032733}
+@media(max-width:1180px){.menu{gap:18px}.auth__field{width:140px}.auth__field+.auth__field{width:120px}.header__inner{gap:22px}}
+@media(max-width:1020px){.menu{display:none}.header__acoes{margin-left:auto}}
+@media (min-width:761px) and (max-height:760px){.header__inner{padding-block:10px 20px}.brand{width:156px}.auth__fields,.abrir-conta{height:40px}.auth input{height:32px}.auth__submit{width:32px;height:32px}}
+@media(max-width:760px){
+  .header__inner{flex-wrap:wrap;gap:10px;padding-block:14px}.brand{width:150px;margin-right:auto}.header__acoes{display:contents}
+  .mobile-access{order:2;min-height:40px}.abrir-conta{order:3;height:40px;padding:0 14px;font-size:13px}
+  .auth{order:4;flex-basis:100%;margin-top:6px}
+  .auth__fields{height:50px}.auth__field,.auth__field+.auth__field{flex:1;width:auto;min-width:0}.auth input{height:42px;font-size:16px}.eye{top:5px}.auth__submit{width:42px;height:42px}
+  .auth__recovery{position:static;display:block;margin:10px 0 0 auto;font-size:12px}
+  .auth__status{position:static;width:auto;margin-top:10px}
+}
+@media(max-width:400px){.brand{width:122px}.mobile-access{padding:8px 9px}.abrir-conta{padding:0 11px;font-size:12px}}

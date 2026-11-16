@@ -24,7 +24,8 @@ test('site público em payax.com.br', async (t) => {
     const r = await pegar(api.raiz, '/', 'payax.com.br');
     assert.equal(r.status, 200);
     assert.match(r.corpo, /Uma nova perspectiva para/);
-    assert.match(r.corpo, /ÁREA DO CLIENTE/);
+    assert.match(r.corpo, /Área do cliente/);
+    assert.match(r.corpo, /href="\/abrir-conta"/, 'botão Abra sua conta');
     assert.match(r.corpo, /\/site\/config\.js/, 'o login liga no sistema pelo config.js');
     for (const arq of ['/site/site.js', '/site/config.js', '/site/styles.css', '/site/assets/payax-logo.svg', '/site/assets/globo-poster.jpg',
       '/site/assets/integracoes.jpg', '/site/assets/globo-loop.mp4']) {

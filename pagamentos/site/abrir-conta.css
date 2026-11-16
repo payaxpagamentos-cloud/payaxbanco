@@ -1,0 +1,58 @@
+/* Página "Abra sua conta" — mesmo visual do site (cores, fontes e botões de styles.css). */
+.pagina-abertura{background:radial-gradient(ellipse at 0% 0%,rgba(86,217,231,.12),transparent 50%),#f4f9fc}
+.pagina-abertura .header__inner{padding-block:14px}
+.voltar{color:#d9fff8;font-size:14px;text-decoration:none}.voltar strong{color:var(--mint);font-weight:650}.voltar:hover strong{text-decoration:underline;text-underline-offset:4px}
+.abertura{padding:40px 0 60px}
+.abertura__grade{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:40px;align-items:start}
+.abertura__lado{position:sticky;top:96px}
+.abertura__lado h1{margin:0 0 14px;font-size:clamp(28px,2.6vw,38px);line-height:1.1;letter-spacing:-.04em}
+.abertura__lado>p{margin:0 0 20px;color:#364d60;font-size:15.5px;line-height:1.55}
+.passos{margin:0 0 20px;padding:0;list-style:none;counter-reset:p}.passos li{position:relative;padding:0 0 14px 40px;color:#364d60;font-size:14.5px;line-height:1.5;counter-increment:p}
+.passos li::before{content:counter(p);position:absolute;left:0;top:-2px;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#032733;color:var(--mint);font-size:13px;font-weight:700}
+.passos strong{color:var(--ink)}
+.lado__nota{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:13.5px!important;margin:0!important}
+
+.ficha{padding:30px;border:1px solid #cfe2e8;border-radius:20px;background:#fff;box-shadow:0 12px 30px rgba(32,94,109,.08)}
+.bloco{margin:0 0 26px;padding:0 0 22px;border:0;border-bottom:1px solid #e1edf1;min-width:0}
+.bloco legend{display:flex;align-items:center;gap:10px;padding:0;margin-bottom:14px;font-size:18px;font-weight:700;letter-spacing:-.02em}
+.num{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#e4f8f8;color:#04606f;font-size:13px}
+.dica{margin:-6px 0 14px;color:#4b6073;font-size:13.5px;line-height:1.5}
+.linha{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px;margin-bottom:12px}
+.c-2{grid-column:span 2}.c-3{grid-column:span 3}.c-4{grid-column:span 4}.c-5{grid-column:span 5}.c-6{grid-column:span 6}.c-7{grid-column:span 7}.c-8{grid-column:span 8}
+.campo{display:flex;flex-direction:column;gap:6px;min-width:0;color:#203b50;font-size:13px;font-weight:600}
+.campo input,.campo select{width:100%;height:42px;padding:0 12px;border:1px solid #bdd3db;border-radius:9px;background:#fbfeff;color:var(--ink);font-size:14.5px;font-weight:400;outline:none}
+.campo select{appearance:auto}
+.campo input:focus,.campo select:focus{border-color:#00a3b5;box-shadow:0 0 0 3px rgba(0,163,181,.15);background:#fff}
+.campo.invalido input,.campo.invalido select{border-color:#c4321d;box-shadow:0 0 0 3px rgba(196,50,29,.1)}
+.campo small{font-weight:400;color:#557083;font-size:12px;line-height:1.4}
+.com-acao{display:flex;gap:6px}.com-acao input{flex:1;min-width:0}
+.mini{flex:0 0 auto;height:42px;padding:0 12px;border:1px solid #9fd6dd;border-radius:9px;background:#e9fbfb;color:#04505d;font-size:13px;font-weight:650}.mini:hover{background:#d6f6f6}
+.marcar{display:flex;align-items:flex-start;gap:10px;margin:0 0 14px;color:#203b50;font-size:14px;line-height:1.5}.marcar input{width:18px;height:18px;margin:2px 0 0;flex:0 0 auto;accent-color:#04606f}
+.marcar a{color:#04606f}
+.opcoes{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.opcao{position:relative}.opcao input{position:absolute;opacity:0}
+.opcao span{display:inline-flex;align-items:center;height:40px;padding:0 18px;border:1px solid #bdd3db;border-radius:999px;background:#fff;color:#203b50;font-size:14px;font-weight:600;cursor:pointer}
+.opcao input:checked+span{border-color:#032733;background:#032733;color:var(--mint)}
+.opcao input:focus-visible+span{outline:3px solid #008da4;outline-offset:2px}
+.arquivo{position:relative;display:flex;align-items:center;gap:14px;min-height:76px;padding:14px 16px;border:1.5px dashed #9fc6d1;border-radius:14px;background:#f7fcfd;cursor:pointer}
+.arquivo:hover{border-color:#04606f;background:#effafa}
+.arquivo input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.arquivo:focus-within{outline:3px solid #008da4;outline-offset:2px}
+.arquivo__icone{display:grid;place-items:center;flex:0 0 auto;width:42px;height:42px;border-radius:10px;background:#e4f8f8;color:#04606f}
+.arquivo__texto{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:14px}.arquivo__texto span{color:#4b6073;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arquivo.ok{border-style:solid;border-color:#1f9a6b;background:#f1fbf6}.arquivo.ok .arquivo__icone{background:#d8f3e6;color:#137a52}.arquivo.ok .arquivo__texto span{color:#137a52}
+.arquivo.invalido{border-color:#c4321d;background:#fff6f4}
+.fim{padding-top:4px}
+.erro{margin:0 0 14px;padding:12px 14px;border-radius:10px;background:#fff4f2;color:#8a1c12;font-size:14px;line-height:1.45}
+.enviar{min-width:260px}.enviar:disabled{opacity:.7;cursor:wait}
+.isca{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.enviado{grid-column:2;text-align:center;padding:50px 30px}
+.enviado__selo{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 18px;border-radius:50%;background:#d8f3e6;color:#137a52}.enviado__selo .icon{width:32px;height:32px;stroke-width:2.4}
+.enviado h2{margin:0 0 10px;font-size:28px;letter-spacing:-.03em}.enviado p{margin:0 auto 14px;max-width:460px;color:#364d60;line-height:1.55}
+.enviado [data-protocolo]{font-size:20px;color:#04606f;letter-spacing:.04em}
+
+@media(max-width:1020px){.abertura__grade{grid-template-columns:1fr}.abertura__lado{position:static}.enviado{grid-column:1}}
+@media (min-width:761px) and (max-height:760px){.abertura{padding-top:24px}.ficha{padding:24px}.bloco{margin-bottom:20px;padding-bottom:16px}.campo input,.campo select,.mini{height:38px}}
+@media(max-width:760px){.abertura{padding:24px 0 40px}.ficha{padding:20px 16px;border-radius:16px}.linha{grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+  .c-2,.c-3{grid-column:span 3}.c-4,.c-5,.c-6,.c-7,.c-8{grid-column:span 6}.campo input,.campo select{font-size:16px}.enviar{width:100%;min-width:0}.voltar{font-size:13px}}
+@media(max-width:400px){.voltar{font-size:12px}.voltar strong{display:block}}

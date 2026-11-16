@@ -16,4 +16,15 @@ function verificarSenha(senha, armazenado) {
   return crypto.timingSafeEqual(esperado, calculado);
 }
 
-module.exports = { hashSenha, verificarSenha };
+/**
+ * Senha provisória para entregar ao cliente (ex.: "k7m2qx-9fa3"): gerada com o sorteio criptográfico do
+ * sistema, sem letras e números que se confundem ao digitar (0/o, 1/l/i).
+ */
+function senhaProvisoria() {
+  const alfabeto = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const sorteio = require('node:crypto').randomBytes(10);
+  const t = [...sorteio].map((b) => alfabeto[b % alfabeto.length]).join('');
+  return `${t.slice(0, 6)}-${t.slice(6, 10)}`;
+}
+
+module.exports = { hashSenha, verificarSenha, senhaProvisoria };

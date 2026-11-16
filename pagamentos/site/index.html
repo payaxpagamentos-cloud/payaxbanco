@@ -18,20 +18,26 @@
   <header class="header" id="inicio">
     <div class="wrap header__inner">
       <a class="brand" href="#inicio" aria-label="PAY AX — início"><img src="/site/assets/payax-logo.svg" alt="PAY AX" width="491" height="84"></a>
-      <button class="mobile-access" type="button" data-mobile-access aria-controls="customer-login" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/></svg>Acessar conta</button>
-      <form class="auth glass" id="customer-login" data-login method="post" aria-label="Acesso à área do cliente" aria-describedby="login-status">
-        <p class="auth__title">ÁREA DO CLIENTE</p>
-        <div class="auth__fields">
-          <div class="auth__field"><label class="sr-only" for="login-email">E-mail</label><input id="login-email" name="email" type="email" placeholder="E-mail" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254" required></div>
-          <div class="auth__field">
-            <div class="password-field"><label class="sr-only" for="login-password">Senha</label><input id="login-password" name="password" type="password" placeholder="••••••••" autocomplete="current-password" required><button class="eye" type="button" data-eye aria-label="Mostrar senha" aria-pressed="false" aria-controls="login-password"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/><path data-eye-slash hidden d="m3 3 18 18"/></svg></button></div>
-            <button class="auth__recovery" type="button" data-action="recovery">Esqueci minha senha</button>
+      <nav class="menu" aria-label="Menu principal">
+        <a href="#solucoes">Soluções</a><a href="#integracoes">Integrações</a><button type="button" data-action="contact">Atendimento</button>
+      </nav>
+      <div class="header__acoes">
+        <button class="mobile-access" type="button" data-mobile-access aria-controls="customer-login" aria-expanded="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/></svg>Acessar</button>
+        <form class="auth" id="customer-login" data-login method="post" aria-label="Acesso à área do cliente" aria-describedby="login-status">
+          <p class="auth__title">Área do cliente</p>
+          <div class="auth__fields">
+            <div class="auth__field auth__field--email"><label class="sr-only" for="login-email">E-mail</label><input id="login-email" name="email" type="email" placeholder="E-mail" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" maxlength="254" required></div>
+            <div class="auth__field">
+              <div class="password-field"><label class="sr-only" for="login-password">Senha</label><input id="login-password" name="password" type="password" placeholder="Senha" autocomplete="current-password" required><button class="eye" type="button" data-eye aria-label="Mostrar senha" aria-pressed="false" aria-controls="login-password"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/><path data-eye-slash hidden d="m3 3 18 18"/></svg></button></div>
+            </div>
+            <button class="auth__submit" type="submit" disabled aria-label="Entrar"><span class="auth__submit-text" data-submit-text>Entrar</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 5l7 7-7 7"/></svg></button>
           </div>
-          <button class="auth__submit" type="submit" disabled><span data-submit-text>Entrar</span><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 5l7 7-7 7"/></svg></button>
-        </div>
-        <p class="auth__status" id="login-status" data-login-status role="alert" tabindex="-1" hidden></p>
-        <noscript>Ative o JavaScript para acessar sua conta.</noscript>
-      </form>
+          <button class="auth__recovery" type="button" data-action="recovery">Esqueci minha senha</button>
+          <p class="auth__status" id="login-status" data-login-status role="alert" tabindex="-1" hidden></p>
+          <noscript>Ative o JavaScript para acessar sua conta.</noscript>
+        </form>
+        <a class="abrir-conta" href="/abrir-conta">Abra sua conta</a>
+      </div>
     </div>
   </header>
   <main id="conteudo">
@@ -43,7 +49,7 @@
       <div class="wrap hero__inner"><div class="hero__copy">
         <h1 id="hero-title">Uma nova<br>perspectiva para<br><span>o seu negócio.</span></h1>
         <p class="hero__intro">Bem-vindo à PAY AX.</p>
-        <div class="hero__actions"><a class="button button--primary" href="#solucoes">Conhecer soluções</a><button class="button button--glass" type="button" data-action="contact">Falar com especialista</button></div>
+        <div class="hero__actions"><a class="button button--primary" href="/abrir-conta">Abra sua conta</a><a class="button button--glass" href="#solucoes">Conhecer soluções</a></div>
       </div></div>
     </section>
     <section class="solutions" id="solucoes" aria-labelledby="solutions-title">

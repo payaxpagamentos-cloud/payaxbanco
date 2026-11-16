@@ -493,7 +493,7 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
         echo "    ssl_certificate_key  %ssl_key%;"
         echo "    include %home%/%user%/conf/web/%domain%/nginx.hsts.conf*;"
       fi
-      echo "    client_max_body_size 20m;"
+      echo "    client_max_body_size 30m;   # abertura de conta pelo site leva o contrato social"
       # Atrás do Cloudflare (nuvem laranja), o IP de quem acessa vem no CF-Connecting-IP. Só é aceito quando a
       # conexão vem mesmo de um endereço do Cloudflare; sem Cloudflare, nada muda. Sem isso, a auditoria, o PLD e o
       # limite de tentativas de login veriam todo mundo com o mesmo IP (o do Cloudflare).

@@ -185,13 +185,14 @@ const guardar = (db, tipo, chave, fonte, dados) => db.prepare(`INSERT INTO consu
 
 // ---------------------------------------------------------------- Públicas
 /** Endereço pelo CEP. */
-async function consultarCep(db, entrada, { semCache = false } = {}) {
+async function consultarCep(db, entrada, { semCache = false, somentePublica = false } = {}) {
   const cep = so(entrada);
   v.exigir(cep.length === 8, 'CEP inválido: informe os 8 dígitos.');
   const cacheado = semCache ? null : doCache(db, 'cep', cep, config.dados.cacheCepDias);
   if (cacheado) return cacheado;
 
-  const fonte = fonteDe(db, 'cep');
+  // Formulário público (abertura de conta): só a fonte gratuita — visitante anônimo não gasta crédito da API Brasil.
+  const fonte = somentePublica ? { nome: 'publica', token: null } : fonteDe(db, 'cep');
   const dados = fonte.nome === 'apibrasil'
     ? lerCepApiBrasil(await buscar(urlApiBrasil(config.dados.caminhoApiBrasilCep), { metodo: 'POST', corpo: { tipo: 'busca-cep', cep }, token: fonte.token }))
     : lerCepPublico(await buscar(`${config.dados.urlViaCep}/${cep}/json/`));
@@ -203,13 +204,13 @@ async function consultarCep(db, entrada, { semCache = false } = {}) {
 }
 
 /** Dados cadastrais pelo CNPJ. */
-async function consultarCnpj(db, entrada, { semCache = false } = {}) {
+async function consultarCnpj(db, entrada, { semCache = false, somentePublica = false } = {}) {
   const cnpj = so(entrada);
   v.exigir(cnpj.length === 14 && v.cnpjValido(cnpj), 'CNPJ inválido.');
   const cacheado = semCache ? null : doCache(db, 'cnpj', cnpj, config.dados.cacheCnpjDias);
   if (cacheado) return cacheado;
 
-  const fonte = fonteDe(db, 'cnpj');
+  const fonte = somentePublica ? { nome: 'publica', token: null } : fonteDe(db, 'cnpj');
   let dados;
   try {
     if (fonte.nome === 'apibrasil') {

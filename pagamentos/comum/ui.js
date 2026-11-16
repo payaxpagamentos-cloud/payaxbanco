@@ -38,6 +38,8 @@ const ICONES = {
   cadeado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   lista: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   grafico: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
+  'pessoa-mais': '<circle cx="9" cy="8" r="3.5"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M19 7v6M16 10h6"/>',
+  documento: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
 };
 
 export function icone(nome, classe = '') {
@@ -147,6 +149,7 @@ export const R = {
   origem: { avulso: 'Avulso', ixc: 'Sistema do cliente', api: 'API', lote: 'Lote' },
   perfilEquipe: { admin: 'Administrador', financeiro: 'Financeiro', operacao: 'Operação', consulta: 'Consulta' },
   perfilCliente: { admin: 'Administrador', operador: 'Operador', consulta: 'Consulta' },
+  situacaoAbertura: { nova: ['Nova', 'info'], em_analise: ['Em análise', 'aviso'], aprovada: ['Aprovada', 'ok'], recusada: ['Recusada', 'neutra'] },
 };
 
 /** Selo de estado: cor + texto (a cor nunca informa sozinha). */

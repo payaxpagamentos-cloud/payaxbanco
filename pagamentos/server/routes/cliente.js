@@ -9,7 +9,7 @@ const config = require('../config');
 const { agora } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { emitirToken, emitirDesafio, lerDesafio, sessaoCliente, exigir } = require('../auth');
-const { hashSenha, verificarSenha } = require('../lib/senha');
+const { hashSenha, verificarSenha, senhaProvisoria } = require('../lib/senha');
 const { csv, listaPaginada } = require('../lib/http');
 const v = require('../lib/validacao');
 const datas = require('../lib/datas');
@@ -325,7 +325,7 @@ module.exports = (db, autenticado) => {
     const email = v.email(req.body?.email);
     const perfil = v.opcao(req.body?.perfil ?? 'operador', 'o perfil', ['admin', 'operador', 'consulta']);
     if (db.prepare('SELECT 1 FROM usuarios_cliente WHERE email = ?').get(email)) throw new ErroNegocio('Já existe um acesso com este e-mail.', 409);
-    const provisoria = `${Math.random().toString(36).slice(2, 8)}-${Math.random().toString(36).slice(2, 6)}`;
+    const provisoria = senhaProvisoria();
     const id = db.prepare(`INSERT INTO usuarios_cliente (cliente_id, nome, email, senha_hash, perfil, senha_provisoria, criado_em)
       VALUES (?, ?, ?, ?, ?, 1, ?) RETURNING id`).get(req.clienteId, nome, email, hashSenha(provisoria), perfil, agora()).id;
     auditoria.registrar(db, req, { acao: 'acesso.criado.cliente', entidade: 'usuario_cliente', entidade_id: id, cliente_id: req.clienteId, depois: { nome, email, perfil } });
@@ -341,7 +341,7 @@ module.exports = (db, autenticado) => {
     if (req.body?.ativo !== undefined) d.ativo = v.booleano(req.body.ativo) ? 1 : 0;
     let provisoria = null;
     if (v.booleano(req.body?.redefinir_senha)) {
-      provisoria = `${Math.random().toString(36).slice(2, 8)}-${Math.random().toString(36).slice(2, 6)}`;
+      provisoria = senhaProvisoria();
       d.senha_hash = hashSenha(provisoria);
       d.senha_provisoria = 1;
     }
