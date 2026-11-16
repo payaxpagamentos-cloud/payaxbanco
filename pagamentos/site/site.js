@@ -67,7 +67,7 @@
   // O que cada solução faz — fiel ao que o sistema entrega hoje.
   const services = {
     pix: ['Pix', 'Boletos com QR Code Pix (Bolepix): o pagador escolhe entre o código de barras e o Pix. Pago por Pix, o valor segue para a conta da sua empresa já sem a tarifa, sem pedir saque.'],
-    boletos: ['Boletos', 'Boletos registrados no Bradesco, com a sua empresa identificada como beneficiária final. Emissão avulsa ou importada do sistema da sua empresa, com multa e juros dentro do Código de Defesa do Consumidor.'],
+    boletos: ['Boletos', 'Boletos registrados, com a sua empresa identificada como beneficiária final. Emissão avulsa ou importada do sistema da sua empresa, com multa e juros dentro do Código de Defesa do Consumidor.'],
     cobrancas: ['Cobranças', 'Acompanhe cada título — em aberto, vencido, pago ou baixado — com o histórico de cada etapa. Na Área do Cliente: extrato, transferências, relatórios e o boleto de cada pagador num link.'],
     conciliacao: ['Conciliação', 'O retorno do banco é processado automaticamente: o pagamento é baixado e o valor segue para a sua empresa. Integrado ao sistema de gestão, o título é baixado lá também, sem digitação.']
   };
