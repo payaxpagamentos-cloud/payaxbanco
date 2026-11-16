@@ -597,3 +597,58 @@ table.lista .sub { display: block; color: var(--texto-3); font-size: 11.5px; }
 
 /* Cursor de digitação só onde se digita (com a "navegação por cursor" do navegador ligada, ele piscava em textos). */
 body{caret-color:transparent}input,textarea,select,[contenteditable]{caret-color:auto}
+
+/* ---------------------------------------------------------------- Modo compacto
+   Telas baixas (notebook com escala de 125–150% no Windows: ~1280 × 550): tudo na mesma proporção, menor,
+   para o menu caber sem rolar e o conteúdo principal aparecer sem rolagem. Só no computador. */
+@media (min-width: 921px) and (max-height: 760px) {
+  :root { --menu-largura: 220px; }
+  .menu { padding: 12px 10px 10px; }
+  .marca { padding: 0 6px 10px; }
+  .marca-texto svg { height: 19px; width: auto; }
+  .marca-texto small { font-size: 7.5px; margin-top: 4px; }
+  .contexto { display: none; }            /* a área e o perfil já aparecem no rodapé do menu */
+  .grupo-menu { margin: 8px 10px 3px; font-size: 9.5px; }
+  .link-menu { padding: 5px 10px; font-size: 13px; gap: 9px; margin-bottom: 1px; }
+  .link-menu svg { width: 16px; height: 16px; }
+  .menu-rodape { padding-top: 8px; gap: 6px; }
+  .selo-ambiente { padding: 6px 9px; font-size: 11px; }
+  .perfil { padding-top: 8px; gap: 8px; }
+  .avatar { width: 28px; height: 28px; font-size: 11px; }
+  .link-privacidade.lateral { font-size: 11.5px; }
+
+  .topo { height: 50px; padding: 0 20px; }
+  .caminho strong { font-size: 14px; }
+  main { padding: 16px 22px 40px; }
+  .cabecalho-tela { margin-bottom: 12px; }
+  .cabecalho-tela h1 { font-size: 18px; }
+  .cabecalho-tela p { font-size: 12.5px; }
+  .botao { padding: 7px 13px; font-size: 13px; }
+  .botao svg { width: 16px; height: 16px; }
+  .abas { margin-bottom: 14px; }
+  .abas button { padding: 8px 12px; font-size: 13px; }
+  .filtros { padding: 10px 12px; margin-bottom: 12px; }
+  input, select, textarea { padding: 7px 10px; font-size: 13px; }
+
+  .grade { gap: 12px; }
+  .kpi { padding: 10px 13px; }
+  .kpi .valor { font-size: 21px; }
+  .kpi .valor.menor { font-size: 17px; }
+  .kpi .rotulo, .kpi .apoio { font-size: 11.5px; }
+  .cartao > header { padding: 11px 14px 0; }
+  .cartao > .corpo { padding: 11px 14px; }
+  .par .val { font-size: 13.5px; }
+  table.lista td { padding: 8px 12px; }
+  table.lista th { padding: 8px 12px; }
+
+  .cartao-conta { padding: 18px 22px 16px; }
+  .cartao-conta .saldo-valor { font-size: 34px; }
+  .cartao-conta .faixa { margin-top: 12px; padding-top: 10px; gap: 22px; }
+  .cartao-conta .faixa .item strong { font-size: 15px; }
+  .cartao-conta .numero-conta { margin-top: 10px; }
+  .cartao-conta .numero-conta strong { font-size: 14px; }
+  .acoes-rapidas { margin-top: 12px; }
+  .acao-rapida { padding: 10px 12px; gap: 6px; font-size: 13px; }
+  .acao-rapida .bolha { width: 30px; height: 30px; border-radius: 9px; }
+  .acao-rapida .bolha svg { width: 16px; height: 16px; }
+}
