@@ -73,8 +73,7 @@ export default async function visao({ alvo }) {
             total: l.bruto_centavos,
             partes: [
               { rotulo: 'Líquido dos clientes', valor: l.liquido_cliente_centavos },
-              { rotulo: 'Tarifa bancária', valor: l.tarifa_banco_centavos },
-              { rotulo: 'Tarifa PAY AX', valor: l.comissao_centavos },
+              { rotulo: 'Tarifa PAY AX', valor: l.comissao_centavos + (l.tarifa_banco_centavos ?? 0) },
             ],
           }),
           el('p', { style: 'margin-top:10px;color:var(--texto-2);font-size:13px' },

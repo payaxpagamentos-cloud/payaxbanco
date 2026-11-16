@@ -37,8 +37,7 @@ export default async function relatorios({ alvo, query }) {
         total: t.bruto_centavos,
         partes: [
           { rotulo: 'Líquido dos clientes', valor: t.bruto_centavos - t.comissao_centavos - t.tarifas_centavos },
-          { rotulo: 'Tarifas', valor: t.tarifas_centavos },
-          { rotulo: 'Tarifa PAY AX', valor: t.comissao_centavos },
+          { rotulo: 'Tarifas Boleto e Bolepix', valor: t.comissao_centavos + t.tarifas_centavos },
         ],
       }) : el('p', { class: 'vazio' }, 'Nada liquidado no período.'))),
 
