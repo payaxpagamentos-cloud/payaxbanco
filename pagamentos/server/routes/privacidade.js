@@ -20,9 +20,9 @@ const VERSAO = '14/11/2026';
 
 function pagina({ titulo, corpo }) {
   return `<!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" translate="no" class="notranslate">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8"><meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(titulo)} · PAY AX</title>
 <style>

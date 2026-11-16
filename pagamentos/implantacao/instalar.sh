@@ -476,6 +476,8 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
   passo "Publicando pelo Hestia ($DOMINIO)"
   TPL=/usr/local/hestia/data/templates/web/nginx
   # Modelo de proxy do Hestia: o nginx dele encaminha o domínio para o sistema, com HTTPS do próprio Hestia.
+  # Só usa o IP real do Cloudflare se o nginx tiver o módulo (senão a configuração inteira do servidor falharia).
+  REALIP=0; nginx -V 2>&1 | grep -q http_realip_module && REALIP=1
   for ext in tpl stpl; do
     {
       echo "# PAY AX Pagamentos — modelo de proxy (gerado pelo instalador; não editar no painel)"
@@ -492,6 +494,16 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
         echo "    include %home%/%user%/conf/web/%domain%/nginx.hsts.conf*;"
       fi
       echo "    client_max_body_size 20m;"
+      # Atrás do Cloudflare (nuvem laranja), o IP de quem acessa vem no CF-Connecting-IP. Só é aceito quando a
+      # conexão vem mesmo de um endereço do Cloudflare; sem Cloudflare, nada muda. Sem isso, a auditoria, o PLD e o
+      # limite de tentativas de login veriam todo mundo com o mesmo IP (o do Cloudflare).
+      [[ $REALIP -eq 1 ]] && for ip in 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 \
+                190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 \
+                104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 \
+                2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32; do
+        echo "    set_real_ip_from $ip;"
+      done
+      [[ $REALIP -eq 1 ]] && echo "    real_ip_header CF-Connecting-IP;"
       echo "    location ~ /\\.(?!well-known\\/) { deny all; return 404; }"
       echo "    location / {"
       echo "        proxy_pass http://127.0.0.1:$PORTA;"

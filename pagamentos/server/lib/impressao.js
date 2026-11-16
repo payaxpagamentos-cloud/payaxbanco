@@ -82,9 +82,9 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
     </div><div class="titulo-via">${esc(titulo)}</div>`;
 
   return `<!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" translate="no" class="notranslate">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8"><meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Boleto ${esc(nn)} — ${esc(boleto.pagador_nome)}</title>
 <style>
