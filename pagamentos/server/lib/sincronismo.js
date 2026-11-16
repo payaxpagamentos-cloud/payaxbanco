@@ -16,20 +16,13 @@ const boletos = require('./boletos');
 const febraban = require('./febraban');
 const bancos = require('./bancos');
 
+/** Endereço do IXC normalizado, para saber se dois clientes usam o mesmo IXC. */
+const mesmoIxc = (url) => String(url ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '') || null;
+
 /**
  * Nosso número que o IXC deu ao título ("00000012345", "12345-P", "000000123456"), em 11 dígitos + DV.
  * Devolve null quando o IXC ainda não gerou o boleto (sem número).
  */
-/** Endereço do IXC normalizado, para saber se dois clientes usam o mesmo IXC. */
-const mesmoIxc = (url) => String(url ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '') || null;
-
-/** Link permanente do boleto PAY AX (o mesmo da Área do Cliente), gravado no "Link gateway" do título no IXC. */
-function linkPublico(id, nossoNumero) {
-  if (!config.urlPublica) return null;
-  const assinatura = require('./cripto').assinar(`ficha:${id}:${nossoNumero}`).slice(0, 32);
-  return `${config.urlPublica}${config.basePath}/api/publico/boleto/${id}/${assinatura}`;
-}
-
 function nossoNumeroDoIxc(valor) {
   const bruto = String(valor ?? '').toUpperCase().trim();
   // Com separador ("12345-6", "0000012345-P"): o que vem depois do traço é o dígito.
@@ -194,7 +187,7 @@ async function importarAgora(db, cliente, { de, ate, limite = 200, maxPaginas = 
         // Quando o IXC numera, o título já tem o número e a linha dele: nada a gravar de volta.
         if (ixc.config.anotar_no_ixc !== false && ixc.config.numeracao !== 'ixc') {
           const b = db.prepare('SELECT linha_digitavel, nosso_numero, nosso_numero_dv FROM boletos WHERE id = ?').get(out.id);
-          await ixc.cliente.anotarBoleto(t.ixc_id, { linha_digitavel: b.linha_digitavel, nosso_numero: `${b.nosso_numero}-${b.nosso_numero_dv}`, link: linkPublico(out.id, b.nosso_numero) })
+          await ixc.cliente.anotarBoleto(t.ixc_id, { nosso_numero: `${b.nosso_numero}-${b.nosso_numero_dv}` })
             .catch((err) => resultado.detalhes.push({ ixc_id: t.ixc_id, aviso: `boleto emitido, mas não foi anotado no IXC: ${err.message}` }));
         }
       } catch (err) {

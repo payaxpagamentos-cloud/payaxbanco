@@ -129,12 +129,11 @@ test('IXC: importa títulos, emite boletos e dá baixa de volta', async (t) => {
     assert.equal((await api.get('/api/boletos?origem=ixc', tk.admin)).dados.total, 2);
   });
 
-  await t.test('a linha digitável, o nosso número e o link do boleto são gravados de volta no título do IXC', async () => {
+  await t.test('o nosso número é gravado de volta no título do IXC (o único campo que o IXC aceita alterar)', async () => {
     const put = ixc.chamadas.filter((c) => c.metodo === 'PUT' && c.recurso === 'fn_areceber_altera');
     assert.ok(put.length >= 2);
-    assert.match(put[0].dados.linha_digitavel ?? '', /^\d{47}$/);
     assert.match(put[0].dados.nn_boleto ?? '', /^\d{11}-[0-9P]$/);
-    if (put[0].dados.gateway_link !== undefined) assert.match(put[0].dados.gateway_link, /\/api\/publico\/boleto\/\d+\/[\w-]{32}$/);
+    assert.equal(put[0].dados.linha_digitavel, undefined);
   });
 
   await t.test('ao liquidar, o IXC recebe a baixa com data e valor', async () => {

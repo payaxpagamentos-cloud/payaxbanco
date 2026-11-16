@@ -35,7 +35,6 @@ const CAMPOS = {
   observacao: 'obs',
   linhaDigitavel: 'linha_digitavel',
   nossoNumero: 'nn_boleto',     // "nosso número" do título (nome confirmado pelo SAC da IXC)
-  linkGateway: 'gateway_link',  // "Link gateway" do Contas a Receber: link do boleto externo
   carteira: 'id_carteira_cobranca',
 };
 
@@ -181,12 +180,12 @@ function criarIxc({ url, token, timeoutMs = config.ixc.timeoutMs }) {
     /**
      * Grava no IXC o código do boleto emitido, para o provedor ver no título de origem.
      */
-    async anotarBoleto(ixcId, { linha_digitavel, nosso_numero, link = null }) {
+    async anotarBoleto(ixcId, { nosso_numero }) {
+      // O IXC só aceita alterar o nosso número pela API: linha digitável e link do boleto são calculados
+      // por ele na impressão (rota get boleto) e não podem ser gravados de fora (resposta do especialista IXC).
       return chamar(RECURSOS.alterarReceber, {
         [CAMPOS.id]: String(ixcId),
-        [CAMPOS.linhaDigitavel]: linha_digitavel,
         [CAMPOS.nossoNumero]: nosso_numero,
-        ...(link ? { [CAMPOS.linkGateway]: link } : {}),
       }, { metodo: 'PUT', sufixo: `/${ixcId}` });
     },
 
