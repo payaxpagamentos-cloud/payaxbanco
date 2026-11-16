@@ -83,7 +83,7 @@ command -v apt-get >/dev/null || falha "Este instalador é para Ubuntu/Debian (a
 [ -d "$ORIGEM/atendimento/server" ] || falha "Não achei $ORIGEM/atendimento — rode de dentro da pasta extraída do pacote."
 PRIMEIRA=1; [ -f "$CODIGO/.env" ] && PRIMEIRA=0
 # Atualização sem --dominio: o domínio é o que já está no .env.
-if [ -z "$DOMINIO" ] && [ -f "$CODIGO/.env" ]; then
+if [ -z "$DOMINIO" ] && [ -z "$IP_ACESSO" ] && [ -f "$CODIGO/.env" ]; then
   DOMINIO="$(sed -n 's|^ATEND_URL_PUBLICA=https\?://||p' "$CODIGO/.env" | head -1)"
   [ "$DOMINIO" = SEU-DOMINIO ] && DOMINIO=""
   # Instalada pelo IP (https://IP:porta): continua pelo IP.
@@ -207,7 +207,10 @@ if [ -f "$CODIGO/.env" ]; then
   echo ".env mantido (segredos e senha não mudam)"
   # Instalações antigas escutavam em todas as interfaces: fecha para só dentro do servidor.
   # Pelo IP: o endereço público acompanha (também quando a primeira instalação ficou sem endereço).
-  [ -n "$URL_IP" ] && sed -i -E "s#^ATEND_URL_PUBLICA=https://([0-9.]+(:[0-9]+)?|SEU-DOMINIO)\$#ATEND_URL_PUBLICA=https://$URL_IP#" "$CODIGO/.env"
+  [ -n "$URL_IP" ] && sed -i -E "s#^ATEND_URL_PUBLICA=.*#ATEND_URL_PUBLICA=https://$URL_IP#" "$CODIGO/.env"
+  # Passou a ter domínio (antes era pelo IP, ou outro domínio): o endereço público vira o domínio.
+  # É ele que aparece como URL do webhook para colar na Meta.
+  [ -n "$DOMINIO" ] && sed -i -E "s#^ATEND_URL_PUBLICA=.*#ATEND_URL_PUBLICA=https://$DOMINIO#" "$CODIGO/.env"
   grep -q '^ATEND_HOST=' "$CODIGO/.env" || printf '\n# Só dentro do servidor (Nginx/Apache ou túnel SSH na frente).\nATEND_HOST=127.0.0.1\n' >> "$CODIGO/.env"
 else
   SENHA_NOVA="$(aleatorio 12 base64url)"

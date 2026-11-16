@@ -103,7 +103,7 @@ fi
 titulo "6. Conferência"
 [ "$DNS_OK" = 1 ] || NOMES=()
 for n in "${NOMES[@]}"; do
-  c="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$n:443:127.0.0.1" "https://$n/atendimento/" || true)"
+  c="$(curl --noproxy '*' -sk -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$n:443:127.0.0.1" "https://$n/atendimento/" || true)"
   if [ "$c" = 200 ]; then ok "https://$n/atendimento/ responde (200)"; else aviso "https://$n/atendimento/ respondeu ${c:-nada} aqui dentro"; fi
 done
 echo
