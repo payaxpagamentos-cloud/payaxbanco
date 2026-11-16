@@ -172,3 +172,39 @@
   .zoe-login .zoe-access:has(.zoe-empresa) .zoe-access-logo { width: 50px; height: 50px; margin-bottom: 12px; }
   .zoe-login .zoe-access:has(.zoe-empresa) .zoe-access-intro { margin-bottom: 20px; }
 }
+
+/* =====================================================================
+   Encaixe na altura da janela (computador). A área útil do navegador é menor que a tela: barra de
+   abas, de favoritos e a do Windows comem 130 a 250 px. Tudo o que é vertical acompanha a altura
+   da janela, para o login caber inteiro, sem barra de rolagem, de 620 px de altura para cima.
+   ===================================================================== */
+@media (min-width: 981px) {
+  .zoe-login { height: 100svh; min-height: 560px; }
+  .zoe-login .zoe-layout { min-height: 0; height: 100%; padding-top: clamp(18px, 4.2vh, 48px); padding-bottom: clamp(52px, 8.5vh, 92px); }
+  .zoe-login .zoe-hero { min-height: 0; }
+  .zoe-login .zoe-brand img { width: clamp(52px, 8vh, 82px); height: clamp(52px, 8vh, 82px); }
+  .zoe-login .zoe-wordmark strong { font-size: clamp(30px, 4.4vh, 45px); }
+  .zoe-login .zoe-hero-copy { margin-top: clamp(16px, 3.6vh, 42px); }
+  .zoe-login .zoe-headline { font-size: clamp(34px, min(4vw, 6.6vh), 66px); }
+  .zoe-login .zoe-tagline { font-size: clamp(15px, min(1.5vw, 2.4vh), 25px); margin-top: clamp(8px, 1.6vh, 17px); }
+  .zoe-login .zoe-orbit { top: clamp(220px, 38vh, 348px); }
+  .zoe-login .zoe-access { margin-top: 0; padding: clamp(20px, 3.4vh, 42px) clamp(28px, 3vw, 48px); border-radius: clamp(26px, 3.6vh, 40px); }
+  .zoe-login .zoe-access-logo { width: clamp(44px, 7vh, 74px); height: clamp(44px, 7vh, 74px); margin-bottom: clamp(10px, 1.8vh, 20px); }
+  .zoe-login .zoe-empresa { margin: 0 auto clamp(6px, 1.2vh, 12px); padding: clamp(3px, .5vh, 6px) 14px; font-size: clamp(12px, 1.6vh, 15px); }
+  .zoe-login .zoe-access h2 { font-size: clamp(26px, 4vh, 42px); }
+  .zoe-login .zoe-access-intro { font-size: clamp(14px, 1.9vh, 18px); margin: clamp(4px, .9vh, 10px) 0 clamp(14px, 2.8vh, 30px); }
+  .zoe-login .zoe-fields { gap: clamp(10px, 1.9vh, 20px); }
+  .zoe-login .zoe-field label { font-size: clamp(14px, 1.8vh, 17px); margin-bottom: clamp(4px, .8vh, 8px); }
+  .zoe-login .zoe-field input { height: clamp(42px, 5.4vh, 54px); font-size: clamp(15px, 1.8vh, 17px); }
+  .zoe-login .zoe-eye { top: 50%; transform: translateY(-50%); height: 40px; }
+  .zoe-login .zoe-remember { margin: clamp(10px, 2vh, 22px) 0 clamp(12px, 2.2vh, 24px); font-size: clamp(14px, 1.8vh, 17px); }
+  .zoe-login .zoe-remember input { width: 22px; height: 22px; flex-basis: 22px; }
+  .zoe-login .zoe-submit { min-height: clamp(46px, 6vh, 60px); font-size: clamp(17px, 2.2vh, 21px); }
+  .zoe-login .zoe-message { margin-top: clamp(8px, 1.2vh, 14px); }
+  .zoe-login .zoe-help { margin-top: clamp(14px, 3vh, 34px); padding-top: clamp(10px, 1.8vh, 20px); gap: clamp(8px, 1.6vh, 18px); }
+  .zoe-login .zoe-help button { font-size: clamp(14px, 1.8vh, 17px); }
+  .zoe-login .zoe-page-footer { bottom: clamp(14px, 3vh, 33px); font-size: clamp(12px, 1.6vh, 15px); }
+}
+@media (min-width: 981px) and (max-height: 660px) {
+  .zoe-login .zoe-access:has(.zoe-empresa) .zoe-access-logo { display: none; }
+}
