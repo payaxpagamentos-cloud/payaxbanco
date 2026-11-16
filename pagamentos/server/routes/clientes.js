@@ -310,6 +310,8 @@ module.exports = (db) => {
     if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
     const campos = Object.keys(d);
     db.prepare(`UPDATE usuarios_cliente SET ${campos.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...campos.map((k) => d[k]), a.id);
+    // Senha nova ou acesso desligado: um link de ativação antigo não pode mais trocar a senha.
+    if (d.senha_hash || d.ativo === 0) ativacaoLib.cancelar(db, a.id);
     auditoria.registrar(db, req, { acao: 'acesso.alterado', entidade: 'usuario_cliente', entidade_id: a.id, cliente_id: c.id,
       depois: { ...d, senha_hash: undefined } });
     res.json({ id: a.id, ...(provisoria ? { senha_provisoria: provisoria } : {}) });

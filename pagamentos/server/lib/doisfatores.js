@@ -32,10 +32,26 @@ async function iniciar(db, tipo, registro, conta) {
 }
 
 /** Confere o código e grava o passo usado — o mesmo código não serve duas vezes. */
+/**
+ * Código errado conta por CONTA (não só por IP): 5 erros seguidos travam a conta por 15 minutos, venha de
+ * onde vier a tentativa. Sem isso, trocar de IP permitia testar códigos até acertar.
+ */
+const ERROS_MAX = 5;
+const TRAVA_MS = 15 * 60_000;
+const erros = new Map();
 function conferir(db, tipo, id, codigo) {
+  const k = `${tipo}:${id}`;
+  const e = erros.get(k);
+  if (e?.ate > Date.now()) throw new ErroNegocio('Muitos códigos errados. Por segurança, aguarde 15 minutos e tente de novo.', 429);
   const r = db.prepare(`SELECT totp_segredo, totp_ultimo_passo FROM ${tabela(tipo)} WHERE id = ?`).get(id);
   const passo = totp.verificar(r?.totp_segredo, codigo, r?.totp_ultimo_passo ?? null);
-  if (passo === null) return false;
+  if (passo === null) {
+    const n = (e && !(e.ate && e.ate <= Date.now()) ? e.n : 0) + 1;
+    erros.set(k, { n, ate: n >= ERROS_MAX ? Date.now() + TRAVA_MS : null });
+    if (erros.size > 20_000) erros.clear();
+    return false;
+  }
+  erros.delete(k);
   db.prepare(`UPDATE ${tabela(tipo)} SET totp_ultimo_passo = ? WHERE id = ?`).run(passo, id);
   return true;
 }

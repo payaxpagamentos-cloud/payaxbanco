@@ -48,16 +48,34 @@ function valorEmCentavos(v) {
 function lerAviso(p) {
   const pega = (...nomes) => nomes.map((n) => p?.[n]).find((x) => x !== undefined && x !== null && x !== '');
   const nossoNumero = String(pega('nossoNumero', 'nosso_numero', 'eNumeroTitulo', 'numeroTitulo', 'identificacaoBoleto') ?? '').replace(/\D/g, '');
-  const centavos = valorEmCentavos(pega('valorPago', 'vlPagoTitulo', 'valor_pago', 'valor'));
-  const dataBruta = String(pega('dataCredito', 'dtCreditoTitulo', 'data_pagamento', 'dataPagamento', 'pago_em') ?? '');
-  const dataPagamento = /^\d{4}-\d{2}-\d{2}/.test(dataBruta) ? dataBruta.slice(0, 10)
-    : /^\d{2}[./]\d{2}[./]\d{4}$/.test(dataBruta) ? dataBruta.replace(/\./g, '/').split('/').reverse().join('-')
-      : null;
-  const evento = String(pega('evento', 'tipoEvento', 'tipo') ?? 'liquidacao').toLowerCase();
+  // Só campos de VALOR PAGO: "valor" sozinho costuma ser o valor do título, não o que foi pago.
+  const centavos = valorEmCentavos(pega('valorPago', 'vlPagoTitulo', 'valor_pago'));
+  const lerData = (bruta) => {
+    const t = String(bruta ?? '');
+    return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10)
+      : /^\d{2}[./]\d{2}[./]\d{4}$/.test(t) ? t.replace(/\./g, '/').split('/').reverse().join('-') : null;
+  };
+  // Data do pagamento e data do crédito são coisas diferentes: o crédito decide quando o dinheiro libera.
+  const creditadoEm = lerData(pega('dataCredito', 'dtCreditoTitulo', 'data_credito'));
+  const dataPagamento = lerData(pega('dataPagamento', 'dtPagamento', 'data_pagamento', 'dataLiquidacao', 'dtLiquidacao', 'pago_em')) ?? creditadoEm;
+  // Sem tipo de evento não se presume pagamento.
+  const evento = String(pega('evento', 'tipoEvento', 'tipo') ?? '').toLowerCase();
+  const situacao = String(pega('situacao', 'status', 'situacaoTitulo') ?? '').toLowerCase();
   // Meio de pagamento: só nos campos que dizem isso. Procurar "pix" no aviso inteiro confundia o tipo do
   // título (BOLEPIX) com o meio usado — e PIX libera no mesmo dia, antes de o banco creditar.
   const meio = /pix|qr/i.test(String(pega('meioPagamento', 'meio_pagamento', 'tipoPagamento', 'formaPagamento', 'canalPagamento', 'meio') ?? '')) ? 'pix' : 'boleto';
-  return { nosso_numero: nossoNumero, valor_centavos: centavos, pago_em: dataPagamento, evento, meio };
+  return { nosso_numero: nossoNumero, valor_centavos: centavos, pago_em: dataPagamento, creditado_em: creditadoEm, evento, situacao, meio };
+}
+
+/**
+ * O aviso é de PAGAMENTO? Só com evento de liquidação explícito (ou, sem evento, com valor pago e data de
+ * pagamento) e sem nenhuma palavra que indique o contrário (estorno, cancelamento, aguardando, registro...).
+ */
+function ehPagamento(aviso) {
+  const negativo = /estorn|cancel|aguard|pendent|registr|rejeit|devol|baixa_(manual|por_decurso|solicit)|vencid|protest/;
+  if (negativo.test(aviso.evento) || negativo.test(aviso.situacao)) return false;
+  if (aviso.evento) return /liquid|^pago$|pagamento_(confirmado|efetuado|realizado|recebido)|baixa_por_pagamento|credito/.test(aviso.evento);
+  return aviso.valor_centavos > 0 && Boolean(aviso.pago_em) && (!aviso.situacao || /pago|liquid/.test(aviso.situacao));
 }
 
 module.exports = (db) => {
@@ -111,7 +129,15 @@ module.exports = (db) => {
         concluir('erro', `valor do aviso (${aviso.valor_centavos} centavos) incompatível com o título (${b.valor_centavos}): conferir`, b.id);
         return res.json({ recebido: true, processado: false });
       }
-      if (!/liquid|pag|credit|baixa_por_pagamento/i.test(aviso.evento)) { concluir('ignorado', `evento ${aviso.evento}`, b.id); return res.json({ recebido: true, processado: false }); }
+      if (!ehPagamento(aviso)) {
+        concluir('ignorado', aviso.evento ? `evento ${aviso.evento} não é pagamento` : 'aviso sem tipo de evento e sem valor/data de pagamento', b.id);
+        return res.json({ recebido: true, processado: false });
+      }
+      // Liquidação já estornada pela equipe: um aviso repetido do banco não pode creditar de novo.
+      if (b.situacao !== 'liquidado' && boletosLib.temEstorno(db, b.id)) {
+        concluir('erro', 'título com liquidação estornada: conferir no banco e liquidar pela ficha, se for o caso', b.id);
+        return res.json({ recebido: true, processado: false });
+      }
 
       const out = boletosLib.liquidar(db, b.id, {
         pago_em: aviso.pago_em ?? hoje(),
@@ -134,7 +160,6 @@ module.exports = (db) => {
 
   // ------------------------------------------------------------ Abertura de conta pelo site
   // Até 5 pedidos por IP a cada 10 minutos; a consulta de CNPJ/CEP só pela fonte gratuita, 20 por minuto.
-  const limitePedido = limitar({ janelaMs: 10 * 60_000, maximo: config.limiteAberturaPor10Min });
   const consultasPorIp = new Map();
   const limiteConsulta = (req, _res, next) => {
     const n = Date.now();
@@ -153,7 +178,8 @@ module.exports = (db) => {
       situacao: d.situacao ?? null });
   });
   r.get('/abertura/cep/:cep', limiteConsulta, async (req, res) => res.json(await consultaDados.consultarCep(db, req.params.cep, { somentePublica: true })));
-  r.post('/abertura', limitePedido, (req, res) => {
+  // O limite de pedidos por IP fica em app.js, antes da leitura do corpo.
+  r.post('/abertura', (req, res) => {
     const { corpoCliente } = require('./clientes');
     const out = abertura.solicitar(db, req.body ?? {}, { ip: req.ip, validarCadastro: (d) => corpoCliente(d, { novo: true }) });
     res.status(201).json({ protocolo: out.protocolo });
@@ -176,4 +202,5 @@ module.exports = (db) => {
 };
 
 module.exports.lerAviso = lerAviso;
+module.exports.ehPagamento = ehPagamento;
 module.exports.valorEmCentavos = valorEmCentavos;

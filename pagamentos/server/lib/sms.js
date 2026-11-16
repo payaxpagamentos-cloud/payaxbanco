@@ -48,7 +48,7 @@ function configuracao(db) {
     const token = cred.token || require('./consultaDados').tokenApiBrasil(db);
     return token ? { id: i?.id ?? null, provedor, token } : null;
   }
-  return cred.token ? { id: i.id, ...cfg, ...cred } : null;
+  return cred.token ? { id: i.id, ...cfg, ...cred, conta_sid: cfg.conta_sid ?? cred.conta_sid } : null;
 }
 
 async function chamar(url, opcoes) {
@@ -153,7 +153,8 @@ function lerConfiguracao(b = {}) {
   const token = String(b.token ?? '').trim();
   const contaSid = String(b.conta_sid ?? '').trim();
   if (provedor === 'twilio' && !/^AC[0-9a-f]{32}$/i.test(contaSid)) throw new ErroNegocio('Informe o Account SID da Twilio (começa com AC).', 422);
-  return { cfg: { provedor, remetente }, credenciais: token ? { token, ...(provedor === 'twilio' ? { conta_sid: contaSid } : {}) } : null };
+  // O Account SID não é segredo: fica na configuração (trocar só o SID não exige redigitar o token).
+  return { cfg: { provedor, remetente, ...(provedor === 'twilio' ? { conta_sid: contaSid } : {}) }, credenciais: token ? { token } : null };
 }
 
 module.exports = { PROVEDORES, celular, mascarar, semAcento, configuracao, enviar, lerConfiguracao };

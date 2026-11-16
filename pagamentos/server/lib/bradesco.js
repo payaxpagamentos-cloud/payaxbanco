@@ -179,9 +179,10 @@ function paraApi(boleto, conta) {
     ufPagador: String(boleto.pagador_uf ?? '').toUpperCase().slice(0, 2),
     cdIndCpfcnpjPagador: so(boleto.pagador_documento).length === 11 ? 1 : 2,
     nuCpfcnpjPagador: Number(so(boleto.pagador_documento)),
-    // Encargos: o Bradesco recebe percentuais com 5 casas (escala 100000 = 1%) — converte do nosso ppm.
-    percentualJuros: Math.round((boleto.juros_mes_ppm || 0) / 10),
-    percentualMulta: Math.round((boleto.multa_ppm || 0) / 10),
+    // Encargos: o Bradesco recebe percentuais com 5 casas (escala 100000 = 1%); no nosso ppm, 1% = 10000.
+    // Conferir na homologação com o banco.
+    percentualJuros: (boleto.juros_mes_ppm || 0) * 10,
+    percentualMulta: (boleto.multa_ppm || 0) * 10,
     vlDesconto1: boleto.desconto_centavos || 0,
     dataLimiteDesconto1: dataBr(boleto.desconto_ate),
     prazoBaixaTitulo: boleto.dias_baixa ?? 60,

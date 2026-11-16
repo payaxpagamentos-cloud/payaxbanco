@@ -11,8 +11,8 @@ const { podeEquipe, podeCliente, permissoesEquipe, permissoesCliente } = require
  * ('payax-cliente') e vice-versa. Perfil, situação e cliente são sempre lidos do banco a cada requisição —
  * o token carrega só o id e a validade.
  */
-function emitirToken(id, aud, ttlSegundos = config.tokenTtlSeconds) {
-  const payload = Buffer.from(JSON.stringify({ sub: id, aud, exp: Math.floor(Date.now() / 1000) + ttlSegundos })).toString('base64url');
+function emitirToken(id, aud, ttlSegundos = config.tokenTtlSeconds, versao = 0) {
+  const payload = Buffer.from(JSON.stringify({ sub: id, aud, sv: versao, exp: Math.floor(Date.now() / 1000) + ttlSegundos })).toString('base64url');
   return `${payload}.${assinar(payload)}`;
 }
 
@@ -42,19 +42,29 @@ const tokenDoPedido = (req) => {
   return c.startsWith('Bearer ') ? c.slice(7) : null;
 };
 
-const LIBERADO_COM_PENDENCIA = /\/api\/auth\/(eu|senha|2fa\/iniciar|2fa\/ativar)\/?(\?|$)/;
+/**
+ * Rotas liberadas com pendência (senha provisória ou 2FA a configurar). Confere o CAMINHO exato, sem a
+ * parte depois do "?" — senão "/api/painel?x=/api/auth/eu" passava.
+ */
+const ROTAS_PENDENCIA = ['eu', 'senha', '2fa/iniciar', '2fa/ativar'];
+const liberadoComPendencia = (req, prefixo) => {
+  const caminho = String(req.originalUrl || '').split('?')[0].replace(/\/+$/, '');
+  return ROTAS_PENDENCIA.some((r) => caminho === `${prefixo}/api/auth/${r}`);
+};
+const sessaoValida = (dados, u) => Number(dados.sv ?? 0) === Number(u.sessao_versao ?? 0);
 
 /** Sessão da equipe PAY AX. */
 function autenticarEquipe(db) {
-  const buscar = db.prepare('SELECT id, nome, email, perfil, ativo, senha_provisoria, totp_ativo FROM usuarios WHERE id = ?');
+  const buscar = db.prepare('SELECT id, nome, email, perfil, ativo, senha_provisoria, totp_ativo, sessao_versao FROM usuarios WHERE id = ?');
   return (req, _res, next) => {
     const dados = lerToken(tokenDoPedido(req), 'payax');
     if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
     const u = buscar.get(dados.sub);
     if (!u || !u.ativo) return next(new ErroNegocio('Usuário inativo.', 401));
+    if (!sessaoValida(dados, u)) return next(new ErroNegocio('Sessão encerrada (a senha ou o acesso mudou). Entre de novo.', 401));
     // Pendências do acesso valem no servidor, não só na tela: com senha provisória ou sem a verificação
     // em duas etapas (quando o administrador exige), só dá para ver a sessão, trocar a senha e configurar o 2FA.
-    if (!LIBERADO_COM_PENDENCIA.test(req.originalUrl)) {
+    if (!liberadoComPendencia(req, config.basePath || '')) {
       if (u.senha_provisoria) return next(new ErroNegocio('Defina a sua senha antes de continuar.', 403));
       if (!u.totp_ativo && require('./lib/doisfatores').exigidaEquipe(db)) {
         return next(new ErroNegocio('Configure a verificação em duas etapas antes de continuar.', 403));
@@ -68,7 +78,7 @@ function autenticarEquipe(db) {
 
 /** Sessão do cliente final (Área do Cliente): sempre amarrada ao cliente dono do usuário. */
 function autenticarCliente(db) {
-  const buscar = db.prepare(`SELECT uc.id, uc.nome, uc.email, uc.perfil, uc.ativo, uc.senha_provisoria, uc.totp_ativo, uc.cliente_id,
+  const buscar = db.prepare(`SELECT uc.id, uc.nome, uc.email, uc.perfil, uc.ativo, uc.senha_provisoria, uc.totp_ativo, uc.cliente_id, uc.sessao_versao,
       c.razao_social, c.nome_fantasia, c.cnpj, c.situacao AS cliente_situacao
     FROM usuarios_cliente uc JOIN clientes c ON c.id = uc.cliente_id WHERE uc.id = ?`);
   return (req, _res, next) => {
@@ -77,6 +87,11 @@ function autenticarCliente(db) {
     const u = buscar.get(dados.sub);
     if (!u || !u.ativo) return next(new ErroNegocio('Acesso inativo. Fale com o seu gerente de conta.', 401));
     if (u.cliente_situacao === 'encerrado') return next(new ErroNegocio('Conta encerrada.', 403));
+    if (!sessaoValida(dados, u)) return next(new ErroNegocio('Sessão encerrada (a senha ou o acesso mudou). Entre de novo.', 401));
+    // Senha provisória vale só para trocar a senha (no servidor, não só na tela).
+    if (u.senha_provisoria && !liberadoComPendencia(req, config.clientePath)) {
+      return next(new ErroNegocio('Defina a sua senha antes de continuar.', 403));
+    }
     req.usuario = u;
     req.usuarioTipo = 'cliente';
     req.clienteId = u.cliente_id;

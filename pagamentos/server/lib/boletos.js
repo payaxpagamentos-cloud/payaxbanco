@@ -58,7 +58,10 @@ function proximoNossoNumero(db, conta) {
         RETURNING nosso_numero_atual`).get(conta.id);
     if (!r) throw new ErroNegocio('A faixa de nosso número desta conta acabou. Peça uma nova faixa ao banco e atualize a conta.', 409);
     const faixa = reservadas.find(([i, f]) => r.nosso_numero_atual >= i && r.nosso_numero_atual <= f);
-    if (!faixa) return String(r.nosso_numero_atual).padStart(11, '0');
+    const nn = String(r.nosso_numero_atual).padStart(11, '0');
+    // Número já usado nesta conta (ex.: registrado com o número do sistema do cliente): pula.
+    if (!faixa && db.prepare('SELECT 1 FROM boletos WHERE conta_id = ? AND nosso_numero = ?').get(conta.id, nn)) continue;
+    if (!faixa) return nn;
     // Caiu numa faixa reservada: pula para depois dela e tenta de novo.
     db.prepare('UPDATE contas_bancarias SET nosso_numero_atual = ? WHERE id = ?').run(faixa[1], conta.id);
   }
@@ -215,7 +218,7 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
   // Limite mensal de emissão (definido na abertura de conta ou no cadastro): soma do que já foi emitido no mês.
   if (cliente.limite_mensal_centavos) {
     const noMes = db.prepare(`SELECT IFNULL(SUM(valor_centavos), 0) AS v FROM boletos
-      WHERE cliente_id = ? AND substr(emissao, 1, 7) = ? AND situacao NOT IN ('cancelado','falha')`).get(cliente.id, entrada.emissao.slice(0, 7)).v;
+      WHERE cliente_id = ? AND substr(emissao, 1, 7) = ? AND situacao NOT IN ('cancelado','falha','baixado')`).get(cliente.id, entrada.emissao.slice(0, 7)).v;
     if (noMes + entrada.valor_centavos > cliente.limite_mensal_centavos) {
       const brl = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       throw new ErroNegocio(`Limite mensal de emissão deste cliente atingido: ${brl(noMes)} já emitidos de ${brl(cliente.limite_mensal_centavos)} no mês.`, 422);
@@ -228,12 +231,15 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
     congelado.custo_liquidacao_centavos = (congelado.custo_liquidacao_centavos ?? 0) + conta.custo_rateio_centavos;
   }
   let nossoNumero;
+  // Número dado pelo sistema do cliente que o banco já tinha recusado: tenta registrar de novo no mesmo título
+  // (sem isso, o título do IXC ficava travado para sempre: o número já "existe" aqui, em falha).
+  let reaproveitar = null;
   if (nossoNumeroDefinido) {
     nossoNumero = String(nossoNumeroDefinido).padStart(11, '0');
     if (!/^\d{11}$/.test(nossoNumero)) throw new ErroNegocio('Nosso número inválido.', 422);
-    if (db.prepare('SELECT 1 FROM boletos WHERE conta_id = ? AND nosso_numero = ?').get(conta.id, nossoNumero)) {
-      throw new ErroNegocio(`O nosso número ${nossoNumero} já foi usado nesta conta.`, 409);
-    }
+    const existente = db.prepare('SELECT id, situacao, cliente_id FROM boletos WHERE conta_id = ? AND nosso_numero = ?').get(conta.id, nossoNumero);
+    if (existente?.situacao === 'falha' && existente.cliente_id === cliente.id) reaproveitar = existente.id;
+    else if (existente) throw new ErroNegocio(`O nosso número ${nossoNumero} já foi usado nesta conta.`, 409);
   } else {
     nossoNumero = transacao(db, () => proximoNossoNumero(db, conta));
   }
@@ -255,6 +261,21 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
     erro = err.message || 'Falha ao registrar no banco.';
     // Sem resposta do banco ainda calculamos o código: o título fica como falha e pode ser consultado depois.
     registro = calcularBoleto(conta, { nossoNumero, valorCentavos: entrada.valor_centavos, vencimento: entrada.vencimento });
+  }
+
+  if (reaproveitar) {
+    return transacao(db, () => {
+      db.prepare(`UPDATE boletos SET valor_centavos = ?, emissao = ?, vencimento = ?, codigo_barras = ?, linha_digitavel = ?, nosso_numero_dv = ?,
+          situacao = ?, erro_registro = ?, registrado_em = ?, preco_id = ?, tarifa_emissao_centavos = ?, tarifa_liquidacao_centavos = ?,
+          comissao_fixa_centavos = ?, percentual_ppm = ?, comissao_minima_centavos = ?, comissao_maxima_centavos = ?, custo_liquidacao_centavos = ?,
+          custo_emissao_centavos = ?, motivo_rejeicao = NULL WHERE id = ? AND situacao = 'falha'`).run(
+        entrada.valor_centavos, entrada.emissao, entrada.vencimento, registro.codigo_barras, registro.linha_digitavel, registro.nosso_numero_dv,
+        erro ? 'falha' : porArquivo ? 'registrando' : 'registrado', erro, erro || porArquivo ? null : agora(),
+        congelado.preco_id, congelado.tarifa_emissao_centavos, congelado.tarifa_liquidacao_centavos, congelado.comissao_fixa_centavos,
+        congelado.percentual_ppm, congelado.comissao_minima_centavos, congelado.comissao_maxima_centavos, congelado.custo_liquidacao_centavos,
+        erro ? 0 : conta.custo_emissao_centavos ?? 0, reaproveitar);
+      return { id: reaproveitar, nosso_numero: nossoNumero, situacao: erro ? 'falha' : 'registrado', erro, nova_tentativa: true };
+    });
   }
 
   return transacao(db, () => {
@@ -473,10 +494,12 @@ async function baixar(db, boletoId, motivo, { usuario = null } = {}) {
   }
   if (erro) throw new ErroNegocio(`O banco recusou a baixa: ${erro}`, 502);
   // No modo arquivo o pedido de baixa vai na próxima remessa (ocorrência 02), sem ninguém gerar nada.
-  db.prepare(`UPDATE boletos SET situacao = 'baixado', baixado_em = ?, motivo_baixa = ?,
+  // Só baixa se ninguém liquidou enquanto o banco respondia (aviso do banco no meio da baixa).
+  const mudou = db.prepare(`UPDATE boletos SET situacao = 'baixado', baixado_em = ?, motivo_baixa = ?,
       comando_pendente = CASE WHEN ? AND remessa_id IS NOT NULL THEN '02' ELSE comando_pendente END,
-      versao = versao + 1 WHERE id = ?`)
-    .run(agora(), v.opcional(motivo, 'o motivo', 160), porArquivo ? 1 : 0, b.id);
+      versao = versao + 1 WHERE id = ? AND situacao NOT IN ('liquidado','baixado','cancelado')`)
+    .run(agora(), v.opcional(motivo, 'o motivo', 160), porArquivo ? 1 : 0, b.id).changes;
+  if (!mudou) throw new ErroNegocio('O título foi pago enquanto a baixa era pedida: confira a ficha (o pagamento vale).', 409);
   return { boleto_id: b.id, situacao: 'baixado', instrucao_na_proxima_remessa: porArquivo };
 }
 
@@ -505,4 +528,7 @@ function situacaoVisivel(b, data = hoje()) {
   return b.situacao;
 }
 
-module.exports = { emitir, encargos, LIMITES_ENCARGOS, beneficiarioFinal, liquidar, estornarLiquidacao, baixar, valorAtualizado, situacaoVisivel, contaDe, credenciaisDaConta, proximoNossoNumero, validarEntrada, hoje, conferirRateio };
+/** O título já teve uma liquidação estornada pela equipe (aviso repetido do banco não liquida sozinho). */
+const temEstorno = (db, boletoId) => Boolean(db.prepare("SELECT 1 FROM lancamentos WHERE boleto_id = ? AND tipo = 'estorno' AND estorno_de = 'credito_liquidacao' LIMIT 1").get(boletoId));
+
+module.exports = { temEstorno, emitir, encargos, LIMITES_ENCARGOS, beneficiarioFinal, liquidar, estornarLiquidacao, baixar, valorAtualizado, situacaoVisivel, contaDe, credenciaisDaConta, proximoNossoNumero, validarEntrada, hoje, conferirRateio };

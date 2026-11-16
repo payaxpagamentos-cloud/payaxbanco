@@ -10,6 +10,12 @@ const { requestId } = require('./lib/http');
 const CSP = [`default-src 'self'`, `img-src 'self' data:`, `style-src 'self' 'unsafe-inline'`, `font-src 'self'`,
   `script-src 'self'`, `connect-src 'self'`, `frame-ancestors 'none'`, `form-action 'self'`, `base-uri 'self'`].join('; ');
 
+/**
+ * Endereço pedido, pelo cabeçalho Host (o nginx sempre o define). Não usa req.hostname: atrás do proxy ele
+ * vem do X-Forwarded-Host, que o visitante pode mandar e assim chegar ao Backoffice pelo endereço do site.
+ */
+const hostDe = (req) => String(req.get('host') || '').toLowerCase().replace(/:\d+$/, '');
+
 function criarApp(db) {
   const app = express();
   app.disable('x-powered-by');
@@ -22,7 +28,8 @@ function criarApp(db) {
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Permissions-Policy': 'geolocation=(), camera=(), microphone=()',
       // HSTS de 2 anos: depois do primeiro acesso, o navegador só abre os endereços da PAY AX com cadeado.
-      ...(config.producao ? { 'Strict-Transport-Security': 'max-age=63072000; includeSubDomains' } : {}),
+      // Sem includeSubDomains: no domínio do site isso forçaria HTTPS em todos os *.payax.com.br (e-mail, webmail).
+      ...(config.producao ? { 'Strict-Transport-Security': 'max-age=63072000' } : {}),
       'Content-Security-Policy': CSP,
     });
     next();
@@ -36,9 +43,13 @@ function criarApp(db) {
   // O retorno do banco chega como arquivo (corpo bruto); o resto da API é JSON.
   equipe.use('/api/arquivos/retornos', express.raw({ type: () => true, limit: '10mb' }));
   // Abertura de conta pelo site: leva o contrato social (até 8 MB, em base64) no próprio pedido.
+  // O limite de pedidos vem ANTES de ler o corpo: pedido barrado não chega a ocupar memória com 25 MB.
+  equipe.post('/api/publico/abertura', limitar({ janelaMs: 10 * 60_000, maximo: config.limiteAberturaPor10Min }));
   equipe.use('/api/publico/abertura', express.json({ limit: '25mb' }));
   const jsonGrande = express.json({ limit: '25mb' });
-  equipe.use('/api/aberturas', (req, res, next) => (req.method === 'POST' && /^\/\d+\/documentos$/.test(req.path) ? jsonGrande(req, res, next) : next()));
+  // Anexo da equipe: corpo grande só para quem manda sessão (a autenticação de fato vem depois, na rota).
+  equipe.use('/api/aberturas', (req, res, next) => (req.method === 'POST' && /^\/\d+\/documentos$/.test(req.path) && /^Bearer /.test(req.get('authorization') || '')
+    ? jsonGrande(req, res, next) : next()));
   equipe.use(express.json({ limit: '1mb' }));
   // Aviso de privacidade e canal do titular (LGPD): públicos, sem login, nas duas áreas.
   const privacidade = require('./routes/privacidade')(db);
@@ -61,13 +72,17 @@ function criarApp(db) {
   // ------------------------------------------------- Ativação do acesso (acesso.payax.com.br)
   // Só a página de ativação e a API dela. Fora desse endereço, a mesma página fica em /ativar.
   const pastaAcesso = path.join(__dirname, '..', 'acesso');
-  const paginaAcesso = (_req, res) => res.set('Cache-Control', 'no-store').sendFile(path.join(pastaAcesso, 'index.html'));
+  const paginaAcesso = (req, res) => {
+    // "/ativar/" quebraria os caminhos relativos da página: volta para "/ativar" (o navegador mantém o #t=).
+    if (/\/ativar\/$/.test(req.path)) return res.redirect(301, req.originalUrl.replace(/\/ativar\/(\?|$)/, '/ativar$1'));
+    return res.set('Cache-Control', 'no-store').sendFile(path.join(pastaAcesso, 'index.html'));
+  };
   const estaticoAcesso = express.static(pastaAcesso, { index: false, setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') });
   equipe.get('/ativar', paginaAcesso);
   equipe.use('/acesso', estaticoAcesso);
   app.use((req, res, next) => {
-    if (!config.acessoHosts.includes(String(req.hostname || '').toLowerCase())) return next();
-    if (req.path === '/' || req.path === '/ativar') return paginaAcesso(req, res);
+    if (!config.acessoHosts.includes(hostDe(req))) return next();
+    if (req.path === '/' || req.path === '/ativar' || req.path === '/ativar/') return paginaAcesso(req, res);
     if (req.path.startsWith('/acesso/')) { req.url = req.url.slice('/acesso'.length); return estaticoAcesso(req, res, () => res.status(404).type('text').send('Não encontrado.')); }
     if (req.path.startsWith('/api/publico/ativacao')) return equipe(req, res, next);
     if (/^\/privacidade(\/|$)/.test(req.path)) return next();
@@ -81,7 +96,7 @@ function criarApp(db) {
   site.get('/abrir-conta', (_req, res) => res.set('Cache-Control', 'no-cache').sendFile(path.join(pastaSite, 'abrir-conta.html')));
   site.use('/site', express.static(pastaSite, { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   app.use((req, res, next) => {
-    if (!config.siteHosts.includes(String(req.hostname || '').toLowerCase())) return next();
+    if (!config.siteHosts.includes(hostDe(req))) return next();
     if (req.path === '/' || req.path === '/abrir-conta' || req.path.startsWith('/site/')) return site(req, res, next);
     // O formulário de abertura de conta envia para a API pública (sem sessão).
     if (req.path.startsWith('/api/publico/abertura')) return equipe(req, res, next);

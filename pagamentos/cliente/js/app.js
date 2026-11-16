@@ -145,9 +145,10 @@ function formularioSenha(aoConcluir) {
   const botao = el('button', { class: 'botao', type: 'submit' }, 'Trocar senha');
   form.append(el('div', { style: 'margin-top:10px' }, botao));
   const enviar = (b) => acao(b, async () => {
-    await api.post('/auth/senha', lerForm(form));
+    const r = await api.post('/auth/senha', lerForm(form));
     const s = api.sessao.get();
-    api.sessao.set({ ...s, usuario: { ...s.usuario, senha_provisoria: false } });
+    // As outras sessões caem com a troca; esta segue com o token novo.
+    api.sessao.set({ ...s, ...(r?.token ? { token: r.token } : {}), usuario: { ...s.usuario, senha_provisoria: false } });
     toast('Senha alterada.', 'ok');
     aoConcluir?.();
   });

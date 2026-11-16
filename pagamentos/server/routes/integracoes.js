@@ -223,7 +223,11 @@ module.exports = (db) => {
         if (ini < conta.nosso_numero_inicial || fim > conta.nosso_numero_final) {
           throw new ErroNegocio(`A faixa precisa estar dentro da faixa da conta no banco (${conta.nosso_numero_inicial} a ${conta.nosso_numero_final}).`, 422);
         }
-        if (ini <= conta.nosso_numero_atual) {
+        // Só confere contra a numeração da PAY AX quando a faixa muda: depois de a PAY AX pular a faixa
+        // reservada, o contador passa do início dela, e salvar outra coisa (token, carteira) não pode travar.
+        const atualCfg = JSON.parse(db.prepare("SELECT config FROM integracoes WHERE escopo = 'ixc' AND cliente_id = ?").get(cliente.id)?.config || '{}');
+        const mesmaFaixa = Number(atualCfg.faixa_inicio) === ini && Number(atualCfg.faixa_fim) === fim && Number(atualCfg.conta_id ?? conta.id) === conta.id;
+        if (!mesmaFaixa && ini <= conta.nosso_numero_atual) {
           throw new ErroNegocio(`A faixa precisa começar depois do último número já usado pela PAY AX nesta conta (${conta.nosso_numero_atual}).`, 422);
         }
         const outra = db.prepare("SELECT cliente_id, config FROM integracoes WHERE escopo = 'ixc' AND cliente_id <> ?").all(cliente.id)

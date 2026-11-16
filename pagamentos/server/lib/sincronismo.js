@@ -21,7 +21,11 @@ const bancos = require('./bancos');
  * Devolve null quando o IXC ainda não gerou o boleto (sem número).
  */
 function nossoNumeroDoIxc(valor) {
-  const t = String(valor ?? '').toUpperCase().replace(/[^0-9P]/g, '');
+  const bruto = String(valor ?? '').toUpperCase().trim();
+  // Com separador ("12345-6", "0000012345-P"): o que vem depois do traço é o dígito.
+  const sep = /^(\d{1,11})\s*[-/]\s*([0-9P])$/.exec(bruto);
+  if (sep) return { numero: sep[1].padStart(11, '0'), dv: sep[2] };
+  const t = bruto.replace(/[^0-9P]/g, '');
   if (!t) return null;
   if (/^\d{1,11}$/.test(t)) return { numero: t.padStart(11, '0'), dv: null };
   if (/^\d{1,11}[0-9P]$/.test(t) && t.length >= 2) return { numero: t.slice(0, -1).padStart(11, '0'), dv: t.slice(-1) };
@@ -64,7 +68,20 @@ async function testar(db, clienteId) {
  * Importa os títulos em aberto do IXC e emite um boleto para cada um.
  * Títulos já importados são ignorados (controle por ixc_receber_id), então pode rodar quantas vezes quiser.
  */
-async function importar(db, cliente, { de, ate, limite = 200, maxPaginas = 50, usuario = null } = {}) {
+/** Clientes com importação em andamento: a manual e a automática nunca rodam juntas (registraria o título duas vezes). */
+const importando = new Set();
+
+async function importar(db, cliente, opcoes = {}) {
+  if (importando.has(cliente.id)) throw new ErroNegocio('Já há uma importação deste cliente em andamento. Aguarde terminar.', 409);
+  importando.add(cliente.id);
+  try {
+    return await importarAgora(db, cliente, opcoes);
+  } finally {
+    importando.delete(cliente.id);
+  }
+}
+
+async function importarAgora(db, cliente, { de, ate, limite = 200, maxPaginas = 50, usuario = null } = {}) {
   const ixc = ixcDoCliente(db, cliente.id);
   if (!ixc) throw new ErroNegocio('O IXC deste cliente ainda não foi configurado.', 409);
   const inicio = agora();
@@ -149,6 +166,12 @@ async function importar(db, cliente, { de, ate, limite = 200, maxPaginas = 50, u
           },
         });
         if (out.ja_existia) { resultado.ignorados += 1; continue; }
+        // O banco não registrou: não conta como criado e não devolve ao IXC uma linha que não vale.
+        if (out.situacao === 'falha') {
+          resultado.erros += 1;
+          resultado.detalhes.push({ ixc_id: t.ixc_id, erro: `o banco não registrou o título: ${out.erro ?? 'sem detalhe'}` });
+          continue;
+        }
         resultado.criados += 1;
         // Devolve ao IXC a linha digitável, para o provedor ver o boleto no título de origem.
         // Quando o IXC numera, o título já tem o número e a linha dele: nada a gravar de volta.

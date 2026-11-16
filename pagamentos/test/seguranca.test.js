@@ -162,6 +162,10 @@ test('duas etapas: login, exigência e redefinição', async (t) => {
     await api.put('/api/seguranca/exigir-2fa', { exigir: false }, tkNovo);
     const r = await api.post('/api/auth/2fa/desativar', { senha: 'admin12345', codigo: codigoUsavel(api, segredo) }, tkNovo);
     assert.equal(r.status, 200);
+    // Desligar o 2FA derruba as sessões antigas; quem desligou recebe um token novo.
+    assert.equal((await api.get('/api/painel', tk.admin)).status, 401, 'sessão antiga caiu');
+    assert.equal((await api.get('/api/painel', r.dados.token)).status, 200);
+    tk.admin = r.dados.token;
     const login = await api.post('/api/auth/login', { email: 'admin@payax.local', senha: 'admin12345' });
     assert.equal(login.dados.precisa_2fa, undefined);
     assert.ok(login.dados.token);

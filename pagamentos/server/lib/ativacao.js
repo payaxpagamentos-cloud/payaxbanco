@@ -117,4 +117,8 @@ function ativar(db, token, { cnpj, senha, ip = null }) {
   };
 }
 
-module.exports = { gerar, consultar, ativar, conferirSenha, senhaInutil, base, MAX_TENTATIVAS };
+/** Cancela os links ainda não usados de um acesso (senha redefinida ou acesso desativado). */
+const cancelar = (db, usuarioClienteId) => db.prepare('UPDATE ativacoes_acesso SET cancelado_em = ? WHERE usuario_cliente_id = ? AND usado_em IS NULL AND cancelado_em IS NULL')
+  .run(agora(), usuarioClienteId).changes;
+
+module.exports = { cancelar, gerar, consultar, ativar, conferirSenha, senhaInutil, base, MAX_TENTATIVAS };

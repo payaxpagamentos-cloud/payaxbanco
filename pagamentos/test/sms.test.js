@@ -96,7 +96,7 @@ test('SMS com o protocolo da abertura de conta', async (t) => {
     assert.equal(ultimo.to, '5511988887777');
     assert.equal(ultimo.from, 'payax');
     assert.match(ultimo.contents[0].text, new RegExp(`Protocolo ${r.dados.protocolo}`));
-    assert.match(ultimo.contents[0].text, /Agil Net/, 'sem acento');
+    assert.doesNotMatch(ultimo.contents[0].text, /Agil|Ágil/, 'nada digitado no formulário vai no SMS');
     assert.ok(ultimo.contents[0].text.length <= 160);
     const d = (await api.get(`/api/aberturas/${id}`, tk.operacao)).dados;
     assert.equal(d.sms[0].situacao, 'enviado');
@@ -144,12 +144,23 @@ test('SMS com o protocolo da abertura de conta', async (t) => {
     assert.deepEqual(JSON.parse(ultimo.corpo), { number: '5531994359434', message: 'PAY AX: teste de envio de SMS. Se voce recebeu, a integracao esta funcionando.' });
     assert.equal((await api.get('/api/integracoes', tk.admin)).dados.sms.estado, 'conectada');
     // Pedido novo pelo site: protocolo por SMS pela API Brasil.
-    const p = await api.post('/api/publico/abertura', pedido('11444777000161'));
+    const p = await api.post('/api/publico/abertura', pedido('11444777000161', { telefone: '(11) 97777-1234' }));
     assert.equal(p.status, 201, JSON.stringify(p.dados));
     const id = Number(p.dados.protocolo.slice(3));
     const m = await esperar(() => api.db.prepare("SELECT * FROM sms_mensagens WHERE referencia_id = ? AND situacao = 'enviado'").get(id));
     assert.equal(m?.provedor, 'apibrasil');
     assert.equal(m.id_provedor, 'abr-1');
+  });
+
+  await t.test('formulário público: no máximo um SMS por celular a cada 24 horas', async () => {
+    const antes = api.db.prepare('SELECT COUNT(*) AS n FROM sms_mensagens').get().n;
+    const p = await api.post('/api/publico/abertura', pedido('04252011000110', { telefone: '(11) 97777-1234' }));
+    assert.equal(p.status, 201);
+    const id = Number(p.dados.protocolo.slice(3));
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(api.db.prepare('SELECT COUNT(*) AS n FROM sms_mensagens').get().n, antes, 'não mandou outro SMS ao mesmo celular');
+    const hist = (await api.get(`/api/aberturas/${id}`, tk.admin)).dados.interacoes;
+    assert.ok(hist.some((i) => /últimas 24 horas/.test(i.texto)), JSON.stringify(hist));
   });
 
   await t.test('API Brasil: erro com HTTP 200 e saldo insuficiente (402) viram falha com o motivo', async () => {

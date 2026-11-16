@@ -9,14 +9,18 @@ const v = require('../lib/validacao');
 const auditoria = require('../lib/auditoria');
 const dois = require('../lib/doisfatores');
 
+/** Resumo de uma senha que ninguém tem (ver o login). */
+const RESUMO_FALSO = hashSenha(require('node:crypto').randomBytes(16).toString('hex'));
+
 module.exports = (db, autenticado) => {
   const r = express.Router();
 
   const entrar = (req, res, u) => {
     db.prepare('UPDATE usuarios SET ultimo_acesso = ? WHERE id = ?').run(agora(), u.id);
-    auditoria.registrar(db, { ...req, usuario: u, usuarioTipo: 'equipe' }, { acao: 'login', entidade: 'usuario', entidade_id: u.id });
+    // Object.create mantém req.ip (é um getter do Express; o "..." perdia o IP no registro do login).
+    auditoria.registrar(db, Object.assign(Object.create(req), { usuario: u, usuarioTipo: 'equipe' }), { acao: 'login', entidade: 'usuario', entidade_id: u.id });
     res.json({
-      token: emitirToken(u.id, 'payax'),
+      token: emitirToken(u.id, 'payax', undefined, u.sessao_versao),
       usuario: sessaoEquipe(u),
       // Com a exigência ligada, quem ainda não tem 2FA precisa configurar antes de trabalhar.
       configurar_2fa: dois.exigidaEquipe(db) && !u.totp_ativo,
@@ -28,7 +32,9 @@ module.exports = (db, autenticado) => {
     const email = String(req.body?.email ?? '').trim().toLowerCase();
     const u = db.prepare('SELECT * FROM usuarios WHERE email = ?').get(email);
     // Mensagem igual para e-mail inexistente e senha errada: não revela quem tem acesso.
-    if (!u || !u.ativo || !verificarSenha(String(req.body?.senha ?? ''), u.senha_hash)) {
+    // Sem usuário, confere contra um resumo falso: o tempo de resposta não revela quais e-mails existem.
+    const senhaOk = verificarSenha(String(req.body?.senha ?? ''), u?.senha_hash ?? RESUMO_FALSO);
+    if (!u || !u.ativo || !senhaOk) {
       auditoria.registrar(db, req, { acao: 'login.recusado', entidade: 'usuario', entidade_id: u?.id ?? null, depois: { email } });
       throw new ErroNegocio('E-mail ou senha inválidos.', 401);
     }
@@ -65,7 +71,9 @@ module.exports = (db, autenticado) => {
     if (nova === String(req.body?.senha_atual)) throw new ErroNegocio('A nova senha precisa ser diferente da atual.', 422);
     db.prepare('UPDATE usuarios SET senha_hash = ?, senha_provisoria = 0 WHERE id = ?').run(hashSenha(nova), u.id);
     auditoria.registrar(db, req, { acao: 'senha.trocada', entidade: 'usuario', entidade_id: u.id });
-    res.json({ ok: true });
+    // As outras sessões caíram com a troca; esta continua com um token novo.
+    const versao = db.prepare('SELECT sessao_versao FROM usuarios WHERE id = ?').get(u.id).sessao_versao;
+    res.json({ ok: true, token: emitirToken(u.id, 'payax', undefined, versao) });
   });
 
   // ---------------------------------------------------------------- Configuração do 2FA
@@ -83,7 +91,8 @@ module.exports = (db, autenticado) => {
     if (dois.exigidaEquipe(db)) throw new ErroNegocio('A autenticação em duas etapas é obrigatória para a equipe e não pode ser desligada.', 403);
     dois.desativar(db, 'equipe', req.usuario.id, req.body?.senha, req.body?.codigo);
     auditoria.registrar(db, req, { acao: '2fa.desativada', entidade: 'usuario', entidade_id: req.usuario.id });
-    res.json({ ok: true });
+    // Desligar o 2FA derruba as outras sessões; esta segue com um token novo.
+    res.json({ ok: true, token: emitirToken(req.usuario.id, 'payax', undefined, db.prepare('SELECT sessao_versao FROM usuarios WHERE id = ?').get(req.usuario.id).sessao_versao) });
   });
 
   return r;

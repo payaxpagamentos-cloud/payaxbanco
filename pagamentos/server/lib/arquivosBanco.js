@@ -139,6 +139,9 @@ function aplicar(db, registro, { creditoEm }) {
       return { resultado: 'rejeitado', boleto_id: b.id, motivo };
     }
     case 'liquidado': {
+      if (b.situacao !== 'liquidado' && boletosLib.temEstorno(db, b.id)) {
+        return { resultado: 'nao_tratado', boleto_id: b.id, motivo: 'título com liquidação estornada: conferir no banco e liquidar pela ficha, se for o caso' };
+      }
       const pago = registro.pago_centavos > 0 ? registro.pago_centavos : registro.valor_centavos || b.valor_centavos;
       const out = boletosLib.liquidar(db, b.id, {
         // Pago no dia da ocorrência; creditado na nossa conta no dia que o banco informa.

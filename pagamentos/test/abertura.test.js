@@ -54,9 +54,16 @@ test('abertura de conta pelo site', async (t) => {
     assert.match(r.dados.protocolo, /^AB-\d{6}$/);
   });
 
-  await t.test('pedido repetido para o mesmo CNPJ não entra', async () => {
+  await t.test('pedido repetido para o mesmo CNPJ entra, sem revelar nada, e a equipe é avisada', async () => {
     const r = await api.post('/api/publico/abertura', pedido());
-    assert.equal(r.status, 409);
+    assert.equal(r.status, 201, 'a resposta é igual: quem testa CNPJs não descobre quem tem pedido');
+    const id2 = Number(r.dados.protocolo.slice(3));
+    const avisos = api.db.prepare('SELECT texto FROM abertura_interacoes WHERE solicitacao_id = ?').all(id2).map((x) => x.texto).join(' ');
+    assert.match(avisos, /já existe outro pedido em andamento/);
+    // Tira o repetido para o resto do teste seguir com um pedido só.
+    api.db.prepare('DELETE FROM abertura_interacoes WHERE solicitacao_id = ?').run(id2);
+    api.db.prepare('DELETE FROM sms_mensagens WHERE referencia_id = ?').run(id2);
+    api.db.prepare('DELETE FROM solicitacoes_abertura WHERE id = ?').run(id2);
   });
 
   await t.test('validações: aceite, contrato social, arquivo de verdade, conta da própria empresa, robô', async () => {
@@ -166,10 +173,12 @@ test('abertura de conta pelo site', async (t) => {
     assert.match(r.dados.conta, /\d/);
     ativacaoAprovada = r.dados.acesso.link.split('#t=')[1];
     assert.equal((await api.post(`/api/aberturas/${id}/aprovar`, {}, tk.financeiro)).status, 409, 'não aprova duas vezes');
-    // Já é cliente: o site não aceita novo pedido para o mesmo CNPJ.
+    // Já é cliente: o site aceita (não revela), e a equipe vê o aviso no pedido novo.
     const de_novo = await api.post('/api/publico/abertura', pedido());
-    assert.equal(de_novo.status, 409);
-    assert.match(de_novo.dados.erro, /já é cliente/);
+    assert.equal(de_novo.status, 201);
+    const idN = Number(de_novo.dados.protocolo.slice(3));
+    assert.ok(api.db.prepare("SELECT 1 FROM abertura_interacoes WHERE solicitacao_id = ? AND texto LIKE '%já é cliente PAY AX%'").get(idN));
+    assert.equal((await api.post(`/api/aberturas/${idN}/recusar`, { motivo: 'Pedido repetido' }, tk.financeiro)).status, 200);
   });
 
   await t.test('recusa com motivo e, depois do prazo, documentos apagados e dados anonimizados', async () => {
@@ -252,9 +261,12 @@ test('abertura de conta pelo site', async (t) => {
     const idC = c.dados.id;
     const e = await api.put(`/api/aberturas/${idC}/dados`, { ...pedido(), empresa: { ...pedido().empresa, cnpj: CNPJ.payax, razao_social: 'Gama Telecom Ltda' },
       destino: { ...pedido().destino, pix_chave: CNPJ.payax } }, tk.operacao);
-    assert.equal(e.status, 200, JSON.stringify(e.dados));
-    assert.equal(e.dados.razao_social, 'Gama Telecom Ltda');
-    assert.ok(e.dados.pendencias.some((x) => /Contrato social/.test(x)));
+    assert.equal(e.status, 403, 'operação não muda a conta de recebimento');
+    const e2 = await api.put(`/api/aberturas/${idC}/dados`, { ...pedido(), empresa: { ...pedido().empresa, cnpj: CNPJ.payax, razao_social: 'Gama Telecom Ltda' },
+      destino: { ...pedido().destino, pix_chave: CNPJ.payax } }, tk.financeiro);
+    assert.equal(e2.status, 200, JSON.stringify(e2.dados));
+    assert.equal(e2.dados.razao_social, 'Gama Telecom Ltda');
+    assert.ok(e2.dados.pendencias.some((x) => /Contrato social/.test(x)));
     const a = await api.post(`/api/aberturas/${idC}/documentos`, { tipo: 'contrato_social', nome: 'contrato.pdf', conteudo: PDF }, tk.operacao);
     assert.equal(a.status, 201, JSON.stringify(a.dados));
     assert.ok(!a.dados.pendencias.some((x) => /Cadastro|Contrato social/.test(x)), JSON.stringify(a.dados.pendencias));

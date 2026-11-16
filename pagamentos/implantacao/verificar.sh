@@ -146,7 +146,8 @@ conferir() {
   # 8. Protocolos: TLS 1.3 aceito; TLS 1.0 e 1.1 (quebrados) recusados.
   local t13=0 antigo=0
   echo | openssl s_client -tls1_3 -servername "$dom" -connect "$IP_NGINX:443" >/dev/null 2>&1 && t13=1
-  for p in -tls1 -tls1_1; do echo | openssl s_client "$p" -servername "$dom" -connect "$IP_NGINX:443" >/dev/null 2>&1 && antigo=1; done
+  # O openssl do Ubuntu, por padrão, nem tenta TLS 1.0/1.1 (SECLEVEL 2): sem baixar o nível, o teste daria "recusado" sempre.
+  for p in -tls1 -tls1_1; do echo | openssl s_client "$p" -cipher 'DEFAULT:@SECLEVEL=0' -servername "$dom" -connect "$IP_NGINX:443" >/dev/null 2>&1 && antigo=1; done
   if (( t13 == 1 && antigo == 0 )); then ok "só TLS 1.2 e 1.3 em $dom (TLS 1.0 e 1.1 recusados)"
   elif (( antigo == 1 )); then falha "$dom ainda aceita TLS 1.0/1.1: rode o instalador de novo (o modelo payax desliga)"
   else aviso "$dom não negociou TLS 1.3 (confira a versão do OpenSSL/nginx do servidor)"; fi

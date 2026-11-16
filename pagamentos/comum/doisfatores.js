@@ -93,7 +93,9 @@ export function blocoDoisFatores(api, { ativo, exigido = false, aoMudar }) {
       campo({ nome: 'codigo', rotulo: 'Código do aplicativo', obrigatorio: true, atributos: { inputmode: 'numeric', maxlength: 7 } }));
     const b = el('button', { class: 'botao perigo' }, 'Desligar');
     b.addEventListener('click', () => acao(b, async () => {
-      await api.post('/auth/2fa/desativar', lerForm(form));
+      const r = await api.post('/auth/2fa/desativar', lerForm(form));
+      // As outras sessões caem; esta segue com o token novo.
+      if (r?.token) api.sessao.set({ ...api.sessao.get(), token: r.token });
       ativo = false;
       toast('Autenticação em duas etapas desligada.');
       desenhar();

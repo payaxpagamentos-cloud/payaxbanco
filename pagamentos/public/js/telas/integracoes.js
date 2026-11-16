@@ -84,7 +84,7 @@ export default async function integracoes({ alvo, recarregar }) {
 function configurarSms(atual, recarregar) {
   const provedor = campo({ nome: 'provedor', rotulo: 'Operadora', tipo: 'select', valor: atual.config?.provedor ?? 'apibrasil',
     opcoes: atual.provedores.map((p) => [p.id, p.nome]) });
-  const sid = campo({ nome: 'conta_sid', rotulo: 'Account SID (Twilio)', ajuda: 'Começa com AC (painel da Twilio)' });
+  const sid = campo({ nome: 'conta_sid', rotulo: 'Account SID (Twilio)', valor: atual.config?.conta_sid ?? '', ajuda: 'Começa com AC (painel da Twilio)' });
   const remetente = campo({ nome: 'remetente', rotulo: 'Remetente', valor: atual.config?.remetente ?? '' });
   const ajudaRemetente = remetente.querySelector('small') ?? remetente.appendChild(el('small', {}));
   const token = campo({ nome: 'token', rotulo: 'Token', tipo: 'password' });

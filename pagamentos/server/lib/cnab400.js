@@ -91,7 +91,8 @@ const OCORRENCIA = {
   13: { acao: 'informativo', texto: 'Abatimento cancelado' },
   14: { acao: 'informativo', texto: 'Vencimento alterado' },
   15: { acao: 'liquidado', texto: 'Liquidação em cartório' },
-  16: { acao: 'liquidado', texto: 'Título pago em cheque (aguardando compensação)' },
+  // Cheque ainda não compensado: não é dinheiro na conta. A liquidação vem na ocorrência seguinte (06).
+  16: { acao: 'informativo', texto: 'Título pago em cheque (aguardando compensação)' },
   17: { acao: 'liquidado', texto: 'Liquidação após baixa' },
   19: { acao: 'informativo', texto: 'Confirmação de instrução de protesto' },
   20: { acao: 'informativo', texto: 'Confirmação de sustação de protesto' },

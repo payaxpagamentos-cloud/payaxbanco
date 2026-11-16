@@ -56,13 +56,30 @@ test('webhook do banco: liquida, não duplica e guarda tudo', async (t) => {
 
   await t.test('a leitura do aviso aceita as variações de nome e formato', () => {
     assert.deepEqual(lerAviso({ nossoNumero: '00000000012', valorPago: '150,75', dataCredito: '15.12.2026' }),
-      { nosso_numero: '00000000012', valor_centavos: 15075, pago_em: '2026-12-15', evento: 'liquidacao', meio: 'boleto' });
+      { nosso_numero: '00000000012', valor_centavos: 15075, pago_em: '2026-12-15', creditado_em: '2026-12-15', evento: '', situacao: '', meio: 'boleto' });
+    // Pagamento e crédito em dias diferentes: cada um no seu campo.
+    const a = lerAviso({ nossoNumero: '1', valorPago: '10,00', dataPagamento: '2026-12-14', dataCredito: '2026-12-15' });
+    assert.deepEqual([a.pago_em, a.creditado_em], ['2026-12-14', '2026-12-15']);
     assert.equal(lerAviso({ eNumeroTitulo: '12', vlPagoTitulo: '99.90', dtCreditoTitulo: '2026-12-15' }).valor_centavos, 9990);
-    assert.equal(lerAviso({ nosso_numero: '12', valor: '15075' }).valor_centavos, 15075, 'texto só de dígitos = centavos');
+    assert.equal(lerAviso({ nosso_numero: '12', valor_pago: '15075' }).valor_centavos, 15075, 'texto só de dígitos = centavos');
+    assert.equal(lerAviso({ nosso_numero: '12', valor: '15075' }).valor_centavos, 0, '"valor" sozinho é o do título, não o pago');
     assert.equal(lerAviso({ nosso_numero: '12', valorPago: 150 }).valor_centavos, 15000, 'número JSON é reais: 150 = R$ 150,00, não R$ 1,50');
     assert.equal(lerAviso({ nosso_numero: '12', valorPago: 150.5 }).valor_centavos, 15050);
     assert.equal(lerAviso({ nosso_numero: '12', tipoTitulo: 'BOLEPIX', pagador: 'Qrz Ltda' }).meio, 'boleto', 'BOLEPIX no tipo do título não é o meio de pagamento');
     assert.equal(lerAviso({ nosso_numero: '12', meioPagamento: 'PIX' }).meio, 'pix');
+  });
+
+  await t.test('só aviso de PAGAMENTO liquida (estorno, cancelamento e aguardando não)', () => {
+    const { ehPagamento } = require('../server/routes/publico');
+    const ok = (p) => ehPagamento(lerAviso({ nossoNumero: '1', ...p }));
+    assert.equal(ok({ evento: 'liquidacao' }), true);
+    assert.equal(ok({ evento: 'pagamento_confirmado' }), true);
+    assert.equal(ok({ evento: 'aguardando_pagamento' }), false);
+    assert.equal(ok({ evento: 'pagamento_estornado' }), false);
+    assert.equal(ok({ evento: 'pagamento_cancelado' }), false);
+    assert.equal(ok({ situacao: 'REGISTRADO' }), false, 'sem evento e sem valor pago');
+    assert.equal(ok({ valorPago: '10,00', dataPagamento: '2026-12-14' }), true, 'sem evento, mas com valor e data de pagamento');
+    assert.equal(ok({ valorPago: '10,00', dataPagamento: '2026-12-14', situacao: 'CANCELADO' }), false);
   });
 
   await t.test('a conciliação mostra o que aconteceu com cada aviso', async () => {

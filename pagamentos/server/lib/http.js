@@ -17,6 +17,8 @@ function requestId(req, res, next) {
  * às repetições do mesmo usuário na mesma rota. É o que impede que um clique duplo emita dois boletos ou
  * peça dois repasses. Repetir a chave em outra rota é conflito.
  */
+const SIGILOSO = /"(link|senha_provisoria|token|segredo|otpauth|uri|qr|desafio)"\s*:/;
+
 function idempotencia(db) {
   const ler = db.prepare('SELECT * FROM idempotencia WHERE usuario_chave = ? AND chave = ?');
   const reservar = db.prepare('INSERT OR IGNORE INTO idempotencia (usuario_chave, chave, rota, criado_em) VALUES (?, ?, ?, ?)');
@@ -37,7 +39,10 @@ function idempotencia(db) {
     }
     const json = res.json.bind(res);
     res.json = (corpo) => {
-      if (res.statusCode < 500) gravar.run(res.statusCode, JSON.stringify(corpo), ...k);
+      const texto = JSON.stringify(corpo);
+      // Resposta com segredo (senha provisória, link de ativação, token, semente do 2FA) NÃO fica guardada:
+      // a tabela vai para as cópias de segurança. A repetição, nesse caso, executa de novo.
+      if (res.statusCode < 500 && !SIGILOSO.test(texto)) gravar.run(res.statusCode, texto, ...k);
       else soltar.run(...k);
       return json(corpo);
     };

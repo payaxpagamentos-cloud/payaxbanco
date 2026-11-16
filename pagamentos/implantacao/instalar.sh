@@ -50,7 +50,9 @@ while [[ $# -gt 0 ]]; do
     --reserva) RESERVA=1; shift ;;
     --anterior-desligado) ANTERIOR_DESLIGADO=1; shift ;;
     --somente-gerar) SOMENTE_GERAR="$2"; shift 2 ;;
-    --hestia) HESTIA_USUARIO="${2:-admin}"; shift 2 ;;
+    --hestia)
+      # Sem valor (ou seguido de outra opção): "auto", o dono do domínio no Hestia.
+      if [[ -n "${2:-}" && "${2:-}" != --* ]]; then HESTIA_USUARIO="$2"; shift 2; else HESTIA_USUARIO=auto; shift; fi ;;
     --sem-copia-externa) SEM_COPIA=1; shift ;;
     --site) SITE="$2"; shift 2 ;;
     --acesso) ACESSO="$2"; shift 2 ;;
@@ -532,6 +534,7 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
       echo "    location / {"
       echo "        proxy_pass http://127.0.0.1:$PORTA;"
       echo "        proxy_set_header Host \$host;"
+      echo "        proxy_set_header X-Forwarded-Host \$host;"
       echo "        proxy_set_header X-Real-IP \$remote_addr;"
       echo "        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"
       echo "        proxy_set_header X-Forwarded-Proto \$scheme;"
@@ -551,12 +554,12 @@ if [[ -n "$HESTIA_USUARIO" ]]; then
     [[ -n "$u" ]] || u="$(v-search-domain-owner "$dom" 2>/dev/null || true)"
     [[ -n "$u" ]] || u="$HESTIA_USUARIO"
     if ! v-list-web-domain "$u" "$dom" plain >/dev/null 2>&1; then
-      v-add-web-domain "$u" "$dom" "" no
+      v-add-web-domain "$u" "$dom" "" no || { echo "O Hestia não criou $dom (usuário $u)." >&2; return 1; }
       [[ "$www" == www ]] || v-delete-web-domain-alias "$u" "$dom" "www.$dom" no 2>/dev/null || true
     fi
     # Site: o www precisa estar como apelido (para o nginx atender e o certificado cobrir).
     [[ "$www" == www ]] && { v-add-web-domain-alias "$u" "$dom" "www.$dom" no 2>/dev/null || true; }
-    v-change-web-domain-proxy-tpl "$u" "$dom" payax "" yes
+    v-change-web-domain-proxy-tpl "$u" "$dom" payax "" yes || { echo "Não consegui aplicar o modelo payax em $dom." >&2; return 1; }
     local apelidos=""; [[ "$www" == www ]] && apelidos="www.$dom"
     if v-add-letsencrypt-domain "$u" "$dom" "$apelidos" 2>/dev/null || v-list-web-domain-ssl "$u" "$dom" plain 2>/dev/null | grep -q .; then
       v-add-web-domain-ssl-force "$u" "$dom" 2>/dev/null || true

@@ -924,6 +924,24 @@ CREATE INDEX idx_sms_referencia ON sms_mensagens(referencia_tipo, referencia_id)
 ALTER TABLE contas_bancarias ADD COLUMN custo_bolepix_centavos INTEGER CHECK (custo_bolepix_centavos IS NULL OR custo_bolepix_centavos >= 0);
 `,
   },
+  {
+    versao: 24,
+    nome: 'versao-da-sessao',
+    sql: `
+-- Versão da sessão: vai dentro do token. Trocar a senha, desativar o acesso ou desligar o 2FA muda a versão,
+-- e todas as sessões abertas daquele usuário caem na hora (inclusive um token roubado).
+ALTER TABLE usuarios ADD COLUMN sessao_versao INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE usuarios_cliente ADD COLUMN sessao_versao INTEGER NOT NULL DEFAULT 0;
+CREATE TRIGGER usuarios_revoga_sessao AFTER UPDATE ON usuarios
+  WHEN NEW.senha_hash IS NOT OLD.senha_hash OR NEW.ativo <> OLD.ativo OR (OLD.totp_ativo = 1 AND NEW.totp_ativo = 0)
+  BEGIN UPDATE usuarios SET sessao_versao = OLD.sessao_versao + 1 WHERE id = NEW.id; END;
+-- Respostas com segredo que a idempotência guardou antes (senha provisória, link de ativação, 2FA): apagadas.
+DELETE FROM idempotencia WHERE corpo LIKE '%senha_provisoria%' OR corpo LIKE '%#t=%' OR corpo LIKE '%otpauth%' OR corpo LIKE '%"segredo"%' OR corpo LIKE '%"token"%';
+CREATE TRIGGER usuarios_cliente_revoga_sessao AFTER UPDATE ON usuarios_cliente
+  WHEN NEW.senha_hash IS NOT OLD.senha_hash OR NEW.ativo <> OLD.ativo OR (OLD.totp_ativo = 1 AND NEW.totp_ativo = 0)
+  BEGIN UPDATE usuarios_cliente SET sessao_versao = OLD.sessao_versao + 1 WHERE id = NEW.id; END;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

@@ -171,7 +171,11 @@ function solicitar(db, body, { ip, validarCadastro }) {
   if (!body?.aceite) throw new ErroNegocio('Confirme que leu o aviso de privacidade e que os dados são verdadeiros.', 422);
   const dados = normalizar(body);
   const { empresa } = validarDados(dados, validarCadastro);
-  semDuplicata(db, empresa.cnpj);
+  // Pedido do site para CNPJ que já é cliente ou já tem pedido aberto: entra igual (a resposta não revela
+  // nada a quem testa CNPJs, e um pedido falso não trava o verdadeiro) e a equipe é avisada no histórico.
+  const jaCliente = Boolean(db.prepare('SELECT 1 FROM clientes WHERE cnpj = ?').get(empresa.cnpj));
+  const outroAberto = db.prepare(`SELECT id FROM solicitacoes_abertura WHERE cnpj = ? AND situacao IN (${ABERTAS.map(() => '?').join(',')}) ORDER BY id LIMIT 1`)
+    .get(empresa.cnpj, ...ABERTAS);
   const documentos = Object.keys(TIPOS_DOCUMENTO).map((t) => lerDocumento(body.documentos?.[t], t)).filter(Boolean);
   dados.empresa.cnpj = empresa.cnpj;
 
@@ -185,6 +189,8 @@ function solicitar(db, body, { ip, validarCadastro }) {
     throw err;
   }
   registrar(db, id, 'sistema', 'Pedido recebido pelo site (Abra sua conta).');
+  if (jaCliente) registrar(db, id, 'sistema', 'ATENÇÃO: este CNPJ já é cliente PAY AX. Confira com a empresa antes de qualquer passo (pode ser um pedido indevido).');
+  if (outroAberto) registrar(db, id, 'sistema', `ATENÇÃO: já existe outro pedido em andamento para este CNPJ (${protocolo(outroAberto.id)}). Confira qual é o verdadeiro.`);
   return { id, protocolo: protocolo(id) };
 }
 
@@ -211,10 +217,23 @@ function criarContato(db, b, usuario) {
 async function avisarProtocolo(db, id, usuario = null) {
   const s = buscar(db, id);
   const d = json(s.dados, {});
-  const nome = String(d.empresa?.nome_fantasia || s.razao_social).slice(0, 40);
+  // Automático (pedido do site): no máximo um SMS por celular a cada 24 horas e 300 por dia no total —
+  // o formulário é público e não pode virar disparador de SMS.
+  const destino = sms.celular(d.financeiro?.telefone);
+  if (!usuario && destino) {
+    const doNumero = db.prepare(`SELECT COUNT(*) AS n FROM sms_mensagens WHERE finalidade = 'abertura.protocolo' AND destino = ? AND situacao = 'enviado'
+      AND criado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')`).get(destino).n;
+    const doDia = db.prepare(`SELECT COUNT(*) AS n FROM sms_mensagens WHERE finalidade = 'abertura.protocolo' AND situacao = 'enviado'
+      AND criado_em > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')`).get().n;
+    if (doNumero || doDia >= 300) {
+      registrar(db, s.id, 'sistema', `SMS com o protocolo não enviado automaticamente: ${doNumero ? 'este celular já recebeu um protocolo nas últimas 24 horas' : 'limite diário de SMS do formulário atingido'} (a equipe pode enviar pela ficha).`);
+      return { situacao: 'falha', erro: 'limite de envio', destino_mascarado: sms.mascarar(destino) };
+    }
+  }
+  // Só o protocolo: nada digitado no formulário vai no SMS (impede usar a marca PAY AX para golpe).
   const r = await sms.enviar(db, {
     telefone: d.financeiro?.telefone,
-    texto: `PAY AX: recebemos o pedido de abertura de conta de ${nome}. Protocolo ${protocolo(s.id)}. Nossa equipe vai analisar e entrar em contato.`,
+    texto: `PAY AX: recebemos o seu pedido de abertura de conta. Protocolo ${protocolo(s.id)}. Nossa equipe vai analisar e entrar em contato.`,
     finalidade: 'abertura.protocolo', referenciaTipo: 'abertura', referenciaId: s.id,
   });
   registrar(db, s.id, 'sistema', r.situacao === 'enviado'
@@ -282,7 +301,7 @@ function arquivo(db, id, indice) {
 
 // ------------------------------------------------------------------ ações da equipe
 /** Corrige ou completa os dados (CNPJ e razão social sempre obrigatórios; o resto é cobrado ao aprovar). */
-function editarDados(db, id, b, usuario) {
+function editarDados(db, id, b, usuario, { podeDestino = false } = {}) {
   const s = buscar(db, id);
   exigirAberta(s);
   const dados = normalizar(b);
@@ -290,8 +309,18 @@ function editarDados(db, id, b, usuario) {
   const razao = v.texto(dados.empresa.razao_social, 'a razão social', 120);
   if (cnpj !== s.cnpj) semDuplicata(db, cnpj, s.id);
   dados.empresa.cnpj = cnpj;
-  db.prepare('UPDATE solicitacoes_abertura SET cnpj = ?, razao_social = ?, dados = ? WHERE id = ?').run(cnpj, razao, JSON.stringify(dados), s.id);
-  registrar(db, s.id, 'sistema', `Dados do cadastro atualizados por ${usuario.nome}.`, usuario.id);
+  const antes = normalizar(json(s.dados, {}));
+  antes.empresa.cnpj = s.cnpj;
+  // Conta de recebimento é o destino do dinheiro: como no cadastro do cliente, só financeiro ou administrador mudam.
+  if (JSON.stringify(antes.destino) !== JSON.stringify(dados.destino) && !podeDestino) {
+    throw new ErroNegocio('Só o financeiro ou o administrador alteram a conta de recebimento e a chave PIX.', 403);
+  }
+  const mudou = JSON.stringify(antes) !== JSON.stringify(dados);
+  // O que foi conferido valia para os dados de antes: mudou, confere de novo.
+  const zerar = mudou && Object.keys(json(s.checklist, {})).length > 0;
+  db.prepare(`UPDATE solicitacoes_abertura SET cnpj = ?, razao_social = ?, dados = ?${zerar ? ", checklist = '{}'" : ''} WHERE id = ?`)
+    .run(cnpj, razao, JSON.stringify(dados), s.id);
+  registrar(db, s.id, 'sistema', `Dados do cadastro atualizados por ${usuario.nome}.${zerar ? ' A análise (checklist) foi zerada: confira de novo.' : ''}`, usuario.id);
   return buscar(db, id);
 }
 
@@ -302,8 +331,14 @@ function anexar(db, id, b, usuario) {
   const doc = lerDocumento({ nome: b?.nome, conteudo: b?.conteudo ?? '' }, tipo);
   if (!doc) throw new ErroNegocio('Escolha o arquivo.', 422);
   const lista = guardarDocumentos(s.id, [doc], json(s.arquivos, []));
-  db.prepare('UPDATE solicitacoes_abertura SET arquivos = ? WHERE id = ?').run(JSON.stringify(lista), s.id);
-  registrar(db, s.id, 'sistema', `${TIPOS_DOCUMENTO[tipo].rotulo} anexado por ${usuario.nome} (${doc.nome}).`, usuario.id);
+  // Documento novo: os itens da análise que dependem dele voltam a ficar por conferir.
+  const marcados = json(s.checklist, {});
+  const afetados = tipo === 'contrato_social' ? ['contrato_conferido', 'representante_confere', 'socios_identificados'] : ['representante_confere'];
+  const desmarcados = afetados.filter((k) => marcados[k]);
+  for (const k of desmarcados) delete marcados[k];
+  db.prepare('UPDATE solicitacoes_abertura SET arquivos = ?, checklist = ? WHERE id = ?').run(JSON.stringify(lista), JSON.stringify(marcados), s.id);
+  registrar(db, s.id, 'sistema', `${TIPOS_DOCUMENTO[tipo].rotulo} anexado por ${usuario.nome} (${doc.nome}).`
+    + `${desmarcados.length ? ` Itens da análise a conferir de novo: ${desmarcados.map((k) => CHECKLIST.find(([c]) => c === k)[1]).join('; ')}.` : ''}`, usuario.id);
   return buscar(db, id);
 }
 
@@ -329,6 +364,7 @@ function atribuir(db, id, usuarioId, usuario) {
 
 function interagir(db, id, b, usuario) {
   const s = buscar(db, id);
+  if (s.dados === '{}') throw new ErroNegocio('Pedido anonimizado (LGPD): não recebe mais anotações.', 409);
   const tipo = v.opcao(b?.tipo || 'nota', 'o tipo do contato', TIPOS_INTERACAO);
   const t = v.texto(b?.texto, 'o texto', 2000);
   registrar(db, s.id, tipo, t, usuario.id);
@@ -447,11 +483,20 @@ function recusar(db, id, motivo, usuario) {
  */
 function aplicarRetencao(db, { dias = 180 } = {}) {
   const corte = new Date(Date.now() - dias * 86_400_000).toISOString();
+  // Pedido parado há mais de `dias` (sem movimento): encerrado como recusado; segue a guarda do recusado.
+  const parados = db.prepare(`SELECT id FROM solicitacoes_abertura WHERE situacao IN (${ABERTAS.map(() => '?').join(',')}) AND IFNULL(atualizado_em, criado_em) < ?`)
+    .all(...ABERTAS, corte);
+  for (const { id } of parados) {
+    db.prepare("UPDATE solicitacoes_abertura SET situacao = 'recusada', analisado_em = ?, motivo = ? WHERE id = ?")
+      .run(agora(), `Encerrado por falta de movimento (${dias} dias)`, id);
+    registrar(db, id, 'sistema', `Pedido encerrado por falta de movimento (${dias} dias).`);
+  }
   const lista = db.prepare("SELECT id FROM solicitacoes_abertura WHERE situacao = 'recusada' AND analisado_em < ? AND dados <> '{}'").all(corte);
   for (const { id } of lista) {
     fs.rmSync(path.join(config.arquivos, 'abertura', String(id)), { recursive: true, force: true });
-    db.prepare("UPDATE solicitacoes_abertura SET dados = '{}', arquivos = '[]', ip = NULL, checklist = '{}' WHERE id = ?").run(id);
+    db.prepare("UPDATE solicitacoes_abertura SET dados = '{}', arquivos = '[]', ip = NULL, checklist = '{}', proposta = NULL, motivo = NULL, razao_social = '(anonimizado)', cnpj = '' WHERE id = ?").run(id);
     db.prepare('DELETE FROM abertura_interacoes WHERE solicitacao_id = ?').run(id);
+    db.prepare("DELETE FROM sms_mensagens WHERE referencia_tipo = 'abertura' AND referencia_id = ?").run(id);
   }
   return lista.length;
 }

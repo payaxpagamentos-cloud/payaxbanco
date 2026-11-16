@@ -6,6 +6,7 @@
  */
 const express = require('express');
 const { exigir } = require('../auth');
+const { podeEquipe } = require('../lib/permissoes');
 const auditoria = require('../lib/auditoria');
 const abertura = require('../lib/abertura');
 const { listaPaginada } = require('../lib/http');
@@ -85,7 +86,7 @@ module.exports = (db) => {
   });
 
   r.put('/:id/dados', exigir('aberturas.editar'), (req, res) => {
-    const s = abertura.editarDados(db, req.params.id, req.body ?? {}, req.usuario);
+    const s = abertura.editarDados(db, req.params.id, req.body ?? {}, req.usuario, { podeDestino: podeEquipe(req.usuario.perfil, 'repasses.aprovar') });
     auditar(req, 'abertura.dados_alterados', s.id);
     res.json(completo(s));
   });

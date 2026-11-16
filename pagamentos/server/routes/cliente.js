@@ -37,6 +37,9 @@ const semMargem = (d) => ({
   split: d.split ? { ...d.split, custo_banco_centavos: undefined, margem_centavos: undefined, receita_centavos: undefined } : undefined,
 });
 
+/** Resumo de uma senha que ninguém tem: o login sem usuário gasta o mesmo tempo que o com usuário. */
+const RESUMO_FALSO = require('../lib/senha').hashSenha(require('node:crypto').randomBytes(16).toString('hex'));
+
 module.exports = (db, autenticado) => {
   const r = express.Router();
   const meuCliente = (req) => {
@@ -50,7 +53,9 @@ module.exports = (db, autenticado) => {
     const email = String(req.body?.email ?? '').trim().toLowerCase();
     const u = db.prepare(`SELECT uc.*, c.situacao AS cliente_situacao, c.razao_social, c.nome_fantasia, c.cnpj
       FROM usuarios_cliente uc JOIN clientes c ON c.id = uc.cliente_id WHERE uc.email = ?`).get(email);
-    if (!u || !u.ativo || !verificarSenha(String(req.body?.senha ?? ''), u.senha_hash)) {
+    // Sem usuário, confere contra um resumo falso: o tempo de resposta não revela quais e-mails existem.
+    const senhaOk = verificarSenha(String(req.body?.senha ?? ''), u?.senha_hash ?? RESUMO_FALSO);
+    if (!u || !u.ativo || !senhaOk) {
       throw new ErroNegocio('E-mail ou senha inválidos.', 401);
     }
     if (u.cliente_situacao === 'encerrado') throw new ErroNegocio('Conta encerrada. Fale com o seu gerente.', 403);
@@ -73,9 +78,9 @@ module.exports = (db, autenticado) => {
 
   function concluirLogin(req, res, u) {
     db.prepare('UPDATE usuarios_cliente SET ultimo_acesso = ? WHERE id = ?').run(agora(), u.id);
-    auditoria.registrar(db, { ...req, usuario: u, usuarioTipo: 'cliente' },
+    auditoria.registrar(db, Object.assign(Object.create(req), { usuario: u, usuarioTipo: 'cliente' }),
       { acao: 'cliente.login', entidade: 'usuario_cliente', entidade_id: u.id, cliente_id: u.cliente_id });
-    return res.json({ token: emitirToken(u.id, 'payax-cliente'), usuario: sessaoCliente(u) });
+    return res.json({ token: emitirToken(u.id, 'payax-cliente', undefined, u.sessao_versao), usuario: sessaoCliente(u) });
   }
 
   r.use(autenticado);
@@ -94,7 +99,7 @@ module.exports = (db, autenticado) => {
   r.post('/auth/2fa/desativar', (req, res) => {
     dois.desativar(db, 'cliente', req.usuario.id, req.body?.senha, req.body?.codigo);
     auditoria.registrar(db, req, { acao: 'cliente.2fa.desativada', entidade: 'usuario_cliente', entidade_id: req.usuario.id, cliente_id: req.clienteId });
-    res.json({ ok: true });
+    res.json({ ok: true, token: emitirToken(req.usuario.id, 'payax-cliente', undefined, db.prepare('SELECT sessao_versao FROM usuarios_cliente WHERE id = ?').get(req.usuario.id).sessao_versao) });
   });
 
   // Consulta de CEP e CNPJ para preencher os dados do pagador.
@@ -107,7 +112,8 @@ module.exports = (db, autenticado) => {
     if (nova === String(req.body?.senha_atual)) throw new ErroNegocio('A nova senha precisa ser diferente da atual.', 422);
     db.prepare('UPDATE usuarios_cliente SET senha_hash = ?, senha_provisoria = 0 WHERE id = ?').run(hashSenha(nova), u.id);
     auditoria.registrar(db, req, { acao: 'cliente.senha.trocada', entidade: 'usuario_cliente', entidade_id: u.id, cliente_id: req.clienteId });
-    res.json({ ok: true });
+    const versao = db.prepare('SELECT sessao_versao FROM usuarios_cliente WHERE id = ?').get(u.id).sessao_versao;
+    res.json({ ok: true, token: emitirToken(u.id, 'payax-cliente', undefined, versao) });
   });
 
   // ---------------------------------------------------------------- painel
@@ -352,6 +358,7 @@ module.exports = (db, autenticado) => {
     }
     const campos = Object.keys(d);
     db.prepare(`UPDATE usuarios_cliente SET ${campos.map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...campos.map((k) => d[k]), u.id);
+    if (d.senha_hash || d.ativo === 0) require('../lib/ativacao').cancelar(db, u.id);
     auditoria.registrar(db, req, { acao: 'acesso.alterado.cliente', entidade: 'usuario_cliente', entidade_id: u.id, cliente_id: req.clienteId });
     res.json({ id: u.id, ...(provisoria ? { senha_provisoria: provisoria } : {}) });
   });

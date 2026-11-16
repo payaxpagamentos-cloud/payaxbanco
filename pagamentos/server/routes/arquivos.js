@@ -24,6 +24,8 @@ module.exports = (db) => {
 
   /** Gera a remessa agora com o que estiver esperando (a rotina já faz isso sozinha em dia útil). */
   r.post('/remessas', exigir('conciliacao.operar'), (req, res) => {
+    // Fora do modo arquivo, os títulos já foram registrados pela API: mandá-los na remessa duplicaria o registro.
+    if (config.banco.modo !== 'cnab') throw new ErroNegocio('A remessa só existe no modo arquivo (CNAB): neste modo os títulos são registrados direto pela API.', 409);
     const conta = boletosLib.contaDe(db, req.body?.conta_id);
     const out = arquivos.gerarRemessa(db, conta, { usuario: req.usuario, automatica: false });
     if (out.vazia) throw new ErroNegocio('Não há títulos esperando para ir ao banco.', 422);

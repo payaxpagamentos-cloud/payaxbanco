@@ -16,11 +16,14 @@ function limitar({ janelaMs, maximo }) {
     if (req.method !== 'POST') return next();
     const agora = Date.now();
     const tempos = (acessos.get(req.ip) ?? []).filter((t) => t > agora - janelaMs);
-    tempos.push(agora);
+    // Acima do limite não guarda mais tentativas (a lista não cresce sem fim) e a memória tem teto.
+    if (tempos.length <= maximo) tempos.push(agora);
+    if (!acessos.has(req.ip) && acessos.size >= 50_000) acessos.clear();
     acessos.set(req.ip, tempos);
     if (tempos.length > maximo) {
       res.set('Retry-After', String(Math.ceil(janelaMs / 1000)));
-      return next(new ErroNegocio('Muitas tentativas. Aguarde um minuto e tente novamente.', 429));
+      const minutos = Math.max(1, Math.ceil((tempos[0] + janelaMs - agora) / 60_000));
+      return next(new ErroNegocio(`Muitas tentativas. Aguarde ${minutos === 1 ? 'um minuto' : `${minutos} minutos`} e tente novamente.`, 429));
     }
     next();
   };

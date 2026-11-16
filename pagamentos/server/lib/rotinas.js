@@ -66,6 +66,10 @@ async function rodar(db, { forcar = false } = {}) {
     try {
       out.retencao = lgpd.aplicarRetencao(db);
       out.retencao.aberturas = abertura.aplicarRetencao(db);
+      // Idempotência só precisa valer contra clique duplo e nova tentativa: 2 dias bastam.
+      out.retencao.idempotencia = db.prepare("DELETE FROM idempotencia WHERE criado_em < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 days')").run().changes;
+      // IP de quem ativou o acesso: 6 meses, como os IPs da auditoria.
+      db.prepare("UPDATE ativacoes_acesso SET ip_uso = NULL WHERE ip_uso IS NOT NULL AND usado_em < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days')").run();
       if (out.retencao.boletos || out.retencao.ips) {
         console.log(`[PAY AX] LGPD: ${out.retencao.boletos} título(s) anonimizado(s), ${out.retencao.ips} IP(s) apagado(s) da auditoria.`);
       }
