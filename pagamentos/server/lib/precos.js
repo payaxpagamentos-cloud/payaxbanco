@@ -110,7 +110,8 @@ const congelar = (precoTabela, conta, tipo = 'boleto') => {
   percentual_ppm: preco.percentual_ppm ?? 0,
   comissao_minima_centavos: preco.comissao_minima_centavos ?? 0,
   comissao_maxima_centavos: preco.comissao_maxima_centavos ?? null,
-  custo_liquidacao_centavos: conta?.custo_liquidacao_centavos ?? 0,
+  // Tarifa que o banco cobra da PAY AX por título pago: a do Bolepix, se a conta tiver uma própria.
+  custo_liquidacao_centavos: (tipo === 'bolepix' ? conta?.custo_bolepix_centavos : null) ?? conta?.custo_liquidacao_centavos ?? 0,
   };
 };
 

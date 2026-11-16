@@ -38,7 +38,8 @@ function corpoConta(b, { novo = false } = {}) {
   if (b.nosso_numero_inicial !== undefined) d.nosso_numero_inicial = v.inteiro(b.nosso_numero_inicial, 'o início da faixa', { min: 1, max: 99999999999 });
   if (b.nosso_numero_final !== undefined) d.nosso_numero_final = v.inteiro(b.nosso_numero_final, 'o fim da faixa', { min: 1, max: 99999999999 });
   if (b.custo_emissao !== undefined) d.custo_emissao_centavos = v.centavos(b.custo_emissao, 'o custo de emissão');
-  if (b.custo_liquidacao !== undefined) d.custo_liquidacao_centavos = v.centavos(b.custo_liquidacao, 'o custo de liquidação');
+  if (b.custo_liquidacao !== undefined) d.custo_liquidacao_centavos = v.centavos(b.custo_liquidacao, 'a tarifa do banco por boleto pago');
+  if (b.custo_bolepix !== undefined) d.custo_bolepix_centavos = v.centavosOpcional(b.custo_bolepix, 'a tarifa do banco por Bolepix pago');
   if (b.custo_rateio !== undefined) d.custo_rateio_centavos = v.centavos(b.custo_rateio, 'o custo do rateio');
   if (b.custo_pix !== undefined) d.custo_pix_centavos = v.centavos(b.custo_pix, 'o custo do PIX');
   if (b.ativa !== undefined) d.ativa = v.booleano(b.ativa) ? 1 : 0;

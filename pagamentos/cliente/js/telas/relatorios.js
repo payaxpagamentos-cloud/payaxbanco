@@ -57,15 +57,11 @@ export default async function relatorios({ alvo, query }) {
       ],
     }))),
 
-    el('div', { style: 'margin-top:14px' }, cartao('A sua tabela de preços', [el('div', { class: 'pares cols-3' },
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, d.preco.bolepix ? 'Tarifa PAY AX (boleto)' : 'Tarifa PAY AX'), el('span', { class: 'val' }, d.preco.tarifa_texto)),
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa máxima'), el('span', { class: 'val' }, d.preco.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(d.preco.comissao_maxima_centavos))),
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por boleto emitido'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_emissao_centavos))),
-      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por transferência'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_repasse_centavos)))),
-      // Bolepix com preço próprio: as tarifas dele, na mesma ordem.
-      d.preco.bolepix ? el('div', { class: 'pares cols-3', style: 'margin-top:16px;padding-top:14px;border-top:1px solid var(--borda)' },
-        el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa PAY AX (Bolepix)'), el('span', { class: 'val' }, d.preco.bolepix.tarifa_texto)),
-        el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa máxima (Bolepix)'), el('span', { class: 'val' }, d.preco.bolepix.comissao_maxima_centavos === null ? 'sem teto' : dinheiro(d.preco.bolepix.comissao_maxima_centavos))),
-        el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por Bolepix emitido'), el('span', { class: 'val' }, dinheiro(d.preco.bolepix.tarifa_emissao_centavos)))) : null])),
+    el('div', { style: 'margin-top:14px' }, cartao('A sua tabela de preços', el('div', { class: 'pares cols-3' },
+      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa Boleto'), el('span', { class: 'val' }, `${d.preco.tarifa_texto}`)),
+      el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa Bolepix'), el('span', { class: 'val' }, `${d.preco.bolepix?.tarifa_texto ?? d.preco.tarifa_texto}`)),
+      // Tabelas antigas: o que ainda for cobrado aparece, para o cliente não ser surpreendido.
+      d.preco.tarifa_emissao_centavos ? el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por boleto emitido'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_emissao_centavos))) : null,
+      d.preco.tarifa_repasse_centavos ? el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Tarifa por transferência'), el('span', { class: 'val' }, dinheiro(d.preco.tarifa_repasse_centavos))) : null))),
   );
 }

@@ -298,7 +298,7 @@ async function definirProposta(s, recarregar) {
       campo({ nome: 'boletos_mes', rotulo: 'Boletos por mês (estimado)', valor: p?.boletos_mes ?? '', atributos: { inputmode: 'numeric' } }),
       campo({ nome: 'sistema', rotulo: 'Sistema de gestão', tipo: 'select', valor: p?.sistema ?? 'nenhum', opcoes: Object.entries(SISTEMA) })),
     el('div', { style: 'margin-top:12px' }, campo({ nome: 'observacao_proposta', rotulo: 'Condições combinadas', tipo: 'textarea', valor: p?.observacao ?? '',
-      atributos: { maxlength: 500, placeholder: 'Ex.: 3 primeiros meses sem tarifa de emissão; revisão em 6 meses.' } })));
+      atributos: { maxlength: 500, placeholder: 'Ex.: tarifa revisada em 6 meses conforme o volume.' } })));
   const botao = el('button', { class: 'botao' }, 'Salvar proposta');
   botao.addEventListener('click', () => acao(botao, async () => {
     await api.put(`/aberturas/${s.id}/proposta`, lerForm(form));

@@ -26,15 +26,17 @@ export default async function resultado({ alvo, query, recarregar }) {
 
   const cb = d.custo_banco;
   const demonstrativo = el('div', { class: 'dre' },
-    linha('Tarifa PAY AX (percentual)', dinheiro(d.receita.tarifa_payax), 'sub'),
-    linha('Tarifa de emissão', dinheiro(d.receita.tarifa_emissao), 'sub'),
-    linha('Tarifa bancária cobrada dos clientes', dinheiro(d.receita.tarifa_banco), 'sub'),
-    linha('Tarifa de repasse', dinheiro(d.receita.tarifa_repasse), 'sub'),
+    // Venda: Tarifa Boleto e Tarifa Bolepix. Tarifas do modelo antigo só aparecem se ainda houver valor.
+    linha('Tarifas Boleto e Bolepix cobradas dos clientes', dinheiro(d.receita.tarifa_payax), 'sub'),
+    d.receita.tarifa_emissao ? linha('Tarifa de emissão (tabela antiga)', dinheiro(d.receita.tarifa_emissao), 'sub') : null,
+    d.receita.tarifa_banco ? linha('Tarifa bancária (tabela antiga)', dinheiro(d.receita.tarifa_banco), 'sub') : null,
+    d.receita.tarifa_repasse ? linha('Tarifa de repasse (tabela antiga)', dinheiro(d.receita.tarifa_repasse), 'sub') : null,
     linha('Receita bruta', dinheiro(d.receita.total), 'total'),
     linha(`Impostos sobre a receita (${percentual(d.impostos.ppm)})`, menos(d.impostos.valor)),
-    linha(`Registro de boletos no banco (${numero(cb.registro.quantidade)})`, menos(cb.registro.valor), 'sub'),
-    linha(`Liquidação e rateio (${numero(cb.liquidacao.quantidade)})`, menos(cb.liquidacao.valor), 'sub'),
-    linha(`PIX de repasse (${numero(cb.pix.quantidade)})`, menos(cb.pix.valor), 'sub'),
+    // Compra: a tarifa que o banco cobra da PAY AX por título pago (e as outras, se o contrato cobrar).
+    linha(`Tarifa do banco por título pago (${numero(cb.liquidacao.quantidade)})`, menos(cb.liquidacao.valor), 'sub'),
+    cb.registro.valor ? linha(`Tarifa do banco por título registrado (${numero(cb.registro.quantidade)})`, menos(cb.registro.valor), 'sub') : null,
+    cb.pix.valor ? linha(`Tarifa do banco por PIX enviado (${numero(cb.pix.quantidade)})`, menos(cb.pix.valor), 'sub') : null,
     linha('Custos do banco', menos(cb.total), 'total'),
     linha('Margem de contribuição', dinheiro(d.margem_contribuicao), 'total', sinal(d.margem_contribuicao)),
     ...d.despesas.por_categoria.map((c) => linha(c.rotulo, menos(c.valor_centavos), 'sub')),
@@ -79,7 +81,7 @@ export default async function resultado({ alvo, query, recarregar }) {
       cartao(`Demonstrativo de ${nomeMes(mes)}`, demonstrativo),
       cartao('Ponto de equilíbrio', [equilibrio,
         el('p', { class: 'regra-exige', style: 'margin-top:12px' },
-          'Custos do banco calculados pelas tarifas cadastradas em Contas e preços (registro, liquidação, rateio e PIX), congeladas em cada operação. No fechamento, confira com o extrato do Bradesco.'),
+          'Custo do banco calculado pelas tarifas cadastradas na conta bancária (Contas e preços), congeladas em cada título. No fechamento, confira com o extrato do banco.'),
         imposto])),
 
     el('div', { style: 'margin-top:14px' }, cartao('Últimos 6 meses', tabela({

@@ -6,7 +6,7 @@ import {
 } from '../../comum/ui.js';
 import { agendaLiberacao } from '../../comum/graficos.js';
 import { emitir } from './boletos.js';
-import { fichaPreco, formPreco, bolepixDe } from './precos-comum.js';
+import { fichaPreco, formPreco, tarifaBoleto, tarifaBolepix } from './precos-comum.js';
 import { blocoLogo } from '../../comum/logo.js';
 import { configurarSistema, importarSistema, testarSistema, nomeSistema } from './sistema-cliente.js';
 
@@ -218,10 +218,9 @@ async function abaPrecos(alvo, c, query, recarregar) {
     el('div', { style: 'margin-top:14px' }, cartao('Histórico de preços', tabela({
       colunas: [
         { titulo: 'Vigência', conteudo: (x) => `${data(x.vigencia_inicio)} → ${x.vigencia_fim ? data(x.vigencia_fim) : 'em diante'}` },
-        { titulo: 'Emissão', dir: true, conteudo: (x) => dinheiro(x.tarifa_emissao_centavos) },
-        { titulo: 'PAY AX fixa', dir: true, conteudo: (x) => dinheiro(x.tarifa_fixa_centavos ?? 0) },
-        { titulo: 'PAY AX %', dir: true, conteudo: (x) => percentual(x.percentual_ppm) },
-        { titulo: 'Bolepix', conteudo: (x) => (bolepixDe(x) ? 'Preço próprio' : 'Igual ao boleto') },
+        { titulo: 'Tarifa Boleto', dir: true, conteudo: (x) => dinheiro(tarifaBoleto(x)) },
+        { titulo: 'Tarifa Bolepix', dir: true, conteudo: (x) => dinheiro(tarifaBolepix(x)) },
+        { titulo: 'Observação', conteudo: (x) => x.observacao || '—' },
       ],
       itens: p.historico,
       vazio: 'Sem tabela própria: vale a tabela padrão da plataforma.',

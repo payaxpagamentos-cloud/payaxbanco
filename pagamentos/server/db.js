@@ -915,6 +915,15 @@ CREATE TABLE sms_mensagens (
 CREATE INDEX idx_sms_referencia ON sms_mensagens(referencia_tipo, referencia_id);
 `,
   },
+  {
+    versao: 23,
+    nome: 'tarifa-banco-bolepix',
+    sql: `
+-- Tarifa que o banco cobra da PAY AX por Bolepix pago (o Bolepix pode custar diferente do boleto).
+-- NULL = igual à do boleto (custo_liquidacao_centavos).
+ALTER TABLE contas_bancarias ADD COLUMN custo_bolepix_centavos INTEGER CHECK (custo_bolepix_centavos IS NULL OR custo_bolepix_centavos >= 0);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();
