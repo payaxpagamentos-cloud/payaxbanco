@@ -238,6 +238,22 @@ module.exports = (db) => {
       })(),
       dias_a_frente: v.inteiroOpcional(b.dias_a_frente, 'os dias à frente', { min: 1, max: 90 }) ?? 10,
     };
+    // Um mesmo IXC pode atender mais de um cliente PAY AX (ex.: duas empresas do mesmo grupo, cada uma com a
+    // sua filial no IXC). Aí cada cliente precisa da SUA carteira: sem isso, um importaria os títulos do outro.
+    {
+      const atualCfg = JSON.parse(db.prepare("SELECT config FROM integracoes WHERE escopo = 'ixc' AND cliente_id = ?").get(cliente.id)?.config || '{}');
+      const urlDeste = sincronismo.mesmoIxc(cfg.url ?? atualCfg.url);
+      const vizinhos = db.prepare("SELECT cliente_id, config FROM integracoes WHERE escopo = 'ixc' AND cliente_id <> ?").all(cliente.id)
+        .map((i) => ({ id: i.cliente_id, c: JSON.parse(i.config || '{}') }))
+        .filter((i) => urlDeste && sincronismo.mesmoIxc(i.c.url) === urlDeste);
+      if (vizinhos.length && !cfg.carteiras.length) {
+        throw new ErroNegocio('Este IXC também atende outro cliente da PAY AX: informe o ID da carteira de cobrança PAY AX deste cliente, para não importar os títulos do outro.', 422);
+      }
+      const choque = vizinhos.find((i) => (i.c.carteiras ?? []).some((x) => cfg.carteiras.includes(String(x))) || !(i.c.carteiras ?? []).length);
+      if (choque) {
+        throw new ErroNegocio('Este IXC também atende outro cliente da PAY AX, e a carteira se repete (ou o outro cliente está sem carteira). Cada cliente precisa de uma carteira PAY AX só dele no IXC.', 409);
+      }
+    }
     // Com o IXC enviando o boleto, o título precisa estar registrado desde que a fatura é gerada:
     // por padrão, importa os vencimentos dos próximos 45 dias.
     if (cfg.numeracao === 'ixc' && (b.dias_a_frente === undefined || b.dias_a_frente === '')) cfg.dias_a_frente = 45;

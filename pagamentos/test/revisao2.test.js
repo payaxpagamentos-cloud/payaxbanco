@@ -181,6 +181,18 @@ test('revisão 2: provedor grande no IXC', async (t) => {
     assert.deepEqual(ids, ['9991']);
     assert.equal((await api.put(`/api/integracoes/ixc/${a.cliente.id}`, { url, carteiras: 'abc' }, tk.admin)).status, 422);
   });
+
+  await t.test('duas empresas no mesmo IXC: cada uma precisa da sua carteira, sem repetir', async () => {
+    assert.equal((await api.put(`/api/integracoes/ixc/${a.cliente.id}`, { url, tipo_padrao: 'bolepix', carteiras: '12' }, tk.admin)).status, 200);
+    const b = await api.cliente(tk.admin, { razao_social: 'Alfa Net Filial SP LTDA', cnpj: '45543915000181', email: 'filial-sp@exemplo.com.br' });
+    const semCarteira = await api.put(`/api/integracoes/ixc/${b.cliente.id}`, { url: `${url}/`, token: '7:hash-de-teste' }, tk.admin);
+    assert.equal(semCarteira.status, 422, 'sem carteira, importaria os títulos da outra empresa');
+    const mesma = await api.put(`/api/integracoes/ixc/${b.cliente.id}`, { url, token: '7:hash-de-teste', carteiras: '12' }, tk.admin);
+    assert.equal(mesma.status, 409);
+    assert.equal((await api.put(`/api/integracoes/ixc/${b.cliente.id}`, { url, token: '7:hash-de-teste', carteiras: '15' }, tk.admin)).status, 200);
+    const r = await api.post(`/api/integracoes/ixc/${b.cliente.id}/importar`, { de: '2026-12-01', ate: '2026-12-31' }, tk.operacao);
+    assert.equal(r.dados.criados, 0, 'nenhum título da carteira 12 (da outra empresa) vira boleto desta');
+  });
 });
 
 test('revisão 2: valores no padrão da tela (R$ 1.500,00)', () => {

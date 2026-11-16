@@ -20,6 +20,9 @@ const bancos = require('./bancos');
  * Nosso número que o IXC deu ao título ("00000012345", "12345-P", "000000123456"), em 11 dígitos + DV.
  * Devolve null quando o IXC ainda não gerou o boleto (sem número).
  */
+/** Endereço do IXC normalizado, para saber se dois clientes usam o mesmo IXC. */
+const mesmoIxc = (url) => String(url ?? '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '') || null;
+
 /** Link permanente do boleto PAY AX (o mesmo da Área do Cliente), gravado no "Link gateway" do título no IXC. */
 function linkPublico(id, nossoNumero) {
   if (!config.urlPublica) return null;
@@ -111,6 +114,12 @@ async function importarAgora(db, cliente, { de, ate, limite = 200, maxPaginas = 
     // Só a(s) carteira(s) de cobrança da PAY AX no IXC: título de outra carteira (outro banco, gateway)
     // já tem boleto lá e não pode ganhar um segundo.
     const carteiras = (ixc.config.carteiras ?? []).map(String);
+    if (!carteiras.length) {
+      const urlDeste = mesmoIxc(ixc.config.url);
+      const compartilhado = urlDeste && db.prepare("SELECT config FROM integracoes WHERE escopo = 'ixc' AND cliente_id <> ?").all(cliente.id)
+        .some((i) => mesmoIxc(JSON.parse(i.config || '{}').url) === urlDeste);
+      if (compartilhado) throw new ErroNegocio('Este IXC atende mais de um cliente da PAY AX: configure a carteira de cobrança deste cliente antes de importar.', 409);
+    }
     for (const t of titulos) {
       if (carteiras.length && !carteiras.includes(t.carteira)) { resultado.ignorados += 1; continue; }
       if (!t.vencimento || t.valor_centavos <= 0) { resultado.ignorados += 1; continue; }
@@ -247,4 +256,4 @@ async function reprocessarBaixas(db, limite = 50) {
   return out;
 }
 
-module.exports = { nossoNumeroDoIxc, ixcDoCliente, testar, importar, avisarBaixa, reprocessarBaixas, hoje };
+module.exports = { mesmoIxc, nossoNumeroDoIxc, ixcDoCliente, testar, importar, avisarBaixa, reprocessarBaixas, hoje };
