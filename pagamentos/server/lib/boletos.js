@@ -212,6 +212,16 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
     if (existente) return { ...existente, ja_existia: true };
   }
 
+  // Limite mensal de emissão (definido na abertura de conta ou no cadastro): soma do que já foi emitido no mês.
+  if (cliente.limite_mensal_centavos) {
+    const noMes = db.prepare(`SELECT IFNULL(SUM(valor_centavos), 0) AS v FROM boletos
+      WHERE cliente_id = ? AND substr(emissao, 1, 7) = ? AND situacao NOT IN ('cancelado','falha')`).get(cliente.id, entrada.emissao.slice(0, 7)).v;
+    if (noMes + entrada.valor_centavos > cliente.limite_mensal_centavos) {
+      const brl = (c) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      throw new ErroNegocio(`Limite mensal de emissão deste cliente atingido: ${brl(noMes)} já emitidos de ${brl(cliente.limite_mensal_centavos)} no mês.`, 422);
+    }
+  }
+
   // Rateio pelo banco: o custo dele (tarifa do Bradesco por rateio) entra no custo do boleto, para a margem.
   const rateio = rateioDe(cliente, conta, entrada.valor_centavos, congelado);
   if (rateio.rateio_ppm && conta.custo_rateio_centavos) {

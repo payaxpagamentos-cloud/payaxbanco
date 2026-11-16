@@ -36,6 +36,8 @@ function criarApp(db) {
   equipe.use('/api/arquivos/retornos', express.raw({ type: () => true, limit: '10mb' }));
   // Abertura de conta pelo site: leva o contrato social (até 8 MB, em base64) no próprio pedido.
   equipe.use('/api/publico/abertura', express.json({ limit: '25mb' }));
+  const jsonGrande = express.json({ limit: '25mb' });
+  equipe.use('/api/aberturas', (req, res, next) => (req.method === 'POST' && /^\/\d+\/documentos$/.test(req.path) ? jsonGrande(req, res, next) : next()));
   equipe.use(express.json({ limit: '1mb' }));
   // Aviso de privacidade e canal do titular (LGPD): públicos, sem login, nas duas áreas.
   const privacidade = require('./routes/privacidade')(db);

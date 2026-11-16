@@ -149,7 +149,10 @@ export const R = {
   origem: { avulso: 'Avulso', ixc: 'Sistema do cliente', api: 'API', lote: 'Lote' },
   perfilEquipe: { admin: 'Administrador', financeiro: 'Financeiro', operacao: 'Operação', consulta: 'Consulta' },
   perfilCliente: { admin: 'Administrador', operador: 'Operador', consulta: 'Consulta' },
-  situacaoAbertura: { nova: ['Nova', 'info'], em_analise: ['Em análise', 'aviso'], aprovada: ['Aprovada', 'ok'], recusada: ['Recusada', 'neutra'] },
+  situacaoAbertura: {
+    prospeccao: ['Prospecção', 'neutra'], nova: ['Novo pedido', 'info'], em_analise: ['Análise cadastral', 'aviso'], proposta: ['Proposta comercial', 'aviso'],
+    aguardando_cliente: ['Aguardando o cliente', 'aviso'], aprovada: ['Conta aberta', 'ok'], recusada: ['Recusada', 'neutra'],
+  },
 };
 
 /** Selo de estado: cor + texto (a cor nunca informa sozinha). */

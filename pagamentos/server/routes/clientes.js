@@ -44,6 +44,10 @@ function corpoCliente(body, { novo = false, cnpjAtual = null } = {}) {
     d.limite_boleto_centavos = v.centavos(body.limite_boleto, 'o limite por boleto');
     if (d.limite_boleto_centavos <= 0) throw new ErroNegocio('O limite por boleto precisa ser maior que zero.', 422);
   }
+  if (body.limite_mensal !== undefined) {
+    d.limite_mensal_centavos = v.centavosOpcional(body.limite_mensal, 'o limite mensal de emissão');
+    if (d.limite_mensal_centavos !== null && d.limite_mensal_centavos <= 0) d.limite_mensal_centavos = null;
+  }
   if (body.observacoes !== undefined) d.observacoes = v.opcional(body.observacoes, 'as observações', 1000);
   // A chave PIX de repasse só muda pela nossa equipe (é o destino do dinheiro): o cliente não altera sozinho.
   if (body.pix_chave !== undefined) {

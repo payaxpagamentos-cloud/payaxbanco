@@ -802,6 +802,55 @@ CREATE INDEX idx_abertura_situacao ON solicitacoes_abertura(situacao, id);
 CREATE INDEX idx_abertura_cnpj ON solicitacoes_abertura(cnpj);
 `,
   },
+  {
+    versao: 20,
+    nome: 'crm-abertura',
+    sql: `
+-- CRM da abertura de conta: funil por etapas, responsável, checklist da análise, proposta comercial
+-- (tarifas e limites) e histórico de contatos. A tabela é refeita para aceitar as etapas novas.
+CREATE TABLE solicitacoes_abertura_nova (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  situacao TEXT NOT NULL DEFAULT 'nova'
+    CHECK (situacao IN ('prospeccao','nova','em_analise','proposta','aguardando_cliente','aprovada','recusada')),
+  origem TEXT NOT NULL DEFAULT 'site' CHECK (origem IN ('site','equipe')),
+  cnpj TEXT NOT NULL,
+  razao_social TEXT NOT NULL,
+  dados TEXT NOT NULL,
+  arquivos TEXT NOT NULL DEFAULT '[]',
+  ip TEXT,
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT,
+  responsavel_id INTEGER REFERENCES usuarios(id),
+  checklist TEXT NOT NULL DEFAULT '{}',   -- itens da análise conferidos: quem e quando (JSON)
+  proposta TEXT,                          -- tarifas, limites e condições combinadas (JSON)
+  analisado_por INTEGER REFERENCES usuarios(id),
+  analisado_em TEXT,
+  motivo TEXT,
+  cliente_id INTEGER REFERENCES clientes(id)
+);
+INSERT INTO solicitacoes_abertura_nova (id, situacao, cnpj, razao_social, dados, arquivos, ip, criado_em, atualizado_em, responsavel_id,
+  analisado_por, analisado_em, motivo, cliente_id)
+  SELECT id, situacao, cnpj, razao_social, dados, arquivos, ip, criado_em, criado_em,
+    CASE WHEN situacao = 'em_analise' THEN analisado_por END, analisado_por, analisado_em, motivo, cliente_id FROM solicitacoes_abertura;
+DROP TABLE solicitacoes_abertura;
+ALTER TABLE solicitacoes_abertura_nova RENAME TO solicitacoes_abertura;
+CREATE INDEX idx_abertura_situacao ON solicitacoes_abertura(situacao, id);
+CREATE INDEX idx_abertura_cnpj ON solicitacoes_abertura(cnpj);
+
+CREATE TABLE abertura_interacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  solicitacao_id INTEGER NOT NULL REFERENCES solicitacoes_abertura(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('nota','ligacao','email','whatsapp','reuniao','sistema')),
+  texto TEXT NOT NULL,
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX idx_abertura_interacoes ON abertura_interacoes(solicitacao_id, id);
+
+-- Limite de emissão no mês (soma dos boletos emitidos). NULL = sem limite mensal.
+ALTER TABLE clientes ADD COLUMN limite_mensal_centavos INTEGER CHECK (limite_mensal_centavos IS NULL OR limite_mensal_centavos > 0);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

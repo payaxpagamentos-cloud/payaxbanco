@@ -100,9 +100,45 @@ test('abertura de conta pelo site', async (t) => {
     assert.ok(painel.alertas.some((a) => a.tipo === 'aberturas'));
   });
 
-  await t.test('operação não aprova; financeiro aprova e cria cliente em implantação com acesso', async () => {
+  await t.test('CRM: etapa, responsável, histórico, checklist e proposta', async () => {
+    assert.equal((await api.put(`/api/aberturas/${id}/etapa`, { etapa: 'em_analise' }, tk.consulta)).status, 403);
+    const m = await api.put(`/api/aberturas/${id}/etapa`, { etapa: 'em_analise' }, tk.operacao);
+    assert.equal(m.status, 200);
+    assert.equal(m.dados.situacao, 'em_analise');
+    assert.equal(m.dados.responsavel_nome, 'Usuário operacao', 'quem move primeiro vira o responsável');
+    assert.equal((await api.put(`/api/aberturas/${id}/etapa`, { etapa: 'aprovada' }, tk.operacao)).status, 422, 'aprovar só pelo botão');
+    const eq = (await api.get('/api/aberturas/equipe', tk.operacao)).dados;
+    assert.ok(eq.some((u) => u.perfil === 'financeiro'));
+    assert.equal((await api.put(`/api/aberturas/${id}/responsavel`, { usuario_id: tk.financeiro_id }, tk.operacao)).dados.responsavel_nome, 'Usuário financeiro');
+    assert.equal((await api.post(`/api/aberturas/${id}/interacoes`, { tipo: 'ligacao', texto: 'Liguei para o João, vai mandar a alteração contratual.' }, tk.operacao)).status, 201);
+
+    // Sem checklist e sem proposta, não aprova — e diz o que falta.
+    const cedo = await api.post(`/api/aberturas/${id}/aprovar`, {}, tk.financeiro);
+    assert.equal(cedo.status, 422);
+    assert.match(cedo.dados.erro, /checklist/);
+    assert.match(cedo.dados.erro, /Proposta comercial/);
+
+    const d0 = (await api.get(`/api/aberturas/${id}`, tk.financeiro)).dados;
+    for (const item of d0.checklist) {
+      assert.equal((await api.put(`/api/aberturas/${id}/checklist/${item.chave}`, { feito: true }, tk.operacao)).status, 200);
+    }
+    // Proposta: tarifas e limites. Operação não mexe em preço.
+    const proposta = { tarifa_emissao: '0,50', tarifa_fixa: 'R$ 1,99', percentual: '0', tarifa_repasse: '0,00', comissao_minima: '0',
+      bolepix_proprio: '1', bolepix_tarifa_fixa: '2,49', limite_boleto: 'R$ 3.000,00', limite_mensal: 'R$ 150.000,00', entrega: 'pix',
+      faturamento_mensal: 'R$ 200.000,00', boletos_mes: '1.500', sistema: 'ixc', observacao_proposta: 'Primeiros 3 meses sem tarifa de emissão.' };
+    assert.equal((await api.put(`/api/aberturas/${id}/proposta`, proposta, tk.operacao)).status, 403);
+    assert.equal((await api.put(`/api/aberturas/${id}/proposta`, { ...proposta, limite_mensal: '1.000,00' }, tk.financeiro)).status, 422, 'mensal menor que por boleto');
+    const p = await api.put(`/api/aberturas/${id}/proposta`, proposta, tk.financeiro);
+    assert.equal(p.status, 200, JSON.stringify(p.dados));
+    assert.equal(p.dados.proposta.limite_boleto_centavos, 300000);
+    assert.equal(p.dados.proposta.boletos_mes, 1500);
+    assert.deepEqual(p.dados.pendencias, []);
+    assert.ok(p.dados.interacoes.some((i) => i.tipo === 'ligacao'));
+    assert.ok(p.dados.interacoes.some((i) => /Proposta definida/.test(i.texto)));
+  });
+
+  await t.test('operação não aprova; financeiro aprova e cria o cliente com a proposta e o acesso', async () => {
     assert.equal((await api.post(`/api/aberturas/${id}/aprovar`, {}, tk.operacao)).status, 403);
-    assert.equal((await api.post(`/api/aberturas/${id}/analisar`, {}, tk.operacao)).status, 200);
     const r = await api.post(`/api/aberturas/${id}/aprovar`, {}, tk.financeiro);
     assert.equal(r.status, 200, JSON.stringify(r.dados));
     const c = api.db.prepare('SELECT * FROM clientes WHERE id = ?').get(r.dados.cliente_id);
@@ -113,6 +149,13 @@ test('abertura de conta pelo site', async (t) => {
     assert.equal(c.pix_chave, '11222333000181');
     assert.equal(c.pix_tipo, 'cnpj');
     assert.ok(c.conta_interna, 'recebe o código do cliente');
+    assert.equal(c.limite_boleto_centavos, 300000);
+    assert.equal(c.limite_mensal_centavos, 15000000);
+    assert.equal(c.entrega, 'pix');
+    const preco = api.db.prepare('SELECT * FROM precos WHERE cliente_id = ?').get(c.id);
+    assert.equal(preco.tarifa_fixa_centavos, 199);
+    assert.equal(preco.tarifa_emissao_centavos, 50);
+    assert.equal(JSON.parse(preco.bolepix).tarifa_fixa_centavos, 249);
     assert.equal(JSON.parse(c.kyc_representantes)[0].documento, CPF);
     assert.equal(r.dados.acesso.email, 'financeiro@exemplo.com.br');
     assert.match(r.dados.acesso.senha_provisoria, /^[a-z2-9]{6}-[a-z2-9]{4}$/);
@@ -141,5 +184,31 @@ test('abertura de conta pelo site', async (t) => {
     const s = api.db.prepare('SELECT * FROM solicitacoes_abertura WHERE id = ?').get(idB);
     assert.equal(s.dados, '{}');
     assert.equal(s.ip, null);
+    assert.equal(api.db.prepare('SELECT COUNT(*) AS n FROM abertura_interacoes WHERE solicitacao_id = ?').get(idB).n, 0);
+  });
+
+  await t.test('contato pela equipe: prospecção, completar dados, anexar contrato', async () => {
+    assert.equal((await api.post('/api/aberturas', { empresa: { cnpj: CNPJ.payax, razao_social: 'Gama Telecom' } }, tk.consulta)).status, 403);
+    const c = await api.post('/api/aberturas', { empresa: { cnpj: CNPJ.payax, razao_social: 'Gama Telecom' },
+      financeiro: { nome: 'Rui', email: 'rui@gama.com.br', telefone: '11966665555' }, observacao: 'Indicação do provedor Alfa.' }, tk.operacao);
+    assert.equal(c.status, 201, JSON.stringify(c.dados));
+    assert.equal(c.dados.situacao, 'prospeccao');
+    assert.equal(c.dados.origem, 'equipe');
+    assert.ok(c.dados.pendencias.some((x) => /Cadastro/.test(x)));
+    assert.ok(c.dados.interacoes.some((i) => i.tipo === 'nota' && /Indicação/.test(i.texto)));
+    const idC = c.dados.id;
+    const e = await api.put(`/api/aberturas/${idC}/dados`, { ...pedido(), empresa: { ...pedido().empresa, cnpj: CNPJ.payax, razao_social: 'Gama Telecom Ltda' },
+      destino: { ...pedido().destino, pix_chave: CNPJ.payax } }, tk.operacao);
+    assert.equal(e.status, 200, JSON.stringify(e.dados));
+    assert.equal(e.dados.razao_social, 'Gama Telecom Ltda');
+    assert.ok(e.dados.pendencias.some((x) => /Contrato social/.test(x)));
+    const a = await api.post(`/api/aberturas/${idC}/documentos`, { tipo: 'contrato_social', nome: 'contrato.pdf', conteudo: PDF }, tk.operacao);
+    assert.equal(a.status, 201, JSON.stringify(a.dados));
+    assert.ok(!a.dados.pendencias.some((x) => /Cadastro|Contrato social/.test(x)), JSON.stringify(a.dados.pendencias));
+    const f = (await api.get('/api/aberturas/funil', tk.consulta)).status;
+    assert.equal(f, 403);
+    const funil = (await api.get('/api/aberturas/funil', tk.operacao)).dados;
+    assert.ok(funil.itens.some((x) => x.id === idC && x.situacao === 'prospeccao'));
+    assert.equal(funil.etapas[0].chave, 'prospeccao');
   });
 });
