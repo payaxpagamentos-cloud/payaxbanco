@@ -31,6 +31,19 @@ const febraban = require('./febraban');
 const { valorAtualizado } = require('./boletos');
 const logoLib = require('./logo');
 
+/*
+ * Marca da PAY AX no topo da página, fora da ficha de compensação. A ficha (as duas vias) continua com o
+ * nome e o código do banco que registrou o título (237-2): é o padrão FEBRABAN/Banco Central e é o que o
+ * caixa e o app do banco conferem. A parte branca do logo do site vira azul-escuro para aparecer no papel.
+ */
+const MARCA_PAYAX = (() => {
+  try {
+    const svg = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../site/assets/payax-logo.svg'), 'utf8')
+      .replace(/fill="#ffffff"/gi, 'fill="#0a2540"');
+    return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+  } catch { return null; }
+})();
+
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const brl = (c) => (Number(c || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const data = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('/') : '');
@@ -97,6 +110,9 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   .acoes button.sec { background: #fff; color: #0f5fbf; border: 1px solid #0f5fbf; }
   .folha { position: relative; }
   /* Quem cobra, antes de tudo: é o nome que o pagador reconhece. */
+  .topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .topo img { height: 9mm; width: auto; display: block; }
+  .topo span { font-size: 9.5px; color: #333; text-align: right; }
   .cobrador { display: flex; align-items: stretch; gap: 14px; border: 2px solid #000; border-radius: 4px; padding: 10px 12px; margin-bottom: 12px; }
   .cobrador .quem { flex: 1; min-width: 0; }
   .cobrador .logo-cliente { display: block; max-height: 16mm; max-width: 60mm; object-fit: contain; margin-bottom: 6px; }
@@ -155,6 +171,7 @@ ${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não e
 <div class="folha">
   ${teste ? '<div class="marca-teste" aria-hidden="true"><span>TESTE · NÃO PAGUE</span></div>' : ''}
 
+  ${MARCA_PAYAX ? `<div class="topo"><img src="${MARCA_PAYAX}" alt="PAY AX"><span>Cobrança processada pela PAY AX</span></div>` : ''}
   <div class="cobrador">
     <div class="quem">
       ${logoLib.paraFicha(cliente.logo) ? `<img class="logo-cliente" src="${logoLib.paraFicha(cliente.logo)}" alt="${esc(bfFantasia)}">` : ''}
