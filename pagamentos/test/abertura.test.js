@@ -203,14 +203,15 @@ test('abertura de conta pelo site', async (t) => {
     const errado = await api.post('/api/publico/ativacao', { token: tok, cnpj: '19.131.243/0001-97', senha: 'SenhaForte2026' });
     assert.equal(errado.status, 422);
     assert.match(errado.dados.erro, /Restam 4/);
-    assert.equal((await api.post('/api/publico/ativacao', { token: tok, cnpj: '11.222.333/0001-81', senha: 'curta1' })).status, 422);
+    assert.equal((await api.post('/api/publico/ativacao', { token: tok, cnpj: '11.222.333/0001-81', senha: 'curta12' })).status, 422, '7 caracteres não');
     assert.equal((await api.post('/api/publico/ativacao', { token: tok, cnpj: '11.222.333/0001-81', senha: 'semnumeroaqui' })).status, 422);
     // Antes de ativar, nenhuma senha funciona.
-    assert.equal((await api.post('/cliente/api/auth/login', { email: 'financeiro@exemplo.com.br', senha: 'Kp7m-Rx4t-Zq9w-Hs3d' })).status, 401);
-    const ok = await api.post('/api/publico/ativacao', { token: tok, cnpj: '11.222.333/0001-81', senha: 'Kp7m-Rx4t-Zq9w-Hs3d' });
+    assert.equal((await api.post('/cliente/api/auth/login', { email: 'financeiro@exemplo.com.br', senha: 'Joao2026' })).status, 401);
+    // Senha própria de 8 caracteres (letras e números) é aceita.
+    const ok = await api.post('/api/publico/ativacao', { token: tok, cnpj: '11.222.333/0001-81', senha: 'Joao2026' });
     assert.equal(ok.status, 200, JSON.stringify(ok.dados));
     assert.equal(ok.dados.codigo_usuario, 'financeiro@exemplo.com.br');
-    const login = await api.post('/cliente/api/auth/login', { email: 'financeiro@exemplo.com.br', senha: 'Kp7m-Rx4t-Zq9w-Hs3d' });
+    const login = await api.post('/cliente/api/auth/login', { email: 'financeiro@exemplo.com.br', senha: 'Joao2026' });
     assert.equal(login.status, 200, JSON.stringify(login.dados));
     assert.equal(login.dados.usuario?.senha_provisoria ?? false, false, 'não pede troca: a senha já é do cliente');
     // Uso único; o token nunca é guardado em claro.

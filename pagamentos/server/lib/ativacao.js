@@ -85,10 +85,10 @@ function consultar(db, token) {
   };
 }
 
-/** Regra da senha criada pelo cliente: 10 a 128 caracteres, com letra e número. */
+/** Regra da senha criada pelo cliente: 8 a 128 caracteres, com letra e número. */
 function conferirSenha(senha) {
   const s = String(senha ?? '');
-  if (s.length < 10) throw new ErroNegocio('A senha precisa ter pelo menos 10 caracteres.', 422);
+  if (s.length < 8) throw new ErroNegocio('A senha precisa ter pelo menos 8 caracteres.', 422);
   if (s.length > 128) throw new ErroNegocio('Senha longa demais (máximo de 128 caracteres).', 422);
   if (!/[A-Za-z]/.test(s) || !/\d/.test(s)) throw new ErroNegocio('Use letras e números na senha.', 422);
   return s;

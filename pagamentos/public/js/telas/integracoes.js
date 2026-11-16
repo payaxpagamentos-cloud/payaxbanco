@@ -64,35 +64,41 @@ export default async function integracoes({ alvo, recarregar }) {
         }) }, icone('atualizar'), 'Testar consulta'),
         pode('*') ? el('button', { class: 'botao', onclick: () => configurarDados(d.dados, recarregar) }, icone('config'), 'Token da API Brasil') : null))),
 
-    el('div', { style: 'margin-top:18px' }, cartao(['SMS (avisos ao cliente) ', statusIntegracao({ ...d.sms, configurada: Boolean(d.sms.configurada) }, { grande: true })],
+    el('div', { style: 'margin-top:18px' }, cartao(['SMS (avisos ao cliente) ', statusIntegracao({ ...d.sms, configurada: Boolean(d.sms.pronto) }, { grande: true })],
       el('div', {},
         el('p', { style: 'color:var(--texto-2);font-size:13px;margin-bottom:12px' },
           'Envia ao celular do responsável financeiro o protocolo do pedido de abertura de conta. Se o SMS não sair, o pedido entra do mesmo jeito e o motivo fica no histórico (com botão para reenviar).'),
         el('div', { class: 'pares cols-3' },
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Operadora'),
-            el('span', { class: 'val' }, d.sms.provedores.find((p) => p.id === d.sms.config?.provedor)?.nome ?? 'não configurada')),
-          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Remetente'), el('span', { class: 'val' }, d.sms.config?.remetente ?? '—')),
+            el('span', { class: 'val' }, d.sms.provedor_em_uso === 'apibrasil' && !d.sms.configurada ? 'API Brasil (mesmo token da consulta de CNPJ)'
+              : d.sms.provedores.find((p) => p.id === d.sms.provedor_em_uso)?.nome ?? 'não configurada: cadastre o token da API Brasil')),
+          el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Custo'), el('span', { class: 'val' }, d.sms.provedor_em_uso === 'apibrasil' ? 'R$ 0,10 por SMS (créditos da API Brasil)' : 'conforme o contrato da operadora')),
           el('div', { class: 'par' }, el('span', { class: 'rot' }, 'Último envio'), el('span', { class: 'val' }, d.sms.ultimo_teste ? dataHora(d.sms.ultimo_teste) : '—'))),
         d.sms.ultimo_erro ? el('div', { style: 'margin-top:10px' }, aviso(d.sms.ultimo_erro, 'erro')) : null),
       el('div', { style: 'display:flex;gap:8px' },
-        pode('*') && d.sms.configurada ? el('button', { class: 'botao sec', onclick: () => testarSms(recarregar) }, icone('atualizar'), 'Enviar teste') : null,
+        pode('*') && d.sms.pronto ? el('button', { class: 'botao sec', onclick: () => testarSms(recarregar) }, icone('atualizar'), 'Enviar teste') : null,
         pode('*') ? el('button', { class: 'botao', onclick: () => configurarSms(d.sms, recarregar) }, icone('config'), 'Configurar') : null))),
   );
 }
 
 function configurarSms(atual, recarregar) {
-  const provedor = campo({ nome: 'provedor', rotulo: 'Operadora', tipo: 'select', valor: atual.config?.provedor ?? 'zenvia',
+  const provedor = campo({ nome: 'provedor', rotulo: 'Operadora', tipo: 'select', valor: atual.config?.provedor ?? 'apibrasil',
     opcoes: atual.provedores.map((p) => [p.id, p.nome]) });
   const sid = campo({ nome: 'conta_sid', rotulo: 'Account SID (Twilio)', ajuda: 'Começa com AC (painel da Twilio)' });
   const remetente = campo({ nome: 'remetente', rotulo: 'Remetente', valor: atual.config?.remetente ?? '' });
   const ajudaRemetente = remetente.querySelector('small') ?? remetente.appendChild(el('small', {}));
+  const token = campo({ nome: 'token', rotulo: 'Token', tipo: 'password' });
+  const ajudaToken = token.appendChild(el('small', {}));
   const form = el('form', { onsubmit: (e) => e.preventDefault() },
     el('div', { class: 'linha-form' }, provedor, remetente),
-    el('div', { class: 'linha-form', style: 'margin-top:12px' }, sid,
-      campo({ nome: 'token', rotulo: 'Token', tipo: 'password', ajuda: atual.configurada ? 'Deixe vazio para manter o token atual' : 'O token da API da operadora' })));
+    el('div', { class: 'linha-form', style: 'margin-top:12px' }, sid, token));
   const ajustar = () => {
-    const twilio = provedor.querySelector('select').value === 'twilio';
+    const op = provedor.querySelector('select').value;
+    const twilio = op === 'twilio';
     sid.hidden = !twilio;
+    remetente.hidden = op === 'apibrasil';
+    ajudaToken.textContent = op === 'apibrasil' ? 'Opcional: vazio usa o mesmo token da API Brasil já cadastrado (consulta de CNPJ)'
+      : atual.configurada ? 'Deixe vazio para manter o token atual' : 'O token da API da operadora';
     ajudaRemetente.textContent = twilio ? 'Número de envio da Twilio (+55...) ou Messaging Service SID (MG...)' : 'O remetente (from) do canal de SMS na Zenvia';
   };
   provedor.querySelector('select').addEventListener('change', ajustar);
@@ -105,7 +111,7 @@ function configurarSms(atual, recarregar) {
     recarregar();
   }));
   const m = modal({ titulo: 'SMS · operadora', largo: true,
-    corpo: [aviso('O token é cifrado antes de ser gravado e nunca volta para a tela. A conta na operadora (Zenvia ou Twilio) é contratada pela PAY AX.', 'info'), form],
+    corpo: [aviso('Com a API Brasil, o SMS usa o mesmo token e os mesmos créditos da consulta de CNPJ (R$ 0,10 por mensagem). Os tokens são cifrados antes de gravar e nunca voltam para a tela.', 'info'), form],
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Cancelar'), botao] });
 }
 

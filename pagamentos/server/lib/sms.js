@@ -5,6 +5,8 @@
  * financeiro). A operadora é contratada pela PAY AX e configurada em Integrações → SMS; o token fica cifrado.
  *
  * Operadoras aceitas:
+ *   - API Brasil (padrão): POST /api/v2/sms/send/credits com o mesmo Bearer Token da consulta de CNPJ.
+ *     O erro pode vir com HTTP 200 (campo "error" do corpo); 402 é saldo insuficiente;
  *   - Zenvia (API v2): POST /v2/channels/sms/messages, cabeçalho X-API-TOKEN;
  *   - Twilio: POST /2010-04-01/Accounts/{SID}/Messages.json, autenticação básica (SID e token).
  *
@@ -16,7 +18,7 @@ const { agora } = require('../db');
 const { ErroNegocio } = require('./erros');
 const { decifrar } = require('./cripto');
 
-const PROVEDORES = Object.freeze({ zenvia: 'Zenvia', twilio: 'Twilio' });
+const PROVEDORES = Object.freeze({ apibrasil: 'API Brasil', zenvia: 'Zenvia', twilio: 'Twilio' });
 
 /** Celular brasileiro no formato +55DD9NNNNNNNN, ou null se não for celular. */
 function celular(tel) {
@@ -31,14 +33,22 @@ const mascarar = (e164) => { const d = String(e164 ?? '').replace(/\D/g, '').sli
 /** Texto sem acento (cabe nos 160 caracteres de um SMS em qualquer operadora). */
 const semAcento = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
 
+/**
+ * Operadora em uso. Sem configuração própria de SMS, usa a API Brasil com o token que já está em
+ * Integrações → API Brasil (o mesmo token vale para toda a plataforma).
+ */
 function configuracao(db) {
   const i = db.prepare("SELECT * FROM integracoes WHERE escopo = 'sms' ORDER BY id LIMIT 1").get();
-  if (!i?.credenciais || i.estado === 'desabilitada') return null;
-  try {
-    return { id: i.id, ...JSON.parse(i.config || '{}'), ...JSON.parse(decifrar(i.credenciais)) };
-  } catch {
-    return null;
+  if (i?.estado === 'desabilitada') return null;
+  const cfg = i ? JSON.parse(i.config || '{}') : {};
+  let cred = {};
+  try { cred = i?.credenciais ? JSON.parse(decifrar(i.credenciais)) : {}; } catch { cred = {}; }
+  const provedor = cfg.provedor || 'apibrasil';
+  if (provedor === 'apibrasil') {
+    const token = cred.token || require('./consultaDados').tokenApiBrasil(db);
+    return token ? { id: i?.id ?? null, provedor, token } : null;
   }
+  return cred.token ? { id: i.id, ...cfg, ...cred } : null;
 }
 
 async function chamar(url, opcoes) {
@@ -60,6 +70,25 @@ async function chamar(url, opcoes) {
 
 /** Entrega o texto pela operadora configurada. Devolve o identificador da mensagem na operadora. */
 async function entregar(cfg, destino, texto) {
+  if (cfg.provedor === 'apibrasil') {
+    let r;
+    try {
+      r = await chamar(config.sms.urlApiBrasil, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.token}` },
+        body: JSON.stringify({ number: destino.replace('+', ''), message: texto }),
+      });
+    } catch (err) {
+      if (/\(402\)/.test(err.message)) throw new Error('saldo insuficiente na API Brasil: recarregue os créditos');
+      throw err;
+    }
+    // A API Brasil pode responder erro com HTTP 200: vale o campo "error" e a situação da mensagem.
+    const situacao = r.response?.data?.status ?? r.response?.status;
+    if (r.error || (situacao && !['processed', 'success', 'sent', 'queued'].includes(String(situacao).toLowerCase()))) {
+      throw new Error(`a API Brasil não enviou: ${r.message || r.response?.message || situacao || 'erro sem detalhe'}`);
+    }
+    return r.response?.data?.id ?? null;
+  }
   if (cfg.provedor === 'zenvia') {
     const r = await chamar(config.sms.urlZenvia, {
       method: 'POST',
@@ -101,7 +130,7 @@ async function enviar(db, { telefone, texto, finalidade, referenciaTipo = null, 
   const id = db.prepare(`INSERT INTO sms_mensagens (destino, texto, finalidade, referencia_tipo, referencia_id, provedor, situacao, id_provedor, erro, criado_em)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
     .get(destino ?? String(telefone ?? ''), msg, finalidade, referenciaTipo, referenciaId, cfg?.provedor ?? null, situacao, idProvedor, erro, agora()).id;
-  if (cfg && destino) {
+  if (cfg?.id && destino) {
     db.prepare('UPDATE integracoes SET estado = ?, ultimo_teste = ?, ultimo_erro = ? WHERE id = ?')
       .run(situacao === 'enviado' ? 'conectada' : 'falha', agora(), erro, cfg.id);
   }
@@ -111,7 +140,12 @@ async function enviar(db, { telefone, texto, finalidade, referenciaTipo = null, 
 /** Lê a configuração vinda da tela (operadora, token, SID e remetente). */
 function lerConfiguracao(b = {}) {
   const provedor = String(b.provedor ?? '');
-  if (!PROVEDORES[provedor]) throw new ErroNegocio('Escolha a operadora de SMS (Zenvia ou Twilio).', 422);
+  if (!PROVEDORES[provedor]) throw new ErroNegocio('Escolha a operadora de SMS (API Brasil, Zenvia ou Twilio).', 422);
+  // API Brasil: sem remetente; o token é opcional (sem ele, usa o da consulta de CNPJ).
+  if (provedor === 'apibrasil') {
+    const token = String(b.token ?? '').trim();
+    return { cfg: { provedor }, credenciais: token ? { token } : null, limpar: !token };
+  }
   const remetente = String(b.remetente ?? '').trim();
   if (!remetente || remetente.length > 40) throw new ErroNegocio(provedor === 'zenvia'
     ? 'Informe o remetente cadastrado na Zenvia (o "from" do canal de SMS).'

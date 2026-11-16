@@ -46,7 +46,7 @@
   const confirmacao = form.elements.confirmacao;
   const msg = $('[data-msg]');
   const regras = {
-    tamanho: (s) => s.length >= 10,
+    tamanho: (s) => s.length >= 8,
     letra: (s) => /[A-Za-z]/.test(s),
     numero: (s) => /\d/.test(s),
   };
@@ -103,7 +103,7 @@
     msg.hidden = true;
     const erro = (t, campo) => { msg.textContent = t; msg.hidden = false; campo?.focus(); };
     if (cnpj.value.replace(/\D/g, '').length !== 14) return erro('Informe o CNPJ da empresa (14 números).', cnpj);
-    if (!Object.values(regras).every((f) => f(senha.value))) return erro('A senha precisa ter pelo menos 10 caracteres, com letras e números.', senha);
+    if (!Object.values(regras).every((f) => f(senha.value))) return erro('A senha precisa ter pelo menos 8 caracteres, com letras e números.', senha);
     if (senha.value !== confirmacao.value) return erro('As duas senhas não são iguais.', confirmacao);
     const botao = $('[data-enviar]');
     botao.disabled = true;

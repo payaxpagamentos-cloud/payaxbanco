@@ -62,6 +62,9 @@ module.exports = (db) => {
         ORDER BY s.id DESC LIMIT 30`).all(),
       sms: {
         ...semSegredo(db.prepare("SELECT * FROM integracoes WHERE escopo = 'sms' ORDER BY id LIMIT 1").get()),
+        // Pronto para enviar (com a configuração própria ou, por padrão, com o token da API Brasil).
+        pronto: Boolean(smsLib.configuracao(db)),
+        provedor_em_uso: smsLib.configuracao(db)?.provedor ?? null,
         provedores: Object.entries(smsLib.PROVEDORES).map(([id, nome]) => ({ id, nome })),
       },
       dados: {
@@ -73,12 +76,16 @@ module.exports = (db) => {
 
   // ---------------------------------------------------------------- SMS (avisos ao cliente)
   r.put('/sms', exigir('*'), (req, res) => {
-    const { cfg, credenciais } = smsLib.lerConfiguracao(req.body ?? {});
+    const { cfg, credenciais, limpar = false } = smsLib.lerConfiguracao(req.body ?? {});
     const atual = db.prepare("SELECT * FROM integracoes WHERE escopo = 'sms' ORDER BY id LIMIT 1").get();
-    if (!credenciais && !atual?.credenciais) throw new ErroNegocio('Informe o token da operadora de SMS.', 422);
-    // Trocar de operadora exige o token novo (o antigo é de outra conta).
-    if (!credenciais && JSON.parse(atual?.config || '{}').provedor !== cfg.provedor) throw new ErroNegocio('Ao trocar de operadora, informe o token dela.', 422);
-    const id = gravar(db, { escopo: 'sms', credenciais, cfg, usuario: req.usuario });
+    if (cfg.provedor === 'apibrasil') {
+      if (!credenciais && !consultaDados.tokenApiBrasil(db)) throw new ErroNegocio('Cadastre o token da API Brasil (no cartão da API Brasil ou aqui).', 422);
+    } else {
+      if (!credenciais && !atual?.credenciais) throw new ErroNegocio('Informe o token da operadora de SMS.', 422);
+      // Trocar de operadora exige o token novo (o antigo é de outra conta).
+      if (!credenciais && (JSON.parse(atual?.config || '{}').provedor ?? 'apibrasil') !== cfg.provedor) throw new ErroNegocio('Ao trocar de operadora, informe o token dela.', 422);
+    }
+    const id = gravar(db, { escopo: 'sms', credenciais, cfg, limpar, usuario: req.usuario });
     auditoria.registrar(db, req, { acao: 'integracao.sms.configurada', entidade: 'integracao', entidade_id: id, depois: cfg });
     res.json(semSegredo(db.prepare('SELECT * FROM integracoes WHERE id = ?').get(id)));
   });
@@ -86,6 +93,8 @@ module.exports = (db) => {
   /** Envia um SMS de teste para o celular informado (o status fica verde se a operadora aceitar). */
   r.post('/sms/testar', exigir('*'), async (req, res) => {
     if (!smsLib.celular(req.body?.telefone)) throw new ErroNegocio('Informe um celular com DDD para receber o teste.', 422);
+    // Sem configuração própria (API Brasil por padrão): cria o registro para guardar o status do teste.
+    if (!db.prepare("SELECT 1 FROM integracoes WHERE escopo = 'sms'").get()) gravar(db, { escopo: 'sms', credenciais: null, cfg: { provedor: 'apibrasil' }, usuario: req.usuario });
     const r2 = await smsLib.enviar(db, { telefone: req.body.telefone, texto: 'PAY AX: teste de envio de SMS. Se voce recebeu, a integracao esta funcionando.', finalidade: 'teste' });
     auditoria.registrar(db, req, { acao: 'integracao.sms.testada', entidade: 'integracao', depois: { situacao: r2.situacao } });
     res.json({ ok: r2.situacao === 'enviado', mensagem: r2.situacao === 'enviado' ? `SMS de teste enviado para ${r2.destino_mascarado}.` : r2.erro });

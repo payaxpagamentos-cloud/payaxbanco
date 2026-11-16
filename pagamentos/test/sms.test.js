@@ -10,12 +10,20 @@ const path = require('node:path');
 // Operadora falsa: responde como a Zenvia e como a Twilio e guarda o que recebeu.
 const recebidos = [];
 let recusar = false;
+let apibrasil = 'ok';
 const falsa = http.createServer((req, res) => {
   let corpo = '';
   req.on('data', (c) => { corpo += c; });
   req.on('end', () => {
     recebidos.push({ url: req.url, headers: req.headers, corpo });
     if (recusar) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ message: 'Número bloqueado' })); }
+    if (req.url.startsWith('/apibrasil')) {
+      if (req.headers.authorization !== 'Bearer tok-apibrasil') { res.writeHead(401); return res.end('{"error":true,"message":"Token inválido"}'); }
+      if (apibrasil === 'saldo') { res.writeHead(402, { 'Content-Type': 'application/json' }); return res.end('{"error":true,"message":"Saldo insuficiente"}'); }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      if (apibrasil === 'erro200') return res.end(JSON.stringify({ error: true, message: 'Número inválido', response: { status: 'invalid' } }));
+      return res.end(JSON.stringify({ error: false, message: 'Voce foi tarifado em R$ 0,10.', response: { data: { id: 'abr-1', status: 'processed' }, status: 'success' } }));
+    }
     if (req.url.startsWith('/zenvia')) {
       if (req.headers['x-api-token'] !== 'tok-zenvia') { res.writeHead(401); return res.end('{"message":"token inválido"}'); }
       res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ id: 'zen-123' }));
@@ -29,6 +37,7 @@ test('SMS com o protocolo da abertura de conta', async (t) => {
   const base = `http://127.0.0.1:${falsa.address().port}`;
   process.env.PAYAX_ZENVIA_URL = `${base}/zenvia/v2/channels/sms/messages`;
   process.env.PAYAX_TWILIO_URL = `${base}/twilio/2010-04-01`;
+  process.env.PAYAX_APIBRASIL_SMS_URL = `${base}/apibrasil/sms/send/credits`;
   process.env.PAYAX_ARQUIVOS = fs.mkdtempSync(path.join(os.tmpdir(), 'payax-arq-'));
   const { iniciar, CNPJ, CPF } = require('./helpers');
   const sms = require('../server/lib/sms');
@@ -120,5 +129,41 @@ test('SMS com o protocolo da abertura de conta', async (t) => {
     const corpo = new URLSearchParams(ultimo.corpo);
     assert.equal(corpo.get('To'), '+5511977776666');
     assert.equal(corpo.get('From'), '+5511900000000');
+  });
+
+  await t.test('API Brasil: usa o mesmo token da consulta de CNPJ, sem configurar nada no SMS', async () => {
+    api.db.prepare("DELETE FROM integracoes WHERE escopo = 'sms'").run();
+    assert.equal((await api.put('/api/integracoes/dados', { token: 'tok-apibrasil' }, tk.admin)).status, 200);
+    const g = (await api.get('/api/integracoes', tk.admin)).dados.sms;
+    assert.equal(g.pronto, true);
+    assert.equal(g.provedor_em_uso, 'apibrasil');
+    const r = await api.post('/api/integracoes/sms/testar', { telefone: '(31) 99435-9434' }, tk.admin);
+    assert.equal(r.dados.ok, true, JSON.stringify(r.dados));
+    const ultimo = recebidos.at(-1);
+    assert.equal(ultimo.url, '/apibrasil/sms/send/credits');
+    assert.deepEqual(JSON.parse(ultimo.corpo), { number: '5531994359434', message: 'PAY AX: teste de envio de SMS. Se voce recebeu, a integracao esta funcionando.' });
+    assert.equal((await api.get('/api/integracoes', tk.admin)).dados.sms.estado, 'conectada');
+    // Pedido novo pelo site: protocolo por SMS pela API Brasil.
+    const p = await api.post('/api/publico/abertura', pedido('11444777000161'));
+    assert.equal(p.status, 201, JSON.stringify(p.dados));
+    const id = Number(p.dados.protocolo.slice(3));
+    const m = await esperar(() => api.db.prepare("SELECT * FROM sms_mensagens WHERE referencia_id = ? AND situacao = 'enviado'").get(id));
+    assert.equal(m?.provedor, 'apibrasil');
+    assert.equal(m.id_provedor, 'abr-1');
+  });
+
+  await t.test('API Brasil: erro com HTTP 200 e saldo insuficiente (402) viram falha com o motivo', async () => {
+    apibrasil = 'erro200';
+    const a = await api.post('/api/integracoes/sms/testar', { telefone: '11977776666' }, tk.admin);
+    assert.equal(a.dados.ok, false);
+    assert.match(a.dados.mensagem, /Número inválido/);
+    apibrasil = 'saldo';
+    const b = await api.post('/api/integracoes/sms/testar', { telefone: '11977776666' }, tk.admin);
+    assert.match(b.dados.mensagem, /saldo insuficiente/);
+    assert.equal((await api.get('/api/integracoes', tk.admin)).dados.sms.estado, 'falha');
+    apibrasil = 'ok';
+    // Escolher a API Brasil na tela, sem token próprio: continua usando o da consulta.
+    assert.equal((await api.put('/api/integracoes/sms', { provedor: 'apibrasil' }, tk.admin)).status, 200);
+    assert.equal((await api.post('/api/integracoes/sms/testar', { telefone: '11977776666' }, tk.admin)).dados.ok, true);
   });
 });

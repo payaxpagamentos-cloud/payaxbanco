@@ -108,9 +108,11 @@ module.exports = {
     urlViaCep: process.env.PAYAX_VIACEP_URL || 'https://viacep.com.br/ws',
     urlBrasilApi: process.env.PAYAX_BRASILAPI_URL || 'https://brasilapi.com.br/api',
   },
-  // SMS (avisos ao cliente). Operadoras aceitas: Zenvia e Twilio; o token fica cifrado em Integrações → SMS.
+  // SMS (avisos ao cliente). Operadoras aceitas: API Brasil (padrão), Zenvia e Twilio; o token fica cifrado.
   sms: {
     timeoutMs: Number(process.env.PAYAX_SMS_TIMEOUT_MS) || 10_000,
+    // API Brasil "SMS Avulso": o mesmo Bearer Token da consulta de CNPJ; R$ 0,10 por mensagem, até 160 caracteres.
+    urlApiBrasil: process.env.PAYAX_APIBRASIL_SMS_URL || `${process.env.PAYAX_APIBRASIL_URL || 'https://gateway.apibrasil.io/api/v2'}/sms/send/credits`,
     urlZenvia: process.env.PAYAX_ZENVIA_URL || 'https://api.zenvia.com/v2/channels/sms/messages',
     urlTwilio: process.env.PAYAX_TWILIO_URL || 'https://api.twilio.com/2010-04-01',
   },
