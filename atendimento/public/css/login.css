@@ -208,3 +208,5 @@
 @media (min-width: 981px) and (max-height: 660px) {
   .zoe-login .zoe-access:has(.zoe-empresa) .zoe-access-logo { display: none; }
 }
+/* A barra de rolagem clássica do Windows aparecia por 1 ou 2 px de arredondamento: no computador, o login nunca rola. */
+@media (min-width: 981px) and (min-height: 560px) { html:has(.zoe-login), body:has(.zoe-login) { overflow: hidden; } }
