@@ -70,48 +70,73 @@ for n in "${NOMES[@]}"; do
   else erro "$n aponta para $r, não para este servidor"; DNS_OK=0; fi
 done
 
-titulo "4. Instalação da ZOE"
-# Com o DNS pronto, instala no domínio. Sem ele, instala pelo IP: assim ninguém perde o acesso
-# enquanto o DNS propaga. Depois é só rodar este mesmo comando de novo.
-if [ "$DNS_OK" = 1 ]; then
-  MODO=(--dominio "$DOMINIO"); echo "  Modo: domínio ($DOMINIO)"
-else
-  [ -n "$IP_PUBLICO" ] || { erro "Não descobri o IP público do servidor. Rode de novo quando o DNS responder."; exit 1; }
-  MODO=(--ip "$IP_PUBLICO"); aviso "Modo: IP ($IP_PUBLICO), porque o DNS ainda não está pronto. Rode de novo depois."
-fi
-if ! bash "$AQUI/instalacao/instalar.sh" "${MODO[@]}" --email "$EMAIL"; then
-  erro "O instalador parou. As últimas linhas acima mostram o motivo. Nada do Opa foi alterado."
-  exit 1
-fi
-ok "ZOE instalada"
-
-titulo "5. Cadeado (certificado)"
+titulo "4. Cadeado (certificado), antes de trocar qualquer coisa"
+# O cadeado é pedido ANTES de mudar o site da ZOE: se não sair, nada do que está no ar é tocado.
+CERT_OK=0
+ARGS=(); for n in "${NOMES[@]}"; do ARGS+=(-d "$n"); done
 if [ "$CADEADO" = 0 ]; then
-  aviso "pulado (--sem-cadeado)"
+  aviso "pulado (--sem-cadeado): a ZOE continua pelo IP"
 elif [ "$DNS_OK" = 0 ]; then
-  aviso "o DNS ainda não está pronto: a ZOE ficou pelo IP (https://$IP_PUBLICO/atendimento/). Quando o DNS responder, rode de novo este comando."
+  aviso "o DNS ainda não está pronto: a ZOE continua pelo IP. Quando o DNS responder, rode de novo este comando."
 else
-  if ! command -v certbot >/dev/null; then apt-get install -y -qq certbot python3-certbot-nginx >/dev/null 2>&1; fi
-  ARGS=(); for n in "${NOMES[@]}"; do ARGS+=(-d "$n"); done
-  if certbot --nginx --non-interactive --agree-tos -m "$EMAIL" --redirect --expand "${ARGS[@]}"; then
-    ok "cadeado emitido para: ${NOMES[*]}"
+  command -v certbot >/dev/null || apt-get install -y -qq certbot python3-certbot-nginx >/dev/null 2>&1
+  if certbot certonly --nginx --non-interactive --agree-tos -m "$EMAIL" --cert-name zoe360 --expand "${ARGS[@]}"; then
+    CERT_OK=1; ok "cadeado emitido para: ${NOMES[*]}"
   else
-    erro "o certbot não conseguiu. Confira se a porta 80 está aberta para a internet (firewall do provedor) e rode de novo."
+    erro "o cadeado não saiu (quase sempre: a porta 80 está fechada para a internet no firewall do provedor do servidor)."
+    aviso "nada foi trocado: a ZOE continua pelo IP. Libere a porta 80 e rode de novo este comando."
   fi
 fi
 
+# Volta para o acesso pelo IP: usado sempre que algo falha depois daqui, para o servidor nunca ficar sem entrada.
+voltar_ip() {
+  [ -n "$IP_PUBLICO" ] || { erro "Sem o IP público não consigo voltar sozinho. Rode: sudo bash instalacao/instalar.sh --ip IP-DO-SERVIDOR --email $EMAIL"; return 1; }
+  # Site da ZOE ajustado pelo certbot não seria refeito pelo instalador: guarda uma cópia e libera.
+  if [ -f /etc/nginx/sites-available/zoe.conf ] && grep -q 'managed by Certbot' /etc/nginx/sites-available/zoe.conf; then
+    cp /etc/nginx/sites-available/zoe.conf "/etc/nginx/sites-available/zoe.conf.bak-$(date +%Y%m%d%H%M%S)"
+    rm -f /etc/nginx/sites-available/zoe.conf
+  fi
+  bash "$AQUI/instalacao/instalar.sh" --ip "$IP_PUBLICO" --email "$EMAIL" >/dev/null 2>&1 \
+    && ok "a ZOE voltou para o acesso pelo IP: https://$IP_PUBLICO/atendimento/" \
+    || erro "não consegui voltar sozinho para o IP. Rode: sudo bash instalacao/instalar.sh --ip $IP_PUBLICO --email $EMAIL"
+}
+
+titulo "5. Instalação da ZOE"
+if [ "$CERT_OK" = 1 ]; then
+  echo "  Modo: domínio ($DOMINIO), com cadeado"
+  if bash "$AQUI/instalacao/instalar.sh" --dominio "$DOMINIO" --email "$EMAIL" \
+     && certbot install --nginx --non-interactive --cert-name zoe360 --redirect >/dev/null 2>&1; then
+    ok "ZOE instalada no domínio, com cadeado"
+  else
+    erro "a instalação no domínio falhou"; voltar_ip; CERT_OK=0
+  fi
+else
+  [ -n "$IP_PUBLICO" ] || { erro "Não descobri o IP público do servidor."; exit 1; }
+  echo "  Modo: IP ($IP_PUBLICO)"
+  if bash "$AQUI/instalacao/instalar.sh" --ip "$IP_PUBLICO" --email "$EMAIL"; then ok "ZOE instalada pelo IP"
+  else erro "O instalador parou. As últimas linhas acima mostram o motivo. Nada do Opa foi alterado."; exit 1; fi
+fi
+
 titulo "6. Conferência"
-[ "$DNS_OK" = 1 ] || NOMES=()
-for n in "${NOMES[@]}"; do
-  c="$(curl --noproxy '*' -sk -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$n:443:127.0.0.1" "https://$n/atendimento/" || true)"
-  if [ "$c" = 200 ]; then ok "https://$n/atendimento/ responde (200)"; else aviso "https://$n/atendimento/ respondeu ${c:-nada} aqui dentro"; fi
-done
+FALHOU=0
+if [ "$CERT_OK" = 1 ]; then
+  for n in "${NOMES[@]}"; do
+    c="$(curl --noproxy '*' -sk -o /dev/null -w '%{http_code}' --max-time 10 --resolve "$n:443:127.0.0.1" "https://$n/atendimento/" || true)"
+    if [ "$c" = 200 ]; then ok "https://$n/atendimento/ responde (200)"; else erro "https://$n/atendimento/ respondeu ${c:-nada}"; FALHOU=1; fi
+  done
+  if [ "$FALHOU" = 1 ]; then aviso "algo não respondeu: voltando para o IP, por segurança"; voltar_ip; CERT_OK=0; fi
+fi
+if [ "$CERT_OK" = 0 ]; then
+  P="$(grep -oE 'listen [0-9]+ ssl' /etc/nginx/sites-available/zoe.conf 2>/dev/null | grep -oE '[0-9]+' | head -1)"; P="${P:-443}"
+  c="$(curl --noproxy '*' -sk -o /dev/null -w '%{http_code}' --max-time 10 "https://127.0.0.1:$P/atendimento/" || true)"
+  if [ "$c" = 200 ]; then ok "https://$IP_PUBLICO$([ "$P" = 443 ] || echo ":$P")/atendimento/ responde (200)"; else erro "a ZOE não respondeu pelo IP (código ${c:-nada})"; fi
+fi
 echo
-if [ "$DNS_OK" = 1 ]; then
-  echo "  Agora abra no navegador: https://$DOMINIO/atendimento/"
+if [ "$CERT_OK" = 1 ]; then
+  echo "  Abra no navegador: https://$DOMINIO/atendimento/"
   [ "${#NOMES[@]}" -gt 1 ] && echo "  E o endereço da empresa: https://${NOMES[1]}/atendimento/"
 else
-  echo "  Por enquanto, abra pelo IP: https://$IP_PUBLICO/atendimento/ (aviso de \"não seguro\": Avançado › Continuar)"
+  echo "  Abra no navegador: https://$IP_PUBLICO$([ "${P:-443}" = 443 ] || echo ":$P")/atendimento/  (com https://; aviso de \"não seguro\": Avançado › Continuar)"
 fi
 echo "  Se o e-mail do master ainda for SEU-EMAIL: sudo zoe-senha SEU-EMAIL --novo-email $EMAIL"
 echo
