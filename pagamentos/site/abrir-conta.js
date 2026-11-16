@@ -43,7 +43,10 @@
   const preencher = (prefixo, dados, campos) => {
     for (const c of campos) {
       const i = $(`${prefixo}.${c}`);
-      if (i && dados[c] && !i.value) i.value = i.dataset.mascara ? mascaras[i.dataset.mascara](so(dados[c])) : dados[c];
+      if (i && dados[c] && !i.value) {
+        i.value = i.dataset.mascara ? mascaras[i.dataset.mascara](so(dados[c])) : dados[c];
+        i.closest('.campo')?.classList.remove('invalido');
+      }
     }
   };
   const infoCnpj = form.querySelector('[data-cnpj-info]');
@@ -63,6 +66,13 @@
   }
   form.querySelector('[data-buscar-cnpj]').addEventListener('click', () => { ultimoCnpj = ''; buscarCnpj(); });
   $('empresa.cnpj').addEventListener('blur', buscarCnpj);
+  // Chave PIX do tipo CNPJ (a mais comum): já vem com o CNPJ da empresa.
+  $('empresa.cnpj').addEventListener('blur', () => {
+    if ($('destino.pix_tipo').value === 'cnpj' && !$('destino.pix_chave').value && $('empresa.cnpj').value) {
+      $('destino.pix_chave').value = $('empresa.cnpj').value;
+      $('destino.pix_chave').closest('.campo').classList.remove('invalido');
+    }
+  });
   $('empresa.cep').addEventListener('blur', async () => {
     const cep = so($('empresa.cep').value);
     if (cep.length !== 8) return;
@@ -82,16 +92,11 @@
   ['nome', 'email', 'telefone'].forEach((c) => $(`representante.${c}`).addEventListener('input', copiar));
 
   // ------------------------------------------------------------------ conta ou PIX
-  const formaAtual = () => form.querySelector('[name="destino.forma"]:checked').value;
-  const mostrarDestino = () => {
-    form.querySelectorAll('[data-destino]').forEach((b) => { b.hidden = b.dataset.destino !== formaAtual(); });
-  };
-  form.querySelectorAll('[name="destino.forma"]').forEach((r) => r.addEventListener('change', mostrarDestino));
   const banco = form.querySelector('[data-banco]');
   banco.addEventListener('change', () => { form.querySelector('[data-outro-banco]').hidden = banco.value !== 'outro'; });
   $('destino.pix_tipo').addEventListener('change', () => {
     const chave = $('destino.pix_chave');
-    if ($('destino.pix_tipo').value === 'cnpj' && !chave.value) chave.value = $('empresa.cnpj').value;
+    if ($('destino.pix_tipo').value === 'cnpj' && !chave.value) { chave.value = $('empresa.cnpj').value; chave.closest('.campo').classList.remove('invalido'); }
   });
 
   // ------------------------------------------------------------------ documentos
@@ -132,10 +137,9 @@
     form.querySelectorAll('.invalido').forEach((x) => x.classList.remove('invalido'));
     const visiveis = [...form.querySelectorAll('input[required], select[required]')].filter((i) => i.type !== 'file' && i.type !== 'checkbox' && !i.closest('[hidden]'));
     const obrig = [...visiveis];
-    if (formaAtual() === 'conta') {
-      obrig.push($('destino.banco'), $('destino.agencia'), $('destino.conta'), $('destino.conta_dv'));
-      if (banco.value === 'outro') obrig.push($('destino.banco_outro'), $('destino.ispb'));
-    } else obrig.push($('destino.pix_chave'));
+    // Conta bancária e chave PIX: as duas obrigatórias.
+    obrig.push($('destino.banco'), $('destino.agencia'), $('destino.conta'), $('destino.conta_dv'), $('destino.pix_chave'));
+    if (banco.value === 'outro') obrig.push($('destino.banco_outro'), $('destino.ispb'));
     const faltando = obrig.filter((i) => !String(i.value).trim());
     faltando.forEach((i) => i.closest('.campo')?.classList.add('invalido'));
     if (faltando.length) { faltando[0].focus(); return 'Preencha os campos marcados.'; }
@@ -157,7 +161,6 @@
     try {
       const docs = {};
       for (const [tipo, f] of Object.entries(documentos)) docs[tipo] = await lerArquivo(f);
-      const forma = formaAtual();
       const corpo = {
         site: valor('site'),
         aceite: true,
@@ -166,11 +169,10 @@
         representante: { nome: valor('representante.nome'), cpf: valor('representante.cpf'), cargo: valor('representante.cargo'),
           email: valor('representante.email'), telefone: valor('representante.telefone') },
         financeiro: { nome: valor('financeiro.nome'), email: valor('financeiro.email'), telefone: valor('financeiro.telefone') },
-        destino: forma === 'pix'
-          ? { forma, pix_tipo: valor('destino.pix_tipo'), pix_chave: valor('destino.pix_chave') }
-          : { forma, banco: banco.value === 'outro' ? valor('destino.banco_outro') : banco.value, ispb: banco.value === 'outro' ? valor('destino.ispb') : '',
-            tipo: valor('destino.tipo'), agencia: valor('destino.agencia'), agencia_dv: valor('destino.agencia_dv'),
-            conta: valor('destino.conta'), conta_dv: valor('destino.conta_dv') },
+        destino: { banco: banco.value === 'outro' ? valor('destino.banco_outro') : banco.value, ispb: banco.value === 'outro' ? valor('destino.ispb') : '',
+          tipo: valor('destino.tipo'), agencia: valor('destino.agencia'), agencia_dv: valor('destino.agencia_dv'),
+          conta: valor('destino.conta'), conta_dv: valor('destino.conta_dv'),
+          pix_tipo: valor('destino.pix_tipo'), pix_chave: valor('destino.pix_chave') },
         documentos: docs,
       };
       let r;

@@ -18,7 +18,7 @@ const pedido = (extra = {}) => ({
     telefone: '(11) 3333-4444', cep: '01001-000', endereco: 'Praça da Sé', numero: '100', bairro: 'Sé', cidade: 'São Paulo', uf: 'SP' },
   representante: { nome: 'Maria Sócia', cpf: CPF, cargo: 'Sócia-administradora', email: 'maria@exemplo.com.br', telefone: '11999998888' },
   financeiro: { nome: 'João Financeiro', email: 'financeiro@exemplo.com.br', telefone: '11988887777' },
-  destino: { forma: 'conta', banco: '237', agencia: '1234', conta: '56789', conta_dv: '0', tipo: 'corrente' },
+  destino: { banco: '237', agencia: '1234', conta: '56789', conta_dv: '0', tipo: 'corrente', pix_tipo: 'cnpj', pix_chave: '11.222.333/0001-81' },
   documentos: { contrato_social: { nome: 'contrato.pdf', conteudo: PDF } },
   ...extra,
 });
@@ -58,15 +58,23 @@ test('abertura de conta pelo site', async (t) => {
   });
 
   await t.test('validações: aceite, contrato social, arquivo de verdade, conta da própria empresa, robô', async () => {
-    const outro = (x) => pedido({ empresa: { ...pedido().empresa, cnpj: CNPJ.beta }, ...x });
+    const outro = (x) => pedido({ empresa: { ...pedido().empresa, cnpj: CNPJ.beta }, destino: { ...pedido().destino, pix_chave: CNPJ.beta }, ...x });
     assert.equal((await api.post('/api/publico/abertura', outro({ aceite: false }))).status, 422);
     assert.equal((await api.post('/api/publico/abertura', outro({ documentos: {} }))).status, 422);
     const falso = `data:application/pdf;base64,${Buffer.from('MZ isto não é PDF').toString('base64')}`;
     const r1 = await api.post('/api/publico/abertura', outro({ documentos: { contrato_social: { nome: 'x.pdf', conteudo: falso } } }));
     assert.equal(r1.status, 422);
     assert.match(r1.dados.erro, /não é um PDF válido/);
-    const r2 = await api.post('/api/publico/abertura', outro({ destino: { forma: 'pix', pix_tipo: 'cpf', pix_chave: CPF } }));
-    assert.equal(r2.status, 422);
+    const r2 = await api.post('/api/publico/abertura', outro({ destino: { ...pedido().destino, pix_tipo: 'cpf', pix_chave: CPF } }));
+    assert.equal(r2.status, 422, 'chave PIX de CPF (pessoa física) não');
+    const pixDeOutro = await api.post('/api/publico/abertura', outro({ destino: { ...pedido().destino, pix_chave: CNPJ.alfa } }));
+    assert.match(pixDeOutro.dados.erro, /CNPJ do próprio cliente/, 'chave de CNPJ de outra empresa não');
+    const semPix = await api.post('/api/publico/abertura', outro({ destino: { ...pedido().destino, pix_chave: '' } }));
+    assert.equal(semPix.status, 422);
+    assert.match(semPix.dados.erro, /chave PIX/);
+    const semConta = await api.post('/api/publico/abertura', outro({ destino: { pix_tipo: 'cnpj', pix_chave: CNPJ.beta } }));
+    assert.equal(semConta.status, 422);
+    assert.match(semConta.dados.erro, /conta bancária/);
     assert.equal((await api.post('/api/publico/abertura', outro({ site: 'http://spam' }))).status, 400);
     const r3 = await api.post('/api/publico/abertura', outro({ representante: { ...pedido().representante, cpf: '12345678900' } }));
     assert.equal(r3.status, 422);
@@ -102,6 +110,8 @@ test('abertura de conta pelo site', async (t) => {
     assert.equal(c.cnpj, '11222333000181');
     assert.equal(c.destino_banco, '237');
     assert.equal(c.destino_documento, '11222333000181');
+    assert.equal(c.pix_chave, '11222333000181');
+    assert.equal(c.pix_tipo, 'cnpj');
     assert.ok(c.conta_interna, 'recebe o código do cliente');
     assert.equal(JSON.parse(c.kyc_representantes)[0].documento, CPF);
     assert.equal(r.dados.acesso.email, 'financeiro@exemplo.com.br');
@@ -118,7 +128,7 @@ test('abertura de conta pelo site', async (t) => {
   await t.test('recusa com motivo e, depois do prazo, documentos apagados e dados anonimizados', async () => {
     const r = await api.post('/api/publico/abertura', pedido({ empresa: { ...pedido().empresa, cnpj: CNPJ.beta, razao_social: 'Beta Ltda' },
       financeiro: { nome: 'Ana', email: 'ana@beta.com.br', telefone: '11977776666' },
-      destino: { forma: 'pix', pix_tipo: 'cnpj', pix_chave: CNPJ.beta } }));
+      destino: { ...pedido().destino, pix_chave: CNPJ.beta } }));
     assert.equal(r.status, 201, JSON.stringify(r.dados));
     const idB = Number(r.dados.protocolo.slice(3));
     assert.equal((await api.post(`/api/aberturas/${idB}/recusar`, {}, tk.financeiro)).status, 422, 'motivo obrigatório');

@@ -56,3 +56,4 @@
 @media(max-width:760px){.abertura{padding:24px 0 40px}.ficha{padding:20px 16px;border-radius:16px}.linha{grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
   .c-2,.c-3{grid-column:span 3}.c-4,.c-5,.c-6,.c-7,.c-8{grid-column:span 6}.campo input,.campo select{font-size:16px}.enviar{width:100%;min-width:0}.voltar{font-size:13px}}
 @media(max-width:400px){.voltar{font-size:12px}.voltar strong{display:block}}
+.subtitulo{margin:4px 0 10px;font-size:14px;font-weight:700;color:#04505d}[data-destino="conta"]{margin-bottom:10px}

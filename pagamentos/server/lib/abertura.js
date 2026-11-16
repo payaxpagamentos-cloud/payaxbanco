@@ -72,14 +72,15 @@ function validar(b, validarCadastro) {
   const cadastro = {
     razao_social: e.razao_social, cnpj: e.cnpj, nome_fantasia: e.nome_fantasia, email: e.email, telefone: e.telefone,
     cep: e.cep, endereco: e.endereco, numero: e.numero, complemento: e.complemento, bairro: e.bairro, cidade: e.cidade, uf: e.uf,
-    ...(destino.forma === 'pix'
-      ? { pix_chave: destino.pix_chave, pix_tipo: destino.pix_tipo || undefined }
-      : { destino_banco: destino.banco, destino_ispb: destino.ispb || undefined, destino_agencia: destino.agencia,
-        destino_agencia_dv: destino.agencia_dv, destino_conta: destino.conta, destino_conta_dv: destino.conta_dv,
-        destino_tipo: destino.tipo, destino_titular: e.razao_social }),
+    // Conta bancária E chave PIX, as duas da própria empresa (mesmo CNPJ): as duas são obrigatórias.
+    destino_banco: destino.banco, destino_ispb: destino.ispb || undefined, destino_agencia: destino.agencia,
+    destino_agencia_dv: destino.agencia_dv, destino_conta: destino.conta, destino_conta_dv: destino.conta_dv,
+    destino_tipo: destino.tipo, destino_titular: e.razao_social,
+    pix_chave: destino.pix_chave, pix_tipo: destino.pix_tipo || undefined,
   };
   if (!e.email) throw new ErroNegocio('Informe o e-mail da empresa.', 422);
-  if (!['pix', 'conta'].includes(destino.forma)) throw new ErroNegocio('Informe onde a empresa quer receber os valores: conta ou chave PIX.', 422);
+  if (!destino.banco || !destino.agencia || !destino.conta) throw new ErroNegocio('Informe a conta bancária da empresa (banco, agência e conta).', 422);
+  if (!String(destino.pix_chave ?? '').trim()) throw new ErroNegocio('Informe a chave PIX da empresa.', 422);
   const empresa = validarCadastro(cadastro);
   const representante = pessoaDe(b.representante, 'responsável legal da empresa', { cpf: true });
   if (so(representante.cpf).length !== 11) throw new ErroNegocio('O responsável legal precisa ser pessoa física (CPF).', 422);

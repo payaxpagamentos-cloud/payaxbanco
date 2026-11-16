@@ -46,22 +46,14 @@ export default async function aberturas({ alvo, params, query, recarregar }) {
 }
 
 function destinoDe(e) {
-  if (e.destino_banco) {
-    const ag = [e.destino_agencia, e.destino_agencia_dv].filter(Boolean).join('-');
-    const conta = [e.destino_conta, e.destino_conta_dv].filter(Boolean).join('-');
-    return [
-      par('Forma', 'Conta bancária'),
-      par('Banco', `${e.destino_banco} · ISPB ${e.destino_ispb}`),
-      par('Agência e conta', `${ag} / ${conta}`),
-      par('Tipo', TIPO_CONTA[e.destino_tipo] ?? e.destino_tipo),
-      par('Titular', `${e.destino_titular} · ${documento(e.destino_documento)}`),
-    ];
-  }
+  const ag = [e.destino_agencia, e.destino_agencia_dv].filter(Boolean).join('-');
+  const conta = [e.destino_conta, e.destino_conta_dv].filter(Boolean).join('-');
   return [
-    par('Forma', 'Chave PIX'),
-    par('Tipo de chave', TIPO_PIX[e.pix_tipo] ?? e.pix_tipo),
-    par('Chave', el('span', { class: 'codigo' }, e.pix_chave)),
-    par('Titular informado', `${e.razao_social} · ${documento(e.cnpj)}`),
+    e.destino_banco ? par('Banco', `${e.destino_banco} · ISPB ${e.destino_ispb}`) : par('Conta bancária', 'não informada'),
+    e.destino_banco ? par('Agência e conta', `${ag} / ${conta} · ${TIPO_CONTA[e.destino_tipo] ?? e.destino_tipo}`) : null,
+    e.destino_banco ? par('Titular da conta', `${e.destino_titular} · ${documento(e.destino_documento)}`) : null,
+    par('Chave PIX', e.pix_chave ? el('span', { class: 'codigo' }, e.pix_chave) : 'não informada'),
+    e.pix_chave ? par('Tipo de chave', TIPO_PIX[e.pix_tipo] ?? e.pix_tipo) : null,
   ];
 }
 

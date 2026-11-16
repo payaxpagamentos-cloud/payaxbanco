@@ -32,7 +32,7 @@
           <li><strong>A PAY AX analisa</strong> o cadastro, como a lei exige de quem recebe por terceiros.</li>
           <li><strong>Conta aprovada:</strong> o responsável financeiro recebe o acesso à Área do Cliente.</li>
         </ol>
-        <p class="lado__nota">Tenha em mãos: CNPJ, contrato social (PDF ou foto), CPF do responsável legal e os dados da conta ou chave PIX da empresa.</p>
+        <p class="lado__nota">Tenha em mãos: CNPJ, contrato social (PDF ou foto), CPF do responsável legal, os dados da conta bancária e a chave PIX da empresa.</p>
       </aside>
 
       <form class="ficha" data-abertura novalidate>
@@ -90,11 +90,8 @@
 
         <fieldset class="bloco">
           <legend><span class="num">4</span> Onde receber os valores</legend>
-          <p class="dica">O valor dos boletos pagos vai para uma conta <strong>da própria empresa</strong> (mesmo CNPJ). Conta de sócio ou de terceiros não é aceita.</p>
-          <div class="opcoes" role="radiogroup" aria-label="Forma de recebimento">
-            <label class="opcao"><input type="radio" name="destino.forma" value="conta" checked><span>Conta bancária</span></label>
-            <label class="opcao"><input type="radio" name="destino.forma" value="pix"><span>Chave PIX</span></label>
-          </div>
+          <p class="dica">Conta bancária e chave PIX <strong>da própria empresa</strong> (mesmo CNPJ), as duas obrigatórias. Conta ou chave de sócio ou de terceiros não é aceita.</p>
+          <h3 class="subtitulo">Conta bancária</h3>
           <div data-destino="conta">
             <div class="linha">
               <label class="campo c-5">Banco *<select name="destino.banco" data-banco>
@@ -117,7 +114,8 @@
               <label class="campo c-2">Dígito *<input name="destino.conta_dv" maxlength="2"></label>
             </div>
           </div>
-          <div data-destino="pix" hidden>
+          <h3 class="subtitulo">Chave PIX</h3>
+          <div data-destino="pix">
             <div class="linha">
               <label class="campo c-4">Tipo de chave *<select name="destino.pix_tipo"><option value="cnpj">CNPJ da empresa</option><option value="email">E-mail</option><option value="telefone">Celular</option><option value="aleatoria">Chave aleatória</option></select></label>
               <label class="campo c-8">Chave PIX *<input name="destino.pix_chave" maxlength="77" autocapitalize="none"></label>
