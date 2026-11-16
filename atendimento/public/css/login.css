@@ -210,3 +210,24 @@
 }
 /* A barra de rolagem clássica do Windows aparecia por 1 ou 2 px de arredondamento: no computador, o login nunca rola. */
 @media (min-width: 981px) and (min-height: 560px) { html:has(.zoe-login), body:has(.zoe-login) { overflow: hidden; } }
+/* Mais compacto no computador (pedido: "está enorme"): cartão mais estreito e tudo ~15% menor. */
+@media (min-width: 981px) {
+  .zoe-login .zoe-layout { grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); }
+  .zoe-login .zoe-brand img { width: clamp(46px, 6.8vh, 68px); height: clamp(46px, 6.8vh, 68px); }
+  .zoe-login .zoe-wordmark strong { font-size: clamp(26px, 3.8vh, 38px); }
+  .zoe-login .zoe-wordmark small { font-size: 11px; }
+  .zoe-login .zoe-headline { font-size: clamp(30px, min(3.4vw, 5.6vh), 56px); }
+  .zoe-login .zoe-tagline { font-size: clamp(14px, min(1.25vw, 2.1vh), 20px); }
+  .zoe-login .zoe-access { padding: clamp(18px, 3vh, 36px) clamp(24px, 2.4vw, 38px); border-radius: clamp(22px, 3vh, 32px); }
+  .zoe-login .zoe-access-logo { width: clamp(38px, 5.6vh, 58px); height: clamp(38px, 5.6vh, 58px); }
+  .zoe-login .zoe-access h2 { font-size: clamp(22px, 3.3vh, 34px); }
+  .zoe-login .zoe-access-intro { font-size: clamp(13px, 1.6vh, 15px); }
+  .zoe-login .zoe-field label, .zoe-login .zoe-remember, .zoe-login .zoe-help button { font-size: clamp(13px, 1.55vh, 15px); }
+  .zoe-login .zoe-field input { height: clamp(40px, 4.8vh, 48px); font-size: 15px; border-radius: 10px; }
+  .zoe-login .zoe-remember input { width: 20px; height: 20px; flex-basis: 20px; border-radius: 6px; }
+  .zoe-login .zoe-submit { min-height: clamp(42px, 5.2vh, 52px); font-size: clamp(15px, 1.9vh, 18px); border-radius: 12px; }
+  .zoe-login .zoe-submit svg { width: 19px; height: 19px; }
+  .zoe-login .zoe-eye svg { width: 19px; height: 19px; }
+  .zoe-login .zoe-page-footer { font-size: clamp(11px, 1.4vh, 13px); }
+  .zoe-login .zoe-footer-brand strong { font-size: clamp(12px, 1.5vh, 14px); }
+}
