@@ -17,6 +17,8 @@
 #   ./implantacao/instalar.sh ... --sem-copia-externa   (só testes: sem cópia fora do servidor; ligar depois
 #                                                        rodando de novo com --bucket/--endpoint, sem reinstalar)
 #   ./implantacao/instalar.sh ... --site payax.com.br   (site público com o acesso da Área do Cliente, e o www)
+#   ./implantacao/instalar.sh ... --banco-modo cnab   (como os boletos vão ao banco: cnab = arquivo de remessa/retorno,
+#                                                    bradesco = API do Bradesco, simulador = testes; fica gravado)
 #   ./implantacao/instalar.sh ... --acesso acesso.payax.com.br   (página em que o cliente ativa o acesso e cria a
 #                                                    senha; com --site e sem --acesso, usa acesso.<site>)
 #   ./implantacao/instalar.sh ... --hestia auto    (servidor que já tem HestiaCP: publica como domínio do Hestia,
@@ -39,7 +41,7 @@ ETC=/etc/payax
 USUARIO=payax
 PORTA=3600
 
-ACESSO="" SITE="" SEM_COPIA=0 REGIAO_INFORMADA=0 HESTIA_USUARIO="" ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
+BANCO_MODO="" ACESSO="" SITE="" SEM_COPIA=0 REGIAO_INFORMADA=0 HESTIA_USUARIO="" ENDPOINT="" DOMINIO="" BUCKET="" EMAIL_ADMIN="" RESERVA=0 SOMENTE_GERAR="" ANTERIOR_DESLIGADO=0 AWS_BIN=/snap/bin/aws
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dominio) DOMINIO="$2"; shift 2 ;;
@@ -56,6 +58,7 @@ while [[ $# -gt 0 ]]; do
     --sem-copia-externa) SEM_COPIA=1; shift ;;
     --site) SITE="$2"; shift 2 ;;
     --acesso) ACESSO="$2"; shift 2 ;;
+    --banco-modo) BANCO_MODO="$2"; shift 2 ;;
     -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
     *) echo "Opção desconhecida: $1" >&2; exit 2 ;;
   esac
@@ -67,6 +70,7 @@ done
 # Página de ativação do acesso: com o site, por padrão acesso.<site>. "--acesso nenhum" desliga.
 [[ -z "$ACESSO" && -n "$SITE" ]] && ACESSO="acesso.$SITE"
 [[ "$ACESSO" == nenhum ]] && ACESSO=""
+[[ -z "$BANCO_MODO" || "$BANCO_MODO" =~ ^(cnab|bradesco|simulador)$ ]] || { echo "Modo do banco inválido: $BANCO_MODO (use cnab, bradesco ou simulador)" >&2; exit 2; }
 [[ -z "$ACESSO" || "$ACESSO" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || { echo "Domínio da ativação inválido: $ACESSO" >&2; exit 2; }
 [[ "$BUCKET" =~ ^[a-z0-9.-]{3,63}$ ]] || { echo "Nome de bucket inválido: $BUCKET" >&2; exit 2; }
 
@@ -422,6 +426,11 @@ if [[ $RESERVA -eq 1 ]]; then sed -i 's/^PAYAX_ROTINAS=.*/PAYAX_ROTINAS=0/' "$ET
 # Site público: os domínios dele mostram o site e a Área do Cliente (o Backoffice não aparece neles).
 sed -i '/^PAYAX_SITE_HOSTS=/d' "$ETC/pagamentos.env.tmp"
 [[ -n "$SITE" ]] && echo "PAYAX_SITE_HOSTS=$SITE,www.$SITE" >> "$ETC/pagamentos.env.tmp"
+# Modo do banco: só muda quando informado (--banco-modo); sem a opção, mantém o que já estava.
+if [[ -n "$BANCO_MODO" ]]; then
+  sed -i '/^PAYAX_BANCO_MODO=/d' "$ETC/pagamentos.env.tmp"
+  echo "PAYAX_BANCO_MODO=$BANCO_MODO" >> "$ETC/pagamentos.env.tmp"
+fi
 # Página de ativação do acesso (acesso.payax.com.br): só ela nesse endereço.
 sed -i '/^PAYAX_ACESSO_HOSTS=/d' "$ETC/pagamentos.env.tmp"
 [[ -n "$ACESSO" ]] && echo "PAYAX_ACESSO_HOSTS=$ACESSO" >> "$ETC/pagamentos.env.tmp"
@@ -633,6 +642,7 @@ passo "Pronto"
 echo "Endereço: https://$DOMINIO/   (Área do Cliente: https://$DOMINIO/cliente/)"
 [[ -n "$SITE" ]] && echo "Site:     https://$SITE/   (com o acesso da Área do Cliente)"
 [[ -n "$ACESSO" ]] && echo "Ativação: https://$ACESSO/   (o cliente cria a senha pelo link que a equipe envia)"
+echo "Banco:    modo $(grep -E '^PAYAX_BANCO_MODO=' "$ETC/pagamentos.env" | cut -d= -f2 || true)$(grep -qE '^PAYAX_BANCO_MODO=' "$ETC/pagamentos.env" || echo 'API do Bradesco (padrão)')"
 echo "Saúde:    https://$DOMINIO/api/saude"
 if [[ $NOVO -eq 1 ]]; then
   echo "Administrador: $EMAIL_ADMIN"
