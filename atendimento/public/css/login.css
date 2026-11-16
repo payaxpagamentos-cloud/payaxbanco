@@ -159,3 +159,8 @@
 .zoe-login .zoe-wordmark strong { white-space: nowrap; }
 .zoe-login .zoe-360 { margin-left: .14em; letter-spacing: .06em; font-weight: 500; color: #b8bdff;
   background: linear-gradient(95deg, #a9cfff, #bba3f6 92%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+/* Título "Sua operação. Em outro nível." um pouco menor (pedido: ~15% abaixo do desenho original). */
+.zoe-login .zoe-headline { font-size: clamp(40px, 4vw, 66px); }
+@media (max-width: 1200px) and (min-width: 981px) { .zoe-login .zoe-headline { font-size: clamp(38px, 3.9vw, 50px); } }
+@media (max-width: 980px) { .zoe-login .zoe-headline { font-size: clamp(32px, 6.4vw, 47px); } }
+@media (max-width: 480px) { .zoe-login .zoe-headline { font-size: clamp(28px, 7.3vw, 34px); } }
