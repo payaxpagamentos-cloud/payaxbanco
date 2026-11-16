@@ -116,11 +116,7 @@
     dialog.close();
     action('contact');
   });
-  dialog.addEventListener('click', event => {
-    if (event.target !== dialog) return;
-    const box = dialog.getBoundingClientRect();
-    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close();
-  });
+  // Clique fora da janela não fecha: só o X ou o botão Fechar (como no restante do sistema).
 
   const video = document.querySelector('[data-globe-video]');
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');

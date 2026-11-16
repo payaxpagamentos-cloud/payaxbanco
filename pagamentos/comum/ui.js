@@ -261,10 +261,20 @@ export function campo({ nome, rotulo, tipo = 'text', valor = '', opcoes = null, 
 export const lerForm = (form) => Object.fromEntries(new FormData(form).entries());
 
 // ---------------------------------------------------------------- Modal, confirmação e aviso
+/**
+ * Janela por cima da tela. Só fecha pelo X ou pelos botões dela (Cancelar, Salvar...): clique fora não fecha,
+ * para ninguém perder um cadastro ou um boleto pela metade — a janela só pisca, mostrando onde está.
+ * O Esc fecha apenas janelas sem campos de preenchimento (avisos, detalhes).
+ */
 export function modal({ titulo, corpo, acoes = [], largo = false, aoFechar = null }) {
-  const fundo = el('div', { class: 'modal-fundo', onclick: (e) => { if (e.target === fundo) fechar(); } });
+  const fundo = el('div', { class: 'modal-fundo', onclick: (e) => { if (e.target === fundo) avisarFora(); } });
   const fechar = () => { fundo.remove(); document.removeEventListener('keydown', esc); aoFechar?.(); };
-  const esc = (e) => { if (e.key === 'Escape') fechar(); };
+  const temCampos = () => Boolean(caixa.querySelector('input:not([type=hidden]), select, textarea'));
+  const avisarFora = () => { caixa.classList.remove('pisca'); void caixa.offsetWidth; caixa.classList.add('pisca'); };
+  const esc = (e) => {
+    if (e.key !== 'Escape' || fundo !== document.querySelector('.modal-fundo:last-of-type')) return;
+    if (temCampos()) avisarFora(); else fechar();
+  };
   document.addEventListener('keydown', esc);
   const caixa = el('div', { class: `modal${largo ? ' largo' : ''}`, role: 'dialog', 'aria-modal': 'true', 'aria-label': titulo },
     el('header', {}, el('h2', {}, titulo), el('button', { class: 'botao-icone', 'aria-label': 'Fechar', onclick: fechar }, icone('fechar'))),
