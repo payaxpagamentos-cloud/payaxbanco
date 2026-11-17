@@ -13,7 +13,7 @@ import {
 } from './comum.js';
 import {telaCaixa} from './caixa.js';
 import { telaAoVivo } from './aovivo.js';
-import {telaIa} from './ia.js';
+import {telaIa, provedorIxc} from './ia.js';
 import {telaOuvidoria} from './ouvidoria.js';
 import {telaCustos} from './custos.js';
 
@@ -449,6 +449,21 @@ async function configuracoes(ctx) {
 // ---------- Integrações ----------
 
 async function integracoes(ctx) {
+  // Duas abas: o IXC (o sistema do provedor que a ZOE consulta) e as chaves de API (outros sistemas falando com a ZOE).
+  const abas = el('div', { class: 'abas' });
+  const corpo = el('div');
+  const ABAS = { ixc: ['Provedor (IXC)', (alvo) => provedorIxc(ctx, alvo)], chaves: ['Chaves de API', (alvo) => chavesApi(ctx, alvo)] };
+  const trocar = async (k) => {
+    ctx.acoes?.();
+    limpar(abas, Object.entries(ABAS).map(([chave, [rotulo]]) => el('button', { class: `aba${chave === k ? ' on' : ''}`, type: 'button', onclick: () => trocar(chave) }, rotulo)));
+    limpar(corpo, el('p', { class: 'mudo' }, 'Carregando…'));
+    try { await ABAS[k][1](corpo); } catch (err) { limpar(corpo, el('p', { class: 'mudo' }, err.message)); }
+  };
+  limpar(ctx.conteudo, abas, corpo);
+  await trocar('ixc');
+}
+
+async function chavesApi(ctx, alvo) {
   const conteudo = el('div');
   const recarregar = async () => {
     const d = await api.get(`/empresas/${ctx.empresaId}/chaves`);
@@ -487,7 +502,7 @@ async function integracoes(ctx) {
     await recarregar();
   };
 
-  limpar(ctx.conteudo, conteudo);
+  limpar(alvo, conteudo);
   await recarregar();
 }
 

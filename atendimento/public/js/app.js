@@ -82,7 +82,7 @@ const SUBTITULOS = {
   equipe: 'Quem atende, com qual perfil e quantas conversas ao mesmo tempo',
   relatorios: 'Quanto a ZOE resolve e onde a equipe é necessária',
   configuracoes: 'Número de WhatsApp, respostas rápidas e etiquetas',
-  integracoes: 'Chaves de API para o seu sistema conversar com a plataforma',
+  integracoes: 'O IXC do provedor e as chaves de API dos seus sistemas',
   empresas: 'Empresas clientes da plataforma',
   usuarios: 'Quem acessa a plataforma e com qual perfil',
   seguranca: 'Acessos recusados, IPs bloqueados e o registro de atividades',

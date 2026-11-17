@@ -135,7 +135,7 @@ journalctl -u zoe -n 80 --no-pager
 | 4 | Teste | mande "oi" de um celular para o número | a ZOE responde |
 | 5 | Transferência | peça "quero falar com um atendente" duas vezes | a conversa chega na fila |
 | 6 | Custo | **Centro de Custo** | a conversa entra sem custo (dentro da janela de 24 h) |
-| 7 | IXC | **ZOE › Provedor (IXC)**: endereço e token | o botão de teste mostra o que está liberado |
+| 7 | IXC | **Integrações › Provedor (IXC)**: endereço e token | o botão de teste mostra o que está liberado |
 | 8 | Equipe | **Usuários**: cada pessoa com permissões e **ramal** | todos conseguem entrar |
 | 9 | Fatura da Meta | separe as linhas de outubro (o PDF ou o extrato do Gerenciador de Negócios) | analisamos juntos os US$ 655 |
 

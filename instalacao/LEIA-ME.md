@@ -82,7 +82,7 @@ Valide nesta ordem:
    - em seguida peça "quero falar com um atendente" duas vezes e veja a conversa chegar na fila;
    - confira em *Centro de Custo* que a conversa entrou **sem custo** (resposta dentro da janela de 24 h).
 5. **Dólar do dia**: em *Centro de Custo › Orçamento e fechamento*, a moeda em dólar mostra a PTAX do Banco Central.
-6. **IXC**: em *ZOE › Provedor (IXC)*, cadastre o endereço e o token (de preferência um usuário só de leitura,
+6. **IXC**: em *Integrações › Provedor (IXC)*, cadastre o endereço e o token (de preferência um usuário só de leitura,
    mais as permissões de segunda via e desbloqueio, se for usar). O botão de teste mostra o que está liberado.
 7. **Usuários e ramais**: em *Usuários*, cadastre a equipe, as permissões e o **ramal** de cada atendente.
 

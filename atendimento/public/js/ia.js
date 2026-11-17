@@ -26,7 +26,6 @@ export async function telaIa(ctx) {
     ferramentas: ['Ferramentas', ferramentas],
     alertas: ['Alertas de rede', alertasDeRede],
     configuracao: ['Como ela atende', configuracao],
-    ixc: ['Provedor (IXC)', provedorIxc],
     teste: ['Testar', teste],
   };
   let atual = 'desempenho';
@@ -505,7 +504,7 @@ async function configuracao(ctx, alvo) {
  * A integração que transforma a atendente num atendente de provedor de verdade: ela consulta o IXC
  * na hora. A sonda testa cada capacidade NESTA instância e a atendente só recebe o que funciona lá.
  */
-async function provedorIxc(ctx, alvo) {
+export async function provedorIxc(ctx, alvo) {
   const filas = (await api.get(`/empresas/${ctx.empresaId}/filas`)).itens;
   const conteudo = el('div');
 
@@ -550,7 +549,7 @@ async function provedorIxc(ctx, alvo) {
 
       el('div', { class: 'barra-salvar' }, el('button', { class: 'btn primario' }, 'Salvar')));
 
-    soLeitura(f, !ctx.pode('zoe.editar'));
+    soLeitura(f, !ctx.pode('integracoes.editar'));
     f.addEventListener('submit', (e) => {
       e.preventDefault();
       acao(f.querySelector('.btn.primario'), async () => {
@@ -581,7 +580,7 @@ async function provedorIxc(ctx, alvo) {
         el('strong', { class: 'pequeno' }, 'Ferramentas que a ZOE tem hoje: '),
         el('div', { class: 'perguntas', style: 'margin-top:6px' }, c.ferramentas.map((n) => el('span', { class: 'etiqueta ok' }, n))))
       : null,
-    ctx.pode('zoe.editar') ? el('div', { style: 'margin-top:12px' }, botao('Testar agora', 'primario', sondar)) : null);
+    ctx.pode('integracoes.editar') ? el('div', { style: 'margin-top:12px' }, botao('Testar agora', 'primario', sondar)) : null);
 
   const sondar = async () => {
     const r = await api.post(`/empresas/${ctx.empresaId}/ixc/sonda`, {});
