@@ -45,7 +45,7 @@ module.exports = function rotasIxc(db) {
       const atual = ler(req.empresa.id) ?? {};
       const d = req.body ?? {};
       const bool = (k, padrao) => (d[k] === undefined ? (atual[k] ?? padrao) : (v.booleano(d[k]) ? 1 : 0));
-      const url = d.url === undefined ? atual.url : (d.url ? v.endereco(d.url, 'o endereço do IXC').replace(/\/webservice\/v1\/?$/i, '').replace(/\/+$/, '') : null);
+      const url = d.url === undefined ? atual.url : (d.url ? v.endereco(d.url, 'o endereço do IXC').replace(/\/(adm\.php|app\b|webservice\/v1)(\/.*|\?.*|#.*)?$/i, '').replace(/\/+$/, '') : null);
       const token = d.token ? cifrar(v.texto(d.token, 'o token do IXC', 300), 'ixc') : (atual.token_cifrado ?? null);
 
       // O token do IXC é "id:hash": confere o formato antes de guardar, para o erro aparecer aqui e não no atendimento.

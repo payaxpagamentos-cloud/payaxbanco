@@ -107,7 +107,7 @@ const soData = (v) => String(v ?? '').slice(0, 10);
 function criarIxc({ url, token, timeoutMs = 8000, cacheMs = 60_000, recursos = {} } = {}) {
   if (!url || !token) throw new ErroIxc('IXC sem endereço ou token configurado.');
   const R = { ...RECURSOS, ...Object.fromEntries(Object.entries(recursos ?? {}).filter(([, v]) => v)) };
-  const base = `${String(url).replace(/\/+$/, '').replace(/\/webservice\/v1$/i, '')}/webservice/v1`;
+  const base = `${String(url).replace(/\/(adm\.php|app\b|webservice\/v1)(\/.*|\?.*|#.*)?$/i, '').replace(/\/+$/, '')}/webservice/v1`;
   const autorizacao = `Basic ${Buffer.from(String(token)).toString('base64')}`;
   const cache = new Map();
 
