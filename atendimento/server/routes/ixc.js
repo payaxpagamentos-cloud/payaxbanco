@@ -85,7 +85,7 @@ module.exports = function rotasIxc(db) {
       db.prepare(`INSERT INTO ixc_config (empresa_id, ${colunas.join(', ')}, atualizado_em)
         VALUES (?, ${colunas.map(() => '?').join(', ')}, ?)
         ON CONFLICT(empresa_id) DO UPDATE SET ${colunas.map((k) => `${k} = excluded.${k}`).join(', ')}, atualizado_em = excluded.atualizado_em`)
-        .run(req.empresa.id, ...colunas.map((k) => campos[k]), agora());
+        .run(req.empresa.id, ...colunas.map((k) => campos[k] ?? null), agora()); // primeira gravação: o que não veio fica nulo
 
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'alterou a integração com o IXC', alvo: campos.url, ip: req.ip });
       res.json(publica(ler(req.empresa.id), req.empresa.id));
