@@ -1,0 +1,63 @@
+ZOE 360 — COMO ATUALIZAR O SERVIDOR
+====================================
+
+Antes de começar: baixe o arquivo zoe-instalacao.zip que foi enviado (ele vai para a pasta Downloads).
+Não precisa apagar os downloads antigos: o comando abaixo pega sozinho o mais recente.
+
+
+PASSO 1 — No seu computador (PowerShell)
+-----------------------------------------
+Copie e cole as duas linhas, uma de cada vez:
+
+$f = Get-ChildItem $HOME\Downloads\zoe-instalacao*.zip | Sort-Object LastWriteTime -Descending | Select-Object -First 1; $f.Name; scp $f.FullName root@200.141.31.37:/root/zoe-instalacao.zip
+
+ssh root@200.141.31.37
+
+Digite a senha do servidor (não aparece nada enquanto digita, é normal).
+Você está dentro do servidor quando aparecer:  root@escritorio:~#
+
+
+PASSO 2 — Dentro do servidor
+----------------------------
+ATENÇÃO: só cole depois de aparecer root@escritorio. No PowerShell do computador NÃO funciona.
+
+Se é a PRIMEIRA vez com este pacote (troque SEU-EMAIL pelo e-mail que você usa no login do master):
+
+cd /root && rm -rf zoe && unzip -oq zoe-instalacao.zip && cd zoe && head -1 VERSAO && sudo bash instalacao/ativar.sh --email SEU-EMAIL --dominio app.zoe360.com.br --empresas connectlink
+
+Das PRÓXIMAS vezes (o servidor já guardou e-mail, domínio e empresa):
+
+cd /root && rm -rf zoe && unzip -oq zoe-instalacao.zip && cd zoe && head -1 VERSAO && sudo bash instalacao/ativar.sh
+
+Logo depois do unzip aparece a versão (o código que eu te passar). Se for outro, o arquivo enviado foi o antigo.
+No final, não pode ter nenhum ✘ vermelho.
+
+
+PASSO 3 — Conferir (ainda no servidor)
+--------------------------------------
+Chave da IA (tem que aparecer 1):
+
+grep -c "^ATEND_IA_CHAVE=." /zoe/atendimento/.env
+
+Se aparecer 0, a chave da IA não está no servidor — me avise.
+
+
+PASSO 4 — No navegador
+----------------------
+Abra  https://app.zoe360.com.br/atendimento/  e aperte Ctrl+F5.
+
+
+PASSO 5 — Testar a ZOE
+----------------------
+ZOE › Testar › desmarque "Continuar a mesma conversa" › mande:  preciso do boleto para pagar
+Ela deve se apresentar ("Aqui é a ZOE, da ...") e pedir o CPF do titular.
+Responda com o CPF de um cliente real: ela confirma, consulta o IXC e manda a 2ª via.
+Nada do Testar vai para o WhatsApp de ninguém.
+
+
+SE ALGO DER ERRADO
+------------------
+- Apareceu a versão antiga: o Windows salvou o arquivo com outro nome; o comando do passo 1 já resolve isso.
+- "O termo 'read' (ou 'cd') não é reconhecido": o comando foi colado no PowerShell. Entre no servidor (ssh) primeiro.
+- Saiu do servidor no meio: rode  ssh root@200.141.31.37  e repita o passo 2.
+- Qualquer ✘ vermelho: mande um print da tela inteira.

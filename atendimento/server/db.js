@@ -1124,6 +1124,15 @@ function colunasDoCreate(sql) {
     .filter((i) => !/^(CONSTRAINT|CHECK|PRIMARY|UNIQUE|FOREIGN)\b/i.test(i));
 }
 
+/** "Eu sou a ZOE, atendente virtual do Fibra Mais." -> "Aqui é a ZOE, do Fibra Mais." */
+function semVirtual(texto) {
+  if (!texto) return texto;
+  return String(texto)
+    .replace(/,?\s*(sua |a |o |seu )?(atendente|assistente) virtual( d([ao]s?))?/gi, (_m, _a, _b, _c, prep) => (prep ? `, d${prep}` : ''))
+    .replace(/\bEu sou a\b/g, 'Aqui é a').replace(/\bEu sou o\b/g, 'Aqui é o')
+    .replace(/\s+,/g, ',').replace(/\s{2,}/g, ' ');
+}
+
 function abrir(arquivo = config.dbFile) {
   if (arquivo !== ':memory:') fs.mkdirSync(path.dirname(arquivo), { recursive: true });
   const db = new DatabaseSync(arquivo);
@@ -1134,6 +1143,13 @@ function abrir(arquivo = config.dbFile) {
 
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);
+
+  // A ZOE não se anuncia mais como "atendente virtual" (muito cliente desiste ao ler isso):
+  // as saudações já gravadas são ajustadas uma vez, do mesmo jeito que a saudação padrão.
+  for (const r of db.prepare("SELECT empresa_id, saudacao FROM ia_config WHERE saudacao LIKE '%virtual%'").all()) {
+    const nova = semVirtual(r.saudacao);
+    if (nova !== r.saudacao) db.prepare('UPDATE ia_config SET saudacao = ? WHERE empresa_id = ?').run(nova, r.empresa_id);
+  }
 
   if (!db.prepare("SELECT 1 FROM usuarios WHERE perfil = 'master' LIMIT 1").get()) {
     db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, 'master', ?)")
@@ -1173,4 +1189,5 @@ function auditar(db, { usuario, empresaId = null, acao, alvo = null, detalhe = n
       detalhe === null || typeof detalhe === 'string' ? detalhe : JSON.stringify(detalhe), ip, agora());
 }
 
-module.exports = { abrir, atualizarEsquema, colunasDoCreate, transacao, lerConfig, auditar, agora, CONFIG_PADRAO, SCHEMA };
+module.exports = {
+  semVirtual, abrir, atualizarEsquema, colunasDoCreate, transacao, lerConfig, auditar, agora, CONFIG_PADRAO, SCHEMA };

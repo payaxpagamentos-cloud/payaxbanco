@@ -101,3 +101,10 @@ test('o Testar nunca manda nada para a Meta, mesmo com o número de verdade cada
     assert.equal(db.prepare("SELECT status FROM mensagens WHERE conversa_id = ? AND texto = 'oi'").get(conversa.id).status, 'enviada');
   } finally { meta.restaurar(); }
 });
+
+test('saudação já gravada com "atendente virtual" é ajustada ao abrir o banco', () => {
+  const { semVirtual } = require('../server/db');
+  assert.equal(semVirtual('Olá! Eu sou a ZOE, atendente virtual do Fibra Mais. Me conta.'), 'Olá! Aqui é a ZOE, do Fibra Mais. Me conta.');
+  assert.equal(semVirtual('Olá, {cliente}! Eu sou a {assistente}, assistente virtual da {empresa}.'), 'Olá, {cliente}! Aqui é a {assistente}, da {empresa}.');
+  assert.equal(semVirtual('Bem-vindo!'), 'Bem-vindo!');
+});
