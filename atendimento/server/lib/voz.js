@@ -191,7 +191,7 @@ function iniciar(db, empresa, { uid, telefone = null } = {}) {
   // Por teclas, a saudação padrão ("me conta o que você precisa") pediria algo que o cliente não
   // tem como fazer. Sem saudação escrita pela empresa, vai uma curta, e o menu vem logo depois.
   const saudacao = modo === 'teclas' && !cfg.saudacao?.trim()
-    ? `Olá! Eu sou a ${cfg.nome_assistente || 'ZOE'}, atendente virtual da ${empresa.nome}.`
+    ? `Olá! Aqui é a ${cfg.nome_assistente || 'ZOE'}, da ${empresa.nome}.`
     : prompt.saudacaoDe(cfg, { empresa, contato, nomeCliente: contato.nome ?? contato.nome_perfil })
       || regras.saudacao(cfg, { nomeAssistente: cfg.nome_assistente, nomeEmpresa: empresa.nome, nomeCliente: contato.nome ?? contato.nome_perfil });
   const marca = ultimaId(db, conversa.id);

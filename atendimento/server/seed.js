@@ -134,7 +134,7 @@ function semear(db) {
     db.prepare(`UPDATE ia_config SET nome_assistente = 'ZOE', fila_padrao_id = ?, max_turnos = 12, pedir_csat = 1,
         saudacao = ?, regras = ?, atualizada_em = ? WHERE empresa_id = ?`)
       .run(filaId.get('Atendimento'),
-        'Olá! Eu sou a ZOE, atendente virtual do Fibra Mais. Me conta o que você precisa e eu já resolvo ou chamo alguém do time. 😊',
+        'Olá! Aqui é a ZOE, do Fibra Mais. Me conta o que você precisa e eu já resolvo ou chamo alguém do time. 😊',
         'Nunca prometa desconto, isenção de multa ou prazo de visita técnica: isso é sempre da equipe.\n'
         + 'Antes de abrir chamado de internet lenta, oriente os três passos da base de conhecimento.\n'
         + 'Cliente com fatura vencida há mais de 30 dias deve ir para o Financeiro.', agora(), empresa.id);
@@ -185,7 +185,7 @@ function semear(db) {
       db.prepare(`INSERT INTO ia_eventos (empresa_id, conversa_id, tipo, nome, detalhe, tokens_entrada, tokens_saida, tokens_cache, ms, criado_em)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(empresa.id, conversaId, tipo, nome, detalhe, entradaTk, saidaTk, cache, ms, em);
 
-    const saudacao = 'Olá! Eu sou a ZOE, atendente virtual do Fibra Mais. Me conta o que você precisa e eu já resolvo ou chamo alguém do time. 😊';
+    const saudacao = 'Olá! Aqui é a ZOE, do Fibra Mais. Me conta o que você precisa e eu já resolvo ou chamo alguém do time. 😊';
     let totais = { ia: 0, humano: 0, abandono: 0, abertas: 0 };
 
     for (let dia = DIAS; dia >= 0; dia--) {

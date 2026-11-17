@@ -119,8 +119,8 @@ describe('API', () => {
 
   test('o prompt da IA é auditável pelo painel', async () => {
     const r = await (await chamar('GET', `/empresas/${ambiente.empresa.id}/ia/prompt`, null, tokens.admin)).json();
-    // O prompt preserva o papel como o cliente lê: 'ZOE, a atendente virtual da Fibra Mais'.
-    assert.match(r.sistema, /ZOE, a atendente virtual da Fibra Mais/);
+    // O prompt preserva o papel como o cliente lê: 'ZOE, do atendimento da Fibra Mais' (sem se anunciar como robô).
+    assert.match(r.sistema, /ZOE, do atendimento da Fibra Mais/);
     assert.match(r.sistema, /transferir_para_humano|Transfira para uma pessoa/);
     assert.ok(r.ferramentas.some((f) => f.nome === 'transferir_para_humano'));
     assert.ok(r.ferramentas.some((f) => f.nome === 'buscar_conhecimento'));

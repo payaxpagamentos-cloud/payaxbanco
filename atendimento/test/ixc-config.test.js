@@ -63,3 +63,20 @@ test('testar a ZOE antes de cadastrar o WhatsApp: usa um número interno que nun
     assert.equal(meta.enviadas.length, 0, 'nada foi para a Meta');
   } finally { sem.restaurar(); meta.restaurar(); await new Promise((r) => servidor.close(r)); }
 });
+
+test('"preciso do boleto" com o IXC ligado: a ZOE atende, sem jogar direto na fila do financeiro', async () => {
+  const meta = h.fingirMeta();
+  const { db, empresa } = h.criarAmbiente();
+  h.comIxc(db, empresa.id);
+  const ixc = h.fingirIxc({ clientes: [], faturas: [], contratos: [], logins: [], chamados: [] });
+  const ia = h.fingirIa([{ texto: 'Claro! Me passa o CPF do titular que eu já te mando a 2ª via.' }]);
+  try {
+    await h.conversar(db, 'bom dia preciso do boleto para pagar', { telefone: '5511977776666' });
+    const c = db.prepare("SELECT * FROM conversas WHERE contato_id = (SELECT id FROM contatos WHERE telefone = '5511977776666')").get();
+    assert.equal(c.estado, 'bot', 'continua com a ZOE');
+    assert.equal(ia.pedidos.length, 1, 'a IA foi chamada');
+    const saidas = db.prepare("SELECT texto FROM mensagens WHERE conversa_id = ? AND direcao = 'saida' AND tipo = 'texto'").all(c.id).map((m) => m.texto);
+    assert.ok(saidas.some((t) => /CPF do titular/.test(t)));
+    assert.ok(!saidas.some((t) => /atendente virtual/i.test(t)), 'não se anuncia como atendente virtual');
+  } finally { ia.restaurar(); ixc.restaurar(); meta.restaurar(); }
+});

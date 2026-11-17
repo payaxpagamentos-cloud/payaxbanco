@@ -131,7 +131,7 @@ function saudacao(cfg, { nomeAssistente = 'ZOE', nomeEmpresa = '', nomeCliente =
   const base = cfg?.saudacao?.trim();
   if (base) return preencher(base, { assistente: nomeAssistente, empresa: nomeEmpresa, cliente: nomeCliente ?? '' });
   const ola = nomeCliente ? `Olá, ${primeiroNome(nomeCliente)}!` : 'Olá!';
-  return `${ola} Eu sou a ${nomeAssistente}${nomeEmpresa ? `, atendente virtual da ${nomeEmpresa}` : ''}. Como posso ajudar?`;
+  return `${ola} Aqui é a ${nomeAssistente}${nomeEmpresa ? `, da ${nomeEmpresa}` : ''}. Como posso ajudar?`;
 }
 
 const primeiroNome = (n) => String(n ?? '').trim().split(/\s+/)[0] ?? '';

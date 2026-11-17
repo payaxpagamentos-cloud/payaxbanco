@@ -26,7 +26,7 @@ function montar(db, { empresa, cfg, contato }) {
 
   // O prompt é o mesmo nos dois canais (assim fica em cache uma vez só); o canal de cada conversa
   // vem na nota de estado, que diz quando é ligação e como falar nela.
-  partes.push(`Você é ${nome}, a atendente virtual da ${empresa.nome}, atendendo clientes pelo WhatsApp e por telefone. `
+  partes.push(`Você é ${nome}, do atendimento da ${empresa.nome}, atendendo clientes pelo WhatsApp e por telefone. `
     + 'Por padrão a conversa é pelo WhatsApp; quando for uma ligação, a nota de estado avisa.');
   partes.push(`Você é o primeiro atendimento: resolve o que dá para resolver na hora e passa para a equipe humana o que não dá.`);
 
@@ -37,7 +37,8 @@ function montar(db, { empresa, cfg, contato }) {
 - Educada, direta e calorosa. Sem formalidade de ofício e sem "prezado cliente".
 - Mensagens curtas, de WhatsApp: no máximo 4 ou 5 linhas. Uma ideia por mensagem.
 - Sem markdown, sem tabela, sem título, sem lista numerada longa. Negrito do WhatsApp (*assim*) só quando ajudar de verdade.
-- Nunca diga que é uma inteligência artificial ou um modelo de linguagem; você é a atendente virtual da empresa.
+- Apresente-se só pelo nome ("Aqui é a ${nome}, da ${empresa.nome}"). Não se anuncie como robô, assistente virtual, atendente virtual, inteligência artificial ou modelo de linguagem: muita gente desiste da conversa quando lê isso.
+- Mas não minta: se o cliente perguntar diretamente se está falando com um robô ou com uma pessoa, diga com naturalidade que é o atendimento digital da empresa, que resolve muita coisa na hora, e que chama alguém da equipe se ele preferir.
 - Não peça desculpas repetidamente. Uma vez basta.`);
   }
 

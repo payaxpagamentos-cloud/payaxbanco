@@ -350,7 +350,13 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
     db.prepare('UPDATE intencoes SET usos = usos + 1 WHERE id = ?').run(intencao.id);
     db.prepare('UPDATE conversas SET intencao = COALESCE(intencao, ?) WHERE id = ?').run(intencao.nome, conversa.id);
     registrarEvento(db, conversa, { tipo: 'intencao', nome: intencao.nome, detalhe: `casou com "${termo}"` });
-    if (intencao.acao === 'transferir' && lista.length) {
+    // Com o IXC ligado e a IA disponível, a ZOE resolve sozinha boa parte do que essas intenções
+    // mandariam para a equipe (2ª via, fatura, conexão, chamado) — inclusive fora do horário. Então
+    // ela tenta antes; se não conseguir, ela mesma transfere, já com o resumo.
+    const zoeResolve = intencao.acao === 'transferir' && cfg.tentar_antes && cfg.ativa && motor.disponivel()
+      && ferramentasIxc.configurado(db, empresa.id);
+    if (zoeResolve) registrarEvento(db, conversa, { tipo: 'intencao', nome: `${intencao.nome}: a ZOE tenta antes`, detalhe: 'IXC ligado' });
+    if (intencao.acao === 'transferir' && lista.length && !zoeResolve) {
       const r = transferirCom(db, conversa, {
         fila: filas.buscar(db, empresa.id, intencao.fila_id), assunto: intencao.nome,
         motivo: `Intenção "${intencao.nome}" (o cliente escreveu "${termo}").`,
