@@ -168,7 +168,7 @@ function comIxc(db, empresaId, extra = {}) {
  * `falhar: true` faz toda chamada cair (para testar a degradação).
  * Devolve { chamadas, restaurar } — `chamadas` tem { recurso, corpo } de cada requisição.
  */
-function fingirIxc(dados = {}, { falhar = false, demorar = false, pagasNaConsultaIndividual = [] } = {}) {
+function fingirIxc(dados = {}, { falhar = false, demorar = false, pagasNaConsultaIndividual = [], boletoFalha = false } = {}) {
   const original = global.fetch;
   const chamadas = [];
   const registros = (lista) => new Response(JSON.stringify({ page: '1', total: lista.length, registros: lista }),
@@ -214,6 +214,8 @@ function fingirIxc(dados = {}, { falhar = false, demorar = false, pagasNaConsult
         return registros(filtrar(lista('chamados'), String(corpo.qtype ?? '').split('.')[1] ?? 'id'));
       case 'su_oss_assunto': return registros(lista('assuntos'));
       case 'get_boleto':
+        // O IXC demorando para gerar o PDF (o caso real que mais derruba a 2ª via).
+        if (boletoFalha) { const e = new Error('tempo'); e.name = 'TimeoutError'; throw e; }
         return new Response(JSON.stringify({ base64: Buffer.from('%PDF-1.4 boleto de teste'.repeat(10)).toString('base64'), linha_digitavel: '34191790010104351004791020150008291070026000' }),
           { status: 200, headers: { 'content-type': 'application/json' } });
       case 'desbloqueio_confianca':

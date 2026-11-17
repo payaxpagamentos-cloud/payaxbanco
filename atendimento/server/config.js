@@ -50,7 +50,7 @@ module.exports = {
     esforco: process.env.ATEND_IA_ESFORCO || 'low',
     maxTokens: Number(process.env.ATEND_IA_MAX_TOKENS) || 4096, // o pensamento do modelo também conta aqui
     // Quantas idas e voltas de ferramenta a IA pode fazer para responder uma mensagem.
-    maxPassos: Number(process.env.ATEND_IA_MAX_PASSOS) || 6,
+    maxPassos: Number(process.env.ATEND_IA_MAX_PASSOS) || 10,
     timeoutMs: Number(process.env.ATEND_IA_TIMEOUT_MS) || 60_000,
     baseUrl: process.env.ATEND_IA_BASE_URL || null,
   },

@@ -111,7 +111,7 @@ function criarIxc({ url, token, timeoutMs = 8000, cacheMs = 60_000, recursos = {
   const autorizacao = `Basic ${Buffer.from(String(token)).toString('base64')}`;
   const cache = new Map();
 
-  async function chamar(recurso, corpo, { listar = false } = {}) {
+  async function chamar(recurso, corpo, { listar = false, tempoMs = timeoutMs } = {}) {
     // O endereço do IXC é cadastrado pela empresa: confere que não aponta para a rede interna.
     try {
       await require('../lib/rede').validarDestino(base, { oQue: 'O endereço do IXC' });
@@ -123,7 +123,7 @@ function criarIxc({ url, token, timeoutMs = 8000, cacheMs = 60_000, recursos = {
         redirect: 'error',
         headers: { Authorization: autorizacao, 'Content-Type': 'application/json', ...(listar ? { ixcsoft: 'listar' } : {}) },
         body: JSON.stringify(corpo),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(tempoMs),
       });
     } catch (err) {
       const tempo = err.name === 'TimeoutError' || err.name === 'AbortError';
@@ -301,10 +301,11 @@ function criarIxc({ url, token, timeoutMs = 8000, cacheMs = 60_000, recursos = {
      * 'arquivo' devolve o PDF em base64, para a plataforma mandar pelo WhatsApp.
      */
     async boleto(faturaId, tipo = 'arquivo') {
+      // Gerar o PDF no IXC é lento (vários segundos): esta chamada tem um tempo próprio, maior.
       return chamar(R.boleto, {
         boletos: String(faturaId), juro: 'N', multa: 'N', atualiza_boleto: 'N',
         tipo_boleto: tipo, base64: tipo === 'arquivo' ? 'S' : 'N',
-      });
+      }, { tempoMs: Math.max(timeoutMs, 25_000) });
     },
 
     /** Desbloqueio de confiança do contrato (o IXC aplica os próprios prazos e regras também). */

@@ -121,3 +121,57 @@ test('padrão da plataforma: integração nova e as que já existiam confirmam p
   b.close();
   assert.equal(abrir(arq).prepare('SELECT confirmar_titular FROM ixc_config').get().confirmar_titular, 0, 'depois respeita a escolha da empresa');
 });
+
+describe('boleto do começo ao fim, sem transferir', () => {
+  const comFatura = (extra = {}) => ({
+    ...h.CADASTRO,
+    clientes: h.CADASTRO.clientes.map((c) => ({ ...c, telefone_celular: '(11) 90000-0000' })),
+    faturas: h.CADASTRO.faturas.map((f) => ({ ...f, linha_digitavel: '34191790010104351004791020150008291070026000', ...extra })),
+  });
+
+  test('CPF → "sim" → 2ª via sai sozinha, em poucas etapas', async () => {
+    const meta = h.fingirMeta();
+    const ixc = h.fingirIxc(comFatura());
+    const { db, empresa } = h.criarAmbiente();
+    h.comIxc(db, empresa.id, { confirmar_titular: 1 });
+    const ia = h.fingirIa([
+      { texto: 'Claro! Me passa o CPF ou CNPJ do titular?' },
+      { ferramenta: 'identificar_cliente', entrada: { documento: '12345678909' } },
+      { texto: 'A conta está em nome de Ana Clara Ribeiro. Está correto?' },
+      { ferramenta: 'confirmar_identidade', entrada: { resposta: 'sim correto.' } },
+      { ferramenta: 'enviar_segunda_via', entrada: { fatura_id: null } },
+      { texto: 'Pronto, Ana! Mandei a 2ª via aqui. Precisa de mais alguma coisa?' },
+    ]);
+    try {
+      await h.conversar(db, 'preciso do boleto para pagar');
+      await h.conversar(db, '123.456.789-09');
+      await h.conversar(db, 'sim correto.');
+      const c = h.conversaDoCliente(db);
+      assert.equal(c.estado, 'bot', 'não transferiu');
+      assert.equal(c.identidade_confirmada, 1);
+      const textos = meta.enviadas.map((m) => m.texto ?? '').join(' ');
+      assert.match(textos, /34191790010104351004791020150008291070026000/);
+      assert.ok(meta.enviadas.some((m) => m.tipo === 'document'), 'o PDF foi junto');
+      assert.match(textos, /mais antiga|vence em 10\/10\/2026/, 'sem id, mandou a fatura mais antiga');
+    } finally { ia.restaurar(); ixc.restaurar(); meta.restaurar(); }
+  });
+
+  test('o IXC demorou para gerar o PDF: manda a linha digitável mesmo assim, sem transferir', async () => {
+    const meta = h.fingirMeta();
+    const ixc = h.fingirIxc(comFatura(), { boletoFalha: true });
+    const { db, empresa } = h.criarAmbiente();
+    h.comIxc(db, empresa.id, { confirmar_titular: 1 });
+    try {
+      const sem = h.semIa(); await h.conversar(db, 'oi'); sem.restaurar();
+      const conversa = h.conversaDoCliente(db);
+      const contato = db.prepare('SELECT * FROM contatos WHERE id = ?').get(conversa.contato_id);
+      const run = (nome, entrada) => ixcTools.executar(ixcTools.FERRAMENTAS[nome], { db, empresa, conversa: h.conversaDoCliente(db), contato, entrada });
+      await run('identificar_cliente', { documento: '12345678909' });
+      await run('confirmar_identidade', { resposta: 'sim' });
+      const r = await run('enviar_segunda_via', { fatura_id: null });
+      assert.equal(r.enviado, true);
+      assert.equal(r.com_pdf, false);
+      assert.equal(r.com_linha_digitavel, true);
+    } finally { ixc.restaurar(); meta.restaurar(); }
+  });
+});

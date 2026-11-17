@@ -264,7 +264,8 @@ const FERRAMENTAS = {
       return {
         ok: true, confere: true,
         cliente: { nome: cadastro.razao ?? cadastro.fantasia ?? null },
-        instrucao: 'Identidade confirmada. Agora pode consultar contrato, faturas e conexão. Cumprimente o cliente pelo primeiro nome e siga com o que ele pediu.',
+        instrucao: 'Identidade confirmada. Siga direto com o que ele pediu, sem perguntar de novo: se foi boleto ou 2ª via, chame enviar_segunda_via '
+          + 'com fatura_id null (manda a mais antiga em aberto). Contrato, faturas e conexão estão liberados.',
       };
     },
   },
@@ -320,31 +321,34 @@ const FERRAMENTAS = {
     capacidade: 'boleto',
     protegida: true,
     descricao: 'Envia a segunda via da fatura para o WhatsApp do cliente: o PDF do boleto, a linha digitável e o PIX quando houver. '
-      + 'Use o id da fatura que veio de faturas_em_aberto.',
-    entrada: esquema({ fatura_id: txt('O id da fatura, exatamente como veio de faturas_em_aberto.') }, ['fatura_id']),
+      + 'Sem fatura_id, manda a fatura em aberto mais antiga — não precisa listar as faturas antes quando o cliente só quer o boleto.',
+    entrada: esquema({ fatura_id: txtOuNulo('O id da fatura, como veio de faturas_em_aberto. null = a fatura em aberto mais antiga.') }, ['fatura_id']),
     executar: async ({ db, conversa, contato, entrada }) => {
       const c = atual(db, conversa);
       // A fatura precisa ser deste cliente: o id vem do modelo, então é conferido aqui.
       const r = await comIxc(db, conversa, contato, 'faturas', (ixc) => ixc.faturasAbertas(c.ixc_cliente_id));
       if (!r.ok) return r;
-      const fatura = r.valor.find((f) => f.id === String(entrada.fatura_id));
-      if (!fatura) return { ok: false, erro: 'Essa fatura não está em aberto neste cliente.', instrucao: 'Chame faturas_em_aberto e use um id da lista.' };
+      if (!r.valor.length) return { ok: true, enviado: false, quantidade: 0, instrucao: 'Não há fatura em aberto: diga isso ao cliente. Se ele diz que está bloqueado, chame situacao_do_contrato.' };
+      const fatura = entrada.fatura_id ? r.valor.find((f) => f.id === String(entrada.fatura_id)) : r.valor[0];
+      if (!fatura) return { ok: false, erro: 'Essa fatura não está em aberto neste cliente.', instrucao: 'Chame enviar_segunda_via com fatura_id null (a mais antiga) ou use um id de faturas_em_aberto.' };
 
       // Na ligação, a segunda via não tem onde "aparecer": PIX copia-e-cola não se fala ao telefone.
       if (c.canal === 'telefone') return segundaViaPelaLigacao(db, { conversa: c, contato, fatura });
 
+      // O PDF é o que mais falha (o IXC demora para gerar): sem ele, o PIX e a linha digitável já resolvem.
       const b = await comIxc(db, conversa, contato, 'boleto', (ixc) => ixc.boleto(fatura.id, 'arquivo'), { registrarAcao: false });
-      if (!b.ok) return b;
+      const dadosBoleto = b.ok ? b.valor : null;
 
       const partes = [`Segunda via da fatura que vence em ${dataBr(fatura.vencimento)}, no valor de ${reais(fatura.valor_centavos)}.`];
-      const pix = fatura.pix ?? b.valor?.pix ?? b.valor?.pix_copia_cola ?? null;
-      const linha = fatura.linha_digitavel ?? b.valor?.linha_digitavel ?? b.valor?.linhaDigitavel ?? null;
+      const pix = fatura.pix ?? dadosBoleto?.pix ?? dadosBoleto?.pix_copia_cola ?? null;
+      const linha = fatura.linha_digitavel ?? dadosBoleto?.linha_digitavel ?? dadosBoleto?.linhaDigitavel ?? null;
+      if (!b.ok && !pix && !linha) return b; // nada para mandar: aí, sim, quem resolve é uma pessoa
       if (pix) partes.push(`PIX copia e cola:\n${pix}`);
       if (linha) partes.push(`Linha digitável:\n${linha}`);
       envio.enfileirar(db, c, { autor: 'ia', tipo: 'texto', texto: partes.join('\n\n') });
 
       // O PDF, quando o IXC devolve em base64, vai como documento.
-      const base64 = b.valor?.base64 ?? b.valor?.pdf ?? (typeof b.valor === 'string' ? b.valor : null);
+      const base64 = dadosBoleto?.base64 ?? dadosBoleto?.pdf ?? (typeof dadosBoleto === 'string' ? dadosBoleto : null);
       let anexo = false;
       if (base64 && String(base64).length > 100) {
         try {
