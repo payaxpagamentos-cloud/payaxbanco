@@ -108,3 +108,14 @@ test('saudação já gravada com "atendente virtual" é ajustada ao abrir o banc
   assert.equal(semVirtual('Olá, {cliente}! Eu sou a {assistente}, assistente virtual da {empresa}.'), 'Olá, {cliente}! Aqui é a {assistente}, da {empresa}.');
   assert.equal(semVirtual('Bem-vindo!'), 'Bem-vindo!');
 });
+
+test('a regra de apresentação vale mesmo com o "jeito de falar" escrito pela empresa', () => {
+  const prompt = require('../server/ia/prompt');
+  const { db, empresa } = h.criarAmbiente();
+  const base = require('../server/lib/conversas').cfgIa(db, empresa.id);
+  for (const cfg of [base, { ...base, tom: 'Fale de um jeito descontraído.' }]) {
+    const texto = prompt.montar(db, { empresa, cfg, contato: null });
+    assert.match(texto, /Não se anuncie como robô/);
+    assert.match(texto, /não minta/);
+  }
+});
