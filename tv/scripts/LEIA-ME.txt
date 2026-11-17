@@ -1,0 +1,131 @@
+PAYAX TV — INSTALAÇÃO (FASE DE TESTES)
+======================================
+
+Endereços depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
+  App do assinante .......... https://SEU-DOMINIO/tv/
+  Painel da operação ........ https://SEU-DOMINIO/tv/admin/
+
+Os dois são servidos pelo mesmo programa (Node.js), que fica nesta pasta "tv".
+As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
+Pode ficar no mesmo servidor dos outros sistemas (portas diferentes: BPO 3100, táxi 3200,
+PABX 3300, rastreador 3400, network 3500, PayAx TV 3600).
+
+
+IMPORTANTE: HTTPS E ESPAÇO EM DISCO
+   - Use HTTPS. Sem ele, navegador de celular e Smart TV barram o player em muitos casos.
+   - Os vídeos ficam na pasta data/midia e ocupam MUITO espaço (um filme em Full HD passa
+     facilmente de 2 GB). Dimensione o disco antes de subir o catálogo.
+   - Os canais ao vivo não ocupam disco: o sinal é retransmitido na hora.
+
+
+1) REQUISITO
+   Node.js 22.13 ou mais novo no servidor.  Confira com:   node -v
+   (O ffmpeg é opcional: serve só para gerar os vídeos de demonstração do "npm run seed".)
+
+
+2) ENVIAR OS ARQUIVOS
+   Envie a pasta "tv" inteira para o servidor, FORA da pasta pública do site
+   (ex.: /home/SEU-USUARIO/tv). O arquivo ".env" começa com ponto: confira se foi enviado.
+
+
+3) CONFERIR O .env
+   Já vem pronto: endereço /tv, segredo novo, senha da operação (TV_ADMIN_SENHA) e
+   cobrança em modo de TESTE (TV_PAGAMENTOS=simulado).
+   NÃO troque o TV_SECRET depois de instalado: ele assina as sessões e os links de vídeo.
+
+
+4) DADOS DE DEMONSTRAÇÃO (opcional)
+   Com o sistema parado, rode uma vez dentro da pasta tv:
+      npm run seed
+   Cria 8 canais com grade, um catálogo de exemplo e assinantes de teste
+   (senha cliente2026). Com ffmpeg instalado, gera também vídeos de demonstração.
+   ATENÇÃO: o seed apaga o conteúdo anterior. Não rode com a plataforma já em uso.
+
+
+5) INICIAR
+   a) Servidor próprio (VPS) com PM2
+         cd /home/SEU-USUARIO/tv
+         npm install -g pm2
+         pm2 start "npm start" --name payax-tv
+         pm2 save && pm2 startup
+      Depois configure o Nginx ou o Apache (item 6).
+
+   b) Docker
+         docker build -t payax-tv .
+         docker run -d --name payax-tv --env-file .env -p 3600:3600 -v payax-tv-dados:/app/data payax-tv
+      Depois configure o Nginx ou o Apache (item 6).
+
+   c) cPanel ("Setup Node.js App")
+      - Node.js version ........... 22 ou mais novo
+      - Application mode .......... Production
+      - Application root .......... tv
+      - Application URL ........... tv
+      - Application startup file .. server/index.js
+      Em "Environment variables", cadastre as variáveis do arquivo .env (menos PORT). Clique em Start.
+      Observação: o envio de vídeos grandes costuma esbarrar nos limites do cPanel. Para o
+      catálogo, prefira a opção (a) ou (b).
+
+
+6) NGINX OU APACHE (só para as opções a e b)
+   Nginx — dentro do "server { ... }" do domínio (com HTTPS):
+      location /tv/ {
+          proxy_pass http://127.0.0.1:3600;
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+
+          # Vídeo e canais ao vivo: entrega em fluxo, sem o Nginx segurar a resposta.
+          proxy_buffering off;
+          proxy_read_timeout 300s;
+
+          # Envio de vídeo pelo painel: cada pedaço tem até 8 MB (TV_UPLOAD_PARTE_MB).
+          client_max_body_size 16m;
+          proxy_request_buffering off;
+      }
+      location = /tv { return 301 /tv/; }
+
+   Apache (módulos proxy e proxy_http ativos):
+      ProxyPreserveHost On
+      ProxyTimeout 300
+      ProxyPass        /tv http://127.0.0.1:3600/tv flushpackets=on
+      ProxyPassReverse /tv http://127.0.0.1:3600/tv
+      LimitRequestBody 16777216
+
+
+7) PRIMEIRO ACESSO À OPERAÇÃO
+   Abra https://SEU-DOMINIO/tv/admin/ e entre com:
+      E-mail: admin@payaxtv.com.br
+      Senha:  a que está em TV_ADMIN_SENHA no arquivo .env
+   Em "Configurações", cadastre a CHAVE PIX que recebe as assinaturas (sem ela as faturas
+   saem sem código de pagamento). Em "Planos", confira preços, telas e qualidade.
+
+
+8) ROTEIRO DE TESTE
+   1. Operação: em "Canais", cadastre um canal com o endereço .m3u8 da emissora,
+      clique em "Testar sinal" e depois em "Prévia" para ver a imagem.
+   2. Em "Grade (EPG)", cadastre um programa no horário de agora (ou importe um XMLTV).
+   3. Em "Catálogo", crie um filme, envie a capa e o vídeo e clique em "Publicar".
+   4. Em "Destaques e home", coloque esse filme no topo da home.
+   5. No app (/tv/), crie uma conta, escolha um plano e pague o PIX
+      (no modo de testes, o botão "Já paguei" libera na hora).
+   6. Assista a um canal e a um filme; veja a tela aparecer em "Assistindo agora" no painel.
+   7. Tente abrir uma segunda tela além do limite do plano: a plataforma avisa e oferece
+      encerrar a outra.
+   Dica: no celular, use "Adicionar à tela de início" para abrir como aplicativo.
+
+
+9) COBRANÇA DE VERDADE
+   Troque TV_PAGAMENTOS para "manual" no .env e reinicie. A partir daí:
+   o assinante paga o PIX e a operação confirma em "Faturas" → "Confirmar PIX",
+   liberando o acesso na hora. A cobrança automática (baixa pelo extrato) exige
+   contratar um intermediador de pagamentos (PSP) e ligá-lo em server/lib/assinaturas.js.
+
+
+10) CÓPIAS DE SEGURANÇA
+   Tudo fica em tv/data: o banco (tv.db) e os vídeos e artes (midia/).
+   Copie as duas coisas; os vídeos não dá para recuperar de outro lugar.
+
+
+11) ATUALIZAR PARA UMA VERSÃO NOVA
+   Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
+   NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart payax-tv).

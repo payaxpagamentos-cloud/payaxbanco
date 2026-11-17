@@ -80,7 +80,8 @@ function pixDaFatura(db, fatura) {
 /** Cria a fatura do ciclo e já guarda o PIX copia e cola. */
 function gerarFatura(db, assinatura, plano, { vencimento, descricao }) {
   const comp = competencia(vencimento);
-  const existente = db.prepare('SELECT * FROM faturas WHERE assinatura_id = ? AND competencia = ?').get(assinatura.id, comp);
+  // Fatura cancelada não conta: depois de um cancelamento dá para emitir outra no mesmo mês.
+  const existente = db.prepare("SELECT * FROM faturas WHERE assinatura_id = ? AND competencia = ? AND status <> 'cancelada'").get(assinatura.id, comp);
   if (existente) return existente;
   const txid = `TV${String(assinatura.id).padStart(5, '0')}${comp.replace('-', '')}${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
   const r = db.prepare(`INSERT INTO faturas (assinatura_id, usuario_id, competencia, descricao, valor_centavos, vencimento, txid, criada_em)

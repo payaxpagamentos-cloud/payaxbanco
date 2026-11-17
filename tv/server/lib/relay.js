@@ -107,8 +107,36 @@ const nosso = (base, uri, { canalId, playToken, rota }) => {
 };
 
 /**
- * Busca a lista HLS na origem e devolve a versão reescrita: cada pedaço, cada lista filha,
- * cada chave e cada faixa de áudio/legenda passa a apontar para o nosso endereço.
+ * Reescreve uma lista HLS: cada pedaço, cada lista filha, cada chave e cada faixa de áudio
+ * ou legenda passa a apontar para o nosso servidor. Função pura (o texto já foi buscado).
+ */
+function reescrever(texto, { canal, playToken, baseApi, urlDaLista }) {
+  if (!/^\s*#EXTM3U/.test(texto)) throw new ErroNegocio('A origem não devolveu uma lista HLS (.m3u8).', 502);
+  const rotaLista = `${baseApi}/play/canal/${canal.id}/lista.m3u8`;
+  const rotaSegmento = `${baseApi}/play/canal/${canal.id}/segmento`;
+  const opcoesLista = { canalId: canal.id, playToken, rota: rotaLista };
+  const opcoesSegmento = { canalId: canal.id, playToken, rota: rotaSegmento };
+  // Lista mestre (várias qualidades) ou lista de pedaços de uma qualidade só.
+  const mestre = /#EXT-X-STREAM-INF/i.test(texto);
+  const trocarAtributo = (linha, opcoes) => linha.replace(/URI="([^"]+)"/i, (_m, uri) => `URI="${nosso(urlDaLista, uri, opcoes)}"`);
+
+  return texto.split(/\r?\n/).map((linha) => {
+    const l = linha.trim();
+    if (!l) return linha;
+    if (l.startsWith('#')) {
+      // Faixas alternativas (áudio, legenda) e listas de I-frames são outras listas.
+      if (/^#EXT-X-(MEDIA|I-FRAME-STREAM-INF)/i.test(l) && /URI="/i.test(l)) return trocarAtributo(l, opcoesLista);
+      // Chave de criptografia e cabeçalho de inicialização são arquivos: viram segmentos.
+      if (/^#EXT-X-(KEY|SESSION-KEY|MAP|PART|PRELOAD-HINT|RENDITION-REPORT)/i.test(l) && /URI="/i.test(l)) return trocarAtributo(l, opcoesSegmento);
+      return linha;
+    }
+    return nosso(urlDaLista, l, mestre ? opcoesLista : opcoesSegmento);
+  }).join('\n');
+}
+
+/**
+ * Busca a lista HLS na origem e devolve a versão reescrita, com um cache curto
+ * (o player pede a lista a cada poucos segundos).
  */
 async function listaReescrita(canal, { url = canal.url_hls, playToken, baseApi }) {
   const agoraMs = Date.now();
@@ -126,30 +154,7 @@ async function listaReescrita(canal, { url = canal.url_hls, playToken, baseApi }
     cacheLista.set(url, { texto, em: agoraMs, finalUrl });
     if (cacheLista.size > 500) for (const [k, val] of cacheLista) if (agoraMs - val.em > 60_000) cacheLista.delete(k);
   }
-  if (!/^\s*#EXTM3U/.test(texto)) throw new ErroNegocio('A origem não devolveu uma lista HLS (.m3u8).', 502);
-
-  const rotaLista = `${baseApi}/play/canal/${canal.id}/lista.m3u8`;
-  const rotaSegmento = `${baseApi}/play/canal/${canal.id}/segmento`;
-  const opcoesLista = { canalId: canal.id, playToken, rota: rotaLista };
-  const opcoesSegmento = { canalId: canal.id, playToken, rota: rotaSegmento };
-  // Lista mestre (várias qualidades) ou lista de pedaços de uma qualidade só.
-  const mestre = /#EXT-X-STREAM-INF/i.test(texto);
-
-  const trocarAtributo = (linha, opcoes) => linha.replace(/URI="([^"]+)"/i, (_m, uri) => `URI="${nosso(finalUrl, uri, opcoes)}"`);
-
-  const linhas = texto.split(/\r?\n/).map((linha) => {
-    const l = linha.trim();
-    if (!l) return linha;
-    if (l.startsWith('#')) {
-      // Faixas alternativas (áudio, legenda) e listas de I-frames são outras listas.
-      if (/^#EXT-X-(MEDIA|I-FRAME-STREAM-INF)/i.test(l) && /URI="/i.test(l)) return trocarAtributo(l, opcoesLista);
-      // Chave de criptografia e cabeçalho de inicialização são arquivos: viram segmentos.
-      if (/^#EXT-X-(KEY|SESSION-KEY|MAP|PART|PRELOAD-HINT|RENDITION-REPORT)/i.test(l) && /URI="/i.test(l)) return trocarAtributo(l, opcoesSegmento);
-      return linha;
-    }
-    return nosso(finalUrl, l, mestre ? opcoesLista : opcoesSegmento);
-  });
-  return linhas.join('\n');
+  return reescrever(texto, { canal, playToken, baseApi, urlDaLista: finalUrl });
 }
 
 /** Repassa um pedaço do sinal (segmento, chave ou cabeçalho) ao player, em fluxo, sem guardar em disco. */
@@ -219,4 +224,4 @@ async function verificarSinais(db, { apenas = null } = {}) {
   return resultados;
 }
 
-module.exports = { ipPrivado, conferirEndereco, assinarUrl, lerUrlAssinada, listaReescrita, repassarSegmento, verificarCanal, verificarSinais, cacheLista };
+module.exports = { ipPrivado, conferirEndereco, assinarUrl, lerUrlAssinada, reescrever, listaReescrita, repassarSegmento, verificarCanal, verificarSinais, cacheLista };

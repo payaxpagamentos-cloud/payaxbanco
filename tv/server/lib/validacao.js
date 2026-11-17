@@ -13,6 +13,13 @@ function dataValida(v) {
 }
 
 const falhar = (msg) => { throw new ErroNegocio(msg, 422); };
+
+/** "o ano" -> "Ano inválido"; "a duração" -> "Duração inválida" (concorda com o artigo do nome do campo). */
+const invalido = (nome) => {
+  const feminino = /^(a|as|uma) /i.test(String(nome));
+  const limpo = String(nome).replace(/^(o|a|os|as|um|uma) /i, '');
+  return `${limpo[0].toUpperCase()}${limpo.slice(1)} ${feminino ? 'inválida' : 'inválido'}.`;
+};
 const exigir = (condicao, msg) => { if (!condicao) falhar(msg); };
 
 /** Texto obrigatório, sem espaços nas pontas e com tamanho máximo. */
@@ -26,14 +33,14 @@ const opcional = (v, nome, max = 255) => (v === undefined || v === null || Strin
 
 function inteiro(v, nome, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   const n = Number(v);
-  exigir(Number.isInteger(n) && n >= min && n <= max, `${nome[0].toUpperCase()}${nome.slice(1)} inválido.`);
+  exigir(Number.isInteger(n) && n >= min && n <= max, invalido(nome));
   return n;
 }
 const inteiroOpcional = (v, nome, o) => (v === undefined || v === null || v === '' ? null : inteiro(v, nome, o));
 
 function numero(v, nome, { min = -Infinity, max = Infinity } = {}) {
   const n = typeof v === 'string' ? Number(v.replace(',', '.')) : Number(v);
-  exigir(v !== '' && v !== null && v !== undefined && Number.isFinite(n) && n >= min && n <= max, `${nome[0].toUpperCase()}${nome.slice(1)} inválido.`);
+  exigir(v !== '' && v !== null && v !== undefined && Number.isFinite(n) && n >= min && n <= max, invalido(nome));
   return n;
 }
 
@@ -41,7 +48,7 @@ function numero(v, nome, { min = -Infinity, max = Infinity } = {}) {
 const id = (v, nome = 'o registro') => (v === undefined || v === null || v === '' ? null : inteiro(v, nome, { min: 1 }));
 
 const opcao = (v, nome, opcoes) => {
-  exigir(opcoes.includes(v), `${nome[0].toUpperCase()}${nome.slice(1)} inválido. Use: ${opcoes.join(', ')}.`);
+  exigir(opcoes.includes(v), `${invalido(nome).replace(/\.$/, '')}. Use: ${opcoes.join(', ')}.`);
   return v;
 };
 
@@ -66,14 +73,14 @@ const telefone = (v) => {
 };
 
 const data = (v, nome) => {
-  exigir(dataValida(v), `${nome[0].toUpperCase()}${nome.slice(1)} inválida (use AAAA-MM-DD).`);
+  exigir(dataValida(v), `${invalido(nome).replace(/\.$/, '')} (use AAAA-MM-DD).`);
   return v;
 };
 
 /** Instante ISO 8601 (ex.: 2026-03-01T22:30:00Z), guardado normalizado em UTC. */
 function instante(v, nome) {
   const t = Date.parse(String(v ?? ''));
-  exigir(Number.isFinite(t), `${nome[0].toUpperCase()}${nome.slice(1)} inválido (use data e hora ISO 8601).`);
+  exigir(Number.isFinite(t), `${invalido(nome).replace(/\.$/, '')} (use data e hora ISO 8601).`);
   return new Date(t).toISOString();
 }
 
@@ -102,6 +109,6 @@ const idioma = (v, padrao = 'pt-BR') => {
 };
 
 module.exports = {
-  digitos, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, inteiroOpcional, numero, id, opcao, booleano,
+  digitos, emailValido, dataValida, exigir, falhar, invalido, texto, opcional, inteiro, inteiroOpcional, numero, id, opcao, booleano,
   email, senha, telefone, data, instante, classificacao, urlHls, idioma,
 };

@@ -88,9 +88,10 @@ CREATE TABLE IF NOT EXISTS faturas (
   pix_copia_cola TEXT,
   criada_em TEXT NOT NULL,
   paga_em TEXT,
-  confirmada_por INTEGER REFERENCES usuarios(id),
-  UNIQUE (assinatura_id, competencia)
+  confirmada_por INTEGER REFERENCES usuarios(id)
 );
+-- Uma fatura viva por competência; a cancelada sai do caminho e deixa emitir outra.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fatura_competencia ON faturas(assinatura_id, competencia) WHERE status <> 'cancelada';
 CREATE INDEX IF NOT EXISTS idx_faturas_status ON faturas(status, vencimento);
 CREATE INDEX IF NOT EXISTS idx_faturas_usuario ON faturas(usuario_id, id);
 
