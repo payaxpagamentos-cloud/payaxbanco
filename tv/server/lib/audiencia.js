@@ -1,7 +1,7 @@
 'use strict';
 
 const config = require('../config');
-const { hoje, somarDias, intervalo, competencia } = require('./datas');
+const { hoje, somarDias, intervalo, competencia, deslocamentoHoras } = require('./datas');
 
 /**
  * Audiência e números da operação. A base é a tabela de sessões do player: cada tela aberta
@@ -84,12 +84,12 @@ const topCanais = (db, { de, ate, limite = 20 }) => {
     .map((l) => ({ ...l, minutos: minutos(l.segundos) }));
 };
 
-/** Por hora do dia: mostra o horário nobre da plataforma. */
+/** Por hora do dia (no fuso da operação): mostra o horário nobre da plataforma. */
 const porHora = (db, { de, ate }) => {
   const [inicio, fim] = intervalo(de, ate);
   const linhas = db.prepare(`SELECT CAST(strftime('%H', iniciada_em, ?) AS INTEGER) AS hora, COUNT(*) AS sessoes, COALESCE(SUM(segundos), 0) AS segundos
     FROM sessoes_player WHERE iniciada_em >= ? AND iniciada_em < ? GROUP BY hora ORDER BY hora`)
-    .all(`${-new Date().getTimezoneOffset() / 60} hours`, inicio, fim);
+    .all(`${deslocamentoHoras()} hours`, inicio, fim);
   const cheio = Array.from({ length: 24 }, (_, h) => ({ hora: h, sessoes: 0, segundos: 0, minutos: 0 }));
   for (const l of linhas) if (l.hora >= 0 && l.hora < 24) cheio[l.hora] = { ...l, minutos: minutos(l.segundos) };
   return cheio;

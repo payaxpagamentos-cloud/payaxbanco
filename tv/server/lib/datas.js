@@ -38,7 +38,16 @@ function inicioDia(data) {
   return new Date(Date.parse(`${data}T00:00:00Z`) - (comoUtc - meioDia)).toISOString();
 }
 
+/** Diferença, em horas, entre o fuso da operação e o UTC (ex.: -3 em São Paulo). */
+function deslocamentoHoras(instante = new Date()) {
+  const t = new Date(instante);
+  const l = local(t);
+  const [a, m, dia] = l.data.split('-').map(Number);
+  const comoUtc = Date.UTC(a, m - 1, dia, l.hora, l.minuto, l.segundo);
+  return Math.round((comoUtc - Math.floor(t.getTime() / 1000) * 1000) / 3_600_000);
+}
+
 /** Intervalo [início, fim) em ISO UTC dos dias locais de..até (inclusive). */
 const intervalo = (de, ate) => [inicioDia(de), inicioDia(somarDias(ate, 1))];
 
-module.exports = { local, hoje, competencia, somarDias, somarMeses, inicioDia, intervalo };
+module.exports = { local, hoje, competencia, somarDias, somarMeses, inicioDia, intervalo, deslocamentoHoras };
