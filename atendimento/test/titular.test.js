@@ -99,3 +99,25 @@ test('a tela salva e mostra o modo "só o CPF/CNPJ"', async () => {
   } finally { meta.restaurar(); await new Promise((r) => servidor.close(r)); }
   void http;
 });
+
+test('padrão da plataforma: integração nova e as que já existiam confirmam pelo CPF/CNPJ + nome', () => {
+  const { db, empresa } = h.criarAmbiente();
+  db.prepare("INSERT INTO ixc_config (empresa_id, ativo, url, atualizado_em) VALUES (?, 0, 'https://x', datetime('now'))").run(empresa.id);
+  assert.equal(ixcTools.metodoConfirmacao(db, empresa.id), 'titular_pendente', 'nova: já vem no modo titular');
+  // Banco antigo, com a integração no modo dos 3 dígitos: a migração liga uma vez só.
+  db.prepare('UPDATE ixc_config SET confirmar_titular = 0 WHERE empresa_id = ?').run(empresa.id);
+  db.prepare("DELETE FROM configuracoes WHERE chave = 'migracao_titular'").run();
+  const { abrir } = require('../server/db');
+  const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+  const arq = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'zoe-')), 'b.db');
+  const a = abrir(arq);
+  a.prepare("INSERT INTO empresas (nome, status, criada_em) VALUES ('X', 'ativa', datetime('now'))").run();
+  a.prepare("INSERT INTO ixc_config (empresa_id, ativo, url, confirmar_titular, atualizado_em) VALUES (1, 1, 'https://x', 0, datetime('now'))").run();
+  a.prepare("DELETE FROM configuracoes WHERE chave = 'migracao_titular'").run();
+  a.close();
+  const b = abrir(arq);
+  assert.equal(b.prepare('SELECT confirmar_titular FROM ixc_config').get().confirmar_titular, 1, 'ligou na atualização');
+  b.prepare('UPDATE ixc_config SET confirmar_titular = 0').run();
+  b.close();
+  assert.equal(abrir(arq).prepare('SELECT confirmar_titular FROM ixc_config').get().confirmar_titular, 0, 'depois respeita a escolha da empresa');
+});

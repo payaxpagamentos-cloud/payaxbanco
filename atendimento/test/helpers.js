@@ -152,7 +152,7 @@ const IXC_URL = 'https://ixc.provedor.teste';
 function comIxc(db, empresaId, extra = {}) {
   const { cifrar } = require('../server/lib/cifra');
   const campos = {
-    ativo: 1, url: IXC_URL, token_cifrado: cifrar('99:tokendeteste', 'ixc'), confirmar_por: 'cpf3',
+    ativo: 1, url: IXC_URL, token_cifrado: cifrar('99:tokendeteste', 'ixc'), confirmar_por: 'cpf3', confirmar_titular: 0,
     max_tentativas: 3, desbloqueio_ativo: 1, desbloqueio_limite: 1, desbloqueio_periodo_dias: 30, chamado_ativo: 1,
     ...extra,
   };

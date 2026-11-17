@@ -472,7 +472,7 @@ CREATE TABLE IF NOT EXISTS ixc_config (
   -- Identificação: quantos dígitos do documento pedir quando o telefone já está no cadastro.
   confirmar_por TEXT NOT NULL DEFAULT 'cpf3' CHECK (confirmar_por IN ('cpf3','nascimento')),
   -- Só o CPF/CNPJ: a ZOE diz em nome de quem está a conta e o cliente confirma ("sim"). Vale para todos os caminhos.
-  confirmar_titular INTEGER NOT NULL DEFAULT 0,
+  confirmar_titular INTEGER NOT NULL DEFAULT 1,
   max_tentativas INTEGER NOT NULL DEFAULT 3 CHECK (max_tentativas BETWEEN 1 AND 6),
   -- Desbloqueio de confiança: liga/desliga e o limite por cliente no período.
   desbloqueio_ativo INTEGER NOT NULL DEFAULT 1,
@@ -1145,6 +1145,13 @@ function abrir(arquivo = config.dbFile) {
 
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);
+
+  // Padrão da plataforma: confirmar só pelo CPF/CNPJ e o nome do titular (sem data de nascimento).
+  // Liga uma vez nas integrações que já existiam; depois disso vale o que cada empresa escolher na tela.
+  if (!db.prepare("SELECT 1 FROM configuracoes WHERE chave = 'migracao_titular'").get()) {
+    db.prepare('UPDATE ixc_config SET confirmar_titular = 1').run();
+    db.prepare("INSERT INTO configuracoes (chave, valor) VALUES ('migracao_titular', '1')").run();
+  }
 
   // A ZOE não se anuncia mais como "atendente virtual" (muito cliente desiste ao ler isso):
   // as saudações já gravadas são ajustadas uma vez, do mesmo jeito que a saudação padrão.

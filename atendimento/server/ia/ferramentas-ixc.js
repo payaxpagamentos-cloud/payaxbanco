@@ -533,7 +533,7 @@ async function executar(def, contexto) {
 // o cliente ainda precisa informar o documento — só depois a ZOE diz o nome e ele confirma.
 const metodoConfirmacao = (db, empresaId) => {
   const cfg = lerConfig(db, empresaId);
-  return cfg?.confirmar_titular ? 'titular_pendente' : (cfg?.confirmar_por ?? 'cpf3');
+  return (cfg?.confirmar_titular ?? 1) ? 'titular_pendente' : (cfg?.confirmar_por ?? 'cpf3');
 };
 const SIM = /^\s*(sim|s|isso|isso mesmo|é isso|correto|certo|exato|confirmo|positivo|ok|okay|é|e sim|está|esta|tá|ta|perfeito|pode ser|yes)\b/i;
 const NAO = /\b(n[aã]o|nao|errado|incorreto|outro nome|n)\b/i;
