@@ -8,6 +8,7 @@ const filas = require('../lib/filas');
 const midia = require('../lib/midia');
 const regras = require('./regras');
 const conhecimento = require('./conhecimento');
+const fluxos = require('./fluxos');
 const ferramentas = require('./ferramentas');
 const motor = require('./motor');
 const ferramentasIxc = require('./ferramentas-ixc');
@@ -345,6 +346,16 @@ async function atender(db, { empresa, numero, contato, conversa, mensagem, idRes
       });
       return { acao: 'transferida', detalhe: r.fila.nome };
     }
+  }
+
+  // Fluxos prontos, sem IA: 2ª via, "já paguei", internet lenta e pergunta que a base responde.
+  // O que se repete todo dia sai em código — zero token, resposta na hora e sempre igual.
+  if (!daOuvidoria) {
+    const f = await fluxos.conduzir(db, {
+      empresa, conversa, contato, texto, idResposta, cfg,
+      ajuda: { responder, registrarEvento, transferir: (d, c, dados) => transferirCom(d, c, dados) },
+    });
+    if (f) return f;
   }
 
   // Intenção cadastrada pela empresa.

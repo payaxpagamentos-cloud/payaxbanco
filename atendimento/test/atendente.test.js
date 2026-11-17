@@ -16,6 +16,8 @@ describe('ZOE', () => {
   test('resolve sozinha com a base de conhecimento e encerra, sem ocupar ninguém', async () => {
     const { db, empresa } = h.criarAmbiente();
     h.comConhecimento(db, empresa.id, 'Horário de atendimento', 'De segunda a sexta, das 8h às 18h.', 'que horas vocês abrem?');
+    // Este teste confere o caminho da IA; com os fluxos prontos, o artigo sairia direto, sem ela (ver fluxos.test.js).
+    db.prepare('UPDATE ia_config SET fluxos_ativos = 0 WHERE empresa_id = ?').run(empresa.id);
     const ia = h.fingirIa([
       { ferramenta: 'buscar_conhecimento', entrada: { pergunta: 'horário de atendimento' } },
       { texto: 'A gente atende de segunda a sexta, das 8h às 18h.', ferramenta: 'encerrar_atendimento', entrada: { resumo: 'Cliente quis saber o horário.', despedida: null } },

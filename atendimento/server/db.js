@@ -191,6 +191,8 @@ CREATE TABLE IF NOT EXISTS conversas (
   encerrada_em TEXT,
   ultima_mensagem_em TEXT,
   ultima_mensagem_cliente_em TEXT,
+  -- Fluxo pronto em andamento (2ª via, desbloqueio, conexão), em JSON: { nome, etapa, falhas, pedido, em }.
+  fluxo TEXT,
   csat_pedido_em TEXT,
   csat_nota INTEGER CHECK (csat_nota BETWEEN 1 AND 5),
   csat_comentario TEXT,
@@ -307,6 +309,9 @@ CREATE TABLE IF NOT EXISTS ia_config (
   -- Resolver antes de transferir: quando o cliente pede uma pessoa sem dizer o assunto, a ZOE
   -- pergunta o assunto UMA vez e tenta resolver. Pediu de novo, transfere na hora.
   tentar_antes INTEGER NOT NULL DEFAULT 1,
+  -- Fluxos prontos sem IA (2ª via, "já paguei", internet, pergunta da base) e os textos trocados pela empresa (JSON).
+  fluxos_ativos INTEGER NOT NULL DEFAULT 1,
+  textos_fluxo TEXT,
   -- Fila usada quando a IA transfere sem escolher uma.
   fila_padrao_id INTEGER REFERENCES filas(id),
   pedir_csat INTEGER NOT NULL DEFAULT 1,

@@ -455,6 +455,17 @@ async function configuracao(ctx, alvo) {
       el('div', { class: 'aviso-caixa info' }, icone('conversa'), el('span', {},
         'O que ela pode e não pode fazer agora fica na Base de conhecimento, como artigos do tipo "Regra" — tudo num lugar só.'))),
 
+    cartao('Fluxos prontos (sem IA)',
+      el('p', { class: 'mudo pequeno', style: 'margin:0 0 8px' },
+        'Os processos que se repetem todo dia saem em código, sem gastar IA: 2ª via, "já paguei" (desbloqueio de confiança), '
+        + 'internet lenta ou sem conexão (diagnóstico e chamado técnico) e perguntas que um artigo da base responde. '
+        + 'A IA só entra no que sair desses trilhos. Os de IXC usam a confirmação pelo CPF/CNPJ e o nome do titular.'),
+      marcar('Usar os fluxos prontos (recomendado: menos custo e resposta na hora)', { name: 'fluxos_ativos', checked: cfg.fluxos_ativos }),
+      el('details', {},
+        el('summary', { style: 'cursor:pointer;margin:6px 0' }, 'Textos dos fluxos (deixe em branco para o padrão)'),
+        ...Object.keys(cfg.fluxos_padrao ?? {}).map((k) => area(cfg.fluxos_rotulos?.[k] ?? k,
+          { name: `fluxo__${k}`, rows: 2, maxlength: 1500, placeholder: cfg.fluxos_padrao[k] }, cfg.textos_fluxo?.[k] ?? '')))),
+
     cartao('Quando passar para a equipe',
       campo('Máximo de mensagens antes de transferir', { name: 'max_turnos', type: 'number', value: cfg.max_turnos, min: 1, max: 60 }),
       marcar('Transferir quando ela não souber responder (recomendado)', { name: 'transferir_sem_resposta', checked: cfg.transferir_sem_resposta }),
@@ -493,6 +504,12 @@ async function configuracao(ctx, alvo) {
     e.preventDefault();
     acao(f.querySelector('button[type=submit], .btn.primario'), async () => {
       const dados = lerForm(f);
+      // Os textos dos fluxos vão juntos num objeto só.
+      dados.textos_fluxo = {};
+      for (const k of Object.keys(dados).filter((x) => x.startsWith('fluxo__'))) {
+        dados.textos_fluxo[k.slice(7)] = dados[k];
+        delete dados[k];
+      }
       if (dados.voz_modo === 'teclas') dados.voz_menu = [...linhasMenu.children].map((l) => l.ler()).filter((o) => o.rotulo || o.pedido);
       await api.patch(`/empresas/${ctx.empresaId}/ia`, dados);
       toast('ZOE salva.');

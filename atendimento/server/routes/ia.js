@@ -54,6 +54,11 @@ module.exports = function rotasIa(db) {
     transferir_sem_resposta: Boolean(cfg.transferir_sem_resposta),
     tentar_antes: Boolean(cfg.tentar_antes),
     pedir_csat: Boolean(cfg.pedir_csat),
+    // Fluxos prontos sem IA: os textos que valem (os da empresa por cima dos padrões) e os padrões.
+    fluxos_ativos: (cfg.fluxos_ativos ?? 1) !== 0,
+    textos_fluxo: (() => { try { return cfg.textos_fluxo ? JSON.parse(cfg.textos_fluxo) : {}; } catch { return {}; } })(),
+    fluxos_padrao: require('../ia/fluxos').TEXTOS,
+    fluxos_rotulos: require('../ia/fluxos').ROTULOS,
     // O que vale de fato, somando o que está no servidor.
     modelo_efetivo: cfg.modelo || config.ia.modelo,
     esforco_efetivo: cfg.esforco || config.ia.esforco,
@@ -95,6 +100,23 @@ module.exports = function rotasIa(db) {
           d.modelo === undefined || !['master', 'suporte'].includes(req.usuario.perfil) ? atual.modelo : v.opcional(d.modelo, 'o modelo', 60),
           d.esforco === undefined ? atual.esforco : (d.esforco ? v.opcao(d.esforco, 'o esforço', ['low', 'medium', 'high', 'xhigh', 'max']) : null),
           agora(), req.empresa.id);
+      // Fluxos prontos sem IA: liga/desliga e os textos (só os que a empresa trocou; vazio volta ao padrão).
+      if (d.fluxos_ativos !== undefined || d.textos_fluxo !== undefined) {
+        const { TEXTOS } = require('../ia/fluxos');
+        let textos = atual.textos_fluxo;
+        if (d.textos_fluxo !== undefined) {
+          const o = v.objeto(d.textos_fluxo, 'os textos dos fluxos') ?? {};
+          const limpos = {};
+          for (const [k, val] of Object.entries(o)) {
+            v.exigir(k in TEXTOS, `Texto de fluxo "${k}" não existe.`);
+            const t = v.opcional(val, 'o texto do fluxo', 1500);
+            if (t && t.trim() !== TEXTOS[k]) limpos[k] = t.trim();
+          }
+          textos = Object.keys(limpos).length ? JSON.stringify(limpos) : null;
+        }
+        db.prepare('UPDATE ia_config SET fluxos_ativos = ?, textos_fluxo = ? WHERE empresa_id = ?')
+          .run(d.fluxos_ativos === undefined ? (atual.fluxos_ativos ?? 1) : (v.booleano(d.fluxos_ativos) ? 1 : 0), textos, req.empresa.id);
+      }
       // Ligações: fala ou teclas, e o menu principal do modo teclas.
       if (d.voz_modo !== undefined || d.voz_menu !== undefined) {
         const modo = d.voz_modo === undefined ? (atual.voz_modo ?? 'fala') : v.opcao(d.voz_modo, 'o jeito de atender ligações', ['fala', 'teclas']);
