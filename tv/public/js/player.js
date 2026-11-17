@@ -1,0 +1,414 @@
+import { api, BASE, ErroApi } from './api.js';
+import { el, icone, relogio, duracao, toast, modal, acao, nomeDoAparelho, etiquetaIdade, QUALIDADES } from './ui.js';
+
+/**
+ * Player da PayAx TV: canais ao vivo (HLS pelo hls.js, com reserva para o HLS nativo do Safari)
+ * e conteúdo sob demanda (MP4 com Range). Controles próprios, legendas, qualidade, telas simultâneas
+ * e "continuar assistindo" salvo de tempo em tempo.
+ */
+
+let Hls = null;
+const carregarHls = async () => {
+  if (Hls !== null) return Hls;
+  try {
+    const mod = await import(`${BASE}/vendor/hls/hls.mjs`);
+    Hls = mod.default ?? mod.Hls ?? null;
+  } catch {
+    Hls = null;
+  }
+  return Hls;
+};
+
+const PASSO = 10;
+
+/** Abre a tela cheia de reprodução. Devolve uma promessa que resolve quando o player fecha. */
+export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, episodio_id: episodioId, aoFechar, aoTrocar }) {
+  let dados;
+  try {
+    dados = await api.post('/play/abrir', { tipo, canal_id: canalId, titulo_id: tituloId, episodio_id: episodioId, dispositivo: nomeDoAparelho() });
+  } catch (err) {
+    // 409 com as telas em uso: o assinante decide qual parar.
+    if (err instanceof ErroApi && err.status === 409 && err.detalhes?.em_uso) {
+      const liberar = await modal('Telas em uso', (fechar) => [
+        el('p', { class: 'mudo' }, err.message),
+        el('div', { class: 'coluna', style: 'margin:12px 0' }, err.detalhes.em_uso.map((t) => el('div', { class: 'cartao fundo linha entre' },
+          el('div', {}, el('strong', {}, t.o_que ?? 'Assistindo'), el('div', { class: 'pequeno mudo' }, t.dispositivo ?? 'Aparelho não informado')),
+          el('span', { class: 'etiqueta' }, 'em uso')))),
+        el('div', { class: 'linha fim' },
+          el('button', { class: 'btn vazio', onclick: () => fechar(false) }, 'Deixar como está'),
+          el('button', { class: 'btn primario', onclick: () => fechar(true) }, 'Parar as outras e assistir aqui')),
+      ]);
+      if (!liberar) return null;
+      await api.post('/conta/telas/encerrar', {});
+      return tocar({ tipo, canal_id: canalId, titulo_id: tituloId, episodio_id: episodioId, aoFechar, aoTrocar });
+    }
+    throw err;
+  }
+
+  const aoVivo = Boolean(dados.ao_vivo);
+  const video = el('video', { playsinline: true, autoplay: true, preload: 'auto', crossorigin: 'use-credentials' });
+  video.setAttribute('x-webkit-airplay', 'allow');
+  let hls = null;
+  let fechado = false;
+  let pararPing = null;
+  let esconder = null;
+  let menuAberto = null;
+
+  // ---------- Montagem da tela ----------
+  const titulo = el('h2', {}, dados.info.titulo);
+  const subtitulo = el('div', { class: 'sub' }, dados.info.subtitulo ?? '');
+  const selos = el('div', { class: 'linha', style: 'margin-top:6px' },
+    aoVivo ? el('span', { class: 'etiqueta vivo' }, 'AO VIVO') : null,
+    dados.info.classificacao !== undefined ? etiquetaIdade(dados.info.classificacao) : null,
+    dados.fonte.qualidade ? el('span', { class: 'etiqueta' }, QUALIDADES[dados.fonte.qualidade] ?? dados.fonte.qualidade) : null,
+    dados.fonte.retransmitido ? el('span', { class: 'etiqueta ok', title: 'O sinal passa pelos nossos servidores' }, 'PayAx CDN') : null);
+
+  const btn = (nomeIcone, rotulo, fn, extra = '') => {
+    const b = el('button', { class: `pbtn ${extra}`, title: rotulo, 'aria-label': rotulo }, icone(nomeIcone));
+    b.addEventListener('click', (e) => { e.stopPropagation(); fn(b); });
+    return b;
+  };
+
+  const feito = el('div', { class: 'feito', style: 'width:0' });
+  const buffer = el('div', { class: 'buffer', style: 'width:0' });
+  const bolinha = el('div', { class: 'bolinha', style: 'left:0' });
+  const trilho = el('div', { class: `trilho${aoVivo ? ' vivo' : ''}`, role: 'slider', 'aria-label': 'Posição', tabindex: '0' },
+    el('div', { class: 'fundo' }, buffer, feito), bolinha);
+  const agora = el('span', { class: 'relogio' }, '0:00');
+  const total = el('span', { class: 'relogio' }, aoVivo ? 'ao vivo' : '0:00');
+
+  const btnTocar = btn('tocar', 'Tocar ou pausar (espaço)', () => alternar(), 'grande');
+  const btnSom = btn('som', 'Som (M)', () => { video.muted = !video.muted; });
+  const faixaVolume = el('input', { type: 'range', min: '0', max: '1', step: '0.02', value: '1', 'aria-label': 'Volume' });
+  faixaVolume.addEventListener('input', () => { video.volume = Number(faixaVolume.value); video.muted = Number(faixaVolume.value) === 0; });
+  faixaVolume.addEventListener('click', (e) => e.stopPropagation());
+
+  const btnLegenda = dados.legendas?.length ? btn('legenda', 'Legendas (C)', (b) => menuLegendas(b)) : null;
+  const btnQualidade = btn('engrenagem', 'Qualidade', (b) => menuQualidade(b));
+  const btnPip = document.pictureInPictureEnabled ? btn('pip', 'Janela flutuante', async () => {
+    try {
+      if (document.pictureInPictureElement) await document.exitPictureInPicture();
+      else await video.requestPictureInPicture();
+    } catch { toast('A janela flutuante não está disponível aqui.', true); }
+  }) : null;
+  const btnTela = btn('tela', 'Tela cheia (F)', () => telaCheia());
+  const btnProximo = dados.proximo_episodio ? btn('proximo', 'Próximo episódio', () => irParaProximo()) : null;
+  const btnVivo = aoVivo ? el('button', { class: 'btn pequeno vazio', onclick: (e) => { e.stopPropagation(); voltarAoVivo(); } }, 'Voltar ao vivo') : null;
+
+  const avisoCentro = el('div', { class: 'centro-aviso' }, el('div', { class: 'rodinha' }));
+  const caixaErro = el('div', { class: 'erro-caixa oculto' });
+  const caixaProximo = el('div', { class: 'proximo oculto' });
+
+  const cobertura = el('div', { class: 'cobertura' },
+    el('div', { class: 'p-topo' },
+      btn('voltar', 'Voltar (Esc)', () => fechar(), ''),
+      el('div', { class: 'info' }, titulo, subtitulo, selos),
+      dados.download ? el('a', { class: 'btn pequeno vazio', href: dados.download, download: '', onclick: (e) => e.stopPropagation() }, icone('baixar'), 'Baixar') : null),
+    el('div', { class: 'p-base' },
+      el('div', { class: 'tempo-barra' }, agora, trilho, total),
+      el('div', { class: 'botoes' },
+        btnTocar,
+        aoVivo ? null : btn('voltar10', 'Voltar 10 segundos (←)', () => pular(-PASSO)),
+        aoVivo ? null : btn('avancar10', 'Avançar 10 segundos (→)', () => pular(PASSO)),
+        btnProximo,
+        el('div', { class: 'volume' }, btnSom, faixaVolume),
+        btnVivo,
+        el('div', { class: 'espaco' }),
+        btnLegenda,
+        btnQualidade,
+        btnPip,
+        btnTela)));
+
+  const caixa = el('div', { class: 'player' }, video, cobertura, avisoCentro, caixaErro, caixaProximo);
+  document.body.append(caixa);
+  document.body.style.overflow = 'hidden';
+
+  // ---------- Fonte do vídeo ----------
+  const semSuporteNativo = () => !video.canPlayType('application/vnd.apple.mpegurl');
+  async function ligarFonte() {
+    if (dados.fonte.tipo === 'hls' && semSuporteNativo()) {
+      const H = await carregarHls();
+      if (H?.isSupported()) {
+        hls = new H({ lowLatencyMode: aoVivo, backBufferLength: aoVivo ? 30 : 90, enableWorker: true, maxBufferLength: 20 });
+        hls.on(H.Events.ERROR, (_e, info) => {
+          if (!info.fatal) return;
+          if (info.type === H.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+          else if (info.type === H.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+          else mostrarErro('Não conseguimos manter a transmissão. Tente abrir de novo.');
+        });
+        hls.on(H.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+        hls.loadSource(dados.fonte.url);
+        hls.attachMedia(video);
+        return;
+      }
+    }
+    video.src = dados.fonte.url;
+    video.play().catch(() => {});
+  }
+
+  // ---------- Controles ----------
+  const alternar = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
+  const pular = (s) => { if (!aoVivo && Number.isFinite(video.duration)) video.currentTime = Math.min(video.duration - 0.5, Math.max(0, video.currentTime + s)); };
+  const voltarAoVivo = () => {
+    const fim = video.seekable.length ? video.seekable.end(video.seekable.length - 1) : null;
+    if (fim) video.currentTime = fim - 1;
+    video.play().catch(() => {});
+  };
+  async function telaCheia() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await caixa.requestFullscreen({ navigationUI: 'hide' });
+    } catch { toast('Seu navegador não deixou abrir em tela cheia.', true); }
+  }
+  document.addEventListener('fullscreenchange', () => {
+    btnTela.replaceChildren(icone(document.fullscreenElement ? 'telaSair' : 'tela'));
+  });
+
+  const fecharMenu = () => { menuAberto?.remove(); menuAberto = null; };
+  function abrirMenu(titulo2, itens) {
+    fecharMenu();
+    const m = el('div', { class: 'menu-flutuante', onclick: (e) => e.stopPropagation() }, el('h4', {}, titulo2),
+      itens.map(({ rotulo, detalhe, ligado, fn }) => el('button', { class: ligado ? 'on' : '', onclick: () => { fn(); fecharMenu(); } },
+        el('span', {}, rotulo), detalhe ? el('span', { class: 'mini mudo' }, detalhe) : ligado ? icone('certo', 15) : null)));
+    caixa.append(m);
+    menuAberto = m;
+  }
+
+  function menuQualidade() {
+    const itens = [];
+    if (hls?.levels?.length) {
+      itens.push({ rotulo: 'Automática', detalhe: hls.autoLevelEnabled && hls.currentLevel >= 0 ? `${hls.levels[hls.currentLevel]?.height}p` : null,
+        ligado: hls.autoLevelEnabled, fn: () => { hls.currentLevel = -1; } });
+      hls.levels.forEach((n, i) => itens.push({
+        rotulo: `${n.height}p`,
+        detalhe: n.bitrate ? `${Math.round(n.bitrate / 1000)} kbps` : null,
+        ligado: !hls.autoLevelEnabled && hls.currentLevel === i,
+        fn: () => { hls.currentLevel = i; },
+      }));
+    } else {
+      itens.push({ rotulo: QUALIDADES[dados.fonte.qualidade] ?? 'Qualidade do arquivo', detalhe: 'única', ligado: true, fn: () => {} });
+    }
+    itens.push({ rotulo: 'Velocidade normal', ligado: video.playbackRate === 1, fn: () => { video.playbackRate = 1; } });
+    for (const r of [1.25, 1.5, 2]) itens.push({ rotulo: `Velocidade ${String(r).replace('.', ',')}×`, ligado: video.playbackRate === r, fn: () => { video.playbackRate = r; } });
+    abrirMenu('Qualidade e velocidade', itens);
+  }
+
+  function menuLegendas() {
+    const faixas = [...video.textTracks];
+    const itens = [{ rotulo: 'Desligadas', ligado: faixas.every((f) => f.mode !== 'showing'), fn: () => faixas.forEach((f) => { f.mode = 'disabled'; }) }];
+    faixas.forEach((f, i) => itens.push({
+      rotulo: f.label || f.language || `Legenda ${i + 1}`,
+      ligado: f.mode === 'showing',
+      fn: () => faixas.forEach((x, j) => { x.mode = j === i ? 'showing' : 'disabled'; }),
+    }));
+    abrirMenu('Legendas', itens);
+  }
+
+  for (const l of dados.legendas ?? []) {
+    const faixa = el('track', { kind: 'subtitles', label: l.rotulo, srclang: l.idioma, src: l.url, ...(l.padrao ? { default: true } : {}) });
+    video.append(faixa);
+  }
+
+  // ---------- Barra de tempo ----------
+  const duracaoAtual = () => (Number.isFinite(video.duration) && video.duration > 0 ? video.duration
+    : (video.seekable.length ? video.seekable.end(video.seekable.length - 1) : 0));
+
+  function pintarTempo() {
+    const d = duracaoAtual();
+    const p = d ? Math.min(100, (video.currentTime / d) * 100) : 0;
+    feito.style.width = `${p}%`;
+    bolinha.style.left = `${p}%`;
+    if (video.buffered.length) buffer.style.width = `${Math.min(100, (video.buffered.end(video.buffered.length - 1) / (d || 1)) * 100)}%`;
+    agora.textContent = aoVivo ? relogio(video.currentTime) : relogio(video.currentTime);
+    if (!aoVivo) total.textContent = relogio(d);
+    trilho.setAttribute('aria-valuetext', `${relogio(video.currentTime)} de ${aoVivo ? 'ao vivo' : relogio(d)}`);
+  }
+
+  const posicaoDoClique = (e) => {
+    const r = trilho.getBoundingClientRect();
+    const x = (e.touches?.[0]?.clientX ?? e.clientX) - r.left;
+    return Math.min(1, Math.max(0, x / r.width));
+  };
+  let arrastando = false;
+  const buscar = (e) => {
+    const d = duracaoAtual();
+    if (!d) return;
+    video.currentTime = posicaoDoClique(e) * d;
+    pintarTempo();
+  };
+  trilho.addEventListener('pointerdown', (e) => { e.stopPropagation(); arrastando = true; trilho.setPointerCapture(e.pointerId); buscar(e); });
+  trilho.addEventListener('pointermove', (e) => { if (arrastando) buscar(e); });
+  trilho.addEventListener('pointerup', () => { arrastando = false; });
+  trilho.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { pular(-PASSO); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { pular(PASSO); e.preventDefault(); }
+  });
+
+  // ---------- Eventos do vídeo ----------
+  video.addEventListener('timeupdate', pintarTempo);
+  video.addEventListener('progress', pintarTempo);
+  video.addEventListener('loadedmetadata', () => {
+    pintarTempo();
+    if (dados.retomar_s > 0 && !aoVivo) {
+      video.currentTime = dados.retomar_s;
+      toast(`Retomando de ${duracao(dados.retomar_s)}`);
+    }
+  });
+  video.addEventListener('play', () => { btnTocar.replaceChildren(icone('pausar')); avisoCentro.classList.add('oculto'); });
+  video.addEventListener('pause', () => { btnTocar.replaceChildren(icone('tocar')); mostrarControles(); salvar(); });
+  video.addEventListener('waiting', () => avisoCentro.classList.remove('oculto'));
+  video.addEventListener('playing', () => avisoCentro.classList.add('oculto'));
+  video.addEventListener('volumechange', () => {
+    btnSom.replaceChildren(icone(video.muted || video.volume === 0 ? 'mudo' : 'som'));
+    faixaVolume.value = String(video.muted ? 0 : video.volume);
+  });
+  video.addEventListener('error', () => mostrarErro(aoVivo ? 'O sinal deste canal está fora do ar neste momento.' : 'Não conseguimos tocar este vídeo.'));
+  video.addEventListener('ended', () => {
+    salvar();
+    if (dados.proximo_episodio) oferecerProximo();
+    else fechar();
+  });
+
+  function mostrarErro(msg) {
+    avisoCentro.classList.add('oculto');
+    caixaErro.classList.remove('oculto');
+    caixaErro.replaceChildren(el('div', { class: 'cartao', style: 'max-width:440px;text-align:center' },
+      el('h2', {}, 'Não foi possível assistir'),
+      el('p', { class: 'mudo' }, msg),
+      el('div', { class: 'linha', style: 'justify-content:center' },
+        el('button', { class: 'btn primario', onclick: () => { caixaErro.classList.add('oculto'); ligarFonte(); } }, 'Tentar de novo'),
+        el('button', { class: 'btn vazio', onclick: () => fechar() }, 'Voltar'))));
+  }
+
+  // ---------- Próximo episódio ----------
+  function oferecerProximo() {
+    const p = dados.proximo_episodio;
+    let restam = 8;
+    const contador = el('strong', {}, `${restam}s`);
+    const t = setInterval(() => {
+      restam -= 1;
+      contador.textContent = `${restam}s`;
+      if (restam <= 0) { clearInterval(t); irParaProximo(); }
+    }, 1000);
+    caixaProximo.classList.remove('oculto');
+    caixaProximo.replaceChildren(
+      el('div', { class: 'pequeno mudo' }, 'A seguir'),
+      el('strong', {}, `T${p.temporada} E${p.numero} · ${p.nome}`),
+      el('div', { class: 'linha entre', style: 'margin-top:10px' },
+        el('button', { class: 'btn vazio pequeno', onclick: () => { clearInterval(t); caixaProximo.classList.add('oculto'); } }, 'Agora não'),
+        el('button', { class: 'btn primario pequeno', onclick: () => { clearInterval(t); irParaProximo(); } }, 'Assistir ', contador)));
+  }
+
+  async function irParaProximo() {
+    const p = dados.proximo_episodio;
+    if (!p) return;
+    await fechar({ silencioso: true });
+    const saida = await tocar({ tipo: 'episodio', titulo_id: dados.info.titulo_id, episodio_id: p.id, aoFechar, aoTrocar });
+    aoTrocar?.(saida);
+  }
+
+  // ---------- Sinal de vida e progresso ----------
+  let ultimoSalvo = 0;
+  const salvar = async () => {
+    if (fechado || aoVivo || !dados.info.titulo_id) return;
+    const pos = Math.floor(video.currentTime);
+    if (Math.abs(pos - ultimoSalvo) < 5) return;
+    ultimoSalvo = pos;
+    try {
+      await api.post('/play/ping', { sessao_id: dados.sessao_id, segundos: Math.floor(video.currentTime), posicao: pos, duracao: Math.floor(duracaoAtual()) });
+    } catch { /* tenta no próximo ciclo */ }
+  };
+
+  const ping = async () => {
+    if (fechado) return;
+    try {
+      await api.post('/play/ping', {
+        sessao_id: dados.sessao_id,
+        segundos: Math.floor(aoVivo ? (Date.now() - inicio) / 1000 : video.currentTime),
+        ...(aoVivo || !dados.info.titulo_id ? {} : { posicao: Math.floor(video.currentTime), duracao: Math.floor(duracaoAtual()) }),
+      });
+    } catch (err) {
+      if (err.status === 409) {
+        fechar({ silencioso: true });
+        toast('Esta tela foi encerrada em outro aparelho.', true);
+      }
+    }
+  };
+  const inicio = Date.now();
+  pararPing = setInterval(ping, 30_000);
+  const pararSalvar = setInterval(salvar, 15_000);
+
+  // ---------- Esconder controles ----------
+  function mostrarControles() {
+    caixa.classList.remove('limpo');
+    clearTimeout(esconder);
+    esconder = setTimeout(() => { if (!video.paused && !menuAberto) caixa.classList.add('limpo'); }, 3500);
+  }
+  caixa.addEventListener('pointermove', mostrarControles);
+  caixa.addEventListener('click', (e) => {
+    if (menuAberto) return fecharMenu();
+    if (e.target === video || e.target === cobertura) return alternar();
+    return undefined;
+  });
+  video.addEventListener('dblclick', () => telaCheia());
+  mostrarControles();
+
+  // ---------- Teclado ----------
+  const teclas = (e) => {
+    if (e.target.matches('input, textarea, select')) return;
+    const mapa = {
+      ' ': () => alternar(), k: () => alternar(), ArrowLeft: () => pular(-PASSO), ArrowRight: () => pular(PASSO),
+      j: () => pular(-30), l: () => pular(30), f: () => telaCheia(), m: () => { video.muted = !video.muted; },
+      c: () => (dados.legendas?.length ? menuLegendas() : null),
+      ArrowUp: () => { video.volume = Math.min(1, video.volume + 0.1); video.muted = false; },
+      ArrowDown: () => { video.volume = Math.max(0, video.volume - 0.1); },
+      Escape: () => (document.fullscreenElement ? document.exitFullscreen() : fechar()),
+    };
+    const fn = mapa[e.key] ?? (/^[0-9]$/.test(e.key) && !aoVivo
+      ? () => { const d = duracaoAtual(); if (d) video.currentTime = (Number(e.key) / 10) * d; }
+      : null);
+    if (!fn) return;
+    e.preventDefault();
+    mostrarControles();
+    fn();
+  };
+  document.addEventListener('keydown', teclas);
+
+  // ---------- Fechar ----------
+  let resolverFim;
+  const fim = new Promise((r) => { resolverFim = r; });
+
+  async function fechar({ silencioso = false } = {}) {
+    if (fechado) return;
+    fechado = true;
+    clearInterval(pararPing);
+    clearInterval(pararSalvar);
+    clearTimeout(esconder);
+    document.removeEventListener('keydown', teclas);
+    if (!aoVivo && dados.info.titulo_id && video.currentTime > 5) {
+      try {
+        await api.post('/play/ping', { sessao_id: dados.sessao_id, segundos: Math.floor(video.currentTime), posicao: Math.floor(video.currentTime), duracao: Math.floor(duracaoAtual()) });
+      } catch { /* segue */ }
+    }
+    try { await api.post('/play/fechar', { sessao_id: dados.sessao_id, motivo: 'fim' }); } catch { /* segue */ }
+    try { hls?.destroy(); } catch { /* segue */ }
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch { /* segue */ } }
+    caixa.remove();
+    document.body.style.overflow = '';
+    if (!silencioso) aoFechar?.();
+    resolverFim({ titulo_id: dados.info.titulo_id ?? null });
+  }
+
+  await ligarFonte();
+  return fim;
+}
+
+/** Botão "Assistir" pronto, com o tratamento de erro padrão. */
+export function botaoAssistir(rotulo, alvo, { classe = 'btn primario grande', aoFechar } = {}) {
+  const b = el('button', { class: classe }, icone('tocar'), rotulo);
+  b.addEventListener('click', () => acao(b, () => tocar({ ...alvo, aoFechar })));
+  return b;
+}

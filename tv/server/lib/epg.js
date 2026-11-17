@@ -31,13 +31,15 @@ const grade = (db, { canalId = null, de, ate }) => db.prepare(`SELECT p.*, c.nom
   WHERE p.fim > ? AND p.inicio < ? ${canalId ? 'AND p.canal_id = ?' : ''} AND c.ativo = 1
   ORDER BY c.ordem, c.numero, p.inicio`).all(de, ate, ...(canalId ? [Number(canalId)] : []));
 
-/** Quanto do programa já passou (a barrinha do guia). */
+/** Quanto do programa já passou, em %, ou null quando ele não está no ar agora (a barrinha do guia). */
 function andamento(p) {
   if (!p) return null;
   const inicio = Date.parse(p.inicio);
   const fim = Date.parse(p.fim);
+  const agoraMs = Date.now();
   if (!Number.isFinite(inicio) || !Number.isFinite(fim) || fim <= inicio) return null;
-  return Math.min(100, Math.max(0, Math.round(((Date.now() - inicio) / (fim - inicio)) * 100)));
+  if (agoraMs < inicio || agoraMs >= fim) return null;
+  return Math.min(100, Math.max(0, Math.round(((agoraMs - inicio) / (fim - inicio)) * 100)));
 }
 
 /** Grava um programa, recusando sobreposição com outro do mesmo canal. */
