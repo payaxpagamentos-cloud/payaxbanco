@@ -8,6 +8,12 @@ import { vigiarLigacoes } from './passagem.js';
 const raiz = $('#app');
 let pararTela = null;
 let nomePlataforma = 'ZOE Atende';
+/** Marca do menu: a da ZOE 360 (símbolo e "360" do login); se o master trocou o nome da plataforma, mostra o nome dele. */
+const marcaMenu = (nome) => (/^ZOE( Atende| 360)?$/i.test(String(nome).trim())
+  ? el('span', { class: 'marca-zoe', role: 'img', 'aria-label': 'ZOE 360' },
+    el('img', { src: 'img/login/zoe-symbol.svg', width: '34', height: '34', alt: '' }),
+    el('span', { class: 'palavra', 'aria-hidden': 'true' }, 'ZOE', el('span', {}, '360')))
+  : marca(nome));
 // A empresa do endereço aberto (connectlink.zoe360.com.br), quando há uma: o login mostra o nome dela.
 let empresaDoEndereco = null;
 const nomesEmpresa = new Map();
@@ -185,7 +191,7 @@ async function desenhar() {
     el('a', { class: `item${k === tela ? ' on' : ''}`, href: link(empresaId, k), title: rotulo }, icone(ic), el('span', { class: 'rotulo' }, rotulo)));
 
   const lateral = el('nav', { class: 'lateral', 'aria-label': 'Menu' },
-    el('div', { class: 'topo-lateral' }, marca(nomePlataforma), el('button', { class: 'recolher', title: 'Recolher menu', onclick: () => {
+    el('div', { class: 'topo-lateral' }, marcaMenu(nomePlataforma), el('button', { class: 'recolher', title: 'Recolher menu', onclick: () => {
       casca.classList.toggle('recolhida');
       try { localStorage.setItem('atend.menu', casca.classList.contains('recolhida') ? 'recolhido' : 'aberto'); } catch { /* ignora */ }
     } }, icone('seta'))),

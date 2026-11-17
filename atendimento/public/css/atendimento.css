@@ -1731,3 +1731,85 @@ body.pagina-tv.sem-cursor, body.pagina-tv.sem-cursor *{ cursor: none; }
   .cl-faisca{ margin-left: 0; }
   .aovivo.clean.tv, .aovivo.clean:fullscreen{ padding: 1.2em; }
 }
+
+/* ==========================================================================
+   Visual clean ZOE 360 (tema claro): o mesmo clima do login — fundo pérola/lavanda,
+   menu lateral claro em vidro, linhas finas e destaque azul→roxo só onde importa.
+   O tema escuro continua como estava.
+   ========================================================================== */
+:root[data-tema="claro"]{
+  --bg: #F4F3FC;
+  --surface-2: #F5F4FD;
+  --hover: #F0EEFC;
+  --border: #E7E5F5;
+  --border-forte: #D9D6EE;
+  --text: #121634;
+  --text-2: #5E6585;
+  --text-3: #8C91AB;
+  --azul: #5B5CF6;
+  --azul-forte: #4B44E0;
+  --destaque-bg: rgba(91, 92, 246, .09);
+  --destaque-borda: rgba(91, 92, 246, .32);
+  --info-bg: #EEEDFE;
+  --barra: #6366F1;
+  --azul-pizza: #6366F1;
+  --radius: 16px;
+  --shadow: 0 1px 2px rgba(40, 32, 110, .03), 0 8px 24px -14px rgba(40, 32, 110, .12);
+  --vidro: rgba(255, 255, 255, .66);
+  --vidro-forte: rgba(255, 255, 255, .86);
+  --vidro-borda: rgba(255, 255, 255, .9);
+  --vidro-sombra: 0 10px 30px -18px rgba(60, 48, 160, .22);
+  --vidro-campo: rgba(255, 255, 255, .78);
+  --luz-1: rgba(56, 152, 255, .16);
+  --luz-2: rgba(146, 72, 255, .14);
+  --luz-3: rgba(120, 110, 255, .10);
+  --gradiente-zoe: linear-gradient(106deg, #18B9F0 0%, #3979FF 38%, #8A32FF 83%, #A526F5 100%);
+}
+
+/* Menu lateral claro, em vidro */
+:root[data-tema="claro"] .lateral{
+  background: rgba(255, 255, 255, .62); color: var(--text-2);
+  -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%);
+  border-right: 1px solid var(--border); box-shadow: none; }
+:root[data-tema="claro"] .lateral .marca{ color: var(--text); }
+:root[data-tema="claro"] .lateral .marca .texto small{ color: var(--text-2); }
+:root[data-tema="claro"] .lateral a.item{ color: #4A5070; font-weight: 600; }
+:root[data-tema="claro"] .lateral a.item svg{ color: #8A8FB0; }
+:root[data-tema="claro"] .lateral a.item:hover{ background: rgba(91, 92, 246, .06); color: var(--text); }
+:root[data-tema="claro"] .lateral a.item.on{ background: rgba(91, 92, 246, .1); color: #3F3AC9; box-shadow: inset 3px 0 0 #6D5CF6; }
+:root[data-tema="claro"] .lateral a.item.on svg{ color: #5B5CF6; }
+:root[data-tema="claro"] .lateral a.sub{ color: var(--text-3); }
+:root[data-tema="claro"] .lateral a.sub.on, :root[data-tema="claro"] .lateral a.sub:hover{ color: #3F3AC9; }
+:root[data-tema="claro"] .lateral .recolher{ color: var(--text-3); }
+:root[data-tema="claro"] .lateral .recolher:hover{ background: rgba(91, 92, 246, .07); color: var(--text); }
+@media (max-width: 860px){ :root[data-tema="claro"] .lateral{ background: rgba(255, 255, 255, .9); border-bottom: 1px solid var(--border); } }
+
+/* Marca ZOE 360 no menu (o símbolo e o "360" do login) */
+.marca-zoe{ display: inline-flex; align-items: center; gap: 10px; text-decoration: none; white-space: nowrap; min-width: 0; }
+.marca-zoe img{ width: 34px; height: 34px; flex: none; }
+.marca-zoe .palavra{ font-size: 21px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.marca-zoe .palavra span{ margin-left: 5px; background: var(--gradiente-zoe, linear-gradient(105deg, #248bff, #922aff)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+:root[data-tema="escuro"] .marca-zoe .palavra{ color: #fff; }
+.casca.recolhida .marca-zoe .palavra{ display: none; }
+
+/* Botão principal com o gradiente do login */
+:root[data-tema="claro"] .btn.primario{ background: var(--gradiente-zoe); border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 8px 18px -10px rgba(91, 70, 246, .75); }
+:root[data-tema="claro"] .btn.primario:hover{ background: var(--gradiente-zoe); filter: brightness(1.05) saturate(1.05); }
+
+/* Cartões mais leves: borda fina, sombra quase nenhuma */
+:root[data-tema="claro"] .cartao{ border-color: rgba(231, 229, 245, .95); }
+:root[data-tema="claro"] .indicador .ic{ box-shadow: none; }
+:root[data-tema="claro"] input:not([type="checkbox"]):focus, :root[data-tema="claro"] select:focus, :root[data-tema="claro"] textarea:focus{
+  border-color: #7471EC; box-shadow: 0 0 0 3px rgba(116, 113, 236, .14); outline: none; }
+/* Azuis fixos trocados pelo tom da ZOE 360 */
+:root[data-tema="claro"] .ferramentas .avatar{ background: var(--gradiente-zoe); }
+:root[data-tema="claro"] .telefone-botao:not(.em-chamada){ background: var(--gradiente-zoe); box-shadow: 0 12px 28px -10px rgba(91, 70, 246, .6); }
+:root[data-tema="claro"] input[type="checkbox"]:checked{ background-color: #5B5CF6; border-color: #5B5CF6; }
+:root[data-tema="claro"] .item-conversa.on{ background: linear-gradient(90deg, rgba(91, 92, 246, .11), rgba(91, 92, 246, .03)); box-shadow: inset 3px 0 0 #6D5CF6; }
+:root[data-tema="claro"] .tabela tr.clicavel:hover td{ background: rgba(91, 92, 246, .05); }
+:root[data-tema="claro"] .tabela tr.clicavel:hover td:first-child{ box-shadow: -12px 0 0 rgba(91, 92, 246, .05); }
+:root[data-tema="claro"] .tabela tr.clicavel:hover td:last-child{ box-shadow: 12px 0 0 rgba(91, 92, 246, .05); }
+:root[data-tema="claro"] .grafico .serie{ stroke: #6366F1; }
+:root[data-tema="claro"] .grafico .area{ fill: rgba(99, 102, 241, .12); }
+:root[data-tema="claro"] .barras .barra{ background: linear-gradient(180deg, #7C6CF6, rgba(99, 102, 241, .5)); box-shadow: none; }
