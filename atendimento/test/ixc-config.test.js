@@ -84,3 +84,20 @@ test('"preciso do boleto" com o IXC ligado: a ZOE atende, sem jogar direto na fi
     assert.ok(!saidas.some((t) => /atendente virtual/i.test(t)), 'não se anuncia como atendente virtual');
   } finally { ia.restaurar(); ixc.restaurar(); meta.restaurar(); }
 });
+
+test('o Testar nunca manda nada para a Meta, mesmo com o número de verdade cadastrado', async () => {
+  const meta = h.fingirMeta();
+  const { db, empresa } = h.criarAmbiente(); // já vem com número ativo
+  const conversas = require('../server/lib/conversas');
+  const envio = require('../server/lib/envio');
+  try {
+    const numero = db.prepare('SELECT * FROM numeros WHERE empresa_id = ? AND ativo = 1').get(empresa.id);
+    const contato = conversas.garantirContato(db, empresa.id, 'teste-1', 'Teste');
+    const conversa = conversas.abrirOuRetomar(db, { empresa, numero, contato });
+    conversas.tocarJanela(db, conversa);
+    envio.enfileirar(db, conversa, { autor: 'ia', texto: 'oi' });
+    await envio.processarFila(db);
+    assert.equal(meta.chamadas.length, 0, 'nenhuma chamada à Meta');
+    assert.equal(db.prepare("SELECT status FROM mensagens WHERE conversa_id = ? AND texto = 'oi'").get(conversa.id).status, 'enviada');
+  } finally { meta.restaurar(); }
+});

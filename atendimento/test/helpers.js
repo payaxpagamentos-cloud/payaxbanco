@@ -58,12 +58,16 @@ function fingirMeta({ falharEm = () => null, midia = null } = {}) {
     const endereco = String(url);
     // Só a Graph API é dublada: chamadas ao próprio servidor (nos testes de HTTP) seguem de verdade.
     if (!endereco.startsWith(config.whatsapp.graph) && !endereco.includes('exemplo/midia')) return original(url, opcoes);
-    const corpo = opcoes.body ? JSON.parse(opcoes.body) : null;
+    const corpo = typeof opcoes.body === 'string' ? JSON.parse(opcoes.body) : null;
     chamadas.push({ url: endereco, metodo: opcoes.method ?? 'GET', corpo });
     const falha = falharEm({ url: endereco, corpo });
     if (falha) {
       return new Response(JSON.stringify({ error: { message: falha.mensagem ?? 'erro', code: falha.codigo ?? 131000 } }),
         { status: falha.status ?? 400, headers: { 'content-type': 'application/json' } });
+    }
+    // Upload de arquivo (FormData): devolve o id da mídia, como a Meta.
+    if (endereco.endsWith('/media') && (opcoes.method ?? 'GET') === 'POST') {
+      return new Response(JSON.stringify({ id: `midia.${++sequencia}` }), { status: 200, headers: { 'content-type': 'application/json' } });
     }
     if (endereco.includes('/messages')) {
       if (corpo?.status === 'read') return new Response(JSON.stringify({ success: true }), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -98,6 +102,17 @@ function fingirIa(roteiro) {
   let i = 0;
   const responder = async (corpo) => {
     pedidos.push(corpo);
+    // O que a API de verdade recusa com 400, a dublê também recusa — senão o teste passa e o servidor quebra.
+    const recusar = (msg) => { const A = require('@anthropic-ai/sdk'); const C = (A.default ?? A).BadRequestError; throw new C(400, { type: 'error', error: { type: 'invalid_request_error', message: msg } }, msg, new Headers()); };
+    const ultima = corpo.messages?.at(-1);
+    if (ultima?.role === 'assistant') recusar('This model does not support assistant message prefill. The conversation must end with a user message.');
+    if (corpo.messages?.[0]?.role !== 'user') recusar('messages: first message must use the "user" role');
+    const { problemasEstrito } = require('../server/ia/esquema-estrito');
+    for (const t of (corpo.tools ?? []).filter((x) => x.strict)) {
+      const p = problemasEstrito(t.input_schema, t.name);
+      if (p.length) recusar(`tools.${t.name}.custom: Invalid schema: ${p[0]}`);
+    }
+    if (corpo.tool_choice && ['any', 'tool'].includes(corpo.tool_choice.type)) recusar('tool_choice: type "tool" and "any" are not supported for this model.');
     const passo = roteiro[Math.min(i, roteiro.length - 1)];
     i++;
     if (passo.erro) throw passo.erro;

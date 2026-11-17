@@ -2,6 +2,8 @@
 
 const { agora } = require('../db');
 const wa = require('./whatsapp');
+const midia = require('./midia');
+const fs = require('node:fs');
 const custo = require('./custo');
 const { ErroNegocio } = require('./erros');
 
@@ -83,13 +85,25 @@ async function processarFila(db, { limite = 50 } = {}) {
 
     for (const m of fila) {
       const numero = { id: m.numero_id, phone_number_id: m.phone_number_id, token_cifrado: m.token_cifrado, app_secret_cifrado: m.app_secret_cifrado };
+      // Conversa do "ZOE › Testar": o contato é de mentira ("teste-<usuário>") e nada pode sair para a Meta.
+      if (String(m.telefone).startsWith('teste-')) {
+        db.prepare("UPDATE mensagens SET status = 'enviada', enviada_em = ? WHERE id = ?").run(agora(), m.id);
+        continue;
+      }
       try {
         if (!m.numero_ativo) throw new wa.ErroWhatsApp('O número de WhatsApp desta empresa está desativado.', { definitivo: true });
         // Fora da janela de 24 h a Meta recusa qualquer mensagem livre: só template passa.
         if (LIVRES.has(m.tipo) && !wa.janelaAberta(m)) {
           throw new wa.ErroWhatsApp('Passaram-se mais de 24 horas desde a última mensagem do cliente: só um template aprovado pode ser enviado agora.', { definitivo: true });
         }
-        const waId = await wa.enviar(numero, corpoDe(m, m.telefone));
+        let corpo = corpoDe(m, m.telefone);
+        // Arquivo guardado aqui (o PDF do boleto, por exemplo): sobe para a Meta e vai pelo id.
+        if (!m.payload && m.midia_arquivo && wa.TIPOS_MIDIA[m.tipo]) {
+          const arquivo = fs.readFileSync(midia.caminho(m.midia_arquivo));
+          const idMidia = await wa.subirMidia(numero, arquivo, m.midia_mime || 'application/octet-stream', m.midia_nome || 'arquivo');
+          corpo = wa.corpos.midia(m.telefone, m.tipo, { id: idMidia, nome: m.midia_nome, legenda: m.texto });
+        }
+        const waId = await wa.enviar(numero, corpo);
         db.prepare("UPDATE mensagens SET status = 'enviada', wa_id = ?, enviada_em = ?, erro = NULL, tentativas = tentativas + 1 WHERE id = ?")
           .run(waId, agora(), m.id);
         enviadas++;

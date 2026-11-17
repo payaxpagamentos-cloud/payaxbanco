@@ -11,6 +11,7 @@
 #  --dominio    o endereço da plataforma (app.<domínio>)
 #  --empresas   subdomínios das empresas, separados por vírgula (ex.: connectlink,outra)
 #  --sem-cadeado  pula o certificado (rode de novo depois que o DNS responder)
+#  Depois da primeira vez, os três ficam guardados em /etc/zoe-ativar.conf: basta  sudo bash instalacao/ativar.sh
 #
 #  Não mexe em outros sistemas do servidor: o site do Opa, o Docker e o PostgreSQL
 #  ficam como estão. O instalador só cria o site da ZOE no Nginx e desfaz se der erro.
@@ -28,6 +29,22 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# A última ativação fica guardada: na atualização basta "sudo bash instalacao/ativar.sh".
+LEMBRAR=/etc/zoe-ativar.conf
+if [ -f "$LEMBRAR" ]; then
+  ANT_EMAIL=""; ANT_DOMINIO=""; ANT_EMPRESAS=""
+  # shellcheck disable=SC1090
+  . "$LEMBRAR"
+  [ -n "$EMAIL" ] || EMAIL="$ANT_EMAIL"
+  [ -n "$DOMINIO" ] || DOMINIO="$ANT_DOMINIO"
+  [ -n "$EMPRESAS" ] || EMPRESAS="$ANT_EMPRESAS"
+fi
+# Sem nada guardado: o e-mail do master que já está no servidor serve.
+if [ -z "$EMAIL" ] && [ -f /zoe/atendimento/.env ]; then
+  EMAIL="$(grep -E '^ATEND_ADMIN_EMAIL=' /zoe/atendimento/.env | tail -1 | cut -d= -f2- | tr -d '"'"'"' ')"
+fi
+if [ "${ZOE_ATIVAR_SO_ARGS:-0}" = 1 ]; then echo "email=$EMAIL dominio=$DOMINIO empresas=$EMPRESAS"; exit 0; fi
+
 AQUI="$(cd "$(dirname "$0")/.." && pwd)"
 ok()    { printf '  \033[32m✔\033[0m %s\n' "$*"; }
 aviso() { printf '  \033[33m!\033[0m %s\n' "$*"; }
@@ -35,7 +52,7 @@ erro()  { printf '  \033[31m✘\033[0m %s\n' "$*"; }
 titulo(){ printf '\n\033[1m== %s ==\033[0m\n' "$*"; }
 
 [ "$(id -u)" = 0 ] || { erro "Rode com sudo (ou como root)."; exit 1; }
-[[ "$EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] || { erro "Informe seu e-mail de verdade em --email."; exit 1; }
+[[ "$EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]] && [[ ! "$EMAIL" =~ ^(SEU|voce)@ ]] || { erro "Informe seu e-mail de verdade em --email (o do login do master)."; exit 1; }
 [[ "$DOMINIO" =~ ^[a-z0-9.-]+\.[a-z]{2,}$ ]] || { erro "Informe o endereço em --dominio (ex.: app.zoe360.com.br)."; exit 1; }
 BASE="${DOMINIO#app.}"
 NOMES=("$DOMINIO")
@@ -139,4 +156,6 @@ else
   echo "  Abra no navegador: https://$IP_PUBLICO$([ "${P:-443}" = 443 ] || echo ":$P")/atendimento/  (com https://; aviso de \"não seguro\": Avançado › Continuar)"
 fi
 echo "  Se o e-mail do master ainda for SEU-EMAIL: sudo zoe-senha SEU-EMAIL --novo-email $EMAIL"
+printf 'ANT_EMAIL=%q\nANT_DOMINIO=%q\nANT_EMPRESAS=%q\n' "$EMAIL" "$DOMINIO" "$EMPRESAS" > "$LEMBRAR" && chmod 600 "$LEMBRAR"
+echo "  Guardei e-mail, domínio e empresas: na próxima atualização basta  sudo bash instalacao/ativar.sh"
 echo

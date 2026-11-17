@@ -194,6 +194,13 @@ describe('IXC: o que a atendente resolve sozinha', () => {
     const textos = meta.enviadas.map((m) => m.texto).join(' ');
     assert.match(textos, /34191790010104351004791020150008291070026000/);
     assert.match(textos.replace(/\u00a0/g, ' '), /R\$ 129,90/);
+    // O PDF sai de verdade: sobe para a Meta e vai como documento pelo id (antes só aparecia no painel).
+    const upload = meta.chamadas.find((c) => c.url.endsWith('/media') && c.metodo === 'POST');
+    assert.ok(upload, 'o arquivo foi enviado para a Meta');
+    const doc = meta.enviadas.find((m) => m.tipo === 'document');
+    assert.ok(doc, 'o boleto saiu como documento');
+    assert.match(doc.corpo.document.id, /^midia\./);
+    assert.match(doc.corpo.document.filename, /^fatura-.*\.pdf$/);
 
     const alheia = await chamar('enviar_segunda_via', { fatura_id: '7777' });
     assert.equal(alheia.ok, false);

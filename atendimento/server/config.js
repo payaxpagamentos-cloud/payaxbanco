@@ -48,7 +48,7 @@ module.exports = {
     modelo: process.env.ATEND_IA_MODELO || 'claude-opus-5-5',
     // low | medium | high | xhigh | max. Atendimento é conversa curta: 'low' responde rápido e gasta menos.
     esforco: process.env.ATEND_IA_ESFORCO || 'low',
-    maxTokens: Number(process.env.ATEND_IA_MAX_TOKENS) || 2048,
+    maxTokens: Number(process.env.ATEND_IA_MAX_TOKENS) || 4096, // o pensamento do modelo também conta aqui
     // Quantas idas e voltas de ferramenta a IA pode fazer para responder uma mensagem.
     maxPassos: Number(process.env.ATEND_IA_MAX_PASSOS) || 6,
     timeoutMs: Number(process.env.ATEND_IA_TIMEOUT_MS) || 60_000,

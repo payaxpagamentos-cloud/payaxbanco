@@ -1,5 +1,7 @@
 'use strict';
 
+const { problemasEstrito } = require('./esquema-estrito');
+
 const { agora } = require('../db');
 const { decifrar } = require('../lib/cifra');
 const conversas = require('../lib/conversas');
@@ -401,12 +403,11 @@ function comoTool(f) {
   let parametros;
   try { parametros = JSON.parse(f.parametros); } catch { parametros = null; }
   if (!parametros || parametros.type !== 'object') parametros = { type: 'object', properties: {}, required: [] };
-  return {
-    name: f.nome,
-    description: f.descricao,
-    input_schema: { ...parametros, additionalProperties: false, required: parametros.required ?? Object.keys(parametros.properties ?? {}) },
-    strict: true,
-  };
+  const input_schema = { ...parametros, additionalProperties: false, required: parametros.required ?? Object.keys(parametros.properties ?? {}) };
+  // Esquema escrito pela empresa: em strict, um detalhe fora da regra (campo opcional, minLength…)
+  // faz a API recusar a conversa inteira. Só vai em strict quando passa nas regras; senão vai sem.
+  const estrito = problemasEstrito(input_schema).length === 0;
+  return { name: f.nome, description: f.descricao, input_schema, ...(estrito ? { strict: true } : {}) };
 }
 
 // ---------- Montagem ----------

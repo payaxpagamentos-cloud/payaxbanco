@@ -89,6 +89,30 @@ async function enviar(numero, corpo) {
   return r?.messages?.[0]?.id ?? null;
 }
 
+/** Sobe um arquivo para a Meta (POST /{phone_number_id}/media) e devolve o id para mandar como mídia. */
+async function subirMidia(numero, buffer, mime, nome = 'arquivo') {
+  const token = tokenDe(numero);
+  const form = new FormData();
+  form.append('messaging_product', 'whatsapp');
+  form.append('type', mime);
+  form.append('file', new Blob([buffer], { type: mime }), nome);
+  let resp;
+  try {
+    resp = await fetch(`${base()}/${encodeURIComponent(numero.phone_number_id)}/media`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form, signal: AbortSignal.timeout(config.whatsapp.timeoutMs),
+    });
+  } catch (err) {
+    throw new ErroWhatsApp(err.name === 'TimeoutError' ? 'A Meta não respondeu no tempo esperado.' : `Falha de rede ao falar com a Meta: ${err.message}`);
+  }
+  let dados = null;
+  try { dados = await resp.json(); } catch { /* sem JSON */ }
+  if (!resp.ok || !dados?.id) {
+    throw new ErroWhatsApp(mascarar(dados?.error?.message || `A Meta respondeu ${resp.status} ao receber o arquivo.`, token),
+      { status: resp.status, definitivo: resp.status >= 400 && resp.status < 500 && resp.status !== 429 });
+  }
+  return dados.id;
+}
+
 const texto = (para, corpo, { responde = null } = {}) => ({
   recipient_type: 'individual', to: para, type: 'text',
   text: { body: String(corpo).slice(0, 4096), preview_url: false },
@@ -209,6 +233,6 @@ function assinaturaValida(numero, cabecalho, corpoCru) {
 const comoErroNegocio = (err) => new ErroNegocio(err instanceof ErroWhatsApp ? err.message : 'Falha ao falar com o WhatsApp.', 502);
 
 module.exports = {
-  ErroWhatsApp, enviar, marcarLida, baixarMidia, infoMidia, situacao, janelaAberta, assinaturaValida, segredoApp, tokenDe, comoErroNegocio, mascarar,
+  ErroWhatsApp, enviar, subirMidia, marcarLida, baixarMidia, infoMidia, situacao, janelaAberta, assinaturaValida, segredoApp, tokenDe, comoErroNegocio, mascarar,
   corpos: { texto, botoes, listaOpcoes, template, midia }, TIPOS_MIDIA,
 };

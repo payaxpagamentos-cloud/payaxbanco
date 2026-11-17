@@ -317,13 +317,8 @@ const FERRAMENTAS = {
           const buffer = Buffer.from(String(base64).replace(/^data:[^,]+,/, ''), 'base64');
           const arquivo = midia.guardar(buffer, 'application/pdf');
           const nome = `fatura-${dataBr(fatura.vencimento).replace(/\//g, '-')}.pdf`;
-          const { to: _to, recipient_type: _rt, ...payload } = wa.corpos.midia('', 'documento', { id: null, nome, legenda: 'Boleto em PDF' });
-          // O documento é enviado pelo próprio arquivo guardado (a rota de mídia serve o PDF à Meta por link assinado
-          // quando configurada; sem ela, o cliente recebe o PIX e a linha digitável acima, que já resolvem).
-          db.prepare(`INSERT INTO mensagens (conversa_id, empresa_id, direcao, autor, tipo, texto, midia_arquivo, midia_nome, midia_mime, midia_bytes, status, criada_em, enviada_em)
-            VALUES (?, ?, 'saida', 'ia', 'documento', 'Boleto em PDF', ?, ?, 'application/pdf', ?, 'enviada', ?, ?)`)
-            .run(conversa.id, conversa.empresa_id, arquivo, nome, buffer.length, agora(), agora());
-          void payload;
+          // Vai pela fila como qualquer mensagem: o envio sobe o arquivo para a Meta e manda como documento.
+          envio.enfileirar(db, c, { autor: 'ia', tipo: 'documento', texto: 'Boleto em PDF', midiaArquivo: arquivo, midiaNome: nome, midiaMime: 'application/pdf', midiaBytes: buffer.length });
           anexo = true;
         } catch { anexo = false; }
       }

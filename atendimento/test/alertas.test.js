@@ -126,9 +126,12 @@ describe('a nota de estado da conversa', () => {
       { role: 'assistant', content: [{ type: 'text', text: 'Olá! Eu sou a ZOE.' }] },
     ];
     const r = atendente.comEstado(hist, 'NOTA');
-    assert.deepEqual(r.map((m) => m.role), ['user', 'system', 'assistant'],
-      'a nota some se for só anexada no fim, e é na primeira mensagem que ela mais faz falta');
-    assert.equal(r[1].content, 'NOTA');
+    // O pedido nunca termina com fala da ZOE: a API recusa isso (400, "prefill"). A saudação vira nota.
+    assert.deepEqual(r.map((m) => m.role), ['user', 'system']);
+    assert.match(r[1].content, /já mandou: "Olá! Eu sou a ZOE\."/);
+    assert.match(r[1].content, /NOTA/, 'a nota de estado continua lá');
+    // Mesmo sem nota de estado, a fala dela no fim sai do histórico.
+    assert.deepEqual(atendente.comEstado(hist, null).map((m) => m.role), ['user', 'system']);
   });
 
   test('entra no fim quando a última é do cliente', () => {

@@ -10,27 +10,7 @@ const ferramentas = require('../server/ia/ferramentas');
  * esquema quebra as regras — a conversa caía na fila com "Invalid schema". Os testes usam uma IA
  * de mentira, que não valida nada; este confere os esquemas do jeito que a API confere.
  */
-const TIPO_JS = { string: 'string', integer: 'number', number: 'number', boolean: 'boolean' };
-
-function conferir(esquema, onde, problemas) {
-  if (!esquema || typeof esquema !== 'object') return;
-  if (esquema.enum) {
-    if (typeof esquema.type !== 'string') problemas.push(`${onde}: enum com type ${JSON.stringify(esquema.type)} (use um tipo só)`);
-    for (const valor of esquema.enum) {
-      if (typeof valor !== TIPO_JS[esquema.type]) problemas.push(`${onde}: valor ${JSON.stringify(valor)} do enum não é ${esquema.type}`);
-    }
-  }
-  const tipos = [].concat(esquema.type ?? []);
-  if (tipos.includes('object')) {
-    if (esquema.additionalProperties !== false) problemas.push(`${onde}: objeto sem additionalProperties: false`);
-    const props = Object.keys(esquema.properties ?? {});
-    const faltam = props.filter((p) => !(esquema.required ?? []).includes(p));
-    if (faltam.length) problemas.push(`${onde}: em strict todo campo é obrigatório; faltam em required: ${faltam.join(', ')}`);
-    for (const [p, sub] of Object.entries(esquema.properties ?? {})) conferir(sub, `${onde}.${p}`, problemas);
-  }
-  if (esquema.items) conferir(esquema.items, `${onde}[]`, problemas);
-  for (const k of ['anyOf', 'oneOf', 'allOf']) (esquema[k] ?? []).forEach((s, i) => conferir(s, `${onde}.${k}[${i}]`, problemas));
-}
+const { problemasEstrito } = require('../server/ia/esquema-estrito');
 
 test('toda ferramenta que vai para a IA tem um esquema que a API aceita em strict', () => {
   const { db, empresa } = h.criarAmbiente();
@@ -40,6 +20,14 @@ test('toda ferramenta que vai para a IA tem um esquema que a API aceita em stric
   const todas = [...tools, ...Object.entries(ferramentas.INTERNAS).map(([name, f]) => ({ name, input_schema: f.entrada, strict: true }))];
   assert.ok(tools.some((t) => t.name === 'enviar_segunda_via'), 'as do IXC estão no kit');
   const problemas = [];
-  for (const t of todas.filter((x) => x.strict)) conferir(t.input_schema, t.name, problemas);
+  for (const t of todas.filter((x) => x.strict)) problemasEstrito(t.input_schema, t.name, problemas);
   assert.deepEqual(problemas, []);
+});
+
+test('ferramenta cadastrada pela empresa com esquema fora da regra vai sem strict (não derruba a conversa)', () => {
+  const boa = ferramentas.comoTool({ nome: 'consulta', descricao: 'x', parametros: JSON.stringify({ type: 'object', properties: { cpf: { type: 'string' } } }) });
+  assert.equal(boa.strict, true);
+  assert.deepEqual(problemasEstrito(boa.input_schema), []);
+  const opcional = ferramentas.comoTool({ nome: 'c2', descricao: 'x', parametros: JSON.stringify({ type: 'object', properties: { cpf: { type: 'string', minLength: 11 }, obs: { type: 'string' } }, required: ['cpf'] }) });
+  assert.equal(opcional.strict, undefined, 'campo opcional e minLength: sem strict');
 });

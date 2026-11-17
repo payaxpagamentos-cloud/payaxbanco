@@ -203,14 +203,18 @@ function notaDaLigacao(db, conversa) {
  * mais faz falta.
  */
 function comEstado(mensagens, nota) {
-  if (!nota || !mensagens.length) return mensagens;
+  // A API recusa (400) um pedido que termina com fala da ZOE: seria "prefill", que os modelos
+  // atuais não aceitam. Acontece na primeira mensagem, quando a saudação sai antes de ela pensar.
+  // O que ela já disse depois da última fala do cliente vira parte da nota, e o pedido termina no cliente.
   const ultimoDoCliente = mensagens.map((m) => m.role).lastIndexOf('user');
-  if (ultimoDoCliente < 0) return mensagens;
-  return [
-    ...mensagens.slice(0, ultimoDoCliente + 1),
-    { role: 'system', content: nota },
-    ...mensagens.slice(ultimoDoCliente + 1),
-  ];
+  if (ultimoDoCliente >= 0 && ultimoDoCliente < mensagens.length - 1) {
+    const jaDisse = mensagens.slice(ultimoDoCliente + 1).flatMap((m) => m.content).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+    mensagens = mensagens.slice(0, ultimoDoCliente + 1);
+    nota = [`Depois da última mensagem do cliente você já mandou: "${jaDisse.slice(0, 600)}". Não repita isso nem cumprimente de novo: continue a partir daí.`, nota]
+      .filter(Boolean).join('\n\n');
+  }
+  if (!nota || !mensagens.length || ultimoDoCliente < 0) return mensagens;
+  return [...mensagens, { role: 'system', content: nota }];
 }
 
 /** O resumo para quem vai atender: "escreveu" no WhatsApp, "disse" na ligação. */
