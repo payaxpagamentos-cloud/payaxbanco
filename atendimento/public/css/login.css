@@ -382,3 +382,58 @@
 .zoe-login-page dialog p { margin: 0 0 8px; font-size: 14px; line-height: 1.55; color: #464c6b; }
 .zoe-login-page dialog button { margin-top: 10px; min-height: 40px; padding: 0 18px; border: 0; border-radius: 10px; color: #fff; font-weight: 700;
   background: linear-gradient(100deg, #2b9bf4, #5b5cf6 55%, #8b2cf0); cursor: pointer; }
+
+/* ---- Ajuste ZOE: esfera grande e viva atrás do vidro, e tudo cabendo sem rolagem ---- */
+@media (min-width: 761px) {
+  .zoe-login-page { --orb: clamp(420px, 42vw, 640px); }
+  .zoe-shell { position: relative; }
+  /* O texto fica por cima da esfera; o cartão de vidro também (e a desfoca por trás). */
+  .zoe-brand, .zoe-hero-title, .zoe-hero-description, .zoe-copyright { position: relative; z-index: 1; }
+  .zoe-card { z-index: 2; }
+  /* A esfera sai do fluxo (não aumenta a altura): grande, centrada na borda do cartão,
+     metade no espaço livre e metade atrás do vidro. */
+  .zoe-orb-stage {
+    position: absolute; z-index: 0; margin: 0; pointer-events: none;
+    width: var(--orb); right: calc(360px - var(--orb) / 2 + 20px);
+    top: 50%; transform: translateY(-50%);
+  }
+  .zoe-orb-stage::before {
+    content: ""; position: absolute; inset: 14% 12%; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(124, 92, 255, .28), rgba(56, 160, 255, .12) 55%, transparent 100%);
+    filter: blur(24px); animation: zoe-orb-glow 7s ease-in-out infinite;
+  }
+  .zoe-orb { position: relative; animation: zoe-orb-float 9s ease-in-out infinite, zoe-orb-turn 14s ease-in-out infinite alternate; }
+  .zoe-hero-description { max-width: 380px; }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .zoe-orb-stage { right: calc(350px - var(--orb) / 2 + 20px); }
+}
+@keyframes zoe-orb-float {
+  0%, 100% { translate: 0 0; scale: 1; }
+  50% { translate: 0 -14px; scale: 1.03; }
+}
+@keyframes zoe-orb-turn { from { rotate: -7deg; } to { rotate: 7deg; } }
+@keyframes zoe-orb-glow { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
+
+/* Telas baixas (notebook, zoom do Windows em 125%/150%): mais compacto, sem rolagem */
+@media (max-height: 700px) and (min-width: 761px) {
+  .zoe-login-page { padding-top: 16px; padding-bottom: 16px; }
+  .zoe-hero-title { margin: 22px 0 10px; font-size: 34px; }
+  .zoe-card { padding: 22px 26px; }
+  .zoe-card-header { margin-bottom: 16px; }
+  .zoe-card-icon { width: 32px; height: 32px; margin-bottom: 8px; }
+  .zoe-card-title { font-size: 24px; }
+  .zoe-field { margin-bottom: 12px; }
+  .zoe-remember { margin-bottom: 14px; }
+  .zoe-card-links { margin-top: 14px; padding-top: 12px; gap: 4px; }
+}
+@media (max-height: 560px) and (min-width: 761px) {
+  .zoe-hero-title { font-size: 30px; margin-top: 16px; }
+  .zoe-card { padding: 18px 24px; }
+  .zoe-card-icon { display: none; }
+  .zoe-login-page .zoe-input, .zoe-password-toggle { height: 38px; }
+  .zoe-submit { min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zoe-orb, .zoe-orb-stage::before { animation: none !important; }
+}
