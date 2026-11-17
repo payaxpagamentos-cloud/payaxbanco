@@ -21,8 +21,15 @@ const palavras = (texto) => [...new Set(normalizar(texto).split(' ').filter((p) 
 /** Radical simples: tira plural e algumas terminações, para "fatura" casar com "faturas". */
 const radical = (p) => p.replace(/(coes|oes|aes)$/, 'ao').replace(/(mente|cao|ções|ndo)$/, '').replace(/s$/, '');
 
-const listar = (db, empresaId, { todos = false } = {}) =>
-  db.prepare(`SELECT * FROM conhecimento WHERE empresa_id = ?${todos ? '' : ' AND ativo = 1'} ORDER BY titulo`).all(empresaId);
+const TIPOS = { informacao: 'Informação', regra: 'Regra' };
+const listar = (db, empresaId, { todos = false, tipo = null } = {}) =>
+  db.prepare(`SELECT * FROM conhecimento WHERE empresa_id = ?${todos ? '' : ' AND ativo = 1'}${tipo ? ' AND tipo = ?' : ''} ORDER BY tipo DESC, titulo`)
+    .all(...[empresaId, ...(tipo ? [tipo] : [])]);
+
+/** As regras da empresa (o que a ZOE pode e não pode), em texto para o prompt. Valem em toda conversa. */
+function regras(db, empresaId) {
+  return listar(db, empresaId, { tipo: 'regra' }).map((a) => `### ${a.titulo}\n${a.resposta.trim()}`).join('\n\n');
+}
 
 /**
  * Procura os artigos que mais combinam com a pergunta.
@@ -31,7 +38,8 @@ const listar = (db, empresaId, { todos = false } = {}) =>
 function buscar(db, empresaId, pergunta, { limite = 4, minimo = 1 } = {}) {
   const termos = palavras(pergunta).map(radical).filter(Boolean);
   if (!termos.length) return [];
-  const artigos = listar(db, empresaId);
+  // As regras já estão no prompt de toda conversa: a busca traz só as informações.
+  const artigos = listar(db, empresaId, { tipo: 'informacao' });
   const pontuados = artigos.map((a) => {
     const noTitulo = new Set(palavras(a.titulo).map(radical));
     const nasPerguntas = new Set(palavras(a.perguntas).map(radical));
@@ -59,20 +67,21 @@ function registrarUso(db, ids) {
  * Dá à IA a noção do que ela sabe responder, sem despejar a base inteira no prompt.
  */
 function indice(db, empresaId, { max = 60 } = {}) {
-  return listar(db, empresaId).slice(0, max)
+  return listar(db, empresaId, { tipo: 'informacao' }).slice(0, max)
     .map((a) => `- [${a.id}] ${a.titulo}${a.perguntas ? ` (ex.: ${String(a.perguntas).split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 3).join(' / ')})` : ''}`)
     .join('\n');
 }
 
 /** Cria ou atualiza um artigo. */
-function salvar(db, empresaId, { id = null, titulo, resposta, perguntas = null, ativo = true }) {
+function salvar(db, empresaId, { id = null, titulo, resposta, perguntas = null, ativo = true, tipo = 'informacao' }) {
+  const t = TIPOS[tipo] ? tipo : 'informacao';
   if (id) {
-    db.prepare('UPDATE conhecimento SET titulo = ?, resposta = ?, perguntas = ?, ativo = ?, atualizado_em = ? WHERE id = ? AND empresa_id = ?')
-      .run(titulo, resposta, perguntas, ativo ? 1 : 0, agora(), Number(id), empresaId);
+    db.prepare('UPDATE conhecimento SET titulo = ?, resposta = ?, perguntas = ?, ativo = ?, tipo = ?, atualizado_em = ? WHERE id = ? AND empresa_id = ?')
+      .run(titulo, resposta, perguntas, ativo ? 1 : 0, t, agora(), Number(id), empresaId);
     return Number(id);
   }
-  return Number(db.prepare('INSERT INTO conhecimento (empresa_id, titulo, resposta, perguntas, ativo, criado_em) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(empresaId, titulo, resposta, perguntas, ativo ? 1 : 0, agora()).lastInsertRowid);
+  return Number(db.prepare('INSERT INTO conhecimento (empresa_id, titulo, resposta, perguntas, ativo, tipo, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(empresaId, titulo, resposta, perguntas, ativo ? 1 : 0, t, agora()).lastInsertRowid);
 }
 
-module.exports = { buscar, listar, indice, salvar, registrarUso, palavras };
+module.exports = { buscar, listar, indice, regras, salvar, registrarUso, palavras, TIPOS };

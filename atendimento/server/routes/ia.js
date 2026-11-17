@@ -144,6 +144,7 @@ module.exports = function rotasIa(db) {
       const id = conhecimentoLib.salvar(db, req.empresa.id, {
         titulo: v.texto(d.titulo, 'o título', 160), resposta: v.texto(d.resposta, 'a resposta', 4000),
         perguntas: v.opcional(d.perguntas, 'as perguntas de exemplo', 2000), ativo: d.ativo === undefined ? true : v.booleano(d.ativo),
+        tipo: d.tipo === undefined ? 'informacao' : v.opcao(d.tipo, 'o tipo', Object.keys(conhecimentoLib.TIPOS)),
       });
       auditar(db, { usuario: req.usuario, empresaId: req.empresa.id, acao: 'criou artigo na base', alvo: d.titulo, ip: req.ip });
       res.status(201).json(db.prepare('SELECT * FROM conhecimento WHERE id = ?').get(id));
@@ -161,6 +162,7 @@ module.exports = function rotasIa(db) {
         resposta: d.resposta === undefined ? atual.resposta : v.texto(d.resposta, 'a resposta', 4000),
         perguntas: d.perguntas === undefined ? atual.perguntas : v.opcional(d.perguntas, 'as perguntas de exemplo', 2000),
         ativo: d.ativo === undefined ? Boolean(atual.ativo) : v.booleano(d.ativo),
+        tipo: d.tipo === undefined ? atual.tipo : v.opcao(d.tipo, 'o tipo', Object.keys(conhecimentoLib.TIPOS)),
       });
       res.json(db.prepare('SELECT * FROM conhecimento WHERE id = ?').get(atual.id));
     } catch (err) { next(err); }

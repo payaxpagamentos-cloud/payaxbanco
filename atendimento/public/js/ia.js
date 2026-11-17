@@ -175,22 +175,37 @@ async function conhecimento(ctx, alvo) {
   const lista = el('div');
   const recarregar = async () => {
     const { itens } = await api.get(`/empresas/${ctx.empresaId}/ia/conhecimento`);
-    limpar(lista, itens.length ? el('div', { class: 'cartoes-conhecimento' }, itens.map((a) => el('article', { class: `cartao artigo${a.ativo ? '' : ' inativo'}` },
+    const cartoes = (lista2) => el('div', { class: 'cartoes-conhecimento' }, lista2.map((a) => el('article', { class: `cartao artigo${a.ativo ? '' : ' inativo'}` },
       el('h3', {}, a.titulo),
       el('p', {}, a.resposta),
       a.perguntas ? el('div', { class: 'perguntas' }, String(a.perguntas).split('\n').filter(Boolean).map((q) => el('span', { class: 'etiqueta' }, q))) : null,
       el('div', { class: 'rodape-artigo' },
         el('div', { class: 'linha', style: 'gap:6px' },
-          el('span', { class: 'pequeno mudo' }, a.usos === 1 ? '1 uso' : `${inteiro(a.usos)} usos`),
+          a.tipo === 'regra' ? el('span', { class: 'etiqueta info' }, 'vale em toda conversa')
+            : el('span', { class: 'pequeno mudo' }, a.usos === 1 ? '1 uso' : `${inteiro(a.usos)} usos`),
           a.ativo ? null : el('span', { class: 'etiqueta aviso' }, 'Desativado')),
-        ctx.pode('zoe.alertas') ? el('div', { class: 'linha', style: 'gap:2px' },
-          botaoIcone('editar', 'Editar', () => editar(a)), botaoIcone('lixo', 'Excluir', () => excluir(a), 'perigo')) : null))))
-      : vazio('A base de conhecimento está vazia.', 'Sem base, a ZOE não responde nada sozinha: ela transfere tudo. Comece pelas 5 perguntas que a sua equipe mais recebe.'));
+        ctx.pode('zoe.editar') ? el('div', { class: 'linha', style: 'gap:2px' },
+          botaoIcone('editar', 'Editar', () => editar(a)), botaoIcone('lixo', 'Excluir', () => excluir(a), 'perigo')) : null))));
+    const regras = itens.filter((a) => a.tipo === 'regra');
+    const infos = itens.filter((a) => a.tipo !== 'regra');
+    // Tudo num lugar só: primeiro o que ela pode e não pode (vale sempre), depois o que ela consulta.
+    limpar(lista,
+      el('h2', { style: 'margin:0 0 4px' }, 'Regras: o que ela pode e não pode'),
+      el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' }, 'Valem em toda conversa, sem depender de busca. Ex.: "Nunca prometa prazo de visita técnica", "Lentidão: primeiro peça para reiniciar o roteador".'),
+      regras.length ? cartoes(regras) : vazio('Nenhuma regra ainda.', 'Crie com "Novo artigo" e escolha o tipo Regra.'),
+      el('h2', { style: 'margin:22px 0 4px' }, 'Informações: o que ela consulta'),
+      el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' }, 'A ZOE busca aqui quando o assunto aparece: planos, horários, cobertura, passo a passo.'),
+      infos.length ? cartoes(infos)
+        : vazio('Nenhuma informação ainda.', 'Sem base, a ZOE não responde nada sozinha: ela transfere tudo. Comece pelas 5 perguntas que a sua equipe mais recebe.'));
   };
 
   const form = (a = {}) => [
     el('p', { class: 'mudo pequeno', style: 'margin:0 0 8px' },
       'O título deve ser o assunto como o cliente pensa. Nas perguntas de exemplo, escreva do jeito que ele escreve — é o que faz a busca acertar.'),
+    escolha('Tipo', 'tipo', {
+      informacao: 'Informação — ela busca quando o assunto aparece',
+      regra: 'Regra — o que ela pode e não pode; vale em toda conversa',
+    }, a.tipo ?? 'informacao'),
     campo('Título', { name: 'titulo', value: a.titulo ?? '', required: true, maxlength: 160, placeholder: 'Segunda via do boleto' }),
     area('Resposta (a ZOE usa este texto)', { name: 'resposta', rows: 5, required: true, maxlength: 4000 }, a.resposta ?? ''),
     area('Perguntas de exemplo (uma por linha)', { name: 'perguntas', rows: 4, maxlength: 2000, placeholder: 'preciso da segunda via\nboleto vencido\nnão recebi a fatura' }, a.perguntas ?? ''),
@@ -437,7 +452,8 @@ async function configuracao(ctx, alvo) {
       campo('Nome dela', { name: 'nome_assistente', value: cfg.nome_assistente ?? 'ZOE', maxlength: 40 }),
       area('Saudação (primeira mensagem da conversa)', { name: 'saudacao', rows: 3, maxlength: 1000, placeholder: 'Vazio usa uma saudação padrão. Use {cliente}, {empresa} e {assistente}.' }, cfg.saudacao ?? ''),
       area('Como ela deve falar', { name: 'tom', rows: 6, maxlength: 3000, placeholder: 'Vazio usa o tom padrão: português do Brasil, você, mensagens curtas, sem formalidade de ofício.' }, cfg.tom ?? ''),
-      area('Regras desta empresa', { name: 'regras', rows: 6, maxlength: 5000, placeholder: 'Nunca prometa desconto nem prazo de visita técnica.\nCliente com fatura vencida há mais de 30 dias vai para o Financeiro.' }, cfg.regras ?? '')),
+      el('div', { class: 'aviso-caixa info' }, icone('conversa'), el('span', {},
+        'O que ela pode e não pode fazer agora fica na Base de conhecimento, como artigos do tipo "Regra" — tudo num lugar só.'))),
 
     cartao('Quando passar para a equipe',
       campo('Máximo de mensagens antes de transferir', { name: 'max_turnos', type: 'number', value: cfg.max_turnos, min: 1, max: 60 }),

@@ -540,6 +540,8 @@ CREATE TABLE IF NOT EXISTS conhecimento (
   resposta TEXT NOT NULL,
   -- Perguntas de exemplo e palavras-chave, uma por linha, usadas na busca.
   perguntas TEXT,
+  -- 'informacao': a ZOE busca quando o assunto aparece. 'regra': o que ela pode e não pode — vale em toda conversa.
+  tipo TEXT NOT NULL DEFAULT 'informacao',
   ativo INTEGER NOT NULL DEFAULT 1,
   usos INTEGER NOT NULL DEFAULT 0,
   criado_em TEXT NOT NULL,
@@ -1151,6 +1153,13 @@ function abrir(arquivo = config.dbFile) {
   if (!db.prepare("SELECT 1 FROM configuracoes WHERE chave = 'migracao_titular'").get()) {
     db.prepare('UPDATE ixc_config SET confirmar_titular = 1').run();
     db.prepare("INSERT INTO configuracoes (chave, valor) VALUES ('migracao_titular', '1')").run();
+  }
+
+  // Tudo centralizado na base de conhecimento: o antigo campo "Regras desta empresa" vira um artigo do tipo regra.
+  for (const r of db.prepare("SELECT empresa_id, regras FROM ia_config WHERE regras IS NOT NULL AND TRIM(regras) <> ''").all()) {
+    db.prepare("INSERT INTO conhecimento (empresa_id, titulo, resposta, tipo, ativo, criado_em) VALUES (?, 'Regras gerais da empresa', ?, 'regra', 1, ?)")
+      .run(r.empresa_id, r.regras.trim().slice(0, 4000), agora());
+    db.prepare('UPDATE ia_config SET regras = NULL WHERE empresa_id = ?').run(r.empresa_id);
   }
 
   // A ZOE não se anuncia mais como "atendente virtual" (muito cliente desiste ao ler isso):

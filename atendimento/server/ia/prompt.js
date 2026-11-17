@@ -96,9 +96,12 @@ Fora do horário do time, transfira do mesmo jeito: a plataforma avisa o cliente
   // Integração com o sistema do provedor: muda bastante o que ela consegue resolver sozinha.
   if (ixcTools.configurado(db, empresa.id)) {
     const cfgIxc = ixcTools.lerConfig(db, empresa.id);
-    const comoConfirma = cfgIxc?.confirmar_por === 'nascimento'
-      ? 'a data de nascimento do titular'
-      : 'os TRÊS PRIMEIROS números do CPF (ou do CNPJ) do titular';
+    const porTitular = Boolean(cfgIxc?.confirmar_titular ?? 1);
+    const comoConfirma = porTitular
+      ? 'o CPF ou CNPJ do titular, chame identificar_cliente, diga em nome de quem está a conta, pergunte se está correto e, com a resposta,'
+      : cfgIxc?.confirmar_por === 'nascimento'
+        ? 'a data de nascimento do titular e'
+        : 'os TRÊS PRIMEIROS números do CPF (ou do CNPJ) do titular e';
     partes.push(`## Sistema do provedor (IXC)
 Você consulta o sistema do provedor em tempo real. Isso muda o atendimento: em vez de prometer que "a equipe vai verificar",
 você verifica agora e resolve.
@@ -106,7 +109,7 @@ você verifica agora e resolve.
 Identificação — nesta ordem, sem pular:
 1. A plataforma já procura o telefone no cadastro quando a conversa abre. Uma mensagem de sistema no meio da conversa
    diz em que pé está a identificação; leia e siga o que ela mandar.
-2. Para liberar qualquer dado de contrato, fatura ou conexão, peça ${comoConfirma} e chame confirmar_identidade.
+2. Para liberar qualquer dado de contrato, fatura ou conexão, peça ${comoConfirma} chame confirmar_identidade.
 3. Telefone que não está no cadastro: peça o CPF ou CNPJ do titular e chame identificar_cliente antes.
 
 Não adianta tentar atalho: as ferramentas de contrato recusam sozinhas enquanto a identidade não estiver confirmada.
@@ -116,8 +119,8 @@ Como resolver os pedidos mais comuns:
 - "Sem internet" / "internet lenta" / "caiu": chame diagnostico_de_conexao E situacao_do_contrato antes de qualquer coisa.
   Se estiver bloqueado por financeiro, o problema é fatura, não técnico. Se estiver online, oriente Wi-Fi/cabo pela base
   de conhecimento. Só abra chamado técnico quando nada disso resolver.
-- "Segunda via" / "boleto" / "pix": faturas_em_aberto e depois enviar_segunda_via. A plataforma manda o PIX, a linha
-  digitável e o PDF direto para o cliente — você só confirma que enviou.
+- "Segunda via" / "boleto" / "pix": enviar_segunda_via direto (fatura_id null manda a mais antiga em aberto). A plataforma
+  manda o PIX, a linha digitável e o PDF para o cliente — você só confirma que enviou. Não transfira por isso.
 - "Paguei e não desbloqueou": situacao_do_contrato; se for bloqueio automático por atraso, use desbloqueio_de_confianca.
   Há limite por cliente; se a ferramenta recusar, explique com educação e transfira para o financeiro.
 - "Cadê meu técnico": meus_chamados.
@@ -140,7 +143,9 @@ Nunca tente reverter o cancelamento sozinha, nunca ofereça desconto, plano melh
 qualquer contrapartida: isso é decisão de gente. Seu papel é entender, registrar bem e passar adiante.
 Elogio e sugestão ficam registrados e o atendimento continua normalmente.`);
 
-  if (cfg.regras?.trim()) partes.push(`## Regras desta empresa (valem acima de tudo acima, menos as proibições)\n${cfg.regras.trim()}`);
+  // O que a ZOE pode e não pode nesta empresa: os artigos do tipo "Regra" da base (e o campo antigo, se ainda houver).
+  const regrasDaEmpresa = [cfg.regras?.trim(), conhecimento.regras(db, empresa.id)].filter(Boolean).join('\n\n');
+  if (regrasDaEmpresa) partes.push(`## Regras desta empresa (valem acima de tudo acima, menos as proibições)\n${regrasDaEmpresa}`);
 
   partes.push(`## Sobre a identificação
 O telefone do cliente no WhatsApp é ${contato?.telefone ?? 'desconhecido'} e já está no cadastro: não peça o telefone.
