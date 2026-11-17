@@ -162,7 +162,7 @@ function iniciar(db, empresa, { uid, telefone = null } = {}) {
   const ja = porUid(db, empresa.id, id);
   if (ja) return { conversa_id: ja.id, repetida: true, ...proximoPasso(db, ja, null, { modo, noMenu: Boolean(ja.voz_no_menu) }) };
 
-  const numero = db.prepare('SELECT * FROM numeros WHERE empresa_id = ? ORDER BY ativo DESC, id LIMIT 1').get(empresa.id);
+  const numero = db.prepare("SELECT * FROM numeros WHERE empresa_id = ? AND phone_number_id NOT LIKE 'zoe-teste-%' ORDER BY ativo DESC, id LIMIT 1").get(empresa.id);
   if (!numero) throw new ErroNegocio('A empresa ainda não tem número cadastrado.', 409);
   const tel = telefoneDaBina(telefone, id);
 

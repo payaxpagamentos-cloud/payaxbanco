@@ -326,6 +326,14 @@ module.exports = function rotasIa(db) {
     } catch (err) { next(err); }
   });
 
+  const numeroDeTeste = (db_, empresaId) => {
+    const pid = `zoe-teste-${empresaId}`;
+    db_.prepare(`INSERT INTO numeros (empresa_id, nome, telefone, phone_number_id, verify_token, ativo, criado_em)
+      VALUES (?, 'Teste da ZOE (interno)', '0', ?, ?, 0, ?) ON CONFLICT(phone_number_id) DO NOTHING`)
+      .run(empresaId, pid, crypto.randomBytes(16).toString('hex'), agora());
+    return db_.prepare('SELECT * FROM numeros WHERE phone_number_id = ?').get(pid);
+  };
+
   // ---------- Teste da ZOE ----------
   /**
    * Conversa de teste: roda a atendente de verdade (mesmo prompt, mesmas ferramentas) contra um
@@ -334,8 +342,10 @@ module.exports = function rotasIa(db) {
   r.post('/testar', exigirPermissao('zoe.testar'), async (req, res, next) => {
     try {
       const texto = v.texto(req.body?.texto, 'a mensagem de teste', 1000);
-      const numero = db.prepare('SELECT * FROM numeros WHERE empresa_id = ? ORDER BY id LIMIT 1').get(req.empresa.id);
-      if (!numero) throw new ErroNegocio('Cadastre o número de WhatsApp antes de testar (o teste usa a mesma configuração).');
+      // Usa o número de verdade quando existe; sem ele, um número interno desativado (nunca envia nada:
+      // o envio recusa número desativado) — assim dá para testar a ZOE antes de ligar o WhatsApp.
+      const numero = db.prepare('SELECT * FROM numeros WHERE empresa_id = ? ORDER BY ativo DESC, id LIMIT 1').get(req.empresa.id)
+        ?? numeroDeTeste(db, req.empresa.id);
       const telefone = `teste-${req.usuario.id}`;
 
       const preparo = transacao(db, () => {

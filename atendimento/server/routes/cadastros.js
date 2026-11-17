@@ -19,7 +19,7 @@ module.exports = function rotasCadastros(db) {
   r.get('/numeros', exigirPermissao('integracoes.ver'), (req, res) => {
     const base = config.basePath || '';
     res.json({
-      itens: db.prepare('SELECT * FROM numeros WHERE empresa_id = ? ORDER BY id').all(req.empresa.id).map(empresasLib.numeroPublico),
+      itens: db.prepare("SELECT * FROM numeros WHERE empresa_id = ? AND phone_number_id NOT LIKE 'zoe-teste-%' ORDER BY id").all(req.empresa.id).map(empresasLib.numeroPublico),
       // O que a empresa precisa colar no painel da Meta.
       webhook: {
         url: `${process.env.ATEND_URL_PUBLICA ?? 'https://SEU-DOMINIO'}${base}/api/webhook`,
