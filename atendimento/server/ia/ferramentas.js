@@ -257,9 +257,11 @@ const INTERNAS = {
       relato: txt('O que o cliente contou, com as palavras dele: o motivo, desde quando, o que já tentou.'),
       ameacou_sair: { type: 'boolean', description: 'true se o cliente falou em cancelar, sair, trocar de provedor ou ir para a concorrência — mesmo numa reclamação ou no Procon. É o que leva o caso para a retenção.' },
       motivo_saida: {
-        type: ['string', 'null'],
-        enum: ['preco', 'qualidade', 'atendimento', 'mudanca', 'concorrente', 'financeiro', 'sem_uso', 'outro', null],
-        description: 'Se ameaçou sair, por quê, pelo que ele disse: preco (acha caro), qualidade (lenta, cai), atendimento, mudanca (vai mudar de endereço), concorrente (recebeu oferta), financeiro (não consegue pagar), sem_uso. null se não disse.',
+        // Em `strict`, a API recusa enum misturado com null ("Enum value does not match declared type"):
+        // o "não disse" é um valor da lista, convertido para null abaixo.
+        type: 'string',
+        enum: ['preco', 'qualidade', 'atendimento', 'mudanca', 'concorrente', 'financeiro', 'sem_uso', 'outro', 'nao_disse'],
+        description: 'Se ameaçou sair, por quê, pelo que ele disse: preco (acha caro), qualidade (lenta, cai), atendimento, mudanca (vai mudar de endereço), concorrente (recebeu oferta), financeiro (não consegue pagar), sem_uso. nao_disse se ele não falou em sair ou não disse o motivo.',
       },
     }, ['tipo', 'assunto', 'relato', 'ameacou_sair', 'motivo_saida']),
     terminal: true,
@@ -277,7 +279,7 @@ const INTERNAS = {
       const { ouvidoria, ja_existia: jaExistia } = ouvidoriaLib.abrir(db, {
         empresa, contato, conversa: atualConversa, tipo,
         assunto: String(entrada.assunto).slice(0, 200), relato: entrada.relato, origem: 'ia', ficha,
-        ameacaSaida: entrada.ameacou_sair === true, motivoSaida: entrada.motivo_saida ?? null,
+        ameacaSaida: entrada.ameacou_sair === true, motivoSaida: entrada.motivo_saida && entrada.motivo_saida !== 'nao_disse' ? entrada.motivo_saida : null,
       });
 
       // Elogio e sugestão não precisam ocupar ninguém: ficam registrados e o atendimento segue.
