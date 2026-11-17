@@ -67,6 +67,10 @@ test('testar a ZOE antes de cadastrar o WhatsApp: usa um número interno que nun
 test('"preciso do boleto" com o IXC ligado: a ZOE atende, sem jogar direto na fila do financeiro', async () => {
   const meta = h.fingirMeta();
   const { db, empresa } = h.criarAmbiente();
+  // A intenção que vem de fábrica em toda empresa nova (empresas.js): "boleto" mandava direto para o financeiro.
+  const fin = db.prepare("SELECT id FROM filas WHERE empresa_id = ? ORDER BY id LIMIT 1").get(empresa.id);
+  db.prepare("INSERT INTO intencoes (empresa_id, nome, palavras, acao, fila_id, ordem, criada_em) VALUES (?, 'Falar com o financeiro', ?, 'transferir', ?, 10, datetime('now'))")
+    .run(empresa.id, 'financeiro\nsegunda via\n2 via\nboleto\nfatura', fin.id);
   h.comIxc(db, empresa.id);
   const ixc = h.fingirIxc({ clientes: [], faturas: [], contratos: [], logins: [], chamados: [] });
   const ia = h.fingirIa([{ texto: 'Claro! Me passa o CPF do titular que eu já te mando a 2ª via.' }]);
