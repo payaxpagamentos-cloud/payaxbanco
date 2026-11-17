@@ -372,7 +372,8 @@ function abrirParaAviso(db, { empresa, numero, contato, regua, alvo = {} }) {
     // continua pedindo os 3 dígitos do CPF antes de mostrar qualquer dado do contrato.
     if (alvo.cliente_id) {
       const metodo = require('../ia/ferramentas-ixc').metodoConfirmacao?.(db, empresa.id) ?? 'cpf3';
-      db.prepare('UPDATE conversas SET ixc_cliente_id = ?, ixc_cliente_nome = ?, identidade_metodo = ? WHERE id = ?')
+      // Modo "só o CPF/CNPJ": o cliente informa o documento mesmo vindo do aviso.
+      if (metodo !== 'titular_pendente') db.prepare('UPDATE conversas SET ixc_cliente_id = ?, ixc_cliente_nome = ?, identidade_metodo = ? WHERE id = ?')
         .run(String(alvo.cliente_id), alvo.nome ?? null, metodo, c.id);
     }
   } else {

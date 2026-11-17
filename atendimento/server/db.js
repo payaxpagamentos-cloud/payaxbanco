@@ -471,6 +471,8 @@ CREATE TABLE IF NOT EXISTS ixc_config (
   recursos TEXT,
   -- Identificação: quantos dígitos do documento pedir quando o telefone já está no cadastro.
   confirmar_por TEXT NOT NULL DEFAULT 'cpf3' CHECK (confirmar_por IN ('cpf3','nascimento')),
+  -- Só o CPF/CNPJ: a ZOE diz em nome de quem está a conta e o cliente confirma ("sim"). Vale para todos os caminhos.
+  confirmar_titular INTEGER NOT NULL DEFAULT 0,
   max_tentativas INTEGER NOT NULL DEFAULT 3 CHECK (max_tentativas BETWEEN 1 AND 6),
   -- Desbloqueio de confiança: liga/desliga e o limite por cliente no período.
   desbloqueio_ativo INTEGER NOT NULL DEFAULT 1,

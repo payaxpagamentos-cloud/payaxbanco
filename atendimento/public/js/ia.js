@@ -531,6 +531,7 @@ export async function provedorIxc(ctx, alvo) {
         escolha('Confirmar quem é pelo', 'confirmar_por', {
           cpf3: 'Três primeiros números do CPF/CNPJ (mais rápido)',
           nascimento: 'Data de nascimento do titular (mais rígido)',
+          titular: 'Só o CPF/CNPJ: a ZOE diz em nome de quem está a conta e o cliente confirma',
         }, c.confirmar_por),
         campo('Tentativas antes de transferir', { name: 'max_tentativas', type: 'number', value: c.max_tentativas, min: 1, max: 6 })),
 

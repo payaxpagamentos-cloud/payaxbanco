@@ -125,6 +125,13 @@ const FERRAMENTAS = {
       const doc = v.digitos(entrada.documento);
       const valido = (doc.length === 11 && v.cpfValido(doc)) || (doc.length === 14 && v.cnpjValido(doc));
       if (!valido) return { ok: false, erro: 'CPF ou CNPJ inválido. Peça para o cliente conferir e repetir.' };
+      const cfgEmpresa = lerConfig(db, conversa.empresa_id);
+      const modoTitular = Boolean(cfgEmpresa?.confirmar_titular);
+      // No modo "só o CPF/CNPJ" cada consulta revela um nome: o limite de tentativas vale aqui também.
+      if (modoTitular && Number(atual(db, conversa).identidade_tentativas) >= Number(cfgEmpresa?.max_tentativas ?? 3)) {
+        return { ok: false, bloqueado: 'limite de tentativas', erro: 'O limite de tentativas de identificação acabou.',
+          instrucao: 'Chame transferir_para_humano dizendo que não foi possível identificar o titular. Não peça outro documento.' };
+      }
 
       const r = await comIxc(db, conversa, contato, 'identificacao', (ixc) => ixc.clientesPorDocumento(doc));
       if (!r.ok) return r;
@@ -141,6 +148,17 @@ const FERRAMENTAS = {
         return { ok: false, erro: 'Há mais de um cadastro com esse documento.', instrucao: 'Chame transferir_para_humano: um atendente precisa escolher o cadastro certo.' };
       }
       const c = lista[0];
+      if (modoTitular) {
+        const titular = c.razao ?? c.fantasia ?? null;
+        db.prepare(`UPDATE conversas SET ixc_cliente_id = ?, ixc_cliente_nome = ?, identidade_confirmada = 0, identidade_metodo = 'documento' WHERE id = ?`)
+          .run(String(c.id), titular, conversa.id);
+        db.prepare('UPDATE contatos SET codigo_externo = COALESCE(codigo_externo, ?) WHERE id = ?').run(String(c.id), contato.id);
+        return {
+          ok: true, encontrou: true, pode_confirmar: true, titular,
+          instrucao: `Pergunte ao cliente, com estas palavras: "A conta está em nome de ${titular ?? 'titular sem nome no cadastro'}. Está correto?". `
+            + 'Quando ele responder, chame confirmar_identidade com a resposta dele (sim ou não). Ainda não informe nada do contrato.',
+        };
+      }
       const nasc = ixcLib.nascimentoDe(c);
       // As tentativas NÃO voltam a zero ao trocar de cadastro: senão bastaria reidentificar para chutar de novo.
       db.prepare(`UPDATE conversas SET ixc_cliente_id = ?, ixc_cliente_nome = ?, identidade_confirmada = 0,
@@ -196,7 +214,23 @@ const FERRAMENTAS = {
       const metodo = c.identidade_metodo ?? cfg?.confirmar_por ?? 'cpf3';
       const resposta = String(entrada.resposta ?? '');
       let confere = false;
-      if (metodo === 'cpf3') {
+      // Modo "só o CPF/CNPJ": o documento veio do cliente (identificar_cliente grava 'documento') e a ZOE disse o nome.
+      if (cfg?.confirmar_titular && metodo !== 'documento') {
+        return { ok: false, erro: 'O cliente ainda não informou o CPF ou CNPJ.', instrucao: 'Peça o CPF ou CNPJ do titular e chame identificar_cliente.' };
+      }
+      if (cfg?.confirmar_titular) {
+        // O cliente informou o documento e a ZOE disse o nome: o "sim" dele é a confirmação.
+        confere = SIM.test(resposta) && !NAO.test(resposta);
+        if (!confere) {
+          const tentativas = Number(c.identidade_tentativas) + 1;
+          db.prepare('UPDATE conversas SET identidade_tentativas = ?, ixc_cliente_id = NULL, ixc_cliente_nome = NULL, identidade_metodo = NULL WHERE id = ?')
+            .run(tentativas, conversa.id);
+          registrar(db, { conversa: c, contato, tipo: 'confirmacao', sucesso: false, detalhe: `titular não confirmado (tentativa ${tentativas})` });
+          return tentativas >= limite
+            ? { ok: false, erro: 'O titular não foi confirmado e o limite de tentativas acabou.', instrucao: 'Chame transferir_para_humano. Não peça outro documento.' }
+            : { ok: false, confere: false, erro: 'O cliente não confirmou o titular.', instrucao: 'Peça o CPF ou CNPJ de quem é o titular da conta e chame identificar_cliente de novo.' };
+        }
+      } else if (metodo === 'cpf3') {
         confere = v.digitos(resposta).slice(0, 3) === v.digitos(cadastro.cnpj_cpf).slice(0, 3) && v.digitos(resposta).length >= 3;
       } else {
         const nasc = ixcLib.nascimentoDe(cadastro);
@@ -495,7 +529,14 @@ async function executar(def, contexto) {
  * Não confirma nada: só guarda quem provavelmente é, para a IA pedir os 3 dígitos em vez do CPF inteiro.
  */
 /** Como a empresa confirma a identidade (3 dígitos do CPF ou data de nascimento). */
-const metodoConfirmacao = (db, empresaId) => lerConfig(db, empresaId)?.confirmar_por ?? 'cpf3';
+// 'titular_pendente': já se sabe quem provavelmente é (telefone, aviso), mas no modo "só o CPF/CNPJ"
+// o cliente ainda precisa informar o documento — só depois a ZOE diz o nome e ele confirma.
+const metodoConfirmacao = (db, empresaId) => {
+  const cfg = lerConfig(db, empresaId);
+  return cfg?.confirmar_titular ? 'titular_pendente' : (cfg?.confirmar_por ?? 'cpf3');
+};
+const SIM = /^\s*(sim|s|isso|isso mesmo|é isso|correto|certo|exato|confirmo|positivo|ok|okay|é|e sim|está|esta|tá|ta|perfeito|pode ser|yes)\b/i;
+const NAO = /\b(n[aã]o|nao|errado|incorreto|outro nome|n)\b/i;
 
 async function identificarPeloTelefone(db, { conversa, contato }) {
   if (!configurado(db, conversa.empresa_id)) return null;
@@ -505,10 +546,14 @@ async function identificarPeloTelefone(db, { conversa, contato }) {
   const r = await comIxc(db, conversa, contato, 'identificacao', (ixc) => ixc.clientesPorTelefone(contato.telefone));
   if (!r.ok || r.valor.length !== 1) return null;
   const cliente = r.valor[0];
+  const metodo = metodoConfirmacao(db, conversa.empresa_id);
+  void cfg;
+  // Modo "só o CPF/CNPJ": não adianta saber pelo telefone — o cliente informa o documento e confirma o nome.
+  if (metodo === 'titular_pendente') return null;
   db.prepare(`UPDATE conversas SET ixc_cliente_id = ?, ixc_cliente_nome = ?, identidade_metodo = ? WHERE id = ?`)
-    .run(String(cliente.id), cliente.razao ?? cliente.fantasia ?? null, cfg?.confirmar_por ?? 'cpf3', conversa.id);
+    .run(String(cliente.id), cliente.razao ?? cliente.fantasia ?? null, metodo, conversa.id);
   db.prepare('UPDATE contatos SET codigo_externo = COALESCE(codigo_externo, ?) WHERE id = ?').run(String(cliente.id), contato.id);
-  return { id: String(cliente.id), nome: cliente.razao ?? cliente.fantasia ?? null, metodo: cfg?.confirmar_por ?? 'cpf3' };
+  return { id: String(cliente.id), nome: cliente.razao ?? cliente.fantasia ?? null, metodo };
 }
 
 /**
@@ -558,6 +603,15 @@ function notaDeEstado(db, conversa) {
   if (c.identidade_confirmada) {
     return `Estado: cliente identificado e confirmado no sistema do provedor${c.ixc_cliente_nome ? ` (${c.ixc_cliente_nome})` : ''}. `
       + 'As consultas de contrato, fatura e conexão estão liberadas.';
+  }
+  const titularModo = Boolean(lerConfig(db, c.empresa_id)?.confirmar_titular);
+  if (titularModo && !(c.ixc_cliente_id && c.identidade_metodo === 'documento')) {
+    return 'Estado: a identidade AINDA NÃO foi confirmada. Se o assunto for contrato, fatura ou conexão, peça o CPF ou CNPJ do titular '
+      + 'e chame identificar_cliente; depois diga em nome de quem está a conta e pergunte se está correto. Até lá, não informe nada do contrato.';
+  }
+  if (titularModo) {
+    return `Estado: o cliente informou o documento; a conta está em nome de ${c.ixc_cliente_nome ?? '(sem nome no cadastro)'}. `
+      + 'Se ainda não perguntou, pergunte se está correto; com a resposta, chame confirmar_identidade. Não informe nada do contrato antes disso.';
   }
   if (c.ixc_cliente_id) {
     return c.identidade_metodo === 'nascimento'
