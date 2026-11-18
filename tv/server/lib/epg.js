@@ -117,8 +117,11 @@ function importarXmltv(db, xml, { canalId = null, porIdExterno = {}, substituir 
   const resultado = { importados: 0, ignorados: 0, removidos: 0, canais: new Set(), avisos: [] };
 
   transacao(db, () => {
-    const porNumero = new Map(db.prepare('SELECT id, numero, slug, nome FROM canais').all().map((c) => [String(c.numero), c]));
-    const porSlug = new Map(db.prepare('SELECT id, numero, slug, nome FROM canais').all().map((c) => [c.slug, c]));
+    const cadastrados = db.prepare('SELECT id, numero, slug, nome, id_epg FROM canais').all();
+    const porNumero = new Map(cadastrados.map((c) => [String(c.numero), c]));
+    const porSlug = new Map(cadastrados.map((c) => [c.slug, c]));
+    // Cada canal pode guardar o identificador que o provedor de grade usa para ele.
+    const porEpg = new Map(cadastrados.filter((c) => c.id_epg).map((c) => [c.id_epg, c]));
     const alvos = new Map();
 
     const programas = [];
@@ -132,7 +135,8 @@ function importarXmltv(db, xml, { canalId = null, porIdExterno = {}, substituir 
       if (!inicio || !fim || fim <= inicio || !titulo) { resultado.ignorados += 1; continue; }
       const canal = canalId ? { id: Number(canalId) }
         : porIdExterno[canalExterno] ? { id: Number(porIdExterno[canalExterno]) }
-          : porSlug.get(String(canalExterno ?? '').toLowerCase()) ?? porNumero.get(String(canalExterno));
+          : porEpg.get(canalExterno)
+          ?? porSlug.get(String(canalExterno ?? '').toLowerCase()) ?? porNumero.get(String(canalExterno));
       if (!canal) {
         resultado.ignorados += 1;
         if (canalExterno && !resultado.avisos.includes(canalExterno)) resultado.avisos.push(canalExterno);

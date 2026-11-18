@@ -144,6 +144,8 @@ CREATE TABLE IF NOT EXISTS canais (
   logo_midia_id INTEGER REFERENCES midias(id),
   -- Identificador do canal na lista pública (iptv-org): serve para buscar o logo oficial.
   id_publico TEXT,
+  -- Identificador do canal no XMLTV da grade (varia conforme o provedor de EPG).
+  id_epg TEXT,
   plano_minimo_id INTEGER REFERENCES planos(id),
   classificacao INTEGER NOT NULL DEFAULT 0 CHECK (classificacao IN (0,10,12,14,16,18)),
   regiao TEXT,
@@ -486,6 +488,7 @@ function migrar(db) {
   if (!colunas.includes('observacao')) db.exec('ALTER TABLE canais ADD COLUMN observacao TEXT');
   if (!colunas.includes('cabecalhos')) db.exec('ALTER TABLE canais ADD COLUMN cabecalhos TEXT');
   if (!colunas.includes('id_publico')) db.exec('ALTER TABLE canais ADD COLUMN id_publico TEXT');
+  if (!colunas.includes('id_epg')) db.exec('ALTER TABLE canais ADD COLUMN id_epg TEXT');
 }
 
 /** Endereço amigável: "Cine Aberta 2" -> "cine-aberta-2". */

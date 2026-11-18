@@ -76,6 +76,8 @@ module.exports = (db) => {
     url_hls: urlHls,
     url_embed: urlEmbed,
     observacao: v.opcional(d.observacao, 'a observação', 1000),
+    // Identificador do canal no arquivo de grade do provedor (XMLTV).
+    id_epg: v.opcional(d.id_epg, 'o identificador na grade', 120),
     relay: v.booleano(d.relay, true) ? 1 : 0,
     logo_midia_id: midiaPronta(d.logo_midia_id, 'imagem', 'Logo do canal'),
     plano_minimo_id: d.plano_minimo_id ? achar('planos', d.plano_minimo_id, 'Plano').id : null,
@@ -89,10 +91,10 @@ module.exports = (db) => {
 
   r.post('/canais', (req, res) => {
     const c = dadosCanal(req.body);
-    const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, url_hls, url_embed, observacao, relay, logo_midia_id,
+    const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, url_hls, url_embed, observacao, id_epg, relay, logo_midia_id,
         plano_minimo_id, classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.fonte, c.url_hls,
-      c.url_embed, c.observacao, c.relay, c.logo_midia_id, c.plano_minimo_id, c.classificacao, c.regiao, c.ordem, c.ativo, agora(), agora());
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.fonte, c.url_hls,
+      c.url_embed, c.observacao, c.id_epg, c.relay, c.logo_midia_id, c.plano_minimo_id, c.classificacao, c.regiao, c.ordem, c.ativo, agora(), agora());
     const canal = achar('canais', Number(r2.lastInsertRowid), 'Canal');
     embed.invalidar();
     registrar(db, req, 'canal_criado', { id: canal.id, nome: canal.nome });
@@ -103,8 +105,8 @@ module.exports = (db) => {
     const atual = achar('canais', req.params.id, 'Canal');
     const c = dadosCanal({ ...atual, ...req.body }, atual.id);
     db.prepare(`UPDATE canais SET numero = ?, nome = ?, slug = ?, descricao = ?, categoria = ?, fonte = ?, url_hls = ?, url_embed = ?, observacao = ?,
-        relay = ?, logo_midia_id = ?, plano_minimo_id = ?, classificacao = ?, regiao = ?, ordem = ?, ativo = ?, atualizado_em = ? WHERE id = ?`)
-      .run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.fonte, c.url_hls, c.url_embed, c.observacao, c.relay, c.logo_midia_id,
+        id_epg = ?, relay = ?, logo_midia_id = ?, plano_minimo_id = ?, classificacao = ?, regiao = ?, ordem = ?, ativo = ?, atualizado_em = ? WHERE id = ?`)
+      .run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.fonte, c.url_hls, c.url_embed, c.observacao, c.id_epg, c.relay, c.logo_midia_id,
         c.plano_minimo_id, c.classificacao, c.regiao, c.ordem, c.ativo, agora(), atual.id);
     // Trocou o endereço do sinal: o cache da lista antiga não serve mais.
     if (atual.url_hls && c.url_hls !== atual.url_hls) relay.cacheLista.delete(atual.url_hls);

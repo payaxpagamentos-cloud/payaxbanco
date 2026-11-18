@@ -237,6 +237,8 @@ async function telaCanais(c) {
         escolha('Classificação', 'classificacao', CLASSIFICACOES_OPCOES, canal?.classificacao ?? 0),
         escolha('Plano mínimo', 'plano_minimo_id', [['', 'Todos os planos'], ...planos.map((p) => [p.id, p.nome])], canal?.plano_minimo_id ?? '')),
       area('Descrição', { name: 'descricao', maxlength: 500, rows: 2 }, canal?.descricao ?? ''),
+      campo('Identificador na grade (XMLTV)', { name: 'id_epg', maxlength: 120, value: canal?.id_epg ?? '' },
+        'Como o provedor da grade chama este canal no arquivo. O comando "npm run epg" preenche sozinho; use este campo para corrigir um canal que não casou.'),
       el('label', { class: 'campo' }, 'Logo do canal', entradaLogo,
         botaoLogoUrl
           ? el('div', { class: 'linha', style: 'gap:8px;margin-top:8px' }, campoLogoUrl, botaoLogoUrl)
@@ -268,6 +270,7 @@ async function telaCanais(c) {
         url_hls: d.url_hls || null,
         url_embed: d.url_embed || null,
         observacao: d.observacao || null,
+        id_epg: d.id_epg || null,
         classificacao: Number(d.classificacao),
         plano_minimo_id: d.plano_minimo_id ? Number(d.plano_minimo_id) : null,
         descricao: d.descricao || null,

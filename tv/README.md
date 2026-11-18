@@ -129,6 +129,22 @@ Traz a ficha e as artes de cada título e põe os três últimos como destaque d
 mesmo arquivo de demonstração para todos**: serve para a vitrine ter o que tocar numa
 apresentação. O conteúdo licenciado entra depois pelo painel, um arquivo por título.
 
+### Grade de verdade das emissoras
+
+```bash
+npm run epg -- https://provedor/grade.xml.gz             # casa os canais e importa
+npm run epg -- https://provedor/grade.xml.gz --listar    # só mostra o que o arquivo tem
+npm run epg -- https://provedor/grade.xml.gz --so-mapear # casa sem importar
+```
+
+O comando casa cada canal cadastrado com o do arquivo (pelo nome, com a mesma regra que não
+deixa "Rede Brasil" virar "TV Brasil"), guarda o identificador em cada canal e importa a
+programação. O endereço fica salvo em Configurações, e a plataforma reimporta **uma vez por dia**
+sozinha. Um canal que não casar recebe o identificador à mão, no cadastro do canal.
+
+O provedor é escolha da operação: o arquivo que a emissora fornece, um serviço de EPG contratado
+ou um público. A plataforma não vem com nenhum endereço embutido.
+
 ## Logos das emissoras
 
 Em Canais, **Buscar logos das emissoras** traz o logo oficial de cada canal da lista pública
