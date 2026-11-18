@@ -25,6 +25,25 @@ Roteiro do teste: `ROTEIRO-TESTE-IXC.md`.
 - A rota de arquivos da fatura (`fn_areceber_arquivos`) existe? Senão, o PDF fica nos arquivos do cliente.
 - Conta e planejamento da baixa: os padrões (conta da carteira e planejamento do título) servem?
 
+## API do banco (em andamento desde 18/11/2026)
+
+- Portal de desenvolvedores do banco: cadastro feito; assinaturas pedidas para "Cobrança" e "Cobrança com
+  QR Code", em Sandbox (aprovadas) e Produção (pendentes de aprovação do banco). E-mail enviado ao contato.
+- Falta: registrar a aplicação e gerar as credenciais (Client ID e Client Secret entram só em
+  Integrações → Banco), e o certificado (seguir o anexo do banco).
+- Falta: receber o manual/especificação dos dois produtos (versões 1.7.2 e 1.8.3 no portal) e ajustar o
+  modo API do sistema, escrito antes da documentação oficial: as rotas e os nomes de campos do produto com
+  QR Code são outros. Testar no Sandbox antes de ligar em produção.
+
+## Do relatório "Terceiro habilitador no convênio" (para o próximo pacote)
+
+- Remessa: incluir o registro Tipo 7 (endereço do beneficiário final) e alertas para as rejeições 53, 54
+  e A3 no retorno. Antes, confirmar com o banco se o convênio está habilitado para beneficiário final por
+  arquivo (condição de aceite "S" ou "A"; o manual pede pedido prévio na agência).
+- PDF: endereço da PAY AX e do provedor; nome e CNPJ da PAY AX exatamente como o banco imprime; mais
+  destaque para o beneficiário final; linha "Boleto emitido por ordem de [provedor]". Sem trocar rótulos.
+- Conferir no extrato a tarifa "TAR MAN SAC AVA" (R$ 97,55 por título numa tabela de 2021; não confirmado).
+
 ## Ainda não feito
 
 - WhatsApp com o PDF anexado (depende da ferramenta do provedor: Opa! Suite ou API oficial).
