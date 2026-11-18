@@ -158,11 +158,27 @@ export function modal(titulo, conteudo, { largo = false, semCabecalho = false } 
         : el('div', { class: 'linha entre', style: 'margin-bottom:12px' },
           el('h2', { style: 'margin:0' }, titulo),
           el('button', { class: 'btn redondo vazio', 'aria-label': 'Fechar', onclick: () => fechar() }, icone('fechar'))));
-    caixa.append(...[].concat(typeof conteudo === 'function' ? conteudo(fechar) : conteudo).flat(Infinity).filter((f) => f !== null && f !== undefined && f !== false));
+    // O conteúdo pode ser uma função assíncrona (quando a janela precisa buscar algo antes de desenhar).
+    const colocar = (partes) => {
+      caixa.append(...[].concat(partes).flat(Infinity).filter((f) => f !== null && f !== undefined && f !== false));
+      caixa.querySelector('input, select, textarea, button.primario')?.focus();
+      if (ehTV) requestAnimationFrame(() => caixa.querySelector('button.primario, button, input')?.focus());
+    };
+    const montado = typeof conteudo === 'function' ? conteudo(fechar) : conteudo;
+    if (montado && typeof montado.then === 'function') {
+      caixa.append(el('p', { class: 'mudo' }, 'Carregando…'));
+      montado.then((partes) => {
+        caixa.querySelector('p.mudo')?.remove();
+        colocar(partes);
+      }).catch((err) => {
+        caixa.querySelector('p.mudo')?.remove();
+        caixa.append(el('div', { class: 'aviso erro' }, err.message));
+      });
+    } else {
+      colocar(montado);
+    }
     fundo.append(caixa);
     document.body.append(fundo);
-    caixa.querySelector('input, select, textarea, button.primario')?.focus();
-    if (ehTV) requestAnimationFrame(() => caixa.querySelector('button.primario, button, input')?.focus());
   });
 }
 

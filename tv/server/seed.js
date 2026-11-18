@@ -13,6 +13,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const config = require('./config');
 const { abrir, transacao, agora, slug, gravarConfig } = require('./db');
@@ -35,23 +36,28 @@ const temFfmpeg = (() => {
 const SENHA_EQUIPE = 'play2026';
 const SENHA_CLIENTE = 'cliente2026';
 
-// ---------------------------------------------------------------- artes geradas
+// ---------------------------------------------------------------- artes
 
 const CORES = [['#7C2D12', '#FF8A5B'], ['#431407', '#FFC043'], ['#5B1A0B', '#FF4D1C'], ['#78350F', '#FBBF24'],
   ['#3F1D0B', '#F97316'], ['#4C1D0C', '#FDBA74'], ['#601410', '#EF4444'], ['#422006', '#FACC15']];
 
 const escapar = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** Cartaz em SVG: gradiente, nome e selo. Serve de arte até a operação enviar a oficial. */
-function arteSvg(nome, { largura = 600, altura = 900, etiqueta = 'PLAY TV', indice = 0, comNome = true } = {}) {
-  const [a, b] = CORES[indice % CORES.length];
-  const palavras = String(nome).split(/\s+/);
+/** Quebra o nome em linhas que cabem na arte. */
+function quebrar(nome, porLinha = 14) {
   const linhas = [];
   let atual = '';
-  for (const p of palavras) {
-    if ((`${atual} ${p}`).trim().length > 14) { linhas.push(atual.trim()); atual = p; } else atual = `${atual} ${p}`;
+  for (const palavra of String(nome).split(/\s+/)) {
+    if ((`${atual} ${palavra}`).trim().length > porLinha) { linhas.push(atual.trim()); atual = palavra; } else atual = `${atual} ${palavra}`;
   }
   if (atual.trim()) linhas.push(atual.trim());
+  return linhas.filter(Boolean);
+}
+
+/** Reserva: cartaz desenhado aqui mesmo, quando não há internet para buscar a foto. */
+function arteSvg(nome, { largura = 600, altura = 900, etiqueta = 'PLAY TV', indice = 0, comNome = true } = {}) {
+  const [a, b] = CORES[indice % CORES.length];
+  const linhas = quebrar(nome);
   const base = altura / 2 - (linhas.length - 1) * (altura * 0.045);
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${largura} ${altura}" width="${largura}" height="${altura}">
 <defs><linearGradient id="f" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>
@@ -60,22 +66,117 @@ function arteSvg(nome, { largura = 600, altura = 900, etiqueta = 'PLAY TV', indi
 <circle cx="${largura * 0.8}" cy="${altura * 0.2}" r="${largura * 0.33}" fill="#fff" fill-opacity=".07"/>
 <circle cx="${largura * 0.2}" cy="${altura * 0.78}" r="${largura * 0.42}" fill="#000" fill-opacity=".12"/>
 <rect width="${largura}" height="${altura}" fill="url(#s)"/>
-${comNome ? `<text x="${largura * 0.08}" y="${altura * 0.1}" font-family="Manrope, sans-serif" font-size="${largura * 0.045}" font-weight="800" fill="#fff" fill-opacity=".85" letter-spacing="2">${escapar(etiqueta).toUpperCase()}</text>` : ''}
-${comNome ? linhas.map((l, i) => `<text x="${largura * 0.08}" y="${base + i * altura * 0.09}" font-family="Manrope, sans-serif" font-size="${largura * 0.095}" font-weight="800" fill="#fff">${escapar(l)}</text>`).join('\n') : ''}
+${comNome ? linhas.map((l, i) => `<text x="${largura * 0.08}" y="${base + i * altura * 0.09}" font-family="sans-serif" font-size="${largura * 0.095}" font-weight="800" fill="#fff">${escapar(l)}</text>`).join('\n') : ''}
 </svg>`, 'utf8');
 }
+void arteSvg;
 
-/** Logo quadrada do canal. */
+/** Logo quadrada do canal (marca, não foto: desenhada aqui mesmo). */
 const logoSvg = (nome, indice) => {
   const [a, b] = CORES[indice % CORES.length];
   const sigla = nome.split(/\s+/).map((p) => p[0]).join('').slice(0, 3).toUpperCase();
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
 <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>
 <rect width="200" height="200" rx="34" fill="url(#g)"/>
-<text x="100" y="124" text-anchor="middle" font-family="Manrope, sans-serif" font-size="68" font-weight="800" fill="#fff">${escapar(sigla)}</text></svg>`, 'utf8');
+<text x="100" y="124" text-anchor="middle" font-family="sans-serif" font-size="68" font-weight="800" fill="#fff">${escapar(sigla)}</text></svg>`, 'utf8');
 };
 
+const pastaArtes = fs.mkdtempSync(path.join(os.tmpdir(), 'playtv-artes-'));
+let fotosBaixadas = 0;
+let fotosFalharam = 0;
+
+/** Baixa uma foto (sempre a mesma para a mesma semente) para servir de base da arte. */
+async function baixarFoto(semente, largura, altura) {
+  const url = `https://picsum.photos/seed/${encodeURIComponent(semente)}/${largura}/${altura}`;
+  for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+    try {
+      const resp = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(20_000) });
+      if (!resp.ok) throw new Error(String(resp.status));
+      const buf = Buffer.from(await resp.arrayBuffer());
+      if (buf.length > 1000) {
+        fotosBaixadas += 1;
+        return buf;
+      }
+    } catch { /* tenta de novo */ }
+  }
+  fotosFalharam += 1;
+  return null;
+}
+
+const FONTE = ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf']
+  .find((f) => fs.existsSync(f)) ?? null;
+
+const paraFfmpeg = (t) => String(t).replace(/\\/g, '').replace(/'/g, '').replace(/:/g, ' ').replace(/[%]/g, '');
+
+/**
+ * Monta a arte a partir da foto: recorte, correção de cor, escurecimento em degradê
+ * e o nome do título — do jeito que um cartaz de catálogo se parece.
+ */
+function tratarFoto(foto, { largura, altura, nome = null, etiqueta = null, lado = 'baixo' }) {
+  const entrada = path.join(pastaArtes, `e-${crypto.randomBytes(6).toString('hex')}.jpg`);
+  const saida = path.join(pastaArtes, `s-${crypto.randomBytes(6).toString('hex')}.jpg`);
+  fs.writeFileSync(entrada, foto);
+
+  const filtros = [
+    `scale=${largura}:${altura}:force_original_aspect_ratio=increase`,
+    `crop=${largura}:${altura}`,
+    'eq=saturation=0.72:contrast=1.12:brightness=-0.04',
+    'vignette=PI/5',
+  ];
+  // Só o cartaz em pé recebe degradê pintado (é onde o nome fica escrito na arte).
+  // No banner, quem escurece é o próprio layout — pintar aqui deixaria faixas à mostra.
+  if (lado === 'baixo') {
+    const faixas = 14;
+    const h = Math.ceil((altura * 0.5) / faixas);
+    for (let i = 0; i < faixas; i += 1) {
+      const alpha = (0.06 + (i / faixas) ** 1.4 * 0.72).toFixed(3);
+      filtros.push(`drawbox=x=0:y=${Math.round(altura - (faixas - i) * h)}:w=${largura}:h=${h}:color=black@${alpha}:t=fill`);
+    }
+  } else {
+    filtros.push('eq=brightness=-0.03');
+  }
+  if (nome && FONTE) {
+    const linhas = quebrar(nome, largura > 1000 ? 22 : 13);
+    const tamanho = Math.round(largura * (largura > 1000 ? 0.052 : 0.105));
+    const base = altura - Math.round(altura * 0.07) - (linhas.length - 1) * Math.round(tamanho * 1.08);
+    if (etiqueta) {
+      filtros.push(`drawtext=fontfile=${FONTE}:text='${paraFfmpeg(etiqueta.toUpperCase())}':fontcolor=#E50914:fontsize=${Math.round(tamanho * 0.3)}:x=${Math.round(largura * 0.07)}:y=${base - Math.round(tamanho * 0.75)}:borderw=0`);
+    }
+    linhas.forEach((linha, i) => {
+      filtros.push(`drawtext=fontfile=${FONTE}:text='${paraFfmpeg(linha)}':fontcolor=white:fontsize=${tamanho}:x=${Math.round(largura * 0.07)}:y=${base + i * Math.round(tamanho * 1.08)}:shadowcolor=black@0.6:shadowx=2:shadowy=3`);
+    });
+  }
+
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', entrada, '-vf', filtros.join(','), '-q:v', '3', saida], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const resultado = fs.readFileSync(saida);
+  fs.rmSync(entrada, { force: true });
+  fs.rmSync(saida, { force: true });
+  return resultado;
+}
+
+/**
+ * Arte do catálogo: tenta a foto tratada; sem internet (ou sem ffmpeg), cai no desenho local.
+ * `tipo` é 'capa' (em pé), 'banner' (deitado) ou 'thumb' (miniatura de episódio).
+ */
+async function arteDoTitulo(nome, { tipo = 'capa', semente, indice = 0, etiqueta = null } = {}) {
+  const medidas = { capa: [600, 900], banner: [1600, 900], thumb: [640, 360] }[tipo];
+  const foto = temFfmpeg ? await baixarFoto(semente ?? slug(nome), medidas[0], medidas[1]) : null;
+  if (foto) {
+    try {
+      return tratarFoto(foto, {
+        largura: medidas[0],
+        altura: medidas[1],
+        nome: tipo === 'capa' ? nome : null,
+        etiqueta: tipo === 'capa' ? etiqueta : null,
+        lado: tipo === 'banner' ? 'esquerda' : 'baixo',
+      });
+    } catch { /* cai na arte desenhada */ }
+  }
+  return arteSvg(nome, { largura: medidas[0], altura: medidas[1], indice, etiqueta: etiqueta ?? 'PLAY TV', comNome: tipo === 'capa' });
+}
+
 const guardarArte = (buf, nome) => midia.salvarImagem(db, equipeFalsa, buf, { nome }).id;
+const guardarArteDoTitulo = async (nome, opcoes) => guardarArte(await arteDoTitulo(nome, opcoes), `${slug(nome)}-${opcoes.tipo ?? 'capa'}.jpg`);
 
 // ---------------------------------------------------------------- vídeos de demonstração
 
@@ -131,6 +232,7 @@ const GRADE = {
 };
 
 const FILMES = [
+  // nome, ano, classificação, sinopse, gêneros, original
   ['A Noite do Sertão', 2026, 12, 'Um caminhoneiro atravessa o sertão levando uma carga que pode mudar o destino de uma cidade inteira.', ['Drama', 'Suspense'], true],
   ['Capital Sul', 2025, 14, 'Dois irmãos disputam a herança de uma construtora em meio a uma investigação federal.', ['Drama'], true],
   ['Último Trem para Olinda', 2024, 10, 'Uma comédia de enganos a bordo do último trem de uma linha que vai ser desativada.', ['Comédia', 'Romance'], false],
@@ -138,9 +240,19 @@ const FILMES = [
   ['O Vale dos Inventores', 2025, 0, 'Três crianças constroem uma máquina para salvar a feira de ciências da escola.', ['Infantil', 'Aventura'], false],
   ['Samba no Asfalto', 2023, 12, 'A história da ala de uma escola de samba que decidiu levar o bairro inteiro para a avenida.', ['Documentário'], false],
   ['Linha de Frente', 2026, 18, 'Repórteres cobrem uma operação policial que sai do controle em uma noite de chuva.', ['Ação', 'Drama'], true],
+  ['Serra da Garoa', 2025, 14, 'Uma delegada volta à cidade natal para investigar um desaparecimento de trinta anos atrás.', ['Suspense', 'Drama'], true],
+  ['Praia Grande', 2024, 12, 'Quatro amigos se reencontram no verão em que tudo mudou para a cidade litorânea.', ['Drama', 'Romance'], false],
+  ['Carnaval Fora de Época', 2026, 10, 'Uma banda de interior tenta emplacar o hit do ano a três dias do desfile.', ['Comédia'], false],
+  ['Pantanal Secreto', 2025, 0, 'Uma expedição filma onças, ariranhas e tuiuiús num ano de cheia histórica.', ['Documentário', 'Aventura'], true],
+  ['Noite de São João', 2024, 12, 'Numa quadrilha junina, dois rivais descobrem que disputam mais do que a fogueira.', ['Romance', 'Comédia'], false],
+  ['O Último Ônibus', 2026, 16, 'O motorista da última linha da madrugada carrega passageiros com segredos demais.', ['Suspense'], true],
+  ['Cerrado em Chamas', 2025, 14, 'Brigadistas enfrentam a maior queimada da região enquanto a fazenda vizinha some de vista.', ['Ação', 'Drama'], false],
+  ['Minha Rua, Meu Time', 2024, 0, 'A várzea paulistana ganha um torneio e um bairro inteiro entra em campo.', ['Esportes', 'Documentário'], false],
+  ['Hotel Beira-Mar', 2026, 14, 'Uma herdeira reabre o hotel da família e descobre por que ele fechou.', ['Drama', 'Suspense'], true],
 ];
 
 const SERIES = [
+  // nome, ano, classificação, sinopse, gêneros, original, temporadas
   ['Capital Norte', 2026, 14, 'Uma procuradora recém-chegada a Belém enfrenta um esquema que envolve o porto e a prefeitura.', ['Drama', 'Suspense'], true,
     [['Temporada 1', ['O porto', 'A procuradora', 'Primeira audiência', 'Noite de cheia', 'O depoimento', 'Sentença']],
       ['Temporada 2', ['Volta ao porto', 'Novo promotor', 'A testemunha', 'Marés']]]],
@@ -150,7 +262,21 @@ const SERIES = [
     [['Temporada 1', ['Turno da noite', 'Sala vermelha', 'Ambulância 7', 'Troca de plantão']]]],
   ['Mata Adentro', 2024, 10, 'Uma expedição documenta espécies que ninguém havia filmado antes.', ['Documentário', 'Aventura'], false,
     [['Temporada 1', ['Rio acima', 'O topo da árvore', 'Chuva na mata', 'De volta']]]],
+  ['Clube da Esquina', 2026, 12, 'Cinco músicos dividem o mesmo apartamento e o mesmo sonho em Belo Horizonte.', ['Drama', 'Romance'], true,
+    [['Temporada 1', ['Primeiro ensaio', 'Palco pequeno', 'A demo', 'Turnê de ônibus', 'O contrato']]]],
+  ['Fronteira Seca', 2025, 16, 'Uma policial federal e um contrabandista se enfrentam na tríplice fronteira.', ['Ação', 'Suspense'], true,
+    [['Temporada 1', ['A travessia', 'Posto 12', 'O informante', 'Caminho fechado', 'Última carga']]]],
 ];
+
+const ELENCO = [
+  'Ana Clara Ribeiro, Marcos Veloso, Tereza Lins',
+  'João Bastos, Helena Prado, Rui Camargo',
+  'Débora Nunes, Caio Serrano, Lúcia Amaral',
+  'Fernando Tavares, Bia Rocha, Otávio Mendes',
+  'Sandra Vilela, Pedro Arruda, Clara Monteiro',
+  'Rafael Duarte, Juliana Peixoto, Nelson Braga',
+];
+const DIRECAO = ['Marina Siqueira', 'Jorge Albuquerque', 'Letícia Franco', 'Paulo Vasconcelos', 'Renata Khoury'];
 
 const ASSINANTES = [
   ['Marina Costa', 'marina@exemplo.com.br', '11988880001', 2, 'ativa'],
@@ -161,6 +287,7 @@ const ASSINANTES = [
 
 // ---------------------------------------------------------------- execução
 
+async function gerar() {
 console.log(`[${config.marca}] Gerando dados de demonstração…`);
 if (!temFfmpeg) console.warn('  · ffmpeg não encontrado: o catálogo entra como rascunho (sem vídeo). Envie os vídeos pelo painel.');
 
@@ -249,45 +376,47 @@ const ligarGeneros = (tituloId, nomes) => {
 const situacao = temFfmpeg ? 'publicado' : 'rascunho';
 const titulos = [];
 
-FILMES.forEach(([nome, ano, classificacao, sinopse, generos, original], i) => {
-  const capa = guardarArte(arteSvg(nome, { indice: i, etiqueta: original ? 'Original PLAY' : 'Filme' }), `capa-${slug(nome)}.svg`);
-  const banner = guardarArte(arteSvg(nome, { largura: 1600, altura: 900, indice: i, etiqueta: 'PLAY TV', comNome: false }), `banner-${slug(nome)}.svg`);
+console.log('  · montando as artes do catálogo (foto tratada com ffmpeg; sem internet, desenho local)…');
+
+for (const [i, [nome, ano, classificacao, sinopse, generos, original]] of FILMES.entries()) {
+  const capa = await guardarArteDoTitulo(nome, { tipo: 'capa', indice: i, semente: `${slug(nome)}-capa`, etiqueta: original ? 'Original PLAY' : null });
+  const banner = await guardarArteDoTitulo(nome, { tipo: 'banner', indice: i, semente: `${slug(nome)}-banner` });
   const duracaoFilme = temFfmpeg ? 15 : 5400 + i * 300;
   const r = db.prepare(`INSERT INTO titulos (tipo, nome, slug, sinopse, ano, pais, classificacao, duracao_s, elenco, direcao, situacao,
       capa_midia_id, banner_midia_id, trailer_midia_id, video_midia_id, original, publicado_em, criado_em, atualizado_em)
     VALUES ('filme', ?, ?, ?, ?, 'Brasil', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(nome, slug(nome), sinopse, ano, classificacao, duracaoFilme, 'Elenco de demonstração', 'Direção de demonstração', situacao,
+    .run(nome, slug(nome), sinopse, ano, classificacao, duracaoFilme, ELENCO[i % ELENCO.length], DIRECAO[i % DIRECAO.length], situacao,
       capa, banner, videoTrailer ?? null, videoFilme ?? null, original ? 1 : 0,
       situacao === 'publicado' ? new Date(Date.now() - (i + 1) * 86_400_000).toISOString() : null, agora(), agora());
   const id = Number(r.lastInsertRowid);
   ligarGeneros(id, generos);
   titulos.push({ id, nome, tipo: 'filme' });
-});
+}
 
-SERIES.forEach(([nome, ano, classificacao, sinopse, generos, original, temporadas], i) => {
+for (const [i, [nome, ano, classificacao, sinopse, generos, original, temporadas]] of SERIES.entries()) {
   const indice = i + FILMES.length;
-  const capa = guardarArte(arteSvg(nome, { indice, etiqueta: original ? 'Original PLAY' : 'Série' }), `capa-${slug(nome)}.svg`);
-  const banner = guardarArte(arteSvg(nome, { largura: 1600, altura: 900, indice, etiqueta: 'Série PLAY', comNome: false }), `banner-${slug(nome)}.svg`);
+  const capa = await guardarArteDoTitulo(nome, { tipo: 'capa', indice, semente: `${slug(nome)}-capa`, etiqueta: original ? 'Original PLAY' : null });
+  const banner = await guardarArteDoTitulo(nome, { tipo: 'banner', indice, semente: `${slug(nome)}-banner` });
   const r = db.prepare(`INSERT INTO titulos (tipo, nome, slug, sinopse, ano, pais, classificacao, elenco, direcao, situacao,
       capa_midia_id, banner_midia_id, trailer_midia_id, original, publicado_em, criado_em, atualizado_em)
     VALUES ('serie', ?, ?, ?, ?, 'Brasil', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(nome, slug(nome), sinopse, ano, classificacao, 'Elenco de demonstração', 'Direção de demonstração', situacao,
+    .run(nome, slug(nome), sinopse, ano, classificacao, ELENCO[indice % ELENCO.length], DIRECAO[indice % DIRECAO.length], situacao,
       capa, banner, videoTrailer ?? null, original ? 1 : 0,
       situacao === 'publicado' ? new Date(Date.now() - (i + 1) * 43_200_000).toISOString() : null, agora(), agora());
   const tituloId = Number(r.lastInsertRowid);
   ligarGeneros(tituloId, generos);
-  temporadas.forEach(([nomeTemporada, episodios], t) => {
+  for (const [t, [nomeTemporada, episodios]] of temporadas.entries()) {
     const tr = db.prepare('INSERT INTO temporadas (titulo_id, numero, nome, ano) VALUES (?, ?, ?, ?)').run(tituloId, t + 1, nomeTemporada, ano + t);
     const temporadaId = Number(tr.lastInsertRowid);
-    episodios.forEach((nomeEp, e) => {
-      const thumb = guardarArte(arteSvg(nomeEp, { largura: 640, altura: 360, indice: indice + e, etiqueta: `T${t + 1} E${e + 1}` }), `thumb-${slug(nomeEp)}.svg`);
+    for (const [e, nomeEp] of episodios.entries()) {
+      const thumb = await guardarArteDoTitulo(nomeEp, { tipo: 'thumb', indice: indice + e, semente: `${slug(nome)}-t${t + 1}e${e + 1}` });
       db.prepare(`INSERT INTO episodios (titulo_id, temporada_id, numero, nome, sinopse, duracao_s, video_midia_id, thumb_midia_id, situacao, criado_em)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(tituloId, temporadaId, e + 1, nomeEp, `${nomeEp} — episódio de demonstração.`,
         temFfmpeg ? 15 : 2700, videoEpisodio ?? null, thumb, temFfmpeg ? 'publicado' : 'rascunho', agora());
-    });
-  });
+    }
+  }
   titulos.push({ id: tituloId, nome, tipo: 'serie' });
-});
+}
 console.log(`  · catálogo: ${FILMES.length} filmes e ${SERIES.length} séries (${situacao})`);
 
 // Destaques e uma fileira de gênero
@@ -392,6 +521,9 @@ console.log(`  · ${sessoes} sessões de audiência nos últimos 30 dias`);
 
 fs.rmSync(pasta, { recursive: true, force: true });
 
+console.log(`  · artes: ${fotosBaixadas} foto(s) tratadas${fotosFalharam ? ` · ${fotosFalharam} sem internet (desenho local)` : ''}`);
+fs.rmSync(pastaArtes, { recursive: true, force: true });
+
 console.log(`\n[${config.marca}] Pronto.`);
 console.log(`  App do assinante : http://localhost:${config.port}${config.basePath}/`);
 console.log(`  Painel           : http://localhost:${config.port}${config.basePath}/admin/`);
@@ -401,3 +533,9 @@ if (!temFfmpeg) console.log('  Atenção: sem ffmpeg o catálogo ficou em rascun
 console.log('  TV aberta: Globo, SBT, Record, Band, RedeTV! e os demais já estão cadastrados e DESLIGADOS.');
 console.log('  Em Canais, cadastre em cada um o endereço do sinal (.m3u8) que a emissora fornece ou o');
 console.log('  endereço do player oficial dela, e ligue o canal. Os dois canais da casa usam sinal de teste.');
+}
+
+gerar().catch((err) => {
+  console.error(`[${config.marca}] Falha ao gerar os dados:`, err.message);
+  process.exitCode = 1;
+});

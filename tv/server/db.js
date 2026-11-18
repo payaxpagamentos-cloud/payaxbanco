@@ -137,6 +137,8 @@ CREATE TABLE IF NOT EXISTS canais (
   url_embed TEXT,
   -- Recado da operação: de quem pedir o sinal, número do contrato, contato da afiliada.
   observacao TEXT,
+  -- Alguns sinais só respondem com cabeçalhos próprios (User-Agent, Referer). JSON, usado pela transmissão.
+  cabecalhos TEXT,
   -- 1: o sinal passa pelos nossos servidores; 0: o player vai direto na origem.
   relay INTEGER NOT NULL DEFAULT 1,
   logo_midia_id INTEGER REFERENCES midias(id),
@@ -427,6 +429,7 @@ function migrar(db) {
   if (!colunas.includes('fonte')) db.exec("ALTER TABLE canais ADD COLUMN fonte TEXT NOT NULL DEFAULT 'hls'");
   if (!colunas.includes('url_embed')) db.exec('ALTER TABLE canais ADD COLUMN url_embed TEXT');
   if (!colunas.includes('observacao')) db.exec('ALTER TABLE canais ADD COLUMN observacao TEXT');
+  if (!colunas.includes('cabecalhos')) db.exec('ALTER TABLE canais ADD COLUMN cabecalhos TEXT');
 }
 
 /** Endereço amigável: "Cine Aberta 2" -> "cine-aberta-2". */

@@ -311,6 +311,9 @@ async function telaCanais(c) {
       ]);
       ir('canais');
     }, 'tv'),
+    botao('Buscar canais (lista pública)', 'vazio', async () => {
+      if (await escolherDaListaPublica()) ir('canais');
+    }, 'busca'),
     botao('Testar todos os sinais', 'vazio', async () => {
       toast('Testando os sinais…');
       for (const x of canais) await api.post(`/admin/canais/${x.id}/testar`);
@@ -318,6 +321,70 @@ async function telaCanais(c) {
     }),
     botao('Novo canal', 'primario', async () => { if (await formCanal()) ir('canais'); }, 'mais')),
   tabela(['Canal', 'Situação', 'No ar agora', '>Ações'], linhas, 'Nenhum canal cadastrado. Comece pelo botão "Novo canal".'));
+}
+
+/**
+ * Catálogo aberto de canais (projeto iptv-org): a operação busca pelo nome, marca o que
+ * interessa e importa. Entram desligados, para testar o sinal antes de pôr no ar.
+ */
+function escolherDaListaPublica() {
+  return modal('Buscar canais em lista pública', async (fechar) => {
+    const escolhidos = new Set();
+    const lista = el('div', { class: 'coluna', style: 'max-height:46vh;overflow:auto;gap:6px' }, el('p', { class: 'mudo' }, 'Carregando a lista…'));
+    const busca = el('input', { type: 'search', placeholder: 'Filtrar por nome' });
+    const contador = el('span', { class: 'pequeno mudo' }, '');
+    const importar = el('button', { class: 'btn primario', disabled: true }, 'Importar selecionados');
+
+    let canais = [];
+    const pintar = () => {
+      const termo = busca.value.trim().toLowerCase();
+      const visiveis = canais.filter((c) => !termo || c.nome.toLowerCase().includes(termo));
+      limpar(lista, visiveis.length ? visiveis.slice(0, 200).map((c) => {
+        const caixa = el('input', { type: 'checkbox', disabled: c.ja_cadastrado, ...(escolhidos.has(c.id) ? { checked: true } : {}) });
+        caixa.addEventListener('change', () => {
+          if (caixa.checked) escolhidos.add(c.id); else escolhidos.delete(c.id);
+          contador.textContent = `${escolhidos.size} selecionado(s)`;
+          importar.disabled = escolhidos.size === 0;
+        });
+        return el('label', { class: 'cartao fundo linha', style: 'gap:10px;cursor:pointer;padding:10px' },
+          caixa,
+          el('div', { style: 'flex:1;min-width:0' },
+            el('div', { class: 'linha firme', style: 'gap:6px' },
+              el('strong', { class: 'cortar' }, c.nome),
+              c.qualidade ? el('span', { class: 'etiqueta' }, c.qualidade) : null,
+              el('span', { class: 'etiqueta info' }, CATEGORIAS_CANAL[c.categoria] ?? c.categoria),
+              c.ja_cadastrado ? el('span', { class: 'etiqueta ok' }, 'já cadastrado') : null,
+              (c.avisos ?? []).includes('Not 24/7') ? el('span', { class: 'etiqueta aviso' }, 'não é 24h') : null),
+            el('div', { class: 'mini apagado cortar' }, c.url)));
+      }) : el('p', { class: 'mudo' }, 'Nenhum canal com esse nome.'));
+    };
+    busca.addEventListener('input', pintar);
+
+    importar.addEventListener('click', () => acao(importar, async () => {
+      const r = await api.post('/admin/canais/importar-lista-publica', { ids: [...escolhidos] });
+      toast(`${r.criados} canal(is) importado(s).`);
+      await modal('Canais importados', (f2) => [
+        el('div', { class: 'aviso atencao' }, r.proximo_passo),
+        el('div', { class: 'linha fim' }, el('button', { class: 'btn primario', onclick: () => f2(true) }, 'Entendi')),
+      ]);
+      fechar('importado');
+    }));
+
+    api.get('/admin/canais/lista-publica?pais=BR&limite=400').then((r) => {
+      canais = r.canais;
+      pintar();
+    }).catch((err) => limpar(lista, el('div', { class: 'aviso erro' }, err.message)));
+
+    return [
+      el('p', { class: 'mudo' }, 'Catálogo aberto de canais (projeto iptv-org), já com o melhor sinal de cada um. '
+        + 'Confira o direito de transmitir cada canal antes de ligar: a lista é pública, mas a decisão é de vocês.'),
+      el('label', { class: 'campo' }, 'Buscar', busca),
+      lista,
+      el('div', { class: 'linha entre', style: 'margin-top:12px' },
+        contador,
+        el('div', { class: 'linha' }, el('button', { class: 'btn vazio', onclick: () => fechar() }, 'Cancelar'), importar)),
+    ];
+  }, { largo: true });
 }
 
 /** Prévia do sinal dentro do painel (não gasta tela do plano). */

@@ -173,7 +173,7 @@ module.exports = (db, autenticado, comPerfil) => {
       player.conferirToken(db, String(req.query.t ?? ''), { tipo: 'canal', canalId, exigirSessaoViva: false });
       const url = relay.lerUrlAssinada(canalId, req.query.u);
       if (!url) throw new ErroNegocio('Endereço de pedaço inválido.', 403);
-      await relay.repassarSegmento(req, res, url);
+      await relay.repassarSegmento(req, res, url, db.prepare('SELECT cabecalhos FROM canais WHERE id = ?').get(canalId));
     } catch (err) {
       next(err);
     }

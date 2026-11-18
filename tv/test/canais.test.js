@@ -223,3 +223,37 @@ test('importação de grade por endereço recusa rede interna', async (t) => {
   assert.equal(r.status, 422);
   assert.match(r.dados.erro, /rede interna/i);
 });
+
+test('sinal que exige cabeçalho próprio guarda e reenvia o cabeçalho', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const { cabecalhosDoCanal } = require('../server/lib/relay');
+
+  const canal = { cabecalhos: JSON.stringify({ user_agent: 'PlayerDaEmissora/2.0', referrer: 'https://emissora.test/' }) };
+  assert.deepEqual(cabecalhosDoCanal(canal), { 'User-Agent': 'PlayerDaEmissora/2.0', Referer: 'https://emissora.test/' });
+  assert.deepEqual(cabecalhosDoCanal({ cabecalhos: null }), {});
+  assert.deepEqual(cabecalhosDoCanal({ cabecalhos: 'isto não é json' }), {});
+});
+
+test('canal importado de lista pública entra desligado e com o aviso para a operação', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+
+  // Importa na mão o que a lista pública traria (sem depender da internet no teste).
+  const criado = await s.post('/admin/canais', {
+    numero: 200,
+    nome: 'Canal Regional da Lista',
+    categoria: 'local',
+    url_hls: 'https://origem.test/regional/index.m3u8',
+    observacao: 'Importado da lista pública (iptv-org) · sinal 720p. Teste o sinal e confirme que pode transmitir este canal antes de ligar.',
+    ativo: false,
+  }, admin);
+  assert.equal(criado.status, 201);
+  assert.equal(criado.dados.canal.ativo, 0);
+  assert.match(criado.dados.canal.observacao, /antes de ligar/);
+
+  // Enquanto desligado, não aparece para o assinante.
+  const cliente = await s.assinante('lista@exemplo.com.br', { plano: 2 });
+  assert.equal((await s.get('/tv/canais', cliente.token, cliente.comPerfil)).dados.canais.length, 0);
+});

@@ -138,6 +138,20 @@ function reescrever(texto, { canal, playToken, baseApi, urlDaLista }) {
  * Busca a lista HLS na origem e devolve a versão reescrita, com um cache curto
  * (o player pede a lista a cada poucos segundos).
  */
+/** Cabeçalhos extras que o sinal exige (alguns servidores só respondem com User-Agent ou Referer próprios). */
+function cabecalhosDoCanal(canal) {
+  if (!canal?.cabecalhos) return {};
+  try {
+    const d = JSON.parse(canal.cabecalhos);
+    const saida = {};
+    if (d.user_agent) saida['User-Agent'] = String(d.user_agent).slice(0, 300);
+    if (d.referrer) saida.Referer = String(d.referrer).slice(0, 300);
+    return saida;
+  } catch {
+    return {};
+  }
+}
+
 async function listaReescrita(canal, { url = canal.url_hls, playToken, baseApi }) {
   const agoraMs = Date.now();
   const emCache = cacheLista.get(url);
@@ -147,7 +161,7 @@ async function listaReescrita(canal, { url = canal.url_hls, playToken, baseApi }
     texto = emCache.texto;
     finalUrl = emCache.finalUrl;
   } else {
-    const resp = await buscar(url);
+    const resp = await buscar(url, { cabecalhos: cabecalhosDoCanal(canal) });
     if (!resp.ok) throw new ErroNegocio(`A origem do sinal respondeu ${resp.status}.`, 502);
     texto = await resp.text();
     finalUrl = resp.url || url;
@@ -158,9 +172,9 @@ async function listaReescrita(canal, { url = canal.url_hls, playToken, baseApi }
 }
 
 /** Repassa um pedaço do sinal (segmento, chave ou cabeçalho) ao player, em fluxo, sem guardar em disco. */
-async function repassarSegmento(req, res, url) {
+async function repassarSegmento(req, res, url, canal = null) {
   const faixa = req.get('range');
-  const resp = await buscar(url, { cabecalhos: faixa ? { Range: faixa } : {} });
+  const resp = await buscar(url, { cabecalhos: { ...cabecalhosDoCanal(canal), ...(faixa ? { Range: faixa } : {}) } });
   if (!resp.ok && resp.status !== 206) throw new ErroNegocio(`A origem do sinal respondeu ${resp.status}.`, 502);
   const tamanho = Number(resp.headers.get('content-length') || 0);
   if (tamanho && tamanho > config.relay.segmentoMaxBytes) throw new ErroNegocio('Pedaço do sinal maior que o permitido.', 502);
@@ -193,7 +207,7 @@ async function verificarCanal(db, canal) {
   let status = 'ok';
   let detalhe = null;
   try {
-    const resp = await buscar(canal.url_hls);
+    const resp = await buscar(canal.url_hls, { cabecalhos: cabecalhosDoCanal(canal) });
     if (!resp.ok) {
       status = 'falha';
       detalhe = `A origem respondeu ${resp.status}.`;
@@ -225,4 +239,4 @@ async function verificarSinais(db, { apenas = null } = {}) {
   return resultados;
 }
 
-module.exports = { ipPrivado, conferirEndereco, assinarUrl, lerUrlAssinada, reescrever, listaReescrita, repassarSegmento, verificarCanal, verificarSinais, cacheLista };
+module.exports = { ipPrivado, conferirEndereco, assinarUrl, lerUrlAssinada, reescrever, listaReescrita, cabecalhosDoCanal, repassarSegmento, verificarCanal, verificarSinais, cacheLista };

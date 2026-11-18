@@ -12,6 +12,7 @@ const relay = require('../lib/relay');
 const epg = require('../lib/epg');
 const embed = require('../lib/embed');
 const { CANAIS_ABERTOS, AVISO_NUMEROS } = require('../lib/tv-aberta');
+const listasPublicas = require('../lib/listas-publicas');
 const player = require('../lib/player');
 const v = require('../lib/validacao');
 
@@ -144,6 +145,63 @@ module.exports = (db) => {
       aviso: AVISO_NUMEROS,
       proximo_passo: 'Os canais entraram desligados. Em cada um, cadastre o endereço do sinal (.m3u8) que a emissora fornece ou o endereço do player oficial dela, e ligue o canal.',
     });
+  });
+
+  /**
+   * Catálogo aberto de canais (projeto iptv-org): mostra o que existe para o país,
+   * já com o melhor sinal de cada canal, para a operação escolher o que importar.
+   */
+  r.get('/canais/lista-publica', async (req, res, next) => {
+    try {
+      const pais = String(req.query.pais ?? 'BR').toUpperCase().slice(0, 2);
+      const canais = await listasPublicas.canaisDoPais(pais, { limite: v.inteiro(req.query.limite ?? 200, 'o limite', { min: 1, max: 500 }) });
+      const jaTenho = new Set(db.prepare('SELECT slug FROM canais').all().map((x) => x.slug));
+      res.json({
+        pais,
+        fonte: listasPublicas.FONTE_CANAIS,
+        canais: canais.map((x) => ({ ...x, ja_cadastrado: jaTenho.has(slug(x.nome)) })),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /** Importa os canais escolhidos da lista pública. Entram desligados, para a operação testar antes. */
+  r.post('/canais/importar-lista-publica', async (req, res, next) => {
+    try {
+      const pais = String(req.body.pais ?? 'BR').toUpperCase().slice(0, 2);
+      const escolhidos = Array.isArray(req.body.ids) ? new Set(req.body.ids.map(String)) : null;
+      const disponiveis = await listasPublicas.canaisDoPais(pais, { limite: 500 });
+      const criados = [];
+      const existentes = [];
+      transacao(db, () => {
+        let numero = db.prepare('SELECT COALESCE(MAX(numero), 199) AS n FROM canais WHERE numero >= 200').get().n;
+        for (const canal of disponiveis) {
+          if (escolhidos && !escolhidos.has(canal.id)) continue;
+          if (db.prepare('SELECT 1 FROM canais WHERE slug = ?').get(slug(canal.nome))) { existentes.push(canal.nome); continue; }
+          numero += 1;
+          const aviso = canal.avisos?.length ? ` · ${canal.avisos.join(', ')}` : '';
+          const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, url_hls, cabecalhos, observacao, relay,
+              classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
+            VALUES (?, ?, ?, ?, ?, 'hls', ?, ?, ?, 1, 0, ?, ?, 0, ?, ?)`)
+            .run(numero, canal.nome, slug(canal.nome), canal.site ?? null, canal.categoria, canal.url,
+              canal.cabecalhos ? JSON.stringify(canal.cabecalhos) : null,
+              `Importado da lista pública (iptv-org) em ${new Date().toLocaleDateString('pt-BR')} · sinal ${canal.qualidade ?? 'sem qualidade informada'}${aviso}. Teste o sinal e confirme que pode transmitir este canal antes de ligar.`,
+              pais === 'BR' ? 'Nacional' : pais, numero, agora(), agora());
+          criados.push({ id: Number(r2.lastInsertRowid), nome: canal.nome, numero });
+        }
+      });
+      embed.invalidar();
+      registrar(db, req, 'canais_lista_publica_importados', { pais, criados: criados.length });
+      res.json({
+        criados: criados.length,
+        ja_existiam: existentes.length,
+        canais: criados,
+        proximo_passo: 'Os canais entraram desligados, numerados a partir do 200. Clique em "Testar sinal" em cada um e ligue os que forem ficar no ar.',
+      });
+    } catch (err) {
+      next(err);
+    }
   });
 
   /** Testa o sinal agora (a operação clica antes de colocar o canal no ar). */

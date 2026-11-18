@@ -13,7 +13,7 @@ com servidor, banco de dados e login próprios.
 | # | Módulo | O que tem |
 |---|---|---|
 | 1 | **Canais ao vivo** | Cadastro do canal (número, categoria, região, logo, classificação, plano mínimo) com o endereço HLS (`.m3u8`) da emissora ou do encoder próprio. **Transmissão pelos nossos servidores**: a lista é reescrita e cada pedaço do sinal passa por aqui, então a origem não aparece para o assinante, o CORS deixa de ser problema e a política de segurança das páginas continua fechada em `'self'`. Teste do sinal em um clique, prévia dentro do painel e verificação automática a cada 15 minutos (o painel mostra quem está fora do ar). |
-| 2 | **TV aberta já cadastrada** | Globo, SBT, Record, Band, RedeTV!, Cultura, Gazeta, TV Brasil, Rede Brasil, Aparecida, Rede Vida e os canais de notícias entram com um clique em **Canais → Importar TV aberta** (número, categoria, logo e o lembrete de onde pedir o sinal de cada um). Cada canal aceita **sinal próprio ou contratado** (.m3u8) ou o **player oficial da emissora** — neste caso a PLAY TV não transmite nada: abre o player público da emissora, com os anúncios dela. |
+| 2 | **TV aberta já cadastrada** | Globo, SBT, Record, Band, RedeTV!, Cultura, Gazeta, TV Brasil, Rede Brasil, Aparecida, Rede Vida e os canais de notícias entram com um clique em **Canais → Importar TV aberta** (número, categoria, logo e onde fica o sinal de cada um). Além disso, **Buscar canais (lista pública)** traz o catálogo aberto do projeto iptv-org, com o melhor sinal de cada canal brasileiro, para importar em lote. Cada canal aceita **sinal .m3u8** (próprio, contratado ou público) ou o **player oficial da emissora**, que abre o player dela com os anúncios dela. |
 | 3 | **Grade de programação (EPG)** | Programação por canal, cadastrada na mão (com recusa de sobreposição) ou importada em **XMLTV** — o formato que emissoras e agregadores publicam. O app mostra "no ar agora" com barra de andamento, o que vem depois e um **guia de 7 dias** que já abre no programa do momento. |
 | 4 | **Catálogo sob demanda** | Filmes e séries com temporadas, episódios, trailer, elenco, direção, gêneros, classificação indicativa e selo de original. **Envio do vídeo pelo painel em pedaços** (retomável, até 8 GB por arquivo), formato reconhecido pelo conteúdo do arquivo (MP4, WebM, MKV) e entrega com **HTTP Range**. Legendas em WebVTT. Publicar confere se há vídeo e capa. |
 | 5 | **Player** | Tela cheia com controles próprios: HLS pelo **hls.js** (com o HLS nativo do Safari como reserva), MP4 com Range, troca de qualidade e velocidade, legendas, janela flutuante, tela cheia, atalhos de teclado, **retomada de onde parou**, **próximo episódio** e aviso de telas simultâneas com a opção de encerrar as outras. |
@@ -65,6 +65,35 @@ Samsung (Tizen), o pipeline de mídia do **webOS** na LG e o **ExoPlayer (Media3
 e na LG a interface vai empacotada dentro da TV (`npm run empacotar-tv https://seu-dominio/tv`) e conversa com a
 API do servidor; no Android TV, a interface roda em WebView e a reprodução é entregue ao player nativo, que devolve
 a posição para "continuar assistindo", audiência e limite de telas continuarem valendo.
+
+## De onde vem o sinal de cada canal
+
+A PLAY TV aceita as três formas que existem hoje, e o painel tem um botão para cada uma:
+
+| Forma | Como entra | Quem paga a banda | Onde isso aparece |
+|---|---|---|---|
+| **Player oficial da emissora** (embed) | cole o endereço da transmissão aberta da emissora (o YouTube verificado dela, o portal) | a emissora | Canais → fonte "player oficial da emissora" |
+| **Sinal .m3u8** (próprio, contratado ou público) | cole o endereço HLS | nós | Canais → fonte "sinal .m3u8" |
+| **Lista pública de canais** | busque pelo nome e importe em lote | nós | Canais → **Buscar canais (lista pública)** |
+
+A busca em lista pública usa o catálogo aberto do projeto **iptv-org**: ele traz nome, categoria e o
+melhor sinal de cada canal do país. Os canais entram **desligados e numerados a partir do 200** —
+a operação testa o sinal e decide o que vai ao ar.
+
+Onde mais procurar o player oficial de uma emissora: **CXTv** e **Guia TV** reúnem os players de
+dezenas de emissoras abertas e regionais brasileiras; **Pluto TV**, **Samsung TV Plus** e
+**LG Channels** mostram quais canais já são distribuídos abertamente pela internet (os canais FAST).
+
+Dois detalhes práticos que a plataforma já resolve:
+
+- **CORS**: muitos servidores de emissora recusam que um site de terceiros puxe o `.m3u8` pelo
+  navegador. Como **quem busca o sinal é o nosso servidor**, e não o navegador do assinante, isso
+  deixa de ser problema — inclusive no app web.
+- **Endereço com token que expira**: emissoras grandes entregam `.m3u8` com senha temporária
+  amarrada ao IP, que morre em algumas horas. A verificação automática a cada 15 minutos marca o
+  canal como **sinal com falha** no painel assim que isso acontece, e o campo de endereço é editável
+  para a troca. Quando o sinal exige cabeçalho próprio (`User-Agent` ou `Referer`), a plataforma
+  guarda e reenvia esse cabeçalho a cada pedaço.
 
 ## Grade dos canais abertos
 
