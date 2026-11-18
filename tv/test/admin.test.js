@@ -184,3 +184,68 @@ test('saúde e configuração pública', async (t) => {
   assert.equal(publico.dados.planos.length, 3);
   assert.equal((await s.get('/rota-que-nao-existe')).status, 404);
 });
+
+test('conversão automática: uma fila de versões menores a partir do arquivo enviado', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const transcodificar = require('../server/lib/transcodificar');
+
+  // A escada só desce: de um 1080p saem HD e SD, e de um 480p não sai nada.
+  assert.deepEqual(transcodificar.escada(1920, 1080), ['sd', 'hd']);
+  assert.deepEqual(transcodificar.escada(640, 480), []);
+
+  if (!transcodificar.temFfmpeg()) {
+    t.diagnostic('sem ffmpeg nesta máquina: a fila de conversão não foi exercitada');
+    return;
+  }
+
+  // Um vídeo de verdade, pequeno, entrando pelo mesmo caminho do painel.
+  const { execFileSync } = require('node:child_process');
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'teste-conv-'));
+  const arquivo = path.join(pasta, 'origem.mp4');
+  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1920x1080:rate=10:duration=2',
+    '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', arquivo], { stdio: 'ignore' });
+  const conteudo = fs.readFileSync(arquivo);
+
+  const abertura = await s.post('/admin/midias/video', { nome: 'origem.mp4', tamanho: conteudo.length, duracao_s: 2, largura: 1920, altura: 1080 }, admin);
+  const midiaId = abertura.dados.midia.id;
+  await s.put(`/admin/midias/${midiaId}/parte?offset=0`, conteudo, admin);
+  await s.post(`/admin/midias/${midiaId}/concluir`, { duracao_s: 2, largura: 1920, altura: 1080 }, admin);
+
+  const capa = await s.enviarImagem(admin);
+  const criado = await s.post('/admin/titulos', { tipo: 'filme', nome: 'Teste de conversão', capa_midia_id: capa, video_midia_id: midiaId, duracao_s: 2 }, admin);
+  const tituloId = criado.dados.titulo.id;
+
+  const fila = await s.post('/admin/versoes/gerar', { titulo_id: tituloId, midia_id: midiaId }, admin);
+  assert.equal(fila.status, 201);
+  assert.deepEqual(fila.dados.criadas.map((c) => c.qualidade).sort(), ['hd', 'sd']);
+  assert.equal(fila.dados.origem, 'fullhd', 'o próprio arquivo já entra como Full HD');
+
+  // Pedir de novo não duplica o que já está na fila.
+  const repetida = await s.post('/admin/versoes/gerar', { titulo_id: tituloId, midia_id: midiaId }, admin);
+  assert.equal(repetida.dados.criadas.length, 0);
+  assert.ok(repetida.dados.puladas.length >= 2);
+
+  // Espera o ffmpeg terminar as duas.
+  const ate = Date.now() + 60_000;
+  let conversoes = [];
+  while (Date.now() < ate) {
+    conversoes = (await s.get('/admin/conversoes', admin)).dados.conversoes.filter((c) => c.titulo_id === tituloId);
+    if (conversoes.length === 2 && conversoes.every((c) => c.situacao === 'pronta' || c.situacao === 'erro')) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  assert.deepEqual(conversoes.map((c) => c.situacao).sort(), ['pronta', 'pronta'], JSON.stringify(conversoes.map((c) => c.erro)));
+
+  // As três versões aparecem para quem assiste, na ordem certa.
+  const cliente = await s.assinante('conversao@exemplo.com.br', { plano: 3 });
+  await s.post(`/admin/titulos/${tituloId}/situacao`, { situacao: 'publicado' }, admin);
+  const abrir = await s.post('/play/abrir', { tipo: 'filme', titulo_id: tituloId }, cliente.token, cliente.comPerfil);
+  assert.deepEqual(abrir.dados.qualidades.map((q) => q.qualidade), ['fullhd', 'hd', 'sd']);
+  assert.equal(abrir.dados.qualidades.find((q) => q.qualidade === 'hd').altura, 720);
+  assert.equal(abrir.dados.fonte.qualidade, 'fullhd');
+});

@@ -7,6 +7,7 @@ const { encerrarSessoesMortas } = require('./lib/player');
 const { rodarCobranca } = require('./lib/assinaturas');
 const { verificarSinais } = require('./lib/relay');
 const { atualizarGradeAutomatica } = require('./lib/epg');
+const transcodificar = require('./lib/transcodificar');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
@@ -34,4 +35,7 @@ cada(24 * 60 * 60_000, 'atualização da grade', () => {
 setTimeout(() => {
   try { rodarCobranca(db); } catch (err) { console.error(`[${config.marca}] Falha na cobrança:`, err.message); }
   verificarSinais(db).catch(() => {});
+  // Conversões que ficaram pela metade num reinício voltam para a fila.
+  const retomadas = transcodificar.retomar(db);
+  if (retomadas) console.log(`[${config.marca}] ${retomadas} conversão(ões) retomada(s).`);
 }, 3000).unref();

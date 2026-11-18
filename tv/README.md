@@ -17,6 +17,7 @@ com servidor, banco de dados e login próprios.
 | 3 | **Grade de programação (EPG)** | Programação por canal, cadastrada na mão (com recusa de sobreposição) ou importada em **XMLTV** — o formato que emissoras e agregadores publicam. O app mostra "no ar agora" com barra de andamento, o que vem depois e um **guia de 7 dias** que já abre no programa do momento. |
 | 4 | **Catálogo sob demanda** | Filmes e séries com temporadas, episódios, trailer, elenco, direção, gêneros, classificação indicativa e selo de original. **Envio do vídeo pelo painel em pedaços** (retomável, até 8 GB por arquivo), formato reconhecido pelo conteúdo do arquivo (MP4, WebM, MKV) e entrega com **HTTP Range**. Legendas em WebVTT. Publicar confere se há vídeo e capa. |
 | 5 | **Player** | Tela cheia com controles próprios: HLS pelo **hls.js** (com o HLS nativo do Safari como reserva), MP4 com Range, **troca de qualidade entre 4K, Full HD, HD e SD** continuando de onde parou (limitada pelo plano), velocidade, legendas, janela flutuante, tela cheia, atalhos de teclado, **retomada de onde parou**, **próximo episódio** e aviso de telas simultâneas com a opção de encerrar as outras. |
+| 5.1 | **Conversão automática** | A operação envia **um** arquivo e o servidor gera as qualidades menores com o ffmpeg, uma de cada vez, em fila no banco (sobrevive a reinício). O painel acompanha o progresso de cada conversão. |
 | 6 | **Assinaturas e cobrança** | Planos com preço, telas simultâneas, perfis, qualidade máxima (SD, HD, Full HD ou 4K), downloads e **nível** (libera conteúdo exclusivo). Fatura mensal com **PIX copia e cola e QR Code**, carência, **suspensão automática** de quem não pagou, troca de plano, cancelamento que vale até o fim do período pago e reativação. Todo o conteúdo exige assinatura ativa. |
 | 7 | **Perfis de visualização** | Vários perfis por conta (até o limite do plano), cada um com sua lista, seu progresso e sua **classificação indicativa**. Perfil infantil nasce limitado a 10 anos. **PIN** opcional: o perfil protegido só abre com a chave assinada que o aparelho recebe ao digitar o PIN. |
 | 8 | **Home e curadoria** | Destaques do topo (que passam sozinhos) e fileiras montadas pela curadoria: continuar assistindo, minha lista, em alta (audiência real), novidades, originais, por gênero, canais ao vivo ou **escolha manual** dos títulos. |
@@ -38,9 +39,9 @@ com servidor, banco de dados e login próprios.
   o que ela não faz é inventar um sinal que a emissora não liberou.
 - **DRM (Widevine/FairPlay/PlayReady)**: estúdios costumam exigir DRM para conteúdo licenciado. A plataforma entrega
   o vídeo por link assinado de curta duração, que resolve o acesso indevido casual, mas não é DRM.
-- **Transcodificação automática**: a plataforma **serve** 4K, Full HD, HD e SD do mesmo título — a operação envia um
-  arquivo por qualidade e o player troca entre eles sem perder a cena —, mas não converte sozinha: quem gera os
-  arquivos é um transcodificador (ffmpeg) antes do envio, ou um encoder que já publique em HLS com várias faixas.
+- **Transcodificação em HLS com faixas (ABR)**: a plataforma converte sozinha as versões menores de um arquivo
+  enviado (Full HD, HD e SD, com o ffmpeg da máquina) e troca de qualidade no player sem perder a cena, mas cada
+  versão é um arquivo próprio — não há uma faixa HLS única que troque de bitrate no meio do pedaço.
 - **Aplicativos de loja (iOS, Android, Smart TV)**: o app é web e abre em qualquer navegador, inclusive das TVs.
   Publicar nas lojas exige empacotamento e as regras de cada loja.
 

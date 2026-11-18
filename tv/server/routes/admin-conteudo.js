@@ -15,6 +15,7 @@ const { CANAIS_ABERTOS, AVISO_NUMEROS } = require('../lib/tv-aberta');
 const listasPublicas = require('../lib/listas-publicas');
 const player = require('../lib/player');
 const versoes = require('../lib/versoes');
+const transcodificar = require('../lib/transcodificar');
 const qualidades = require('../lib/qualidades');
 const v = require('../lib/validacao');
 
@@ -558,6 +559,37 @@ module.exports = (db) => {
     });
     registrar(db, req, 'versao_cadastrada', { id: versao.id, qualidade: versao.qualidade, titulo_id: tituloId, episodio_id: episodioId });
     res.status(201).json({ versao });
+  });
+
+  /**
+   * Gera sozinho as versões menores a partir do arquivo já enviado.
+   * O ffmpeg roda em segundo plano, uma conversão de cada vez.
+   */
+  r.post('/versoes/gerar', (req, res) => {
+    const d = req.body;
+    const tituloId = d.titulo_id ? achar('titulos', d.titulo_id, 'Título').id : null;
+    const episodioId = d.episodio_id ? achar('episodios', d.episodio_id, 'Episódio').id : null;
+    if (!tituloId && !episodioId) throw new ErroNegocio('Diga de qual filme ou episódio é a conversão.', 422);
+    const resultado = transcodificar.enfileirar(db, {
+      midiaId: d.midia_id,
+      tituloId: episodioId ? null : tituloId,
+      episodioId,
+      qualidadesPedidas: Array.isArray(d.qualidades) ? d.qualidades : null,
+    });
+    registrar(db, req, 'conversao_enfileirada', {
+      titulo_id: tituloId, episodio_id: episodioId, qualidades: resultado.criadas.map((c) => c.qualidade),
+    });
+    res.status(201).json(resultado);
+  });
+
+  /** Fila de conversão, para o painel acompanhar. */
+  r.get('/conversoes', (req, res) => res.json({
+    conversoes: transcodificar.listar(db, { limite: Number(req.query.limite) || 40 }),
+    ffmpeg: transcodificar.temFfmpeg(),
+  }));
+
+  r.delete('/conversoes/:id', (req, res) => {
+    res.json({ conversao: transcodificar.cancelar(db, v.inteiro(req.params.id, 'a conversão', { min: 1 })) });
   });
 
   r.delete('/versoes/:id', (req, res) => {

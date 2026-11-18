@@ -261,6 +261,24 @@ CREATE TABLE IF NOT EXISTS versoes (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_versao_titulo ON versoes(titulo_id, qualidade) WHERE titulo_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_versao_episodio ON versoes(episodio_id, qualidade) WHERE episodio_id IS NOT NULL;
 
+-- Fila de conversão: a partir de um arquivo enviado, o servidor gera as versões menores
+-- (Full HD, HD e SD) com o ffmpeg, uma de cada vez, sem travar o painel.
+CREATE TABLE IF NOT EXISTS conversoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  midia_id INTEGER NOT NULL REFERENCES midias(id) ON DELETE CASCADE,
+  titulo_id INTEGER REFERENCES titulos(id) ON DELETE CASCADE,
+  episodio_id INTEGER REFERENCES episodios(id) ON DELETE CASCADE,
+  qualidade TEXT NOT NULL CHECK (qualidade IN ('sd','hd','fullhd','4k')),
+  -- fila: esperando a vez; convertendo: ffmpeg rodando; pronta; erro; cancelada.
+  situacao TEXT NOT NULL DEFAULT 'fila' CHECK (situacao IN ('fila','convertendo','pronta','erro','cancelada')),
+  progresso INTEGER NOT NULL DEFAULT 0,
+  erro TEXT,
+  saida_midia_id INTEGER REFERENCES midias(id),
+  criado_em TEXT NOT NULL,
+  concluido_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_conversoes_situacao ON conversoes(situacao, id);
+
 -- Legendas de um filme ou episódio (arquivo .vtt).
 CREATE TABLE IF NOT EXISTS legendas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

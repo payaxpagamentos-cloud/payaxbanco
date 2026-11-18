@@ -70,6 +70,18 @@ function abrirEnvioVideo(db, usuario, { nome, tamanho, duracao_s: duracao, largu
   return db.prepare('SELECT * FROM midias WHERE id = ?').get(Number(r.lastInsertRowid));
 }
 
+/**
+ * Traz para o acervo um vídeo que já está pronto no disco (o que a conversão gera).
+ * Passa pelas mesmas conferências do envio pelo painel: tamanho, formato e SHA-256.
+ */
+function salvarVideoDeArquivo(db, usuario, origem, { nome, duracao_s: duracao = null, largura = null, altura = null }) {
+  const tamanho = fs.statSync(origem).size;
+  const m = abrirEnvioVideo(db, usuario, { nome, tamanho, duracao_s: duracao, largura, altura });
+  fs.copyFileSync(origem, caminho(m));
+  db.prepare('UPDATE midias SET recebido = ? WHERE id = ?').run(tamanho, m.id);
+  return concluirEnvioVideo(db, m.id, { duracao_s: duracao, largura, altura });
+}
+
 /** Grava uma parte do vídeo na posição informada (permite repetir a última parte se a rede caiu). */
 function receberParte(db, id, offset, conteudo) {
   const m = buscar(db, id);
@@ -231,5 +243,6 @@ function enviar(req, res, m, { download = false, cache = 'private, max-age=0, no
 
 module.exports = {
   detectarVideo, detectarImagem, qualidadePorAltura, abrirEnvioVideo, receberParte, concluirEnvioVideo,
+  salvarVideoDeArquivo,
   salvarImagem, salvarLegenda, buscar, usos, excluir, enviar, caminho,
 };

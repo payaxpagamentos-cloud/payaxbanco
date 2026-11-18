@@ -39,6 +39,12 @@ module.exports = {
   // Vídeos, artes e legendas enviados pelo painel. Ficam fora da pasta pública, com nome aleatório.
   // **Inclua esta pasta no backup** (o banco guarda só os registros).
   midiaDir: process.env.TV_MIDIA || path.join(path.dirname(dbFile), 'midia'),
+  // Conversão automática das versões menores (Full HD, HD e SD) a partir do arquivo enviado.
+  ffmpeg: process.env.TV_FFMPEG || 'ffmpeg',
+  conversao: {
+    preset: process.env.TV_CONVERSAO_PRESET || 'veryfast',
+    crf: Number(process.env.TV_CONVERSAO_CRF) || 23,
+  },
   videoMaxBytes: (Number(process.env.TV_VIDEO_MAX_MB) || 8192) * 1024 * 1024,
   arteMaxBytes: (Number(process.env.TV_ARTE_MAX_MB) || 8) * 1024 * 1024,
   legendaMaxBytes: (Number(process.env.TV_LEGENDA_MAX_KB) || 512) * 1024,

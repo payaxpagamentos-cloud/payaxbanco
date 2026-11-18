@@ -184,14 +184,15 @@ export async function telaCatalogo(c, { abrirTitulo }) {
 
 // ---------------------------------------------------------------- editor do título
 
-export async function telaTituloEditor(c, id, { voltar }) {
+export async function telaTituloEditor(c, id, { voltar, abaInicial = null }) {
   const dados = await api.get(`/admin/titulos/${id}`);
   const t = dados.titulo;
   const { generos } = await api.get('/admin/titulos');
-  let aba = t.tipo === 'serie' ? 'episodios' : 'ficha';
+  // Recarregar mantém a aba aberta: quem está mexendo em arquivos não volta para a ficha.
+  let aba = abaInicial ?? (t.tipo === 'serie' ? 'episodios' : 'ficha');
   const painel = el('div');
 
-  const recarregar = () => telaTituloEditor(c, id, { voltar });
+  const recarregar = () => telaTituloEditor(c, id, { voltar, abaInicial: aba });
   const salvar = async (corpo) => {
     await api.patch(`/admin/titulos/${id}`, corpo);
     toast('Salvo.');
@@ -266,10 +267,65 @@ export async function telaTituloEditor(c, id, { voltar }) {
    */
   const versoesEl = () => {
     const lista = (dados.versoes ?? []).filter((v) => (t.tipo === 'filme' ? v.titulo_id === t.id : true));
-    const escolhaQualidade = el('select', { class: 'entrada' },
-      Object.entries(QUALIDADES).reverse().map(([valor, rotulo]) => el('option', { value: valor }, `${rotulo} (${LINHAS_QUALIDADE[valor] ?? ''})`)));
-    const alvoEpisodio = t.tipo === 'filme' ? null : el('select', { class: 'entrada' },
-      (dados.temporadas ?? []).flatMap((tm) => tm.episodios.map((ep) => el('option', { value: String(ep.id) }, `T${tm.numero} E${ep.numero} · ${ep.nome}`))));
+    const campoQualidade = escolha('Qualidade do próximo envio', 'qualidade_versao',
+      Object.entries(QUALIDADES).reverse().map(([valor, rotulo]) => [valor, `${rotulo} (${LINHAS_QUALIDADE[valor] ?? ''})`]), 'fullhd');
+    const escolhaQualidade = campoQualidade.querySelector('select');
+    const campoEpisodio = t.tipo === 'filme' ? null : escolha('Episódio', 'episodio_versao',
+      (dados.temporadas ?? []).flatMap((tm) => tm.episodios.map((ep) => [String(ep.id), `T${tm.numero} E${ep.numero} · ${ep.nome}`])), null);
+    const alvoEpisodio = campoEpisodio?.querySelector('select') ?? null;
+
+    // Fila de conversão deste título: o servidor gera as versões menores sozinho.
+    const fila = el('div', { class: 'coluna', style: 'gap:8px' });
+    const pintarFila = async () => {
+      let r;
+      try { r = await api.get('/admin/conversoes'); } catch { return false; }
+      const minhas = (r.conversoes ?? []).filter((c) => (t.tipo === 'filme'
+        ? c.titulo_id === t.id
+        : (dados.temporadas ?? []).some((tm) => tm.episodios.some((ep) => ep.id === c.episodio_id))));
+      const andando = minhas.filter((c) => c.situacao === 'fila' || c.situacao === 'convertendo');
+      limpar(fila, minhas.length
+        ? minhas.slice(0, 8).map((c) => el('div', { class: 'linha entre', style: 'gap:10px' },
+          el('span', { class: 'mini' }, `${QUALIDADES[c.qualidade] ?? c.qualidade}${c.episodio_nome ? ` · ${c.episodio_nome}` : ''}`),
+          c.situacao === 'convertendo'
+            ? el('div', { class: 'barra-progresso', style: 'flex:1;max-width:220px' }, el('span', { style: `width:${c.progresso}%` }))
+            : null,
+          el('span', { class: `etiqueta ${c.situacao === 'pronta' ? 'ok' : c.situacao === 'erro' ? 'erro' : 'aviso'}`, title: c.erro ?? '' },
+            c.situacao === 'convertendo' ? `convertendo ${c.progresso}%` : c.situacao)))
+        : null);
+      return andando.length > 0;
+    };
+
+    const botaoGerar = el('button', {
+      class: 'btn primario',
+      onclick: (e) => acao(e.currentTarget, async () => {
+        const midiaOrigem = t.tipo === 'filme' ? t.video_midia_id : Number(alvoEpisodio?.value) && (dados.temporadas ?? [])
+          .flatMap((tm) => tm.episodios).find((ep) => ep.id === Number(alvoEpisodio.value))?.video_midia_id;
+        if (!midiaOrigem) return toast('Envie primeiro o vídeo principal.', true);
+        const r = await api.post('/admin/versoes/gerar', {
+          ...(t.tipo === 'filme' ? { titulo_id: t.id } : { episodio_id: Number(alvoEpisodio.value) }),
+          midia_id: midiaOrigem,
+        });
+        if (!r.criadas.length) {
+          toast(r.puladas.length ? `Nada a converter: ${r.puladas.map((x) => `${QUALIDADES[x.qualidade] ?? x.qualidade} ${x.motivo}`).join(', ')}.` : 'Este arquivo já é a menor qualidade.');
+        } else {
+          toast(`${r.criadas.length} conversão(ões) na fila: ${r.criadas.map((x) => QUALIDADES[x.qualidade] ?? x.qualidade).join(', ')}.`);
+        }
+        acompanhar();
+      }),
+    }, icone('raio'), 'Gerar as versões menores');
+
+    // Acompanha a fila enquanto o cartão estiver na tela.
+    let relogio = null;
+    const acompanhar = () => {
+      clearInterval(relogio);
+      relogio = setInterval(async () => {
+        if (!document.body.contains(fila)) return clearInterval(relogio);
+        const andando = await pintarFila();
+        if (!andando) { clearInterval(relogio); recarregar(); }
+      }, 3000);
+      pintarFila();
+    };
+    setTimeout(acompanhar, 0);
 
     const envio = campoVideo('Enviar outra qualidade', {
       dica: 'O mesmo conteúdo, no mesmo tempo, em outra resolução. O player troca sem perder a cena.',
@@ -294,10 +350,16 @@ export async function telaTituloEditor(c, id, { voltar }) {
           td(vz.largura && vz.altura ? `${vz.largura}×${vz.altura}` : '—'),
           td(botao('Remover', 'perigo', async () => { await api.del(`/admin/versoes/${vz.id}`); recarregar(); }), true))))
         : el('div', { class: 'mini apagado' }, 'Nenhuma versão extra: o player usa só o arquivo principal.'),
-      el('div', { class: 'linha', style: 'margin:12px 0 6px;gap:8px' },
-        el('label', { class: 'campo', style: 'margin:0' }, 'Qualidade do próximo envio', escolhaQualidade),
-        alvoEpisodio ? el('label', { class: 'campo', style: 'margin:0' }, 'Episódio', alvoEpisodio) : null),
-      envio);
+      el('div', { class: 'duas', style: 'margin:12px 0 6px' }, campoQualidade, campoEpisodio),
+      envio,
+      el('div', { class: 'cartao fundo', style: 'margin-top:12px' },
+        el('div', { class: 'linha entre' },
+          el('div', {},
+            el('strong', {}, 'Conversão automática'),
+            el('div', { class: 'mini apagado', style: 'margin-top:4px' },
+              'A partir do arquivo principal, o servidor gera as qualidades menores com o ffmpeg, uma de cada vez.')),
+          botaoGerar),
+        fila));
   };
 
   // ---- Temporadas e episódios
