@@ -1,0 +1,628 @@
+<!doctype html>
+<!--
+  Documento de requisitos de instalação da PLAY TECH VIP — o que o cliente precisa
+  providenciar (servidor, banda, rede, IXC) para a plataforma entrar em operação.
+
+  Para gerar o PDF: abra este arquivo no navegador e imprima em PDF, com papel A4,
+  margens "nenhuma" e a opção de imprimir o fundo (cores e imagens) ligada.
+  O texto do documento é o conteúdo abaixo: para atualizar números ou datas, edite aqui.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>PLAY TECH VIP — Requisitos de Instalação</title>
+<style>
+  @font-face { font-family: 'Manrope'; src: url('../public/fonts/manrope.woff2') format('woff2'); font-weight: 200 800; font-display: block; }
+  @page { size: A4; margin: 0; }
+  :root{
+    --vermelho:#E50914; --preto:#0B0B0D; --grafite:#17171C; --cinza:#5A5A66;
+    --linha:#E3E3EA; --fundo:#F7F7FA; --texto:#1C1C22; --dourado:#C9A227;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Inter','Liberation Sans',sans-serif; color:var(--texto); font-size:10.2pt; line-height:1.5; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .folha{ width:210mm; height:297mm; padding:17mm 16mm 14mm; position:relative; overflow:hidden; page-break-after:always; background:#fff; }
+  .folha:last-child{ page-break-after:auto; }
+
+  /* ---------- capa ---------- */
+  .capa{ background:var(--preto); color:#fff; padding:0; }
+  .capa .brilho{ position:absolute; inset:0; background:
+      radial-gradient(120% 70% at 85% 0%, rgba(229,9,20,.45), transparent 60%),
+      radial-gradient(90% 60% at 0% 100%, rgba(201,162,39,.20), transparent 60%); }
+  .capa .conteudo{ position:relative; height:100%; padding:26mm 18mm 18mm; display:flex; flex-direction:column; }
+  .marca{ font-family:'Manrope','Inter',sans-serif; font-weight:800; letter-spacing:.26em; font-size:16pt; text-transform:uppercase; }
+  .marca b{ color:var(--vermelho); }
+  .capa .selo{ display:inline-block; margin-top:3mm; font-size:7.6pt; letter-spacing:.22em; text-transform:uppercase; color:#B9B9C4; }
+  .capa h1{ font-family:'Manrope','Inter',sans-serif; font-size:40pt; line-height:1.03; font-weight:800; margin-top:auto; letter-spacing:-.02em; }
+  .capa h1 span{ color:var(--vermelho); }
+  .capa .sub{ margin-top:6mm; font-size:12pt; color:#D6D6DE; max-width:118mm; line-height:1.45; }
+  .capa .barra{ width:34mm; height:3px; background:var(--vermelho); margin:9mm 0 0; }
+  .capa .ficha{ margin-top:12mm; display:grid; grid-template-columns:repeat(2,1fr); gap:6mm 10mm; border-top:1px solid rgba(255,255,255,.16); padding-top:7mm; }
+  .capa .ficha div span{ display:block; font-size:7.4pt; letter-spacing:.18em; text-transform:uppercase; color:#8C8C99; margin-bottom:1.5mm; }
+  .capa .ficha div strong{ font-size:10.6pt; font-weight:600; color:#fff; }
+
+  /* ---------- cabeçalho/rodapé das folhas ---------- */
+  .topo{ display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid var(--linha); padding-bottom:3mm; margin-bottom:8mm; }
+  .topo .m{ font-family:'Manrope','Inter',sans-serif; font-weight:800; letter-spacing:.2em; font-size:8pt; text-transform:uppercase; color:var(--preto); }
+  .topo .m b{ color:var(--vermelho); }
+  .topo .s{ font-size:8pt; color:var(--cinza); letter-spacing:.04em; }
+  .pe{ position:absolute; left:16mm; right:16mm; bottom:9mm; display:flex; justify-content:space-between; font-size:7.6pt; color:#9A9AA6; border-top:1px solid var(--linha); padding-top:2.5mm; }
+
+  /* ---------- tipografia ---------- */
+  h2{ font-family:'Manrope','Inter',sans-serif; font-size:20pt; font-weight:800; letter-spacing:-.015em; line-height:1.12; margin-bottom:2mm; }
+  h2 .n{ color:var(--vermelho); }
+  .linhafina{ font-size:10.4pt; color:var(--cinza); margin-bottom:7mm; max-width:150mm; }
+  h3{ font-family:'Manrope','Inter',sans-serif; font-size:11pt; font-weight:700; margin:7mm 0 3mm; letter-spacing:.01em; }
+  h3:first-of-type{ margin-top:0; }
+  p{ margin-bottom:3mm; }
+  p:last-child{ margin-bottom:0; }
+  strong{ font-weight:600; }
+  ul{ margin:0 0 3mm 4.5mm; }
+  li{ margin-bottom:1.6mm; padding-left:1mm; }
+  li::marker{ color:var(--vermelho); }
+  code{ font-family:'DejaVu Sans Mono',monospace; font-size:8.6pt; background:#F0F0F5; padding:.4mm 1.2mm; border-radius:2px; }
+
+  /* ---------- tabelas ---------- */
+  table{ width:100%; border-collapse:collapse; font-size:9.3pt; margin-bottom:4mm; }
+  th{ text-align:left; font-size:7.6pt; letter-spacing:.12em; text-transform:uppercase; color:#fff; background:var(--grafite); padding:2.6mm 3mm; font-weight:600; }
+  td{ padding:2.6mm 3mm; border-bottom:1px solid var(--linha); vertical-align:top; }
+  tbody tr:nth-child(even) td{ background:#FAFAFC; }
+  td.destaque{ font-weight:600; }
+  .num{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+  /* ---------- caixas ---------- */
+  .caixa{ border:1px solid var(--linha); border-left:3px solid var(--vermelho); background:var(--fundo); padding:4.5mm 5mm; margin:4mm 0; border-radius:0 3px 3px 0; }
+  .caixa .rot{ font-size:7.6pt; letter-spacing:.16em; text-transform:uppercase; color:var(--vermelho); font-weight:600; margin-bottom:2mm; }
+  .caixa.atencao{ border-left-color:var(--dourado); background:#FEFBF0; }
+  .caixa.atencao .rot{ color:#9A7B10; }
+  .caixa.escura{ background:var(--preto); border-color:var(--preto); color:#E8E8EE; }
+  .caixa.escura .rot{ color:#FF6A72; }
+
+  .cartoes{ display:grid; grid-template-columns:repeat(3,1fr); gap:4mm; margin:5mm 0; }
+  .cartao{ border:1px solid var(--linha); border-radius:4px; padding:4mm; background:#fff; }
+  .cartao .et{ font-size:7.4pt; letter-spacing:.14em; text-transform:uppercase; color:var(--cinza); }
+  .cartao .vl{ font-family:'Manrope','Inter',sans-serif; font-size:19pt; font-weight:800; color:var(--preto); line-height:1.1; margin:1.5mm 0; }
+  .cartao .ds{ font-size:8.6pt; color:var(--cinza); line-height:1.4; }
+
+  .check li{ list-style:none; margin-left:0; padding-left:7mm; position:relative; margin-bottom:3mm; }
+  .check li::before{ content:''; position:absolute; left:0; top:.6mm; width:3.6mm; height:3.6mm; border:1.4px solid #B9B9C4; border-radius:1px; }
+  .check{ margin-left:0; }
+  .check li b{ display:block; font-weight:600; }
+  .check li span{ color:var(--cinza); font-size:9.2pt; }
+
+  .assinaturas{ display:grid; grid-template-columns:1fr 1fr; gap:14mm; margin-top:16mm; }
+  .assinaturas div{ border-top:1px solid #9A9AA6; padding-top:2.5mm; font-size:9pt; color:var(--cinza); }
+  .sumario{ font-size:10.4pt; }
+  .sumario li{ list-style:none; display:flex; align-items:baseline; gap:2mm; margin-bottom:3.2mm; }
+  .sumario li .t{ font-weight:600; }
+  .sumario li .pt{ flex:1; border-bottom:1px dotted #C5C5D0; }
+  .sumario li .pg{ color:var(--cinza); font-variant-numeric:tabular-nums; }
+  .sumario{ margin-left:0; }
+</style>
+</head>
+<body>
+
+<!-- 1 CAPA -->
+<section class="folha capa">
+  <div class="brilho"></div>
+  <div class="conteudo">
+    <div>
+      <div class="marca">PLAY <b>TECH</b> VIP</div>
+      <div class="selo">Plataforma de streaming · canais ao vivo e catálogo</div>
+    </div>
+    <h1>Requisitos de<br><span>Instalação</span></h1>
+    <div class="barra"></div>
+    <div class="sub">O que precisa estar pronto no servidor, na rede e nos sistemas do provedor para a plataforma entrar em operação — com o controle de assinaturas e a cobrança no IXC.</div>
+    <div class="ficha">
+      <div><span>Documento</span><strong>Requisitos de infraestrutura</strong></div>
+      <div><span>Versão</span><strong>1.0 — 18/11/2026</strong></div>
+      <div><span>Destinatário</span><strong>Cliente / equipe de TI</strong></div>
+      <div><span>Validade da proposta técnica</span><strong>90 dias</strong></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 SUMÁRIO -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">Requisitos de instalação · v1.0</div></div>
+  <h2>Sobre este documento</h2>
+  <div class="linhafina">A plataforma está pronta e testada. Este documento reúne, em uma lista objetiva, tudo o que depende da infraestrutura do cliente para que a instalação aconteça sem retrabalho.</div>
+
+  <div class="caixa">
+    <div class="rot">Resumo em três linhas</div>
+    <p><strong>1.</strong> O que dimensiona o servidor é <strong>banda de internet</strong>, não processador: cada assinante assistindo em Full HD consome cerca de 5 Mbps.</p>
+    <p><strong>2.</strong> A recomendação é hospedar <strong>dentro da estrutura do próprio provedor</strong>, no mesmo AS dos assinantes — o tráfego fica on-net, sem custo de trânsito.</p>
+    <p><strong>3.</strong> O sistema é entregue em <strong>containers</strong>: um servidor com Ubuntu Server 24.04 LTS e Docker sobe a plataforma com HTTPS automático em um comando.</p>
+  </div>
+
+  <h3>Conteúdo</h3>
+  <ul class="sumario">
+    <li><span class="t">1. Como a plataforma funciona</span><span class="pt"></span><span class="pg">3</span></li>
+    <li><span class="t">2. Banda de internet — o item que manda</span><span class="pt"></span><span class="pg">4</span></li>
+    <li><span class="t">3. Servidor: três cenários</span><span class="pt"></span><span class="pg">5</span></li>
+    <li><span class="t">4. Armazenamento</span><span class="pt"></span><span class="pg">6</span></li>
+    <li><span class="t">5. Sistema operacional e softwares</span><span class="pt"></span><span class="pg">7</span></li>
+    <li><span class="t">6. Rede, domínio e certificado</span><span class="pt"></span><span class="pg">8</span></li>
+    <li><span class="t">7. Onde hospedar — recomendação</span><span class="pt"></span><span class="pg">9</span></li>
+    <li><span class="t">8. Integração com o IXC</span><span class="pt"></span><span class="pg">10</span></li>
+    <li><span class="t">9. Backup, monitoramento e manutenção</span><span class="pt"></span><span class="pg">11</span></li>
+    <li><span class="t">10. Checklist de entrega</span><span class="pt"></span><span class="pg">12</span></li>
+    <li><span class="t">11. Fora do escopo e dependências de terceiros</span><span class="pt"></span><span class="pg">13</span></li>
+    <li><span class="t">12. Aprovação</span><span class="pt"></span><span class="pg">14</span></li>
+  </ul>
+
+  <div class="caixa atencao">
+    <div class="rot">Observação honesta</div>
+    <p>Os números deste documento são de dimensionamento, calculados a partir do consumo real de cada qualidade de vídeo. O ajuste fino acontece com a plataforma no ar: a própria operação mostra, em Relatórios, quantas telas simultâneas existem por horário.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>2</span></div>
+</section>
+
+<!-- 3 ARQUITETURA -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">1. Como a plataforma funciona</div></div>
+  <h2><span class="n">1.</span> Como a plataforma funciona</h2>
+  <div class="linhafina">Entender o caminho do vídeo explica cada requisito das páginas seguintes.</div>
+
+  <svg viewBox="0 0 620 250" style="width:100%; height:auto; margin:2mm 0 6mm">
+    <defs>
+      <marker id="f" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#E50914"/></marker>
+      <marker id="g" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#9A9AA6"/></marker>
+    </defs>
+    <!-- assinantes -->
+    <rect x="4" y="60" width="116" height="130" rx="7" fill="#F7F7FA" stroke="#E3E3EA"/>
+    <text x="62" y="82" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#17171C">Assinantes</text>
+    <text x="62" y="104" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5A5A66">Celular</text>
+    <text x="62" y="124" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5A5A66">Navegador</text>
+    <text x="62" y="144" text-anchor="middle" font-family="Inter" font-size="10.5" fill="#5A5A66">Smart TV</text>
+    <text x="62" y="168" text-anchor="middle" font-family="Inter" font-size="8.5" fill="#9A9AA6">Samsung · LG · Android TV</text>
+    <!-- servidor -->
+    <rect x="168" y="28" width="196" height="194" rx="8" fill="#0B0B0D"/>
+    <text x="266" y="52" text-anchor="middle" font-family="Inter" font-size="9" letter-spacing="1.6" fill="#8C8C99">SERVIDOR DO PROVEDOR</text>
+    <rect x="184" y="64" width="164" height="38" rx="5" fill="#17171C" stroke="#2A2A33"/>
+    <text x="266" y="82" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#fff">Proxy + HTTPS</text>
+    <text x="266" y="96" text-anchor="middle" font-family="Inter" font-size="9" fill="#9A9AA6">portas 80 e 443 · certificado automático</text>
+    <rect x="184" y="112" width="164" height="44" rx="5" fill="#17171C" stroke="#2A2A33"/>
+    <text x="266" y="130" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#fff">Plataforma + Painel</text>
+    <text x="266" y="145" text-anchor="middle" font-family="Inter" font-size="9" fill="#9A9AA6">catálogo · player · canais · relatórios</text>
+    <rect x="184" y="166" width="164" height="42" rx="5" fill="#17171C" stroke="#2A2A33"/>
+    <text x="266" y="184" text-anchor="middle" font-family="Inter" font-size="11" font-weight="600" fill="#fff">Disco de mídia</text>
+    <text x="266" y="199" text-anchor="middle" font-family="Inter" font-size="9" fill="#9A9AA6">vídeos, artes, legendas e banco</text>
+    <!-- emissoras -->
+    <rect x="422" y="28" width="196" height="62" rx="7" fill="#fff" stroke="#E3E3EA"/>
+    <text x="520" y="52" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#17171C">Emissoras</text>
+    <text x="520" y="70" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#5A5A66">sinal ao vivo (.m3u8) e grade XMLTV</text>
+    <!-- ixc -->
+    <rect x="422" y="104" width="196" height="62" rx="7" fill="#fff" stroke="#E3E3EA"/>
+    <text x="520" y="128" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#17171C">IXC</text>
+    <text x="520" y="146" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#5A5A66">contrato, plano e situação financeira</text>
+    <!-- tmdb -->
+    <rect x="422" y="180" width="196" height="54" rx="7" fill="#fff" stroke="#E3E3EA"/>
+    <text x="520" y="202" text-anchor="middle" font-family="Inter" font-size="11.5" font-weight="700" fill="#17171C">Base de filmes</text>
+    <text x="520" y="219" text-anchor="middle" font-family="Inter" font-size="9.5" fill="#5A5A66">capas, sinopses e fichas</text>
+    <!-- setas -->
+    <line x1="124" y1="118" x2="164" y2="118" stroke="#E50914" stroke-width="2" marker-end="url(#f)"/>
+    <line x1="164" y1="140" x2="124" y2="140" stroke="#E50914" stroke-width="2" marker-end="url(#f)"/>
+    <line x1="420" y1="60" x2="368" y2="78" stroke="#9A9AA6" stroke-width="1.6" marker-end="url(#g)"/>
+    <line x1="420" y1="134" x2="368" y2="134" stroke="#9A9AA6" stroke-width="1.6" marker-end="url(#g)"/>
+    <line x1="420" y1="206" x2="368" y2="190" stroke="#9A9AA6" stroke-width="1.6" marker-end="url(#g)"/>
+  </svg>
+
+  <h3>O que isso significa na prática</h3>
+  <table>
+    <tbody>
+      <tr><td class="destaque" style="width:46mm">Um servidor só</td><td>Plataforma, painel, banco de dados e arquivos de vídeo rodam na mesma máquina, em containers. Não há dependência de serviço de nuvem de terceiros para a plataforma funcionar.</td></tr>
+      <tr><td class="destaque">O vídeo sai do servidor</td><td>Tanto os filmes e séries do catálogo quanto os canais ao vivo passam pelos nossos servidores. O assinante nunca vê o endereço de origem da emissora — e é por isso que a banda de saída é o requisito principal.</td></tr>
+      <tr><td class="destaque">Conversão no envio</td><td>A operação envia <strong>um</strong> arquivo e o servidor gera as versões Full HD, HD e SD em segundo plano. Nada é convertido durante a exibição, o que mantém o processador folgado no horário de pico.</td></tr>
+      <tr><td class="destaque">Sem build e sem framework</td><td>Node.js 22 com SQLite. Não precisa de banco de dados externo, Redis, fila ou servidor de aplicação à parte.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="cartoes">
+    <div class="cartao"><div class="et">Máquinas necessárias</div><div class="vl">1</div><div class="ds">Um servidor roda a plataforma inteira, do painel ao player.</div></div>
+    <div class="cartao"><div class="et">Serviços externos obrigatórios</div><div class="vl">0</div><div class="ds">Nenhuma assinatura de nuvem é exigida para a plataforma funcionar.</div></div>
+    <div class="cartao"><div class="et">Comandos para subir</div><div class="vl">1</div><div class="ds">Com HTTPS emitido e renovado automaticamente.</div></div>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>3</span></div>
+</section>
+
+<!-- 4 BANDA -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">2. Banda de internet</div></div>
+  <h2><span class="n">2.</span> Banda de internet — o item que manda</h2>
+  <div class="linhafina">Streaming é um serviço de rede antes de ser um serviço de servidor. Esta é a única conta que precisa ser feita com cuidado antes de comprar a máquina.</div>
+
+  <h3>Consumo por assinante assistindo</h3>
+  <table>
+    <thead><tr><th>Qualidade</th><th>Resolução</th><th class="num">Por tela</th><th class="num">50 telas</th><th class="num">200 telas</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">SD</td><td>854 × 480</td><td class="num">1,5 Mbps</td><td class="num">75 Mbps</td><td class="num">300 Mbps</td></tr>
+      <tr><td class="destaque">HD</td><td>1280 × 720</td><td class="num">3 Mbps</td><td class="num">150 Mbps</td><td class="num">600 Mbps</td></tr>
+      <tr><td class="destaque">Full HD</td><td>1920 × 1080</td><td class="num">5 Mbps</td><td class="num">250 Mbps</td><td class="num">1 Gbps</td></tr>
+      <tr><td class="destaque">4K</td><td>3840 × 2160</td><td class="num">18 Mbps</td><td class="num">900 Mbps</td><td class="num">3,6 Gbps</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa">
+    <div class="rot">A conta</div>
+    <p style="font-size:11pt"><strong>Banda de pico = telas simultâneas no horário de maior audiência × consumo da qualidade do plano.</strong></p>
+    <p>O horário de pico em streaming residencial fica entre 20h e 23h, e costuma concentrar de 8% a 15% da base de assinantes assistindo ao mesmo tempo. Uma base de 1.000 assinantes com plano Full HD pede, na prática, de <strong>400 Mbps a 750 Mbps</strong> de pico.</p>
+  </div>
+
+  <h3>Canais ao vivo consomem banda duas vezes</h3>
+  <p>Para esconder a origem da emissora, a plataforma retransmite o sinal: ela <strong>recebe</strong> da emissora e <strong>entrega</strong> ao assinante. Cada tela de canal ao vivo, portanto, usa banda de entrada e de saída na mesma proporção. O link do servidor precisa ser contado nos dois sentidos.</p>
+  <p>Se o provedor preferir, essa retransmissão pode ser desligada por canal: o player passa a buscar o sinal direto na emissora, o que elimina o consumo de entrada em troca de expor o endereço de origem.</p>
+
+  <div class="caixa atencao">
+    <div class="rot">Requisito de link</div>
+    <p>Link <strong>dedicado</strong>, com tráfego não medido (sem franquia) e sem política de limite por conexão. Banda compartilhada de VPS popular funciona para o piloto, mas não sustenta o horário de pico da operação.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>4</span></div>
+</section>
+
+<!-- 5 SERVIDOR -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">3. Servidor</div></div>
+  <h2><span class="n">3.</span> Servidor: três cenários</h2>
+  <div class="linhafina">Escolha o cenário pelo número de telas simultâneas esperado no pico, não pelo total de assinantes.</div>
+
+  <table>
+    <thead><tr><th style="width:34mm">Item</th><th>Piloto / homologação</th><th>Operação</th><th>Escala</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">Telas no pico</td><td class="num">até 50</td><td class="num">até 180</td><td class="num">1.000 ou mais</td></tr>
+      <tr><td class="destaque">Processador</td><td>4 vCPU</td><td>8 núcleos físicos<br>(Xeon / EPYC / Ryzen)</td><td>8 a 16 núcleos na origem</td></tr>
+      <tr><td class="destaque">Memória</td><td>8 GB</td><td>32 GB</td><td>64 GB</td></tr>
+      <tr><td class="destaque">Disco</td><td>200 GB NVMe</td><td>2 × 2 TB NVMe<br>em espelho (RAID 1)</td><td>4 a 10 TB NVMe<br>+ arquivo morto em HDD</td></tr>
+      <tr><td class="destaque">Rede</td><td>1 Gbps compartilhado</td><td>1 Gbps dedicado,<br>tráfego ilimitado</td><td>10 Gbps + CDN<br>ou cache na borda</td></tr>
+      <tr><td class="destaque">Pico atendido</td><td class="num">≈ 250 Mbps</td><td class="num">≈ 900 Mbps</td><td class="num">5 Gbps ou mais</td></tr>
+      <tr><td class="destaque">Serve para</td><td>Demonstração, homologação e primeiros assinantes</td><td>Operação comercial de um provedor regional</td><td>Operação com várias cidades</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Por que o processador pede pouco</h3>
+  <p>A plataforma não converte vídeo durante a exibição: entregar um arquivo já pronto é trabalho de disco e de rede. O processador é exigido apenas na <strong>conversão dos títulos enviados</strong>, que roda em fila, em segundo plano, com limite de núcleos configurável — a conversão nunca rouba capacidade do horário de pico.</p>
+
+  <div class="cartoes">
+    <div class="cartao"><div class="et">Converter um filme</div><div class="vl">1 a 3 h</div><div class="ds">Um título de 2 h em 4K gerando Full HD, HD e SD, com 2 núcleos reservados.</div></div>
+    <div class="cartao"><div class="et">Memória em uso</div><div class="vl">≈ 1 GB</div><div class="ds">A plataforma em si é leve. O resto da memória vira cache de leitura dos vídeos.</div></div>
+    <div class="cartao"><div class="et">Banco de dados</div><div class="vl">&lt; 1 GB</div><div class="ds">SQLite em arquivo. Cresce com assinantes e audiência, não com vídeo.</div></div>
+  </div>
+
+  <div class="caixa">
+    <div class="rot">Disco: por que NVMe</div>
+    <p>Dezenas de assinantes assistindo a títulos diferentes significam leituras espalhadas pelo disco. Em HDD, isso vira travamento no meio do filme. O conteúdo em exibição precisa estar em <strong>NVMe ou SSD</strong>; HDD serve para arquivo morto e backup.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>5</span></div>
+</section>
+
+<!-- 6 ARMAZENAMENTO -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">4. Armazenamento</div></div>
+  <h2><span class="n">4.</span> Armazenamento</h2>
+  <div class="linhafina">É o item que mais cresce com o tempo, e o único que precisa de planejamento de expansão desde o primeiro dia.</div>
+
+  <h3>Espaço por título, em cada qualidade</h3>
+  <table>
+    <thead><tr><th>Qualidade</th><th class="num">Filme de 2 h</th><th class="num">Episódio de 45 min</th><th class="num">Temporada de 10 episódios</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">SD</td><td class="num">1 a 2 GB</td><td class="num">0,4 a 0,8 GB</td><td class="num">4 a 8 GB</td></tr>
+      <tr><td class="destaque">HD</td><td class="num">2 a 4 GB</td><td class="num">0,8 a 1,5 GB</td><td class="num">8 a 15 GB</td></tr>
+      <tr><td class="destaque">Full HD</td><td class="num">4 a 8 GB</td><td class="num">1,5 a 3 GB</td><td class="num">15 a 30 GB</td></tr>
+      <tr><td class="destaque">4K</td><td class="num">15 a 25 GB</td><td class="num">6 a 10 GB</td><td class="num">60 a 100 GB</td></tr>
+      <tr><td class="destaque">As quatro juntas</td><td class="num">22 a 39 GB</td><td class="num">9 a 15 GB</td><td class="num">87 a 153 GB</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Catálogo inteiro</h3>
+  <table>
+    <thead><tr><th>Catálogo</th><th>Até Full HD</th><th>Com 4K</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">100 filmes</td><td class="num">≈ 1,4 TB</td><td class="num">≈ 3,9 TB</td></tr>
+      <tr><td class="destaque">300 filmes + 20 temporadas</td><td class="num">≈ 5,2 TB</td><td class="num">≈ 14,7 TB</td></tr>
+      <tr><td class="destaque">500 filmes + 50 temporadas</td><td class="num">≈ 9,7 TB</td><td class="num">≈ 27 TB</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa atencao">
+    <div class="rot">Decisão que vale dinheiro</div>
+    <p>O 4K multiplica o armazenamento por três e a banda por quatro. A recomendação é oferecer 4K em <strong>uma vitrine selecionada</strong> — lançamentos e destaques — e manter o restante do catálogo até Full HD. Os planos da plataforma já permitem essa separação: a qualidade máxima é definida por plano.</p>
+  </div>
+
+  <h3>Como o espaço é ocupado</h3>
+  <ul>
+    <li>Tudo fica em uma única pasta de dados: vídeos, capas, banners, legendas e o banco. É essa pasta que entra no backup e que pode morar em um volume ou NAS separado.</li>
+    <li>O painel mostra o espaço em uso e avisa quando o disco se aproxima do limite.</li>
+    <li>Crescer significa acrescentar disco e apontar a pasta de mídia para ele — não há remontagem do sistema.</li>
+  </ul>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>6</span></div>
+</section>
+
+<!-- 7 SO -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">5. Sistema operacional e softwares</div></div>
+  <h2><span class="n">5.</span> Sistema operacional e softwares</h2>
+  <div class="linhafina">A entrega é em containers: o que precisa existir na máquina é pouco e padrão de mercado.</div>
+
+  <table>
+    <thead><tr><th style="width:44mm">Item</th><th>Requisito</th><th>Observação</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">Sistema operacional</td><td>Ubuntu Server 24.04 LTS<br>(ou Debian 12)</td><td>Instalação mínima, 64 bits, sem interface gráfica. Suporte até 2029.</td></tr>
+      <tr><td class="destaque">Containers</td><td>Docker Engine 24+ e<br>Docker Compose v2</td><td>Instalado pelo repositório oficial da Docker.</td></tr>
+      <tr><td class="destaque">Arquitetura</td><td>x86_64 (amd64)</td><td>ARM funciona, mas não foi homologado nesta entrega.</td></tr>
+      <tr><td class="destaque">Node.js e ffmpeg</td><td>Já vêm na imagem</td><td>Nada a instalar na máquina: Node.js 22 e ffmpeg vão dentro do container.</td></tr>
+      <tr><td class="destaque">Banco de dados</td><td>Nenhum serviço externo</td><td>SQLite em arquivo, dentro do volume de dados.</td></tr>
+      <tr><td class="destaque">Acesso</td><td>SSH com chave, usuário com sudo</td><td>Necessário para a instalação e para o suporte. Senha de root pode ficar desabilitada.</td></tr>
+      <tr><td class="destaque">Fuso horário</td><td>America/Sao_Paulo</td><td>Vale para a grade de programação, as faturas e os relatórios.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Subida da plataforma</h3>
+  <div class="caixa escura">
+    <div class="rot">Três comandos</div>
+    <p style="font-family:'DejaVu Sans Mono',monospace; font-size:9pt; line-height:1.9; color:#E8E8EE">
+      cp .env.exemplo .env<br>
+      <span style="color:#8C8C99"># preencher domínio, segredo e senha da operação</span><br>
+      docker compose up -d
+    </p>
+  </div>
+  <p>A subida inclui o proxy que <strong>emite e renova o certificado HTTPS sozinho</strong>. Não há passo de compilação, nem servidor de aplicação a configurar à parte.</p>
+
+  <div class="caixa">
+    <div class="rot">Se o provedor usa proxy de saída</div>
+    <p>Em redes corporativas com proxy obrigatório, duas variáveis precisam ser preenchidas no arquivo de configuração para que a busca de capas, logos e grade de programação funcione. Está documentado no arquivo de exemplo que acompanha a entrega.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>7</span></div>
+</section>
+
+<!-- 8 REDE -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">6. Rede, domínio e certificado</div></div>
+  <h2><span class="n">6.</span> Rede, domínio e certificado</h2>
+  <div class="linhafina">Sem estes itens a plataforma sobe, mas não é acessível de fora — e o app de Smart TV exige HTTPS válido para funcionar.</div>
+
+  <table>
+    <thead><tr><th style="width:44mm">Item</th><th>Requisito</th><th>Quem providencia</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">IP público</td><td>Um IPv4 público e fixo para o servidor</td><td>Cliente</td></tr>
+      <tr><td class="destaque">Domínio</td><td>Um subdomínio dedicado, por exemplo <code>play.provedor.com.br</code></td><td>Cliente</td></tr>
+      <tr><td class="destaque">DNS</td><td>Registro A do subdomínio apontando para o IP, propagado <strong>antes</strong> da instalação</td><td>Cliente</td></tr>
+      <tr><td class="destaque">Portas de entrada</td><td>80 e 443 abertas na internet</td><td>Cliente</td></tr>
+      <tr><td class="destaque">Portas de saída</td><td>443 liberada para a emissora, para a base de filmes e para a emissão do certificado</td><td>Cliente</td></tr>
+      <tr><td class="destaque">Certificado HTTPS</td><td>Emitido e renovado automaticamente (Let's Encrypt)</td><td>Plataforma</td></tr>
+      <tr><td class="destaque">Firewall</td><td>Sem inspeção de conteúdo e sem limite por conexão no tráfego de vídeo</td><td>Cliente</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa atencao">
+    <div class="rot">Dois pontos que travam instalações</div>
+    <p><strong>Porta 80 fechada.</strong> Ela é usada na validação do certificado. Fechada, o HTTPS não é emitido e nem o navegador nem a Smart TV abrem a plataforma.</p>
+    <p><strong>DNS apontado depois.</strong> O certificado é emitido na primeira subida. Se o domínio ainda não resolve, a emissão falha e a instalação precisa ser repetida.</p>
+  </div>
+
+  <h3>Boas práticas recomendadas</h3>
+  <ul>
+    <li><strong>IPv6</strong> habilitado, se o provedor já entrega IPv6 aos assinantes — reduz o uso de NAT no horário de pico.</li>
+    <li><strong>Reverso do IP</strong> configurado com o nome do domínio, o que ajuda na reputação do serviço.</li>
+    <li><strong>Monitoramento externo</strong> apontado para o endereço de saúde da plataforma, que responde se o serviço está no ar.</li>
+    <li><strong>Sem CGNAT no servidor.</strong> O servidor precisa de IP público próprio; atrás de CGNAT o serviço não é publicável.</li>
+  </ul>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>8</span></div>
+</section>
+
+<!-- 9 ONDE HOSPEDAR -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">7. Onde hospedar</div></div>
+  <h2><span class="n">7.</span> Onde hospedar — recomendação</h2>
+  <div class="linhafina">O cliente é um provedor de internet. Isso muda a melhor resposta.</div>
+
+  <div class="caixa">
+    <div class="rot">Recomendação</div>
+    <p style="font-size:11pt">Hospedar <strong>dentro da estrutura do próprio provedor</strong>, no mesmo AS dos assinantes. O tráfego de vídeo nasce e morre na rede do cliente: não paga trânsito, não disputa com o link de saída e chega ao assinante com a menor latência possível — o filme abre na hora, sem o rodinha de carregamento.</p>
+  </div>
+
+  <h3>Comparativo</h3>
+  <table>
+    <thead><tr><th style="width:38mm">Critério</th><th>No rack do provedor <span style="color:#E50914">(recomendado)</span></th><th>Em nuvem / datacenter de terceiros</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">Custo de banda</td><td>Tráfego on-net, sem custo por GB</td><td>Cobrado por GB ou por franquia — é o maior custo mensal de um serviço de vídeo</td></tr>
+      <tr><td class="destaque">Latência</td><td>Dentro da própria rede, mínima</td><td>Depende do caminho até o datacenter</td></tr>
+      <tr><td class="destaque">Investimento</td><td>Compra do servidor, uma vez</td><td>Mensalidade, sempre</td></tr>
+      <tr><td class="destaque">Quando faz sentido</td><td>Provedor com rack, energia redundante e link próprio</td><td>Piloto, demonstração ou base pequena fora da rede</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Caminho sugerido em duas etapas</h3>
+  <table>
+    <tbody>
+      <tr><td class="destaque" style="width:30mm">Etapa 1 — Piloto</td><td>Uma VPS do cenário “piloto”, por volta de 30 a 60 dias. Serve para homologar com a equipe, treinar a operação, carregar o catálogo e validar a integração com o IXC, sem comprar equipamento.</td></tr>
+      <tr><td class="destaque">Etapa 2 — Produção</td><td>Servidor no rack do provedor, com o cenário “operação”. A migração é a cópia da pasta de dados e a troca do apontamento do domínio: a plataforma sobe igual, sem reconfiguração.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa atencao">
+    <div class="rot">Alta disponibilidade</div>
+    <p>Esta entrega é de <strong>um servidor</strong>. Operar com dois nós em redundância, com banco replicado e balanceador, é um projeto à parte: muda a arquitetura de armazenamento e precisa ser orçado separadamente. Para a maioria dos provedores, um servidor bem dimensionado com backup diário é o ponto de equilíbrio correto no primeiro ano.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>9</span></div>
+</section>
+
+<!-- 10 IXC -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">8. Integração com o IXC</div></div>
+  <h2><span class="n">8.</span> Integração com o IXC</h2>
+  <div class="linhafina">Com assinatura e cobrança no IXC, a plataforma deixa de ter cadastro financeiro próprio: o cliente é cadastrado uma única vez, onde ele já é cadastrado hoje.</div>
+
+  <h3>Divisão de responsabilidades</h3>
+  <table>
+    <thead><tr><th>Função</th><th style="width:34mm">Onde fica</th></tr></thead>
+    <tbody>
+      <tr><td>Cadastro do cliente, contrato e plano comercial</td><td class="destaque">IXC</td></tr>
+      <tr><td>Boleto, PIX, baixa de pagamento e cobrança</td><td class="destaque">IXC</td></tr>
+      <tr><td>Bloqueio e desbloqueio por inadimplência</td><td class="destaque">IXC</td></tr>
+      <tr><td>Login do assinante e perfis da casa</td><td class="destaque">PLAY TECH VIP</td></tr>
+      <tr><td>Catálogo, canais ao vivo, grade, player e relatórios</td><td class="destaque">PLAY TECH VIP</td></tr>
+      <tr><td>Limite de telas simultâneas e qualidade máxima</td><td class="destaque">PLAY TECH VIP</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Como funciona na prática</h3>
+  <ul>
+    <li>O assinante entra e a plataforma <strong>consulta o IXC</strong>: o contrato está ativo e qual é o plano? Contrato ativo libera o acesso; o plano define <strong>quantas telas</strong> e <strong>até qual qualidade</strong>.</li>
+    <li>Contrato suspenso pelo IXC derruba o acesso sozinho, sem ninguém mexer na plataforma.</li>
+    <li>As telas de fatura e de cobrança ficam desligadas nesse modo — o assinante paga onde sempre pagou.</li>
+  </ul>
+
+  <div class="caixa">
+    <div class="rot">O que precisamos receber do cliente</div>
+    <p><strong>1. Acesso à API do IXC</strong> — endereço do webservice e um token com leitura de clientes e contratos.</p>
+    <p><strong>2. Como o assinante vai se identificar</strong> — por CPF/CNPJ, por número do contrato ou pelo mesmo login da Central do Assinante, conforme o que a versão do IXC do cliente oferece.</p>
+    <p><strong>3. A lista de planos do IXC</strong> que dão direito à plataforma, para mapear cada um no painel: plano A vale 2 telas em Full HD, plano B vale 4 telas em 4K.</p>
+  </div>
+
+  <div class="caixa atencao">
+    <div class="rot">Ressalva técnica</div>
+    <p>A API do IXC varia conforme a versão instalada. Com o endereço e o token em mãos, a integração é testada em homologação <strong>antes</strong> de qualquer alteração na plataforma, e o resultado é reportado ao cliente.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>10</span></div>
+</section>
+
+<!-- 11 BACKUP -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">9. Backup, monitoramento e manutenção</div></div>
+  <h2><span class="n">9.</span> Backup, monitoramento e manutenção</h2>
+  <div class="linhafina">O que precisa ser combinado com a equipe de TI antes de a plataforma receber assinantes de verdade.</div>
+
+  <h3>Backup</h3>
+  <table>
+    <thead><tr><th style="width:40mm">Item</th><th>Como é</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">O que é copiado</td><td>O banco de dados (assinantes, catálogo, grade, audiência) e os arquivos de mídia.</td></tr>
+      <tr><td class="destaque">Rotina entregue</td><td>Uma tarefa diária, já pronta, que gera a cópia com o serviço no ar e mantém as 7 mais recentes.</td></tr>
+      <tr><td class="destaque">Onde guardar</td><td><strong>Fora do servidor</strong>: outro disco, um NAS ou armazenamento remoto. Backup no mesmo disco não protege contra perda de disco.</td></tr>
+      <tr><td class="destaque">Espaço necessário</td><td>O banco é pequeno (menos de 1 GB). O peso é a mídia — reserve espaço equivalente ao catálogo, ou faça o backup da mídia em HDD à parte.</td></tr>
+      <tr><td class="destaque">Teste de restauração</td><td>Recomendado uma vez por trimestre. Restaurar é copiar a pasta de volta e subir os containers.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Monitoramento</h3>
+  <ul>
+    <li>A plataforma publica um endereço de <strong>saúde</strong> que responde se o serviço está de pé — é o que o monitoramento do provedor (Zabbix, Uptime Kuma ou similar) deve consultar.</li>
+    <li>Os canais ao vivo são <strong>conferidos automaticamente a cada 15 minutos</strong>; o painel marca quem saiu do ar, sem depender de reclamação de assinante.</li>
+    <li>O painel traz audiência por hora, telas simultâneas e títulos mais vistos — é por ali que se acompanha o crescimento do pico e a hora de ampliar a banda. Toda ação da operação fica registrada em auditoria.</li>
+  </ul>
+
+  <h3>Manutenção</h3>
+  <table>
+    <tbody>
+      <tr><td class="destaque" style="width:40mm">Atualização do sistema</td><td>Pacotes de segurança do Ubuntu, pelo processo normal do provedor.</td></tr>
+      <tr><td class="destaque">Atualização da plataforma</td><td>Nova versão da imagem e <code>docker compose up -d</code>. Os dados ficam no volume e não são tocados.</td></tr>
+      <tr><td class="destaque">Senhas</td><td>As senhas de demonstração precisam ser trocadas antes da abertura ao público. Em produção, o servidor não sobe sem segredo e senha de operação definidos.</td></tr>
+    </tbody>
+  </table>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>11</span></div>
+</section>
+
+<!-- 12 CHECKLIST -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">10. Checklist de entrega</div></div>
+  <h2><span class="n">10.</span> Checklist de entrega</h2>
+  <div class="linhafina">Com estes itens prontos, a instalação acontece em um único dia de trabalho.</div>
+
+  <h3>Infraestrutura</h3>
+  <ul class="check">
+    <li><b>Servidor provisionado</b><span>Conforme o cenário escolhido na página 5, com Ubuntu Server 24.04 LTS instalado.</span></li>
+    <li><b>Acesso SSH entregue</b><span>Usuário com sudo e chave pública cadastrada.</span></li>
+    <li><b>IP público fixo e domínio apontado</b><span>Registro A do subdomínio resolvendo para o IP, já propagado.</span></li>
+    <li><b>Portas 80 e 443 abertas</b><span>Entrada liberada na internet; saída 443 liberada para emissoras e serviços.</span></li>
+    <li><b>Destino de backup definido</b><span>Disco, NAS ou armazenamento remoto fora do servidor.</span></li>
+  </ul>
+
+  <h3>Conteúdo e serviços</h3>
+  <ul class="check">
+    <li><b>Endereço do sinal de cada canal</b><span>O <code>.m3u8</code> ou o player oficial que a emissora fornece. Um campo por canal, no painel.</span></li>
+    <li><b>Arquivos dos filmes e séries licenciados</b><span>Entram pelo painel. A vitrine já está montada com as fichas e capas oficiais.</span></li>
+    <li><b>Grade de programação</b><span>O arquivo XMLTV do fornecedor escolhido, se houver. A plataforma reimporta sozinha, uma vez por dia.</span></li>
+    <li><b>Token da base de filmes</b><span>Conta gratuita no themoviedb.org, para o catálogo trazer capa, sinopse e ficha dos títulos.</span></li>
+  </ul>
+
+  <h3>IXC</h3>
+  <ul class="check">
+    <li><b>Endereço e token da API</b><span>Com permissão de leitura de clientes e contratos.</span></li>
+    <li><b>Forma de identificação do assinante</b><span>CPF/CNPJ, contrato ou login da Central do Assinante.</span></li>
+    <li><b>Lista de planos a mapear</b><span>Quais planos dão direito à plataforma, com telas e qualidade de cada um.</span></li>
+  </ul>
+
+  <h3>Publicação nas lojas (opcional, em paralelo)</h3>
+  <ul class="check">
+    <li><b>Contas de desenvolvedor</b><span>Samsung Seller, LG Seller e Google Play, com as artes de loja e uma conta de teste para a avaliação.</span></li>
+  </ul>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>12</span></div>
+</section>
+
+<!-- 13 FORA DO ESCOPO -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">11. Fora do escopo</div></div>
+  <h2><span class="n">11.</span> Fora do escopo e dependências de terceiros</h2>
+  <div class="linhafina">Transparência para que não haja surpresa na homologação.</div>
+
+  <table>
+    <thead><tr><th style="width:46mm">Item</th><th>Situação</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">DRM (Widevine, FairPlay, PlayReady)</td><td>Não incluído. A proteção atual é link assinado de curta duração, que resolve o acesso indevido casual. Estúdios que exigem DRM contratual demandam um serviço licenciado à parte.</td></tr>
+      <tr><td class="destaque">Cobrança automática</td><td>Fora do escopo por decisão do cliente: assinatura e pagamento ficam no IXC.</td></tr>
+      <tr><td class="destaque">Conteúdo licenciado</td><td>Depende do cliente. Hoje o catálogo mostra as fichas e capas oficiais dos títulos atuais; o vídeo ligado a eles é de demonstração.</td></tr>
+      <tr><td class="destaque">Sinal das emissoras</td><td>Depende do cliente. Os canais abertos já estão cadastrados, aguardando o endereço de cada sinal.</td></tr>
+      <tr><td class="destaque">Primeira rodada em TV física</td><td>Os apps de Samsung, LG e Android TV estão prontos e foram validados em navegador simulando a TV. A primeira execução em aparelho real precisa de um equipamento de cada fabricante.</td></tr>
+      <tr><td class="destaque">Transmissão com faixas (ABR)</td><td>Cada qualidade é um arquivo próprio e o player troca entre elas sem perder a cena. Não há faixa única que mude de bitrate no meio do pedaço.</td></tr>
+      <tr><td class="destaque">Redundância de servidores</td><td>A entrega é de um servidor. Operação em dois nós com banco replicado é um projeto à parte.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa">
+    <div class="rot">O que já está pronto e testado</div>
+    <p>App do assinante (navegador, celular e Smart TV), player com 4K, Full HD, HD e SD com troca sem perder a cena, canais ao vivo retransmitidos pelos nossos servidores com grade de programação, conversão automática das versões menores, perfis com classificação etária, limite de telas por plano, painel de operação com 13 telas, relatórios de audiência, auditoria, subida em containers com HTTPS automático e backup diário.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>13</span></div>
+</section>
+
+<!-- 14 APROVAÇÃO -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">12. Aprovação</div></div>
+  <h2><span class="n">12.</span> Aprovação</h2>
+  <div class="linhafina">Para seguir com a instalação, basta confirmar o cenário escolhido e a data em que a infraestrutura estará disponível.</div>
+
+  <h3>Cenário escolhido</h3>
+  <table>
+    <thead><tr><th style="width:12mm"></th><th>Cenário</th><th>Telas no pico</th><th>Indicação</th></tr></thead>
+    <tbody>
+      <tr><td style="text-align:center">☐</td><td class="destaque">Piloto</td><td class="num">até 50</td><td>Homologação e primeiros assinantes</td></tr>
+      <tr><td style="text-align:center">☐</td><td class="destaque">Operação</td><td class="num">até 180</td><td>Operação comercial</td></tr>
+      <tr><td style="text-align:center">☐</td><td class="destaque">Escala</td><td class="num">1.000 ou mais</td><td>Origem com CDN</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Datas</h3>
+  <table>
+    <tbody>
+      <tr><td class="destaque" style="width:58mm">Infraestrutura disponível em</td><td>&nbsp;</td></tr>
+      <tr><td class="destaque">Acesso à API do IXC em</td><td>&nbsp;</td></tr>
+      <tr><td class="destaque">Instalação prevista para</td><td>&nbsp;</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Observações do cliente</h3>
+  <table><tbody><tr><td style="height:26mm">&nbsp;</td></tr></tbody></table>
+
+  <div class="assinaturas">
+    <div>Responsável pelo cliente<br><span style="font-size:8pt">nome, cargo e data</span></div>
+    <div>Responsável técnico<br><span style="font-size:8pt">nome, cargo e data</span></div>
+  </div>
+
+  <div class="caixa escura" style="margin-top:14mm">
+    <div class="rot">PLAY TECH VIP</div>
+    <p>Plataforma de streaming com canais ao vivo e catálogo sob demanda, app para navegador, celular e Smart TV, e painel próprio para a operação. Documento de requisitos de instalação, versão 1.0, 18 de novembro de 2026.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>14</span></div>
+</section>
+
+</body>
+</html>
