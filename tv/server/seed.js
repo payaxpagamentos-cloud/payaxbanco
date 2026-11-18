@@ -23,17 +23,11 @@ const { hoje, somarDias, somarMeses, competencia } = require('./lib/datas');
 const { CANAIS_ABERTOS } = require('./lib/tv-aberta');
 const versoes = require('./lib/versoes');
 const qualidades = require('./lib/qualidades');
+const acervo = require('./lib/acervo');
 
 const db = abrir();
 const equipeFalsa = { id: 1, nome: 'seed' };
-const temFfmpeg = (() => {
-  try {
-    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-})();
+const temFfmpeg = acervo.temFfmpeg();
 
 const SENHA_EQUIPE = 'play2026';
 const SENHA_CLIENTE = 'cliente2026';
@@ -85,96 +79,9 @@ const logoSvg = (nome, indice) => {
 
 const urlArchive = (item, arquivo) => `https://archive.org/download/${item}/${encodeURIComponent(arquivo)}`;
 
-/** Tira um quadro do próprio filme (o ffmpeg busca só os bytes daquele trecho). */
-function quadroDoFilme(url, segundo) {
-  const saida = path.join(pastaArtes, `q-${crypto.randomBytes(6).toString('hex')}.jpg`);
-  try {
-    // thumbnail=60: olha 60 quadros e fica com o mais representativo (evita cortes e telas pretas).
-    execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(segundo), '-i', url, '-vf', 'thumbnail=60', '-frames:v', '1', '-q:v', '2', saida],
-      { stdio: ['ignore', 'ignore', 'pipe'], timeout: 180_000 });
-    const buf = fs.readFileSync(saida);
-    fs.rmSync(saida, { force: true });
-    return buf;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Escolhe o melhor quadro entre alguns instantes: cena escura ou parada comprime muito,
- * então o maior JPEG costuma ser o quadro com mais imagem — e é esse que vira a arte.
- */
-function melhorQuadro(url, instantes) {
-  let melhor = null;
-  for (const t of instantes) {
-    const q = quadroDoFilme(url, t);
-    if (q && (!melhor || q.length > melhor.length)) melhor = q;
-  }
-  return melhor;
-}
-
-/** Duração real da cópia no acervo (cada cópia tem a sua: restaurações são mais longas). */
-function duracaoRemota(url) {
-  try {
-    const saida = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', url],
-      { encoding: 'utf8', timeout: 180_000 }).trim();
-    return Math.round(Number(saida)) || null;
-  } catch {
-    return null;
-  }
-}
-
-/** Guarda um trecho do filme, copiando os fluxos (rápido e sem recomprimir). */
-function trechoDoFilme(url, segundo, duracao) {
-  const saida = path.join(pastaArtes, `t-${crypto.randomBytes(6).toString('hex')}.mp4`);
-  try {
-    execFileSync('ffmpeg', ['-v', 'error', '-y', '-ss', String(segundo), '-i', url, '-t', String(duracao),
-      '-c', 'copy', '-movflags', '+faststart', saida], { stdio: ['ignore', 'ignore', 'pipe'], timeout: 300_000 });
-    return fs.existsSync(saida) && fs.statSync(saida).size > 100_000 ? saida : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Largura, altura e duração reais de um arquivo (o painel grava isso junto com a mídia). */
-function medirVideo(arquivo) {
-  try {
-    const saida = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0',
-      '-show_entries', 'stream=width,height:format=duration', '-of', 'default=nw=1:nk=1', arquivo],
-    { encoding: 'utf8', timeout: 60_000 }).trim().split(/\s+/);
-    return { largura: Number(saida[0]) || null, altura: Number(saida[1]) || null, duracao: Math.round(Number(saida[2])) || null };
-  } catch {
-    return { largura: null, altura: null, duracao: null };
-  }
-}
-
-// Altura de cada degrau da escada de qualidade.
-const ESCADA = [['4k', 2160], ['fullhd', 1080], ['hd', 720], ['sd', 480]];
-
-/**
- * Gera as versões menores do trecho num passe só do ffmpeg: decodifica uma vez e escreve
- * todos os degraus abaixo do original. É assim que o assinante escolhe 4K, Full HD, HD ou SD.
- */
-function versoesMenores(arquivoTopo, alturaTopo, larguraTopo = 0) {
-  const doTopo = qualidades.porMedidas(larguraTopo, alturaTopo);
-  // Só degraus abaixo do original — e nunca a mesma qualidade dele (um 1608p já é Full HD).
-  const alvos = ESCADA.filter(([q, alt]) => alt < alturaTopo - 60 && qualidades.nivel(q) < qualidades.nivel(doTopo));
-  if (!alvos.length) return [];
-  const saidas = alvos.map(([q, alt]) => ({ qualidade: q, altura: alt, arquivo: path.join(pastaArtes, `v-${q}-${crypto.randomBytes(5).toString('hex')}.mp4`) }));
-  const filtro = [`[0:v]split=${saidas.length}${saidas.map((_, i) => `[d${i}]`).join('')}`,
-    ...saidas.map((s2, i) => `[d${i}]scale=-2:${s2.altura}[v${i}]`)].join(';');
-  const args = ['-v', 'error', '-y', '-i', arquivoTopo, '-filter_complex', filtro];
-  saidas.forEach((s2, i) => {
-    args.push('-map', `[v${i}]`, '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-      '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', s2.arquivo);
-  });
-  try {
-    execFileSync('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'], timeout: 900_000 });
-  } catch {
-    return saidas.filter((s2) => fs.existsSync(s2.arquivo) && fs.statSync(s2.arquivo).size > 50_000);
-  }
-  return saidas.filter((s2) => fs.existsSync(s2.arquivo) && fs.statSync(s2.arquivo).size > 50_000);
-}
+// As ferramentas de acervo (quadro, trecho, medição e versões menores) moram em lib/acervo.js,
+// e são as mesmas que o script de catálogo público usa.
+const { quadroDoFilme, melhorQuadro, duracaoRemota, trechoDoFilme, medirVideo, versoesMenores } = acervo;
 
 const pastaArtes = fs.mkdtempSync(path.join(os.tmpdir(), 'playtechvip-artes-'));
 let fotosBaixadas = 0;

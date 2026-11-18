@@ -18,6 +18,7 @@
     "empacotar-apps": "node scripts/empacotar-apps.js",
     "backup": "node --disable-warning=ExperimentalWarning scripts/backup.js",
     "catalogo-demo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/catalogo-tmdb.js",
+    "catalogo-publico": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/catalogo-publico.js",
     "epg": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/epg-mapear.js",
     "conferir": "bash scripts/conferir-instalacao.sh"
   },

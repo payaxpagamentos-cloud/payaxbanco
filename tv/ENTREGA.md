@@ -81,6 +81,10 @@ Backup diário (banco + vídeos), guardando as 7 cópias mais recentes:
 **Grade de programação**: Grade (EPG) aceita cadastro manual ou um arquivo XMLTV, que a plataforma
 reimporta sozinha uma vez por dia.
 
+**Encher o catálogo sem contrato**: `npm run catalogo-publico` traz filmes de domínio público e
+Creative Commons (coloridos, em Full HD), com capa, banner e as quatro qualidades geradas na
+importação. O que é legal e o que não é está em `ACERVO.md`.
+
 **Cobrança**: fatura mensal com PIX copia e cola e QR Code. A baixa do pagamento é feita pela
 operação, em Faturas (a integração automática com o banco ficou fora do escopo).
 

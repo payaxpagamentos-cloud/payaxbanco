@@ -180,6 +180,24 @@ então o logo vem do canal certo, sem adivinhação por nome parecido.
 > Se o servidor fica atrás de um proxy de saída, ligue `NODE_USE_ENV_PROXY=1` no `.env`: sem isso o
 > Node não usa o proxy e a busca de logos, a lista pública e a grade XMLTV não saem.
 
+## Catálogo de acervo público (filmes livres)
+
+Filmes em domínio público ou Creative Commons entram no catálogo por um comando — com capa,
+banner, ficha e a escada de qualidade geradas na importação:
+
+```bash
+npm run catalogo-publico -- --listar      # o que está conferido e pronto
+npm run catalogo-publico                  # traz para o catálogo
+npm run catalogo-publico -- --buscar "nasa" --colecao nasa --importar --quantos 3
+```
+
+A lista curada traz obras **atuais e coloridas, em Full HD ou mais** (Sintel, Lágrimas de Aço,
+Sita Canta o Blues, Big Buck Bunny), porque a busca aberta do acervo devolve principalmente
+clássicos em preto e branco. O script só importa sozinho o que tem licença livre confirmada.
+
+O detalhe — fontes, o que é legal, o que não é e por que listas de IPTV "VOD" ficam de fora —
+está em [`ACERVO.md`](ACERVO.md).
+
 ## Grade dos canais abertos
 
 Em **Configurações → Grade dos canais abertos (EPG)**, a operação cadastra o endereço de um arquivo **XMLTV**
