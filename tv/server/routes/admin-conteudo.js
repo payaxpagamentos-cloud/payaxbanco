@@ -127,12 +127,12 @@ module.exports = (db) => {
     const criados = [];
     const existentes = [];
     transacao(db, () => {
-      for (const [numero, nome, categoria, grupo, site, observacao] of CANAIS_ABERTOS) {
+      for (const [numero, nome, categoria, grupo, observacao] of CANAIS_ABERTOS) {
         const ja = db.prepare('SELECT id FROM canais WHERE slug = ? OR numero = ?').get(slug(nome), numero);
         if (ja) { existentes.push(nome); continue; }
         const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, observacao, relay, classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
           VALUES (?, ?, ?, ?, ?, 'hls', ?, 1, 0, 'Nacional', ?, 0, ?, ?)`)
-          .run(numero, nome, slug(nome), `${grupo} · ${site}`, categoria, observacao, numero, agora(), agora());
+          .run(numero, nome, slug(nome), grupo, categoria, observacao, numero, agora(), agora());
         criados.push({ id: Number(r2.lastInsertRowid), nome, numero });
       }
     });
@@ -162,14 +162,14 @@ module.exports = (db) => {
     const c = achar('canais', req.params.id, 'Canal');
     if (c.fonte === 'embed') {
       if (!c.url_embed) throw new ErroNegocio('Este canal ainda não tem o endereço do player oficial.', 409);
-      return res.json({ tipo: 'embed', url: c.url_embed, retransmitido: false });
+      return res.json({ tipo: 'embed', url: c.url_embed, nossos_servidores: false });
     }
     if (!c.url_hls) throw new ErroNegocio('Este canal ainda não tem o endereço do sinal.', 409);
     const token = player.emitirToken({ s: 0, u: req.usuario.id, p: 0, t: 'canal', c: c.id });
     return res.json({
       tipo: 'hls',
       url: c.relay && config.relay.ligado ? `${config.basePath}/api/play/canal/${c.id}/lista.m3u8?t=${encodeURIComponent(token)}` : c.url_hls,
-      retransmitido: Boolean(c.relay && config.relay.ligado),
+      nossos_servidores: Boolean(c.relay && config.relay.ligado),
     });
   });
 

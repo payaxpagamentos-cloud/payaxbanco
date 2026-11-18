@@ -50,7 +50,7 @@ module.exports = {
   segmentoTokenSegundos: Number(process.env.TV_SEGMENTO_TTL) || 60 * 60,
   // Telas simultâneas: a sessão do player morre sem sinal de vida por este tempo.
   sessaoPlayerSegundos: Number(process.env.TV_SESSAO_PLAYER_S) || 120,
-  // Retransmissão (CDN) dos canais ao vivo: o servidor busca a lista HLS na origem e entrega os segmentos
+  // Transmissão (CDN) dos canais ao vivo: o servidor busca a lista HLS na origem e entrega os segmentos
   // pelo nosso endereço. Protege a origem, resolve CORS e deixa a política de segurança das páginas fechada em 'self'.
   relay: {
     ligado: process.env.TV_RELAY !== '0',
@@ -60,7 +60,7 @@ module.exports = {
     segmentoMaxBytes: (Number(process.env.TV_RELAY_SEGMENTO_MAX_MB) || 32) * 1024 * 1024,
     userAgent: process.env.TV_RELAY_USER_AGENT || 'PLAYTV/1.0',
   },
-  // Canais marcados para tocar direto na origem (sem retransmissão) precisam que o domínio da emissora
+  // Canais marcados para tocar direto na origem (sem transmissão) precisam que o domínio da emissora
   // seja liberado na política de segurança das páginas. Lista separada por vírgula, ex.: 'cdn.emissora.com.br'.
   origensMidia: String(process.env.TV_ORIGENS_MIDIA || '').split(',').map((h) => h.trim()).filter(Boolean),
   // Cobrança: 'simulado' (testes: o assinante confirma o PIX na tela) ou 'manual'

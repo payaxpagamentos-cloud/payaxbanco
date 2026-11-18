@@ -138,7 +138,7 @@ export async function acao(botao, fn) {
 }
 
 /** Janela modal; resolve com o valor passado a fechar() ou null ao cancelar. */
-export function modal(titulo, conteudo, { largo = false } = {}) {
+export function modal(titulo, conteudo, { largo = false, semCabecalho = false } = {}) {
   return new Promise((resolve) => {
     const fundo = el('div', { class: 'modal-fundo' });
     const fechar = (v = null) => {
@@ -152,10 +152,12 @@ export function modal(titulo, conteudo, { largo = false } = {}) {
     const tecla = (e) => { if (e.key === 'Escape') fechar(); };
     document.addEventListener('keydown', tecla);
     fundo.addEventListener('click', (e) => { if (e.target === fundo) fechar(); });
-    const caixa = el('div', { class: `modal${largo ? ' largo' : ''}`, role: 'dialog', 'aria-label': titulo },
-      el('div', { class: 'linha entre', style: 'margin-bottom:12px' },
-        el('h2', { style: 'margin:0' }, titulo),
-        el('button', { class: 'btn redondo vazio', 'aria-label': 'Fechar', onclick: () => fechar() }, icone('fechar'))));
+    const caixa = el('div', { class: `modal${largo ? ' largo' : ''}${semCabecalho ? ' sem-cabecalho' : ''}`, role: 'dialog', 'aria-label': titulo },
+      semCabecalho
+        ? el('button', { class: 'btn redondo fechar-flutuante', 'aria-label': 'Fechar', onclick: () => fechar() }, icone('fechar'))
+        : el('div', { class: 'linha entre', style: 'margin-bottom:12px' },
+          el('h2', { style: 'margin:0' }, titulo),
+          el('button', { class: 'btn redondo vazio', 'aria-label': 'Fechar', onclick: () => fechar() }, icone('fechar'))));
     caixa.append(...[].concat(typeof conteudo === 'function' ? conteudo(fechar) : conteudo).flat(Infinity).filter((f) => f !== null && f !== undefined && f !== false));
     fundo.append(caixa);
     document.body.append(fundo);

@@ -64,12 +64,12 @@ module.exports = (db, autenticado, comPerfil) => {
         sessao_id: sessao.id,
         token,
         ao_vivo: true,
-        // 'embed' abre o player oficial da emissora (não retransmitimos nada); 'hls' toca no nosso player.
+        // 'embed' abre o player oficial da emissora; 'hls' toca no nosso player.
         fonte: canal.fonte === 'embed'
-          ? { tipo: 'embed', url: canal.url_embed, retransmitido: false, emissora: true }
+          ? { tipo: 'embed', url: canal.url_embed, nossos_servidores: false, emissora: true }
           : canal.relay && config.relay.ligado
-            ? { tipo: 'hls', url: `${baseApi()}/play/canal/${canal.id}/lista.m3u8?t=${encodeURIComponent(token)}`, retransmitido: true }
-            : { tipo: 'hls', url: canal.url_hls, retransmitido: false },
+            ? { tipo: 'hls', url: `${baseApi()}/play/canal/${canal.id}/lista.m3u8?t=${encodeURIComponent(token)}`, nossos_servidores: true }
+            : { tipo: 'hls', url: canal.url_hls, nossos_servidores: false },
         info: {
           titulo: canal.nome,
           subtitulo: noAr ? noAr.titulo : 'Ao vivo',
@@ -142,7 +142,7 @@ module.exports = (db, autenticado, comPerfil) => {
   // ---------- O que o player busca sozinho (token na URL) ----------
 
   /**
-   * Lista HLS do canal, retransmitida pelo nosso servidor: os endereços dos pedaços são
+   * Lista HLS do canal, servida pelos nossos servidores: os endereços dos pedaços são
    * reescritos para cá, então a origem da emissora não aparece para o assinante.
    */
   r.get('/canal/:id/lista.m3u8', async (req, res, next) => {
@@ -150,7 +150,7 @@ module.exports = (db, autenticado, comPerfil) => {
       const canal = canalDe(req.params.id);
       const token = String(req.query.t ?? '');
       player.conferirToken(db, token, { tipo: 'canal', canalId: canal.id });
-      if (!canal.relay || !config.relay.ligado) throw new ErroNegocio('Este canal não é retransmitido pelo servidor.', 409);
+      if (!canal.relay || !config.relay.ligado) throw new ErroNegocio('Este canal não passa pelos nossos servidores.', 409);
       const url = req.query.u ? relay.lerUrlAssinada(canal.id, req.query.u) : canal.url_hls;
       if (!url) throw new ErroNegocio('Endereço de lista inválido.', 403);
       const lista = await relay.listaReescrita(canal, { url, playToken: token, baseApi: baseApi() });

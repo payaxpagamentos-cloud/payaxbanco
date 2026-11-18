@@ -404,7 +404,7 @@ async function telaConfig(c) {
     tabela(['Item', 'Valor'], [
       ['Marca', servidor.marca],
       ['Cobrança', servidor.pagamentos === 'simulado' ? 'simulado (teste: o assinante confirma na tela)' : 'manual (a operação confirma o PIX)'],
-      ['Retransmissão de canais', servidor.relay_ligado ? 'ligada' : 'desligada (o player vai direto na origem)'],
+      ['Transmissão dos canais', servidor.relay_ligado ? 'ligada' : 'desligada (o player vai direto na origem)'],
       ['Tamanho máximo de vídeo', `${servidor.video_max_mb} MB`],
       ['Tela sem sinal de vida é encerrada em', `${servidor.telas_sem_sinal_s} segundos`],
       ['Pasta dos arquivos', servidor.midia_dir],

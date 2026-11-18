@@ -128,8 +128,8 @@ CREATE TABLE IF NOT EXISTS canais (
   categoria TEXT NOT NULL DEFAULT 'aberta'
     CHECK (categoria IN ('aberta','noticias','esportes','filmes','series','infantil','documentarios','musica','variedades','religioso','local')),
   -- Como o canal chega ao assinante:
-  --   'hls'   = sinal próprio ou contratado, em lista .m3u8 (com ou sem retransmissão nossa);
-  --   'embed' = player oficial e público da emissora (não retransmitimos nada: abrimos o player dela).
+  --   'hls'   = sinal próprio ou contratado, em lista .m3u8 (com ou sem transmissão nossa);
+  --   'embed' = player oficial e público da emissora (abrimos o player dela, com os anúncios dela).
   fonte TEXT NOT NULL DEFAULT 'hls' CHECK (fonte IN ('hls','embed')),
   -- Endereço da lista HLS (quando fonte = 'hls'). Vazio enquanto o sinal não chega.
   url_hls TEXT,
@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS canais (
   url_embed TEXT,
   -- Recado da operação: de quem pedir o sinal, número do contrato, contato da afiliada.
   observacao TEXT,
-  -- 1: o sinal passa pelo nosso servidor (retransmissão); 0: o player vai direto na origem.
+  -- 1: o sinal passa pelos nossos servidores; 0: o player vai direto na origem.
   relay INTEGER NOT NULL DEFAULT 1,
   logo_midia_id INTEGER REFERENCES midias(id),
   plano_minimo_id INTEGER REFERENCES planos(id),

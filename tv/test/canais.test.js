@@ -140,7 +140,7 @@ test('importar a TV aberta deixa tudo cadastrado e desligado, sem duplicar', asy
   assert.ok(globo, 'a Globo entra no cadastro');
   assert.equal(globo.ativo, false, 'entra desligada: só vai ao ar com o sinal cadastrado');
   assert.equal(globo.url_hls, null);
-  assert.match(globo.observacao, /contrato/i, 'explica de quem pedir o sinal');
+  assert.match(globo.observacao, /sinal/i, 'diz onde procurar o sinal');
   assert.ok(canais.some((c) => c.nome === 'SBT') && canais.some((c) => c.nome === 'Record')
     && canais.some((c) => c.nome === 'Band') && canais.some((c) => c.nome === 'RedeTV!'));
 
@@ -172,7 +172,7 @@ test('canal não vai ao ar sem endereço, seja sinal ou player da emissora', asy
   assert.equal(guardado.dados.canal.url_hls, null);
 });
 
-test('canal com player oficial da emissora abre o player dela, sem retransmissão', async (t) => {
+test('canal com player oficial da emissora abre o player dela, sem transmissão', async (t) => {
   const s = await iniciar();
   t.after(s.fechar);
   const admin = await s.adminLogin();
@@ -189,7 +189,7 @@ test('canal com player oficial da emissora abre o player dela, sem retransmissã
   const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: criado.dados.canal.id }, cliente.token, cliente.comPerfil);
   assert.equal(abrir.status, 201);
   assert.equal(abrir.dados.fonte.tipo, 'embed');
-  assert.equal(abrir.dados.fonte.retransmitido, false, 'não passa pelo nosso servidor');
+  assert.equal(abrir.dados.fonte.nossos_servidores, false, 'não passa pelo nosso servidor');
   assert.match(abrir.dados.fonte.url, /youtube\.com\/embed\//);
 
   // A página libera só a origem do player cadastrado.

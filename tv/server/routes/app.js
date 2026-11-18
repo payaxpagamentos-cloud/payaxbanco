@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { naoEncontrado } = require('../lib/erros');
-const { hoje, somarDias } = require('../lib/datas');
+const { hoje, somarDias, inicioDia } = require('../lib/datas');
 const assinaturas = require('../lib/assinaturas');
 const catalogo = require('../lib/catalogo');
 const player = require('../lib/player');
@@ -39,11 +39,18 @@ module.exports = (db) => {
     res.json({ canal, grade: epg.grade(db, { canalId: id, de, ate }).map((p) => ({ ...p, ao_vivo: Boolean(p.ao_vivo), andamento: epg.andamento(p) })) });
   });
 
-  /** Guia de programação: a grade de todos os canais num período. */
+  /**
+   * Guia de programação: a grade de todos os canais num período.
+   * Sem dia, a janela começa um pouco antes de agora — assim o programa no ar sempre aparece,
+   * mesmo que o aparelho esteja num fuso diferente do da operação.
+   */
   r.get('/guia', (req, res) => {
-    const dia = req.query.dia ? v.data(req.query.dia, 'o dia') : hoje();
-    const de = req.query.de ? v.instante(req.query.de, 'o início') : new Date(`${dia}T00:00:00-03:00`).toISOString();
-    const ate = req.query.ate ? v.instante(req.query.ate, 'o fim') : new Date(`${somarDias(dia, 1)}T00:00:00-03:00`).toISOString();
+    const diaPedido = req.query.dia ? v.data(req.query.dia, 'o dia') : null;
+    const dia = diaPedido ?? hoje();
+    const de = req.query.de ? v.instante(req.query.de, 'o início')
+      : diaPedido ? inicioDia(diaPedido) : new Date(Date.now() - 2 * 3600_000).toISOString();
+    const ate = req.query.ate ? v.instante(req.query.ate, 'o fim')
+      : diaPedido ? inicioDia(somarDias(diaPedido, 1)) : new Date(Date.now() + 36 * 3600_000).toISOString();
     const canais = catalogo.canaisAoVivo(db, req.perfilView, req.acesso);
     const programas = epg.grade(db, { de, ate });
     res.json({

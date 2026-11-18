@@ -64,7 +64,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     aoVivo ? el('span', { class: 'etiqueta vivo' }, 'AO VIVO') : null,
     dados.info.classificacao !== undefined ? etiquetaIdade(dados.info.classificacao) : null,
     dados.fonte.qualidade ? el('span', { class: 'etiqueta' }, QUALIDADES[dados.fonte.qualidade] ?? dados.fonte.qualidade) : null,
-    dados.fonte.retransmitido ? el('span', { class: 'etiqueta ok', title: 'O sinal passa pelos nossos servidores' }, 'PLAY CDN') : null);
+    dados.fonte.nossos_servidores ? el('span', { class: 'etiqueta ok', title: 'O sinal passa pelos nossos servidores' }, 'PLAY CDN') : null);
 
   const btn = (nomeIcone, rotulo, fn, extra = '') => {
     const b = el('button', { class: `pbtn ${extra}`, title: rotulo, 'aria-label': rotulo }, icone(nomeIcone));
@@ -424,7 +424,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
 
 /**
  * Canal com fonte "embed": a PLAY TV abre o player público da própria emissora dentro da tela,
- * com os anúncios dela. Não retransmitimos nada — por isso aqui não há controles nossos
+ * com os anúncios dela — por isso aqui não há controles nossos
  * (quem manda no vídeo é o player da emissora). A tela continua contando para o limite do plano.
  */
 function tocarNoPlayerDaEmissora(dados, { aoFechar }) {

@@ -140,7 +140,7 @@ test('canal ao vivo: a lista HLS exige token do canal certo', async (t) => {
   const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil);
   assert.equal(abrir.status, 201);
   assert.equal(abrir.dados.ao_vivo, true);
-  assert.equal(abrir.dados.fonte.retransmitido, true);
+  assert.equal(abrir.dados.fonte.nossos_servidores, true);
   assert.match(abrir.dados.fonte.url, new RegExp(`/play/canal/${canal.id}/lista.m3u8`));
 
   const token = new URL(`http://x${abrir.dados.fonte.url}`).searchParams.get('t');
@@ -187,7 +187,7 @@ test('reescrita da lista HLS aponta tudo para o nosso servidor', () => {
   assert.throws(() => relay.reescrever('isto não é uma lista', opcoes), /lista HLS/);
 });
 
-test('a retransmissão recusa endereços de rede interna', async () => {
+test('a transmissão recusa endereços de rede interna', async () => {
   for (const url of ['http://127.0.0.1:8080/x.m3u8', 'http://10.0.0.5/x.m3u8', 'http://169.254.169.254/latest/meta-data',
     'http://192.168.0.10/x.m3u8', 'http://[::1]/x.m3u8']) {
     await assert.rejects(() => relay.conferirEndereco(url), /rede interna|inválido/i, url);

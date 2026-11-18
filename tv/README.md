@@ -1,6 +1,6 @@
 # PLAY TV
 
-Plataforma de streaming: **canais de TV ao vivo** retransmitidos pelos nossos servidores e **catálogo sob demanda**
+Plataforma de streaming: **canais de TV ao vivo** nossa transmissãos pelos nossos servidores e **catálogo sob demanda**
 com conteúdo próprio (filmes, séries e episódios), vendido por **assinatura**. App do assinante e painel da operação,
 com servidor, banco de dados e login próprios.
 
@@ -12,8 +12,8 @@ com servidor, banco de dados e login próprios.
 
 | # | Módulo | O que tem |
 |---|---|---|
-| 1 | **Canais ao vivo** | Cadastro do canal (número, categoria, região, logo, classificação, plano mínimo) com o endereço HLS (`.m3u8`) da emissora ou do encoder próprio. **Retransmissão pelo nosso servidor**: a lista é reescrita e cada pedaço do sinal passa por aqui, então a origem não aparece para o assinante, o CORS deixa de ser problema e a política de segurança das páginas continua fechada em `'self'`. Teste do sinal em um clique, prévia dentro do painel e verificação automática a cada 15 minutos (o painel mostra quem está fora do ar). |
-| 2 | **TV aberta já cadastrada** | Globo, SBT, Record, Band, RedeTV!, Cultura, Gazeta, TV Brasil, Rede Brasil, Aparecida, Rede Vida e os canais de notícias entram com um clique em **Canais → Importar TV aberta** (número, categoria, logo e o lembrete de onde pedir o sinal de cada um). Cada canal aceita **sinal próprio ou contratado** (.m3u8) ou o **player oficial da emissora** — neste caso a PLAY TV não retransmite nada: abre o player público da emissora, com os anúncios dela. |
+| 1 | **Canais ao vivo** | Cadastro do canal (número, categoria, região, logo, classificação, plano mínimo) com o endereço HLS (`.m3u8`) da emissora ou do encoder próprio. **Transmissão pelos nossos servidores**: a lista é reescrita e cada pedaço do sinal passa por aqui, então a origem não aparece para o assinante, o CORS deixa de ser problema e a política de segurança das páginas continua fechada em `'self'`. Teste do sinal em um clique, prévia dentro do painel e verificação automática a cada 15 minutos (o painel mostra quem está fora do ar). |
+| 2 | **TV aberta já cadastrada** | Globo, SBT, Record, Band, RedeTV!, Cultura, Gazeta, TV Brasil, Rede Brasil, Aparecida, Rede Vida e os canais de notícias entram com um clique em **Canais → Importar TV aberta** (número, categoria, logo e o lembrete de onde pedir o sinal de cada um). Cada canal aceita **sinal próprio ou contratado** (.m3u8) ou o **player oficial da emissora** — neste caso a PLAY TV não transmite nada: abre o player público da emissora, com os anúncios dela. |
 | 3 | **Grade de programação (EPG)** | Programação por canal, cadastrada na mão (com recusa de sobreposição) ou importada em **XMLTV** — o formato que emissoras e agregadores publicam. O app mostra "no ar agora" com barra de andamento, o que vem depois e um **guia de 7 dias** que já abre no programa do momento. |
 | 4 | **Catálogo sob demanda** | Filmes e séries com temporadas, episódios, trailer, elenco, direção, gêneros, classificação indicativa e selo de original. **Envio do vídeo pelo painel em pedaços** (retomável, até 8 GB por arquivo), formato reconhecido pelo conteúdo do arquivo (MP4, WebM, MKV) e entrega com **HTTP Range**. Legendas em WebVTT. Publicar confere se há vídeo e capa. |
 | 5 | **Player** | Tela cheia com controles próprios: HLS pelo **hls.js** (com o HLS nativo do Safari como reserva), MP4 com Range, troca de qualidade e velocidade, legendas, janela flutuante, tela cheia, atalhos de teclado, **retomada de onde parou**, **próximo episódio** e aviso de telas simultâneas com a opção de encerrar as outras. |
@@ -30,11 +30,11 @@ com servidor, banco de dados e login próprios.
 - **Baixa automática do PIX**: exige contratar um intermediador de pagamentos (PSP) ou a API PIX do banco. Hoje a
   operação confirma a fatura em um clique (e, em modo de testes, o próprio assinante confirma).
 - **Sinal das emissoras abertas**: Globo, SBT, Record, Band e RedeTV! **não publicam endereço livre** para
-  retransmissão — o sinal ao vivo delas é distribuído por contrato (Globoplay, UOL Play e afins). Os canais já vêm
+  transmissão — o sinal ao vivo delas é distribuído por contrato (Globoplay, UOL Play e afins). Os canais já vêm
   cadastrados na plataforma, mas cada um só entra no ar quando a operação colocar ali uma destas três coisas:
   (a) o **.m3u8 que a emissora ou a afiliada fornece por contrato** (ou o encoder próprio de quem é afiliado);
   (b) o **endereço do player oficial e público da emissora** (fonte "embed"), em que abrimos o player dela e nada é
-  retransmitido; ou (c) nada — e o canal fica cadastrado e desligado. A plataforma está pronta para os três casos;
+  nossa transmissão; ou (c) nada — e o canal fica cadastrado e desligado. A plataforma está pronta para os três casos;
   o que ela não faz é inventar um sinal que a emissora não liberou.
 - **DRM (Widevine/FairPlay/PlayReady)**: estúdios costumam exigir DRM para conteúdo licenciado. A plataforma entrega
   o vídeo por link assinado de curta duração, que resolve o acesso indevido casual, mas não é DRM.
@@ -119,7 +119,7 @@ No Nginx, o `location /tv/` precisa de `proxy_buffering off` (entrega em fluxo d
 | `TV_VIDEO_MAX_MB` | `8192` | Tamanho máximo de cada vídeo enviado. |
 | `TV_UPLOAD_PARTE_MB` | `8` | Tamanho de cada pedaço do envio (combine com o limite do proxy). |
 | `TV_ARTE_MAX_MB` / `TV_LEGENDA_MAX_KB` | `8` / `512` | Tamanho máximo das artes e das legendas. |
-| `TV_RELAY` | `1` | Retransmissão dos canais pelo servidor. `0` faz o player ir direto na origem. |
+| `TV_RELAY` | `1` | Transmissão dos canais pelo servidor. `0` faz o player ir direto na origem. |
 | `TV_ORIGENS_MIDIA` | — | Domínios das emissoras liberados nas páginas, para canais que tocam direto na origem. |
 | `TV_RELAY_TIMEOUT_MS` / `TV_RELAY_CACHE_MS` | `12000` / `2000` | Tempo limite da origem e cache do manifesto HLS. |
 | `TV_RELAY_SEGMENTO_MAX_MB` | `32` | Tamanho máximo de cada pedaço do sinal repassado. |
@@ -149,7 +149,7 @@ tv/
     lib/catalogo.js       # home, fileiras, detalhe, busca, classificação e nível do plano
     lib/epg.js            # grade, "no ar agora" e importação XMLTV
     lib/player.js         # token de reprodução, telas simultâneas, progresso e sinal de vida
-    lib/relay.js          # retransmissão HLS: reescrita da lista, repasse dos pedaços e proteção contra SSRF
+    lib/relay.js          # transmissão HLS: reescrita da lista, repasse dos pedaços e proteção contra SSRF
     lib/midia.js          # envio em pedaços, reconhecimento do formato e entrega com HTTP Range
     lib/audiencia.js      # painel, audiência por dia/hora/aparelho, top títulos e canais, financeiro
     routes/               # auth, conta (assinatura e perfis), app (catálogo), play, admin-conteudo, admin-negocio

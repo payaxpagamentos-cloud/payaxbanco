@@ -39,7 +39,7 @@ TV_TRUST_PROXY=1
 # Cobrança na fase de testes: "simulado" (o assinante confirma o PIX por um botão de teste).
 # Para valer de verdade, troque para "manual" (PIX na chave da plataforma, confirmado pela operação).
 TV_PAGAMENTOS=simulado
-# Retransmissão dos canais pelo nosso servidor (protege a origem e resolve CORS).
+# Transmissão dos canais pelo nosso servidor (protege a origem e resolve CORS).
 TV_RELAY=1
 # Canais que tocam direto na origem: libere aqui o domínio da emissora (separado por vírgula).
 # TV_ORIGENS_MIDIA=cdn.emissora.com.br

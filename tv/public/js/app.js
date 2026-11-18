@@ -3,9 +3,9 @@ import { el, $, limpar, icone, toast, acao, marca, iniciais, corPerfil, etiqueta
   hojeLocal, somarDias, duracao, modal, CATEGORIAS_CANAL } from './ui.js';
 import { telaEntrada, telaPlanos, telaPagamento } from './entrada.js';
 import { telaPerfis } from './perfis.js';
-import { telaTitulo } from './titulo.js';
+import { telaTitulo, modalTitulo } from './titulo.js';
 import { telaConta } from './conta.js';
-import { cartaz, canalCartao, fileira, grade, vazio } from './cartoes.js';
+import { cartaz, canalCartao, fileira, grade, vazio, fecharPrevia } from './cartoes.js';
 import { tocar } from './player.js';
 import { ehTV, ligarControle, focarPrimeiro } from './tv.js';
 
@@ -193,7 +193,24 @@ async function desenharRota() {
   }
 }
 
-const abrirTitulo = (t) => ir(`#/titulo/${t.slug}`);
+/** Abre a janela do título sobre a tela atual, como nas grandes plataformas. */
+const abrirTitulo = (t) => {
+  fecharPrevia();
+  modalTitulo(t.slug ?? t.id, { ir, aoAtualizar: () => desenharRota() }).catch((err) => toast(err.message, true));
+};
+
+/** Liga ou desliga "minha lista" direto do cartão. */
+const alternarLista = async (item, ligado) => {
+  try {
+    if (ligado) await api.post(`/tv/minha-lista/${item.id}`);
+    else await api.del(`/tv/minha-lista/${item.id}`);
+    toast(ligado ? 'Adicionado à sua lista.' : 'Removido da sua lista.');
+  } catch (err) {
+    toast(err.message, true);
+  }
+};
+
+const opcoesCartaz = () => ({ aoAbrir: abrirTitulo, aoTocar: tocarItem, aoAlternarLista: alternarLista });
 
 /** Toca o que o cartaz pede: filme direto, série no próximo episódio, canal ao vivo. */
 async function tocarItem(item) {
@@ -230,16 +247,33 @@ async function telaHome() {
   for (const f of home.fileiras) {
     if (f.tipo === 'canais') {
       partes.push(fileira(f.nome, f.itens.map((c) => canalCartao(c, { aoAbrir: tocarCanal })), { larga: true, verTudo: () => ir('#/canais') }));
+    } else if (f.tipo === 'em_alta') {
+      // Os dez mais assistidos ganham o numeral gigante ao lado do cartaz.
+      partes.push(fileira('Top 10 de hoje na PLAY TV',
+        f.itens.slice(0, 10).map((t, i) => cartaz(t, { posicao: i + 1, ...opcoesCartaz() })), { cartazes: true }));
     } else {
-      const deitado = f.tipo === 'continuar';
-      partes.push(fileira(f.nome, f.itens.map((t) => cartaz(t, { deitado, aoAbrir: abrirTitulo, aoTocar: tocarItem })),
-        { larga: deitado, verTudo: f.tipo === 'minha_lista' ? () => ir('#/lista') : null }));
+      partes.push(fileira(f.nome, f.itens.map((t) => cartaz(t, opcoesCartaz())),
+        { larga: f.tipo === 'continuar', verTudo: f.tipo === 'minha_lista' ? () => ir('#/lista') : null }));
     }
   }
   if (!home.fileiras.length) {
     partes.push(el('div', { class: 'secao' }, vazio('A programação está sendo montada. Volte em instantes.')));
   }
+  partes.push(rodape());
   limpar(conteudo, partes);
+}
+
+/** Rodapé da home. */
+function rodape() {
+  const link = (texto, aoClicar) => el('button', { onclick: aoClicar }, texto);
+  return el('footer', { class: 'rodape-app' },
+    el('div', { class: 'colunas' },
+      el('div', {}, link('Canais ao vivo', () => ir('#/canais')), link('Guia de programação', () => ir('#/guia')), link('Filmes', () => ir('#/filmes'))),
+      el('div', {}, link('Séries', () => ir('#/series')), link('Minha lista', () => ir('#/lista')), link('Minha conta', () => ir('#/conta'))),
+      el('div', {}, link('Planos e assinatura', () => ir('#/planos')), link('Perfis de visualização', () => ir('#/perfis')),
+        link('Telas em uso', () => ir('#/conta'))),
+      el('div', {}, el('span', {}, `Plano ${conta?.assinatura?.plano?.nome ?? '—'}`), el('span', {}, conta?.usuario?.email ?? ''))),
+    el('div', { class: 'mini' }, '© PLAY TV'));
 }
 
 /** Destaque do topo que troca sozinho. */
@@ -270,7 +304,7 @@ function heroEl(destaques) {
         d.descricao ? el('p', { class: 'sinopse tres-linhas' }, d.descricao) : null,
         el('div', { class: 'linha' },
           botaoAssistir,
-          d.tipo === 'titulo' ? el('button', { class: 'btn vazio grande', onclick: () => abrirTitulo(d.titulo) }, icone('info'), 'Detalhes') : null,
+          d.tipo === 'titulo' ? el('button', { class: 'btn grande', onclick: () => abrirTitulo(d.titulo) }, icone('info'), 'Mais informações') : null,
           d.tipo === 'canal' ? el('button', { class: 'btn vazio grande', onclick: () => ir('#/guia') }, icone('tv'), 'Ver a programação') : null)),
       destaques.length > 1 ? pontos : null);
 
@@ -318,9 +352,9 @@ async function telaCanais() {
 // ---------------------------------------------------------------- Guia (EPG)
 
 async function telaGuia(diaPedido) {
-  const dia = diaPedido ?? hojeLocal();
-  const { canais } = await api.get(`/tv/guia?dia=${dia}`);
-  const dias = Array.from({ length: 7 }, (_, i) => somarDias(hojeLocal(), i));
+  // Sem dia escolhido, o servidor devolve a partir de agora (independe do fuso do aparelho).
+  const { canais, dia } = await api.get(diaPedido ? `/tv/guia?dia=${diaPedido}` : '/tv/guia');
+  const dias = Array.from({ length: 7 }, (_, i) => somarDias(dia, i));
 
   const linhas = canais.map((c) => el('div', { class: 'guia-linha' },
     (() => {
@@ -356,10 +390,10 @@ async function telaGuia(diaPedido) {
 
   limpar(conteudo, el('div', { class: 'secao' },
     el('h1', {}, 'Guia de programação'),
-    el('div', { class: 'linha', style: 'margin-bottom:16px' }, dias.map((d) => el('button', {
-      class: `btn pequeno${d === dia ? ' primario' : ' vazio'}`,
-      onclick: () => ir(`#/guia?dia=${d}`),
-    }, d === hojeLocal() ? 'Hoje' : diaSemana(d)))),
+    el('div', { class: 'linha', style: 'margin-bottom:16px' }, dias.map((d, i) => el('button', {
+      class: `btn pequeno${(i === 0 ? !diaPedido : d === diaPedido) ? ' primario' : ' vazio'}`,
+      onclick: () => ir(i === 0 ? '#/guia' : `#/guia?dia=${d}`),
+    }, i === 0 ? 'Hoje' : diaSemana(d)))),
     el('div', { class: 'guia' }, linhas.length ? linhas : vazio('Nenhum canal disponível.'))));
   // Cada fileira começa no programa que está no ar (ou no começo do dia, se for outro dia).
   for (const faixa of conteudo.querySelectorAll('.guia-programas')) {
@@ -395,7 +429,7 @@ async function telaCatalogo(tipo, titulo, params) {
         }, rot)))),
       el('div', { class: 'pequeno mudo', style: 'margin-left:auto' }, `${dados.total} ${dados.total === 1 ? 'título' : 'títulos'}`)),
     dados.itens.length
-      ? grade(dados.itens.map((t) => cartaz(t, { aoAbrir: abrirTitulo, aoTocar: tocarItem })))
+      ? grade(dados.itens.map((t) => cartaz(t, opcoesCartaz())))
       : vazio('Nada por aqui ainda com esses filtros.')));
 }
 
@@ -404,7 +438,7 @@ async function telaMinhaLista() {
   limpar(conteudo, el('div', { class: 'secao' },
     el('h1', {}, 'Minha lista'),
     itens.length
-      ? grade(itens.map((t) => cartaz(t, { aoAbrir: abrirTitulo, aoTocar: tocarItem })))
+      ? grade(itens.map((t) => cartaz(t, opcoesCartaz())))
       : vazio('Sua lista está vazia. Toque em "Minha lista" na página de um filme ou série.',
         el('button', { class: 'btn primario', onclick: () => ir('#/') }, 'Ver o catálogo'))));
 }
@@ -413,7 +447,7 @@ async function telaBusca(q) {
   if (!q || q.length < 2) return ir('#/');
   const r = await api.get(`/tv/busca?q=${encodeURIComponent(q)}`);
   const partes = [el('h1', {}, `Resultados para "${r.termo}"`)];
-  if (r.titulos.length) partes.push(el('h2', { style: 'margin-top:18px' }, 'Filmes e séries'), grade(r.titulos.map((t) => cartaz(t, { aoAbrir: abrirTitulo, aoTocar: tocarItem }))));
+  if (r.titulos.length) partes.push(el('h2', { style: 'margin-top:18px' }, 'Filmes e séries'), grade(r.titulos.map((t) => cartaz(t, opcoesCartaz()))));
   if (r.canais.length) {
     partes.push(el('h2', { style: 'margin-top:26px' }, 'Canais'),
       el('div', { class: 'grade', style: 'grid-template-columns:repeat(auto-fill,minmax(300px,1fr))' },

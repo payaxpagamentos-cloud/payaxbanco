@@ -1,7 +1,107 @@
 import { api, arte } from './api.js';
 import { el, limpar, icone, toast, acao, duracao, dataBR, etiquetaIdade, modal } from './ui.js';
-import { cartaz, fileira } from './cartoes.js';
+import { cartaz, fileira, grade } from './cartoes.js';
 import { tocar } from './player.js';
+
+/**
+ * Janela do título sobre a home (é assim que as grandes plataformas abrem um filme: sem sair
+ * da tela em que você estava). A página inteira continua existindo para links diretos.
+ */
+export async function modalTitulo(chave, { ir, aoAtualizar } = {}) {
+  const { titulo: t } = await api.get(`/tv/titulos/${encodeURIComponent(chave)}`);
+  const banner = arte(t.banner ?? t.capa);
+  const continuarEp = t.tipo === 'serie' ? (t.proximo_episodio ?? null) : null;
+  const prog = t.progresso;
+  const rotulo = t.tipo === 'filme'
+    ? (prog && !prog.concluido && prog.segundos > 30 ? `Continuar de ${duracao(prog.segundos)}` : 'Assistir')
+    : (continuarEp ? `Assistir T${continuarEp.temporada} E${continuarEp.numero}` : 'Assistir');
+
+  return modal(t.nome, (fechar) => {
+    const assistir = async (alvo) => {
+      if (t.bloqueado) {
+        toast(`"${t.nome}" faz parte do plano ${t.plano_nome}.`, true);
+        return;
+      }
+      fechar();
+      await tocar({ ...alvo, aoFechar: () => aoAtualizar?.() });
+      aoAtualizar?.();
+    };
+
+    const botaoPrincipal = el('button', { class: 'btn claro grande' }, icone('tocar'), rotulo);
+    botaoPrincipal.addEventListener('click', () => acao(botaoPrincipal, () => assistir(
+      t.tipo === 'filme' ? { tipo: 'filme', titulo_id: t.id } : { tipo: 'episodio', titulo_id: t.id, episodio_id: continuarEp.id },
+    )));
+    if ((t.tipo === 'filme' && !t.tem_video) || (t.tipo === 'serie' && !continuarEp)) botaoPrincipal.disabled = true;
+
+    const botaoLista = el('button', { class: 'btn redondo', title: t.favorito ? 'Remover da minha lista' : 'Minha lista' },
+      icone(t.favorito ? 'certo' : 'mais'));
+    botaoLista.addEventListener('click', () => acao(botaoLista, async () => {
+      const novo = !t.favorito;
+      if (novo) await api.post(`/tv/minha-lista/${t.id}`);
+      else await api.del(`/tv/minha-lista/${t.id}`);
+      t.favorito = novo;
+      botaoLista.replaceChildren(icone(novo ? 'certo' : 'mais'));
+      aoAtualizar?.();
+    }));
+
+    const episodios = () => {
+      if (t.tipo !== 'serie' || !t.temporadas.length) return null;
+      let aberta = t.temporadas.find((tm) => tm.episodios.some((e) => e.id === continuarEp?.id)) ?? t.temporadas[0];
+      const lista = el('div', {});
+      const seletor = el('select', { style: 'width:auto;min-height:40px' },
+        t.temporadas.map((tm) => el('option', { value: tm.id }, tm.nome ?? `Temporada ${tm.numero}`)));
+      const pintar = () => limpar(lista, aberta.episodios.length
+        ? aberta.episodios.map((ep) => {
+          const b = el('button', { class: 'episodio', disabled: !ep.tem_video },
+            el('div', { class: 'thumb' }, arte(ep.thumb) ? el('img', { src: arte(ep.thumb), alt: '' }) : el('span', { class: 'n' }, ep.numero)),
+            el('div', { class: 'meio' },
+              el('div', { class: 'linha entre' }, el('strong', {}, `${ep.numero}. ${ep.nome}`), el('span', { class: 'pequeno mudo' }, duracao(ep.duracao_s))),
+              ep.sinopse ? el('p', { class: 'pequeno mudo duas-linhas', style: 'margin:4px 0 0' }, ep.sinopse) : null,
+              ep.visto_segundos && ep.duracao_s && !ep.concluido
+                ? el('div', { class: 'barra-progresso', style: 'margin-top:8px' }, el('span', { style: `width:${Math.min(100, (ep.visto_segundos / ep.duracao_s) * 100)}%` }))
+                : null));
+          b.addEventListener('click', () => assistir({ tipo: 'episodio', titulo_id: t.id, episodio_id: ep.id }));
+          return b;
+        })
+        : el('p', { class: 'mudo' }, 'Episódios em breve.'));
+      seletor.addEventListener('change', () => { aberta = t.temporadas.find((tm) => String(tm.id) === seletor.value); pintar(); });
+      pintar();
+      return el('div', {},
+        el('div', { class: 'linha entre', style: 'margin:22px 0 10px' }, el('h2', { style: 'margin:0' }, 'Episódios'), seletor),
+        lista);
+    };
+
+    return [
+      el('div', { style: 'margin:0 -28px 0;position:relative' },
+        el('div', { style: 'aspect-ratio:16/9;overflow:hidden;background:var(--surface-2);border-radius:8px 8px 0 0' },
+          banner ? el('img', { src: banner, alt: '', style: 'width:100%;height:100%;object-fit:cover' }) : null),
+        el('div', { style: 'position:absolute;inset:0;background:linear-gradient(0deg, var(--surface) 2%, rgba(24,24,24,.1) 50%, transparent)' }),
+        el('div', { style: 'position:absolute;left:28px;right:28px;bottom:18px' },
+          t.original ? el('span', { class: 'etiqueta ok', style: 'margin-bottom:8px;display:inline-flex' }, 'ORIGINAL PLAY') : null,
+          el('h1', { style: 'margin:6px 0 14px;font-size:clamp(22px,3vw,40px)' }, t.nome),
+          el('div', { class: 'linha' }, botaoPrincipal, botaoLista))),
+      el('div', { style: 'display:grid;grid-template-columns:1.7fr 1fr;gap:26px;margin-top:22px' },
+        el('div', {},
+          el('div', { class: 'linha', style: 'gap:10px;margin-bottom:12px' },
+            el('span', { class: 'mudo pequeno' }, t.ano ?? ''),
+            etiquetaIdade(t.classificacao),
+            el('span', { class: 'mudo pequeno' }, t.tipo === 'filme' ? duracao(t.duracao_s) : `${t.temporadas.length} temporada(s)`),
+            t.bloqueado ? el('span', { class: 'etiqueta plano' }, t.plano_nome) : null),
+          el('p', {}, t.sinopse ?? 'Sem sinopse cadastrada.')),
+        el('div', { class: 'pequeno' },
+          t.elenco ? el('p', {}, el('span', { class: 'mudo' }, 'Elenco: '), t.elenco) : null,
+          t.generos ? el('p', {}, el('span', { class: 'mudo' }, 'Gêneros: '), t.generos) : null,
+          t.direcao ? el('p', {}, el('span', { class: 'mudo' }, 'Direção: '), t.direcao) : null)),
+      episodios(),
+      t.similares?.length ? el('div', {},
+        el('h2', { style: 'margin:24px 0 12px' }, 'Títulos parecidos'),
+        grade(t.similares.slice(0, 8).map((s2) => cartaz(s2, {
+          aoAbrir: (x) => { fechar(); modalTitulo(x.slug, { ir, aoAtualizar }); },
+          aoTocar: (x) => { fechar(); modalTitulo(x.slug, { ir, aoAtualizar }); },
+        })))) : null,
+    ];
+  }, { largo: true, semCabecalho: true });
+}
 
 /** Página do filme ou da série: ficha, botões, temporadas, episódios e parecidos. */
 export async function telaTitulo(raiz, chave, { ir, aoAtualizar }) {

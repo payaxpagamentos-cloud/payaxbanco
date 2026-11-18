@@ -88,7 +88,7 @@ function instante(v, nome) {
 const classificacao = (v, padrao = 0) => (v === undefined || v === null || v === '' ? padrao : opcao(Number(v), 'a classificação indicativa', [0, 10, 12, 14, 16, 18]));
 
 /**
- * Endereço do sinal do canal: só http(s) e sem credenciais na URL. A retransmissão recusa
+ * Endereço do sinal do canal: só http(s) e sem credenciais na URL. A transmissão recusa
  * endereços de rede interna (ver lib/relay.js), por isso aqui a conferência é de formato.
  */
 function urlHls(v, { obrigatorio = true } = {}) {

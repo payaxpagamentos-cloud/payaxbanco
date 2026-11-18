@@ -60,7 +60,7 @@ function arteSvg(nome, { largura = 600, altura = 900, etiqueta = 'PLAY TV', indi
 <circle cx="${largura * 0.8}" cy="${altura * 0.2}" r="${largura * 0.33}" fill="#fff" fill-opacity=".07"/>
 <circle cx="${largura * 0.2}" cy="${altura * 0.78}" r="${largura * 0.42}" fill="#000" fill-opacity=".12"/>
 <rect width="${largura}" height="${altura}" fill="url(#s)"/>
-<text x="${largura * 0.08}" y="${altura * 0.1}" font-family="Manrope, sans-serif" font-size="${largura * 0.045}" font-weight="800" fill="#fff" fill-opacity=".85" letter-spacing="2">${escapar(etiqueta).toUpperCase()}</text>
+${comNome ? `<text x="${largura * 0.08}" y="${altura * 0.1}" font-family="Manrope, sans-serif" font-size="${largura * 0.045}" font-weight="800" fill="#fff" fill-opacity=".85" letter-spacing="2">${escapar(etiqueta).toUpperCase()}</text>` : ''}
 ${comNome ? linhas.map((l, i) => `<text x="${largura * 0.08}" y="${base + i * altura * 0.09}" font-family="Manrope, sans-serif" font-size="${largura * 0.095}" font-weight="800" fill="#fff">${escapar(l)}</text>`).join('\n') : ''}
 </svg>`, 'utf8');
 }
@@ -193,10 +193,10 @@ const inserirCanal = db.prepare(`INSERT INTO canais (numero, nome, slug, descric
     classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
   VALUES (?, ?, ?, ?, ?, 'hls', ?, ?, 1, ?, 0, ?, ?, ?, ?, ?)`);
 
-CANAIS_ABERTOS.forEach(([numero, nome, categoria, grupo, site, observacao], i) => {
+CANAIS_ABERTOS.forEach(([numero, nome, categoria, grupo, observacao], i) => {
   const logo = guardarArte(logoSvg(nome, i), `logo-${slug(nome)}.svg`);
   // Sem endereço de sinal e desligado: entra no ar quando a operação cadastrar o sinal.
-  inserirCanal.run(numero, nome, slug(nome), `${grupo} · ${site}`, categoria, null, observacao, logo, 'Nacional', numero, 0, agora(), agora());
+  inserirCanal.run(numero, nome, slug(nome), grupo, categoria, null, observacao, logo, 'Nacional', numero, 0, agora(), agora());
 });
 
 CANAIS_PROPRIOS.forEach(([numero, nome, categoria, regiao, descricao], i) => {

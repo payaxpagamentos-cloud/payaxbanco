@@ -9,7 +9,7 @@ const { ErroNegocio } = require('./erros');
 const { assinar, confere } = require('./cripto');
 
 /**
- * Retransmissão (o lado "CDN" da plataforma): o servidor busca a lista HLS na origem da emissora,
+ * Transmissão (o lado "CDN" da plataforma): o servidor busca a lista HLS na origem da emissora,
  * reescreve os endereços dos pedaços para o nosso endereço e repassa cada pedaço ao player.
  *
  * Com isso: a origem não aparece para o assinante (e não precisa liberar CORS), a política de

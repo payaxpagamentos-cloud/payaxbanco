@@ -15,7 +15,7 @@ IMPORTANTE: HTTPS E ESPAÇO EM DISCO
    - Use HTTPS. Sem ele, navegador de celular e Smart TV barram o player em muitos casos.
    - Os vídeos ficam na pasta data/midia e ocupam MUITO espaço (um filme em Full HD passa
      facilmente de 2 GB). Dimensione o disco antes de subir o catálogo.
-   - Os canais ao vivo não ocupam disco: o sinal é retransmitido na hora.
+   - Os canais ao vivo não ocupam disco: o sinal é nossa transmissão na hora.
 
 
 1) REQUISITO
