@@ -99,6 +99,19 @@ Dois detalhes práticos que a plataforma já resolve:
   para a troca. Quando o sinal exige cabeçalho próprio (`User-Agent` ou `Referer`), a plataforma
   guarda e reenvia esse cabeçalho a cada pedaço.
 
+## Logos das emissoras
+
+Em Canais, **Buscar logos das emissoras** traz o logo oficial de cada canal da lista pública
+(iptv-org) e guarda no acervo — é o mesmo uso que qualquer guia de programação faz. A operação
+escolhe entre completar só quem não tem ou substituir todos.
+
+Quem não aparece na lista (ou tem material oficial da emissora) recebe a imagem pelo cadastro do
+canal, no campo do logo. Os canais importados da lista pública guardam o identificador de origem,
+então o logo vem do canal certo, sem adivinhação por nome parecido.
+
+> Se o servidor fica atrás de um proxy de saída, ligue `NODE_USE_ENV_PROXY=1` no `.env`: sem isso o
+> Node não usa o proxy e a busca de logos, a lista pública e a grade XMLTV não saem.
+
 ## Grade dos canais abertos
 
 Em **Configurações → Grade dos canais abertos (EPG)**, a operação cadastra o endereço de um arquivo **XMLTV**

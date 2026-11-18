@@ -142,6 +142,8 @@ CREATE TABLE IF NOT EXISTS canais (
   -- 1: o sinal passa pelos nossos servidores; 0: o player vai direto na origem.
   relay INTEGER NOT NULL DEFAULT 1,
   logo_midia_id INTEGER REFERENCES midias(id),
+  -- Identificador do canal na lista pública (iptv-org): serve para buscar o logo oficial.
+  id_publico TEXT,
   plano_minimo_id INTEGER REFERENCES planos(id),
   classificacao INTEGER NOT NULL DEFAULT 0 CHECK (classificacao IN (0,10,12,14,16,18)),
   regiao TEXT,
@@ -483,6 +485,7 @@ function migrar(db) {
   if (!colunas.includes('url_embed')) db.exec('ALTER TABLE canais ADD COLUMN url_embed TEXT');
   if (!colunas.includes('observacao')) db.exec('ALTER TABLE canais ADD COLUMN observacao TEXT');
   if (!colunas.includes('cabecalhos')) db.exec('ALTER TABLE canais ADD COLUMN cabecalhos TEXT');
+  if (!colunas.includes('id_publico')) db.exec('ALTER TABLE canais ADD COLUMN id_publico TEXT');
 }
 
 /** Endereço amigável: "Cine Aberta 2" -> "cine-aberta-2". */

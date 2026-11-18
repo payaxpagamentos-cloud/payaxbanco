@@ -13,9 +13,10 @@ const { conferirEndereco } = require('./relay');
 
 const FONTE_CANAIS = 'https://iptv-org.github.io/api/channels.json';
 const FONTE_FLUXOS = 'https://iptv-org.github.io/api/streams.json';
+const FONTE_LOGOS = 'https://iptv-org.github.io/api/logos.json';
 
 // Os arquivos são grandes (vários MB): guarda por alguns minutos.
-const cache = { em: 0, canais: null, fluxos: null };
+const cache = { em: 0, canais: null, fluxos: null, logos: null, logosEm: 0 };
 const VALIDADE_MS = 10 * 60_000;
 
 async function baixarJson(url, timeoutMs) {
@@ -37,6 +38,90 @@ async function carregar({ timeoutMs = 60_000 } = {}) {
   cache.fluxos = fluxos;
   cache.em = Date.now();
   return cache;
+}
+
+/**
+ * Logos das emissoras, da mesma lista pública.
+ *
+ * O logo serve para identificar o canal na grade — é o mesmo uso que qualquer guia de
+ * programação faz. Quem tiver o material oficial da emissora pode trocar pelo painel.
+ */
+async function carregarLogos({ timeoutMs = 60_000 } = {}) {
+  if (cache.logos && Date.now() - cache.logosEm < VALIDADE_MS) return cache.logos;
+  cache.logos = await baixarJson(FONTE_LOGOS, timeoutMs);
+  cache.logosEm = Date.now();
+  return cache.logos;
+}
+
+/** Só letras e números, sem acento: a forma de comparar dois nomes de canal. */
+const chaveDoNome = (nome) => String(nome ?? '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]/g, '');
+
+/**
+ * Separa a palavra genérica do começo do nome: "TV Globo" vira ['tv', 'globo'].
+ * Dois canais só são o mesmo quando o resto bate **e** o começo não os distingue —
+ * "Rede Brasil" e "TV Brasil" são emissoras diferentes, e não podem trocar de logo.
+ */
+function partes(nome) {
+  const cheia = chaveDoNome(nome);
+  const m = /^(tv|rede|canal|radio)(.+)$/.exec(cheia);
+  return m ? { prefixo: m[1], resto: m[2], cheia } : { prefixo: '', resto: cheia, cheia };
+}
+
+const mesmoCanal = (a, b) => {
+  const x = partes(a);
+  const y = partes(b);
+  if (!x.cheia || !y.cheia) return false;
+  if (x.cheia === y.cheia) return true;
+  // Um dos dois não traz a palavra genérica: "Globo" é o mesmo canal que "TV Globo".
+  return x.resto === y.resto && x.resto.length >= 4 && (!x.prefixo || !y.prefixo);
+};
+
+/** Entre os logos do mesmo canal, o melhor para a grade: em uso, quadrado e nem grande nem minúsculo. */
+function melhorLogo(lista) {
+  const nota = (l) => {
+    const largura = Number(l.width) || 0;
+    const altura = Number(l.height) || 0;
+    if (!largura || !altura) return -1e9;
+    const proporcao = largura / altura;
+    return (l.in_use ? 300 : 0)
+      + (String(l.format).toUpperCase() === 'SVG' ? 60 : 0)
+      - Math.abs(Math.log(proporcao)) * 120          // perto do quadrado
+      - Math.abs(Math.log(Math.max(largura, altura) / 512)) * 40;  // perto de 512 px
+  };
+  return [...lista].sort((a, b) => nota(b) - nota(a))[0] ?? null;
+}
+
+/**
+ * Procura o logo de um canal pelo nome. Devolve { url, largura, altura, canal } ou null.
+ * Casa pelo nome do canal na lista pública (e pelos nomes alternativos que ela traz).
+ */
+async function logoDoCanal(nome, { id = null, pais = 'BR', timeoutMs = 60_000 } = {}) {
+  const { canais } = await carregar({ timeoutMs });
+  if (!id && !chaveDoNome(nome)) return null;
+
+  // Com o identificador na mão não há adivinhação: é o canal certo.
+  if (id) {
+    const certo = canais.find((c) => c.id === id);
+    if (certo) {
+      const logos = await carregarLogos({ timeoutMs });
+      const melhor = melhorLogo(logos.filter((l) => l.channel === certo.id));
+      return melhor ? { url: melhor.url, largura: melhor.width, altura: melhor.height, canal: certo.id, nome: certo.name } : null;
+    }
+  }
+
+  const doPais = canais.filter((c) => c.country === pais && !c.closed);
+  const nomes = (c) => [c.name, ...(c.alt_names ?? [])];
+  const canal = doPais.find((c) => nomes(c).some((n) => chaveDoNome(n) === chaveDoNome(nome)))
+    ?? doPais.find((c) => nomes(c).some((n) => mesmoCanal(n, nome)));
+  if (!canal) return null;
+
+  const logos = await carregarLogos({ timeoutMs });
+  const escolhido = melhorLogo(logos.filter((l) => l.channel === canal.id));
+  if (!escolhido) return null;
+  return { url: escolhido.url, largura: escolhido.width, altura: escolhido.height, canal: canal.id, nome: canal.name };
 }
 
 // Categorias da lista pública → categorias da PLAY TECH VIP.
@@ -94,4 +179,4 @@ async function canaisDoPais(pais = 'BR', { limite = 120 } = {}) {
     .slice(0, limite);
 }
 
-module.exports = { canaisDoPais, CATEGORIAS, FONTE_CANAIS, FONTE_FLUXOS };
+module.exports = { canaisDoPais, logoDoCanal, chaveDoNome, mesmoCanal, CATEGORIAS, FONTE_CANAIS, FONTE_FLUXOS, FONTE_LOGOS };

@@ -13,6 +13,7 @@ const epg = require('../lib/epg');
 const embed = require('../lib/embed');
 const { CANAIS_ABERTOS, AVISO_NUMEROS } = require('../lib/tv-aberta');
 const listasPublicas = require('../lib/listas-publicas');
+const logos = require('../lib/logos');
 const player = require('../lib/player');
 const versoes = require('../lib/versoes');
 const transcodificar = require('../lib/transcodificar');
@@ -131,12 +132,12 @@ module.exports = (db) => {
     const criados = [];
     const existentes = [];
     transacao(db, () => {
-      for (const [numero, nome, categoria, grupo, observacao] of CANAIS_ABERTOS) {
+      for (const [numero, nome, categoria, grupo, observacao, idPublico] of CANAIS_ABERTOS) {
         const ja = db.prepare('SELECT id FROM canais WHERE slug = ? OR numero = ?').get(slug(nome), numero);
         if (ja) { existentes.push(nome); continue; }
-        const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, observacao, relay, classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
-          VALUES (?, ?, ?, ?, ?, 'hls', ?, 1, 0, 'Nacional', ?, 0, ?, ?)`)
-          .run(numero, nome, slug(nome), grupo, categoria, observacao, numero, agora(), agora());
+        const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, observacao, relay, classificacao, regiao, ordem, ativo, id_publico, criado_em, atualizado_em)
+          VALUES (?, ?, ?, ?, ?, 'hls', ?, 1, 0, 'Nacional', ?, 0, ?, ?, ?)`)
+          .run(numero, nome, slug(nome), grupo, categoria, observacao, numero, idPublico ?? null, agora(), agora());
         criados.push({ id: Number(r2.lastInsertRowid), nome, numero });
       }
     });
@@ -148,6 +149,33 @@ module.exports = (db) => {
       aviso: AVISO_NUMEROS,
       proximo_passo: 'Os canais entraram desligados. Em cada um, cadastre o endereço do sinal (.m3u8) que a emissora fornece ou o endereço do player oficial dela, e ligue o canal.',
     });
+  });
+
+  /**
+   * Busca o logo oficial de cada emissora na lista pública e guarda no acervo.
+   * Sem `forcar`, só mexe em quem ainda não tem logo.
+   */
+  r.post('/canais/logos', async (req, res, next) => {
+    try {
+      const resultado = await logos.aplicarEmTodos(db, { forcar: v.booleano(req.body?.forcar) });
+      registrar(db, req, 'logos_buscados', { com_logo: resultado.com_logo.length, sem_logo: resultado.sem_logo.length });
+      res.json(resultado);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /** Logo de um canal só: do endereço informado ou da lista pública. */
+  r.post('/canais/:id/logo', async (req, res, next) => {
+    try {
+      const canal = achar('canais', req.params.id, 'Canal');
+      const r2 = await logos.aplicar(db, canal.id, { url: v.opcional(req.body?.url, 'o endereço do logo', 500), forcar: true });
+      if (!r2) throw new ErroNegocio('A lista pública não tem logo para este canal. Envie a imagem oficial da emissora pelo cadastro do canal.', 404);
+      registrar(db, req, 'logo_do_canal', r2);
+      res.json(r2);
+    } catch (err) {
+      next(err);
+    }
   });
 
   /**
@@ -185,12 +213,12 @@ module.exports = (db) => {
           numero += 1;
           const aviso = canal.avisos?.length ? ` · ${canal.avisos.join(', ')}` : '';
           const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, url_hls, cabecalhos, observacao, relay,
-              classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
-            VALUES (?, ?, ?, ?, ?, 'hls', ?, ?, ?, 1, 0, ?, ?, 0, ?, ?)`)
+              classificacao, regiao, ordem, ativo, id_publico, criado_em, atualizado_em)
+            VALUES (?, ?, ?, ?, ?, 'hls', ?, ?, ?, 1, 0, ?, ?, 0, ?, ?, ?)`)
             .run(numero, canal.nome, slug(canal.nome), canal.site ?? null, canal.categoria, canal.url,
               canal.cabecalhos ? JSON.stringify(canal.cabecalhos) : null,
               `Importado da lista pública (iptv-org) em ${new Date().toLocaleDateString('pt-BR')} · sinal ${canal.qualidade ?? 'sem qualidade informada'}${aviso}. Teste o sinal e confirme que pode transmitir este canal antes de ligar.`,
-              pais === 'BR' ? 'Nacional' : pais, numero, agora(), agora());
+              pais === 'BR' ? 'Nacional' : pais, numero, canal.id ?? null, agora(), agora());
           criados.push({ id: Number(r2.lastInsertRowid), nome: canal.nome, numero });
         }
       });

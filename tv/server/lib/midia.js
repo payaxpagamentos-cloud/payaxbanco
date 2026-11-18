@@ -36,7 +36,17 @@ function detectarImagem(b) {
   if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { mime: 'image/jpeg', ext: 'jpg' };
   if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { mime: 'image/png', ext: 'png' };
   if (b.length >= 12 && b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP') return { mime: 'image/webp', ext: 'webp' };
-  if (b.length >= 5 && b.subarray(0, 5).toString('latin1') === '<svg ') return { mime: 'image/svg+xml', ext: 'svg' };
+  // SVG costuma vir com declaração XML, comentário ou BOM antes do <svg>.
+  if (b.length >= 5) {
+    const inicio = b.subarray(0, 1024).toString('utf8').replace(/^\uFEFF/, '').trimStart();
+    if (/^<(\?xml|!--|!DOCTYPE svg|svg[\s>])/i.test(inicio) && /<svg[\s>]/i.test(inicio)) {
+      return { mime: 'image/svg+xml', ext: 'svg' };
+    }
+  }
+  if (b.length >= 12 && b.subarray(4, 8).toString('latin1') === 'ftyp' && ['avif', 'avis'].includes(b.subarray(8, 12).toString('latin1'))) {
+    return { mime: 'image/avif', ext: 'avif' };
+  }
+  if (b.length >= 6 && ['GIF87a', 'GIF89a'].includes(b.subarray(0, 6).toString('latin1'))) return { mime: 'image/gif', ext: 'gif' };
   return null;
 }
 
@@ -148,7 +158,7 @@ function salvarImagem(db, usuario, conteudo, { nome } = {}) {
   if (!Buffer.isBuffer(conteudo) || !conteudo.length) throw new ErroNegocio('Envie a imagem.', 422);
   if (conteudo.length > config.arteMaxBytes) throw new ErroNegocio(`Imagem maior que ${Math.round(config.arteMaxBytes / 1048576)} MB.`, 413);
   const tipo = detectarImagem(conteudo);
-  if (!tipo) throw new ErroNegocio('Formato não aceito. Envie JPG, PNG, WEBP ou SVG.', 415);
+  if (!tipo) throw new ErroNegocio('Formato não aceito. Envie JPG, PNG, WEBP, AVIF, GIF ou SVG.', 415);
   const relativo = novoArquivo(tipo.ext);
   fs.writeFileSync(path.join(config.midiaDir, relativo), conteudo, { flag: 'wx', mode: 0o600 });
   const r = db.prepare(`INSERT INTO midias (tipo, arquivo, nome_original, mime, tamanho, recebido, sha256, status, enviado_por, criado_em, concluido_em)

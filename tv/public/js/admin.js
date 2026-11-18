@@ -314,6 +314,29 @@ async function telaCanais(c) {
     botao('Buscar canais (lista pública)', 'vazio', async () => {
       if (await escolherDaListaPublica()) ir('canais');
     }, 'busca'),
+    botao('Buscar logos das emissoras', 'vazio', async () => {
+      const forcar = await modal('Logos das emissoras', (fechar) => [
+        el('p', { class: 'mudo' }, 'A busca usa a lista pública de canais (iptv-org), que traz o logo oficial da maioria das emissoras. Quem tiver o material da emissora pode enviar a imagem no cadastro de cada canal.'),
+        el('div', { class: 'linha fim', style: 'margin-top:14px' },
+          el('button', { class: 'btn vazio', onclick: () => fechar('cancelar') }, 'Cancelar'),
+          el('button', { class: 'btn vazio', onclick: () => fechar(false) }, 'Só os que não têm'),
+          el('button', { class: 'btn primario', onclick: () => fechar(true) }, 'Substituir todos')),
+      ]);
+      if (forcar === 'cancelar' || forcar === null || forcar === undefined) return;
+      toast('Procurando os logos na lista pública…');
+      const r = await api.post('/admin/canais/logos', { forcar });
+      await modal('Logos das emissoras', (fechar) => [
+        el('p', {}, `${r.com_logo.length} canal(is) com logo novo.`),
+        r.com_logo.length ? el('div', { class: 'coluna', style: 'gap:4px;margin:10px 0' },
+          r.com_logo.slice(0, 20).map((x) => el('div', { class: 'mini' }, `${x.canal} — ${x.origem}`))) : null,
+        r.sem_logo.length ? el('div', { class: 'aviso atencao' },
+          `Sem logo na lista pública: ${r.sem_logo.join(', ')}. Envie a imagem oficial da emissora no cadastro de cada um.`) : null,
+        r.falharam.length ? el('div', { class: 'aviso erro' },
+          r.falharam.map((x) => `${x.canal}: ${x.erro}`).join(' · ')) : null,
+        el('div', { class: 'linha fim' }, el('button', { class: 'btn primario', onclick: () => fechar(true) }, 'Fechar')),
+      ]);
+      ir('canais');
+    }, 'imagem'),
     botao('Testar todos os sinais', 'vazio', async () => {
       toast('Testando os sinais…');
       for (const x of canais) await api.post(`/admin/canais/${x.id}/testar`);

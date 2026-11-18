@@ -496,19 +496,19 @@ void curador;
 // Canais: a TV aberta inteira já cadastrada (desligada, esperando o sinal) + os canais da casa.
 const canaisCriados = [];
 const inserirCanal = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, url_hls, observacao, relay, logo_midia_id,
-    classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
-  VALUES (?, ?, ?, ?, ?, 'hls', ?, ?, 1, ?, 0, ?, ?, ?, ?, ?)`);
+    classificacao, regiao, ordem, ativo, id_publico, criado_em, atualizado_em)
+  VALUES (?, ?, ?, ?, ?, 'hls', ?, ?, 1, ?, 0, ?, ?, ?, ?, ?, ?)`);
 
-CANAIS_ABERTOS.forEach(([numero, nome, categoria, grupo, observacao], i) => {
+CANAIS_ABERTOS.forEach(([numero, nome, categoria, grupo, observacao, idPublico], i) => {
   const logo = guardarArte(logoSvg(nome, i), `logo-${slug(nome)}.svg`);
   // Sem endereço de sinal e desligado: entra no ar quando a operação cadastrar o sinal.
-  inserirCanal.run(numero, nome, slug(nome), grupo, categoria, null, observacao, logo, 'Nacional', numero, 0, agora(), agora());
+  inserirCanal.run(numero, nome, slug(nome), grupo, categoria, null, observacao, logo, 'Nacional', numero, 0, idPublico ?? null, agora(), agora());
 });
 
 CANAIS_PROPRIOS.forEach(([numero, nome, categoria, regiao, descricao], i) => {
   const logo = guardarArte(logoSvg(nome, i + 9), `logo-${slug(nome)}.svg`);
   const r = inserirCanal.run(numero, nome, slug(nome), descricao, categoria, SINAIS_DEMO[i % SINAIS_DEMO.length],
-    'Canal próprio da PLAY TECH VIP (sinal de demonstração).', logo, regiao, numero, 1, agora(), agora());
+    'Canal próprio da PLAY TECH VIP (sinal de demonstração).', logo, regiao, numero, 1, null, agora(), agora());
   canaisCriados.push({ id: Number(r.lastInsertRowid), numero, nome, categoria });
 });
 

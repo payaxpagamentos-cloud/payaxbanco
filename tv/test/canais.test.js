@@ -257,3 +257,20 @@ test('canal importado de lista pública entra desligado e com o aviso para a ope
   const cliente = await s.assinante('lista@exemplo.com.br', { plano: 2 });
   assert.equal((await s.get('/tv/canais', cliente.token, cliente.comPerfil)).dados.canais.length, 0);
 });
+
+test('logo da emissora: o nome só casa quando é mesmo o canal', async () => {
+  const { mesmoCanal, chaveDoNome } = require('../server/lib/listas-publicas');
+
+  // A palavra genérica do começo não atrapalha.
+  assert.equal(mesmoCanal('TV Globo', 'Globo'), true);
+  assert.equal(mesmoCanal('RedeTV!', 'Rede TV!'), true);
+  assert.equal(mesmoCanal('TV Cultura', 'tv cultura'), true);
+  assert.equal(chaveDoNome('RedeTV!'), 'redetv');
+
+  // Emissoras diferentes que só parecem iguais depois de cortar a palavra do começo.
+  assert.equal(mesmoCanal('Rede Brasil', 'TV Brasil'), false);
+  assert.equal(mesmoCanal('TV Gazeta', 'Rede Gazeta'), false);
+  // Restos curtos demais não bastam para dizer que é o mesmo canal.
+  assert.equal(mesmoCanal('TV Rio', 'Rede Rio'), false);
+  assert.equal(mesmoCanal('', 'Globo'), false);
+});
