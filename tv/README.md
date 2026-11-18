@@ -1,5 +1,7 @@
 # PLAY TECH VIP
 
+> Resumo para o cliente, com acessos, passo a passo da operação e o que falta: [ENTREGA.md](ENTREGA.md).
+
 Plataforma de streaming: **canais de TV ao vivo** nossa transmissãos pelos nossos servidores e **catálogo sob demanda**
 com conteúdo próprio (filmes, séries e episódios), vendido por **assinatura**. App do assinante e painel da operação,
 com servidor, banco de dados e login próprios.

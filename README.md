@@ -9,7 +9,7 @@ usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 >
 > E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
 >
-> E a **PLAY TV** (pasta [`tv/`](tv/README.md), publicada em `/tv`): plataforma de streaming com canais de TV aberta ao vivo, catálogo de filmes e séries, assinatura com PIX, perfis de visualização, apps para Smart TV e painel de operação com audiência, com servidor próprio. É um produto à parte, com marca própria.
+> E a **PLAY TECH VIP** (pasta [`tv/`](tv/README.md), publicada em `/tv`): plataforma de streaming com canais de TV ao vivo, catálogo de filmes e séries em 4K, Full HD, HD e SD, conversão automática das qualidades, assinatura com PIX, perfis de visualização, apps para Smart TV (Samsung, LG e TCL) e painel de operação com audiência, com servidor próprio. É um produto à parte, com marca própria — a [entrega](tv/ENTREGA.md) resume acessos e pendências.
 
 ## Módulos
 
