@@ -138,6 +138,46 @@ passo (cPanel, PM2, Docker, Nginx e Apache), incluindo os ajustes de proxy que o
 No Nginx, o `location /tv/` precisa de `proxy_buffering off` (entrega em fluxo do vídeo e dos canais) e de
 `client_max_body_size 16m` com `proxy_request_buffering off` (envio do catálogo em pedaços de 8 MB).
 
+## No ar com um domínio (docker compose + HTTPS)
+
+Para subir num servidor próprio (VPS, nuvem ou máquina na empresa), com HTTPS automático:
+
+```bash
+cp .env.exemplo .env     # preencha TV_SECRET, TV_ADMIN_SENHA e DOMINIO
+docker compose up -d     # sobe o app e o proxy
+docker compose logs -f app
+```
+
+O `docker-compose.yml` sobe dois contêineres:
+
+| Serviço | O que faz |
+|---|---|
+| `app` | A plataforma. A imagem já traz o **ffmpeg**, então a conversão automática das versões funciona. O banco e os vídeos ficam no volume `dados` (`/app/data`). |
+| `proxy` | **Caddy**: emite e renova o certificado HTTPS sozinho pelo Let's Encrypt, entrega o vídeo em fluxo (sem buffer) e aceita envios de até 16 GB. |
+
+Antes de subir: aponte o domínio do `.env` para o IP do servidor e deixe as portas **80 e 443** abertas — o
+Let's Encrypt precisa das duas para emitir o certificado.
+
+Converter vídeo é o que mais consome CPU. `CPUS_APP` no `.env` limita quanto o app pode usar, para uma conversão
+longa não derrubar o resto do servidor.
+
+### Backup
+
+```bash
+npm run backup /var/backups/playtechvip              # guarda as 7 cópias mais recentes
+npm run backup /var/backups/playtechvip -- --manter 14
+npm run backup /var/backups/playtechvip -- --sem-midia
+```
+
+O banco sai por `VACUUM INTO` (cópia consistente, com o servidor no ar) e a mídia é espelhada com `rsync`. Numa
+rotina diária, basta o cron:
+
+```
+20 3 * * * cd /caminho/do/tv && npm run backup /var/backups/playtechvip >> /var/log/playtechvip-backup.log 2>&1
+```
+
+Para restaurar: pare o servidor, ponha `tv.db` e a pasta `midia` no lugar de `data/` e suba de novo.
+
 ## Configuração
 
 | Variável | Padrão | Descrição |

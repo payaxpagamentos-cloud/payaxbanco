@@ -1,0 +1,53 @@
+# PLAY TECH VIP — subida em produção.
+#
+#   cp .env.exemplo .env     # e preencha TV_SECRET, TV_ADMIN_SENHA e DOMINIO
+#   docker compose up -d
+#
+# O Caddy cuida do HTTPS sozinho (certificado Let's Encrypt, renovação incluída),
+# desde que o domínio aponte para este servidor e as portas 80 e 443 estejam abertas.
+
+name: play-tech-vip
+
+services:
+  app:
+    build: .
+    image: play-tech-vip:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3600"
+      TV_DB: /app/data/tv.db
+      TV_MIDIA: /app/data/midia
+      # Atrás do Caddy: o IP real do assinante chega pelo cabeçalho do proxy.
+      TV_TRUST_PROXY: "1"
+    volumes:
+      # Banco, vídeos, artes e legendas. É o que precisa de backup.
+      - dados:/app/data
+    expose:
+      - "3600"
+    # Converter vídeo consome CPU; sem limite, um 4K longo pode engasgar o servidor inteiro.
+    deploy:
+      resources:
+        limits:
+          cpus: "${CPUS_APP:-2}"
+
+  proxy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMINIO: ${DOMINIO:?defina DOMINIO no .env, por exemplo play.seudominio.com.br}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_dados:/data
+      - caddy_config:/config
+
+volumes:
+  dados:
+  caddy_dados:
+  caddy_config:

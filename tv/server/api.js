@@ -5,15 +5,18 @@ const config = require('./config');
 const { autenticar, permitir, comPerfilVisualizacao } = require('./auth');
 const { ErroNegocio } = require('./lib/erros');
 const { lerConfig } = require('./db');
+const transcodificar = require('./lib/transcodificar');
 
 function criarApi(db) {
   const api = express.Router();
   const autenticado = autenticar(db);
   const comPerfil = comPerfilVisualizacao(db);
 
+  // Saúde para o monitoramento: banco de pé, conversor disponível e tamanho da fila.
   api.get('/saude', (_req, res) => {
     db.prepare('SELECT 1').get();
-    res.json({ ok: true });
+    const fila = db.prepare("SELECT COUNT(*) AS n FROM conversoes WHERE situacao IN ('fila','convertendo')").get().n;
+    res.json({ ok: true, ffmpeg: transcodificar.temFfmpeg(), conversoes_na_fila: fila });
   });
 
   /** Dados públicos da tela de entrada: marca, planos à venda e forma de cobrança. */

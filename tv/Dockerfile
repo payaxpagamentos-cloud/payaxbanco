@@ -7,6 +7,11 @@ ENV NODE_ENV=production \
     TV_DB=/app/data/tv.db \
     TV_MIDIA=/app/data/midia
 
+# O ffmpeg gera as versões menores (Full HD, HD e SD) dos vídeos enviados.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force

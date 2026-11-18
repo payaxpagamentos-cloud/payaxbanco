@@ -1,0 +1,31 @@
+# Proxy da PLAY TECH VIP: HTTPS automático e repasse para o app.
+{$DOMINIO} {
+	encode zstd gzip
+
+	# Vídeo não é comprimido de novo (gasta CPU à toa) e precisa de tempo para fluir.
+	@midia path /api/play/video/* /api/play/baixar/* /api/play/canal/*
+	handle @midia {
+		reverse_proxy app:3600 {
+			flush_interval -1
+			transport http {
+				response_header_timeout 5m
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy app:3600
+	}
+
+	# O envio de um filme em 4K passa fácil de 1 GB.
+	request_body {
+		max_size 16GB
+	}
+
+	log {
+		output file /data/acesso.log {
+			roll_size 50MiB
+			roll_keep 10
+		}
+	}
+}

@@ -178,7 +178,10 @@ test('a auditoria registra o que a equipe faz', async (t) => {
 test('saúde e configuração pública', async (t) => {
   const s = await iniciar();
   t.after(s.fechar);
-  assert.deepEqual((await s.get('/saude')).dados, { ok: true });
+  const saude = (await s.get('/saude')).dados;
+  assert.equal(saude.ok, true);
+  assert.equal(typeof saude.ffmpeg, 'boolean', 'a saúde diz se o conversor está disponível');
+  assert.equal(saude.conversoes_na_fila, 0);
   const publico = await s.get('/publico');
   assert.equal(publico.dados.marca, 'PLAY TECH VIP');
   assert.equal(publico.dados.planos.length, 3);
