@@ -1,0 +1,312 @@
+<!doctype html>
+<!--
+  Dimensionamento de servidores da PLAY TECH VIP: quantos assinantes cada degrau
+  atende, a banda exigida no horário de pico e quando trocar de degrau.
+
+  Para gerar o PDF: abra este arquivo no navegador e imprima em PDF, com papel A4,
+  margens "nenhuma" e a opção de imprimir o fundo (cores e imagens) ligada.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>PLAY TECH VIP — Servidores e Projeção de Usuários</title>
+<style>
+  @font-face { font-family: 'Manrope'; src: url('../public/fonts/manrope.woff2') format('woff2'); font-weight: 200 800; font-display: block; }
+  @page { size: A4; margin: 0; }
+  :root{
+    --vermelho:#E50914; --preto:#0B0B0D; --grafite:#17171C; --cinza:#5A5A66;
+    --linha:#E3E3EA; --fundo:#F7F7FA; --texto:#1C1C22; --dourado:#C9A227;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Inter','Liberation Sans',sans-serif; color:var(--texto); font-size:10.2pt; line-height:1.5; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .folha{ width:210mm; height:297mm; padding:17mm 16mm 14mm; position:relative; overflow:hidden; page-break-after:always; background:#fff; }
+  .folha:last-child{ page-break-after:auto; }
+
+  /* ---------- capa ---------- */
+  .capa{ background:var(--preto); color:#fff; padding:0; }
+  .capa .brilho{ position:absolute; inset:0; background:
+      radial-gradient(120% 70% at 85% 0%, rgba(229,9,20,.45), transparent 60%),
+      radial-gradient(90% 60% at 0% 100%, rgba(201,162,39,.20), transparent 60%); }
+  .capa .conteudo{ position:relative; height:100%; padding:26mm 18mm 18mm; display:flex; flex-direction:column; }
+  .marca{ font-family:'Manrope','Inter',sans-serif; font-weight:800; letter-spacing:.26em; font-size:16pt; text-transform:uppercase; }
+  .marca b{ color:var(--vermelho); }
+  .capa .selo{ display:inline-block; margin-top:3mm; font-size:7.6pt; letter-spacing:.22em; text-transform:uppercase; color:#B9B9C4; }
+  .capa h1{ font-family:'Manrope','Inter',sans-serif; font-size:40pt; line-height:1.03; font-weight:800; margin-top:auto; letter-spacing:-.02em; }
+  .capa h1 span{ color:var(--vermelho); }
+  .capa .sub{ margin-top:6mm; font-size:12pt; color:#D6D6DE; max-width:118mm; line-height:1.45; }
+  .capa .barra{ width:34mm; height:3px; background:var(--vermelho); margin:9mm 0 0; }
+  .capa .ficha{ margin-top:12mm; display:grid; grid-template-columns:repeat(2,1fr); gap:6mm 10mm; border-top:1px solid rgba(255,255,255,.16); padding-top:7mm; }
+  .capa .ficha div span{ display:block; font-size:7.4pt; letter-spacing:.18em; text-transform:uppercase; color:#8C8C99; margin-bottom:1.5mm; }
+  .capa .ficha div strong{ font-size:10.6pt; font-weight:600; color:#fff; }
+
+  /* ---------- cabeçalho/rodapé das folhas ---------- */
+  .topo{ display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid var(--linha); padding-bottom:3mm; margin-bottom:8mm; }
+  .topo .m{ font-family:'Manrope','Inter',sans-serif; font-weight:800; letter-spacing:.2em; font-size:8pt; text-transform:uppercase; color:var(--preto); }
+  .topo .m b{ color:var(--vermelho); }
+  .topo .s{ font-size:8pt; color:var(--cinza); letter-spacing:.04em; }
+  .pe{ position:absolute; left:16mm; right:16mm; bottom:9mm; display:flex; justify-content:space-between; font-size:7.6pt; color:#9A9AA6; border-top:1px solid var(--linha); padding-top:2.5mm; }
+
+  /* ---------- tipografia ---------- */
+  h2{ font-family:'Manrope','Inter',sans-serif; font-size:20pt; font-weight:800; letter-spacing:-.015em; line-height:1.12; margin-bottom:2mm; }
+  h2 .n{ color:var(--vermelho); }
+  .linhafina{ font-size:10.4pt; color:var(--cinza); margin-bottom:7mm; max-width:150mm; }
+  h3{ font-family:'Manrope','Inter',sans-serif; font-size:11pt; font-weight:700; margin:7mm 0 3mm; letter-spacing:.01em; }
+  h3:first-of-type{ margin-top:0; }
+  p{ margin-bottom:3mm; }
+  p:last-child{ margin-bottom:0; }
+  strong{ font-weight:600; }
+  ul{ margin:0 0 3mm 4.5mm; }
+  li{ margin-bottom:1.6mm; padding-left:1mm; }
+  li::marker{ color:var(--vermelho); }
+  code{ font-family:'DejaVu Sans Mono',monospace; font-size:8.6pt; background:#F0F0F5; padding:.4mm 1.2mm; border-radius:2px; }
+
+  /* ---------- tabelas ---------- */
+  table{ width:100%; border-collapse:collapse; font-size:9.3pt; margin-bottom:4mm; }
+  th{ text-align:left; font-size:7.6pt; letter-spacing:.12em; text-transform:uppercase; color:#fff; background:var(--grafite); padding:2.6mm 3mm; font-weight:600; }
+  td{ padding:2.6mm 3mm; border-bottom:1px solid var(--linha); vertical-align:top; }
+  tbody tr:nth-child(even) td{ background:#FAFAFC; }
+  td.destaque{ font-weight:600; }
+  .num{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+  /* ---------- caixas ---------- */
+  .caixa{ border:1px solid var(--linha); border-left:3px solid var(--vermelho); background:var(--fundo); padding:4.5mm 5mm; margin:4mm 0; border-radius:0 3px 3px 0; }
+  .caixa .rot{ font-size:7.6pt; letter-spacing:.16em; text-transform:uppercase; color:var(--vermelho); font-weight:600; margin-bottom:2mm; }
+  .caixa.atencao{ border-left-color:var(--dourado); background:#FEFBF0; }
+  .caixa.atencao .rot{ color:#9A7B10; }
+  .caixa.escura{ background:var(--preto); border-color:var(--preto); color:#E8E8EE; }
+  .caixa.escura .rot{ color:#FF6A72; }
+
+  .cartoes{ display:grid; grid-template-columns:repeat(3,1fr); gap:4mm; margin:5mm 0; }
+  .cartao{ border:1px solid var(--linha); border-radius:4px; padding:4mm; background:#fff; }
+  .cartao .et{ font-size:7.4pt; letter-spacing:.14em; text-transform:uppercase; color:var(--cinza); }
+  .cartao .vl{ font-family:'Manrope','Inter',sans-serif; font-size:19pt; font-weight:800; color:var(--preto); line-height:1.1; margin:1.5mm 0; }
+  .cartao .ds{ font-size:8.6pt; color:var(--cinza); line-height:1.4; }
+
+  .check li{ list-style:none; margin-left:0; padding-left:7mm; position:relative; margin-bottom:3mm; }
+  .check li::before{ content:''; position:absolute; left:0; top:.6mm; width:3.6mm; height:3.6mm; border:1.4px solid #B9B9C4; border-radius:1px; }
+  .check{ margin-left:0; }
+  .check li b{ display:block; font-weight:600; }
+  .check li span{ color:var(--cinza); font-size:9.2pt; }
+
+  .assinaturas{ display:grid; grid-template-columns:1fr 1fr; gap:14mm; margin-top:16mm; }
+  .assinaturas div{ border-top:1px solid #9A9AA6; padding-top:2.5mm; font-size:9pt; color:var(--cinza); }
+  .sumario{ font-size:10.4pt; }
+  .sumario li{ list-style:none; display:flex; align-items:baseline; gap:2mm; margin-bottom:3.2mm; }
+  .sumario li .t{ font-weight:600; }
+  .sumario li .pt{ flex:1; border-bottom:1px dotted #C5C5D0; }
+  .sumario li .pg{ color:var(--cinza); font-variant-numeric:tabular-nums; }
+  .sumario{ margin-left:0; }
+</style>
+</head>
+<body>
+
+<!-- 1 CAPA -->
+<section class="folha capa">
+  <div class="brilho"></div>
+  <div class="conteudo">
+    <div>
+      <div class="marca">PLAY <b>TECH</b> VIP</div>
+      <div class="selo">Plataforma de streaming · canais ao vivo e catálogo</div>
+    </div>
+    <h1>Servidores e<br><span>Projeção de Usuários</span></h1>
+    <div class="barra"></div>
+    <div class="sub">Quantos assinantes cada configuração atende, quanto de banda o horário de pico exige e em que momento trocar de degrau.</div>
+    <div class="ficha">
+      <div><span>Documento</span><strong>Dimensionamento de servidores</strong></div>
+      <div><span>Versão</span><strong>1.0 — 18/11/2026</strong></div>
+      <div><span>Destinatário</span><strong>Cliente / equipe de TI</strong></div>
+      <div><span>Base de cálculo</span><strong>Consumo real por qualidade</strong></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 COMO A CONTA É FEITA -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">1. Como a projeção é feita</div></div>
+  <h2><span class="n">1.</span> Como a projeção é feita</h2>
+  <div class="linhafina">Servidor de streaming não se dimensiona pelo total de assinantes, e sim por quantos deles estão assistindo <strong>ao mesmo tempo</strong> no horário de maior audiência.</div>
+
+  <div class="caixa">
+    <div class="rot">A fórmula</div>
+    <p style="font-size:11.5pt; line-height:1.6"><strong>Banda de pico = assinantes × % que assiste ao mesmo tempo × consumo da qualidade</strong></p>
+    <p>Exemplo: 1.000 assinantes, 15% assistindo às 21h, todos em Full HD → 150 telas × 5 Mbps = <strong>750 Mbps</strong>.</p>
+  </div>
+
+  <h3>Premissas usadas neste documento</h3>
+  <table>
+    <thead><tr><th style="width:52mm">Premissa</th><th>Valor adotado</th><th>Por quê</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">Pico moderado</td><td class="num">10% da base</td><td>Dia comum, fora de evento.</td></tr>
+      <tr><td class="destaque">Pico forte</td><td class="num">15% da base</td><td>Domingo à noite, estreia ou jogo, entre 20h e 23h. <strong>É por este que se dimensiona.</strong></td></tr>
+      <tr><td class="destaque">Qualidade padrão</td><td>Full HD — 5 Mbps por tela</td><td>Plano mais vendido em serviço de provedor.</td></tr>
+      <tr><td class="destaque">Cenário com 4K</td><td>7,2 Mbps por tela</td><td>Mistura de 20% em 4K, 60% em Full HD e 20% em HD.</td></tr>
+      <tr><td class="destaque">Telas por assinante</td><td>Contadas como telas, não como pessoas</td><td>Um plano de 2 telas pode gerar 2 fluxos simultâneos na mesma casa.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Consumo por tela, por qualidade</h3>
+  <div class="cartoes" style="grid-template-columns:repeat(4,1fr)">
+    <div class="cartao"><div class="et">SD · 480p</div><div class="vl">1,5</div><div class="ds">Mbps por tela</div></div>
+    <div class="cartao"><div class="et">HD · 720p</div><div class="vl">3</div><div class="ds">Mbps por tela</div></div>
+    <div class="cartao"><div class="et">Full HD · 1080p</div><div class="vl">5</div><div class="ds">Mbps por tela</div></div>
+    <div class="cartao"><div class="et">4K · 2160p</div><div class="vl">18</div><div class="ds">Mbps por tela</div></div>
+  </div>
+
+  <div class="caixa atencao">
+    <div class="rot">Canal ao vivo conta duas vezes</div>
+    <p>Para esconder a origem da emissora, a plataforma recebe o sinal e o reenvia ao assinante: cada tela de canal ao vivo usa banda de <strong>entrada e de saída</strong>. As projeções a seguir são da banda de saída.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Servidores e projeção de usuários</span><span>2</span></div>
+</section>
+
+<!-- 3 PROJEÇÃO -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">2. Projeção por base de assinantes</div></div>
+  <h2><span class="n">2.</span> Projeção por base de assinantes</h2>
+  <div class="linhafina">A tabela principal deste documento. Encontre a linha da base esperada e leia o degrau de servidor correspondente.</div>
+
+  <table>
+    <thead><tr>
+      <th>Assinantes</th><th class="num">Telas no pico<br>moderado (10%)</th><th class="num">Telas no pico<br>forte (15%)</th>
+      <th class="num">Banda em<br>Full HD</th><th class="num">Banda com<br>4K na vitrine</th><th>Degrau</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="destaque num">100</td><td class="num">10</td><td class="num">15</td><td class="num">75 Mbps</td><td class="num">108 Mbps</td><td class="destaque">A</td></tr>
+      <tr><td class="destaque num">250</td><td class="num">25</td><td class="num">38</td><td class="num">190 Mbps</td><td class="num">274 Mbps</td><td class="destaque">A</td></tr>
+      <tr><td class="destaque num">500</td><td class="num">50</td><td class="num">75</td><td class="num">375 Mbps</td><td class="num">540 Mbps</td><td class="destaque">B</td></tr>
+      <tr><td class="destaque num">1.000</td><td class="num">100</td><td class="num">150</td><td class="num">750 Mbps</td><td class="num">1,1 Gbps</td><td class="destaque">B</td></tr>
+      <tr><td class="destaque num">2.500</td><td class="num">250</td><td class="num">375</td><td class="num">1,9 Gbps</td><td class="num">2,7 Gbps</td><td class="destaque">C</td></tr>
+      <tr><td class="destaque num">5.000</td><td class="num">500</td><td class="num">750</td><td class="num">3,8 Gbps</td><td class="num">5,4 Gbps</td><td class="destaque">C</td></tr>
+      <tr><td class="destaque num">10.000</td><td class="num">1.000</td><td class="num">1.500</td><td class="num">7,5 Gbps</td><td class="num">10,8 Gbps</td><td class="destaque">D</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa">
+    <div class="rot">Como ler</div>
+    <p>Um provedor com <strong>1.000 assinantes</strong> na plataforma precisa sustentar <strong>150 telas simultâneas</strong> e cerca de <strong>750 Mbps</strong> no pior horário — o que cabe em um servidor do degrau <strong>B</strong>, com link de 1 Gbps dedicado. Se esse mesmo provedor liberar 4K para parte do catálogo, o pico passa de 1 Gbps e o link precisa ser ampliado, mesmo sem ganhar um assinante novo.</p>
+  </div>
+
+  <div class="caixa atencao">
+    <div class="rot">O 4K é a decisão mais cara do projeto</div>
+    <p>A última coluna mostra o custo real do 4K: com apenas 20% das telas em 4K, a banda sobe cerca de <strong>45%</strong>. Oferecer 4K só nos lançamentos e destaques, mantendo o resto do catálogo até Full HD, segura o degrau do servidor por muito mais tempo. A plataforma já permite definir a qualidade máxima por plano.</p>
+  </div>
+  <div class="cartoes">
+    <div class="cartao"><div class="et">Simultaneidade adotada</div><div class="vl">15%</div><div class="ds">Da base assistindo ao mesmo tempo no pior horário.</div></div>
+    <div class="cartao"><div class="et">Banda por tela em Full HD</div><div class="vl">5 Mbps</div><div class="ds">Qualidade padrão do plano mais vendido.</div></div>
+    <div class="cartao"><div class="et">Acréscimo do 4K</div><div class="vl">+45%</div><div class="ds">Com 20% das telas em 4K, sobre a mesma base.</div></div>
+  </div>
+
+  <div class="pe"><span>PLAY TECH VIP — Servidores e projeção de usuários</span><span>3</span></div>
+</section>
+
+<!-- 4 DEGRAUS -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">3. Os quatro degraus de servidor</div></div>
+  <h2><span class="n">3.</span> Os quatro degraus de servidor</h2>
+  <div class="linhafina">Configurações de referência. O disco aparece aqui em valor mínimo: ele depende do catálogo, não do número de assinantes (página 5).</div>
+
+  <table>
+    <thead><tr><th style="width:30mm">Item</th><th>A · Piloto</th><th>B · Operação</th><th>C · Operação plus</th><th>D · Escala</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">Assinantes</td><td class="num">até 300</td><td class="num">até 1.200</td><td class="num">até 8.000</td><td class="num">acima de 8.000</td></tr>
+      <tr><td class="destaque">Telas no pico</td><td class="num">até 50</td><td class="num">até 180</td><td class="num">até 1.200</td><td class="num">sem limite prático</td></tr>
+      <tr><td class="destaque">Processador</td><td>4 vCPU</td><td>8 núcleos físicos</td><td>16 núcleos físicos</td><td>16 núcleos na origem + nós de borda</td></tr>
+      <tr><td class="destaque">Memória</td><td>8 GB</td><td>32 GB</td><td>64 GB</td><td>64 GB na origem</td></tr>
+      <tr><td class="destaque">Disco</td><td>200 GB NVMe</td><td>2 × 2 TB NVMe<br>espelhados</td><td>4 × 4 TB NVMe<br>RAID 10</td><td>NVMe na origem<br>+ cache nos nós</td></tr>
+      <tr><td class="destaque">Rede</td><td>1 Gbps<br>compartilhado</td><td>1 Gbps<br>dedicado</td><td>10 Gbps<br>dedicado</td><td>10 Gbps + CDN<br>ou cache na borda</td></tr>
+      <tr><td class="destaque">Banda entregue</td><td class="num">≈ 250 Mbps</td><td class="num">≈ 900 Mbps</td><td class="num">≈ 6 Gbps</td><td class="num">acima de 10 Gbps</td></tr>
+      <tr><td class="destaque">Servidores</td><td class="num">1</td><td class="num">1</td><td class="num">1</td><td class="num">1 origem + 2 ou mais bordas</td></tr>
+      <tr><td class="destaque">Indicação</td><td>Homologação e primeiros assinantes</td><td>Provedor regional em operação comercial</td><td>Provedor consolidado, várias cidades</td><td>Operação multirregional</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa">
+    <div class="rot">Por que o processador cresce tão pouco entre os degraus</div>
+    <p>A plataforma <strong>não converte vídeo durante a exibição</strong>: entregar um arquivo pronto é trabalho de disco e de rede. O processador é exigido apenas na conversão dos títulos enviados, que roda em fila e em segundo plano, com limite de núcleos configurável. Quem cresce de degrau para degrau é a <strong>rede</strong>, e depois o disco.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Servidores e projeção de usuários</span><span>4</span></div>
+</section>
+
+<!-- 5 DISCO -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">4. Disco: depende do catálogo</div></div>
+  <h2><span class="n">4.</span> Disco: depende do catálogo, não da base</h2>
+  <div class="linhafina">Dobrar o número de assinantes não ocupa um byte a mais. Quem ocupa disco é o conteúdo publicado — por isso o disco se calcula à parte.</div>
+
+  <h3>Espaço por título</h3>
+  <table>
+    <thead><tr><th>Qualidade</th><th class="num">Filme de 2 h</th><th class="num">Temporada de 10 episódios</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">SD</td><td class="num">1 a 2 GB</td><td class="num">4 a 8 GB</td></tr>
+      <tr><td class="destaque">HD</td><td class="num">2 a 4 GB</td><td class="num">8 a 15 GB</td></tr>
+      <tr><td class="destaque">Full HD</td><td class="num">4 a 8 GB</td><td class="num">15 a 30 GB</td></tr>
+      <tr><td class="destaque">4K</td><td class="num">15 a 25 GB</td><td class="num">60 a 100 GB</td></tr>
+      <tr><td class="destaque">As quatro juntas</td><td class="num">22 a 39 GB</td><td class="num">87 a 153 GB</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Catálogo inteiro</h3>
+  <table>
+    <thead><tr><th>Catálogo publicado</th><th class="num">Até Full HD</th><th class="num">Com 4K</th><th>Disco sugerido</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">100 filmes</td><td class="num">≈ 1,4 TB</td><td class="num">≈ 3,9 TB</td><td>2 TB · 4 TB com 4K</td></tr>
+      <tr><td class="destaque">300 filmes + 20 temporadas</td><td class="num">≈ 5,2 TB</td><td class="num">≈ 14,7 TB</td><td>8 TB · 16 TB com 4K</td></tr>
+      <tr><td class="destaque">500 filmes + 50 temporadas</td><td class="num">≈ 9,7 TB</td><td class="num">≈ 27 TB</td><td>12 TB · 32 TB com 4K</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa">
+    <div class="rot">Três regras práticas</div>
+    <p><strong>NVMe para o que está no ar.</strong> Dezenas de assinantes em títulos diferentes significam leituras espalhadas; em HDD isso vira travamento no meio do filme. HDD serve para arquivo morto e backup.</p>
+    <p><strong>Deixe 30% livre.</strong> Converter um título exige espaço temporário, e disco cheio trava a publicação.</p>
+    <p><strong>Crescer é acrescentar disco.</strong> Basta apontar a pasta de mídia para o volume novo — não há remontagem do sistema.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Servidores e projeção de usuários</span><span>5</span></div>
+</section>
+
+<!-- 6 QUANDO SUBIR + ESCOLHA -->
+<section class="folha">
+  <div class="topo"><div class="m">PLAY <b>TECH</b> VIP</div><div class="s">5. Quando trocar de degrau</div></div>
+  <h2><span class="n">5.</span> Quando trocar de degrau</h2>
+  <div class="linhafina">O painel mostra audiência por hora e telas simultâneas: são esses números que avisam a hora de ampliar, antes do assinante reclamar.</div>
+
+  <table>
+    <thead><tr><th style="width:56mm">Sinal no painel ou no monitoramento</th><th>O que fazer</th></tr></thead>
+    <tbody>
+      <tr><td class="destaque">Pico passou de 70% da banda contratada</td><td>Ampliar o link: é o limite que chega primeiro, e o único que o assinante sente na hora.</td></tr>
+      <tr><td class="destaque">Disco acima de 80%</td><td>Acrescentar volume ou mover títulos antigos para o arquivo morto.</td></tr>
+      <tr><td class="destaque">Fila de conversão acumulando</td><td>Liberar mais núcleos ou converter fora do horário de pico.</td></tr>
+      <tr><td class="destaque">Telas acima de 80% do degrau</td><td>Planejar a troca com 60 a 90 dias de antecedência.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:5mm">Caminho recomendado</h3>
+  <table>
+    <tbody>
+      <tr><td class="destaque" style="width:34mm">Agora — degrau A</td><td>VPS por 30 a 60 dias: homologação, carga do catálogo, treinamento da operação e validação do IXC, sem comprar equipamento.</td></tr>
+      <tr><td class="destaque">Abertura — degrau B</td><td>Servidor no rack do provedor, no mesmo AS dos assinantes: tráfego on-net, sem custo de trânsito. Migrar é copiar a pasta de dados e trocar o apontamento do domínio.</td></tr>
+      <tr><td class="destaque">Crescimento — C ou D</td><td>Pelos sinais da tabela acima. Do B para o C troca-se a máquina; do C para o D acrescentam-se nós de borda, sem mexer na origem.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:5mm">Degrau escolhido</h3>
+  <table>
+    <thead><tr><th style="width:12mm"></th><th>Degrau</th><th>Assinantes</th><th>Rede</th><th>Banda entregue</th></tr></thead>
+    <tbody>
+      <tr><td style="text-align:center">☐</td><td class="destaque">A · Piloto</td><td class="num">até 300</td><td>1 Gbps compartilhado</td><td class="num">≈ 250 Mbps</td></tr>
+      <tr><td style="text-align:center">☐</td><td class="destaque">B · Operação</td><td class="num">até 1.200</td><td>1 Gbps dedicado</td><td class="num">≈ 900 Mbps</td></tr>
+      <tr><td style="text-align:center">☐</td><td class="destaque">C · Operação plus</td><td class="num">até 8.000</td><td>10 Gbps dedicado</td><td class="num">≈ 6 Gbps</td></tr>
+      <tr><td style="text-align:center">☐</td><td class="destaque">D · Escala</td><td class="num">acima de 8.000</td><td>10 Gbps + borda</td><td class="num">acima de 10 Gbps</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caixa atencao" style="margin-top:2mm">
+    <div class="rot">Observação honesta</div>
+    <p>Os números vêm do consumo real de cada qualidade e das taxas de simultaneidade usuais em serviço residencial. Em 30 dias no ar, o relatório de audiência mostra o pico verdadeiro desta base — e é ele que vale.</p>
+  </div>
+  <div class="pe"><span>PLAY TECH VIP — Servidores e projeção de usuários</span><span>6</span></div>
+</section>
+
+
+</body>
+</html>
