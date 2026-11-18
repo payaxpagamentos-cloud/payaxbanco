@@ -92,7 +92,7 @@ operação, em Faturas (a integração automática com o banco ficou fora do esc
 | Painel | 13 telas: conteúdo, canais, grade, catálogo, destaques, assinantes, faturas, planos, relatórios, equipe, configurações e auditoria |
 | Smart TV | Apps para Samsung (Tizen/AVPlay), LG (webOS) e TCL/Android TV (ExoPlayer), com navegação por controle remoto |
 | Produção | Docker Compose com HTTPS automático, backup e monitoramento por `/api/saude` |
-| Testes | 49 testes automáticos, incluindo uma conversão de vídeo de verdade |
+| Testes | 56 testes automáticos, incluindo uma conversão de vídeo de verdade e as guardas de produção |
 
 ---
 
@@ -130,7 +130,7 @@ tv/
   public/          App do assinante e painel (sem build: JavaScript de módulo direto)
   tv-apps/         Samsung (Tizen), LG (webOS) e TCL/Android TV
   scripts/         Empacotamento dos apps e backup
-  test/            49 testes automáticos (node:test)
+  test/            56 testes automáticos (node:test)
   docker-compose.yml, Caddyfile, Dockerfile
 ```
 

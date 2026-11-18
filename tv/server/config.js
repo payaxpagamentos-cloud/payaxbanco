@@ -10,12 +10,19 @@ if (!process.env.TV_SECRET && process.env.NODE_ENV !== 'test') {
 
 const producao = process.env.NODE_ENV === 'production';
 
-// Em produção, recusa iniciar com segredos ausentes ou fracos.
+// Em produção, recusa iniciar com segredos ausentes, fracos ou ainda com o valor de exemplo.
+// (O .env.exemplo traz valores com "troque": subir com eles é o mesmo que não ter senha.)
+const DE_EXEMPLO = /troque|exemplo|mude-?isto|changeme|senha123|admin123/i;
 if (producao) {
   const faltando = ['TV_SECRET', 'TV_ADMIN_SENHA'].filter((k) => !process.env[k]);
   if (faltando.length) throw new Error(`[PLAY TECH VIP] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
   if (process.env.TV_SECRET.length < 32) throw new Error('[PLAY TECH VIP] TV_SECRET deve ter pelo menos 32 caracteres.');
   if (process.env.TV_ADMIN_SENHA.length < 12) throw new Error('[PLAY TECH VIP] TV_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
+  for (const k of ['TV_SECRET', 'TV_ADMIN_SENHA']) {
+    if (DE_EXEMPLO.test(process.env[k])) {
+      throw new Error(`[PLAY TECH VIP] ${k} ainda está com o valor de exemplo do .env. Troque antes de abrir ao público.`);
+    }
+  }
 }
 
 // Endereço em que a plataforma é publicada: '' (raiz do domínio) ou um caminho, como '/tv'.

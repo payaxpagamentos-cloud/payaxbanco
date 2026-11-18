@@ -306,8 +306,9 @@ async function telaCanais(c) {
     td(el('div', {}, el('strong', { class: 'pequeno' }, x.agora?.titulo ?? '—'),
       el('div', { class: 'mini apagado' }, `${x.programas_futuros} programa(s) na grade`),
       x.observacao ? el('div', { class: 'mini apagado duas-linhas', style: 'margin-top:4px;max-width:420px' }, x.observacao) : null)),
-    td(el('div', { class: 'linha', style: 'gap:6px' },
-      botao('Testar sinal', 'vazio', async () => {
+    // Os cinco botões cabem numa linha só: a coluna fica alinhada de canal para canal.
+    td(el('div', { class: 'linha fim', style: 'gap:6px' },
+      botao('Testar', 'vazio', async () => {
         const r = await api.post(`/admin/canais/${x.id}/testar`);
         toast(r.status === 'ok' ? `${x.nome}: sinal respondendo.` : `${x.nome}: ${r.detalhe}`, r.status !== 'ok');
         ir('canais');

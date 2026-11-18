@@ -1,19 +1,23 @@
 'use strict';
 
 const config = require('./config');
-const { abrir } = require('./db');
+const { abrir, lerConfig } = require('./db');
 const { criarApp } = require('./app');
 const { encerrarSessoesMortas } = require('./lib/player');
 const { rodarCobranca } = require('./lib/assinaturas');
 const { verificarSinais } = require('./lib/relay');
-const { atualizarGradeAutomatica } = require('./lib/epg');
+const { atualizarGradeAutomatica, limparAntigos } = require('./lib/epg');
 const transcodificar = require('./lib/transcodificar');
 
 const db = abrir();
-criarApp(db).listen(config.port, () => {
+const servidor = criarApp(db).listen(config.port, () => {
   const url = `http://localhost:${config.port}${config.basePath}`;
   console.log(`[${config.marca}] Assinante: ${url}/  ·  Operação: ${url}/admin/`);
 });
+// Envio de vídeo grande e canal ao vivo são conexões longas: o proxy à frente controla o tempo.
+servidor.requestTimeout = 0;
+servidor.headersTimeout = 65_000;
+servidor.keepAliveTimeout = 61_000;
 
 const cada = (ms, nome, fn) => setInterval(() => {
   try { fn(); } catch (err) { console.error(`[${config.marca}] Falha em ${nome}:`, err.message); }
@@ -25,12 +29,15 @@ cada(30_000, 'sessões do player', () => encerrarSessoesMortas(db));
 cada(60 * 60_000, 'cobrança', () => rodarCobranca(db));
 // Sinal dos canais: o painel mostra quem está fora do ar.
 cada(15 * 60_000, 'verificação de sinal', () => { verificarSinais(db).catch(() => {}); });
-// Grade dos canais abertos: busca o XMLTV cadastrado uma vez por dia.
-cada(24 * 60 * 60_000, 'atualização da grade', () => {
-  atualizarGradeAutomatica(db).then((r) => r && console.log(`[${config.marca}] Grade atualizada: ${r.importados} programa(s).`)).catch((err) => {
-    console.error(`[${config.marca}] Falha ao atualizar a grade:`, err.message);
-  });
-});
+// Grade dos canais abertos: busca o XMLTV cadastrado e limpa o que já passou.
+const cuidarDaGrade = () => {
+  const removidos = limparAntigos(db, 7);
+  if (removidos) console.log(`[${config.marca}] Grade: ${removidos} programa(s) antigo(s) removido(s).`);
+  return atualizarGradeAutomatica(db)
+    .then((r) => r && console.log(`[${config.marca}] Grade atualizada: ${r.importados} programa(s).`))
+    .catch((err) => console.error(`[${config.marca}] Falha ao atualizar a grade:`, err.message));
+};
+cada(24 * 60 * 60_000, 'atualização da grade', cuidarDaGrade);
 
 setTimeout(() => {
   try { rodarCobranca(db); } catch (err) { console.error(`[${config.marca}] Falha na cobrança:`, err.message); }
@@ -38,4 +45,32 @@ setTimeout(() => {
   // Conversões que ficaram pela metade num reinício voltam para a fila.
   const retomadas = transcodificar.retomar(db);
   if (retomadas) console.log(`[${config.marca}] ${retomadas} conversão(ões) retomada(s).`);
+  // Num servidor que reinicia todo dia, a atualização de 24 em 24 horas nunca chegaria a rodar:
+  // ao subir, põe a grade em dia se a última importação já passou de 12 horas.
+  try {
+    const { epg_importado_em: ultima } = lerConfig(db);
+    const velha = !ultima || Date.now() - new Date(ultima).getTime() > 12 * 60 * 60_000;
+    if (velha) cuidarDaGrade();
+  } catch (err) { console.error(`[${config.marca}] Falha ao conferir a grade:`, err.message); }
 }, 3000).unref();
+
+// Erro solto em tarefa de fundo não derruba a plataforma: fica registrado e o serviço continua.
+process.on('unhandledRejection', (motivo) => console.error(`[${config.marca}] Promessa rejeitada sem tratamento:`, motivo));
+process.on('uncaughtException', (err) => console.error(`[${config.marca}] Exceção não tratada:`, err));
+
+/** Parada limpa: para de aceitar conexões, deixa as em curso terminarem e fecha o banco. */
+let encerrando = false;
+const encerrar = (sinal) => {
+  if (encerrando) return;
+  encerrando = true;
+  console.log(`[${config.marca}] ${sinal} recebido: encerrando…`);
+  const prazo = setTimeout(() => { console.log(`[${config.marca}] Encerrando à força.`); process.exit(0); }, 15_000);
+  prazo.unref();
+  servidor.close(() => {
+    try { db.close(); } catch { /* já fechado */ }
+    clearTimeout(prazo);
+    console.log(`[${config.marca}] Encerrado.`);
+    process.exit(0);
+  });
+};
+for (const sinal of ['SIGTERM', 'SIGINT']) process.on(sinal, () => encerrar(sinal));

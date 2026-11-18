@@ -165,6 +165,10 @@ Em **Configurações → Grade dos canais abertos (EPG)**, a operação cadastra
 aberta se mantém em dia. O provedor da grade é escolhido por vocês: a própria emissora, a afiliada ou um serviço
 de guia. Também dá para enviar o arquivo na mão em **Grade (EPG) → Importar XMLTV**.
 
+A atualização roda de 24 em 24 horas e, **ao subir o servidor**, se a última importação já passou de 12 horas —
+assim um servidor que reinicia todo dia não fica com a grade parada. Na mesma rotina, a plataforma apaga os
+programas que já passaram há mais de 7 dias, para a tabela da grade não crescer para sempre.
+
 ## Como executar
 
 Requisitos: **Node.js 22.13+**. O `ffmpeg` é opcional (só para os vídeos de demonstração do seed).
@@ -221,6 +225,14 @@ Let's Encrypt precisa das duas para emitir o certificado.
 
 Converter vídeo é o que mais consome CPU. `CPUS_APP` no `.env` limita quanto o app pode usar, para uma conversão
 longa não derrubar o resto do servidor.
+
+Em produção o servidor **recusa subir** sem `TV_SECRET` e `TV_ADMIN_SENHA`, com valores curtos ou **ainda com os
+valores de exemplo do `.env.exemplo`** (os que têm "troque"): é a checagem que impede abrir ao público com a senha
+que veio no pacote.
+
+Ao receber `SIGTERM` (o que o `docker compose down`, o `restart` e o `systemctl stop` mandam), a plataforma **para
+de aceitar conexões, deixa as que estão em curso terminarem e fecha o banco** antes de sair, com 15 segundos de
+prazo. Envio de vídeo e canal ao vivo não são cortados no meio por um reinício planejado.
 
 ### Backup
 

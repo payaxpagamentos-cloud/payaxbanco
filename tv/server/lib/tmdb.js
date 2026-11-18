@@ -18,6 +18,28 @@ const IMAGENS = 'https://image.tmdb.org/t/p';
 /** O cliente configurou o token? */
 const ligado = () => Boolean(config.tmdb.token);
 
+/**
+ * O TMDB não traduz alguns gêneros de série, e eles voltam em inglês mesmo pedindo pt-BR.
+ * Como o nome aparece na ficha do título, para o assinante, a tradução fica aqui.
+ */
+const GENEROS_PT = {
+  'Action & Adventure': 'Ação & Aventura',
+  'Sci-Fi & Fantasy': 'Ficção científica & Fantasia',
+  'War & Politics': 'Guerra & Política',
+  Kids: 'Infantil',
+  Soap: 'Novela',
+  Talk: 'Talk show',
+  // Os nomes abaixo são os mesmos da lista que já vem cadastrada, para não criar gênero repetido.
+  Reality: 'Reality',
+  News: 'Jornalismo',
+  Western: 'Faroeste',
+  Mystery: 'Mistério',
+  Documentary: 'Documentário',
+};
+
+/** Nome do gênero em português, quando o TMDB devolveu o nome em inglês. */
+const generoPt = (nome) => (/^pt/i.test(config.tmdb.idioma) ? GENEROS_PT[String(nome).trim()] ?? nome : nome);
+
 /** Endereço de uma arte do TMDB, no tamanho pedido ('original', 'w780'…). */
 const arte = (caminho, tamanho = 'original') => (caminho ? `${IMAGENS}/${tamanho}${caminho}` : null);
 
@@ -116,7 +138,7 @@ async function detalhes(tmdbId, { tipo = 'filme' } = {}) {
     pais: (d.production_countries ?? [])[0]?.name ?? null,
     duracao_s: tipo === 'serie' ? null : (d.runtime ? d.runtime * 60 : null),
     classificacao: classificacaoBR(d),
-    generos: (d.genres ?? []).map((g) => g.name),
+    generos: (d.genres ?? []).map((g) => generoPt(g.name)),
     elenco,
     direcao,
     nota: d.vote_average ? Number(d.vote_average.toFixed(1)) : null,
@@ -126,4 +148,4 @@ async function detalhes(tmdbId, { tipo = 'filme' } = {}) {
   };
 }
 
-module.exports = { ligado, buscar, detalhes, arte, IMAGENS };
+module.exports = { ligado, buscar, detalhes, arte, generoPt, GENEROS_PT, IMAGENS };
