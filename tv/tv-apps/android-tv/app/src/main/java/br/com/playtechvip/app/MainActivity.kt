@@ -73,6 +73,12 @@ class MainActivity : AppCompatActivity() {
   @SuppressLint("SetJavaScriptEnabled")
   override fun onCreate(estado: Bundle?) {
     super.onCreate(estado)
+    // APK de teste ainda sem domínio gravado: pergunta o endereço antes de abrir.
+    if (Servidor.precisaPerguntar(this)) {
+      startActivity(Intent(this, ServidorActivity::class.java))
+      finish()
+      return
+    }
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
     raiz = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
@@ -114,7 +120,7 @@ class MainActivity : AppCompatActivity() {
 
     raiz.addView(navegador)
     setContentView(raiz)
-    navegador.loadUrl(getString(R.string.servidor))
+    navegador.loadUrl(Servidor.atual(this))
   }
 
   /**

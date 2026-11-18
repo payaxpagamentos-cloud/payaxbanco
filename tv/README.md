@@ -58,6 +58,28 @@ com servidor, banco de dados e login próprios.
 As regras ficam no servidor: toda rota do assinante confere a assinatura ativa (`402` quando falta), a classificação
 do perfil (`403`) e o nível do plano (`403`); o painel confere o perfil de acesso em cada rota.
 
+## Aplicativos (celular, tablet e Smart TV)
+
+Seis formas de assistir, todas no mesmo servidor e no mesmo catálogo. O guia completo, com o
+passo a passo de cada loja, está em [`APPS.md`](APPS.md).
+
+| Onde | O que é | Player |
+|---|---|---|
+| Celular e tablet, sem loja | **App instalável (PWA)**: o assinante abre no navegador e escolhe "Instalar" | player da plataforma |
+| Android (celular e tablet) | App nativo em `celular-apps/android/` | ExoPlayer do aparelho |
+| iPhone e iPad | App nativo em `celular-apps/ios/` | AVPlayer do iOS |
+| Samsung, LG, TCL/Google TV | Apps em `tv-apps/` | player nativo de cada TV |
+
+Um comando aponta todos para o servidor de vocês:
+
+```bash
+npm run empacotar-apps https://play.seudominio.com.br
+```
+
+O app instalável não depende de loja nem de conta de desenvolvedor: ele é servido pelo próprio
+servidor (precisa de HTTPS), ganha ícone na tela inicial, abre em tela cheia e guarda os arquivos
+do app para abrir rápido e aguentar a rede oscilar. Vídeo e catálogo nunca ficam guardados.
+
 ## Smart TVs (Samsung, LG e TCL)
 
 A interface entra sozinha em **modo TV** quando reconhece o aparelho (Tizen, webOS, Android TV, Fire TV, VIDAA):

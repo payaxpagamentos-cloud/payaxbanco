@@ -1,5 +1,8 @@
 # PLAY TECH VIP nas Smart TVs
 
+> Os apps de **celular e tablet** (instalável pelo navegador, Android e iPhone) estão descritos
+> em [`../APPS.md`](../APPS.md), junto com o que cada loja exige.
+
 Três apps, cada um usando o **player nativo do aparelho**:
 
 | Pasta | Aparelhos | Player | Interface |

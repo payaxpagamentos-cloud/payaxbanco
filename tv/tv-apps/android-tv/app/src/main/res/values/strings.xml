@@ -5,4 +5,9 @@
   <string name="servidor">https://SEU-DOMINIO/tv/?tv=1</string>
   <string name="sem_conexao">Sem internet. Confira a conexão da TV e tente de novo.</string>
   <string name="tentar">Tentar de novo</string>
+  <string name="trocar_servidor">Trocar o endereço do servidor</string>
+  <string name="servidor_explicacao">Digite o endereço da PLAY TECH VIP do seu provedor.</string>
+  <string name="servidor_exemplo">play.seuprovedor.com.br</string>
+  <string name="servidor_entrar">Entrar</string>
+  <string name="servidor_invalido">Endereço inválido. Exemplo: play.seuprovedor.com.br</string>
 </resources>

@@ -15,6 +15,7 @@
     "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
     "empacotar": "node scripts/empacotar.js",
     "empacotar-tv": "node scripts/empacotar-tv.js",
+    "empacotar-apps": "node scripts/empacotar-apps.js",
     "backup": "node --disable-warning=ExperimentalWarning scripts/backup.js",
     "catalogo-demo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/catalogo-tmdb.js",
     "epg": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/epg-mapear.js",

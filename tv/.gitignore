@@ -7,3 +7,17 @@ dist/
 
 # pacotes gerados dos apps de TV
 tv-apps/*/dist/
+
+# projetos Android (saída de compilação e caminho local do SDK)
+celular-apps/android/.gradle/
+celular-apps/android/build/
+celular-apps/android/app/build/
+celular-apps/android/local.properties
+tv-apps/android-tv/.gradle/
+tv-apps/android-tv/build/
+tv-apps/android-tv/app/build/
+tv-apps/android-tv/local.properties
+
+# projeto iOS gerado pelo XcodeGen
+celular-apps/ios/*.xcodeproj/
+celular-apps/ios/*.xcworkspace/

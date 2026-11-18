@@ -8,6 +8,7 @@ import { telaConta } from './conta.js';
 import { cartaz, canalCartao, fileira, grade, vazio, fecharPrevia } from './cartoes.js';
 import { tocar } from './player.js';
 import { ehTV, ligarControle, focarPrimeiro } from './tv.js';
+import { registrarServiceWorker, botaoInstalar, convidarUmaVez } from './instalar.js';
 
 const raiz = $('#app');
 let conta = null;
@@ -82,6 +83,8 @@ async function iniciar() {
 function iniciar2() {
   montarCasca();
   desenharRota();
+  // Convite para instalar no celular: aparece uma vez, depois que o assinante já está dentro.
+  if (!ehTV) setTimeout(convidarUmaVez, 2500);
 }
 
 // ---------------------------------------------------------------- casca (topo e navegação)
@@ -118,6 +121,7 @@ function montarCasca() {
     el('div', { class: 'coluna' },
       el('button', { class: 'btn bloco vazio', onclick: () => { fechar(); perfilGuardado.limpar(); iniciar(); } }, 'Trocar de perfil'),
       el('button', { class: 'btn bloco vazio', onclick: () => { fechar(); ir('#/conta'); } }, 'Minha conta e assinatura'),
+      botaoInstalar(fechar),
       conta.usuario.perfil !== 'assinante'
         ? el('a', { class: 'btn bloco vazio', href: './admin/' }, 'Painel da operação')
         : null,
@@ -467,5 +471,8 @@ async function telaBusca(q) {
   limpar(conteudo, el('div', { class: 'secao' }, partes));
   return undefined;
 }
+
+// Guarda os arquivos do app (abre rápido e aguenta a rede oscilar); sem https, o navegador ignora.
+registrarServiceWorker();
 
 iniciar();

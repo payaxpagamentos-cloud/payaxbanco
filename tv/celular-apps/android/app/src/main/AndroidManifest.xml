@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PLAY TECH VIP — app para celular e tablet Android. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+  <!-- Celular e tablet: tela sensível ao toque é esperada, mas o app também roda em Chromebook. -->
+  <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+  <uses-feature android:name="android.software.picture_in_picture" android:required="false"/>
+
+  <application
+      android:allowBackup="true"
+      android:icon="@mipmap/ic_launcher"
+      android:roundIcon="@mipmap/ic_launcher_round"
+      android:label="@string/app_name"
+      android:supportsRtl="false"
+      android:usesCleartextTraffic="false"
+      android:theme="@style/Tema.PlayTechVip">
+
+    <activity
+        android:name=".MainActivity"
+        android:exported="true"
+        android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode|smallestScreenSize|density"
+        android:launchMode="singleTask"
+        android:windowSoftInputMode="adjustResize">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+    </activity>
+
+    <!-- Primeira abertura de um APK de teste: pergunta o endereço do servidor. -->
+    <activity
+        android:name=".ServidorActivity"
+        android:exported="false"
+        android:windowSoftInputMode="adjustResize"/>
+
+    <!-- Reprodução nativa (ExoPlayer), com janela flutuante ao sair do app. -->
+    <activity
+        android:name=".PlayerActivity"
+        android:exported="false"
+        android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode|smallestScreenSize|density"
+        android:launchMode="singleTop"
+        android:resizeableActivity="true"
+        android:supportsPictureInPicture="true"
+        android:theme="@style/Tema.PlayTechVip.Player"/>
+  </application>
+</manifest>

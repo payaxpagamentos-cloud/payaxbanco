@@ -1,0 +1,34 @@
+# Projeto do app iOS da PLAY TECH VIP, descrito em texto (XcodeGen).
+#
+#   brew install xcodegen      # uma vez
+#   xcodegen generate          # gera PlayTechVip.xcodeproj
+#   open PlayTechVip.xcodeproj # abre no Xcode, escolhe o time e publica
+#
+# Assim o projeto vive no repositório como texto legível, sem o arquivo binário do Xcode
+# que ninguém consegue revisar nem mesclar.
+name: PlayTechVip
+options:
+  bundleIdPrefix: br.com.playtechvip
+  deploymentTarget:
+    iOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""            # preencha com o Team ID da conta Apple Developer
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+targets:
+  PlayTechVip:
+    type: application
+    platform: iOS
+    sources:
+      - PlayTechVip
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: br.com.playtechvip.celular
+        INFOPLIST_FILE: PlayTechVip/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"   # iPhone e iPad
+        ENABLE_BITCODE: NO

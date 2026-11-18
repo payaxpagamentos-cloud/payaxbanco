@@ -97,6 +97,8 @@ operação, em Faturas (a integração automática com o banco ficou fora do esc
 | Assinaturas | Três planos (Essencial HD, Família Full HD, Cinema 4K), faturas, carência, suspensão automática, troca de plano e cancelamento |
 | Painel | 13 telas: conteúdo, canais, grade, catálogo, destaques, assinantes, faturas, planos, relatórios, equipe, configurações e auditoria |
 | Smart TV | Apps para Samsung (Tizen/AVPlay), LG (webOS) e TCL/Android TV (ExoPlayer), com navegação por controle remoto |
+| Celular e tablet | App instalável pelo navegador (ícone na tela inicial, tela cheia, sem loja) e apps nativos de Android e iPhone, com player do aparelho e janela flutuante |
+| APKs de teste | `dist/PLAYTECHVIP-celular-android-teste.apk` e `dist/PLAYTECHVIP-androidtv-teste.apk`, compilados e prontos para instalar; pedem o endereço do servidor na primeira abertura |
 | Produção | Docker Compose com HTTPS automático, backup e monitoramento por `/api/saude` |
 | Testes | 56 testes automáticos, incluindo uma conversão de vídeo de verdade e as guardas de produção |
 

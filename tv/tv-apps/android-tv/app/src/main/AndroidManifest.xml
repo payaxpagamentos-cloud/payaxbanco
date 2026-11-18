@@ -30,6 +30,12 @@
       </intent-filter>
     </activity>
 
+    <!-- Primeira abertura de um APK de teste: pergunta o endereço do servidor. -->
+    <activity
+        android:name=".ServidorActivity"
+        android:exported="false"
+        android:screenOrientation="landscape"/>
+
     <!-- Reprodução nativa (ExoPlayer), aberta pela página através da ponte. -->
     <activity
         android:name=".PlayerActivity"
