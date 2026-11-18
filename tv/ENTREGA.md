@@ -58,7 +58,9 @@ Backup diário (banco + vídeos), guardando as 7 cópias mais recentes:
 ## 3. O dia a dia da operação
 
 **Publicar um filme ou série**
-1. Catálogo → Novo título → preencha a ficha (nome, sinopse, ano, classificação, gêneros).
+1. Catálogo → Novo título → digite o nome e clique em **Buscar ficha e artes na base de filmes**:
+   sinopse, ano, duração, classificação, gêneros, elenco, direção e as artes oficiais vêm prontas
+   (precisa do token gratuito do TMDB em `TV_TMDB_TOKEN`). Sem o token, preencha à mão.
 2. Aba *Arquivos e artes*: envie a capa (2:3), o banner (16:9) e o vídeo.
 3. Em *Conversão automática*, clique em **Gerar as versões menores** — o servidor cria Full HD, HD
    e SD a partir do arquivo enviado. Um 4K vira quatro qualidades.
@@ -98,6 +100,7 @@ operação, em Faturas (a integração automática com o banco ficou fora do esc
 
 | Pendência | O que é preciso |
 |---|---|
+| Token da base de filmes | Uma conta gratuita em themoviedb.org e o token em `TV_TMDB_TOKEN`, para o catálogo trazer cartaz, banner e ficha dos títulos atuais. |
 | Conteúdo licenciado | Os arquivos dos filmes e séries contratados. Entram pelo painel; o acervo de hoje é demonstração (Creative Commons). |
 | Sinal das emissoras | O endereço `.m3u8` ou o player oficial de cada canal aberto. É um campo por canal. |
 | Hospedagem e domínio | Um servidor (VPS ou nuvem) e o domínio apontando para ele. |

@@ -39,6 +39,12 @@ module.exports = {
   // Vídeos, artes e legendas enviados pelo painel. Ficam fora da pasta pública, com nome aleatório.
   // **Inclua esta pasta no backup** (o banco guarda só os registros).
   midiaDir: process.env.TV_MIDIA || path.join(path.dirname(dbFile), 'midia'),
+  // Catálogo de filmes e séries (themoviedb.org): cartaz, banner, sinopse, elenco e classificação.
+  // O token é gratuito e sai da conta do cliente; sem ele, a busca some do painel.
+  tmdb: {
+    token: process.env.TV_TMDB_TOKEN || '',
+    idioma: process.env.TV_TMDB_IDIOMA || 'pt-BR',
+  },
   // Conversão automática das versões menores (Full HD, HD e SD) a partir do arquivo enviado.
   ffmpeg: process.env.TV_FFMPEG || 'ffmpeg',
   conversao: {

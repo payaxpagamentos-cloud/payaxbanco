@@ -99,6 +99,23 @@ Dois detalhes práticos que a plataforma já resolve:
   para a troca. Quando o sinal exige cabeçalho próprio (`User-Agent` ou `Referer`), a plataforma
   guarda e reenvia esse cabeçalho a cada pedaço.
 
+## Fichas e artes dos filmes (base TMDB)
+
+No cadastro de um título, **Buscar ficha e artes na base de filmes** procura o nome na base do
+[TMDB](https://www.themoviedb.org) — a mesma que os aplicativos de streaming usam — e traz tudo
+pronto: nome em português e original, sinopse, ano, país, duração, classificação indicativa
+brasileira, gêneros, elenco, direção e as **artes oficiais** (cartaz e banner), que entram no
+acervo como qualquer outra imagem.
+
+Precisa de uma credencial gratuita da conta do cliente em `TV_TMDB_TOKEN`: serve a *API Read
+Access Token* (a longa, enviada no cabeçalho) ou a *API Key* de 32 caracteres (enviada na URL) —
+a plataforma reconhece as duas. Sem credencial, o botão explica o que falta e o cadastro segue
+manual, como antes.
+
+> O TMDB é gratuito para uso não comercial e exige atribuição; para uso comercial, a conta do
+> cliente precisa do acordo comercial deles. As artes continuam sendo do estúdio: a base entrega
+> o endereço, e quem licencia o filme licencia também o material de divulgação.
+
 ## Logos das emissoras
 
 Em Canais, **Buscar logos das emissoras** traz o logo oficial de cada canal da lista pública

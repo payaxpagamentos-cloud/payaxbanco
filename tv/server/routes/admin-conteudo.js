@@ -14,6 +14,8 @@ const embed = require('../lib/embed');
 const { CANAIS_ABERTOS, AVISO_NUMEROS } = require('../lib/tv-aberta');
 const listasPublicas = require('../lib/listas-publicas');
 const logos = require('../lib/logos');
+const tmdb = require('../lib/tmdb');
+const { baixarImagem } = require('../lib/baixar');
 const player = require('../lib/player');
 const versoes = require('../lib/versoes');
 const transcodificar = require('../lib/transcodificar');
@@ -461,6 +463,68 @@ module.exports = (db) => {
     if (Array.isArray(req.body.generos)) trocarGeneros(atual.id, req.body.generos);
     registrar(db, req, 'titulo_alterado', { id: atual.id, nome: t.nome });
     res.json({ titulo: achar('titulos', atual.id, 'Título') });
+  });
+
+  // ---------------- Catálogo de filmes e séries (TMDB) ----------------
+
+  /** Busca um filme ou série pelo nome na base do TMDB. */
+  r.get('/tmdb/buscar', async (req, res, next) => {
+    try {
+      if (!tmdb.ligado()) return res.json({ ligado: false, resultados: [] });
+      const resultados = await tmdb.buscar(String(req.query.q ?? ''), {
+        tipo: v.opcao(req.query.tipo ?? 'filme', 'o tipo', ['filme', 'serie']),
+        ano: req.query.ano ? v.inteiro(req.query.ano, 'o ano', { min: 1890, max: 2100 }) : null,
+      });
+      res.json({ ligado: true, resultados });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /**
+   * Traz a ficha do TMDB para um título: sinopse, ano, duração, classificação, gêneros,
+   * elenco, direção e as artes oficiais (cartaz e banner).
+   */
+  r.post('/titulos/:id/tmdb', async (req, res, next) => {
+    try {
+      const atual = achar('titulos', req.params.id, 'Título');
+      const ficha = await tmdb.detalhes(v.inteiro(req.body.tmdb_id, 'o título no TMDB', { min: 1 }), {
+        tipo: atual.tipo === 'serie' ? 'serie' : 'filme',
+      });
+
+      // As artes entram no acervo como qualquer outra imagem do painel.
+      let capa = atual.capa_midia_id;
+      let banner = atual.banner_midia_id;
+      const comArtes = req.body.artes === undefined ? true : v.booleano(req.body.artes);
+      if (comArtes && ficha.capa_url) capa = midia.salvarImagem(db, req.usuario, await baixarImagem(ficha.capa_url), { nome: `capa-${slug(ficha.nome)}` }).id;
+      if (comArtes && ficha.banner_url) banner = midia.salvarImagem(db, req.usuario, await baixarImagem(ficha.banner_url), { nome: `banner-${slug(ficha.nome)}` }).id;
+
+      // Gêneros do TMDB: usa os que já existem e cadastra os que faltam.
+      const generoIds = [];
+      for (const nomeGenero of ficha.generos) {
+        const chave = slug(nomeGenero);
+        let g = db.prepare('SELECT id FROM generos WHERE slug = ?').get(chave);
+        if (!g) {
+          const ordem = db.prepare('SELECT COALESCE(MAX(ordem), 0) + 1 AS n FROM generos').get().n;
+          const novoG = db.prepare('INSERT INTO generos (nome, slug, ordem) VALUES (?, ?, ?)').run(nomeGenero, chave, ordem);
+          g = { id: Number(novoG.lastInsertRowid) };
+        }
+        generoIds.push(g.id);
+      }
+
+      db.prepare(`UPDATE titulos SET nome = ?, nome_original = ?, sinopse = ?, ano = ?, pais = ?, classificacao = ?, duracao_s = ?,
+          elenco = ?, direcao = ?, capa_midia_id = ?, banner_midia_id = ?, atualizado_em = ? WHERE id = ?`)
+        .run(ficha.nome ?? atual.nome, ficha.nome_original ?? atual.nome_original, ficha.sinopse ?? atual.sinopse,
+          ficha.ano ?? atual.ano, ficha.pais ?? atual.pais, ficha.classificacao ?? atual.classificacao,
+          atual.tipo === 'serie' ? atual.duracao_s : (ficha.duracao_s ?? atual.duracao_s),
+          ficha.elenco ?? atual.elenco, ficha.direcao ?? atual.direcao, capa, banner, agora(), atual.id);
+      if (generoIds.length) trocarGeneros(atual.id, generoIds);
+
+      registrar(db, req, 'titulo_do_tmdb', { id: atual.id, nome: ficha.nome, tmdb_id: ficha.tmdb_id });
+      res.json({ titulo: achar('titulos', atual.id, 'Título'), ficha });
+    } catch (err) {
+      next(err);
+    }
   });
 
   /** Publicar: confere se há o que assistir antes de deixar o título no ar. */

@@ -198,6 +198,47 @@ export async function telaTituloEditor(c, id, { voltar, abaInicial = null }) {
     toast('Salvo.');
   };
 
+  /**
+   * Busca o título na base do TMDB e traz a ficha pronta: sinopse, ano, duração,
+   * classificação, gêneros, elenco, direção e as artes oficiais.
+   */
+  const buscarNoTmdb = () => modal('Buscar na base de filmes', (fechar) => {
+    const campoBusca = el('input', { class: 'entrada', placeholder: 'Nome do filme ou da série', value: t.nome ?? '' });
+    const lista = el('div', { class: 'coluna', style: 'gap:8px;margin-top:14px;max-height:52vh;overflow:auto' });
+
+    const procurar = async () => {
+      limpar(lista, el('div', { class: 'mini apagado' }, 'Procurando…'));
+      const r = await api.get(`/admin/tmdb/buscar?q=${encodeURIComponent(campoBusca.value)}&tipo=${t.tipo === 'serie' ? 'serie' : 'filme'}`);
+      if (!r.ligado) {
+        return limpar(lista, el('div', { class: 'aviso atencao' },
+          'A busca de filmes não está configurada. Crie um token gratuito em themoviedb.org e ponha em TV_TMDB_TOKEN no .env do servidor.'));
+      }
+      if (!r.resultados.length) return limpar(lista, el('div', { class: 'mini apagado' }, 'Nada encontrado com esse nome.'));
+      limpar(lista, r.resultados.map((f) => {
+        const b = el('button', { class: 'cartao fundo linha', style: 'gap:12px;text-align:left;width:100%;align-items:flex-start;cursor:pointer' },
+          f.capa ? el('img', { src: f.capa, alt: '', style: 'width:60px;border-radius:6px;flex:0 0 auto' }) : null,
+          el('div', {},
+            el('strong', {}, f.nome),
+            el('div', { class: 'mini apagado' }, [f.ano, f.nome_original !== f.nome ? f.nome_original : null, f.nota ? `nota ${f.nota}` : null].filter(Boolean).join(' · ')),
+            el('div', { class: 'mini', style: 'margin-top:4px' }, (f.sinopse ?? '').slice(0, 180))));
+        b.addEventListener('click', () => acao(b, async () => {
+          await api.post(`/admin/titulos/${id}/tmdb`, { tmdb_id: f.tmdb_id, artes: true });
+          toast('Ficha e artes trazidas da base de filmes.');
+          fechar(true);
+        }));
+        return b;
+      }));
+    };
+
+    campoBusca.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); procurar(); } });
+    setTimeout(procurar, 0);
+    return [
+      el('p', { class: 'mudo pequeno' }, 'Escolha o título certo: a ficha e as artes oficiais entram no lugar do que está cadastrado.'),
+      el('div', { class: 'linha', style: 'gap:8px' }, campoBusca, el('button', { class: 'btn primario', onclick: () => procurar() }, 'Procurar')),
+      lista,
+    ];
+  }, { largo: true });
+
   // ---- Ficha
   const fichaEl = () => {
     const escolhidos = new Set(dados.generos);
@@ -223,7 +264,13 @@ export async function telaTituloEditor(c, id, { voltar, abaInicial = null }) {
         return b;
       }))),
       caixaSim('Produção original PLAY', 'original', Boolean(t.original)),
-      el('div', { class: 'linha fim' }, el('button', { class: 'btn primario' }, 'Salvar ficha')));
+      el('div', { class: 'linha entre' },
+        el('button', {
+          type: 'button',
+          class: 'btn vazio',
+          onclick: async () => { if (await buscarNoTmdb()) recarregar(); },
+        }, icone('busca'), 'Buscar ficha e artes na base de filmes'),
+        el('button', { class: 'btn primario' }, 'Salvar ficha')));
     f.querySelector('textarea[name=sinopse]').value = t.sinopse ?? '';
     f.querySelector('textarea[name=elenco]').value = t.elenco ?? '';
     f.addEventListener('submit', (e) => {

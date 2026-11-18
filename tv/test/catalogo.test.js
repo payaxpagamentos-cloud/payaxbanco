@@ -142,3 +142,28 @@ test('série: episódios, próximo episódio e retomada', async (t) => {
   const det2 = await s.get(`/tv/titulos/${serie.slug}`, cliente.token, cliente.comPerfil);
   assert.equal(det2.dados.titulo.proximo_episodio.id, ep2.dados.episodio.id);
 });
+
+test('base de filmes: sem token configurado, o painel não oferece a busca', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const tmdb = require('../server/lib/tmdb');
+
+  // No ambiente de teste não há token: a busca responde "desligada" em vez de quebrar.
+  assert.equal(tmdb.ligado(), Boolean(process.env.TV_TMDB_TOKEN));
+  if (tmdb.ligado()) {
+    t.diagnostic('token do TMDB presente: o caminho sem token não foi exercitado');
+    return;
+  }
+  const r = await s.get('/admin/tmdb/buscar?q=duna', admin);
+  assert.equal(r.status, 200);
+  assert.equal(r.dados.ligado, false);
+  assert.deepEqual(r.dados.resultados, []);
+
+  // E a importação da ficha avisa o motivo, sem erro genérico.
+  const capa = await s.enviarImagem(admin);
+  const criado = await s.post('/admin/titulos', { tipo: 'filme', nome: 'Sem base', capa_midia_id: capa }, admin);
+  const erro = await s.post(`/admin/titulos/${criado.dados.titulo.id}/tmdb`, { tmdb_id: 1 }, admin);
+  assert.equal(erro.status, 409);
+  assert.equal(erro.dados.detalhes?.motivo, 'sem_tmdb');
+});
