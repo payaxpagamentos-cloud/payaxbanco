@@ -204,3 +204,48 @@ test('token de reprodução expirado não vale', () => {
   Date.now = original;
   assert.ok(player.lerToken(token));
 });
+
+test('qualidades: o plano manda até onde o assinante pode subir', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+
+  const capa = await s.enviarImagem(admin);
+  const video4k = await s.enviarVideo(admin, { tamanho: 20_000, duracao: 600, altura: 2160 });
+  const r = await s.post('/admin/titulos', { tipo: 'filme', nome: 'Noite em 4K', capa_midia_id: capa, video_midia_id: video4k, duracao_s: 600 }, admin);
+  const id = r.dados.titulo.id;
+
+  const videoFull = await s.enviarVideo(admin, { tamanho: 14_000, duracao: 600, altura: 1080 });
+  const videoHd = await s.enviarVideo(admin, { tamanho: 9000, duracao: 600, altura: 720 });
+  assert.equal((await s.post('/admin/versoes', { titulo_id: id, midia_id: videoHd, qualidade: 'hd' }, admin)).status, 201);
+  // Sem dizer a qualidade, vale a altura do arquivo.
+  const auto = await s.post('/admin/versoes', { titulo_id: id, midia_id: videoFull }, admin);
+  assert.equal(auto.dados.versao.qualidade, 'fullhd');
+  await s.post(`/admin/titulos/${id}/situacao`, { situacao: 'publicado' }, admin);
+
+  // Plano Essencial: só até HD.
+  const essencial = await s.assinante('hd@exemplo.com.br', { plano: 1 });
+  const a = await s.post('/play/abrir', { tipo: 'filme', titulo_id: id }, essencial.token, essencial.comPerfil);
+  assert.equal(a.dados.fonte.qualidade, 'hd', 'toca a melhor que o plano alcança');
+  assert.deepEqual(a.dados.qualidades.map((q) => q.qualidade), ['4k', 'fullhd', 'hd']);
+  const quatroK = a.dados.qualidades.find((q) => q.qualidade === '4k');
+  assert.equal(quatroK.bloqueada, true);
+  assert.equal(quatroK.url, null, 'a qualidade bloqueada aparece no menu, mas sem endereço');
+  const tokenEssencial = new URL(`http://x${a.dados.fonte.url}`).searchParams.get('t');
+  assert.equal((await s.get(`/play/video/${video4k}?t=${encodeURIComponent(tokenEssencial)}`)).status, 403,
+    'o token do plano HD não abre o arquivo em 4K');
+
+  // Plano Cinema 4K: abre tudo e troca de qualidade com o mesmo token.
+  const cinema = await s.assinante('ultra@exemplo.com.br', { plano: 3 });
+  const b = await s.post('/play/abrir', { tipo: 'filme', titulo_id: id }, cinema.token, cinema.comPerfil);
+  assert.equal(b.dados.fonte.qualidade, '4k');
+  assert.ok(b.dados.qualidades.every((q) => !q.bloqueada));
+  const paraFullHd = b.dados.qualidades.find((q) => q.qualidade === 'fullhd').url;
+  const troca = await s.req('GET', paraFullHd.replace(/^.*\/api/, ''));
+  assert.equal(troca.status, 200, 'trocar de qualidade não precisa de token novo');
+  assert.equal(troca.headers.get('content-length'), '14000');
+
+  // A ficha do catálogo mostra as qualidades disponíveis.
+  const ficha = await s.get(`/tv/titulos/${r.dados.titulo.slug}`, cinema.token, cinema.comPerfil);
+  assert.deepEqual(ficha.dados.titulo.qualidades, ['4k', 'fullhd', 'hd']);
+});

@@ -8,6 +8,8 @@ const catalogo = require('../lib/catalogo');
 const player = require('../lib/player');
 const relay = require('../lib/relay');
 const midia = require('../lib/midia');
+const versoes = require('../lib/versoes');
+const qualidades = require('../lib/qualidades');
 const epg = require('../lib/epg');
 const v = require('../lib/validacao');
 
@@ -103,16 +105,40 @@ module.exports = (db, autenticado, comPerfil) => {
       m = videoPronto(titulo.video_midia_id, 'Este filme');
     }
 
+    // Menu de qualidades: a versão principal mais as cadastradas (SD, HD, Full HD, 4K).
+    const alvo = episodio ? { episodioId: episodio.id } : { tituloId: titulo.id };
+    const { lista, escolhida } = tipo === 'trailer'
+      ? { lista: [], escolhida: null }
+      : versoes.menu(db, { ...alvo, principal: m, limitePlano: acesso.qualidade });
+    const tocando = escolhida ? db.prepare('SELECT * FROM midias WHERE id = ?').get(escolhida.midia_id) : m;
+
     const { sessao, token } = player.abrirSessao(db, {
-      usuario: req.usuario, perfil, acesso, tipo, titulo, episodio, midiaId: m.id, dispositivo, ip: req.ip,
-      qualidade: m.qualidade && m.qualidade !== acesso.qualidade ? m.qualidade : acesso.qualidade,
+      usuario: req.usuario, perfil, acesso, tipo, titulo, episodio, midiaId: tocando.id,
+      midiasPermitidas: lista.filter((q) => !q.bloqueada).map((q) => q.midia_id).concat(tocando.id),
+      dispositivo, ip: req.ip,
+      qualidade: escolhida?.qualidade ?? m.qualidade ?? acesso.qualidade,
     });
+    const urlDaMidia = (id) => `${baseApi()}/play/video/${id}?t=${encodeURIComponent(token)}`;
+    const menuQualidades = lista.map((q) => ({
+      qualidade: q.qualidade,
+      rotulo: qualidades.rotulo(q.qualidade),
+      linha: qualidades.linha(q.qualidade),
+      largura: q.largura,
+      altura: q.altura,
+      tamanho: q.tamanho,
+      mime: q.mime,
+      bloqueada: q.bloqueada,
+      // A bloqueada aparece no menu, em cinza, com o aviso do plano: não ganha endereço.
+      url: q.bloqueada ? null : urlDaMidia(q.midia_id),
+      atual: q.midia_id === tocando.id,
+    }));
     const retomar = tipo === 'trailer' ? 0 : player.retomarEm(db, perfil.id, titulo.id, episodio?.id ?? 0);
     res.status(201).json({
       sessao_id: sessao.id,
       token,
       ao_vivo: false,
-      fonte: { tipo: 'video', url: `${baseApi()}/play/video/${m.id}?t=${encodeURIComponent(token)}`, mime: m.mime, duracao_s: m.duracao_s, qualidade: m.qualidade },
+      fonte: { tipo: 'video', url: urlDaMidia(tocando.id), mime: tocando.mime, duracao_s: tocando.duracao_s, qualidade: escolhida?.qualidade ?? tocando.qualidade },
+      qualidades: menuQualidades,
       info: {
         titulo: titulo.nome,
         subtitulo: episodio ? `T${episodio.temporada} E${episodio.numero} · ${episodio.nome}` : tipo === 'trailer' ? 'Trailer' : null,
@@ -125,7 +151,7 @@ module.exports = (db, autenticado, comPerfil) => {
       legendas: tipo === 'trailer' ? [] : legendasDe(titulo.id, episodio?.id, token),
       retomar_s: retomar,
       proximo_episodio: episodio ? proximoEpisodio(titulo.id, episodio.id) : null,
-      download: acesso.downloads && tipo !== 'trailer' ? `${baseApi()}/play/baixar/${m.id}?t=${encodeURIComponent(token)}` : null,
+      download: acesso.downloads && tipo !== 'trailer' ? `${baseApi()}/play/baixar/${tocando.id}?t=${encodeURIComponent(token)}` : null,
       limites: { telas: acesso.telas, qualidade: acesso.qualidade },
     });
   });
@@ -135,6 +161,7 @@ module.exports = (db, autenticado, comPerfil) => {
     segundos: req.body.segundos ?? null,
     posicao: req.body.posicao ?? null,
     duracao: req.body.duracao ?? null,
+    qualidade: req.body.qualidade ?? null,
   })));
 
   r.post('/fechar', autenticado, (req, res) => res.json(player.fechar(db, req.usuario.id, v.inteiro(req.body.sessao_id, 'a tela', { min: 1 }), req.body.motivo ?? 'fim')));

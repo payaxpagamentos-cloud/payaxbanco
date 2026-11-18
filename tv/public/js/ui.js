@@ -95,14 +95,15 @@ export const iniciais = (nome) => String(nome ?? '?').split(/\s+/).filter(Boolea
 export const CLASSIFICACOES = { 0: 'L', 10: '10', 12: '12', 14: '14', 16: '16', 18: '18' };
 export const etiquetaIdade = (c) => el('span', { class: `etiqueta idade ${c === 0 ? 'l' : `a${c}`}`, title: c === 0 ? 'Livre para todos os públicos' : `Não recomendado para menores de ${c} anos` },
   CLASSIFICACOES[c] ?? String(c ?? ''));
-export const QUALIDADES = { sd: 'SD', hd: 'Full HD', '4k': '4K HDR' };
+export const QUALIDADES = { sd: 'SD', hd: 'HD', fullhd: 'Full HD', '4k': '4K Ultra HD' };
+export const LINHAS_QUALIDADE = { sd: '480p', hd: '720p', fullhd: '1080p', '4k': '2160p' };
 export const CATEGORIAS_CANAL = { aberta: 'TV aberta', noticias: 'Notícias', esportes: 'Esportes', filmes: 'Filmes', series: 'Séries',
   infantil: 'Infantil', documentarios: 'Documentários', musica: 'Música', variedades: 'Variedades', religioso: 'Religioso', local: 'Local' };
 
 export function marca(sub) {
   return el('span', { class: 'marca' },
     el('img', { src: `${new URL('../img/favicon.svg', import.meta.url).pathname}`, alt: '' }),
-    el('span', {}, el('span', { class: 'play' }, 'PLAY'), el('span', { class: 'tv' }, ' TV')),
+    el('span', {}, el('span', { class: 'play' }, 'PLAY'), el('span', { class: 'tv' }, ' TECH'), el('span', { class: 'vip' }, 'VIP')),
     sub ? el('span', { class: 'etiqueta' }, sub) : null);
 }
 
@@ -144,11 +145,11 @@ export function modal(titulo, conteudo, { largo = false, semCabecalho = false } 
     const fechar = (v = null) => {
       fundo.remove();
       document.removeEventListener('keydown', tecla);
-      if (window.playtvModal === fechar) window.playtvModal = null;
+      if (window.playtechvipModal === fechar) window.playtechvipModal = null;
       resolve(v);
     };
     // O botão Voltar do controle da TV fecha a janela antes de sair da tela.
-    window.playtvModal = fechar;
+    window.playtechvipModal = fechar;
     const tecla = (e) => { if (e.key === 'Escape') fechar(); };
     document.addEventListener('keydown', tecla);
     fundo.addEventListener('click', (e) => { if (e.target === fundo) fechar(); });

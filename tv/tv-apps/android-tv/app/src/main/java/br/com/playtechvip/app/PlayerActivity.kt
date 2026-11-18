@@ -1,4 +1,4 @@
-package br.com.playtv.app
+package br.com.playtechvip.app
 
 import android.app.Activity
 import android.content.Intent
@@ -21,7 +21,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 
 /**
- * Reprodução nativa da PLAY TV na Android TV (TCL, Google TV e afins).
+ * Reprodução nativa da PLAY TECH VIP na Android TV (TCL, Google TV e afins).
  *
  * Usa o ExoPlayer (Media3), que é o player nativo do Android: decodificação por hardware,
  * HLS ao vivo, troca de faixa automática e os controles que o usuário da TV já conhece.
@@ -64,7 +64,7 @@ class PlayerActivity : AppCompatActivity() {
     val posicao = intent.getLongExtra("posicao", 0L)
 
     val fonteHttp = DefaultHttpDataSource.Factory()
-      .setUserAgent("PlayTV-AndroidTV/1.0")
+      .setUserAgent("PlayTechVip-AndroidTV/1.0")
       .setAllowCrossProtocolRedirects(true)
 
     val midia = MediaItem.Builder()

@@ -1,4 +1,4 @@
-package br.com.playtv.app
+package br.com.playtechvip.app
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -23,9 +23,9 @@ import androidx.media3.common.util.UnstableApi
 import org.json.JSONObject
 
 /**
- * PLAY TV na Android TV (TCL, Google TV e afins).
+ * PLAY TECH VIP na Android TV (TCL, Google TV e afins).
  *
- * O app é uma casca: ele abre a PLAY TV do servidor de vocês em tela cheia, já no modo TV
+ * O app é uma casca: ele abre a PLAY TECH VIP do servidor de vocês em tela cheia, já no modo TV
  * (?tv=1), e repassa o controle remoto para a página — as setas, o OK, o Voltar e as teclas
  * de mídia são tratados lá dentro, como em qualquer outro aparelho.
  */
@@ -66,7 +66,7 @@ class MainActivity : AppCompatActivity() {
 
   private fun avisarPagina(evento: JSONObject) {
     runOnUiThread {
-      navegador.evaluateJavascript("window.playtvNativoEvento && window.playtvNativoEvento($evento)", null)
+      navegador.evaluateJavascript("window.playtechvipNativoEvento && window.playtechvipNativoEvento($evento)", null)
     }
   }
 
@@ -86,9 +86,9 @@ class MainActivity : AppCompatActivity() {
         useWideViewPort = true
         mediaPlaybackRequiresUserGesture = false   // o vídeo começa sozinho, como numa TV
         cacheMode = WebSettings.LOAD_DEFAULT
-        userAgentString = "$userAgentString PlayTV-AndroidTV/1.0"
+        userAgentString = "$userAgentString PlayTechVip-AndroidTV/1.0"
       }
-      addJavascriptInterface(PlayTVBridge(this@MainActivity), "PlayTVNative")
+      addJavascriptInterface(PlayTechVipBridge(this@MainActivity), "PlayTechVipNative")
       webViewClient = object : WebViewClient() {
         override fun onReceivedError(v: WebView?, req: WebResourceRequest?, erro: WebResourceError?) {
           if (req?.isForMainFrame == true) {

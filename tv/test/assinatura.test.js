@@ -19,14 +19,14 @@ test('contratar gera fatura com PIX, e o pagamento libera o acesso', async (t) =
   const s = await iniciar();
   t.after(s.fechar);
   const admin = await s.adminLogin();
-  await s.put('/admin/config', { pix_chave: 'pix@playtv.com.br', pix_recebedor: 'PLAY TV', pix_cidade: 'SAO PAULO' }, admin);
+  await s.put('/admin/config', { pix_chave: 'pix@playtechvip.com.br', pix_recebedor: 'PLAY TECH VIP', pix_cidade: 'SAO PAULO' }, admin);
 
   const cliente = await s.assinante('novo@exemplo.com.br');
   const a = await s.post('/conta/assinar', { plano_id: 2 }, cliente.token);
   assert.equal(a.status, 201);
   assert.equal(a.dados.assinatura.status, 'pendente');
   assert.match(a.dados.fatura.pix_copia_cola, /^000201/, 'o PIX copia e cola começa no padrão EMV');
-  assert.ok(a.dados.fatura.pix_copia_cola.includes('pix@playtv.com.br'));
+  assert.ok(a.dados.fatura.pix_copia_cola.includes('pix@playtechvip.com.br'));
 
   // Antes de pagar, nada de catálogo.
   assert.equal((await s.get('/tv/home', cliente.token, cliente.comPerfil)).status, 402);
@@ -42,7 +42,7 @@ test('QR Code do PIX sai como SVG', async (t) => {
   const s = await iniciar();
   t.after(s.fechar);
   const admin = await s.adminLogin();
-  await s.put('/admin/config', { pix_chave: 'pix@playtv.com.br' }, admin);
+  await s.put('/admin/config', { pix_chave: 'pix@playtechvip.com.br' }, admin);
   const cliente = await s.assinante('qr@exemplo.com.br');
   const a = await s.post('/conta/assinar', { plano_id: 1 }, cliente.token);
   const qr = await s.get(`/conta/faturas/${a.dados.fatura.id}/qr`, cliente.token);

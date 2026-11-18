@@ -1,7 +1,15 @@
 import { api, arte } from './api.js';
-import { el, limpar, icone, toast, acao, duracao, dataBR, etiquetaIdade, modal } from './ui.js';
+import { el, limpar, icone, toast, acao, duracao, dataBR, etiquetaIdade, modal, QUALIDADES } from './ui.js';
 import { cartaz, fileira, grade } from './cartoes.js';
 import { tocar } from './player.js';
+
+/** Selo da melhor qualidade do título (4K, Full HD, HD): é o que o assinante procura na ficha. */
+function selosDeQualidade(t) {
+  const melhor = t.qualidades?.[0];
+  if (!melhor) return null;
+  return el('span', { class: `etiqueta qualidade${melhor === '4k' ? ' ultra' : ''}`, title: `Disponível em ${(t.qualidades ?? []).map((q) => QUALIDADES[q] ?? q).join(', ')}` },
+    QUALIDADES[melhor] ?? melhor);
+}
 
 /**
  * Janela do título sobre a home (é assim que as grandes plataformas abrem um filme: sem sair
@@ -85,6 +93,7 @@ export async function modalTitulo(chave, { ir, aoAtualizar } = {}) {
           el('div', { class: 'linha', style: 'gap:10px;margin-bottom:12px' },
             el('span', { class: 'mudo pequeno' }, t.ano ?? ''),
             etiquetaIdade(t.classificacao),
+            selosDeQualidade(t),
             el('span', { class: 'mudo pequeno' }, t.tipo === 'filme' ? duracao(t.duracao_s) : `${t.temporadas.length} temporada(s)`),
             t.bloqueado ? el('span', { class: 'etiqueta plano' }, t.plano_nome) : null),
           el('p', {}, t.sinopse ?? 'Sem sinopse cadastrada.')),
@@ -210,6 +219,7 @@ export async function telaTitulo(raiz, chave, { ir, aoAtualizar }) {
           el('div', { class: 'linha', style: 'gap:7px;margin-bottom:8px' },
             t.original ? el('span', { class: 'etiqueta ok' }, 'ORIGINAL PLAY') : null,
             el('span', { class: 'etiqueta' }, t.tipo === 'filme' ? 'Filme' : 'Série'),
+            selosDeQualidade(t),
             t.bloqueado ? el('span', { class: 'etiqueta plano' }, t.plano_nome) : null),
           el('h1', {}, t.nome),
           el('div', { class: 'linha', style: 'gap:9px;margin-bottom:12px' },

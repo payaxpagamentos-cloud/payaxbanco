@@ -4,6 +4,7 @@ const { ErroNegocio, naoEncontrado } = require('./erros');
 const { agora } = require('../db');
 const epg = require('./epg');
 const v = require('./validacao');
+const qualidades = require('./qualidades');
 
 /**
  * Consultas do catálogo (o que o assinante vê). Tudo passa por dois filtros:
@@ -189,6 +190,20 @@ const buscarTitulo = (db, chave) => (/^\d+$/.test(String(chave))
   : db.prepare('SELECT * FROM titulos WHERE slug = ?').get(String(chave)));
 
 /** Página do filme ou da série: fichas, temporadas, episódios, legendas e onde você parou. */
+/**
+ * Qualidades que este título oferece: as versões cadastradas do filme (ou dos episódios),
+ * mais a do arquivo principal. Da melhor para a pior.
+ */
+function qualidadesDoTitulo(db, t) {
+  const linhas = db.prepare(`SELECT DISTINCT v.qualidade FROM versoes v
+    WHERE v.titulo_id = ? OR v.episodio_id IN (SELECT id FROM episodios WHERE titulo_id = ? AND situacao = 'publicado')`).all(t.id, t.id);
+  const lista = new Set(linhas.map((l) => l.qualidade));
+  const principal = db.prepare('SELECT largura, altura FROM midias WHERE id = ?').get(t.video_midia_id ?? -1);
+  const q = qualidades.porMedidas(principal?.largura, principal?.altura);
+  if (q) lista.add(q);
+  return [...lista].sort((a, b) => qualidades.nivel(b) - qualidades.nivel(a));
+}
+
 function detalhe(db, chave, perfil, acesso) {
   const t = buscarTitulo(db, chave);
   if (!t || t.situacao !== 'publicado') throw naoEncontrado('Título');
@@ -226,6 +241,8 @@ function detalhe(db, chave, perfil, acesso) {
     direcao: t.direcao,
     trailer: t.trailer_midia_id ? { midia_id: t.trailer_midia_id } : null,
     tem_video: Boolean(t.video_midia_id),
+    // Qualidades disponíveis (4K, Full HD, HD, SD): a ficha mostra como selo, igual aos grandes.
+    qualidades: qualidadesDoTitulo(db, t),
     estreia: t.estreia,
     temporadas,
     proximo_episodio: proximo,

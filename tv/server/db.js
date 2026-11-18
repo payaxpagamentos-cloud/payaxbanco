@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS planos (
   periodicidade TEXT NOT NULL DEFAULT 'mensal' CHECK (periodicidade IN ('mensal','anual')),
   telas INTEGER NOT NULL DEFAULT 1 CHECK (telas BETWEEN 1 AND 10),
   perfis_max INTEGER NOT NULL DEFAULT 4 CHECK (perfis_max BETWEEN 1 AND 10),
-  qualidade TEXT NOT NULL DEFAULT 'hd' CHECK (qualidade IN ('sd','hd','4k')),
+  qualidade TEXT NOT NULL DEFAULT 'hd' CHECK (qualidade IN ('sd','hd','fullhd','4k')),
   downloads INTEGER NOT NULL DEFAULT 0,
   canais_ao_vivo INTEGER NOT NULL DEFAULT 1,
   -- Nível do plano: um título ou canal com plano mínimo exige assinatura deste nível ou acima.
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS midias (
   duracao_s INTEGER,
   largura INTEGER,
   altura INTEGER,
-  qualidade TEXT CHECK (qualidade IS NULL OR qualidade IN ('sd','hd','4k')),
+  qualidade TEXT CHECK (qualidade IS NULL OR qualidade IN ('sd','hd','fullhd','4k')),
   idioma TEXT,
   rotulo TEXT,
   -- enviando: upload em pedaços em andamento; pronta: fechada e conferida; erro.
@@ -246,6 +246,21 @@ CREATE TABLE IF NOT EXISTS episodios (
 );
 CREATE INDEX IF NOT EXISTS idx_episodios_titulo ON episodios(titulo_id, temporada_id, numero);
 
+-- Versões do mesmo conteúdo em qualidades diferentes (SD, HD, Full HD e 4K).
+-- O título (ou o episódio) aponta para a versão principal em video_midia_id; aqui ficam todas,
+-- e o player escolhe a melhor que o plano do assinante permite.
+CREATE TABLE IF NOT EXISTS versoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  titulo_id INTEGER REFERENCES titulos(id) ON DELETE CASCADE,
+  episodio_id INTEGER REFERENCES episodios(id) ON DELETE CASCADE,
+  midia_id INTEGER NOT NULL REFERENCES midias(id),
+  qualidade TEXT NOT NULL CHECK (qualidade IN ('sd','hd','fullhd','4k')),
+  criado_em TEXT NOT NULL,
+  CHECK ((titulo_id IS NULL) <> (episodio_id IS NULL))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_versao_titulo ON versoes(titulo_id, qualidade) WHERE titulo_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_versao_episodio ON versoes(episodio_id, qualidade) WHERE episodio_id IS NOT NULL;
+
 -- Legendas de um filme ou episódio (arquivo .vtt).
 CREATE TABLE IF NOT EXISTS legendas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -357,7 +372,7 @@ CREATE TABLE IF NOT EXISTS configuracoes (
 const PLANOS_PADRAO = [
   // slug, nome, descrição, preço, telas, perfis, qualidade, downloads, nível, ordem
   ['essencial', 'Essencial', 'Todos os canais ao vivo e o catálogo completo em uma tela, em HD.', 1990, 1, 2, 'hd', 0, 1, 1],
-  ['familia', 'Família', 'Quatro telas ao mesmo tempo, Full HD e downloads para assistir sem internet.', 3990, 4, 5, 'hd', 1, 2, 2],
+  ['familia', 'Família', 'Quatro telas ao mesmo tempo, Full HD e downloads para assistir sem internet.', 3990, 4, 5, 'fullhd', 1, 2, 2],
   ['cinema', 'Cinema 4K', 'Seis telas, 4K com HDR, downloads e os lançamentos em primeira mão.', 5990, 6, 6, '4k', 1, 3, 3],
 ];
 
@@ -367,16 +382,16 @@ const GENEROS_PADRAO = ['Ação', 'Aventura', 'Comédia', 'Documentário', 'Dram
 const FILEIRAS_PADRAO = [
   // nome, tipo, limite, ordem
   ['Canais ao vivo agora', 'canais', 20, 1],
-  ['Em alta na PLAY TV', 'em_alta', 20, 2],
+  ['Em alta na PLAY TECH VIP', 'em_alta', 20, 2],
   ['Novidades', 'novidades', 20, 3],
-  ['Originais PLAY', 'originais', 20, 4],
+  ['Originais PLAY TECH VIP', 'originais', 20, 4],
   ['Séries para maratonar', 'series', 20, 5],
   ['Filmes', 'filmes', 20, 6],
 ];
 
 const CONFIG_PADRAO = {
   pix_chave: '',
-  pix_recebedor: 'PLAY TV',
+  pix_recebedor: 'PLAY TECH VIP',
   pix_cidade: 'SAO PAULO',
   // Dias entre o vencimento da fatura e a suspensão do acesso.
   carencia_dias: '5',
@@ -424,7 +439,27 @@ function abrir(arquivo = config.dbFile) {
 }
 
 /** Acrescenta colunas que entraram depois, em bancos já criados. */
+/**
+ * Abre espaço para 'fullhd' no CHECK de uma tabela que já existe.
+ * Mexer no texto do schema é o caminho curto: a alternativa seria recriar a tabela, e midias
+ * é apontada por meia dúzia de outras.
+ */
+function aceitarFullHd(db, tabela) {
+  const linha = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabela);
+  if (!linha || String(linha.sql).includes("'fullhd'")) return;
+  try {
+    db.exec('PRAGMA writable_schema = ON');
+    db.prepare("UPDATE sqlite_master SET sql = replace(sql, ?, ?) WHERE type = 'table' AND name = ?")
+      .run("'sd','hd','4k'", "'sd','hd','fullhd','4k'", tabela);
+    db.exec('PRAGMA writable_schema = RESET');
+  } catch {
+    db.exec('PRAGMA writable_schema = OFF');
+  }
+}
+
 function migrar(db) {
+  aceitarFullHd(db, 'planos');
+  aceitarFullHd(db, 'midias');
   const colunas = db.prepare('PRAGMA table_info(canais)').all().map((c) => c.name);
   if (!colunas.includes('fonte')) db.exec("ALTER TABLE canais ADD COLUMN fonte TEXT NOT NULL DEFAULT 'hls'");
   if (!colunas.includes('url_embed')) db.exec('ALTER TABLE canais ADD COLUMN url_embed TEXT');
@@ -461,7 +496,7 @@ function lerConfig(db) {
   const c = Object.fromEntries(db.prepare('SELECT chave, valor FROM configuracoes').all().map((r) => [r.chave, r.valor]));
   return {
     pix_chave: c.pix_chave ?? '',
-    pix_recebedor: c.pix_recebedor ?? 'PLAY TV',
+    pix_recebedor: c.pix_recebedor ?? 'PLAY TECH VIP',
     pix_cidade: c.pix_cidade ?? 'SAO PAULO',
     carencia_dias: Number(c.carencia_dias),
     antecedencia_fatura_dias: Number(c.antecedencia_fatura_dias),

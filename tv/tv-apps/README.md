@@ -1,4 +1,4 @@
-# PLAY TV nas Smart TVs
+# PLAY TECH VIP nas Smart TVs
 
 Três apps, cada um usando o **player nativo do aparelho**:
 
@@ -22,10 +22,10 @@ aparelho e a reprodução usa o player do sistema.
   exige para HLS ao vivo, 4K e DRM.
 - **LG**: o `<video>` do webOS já é o decodificador do aparelho; o HLS vai pelo hls.js, que o
   webOS roda com aceleração.
-- **Android TV**: a página detecta `window.PlayTVNative` e entrega a reprodução ao app: abre a
+- **Android TV**: a página detecta `window.PlayTechVipNative` e entrega a reprodução ao app: abre a
   `PlayerActivity` com **ExoPlayer** em tela cheia, com os controles nativos da TV. A posição
   volta para a página, então "continuar assistindo", audiência e limite de telas seguem valendo.
-- **Qualquer outro aparelho**: o player da própria PLAY TV (hls.js + `<video>`).
+- **Qualquer outro aparelho**: o player da própria PLAY TECH VIP (hls.js + `<video>`).
 
 ## Montar os apps da Samsung e da LG
 
@@ -41,12 +41,12 @@ o `config.js` apontando para o servidor e, no caso da Samsung, a chamada do `web
 # Samsung — com o Tizen Studio instalado
 tizen build-web -- tv-apps/samsung-tizen/dist
 tizen package -t wgt -s <seu-perfil-de-assinatura> -- tv-apps/samsung-tizen/dist/.buildResult
-tizen install -n PlayTV.wgt -t <nome-da-tv> -- .
+tizen install -n PlayTechVip.wgt -t <nome-da-tv> -- .
 
 # LG — com a CLI da LG (npm i -g @webos-tools/cli)
 ares-package tv-apps/lg-webos/dist
-ares-install br.com.playtv.app_1.0.0_all.ipk -d <nome-da-tv>
-ares-launch br.com.playtv.app -d <nome-da-tv>
+ares-install br.com.playtechvip.app_1.0.0_all.ipk -d <nome-da-tv>
+ares-launch br.com.playtechvip.app -d <nome-da-tv>
 ```
 
 Publicação: **Samsung Seller Portal** (seller.samsungapps.com) e **LG Seller Lounge**

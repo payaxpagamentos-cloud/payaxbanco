@@ -1,5 +1,5 @@
 /**
- * Modo TV: a PLAY TV aberta na Smart TV é operada pelo controle remoto, não pelo mouse.
+ * Modo TV: a PLAY TECH VIP aberta na Smart TV é operada pelo controle remoto, não pelo mouse.
  * Aqui ficam a detecção do aparelho, a navegação por setas (foco geométrico), o botão
  * Voltar das TVs e as teclas de mídia.
  *
@@ -10,7 +10,7 @@
 const MARCAS_TV = /Tizen|Web0S|webOS|NetCast|SmartTV|SMART-TV|HbbTV|BRAVIA|AFT[BMNST]|GoogleTV|Android TV|CrKey|VIDAA|TCL|Hisense|Philips.*TV/i;
 
 const guardado = (() => {
-  try { return localStorage.getItem('playtv.modo') === 'tv'; } catch { return false; }
+  try { return localStorage.getItem('playtechvip.modo') === 'tv'; } catch { return false; }
 })();
 
 const pedidoNaUrl = new URLSearchParams(window.location.search).has('tv');
@@ -19,7 +19,7 @@ const pedidoNaUrl = new URLSearchParams(window.location.search).has('tv');
 export const ehTV = pedidoNaUrl || guardado || MARCAS_TV.test(navigator.userAgent);
 
 if (ehTV) {
-  try { localStorage.setItem('playtv.modo', 'tv'); } catch { /* sem armazenamento */ }
+  try { localStorage.setItem('playtechvip.modo', 'tv'); } catch { /* sem armazenamento */ }
 }
 
 /** Nome do aparelho para a lista de telas em uso. */

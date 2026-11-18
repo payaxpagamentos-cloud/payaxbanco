@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  PLAY TV — app para Samsung Smart TV (Tizen).
+  PLAY TECH VIP — app para Samsung Smart TV (Tizen).
   Empacote com o Tizen Studio: o app abre o servidor configurado em config.js.
   Troque o id do pacote (xxxxxxxxxx) pelo id que o Samsung Seller Portal gerar para vocês.
 -->
 <widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets"
-        id="http://playtv.com.br/playtv" version="1.0.0" viewmodes="maximized">
-  <tizen:application id="PLAYTV0001.PlayTV" package="PLAYTV0001" required_version="6.0"/>
-  <name>PLAY TV</name>
+        id="http://playtechvip.com.br/playtechvip" version="1.0.0" viewmodes="maximized">
+  <tizen:application id="PLAYTECHVIP0001.PlayTechVip" package="PLAYTECHVIP0001" required_version="6.0"/>
+  <name>PLAY TECH VIP</name>
   <description>Canais de TV ao vivo, filmes e séries.</description>
-  <author email="contato@playtv.com.br">PLAY TV</author>
+  <author email="contato@playtechvip.com.br">PLAY TECH VIP</author>
   <icon src="icon.png"/>
   <content src="index.html"/>
 
-  <!-- A TV precisa de internet e de navegar até o servidor da PLAY TV. -->
+  <!-- A TV precisa de internet e de navegar até o servidor da PLAY TECH VIP. -->
   <tizen:privilege name="http://tizen.org/privilege/internet"/>
   <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
   <tizen:privilege name="http://developer.samsung.com/privilege/productinfo"/>

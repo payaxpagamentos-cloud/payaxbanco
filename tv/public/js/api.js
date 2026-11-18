@@ -2,19 +2,19 @@
  * Endereço base da API.
  * No navegador, sai de onde este arquivo foi carregado (ex.: '/tv').
  * Dentro dos apps de TV, a interface vai empacotada no aparelho e o servidor fica noutro
- * endereço: aí o app define window.PLAYTV_API antes de carregar o script.
+ * endereço: aí o app define window.PLAYTECHVIP_API antes de carregar o script.
  */
-export const BASE = window.PLAYTV_API
-  ? String(window.PLAYTV_API).replace(/\/+$/, '')
+export const BASE = window.PLAYTECHVIP_API
+  ? String(window.PLAYTECHVIP_API).replace(/\/+$/, '')
   : new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 
 /** Transforma um caminho devolvido pelo servidor em endereço completo, quando o app é empacotado. */
-export const absoluto = (caminho) => (!caminho || /^https?:/i.test(caminho) || !window.PLAYTV_API
+export const absoluto = (caminho) => (!caminho || /^https?:/i.test(caminho) || !window.PLAYTECHVIP_API
   ? caminho
-  : new URL(caminho, window.PLAYTV_API).toString());
+  : new URL(caminho, window.PLAYTECHVIP_API).toString());
 
-const CHAVE_SESSAO = 'playtv.sessao';
-const CHAVE_PERFIL = 'playtv.perfil';
+const CHAVE_SESSAO = 'playtechvip.sessao';
+const CHAVE_PERFIL = 'playtechvip.perfil';
 let memoria = null;
 
 const guardar = (chave, valor) => { try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem armazenamento */ } };

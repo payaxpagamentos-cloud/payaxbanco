@@ -54,7 +54,7 @@ async function iniciar() {
     sessao.limpar();
     return telaLogin(err.status === 401 ? null : err.message);
   }
-  try { tela = sessionStorage.getItem('playtv.admin.tela') || 'painel'; } catch { /* padrão */ }
+  try { tela = sessionStorage.getItem('playtechvip.admin.tela') || 'painel'; } catch { /* padrão */ }
   return ir(tela);
 }
 
@@ -78,7 +78,7 @@ function ir(novaTela, dados = null) {
   const def = TELAS[novaTela];
   if (!def || (def[3] && usuario.perfil !== def[3])) novaTela = 'painel';
   tela = novaTela;
-  try { sessionStorage.setItem('playtv.admin.tela', tela); } catch { /* ignora */ }
+  try { sessionStorage.setItem('playtechvip.admin.tela', tela); } catch { /* ignora */ }
   const principal = el('main');
   limpar(raiz, el('div', { class: 'painel' },
     el('nav', { class: 'menu' },
@@ -184,7 +184,7 @@ async function telaCanais(c) {
     const campoHls = campo('Endereço do sinal (.m3u8)', { name: 'url_hls', value: canal?.url_hls ?? '', placeholder: 'https://origem.emissora.com.br/canal/index.m3u8' },
       'Lista HLS que a emissora (ou a afiliada) fornece por contrato, ou o sinal do seu encoder. Deixe em branco enquanto o sinal não chega: o canal fica cadastrado e desligado.');
     const campoEmbed = campo('Endereço do player oficial da emissora', { name: 'url_embed', value: canal?.url_embed ?? '', placeholder: 'https://www.youtube.com/watch?v=… (transmissão ao vivo do canal verificado)' },
-      'Cole o endereço da transmissão ao vivo oficial e pública da emissora. A PLAY TV abre o player dela, com os anúncios dela — não há transmissão.');
+      'Cole o endereço da transmissão ao vivo oficial e pública da emissora. A PLAY TECH VIP abre o player dela, com os anúncios dela — não há transmissão.');
     const trocarFonte = (fonte) => {
       campoHls.classList.toggle('oculto', fonte !== 'hls');
       campoEmbed.classList.toggle('oculto', fonte !== 'embed');
@@ -398,7 +398,7 @@ function previaCanal(canal, fonte) {
         style: 'width:100%;aspect-ratio:16/9;border:0;border-radius:12px;background:#000',
         title: canal.nome,
       }),
-      el('p', { class: 'pequeno mudo', style: 'margin-top:10px' }, 'Este canal abre o player oficial da emissora. A PLAY TV não transmite o sinal: a transmissão, e os anúncios, são da emissora.'),
+      el('p', { class: 'pequeno mudo', style: 'margin-top:10px' }, 'Este canal abre o player oficial da emissora. A PLAY TECH VIP não transmite o sinal: a transmissão, e os anúncios, são da emissora.'),
     ], { largo: true });
   }
   return modal(`Prévia · ${canal.nome}`, () => {
@@ -578,7 +578,7 @@ async function telaHome(c) {
   const formFileira = (fl = null) => modal(fl ? `Fileira ${fl.nome}` : 'Nova fileira', (fechar) => {
     const f = el('form', { class: 'form' },
       campo('Nome na home', { name: 'nome', required: true, maxlength: 80, value: fl?.nome ?? '' }),
-      escolha('O que mostra', 'tipo', [['em_alta', 'Em alta (mais assistidos)'], ['novidades', 'Novidades'], ['originais', 'Originais PLAY'],
+      escolha('O que mostra', 'tipo', [['em_alta', 'Em alta (mais assistidos)'], ['novidades', 'Novidades'], ['originais', 'Originais PLAY TECH VIP'],
         ['filmes', 'Filmes'], ['series', 'Séries'], ['canais', 'Canais ao vivo'], ['genero', 'Um gênero'], ['manual', 'Escolha manual']], fl?.tipo ?? 'em_alta'),
       escolha('Gênero (só para o tipo "um gênero")', 'genero_id', [['', '—'], ...generos.map((g) => [g.id, g.nome])], fl?.genero_id ?? ''),
       el('div', { class: 'duas' },

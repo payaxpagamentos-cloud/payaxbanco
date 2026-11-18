@@ -1,4 +1,4 @@
-# PLAY TV — imagem de produção
+# PLAY TECH VIP — imagem de produção
 ARG BASE=node:22-slim
 FROM ${BASE}
 

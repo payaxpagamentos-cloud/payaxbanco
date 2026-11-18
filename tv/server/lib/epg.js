@@ -188,7 +188,7 @@ async function importarDeUrl(db, url, { substituir = true, timeoutMs = 60_000 } 
   await conferirEndereco(url);
   let resp;
   try {
-    resp = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'PLAYTV/1.0', Accept: '*/*' }, signal: AbortSignal.timeout(timeoutMs) });
+    resp = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'PLAYTECHVIP/1.0', Accept: '*/*' }, signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
     throw new ErroNegocio(`Não foi possível buscar a grade (${err.name === 'TimeoutError' ? 'tempo esgotado' : 'falha de rede'}).`, 504);
   }

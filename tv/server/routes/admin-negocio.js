@@ -13,6 +13,7 @@ const assinaturas = require('../lib/assinaturas');
 const audiencia = require('../lib/audiencia');
 const player = require('../lib/player');
 const v = require('../lib/validacao');
+const qualidades = require('../lib/qualidades');
 
 const soAdmin = permitir('admin');
 
@@ -63,7 +64,7 @@ module.exports = (db) => {
     periodicidade: v.opcao(d.periodicidade ?? 'mensal', 'a periodicidade', ['mensal', 'anual']),
     telas: v.inteiro(d.telas ?? 1, 'as telas', { min: 1, max: 10 }),
     perfis_max: v.inteiro(d.perfis_max ?? 4, 'os perfis', { min: 1, max: 10 }),
-    qualidade: v.opcao(d.qualidade ?? 'hd', 'a qualidade', ['sd', 'hd', '4k']),
+    qualidade: v.opcao(d.qualidade ?? 'hd', 'a qualidade', qualidades.ORDEM),
     downloads: v.booleano(d.downloads) ? 1 : 0,
     canais_ao_vivo: v.booleano(d.canais_ao_vivo, true) ? 1 : 0,
     nivel: v.inteiro(d.nivel ?? 1, 'o nível', { min: 1, max: 9 }),

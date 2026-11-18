@@ -1,10 +1,10 @@
 {
-  "id": "br.com.playtv.app",
+  "id": "br.com.playtechvip.app",
   "version": "1.0.0",
-  "vendor": "PLAY TV",
+  "vendor": "PLAY TECH VIP",
   "type": "web",
   "main": "index.html",
-  "title": "PLAY TV",
+  "title": "PLAY TECH VIP",
   "appDescription": "Canais de TV ao vivo, filmes e séries.",
   "icon": "icon.png",
   "largeIcon": "largeIcon.png",

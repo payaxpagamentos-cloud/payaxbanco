@@ -1,9 +1,9 @@
 import { api, BASE, ErroApi, absoluto } from './api.js';
-import { el, icone, relogio, duracao, toast, modal, acao, nomeDoAparelho, etiquetaIdade, QUALIDADES } from './ui.js';
+import { el, icone, relogio, duracao, toast, modal, acao, nomeDoAparelho, etiquetaIdade, QUALIDADES, LINHAS_QUALIDADE } from './ui.js';
 import { temPonteAndroid, criarVideoTizen, tocarNoAndroidTV } from './motor-nativo.js';
 
 /**
- * Player da PLAY TV: canais ao vivo (HLS pelo hls.js, com reserva para o HLS nativo do Safari)
+ * Player da PLAY TECH VIP: canais ao vivo (HLS pelo hls.js, com reserva para o HLS nativo do Safari)
  * e conteúdo sob demanda (MP4 com Range). Controles próprios, legendas, qualidade, telas simultâneas
  * e "continuar assistindo" salvo de tempo em tempo.
  */
@@ -66,10 +66,14 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   // ---------- Montagem da tela ----------
   const titulo = el('h2', {}, dados.info.titulo);
   const subtitulo = el('div', { class: 'sub' }, dados.info.subtitulo ?? '');
+  const rotuloQualidade = (q) => QUALIDADES[q] ?? String(q ?? '').toUpperCase();
+  const seloQualidade = dados.fonte.qualidade
+    ? el('span', { class: `etiqueta qualidade${dados.fonte.qualidade === '4k' ? ' ultra' : ''}` }, rotuloQualidade(dados.fonte.qualidade))
+    : null;
   const selos = el('div', { class: 'linha', style: 'margin-top:6px' },
     aoVivo ? el('span', { class: 'etiqueta vivo' }, 'AO VIVO') : null,
     dados.info.classificacao !== undefined ? etiquetaIdade(dados.info.classificacao) : null,
-    dados.fonte.qualidade ? el('span', { class: 'etiqueta' }, QUALIDADES[dados.fonte.qualidade] ?? dados.fonte.qualidade) : null,
+    seloQualidade,
     dados.fonte.nossos_servidores ? el('span', { class: 'etiqueta ok', title: 'O sinal passa pelos nossos servidores' }, 'PLAY CDN') : null);
 
   const btn = (nomeIcone, rotulo, fn, extra = '') => {
@@ -132,7 +136,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   document.body.append(caixa);
   document.body.style.overflow = 'hidden';
   // Teclas de mídia do controle remoto e botão Voltar da TV.
-  window.playtvPlayer = {
+  window.playtechvipPlayer = {
     fechar: () => fechar(),
     alternar: () => alternar(),
     tocar: () => video.play().catch(() => {}),
@@ -198,9 +202,66 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     menuAberto = m;
   }
 
+  const LEMBRETE = 'playtechvip.qualidade';
+
+  /** Troca a versão do arquivo (SD, HD, Full HD, 4K) continuando de onde parou. */
+  function trocarVersao(item) {
+    if (!item?.url || item.bloqueada || item.atual) return;
+    const posicao = video.currentTime;
+    const tocando = !video.paused;
+    avisoCentro.classList.remove('oculto');
+    const retomar = () => {
+      try { video.currentTime = posicao; } catch { /* o arquivo ainda não aceitou o salto */ }
+      if (tocando) video.play().catch(() => {});
+      avisoCentro.classList.add('oculto');
+    };
+    video.addEventListener('loadedmetadata', retomar, { once: true });
+    video.src = absoluto(item.url);
+    video.load?.();
+    for (const q of dados.qualidades ?? []) q.atual = q === item;
+    dados.fonte.qualidade = item.qualidade;
+    dados.fonte.url = item.url;
+    if (seloQualidade) {
+      seloQualidade.textContent = rotuloQualidade(item.qualidade);
+      seloQualidade.classList.toggle('ultra', item.qualidade === '4k');
+    }
+    try { localStorage.setItem(LEMBRETE, item.qualidade); } catch { /* navegador sem armazenamento */ }
+    toast(`Qualidade: ${item.rotulo ?? rotuloQualidade(item.qualidade)}`);
+  }
+
+  /** Na abertura, respeita a qualidade que o assinante escolheu da última vez. */
+  function aplicarPreferencia() {
+    let preferida = null;
+    try { preferida = localStorage.getItem(LEMBRETE); } catch { /* sem armazenamento */ }
+    const alvo = (dados.qualidades ?? []).find((q) => q.qualidade === preferida && !q.bloqueada && !q.atual);
+    if (alvo) {
+      dados.fonte.qualidade = alvo.qualidade;
+      dados.fonte.url = alvo.url;
+      for (const q of dados.qualidades) q.atual = q === alvo;
+      if (seloQualidade) {
+        seloQualidade.textContent = rotuloQualidade(alvo.qualidade);
+        seloQualidade.classList.toggle('ultra', alvo.qualidade === '4k');
+      }
+    }
+  }
+
   function menuQualidade() {
     const itens = [];
-    if (hls?.levels?.length) {
+    const versoes = dados.qualidades ?? [];
+    if (!hls?.levels?.length && versoes.length) {
+      // Sob demanda: cada versão é um arquivo próprio, do 4K ao SD.
+      for (const q of versoes) {
+        const linhas = q.linha ?? LINHAS_QUALIDADE[q.qualidade] ?? '';
+        itens.push({
+          rotulo: q.rotulo ?? rotuloQualidade(q.qualidade),
+          detalhe: q.bloqueada ? 'plano superior' : [linhas, q.largura && q.altura ? `${q.largura}×${q.altura}` : null].filter(Boolean).join(' · '),
+          ligado: Boolean(q.atual),
+          fn: () => (q.bloqueada
+            ? toast('Seu plano não inclui esta qualidade. Veja os planos em Minha conta.', true)
+            : trocarVersao(q)),
+        });
+      }
+    } else if (hls?.levels?.length) {
       itens.push({ rotulo: 'Automática', detalhe: hls.autoLevelEnabled && hls.currentLevel >= 0 ? `${hls.levels[hls.currentLevel]?.height}p` : null,
         ligado: hls.autoLevelEnabled, fn: () => { hls.currentLevel = -1; } });
       hls.levels.forEach((n, i) => itens.push({
@@ -210,7 +271,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
         fn: () => { hls.currentLevel = i; },
       }));
     } else {
-      itens.push({ rotulo: QUALIDADES[dados.fonte.qualidade] ?? 'Qualidade do arquivo', detalhe: 'única', ligado: true, fn: () => {} });
+      itens.push({ rotulo: rotuloQualidade(dados.fonte.qualidade) || 'Qualidade do arquivo', detalhe: 'versão única', ligado: true, fn: () => {} });
     }
     itens.push({ rotulo: 'Velocidade normal', ligado: video.playbackRate === 1, fn: () => { video.playbackRate = 1; } });
     for (const r of [1.25, 1.5, 2]) itens.push({ rotulo: `Velocidade ${String(r).replace('.', ',')}×`, ligado: video.playbackRate === r, fn: () => { video.playbackRate = r; } });
@@ -339,7 +400,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     if (Math.abs(pos - ultimoSalvo) < 5) return;
     ultimoSalvo = pos;
     try {
-      await api.post('/play/ping', { sessao_id: dados.sessao_id, segundos: Math.floor(video.currentTime), posicao: pos, duracao: Math.floor(duracaoAtual()) });
+      await api.post('/play/ping', { sessao_id: dados.sessao_id, segundos: Math.floor(video.currentTime), posicao: pos, duracao: Math.floor(duracaoAtual()), qualidade: dados.fonte.qualidade ?? null });
     } catch { /* tenta no próximo ciclo */ }
   };
 
@@ -425,11 +486,12 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch { /* segue */ } }
     caixa.remove();
     document.body.style.overflow = '';
-    window.playtvPlayer = null;
+    window.playtechvipPlayer = null;
     if (!silencioso) aoFechar?.();
     resolverFim({ titulo_id: dados.info.titulo_id ?? null });
   }
 
+  aplicarPreferencia();
   await ligarFonte();
   return fim;
 }
@@ -486,7 +548,7 @@ async function tocarNativoAndroid(dados, { aoFechar }) {
 }
 
 /**
- * Canal com fonte "embed": a PLAY TV abre o player público da própria emissora dentro da tela,
+ * Canal com fonte "embed": a PLAY TECH VIP abre o player público da própria emissora dentro da tela,
  * com os anúncios dela — por isso aqui não há controles nossos
  * (quem manda no vídeo é o player da emissora). A tela continua contando para o limite do plano.
  */
@@ -529,7 +591,7 @@ function tocarNoPlayerDaEmissora(dados, { aoFechar }) {
 
   document.body.append(caixa);
   document.body.style.overflow = 'hidden';
-  window.playtvPlayer = { fechar: () => fechar(), alternar: () => {}, parar: () => fechar() };
+  window.playtechvipPlayer = { fechar: () => fechar(), alternar: () => {}, parar: () => fechar() };
 
   const inicio = Date.now();
   const ping = setInterval(async () => {
@@ -555,7 +617,7 @@ function tocarNoPlayerDaEmissora(dados, { aoFechar }) {
     if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch { /* segue */ } }
     caixa.remove();
     document.body.style.overflow = '';
-    window.playtvPlayer = null;
+    window.playtechvipPlayer = null;
     aoFechar?.();
     resolverFim({ titulo_id: null });
   }

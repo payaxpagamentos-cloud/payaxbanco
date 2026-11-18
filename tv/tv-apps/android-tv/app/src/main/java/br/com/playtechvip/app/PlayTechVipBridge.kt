@@ -1,13 +1,13 @@
-package br.com.playtv.app
+package br.com.playtechvip.app
 
 import android.webkit.JavascriptInterface
 import org.json.JSONObject
 
 /**
- * O que a página da PLAY TV enxerga como `window.PlayTVNative`.
+ * O que a página da PLAY TECH VIP enxerga como `window.PlayTechVipNative`.
  * Quando existe, o player da página se cala e quem toca é o ExoPlayer nativo.
  */
-class PlayTVBridge(private val tela: MainActivity) {
+class PlayTechVipBridge(private val tela: MainActivity) {
 
   /** A página pede para tocar: { url, titulo, subtitulo, aoVivo, posicao, sessaoId } */
   @JavascriptInterface

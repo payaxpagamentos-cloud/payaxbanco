@@ -1,12 +1,12 @@
 /**
- * Abre a PLAY TV no servidor configurado. Antes de sair daqui, registra as teclas de mídia
+ * Abre a PLAY TECH VIP no servidor configurado. Antes de sair daqui, registra as teclas de mídia
  * do controle remoto (cada fabricante exige que o app peça por elas).
  */
 (function carregar() {
   var aviso = document.getElementById('aviso');
   var rodinha = document.getElementById('rodinha');
   var tentar = document.getElementById('tentar');
-  var servidor = (window.PLAYTV_SERVIDOR || '').replace(/\/+$/, '');
+  var servidor = (window.PLAYTECHVIP_SERVIDOR || '').replace(/\/+$/, '');
 
   function falhar(texto) {
     rodinha.style.display = 'none';
@@ -16,7 +16,7 @@
   }
 
   if (!servidor || servidor.indexOf('SEU-DOMINIO') >= 0) {
-    return falhar('Antes de instalar, abra o arquivo config.js do app e troque PLAYTV_SERVIDOR pelo endereço do seu servidor.');
+    return falhar('Antes de instalar, abra o arquivo config.js do app e troque PLAYTECHVIP_SERVIDOR pelo endereço do seu servidor.');
   }
 
   // Samsung (Tizen): sem registrar, as teclas de mídia não chegam ao app.

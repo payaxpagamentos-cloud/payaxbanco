@@ -46,7 +46,7 @@ function copiarInterface(destino) {
 /** Escreve o config.js e pendura os scripts certos no index.html. */
 function ajustarPagina(destino, { comWebapis }) {
   fs.writeFileSync(path.join(destino, 'config.js'),
-    `/* Endereço do servidor da PLAY TV (gerado por scripts/empacotar-tv.js). */\nwindow.PLAYTV_API = '${servidor}';\n`);
+    `/* Endereço do servidor da PLAY TECH VIP (gerado por scripts/empacotar-tv.js). */\nwindow.PLAYTECHVIP_API = '${servidor}';\n`);
 
   const pagina = path.join(destino, 'index.html');
   let html = fs.readFileSync(pagina, 'utf8');
@@ -56,7 +56,7 @@ function ajustarPagina(destino, { comWebapis }) {
   ].filter(Boolean).join('\n');
   html = html.replace('  <script type="module" src="js/app.js"></script>', `${antes}\n  <script type="module" src="js/app.js"></script>`);
   // Na TV o app já entra em modo TV, sem depender do reconhecimento pelo user agent.
-  html = html.replace('<body>', '<body>\n  <script>try { localStorage.setItem("playtv.modo", "tv"); } catch (e) {}</script>');
+  html = html.replace('<body>', '<body>\n  <script>try { localStorage.setItem("playtechvip.modo", "tv"); } catch (e) {}</script>');
   fs.writeFileSync(pagina, html);
 }
 

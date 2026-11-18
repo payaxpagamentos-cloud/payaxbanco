@@ -1,7 +1,7 @@
 {
-  "name": "play-tv",
+  "name": "play-tech-vip",
   "version": "1.0.0",
-  "description": "PLAY TV — plataforma de streaming: canais de TV ao vivo, catálogo sob demanda, assinaturas e painel de operação.",
+  "description": "PLAY TECH VIP — plataforma de streaming: canais de TV ao vivo, catálogo sob demanda, assinaturas e painel de operação.",
   "main": "server/index.js",
   "private": true,
   "type": "commonjs",

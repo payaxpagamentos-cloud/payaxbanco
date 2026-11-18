@@ -10,7 +10,7 @@
  */
 
 /** O app nativo do Android TV está por perto? */
-export const temPonteAndroid = () => Boolean(window.PlayTVNative?.tocar);
+export const temPonteAndroid = () => Boolean(window.PlayTechVipNative?.tocar);
 
 /** A TV Samsung expõe o player nativo? (só dentro do app empacotado, com webapis.js carregado) */
 export const temAvplay = () => Boolean(window.webapis?.avplay);
@@ -170,14 +170,14 @@ export function criarVideoTizen() {
  */
 export function tocarNoAndroidTV({ url, titulo, subtitulo, aoVivo, posicao = 0, sessaoId = null }) {
   return new Promise((resolve) => {
-    window.playtvNativoEvento = (evento) => {
+    window.playtechvipNativoEvento = (evento) => {
       const e = typeof evento === 'string' ? JSON.parse(evento) : evento;
       if (e?.tipo === 'progresso') window.dispatchEvent(new CustomEvent('tv:progresso-nativo', { detail: e }));
       if (e?.tipo === 'fim') {
-        window.playtvNativoEvento = null;
+        window.playtechvipNativoEvento = null;
         resolve({ segundos: Number(e.segundos) || 0, concluido: Boolean(e.concluido) });
       }
     };
-    window.PlayTVNative.tocar(JSON.stringify({ url, titulo, subtitulo: subtitulo ?? '', aoVivo: Boolean(aoVivo), posicao, sessaoId }));
+    window.PlayTechVipNative.tocar(JSON.stringify({ url, titulo, subtitulo: subtitulo ?? '', aoVivo: Boolean(aoVivo), posicao, sessaoId }));
   });
 }

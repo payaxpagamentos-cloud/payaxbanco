@@ -1,4 +1,4 @@
-/* PLAY TV — layout e design no padrão das grandes plataformas de streaming: preto, vermelho e cartões deitados. */
+/* PLAY TECH VIP — layout e design no padrão das grandes plataformas de streaming: preto, vermelho e cartões deitados. */
 @font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
 
 :root{
@@ -67,6 +67,13 @@ a:hover{ color: var(--text-2); }
 .marca img{ width: 30px; height: 30px; }
 .marca .play{ color: var(--acento); }
 .marca .tv{ color: var(--text); white-space: pre; }
+.marca .vip{
+  margin-left: 7px; padding: 2px 7px 1px; border-radius: 5px;
+  background: linear-gradient(140deg, #F5D176, #C9972F);
+  color: #140d02; font-size: .62em; font-weight: 800; letter-spacing: .1em;
+  vertical-align: 3px; text-shadow: none;
+}
+body.tv .marca .vip{ vertical-align: 5px; }
 
 /* ---------- Botões ---------- */
 .btn{ display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; background: rgba(109,109,110,.7);
@@ -117,6 +124,10 @@ legend{ padding: 0 6px; font-size: 12px; font-weight: 800; color: var(--text-2);
 .etiqueta.vivo{ background: var(--acento); color: #fff; letter-spacing: .04em; }
 .etiqueta.vivo::before{ content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: pisca 1.6s infinite; }
 .etiqueta.plano{ background: var(--ouro); color: #1A1400; }
+/* Qualidade do que está tocando: 4K ganha o dourado da marca. */
+.etiqueta.qualidade{ background: var(--surface-3); color: var(--text); letter-spacing: .04em;
+  flex: 0 0 auto; align-self: center; width: fit-content; }
+.etiqueta.qualidade.ultra{ background: linear-gradient(140deg, #F5D176, #C9972F); color: #140d02; }
 .etiqueta.idade{ background: transparent; color: var(--text); border-left: 3px solid var(--text-2); border-radius: 0; padding: 1px 7px; font-weight: 600; }
 .etiqueta.idade.l{ border-left-color: var(--ok); }
 .etiqueta.idade.a16, .etiqueta.idade.a18{ border-left-color: var(--acento); }

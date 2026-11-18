@@ -1,4 +1,4 @@
-# PLAY TV
+# PLAY TECH VIP
 
 Plataforma de streaming: **canais de TV ao vivo** nossa transmissãos pelos nossos servidores e **catálogo sob demanda**
 com conteúdo próprio (filmes, séries e episódios), vendido por **assinatura**. App do assinante e painel da operação,
@@ -16,8 +16,8 @@ com servidor, banco de dados e login próprios.
 | 2 | **TV aberta já cadastrada** | Globo, SBT, Record, Band, RedeTV!, Cultura, Gazeta, TV Brasil, Rede Brasil, Aparecida, Rede Vida e os canais de notícias entram com um clique em **Canais → Importar TV aberta** (número, categoria, logo e onde fica o sinal de cada um). Além disso, **Buscar canais (lista pública)** traz o catálogo aberto do projeto iptv-org, com o melhor sinal de cada canal brasileiro, para importar em lote. Cada canal aceita **sinal .m3u8** (próprio, contratado ou público) ou o **player oficial da emissora**, que abre o player dela com os anúncios dela. |
 | 3 | **Grade de programação (EPG)** | Programação por canal, cadastrada na mão (com recusa de sobreposição) ou importada em **XMLTV** — o formato que emissoras e agregadores publicam. O app mostra "no ar agora" com barra de andamento, o que vem depois e um **guia de 7 dias** que já abre no programa do momento. |
 | 4 | **Catálogo sob demanda** | Filmes e séries com temporadas, episódios, trailer, elenco, direção, gêneros, classificação indicativa e selo de original. **Envio do vídeo pelo painel em pedaços** (retomável, até 8 GB por arquivo), formato reconhecido pelo conteúdo do arquivo (MP4, WebM, MKV) e entrega com **HTTP Range**. Legendas em WebVTT. Publicar confere se há vídeo e capa. |
-| 5 | **Player** | Tela cheia com controles próprios: HLS pelo **hls.js** (com o HLS nativo do Safari como reserva), MP4 com Range, troca de qualidade e velocidade, legendas, janela flutuante, tela cheia, atalhos de teclado, **retomada de onde parou**, **próximo episódio** e aviso de telas simultâneas com a opção de encerrar as outras. |
-| 6 | **Assinaturas e cobrança** | Planos com preço, telas simultâneas, perfis, qualidade (SD/Full HD/4K), downloads e **nível** (libera conteúdo exclusivo). Fatura mensal com **PIX copia e cola e QR Code**, carência, **suspensão automática** de quem não pagou, troca de plano, cancelamento que vale até o fim do período pago e reativação. Todo o conteúdo exige assinatura ativa. |
+| 5 | **Player** | Tela cheia com controles próprios: HLS pelo **hls.js** (com o HLS nativo do Safari como reserva), MP4 com Range, **troca de qualidade entre 4K, Full HD, HD e SD** continuando de onde parou (limitada pelo plano), velocidade, legendas, janela flutuante, tela cheia, atalhos de teclado, **retomada de onde parou**, **próximo episódio** e aviso de telas simultâneas com a opção de encerrar as outras. |
+| 6 | **Assinaturas e cobrança** | Planos com preço, telas simultâneas, perfis, qualidade máxima (SD, HD, Full HD ou 4K), downloads e **nível** (libera conteúdo exclusivo). Fatura mensal com **PIX copia e cola e QR Code**, carência, **suspensão automática** de quem não pagou, troca de plano, cancelamento que vale até o fim do período pago e reativação. Todo o conteúdo exige assinatura ativa. |
 | 7 | **Perfis de visualização** | Vários perfis por conta (até o limite do plano), cada um com sua lista, seu progresso e sua **classificação indicativa**. Perfil infantil nasce limitado a 10 anos. **PIN** opcional: o perfil protegido só abre com a chave assinada que o aparelho recebe ao digitar o PIN. |
 | 8 | **Home e curadoria** | Destaques do topo (que passam sozinhos) e fileiras montadas pela curadoria: continuar assistindo, minha lista, em alta (audiência real), novidades, originais, por gênero, canais ao vivo ou **escolha manual** dos títulos. |
 | 9 | **Telas simultâneas** | Cada tela aberta é uma sessão com sinal de vida. O plano define quantas cabem ao mesmo tempo; quem bate no limite vê onde está assistindo e pode encerrar as outras. A tela que para de dar sinal libera a vaga sozinha. |
@@ -38,8 +38,9 @@ com servidor, banco de dados e login próprios.
   o que ela não faz é inventar um sinal que a emissora não liberou.
 - **DRM (Widevine/FairPlay/PlayReady)**: estúdios costumam exigir DRM para conteúdo licenciado. A plataforma entrega
   o vídeo por link assinado de curta duração, que resolve o acesso indevido casual, mas não é DRM.
-- **Transcodificação para várias qualidades (ABR)**: o vídeo enviado é entregue como está. Para gerar 1080p/720p/480p
-  do mesmo filme, rode um transcodificador (ffmpeg) antes do envio ou um encoder que já publique em HLS.
+- **Transcodificação automática**: a plataforma **serve** 4K, Full HD, HD e SD do mesmo título — a operação envia um
+  arquivo por qualidade e o player troca entre eles sem perder a cena —, mas não converte sozinha: quem gera os
+  arquivos é um transcodificador (ffmpeg) antes do envio, ou um encoder que já publique em HLS com várias faixas.
 - **Aplicativos de loja (iOS, Android, Smart TV)**: o app é web e abre em qualquer navegador, inclusive das TVs.
   Publicar nas lojas exige empacotamento e as regras de cada loja.
 
@@ -68,7 +69,7 @@ a posição para "continuar assistindo", audiência e limite de telas continuare
 
 ## De onde vem o sinal de cada canal
 
-A PLAY TV aceita as três formas que existem hoje, e o painel tem um botão para cada uma:
+A PLAY TECH VIP aceita as três formas que existem hoje, e o painel tem um botão para cada uma:
 
 | Forma | Como entra | Quem paga a banda | Onde isso aparece |
 |---|---|---|---|
@@ -112,8 +113,8 @@ npm run seed     # opcional: 8 canais com grade, catálogo de exemplo, assinante
 npm start        # http://localhost:3600
 ```
 
-Acesso inicial da operação: `admin@playtv.com.br` / `admin123` (troque em produção pelo `.env`).
-Com o seed: `curadoria@playtv.com.br` / `play2026` e assinantes `marina@`, `rogerio@`, `andrade@` e
+Acesso inicial da operação: `admin@playtechvip.com.br` / `admin123` (troque em produção pelo `.env`).
+Com o seed: `curadoria@playtechvip.com.br` / `play2026` e assinantes `marina@`, `rogerio@`, `andrade@` e
 `juliana@exemplo.com.br`, senha `cliente2026` (ativo, ativo, suspenso e aguardando pagamento).
 
 ```bash
@@ -126,7 +127,7 @@ emissora em **Canais**.
 ## Instalação no servidor (/tv)
 
 ```bash
-npm run empacotar   # gera dist/play-tv.zip
+npm run empacotar   # gera dist/play-tech-vip.zip
 ```
 
 O pacote traz a pasta `tv/` pronta para enviar ao servidor: código, dependências de produção já instaladas, `.env`
@@ -142,7 +143,7 @@ No Nginx, o `location /tv/` precisa de `proxy_buffering off` (entrega em fluxo d
 |---|---|---|
 | `PORT` | `3600` | Porta HTTP. |
 | `TV_BASE_PATH` | (raiz) | Endereço da plataforma, ex.: `/tv`. O painel fica em `<endereço>/admin/`. |
-| `TV_MARCA` | `PLAY TV` | Nome da plataforma nas telas e no PIX. |
+| `TV_MARCA` | `PLAY TECH VIP` | Nome da plataforma nas telas e no PIX. |
 | `TV_SECRET` | aleatório | Segredo das sessões e dos links de reprodução (mín. 32 caracteres). **Obrigatório em produção.** Trocar derruba as sessões e invalida os links. |
 | `TV_ADMIN_EMAIL` / `TV_ADMIN_SENHA` / `TV_ADMIN_NOME` | — | Administrador criado no primeiro start. Senha obrigatória em produção (mín. 12). |
 | `TV_DB` | `data/tv.db` | Arquivo do banco SQLite. |
@@ -165,7 +166,7 @@ No Nginx, o `location /tv/` precisa de `proxy_buffering off` (entrega em fluxo d
 A API responde com liberação de origem (CORS) porque os apps de TV levam a interface dentro do aparelho e chamam o
 servidor de outra origem. A autenticação é por token no cabeçalho, não por cookie: sem o token, nada responde.
 
-Produção com Docker: `docker build -t play-tv tv/` e rode com um volume em `/app/data` (banco **e** vídeos).
+Produção com Docker: `docker build -t play-tech-vip tv/` e rode com um volume em `/app/data` (banco **e** vídeos).
 
 ## Tecnologia e arquitetura
 

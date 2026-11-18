@@ -14,6 +14,8 @@ const embed = require('../lib/embed');
 const { CANAIS_ABERTOS, AVISO_NUMEROS } = require('../lib/tv-aberta');
 const listasPublicas = require('../lib/listas-publicas');
 const player = require('../lib/player');
+const versoes = require('../lib/versoes');
+const qualidades = require('../lib/qualidades');
 const v = require('../lib/validacao');
 
 const CATEGORIAS = ['aberta', 'noticias', 'esportes', 'filmes', 'series', 'infantil', 'documentarios', 'musica', 'variedades', 'religioso', 'local'];
@@ -413,6 +415,9 @@ module.exports = (db) => {
         episodios: db.prepare('SELECT * FROM episodios WHERE temporada_id = ? ORDER BY numero').all(tm.id),
       })),
       legendas: db.prepare('SELECT * FROM legendas WHERE titulo_id = ? OR episodio_id IN (SELECT id FROM episodios WHERE titulo_id = ?)').all(t.id, t.id),
+      versoes: db.prepare(`SELECT v.*, m.nome_original, m.largura, m.altura, m.tamanho, m.duracao_s FROM versoes v JOIN midias m ON m.id = v.midia_id
+        WHERE v.titulo_id = ? OR v.episodio_id IN (SELECT id FROM episodios WHERE titulo_id = ?)
+        ORDER BY v.episodio_id, v.qualidade`).all(t.id, t.id),
     });
   });
 
@@ -531,6 +536,34 @@ module.exports = (db) => {
   });
 
   // ---------------- Legendas ----------------
+
+  // ---------------- Versões em SD, HD, Full HD e 4K ----------------
+
+  /**
+   * Liga um arquivo já enviado a um filme ou episódio como a versão de uma qualidade.
+   * O assinante vê todas no menu do player, limitado ao que o plano dele permite.
+   */
+  r.post('/versoes', (req, res) => {
+    const d = req.body;
+    const tituloId = d.titulo_id ? achar('titulos', d.titulo_id, 'Título').id : null;
+    const episodioId = d.episodio_id ? achar('episodios', d.episodio_id, 'Episódio').id : null;
+    if (!tituloId && !episodioId) throw new ErroNegocio('Diga de qual filme ou episódio é a versão.', 422);
+    const m = midia.buscar(db, v.inteiro(d.midia_id, 'o vídeo', { min: 1 }));
+    const versao = versoes.registrar(db, {
+      tituloId: episodioId ? null : tituloId,
+      episodioId,
+      midiaId: m.id,
+      // Sem qualidade informada, vale a altura do arquivo.
+      qualidade: d.qualidade ?? qualidades.porMedidas(m.largura, m.altura) ?? 'hd',
+    });
+    registrar(db, req, 'versao_cadastrada', { id: versao.id, qualidade: versao.qualidade, titulo_id: tituloId, episodio_id: episodioId });
+    res.status(201).json({ versao });
+  });
+
+  r.delete('/versoes/:id', (req, res) => {
+    if (!versoes.remover(db, v.inteiro(req.params.id, 'a versão', { min: 1 }))) throw naoEncontrado('Versão');
+    res.status(204).end();
+  });
 
   r.post('/legendas', (req, res) => {
     const d = req.body;

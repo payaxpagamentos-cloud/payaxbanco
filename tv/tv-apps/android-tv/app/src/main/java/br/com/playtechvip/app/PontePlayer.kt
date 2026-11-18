@@ -1,7 +1,7 @@
-package br.com.playtv.app
+package br.com.playtechvip.app
 
 /**
- * Ponte entre o player nativo (PlayerActivity) e a página da PLAY TV que roda no WebView.
+ * Ponte entre o player nativo (PlayerActivity) e a página da PLAY TECH VIP que roda no WebView.
  * A tela de reprodução avisa aqui o andamento; a MainActivity repassa para o JavaScript.
  */
 object PontePlayer {

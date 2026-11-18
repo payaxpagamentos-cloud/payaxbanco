@@ -1,7 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF4D1C"/><stop offset="1" stop-color="#FFC043"/></linearGradient></defs>
-  <rect width="64" height="64" rx="15" fill="#0A0A0B"/>
-  <rect x="8" y="14" width="48" height="33" rx="7" fill="url(#g)"/>
-  <path d="M27 24.5 40 30.5 27 36.5z" fill="#0A0A0B"/>
-  <path d="M22 55h20" stroke="url(#g)" stroke-width="3.6" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="v" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5D176"/><stop offset="1" stop-color="#C9972F"/></linearGradient>
+    <linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF2A36"/><stop offset="1" stop-color="#B20710"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="#070707"/>
+  <rect x="7" y="11" width="50" height="34" rx="8" fill="none" stroke="url(#v)" stroke-width="2.4"/>
+  <path d="M26 20.5 43 28 26 35.5z" fill="url(#r)"/>
+  <path d="M20.5 55h23" stroke="url(#v)" stroke-width="4" stroke-linecap="round"/>
 </svg>

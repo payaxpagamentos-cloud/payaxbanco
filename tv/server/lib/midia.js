@@ -7,6 +7,7 @@ const config = require('../config');
 const { agora } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('./erros');
 const v = require('./validacao');
+const qualidades = require('./qualidades');
 
 /**
  * Formatos aceitos, reconhecidos pelo conteúdo do arquivo (assinatura dos primeiros bytes),
@@ -43,7 +44,7 @@ const caminho = (m) => path.join(config.midiaDir, m.arquivo);
 const nomeLimpo = (n, padrao) => String(n ?? padrao).replace(/[^\p{L}\p{N} ._()-]/gu, '_').slice(0, 160) || padrao;
 
 /** Qualidade pela altura da imagem do vídeo. */
-const qualidadePorAltura = (altura) => (!altura ? null : altura >= 1800 ? '4k' : altura >= 700 ? 'hd' : 'sd');
+const qualidadePorAltura = (altura, largura = 0) => qualidades.porMedidas(largura, altura);
 
 /** Caminho relativo novo (ano/mês/aleatório.ext), com a pasta criada. */
 function novoArquivo(ext) {
@@ -65,7 +66,7 @@ function abrirEnvioVideo(db, usuario, { nome, tamanho, duracao_s: duracao, largu
     VALUES ('video', ?, ?, 'application/octet-stream', ?, 0, ?, ?, ?, ?, 'enviando', ?, ?)`)
     .run(relativo, nomeLimpo(nome, 'video.mp4'), bytes, v.inteiroOpcional(duracao, 'a duração', { min: 0, max: 86_400 }),
       v.inteiroOpcional(largura, 'a largura', { min: 0, max: 16_384 }), v.inteiroOpcional(altura, 'a altura', { min: 0, max: 16_384 }),
-      qualidadePorAltura(Number(altura) || 0), usuario.id, agora());
+      qualidadePorAltura(Number(altura) || 0, Number(largura) || 0), usuario.id, agora());
   return db.prepare('SELECT * FROM midias WHERE id = ?').get(Number(r.lastInsertRowid));
 }
 
@@ -121,11 +122,12 @@ function concluirEnvioVideo(db, id, { duracao_s: duracao, largura, altura } = {}
     fs.closeSync(leitor);
   }
   const alt = v.inteiroOpcional(altura, 'a altura', { min: 0, max: 16_384 }) ?? m.altura;
+  const larg = v.inteiroOpcional(largura, 'a largura', { min: 0, max: 16_384 }) ?? m.largura;
   db.prepare(`UPDATE midias SET arquivo = ?, mime = ?, sha256 = ?, status = 'pronta', concluido_em = ?,
       duracao_s = COALESCE(?, duracao_s), largura = COALESCE(?, largura), altura = COALESCE(?, altura), qualidade = COALESCE(?, qualidade)
     WHERE id = ?`).run(destino, tipo.mime, hash.digest('hex'), agora(),
-    v.inteiroOpcional(duracao, 'a duração', { min: 0, max: 86_400 }), v.inteiroOpcional(largura, 'a largura', { min: 0, max: 16_384 }), alt,
-    qualidadePorAltura(alt ?? 0), m.id);
+    v.inteiroOpcional(duracao, 'a duração', { min: 0, max: 86_400 }), larg, alt,
+    qualidadePorAltura(alt ?? 0, larg ?? 0), m.id);
   return buscar(db, m.id);
 }
 

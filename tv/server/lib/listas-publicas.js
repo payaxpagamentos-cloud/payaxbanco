@@ -22,7 +22,7 @@ async function baixarJson(url, timeoutMs) {
   await conferirEndereco(url);
   let resp;
   try {
-    resp = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'PLAYTV/1.0' }, signal: AbortSignal.timeout(timeoutMs) });
+    resp = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'PLAYTECHVIP/1.0' }, signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
     throw new ErroNegocio(`Não foi possível baixar a lista pública (${err.name === 'TimeoutError' ? 'tempo esgotado' : 'falha de rede'}).`, 504);
   }
@@ -39,7 +39,7 @@ async function carregar({ timeoutMs = 60_000 } = {}) {
   return cache;
 }
 
-// Categorias da lista pública → categorias da PLAY TV.
+// Categorias da lista pública → categorias da PLAY TECH VIP.
 const CATEGORIAS = {
   news: 'noticias', sports: 'esportes', movies: 'filmes', series: 'series', kids: 'infantil',
   animation: 'infantil', documentary: 'documentarios', music: 'musica', religious: 'religioso',

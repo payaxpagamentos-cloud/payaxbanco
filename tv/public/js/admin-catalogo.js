@@ -1,5 +1,5 @@
 import { api, arte } from './api.js';
-import { el, limpar, icone, toast, acao, modal, lerForm, duracao, dataHora, confirmar, etiquetaIdade, dataBR } from './ui.js';
+import { el, limpar, icone, toast, acao, modal, lerForm, duracao, dataHora, confirmar, etiquetaIdade, dataBR, QUALIDADES, LINHAS_QUALIDADE } from './ui.js';
 import { cabeca, indicador, tabela, td, botao, campo, area, escolha, caixaSim, CLASSIFICACOES_OPCOES } from './admin-ui.js';
 import { enviarVideo, enviarImagem, enviarLegenda } from './envio.js';
 
@@ -257,7 +257,48 @@ export async function telaTituloEditor(c, id, { voltar }) {
     t.tipo === 'filme'
       ? campoVideo('Vídeo do filme', { midiaId: t.video_midia_id, dica: 'MP4 (H.264/AAC), WebM ou MKV. O arquivo vai em pedaços e pode ser grande.', aoEnviar: (m) => salvar({ video_midia_id: m.id }) })
       : el('div', { class: 'aviso' }, 'Em séries, o vídeo é enviado em cada episódio, na aba "Temporadas e episódios".'),
-    campoVideo('Trailer (opcional)', { midiaId: t.trailer_midia_id, aoEnviar: (m) => salvar({ trailer_midia_id: m.id }) }));
+    campoVideo('Trailer (opcional)', { midiaId: t.trailer_midia_id, aoEnviar: (m) => salvar({ trailer_midia_id: m.id }) }),
+    versoesEl());
+
+  /**
+   * Versões em outras qualidades. O arquivo principal já entra como uma delas (pela altura);
+   * aqui a operação sobe as demais, e o assinante escolhe no player até o limite do plano.
+   */
+  const versoesEl = () => {
+    const lista = (dados.versoes ?? []).filter((v) => (t.tipo === 'filme' ? v.titulo_id === t.id : true));
+    const escolhaQualidade = el('select', { class: 'entrada' },
+      Object.entries(QUALIDADES).reverse().map(([valor, rotulo]) => el('option', { value: valor }, `${rotulo} (${LINHAS_QUALIDADE[valor] ?? ''})`)));
+    const alvoEpisodio = t.tipo === 'filme' ? null : el('select', { class: 'entrada' },
+      (dados.temporadas ?? []).flatMap((tm) => tm.episodios.map((ep) => el('option', { value: String(ep.id) }, `T${tm.numero} E${ep.numero} · ${ep.nome}`))));
+
+    const envio = campoVideo('Enviar outra qualidade', {
+      dica: 'O mesmo conteúdo, no mesmo tempo, em outra resolução. O player troca sem perder a cena.',
+      aoEnviar: async (m) => {
+        await api.post('/admin/versoes', {
+          ...(t.tipo === 'filme' ? { titulo_id: t.id } : { episodio_id: Number(alvoEpisodio?.value) }),
+          midia_id: m.id,
+          qualidade: escolhaQualidade.value,
+        });
+        recarregar();
+      },
+    });
+
+    return el('div', { class: 'cartao fundo' },
+      el('strong', {}, 'Versões em 4K, Full HD, HD e SD'),
+      el('div', { class: 'mini apagado', style: 'margin:4px 0 10px' },
+        'O plano do assinante limita até onde ele pode subir: Essencial vai até HD, Família até Full HD, Cinema 4K até 4K.'),
+      lista.length
+        ? tabela(['Qualidade', 'Arquivo', 'Resolução', '>Ações'], lista.map((vz) => el('tr', {},
+          td(el('span', { class: `etiqueta qualidade${vz.qualidade === '4k' ? ' ultra' : ''}` }, QUALIDADES[vz.qualidade] ?? vz.qualidade)),
+          td(el('span', { class: 'mini' }, `${vz.nome_original ?? `#${vz.midia_id}`}${vz.episodio_id ? ` · episódio #${vz.episodio_id}` : ''}`)),
+          td(vz.largura && vz.altura ? `${vz.largura}×${vz.altura}` : '—'),
+          td(botao('Remover', 'perigo', async () => { await api.del(`/admin/versoes/${vz.id}`); recarregar(); }), true))))
+        : el('div', { class: 'mini apagado' }, 'Nenhuma versão extra: o player usa só o arquivo principal.'),
+      el('div', { class: 'linha', style: 'margin:12px 0 6px;gap:8px' },
+        el('label', { class: 'campo', style: 'margin:0' }, 'Qualidade do próximo envio', escolhaQualidade),
+        alvoEpisodio ? el('label', { class: 'campo', style: 'margin:0' }, 'Episódio', alvoEpisodio) : null),
+      envio);
+  };
 
   // ---- Temporadas e episódios
   const formEpisodio = (temporada, ep = null) => modal(ep ? `Episódio ${ep.numero}` : `Novo episódio · ${temporada.nome ?? `Temporada ${temporada.numero}`}`, (fechar) => {

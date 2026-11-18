@@ -54,7 +54,7 @@ function encerrarOutras(db, usuarioId, manterId = null) {
  * Abre uma tela: confere o limite do plano e registra a sessão.
  * Devolve a sessão e o token de reprodução que o player usa nas URLs.
  */
-function abrirSessao(db, { usuario, perfil, acesso, tipo, canal = null, titulo = null, episodio = null, midiaId = null, dispositivo, ip, qualidade }) {
+function abrirSessao(db, { usuario, perfil, acesso, tipo, canal = null, titulo = null, episodio = null, midiaId = null, midiasPermitidas = null, dispositivo, ip, qualidade }) {
   v.opcao(tipo, 'o tipo de reprodução', TIPOS);
   encerrarSessoesMortas(db);
   const vivas = sessoesVivas(db, usuario.id);
@@ -70,7 +70,10 @@ function abrirSessao(db, { usuario, perfil, acesso, tipo, canal = null, titulo =
   const sessao = db.prepare('SELECT * FROM sessoes_player WHERE id = ?').get(Number(r.lastInsertRowid));
   const token = emitirToken({
     s: sessao.id, u: usuario.id, p: perfil.id, t: tipo,
-    c: canal?.id ?? null, i: titulo?.id ?? null, e: episodio?.id ?? null, m: midiaId ?? null,
+    c: canal?.id ?? null, i: titulo?.id ?? null, e: episodio?.id ?? null,
+    // Todas as versões liberadas desta tela (SD, HD, Full HD, 4K): o player troca de qualidade
+    // sem precisar de um token novo.
+    m: midiasPermitidas?.length ? [...new Set(midiasPermitidas.map(Number))] : (midiaId ?? null),
   });
   return { sessao, token };
 }
@@ -90,7 +93,8 @@ function conferirToken(db, token, { tipo = null, canalId = null, midiaId = null,
   if (!d) throw new ErroNegocio('Link de reprodução expirado. Abra o conteúdo de novo.', 401);
   if (tipo && d.t !== tipo) throw new ErroNegocio('Link de reprodução inválido para este conteúdo.', 403);
   if (canalId && Number(d.c) !== Number(canalId)) throw new ErroNegocio('Link de reprodução inválido para este canal.', 403);
-  if (midiaId && Number(d.m) !== Number(midiaId)) throw new ErroNegocio('Link de reprodução inválido para este arquivo.', 403);
+  const liberadas = Array.isArray(d.m) ? d.m.map(Number) : [Number(d.m)];
+  if (midiaId && !liberadas.includes(Number(midiaId))) throw new ErroNegocio('Link de reprodução inválido para este arquivo.', 403);
   if (exigirSessaoViva && !sessaoViva(db, d.s)) throw new ErroNegocio('Esta tela foi encerrada. Abra o conteúdo de novo.', 409);
   return d;
 }
@@ -122,12 +126,16 @@ function retomarEm(db, perfilId, tituloId, episodioId = 0) {
 }
 
 /** Sinal de vida da tela: mantém a vaga do plano e soma a audiência. */
-function ping(db, usuarioId, sessaoId, { segundos = null, posicao = null, duracao = null } = {}) {
+function ping(db, usuarioId, sessaoId, { segundos = null, posicao = null, duracao = null, qualidade = null } = {}) {
   const s = db.prepare('SELECT * FROM sessoes_player WHERE id = ? AND usuario_id = ?').get(Number(sessaoId), Number(usuarioId));
   if (!s) throw naoEncontrado('Tela');
   if (s.encerrada_em) throw new ErroNegocio('Esta tela foi encerrada. Abra o conteúdo de novo.', 409, { encerrada: true });
   const assistidos = segundos === null ? s.segundos : v.inteiro(Math.round(segundos), 'o tempo assistido', { min: 0, max: 86_400 * 2 });
   db.prepare('UPDATE sessoes_player SET ultimo_ping = ?, segundos = ? WHERE id = ?').run(agora(), Math.max(s.segundos, assistidos), s.id);
+  // O assinante pode trocar a qualidade no meio: o relatório de audiência registra a última.
+  if (qualidade && qualidade !== s.qualidade) {
+    db.prepare('UPDATE sessoes_player SET qualidade = ? WHERE id = ?').run(v.opcao(qualidade, 'a qualidade', require('./qualidades').ORDEM), s.id);
+  }
   if (posicao !== null && s.titulo_id) {
     registrarProgresso(db, s.perfil_id, { titulo_id: s.titulo_id, episodio_id: s.episodio_id ?? 0, segundos: posicao, duracao_s: duracao ?? 0 });
   }

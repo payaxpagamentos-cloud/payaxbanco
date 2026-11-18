@@ -26,12 +26,12 @@ window.addEventListener('hashchange', () => desenharRota());
 // Controle remoto da Smart TV: Voltar fecha o que estiver aberto e, na tela inicial, sai do app.
 ligarControle({
   aoVoltar: () => {
-    if (window.playtvPlayer) { window.playtvPlayer.fechar(); return true; }
-    if (window.playtvModal) { window.playtvModal(null); return true; }
+    if (window.playtechvipPlayer) { window.playtechvipPlayer.fechar(); return true; }
+    if (window.playtechvipModal) { window.playtechvipModal(null); return true; }
     if ((window.location.hash || '#/') !== '#/') { ir('#/'); return true; }
     return false;
   },
-  aoMidia: (comando) => window.playtvPlayer?.[comando]?.(),
+  aoMidia: (comando) => window.playtechvipPlayer?.[comando]?.(),
 });
 
 // ---------------------------------------------------------------- entrada
@@ -249,7 +249,7 @@ async function telaHome() {
       partes.push(fileira(f.nome, f.itens.map((c) => canalCartao(c, { aoAbrir: tocarCanal })), { larga: true, verTudo: () => ir('#/canais') }));
     } else if (f.tipo === 'em_alta') {
       // Os dez mais assistidos ganham o numeral gigante ao lado do cartaz.
-      partes.push(fileira('Top 10 de hoje na PLAY TV',
+      partes.push(fileira('Top 10 de hoje na PLAY TECH VIP',
         f.itens.slice(0, 10).map((t, i) => cartaz(t, { posicao: i + 1, ...opcoesCartaz() })), { cartazes: true }));
     } else {
       partes.push(fileira(f.nome, f.itens.map((t) => cartaz(t, opcoesCartaz())),
@@ -273,7 +273,7 @@ function rodape() {
       el('div', {}, link('Planos e assinatura', () => ir('#/planos')), link('Perfis de visualização', () => ir('#/perfis')),
         link('Telas em uso', () => ir('#/conta'))),
       el('div', {}, el('span', {}, `Plano ${conta?.assinatura?.plano?.nome ?? '—'}`), el('span', {}, conta?.usuario?.email ?? ''))),
-    el('div', { class: 'mini' }, '© PLAY TV'));
+    el('div', { class: 'mini' }, '© PLAY TECH VIP'));
 }
 
 /** Destaque do topo que troca sozinho. */

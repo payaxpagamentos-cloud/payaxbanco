@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-  namespace = "br.com.playtv.app"
+  namespace = "br.com.playtechvip.app"
   compileSdk = 35
 
   defaultConfig {
-    applicationId = "br.com.playtv.app"
+    applicationId = "br.com.playtechvip.app"
     minSdk = 23          // alcança TVs TCL/Android TV antigas
     targetSdk = 35
     versionCode = 1

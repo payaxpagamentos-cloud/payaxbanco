@@ -3,7 +3,7 @@
 const { ErroNegocio } = require('./erros');
 
 /**
- * Player oficial da emissora (fonte "embed"): a PLAY TV não transmite nada, ela abre o
+ * Player oficial da emissora (fonte "embed"): a PLAY TECH VIP não transmite nada, ela abre o
  * player público da própria emissora dentro da tela, com os anúncios dela.
  *
  * Aceita o endereço como a pessoa copiou (página ao vivo, link curto, canal do YouTube) e
