@@ -116,6 +116,19 @@ manual, como antes.
 > cliente precisa do acordo comercial deles. As artes continuam sendo do estúdio: a base entrega
 > o endereço, e quem licencia o filme licencia também o material de divulgação.
 
+### Encher o catálogo de uma vez
+
+```bash
+npm run catalogo-demo                                   # lista de demonstração (12 filmes + 6 séries)
+npm run catalogo-demo -- "Duna: Parte Dois" "Wicked"    # títulos escolhidos
+npm run catalogo-demo -- --serie "Round 6"              # séries
+npm run catalogo-demo -- --rascunho                     # sem publicar
+```
+
+Traz a ficha e as artes de cada título e põe os três últimos como destaque da home. **O vídeo é o
+mesmo arquivo de demonstração para todos**: serve para a vitrine ter o que tocar numa
+apresentação. O conteúdo licenciado entra depois pelo painel, um arquivo por título.
+
 ## Logos das emissoras
 
 Em Canais, **Buscar logos das emissoras** traz o logo oficial de cada canal da lista pública

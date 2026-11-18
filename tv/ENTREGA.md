@@ -101,7 +101,7 @@ operação, em Faturas (a integração automática com o banco ficou fora do esc
 | Pendência | O que é preciso |
 |---|---|
 | Token da base de filmes | Uma conta gratuita em themoviedb.org e o token em `TV_TMDB_TOKEN`, para o catálogo trazer cartaz, banner e ficha dos títulos atuais. |
-| Conteúdo licenciado | Os arquivos dos filmes e séries contratados. Entram pelo painel; o acervo de hoje é demonstração (Creative Commons). |
+| Conteúdo licenciado | Os arquivos dos filmes e séries contratados. Entram pelo painel. Hoje o catálogo mostra fichas e capas oficiais dos títulos atuais (vindas do TMDB), mas **o vídeo ligado a eles é de demonstração** — a vitrine está pronta, falta o conteúdo. |
 | Sinal das emissoras | O endereço `.m3u8` ou o player oficial de cada canal aberto. É um campo por canal. |
 | Hospedagem e domínio | Um servidor (VPS ou nuvem) e o domínio apontando para ele. |
 | Publicação nas lojas | Contas de desenvolvedor Samsung Seller, LG Seller e Google Play, com as artes de loja e uma conta de teste para a avaliação. |
