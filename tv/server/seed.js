@@ -478,8 +478,13 @@ gravarConfig(db, {
 });
 
 // Equipe
+// Em bancos criados antes da troca de nome, a conta da operação ficou com o endereço antigo:
+// aqui ela passa a ser a que o config manda, com a senha padrão, e as sobras saem.
+db.prepare("DELETE FROM usuarios WHERE perfil = 'curador' AND email <> ?").run('curadoria@playtechvip.com.br');
+db.prepare("UPDATE usuarios SET nome = ?, email = ?, senha_hash = ? WHERE perfil = 'admin' AND id = (SELECT MIN(id) FROM usuarios WHERE perfil = 'admin')")
+  .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha));
 const curador = db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, 'curador', ?)")
-  .run('Curadoria PLAY', 'curadoria@playtechvip.com.br', hashSenha(SENHA_EQUIPE), agora());
+  .run('Curadoria PLAY TECH VIP', 'curadoria@playtechvip.com.br', hashSenha(SENHA_EQUIPE), agora());
 console.log(`  · equipe: admin + curadoria (senha ${SENHA_EQUIPE})`);
 
 // Planos de demonstração alinhados com o que o player oferece hoje (SD, HD, Full HD e 4K).
@@ -803,12 +808,15 @@ const episodiosPublicados = db.prepare("SELECT id, titulo_id FROM episodios WHER
 const inserirSessao = db.prepare(`INSERT INTO sessoes_player (usuario_id, perfil_id, tipo, canal_id, titulo_id, episodio_id, dispositivo, segundos, iniciada_em, ultimo_ping, encerrada_em, motivo_fim)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'fim')`);
 const APARELHOS = ['Android · Chrome', 'iPhone/iPad · Safari', 'Windows · Chrome', 'Mac · Safari', 'Smart TV · Navegador'];
+// Quanto mais vezes a hora aparece, mais gente assistindo nela.
+const HORAS_DE_PICO = [7, 8, 9, 11, 12, 13, 13, 15, 16, 17, 18, 18, 19, 19, 20, 20, 20, 21, 21, 21, 21, 22, 22, 22, 23, 23, 0, 1];
 let sessoes = 0;
 for (const a of assinantesCriados.filter((x) => x.estado === 'ativa' || x.estado === 'suspensa')) {
   for (let d = 29; d >= 0; d -= 1) {
     const quantas = 1 + ((d * 7 + a.usuarioId) % 3);
     for (let k = 0; k < quantas; k += 1) {
-      const horaBase = 19 + ((d + k) % 4);
+      // Curva de um dia de verdade: café da manhã, almoço, fim de tarde e o pico da noite.
+      const horaBase = HORAS_DE_PICO[(d * 3 + k * 5 + a.usuarioId) % HORAS_DE_PICO.length];
       const inicio = new Date(`${somarDias(hoje(), -d)}T${String(horaBase).padStart(2, '0')}:${String((k * 17) % 60).padStart(2, '0')}:00-03:00`);
       const aoVivo = (d + k) % 3 === 0;
       const segundos = 600 + ((d * 137 + k * 311) % 4200);

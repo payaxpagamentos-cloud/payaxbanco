@@ -400,7 +400,9 @@ video::cue{ background: rgba(0,0,0,.6); color: #fff; font-family: inherit; }
 /* ---------- Painel da operação ---------- */
 .painel{ display: grid; grid-template-columns: 236px 1fr; min-height: 100vh; }
 .menu{ background: var(--bg-2); border-right: 1px solid var(--border); padding: 20px 12px; display: flex; flex-direction: column; gap: 2px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-.menu .marca{ padding: 0 8px 20px; font-size: 20px; }
+.menu .marca{ padding: 0 8px 20px; font-size: 19px; flex-wrap: wrap; white-space: normal; row-gap: 6px; }
+/* A etiqueta "Operação" desce para a linha de baixo em vez de sumir na borda do menu. */
+.menu .marca .etiqueta{ flex-basis: 100%; width: fit-content; margin-left: 30px; }
 .menu .grupo{ font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); font-weight: 800; padding: 16px 10px 6px; }
 .menu button{ display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 0; background: none; color: var(--text-2);
   text-align: left; padding: 10px 12px; border-radius: var(--radius); cursor: pointer; font-weight: 600; font-size: 14px; }
