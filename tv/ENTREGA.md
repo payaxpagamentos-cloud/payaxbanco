@@ -47,6 +47,12 @@ docker compose up -d
 Sobe a plataforma e um proxy que **emite e renova o certificado HTTPS sozinho**. Antes, aponte o
 domínio para o servidor e deixe as portas 80 e 443 abertas.
 
+Conferência de ponta a ponta depois de subir (API, HTTPS, páginas, acesso e conteúdo no ar):
+
+```bash
+BASE=https://play.seudominio.com.br ADMIN=admin@provedor.com.br SENHA='...' npm run conferir
+```
+
 Backup diário (banco + vídeos), guardando as 7 cópias mais recentes:
 
 ```

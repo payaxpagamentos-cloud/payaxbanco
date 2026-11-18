@@ -17,7 +17,8 @@
     "empacotar-tv": "node scripts/empacotar-tv.js",
     "backup": "node --disable-warning=ExperimentalWarning scripts/backup.js",
     "catalogo-demo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/catalogo-tmdb.js",
-    "epg": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/epg-mapear.js"
+    "epg": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/epg-mapear.js",
+    "conferir": "bash scripts/conferir-instalacao.sh"
   },
   "dependencies": {
     "express": "^5.2.1",

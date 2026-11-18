@@ -234,6 +234,18 @@ Ao receber `SIGTERM` (o que o `docker compose down`, o `restart` e o `systemctl 
 de aceitar conexões, deixa as que estão em curso terminarem e fecha o banco** antes de sair, com 15 segundos de
 prazo. Envio de vídeo e canal ao vivo não são cortados no meio por um reinício planejado.
 
+### Conferir a instalação
+
+Depois de subir (e sempre que mexer no servidor), uma conferência de ponta a ponta pela API:
+
+```bash
+BASE=https://play.seudominio.com.br ADMIN=admin@provedor.com.br SENHA='a senha da operação' npm run conferir
+```
+
+Confere se a API responde, se o ffmpeg está disponível, se o app e o painel abrem, se o certificado
+HTTPS é válido e o http redireciona, se a operação entra, se o que é privado pede sessão e se há canal
+ligado e título publicado. Sai com erro se algo falhar — serve para o cron ou para o checklist de entrega.
+
 ### Backup
 
 ```bash
