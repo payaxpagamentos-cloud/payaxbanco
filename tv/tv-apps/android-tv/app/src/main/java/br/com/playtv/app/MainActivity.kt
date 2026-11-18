@@ -1,6 +1,8 @@
 package br.com.playtv.app
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.KeyEvent
@@ -15,7 +17,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.media3.common.util.UnstableApi
+import org.json.JSONObject
 
 /**
  * PLAY TV na Android TV (TCL, Google TV e afins).
@@ -24,11 +29,46 @@ import androidx.appcompat.app.AppCompatActivity
  * (?tv=1), e repassa o controle remoto para a página — as setas, o OK, o Voltar e as teclas
  * de mídia são tratados lá dentro, como em qualquer outro aparelho.
  */
+@UnstableApi
 class MainActivity : AppCompatActivity() {
 
   private lateinit var raiz: FrameLayout
   private lateinit var navegador: WebView
   private var telaCheiaDoVideo: View? = null
+
+  /** Volta da tela de reprodução nativa: devolve à página onde o assinante parou. */
+  private val playerNativo = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+    val segundos = r.data?.getLongExtra("segundos", 0L) ?: 0L
+    val concluido = r.data?.getBooleanExtra("concluido", false) ?: false
+    avisarPagina(JSONObject().put("tipo", "fim").put("segundos", segundos).put("concluido", concluido))
+  }
+
+  /** Abre o ExoPlayer nativo (chamado pela página através da ponte). */
+  fun abrirPlayerNativo(url: String, titulo: String, subtitulo: String, aoVivo: Boolean, posicao: Long) {
+    runOnUiThread {
+      PontePlayer.aoProgresso = { s, d ->
+        avisarPagina(JSONObject().put("tipo", "progresso").put("segundos", s).put("duracao", d))
+      }
+      playerNativo.launch(
+        Intent(this, PlayerActivity::class.java)
+          .putExtra("url", url)
+          .putExtra("titulo", titulo)
+          .putExtra("subtitulo", subtitulo)
+          .putExtra("aoVivo", aoVivo)
+          .putExtra("posicao", posicao)
+      )
+    }
+  }
+
+  fun fecharPlayerNativo() {
+    runOnUiThread { PontePlayer.aoProgresso = null }
+  }
+
+  private fun avisarPagina(evento: JSONObject) {
+    runOnUiThread {
+      navegador.evaluateJavascript("window.playtvNativoEvento && window.playtvNativoEvento($evento)", null)
+    }
+  }
 
   @SuppressLint("SetJavaScriptEnabled")
   override fun onCreate(estado: Bundle?) {
@@ -48,6 +88,7 @@ class MainActivity : AppCompatActivity() {
         cacheMode = WebSettings.LOAD_DEFAULT
         userAgentString = "$userAgentString PlayTV-AndroidTV/1.0"
       }
+      addJavascriptInterface(PlayTVBridge(this@MainActivity), "PlayTVNative")
       webViewClient = object : WebViewClient() {
         override fun onReceivedError(v: WebView?, req: WebResourceRequest?, erro: WebResourceError?) {
           if (req?.isForMainFrame == true) {

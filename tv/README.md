@@ -60,9 +60,11 @@ A interface entra sozinha em **modo TV** quando reconhece o aparelho (Tizen, web
 fontes maiores, margens de 10 pés, foco bem visível e navegação inteira pelo controle remoto — setas, OK, Voltar
 e as teclas de mídia. Dá para ver no computador abrindo `/?tv=1`.
 
-Os projetos de empacotamento estão em [`tv-apps/`](tv-apps/README.md): **Samsung (Tizen)**, **LG (webOS)** e
-**Android TV** (TCL, Google TV, Philips, Sony). Os três abrem o servidor de vocês, então publicar conteúdo novo
-não exige republicar o app na loja.
+Os apps estão em [`tv-apps/`](tv-apps/README.md) e cada um usa o **player nativo do aparelho**: **AVPlay** na
+Samsung (Tizen), o pipeline de mídia do **webOS** na LG e o **ExoPlayer (Media3)** no Android TV da TCL. Na Samsung
+e na LG a interface vai empacotada dentro da TV (`npm run empacotar-tv https://seu-dominio/tv`) e conversa com a
+API do servidor; no Android TV, a interface roda em WebView e a reprodução é entregue ao player nativo, que devolve
+a posição para "continuar assistindo", audiência e limite de telas continuarem valendo.
 
 ## Grade dos canais abertos
 
@@ -130,6 +132,9 @@ No Nginx, o `location /tv/` precisa de `proxy_buffering off` (entrega em fluxo d
 | `TV_TRUST_PROXY` | `loopback` | Proxies confiáveis para obter o IP real. |
 | `TV_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
 | `TV_FUSO` | `America/Sao_Paulo` | Fuso da grade e dos relatórios. |
+
+A API responde com liberação de origem (CORS) porque os apps de TV levam a interface dentro do aparelho e chamam o
+servidor de outra origem. A autenticação é por token no cabeçalho, não por cookie: sem o token, nada responde.
 
 Produção com Docker: `docker build -t play-tv tv/` e rode com um volume em `/app/data` (banco **e** vídeos).
 

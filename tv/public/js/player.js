@@ -1,5 +1,6 @@
-import { api, BASE, ErroApi } from './api.js';
+import { api, BASE, ErroApi, absoluto } from './api.js';
 import { el, icone, relogio, duracao, toast, modal, acao, nomeDoAparelho, etiquetaIdade, QUALIDADES } from './ui.js';
+import { temPonteAndroid, criarVideoTizen, tocarNoAndroidTV } from './motor-nativo.js';
 
 /**
  * Player da PLAY TV: canais ao vivo (HLS pelo hls.js, com reserva para o HLS nativo do Safari)
@@ -48,8 +49,13 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   // Canal que vem pelo player oficial da emissora: não é o nosso <video>, é o player dela.
   if (dados.fonte.tipo === 'embed') return tocarNoPlayerDaEmissora(dados, { aoFechar });
 
+  // Dentro do app nativo da Android TV (TCL, Google TV), quem toca é o ExoPlayer do aparelho.
+  if (temPonteAndroid()) return tocarNativoAndroid(dados, { aoFechar });
+
   const aoVivo = Boolean(dados.ao_vivo);
-  const video = el('video', { playsinline: true, autoplay: true, preload: 'auto', crossorigin: 'use-credentials' });
+  // Na Samsung, o motor é o AVPlay (player nativo do sistema); nos demais, o <video> do navegador,
+  // que nas Smart TVs já é o decodificador do aparelho.
+  const video = criarVideoTizen() ?? el('video', { playsinline: true, autoplay: true, preload: 'auto' });
   video.setAttribute('x-webkit-airplay', 'allow');
   let hls = null;
   let fechado = false;
@@ -122,7 +128,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
         btnPip,
         btnTela)));
 
-  const caixa = el('div', { class: 'player' }, video, cobertura, avisoCentro, caixaErro, caixaProximo);
+  const caixa = el('div', { class: 'player' }, video.elemento ?? video, cobertura, avisoCentro, caixaErro, caixaProximo);
   document.body.append(caixa);
   document.body.style.overflow = 'hidden';
   // Teclas de mídia do controle remoto e botão Voltar da TV.
@@ -139,6 +145,11 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   // ---------- Fonte do vídeo ----------
   const semSuporteNativo = () => !video.canPlayType('application/vnd.apple.mpegurl');
   async function ligarFonte() {
+    // O AVPlay toca HLS e MP4 direto, sem hls.js.
+    if (video.nativo === 'avplay') {
+      video.src = absoluto(dados.fonte.url);
+      return;
+    }
     if (dados.fonte.tipo === 'hls' && semSuporteNativo()) {
       const H = await carregarHls();
       if (H?.isSupported()) {
@@ -150,12 +161,12 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
           else mostrarErro('Não conseguimos manter a transmissão. Tente abrir de novo.');
         });
         hls.on(H.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
-        hls.loadSource(dados.fonte.url);
+        hls.loadSource(absoluto(dados.fonte.url));
         hls.attachMedia(video);
         return;
       }
     }
-    video.src = dados.fonte.url;
+    video.src = absoluto(dados.fonte.url);
     video.play().catch(() => {});
   }
 
@@ -218,7 +229,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   }
 
   for (const l of dados.legendas ?? []) {
-    const faixa = el('track', { kind: 'subtitles', label: l.rotulo, srclang: l.idioma, src: l.url, ...(l.padrao ? { default: true } : {}) });
+    const faixa = el('track', { kind: 'subtitles', label: l.rotulo, srclang: l.idioma, src: absoluto(l.url), ...(l.padrao ? { default: true } : {}) });
     video.append(faixa);
   }
 
@@ -408,6 +419,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     try { await api.post('/play/fechar', { sessao_id: dados.sessao_id, motivo: 'fim' }); } catch { /* segue */ }
     try { hls?.destroy(); } catch { /* segue */ }
     video.pause();
+    video.destruir?.();
     video.removeAttribute('src');
     video.load();
     if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch { /* segue */ } }
@@ -420,6 +432,57 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
 
   await ligarFonte();
   return fim;
+}
+
+/**
+ * Reprodução dentro do app nativo da Android TV: o ExoPlayer do aparelho abre em tela cheia,
+ * com os controles nativos. A página continua cuidando da sessão (telas simultâneas) e de
+ * guardar onde o assinante parou.
+ */
+async function tocarNativoAndroid(dados, { aoFechar }) {
+  const aoVivo = Boolean(dados.ao_vivo);
+  let ultimaPosicao = dados.retomar_s ?? 0;
+
+  const anotarProgresso = (e) => {
+    const segundos = Number(e.detail?.segundos) || 0;
+    ultimaPosicao = segundos;
+    if (!aoVivo && dados.info.titulo_id) {
+      api.post('/play/ping', {
+        sessao_id: dados.sessao_id,
+        segundos,
+        posicao: segundos,
+        duracao: Math.round(Number(e.detail?.duracao) || dados.fonte.duracao_s || 0),
+      }).catch(() => {});
+    } else {
+      api.post('/play/ping', { sessao_id: dados.sessao_id, segundos }).catch(() => {});
+    }
+  };
+  window.addEventListener('tv:progresso-nativo', anotarProgresso);
+
+  try {
+    const fim = await tocarNoAndroidTV({
+      url: absoluto(dados.fonte.url),
+      titulo: dados.info.titulo,
+      subtitulo: dados.info.subtitulo,
+      aoVivo,
+      posicao: dados.retomar_s ?? 0,
+      sessaoId: dados.sessao_id,
+    });
+    ultimaPosicao = fim.segundos || ultimaPosicao;
+  } finally {
+    window.removeEventListener('tv:progresso-nativo', anotarProgresso);
+    if (!aoVivo && dados.info.titulo_id && ultimaPosicao > 5) {
+      await api.post('/play/ping', {
+        sessao_id: dados.sessao_id,
+        segundos: Math.round(ultimaPosicao),
+        posicao: Math.round(ultimaPosicao),
+        duracao: Math.round(dados.fonte.duracao_s || 0),
+      }).catch(() => {});
+    }
+    await api.post('/play/fechar', { sessao_id: dados.sessao_id, motivo: 'fim' }).catch(() => {});
+    aoFechar?.();
+  }
+  return { titulo_id: dados.info.titulo_id ?? null };
 }
 
 /**

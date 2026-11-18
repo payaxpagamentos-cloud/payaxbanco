@@ -1,5 +1,17 @@
-/** Endereço base do app (ex.: '/tv'), deduzido de onde este arquivo foi carregado. */
-export const BASE = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+/**
+ * Endereço base da API.
+ * No navegador, sai de onde este arquivo foi carregado (ex.: '/tv').
+ * Dentro dos apps de TV, a interface vai empacotada no aparelho e o servidor fica noutro
+ * endereço: aí o app define window.PLAYTV_API antes de carregar o script.
+ */
+export const BASE = window.PLAYTV_API
+  ? String(window.PLAYTV_API).replace(/\/+$/, '')
+  : new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+
+/** Transforma um caminho devolvido pelo servidor em endereço completo, quando o app é empacotado. */
+export const absoluto = (caminho) => (!caminho || /^https?:/i.test(caminho) || !window.PLAYTV_API
+  ? caminho
+  : new URL(caminho, window.PLAYTV_API).toString());
 
 const CHAVE_SESSAO = 'playtv.sessao';
 const CHAVE_PERFIL = 'playtv.perfil';

@@ -1,92 +1,106 @@
 # PLAY TV nas Smart TVs
 
-Três projetos prontos para empacotar a PLAY TV como aplicativo de TV:
+Três apps, cada um usando o **player nativo do aparelho**:
 
-| Pasta | Aparelhos | Como é o app |
-|---|---|---|
-| [`samsung-tizen/`](samsung-tizen) | Samsung (Tizen 6.0+) | App web da Samsung que abre o servidor da PLAY TV. |
-| [`lg-webos/`](lg-webos) | LG (webOS 5.0+) | App web da LG que abre o servidor da PLAY TV. |
-| [`android-tv/`](android-tv) | **TCL**, Google TV, Philips, Sony, Fire TV* | App Android (Kotlin) com WebView em tela cheia. |
+| Pasta | Aparelhos | Player | Interface |
+|---|---|---|---|
+| [`samsung-tizen/`](samsung-tizen) | Samsung (Tizen 6.0+) | **AVPlay**, o player nativo do sistema | vai dentro do app |
+| [`lg-webos/`](lg-webos) | LG (webOS 5.0+) | pipeline de mídia do webOS (o `<video>` da TV) | vai dentro do app |
+| [`android-tv/`](android-tv) | **TCL**, Google TV, Philips, Sony, Fire TV* | **ExoPlayer (Media3)**, nativo do Android | WebView + player nativo |
 
-\* o Fire TV usa a mesma base Android, mas a publicação é na Amazon Appstore.
+\* o Fire TV usa a mesma base Android; a publicação é na Amazon Appstore.
 
-Os três são **cascas**: abrem o endereço do seu servidor já em modo TV (`?tv=1`). Toda a interface,
-o player e as atualizações continuam vindo do servidor — publicar conteúdo novo **não exige**
-republicar o app na loja.
+Nas TVs da Samsung e da LG, **app nativo é app web**: é esse o SDK oficial dos dois fabricantes
+(Tizen Web App e webOS Web App). O que muda num app de verdade é de onde vem a interface e quem
+decodifica o vídeo — e os dois pontos estão resolvidos aqui: a interface é empacotada no
+aparelho e a reprodução usa o player do sistema.
 
-## Antes de empacotar
+## Como o vídeo toca em cada um
 
-1. Publique a PLAY TV num domínio com **HTTPS** (as TVs bloqueiam conteúdo sem criptografia).
-2. Aponte o app para esse endereço:
-   - Samsung e LG: edite `config.js` → `window.PLAYTV_SERVIDOR = 'https://seu-dominio/tv'`.
-   - Android TV: edite `app/src/main/res/values/strings.xml` → `<string name="servidor">`.
-3. Troque os identificadores pelos seus: `tizen:application id` e `package` (Samsung),
-   `id` do `appinfo.json` (LG) e `applicationId` (Android).
+- **Samsung**: o `motor-nativo.js` detecta `webapis.avplay` e troca o `<video>` pelo AVPlay,
+  mantendo os mesmos controles na tela. É o AVPlay que decodifica — é o caminho que a Samsung
+  exige para HLS ao vivo, 4K e DRM.
+- **LG**: o `<video>` do webOS já é o decodificador do aparelho; o HLS vai pelo hls.js, que o
+  webOS roda com aceleração.
+- **Android TV**: a página detecta `window.PlayTVNative` e entrega a reprodução ao app: abre a
+  `PlayerActivity` com **ExoPlayer** em tela cheia, com os controles nativos da TV. A posição
+  volta para a página, então "continuar assistindo", audiência e limite de telas seguem valendo.
+- **Qualquer outro aparelho**: o player da própria PLAY TV (hls.js + `<video>`).
 
-## Samsung (Tizen)
+## Montar os apps da Samsung e da LG
 
 ```bash
-# Tizen Studio instalado (https://developer.tizen.org)
-tizen build-web -- samsung-tizen
-tizen package -t wgt -s <seu-perfil-de-assinatura> -- samsung-tizen/.buildResult
-# instalar numa TV em modo desenvolvedor (Apps > 12345 > Developer Mode)
-tizen install -n PlayTV.wgt -t <nome-da-tv> -- .
+# na pasta tv/ — leva a interface para dentro do pacote e aponta para o seu servidor
+npm run empacotar-tv https://seu-dominio/tv
 ```
 
-Publicação: **Samsung Seller Portal** (seller.samsungapps.com) → Smart TV. A Samsung pede o
-pacote `.wgt`, descrição, capturas de tela e uma conta de teste para a avaliação deles.
-
-## LG (webOS)
+Isso gera `tv-apps/samsung-tizen/dist/` e `tv-apps/lg-webos/dist/` com a interface, o hls.js,
+o `config.js` apontando para o servidor e, no caso da Samsung, a chamada do `webapis.js`.
 
 ```bash
-# CLI da LG instalada (npm i -g @webos-tools/cli)
-ares-package lg-webos
+# Samsung — com o Tizen Studio instalado
+tizen build-web -- tv-apps/samsung-tizen/dist
+tizen package -t wgt -s <seu-perfil-de-assinatura> -- tv-apps/samsung-tizen/dist/.buildResult
+tizen install -n PlayTV.wgt -t <nome-da-tv> -- .
+
+# LG — com a CLI da LG (npm i -g @webos-tools/cli)
+ares-package tv-apps/lg-webos/dist
 ares-install br.com.playtv.app_1.0.0_all.ipk -d <nome-da-tv>
 ares-launch br.com.playtv.app -d <nome-da-tv>
 ```
 
-Publicação: **LG Seller Lounge** (seller.lgappstv.com). A LG também pede o `.ipk`, as artes e
-uma conta de teste.
+Publicação: **Samsung Seller Portal** (seller.samsungapps.com) e **LG Seller Lounge**
+(seller.lgappstv.com). Os dois pedem o pacote, as artes e uma conta de teste para a avaliação.
 
-## TCL / Android TV
+> Ao abrir o `dist` fora de uma TV Samsung, o navegador acusa 404 em `$WEBAPIS/webapis/webapis.js`.
+> É esperado: esse caminho só existe dentro da TV, e o código só usa o AVPlay quando ele responde.
 
-Abra a pasta `android-tv/` no **Android Studio** (Giraffe ou mais novo) e rode em um emulador
-de TV ou numa TV em modo desenvolvedor:
+## Montar o app da TCL / Android TV
+
+Abra `android-tv/` no **Android Studio** (Giraffe ou mais novo), troque o endereço em
+`app/src/main/res/values/strings.xml` e rode numa TV em modo desenvolvedor:
 
 ```bash
 cd android-tv
-./gradlew assembleRelease          # gera o APK
-adb connect <ip-da-tv>:5555        # TV com depuração por rede ligada
+./gradlew assembleRelease
+adb connect <ip-da-tv>:5555
 adb install app/build/outputs/apk/release/app-release.apk
 ```
 
-Publicação: **Google Play Console**, ficha "Android TV" (a Play exige o banner 320×180, que já
-está em `res/drawable-xhdpi/banner.png`, e a navegação 100% por controle remoto — que a PLAY TV
-já faz). Assine o APK/AAB com a chave de vocês antes de enviar: o `build.gradle.kts` vem com a
+Publicação: **Google Play Console**, ficha "Android TV" (o banner 320×180 já está em
+`res/drawable-xhdpi/banner.png`). Assine com a chave de vocês: o `build.gradle.kts` vem com a
 chave de depuração só para testar.
 
 ## O que o controle remoto faz
 
-Isto vale nos três apps e também em qualquer navegador aberto com `?tv=1`:
-
 | Tecla | O que acontece |
 |---|---|
 | Setas | Andam pelo foco (fileiras, canais, botões do player) |
-| OK / Enter | Abre o que está em foco |
+| OK | Abre o que está em foco |
 | Voltar | Fecha o player ou a janela; na tela inicial, sai do app |
 | Play/Pause | Toca e pausa |
 | ⏩ / ⏪ | Avançam e voltam 30 segundos |
 | Stop | Fecha o player |
 
-A interface entra sozinha no modo TV quando reconhece o aparelho (Tizen, webOS, Android TV,
-Fire TV, VIDAA e afins): fontes maiores, margens de 10 pés e foco bem visível.
+A interface entra sozinha no modo TV (fontes maiores, margens de 10 pés, foco bem visível).
+Para conferir no computador, abra o app com `?tv=1`.
 
-## Testado até onde dá
+## O que foi testado e o que não foi
 
-A navegação por controle remoto, o foco, o botão Voltar das TVs (código 10009 da Samsung) e as
-teclas de mídia **foram testados num navegador real** simulando uma Samsung Tizen em 1920×1080.
+**Testado em navegador real, aqui:**
 
-O empacotamento em si (`.wgt`, `.ipk` e APK) **não foi executado aqui**: ele depende do Tizen
-Studio, da CLI da LG e do SDK do Android, que não existem neste ambiente. Os projetos estão
-completos e seguem a estrutura que cada ferramenta espera, mas a primeira build precisa ser
-feita por vocês, numa máquina com essas ferramentas instaladas.
+- navegação por controle remoto, foco, botão Voltar da Samsung (código 10009) e teclas de mídia,
+  simulando uma TV Tizen em 1920×1080;
+- o **modo empacotado** completo: interface servida de outra origem (como fica dentro do
+  aparelho) falando com a API do servidor — login, 40 artes carregadas e vídeo tocando.
+
+**Não testado, por falta de aparelho e de SDK neste ambiente:**
+
+- a troca para o **AVPlay** da Samsung (o código tem reserva: se o AVPlay falhar, o `<video>`
+  assume);
+- o **ExoPlayer** do app Android TV (o projeto compila com Media3 1.4.1, mas o build precisa do
+  SDK do Android);
+- a geração dos pacotes `.wgt`, `.ipk` e `.apk`, que dependem do Tizen Studio, da CLI da LG e do
+  Android Studio.
+
+Esses três pontos precisam de uma primeira rodada numa TV de verdade.

@@ -63,6 +63,20 @@ function criarApp(db) {
 
   // Tudo é servido em TV_BASE_PATH (ex.: /tv): páginas, arquivos e a API em <endereço>/api.
   const r = express.Router();
+  // Os apps de TV levam a interface dentro do aparelho e chamam a API de outra origem.
+  // A autenticação é por token no cabeçalho (não por cookie), então liberar a leitura é seguro:
+  // sem o token, nada responde.
+  r.use('/api', (req, res, next) => {
+    res.set({
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Perfil, X-Perfil-Chave, Range',
+      'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
+      'Access-Control-Max-Age': '86400',
+    });
+    if (req.method === 'OPTIONS') return res.status(204).end();
+    return next();
+  });
   r.use(['/api/auth/login', '/api/auth/cadastro', '/api/auth/senha-recuperar'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // Os pedaços de vídeo do painel chegam como application/octet-stream e são lidos pela própria rota (sem JSON).
   r.use(express.json({ limit: '200kb' }));

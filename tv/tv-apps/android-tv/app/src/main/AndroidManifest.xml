@@ -29,5 +29,14 @@
         <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
       </intent-filter>
     </activity>
+
+    <!-- Reprodução nativa (ExoPlayer), aberta pela página através da ponte. -->
+    <activity
+        android:name=".PlayerActivity"
+        android:exported="false"
+        android:screenOrientation="landscape"
+        android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|uiMode|smallestScreenSize"
+        android:theme="@style/Tema.PlayTV"
+        android:launchMode="singleTop"/>
   </application>
 </manifest>
