@@ -202,6 +202,23 @@ async function telaCanais(c) {
       } catch (err) { toast(err.message, true); }
     });
 
+    // Logo por endereço: serve para o material oficial que a emissora publica no site dela,
+    // e para quem não aparece na lista pública.
+    const campoLogoUrl = el('input', { class: 'entrada', placeholder: 'https://emissora.com.br/logo.png' });
+    const botaoLogoUrl = canal
+      ? el('button', {
+        type: 'button',
+        class: 'btn pequeno vazio',
+        onclick: (e) => acao(e.currentTarget, async () => {
+          const r = await api.post(`/admin/canais/${canal.id}/logo`, campoLogoUrl.value ? { url: campoLogoUrl.value } : {});
+          logoId = r.logo_midia_id;
+          previa.src = arte(logoId);
+          previa.style.display = '';
+          toast(`Logo de ${r.origem}.`);
+        }),
+      }, campoLogoUrl.value ? 'Trazer deste endereço' : 'Buscar o logo')
+      : null;
+
     const f = el('form', { class: 'form' },
       el('div', { class: 'duas' },
         campo('Nome do canal', { name: 'nome', required: true, maxlength: 80, value: canal?.nome ?? '' }),
@@ -220,7 +237,12 @@ async function telaCanais(c) {
         escolha('Classificação', 'classificacao', CLASSIFICACOES_OPCOES, canal?.classificacao ?? 0),
         escolha('Plano mínimo', 'plano_minimo_id', [['', 'Todos os planos'], ...planos.map((p) => [p.id, p.nome])], canal?.plano_minimo_id ?? '')),
       area('Descrição', { name: 'descricao', maxlength: 500, rows: 2 }, canal?.descricao ?? ''),
-      el('label', { class: 'campo' }, 'Logo do canal', entradaLogo),
+      el('label', { class: 'campo' }, 'Logo do canal', entradaLogo,
+        botaoLogoUrl
+          ? el('div', { class: 'linha', style: 'gap:8px;margin-top:8px' }, campoLogoUrl, botaoLogoUrl)
+          : null,
+        el('div', { class: 'mini apagado', style: 'margin-top:6px' },
+          'Envie a imagem oficial da emissora, cole o endereço dela, ou deixe em branco e clique em "Buscar o logo" para trazer da lista pública.')),
       previa,
       el('div', { class: 'duas' },
         caixaSim('Transmitir pelos nossos servidores (recomendado)', 'relay', canal ? Boolean(canal.relay) : true),

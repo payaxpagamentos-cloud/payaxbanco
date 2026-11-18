@@ -18,7 +18,7 @@ const CANAIS_ABERTOS = [
   [2, 'TV Cultura', 'aberta', 'Fundação Padre Anchieta',
     'Transmite aberto no site cmais.com.br/aovivo e no canal oficial do YouTube — dá para usar a fonte "embed" direto.', 'TVCultura.br'],
   [4, 'SBT', 'aberta', 'Grupo Silvio Santos',
-    'Sinal pela emissora ou pela afiliada da praça. O SBT News transmite aberto no YouTube e serve como fonte "embed".', null],
+    'Sinal pela emissora ou pela afiliada da praça. O SBT News transmite aberto no YouTube e serve como fonte "embed".', 'SBTNacional.br'],
   [5, 'TV Globo', 'aberta', 'Grupo Globo',
     'Sinal pela emissora ou pela afiliada da praça (quem opera retransmissora costuma ter o endereço do próprio encoder).', 'RedeGlobo.br'],
   [7, 'Record', 'aberta', 'Grupo Record',

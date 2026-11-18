@@ -102,14 +102,17 @@ async function logoDoCanal(nome, { id = null, pais = 'BR', timeoutMs = 60_000 } 
   const { canais } = await carregar({ timeoutMs });
   if (!id && !chaveDoNome(nome)) return null;
 
-  // Com o identificador na mão não há adivinhação: é o canal certo.
+  // Com o identificador na mão não há adivinhação: é o canal certo. A lista de logos cobre
+  // canais que nem estão no catálogo de canais (o SBT nacional, por exemplo), então a busca
+  // vai direto nela.
   if (id) {
-    const certo = canais.find((c) => c.id === id);
-    if (certo) {
-      const logos = await carregarLogos({ timeoutMs });
-      const melhor = melhorLogo(logos.filter((l) => l.channel === certo.id));
-      return melhor ? { url: melhor.url, largura: melhor.width, altura: melhor.height, canal: certo.id, nome: certo.name } : null;
+    const logos = await carregarLogos({ timeoutMs });
+    const melhor = melhorLogo(logos.filter((l) => l.channel === id));
+    if (melhor) {
+      const certo = canais.find((c) => c.id === id);
+      return { url: melhor.url, largura: melhor.width, altura: melhor.height, canal: id, nome: certo?.name ?? id.replace(/\.[a-z]{2}$/, '') };
     }
+    return null;
   }
 
   const doPais = canais.filter((c) => c.country === pais && !c.closed);
