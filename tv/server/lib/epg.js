@@ -178,4 +178,37 @@ function importarXmltv(db, xml, { canalId = null, porIdExterno = {}, substituir 
   return { ...resultado, canais: resultado.canais.size };
 }
 
-module.exports = { agoraEmTodos, noAr, aSeguir, grade, andamento, salvarPrograma, limparAntigos, dataXmltv, importarXmltv };
+/**
+ * Busca um XMLTV num endereço e importa. Serve para a grade dos canais abertos: a operação
+ * cadastra o endereço do provedor que ela escolheu e a plataforma atualiza sozinha, uma vez por dia.
+ * Aceita arquivo .xml e .xml.gz (o formato que a maioria dos provedores publica).
+ */
+async function importarDeUrl(db, url, { substituir = true, timeoutMs = 60_000 } = {}) {
+  const { conferirEndereco } = require('./relay');
+  await conferirEndereco(url);
+  let resp;
+  try {
+    resp = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'PLAYTV/1.0', Accept: '*/*' }, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (err) {
+    throw new ErroNegocio(`Não foi possível buscar a grade (${err.name === 'TimeoutError' ? 'tempo esgotado' : 'falha de rede'}).`, 504);
+  }
+  if (!resp.ok) throw new ErroNegocio(`O provedor da grade respondeu ${resp.status}.`, 502);
+  const bruto = Buffer.from(await resp.arrayBuffer());
+  const comprimido = bruto[0] === 0x1f && bruto[1] === 0x8b;
+  const xml = (comprimido ? require('node:zlib').gunzipSync(bruto) : bruto).toString('utf8');
+  const saida = importarXmltv(db, xml, { substituir });
+  const { gravarConfig } = require('../db');
+  gravarConfig(db, { epg_importado_em: agora() });
+  return { ...saida, url, comprimido, tamanho: bruto.length };
+}
+
+/** Atualização diária da grade (roda sozinha quando há endereço cadastrado). */
+async function atualizarGradeAutomatica(db) {
+  const { lerConfig } = require('../db');
+  const { epg_url: url } = lerConfig(db);
+  if (!url) return null;
+  return importarDeUrl(db, url);
+}
+
+module.exports = { agoraEmTodos, noAr, aSeguir, grade, andamento, salvarPrograma, limparAntigos, dataXmltv, importarXmltv,
+  importarDeUrl, atualizarGradeAutomatica };

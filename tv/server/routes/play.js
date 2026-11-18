@@ -55,15 +55,21 @@ module.exports = (db, autenticado, comPerfil) => {
     if (tipo === 'canal') {
       const canal = canalDe(d.canal_id);
       catalogo.conferirPermissao(db, { item: canal, tipo: 'canal', perfil, acesso });
+      if (canal.fonte === 'embed' ? !canal.url_embed : !canal.url_hls) {
+        throw new ErroNegocio('Este canal ainda não tem sinal cadastrado. Fale com o atendimento.', 409, { motivo: 'sem_sinal' });
+      }
       const { sessao, token } = player.abrirSessao(db, { usuario: req.usuario, perfil, acesso, tipo, canal, dispositivo, ip: req.ip });
       const noAr = epg.noAr(db, canal.id);
       return res.status(201).json({
         sessao_id: sessao.id,
         token,
         ao_vivo: true,
-        fonte: canal.relay && config.relay.ligado
-          ? { tipo: 'hls', url: `${baseApi()}/play/canal/${canal.id}/lista.m3u8?t=${encodeURIComponent(token)}`, retransmitido: true }
-          : { tipo: 'hls', url: canal.url_hls, retransmitido: false },
+        // 'embed' abre o player oficial da emissora (não retransmitimos nada); 'hls' toca no nosso player.
+        fonte: canal.fonte === 'embed'
+          ? { tipo: 'embed', url: canal.url_embed, retransmitido: false, emissora: true }
+          : canal.relay && config.relay.ligado
+            ? { tipo: 'hls', url: `${baseApi()}/play/canal/${canal.id}/lista.m3u8?t=${encodeURIComponent(token)}`, retransmitido: true }
+            : { tipo: 'hls', url: canal.url_hls, retransmitido: false },
         info: {
           titulo: canal.nome,
           subtitulo: noAr ? noAr.titulo : 'Ao vivo',

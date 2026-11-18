@@ -358,6 +358,21 @@ async function telaConfig(c) {
     el('div', { class: 'duas' },
       campo('Créditos finais (segundos) — marca como assistido', { name: 'creditos_s', type: 'number', min: 0, max: 1800, value: config.creditos_s }),
       campo('Voltar quantos segundos ao retomar', { name: 'retomar_folga_s', type: 'number', min: 0, max: 120, value: config.retomar_folga_s })),
+    el('h2', { style: 'margin-top:18px' }, 'Grade dos canais abertos (EPG)'),
+    campo('Endereço do arquivo XMLTV', { name: 'epg_url', maxlength: 1000, value: config.epg_url ?? '', placeholder: 'https://provedor-de-grade.exemplo/br.xml.gz' },
+      'A plataforma busca este arquivo uma vez por dia e preenche a programação dos canais. Aceita .xml e .xml.gz. O provedor é escolhido por vocês (a emissora, a afiliada ou um serviço de grade).'),
+    el('div', { class: 'linha' },
+      (() => {
+        const b = el('button', { type: 'button', class: 'btn pequeno' }, 'Importar a grade agora');
+        b.addEventListener('click', () => acao(b, async () => {
+          const url = f.querySelector('input[name=epg_url]').value.trim();
+          if (!url) throw new Error('Cadastre o endereço do XMLTV primeiro.');
+          const r = await api.post('/admin/epg/importar-url', { url });
+          toast(`${r.importados} programa(s) importados em ${r.canais} canal(is).`);
+        }));
+        return b;
+      })(),
+      el('span', { class: 'pequeno mudo' }, config.epg_importado_em ? `última importação: ${dataHora(config.epg_importado_em)}` : 'nunca importada')),
     el('h2', { style: 'margin-top:18px' }, 'Aviso na home'),
     area('Mensagem para os assinantes (em branco não mostra nada)', { name: 'aviso_home', rows: 2, maxlength: 300 }),
     el('div', { class: 'linha fim' }, el('button', { class: 'btn primario' }, 'Salvar configurações')));
@@ -374,6 +389,7 @@ async function telaConfig(c) {
         antecedencia_fatura_dias: Number(d.antecedencia_fatura_dias),
         creditos_s: Number(d.creditos_s),
         retomar_folga_s: Number(d.retomar_folga_s),
+        epg_url: d.epg_url,
         aviso_home: d.aviso_home,
       });
       toast('Configurações salvas.');

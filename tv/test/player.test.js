@@ -133,7 +133,7 @@ test('canal ao vivo: a lista HLS exige token do canal certo', async (t) => {
   const s = await iniciar();
   t.after(s.fechar);
   const admin = await s.adminLogin();
-  const canal = (await s.post('/admin/canais', { numero: 4, nome: 'PayAx 4', url_hls: 'https://origem.test/live.m3u8' }, admin)).dados.canal;
+  const canal = (await s.post('/admin/canais', { numero: 4, nome: 'PLAY 4', url_hls: 'https://origem.test/live.m3u8' }, admin)).dados.canal;
   const outro = (await s.post('/admin/canais', { numero: 9, nome: 'Outro', url_hls: 'https://origem.test/outro.m3u8' }, admin)).dados.canal;
   const cliente = await s.assinante('vivo@exemplo.com.br', { plano: 2 });
 

@@ -5,6 +5,7 @@ const express = require('express');
 const config = require('./config');
 const { criarApi, tratarErro } = require('./api');
 const { limitar } = require('./lib/limitador');
+const { origensCadastradas, versaoAtual } = require('./lib/embed');
 
 /**
  * Política de segurança das páginas. O player roda em casa: vídeo e listas HLS vêm do nosso servidor
@@ -12,7 +13,9 @@ const { limitar } = require('./lib/limitador');
  * exigem o domínio da emissora em TV_ORIGENS_MIDIA.
  */
 const origens = config.origensMidia.map((h) => (h.includes('://') ? h : `https://${h}`)).join(' ');
-const csp = [
+
+/** Monta a política de segurança da página, liberando só as origens dos players oficiais cadastrados. */
+const montarCsp = (origensEmbed = []) => [
   "default-src 'self'",
   "script-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
@@ -24,11 +27,26 @@ const csp = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
+  // Canais com fonte "embed" abrem o player da própria emissora: só os domínios cadastrados entram.
+  `frame-src 'self'${origensEmbed.length ? ` ${origensEmbed.join(' ')}` : ''}`,
   "frame-ancestors 'none'",
 ].join('; ');
 
 function criarApp(db) {
   const app = express();
+  // Guarda as origens dos players oficiais para não consultar o banco a cada página, mas refaz
+  // na hora em que um canal muda (e, de qualquer forma, a cada minuto).
+  let cspAtual = montarCsp(origensCadastradas(db));
+  let cspEm = Date.now();
+  let cspVersao = versaoAtual();
+  const csp = () => {
+    if (cspVersao !== versaoAtual() || Date.now() - cspEm > 60_000) {
+      cspAtual = montarCsp(origensCadastradas(db));
+      cspEm = Date.now();
+      cspVersao = versaoAtual();
+    }
+    return cspAtual;
+  };
   app.disable('x-powered-by');
   app.set('trust proxy', /^\d+$/.test(String(config.trustProxy)) ? Number(config.trustProxy) : config.trustProxy);
   app.use((_req, res, next) => {
@@ -38,7 +56,7 @@ function criarApp(db) {
       'Referrer-Policy': 'no-referrer',
       'Permissions-Policy': 'fullscreen=(self), picture-in-picture=(self), autoplay=(self), geolocation=(), camera=(), microphone=()',
       ...(config.producao ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),
-      'Content-Security-Policy': csp,
+      'Content-Security-Policy': csp(),
     });
     next();
   });

@@ -1,0 +1,19 @@
+{
+  "id": "br.com.playtv.app",
+  "version": "1.0.0",
+  "vendor": "PLAY TV",
+  "type": "web",
+  "main": "index.html",
+  "title": "PLAY TV",
+  "appDescription": "Canais de TV ao vivo, filmes e séries.",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#0A0A0B",
+  "iconColor": "#FF4D1C",
+  "disableBackHistoryAPI": true,
+  "supportTouchMode": "none",
+  "handlesRelaunch": true,
+  "requiredPermissions": ["time.query", "activity.operation"],
+  "allowVideoCapture": false,
+  "allowAudioCapture": false
+}

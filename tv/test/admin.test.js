@@ -79,9 +79,9 @@ test('curadoria cuida do conteúdo, mas não do financeiro', async (t) => {
   const s = await iniciar();
   t.after(s.fechar);
   const admin = await s.adminLogin();
-  const criada = await s.post('/admin/equipe', { nome: 'Curadoria', email: 'curadoria@payaxtv.com.br', senha: 'curadoria123', perfil: 'curador' }, admin);
+  const criada = await s.post('/admin/equipe', { nome: 'Curadoria', email: 'curadoria@playtv.com.br', senha: 'curadoria123', perfil: 'curador' }, admin);
   assert.equal(criada.status, 201);
-  const curador = await s.login('curadoria@payaxtv.com.br', 'curadoria123');
+  const curador = await s.login('curadoria@playtv.com.br', 'curadoria123');
 
   assert.equal((await s.get('/admin/canais', curador)).status, 200);
   assert.equal((await s.post('/admin/canais', { numero: 4, nome: 'Canal', url_hls: 'https://origem.test/x.m3u8' }, curador)).status, 201);
@@ -112,7 +112,7 @@ test('equipe: sempre sobra um administrador ativo', async (t) => {
   assert.equal((await s.patch(`/admin/equipe/${eu.id}`, { ativo: false }, admin)).status, 409, 'não desativa a si mesmo');
   assert.equal((await s.patch(`/admin/equipe/${eu.id}`, { perfil: 'curador' }, admin)).status, 409, 'não rebaixa a si mesmo');
 
-  const outro = await s.post('/admin/equipe', { nome: 'Segundo Admin', email: 'admin2@payaxtv.com.br', senha: 'segundo123', perfil: 'admin' }, admin);
+  const outro = await s.post('/admin/equipe', { nome: 'Segundo Admin', email: 'admin2@playtv.com.br', senha: 'segundo123', perfil: 'admin' }, admin);
   assert.equal((await s.patch(`/admin/equipe/${outro.dados.usuario.id}`, { ativo: false }, admin)).status, 200);
 });
 
@@ -172,7 +172,7 @@ test('a auditoria registra o que a equipe faz', async (t) => {
   const criado = registros.find((r) => r.acao === 'canal_criado');
   assert.ok(criado, 'a criação do canal entra na auditoria');
   assert.match(criado.detalhes, /Canal Auditado/);
-  assert.equal(criado.usuario, 'Operação PayAx TV');
+  assert.equal(criado.usuario, 'Operação PLAY TV');
 });
 
 test('saúde e configuração pública', async (t) => {
@@ -180,7 +180,7 @@ test('saúde e configuração pública', async (t) => {
   t.after(s.fechar);
   assert.deepEqual((await s.get('/saude')).dados, { ok: true });
   const publico = await s.get('/publico');
-  assert.equal(publico.dados.marca, 'PayAx TV');
+  assert.equal(publico.dados.marca, 'PLAY TV');
   assert.equal(publico.dados.planos.length, 3);
   assert.equal((await s.get('/rota-que-nao-existe')).status, 404);
 });

@@ -321,6 +321,7 @@ module.exports = (db) => {
     if (d.creditos_s !== undefined) valores.creditos_s = v.inteiro(d.creditos_s, 'o tempo dos créditos', { min: 0, max: 1800 });
     if (d.retomar_folga_s !== undefined) valores.retomar_folga_s = v.inteiro(d.retomar_folga_s, 'a folga ao retomar', { min: 0, max: 120 });
     if (d.aviso_home !== undefined) valores.aviso_home = String(d.aviso_home ?? '').slice(0, 300);
+    if (d.epg_url !== undefined) valores.epg_url = String(d.epg_url ?? '').trim().slice(0, 1000);
     gravarConfig(db, valores);
     registrar(db, req, 'config_alterada', Object.keys(valores));
     res.json({ config: lerConfig(db) });

@@ -7,6 +7,7 @@ import { telaTitulo } from './titulo.js';
 import { telaConta } from './conta.js';
 import { cartaz, canalCartao, fileira, grade, vazio } from './cartoes.js';
 import { tocar } from './player.js';
+import { ehTV, ligarControle, focarPrimeiro } from './tv.js';
 
 const raiz = $('#app');
 let conta = null;
@@ -22,6 +23,17 @@ window.addEventListener('tv:assinatura', () => { if (!window.location.hash.start
 window.addEventListener('tv:pin', () => { perfilGuardado.limpar(); ir('#/perfis'); });
 window.addEventListener('hashchange', () => desenharRota());
 
+// Controle remoto da Smart TV: Voltar fecha o que estiver aberto e, na tela inicial, sai do app.
+ligarControle({
+  aoVoltar: () => {
+    if (window.playtvPlayer) { window.playtvPlayer.fechar(); return true; }
+    if (window.playtvModal) { window.playtvModal(null); return true; }
+    if ((window.location.hash || '#/') !== '#/') { ir('#/'); return true; }
+    return false;
+  },
+  aoMidia: (comando) => window.playtvPlayer?.[comando]?.(),
+});
+
 // ---------------------------------------------------------------- entrada
 
 async function iniciar() {
@@ -29,6 +41,7 @@ async function iniciar() {
   pararTela = null;
   if (!sessao.get()?.token) {
     telaEntrada(raiz, { aoEntrar: () => iniciar() });
+    focarPrimeiro(raiz);
     return;
   }
   try {
@@ -59,7 +72,9 @@ async function iniciar() {
     });
   }
   if (!perfilGuardado.get()?.id || !conta.perfis.some((p) => p.id === perfilGuardado.get().id)) {
-    return telaPerfis(raiz, { aoEscolher: () => { ir('#/'); iniciar2(); }, aoSair: () => { sessao.limpar(); iniciar(); } });
+    telaPerfis(raiz, { aoEscolher: () => { ir('#/'); iniciar2(); }, aoSair: () => { sessao.limpar(); iniciar(); } });
+    focarPrimeiro(raiz);
+    return undefined;
   }
   return iniciar2();
 }
@@ -169,10 +184,12 @@ async function desenharRota() {
       telaPerfis(raiz, { aoEscolher: () => { montarCasca(); ir('#/'); }, aoSair: () => { sessao.limpar(); iniciar(); } });
     } else ir('#/');
     void recarregar;
+    focarPrimeiro(conteudo);
   } catch (err) {
     if (err.status === 402 || err.status === 423) return;
     limpar(conteudo, el('div', { class: 'secao' }, el('div', { class: 'aviso erro' }, err.message),
       el('button', { class: 'btn', style: 'margin-top:12px', onclick: () => desenharRota() }, 'Tentar de novo')));
+    focarPrimeiro(conteudo);
   }
 }
 

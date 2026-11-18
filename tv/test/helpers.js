@@ -10,7 +10,7 @@ process.env.TV_LIMITE_LOGIN = '1000';
 process.env.TV_PAGAMENTOS = 'simulado';
 process.env.TV_RELAY = '1';
 // Cada execução grava os arquivos numa pasta temporária própria.
-process.env.TV_MIDIA = fs.mkdtempSync(path.join(os.tmpdir(), 'payax-tv-teste-'));
+process.env.TV_MIDIA = fs.mkdtempSync(path.join(os.tmpdir(), 'play-tv-teste-'));
 
 const { abrir } = require('../server/db');
 const { criarApp } = require('../server/app');

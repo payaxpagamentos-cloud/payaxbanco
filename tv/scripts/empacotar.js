@@ -1,6 +1,6 @@
 'use strict';
 
-// Gera o pacote de instalação: <saída>/payax-tv.zip com a pasta tv/ pronta para enviar ao servidor
+// Gera o pacote de instalação: <saída>/play-tv.zip com a pasta tv/ pronta para enviar ao servidor
 // (código, dependências de produção já instaladas, .env com segredos novos e LEIA-ME).
 // Uso: node scripts/empacotar.js [pasta de saída]   (padrão: dist)
 
@@ -22,7 +22,7 @@ for (const item of ['server', 'public', 'package.json', 'package-lock.json', 'Do
 execFileSync('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'], { cwd: pasta, stdio: 'inherit' });
 
 const senhaAdmin = crypto.randomBytes(12).toString('base64url');
-const env = `# PayAx TV — configuração do servidor (fase de testes)
+const env = `# PLAY TV — configuração do servidor (fase de testes)
 NODE_ENV=production
 PORT=3600
 # Endereço da plataforma: https://SEU-DOMINIO/tv/  (app do assinante) e /tv/admin/ (operação)
@@ -31,9 +31,9 @@ TV_BASE_PATH=/tv
 # trocar derruba todas as sessões e invalida os links de reprodução.
 TV_SECRET=${crypto.randomBytes(32).toString('hex')}
 # Administrador da operação, criado no primeiro acesso.
-TV_ADMIN_EMAIL=admin@payaxtv.com.br
+TV_ADMIN_EMAIL=admin@playtv.com.br
 TV_ADMIN_SENHA=${senhaAdmin}
-TV_ADMIN_NOME=Operação PayAx TV
+TV_ADMIN_NOME=Operação PLAY TV
 # Atrás de Nginx/Apache: confia no proxy para obter o IP real dos acessos.
 TV_TRUST_PROXY=1
 # Cobrança na fase de testes: "simulado" (o assinante confirma o PIX por um botão de teste).
@@ -53,7 +53,7 @@ fs.writeFileSync(path.join(pasta, '.env'), env, { mode: 0o600 });
 fs.copyFileSync(path.join(raiz, 'scripts', 'LEIA-ME.txt'), path.join(pasta, 'LEIA-ME.txt'));
 fs.mkdirSync(path.join(pasta, 'data', 'midia'), { recursive: true });
 
-const zip = path.join(saida, 'payax-tv.zip');
+const zip = path.join(saida, 'play-tv.zip');
 execFileSync('zip', ['-qr', zip, 'tv'], { cwd: saida });
 console.log(`Pacote: ${zip}`);
-console.log(`Senha inicial da operação (admin@payaxtv.com.br): ${senhaAdmin}`);
+console.log(`Senha inicial da operação (admin@playtv.com.br): ${senhaAdmin}`);

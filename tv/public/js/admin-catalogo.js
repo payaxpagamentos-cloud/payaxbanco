@@ -101,7 +101,7 @@ export async function telaCatalogo(c, { abrirTitulo }) {
         });
         return b;
       }))),
-      caixaSim('Produção original PayAx', 'original', false),
+      caixaSim('Produção original PLAY', 'original', false),
       el('div', { class: 'linha fim' },
         el('button', { type: 'button', class: 'btn vazio', onclick: () => fechar() }, 'Cancelar'),
         el('button', { class: 'btn primario' }, 'Criar e abrir')));
@@ -221,7 +221,7 @@ export async function telaTituloEditor(c, id, { voltar }) {
         });
         return b;
       }))),
-      caixaSim('Produção original PayAx', 'original', Boolean(t.original)),
+      caixaSim('Produção original PLAY', 'original', Boolean(t.original)),
       el('div', { class: 'linha fim' }, el('button', { class: 'btn primario' }, 'Salvar ficha')));
     f.querySelector('textarea[name=sinopse]').value = t.sinopse ?? '';
     f.querySelector('textarea[name=elenco]').value = t.elenco ?? '';

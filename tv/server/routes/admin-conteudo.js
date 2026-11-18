@@ -3,13 +3,15 @@
 const { Router } = require('express');
 const express = require('express');
 const config = require('../config');
-const { agora, transacao, slug } = require('../db');
+const { agora, transacao, slug, lerConfig, gravarConfig } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { permitir } = require('../auth');
 const midia = require('../lib/midia');
 const relay = require('../lib/relay');
 const epg = require('../lib/epg');
+const embed = require('../lib/embed');
+const { CANAIS_ABERTOS, AVISO_NUMEROS } = require('../lib/tv-aberta');
 const player = require('../lib/player');
 const v = require('../lib/validacao');
 
@@ -46,28 +48,46 @@ module.exports = (db) => {
     relay_ligado: config.relay.ligado,
   }));
 
-  const dadosCanal = (d, id = null) => ({
+  const dadosCanal = (d, id = null) => {
+    const fonte = v.opcao(d.fonte ?? 'hls', 'a forma de transmissão', ['hls', 'embed']);
+    const ativo = v.booleano(d.ativo, true) ? 1 : 0;
+    const urlHls = v.urlHls(d.url_hls, { obrigatorio: false });
+    const urlEmbed = d.url_embed ? embed.normalizar(d.url_embed).url : null;
+    // Um canal só vai ao ar com endereço: sem ele, fica cadastrado e desligado.
+    if (ativo && fonte === 'hls' && !urlHls) {
+      throw new ErroNegocio('Cadastre o endereço do sinal (.m3u8) ou deixe o canal desligado até ele chegar.', 422);
+    }
+    if (ativo && fonte === 'embed' && !urlEmbed) {
+      throw new ErroNegocio('Cadastre o endereço do player oficial da emissora ou deixe o canal desligado.', 422);
+    }
+    return {
     numero: v.inteiro(d.numero, 'o número do canal', { min: 1, max: 9999 }),
     nome: v.texto(d.nome, 'o nome do canal', 80),
     descricao: v.opcional(d.descricao, 'a descrição', 500),
     categoria: v.opcao(d.categoria ?? 'aberta', 'a categoria', CATEGORIAS),
-    url_hls: v.urlHls(d.url_hls),
+    fonte,
+    url_hls: urlHls,
+    url_embed: urlEmbed,
+    observacao: v.opcional(d.observacao, 'a observação', 1000),
     relay: v.booleano(d.relay, true) ? 1 : 0,
     logo_midia_id: midiaPronta(d.logo_midia_id, 'imagem', 'Logo do canal'),
     plano_minimo_id: d.plano_minimo_id ? achar('planos', d.plano_minimo_id, 'Plano').id : null,
     classificacao: v.classificacao(d.classificacao),
     regiao: v.opcional(d.regiao, 'a região', 60),
     ordem: v.inteiro(d.ordem ?? 0, 'a ordem', { min: 0, max: 9999 }),
-    ativo: v.booleano(d.ativo, true) ? 1 : 0,
+    ativo,
     slug: slugLivre('canais', d.slug || d.nome, id),
-  });
+    };
+  };
 
   r.post('/canais', (req, res) => {
     const c = dadosCanal(req.body);
-    const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, url_hls, relay, logo_midia_id, plano_minimo_id, classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.url_hls, c.relay,
-      c.logo_midia_id, c.plano_minimo_id, c.classificacao, c.regiao, c.ordem, c.ativo, agora(), agora());
+    const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, url_hls, url_embed, observacao, relay, logo_midia_id,
+        plano_minimo_id, classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.fonte, c.url_hls,
+      c.url_embed, c.observacao, c.relay, c.logo_midia_id, c.plano_minimo_id, c.classificacao, c.regiao, c.ordem, c.ativo, agora(), agora());
     const canal = achar('canais', Number(r2.lastInsertRowid), 'Canal');
+    embed.invalidar();
     registrar(db, req, 'canal_criado', { id: canal.id, nome: canal.nome });
     res.status(201).json({ canal });
   });
@@ -75,12 +95,13 @@ module.exports = (db) => {
   r.patch('/canais/:id', (req, res) => {
     const atual = achar('canais', req.params.id, 'Canal');
     const c = dadosCanal({ ...atual, ...req.body }, atual.id);
-    db.prepare(`UPDATE canais SET numero = ?, nome = ?, slug = ?, descricao = ?, categoria = ?, url_hls = ?, relay = ?, logo_midia_id = ?,
-        plano_minimo_id = ?, classificacao = ?, regiao = ?, ordem = ?, ativo = ?, atualizado_em = ? WHERE id = ?`)
-      .run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.url_hls, c.relay, c.logo_midia_id, c.plano_minimo_id, c.classificacao,
-        c.regiao, c.ordem, c.ativo, agora(), atual.id);
+    db.prepare(`UPDATE canais SET numero = ?, nome = ?, slug = ?, descricao = ?, categoria = ?, fonte = ?, url_hls = ?, url_embed = ?, observacao = ?,
+        relay = ?, logo_midia_id = ?, plano_minimo_id = ?, classificacao = ?, regiao = ?, ordem = ?, ativo = ?, atualizado_em = ? WHERE id = ?`)
+      .run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.fonte, c.url_hls, c.url_embed, c.observacao, c.relay, c.logo_midia_id,
+        c.plano_minimo_id, c.classificacao, c.regiao, c.ordem, c.ativo, agora(), atual.id);
     // Trocou o endereço do sinal: o cache da lista antiga não serve mais.
-    if (c.url_hls !== atual.url_hls) relay.cacheLista.delete(atual.url_hls);
+    if (atual.url_hls && c.url_hls !== atual.url_hls) relay.cacheLista.delete(atual.url_hls);
+    embed.invalidar();
     registrar(db, req, 'canal_alterado', { id: atual.id, nome: c.nome });
     res.json({ canal: achar('canais', atual.id, 'Canal') });
   });
@@ -92,8 +113,37 @@ module.exports = (db) => {
       db.prepare('DELETE FROM destaques WHERE canal_id = ?').run(c.id);
       db.prepare('DELETE FROM canais WHERE id = ?').run(c.id);
     });
+    embed.invalidar();
     registrar(db, req, 'canal_excluido', { id: c.id, nome: c.nome });
     res.status(204).end();
+  });
+
+  /**
+   * Deixa a TV aberta inteira cadastrada de uma vez (número, categoria, logo e o lembrete de
+   * onde pedir o sinal). Os canais nascem desligados: cada um entra no ar quando a operação
+   * cadastra o endereço do sinal ou o player oficial da emissora.
+   */
+  r.post('/canais/importar-abertos', (req, res) => {
+    const criados = [];
+    const existentes = [];
+    transacao(db, () => {
+      for (const [numero, nome, categoria, grupo, site, observacao] of CANAIS_ABERTOS) {
+        const ja = db.prepare('SELECT id FROM canais WHERE slug = ? OR numero = ?').get(slug(nome), numero);
+        if (ja) { existentes.push(nome); continue; }
+        const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, observacao, relay, classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
+          VALUES (?, ?, ?, ?, ?, 'hls', ?, 1, 0, 'Nacional', ?, 0, ?, ?)`)
+          .run(numero, nome, slug(nome), `${grupo} · ${site}`, categoria, observacao, numero, agora(), agora());
+        criados.push({ id: Number(r2.lastInsertRowid), nome, numero });
+      }
+    });
+    registrar(db, req, 'canais_abertos_importados', { criados: criados.length });
+    res.json({
+      criados: criados.length,
+      ja_existiam: existentes.length,
+      canais: criados,
+      aviso: AVISO_NUMEROS,
+      proximo_passo: 'Os canais entraram desligados. Em cada um, cadastre o endereço do sinal (.m3u8) que a emissora fornece ou o endereço do player oficial dela, e ligue o canal.',
+    });
   });
 
   /** Testa o sinal agora (a operação clica antes de colocar o canal no ar). */
@@ -110,8 +160,14 @@ module.exports = (db) => {
   /** Link de conferência: abre o canal no player do painel sem gastar uma tela do plano. */
   r.get('/canais/:id/previa', (req, res) => {
     const c = achar('canais', req.params.id, 'Canal');
+    if (c.fonte === 'embed') {
+      if (!c.url_embed) throw new ErroNegocio('Este canal ainda não tem o endereço do player oficial.', 409);
+      return res.json({ tipo: 'embed', url: c.url_embed, retransmitido: false });
+    }
+    if (!c.url_hls) throw new ErroNegocio('Este canal ainda não tem o endereço do sinal.', 409);
     const token = player.emitirToken({ s: 0, u: req.usuario.id, p: 0, t: 'canal', c: c.id });
-    res.json({
+    return res.json({
+      tipo: 'hls',
       url: c.relay && config.relay.ligado ? `${config.basePath}/api/play/canal/${c.id}/lista.m3u8?t=${encodeURIComponent(token)}` : c.url_hls,
       retransmitido: Boolean(c.relay && config.relay.ligado),
     });
@@ -151,6 +207,19 @@ module.exports = (db) => {
     });
     registrar(db, req, 'epg_importada', saida);
     res.json(saida);
+  });
+
+  /** Importa a grade de um endereço XMLTV (o provedor é escolhido pela operação). */
+  r.post('/epg/importar-url', async (req, res, next) => {
+    try {
+      const url = v.texto(req.body.url ?? lerConfig(db).epg_url, 'o endereço do XMLTV', 1000);
+      const saida = await epg.importarDeUrl(db, url, { substituir: req.body.substituir !== false });
+      if (v.booleano(req.body.guardar, true)) gravarConfig(db, { epg_url: url });
+      registrar(db, req, 'epg_importada_url', { url, ...saida });
+      res.json(saida);
+    } catch (err) {
+      next(err);
+    }
   });
 
   r.post('/epg/limpar', (req, res) => res.json({ removidos: epg.limparAntigos(db, v.inteiro(req.body.dias ?? 7, 'os dias', { min: 1, max: 365 })) }));

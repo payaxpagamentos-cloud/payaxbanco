@@ -215,9 +215,10 @@ async function verificarCanal(db, canal) {
 /** Verifica todos os canais ativos (roda sozinha de 15 em 15 minutos). */
 async function verificarSinais(db, { apenas = null } = {}) {
   if (!config.relay.ligado && !apenas) return [];
+  // Só faz sentido conferir quem tem lista HLS: canal com player da emissora não passa por aqui.
   const canais = apenas
-    ? db.prepare('SELECT * FROM canais WHERE id = ?').all(Number(apenas))
-    : db.prepare('SELECT * FROM canais WHERE ativo = 1').all();
+    ? db.prepare("SELECT * FROM canais WHERE id = ? AND fonte = 'hls' AND url_hls IS NOT NULL").all(Number(apenas))
+    : db.prepare("SELECT * FROM canais WHERE ativo = 1 AND fonte = 'hls' AND url_hls IS NOT NULL").all();
   const resultados = [];
   // Em série para não disparar dezenas de buscas ao mesmo tempo.
   for (const c of canais) resultados.push(await verificarCanal(db, c));

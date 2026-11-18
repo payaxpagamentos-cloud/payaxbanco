@@ -1,8 +1,8 @@
 /** Endereço base do app (ex.: '/tv'), deduzido de onde este arquivo foi carregado. */
 export const BASE = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 
-const CHAVE_SESSAO = 'payaxtv.sessao';
-const CHAVE_PERFIL = 'payaxtv.perfil';
+const CHAVE_SESSAO = 'playtv.sessao';
+const CHAVE_PERFIL = 'playtv.perfil';
 let memoria = null;
 
 const guardar = (chave, valor) => { try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem armazenamento */ } };

@@ -127,8 +127,16 @@ CREATE TABLE IF NOT EXISTS canais (
   descricao TEXT,
   categoria TEXT NOT NULL DEFAULT 'aberta'
     CHECK (categoria IN ('aberta','noticias','esportes','filmes','series','infantil','documentarios','musica','variedades','religioso','local')),
-  -- Origem do sinal: lista HLS (.m3u8) da emissora ou do nosso encoder.
-  url_hls TEXT NOT NULL,
+  -- Como o canal chega ao assinante:
+  --   'hls'   = sinal próprio ou contratado, em lista .m3u8 (com ou sem retransmissão nossa);
+  --   'embed' = player oficial e público da emissora (não retransmitimos nada: abrimos o player dela).
+  fonte TEXT NOT NULL DEFAULT 'hls' CHECK (fonte IN ('hls','embed')),
+  -- Endereço da lista HLS (quando fonte = 'hls'). Vazio enquanto o sinal não chega.
+  url_hls TEXT,
+  -- Endereço do player oficial da emissora (quando fonte = 'embed').
+  url_embed TEXT,
+  -- Recado da operação: de quem pedir o sinal, número do contrato, contato da afiliada.
+  observacao TEXT,
   -- 1: o sinal passa pelo nosso servidor (retransmissão); 0: o player vai direto na origem.
   relay INTEGER NOT NULL DEFAULT 1,
   logo_midia_id INTEGER REFERENCES midias(id),
@@ -357,16 +365,16 @@ const GENEROS_PADRAO = ['Ação', 'Aventura', 'Comédia', 'Documentário', 'Dram
 const FILEIRAS_PADRAO = [
   // nome, tipo, limite, ordem
   ['Canais ao vivo agora', 'canais', 20, 1],
-  ['Em alta na PayAx TV', 'em_alta', 20, 2],
+  ['Em alta na PLAY TV', 'em_alta', 20, 2],
   ['Novidades', 'novidades', 20, 3],
-  ['Originais PayAx', 'originais', 20, 4],
+  ['Originais PLAY', 'originais', 20, 4],
   ['Séries para maratonar', 'series', 20, 5],
   ['Filmes', 'filmes', 20, 6],
 ];
 
 const CONFIG_PADRAO = {
   pix_chave: '',
-  pix_recebedor: 'PAYAX TV',
+  pix_recebedor: 'PLAY TV',
   pix_cidade: 'SAO PAULO',
   // Dias entre o vencimento da fatura e a suspensão do acesso.
   carencia_dias: '5',
@@ -377,6 +385,10 @@ const CONFIG_PADRAO = {
   // Quanto do começo é descartado ao retomar (volta um pouco atrás, como nos grandes streamings).
   retomar_folga_s: '5',
   aviso_home: '',
+  // Grade dos canais abertos: endereço de um arquivo XMLTV que a plataforma importa sozinha,
+  // uma vez por dia (o provedor é escolhido pela operação).
+  epg_url: '',
+  epg_importado_em: '',
 };
 
 const agora = () => new Date().toISOString();
@@ -386,6 +398,8 @@ function abrir(arquivo = config.dbFile) {
   const db = new DatabaseSync(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+
+  migrar(db);
 
   const plano = db.prepare(`INSERT OR IGNORE INTO planos (slug, nome, descricao, preco_centavos, telas, perfis_max, qualidade, downloads, nivel, ordem, criado_em)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
@@ -405,6 +419,14 @@ function abrir(arquivo = config.dbFile) {
       .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha), agora());
   }
   return db;
+}
+
+/** Acrescenta colunas que entraram depois, em bancos já criados. */
+function migrar(db) {
+  const colunas = db.prepare('PRAGMA table_info(canais)').all().map((c) => c.name);
+  if (!colunas.includes('fonte')) db.exec("ALTER TABLE canais ADD COLUMN fonte TEXT NOT NULL DEFAULT 'hls'");
+  if (!colunas.includes('url_embed')) db.exec('ALTER TABLE canais ADD COLUMN url_embed TEXT');
+  if (!colunas.includes('observacao')) db.exec('ALTER TABLE canais ADD COLUMN observacao TEXT');
 }
 
 /** Endereço amigável: "Cine Aberta 2" -> "cine-aberta-2". */
@@ -436,13 +458,15 @@ function lerConfig(db) {
   const c = Object.fromEntries(db.prepare('SELECT chave, valor FROM configuracoes').all().map((r) => [r.chave, r.valor]));
   return {
     pix_chave: c.pix_chave ?? '',
-    pix_recebedor: c.pix_recebedor ?? 'PAYAX TV',
+    pix_recebedor: c.pix_recebedor ?? 'PLAY TV',
     pix_cidade: c.pix_cidade ?? 'SAO PAULO',
     carencia_dias: Number(c.carencia_dias),
     antecedencia_fatura_dias: Number(c.antecedencia_fatura_dias),
     creditos_s: Number(c.creditos_s),
     retomar_folga_s: Number(c.retomar_folga_s),
     aviso_home: c.aviso_home ?? '',
+    epg_url: c.epg_url ?? '',
+    epg_importado_em: c.epg_importado_em ?? '',
   };
 }
 

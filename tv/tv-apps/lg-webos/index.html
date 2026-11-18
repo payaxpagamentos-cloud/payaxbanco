@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PLAY TV</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0A0A0B; color: #F5F5F7;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .tela { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; padding: 40px; }
+    .marca { font-size: 64px; font-weight: 800; letter-spacing: -2px; }
+    .marca .play { background: linear-gradient(100deg, #FF4D1C, #FFC043); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .aviso { color: #ABABB5; font-size: 24px; max-width: 900px; line-height: 1.5; }
+    .rodinha { width: 64px; height: 64px; border: 6px solid rgba(255,255,255,.18); border-top-color: #FF4D1C; border-radius: 50%; animation: gira 1s linear infinite; }
+    @keyframes gira { to { transform: rotate(360deg); } }
+    button { font: inherit; font-size: 24px; font-weight: 700; padding: 16px 32px; border-radius: 999px;
+      border: 0; background: #FF4D1C; color: #1A0800; cursor: pointer; }
+    button:focus { outline: 4px solid #FFC043; outline-offset: 4px; }
+  </style>
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="tela">
+    <div class="marca"><span class="play">PLAY</span> TV</div>
+    <div class="rodinha" id="rodinha"></div>
+    <div class="aviso" id="aviso">Conectando…</div>
+    <button id="tentar" style="display:none">Tentar de novo</button>
+  </div>
+  <script src="carregador.js"></script>
+</body>
+</html>

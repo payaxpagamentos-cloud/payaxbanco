@@ -2,7 +2,7 @@ import { api, BASE, ErroApi } from './api.js';
 import { el, icone, relogio, duracao, toast, modal, acao, nomeDoAparelho, etiquetaIdade, QUALIDADES } from './ui.js';
 
 /**
- * Player da PayAx TV: canais ao vivo (HLS pelo hls.js, com reserva para o HLS nativo do Safari)
+ * Player da PLAY TV: canais ao vivo (HLS pelo hls.js, com reserva para o HLS nativo do Safari)
  * e conteúdo sob demanda (MP4 com Range). Controles próprios, legendas, qualidade, telas simultâneas
  * e "continuar assistindo" salvo de tempo em tempo.
  */
@@ -45,6 +45,9 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     throw err;
   }
 
+  // Canal que vem pelo player oficial da emissora: não é o nosso <video>, é o player dela.
+  if (dados.fonte.tipo === 'embed') return tocarNoPlayerDaEmissora(dados, { aoFechar });
+
   const aoVivo = Boolean(dados.ao_vivo);
   const video = el('video', { playsinline: true, autoplay: true, preload: 'auto', crossorigin: 'use-credentials' });
   video.setAttribute('x-webkit-airplay', 'allow');
@@ -61,7 +64,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     aoVivo ? el('span', { class: 'etiqueta vivo' }, 'AO VIVO') : null,
     dados.info.classificacao !== undefined ? etiquetaIdade(dados.info.classificacao) : null,
     dados.fonte.qualidade ? el('span', { class: 'etiqueta' }, QUALIDADES[dados.fonte.qualidade] ?? dados.fonte.qualidade) : null,
-    dados.fonte.retransmitido ? el('span', { class: 'etiqueta ok', title: 'O sinal passa pelos nossos servidores' }, 'PayAx CDN') : null);
+    dados.fonte.retransmitido ? el('span', { class: 'etiqueta ok', title: 'O sinal passa pelos nossos servidores' }, 'PLAY CDN') : null);
 
   const btn = (nomeIcone, rotulo, fn, extra = '') => {
     const b = el('button', { class: `pbtn ${extra}`, title: rotulo, 'aria-label': rotulo }, icone(nomeIcone));
@@ -122,6 +125,16 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   const caixa = el('div', { class: 'player' }, video, cobertura, avisoCentro, caixaErro, caixaProximo);
   document.body.append(caixa);
   document.body.style.overflow = 'hidden';
+  // Teclas de mídia do controle remoto e botão Voltar da TV.
+  window.playtvPlayer = {
+    fechar: () => fechar(),
+    alternar: () => alternar(),
+    tocar: () => video.play().catch(() => {}),
+    pausar: () => video.pause(),
+    parar: () => fechar(),
+    avancar: () => pular(30),
+    voltar: () => pular(-30),
+  };
 
   // ---------- Fonte do vídeo ----------
   const semSuporteNativo = () => !video.canPlayType('application/vnd.apple.mpegurl');
@@ -352,10 +365,12 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   });
   video.addEventListener('dblclick', () => telaCheia());
   mostrarControles();
+  if (document.body.classList.contains('tv')) requestAnimationFrame(() => btnTocar.focus({ preventScroll: true }));
 
   // ---------- Teclado ----------
   const teclas = (e) => {
-    if (e.target.matches('input, textarea, select')) return;
+    // A tecla pode vir do controle remoto (evento disparado no documento, sem elemento alvo).
+    if (e.target.matches?.('input, textarea, select')) return;
     const mapa = {
       ' ': () => alternar(), k: () => alternar(), ArrowLeft: () => pular(-PASSO), ArrowRight: () => pular(PASSO),
       j: () => pular(-30), l: () => pular(30), f: () => telaCheia(), m: () => { video.muted = !video.muted; },
@@ -398,11 +413,89 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch { /* segue */ } }
     caixa.remove();
     document.body.style.overflow = '';
+    window.playtvPlayer = null;
     if (!silencioso) aoFechar?.();
     resolverFim({ titulo_id: dados.info.titulo_id ?? null });
   }
 
   await ligarFonte();
+  return fim;
+}
+
+/**
+ * Canal com fonte "embed": a PLAY TV abre o player público da própria emissora dentro da tela,
+ * com os anúncios dela. Não retransmitimos nada — por isso aqui não há controles nossos
+ * (quem manda no vídeo é o player da emissora). A tela continua contando para o limite do plano.
+ */
+function tocarNoPlayerDaEmissora(dados, { aoFechar }) {
+  let fechado = false;
+  const quadro = el('iframe', {
+    src: dados.fonte.url,
+    allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen',
+    allowfullscreen: true,
+    referrerpolicy: 'origin-when-cross-origin',
+    style: 'position:absolute;inset:0;width:100%;height:100%;border:0;background:#000',
+    title: dados.info.titulo,
+  });
+
+  const caixa = el('div', { class: 'player' }, quadro,
+    el('div', { class: 'cobertura', style: 'background:linear-gradient(180deg, rgba(0,0,0,.8), transparent 18%);justify-content:flex-start;pointer-events:none' },
+      el('div', { class: 'p-topo', style: 'pointer-events:auto' },
+        (() => {
+          const b = el('button', { class: 'pbtn', title: 'Voltar (Esc)', 'aria-label': 'Voltar' }, icone('voltar'));
+          b.addEventListener('click', () => fechar());
+          return b;
+        })(),
+        el('div', { class: 'info' },
+          el('h2', {}, dados.info.titulo),
+          el('div', { class: 'sub' }, dados.info.subtitulo ?? 'Ao vivo'),
+          el('div', { class: 'linha', style: 'margin-top:6px' },
+            el('span', { class: 'etiqueta vivo' }, 'AO VIVO'),
+            dados.info.classificacao !== undefined ? etiquetaIdade(dados.info.classificacao) : null,
+            el('span', { class: 'etiqueta', title: 'A transmissão é do player oficial da emissora' }, 'Player da emissora'))),
+        (() => {
+          const b = el('button', { class: 'btn pequeno vazio' }, icone('tela'), 'Tela cheia');
+          b.addEventListener('click', async () => {
+            try {
+              if (document.fullscreenElement) await document.exitFullscreen();
+              else await caixa.requestFullscreen({ navigationUI: 'hide' });
+            } catch { toast('Seu navegador não deixou abrir em tela cheia.', true); }
+          });
+          return b;
+        })())));
+
+  document.body.append(caixa);
+  document.body.style.overflow = 'hidden';
+  window.playtvPlayer = { fechar: () => fechar(), alternar: () => {}, parar: () => fechar() };
+
+  const inicio = Date.now();
+  const ping = setInterval(async () => {
+    if (fechado) return;
+    try {
+      await api.post('/play/ping', { sessao_id: dados.sessao_id, segundos: Math.floor((Date.now() - inicio) / 1000) });
+    } catch (err) {
+      if (err.status === 409) { fechar(); toast('Esta tela foi encerrada em outro aparelho.', true); }
+    }
+  }, 30_000);
+
+  const teclas = (e) => { if (e.key === 'Escape' && !document.fullscreenElement) fechar(); };
+  document.addEventListener('keydown', teclas);
+
+  let resolverFim;
+  const fim = new Promise((r) => { resolverFim = r; });
+  async function fechar() {
+    if (fechado) return;
+    fechado = true;
+    clearInterval(ping);
+    document.removeEventListener('keydown', teclas);
+    try { await api.post('/play/fechar', { sessao_id: dados.sessao_id, motivo: 'fim' }); } catch { /* segue */ }
+    if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch { /* segue */ } }
+    caixa.remove();
+    document.body.style.overflow = '';
+    window.playtvPlayer = null;
+    aoFechar?.();
+    resolverFim({ titulo_id: null });
+  }
   return fim;
 }
 

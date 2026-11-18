@@ -1,4 +1,4 @@
-# PayAx TV — imagem de produção
+# PLAY TV — imagem de produção
 ARG BASE=node:22-slim
 FROM ${BASE}
 

@@ -17,9 +17,9 @@ test('canal: cadastro, endereço do sinal e situação', async (t) => {
   const comSenha = await s.post('/admin/canais', { numero: 4, nome: 'Canal', url_hls: 'https://user:senha@origem.test/x.m3u8' }, admin);
   assert.equal(comSenha.status, 422, 'endereço com usuário e senha é recusado');
 
-  const c = await s.post('/admin/canais', { numero: 4, nome: 'PayAx 4 Aberta', categoria: 'aberta', url_hls: 'https://origem.test/live.m3u8' }, admin);
+  const c = await s.post('/admin/canais', { numero: 4, nome: 'PLAY 4 Aberta', categoria: 'aberta', url_hls: 'https://origem.test/live.m3u8' }, admin);
   assert.equal(c.status, 201);
-  assert.equal(c.dados.canal.slug, 'payax-4-aberta');
+  assert.equal(c.dados.canal.slug, 'play-4-aberta');
   assert.equal(c.dados.canal.relay, 1, 'por padrão o sinal passa pelo nosso servidor');
 
   const repetido = await s.post('/admin/canais', { numero: 4, nome: 'Outro', url_hls: 'https://origem.test/outro.m3u8' }, admin);
@@ -30,7 +30,7 @@ test('grade: programa no ar agora, sem sobreposição, e guia do assinante', asy
   const s = await iniciar();
   t.after(s.fechar);
   const admin = await s.adminLogin();
-  const canal = (await s.post('/admin/canais', { numero: 5, nome: 'PayAx News', categoria: 'noticias', url_hls: 'https://origem.test/news.m3u8' }, admin)).dados.canal;
+  const canal = (await s.post('/admin/canais', { numero: 5, nome: 'PLAY News', categoria: 'noticias', url_hls: 'https://origem.test/news.m3u8' }, admin)).dados.canal;
 
   const agora = await s.post(`/admin/canais/${canal.id}/programas`, { titulo: 'Jornal das Seis', inicio: agoraMais(-20), fim: agoraMais(40), ao_vivo: true }, admin);
   assert.equal(agora.status, 201);
@@ -61,7 +61,7 @@ test('importação XMLTV preenche a grade do canal', async (t) => {
   const s = await iniciar();
   t.after(s.fechar);
   const admin = await s.adminLogin();
-  const canal = (await s.post('/admin/canais', { numero: 7, nome: 'Arena PayAx', categoria: 'esportes', url_hls: 'https://origem.test/arena.m3u8' }, admin)).dados.canal;
+  const canal = (await s.post('/admin/canais', { numero: 7, nome: 'Arena PLAY', categoria: 'esportes', url_hls: 'https://origem.test/arena.m3u8' }, admin)).dados.canal;
 
   const xml = `<?xml version="1.0"?><tv>
     <programme start="20260320180000 -0300" stop="20260320200000 -0300" channel="7">
@@ -104,7 +104,7 @@ test('canal só do plano superior fica bloqueado para o plano básico', async (t
   const s = await iniciar();
   t.after(s.fechar);
   const admin = await s.adminLogin();
-  const canal = (await s.post('/admin/canais', { numero: 11, nome: 'Cine PayAx', categoria: 'filmes', url_hls: 'https://origem.test/cine.m3u8', plano_minimo_id: 3 }, admin)).dados.canal;
+  const canal = (await s.post('/admin/canais', { numero: 11, nome: 'Cine PLAY', categoria: 'filmes', url_hls: 'https://origem.test/cine.m3u8', plano_minimo_id: 3 }, admin)).dados.canal;
 
   const basico = await s.assinante('canalbasico@exemplo.com.br', { plano: 1 });
   const lista = await s.get('/tv/canais', basico.token, basico.comPerfil);
@@ -123,4 +123,103 @@ test('canal fora do ar não aparece para o assinante', async (t) => {
   const cliente = await s.assinante('semcanal@exemplo.com.br', { plano: 2 });
   assert.equal((await s.get('/tv/canais', cliente.token, cliente.comPerfil)).dados.canais.length, 0);
   assert.equal((await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil)).status, 404);
+});
+
+test('importar a TV aberta deixa tudo cadastrado e desligado, sem duplicar', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+
+  const r = await s.post('/admin/canais/importar-abertos', {}, admin);
+  assert.equal(r.status, 200);
+  assert.ok(r.dados.criados >= 15, 'importa a lista inteira');
+  assert.match(r.dados.proximo_passo, /cadastre o endereço do sinal/i);
+
+  const { canais } = (await s.get('/admin/canais', admin)).dados;
+  const globo = canais.find((c) => c.nome === 'TV Globo');
+  assert.ok(globo, 'a Globo entra no cadastro');
+  assert.equal(globo.ativo, false, 'entra desligada: só vai ao ar com o sinal cadastrado');
+  assert.equal(globo.url_hls, null);
+  assert.match(globo.observacao, /contrato/i, 'explica de quem pedir o sinal');
+  assert.ok(canais.some((c) => c.nome === 'SBT') && canais.some((c) => c.nome === 'Record')
+    && canais.some((c) => c.nome === 'Band') && canais.some((c) => c.nome === 'RedeTV!'));
+
+  // Nada disso aparece para o assinante enquanto estiver desligado.
+  const cliente = await s.assinante('aberta@exemplo.com.br', { plano: 2 });
+  assert.equal((await s.get('/tv/canais', cliente.token, cliente.comPerfil)).dados.canais.length, 0);
+
+  const denovo = await s.post('/admin/canais/importar-abertos', {}, admin);
+  assert.equal(denovo.dados.criados, 0);
+  assert.ok(denovo.dados.ja_existiam >= 15, 'não duplica o que já está cadastrado');
+});
+
+test('canal não vai ao ar sem endereço, seja sinal ou player da emissora', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+
+  const semNada = await s.post('/admin/canais', { numero: 5, nome: 'Sem Sinal', ativo: true }, admin);
+  assert.equal(semNada.status, 422);
+  assert.match(semNada.dados.erro, /endereço do sinal/i);
+
+  const semEmbed = await s.post('/admin/canais', { numero: 5, nome: 'Sem Player', fonte: 'embed', ativo: true }, admin);
+  assert.equal(semEmbed.status, 422);
+  assert.match(semEmbed.dados.erro, /player oficial/i);
+
+  // Desligado, pode ficar cadastrado esperando o sinal.
+  const guardado = await s.post('/admin/canais', { numero: 5, nome: 'Aguardando', ativo: false }, admin);
+  assert.equal(guardado.status, 201);
+  assert.equal(guardado.dados.canal.url_hls, null);
+});
+
+test('canal com player oficial da emissora abre o player dela, sem retransmissão', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+
+  const criado = await s.post('/admin/canais', {
+    numero: 48, nome: 'Canal de Notícias', categoria: 'noticias', fonte: 'embed',
+    url_embed: 'https://www.youtube.com/watch?v=AbCdEf12345', ativo: true,
+  }, admin);
+  assert.equal(criado.status, 201, JSON.stringify(criado.dados));
+  // O endereço colado vira o endereço de incorporação do player.
+  assert.equal(criado.dados.canal.url_embed, 'https://www.youtube.com/embed/AbCdEf12345?autoplay=1&rel=0&modestbranding=1&playsinline=1');
+
+  const cliente = await s.assinante('embed@exemplo.com.br', { plano: 2 });
+  const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: criado.dados.canal.id }, cliente.token, cliente.comPerfil);
+  assert.equal(abrir.status, 201);
+  assert.equal(abrir.dados.fonte.tipo, 'embed');
+  assert.equal(abrir.dados.fonte.retransmitido, false, 'não passa pelo nosso servidor');
+  assert.match(abrir.dados.fonte.url, /youtube\.com\/embed\//);
+
+  // A página libera só a origem do player cadastrado.
+  const pagina = await fetch(`${s.raiz}/`);
+  const csp = pagina.headers.get('content-security-policy');
+  assert.match(csp, /frame-src 'self' https:\/\/www\.youtube\.com/);
+  assert.match(csp, /frame-ancestors 'none'/);
+
+  const endereco = await s.post('/admin/canais', { numero: 49, nome: 'Endereço Ruim', fonte: 'embed', url_embed: 'http://sem-https.test/live', ativo: true }, admin);
+  assert.equal(endereco.status, 422, 'player oficial precisa ser https');
+});
+
+test('canal cadastrado mas ainda sem sinal avisa ao assinante', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const canal = (await s.post('/admin/canais', { numero: 5, nome: 'TV Globo', ativo: false }, admin)).dados.canal;
+  // A operação ligou o canal direto no banco antes de cadastrar o sinal (ou o sinal foi apagado).
+  s.db.prepare('UPDATE canais SET ativo = 1 WHERE id = ?').run(canal.id);
+  const cliente = await s.assinante('semsinal@exemplo.com.br', { plano: 2 });
+  const r = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil);
+  assert.equal(r.status, 409);
+  assert.equal(r.dados.detalhes.motivo, 'sem_sinal');
+});
+
+test('importação de grade por endereço recusa rede interna', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const r = await s.post('/admin/epg/importar-url', { url: 'http://127.0.0.1:9/epg.xml' }, admin);
+  assert.equal(r.status, 422);
+  assert.match(r.dados.erro, /rede interna/i);
 });

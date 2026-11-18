@@ -1,3 +1,5 @@
+import { ehTV, nomeDaTV } from './tv.js';
+
 /** Criação de elementos, formatação e avisos. Texto vindo da API entra sempre como texto, nunca como HTML. */
 export function el(tag, attrs = {}, ...filhos) {
   const e = document.createElement(tag);
@@ -100,14 +102,14 @@ export const CATEGORIAS_CANAL = { aberta: 'TV aberta', noticias: 'Notícias', es
 export function marca(sub) {
   return el('span', { class: 'marca' },
     el('img', { src: `${new URL('../img/favicon.svg', import.meta.url).pathname}`, alt: '' }),
-    el('span', {}, el('span', { class: 'pay' }, 'PayAx'), el('span', { class: 'tv' }, 'TV')),
+    el('span', {}, el('span', { class: 'play' }, 'PLAY'), el('span', { class: 'tv' }, ' TV')),
     sub ? el('span', { class: 'etiqueta' }, sub) : null);
 }
 
 /** Cor do avatar do perfil a partir do nome (sempre a mesma para o mesmo nome). */
 export function corPerfil(nome, cor) {
   if (cor) return cor;
-  const cores = ['#22C58B', '#5B9BFF', '#F0B429', '#FF6B6B', '#C084FC', '#2DD4BF'];
+  const cores = ['#FF4D1C', '#FFC043', '#E11D3C', '#FF8A5B', '#C2410C', '#F97316'];
   const soma = [...String(nome ?? '')].reduce((a, c) => a + c.charCodeAt(0), 0);
   return cores[soma % cores.length];
 }
@@ -139,7 +141,14 @@ export async function acao(botao, fn) {
 export function modal(titulo, conteudo, { largo = false } = {}) {
   return new Promise((resolve) => {
     const fundo = el('div', { class: 'modal-fundo' });
-    const fechar = (v = null) => { fundo.remove(); document.removeEventListener('keydown', tecla); resolve(v); };
+    const fechar = (v = null) => {
+      fundo.remove();
+      document.removeEventListener('keydown', tecla);
+      if (window.playtvModal === fechar) window.playtvModal = null;
+      resolve(v);
+    };
+    // O botão Voltar do controle da TV fecha a janela antes de sair da tela.
+    window.playtvModal = fechar;
     const tecla = (e) => { if (e.key === 'Escape') fechar(); };
     document.addEventListener('keydown', tecla);
     fundo.addEventListener('click', (e) => { if (e.target === fundo) fechar(); });
@@ -151,6 +160,7 @@ export function modal(titulo, conteudo, { largo = false } = {}) {
     fundo.append(caixa);
     document.body.append(fundo);
     caixa.querySelector('input, select, textarea, button.primario')?.focus();
+    if (ehTV) requestAnimationFrame(() => caixa.querySelector('button.primario, button, input')?.focus());
   });
 }
 
@@ -211,6 +221,7 @@ export async function copiar(texto) {
 
 /** Nome do aparelho, para a lista de telas em uso. */
 export function nomeDoAparelho() {
+  if (ehTV) return nomeDaTV();
   const ua = navigator.userAgent;
   const sistema = /iPhone|iPad/i.test(ua) ? 'iPhone/iPad' : /Android/i.test(ua) ? 'Android' : /Mac/i.test(ua) ? 'Mac'
     : /Windows/i.test(ua) ? 'Windows' : /CrOS/i.test(ua) ? 'Chromebook' : /Linux/i.test(ua) ? 'Linux' : 'Navegador';

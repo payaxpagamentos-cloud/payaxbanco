@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 
 const secret = process.env.TV_SECRET || crypto.randomBytes(32).toString('hex');
 if (!process.env.TV_SECRET && process.env.NODE_ENV !== 'test') {
-  console.warn('[PayAx TV] TV_SECRET não definido: usando segredo temporário (sessões expiram ao reiniciar).');
+  console.warn('[PLAY TV] TV_SECRET não definido: usando segredo temporário (sessões expiram ao reiniciar).');
 }
 
 const producao = process.env.NODE_ENV === 'production';
@@ -13,9 +13,9 @@ const producao = process.env.NODE_ENV === 'production';
 // Em produção, recusa iniciar com segredos ausentes ou fracos.
 if (producao) {
   const faltando = ['TV_SECRET', 'TV_ADMIN_SENHA'].filter((k) => !process.env[k]);
-  if (faltando.length) throw new Error(`[PayAx TV] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
-  if (process.env.TV_SECRET.length < 32) throw new Error('[PayAx TV] TV_SECRET deve ter pelo menos 32 caracteres.');
-  if (process.env.TV_ADMIN_SENHA.length < 12) throw new Error('[PayAx TV] TV_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
+  if (faltando.length) throw new Error(`[PLAY TV] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
+  if (process.env.TV_SECRET.length < 32) throw new Error('[PLAY TV] TV_SECRET deve ter pelo menos 32 caracteres.');
+  if (process.env.TV_ADMIN_SENHA.length < 12) throw new Error('[PLAY TV] TV_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
 }
 
 // Endereço em que a plataforma é publicada: '' (raiz do domínio) ou um caminho, como '/tv'.
@@ -29,7 +29,7 @@ module.exports = {
   dbFile,
   secret,
   // Nome da plataforma nas telas, nos e-mails e no PIX.
-  marca: process.env.TV_MARCA || 'PayAx TV',
+  marca: process.env.TV_MARCA || 'PLAY TV',
   // Sessão do assinante dura mais que a da operação (a TV fica aberta na sala).
   tokenTtlSeconds: Number(process.env.TV_SESSAO_HORAS) * 3600 || 30 * 24 * 60 * 60,
   tokenOperacaoTtlSeconds: 8 * 60 * 60,
@@ -58,7 +58,7 @@ module.exports = {
     // Cache do manifesto em memória (segundos). Segmentos não são guardados: são repassados em fluxo.
     cacheListaMs: Number(process.env.TV_RELAY_CACHE_MS) || 2000,
     segmentoMaxBytes: (Number(process.env.TV_RELAY_SEGMENTO_MAX_MB) || 32) * 1024 * 1024,
-    userAgent: process.env.TV_RELAY_USER_AGENT || 'PayAxTV/1.0',
+    userAgent: process.env.TV_RELAY_USER_AGENT || 'PLAYTV/1.0',
   },
   // Canais marcados para tocar direto na origem (sem retransmissão) precisam que o domínio da emissora
   // seja liberado na política de segurança das páginas. Lista separada por vírgula, ex.: 'cdn.emissora.com.br'.
@@ -67,8 +67,8 @@ module.exports = {
   // (PIX na chave da plataforma, confirmado pela operação). A baixa automática exige um intermediador (PSP).
   pagamentos: process.env.TV_PAGAMENTOS || (producao ? 'manual' : 'simulado'),
   admin: {
-    nome: process.env.TV_ADMIN_NOME || 'Operação PayAx TV',
-    email: process.env.TV_ADMIN_EMAIL || 'admin@payaxtv.com.br',
+    nome: process.env.TV_ADMIN_NOME || 'Operação PLAY TV',
+    email: process.env.TV_ADMIN_EMAIL || 'admin@playtv.com.br',
     senha: process.env.TV_ADMIN_SENHA || 'admin123',
   },
 };

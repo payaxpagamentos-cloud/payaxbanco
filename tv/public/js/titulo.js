@@ -108,7 +108,7 @@ export async function telaTitulo(raiz, chave, { ir, aoAtualizar }) {
         arte(t.capa) ? el('div', { class: 'poster' }, el('img', { src: arte(t.capa), alt: t.nome })) : null,
         el('div', { class: 'ficha' },
           el('div', { class: 'linha', style: 'gap:7px;margin-bottom:8px' },
-            t.original ? el('span', { class: 'etiqueta ok' }, 'ORIGINAL PAYAX') : null,
+            t.original ? el('span', { class: 'etiqueta ok' }, 'ORIGINAL PLAY') : null,
             el('span', { class: 'etiqueta' }, t.tipo === 'filme' ? 'Filme' : 'Série'),
             t.bloqueado ? el('span', { class: 'etiqueta plano' }, t.plano_nome) : null),
           el('h1', {}, t.nome),

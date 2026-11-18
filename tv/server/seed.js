@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Dados de demonstração da PayAx TV: canais com grade, catálogo com artes geradas aqui,
+ * Dados de demonstração da PLAY TV: canais com grade, catálogo com artes geradas aqui,
  * assinantes, faturas e audiência dos últimos 30 dias.
  *
  * Os vídeos de demonstração são gerados pelo ffmpeg, se ele estiver instalado. Sem ffmpeg,
@@ -19,6 +19,7 @@ const { abrir, transacao, agora, slug, gravarConfig } = require('./db');
 const { hashSenha } = require('./lib/senha');
 const midia = require('./lib/midia');
 const { hoje, somarDias, somarMeses, competencia } = require('./lib/datas');
+const { CANAIS_ABERTOS } = require('./lib/tv-aberta');
 
 const db = abrir();
 const equipeFalsa = { id: 1, nome: 'seed' };
@@ -31,18 +32,18 @@ const temFfmpeg = (() => {
   }
 })();
 
-const SENHA_EQUIPE = 'payax2026';
+const SENHA_EQUIPE = 'play2026';
 const SENHA_CLIENTE = 'cliente2026';
 
 // ---------------------------------------------------------------- artes geradas
 
-const CORES = [['#1E3A8A', '#22C58B'], ['#4C1D95', '#DB2777'], ['#0F766E', '#84CC16'], ['#7C2D12', '#F59E0B'],
-  ['#1E1B4B', '#6366F1'], ['#134E4A', '#2DD4BF'], ['#450A0A', '#EF4444'], ['#172554', '#38BDF8']];
+const CORES = [['#7C2D12', '#FF8A5B'], ['#431407', '#FFC043'], ['#5B1A0B', '#FF4D1C'], ['#78350F', '#FBBF24'],
+  ['#3F1D0B', '#F97316'], ['#4C1D0C', '#FDBA74'], ['#601410', '#EF4444'], ['#422006', '#FACC15']];
 
 const escapar = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** Cartaz em SVG: gradiente, nome e selo. Serve de arte até a operação enviar a oficial. */
-function arteSvg(nome, { largura = 600, altura = 900, etiqueta = 'PayAx TV', indice = 0, comNome = true } = {}) {
+function arteSvg(nome, { largura = 600, altura = 900, etiqueta = 'PLAY TV', indice = 0, comNome = true } = {}) {
   const [a, b] = CORES[indice % CORES.length];
   const palavras = String(nome).split(/\s+/);
   const linhas = [];
@@ -78,7 +79,7 @@ const guardarArte = (buf, nome) => midia.salvarImagem(db, equipeFalsa, buf, { no
 
 // ---------------------------------------------------------------- vídeos de demonstração
 
-const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'payax-tv-seed-'));
+const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'play-tv-seed-'));
 
 /** Gera um clipe com barras de teste, o nome escrito na tela e um tom de áudio. */
 function gerarClipe(nome, segundos = 15) {
@@ -104,16 +105,11 @@ function guardarVideo(arquivo, { duracao, nome }) {
 
 // ---------------------------------------------------------------- dados
 
-const CANAIS = [
+/** Canais próprios da PLAY TV, com sinal de demonstração (esses tocam de verdade no exemplo). */
+const CANAIS_PROPRIOS = [
   // número, nome, categoria, região, descrição
-  [4, 'PayAx 4 Aberta', 'aberta', 'Nacional', 'O canal principal da PayAx: novelas, jornalismo e os grandes eventos.'],
-  [5, 'PayAx News', 'noticias', 'Nacional', 'Notícia o dia inteiro, com boletins de hora em hora.'],
-  [7, 'Arena PayAx', 'esportes', 'Nacional', 'Futebol, vôlei e os campeonatos regionais ao vivo.'],
-  [11, 'Cine PayAx', 'filmes', 'Nacional', 'Um filme por sessão, sem intervalo comercial.'],
-  [14, 'PayAx Kids', 'infantil', 'Nacional', 'Desenhos e programas para a criançada, com classificação até 10 anos.'],
-  [20, 'Documento Brasil', 'documentarios', 'Nacional', 'Documentários brasileiros e séries de investigação.'],
-  [26, 'Som & Palco', 'musica', 'Nacional', 'Shows, festivais e clipes 24 horas.'],
-  [33, 'PayAx Regional Norte', 'local', 'Norte', 'A programação da sua região, com telejornal local.'],
+  [100, 'PLAY Destaques', 'variedades', 'Nacional', 'O canal da casa: o melhor do catálogo PLAY TV, 24 horas no ar.'],
+  [101, 'PLAY Cinema', 'filmes', 'Nacional', 'Um filme por sessão, sem intervalo comercial.'],
 ];
 
 // Sinais públicos de teste de HLS, só para a demonstração: troque pelo sinal da emissora no painel.
@@ -123,13 +119,14 @@ const SINAIS_DEMO = [
 ];
 
 const GRADE = {
-  aberta: [['Bom Dia Brasil Agora', 120], ['Novela: Rio Acima', 60], ['Sessão da Tarde', 120], ['Telejornal PayAx', 60], ['Novela: Ventos do Sul', 60], ['Show da Noite', 90], ['Cinema de Madrugada', 120]],
-  noticias: [['Primeiro Giro', 60], ['PayAx News 10h', 60], ['Bolsa e Mercado', 60], ['Entrevista da Semana', 60], ['Jornal das Seis', 60], ['Mesa Redonda', 60], ['Plantão da Noite', 120]],
+  variedades: [['Clipes da Manhã', 120], ['Sessão da Tarde', 120], ['Show da Noite', 90], ['Cinema de Madrugada', 120]],
+  aberta: [['Bom Dia Brasil Agora', 120], ['Novela: Rio Acima', 60], ['Sessão da Tarde', 120], ['Telejornal PLAY', 60], ['Novela: Ventos do Sul', 60], ['Show da Noite', 90], ['Cinema de Madrugada', 120]],
+  noticias: [['Primeiro Giro', 60], ['PLAY News 10h', 60], ['Bolsa e Mercado', 60], ['Entrevista da Semana', 60], ['Jornal das Seis', 60], ['Mesa Redonda', 60], ['Plantão da Noite', 120]],
   esportes: [['Mesa de Debates', 90], ['Brasileirão: clássico ao vivo', 120], ['Vôlei Superliga', 120], ['Resenha Esportiva', 60], ['Futebol Regional', 120], ['Melhores Momentos', 60]],
   filmes: [['Clássicos: Terra Seca', 120], ['Comédia da Tarde', 120], ['Sessão Nacional', 120], ['Grande Sessão', 150], ['Suspense de Madrugada', 120]],
   infantil: [['Turma do Quintal', 60], ['Aventuras na Mata', 60], ['Hora da História', 60], ['Desenho Animado', 60], ['Clube dos Inventores', 60]],
   documentarios: [['Amazônia Profunda', 60], ['Histórias do Sertão', 60], ['Arquivos Abertos', 60], ['Cidades Invisíveis', 60], ['Grandes Obras', 90]],
-  musica: [['Clipes da Manhã', 120], ['Acústico PayAx', 60], ['Festival ao Vivo', 120], ['Samba de Raiz', 60], ['Rock Nacional', 120]],
+  musica: [['Clipes da Manhã', 120], ['Acústico PLAY', 60], ['Festival ao Vivo', 120], ['Samba de Raiz', 60], ['Rock Nacional', 120]],
   local: [['Bom Dia Região', 90], ['Jornal Local 1ª edição', 60], ['Nossa Terra', 60], ['Jornal Local 2ª edição', 60], ['Programa do Interior', 90]],
 };
 
@@ -173,30 +170,39 @@ transacao(db, () => {
     'legendas', 'episodios', 'temporadas', 'titulo_generos', 'titulos', 'programas', 'canais', 'midias']) {
     db.prepare(`DELETE FROM ${t}`).run();
   }
-  db.prepare("DELETE FROM usuarios WHERE perfil = 'assinante' OR email LIKE '%@payaxtv.com.br' AND perfil = 'curador'").run();
+  db.prepare("DELETE FROM usuarios WHERE perfil = 'assinante' OR email LIKE '%@playtv.com.br' AND perfil = 'curador'").run();
 });
 fs.rmSync(config.midiaDir, { recursive: true, force: true });
 
 gravarConfig(db, {
-  pix_chave: 'pix@payaxtv.com.br',
-  pix_recebedor: 'PAYAX TV LTDA',
+  pix_chave: 'pix@playtv.com.br',
+  pix_recebedor: 'PLAY TV LTDA',
   pix_cidade: 'SAO PAULO',
   aviso_home: '',
 });
 
 // Equipe
 const curador = db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, 'curador', ?)")
-  .run('Curadoria PayAx', 'curadoria@payaxtv.com.br', hashSenha(SENHA_EQUIPE), agora());
+  .run('Curadoria PLAY', 'curadoria@playtv.com.br', hashSenha(SENHA_EQUIPE), agora());
 console.log(`  · equipe: admin + curadoria (senha ${SENHA_EQUIPE})`);
 void curador;
 
-// Canais e grade
+// Canais: a TV aberta inteira já cadastrada (desligada, esperando o sinal) + os canais da casa.
 const canaisCriados = [];
-CANAIS.forEach(([numero, nome, categoria, regiao, descricao], i) => {
+const inserirCanal = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, url_hls, observacao, relay, logo_midia_id,
+    classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
+  VALUES (?, ?, ?, ?, ?, 'hls', ?, ?, 1, ?, 0, ?, ?, ?, ?, ?)`);
+
+CANAIS_ABERTOS.forEach(([numero, nome, categoria, grupo, site, observacao], i) => {
   const logo = guardarArte(logoSvg(nome, i), `logo-${slug(nome)}.svg`);
-  const r = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, url_hls, relay, logo_midia_id, classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
-    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 1, ?, ?)`).run(numero, nome, slug(nome), descricao, categoria,
-    SINAIS_DEMO[i % SINAIS_DEMO.length], logo, categoria === 'infantil' ? 0 : 0, regiao, i + 1, agora(), agora());
+  // Sem endereço de sinal e desligado: entra no ar quando a operação cadastrar o sinal.
+  inserirCanal.run(numero, nome, slug(nome), `${grupo} · ${site}`, categoria, null, observacao, logo, 'Nacional', numero, 0, agora(), agora());
+});
+
+CANAIS_PROPRIOS.forEach(([numero, nome, categoria, regiao, descricao], i) => {
+  const logo = guardarArte(logoSvg(nome, i + 9), `logo-${slug(nome)}.svg`);
+  const r = inserirCanal.run(numero, nome, slug(nome), descricao, categoria, SINAIS_DEMO[i % SINAIS_DEMO.length],
+    'Canal próprio da PLAY TV (sinal de demonstração).', logo, regiao, numero, 1, agora(), agora());
   canaisCriados.push({ id: Number(r.lastInsertRowid), numero, nome, categoria });
 });
 
@@ -220,12 +226,13 @@ for (const c of canaisCriados) {
     }
   }
 }
-console.log(`  · ${canaisCriados.length} canais com ${programas} programas na grade (ontem, hoje e amanhã)`);
+console.log(`  · ${CANAIS_ABERTOS.length} canais de TV aberta cadastrados (desligados, aguardando o sinal de cada emissora)`);
+console.log(`  · ${canaisCriados.length} canais próprios no ar, com ${programas} programas na grade (ontem, hoje e amanhã)`);
 
 // Vídeos de demonstração (reaproveitados pelo catálogo)
 let videos = [];
 if (temFfmpeg) {
-  videos = ['Demonstração PayAx TV', 'Episódio de demonstração', 'Trailer de demonstração'].map((nome, i) => {
+  videos = ['Demonstração PLAY TV', 'Episódio de demonstração', 'Trailer de demonstração'].map((nome, i) => {
     const arquivo = gerarClipe(nome, i === 2 ? 8 : 15);
     return guardarVideo(arquivo, { duracao: i === 2 ? 8 : 15, nome: `${slug(nome)}.mp4` });
   });
@@ -243,8 +250,8 @@ const situacao = temFfmpeg ? 'publicado' : 'rascunho';
 const titulos = [];
 
 FILMES.forEach(([nome, ano, classificacao, sinopse, generos, original], i) => {
-  const capa = guardarArte(arteSvg(nome, { indice: i, etiqueta: original ? 'Original PayAx' : 'Filme' }), `capa-${slug(nome)}.svg`);
-  const banner = guardarArte(arteSvg(nome, { largura: 1600, altura: 900, indice: i, etiqueta: 'PayAx TV', comNome: false }), `banner-${slug(nome)}.svg`);
+  const capa = guardarArte(arteSvg(nome, { indice: i, etiqueta: original ? 'Original PLAY' : 'Filme' }), `capa-${slug(nome)}.svg`);
+  const banner = guardarArte(arteSvg(nome, { largura: 1600, altura: 900, indice: i, etiqueta: 'PLAY TV', comNome: false }), `banner-${slug(nome)}.svg`);
   const duracaoFilme = temFfmpeg ? 15 : 5400 + i * 300;
   const r = db.prepare(`INSERT INTO titulos (tipo, nome, slug, sinopse, ano, pais, classificacao, duracao_s, elenco, direcao, situacao,
       capa_midia_id, banner_midia_id, trailer_midia_id, video_midia_id, original, publicado_em, criado_em, atualizado_em)
@@ -259,8 +266,8 @@ FILMES.forEach(([nome, ano, classificacao, sinopse, generos, original], i) => {
 
 SERIES.forEach(([nome, ano, classificacao, sinopse, generos, original, temporadas], i) => {
   const indice = i + FILMES.length;
-  const capa = guardarArte(arteSvg(nome, { indice, etiqueta: original ? 'Original PayAx' : 'Série' }), `capa-${slug(nome)}.svg`);
-  const banner = guardarArte(arteSvg(nome, { largura: 1600, altura: 900, indice, etiqueta: 'Série PayAx', comNome: false }), `banner-${slug(nome)}.svg`);
+  const capa = guardarArte(arteSvg(nome, { indice, etiqueta: original ? 'Original PLAY' : 'Série' }), `capa-${slug(nome)}.svg`);
+  const banner = guardarArte(arteSvg(nome, { largura: 1600, altura: 900, indice, etiqueta: 'Série PLAY', comNome: false }), `banner-${slug(nome)}.svg`);
   const r = db.prepare(`INSERT INTO titulos (tipo, nome, slug, sinopse, ano, pais, classificacao, elenco, direcao, situacao,
       capa_midia_id, banner_midia_id, trailer_midia_id, original, publicado_em, criado_em, atualizado_em)
     VALUES ('serie', ?, ?, ?, ?, 'Brasil', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -286,11 +293,11 @@ console.log(`  · catálogo: ${FILMES.length} filmes e ${SERIES.length} séries 
 // Destaques e uma fileira de gênero
 const destaque = db.prepare('INSERT INTO destaques (titulo_id, canal_id, chamada, descricao, arte_midia_id, ordem, ativo, criado_em) VALUES (?, ?, ?, ?, ?, ?, 1, ?)');
 const porNome = (nome) => titulos.find((t) => t.nome === nome);
-destaque.run(porNome('Capital Norte').id, null, 'Original PayAx · 2ª temporada', 'A procuradora volta ao porto — e agora ninguém está a salvo.',
+destaque.run(porNome('Capital Norte').id, null, 'Original PLAY · 2ª temporada', 'A procuradora volta ao porto — e agora ninguém está a salvo.',
   db.prepare('SELECT banner_midia_id AS b FROM titulos WHERE id = ?').get(porNome('Capital Norte').id).b, 1, agora());
 destaque.run(porNome('A Noite do Sertão').id, null, 'Estreia da semana', 'Um caminhoneiro, uma carga e uma cidade inteira esperando.',
   db.prepare('SELECT banner_midia_id AS b FROM titulos WHERE id = ?').get(porNome('A Noite do Sertão').id).b, 2, agora());
-destaque.run(null, canaisCriados.find((c) => c.categoria === 'esportes').id, 'Agora, ao vivo', 'Clássico pelo Brasileirão com narração da Arena PayAx.', null, 3, agora());
+destaque.run(null, canaisCriados[0].id, 'Agora, ao vivo', 'O melhor do catálogo PLAY TV, 24 horas no ar.', null, 3, agora());
 
 if (!db.prepare("SELECT 1 FROM fileiras WHERE tipo = 'genero'").get()) {
   db.prepare('INSERT INTO fileiras (nome, tipo, genero_id, limite, ordem, ativa, criado_em) VALUES (?, ?, ?, ?, ?, 1, ?)')
@@ -388,7 +395,9 @@ fs.rmSync(pasta, { recursive: true, force: true });
 console.log(`\n[${config.marca}] Pronto.`);
 console.log(`  App do assinante : http://localhost:${config.port}${config.basePath}/`);
 console.log(`  Painel           : http://localhost:${config.port}${config.basePath}/admin/`);
-console.log(`  Operação         : ${config.admin.email} / ${config.admin.senha}  ·  curadoria@payaxtv.com.br / ${SENHA_EQUIPE}`);
+console.log(`  Operação         : ${config.admin.email} / ${config.admin.senha}  ·  curadoria@playtv.com.br / ${SENHA_EQUIPE}`);
 console.log(`  Assinantes       : ${ASSINANTES.map(([, e]) => e).join(', ')} (senha ${SENHA_CLIENTE})`);
 if (!temFfmpeg) console.log('  Atenção: sem ffmpeg o catálogo ficou em rascunho. Envie os vídeos no painel (Catálogo) e publique.');
-console.log('  Os canais usam sinais públicos de teste de HLS: troque pelo sinal da emissora em Canais.');
+console.log('  TV aberta: Globo, SBT, Record, Band, RedeTV! e os demais já estão cadastrados e DESLIGADOS.');
+console.log('  Em Canais, cadastre em cada um o endereço do sinal (.m3u8) que a emissora fornece ou o');
+console.log('  endereço do player oficial dela, e ligue o canal. Os dois canais da casa usam sinal de teste.');

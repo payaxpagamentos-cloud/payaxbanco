@@ -6,6 +6,7 @@ const { criarApp } = require('./app');
 const { encerrarSessoesMortas } = require('./lib/player');
 const { rodarCobranca } = require('./lib/assinaturas');
 const { verificarSinais } = require('./lib/relay');
+const { atualizarGradeAutomatica } = require('./lib/epg');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
@@ -23,6 +24,12 @@ cada(30_000, 'sessões do player', () => encerrarSessoesMortas(db));
 cada(60 * 60_000, 'cobrança', () => rodarCobranca(db));
 // Sinal dos canais: o painel mostra quem está fora do ar.
 cada(15 * 60_000, 'verificação de sinal', () => { verificarSinais(db).catch(() => {}); });
+// Grade dos canais abertos: busca o XMLTV cadastrado uma vez por dia.
+cada(24 * 60 * 60_000, 'atualização da grade', () => {
+  atualizarGradeAutomatica(db).then((r) => r && console.log(`[${config.marca}] Grade atualizada: ${r.importados} programa(s).`)).catch((err) => {
+    console.error(`[${config.marca}] Falha ao atualizar a grade:`, err.message);
+  });
+});
 
 setTimeout(() => {
   try { rodarCobranca(db); } catch (err) { console.error(`[${config.marca}] Falha na cobrança:`, err.message); }

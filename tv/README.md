@@ -1,4 +1,4 @@
-# PayAx TV
+# PLAY TV
 
 Plataforma de streaming: **canais de TV ao vivo** retransmitidos pelos nossos servidores e **catálogo sob demanda**
 com conteúdo próprio (filmes, séries e episódios), vendido por **assinatura**. App do assinante e painel da operação,
@@ -13,22 +13,29 @@ com servidor, banco de dados e login próprios.
 | # | Módulo | O que tem |
 |---|---|---|
 | 1 | **Canais ao vivo** | Cadastro do canal (número, categoria, região, logo, classificação, plano mínimo) com o endereço HLS (`.m3u8`) da emissora ou do encoder próprio. **Retransmissão pelo nosso servidor**: a lista é reescrita e cada pedaço do sinal passa por aqui, então a origem não aparece para o assinante, o CORS deixa de ser problema e a política de segurança das páginas continua fechada em `'self'`. Teste do sinal em um clique, prévia dentro do painel e verificação automática a cada 15 minutos (o painel mostra quem está fora do ar). |
-| 2 | **Grade de programação (EPG)** | Programação por canal, cadastrada na mão (com recusa de sobreposição) ou importada em **XMLTV** — o formato que emissoras e agregadores publicam. O app mostra "no ar agora" com barra de andamento, o que vem depois e um **guia de 7 dias** que já abre no programa do momento. |
-| 3 | **Catálogo sob demanda** | Filmes e séries com temporadas, episódios, trailer, elenco, direção, gêneros, classificação indicativa e selo de original. **Envio do vídeo pelo painel em pedaços** (retomável, até 8 GB por arquivo), formato reconhecido pelo conteúdo do arquivo (MP4, WebM, MKV) e entrega com **HTTP Range**. Legendas em WebVTT. Publicar confere se há vídeo e capa. |
-| 4 | **Player** | Tela cheia com controles próprios: HLS pelo **hls.js** (com o HLS nativo do Safari como reserva), MP4 com Range, troca de qualidade e velocidade, legendas, janela flutuante, tela cheia, atalhos de teclado, **retomada de onde parou**, **próximo episódio** e aviso de telas simultâneas com a opção de encerrar as outras. |
-| 5 | **Assinaturas e cobrança** | Planos com preço, telas simultâneas, perfis, qualidade (SD/Full HD/4K), downloads e **nível** (libera conteúdo exclusivo). Fatura mensal com **PIX copia e cola e QR Code**, carência, **suspensão automática** de quem não pagou, troca de plano, cancelamento que vale até o fim do período pago e reativação. Todo o conteúdo exige assinatura ativa. |
-| 6 | **Perfis de visualização** | Vários perfis por conta (até o limite do plano), cada um com sua lista, seu progresso e sua **classificação indicativa**. Perfil infantil nasce limitado a 10 anos. **PIN** opcional: o perfil protegido só abre com a chave assinada que o aparelho recebe ao digitar o PIN. |
-| 7 | **Home e curadoria** | Destaques do topo (que passam sozinhos) e fileiras montadas pela curadoria: continuar assistindo, minha lista, em alta (audiência real), novidades, originais, por gênero, canais ao vivo ou **escolha manual** dos títulos. |
-| 8 | **Telas simultâneas** | Cada tela aberta é uma sessão com sinal de vida. O plano define quantas cabem ao mesmo tempo; quem bate no limite vê onde está assistindo e pode encerrar as outras. A tela que para de dar sinal libera a vaga sozinha. |
-| 9 | **Audiência e relatórios** | Quem está assistindo neste instante, minutos assistidos por dia e por hora (no fuso da operação), por aparelho, títulos e canais mais vistos, com CSV. Financeiro por competência, receita recorrente (MRR), recebido no mês e inadimplência. |
-| 10 | **Operação** | Painel com assinantes (plano, cortesia, senha provisória, desativação), faturas com baixa do PIX, planos, equipe com dois perfis de acesso, configurações e **auditoria** de tudo que a equipe faz. |
+| 2 | **TV aberta já cadastrada** | Globo, SBT, Record, Band, RedeTV!, Cultura, Gazeta, TV Brasil, Rede Brasil, Aparecida, Rede Vida e os canais de notícias entram com um clique em **Canais → Importar TV aberta** (número, categoria, logo e o lembrete de onde pedir o sinal de cada um). Cada canal aceita **sinal próprio ou contratado** (.m3u8) ou o **player oficial da emissora** — neste caso a PLAY TV não retransmite nada: abre o player público da emissora, com os anúncios dela. |
+| 3 | **Grade de programação (EPG)** | Programação por canal, cadastrada na mão (com recusa de sobreposição) ou importada em **XMLTV** — o formato que emissoras e agregadores publicam. O app mostra "no ar agora" com barra de andamento, o que vem depois e um **guia de 7 dias** que já abre no programa do momento. |
+| 4 | **Catálogo sob demanda** | Filmes e séries com temporadas, episódios, trailer, elenco, direção, gêneros, classificação indicativa e selo de original. **Envio do vídeo pelo painel em pedaços** (retomável, até 8 GB por arquivo), formato reconhecido pelo conteúdo do arquivo (MP4, WebM, MKV) e entrega com **HTTP Range**. Legendas em WebVTT. Publicar confere se há vídeo e capa. |
+| 5 | **Player** | Tela cheia com controles próprios: HLS pelo **hls.js** (com o HLS nativo do Safari como reserva), MP4 com Range, troca de qualidade e velocidade, legendas, janela flutuante, tela cheia, atalhos de teclado, **retomada de onde parou**, **próximo episódio** e aviso de telas simultâneas com a opção de encerrar as outras. |
+| 6 | **Assinaturas e cobrança** | Planos com preço, telas simultâneas, perfis, qualidade (SD/Full HD/4K), downloads e **nível** (libera conteúdo exclusivo). Fatura mensal com **PIX copia e cola e QR Code**, carência, **suspensão automática** de quem não pagou, troca de plano, cancelamento que vale até o fim do período pago e reativação. Todo o conteúdo exige assinatura ativa. |
+| 7 | **Perfis de visualização** | Vários perfis por conta (até o limite do plano), cada um com sua lista, seu progresso e sua **classificação indicativa**. Perfil infantil nasce limitado a 10 anos. **PIN** opcional: o perfil protegido só abre com a chave assinada que o aparelho recebe ao digitar o PIN. |
+| 8 | **Home e curadoria** | Destaques do topo (que passam sozinhos) e fileiras montadas pela curadoria: continuar assistindo, minha lista, em alta (audiência real), novidades, originais, por gênero, canais ao vivo ou **escolha manual** dos títulos. |
+| 9 | **Telas simultâneas** | Cada tela aberta é uma sessão com sinal de vida. O plano define quantas cabem ao mesmo tempo; quem bate no limite vê onde está assistindo e pode encerrar as outras. A tela que para de dar sinal libera a vaga sozinha. |
+| 10 | **Audiência e relatórios** | Quem está assistindo neste instante, minutos assistidos por dia e por hora (no fuso da operação), por aparelho, títulos e canais mais vistos, com CSV. Financeiro por competência, receita recorrente (MRR), recebido no mês e inadimplência. |
+| 11 | **Apps de Smart TV** | Modo TV automático (foco visível, interface de 10 pés e navegação só pelo controle remoto: setas, OK, Voltar e teclas de mídia) e projetos prontos de empacotamento para **Samsung (Tizen)**, **LG (webOS)** e **Android TV / TCL**, em [`tv-apps/`](tv-apps/README.md). |
+| 12 | **Operação** | Painel com assinantes (plano, cortesia, senha provisória, desativação), faturas com baixa do PIX, planos, equipe com dois perfis de acesso, configurações e **auditoria** de tudo que a equipe faz. |
 
 ### O que depende de terceiros (não incluído)
 
 - **Baixa automática do PIX**: exige contratar um intermediador de pagamentos (PSP) ou a API PIX do banco. Hoje a
   operação confirma a fatura em um clique (e, em modo de testes, o próprio assinante confirma).
-- **Direitos de transmissão dos canais**: a plataforma retransmite o endereço que a operação cadastrar. Cadastre
-  apenas sinais que vocês tenham direito de retransmitir (o sinal próprio da emissora, o seu encoder ou um contrato de distribuição).
+- **Sinal das emissoras abertas**: Globo, SBT, Record, Band e RedeTV! **não publicam endereço livre** para
+  retransmissão — o sinal ao vivo delas é distribuído por contrato (Globoplay, UOL Play e afins). Os canais já vêm
+  cadastrados na plataforma, mas cada um só entra no ar quando a operação colocar ali uma destas três coisas:
+  (a) o **.m3u8 que a emissora ou a afiliada fornece por contrato** (ou o encoder próprio de quem é afiliado);
+  (b) o **endereço do player oficial e público da emissora** (fonte "embed"), em que abrimos o player dela e nada é
+  retransmitido; ou (c) nada — e o canal fica cadastrado e desligado. A plataforma está pronta para os três casos;
+  o que ela não faz é inventar um sinal que a emissora não liberou.
 - **DRM (Widevine/FairPlay/PlayReady)**: estúdios costumam exigir DRM para conteúdo licenciado. A plataforma entrega
   o vídeo por link assinado de curta duração, que resolve o acesso indevido casual, mas não é DRM.
 - **Transcodificação para várias qualidades (ABR)**: o vídeo enviado é entregue como está. Para gerar 1080p/720p/480p
@@ -47,6 +54,23 @@ com servidor, banco de dados e login próprios.
 As regras ficam no servidor: toda rota do assinante confere a assinatura ativa (`402` quando falta), a classificação
 do perfil (`403`) e o nível do plano (`403`); o painel confere o perfil de acesso em cada rota.
 
+## Smart TVs (Samsung, LG e TCL)
+
+A interface entra sozinha em **modo TV** quando reconhece o aparelho (Tizen, webOS, Android TV, Fire TV, VIDAA):
+fontes maiores, margens de 10 pés, foco bem visível e navegação inteira pelo controle remoto — setas, OK, Voltar
+e as teclas de mídia. Dá para ver no computador abrindo `/?tv=1`.
+
+Os projetos de empacotamento estão em [`tv-apps/`](tv-apps/README.md): **Samsung (Tizen)**, **LG (webOS)** e
+**Android TV** (TCL, Google TV, Philips, Sony). Os três abrem o servidor de vocês, então publicar conteúdo novo
+não exige republicar o app na loja.
+
+## Grade dos canais abertos
+
+Em **Configurações → Grade dos canais abertos (EPG)**, a operação cadastra o endereço de um arquivo **XMLTV**
+(aceita `.xml` e `.xml.gz`) e a plataforma importa sozinha, uma vez por dia — é assim que a programação da TV
+aberta se mantém em dia. O provedor da grade é escolhido por vocês: a própria emissora, a afiliada ou um serviço
+de guia. Também dá para enviar o arquivo na mão em **Grade (EPG) → Importar XMLTV**.
+
 ## Como executar
 
 Requisitos: **Node.js 22.13+**. O `ffmpeg` é opcional (só para os vídeos de demonstração do seed).
@@ -57,8 +81,8 @@ npm run seed     # opcional: 8 canais com grade, catálogo de exemplo, assinante
 npm start        # http://localhost:3600
 ```
 
-Acesso inicial da operação: `admin@payaxtv.com.br` / `admin123` (troque em produção pelo `.env`).
-Com o seed: `curadoria@payaxtv.com.br` / `payax2026` e assinantes `marina@`, `rogerio@`, `andrade@` e
+Acesso inicial da operação: `admin@playtv.com.br` / `admin123` (troque em produção pelo `.env`).
+Com o seed: `curadoria@playtv.com.br` / `play2026` e assinantes `marina@`, `rogerio@`, `andrade@` e
 `juliana@exemplo.com.br`, senha `cliente2026` (ativo, ativo, suspenso e aguardando pagamento).
 
 ```bash
@@ -71,7 +95,7 @@ emissora em **Canais**.
 ## Instalação no servidor (/tv)
 
 ```bash
-npm run empacotar   # gera dist/payax-tv.zip
+npm run empacotar   # gera dist/play-tv.zip
 ```
 
 O pacote traz a pasta `tv/` pronta para enviar ao servidor: código, dependências de produção já instaladas, `.env`
@@ -87,7 +111,7 @@ No Nginx, o `location /tv/` precisa de `proxy_buffering off` (entrega em fluxo d
 |---|---|---|
 | `PORT` | `3600` | Porta HTTP. |
 | `TV_BASE_PATH` | (raiz) | Endereço da plataforma, ex.: `/tv`. O painel fica em `<endereço>/admin/`. |
-| `TV_MARCA` | `PayAx TV` | Nome da plataforma nas telas e no PIX. |
+| `TV_MARCA` | `PLAY TV` | Nome da plataforma nas telas e no PIX. |
 | `TV_SECRET` | aleatório | Segredo das sessões e dos links de reprodução (mín. 32 caracteres). **Obrigatório em produção.** Trocar derruba as sessões e invalida os links. |
 | `TV_ADMIN_EMAIL` / `TV_ADMIN_SENHA` / `TV_ADMIN_NOME` | — | Administrador criado no primeiro start. Senha obrigatória em produção (mín. 12). |
 | `TV_DB` | `data/tv.db` | Arquivo do banco SQLite. |
@@ -107,7 +131,7 @@ No Nginx, o `location /tv/` precisa de `proxy_buffering off` (entrega em fluxo d
 | `TV_LIMITE_LOGIN` | `10` | Tentativas de login por IP por minuto. |
 | `TV_FUSO` | `America/Sao_Paulo` | Fuso da grade e dos relatórios. |
 
-Produção com Docker: `docker build -t payax-tv tv/` e rode com um volume em `/app/data` (banco **e** vídeos).
+Produção com Docker: `docker build -t play-tv tv/` e rode com um volume em `/app/data` (banco **e** vídeos).
 
 ## Tecnologia e arquitetura
 

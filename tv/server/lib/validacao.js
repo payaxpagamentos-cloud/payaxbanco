@@ -91,7 +91,8 @@ const classificacao = (v, padrao = 0) => (v === undefined || v === null || v ===
  * Endereço do sinal do canal: só http(s) e sem credenciais na URL. A retransmissão recusa
  * endereços de rede interna (ver lib/relay.js), por isso aqui a conferência é de formato.
  */
-function urlHls(v) {
+function urlHls(v, { obrigatorio = true } = {}) {
+  if (!obrigatorio && (v === undefined || v === null || String(v).trim() === '')) return null;
   const t = texto(v, 'o endereço do sinal (.m3u8)', 1000);
   let u;
   try { u = new URL(t); } catch { falhar('Endereço do sinal inválido (use http:// ou https://).'); }

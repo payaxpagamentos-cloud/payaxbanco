@@ -1,4 +1,4 @@
-PAYAX TV — INSTALAÇÃO (FASE DE TESTES)
+PLAY TV — INSTALAÇÃO (FASE DE TESTES)
 ======================================
 
 Endereços depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
@@ -8,7 +8,7 @@ Endereços depois de instalado (troque SEU-DOMINIO pelo domínio de vocês):
 Os dois são servidos pelo mesmo programa (Node.js), que fica nesta pasta "tv".
 As dependências já estão instaladas (pasta node_modules): não precisa rodar npm install.
 Pode ficar no mesmo servidor dos outros sistemas (portas diferentes: BPO 3100, táxi 3200,
-PABX 3300, rastreador 3400, network 3500, PayAx TV 3600).
+PABX 3300, rastreador 3400, network 3500, PLAY TV 3600).
 
 
 IMPORTANTE: HTTPS E ESPAÇO EM DISCO
@@ -46,13 +46,13 @@ IMPORTANTE: HTTPS E ESPAÇO EM DISCO
    a) Servidor próprio (VPS) com PM2
          cd /home/SEU-USUARIO/tv
          npm install -g pm2
-         pm2 start "npm start" --name payax-tv
+         pm2 start "npm start" --name play-tv
          pm2 save && pm2 startup
       Depois configure o Nginx ou o Apache (item 6).
 
    b) Docker
-         docker build -t payax-tv .
-         docker run -d --name payax-tv --env-file .env -p 3600:3600 -v payax-tv-dados:/app/data payax-tv
+         docker build -t play-tv .
+         docker run -d --name play-tv --env-file .env -p 3600:3600 -v play-tv-dados:/app/data play-tv
       Depois configure o Nginx ou o Apache (item 6).
 
    c) cPanel ("Setup Node.js App")
@@ -94,7 +94,7 @@ IMPORTANTE: HTTPS E ESPAÇO EM DISCO
 
 7) PRIMEIRO ACESSO À OPERAÇÃO
    Abra https://SEU-DOMINIO/tv/admin/ e entre com:
-      E-mail: admin@payaxtv.com.br
+      E-mail: admin@playtv.com.br
       Senha:  a que está em TV_ADMIN_SENHA no arquivo .env
    Em "Configurações", cadastre a CHAVE PIX que recebe as assinaturas (sem ela as faturas
    saem sem código de pagamento). Em "Planos", confira preços, telas e qualidade.
@@ -128,4 +128,4 @@ IMPORTANTE: HTTPS E ESPAÇO EM DISCO
 
 11) ATUALIZAR PARA UMA VERSÃO NOVA
    Pare o sistema, substitua as pastas server, public e node_modules e os arquivos package*.json.
-   NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart payax-tv).
+   NÃO apague a pasta data nem o arquivo .env. Inicie de novo (pm2 restart play-tv).

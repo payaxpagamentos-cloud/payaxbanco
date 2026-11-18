@@ -54,7 +54,7 @@ async function iniciar() {
     sessao.limpar();
     return telaLogin(err.status === 401 ? null : err.message);
   }
-  try { tela = sessionStorage.getItem('payaxtv.admin.tela') || 'painel'; } catch { /* padrão */ }
+  try { tela = sessionStorage.getItem('playtv.admin.tela') || 'painel'; } catch { /* padrão */ }
   return ir(tela);
 }
 
@@ -78,7 +78,7 @@ function ir(novaTela, dados = null) {
   const def = TELAS[novaTela];
   if (!def || (def[3] && usuario.perfil !== def[3])) novaTela = 'painel';
   tela = novaTela;
-  try { sessionStorage.setItem('payaxtv.admin.tela', tela); } catch { /* ignora */ }
+  try { sessionStorage.setItem('playtv.admin.tela', tela); } catch { /* ignora */ }
   const principal = el('main');
   limpar(raiz, el('div', { class: 'painel' },
     el('nav', { class: 'menu' },
@@ -181,6 +181,14 @@ async function telaCanais(c) {
 
   const formCanal = (canal = null) => modal(canal ? `Canal ${canal.nome}` : 'Novo canal', (fechar) => {
     let logoId = canal?.logo_midia_id ?? null;
+    const campoHls = campo('Endereço do sinal (.m3u8)', { name: 'url_hls', value: canal?.url_hls ?? '', placeholder: 'https://origem.emissora.com.br/canal/index.m3u8' },
+      'Lista HLS que a emissora (ou a afiliada) fornece por contrato, ou o sinal do seu encoder. Deixe em branco enquanto o sinal não chega: o canal fica cadastrado e desligado.');
+    const campoEmbed = campo('Endereço do player oficial da emissora', { name: 'url_embed', value: canal?.url_embed ?? '', placeholder: 'https://www.youtube.com/watch?v=… (transmissão ao vivo do canal verificado)' },
+      'Cole o endereço da transmissão ao vivo oficial e pública da emissora. A PLAY TV abre o player dela, com os anúncios dela — não há retransmissão.');
+    const trocarFonte = (fonte) => {
+      campoHls.classList.toggle('oculto', fonte !== 'hls');
+      campoEmbed.classList.toggle('oculto', fonte !== 'embed');
+    };
     const previa = el('img', { class: 'prev-arte deitada', src: arte(logoId) ?? '', alt: '', style: logoId ? '' : 'display:none' });
     const entradaLogo = el('input', { type: 'file', accept: 'image/*' });
     entradaLogo.addEventListener('change', async () => {
@@ -201,8 +209,13 @@ async function telaCanais(c) {
       el('div', { class: 'duas' },
         escolha('Categoria', 'categoria', Object.entries(CATEGORIAS_CANAL), canal?.categoria ?? 'aberta'),
         campo('Região (opcional)', { name: 'regiao', maxlength: 60, value: canal?.regiao ?? '' })),
-      campo('Endereço do sinal (.m3u8)', { name: 'url_hls', required: true, value: canal?.url_hls ?? '', placeholder: 'https://origem.emissora.com.br/canal/index.m3u8' },
-        'Lista HLS da emissora ou do seu encoder. Use um endereço que vocês tenham direito de retransmitir.'),
+      escolha('Como este canal chega', 'fonte', [
+        ['hls', 'Sinal próprio ou contratado (.m3u8) — tocamos no nosso player'],
+        ['embed', 'Player oficial da emissora — abrimos o player dela, sem retransmitir'],
+      ], canal?.fonte ?? 'hls', { onchange: (e) => trocarFonte(e.target.value) }),
+      campoHls,
+      campoEmbed,
+      area('Observação da operação (de quem pedir o sinal, contrato, contato da afiliada)', { name: 'observacao', maxlength: 1000, rows: 2 }),
       el('div', { class: 'duas' },
         escolha('Classificação', 'classificacao', CLASSIFICACOES_OPCOES, canal?.classificacao ?? 0),
         escolha('Plano mínimo', 'plano_minimo_id', [['', 'Todos os planos'], ...planos.map((p) => [p.id, p.nome])], canal?.plano_minimo_id ?? '')),
@@ -219,6 +232,8 @@ async function telaCanais(c) {
         el('button', { class: 'btn primario' }, canal ? 'Salvar canal' : 'Criar canal')));
 
     f.querySelector('textarea[name=descricao]').value = canal?.descricao ?? '';
+    f.querySelector('textarea[name=observacao]').value = canal?.observacao ?? '';
+    trocarFonte(canal?.fonte ?? 'hls');
     f.addEventListener('submit', (e) => {
       e.preventDefault();
       const d = lerForm(f);
@@ -227,7 +242,10 @@ async function telaCanais(c) {
         numero: Number(d.numero),
         categoria: d.categoria,
         regiao: d.regiao || null,
-        url_hls: d.url_hls,
+        fonte: d.fonte,
+        url_hls: d.url_hls || null,
+        url_embed: d.url_embed || null,
+        observacao: d.observacao || null,
         classificacao: Number(d.classificacao),
         plano_minimo_id: d.plano_minimo_id ? Number(d.plano_minimo_id) : null,
         descricao: d.descricao || null,
@@ -252,12 +270,17 @@ async function telaCanais(c) {
       el('div', {}, el('strong', {}, x.nome), el('div', { class: 'mini apagado' }, `canal ${x.numero} · ${CATEGORIAS_CANAL[x.categoria] ?? x.categoria}`)))),
     td(el('div', {}, el('div', { class: 'linha', style: 'gap:5px' },
       x.ativo ? el('span', { class: 'etiqueta ok' }, 'no ar') : el('span', { class: 'etiqueta' }, 'fora'),
-      x.relay ? el('span', { class: 'etiqueta info' }, 'retransmitido') : el('span', { class: 'etiqueta' }, 'direto'),
+      // Só faz sentido falar em retransmissão depois que o sinal existe.
+      (x.fonte === 'embed' ? !x.url_embed : !x.url_hls)
+        ? el('span', { class: 'etiqueta aviso' }, 'aguardando sinal')
+        : x.fonte === 'embed' ? el('span', { class: 'etiqueta info', title: 'Abre o player oficial da emissora' }, 'player da emissora')
+          : x.relay ? el('span', { class: 'etiqueta info' }, 'retransmitido') : el('span', { class: 'etiqueta' }, 'direto'),
       x.sinal_status === 'falha' ? el('span', { class: 'etiqueta erro', title: x.sinal_detalhe ?? '' }, 'sinal com falha')
         : x.sinal_status === 'ok' ? el('span', { class: 'etiqueta ok' }, 'sinal ok') : null),
     el('div', { class: 'mini apagado', style: 'margin-top:3px' }, x.sinal_em ? `conferido ${dataHora(x.sinal_em)}` : 'sinal ainda não conferido'))),
     td(el('div', {}, el('strong', { class: 'pequeno' }, x.agora?.titulo ?? '—'),
-      el('div', { class: 'mini apagado' }, `${x.programas_futuros} programa(s) na grade`))),
+      el('div', { class: 'mini apagado' }, `${x.programas_futuros} programa(s) na grade`),
+      x.observacao ? el('div', { class: 'mini apagado duas-linhas', style: 'margin-top:4px;max-width:420px' }, x.observacao) : null)),
     td(el('div', { class: 'linha', style: 'gap:6px' },
       botao('Testar sinal', 'vazio', async () => {
         const r = await api.post(`/admin/canais/${x.id}/testar`);
@@ -278,6 +301,16 @@ async function telaCanais(c) {
       }) : null), true)));
 
   limpar(c, cabeca('Canais ao vivo',
+    botao('Importar TV aberta', 'vazio', async () => {
+      const r = await api.post('/admin/canais/importar-abertos');
+      await modal('TV aberta cadastrada', (fechar) => [
+        el('p', {}, `${r.criados} canal(is) cadastrado(s)${r.ja_existiam ? ` · ${r.ja_existiam} já existia(m)` : ''}.`),
+        el('div', { class: 'aviso atencao' }, r.proximo_passo),
+        el('p', { class: 'pequeno mudo' }, r.aviso),
+        el('div', { class: 'linha fim' }, el('button', { class: 'btn primario', onclick: () => fechar(true) }, 'Entendi')),
+      ]);
+      ir('canais');
+    }, 'tv'),
     botao('Testar todos os sinais', 'vazio', async () => {
       toast('Testando os sinais…');
       for (const x of canais) await api.post(`/admin/canais/${x.id}/testar`);
@@ -289,9 +322,21 @@ async function telaCanais(c) {
 
 /** Prévia do sinal dentro do painel (não gasta tela do plano). */
 function previaCanal(canal, fonte) {
-  modal(`Prévia · ${canal.nome}`, () => {
+  if (fonte.tipo === 'embed') {
+    return modal(`Prévia · ${canal.nome}`, () => [
+      el('iframe', {
+        src: fonte.url,
+        allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen',
+        allowfullscreen: true,
+        style: 'width:100%;aspect-ratio:16/9;border:0;border-radius:12px;background:#000',
+        title: canal.nome,
+      }),
+      el('p', { class: 'pequeno mudo', style: 'margin-top:10px' }, 'Este canal abre o player oficial da emissora. A PLAY TV não retransmite o sinal: a transmissão, e os anúncios, são da emissora.'),
+    ], { largo: true });
+  }
+  return modal(`Prévia · ${canal.nome}`, () => {
     const video = el('video', { controls: true, autoplay: true, playsinline: true, style: 'width:100%;border-radius:12px;background:#000;aspect-ratio:16/9' });
-    const aviso = el('div', { class: 'pequeno mudo' }, fonte.retransmitido ? 'Sinal passando pela retransmissão da PayAx.' : 'Tocando direto na origem da emissora.');
+    const aviso = el('div', { class: 'pequeno mudo' }, fonte.retransmitido ? 'Sinal passando pela retransmissão da PLAY.' : 'Tocando direto na origem da emissora.');
     (async () => {
       if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = fonte.url; return; }
       try {
@@ -305,7 +350,7 @@ function previaCanal(canal, fonte) {
       } catch { video.src = fonte.url; }
     })();
     return [video, el('div', { class: 'linha entre', style: 'margin-top:10px' }, aviso,
-      el('code', { class: 'mini apagado cortar', style: 'max-width:50%' }, canal.url_hls))];
+      el('code', { class: 'mini apagado cortar', style: 'max-width:50%' }, canal.url_hls ?? ''))];
   }, { largo: true });
 }
 
@@ -466,7 +511,7 @@ async function telaHome(c) {
   const formFileira = (fl = null) => modal(fl ? `Fileira ${fl.nome}` : 'Nova fileira', (fechar) => {
     const f = el('form', { class: 'form' },
       campo('Nome na home', { name: 'nome', required: true, maxlength: 80, value: fl?.nome ?? '' }),
-      escolha('O que mostra', 'tipo', [['em_alta', 'Em alta (mais assistidos)'], ['novidades', 'Novidades'], ['originais', 'Originais PayAx'],
+      escolha('O que mostra', 'tipo', [['em_alta', 'Em alta (mais assistidos)'], ['novidades', 'Novidades'], ['originais', 'Originais PLAY'],
         ['filmes', 'Filmes'], ['series', 'Séries'], ['canais', 'Canais ao vivo'], ['genero', 'Um gênero'], ['manual', 'Escolha manual']], fl?.tipo ?? 'em_alta'),
       escolha('Gênero (só para o tipo "um gênero")', 'genero_id', [['', '—'], ...generos.map((g) => [g.id, g.nome])], fl?.genero_id ?? ''),
       el('div', { class: 'duas' },
