@@ -141,10 +141,14 @@ test('IXC: importa títulos, emite boletos e dá baixa de volta', async (t) => {
     const antes = ixc.chamadas.length;
     await api.post(`/api/boletos/${b.id}/liquidar`, { pago_em: '2026-12-15', valor_pago: '129,90' }, tk.financeiro);
     await new Promise((r) => setTimeout(r, 300));
-    const baixa = ixc.chamadas.slice(antes).find((c) => c.metodo === 'PUT' && c.dados.status === 'R');
-    assert.ok(baixa, 'o IXC foi avisado');
-    assert.equal(baixa.dados.valor_recebido, '129.90');
-    assert.equal(baixa.dados.data_recebimento, '2026-12-15');
+    const baixa = ixc.chamadas.slice(antes).find((c) => c.metodo === 'POST' && c.recurso === 'fn_areceber_recebimentos_baixas_novo');
+    assert.ok(baixa, 'o IXC foi avisado pela rota do botão "Receber"');
+    assert.equal(baixa.dados.id_receber, String(b.ixc_receber_id));
+    assert.equal(baixa.dados.valor_total_recebido, '129,90', 'valor com vírgula, como o IXC pede');
+    assert.equal(baixa.dados.data, '15/12/2026');
+    assert.equal(baixa.dados.conta_, '77', 'a conta da carteira de cobrança do título');
+    assert.equal(baixa.dados.tipo_lanc, 'R');
+    assert.equal(ixc.titulos.find((x) => x.id === String(b.ixc_receber_id)).status, 'R', 'o título ficou recebido no IXC');
     const s = api.db.prepare("SELECT * FROM sincronismos WHERE tipo = 'baixa' ORDER BY id DESC LIMIT 1").get();
     assert.equal(s.erros, 0);
   });

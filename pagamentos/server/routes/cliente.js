@@ -25,7 +25,9 @@ const auditoria = require('../lib/auditoria');
 const contaInterna = require('../lib/contaInterna');
 const contaDestino = require('../lib/contaDestino');
 const dois = require('../lib/doisfatores');
-const { detalhe, assinaturaFicha } = require('./boletos');
+const { detalhe } = require('./boletos');
+const linkBoleto = require('../lib/linkBoleto');
+const boletoPdf = require('../lib/boletoPdf');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 const periodo = (q) => ({ de: q.de || datas.primeiroDiaMes(hoje()), ate: q.ate || hoje() });
@@ -204,8 +206,14 @@ module.exports = (db, autenticado) => {
   r.get('/boletos/:id/link', exigir('boletos.ver'), (req, res) => {
     const b = db.prepare('SELECT id, nosso_numero FROM boletos WHERE id = ? AND cliente_id = ?').get(Number(req.params.id), req.clienteId);
     if (!b) throw naoEncontrado('Boleto');
-    const caminho = `${config.basePath}/api/publico/boleto/${b.id}/${assinaturaFicha(b.id, b.nosso_numero)}`;
-    res.json({ caminho, url: config.urlPublica ? `${config.urlPublica}${caminho}` : null });
+    res.json({ caminho: linkBoleto.caminho(b), url: linkBoleto.url(b), caminho_pdf: linkBoleto.caminho(b, { pdf: true }), url_pdf: linkBoleto.url(b, { pdf: true }) });
+  });
+
+  r.get('/boletos/:id/pdf', exigir('boletos.ver'), async (req, res) => {
+    const d = consultas.boletoCompleto(db, req.params.id, { clienteId: req.clienteId });
+    if (!d) throw naoEncontrado('Boleto');
+    const pdf = await boletoPdf.gerar({ ...d, hoje: hoje() });
+    res.set('Cache-Control', 'private, no-store').set('Content-Disposition', `inline; filename="${boletoPdf.nomeArquivo(d.boleto)}"`).type('application/pdf').send(pdf);
   });
 
   r.post('/boletos/:id/baixa', exigir('boletos.baixar'), async (req, res) => {

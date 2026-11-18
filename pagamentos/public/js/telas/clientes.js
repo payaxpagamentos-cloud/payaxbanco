@@ -8,7 +8,7 @@ import { agendaLiberacao } from '../../comum/graficos.js';
 import { emitir } from './boletos.js';
 import { fichaPreco, formPreco, tarifaBoleto, tarifaBolepix } from './precos-comum.js';
 import { blocoLogo } from '../../comum/logo.js';
-import { configurarSistema, importarSistema, testarSistema, nomeSistema } from './sistema-cliente.js';
+import { configurarSistema, importarSistema, testarSistema, diagnosticarSistema, nomeSistema } from './sistema-cliente.js';
 
 export default async function clientes({ alvo, params, query, recarregar }) {
   if (params[0]) return ficha(alvo, params[0], params[1] ?? 'resumo', query, recarregar);
@@ -306,6 +306,8 @@ async function abaAcessos(alvo, c, query, recarregar) {
       el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' },
         c.ixc.configurada && (pode('integracoes.ixc') || pode('*'))
           ? el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, () => testarSistema(c, recarregar)) }, icone('atualizar'), 'Testar') : null,
+        c.ixc.configurada && (pode('integracoes.ixc') || pode('*'))
+          ? el('button', { class: 'botao sec', onclick: () => diagnosticarSistema(c) }, icone('busca'), 'Diagnóstico') : null,
         c.ixc.configurada && pode('boletos.emitir')
           ? el('button', { class: 'botao sec', onclick: () => importarSistema(c, recarregar) }, icone('importar'), 'Importar títulos') : null,
         pode('integracoes.ixc') || pode('*')

@@ -959,6 +959,38 @@ UPDATE contas_bancarias SET rateio_contratado = 0;
 ALTER TABLE boletos ADD COLUMN pagador_complemento TEXT;
 `,
   },
+  {
+    versao: 27,
+    nome: 'entrega-do-boleto',
+    sql: `
+-- Entrega do boleto emitido pela PAY AX para um título do sistema do cliente (IXC): o link gravado no título,
+-- o PDF anexado lá e o e-mail com o PDF. Cada passo guarda quando foi feito; o erro e as tentativas ficam
+-- para a rotina tentar de novo sem insistir para sempre.
+ALTER TABLE boletos ADD COLUMN ixc_link_em TEXT;
+ALTER TABLE boletos ADD COLUMN ixc_pdf_em TEXT;
+ALTER TABLE boletos ADD COLUMN email_enviado_em TEXT;
+ALTER TABLE boletos ADD COLUMN entrega_erro TEXT;
+ALTER TABLE boletos ADD COLUMN entrega_tentativas INTEGER NOT NULL DEFAULT 0;
+-- Acompanhamento do título de origem: última conferência no sistema do cliente, e a marca de boleto
+-- substituído (a fatura mudou lá; este foi baixado e outro foi emitido no lugar).
+ALTER TABLE boletos ADD COLUMN ixc_conferido_em TEXT;
+ALTER TABLE boletos ADD COLUMN substituido_em TEXT;
+
+-- E-mails enviados com o boleto (para o cliente ver o que saiu e o que falhou). O texto não guarda o boleto.
+CREATE TABLE emails_enviados (
+  id INTEGER PRIMARY KEY,
+  cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+  boleto_id INTEGER REFERENCES boletos(id),
+  destino TEXT NOT NULL,
+  assunto TEXT NOT NULL,
+  situacao TEXT NOT NULL CHECK (situacao IN ('enviado','falha')),
+  erro TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX idx_emails_boleto ON emails_enviados(boleto_id);
+CREATE INDEX idx_emails_cliente ON emails_enviados(cliente_id, criado_em);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

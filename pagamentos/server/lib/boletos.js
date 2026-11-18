@@ -211,7 +211,7 @@ async function emitir(db, { cliente, dados, usuario = null, usuarioCliente = nul
 
   // Evita duplicar o mesmo título vindo do IXC.
   if (origem === 'ixc' && ixc.receber_id) {
-    const existente = db.prepare("SELECT id, nosso_numero FROM boletos WHERE cliente_id = ? AND ixc_receber_id = ? AND situacao NOT IN ('cancelado','falha')")
+    const existente = db.prepare("SELECT id, nosso_numero FROM boletos WHERE cliente_id = ? AND ixc_receber_id = ? AND situacao NOT IN ('cancelado','falha') AND substituido_em IS NULL")
       .get(cliente.id, String(ixc.receber_id));
     if (existente) return { ...existente, ja_existia: true };
   }

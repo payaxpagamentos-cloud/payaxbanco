@@ -16,11 +16,14 @@ const { formatarNossoNumero, formatarLinha } = require('../lib/febraban');
 const { assinar } = require('../lib/cripto');
 const auditoria = require('../lib/auditoria');
 const ixcLib = require('../lib/sincronismo');
+const entrega = require('../lib/entrega');
 
 const hoje = () => datas.dataLocal(config.fusoPadrao);
 
 /** Link público da ficha (o pagador abre sem login). Assinado: só vale para aquele boleto. */
-const assinaturaFicha = (id, nossoNumero) => assinar(`ficha:${id}:${nossoNumero}`).slice(0, 32);
+const linkBoleto = require('../lib/linkBoleto');
+const boletoPdf = require('../lib/boletoPdf');
+const assinaturaFicha = linkBoleto.assinatura;
 
 module.exports = (db) => {
   const r = express.Router();
@@ -64,11 +67,26 @@ module.exports = (db) => {
     res.type('html').send(await impressao.fichaCompensacao({ ...d, hoje: hoje(), base: config.basePath }));
   });
 
+  /** O boleto em PDF (arquivo), para anexar numa conversa ou e-mail. */
+  r.get('/:id/pdf', exigir('boletos.ver'), async (req, res) => {
+    const d = consultas.boletoCompleto(db, req.params.id);
+    if (!d) throw naoEncontrado('Boleto');
+    const pdf = await boletoPdf.gerar({ ...d, hoje: hoje() });
+    res.set('Cache-Control', 'private, no-store').set('Content-Disposition', `inline; filename="${boletoPdf.nomeArquivo(d.boleto)}"`).type('application/pdf').send(pdf);
+  });
+
   r.get('/:id/link', exigir('boletos.ver'), (req, res) => {
     const b = db.prepare('SELECT id, nosso_numero FROM boletos WHERE id = ?').get(Number(req.params.id));
     if (!b) throw naoEncontrado('Boleto');
-    const caminho = `${config.basePath}/api/publico/boleto/${b.id}/${assinaturaFicha(b.id, b.nosso_numero)}`;
-    res.json({ caminho, url: config.urlPublica ? `${config.urlPublica}${caminho}` : null });
+    res.json({ caminho: linkBoleto.caminho(b), url: linkBoleto.url(b), caminho_pdf: linkBoleto.caminho(b, { pdf: true }), url_pdf: linkBoleto.url(b, { pdf: true }) });
+  });
+
+  /** Entrega do boleto no sistema do cliente (link no título, PDF nos arquivos) e por e-mail: refaz agora. */
+  r.post('/:id/entrega', exigir('boletos.emitir'), async (req, res) => {
+    const out = await entrega.entregarBoleto(db, Number(req.params.id), { forcar: true });
+    auditoria.registrar(db, req, { acao: 'boleto.entrega', entidade: 'boleto', entidade_id: Number(req.params.id),
+      depois: { passos: (out.passos ?? []).map((p) => ({ passo: p.passo, ok: p.ok })) } });
+    res.json(out);
   });
 
   r.post('/:id/baixa', exigir('boletos.baixar'), async (req, res) => {

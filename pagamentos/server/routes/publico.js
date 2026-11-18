@@ -17,6 +17,8 @@ const repassesLib = require('../lib/repasses');
 const sincronismo = require('../lib/sincronismo');
 const datas = require('../lib/datas');
 const { assinaturaFicha } = require('./boletos');
+const linkBoleto = require('../lib/linkBoleto');
+const boletoPdf = require('../lib/boletoPdf');
 const abertura = require('../lib/abertura');
 const ativacao = require('../lib/ativacao');
 const auditoria = require('../lib/auditoria');
@@ -85,12 +87,20 @@ module.exports = (db) => {
   r.get('/boleto/:id/:assinatura', async (req, res) => {
     const d = consultas.boletoCompleto(db, req.params.id);
     if (!d) throw naoEncontrado('Boleto');
-    if (!igual(req.params.assinatura, assinaturaFicha(d.boleto.id, d.boleto.nosso_numero))) {
+    // Com ".pdf" no fim, o link devolve o arquivo; sem, a página.
+    const emPdf = /\.pdf$/i.test(req.params.assinatura);
+    const assinatura = req.params.assinatura.replace(/\.pdf$/i, '');
+    if (!igual(assinatura, assinaturaFicha(d.boleto.id, d.boleto.nosso_numero))) {
       throw new ErroNegocio('Link inválido ou expirado.', 403);
     }
-    if (d.boleto.situacao === 'cancelado') throw new ErroNegocio('Este boleto foi cancelado.', 410);
     res.set('Cache-Control', 'private, no-store');
-    res.type('html').send(await impressao.fichaCompensacao({ ...d, hoje: hoje(), base: config.clientePath }));
+    if (emPdf) {
+      // O PDF sempre responde, com a situação do momento: boleto pago ou cancelado vira um aviso, sem código de barras.
+      const pdf = await boletoPdf.gerar({ ...d, hoje: hoje() });
+      return res.set('Content-Disposition', `inline; filename="${boletoPdf.nomeArquivo(d.boleto)}"`).type('application/pdf').send(pdf);
+    }
+    if (d.boleto.situacao === 'cancelado') throw new ErroNegocio('Este boleto foi cancelado.', 410);
+    res.type('html').send(await impressao.fichaCompensacao({ ...d, hoje: hoje(), base: config.clientePath, pdf: linkBoleto.caminho(d.boleto, { pdf: true }) }));
   });
 
   /**

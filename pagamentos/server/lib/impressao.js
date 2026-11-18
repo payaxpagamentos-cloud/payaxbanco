@@ -58,15 +58,14 @@ const pct = (ppm) => (Number(ppm || 0) / 10000).toLocaleString('pt-BR', { maximu
 const campo = (rotulo, valor, { grande = false, classe = '' } = {}) =>
   `<div class="campo ${classe}"><span class="rot">${esc(rotulo)}</span><span class="val${grande ? ' grande' : ''}">${esc(valor ?? '')}</span></div>`;
 
-/** @returns {Promise<string>} HTML completo da ficha. */
-async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
+/**
+ * Tudo o que a ficha mostra, já formatado: usado pela página (HTML) e pelo PDF, para os dois dizerem
+ * exatamente a mesma coisa.
+ */
+function dadosFicha({ boleto, conta, cliente, hoje }) {
   const atual = valorAtualizado(boleto, hoje);
   const linha = febraban.formatarLinha(boleto.linha_digitavel ?? '');
   const nn = febraban.formatarNossoNumero(boleto.nosso_numero, boleto.nosso_numero_dv);
-  const barras = boleto.codigo_barras ? codigobarras.svg(boleto.codigo_barras, { altura: 50 }) : '';
-  const qr = boleto.pix_emv
-    ? await QRCode.toString(boleto.pix_emv, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' })
-    : '';
   const instrucoes = [
     boleto.mensagem,
     boleto.multa_ppm ? `Após o vencimento, multa de ${pct(boleto.multa_ppm)}%.` : null,
@@ -91,6 +90,19 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   const cidadePagador = [boleto.pagador_bairro, [boleto.pagador_cidade, boleto.pagador_uf].filter(Boolean).join('/'),
     boleto.pagador_cep ? `CEP ${String(boleto.pagador_cep).replace(/(\d{5})(\d{3})/, '$1-$2')}` : null].filter(Boolean).join(' · ');
 
+  return { atual, linha, nn, instrucoes, bfNome, bfFantasia, bfDoc, beneficiarioFinal, beneficiario, codigoBeneficiario, teste,
+    enderecoPagador, cidadePagador, bancoNome: 'BRADESCO', bancoCodigo: `${conta.banco}-2` };
+}
+
+/** @returns {Promise<string>} HTML completo da ficha. */
+async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '', pdf = null }) {
+  const { atual, linha, nn, instrucoes, bfNome, bfFantasia, bfDoc, beneficiarioFinal, beneficiario, codigoBeneficiario, teste,
+    enderecoPagador, cidadePagador } = dadosFicha({ boleto, conta, cliente, hoje });
+  const barras = boleto.codigo_barras ? codigobarras.svg(boleto.codigo_barras, { altura: 50 }) : '';
+  const qr = boleto.pix_emv
+    ? await QRCode.toString(boleto.pix_emv, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' })
+    : '';
+
   const cabecalho = (titulo) => `<div class="banco">
       <span class="logo">BRADESCO</span><span class="cod">${esc(conta.banco)}-2</span>
       <span class="linha-dig">${esc(linha)}</span>
@@ -109,6 +121,7 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
   .folha { background: #fff; max-width: 190mm; margin: 0 auto; padding: 10mm; }
   .acoes { max-width: 190mm; margin: 0 auto 12px; display: flex; gap: 8px; justify-content: flex-end; }
   .acoes button { font: 600 13px/1 Arial; padding: 10px 16px; border: 0; border-radius: 6px; background: #0f5fbf; color: #fff; cursor: pointer; }
+  .acoes .botao-pdf { font: 600 13px/1 Arial; padding: 10px 16px; border-radius: 6px; background: #0f5fbf; color: #fff; text-decoration: none; }
   .acoes button.sec { background: #fff; color: #0f5fbf; border: 1px solid #0f5fbf; }
   .folha { position: relative; }
   /* Quem cobra, antes de tudo: é o nome que o pagador reconhece. */
@@ -167,7 +180,8 @@ async function fichaCompensacao({ boleto, conta, cliente, hoje, base = '' }) {
 <body>
 ${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não está registrado em banco nenhum e não pode ser pago.</div>` : ''}
 <div class="acoes">
-  <button type="button" onclick="window.print()">Imprimir / salvar PDF</button>
+  ${pdf ? `<a class="botao-pdf" href="${esc(pdf)}">Baixar PDF</a>` : ''}
+  <button type="button" onclick="window.print()">Imprimir</button>
   ${boleto.pix_emv ? '<button type="button" class="sec" id="copiar">Copiar código PIX</button>' : ''}
 </div>
 <div class="folha">
@@ -281,4 +295,4 @@ ${teste ? `<div class="aviso-teste">Boleto de teste, gerado no simulador. Não e
 </html>`;
 }
 
-module.exports = { fichaCompensacao, ROTULO_BENEFICIARIO_FINAL };
+module.exports = { fichaCompensacao, dadosFicha, ROTULO_BENEFICIARIO_FINAL, brl, data, doc };

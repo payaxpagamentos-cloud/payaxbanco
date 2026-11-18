@@ -12,6 +12,7 @@ const config = require('./../config');
 const datas = require('./datas');
 const repasses = require('./repasses');
 const sincronismo = require('./sincronismo');
+const entrega = require('./entrega');
 const arquivosBanco = require('./arquivosBanco');
 const pld = require('./pld');
 const lgpd = require('./lgpd');
@@ -83,6 +84,21 @@ async function rodar(db, { forcar = false } = {}) {
     out.baixas = await sincronismo.reprocessarBaixas(db, 50);
   } catch (err) {
     console.error('[PAY AX] Falha ao reprocessar baixas no IXC:', err.message);
+  }
+
+  // Faturas alteradas, canceladas ou recebidas por outro meio no sistema do cliente: o boleto acompanha.
+  try {
+    out.acompanhamento = await entrega.acompanhar(db);
+    if (out.acompanhamento.avisos.length) console.warn('[PAY AX] Acompanhamento do IXC:', JSON.stringify(out.acompanhamento.avisos.slice(0, 10)));
+  } catch (err) {
+    console.error('[PAY AX] Falha ao acompanhar as faturas do IXC:', err.message);
+  }
+
+  // Entrega do boleto no sistema do cliente (link, PDF) e por e-mail: o que ficou pendente.
+  try {
+    out.entregas = await entrega.entregarPendentes(db);
+  } catch (err) {
+    console.error('[PAY AX] Falha na entrega dos boletos:', err.message);
   }
 
   // Importação automática do IXC, para os clientes que pediram: a cada ciclo (15 minutos), porque quando o

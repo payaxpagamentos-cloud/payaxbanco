@@ -2,7 +2,7 @@ import { api, ir, pode } from '../app.js';
 import { qs } from '../../comum/api.js';
 import {
   el, montar, cartao, tabela, paginacao, campo, lerForm, modal, confirmar, toast, acao, aviso, selo, copiar, autoPreencher,
-  dinheiro, numero, data, documento, linhaDigitavel, hojeIso, somarDias, primeiroDiaMes, R, icone,
+  dinheiro, numero, data, dataHora, documento, linhaDigitavel, hojeIso, somarDias, primeiroDiaMes, R, icone,
 } from '../../comum/ui.js';
 import { barraSplit } from '../../comum/graficos.js';
 
@@ -148,6 +148,7 @@ async function detalheBoleto(alvo, id, recarregar) {
 
   const acoes = el('div', { class: 'acoes' },
     el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, () => api.abrirFicha(b.id)) }, icone('imprimir'), 'Ficha / imprimir'),
+    el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, () => api.baixar(`/boletos/${b.id}/pdf`, `boleto-${b.nosso_numero}.pdf`)) }, icone('baixar'), 'Baixar PDF'),
     el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
       const l = await api.get(`/boletos/${b.id}/link`);
       await copiar(l.url ?? `${location.origin}${l.caminho}`, 'Link do boleto copiado — envie ao pagador.');
@@ -166,6 +167,16 @@ async function detalheBoleto(alvo, id, recarregar) {
         const r = await confirmar({ titulo: 'Estornar liquidação', texto: 'O crédito e os descontos voltam no extrato do cliente como estorno.', confirmarTexto: 'Estornar', perigo: true, campoMotivo: true });
         if (r) acao(botao, async () => { await api.post(`/boletos/${b.id}/estorno`, r); toast('Liquidação estornada.', 'ok'); recarregar(); });
       } }, 'Estornar')
+      : null,
+    b.origem === 'ixc' && ['registrando', 'registrado'].includes(b.situacao) && pode('boletos.emitir')
+      ? el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
+        const r = await api.post(`/boletos/${b.id}/entrega`, {});
+        const passos = r.passos ?? [];
+        const nomes = { link: 'link no título', pdf: 'PDF no sistema', email: 'e-mail' };
+        if (!passos.length) toast(r.motivo ? `Nada a entregar: ${r.motivo}.` : 'Nada a entregar: ligue o link, o PDF ou o e-mail na configuração do sistema do cliente (PDF e e-mail só saem com o boleto registrado).');
+        else toast(passos.map((p) => `${nomes[p.passo] ?? p.passo}: ${p.ok ? 'ok' : p.detalhe}`).join(' · '), passos.every((p) => p.ok) ? 'ok' : 'erro');
+        recarregar();
+      }) }, icone('seta'), 'Entregar no sistema do cliente')
       : null,
     pode('conciliacao.operar')
       ? el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
@@ -196,7 +207,14 @@ async function detalheBoleto(alvo, id, recarregar) {
         b.situacao === 'registrado' && b.atualizado.dias_atraso ? par('Atraso', `${b.atualizado.dias_atraso} dia(s) · multa ${dinheiro(b.atualizado.multa_centavos)} + juros ${dinheiro(b.atualizado.juros_centavos)}`) : null,
         b.pago_em ? par('Pago em', `${data(b.pago_em)} · ${dinheiro(b.pago_valor_centavos)} (${b.pago_meio === 'pix' ? 'PIX' : 'boleto'})`) : null,
         par('Documento', b.seu_numero ?? '—'),
-        par('Origem', R.origem[b.origem] ?? b.origem))),
+        par('Origem', R.origem[b.origem] ?? b.origem),
+        b.origem === 'ixc' ? par('Entrega', [
+          b.ixc_link_em ? `link no título em ${dataHora(b.ixc_link_em)}` : null,
+          b.ixc_pdf_em ? `PDF no sistema em ${dataHora(b.ixc_pdf_em)}` : null,
+          b.email_enviado_em ? `e-mail em ${dataHora(b.email_enviado_em)}` : null,
+          b.substituido_em ? 'substituído por outro boleto (a fatura mudou)' : null,
+        ].filter(Boolean).join(' · ') || '—') : null,
+        b.entrega_erro ? par('Falha na entrega', b.entrega_erro) : null)),
       cartao('Pagador', el('div', { class: 'pares' },
         par('Nome', b.pagador_nome),
         par('CPF/CNPJ', documento(b.pagador_documento)),

@@ -45,7 +45,7 @@ function ixcDoCliente(db, clienteId) {
   let cred;
   try { cred = JSON.parse(decifrar(i.credenciais)); } catch { return null; }
   if (!cred?.url || !cred?.token) return null;
-  return { integracao: i, config: JSON.parse(i.config || '{}'), cliente: criarIxc({ url: cred.url, token: cred.token }) };
+  return { integracao: i, config: JSON.parse(i.config || '{}'), segredos: cred, cliente: criarIxc({ url: cred.url, token: cred.token }) };
 }
 
 function marcarEstado(db, clienteId, estado, erro = null) {
@@ -67,6 +67,98 @@ async function testar(db, clienteId) {
   }
 }
 
+/**
+ * Emite o boleto de um título do IXC (um por vez). Usado pela importação e também quando a fatura é alterada
+ * no IXC e o boleto precisa ser emitido de novo. `ctx` leva o resultado acumulado e o cache de clientes.
+ */
+async function emitirParaTitulo(db, cliente, ixc, t, { resultado, cacheClientes, carteiras, usuario = null }) {
+  if (carteiras.length && !carteiras.includes(t.carteira)) { resultado.ignorados += 1; return; }
+  if (!t.vencimento || t.valor_centavos <= 0) { resultado.ignorados += 1; return; }
+  // Boleto substituído (a fatura mudou no IXC e ele foi baixado) não conta: o título ganha outro.
+  const jaTem = db.prepare("SELECT id FROM boletos WHERE cliente_id = ? AND ixc_receber_id = ? AND situacao NOT IN ('cancelado','falha') AND substituido_em IS NULL")
+    .get(cliente.id, t.ixc_id);
+  if (jaTem) { resultado.ignorados += 1; return; }
+  try {
+    if (!cacheClientes.has(t.ixc_cliente_id)) cacheClientes.set(t.ixc_cliente_id, await ixc.cliente.clientePorId(t.ixc_cliente_id));
+    const p = cacheClientes.get(t.ixc_cliente_id);
+    if (!p?.documento) { resultado.ignorados += 1; resultado.detalhes.push({ ixc_id: t.ixc_id, motivo: 'pagador sem CPF/CNPJ no IXC' }); return; }
+
+    // O IXC numera e imprime o boleto: registramos com o número dele, e só se o código que ele calculou
+    // for exatamente o que vai para o banco (senão o pagador teria um boleto que o banco não reconhece).
+    let nossoNumeroDefinido = null;
+    if (ixc.config.numeracao === 'ixc') {
+      const nn = nossoNumeroDoIxc(t.bruto?.nn_boleto ?? t.bruto?.nosso_numero);
+      if (!nn) { resultado.ignorados += 1; resultado.detalhes.push({ ixc_id: t.ixc_id, motivo: 'o IXC ainda não gerou o boleto (sem nosso número): entra na próxima rodada' }); return; }
+      const n = Number(nn.numero);
+      if (!(n >= Number(ixc.config.faixa_inicio) && n <= Number(ixc.config.faixa_fim))) {
+        throw new ErroNegocio(`nosso número ${nn.numero} fora da faixa reservada para este cliente (${ixc.config.faixa_inicio} a ${ixc.config.faixa_fim}): confira a carteira PAY AX no IXC`, 422);
+      }
+      const conta = boletos.contaDe(db, ixc.config.conta_id ?? null);
+      const esperado = bancos.calcularBoleto(conta, { nossoNumero: nn.numero, valorCentavos: t.valor_centavos, vencimento: t.vencimento });
+      if (nn.dv && nn.dv !== esperado.nosso_numero_dv) {
+        throw new ErroNegocio(`dígito do nosso número do IXC (${nn.dv}) diferente do calculado pelo banco (${esperado.nosso_numero_dv}): confira a carteira (09) no IXC`, 422);
+      }
+      const linhaIxc = String(t.bruto?.linha_digitavel ?? '').replace(/\D/g, '');
+      if (linhaIxc && linhaIxc !== esperado.linha_digitavel.replace(/\D/g, '')) {
+        throw new ErroNegocio('a linha digitável do boleto do IXC não bate com a do registro: confira agência, conta e carteira da carteira PAY AX no IXC (nada foi registrado)', 422);
+      }
+      nossoNumeroDefinido = nn.numero;
+    }
+
+    const out = await boletos.emitir(db, {
+      cliente,
+      origem: 'ixc',
+      ixc: { receber_id: t.ixc_id, cliente_id: t.ixc_cliente_id },
+      nossoNumeroDefinido,
+      contaId: ixc.config.numeracao === 'ixc' ? ixc.config.conta_id ?? null : null,
+      usuario,
+      dados: {
+        // Com o layout do IXC, o QR Code PIX do Bolepix não sairia no papel: registra como boleto comum.
+        tipo: ixc.config.numeracao === 'ixc' || ixc.config.tipo_padrao === 'boleto' ? 'boleto' : 'bolepix',
+        valor_centavos: t.valor_centavos,
+        vencimento: t.vencimento,
+        seu_numero: t.documento || `IXC-${t.ixc_id}`,
+        pagador_nome: p.nome,
+        pagador_documento: p.documento,
+        pagador_email: p.email,
+        pagador_telefone: p.telefone,
+        pagador_cep: p.cep,
+        pagador_endereco: p.endereco,
+        pagador_numero: p.numero,
+        pagador_complemento: p.complemento,
+        pagador_bairro: p.bairro,
+        pagador_cidade: p.cidade,
+        pagador_uf: p.uf,
+        juros_mes: ixc.config.juros_mes ?? 1,
+        multa: ixc.config.multa ?? 2,
+        mensagem: ixc.config.mensagem ?? null,
+      },
+    });
+    if (out.ja_existia) { resultado.ignorados += 1; return; }
+    // O banco não registrou: não conta como criado e não devolve ao IXC uma linha que não vale.
+    if (out.situacao === 'falha') {
+      resultado.erros += 1;
+      resultado.detalhes.push({ ixc_id: t.ixc_id, erro: `o banco não registrou o título: ${out.erro ?? 'sem detalhe'}` });
+      return;
+    }
+    resultado.criados += 1;
+    // Devolve ao IXC a linha digitável, para o provedor ver o boleto no título de origem.
+    // Quando o IXC numera, o título já tem o número e a linha dele: nada a gravar de volta.
+    if (ixc.config.anotar_no_ixc !== false && ixc.config.numeracao !== 'ixc') {
+      const b = db.prepare('SELECT linha_digitavel, nosso_numero, nosso_numero_dv FROM boletos WHERE id = ?').get(out.id);
+      await ixc.cliente.anotarBoleto(t.ixc_id, { nosso_numero: `${b.nosso_numero}-${b.nosso_numero_dv}` })
+        .catch((err) => resultado.detalhes.push({ ixc_id: t.ixc_id, aviso: `boleto emitido, mas não foi anotado no IXC: ${err.message}` }));
+    }
+    // Entrega do boleto no sistema do cliente (link no título; PDF e e-mail saem quando o banco confirmar).
+    if (ixc.config.numeracao !== 'ixc') {
+      const r = await require('./entrega').entregarBoleto(db, out.id).catch((err) => ({ passos: [{ passo: 'entrega', ok: false, detalhe: err.message }] }));
+      for (const p of r.passos ?? []) if (!p.ok && !p.definitivo) resultado.detalhes.push({ ixc_id: t.ixc_id, aviso: `boleto emitido, mas a entrega falhou (${p.passo}): ${p.detalhe}` });
+    }
+  } catch (err) {
+    resultado.erros += 1;
+    resultado.detalhes.push({ ixc_id: t.ixc_id, erro: err.message });
+  }
+}
 /**
  * Importa os títulos em aberto do IXC e emite um boleto para cada um.
  * Títulos já importados são ignorados (controle por ixc_receber_id), então pode rodar quantas vezes quiser.
@@ -113,88 +205,7 @@ async function importarAgora(db, cliente, { de, ate, limite = 200, maxPaginas = 
         .some((i) => mesmoIxc(JSON.parse(i.config || '{}').url) === urlDeste);
       if (compartilhado) throw new ErroNegocio('Este IXC atende mais de um cliente da PAY AX: configure a carteira de cobrança deste cliente antes de importar.', 409);
     }
-    for (const t of titulos) {
-      if (carteiras.length && !carteiras.includes(t.carteira)) { resultado.ignorados += 1; continue; }
-      if (!t.vencimento || t.valor_centavos <= 0) { resultado.ignorados += 1; continue; }
-      const jaTem = db.prepare("SELECT id FROM boletos WHERE cliente_id = ? AND ixc_receber_id = ? AND situacao NOT IN ('cancelado','falha')")
-        .get(cliente.id, t.ixc_id);
-      if (jaTem) { resultado.ignorados += 1; continue; }
-      try {
-        if (!cacheClientes.has(t.ixc_cliente_id)) cacheClientes.set(t.ixc_cliente_id, await ixc.cliente.clientePorId(t.ixc_cliente_id));
-        const p = cacheClientes.get(t.ixc_cliente_id);
-        if (!p?.documento) { resultado.ignorados += 1; resultado.detalhes.push({ ixc_id: t.ixc_id, motivo: 'pagador sem CPF/CNPJ no IXC' }); continue; }
-
-        // O IXC numera e imprime o boleto: registramos com o número dele, e só se o código que ele calculou
-        // for exatamente o que vai para o banco (senão o pagador teria um boleto que o banco não reconhece).
-        let nossoNumeroDefinido = null;
-        if (ixc.config.numeracao === 'ixc') {
-          const nn = nossoNumeroDoIxc(t.bruto?.nn_boleto ?? t.bruto?.nosso_numero);
-          if (!nn) { resultado.ignorados += 1; resultado.detalhes.push({ ixc_id: t.ixc_id, motivo: 'o IXC ainda não gerou o boleto (sem nosso número): entra na próxima rodada' }); continue; }
-          const n = Number(nn.numero);
-          if (!(n >= Number(ixc.config.faixa_inicio) && n <= Number(ixc.config.faixa_fim))) {
-            throw new ErroNegocio(`nosso número ${nn.numero} fora da faixa reservada para este cliente (${ixc.config.faixa_inicio} a ${ixc.config.faixa_fim}): confira a carteira PAY AX no IXC`, 422);
-          }
-          const conta = boletos.contaDe(db, ixc.config.conta_id ?? null);
-          const esperado = bancos.calcularBoleto(conta, { nossoNumero: nn.numero, valorCentavos: t.valor_centavos, vencimento: t.vencimento });
-          if (nn.dv && nn.dv !== esperado.nosso_numero_dv) {
-            throw new ErroNegocio(`dígito do nosso número do IXC (${nn.dv}) diferente do calculado pelo banco (${esperado.nosso_numero_dv}): confira a carteira (09) no IXC`, 422);
-          }
-          const linhaIxc = String(t.bruto?.linha_digitavel ?? '').replace(/\D/g, '');
-          if (linhaIxc && linhaIxc !== esperado.linha_digitavel.replace(/\D/g, '')) {
-            throw new ErroNegocio('a linha digitável do boleto do IXC não bate com a do registro: confira agência, conta e carteira da carteira PAY AX no IXC (nada foi registrado)', 422);
-          }
-          nossoNumeroDefinido = nn.numero;
-        }
-
-        const out = await boletos.emitir(db, {
-          cliente,
-          origem: 'ixc',
-          ixc: { receber_id: t.ixc_id, cliente_id: t.ixc_cliente_id },
-          nossoNumeroDefinido,
-          contaId: ixc.config.numeracao === 'ixc' ? ixc.config.conta_id ?? null : null,
-          usuario,
-          dados: {
-            // Com o layout do IXC, o QR Code PIX do Bolepix não sairia no papel: registra como boleto comum.
-            tipo: ixc.config.numeracao === 'ixc' || ixc.config.tipo_padrao === 'boleto' ? 'boleto' : 'bolepix',
-            valor_centavos: t.valor_centavos,
-            vencimento: t.vencimento,
-            seu_numero: t.documento || `IXC-${t.ixc_id}`,
-            pagador_nome: p.nome,
-            pagador_documento: p.documento,
-            pagador_email: p.email,
-            pagador_telefone: p.telefone,
-            pagador_cep: p.cep,
-            pagador_endereco: p.endereco,
-            pagador_numero: p.numero,
-            pagador_complemento: p.complemento,
-            pagador_bairro: p.bairro,
-            pagador_cidade: p.cidade,
-            pagador_uf: p.uf,
-            juros_mes: ixc.config.juros_mes ?? 1,
-            multa: ixc.config.multa ?? 2,
-            mensagem: ixc.config.mensagem ?? null,
-          },
-        });
-        if (out.ja_existia) { resultado.ignorados += 1; continue; }
-        // O banco não registrou: não conta como criado e não devolve ao IXC uma linha que não vale.
-        if (out.situacao === 'falha') {
-          resultado.erros += 1;
-          resultado.detalhes.push({ ixc_id: t.ixc_id, erro: `o banco não registrou o título: ${out.erro ?? 'sem detalhe'}` });
-          continue;
-        }
-        resultado.criados += 1;
-        // Devolve ao IXC a linha digitável, para o provedor ver o boleto no título de origem.
-        // Quando o IXC numera, o título já tem o número e a linha dele: nada a gravar de volta.
-        if (ixc.config.anotar_no_ixc !== false && ixc.config.numeracao !== 'ixc') {
-          const b = db.prepare('SELECT linha_digitavel, nosso_numero, nosso_numero_dv FROM boletos WHERE id = ?').get(out.id);
-          await ixc.cliente.anotarBoleto(t.ixc_id, { nosso_numero: `${b.nosso_numero}-${b.nosso_numero_dv}` })
-            .catch((err) => resultado.detalhes.push({ ixc_id: t.ixc_id, aviso: `boleto emitido, mas não foi anotado no IXC: ${err.message}` }));
-        }
-      } catch (err) {
-        resultado.erros += 1;
-        resultado.detalhes.push({ ixc_id: t.ixc_id, erro: err.message });
-      }
-    }
+    for (const t of titulos) await emitirParaTitulo(db, cliente, ixc, t, { resultado, cacheClientes, carteiras, usuario });
     marcarEstado(db, cliente.id, 'conectada');
   } catch (err) {
     resultado.erros += 1;
@@ -221,6 +232,9 @@ async function avisarBaixa(db, boletoId) {
       data_recebimento: b.pago_em,
       valor_centavos: b.pago_valor_centavos ?? b.valor_centavos,
       observacao: `Baixa automática PAY AX · boleto ${b.nosso_numero}-${b.nosso_numero_dv}`,
+      conta: ixc.config.baixa_conta || null,
+      planejamento: ixc.config.baixa_planejamento || null,
+      pix: b.pago_meio === 'pix',
     });
     db.prepare("UPDATE sincronismos SET fim = ?, lidos = 1, criados = 1, detalhe = ? WHERE id = ?")
       .run(agora(), JSON.stringify({ boleto_id: b.id, ixc_id: b.ixc_receber_id }), sincId);
@@ -249,4 +263,4 @@ async function reprocessarBaixas(db, limite = 50) {
   return out;
 }
 
-module.exports = { mesmoIxc, nossoNumeroDoIxc, ixcDoCliente, testar, importar, avisarBaixa, reprocessarBaixas, hoje };
+module.exports = { mesmoIxc, nossoNumeroDoIxc, ixcDoCliente, testar, importar, emitirParaTitulo, avisarBaixa, reprocessarBaixas, hoje };

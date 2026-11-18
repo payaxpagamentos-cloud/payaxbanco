@@ -135,6 +135,7 @@ async function detalhe(alvo, id, recarregar) {
         el('p', {}, `${R.tipoBoleto[b.tipo]} · nosso número ${b.nosso_numero_formatado} · emitido em ${data(b.emissao)}`)),
       el('div', { class: 'acoes' },
         el('button', { class: 'botao', onclick: (e) => acao(e.currentTarget, () => api.abrirFicha(b.id)) }, icone('imprimir'), 'Ver / imprimir boleto'),
+        el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, () => api.baixar(`/boletos/${b.id}/pdf`, `boleto-${b.nosso_numero}.pdf`)) }, icone('baixar'), 'Baixar PDF'),
         el('button', { class: 'botao sec', onclick: (e) => acao(e.currentTarget, async () => {
           const l = await api.get(`/boletos/${b.id}/link`);
           await copiar(l.url ?? `${location.origin}${l.caminho}`, 'Link copiado — é só enviar ao pagador.');

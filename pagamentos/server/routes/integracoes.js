@@ -10,6 +10,8 @@ const { podeEquipe } = require('../lib/permissoes');
 const { cifrar, decifrar } = require('../lib/cripto');
 const v = require('../lib/validacao');
 const sincronismo = require('../lib/sincronismo');
+const entrega = require('../lib/entrega');
+const email = require('../lib/email');
 const boletosLib = require('../lib/boletos');
 const { criarBanco, doBanco } = require('../lib/bancos');
 const consultaDados = require('../lib/consultaDados');
@@ -182,16 +184,18 @@ module.exports = (db) => {
     const cliente = db.prepare('SELECT * FROM clientes WHERE id = ?').get(Number(req.params.clienteId));
     if (!cliente) throw naoEncontrado('Cliente');
     const b = req.body ?? {};
-    let credenciais = b.token ? { url: v.url(b.url, 'o endereço do IXC'), token: v.texto(b.token, 'o token', 200) } : null;
-    // Endereço novo sem redigitar o token: a conexão usa o endereço guardado nas credenciais, então ele
-    // é atualizado lá também (antes a tela mostrava o novo e a conexão seguia indo para o antigo).
-    if (!credenciais && b.url) {
-      const atual = db.prepare("SELECT credenciais FROM integracoes WHERE escopo = 'ixc' AND cliente_id = ?").get(cliente.id);
-      if (atual?.credenciais) {
-        const c = JSON.parse(decifrar(atual.credenciais));
-        credenciais = { ...c, url: v.url(b.url, 'o endereço do IXC') };
-      }
-    }
+    const guardado = db.prepare("SELECT credenciais, config FROM integracoes WHERE escopo = 'ixc' AND cliente_id = ?").get(cliente.id);
+    let segredos = {};
+    try { segredos = guardado?.credenciais ? JSON.parse(decifrar(guardado.credenciais)) : {}; } catch { segredos = {}; }
+    const cfgGuardada = JSON.parse(guardado?.config || '{}');
+    // Token novo e/ou endereço novo: a conexão usa o endereço guardado junto do token, então os dois andam juntos.
+    if (b.token) Object.assign(segredos, { url: v.url(b.url, 'o endereço do IXC'), token: v.texto(b.token, 'o token', 200) });
+    else if (b.url && segredos.token) segredos.url = v.url(b.url, 'o endereço do IXC');
+    // E-mail com o PDF: a senha só muda quando vem preenchida.
+    const mail = email.lerConfiguracao(b);
+    if (mail.senha) segredos.smtp_senha = mail.senha;
+    if (mail.cfg.ativo && !segredos.smtp_senha) throw new ErroNegocio('Informe a senha do e-mail para ligar o envio do boleto por e-mail.', 422);
+    const credenciais = Object.keys(segredos).length ? segredos : null;
     const cfg = {
       // Sistema de gestão do cliente: só os homologados pela PAY AX (hoje, o IXC).
       sistema: v.opcao(b.sistema || 'ixc', 'o sistema de gestão', Object.keys(SISTEMAS_HOMOLOGADOS)),
@@ -237,7 +241,20 @@ module.exports = (db) => {
         return { numeracao, conta_id: conta.id, faixa_inicio: ini, faixa_fim: fim };
       })(),
       dias_a_frente: v.inteiroOpcional(b.dias_a_frente, 'os dias à frente', { min: 1, max: 90 }) ?? 10,
+      // Entrega do boleto PAY AX no sistema do cliente e por e-mail (lib/entrega.js).
+      gravar_link: v.booleano(b.gravar_link),
+      anexar_pdf: v.opcao(b.anexar_pdf || 'nao', 'onde anexar o PDF', ['nao', 'cliente', 'titulo']),
+      acompanhar: b.acompanhar === undefined ? true : v.booleano(b.acompanhar),
+      email: mail.cfg,
+      // Baixa no IXC: conta (caixa/banco) e planejamento analítico; vazios = os da carteira e do próprio título.
+      baixa_conta: (() => { const x = String(b.baixa_conta ?? '').trim(); if (x && !/^\d{1,10}$/.test(x)) throw new ErroNegocio('A conta para a baixa é o número (ID) da conta no IXC.', 422); return x || null; })(),
+      baixa_planejamento: (() => { const x = String(b.baixa_planejamento ?? '').trim(); if (x && !/^\d{1,10}$/.test(x)) throw new ErroNegocio('O planejamento para a baixa é o número (ID) do planejamento analítico no IXC.', 422); return x || null; })(),
     };
+    // A entrega vale para os boletos emitidos a partir de quando foi ligada (não dispara e-mail para a carteira antiga).
+    if (entrega.algumaEntrega(entrega.opcoes(cfg))) cfg.entrega_desde = cfgGuardada.entrega_desde ?? agora();
+    if (cfg.numeracao === 'ixc' && (cfg.gravar_link || cfg.anexar_pdf !== 'nao' || cfg.email.ativo)) {
+      throw new ErroNegocio('Link, PDF e e-mail são do boleto montado pela PAY AX: escolha "A PAY AX" em "Quem monta e envia o boleto".', 422);
+    }
     // Um mesmo IXC pode atender mais de um cliente PAY AX (ex.: duas empresas do mesmo grupo, cada uma com a
     // sua filial no IXC). Aí cada cliente precisa da SUA carteira: sem isso, um importaria os títulos do outro.
     {
@@ -260,6 +277,25 @@ module.exports = (db) => {
     const id = gravar(db, { escopo: 'ixc', cliente_id: cliente.id, credenciais, cfg, usuario: req.usuario });
     auditoria.registrar(db, req, { acao: 'integracao.ixc.configurada', entidade: 'integracao', entidade_id: id, cliente_id: cliente.id, depois: cfg });
     res.json(semSegredo(db.prepare('SELECT * FROM integracoes WHERE id = ?').get(id)));
+  });
+
+  /** Diagnóstico num título de teste: o que o IXC deste cliente aceita (ler, gravar número e link, anexar PDF). */
+  r.post('/ixc/:clienteId/diagnostico', exigir('integracoes.ixc', '*'), async (req, res) => {
+    const b = req.body ?? {};
+    const out = await entrega.diagnosticar(db, Number(req.params.clienteId), {
+      titulo_id: b.titulo_id, gravar_nosso_numero: v.booleano(b.gravar_nosso_numero), gravar_link: v.booleano(b.gravar_link),
+      anexar_cliente: v.booleano(b.anexar_cliente), anexar_titulo: v.booleano(b.anexar_titulo),
+    });
+    auditoria.registrar(db, req, { acao: 'integracao.ixc.diagnostico', entidade: 'integracao', cliente_id: Number(req.params.clienteId),
+      depois: { titulo_id: String(b.titulo_id ?? ''), passos: out.passos.map((p) => ({ passo: p.passo, ok: p.ok })) } });
+    res.json(out);
+  });
+
+  /** Confere o servidor de e-mail do cliente (usuário e senha), sem mandar mensagem. */
+  r.post('/ixc/:clienteId/email/testar', exigir('integracoes.ixc', '*'), async (req, res) => {
+    const ixc = sincronismo.ixcDoCliente(db, Number(req.params.clienteId));
+    if (!ixc?.config.email?.host) throw new ErroNegocio('Salve antes o servidor de e-mail deste cliente.', 409);
+    res.json(await email.testar(ixc.config.email, ixc.segredos?.smtp_senha));
   });
 
   r.post('/ixc/:clienteId/testar', exigir('integracoes.ixc', '*'), async (req, res) => {
