@@ -226,8 +226,14 @@ async function consultarCnpj(db, entrada, { semCache = false, somentePublica = f
     }
   } catch (err) {
     // Falha na API Brasil (saldo, token, instabilidade) não impede o cadastro: tenta a fonte pública.
-    if (fonte.nome !== 'apibrasil' || err.status === 404) throw err;
-    dados = lerCnpjPublico(await buscar(`${config.dados.urlBrasilApi}/cnpj/v1/${cnpj}`));
+    // "Não encontrado" na API Brasil também tenta a fonte pública: empresa aberta há pouco pode estar numa base e não na outra.
+    if (fonte.nome !== 'apibrasil') throw err;
+    try {
+      dados = lerCnpjPublico(await buscar(`${config.dados.urlBrasilApi}/cnpj/v1/${cnpj}`));
+    } catch (erroPublica) {
+      throw err.status === 404 || erroPublica.status === 404 ? new ErroNegocio('CNPJ não encontrado nas bases de consulta.', 404) : erroPublica;
+    }
+    if (!dados.razao_social) throw new ErroNegocio('CNPJ não encontrado nas bases de consulta.', 404);
     const alternativa = { ...dados, cnpj: dados.cnpj || cnpj };
     guardar(db, 'cnpj', cnpj, 'publica', alternativa);
     return { ...alternativa, fonte: 'publica', do_cache: false, aviso: `A API Brasil não atendeu (${err.message}); os dados vieram da fonte pública.` };

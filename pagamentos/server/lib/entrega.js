@@ -161,9 +161,10 @@ async function entregarPendentes(db, { limite = 200 } = {}) {
  *   - valor ou vencimento alterados (quando é a PAY AX que monta o boleto) → baixa e emite outro no lugar.
  * Fatura que o IXC não devolveu NÃO baixa nada: pode ser falha passageira da consulta.
  */
-async function acompanhar(db, { limitePorCliente = 200 } = {}) {
+async function acompanhar(db, { limitePorCliente = 200, clienteId = null } = {}) {
   const out = { conferidos: 0, baixados: 0, reemitidos: 0, avisos: [] };
   for (const c of clientesComIxc(db)) {
+    if (clienteId && c.id !== Number(clienteId)) continue;
     const ixc = sincronismo.ixcDoCliente(db, c.id);
     if (!ixc || !opcoes(ixc.config).acompanhar) continue;
     const carteiras = (ixc.config.carteiras ?? []).map(String);

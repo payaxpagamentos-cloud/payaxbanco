@@ -126,3 +126,11 @@ export function diagnosticarSistema(cliente) {
     corpo: [aviso('Use um título de TESTE. "Ler" não muda nada; cada teste de gravação altera só aquele título, e o resultado é conferido na hora. Depois, confira também na tela do sistema do cliente.', 'aviso'), form, saida],
     acoes: [el('button', { class: 'botao sec', onclick: () => m.fechar() }, 'Fechar'), botao] });
 }
+
+/** Confere agora, no sistema do cliente, as faturas dos boletos em aberto (cancelada, alterada, paga por fora). */
+export async function conferirFaturas(cliente, recarregar) {
+  const r = await api.post(`/integracoes/ixc/${cliente.id}/acompanhar`, {});
+  const avisos = (r.avisos ?? []).map((a) => a.aviso ?? a.erro).filter(Boolean);
+  toast(`${numero(r.conferidos)} fatura(s) conferida(s) · ${r.baixados} boleto(s) baixado(s) · ${r.reemitidos} reemitido(s)${avisos.length ? ` · ${avisos[0]}` : ''}.`, avisos.length ? 'erro' : 'ok');
+  recarregar();
+}

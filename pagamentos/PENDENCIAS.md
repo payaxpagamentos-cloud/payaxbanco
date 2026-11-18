@@ -1,31 +1,41 @@
-# Pendências para a próxima atualização
+# Pendências
 
-Lista do que ficou combinado para fazer junto com a próxima atualização do servidor (um pacote único).
+## Entrou neste pacote (para o teste no IXC)
 
-## Para corrigir
+- Boleto em PDF de verdade (arquivo), no painel, na Área do Cliente e no link do pagador (`...pdf`).
+  O PDF mostra sempre a situação do momento: pago ou cancelado vira um aviso, sem código de barras.
+- Entrega do boleto no sistema do cliente: link no campo "Link gateway" do título, PDF nos arquivos do
+  cliente (ou da fatura) e e-mail com o PDF anexado pelo servidor de e-mail do próprio cliente.
+- Baixa no IXC pela rota oficial (`fn_areceber_recebimentos_baixas_novo`), com conferência depois.
+- Acompanhamento da fatura: cancelada, recebida por outro meio ou alterada no IXC → o boleto é baixado no
+  banco e, se mudou valor ou vencimento, reemitido.
+- Diagnóstico do sistema do cliente num título de teste (o que o IXC aceita gravar).
+- Alterar título no IXC sem esconder a fatura (`liberado = S` e os valores atuais dos outros campos).
+- Consulta de CNPJ: tenta a fonte pública quando a API Brasil não acha; mensagem clara para empresa
+  aberta há pouco tempo; o campo mostra o CNPJ e o CEP no formato de sempre.
+- Complemento do endereço; logo da PAY AX menor no boleto; nome do banco em preto; site sem o nome do
+  banco parceiro; mesmo IXC atendendo duas empresas (uma carteira para cada).
 
-1. **Consulta de CNPJ não preenche os dados** (visto em 16/11/2026, CNPJ 69.360.078/0001-13).
-   A tela mostra "CNPJ não encontrado — preencha à mão." Essa mensagem aparece quando a consulta
-   devolve 404 (`comum/ui.js`, autopreenchimento; servidor em `server/routes/consultas.js` →
-   `consultaDados.consultarCnpj`). Conferir no servidor:
-   - se o token da API Brasil está configurado e com saldo (Integrações → API Brasil);
-   - se a API Brasil devolve "não encontrado" para CNPJ aberto recentemente (as bases públicas demoram a
-     ter CNPJ novo) e, nesse caso, mostrar uma mensagem clara em vez de só "não encontrado";
-   - se a consulta pública de reserva está respondendo;
-   - a máscara do campo: o print mostrou "69.360.078/000113" (sem o hífen), conferir a formatação.
+Roteiro do teste: `ROTEIRO-TESTE-IXC.md`.
 
-## Já feito no código, entra no próximo pacote
+## Depende do teste no IXC
 
-- Complemento do endereço (pagador e cliente).
-- Logo da PAY AX menor no topo do boleto; nome do banco em preto.
-- Boleto em modo arquivo (CNAB) não imprime prazo de baixa que não vai no arquivo.
-- IXC: grava só o nosso número no título (`nn_boleto` via `fn_areceber_altera`), lê `nn_boleto`.
-- Mesmo IXC atendendo duas empresas: cada uma exige a sua carteira, sem repetir.
-- Site sem o nome do banco parceiro.
+- A carteira "Importado gateway" funciona sem gateway por trás? O que faz o botão "Imprimir boleto"?
+- A edição completa do título (PUT `fn_areceber`) guarda o link sem mexer em valor, vencimento e situação?
+- A rota de arquivos da fatura (`fn_areceber_arquivos`) existe? Senão, o PDF fica nos arquivos do cliente.
+- Conta e planejamento da baixa: os padrões (conta da carteira e planejamento do título) servem?
 
-## Esperando resposta
+## Ainda não feito
 
-- IXC: filial só para impressão do boleto afeta contabilidade, DRE ou SPED? (ou teste controlado no IXC).
-- IXC: rota correta de baixa de título pela API.
-- Banco: liberação das APIs de Cobrança e Pix; homologação do arquivo CNAB 400 do convênio.
-- Propostas de gateways com subcontas (Asaas, Iugu, Celcash) — só para comparação de custo.
+- WhatsApp com o PDF anexado (depende da ferramenta do provedor: Opa! Suite ou API oficial).
+- Página de 2ª via para o assinante (CPF + código por SMS) e API de 2ª via para robôs de atendimento.
+- Registro pela API do banco (o sistema tem o modo pronto; falta o banco liberar as credenciais).
+- Acompanhamento em volume grande: hoje confere até 200 faturas por cliente a cada ciclo.
+
+## Esperando resposta de fora
+
+- Banco: liberação das APIs de Cobrança e Pix; homologação do arquivo CNAB 400; rateio na liquidação;
+  contrato de terceiro habilitador (Resolução BCB 443, art. 14).
+- Advogado regulatório: enquadramento do recebimento e repasse (Resolução BCB 494/2025).
+- IXC: versão dos provedores (trava de vencimentos a partir de 01/01/2027); parceria de gateway.
+- Dados de contato para os botões "Atendimento" do site.

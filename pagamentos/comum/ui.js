@@ -403,6 +403,11 @@ export function autoPreencher(raiz, api, { tipo, campo: nomeCampo, mapa, aoBusca
 
   async function buscar() {
     const valor = String(entrada.value ?? '').replace(/\D/g, '');
+    // Número completo: mostra no formato de sempre, mesmo que tenha sido digitado sem pontos ou traço.
+    if (valor.length === tamanho && document.activeElement !== entrada) {
+      const formatado = tipo === 'cep' ? valor.replace(/(\d{5})(\d{3})/, '$1-$2') : valor.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+      if (entrada.value !== formatado) entrada.value = formatado;
+    }
     if (valor.length !== tamanho || valor === ultimo || emCurso) return;
     ultimo = valor;
     emCurso = true;
@@ -435,7 +440,8 @@ export function autoPreencher(raiz, api, { tipo, campo: nomeCampo, mapa, aoBusca
     } catch (err) {
       situacao.className = 'auto-busca erro';
       situacao.textContent = err.status === 404
-        ? `${tipo === 'cep' ? 'CEP' : 'CNPJ'} não encontrado — preencha à mão.`
+        ? (tipo === 'cep' ? 'CEP não encontrado — preencha à mão.'
+          : 'CNPJ não encontrado nas bases de consulta (empresa aberta há pouco tempo pode ainda não constar). Preencha os dados à mão.')
         : err.message;
       ultimo = null; // deixa tentar de novo
     } finally {

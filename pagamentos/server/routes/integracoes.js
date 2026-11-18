@@ -291,6 +291,15 @@ module.exports = (db) => {
     res.json(out);
   });
 
+  /** Confere agora as faturas dos boletos em aberto deste cliente (a rotina faz isso sozinha a cada ciclo). */
+  r.post('/ixc/:clienteId/acompanhar', exigir('integracoes.ixc', 'boletos.emitir', '*'), async (req, res) => {
+    const out = await entrega.acompanhar(db, { clienteId: Number(req.params.clienteId) });
+    const pendentes = await entrega.entregarPendentes(db);
+    auditoria.registrar(db, req, { acao: 'integracao.ixc.acompanhamento', entidade: 'integracao', cliente_id: Number(req.params.clienteId),
+      depois: { conferidos: out.conferidos, baixados: out.baixados, reemitidos: out.reemitidos } });
+    res.json({ ...out, entregas: pendentes });
+  });
+
   /** Confere o servidor de e-mail do cliente (usuário e senha), sem mandar mensagem. */
   r.post('/ixc/:clienteId/email/testar', exigir('integracoes.ixc', '*'), async (req, res) => {
     const ixc = sincronismo.ixcDoCliente(db, Number(req.params.clienteId));
