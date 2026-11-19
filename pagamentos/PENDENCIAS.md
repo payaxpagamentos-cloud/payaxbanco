@@ -34,6 +34,15 @@ Roteiro do teste: `ROTEIRO-TESTE-IXC.md`.
 - Falta: receber o manual/especificação dos dois produtos (versões 1.7.2 e 1.8.3 no portal) e ajustar o
   modo API do sistema, escrito antes da documentação oficial: as rotas e os nomes de campos do produto com
   QR Code são outros. Testar no Sandbox antes de ligar em produção.
+- Autenticação (visto na documentação do portal em 19/11/2026, "Autenticação – Gerar Bearer Token", manual
+  "Desenvolvedor mTLS" versão 1.0.0 de 06/07/2026): o token agora é por mTLS, em
+  `/auth/server-mtls/v2/token`; produção em `https://openapi.bradesco.com.br`, sandbox em
+  `https://openapisandbox.prebanco.com.br`. O sistema ainda usa `/auth/server/v1.1/token` e o endereço
+  antigo de homologação: trocar quando o manual chegar.
+- Webhook (aviso de pagamento): o banco exige SSL OV ou EV no domínio da notificação, com validade acima
+  de 4 meses. Pedido feito em 19/11/2026: Sectigo InstantSSL (OV) para pagamentos.payax.com.br. Falta gerar
+  o CSR no servidor (/root/ssl-ov), validar o domínio por DNS, a validação da empresa, instalar o
+  certificado e pedir o cadastro do webhook ao banco.
 
 ## Do relatório "Terceiro habilitador no convênio" (para o próximo pacote)
 
