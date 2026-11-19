@@ -114,7 +114,7 @@
     <div class="sub">O que precisa estar pronto no servidor, na rede e nos sistemas do provedor para a plataforma entrar em operação — com o controle de assinaturas e a cobrança no IXC.</div>
     <div class="ficha">
       <div><span>Documento</span><strong>Requisitos de infraestrutura</strong></div>
-      <div><span>Versão</span><strong>1.0 — 18/11/2026</strong></div>
+      <div><span>Versão</span><strong>1.1 — 19/11/2026</strong></div>
       <div><span>Destinatário</span><strong>Cliente / equipe de TI</strong></div>
       <div><span>Validade da proposta técnica</span><strong>90 dias</strong></div>
     </div>
@@ -131,7 +131,7 @@
     <div class="rot">Resumo em três linhas</div>
     <p><strong>1.</strong> O que dimensiona o servidor é <strong>banda de internet</strong>, não processador: cada assinante assistindo em Full HD consome cerca de 5 Mbps.</p>
     <p><strong>2.</strong> A recomendação é hospedar <strong>dentro da estrutura do próprio provedor</strong>, no mesmo AS dos assinantes — o tráfego fica on-net, sem custo de trânsito.</p>
-    <p><strong>3.</strong> O sistema é entregue em <strong>containers</strong>: um servidor com Ubuntu Server 24.04 LTS e Docker sobe a plataforma com HTTPS automático em um comando.</p>
+    <p><strong>3.</strong> O sistema é entregue em <strong>containers</strong>: um servidor com Ubuntu Server 26.04 LTS e Docker sobe a plataforma com HTTPS automático em um comando.</p>
   </div>
 
   <h3>Conteúdo</h3>
@@ -345,7 +345,7 @@
   <table>
     <thead><tr><th style="width:44mm">Item</th><th>Requisito</th><th>Observação</th></tr></thead>
     <tbody>
-      <tr><td class="destaque">Sistema operacional</td><td>Ubuntu Server 24.04 LTS<br>(ou Debian 12)</td><td>Instalação mínima, 64 bits, sem interface gráfica. Suporte até 2029.</td></tr>
+      <tr><td class="destaque">Sistema operacional</td><td>Ubuntu Server 26.04 LTS<br>(ou Debian 13)</td><td>Instalação mínima, 64 bits, sem interface gráfica. Segurança garantida até 2031. A 24.04 LTS também serve, com suporte até 2029.</td></tr>
       <tr><td class="destaque">Containers</td><td>Docker Engine 24+ e<br>Docker Compose v2</td><td>Instalado pelo repositório oficial da Docker.</td></tr>
       <tr><td class="destaque">Arquitetura</td><td>x86_64 (amd64)</td><td>ARM funciona, mas não foi homologado nesta entrega.</td></tr>
       <tr><td class="destaque">Node.js e ffmpeg</td><td>Já vêm na imagem</td><td>Nada a instalar na máquina: Node.js 22 e ffmpeg vão dentro do container.</td></tr>
@@ -529,7 +529,7 @@
 
   <h3>Infraestrutura</h3>
   <ul class="check">
-    <li><b>Servidor provisionado</b><span>Conforme o cenário escolhido na página 5, com Ubuntu Server 24.04 LTS instalado.</span></li>
+    <li><b>Servidor provisionado</b><span>Conforme o cenário escolhido na página 5, com Ubuntu Server 26.04 LTS instalado.</span></li>
     <li><b>Acesso SSH entregue</b><span>Usuário com sudo e chave pública cadastrada.</span></li>
     <li><b>IP público fixo e domínio apontado</b><span>Registro A do subdomínio resolvendo para o IP, já propagado.</span></li>
     <li><b>Portas 80 e 443 abertas</b><span>Entrada liberada na internet; saída 443 liberada para emissoras e serviços.</span></li>
@@ -619,7 +619,7 @@
 
   <div class="caixa escura" style="margin-top:14mm">
     <div class="rot">PLAY TECH VIP</div>
-    <p>Plataforma de streaming com canais ao vivo e catálogo sob demanda, app para navegador, celular e Smart TV, e painel próprio para a operação. Documento de requisitos de instalação, versão 1.0, 18 de novembro de 2026.</p>
+    <p>Plataforma de streaming com canais ao vivo e catálogo sob demanda, app para navegador, celular e Smart TV, e painel próprio para a operação. Documento de requisitos de instalação, versão 1.1, 19 de novembro de 2026.</p>
   </div>
   <div class="pe"><span>PLAY TECH VIP — Requisitos de instalação</span><span>14</span></div>
 </section>
