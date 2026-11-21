@@ -17,8 +17,6 @@
     "coletor": "node scripts/coletor-exemplo.js"
   },
   "dependencies": {
-    "express": "^5.2.1",
-    "leaflet": "1.9.4",
-    "leaflet.markercluster": "1.5.3"
+    "express": "^5.2.1"
   }
 }

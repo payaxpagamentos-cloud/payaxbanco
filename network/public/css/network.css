@@ -315,10 +315,31 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .pino.veiculo { border-color: var(--grafite); color: var(--grafite); border-radius: 8px; }
 .pino.veiculo.desatualizada, .pino.veiculo.sem_posicao { border-color: #b9c3b2; color: #9aa691; border-style: dashed; }
 @keyframes pulso { 0% { box-shadow: 0 0 0 0 rgba(207, 91, 85, 0.45); } 70% { box-shadow: 0 0 0 12px rgba(207, 91, 85, 0); } 100% { box-shadow: 0 0 0 0 rgba(207, 91, 85, 0); } }
-.ligacao-rede { stroke-dasharray: 8 6; animation: fluxo 1.6s linear infinite; }
 @keyframes fluxo { to { stroke-dashoffset: -28; } }
-.leaflet-container { font-family: var(--fonte); }
-.leaflet-popup-content { font-size: 13px; }
+
+/*
+ * Marcadores do mapa (Google Maps).
+ *
+ * O marcador é HTML posicionado por uma sobreposição própria, e não um ícone em imagem: assim a casinha do
+ * assinante no mapa é literalmente o mesmo elemento da legenda, com as mesmas classes e as mesmas cores.
+ * Com ícone em imagem, cada cor seria um arquivo e a legenda sairia do lugar na primeira mudança.
+ */
+.marcador-mapa { position: absolute; transform: translate(-50%, -50%); cursor: default; line-height: 0; }
+.marcador-mapa[role='button'] { cursor: pointer; }
+.marcador-mapa:focus-visible { outline: 3px solid var(--verde-vivo); outline-offset: 3px; border-radius: 10px; }
+/* O agrupamento guarda a cor do caso mais grave que está dentro dele: o vermelho não some no zoom. */
+.agrupamento {
+  min-width: 38px; height: 38px; padding: 0 8px; border-radius: 19px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; line-height: 1; background: #fff; color: var(--verde);
+  border: 2px solid var(--verde); box-shadow: 0 3px 10px rgba(0, 0, 0, .28); font-variant-numeric: tabular-nums;
+}
+.agrupamento strong { font-size: 14px; font-weight: 700; }
+.agrupamento small { font-size: 9px; font-weight: 700; }
+.agrupamento.atencao { border-color: var(--vermelho-vivo); color: var(--vermelho-vivo); }
+.ponta-trajeto { width: 13px; height: 13px; border-radius: 50%; background: var(--cor); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
+.gm-style .gm-style-iw-c { font-family: var(--fonte); font-size: 13px; }
+.gm-style .gm-style-iw-d { overflow: auto !important; }
+.mapa-indisponivel { padding: 28px 20px; }
 .lista-mapa { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 22px 16px; }
 .lista-mapa button { border: 1px solid var(--borda); background: #fff; border-radius: 8px; padding: 4px 9px; font-size: 12px; cursor: pointer; }
 .lista-mapa button:hover { border-color: var(--verde); color: var(--verde); }
@@ -513,6 +534,66 @@ pre.bruto {
 
 
 /* ---------------- Panorama ---------------- */
+/*
+ * Panorama em tela cheia: o mapa ocupa tudo o que sobra entre o menu e a borda, e os controles flutuam
+ * por cima. Mapa dentro de um painel com margem é mapa pequeno — e num mapa de operação cada pixel a mais
+ * é um quarteirão a mais que a equipe enxerga sem arrastar.
+ *
+ * O "main" perde o espaçamento só nesta tela, por uma classe que a própria tela põe e tira ao sair.
+ */
+main.tela-cheia { padding: 0; display: flex; animation: none; }
+.panorama { position: relative; flex: 1; min-width: 0; display: flex; }
+/* O Google já corta o que sai da área do mapa; declarar aqui garante o mesmo se o contêiner mudar. */
+.panorama > .mapa { flex: 1; min-width: 0; height: auto; border-radius: 0; overflow: hidden; }
+/*
+ * O "hidden" precisa ser declarado aqui: a regra do navegador para [hidden] é de prioridade menor que a
+ * de uma classe, e ".panorama-lateral { display: flex }" a vencia. O painel ficava invisível mas por cima
+ * dos controles, engolindo os cliques dos filtros — defeito que só aparece clicando de verdade.
+ */
+.painel-flutuante[hidden] { display: none; }
+.painel-flutuante {
+  position: absolute; z-index: 5; max-width: calc(100% - 24px);
+  background: var(--vidro); border: 1px solid var(--vidro-borda); border-radius: var(--raio);
+  box-shadow: var(--sombra), var(--vidro-brilho); backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+}
+.panorama-topo { top: 14px; left: 14px; right: 14px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; flex-wrap: wrap; }
+.panorama-topo .abas { border: 0; margin: 0; padding: 0; gap: 2px; }
+.panorama-topo .abas button { padding: 6px 12px; font-size: 13px; }
+.panorama-topo .separador { width: 1px; height: 26px; background: var(--vidro-borda); }
+.panorama-topo select, .panorama-topo input[type=search] { height: 34px; font-size: 13px; width: auto; min-width: 128px; }
+/* Os filtros acompanham a barra no computador; no celular ficam atrás do botão "Filtros". */
+.panorama-filtros { display: contents; }
+.so-celular { display: none; }
+.panorama-topo .empurra { margin-left: auto; }
+/* As abas rolam em vez de serem cortadas quando a barra é estreita. */
+.panorama-topo .abas { overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+.panorama-topo .abas::-webkit-scrollbar { display: none; }
+.panorama-resumo { display: flex; gap: 14px; align-items: center; font-size: 12.5px; color: var(--texto-2); white-space: nowrap; }
+.panorama-resumo b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.panorama-resumo .atencao { color: var(--vermelho-vivo); }
+.panorama-rodape { left: 14px; bottom: 14px; padding: 10px 14px; max-width: min(520px, calc(100% - 28px)); }
+.panorama-rodape .legenda-mapa { margin: 0; }
+.panorama-lateral {
+  top: calc(var(--topo-h, 56px) + 24px); right: 14px; bottom: 14px; width: min(372px, calc(100% - 28px));
+  overflow: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px;
+}
+.panorama-lateral h2 { font-size: 17px; line-height: 1.25; }
+.panorama-lateral .fechar { position: absolute; top: 10px; right: 10px; }
+.panorama-aviso { top: calc(var(--topo-h, 56px) + 24px); left: 14px; padding: 10px 14px; max-width: min(460px, calc(100% - 28px)); }
+/* A barra não pode transbordar a própria largura: no celular isso vira rolagem horizontal da página. */
+.panorama-topo > * { min-width: 0; }
+.panorama-resumo { flex-wrap: wrap; min-width: 0; }
+@media (max-width: 860px) {
+  .panorama-topo { gap: 8px; padding: 8px 10px; max-height: 70%; overflow-y: auto; }
+  .panorama-topo select, .panorama-topo input[type=search] { min-width: 0; flex: 1 1 128px; }
+  .so-celular { display: inline-flex; }
+  .panorama-filtros { display: none; flex: 1 0 100%; flex-wrap: wrap; gap: 8px; }
+  .panorama-filtros.aberto { display: flex; }
+  .panorama-topo .empurra { margin-left: 0; }
+  .panorama-resumo { gap: 4px 12px; font-size: 12px; }
+  .panorama-lateral { top: auto; left: 14px; right: 14px; bottom: 14px; width: auto; max-height: 56%; }
+  .panorama-rodape, .panorama-aviso { display: none; }
+}
 /* Classe própria: redefinir ".mapa" mudaria a altura dos mapas da Visão geral e da Rede óptica. */
 .mapa-panorama { height: 520px; }
 /*
@@ -537,7 +618,7 @@ pre.bruto {
 .pino.chamado::after { display: none; }
 .pino.chamado.critica, .pino.chamado.alta { border-color: var(--vermelho-vivo); color: var(--vermelho-vivo); }
 
-.leaflet-container.desenhando { cursor: crosshair; }
+.mapa.desenhando { cursor: crosshair; }
 .celula-calor { cursor: pointer; }
 
 .painel-mapa { position: relative; }

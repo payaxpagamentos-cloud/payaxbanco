@@ -1,50 +1,74 @@
 import { api, qs, baixarPost } from '../api.js';
-import { el, limpar, pode, cabecalho, painel, tabela, etqDe, rotulo, opcoes, dinheiro, dataHora, desde, dl, documento,
-  telefone, numero, carregar, carregando, formulario, botao, toast, faixa, stat, vazio, modal, confirmar } from '../ui.js';
+import { el, limpar, icone, pode, painel, tabela, etqDe, rotulo, opcoes, dinheiro, dataHora, desde, dl, documento,
+  telefone, numero, carregar, carregando, formulario, botao, toast, faixa, stat, vazio, modal, confirmar, cabecalho } from '../ui.js';
 import { criarMapa } from '../mapa.js';
 
 /*
- * Panorama: a operação inteira num mapa.
+ * Panorama: a operação inteira num mapa, em tela cheia.
  *
- * Nenhuma cor aqui é chute. O verde e o vermelho saem da varredura das sessões do concentrador; quando
- * ninguém leu, ou a leitura envelheceu, a casinha fica tracejada e a tela diz por quê. Mapa que pinta de
- * verde o que não sabe manda a equipe dormir tranquila com o assinante fora do ar.
+ * O mapa ocupa tudo o que sobra entre o menu e a borda; filtros, legenda e a ficha do ponto flutuam por
+ * cima. Mapa dentro de um painel com margem é mapa pequeno, e aqui cada pixel a mais é um quarteirão a
+ * mais que a equipe enxerga sem precisar arrastar.
+ *
+ * A regra que vale para tudo: COR NENHUMA é inventada. O verde e o vermelho saem da leitura do
+ * concentrador; quando ninguém leu, ou a leitura é velha demais para valer, o ponto fica tracejado e a
+ * tela diz por quê.
  */
 
 const ESTADOS = ['conectado', 'sem_conexao', 'bloqueado', 'desconhecido', 'sem_servico', 'implantacao', 'suspenso', 'leitura_antiga', 'nunca_lido'];
+const ABAS = [['mapa', 'Mapa'], ['calor', 'Onde mais cai'], ['viabilidade', 'Viabilidade'], ['fora', 'Fora do mapa']];
 
 export default async function panorama({ alvo, query, ir, aoSair }) {
   let vivo = null;
-  // O harness avisa quando a tela sai: é ali que o mapa é desmontado, sem estado global.
-  aoSair(() => { vivo?.destruir(); vivo = null; });
+  aoSair(() => { vivo?.destruir(); vivo = null; alvo.classList.remove('tela-cheia'); });
   const guardar = (m) => { vivo = m; return m; };
+  const aba = query.aba ?? 'mapa';
   const filtro = { ...query };
   delete filtro.aba;
-  const aba = query.aba ?? 'mapa';
 
-  const corpo = el('div');
-  limpar(alvo, cabecalho({
-    sobretitulo: 'Operação',
-    titulo: 'Panorama',
-    descricao: 'Cada casinha é um contrato no endereço dele. A cor diz o que fazer: quem caiu, quem foi cortado por '
-      + 'inadimplência e quem o sistema ainda não leu são coisas diferentes e aparecem diferentes.',
-    acoes: [
-      pode('panorama.area') ? botao('Varrer agora', () => varrer(() => panorama({ alvo, query, ir })), { tipo: 'secundario', ic: 'atualizar' }) : null,
-    ],
-  }), el('div', { class: 'abas', role: 'tablist' },
-    [['mapa', 'Mapa'], ['calor', 'Onde mais cai'], ['viabilidade', 'Viabilidade'], ['fora', 'Fora do mapa']]
-      .map(([id, r]) => el('button', { role: 'tab', 'aria-selected': String(id === aba), onclick: () => ir(`#/panorama?aba=${id}`) }, r))),
-  corpo);
+  // A aba "Fora do mapa" é uma tabela: não faz sentido roubar a tela inteira dela.
+  const cheia = aba !== 'fora';
+  alvo.classList.toggle('tela-cheia', cheia);
+  if (!cheia) {
+    limpar(alvo, cabecalho({ sobretitulo: 'Operação', titulo: 'Panorama', descricao: 'Contratos que não aparecem em mapa nenhum.' }),
+      abas(aba, ir), el('div', { id: 'corpo-panorama' }));
+    return telaForaDoMapa(document.getElementById('corpo-panorama'), ir);
+  }
 
-  if (aba === 'calor') return telaCalor(corpo, guardar);
-  if (aba === 'viabilidade') return telaViabilidade(corpo, guardar);
-  if (aba === 'fora') return telaForaDoMapa(corpo, ir);
-  return telaMapa(corpo, filtro, ir, guardar);
+  const raiz = el('div', { class: 'panorama' });
+  limpar(alvo, raiz);
+  if (aba === 'calor') return telaCalor(raiz, ir, guardar);
+  if (aba === 'viabilidade') return telaViabilidade(raiz, ir, guardar);
+  return telaMapa(raiz, filtro, ir, guardar);
 }
 
-// ---------------- Mapa ----------------
-async function telaMapa(corpo, filtro, ir, guardar) {
-  limpar(corpo, carregando('Carregando o mapa…'));
+const abas = (ativa, ir) => el('div', { class: 'abas', role: 'tablist' },
+  ABAS.map(([id, r]) => el('button', { role: 'tab', 'aria-selected': String(id === ativa), onclick: () => ir(`#/panorama?aba=${id}`) }, r)));
+
+/**
+ * O painel lateral começa logo abaixo do topo. A altura do topo NÃO é fixa: com muitos filtros ele quebra
+ * em duas linhas, e um valor chutado faria o lateral cobrir a segunda — com os cliques indo para o painel
+ * errado. Aqui ela é medida e vira uma variável de CSS.
+ */
+function acompanharTopo(raiz, topo) {
+  const medir = () => raiz.style.setProperty('--topo-h', `${Math.ceil(topo.getBoundingClientRect().height)}px`);
+  const observador = new ResizeObserver(medir);
+  observador.observe(topo);
+  medir();
+  return () => observador.disconnect();
+}
+
+/* ---------------- Mapa ---------------- */
+
+async function telaMapa(raiz, filtro, ir, guardar) {
+  const caixaMapa = el('div', { class: 'mapa' });
+  const topo = el('div', { class: 'painel-flutuante panorama-topo' }, carregando('Carregando…'));
+  const rodape = el('div', { class: 'painel-flutuante panorama-rodape', hidden: true });
+  const lateral = el('div', { class: 'painel-flutuante panorama-lateral', hidden: true });
+  const aviso = el('div', { class: 'painel-flutuante panorama-aviso', hidden: true });
+  limpar(raiz, caixaMapa, topo, aviso, rodape, lateral);
+  acompanharTopo(raiz, topo);
+
   let dados;
   let camadas;
   let listas;
@@ -52,89 +76,85 @@ async function telaMapa(corpo, filtro, ir, guardar) {
     [dados, camadas, listas] = await Promise.all([
       api.get(`/panorama/pontos${qs(filtro)}`), api.get('/panorama/camadas'), api.get('/panorama/filtros'),
     ]);
-  } catch (err) { return limpar(corpo, el('div', { class: 'falha' }, err.message)); }
+  } catch (err) { return limpar(topo, el('div', { class: 'falha' }, err.message)); }
 
-  const caixaMapa = el('div', { class: 'mapa mapa-panorama' });
-  const lateral = el('div');
-  const barraDesenho = el('div');
-  const cab = el('div', { class: 'camadas-mapa' });
-
-  const recarregar = (mudanca) => ir(`#/panorama${qs({ ...filtro, ...mudanca, aba: undefined })}`);
+  const recarregar = (mudanca) => ir(`#/panorama${qs({ ...filtro, ...mudanca })}`);
   const sel = (nome, rotuloVazio, itens, valorDe = (x) => x.id, textoDe = (x) => x.nome) =>
     el('select', { 'aria-label': rotuloVazio, onchange: (e) => recarregar({ [nome]: e.target.value }) },
       el('option', { value: '' }, rotuloVazio),
       itens.map((x) => el('option', { value: valorDe(x), selected: String(filtro[nome] ?? '') === String(valorDe(x)) }, textoDe(x))));
 
-  limpar(corpo,
-    dados.sem_coordenada
-      ? faixa(`${numero(dados.sem_coordenada)} contrato(s) não têm coordenada e NÃO estão neste mapa. O mapa mostra ${numero(dados.no_mapa)} de ${numero(dados.total)}.`,
-        'aviso', 'alerta')
-      : null,
-    el('div', { class: 'stats' },
-      stat({ rotulo: 'No ar', valor: numero(dados.por_estado.conectado ?? 0), nota: 'Sessão ativa na última varredura', ic: 'ok' }),
-      stat({ rotulo: 'Sem conexão', valor: numero(dados.por_estado.sem_conexao ?? 0), nota: (dados.por_estado.sem_conexao ?? 0) ? 'Contrato ativo e fora do ar: é defeito' : 'Nenhum contrato ativo fora do ar',
-        notaTipo: (dados.por_estado.sem_conexao ?? 0) ? 'erro' : 'ok', ic: 'alerta', semDado: !(dados.por_estado.sem_conexao ?? 0) }),
-      stat({ rotulo: 'Cortados', valor: numero(dados.por_estado.bloqueado ?? 0), nota: 'Inadimplência: fora do ar é o esperado', ic: 'cadeado' }),
-      stat({ rotulo: 'Sem leitura', valor: numero((dados.por_estado.nunca_lido ?? 0) + (dados.por_estado.leitura_antiga ?? 0)),
-        nota: 'O sistema não sabe dizer o estado destes', ic: 'relogio', semDado: !((dados.por_estado.nunca_lido ?? 0) + (dados.por_estado.leitura_antiga ?? 0)) })),
-    faixa(dados.fonte.explicacao, dados.fonte.varredura_min ? '' : 'aviso', 'info'),
-    el('div', { class: 'filtros' },
-      el('input', {
-        type: 'search', class: 'busca', placeholder: 'Assinante, CPF/CNPJ ou login', value: filtro.busca ?? '', 'aria-label': 'Buscar no mapa',
-        onchange: (e) => recarregar({ busca: e.target.value }),
-      }),
-      sel('estado', 'Todos os estados', ESTADOS.map((e) => ({ id: e, nome: rotulo('estadoConexao', e) }))),
-      sel('plano_id', 'Todos os planos', listas.planos),
-      sel('cto_id', 'Todas as caixas', listas.ctos, (x) => x.id, (x) => x.codigo),
-      sel('concentrador_id', 'Todos os concentradores', listas.concentradores),
-      sel('bairro', 'Todos os bairros', listas.bairros.map((b) => ({ id: b, nome: b })), (x) => x.id),
-      Object.keys(filtro).length ? botao('Limpar filtros', () => ir('#/panorama'), { tipo: 'secundario pequeno', ic: 'fechar' }) : null),
-    el('div', { class: 'grade principal-lateral' },
-      // A barra de desenho fica SOBRE o mapa: aparecer empurrando o mapa para baixo tiraria do lugar
-      // justamente o que a pessoa vai clicar em seguida.
-      el('div', {}, painel(null, [cab, el('div', { class: 'painel-mapa' }, caixaMapa, barraDesenho),
-      el('div', { class: 'legenda-mapa' },
-          ['conectado', 'sem_conexao', 'bloqueado', 'desconhecido', 'implantacao', 'nunca_lido'].map((e) =>
-            el('span', { class: e }, el('i', {}), el('span', { style: 'color:var(--texto-2)' }, rotulo('estadoConexao', e)))))], { semCorpo: false })),
-      el('div', {}, lateral)));
-
-  limpar(lateral, vazio('Clique numa casinha.', 'Os dados do assinante e as ações aparecem aqui, sem sair do mapa.'));
+  const e = dados.por_estado;
+  const semLeitura = (e.nunca_lido ?? 0) + (e.leitura_antiga ?? 0);
+  const n = (v, classe) => el('span', { class: classe ?? '' }, el('b', {}, numero(v)));
 
   const m = guardar(await criarMapa(caixaMapa));
-  const desenhados = m.mostrarPanorama(dados.pontos, { aoAbrir: (p) => abrirPonto(p, lateral, ir) });
-  const apoio = m.camadasApoio(camadas, {
-    aoAbrirAtivo: (a) => ir(`#/rede/${a.id}`),
-    aoAbrirChamado: (c) => ir(`#/chamados/${c.id}`),
-  });
+  const desenhados = m.indisponivel ? 0 : m.mostrarPanorama(dados.pontos, { aoAbrir: (p) => abrirPonto(p, lateral, ir) });
+  const apoio = m.camadasApoio(camadas, { aoAbrirAtivo: (a) => ir(`#/rede/${a.id}`), aoAbrirChamado: (c) => ir(`#/chamados/${c.id}`) });
+  const caixa = (texto, aoMudar) => el('label', {}, el('input', { type: 'checkbox', onchange: (ev) => aoMudar(ev.target.checked) }), texto);
 
-  const caixa = (texto, aoMudar, marcado = false) => {
-    const c = el('input', { type: 'checkbox', checked: marcado, onchange: (e) => aoMudar(e.target.checked) });
-    return el('label', {}, c, texto);
-  };
-  limpar(cab,
-    caixa(`Caixas ópticas (${camadas.rede.length})`, (on) => m.alternarCamada(apoio.rede, on)),
-    caixa(`Chamados abertos (${camadas.chamados.length})`, (on) => m.alternarCamada(apoio.chamados, on)),
-    el('span', { class: 'fraco', style: 'margin-left:auto' }, `${numero(desenhados)} ponto(s) no mapa`),
-    pode('panorama.area') ? botao('Desenhar área', () => iniciarDesenho(m, barraDesenho, filtro, ir), { tipo: 'secundario pequeno', ic: 'rota' }) : null);
+  // No celular a barra inteira comeria metade da tela: os filtros ficam atrás de um botão.
+  const filtros = el('div', { class: 'panorama-filtros' });
+  const abrirFiltros = el('button', {
+    class: 'botao secundario pequeno so-celular', 'aria-expanded': 'false',
+    onclick: (ev) => { const aberto = filtros.classList.toggle('aberto'); ev.currentTarget.setAttribute('aria-expanded', String(aberto)); },
+  }, icone('busca'), 'Filtros');
+
+  limpar(filtros,
+    el('input', {
+      type: 'search', placeholder: 'Assinante, CPF/CNPJ ou login', value: filtro.busca ?? '', 'aria-label': 'Buscar no mapa',
+      onchange: (ev) => recarregar({ busca: ev.target.value }),
+    }),
+    sel('estado', 'Todos os estados', ESTADOS.map((x) => ({ id: x, nome: rotulo('estadoConexao', x) }))),
+    sel('plano_id', 'Todos os planos', listas.planos),
+    sel('cto_id', 'Todas as caixas', listas.ctos, (x) => x.id, (x) => x.codigo),
+    sel('concentrador_id', 'Concentradores', listas.concentradores),
+    sel('bairro', 'Todos os bairros', listas.bairros.map((b) => ({ id: b, nome: b })), (x) => x.id),
+    Object.keys(filtro).length ? botao('Limpar', () => ir('#/panorama'), { tipo: 'secundario pequeno', ic: 'fechar' }) : null);
+
+  limpar(topo,
+    abas('mapa', ir),
+    el('span', { class: 'separador' }),
+    abrirFiltros,
+    filtros,
+    el('div', { class: 'empurra panorama-resumo' },
+      el('span', {}, n(e.conectado ?? 0), ' no ar'),
+      el('span', { class: (e.sem_conexao ?? 0) ? 'atencao' : '' }, n(e.sem_conexao ?? 0), ' sem conexão'),
+      el('span', {}, n(e.bloqueado ?? 0), ' cortados'),
+      el('span', {}, n(semLeitura), ' sem leitura')),
+    el('span', { class: 'separador' }),
+    m.indisponivel ? null : caixa(`Caixas (${camadas.rede.length})`, (on) => m.alternarCamada(apoio.rede, on)),
+    m.indisponivel ? null : caixa(`Chamados (${camadas.chamados.length})`, (on) => m.alternarCamada(apoio.chamados, on)),
+    pode('panorama.area') && !m.indisponivel ? botao('Desenhar área', () => iniciarDesenho(m, aviso, filtro, ir), { tipo: 'secundario pequeno', ic: 'rota' }) : null,
+    pode('panorama.area') ? botao('Varrer', () => varrer(() => recarregar({})), { tipo: 'secundario pequeno', ic: 'atualizar', titulo: 'Varrer as sessões dos concentradores agora' }) : null);
+
+  if (dados.sem_coordenada) {
+    aviso.hidden = false;
+    limpar(aviso, faixa(`${numero(dados.sem_coordenada)} contrato(s) sem coordenada NÃO estão neste mapa (mostrando ${numero(dados.no_mapa)} de ${numero(dados.total)}).`, 'aviso', 'alerta'),
+      el('div', { style: 'margin-top:8px' }, botao('Ver quem são', () => ir('#/panorama?aba=fora'), { tipo: 'secundario pequeno' })));
+  }
+
+  if (!m.indisponivel) {
+    rodape.hidden = false;
+    limpar(rodape,
+      el('div', { class: 'legenda-mapa' },
+        ['conectado', 'sem_conexao', 'bloqueado', 'desconhecido', 'implantacao', 'nunca_lido'].map((x) =>
+          el('span', { class: x }, el('i', {}), el('span', { style: 'color:var(--texto-2)' }, rotulo('estadoConexao', x))))),
+      el('div', { class: 'fraco', style: 'margin-top:8px' }, `${numero(desenhados)} ponto(s) no mapa · ${dados.fonte.explicacao}`));
+  }
 }
 
-/** Painel lateral do ponto: tudo do assinante e as ações, sem trocar de tela. */
+/** Ficha do ponto, flutuando sobre o mapa: tudo do assinante e as ações, sem trocar de tela. */
 async function abrirPonto(ponto, lateral, ir) {
+  lateral.hidden = false;
   limpar(lateral, carregando('Abrindo…'));
   let p;
   try { p = await api.get(`/panorama/contratos/${ponto.contrato_id}`); }
   catch (err) { return limpar(lateral, el('div', { class: 'falha' }, err.message)); }
 
-  const acoes = [
-    botao('Abrir a ficha', () => ir(`#/assinantes/${p.assinante_id}`), { ic: 'pessoa' }),
-    p.servico_id ? botao('Ler agora', async () => {
-      const r = await api.post(`/panorama/contratos/${p.contrato_id}/ler`, {});
-      toast(r.aviso);
-    }, { tipo: 'secundario', ic: 'atualizar' }) : null,
-    pode('chamados.criar') ? botao('Abrir chamado', () => ir(`#/chamados?novo=1&assinante_id=${p.assinante_id}&contrato_id=${p.contrato_id}`), { tipo: 'secundario', ic: 'chamado' }) : null,
-  ];
-
-  limpar(lateral, painel(p.assinante_nome, [
+  limpar(lateral,
+    el('button', { class: 'botao-icone fechar', 'aria-label': 'Fechar', onclick: () => { lateral.hidden = true; } }, icone('fechar')),
+    el('h2', {}, p.assinante_nome),
     faixa(p.motivo, p.atencao ? 'erro' : p.estado === 'conectado' ? '' : 'aviso', p.atencao ? 'alerta' : 'info'),
     dl([
       ['Estado', etqDe('estadoConexao', p.estado)],
@@ -154,37 +174,40 @@ async function abrirPonto(ponto, lateral, ir) {
       p.cto_codigo ? ['Caixa / porta', `${p.cto_codigo}${p.porta_numero ? ` · porta ${p.porta_numero}` : ''}`] : null,
       p.onu_serial ? ['ONU', `${p.onu_serial}${p.pon ? ` · PON ${p.pon}` : ''}`] : null,
     ]),
-    el('div', { class: 'form-acoes', style: 'justify-content:flex-start' }, acoes),
+    el('div', { class: 'form-acoes', style: 'justify-content:flex-start' },
+      botao('Abrir a ficha', () => ir(`#/assinantes/${p.assinante_id}`), { ic: 'pessoa' }),
+      p.servico_id ? botao('Ler agora', async () => toast((await api.post(`/panorama/contratos/${p.contrato_id}/ler`, {})).aviso), { tipo: 'secundario', ic: 'atualizar' }) : null,
+      pode('chamados.criar') ? botao('Abrir chamado', () => ir(`#/chamados?novo=1&assinante_id=${p.assinante_id}&contrato_id=${p.contrato_id}`), { tipo: 'secundario', ic: 'chamado' }) : null),
     p.historico.length
       ? el('details', { class: 'bloco-expansivel' }, el('summary', {}, 'Histórico de conexão', el('span', { class: 'num' }, numero(p.historico.length))),
         el('ul', { class: 'linha-tempo' }, p.historico.map((h) => el('li', {},
           etqDe('eventoConexao', h.evento), ' ',
           h.duracao_s !== null ? (h.evento === 'voltou' ? `ficou ${duracao(h.duracao_s)} fora do ar` : `estava no ar há ${duracao(h.duracao_s)}`) : '',
           el('small', {}, `${dataHora(h.em)}${h.ip ? ` · ${h.ip}` : ''}`)))))
-      : el('p', { class: 'fraco' }, 'Sem mudança de estado registrada ainda.'),
-  ]));
+      : el('p', { class: 'fraco' }, 'Sem mudança de estado registrada ainda.'));
 }
 
 const duracao = (s) => (s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.floor(s / 3600)} h ${String(Math.round((s % 3600) / 60)).padStart(2, '0')} min`);
 
-// ---------------- Área ----------------
-function iniciarDesenho(m, barra, filtro, ir) {
-  const aviso = el('span', {}, 'Clique no mapa para marcar os cantos da área. Dois cliques fecham.');
+/* ---------------- Área ---------------- */
+
+function iniciarDesenho(m, aviso, filtro, ir) {
+  const antes = aviso.hidden;
+  aviso.hidden = false;
   const controle = m.desenhar({
     aoFechar: async (area) => {
-      limpar(barra);
-      if (!area) return;
-      limpar(barra, carregando('Somando o que está dentro…'));
+      if (!area) { aviso.hidden = antes; return; }
+      limpar(aviso, carregando('Somando o que está dentro…'));
       try {
         const d = await api.post('/panorama/area', { area, filtros: filtro });
-        limpar(barra);
+        aviso.hidden = antes;
         await mostrarImpacto(d, area, filtro, m, ir);
-      } catch (err) { limpar(barra, faixa(err.message, 'erro', 'alerta')); }
+      } catch (err) { limpar(aviso, faixa(err.message, 'erro', 'alerta')); }
     },
   });
-  limpar(barra, aviso,
-    botao('Fechar a área', () => controle.concluir(), { tipo: 'secundario pequeno', ic: 'ok' }),
-    botao('Cancelar', () => { controle.cancelar(); m.limparArea(); }, { tipo: 'secundario pequeno', ic: 'fechar' }));
+  limpar(aviso,
+    faixa('Clique no mapa para marcar os cantos da área. Dois cliques fecham.', '', 'info'),
+    el('div', { style: 'margin-top:8px' }, botao('Cancelar', () => { controle.cancelar(); m.limparArea(); }, { tipo: 'secundario pequeno', ic: 'fechar' })));
 }
 
 function mostrarImpacto(d, area, filtro, m, ir) {
@@ -196,9 +219,7 @@ function mostrarImpacto(d, area, filtro, m, ir) {
       stat({ rotulo: 'Sem leitura', valor: numero(d.sem_leitura), nota: d.sem_leitura ? 'Podem estar fora do ar sem ninguém saber' : null,
         notaTipo: d.sem_leitura ? 'aviso' : '', semDado: !d.sem_leitura }),
       stat({ rotulo: 'Mensalidade na área', valor: dinheiro(d.mensalidade_centavos) })),
-    d.ctos.length
-      ? el('p', { class: 'fraco' }, `Caixas envolvidas: ${d.ctos.map((c) => `${c.codigo} (${c.assinantes})`).join(', ')}.`)
-      : null,
+    d.ctos.length ? el('p', { class: 'fraco' }, `Caixas envolvidas: ${d.ctos.map((c) => `${c.codigo} (${c.assinantes})`).join(', ')}.`) : null,
     tabela([
       { titulo: 'Assinante', valor: (p) => el('div', {}, el('div', { class: 'forte' }, p.assinante_nome),
         el('div', { class: 'fraco' }, [p.endereco, p.bairro].filter(Boolean).join(' · '))) },
@@ -209,8 +230,7 @@ function mostrarImpacto(d, area, filtro, m, ir) {
     d.itens.length > 100 ? el('p', { class: 'fraco' }, `Mostrando 100 de ${numero(d.itens.length)}. O CSV traz todos.`) : null,
     el('div', { class: 'modal-rodape' },
       d.assinantes && pode('panorama.area')
-        ? botao('Abrir incidente com este impacto', () => { fechar(); abrirIncidente(d, area, filtro, ir); }, { ic: 'alerta' })
-        : null,
+        ? botao('Abrir incidente com este impacto', () => { fechar(); abrirIncidente(d, area, filtro, ir); }, { ic: 'alerta' }) : null,
       d.assinantes ? botao('Baixar CSV', () => baixarArea(area, filtro), { tipo: 'secundario', ic: 'baixar' }) : null,
       botao('Apagar a área', () => { m.limparArea(); fechar(); }, { tipo: 'secundario', ic: 'fechar' })),
   ], { largo: true });
@@ -233,75 +253,80 @@ const abrirIncidente = (d, area, filtros, ir) => formulario('Abrir incidente a p
   },
 });
 
-// ---------------- Onde mais cai ----------------
-function telaCalor(corpo, guardar) {
+/* ---------------- Onde mais cai ---------------- */
+
+function telaCalor(raiz, ir, guardar) {
   const estado = { dias: 7, celula_m: 250 };
+  const caixaMapa = el('div', { class: 'mapa' });
+  const topo = el('div', { class: 'painel-flutuante panorama-topo' });
+  const lateral = el('div', { class: 'painel-flutuante panorama-lateral' }, carregando('Somando as quedas…'));
+  limpar(raiz, caixaMapa, topo, lateral);
+  acompanharTopo(raiz, topo);
   let mapa = null;
-  const caixaMapa = el('div', { class: 'mapa mapa-panorama' });
-  const resumo = el('div');
+
   const desenhar = async () => {
-    limpar(resumo, carregando('Somando as quedas…'));
+    limpar(lateral, carregando('Somando as quedas…'));
     let d;
     try { d = await api.get(`/panorama/calor${qs(estado)}`); }
-    catch (err) { return limpar(resumo, el('div', { class: 'falha' }, err.message)); }
-    limpar(resumo,
+    catch (err) { return limpar(lateral, el('div', { class: 'falha' }, err.message)); }
+    limpar(lateral,
+      el('h2', {}, 'Onde a rede mais cai'),
       el('div', { class: 'stats compactas' },
-        stat({ rotulo: 'Quedas no período', valor: numero(d.quedas) }),
-        stat({ rotulo: 'Assinantes atingidos', valor: numero(d.assinantes_afetados) }),
-        stat({ rotulo: 'Células com queda', valor: numero(d.celulas.length) }),
-        stat({ rotulo: 'Lado da célula', valor: `${numero(d.periodo.celula_m)} m` })),
+        stat({ rotulo: 'Quedas', valor: numero(d.quedas) }),
+        stat({ rotulo: 'Assinantes', valor: numero(d.assinantes_afetados) }),
+        stat({ rotulo: 'Células', valor: numero(d.celulas.length) })),
       faixa(d.ressalva, '', 'info'),
       d.celulas.length
         ? tabela([
           { titulo: 'Região', valor: (c) => `${c.centro.lat.toFixed(4)}, ${c.centro.lng.toFixed(4)}` },
           { titulo: 'Quedas', valor: (c) => numero(c.quedas), classe: 'num' },
           { titulo: 'Assinantes', valor: (c) => numero(c.assinantes), classe: 'num' },
-        ], d.celulas.slice(0, 15), { vazioTexto: 'Nenhuma queda registrada no período.' })
+        ], d.celulas.slice(0, 20), { vazioTexto: 'Nenhuma queda no período.' })
         : vazio('Nenhuma queda registrada no período.',
           'Ou a rede esteve estável, ou a varredura de sessões ainda não rodou tempo suficiente para ter o que comparar.'));
-    if (mapa) mapa.mostrarCalor(d.celulas, (c) => toast(`${c.quedas} queda(s) em ${c.assinantes} assinante(s) nesta célula.`));
+    mapa?.mostrarCalor(d.celulas, (c) => toast(`${c.quedas} queda(s) em ${c.assinantes} assinante(s) nesta célula.`));
   };
 
-  limpar(corpo,
-    el('div', { class: 'filtros' },
-      el('select', { 'aria-label': 'Período', onchange: (e) => { estado.dias = Number(e.target.value); desenhar(); } },
-        [[1, 'Últimas 24 horas'], [7, 'Últimos 7 dias'], [30, 'Últimos 30 dias'], [90, 'Últimos 90 dias']]
-          .map(([v, r]) => el('option', { value: v, selected: estado.dias === v }, r))),
-      el('select', { 'aria-label': 'Tamanho da célula', onchange: (e) => { estado.celula_m = Number(e.target.value); desenhar(); } },
-        [[100, 'Célula de 100 m'], [250, 'Célula de 250 m'], [500, 'Célula de 500 m'], [1000, 'Célula de 1 km']]
-          .map(([v, r]) => el('option', { value: v, selected: estado.celula_m === v }, r)))),
-    el('div', { class: 'grade principal-lateral' },
-      el('div', {}, painel('Onde a rede mais cai', caixaMapa)),
-      el('div', {}, resumo)));
+  limpar(topo, abas('calor', ir), el('span', { class: 'separador' }),
+    el('select', { 'aria-label': 'Período', onchange: (ev) => { estado.dias = Number(ev.target.value); desenhar(); } },
+      [[1, 'Últimas 24 horas'], [7, 'Últimos 7 dias'], [30, 'Últimos 30 dias'], [90, 'Últimos 90 dias']]
+        .map(([v, r]) => el('option', { value: v, selected: estado.dias === v }, r))),
+    el('select', { 'aria-label': 'Tamanho da célula', onchange: (ev) => { estado.celula_m = Number(ev.target.value); desenhar(); } },
+      [[100, 'Célula de 100 m'], [250, 'Célula de 250 m'], [500, 'Célula de 500 m'], [1000, 'Célula de 1 km']]
+        .map(([v, r]) => el('option', { value: v, selected: estado.celula_m === v }, r))));
 
   criarMapa(caixaMapa).then((m) => { mapa = guardar(m); desenhar(); });
 }
 
-// ---------------- Viabilidade ----------------
-function telaViabilidade(corpo, guardar) {
-  const caixaMapa = el('div', { class: 'mapa mapa-panorama' });
-  const resultado = el('div');
+/* ---------------- Viabilidade ---------------- */
+
+function telaViabilidade(raiz, ir, guardar) {
+  const caixaMapa = el('div', { class: 'mapa' });
+  const topo = el('div', { class: 'painel-flutuante panorama-topo' });
+  const lateral = el('div', { class: 'painel-flutuante panorama-lateral' });
+  limpar(raiz, caixaMapa, topo, lateral);
+  acompanharTopo(raiz, topo);
   let mapa = null;
   let camadaCaixas = null;
+  let raio = 300;
 
-  const consultar = async (lat, lng, raio) => {
-    limpar(resultado, carregando('Procurando caixa com porta livre…'));
+  const consultar = async (lat, lng) => {
+    limpar(lateral, carregando('Procurando caixa com porta livre…'));
     let d;
     try { d = await api.get(`/panorama/viabilidade${qs({ lat, lng, raio_m: raio })}`); }
-    catch (err) { return limpar(resultado, el('div', { class: 'falha' }, err.message)); }
-    limpar(resultado,
+    catch (err) { return limpar(lateral, el('div', { class: 'falha' }, err.message)); }
+    limpar(lateral,
+      el('h2', {}, 'Caixas próximas'),
       faixa(d.resumo, d.atendivel ? '' : 'aviso', d.atendivel ? 'ok' : 'alerta'),
       tabela([
         { titulo: 'Caixa', valor: (c) => el('div', {}, el('div', { class: 'forte' }, c.codigo), el('div', { class: 'fraco' }, c.bairro ?? '—')) },
         { titulo: 'Distância', valor: (c) => `${numero(c.distancia_m)} m`, classe: 'num' },
-        { titulo: 'Portas', valor: (c) => (c.portas ? `${c.portas.livre ?? 0} livre(s) de ${c.portas.total}` : el('span', { class: 'fraco' }, 'Não cadastradas')) },
-        { titulo: 'Atende?', valor: (c) => el('div', {}, c.livre ? etqDe('statusAtivo', 'operacional') : etqDe('statusAtivo', 'indisponivel'),
+        { titulo: 'Portas', valor: (c) => (c.portas ? `${c.portas.livre ?? 0} de ${c.portas.total}` : el('span', { class: 'fraco' }, 'Não cadastradas')) },
+        { titulo: 'Atende?', valor: (c) => el('div', {}, etqDe('statusAtivo', c.livre ? 'operacional' : 'indisponivel'),
           c.observacao ? el('div', { class: 'fraco' }, c.observacao) : null) },
       ], d.caixas, { vazioTexto: 'Nenhuma caixa cadastrada neste raio.' }),
       faixa(d.ressalva, 'aviso', 'info'));
-    if (mapa) {
-      // Caixa óptica é pino de rede, não casinha de assinante: usar o ícone errado confundiria as duas coisas.
-      mapa.limparArea();
+    if (mapa && !mapa.indisponivel) {
       mapa.alternarCamada(camadaCaixas, false);
       camadaCaixas = mapa.camadasApoio({ rede: d.caixas, chamados: [] }).rede;
       mapa.alternarCamada(camadaCaixas, true);
@@ -309,20 +334,19 @@ function telaViabilidade(corpo, guardar) {
     }
   };
 
-  limpar(corpo,
-    faixa('Clique no mapa onde o cliente quer ser atendido. O sistema mostra as caixas mais próximas e se ainda há porta livre.', '', 'info'),
-    el('div', { class: 'grade principal-lateral' },
-      el('div', {}, painel('Onde o cliente está', caixaMapa)),
-      el('div', {}, painel('Caixas próximas', resultado))));
-  limpar(resultado, vazio('Escolha um ponto no mapa.', 'Também dá para digitar a coordenada, se você já tiver.'));
+  limpar(topo, abas('viabilidade', ir), el('span', { class: 'separador' }),
+    el('select', { 'aria-label': 'Raio de busca', onchange: (ev) => { raio = Number(ev.target.value); } },
+      [[150, 'Raio de 150 m'], [300, 'Raio de 300 m'], [600, 'Raio de 600 m'], [1200, 'Raio de 1,2 km']]
+        .map(([v, r]) => el('option', { value: v, selected: raio === v }, r))),
+    el('span', { class: 'empurra fraco' }, 'Clique no mapa onde o cliente quer ser atendido.'));
+  limpar(lateral, vazio('Escolha um ponto no mapa.', 'O sistema mostra as caixas mais próximas e se ainda há porta livre.'));
 
   criarMapa(caixaMapa).then(async (m) => {
     mapa = guardar(m);
-    m.mapa?.on('click', (e) => consultar(e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6), 300));
-    /*
-     * Abrir no centro genérico da organização faria o primeiro clique cair longe de qualquer caixa e
-     * responder "nenhuma caixa por perto" — verdade inútil. A tela começa mostrando a rede que existe.
-     */
+    if (m.indisponivel) return;
+    m.maps.event.addListener(m.mapa, 'click', (ev) => consultar(ev.latLng.lat().toFixed(6), ev.latLng.lng().toFixed(6)));
+    // Abrir no centro genérico faria o primeiro clique cair longe de qualquer caixa e responder
+    // "nenhuma caixa por perto" — verdade inútil. A tela começa mostrando a rede que existe.
     try {
       const { rede } = await api.get('/panorama/camadas');
       const comPonto = rede.filter((a) => a.lat !== null && a.lng !== null);
@@ -330,11 +354,13 @@ function telaViabilidade(corpo, guardar) {
       camadaCaixas = m.camadasApoio({ rede: comPonto, chamados: [] }).rede;
       m.alternarCamada(camadaCaixas, true);
       m.enquadrar(comPonto.map((a) => [a.lat, a.lng]));
-    } catch { /* sem rede cadastrada: o mapa fica no centro da operação mesmo */ }
+    } catch { /* sem rede cadastrada: fica no centro da operação */ }
   });
+  void ir;
 }
 
-// ---------------- Fora do mapa ----------------
+/* ---------------- Fora do mapa ---------------- */
+
 function telaForaDoMapa(corpo, ir) {
   return carregar(corpo, () => api.get('/panorama/sem-coordenada'), (d) => [
     d.total
@@ -350,7 +376,8 @@ function telaForaDoMapa(corpo, ir) {
   ]);
 }
 
-// ---------------- Varredura ----------------
+/* ---------------- Varredura ---------------- */
+
 async function varrer(recarregar) {
   if (!await confirmar('Varrer os concentradores agora',
     'O sistema vai pedir a lista de sessões ativas a cada concentrador e atualizar o estado de toda a carteira. '
@@ -362,4 +389,3 @@ async function varrer(recarregar) {
     recarregar();
   } catch (err) { toast(err.message, true); }
 }
-

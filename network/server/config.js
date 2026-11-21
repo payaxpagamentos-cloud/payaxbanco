@@ -61,11 +61,21 @@ module.exports = {
   equipamentoLoopback: process.env.NETWORK_EQUIPAMENTO_LOOPBACK === '1' || teste,
   // Liga as coletas periódicas (rastreador, Downdetector). Nos testes, as coletas são chamadas diretamente.
   coletasAutomaticas: process.env.NETWORK_COLETAS !== '0' && !teste,
+  /*
+   * Mapas: Google Maps JavaScript API.
+   *
+   * A chave vai para o NAVEGADOR — não tem como ser secreta, é assim que a API funciona. O que protege
+   * a conta não é esconder a chave, é restringi-la no Google Cloud: limite por referenciador HTTP (o
+   * domínio do provedor) e habilite só as APIs usadas. Sem isso, qualquer um copia a chave da página e
+   * gasta a cota da operação.
+   *
+   * O "id_mapa" é opcional e serve ao estilo visual criado no console do Google (Cloud-based styling).
+   */
   mapa: {
-    // Camada de imagens do mapa (Leaflet). Use um provedor licenciado para o volume de uso da operação.
-    tiles: process.env.NETWORK_MAPA_TILES || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-    atribuicao: process.env.NETWORK_MAPA_ATRIBUICAO || 'Mapa &copy; Esri, HERE, Garmin, colaboradores do OpenStreetMap',
+    chave: process.env.NETWORK_GOOGLE_MAPS_CHAVE || '',
+    id_mapa: process.env.NETWORK_GOOGLE_MAPS_ID || '',
     centro: [Number.isFinite(lat) ? lat : -24.0058, Number.isFinite(lng) ? lng : -46.4028],
+    zoom: Number(process.env.NETWORK_MAPA_ZOOM) || 13,
   },
   admin: {
     organizacao: process.env.NETWORK_ORGANIZACAO || 'Minha operação',

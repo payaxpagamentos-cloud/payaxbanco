@@ -44,8 +44,6 @@ function criarApp(db, extras = {}) {
     : prox()));
   r.use(express.json({ limit: '1mb' }));
   r.use('/api', criarApi(db, extras));
-  r.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));
-  r.use('/vendor/markercluster', express.static(path.dirname(require.resolve('leaflet.markercluster/dist/leaflet.markercluster.js')), { maxAge: '7d' }));
   r.use(express.static(path.join(__dirname, '..', 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
   if (config.basePath) {
     app.get(config.basePath, (req, res, next) => (req.originalUrl.split('?')[0] === config.basePath ? res.redirect(`${config.basePath}/`) : next()));

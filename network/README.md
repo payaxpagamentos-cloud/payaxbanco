@@ -32,7 +32,7 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 12 | **Manutenção e lavagem** | Planos preventivos por item, por dias e/ou km (alerta no primeiro limite, antecedência e tolerância); ordens solicitado → orçado → aprovado (alçada por valor) → agendado → em execução → concluído; lavagem sem zerar a mecânica; fornecedores; custos orçado e realizado separados. |
 | 13 | **Abastecimentos** | Comprovante, volume, preço, odômetro e tanque cheio; total = litros × preço; preço médio ponderado; consumo por ciclo entre tanques cheios (com os parciais); lançamento retroativo validado; volume acima do tanque sinalizado; correção autorizada com valor original guardado; relatórios por veículo, técnico e posto; CSV protegido. |
 | 14 | **Rastreamento** | Posições do rastreador com horário da medição e idade; parado ≠ sem comunicação; ignição ausente = desconhecida; trajeto do período; vínculo dispositivo ↔ veículo pelo IMEI (a placa só sugere); chamados próximos por distância em linha reta (não é ETA). |
-| 14.1 | **Panorama** | A operação inteira num mapa: cada contrato é uma casinha no endereço dele. A cor responde "o que eu faço com isso?" — **verde** no ar, **vermelho** contrato ativo e sem sessão (defeito agora), **âmbar** cortado por inadimplência (fora do ar é o esperado), **roxo** login que não existe no concentrador (falta provisionar), **azul** em implantação, **cinza tracejado** o sistema não sabe. Camadas de caixas ópticas e chamados abertos; filtros por estado, plano, caixa, concentrador e bairro; clique no ponto abre o assinante inteiro com as ações, sem trocar de tela. Desenho de **área de impacto** (quem está dentro, quanto de mensalidade, quais CTOs, e abrir incidente no NOC a partir dali), **viabilidade** por proximidade de CTO com porta livre, **mapa de calor das quedas** como grade com contagem exata, e a lista de quem está **fora do mapa** por falta de coordenada. |
+| 14.1 | **Panorama** | A operação inteira num mapa **em tela cheia**: cada contrato é uma casinha no endereço dele. A cor responde "o que eu faço com isso?" — **verde** no ar, **vermelho** contrato ativo e sem sessão (defeito agora), **âmbar** cortado por inadimplência (fora do ar é o esperado), **roxo** login que não existe no concentrador (falta provisionar), **azul** em implantação, **cinza tracejado** o sistema não sabe. Camadas de caixas ópticas e chamados abertos; filtros por estado, plano, caixa, concentrador e bairro; clique no ponto abre o assinante inteiro com as ações, sem trocar de tela. Desenho de **área de impacto** (quem está dentro, quanto de mensalidade, quais CTOs, e abrir incidente no NOC a partir dali), **viabilidade** por proximidade de CTO com porta livre, **mapa de calor das quedas** como grade com contagem exata, e a lista de quem está **fora do mapa** por falta de coordenada. |
 | 15 | **Provisionamento** | A ponte entre o contratado e o equipamento, por uma **camada de drivers**: o sistema fala em estado desejado (login, velocidade, IP, corte) e cada fabricante é um driver plugável, que declara o que sabe fazer. Fila de tarefas com ensaio (dry-run), tentativa com recuo, erro legível e histórico; releitura periódica que acha o que foi mexido por fora; e a tela de divergências, que mostra serviço liberado com contrato bloqueado (receita escapando) e contrato ativo com serviço cortado. |
 | 16 | **Wi-Fi do assinante (TR-069)** | ACS próprio: o roteador do assinante liga para o sistema, se registra sozinho e passa a ser gerenciável. Trocar SSID, senha e canal e reiniciar o aparelho saem da ficha do cliente, nos dois dialetos de parâmetro (TR-098 e TR-181). Para não esperar o contato periódico, o sistema bate na porta do CPE (Connection Request com Digest) pedindo que ligue agora — e grava nele, no primeiro encontro, a credencial que torna isso possível. |
 | 17 | **Consulta de CNPJ e CEP** | Cadastro preenchido pela base pública da Receita e pelos Correios, com a fonte e o horário à vista, o que veio marcado até alguém conferir, e queda para a fonte seguinte. Fonte fora do ar não trava o cadastro. |
@@ -177,6 +177,40 @@ Dois controles do desenho precisaram de honestidade, porque o sistema não faz o
 A marca é o monograma **M** em fita. O símbolo **N**, herdado do nome anterior do sistema, saiu do menu, do
 modo TV e do favicon. Cada instância do SVG numera os próprios gradientes: dois SVGs com o mesmo `id` na
 página fariam o segundo herdar as cores do primeiro.
+
+### Mapas: Google Maps
+
+Todas as telas com mapa — Panorama, Visão geral, Rede óptica e Rastreamento — usam o **Google Maps
+JavaScript API**, por um adaptador só (`public/js/mapa.js`). Dois provedores de mapa no mesmo produto
+significariam dois comportamentos de zoom, dois jeitos de desenhar marcador e dois lugares para corrigir
+cada defeito.
+
+Para o mapa funcionar, a operação precisa de uma chave própria:
+
+1. No [Google Cloud Console](https://console.cloud.google.com/), crie um projeto e **ative o faturamento**
+   (a Maps JavaScript API não funciona sem ele, mesmo dentro da cota gratuita).
+2. Ative a **Maps JavaScript API**.
+3. Crie uma chave de API e **restrinja-a**: em *Restrições de aplicativo* escolha *Referenciadores HTTP* e
+   informe o domínio do provedor (`https://painel.seuprovedor.com.br/*`); em *Restrições de API*, deixe só
+   a Maps JavaScript API.
+4. Informe a chave em `NETWORK_GOOGLE_MAPS_CHAVE`.
+
+A restrição do passo 3 não é detalhe. A chave vai para o navegador — é assim que a API funciona, não há
+como escondê-la. O que impede alguém de copiá-la da página e gastar a cota da operação é a lista de
+referenciadores, não o sigilo. O sistema entrega a chave só a quem já tem sessão, o que reduz a coleta
+casual, mas isso não substitui a restrição.
+
+Opcionalmente, `NETWORK_GOOGLE_MAPS_ID` aceita um **Map ID** criado no console, que permite estilizar o
+mapa (cores, rótulos, pontos de interesse) sem mexer em código.
+
+**Sem a chave o sistema não quebra:** cada tela de mapa mostra o motivo exato — falta de chave, chave
+recusada pelo Google ou falha de rede, que pedem providências diferentes — e as listas e tabelas ao lado
+continuam funcionando, que é o que permite trabalhar.
+
+Os marcadores são HTML, não imagens: a casinha do assinante no mapa é o mesmo elemento da legenda, com as
+mesmas classes e cores. Com ícone em imagem, cada cor viraria um arquivo e a legenda sairia do lugar na
+primeira mudança. Quando muitos pontos caem no mesmo lugar, eles viram um agrupamento com a contagem — e a
+bolha herda a cor do caso mais grave que está dentro dela, para o vermelho não sumir no zoom.
 
 ### Panorama: de onde vêm o verde e o vermelho
 

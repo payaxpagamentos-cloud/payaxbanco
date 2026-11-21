@@ -1,256 +1,421 @@
-/* global L */
-/** Mapa geográfico (Leaflet) com os ativos da rede, as ligações do banco e os veículos. Sem pontos inventados. */
 import { api } from './api.js';
 import { el, rotulo, dataHora, desde, placa } from './ui.js';
 
+/*
+ * Mapa do sistema: Google Maps JavaScript API.
+ *
+ * Há um adaptador só, usado por todas as telas que mostram mapa (Panorama, Visão geral, Rede óptica e
+ * Rastreamento). Dois provedores de mapa no mesmo produto significariam dois comportamentos de zoom, dois
+ * jeitos de desenhar marcador e dois lugares para corrigir cada defeito.
+ *
+ * Os marcadores são HTML, não imagens: desenhados por uma sobreposição própria (OverlayView), eles usam as
+ * MESMAS classes de CSS do resto do sistema — a casinha do assinante no mapa é a mesma casinha da legenda.
+ * Com ícone em imagem, cada cor viraria um arquivo e a legenda sairia do lugar na primeira mudança de tema.
+ *
+ * Quando há muitos pontos juntos, eles viram um agrupamento com a contagem. Milhares de elementos soltos no
+ * documento travam o navegador, e um mapa travado não é mapa.
+ */
+
 let config = null;
+let carregando = null;
+
 async function configMapa() {
   config ??= (await api.get('/publico')).mapa;
   return config;
 }
 
-// Leaflet 1.9: o fim de uma transição de zoom pode chegar depois de o mapa ser removido (troca de tela no meio da animação).
-if (typeof L !== 'undefined' && !L.Map.prototype._protegidoNetwork) {
-  const fim = L.Map.prototype._onZoomTransitionEnd;
-  L.Map.prototype._onZoomTransitionEnd = function protegido(...a) { if (this._mapPane && this._container?.isConnected !== false && this._loaded) fim.apply(this, a); };
-  L.Map.prototype._protegidoNetwork = true;
+/**
+ * Carrega a API do Google uma vez só.
+ *
+ * Falha com motivo legível em vez de deixar a tela em branco: sem chave, com chave recusada ou sem rede,
+ * quem está olhando precisa saber qual dos três é — as providências são diferentes.
+ */
+function carregarGoogle(cfg) {
+  if (window.google?.maps?.Map) return Promise.resolve(window.google.maps);
+  if (carregando) return carregando;
+  if (!cfg.chave) {
+    return Promise.reject(new Error('Mapa não configurado: falta a chave do Google Maps (NETWORK_GOOGLE_MAPS_CHAVE).'));
+  }
+  carregando = new Promise((resolve, reject) => {
+    const retorno = `__mapaPronto${Date.now()}`;
+    const limite = setTimeout(() => reject(new Error('O Google Maps não respondeu a tempo. Verifique a conexão desta máquina.')), 20_000);
+    window[retorno] = () => {
+      clearTimeout(limite);
+      delete window[retorno];
+      resolve(window.google.maps);
+    };
+    // "gm_authFailure" é como o Google avisa que a chave foi recusada: sem isso, a tela só fica cinza.
+    window.gm_authFailure = () => {
+      clearTimeout(limite);
+      reject(new Error('O Google recusou a chave deste mapa. Confira se a Maps JavaScript API está habilitada, '
+        + 'se o faturamento está ativo e se o domínio desta página está na lista de referenciadores permitidos.'));
+    };
+    const s = document.createElement('script');
+    const p = new URLSearchParams({
+      key: cfg.chave,
+      libraries: 'drawing',
+      language: 'pt-BR',
+      region: 'BR',
+      loading: 'async',
+      callback: retorno,
+    });
+    s.src = `https://maps.googleapis.com/maps/api/js?${p}`;
+    s.async = true;
+    s.onerror = () => { clearTimeout(limite); reject(new Error('Não foi possível carregar o Google Maps (a página não alcançou maps.googleapis.com).')); };
+    document.head.append(s);
+  }).catch((err) => { carregando = null; throw err; });
+  return carregando;
 }
 
-const COR_STATUS = { operacional: '#19724e', atencao: '#d58b3a', indisponivel: '#cf5b55', nao_avaliado: '#9aa691' };
+/* ---------------- Marcador em HTML ---------------- */
 
-/*
- * A casinha do assinante. A cor diz o que fazer, não só o que é:
- *
- *   verde      no ar, nada a fazer
- *   vermelho   contrato ativo e SEM sessão: é defeito, é agora
- *   âmbar      cortado por inadimplência: estar fora do ar é o esperado, não chame técnico
- *   roxo       login não existe no concentrador: falta provisionar, não é queda
- *   azul       em implantação: ainda não deveria estar no ar
- *   cinza      o sistema não sabe (nunca leu, ou a leitura envelheceu)
- *
- * O IXC pinta de vermelho o cortado e o caído do mesmo jeito. São problemas opostos, e a equipe perde a
- * manhã atrás de um defeito que é só a cobrança funcionando.
- */
-const SVG_CASA = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M12 3 2.5 11h2.7v9h5.3v-5.6h3v5.6h5.3v-9h2.7z"/></svg>';
-const SVG_ALERTA = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M12 2 1 21h22zm0 6 7 12H5zm-1 4v4h2v-4zm0 5v2h2v-2z"/></svg>';
+let MarcadorHtml = null;
+function definirMarcador(maps) {
+  if (MarcadorHtml) return MarcadorHtml;
+  MarcadorHtml = class extends maps.OverlayView {
+    constructor({ lat, lng, conteudo, titulo, aoClicar, zIndex = 1 }) {
+      super();
+      this.posicao = new maps.LatLng(lat, lng);
+      this.caixa = el('div', { class: 'marcador-mapa', title: titulo ?? null, tabindex: aoClicar ? '0' : null, role: aoClicar ? 'button' : null }, conteudo);
+      this.caixa.style.zIndex = String(zIndex);
+      if (aoClicar) {
+        this.caixa.addEventListener('click', (e) => { e.stopPropagation(); aoClicar(); });
+        this.caixa.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); aoClicar(); } });
+      }
+    }
+
+    onAdd() { this.getPanes().overlayMouseTarget.append(this.caixa); }
+
+    draw() {
+      const p = this.getProjection()?.fromLatLngToDivPixel(this.posicao);
+      if (!p) return;
+      this.caixa.style.left = `${p.x}px`;
+      this.caixa.style.top = `${p.y}px`;
+    }
+
+    onRemove() { this.caixa.remove(); }
+  };
+  return MarcadorHtml;
+}
+
+/* ---------------- Agrupamento ---------------- */
 
 /**
- * Cria o mapa em `alvo`. Devolve { mapa, mostrarRede(dados, aoAbrir), mostrarFrota(veiculos, aoAbrir), destruir() }.
- * Se o Leaflet não carregar (sem rede para as imagens), mostra o aviso e a lista continua funcionando.
+ * Agrupa por grade de pixels no zoom atual. Pontos que cairiam um por cima do outro viram uma bolha com a
+ * contagem; clicar nela aproxima naquele ponto, que é o gesto que todo mundo já espera de um mapa.
+ */
+function agrupar(maps, mapa, itens, lado = 56) {
+  const projecao = mapa.getProjection();
+  if (!projecao || itens.length < 2) return itens.map((x) => ({ itens: [x] }));
+  const escala = 2 ** mapa.getZoom();
+  const celulas = new Map();
+  for (const item of itens) {
+    const ponto = projecao.fromLatLngToPoint(new maps.LatLng(item.lat, item.lng));
+    const chave = `${Math.floor((ponto.x * escala) / lado)}:${Math.floor((ponto.y * escala) / lado)}`;
+    const atual = celulas.get(chave);
+    if (atual) atual.itens.push(item);
+    else celulas.set(chave, { itens: [item] });
+  }
+  return [...celulas.values()];
+}
+
+const media = (itens, campo) => itens.reduce((s, x) => s + x[campo], 0) / itens.length;
+
+/* ---------------- Mapa ---------------- */
+
+const COR_STATUS = { operacional: '#19724e', atencao: '#d58b3a', indisponivel: '#cf5b55', nao_avaliado: '#9aa691' };
+const SVG_CASA = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M12 3 2.5 11h2.7v9h5.3v-5.6h3v5.6h5.3v-9h2.7z"/></svg>';
+const SVG_ALERTA = '<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path fill="currentColor" d="M12 2 1 21h22zm0 6 7 12H5zm-1 4v4h2v-4zm0 5v2h2v-2z"/></svg>';
+const bloco = (html, classe) => { const d = el('div', { class: classe }); d.innerHTML = html; return d; };
+
+/**
+ * Cria o mapa em `alvo`. A interface é a mesma de antes, de propósito: as telas que já usavam mapa não
+ * precisaram mudar uma linha para trocar de provedor.
+ *
+ * Se o mapa não puder carregar, devolve um objeto com os mesmos métodos, todos sem efeito, e escreve o
+ * motivo na tela — a lista que acompanha o mapa continua funcionando, que é o que importa para trabalhar.
  */
 export async function criarMapa(alvo) {
   const cfg = await configMapa();
-  if (typeof L === 'undefined') {
-    alvo.replaceChildren(el('div', { class: 'vazio' }, el('strong', {}, 'Mapa indisponível'), 'Use a lista abaixo do mapa.'));
-    return { mostrarRede() {}, mostrarFrota() {}, focar() {}, destruir() {} };
+  let maps;
+  try {
+    maps = await carregarGoogle(cfg);
+  } catch (err) {
+    alvo.replaceChildren(el('div', { class: 'vazio mapa-indisponivel' },
+      el('strong', {}, 'Mapa indisponível'),
+      err.message,
+      el('div', { class: 'fraco', style: 'margin-top:8px' }, 'Use a lista abaixo do mapa: ela não depende do mapa.')));
+    const nada = () => {};
+    return { mapa: null, indisponivel: true, motivo: err.message, mostrarRede: nada, mostrarFrota: nada, mostrarPanorama: () => 0,
+      camadasApoio: () => ({ rede: null, chamados: null }), alternarCamada: nada, desenhar: () => ({ concluir: nada, cancelar: nada }),
+      limparArea: nada, mostrarCalor: nada, trajeto: nada, focar: nada, enquadrar: nada, destruir: nada };
   }
+
+  const Marcador = definirMarcador(maps);
   const reduzir = window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.classList.contains('sem-efeitos');
-  const mapa = L.map(alvo, { zoomControl: true, attributionControl: true, scrollWheelZoom: false, zoomAnimation: !reduzir, markerZoomAnimation: !reduzir, fadeAnimation: !reduzir })
-    .setView(cfg.centro, 13);
-  L.tileLayer(cfg.tiles, { maxZoom: 19, attribution: cfg.atribuicao }).addTo(mapa);
-  mapa.on('focus', () => mapa.scrollWheelZoom.enable());
-  mapa.on('blur', () => mapa.scrollWheelZoom.disable());
-  const camadaLinhas = L.layerGroup().addTo(mapa);
-  const grupo = L.markerClusterGroup ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 40 }) : L.layerGroup();
-  grupo.addTo(mapa);
-  const marcadores = new Map();
+  const mapa = new maps.Map(alvo, {
+    center: { lat: cfg.centro[0], lng: cfg.centro[1] },
+    zoom: cfg.zoom ?? 13,
+    mapId: cfg.id_mapa || undefined,
+    mapTypeControl: true,
+    mapTypeControlOptions: { style: maps.MapTypeControlStyle.DROPDOWN_MENU, position: maps.ControlPosition.TOP_RIGHT },
+    streetViewControl: true,
+    fullscreenControl: false,
+    // A rolagem da página não pode virar zoom sem querer: com Ctrl (ou dois dedos) o zoom funciona.
+    gestureHandling: 'cooperative',
+    clickableIcons: false,
+    // Sem animação quando o sistema pede movimento reduzido.
+    ...(reduzir ? { disableDefaultUI: false } : {}),
+  });
+
+  const janela = new maps.InfoWindow();
+  let marcadores = [];
+  let formas = [];
+  let apoio = [];
+  let areaDesenhada = null;
+  let ouvintes = [];
+  let agrupamentoAtual = null;
   let vivo = true;
 
-  const enquadrar = (pontos) => {
-    if (pontos.length === 1) mapa.setView(pontos[0], 16);
-    else if (pontos.length > 1) mapa.fitBounds(L.latLngBounds(pontos), { padding: [30, 30], maxZoom: 16 });
+  const limparMarcadores = () => { for (const m of marcadores) m.setMap(null); marcadores = []; };
+  const limparFormas = () => { for (const f of formas) f.setMap(null); formas = []; };
+
+  function enquadrar(pontos) {
+    const validos = (pontos ?? []).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+    if (!validos.length) return;
+    if (validos.length === 1) { mapa.setCenter({ lat: validos[0][0], lng: validos[0][1] }); mapa.setZoom(16); return; }
+    const limites = new maps.LatLngBounds();
+    for (const [lat, lng] of validos) limites.extend({ lat, lng });
+    mapa.fitBounds(limites, 48);
+  }
+
+  const abrirJanela = (marcador, conteudo) => {
+    janela.setContent(conteudo);
+    janela.setPosition(marcador.posicao);
+    janela.open({ map: mapa });
   };
-  const limpar = () => { grupo.clearLayers(); camadaLinhas.clearLayers(); marcadores.clear(); };
+
+  /** Põe um marcador no mapa e guarda para a limpeza. */
+  function pôr(opcoes) {
+    const m = new Marcador(opcoes);
+    m.setMap(mapa);
+    marcadores.push(m);
+    return m;
+  }
 
   return {
     mapa,
+    maps,
+    indisponivel: false,
+
     mostrarRede({ ativos, ligacoes }, aoAbrir) {
       if (!vivo) return;
-      limpar();
-      for (const l of ligacoes) {
-        L.polyline([[l.origem_lat, l.origem_lng], [l.destino_lat, l.destino_lng]], { color: '#6f9f7c', weight: 4, opacity: 0.8, className: 'ligacao-rede' }).addTo(camadaLinhas);
+      limparMarcadores();
+      limparFormas();
+      for (const l of ligacoes ?? []) {
+        formas.push(new maps.Polyline({
+          map: mapa,
+          path: [{ lat: l.origem_lat, lng: l.origem_lng }, { lat: l.destino_lat, lng: l.destino_lng }],
+          strokeColor: '#6f9f7c', strokeOpacity: 0.85, strokeWeight: 4,
+        }));
       }
-      for (const a of ativos) {
-        const icon = L.divIcon({ className: '', html: `<div class="pino ${a.tipo === 'pop' ? 'pop ' : ''}${a.status_operacional}"></div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
-        const m = L.marker([a.lat, a.lng], { icon, title: `${a.codigo} · ${rotulo('statusAtivo', a.status_operacional)}`, keyboard: true, alt: a.codigo });
-        const popup = el('div', {}, el('strong', {}, a.codigo), el('div', {}, `${rotulo('tipoAtivo', a.tipo)}${a.bairro ? ` · ${a.bairro}` : ''}`),
-          el('div', { style: `color:${COR_STATUS[a.status_operacional]}` }, `${rotulo('statusAtivo', a.status_operacional)} (${rotulo('origemStatus', a.status_origem)})`),
-          a.portas ? el('div', {}, `${a.portas.ocupadas}/${a.portas.total} portas ocupadas`) : null,
-          aoAbrir ? el('button', { class: 'botao pequeno', style: 'margin-top:8px', onclick: () => aoAbrir(a) }, 'Abrir detalhe') : null);
-        m.bindPopup(popup);
-        grupo.addLayer(m);
-        marcadores.set(`a${a.id}`, m);
+      for (const a of ativos ?? []) {
+        const m = pôr({
+          lat: a.lat, lng: a.lng, titulo: `${a.codigo} · ${rotulo('statusAtivo', a.status_operacional)}`,
+          conteudo: el('div', { class: `pino ${a.tipo === 'pop' ? 'pop ' : ''}${a.status_operacional}` }),
+          aoClicar: () => abrirJanela(m, el('div', {}, el('strong', {}, a.codigo),
+            el('div', {}, `${rotulo('tipoAtivo', a.tipo)}${a.bairro ? ` · ${a.bairro}` : ''}`),
+            el('div', { style: `color:${COR_STATUS[a.status_operacional]}` }, `${rotulo('statusAtivo', a.status_operacional)} (${rotulo('origemStatus', a.status_origem)})`),
+            a.portas ? el('div', {}, `${a.portas.ocupadas ?? a.portas.ocupada ?? 0}/${a.portas.total} portas ocupadas`) : null,
+            aoAbrir ? el('button', { class: 'botao pequeno', style: 'margin-top:8px', onclick: () => aoAbrir(a) }, 'Abrir detalhe') : null)),
+        });
+        m.chave = `a${a.id}`;
       }
-      enquadrar(ativos.map((a) => [a.lat, a.lng]));
+      enquadrar((ativos ?? []).map((a) => [a.lat, a.lng]));
     },
+
     mostrarFrota(veiculos, aoAbrir) {
       if (!vivo) return;
-      limpar();
-      const com = veiculos.filter((v) => v.lat !== null && v.lat !== undefined);
+      limparMarcadores();
+      limparFormas();
+      const com = (veiculos ?? []).filter((v) => v.lat !== null && v.lat !== undefined);
       for (const v of com) {
-        const icon = L.divIcon({ className: '', html: `<div class="pino veiculo ${v.situacao}"></div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
-        const m = L.marker([v.lat, v.lng], { icon, title: `${placa(v.placa)} · ${rotulo('situacaoRastreio', v.situacao)}`, keyboard: true, alt: v.placa });
-        m.bindPopup(el('div', {}, el('strong', {}, `${placa(v.placa)} · ${v.modelo}`), el('div', {}, rotulo('situacaoRastreio', v.situacao)),
-          el('div', {}, `Posição de ${dataHora(v.observado_em)} (${desde(v.observado_em)})`), el('div', {}, `Ignição: ${v.ignicao}`),
-          v.velocidade_kmh !== null ? el('div', {}, `${Math.round(v.velocidade_kmh)} km/h`) : null,
-          aoAbrir ? el('button', { class: 'botao pequeno', style: 'margin-top:8px', onclick: () => aoAbrir(v) }, 'Abrir veículo') : null));
-        grupo.addLayer(m);
-        marcadores.set(`v${v.id}`, m);
+        const m = pôr({
+          lat: v.lat, lng: v.lng, titulo: `${placa(v.placa)} · ${rotulo('situacaoRastreio', v.situacao)}`,
+          conteudo: el('div', { class: `pino veiculo ${v.situacao}` }),
+          aoClicar: () => abrirJanela(m, el('div', {}, el('strong', {}, `${placa(v.placa)} · ${v.modelo}`),
+            el('div', {}, rotulo('situacaoRastreio', v.situacao)),
+            el('div', {}, `Posição de ${dataHora(v.observado_em)} (${desde(v.observado_em)})`),
+            el('div', {}, `Ignição: ${v.ignicao}`),
+            v.velocidade_kmh !== null && v.velocidade_kmh !== undefined ? el('div', {}, `${Math.round(v.velocidade_kmh)} km/h`) : null,
+            aoAbrir ? el('button', { class: 'botao pequeno', style: 'margin-top:8px', onclick: () => aoAbrir(v) }, 'Abrir veículo') : null)),
+        });
+        m.chave = `v${v.id}`;
       }
       enquadrar(com.map((v) => [v.lat, v.lng]));
     },
-    trajeto(pontos) {
-      if (!vivo) return;
-      camadaLinhas.clearLayers();
-      if (!pontos.length) return;
-      const linha = L.polyline(pontos.map((p) => [p.lat, p.lng]), { color: '#19724e', weight: 4 }).addTo(camadaLinhas);
-      L.circleMarker([pontos[0].lat, pontos[0].lng], { radius: 6, color: '#19724e', fillOpacity: 1 }).bindTooltip(`Início ${dataHora(pontos[0].observado_em)}`).addTo(camadaLinhas);
-      L.circleMarker([pontos.at(-1).lat, pontos.at(-1).lng], { radius: 6, color: '#15261e', fillOpacity: 1 }).bindTooltip(`Fim ${dataHora(pontos.at(-1).observado_em)}`).addTo(camadaLinhas);
-      mapa.fitBounds(linha.getBounds(), { padding: [30, 30] });
-    },
-    focar(chave) {
-      if (!vivo) return;
-      const m = marcadores.get(chave);
-      if (!m) return;
-      if (grupo.zoomToShowLayer) grupo.zoomToShowLayer(m, () => m.openPopup());
-      else { mapa.setView(m.getLatLng(), 17); m.openPopup(); }
-    },
-    /**
-     * Casinhas dos assinantes. `aoAbrir(ponto)` recebe o ponto clicado.
-     * Devolve quantas foram de fato desenhadas — a tela compara com o total e avisa a diferença.
-     */
+
+    /** Casinhas dos assinantes, agrupadas enquanto o zoom não separa os pontos. */
     mostrarPanorama(pontos, { aoAbrir = null, enquadrarAgora = true } = {}) {
       if (!vivo) return 0;
-      grupo.clearLayers();
-      marcadores.clear();
-      for (const p of pontos) {
-        const icon = L.divIcon({
-          className: '',
-          html: `<div class="casa ${p.estado}${p.atencao ? ' atencao' : ''}">${SVG_CASA}</div>`,
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-        });
-        const m = L.marker([p.lat, p.lng], { icon, title: `${p.assinante_nome} · ${p.estado}`, keyboard: true, alt: p.assinante_nome });
-        m.on('click', () => aoAbrir?.(p));
-        m.on('keydown', (e) => { if (e.originalEvent?.key === 'Enter') aoAbrir?.(p); });
-        grupo.addLayer(m);
-        marcadores.set(`c${p.contrato_id}`, m);
-      }
-      if (enquadrarAgora) enquadrar(pontos.map((p) => [p.lat, p.lng]));
-      return pontos.length;
+      const lista = (pontos ?? []).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+      const desenharAgrupado = () => {
+        if (!vivo) return;
+        limparMarcadores();
+        for (const grupo of agrupar(maps, mapa, lista)) {
+          if (grupo.itens.length === 1) {
+            const p = grupo.itens[0];
+            pôr({
+              lat: p.lat, lng: p.lng, titulo: `${p.assinante_nome} · ${rotulo('estadoConexao', p.estado)}`,
+              zIndex: p.atencao ? 3 : 1,
+              conteudo: bloco(SVG_CASA, `casa ${p.estado}${p.atencao ? ' atencao' : ''}`),
+              aoClicar: () => aoAbrir?.(p),
+            });
+            continue;
+          }
+          // A bolha herda a cor do caso mais grave que está dentro dela: o vermelho não pode sumir no agrupamento.
+          const atencao = grupo.itens.filter((x) => x.atencao).length;
+          const grupoLat = media(grupo.itens, 'lat');
+          const grupoLng = media(grupo.itens, 'lng');
+          pôr({
+            lat: grupoLat, lng: grupoLng, zIndex: atencao ? 3 : 2,
+            titulo: `${grupo.itens.length} assinantes${atencao ? ` · ${atencao} precisando de atenção` : ''}`,
+            conteudo: el('div', { class: `agrupamento${atencao ? ' atencao' : ''}` },
+              el('strong', {}, String(grupo.itens.length)), atencao ? el('small', {}, String(atencao)) : null),
+            aoClicar: () => { mapa.setCenter({ lat: grupoLat, lng: grupoLng }); mapa.setZoom(Math.min(19, mapa.getZoom() + 3)); },
+          });
+        }
+      };
+      if (agrupamentoAtual) maps.event.removeListener(agrupamentoAtual);
+      agrupamentoAtual = maps.event.addListener(mapa, 'idle', desenharAgrupado);
+      if (enquadrarAgora) enquadrar(lista.map((p) => [p.lat, p.lng]));
+      desenharAgrupado();
+      return lista.length;
     },
 
-    /** Camadas de apoio: caixas ópticas e chamados abertos, cada uma ligável à parte. */
-    camadasApoio({ rede: ativos = [], chamados: oss = [] }, { aoAbrirAtivo = null, aoAbrirChamado = null } = {}) {
+    /** Camadas de apoio ligáveis à parte. Devolve objetos com .setMap, para alternarCamada acender e apagar. */
+    camadasApoio({ rede: ativos = [], chamados: oss = [] } = {}, { aoAbrirAtivo = null, aoAbrirChamado = null } = {}) {
       if (!vivo) return { rede: null, chamados: null };
-      const camadaRede = L.layerGroup();
-      for (const a of ativos) {
-        const icon = L.divIcon({ className: '', html: `<div class="pino ${a.tipo === 'pop' ? 'pop ' : ''}${a.status_operacional}"></div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
-        const m = L.marker([a.lat, a.lng], { icon, title: a.codigo, keyboard: true, alt: a.codigo });
-        m.bindPopup(el('div', {}, el('strong', {}, a.codigo),
-          el('div', {}, `${rotulo('tipoAtivo', a.tipo)}${a.bairro ? ` · ${a.bairro}` : ''}`),
-          a.portas ? el('div', {}, `${a.portas.livre ?? 0} porta(s) livre(s) de ${a.portas.total}`) : el('div', { class: 'fraco' }, 'Sem portas cadastradas'),
-          aoAbrirAtivo ? el('button', { class: 'botao pequeno', style: 'margin-top:8px', onclick: () => aoAbrirAtivo(a) }, 'Abrir na rede') : null));
-        camadaRede.addLayer(m);
-      }
-      const camadaOs = L.layerGroup();
-      for (const c of oss) {
-        const icon = L.divIcon({ className: '', html: `<div class="pino chamado ${c.prioridade}">${SVG_ALERTA}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] });
-        const m = L.marker([c.lat, c.lng], { icon, title: `OS ${c.numero}`, keyboard: true, alt: `OS ${c.numero}` });
-        m.bindPopup(el('div', {}, el('strong', {}, `OS ${c.numero}`), el('div', {}, rotulo('tipoChamado', c.tipo)),
-          el('div', {}, rotulo('statusChamado', c.status)), c.tecnico_nome ? el('div', {}, c.tecnico_nome) : null,
-          aoAbrirChamado ? el('button', { class: 'botao pequeno', style: 'margin-top:8px', onclick: () => aoAbrirChamado(c) }, 'Abrir chamado') : null));
-        camadaOs.addLayer(m);
-      }
-      return { rede: camadaRede, chamados: camadaOs };
+      const criar = (itens, montar) => {
+        const marcas = itens.map(montar);
+        apoio.push(...marcas);
+        return {
+          setMap: (m) => { for (const x of marcas) x.setMap(m); },
+          marcas,
+        };
+      };
+      const rede = criar(ativos.filter((a) => Number.isFinite(a.lat) && Number.isFinite(a.lng)), (a) => {
+        const m = new Marcador({
+          lat: a.lat, lng: a.lng, titulo: a.codigo,
+          conteudo: el('div', { class: `pino ${a.tipo === 'pop' ? 'pop ' : ''}${a.status_operacional}` }),
+          aoClicar: () => abrirJanela(m, el('div', {}, el('strong', {}, a.codigo),
+            el('div', {}, `${rotulo('tipoAtivo', a.tipo)}${a.bairro ? ` · ${a.bairro}` : ''}`),
+            a.portas ? el('div', {}, `${a.portas.livre ?? 0} porta(s) livre(s) de ${a.portas.total}`) : el('div', { class: 'fraco' }, 'Sem portas cadastradas'),
+            aoAbrirAtivo ? el('button', { class: 'botao pequeno', style: 'margin-top:8px', onclick: () => aoAbrirAtivo(a) }, 'Abrir na rede') : null)),
+        });
+        return m;
+      });
+      const chamados = criar(oss.filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng)), (c) => {
+        const m = new Marcador({
+          lat: c.lat, lng: c.lng, titulo: `OS ${c.numero}`, zIndex: 2,
+          conteudo: bloco(SVG_ALERTA, `pino chamado ${c.prioridade}`),
+          aoClicar: () => abrirJanela(m, el('div', {}, el('strong', {}, `OS ${c.numero}`),
+            el('div', {}, rotulo('tipoChamado', c.tipo)), el('div', {}, rotulo('statusChamado', c.status)),
+            c.tecnico_nome ? el('div', {}, c.tecnico_nome) : null,
+            aoAbrirChamado ? el('button', { class: 'botao pequeno', style: 'margin-top:8px', onclick: () => aoAbrirChamado(c) }, 'Abrir chamado') : null)),
+        });
+        return m;
+      });
+      return { rede, chamados };
     },
 
-    alternarCamada(camada, ligada) {
-      if (!vivo || !camada) return;
-      if (ligada) camada.addTo(mapa);
-      else mapa.removeLayer(camada);
-    },
+    alternarCamada(camada, ligada) { if (vivo && camada) camada.setMap(ligada ? mapa : null); },
 
-    /**
-     * Desenho de área à mão, sem biblioteca de desenho: clique põe vértice, o traço acompanha o cursor,
-     * duplo clique (ou o botão) fecha. São trinta linhas — não vale carregar mais um script por isso.
-     */
+    /** Desenho de área com a ferramenta do próprio Google: um polígono, fechado com duplo clique. */
     desenhar({ aoFechar }) {
-      if (!vivo) return () => {};
-      const pontos = [];
-      let previa = null;
-      let linha = null;
-      const marcas = L.layerGroup().addTo(mapa);
+      if (!vivo) return { concluir: () => {}, cancelar: () => {} };
       alvo.classList.add('desenhando');
-      const redesenhar = (ate = null) => {
-        const todos = ate ? [...pontos, ate] : pontos;
-        if (linha) linha.remove();
-        if (todos.length >= 2) {
-          linha = (todos.length >= 3 ? L.polygon(todos, { color: '#19724e', weight: 2, fillOpacity: 0.12, dashArray: '6 4' })
-            : L.polyline(todos, { color: '#19724e', weight: 2, dashArray: '6 4' })).addTo(mapa);
-        }
+      const gerente = new maps.drawing.DrawingManager({
+        map: mapa,
+        drawingMode: maps.drawing.OverlayType.POLYGON,
+        drawingControl: false,
+        polygonOptions: { fillColor: '#19724e', fillOpacity: 0.14, strokeColor: '#19724e', strokeWeight: 2, clickable: false },
+      });
+      const encerrar = () => { gerente.setDrawingMode(null); gerente.setMap(null); alvo.classList.remove('desenhando'); };
+      const ouvinte = maps.event.addListener(gerente, 'polygoncomplete', (poligono) => {
+        encerrar();
+        maps.event.removeListener(ouvinte);
+        areaDesenhada?.setMap(null);
+        areaDesenhada = poligono;
+        aoFechar(poligono.getPath().getArray().map((p) => ({ lat: p.lat(), lng: p.lng() })));
+      });
+      return {
+        concluir: () => { /* o polígono fecha no duplo clique: a ferramenta do Google não fecha por fora */ },
+        cancelar: () => { encerrar(); maps.event.removeListener(ouvinte); aoFechar(null); },
       };
-      const clique = (e) => {
-        pontos.push([e.latlng.lat, e.latlng.lng]);
-        L.circleMarker(e.latlng, { radius: 4, color: '#19724e', fillColor: '#fff', fillOpacity: 1, weight: 2 }).addTo(marcas);
-        redesenhar();
-      };
-      const mover = (e) => { if (pontos.length) { previa = e.latlng; redesenhar([e.latlng.lat, e.latlng.lng]); } };
-      const encerrar = (cancelado = false) => {
-        mapa.off('click', clique); mapa.off('mousemove', mover); mapa.off('dblclick', fechar);
-        mapa.doubleClickZoom.enable();
-        alvo.classList.remove('desenhando');
-        marcas.remove();
-        if (linha) linha.remove();
-        return cancelado || pontos.length < 3 ? null : pontos.map(([lat, lng]) => ({ lat, lng }));
-      };
-      const fechar = () => {
-        const area = encerrar(false);
-        if (area) {
-          camadaLinhas.clearLayers();
-          L.polygon(area.map((p) => [p.lat, p.lng]), { color: '#19724e', weight: 2, fillOpacity: 0.12 }).addTo(camadaLinhas);
-        }
-        aoFechar(area);
-      };
-      mapa.doubleClickZoom.disable();
-      mapa.on('click', clique);
-      mapa.on('mousemove', mover);
-      mapa.on('dblclick', fechar);
-      void previa;
-      return { concluir: fechar, cancelar: () => { encerrar(true); aoFechar(null); } };
     },
 
-    limparArea() { if (vivo) camadaLinhas.clearLayers(); },
+    limparArea() { if (vivo) { areaDesenhada?.setMap(null); areaDesenhada = null; } },
 
-    /**
-     * Mapa de calor como GRADE de células clicáveis, não como borrão.
-     * Uma mancha degradê sugere uma precisão que o dado não tem; a célula diz "sete quedas, quatro
-     * assinantes" e pode ser aberta para ver quais.
-     */
+    /** Grade de calor: retângulos com a contagem real, não um borrão. */
     mostrarCalor(celulas, aoAbrirCelula) {
       if (!vivo) return;
-      camadaLinhas.clearLayers();
-      for (const c of celulas) {
-        const r = L.rectangle([[c.sul, c.oeste], [c.norte, c.leste]], {
-          color: '#cf5b55',
-          weight: 1,
-          opacity: 0.45 + c.intensidade * 0.35,
-          fillOpacity: 0.12 + c.intensidade * 0.45,
-          className: 'celula-calor',
-        }).addTo(camadaLinhas);
-        r.bindTooltip(`${c.quedas} queda(s) · ${c.assinantes} assinante(s)`, { direction: 'top' });
-        if (aoAbrirCelula) r.on('click', () => aoAbrirCelula(c));
+      limparFormas();
+      for (const c of celulas ?? []) {
+        const r = new maps.Rectangle({
+          map: mapa,
+          bounds: { south: c.sul, west: c.oeste, north: c.norte, east: c.leste },
+          strokeColor: '#cf5b55', strokeWeight: 1, strokeOpacity: 0.45 + c.intensidade * 0.35,
+          fillColor: '#cf5b55', fillOpacity: 0.12 + c.intensidade * 0.45,
+          clickable: Boolean(aoAbrirCelula),
+        });
+        if (aoAbrirCelula) maps.event.addListener(r, 'click', () => aoAbrirCelula(c));
+        formas.push(r);
       }
-      const todos = celulas.flatMap((c) => [[c.sul, c.oeste], [c.norte, c.leste]]);
-      if (todos.length) mapa.fitBounds(L.latLngBounds(todos), { padding: [30, 30], maxZoom: 15 });
+      const todos = (celulas ?? []).flatMap((c) => [[c.sul, c.oeste], [c.norte, c.leste]]);
+      if (todos.length) enquadrar(todos);
+    },
+
+    trajeto(pontos) {
+      if (!vivo) return;
+      limparFormas();
+      if (!pontos?.length) return;
+      const caminho = pontos.map((p) => ({ lat: p.lat, lng: p.lng }));
+      formas.push(new maps.Polyline({ map: mapa, path: caminho, strokeColor: '#19724e', strokeWeight: 4, strokeOpacity: 0.9 }));
+      const ponta = (p, cor, texto) => {
+        const m = pôr({ lat: p.lat, lng: p.lng, titulo: texto, conteudo: el('div', { class: 'ponta-trajeto', style: `--cor:${cor}` }) });
+        return m;
+      };
+      ponta(pontos[0], '#19724e', `Início ${dataHora(pontos[0].observado_em)}`);
+      ponta(pontos.at(-1), '#15261e', `Fim ${dataHora(pontos.at(-1).observado_em)}`);
+      enquadrar(caminho.map((p) => [p.lat, p.lng]));
+    },
+
+    focar(chave) {
+      if (!vivo) return;
+      const m = marcadores.find((x) => x.chave === chave);
+      if (!m) return;
+      mapa.setCenter(m.posicao);
+      mapa.setZoom(Math.max(mapa.getZoom(), 17));
+      m.caixa.click();
     },
 
     enquadrar,
 
     destruir() {
       vivo = false;
-      // Para animações de zoom em andamento antes de remover (evita erro ao trocar de tela no meio de um movimento).
-      try { mapa.stop(); mapa.off(); grupo.clearLayers(); mapa.remove(); } catch { /* já removido */ }
+      try {
+        if (agrupamentoAtual) maps.event.removeListener(agrupamentoAtual);
+        for (const o of ouvintes) maps.event.removeListener(o);
+        ouvintes = [];
+        janela.close();
+        limparMarcadores();
+        limparFormas();
+        for (const a of apoio) a.setMap(null);
+        apoio = [];
+        areaDesenhada?.setMap(null);
+        maps.event.clearInstanceListeners(mapa);
+      } catch { /* já desmontado */ }
     },
   };
 }

@@ -16,7 +16,12 @@ function criarApi(db, extras = {}) {
     db.prepare('SELECT 1').get();
     res.json({ ok: true });
   });
-  api.get('/publico', (_req, res) => res.json({ mapa: config.mapa }));
+  /*
+   * Configuração do mapa. Exige sessão: a chave do Google vai para o navegador de qualquer jeito (é assim
+   * que a API funciona), mas não há motivo para entregá-la a quem nem entrou no sistema. Quem protege a
+   * conta de verdade é a restrição por referenciador HTTP no console do Google.
+   */
+  api.get('/publico', autenticado, (req, res) => res.json({ mapa: config.mapa }));
 
   // Arquivo por link temporário assinado (para <img> e abrir comprovantes); a permissão é conferida de novo aqui.
   api.get('/arquivos/:id', (req, res) => {
