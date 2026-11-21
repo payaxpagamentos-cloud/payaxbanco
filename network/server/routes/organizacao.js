@@ -13,6 +13,12 @@ const v = require('../lib/validacao');
 const FUSOS = ['America/Sao_Paulo', 'America/Manaus', 'America/Cuiaba', 'America/Rio_Branco', 'America/Noronha', 'America/Belem', 'America/Fortaleza',
   'America/Recife', 'America/Bahia', 'America/Porto_Velho', 'America/Boa_Vista', 'America/Campo_Grande'];
 
+/** Percentual digitado ("2", "2,5") guardado em centésimos de ponto (2,5% → 250). */
+function percentual(valor, nome, maximo) {
+  const n = v.numero(valor, nome, { min: 0, max: maximo });
+  return Math.round(n * 100);
+}
+
 /** Dados da organização, usuários e histórico de auditoria. */
 module.exports = (db) => {
   const r = Router();
@@ -31,9 +37,20 @@ module.exports = (db) => {
       janela_recorrencia_min: b.janela_recorrencia_min !== undefined ? v.inteiro(b.janela_recorrencia_min, 'a janela de recorrência', { max: 1440 }) : antes.janela_recorrencia_min,
       desatualizado_min: b.desatualizado_min !== undefined ? v.inteiro(b.desatualizado_min, 'o tempo de desatualização', { min: 1, max: 1440 }) : antes.desatualizado_min,
       reserva_porta_horas: b.reserva_porta_horas !== undefined ? v.inteiro(b.reserva_porta_horas, 'a validade da reserva', { min: 1, max: 720 }) : antes.reserva_porta_horas,
+      // Faturamento e cobrança. A carência vale sobre qualquer regra da régua: nenhuma bloqueia antes dela.
+      dia_vencimento_padrao: b.dia_vencimento_padrao !== undefined ? v.inteiro(b.dia_vencimento_padrao, 'o dia de vencimento padrão', { min: 1, max: 28 }) : antes.dia_vencimento_padrao,
+      carencia_bloqueio_dias: b.carencia_bloqueio_dias !== undefined ? v.inteiro(b.carencia_bloqueio_dias, 'a carência antes do bloqueio', { max: 180 }) : antes.carencia_bloqueio_dias,
+      multa_atraso_pct_centesimos: b.multa_atraso_pct !== undefined ? percentual(b.multa_atraso_pct, 'a multa por atraso', 20) : antes.multa_atraso_pct_centesimos,
+      juros_mes_pct_centesimos: b.juros_mes_pct !== undefined ? percentual(b.juros_mes_pct, 'os juros ao mês', 20) : antes.juros_mes_pct_centesimos,
+      pro_rata: b.pro_rata !== undefined ? (v.booleano(b.pro_rata) ? 1 : 0) : antes.pro_rata,
+      confianca_dias: b.confianca_dias !== undefined ? v.inteiro(b.confianca_dias, 'o prazo do desbloqueio de confiança', { max: 90 }) : antes.confianca_dias,
+      confianca_max_ano: b.confianca_max_ano !== undefined ? v.inteiro(b.confianca_max_ano, 'o limite de confiança por ano', { max: 24 }) : antes.confianca_max_ano,
     };
     db.prepare(`UPDATE organizacoes SET nome = ?, fuso = ?, aprovacao_manutencao_centavos = ?, janela_recorrencia_min = ?, desatualizado_min = ?,
-      reserva_porta_horas = ? WHERE id = ?`).run(d.nome, d.fuso, d.aprovacao_manutencao_centavos, d.janela_recorrencia_min, d.desatualizado_min, d.reserva_porta_horas, req.org);
+      reserva_porta_horas = ?, dia_vencimento_padrao = ?, carencia_bloqueio_dias = ?, multa_atraso_pct_centesimos = ?, juros_mes_pct_centesimos = ?,
+      pro_rata = ?, confianca_dias = ?, confianca_max_ano = ? WHERE id = ?`)
+      .run(d.nome, d.fuso, d.aprovacao_manutencao_centavos, d.janela_recorrencia_min, d.desatualizado_min, d.reserva_porta_horas, d.dia_vencimento_padrao,
+        d.carencia_bloqueio_dias, d.multa_atraso_pct_centesimos, d.juros_mes_pct_centesimos, d.pro_rata, d.confianca_dias, d.confianca_max_ano, req.org);
     registrar(db, req, 'organizacao_alterada', { recurso: 'organizacao', recursoId: req.org, antes, depois: d });
     res.json(db.prepare('SELECT * FROM organizacoes WHERE id = ?').get(req.org));
   });

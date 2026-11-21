@@ -1,8 +1,8 @@
 import { api, qs } from '../api.js';
-import { el, limpar, cabecalho, painel, tabela, paginacao, abas, etq, dataHora, toast, carregar, formulario, botao, dinheiro, usuario } from '../ui.js';
+import { el, limpar, cabecalho, painel, tabela, paginacao, abas, etq, dataHora, dl, toast, carregar, formulario, botao, dinheiro, usuario } from '../ui.js';
 
 export default async function admin({ alvo }) {
-  const lista = [['usuarios', 'Usuários e perfis'], ['permissoes', 'Permissões'], ['organizacao', 'Organização'], ['auditoria', 'Auditoria']];
+  const lista = [['usuarios', 'Usuários e perfis'], ['permissoes', 'Permissões'], ['organizacao', 'Organização'], ['financeiro', 'Faturamento e cobrança'], ['auditoria', 'Auditoria']];
   let aba = 'usuarios';
   const corpo = el('div');
   const barra = el('div');
@@ -32,6 +32,31 @@ export default async function admin({ alvo }) {
         { nome: 'desatualizado_min', rotulo: 'Leitura desatualizada após (min)', tipo: 'number', valor: o.desatualizado_min },
         { nome: 'reserva_porta_horas', rotulo: 'Validade da reserva de porta (h)', tipo: 'number', valor: o.reserva_porta_horas },
       ], { enviar: async (d) => { await api.patch('/organizacao', d); toast('Parâmetros salvos.'); TELAS.organizacao(); } }), { tipo: 'secundario' })))),
+    /*
+     * Parâmetros que o motor de faturamento e a régua de cobrança leem a cada execução. A carência é a garantia
+     * da operação: nenhuma regra da régua bloqueia antes dela, mesmo pedindo um corte mais cedo.
+     */
+    financeiro: () => carregar(corpo, async () => (org = await api.get('/organizacao')), (o) => painel('Faturamento e cobrança', el('div', {},
+      dl([
+        ['Dia de vencimento padrão', `dia ${o.dia_vencimento_padrao} (cada contrato pode ter o seu)`],
+        ['Carência antes de qualquer bloqueio', `${o.carencia_bloqueio_dias} dia(s) após o vencimento`],
+        ['Multa por atraso', `${(o.multa_atraso_pct_centesimos / 100).toLocaleString('pt-BR')}% uma única vez sobre o saldo`],
+        ['Juros', `${(o.juros_mes_pct_centesimos / 100).toLocaleString('pt-BR')}% ao mês, proporcional aos dias`],
+        ['Primeira fatura proporcional', o.pro_rata ? 'Sim: o mês de entrada (e o de saída) é cobrado pelos dias de serviço' : 'Não: o mês de entrada é cobrado inteiro'],
+        ['Desbloqueio de confiança', o.confianca_dias ? `até ${o.confianca_dias} dia(s), no máximo ${o.confianca_max_ano} vez(es) por ano em cada contrato` : 'Desligado'],
+      ]),
+      botao('Editar', () => formulario('Faturamento e cobrança', [
+        { nome: 'dia_vencimento_padrao', rotulo: 'Dia de vencimento padrão', tipo: 'number', min: 1, max: 28, valor: o.dia_vencimento_padrao,
+          ajuda: 'De 1 a 28, para existir em todo mês. Vale para contratos novos.' },
+        { nome: 'carencia_bloqueio_dias', rotulo: 'Carência antes do bloqueio (dias)', tipo: 'number', valor: o.carencia_bloqueio_dias,
+          ajuda: 'Nenhuma regra da régua corta antes disso, mesmo configurada para menos.' },
+        { nome: 'multa_atraso_pct', rotulo: 'Multa por atraso (%)', tipo: 'decimal', valor: (o.multa_atraso_pct_centesimos / 100).toString().replace('.', ','), ajuda: 'Cobrada uma vez sobre o saldo.' },
+        { nome: 'juros_mes_pct', rotulo: 'Juros ao mês (%)', tipo: 'decimal', valor: (o.juros_mes_pct_centesimos / 100).toString().replace('.', ','), ajuda: 'Proporcional aos dias de atraso.' },
+        { nome: 'pro_rata', rotulo: 'Cobrar o mês de entrada e de saída pelos dias de serviço', tipo: 'checkbox', valor: Boolean(o.pro_rata), inteiro: true },
+        { nome: 'confianca_dias', rotulo: 'Desbloqueio de confiança: prazo máximo (dias)', tipo: 'number', valor: o.confianca_dias, ajuda: 'Zero desliga o recurso.' },
+        { nome: 'confianca_max_ano', rotulo: 'Confianças por contrato por ano', tipo: 'number', valor: o.confianca_max_ano, ajuda: 'Zero não limita.' },
+      ], { largo: true, enviar: async (d) => { await api.patch('/organizacao', d); toast('Parâmetros salvos. Valem na próxima execução do ciclo e da régua.'); TELAS.financeiro(); } }),
+      { tipo: 'secundario' })))),
     auditoria: (f = { pagina: 1 }) => carregar(corpo, () => api.get(`/organizacao/auditoria${qs(f)}`), (l) => painel(null, tabela([
       { titulo: 'Quando', valor: (a) => dataHora(a.criado_em, { segundos: true }) }, { titulo: 'Quem', valor: (a) => a.usuario_nome ?? 'Sistema' },
       { titulo: 'Ação', valor: (a) => a.acao.replaceAll('_', ' ') }, { titulo: 'Recurso', valor: (a) => (a.recurso ? `${a.recurso} #${a.recurso_id ?? ''}` : '—') },

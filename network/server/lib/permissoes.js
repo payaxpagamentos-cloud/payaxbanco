@@ -3,6 +3,9 @@
 /**
  * Permissões por perfil, verificadas no servidor em cada rota. Esconder um botão na tela não substitui esta tabela.
  * Escopos de técnico (só os próprios chamados, comissões e abastecimentos) são aplicados dentro das rotas.
+ *
+ * Esta tabela é a única verdade sobre perfis: o banco guarda o perfil como texto livre e a rota valida contra as
+ * chaves daqui, então um módulo novo acrescenta um perfil sem mexer no esquema.
  */
 const PERFIS = {
   admin: 'Administrador',
@@ -11,6 +14,7 @@ const PERFIS = {
   frota: 'Gestor de frota',
   tecnico: 'Técnico',
   comissoes: 'Conferência de comissões',
+  financeiro: 'Financeiro',
   consulta: 'Consulta / TV',
 };
 
@@ -47,6 +51,24 @@ const P = {
   'combustivel.comprovantes': ['admin', 'frota'],
   'rastreamento.ver': ['admin', 'gestor', 'frota'],
   'rastreamento.vincular': ['admin', 'frota'],
+  // Assinantes e planos. O técnico não consulta a base de assinantes: no chamado dele vêm só os dados daquele atendimento.
+  'assinantes.ver': ['admin', 'financeiro', 'gestor', 'noc'],
+  'assinantes.editar': ['admin', 'financeiro'],
+  'planos.editar': ['admin', 'financeiro'],
+  'contratos.ver': ['admin', 'financeiro', 'gestor', 'noc'],
+  'contratos.editar': ['admin', 'financeiro'],
+  // Ativar, suspender, reativar e cancelar contrato: mexe no serviço e na receita.
+  'contratos.ciclo': ['admin', 'financeiro'],
+  'faturamento.ver': ['admin', 'financeiro', 'gestor'],
+  'faturamento.faturar': ['admin', 'financeiro'],
+  'faturamento.baixar': ['admin', 'financeiro'],
+  // Estornar baixa e cancelar fatura desfazem dinheiro já registrado: só o administrador.
+  'faturamento.estornar': ['admin'],
+  'cobranca.ver': ['admin', 'financeiro', 'gestor'],
+  'cobranca.regras': ['admin', 'financeiro'],
+  'cobranca.executar': ['admin', 'financeiro'],
+  'bloqueios.aplicar': ['admin', 'financeiro'],
+  'bloqueios.liberar': ['admin', 'financeiro'],
   'integracoes.ver': ['admin', 'noc', 'frota', 'gestor'],
   'integracoes.editar': ['admin'],
   'usuarios.gerenciar': ['admin'],

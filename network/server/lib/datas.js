@@ -13,4 +13,9 @@ function somarDias(data, n) {
 
 const diasEntre = (a, b) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400_000);
 
-module.exports = { dataLocal, somarDias, diasEntre };
+/** Data 'AAAA-MM-DD' como 18/08/2026, para mensagens e históricos que a pessoa lê. */
+const dataBr = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('/') : '—');
+/** Competência 'AAAA-MM' como 08/2026. */
+const competenciaBr = (c) => (c ? `${String(c).slice(5, 7)}/${String(c).slice(0, 4)}` : '—');
+
+module.exports = { dataLocal, somarDias, diasEntre, dataBr, competenciaBr };

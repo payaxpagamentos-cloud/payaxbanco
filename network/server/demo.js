@@ -18,6 +18,8 @@ const { criarApp } = require('./app');
 const { criarOrganizacao } = require('./lib/organizacoes');
 const { hashSenha } = require('./lib/senha');
 const { processarAmostra } = require('./lib/noc');
+const fat = require('./lib/faturamento');
+const cob = require('./lib/cobranca');
 
 const SENHA = 'demo12345';
 const db = abrir();
@@ -28,9 +30,9 @@ if (db.prepare("SELECT 1 FROM usuarios WHERE email = 'demo@managernetwork.local'
 const org = criarOrganizacao(db, { nome: 'Provedor Demonstração', demonstracao: true });
 db.prepare("UPDATE organizacoes SET nome = 'Provedor Demonstração · Praia Grande' WHERE id = ?").run(org);
 const PERFIS = { demo: 'admin', 'gestor.demo': 'gestor', 'noc.demo': 'noc', 'frota.demo': 'frota', 'lucas.demo': 'tecnico', 'rafael.demo': 'tecnico', 'bruno.demo': 'tecnico',
-  'comissoes.demo': 'comissoes', 'tv.demo': 'consulta' };
+  'comissoes.demo': 'comissoes', 'financeiro.demo': 'financeiro', 'tv.demo': 'consulta' };
 const NOMES = { demo: 'Adriano Almeida', 'gestor.demo': 'Gestão Operacional', 'noc.demo': 'Operador NOC', 'frota.demo': 'Gestão de Frota', 'lucas.demo': 'Lucas Oliveira',
-  'rafael.demo': 'Rafael Santos', 'bruno.demo': 'Bruno Costa', 'comissoes.demo': 'Conferência', 'tv.demo': 'Painel TV' };
+  'rafael.demo': 'Rafael Santos', 'bruno.demo': 'Bruno Costa', 'comissoes.demo': 'Conferência', 'financeiro.demo': 'Financeiro', 'tv.demo': 'Painel TV' };
 const ids = {};
 for (const [k, perfil] of Object.entries(PERFIS)) {
   ids[k] = Number(db.prepare('INSERT INTO usuarios (organizacao_id, nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, ?, ?, ?)')
@@ -176,6 +178,97 @@ const servidor = criarApp(db).listen(0, async () => {
     }
     c5 = await req('lucas.demo', 'GET', `/chamados/${c5.id}`);
     await req('lucas.demo', 'POST', `/chamados/${c5.id}/concluir`, { versao: c5.versao });
+
+
+    /*
+     * Assinantes, contratos e financeiro. As competências são calculadas a partir de hoje, então a demonstração
+     * sempre tem um mês fechado, um mês corrente, faturas pagas, faturas vencidas e serviço cortado pela régua.
+     */
+    const HOJE = dia(0);
+    const C_ATUAL = fat.competenciaDe(HOJE);
+    const C_ANTERIOR = fat.somarMeses(C_ATUAL, -1);
+    const C_RETRASADA = fat.somarMeses(C_ATUAL, -2);
+    const fin = (c, b) => post('financeiro.demo', c, b);
+
+    const planos = {};
+    for (const [chave, b] of Object.entries({
+      f300: { nome: 'Fibra 300', tipo: 'internet', tecnologia: 'fibra', download_mbps: 300, upload_mbps: 150, mensalidade: '89,90', instalacao: '150,00', fidelidade_meses: 12 },
+      f500: { nome: 'Fibra 500', tipo: 'internet', tecnologia: 'fibra', download_mbps: 500, upload_mbps: 250, mensalidade: '109,90', instalacao: '150,00', fidelidade_meses: 12 },
+      f700: { nome: 'Fibra 700 + Wi-Fi 6', tipo: 'internet', tecnologia: 'fibra', download_mbps: 700, upload_mbps: 350, mensalidade: '149,90', instalacao: '0,00', fidelidade_meses: 12 },
+      combo: { nome: 'Combo Fibra 500 + Voz', tipo: 'combo', tecnologia: 'fibra', download_mbps: 500, upload_mbps: 250, mensalidade: '129,90', instalacao: '99,00', fidelidade_meses: 12 },
+      empresarial: { nome: 'Empresarial 600 dedicado', tipo: 'internet', tecnologia: 'fibra', download_mbps: 600, upload_mbps: 600, mensalidade: '399,00', instalacao: '450,00' },
+    })) planos[chave] = await fin('/planos', b);
+
+    // Portas livres das CTOs, para o contrato ocupar o ponto de verdade na planta.
+    const livres = db.prepare(`SELECT id FROM portas_rede WHERE ativo_id IN (${ctos.map(() => '?').join(',')}) AND situacao = 'livre' AND em_uso = 1
+      ORDER BY ativo_id, numero`).all(...ctos.map((c) => c.id));
+
+    // [nome, documento, tipo, telefone, bairro, rua, numero, plano, dia de vencimento, ativação, situação final]
+    const CARTEIRA = [
+      ['Maria Souza Lima', '390.533.447-05', 'pf', '13991110001', 'Ocian', 'Rua das Gaivotas', '120', 'f500', 20, `${C_ANTERIOR}-08`, 'ativo'],
+      ['José Carlos Pereira', '111.444.777-35', 'pf', '13991110002', 'Mirim', 'Av. dos Jacarandás', '455', 'f300', 10, dia(-200), 'ativo'],
+      ['Ana Paula Rodrigues', '529.982.247-25', 'pf', '13991110003', 'Tupi', 'Rua dos Corais', '78', 'f700', 5, dia(-420), 'ativo'],
+      ['Padaria Pão Quente ME', '45.997.418/0001-53', 'pj', '1334440004', 'Aviação', 'Av. Central', '1020', 'empresarial', 10, dia(-150), 'inadimplente'],
+      ['Carlos Eduardo Dias', '693.419.080-78', 'pf', '13991110005', 'Ocian', 'Rua das Pitangueiras', '33', 'combo', 15, dia(-95), 'inadimplente'],
+      ['Fernanda Alves Costa', '040.981.520-96', 'pf', '13991110006', 'Mirim', 'Rua do Farol', '610', 'f300', 25, dia(-60), 'ativo'],
+      ['Mercado Bom Preço Ltda', '19.131.243/0001-97', 'pj', '1334440007', 'Tupi', 'Rua do Comércio', '240', 'combo', 10, dia(-30), 'ativo'],
+      ['Roberto Nunes Teixeira', '370.527.980-77', 'pf', '13991110008', 'Aviação', 'Rua das Acácias', '12', 'f500', 20, null, 'implantacao'],
+      ['Luciana Martins Reis', '818.233.740-26', 'pf', '13991110009', 'Ocian', 'Rua das Hortênsias', '505', 'f300', 10, dia(-380), 'cancelado'],
+    ];
+    const carteira = [];
+    for (const [nome, documento, tipo, telefone, bairro, rua, numero, plano, venc, ativacao, destino] of CARTEIRA) {
+      const a = await fin('/assinantes', { tipo, nome, documento, telefone, email: `${nome.split(' ')[0].toLowerCase()}@exemplo.com`,
+        cep: '11700000', logradouro: rua, numero, bairro, cidade: 'Praia Grande', uf: 'SP', consentimento: true });
+      // Uma porta livre por contrato: a reserva acompanha o contrato mesmo antes de o serviço ser ativado.
+      const portaId = livres[carteira.length]?.id;
+      const c = await fin('/contratos', { assinante_id: a.id, plano_id: planos[plano].id, dia_vencimento: venc,
+        cto_id: ctos[carteira.length % ctos.length].id, porta_id: portaId });
+      if (ativacao) await fin(`/contratos/${c.id}/ativar`, { ativacao, porta_id: portaId });
+      carteira.push({ assinante: a, contrato: c, destino, plano });
+    }
+
+    // Serviços adicionais e um desconto de fidelidade, com vigência por competência.
+    await fin(`/contratos/${carteira[0].contrato.id}/itens`, { descricao: 'Streaming parceiro', tipo: 'sva', valor: '19,90', inicio: C_ANTERIOR });
+    await fin(`/contratos/${carteira[2].contrato.id}/itens`, { descricao: 'Aluguel de roteador Wi-Fi 6', tipo: 'equipamento', valor: '15,00', inicio: C_RETRASADA });
+    await fin(`/contratos/${carteira[2].contrato.id}/itens`, { descricao: 'Desconto fidelidade', tipo: 'desconto', valor: '10,00', inicio: C_RETRASADA });
+    await fin(`/contratos/${carteira[6].contrato.id}/itens`, { descricao: 'Ponto adicional', tipo: 'ponto_adicional', valor: '29,90', inicio: C_ATUAL });
+
+    // Régua de cobrança da operação.
+    for (const r of [
+      { nome: 'Lembrete antes do vencimento', dias: -3, acao: 'avisar', canal: 'whatsapp', texto: 'Sua fatura vence em 3 dias. Qualquer dúvida, estamos à disposição.' },
+      { nome: 'Aviso de atraso', dias: 1, acao: 'avisar', canal: 'whatsapp', texto: 'Identificamos que sua fatura venceu ontem. O serviço segue ativo durante a carência.' },
+      { nome: 'Corte por inadimplência', dias: 7, acao: 'bloquear' },
+      { nome: 'Indicar para cancelamento', dias: 45, acao: 'indicar_cancelamento' },
+    ]) await fin('/cobranca/regras', r);
+
+    // Faturamento dos três meses e baixa de quem está em dia.
+    for (const competencia of [C_RETRASADA, C_ANTERIOR, C_ATUAL]) await fin('/faturamento/ciclos', { competencia });
+    const inadimplentes = new Set(carteira.filter((x) => x.destino === 'inadimplente').map((x) => x.contrato.id));
+    for (const f of db.prepare(`SELECT * FROM faturas WHERE organizacao_id = ? AND situacao = 'aberta' ORDER BY vencimento`).all(org)) {
+      if (inadimplentes.has(f.contrato_id) || f.vencimento > HOJE) continue;
+      await fin(`/faturamento/faturas/${f.id}/pagamentos`, { forma: f.numero % 3 === 0 ? 'boleto' : 'pix', data: f.vencimento });
+    }
+    // Uma fatura em dia com pagamento parcial, para a tela mostrar o saldo remanescente.
+    const parcial = db.prepare(`SELECT * FROM faturas WHERE organizacao_id = ? AND contrato_id = ? AND situacao = 'aberta' ORDER BY vencimento LIMIT 1`)
+      .get(org, carteira[5].contrato.id);
+    if (parcial) await fin(`/faturamento/faturas/${parcial.id}/pagamentos`, { valor: '40,00', forma: 'pix', data: HOJE });
+
+    // Cobrança avulsa de uma visita técnica.
+    await fin('/faturamento/faturas', { assinante_id: carteira[1].assinante.id, vencimento: dia(8),
+      itens: [{ descricao: 'Visita técnica a pedido do assinante', valor: '80,00' }], observacoes: 'Mudança de ponto dentro do imóvel.' });
+
+    // A régua roda e corta quem passou da carência; um dos cortados recebe desbloqueio de confiança.
+    const execucao = cob.rotinaDiaria(db, org, HOJE);
+    const cortado = db.prepare("SELECT * FROM contratos WHERE organizacao_id = ? AND situacao = 'bloqueado' ORDER BY id LIMIT 1").get(org);
+    if (cortado) {
+      await post('financeiro.demo', `/cobranca/contratos/${cortado.id}/confianca`, { dias: 3, motivo: 'Assinante informou pagamento para esta semana.' })
+        .catch(() => { /* sem bloqueio por inadimplência: segue sem confiança */ });
+    }
+    // Contrato encerrado, para o histórico de churn existir.
+    const encerrado = carteira.find((x) => x.destino === 'cancelado');
+    if (encerrado) await fin(`/contratos/${encerrado.contrato.id}/cancelar`, { motivo: 'Mudança para outra cidade', data: dia(-20) });
+
+    console.log(`Carteira demonstrativa: ${carteira.length} assinantes, ${execucao.regua.bloqueios} corte(s) pela régua, ${execucao.regua.avisos} aviso(s) preparado(s).`);
 
     console.log('Organização demonstrativa criada. Acessos (senha demo12345):');
     for (const [k, p] of Object.entries(PERFIS)) console.log(`  ${k}@managernetwork.local  (${p})`);

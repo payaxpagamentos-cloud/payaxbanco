@@ -1,8 +1,12 @@
 # Manager Network
 
-Sistema para provedores de internet que reúne **rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota,
-manutenção, abastecimentos e rastreamento**. Publicado em `/network`, com servidor, banco (SQLite com migrações), usuários
-e login próprios, e identidade própria: grafite e verde-esmeralda, com alertas em laranja e vermelho.
+ERP para provedores de internet: **assinantes, contratos, faturamento e cobrança** ao lado de **rede óptica, Central NOC,
+chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento**. Publicado em `/network`, com
+servidor, banco (SQLite com migrações), usuários e login próprios, e identidade própria: grafite e verde-esmeralda, com
+alertas em laranja e vermelho.
+
+O assinante, o contrato e a planta óptica vivem no mesmo banco: o contrato ocupa a porta na CTO, o corte por inadimplência
+aparece no histórico do contrato e o chamado técnico cai na mesma caixa que o cliente usa. Uma instalação por provedor.
 
 Ele se conecta ao **Rastreador de Veículos** deste repositório ([`rastreador/`](../rastreador/README.md)) pela API de
 integração dele, recebe as medições da rede por um **coletor** autenticado e tem um adaptador configurável para o
@@ -17,11 +21,16 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 3 | **Rede óptica** | POPs, CEOs e CTOs com coordenadas validadas; portas com reserva (validade e responsável), ocupação, defeito e histórico; ligações com percurso até o POP (trecho desconhecido explícito); fusões por bandeja sem extremidade repetida; cabos; equipamentos ativos (OLT/PON). Situação de CTO/CEO sempre com a origem: inspeção manual ou inferência pelo equipamento ativo. |
 | 4 | **Chamados técnicos** | Kanban e lista; aberto → atribuído → em rota → em execução → concluído (em validação) → aprovado/retornado, com cancelar, reagendar e reabrir auditados. Atribuição recusa veículo indisponível (com o motivo) e sinaliza conflito de agenda. Checklist versionado por tipo (potência antes/depois, foto, porta…), evidências por câmera, interface do técnico no celular. |
 | 5 | **Equipe e comissões** | Técnicos, produtividade por período (concluídos, aprovados, tempo médio, prazo, retrabalho), regras versionadas (valor fixo ou valor × quantidade do checklist), conferência (ninguém aprova a própria), rateio da equipe, ajustes/estornos e **registro administrativo** de pagamento com comprovante. |
-| 6 | **Veículos** | Placa normalizada e única por organização, responsáveis com início e fim, restrições (oficina, documento, sinistro…) que tiram o veículo da escala até a liberação, documentos com vencimento, histórico de manutenção, abastecimentos e chamados. |
-| 7 | **Manutenção e lavagem** | Planos preventivos por item, por dias e/ou km (alerta no primeiro limite, antecedência e tolerância); ordens solicitado → orçado → aprovado (alçada por valor) → agendado → em execução → concluído; lavagem sem zerar a mecânica; fornecedores; custos orçado e realizado separados. |
-| 8 | **Abastecimentos** | Comprovante, volume, preço, odômetro e tanque cheio; total = litros × preço; preço médio ponderado; consumo por ciclo entre tanques cheios (com os parciais); lançamento retroativo validado; volume acima do tanque sinalizado; correção autorizada com valor original guardado; relatórios por veículo, técnico e posto; CSV protegido. |
-| 9 | **Rastreamento** | Posições do rastreador com horário da medição e idade; parado ≠ sem comunicação; ignição ausente = desconhecida; trajeto do período; vínculo dispositivo ↔ veículo pelo IMEI (a placa só sugere); chamados próximos por distância em linha reta (não é ETA). |
-| 10 | **Integrações** | Rastreador, coletores de monitoramento e Downdetector: configuração, teste de conexão, estado (não configurada, conectada, parcial, desatualizada, sem permissão, limite atingido, falha), último sucesso, erro com ID e histórico de coletas. |
+| 6 | **Assinantes** | Pessoa física e jurídica com CPF/CNPJ conferido pelo dígito e único na operação, endereço georreferenciado, contatos, consentimento de contato comercial (LGPD) e posição financeira. Situação comercial (prospecto → cliente → inativo) mantida pelo próprio sistema; o estado do serviço é do contrato, nunca copiado. |
+| 7 | **Contratos** | O serviço de um assinante num endereço: plano, mensalidade contratada (independente da tabela de preços de hoje), dia de vencimento, fidelidade, ponto na planta (CTO e porta, ocupada de verdade na ativação) e itens fixos por competência (SVA, aluguel de equipamento, ponto adicional, desconto). Ciclo em implantação → ativo → bloqueado/suspenso → cancelado, cada passo com quem fez, de onde veio e por quê. |
+| 8 | **Faturamento** | Ciclo mensal **simulável quantas vezes quiser** antes de emitir, com o que será cobrado de cada contrato e o motivo de cada contrato fora do ciclo; **pró-rata** de entrada e de saída (e adiada quando o vencimento do mês de entrada já passou); instalação cobrada uma vez; competência que não roda duas vezes; multa e juros calculados no dia do pagamento, sem alterar o valor da fatura; baixa total ou parcial, estorno com motivo, cancelamento e cobrança avulsa. |
+| 9 | **Cobrança e bloqueios** | Régua versionada por dias em relação ao vencimento (avisar, bloquear, indicar para cancelamento), carência que prevalece sobre qualquer regra, execução idempotente (a mesma regra nunca roda duas vezes na mesma fatura), bloqueio que guarda a regra e a fatura que o originou, **desbloqueio de confiança** com prazo e limite anual, desbloqueio automático na quitação e inadimplência por faixa de atraso. |
+| 10 | **Planos** | Tabela comercial (internet, voz, SVA, combo) com tecnologia, velocidade, mensalidade, taxa de instalação e fidelidade. Alterar o plano não altera o que já foi contratado. |
+| 11 | **Veículos** | Placa normalizada e única por organização, responsáveis com início e fim, restrições (oficina, documento, sinistro…) que tiram o veículo da escala até a liberação, documentos com vencimento, histórico de manutenção, abastecimentos e chamados. |
+| 12 | **Manutenção e lavagem** | Planos preventivos por item, por dias e/ou km (alerta no primeiro limite, antecedência e tolerância); ordens solicitado → orçado → aprovado (alçada por valor) → agendado → em execução → concluído; lavagem sem zerar a mecânica; fornecedores; custos orçado e realizado separados. |
+| 13 | **Abastecimentos** | Comprovante, volume, preço, odômetro e tanque cheio; total = litros × preço; preço médio ponderado; consumo por ciclo entre tanques cheios (com os parciais); lançamento retroativo validado; volume acima do tanque sinalizado; correção autorizada com valor original guardado; relatórios por veículo, técnico e posto; CSV protegido. |
+| 14 | **Rastreamento** | Posições do rastreador com horário da medição e idade; parado ≠ sem comunicação; ignição ausente = desconhecida; trajeto do período; vínculo dispositivo ↔ veículo pelo IMEI (a placa só sugere); chamados próximos por distância em linha reta (não é ETA). |
+| 15 | **Integrações** | Rastreador, coletores de monitoramento e Downdetector: configuração, teste de conexão, estado (não configurada, conectada, parcial, desatualizada, sem permissão, limite atingido, falha), último sucesso, erro com ID e histórico de coletas. |
 
 Mais: **Organização e acessos** (usuários, perfis, matriz de permissões, parâmetros da operação e auditoria com request ID).
 
@@ -30,11 +39,12 @@ Mais: **Organização e acessos** (usuários, perfis, matriz de permissões, par
 | Perfil | Acesso |
 |---|---|
 | **Administrador** | Tudo da própria organização, inclusive usuários, integrações, parâmetros e auditoria. |
-| **Gestor operacional** | Distribui e valida chamados, rede, NOC, frota (consulta e escala) e produtividade. |
+| **Gestor operacional** | Distribui e valida chamados, rede, NOC, frota (consulta e escala) e produtividade. Consulta assinantes, contratos, faturas e inadimplência, sem alterar. |
 | **NOC** | Rede, incidentes, regras de monitoramento, topologia e chamados relacionados. |
 | **Gestor de frota** | Veículos, restrições, documentos, manutenção, lavagem, fornecedores, combustível e vínculos do rastreador. |
-| **Técnico** | Só os próprios chamados (execução, checklist, evidências), as próprias comissões e os abastecimentos do veículo sob sua responsabilidade. Não vê a posição das equipes. |
+| **Técnico** | Só os próprios chamados (execução, checklist, evidências), as próprias comissões e os abastecimentos do veículo sob sua responsabilidade. Não vê a posição das equipes **nem a base de assinantes**: do atendimento dele vêm só os dados daquele chamado. |
 | **Conferência de comissões** | Regras, aprovação, ajustes e registro de pagamento (nunca da própria comissão). |
+| **Financeiro** | Assinantes, planos, contratos (inclusive ativar, suspender e cancelar), faturamento, baixas, régua de cobrança, bloqueio e desbloqueio. Não estorna baixa nem cancela fatura: isso é do administrador. |
 | **Consulta / TV** | Indicadores e painel TV, sem escrita. |
 
 As regras ficam no servidor (`server/lib/permissoes.js` e as rotas): esconder um botão não substitui a permissão. Todo dado
@@ -48,7 +58,7 @@ Requisitos: **Node.js 22.13+**.
 cd network
 npm install
 npm start          # http://localhost:3500/  (com NETWORK_BASE_PATH=/network → http://localhost:3500/network/)
-npm test           # 63 testes de aceite (inclui o rastreador real, se rastreador/node_modules existir)
+npm test           # 110 testes de aceite (inclui o rastreador real, se rastreador/node_modules existir)
 ```
 
 Acesso inicial: `admin@managernetwork.local` / `admin12345` (defina `NETWORK_ADMIN_EMAIL` e `NETWORK_ADMIN_SENHA`; em produção a senha é obrigatória).
@@ -60,9 +70,9 @@ O primeiro start cria a organização (`NETWORK_ORGANIZACAO`) **vazia**: os cada
 npm run demo       # cria a organização "Provedor Demonstração", separada e marcada como demonstração
 ```
 
-Dados fictícios (pessoas, placas, endereços, medições, valores de comissão), criados pela própria API. A interface mostra o
+Dados fictícios (pessoas, placas, endereços, medições, valores de comissão, carteira de assinantes com três meses faturados, faturas pagas e vencidas, cortes feitos pela régua e um desbloqueio de confiança), criados pela própria API. A interface mostra o
 selo **Ambiente demonstrativo** só nessa organização. Acessos com a senha `demo12345`: `demo@`, `gestor.demo@`, `noc.demo@`,
-`frota.demo@`, `lucas.demo@` (técnico), `comissoes.demo@` e `tv.demo@managernetwork.local`. O script recusa rodar com
+`frota.demo@`, `lucas.demo@` (técnico), `comissoes.demo@`, `financeiro.demo@` e `tv.demo@managernetwork.local`. O script recusa rodar com
 `NODE_ENV=production`; use um banco separado. Rastreador e Downdetector ficam não configurados.
 
 ## Configuração
@@ -84,6 +94,24 @@ Veja [`.env.exemplo`](.env.exemplo).
 | `NETWORK_COLETAS` | ligado | `0` desliga as coletas periódicas. |
 | `NETWORK_MAPA_TILES` / `_ATRIBUICAO` / `_LAT` / `_LNG` | Esri World Street Map | Camada de imagens do mapa (Leaflet). Para uso comercial e volume alto, use um provedor licenciado. |
 | `NETWORK_TRUST_PROXY` / `NETWORK_LIMITE_LOGIN` | `loopback` / `10` | Proxy reverso e tentativas de login por minuto. |
+
+### Parâmetros de faturamento e cobrança
+
+Ficam na organização (não em variável de ambiente) e são editados em **Organização e acessos → Faturamento e cobrança**.
+O ciclo e a régua leem estes valores a cada execução:
+
+| Parâmetro | Padrão | O que faz |
+|---|---|---|
+| Dia de vencimento padrão | `10` | Sugerido ao criar contrato (1 a 28, para existir em todo mês). Cada contrato pode ter o seu. |
+| Carência antes do bloqueio | `5` dias | **Nenhuma regra da régua corta antes disso**, mesmo configurada para menos. O contrato pode ter carência própria. |
+| Multa por atraso | `2,00%` | Uma única vez sobre o saldo, calculada no dia do pagamento. |
+| Juros | `1,00%` ao mês | Proporcional aos dias de atraso (pro rata die). |
+| Primeira fatura proporcional | ligada | O mês de entrada (e o de saída) é cobrado pelos dias de serviço. Desligada, o mês é cobrado inteiro. |
+| Desbloqueio de confiança | `5` dias, `3` por ano | Prazo máximo e quantas vezes cada contrato pode usar no ano. Zero dias desliga o recurso. |
+
+A rotina diária (expirar confianças vencidas e aplicar a régua) roda sozinha uma vez por dia, pela data no fuso da
+organização, e fica registrada. Se o servidor passar um dia desligado, ela roda ao voltar e a régua pega o atraso
+acumulado sem repetir o que já havia feito. `NETWORK_COLETAS=0` desliga também essa rotina.
 
 Migrações: aplicadas automaticamente no start, em ordem e numa transação cada (`server/db.js`, tabela `schema_migracoes`).
 `npm run migrar` aplica sem iniciar o servidor. Produção com Docker: `docker build -t manager-network network/` e volume em `/app/data`.
@@ -143,6 +171,13 @@ com `{servico}`, cabeçalho de autenticação, credencial e onde ler o volume de
   versão da regra e valor guardados; ajustes são novos registros; pagamento é **registro administrativo, sem transferência bancária**.
 - **Preventiva** alerta no primeiro limite (data ou km); sem odômetro confiável, avalia só a data e avisa.
 - **Veículo com restrição ativa** não recebe escala; concluir um serviço só libera a restrição daquele serviço.
+- **Uma competência por contrato**: rodar o ciclo duas vezes não cobra o assinante duas vezes, e a simulação não grava nada nem consome número de fatura.
+- **O valor da fatura não muda depois de emitida**: multa e juros são calculados no dia do pagamento e ficam registrados na baixa.
+- **A carência prevalece sobre a régua**: uma regra que mande cortar antes dela só age quando ela terminar.
+- **Quem corta é sempre uma regra identificada**: o bloqueio guarda a regra, a fatura e o dia, e aparece no histórico do contrato.
+- **Cancelar contrato nunca é automático**: a régua, no máximo, indica o contrato e registra a indicação.
+- **Bloqueio por inadimplência continua faturando** (o serviço está cortado, o contrato não); **suspensão a pedido** não fatura.
+- **Nada de dinheiro é apagado**: estorno, cancelamento de fatura e item encerrado continuam no histórico, com motivo e autor.
 - **Dinheiro em centavos**, volume em mL e preço por litro em milésimos: todos os cálculos com inteiros.
 - **Concorrência**: reserva de porta, aprovação e mudanças de status com condição sobre o estado e versão otimista (`versao`); conflito devolve 409 legível.
 - **Idempotência**: todo POST da interface leva `Idempotency-Key`; repetir devolve a mesma resposta.
@@ -156,10 +191,12 @@ network/
     db.js              # migrações (organizações, frota, rede, chamados, comissões, rastreamento, NOC, integrações, auditoria)
     auth.js            # token HMAC e exigir(permissão)
     lib/permissoes.js  # matriz perfil × permissão
-    lib/frota.js manutencao.js combustivel.js rede.js comissoes.js noc.js anexos.js http.js (paginação, idempotência, CSV)
+    lib/faturamento.js # pró-rata, ciclo, encargos, baixa, estorno
+    lib/cobranca.js    # régua versionada, carência, bloqueio, confiança, inadimplência
+    lib/frota.js manutencao.js combustivel.js rede.js comissoes.js noc.js anexos.js enderecos.js http.js (paginação, idempotência, CSV)
     conectores/        # base (SSRF, timeout, estados, backoff), rastreador, downdetector
-    routes/            # organizacao, frota, manutencao, combustivel, rede, chamados, equipe, noc, coletor, rastreamento, integracoes, painel
-    coletas.js         # agenda das coletas
+    routes/            # organizacao, assinantes, planos, contratos, faturamento, cobranca, frota, manutencao, combustivel, rede, chamados, equipe, noc, coletor, rastreamento, integracoes, painel
+    coletas.js         # agenda das coletas e a rotina diária de cobrança (uma vez por dia, no fuso da organização)
     demo.js            # organização demonstrativa (separada)
   public/              # SPA sem build (módulos ES), Leaflet + markercluster servidos do próprio pacote
   scripts/coletor-exemplo.js
@@ -168,8 +205,12 @@ network/
 
 ## O que depende de terceiros
 
+- **Boleto registrado, PIX cobrança e cartão**: exigem convênio com o banco ou contrato com um meio de pagamento. Hoje a fatura é emitida e a baixa é registrada pela equipe (ou importada), com a forma de pagamento e a origem.
+- **Retorno bancário (CNAB) automático**: a baixa já aceita a origem `retorno`; a leitura do arquivo depende do layout do banco do provedor.
+- **Envio automático de aviso por WhatsApp ou e-mail**: exige contrato com um provedor de mensagens. A régua deixa o aviso pronto, com o texto da regra, e registra quem despachou e quando.
+- **Nota fiscal (NFCom, modelo 62)**: exige certificado digital e credenciamento na SEFAZ.
+- **Corte e religação no equipamento** (RADIUS, OLT, Mikrotik): o bloqueio aqui é a decisão comercial, registrada e auditada; a execução na rede depende do provisionamento, que ainda não faz parte deste módulo.
 - **Downdetector**: acesso autorizado (API Enterprise), credencial e a documentação dos recursos contratados.
 - **Plataforma de monitoramento** do provedor (ou o agente de exemplo na rede interna) enviando amostras ao coletor.
-- **Cadastro de clientes/ONUs** do sistema de gestão: hoje a referência do cliente entra na porta; a conexão automática exige o contrato dessa API.
 - **Rota viária e trânsito** para estimar chegada: hoje só distância em linha reta, identificada como tal.
 - **Camada de mapa licenciada** para o volume de uso da operação.

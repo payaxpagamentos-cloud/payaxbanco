@@ -44,6 +44,9 @@ const ICONES = {
   sair: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h11"/>',
   config: '<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/>',
   camera: '<path d="M3 8h4l2-3h6l2 3h4v12H3V8Z"/><circle cx="12" cy="13" r="4"/>',
+  pessoa: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 16 0v2"/>',
+  recibo: '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2Z"/><path d="M9 7h6M9 11h6M9 15h3"/>',
+  cadeado: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
 };
 
 export function icone(nome, classe = '') {
@@ -108,6 +111,24 @@ export function desde(iso) {
 }
 export const duracaoMin = (m) => (m === null || m === undefined ? '—' : m < 60 ? `${Math.round(m)} min` : `${Math.floor(m / 60)} h ${String(Math.round(m % 60)).padStart(2, '0')} min`);
 export const placa = (p) => (/^[A-Z]{3}\d{4}$/.test(p ?? '') ? `${p.slice(0, 3)}-${p.slice(3)}` : p ?? '');
+/** Competência 'AAAA-MM' como 11/2026. */
+export const competencia = (c) => (c ? `${String(c).slice(5, 7)}/${String(c).slice(0, 4)}` : '—');
+/** CPF ou CNPJ formatado a partir dos dígitos guardados. */
+export const documento = (d) => {
+  const t = String(d ?? '').replace(/\D/g, '');
+  if (t.length === 11) return `${t.slice(0, 3)}.${t.slice(3, 6)}.${t.slice(6, 9)}-${t.slice(9)}`;
+  if (t.length === 14) return `${t.slice(0, 2)}.${t.slice(2, 5)}.${t.slice(5, 8)}/${t.slice(8, 12)}-${t.slice(12)}`;
+  return t || '—';
+};
+export const telefone = (t) => {
+  const d = String(t ?? '').replace(/\D/g, '');
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return d || '—';
+};
+export const porcento = (n) => (n === null || n === undefined ? '—' : `${numero(n, 2)}%`);
+/** Velocidade do plano: 500/250 Mbps, ou só o download quando o upload não é informado. */
+export const velocidade = (d, u) => (d ? `${numero(d)}${u ? `/${numero(u)}` : ''} Mbps` : '—');
 export const iniciais = (n) => String(n ?? '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join('');
 /** Valor de <input type=datetime-local> para ISO (UTC) e de volta. */
 export const localParaIso = (v) => (v ? new Date(v).toISOString() : null);
@@ -143,6 +164,28 @@ export const R = {
   fornecedor: { oficina: 'Oficina / mecânico', posto: 'Posto', lavagem: 'Lavagem', pecas: 'Peças', outro: 'Outro' },
   documento: { crlv: 'CRLV', seguro: 'Seguro', licenciamento: 'Licenciamento', ipva: 'IPVA', vistoria: 'Vistoria', outro: 'Outro' },
   equipamento: { olt: 'OLT', switch: 'Switch', roteador: 'Roteador', servidor: 'Servidor', outro: 'Outro' },
+  situacaoAssinante: { prospecto: ['Prospecto', 'neutra'], cliente: ['Cliente', 'ok'], inativo: ['Inativo', 'neutra'] },
+  situacaoContrato: { em_implantacao: ['Em implantação', 'info'], ativo: ['Ativo', 'ok'], bloqueado: ['Bloqueado', 'erro'],
+    suspenso: ['Suspenso a pedido', 'aviso'], cancelado: ['Cancelado', 'neutra'] },
+  situacaoFatura: { aberta: ['Em aberto', 'info'], parcial: ['Pagamento parcial', 'aviso'], paga: ['Paga', 'ok'], cancelada: ['Cancelada', 'neutra'] },
+  tipoPlano: { internet: 'Internet', voz: 'Voz', sva: 'SVA', combo: 'Combo' },
+  tecnologia: { fibra: 'Fibra', radio: 'Rádio', cabo: 'Cabo', satelite: 'Satélite' },
+  tipoPessoa: { pf: 'Pessoa física', pj: 'Pessoa jurídica' },
+  origemItem: { mensalidade: 'Mensalidade', pro_rata: 'Proporcional', instalacao: 'Instalação', sva: 'Serviço adicional',
+    equipamento: 'Equipamento', ponto_adicional: 'Ponto adicional', desconto: 'Desconto', avulso: 'Avulso', outro: 'Outro' },
+  tipoItemContrato: { sva: 'Serviço adicional', equipamento: 'Aluguel de equipamento', ponto_adicional: 'Ponto adicional', desconto: 'Desconto', outro: 'Outro' },
+  formaPagamento: { pix: 'PIX', boleto: 'Boleto', dinheiro: 'Dinheiro', cartao: 'Cartão', transferencia: 'Transferência', outro: 'Outro' },
+  origemPagamento: { manual: 'Lançada pela equipe', retorno: 'Retorno do banco', portal: 'Portal do assinante' },
+  acaoRegua: { avisar: 'Avisar', bloquear: 'Bloquear o serviço', indicar_cancelamento: 'Indicar para cancelamento' },
+  canalRegua: { sistema: 'No sistema', email: 'E-mail', whatsapp: 'WhatsApp' },
+  resultadoRegua: { executada: ['Executada', 'ok'], pendente_envio: ['Aguardando envio', 'aviso'], ignorada: ['Ignorada', 'neutra'] },
+  tipoBloqueio: { inadimplencia: 'Inadimplência', pedido: 'A pedido do assinante', tecnico: 'Técnico', administrativo: 'Administrativo' },
+  origemAcao: { usuario: 'Equipe', regua: 'Régua de cobrança', sistema: 'Sistema' },
+  estadoConfianca: { vigente: ['Em vigor', 'ok'], vencendo: ['Prazo terminado', 'aviso'], pago: ['Encerrada: pagou', 'ok'],
+    expirada: ['Expirada: bloqueou', 'erro'], cancelada: ['Cancelada', 'neutra'] },
+  eventoContrato: { criado: 'Contrato criado', ativado: 'Serviço ativado', bloqueado: 'Serviço bloqueado', desbloqueado: 'Serviço liberado',
+    suspenso: 'Suspenso a pedido', reativado: 'Reativado', cancelado: 'Contrato cancelado', valor_alterado: 'Valor alterado',
+    plano_alterado: 'Plano alterado', item_incluido: 'Item incluído', item_encerrado: 'Item encerrado', indicado_para_cancelamento: 'Indicado para cancelamento' },
 };
 export const etq = (texto, tipo = '') => el('span', { class: `etq ${tipo}` }, texto);
 export const etqDe = (mapa, chave) => { const x = R[mapa]?.[chave]; return Array.isArray(x) ? etq(x[0], x[1]) : etq(x ?? chave ?? '—', 'neutra'); };

@@ -38,6 +38,11 @@ function criarApi(db, extras = {}) {
   api.use('/organizacao', require('./routes/organizacao')(db));
   api.use('/anexos', require('./routes/anexos')(db));
   api.use('/painel', exigir('painel.ver'), require('./routes/painel')(db));
+  api.use('/assinantes', require('./routes/assinantes')(db));
+  api.use('/planos', require('./routes/planos')(db));
+  api.use('/contratos', require('./routes/contratos')(db));
+  api.use('/faturamento', require('./routes/faturamento')(db));
+  api.use('/cobranca', require('./routes/cobranca')(db));
   api.use('/frota', require('./routes/frota')(db));
   api.use('/manutencao', require('./routes/manutencao')(db));
   api.use('/combustivel', require('./routes/combustivel')(db));

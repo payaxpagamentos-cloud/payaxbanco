@@ -10,6 +10,13 @@ const MENU = [
     ['chamados', 'Chamados técnicos', 'chamado', 'chamados.ver', () => import('./telas/chamados.js')],
     ['equipe', 'Equipe e comissões', 'equipe', ['equipe.ver', 'comissoes.ver'], () => import('./telas/equipe.js')],
   ]],
+  ['Assinantes e financeiro', [
+    ['assinantes', 'Assinantes', 'pessoa', 'assinantes.ver', () => import('./telas/assinantes.js')],
+    ['contratos', 'Contratos', 'arquivo', 'contratos.ver', () => import('./telas/contratos.js')],
+    ['faturamento', 'Faturamento', 'dinheiro', 'faturamento.ver', () => import('./telas/faturamento.js')],
+    ['cobranca', 'Cobrança e bloqueios', 'cadeado', 'cobranca.ver', () => import('./telas/cobranca.js')],
+    ['planos', 'Planos', 'camadas', 'contratos.ver', () => import('./telas/planos.js')],
+  ]],
   ['Gestão de frota', [
     ['veiculos', 'Veículos', 'carro', 'frota.ver', () => import('./telas/veiculos.js')],
     ['manutencao', 'Manutenção e lavagem', 'chave', 'manutencao.ver', () => import('./telas/manutencao.js')],
@@ -95,19 +102,24 @@ function estrutura(rota, principal) {
     pausar.replaceChildren(icone(p ? 'tocar' : 'pausa'));
     toast(p ? 'Efeitos visuais pausados.' : 'Efeitos visuais ativos.');
   } }, icone(efeitosPausados() ? 'tocar' : 'pausa'));
-  const busca = el('input', { type: 'search', placeholder: 'Buscar CTO, chamado ou placa', 'aria-label': 'Buscar na operação' });
+  const busca = el('input', { type: 'search', placeholder: 'Buscar assinante, CPF/CNPJ, CTO, chamado ou placa', 'aria-label': 'Buscar na operação' });
   busca.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || !busca.value.trim()) return;
     const t = busca.value.trim();
-    if (/^[A-Za-z]{3}-?\d[A-Za-z0-9]\d{2}$/.test(t) && permitido('frota.ver')) ir(`#/veiculos?busca=${encodeURIComponent(t)}`);
-    else if (/^#?\d+$/.test(t) && permitido('chamados.ver')) ir(`#/chamados?busca=${encodeURIComponent(t.replace('#', ''))}`);
-    else if (permitido('rede.ver')) ir(`#/rede?busca=${encodeURIComponent(t)}`);
+    const digitos = t.replace(/\D/g, '');
+    const parar = (hash) => ir(hash);
+    if (/^[A-Za-z]{3}-?\d[A-Za-z0-9]\d{2}$/.test(t) && permitido('frota.ver')) parar(`#/veiculos?busca=${encodeURIComponent(t)}`);
+    // CPF ou CNPJ completo leva direto ao assinante.
+    else if ((digitos.length === 11 || digitos.length === 14) && permitido('assinantes.ver')) parar(`#/assinantes?busca=${encodeURIComponent(digitos)}`);
+    else if (/^#?\d+$/.test(t) && permitido('chamados.ver')) parar(`#/chamados?busca=${encodeURIComponent(t.replace('#', ''))}`);
+    else if (/^[A-Za-zÀ-ú\s.]+$/.test(t) && permitido('assinantes.ver')) parar(`#/assinantes?busca=${encodeURIComponent(t)}`);
+    else if (permitido('rede.ver')) parar(`#/rede?busca=${encodeURIComponent(t)}`);
   });
   const sino = el('button', { class: 'botao-icone', title: 'Alertas prioritários', 'aria-label': 'Alertas prioritários', onclick: () => ir(permitido('noc.ver') ? '#/noc' : '#/visao') }, icone('sino'));
   const topo = el('header', { class: 'topo' },
     el('button', { class: 'botao-icone abrir-menu', 'aria-label': 'Abrir menu', 'aria-controls': 'menu', onclick: () => alternarMenu(!menu.classList.contains('aberto')) }, icone('menu')),
     el('div', { class: 'caminho' }, el('span', {}, u.organizacao_nome), el('span', { class: 'sep' }, '/'), el('strong', {}, ROTAS[rota]?.rotulo ?? '')),
-    el('div', { class: 'topo-acoes' }, permitido(['rede.ver', 'chamados.ver', 'frota.ver']) ? el('label', { class: 'busca-topo' }, icone('busca'), busca) : null,
+    el('div', { class: 'topo-acoes' }, permitido(['rede.ver', 'chamados.ver', 'frota.ver', 'assinantes.ver']) ? el('label', { class: 'busca-topo' }, icone('busca'), busca) : null,
       permitido('noc.ver') ? el('a', { class: 'botao-icone', href: '#/tv', title: 'Painel TV do NOC', 'aria-label': 'Painel TV do NOC' }, icone('tv')) : null, pausar, sino));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu.classList.contains('aberto')) alternarMenu(false); }, { once: true });
   return el('div', { class: 'app' }, el('a', { class: 'sr', href: '#conteudo' }, 'Ir para o conteúdo'), menu, fundo, el('div', { class: 'principal' }, topo, principal));

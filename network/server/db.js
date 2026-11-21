@@ -814,26 +814,389 @@ CREATE TABLE amostras_servico_externo (
 CREATE INDEX idx_amostras_servico ON amostras_servico_externo(servico_id, id DESC);
 `,
   },
+  {
+    versao: 2,
+    nome: 'assinantes_faturamento',
+    // Reconstrói a tabela usuarios: as chaves estrangeiras ficam desligadas durante a troca (receita do SQLite).
+    semFk: true,
+    sql: `
+-- Parâmetros financeiros da operação (um provedor por instalação; a organização continua isolando os dados).
+ALTER TABLE organizacoes ADD COLUMN dia_vencimento_padrao INTEGER NOT NULL DEFAULT 10;
+-- Dias após o vencimento antes de a régua poder bloquear (carência da operação; o contrato pode ter a própria).
+ALTER TABLE organizacoes ADD COLUMN carencia_bloqueio_dias INTEGER NOT NULL DEFAULT 5;
+-- Multa única e juros ao mês (pro rata die) sobre fatura em atraso, em centésimos de ponto percentual (200 = 2,00%).
+ALTER TABLE organizacoes ADD COLUMN multa_atraso_pct_centesimos INTEGER NOT NULL DEFAULT 200;
+ALTER TABLE organizacoes ADD COLUMN juros_mes_pct_centesimos INTEGER NOT NULL DEFAULT 100;
+-- Primeira fatura proporcional aos dias a partir da ativação.
+ALTER TABLE organizacoes ADD COLUMN pro_rata INTEGER NOT NULL DEFAULT 1;
+-- Desbloqueio de confiança: prazo concedido e quantas vezes por ano cada contrato pode usar (0 = desligado).
+ALTER TABLE organizacoes ADD COLUMN confianca_dias INTEGER NOT NULL DEFAULT 5;
+ALTER TABLE organizacoes ADD COLUMN confianca_max_ano INTEGER NOT NULL DEFAULT 3;
+
+/*
+ * O perfil do usuário deixa de ser uma lista fixa no banco: a verdade é a tabela de permissões
+ * (server/lib/permissoes.js), conferida em toda rota, e a rota valida o perfil na entrada. Assim cada
+ * módulo novo do ERP (financeiro, atendimento, fiscal, RH) acrescenta um perfil sem reconstruir a tabela.
+ * Troca feita pela receita do SQLite (chaves estrangeiras desligadas e integridade conferida antes do commit).
+ */
+CREATE TABLE usuarios_novo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nome TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  senha_hash TEXT NOT NULL,
+  perfil TEXT NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  ultimo_acesso TEXT,
+  criado_em TEXT NOT NULL
+);
+INSERT INTO usuarios_novo (id, organizacao_id, nome, email, senha_hash, perfil, ativo, ultimo_acesso, criado_em)
+  SELECT id, organizacao_id, nome, email, senha_hash, perfil, ativo, ultimo_acesso, criado_em FROM usuarios;
+DROP TABLE usuarios;
+ALTER TABLE usuarios_novo RENAME TO usuarios;
+
+/*
+ * Assinante: a pessoa ou empresa. A situação aqui é comercial (prospecto, cliente, inativo) e quem a move é o
+ * sistema, quando o primeiro contrato nasce e quando o último é cancelado. O estado do serviço (ativo, bloqueado,
+ * suspenso) é do contrato e nunca é copiado para cá, para não haver duas verdades.
+ */
+CREATE TABLE assinantes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  codigo INTEGER NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('pf','pj')),
+  nome TEXT NOT NULL,
+  nome_fantasia TEXT,
+  -- CPF ou CNPJ, só dígitos, conferido pelo dígito verificador e único na organização.
+  documento TEXT NOT NULL,
+  identidade TEXT,
+  nascimento TEXT,
+  email TEXT,
+  telefone TEXT,
+  telefone2 TEXT,
+  cep TEXT,
+  logradouro TEXT,
+  numero TEXT,
+  complemento TEXT,
+  bairro TEXT,
+  cidade TEXT,
+  uf TEXT,
+  latitude REAL,
+  longitude REAL,
+  situacao TEXT NOT NULL DEFAULT 'prospecto' CHECK (situacao IN ('prospecto','cliente','inativo')),
+  observacoes TEXT,
+  -- LGPD: quando o titular consentiu com o contato comercial (a execução do contrato não depende de consentimento).
+  consentimento_em TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organizacao_id, documento),
+  UNIQUE (organizacao_id, codigo)
+);
+CREATE INDEX idx_assinantes_nome ON assinantes(organizacao_id, nome);
+CREATE INDEX idx_assinantes_situacao ON assinantes(organizacao_id, situacao);
+
+-- Plano comercial. Alterar o plano não altera o que já foi contratado: o contrato guarda o próprio valor.
+CREATE TABLE planos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nome TEXT NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('internet','voz','sva','combo')),
+  tecnologia TEXT CHECK (tecnologia IS NULL OR tecnologia IN ('fibra','radio','cabo','satelite')),
+  download_mbps INTEGER CHECK (download_mbps IS NULL OR download_mbps > 0),
+  upload_mbps INTEGER CHECK (upload_mbps IS NULL OR upload_mbps > 0),
+  mensalidade_centavos INTEGER NOT NULL CHECK (mensalidade_centavos >= 0),
+  instalacao_centavos INTEGER NOT NULL DEFAULT 0 CHECK (instalacao_centavos >= 0),
+  fidelidade_meses INTEGER NOT NULL DEFAULT 0 CHECK (fidelidade_meses >= 0),
+  descricao TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organizacao_id, nome)
+);
+
+/*
+ * Contrato: o serviço de um assinante num endereço. É o que fatura e o que bloqueia.
+ * O endereço em branco significa "o mesmo do assinante" (não é copiado, para não divergir).
+ */
+CREATE TABLE contratos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  assinante_id INTEGER NOT NULL REFERENCES assinantes(id),
+  numero INTEGER NOT NULL,
+  plano_id INTEGER NOT NULL REFERENCES planos(id),
+  -- Valor realmente contratado: pode diferir do plano (desconto negociado) e é ele que entra na fatura.
+  mensalidade_centavos INTEGER NOT NULL CHECK (mensalidade_centavos >= 0),
+  instalacao_centavos INTEGER NOT NULL DEFAULT 0 CHECK (instalacao_centavos >= 0),
+  -- Até 28 para o vencimento existir em todo mês.
+  dia_vencimento INTEGER NOT NULL CHECK (dia_vencimento BETWEEN 1 AND 28),
+  cep TEXT,
+  logradouro TEXT,
+  numero_endereco TEXT,
+  complemento TEXT,
+  bairro TEXT,
+  cidade TEXT,
+  uf TEXT,
+  latitude REAL,
+  longitude REAL,
+  -- Ponto na planta óptica: a CTO e a porta que este contrato ocupa.
+  cto_id INTEGER REFERENCES ativos_rede(id),
+  porta_id INTEGER REFERENCES portas_rede(id),
+  situacao TEXT NOT NULL DEFAULT 'em_implantacao' CHECK (situacao IN ('em_implantacao','ativo','bloqueado','suspenso','cancelado')),
+  -- Data da ativação: define a pró-rata da primeira fatura e o início da fidelidade.
+  ativacao TEXT,
+  fidelidade_fim TEXT,
+  -- Carência própria do contrato (em branco = a da organização).
+  carencia_dias INTEGER CHECK (carencia_dias IS NULL OR carencia_dias >= 0),
+  cancelado_em TEXT,
+  motivo_cancelamento TEXT,
+  cancelado_por INTEGER REFERENCES usuarios(id),
+  observacoes TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organizacao_id, numero)
+);
+CREATE INDEX idx_contratos_assinante ON contratos(assinante_id);
+CREATE INDEX idx_contratos_situacao ON contratos(organizacao_id, situacao);
+CREATE INDEX idx_contratos_porta ON contratos(porta_id);
+
+-- Cobranças fixas além da mensalidade, por competência: SVA, aluguel de equipamento, ponto adicional, desconto.
+CREATE TABLE contrato_itens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id),
+  descricao TEXT NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('sva','equipamento','ponto_adicional','desconto','outro')),
+  -- Negativo somente em 'desconto'.
+  valor_centavos INTEGER NOT NULL,
+  -- Competências AAAA-MM: fim em branco = sem prazo.
+  inicio TEXT NOT NULL,
+  fim TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX idx_contrato_itens ON contrato_itens(contrato_id);
+
+-- Ciclo de vida do contrato: cada passo fica registrado com quem fez, de onde veio e por quê.
+CREATE TABLE contrato_eventos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id),
+  evento TEXT NOT NULL,
+  de TEXT,
+  para TEXT,
+  motivo TEXT,
+  origem TEXT NOT NULL DEFAULT 'usuario' CHECK (origem IN ('usuario','regua','sistema')),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX idx_contrato_eventos ON contrato_eventos(contrato_id, id DESC);
+
+-- Execução do faturamento de uma competência. A simulação não grava nada: só o efetivado vira ciclo.
+CREATE TABLE ciclos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  competencia TEXT NOT NULL,
+  faturas INTEGER NOT NULL DEFAULT 0,
+  valor_centavos INTEGER NOT NULL DEFAULT 0,
+  -- JSON: contratos fora do ciclo e o motivo de cada um.
+  pulados TEXT,
+  executado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, competencia)
+);
+
+/*
+ * Fatura. O valor é a soma dos itens no momento da emissão e não muda depois; juros e multa são calculados
+ * no dia do pagamento (não ficam somados ao valor). pago_centavos é a soma dos pagamentos não estornados.
+ */
+CREATE TABLE faturas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  assinante_id INTEGER NOT NULL REFERENCES assinantes(id),
+  -- Em branco = cobrança avulsa do assinante (sem contrato).
+  contrato_id INTEGER REFERENCES contratos(id),
+  numero INTEGER NOT NULL,
+  competencia TEXT,
+  ciclo_id INTEGER REFERENCES ciclos(id),
+  vencimento TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos >= 0),
+  pago_centavos INTEGER NOT NULL DEFAULT 0 CHECK (pago_centavos >= 0),
+  pago_em TEXT,
+  situacao TEXT NOT NULL DEFAULT 'aberta' CHECK (situacao IN ('aberta','parcial','paga','cancelada')),
+  cancelada_em TEXT,
+  motivo_cancelamento TEXT,
+  cancelada_por INTEGER REFERENCES usuarios(id),
+  observacoes TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organizacao_id, numero)
+);
+CREATE INDEX idx_faturas_assinante ON faturas(assinante_id, vencimento DESC);
+CREATE INDEX idx_faturas_abertas ON faturas(organizacao_id, situacao, vencimento);
+CREATE INDEX idx_faturas_contrato ON faturas(contrato_id, vencimento DESC);
+-- Uma competência por contrato: rodar o ciclo duas vezes não cobra o assinante duas vezes.
+-- A fatura cancelada sai do índice, para a competência poder ser refeita depois de uma correção.
+CREATE UNIQUE INDEX idx_faturas_competencia ON faturas(contrato_id, competencia)
+  WHERE contrato_id IS NOT NULL AND competencia IS NOT NULL AND situacao <> 'cancelada';
+
+CREATE TABLE fatura_itens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  fatura_id INTEGER NOT NULL REFERENCES faturas(id),
+  contrato_id INTEGER REFERENCES contratos(id),
+  descricao TEXT NOT NULL,
+  origem TEXT NOT NULL CHECK (origem IN ('mensalidade','pro_rata','instalacao','sva','equipamento','ponto_adicional','desconto','avulso','outro')),
+  valor_centavos INTEGER NOT NULL,
+  -- O que gerou o item (ex.: 'contrato_item:12', 'periodo:2026-11-08..2026-11-30').
+  referencia TEXT
+);
+CREATE INDEX idx_fatura_itens ON fatura_itens(fatura_id);
+
+-- Baixa da fatura. O estorno não apaga o pagamento: marca quem estornou, quando e por quê.
+CREATE TABLE pagamentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  fatura_id INTEGER NOT NULL REFERENCES faturas(id),
+  -- Valor que abate a fatura (sem encargos).
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  -- Encargos efetivamente cobrados nesta baixa, calculados no dia do pagamento.
+  juros_centavos INTEGER NOT NULL DEFAULT 0 CHECK (juros_centavos >= 0),
+  multa_centavos INTEGER NOT NULL DEFAULT 0 CHECK (multa_centavos >= 0),
+  desconto_centavos INTEGER NOT NULL DEFAULT 0 CHECK (desconto_centavos >= 0),
+  data TEXT NOT NULL,
+  forma TEXT NOT NULL CHECK (forma IN ('pix','boleto','dinheiro','cartao','transferencia','outro')),
+  origem TEXT NOT NULL DEFAULT 'manual' CHECK (origem IN ('manual','retorno','portal')),
+  observacoes TEXT,
+  estornado_em TEXT,
+  motivo_estorno TEXT,
+  estornado_por INTEGER REFERENCES usuarios(id),
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX idx_pagamentos_fatura ON pagamentos(fatura_id);
+CREATE INDEX idx_pagamentos_data ON pagamentos(organizacao_id, data);
+
+/*
+ * Régua de cobrança versionada: editar uma regra cria a versão seguinte e aposenta a anterior, que continua
+ * explicando o que já foi executado por ela. Nenhuma regra é apagada.
+ */
+CREATE TABLE regua_regras (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nome TEXT NOT NULL,
+  -- Dias em relação ao vencimento: negativo = antes, 0 = no dia, positivo = em atraso.
+  dias INTEGER NOT NULL CHECK (dias BETWEEN -60 AND 365),
+  acao TEXT NOT NULL CHECK (acao IN ('avisar','bloquear','indicar_cancelamento')),
+  canal TEXT NOT NULL DEFAULT 'sistema' CHECK (canal IN ('sistema','email','whatsapp')),
+  texto TEXT,
+  ativa INTEGER NOT NULL DEFAULT 1,
+  versao INTEGER NOT NULL DEFAULT 1,
+  substituida_por INTEGER REFERENCES regua_regras(id),
+  criada_por INTEGER REFERENCES usuarios(id),
+  criada_em TEXT NOT NULL
+);
+CREATE INDEX idx_regua_ativas ON regua_regras(organizacao_id, ativa, dias);
+
+-- O que a régua fez, por fatura e regra. A chave única garante que a mesma regra nunca roda duas vezes na mesma fatura.
+CREATE TABLE regua_eventos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  regra_id INTEGER NOT NULL REFERENCES regua_regras(id),
+  fatura_id INTEGER NOT NULL REFERENCES faturas(id),
+  contrato_id INTEGER REFERENCES contratos(id),
+  acao TEXT NOT NULL,
+  canal TEXT NOT NULL,
+  -- 'pendente_envio': o aviso está pronto e aguarda o envio por um canal contratado (e-mail, WhatsApp).
+  resultado TEXT NOT NULL CHECK (resultado IN ('executada','pendente_envio','ignorada')),
+  detalhe TEXT,
+  dias_atraso INTEGER,
+  enviado_em TEXT,
+  enviado_por INTEGER REFERENCES usuarios(id),
+  executado_em TEXT NOT NULL,
+  UNIQUE (regra_id, fatura_id)
+);
+CREATE INDEX idx_regua_eventos ON regua_eventos(organizacao_id, executado_em DESC);
+CREATE INDEX idx_regua_pendentes ON regua_eventos(organizacao_id, resultado, executado_em DESC);
+
+-- Bloqueio do serviço. O bloqueio aberto (fim em branco) é o que vale; a liberação sempre tem motivo.
+CREATE TABLE bloqueios (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('inadimplencia','pedido','tecnico','administrativo')),
+  motivo TEXT NOT NULL,
+  origem TEXT NOT NULL DEFAULT 'usuario' CHECK (origem IN ('usuario','regua','sistema')),
+  regra_id INTEGER REFERENCES regua_regras(id),
+  fatura_id INTEGER REFERENCES faturas(id),
+  inicio TEXT NOT NULL,
+  fim TEXT,
+  motivo_liberacao TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  liberado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX idx_bloqueios_contrato ON bloqueios(contrato_id, id DESC);
+CREATE INDEX idx_bloqueios_abertos ON bloqueios(organizacao_id, fim);
+
+/*
+ * Desbloqueio de confiança: devolve o serviço por um prazo mesmo com a fatura em aberto. Quando o prazo vence e a
+ * fatura continua em aberto, a rotina bloqueia de novo; se a fatura é quitada antes, a confiança encerra como 'pago'.
+ * O limite por ano é da organização e é contado por contrato.
+ */
+CREATE TABLE confiancas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id),
+  bloqueio_id INTEGER REFERENCES bloqueios(id),
+  inicio TEXT NOT NULL,
+  ate TEXT NOT NULL,
+  motivo TEXT,
+  encerrada_em TEXT,
+  encerramento TEXT CHECK (encerramento IS NULL OR encerramento IN ('pago','expirada','cancelada')),
+  concedida_por INTEGER REFERENCES usuarios(id),
+  criada_em TEXT NOT NULL
+);
+CREATE INDEX idx_confiancas_contrato ON confiancas(contrato_id, id DESC);
+CREATE INDEX idx_confiancas_abertas ON confiancas(organizacao_id, encerrada_em, ate);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();
 
-/** Aplica as migrações pendentes, em ordem, cada uma numa transação. */
+/**
+ * Aplica as migrações pendentes, em ordem, cada uma numa transação.
+ *
+ * A migração marcada com `semFk` troca uma tabela referenciada por outras (criar a nova, copiar, derrubar a antiga,
+ * renomear). O SQLite recusa derrubar a tabela-pai com as chaves estrangeiras ligadas, então elas são desligadas em
+ * volta da transação e a integridade é conferida (`foreign_key_check`) antes do commit: qualquer referência órfã
+ * desfaz a migração inteira.
+ */
 function migrar(db) {
   db.exec('CREATE TABLE IF NOT EXISTS schema_migracoes (versao INTEGER PRIMARY KEY, nome TEXT NOT NULL, aplicada_em TEXT NOT NULL)');
   const feitas = new Set(db.prepare('SELECT versao FROM schema_migracoes').all().map((r) => r.versao));
   const aplicadas = [];
   for (const m of MIGRACOES) {
     if (feitas.has(m.versao)) continue;
+    if (m.semFk) db.exec('PRAGMA foreign_keys = OFF');
     db.exec('BEGIN IMMEDIATE');
     try {
       db.exec(m.sql);
+      if (m.semFk) {
+        const orfas = db.prepare('PRAGMA foreign_key_check').all();
+        if (orfas.length) throw new Error(`${orfas.length} referência(s) órfã(s) depois da troca de tabela (${[...new Set(orfas.map((o) => o.table))].join(', ')})`);
+      }
       db.prepare('INSERT INTO schema_migracoes (versao, nome, aplicada_em) VALUES (?, ?, ?)').run(m.versao, m.nome, agora());
       db.exec('COMMIT');
       aplicadas.push(m.versao);
     } catch (err) {
       db.exec('ROLLBACK');
       throw new Error(`Migração ${m.versao} (${m.nome}) falhou: ${err.message}`);
+    } finally {
+      if (m.semFk) db.exec('PRAGMA foreign_keys = ON');
     }
   }
   return aplicadas;
