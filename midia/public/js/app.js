@@ -46,7 +46,7 @@ const SUBTITULOS = {
   usuarios: 'Quem acessa o painel e os portais', configuracoes: 'Regras da programação, preços de tabela e PIX das faturas',
   receber: 'Faturas dos anunciantes: o que entra, o que está vencendo e o que atrasou',
   pagar: 'Repasses aos pontos e despesas da operação: o que sai',
-  historico: 'Registro de quem fez o quê', prova: 'Cada vez que seu anúncio foi ao ar', faturas: 'Suas faturas e o PIX para pagamento',
+  historico: 'Registro de quem fez o quê', prova: 'Cada vez que seu anúncio foi ao ar', faturas: 'Seu contrato, as faturas e o PIX para pagamento',
   rede: 'Pontos e telas onde a publicidade pode passar', conteudo: 'Imagens e vídeos do seu ponto na TV', conta: 'Sua conta',
 };
 

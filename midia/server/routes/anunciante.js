@@ -118,10 +118,21 @@ module.exports = (db) => {
     require('node:fs').createReadStream(arquivos.caminho(m)).pipe(res);
   });
 
+  /**
+   * As faturas do anunciante e o contrato dele — só para ler. O cliente vê o que foi combinado
+   * (vigência, forma de cobrança, valor, dia do vencimento e reajuste) sem precisar ligar para a equipe.
+   */
   r.get('/faturas', (req, res) => {
+    const eu = meu(req);
     res.json({
-      itens: db.prepare(`SELECT *, (status = 'aberta' AND vencimento < ?) AS atrasada FROM faturas WHERE anunciante_id = ? ORDER BY competencia DESC`)
-        .all(hoje(), meu(req)),
+      itens: db.prepare(`SELECT f.*, c.numero AS contrato, (f.status = 'aberta' AND f.vencimento < ?) AS atrasada
+        FROM faturas f LEFT JOIN contratos c ON c.id = f.contrato_id
+        WHERE f.anunciante_id = ? ORDER BY f.competencia DESC`).all(hoje(), eu),
+      contratos: db.prepare(`SELECT c.id, c.numero, c.objeto, c.inicio, c.fim, c.cobranca, c.valor_centavos, c.vencimento_dia,
+          c.reajuste, c.renovacao_automatica, c.status, ag.nome AS agencia,
+          (SELECT COUNT(*) FROM campanhas ca WHERE ca.contrato_id = c.id) AS campanhas
+        FROM contratos c LEFT JOIN agencias ag ON ag.id = c.agencia_id
+        WHERE c.anunciante_id = ? AND c.status <> 'rascunho' ORDER BY (c.status = 'ativo') DESC, c.inicio DESC`).all(eu),
     });
   });
 

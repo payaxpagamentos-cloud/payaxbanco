@@ -87,7 +87,9 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
 
 ### Portal do anunciante
 Campanhas no ar, inserções e pessoas alcançadas no mês, desempenho por campanha, onde cada anúncio passou,
-**prova de exibição com CSV**, envio de criativos (que a equipe aprova) e faturas com o PIX para pagar.
+**prova de exibição com CSV**, envio de criativos (que a equipe aprova) e, em *Faturas*, o **contrato dele**
+(vigência, cobrança, valor, dia do vencimento, reajuste e renovação — só para ler) junto das faturas, com o PIX
+para pagar e o número da nota fiscal quando já emitida.
 
 ### Portal do responsável pelo ponto (síndico, administradora ou lojista)
 As telas do ponto (no ar ou não, e o que está passando agora), os **comunicados** do prédio ou da loja

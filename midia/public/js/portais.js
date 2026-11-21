@@ -3,7 +3,7 @@ import { api, qs, baixar } from './api.js';
 import {
   el, limpar, icone, toast, acao, modal, formModal, confirmar, campo, escolha, lerForm, repetir,
   inteiro, dinheiro, duracao, dataBr, dataHora, etiquetaDe, etiqueta, percentual, competenciaTexto, situacao,
-  diasTexto, faixaHorario, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_FATURA, STATUS_REPASSE, STATUS_COMUNICADO,
+  diasTexto, faixaHorario, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_FATURA, STATUS_CONTRATO, STATUS_REPASSE, STATUS_COMUNICADO,
   TIPOS_COMUNICADO, REPASSES, CATEGORIAS,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio, previa, enviarArquivo } from './comum.js';
@@ -136,15 +136,49 @@ async function provaAnunciante(ctx) {
   await pintar();
 }
 
+const COBRANCA_CONTRATO = { mensal: 'Valor mensal', cpm: 'CPM (por mil impactos)', pacote: 'Pacote fechado', cortesia: 'Cortesia' };
+
+/** O contrato como o cliente precisa ver: o que foi combinado, sem poder mexer. */
+const cartaoContrato = (c) => el('div', { class: 'cartao raso' },
+  el('div', { class: 'linha entre' },
+    el('div', {},
+      el('strong', {}, `Contrato ${c.numero}`),
+      el('div', { class: 'pequeno mudo' }, c.objeto || 'Veiculação de publicidade na rede de telas')),
+    etiquetaDe(STATUS_CONTRATO, c.status)),
+  el('div', { class: 'dados', style: 'margin-top:12px' },
+    el('div', {}, el('span', { class: 'rotulo' }, 'Vigência'),
+      el('span', {}, `${dataBr(c.inicio)} — ${c.fim ? dataBr(c.fim) : 'sem data de término'}`)),
+    el('div', {}, el('span', { class: 'rotulo' }, 'Cobrança'),
+      el('span', {}, COBRANCA_CONTRATO[c.cobranca] ?? c.cobranca)),
+    c.cobranca !== 'cortesia'
+      ? el('div', {}, el('span', { class: 'rotulo' }, c.cobranca === 'cpm' ? 'CPM contratado' : 'Valor'),
+        el('span', {}, dinheiro(c.valor_centavos)))
+      : null,
+    el('div', {}, el('span', { class: 'rotulo' }, 'Vencimento'), el('span', {}, `todo dia ${c.vencimento_dia}`)),
+    c.reajuste ? el('div', {}, el('span', { class: 'rotulo' }, 'Reajuste'), el('span', {}, c.reajuste)) : null,
+    el('div', {}, el('span', { class: 'rotulo' }, 'Renovação'),
+      el('span', {}, c.renovacao_automatica ? 'Automática' : 'Mediante novo aceite')),
+    c.agencia ? el('div', {}, el('span', { class: 'rotulo' }, 'Agência'), el('span', {}, c.agencia)) : null,
+    el('div', {}, el('span', { class: 'rotulo' }, 'Campanhas'), el('span', {}, `${inteiro(c.campanhas)} no contrato`))));
+
 async function faturasAnunciante(ctx) {
   const d = await api.get('/anunciante/faturas');
-  limpar(ctx.conteudo, el('div', { class: 'cartao' }, tabela([
-    [(f) => competenciaTexto(f.competencia), 'Competência'],
-    [(f) => dinheiro(f.valor_centavos), 'Valor', 'num dir'],
-    [(f) => dataBr(f.vencimento), 'Vencimento'],
-    [(f) => (f.atrasada ? etiqueta('Atrasada', 'erro') : etiquetaDe(STATUS_FATURA, f.status)), 'Situação'],
-    [(f) => (f.pago_em ? dataBr(f.pago_em) : '—'), 'Pagamento'],
-  ], d.itens, { aoClicar: (f) => abrirFaturaAnunciante(f.id), vazioTexto: 'Nenhuma fatura.' })));
+  const ativos = d.contratos.filter((c) => c.status === 'ativo');
+  limpar(ctx.conteudo, el('div', { class: 'coluna' },
+    d.contratos.length
+      ? cartao(ativos.length > 1 ? 'Meus contratos' : 'Meu contrato',
+        el('div', { class: 'coluna' }, d.contratos.map(cartaoContrato)),
+        el('p', { class: 'pequeno mudo', style: 'margin:12px 0 0' },
+          'Para alterar qualquer ponto do contrato, fale com a equipe comercial.'))
+      : null,
+    cartao('Faturas', tabela([
+      [(f) => competenciaTexto(f.competencia), 'Competência'],
+      [(f) => dinheiro(f.valor_centavos), 'Valor', 'num dir'],
+      [(f) => dataBr(f.vencimento), 'Vencimento'],
+      [(f) => (f.atrasada ? etiqueta('Atrasada', 'erro') : etiquetaDe(STATUS_FATURA, f.status)), 'Situação'],
+      [(f) => (f.pago_em ? dataBr(f.pago_em) : '—'), 'Pagamento'],
+      [(f) => (f.nf_numero ? `NF ${f.nf_numero}` : '—'), 'Nota fiscal'],
+    ], d.itens, { aoClicar: (f) => abrirFaturaAnunciante(f.id), vazioTexto: 'Nenhuma fatura.' }))));
 }
 
 async function abrirFaturaAnunciante(id) {
@@ -168,6 +202,9 @@ async function abrirFaturaAnunciante(id) {
       el('div', {}, el('strong', {}, 'PIX copia e cola'), el('div', { class: 'segredo', style: 'margin:8px 0' }, f.pix.codigo),
         el('button', { class: 'btn pequeno', onclick: () => { navigator.clipboard?.writeText(f.pix.codigo); toast('Código PIX copiado.'); } }, 'Copiar código')))
       : el('p', { class: 'mudo' }, 'Para pagar, fale com a equipe.'),
+    f.nf_numero ? el('p', { class: 'pequeno mudo', style: 'margin:12px 0 0' },
+      `Nota fiscal ${f.nf_numero}, emitida em ${dataBr(f.nf_emitida_em)}. `,
+      f.nf_link ? el('a', { href: f.nf_link, target: '_blank', rel: 'noopener' }, 'Abrir a nota') : null) : null,
     el('div', { class: 'linha entre', style: 'margin-top:18px' }, el('span', {}), el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
   ], { largo: true });
 }

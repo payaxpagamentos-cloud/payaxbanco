@@ -490,6 +490,24 @@ test('Financeiro: contrato do cliente, contas a receber e contas a pagar', async
     assert.match(csv.dados, /-300,00/, 'a saída sai com sinal negativo na planilha');
   });
 
+  await t.test('o anunciante vê o contrato dele no portal, só para ler', async () => {
+    const acesso = await api.post(`/painel/anunciantes/${cliente}/acesso`, { nome: 'Dona do contrato', email: 'contrato@exemplo.com' }, master);
+    const tk = await api.login('contrato@exemplo.com', acesso.dados.senha_provisoria);
+
+    const d = (await api.get('/anunciante/faturas', tk)).dados;
+    assert.equal(d.contratos.length, 1);
+    const c = d.contratos[0];
+    assert.equal(c.numero, '2026-014');
+    assert.equal(c.vencimento_dia, 10);
+    assert.ok(c.inicio && 'reajuste' in c && 'renovacao_automatica' in c, 'vigência, reajuste e renovação aparecem');
+    assert.equal(c.campanhas, 1);
+    assert.equal(d.itens[0].contrato, '2026-014', 'cada fatura mostra de qual contrato veio');
+
+    // Só para ler: o portal não tem rota de escrita de contrato, e o contrato de outro cliente não aparece.
+    assert.equal((await api.post('/anunciante/contratos', { numero: 'X' }, tk)).status, 404);
+    assert.ok(d.contratos.every((x) => x.numero === '2026-014'));
+  });
+
   await t.test('nota fiscal: o painel registra o número, não emite a nota', async () => {
     const fatura = (await api.get('/painel/contas-a-receber?status=paga', master)).dados.itens[0];
     assert.equal(fatura.nf_numero, null, 'nasce sem nota');
