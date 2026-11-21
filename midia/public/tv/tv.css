@@ -113,3 +113,30 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 .comunicado.assembleia .selo-tipo{ background: #2563EB; }
 .comunicado.entrega{ background: linear-gradient(135deg, #0A2A1B 0%, #04120B 100%); }
 .comunicado.entrega .selo-tipo{ background: #15803D; }
+
+/*
+  Tela da própria rede: logotipo, frase e o símbolo grande sangrando no canto — a peça que aparece
+  numa tela recém-instalada e que completa o loop quando sobra espaço.
+*/
+.cartao-marca{ position: absolute; inset: 0; overflow: hidden; background: var(--preto); color: #fff;
+  display: flex; flex-direction: column; justify-content: flex-start; gap: 2.4vh; padding: 9vh 7vw; }
+.cartao-marca .lockup{ display: flex; align-items: center; gap: 2.4vh; z-index: 1; }
+.cartao-marca .lockup .v{ height: 11vh; width: auto; color: var(--lime); flex: none; }
+.cartao-marca .nome{ display: flex; flex-direction: column; line-height: .94; }
+.cartao-marca .nome em{ font-style: normal; font-weight: 800; font-size: 8.4vh; letter-spacing: -.02em; }
+.cartao-marca .frase{ margin: 0; font-size: 4.4vh; font-weight: 600; color: #EDF1F6; max-width: 60%; z-index: 1; }
+/* O símbolo gigante sai pela borda, como nas peças da marca. */
+.cartao-marca .v-gigante{ position: absolute; color: var(--lime); z-index: 0;
+  width: 62%; height: auto; right: -6%; bottom: -12%; }
+@media (max-aspect-ratio: 1/1){
+  .cartao-marca{ padding: 7vh 8vw; gap: 1.8vh; }
+  .cartao-marca .lockup .v{ height: 7.4vh; }
+  .cartao-marca .nome em{ font-size: 5.6vh; }
+  .cartao-marca .frase{ font-size: 3.4vh; max-width: 100%; }
+  .cartao-marca .v-gigante{ width: 92%; right: -10%; bottom: -6%; }
+}
+/* Na zona de anúncio da tela dividida, a peça é menor: encolhe junto. */
+.zona-anuncio .cartao-marca{ padding: 6vh 6%; gap: 1.4vh; }
+.zona-anuncio .cartao-marca .lockup .v{ height: 6vh; }
+.zona-anuncio .cartao-marca .nome em{ font-size: 4.6vh; }
+.zona-anuncio .cartao-marca .frase{ font-size: 2.8vh; max-width: 100%; }

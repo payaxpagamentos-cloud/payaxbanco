@@ -91,7 +91,16 @@ export async function configuracoes(ctx) {
       el('div', { class: 'duas' },
         campo('A TV fala com o servidor a cada (segundos)', { name: 'batida_intervalo_s', type: 'number', min: 15, max: 900, value: c.batida_intervalo_s }),
         campo('Sem contato por (minutos) = offline', { name: 'offline_minutos', type: 'number', min: 2, max: 1440, value: c.offline_minutos })),
-      marcar('O lojista pode escrever o aviso da faixa da própria TV', { name: 'aviso_lojista', checked: Boolean(c.aviso_lojista) })),
+      marcar('O responsável pelo ponto pode escrever o aviso da faixa da própria tela', { name: 'aviso_lojista', checked: Boolean(c.aviso_lojista) }),
+      marcar('Comunicado publicado pelo ponto entra no ar direto (sem passar pela equipe)', { name: 'comunicado_automatico', checked: Boolean(c.comunicado_automatico) })),
+
+    el('fieldset', {}, el('legend', {}, 'Tela da marca'),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'Quando sobra espaço no loop — ou quando a tela ainda não tem campanha —, a própria tela desenha a peça da '
+        + 'marca (logotipo, frase e o símbolo). Não precisa subir arte, e ela se ajusta a telas deitadas e em pé.'),
+      el('div', { class: 'duas' },
+        marcar('Usar a tela da marca para completar o loop', { name: 'marca_preenche', checked: Boolean(c.marca_preenche) }),
+        campo('Tempo de cada aparição (segundos)', { name: 'marca_duracao_s', type: 'number', min: 5, max: 60, value: c.marca_duracao_s }))),
 
     el('fieldset', {}, el('legend', {}, 'Preços de tabela e faturamento'),
       el('div', { class: 'tres' },
@@ -119,6 +128,8 @@ export async function configuracoes(ctx) {
       const corpo = {
         ...d,
         aviso_lojista: d.aviso_lojista ? 1 : 0,
+        comunicado_automatico: d.comunicado_automatico ? 1 : 0,
+        marca_preenche: d.marca_preenche ? 1 : 0,
         mensalidade_tela_centavos: centavos(d.mensalidade) ?? 0,
         cpm_centavos: centavos(d.cpm) ?? 0,
         comissao_local_percentual: Math.round(Number(String(d.comissao).replace(',', '.')) * 100),

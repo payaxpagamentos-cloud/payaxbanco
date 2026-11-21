@@ -173,10 +173,10 @@ function criar(db) {
       criado, criado);
   };
 
-  // Institucional da rede (preenche a grade quando falta publicidade) e conteúdo de um ponto.
-  gravarMidia(cartaz(1920, 1080, [11, 27, 63]), { nome: 'Anuncie aqui — fale com a equipe', uso: 'institucional', duracao: 10 });
-  gravarMidia(cartaz(1080, 1920, [11, 27, 63]), { nome: 'Anuncie aqui (retrato)', uso: 'institucional', duracao: 10 });
-  gravarMidia(cartaz(1920, 1080, [217, 119, 6]), { nome: 'Promoção do dia da padaria', uso: 'institucional', localId: pontos[0].id, duracao: 10 });
+  // Conteúdo institucional de um ponto. O "anuncie aqui" da rede não precisa de arte: quando sobra espaço
+  // no loop, a própria tela desenha a peça da marca (Configurações › a tela da marca completa o loop).
+  const padaria = pontos.find((p) => p.categoria === 'padaria');
+  gravarMidia(cartaz(1920, 1080, [217, 119, 6]), { nome: 'Promoção do dia da padaria', uso: 'institucional', localId: padaria.id, duracao: 10 });
 
   const agencias = AGENCIAS.map((a) => ({
     ...a,

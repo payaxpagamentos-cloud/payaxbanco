@@ -261,6 +261,9 @@ CREATE TABLE IF NOT EXISTS exibicoes (
   anunciante_id INTEGER REFERENCES anunciantes(id),
   midia_id INTEGER REFERENCES midias(id),
   comunicado_id INTEGER REFERENCES comunicados(id),
+  -- 'midia': criativo ou institucional; 'comunicado': recado do ponto; 'marca': a tela da própria rede.
+  -- As duas últimas são tempo não vendido, e entram no cálculo para a divisão dos impactos ficar honesta.
+  tipo TEXT NOT NULL DEFAULT 'midia',
   data TEXT NOT NULL,
   exibida_em TEXT NOT NULL,
   duracao_s INTEGER NOT NULL CHECK (duracao_s >= 0),
@@ -393,6 +396,10 @@ const CONFIG_PADRAO = {
   aviso_lojista: '1',
   // Comunicado publicado pelo ponto entra no ar direto (1) ou espera a equipe aprovar (0).
   comunicado_automatico: '0',
+  // A tela da própria rede (logo, frase e o símbolo) entra quando falta conteúdo para completar o loop,
+  // e é o que aparece numa tela que ainda não tem campanha. 0 desliga.
+  marca_preenche: '1',
+  marca_duracao_s: '10',
   // Por quantos dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta
   // relatórios e faturamento, nunca é apagado). 0 = guardar tudo.
   prova_dias: '180',
@@ -441,6 +448,7 @@ const COLUNAS_NOVAS = [
   ['campanhas', 'pi', 'TEXT'],
   ['campanhas', 'comissao_agencia_percentual', 'INTEGER NOT NULL DEFAULT 0'],
   ['exibicoes', 'comunicado_id', 'INTEGER REFERENCES comunicados(id)'],
+  ['exibicoes', 'tipo', "TEXT NOT NULL DEFAULT 'midia'"],
   ['faturas', 'agencia_id', 'INTEGER REFERENCES agencias(id)'],
   ['faturas', 'bruto_centavos', 'INTEGER NOT NULL DEFAULT 0'],
   ['faturas', 'comissao_agencia_centavos', 'INTEGER NOT NULL DEFAULT 0'],

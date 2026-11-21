@@ -165,12 +165,19 @@ function montar(db, tela, instante = new Date()) {
     .filter((m) => !m.orientacao || m.orientacao === tela.orientacao);
   const preenchimento = dividida ? [] : comunicados.map((c) => ({ comunicado: c }));
   let tempo = vendido + preenchimento.reduce((t, p) => t + p.comunicado.duracao_s, 0);
+  const minimo = slots.length ? cfg.bloco_minimo_s : Math.max(cfg.bloco_minimo_s, 1);
   if (institucional.length) {
-    const minimo = slots.length ? cfg.bloco_minimo_s : Math.max(cfg.bloco_minimo_s, 1);
     for (let i = 0; tempo < minimo && i < 60; i++) {
       const m = institucional[i % institucional.length];
       preenchimento.push({ midia: m });
       tempo += m.duracao_s;
+    }
+  }
+  // Sobrou espaço (ou a tela ainda não tem nada): entra a tela da própria rede, desenhada pelo player.
+  if (cfg.marca_preenche) {
+    for (let i = 0; tempo < minimo && i < 30; i++) {
+      preenchimento.push({ marca: { duracao_s: cfg.marca_duracao_s } });
+      tempo += cfg.marca_duracao_s;
     }
   }
 
@@ -212,6 +219,21 @@ function montar(db, tela, instante = new Date()) {
         local: tela.local_nome ?? null,
       };
     }
+    // Tela da própria rede: o player desenha com o nome e a frase da plataforma.
+    if (it.marca) {
+      return {
+        ordem,
+        formato: 'marca',
+        midia_id: null,
+        comunicado_id: null,
+        nome: cfg.nome_plataforma,
+        duracao_s: it.marca.duracao_s,
+        campanha_id: null,
+        campanha: null,
+        anunciante_id: null,
+        anunciante: null,
+      };
+    }
     const m = it.midia ?? it.criativo;
     return {
       ordem,
@@ -248,7 +270,7 @@ function montar(db, tela, instante = new Date()) {
   }).sort((a, b) => b.segundos - a.segundos);
 
   const assinatura = JSON.stringify([
-    lista.map((i) => [i.midia_id, i.comunicado_id, i.duracao_s, i.campanha_id, i.texto ?? '']),
+    lista.map((i) => [i.formato, i.midia_id, i.comunicado_id, i.duracao_s, i.campanha_id, i.texto ?? '']),
     dividida ? comunicados.map((c) => [c.id, c.titulo, c.texto, c.tipo, c.duracao_s]) : [],
     tela.layout, tela.som, tela.relogio, tela.legenda ?? '',
     (tela.aviso_ate && tela.aviso_ate < new Date().toISOString()) ? '' : (tela.aviso ?? ''),

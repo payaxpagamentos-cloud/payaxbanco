@@ -105,7 +105,7 @@ export function linhaDoLoop(grade) {
     el('div', { class: 'loop' }, grade.itens.map((i) => el('div', {
       class: `item${i.campanha_id ? '' : ' institucional'}`,
       style: `width:${(i.duracao_s / total) * 100}%${estiloDoItem(i)}`,
-      title: `${i.ordem}. ${i.anunciante ? `${i.anunciante} — ` : ''}${i.nome} (${i.duracao_s}s)`,
+      title: `${i.ordem}. ${i.anunciante ? `${i.anunciante} — ` : ''}${i.nome} (${i.duracao_s}s)${i.formato === 'marca' ? ' — tela da marca' : ''}`,
     }, i.duracao_s >= total / 14 ? `${i.duracao_s}s` : ''))),
     el('div', { class: 'loop-legenda' },
       el('span', {}, `Loop de ${duracao(grade.duracao_s)} · ${grade.itens.length} itens`),
@@ -113,10 +113,20 @@ export function linhaDoLoop(grade) {
     zona);
 }
 
-/** Lista dos itens do loop, com miniatura. */
+/** O que aparece no lugar da miniatura quando o item é desenhado pela própria tela. */
+const selo = (texto, classe) => el('div', { class: `mini ${classe}` }, el('span', { class: 'pequeno' }, texto));
+
+const descricaoDoItem = (i) => {
+  if (i.formato === 'marca') return 'Tela da marca (preenche o espaço livre)';
+  if (i.formato === 'comunicado') return 'Comunicado do ponto';
+  return i.anunciante ? `${i.anunciante} · ${i.campanha}` : 'Institucional / conteúdo do ponto';
+};
+
+/** Lista dos itens do loop, com miniatura (ou o selo, quando a tela desenha o item). */
 export const itensDoLoop = (grade, rota = 'painel') => el('div', { class: 'itens-grade' }, grade.itens.map((i) => el('div', { class: 'item' },
-  el('span', { class: 'ordem' }, i.ordem), miniatura(i.midia_id, rota),
-  el('div', {}, el('div', {}, i.nome), el('div', { class: 'pequeno mudo' }, i.anunciante ? `${i.anunciante} · ${i.campanha}` : 'Institucional / conteúdo do ponto')),
+  el('span', { class: 'ordem' }, i.ordem),
+  i.formato === 'marca' ? selo('marca', 'selo-marca') : (i.formato === 'comunicado' ? selo('recado', 'selo-comunicado') : miniatura(i.midia_id, rota)),
+  el('div', {}, el('div', {}, i.nome), el('div', { class: 'pequeno mudo' }, descricaoDoItem(i))),
   el('span', { class: 'num mudo' }, `${i.duracao_s}s`))));
 
 /** Resumo por campanha dentro de um loop (quanto cada uma ocupa). */

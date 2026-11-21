@@ -128,8 +128,8 @@ async function guardarArquivos(itens) {
   const cache = await caches.open(CACHE);
   const vistos = lido(CHAVES.vistos) ?? {};
   const agora = Date.now();
-  // Comunicados não têm arquivo: a própria TV desenha.
-  for (const item of itens.filter((i) => i.formato !== 'comunicado')) {
+  // Comunicados e a tela da marca não têm arquivo: a própria TV desenha.
+  for (const item of itens.filter((i) => i.url)) {
     const url = enderecoDoItem(item);
     vistos[url] = agora;
     if (await cache.match(url)) continue;
@@ -169,6 +169,8 @@ function anotarExibicao(item, inicio, segundos) {
   estado.fila.push({
     midia_id: item.midia_id ?? null,
     comunicado_id: item.comunicado_id ?? null,
+    // A tela da própria rede também é anotada: é tempo de tela não vendido, e entra na conta dos impactos.
+    tipo: item.formato === 'marca' ? 'marca' : undefined,
     campanha_id: item.campanha_id,
     exibida_em: new Date(inicio).toISOString(),
     duracao_s: Math.round(segundos),
@@ -327,11 +329,60 @@ function rodarZonaComunicados() {
   mostrar();
 }
 
+/**
+ * Tela da própria rede: logo, frase e o símbolo grande sangrando no canto. É o que aparece numa tela que
+ * ainda não tem campanha e o que completa o loop quando sobra espaço — sem ninguém precisar subir arte.
+ */
+function montarMarca() {
+  const nome = estado.programacao?.plataforma ?? 'Vai Mídia';
+  const frase = estado.programacao?.slogan ?? '';
+  const cartao = document.createElement('div');
+  cartao.className = 'cartao-marca';
+
+  const lockup = document.createElement('div');
+  lockup.className = 'lockup';
+  lockup.append(simboloSvg('v'));
+  const texto = document.createElement('span');
+  texto.className = 'nome';
+  // Duas palavras ficam empilhadas, como no logotipo; mais do que isso, em uma linha só.
+  const palavras = String(nome).trim().split(/\s+/);
+  for (const palavra of (palavras.length === 2 ? palavras : [palavras.join(' ')])) {
+    const linha = document.createElement('em');
+    linha.textContent = palavra.toUpperCase();
+    texto.append(linha);
+  }
+  lockup.append(texto);
+  cartao.append(lockup);
+
+  if (frase) {
+    const p = document.createElement('p');
+    p.className = 'frase';
+    p.textContent = frase;
+    cartao.append(p);
+  }
+  cartao.append(simboloSvg('v-gigante'));
+  return cartao;
+}
+
+/** O símbolo da marca em SVG (o mesmo desenho do painel e do favicon). */
+function simboloSvg(classe) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 138 111');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', classe);
+  const caminho = document.createElementNS(ns, 'path');
+  caminho.setAttribute('fill', 'currentColor');
+  caminho.setAttribute('d', 'M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z');
+  svg.append(caminho);
+  return svg;
+}
+
 /** Prepara o elemento do item na camada que está fora do ar e devolve uma função que o põe no ar. */
 async function prepararItem(item) {
   const alvoCamada = $(`camada-${estado.camadaAtual === 'a' ? 'b' : 'a'}`);
-  if (item.formato === 'comunicado') {
-    const cartao = montarComunicado(item);
+  if (item.formato === 'comunicado' || item.formato === 'marca') {
+    const cartao = item.formato === 'marca' ? montarMarca() : montarComunicado(item);
     alvoCamada.replaceChildren(cartao);
     return cartao;
   }
@@ -350,7 +401,7 @@ async function prepararItem(item) {
   }
   if (origem.temporario) elemento.dataset.blob = origem.src;
   // Na tela dividida, a peça desfocada preenche o fundo da zona (em vez de barras pretas).
-  const fundo = estado.programacao?.grade?.layout === 'dividida' && item.tipo === 'imagem'
+  const fundo = estado.programacao?.grade?.layout === 'dividida' && item.formato === 'midia' && item.tipo === 'imagem'
     ? Object.assign(document.createElement('img'), { src: origem.src, alt: '', className: 'fundo' })
     : null;
   alvo.replaceChildren(...[fundo, elemento].filter(Boolean));
@@ -377,7 +428,7 @@ async function exibir(item) {
   const elemento = await prepararItem(item);
   trocarCamada();
   const inicio = Date.now();
-  if (item.formato !== 'comunicado' && item.tipo === 'video') {
+  if (item.formato === 'midia' && item.tipo === 'video') {
     try { await elemento.play(); } catch { /* alguns aparelhos só tocam sem som */ }
     await Promise.race([
       new Promise((fim) => elemento.addEventListener('ended', fim, { once: true })),
@@ -457,7 +508,7 @@ async function rodar() {
     }
     desenharFaixa();
     if (!itens().length) {
-      mostrarEspera(estado.programacao.tela.local ?? 'Sem programação', 'Esta TV está no ar e aguardando campanhas.');
+      mostrarEspera(estado.programacao.plataforma ?? 'Sem programação', 'Esta tela está no ar e aguardando conteúdo.');
       await dormir(30_000);
       estado.trocarPendente = true;
     } else {

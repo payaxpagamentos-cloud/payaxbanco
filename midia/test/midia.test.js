@@ -59,7 +59,8 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
 
     const prog = await tv.programacao();
     assert.equal(prog.status, 200);
-    assert.equal(prog.dados.grade.sem_conteudo, true, 'sem campanha, a TV fica em espera');
+    assert.ok(prog.dados.grade.itens.every((i) => i.formato === 'marca'), 'sem campanha, a TV mostra a marca da rede');
+    assert.equal(prog.dados.grade.ocupacao, 0, 'nada vendido ainda');
     assert.equal(prog.dados.tela.nome, 'TV do balcão');
   });
 
@@ -120,10 +121,11 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
     assert.equal(aprovada.dados.status, 'ativa');
 
     const prog = await tv.programacao();
-    assert.equal(prog.dados.grade.sem_conteudo, false);
-    assert.equal(prog.dados.grade.itens.length, 2, 'os dois criativos entram no loop');
-    assert.equal(prog.dados.grade.duracao_s, 27);
-    assert.equal(prog.dados.grade.ocupacao, 100);
+    const publicidade = prog.dados.grade.itens.filter((i) => i.campanha_id);
+    assert.equal(publicidade.length, 2, 'os dois criativos entram no loop');
+    assert.equal(prog.dados.grade.vendido_s, 27, 'a publicidade ocupa os 27 segundos contratados');
+    assert.ok(prog.dados.grade.itens.some((i) => i.formato === 'marca'), 'a marca da rede completa o resto do loop');
+    assert.ok(prog.dados.grade.ocupacao > 0 && prog.dados.grade.ocupacao < 100);
     assert.equal(prog.dados.grade.campanhas[0].contratado_hora, 6);
     tv.versao = prog.dados.grade.versao;
   });
@@ -172,19 +174,40 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
     assert.equal(telaDet.item_atual, 'Cartaz promocao');
   });
 
+  await t.test('a tela da marca é anotada como tempo não vendido', async () => {
+    const agora = Date.now();
+    const r = await tv.exibicoes([
+      { tipo: 'marca', exibida_em: new Date(agora - 30_000).toISOString(), duracao_s: 10 },
+      { tipo: 'marca', exibida_em: new Date(agora - 20_000).toISOString(), duracao_s: 10 },
+    ]);
+    assert.equal(r.dados.gravadas, 2, 'a tela da marca não tem arquivo nem id, mas entra na prova de exibição');
+
+    const telas = (await api.get(`/painel/relatorios/telas?de=${dia(0)}&ate=${dia(0)}`, master)).dados;
+    const linha = telas.itens.find((x) => x.tela_id === tela);
+    assert.equal(linha.insercoes, 5, 'três de publicidade e duas da marca');
+    assert.equal(linha.insercoes_pagas, 3);
+    assert.ok(linha.ocupacao < 100, 'o tempo da marca entra no denominador da ocupação');
+
+    const prova = (await api.get(`/painel/relatorios/prova?de=${dia(0)}&ate=${dia(0)}&tela_id=${tela}`, master)).dados;
+    assert.equal(prova.total, 5);
+    assert.equal(prova.itens.filter((x) => x.campanha === 'Institucional').length, 2);
+  });
+
   await t.test('relatórios: desempenho, impactos e prova de exibição em CSV', async () => {
     const camp = (await api.get(`/painel/relatorios/campanhas?de=${dia(-1)}&ate=${dia(0)}`, master)).dados;
     assert.equal(camp.itens.length, 1);
     assert.equal(camp.itens[0].insercoes, 3);
     assert.equal(camp.itens[0].segundos, 39);
-    assert.equal(camp.itens[0].impactos, 500, 'ocupando todo o tempo de tela, a campanha recebe o público do dia');
+    // A campanha ocupou 39s dos 59s exibidos (os outros 20 foram da tela da marca): recebe a fatia dela do público.
+    assert.equal(camp.itens[0].impactos, Math.round(500 * (39 / 59)),
+      'o público do dia é dividido pela fatia de tempo de cada um — a marca da rede não vira impacto de anunciante');
 
     const telas = (await api.get(`/painel/relatorios/telas?de=${dia(-1)}&ate=${dia(0)}`, master)).dados;
-    assert.equal(telas.itens[0].ocupacao, 100);
+    assert.ok(telas.itens[0].ocupacao > 0 && telas.itens[0].ocupacao < 100, 'parte do tempo é da marca, não vendido');
 
     const csv = await api.get(`/painel/relatorios/prova?de=${dia(-1)}&ate=${dia(0)}&csv=1`, master);
     assert.match(csv.headers.get('content-type'), /text\/csv/);
-    assert.equal(csv.dados.split('\r\n').filter(Boolean).length, 4, 'cabeçalho + três exibições');
+    assert.equal(csv.dados.split('\r\n').filter(Boolean).length, 6, 'cabeçalho, três exibições e as duas da marca');
     assert.match(csv.dados, /Ótica Visão/);
   });
 
@@ -259,12 +282,12 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
     assert.equal(resumo.ponto.nome, 'Padaria Pão Quente');
     assert.equal(resumo.telas.length, 1);
     assert.equal(resumo.telas[0].online, true);
-    assert.equal(resumo.hoje.insercoes, 3);
+    assert.equal(resumo.hoje.insercoes, 5, 'três de publicidade e duas da tela da marca');
     assert.equal(resumo.repasses.length, 1);
 
     const prog = (await api.get(`/ponto/telas/${tela}/programacao`, tk)).dados;
-    assert.equal(prog.itens.length, 2);
-    assert.ok(prog.itens.every((i) => i.publicidade === true));
+    assert.equal(prog.itens.filter((i) => i.publicidade).length, 2);
+    assert.ok(prog.itens.some((i) => !i.publicidade), 'a marca da rede também aparece na lista');
     assert.ok(!('anunciante' in prog.itens[0]), 'o lojista não vê de quem é cada anúncio');
 
     const versaoAntes = (await tv.programacao()).dados.grade.versao;
@@ -318,7 +341,9 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
 
   await t.test('desparear tira o aparelho do ar; pausar a campanha esvazia a grade', async () => {
     assert.equal((await api.post(`/painel/campanhas/${campanha}/status`, { acao: 'pausar', motivo: 'Fim do estoque' }, master)).dados.status, 'pausada');
-    assert.equal((await tv.programacao()).dados.grade.sem_conteudo, true, 'campanha pausada sai da TV na hora');
+    const depois = (await tv.programacao()).dados.grade;
+    assert.equal(depois.vendido_s, 0, 'campanha pausada sai da TV na hora');
+    assert.ok(depois.itens.every((i) => i.formato === 'marca'), 'a tela volta a mostrar só a marca da rede');
 
     assert.equal((await api.post(`/painel/telas/${tela}/desparear`, {}, master)).status, 204);
     assert.equal((await tv.programacao()).status, 401, 'o token do aparelho despareado não vale mais');

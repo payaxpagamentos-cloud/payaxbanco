@@ -10,6 +10,9 @@ const { inicioDia, minutosDe, dentroDaJanela } = require('../server/lib/datas');
 /** Monta um cenário na memória: pontos, telas, anunciantes, criativos e campanhas. */
 function cenario() {
   const db = abrir(':memory:');
+  // Nestes testes interessa o encaixe das campanhas: a tela da marca (que completa o loop) fica desligada,
+  // e tem teste próprio mais abaixo.
+  gravarConfig(db, 'marca_preenche', 0);
   const inserir = (sql, ...p) => Number(db.prepare(sql).run(...p).lastInsertRowid);
 
   const ponto = (nome, categoria, cidade, publico = 400) =>
@@ -197,6 +200,33 @@ test('limite de inserções por dia tira a campanha do ar quando bate a meta', (
   c.db.prepare('INSERT INTO resumo_dia (data, tela_id, campanha_id, local_id, insercoes, segundos) VALUES (?, ?, ?, ?, 50, 500)')
     .run(require('../server/lib/datas').hoje(), t, campanha, p);
   assert.equal(montar(c.db, c.daTela(t)).sem_conteudo, true, 'batido o teto do dia, sai da grade daquela TV');
+});
+
+test('a tela da marca completa o loop e segura a tela que ainda não tem campanha', () => {
+  const c = cenario();
+  const t = c.tela(c.ponto('Prédio novo', 'condominio_residencial', 'Campinas'), 'Elevador');
+  gravarConfig(c.db, 'marca_preenche', 1);
+  gravarConfig(c.db, 'marca_duracao_s', 10);
+  gravarConfig(c.db, 'bloco_minimo_s', 60);
+
+  const sozinha = montar(c.db, c.daTela(t));
+  assert.equal(sozinha.sem_conteudo, false, 'tela sem campanha não fica preta: entra a marca da rede');
+  assert.ok(sozinha.itens.every((i) => i.formato === 'marca'));
+  assert.equal(sozinha.duracao_s, 60);
+  assert.equal(sozinha.ocupacao, 0, 'é tempo não vendido');
+
+  const a = c.anunciante('Construtora');
+  c.campanha(a, 'Lançamento', [c.midia(a, 'lancamento', 15)], { insercoes_hora: 6 });
+  const g = montar(c.db, c.daTela(t));
+  assert.equal(g.vendido_s, 15, 'a publicidade não perde espaço para a marca');
+  assert.ok(g.duracao_s >= 60);
+  assert.ok(g.itens.some((i) => i.campanha === 'Lançamento'));
+  assert.ok(g.itens.some((i) => i.formato === 'marca'));
+
+  gravarConfig(c.db, 'marca_preenche', 0);
+  const semMarca = montar(c.db, c.daTela(t));
+  assert.ok(!semMarca.itens.some((i) => i.formato === 'marca'), 'dá para desligar a tela da marca');
+  assert.equal(semMarca.duracao_s, 15);
 });
 
 test('a versão só muda quando a programação muda', () => {

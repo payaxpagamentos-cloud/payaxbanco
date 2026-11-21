@@ -114,6 +114,17 @@ textos e traços de gráfico usam a versão escurecida (`--cor-tinta`).
 O **nome e a frase da marca** ficam em *Configurações › Marca* e valem para o painel inteiro e para as telas: quem
 revende a plataforma com outro nome troca ali, sem mexer no código.
 
+### A tela da marca
+
+Quando sobra espaço no loop — ou quando a tela acabou de ser instalada e ainda não tem campanha — **a própria tela
+desenha a peça da marca**: logotipo, frase e o símbolo grande sangrando no canto, ajustado a telas deitadas e em pé.
+Ninguém precisa produzir nem subir arte, e uma tela nova nunca aparece preta num hall.
+
+Esse tempo é **não vendido**, e é anotado na prova de exibição como tal: ele entra no denominador da ocupação e da
+divisão dos impactos, então o anunciante nunca recebe o público que passou enquanto a tela mostrava a marca da rede.
+Em *Configurações › Tela da marca* dá para desligar ou mudar quanto tempo ela fica no ar. Conteúdo institucional que
+a equipe tenha enviado tem preferência: a peça da marca só completa o que faltar.
+
 ## Comunicados do ponto e o layout da tela
 
 O recado do próprio ponto. Em condomínio, é a moeda de troca pelo espaço.
