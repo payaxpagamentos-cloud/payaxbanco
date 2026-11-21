@@ -273,7 +273,7 @@ Não há câmera nem leitura do ambiente: é uma cópia do que o próprio player
 
 ## O player (o que roda na TV)
 
-Abra `https://SEU-DOMINIO/midia/tv/` no aparelho ligado à TV e deixe em tela cheia. Funciona em **TV box Android,
+Abra `https://vaimidia.com.br/midia/tv/` no aparelho ligado à TV e deixe em tela cheia. Funciona em **TV box Android,
 Fire TV Stick, Chromecast com Google TV, mini PC, Raspberry Pi** ou no navegador da própria smart TV.
 
 - **Pareamento por código**: o aparelho não tem usuário nem senha. Mostra um código (sem letras parecidas, tipo `DT6KZ7`),
@@ -364,10 +364,17 @@ Três coisas ligam o site ao sistema:
   resultado do briefing, sem ninguém editar arquivo.
 - **O rodapé leva ao painel**, para quem já é cliente entrar no portal.
 
+O endereço oficial é **https://vaimidia.com.br**: o site fica na raiz, o painel em `/midia/` e o player das TVs
+em `/midia/tv/`. O domínio está escrito no `canonical`, nas meta tags de prévia de link, no `sitemap.xml` e no
+`robots.txt` — que deixa o site ser indexado e **mantém o painel e os links de proposta fora do buscador**.
+
 O servidor publica o site na **raiz do domínio** e também em `<base>/site/`; o painel segue em `<base>/`
 (padrão `/midia/`). Para hospedar o site separado (Vercel, Netlify, nginx), basta subir a pasta e desligar aqui
 com `MIDIA_SITE=0` — nesse caso ele descobre a API sozinho, ou você fixa o endereço com
-`<body data-api="https://seu-dominio/midia/api/">`. Sem API por perto, o site funciona como pacote estático.
+`<body data-api="https://vaimidia.com.br/midia/api/">`. Sem API por perto, o site funciona como pacote estático.
+
+Quando o link do site é colado no WhatsApp, no Instagram ou em qualquer lugar que mostre prévia, aparece
+`site/assets/og-capa.jpg` (1200×630), a marca e o endereço. Trocar a imagem é trocar esse arquivo.
 
 O portfólio comercial em PDF fica em `site/assets/` e é baixado pelo próprio site.
 

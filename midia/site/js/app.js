@@ -263,13 +263,8 @@
   const email = String(config.email || '').trim();
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { const link = $('#official-email'); link.href = 'mailto:' + email; link.textContent = email; link.hidden = false; }
   try { if (config.instagramUrl) { const url = new URL(config.instagramUrl); if (url.protocol === 'https:' && (url.hostname === 'instagram.com' || url.hostname === 'www.instagram.com')) { $('#official-instagram').href = url.href; $('#official-instagram').hidden = false; } } } catch { /* Link permanece oculto sem endereço válido. */ }
-  try {
-    if (config.siteUrl) {
-      const url = new URL(config.siteUrl);
-      if (url.protocol === 'https:' || url.protocol === 'http:') {
-        const canonical = document.createElement('link'); canonical.rel = 'canonical'; canonical.href = url.href; document.head.appendChild(canonical);
-        const og = document.createElement('meta'); og.setAttribute('property', 'og:image'); og.content = new URL('assets/layout-aprovado.png', url).href; document.head.appendChild(og);
-      }
-    }
-  } catch { /* O endereço oficial pode ser configurado antes da publicação. */ }
+  /*
+   * O canonical e a imagem de prévia saíram daqui e foram para o <head> do HTML: quem monta a
+   * prévia do link (WhatsApp, Instagram, Google) lê a página crua, sem rodar JavaScript.
+   */
 })();

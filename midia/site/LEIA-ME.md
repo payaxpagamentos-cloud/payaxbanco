@@ -38,13 +38,15 @@ window.VAI_CONFIG = Object.freeze({
   whatsapp: '',
   email: '',
   instagramUrl: '',
-  siteUrl: ''
+  siteUrl: 'https://vaimidia.com.br'
 });
 ```
 
 Use somente dados oficiais. O WhatsApp deve conter país, DDD e número, sem espaços ou pontuação. Quando um número válido é preenchido, o briefing oferece a opção de abri-lo no WhatsApp; o visitante confirma o envio no próprio aplicativo. E-mail e Instagram aparecem no rodapé apenas quando configurados.
 
-Não foi inventado um telefone, e-mail, perfil social ou domínio. O campo `siteUrl` deve receber o endereço oficial antes da publicação.
+Não foi inventado um telefone, e-mail ou perfil social. O endereço oficial é **vaimidia.com.br**, já preenchido
+em `siteUrl` e escrito também nas meta tags do `index.html` e da `privacidade.html`, no `sitemap.xml` e no
+`robots.txt`. Se o domínio mudar, troque nesses quatro lugares.
 
 ## Como funciona o formulário
 
@@ -66,11 +68,15 @@ index.html
 css/styles.css
 js/config.js
 js/app.js
+privacidade.html
+js/privacidade.js
+robots.txt
+sitemap.xml
 assets/marca.svg
-assets/layout-aprovado.png
+assets/layout-aprovado.webp
+assets/og-capa.jpg
 assets/VAI_MIDIA_Portfolio_Comercial.pdf
 assets/fonts/
-documentacao/PROMPT_PARA_CODE.md
 ```
 
 ## Imagens e identidade
@@ -84,9 +90,11 @@ O símbolo da marca é um SVG editável. A tipografia do site é Open Sans, incl
 
 ## Publicação
 
-1. Configure os contatos e o endereço oficial.
-2. Hospede todos os arquivos mantendo as pastas.
-3. Para compartilhamento em redes sociais, coloque a URL pública absoluta da imagem em `og:image` no HTML. A configuração `siteUrl` também prepara esse metadado no navegador, mas os robôs de prévia normalmente exigem o valor já no HTML.
-4. Confira os links, o PDF e o planejador no domínio final.
+1. Aponte **vaimidia.com.br** para o servidor e publique com HTTPS (o `canonical` e as prévias usam `https://`).
+2. Preencha razão social, CNPJ, WhatsApp, e-mail e Instagram em `js/config.js`. A linha do controlador na
+   política de privacidade só aparece com razão social e CNPJ preenchidos.
+3. Hospede todos os arquivos mantendo as pastas.
+4. Confira os links, o PDF e o planejador no domínio final, e cole o endereço no WhatsApp para ver a prévia.
 
-O envio deste pacote não publica nem registra um domínio.
+A prévia de link (WhatsApp, Instagram, Google) usa `assets/og-capa.jpg`, 1200×630, e as meta tags já escritas
+no HTML — robô de prévia não roda JavaScript, por isso o endereço está no arquivo e não só em `config.js`.

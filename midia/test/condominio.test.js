@@ -1056,6 +1056,22 @@ test('Site do Vai Mídia: abre na raiz e o formulário vira lead', async (t) => 
       assert.match(html, new RegExp(`data-numero="${n}"`), `o site tem lugar para o número de ${n}`));
   });
 
+  await t.test('o endereço oficial está no HTML, e o painel fica fora do buscador', async () => {
+    const html = await (await fetch(`${raiz}/`)).text();
+    // Robô de prévia de link não roda JavaScript: o endereço precisa estar escrito na página.
+    assert.match(html, /<link rel="canonical" href="https:\/\/vaimidia\.com\.br\/">/);
+    assert.match(html, /property="og:image" content="https:\/\/vaimidia\.com\.br\/assets\/og-capa\.jpg"/);
+    assert.equal((await fetch(`${raiz}/assets/og-capa.jpg`)).status, 200, 'a imagem da prévia existe');
+
+    const robots = await (await fetch(`${raiz}/robots.txt`)).text();
+    assert.match(robots, /Disallow: \/midia\//, 'painel, telas e links de proposta ficam fora do buscador');
+    assert.match(robots, /Sitemap: https:\/\/vaimidia\.com\.br\/sitemap\.xml/);
+
+    const mapa = await (await fetch(`${raiz}/sitemap.xml`)).text();
+    assert.match(mapa, /<loc>https:\/\/vaimidia\.com\.br\/<\/loc>/);
+    assert.ok(!mapa.includes('/midia/'), 'o mapa do site não entrega o painel');
+  });
+
   await t.test('a política de privacidade está no ar e o formulário avisa antes de enviar', async () => {
     const r = await fetch(`${raiz}/privacidade.html`);
     assert.equal(r.status, 200, 'a página de privacidade abre');

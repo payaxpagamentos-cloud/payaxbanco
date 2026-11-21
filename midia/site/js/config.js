@@ -8,6 +8,7 @@ window.VAI_CONFIG = Object.freeze({
   whatsapp: '',
   email: '',
   instagramUrl: '',
-  // Informe após escolher o endereço oficial. O site funciona sem preencher.
-  siteUrl: ''
+  // Endereço oficial. Também está escrito nas meta tags do index.html e da privacidade,
+  // no sitemap.xml e no robots.txt — se um dia mudar, troque nos quatro lugares.
+  siteUrl: 'https://vaimidia.com.br'
 });

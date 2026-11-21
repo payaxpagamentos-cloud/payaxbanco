@@ -1,0 +1,6 @@
+# O site é público; o painel, as telas e as propostas por link não são.
+User-agent: *
+Allow: /
+Disallow: /midia/
+
+Sitemap: https://vaimidia.com.br/sitemap.xml
