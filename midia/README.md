@@ -471,6 +471,7 @@ HTTPS e o serviço subindo sozinho no reinício — está em [`instalacao/`](ins
 
 ```bash
 cd midia/instalacao
+./conferir.sh --dominio vaimidia.com.br     # antes: a máquina tem o que precisa?
 sudo ./instalar.sh --dominio vaimidia.com.br --email voce@vaimidia.com.br
 ```
 

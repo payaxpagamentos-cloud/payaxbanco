@@ -6,6 +6,7 @@ com HTTPS do Let's Encrypt, subindo sozinho quando a máquina reinicia.
 
 | Arquivo | O que é |
 |---|---|
+| `conferir.sh` | Diz, antes e depois, se a máquina tem o que é preciso (DNS, PTR, portas, serviços). |
 | `instalar.sh` | A instalação inteira, de uma vez. Pode rodar de novo sem medo. |
 | `atualizar.sh` | Troca o código por uma versão nova, guardando antes uma cópia do banco. |
 | `vaimidia.service` | O serviço do systemd (quem mantém o sistema no ar). |
@@ -34,6 +35,23 @@ Crie estes registros no painel do seu domínio. Sem eles o HTTPS não sai e o e-
 
 Duas coisas que **só o provedor da máquina resolve**: o **DNS reverso (PTR)** do IP apontando para o
 domínio, e a **porta 25 liberada na entrada** — quase toda nuvem bloqueia a 25 por padrão e abre a pedido.
+
+## Antes de instalar: conferir a máquina
+
+```bash
+cd midia/instalacao
+./conferir.sh --dominio vaimidia.com.br
+```
+
+Não altera nada. Em um minuto ele responde se o domínio aponta para esta máquina, se o IP tem **nome
+reverso (PTR)**, se os registros de e-mail existem, quais portas estão ouvindo e se o provedor deixa a
+máquina conversar com outros servidores de e-mail. Vale rodar de novo depois de instalar.
+
+**O PTR merece atenção especial.** Ele não se configura no DNS do domínio: quem acerta é o dono do IP,
+ou seja, o provedor da máquina. IP de conexão residencial normalmente **não tem PTR, muda sozinho e
+está em lista de bloqueio** — nessa situação, o site até funciona enquanto o IP não trocar, mas e-mail
+não vai a lugar nenhum, e o MX apontado para lá quebra no primeiro reinício do modem. Para o sistema em
+produção, use um servidor com **IP fixo de datacenter** (VPS).
 
 ## Instalar
 
