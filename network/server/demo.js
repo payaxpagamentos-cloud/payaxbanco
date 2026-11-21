@@ -287,7 +287,36 @@ const servidor = criarApp(db).listen(0, async () => {
       provisionados += 1;
     }
 
+    /*
+     * ACS e aparelhos dos assinantes. O ACS fica configurado e os CPEs aparecem como se já tivessem ligado
+     * uma vez — que é o estado real de quem acabou de apontar a base para o ACS. Nenhum aparelho é inventado
+     * com credencial de chamada: sem ela, a tela diz corretamente que a mudança espera o contato do aparelho.
+     */
+    await req('demo', 'PUT', '/cpes/acs', { usuario: 'acs', senha: 'senha-do-acs-demonstrativa', url: 'https://demonstracao.exemplo/network/api/acs' });
+    const MODELOS_CPE = [['Intelbras', 'TWIBAM GPON', 'tr098'], ['Huawei', 'EG8145V5', 'tr098'], ['ZTE', 'F670L', 'tr181'], ['Nokia', 'G-1425G-A', 'tr181']];
+    let aparelhos = 0;
+    for (const x of carteira) {
+      const servico = db.prepare('SELECT id FROM servicos WHERE contrato_id = ?').get(x.contrato.id);
+      if (!servico || aparelhos >= 5) continue;
+      const [fabricante, modeloCpe, dados] = MODELOS_CPE[aparelhos % MODELOS_CPE.length];
+      const raiz = dados === 'tr181' ? 'Device' : 'InternetGatewayDevice';
+      const wlan = dados === 'tr181' ? 'Device.WiFi.SSID.1.SSID' : `${raiz}.LANDevice.1.WLANConfiguration.1.SSID`;
+      const canal = dados === 'tr181' ? 'Device.WiFi.Radio.1.Channel' : `${raiz}.LANDevice.1.WLANConfiguration.1.Channel`;
+      const serial = `${fabricante.slice(0, 2).toUpperCase()}${String(480000 + aparelhos * 7919)}`;
+      db.prepare(`INSERT INTO cpes (organizacao_id, serial, oui, classe, fabricante, modelo, versao_firmware, modelo_dados,
+        url_chamado, usuario_chamado, ip, servico_id, ultimo_contato, ultimo_evento, informs, parametros, lido_em, criado_em)
+        VALUES (?, ?, '00259E', ?, ?, ?, ?, ?, ?, 'acs', ?, ?, ?, '2 PERIODIC', ?, ?, ?, ?)`)
+        .run(org, serial, modeloCpe, fabricante, modeloCpe, `${1 + aparelhos}.${3 + aparelhos}.2`, dados,
+          `http://100.64.${aparelhos}.${10 + aparelhos}:7547/cr`, `100.64.${aparelhos}.${10 + aparelhos}`, servico.id,
+          horas(-(2 + aparelhos)), 3 + aparelhos,
+          JSON.stringify({ [wlan]: `PROVEDOR-${x.assinante.nome.split(' ')[0].toUpperCase()}`, [canal]: String(1 + aparelhos * 5),
+            [`${raiz}.DeviceInfo.UpTime`]: String(86400 * (1 + aparelhos)) }),
+          horas(-(2 + aparelhos)), horas(-(2 + aparelhos)));
+      aparelhos += 1;
+    }
+
     console.log(`Carteira demonstrativa: ${carteira.length} assinantes, ${execucao.regua.bloqueios} corte(s) pela régua, ${execucao.regua.avisos} aviso(s) preparado(s).`);
+    console.log(`TR-069: ACS configurado e ${aparelhos} aparelho(s) de assinante registrados (sem credencial de chamada: a tela diz que a mudança espera o contato do aparelho).`);
     console.log(`Provisionamento: ${provisionados} serviço(s) no concentrador BRAS-PG-01 (sem acesso de gerência: nenhum equipamento real foi inventado).`);
 
     console.log('Organização demonstrativa criada. Acessos (senha demo12345):');

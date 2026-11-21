@@ -159,11 +159,12 @@ function contexto(db, equipamentoId, { ensaio = false, trocarSenha = false } = {
   };
 }
 
-/** Qual equipamento executa a ação deste serviço (hoje, o concentrador; o Wi-Fi vai para o ACS do CPE). */
-function equipamentoDa(servico, acao) {
-  if (['configurar_wifi', 'reiniciar_cpe'].includes(acao)) return servico.acs_id ?? null;
-  return servico.concentrador_id ?? null;
-}
+/*
+ * Qual equipamento executa a ação deste serviço. Hoje é sempre o concentrador: as ações no aparelho do
+ * assinante (Wi-Fi, reinício) NÃO passam por aqui, porque no TR-069 quem liga é o CPE — elas vivem no ACS
+ * (lib/acs.js e routes/cpes.js), com fila própria, e por isso nenhum driver de discagem as declara.
+ */
+const equipamentoDa = (servico) => servico.concentrador_id ?? null;
 
 /**
  * Executa uma tarefa da fila. Nunca lança: o resultado (sucesso, falha com nova tentativa, falha permanente ou
@@ -173,7 +174,7 @@ async function executarTarefa(db, tarefa) {
   const inicio = Date.now();
   db.prepare("UPDATE tarefas_equipamento SET situacao = 'executando', iniciado_em = ?, tentativas = tentativas + 1 WHERE id = ?").run(agora(), tarefa.id);
   const servico = tarefa.servico_id ? db.prepare('SELECT * FROM servicos WHERE id = ?').get(tarefa.servico_id) : null;
-  const equipamentoId = tarefa.equipamento_id ?? (servico ? equipamentoDa(servico, tarefa.acao) : null);
+  const equipamentoId = tarefa.equipamento_id ?? (servico ? equipamentoDa(servico) : null);
   const pedido = tarefa.pedido ? JSON.parse(tarefa.pedido) : {};
 
   try {
@@ -197,8 +198,6 @@ async function executarTarefa(db, tarefa) {
       case 'cortar': resultado = await driver.cortar(ctx, servico, { motivo: pedido.motivo }); break;
       case 'religar': resultado = await driver.religar(ctx, servico); break;
       case 'remover': resultado = await driver.remover(ctx, servico); break;
-      case 'configurar_wifi': resultado = await driver.configurarWifi(ctx, servico, pedido); break;
-      case 'reiniciar_cpe': resultado = await driver.reiniciarCpe(ctx, servico); break;
       default: throw new ErroEquipamento(`Ação não implementada: ${tarefa.acao}.`, 'falha', { permanente: true });
     }
 

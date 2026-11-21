@@ -1,8 +1,9 @@
 import { api, qs } from '../api.js';
+import { listaCpes } from './wifi.js';
 import { el, limpar, pode, cabecalho, painel, tabela, paginacao, abas, etq, etqDe, rotulo, dataHora, desde, dl, numero,
   carregar, formulario, confirmar, botao, toast, faixa, stat, vazio } from '../ui.js';
 
-const ABAS = [['divergencias', 'Divergências'], ['servicos', 'Serviços'], ['equipamentos', 'Equipamentos'], ['fila', 'Fila de tarefas']];
+const ABAS = [['divergencias', 'Divergências'], ['servicos', 'Serviços'], ['equipamentos', 'Equipamentos'], ['aparelhos', 'Aparelhos (TR-069)'], ['fila', 'Fila de tarefas']];
 
 export default async function provisionamento({ alvo, query, ir }) {
   const aba = query.aba ?? 'divergencias';
@@ -23,6 +24,12 @@ export default async function provisionamento({ alvo, query, ir }) {
   if (aba === 'servicos') return servicos(corpo, ir);
   if (aba === 'equipamentos') return carregar(corpo, () => Promise.all([api.get('/provisionamento/equipamentos'), api.get('/provisionamento/drivers')]),
     ([lista, drivers]) => equipamentos(lista, drivers, recarregar));
+  if (aba === 'aparelhos') {
+    // A configuração do ACS é de quem administra integrações; a lista de aparelhos é do atendimento.
+    // Quem não tem a primeira continua vendo a segunda, em vez de a aba inteira falhar.
+    return carregar(corpo, () => Promise.all([api.get('/cpes?por_pagina=100'), pode('integracoes.ver') ? api.get('/cpes/acs') : null]),
+      ([lista, cfg]) => aparelhos(lista, cfg, ir, recarregar));
+  }
   if (aba === 'fila') return fila(corpo, recarregar);
   return carregar(corpo, () => api.get('/provisionamento/reconciliacao'), (d) => divergencias(d, ir));
 }
@@ -138,6 +145,57 @@ function configurarAcesso(e, drivers, depois) {
       await api.put(`/provisionamento/equipamentos/${e.id}/acesso`, { ...d, senha: d.senha || undefined, porta: d.porta || undefined });
       toast('Acesso salvo. Use "Testar" para confirmar que o sistema fala com o equipamento.');
       depois?.();
+    },
+  });
+}
+
+/*
+ * Aparelhos dos assinantes. Aqui a direção da conversa é o contrário do resto: quem liga é o CPE, e o ACS
+ * é o endereço para onde ele liga. Por isso a tela mostra primeiro se o ACS está configurado e quantos
+ * aparelhos realmente falaram — sem isso, nenhuma mudança de Wi-Fi sai do lugar.
+ */
+function aparelhos(lista, cfg, ir, recarregar) {
+  const semVinculo = lista.itens.filter((c) => !c.assinante_nome).length;
+  const ativos24h = cfg?.ativos_24h ?? lista.itens.filter((c) => c.ultimo_contato && Date.now() - Date.parse(c.ultimo_contato) < 86400_000).length;
+  return [
+    faixa('No TR-069 quem liga é o aparelho. O sistema guarda o pedido e bate na porta do CPE para ele ligar agora; se não atender, o pedido vale no próximo contato dele.', '', 'info'),
+    cfg && !cfg.senha_configurada
+      ? faixa('O ACS ainda não tem credencial definida: nenhum aparelho consegue falar com ele. Configure abaixo e aponte os CPEs para o endereço indicado.', 'erro', 'alerta')
+      : null,
+    el('div', { class: 'stats' },
+      stat({ rotulo: 'Aparelhos conhecidos', valor: numero(cfg?.aparelhos ?? lista.total), nota: 'já conversaram com o ACS', ic: 'servidor', semDado: !lista.total }),
+      stat({ rotulo: 'Falaram em 24 h', valor: numero(ativos24h), nota: ativos24h ? 'o ACS está recebendo' : 'nenhum contato recente',
+        notaTipo: ativos24h ? 'ok' : 'erro', ic: 'atividade' }),
+      stat({ rotulo: 'Aplicam na hora', valor: numero(lista.itens.filter((c) => c.chamado_configurado).length), nota: 'com credencial de chamada', ic: 'relogio' }),
+      stat({ rotulo: 'Sem vínculo', valor: numero(semVinculo), nota: 'não ligados a um contrato', notaTipo: semVinculo ? 'aviso' : 'ok', ic: 'info' })),
+    cfg ? painel('Endereço do ACS', el('div', {},
+      dl([
+        ['Endereço para configurar no CPE', cfg.url || cfg.url_sugerida],
+        ['Usuário', cfg.usuario ?? el('span', { class: 'fraco' }, 'não definido')],
+        ['Senha', cfg.senha_configurada ? 'definida (guardada cifrada)' : el('span', { class: 'fraco' }, 'não definida')],
+      ]),
+      pode('integracoes.editar')
+        ? el('div', { class: 'form-acoes', style: 'justify-content:flex-start' }, botao('Configurar o ACS', () => configurarAcs(cfg, recarregar), { tipo: 'secundario pequeno' }))
+        : null)) : null,
+    listaCpes(lista.itens, ir),
+  ];
+}
+
+function configurarAcs(cfg, depois) {
+  return formulario('Endereço e credencial do ACS', [
+    { nome: 'usuario', rotulo: 'Usuário', obrigatorio: true, valor: cfg.usuario ?? 'acs', ajuda: 'O mesmo em todos os aparelhos.' },
+    { nome: 'senha', rotulo: cfg.senha_configurada ? 'Senha (em branco mantém a atual)' : 'Senha', tipo: 'password', obrigatorio: !cfg.senha_configurada,
+      autocomplete: 'new-password', ajuda: 'Pelo menos 12 caracteres: ela fica guardada em milhares de aparelhos.' },
+    { nome: 'url', rotulo: 'Endereço público do ACS', valor: cfg.url ?? cfg.url_sugerida, inteiro: true,
+      ajuda: 'É o que vai configurado no CPE. Precisa ser alcançável de onde o assinante está.' },
+  ], {
+    largo: true,
+    antes: faixa('Trocar a senha derruba a conversa de todos os aparelhos já provisionados com a anterior, até que sejam atualizados.', 'aviso', 'alerta'),
+    enviar: async (d) => {
+      const r = await api.put('/cpes/acs', { ...d, senha: d.senha || undefined });
+      toast(r.aviso ?? 'ACS configurado.');
+      depois?.();
+      return r;
     },
   });
 }

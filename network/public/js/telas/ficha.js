@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { el, limpar, icone, pode, cabecalho, painel, tabela, abas, etq, etqDe, rotulo, opcoes, dinheiro, numero, data, dataHora, desde, dl,
   documento, telefone, competencia, velocidade, carregando, formulario, pedirMotivo, botao, toast, faixa, stat, vazio, hoje } from '../ui.js';
 import { baixa } from './faturamento.js';
+import { painelWifi } from './wifi.js';
 
 /*
  * Ficha do assinante: uma tela só.
@@ -224,6 +225,8 @@ function cartaoContrato(c, { f, recarregar }, compacto) {
       el('details', { class: 'bloco-expansivel' }, el('summary', {}, 'Serviço no equipamento'),
         c.servico ? blocoServico(c, recarregar)
           : el('p', { class: 'fraco', style: 'padding:8px 0' }, 'Contrato não provisionado: o bloqueio por inadimplência seria só comercial, sem cortar o acesso.')),
+      el('details', { class: 'bloco-expansivel' }, el('summary', {}, `Wi-Fi do assinante${c.servico?.cpe ? '' : ' (aparelho não conectado ao ACS)'}`),
+        painelWifi(c.servico?.cpe ?? null, recarregar, { titulo: null })),
       c.eventos.length ? el('details', { class: 'bloco-expansivel' }, el('summary', {}, `Histórico do contrato (${c.eventos.length})`),
         el('ul', { class: 'linha-tempo' }, c.eventos.slice(0, 20).map((e) => el('li', {},
           el('strong', {}, rotulo('eventoContrato', e.evento)), e.motivo ? ` ${e.motivo}` : '',

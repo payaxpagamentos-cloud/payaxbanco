@@ -53,6 +53,8 @@ module.exports = {
   conectorTimeoutMs: Number(process.env.NETWORK_CONECTOR_TIMEOUT_MS) || 10_000,
   // Tempo máximo de cada chamada a um equipamento (concentrador, OLT, CPE). Equipamento carregado demora mais que uma API.
   equipamentoTimeoutMs: Number(process.env.NETWORK_EQUIPAMENTO_TIMEOUT_MS) || 15_000,
+  // Tempo máximo para o roteador do assinante atender à chamada do ACS. Curto: não atender é comum e esperado.
+  acsChamadoTimeoutMs: Number(process.env.NETWORK_ACS_CHAMADO_TIMEOUT_MS) || 6_000,
   // Liga a fila que executa as tarefas no equipamento. Nos testes, a fila é chamada diretamente.
   provisionamentoAutomatico: process.env.NETWORK_PROVISIONAMENTO !== '0' && !teste,
   // O endereço de gerência pode ser o próprio servidor? Desligado: 127.x normalmente é engano de cadastro.

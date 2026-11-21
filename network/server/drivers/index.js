@@ -14,10 +14,13 @@ const DRIVERS = [
 ];
 
 const OBRIGATORIOS = ['nome', 'rotulo', 'fabricante', 'papeis', 'capacidades'];
-const ACOES = ['identificar', 'ler', 'aplicar', 'cortar', 'religar', 'remover', 'configurar_wifi', 'reiniciar_cpe'];
+/*
+ * Ações da fila de discagem (o sistema abre a conexão com o equipamento). O aparelho do assinante fica de
+ * fora de propósito: no TR-069 quem liga é ele, então Wi-Fi e reinício de CPE vivem no ACS, com fila própria.
+ */
+const ACOES = ['identificar', 'ler', 'aplicar', 'cortar', 'religar', 'remover'];
 /** Nome do método que executa cada ação (a ação é snake_case na fila; o método é camelCase no driver). */
-const METODO = { identificar: 'identificar', ler: 'ler', aplicar: 'aplicar', cortar: 'cortar', religar: 'religar',
-  remover: 'remover', configurar_wifi: 'configurarWifi', reiniciar_cpe: 'reiniciarCpe' };
+const METODO = { identificar: 'identificar', ler: 'ler', aplicar: 'aplicar', cortar: 'cortar', religar: 'religar', remover: 'remover' };
 
 const registro = new Map();
 for (const d of DRIVERS) {

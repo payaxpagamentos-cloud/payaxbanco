@@ -31,6 +31,9 @@ function criarApi(db, extras = {}) {
     res.send(anexos.conteudo(a));
   });
 
+  // Entrada do roteador do assinante (TR-069). Credencial própria do ACS, não usa sessão de usuário.
+  api.use('/acs', require('./routes/acs')(db));
+
   // Entrada autenticada do coletor de monitoramento (token próprio, não usa sessão de usuário).
   api.use('/coletor', require('./routes/coletor')(db));
 
@@ -46,6 +49,7 @@ function criarApi(db, extras = {}) {
   api.use('/faturamento', require('./routes/faturamento')(db));
   api.use('/cobranca', require('./routes/cobranca')(db));
   api.use('/provisionamento', require('./routes/provisionamento')(db));
+  api.use('/cpes', require('./routes/cpes')(db));
   api.use('/frota', require('./routes/frota')(db));
   api.use('/manutencao', require('./routes/manutencao')(db));
   api.use('/combustivel', require('./routes/combustivel')(db));

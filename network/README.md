@@ -32,8 +32,9 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 13 | **Abastecimentos** | Comprovante, volume, preço, odômetro e tanque cheio; total = litros × preço; preço médio ponderado; consumo por ciclo entre tanques cheios (com os parciais); lançamento retroativo validado; volume acima do tanque sinalizado; correção autorizada com valor original guardado; relatórios por veículo, técnico e posto; CSV protegido. |
 | 14 | **Rastreamento** | Posições do rastreador com horário da medição e idade; parado ≠ sem comunicação; ignição ausente = desconhecida; trajeto do período; vínculo dispositivo ↔ veículo pelo IMEI (a placa só sugere); chamados próximos por distância em linha reta (não é ETA). |
 | 15 | **Provisionamento** | A ponte entre o contratado e o equipamento, por uma **camada de drivers**: o sistema fala em estado desejado (login, velocidade, IP, corte) e cada fabricante é um driver plugável, que declara o que sabe fazer. Fila de tarefas com ensaio (dry-run), tentativa com recuo, erro legível e histórico; releitura periódica que acha o que foi mexido por fora; e a tela de divergências, que mostra serviço liberado com contrato bloqueado (receita escapando) e contrato ativo com serviço cortado. |
-| 16 | **Consulta de CNPJ e CEP** | Cadastro preenchido pela base pública da Receita e pelos Correios, com a fonte e o horário à vista, o que veio marcado até alguém conferir, e queda para a fonte seguinte. Fonte fora do ar não trava o cadastro. |
-| 17 | **Integrações** | Rastreador, coletores de monitoramento e Downdetector: configuração, teste de conexão, estado (não configurada, conectada, parcial, desatualizada, sem permissão, limite atingido, falha), último sucesso, erro com ID e histórico de coletas. |
+| 16 | **Wi-Fi do assinante (TR-069)** | ACS próprio: o roteador do assinante liga para o sistema, se registra sozinho e passa a ser gerenciável. Trocar SSID, senha e canal e reiniciar o aparelho saem da ficha do cliente, nos dois dialetos de parâmetro (TR-098 e TR-181). Para não esperar o contato periódico, o sistema bate na porta do CPE (Connection Request com Digest) pedindo que ligue agora — e grava nele, no primeiro encontro, a credencial que torna isso possível. |
+| 17 | **Consulta de CNPJ e CEP** | Cadastro preenchido pela base pública da Receita e pelos Correios, com a fonte e o horário à vista, o que veio marcado até alguém conferir, e queda para a fonte seguinte. Fonte fora do ar não trava o cadastro. |
+| 18 | **Integrações** | Rastreador, coletores de monitoramento e Downdetector: configuração, teste de conexão, estado (não configurada, conectada, parcial, desatualizada, sem permissão, limite atingido, falha), último sucesso, erro com ID e histórico de coletas. |
 
 Mais: **Organização e acessos** (usuários, perfis, matriz de permissões, parâmetros da operação e auditoria com request ID).
 
@@ -61,7 +62,7 @@ Requisitos: **Node.js 22.13+**.
 cd network
 npm install
 npm start          # http://localhost:3500/  (com NETWORK_BASE_PATH=/network → http://localhost:3500/network/)
-npm test           # 165 testes de aceite (inclui o rastreador real, se rastreador/node_modules existir)
+npm test           # 183 testes de aceite (inclui o rastreador real, se rastreador/node_modules existir)
 ```
 
 Acesso inicial: `admin@managerprovedor.local` / `admin12345` (defina `NETWORK_ADMIN_EMAIL` e `NETWORK_ADMIN_SENHA`; em produção a senha é obrigatória).
@@ -97,6 +98,23 @@ Veja [`.env.exemplo`](.env.exemplo).
 | `NETWORK_COLETAS` | ligado | `0` desliga as coletas periódicas. |
 | `NETWORK_MAPA_TILES` / `_ATRIBUICAO` / `_LAT` / `_LNG` | Esri World Street Map | Camada de imagens do mapa (Leaflet). Para uso comercial e volume alto, use um provedor licenciado. |
 | `NETWORK_TRUST_PROXY` / `NETWORK_LIMITE_LOGIN` | `loopback` / `10` | Proxy reverso e tentativas de login por minuto. |
+
+### ACS (TR-069) e o Wi-Fi do assinante
+
+Configurado em **Provisionamento → Aparelhos (TR-069)**. O endereço do ACS é `<endereço público>/api/acs`, e é
+ele que vai nos CPEs junto com o usuário e a senha definidos ali.
+
+A conversa é sempre do aparelho para o sistema: ele liga no boot, de tempos em tempos e quando algo muda. No
+primeiro encontro o sistema grava nele a **credencial de chamada** — é ela que depois permite pedir "ligue
+agora" e aplicar uma mudança de Wi-Fi em segundos, em vez de esperar o contato periódico. Se a gravação falhar,
+a credencial guardada é descartada e tudo é tentado de novo no contato seguinte.
+
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `NETWORK_ACS_CHAMADO_TIMEOUT_MS` | `6000` | Tempo máximo para o aparelho atender à chamada. Curto de propósito: não atender é comum e esperado. |
+
+A senha do ACS fica guardada em milhares de aparelhos: trocá-la derruba a conversa de todos os já
+provisionados até que sejam atualizados, e o sistema avisa isso antes de salvar.
 
 ### Parâmetros do provisionamento
 
@@ -202,6 +220,8 @@ com `{servico}`, cabeçalho de autenticação, credencial e onde ler o volume de
 - **Ensaio antes de aplicar**: o mesmo caminho da execução, descrevendo o que faria, sem escrever.
 - **Corte não é exclusão**: o acesso é desabilitado e a sessão derrubada, para o assinante voltar igual ao religar. Apagar só no cancelamento.
 - **O que o driver não sabe fazer, ele declara**: a ação é recusada com o motivo. Nenhuma tela diz "aplicado" sem ter aplicado.
+- **No TR-069, quem liga é o aparelho**: o sistema guarda o pedido e bate na porta do CPE. Se ele não atender — roteador desligado, CGNAT sem porta aberta —, a tela diz que o pedido ficou guardado, em vez de dizer que aplicou.
+- **"Entregue" não é "aplicado"**: só a confirmação do aparelho conclui o pedido de Wi-Fi; a recusa dele vira erro legível com o código do CWMP.
 - **A consulta pública é sugestão, não cadastro**: a resposta diz a fonte e o horário, os campos preenchidos ficam marcados, e quem salva é a pessoa.
 - **"Está tudo certo" só se diz do que foi lido**: com serviço nunca lido, a tela diz que não sabe.
 - **Uma tela por assunto, não uma tela por tabela**: a ficha do assinante responde "ele pagou?", "está cortado?", "qual o login dele?" e "abriu chamado?" sem trocar de tela, porque é tudo a mesma conversa.
@@ -216,6 +236,8 @@ network/
     auth.js            # token HMAC e exigir(permissão)
     lib/permissoes.js  # matriz perfil × permissão
     drivers/           # contrato único por fabricante: base (HTTP com TLS por equipamento), index (registro), mikrotik
+    lib/cwmp.js        # o SOAP do TR-069, lido como entrada hostil (sem DOCTYPE, tamanho limitado, caixa respeitada)
+    lib/acs.js         # registro do aparelho, fila por CPE, credencial e chamada (Digest)
     lib/ficha.js       # a ficha do assinante inteira numa resposta, filtrada pela permissão do perfil
     lib/provisionamento.js # estado desejado x real, divergências, fila, reconciliação
     lib/consultas.js   # CNPJ e CEP com cache, queda de fonte e degradação honesta
@@ -223,12 +245,12 @@ network/
     lib/cobranca.js    # régua versionada, carência, bloqueio, confiança, inadimplência
     lib/frota.js manutencao.js combustivel.js rede.js comissoes.js noc.js anexos.js enderecos.js http.js (paginação, idempotência, CSV)
     conectores/        # base (SSRF, timeout, estados, backoff), rastreador, downdetector
-    routes/            # organizacao, assinantes, planos, contratos, faturamento, cobranca, provisionamento, consultas, frota, manutencao, combustivel, rede, chamados, equipe, noc, coletor, rastreamento, integracoes, painel
+    routes/            # organizacao, assinantes, planos, contratos, faturamento, cobranca, provisionamento, acs (público), cpes, consultas, frota, manutencao, combustivel, rede, chamados, equipe, noc, coletor, rastreamento, integracoes, painel
     coletas.js         # agenda das coletas, a rotina diária de cobrança e a fila do provisionamento
     demo.js            # organização demonstrativa (separada)
   public/              # SPA sem build (módulos ES), Leaflet + markercluster servidos do próprio pacote
   scripts/coletor-exemplo.js
-  test/                # node:test, incluindo o rastreador real e um RouterOS de mentira que fala a API REST de verdade
+  test/                # node:test, com o rastreador real, um RouterOS e um CPE de mentira que falam os protocolos de verdade
 ```
 
 ## O que depende de terceiros
@@ -238,7 +260,7 @@ network/
 - **Envio automático de aviso por WhatsApp ou e-mail**: exige contrato com um provedor de mensagens. A régua deixa o aviso pronto, com o texto da regra, e registra quem despachou e quando.
 - **Nota fiscal (NFCom, modelo 62)**: exige certificado digital e credenciamento na SEFAZ.
 - **Drivers de outros fabricantes**: hoje acompanha o driver de **MikroTik RouterOS** (concentrador PPPoE, API REST), testado de ponta a ponta. Huawei, ZTE, Fiberhome, Datacom, Parks, Intelbras e Cisco entram pelo mesmo contrato — OLT e CPE normalmente exigem SSH/Telnet/SNMP ou TR-069, caminhos que ainda não estão escritos. O que falta é driver, não arquitetura.
-- **Configurar o Wi-Fi do assinante** (SSID, senha, canal): a ação existe no contrato dos drivers (`configurar_wifi`); falta o driver TR-069/ACS que fala com o CPE.
+- **Alcance do ACS**: o CPE precisa chegar ao endereço do ACS, e o ACS precisa chegar ao CPE para o "aplicar agora". Em CGNAT sem porta aberta a mudança continua funcionando — só espera o contato periódico do aparelho.
 - **Downdetector**: acesso autorizado (API Enterprise), credencial e a documentação dos recursos contratados.
 - **Plataforma de monitoramento** do provedor (ou o agente de exemplo na rede interna) enviando amostras ao coletor.
 - **Rota viária e trânsito** para estimar chegada: hoje só distância em linha reta, identificada como tal.

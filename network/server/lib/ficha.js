@@ -5,6 +5,7 @@ const { pode } = require('./permissoes');
 const fat = require('./faturamento');
 const cob = require('./cobranca');
 const prov = require('./provisionamento');
+const acs = require('./acs');
 
 /*
  * Ficha do assinante: tudo que se sabe sobre um cliente, numa resposta só.
@@ -112,8 +113,22 @@ function contratosDo(db, assinante, hoje, linha) {
     if (servicoBruto) {
       const d = prov.desejado(db, servicoBruto);
       const real = servicoBruto.estado_real ? JSON.parse(servicoBruto.estado_real) : null;
+      // O aparelho do assinante (TR-069) vem junto: alterar o Wi-Fi é parte do atendimento, não outra tela.
+      const cpeBruto = db.prepare('SELECT * FROM cpes WHERE servico_id = ?').get(servicoBruto.id);
+      const cpe = cpeBruto ? {
+        ...acs.publico(cpeBruto),
+        tarefas: db.prepare(`SELECT t.*, u.nome AS usuario_nome FROM cpe_tarefas t LEFT JOIN usuarios u ON u.id = t.usuario_id
+          WHERE t.cpe_id = ? ORDER BY t.id DESC LIMIT 15`).all(cpeBruto.id)
+          .map((x) => ({ ...x, parametros: undefined, resultado: x.resultado ? JSON.parse(x.resultado) : null })),
+      } : null;
       servico = { ...prov.publico(servicoBruto), desejado: prov.desejadoPublico(d), divergencias: prov.divergencias(d, real, servicoBruto.lido_em),
-        concentrador_nome: servicoBruto.concentrador_id ? db.prepare('SELECT nome FROM equipamentos WHERE id = ?').get(servicoBruto.concentrador_id)?.nome ?? null : null };
+        concentrador_nome: servicoBruto.concentrador_id ? db.prepare('SELECT nome FROM equipamentos WHERE id = ?').get(servicoBruto.concentrador_id)?.nome ?? null : null,
+        cpe };
+      for (const x of cpe?.tarefas ?? []) {
+        if (x.situacao !== 'concluida') continue;
+        linha.push(evento(x.concluido_em, 'cpe', x.descricao ?? `Aparelho: ${x.rpc}`, 'confirmado pelo aparelho do assinante',
+          { contrato: c.numero, usuario: x.usuario_nome, origem: x.origem }));
+      }
     }
     return {
       ...c,

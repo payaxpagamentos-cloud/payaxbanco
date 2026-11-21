@@ -1303,6 +1303,85 @@ ALTER TABLE organizacoes ADD COLUMN corte_automatico INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE organizacoes ADD COLUMN reconciliacao_horas INTEGER NOT NULL DEFAULT 12;
 `,
   },
+  {
+    versao: 5,
+    nome: 'acs_tr069',
+    sql: `
+/*
+ * ACS (TR-069): o servidor com que o roteador do assinante conversa.
+ *
+ * No TR-069 quem liga é o CPE: ele abre sessão com o ACS no boot, periodicamente e quando algo muda.
+ * Por isso o ACS não "configura o Wi-Fi agora" — ele deixa o pedido guardado e, para não esperar a próxima
+ * ligação, bate na porta do CPE (Connection Request) pedindo que ele ligue já.
+ *
+ * As credenciais são duas e não se confundem: a do CPE para entrar no ACS (acs_usuario/acs_senha) e a do ACS
+ * para bater na porta do CPE (usuario_chamado/senha_chamado, que o próprio CPE informa no Inform).
+ */
+ALTER TABLE organizacoes ADD COLUMN acs_usuario TEXT;
+ALTER TABLE organizacoes ADD COLUMN acs_senha_cifrada TEXT;
+-- Endereço público do ACS, para a tela dizer o que configurar no CPE (e para conferir o que foi provisionado).
+ALTER TABLE organizacoes ADD COLUMN acs_url TEXT;
+
+/*
+ * Aparelho do assinante (CPE/ONT) que já conversou com o ACS. O registro nasce do primeiro Inform:
+ * o que está aqui é o que o próprio aparelho contou sobre si, não o que alguém digitou.
+ */
+CREATE TABLE cpes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  serial TEXT NOT NULL,
+  oui TEXT,
+  classe TEXT,
+  fabricante TEXT,
+  modelo TEXT,
+  versao_firmware TEXT,
+  -- Qual árvore de parâmetros o aparelho fala: InternetGatewayDevice (TR-098) ou Device (TR-181).
+  modelo_dados TEXT CHECK (modelo_dados IS NULL OR modelo_dados IN ('tr098','tr181')),
+  -- Onde bater para o CPE abrir sessão agora, e com que credencial (ele mesmo informa no Inform).
+  url_chamado TEXT,
+  usuario_chamado TEXT,
+  senha_chamado_cifrada TEXT,
+  ip TEXT,
+  -- Contrato a que este aparelho pertence, quando se sabe.
+  servico_id INTEGER REFERENCES servicos(id),
+  ultimo_contato TEXT,
+  ultimo_evento TEXT,
+  informs INTEGER NOT NULL DEFAULT 0,
+  -- Último retrato dos parâmetros lidos (JSON), com o horário.
+  parametros TEXT,
+  lido_em TEXT,
+  criado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, serial)
+);
+CREATE INDEX idx_cpes_servico ON cpes(servico_id);
+CREATE INDEX idx_cpes_contato ON cpes(organizacao_id, ultimo_contato DESC);
+
+/*
+ * Pedidos guardados para o próximo contato do aparelho. "entregue" significa que o ACS mandou o comando e
+ * está esperando a resposta; só "concluida" quer dizer que o aparelho confirmou. A tela nunca diz
+ * "Wi-Fi alterado" antes dessa confirmação.
+ */
+CREATE TABLE cpe_tarefas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  cpe_id INTEGER NOT NULL REFERENCES cpes(id),
+  rpc TEXT NOT NULL CHECK (rpc IN ('SetParameterValues','GetParameterValues','Reboot','FactoryReset')),
+  parametros TEXT,
+  descricao TEXT,
+  situacao TEXT NOT NULL DEFAULT 'pendente' CHECK (situacao IN ('pendente','entregue','concluida','falhou','cancelada')),
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  resultado TEXT,
+  erro TEXT,
+  origem TEXT NOT NULL DEFAULT 'usuario' CHECK (origem IN ('usuario','sistema','reconciliacao')),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  entregue_em TEXT,
+  concluido_em TEXT
+);
+CREATE INDEX idx_cpe_tarefas_fila ON cpe_tarefas(cpe_id, situacao, id);
+CREATE INDEX idx_cpe_tarefas_org ON cpe_tarefas(organizacao_id, id DESC);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

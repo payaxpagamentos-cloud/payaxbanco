@@ -34,6 +34,8 @@ function criarApp(db, extras = {}) {
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // Arquivos chegam como corpo bruto (até o limite configurado); o resto, JSON.
   r.use('/api/anexos', express.raw({ type: () => true, limit: config.arquivoMaxBytes + 1024 }));
+  // O ACS recebe SOAP do roteador do assinante: texto, não JSON, e com tamanho curto por ser endpoint público.
+  r.use('/api/acs', express.text({ type: () => true, limit: '512kb' }));
   r.use(express.json({ limit: '1mb' }));
   r.use('/api', criarApi(db, extras));
   r.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));
