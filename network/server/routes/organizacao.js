@@ -20,6 +20,14 @@ function percentual(valor, nome, maximo) {
 }
 
 /** Dados da organização, usuários e histórico de auditoria. */
+/** CNPJ (ou CPF, no provedor individual) da própria empresa, conferido pelo dígito. */
+function documentoDaEmpresa(valor) {
+  if (valor === null || valor === '') return null;
+  const t = v.digitos(valor);
+  v.exigir(v.cnpjValido(t) || v.cpfValido(t), 'CNPJ/CPF da organização inválido.');
+  return t;
+}
+
 module.exports = (db) => {
   const r = Router();
 
@@ -37,6 +45,8 @@ module.exports = (db) => {
       janela_recorrencia_min: b.janela_recorrencia_min !== undefined ? v.inteiro(b.janela_recorrencia_min, 'a janela de recorrência', { max: 1440 }) : antes.janela_recorrencia_min,
       desatualizado_min: b.desatualizado_min !== undefined ? v.inteiro(b.desatualizado_min, 'o tempo de desatualização', { min: 1, max: 1440 }) : antes.desatualizado_min,
       reserva_porta_horas: b.reserva_porta_horas !== undefined ? v.inteiro(b.reserva_porta_horas, 'a validade da reserva', { min: 1, max: 720 }) : antes.reserva_porta_horas,
+      // CNPJ do provedor: confere o certificado digital e vai na nota fiscal e nas obrigações acessórias.
+      documento: b.documento !== undefined ? documentoDaEmpresa(b.documento) : antes.documento,
       // Faturamento e cobrança. A carência vale sobre qualquer regra da régua: nenhuma bloqueia antes dela.
       dia_vencimento_padrao: b.dia_vencimento_padrao !== undefined ? v.inteiro(b.dia_vencimento_padrao, 'o dia de vencimento padrão', { min: 1, max: 28 }) : antes.dia_vencimento_padrao,
       carencia_bloqueio_dias: b.carencia_bloqueio_dias !== undefined ? v.inteiro(b.carencia_bloqueio_dias, 'a carência antes do bloqueio', { max: 180 }) : antes.carencia_bloqueio_dias,
@@ -50,10 +60,10 @@ module.exports = (db) => {
       corte_automatico: b.corte_automatico !== undefined ? (v.booleano(b.corte_automatico) ? 1 : 0) : antes.corte_automatico,
       reconciliacao_horas: b.reconciliacao_horas !== undefined ? v.inteiro(b.reconciliacao_horas, 'o intervalo de reconciliação', { max: 720 }) : antes.reconciliacao_horas,
     };
-    db.prepare(`UPDATE organizacoes SET nome = ?, fuso = ?, aprovacao_manutencao_centavos = ?, janela_recorrencia_min = ?, desatualizado_min = ?,
+    db.prepare(`UPDATE organizacoes SET nome = ?, documento = ?, fuso = ?, aprovacao_manutencao_centavos = ?, janela_recorrencia_min = ?, desatualizado_min = ?,
       reserva_porta_horas = ?, dia_vencimento_padrao = ?, carencia_bloqueio_dias = ?, multa_atraso_pct_centesimos = ?, juros_mes_pct_centesimos = ?,
       pro_rata = ?, confianca_dias = ?, confianca_max_ano = ?, provisionamento_automatico = ?, corte_automatico = ?, reconciliacao_horas = ? WHERE id = ?`)
-      .run(d.nome, d.fuso, d.aprovacao_manutencao_centavos, d.janela_recorrencia_min, d.desatualizado_min, d.reserva_porta_horas, d.dia_vencimento_padrao,
+      .run(d.nome, d.documento, d.fuso, d.aprovacao_manutencao_centavos, d.janela_recorrencia_min, d.desatualizado_min, d.reserva_porta_horas, d.dia_vencimento_padrao,
         d.carencia_bloqueio_dias, d.multa_atraso_pct_centesimos, d.juros_mes_pct_centesimos, d.pro_rata, d.confianca_dias, d.confianca_max_ano,
         d.provisionamento_automatico, d.corte_automatico, d.reconciliacao_horas, req.org);
     registrar(db, req, 'organizacao_alterada', { recurso: 'organizacao', recursoId: req.org, antes, depois: d });

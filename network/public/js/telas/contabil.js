@@ -1,5 +1,5 @@
 import { api, qs, baixar } from '../api.js';
-import { el, limpar, pode, cabecalho, painel, tabela, paginacao, abas, etq, rotulo, opcoes, dinheiro, data, dl,
+import { el, limpar, pode, cabecalho, painel, tabela, paginacao, abas, etq, rotulo, opcoes, dinheiro, data, dataHora, documento, dl,
   numero, porcento, carregar, carregando, formulario, pedirMotivo, confirmar, botao, toast, faixa, stat, vazio, modal, hoje } from '../ui.js';
 
 /*
@@ -33,13 +33,15 @@ export default async function contabil({ alvo, query, ir }) {
       pode('contabil.lancar') ? botao('Novo lançamento', () => novoLancamento(recarregar), { ic: 'mais' }) : null,
     ],
   }), abas([['painel', 'Painel'], ['balancete', 'Balancete'], ['dre', 'DRE'], ['lancamentos', 'Lançamentos'],
-    ['orcamento', 'Orçado × realizado'], ['plano', 'Plano de contas']], aba, (id) => ir(`#/contabil?aba=${id}&competencia=${comp}`)), corpo);
+    ['orcamento', 'Orçado × realizado'], ['plano', 'Plano de contas'], ['certificado', 'Certificado digital']],
+  aba, (id) => ir(`#/contabil?aba=${id}&competencia=${comp}`)), corpo);
 
   if (aba === 'balancete') return telaBalancete(corpo, comp, ir);
   if (aba === 'dre') return telaDre(corpo, comp, ir);
   if (aba === 'lancamentos') return telaLancamentos(corpo, query, ir, recarregar);
   if (aba === 'orcamento') return telaOrcamento(corpo, comp, ir, recarregar);
   if (aba === 'plano') return telaPlano(corpo, recarregar);
+  if (aba === 'certificado') return telaCertificado(corpo, recarregar);
   return telaPainel(corpo, comp, ir, recarregar);
 }
 
@@ -59,7 +61,7 @@ function telaPainel(corpo, comp, ir, recarregar) {
     const d = r.dre ?? {};
     return [
       seletorCompetencia(comp, ir, 'painel'),
-      r.fechada ? faixa(`A competência ${comp} está fechada: nada entra nem muda nela.`, '', 'cadeado') : null,
+      r.fechada ? faixa(`A competência ${comp} está fechada: nada entra nem muda nela.`, 'info', 'cadeado') : null,
       r.balancete_fecha === false
         ? faixa('O balancete desta competência não está fechando. Isso não deveria acontecer — avise antes de entregar ao contador.', 'erro', 'alerta')
         : null,
@@ -72,7 +74,7 @@ function telaPainel(corpo, comp, ir, recarregar) {
       r.pendentes
         ? faixa(`${numero(r.pendentes)}${r.pode_haver_mais_pendentes ? '+' : ''} fato(s) do financeiro ainda sem lançamento. `
           + 'Enquanto estiverem assim, o balancete está incompleto.', 'aviso', 'alerta')
-        : faixa('Nenhum fato do financeiro sem lançamento: a contabilidade está em dia com o caixa.', '', 'ok'),
+        : faixa('Nenhum fato do financeiro sem lançamento: a contabilidade está em dia com o caixa.', 'ok', 'ok'),
       el('div', { class: 'stats' },
         stat({ rotulo: 'Receita líquida', valor: dinheiro(d.receita_liquida_centavos ?? 0), nota: `Competência ${comp}`, ic: 'dinheiro' }),
         stat({ rotulo: 'Custo do serviço', valor: dinheiro(d.custo_servico_centavos ?? 0), nota: 'Link, manutenção, materiais', ic: 'rede' }),
@@ -80,7 +82,7 @@ function telaPainel(corpo, comp, ir, recarregar) {
         stat({ rotulo: 'Resultado', valor: dinheiro(d.resultado_centavos ?? 0),
           nota: d.margem_pct === null || d.margem_pct === undefined ? 'Sem receita na competência' : `Margem de ${porcento(d.margem_pct)}`,
           notaTipo: (d.resultado_centavos ?? 0) < 0 ? 'erro' : 'ok', ic: 'painel' })),
-      el('div', { class: 'grade principal-lateral' },
+      el('div', { class: 'grade meio-a-meio' },
         el('div', {}, painel('Conferência com o financeiro', dl([
           ['Lançamentos na competência', numero(r.lancamentos)],
           ['Contas no plano', numero(r.contas)],
@@ -127,7 +129,7 @@ const verPendencias = async () => {
   return modal('Fatos do financeiro sem lançamento', [
     p.total
       ? faixa(`${numero(p.total)}${p.pode_haver_mais ? '+' : ''} fato(s) pendentes. O balancete não está completo enquanto houver qualquer um aqui.`, 'aviso', 'alerta')
-      : faixa('Nada pendente: tudo o que o financeiro registrou tem lançamento contábil.', '', 'ok'),
+      : faixa('Nada pendente: tudo o que o financeiro registrou tem lançamento contábil.', 'ok', 'ok'),
     p.contas_faltando.length ? faixa(`Contas ainda não mapeadas: ${p.contas_faltando.map((k) => ROTULO_CHAVE[k] ?? k).join(', ')}.`, 'erro', 'alerta') : null,
     p.faturas.length ? painel('Faturas', tabela([
       { titulo: 'Fatura', valor: (f) => `#${f.numero}` },
@@ -167,9 +169,9 @@ function telaBalancete(corpo, comp, ir) {
   return carregar(corpo, () => api.get(`/contabil/balancete${qs({ de: comp, ate: comp })}`), (b) => [
     seletorCompetencia(comp, ir, 'balancete'),
     b.fecha
-      ? faixa(`Balancete de ${comp} fecha: débitos e créditos somam ${dinheiro(b.total_debito_centavos)}.`, '', 'ok')
+      ? faixa(`Balancete de ${comp} fecha: débitos e créditos somam ${dinheiro(b.total_debito_centavos)}.`, 'ok', 'ok')
       : faixa(`O balancete NÃO fecha: diferença de ${dinheiro(b.diferenca_centavos)}. Não entregue assim.`, 'erro', 'alerta'),
-    b.fechada ? faixa('Competência fechada.', '', 'cadeado') : null,
+    b.fechada ? faixa('Competência fechada.', 'info', 'cadeado') : null,
     painel(null, tabela([
       { titulo: 'Conta', valor: (c) => el('div', { style: `padding-left:${(c.nivel - 1) * 14}px` },
         el('span', { class: c.analitica ? '' : 'forte' }, `${c.codigo} ${c.nome}`)) },
@@ -207,8 +209,8 @@ function telaDre(corpo, comp, ir) {
       el('strong', { class: negativo ? 'erro' : '' }, dinheiro(valor)));
   return carregar(corpo, () => api.get(`/contabil/dre${qs({ de: comp, ate: comp })}`), (d) => [
     seletorCompetencia(comp, ir, 'dre'),
-    d.fechada ? faixa('Competência fechada: este resultado não muda mais.', '', 'cadeado') : null,
-    el('div', { class: 'grade principal-lateral' },
+    d.fechada ? faixa('Competência fechada: este resultado não muda mais.', 'info', 'cadeado') : null,
+    el('div', { class: 'grade meio-a-meio' },
       el('div', {}, painel(`Resultado de ${comp}`, [
         linha('Receita de serviços', d.receita_servicos_centavos),
         linha('Outras receitas', d.outras_receitas_centavos),
@@ -222,12 +224,19 @@ function telaDre(corpo, comp, ir) {
           ? el('p', { class: 'fraco' }, 'Sem receita na competência: não há margem a calcular.')
           : el('p', { class: 'fraco' }, `Margem de ${porcento(d.margem_pct)} sobre a receita líquida.`),
       ])),
-      el('div', {},
-        painel('Receitas', detalhe(d.detalhe.receitas)),
-        painel('Custos', detalhe(d.detalhe.custos)),
-        painel('Despesas', detalhe(d.detalhe.despesas)))),
+      // Um painel com três seções, e não três painéis: três molduras empilhadas ficavam bem mais altas
+      // que o resultado ao lado, e a comparação entre as duas colunas é justamente o que se quer aqui.
+      el('div', {}, painel('Detalhe por conta', [
+        secao('Receitas', d.detalhe.receitas),
+        secao('Custos', d.detalhe.custos),
+        secao('Despesas', d.detalhe.despesas),
+      ]))),
   ]);
 }
+
+const secao = (titulo, itens) => el('div', { class: 'secao-detalhe' },
+  el('h3', {}, titulo, el('span', { class: 'fraco' }, itens.length ? `${itens.length} conta(s)` : '')),
+  detalhe(itens));
 
 const detalhe = (itens) => (itens.length
   ? el('ul', { class: 'linha-tempo' }, itens.map((i) => el('li', {}, `${i.codigo} ${i.nome}`, el('small', {}, dinheiro(i.valor_centavos)))))
@@ -366,6 +375,104 @@ async function definirOrcamento(comp, recarregar) {
   });
 }
 
+/* ---------------- Certificado digital ---------------- */
+
+/*
+ * O certificado é a identidade da empresa em forma de arquivo: com ele se assina declaração, guia e nota
+ * fiscal. Por isso a tela mostra só o que o próprio certificado diz de si — nada é digitado — e avisa
+ * com antecedência do vencimento: certificado vencido trava tudo de uma vez.
+ */
+function telaCertificado(corpo, recarregar) {
+  return carregar(corpo, () => api.get('/certificado'), (d) => {
+    const c = d.certificado;
+    const s = d.situacao;
+    const cor = { ausente: 'neutra', valido: 'ok', vencendo: 'aviso', vencido: 'erro', futuro: 'info' }[s.estado];
+    return [
+      s.estado === 'vencido' ? faixa(s.texto, 'erro', 'alerta')
+        : s.estado === 'vencendo' ? faixa(s.texto, 'aviso', 'alerta')
+          : s.estado === 'ausente' ? faixa('Sem certificado, nenhuma obrigação pode ser assinada em nome da empresa.', 'aviso', 'info')
+            : faixa(s.texto, 'ok', 'ok'),
+      el('div', { class: 'grade meio-a-meio' },
+        el('div', {}, painel('Certificado instalado', c
+          ? dl([
+            ['Apelido', c.apelido],
+            ['Titular', c.titular ?? '—'],
+            ['CNPJ', c.documento ? documento(c.documento) : el('span', { class: 'fraco' }, 'não consta no certificado')],
+            ['Emissor', c.emissor ?? '—'],
+            ['Tipo', `${c.tipo} (arquivo)`],
+            ['Válido de', data(c.valido_de)],
+            ['Válido até', el('span', {}, data(c.valido_ate), ' ', etq(s.dias >= 0 ? `${s.dias} dia(s)` : 'vencido', cor))],
+            ['Série', el('span', { class: 'mono miudo' }, c.serie ?? '—')],
+            ['Impressão digital', el('span', { class: 'mono miudo quebra' }, c.impressao)],
+            ['Instalado em', `${dataHora(c.enviado_em)}${c.enviado_por_nome ? ` por ${c.enviado_por_nome}` : ''}`],
+            ['Último uso', c.ultimo_uso_em ? dataHora(c.ultimo_uso_em) : el('span', { class: 'fraco' }, 'nunca usado ainda')],
+          ])
+          : vazio('Nenhum certificado instalado.',
+            'O e-CNPJ tipo A1 é um arquivo .pfx ou .p12 com senha, emitido por uma autoridade certificadora da ICP-Brasil.'), {
+          acoes: [
+            pode('integracoes.editar') ? botao(c ? 'Substituir' : 'Instalar certificado', () => instalarCertificado(recarregar), { ic: 'escudo' }) : null,
+            c ? botao('Testar', () => testarCertificado(), { tipo: 'secundario', ic: 'ok' }) : null,
+            c && pode('integracoes.editar') ? botao('Remover', () => removerCertificado(recarregar), { tipo: 'perigo' }) : null,
+          ],
+          rodape: el('span', { class: 'fraco' }, 'O arquivo e a senha ficam cifrados e nunca saem do servidor — nem nesta tela, nem na API.'),
+        })),
+        el('div', {}, painel('O que cada integração ainda precisa', [
+          el('p', { class: 'fraco' }, 'O certificado é o primeiro requisito de todas elas, e não é o único. '
+            + 'O que depende de providência nos órgãos está listado aqui para não virar surpresa.'),
+          ...d.integracoes.map((i) => el('div', { class: 'bloco-integracao' },
+            el('div', { class: 'forte' }, i.nome),
+            el('div', { class: 'fraco' }, i.faz),
+            el('ul', { class: 'lista-requisitos' }, i.exige.map((x, n) => el('li', { class: n === 0 && i.certificado_ok ? 'feito' : '' },
+              n === 0 && i.certificado_ok ? '✓ ' : '', x))),
+            el('div', { class: 'fraco miudo' }, i.observacao))),
+        ]))),
+      d.historico.length > 1 ? painel('Histórico', tabela([
+        { titulo: 'Apelido', valor: (x) => x.apelido },
+        { titulo: 'Titular', valor: (x) => x.titular ?? '—' },
+        { titulo: 'Validade', valor: (x) => `${data(x.valido_de)} a ${data(x.valido_ate)}` },
+        { titulo: 'Situação', valor: (x) => (x.ativo ? etq('Ativo', 'ok') : etq('Desativado', 'neutra')) },
+        { titulo: 'Saída', valor: (x) => (x.removido_em ? el('div', {}, dataHora(x.removido_em), el('div', { class: 'fraco' }, x.motivo_remocao)) : '') },
+      ], d.historico), { semCorpo: true }) : null,
+    ];
+  });
+}
+
+const instalarCertificado = (recarregar) => formulario('Instalar certificado digital', [
+  { nome: 'apelido', rotulo: 'Apelido', obrigatorio: true, valor: `e-CNPJ ${new Date().getFullYear()}`,
+    ajuda: 'Só para identificar na tela, quando houver renovação.' },
+  { nome: 'arquivo', rotulo: 'Arquivo do certificado', tipo: 'file', obrigatorio: true, accept: '.pfx,.p12',
+    ajuda: 'O A1 é um arquivo .pfx ou .p12. O A3 (cartão ou token) não serve aqui: a chave dele nunca sai do dispositivo.' },
+  { nome: 'senha', rotulo: 'Senha do certificado', tipo: 'password', obrigatorio: true,
+    ajuda: 'Fica cifrada no servidor e nunca é mostrada de volta.' },
+], {
+  rotuloEnviar: 'Instalar',
+  enviar: async (d) => {
+    const arquivo = d.arquivo;
+    if (!arquivo) throw new Error('Escolha o arquivo do certificado.');
+    const base64 = await new Promise((resolve, reject) => {
+      const leitor = new FileReader();
+      leitor.onload = () => resolve(String(leitor.result).split(',')[1]);
+      leitor.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+      leitor.readAsDataURL(arquivo);
+    });
+    const r = await api.post('/certificado', { apelido: d.apelido, senha: d.senha, arquivo: base64 });
+    toast(`Certificado de ${r.titular ?? 'titular não identificado'} instalado. ${r.situacao.texto}`);
+    if (r.aviso) toast(r.aviso, true);
+    recarregar();
+  },
+});
+
+async function testarCertificado() {
+  const r = await api.post('/certificado/testar', {});
+  toast(r.confere ? `Certificado abre normalmente. ${r.texto}` : r.aviso, !r.confere);
+}
+
+const removerCertificado = (recarregar) => pedirMotivo('Remover o certificado', 'Motivo da remoção', async (motivo) => {
+  const r = await api.remover('/certificado', { motivo });
+  toast(r.aviso ?? 'Certificado removido.', true);
+  recarregar();
+}, { rotuloEnviar: 'Remover', ajuda: 'O certificado sai de uso, mas continua no histórico com a data e o motivo.' });
+
 /* ---------------- Plano de contas ---------------- */
 
 function telaPlano(corpo, recarregar) {
@@ -380,7 +487,7 @@ function telaPlano(corpo, recarregar) {
         ? faixa(`Falta apontar a conta de: ${faltando.map((k) => ROTULO_CHAVE[k] ?? k).join(', ')}. Sem isso o sistema não contabiliza sozinho.`, 'aviso', 'alerta')
         : faixa(p.automatica ? 'Mapa completo e contabilização automática ligada.' : 'Mapa completo. A contabilização automática está desligada.',
           p.automatica ? '' : 'aviso', p.automatica ? 'ok' : 'info'),
-      el('div', { class: 'grade principal-lateral' },
+      el('div', { class: 'grade plano-mapa' },
         el('div', {}, painel('Contas', tabela([
           { titulo: 'Conta', valor: (c) => el('div', { style: `padding-left:${(c.nivel - 1) * 14}px` },
             el('span', { class: c.analitica ? '' : 'forte' }, `${c.codigo} ${c.nome}`),

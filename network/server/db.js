@@ -1704,6 +1704,63 @@ CREATE TABLE contas_padrao (
 ALTER TABLE organizacoes ADD COLUMN contabilidade_automatica INTEGER NOT NULL DEFAULT 0;
 `,
   },
+  {
+    versao: 9,
+    nome: 'certificado_digital',
+    sql: `
+/*
+ * Certificado digital e-CNPJ (A1).
+ *
+ * É o item mais sensível do sistema inteiro: com ele se assina em nome da empresa — declaração, guia,
+ * nota fiscal. Por isso o arquivo E a senha ficam cifrados (AES-256-GCM, como as demais credenciais),
+ * nenhuma rota devolve qualquer um dos dois, e só o administrador instala ou remove.
+ *
+ * Nada é apagado: remover marca a data e o motivo. Saber QUANDO um certificado deixou de valer explica
+ * por que uma obrigação falhou naquela semana.
+ *
+ * O A3 (cartão ou token) não cabe aqui: a chave privada nunca sai do dispositivo, e assinar exige o
+ * hardware presente na máquina de quem assina. Guardar "um A3" num servidor não é possível, e prometer
+ * isso seria mentira.
+ */
+CREATE TABLE certificados (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  apelido TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'A1' CHECK (tipo IN ('A1')),
+  -- O .pfx inteiro e a senha, cifrados. Nunca saem daqui em nenhuma resposta.
+  arquivo_cifrado TEXT NOT NULL,
+  senha_cifrada TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  -- Lido do próprio certificado, não digitado por ninguém.
+  titular TEXT,
+  documento TEXT,
+  emissor TEXT,
+  valido_de TEXT,
+  valido_ate TEXT,
+  serie TEXT,
+  impressao TEXT NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  enviado_por INTEGER REFERENCES usuarios(id),
+  enviado_em TEXT NOT NULL,
+  ultimo_uso_em TEXT,
+  removido_em TEXT,
+  removido_por INTEGER REFERENCES usuarios(id),
+  motivo_remocao TEXT
+);
+CREATE INDEX idx_certificados_org ON certificados(organizacao_id, ativo);
+-- O mesmo certificado não entra duas vezes enquanto estiver ativo.
+CREATE UNIQUE INDEX idx_certificados_impressao ON certificados(organizacao_id, impressao) WHERE ativo = 1;
+
+/*
+ * CNPJ do próprio provedor.
+ *
+ * Até aqui ele só existia solto, no beneficiário da conta de cobrança. É dado da empresa, não da conta:
+ * é com ele que se confere se o certificado digital é mesmo desta organização, e é ele que vai na nota
+ * fiscal e em toda obrigação acessória.
+ */
+ALTER TABLE organizacoes ADD COLUMN documento TEXT;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

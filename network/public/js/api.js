@@ -54,6 +54,8 @@ export const api = {
   get: (c, o) => chamar('GET', c, undefined, { ...o, idempotente: false }),
   post: (c, b = {}) => chamar('POST', c, b),
   patch: (c, b) => chamar('PATCH', c, b),
+  // DELETE com corpo: as remoções do sistema sempre pedem motivo, e ele viaja no corpo.
+  remover: (c, b = {}) => chamar('DELETE', c, b),
   put: (c, b) => chamar('PUT', c, b),
   enviarArquivo: (recurso, recursoId, arquivo) => chamar('POST', `/anexos?recurso=${recurso}${recursoId ? `&recurso_id=${recursoId}` : ''}`, undefined, { arquivo }),
   // O retorno do banco sobe como texto cru: o servidor só CONFERE e devolve a prévia, sem aplicar nada.

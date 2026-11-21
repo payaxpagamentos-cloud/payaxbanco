@@ -56,6 +56,7 @@ function criarApi(db, extras = {}) {
   api.use('/cobrancas', require('./routes/cobrancas')(db));
   api.use('/panorama', require('./routes/panorama')(db));
   api.use('/contabil', require('./routes/contabil')(db));
+  api.use('/certificado', require('./routes/certificado')(db));
   api.use('/provisionamento', require('./routes/provisionamento')(db));
   api.use('/cpes', require('./routes/cpes')(db));
   api.use('/frota', require('./routes/frota')(db));

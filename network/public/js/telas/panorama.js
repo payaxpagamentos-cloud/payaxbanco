@@ -366,7 +366,7 @@ function telaForaDoMapa(corpo, ir) {
     d.total
       ? faixa(`${numero(d.total)} contrato(s) não aparecem em mapa nenhum por não terem coordenada. Enquanto estiverem assim, `
         + 'ficam de fora de toda área desenhada e de todo cálculo de impacto.', 'aviso', 'alerta')
-      : faixa('Todo contrato tem coordenada: o mapa mostra a carteira inteira.', '', 'ok'),
+      : faixa('Todo contrato tem coordenada: o mapa mostra a carteira inteira.', 'ok', 'ok'),
     painel(null, tabela([
       { titulo: 'Assinante', valor: (x) => el('div', {}, el('div', { class: 'forte' }, x.assinante_nome), el('div', { class: 'fraco' }, `Contrato #${x.contrato_numero}`)) },
       { titulo: 'Endereço', valor: (x) => [x.endereco, x.bairro].filter(Boolean).join(' · ') || el('span', { class: 'fraco' }, 'Sem endereço') },

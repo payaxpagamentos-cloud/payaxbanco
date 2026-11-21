@@ -647,6 +647,30 @@ main.tela-cheia { padding: 0; display: flex; animation: none; }
 }
 
 /* ---------------- Contabilidade ---------------- */
+/*
+ * Grades simétricas.
+ *
+ * "principal-lateral" (1fr + 320px) serve a telas com conteúdo dominante e apoio estreito. Em telas de
+ * leitura comparada — DRE ao lado do detalhe, conferência ao lado do fechamento — ela desequilibra: um
+ * painel curto deixa metade da tela vazia ao lado de outro comprido. Aqui as colunas têm o mesmo peso,
+ * e os blocos de detalhe se distribuem em vez de empilhar.
+ */
+.grade.meio-a-meio { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.grade.plano-mapa { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; }
+/* O lado direito do plano acompanha a rolagem: a tabela de contas é longa por natureza, e o mapa de
+   para onde vai cada fato precisa ficar à vista enquanto se confere conta por conta. */
+.grade.plano-mapa > div:last-child { position: sticky; top: 78px; }
+.secao-detalhe + .secao-detalhe { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--borda); }
+.secao-detalhe h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--texto-2); display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.secao-detalhe h3 .fraco { text-transform: none; letter-spacing: 0; font-size: 12px; }
+.bloco-integracao { padding: 12px 0; border-bottom: 1px solid var(--borda); }
+.bloco-integracao:last-child { border-bottom: 0; padding-bottom: 0; }
+.lista-requisitos { margin: 8px 0 6px; padding-left: 18px; font-size: 12.5px; color: var(--texto-2); }
+.lista-requisitos li + li { margin-top: 3px; }
+.lista-requisitos .feito { color: var(--verde); list-style: none; margin-left: -18px; }
+@media (max-width: 1100px) {
+  .grade.meio-a-meio, .grade.plano-mapa { grid-template-columns: minmax(0, 1fr); }
+}
 /* Débito e crédito lado a lado: é assim que um lançamento se lê, e a cor evita trocar um pelo outro. */
 .partidas { margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
 .partidas li { display: flex; align-items: baseline; gap: 6px; }

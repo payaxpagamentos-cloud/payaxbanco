@@ -216,13 +216,38 @@ Acompanham: **balancete** (com CSV), **DRE**, **razão** com saldo correndo lan�
 **orçado × realizado** por competência, que é o planejamento contábil — sem o orçado, o realizado é um
 número sem régua.
 
+#### Certificado digital (e-CNPJ A1)
+
+O certificado se instala pela própria tela (**Contabilidade → Certificado digital**). O sistema lê o
+arquivo e mostra **o que ele diz de si** — titular, CNPJ, emissor, validade, série e impressão digital —
+sem ninguém digitar nada. O arquivo e a senha ficam cifrados (AES-256-GCM) e **nunca saem do servidor**:
+nem na tela, nem na API, nem no registro de auditoria, que guarda só o que identifica o certificado.
+
+Regras que o sistema aplica sozinho:
+
+- **O CNPJ do certificado tem de ser o da organização.** Assinar em nome de outra empresa é problema
+  grave, e normalmente é só o arquivo errado enviado por engano.
+- **Certificado vencido não é instalado**, e um certificado prestes a vencer avisa com 30 dias: vencido,
+  ele trava declaração, guia e nota fiscal de uma vez.
+- **Só um fica ativo por vez.** Instalar outro desativa o anterior, que continua no histórico com data e
+  motivo. Dois certificados válidos deixariam em aberto qual assinou o quê.
+- O **A3** (cartão ou token) não cabe: a chave privada nunca sai do dispositivo e assinar exige o hardware
+  presente na máquina de quem assina. Um servidor não guarda A3, e prometer isso seria mentira.
+
+**Certificado no formato antigo:** muitos A1 brasileiros ainda vêm com a cifra RC2-40 ou 3DES, que o
+OpenSSL 3 move para o provedor legado e o Node recusa por padrão. Quando isso acontece, o sistema não diz
+só "falhou" — diz os dois caminhos: iniciar o servidor com `--openssl-legacy-provider`, ou converter o
+arquivo uma vez com `openssl pkcs12 -in seu.pfx -nodes -legacy | openssl pkcs12 -export -out novo.pfx`.
+O conteúdo do certificado não muda em nenhum dos dois.
+
 #### O que ainda depende de certificado digital
 
-A integração com **Receita Federal, FGTS Digital e eSocial** exige o **e-CNPJ (A1 ou A3)** do provedor e,
-em vários casos, procuração eletrônica. Sem o certificado instalado não há como autenticar, assinar evento
-nem emitir guia — e inventar essas chamadas produziria um sistema que *parece* integrado, com o erro
-aparecendo só no vencimento da guia. Por isso essa parte não está escrita: entra quando o certificado
-existir, no mesmo molde dos adaptadores bancários. O que não depende de certificado — plano de contas,
+Com o certificado instalado, **o primeiro requisito está atendido — e não é o único.** A tela lista, para
+cada integração, o que ainda falta e depende de providência nos órgãos: procuração eletrônica no e-CAC,
+contratação do Integra Contador (Serpro), procuração do FGTS Digital, cadastro no ambiente de produção
+restrita do eSocial. Os conectores em si ainda não estão escritos, e a tela diz isso em vez de sugerir que
+basta o certificado. Inventar essas chamadas produziria um sistema que *parece* integrado, com o erro
+aparecendo só no vencimento da guia. O que não depende de certificado — plano de contas,
 lançamentos, balancete, DRE, planejamento e a contabilização automática do faturamento — está pronto e
 funciona hoje.
 
