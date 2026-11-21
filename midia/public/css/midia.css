@@ -300,6 +300,13 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 13px; }
 .barras{ display: flex; align-items: flex-end; gap: 4px; height: 160px; padding-top: 10px; }
 .barras .barra{ flex: 1; background: linear-gradient(180deg, #C8FF31, #9FD400); opacity: .95; border-radius: 4px 4px 0 0; min-height: 2px; }
 .barras .barra:hover{ opacity: 1; }
+.barras.duplas{ align-items: stretch; gap: 10px; height: 190px; }
+.barras.duplas{ justify-content: center; }
+.barras.duplas .par{ flex: 1; max-width: 96px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.barras.duplas .colunas{ flex: 1; display: flex; align-items: flex-end; gap: 3px; }
+.barras.duplas .barra{ flex: 1; }
+.barra.saida, .legenda i.saida{ background: linear-gradient(180deg, var(--text-3), var(--text-2)); }
+.barras.duplas .eixo{ text-align: center; font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; }
 .vazio-grafico{ display: grid; place-items: center; min-height: 140px; color: var(--text-3); font-size: 13px; }
 
 /* Modal e aviso rápido */

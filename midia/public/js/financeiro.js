@@ -6,10 +6,13 @@ import {
   STATUS_FATURA, STATUS_REPASSE, COBRANCA, REPASSES,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio } from './comum.js';
+import { barrasComparadas, pizza, CORES } from './graficos.js';
 
 const hojeLocal = () => new Date().toLocaleDateString('en-CA');
 const diasAtras = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
 const competenciaAtual = () => hojeLocal().slice(0, 7);
+const primeiroDoMes = () => `${competenciaAtual()}-01`;
+const ultimoDoMes = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 0).toLocaleDateString('en-CA'); };
 const mesAnterior = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.toLocaleDateString('en-CA').slice(0, 7); };
 
 // ---------------------------------------------------------------- Relatórios
@@ -208,6 +211,79 @@ async function abrirFatura(id, recarregar) {
   ], { largo: true });
 }
 
+// ================================================================ Fluxo de caixa
+const CORES_SAIDA = [CORES.marca, CORES.oliva, CORES.azul, CORES.amarelo, CORES.cinza, CORES.vermelho, CORES.verde, CORES.grafite];
+
+/**
+ * O que entrou e o que saiu, junto: o realizado é pela data do pagamento e o previsto, pela do vencimento.
+ * É a resposta para "quanto sobra no fim do mês", que contas a pagar e a receber só davam separadas.
+ */
+export async function fluxoCaixa(ctx) {
+  const estado = { de: primeiroDoMes(), ate: ultimoDoMes() };
+  const corpo = el('div', { class: 'coluna' });
+
+  const pintar = async () => {
+    limpar(corpo, el('p', { class: 'mudo' }, 'Carregando…'));
+    const d = await api.get(`/painel/fluxo-caixa${qs(estado)}`);
+    const saldo = d.realizado.saldo_centavos;
+    const sinal = (c) => `${c < 0 ? '−' : ''}${dinheiro(Math.abs(c))}`;
+
+    limpar(corpo,
+      el('div', { class: 'grade' },
+        indicador({ rotulo: 'Entrou no período', valor: dinheiro(d.realizado.recebido_centavos), ic: 'faturamento', cor: 'verde' }),
+        indicador({ rotulo: 'Saiu no período', valor: dinheiro(d.realizado.pago_centavos), ic: 'repasses', cor: 'laranja' }),
+        indicador({
+          rotulo: 'Saldo realizado', valor: sinal(saldo), ic: saldo >= 0 ? 'ok' : 'erro', cor: saldo >= 0 ? 'verde' : 'vermelho',
+          nota: 'pelo que foi pago e recebido',
+        }),
+        indicador({
+          rotulo: 'Projetado', valor: sinal(d.projetado_centavos), ic: 'relogio', cor: d.projetado_centavos >= 0 ? 'azul' : 'vermelho',
+          nota: 'se tudo em aberto for pago no prazo',
+        })),
+
+      cartao('Ainda em aberto no período', tabela([
+        [(x) => x.rotulo, 'Previsto'],
+        [(x) => el('span', { style: x.cor ? `color:${x.cor};font-weight:700` : null }, x.valor), 'Valor', 'num dir'],
+      ], [
+        { rotulo: 'A receber (faturas em aberto que vencem no período)', valor: dinheiro(d.previsto.a_receber_centavos) },
+        { rotulo: 'A pagar (repasses e despesas que vencem no período)', valor: dinheiro(d.previsto.a_pagar_centavos) },
+        { rotulo: 'Saldo previsto', valor: sinal(d.previsto.saldo_centavos), cor: d.previsto.saldo_centavos >= 0 ? null : 'var(--erro)' },
+      ]),
+      el('p', { class: 'pequeno mudo' },
+        `Nos próximos 30 dias: ${dinheiro(d.proximos.receber_centavos)} a receber e ${dinheiro(d.proximos.pagar_centavos)} a pagar.`)),
+
+      el('div', { class: 'grade-dash' },
+        el('div', { class: 'c7' }, cartao('Entrou e saiu, mês a mês', d.por_mes.length
+          ? barrasComparadas(d.por_mes.map((m) => ({ rotulo: competenciaTexto(m.competencia).replace(/ de \d{4}$/, ''), a: m.entrou, b: m.saiu })),
+            { formato: (c) => dinheiro(c) })
+          : vazio('Sem movimento registrado ainda.'))),
+        el('div', { class: 'c5' }, cartao('Para onde foi o dinheiro', d.saidas_por_categoria.length
+          ? pizza(d.saidas_por_categoria.map((c, i) => ({
+            rotulo: c.categoria === 'repasse' ? 'Repasse aos pontos' : (CATEGORIAS_DESPESA[c.categoria] ?? c.categoria),
+            valor: c.valor_centavos, cor: CORES_SAIDA[i % CORES_SAIDA.length],
+          })), { formato: (c) => dinheiro(c), lado: true })
+          : vazio('Nenhuma saída paga no período.')))),
+
+      cartao('Movimentos do caixa', tabela([
+        [(x) => dataBr(x.data), 'Data'],
+        [(x) => etiqueta(x.tipo === 'entrada' ? 'Entrada' : 'Saída', x.tipo === 'entrada' ? 'ok' : 'aviso'), 'Tipo'],
+        [(x) => el('div', {}, el('div', {}, x.descricao), x.quem ? el('div', { class: 'pequeno mudo' }, x.quem) : null), 'Lançamento'],
+        [(x) => el('span', { style: `font-weight:700;color:${x.tipo === 'entrada' ? 'var(--ok)' : 'var(--text-2)'}` },
+          `${x.tipo === 'entrada' ? '+' : '−'} ${dinheiro(x.valor_centavos)}`), 'Valor', 'num dir'],
+      ], d.movimentos, { vazioTexto: 'Nenhum pagamento ou recebimento no período.' })));
+  };
+
+  limpar(ctx.conteudo,
+    el('div', { class: 'filtros livre' },
+      campo('De', { type: 'date', value: estado.de, onchange: (e) => { estado.de = e.target.value; pintar(); } }),
+      campo('Até', { type: 'date', value: estado.ate, onchange: (e) => { estado.ate = e.target.value; pintar(); } }),
+      el('button', {
+        class: 'btn', onclick: (e) => acao(e.target, () => baixar(`/painel/fluxo-caixa${qs({ ...estado, csv: 1 })}`, `fluxo-de-caixa-${estado.de}-${estado.ate}.csv`)),
+      }, icone('baixar'), 'Baixar CSV')),
+    corpo);
+  await pintar();
+}
+
 // ================================================================ Contas a receber
 /** As faturas dos anunciantes: o que entra, o que vence e o que já atrasou (com as faixas de atraso). */
 export async function contasAReceber(ctx) {
@@ -256,7 +332,10 @@ export async function contasAReceber(ctx) {
       escolha('Cliente', 'anunciante_id', { '': 'Todos', ...Object.fromEntries(opcoes.anunciantes.map((x) => [x.id, x.nome])) }, '',
         { onchange: (e) => { estado.anunciante_id = e.target.value; pintar(); } }),
       campo('Vencimento de', { type: 'date', onchange: (e) => { estado.de = e.target.value; pintar(); } }),
-      campo('até', { type: 'date', onchange: (e) => { estado.ate = e.target.value; pintar(); } })),
+      campo('até', { type: 'date', onchange: (e) => { estado.ate = e.target.value; pintar(); } }),
+      el('button', {
+        class: 'btn', onclick: (e) => acao(e.target, () => baixar(`/painel/contas-a-receber${qs({ ...estado, csv: 1 })}`, `contas-a-receber-${hojeLocal()}.csv`)),
+      }, icone('baixar'), 'Baixar CSV')),
     corpo);
   await pintar();
 }
@@ -324,6 +403,9 @@ export async function contasAPagar(ctx) {
       escolha('Tipo', 'tipo', { '': 'Tudo', repasse: 'Repasses aos pontos', despesa: 'Despesas da operação' }, '', { onchange: (e) => { estado.tipo = e.target.value; pintar(); } }),
       campo('Vencimento de', { type: 'date', onchange: (e) => { estado.de = e.target.value; pintar(); } }),
       campo('até', { type: 'date', onchange: (e) => { estado.ate = e.target.value; pintar(); } }),
+      el('button', {
+        class: 'btn', onclick: (e) => acao(e.target, () => baixar(`/painel/contas-a-pagar${qs({ ...estado, csv: 1 })}`, `contas-a-pagar-${hojeLocal()}.csv`)),
+      }, icone('baixar'), 'Baixar CSV'),
       el('button', { class: 'btn primario', onclick: () => editarDespesa(null, pintar) }, icone('mais'), 'Lançar despesa')),
     corpo);
   await pintar();

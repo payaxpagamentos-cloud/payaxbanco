@@ -221,6 +221,15 @@ module.exports = (db) => {
       .map((f) => ({ ...f, atrasada: f.status === 'aberta' && f.vencimento < data, dias_atraso: f.status === 'aberta' && f.vencimento < data
         ? Math.round((Date.parse(`${data}T12:00:00Z`) - Date.parse(`${f.vencimento}T12:00:00Z`)) / 86_400_000) : 0 }));
 
+    if (req.query.csv) {
+      return rel.enviarCsv(res, `contas-a-receber-${data}.csv`, rel.csv([
+        ['competencia', 'Competência'], ['anunciante', 'Cliente'], [(x) => x.agencia ?? '', 'Agência'],
+        [(x) => x.contrato ?? '', 'Contrato'], ['vencimento', 'Vencimento'], ['status', 'Situação'],
+        [(x) => (x.atrasada ? x.dias_atraso : ''), 'Dias em atraso'], [(x) => x.pago_em ?? '', 'Pago em'],
+        [(x) => rel.reais(x.valor_centavos), 'Valor (R$)'],
+      ], itens));
+    }
+
     const soma = (f) => itens.filter(f).reduce((t, x) => t + x.valor_centavos, 0);
     const faixa = (min, max) => soma((x) => x.atrasada && x.dias_atraso >= min && (max === null || x.dias_atraso <= max));
     res.json({
@@ -337,6 +346,15 @@ module.exports = (db) => {
       .map((x) => ({ ...x, atrasada: x.status === 'aberta' && x.vencimento < data }))
       .sort((a, b) => a.vencimento.localeCompare(b.vencimento) || b.valor_centavos - a.valor_centavos);
 
+    if (req.query.csv) {
+      return rel.enviarCsv(res, `contas-a-pagar-${data}.csv`, rel.csv([
+        ['vencimento', 'Vencimento'], [(x) => (x.tipo === 'repasse' ? 'Repasse ao ponto' : 'Despesa'), 'Tipo'],
+        ['descricao', 'Descrição'], [(x) => x.fornecedor ?? '', 'Fornecedor / ponto'], ['categoria', 'Categoria'],
+        [(x) => x.competencia ?? '', 'Competência'], ['status', 'Situação'], [(x) => (x.atrasada ? 'sim' : ''), 'Em atraso'],
+        [(x) => x.pago_em ?? '', 'Pago em'], [(x) => rel.reais(x.valor_centavos), 'Valor (R$)'],
+      ], itens));
+    }
+
     const soma = (f) => itens.filter(f).reduce((t, x) => t + x.valor_centavos, 0);
     res.json({
       itens,
@@ -348,6 +366,97 @@ module.exports = (db) => {
         repasses_centavos: soma((x) => x.tipo === 'repasse' && x.status === 'aberta'),
         despesas_centavos: soma((x) => x.tipo === 'despesa' && x.status === 'aberta'),
         vence_em_7_centavos: soma((x) => x.status === 'aberta' && !x.atrasada && x.vencimento <= somarDias(data, 7)),
+      },
+    });
+  });
+
+  /**
+   * Fluxo de caixa: o que entrou e o que saiu de verdade (pela data do pagamento) e o que está previsto
+   * (pela data de vencimento). É a visão que faltava entre contas a receber e contas a pagar.
+   */
+  r.get('/fluxo-caixa', (req, res) => {
+    const data = hoje();
+    const ate = req.query.ate ? v.data(req.query.ate, 'a data final') : `${mes()}-${String(new Date(Date.UTC(
+      Number(mes().slice(0, 4)), Number(mes().slice(5, 7)), 0)).getUTCDate()).padStart(2, '0')}`;
+    const de = req.query.de ? v.data(req.query.de, 'a data inicial') : `${mes()}-01`;
+    v.exigir(de <= ate, 'A data inicial não pode ser depois da final.');
+
+    const entradas = db.prepare(`SELECT f.pago_em AS data, f.valor_centavos, f.competencia, a.nome AS quem
+      FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id
+      WHERE f.status = 'paga' AND f.pago_em BETWEEN ? AND ?`).all(de, ate)
+      .map((x) => ({ ...x, tipo: 'entrada', origem: 'fatura', descricao: `Fatura ${x.competencia} — ${x.quem}` }));
+
+    const saidasDespesas = db.prepare(`SELECT d.pago_em AS data, d.valor_centavos, d.descricao, d.categoria, d.fornecedor AS quem
+      FROM despesas d WHERE d.status = 'paga' AND d.pago_em BETWEEN ? AND ?`).all(de, ate)
+      .map((x) => ({ ...x, tipo: 'saida', origem: 'despesa' }));
+    const saidasRepasses = db.prepare(`SELECT r.pago_em AS data, r.valor_centavos, r.competencia, l.nome AS quem
+      FROM repasses r JOIN locais l ON l.id = r.local_id WHERE r.status = 'pago' AND r.pago_em BETWEEN ? AND ?`).all(de, ate)
+      .map((x) => ({ ...x, tipo: 'saida', origem: 'repasse', categoria: 'repasse', descricao: `Repasse ${x.competencia} — ${x.quem}` }));
+
+    const movimentos = [...entradas, ...saidasDespesas, ...saidasRepasses].sort((a, b) => a.data.localeCompare(b.data));
+    const soma = (lista) => lista.reduce((t, x) => t + x.valor_centavos, 0);
+    const recebido = soma(entradas);
+    const pago = soma([...saidasDespesas, ...saidasRepasses]);
+
+    if (req.query.csv) {
+      return rel.enviarCsv(res, `fluxo-de-caixa-${de}-${ate}.csv`, rel.csv([
+        ['data', 'Data'], [(x) => (x.tipo === 'entrada' ? 'Entrada' : 'Saída'), 'Tipo'], ['origem', 'Origem'],
+        ['descricao', 'Descrição'], ['quem', 'Cliente / fornecedor'], [(x) => x.categoria ?? '', 'Categoria'],
+        [(x) => rel.reais(x.tipo === 'entrada' ? x.valor_centavos : -x.valor_centavos), 'Valor (R$)'],
+      ], movimentos));
+    }
+
+    // Previsto no mesmo período: o que vence e ainda não foi pago (dos dois lados).
+    const aReceber = db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM faturas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?").get(de, ate).n;
+    const aPagarDespesas = db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM despesas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?").get(de, ate).n;
+    const aPagarRepasses = db.prepare("SELECT competencia, valor_centavos FROM repasses WHERE status = 'a_pagar'").all()
+      .filter((x) => { const venc = `${somarMeses(x.competencia, 1)}-10`; return venc >= de && venc <= ate; })
+      .reduce((t, x) => t + x.valor_centavos, 0);
+
+    // Série dos últimos 12 meses (pelo caixa), para ver a tendência.
+    const serie = db.prepare(`
+      SELECT substr(pago_em, 1, 7) AS competencia, SUM(valor_centavos) AS entrou, 0 AS saiu FROM faturas WHERE status = 'paga' AND pago_em >= ? GROUP BY 1
+      UNION ALL
+      SELECT substr(pago_em, 1, 7), 0, SUM(valor_centavos) FROM despesas WHERE status = 'paga' AND pago_em >= ? GROUP BY 1
+      UNION ALL
+      SELECT substr(pago_em, 1, 7), 0, SUM(valor_centavos) FROM repasses WHERE status = 'pago' AND pago_em >= ? GROUP BY 1`)
+      .all(`${somarMeses(mes(), -11)}-01`, `${somarMeses(mes(), -11)}-01`, `${somarMeses(mes(), -11)}-01`);
+    const porMes = new Map();
+    for (const x of serie) {
+      const m = porMes.get(x.competencia) ?? { competencia: x.competencia, entrou: 0, saiu: 0 };
+      m.entrou += x.entrou;
+      m.saiu += x.saiu;
+      porMes.set(x.competencia, m);
+    }
+
+    // Saídas por categoria (o repasse aos pontos costuma ser a maior delas).
+    const categorias = new Map();
+    for (const x of [...saidasDespesas, ...saidasRepasses]) {
+      categorias.set(x.categoria, (categorias.get(x.categoria) ?? 0) + x.valor_centavos);
+    }
+
+    res.json({
+      de,
+      ate,
+      realizado: { recebido_centavos: recebido, pago_centavos: pago, saldo_centavos: recebido - pago },
+      previsto: {
+        a_receber_centavos: aReceber,
+        a_pagar_centavos: aPagarDespesas + aPagarRepasses,
+        saldo_centavos: aReceber - (aPagarDespesas + aPagarRepasses),
+      },
+      // Como o mês termina se tudo que está em aberto for pago e recebido no prazo.
+      projetado_centavos: (recebido - pago) + aReceber - (aPagarDespesas + aPagarRepasses),
+      por_mes: [...porMes.values()].sort((a, b) => a.competencia.localeCompare(b.competencia))
+        .map((m) => ({ ...m, saldo: m.entrou - m.saiu })),
+      saidas_por_categoria: [...categorias.entries()].map(([categoria, valor_centavos]) => ({ categoria, valor_centavos }))
+        .sort((a, b) => b.valor_centavos - a.valor_centavos),
+      movimentos: movimentos.slice(-300).reverse(),
+      // Os próximos 30 dias, para saber se o caixa aperta.
+      proximos: {
+        receber_centavos: db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM faturas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?")
+          .get(data, somarDias(data, 30)).n,
+        pagar_centavos: db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM despesas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?")
+          .get(data, somarDias(data, 30)).n,
       },
     });
   });

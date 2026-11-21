@@ -18,7 +18,7 @@ const MENUS = {
     ['programacao', 'Programação', 'grade'], ['inventario', 'Inventário', 'ocupacao'],
     ['relatorios', 'Relatórios', 'relatorios'],
     ['financeiro', 'Financeiro', 'faturamento', null, [
-      ['receber', 'Contas a receber'], ['pagar', 'Contas a pagar'], ['faturamento', 'Faturamento'],
+      ['caixa', 'Fluxo de caixa'], ['receber', 'Contas a receber'], ['pagar', 'Contas a pagar'], ['faturamento', 'Faturamento'],
     ]],
     ['diagnostico', 'Diagnóstico', 'diagnostico'],
     ['usuarios', 'Usuários', 'usuarios', ['master']], ['configuracoes', 'Configurações', 'configuracoes', ['master']],

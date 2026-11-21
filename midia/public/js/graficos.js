@@ -76,6 +76,21 @@ export function linhaDoDia(pontos, { passoMin = 15 } = {}) {
   return g;
 }
 
+/** Barras lado a lado por período: [{ rotulo, a, b }] — para comparar o que entra com o que sai. */
+export function barrasComparadas(itens, { rotuloA = 'Entrou', rotuloB = 'Saiu', formato = (v) => String(v) } = {}) {
+  const max = Math.max(1, ...itens.flatMap((i) => [i.a, i.b]));
+  const altura = (v) => `${Math.max(v > 0 ? 2 : 0, (v / max) * 100)}%`;
+  return el('div', { class: 'coluna' },
+    el('div', { class: 'barras duplas' }, itens.map((i) => el('div', { class: 'par' },
+      el('div', { class: 'colunas' },
+        el('div', { class: 'barra', style: `height:${altura(i.a)}`, title: `${i.rotulo} — ${rotuloA}: ${formato(i.a)}` }),
+        el('div', { class: 'barra saida', style: `height:${altura(i.b)}`, title: `${i.rotulo} — ${rotuloB}: ${formato(i.b)}` })),
+      el('div', { class: 'eixo' }, i.rotulo)))),
+    el('div', { class: 'legenda' },
+      el('span', {}, el('i', { style: `background:${CORES.marca}` }), rotuloA),
+      el('span', {}, el('i', { class: 'saida' }), rotuloB)));
+}
+
 /** Barras verticais: [{ rotulo, valor, titulo }]. */
 export function barras(itens) {
   const max = Math.max(1, ...itens.map((i) => i.valor));

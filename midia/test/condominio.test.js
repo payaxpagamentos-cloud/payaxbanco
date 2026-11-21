@@ -466,6 +466,40 @@ test('Financeiro: contrato do cliente, contas a receber e contas a pagar', async
     const depois = (await api.get('/painel/contas-a-pagar?status=aberta', master)).dados;
     assert.ok(!depois.itens.some((x) => x.tipo === 'repasse'), 'repasse pago sai da lista de abertas');
   });
+
+  await t.test('fluxo de caixa junta o que entrou com o que saiu', async () => {
+    // No período: a fatura de 2026-10 (recebida há 4 dias), a despesa paga hoje e o repasse pago hoje.
+    const de = diaRel(-10);
+    const ate = diaRel(0);
+    const d = (await api.get(`/painel/fluxo-caixa?de=${de}&ate=${ate}`, master)).dados;
+
+    assert.equal(d.realizado.recebido_centavos, 350_000, 'a fatura paga há 4 dias');
+    assert.equal(d.realizado.pago_centavos, 30_000, 'o repasse de 30,00 pago hoje (a despesa foi estornada)');
+    assert.equal(d.realizado.saldo_centavos, 320_000);
+    assert.equal(d.previsto.a_receber_centavos, 0, 'as faturas em aberto vencem fora deste período');
+    assert.equal(d.projetado_centavos, d.realizado.saldo_centavos + d.previsto.saldo_centavos);
+
+    const entrada = d.movimentos.find((m) => m.tipo === 'entrada');
+    assert.match(entrada.descricao, /^Fatura 2026-10/);
+    assert.equal(d.saidas_por_categoria[0].categoria, 'repasse');
+    assert.ok(d.por_mes.some((m) => m.entrou === 350_000), 'a série mensal traz o mês do recebimento');
+
+    const csv = await api.get(`/painel/fluxo-caixa?de=${de}&ate=${ate}&csv=1`, master);
+    assert.match(csv.dados.split('\r\n')[0], /Data;Tipo;Origem/);
+    assert.match(csv.dados, /Entrada;fatura/);
+    assert.match(csv.dados, /-300,00/, 'a saída sai com sinal negativo na planilha');
+  });
+
+  await t.test('contas a receber e a pagar saem em CSV', async () => {
+    const receber = await api.get('/painel/contas-a-receber?csv=1', master);
+    assert.match(receber.headers.get('content-type'), /text\/csv/);
+    assert.match(receber.dados.split('\r\n')[0], /Compet.ncia;Cliente;Ag.ncia;Contrato/);
+    assert.match(receber.dados, /3500,00/);
+
+    const pagar = await api.get('/painel/contas-a-pagar?csv=1', master);
+    assert.match(pagar.dados.split('\r\n')[0], /Vencimento;Tipo;Descri..o/);
+    assert.match(pagar.dados, /Repasse ao ponto/);
+  });
 });
 
 /** O portal do ponto tem de dizer a verdade sobre o que foi combinado com aquele ponto. */
