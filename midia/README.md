@@ -454,7 +454,7 @@ Requisitos: **Node.js 22.13+**.
 npm install
 npm run demo      # opcional: 6 pontos, 9 TVs, 5 anunciantes, campanhas e 31 dias de exibições
 npm start         # painel em http://localhost:3600/midia/ e player em http://localhost:3600/midia/tv/
-npm test          # 60 testes de aceite
+npm test          # 115 testes de aceite
 ```
 
 A demonstração monta uma rede com 3 condomínios residenciais, um condomínio comercial, academia, mercado, padaria e
@@ -463,6 +463,23 @@ clínica — 15 telas entre elevadores, halls, portarias e áreas de atendimento
 `anunciante@midia.com.br` / `anunciante-demo-2026`, `sindico@midia.com.br` e `lojista@midia.com.br` / `lojista-demo-2026`.
 O master é o configurado em `MIDIA_ADMIN_EMAIL` (padrão `master@midia.com.br` / `master123`).
 As TVs da demonstração aparecem como *sem contato* até um player de verdade se parear.
+
+### No servidor (Ubuntu 24.04 LTS)
+
+A instalação inteira numa máquina limpa — site, painel, portais, player, servidor de e-mail, nginx,
+HTTPS e o serviço subindo sozinho no reinício — está em [`instalacao/`](instalacao/LEIA-ME.md):
+
+```bash
+cd midia/instalacao
+sudo ./instalar.sh --dominio vaimidia.com.br --email voce@vaimidia.com.br
+```
+
+No fim ele imprime a senha do master e os registros que faltam no DNS (A, MX, SPF, a chave DKIM já
+gerada e DMARC). `--simular` mostra tudo o que seria feito sem tocar na máquina; rodar de novo não
+sobrescreve configuração, senha nem chave. Para atualizar depois: `sudo ./atualizar.sh`.
+
+O sistema fica em `/opt/vaimidia`, a configuração em `/etc/vaimidia/vaimidia.env` e os dados (banco,
+criativos, e-mails, backups) em `/var/lib/vaimidia`.
 
 Configuração: veja [`.env.exemplo`](.env.exemplo). Em produção com Docker:
 
