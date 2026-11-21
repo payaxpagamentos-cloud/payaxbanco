@@ -1,0 +1,364 @@
+'use strict';
+
+const { Router } = require('express');
+const crypto = require('node:crypto');
+const { agora, transacao, lerConfig } = require('../db');
+const { permitir } = require('../auth');
+const { ErroNegocio, naoEncontrado } = require('../lib/erros');
+const { registrar } = require('../lib/auditoria');
+const { hashSenha } = require('../lib/senha');
+const { estaOnline, pontoAberto, uptime } = require('../lib/monitor');
+const { montarPorTela } = require('../lib/grade');
+const { hoje } = require('../lib/datas');
+const v = require('../lib/validacao');
+
+const CATEGORIAS = ['mercado', 'padaria', 'farmacia', 'academia', 'clinica', 'salao', 'restaurante', 'lanchonete', 'loja', 'oficina', 'posto', 'escola', 'predio', 'outro'];
+const SENHA_ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+const senhaProvisoria = () => Array.from(crypto.randomBytes(10), (b) => SENHA_ALFABETO[b % SENHA_ALFABETO.length]).join('');
+
+/** Dados do ponto vindos do formulário. */
+function lerLocal(c, cfg, parcial = false) {
+  const d = {};
+  const tem = (k) => c[k] !== undefined || !parcial;
+  if (tem('nome')) d.nome = v.texto(c.nome, 'o nome do ponto', 120);
+  if (tem('categoria')) d.categoria = v.opcao(c.categoria ?? 'outro', 'a categoria', CATEGORIAS);
+  if (c.documento !== undefined) d.documento = c.documento === null || c.documento === '' ? null : v.documento(c.documento);
+  for (const [k, nome, max] of [['cep', 'o CEP', 9], ['logradouro', 'o endereço', 160], ['numero', 'o número', 20], ['bairro', 'o bairro', 80],
+    ['responsavel', 'o responsável', 120], ['email', 'o e-mail', 160], ['observacao', 'a observação', 500]]) {
+    if (c[k] !== undefined) d[k] = v.opcional(c[k], nome, max);
+  }
+  if (c.telefone !== undefined) d.telefone = c.telefone === null || c.telefone === '' ? null : v.telefone(c.telefone);
+  if (tem('cidade')) d.cidade = v.texto(c.cidade, 'a cidade', 80);
+  if (tem('uf')) d.uf = v.uf(c.uf);
+  if (c.publico_dia !== undefined) d.publico_dia = v.inteiro(c.publico_dia, 'o público por dia', { max: 1_000_000 });
+  if (c.comissao_percentual !== undefined) d.comissao_percentual = v.percentual(c.comissao_percentual, 'a comissão');
+  else if (!parcial) d.comissao_percentual = cfg.comissao_local_percentual;
+  if (c.status !== undefined) d.status = v.opcao(c.status, 'a situação', ['ativo', 'pausado', 'encerrado']);
+  if (c.inicio_parceria !== undefined) d.inicio_parceria = c.inicio_parceria ? v.data(c.inicio_parceria, 'a data de início') : null;
+  return d;
+}
+
+/** Horário de funcionamento: lista de { dia_semana, abre, fecha }. */
+function gravarHorarios(db, localId, horarios) {
+  if (!Array.isArray(horarios)) return;
+  transacao(db, () => {
+    db.prepare('DELETE FROM local_horarios WHERE local_id = ?').run(localId);
+    for (const h of horarios) {
+      const dia = v.inteiro(h.dia_semana, 'o dia da semana', { max: 6 });
+      db.prepare('INSERT INTO local_horarios (local_id, dia_semana, abre, fecha) VALUES (?, ?, ?, ?)')
+        .run(localId, dia, v.hora(h.abre, 'a hora de abertura'), v.hora(h.fecha, 'a hora de fechamento'));
+    }
+  });
+}
+
+module.exports = (db) => {
+  const r = Router();
+  const cfg = () => lerConfig(db);
+
+  // ----------------------------------------------------------------- Pontos (comércios onde as TVs ficam)
+  r.get('/locais', (req, res) => {
+    const onde = [];
+    const p = [];
+    if (req.query.busca) { onde.push('(l.nome LIKE ? OR l.cidade LIKE ? OR l.bairro LIKE ?)'); p.push(`%${req.query.busca}%`, `%${req.query.busca}%`, `%${req.query.busca}%`); }
+    if (req.query.categoria) { onde.push('l.categoria = ?'); p.push(req.query.categoria); }
+    if (req.query.cidade) { onde.push('l.cidade = ?'); p.push(req.query.cidade); }
+    if (req.query.status) { onde.push('l.status = ?'); p.push(req.query.status); }
+    const itens = db.prepare(`SELECT l.*, (SELECT COUNT(*) FROM telas t WHERE t.local_id = l.id AND t.status <> 'inativa') AS telas,
+        (SELECT COUNT(*) FROM telas t WHERE t.local_id = l.id AND t.ultimo_contato > ?) AS telas_online
+      FROM locais l ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY l.nome`)
+      .all(new Date(Date.now() - cfg().offline_minutos * 60_000).toISOString(), ...p);
+    res.json({ itens, categorias: CATEGORIAS, cidades: db.prepare("SELECT DISTINCT cidade FROM locais WHERE cidade <> '' ORDER BY cidade").all().map((x) => x.cidade) });
+  });
+
+  r.get('/locais/:id', (req, res) => {
+    const l = db.prepare('SELECT * FROM locais WHERE id = ?').get(Number(req.params.id));
+    if (!l) throw naoEncontrado('Ponto');
+    const limite = new Date(Date.now() - cfg().offline_minutos * 60_000).toISOString();
+    res.json({
+      ...l,
+      aberto: pontoAberto(db, l.id),
+      horarios: db.prepare('SELECT dia_semana, abre, fecha FROM local_horarios WHERE local_id = ? ORDER BY dia_semana').all(l.id),
+      telas: db.prepare('SELECT * FROM telas WHERE local_id = ? ORDER BY nome').all(l.id).map((t) => ({ ...t, online: t.ultimo_contato > limite })),
+      usuarios: db.prepare("SELECT id, nome, email, ativo, ultimo_acesso FROM usuarios WHERE local_id = ? AND perfil = 'lojista'").all(l.id),
+      repasses: db.prepare('SELECT * FROM repasses WHERE local_id = ? ORDER BY competencia DESC LIMIT 12').all(l.id),
+    });
+  });
+
+  r.post('/locais', (req, res) => {
+    const d = lerLocal(req.body, cfg());
+    const campos = Object.keys(d);
+    const id = Number(db.prepare(`INSERT INTO locais (${campos.join(', ')}, criado_em) VALUES (${campos.map(() => '?').join(', ')}, ?)`)
+      .run(...campos.map((k) => d[k]), agora()).lastInsertRowid);
+    if (req.body.horarios) gravarHorarios(db, id, req.body.horarios);
+    registrar(db, req, 'local_criado', { id, nome: d.nome });
+    res.status(201).json({ id, ...d });
+  });
+
+  r.patch('/locais/:id', (req, res) => {
+    const id = Number(req.params.id);
+    const antes = db.prepare('SELECT * FROM locais WHERE id = ?').get(id);
+    if (!antes) throw naoEncontrado('Ponto');
+    const d = lerLocal(req.body, cfg(), true);
+    if (Object.keys(d).length) {
+      db.prepare(`UPDATE locais SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), id);
+    }
+    if (req.body.horarios) gravarHorarios(db, id, req.body.horarios);
+    registrar(db, req, 'local_alterado', { id, antes: Object.fromEntries(Object.keys(d).map((k) => [k, antes[k]])), depois: d });
+    res.json(db.prepare('SELECT * FROM locais WHERE id = ?').get(id));
+  });
+
+  r.delete('/locais/:id', permitir('master'), (req, res) => {
+    const id = Number(req.params.id);
+    const l = db.prepare('SELECT * FROM locais WHERE id = ?').get(id);
+    if (!l) throw naoEncontrado('Ponto');
+    if (db.prepare('SELECT 1 FROM exibicoes WHERE local_id = ? LIMIT 1').get(id)) {
+      throw new ErroNegocio('Este ponto já tem histórico de exibições. Marque como encerrado em vez de excluir.', 409);
+    }
+    transacao(db, () => {
+      db.prepare("DELETE FROM usuarios WHERE local_id = ? AND perfil = 'lojista'").run(id);
+      db.prepare('DELETE FROM telas WHERE local_id = ?').run(id);
+      db.prepare('DELETE FROM locais WHERE id = ?').run(id);
+    });
+    registrar(db, req, 'local_excluido', { id, nome: l.nome });
+    res.status(204).end();
+  });
+
+  /** Acesso do lojista ao portal do próprio ponto (senha provisória que ele troca depois). */
+  r.post('/locais/:id/acesso', (req, res) => {
+    const l = db.prepare('SELECT * FROM locais WHERE id = ?').get(Number(req.params.id));
+    if (!l) throw naoEncontrado('Ponto');
+    const senha = senhaProvisoria();
+    const id = Number(db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, local_id, criado_em) VALUES (?, ?, ?, 'lojista', ?, ?)")
+      .run(v.texto(req.body.nome, 'o nome do responsável', 120), v.email(req.body.email), hashSenha(senha), l.id, agora()).lastInsertRowid);
+    registrar(db, req, 'acesso_lojista_criado', { local_id: l.id, usuario_id: id });
+    res.status(201).json({ id, senha_provisoria: senha });
+  });
+
+  // ----------------------------------------------------------------- TVs
+  r.get('/telas', (req, res) => {
+    const limite = new Date(Date.now() - cfg().offline_minutos * 60_000).toISOString();
+    const onde = [];
+    const p = [];
+    if (req.query.local_id) { onde.push('t.local_id = ?'); p.push(Number(req.query.local_id)); }
+    if (req.query.status) { onde.push('t.status = ?'); p.push(req.query.status); }
+    if (req.query.busca) { onde.push('(t.nome LIKE ? OR l.nome LIKE ?)'); p.push(`%${req.query.busca}%`, `%${req.query.busca}%`); }
+    const itens = db.prepare(`SELECT t.*, l.nome AS local_nome, l.cidade, l.uf, l.categoria FROM telas t JOIN locais l ON l.id = t.local_id
+      ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY l.nome, t.nome`).all(...p)
+      .map((t) => ({ ...t, online: Boolean(t.ultimo_contato && t.ultimo_contato > limite), pareada: Boolean(t.pareada_em) }));
+    res.json({
+      itens,
+      aguardando: db.prepare('SELECT id, codigo, aparelho, largura, altura, versao, criado_em, expira_em FROM pareamentos WHERE tela_id IS NULL AND expira_em > ? ORDER BY id DESC')
+        .all(agora()),
+    });
+  });
+
+  r.get('/telas/:id', (req, res) => {
+    const t = db.prepare(`SELECT t.*, l.nome AS local_nome, l.cidade, l.uf, l.categoria, l.publico_dia FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`)
+      .get(Number(req.params.id));
+    if (!t) throw naoEncontrado('Tela');
+    res.json({
+      ...t,
+      online: estaOnline(t, cfg()),
+      aberto: pontoAberto(db, t.local_id),
+      grade: montarPorTela(db, t.id),
+      historico: uptime(db, t.id, 7),
+      hoje: db.prepare(`SELECT COALESCE(SUM(insercoes), 0) AS insercoes, COALESCE(SUM(segundos), 0) AS segundos,
+        COALESCE(SUM(CASE WHEN campanha_id <> 0 THEN insercoes ELSE 0 END), 0) AS insercoes_pagas
+        FROM resumo_dia WHERE tela_id = ? AND data = ?`).get(t.id, hoje()),
+    });
+  });
+
+  r.post('/telas', (req, res) => {
+    const local = db.prepare('SELECT * FROM locais WHERE id = ?').get(Number(req.body.local_id));
+    if (!local) throw new ErroNegocio('Ponto não encontrado.', 422);
+    const d = {
+      local_id: local.id,
+      nome: v.texto(req.body.nome, 'o nome da tela', 120),
+      orientacao: v.opcao(req.body.orientacao ?? 'paisagem', 'a orientação', ['paisagem', 'retrato']),
+      som: v.booleano(req.body.som) ? 1 : 0,
+      relogio: req.body.relogio === undefined ? 1 : (v.booleano(req.body.relogio) ? 1 : 0),
+      legenda: v.opcional(req.body.legenda, 'a legenda', 200),
+      observacao: v.opcional(req.body.observacao, 'a observação', 500),
+    };
+    const id = Number(db.prepare(`INSERT INTO telas (${Object.keys(d).join(', ')}, criado_em) VALUES (${Object.keys(d).map(() => '?').join(', ')}, ?)`)
+      .run(...Object.values(d), agora()).lastInsertRowid);
+    registrar(db, req, 'tela_criada', { id, nome: d.nome, local_id: local.id });
+    res.status(201).json({ id, ...d });
+  });
+
+  r.patch('/telas/:id', (req, res) => {
+    const id = Number(req.params.id);
+    const t = db.prepare('SELECT * FROM telas WHERE id = ?').get(id);
+    if (!t) throw naoEncontrado('Tela');
+    const d = {};
+    if (req.body.nome !== undefined) d.nome = v.texto(req.body.nome, 'o nome da tela', 120);
+    if (req.body.orientacao !== undefined) d.orientacao = v.opcao(req.body.orientacao, 'a orientação', ['paisagem', 'retrato']);
+    if (req.body.status !== undefined) d.status = v.opcao(req.body.status, 'a situação', ['ativa', 'manutencao', 'inativa']);
+    if (req.body.som !== undefined) d.som = v.booleano(req.body.som) ? 1 : 0;
+    if (req.body.relogio !== undefined) d.relogio = v.booleano(req.body.relogio) ? 1 : 0;
+    if (req.body.legenda !== undefined) d.legenda = v.opcional(req.body.legenda, 'a legenda', 200);
+    if (req.body.observacao !== undefined) d.observacao = v.opcional(req.body.observacao, 'a observação', 500);
+    if (req.body.local_id !== undefined) {
+      const local = db.prepare('SELECT 1 FROM locais WHERE id = ?').get(Number(req.body.local_id));
+      if (!local) throw new ErroNegocio('Ponto não encontrado.', 422);
+      d.local_id = Number(req.body.local_id);
+    }
+    if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
+    db.prepare(`UPDATE telas SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), id);
+    registrar(db, req, 'tela_alterada', { id, depois: d });
+    res.json(db.prepare('SELECT * FROM telas WHERE id = ?').get(id));
+  });
+
+  /** Aviso que passa na faixa da TV por algumas horas (promoção do dia, recado do ponto). */
+  r.put('/telas/:id/aviso', (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM telas WHERE id = ?').get(id)) throw naoEncontrado('Tela');
+    const texto = req.body.aviso === null || req.body.aviso === '' ? null : v.texto(req.body.aviso, 'o aviso', 200);
+    const horas = texto ? v.inteiro(req.body.horas ?? 12, 'as horas', { min: 1, max: 720 }) : 0;
+    db.prepare('UPDATE telas SET aviso = ?, aviso_ate = ? WHERE id = ?')
+      .run(texto, texto ? new Date(Date.now() + horas * 3_600_000).toISOString() : null, id);
+    registrar(db, req, 'tela_aviso', { id, aviso: texto, horas });
+    res.json(db.prepare('SELECT id, aviso, aviso_ate FROM telas WHERE id = ?').get(id));
+  });
+
+  /**
+   * Pareamento: a equipe digita o código que apareceu na TV. Pode ligar numa tela já cadastrada
+   * ou criar a tela na hora (informando o ponto).
+   */
+  r.post('/telas/parear', (req, res) => {
+    const codigo = String(req.body.codigo ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const p = db.prepare('SELECT * FROM pareamentos WHERE codigo = ?').get(codigo);
+    if (!p) throw new ErroNegocio('Código não encontrado. Confira o que está na TV.', 404);
+    if (p.expira_em < agora()) throw new ErroNegocio('Código expirado. Recarregue a tela do player para gerar outro.', 410);
+    if (p.tela_id) throw new ErroNegocio('Este código já foi usado.', 409);
+
+    const resultado = transacao(db, () => {
+      let telaId = req.body.tela_id ? Number(req.body.tela_id) : null;
+      if (telaId) {
+        if (!db.prepare('SELECT 1 FROM telas WHERE id = ?').get(telaId)) throw naoEncontrado('Tela');
+      } else {
+        const local = db.prepare('SELECT * FROM locais WHERE id = ?').get(Number(req.body.local_id));
+        if (!local) throw new ErroNegocio('Informe o ponto onde esta TV está instalada.', 422);
+        const orientacao = req.body.orientacao ? v.opcao(req.body.orientacao, 'a orientação', ['paisagem', 'retrato'])
+          : (p.altura && p.largura && p.altura > p.largura ? 'retrato' : 'paisagem');
+        telaId = Number(db.prepare('INSERT INTO telas (local_id, nome, orientacao, criado_em) VALUES (?, ?, ?, ?)')
+          .run(local.id, v.texto(req.body.nome ?? `TV ${local.nome}`, 'o nome da tela', 120), orientacao, agora()).lastInsertRowid);
+      }
+      db.prepare(`UPDATE telas SET token_versao = token_versao + 1, pareada_em = ?, aparelho = ?, largura = ?, altura = ?, versao_player = ?, grade_versao = NULL
+        WHERE id = ?`).run(agora(), p.aparelho, p.largura, p.altura, p.versao, telaId);
+      db.prepare('UPDATE pareamentos SET tela_id = ?, pareado_em = ? WHERE id = ?').run(telaId, agora(), p.id);
+      db.prepare("INSERT INTO telas_eventos (tela_id, tipo, detalhe, criado_em) VALUES (?, 'pareada', ?, ?)")
+        .run(telaId, `Aparelho pareado pelo código ${codigo}${p.aparelho ? ` — ${p.aparelho}` : ''}`, agora());
+      return telaId;
+    });
+    registrar(db, req, 'tela_pareada', { tela_id: resultado, codigo });
+    res.status(201).json(db.prepare(`SELECT t.*, l.nome AS local_nome FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`).get(resultado));
+  });
+
+  /** Desparear: o aparelho atual perde o acesso e precisa de um código novo. */
+  r.post('/telas/:id/desparear', (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM telas WHERE id = ?').get(id)) throw naoEncontrado('Tela');
+    db.prepare('UPDATE telas SET token_versao = token_versao + 1, pareada_em = NULL, ultimo_contato = NULL, grade_versao = NULL, item_atual = NULL WHERE id = ?').run(id);
+    db.prepare('DELETE FROM pareamentos WHERE tela_id = ?').run(id);
+    db.prepare("INSERT INTO telas_eventos (tela_id, tipo, detalhe, criado_em) VALUES (?, 'desparear', ?, ?)").run(id, 'Aparelho despareado no painel', agora());
+    registrar(db, req, 'tela_despareada', { id });
+    res.status(204).end();
+  });
+
+  r.delete('/telas/:id', permitir('master'), (req, res) => {
+    const id = Number(req.params.id);
+    const t = db.prepare('SELECT * FROM telas WHERE id = ?').get(id);
+    if (!t) throw naoEncontrado('Tela');
+    if (db.prepare('SELECT 1 FROM exibicoes WHERE tela_id = ? LIMIT 1').get(id)) {
+      throw new ErroNegocio('Esta tela já tem histórico de exibições. Marque como inativa em vez de excluir.', 409);
+    }
+    db.prepare('DELETE FROM telas WHERE id = ?').run(id);
+    registrar(db, req, 'tela_excluida', { id, nome: t.nome });
+    res.status(204).end();
+  });
+
+  // ----------------------------------------------------------------- Anunciantes
+  r.get('/anunciantes', (req, res) => {
+    const onde = [];
+    const p = [];
+    if (req.query.busca) { onde.push('(a.nome LIKE ? OR a.documento LIKE ?)'); p.push(`%${req.query.busca}%`, `%${req.query.busca}%`); }
+    if (req.query.status) { onde.push('a.status = ?'); p.push(req.query.status); }
+    res.json({
+      itens: db.prepare(`SELECT a.*, (SELECT COUNT(*) FROM campanhas c WHERE c.anunciante_id = a.id AND c.status = 'ativa') AS campanhas_ativas,
+          (SELECT COUNT(*) FROM campanhas c WHERE c.anunciante_id = a.id) AS campanhas,
+          (SELECT COALESCE(SUM(f.valor_centavos), 0) FROM faturas f WHERE f.anunciante_id = a.id AND f.status = 'aberta') AS aberto_centavos
+        FROM anunciantes a ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY a.nome`).all(...p),
+    });
+  });
+
+  r.get('/anunciantes/:id', (req, res) => {
+    const a = db.prepare('SELECT * FROM anunciantes WHERE id = ?').get(Number(req.params.id));
+    if (!a) throw naoEncontrado('Anunciante');
+    res.json({
+      ...a,
+      campanhas: db.prepare('SELECT id, nome, status, inicio, fim, cobranca, valor_centavos, cpm_centavos FROM campanhas WHERE anunciante_id = ? ORDER BY inicio DESC').all(a.id),
+      midias: db.prepare('SELECT id, nome, tipo, status, duracao_s, validade_ate, criado_em FROM midias WHERE anunciante_id = ? ORDER BY id DESC').all(a.id),
+      faturas: db.prepare('SELECT * FROM faturas WHERE anunciante_id = ? ORDER BY competencia DESC LIMIT 12').all(a.id),
+      usuarios: db.prepare("SELECT id, nome, email, ativo, ultimo_acesso FROM usuarios WHERE anunciante_id = ? AND perfil = 'anunciante'").all(a.id),
+    });
+  });
+
+  const lerAnunciante = (c, parcial = false) => {
+    const d = {};
+    if (c.nome !== undefined || !parcial) d.nome = v.texto(c.nome, 'o nome do anunciante', 120);
+    if (c.documento !== undefined) d.documento = c.documento === null || c.documento === '' ? null : v.documento(c.documento);
+    if (c.contato !== undefined) d.contato = v.opcional(c.contato, 'o contato', 120);
+    if (c.email !== undefined) d.email = c.email === null || c.email === '' ? null : v.email(c.email);
+    if (c.telefone !== undefined) d.telefone = c.telefone === null || c.telefone === '' ? null : v.telefone(c.telefone);
+    if (c.status !== undefined) d.status = v.opcao(c.status, 'a situação', ['ativo', 'inativo']);
+    if (c.observacao !== undefined) d.observacao = v.opcional(c.observacao, 'a observação', 500);
+    return d;
+  };
+
+  r.post('/anunciantes', (req, res) => {
+    const d = lerAnunciante(req.body);
+    const id = Number(db.prepare(`INSERT INTO anunciantes (${Object.keys(d).join(', ')}, criado_em) VALUES (${Object.keys(d).map(() => '?').join(', ')}, ?)`)
+      .run(...Object.values(d), agora()).lastInsertRowid);
+    registrar(db, req, 'anunciante_criado', { id, nome: d.nome });
+    res.status(201).json({ id, ...d });
+  });
+
+  r.patch('/anunciantes/:id', (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM anunciantes WHERE id = ?').get(id)) throw naoEncontrado('Anunciante');
+    const d = lerAnunciante(req.body, true);
+    if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
+    db.prepare(`UPDATE anunciantes SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), id);
+    registrar(db, req, 'anunciante_alterado', { id, depois: d });
+    res.json(db.prepare('SELECT * FROM anunciantes WHERE id = ?').get(id));
+  });
+
+  r.delete('/anunciantes/:id', permitir('master'), (req, res) => {
+    const id = Number(req.params.id);
+    const a = db.prepare('SELECT * FROM anunciantes WHERE id = ?').get(id);
+    if (!a) throw naoEncontrado('Anunciante');
+    if (db.prepare('SELECT 1 FROM campanhas WHERE anunciante_id = ? LIMIT 1').get(id)) {
+      throw new ErroNegocio('Este anunciante tem campanhas. Marque como inativo em vez de excluir.', 409);
+    }
+    transacao(db, () => {
+      db.prepare("DELETE FROM usuarios WHERE anunciante_id = ? AND perfil = 'anunciante'").run(id);
+      db.prepare('DELETE FROM anunciantes WHERE id = ?').run(id);
+    });
+    registrar(db, req, 'anunciante_excluido', { id, nome: a.nome });
+    res.status(204).end();
+  });
+
+  /** Acesso do anunciante ao portal (vê onde a campanha dele rodou e as faturas). */
+  r.post('/anunciantes/:id/acesso', (req, res) => {
+    const a = db.prepare('SELECT * FROM anunciantes WHERE id = ?').get(Number(req.params.id));
+    if (!a) throw naoEncontrado('Anunciante');
+    const senha = senhaProvisoria();
+    const id = Number(db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, anunciante_id, criado_em) VALUES (?, ?, ?, 'anunciante', ?, ?)")
+      .run(v.texto(req.body.nome, 'o nome da pessoa', 120), v.email(req.body.email), hashSenha(senha), a.id, agora()).lastInsertRowid);
+    registrar(db, req, 'acesso_anunciante_criado', { anunciante_id: a.id, usuario_id: id });
+    res.status(201).json({ id, senha_provisoria: senha });
+  });
+
+  return r;
+};

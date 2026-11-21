@@ -1,0 +1,44 @@
+/* Player da TV: tela cheia, fundo preto e nada que distraia. Pensado para TV box, Fire Stick, mini PC e smart TV. */
+@font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+
+:root{
+  --faixa-altura: 7vh;
+  --azul: #2563EB;
+}
+*{ box-sizing: border-box; }
+/* O atributo hidden tem de vencer o display das classes abaixo (senão a tela de espera fica por cima do anúncio). */
+[hidden]{ display: none !important; }
+html, body{ margin: 0; height: 100%; overflow: hidden; background: #000; }
+body{ color: #fff; font-family: "Manrope", system-ui, sans-serif; cursor: none; user-select: none; -webkit-user-select: none; }
+
+.palco{ position: fixed; inset: 0; background: #000; }
+.camada{ position: absolute; inset: 0; opacity: 0; transition: opacity .45s ease; display: grid; place-items: center; }
+.camada.no-ar{ opacity: 1; }
+.camada img, .camada video{ width: 100%; height: 100%; object-fit: contain; background: #000; }
+
+/* Com a faixa ligada, o conteúdo sobe para não ficar coberto. */
+body.com-faixa .palco{ bottom: var(--faixa-altura); }
+
+.faixa{ position: fixed; left: 0; right: 0; bottom: 0; height: var(--faixa-altura); background: linear-gradient(90deg, #0B1B3F, #14306B);
+  display: flex; align-items: center; justify-content: space-between; gap: 2vw; padding: 0 2.5vw; border-top: 1px solid rgba(255,255,255,.12); }
+.faixa .texto{ font-size: 3.1vh; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.faixa .relogio{ font-size: 3.4vh; font-weight: 800; font-variant-numeric: tabular-nums; flex: none; opacity: .95; }
+
+/* Tela de espera: pareamento, sem programação ou erro. */
+.espera{ position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 1.2vh; text-align: center;
+  background: radial-gradient(1200px 600px at 50% 0%, #10204a 0%, #06101f 60%, #000 100%); padding: 6vh; z-index: 5; }
+.espera h1{ font-size: 5vh; font-weight: 800; margin: 0; letter-spacing: -.02em; }
+.espera .mudo{ color: #9FB2D4; font-size: 2.6vh; margin: 0; max-width: 60ch; }
+.espera .ajuda{ color: #7F93B8; font-size: 2.1vh; margin-top: 1vh; }
+.espera .ajuda strong{ color: #CBD9F2; }
+.marca-tv{ display: flex; align-items: center; gap: 1.2vh; font-size: 2.4vh; font-weight: 700; color: #BBD0F5; margin-bottom: 2vh; }
+.marca-tv .ponto{ width: 1.6vh; height: 1.6vh; border-radius: 50%; background: #3B82F6; box-shadow: 0 0 0 .6vh rgba(59,130,246,.25); }
+.codigo{ font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14vh; font-weight: 800; letter-spacing: 1.2vh; line-height: 1.1;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 2.4vh; padding: 2vh 4vh 2vh 5.2vh; margin: 2vh 0; }
+
+.aviso-conexao{ position: fixed; top: 2.4vh; left: 2.4vh; z-index: 6; background: rgba(180, 83, 9, .92); color: #fff; font-size: 2vh; font-weight: 700;
+  padding: .9vh 1.8vh; border-radius: 999px; }
+
+.info{ position: fixed; top: 2.4vh; right: 2.4vh; z-index: 7; background: rgba(0,0,0,.82); border: 1px solid rgba(255,255,255,.16); border-radius: 1.4vh;
+  padding: 2vh 2.4vh; font-size: 1.9vh; line-height: 1.7; max-width: 46vw; font-variant-numeric: tabular-nums; }
+.info b{ color: #93B4F7; font-weight: 700; }

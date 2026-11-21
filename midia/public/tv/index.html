@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <title>Player — Mídia Indoor</title>
+  <link rel="icon" href="../img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="tv.css">
+</head>
+<body>
+  <!-- Duas camadas de exibição: enquanto uma está no ar, a outra já carrega o próximo item. -->
+  <div class="palco">
+    <div class="camada" id="camada-a"></div>
+    <div class="camada" id="camada-b"></div>
+  </div>
+
+  <div class="espera" id="espera" hidden>
+    <div class="marca-tv"><span class="ponto"></span> <span id="espera-plataforma">Mídia Indoor</span></div>
+    <h1 id="espera-titulo">Preparando a tela…</h1>
+    <p id="espera-texto" class="mudo"></p>
+    <div class="codigo" id="codigo" hidden></div>
+    <p id="espera-ajuda" class="ajuda" hidden>Informe este código no painel, em <strong>TVs › Parear aparelho</strong>.</p>
+  </div>
+
+  <div class="faixa" id="faixa" hidden>
+    <div class="texto" id="faixa-texto"></div>
+    <div class="relogio" id="relogio" hidden></div>
+  </div>
+
+  <div class="aviso-conexao" id="sem-conexao" hidden>Sem internet — exibindo o conteúdo guardado</div>
+
+  <div class="info" id="info" hidden></div>
+  <noscript>Ative o JavaScript neste aparelho para exibir a programação.</noscript>
+  <script src="player.js"></script>
+</body>
+</html>

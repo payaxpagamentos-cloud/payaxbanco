@@ -1,0 +1,21 @@
+{
+  "name": "payax-midia",
+  "version": "1.0.0",
+  "description": "Mídia Indoor — painel de mídia e publicidade em TVs instaladas em comércios: pontos, telas, campanhas, criativos, prova de exibição, faturamento e repasse ao lojista.",
+  "main": "server/index.js",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
+    "demo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/demo.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "qrcode": "^1.5.4"
+  }
+}

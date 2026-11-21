@@ -1,0 +1,363 @@
+/** Portais: o anunciante acompanha as próprias campanhas; o lojista acompanha as TVs do ponto dele. */
+import { api, qs, baixar } from './api.js';
+import {
+  el, limpar, icone, toast, acao, modal, formModal, confirmar, campo, escolha, lerForm, repetir,
+  inteiro, dinheiro, duracao, dataBr, dataHora, etiquetaDe, etiqueta, percentual, competenciaTexto, situacao,
+  diasTexto, faixaHorario, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_FATURA, STATUS_REPASSE, CATEGORIAS,
+} from './ui.js';
+import { cartao, indicador, tabela, vazio, previa, enviarArquivo } from './comum.js';
+import { barras, pizza, CORES } from './graficos.js';
+
+const hojeLocal = () => new Date().toLocaleDateString('en-CA');
+const diasAtras = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
+
+// ================================================================ Anunciante
+async function resumoAnunciante(ctx) {
+  const pintar = async () => {
+    const d = await api.get('/anunciante/resumo');
+    limpar(ctx.conteudo, el('div', { class: 'grade-dash' },
+      el('div', { class: 'c3' }, indicador({ rotulo: 'Campanhas no ar', valor: inteiro(d.campanhas.ativas), ic: 'campanhas', cor: 'roxo', nota: d.campanhas.aguardando ? `${d.campanhas.aguardando} aguardando aprovação` : null })),
+      el('div', { class: 'c3' }, indicador({ rotulo: `Inserções em ${competenciaTexto(d.competencia)}`, valor: inteiro(d.mes.insercoes), ic: 'tocar', nota: `em até ${inteiro(d.mes.telas)} TVs` })),
+      el('div', { class: 'c3' }, indicador({ rotulo: 'Pessoas alcançadas (estimativa)', valor: inteiro(d.mes.impactos), ic: 'pessoas', cor: 'ciano' })),
+      el('div', { class: 'c3' }, indicador({
+        rotulo: 'Faturas em aberto', valor: dinheiro(d.faturas.aberto_centavos), ic: 'faturamento',
+        cor: d.faturas.atrasadas ? 'vermelho' : 'verde', nota: d.faturas.atrasadas ? `${d.faturas.atrasadas} atrasada(s)` : `${d.faturas.abertas} em aberto`,
+      })),
+      el('div', { class: 'c8' }, cartao('Inserções por dia (últimos 14 dias)',
+        d.por_dia.length
+          ? barras(d.por_dia.map((x) => ({ rotulo: x.data, valor: x.insercoes, titulo: `${dataBr(x.data)}: ${inteiro(x.insercoes)} inserções` })))
+          : vazio('Sem exibições ainda.'))),
+      el('div', { class: 'c4' }, cartao('Hoje',
+        el('div', {}, el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Inserções hoje'), el('strong', { class: 'num' }, inteiro(d.hoje.insercoes))),
+          el('div', { class: 'chave' }, el('span', { class: 'mudo' }, 'Criativos aguardando aprovação'), el('strong', { class: 'num' }, inteiro(d.midias_pendentes)))))),
+      el('div', { class: 'c12' }, cartao('Desempenho das campanhas no mês', tabela([
+        [(c) => c.campanha, 'Campanha'],
+        [(c) => inteiro(c.insercoes), 'Inserções', 'num dir'],
+        [(c) => duracao(c.segundos), 'Tempo no ar', 'num dir'],
+        [(c) => inteiro(c.telas), 'TVs', 'num dir'],
+        [(c) => inteiro(c.pontos), 'Pontos', 'num dir'],
+        [(c) => inteiro(c.impactos), 'Pessoas alcançadas', 'num dir'],
+      ], d.desempenho, { vazioTexto: 'Nenhuma exibição neste mês.' })))));
+  };
+  await pintar();
+  ctx.parar(repetir(pintar, 120_000));
+}
+
+async function campanhasAnunciante(ctx) {
+  const d = await api.get('/anunciante/campanhas');
+  limpar(ctx.conteudo, el('div', { class: 'cartao' }, tabela([
+    [(c) => c.nome, 'Campanha'],
+    [(c) => etiquetaDe(STATUS_CAMPANHA, c.status), 'Situação'],
+    [(c) => `${dataBr(c.inicio)} → ${c.fim ? dataBr(c.fim) : 'sem fim'}`, 'Período'],
+    [(c) => `${diasTexto(c.dias_semana)} · ${faixaHorario(c.hora_inicio, c.hora_fim)}`, 'Quando passa'],
+    [(c) => `${c.insercoes_hora}/h`, 'Inserções', 'num dir'],
+    [(c) => inteiro(c.criativos), 'Criativos', 'num dir'],
+    [(c) => inteiro(c.insercoes_total), 'Exibições', 'num dir'],
+  ], d.itens, { aoClicar: (c) => abrirCampanhaAnunciante(c.id), vazioTexto: 'Nenhuma campanha ainda. Fale com a equipe para criar a primeira.' })));
+}
+
+async function abrirCampanhaAnunciante(id) {
+  const d = await api.get(`/anunciante/campanhas/${id}`);
+  await modal(d.nome, (fechar) => [
+    el('div', { class: 'linha entre' },
+      el('div', { class: 'linha' }, etiquetaDe(STATUS_CAMPANHA, d.status),
+        el('span', { class: 'mudo pequeno' }, `${dataBr(d.inicio)} → ${d.fim ? dataBr(d.fim) : 'sem fim'} · ${diasTexto(d.dias_semana)} · ${faixaHorario(d.hora_inicio, d.hora_fim)}`)),
+      el('span', { class: 'mudo pequeno' }, COBRANCA[d.cobranca])),
+    d.motivo ? el('p', { class: 'aviso' }, d.motivo) : null,
+    el('div', { class: 'grade', style: 'margin:16px 0' },
+      indicador({ rotulo: 'Inserções', valor: inteiro(d.desempenho.insercoes), ic: 'tocar' }),
+      indicador({ rotulo: 'Pessoas alcançadas', valor: inteiro(d.desempenho.impactos), ic: 'pessoas', cor: 'ciano' }),
+      indicador({ rotulo: 'TVs', valor: inteiro(d.desempenho.telas), ic: 'telas', cor: 'roxo' }),
+      indicador({ rotulo: 'Tempo no ar', valor: duracao(d.desempenho.segundos), ic: 'relogio', cor: 'verde' })),
+    el('h3', {}, 'Criativos'),
+    tabela([
+      [(m) => m.nome, 'Criativo'], [(m) => (m.tipo === 'video' ? 'Vídeo' : 'Imagem'), 'Tipo'],
+      [(m) => `${m.duracao_s}s`, 'Duração', 'num dir'], [(m) => etiquetaDe(STATUS_MIDIA, m.status), 'Situação'],
+      [(m) => m.motivo ?? '—', 'Observação'],
+    ], d.criativos, { vazioTexto: 'Nenhum criativo nesta campanha.' }),
+    el('h3', {}, 'Onde passou'),
+    tabela([
+      [(p) => p.local, 'Ponto'], [(p) => `${p.cidade}/${p.uf}`, 'Cidade'], [(p) => CATEGORIAS[p.categoria] ?? p.categoria, 'Categoria'],
+      [(p) => inteiro(p.telas), 'TVs', 'num dir'], [(p) => inteiro(p.insercoes), 'Inserções', 'num dir'],
+    ], d.pontos, { vazioTexto: 'Ainda sem exibições.' }),
+    el('div', { class: 'linha entre', style: 'margin-top:18px' }, el('span', {}), el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
+  ], { largo: true });
+}
+
+async function criativosAnunciante(ctx) {
+  const corpo = el('div', {});
+  const pintar = async () => {
+    const d = await api.get('/anunciante/midias');
+    limpar(corpo, d.itens.length
+      ? el('div', { class: 'midias' }, d.itens.map((m) => el('div', { class: 'midia-cartao' }, previa(m, { rota: 'anunciante' }),
+        el('div', { class: 'corpo' },
+          el('h3', { title: m.nome }, m.nome),
+          el('div', { class: 'linha' }, etiquetaDe(STATUS_MIDIA, m.status), el('span', { class: 'pequeno mudo' }, `${m.duracao_s}s`)),
+          m.motivo ? el('div', { class: 'pequeno', style: 'color:var(--erro)' }, m.motivo) : null,
+          m.campanhas ? el('div', { class: 'pequeno mudo' }, `Em ${m.campanhas} campanha(s)`) : el('div', { class: 'pequeno mudo' }, 'Ainda não usado em campanha')))))
+      : vazio('Nenhum criativo enviado. Envie a imagem ou o vídeo do seu anúncio.'));
+  };
+  limpar(ctx.conteudo,
+    el('div', { class: 'linha entre', style: 'margin-bottom:16px' },
+      el('p', { class: 'mudo', style: 'margin:0' }, 'A equipe aprova cada criativo antes de ele ir para as telas.'),
+      el('button', { class: 'btn primario', onclick: () => enviarCriativoPortal('anunciante', pintar) }, icone('enviar'), 'Enviar criativo')),
+    corpo);
+  await pintar();
+}
+
+async function provaAnunciante(ctx) {
+  const estado = { de: diasAtras(29), ate: hojeLocal(), pagina: 1 };
+  const corpo = el('div', { class: 'cartao' });
+  const pintar = async () => {
+    const d = await api.get(`/anunciante/prova${qs({ ...estado, limite: 200 })}`);
+    limpar(corpo,
+      el('p', { class: 'pequeno mudo' }, `${inteiro(d.total)} exibições no período · ${duracao(d.segundos)} de tela`),
+      tabela([
+        [(e) => dataHora(e.exibida_em), 'Data e hora'],
+        [(e) => el('div', {}, el('div', {}, e.local), el('div', { class: 'pequeno mudo' }, `${e.tela} · ${e.cidade}/${e.uf}`)), 'Onde'],
+        [(e) => e.campanha, 'Campanha'],
+        [(e) => e.midia ?? '—', 'Criativo'],
+        [(e) => `${e.duracao_s}s`, 'Duração', 'num dir'],
+      ], d.itens, { vazioTexto: 'Nenhuma exibição no período.' }),
+      d.total > 200 ? el('div', { class: 'paginacao' },
+        el('button', { class: 'btn pequeno', disabled: estado.pagina <= 1, onclick: () => { estado.pagina--; pintar(); } }, 'Anteriores'),
+        el('span', { class: 'pequeno mudo' }, `Página ${estado.pagina} de ${Math.ceil(d.total / 200)}`),
+        el('button', { class: 'btn pequeno', disabled: estado.pagina >= Math.ceil(d.total / 200), onclick: () => { estado.pagina++; pintar(); } }, 'Próximas')) : null);
+  };
+  limpar(ctx.conteudo,
+    el('div', { class: 'filtros livre' },
+      campo('De', { type: 'date', value: estado.de, onchange: (e) => { estado.de = e.target.value; estado.pagina = 1; pintar(); } }),
+      campo('Até', { type: 'date', value: estado.ate, onchange: (e) => { estado.ate = e.target.value; estado.pagina = 1; pintar(); } }),
+      el('button', {
+        class: 'btn', onclick: (e) => acao(e.target, () => baixar(`/anunciante/prova${qs({ de: estado.de, ate: estado.ate, csv: 1 })}`, `prova-de-exibicao-${estado.de}-${estado.ate}.csv`)),
+      }, icone('baixar'), 'Baixar CSV')),
+    corpo);
+  await pintar();
+}
+
+async function faturasAnunciante(ctx) {
+  const d = await api.get('/anunciante/faturas');
+  limpar(ctx.conteudo, el('div', { class: 'cartao' }, tabela([
+    [(f) => competenciaTexto(f.competencia), 'Competência'],
+    [(f) => dinheiro(f.valor_centavos), 'Valor', 'num dir'],
+    [(f) => dataBr(f.vencimento), 'Vencimento'],
+    [(f) => (f.atrasada ? etiqueta('Atrasada', 'erro') : etiquetaDe(STATUS_FATURA, f.status)), 'Situação'],
+    [(f) => (f.pago_em ? dataBr(f.pago_em) : '—'), 'Pagamento'],
+  ], d.itens, { aoClicar: (f) => abrirFaturaAnunciante(f.id), vazioTexto: 'Nenhuma fatura.' })));
+}
+
+async function abrirFaturaAnunciante(id) {
+  const f = await api.get(`/anunciante/faturas/${id}`);
+  await modal(`Fatura ${competenciaTexto(f.competencia)}`, (fechar) => [
+    el('div', { class: 'linha entre' },
+      el('div', { class: 'linha' }, f.atrasada ? etiqueta('Atrasada', 'erro') : etiquetaDe(STATUS_FATURA, f.status),
+        el('span', { class: 'mudo pequeno' }, `Vence em ${dataBr(f.vencimento)}`)),
+      el('strong', { style: 'font-size:20px' }, dinheiro(f.valor_centavos))),
+    el('table', { class: 'fatura-itens', style: 'margin:16px 0' },
+      el('thead', {}, el('tr', {}, el('th', {}, 'Campanha'), el('th', { class: 'dir' }, 'Inserções'), el('th', { class: 'dir' }, 'Pessoas alcançadas'), el('th', { class: 'dir' }, 'Valor'))),
+      el('tbody', {}, f.itens.map((i) => el('tr', {}, el('td', {}, i.descricao), el('td', { class: 'dir num' }, inteiro(i.insercoes)),
+        el('td', { class: 'dir num' }, inteiro(i.impactos)), el('td', { class: 'dir num' }, dinheiro(i.valor_centavos)))))),
+    f.pix ? el('div', { class: 'pix' },
+      f.pix.qr ? el('img', { src: f.pix.qr, alt: 'QR Code do PIX' }) : el('div', {}),
+      el('div', {}, el('strong', {}, 'PIX copia e cola'), el('div', { class: 'segredo', style: 'margin:8px 0' }, f.pix.codigo),
+        el('button', { class: 'btn pequeno', onclick: () => { navigator.clipboard?.writeText(f.pix.codigo); toast('Código PIX copiado.'); } }, 'Copiar código')))
+      : el('p', { class: 'mudo' }, 'Para pagar, fale com a equipe.'),
+    el('div', { class: 'linha entre', style: 'margin-top:18px' }, el('span', {}), el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
+  ], { largo: true });
+}
+
+async function redeAnunciante(ctx) {
+  const d = await api.get('/anunciante/rede');
+  const total = d.pontos.reduce((t, p) => t + p.publico_dia, 0);
+  limpar(ctx.conteudo, el('div', { class: 'coluna' },
+    el('div', { class: 'grade' },
+      indicador({ rotulo: 'Pontos na rede', valor: inteiro(d.pontos.length), ic: 'pontos' }),
+      indicador({ rotulo: 'TVs', valor: inteiro(d.pontos.reduce((t, p) => t + p.telas, 0)), ic: 'telas', cor: 'roxo' }),
+      indicador({ rotulo: 'Público somado por dia', valor: inteiro(total), ic: 'pessoas', cor: 'ciano' })),
+    el('div', { class: 'cartao' }, tabela([
+      [(p) => p.nome, 'Ponto'], [(p) => CATEGORIAS[p.categoria] ?? p.categoria, 'Categoria'],
+      [(p) => `${p.cidade}/${p.uf}`, 'Cidade'], [(p) => inteiro(p.telas), 'TVs', 'num dir'],
+      [(p) => inteiro(p.publico_dia), 'Público/dia', 'num dir'],
+    ], d.pontos, { vazioTexto: 'Nenhum ponto ativo.' }))));
+}
+
+// ================================================================ Lojista
+async function resumoLojista(ctx) {
+  const pintar = async () => {
+    const d = await api.get('/ponto/resumo');
+    limpar(ctx.conteudo, el('div', { class: 'grade-dash' },
+      el('div', { class: 'c3' }, indicador({
+        rotulo: 'TVs no ar', valor: `${d.telas.filter((t) => t.online).length} de ${d.telas.length}`, ic: 'telas',
+        cor: d.telas.every((t) => t.online) ? 'verde' : 'laranja', nota: d.aberto ? 'Loja aberta agora' : 'Loja fechada agora',
+      })),
+      el('div', { class: 'c3' }, indicador({ rotulo: 'Exibições hoje', valor: inteiro(d.hoje.insercoes), ic: 'tocar', nota: duracao(d.hoje.segundos) })),
+      el('div', { class: 'c3' }, indicador({ rotulo: `Exibições em ${competenciaTexto(new Date().toLocaleDateString('en-CA').slice(0, 7))}`, valor: inteiro(d.mes.insercoes), ic: 'relatorios', cor: 'roxo' })),
+      el('div', { class: 'c3' }, indicador({ rotulo: 'Repasse a receber', valor: dinheiro(d.a_receber_centavos), ic: 'dinheiro', cor: 'verde', nota: `Comissão de ${percentual(d.ponto.comissao_percentual)}` })),
+
+      el('div', { class: 'c12' }, cartao('Minhas TVs',
+        el('div', { class: 'telas' }, d.telas.map((t) => el('div', { class: 'tela-cartao' },
+          el('div', { class: `moldura${t.orientacao === 'retrato' ? ' retrato' : ''}` },
+            el('span', { class: `selo${t.online ? '' : ' off'}` }, t.online ? 'no ar' : 'sem contato'),
+            el('div', { class: 'vazia' }, t.item_atual ? el('div', {}, el('div', { style: 'font-size:11px;opacity:.7' }, 'No ar agora'), el('strong', {}, t.item_atual)) : 'Sem informação')),
+          el('div', { class: 'corpo' },
+            el('h3', {}, t.nome),
+            el('div', { class: 'pequeno mudo' }, t.ultimo_contato ? `Último contato: ${dataHora(t.ultimo_contato)}` : 'Aparelho ainda não pareado'),
+            t.aviso ? el('p', { class: 'aviso', style: 'margin:0' }, `Seu aviso: “${t.aviso}”`) : null,
+            el('div', { class: 'acoes' },
+              el('button', { class: 'btn pequeno', onclick: () => verProgramacao(t) }, icone('olho'), 'O que está passando'),
+              d.pode_avisar ? el('button', { class: 'btn pequeno', onclick: () => avisoLojista(t, pintar) }, 'Meu aviso') : null))))))),
+
+      el('div', { class: 'c6' }, cartao('Exibições por dia',
+        d.por_dia.length ? barras(d.por_dia.map((x) => ({ rotulo: x.data, valor: x.insercoes, titulo: `${dataBr(x.data)}: ${inteiro(x.insercoes)}` }))) : vazio('Sem exibições ainda.'))),
+
+      el('div', { class: 'c6' }, cartao('Meus repasses', tabela([
+        [(r) => competenciaTexto(r.competencia), 'Mês'],
+        [(r) => dinheiro(r.valor_centavos), 'Valor', 'num dir'],
+        [(r) => etiquetaDe(STATUS_REPASSE, r.status), 'Situação'],
+      ], d.repasses, { vazioTexto: 'Nenhum repasse ainda.' })))));
+  };
+  await pintar();
+  ctx.parar(repetir(pintar, 60_000));
+}
+
+async function verProgramacao(t) {
+  const d = await api.get(`/ponto/telas/${t.id}/programacao`);
+  await modal(`O que está passando — ${d.tela.nome}`, (fechar) => [
+    el('p', { class: 'mudo', style: 'margin:0' }, `Loop de ${duracao(d.duracao_s)}, com ${d.itens.length} itens.`),
+    tabela([
+      [(i) => i.ordem, '#', 'num'],
+      [(i) => i.nome, 'Conteúdo'],
+      [(i) => (i.publicidade ? etiqueta('Publicidade', 'info') : etiqueta('Conteúdo da loja / institucional', 'ok')), 'Tipo'],
+      [(i) => `${i.duracao_s}s`, 'Duração', 'num dir'],
+    ], d.itens, { vazioTexto: 'Esta TV está sem programação agora.' }),
+    el('div', { class: 'linha entre', style: 'margin-top:14px' }, el('span', {}), el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
+  ], { largo: true });
+}
+
+const avisoLojista = (t, recarregar) => formModal(`Aviso na TV — ${t.nome}`, () => [
+  el('p', { class: 'mudo', style: 'margin:0' }, 'O texto passa na faixa de baixo da TV. Deixe em branco para tirar.'),
+  campo('Aviso', { name: 'aviso', value: t.aviso ?? '', maxlength: 160, placeholder: 'Ex.: Pão quentinho às 17h' }),
+  escolha('Por quanto tempo', 'horas', { 2: '2 horas', 6: '6 horas', 12: '12 horas', 24: '1 dia', 48: '2 dias', 72: '3 dias' }, 12),
+], async (d) => {
+  await api.put(`/ponto/telas/${t.id}/aviso`, { aviso: d.aviso || null, horas: Number(d.horas) });
+  toast(d.aviso ? 'Aviso no ar.' : 'Aviso retirado.');
+  recarregar();
+}, { rotulo: 'Salvar' });
+
+async function conteudoLojista(ctx) {
+  const corpo = el('div', {});
+  const pintar = async () => {
+    const d = await api.get('/ponto/resumo');
+    limpar(corpo, d.midias.length
+      ? el('div', { class: 'midias' }, d.midias.map((m) => el('div', { class: 'midia-cartao' }, previa(m, { rota: 'ponto' }),
+        el('div', { class: 'corpo' },
+          el('h3', { title: m.nome }, m.nome),
+          el('div', { class: 'linha' }, etiquetaDe(STATUS_MIDIA, m.status)),
+          m.motivo ? el('div', { class: 'pequeno', style: 'color:var(--erro)' }, m.motivo) : null,
+          el('div', { class: 'acoes' }, el('button', {
+            class: 'btn pequeno perigo', onclick: (e) => acao(e.target, async () => {
+              if (!await confirmar('Remover conteúdo', `Apagar "${m.nome}"?`, 'Remover')) return;
+              await api.del(`/ponto/midias/${m.id}`);
+              toast('Conteúdo removido.');
+              pintar();
+            }),
+          }, 'Remover'))))))
+      : vazio('Nenhum conteúdo seu ainda. Você pode mandar um cartaz ou vídeo da loja para entrar entre os anúncios.'));
+  };
+  limpar(ctx.conteudo,
+    el('div', { class: 'linha entre', style: 'margin-bottom:16px' },
+      el('p', { class: 'mudo', style: 'margin:0' }, 'A equipe aprova antes de o conteúdo entrar na TV.'),
+      el('button', { class: 'btn primario', onclick: () => enviarCriativoPortal('ponto', pintar) }, icone('enviar'), 'Enviar conteúdo')),
+    corpo);
+  await pintar();
+}
+
+async function repassesLojista(ctx) {
+  const d = await api.get('/ponto/resumo');
+  limpar(ctx.conteudo, el('div', { class: 'coluna' },
+    el('div', { class: 'grade' },
+      indicador({ rotulo: 'A receber', valor: dinheiro(d.a_receber_centavos), ic: 'dinheiro', cor: 'verde' }),
+      indicador({ rotulo: 'Minha comissão', valor: percentual(d.ponto.comissao_percentual), ic: 'repasses', nota: 'sobre a receita das minhas TVs' }),
+      indicador({ rotulo: 'Público estimado da loja', valor: inteiro(d.ponto.publico_dia), ic: 'pessoas', cor: 'ciano', nota: 'pessoas por dia' })),
+    el('div', { class: 'cartao' }, tabela([
+      [(r) => competenciaTexto(r.competencia), 'Mês'],
+      [(r) => dinheiro(r.base_centavos), 'Receita das minhas TVs', 'num dir'],
+      [(r) => percentual(r.comissao_percentual), 'Comissão', 'num dir'],
+      [(r) => el('strong', {}, dinheiro(r.valor_centavos)), 'Meu repasse', 'num dir'],
+      [(r) => etiquetaDe(STATUS_REPASSE, r.status), 'Situação'],
+      [(r) => (r.pago_em ? dataBr(r.pago_em) : '—'), 'Pago em'],
+    ], d.repasses, { vazioTexto: 'Nenhum repasse ainda. Eles aparecem no fechamento de cada mês.' }))));
+}
+
+async function relatoriosLojista(ctx) {
+  const estado = { de: diasAtras(29), ate: hojeLocal() };
+  const corpo = el('div', { class: 'coluna' });
+  const pintar = async () => {
+    const d = await api.get(`/ponto/relatorios${qs(estado)}`);
+    limpar(corpo,
+      el('div', { class: 'cartao' }, el('h2', {}, 'Exibições por dia'),
+        d.por_dia.length ? barras(d.por_dia.map((x) => ({ rotulo: x.data, valor: x.insercoes, titulo: `${dataBr(x.data)}: ${inteiro(x.insercoes)}` }))) : vazio('Sem exibições no período.')),
+      el('div', { class: 'cartao' }, el('h2', {}, 'Por TV'), tabela([
+        [(t) => t.tela, 'TV'],
+        [(t) => inteiro(t.insercoes), 'Exibições', 'num dir'],
+        [(t) => inteiro(t.insercoes_pagas), 'De publicidade', 'num dir'],
+        [(t) => duracao(t.segundos), 'Tempo no ar', 'num dir'],
+        [(t) => inteiro(t.dias), 'Dias', 'num dir'],
+      ], d.telas, { vazioTexto: 'Sem exibições no período.' })));
+  };
+  limpar(ctx.conteudo,
+    el('div', { class: 'filtros livre' },
+      campo('De', { type: 'date', value: estado.de, onchange: (e) => { estado.de = e.target.value; pintar(); } }),
+      campo('Até', { type: 'date', value: estado.ate, onchange: (e) => { estado.ate = e.target.value; pintar(); } })),
+    corpo);
+  await pintar();
+}
+
+/** Envio de arquivo pelos portais (o criativo entra como pendente de aprovação). */
+function enviarCriativoPortal(rota, recarregar) {
+  return modal(rota === 'anunciante' ? 'Enviar criativo' : 'Enviar conteúdo da loja', (fechar) => {
+    const arquivo = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm', required: true });
+    const nome = campo('Nome', { name: 'nome', required: true, maxlength: 140 });
+    const duracaoCampo = campo('Duração da imagem (segundos, opcional)', { name: 'duracao_s', type: 'number', min: 1, max: 600 });
+    arquivo.addEventListener('change', () => {
+      const f = arquivo.files?.[0];
+      if (f && !nome.querySelector('input').value) nome.querySelector('input').value = f.name.replace(/\.[^.]+$/, '').slice(0, 140);
+      duracaoCampo.hidden = Boolean(f && f.type.startsWith('video'));
+    });
+    const ok = el('button', { class: 'btn primario largo' }, 'Enviar');
+    const f = el('form', { class: 'form' },
+      el('label', { class: 'campo' }, 'Arquivo (JPG, PNG, WEBP, MP4, MOV ou WEBM)', arquivo),
+      nome, duracaoCampo,
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Para TV, o ideal é 1920×1080 (deitado) ou 1080×1920 (em pé).'),
+      el('div', { class: 'linha entre' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Cancelar'), ok));
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      acao(ok, async () => {
+        const d = lerForm(f);
+        const alvo = arquivo.files?.[0];
+        if (!alvo) throw new Error('Escolha o arquivo.');
+        await enviarArquivo(`${rota}/midias`, alvo, { nome: d.nome, duracao_s: d.duracao_s });
+        toast('Enviado! A equipe vai aprovar antes de ir para as telas.');
+        fechar();
+        recarregar();
+      });
+    });
+    return f;
+  });
+}
+
+export const TELAS_ANUNCIANTE = {
+  resumo: resumoAnunciante,
+  campanhas: campanhasAnunciante,
+  criativos: criativosAnunciante,
+  prova: provaAnunciante,
+  faturas: faturasAnunciante,
+  rede: redeAnunciante,
+};
+
+export const TELAS_LOJISTA = {
+  resumo: resumoLojista,
+  conteudo: conteudoLojista,
+  repasses: repassesLojista,
+  relatorios: relatoriosLojista,
+};

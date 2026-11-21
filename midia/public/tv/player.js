@@ -1,0 +1,410 @@
+/*
+ * Player da TV (Mídia Indoor).
+ *
+ * Roda em qualquer navegador de TV box, Fire Stick, mini PC, Chromecast com Google TV ou smart TV:
+ * basta abrir este endereço em tela cheia. O aparelho mostra um código, a equipe confirma no painel
+ * e a partir daí ele:
+ *   1. baixa a programação e guarda os arquivos no cache do navegador;
+ *   2. roda o loop em tela cheia (imagem com tempo e vídeo até o fim), já carregando o próximo item;
+ *   3. anota cada exibição e envia em lote (a fila fica guardada quando a internet cai);
+ *   4. avisa que está vivo de tempo em tempo e baixa a grade de novo quando ela muda.
+ *
+ * Sem internet, continua rodando o que está no cache — é o caso comum no comércio.
+ */
+'use strict';
+
+const VERSAO = '1.0';
+const API = new URL('../api/', location.href).href;
+const CHAVES = { token: 'midia.tv.token', grade: 'midia.tv.grade', fila: 'midia.tv.fila', codigo: 'midia.tv.codigo', vistos: 'midia.tv.vistos' };
+// Um arquivo que sumiu da programação (campanha só de manhã, por exemplo) ainda fica no cache por estes dias,
+// para a TV não baixar tudo de novo a cada troca de faixa de horário.
+const DIAS_NO_CACHE = 3;
+const CACHE = 'midia-tv-v1';
+const MAX_FILA = 400;
+
+const $ = (id) => document.getElementById(id);
+const guardar = (chave, valor) => { try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem armazenamento */ } };
+const lido = (chave) => { try { return JSON.parse(localStorage.getItem(chave)); } catch { return null; } };
+const apagar = (chave) => { try { localStorage.removeItem(chave); } catch { /* ignora */ } };
+const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const estado = {
+  token: lido(CHAVES.token),
+  programacao: lido(CHAVES.grade),
+  fila: lido(CHAVES.fila) ?? [],
+  indice: 0,
+  camadaAtual: 'a',
+  online: true,
+  batidaS: 60,
+  trocarPendente: false,
+  parado: false,
+};
+
+// ---------------------------------------------------------------- Conversa com o servidor
+async function chamar(caminho, { metodo = 'GET', corpo, comToken = true } = {}) {
+  const resp = await fetch(API + caminho, {
+    method: metodo,
+    headers: { ...(corpo ? { 'Content-Type': 'application/json' } : {}), ...(comToken && estado.token ? { Authorization: `Bearer ${estado.token}` } : {}) },
+    body: corpo ? JSON.stringify(corpo) : undefined,
+  });
+  if (resp.status === 401 && comToken) {
+    // Aparelho despareado no painel: volta para a tela de código.
+    apagar(CHAVES.token);
+    apagar(CHAVES.grade);
+    estado.token = null;
+    estado.programacao = null;
+    throw new Error('despareado');
+  }
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.status === 204 ? null : resp.json();
+}
+
+function marcarConexao(ok) {
+  estado.online = ok;
+  $('sem-conexao').hidden = ok;
+}
+
+// ---------------------------------------------------------------- Pareamento
+async function parear() {
+  mostrarEspera('Preparando a tela…', 'Falando com o servidor.');
+  let guardado = lido(CHAVES.codigo);
+  while (!estado.token) {
+    try {
+      if (!guardado || Date.parse(guardado.expira_em) < Date.now()) {
+        const r = await chamar('player/registrar', {
+          metodo: 'POST',
+          comToken: false,
+          corpo: { aparelho: navigator.userAgent.slice(0, 160), largura: screen.width, altura: screen.height, versao: VERSAO },
+        });
+        guardado = r;
+        guardar(CHAVES.codigo, r);
+        if (r.plataforma) $('espera-plataforma').textContent = r.plataforma;
+      }
+      marcarConexao(true);
+      mostrarEspera('Vamos ligar esta TV', 'Esta tela ainda não está vinculada a um ponto.', guardado.codigo);
+      const p = await chamar(`player/pareamento?codigo=${encodeURIComponent(guardado.codigo)}`, { comToken: false });
+      if (p.expirado) { guardado = null; continue; }
+      if (p.pareado) {
+        estado.token = p.token;
+        guardar(CHAVES.token, p.token);
+        apagar(CHAVES.codigo);
+        mostrarEspera('Pronto!', `Esta TV agora é "${p.tela.nome}". Baixando a programação…`);
+        return;
+      }
+    } catch (err) {
+      marcarConexao(false);
+      mostrarEspera('Sem conexão', 'Confira a internet do local. A tela tenta de novo sozinha.', guardado?.codigo);
+    }
+    await dormir(5000);
+  }
+}
+
+// ---------------------------------------------------------------- Programação e cache dos arquivos
+async function baixarProgramacao() {
+  const p = await chamar('player/programacao');
+  estado.programacao = p;
+  estado.batidaS = Math.max(15, Number(p.batida_s) || 60);
+  guardar(CHAVES.grade, p);
+  marcarConexao(true);
+  guardarArquivos(p.grade.itens).catch(() => {});
+  return p;
+}
+
+const enderecoDoItem = (item) => new URL(`player/${item.url}`, API).href;
+
+/** Guarda cada arquivo no cache do navegador e apaga só o que não aparece na programação há dias. */
+async function guardarArquivos(itens) {
+  if (!('caches' in window)) return;
+  const cache = await caches.open(CACHE);
+  const vistos = lido(CHAVES.vistos) ?? {};
+  const agora = Date.now();
+  for (const item of itens) {
+    const url = enderecoDoItem(item);
+    vistos[url] = agora;
+    if (await cache.match(url)) continue;
+    try {
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${estado.token}` } });
+      if (resp.ok) await cache.put(url, resp);
+    } catch { /* tenta no próximo ciclo */ }
+  }
+  const corte = agora - DIAS_NO_CACHE * 86_400_000;
+  for (const req of await cache.keys()) {
+    if (!vistos[req.url] || vistos[req.url] < corte) {
+      await cache.delete(req);
+      delete vistos[req.url];
+    }
+  }
+  for (const [url, quando] of Object.entries(vistos)) if (quando < corte) delete vistos[url];
+  guardar(CHAVES.vistos, vistos);
+}
+
+/** Endereço local do arquivo: do cache, se já estiver guardado; direto do servidor, se não. */
+async function origemDoItem(item) {
+  const url = enderecoDoItem(item);
+  if ('caches' in window) {
+    try {
+      const achado = await (await caches.open(CACHE)).match(url);
+      if (achado) return { src: URL.createObjectURL(await achado.blob()), temporario: true };
+    } catch { /* cache indisponível */ }
+  }
+  // Sem cache: busca com o token e transforma em blob (a tag <img>/<video> não manda cabeçalho).
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${estado.token}` } });
+  if (!resp.ok) throw new Error(`arquivo ${item.midia_id}: HTTP ${resp.status}`);
+  return { src: URL.createObjectURL(await resp.blob()), temporario: true };
+}
+
+// ---------------------------------------------------------------- Prova de exibição
+function anotarExibicao(item, inicio, segundos) {
+  estado.fila.push({ midia_id: item.midia_id, campanha_id: item.campanha_id, exibida_em: new Date(inicio).toISOString(), duracao_s: Math.round(segundos) });
+  if (estado.fila.length > MAX_FILA) estado.fila = estado.fila.slice(-MAX_FILA);
+  guardar(CHAVES.fila, estado.fila);
+}
+
+async function enviarExibicoes() {
+  if (!estado.fila.length || !estado.token) return;
+  const lote = estado.fila.slice(0, 200);
+  try {
+    await chamar('player/exibicoes', { metodo: 'POST', corpo: { exibicoes: lote } });
+    estado.fila = estado.fila.slice(lote.length);
+    guardar(CHAVES.fila, estado.fila);
+    marcarConexao(true);
+  } catch (err) {
+    if (err.message !== 'despareado') marcarConexao(false);
+  }
+}
+
+// ---------------------------------------------------------------- Batida (a TV diz que está viva)
+async function bater(erro) {
+  if (!estado.token) return;
+  const item = itemAtual();
+  try {
+    const r = await chamar('player/batida', {
+      metodo: 'POST',
+      corpo: { grade_versao: estado.programacao?.grade?.versao ?? null, versao: VERSAO, item_atual: item ? item.nome : null, erro: erro ?? null },
+    });
+    marcarConexao(true);
+    if (r.recarregar) estado.trocarPendente = true;
+  } catch (err) {
+    if (err.message !== 'despareado') marcarConexao(false);
+  }
+}
+
+// ---------------------------------------------------------------- Exibição
+const itens = () => estado.programacao?.grade?.itens ?? [];
+const itemAtual = () => itens()[estado.indice % Math.max(1, itens().length)] ?? null;
+
+function trocarCamada() {
+  const sai = $(`camada-${estado.camadaAtual}`);
+  estado.camadaAtual = estado.camadaAtual === 'a' ? 'b' : 'a';
+  const entra = $(`camada-${estado.camadaAtual}`);
+  entra.classList.add('no-ar');
+  sai.classList.remove('no-ar');
+  setTimeout(() => {
+    for (const m of sai.querySelectorAll('video')) { m.pause(); m.removeAttribute('src'); m.load(); }
+    for (const e of sai.querySelectorAll('[data-blob]')) URL.revokeObjectURL(e.dataset.blob);
+    sai.replaceChildren();
+  }, 600);
+  return entra;
+}
+
+/** Prepara o elemento do item na camada que está fora do ar e devolve uma função que o põe no ar. */
+async function prepararItem(item) {
+  const origem = await origemDoItem(item);
+  const alvo = $(`camada-${estado.camadaAtual === 'a' ? 'b' : 'a'}`);
+  let elemento;
+  if (item.tipo === 'video') {
+    elemento = document.createElement('video');
+    Object.assign(elemento, { src: origem.src, muted: !estado.programacao.tela.som, autoplay: false, loop: false, playsInline: true, preload: 'auto' });
+    elemento.setAttribute('playsinline', '');
+    if (!estado.programacao.tela.som) elemento.setAttribute('muted', '');
+  } else {
+    elemento = document.createElement('img');
+    elemento.src = origem.src;
+    elemento.alt = '';
+  }
+  if (origem.temporario) elemento.dataset.blob = origem.src;
+  alvo.replaceChildren(elemento);
+  // Espera o arquivo estar pronto (com teto, para não travar o loop num arquivo ruim).
+  await Promise.race([
+    new Promise((pronto, falhou) => {
+      if (item.tipo === 'video') {
+        elemento.addEventListener('loadeddata', pronto, { once: true });
+        elemento.addEventListener('error', () => falhou(new Error(`vídeo ${item.midia_id} não abriu`)), { once: true });
+      } else if (elemento.complete) {
+        pronto();
+      } else {
+        elemento.addEventListener('load', pronto, { once: true });
+        elemento.addEventListener('error', () => falhou(new Error(`imagem ${item.midia_id} não abriu`)), { once: true });
+      }
+    }),
+    dormir(15000),
+  ]);
+  return elemento;
+}
+
+/** Roda um item: imagem pelo tempo contratado, vídeo até o fim (com teto de segurança). */
+async function exibir(item) {
+  const elemento = await prepararItem(item);
+  trocarCamada();
+  const inicio = Date.now();
+  if (item.tipo === 'video') {
+    try { await elemento.play(); } catch { /* alguns aparelhos só tocam sem som */ }
+    await Promise.race([
+      new Promise((fim) => elemento.addEventListener('ended', fim, { once: true })),
+      dormir((item.duracao_s + 5) * 1000),
+    ]);
+  } else {
+    await dormir(item.duracao_s * 1000);
+  }
+  anotarExibicao(item, inicio, Math.min(item.duracao_s + 5, (Date.now() - inicio) / 1000));
+}
+
+function mostrarEspera(titulo, texto, codigo) {
+  $('espera').hidden = false;
+  $('espera-titulo').textContent = titulo;
+  $('espera-texto').textContent = texto ?? '';
+  $('codigo').hidden = !codigo;
+  $('espera-ajuda').hidden = !codigo;
+  if (codigo) $('codigo').textContent = codigo;
+}
+const esconderEspera = () => { $('espera').hidden = true; };
+
+/** Faixa de baixo: aviso do ponto (prioridade), legenda fixa e relógio. */
+function desenharFaixa() {
+  const t = estado.programacao?.tela;
+  const texto = t?.aviso || t?.legenda || '';
+  const relogio = Boolean(t?.relogio);
+  const mostrar = Boolean(texto || relogio);
+  $('faixa').hidden = !mostrar;
+  document.body.classList.toggle('com-faixa', mostrar);
+  $('faixa-texto').textContent = texto;
+  $('relogio').hidden = !relogio;
+}
+
+function desenharInfo() {
+  const p = estado.programacao;
+  const g = p?.grade;
+  $('info').innerHTML = '';
+  const linhas = [
+    ['TV', p?.tela?.nome ?? '—'],
+    ['Ponto', p?.tela?.local ?? '—'],
+    ['Programação', g ? `${g.itens.length} itens · ${g.duracao_s}s · ${g.ocupacao}% vendido` : '—'],
+    ['Versão da grade', g?.versao ?? '—'],
+    ['No ar', itemAtual()?.nome ?? '—'],
+    ['Fila para enviar', String(estado.fila.length)],
+    ['Conexão', estado.online ? 'ok' : 'sem internet'],
+    ['Player', VERSAO],
+  ];
+  for (const [rotulo, valor] of linhas) {
+    const l = document.createElement('div');
+    const b = document.createElement('b');
+    b.textContent = `${rotulo}: `;
+    l.append(b, document.createTextNode(valor));
+    $('info').append(l);
+  }
+}
+
+// ---------------------------------------------------------------- Laço principal
+async function rodar() {
+  while (!estado.parado) {
+    if (!estado.token) {
+      await parear();
+      continue;
+    }
+    if (!estado.programacao) {
+      try {
+        await baixarProgramacao();
+        bater(); // avisa o painel na hora que esta TV entrou no ar
+      } catch (err) {
+        if (err.message === 'despareado') continue;
+        marcarConexao(false);
+        mostrarEspera('Sem conexão', 'A tela volta a exibir assim que a internet voltar.');
+        await dormir(10_000);
+        continue;
+      }
+    }
+    desenharFaixa();
+    if (!itens().length) {
+      mostrarEspera(estado.programacao.tela.local ?? 'Sem programação', 'Esta TV está no ar e aguardando campanhas.');
+      await dormir(30_000);
+      estado.trocarPendente = true;
+    } else {
+      esconderEspera();
+      const item = itemAtual();
+      try {
+        await exibir(item);
+      } catch (err) {
+        bater(String(err.message).slice(0, 200));
+        await dormir(1500);
+      }
+      estado.indice = (estado.indice + 1) % itens().length;
+    }
+    // Troca a programação na virada do loop, para não cortar um anúncio no meio.
+    if (estado.trocarPendente && estado.indice === 0) {
+      estado.trocarPendente = false;
+      try {
+        await baixarProgramacao();
+        estado.indice = 0;
+        desenharFaixa();
+      } catch { /* segue com a programação atual */ }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- Rotinas de fundo
+function relogio() {
+  const marcar = () => { $('relogio').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+  marcar();
+  setInterval(marcar, 15_000);
+}
+
+async function manterTelaAcesa() {
+  try {
+    if ('wakeLock' in navigator) {
+      let trava = await navigator.wakeLock.request('screen');
+      document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible') { try { trava = await navigator.wakeLock.request('screen'); } catch { /* sem permissão */ } }
+      });
+    }
+  } catch { /* aparelho sem a função: configure o descanso de tela no próprio aparelho */ }
+}
+
+function atalhos() {
+  document.addEventListener('keydown', (e) => {
+    const tecla = e.key.toLowerCase();
+    if (tecla === 'i') {
+      const mostrar = $('info').hidden;
+      $('info').hidden = !mostrar;
+      if (mostrar) desenharInfo();
+    }
+    if (tecla === 'r') location.reload();
+    if (tecla === 'f') document.documentElement.requestFullscreen?.().catch(() => {});
+  });
+  // Toque/clique longo também abre a tela cheia (controle de TV sem teclado).
+  document.addEventListener('dblclick', () => document.documentElement.requestFullscreen?.().catch(() => {}));
+}
+
+async function iniciar() {
+  if (estado.programacao?.plataforma) $('espera-plataforma').textContent = estado.programacao.plataforma;
+  mostrarEspera('Preparando a tela…', 'Carregando a programação guardada.');
+  relogio();
+  atalhos();
+  manterTelaAcesa();
+  // A batida segue o intervalo configurado na plataforma (o servidor informa a cada resposta).
+  const baterSempre = async () => {
+    await bater();
+    setTimeout(baterSempre, estado.batidaS * 1000);
+  };
+  setTimeout(baterSempre, 5000);
+  setInterval(enviarExibicoes, 30_000);
+  setInterval(() => { if (!$('info').hidden) desenharInfo(); }, 5000);
+  // Reaproveita a programação guardada para começar a exibir mesmo sem internet.
+  if (estado.token && estado.programacao) {
+    desenharFaixa();
+    baixarProgramacao().catch(() => marcarConexao(false));
+  }
+  await enviarExibicoes();
+  rodar();
+}
+
+iniciar();
