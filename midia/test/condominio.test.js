@@ -1049,6 +1049,23 @@ test('Site do Vai Mídia: abre na raiz e o formulário vira lead', async (t) => 
     assert.equal((await fetch(`${raiz}/css/styles.css`)).status, 200, 'os arquivos do site saem na raiz');
     assert.equal((await fetch(`${raiz}/assets/layout-aprovado.webp`)).status, 200);
     assert.equal((await fetch(`${raiz}/assets/VAI_MIDIA_Portfolio_Comercial.pdf`)).status, 200, 'o portfólio baixa pelo site');
+
+    // A faixa de números nasce escondida: só aparece quando a API diz que já há tela no ar.
+    assert.match(html, /<section class="rede-numeros[^>]*hidden>/, 'sem rede no ar, o site não mostra número nenhum');
+    ['telas', 'pontos', 'cidades', 'publico_mes'].forEach((n) =>
+      assert.match(html, new RegExp(`data-numero="${n}"`), `o site tem lugar para o número de ${n}`));
+  });
+
+  await t.test('a política de privacidade está no ar e o formulário avisa antes de enviar', async () => {
+    const r = await fetch(`${raiz}/privacidade.html`);
+    assert.equal(r.status, 200, 'a página de privacidade abre');
+    const politica = await r.text();
+    assert.match(politica, /Lei 13\.709\/2018/, 'a LGPD está citada');
+    assert.match(politica, /exclus/i, 'a página explica como pedir exclusão dos dados');
+
+    const html = await (await fetch(`${raiz}/`)).text();
+    assert.match(html, /href="privacidade\.html"/, 'o site leva à política');
+    assert.match(html, /concorda que a VAI MÍDIA use os dados/, 'quem preenche o formulário é avisado do uso dos dados');
   });
 
   await t.test('os números da rede são agregados, sem nome de ninguém', async () => {

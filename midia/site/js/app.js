@@ -49,6 +49,25 @@
   }
   window.addEventListener('load', frameAll, { once: true });
 
+  /*
+   * A rede em números. Vem da API do painel, então o site nunca mostra um número desatualizado;
+   * com a rede ainda vazia (ou sem API por perto), a faixa simplesmente não aparece.
+   */
+  (async () => {
+    const base = await api();
+    if (!base) return;
+    try {
+      const dados = await fetch(new URL('publico/rede', base)).then(r => (r.ok ? r.json() : null));
+      if (!dados || !dados.telas) return;
+      const faixa = $('#rede-numeros');
+      Object.entries(dados).forEach(([chave, valor]) => {
+        const alvo = $('[data-numero="' + chave + '"]', faixa);
+        if (alvo) alvo.textContent = Number(valor || 0).toLocaleString('pt-BR');
+      });
+      faixa.hidden = false;
+    } catch { /* sem números, o site segue igual */ }
+  })();
+
   const menu = $('#mobile-menu');
   const menuToggle = $('.menu-toggle');
   function closeMenu() { menu.hidden = true; menuToggle.setAttribute('aria-expanded', 'false'); menuToggle.setAttribute('aria-label', 'Abrir menu'); }

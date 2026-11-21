@@ -17,3 +17,30 @@
 @media(max-width:540px){:root{--gutter:20px}.site-header{height:64px;padding-inline:14px;gap:10px;border-radius:14px}.brand{gap:7px}.brand span{font-size:1.3rem}.brand>img{width:33px}.site-header .header-cta{display:none}.menu-toggle{margin-left:auto}.hero{margin-top:16px}.hero-copy{padding-top:25px;padding-bottom:23px}.hero h1{font-size:clamp(2rem,8.1vw,2.65rem);line-height:1.13;letter-spacing:-.06em;margin-bottom:22px}.hero-copy>p{font-size:1.05rem;max-width:330px;margin-right:0}.hero-actions{gap:19px}.hero-cta{font-size:.93rem;padding:13px 15px;gap:9px;min-height:50px}.hero-cta img{width:21px}.formats-link{font-size:.85rem}.hero-art{aspect-ratio:1.65;border-radius:26px 14px 14px 26px}.solutions-heading h2{font-size:1.97rem;white-space:normal}.format-tabs{gap:19px}.format-tabs button{font-size:.9rem}.gallery-pair{grid-template-columns:1fr;gap:20px}.gallery-image{aspect-ratio:2.1}.gallery-pair figcaption{margin-top:8px}.image-note{margin:12px 0 25px}.format-panel{grid-template-columns:1fr;gap:24px}.selected-image{aspect-ratio:1.4}.format-copy h3{font-size:1.8rem;max-width:360px}.format-copy>p{font-size:1rem}.format-copy dl{gap:15px;margin-block:21px}.format-copy dd{font-size:.95rem}.advertisers{padding-block:64px;gap:35px}.eyebrow{font-size:.78rem}.section-intro>p{font-size:1rem}.campaign-steps li{gap:17px}.portfolio{align-items:flex-start;flex-direction:column;padding:29px 24px;gap:24px;margin-bottom:60px}.portfolio h2{font-size:1.9rem}.portfolio p{font-size:.95rem}.portfolio-download{flex-direction:row;justify-content:space-between;gap:18px;width:100%;padding:16px 18px;font-size:.94rem}.file-label{font-size:.75rem}.partner-art{aspect-ratio:1.7}.partner-copy>p{font-size:1rem}.faq-list summary{font-size:.95rem}.closing{align-items:flex-start;flex-direction:column;gap:26px;padding-block:45px;margin-top:30px}.closing h2{font-size:1.95rem}.closing-cta{font-size:.98rem;padding:15px 26px}.site-footer{grid-template-columns:1fr;gap:12px}.site-footer nav{justify-content:flex-start;gap:18px 25px;margin-bottom:12px}.footer-note{font-size:.76rem}.brief-dialog{width:calc(100% - 18px);max-height:calc(100dvh - 18px);border-radius:16px}.dialog-top{padding:14px 18px}.dialog-content{padding:24px 20px}.dialog-content h2{font-size:1.8rem}.form-grid{grid-template-columns:1fr;gap:0}.intent-field{gap:8px}.intent-field label{font-size:.85rem;padding:10px}.format-options{gap:8px 15px}.result-actions button,.result-actions a{flex:1;text-align:center;font-size:.85rem}.brief-result pre{font-size:.875rem;padding:16px}}
 @media(prefers-reduced-motion:reduce){:root{scroll-behavior:auto}*,*::before,*::after{transition:none!important;animation:none!important}button:active{transform:none}}
 @media print{.site-header,.hero-actions,button,.format-tabs,.site-footer nav,.brief-dialog{display:none!important}.hero{grid-template-columns:1fr 1fr}.section-shell,.hero{width:100%;break-inside:avoid}body{background:white}.advertisers,.partners,.faq{padding-block:25px}.photo-window{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* Página de política de privacidade: leitura longa, coluna estreita e respiro entre os blocos. */
+.legal{max-width:760px;padding-block:70px 90px}
+.legal h1{font-size:clamp(2.1rem,4vw,2.9rem);letter-spacing:-.04em;margin-bottom:22px}
+.legal-intro{font-size:1.05rem;color:var(--muted);line-height:1.75}
+.legal-update{font-size:.85rem;color:var(--muted);margin-top:14px}
+.legal section{margin-top:40px}
+.legal h2{font-size:1.3rem;letter-spacing:-.02em;margin-bottom:12px}
+.legal p{line-height:1.8;margin-bottom:14px}
+.legal ul{margin:0 0 14px;padding-left:22px;line-height:1.8}
+.legal li{margin-bottom:8px}
+.legal a{color:var(--ink);text-underline-offset:3px}
+.legal-nota{margin-top:46px;padding-top:22px;border-top:1px solid var(--line);font-size:.9rem;color:var(--muted)}
+.site-header .header-cta[href]{display:inline-flex;align-items:center;text-decoration:none}
+@media(max-width:540px){.legal{padding-block:46px 60px}.legal h2{font-size:1.15rem}}
+
+/* A rede em números: discreta, entre a capa e os formatos. */
+.rede-numeros{padding-block:34px 10px}
+.rede-numeros dl{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin:0}
+.rede-numeros div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.rede-numeros dt{font-size:.82rem;color:var(--muted);order:2}
+.rede-numeros dd{margin:0;font-size:clamp(1.6rem,3vw,2.3rem);font-weight:800;letter-spacing:-.04em;line-height:1.05;order:1;
+  font-variant-numeric:tabular-nums}
+.rede-numeros dd::after{content:"";display:block;width:26px;height:3px;border-radius:2px;background:var(--lime);margin-top:9px}
+.rede-nota{font-size:.78rem;color:var(--muted);margin-top:18px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+@media(max-width:700px){.rede-numeros dl{grid-template-columns:repeat(2,1fr);gap:20px}}

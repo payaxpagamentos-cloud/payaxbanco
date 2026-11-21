@@ -57,6 +57,21 @@
       </div>
     </section>
 
+    <!--
+      A rede em números, direto do sistema: só aparece quando já existe tela no ar.
+      Dado atualizado sozinho convence mais que número escrito à mão — e nunca fica velho.
+    -->
+    <section class="rede-numeros section-shell" id="rede-numeros" aria-labelledby="rede-title" hidden>
+      <h2 id="rede-title" class="sr-only">A rede hoje</h2>
+      <dl>
+        <div><dt>Telas no ar</dt><dd data-numero="telas">—</dd></div>
+        <div><dt>Pontos na rede</dt><dd data-numero="pontos">—</dd></div>
+        <div><dt>Cidades</dt><dd data-numero="cidades">—</dd></div>
+        <div><dt>Pessoas por mês</dt><dd data-numero="publico_mes">—</dd></div>
+      </dl>
+      <p class="rede-nota">Números da rede hoje, atualizados pelo próprio sistema.</p>
+    </section>
+
     <section class="solutions section-shell" id="solucoes" aria-labelledby="solutions-title">
       <div class="solutions-heading">
         <h2 id="solutions-title">Onde a vida acontece.</h2>
@@ -143,7 +158,7 @@
 
   <footer class="site-footer section-shell">
     <div><a class="brand" href="#inicio" aria-label="VAI MÍDIA, voltar ao início"><img src="assets/marca.svg" width="37" height="31" alt=""><span>VAI MÍDIA</span></a><p>Sua marca em movimento.</p></div>
-    <nav aria-label="Links do rodapé"><a href="#solucoes">Soluções</a><a href="#parceiros">Seja parceiro</a><a href="assets/VAI_MIDIA_Portfolio_Comercial.pdf" download>Portfólio</a><a id="painel-link" href="../">Entrar no painel</a><a id="official-email" hidden></a><a id="official-instagram" hidden rel="noopener noreferrer" target="_blank">Instagram</a></nav>
+    <nav aria-label="Links do rodapé"><a href="#solucoes">Soluções</a><a href="#parceiros">Seja parceiro</a><a href="assets/VAI_MIDIA_Portfolio_Comercial.pdf" download>Portfólio</a><a href="privacidade.html">Privacidade</a><a id="painel-link" href="../">Entrar no painel</a><a id="official-email" hidden></a><a id="official-instagram" hidden rel="noopener noreferrer" target="_blank">Instagram</a></nav>
     <p class="footer-note">As imagens mostram aplicações ilustrativas. Pontos e condições são definidos em proposta comercial.</p>
   </footer>
 
@@ -174,7 +189,8 @@
         <label>Conte um pouco mais <span class="optional">(opcional)</span><textarea name="detalhes" rows="3" maxlength="1500"></textarea></label>
         <p id="form-error" class="form-error" role="alert" hidden>Escolha pelo menos um formato ou a opção “Preciso de orientação”.</p>
         <button type="submit" class="prepare-brief">Enviar para a equipe</button>
-        <p class="privacy-note">Os dados vão para a equipe comercial da VAI MÍDIA e ficam no sistema dela. Você também pode baixar ou copiar o resumo.</p>
+        <p class="privacy-note">Ao enviar, você concorda que a VAI MÍDIA use os dados acima para responder ao seu pedido,
+          como explica a <a href="privacidade.html" target="_blank" rel="noopener">política de privacidade</a>. Você também pode baixar ou copiar o resumo.</p>
       </form>
       <section class="brief-result" id="brief-result" aria-labelledby="result-title" hidden>
         <h3 id="result-title">Seu briefing está pronto.</h3>
