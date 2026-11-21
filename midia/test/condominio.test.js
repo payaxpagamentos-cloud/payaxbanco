@@ -1040,7 +1040,8 @@ test('Site do Vai Mídia: abre na raiz e o formulário vira lead', async (t) => 
     assert.equal(r.status, 200);
     const html = await r.text();
     assert.match(html, /Sua marca <em>em movimento<\/em>/);
-    assert.match(html, /data-api="\/midia\/api\/"/, 'o site não precisa sair procurando a API');
+    assert.match(html, /<body[^>]*data-api="\/midia\/api\/"/, 'o site não precisa sair procurando a API');
+    assert.match(html, /data-criativos=/, 'o encaixe das artes reais continua no lugar');
 
     // O painel continua no lugar dele, e o site também responde em /midia/site/.
     assert.equal((await fetch(`${raiz}/midia/`)).status, 200);

@@ -53,8 +53,9 @@ function criarApp(db) {
   const site = path.join(__dirname, '..', 'site');
   if (config.site && fs.existsSync(site)) {
     // Servido por aqui, o site já sabe onde fica a API (sem precisar sair procurando).
+    // O atributo entra na abertura do <body>, que pode já ter outros (data-criativos, por exemplo).
     const montarPagina = () => fs.readFileSync(path.join(site, 'index.html'), 'utf8')
-      .replace('<body>', `<body data-api="${config.basePath}/api/">`);
+      .replace('<body', `<body data-api="${config.basePath}/api/"`);
     // Em produção a página é lida uma vez; fora dela, a cada pedido, para quem está editando o site ver na hora.
     let pagina = montarPagina();
     const inicio = (_req, res) => res.type('html').set('Cache-Control', 'no-cache').send(config.producao ? pagina : (pagina = montarPagina()));

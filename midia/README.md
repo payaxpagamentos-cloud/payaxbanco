@@ -349,7 +349,15 @@ A pasta `site/` é o site institucional: uma página só, sem framework e sem bu
 produto (o preto, o lime e a Manrope). A capa mostra a **tela instalada no elevador** — a parede de aço, o painel
 de madeira, o indicador de andar e a tela com o recado do ponto de um lado e a publicidade girando do outro.
 A cena inteira é desenhada em CSS, com o mesmo layout do player: nada de foto de banco de imagem nem de prédio
-de outra empresa. Depois vêm onde a rede fica, como funciona, o que muda para quem anuncia e para quem tem o
+de outra empresa.
+
+Os **anúncios que giram na tela** são peças de exemplo desenhadas em SVG — imagem dominante, uma oferta só e a
+marca pequena, que é como se lê um anúncio de passagem. Para mostrar **arte real de cliente**, que é o que
+convence quem está decidindo comprar mídia, basta copiar os arquivos para `site/img/criativos/` e listá-los no
+`<body data-criativos="…">` (instruções em `site/img/criativos/LEIA-ME.md`). Arquivo que não carrega não quebra
+nada: a peça desenhada continua no lugar.
+
+Depois vêm onde a rede fica, como funciona, o que muda para quem anuncia e para quem tem o
 espaço (condomínio, loja, academia, clínica), e o formulário de contato.
 
 Duas coisas fazem o site trabalhar em vez de só existir:

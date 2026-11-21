@@ -12,7 +12,11 @@
 <meta property="og:type" content="website">
 <link rel="stylesheet" href="site.css">
 </head>
-<body>
+<!--
+  data-criativos: as artes reais que giram na tela da capa. Ponha os arquivos em site/img/criativos/
+  e liste os nomes aqui, separados por vírgula (até três). Vazio = as peças de exemplo desenhadas em SVG.
+-->
+<body data-criativos="">
 <a class="pular" href="#conteudo">Pular para o conteúdo</a>
 
 <header class="topo" id="topo">
@@ -82,70 +86,73 @@
               </div>
               <div class="zona-anuncio">
                 <!--
-                  Os anúncios são peças desenhadas em SVG, como as que vão ao ar de verdade: ilustração,
-                  tipografia forte, selo de oferta e QR no canto. Nada de foto de banco de imagem.
+                  Peças de exemplo, no formato que vai ao ar: imagem ocupando a tela, uma oferta só e
+                  a marca pequena. São vetores desenhados aqui — a empresa troca pelas artes reais dos
+                  clientes dela preenchendo data-criativos no <body> (veja o README do site).
                 -->
                 <div class="anuncio a1">
                   <svg viewBox="0 0 400 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
                     <defs>
-                      <radialGradient id="pz-fundo" cx="76%" cy="18%" r="105%">
-                        <stop offset="0" stop-color="#8A1A16"/><stop offset=".55" stop-color="#53100E"/><stop offset="1" stop-color="#240605"/>
+                      <radialGradient id="pz-luz" cx="70%" cy="34%" r="75%">
+                        <stop offset="0" stop-color="#7E1C14"/><stop offset=".6" stop-color="#4A0E0B"/><stop offset="1" stop-color="#220604"/>
                       </radialGradient>
-                      <linearGradient id="pz-massa" x1="0" y1="0" x2=".8" y2="1">
-                        <stop offset="0" stop-color="#F0C078"/><stop offset="1" stop-color="#C4853A"/>
-                      </linearGradient>
-                      <linearGradient id="pz-queijo" x1=".2" y1="0" x2=".9" y2="1">
-                        <stop offset="0" stop-color="#F7CE6B"/><stop offset="1" stop-color="#E2A33F"/>
-                      </linearGradient>
+                      <radialGradient id="pz-massa" cx="38%" cy="32%" r="72%">
+                        <stop offset="0" stop-color="#F6D08A"/><stop offset=".72" stop-color="#D79B4B"/><stop offset="1" stop-color="#A96D2B"/>
+                      </radialGradient>
+                      <radialGradient id="pz-molho" cx="40%" cy="34%" r="70%">
+                        <stop offset="0" stop-color="#E35B33"/><stop offset="1" stop-color="#A62E18"/>
+                      </radialGradient>
                       <linearGradient id="pz-veu" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stop-color="#2B0706" stop-opacity=".96"/>
-                        <stop offset=".58" stop-color="#2B0706" stop-opacity=".82"/>
-                        <stop offset="1" stop-color="#2B0706" stop-opacity="0"/>
+                        <stop offset="0" stop-color="#1A0403" stop-opacity=".92"/>
+                        <stop offset=".34" stop-color="#1A0403" stop-opacity=".45"/>
+                        <stop offset=".62" stop-color="#1A0403" stop-opacity="0"/>
+                      </linearGradient>
+                      <linearGradient id="pz-baixo" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stop-color="#140302" stop-opacity="0"/>
+                        <stop offset="1" stop-color="#140302" stop-opacity=".9"/>
                       </linearGradient>
                     </defs>
-                    <rect width="400" height="340" fill="url(#pz-fundo)"/>
-                    <!-- a pizza entra pelo canto, como numa peça de verdade -->
-                    <g transform="translate(348 262)">
-                      <circle r="152" fill="url(#pz-massa)"/>
-                      <circle r="130" fill="url(#pz-queijo)"/>
-                      <circle r="126" fill="#C8482C" opacity=".92"/>
-                      <g fill="#F3CE78" opacity=".9">
-                        <ellipse cx="-66" cy="-44" rx="30" ry="21" transform="rotate(-18 -66 -44)"/>
-                        <ellipse cx="18" cy="-74" rx="24" ry="17" transform="rotate(12 18 -74)"/>
-                        <ellipse cx="-24" cy="36" rx="34" ry="22" transform="rotate(-6 -24 36)"/>
-                        <ellipse cx="62" cy="-8" rx="22" ry="15" transform="rotate(22 62 -8)"/>
-                        <ellipse cx="-78" cy="52" rx="20" ry="14"/>
+                    <rect width="400" height="340" fill="url(#pz-luz)"/>
+                    <!-- a pizza domina a peça, como a foto domina o anúncio -->
+                    <g transform="translate(308 134)">
+                      <ellipse cx="6" cy="122" rx="112" ry="20" fill="#150302" opacity=".45"/>
+                      <circle r="116" fill="url(#pz-massa)"/>
+                      <circle r="98" fill="url(#pz-molho)"/>
+                      <g fill="#FBDC93" opacity=".95">
+                        <ellipse cx="-50" cy="-40" rx="28" ry="19" transform="rotate(-18 -50 -40)"/>
+                        <ellipse cx="20" cy="-64" rx="22" ry="15" transform="rotate(14 20 -64)"/>
+                        <ellipse cx="-14" cy="32" rx="31" ry="20" transform="rotate(-8 -14 32)"/>
+                        <ellipse cx="58" cy="-6" rx="20" ry="14" transform="rotate(24 58 -6)"/>
+                        <ellipse cx="-64" cy="44" rx="18" ry="13"/>
+                        <ellipse cx="38" cy="66" rx="21" ry="14" transform="rotate(-12 38 66)"/>
                       </g>
-                      <g fill="#8C1F14">
-                        <circle cx="-84" cy="-12" r="19"/><circle cx="-14" cy="-56" r="16"/>
-                        <circle cx="46" cy="36" r="20"/><circle cx="-46" cy="78" r="15"/>
-                        <circle cx="86" cy="-56" r="14"/>
+                      <g fill="#9E2316">
+                        <circle cx="-68" cy="-10" r="16"/><circle cx="-4" cy="-45" r="14"/>
+                        <circle cx="41" cy="31" r="17"/><circle cx="-37" cy="65" r="13"/>
+                        <circle cx="70" cy="-46" r="12"/><circle cx="-85" cy="34" r="10"/>
                       </g>
-                      <g fill="#2F7D32">
-                        <path d="M-40 -6c14-20 42-24 52-12-10 20-38 26-52 12Z"/>
-                        <path d="M24 70c12-18 38-22 48-10-10 18-36 24-48 10Z"/>
+                      <g fill="#D4573A" opacity=".6">
+                        <circle cx="-68" cy="-13" r="16"/><circle cx="-4" cy="-48" r="14"/><circle cx="41" cy="28" r="17"/>
                       </g>
-                      <circle r="152" fill="none" stroke="#00000022" stroke-width="10"/>
+                      <g fill="#2F8A36">
+                        <path d="M-32 -4c11-16 34-19 42-10-8 16-31 21-42 10Z"/>
+                        <path d="M20 56c10-15 31-18 39-9-8 15-29 20-39 9Z"/>
+                        <path d="M-76 -56c11-10 28-7 32 1-9 10-26 11-32-1Z"/>
+                      </g>
+                      <circle r="116" fill="none" stroke="#000" stroke-opacity=".16" stroke-width="9"/>
                     </g>
-                    <!-- véu escuro: o texto tem de ser lido de longe, mesmo por cima da foto -->
-                    <rect width="300" height="340" fill="url(#pz-veu)"/>
-                    <!-- marca do anunciante, oferta e chamada -->
-                    <text x="28" y="48" font-family="Manrope, sans-serif" font-size="17" font-weight="800" letter-spacing="2.4" fill="#F6C76A">PIZZARIA</text>
-                    <text x="28" y="72" font-family="Manrope, sans-serif" font-size="17" font-weight="800" letter-spacing="2.4" fill="#F6C76A">FORNO DE PEDRA</text>
-                    <text x="26" y="168" font-family="Manrope, sans-serif" font-size="96" font-weight="800" letter-spacing="-4" fill="#fff">2 POR 1</text>
-                    <text x="30" y="206" font-family="Manrope, sans-serif" font-size="30" font-weight="700" letter-spacing="1" fill="#FFD9A0">NAS TERÇAS</text>
-                    <g transform="translate(28 236)">
-                      <rect width="214" height="44" rx="22" fill="#C8FF31"/>
-                      <text x="22" y="29" font-family="Manrope, sans-serif" font-size="19" font-weight="800" fill="#111417">Peça pelo WhatsApp</text>
+                    <rect width="400" height="340" fill="url(#pz-veu)"/>
+                    <rect y="210" width="400" height="130" fill="url(#pz-baixo)"/>
+                    <!-- marca pequena, oferta grande: é assim que se lê de passagem -->
+                    <text x="26" y="46" font-family="Manrope, sans-serif" font-size="15" font-weight="800" letter-spacing="3" fill="#F3B45C">FORNO DE PEDRA</text>
+                    <text x="24" y="134" font-family="Manrope, sans-serif" font-size="74" font-weight="800" letter-spacing="-3.5" fill="#fff">2 POR 1</text>
+                    <text x="26" y="168" font-family="Manrope, sans-serif" font-size="21" font-weight="700" letter-spacing="1.6" fill="#FFCE8E">TERÇA E QUARTA</text>
+                    <g transform="translate(26 232)">
+                      <rect width="152" height="52" rx="26" fill="#C8FF31"/>
+                      <text x="22" y="34" font-family="Manrope, sans-serif" font-size="25" font-weight="800" fill="#111417">R$ 39,90</text>
+                      <text x="166" y="34" font-family="Manrope, sans-serif" font-size="15" font-weight="700" fill="#FFCE8E">a grande</text>
                     </g>
-                    <g transform="translate(28 296)" fill="#ffffff" opacity=".9">
-                      <rect width="30" height="30" rx="4" fill="#ffffff"/>
-                      <g fill="#53100E">
-                        <rect x="4" y="4" width="8" height="8"/><rect x="18" y="4" width="8" height="8"/><rect x="4" y="18" width="8" height="8"/>
-                        <rect x="14" y="14" width="4" height="4"/><rect x="22" y="18" width="4" height="4"/><rect x="18" y="24" width="4" height="4"/>
-                      </g>
-                      <text x="40" y="20" font-family="Manrope, sans-serif" font-size="13" font-weight="600" fill="#F3D7B0">aponte e peça</text>
-                    </g>
+                    <text x="26" y="312" font-family="Manrope, sans-serif" font-size="15" font-weight="600" fill="#C6A98E">Peça pelo WhatsApp · entrega em 40 min</text>
                   </svg>
                 </div>
 
@@ -153,84 +160,88 @@
                   <svg viewBox="0 0 400 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
                     <defs>
                       <linearGradient id="im-ceu" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0" stop-color="#0B3B2E"/><stop offset=".55" stop-color="#0C5C3F"/><stop offset="1" stop-color="#063024"/>
+                        <stop offset="0" stop-color="#15324F"/><stop offset=".4" stop-color="#2A6076"/>
+                        <stop offset=".66" stop-color="#E08A4A"/><stop offset=".86" stop-color="#F7B96E"/><stop offset="1" stop-color="#FFD79B"/>
                       </linearGradient>
                       <linearGradient id="im-torre" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stop-color="#E8EFE9"/><stop offset="1" stop-color="#B6C6BB"/>
+                        <stop offset="0" stop-color="#F2F5F3"/><stop offset=".65" stop-color="#CBD6CE"/><stop offset="1" stop-color="#9DAFA3"/>
                       </linearGradient>
-                      <linearGradient id="im-veu" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stop-color="#06281E" stop-opacity=".97"/>
-                        <stop offset=".6" stop-color="#06281E" stop-opacity=".85"/>
-                        <stop offset="1" stop-color="#06281E" stop-opacity="0"/>
+                      <linearGradient id="im-veu" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stop-color="#06131C" stop-opacity=".9"/>
+                        <stop offset=".3" stop-color="#06131C" stop-opacity=".58"/>
+                        <stop offset=".62" stop-color="#06131C" stop-opacity="0"/>
+                        <stop offset=".84" stop-color="#06131C" stop-opacity=".6"/>
+                        <stop offset="1" stop-color="#06131C" stop-opacity=".92"/>
                       </linearGradient>
                     </defs>
                     <rect width="400" height="340" fill="url(#im-ceu)"/>
-                    <circle cx="338" cy="64" r="44" fill="#C8FF31" opacity=".2"/>
-                    <!-- skyline: as torres do lançamento -->
+                    <circle cx="312" cy="226" r="40" fill="#FFE2B4" opacity=".95"/>
+                    <circle cx="312" cy="226" r="78" fill="#FFD79B" opacity=".25"/>
+                    <!-- o empreendimento: torres contra o fim de tarde -->
                     <g>
-                      <rect x="262" y="120" width="70" height="220" rx="6" fill="url(#im-torre)"/>
-                      <rect x="340" y="168" width="54" height="172" rx="6" fill="#9FB4A6"/>
-                      <rect x="224" y="206" width="34" height="134" rx="5" fill="#86A294"/>
-                      <g fill="#0B3B2E" opacity=".55">
-                        <rect x="274" y="136" width="14" height="12" rx="2"/><rect x="296" y="136" width="14" height="12" rx="2"/>
-                        <rect x="274" y="160" width="14" height="12" rx="2"/><rect x="296" y="160" width="14" height="12" rx="2"/>
-                        <rect x="274" y="184" width="14" height="12" rx="2"/><rect x="296" y="184" width="14" height="12" rx="2"/>
-                        <rect x="274" y="208" width="14" height="12" rx="2"/><rect x="296" y="208" width="14" height="12" rx="2"/>
-                        <rect x="274" y="232" width="14" height="12" rx="2"/><rect x="296" y="232" width="14" height="12" rx="2"/>
-                        <rect x="352" y="186" width="13" height="11" rx="2"/><rect x="372" y="186" width="13" height="11" rx="2"/>
-                        <rect x="352" y="210" width="13" height="11" rx="2"/><rect x="372" y="210" width="13" height="11" rx="2"/>
-                        <rect x="352" y="234" width="13" height="11" rx="2"/><rect x="372" y="234" width="13" height="11" rx="2"/>
+                      <rect x="150" y="96" width="92" height="244" rx="7" fill="url(#im-torre)"/>
+                      <rect x="252" y="150" width="70" height="190" rx="7" fill="#C2CEC6"/>
+                      <rect x="330" y="192" width="54" height="148" rx="6" fill="#A4B5AA"/>
+                      <rect x="104" y="214" width="40" height="126" rx="5" fill="#93A69B"/>
+                      <g fill="#16323F" opacity=".5">
+                        <rect x="164" y="116" width="18" height="14" rx="2"/><rect x="190" y="116" width="18" height="14" rx="2"/><rect x="216" y="116" width="14" height="14" rx="2"/>
+                        <rect x="164" y="146" width="18" height="14" rx="2"/><rect x="190" y="146" width="18" height="14" rx="2"/><rect x="216" y="146" width="14" height="14" rx="2"/>
+                        <rect x="164" y="176" width="18" height="14" rx="2"/><rect x="190" y="176" width="18" height="14" rx="2"/><rect x="216" y="176" width="14" height="14" rx="2"/>
+                        <rect x="164" y="206" width="18" height="14" rx="2"/><rect x="190" y="206" width="18" height="14" rx="2"/><rect x="216" y="206" width="14" height="14" rx="2"/>
+                        <rect x="264" y="168" width="16" height="13" rx="2"/><rect x="290" y="168" width="16" height="13" rx="2"/>
+                        <rect x="264" y="196" width="16" height="13" rx="2"/><rect x="290" y="196" width="16" height="13" rx="2"/>
+                        <rect x="342" y="210" width="14" height="12" rx="2"/><rect x="364" y="210" width="14" height="12" rx="2"/>
                       </g>
-                      <g fill="#C8FF31">
-                        <rect x="274" y="256" width="14" height="12" rx="2"/><rect x="296" y="280" width="14" height="12" rx="2"/>
-                        <rect x="352" y="258" width="13" height="11" rx="2"/><rect x="230" y="236" width="12" height="11" rx="2"/>
+                      <g fill="#FFD9A0">
+                        <rect x="164" y="236" width="18" height="14" rx="2"/><rect x="216" y="176" width="14" height="14" rx="2"/>
+                        <rect x="290" y="224" width="16" height="13" rx="2"/><rect x="342" y="238" width="14" height="12" rx="2"/>
+                        <rect x="190" y="266" width="18" height="14" rx="2"/>
                       </g>
                     </g>
-                    <rect width="330" height="340" fill="url(#im-veu)"/>
-                    <text x="28" y="52" font-family="Manrope, sans-serif" font-size="16" font-weight="800" letter-spacing="2.6" fill="#C8FF31">IMOBILIÁRIA CASA NOVA</text>
-                    <text x="26" y="124" font-family="Manrope, sans-serif" font-size="46" font-weight="800" letter-spacing="-1.8" fill="#fff">Apartamentos</text>
-                    <text x="26" y="170" font-family="Manrope, sans-serif" font-size="46" font-weight="800" letter-spacing="-1.8" fill="#fff">no Cambuí</text>
-                    <text x="28" y="206" font-family="Manrope, sans-serif" font-size="20" font-weight="600" fill="#BFE0CC">2 e 3 dormitórios</text>
-                    <g transform="translate(28 232)">
-                      <rect width="166" height="42" rx="21" fill="#ffffff"/>
-                      <text x="20" y="28" font-family="Manrope, sans-serif" font-size="18" font-weight="800" fill="#0B3B2E">Visite o decorado</text>
+                    <rect width="400" height="340" fill="url(#im-veu)"/>
+                    <text x="26" y="46" font-family="Manrope, sans-serif" font-size="15" font-weight="800" letter-spacing="3" fill="#C8FF31">CASA NOVA</text>
+                    <text x="24" y="120" font-family="Manrope, sans-serif" font-size="58" font-weight="800" letter-spacing="-2.6" fill="#fff">3 dorms</text>
+                    <text x="24" y="172" font-family="Manrope, sans-serif" font-size="58" font-weight="800" letter-spacing="-2.6" fill="#fff">no Cambuí</text>
+                    <g transform="translate(26 286)">
+                      <text y="0" font-family="Manrope, sans-serif" font-size="15" font-weight="700" letter-spacing="1" fill="#CFE6D6">ENTRADA FACILITADA</text>
+                      <text y="30" font-family="Manrope, sans-serif" font-size="27" font-weight="800" fill="#C8FF31">a partir de R$ 650 mil</text>
                     </g>
-                    <text x="28" y="320" font-family="Manrope, sans-serif" font-size="14" font-weight="600" fill="#8FB7A1">CRECI 00000-J</text>
                   </svg>
                 </div>
 
                 <div class="anuncio a3">
                   <svg viewBox="0 0 400 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
                     <defs>
-                      <linearGradient id="ac-fundo" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0" stop-color="#101418"/><stop offset=".6" stop-color="#1B2026"/><stop offset="1" stop-color="#0A0D10"/>
-                      </linearGradient>
+                      <radialGradient id="ac-luz" cx="72%" cy="34%" r="78%">
+                        <stop offset="0" stop-color="#2A323B"/><stop offset=".7" stop-color="#12171C"/><stop offset="1" stop-color="#07090C"/>
+                      </radialGradient>
                       <linearGradient id="ac-veu" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stop-color="#0A0D10" stop-opacity=".96"/>
-                        <stop offset=".6" stop-color="#0A0D10" stop-opacity=".8"/>
-                        <stop offset="1" stop-color="#0A0D10" stop-opacity="0"/>
+                        <stop offset="0" stop-color="#07090C" stop-opacity=".92"/>
+                        <stop offset=".45" stop-color="#07090C" stop-opacity=".35"/>
+                        <stop offset="1" stop-color="#07090C" stop-opacity="0"/>
                       </linearGradient>
                     </defs>
-                    <rect width="400" height="340" fill="url(#ac-fundo)"/>
-                    <path d="M400 0 285 340h115Z" fill="#C8FF31" opacity=".16"/>
-                    <!-- halteres -->
-                    <g transform="translate(296 244) rotate(-24) scale(.82)" fill="#D7DCE2">
-                      <rect x="-96" y="-13" width="192" height="26" rx="13" fill="#9AA3AD"/>
-                      <rect x="-126" y="-40" width="30" height="80" rx="10"/>
-                      <rect x="-158" y="-28" width="26" height="56" rx="9" fill="#C8FF31"/>
-                      <rect x="96" y="-40" width="30" height="80" rx="10"/>
-                      <rect x="132" y="-28" width="26" height="56" rx="9" fill="#C8FF31"/>
+                    <rect width="400" height="340" fill="url(#ac-luz)"/>
+                    <g opacity=".14" fill="#C8FF31">
+                      <path d="M330 -20 230 360h44L374 -20Z"/>
+                      <path d="M392 -20 292 360h30L422 -20Z"/>
                     </g>
-                    <rect width="320" height="340" fill="url(#ac-veu)"/>
-                    <text x="28" y="52" font-family="Manrope, sans-serif" font-size="16" font-weight="800" letter-spacing="2.6" fill="#C8FF31">ACADEMIA FORÇA TOTAL</text>
-                    <text x="26" y="136" font-family="Manrope, sans-serif" font-size="58" font-weight="800" letter-spacing="-2.4" fill="#fff">Primeira</text>
-                    <text x="26" y="192" font-family="Manrope, sans-serif" font-size="58" font-weight="800" letter-spacing="-2.4" fill="#C8FF31">aula grátis</text>
-                    <text x="28" y="228" font-family="Manrope, sans-serif" font-size="22" font-weight="600" fill="#AEB6C0">Musculação e funcional</text>
-                    <g transform="translate(28 252)">
-                      <rect width="162" height="42" rx="21" fill="#C8FF31"/>
-                      <text x="20" y="28" font-family="Manrope, sans-serif" font-size="18" font-weight="800" fill="#111417">Matrícula zero</text>
+                    <!-- selo de oferta, como adesivo de vitrine -->
+                    <g transform="translate(320 106) rotate(-11)">
+                      <circle r="66" fill="#C8FF31"/>
+                      <circle r="58" fill="none" stroke="#111417" stroke-opacity=".25" stroke-width="2" stroke-dasharray="5 6"/>
+                      <text y="-12" text-anchor="middle" font-family="Manrope, sans-serif" font-size="22" font-weight="800" fill="#111417">1ª AULA</text>
+                      <text y="22" text-anchor="middle" font-family="Manrope, sans-serif" font-size="33" font-weight="800" letter-spacing="-1" fill="#111417">GRÁTIS</text>
                     </g>
-                    <text x="28" y="322" font-family="Manrope, sans-serif" font-size="14" font-weight="600" fill="#7E8793">Rua das Palmeiras, 120</text>
+                    <rect width="400" height="340" fill="url(#ac-veu)"/>
+                    <text x="26" y="46" font-family="Manrope, sans-serif" font-size="15" font-weight="800" letter-spacing="3" fill="#C8FF31">FORÇA TOTAL</text>
+                    <text x="24" y="134" font-family="Manrope, sans-serif" font-size="52" font-weight="800" letter-spacing="-2.2" fill="#fff">Comece</text>
+                    <text x="24" y="186" font-family="Manrope, sans-serif" font-size="52" font-weight="800" letter-spacing="-2.2" fill="#fff">hoje</text>
+                    <g transform="translate(26 226)">
+                      <rect width="186" height="48" rx="24" fill="#fff"/>
+                      <text x="22" y="31" font-family="Manrope, sans-serif" font-size="20" font-weight="800" fill="#111417">Matrícula zero</text>
+                    </g>
+                    <text x="26" y="312" font-family="Manrope, sans-serif" font-size="15" font-weight="600" fill="#9AA3AD">Musculação, funcional e dança</text>
                   </svg>
                 </div>
               </div>

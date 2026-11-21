@@ -155,8 +155,8 @@ a{ color: inherit; }
 .zona-aviso .assinatura{ margin-top: auto; font-size: 9px; color: #868D98; border-top: 1px solid rgba(255,255,255,.12); padding-top: 6px; }
 .zona-anuncio{ position: relative; border-top: 2px solid var(--lime); overflow: hidden; }
 .anuncio{ position: absolute; inset: 0; opacity: 0; }
-/* A peça preenche a área toda, como um criativo de verdade na tela. */
-.anuncio svg{ width: 100%; height: 100%; display: block; }
+/* A peça preenche a área toda, como um criativo de verdade na tela — desenhada ou enviada. */
+.anuncio svg, .anuncio img{ width: 100%; height: 100%; display: block; object-fit: cover; }
 .anuncio.a1{ animation: girar 12s infinite; }
 .anuncio.a2{ animation: girar 12s infinite 4s; }
 .anuncio.a3{ animation: girar 12s infinite 8s; }

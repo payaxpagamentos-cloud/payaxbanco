@@ -56,6 +56,21 @@ for (const botao of document.querySelectorAll('[data-intencao]')) {
 
 document.getElementById('ano').textContent = String(new Date().getFullYear());
 
+// ----------------------------------------------------------------- Artes reais dos clientes
+/**
+ * Se a empresa listou arquivos em data-criativos, eles entram no lugar das peças de exemplo.
+ * É o jeito de a capa mostrar anúncio de cliente de verdade — que é o que vende — sem mexer em código.
+ * O arquivo que não carregar simplesmente não troca nada: a peça desenhada continua ali.
+ */
+for (const [i, arquivo] of (document.body.dataset.criativos ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 3).entries()) {
+  const alvo = document.querySelector(`.anuncio.a${i + 1}`);
+  if (!alvo) continue;
+  const img = new Image();
+  img.src = `img/criativos/${arquivo}`;
+  img.alt = '';
+  img.addEventListener('load', () => alvo.replaceChildren(img));
+}
+
 // ----------------------------------------------------------------- WhatsApp da empresa
 /** Link do WhatsApp com a mensagem pronta (o mesmo formato usado no painel). */
 function linkWhats(numero, texto) {
