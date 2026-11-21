@@ -19,6 +19,36 @@ function criarApi(db) {
     res.json({ nome: c.nome_plataforma, slogan: c.slogan });
   });
 
+  /**
+   * Formulário do site: quem pede contato entra direto no CRM como lead.
+   * É público de propósito (não há login para quem ainda não é cliente), então tem limite por IP
+   * e grava só o que o formulário manda — nada daqui vai para a tela sem alguém da equipe aprovar.
+   */
+  api.post('/contato', require('./lib/limitador').limitar({ janelaMs: 60_000, maximo: 5 }), (req, res) => {
+    const v = require('./lib/validacao');
+    const { agora } = require('./db');
+    const d = {
+      nome: v.texto(req.body.nome, 'o nome', 120),
+      tipo: v.opcao(req.body.tipo ?? 'anunciante', 'o tipo', ['anunciante', 'ponto']),
+      contato: v.opcional(req.body.contato, 'o contato', 120),
+      email: req.body.email ? v.email(req.body.email) : null,
+      telefone: v.opcional(req.body.telefone, 'o telefone', 20),
+      cidade: v.opcional(req.body.cidade, 'a cidade', 80),
+      mensagem: v.opcional(req.body.mensagem, 'a mensagem', 500),
+      origem: 'site',
+      criado_em: agora(),
+      atualizado_em: agora(),
+    };
+    if (!d.email && !d.telefone) throw new ErroNegocio('Deixe um e-mail ou um telefone para a gente responder.', 422);
+    const id = Number(db.prepare(`INSERT INTO leads (${Object.keys(d).join(', ')})
+      VALUES (${Object.keys(d).map(() => '?').join(', ')})`).run(...Object.values(d)).lastInsertRowid);
+    if (d.mensagem) {
+      db.prepare("INSERT INTO lead_interacoes (lead_id, tipo, texto, criado_em) VALUES (?, 'nota', ?, ?)")
+        .run(id, `Pedido pelo site: ${d.mensagem}`, agora());
+    }
+    res.status(201).json({ ok: true, mensagem: 'Recebemos o seu contato. A equipe responde em breve.' });
+  });
+
   api.use('/auth', require('./routes/auth')(db, autenticado));
   // A TV fala por aqui: pareamento e, depois, com o token do aparelho.
   api.use('/player', require('./routes/player')(db));

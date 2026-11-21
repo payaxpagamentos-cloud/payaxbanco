@@ -270,6 +270,48 @@ function criar(db) {
       VALUES (?, ?, ?, ?, ?, ?, ?)`).run(cidade, uf, temp, max, min, codigo, new Date().toISOString());
   }
 
+  // CRM: o funil do comercial — quem ainda não é cliente, em que pé está e o que ficou combinado.
+  const equipeId = db.prepare("SELECT id FROM usuarios WHERE perfil = 'operador' LIMIT 1").get()?.id ?? null;
+  const LEADS = [
+    { nome: 'Rede Pão Dourado', tipo: 'anunciante', contato: 'Marcos Lima', telefone: '19988770011', cidade: 'Campinas', uf: 'SP',
+      origem: 'site', etapa: 'negociacao', valor: 450_000, passo: 'Fechar o desconto do trimestre', dias: 1,
+      mensagem: 'Vi a tela no elevador do meu prédio e quero anunciar nas três lojas.',
+      conversas: [['ligacao', 'Conversa com o Marcos: quer 3 meses em condomínios do Cambuí.'], ['reuniao', 'Reunião no escritório. Pediu desconto para pagamento trimestral.']] },
+    { nome: 'Edifício Vista Alegre', tipo: 'ponto', contato: 'Síndica Helena', telefone: '19988770022', cidade: 'Campinas', uf: 'SP',
+      origem: 'indicacao', etapa: 'proposta', valor: 0, passo: 'Levar o contrato de parceria na assembleia', dias: 4,
+      conversas: [['visita', 'Visita ao prédio: dois elevadores sociais e hall com boa circulação.']] },
+    { nome: 'Clínica Sorriso', tipo: 'anunciante', contato: 'Dra. Paula', email: 'contato@clinicasorriso.com.br', cidade: 'Valinhos', uf: 'SP',
+      origem: 'prospeccao', etapa: 'contato', valor: 120_000, passo: 'Enviar o mídia kit', dias: -2,
+      conversas: [['email', 'Mandei o mídia kit. Aguardando retorno.']] },
+    { nome: 'Auto Posto Central', tipo: 'anunciante', contato: 'Seu Jorge', telefone: '19988770033', cidade: 'Campinas', uf: 'SP',
+      origem: 'evento', etapa: 'novo', valor: 90_000, passo: null, dias: null, conversas: [] },
+    { nome: 'Condomínio Parque das Flores', tipo: 'ponto', contato: 'Zelador Beto', telefone: '19988770044', cidade: 'Valinhos', uf: 'SP',
+      origem: 'site', etapa: 'novo', valor: 0, passo: 'Ligar para o síndico', dias: 0,
+      mensagem: 'O condomínio tem interesse em colocar tela no hall.', conversas: [] },
+  ];
+  for (const l of LEADS) {
+    const id = inserir(`INSERT INTO leads (nome, tipo, contato, email, telefone, cidade, uf, origem, etapa, responsavel_id,
+        valor_estimado_centavos, proximo_passo, proximo_em, mensagem, criado_em, atualizado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      l.nome, l.tipo, l.contato ?? null, l.email ?? null, l.telefone ?? null, l.cidade, l.uf, l.origem, l.etapa, equipeId,
+      l.valor, l.passo, l.dias === null ? null : somarDias(hoje(), l.dias), l.mensagem ?? null, criado, criado);
+    if (l.mensagem) {
+      db.prepare("INSERT INTO lead_interacoes (lead_id, tipo, texto, criado_em) VALUES (?, 'nota', ?, ?)")
+        .run(id, `Pedido pelo site: ${l.mensagem}`, criado);
+    }
+    for (const [tipo, texto] of l.conversas) {
+      db.prepare('INSERT INTO lead_interacoes (lead_id, tipo, texto, criado_por, criado_em) VALUES (?, ?, ?, ?, ?)')
+        .run(id, tipo, texto, equipeId, criado);
+    }
+  }
+  // Um ganho e um perdido, para o quadro mostrar os dois fins possíveis.
+  inserir(`INSERT INTO leads (nome, tipo, contato, telefone, cidade, uf, origem, etapa, responsavel_id, valor_estimado_centavos,
+      anunciante_id, ganho_em, criado_em, atualizado_em) VALUES (?, 'anunciante', ?, ?, 'Campinas', 'SP', 'indicacao', 'ganho', ?, ?, ?, ?, ?, ?)`,
+    'Pizzaria Forno de Pedra', 'Luigi', '19988770055', equipeId, 300_000, anunciantes[1].id, somarDias(hoje(), -12), criado, criado);
+  inserir(`INSERT INTO leads (nome, tipo, contato, telefone, cidade, uf, origem, etapa, responsavel_id, valor_estimado_centavos,
+      motivo, criado_em, atualizado_em) VALUES (?, 'anunciante', ?, ?, 'Valinhos', 'SP', 'prospeccao', 'perdido', ?, ?, ?, ?, ?)`,
+    'Loja do Celular', 'Rafael', '19988770066', equipeId, 60_000, 'Achou caro para uma loja só.', criado, criado);
+
   // Propostas: o funil do comercial — uma na mesa do cliente, uma recusada e uma que virou contrato.
   const propostasLib = require('./lib/propostas');
   const proposta = (circuitoIdx, anuncianteIdx, meses, desconto, observacao) => propostasLib.criar(db, {

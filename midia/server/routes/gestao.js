@@ -449,6 +449,8 @@ module.exports = (db) => {
       telas: db.prepare(`SELECT t.id, t.nome, t.orientacao, t.local_id, l.nome AS local_nome, t.ultimo_contato FROM telas t JOIN locais l ON l.id = t.local_id
         WHERE t.status <> 'inativa' ORDER BY l.nome, t.nome`).all().map((t) => ({ ...t, online: estaOnline(t, c) })),
       cidades: db.prepare("SELECT DISTINCT cidade FROM locais WHERE cidade <> '' ORDER BY cidade").all().map((x) => x.cidade),
+      // Quem pode ser responsável por um lead no CRM.
+      equipe: db.prepare("SELECT id, nome FROM usuarios WHERE perfil IN ('master','operador') AND ativo = 1 ORDER BY nome").all(),
       competencias: db.prepare('SELECT DISTINCT substr(data, 1, 7) AS competencia FROM resumo_dia ORDER BY competencia DESC LIMIT 24').all().map((x) => x.competencia),
     });
   });

@@ -239,6 +239,30 @@ select{ appearance: none; padding-right: 34px; cursor: pointer;
 .moldura .foto{ position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }
 .moldura .foto img{ width: 100%; height: 100%; object-fit: cover; display: block; }
 
+/* CRM: o quadro do funil, os cartões de lead e a linha do tempo das conversas */
+.funil{ display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; align-items: flex-start; }
+.coluna-funil{ flex: 1 0 230px; max-width: 320px; background: var(--surface-2); border-radius: var(--radius); padding: 12px; min-width: 0; }
+.coluna-funil.fechada{ opacity: .8; flex: 0 0 186px; }
+.coluna-funil .cabeca-coluna{ display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.coluna-funil .conta{ background: var(--surface); border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 700; color: var(--text-2); }
+.coluna-funil .valor-coluna{ font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+.coluna-funil .cartoes{ display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.cartao-lead{ display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--cor); border-radius: 10px; padding: 10px 12px;
+  font: inherit; color: var(--text); transition: transform .12s, box-shadow .12s; }
+.cartao-lead:hover{ transform: translateY(-1px); box-shadow: var(--shadow); }
+.cartao-lead.atrasado{ border-left-color: var(--erro); }
+.cartao-lead .valor{ font-weight: 700; font-size: 13.5px; }
+.cartao-lead .proximo{ display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-2); margin-top: 2px; }
+.cartao-lead svg{ width: 15px; height: 15px; flex: none; color: var(--text-3); }
+.cartao-lead .proximo svg{ width: 13px; height: 13px; color: inherit; }
+.cartao-lead .proximo.tarde{ color: var(--erro); font-weight: 700; }
+.cartao-lead .proximo.pendente{ color: var(--aviso); }
+.cartao-lead strong{ overflow-wrap: anywhere; }
+.linha-tempo{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.linha-tempo li{ display: flex; gap: 14px; border-left: 2px solid var(--border); padding-left: 14px; margin-left: 4px; }
+.linha-tempo .quando{ flex: none; width: 118px; font-size: 11.5px; color: var(--text-3); padding-top: 2px; }
+
 /* Prova visual: a última foto que a TV mandou do que está na tela */
 .foto-tela{ display: flex; gap: 14px; align-items: flex-start; background: var(--surface-2); border-radius: var(--radius-sm); padding: 12px; }
 .foto-tela .quadro{ flex: none; width: 260px; border-radius: 8px; overflow: hidden; background: #000; display: grid; place-items: center; min-height: 90px; }

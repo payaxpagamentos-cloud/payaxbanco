@@ -376,6 +376,47 @@ CREATE TABLE IF NOT EXISTS clima (
   PRIMARY KEY (cidade, uf)
 );
 
+-- CRM: quem ainda não é cliente. Um lead pode ser quem quer anunciar ou um condomínio que quer tela.
+-- É de onde nascem a proposta, o contrato e a campanha — e, do outro lado, o ponto novo na rede.
+CREATE TABLE IF NOT EXISTS leads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'anunciante' CHECK (tipo IN ('anunciante','ponto')),
+  contato TEXT,
+  email TEXT,
+  telefone TEXT,
+  cidade TEXT,
+  uf TEXT,
+  origem TEXT NOT NULL DEFAULT 'prospeccao' CHECK (origem IN ('site','indicacao','prospeccao','evento','outro')),
+  etapa TEXT NOT NULL DEFAULT 'novo' CHECK (etapa IN ('novo','contato','proposta','negociacao','ganho','perdido')),
+  responsavel_id INTEGER REFERENCES usuarios(id),
+  valor_estimado_centavos INTEGER NOT NULL DEFAULT 0 CHECK (valor_estimado_centavos >= 0),
+  -- O próximo passo combinado e quando: é o que impede o lead de morrer esquecido numa coluna.
+  proximo_passo TEXT,
+  proximo_em TEXT,
+  mensagem TEXT,
+  observacao TEXT,
+  motivo TEXT,
+  anunciante_id INTEGER REFERENCES anunciantes(id),
+  local_id INTEGER REFERENCES locais(id),
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  atualizado_em TEXT NOT NULL,
+  ganho_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_leads_etapa ON leads (etapa, proximo_em);
+
+-- Cada conversa com o lead: o histórico que faz a próxima ligação começar de onde a última parou.
+CREATE TABLE IF NOT EXISTS lead_interacoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL DEFAULT 'nota' CHECK (tipo IN ('nota','ligacao','email','whatsapp','reuniao','visita','etapa')),
+  texto TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_interacoes_lead ON lead_interacoes (lead_id, criado_em);
+
 -- Propostas comerciais. A proposta guarda o CÁLCULO DO DIA em que foi feita (a coluna folha, um JSON):
 -- a rede muda toda semana, e reimprimir uma proposta de dois meses atrás tem de mostrar o que foi oferecido,
 -- não o inventário de hoje. Quando o cliente aceita, ela vira contrato e campanha sem ninguém redigitar nada.
@@ -621,6 +662,7 @@ const COLUNAS_NOVAS = [
   ['faturas', 'contrato_id', 'INTEGER REFERENCES contratos(id)'],
   ['contratos', 'reajuste_meses', 'INTEGER NOT NULL DEFAULT 12'], ['contratos', 'reajuste_percentual', 'INTEGER NOT NULL DEFAULT 0'],
   ['contratos', 'ultimo_reajuste', 'TEXT'], ['contratos', 'renovado_em', 'TEXT'], ['contratos', 'renovacoes', 'INTEGER NOT NULL DEFAULT 0'],
+  ['propostas', 'lead_id', 'INTEGER REFERENCES leads(id)'],
   ['locais', 'latitude', 'REAL'], ['locais', 'longitude', 'REAL'],
   ['comunicados', 'evento_em', 'TEXT'], ['comunicados', 'evento_hora', 'TEXT'],
   ['telas', 'foto_arquivo', 'TEXT'], ['telas', 'foto_em', 'TEXT'], ['telas', 'foto_item', 'TEXT'],

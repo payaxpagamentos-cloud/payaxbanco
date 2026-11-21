@@ -870,3 +870,126 @@ function somarMeses12(data) {
   const [a, m, d] = data.split('-').map(Number);
   return new Date(Date.UTC(a, m - 1 + 12, Math.min(d, 28))).toISOString().slice(0, 10);
 }
+
+/**
+ * O CRM é o que acontece antes de existir cliente: com quem estamos falando, o que ficou combinado
+ * para hoje e o que disso virou contrato. Inclusive o que chega pelo formulário do site.
+ */
+test('CRM: do lead ao contrato, sem redigitar nada', async (t) => {
+  const { iniciar: iniciarApi, dia: diaRel } = require('./helpers');
+  const api = await iniciarApi();
+  t.after(api.fechar);
+  const master = await api.login();
+
+  // Um circuito para a proposta ter o que vender.
+  const ponto = (await api.post('/painel/locais', {
+    nome: 'Edifício Funil', categoria: 'condominio_residencial', cidade: 'Campinas', uf: 'SP', publico_dia: 800,
+  }, master)).dados.id;
+  await api.post('/painel/telas', { local_id: ponto, nome: 'Elevador', orientacao: 'retrato' }, master);
+  const circuito = (await api.post('/painel/circuitos', {
+    nome: 'Residencial', valor_mes_centavos: 300_000, insercoes_hora: 6,
+    alvos: [{ tipo: 'categoria', valor: 'condominio_residencial' }],
+  }, master)).dados.id;
+
+  let lead;
+
+  await t.test('o formulário do site cai no funil como lead', async () => {
+    const r = await api.post('/contato', {
+      nome: 'Padaria do Bairro', tipo: 'anunciante', contato: 'Dona Ana', telefone: '19999990000',
+      cidade: 'Campinas', mensagem: 'Quero anunciar nos prédios perto da padaria.',
+    });
+    assert.equal(r.status, 201);
+    assert.match(r.dados.mensagem, /Recebemos/);
+
+    assert.equal((await api.post('/contato', { nome: 'Sem contato' })).status, 422, 'sem e-mail nem telefone não dá para responder');
+
+    const d = (await api.get('/painel/crm/funil', master)).dados;
+    const novo = d.etapas.find((e) => e.etapa === 'novo');
+    assert.equal(novo.total, 1);
+    lead = novo.itens[0];
+    assert.equal(lead.origem, 'site');
+    assert.equal(lead.nome, 'Padaria do Bairro');
+
+    const ficha = (await api.get(`/painel/crm/leads/${lead.id}`, master)).dados;
+    assert.match(ficha.interacoes[0].texto, /Quero anunciar nos prédios/, 'a mensagem do site vira a primeira anotação');
+  });
+
+  await t.test('a conversa anda e o próximo passo fica marcado', async () => {
+    const r = await api.post(`/painel/crm/leads/${lead.id}/interacoes`, {
+      tipo: 'ligacao', texto: 'Falei com a Ana. Pediu proposta de 3 meses.',
+      proximo_passo: 'Enviar proposta', proximo_em: diaRel(2),
+    }, master);
+    assert.equal(r.status, 201);
+    assert.equal(r.dados.proximo_em, diaRel(2));
+    assert.equal(r.dados.interacoes.length, 2);
+
+    await api.patch(`/painel/crm/leads/${lead.id}`, { etapa: 'contato', valor_estimado_centavos: 300_000 }, master);
+    const ficha = (await api.get(`/painel/crm/leads/${lead.id}`, master)).dados;
+    assert.equal(ficha.etapa, 'contato');
+    assert.ok(ficha.interacoes.some((i) => i.tipo === 'etapa'), 'a mudança de etapa entra no histórico');
+
+    assert.equal((await api.patch(`/painel/crm/leads/${lead.id}`, { etapa: 'ganho' }, master)).status, 422,
+      'ganhar é uma ação, não uma edição de campo');
+  });
+
+  await t.test('atrasado aparece em destaque e some quando a data é remarcada', async () => {
+    await api.patch(`/painel/crm/leads/${lead.id}`, { proximo_em: diaRel(-3) }, master);
+    const d = (await api.get('/painel/crm/funil', master)).dados;
+    assert.equal(d.totais.atrasados, 1);
+    assert.equal(d.agenda[0].id, lead.id);
+    assert.equal(d.agenda[0].atrasado, true);
+
+    await api.patch(`/painel/crm/leads/${lead.id}`, { proximo_em: diaRel(2) }, master);
+    assert.equal((await api.get('/painel/crm/funil', master)).dados.totais.atrasados, 0);
+  });
+
+  await t.test('a proposta nasce do lead e o funil anda sozinho', async () => {
+    const p = await api.post('/painel/propostas', { circuito_id: circuito, lead_id: lead.id, meses: 3 }, master);
+    assert.equal(p.status, 201, JSON.stringify(p.dados));
+    assert.equal(p.dados.lead_id, lead.id);
+
+    const ficha = (await api.get(`/painel/crm/leads/${lead.id}`, master)).dados;
+    assert.equal(ficha.etapa, 'proposta', 'gerar proposta move o lead de etapa');
+    assert.equal(ficha.propostas_lista.length, 1);
+
+    // Aceitar fecha o lead, cria o cliente e o contrato — tudo a partir do que já estava no CRM.
+    const aceita = (await api.post(`/painel/propostas/${p.dados.id}/aceitar`, {}, master)).dados;
+    assert.equal(aceita.status, 'aceita');
+    const depois = (await api.get(`/painel/crm/leads/${lead.id}`, master)).dados;
+    assert.equal(depois.etapa, 'ganho');
+    assert.equal(depois.cliente, 'Padaria do Bairro', 'o cliente nasceu do lead');
+    const contrato = (await api.get(`/painel/contratos/${aceita.contrato_id}`, master)).dados;
+    assert.equal(contrato.anunciante, 'Padaria do Bairro');
+    assert.equal(contrato.valor_centavos, 300_000);
+
+    assert.equal((await api.del(`/painel/crm/leads/${lead.id}`, {}, master)).status, 409, 'lead ganho é a origem de um cliente');
+  });
+
+  await t.test('um condomínio que pede tela vira ponto na rede', async () => {
+    const r = await api.post('/contato', { nome: 'Edifício Interessado', tipo: 'ponto', email: 'sindico@exemplo.com', cidade: 'Valinhos' });
+    assert.equal(r.status, 201);
+    const funil = (await api.get('/painel/crm/funil?tipo=ponto', master)).dados;
+    const novo = funil.etapas.find((e) => e.etapa === 'novo').itens[0];
+
+    const ganho = (await api.post(`/painel/crm/leads/${novo.id}/ganhar`, {}, master)).dados;
+    assert.equal(ganho.etapa, 'ganho');
+    assert.equal(ganho.ponto, 'Edifício Interessado');
+    const pontos = (await api.get('/painel/locais', master)).dados.itens;
+    assert.ok(pontos.some((p) => p.nome === 'Edifício Interessado'), 'o ponto entrou na rede para a equipe completar o cadastro');
+  });
+
+  await t.test('perder guarda o motivo, e reabrir traz de volta', async () => {
+    const novo = (await api.post('/painel/crm/leads', {
+      nome: 'Academia Teste', tipo: 'anunciante', telefone: '1933330000', origem: 'prospeccao', valor_estimado_centavos: 80_000,
+    }, master)).dados;
+    assert.equal(novo.etapa, 'novo');
+
+    const perdido = (await api.post(`/painel/crm/leads/${novo.id}/perder`, { motivo: 'Fechou com o concorrente' }, master)).dados;
+    assert.equal(perdido.etapa, 'perdido');
+    assert.equal(perdido.motivo, 'Fechou com o concorrente');
+    assert.ok(perdido.interacoes.some((i) => i.texto.includes('Fechou com o concorrente')));
+
+    assert.equal((await api.post(`/painel/crm/leads/${novo.id}/reabrir`, {}, master)).dados.etapa, 'contato');
+    assert.equal((await api.del(`/painel/crm/leads/${novo.id}`, {}, master)).status, 204);
+  });
+});

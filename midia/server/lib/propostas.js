@@ -162,10 +162,10 @@ function criar(db, dados, usuarioId = null) {
   const folha = calcular(db, Number(dados.circuito_id), dados);
   const numero = proximoNumero(db);
   const titulo = folha.anunciante ? `${folha.circuito.nome} — ${folha.anunciante.nome}` : folha.circuito.nome;
-  const id = Number(db.prepare(`INSERT INTO propostas (numero, anunciante_id, circuito_id, titulo, meses, desconto_percentual,
+  const id = Number(db.prepare(`INSERT INTO propostas (numero, anunciante_id, lead_id, circuito_id, titulo, meses, desconto_percentual,
       insercoes_hora, mes_centavos, total_centavos, valida_ate, observacao, folha, criado_por, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    numero, folha.anunciante?.id ?? null, folha.circuito.id, titulo, folha.investimento.meses, folha.investimento.desconto_percentual,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    numero, folha.anunciante?.id ?? null, dados.lead_id ?? null, folha.circuito.id, titulo, folha.investimento.meses, folha.investimento.desconto_percentual,
     folha.veiculacao.insercoes_hora, folha.investimento.mes_centavos, folha.investimento.total_centavos, folha.valida_ate,
     dados.observacao ?? null, JSON.stringify({ ...folha, numero, observacao: dados.observacao ?? null }), usuarioId, agora(),
   ).lastInsertRowid);
@@ -175,10 +175,10 @@ function criar(db, dados, usuarioId = null) {
 /** A proposta guardada, com a folha do dia em que foi feita. */
 function detalhe(db, id) {
   const p = db.prepare(`SELECT p.*, a.nome AS anunciante, ci.nome AS circuito, u.nome AS criado_por_nome,
-      ct.numero AS contrato_numero, ca.nome AS campanha_nome
+      ct.numero AS contrato_numero, ca.nome AS campanha_nome, le.nome AS lead
     FROM propostas p LEFT JOIN anunciantes a ON a.id = p.anunciante_id LEFT JOIN circuitos ci ON ci.id = p.circuito_id
     LEFT JOIN usuarios u ON u.id = p.criado_por LEFT JOIN contratos ct ON ct.id = p.contrato_id
-    LEFT JOIN campanhas ca ON ca.id = p.campanha_id WHERE p.id = ?`).get(id);
+    LEFT JOIN campanhas ca ON ca.id = p.campanha_id LEFT JOIN leads le ON le.id = p.lead_id WHERE p.id = ?`).get(id);
   if (!p) throw new ErroNegocio('Proposta não encontrada.', 404);
   return { ...p, folha: JSON.parse(p.folha), expirada: p.status === 'enviada' && p.valida_ate < hoje() };
 }
@@ -238,11 +238,12 @@ function listar(db, filtros = {}) {
   if (filtros.status) { onde.push('p.status = ?'); p.push(filtros.status); }
   if (filtros.anunciante_id) { onde.push('p.anunciante_id = ?'); p.push(Number(filtros.anunciante_id)); }
   if (filtros.circuito_id) { onde.push('p.circuito_id = ?'); p.push(Number(filtros.circuito_id)); }
+  if (filtros.lead_id) { onde.push('p.lead_id = ?'); p.push(Number(filtros.lead_id)); }
   const itens = db.prepare(`SELECT p.id, p.numero, p.titulo, p.status, p.meses, p.desconto_percentual, p.mes_centavos, p.total_centavos,
-      p.valida_ate, p.criado_em, p.enviada_em, p.respondida_em, p.contrato_id, p.campanha_id,
-      a.nome AS anunciante, ci.nome AS circuito, ct.numero AS contrato_numero
+      p.valida_ate, p.criado_em, p.enviada_em, p.respondida_em, p.contrato_id, p.campanha_id, p.lead_id,
+      a.nome AS anunciante, ci.nome AS circuito, ct.numero AS contrato_numero, le.nome AS lead
     FROM propostas p LEFT JOIN anunciantes a ON a.id = p.anunciante_id LEFT JOIN circuitos ci ON ci.id = p.circuito_id
-    LEFT JOIN contratos ct ON ct.id = p.contrato_id
+    LEFT JOIN contratos ct ON ct.id = p.contrato_id LEFT JOIN leads le ON le.id = p.lead_id
     ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY p.criado_em DESC`).all(...p)
     .map((x) => ({ ...x, expirada: x.status === 'enviada' && x.valida_ate < hoje() }));
 

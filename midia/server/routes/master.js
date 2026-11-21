@@ -9,6 +9,6 @@ module.exports = (db) => {
   r.use(require('./campanhas')(db));
   r.use(require('./financeiro')(db));
   r.use(require('./gestao')(db));
-  r.use(require('./propostas')(db));
+  r.use(require('./crm')(db));
   return r;
 };

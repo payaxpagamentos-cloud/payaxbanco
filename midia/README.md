@@ -68,11 +68,17 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
   e a lista de pontos com ambiente, unidades, onde as telas ficam e a tabela. Exporta em CSV, e cada circuito gera a
   **proposta comercial** pronta para imprimir ou salvar em PDF: a marca, a rede alcançada, as inserções e pessoas
   alcançadas estimadas, onde o anúncio passa ponto a ponto, o investimento (com desconto e CPM) e a validade.
-- **Propostas**: o funil entre o inventário e o contrato. Cada proposta fica guardada com a **folha do dia em que
-  foi feita** — a rede muda toda semana, e reimprimir uma proposta de dois meses atrás tem de mostrar o que foi
-  oferecido, não o inventário de hoje. A tela mostra o que está na mesa do cliente, o que virou contrato e a taxa de
-  conversão; quando o cliente aceita, **nascem o contrato e a campanha** (em rascunho, esperando o criativo) com as
-  telas do circuito, sem ninguém redigitar o que já foi combinado.
+- **CRM**, com duas abas:
+  - **Funil**: o quadro de quem ainda não é cliente — os dois lados do negócio, quem quer **anunciar** e o
+    condomínio que quer **tela**. Cada lead tem etapa, valor estimado, responsável, o histórico das conversas e,
+    acima de tudo, **o próximo passo e a data**: lead sem próximo passo marcado é lead que morre numa coluna, e por
+    isso ele aparece em destaque. No alto, *o que está combinado para hoje* e o que já passou da data.
+    Ganhar o lead **cria o cliente** (ou o ponto) a partir dele, e o lead continua apontando para o cadastro que
+    nasceu dali — é assim que se sabe de onde veio cada contrato.
+  - **Propostas**: o papel que sai do funil. Cada proposta fica guardada com a **folha do dia em que foi feita** —
+    a rede muda toda semana, e reimprimir uma proposta de dois meses atrás tem de mostrar o que foi oferecido, não o
+    inventário de hoje. Quando o cliente aceita, **nascem o cliente, o contrato e a campanha** (em rascunho,
+    esperando o criativo) com as telas do circuito, sem ninguém redigitar o que já foi combinado.
 - **Relatórios**: por campanha, por TV, por ponto e a **prova de exibição** linha por linha; tudo com CSV. Cada
   campanha gera ainda o **relatório de veiculação** (o *checking* que a agência pede): o que foi ao ar no mês, por
   ponto, por criativo e as últimas linhas da prova, na mesma folha impressa da proposta — com o CSV completo em anexo.

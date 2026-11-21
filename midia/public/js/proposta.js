@@ -12,13 +12,24 @@ import { cartao, indicador, tabela } from './comum.js';
 
 const PERIODOS = { 1: '1 mês', 3: '3 meses', 6: '6 meses', 12: '12 meses' };
 
-/** Pergunta as condições comerciais, guarda a proposta e abre a folha. */
-export async function gerarProposta(circuitoId, nomeCircuito, recarregar = null) {
+/**
+ * Pergunta as condições comerciais, guarda a proposta e abre a folha.
+ * Vinda do inventário, o circuito já está escolhido; vinda do CRM, quem escolhe é o vendedor,
+ * e a proposta nasce amarrada ao lead (o funil anda sozinho para "proposta").
+ */
+export async function gerarProposta(circuitoId, nomeCircuito, recarregar = null, { lead = null } = {}) {
   const opcoes = await api.get('/painel/opcoes');
-  return modal(`Proposta — ${nomeCircuito}`, (fechar) => {
+  const titulo = circuitoId ? `Proposta — ${nomeCircuito}` : `Proposta para ${nomeCircuito}`;
+  return modal(titulo, (fechar) => {
     const ok = el('button', { class: 'btn primario largo' }, icone('relatorios'), 'Gerar proposta');
     const f = el('form', { class: 'form' },
-      escolha('Cliente (opcional)', 'anunciante_id', { '': 'Proposta sem cliente definido', ...Object.fromEntries(opcoes.anunciantes.map((a) => [a.id, a.nome])) }, ''),
+      circuitoId
+        ? null
+        : escolha('Circuito', 'circuito_id', Object.fromEntries(opcoes.circuitos.map((c) => [c.id, c.nome])), '', { required: true }),
+      lead
+        ? el('p', { class: 'mudo pequeno', style: 'margin:0' },
+          `A proposta fica ligada ao lead ${lead.nome}. Quando for aceita, o cliente e o contrato nascem daqui.`)
+        : escolha('Cliente (opcional)', 'anunciante_id', { '': 'Proposta sem cliente definido', ...Object.fromEntries(opcoes.anunciantes.map((a) => [a.id, a.nome])) }, ''),
       el('div', { class: 'tres' },
         escolha('Período', 'meses', PERIODOS, '3'),
         campo('Desconto (%)', { name: 'desconto', type: 'number', min: 0, max: 50, step: '0.5', value: '0' }),
@@ -32,8 +43,9 @@ export async function gerarProposta(circuitoId, nomeCircuito, recarregar = null)
       acao(ok, async () => {
         const d = lerForm(f);
         const guardada = await api.post('/painel/propostas', {
-          circuito_id: circuitoId,
-          anunciante_id: d.anunciante_id || null,
+          circuito_id: circuitoId ?? Number(d.circuito_id),
+          anunciante_id: d.anunciante_id || lead?.anunciante_id || null,
+          lead_id: lead?.id ?? null,
           meses: Number(d.meses),
           desconto_percentual: Math.round(Number(String(d.desconto).replace(',', '.')) * 100) || 0,
           validade_dias: Number(d.validade_dias),
@@ -176,7 +188,7 @@ export async function propostas(ctx) {
 
       cartao('Propostas', tabela([
         [(p) => el('div', {}, el('div', {}, p.numero), el('div', { class: 'pequeno mudo' }, p.circuito ?? '—')), 'Proposta'],
-        [(p) => p.anunciante ?? el('span', { class: 'mudo' }, 'sem cliente definido'), 'Cliente'],
+        [(p) => p.anunciante ?? (p.lead ? el('span', {}, p.lead, el('div', { class: 'pequeno mudo' }, 'lead do CRM')) : el('span', { class: 'mudo' }, 'sem cliente definido')), 'Cliente'],
         [(p) => `${p.meses} ${p.meses === 1 ? 'mês' : 'meses'}`, 'Período'],
         [(p) => el('div', {}, el('div', {}, dinheiro(p.total_centavos)),
           el('div', { class: 'pequeno mudo' }, `${dinheiro(p.mes_centavos)}/mês${p.desconto_percentual ? ` · ${percentual(p.desconto_percentual)} off` : ''}`)), 'Valor', 'num dir'],
