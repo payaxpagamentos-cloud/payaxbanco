@@ -69,9 +69,14 @@
   -webkit-backdrop-filter: blur(28px) saturate(1.15); backdrop-filter: blur(28px) saturate(1.15);
   box-shadow: 0 24px 80px rgba(0,17,10,.23), inset 0 1px 2px rgba(255,255,255,.86), 0 0 50px rgba(115,252,172,.04);
   position: relative; z-index: 4; }
-.m-login-page .m-card-mark { width: 54px; height: 35px; margin-bottom: 18px; }
-.m-login-page .m-card-title { font-size: 34px; font-weight: 700; letter-spacing: -1.3px; line-height: 1.15; margin: 0; }
-.m-login-page .m-card-subtitle { margin: 9px 0 25px; color: var(--m-muted); font-size: 15px; }
+/*
+ * Cabeçalho do cartão centralizado: monograma, "Bem-vindo" e a linha de apoio.
+ * Os campos continuam alinhados à esquerda — rótulo centralizado sobre campo faz o olho procurar onde
+ * começa cada linha, e formulário se lê de cima a baixo pela margem esquerda.
+ */
+.m-login-page .m-card-mark { width: 54px; height: 35px; margin: 0 auto 18px; }
+.m-login-page .m-card-title { font-size: 34px; font-weight: 700; letter-spacing: -1.3px; line-height: 1.15; margin: 0; text-align: center; }
+.m-login-page .m-card-subtitle { margin: 9px 0 25px; color: var(--m-muted); font-size: 15px; text-align: center; }
 .m-login-page .m-form { margin: 0; }
 .m-login-page .m-fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
 .m-login-page .m-field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
