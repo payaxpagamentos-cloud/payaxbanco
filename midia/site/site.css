@@ -154,12 +154,12 @@ a{ color: inherit; }
 .zona-aviso p{ color: #C3C9D1; font-size: 11px; line-height: 1.35; }
 .zona-aviso .assinatura{ margin-top: auto; font-size: 9px; color: #868D98; border-top: 1px solid rgba(255,255,255,.12); padding-top: 6px; }
 .zona-anuncio{ position: relative; border-top: 2px solid var(--lime); overflow: hidden; }
-.anuncio{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 14px; opacity: 0; }
-.anuncio span{ font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
-.anuncio b{ font-size: 16px; line-height: 1.15; }
-.anuncio.a1{ background: linear-gradient(140deg, #DC2626, #7F1D1D); animation: girar 12s infinite; }
-.anuncio.a2{ background: linear-gradient(140deg, #16A34A, #064E3B); animation: girar 12s infinite 4s; }
-.anuncio.a3{ background: linear-gradient(140deg, #2563EB, #1E3A8A); animation: girar 12s infinite 8s; }
+.anuncio{ position: absolute; inset: 0; opacity: 0; }
+/* A peça preenche a área toda, como um criativo de verdade na tela. */
+.anuncio svg{ width: 100%; height: 100%; display: block; }
+.anuncio.a1{ animation: girar 12s infinite; }
+.anuncio.a2{ animation: girar 12s infinite 4s; }
+.anuncio.a3{ animation: girar 12s infinite 8s; }
 @keyframes girar{ 0%{ opacity: 0; transform: scale(1.04); } 4%{ opacity: 1; transform: scale(1); } 30%{ opacity: 1; } 34%{ opacity: 0; } 100%{ opacity: 0; } }
 @media (prefers-reduced-motion: reduce){ .anuncio{ animation: none !important; } .anuncio.a1{ opacity: 1; } }
 .faixa-tela{ display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: #0B0E11; border-top: 1px solid rgba(255,255,255,.1); font-size: 9.5px; }
@@ -267,7 +267,6 @@ a{ color: inherit; }
   .zona-aviso p{ display: none; }
   .zona-aviso strong{ line-height: 1.1; }
   .zona-aviso .assinatura{ font-size: 9px; padding-top: 6px; }
-  .anuncio b{ font-size: 15px; }
   .faixa-tela{ font-size: 9px; padding: 6px 8px; }
   .duas-colunas{ grid-template-columns: 1fr; gap: 36px; }
   .numeros{ grid-template-columns: repeat(2, 1fr); gap: 18px 26px; }
