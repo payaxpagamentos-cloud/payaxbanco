@@ -47,6 +47,22 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
 
 ## Telas
 
+### A entrada no sistema
+
+A tela de login é a página mais aberta do sistema e a primeira coisa que o cliente vê do produto: ela
+mostra a fotografia de uma tela da rede ocupando a janela inteira, com o formulário num cartão de vidro
+por cima — o visual aprovado no atendimento, no mesmo padrão do site.
+
+- **Olho na senha**: dá para conferir o que foi digitado antes de errar pela terceira vez.
+- **Lembrar de mim**: marcado, a sessão sobrevive a fechar o navegador e o e-mail volta preenchido;
+  **desmarcado, a sessão morre junto com a aba** — que é o certo no computador da portaria ou da
+  recepção, onde a próxima pessoa não pode cair dentro do painel de quem usou antes. A senha nunca é
+  guardada no navegador.
+- **Acessar player** leva ao endereço que se abre no aparelho ligado à TV, e *Voltar ao site* volta
+  para a vitrine.
+
+A criação de senha nova (o link que chega por e-mail) usa a mesma tela.
+
 ### Painel da equipe
 - **Visão geral**: TVs no ar, inserções de hoje, campanhas ativas, receita prevista do mês, inserções por dia,
   publicidade × institucional, campanhas e pontos que mais exibiram, e o que precisa de atenção.

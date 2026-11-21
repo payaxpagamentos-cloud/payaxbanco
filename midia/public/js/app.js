@@ -1,5 +1,5 @@
-import { api, sessao } from './api.js';
-import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, linkWhatsApp, PERFIS } from './ui.js';
+import { api, sessao, BASE } from './api.js';
+import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, marcar, formModal, repetir, linkWhatsApp, PERFIS } from './ui.js';
 import { TELAS_EQUIPE } from './painel.js';
 import { TELAS_ANUNCIANTE, TELAS_LOJISTA } from './portais.js';
 
@@ -182,28 +182,72 @@ function alterarSenha() {
   });
 }
 
+/**
+ * A casca das telas de entrada: a fotografia da rede ocupando a janela e o cartão de vidro por cima.
+ * Vale para o login e para a criação de senha nova, para as duas serem a mesma casa.
+ */
+function cascaDeEntrada(...dentro) {
+  return el('div', { class: 'entrada' },
+    // O site fica na raiz do domínio; o painel, em <base>/. Daqui se volta para a vitrine.
+    el('a', { class: 'voltar-site', href: `${BASE.replace(/\/[^/]*$/, '') || ''}/` }, 'Voltar ao site'),
+    el('div', { class: 'cartao' },
+      marca(nomePlataforma),
+      ...dentro.flat(Infinity).filter(Boolean)),
+    slogan ? el('p', { class: 'assinatura' }, slogan) : null);
+}
+
+/** O olho que mostra a senha digitada: evita a terceira tentativa errada por causa do teclado. */
+function campoSenha(rotulo, attrs) {
+  const entrada = el('input', { type: 'password', ...attrs });
+  const botao = el('button', {
+    type: 'button', class: 'ver-senha', 'aria-pressed': 'false', 'aria-label': 'Mostrar senha', title: 'Mostrar senha',
+    onclick: () => {
+      const mostrando = entrada.type === 'text';
+      entrada.type = mostrando ? 'password' : 'text';
+      botao.setAttribute('aria-pressed', String(!mostrando));
+      botao.setAttribute('aria-label', mostrando ? 'Mostrar senha' : 'Esconder senha');
+      entrada.focus();
+    },
+  }, el('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
+    el('path', { d: 'M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z' }),
+    el('circle', { cx: '12', cy: '12', r: '3' }),
+    el('path', { class: 'corte', d: 'm4 4 16 16' })));
+  return el('label', { class: 'campo senha-campo' }, rotulo, entrada, botao);
+}
+
 function telaEntrada() {
+  const lembradoAntes = Boolean(sessao.emailLembrado());
   const f = el('form', { class: 'form' },
-    campo('E-mail', { name: 'email', type: 'email', autocomplete: 'username', required: true }),
-    campo('Senha', { name: 'senha', type: 'password', autocomplete: 'current-password', required: true }),
-    el('button', { class: 'btn primario', style: 'min-height:42px;margin-top:4px' }, 'Entrar'));
+    campo('E-mail', {
+      name: 'email', type: 'email', autocomplete: 'username', required: true,
+      placeholder: 'seuemail@empresa.com.br', value: sessao.emailLembrado(),
+    }),
+    campoSenha('Senha', { name: 'senha', autocomplete: 'current-password', required: true, placeholder: '••••••' }),
+    el('div', { class: 'opcoes' },
+      marcar('Lembrar de mim', { name: 'lembrar', checked: lembradoAntes }),
+      el('button', { type: 'button', class: 'link-texto', onclick: esqueciSenha }, 'Esqueci minha senha')),
+    el('button', { class: 'btn primario' }, 'Entrar'));
+
   f.addEventListener('submit', (e) => {
     e.preventDefault();
-    acao(f.querySelector('button'), async () => {
-      const r = await api.post('/auth/login', lerForm(f));
-      sessao.set(r);
+    acao(f.querySelector('button.primario'), async () => {
+      const d = lerForm(f);
+      const r = await api.post('/auth/login', { email: d.email, senha: d.senha });
+      // Marcou "lembrar": a sessão sobrevive a fechar o navegador e o e-mail volta preenchido.
+      sessao.set(r, { lembrar: d.lembrar });
+      sessao.lembrarEmail(d.lembrar ? d.email : '');
       location.hash = '';
       desenhar();
     });
   });
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'cartao' },
-    marca(nomePlataforma),
-    slogan ? el('p', { class: 'slogan-marca' }, slogan) : null,
-    el('h1', { style: 'margin:22px 0 4px;font-size:20px' }, 'Entrar no painel'),
-    el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'Equipe, anunciantes e responsáveis pelos pontos entram por aqui.'), f,
-    el('div', { class: 'linha entre', style: 'margin-top:14px' },
-      el('button', { type: 'button', class: 'btn pequeno', style: 'border:0;background:none;padding:0', onclick: esqueciSenha }, 'Esqueci minha senha'),
-      el('span', { class: 'pequeno mudo' }, 'Instalando uma tela? Abra ', el('a', { href: 'tv/' }, 'o player'), ' no aparelho.')))));
+
+  limpar(raiz, cascaDeEntrada(
+    el('h1', {}, 'Bem-vindo'),
+    el('p', { class: 'abertura' }, 'Acesse sua conta.'),
+    f,
+    el('div', { class: 'ir-player' },
+      el('a', { href: 'tv/' }, 'Acessar player'),
+      el('p', { class: 'pequeno mudo', style: 'margin:8px 0 0' }, 'Para o aparelho ligado à TV.'))));
   f.querySelector('input').focus();
 }
 
@@ -219,9 +263,9 @@ const esqueciSenha = () => formModal('Esqueci minha senha', () => [
 /** Tela aberta pelo link do e-mail. */
 function telaNovaSenha(codigo) {
   const f = el('form', { class: 'form' },
-    campo('Nova senha (mínimo 8 caracteres)', { name: 'senha', type: 'password', required: true, minlength: 8, autocomplete: 'new-password' }),
-    campo('Repita a nova senha', { name: 'repetir', type: 'password', required: true, minlength: 8, autocomplete: 'new-password' }),
-    el('button', { class: 'btn primario', style: 'min-height:42px;margin-top:4px' }, 'Salvar e entrar'));
+    campoSenha('Nova senha (mínimo 8 caracteres)', { name: 'senha', required: true, minlength: 8, autocomplete: 'new-password' }),
+    campoSenha('Repita a nova senha', { name: 'repetir', required: true, minlength: 8, autocomplete: 'new-password' }),
+    el('button', { class: 'btn primario' }, 'Salvar e entrar'));
   f.addEventListener('submit', (e) => {
     e.preventDefault();
     acao(f.querySelector('button'), async () => {
@@ -235,11 +279,9 @@ function telaNovaSenha(codigo) {
       desenhar();
     });
   });
-  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'cartao' },
-    marca(nomePlataforma),
-    slogan ? el('p', { class: 'slogan-marca' }, slogan) : null,
-    el('h1', { style: 'margin:22px 0 4px;font-size:20px' }, 'Criar uma nova senha'),
-    el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'O link do e-mail vale por uma hora e só funciona uma vez.'), f)));
+  limpar(raiz, cascaDeEntrada(
+    el('h1', {}, 'Nova senha'),
+    el('p', { class: 'abertura' }, 'O link do e-mail vale por uma hora e só funciona uma vez.'), f));
   f.querySelector('input').focus();
 }
 

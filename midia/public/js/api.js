@@ -2,19 +2,48 @@
 export const BASE = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 
 const CHAVE = 'midia.sessao';
+const CHAVE_EMAIL = 'midia.ultimo-email';
 let memoria = null;
 
+/**
+ * A sessão de quem entrou.
+ *
+ * Com "lembrar de mim" marcado, ela fica guardada no navegador e continua valendo depois de fechar a
+ * janela; sem marcar, vive só enquanto a aba estiver aberta — é o certo para computador de recepção,
+ * de portaria ou emprestado, onde a próxima pessoa não pode cair dentro do painel de quem usou antes.
+ */
 export const sessao = {
   get() {
-    try { return JSON.parse(localStorage.getItem(CHAVE)) || memoria; } catch { return memoria; }
+    for (const guarda of [localStorage, sessionStorage]) {
+      try {
+        const bruto = guarda.getItem(CHAVE);
+        if (bruto) return JSON.parse(bruto);
+      } catch { /* armazenamento indisponível */ }
+    }
+    return memoria;
   },
-  set(dados) {
+  set(dados, { lembrar = true } = {}) {
     memoria = dados;
-    try { localStorage.setItem(CHAVE, JSON.stringify(dados)); } catch { /* armazenamento indisponível */ }
+    const guarda = lembrar ? localStorage : sessionStorage;
+    const outro = lembrar ? sessionStorage : localStorage;
+    try { guarda.setItem(CHAVE, JSON.stringify(dados)); } catch { /* armazenamento indisponível */ }
+    try { outro.removeItem(CHAVE); } catch { /* ignora */ }
   },
   limpar() {
     memoria = null;
-    try { localStorage.removeItem(CHAVE); } catch { /* ignora */ }
+    for (const guarda of [localStorage, sessionStorage]) {
+      try { guarda.removeItem(CHAVE); } catch { /* ignora */ }
+    }
+  },
+  /** O e-mail de quem entrou por último, só para não digitar de novo. Senha nunca é guardada. */
+  lembrarEmail(email) {
+    try {
+      if (email) localStorage.setItem(CHAVE_EMAIL, email);
+      else localStorage.removeItem(CHAVE_EMAIL);
+    } catch { /* ignora */ }
+  },
+  emailLembrado() {
+    try { return localStorage.getItem(CHAVE_EMAIL) ?? ''; } catch { return ''; }
   },
 };
 

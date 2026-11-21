@@ -1139,6 +1139,17 @@ test('Padrão visual: o sistema inteiro segue o site', async (t) => {
     }
   });
 
+  await t.test('a tela de entrada tem a foto da rede e as peças do visual aprovado', () => {
+    assert.ok(fs.existsSync(path.join(__dirname, '..', 'public/img/entrada.webp')), 'a fotografia da entrada está no lugar');
+    const entrada = ler('public/js/app.js');
+    assert.match(entrada, /class: 'ver-senha'/, 'o olho da senha existe');
+    assert.match(entrada, /name: 'lembrar'/, 'o "lembrar de mim" existe');
+    assert.match(painel, /\.entrada::before\{[^}]*entrada\.webp/, 'a foto é o fundo da tela de entrada');
+    // Quem não marca "lembrar" não pode deixar a sessão guardada no computador da portaria.
+    const sessaoJs = ler('public/js/api.js');
+    assert.match(sessaoJs, /lembrar \? localStorage : sessionStorage/, 'sem "lembrar", a sessão morre com a aba');
+  });
+
   await t.test('a folha que o cliente recebe segue o mesmo padrão', () => {
     assert.match(painel, /\.folha\{[^}]*color: #18232A/, 'a proposta é escrita na tinta do site');
     assert.match(painel, /\.folha h2::before\{[^}]*background: #C8FF31/, 'o título de seção leva o tracinho lima do site');
