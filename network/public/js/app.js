@@ -16,6 +16,7 @@ const MENU = [
     ['contratos', 'Contratos', 'arquivo', 'contratos.ver', () => import('./telas/contratos.js')],
     ['faturamento', 'Faturamento', 'dinheiro', 'faturamento.ver', () => import('./telas/faturamento.js')],
     ['cobranca', 'Cobrança e bloqueios', 'cadeado', 'cobranca.ver', () => import('./telas/cobranca.js')],
+    ['bancos', 'Cobrança bancária', 'recibo', 'faturamento.ver', () => import('./telas/cobrancas.js')],
     ['planos', 'Planos', 'camadas', 'contratos.ver', () => import('./telas/planos.js')],
   ]],
   ['Gestão de frota', [

@@ -55,6 +55,17 @@ function senhaGerada(tamanho = 10) {
   return [...crypto.randomBytes(tamanho)].map((b) => alfabeto[b % alfabeto.length]).join('');
 }
 
+/*
+ * A senha do serviço é guardada cifrada. Se a chave do sistema mudou, ela não volta — mas isso não pode
+ * derrubar a ficha inteira do assinante, que é onde o dado aparece. Aqui a senha some e fica marcada como
+ * ilegível; quem precisa dela de verdade (aplicar no equipamento) recusa a tarefa com o motivo, logo abaixo.
+ */
+function lerSenha(servico) {
+  if (!servico.senha_cifrada) return { senha: null };
+  try { return { senha: decifrar(servico.senha_cifrada) }; }
+  catch { return { senha: null, senha_ilegivel: true }; }
+}
+
 /**
  * Estado desejado do serviço, derivado do contrato e do plano. `situacao: null` significa que o contrato
  * ainda não deve existir no equipamento (em implantação).
@@ -70,7 +81,7 @@ function desejado(db, servico) {
     plano: contrato.plano_nome,
     tipo_acesso: servico.tipo_acesso,
     login: servico.login,
-    senha: servico.senha_cifrada ? decifrar(servico.senha_cifrada) : null,
+    ...lerSenha(servico),
     ip_fixo: servico.ip_fixo,
     perfil: contrato.perfil_equipamento || null,
     download_kbps: contrato.download_mbps ? contrato.download_mbps * 1000 : null,
@@ -194,7 +205,14 @@ async function executarTarefa(db, tarefa) {
     switch (tarefa.acao) {
       case 'identificar': resultado = await driver.identificar(ctx); break;
       case 'ler': resultado = await driver.ler(ctx, servico); break;
-      case 'aplicar': resultado = await driver.aplicar(ctx, servico, alvo); break;
+      case 'aplicar':
+        // Aplicar sem a senha gravaria uma credencial vazia no concentrador e derrubaria o assinante.
+        if (alvo?.senha_ilegivel) {
+          throw new ErroEquipamento('A senha deste serviço não pôde ser decifrada (a chave do sistema mudou desde que foi salva). '
+            + 'Defina a senha de novo no serviço antes de aplicar.', 'falha', { permanente: true });
+        }
+        resultado = await driver.aplicar(ctx, servico, alvo);
+        break;
       case 'cortar': resultado = await driver.cortar(ctx, servico, { motivo: pedido.motivo }); break;
       case 'religar': resultado = await driver.religar(ctx, servico); break;
       case 'remover': resultado = await driver.remover(ctx, servico); break;

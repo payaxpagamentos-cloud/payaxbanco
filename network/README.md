@@ -26,6 +26,7 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 7 | **Contratos** | O serviço de um assinante num endereço: plano, mensalidade contratada (independente da tabela de preços de hoje), dia de vencimento, fidelidade, ponto na planta (CTO e porta, ocupada de verdade na ativação) e itens fixos por competência (SVA, aluguel de equipamento, ponto adicional, desconto). Ciclo em implantação → ativo → bloqueado/suspenso → cancelado, cada passo com quem fez, de onde veio e por quê. |
 | 8 | **Faturamento** | Ciclo mensal **simulável quantas vezes quiser** antes de emitir, com o que será cobrado de cada contrato e o motivo de cada contrato fora do ciclo; **pró-rata** de entrada e de saída (e adiada quando o vencimento do mês de entrada já passou); instalação cobrada uma vez; competência que não roda duas vezes; multa e juros calculados no dia do pagamento, sem alterar o valor da fatura; baixa total ou parcial, estorno com motivo, cancelamento e cobrança avulsa. |
 | 9 | **Cobrança e bloqueios** | Régua versionada por dias em relação ao vencimento (avisar, bloquear, indicar para cancelamento), carência que prevalece sobre qualquer regra, execução idempotente (a mesma regra nunca roda duas vezes na mesma fatura), bloqueio que guarda a regra e a fatura que o originou, **desbloqueio de confiança** com prazo e limite anual, desbloqueio automático na quitação e inadimplência por faixa de atraso. |
+| 9.1 | **Cobrança bancária** | Como o assinante paga. **PIX** com BR Code gerado aqui (EMV BR Code com CRC16, sem API nenhuma: basta a chave) e **boleto** com código de barras e linha digitável montados no sistema (módulo 10 e 11, fator de vencimento com a virada de 2025). Registro e baixa por arquivo: **remessa CNAB 240** e leitura de **retorno 240 e 400**, com o mapa de posições à vista. O retorno nunca é aplicado direto — vira prévia (o que casou, por qual chave, com que divergência), e só então o operador manda aplicar. Uma conta cujo campo livre nunca foi conferido com o banco avisa isso em toda emissão. |
 | 10 | **Planos** | Tabela comercial (internet, voz, SVA, combo) com tecnologia, velocidade, mensalidade, taxa de instalação e fidelidade. Alterar o plano não altera o que já foi contratado. |
 | 11 | **Veículos** | Placa normalizada e única por organização, responsáveis com início e fim, restrições (oficina, documento, sinistro…) que tiram o veículo da escala até a liberação, documentos com vencimento, histórico de manutenção, abastecimentos e chamados. |
 | 12 | **Manutenção e lavagem** | Planos preventivos por item, por dias e/ou km (alerta no primeiro limite, antecedência e tolerância); ordens solicitado → orçado → aprovado (alçada por valor) → agendado → em execução → concluído; lavagem sem zerar a mecânica; fornecedores; custos orçado e realizado separados. |
@@ -151,6 +152,45 @@ acumulado sem repetir o que já havia feito. `NETWORK_COLETAS=0` desliga também
 Migrações: aplicadas automaticamente no start, em ordem e numa transação cada (`server/db.js`, tabela `schema_migracoes`).
 `npm run migrar` aplica sem iniciar o servidor. Produção com Docker: `docker build -t manager-network network/` e volume em `/app/data`.
 
+### Cobrança bancária: conta, remessa e retorno
+
+A **conta de cobrança** (menu *Cobrança bancária → Contas*) guarda o beneficiário, a chave PIX e, para boleto,
+o convênio e a carteira combinados com o banco. Só o perfil **administrador** mexe nela: é por onde o dinheiro entra.
+
+O **PIX funciona de imediato** — a chave basta, e o BR Code é montado e conferido aqui mesmo.
+
+O **boleto exige cuidado**. O código de barras tem 44 posições; 25 delas são o *campo livre*, que cada banco define
+conforme a carteira contratada. O sistema traz a montagem de 8 bancos (001, 033, 077, 104, 237, 341, 748, 756),
+mas **todas marcadas como não validadas**: nenhuma foi conferida contra um boleto real em produção. Campo livre
+errado produz um boleto que o cliente paga e o provedor não recebe, e o erro só aparece depois do pagamento.
+Por isso o fluxo correto é: emitir um boleto, pagar no caixa ou no aplicativo, confirmar a compensação com o
+gerente e então marcar a conta como **layout conferido**. Enquanto isso não acontece, o aviso aparece em toda emissão.
+
+A **remessa** (CNAB 240, layout FEBRABAN) leva os boletos emitidos que o banco ainda não recebeu. O arquivo fica
+guardado: baixar de novo não muda a numeração.
+
+O **retorno** (240 ou 400) entra em dois passos, de propósito:
+
+1. **Enviar** — o arquivo é apenas lido. A prévia mostra cada registro ao lado da linha crua: o que o banco disse,
+   com qual cobrança casou (por nosso número, por nosso número com dígito ou por número da fatura) e que divergência existe.
+2. **Aplicar** — só então as baixas entram no financeiro, como pagamentos comuns de origem `retorno`, e a quitação
+   religa o serviço igual a uma baixa feita à mão.
+
+Posição de layout errada aparece como valor sem sentido na prévia, em vez de virar baixa errada no caixa.
+Só ocorrência de **liquidação** vira baixa; entrada confirmada, rejeição e baixa pelo banco mudam a situação da
+cobrança e não tocam na fatura.
+
+### API de banco e PayAx
+
+O registro de adaptadores (`server/bancos/`) define o contrato que um banco — ou a PayAx — precisa cumprir:
+registrar título, consultar, baixar, extrato, cobrança PIX e consulta de PIX, com idempotência por (conta, cobrança)
+e a regra de que nenhum adaptador mexe no financeiro por conta própria.
+
+**O registro está vazio, e isso é proposital.** Cada instituição publica o próprio manual (endpoints, escopos OAuth,
+certificado mTLS, ambiente de homologação) e esse manual só sai depois do credenciamento. Escrever um adaptador de
+memória produziria chamadas que falham em produção e, pior, um sistema que *parece* conectado. Para ligar um banco
+ou a PayAx, basta a especificação da API e as credenciais: nada no núcleo muda.
+
 ## Integrações
 
 ### Rastreador de Veículos (conectado de verdade)
@@ -255,8 +295,10 @@ network/
 
 ## O que depende de terceiros
 
-- **Boleto registrado, PIX cobrança e cartão**: exigem convênio com o banco ou contrato com um meio de pagamento. Hoje a fatura é emitida e a baixa é registrada pela equipe (ou importada), com a forma de pagamento e a origem.
-- **Retorno bancário (CNAB) automático**: a baixa já aceita a origem `retorno`; a leitura do arquivo depende do layout do banco do provedor.
+- **Campo livre do boleto**: os 8 bancos acompanhados montam o código de barras pelo manual da instituição, mas nenhum foi conferido contra um boleto real. A conta nasce com o layout **não validado** e avisa isso em toda emissão, até alguém pagar um boleto de teste e confirmar a compensação. Carteira e convênio vêm do contrato de cobrança do provedor.
+- **Posições do retorno CNAB**: o 240 segue a FEBRABAN; o 400 varia por banco. Por isso o arquivo passa por conferência antes de aplicar, e o mapa de posições (`server/lib/cnab.js`, `POSICOES`) é editável.
+- **Registro de boleto e cobrança PIX por API, e a PayAx**: exigem o manual da instituição e as credenciais do credenciamento. O contrato do adaptador está escrito (`server/bancos/`), o registro está vazio, e a cobrança por arquivo e por BR Code funciona sem nenhuma delas.
+- **Cartão de crédito e débito automático**: exigem contrato com um meio de pagamento.
 - **Envio automático de aviso por WhatsApp ou e-mail**: exige contrato com um provedor de mensagens. A régua deixa o aviso pronto, com o texto da regra, e registra quem despachou e quando.
 - **Nota fiscal (NFCom, modelo 62)**: exige certificado digital e credenciamento na SEFAZ.
 - **Drivers de outros fabricantes**: hoje acompanha o driver de **MikroTik RouterOS** (concentrador PPPoE, API REST), testado de ponta a ponta. Huawei, ZTE, Fiberhome, Datacom, Parks, Intelbras e Cisco entram pelo mesmo contrato — OLT e CPE normalmente exigem SSH/Telnet/SNMP ou TR-069, caminhos que ainda não estão escritos. O que falta é driver, não arquitetura.

@@ -150,6 +150,9 @@ function financeiroDo(db, assinante, organizacao, hoje, linha) {
   const itens = db.prepare('SELECT * FROM fatura_itens WHERE fatura_id = ? ORDER BY id');
   const baixas = db.prepare(`SELECT pg.*, u.nome AS criado_por_nome, e.nome AS estornado_por_nome FROM pagamentos pg
     LEFT JOIN usuarios u ON u.id = pg.criado_por LEFT JOIN usuarios e ON e.id = pg.estornado_por WHERE pg.fatura_id = ? ORDER BY pg.id DESC`);
+  // Os meios de pagamento emitidos (PIX e boleto): a ficha mostra o que o assinante recebeu para pagar.
+  const meios = db.prepare(`SELECT cb.*, ct.nome AS conta_nome FROM cobrancas cb JOIN contas_cobranca ct ON ct.id = cb.conta_id
+    WHERE cb.fatura_id = ? ORDER BY cb.id DESC`);
 
   const pagamentos = [];
   const completas = faturas.map((f) => {
@@ -163,7 +166,7 @@ function financeiroDo(db, assinante, organizacao, hoje, linha) {
     }
     linha.push(evento(f.criado_em, 'fatura', `Fatura ${f.numero} emitida`,
       `R$ ${(f.valor_centavos / 100).toFixed(2).replace('.', ',')} · vence ${dataBr(f.vencimento)}`, { contrato: f.contrato_numero }));
-    return { ...f, encargos: fat.encargos(f, organizacao, hoje), itens: itens.all(f.id), pagamentos: pgs };
+    return { ...f, encargos: fat.encargos(f, organizacao, hoje), itens: itens.all(f.id), pagamentos: pgs, cobrancas: meios.all(f.id) };
   });
 
   const abertas = completas.filter((f) => ABERTAS.includes(f.situacao));

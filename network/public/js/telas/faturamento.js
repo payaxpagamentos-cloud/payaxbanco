@@ -1,4 +1,5 @@
 import { api, qs, baixar } from '../api.js';
+import { emitirCobranca, verCobranca } from './cobrancas.js';
 import { el, limpar, icone, pode, cabecalho, painel, tabela, paginacao, abas, etqDe, rotulo, opcoes, dinheiro, data, dataHora, dl, competencia, documento,
   telefone, numero, carregar, carregando, formulario, pedirMotivo, botao, toast, faixa, stat, vazio, hoje } from '../ui.js';
 
@@ -172,12 +173,21 @@ async function detalhe(alvo, id, ir) {
   const recarregar = () => detalhe(alvo, id, ir);
   limpar(alvo, carregando());
   let f;
-  try { f = await api.get(`/faturamento/faturas/${id}`); } catch (err) { limpar(alvo, el('div', { class: 'falha' }, err.message)); return; }
+  let meios = [];
+  try {
+    // A fatura diz o que é devido; as cobranças dizem COMO pagar. Carregadas juntas para a tela não piscar.
+    const [fatura, lista] = await Promise.all([api.get(`/faturamento/faturas/${id}`), api.get(`/cobrancas?fatura_id=${id}`)]);
+    f = fatura;
+    meios = lista.itens;
+  } catch (err) { limpar(alvo, el('div', { class: 'falha' }, err.message)); return; }
   const saldo = f.valor_centavos - f.pago_centavos;
   const emVigor = f.pagamentos.filter((p) => !p.estornado_em);
 
   const acoes = [];
   if (pode('faturamento.baixar') && !['paga', 'cancelada'].includes(f.situacao)) acoes.push(botao('Registrar baixa', () => baixa(f, recarregar), { ic: 'ok' }));
+  if (pode('faturamento.faturar') && !['paga', 'cancelada'].includes(f.situacao)) {
+    acoes.push(botao('Emitir PIX ou boleto', () => emitirCobranca(f, recarregar), { tipo: 'secundario', ic: 'recibo' }));
+  }
   if (pode('faturamento.estornar') && f.situacao !== 'cancelada') {
     acoes.push(botao('Cancelar fatura', () => pedirMotivo('Cancelar a fatura', 'Motivo do cancelamento', async (motivo) => {
       const r = await api.post(`/faturamento/faturas/${f.id}/cancelar`, { motivo });
@@ -242,6 +252,14 @@ async function detalhe(alvo, id, ir) {
           ['Emitida em', dataHora(f.criado_em)],
           ['Observações', f.observacoes],
         ])),
+        painel('Meios de pagamento', meios.length
+          ? el('ul', { class: 'linha-tempo' }, meios.map((c) => el('li', {},
+            el('strong', {}, rotulo('tipoCobranca', c.tipo)), ' ', etqDe('situacaoCobranca', c.situacao),
+            el('small', {}, c.linha_formatada ?? c.pix_txid ?? ''),
+            el('div', {}, el('button', { class: 'botao secundario pequeno', onclick: () => verCobranca(c) }, 'Ver o código')))))
+          : el('p', { class: 'fraco' }, ['paga', 'cancelada'].includes(f.situacao)
+            ? 'Nenhuma cobrança emitida para esta fatura.'
+            : 'Nenhum PIX ou boleto emitido: o assinante ainda não tem como pagar esta fatura.')),
         painel('Cobrança', f.cobranca.length
           ? el('ul', { class: 'linha-tempo' }, f.cobranca.map((ev) => el('li', {},
             el('strong', {}, ev.regra_nome), ` · ${rotulo('acaoRegua', ev.acao)}`,

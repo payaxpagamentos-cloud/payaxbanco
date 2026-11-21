@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { el, limpar, icone, pode, cabecalho, painel, tabela, abas, etq, etqDe, rotulo, opcoes, dinheiro, numero, data, dataHora, desde, dl,
   documento, telefone, competencia, velocidade, carregando, formulario, pedirMotivo, botao, toast, faixa, stat, vazio, hoje } from '../ui.js';
 import { baixa } from './faturamento.js';
+import { emitirCobranca, verCobranca } from './cobrancas.js';
 import { painelWifi } from './wifi.js';
 
 /*
@@ -313,7 +314,15 @@ function faturaExpansivel(x, recarregar) {
             recarregar();
           }), { tipo: 'secundario pequeno' }) : '') },
       ], x.pagamentos) : el('p', { class: 'fraco' }, 'Nenhuma baixa registrada.'),
+      // Como pagar esta fatura: sem isso, a equipe teria de sair da ficha para gerar o PIX ou o boleto.
+      x.cobrancas?.length
+        ? el('div', { class: 'form-acoes', style: 'justify-content:flex-start' }, x.cobrancas.map((c) =>
+          botao(`${rotulo('tipoCobranca', c.tipo)} · ${rotulo('situacaoCobranca', c.situacao)}`, () => verCobranca({ ...c, fatura_numero: x.numero }),
+            { tipo: 'secundario pequeno', ic: 'recibo' })))
+        : null,
       el('div', { class: 'form-acoes', style: 'justify-content:flex-start' },
+        pode('faturamento.faturar') && !['paga', 'cancelada'].includes(x.situacao)
+          ? botao('Emitir PIX ou boleto', () => emitirCobranca(x, recarregar), { tipo: 'secundario pequeno', ic: 'recibo' }) : null,
         pode('faturamento.baixar') && !['paga', 'cancelada'].includes(x.situacao) ? botao('Registrar baixa', () => baixa(x, recarregar), { tipo: 'pequeno', ic: 'ok' }) : null,
         pode('faturamento.estornar') && x.situacao !== 'cancelada' ? botao('Cancelar fatura', () => pedirMotivo('Cancelar a fatura', 'Motivo do cancelamento', async (motivo) => {
           const r = await api.post(`/faturamento/faturas/${x.id}/cancelar`, { motivo });

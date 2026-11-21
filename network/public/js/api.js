@@ -56,6 +56,8 @@ export const api = {
   patch: (c, b) => chamar('PATCH', c, b),
   put: (c, b) => chamar('PUT', c, b),
   enviarArquivo: (recurso, recursoId, arquivo) => chamar('POST', `/anexos?recurso=${recurso}${recursoId ? `&recurso_id=${recursoId}` : ''}`, undefined, { arquivo }),
+  // O retorno do banco sobe como texto cru: o servidor só CONFERE e devolve a prévia, sem aplicar nada.
+  enviarRetorno: (arquivo) => chamar('POST', '/cobrancas/retornos', undefined, { arquivo }),
 };
 
 /** Abre um anexo por link temporário (a permissão é conferida no servidor). */

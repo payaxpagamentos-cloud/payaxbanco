@@ -36,6 +36,12 @@ function criarApp(db, extras = {}) {
   r.use('/api/anexos', express.raw({ type: () => true, limit: config.arquivoMaxBytes + 1024 }));
   // O ACS recebe SOAP do roteador do assinante: texto, não JSON, e com tamanho curto por ser endpoint público.
   r.use('/api/acs', express.text({ type: () => true, limit: '512kb' }));
+  // Retorno do banco é arquivo de texto de largura fixa, não JSON — mas só o envio do arquivo.
+  // As demais rotas abaixo de /retornos (aplicar, descartar) continuam em JSON.
+  const textoRetorno = express.text({ type: () => true, limit: '8mb' });
+  r.use('/api/cobrancas/retornos', (req, res, prox) => (req.method === 'POST' && (req.path === '/' || req.path === '')
+    ? textoRetorno(req, res, prox)
+    : prox()));
   r.use(express.json({ limit: '1mb' }));
   r.use('/api', criarApi(db, extras));
   r.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));

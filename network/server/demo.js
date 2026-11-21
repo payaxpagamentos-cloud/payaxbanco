@@ -51,6 +51,14 @@ const servidor = criarApp(db).listen(0, async () => {
     return d;
   };
   const post = (q, c, b) => req(q, 'POST', c, b);
+  /** Envia um arquivo de texto cru (o retorno do banco não é JSON). */
+  const postTexto = async (quem, caminho, texto, nome) => {
+    const r = await fetch(base + caminho, { method: 'POST', body: texto,
+      headers: { 'Content-Type': 'text/plain', 'X-Nome-Arquivo': nome, Authorization: `Bearer ${tokens[quem]}` } });
+    const d = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(`POST ${caminho}: ${r.status} ${JSON.stringify(d)}`);
+    return d;
+  };
   const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a1b30000000049454e44ae426082', 'hex');
   const anexar = async (quem, recurso, id) => (await (await fetch(`${base}/anexos?recurso=${recurso}&recurso_id=${id}`, { method: 'POST',
     headers: { Authorization: `Bearer ${tokens[quem]}`, 'X-Nome-Arquivo': 'foto-demo.png' }, body: PNG })).json());
@@ -269,6 +277,56 @@ const servidor = criarApp(db).listen(0, async () => {
     if (encerrado) await fin(`/contratos/${encerrado.contrato.id}/cancelar`, { motivo: 'Mudança para outra cidade', data: dia(-20) });
 
     /*
+     * Cobrança bancária. A conta é cadastrada com um convênio de demonstração e fica marcada como layout
+     * NÃO conferido — que é o estado real de qualquer provedor antes de pagar o primeiro boleto de teste.
+     * O PIX sai para toda fatura em aberto (depende só da chave); o boleto sai para parte delas, vai na
+     * remessa, e um retorno do banco fica aguardando conferência, para a tela de conferência ter o que mostrar.
+     */
+    const conta = await post('demo', '/cobrancas/contas', {
+      nome: 'Itaú cobrança', banco: '341', agencia: '0912', conta: '34567', conta_dv: '8', carteira: '109', convenio: '34567',
+      beneficiario_nome: 'Provedor Demonstração LTDA', beneficiario_documento: '11.222.333/0001-81',
+      beneficiario_endereco: 'Av. das Fibras, 1000', beneficiario_cidade: 'PONTA GROSSA', beneficiario_uf: 'PR', beneficiario_cep: '84010-000',
+      chave_pix: 'financeiro@provedor-demo.com.br', chave_pix_tipo: 'email',
+      emite_boleto: true, emite_pix: true, padrao: true,
+      observacoes: 'Convênio de demonstração. Nenhum boleto daqui foi conferido com o banco.',
+    });
+    const emAberto = db.prepare("SELECT * FROM faturas WHERE organizacao_id = ? AND situacao IN ('aberta','parcial') ORDER BY vencimento").all(org);
+    const comBoleto = [];
+    for (const [i, f] of emAberto.entries()) {
+      await fin(`/cobrancas/faturas/${f.id}/emitir`, { tipo: 'pix', conta_id: conta.id });
+      if (i % 2 === 0) comBoleto.push(await fin(`/cobrancas/faturas/${f.id}/emitir`, { tipo: 'boleto', conta_id: conta.id }));
+    }
+    const remessa = comBoleto.length ? await fin('/cobrancas/remessas', { conta_id: conta.id }) : null;
+
+    // Retorno de mentira, montado nas posições do CNAB 400, com dois títulos liquidados e um registro sem par.
+    if (comBoleto.length >= 2) {
+      const ddmmaa = (iso) => `${iso.slice(8, 10)}${iso.slice(5, 7)}${iso.slice(2, 4)}`;
+      const linha = (c) => {
+        const l = Array(400).fill(' ');
+        const por = (de, ate, v) => { const t = String(v).slice(0, ate - de + 1).padStart(ate - de + 1, '0'); for (let i = 0; i < t.length; i++) l[de - 1 + i] = t[i]; };
+        l[0] = '1';
+        por(38, 62, c.nosso_numero); por(109, 110, c.ocorrencia); por(111, 116, ddmmaa(HOJE));
+        por(117, 126, c.documento); por(147, 152, ddmmaa(c.vencimento)); por(153, 165, c.valor_centavos);
+        por(254, 266, c.valor_pago_centavos ?? c.valor_centavos); por(267, 279, c.juros_centavos ?? 0); por(296, 301, ddmmaa(HOJE));
+        return l.join('');
+      };
+      const cabeca = Array(400).fill(' ');
+      cabeca[0] = '0';
+      for (let i = 0; i < 3; i++) cabeca[76 + i] = '341'[i];
+      for (let i = 0; i < 6; i++) cabeca[94 + i] = ddmmaa(HOJE)[i];
+      const numeroDe = (id) => db.prepare('SELECT numero FROM faturas WHERE id = ?').get(id).numero;
+      const arquivo = [cabeca.join(''),
+        linha({ nosso_numero: `${comBoleto[0].nosso_numero}${comBoleto[0].nosso_numero_dv ?? ''}`, ocorrencia: '06',
+          documento: numeroDe(comBoleto[0].fatura_id), vencimento: comBoleto[0].vencimento, valor_centavos: comBoleto[0].valor_centavos }),
+        linha({ nosso_numero: `${comBoleto[1].nosso_numero}${comBoleto[1].nosso_numero_dv ?? ''}`, ocorrencia: '02',
+          documento: numeroDe(comBoleto[1].fatura_id), vencimento: comBoleto[1].vencimento, valor_centavos: comBoleto[1].valor_centavos }),
+        // Um registro que não casa com nada: é assim que a tela mostra o que NÃO deve ser aplicado.
+        linha({ nosso_numero: '999999', ocorrencia: '06', documento: '999999', vencimento: HOJE, valor_centavos: 7890 }),
+        `${'9'}${' '.repeat(399)}`].join('\r\n');
+      await postTexto('financeiro.demo', '/cobrancas/retornos', arquivo, 'CB341DEMO.RET');
+    }
+
+    /*
      * Provisionamento: o concentrador fica cadastrado com driver e papel, mas SEM acesso de gerência — não há
      * equipamento de verdade para apontar, e inventar um endereço faria a tela mentir. Os serviços são criados
      * com login e ONU, e aparecem como "nunca lidos": é exatamente o que o sistema mostra antes do primeiro contato.
@@ -318,6 +376,8 @@ const servidor = criarApp(db).listen(0, async () => {
     console.log(`Carteira demonstrativa: ${carteira.length} assinantes, ${execucao.regua.bloqueios} corte(s) pela régua, ${execucao.regua.avisos} aviso(s) preparado(s).`);
     console.log(`TR-069: ACS configurado e ${aparelhos} aparelho(s) de assinante registrados (sem credencial de chamada: a tela diz que a mudança espera o contato do aparelho).`);
     console.log(`Provisionamento: ${provisionados} serviço(s) no concentrador BRAS-PG-01 (sem acesso de gerência: nenhum equipamento real foi inventado).`);
+    console.log(`Cobrança bancária: ${emAberto.length} PIX e ${comBoleto.length} boleto(s) emitidos${remessa ? `, remessa ${remessa.arquivo}` : ''} `
+      + '· 1 retorno aguardando conferência · layout do boleto NÃO conferido com o banco (é o que vale para qualquer convênio novo).');
 
     console.log('Organização demonstrativa criada. Acessos (senha demo12345):');
     for (const [k, p] of Object.entries(PERFIS)) console.log(`  ${k}@managerprovedor.local  (${p})`);

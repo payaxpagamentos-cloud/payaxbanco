@@ -1382,6 +1382,145 @@ CREATE INDEX idx_cpe_tarefas_fila ON cpe_tarefas(cpe_id, situacao, id);
 CREATE INDEX idx_cpe_tarefas_org ON cpe_tarefas(organizacao_id, id DESC);
 `,
   },
+  {
+    versao: 6,
+    nome: 'cobranca_bancaria',
+    sql: `
+/*
+ * Conta de cobrança: de onde saem o boleto e o PIX.
+ *
+ * O PIX funciona com a chave e mais nada — por isso é a primeira forma de cobrança a sair do papel.
+ * O boleto precisa de convênio com o banco, e o campo livre do código de barras muda conforme a carteira
+ * contratada: "layout_validado" guarda se alguém já conferiu um boleto de verdade com o banco. Enquanto
+ * for zero, o sistema avisa em toda emissão que aquilo ainda não foi provado em produção.
+ */
+CREATE TABLE contas_cobranca (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nome TEXT NOT NULL,
+  banco TEXT,
+  agencia TEXT,
+  agencia_dv TEXT,
+  conta TEXT,
+  conta_dv TEXT,
+  carteira TEXT,
+  convenio TEXT,
+  codigo_beneficiario TEXT,
+  posto TEXT,
+  modalidade TEXT,
+  -- Quem recebe: vai impresso no boleto e dentro do BR Code do PIX.
+  beneficiario_nome TEXT NOT NULL,
+  beneficiario_documento TEXT NOT NULL,
+  beneficiario_endereco TEXT,
+  beneficiario_cidade TEXT,
+  beneficiario_uf TEXT,
+  beneficiario_cep TEXT,
+  chave_pix TEXT,
+  chave_pix_tipo TEXT CHECK (chave_pix_tipo IS NULL OR chave_pix_tipo IN ('cpf','cnpj','email','telefone','aleatoria')),
+  -- Numeração do título no banco e do arquivo de remessa.
+  proximo_nosso_numero INTEGER NOT NULL DEFAULT 1 CHECK (proximo_nosso_numero > 0),
+  proxima_remessa INTEGER NOT NULL DEFAULT 1 CHECK (proxima_remessa > 0),
+  emite_boleto INTEGER NOT NULL DEFAULT 0,
+  emite_pix INTEGER NOT NULL DEFAULT 1,
+  -- Alguém já conferiu um boleto desta conta com o banco?
+  layout_validado INTEGER NOT NULL DEFAULT 0,
+  layout_validado_em TEXT,
+  layout_validado_por INTEGER REFERENCES usuarios(id),
+  ativa INTEGER NOT NULL DEFAULT 1,
+  padrao INTEGER NOT NULL DEFAULT 0,
+  observacoes TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organizacao_id, nome)
+);
+CREATE INDEX idx_contas_cobranca ON contas_cobranca(organizacao_id, ativa);
+
+/*
+ * O título emitido para uma fatura: o boleto (código de barras e linha digitável) ou o PIX (BR Code).
+ * A fatura continua sendo a verdade do que é devido; a cobrança é o MEIO de pagar, e uma fatura pode ter
+ * mais de um (boleto e PIX ao mesmo tempo, que é o normal hoje).
+ */
+CREATE TABLE cobrancas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  fatura_id INTEGER NOT NULL REFERENCES faturas(id),
+  conta_id INTEGER NOT NULL REFERENCES contas_cobranca(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('boleto','pix')),
+  nosso_numero TEXT,
+  nosso_numero_dv TEXT,
+  codigo_barras TEXT,
+  linha_digitavel TEXT,
+  pix_brcode TEXT,
+  pix_txid TEXT,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  vencimento TEXT NOT NULL,
+  -- "registrada" é o banco ter confirmado pelo retorno; "emitida" é só o sistema ter gerado.
+  situacao TEXT NOT NULL DEFAULT 'emitida' CHECK (situacao IN ('emitida','registrada','paga','baixada','cancelada','rejeitada')),
+  registrada_em TEXT,
+  motivo_rejeicao TEXT,
+  pago_em TEXT,
+  valor_pago_centavos INTEGER,
+  juros_centavos INTEGER,
+  despesas_centavos INTEGER,
+  remessa_id INTEGER,
+  retorno_id INTEGER,
+  -- Baixa gerada no financeiro a partir desta cobrança.
+  pagamento_id INTEGER REFERENCES pagamentos(id),
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX idx_cobrancas_fatura ON cobrancas(fatura_id);
+CREATE INDEX idx_cobrancas_situacao ON cobrancas(organizacao_id, situacao, vencimento);
+-- O nosso número é a chave do título no banco: não pode repetir na mesma conta.
+CREATE UNIQUE INDEX idx_cobrancas_nosso_numero ON cobrancas(conta_id, nosso_numero)
+  WHERE nosso_numero IS NOT NULL AND situacao <> 'cancelada';
+
+CREATE TABLE remessas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  conta_id INTEGER NOT NULL REFERENCES contas_cobranca(id),
+  numero INTEGER NOT NULL,
+  layout TEXT NOT NULL,
+  arquivo TEXT NOT NULL,
+  titulos INTEGER NOT NULL,
+  valor_centavos INTEGER NOT NULL,
+  -- O arquivo fica guardado para poder ser baixado de novo sem regerar (e mudar) a numeração.
+  conteudo TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  UNIQUE (conta_id, numero)
+);
+
+/*
+ * Retorno do banco. Nada é aplicado na leitura: o arquivo entra como "conferindo", o operador vê a prévia
+ * com os campos lidos ao lado da linha crua, e só então manda aplicar. Posição de layout errada aparece
+ * como valor sem sentido na prévia, em vez de virar baixa errada no financeiro.
+ */
+CREATE TABLE retornos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  conta_id INTEGER REFERENCES contas_cobranca(id),
+  arquivo TEXT NOT NULL,
+  layout TEXT NOT NULL,
+  banco TEXT,
+  registros INTEGER NOT NULL DEFAULT 0,
+  pagamentos INTEGER NOT NULL DEFAULT 0,
+  valor_centavos INTEGER NOT NULL DEFAULT 0,
+  aplicados INTEGER NOT NULL DEFAULT 0,
+  nao_encontrados INTEGER NOT NULL DEFAULT 0,
+  situacao TEXT NOT NULL DEFAULT 'conferindo' CHECK (situacao IN ('conferindo','aplicado','descartado')),
+  conteudo TEXT NOT NULL,
+  resumo TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  aplicado_em TEXT,
+  aplicado_por INTEGER REFERENCES usuarios(id)
+);
+CREATE INDEX idx_retornos ON retornos(organizacao_id, id DESC);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

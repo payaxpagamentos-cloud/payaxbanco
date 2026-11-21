@@ -494,3 +494,32 @@ input.preenchido, select.preenchido, textarea.preenchido { border-color: var(--v
   .stat .valor { font-size: 26px; }
   .caminho > span:first-child, .caminho > .sep { display: none; }
 }
+
+/* ---------------- Cobrança bancária ---------------- */
+/* Linha digitável e BR Code: o operador lê, confere e copia — fonte monoespaçada e seleção fácil. */
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.miudo { font-size: 11.5px; }
+.quebra { overflow-wrap: anywhere; }
+.bloco-codigo {
+  margin-top: 14px; padding: 14px; border-radius: var(--raio-ctl);
+  border: 1px solid var(--borda); background: var(--fundo); user-select: all;
+}
+.bloco-codigo .grande { font-size: 16px; font-weight: 600; letter-spacing: .4px; }
+.bloco-codigo .acoes { display: flex; gap: 8px; margin-top: 12px; user-select: none; }
+.bloco-codigo + .bloco-codigo { margin-top: 10px; }
+.lista-aviso { margin: 0; padding-left: 16px; color: var(--texto-2); font-size: 12.5px; }
+.lista-aviso li + li { margin-top: 3px; }
+.tabela .acoes-celula { text-align: right; white-space: nowrap; }
+.stats.compactas { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+.stats.compactas .stat { padding: 12px 14px; }
+.stats.compactas .valor { font-size: 22px; }
+/* As linhas cruas do retorno: largura fixa importa para conferir posição de campo. */
+pre.bruto {
+  margin: 14px 0 0; padding: 12px; max-height: 220px; overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.6;
+  white-space: pre; border-radius: var(--raio-ctl); border: 1px solid var(--borda); background: var(--fundo); color: var(--texto-2);
+}
+.modal-rodape { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borda); }
+@media (max-width: 860px) {
+  .stats.compactas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
