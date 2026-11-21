@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><rect width="36" height="36" rx="9" fill="#15261e"/><path d="M8 26V11h4.5l11 15H28V10" fill="none" stroke="#38c78b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="26" r="2.6" fill="#38c78b"/><circle cx="28" cy="10" r="2.6" fill="#38c78b"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+  <defs>
+    <linearGradient id="f" x1="7" y1="9" x2="30" y2="29" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8ff0c2"/><stop offset=".4" stop-color="#29d78e"/><stop offset="1" stop-color="#009659"/>
+    </linearGradient>
+    <linearGradient id="d" x1="15" y1="12" x2="21" y2="27" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#087949"/><stop offset="1" stop-color="#004c34"/>
+    </linearGradient>
+  </defs>
+  <rect width="36" height="36" rx="9" fill="#05281b"/>
+  <g transform="translate(2.2 7.4) scale(.435)">
+    <path d="M3 39 16 8c1-3 3-5 7-5h5l12 29-6 11h-8L19 25l-6 15H4c-1 0-2 0-1-1Z" fill="url(#f)"/>
+    <path d="m25 4 12 29 7-16 9 21-5 5H34L18 5c2-2 5-2 7-1Z" fill="url(#d)"/>
+    <path d="M36 34 48 8c1-3 3-5 6-5h7l12 37c0 1 0 2-2 2H59l-6-19-8 17c-2 4-7 4-9 2l-4-8h4Z" fill="url(#f)"/>
+  </g>
+</svg>

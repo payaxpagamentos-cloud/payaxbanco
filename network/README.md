@@ -153,6 +153,31 @@ acumulado sem repetir o que já havia feito. `NETWORK_COLETAS=0` desliga também
 Migrações: aplicadas automaticamente no start, em ordem e numa transação cada (`server/db.js`, tabela `schema_migracoes`).
 `npm run migrar` aplica sem iniciar o servidor. Produção com Docker: `docker build -t manager-network network/` e volume em `/app/data`.
 
+### Tela de entrada e a marca
+
+A entrada tem folha própria (`public/css/login.css`) e componentes próprios, porque suas proporções —
+cartão de 420 px, tipografia grande, esfera — não têm relação com o resto do sistema. Todo seletor dela é
+prefixado com `.m-login-page`: a regra global `input[type=email], … { font-size: 14px }` do sistema tem
+especificidade maior que uma classe sozinha, e sem o prefixo os campos do login voltariam a 14 px, fazendo
+o Safari do iPhone dar zoom sozinho a cada foco.
+
+A esfera (`public/js/esfera.js`) é decoração em Canvas 2D, sem biblioteca: no máximo 30 quadros por segundo,
+para quando sai da tela ou a aba vai para segundo plano, respeita `prefers-reduced-motion` e se desmonta ao
+sair do login, pelo mesmo mecanismo de limpeza das demais telas.
+
+Dois controles do desenho precisaram de honestidade, porque o sistema não faz o que o nome sugere:
+
+- **"Lembrar acesso" não estende a sessão.** O token vale 12 horas e mudar isso seria decisão de segurança,
+  não de tela. O que a caixa faz é guardar **o e-mail** neste navegador, para o campo vir preenchido na
+  próxima vez — e a tela diz exatamente isso quando ela é marcada. Senha e token nunca são gravados ali.
+- **"Esqueci minha senha" não tem para onde ir.** Não existe recuperação por e-mail: as contas são criadas
+  pelo administrador da organização. Em vez de um link morto ou de um formulário que não envia nada, o botão
+  responde com quem procurar.
+
+A marca é o monograma **M** em fita. O símbolo **N**, herdado do nome anterior do sistema, saiu do menu, do
+modo TV e do favicon. Cada instância do SVG numera os próprios gradientes: dois SVGs com o mesmo `id` na
+página fariam o segundo herdar as cores do primeiro.
+
 ### Panorama: de onde vêm o verde e o vermelho
 
 Nenhuma cor do mapa é inferida. O estado de conexão vem de **uma fonte só**: a varredura das sessões do
