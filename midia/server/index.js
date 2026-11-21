@@ -8,18 +8,18 @@ const { faturarAutomatico } = require('./lib/faturamento');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
-  console.log(`[Mídia Indoor] Painel: http://localhost:${config.port}${config.basePath}/`);
-  console.log(`[Mídia Indoor] Player da TV: http://localhost:${config.port}${config.basePath}/tv/`);
+  console.log(`[Vai Mídia] Painel: http://localhost:${config.port}${config.basePath}/`);
+  console.log(`[Vai Mídia] Player da TV: http://localhost:${config.port}${config.basePath}/tv/`);
 });
 
 // Marca as TVs que pararam de falar com o servidor, encerra campanhas vencidas e expira códigos de pareamento.
 setInterval(() => {
   try {
     const m = manutencao(db);
-    if (m.offline.length) console.log(`[Mídia Indoor] TVs offline: ${m.offline.map((t) => t.nome).join(', ')}`);
-    if (m.encerradas) console.log(`[Mídia Indoor] Campanhas encerradas por fim de período: ${m.encerradas}`);
+    if (m.offline.length) console.log(`[Vai Mídia] TVs offline: ${m.offline.map((t) => t.nome).join(', ')}`);
+    if (m.encerradas) console.log(`[Vai Mídia] Campanhas encerradas por fim de período: ${m.encerradas}`);
   } catch (err) {
-    console.error('[Mídia Indoor] Falha na manutenção:', err.message);
+    console.error('[Vai Mídia] Falha na manutenção:', err.message);
   }
 }, 60_000).unref();
 
@@ -27,9 +27,9 @@ setInterval(() => {
 const faturar = () => {
   try {
     const r = faturarAutomatico(db);
-    if (r.geradas) console.log(`[Mídia Indoor] Faturas geradas (${r.competencia}): ${r.geradas}; repasses: ${r.repasses}`);
+    if (r.geradas) console.log(`[Vai Mídia] Faturas geradas (${r.competencia}): ${r.geradas}; repasses: ${r.repasses}`);
   } catch (err) {
-    console.error('[Mídia Indoor] Falha ao gerar faturas:', err.message);
+    console.error('[Vai Mídia] Falha ao gerar faturas:', err.message);
   }
 };
 setInterval(faturar, 6 * 3_600_000).unref();

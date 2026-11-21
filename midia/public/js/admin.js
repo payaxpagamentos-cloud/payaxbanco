@@ -72,8 +72,10 @@ function novoUsuario(opcoes, recarregar) {
 export async function configuracoes(ctx) {
   const c = await api.get('/painel/configuracoes');
   const f = el('form', { class: 'form' },
-    el('fieldset', {}, el('legend', {}, 'Plataforma'),
-      campo('Nome que aparece no painel e nas TVs', { name: 'nome_plataforma', value: c.nome_plataforma, required: true, maxlength: 60 })),
+    el('fieldset', {}, el('legend', {}, 'Marca'),
+      el('div', { class: 'duas' },
+        campo('Nome que aparece no painel e nas telas', { name: 'nome_plataforma', value: c.nome_plataforma, required: true, maxlength: 60 }),
+        campo('Frase da marca', { name: 'slogan', value: c.slogan, maxlength: 80, placeholder: 'Sua marca em movimento.' }))),
 
     el('fieldset', {}, el('legend', {}, 'Programação das telas'),
       el('div', { class: 'duas' },

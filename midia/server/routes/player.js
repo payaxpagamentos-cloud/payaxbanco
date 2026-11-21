@@ -42,7 +42,7 @@ module.exports = (db) => {
       codigo, limparTexto(req.body.aparelho, 160), Number(req.body.largura) || null, Number(req.body.altura) || null,
       limparTexto(req.body.versao, 20), req.ip ?? null, expira, agora(),
     );
-    res.status(201).json({ codigo, expira_em: expira, consulta_s: 5, plataforma: cfg.nome_plataforma });
+    res.status(201).json({ codigo, expira_em: expira, consulta_s: 5, plataforma: cfg.nome_plataforma, slogan: cfg.slogan });
   });
 
   // A TV consulta até a equipe confirmar; quando confirma, recebe o token e guarda.
@@ -69,6 +69,7 @@ module.exports = (db) => {
         som: Boolean(tela.som), relogio: Boolean(tela.relogio), legenda: tela.legenda ?? null, aviso: avisoVale ? tela.aviso : null,
       },
       plataforma: cfg.nome_plataforma,
+      slogan: cfg.slogan,
       batida_s: cfg.batida_intervalo_s,
       grade: g,
     });

@@ -79,7 +79,9 @@ export async function enviarArquivo(rota, arquivo, dados = {}) {
   return resp.json();
 }
 
-const CORES_LOOP = ['#6D28D9', '#2563EB', '#0EA5E9', '#16A34A', '#EA7A0B', '#DC2626', '#7C3AED', '#0891B2'];
+// Cada campanha ganha uma cor na linha do tempo do loop; o par leva a cor do texto que fica legível nela.
+const CORES_LOOP = [['#C8FF31', '#111417'], ['#111417', '#FFFFFF'], ['#5A7D00', '#FFFFFF'], ['#0E7490', '#FFFFFF'],
+  ['#B45309', '#FFFFFF'], ['#9D174D', '#FFFFFF'], ['#1D4ED8', '#FFFFFF'], ['#166534', '#FFFFFF']];
 
 /** Linha do tempo do loop: cada item com largura proporcional à duração. */
 export function linhaDoLoop(grade) {
@@ -90,6 +92,11 @@ export function linhaDoLoop(grade) {
     if (!cores.has(id)) cores.set(id, CORES_LOOP[cores.size % CORES_LOOP.length]);
     return cores.get(id);
   };
+  const estiloDoItem = (i) => {
+    if (!i.campanha_id) return '';
+    const [fundo, tinta] = cor(i.campanha_id);
+    return `;background:${fundo};color:${tinta}`;
+  };
   const zona = grade.layout === 'dividida' && grade.comunicados?.length
     ? el('p', { class: 'pequeno mudo', style: 'margin:8px 0 0' },
       `Tela dividida: ${grade.comunicados.length} comunicado(s) do ponto giram na zona ao lado, fora do carrossel.`)
@@ -97,7 +104,7 @@ export function linhaDoLoop(grade) {
   return el('div', {},
     el('div', { class: 'loop' }, grade.itens.map((i) => el('div', {
       class: `item${i.campanha_id ? '' : ' institucional'}`,
-      style: `width:${(i.duracao_s / total) * 100}%${i.campanha_id ? `;background:${cor(i.campanha_id)}` : ''}`,
+      style: `width:${(i.duracao_s / total) * 100}%${estiloDoItem(i)}`,
       title: `${i.ordem}. ${i.anunciante ? `${i.anunciante} — ` : ''}${i.nome} (${i.duracao_s}s)`,
     }, i.duracao_s >= total / 14 ? `${i.duracao_s}s` : ''))),
     el('div', { class: 'loop-legenda' },

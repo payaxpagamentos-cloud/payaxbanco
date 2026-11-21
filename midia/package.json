@@ -1,7 +1,7 @@
 {
   "name": "payax-midia",
   "version": "1.0.0",
-  "description": "Mídia Indoor — painel de mídia e publicidade em TVs instaladas em comércios: pontos, telas, campanhas, criativos, prova de exibição, faturamento e repasse ao lojista.",
+  "description": "Vai Mídia — painel de mídia e publicidade em TVs instaladas em comércios: pontos, telas, campanhas, criativos, prova de exibição, faturamento e repasse ao lojista.",
   "main": "server/index.js",
   "private": true,
   "type": "commonjs",

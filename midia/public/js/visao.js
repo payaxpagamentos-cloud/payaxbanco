@@ -40,7 +40,7 @@ export async function visao(ctx) {
 
       el('div', { class: 'c4' }, cartao('Publicidade x institucional (hoje)',
         pizza([
-          { rotulo: 'Publicidade', valor: d.hoje.insercoes_pagas, cor: CORES.roxo },
+          { rotulo: 'Publicidade', valor: d.hoje.insercoes_pagas, cor: CORES.marca },
           { rotulo: 'Institucional', valor: Math.max(0, d.hoje.insercoes - d.hoje.insercoes_pagas), cor: CORES.cinza },
         ], { formato: inteiro, lado: true, vazio: 'Sem exibições hoje.', centro: { valor: inteiro(d.hoje.insercoes), rotulo: 'inserções' } }))),
 

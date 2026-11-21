@@ -241,15 +241,14 @@ export function icone(nome) {
   return el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' },
     el('path', { d: P[nome] ?? '' }));
 }
-/** Marca: uma TV com o sinal no ar + nome (a primeira palavra em destaque, o resto como subtítulo). */
-export function marca(nome = 'Mídia Indoor') {
-  const [principal, ...resto] = String(nome).trim().split(/\s+/);
-  const svg = el('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' },
-    el('rect', { x: 2.5, y: 4.5, width: 19, height: 13, rx: 2.4, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.9 }),
-    el('path', { d: 'M9.6 8.6v5.2l4.6-2.6z', fill: 'currentColor' }),
-    el('path', { d: 'M9 21h6M12 17.5V21', stroke: 'currentColor', 'stroke-width': 1.9, 'stroke-linecap': 'round', fill: 'none' }));
-  return el('span', { class: 'marca' }, el('span', { class: 'simbolo' }, svg),
-    el('span', { class: 'texto' }, el('strong', {}, principal), resto.length ? el('small', {}, resto.join(' ')) : null));
+/** O símbolo da marca (o "V"), em vetor, herdando a cor de onde está. */
+export const simbolo = () => el('svg', { viewBox: '0 0 138 111', 'aria-hidden': 'true' },
+  el('path', { d: 'M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z', fill: 'currentColor' }));
+
+/** Marca: símbolo + nome em caixa alta (o nome vem das configurações da plataforma). */
+export function marca(nome = 'Vai Mídia') {
+  return el('span', { class: 'marca' }, el('span', { class: 'simbolo' }, simbolo()),
+    el('span', { class: 'texto' }, el('strong', {}, String(nome).trim().toUpperCase())));
 }
 
 /** Pessoa com as iniciais num círculo (tabelas de ramais, agentes e usuários). */

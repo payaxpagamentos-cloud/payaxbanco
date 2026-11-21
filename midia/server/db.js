@@ -367,7 +367,9 @@ CREATE INDEX IF NOT EXISTS idx_auditoria_data ON auditoria (criado_em);
 
 // Configurações da plataforma (texto ou número; TEXTO lista as que não são número).
 const CONFIG_PADRAO = {
-  nome_plataforma: 'Mídia Indoor',
+  nome_plataforma: 'Vai Mídia',
+  // Frase da marca: aparece na entrada do painel e na tela de espera do player.
+  slogan: 'Sua marca em movimento.',
   // Duração padrão de uma imagem no ar, em segundos.
   duracao_imagem_s: '12',
   // Inserções por hora sugeridas numa campanha nova.
@@ -399,7 +401,7 @@ const CONFIG_PADRAO = {
   pix_nome: '',
   pix_cidade: '',
 };
-const TEXTO = new Set(['nome_plataforma', 'pix_chave', 'pix_nome', 'pix_cidade']);
+const TEXTO = new Set(['nome_plataforma', 'slogan', 'pix_chave', 'pix_nome', 'pix_cidade']);
 
 const agora = () => new Date().toISOString();
 
@@ -413,6 +415,8 @@ function abrir(arquivo = config.dbFile) {
 
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);
+  // Instalações que ainda estavam com o nome genérico anterior passam a usar a marca (um nome escolhido no painel não muda).
+  db.prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'nome_plataforma' AND valor = 'Vai Mídia'").run(CONFIG_PADRAO.nome_plataforma);
 
   if (!db.prepare("SELECT 1 FROM usuarios WHERE perfil = 'master' LIMIT 1").get()) {
     db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, 'master', ?)")
@@ -463,7 +467,7 @@ function migrar(db) {
 /** Recria a tabela no formato novo (do SCHEMA) e copia os dados pelas colunas que existem nas duas. */
 function refazerTabela(db, tabela) {
   const criar = SCHEMA.split(/;\s*\n/).map((x) => `${x.trim()};`).find((x) => new RegExp(`CREATE TABLE IF NOT EXISTS ${tabela} \\(`).test(x));
-  if (!criar) throw new Error(`[Mídia Indoor] Não achei o CREATE TABLE de ${tabela} para migrar.`);
+  if (!criar) throw new Error(`[Vai Mídia] Não achei o CREATE TABLE de ${tabela} para migrar.`);
   const antigas = new Set(db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name));
   db.exec('PRAGMA foreign_keys = OFF');
   try {

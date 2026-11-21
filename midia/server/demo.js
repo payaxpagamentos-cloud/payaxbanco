@@ -345,16 +345,16 @@ function criar(db) {
 if (require.main === module) {
   const db = abrir();
   if (db.prepare('SELECT COUNT(*) AS n FROM locais').get().n) {
-    console.log('[Mídia Indoor] O banco já tem pontos cadastrados. A demonstração foi feita para um banco novo.');
-    console.log('[Mídia Indoor] Apague o arquivo do banco (ou use MIDIA_DB=./data/demo.db npm run demo) e rode de novo.');
+    console.log('[Vai Mídia] O banco já tem pontos cadastrados. A demonstração foi feita para um banco novo.');
+    console.log('[Vai Mídia] Apague o arquivo do banco (ou use MIDIA_DB=./data/demo.db npm run demo) e rode de novo.');
     process.exit(1);
   }
   const r = transacao(db, () => criar(db));
-  console.log(`[Mídia Indoor] Demonstração criada: ${r.pontos} pontos, ${r.telas} telas, ${r.anunciantes} anunciantes, ${r.agencias} agências,`);
-  console.log(`[Mídia Indoor] ${r.circuitos} circuitos, ${r.campanhas} campanhas e ${r.comunicados} comunicados de condomínio;`);
-  console.log(`[Mídia Indoor] ${r.exibicoes.toLocaleString('pt-BR')} exibições detalhadas (últimos 3 dias) e mais `
+  console.log(`[Vai Mídia] Demonstração criada: ${r.pontos} pontos, ${r.telas} telas, ${r.anunciantes} anunciantes, ${r.agencias} agências,`);
+  console.log(`[Vai Mídia] ${r.circuitos} circuitos, ${r.campanhas} campanhas e ${r.comunicados} comunicados de condomínio;`);
+  console.log(`[Vai Mídia] ${r.exibicoes.toLocaleString('pt-BR')} exibições detalhadas (últimos 3 dias) e mais `
     + `${r.resumidas.toLocaleString('pt-BR')} no resumo diário; ${r.fechamento.geradas} faturas (${r.fechamento.competencia}).`);
-  console.log('[Mídia Indoor] Acessos de demonstração:');
+  console.log('[Vai Mídia] Acessos de demonstração:');
   for (const s of r.senhas) console.log(`  ${s.perfil.padEnd(11)} ${s.email}  senha: ${s.senha}`);
   console.log(`  master      ${require('./config').admin.email}  senha: ${require('./config').admin.senha}`);
 }

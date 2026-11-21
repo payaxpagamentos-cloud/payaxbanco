@@ -1,5 +1,5 @@
 /*
- * Player da TV (Mídia Indoor).
+ * Player da TV (Vai Mídia).
  *
  * Roda em qualquer navegador de TV box, Fire Stick, mini PC, Chromecast com Google TV ou smart TV:
  * basta abrir este endereço em tela cheia. O aparelho mostra um código, a equipe confirma no painel
@@ -85,7 +85,7 @@ async function parear() {
         });
         guardado = r;
         guardar(CHAVES.codigo, r);
-        if (r.plataforma) $('espera-plataforma').textContent = r.plataforma;
+          if (r.plataforma) marcarPlataforma(r.plataforma, r.slogan);
       }
       marcarConexao(true);
       mostrarEspera('Vamos ligar esta TV', 'Esta tela ainda não está vinculada a um ponto.', guardado.codigo);
@@ -111,6 +111,7 @@ async function baixarProgramacao() {
   const p = await chamar('player/programacao');
   estado.programacao = p;
   estado.batidaS = Math.max(15, Number(p.batida_s) || 60);
+  marcarPlataforma(p.plataforma, p.slogan);
   guardar(CHAVES.grade, p);
   marcarConexao(true);
   await carregarLogo();
@@ -403,6 +404,7 @@ function desenharFaixa() {
   const t = estado.programacao?.tela;
   const texto = t?.aviso || t?.legenda || '';
   const relogio = Boolean(t?.relogio);
+  // O rodapé leva a marca da rede: aparece sempre que a tela tiver relógio ou algum recado na faixa.
   const mostrar = Boolean(texto || relogio);
   $('faixa').hidden = !mostrar;
   document.body.classList.toggle('com-faixa', mostrar);
@@ -514,8 +516,18 @@ function atalhos() {
   document.addEventListener('dblclick', () => document.documentElement.requestFullscreen?.().catch(() => {}));
 }
 
+/** Nome e frase da marca nas telas de espera e no rodapé. */
+function marcarPlataforma(nome, slogan) {
+  if (nome) {
+    $('espera-plataforma').textContent = nome;
+    $('faixa-plataforma').textContent = nome;
+    document.title = `Player — ${nome}`;
+  }
+  if (slogan !== undefined) $('espera-slogan').textContent = slogan ?? '';
+}
+
 async function iniciar() {
-  if (estado.programacao?.plataforma) $('espera-plataforma').textContent = estado.programacao.plataforma;
+  marcarPlataforma(estado.programacao?.plataforma, estado.programacao?.slogan);
   mostrarEspera('Preparando a tela…', 'Carregando a programação guardada.');
   relogio();
   atalhos();

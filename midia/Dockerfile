@@ -1,4 +1,4 @@
-# Mídia Indoor — imagem de produção
+# Vai Mídia — imagem de produção
 ARG BASE=node:22-slim
 FROM ${BASE}
 

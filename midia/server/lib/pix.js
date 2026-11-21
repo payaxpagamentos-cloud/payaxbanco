@@ -22,7 +22,7 @@ function copiaECola({ chave, nome, cidade, valorCentavos, txid }) {
   const id = String(txid ?? '***').replace(/[^A-Za-z0-9]/g, '').slice(0, 25) || '***';
   const corpo = campo('00', '01') + campo('26', conta) + campo('52', '0000') + campo('53', '986')
     + (valorCentavos ? campo('54', (valorCentavos / 100).toFixed(2)) : '') + campo('58', 'BR')
-    + campo('59', semAcento(nome, 25) || 'MIDIA INDOOR') + campo('60', semAcento(cidade, 15) || 'SAO PAULO') + campo('62', campo('05', id)) + '6304';
+    + campo('59', semAcento(nome, 25) || 'VAI MIDIA') + campo('60', semAcento(cidade, 15) || 'SAO PAULO') + campo('62', campo('05', id)) + '6304';
   return corpo + crc16(corpo);
 }
 

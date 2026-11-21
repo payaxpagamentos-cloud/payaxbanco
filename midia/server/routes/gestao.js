@@ -454,7 +454,10 @@ module.exports = (db) => {
       for (const [k] of Object.entries(CONFIG_PADRAO)) {
         if (req.body[k] === undefined) continue;
         if (TEXTO.has(k)) {
-          gravarConfig(db, k, k === 'nome_plataforma' ? v.texto(req.body[k], 'o nome da plataforma', 60) : (v.opcional(req.body[k], k, 80) ?? ''));
+          const limiteTexto = { nome_plataforma: 60, slogan: 80 }[k] ?? 80;
+          gravarConfig(db, k, k === 'nome_plataforma'
+            ? v.texto(req.body[k], 'o nome da plataforma', limiteTexto)
+            : (v.opcional(req.body[k], k, limiteTexto) ?? ''));
         } else {
           const [min, max] = limites[k];
           gravarConfig(db, k, v.inteiro(req.body[k], k.replace(/_/g, ' '), { min, max }));

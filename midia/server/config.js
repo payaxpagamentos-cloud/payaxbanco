@@ -5,7 +5,7 @@ const crypto = require('node:crypto');
 
 const secret = process.env.MIDIA_SECRET || crypto.randomBytes(32).toString('hex');
 if (!process.env.MIDIA_SECRET && process.env.NODE_ENV !== 'test') {
-  console.warn('[Mídia Indoor] MIDIA_SECRET não definido: usando segredo temporário (sessões e TVs pareadas caem ao reiniciar).');
+  console.warn('[Vai Mídia] MIDIA_SECRET não definido: usando segredo temporário (sessões e TVs pareadas caem ao reiniciar).');
 }
 
 const producao = process.env.NODE_ENV === 'production';
@@ -13,9 +13,9 @@ const producao = process.env.NODE_ENV === 'production';
 // Em produção, recusa iniciar com segredos ausentes ou fracos.
 if (producao) {
   const faltando = ['MIDIA_SECRET', 'MIDIA_ADMIN_SENHA'].filter((k) => !process.env[k]);
-  if (faltando.length) throw new Error(`[Mídia Indoor] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
-  if (process.env.MIDIA_SECRET.length < 32) throw new Error('[Mídia Indoor] MIDIA_SECRET deve ter pelo menos 32 caracteres.');
-  if (process.env.MIDIA_ADMIN_SENHA.length < 12) throw new Error('[Mídia Indoor] MIDIA_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
+  if (faltando.length) throw new Error(`[Vai Mídia] Produção sem configuração obrigatória: ${faltando.join(', ')}.`);
+  if (process.env.MIDIA_SECRET.length < 32) throw new Error('[Vai Mídia] MIDIA_SECRET deve ter pelo menos 32 caracteres.');
+  if (process.env.MIDIA_ADMIN_SENHA.length < 12) throw new Error('[Vai Mídia] MIDIA_ADMIN_SENHA deve ter pelo menos 12 caracteres.');
 }
 
 // Endereço em que o painel é publicado: '' (raiz do domínio) ou um caminho, como '/midia'.

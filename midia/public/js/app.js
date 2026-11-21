@@ -6,7 +6,8 @@ import { TELAS_ANUNCIANTE, TELAS_LOJISTA } from './portais.js';
 const raiz = $('#app');
 let pararTela = null;
 let pararSaude = null;
-let nomePlataforma = 'Mídia Indoor';
+let nomePlataforma = 'Vai Mídia';
+let slogan = 'Sua marca em movimento.';
 
 // [rota, rótulo, ícone, perfis que veem (vazio = todos do grupo)]
 const MENUS = {
@@ -162,10 +163,15 @@ function telaEntrada() {
     });
   });
   limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'cartao' },
-    marca(nomePlataforma), el('h1', { style: 'margin:28px 0 4px;font-size:20px' }, 'Entrar no painel'),
-    el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'Equipe, anunciantes e lojistas entram por aqui.'), f,
+    marca(nomePlataforma),
+    slogan ? el('p', { class: 'slogan-marca' }, slogan) : null,
+    el('h1', { style: 'margin:22px 0 4px;font-size:20px' }, 'Entrar no painel'),
+    el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'Equipe, anunciantes e responsáveis pelos pontos entram por aqui.'), f,
     el('p', { class: 'pequeno mudo', style: 'margin:18px 0 0' }, 'Instalando uma TV? Abra ', el('a', { href: 'tv/' }, 'o player'), ' no aparelho.'))));
   f.querySelector('input').focus();
 }
 
-api.get('/publico').then((p) => { nomePlataforma = p.nome || 'Mídia Indoor'; }).catch(() => {}).finally(desenhar);
+api.get('/publico').then((p) => {
+  nomePlataforma = p.nome || 'Vai Mídia';
+  slogan = p.slogan ?? '';
+}).catch(() => {}).finally(desenhar);

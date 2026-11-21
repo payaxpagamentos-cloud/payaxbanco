@@ -1,4 +1,4 @@
-# Mídia Indoor
+# Vai Mídia
 
 Plataforma de **mídia digital em telas** (mídia indoor / DOOH), publicada em `/midia`.
 
@@ -95,6 +95,24 @@ O servidor monta a grade **na hora**, para cada tela, e o player só baixa de no
 5. Tela em retrato prefere criativo em retrato; em paisagem, o contrário.
 
 A tela *Programação* mostra exatamente esse resultado, inclusive simulando outro dia e horário.
+
+## A marca na tela
+
+A identidade **Vai Mídia** está aplicada no painel, no player e nas telas dos pontos:
+
+| | |
+|---|---|
+| Preto | `#111417` — menu, rodapé das telas e fundo dos comunicados |
+| Lime | `#C8FF31` — destaques, botão principal, relógio e o símbolo |
+| Off-white | `#F7F8FA` — fundo do painel no tema claro |
+
+O símbolo (o "V") está em [`public/img/marca.svg`](public/img/marca.svg), em vetor e herdando a cor de onde está
+(`currentColor`), e é o mesmo desenho usado no favicon, no menu do painel, na tela de pareamento e no rodapé das telas.
+Sobre o lime, o texto é sempre o preto da marca — em fundo claro, o lime puro não tem contraste para ler, então
+textos e traços de gráfico usam a versão escurecida (`--cor-tinta`).
+
+O **nome e a frase da marca** ficam em *Configurações › Marca* e valem para o painel inteiro e para as telas: quem
+revende a plataforma com outro nome troca ali, sem mexer no código.
 
 ## Comunicados do ponto e o layout da tela
 

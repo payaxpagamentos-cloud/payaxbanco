@@ -10,7 +10,7 @@ const PONTO = {
   horarios: [1, 2, 3, 4, 5, 6].map((d) => ({ dia_semana: d, abre: '06:00', fecha: '20:00' })),
 };
 
-test('Mídia Indoor — da instalação da TV ao faturamento', async (t) => {
+test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
   const api = await iniciar();
   t.after(() => { api.fechar(); limparArquivos(); });
   const master = await api.login();

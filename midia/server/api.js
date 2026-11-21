@@ -14,7 +14,10 @@ function criarApi(db) {
     res.json({ ok: true });
   });
   // Lido pela tela de entrada e pelo player antes de parear (só o nome da plataforma).
-  api.get('/publico', (_req, res) => res.json({ nome: lerConfig(db).nome_plataforma }));
+  api.get('/publico', (_req, res) => {
+    const c = lerConfig(db);
+    res.json({ nome: c.nome_plataforma, slogan: c.slogan });
+  });
 
   api.use('/auth', require('./routes/auth')(db, autenticado));
   // A TV fala por aqui: pareamento e, depois, com o token do aparelho.

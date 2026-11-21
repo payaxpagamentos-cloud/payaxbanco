@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#000000">
-  <title>Player — Mídia Indoor</title>
+  <meta name="theme-color" content="#111417">
+  <title>Player — Vai Mídia</title>
   <link rel="icon" href="../img/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="tv.css">
 </head>
@@ -23,14 +23,23 @@
   </div>
 
   <div class="espera" id="espera" hidden>
-    <div class="marca-tv"><span class="ponto"></span> <span id="espera-plataforma">Mídia Indoor</span></div>
+    <div class="marca-tv">
+      <svg class="simbolo" viewBox="0 0 138 111" aria-hidden="true"><path fill="currentColor" d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z"/></svg>
+      <span id="espera-plataforma">Vai Mídia</span>
+    </div>
+    <p class="slogan" id="espera-slogan"></p>
     <h1 id="espera-titulo">Preparando a tela…</h1>
     <p id="espera-texto" class="mudo"></p>
     <div class="codigo" id="codigo" hidden></div>
     <p id="espera-ajuda" class="ajuda" hidden>Informe este código no painel, em <strong>TVs › Parear aparelho</strong>.</p>
   </div>
 
+  <!-- Rodapé da tela: a marca da rede, o recado da faixa e o relógio. -->
   <div class="faixa" id="faixa" hidden>
+    <div class="marca-faixa">
+      <svg viewBox="0 0 138 111" aria-hidden="true"><path fill="currentColor" d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z"/></svg>
+      <span id="faixa-plataforma">Vai Mídia</span>
+    </div>
     <div class="texto" id="faixa-texto"></div>
     <div class="relogio" id="relogio" hidden></div>
   </div>
