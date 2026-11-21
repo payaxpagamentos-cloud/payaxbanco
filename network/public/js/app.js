@@ -1,17 +1,14 @@
 import { api, sessao } from './api.js';
 import { el, $, limpar, icone, iniciais, pode, usuario, toast, modal, formulario } from './ui.js';
 
-// [rota, rótulo, ícone, permissão, módulo]
+/*
+ * Menu. A ORDEM aqui é a ordem na tela e, mais do que isso, é a ordem de prioridade: quando o perfil de
+ * quem entra não tem acesso à rota pedida, o sistema abre a primeira que ele puder ver, percorrendo esta
+ * lista de cima para baixo. Mudar a ordem muda onde cada perfil cai.
+ *
+ * [rota, rótulo, ícone, permissão, módulo]
+ */
 const MENU = [
-  ['Operação', [
-    ['visao', 'Visão geral', 'painel', 'painel.ver', () => import('./telas/visao.js')],
-    ['noc', 'Central NOC', 'atividade', 'noc.ver', () => import('./telas/noc.js')],
-    ['rede', 'Rede óptica', 'rede', 'rede.ver', () => import('./telas/rede.js')],
-    ['chamados', 'Chamados técnicos', 'chamado', 'chamados.ver', () => import('./telas/chamados.js')],
-    ['panorama', 'Panorama', 'pino', 'panorama.ver', () => import('./telas/panorama.js')],
-    ['provisionamento', 'Provisionamento', 'servidor', ['contratos.ver', 'faturamento.ver'], () => import('./telas/provisionamento.js')],
-    ['equipe', 'Equipe e comissões', 'equipe', ['equipe.ver', 'comissoes.ver'], () => import('./telas/equipe.js')],
-  ]],
   ['Assinantes e financeiro', [
     ['assinantes', 'Assinantes', 'pessoa', 'assinantes.ver', () => import('./telas/assinantes.js')],
     ['contratos', 'Contratos', 'arquivo', 'contratos.ver', () => import('./telas/contratos.js')],
@@ -20,6 +17,15 @@ const MENU = [
     ['bancos', 'Cobrança bancária', 'recibo', 'faturamento.ver', () => import('./telas/cobrancas.js')],
     ['planos', 'Planos', 'camadas', 'contratos.ver', () => import('./telas/planos.js')],
     ['contabil', 'Contabilidade', 'painel', 'contabil.ver', () => import('./telas/contabil.js')],
+  ]],
+  ['Operação', [
+    ['visao', 'Visão geral', 'painel', 'painel.ver', () => import('./telas/visao.js')],
+    ['noc', 'Central NOC', 'atividade', 'noc.ver', () => import('./telas/noc.js')],
+    ['rede', 'Rede óptica', 'rede', 'rede.ver', () => import('./telas/rede.js')],
+    ['chamados', 'Chamados técnicos', 'chamado', 'chamados.ver', () => import('./telas/chamados.js')],
+    ['panorama', 'Panorama', 'pino', 'panorama.ver', () => import('./telas/panorama.js')],
+    ['provisionamento', 'Provisionamento', 'servidor', ['contratos.ver', 'faturamento.ver'], () => import('./telas/provisionamento.js')],
+    ['equipe', 'Equipe e comissões', 'equipe', ['equipe.ver', 'comissoes.ver'], () => import('./telas/equipe.js')],
   ]],
   ['Gestão de frota', [
     ['veiculos', 'Veículos', 'carro', 'frota.ver', () => import('./telas/veiculos.js')],
