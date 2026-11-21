@@ -345,33 +345,31 @@ número — envio automático exige contratar um provedor oficial da Meta (veja 
 
 ## O site do Vai Mídia
 
-A pasta `site/` é o site institucional: uma página só, sem framework e sem build, com a mesma identidade do
-produto (o preto, o lime e a Manrope). A capa mostra a **tela instalada no elevador** — a parede de aço, o painel
-de madeira, o indicador de andar e a tela com o recado do ponto de um lado e a publicidade girando do outro.
-A cena inteira é desenhada em CSS, com o mesmo layout do player: nada de foto de banco de imagem nem de prédio
-de outra empresa.
+A pasta `site/` traz o site institucional aprovado no atendimento: fundo claro, cabeçalho flutuante com efeito
+vidro, fotografias das telas **em uso** (shopping, elevador, TV indoor e recepção) e o planejador de campanha.
+Continua sem framework e sem compilação — HTML, CSS e JS editáveis —, com a fonte e o símbolo locais.
 
-Os **anúncios que giram na tela** são peças de exemplo desenhadas em SVG — imagem dominante, uma oferta só e a
-marca pequena, que é como se lê um anúncio de passagem. Para mostrar **arte real de cliente**, que é o que
-convence quem está decidindo comprar mídia, basta copiar os arquivos para `site/img/criativos/` e listá-los no
-`<body data-criativos="…">` (instruções em `site/img/criativos/LEIA-ME.md`). Arquivo que não carrega não quebra
-nada: a peça desenhada continua no lugar.
+As fotografias são recortes, feitos no navegador por `data-crop`, da arte aprovada
+(`assets/layout-aprovado.webp`). São **aplicações ilustrativas**, e o site diz isso no rodapé: não são fotos de
+pontos ou clientes reais da rede.
 
-Depois vêm onde a rede fica, como funciona, o que muda para quem anuncia e para quem tem o
-espaço (condomínio, loja, academia, clínica), e o formulário de contato.
+Três coisas ligam o site ao sistema:
 
-Duas coisas fazem o site trabalhar em vez de só existir:
+- **O planejador vira lead no CRM.** Além de montar o briefing para baixar, copiar ou mandar no WhatsApp, o
+  pedido é enviado para `/api/contato` e entra no funil com origem "site" — quem quer anunciar como lead de
+  anunciante, quem oferece o espaço como lead de ponto. A mensagem de recebimento só aparece depois que o
+  servidor confirma. Por isso o formulário pede **nome, e-mail e WhatsApp**: pedido sem caminho de volta não
+  vira negócio.
+- **O WhatsApp sai do painel.** O número cadastrado em *Configurações → WhatsApp da empresa* aparece no
+  resultado do briefing, sem ninguém editar arquivo.
+- **O rodapé leva ao painel**, para quem já é cliente entrar no portal.
 
-- **O formulário cai no CRM**: o pedido entra como *lead* com origem "site", já com a mensagem na primeira
-  anotação. Ninguém copia e-mail para planilha.
-- **Os números da rede são ao vivo**: telas, pontos, cidades e pessoas por mês vêm da API (`/api/publico/rede`,
-  só agregados — nenhum nome de ponto ou cliente). Com a rede ainda vazia, a faixa de números simplesmente não
-  aparece.
+O servidor publica o site na **raiz do domínio** e também em `<base>/site/`; o painel segue em `<base>/`
+(padrão `/midia/`). Para hospedar o site separado (Vercel, Netlify, nginx), basta subir a pasta e desligar aqui
+com `MIDIA_SITE=0` — nesse caso ele descobre a API sozinho, ou você fixa o endereço com
+`<body data-api="https://seu-dominio/midia/api/">`. Sem API por perto, o site funciona como pacote estático.
 
-O servidor publica o site na **raiz do domínio** (onde o visitante chega) e também em `<base>/site/`; o painel
-segue em `<base>/` (padrão `/midia/`). Para hospedar o site separado (Vercel, Netlify, nginx), basta subir a
-pasta `site/` e desligar aqui com `MIDIA_SITE=0` — nesse caso ele descobre a API sozinho, ou você fixa o
-endereço com `<body data-api="https://seu-dominio/midia/api/">`.
+O portfólio comercial em PDF fica em `site/assets/` e é baixado pelo próprio site.
 
 ## Como executar
 

@@ -1039,14 +1039,16 @@ test('Site do Vai Mídia: abre na raiz e o formulário vira lead', async (t) => 
     const r = await fetch(`${raiz}/`);
     assert.equal(r.status, 200);
     const html = await r.text();
-    assert.match(html, /Sua marca <em>em movimento<\/em>/);
+    assert.match(html, /Sua marca no<br><span>centro da atenção\.<\/span>/, 'o visual aprovado está no ar');
     assert.match(html, /<body[^>]*data-api="\/midia\/api\/"/, 'o site não precisa sair procurando a API');
-    assert.match(html, /data-criativos=/, 'o encaixe das artes reais continua no lugar');
+    assert.match(html, /id="painel-link"/, 'quem já é cliente chega ao painel pelo rodapé');
 
     // O painel continua no lugar dele, e o site também responde em /midia/site/.
     assert.equal((await fetch(`${raiz}/midia/`)).status, 200);
     assert.equal((await fetch(`${raiz}/midia/site/`)).status, 200);
-    assert.equal((await fetch(`${raiz}/site.css`)).status, 200, 'os arquivos do site saem na raiz');
+    assert.equal((await fetch(`${raiz}/css/styles.css`)).status, 200, 'os arquivos do site saem na raiz');
+    assert.equal((await fetch(`${raiz}/assets/layout-aprovado.webp`)).status, 200);
+    assert.equal((await fetch(`${raiz}/assets/VAI_MIDIA_Portfolio_Comercial.pdf`)).status, 200, 'o portfólio baixa pelo site');
   });
 
   await t.test('os números da rede são agregados, sem nome de ninguém', async () => {

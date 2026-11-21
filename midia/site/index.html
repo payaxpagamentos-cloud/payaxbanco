@@ -1,454 +1,190 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vai Mídia — sua marca em movimento</title>
-<meta name="description" content="Mídia digital em telas de condomínios, prédios comerciais, mercados, academias e clínicas: o seu anúncio no elevador, no hall e na fila do caixa, com prova de exibição de cada vez que ele foi ao ar.">
-<meta name="theme-color" content="#111417">
-<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
-<meta property="og:title" content="Vai Mídia — sua marca em movimento">
-<meta property="og:description" content="Telas em condomínios, prédios comerciais, mercados, academias e clínicas. O seu anúncio onde as pessoas passam todo dia, com relatório do que foi ao ar.">
-<meta property="og:type" content="website">
-<link rel="stylesheet" href="site.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#F5F7FA">
+  <meta name="description" content="VAI MÍDIA. Mídia digital em shopping, elevadores, TVs indoor e recepções. Conheça os formatos e planeje sua campanha.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="VAI MÍDIA | Sua marca em movimento">
+  <meta property="og:description" content="Mídia digital nos lugares que fazem parte da vida. Conheça os formatos e planeje sua campanha.">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>VAI MÍDIA | Sua marca em movimento</title>
+  <link rel="icon" type="image/svg+xml" href="assets/marca.svg">
+  <link rel="preload" href="assets/fonts/OpenSans-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="assets/fonts/OpenSans-Bold.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/config.js" defer></script>
+  <script src="js/app.js" defer></script>
 </head>
-<!--
-  data-criativos: as artes reais que giram na tela da capa. Ponha os arquivos em site/img/criativos/
-  e liste os nomes aqui, separados por vírgula (até três). Vazio = as peças de exemplo desenhadas em SVG.
--->
-<body data-criativos="">
-<a class="pular" href="#conteudo">Pular para o conteúdo</a>
-
-<header class="topo" id="topo">
-  <div class="faixa-topo">
-    <a class="marca" href="#topo" aria-label="Vai Mídia, página inicial">
-      <svg class="simbolo" viewBox="0 0 138 111" aria-hidden="true"><path d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z" fill="currentColor"/></svg>
+<body>
+  <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+  <header class="site-header">
+    <a class="brand" href="#inicio" aria-label="VAI MÍDIA, início">
+      <img src="assets/marca.svg" alt="" width="46" height="38">
       <span>VAI MÍDIA</span>
     </a>
-    <nav class="menu" aria-label="Seções do site">
-      <a href="#rede">A rede</a>
-      <a href="#como">Como funciona</a>
+    <nav class="desktop-nav" aria-label="Navegação principal">
+      <a href="#solucoes">Soluções</a>
       <a href="#anunciantes">Para anunciantes</a>
-      <a href="#pontos">Quero uma tela</a>
+      <a href="#parceiros">Para parceiros</a>
     </nav>
-    <div class="acoes-topo">
-      <a class="btn fantasma" href="../" data-painel>Entrar no painel</a>
-      <a class="btn" href="#contato">Falar com a gente</a>
-    </div>
-    <button class="menu-botao" type="button" aria-label="Abrir o menu" aria-expanded="false">
+    <button class="header-cta" type="button" data-open-brief>Quero anunciar</button>
+    <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-controls="mobile-menu" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
-  </div>
-</header>
-
-<main id="conteudo">
-  <!-- Capa: a frase da marca e, ao lado, uma tela de elevador de verdade (o mesmo layout do player). -->
-  <section class="capa">
-    <div class="capa-texto">
-      <p class="chapeu">Mídia digital indoor</p>
-      <h1>Sua marca <em>em movimento</em>.</h1>
-      <p class="linha-fina">
-        Telas em condomínios, prédios comerciais, mercados, academias e clínicas: o seu anúncio onde as pessoas
-        passam todo dia, no caminho do elevador, do hall e da fila do caixa. Com relatório de cada vez que ele foi ao ar.
-      </p>
-      <div class="botoes">
-        <a class="btn grande" href="#contato" data-intencao="anunciante">Quero anunciar</a>
-        <a class="btn grande fantasma" href="#contato" data-intencao="ponto">Quero uma tela no meu espaço</a>
-      </div>
-      <dl class="numeros" id="numeros" hidden>
-        <div><dt>Telas no ar</dt><dd data-numero="telas">—</dd></div>
-        <div><dt>Pontos na rede</dt><dd data-numero="pontos">—</dd></div>
-        <div><dt>Cidades</dt><dd data-numero="cidades">—</dd></div>
-        <div><dt>Pessoas por mês</dt><dd data-numero="publico_mes">—</dd></div>
-      </dl>
-    </div>
-
-    <!--
-      A tela como ela aparece de verdade: instalada na parede do elevador, metade com o recado do
-      ponto, metade com a publicidade girando. O cenário é desenhado em CSS — nada de foto de banco
-      de imagem nem de prédio de outra empresa.
-    -->
-    <div class="capa-tela" aria-hidden="true">
-      <div class="elevador">
-        <div class="parede-aco">
-          <div class="indicador"><span class="seta">▲</span><span class="andar">4</span></div>
-          <div class="placa"><b>13 PESSOAS</b><span>1000 kg</span></div>
-          <div class="botoes"><i></i><i></i><i></i></div>
-        </div>
-        <div class="parede-madeira">
-          <div class="aparelho">
-            <div class="tela">
-              <div class="zona-aviso">
-                <span class="selo">Assembleia</span>
-                <strong>Assembleia geral</strong>
-                <p>Quinta, 19h, no salão de festas.</p>
-                <span class="assinatura">Administração / Síndico</span>
-              </div>
-              <div class="zona-anuncio">
-                <!--
-                  Peças de exemplo, no formato que vai ao ar: imagem ocupando a tela, uma oferta só e
-                  a marca pequena. São vetores desenhados aqui — a empresa troca pelas artes reais dos
-                  clientes dela preenchendo data-criativos no <body> (veja o README do site).
-                -->
-                <div class="anuncio a1">
-                  <svg viewBox="0 0 400 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-                    <defs>
-                      <radialGradient id="pz-luz" cx="70%" cy="34%" r="75%">
-                        <stop offset="0" stop-color="#7E1C14"/><stop offset=".6" stop-color="#4A0E0B"/><stop offset="1" stop-color="#220604"/>
-                      </radialGradient>
-                      <radialGradient id="pz-massa" cx="38%" cy="32%" r="72%">
-                        <stop offset="0" stop-color="#F6D08A"/><stop offset=".72" stop-color="#D79B4B"/><stop offset="1" stop-color="#A96D2B"/>
-                      </radialGradient>
-                      <radialGradient id="pz-molho" cx="40%" cy="34%" r="70%">
-                        <stop offset="0" stop-color="#E35B33"/><stop offset="1" stop-color="#A62E18"/>
-                      </radialGradient>
-                      <linearGradient id="pz-veu" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stop-color="#1A0403" stop-opacity=".92"/>
-                        <stop offset=".34" stop-color="#1A0403" stop-opacity=".45"/>
-                        <stop offset=".62" stop-color="#1A0403" stop-opacity="0"/>
-                      </linearGradient>
-                      <linearGradient id="pz-baixo" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0" stop-color="#140302" stop-opacity="0"/>
-                        <stop offset="1" stop-color="#140302" stop-opacity=".9"/>
-                      </linearGradient>
-                    </defs>
-                    <rect width="400" height="340" fill="url(#pz-luz)"/>
-                    <!-- a pizza domina a peça, como a foto domina o anúncio -->
-                    <g transform="translate(308 134)">
-                      <ellipse cx="6" cy="122" rx="112" ry="20" fill="#150302" opacity=".45"/>
-                      <circle r="116" fill="url(#pz-massa)"/>
-                      <circle r="98" fill="url(#pz-molho)"/>
-                      <g fill="#FBDC93" opacity=".95">
-                        <ellipse cx="-50" cy="-40" rx="28" ry="19" transform="rotate(-18 -50 -40)"/>
-                        <ellipse cx="20" cy="-64" rx="22" ry="15" transform="rotate(14 20 -64)"/>
-                        <ellipse cx="-14" cy="32" rx="31" ry="20" transform="rotate(-8 -14 32)"/>
-                        <ellipse cx="58" cy="-6" rx="20" ry="14" transform="rotate(24 58 -6)"/>
-                        <ellipse cx="-64" cy="44" rx="18" ry="13"/>
-                        <ellipse cx="38" cy="66" rx="21" ry="14" transform="rotate(-12 38 66)"/>
-                      </g>
-                      <g fill="#9E2316">
-                        <circle cx="-68" cy="-10" r="16"/><circle cx="-4" cy="-45" r="14"/>
-                        <circle cx="41" cy="31" r="17"/><circle cx="-37" cy="65" r="13"/>
-                        <circle cx="70" cy="-46" r="12"/><circle cx="-85" cy="34" r="10"/>
-                      </g>
-                      <g fill="#D4573A" opacity=".6">
-                        <circle cx="-68" cy="-13" r="16"/><circle cx="-4" cy="-48" r="14"/><circle cx="41" cy="28" r="17"/>
-                      </g>
-                      <g fill="#2F8A36">
-                        <path d="M-32 -4c11-16 34-19 42-10-8 16-31 21-42 10Z"/>
-                        <path d="M20 56c10-15 31-18 39-9-8 15-29 20-39 9Z"/>
-                        <path d="M-76 -56c11-10 28-7 32 1-9 10-26 11-32-1Z"/>
-                      </g>
-                      <circle r="116" fill="none" stroke="#000" stroke-opacity=".16" stroke-width="9"/>
-                    </g>
-                    <rect width="400" height="340" fill="url(#pz-veu)"/>
-                    <rect y="210" width="400" height="130" fill="url(#pz-baixo)"/>
-                    <!-- marca pequena, oferta grande: é assim que se lê de passagem -->
-                    <text x="26" y="46" font-family="Manrope, sans-serif" font-size="15" font-weight="800" letter-spacing="3" fill="#F3B45C">FORNO DE PEDRA</text>
-                    <text x="24" y="134" font-family="Manrope, sans-serif" font-size="74" font-weight="800" letter-spacing="-3.5" fill="#fff">2 POR 1</text>
-                    <text x="26" y="168" font-family="Manrope, sans-serif" font-size="21" font-weight="700" letter-spacing="1.6" fill="#FFCE8E">TERÇA E QUARTA</text>
-                    <g transform="translate(26 232)">
-                      <rect width="152" height="52" rx="26" fill="#C8FF31"/>
-                      <text x="22" y="34" font-family="Manrope, sans-serif" font-size="25" font-weight="800" fill="#111417">R$ 39,90</text>
-                      <text x="166" y="34" font-family="Manrope, sans-serif" font-size="15" font-weight="700" fill="#FFCE8E">a grande</text>
-                    </g>
-                    <text x="26" y="312" font-family="Manrope, sans-serif" font-size="15" font-weight="600" fill="#C6A98E">Peça pelo WhatsApp · entrega em 40 min</text>
-                  </svg>
-                </div>
-
-                <div class="anuncio a2">
-                  <svg viewBox="0 0 400 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-                    <defs>
-                      <linearGradient id="im-ceu" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0" stop-color="#15324F"/><stop offset=".4" stop-color="#2A6076"/>
-                        <stop offset=".66" stop-color="#E08A4A"/><stop offset=".86" stop-color="#F7B96E"/><stop offset="1" stop-color="#FFD79B"/>
-                      </linearGradient>
-                      <linearGradient id="im-torre" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stop-color="#F2F5F3"/><stop offset=".65" stop-color="#CBD6CE"/><stop offset="1" stop-color="#9DAFA3"/>
-                      </linearGradient>
-                      <linearGradient id="im-veu" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0" stop-color="#06131C" stop-opacity=".9"/>
-                        <stop offset=".3" stop-color="#06131C" stop-opacity=".58"/>
-                        <stop offset=".62" stop-color="#06131C" stop-opacity="0"/>
-                        <stop offset=".84" stop-color="#06131C" stop-opacity=".6"/>
-                        <stop offset="1" stop-color="#06131C" stop-opacity=".92"/>
-                      </linearGradient>
-                    </defs>
-                    <rect width="400" height="340" fill="url(#im-ceu)"/>
-                    <circle cx="312" cy="226" r="40" fill="#FFE2B4" opacity=".95"/>
-                    <circle cx="312" cy="226" r="78" fill="#FFD79B" opacity=".25"/>
-                    <!-- o empreendimento: torres contra o fim de tarde -->
-                    <g>
-                      <rect x="150" y="96" width="92" height="244" rx="7" fill="url(#im-torre)"/>
-                      <rect x="252" y="150" width="70" height="190" rx="7" fill="#C2CEC6"/>
-                      <rect x="330" y="192" width="54" height="148" rx="6" fill="#A4B5AA"/>
-                      <rect x="104" y="214" width="40" height="126" rx="5" fill="#93A69B"/>
-                      <g fill="#16323F" opacity=".5">
-                        <rect x="164" y="116" width="18" height="14" rx="2"/><rect x="190" y="116" width="18" height="14" rx="2"/><rect x="216" y="116" width="14" height="14" rx="2"/>
-                        <rect x="164" y="146" width="18" height="14" rx="2"/><rect x="190" y="146" width="18" height="14" rx="2"/><rect x="216" y="146" width="14" height="14" rx="2"/>
-                        <rect x="164" y="176" width="18" height="14" rx="2"/><rect x="190" y="176" width="18" height="14" rx="2"/><rect x="216" y="176" width="14" height="14" rx="2"/>
-                        <rect x="164" y="206" width="18" height="14" rx="2"/><rect x="190" y="206" width="18" height="14" rx="2"/><rect x="216" y="206" width="14" height="14" rx="2"/>
-                        <rect x="264" y="168" width="16" height="13" rx="2"/><rect x="290" y="168" width="16" height="13" rx="2"/>
-                        <rect x="264" y="196" width="16" height="13" rx="2"/><rect x="290" y="196" width="16" height="13" rx="2"/>
-                        <rect x="342" y="210" width="14" height="12" rx="2"/><rect x="364" y="210" width="14" height="12" rx="2"/>
-                      </g>
-                      <g fill="#FFD9A0">
-                        <rect x="164" y="236" width="18" height="14" rx="2"/><rect x="216" y="176" width="14" height="14" rx="2"/>
-                        <rect x="290" y="224" width="16" height="13" rx="2"/><rect x="342" y="238" width="14" height="12" rx="2"/>
-                        <rect x="190" y="266" width="18" height="14" rx="2"/>
-                      </g>
-                    </g>
-                    <rect width="400" height="340" fill="url(#im-veu)"/>
-                    <text x="26" y="46" font-family="Manrope, sans-serif" font-size="15" font-weight="800" letter-spacing="3" fill="#C8FF31">CASA NOVA</text>
-                    <text x="24" y="120" font-family="Manrope, sans-serif" font-size="58" font-weight="800" letter-spacing="-2.6" fill="#fff">3 dorms</text>
-                    <text x="24" y="172" font-family="Manrope, sans-serif" font-size="58" font-weight="800" letter-spacing="-2.6" fill="#fff">no Cambuí</text>
-                    <g transform="translate(26 286)">
-                      <text y="0" font-family="Manrope, sans-serif" font-size="15" font-weight="700" letter-spacing="1" fill="#CFE6D6">ENTRADA FACILITADA</text>
-                      <text y="30" font-family="Manrope, sans-serif" font-size="27" font-weight="800" fill="#C8FF31">a partir de R$ 650 mil</text>
-                    </g>
-                  </svg>
-                </div>
-
-                <div class="anuncio a3">
-                  <svg viewBox="0 0 400 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-                    <defs>
-                      <radialGradient id="ac-luz" cx="72%" cy="34%" r="78%">
-                        <stop offset="0" stop-color="#2A323B"/><stop offset=".7" stop-color="#12171C"/><stop offset="1" stop-color="#07090C"/>
-                      </radialGradient>
-                      <linearGradient id="ac-veu" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0" stop-color="#07090C" stop-opacity=".92"/>
-                        <stop offset=".45" stop-color="#07090C" stop-opacity=".35"/>
-                        <stop offset="1" stop-color="#07090C" stop-opacity="0"/>
-                      </linearGradient>
-                    </defs>
-                    <rect width="400" height="340" fill="url(#ac-luz)"/>
-                    <g opacity=".14" fill="#C8FF31">
-                      <path d="M330 -20 230 360h44L374 -20Z"/>
-                      <path d="M392 -20 292 360h30L422 -20Z"/>
-                    </g>
-                    <!-- selo de oferta, como adesivo de vitrine -->
-                    <g transform="translate(320 106) rotate(-11)">
-                      <circle r="66" fill="#C8FF31"/>
-                      <circle r="58" fill="none" stroke="#111417" stroke-opacity=".25" stroke-width="2" stroke-dasharray="5 6"/>
-                      <text y="-12" text-anchor="middle" font-family="Manrope, sans-serif" font-size="22" font-weight="800" fill="#111417">1ª AULA</text>
-                      <text y="22" text-anchor="middle" font-family="Manrope, sans-serif" font-size="33" font-weight="800" letter-spacing="-1" fill="#111417">GRÁTIS</text>
-                    </g>
-                    <rect width="400" height="340" fill="url(#ac-veu)"/>
-                    <text x="26" y="46" font-family="Manrope, sans-serif" font-size="15" font-weight="800" letter-spacing="3" fill="#C8FF31">FORÇA TOTAL</text>
-                    <text x="24" y="134" font-family="Manrope, sans-serif" font-size="52" font-weight="800" letter-spacing="-2.2" fill="#fff">Comece</text>
-                    <text x="24" y="186" font-family="Manrope, sans-serif" font-size="52" font-weight="800" letter-spacing="-2.2" fill="#fff">hoje</text>
-                    <g transform="translate(26 226)">
-                      <rect width="186" height="48" rx="24" fill="#fff"/>
-                      <text x="22" y="31" font-family="Manrope, sans-serif" font-size="20" font-weight="800" fill="#111417">Matrícula zero</text>
-                    </g>
-                    <text x="26" y="312" font-family="Manrope, sans-serif" font-size="15" font-weight="600" fill="#9AA3AD">Musculação, funcional e dança</text>
-                  </svg>
-                </div>
-              </div>
-              <div class="faixa-tela">
-                <svg class="simbolo" viewBox="0 0 138 111" aria-hidden="true"><path d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z" fill="currentColor"/></svg>
-                <span>VAI MÍDIA</span>
-                <em>27°</em>
-                <strong>19:42</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="porta"></div>
-      </div>
-      <p class="legenda-capa">Elevador social de um condomínio atendido pela rede</p>
-    </div>
-  </section>
-
-  <!-- Onde as telas ficam -->
-  <section class="secao" id="rede">
-    <div class="cabeca-secao">
-      <h2>Onde a sua marca aparece</h2>
-      <p>Lugar de espera é lugar de atenção. É ali que a tela entra.</p>
-    </div>
-    <div class="cartoes">
-      <article class="cartao">
-        <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v16"/><path d="M14 9h5a1 1 0 0 1 1 1v11"/><path d="M2 21h20"/><path d="M7 8h3M7 12h3M7 16h3M17 13h0M17 17h0"/></svg></span>
-        <h3>Condomínios residenciais</h3>
-        <p>Elevador social, hall e portaria. O morador passa duas, três vezes por dia — e olha a tela enquanto espera.</p>
-      </article>
-      <article class="cartao">
-        <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M2.5 12h19"/></svg></span>
-        <h3>Prédios comerciais</h3>
-        <p>Recepção e elevadores de escritório, onde circula quem decide e quem trabalha no prédio inteiro.</p>
-      </article>
-      <article class="cartao">
-        <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3h2.2l2.3 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L20.5 7H6"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg></span>
-        <h3>Mercados e lojas</h3>
-        <p>Fila do caixa, balcão e corredor: a mensagem chega a quem já está com a carteira na mão.</p>
-      </article>
-      <article class="cartao">
-        <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"/></svg></span>
-        <h3>Academias e clínicas</h3>
-        <p>Recepção e sala de espera, com o tempo de permanência mais longo de toda a rede.</p>
-      </article>
-    </div>
-  </section>
-
-  <!-- Como funciona -->
-  <section class="secao escura" id="como">
-    <div class="cabeca-secao">
-      <h2>Como funciona</h2>
-      <p>Do primeiro contato ao relatório do mês, sem complicação para ninguém.</p>
-    </div>
-    <ol class="passos">
-      <li>
-        <span class="n">1</span>
-        <h3>A gente instala</h3>
-        <p>A tela e o aparelho são nossos. O local só cede o ponto de energia e a internet — sem obra e sem custo.</p>
-      </li>
-      <li>
-        <span class="n">2</span>
-        <h3>Você manda a arte</h3>
-        <p>Imagem ou vídeo, na medida da tela. Se preferir, a nossa equipe cria a peça para você.</p>
-      </li>
-      <li>
-        <span class="n">3</span>
-        <h3>O anúncio entra no ar</h3>
-        <p>Ele se alterna com os outros anunciantes ao longo de todo o horário do ponto, em um carrossel que nunca para.</p>
-      </li>
-      <li>
-        <span class="n">4</span>
-        <h3>Você vê a prova</h3>
-        <p>Todo mês, o relatório com data, hora e tela de cada vez que o seu anúncio foi exibido. Nada de estimativa solta.</p>
-      </li>
-    </ol>
-  </section>
-
-  <!-- Para anunciantes -->
-  <section class="secao" id="anunciantes">
-    <div class="duas-colunas">
-      <div>
-        <p class="chapeu">Para quem anuncia</p>
-        <h2>A sua marca no caminho de quem decide</h2>
-        <p class="linha-fina">
-          Você escolhe o circuito — só condomínios, só academias, só a sua região, ou a rede inteira — e nós cuidamos do resto.
-          O investimento é mensal, com nota fiscal, e o relatório chega sem você precisar pedir.
-        </p>
-        <ul class="lista-marcada">
-          <li><strong>Prova de exibição:</strong> cada inserção registrada pela própria TV, com data, hora e tela.</li>
-          <li><strong>Pessoas alcançadas:</strong> estimativa pelo fluxo real de cada ponto, não por chute.</li>
-          <li><strong>Portal do anunciante:</strong> acompanhe as campanhas, as faturas e o contrato quando quiser.</li>
-          <li><strong>Sem fidelidade escondida:</strong> prazo, valor e reajuste combinados em contrato, na sua frente.</li>
-        </ul>
-        <a class="btn grande" href="#contato" data-intencao="anunciante">Pedir uma proposta</a>
-      </div>
-      <figure class="quadro">
-        <blockquote>
-          “Em vez de panfleto na portaria, o anúncio aparece na tela do elevador — e eu recebo o relatório
-          mostrando quantas vezes ele passou.”
-        </blockquote>
-        <figcaption>O que a prova de exibição muda para quem anuncia</figcaption>
-      </figure>
-    </div>
-  </section>
-
-  <!-- Para quem tem o espaço: condomínio, loja, academia, clínica, prédio comercial -->
-  <section class="secao lime" id="pontos">
-    <div class="duas-colunas">
-      <figure class="quadro claro">
-        <blockquote>
-          “A tela virou o mural do lugar: no prédio é a assembleia e a encomenda na portaria; na academia, o horário
-          das aulas; na clínica, o aviso da recepção. Sempre onde todo mundo passa.”
-        </blockquote>
-        <figcaption>O que o síndico, o lojista ou o gerente ganha com a parceria</figcaption>
-      </figure>
-      <div>
-        <p class="chapeu">Para quem tem o espaço</p>
-        <h2>Uma tela no seu espaço, sem custo nenhum</h2>
-        <p class="linha-fina">
-          Condomínio, prédio comercial, mercado, academia, clínica, padaria: se passa gente ali, cabe uma tela.
-          A instalação, o aparelho e a manutenção são por nossa conta. Em troca do espaço, o lugar ganha um canal
-          próprio de comunicação — e, conforme o combinado, uma parte da receita dos anúncios.
-        </p>
-        <ul class="lista-marcada">
-          <li><strong>Os seus recados</strong> em destaque, ao lado dos anúncios, publicados por você mesmo.</li>
-          <li><strong>Agenda e clima do dia</strong> na tela, que é o que faz as pessoas olharem por vontade própria.</li>
-          <li><strong>Sem obra:</strong> precisamos só de uma tomada e da internet do local.</li>
-          <li><strong>Portal próprio</strong> para escrever os recados e acompanhar o repasse, se houver.</li>
-        </ul>
-        <a class="btn grande escuro" href="#contato" data-intencao="ponto">Quero uma tela no meu espaço</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- Contato: cai direto no CRM como lead -->
-  <section class="secao" id="contato">
-    <div class="duas-colunas">
-      <div>
-        <p class="chapeu">Contato</p>
-        <h2>Conte o que você precisa</h2>
-        <p class="linha-fina">
-          Deixe o seu contato e a gente responde com a proposta ou com a visita ao seu espaço. Sem robô: quem responde
-          é a nossa equipe comercial.
-        </p>
-        <ul class="lista-simples">
-          <li><a class="link-whats" data-whatsapp href="#" target="_blank" rel="noopener" hidden>Falar agora no WhatsApp</a></li>
-          <li><a href="mailto:contato@vaimidia.com.br">contato@vaimidia.com.br</a></li>
-          <li>Campinas e região — São Paulo</li>
-        </ul>
-      </div>
-
-      <form class="formulario" id="form-contato" novalidate>
-        <div class="escolha-tipo" role="radiogroup" aria-label="O que você quer">
-          <label><input type="radio" name="tipo" value="anunciante" checked><span>Quero anunciar</span></label>
-          <label><input type="radio" name="tipo" value="ponto"><span>Quero uma tela no meu espaço</span></label>
-        </div>
-        <label class="campo">Empresa, condomínio ou estabelecimento
-          <input name="nome" required maxlength="120" autocomplete="organization">
-        </label>
-        <label class="campo">Seu nome
-          <input name="contato" maxlength="120" autocomplete="name">
-        </label>
-        <div class="dois">
-          <label class="campo">E-mail
-            <input name="email" type="email" maxlength="160" autocomplete="email">
-          </label>
-          <label class="campo">Telefone ou WhatsApp
-            <input name="telefone" maxlength="20" autocomplete="tel" inputmode="tel">
-          </label>
-        </div>
-        <label class="campo">Cidade
-          <input name="cidade" maxlength="80" autocomplete="address-level2">
-        </label>
-        <label class="campo">Mensagem
-          <textarea name="mensagem" rows="3" maxlength="500" placeholder="Ex.: tenho uma padaria no Cambuí e quero anunciar nas telas da região."></textarea>
-        </label>
-        <p class="pequeno">Deixe pelo menos um e-mail ou um telefone para a gente conseguir responder.</p>
-        <button class="btn grande" type="submit">Enviar</button>
-        <p class="resposta" id="resposta" role="status" hidden></p>
-      </form>
-    </div>
-  </section>
-</main>
-
-<footer class="rodape">
-  <div class="faixa-rodape">
-    <a class="marca" href="#topo">
-      <svg class="simbolo" viewBox="0 0 138 111" aria-hidden="true"><path d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z" fill="currentColor"/></svg>
-      <span>VAI MÍDIA</span>
-    </a>
-    <p>Sua marca em movimento.</p>
-    <nav aria-label="Rodapé">
-      <a href="#rede">A rede</a>
-      <a href="#como">Como funciona</a>
-      <a href="#contato">Contato</a>
-      <a href="../" data-painel>Painel</a>
+    <nav class="mobile-nav" id="mobile-menu" aria-label="Navegação para celular" hidden>
+      <a href="#solucoes">Soluções</a>
+      <a href="#anunciantes">Para anunciantes</a>
+      <a href="#parceiros">Para parceiros</a>
+      <a href="#portfolio">Portfólio</a>
+      <button type="button" data-open-brief>Quero anunciar</button>
     </nav>
-  </div>
-  <p class="direitos">© <span id="ano">2026</span> Vai Mídia. Mídia digital indoor.</p>
-</footer>
+  </header>
 
-<!-- Botão flutuante: só aparece quando a empresa cadastrou o WhatsApp no painel. -->
-<a class="whats-flutuante" id="whats-flutuante" href="#" target="_blank" rel="noopener" hidden aria-label="Falar no WhatsApp">
-  <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.3-1.39a9.86 9.86 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.64-1.03-5.13-2.9-7A9.82 9.82 0 0 0 12.04 2Zm0 18.15h-.01a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.1.81.83-3.02-.2-.31a8.17 8.17 0 0 1-1.26-4.4c0-4.54 3.7-8.23 8.24-8.23 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.7 8.24-8.25 8.24Zm4.52-6.16c-.25-.13-1.47-.72-1.69-.81-.23-.08-.39-.13-.56.12-.16.25-.64.81-.78.97-.14.17-.29.19-.54.06-.25-.12-1.05-.38-1.99-1.23-.74-.65-1.23-1.46-1.38-1.71-.14-.25-.01-.38.11-.51.11-.11.25-.29.37-.43.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.35-.76-1.84-.2-.48-.4-.42-.56-.43h-.48c-.16 0-.43.06-.65.31-.23.25-.86.84-.86 2.05s.88 2.38 1 2.54c.12.17 1.73 2.64 4.19 3.7.59.26 1.04.41 1.4.52.59.19 1.12.16 1.55.1.47-.07 1.47-.6 1.67-1.18.21-.58.21-1.07.15-1.18-.06-.11-.23-.17-.48-.3Z"/></svg>
-</a>
+  <main id="conteudo">
+    <section class="hero" id="inicio" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <h1 id="hero-title">Sua marca no<br><span>centro da atenção.</span></h1>
+        <p>Mídia digital nos lugares que fazem parte da vida.</p>
+        <div class="hero-actions">
+          <button class="hero-cta" type="button" data-open-brief><img src="assets/marca.svg" alt="" width="25" height="21">Quero anunciar</button>
+          <a class="formats-link" href="#solucoes">Conheça os formatos</a>
+        </div>
+      </div>
+      <div class="hero-art photo-window" data-crop="582,94,905,518">
+        <img src="assets/layout-aprovado.webp" width="1487" height="1058" alt="Aplicações ilustrativas: painel com campanha de perfume no shopping e TV com campanha de café." fetchpriority="high">
+      </div>
+    </section>
 
-<script src="site.js" type="module"></script>
+    <section class="solutions section-shell" id="solucoes" aria-labelledby="solutions-title">
+      <div class="solutions-heading">
+        <h2 id="solutions-title">Onde a vida acontece.</h2>
+        <div class="format-tabs" role="tablist" aria-label="Formatos de mídia">
+          <button id="tab-shopping" type="button" role="tab" aria-selected="true" aria-controls="format-panel" tabindex="0" data-format="shopping">Shopping</button>
+          <button id="tab-elevadores" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="elevadores">Elevadores</button>
+          <button id="tab-tv" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="tv">TVs indoor</button>
+          <button id="tab-recepcoes" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="recepcoes">Recepções</button>
+        </div>
+      </div>
+      <div class="gallery-pair" aria-label="Exemplos de campanhas">
+        <figure>
+          <div class="gallery-image photo-window" data-crop="61,752,653,274"><img src="assets/layout-aprovado.webp" width="1487" height="1058" alt="Aplicação ilustrativa de campanha automotiva em tela próxima ao elevador." loading="lazy"></div>
+          <figcaption>Mensagens que acompanham cada trajeto.</figcaption>
+        </figure>
+        <figure>
+          <div class="gallery-image photo-window" data-crop="731,752,694,274"><img src="assets/layout-aprovado.webp" width="1487" height="1058" alt="Aplicação ilustrativa de campanha em um totem de recepção." loading="lazy"></div>
+          <figcaption>Campanhas que fazem parte do ambiente.</figcaption>
+        </figure>
+      </div>
+      <p class="image-note">Aplicações ilustrativas.</p>
+      <div class="format-panel" id="format-panel" role="tabpanel" aria-labelledby="tab-shopping" tabindex="0">
+        <div class="selected-image photo-window" id="format-image" data-crop="584,122,511,438"><img src="assets/layout-aprovado.webp" width="1487" height="1058" alt="Painel publicitário em shopping, aplicação ilustrativa." loading="lazy"></div>
+        <div class="format-copy" aria-live="polite" aria-atomic="true">
+          <span class="format-name" id="format-name">Shopping</span>
+          <h3 id="format-title">Sua marca no caminho das pessoas.</h3>
+          <p id="format-description">Campanhas digitais que entram na rotina de quem passeia, encontra e consome.</p>
+          <dl>
+            <div><dt>Ambientes</dt><dd id="format-locations">Corredores, entradas e áreas de circulação.</dd></div>
+            <div><dt>Possibilidades</dt><dd id="format-content">Lançamentos, ofertas e campanhas institucionais.</dd></div>
+          </dl>
+          <button class="select-format" type="button" id="choose-format">Planejar neste formato</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="advertisers section-shell" id="anunciantes" aria-labelledby="advertisers-title">
+      <div class="section-intro">
+        <span class="eyebrow">PARA ANUNCIANTES</span>
+        <h2 id="advertisers-title">Uma campanha.<br>O contexto certo.</h2>
+        <p>O ponto, a mensagem e o período trabalham juntos para aproximar sua marca das pessoas.</p>
+      </div>
+      <ol class="campaign-steps">
+        <li><span class="step-line"></span><div><h3>Defina o objetivo</h3><p>Apresentar um produto, divulgar uma oferta ou fortalecer a presença da marca.</p></div></li>
+        <li><span class="step-line"></span><div><h3>Escolha os ambientes</h3><p>Combine os formatos com o público e a região que fazem sentido para a campanha.</p></div></li>
+        <li><span class="step-line"></span><div><h3>Prepare a mensagem</h3><p>Peças pensadas para o tamanho da tela, o tempo de leitura e o contexto de cada local.</p></div></li>
+      </ol>
+    </section>
+
+    <section class="portfolio section-shell" id="portfolio" aria-labelledby="portfolio-title">
+      <div>
+        <h2 id="portfolio-title">Conheça as possibilidades.</h2>
+        <p>Veja os formatos e as aplicações no portfólio da VAI MÍDIA.</p>
+      </div>
+      <a class="portfolio-download" href="assets/VAI_MIDIA_Portfolio_Comercial.pdf" download="VAI_MIDIA_Portfolio_Comercial.pdf"><span>Baixar portfólio</span><span class="file-label">PDF · 8 páginas</span></a>
+    </section>
+
+    <section class="partners section-shell" id="parceiros" aria-labelledby="partners-title">
+      <div class="partner-art photo-window" data-crop="732,753,692,272"><img src="assets/layout-aprovado.webp" width="1487" height="1058" alt="Totem em uma recepção contemporânea, aplicação ilustrativa." loading="lazy"></div>
+      <div class="partner-copy">
+        <span class="eyebrow">PARA PARCEIROS</span>
+        <h2 id="partners-title">Seu espaço pode<br>ir além.</h2>
+        <p>Uma proposta para integrar telas à comunicação do seu ambiente e criar oportunidades para marcas.</p>
+        <p class="muted">O formato e as condições são definidos após a avaliação de cada local.</p>
+        <button class="partner-cta" type="button" data-open-brief data-intent="parceiro">Quero receber telas</button>
+      </div>
+    </section>
+
+    <section class="faq section-shell" aria-labelledby="faq-title">
+      <h2 id="faq-title">Vamos tirar suas dúvidas?</h2>
+      <div class="faq-list">
+        <details><summary>Quais formatos posso combinar?</summary><p>Shopping, elevadores, TVs indoor e recepções podem compor o planejamento. A seleção dos pontos depende da disponibilidade e dos objetivos da campanha.</p></details>
+        <details><summary>Preciso ter a arte pronta?</summary><p>Você pode partir de uma peça existente ou incluir a criação e a adaptação das peças no escopo da proposta comercial.</p></details>
+        <details><summary>Como é definido o investimento?</summary><p>O valor depende dos pontos, dos formatos, do período e do escopo criativo. O briefing ajuda a reunir essas informações para a proposta.</p></details>
+        <details><summary>Posso indicar meu espaço para receber telas?</summary><p>Sim. Use a opção “Quero receber telas” para preparar uma apresentação do local. A instalação e as condições dependem de avaliação.</p></details>
+      </div>
+    </section>
+
+    <section class="closing section-shell" aria-labelledby="closing-title">
+      <div><h2 id="closing-title">Sua próxima campanha<br>começa com uma ideia.</h2><p>Conte onde sua marca quer chegar.</p></div>
+      <button class="closing-cta" type="button" data-open-brief>Quero anunciar</button>
+    </section>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><a class="brand" href="#inicio" aria-label="VAI MÍDIA, voltar ao início"><img src="assets/marca.svg" width="37" height="31" alt=""><span>VAI MÍDIA</span></a><p>Sua marca em movimento.</p></div>
+    <nav aria-label="Links do rodapé"><a href="#solucoes">Soluções</a><a href="#parceiros">Seja parceiro</a><a href="assets/VAI_MIDIA_Portfolio_Comercial.pdf" download>Portfólio</a><a id="painel-link" href="../">Entrar no painel</a><a id="official-email" hidden></a><a id="official-instagram" hidden rel="noopener noreferrer" target="_blank">Instagram</a></nav>
+    <p class="footer-note">As imagens mostram aplicações ilustrativas. Pontos e condições são definidos em proposta comercial.</p>
+  </footer>
+
+  <dialog class="brief-dialog" id="brief-dialog" aria-labelledby="brief-title">
+    <div class="dialog-top"><a class="brand" href="#inicio" tabindex="-1"><img src="assets/marca.svg" width="31" height="26" alt=""><span>VAI MÍDIA</span></a><button type="button" class="close-dialog" aria-label="Fechar planejamento">×</button></div>
+    <div class="dialog-content">
+      <h2 id="brief-title">Vamos planejar sua campanha.</h2>
+      <p class="dialog-intro">Reúna as informações e salve um resumo para compartilhar com a equipe.</p>
+      <form id="brief-form">
+        <fieldset class="intent-field"><legend>Como podemos ajudar?</legend><label><input type="radio" name="intent" value="anunciante" checked> Quero anunciar</label><label><input type="radio" name="intent" value="parceiro"> Quero receber telas</label></fieldset>
+        <div class="form-grid">
+          <label>Empresa ou marca<input name="empresa" required maxlength="120" autocomplete="organization"></label>
+          <label>Cidade / região<input name="cidade" required maxlength="120" autocomplete="address-level2"></label>
+        </div>
+        <div class="form-grid">
+          <label>Seu nome<input name="contato" maxlength="120" autocomplete="name"></label>
+          <label>E-mail<input name="email" type="email" maxlength="160" autocomplete="email"></label>
+        </div>
+        <div class="form-grid">
+          <label>WhatsApp<input name="telefone" maxlength="20" autocomplete="tel" inputmode="tel"></label>
+          <span class="contact-hint">Deixe e-mail ou WhatsApp para a equipe responder.</span>
+        </div>
+        <div class="form-grid">
+          <label>Objetivo<select name="objetivo" required><option value="">Selecione</option><option>Lançar um produto ou serviço</option><option>Divulgar uma oferta</option><option>Fortalecer a marca</option><option>Apresentar meu espaço</option><option>Outro objetivo</option></select></label>
+          <label>Período desejado<select name="periodo"><option>A definir</option><option>Até 15 dias</option><option>De 15 a 30 dias</option><option>Mais de 30 dias</option></select></label>
+        </div>
+        <fieldset class="format-options"><legend>Formatos de interesse</legend><label><input type="checkbox" name="formatos" value="Shopping">Shopping</label><label><input type="checkbox" name="formatos" value="Elevadores">Elevadores</label><label><input type="checkbox" name="formatos" value="TVs indoor">TVs indoor</label><label><input type="checkbox" name="formatos" value="Recepções e totens">Recepções e totens</label><label><input type="checkbox" name="formatos" value="Preciso de orientação">Preciso de orientação</label></fieldset>
+        <label>Conte um pouco mais <span class="optional">(opcional)</span><textarea name="detalhes" rows="3" maxlength="1500"></textarea></label>
+        <p id="form-error" class="form-error" role="alert" hidden>Escolha pelo menos um formato ou a opção “Preciso de orientação”.</p>
+        <button type="submit" class="prepare-brief">Enviar para a equipe</button>
+        <p class="privacy-note">Os dados vão para a equipe comercial da VAI MÍDIA e ficam no sistema dela. Você também pode baixar ou copiar o resumo.</p>
+      </form>
+      <section class="brief-result" id="brief-result" aria-labelledby="result-title" hidden>
+        <h3 id="result-title">Seu briefing está pronto.</h3>
+        <pre id="brief-preview"></pre>
+        <div class="result-actions"><button type="button" id="download-brief">Baixar briefing</button><button type="button" id="copy-brief">Copiar resumo</button><a id="send-whatsapp" target="_blank" rel="noopener noreferrer" hidden>Enviar pelo WhatsApp</a></div>
+        <p class="result-status" id="result-status" role="status" aria-live="polite"></p>
+        <button class="edit-brief" id="edit-brief" type="button">Editar informações</button>
+      </section>
+    </div>
+  </dialog>
+  <noscript><p class="noscript-note">Ative o JavaScript para visualizar as fotografias e usar o planejador. O portfólio em PDF está disponível para download.</p></noscript>
 </body>
 </html>
