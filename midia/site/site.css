@@ -93,31 +93,78 @@ a{ color: inherit; }
 .numeros dt{ font-size: 12.5px; color: #9AA2AD; }
 .numeros dd{ margin: 2px 0 0; font-size: clamp(22px, 2.6vw, 30px); font-weight: 800; color: var(--lime); font-variant-numeric: tabular-nums; }
 
-/* A tela de elevador da capa: o mesmo desenho do player, em miniatura. */
-.capa-tela{ display: grid; place-items: center; }
-.aparelho{
-  width: min(330px, 78vw); aspect-ratio: 9 / 16; background: #05070A; border-radius: 22px; padding: 10px;
-  box-shadow: 0 40px 90px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.08);
+/* ---------------------------------------------------------------- A tela instalada no elevador
+   O cenário é todo desenhado em CSS: aço escovado, madeira, indicador de andar e a placa de carga.
+   Assim a capa mostra o produto onde ele vive, sem depender de foto de banco de imagem. */
+.capa-tela{ display: grid; place-items: center; gap: 14px; }
+.elevador{
+  position: relative; display: grid; grid-template-columns: .95fr 1.65fr .45fr;
+  width: min(440px, 92vw); border-radius: 18px; overflow: hidden; align-items: stretch;
+  box-shadow: 0 50px 110px -40px rgba(0,0,0,.95), 0 0 0 1px rgba(255,255,255,.07);
 }
-.tela{ width: 100%; height: 100%; border-radius: 14px; overflow: hidden; display: grid; grid-template-rows: 1fr 1fr auto; background: var(--preto); }
-.zona-aviso{ background: linear-gradient(135deg, #1A1F24 0%, #0B0E11 100%); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-.zona-aviso .selo{ align-self: flex-start; background: #E6EAF0; color: var(--preto); font-size: 10px; font-weight: 800; letter-spacing: .08em;
-  text-transform: uppercase; padding: 3px 9px; border-radius: 999px; }
-.zona-aviso strong{ font-size: 20px; line-height: 1.15; }
-.zona-aviso p{ color: #C3C9D1; font-size: 13px; }
-.zona-aviso .assinatura{ margin-top: auto; font-size: 10.5px; color: #868D98; border-top: 1px solid rgba(255,255,255,.12); padding-top: 8px; }
+/* Parede de aço escovado: faixas finas e verticais, como no elevador de verdade. */
+.parede-aco{
+  position: relative; padding: 18px 12px; display: flex; flex-direction: column; align-items: center; gap: 16px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, rgba(0,0,0,.05) 1px 3px),
+    linear-gradient(100deg, #8D939A 0%, #C3C8CE 22%, #9BA2A9 45%, #D4D8DD 68%, #959BA2 100%);
+}
+.parede-aco .indicador{
+  display: flex; align-items: center; gap: 8px; background: #0B0E11; color: #E8EBEF; border-radius: 6px;
+  padding: 7px 12px; box-shadow: inset 0 1px 3px rgba(0,0,0,.8);
+}
+.parede-aco .seta{ font-size: 13px; color: #9AA2AD; }
+.parede-aco .andar{ font-size: 26px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.parede-aco .placa{
+  display: flex; flex-direction: column; align-items: center; gap: 1px; background: rgba(255,255,255,.55);
+  border: 1px solid rgba(0,0,0,.18); border-radius: 3px; padding: 6px 10px; color: #2B3036; text-align: center;
+}
+.parede-aco .placa b{ font-size: 10px; letter-spacing: .04em; }
+.parede-aco .placa span{ font-size: 9px; opacity: .8; }
+.parede-aco .botoes{ margin-top: auto; display: flex; flex-direction: column; gap: 9px; }
+.parede-aco .botoes i{
+  width: 17px; height: 17px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #F2F4F6, #AEB4BB);
+  box-shadow: 0 1px 2px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,0,0,.12);
+}
+/* Painel de madeira: é nele que a tela é instalada. */
+.parede-madeira{
+  display: grid; place-items: center; padding: 22px 16px;
+  background:
+    repeating-linear-gradient(94deg, rgba(0,0,0,.05) 0 2px, rgba(255,255,255,.03) 2px 7px),
+    linear-gradient(120deg, #8E6F4C 0%, #C3A379 28%, #A98762 48%, #B08F65 70%, #87694A 100%);
+}
+/* Porta do elevador, à direita: aço mais escuro e um vão de luz. */
+.porta{
+  background: linear-gradient(100deg, #6E747B 0%, #AAB0B7 30%, #7D838A 70%, #596067 100%);
+  border-left: 3px solid rgba(0,0,0,.35);
+}
+.legenda-capa{ font-size: 12.5px; color: #8A929C; text-align: center; }
+
+.aparelho{
+  width: 100%; aspect-ratio: 9 / 16; background: #05070A; border-radius: 12px; padding: 7px;
+  box-shadow: 0 18px 36px -12px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.1);
+}
+.tela{ width: 100%; height: 100%; border-radius: 14px; overflow: hidden; display: grid;
+  /* minmax(0,…) para as duas metades ficarem iguais de verdade: senão o texto do recado empurra o anúncio. */
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto; background: var(--preto); }
+.zona-aviso{ background: linear-gradient(135deg, #1A1F24 0%, #0B0E11 100%); padding: 12px; display: flex; flex-direction: column; gap: 5px; overflow: hidden; }
+.zona-aviso .selo{ align-self: flex-start; background: #E6EAF0; color: var(--preto); font-size: 8.5px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 999px; }
+.zona-aviso strong{ font-size: 15px; line-height: 1.15; }
+.zona-aviso p{ color: #C3C9D1; font-size: 11px; line-height: 1.35; }
+.zona-aviso .assinatura{ margin-top: auto; font-size: 9px; color: #868D98; border-top: 1px solid rgba(255,255,255,.12); padding-top: 6px; }
 .zona-anuncio{ position: relative; border-top: 2px solid var(--lime); overflow: hidden; }
-.anuncio{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 18px; opacity: 0; }
-.anuncio span{ font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
-.anuncio b{ font-size: 21px; line-height: 1.15; }
+.anuncio{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 14px; opacity: 0; }
+.anuncio span{ font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
+.anuncio b{ font-size: 16px; line-height: 1.15; }
 .anuncio.a1{ background: linear-gradient(140deg, #DC2626, #7F1D1D); animation: girar 12s infinite; }
 .anuncio.a2{ background: linear-gradient(140deg, #16A34A, #064E3B); animation: girar 12s infinite 4s; }
 .anuncio.a3{ background: linear-gradient(140deg, #2563EB, #1E3A8A); animation: girar 12s infinite 8s; }
 @keyframes girar{ 0%{ opacity: 0; transform: scale(1.04); } 4%{ opacity: 1; transform: scale(1); } 30%{ opacity: 1; } 34%{ opacity: 0; } 100%{ opacity: 0; } }
 @media (prefers-reduced-motion: reduce){ .anuncio{ animation: none !important; } .anuncio.a1{ opacity: 1; } }
-.faixa-tela{ display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #0B0E11; border-top: 1px solid rgba(255,255,255,.1); font-size: 11px; }
-.faixa-tela .simbolo{ width: 14px; color: var(--lime); }
-.faixa-tela span{ font-weight: 800; letter-spacing: .06em; }
+.faixa-tela{ display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: #0B0E11; border-top: 1px solid rgba(255,255,255,.1); font-size: 9.5px; }
+.faixa-tela .simbolo{ width: 12px; color: var(--lime); }
+.faixa-tela span{ font-weight: 800; letter-spacing: .06em; white-space: nowrap; }
 .faixa-tela em{ margin-left: auto; font-style: normal; color: #C3C9D1; }
 .faixa-tela strong{ color: var(--lime); font-variant-numeric: tabular-nums; }
 
@@ -210,7 +257,18 @@ a{ color: inherit; }
 /* ----------------------------------------------------------------- Telas menores */
 @media (max-width: 980px){
   .capa{ grid-template-columns: 1fr; gap: 40px; }
-  .capa-tela{ order: -1; }
+  .capa > *{ max-width: 100%; justify-self: stretch; }
+  /* A frase da marca vem primeiro: a cena do elevador ilustra, não abre a conversa. */
+  .elevador{ width: min(330px, 84vw); margin: 0 auto; }
+  .zona-aviso{ padding: 10px; gap: 4px; }
+  .zona-aviso strong{ font-size: 14px; }
+  /* Em miniatura, o corpo do recado não cabe sem cortar no meio da linha: fica o essencial
+     (o tipo, o título e a assinatura), que é o que se lê de longe num elevador de verdade. */
+  .zona-aviso p{ display: none; }
+  .zona-aviso strong{ line-height: 1.1; }
+  .zona-aviso .assinatura{ font-size: 9px; padding-top: 6px; }
+  .anuncio b{ font-size: 15px; }
+  .faixa-tela{ font-size: 9px; padding: 6px 8px; }
   .duas-colunas{ grid-template-columns: 1fr; gap: 36px; }
   .numeros{ grid-template-columns: repeat(2, 1fr); gap: 18px 26px; }
 }

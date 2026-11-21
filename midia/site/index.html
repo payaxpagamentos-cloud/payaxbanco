@@ -59,29 +59,44 @@
       </dl>
     </div>
 
-    <!-- A tela do elevador: metade comunicado do prédio, metade publicidade girando. -->
+    <!--
+      A tela como ela aparece de verdade: instalada na parede do elevador, metade com o recado do
+      ponto, metade com a publicidade girando. O cenário é desenhado em CSS — nada de foto de banco
+      de imagem nem de prédio de outra empresa.
+    -->
     <div class="capa-tela" aria-hidden="true">
-      <div class="aparelho">
-        <div class="tela">
-          <div class="zona-aviso">
-            <span class="selo">Assembleia</span>
-            <strong>Assembleia geral</strong>
-            <p>Quinta, 19h, no salão de festas.</p>
-            <span class="assinatura">Administração / Síndico</span>
-          </div>
-          <div class="zona-anuncio">
-            <div class="anuncio a1"><span>Pizzaria</span><b>2 por 1 nas terças</b></div>
-            <div class="anuncio a2"><span>Imobiliária</span><b>Apartamentos no Cambuí</b></div>
-            <div class="anuncio a3"><span>Academia</span><b>Primeira aula grátis</b></div>
-          </div>
-          <div class="faixa-tela">
-            <svg class="simbolo" viewBox="0 0 138 111" aria-hidden="true"><path d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z" fill="currentColor"/></svg>
-            <span>VAI MÍDIA</span>
-            <em>27°</em>
-            <strong>19:42</strong>
+      <div class="elevador">
+        <div class="parede-aco">
+          <div class="indicador"><span class="seta">▲</span><span class="andar">4</span></div>
+          <div class="placa"><b>13 PESSOAS</b><span>1000 kg</span></div>
+          <div class="botoes"><i></i><i></i><i></i></div>
+        </div>
+        <div class="parede-madeira">
+          <div class="aparelho">
+            <div class="tela">
+              <div class="zona-aviso">
+                <span class="selo">Assembleia</span>
+                <strong>Assembleia geral</strong>
+                <p>Quinta, 19h, no salão de festas.</p>
+                <span class="assinatura">Administração / Síndico</span>
+              </div>
+              <div class="zona-anuncio">
+                <div class="anuncio a1"><span>Pizzaria</span><b>2 por 1 nas terças</b></div>
+                <div class="anuncio a2"><span>Imobiliária</span><b>Apartamentos no Cambuí</b></div>
+                <div class="anuncio a3"><span>Academia</span><b>Primeira aula grátis</b></div>
+              </div>
+              <div class="faixa-tela">
+                <svg class="simbolo" viewBox="0 0 138 111" aria-hidden="true"><path d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z" fill="currentColor"/></svg>
+                <span>VAI MÍDIA</span>
+                <em>27°</em>
+                <strong>19:42</strong>
+              </div>
+            </div>
           </div>
         </div>
+        <div class="porta"></div>
       </div>
+      <p class="legenda-capa">Elevador social de um condomínio atendido pela rede</p>
     </div>
   </section>
 

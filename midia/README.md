@@ -346,8 +346,10 @@ número — envio automático exige contratar um provedor oficial da Meta (veja 
 ## O site do Vai Mídia
 
 A pasta `site/` é o site institucional: uma página só, sem framework e sem build, com a mesma identidade do
-produto (o preto, o lime e a Manrope). Ela traz a capa com uma **tela de elevador de verdade** desenhada em CSS
-— o mesmo layout do player —, onde a rede fica, como funciona, o que muda para quem anuncia e para quem tem o
+produto (o preto, o lime e a Manrope). A capa mostra a **tela instalada no elevador** — a parede de aço, o painel
+de madeira, o indicador de andar e a tela com o recado do ponto de um lado e a publicidade girando do outro.
+A cena inteira é desenhada em CSS, com o mesmo layout do player: nada de foto de banco de imagem nem de prédio
+de outra empresa. Depois vêm onde a rede fica, como funciona, o que muda para quem anuncia e para quem tem o
 espaço (condomínio, loja, academia, clínica), e o formulário de contato.
 
 Duas coisas fazem o site trabalhar em vez de só existir:
