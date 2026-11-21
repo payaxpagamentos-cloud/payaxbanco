@@ -15,11 +15,18 @@ const pix = require('./pix');
  *
  * Campanha sem nenhuma exibição no mês não é cobrada (o valor sai zero e o item diz o motivo).
  *
- * Repasse: a receita de cada campanha é dividida entre os pontos na proporção do tempo de tela que ela ocupou
- * em cada um; sobre a parte de cada ponto aplica-se a comissão combinada com o lojista.
+ * Quando a campanha vem por agência, a comissão dela sai do bruto: a fatura mostra bruto, comissão e líquido
+ * (o que a plataforma recebe).
+ *
+ * Contrapartida ao ponto, conforme o combinado em cada um:
+ *  - 'comissao': a receita líquida de cada campanha é dividida entre os pontos na proporção do tempo de tela
+ *    que ela ocupou em cada um, e sobre a parte do ponto aplica-se o percentual combinado;
+ *  - 'fixo': um valor por mês, enquanto as telas do ponto exibiram (típico de condomínio com aluguel do espaço);
+ *  - 'nenhum': sem repasse — é o caso comum em condomínio, onde a contrapartida são os comunicados na tela.
  */
 
-const SQL_CAMPANHAS_DO_MES = `SELECT c.*, a.nome AS anunciante_nome, a.status AS anunciante_status FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
+const SQL_CAMPANHAS_DO_MES = `SELECT c.*, a.nome AS anunciante_nome, a.status AS anunciante_status, ag.nome AS agencia_nome
+  FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id LEFT JOIN agencias ag ON ag.id = c.agencia_id
   WHERE c.status <> 'rascunho' AND c.inicio <= ? AND (c.fim IS NULL OR c.fim >= ?)`;
 
 /** Prévia da fatura de cada anunciante na competência (não grava nada). */
@@ -45,29 +52,43 @@ function calcular(db, competencia) {
     } else {
       nota = 'cortesia';
     }
+    const comissao = Math.round((valor * (c.comissao_agencia_percentual ?? 0)) / 10_000);
     if (!porAnunciante.has(c.anunciante_id)) {
-      porAnunciante.set(c.anunciante_id, { anunciante_id: c.anunciante_id, anunciante: c.anunciante_nome, competencia, valor_centavos: 0, itens: [] });
+      porAnunciante.set(c.anunciante_id, {
+        anunciante_id: c.anunciante_id, anunciante: c.anunciante_nome, agencia_id: null, agencia: null,
+        competencia, bruto_centavos: 0, comissao_agencia_centavos: 0, valor_centavos: 0, itens: [],
+      });
     }
     const f = porAnunciante.get(c.anunciante_id);
+    if (c.agencia_id && !f.agencia_id) { f.agencia_id = c.agencia_id; f.agencia = c.agencia_nome; }
     f.itens.push({
       campanha_id: c.id,
-      descricao: `${c.nome} (${c.cobranca === 'cpm' ? 'CPM' : c.cobranca === 'mensal' ? 'mensal' : 'cortesia'}${nota ? `, ${nota}` : ''})`,
+      descricao: `${c.nome} (${c.cobranca === 'cpm' ? 'CPM' : c.cobranca === 'mensal' ? 'mensal' : 'cortesia'}${nota ? `, ${nota}` : ''}`
+        + `${c.pi ? `, PI ${c.pi}` : ''})`,
       insercoes: d.insercoes ?? 0,
       impactos: d.impactos ?? 0,
       telas: d.telas ?? 0,
       segundos: d.segundos ?? 0,
       valor_centavos: valor,
+      comissao_centavos: comissao,
     });
-    f.valor_centavos += valor;
+    f.bruto_centavos += valor;
+    f.comissao_agencia_centavos += comissao;
+    f.valor_centavos = f.bruto_centavos - f.comissao_agencia_centavos;
   }
   return [...porAnunciante.values()].sort((a, b) => b.valor_centavos - a.valor_centavos);
 }
 
-/** Quanto cada ponto gerou de receita na competência e quanto vira repasse ao lojista. */
+/** Quanto cada ponto gerou de receita na competência e qual a contrapartida combinada com ele. */
 function calcularRepasses(db, competencia, faturas = calcular(db, competencia)) {
   const { de, ate } = periodoMes(competencia);
+  // Receita líquida por campanha (depois da comissão de agência): é ela que sustenta o repasse.
   const receitaCampanha = new Map();
-  for (const f of faturas) for (const i of f.itens) receitaCampanha.set(i.campanha_id, (receitaCampanha.get(i.campanha_id) ?? 0) + i.valor_centavos);
+  for (const f of faturas) {
+    for (const i of f.itens) {
+      receitaCampanha.set(i.campanha_id, (receitaCampanha.get(i.campanha_id) ?? 0) + (i.valor_centavos - (i.comissao_centavos ?? 0)));
+    }
+  }
 
   const segmentos = db.prepare(`SELECT campanha_id, local_id, SUM(segundos) AS segundos FROM resumo_dia
     WHERE data BETWEEN ? AND ? AND campanha_id <> 0 GROUP BY campanha_id, local_id`).all(de, ate);
@@ -82,18 +103,26 @@ function calcularRepasses(db, competencia, faturas = calcular(db, competencia)) 
     base.set(s.local_id, (base.get(s.local_id) ?? 0) + (receita * s.segundos) / total);
   }
 
-  const locais = db.prepare('SELECT id, nome, comissao_percentual FROM locais').all();
-  return locais.filter((l) => base.has(l.id)).map((l) => {
-    const baseCent = Math.round(base.get(l.id));
-    return {
-      local_id: l.id,
-      local: l.nome,
-      competencia,
-      base_centavos: baseCent,
-      comissao_percentual: l.comissao_percentual,
-      valor_centavos: Math.round((baseCent * l.comissao_percentual) / 10_000),
-    };
-  }).sort((a, b) => b.valor_centavos - a.valor_centavos);
+  // Pontos que exibiram alguma coisa no mês (inclusive só institucional ou comunicados): o fixo é devido a eles.
+  const exibiram = new Set(db.prepare('SELECT DISTINCT local_id FROM resumo_dia WHERE data BETWEEN ? AND ?').all(de, ate).map((r) => r.local_id));
+
+  return db.prepare('SELECT id, nome, repasse_tipo, comissao_percentual, repasse_fixo_centavos FROM locais').all()
+    .filter((l) => l.repasse_tipo !== 'nenhum' && (base.has(l.id) || (l.repasse_tipo === 'fixo' && exibiram.has(l.id))))
+    .map((l) => {
+      const baseCent = Math.round(base.get(l.id) ?? 0);
+      const valor = l.repasse_tipo === 'fixo' ? l.repasse_fixo_centavos : Math.round((baseCent * l.comissao_percentual) / 10_000);
+      return {
+        local_id: l.id,
+        local: l.nome,
+        competencia,
+        tipo: l.repasse_tipo,
+        base_centavos: baseCent,
+        comissao_percentual: l.repasse_tipo === 'fixo' ? 0 : l.comissao_percentual,
+        valor_centavos: valor,
+      };
+    })
+    .filter((r) => r.valor_centavos > 0)
+    .sort((a, b) => b.valor_centavos - a.valor_centavos);
 }
 
 /** Gera (ou refaz) as faturas abertas e os repasses a pagar da competência. Faturas pagas ou canceladas não são tocadas. */
@@ -111,11 +140,13 @@ function gerar(db, competencia, { vencimento } = {}) {
       if (atual && atual.status !== 'aberta') { mantidas++; continue; }
       let id = atual?.id;
       if (id) {
-        db.prepare('UPDATE faturas SET valor_centavos = ?, vencimento = ? WHERE id = ?').run(f.valor_centavos, venc, id);
+        db.prepare('UPDATE faturas SET valor_centavos = ?, bruto_centavos = ?, comissao_agencia_centavos = ?, agencia_id = ?, vencimento = ? WHERE id = ?')
+          .run(f.valor_centavos, f.bruto_centavos, f.comissao_agencia_centavos, f.agencia_id, venc, id);
         db.prepare('DELETE FROM fatura_itens WHERE fatura_id = ?').run(id);
       } else {
-        id = Number(db.prepare('INSERT INTO faturas (anunciante_id, competencia, vencimento, valor_centavos, criado_em) VALUES (?, ?, ?, ?, ?)')
-          .run(f.anunciante_id, competencia, venc, f.valor_centavos, agora()).lastInsertRowid);
+        id = Number(db.prepare(`INSERT INTO faturas (anunciante_id, agencia_id, competencia, vencimento, bruto_centavos, comissao_agencia_centavos, valor_centavos, criado_em)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(f.anunciante_id, f.agencia_id, competencia, venc, f.bruto_centavos, f.comissao_agencia_centavos, f.valor_centavos, agora()).lastInsertRowid);
       }
       for (const i of f.itens) {
         db.prepare('INSERT INTO fatura_itens (fatura_id, campanha_id, descricao, insercoes, impactos, telas, valor_centavos) VALUES (?, ?, ?, ?, ?, ?, ?)')
@@ -129,11 +160,11 @@ function gerar(db, competencia, { vencimento } = {}) {
       const atual = db.prepare('SELECT * FROM repasses WHERE local_id = ? AND competencia = ?').get(r.local_id, competencia);
       if (atual && atual.status !== 'a_pagar') continue;
       if (atual) {
-        db.prepare('UPDATE repasses SET base_centavos = ?, comissao_percentual = ?, valor_centavos = ? WHERE id = ?')
-          .run(r.base_centavos, r.comissao_percentual, r.valor_centavos, atual.id);
+        db.prepare('UPDATE repasses SET tipo = ?, base_centavos = ?, comissao_percentual = ?, valor_centavos = ? WHERE id = ?')
+          .run(r.tipo, r.base_centavos, r.comissao_percentual, r.valor_centavos, atual.id);
       } else {
-        db.prepare('INSERT INTO repasses (local_id, competencia, base_centavos, comissao_percentual, valor_centavos, criado_em) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(r.local_id, competencia, r.base_centavos, r.comissao_percentual, r.valor_centavos, agora());
+        db.prepare('INSERT INTO repasses (local_id, competencia, tipo, base_centavos, comissao_percentual, valor_centavos, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(r.local_id, competencia, r.tipo, r.base_centavos, r.comissao_percentual, r.valor_centavos, agora());
       }
       repassesGerados++;
     }
@@ -151,7 +182,8 @@ function faturarAutomatico(db) {
 
 /** Fatura com itens, PIX copia e cola e situação. */
 function detalhe(db, faturaId) {
-  const f = db.prepare(`SELECT f.*, a.nome AS anunciante, a.documento, a.email FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id WHERE f.id = ?`).get(faturaId);
+  const f = db.prepare(`SELECT f.*, a.nome AS anunciante, a.documento, a.email, ag.nome AS agencia
+    FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id LEFT JOIN agencias ag ON ag.id = f.agencia_id WHERE f.id = ?`).get(faturaId);
   if (!f) throw new ErroNegocio('Fatura não encontrada.', 404);
   const cfg = lerConfig(db);
   const itens = db.prepare('SELECT * FROM fatura_itens WHERE fatura_id = ? ORDER BY valor_centavos DESC, id').all(f.id);

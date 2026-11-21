@@ -1,8 +1,9 @@
 /** Rede física: as TVs (com pareamento e programação de cada uma) e os pontos onde elas estão. */
-import { api } from './api.js';
+import { api, qs } from './api.js';
 import {
   el, limpar, $, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, marcar, area, lerForm, repetir,
-  inteiro, dinheiro, dataHora, duracao, percentual, dataBr, etiquetaDe, situacao, CATEGORIAS, ORIENTACOES, STATUS_TELA, STATUS_PONTO, DIAS,
+  inteiro, dinheiro, dataHora, duracao, percentual, dataBr, etiqueta, etiquetaDe, situacao, centavos, reaisCampo,
+  CATEGORIAS, PREDIOS, POSICOES, REPASSES, ORIENTACOES, STATUS_TELA, STATUS_PONTO, STATUS_COMUNICADO, TIPOS_COMUNICADO, DIAS,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa } from './comum.js';
 
@@ -57,7 +58,7 @@ function cartaoTela(t, recarregar) {
   return el('div', { class: 'tela-cartao' }, moldura,
     el('div', { class: 'corpo' },
       el('h3', {}, t.nome),
-      el('div', { class: 'pequeno mudo' }, `${t.local_nome} · ${t.cidade ?? ''} · ${ORIENTACOES[t.orientacao]}`),
+      el('div', { class: 'pequeno mudo' }, `${t.local_nome}${t.posicao ? ` · ${t.posicao}` : ''} · ${t.cidade ?? ''} · ${ORIENTACOES[t.orientacao]}`),
       el('div', { class: 'linha' }, etiquetaDe(STATUS_TELA, t.status),
         t.versao_player ? el('span', { class: 'pequeno mudo' }, `player ${t.versao_player}`) : null),
       el('div', { class: 'pequeno mudo' }, t.ultimo_contato ? `Último contato: ${dataHora(t.ultimo_contato)}` : 'Nunca falou com o servidor'),
@@ -105,7 +106,10 @@ async function abrirTela(id, recarregar) {
 
 const camposTela = (t = {}, opcoes) => [
   escolha('Ponto', 'local_id', Object.fromEntries(opcoes.locais.map((l) => [l.id, `${l.nome} — ${l.cidade}`])), t.local_id ?? '', { required: true }),
-  campo('Nome da TV (ex.: TV do caixa)', { name: 'nome', value: t.nome ?? '', required: true, maxlength: 120 }),
+  campo('Nome da TV (ex.: TV do elevador 1)', { name: 'nome', value: t.nome ?? '', required: true, maxlength: 120 }),
+  el('label', { class: 'campo' }, 'Onde fica dentro do ponto',
+    el('input', { name: 'posicao', value: t.posicao ?? '', maxlength: 60, list: 'posicoes-tela', placeholder: 'Elevador social, hall, portaria…' }),
+    el('datalist', { id: 'posicoes-tela' }, POSICOES.map((x) => el('option', { value: x })))),
   el('div', { class: 'duas' },
     escolha('Orientação', 'orientacao', ORIENTACOES, t.orientacao ?? 'paisagem'),
     t.id ? escolha('Situação', 'status', { ativa: 'Ativa', manutencao: 'Manutenção', inativa: 'Inativa' }, t.status ?? 'ativa') : null),
@@ -213,11 +217,15 @@ async function abrirPonto(id, recarregar) {
   await modal(d.nome, (fechar) => [
     el('div', { class: 'grade', style: 'margin-bottom:16px' },
       indicador({ rotulo: 'TVs', valor: inteiro(d.telas.length), ic: 'telas', nota: `${d.telas.filter((t) => t.online).length} no ar` }),
-      indicador({ rotulo: 'Público por dia', valor: inteiro(d.publico_dia), ic: 'pessoas', cor: 'ciano' }),
-      indicador({ rotulo: 'Comissão do lojista', valor: percentual(d.comissao_percentual), ic: 'dinheiro', cor: 'verde' })),
+      indicador({ rotulo: 'Passagens por dia', valor: inteiro(d.publico_dia), ic: 'pessoas', cor: 'ciano', nota: d.unidades ? `${inteiro(d.unidades)} unidades` : null }),
+      indicador({
+        rotulo: 'Contrapartida', ic: 'dinheiro', cor: d.repasse_tipo === 'nenhum' ? 'azul' : 'verde',
+        valor: d.repasse_tipo === 'fixo' ? dinheiro(d.repasse_fixo_centavos) : (d.repasse_tipo === 'nenhum' ? 'Comunicados' : percentual(d.comissao_percentual)),
+        nota: REPASSES[d.repasse_tipo],
+      })),
     el('h3', {}, 'Endereço e contato'),
     el('div', {}, [
-      ['Categoria', CATEGORIAS[d.categoria]], ['Endereço', [d.logradouro, d.numero, d.bairro].filter(Boolean).join(', ') || '—'],
+      ['Ambiente', CATEGORIAS[d.categoria] ?? d.categoria], ['Administradora', d.administradora ?? '—'], ['Endereço', [d.logradouro, d.numero, d.bairro].filter(Boolean).join(', ') || '—'],
       ['Cidade', `${d.cidade}/${d.uf}`], ['CEP', d.cep ?? '—'], ['CNPJ/CPF', d.documento ?? '—'],
       ['Responsável', d.responsavel ?? '—'], ['Telefone', d.telefone ?? '—'], ['E-mail', d.email ?? '—'],
       ['Parceria desde', d.inicio_parceria ? dataBr(d.inicio_parceria) : '—'], ['Agora', d.aberto ? 'aberto' : 'fechado'],
@@ -226,9 +234,19 @@ async function abrirPonto(id, recarregar) {
     d.horarios.length
       ? el('div', { class: 'fichas' }, d.horarios.map((h) => el('span', { class: 'ficha' }, `${DIAS[h.dia_semana]} ${h.abre}–${h.fecha}`)))
       : vazio('Sem horário cadastrado: a TV conta como aberta o tempo todo.'),
+    el('h3', {}, 'Comunicados do ponto'),
+    el('p', { class: 'pequeno mudo', style: 'margin:0 0 8px' }, 'Recados do prédio ou da loja que entram no carrossel entre os anúncios.'),
+    tabela([
+      [(c) => el('div', {}, el('div', {}, c.titulo), el('div', { class: 'pequeno mudo' }, c.texto.slice(0, 80))), 'Comunicado'],
+      [(c) => TIPOS_COMUNICADO[c.tipo] ?? c.tipo, 'Tipo'],
+      [(c) => `${dataBr(c.inicio)} a ${dataBr(c.fim)}`, 'Período'],
+      [(c) => etiquetaDe(STATUS_COMUNICADO, c.status), 'Situação'],
+    ], d.comunicados ?? [], { vazioTexto: 'Nenhum comunicado.' }),
+    el('button', { class: 'btn', style: 'margin-top:10px', onclick: () => { fechar(); editarComunicado(null, d, recarregar); } }, icone('mais'), 'Novo comunicado'),
     el('h3', {}, 'TVs do ponto'),
     tabela([
-      [(t) => t.nome, 'TV'], [(t) => ORIENTACOES[t.orientacao], 'Orientação'],
+      [(t) => el('div', {}, el('div', {}, t.nome), t.posicao ? el('div', { class: 'pequeno mudo' }, t.posicao) : null), 'TV'],
+      [(t) => ORIENTACOES[t.orientacao], 'Orientação'],
       [(t) => situacao(t.online ? 'No ar' : 'Sem contato', t.online ? 'ok' : 'erro'), 'Agora'],
       [(t) => etiquetaDe(STATUS_TELA, t.status), 'Situação'],
     ], d.telas, { vazioTexto: 'Nenhuma TV neste ponto.' }),
@@ -238,11 +256,11 @@ async function abrirPonto(id, recarregar) {
       [(r) => percentual(r.comissao_percentual), 'Comissão', 'num dir'], [(r) => dinheiro(r.valor_centavos), 'Repasse', 'num dir'],
       [(r) => (r.status === 'pago' ? `pago em ${dataBr(r.pago_em)}` : 'a pagar'), 'Situação'],
     ], d.repasses, { vazioTexto: 'Sem repasses ainda.' }),
-    el('h3', {}, 'Acesso do lojista ao portal'),
+    el('h3', {}, 'Acesso do responsável ao portal'),
     d.usuarios.length
       ? el('div', {}, d.usuarios.map((u) => el('div', { class: 'chave' }, el('span', {}, `${u.nome} · ${u.email}`),
         el('span', { class: 'pequeno mudo' }, u.ultimo_acesso ? `último acesso ${dataHora(u.ultimo_acesso)}` : 'nunca acessou'))))
-      : vazio('Sem acesso criado. O lojista pode acompanhar as TVs e o repasse pelo portal.'),
+      : vazio('Sem acesso criado. Pelo portal, o responsável (lojista ou síndico) acompanha as TVs, publica comunicados e vê o repasse.'),
     el('div', { class: 'linha entre', style: 'margin-top:18px' },
       el('button', { class: 'btn', onclick: () => { fechar(); criarAcessoLojista(d, recarregar); } }, icone('pessoas'), 'Criar acesso do lojista'),
       el('div', { class: 'linha' },
@@ -272,9 +290,18 @@ function editarPonto(p, recarregar) {
       campo('Telefone', { name: 'telefone', value: p?.telefone ?? '', maxlength: 20 }),
       campo('E-mail', { name: 'email', value: p?.email ?? '', type: 'email', maxlength: 160 })),
     el('div', { class: 'tres' },
-      campo('Público por dia (estimativa)', { name: 'publico_dia', value: p?.publico_dia ?? 0, type: 'number', min: 0, step: 10 }),
-      campo('Comissão do lojista (%)', { name: 'comissao_percentual', value: p ? (p.comissao_percentual / 100) : '', type: 'number', min: 0, max: 100, step: 0.5 }),
-      p ? escolha('Situação', 'status', { ativo: 'Ativo', pausado: 'Pausado', encerrado: 'Encerrado' }, p.status) : null),
+      campo('Administradora / rede (opcional)', { name: 'administradora', value: p?.administradora ?? '', maxlength: 120 }),
+      campo('Unidades (apartamentos, salas ou lojas)', { name: 'unidades', value: p?.unidades ?? 0, type: 'number', min: 0 }),
+      campo('Passagens de pessoas por dia', { name: 'publico_dia', value: p?.publico_dia ?? 0, type: 'number', min: 0, step: 10 })),
+    el('fieldset', {}, el('legend', {}, 'Contrapartida ao ponto'),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'Em comércio costuma ser comissão sobre a receita; em condomínio, muitas vezes não há dinheiro — '
+        + 'a contrapartida é o espaço para os comunicados do prédio na própria tela.'),
+      el('div', { class: 'tres' },
+        escolha('Forma', 'repasse_tipo', REPASSES, p?.repasse_tipo ?? 'comissao'),
+        campo('Comissão (%)', { name: 'comissao_percentual', value: p ? (p.comissao_percentual / 100) : '', type: 'number', min: 0, max: 100, step: 0.5 }),
+        campo('Valor fixo por mês (R$)', { name: 'repasse_fixo', value: reaisCampo(p?.repasse_fixo_centavos), inputmode: 'decimal' }))),
+    p ? escolha('Situação', 'status', { ativo: 'Ativo', pausado: 'Pausado', encerrado: 'Encerrado' }, p.status) : null,
     el('fieldset', {}, el('legend', {}, 'Funcionamento'),
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Marque os dias em que o comércio abre. Sem nenhum dia marcado, a TV conta como aberta sempre.'),
       ...DIAS.map((nome, d) => {
@@ -288,7 +315,8 @@ function editarPonto(p, recarregar) {
     area('Observação', { name: 'observacao', maxlength: 500 }, p?.observacao ?? ''),
   ], async (d) => {
     const horarios = DIAS.map((_, i) => (d[`dia_${i}`] ? { dia_semana: i, abre: d[`abre_${i}`], fecha: d[`fecha_${i}`] } : null)).filter(Boolean);
-    const corpo = { ...d, horarios };
+    const corpo = { ...d, horarios, repasse_fixo_centavos: centavos(d.repasse_fixo) ?? 0 };
+    delete corpo.repasse_fixo;
     for (const k of Object.keys(corpo)) if (/^(dia|abre|fecha)_\d$/.test(k)) delete corpo[k];
     if (p) await api.patch(`/painel/locais/${p.id}`, corpo);
     else await api.post('/painel/locais', corpo);
@@ -298,7 +326,7 @@ function editarPonto(p, recarregar) {
 }
 
 const criarAcessoLojista = (p, recarregar) => formModal(`Acesso ao portal — ${p.nome}`, () => [
-  el('p', { class: 'mudo', style: 'margin:0' }, 'O lojista vê as TVs dele, o que está no ar, o repasse e pode enviar conteúdo da loja.'),
+  el('p', { class: 'mudo', style: 'margin:0' }, 'O responsável vê as TVs do ponto, o que está no ar e o repasse, publica comunicados e envia conteúdo próprio.'),
   campo('Nome da pessoa', { name: 'nome', value: p.responsavel ?? '', required: true, maxlength: 120 }),
   campo('E-mail (será o login)', { name: 'email', type: 'email', value: p.email ?? '', required: true }),
 ], async (d) => {
@@ -310,3 +338,88 @@ const criarAcessoLojista = (p, recarregar) => formModal(`Acesso ao portal — ${
     el('div', { class: 'linha entre' }, el('span', {}), el('button', { class: 'btn primario', onclick: () => fechar() }, 'Entendi')),
   ]);
 });
+
+// ---------------------------------------------------------------- Comunicados dos pontos
+/**
+ * Fila de aprovação dos recados dos pontos. Em condomínio é a contrapartida pelo espaço: o síndico escreve
+ * no portal e a equipe confere antes de ir para a tela.
+ */
+export async function comunicados(ctx) {
+  const corpo = el('div', { class: 'cartao' });
+  const filtro = { status: '', local_id: '' };
+  const opcoes = await api.get('/painel/opcoes');
+
+  const pintar = async () => {
+    const d = await api.get(`/painel/comunicados${qs(filtro)}`);
+    limpar(corpo,
+      d.pendentes ? el('p', { class: 'aviso' }, `${d.pendentes} comunicado(s) aguardando aprovação.`) : null,
+      tabela([
+        [(c) => el('div', {}, el('div', {}, c.titulo), el('div', { class: 'pequeno mudo' }, c.texto.slice(0, 90))), 'Comunicado'],
+        [(c) => el('div', {}, el('div', {}, c.local_nome), el('div', { class: 'pequeno mudo' }, c.autor ? `por ${c.autor}` : 'pela equipe')), 'Ponto'],
+        [(c) => TIPOS_COMUNICADO[c.tipo] ?? c.tipo, 'Tipo'],
+        [(c) => `${dataBr(c.inicio)} a ${dataBr(c.fim)}`, 'No ar'],
+        [(c) => `${c.duracao_s}s`, 'Duração', 'num dir'],
+        [(c) => etiquetaDe(STATUS_COMUNICADO, c.status), 'Situação'],
+        [(c) => el('div', { class: 'acoes' },
+          c.status !== 'aprovado' ? el('button', {
+            class: 'btn pequeno primario', onclick: (e) => acao(e.target, async () => {
+              await api.post(`/painel/comunicados/${c.id}/aprovacao`, { decisao: 'aprovar' });
+              toast('Comunicado no ar.');
+              pintar();
+            }),
+          }, 'Aprovar') : null,
+          c.status !== 'recusado' ? el('button', {
+            class: 'btn pequeno', onclick: (e) => acao(e.target, async () => {
+              const motivo = await perguntar('Recusar comunicado', 'Motivo (o responsável pelo ponto vê)');
+              if (!motivo) return;
+              await api.post(`/painel/comunicados/${c.id}/aprovacao`, { decisao: 'recusar', motivo });
+              toast('Comunicado recusado.');
+              pintar();
+            }),
+          }, 'Recusar') : null,
+          el('button', { class: 'icone-btn', title: 'Editar', onclick: () => editarComunicado(c, null, pintar) }, icone('editar')),
+          el('button', {
+            class: 'icone-btn perigo', title: 'Excluir', onclick: (e) => acao(e.target, async () => {
+              if (!await confirmar('Excluir comunicado', `Apagar "${c.titulo}"?`, 'Excluir')) return;
+              await api.del(`/painel/comunicados/${c.id}`);
+              toast('Comunicado excluído.');
+              pintar();
+            }),
+          }, icone('lixo'))), '', 'acoes'],
+      ], d.itens, { vazioTexto: 'Nenhum comunicado. Eles vêm do portal do ponto ou podem ser criados aqui.' }));
+  };
+
+  limpar(ctx.conteudo,
+    el('div', { class: 'filtros livre' },
+      escolha('Situação', 'status', { '': 'Todos', pendente: 'Aguardando aprovação', aprovado: 'No ar', recusado: 'Recusados' }, '',
+        { onchange: (e) => { filtro.status = e.target.value; pintar(); } }),
+      escolha('Ponto', 'local_id', { '': 'Todos', ...Object.fromEntries(opcoes.locais.map((l) => [l.id, l.nome])) }, '',
+        { onchange: (e) => { filtro.local_id = e.target.value; pintar(); } }),
+      el('button', { class: 'btn primario', onclick: () => editarComunicado(null, null, pintar, opcoes) }, icone('mais'), 'Novo comunicado')),
+    corpo);
+  await pintar();
+}
+
+/** Formulário do comunicado. `ponto` fixa o local (quando vem do detalhe do ponto). */
+function editarComunicado(c, ponto, recarregar, opcoes = null) {
+  const hoje = new Date().toLocaleDateString('en-CA');
+  const emDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA'); };
+  const montar = (op) => formModal(c ? 'Editar comunicado' : 'Novo comunicado', () => [
+    el('p', { class: 'mudo', style: 'margin:0' }, 'O comunicado entra no carrossel entre os anúncios. A própria TV desenha o texto — não precisa de arte.'),
+    c || ponto ? null : escolha('Ponto', 'local_id', Object.fromEntries(op.locais.map((l) => [l.id, `${l.nome} — ${l.cidade}`])), '', { required: true }),
+    campo('Título', { name: 'titulo', value: c?.titulo ?? '', required: true, maxlength: 80, placeholder: 'Ex.: Assembleia dia 12' }),
+    area('Texto', { name: 'texto', required: true, maxlength: 400, placeholder: 'Ex.: Às 19h no salão de festas. Pauta: previsão orçamentária.' }, c?.texto ?? ''),
+    el('div', { class: 'tres' },
+      escolha('Tipo', 'tipo', TIPOS_COMUNICADO, c?.tipo ?? 'aviso'),
+      campo('No ar de', { name: 'inicio', type: 'date', value: c?.inicio ?? hoje, required: true }),
+      campo('até', { name: 'fim', type: 'date', value: c?.fim ?? emDias(7), required: true })),
+    campo('Tempo na tela (segundos)', { name: 'duracao_s', type: 'number', min: 5, max: 60, value: c?.duracao_s ?? 10 }),
+  ], async (d) => {
+    const corpo = { ...d, local_id: ponto?.id ?? c?.local_id ?? d.local_id };
+    if (c) await api.patch(`/painel/comunicados/${c.id}`, corpo);
+    else await api.post('/painel/comunicados', corpo);
+    toast(c ? 'Comunicado atualizado.' : 'Comunicado criado e no ar.');
+    recarregar();
+  });
+  return opcoes ? montar(opcoes) : api.get('/painel/opcoes').then(montar);
+}

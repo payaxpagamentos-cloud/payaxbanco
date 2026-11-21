@@ -6,10 +6,12 @@ import {
   CATEGORIAS, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, DIAS,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio, previa, miniatura, linhaDoLoop, itensDoLoop, resumoDoLoop, enviarArquivo } from './comum.js';
+import { agencias } from './inventario.js';
 
-// ---------------------------------------------------------------- Anunciantes
+// ---------------------------------------------------------------- Anunciantes e agências
 export async function anunciantes(ctx) {
   const corpo = el('div', { class: 'cartao' });
+  const filtros = el('div', { class: 'filtros livre' });
   const filtro = { busca: '', status: '' };
   const pintar = async () => {
     const d = await api.get(`/painel/anunciantes${qs(filtro)}`);
@@ -23,12 +25,24 @@ export async function anunciantes(ctx) {
     ], d.itens, { aoClicar: (a) => abrirAnunciante(a.id, pintar), vazioTexto: 'Nenhum anunciante cadastrado.' }));
   };
   let timer;
-  limpar(ctx.conteudo,
-    el('div', { class: 'filtros livre' },
-      el('label', { class: 'campo' }, 'Buscar', el('input', { placeholder: 'Nome ou documento', oninput: (e) => { filtro.busca = e.target.value; clearTimeout(timer); timer = setTimeout(pintar, 300); } })),
-      escolha('Situação', 'status', { '': 'Todos', ativo: 'Ativos', inativo: 'Inativos' }, '', { onchange: (e) => { filtro.status = e.target.value; pintar(); } }),
-      el('button', { class: 'btn primario', onclick: () => editarAnunciante(null, pintar) }, icone('mais'), 'Novo anunciante')),
-    corpo);
+  limpar(filtros,
+    el('label', { class: 'campo' }, 'Buscar', el('input', { placeholder: 'Nome ou documento', oninput: (e) => { filtro.busca = e.target.value; clearTimeout(timer); timer = setTimeout(pintar, 300); } })),
+    escolha('Situação', 'status', { '': 'Todos', ativo: 'Ativos', inativo: 'Inativos' }, '', { onchange: (e) => { filtro.status = e.target.value; pintar(); } }),
+    el('button', { class: 'btn primario', onclick: () => editarAnunciante(null, pintar) }, icone('mais'), 'Novo anunciante'));
+
+  // Duas abas: quem anuncia e as agências que compram a mídia para eles.
+  const abas = el('div', { class: 'linha' },
+    el('button', { class: 'btn pequeno primario', onclick: (e) => trocar(e.target, 'anunciantes') }, 'Anunciantes'),
+    el('button', { class: 'btn pequeno', onclick: (e) => trocar(e.target, 'agencias') }, 'Agências'));
+  const trocar = (botao, aba) => {
+    for (const b of abas.children) b.classList.remove('primario');
+    botao.classList.add('primario');
+    filtros.hidden = aba !== 'anunciantes';
+    if (aba === 'anunciantes') pintar();
+    else agencias(corpo);
+  };
+
+  limpar(ctx.conteudo, el('div', { class: 'coluna' }, abas, filtros, corpo));
   await pintar();
 }
 
@@ -98,7 +112,8 @@ export async function campanhas(ctx) {
   const pintar = async () => {
     const d = await api.get(`/painel/campanhas${qs(filtro)}`);
     limpar(corpo, tabela([
-      [(c) => el('div', {}, el('div', {}, c.nome), el('div', { class: 'pequeno mudo' }, c.anunciante)), 'Campanha'],
+      [(c) => el('div', {}, el('div', {}, c.nome),
+        el('div', { class: 'pequeno mudo' }, `${c.anunciante}${c.agencia ? ` · ${c.agencia}` : ''}${c.circuito ? ` · ${c.circuito}` : ''}`)), 'Campanha'],
       [(c) => etiquetaDe(STATUS_CAMPANHA, c.status), 'Situação'],
       [(c) => el('div', {}, el('div', {}, `${dataBr(c.inicio)} → ${c.fim ? dataBr(c.fim) : 'sem fim'}`),
         el('div', { class: 'pequeno mudo' }, `${diasTexto(c.dias_semana)} · ${faixaHorario(c.hora_inicio, c.hora_fim)}`)), 'Quando'],
@@ -127,8 +142,15 @@ const camposCampanha = (c, opcoes, padroes) => [
   c ? null : escolha('Anunciante', 'anunciante_id', Object.fromEntries(opcoes.anunciantes.map((a) => [a.id, a.nome])), '', { required: true }),
   campo('Nome da campanha', { name: 'nome', value: c?.nome ?? '', required: true, maxlength: 140 }),
   el('div', { class: 'duas' },
+    escolha('Agência (opcional)', 'agencia_id', { '': 'Direto com o anunciante', ...Object.fromEntries(opcoes.agencias.map((a) => [a.id, a.nome])) }, c?.agencia_id ?? ''),
+    campo('Número do PI', { name: 'pi', value: c?.pi ?? '', maxlength: 40, placeholder: 'pedido de inserção' })),
+  el('div', { class: 'duas' },
     campo('Começa em', { name: 'inicio', type: 'date', value: c?.inicio ?? new Date().toLocaleDateString('en-CA'), required: true }),
     campo('Termina em (vazio = sem fim)', { name: 'fim', type: 'date', value: c?.fim ?? '' })),
+  opcoes.circuitos.length
+    ? escolha('Circuito (preenche onde passa e as inserções)', 'circuito_id',
+      { '': 'Escolher as telas manualmente', ...Object.fromEntries(opcoes.circuitos.map((x) => [x.id, `${x.nome} — ${x.insercoes_hora}/h`])) }, c?.circuito_id ?? '')
+    : null,
   el('fieldset', {}, el('legend', {}, 'Quanto vai ao ar'),
     el('div', { class: 'duas' },
       campo('Inserções por hora, em cada TV', { name: 'insercoes_hora', type: 'number', min: 1, max: 120, value: c?.insercoes_hora ?? padroes.insercoes_hora, required: true }),
@@ -158,8 +180,11 @@ function editarCampanha(c, recarregar, opcoes) {
       fim: d.fim || null,
     };
     for (const k of Object.keys(corpo)) if (/^dia_\d$/.test(k) || ['valor', 'cpm'].includes(k)) delete corpo[k];
+    const circuitoId = corpo.circuito_id;
+    delete corpo.circuito_id;
     const r = c ? await api.patch(`/painel/campanhas/${c.id}`, corpo) : await api.post('/painel/campanhas', corpo);
-    toast(c ? 'Campanha atualizada.' : 'Campanha criada. Agora adicione os criativos e diga onde ela passa.');
+    if (circuitoId) await api.post(`/painel/campanhas/${r.id}/circuito`, { circuito_id: circuitoId });
+    toast(c ? 'Campanha atualizada.' : (circuitoId ? 'Campanha criada com as telas do circuito. Agora adicione os criativos.' : 'Campanha criada. Agora adicione os criativos e diga onde ela passa.'));
     recarregar();
     if (!c) abrirCampanha(r.id, recarregar, opcoes);
   }, { largo: true }));
@@ -173,7 +198,9 @@ async function abrirCampanha(id, recarregar, opcoes) {
   await modal(`${d.nome} — ${d.anunciante}`, (fechar) => [
     el('div', { class: 'linha entre' },
       el('div', { class: 'linha' }, etiquetaDe(STATUS_CAMPANHA, d.status),
-        el('span', { class: 'mudo pequeno' }, `${dataBr(d.inicio)} → ${d.fim ? dataBr(d.fim) : 'sem fim'} · ${diasTexto(d.dias_semana)} · ${faixaHorario(d.hora_inicio, d.hora_fim)}`)),
+        el('span', { class: 'mudo pequeno' }, `${dataBr(d.inicio)} → ${d.fim ? dataBr(d.fim) : 'sem fim'} · ${diasTexto(d.dias_semana)} · ${faixaHorario(d.hora_inicio, d.hora_fim)}`),
+        d.agencia ? etiqueta(`${d.agencia}${d.pi ? ` · PI ${d.pi}` : ''} · ${(d.comissao_agencia_percentual / 100).toFixed(0)}% de comissão`, 'info') : null,
+        d.circuito ? etiqueta(`Circuito ${d.circuito}`, '') : null),
       el('div', { class: 'linha' }, ...acoesStatus(d, () => atualizar(fechar)))),
     d.motivo ? el('p', { class: 'aviso' }, `Motivo registrado: ${d.motivo}`) : null,
 

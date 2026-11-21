@@ -16,11 +16,12 @@ function registrar(db, tela, lista) {
 
   const midias = new Map(db.prepare('SELECT id, anunciante_id FROM midias').all().map((m) => [m.id, m]));
   const campanhas = new Map(db.prepare('SELECT id, anunciante_id FROM campanhas').all().map((c) => [c.id, c]));
+  const comunicados = new Set(db.prepare('SELECT id FROM comunicados WHERE local_id = ?').all(tela.local_id).map((c) => c.id));
   const limiteFuturo = Date.now() + 3_600_000;
   const limitePassado = Date.now() - 30 * 86_400_000;
 
-  const inserir = db.prepare(`INSERT OR IGNORE INTO exibicoes (tela_id, local_id, campanha_id, anunciante_id, midia_id, data, exibida_em, duracao_s, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const inserir = db.prepare(`INSERT OR IGNORE INTO exibicoes (tela_id, local_id, campanha_id, anunciante_id, midia_id, comunicado_id, data, exibida_em, duracao_s, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const somar = db.prepare(`INSERT INTO resumo_dia (data, tela_id, campanha_id, local_id, insercoes, segundos) VALUES (?, ?, ?, ?, 1, ?)
     ON CONFLICT (data, tela_id, campanha_id) DO UPDATE SET insercoes = insercoes + 1, segundos = segundos + excluded.segundos`);
 
@@ -30,16 +31,21 @@ function registrar(db, tela, lista) {
     let ignoradas = 0;
     const criado = agora();
     for (const e of lista) {
-      const midiaId = Number(e.midia_id);
       const instante = Date.parse(e.exibida_em ?? '');
       const duracao = Math.min(600, Math.max(0, Math.round(Number(e.duracao_s) || 0)));
-      if (!midias.has(midiaId) || !Number.isFinite(instante) || instante > limiteFuturo || instante < limitePassado) { ignoradas++; continue; }
+      if (!Number.isFinite(instante) || instante > limiteFuturo || instante < limitePassado) { ignoradas++; continue; }
+      // Ou é um criativo (mídia), ou é um comunicado do próprio ponto.
+      const midiaId = e.midia_id ? Number(e.midia_id) : null;
+      const comunicadoId = e.comunicado_id ? Number(e.comunicado_id) : null;
+      if (midiaId !== null && !midias.has(midiaId)) { ignoradas++; continue; }
+      if (comunicadoId !== null && !comunicados.has(comunicadoId)) { ignoradas++; continue; }
+      if (midiaId === null && comunicadoId === null) { ignoradas++; continue; }
       const campanhaId = e.campanha_id ? Number(e.campanha_id) : null;
       if (campanhaId !== null && !campanhas.has(campanhaId)) { ignoradas++; continue; }
       const iso = new Date(instante).toISOString();
       const data = local(instante).data;
-      const anuncianteId = campanhaId !== null ? campanhas.get(campanhaId).anunciante_id : midias.get(midiaId).anunciante_id;
-      const r = inserir.run(tela.id, tela.local_id, campanhaId, anuncianteId, midiaId, data, iso, duracao, criado);
+      const anuncianteId = campanhaId !== null ? campanhas.get(campanhaId).anunciante_id : (midiaId !== null ? midias.get(midiaId).anunciante_id : null);
+      const r = inserir.run(tela.id, tela.local_id, campanhaId, anuncianteId, midiaId, comunicadoId, data, iso, duracao, criado);
       if (!r.changes) { repetidas++; continue; }
       somar.run(data, tela.id, campanhaId ?? 0, tela.local_id, duracao);
       gravadas++;

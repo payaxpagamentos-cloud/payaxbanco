@@ -133,7 +133,18 @@ function uf(v) {
   return u;
 }
 
+/**
+ * Ambientes onde a rede instala telas. A lista mora aqui (e não numa restrição do banco) para crescer
+ * sem migração; o painel mostra os rótulos de CATEGORIAS em public/js/ui.js.
+ */
+const CATEGORIAS = ['condominio_residencial', 'condominio_comercial', 'predio_corporativo', 'academia', 'mercado', 'padaria', 'farmacia',
+  'clinica', 'hospital', 'universidade', 'escola', 'salao', 'restaurante', 'lanchonete', 'loja', 'shopping', 'posto', 'oficina',
+  'aeroporto', 'transporte', 'rua', 'predio', 'outro'];
+
+/** Posição da tela dentro do ponto (elevador social, hall, portaria...). Texto livre, com sugestões no painel. */
+const posicao = (v) => opcional(v, 'a posição da tela', 60);
+
 const booleano = (v) => v === true || v === 1 || v === '1' || v === 'true' || v === 'on';
 
 module.exports = { digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data,
-  documento, hora, competencia, percentual, diasSemana, uf, booleano };
+  documento, hora, competencia, percentual, diasSemana, uf, booleano, CATEGORIAS, posicao };

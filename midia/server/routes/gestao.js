@@ -9,6 +9,7 @@ const { registrar } = require('../lib/auditoria');
 const { hashSenha } = require('../lib/senha');
 const { hoje, mes, somarDias, somarMeses, inicioMes, fimMes } = require('../lib/datas');
 const { diagnostico, estaOnline } = require('../lib/monitor');
+const grade = require('../lib/grade');
 const rel = require('../lib/relatorios');
 const faturamento = require('../lib/faturamento');
 const exibicoes = require('../lib/exibicoes');
@@ -229,6 +230,172 @@ module.exports = (db) => {
     res.json(db.prepare('SELECT * FROM repasses WHERE id = ?').get(id));
   });
 
+  // ----------------------------------------------------------------- Agências
+  r.get('/agencias', (_req, res) => {
+    res.json({
+      itens: db.prepare(`SELECT a.*, (SELECT COUNT(*) FROM campanhas c WHERE c.agencia_id = a.id) AS campanhas,
+          (SELECT COUNT(*) FROM campanhas c WHERE c.agencia_id = a.id AND c.status = 'ativa') AS campanhas_ativas
+        FROM agencias a ORDER BY a.nome`).all(),
+    });
+  });
+
+  const lerAgencia = (c, parcial = false) => {
+    const d = {};
+    if (c.nome !== undefined || !parcial) d.nome = v.texto(c.nome, 'o nome da agência', 120);
+    if (c.documento !== undefined) d.documento = c.documento === null || c.documento === '' ? null : v.documento(c.documento);
+    if (c.contato !== undefined) d.contato = v.opcional(c.contato, 'o contato', 120);
+    if (c.email !== undefined) d.email = c.email === null || c.email === '' ? null : v.email(c.email);
+    if (c.telefone !== undefined) d.telefone = c.telefone === null || c.telefone === '' ? null : v.telefone(c.telefone);
+    if (c.comissao_percentual !== undefined) d.comissao_percentual = v.percentual(c.comissao_percentual, 'a comissão da agência');
+    if (c.status !== undefined) d.status = v.opcao(c.status, 'a situação', ['ativa', 'inativa']);
+    return d;
+  };
+
+  r.post('/agencias', (req, res) => {
+    const d = lerAgencia(req.body);
+    const id = Number(db.prepare(`INSERT INTO agencias (${Object.keys(d).join(', ')}, criado_em) VALUES (${Object.keys(d).map(() => '?').join(', ')}, ?)`)
+      .run(...Object.values(d), agora()).lastInsertRowid);
+    registrar(db, req, 'agencia_criada', { id, nome: d.nome });
+    res.status(201).json({ id, ...d });
+  });
+
+  r.patch('/agencias/:id', (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM agencias WHERE id = ?').get(id)) throw naoEncontrado('Agência');
+    const d = lerAgencia(req.body, true);
+    if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
+    db.prepare(`UPDATE agencias SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), id);
+    registrar(db, req, 'agencia_alterada', { id, depois: d });
+    res.json(db.prepare('SELECT * FROM agencias WHERE id = ?').get(id));
+  });
+
+  // ----------------------------------------------------------------- Circuitos (o pacote que o comercial vende)
+  /** Telas que o circuito alcança, com a audiência somada — é o que vai na proposta. */
+  function telasDoCircuito(circuitoId) {
+    const alvos = db.prepare('SELECT tipo, valor FROM circuito_alvos WHERE circuito_id = ?').all(circuitoId);
+    const telas = db.prepare(`SELECT t.id, t.nome, t.orientacao, t.posicao, l.id AS local_id, l.nome AS local_nome, l.categoria, l.cidade, l.uf,
+        l.publico_dia, l.unidades FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.status = 'ativa' AND l.status = 'ativo'`).all();
+    return telas.filter((t) => grade.alvoBate(alvos, t));
+  }
+
+  const resumoCircuito = (c) => {
+    const telas = telasDoCircuito(c.id);
+    const pontos = new Set(telas.map((t) => t.local_id));
+    // O público do ponto é contado uma vez, mesmo com várias telas nele.
+    const publico = [...pontos].reduce((t, id) => t + (telas.find((x) => x.local_id === id)?.publico_dia ?? 0), 0);
+    return {
+      ...c,
+      telas: telas.length,
+      pontos: pontos.size,
+      cidades: new Set(telas.map((t) => t.cidade)).size,
+      publico_dia: publico,
+      publico_mes: publico * 30,
+      retrato: telas.filter((t) => t.orientacao === 'retrato').length,
+      paisagem: telas.filter((t) => t.orientacao === 'paisagem').length,
+      lista: telas,
+    };
+  };
+
+  r.get('/circuitos', (_req, res) => {
+    res.json({ itens: db.prepare('SELECT * FROM circuitos ORDER BY ativo DESC, nome').all().map((c) => ({ ...resumoCircuito(c), lista: undefined })) });
+  });
+
+  r.get('/circuitos/:id', (req, res) => {
+    const c = db.prepare('SELECT * FROM circuitos WHERE id = ?').get(Number(req.params.id));
+    if (!c) throw naoEncontrado('Circuito');
+    res.json({ ...resumoCircuito(c), alvos: db.prepare('SELECT id, tipo, valor FROM circuito_alvos WHERE circuito_id = ? ORDER BY tipo, valor').all(c.id) });
+  });
+
+  const lerCircuito = (c, parcial = false) => {
+    const d = {};
+    if (c.nome !== undefined || !parcial) d.nome = v.texto(c.nome, 'o nome do circuito', 120);
+    if (c.descricao !== undefined) d.descricao = v.opcional(c.descricao, 'a descrição', 300);
+    if (c.valor_mes_centavos !== undefined) d.valor_mes_centavos = v.inteiro(c.valor_mes_centavos, 'o valor por mês', { max: 1_000_000_000 });
+    if (c.cpm_centavos !== undefined) d.cpm_centavos = v.inteiro(c.cpm_centavos, 'o CPM', { max: 1_000_000 });
+    if (c.insercoes_hora !== undefined) d.insercoes_hora = v.inteiro(c.insercoes_hora, 'as inserções por hora', { min: 1, max: 120 });
+    if (c.ativo !== undefined) d.ativo = v.booleano(c.ativo) ? 1 : 0;
+    return d;
+  };
+
+  r.post('/circuitos', (req, res) => {
+    const d = lerCircuito(req.body);
+    const id = transacao(db, () => {
+      const novo = Number(db.prepare(`INSERT INTO circuitos (${Object.keys(d).join(', ')}, criado_em) VALUES (${Object.keys(d).map(() => '?').join(', ')}, ?)`)
+        .run(...Object.values(d), agora()).lastInsertRowid);
+      for (const a of req.body.alvos ?? []) {
+        db.prepare('INSERT OR IGNORE INTO circuito_alvos (circuito_id, tipo, valor) VALUES (?, ?, ?)')
+          .run(novo, v.opcao(a.tipo, 'o tipo de alvo', ['tela', 'local', 'categoria', 'cidade']), v.texto(a.valor, 'o alvo', 80));
+      }
+      return novo;
+    });
+    registrar(db, req, 'circuito_criado', { id, nome: d.nome });
+    res.status(201).json({ id, ...d });
+  });
+
+  r.patch('/circuitos/:id', (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM circuitos WHERE id = ?').get(id)) throw naoEncontrado('Circuito');
+    const d = lerCircuito(req.body, true);
+    transacao(db, () => {
+      if (Object.keys(d).length) db.prepare(`UPDATE circuitos SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), id);
+      if (Array.isArray(req.body.alvos)) {
+        db.prepare('DELETE FROM circuito_alvos WHERE circuito_id = ?').run(id);
+        for (const a of req.body.alvos) {
+          db.prepare('INSERT OR IGNORE INTO circuito_alvos (circuito_id, tipo, valor) VALUES (?, ?, ?)')
+            .run(id, v.opcao(a.tipo, 'o tipo de alvo', ['tela', 'local', 'categoria', 'cidade']), v.texto(a.valor, 'o alvo', 80));
+        }
+      }
+    });
+    registrar(db, req, 'circuito_alterado', { id });
+    res.json(db.prepare('SELECT * FROM circuitos WHERE id = ?').get(id));
+  });
+
+  r.delete('/circuitos/:id', permitir('master'), (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM circuitos WHERE id = ?').get(id)) throw naoEncontrado('Circuito');
+    db.prepare('UPDATE campanhas SET circuito_id = NULL WHERE circuito_id = ?').run(id);
+    db.prepare('DELETE FROM circuitos WHERE id = ?').run(id);
+    registrar(db, req, 'circuito_excluido', { id });
+    res.status(204).end();
+  });
+
+  /** Inventário (mídia kit): o que a rede tem para vender, ponto a ponto. */
+  r.get('/inventario', (req, res) => {
+    const c = cfg();
+    const pontos = db.prepare(`SELECT l.*, COUNT(t.id) AS telas,
+        SUM(t.orientacao = 'retrato') AS retrato, SUM(t.orientacao = 'paisagem') AS paisagem,
+        GROUP_CONCAT(DISTINCT t.posicao) AS posicoes
+      FROM locais l LEFT JOIN telas t ON t.local_id = l.id AND t.status = 'ativa'
+      WHERE l.status = 'ativo' GROUP BY l.id ORDER BY l.cidade, l.nome`).all();
+    const itens = pontos.map((p) => ({
+      ...p,
+      posicoes: p.posicoes ? p.posicoes.split(',').filter(Boolean) : [],
+      publico_mes: (p.publico_dia ?? 0) * 30,
+      tabela_centavos: (p.telas ?? 0) * c.mensalidade_tela_centavos,
+    }));
+    if (req.query.csv) {
+      return rel.enviarCsv(res, 'inventario.csv', rel.csv([
+        ['nome', 'Ponto'], ['categoria', 'Ambiente'], ['cidade', 'Cidade'], ['uf', 'UF'], ['bairro', 'Bairro'],
+        ['unidades', 'Unidades'], ['telas', 'Telas'], ['paisagem', 'Paisagem'], ['retrato', 'Retrato'],
+        [(x) => x.posicoes.join(' / '), 'Posições'], ['publico_dia', 'Público/dia'], ['publico_mes', 'Público/mês'],
+        [(x) => rel.reais(x.tabela_centavos), 'Tabela (R$/mês)'],
+      ], itens));
+    }
+    res.json({
+      itens,
+      totais: {
+        pontos: itens.length,
+        telas: itens.reduce((t, x) => t + (x.telas ?? 0), 0),
+        publico_dia: itens.reduce((t, x) => t + (x.publico_dia ?? 0), 0),
+        cidades: new Set(itens.map((x) => x.cidade)).size,
+        unidades: itens.reduce((t, x) => t + (x.unidades ?? 0), 0),
+      },
+      circuitos: db.prepare('SELECT * FROM circuitos WHERE ativo = 1 ORDER BY nome').all().map((x) => ({ ...resumoCircuito(x), lista: undefined })),
+      mensalidade_tela_centavos: c.mensalidade_tela_centavos,
+      cpm_centavos: c.cpm_centavos,
+    });
+  });
+
   // ----------------------------------------------------------------- Usuários, configurações e histórico
   r.get('/usuarios', permitir('master'), (_req, res) => {
     res.json({
@@ -281,7 +448,7 @@ module.exports = (db) => {
     const limites = {
       duracao_imagem_s: [3, 120], insercoes_hora_padrao: [1, 120], bloco_minimo_s: [30, 3600], bloco_maximo_s: [60, 7200],
       batida_intervalo_s: [15, 900], offline_minutos: [2, 1440], mensalidade_tela_centavos: [0, 1_000_000_00], cpm_centavos: [0, 1_000_000],
-      comissao_local_percentual: [0, 10_000], vencimento_dia: [1, 28], aviso_lojista: [0, 1], prova_dias: [0, 3650],
+      comissao_local_percentual: [0, 10_000], vencimento_dia: [1, 28], aviso_lojista: [0, 1], comunicado_automatico: [0, 1], prova_dias: [0, 3650],
     };
     transacao(db, () => {
       for (const [k] of Object.entries(CONFIG_PADRAO)) {
@@ -316,6 +483,8 @@ module.exports = (db) => {
     const c = cfg();
     res.json({
       anunciantes: db.prepare("SELECT id, nome FROM anunciantes WHERE status = 'ativo' ORDER BY nome").all(),
+      agencias: db.prepare("SELECT id, nome, comissao_percentual FROM agencias WHERE status = 'ativa' ORDER BY nome").all(),
+      circuitos: db.prepare('SELECT id, nome, insercoes_hora, valor_mes_centavos, cpm_centavos FROM circuitos WHERE ativo = 1 ORDER BY nome').all(),
       locais: db.prepare("SELECT id, nome, cidade, categoria FROM locais WHERE status <> 'encerrado' ORDER BY nome").all(),
       telas: db.prepare(`SELECT t.id, t.nome, t.orientacao, t.local_id, l.nome AS local_nome, t.ultimo_contato FROM telas t JOIN locais l ON l.id = t.local_id
         WHERE t.status <> 'inativa' ORDER BY l.nome, t.nome`).all().map((t) => ({ ...t, online: estaOnline(t, c) })),

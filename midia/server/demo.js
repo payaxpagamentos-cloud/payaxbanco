@@ -59,13 +59,55 @@ function cartaz(largura, altura, [r, g, b]) {
   ]);
 }
 
+// A rede de demonstração mistura os ambientes típicos: condomínios (onde a contrapartida são os comunicados),
+// prédio corporativo, academia e comércio de rua.
 const PONTOS = [
-  { nome: 'Padaria Pão Quente', categoria: 'padaria', cidade: 'Campinas', bairro: 'Centro', publico_dia: 620, comissao: 2000, responsavel: 'Jorge Lima', telefone: '19988881111', abre: '06:00', fecha: '20:00' },
-  { nome: 'Mercado Bom Preço', categoria: 'mercado', cidade: 'Campinas', bairro: 'Taquaral', publico_dia: 1800, comissao: 1500, responsavel: 'Marta Souza', telefone: '19988882222', abre: '07:00', fecha: '22:00' },
-  { nome: 'Academia Força Total', categoria: 'academia', cidade: 'Campinas', bairro: 'Cambuí', publico_dia: 430, comissao: 2500, responsavel: 'Rafael Dias', telefone: '19988883333', abre: '06:00', fecha: '23:00' },
-  { nome: 'Clínica Vida', categoria: 'clinica', cidade: 'Valinhos', bairro: 'Centro', publico_dia: 260, comissao: 1800, responsavel: 'Dra. Helena', telefone: '19988884444', abre: '08:00', fecha: '18:00' },
-  { nome: 'Barbearia Navalha', categoria: 'salao', cidade: 'Valinhos', bairro: 'Jardim', publico_dia: 140, comissao: 3000, responsavel: 'Tiago Alves', telefone: '19988885555', abre: '09:00', fecha: '19:00' },
-  { nome: 'Restaurante Prato Cheio', categoria: 'restaurante', cidade: 'Indaiatuba', bairro: 'Centro', publico_dia: 520, comissao: 2000, responsavel: 'Dona Cida', telefone: '19988886666', abre: '10:00', fecha: '16:00' },
+  { nome: 'Edifício Jardim das Acácias', categoria: 'condominio_residencial', cidade: 'Campinas', bairro: 'Cambuí', publico_dia: 940, unidades: 96,
+    administradora: 'Administra Bem', repasse: 'nenhum', comissao: 0, fixo: 0, responsavel: 'Síndico Paulo Rocha', telefone: '19988881111',
+    abre: '00:00', fecha: '23:59', telas: [['Elevador social 1', 'retrato', 'Elevador social'], ['Hall de entrada', 'paisagem', 'Hall de entrada']] },
+  { nome: 'Residencial Vista Verde', categoria: 'condominio_residencial', cidade: 'Campinas', bairro: 'Taquaral', publico_dia: 1240, unidades: 128,
+    administradora: 'Administra Bem', repasse: 'fixo', comissao: 0, fixo: 30_000, responsavel: 'Síndica Marta Souza', telefone: '19988882222',
+    abre: '00:00', fecha: '23:59', telas: [['Elevador social 1', 'retrato', 'Elevador social'], ['Elevador social 2', 'retrato', 'Elevador social'], ['Portaria', 'paisagem', 'Portaria']] },
+  { nome: 'Condomínio Alphaville Valinhos', categoria: 'condominio_residencial', cidade: 'Valinhos', bairro: 'Alphaville', publico_dia: 680, unidades: 74,
+    administradora: 'Lar Gestão', repasse: 'nenhum', comissao: 0, fixo: 0, responsavel: 'Síndico Tiago Alves', telefone: '19988883333',
+    abre: '00:00', fecha: '23:59', telas: [['Hall social', 'retrato', 'Hall de entrada']] },
+  { nome: 'Centro Empresarial Nações', categoria: 'condominio_comercial', cidade: 'Campinas', bairro: 'Centro', publico_dia: 2100, unidades: 180,
+    administradora: 'Prime Facilities', repasse: 'fixo', comissao: 0, fixo: 60_000, responsavel: 'Gerente predial Helena Dias', telefone: '19988884444',
+    abre: '06:00', fecha: '22:00', telas: [['Elevador torre A', 'retrato', 'Elevador social'], ['Recepção', 'paisagem', 'Recepção']] },
+  { nome: 'Academia Força Total', categoria: 'academia', cidade: 'Campinas', bairro: 'Cambuí', publico_dia: 430, unidades: 0,
+    administradora: null, repasse: 'comissao', comissao: 2500, fixo: 0, responsavel: 'Rafael Dias', telefone: '19988885555',
+    abre: '06:00', fecha: '23:00', telas: [['TV da esteira', 'paisagem', 'Área de cardio'], ['Recepção', 'retrato', 'Recepção']] },
+  { nome: 'Mercado Bom Preço', categoria: 'mercado', cidade: 'Campinas', bairro: 'Taquaral', publico_dia: 1800, unidades: 0,
+    administradora: null, repasse: 'comissao', comissao: 1500, fixo: 0, responsavel: 'Marta Lima', telefone: '19988886666',
+    abre: '07:00', fecha: '22:00', telas: [['Fila do caixa', 'paisagem', 'Fila do caixa'], ['Totem da entrada', 'retrato', 'Hall de entrada']] },
+  { nome: 'Padaria Pão Quente', categoria: 'padaria', cidade: 'Campinas', bairro: 'Centro', publico_dia: 620, unidades: 0,
+    administradora: null, repasse: 'comissao', comissao: 2000, fixo: 0, responsavel: 'Jorge Lima', telefone: '19988887777',
+    abre: '06:00', fecha: '20:00', telas: [['TV do balcão', 'paisagem', 'Balcão']] },
+  { nome: 'Clínica Vida', categoria: 'clinica', cidade: 'Valinhos', bairro: 'Centro', publico_dia: 260, unidades: 0,
+    administradora: null, repasse: 'comissao', comissao: 1800, fixo: 0, responsavel: 'Dra. Helena', telefone: '19988888888',
+    abre: '08:00', fecha: '18:00', telas: [['Sala de espera', 'paisagem', 'Sala de espera']] },
+];
+
+const AGENCIAS = [
+  { nome: 'Ponto Alto Publicidade', documento: '11222333000181', contato: 'Carolina Reis', email: 'midia@pontoalto.com.br', telefone: '1933220011', comissao: 2000 },
+  { nome: 'Interior Mídia', documento: '04252011000110', contato: 'Fernando Braga', email: 'planejamento@interiormidia.com.br', telefone: '1933220022', comissao: 2000 },
+];
+
+const CIRCUITOS = [
+  { nome: 'Residencial Campinas', descricao: 'Condomínios residenciais de Campinas: elevadores e halls.', valor: 350_000, cpm: 2200, insercoes: 8,
+    alvos: [{ tipo: 'categoria', valor: 'condominio_residencial' }, { tipo: 'cidade', valor: 'Campinas' }] },
+  { nome: 'Corporativo', descricao: 'Prédios comerciais e corporativos, no horário comercial.', valor: 280_000, cpm: 2500, insercoes: 6,
+    alvos: [{ tipo: 'categoria', valor: 'condominio_comercial' }, { tipo: 'categoria', valor: 'predio_corporativo' }] },
+  { nome: 'Comércio e academia', descricao: 'Supermercado, padaria, academia e clínica — alto fluxo de passagem.', valor: 240_000, cpm: 1800, insercoes: 6,
+    alvos: [{ tipo: 'categoria', valor: 'mercado' }, { tipo: 'categoria', valor: 'padaria' }, { tipo: 'categoria', valor: 'academia' }, { tipo: 'categoria', valor: 'clinica' }] },
+];
+
+const COMUNICADOS = [
+  { ponto: 0, titulo: 'Assembleia geral dia 12', texto: 'Às 19h no salão de festas. Pauta: previsão orçamentária de 2027 e troca do portão social.', tipo: 'assembleia', dias: 12 },
+  { ponto: 0, titulo: 'Dedetização na quinta', texto: 'Garagem e áreas comuns a partir das 8h. Retire os veículos até as 7h30.', tipo: 'manutencao', dias: 5 },
+  { ponto: 1, titulo: 'Encomendas na portaria', texto: 'Retire suas encomendas em até 48 horas. Depois disso elas voltam para os Correios.', tipo: 'entrega', dias: 20 },
+  { ponto: 1, titulo: 'Elevador 2 em manutenção', texto: 'Manutenção preventiva na sexta, das 9h às 12h. Use o elevador 1.', tipo: 'manutencao', dias: 3, pendente: true },
+  { ponto: 3, titulo: 'Limpeza da fachada', texto: 'Rapel na torre B entre segunda e quarta. Mantenha as janelas fechadas.', tipo: 'aviso', dias: 7 },
 ];
 
 const ANUNCIANTES = [
@@ -82,37 +124,38 @@ function criar(db) {
   const criado = agora();
 
   const pontos = PONTOS.map((p) => {
-    const id = inserir(`INSERT INTO locais (nome, categoria, cidade, uf, bairro, logradouro, numero, responsavel, telefone, publico_dia, comissao_percentual,
-        status, inicio_parceria, criado_em) VALUES (?, ?, ?, 'SP', ?, 'Rua Exemplo', ?, ?, ?, ?, ?, 'ativo', ?, ?)`,
-      p.nome, p.categoria, p.cidade, p.bairro, String(100 + Math.floor(Math.random() * 900)), p.responsavel, p.telefone, p.publico_dia, p.comissao,
-      somarDias(hoje(), -120), criado);
+    const id = inserir(`INSERT INTO locais (nome, categoria, administradora, unidades, cidade, uf, bairro, logradouro, numero, responsavel, telefone,
+        publico_dia, repasse_tipo, comissao_percentual, repasse_fixo_centavos, status, inicio_parceria, criado_em)
+      VALUES (?, ?, ?, ?, ?, 'SP', ?, 'Rua Exemplo', ?, ?, ?, ?, ?, ?, ?, 'ativo', ?, ?)`,
+      p.nome, p.categoria, p.administradora, p.unidades, p.cidade, p.bairro, String(100 + Math.floor(Math.random() * 900)), p.responsavel, p.telefone,
+      p.publico_dia, p.repasse, p.comissao, p.fixo, somarDias(hoje(), -120), criado);
+    // Condomínio tem tela ligada todo dia; comércio segue o horário de funcionamento (domingo só no mercado).
+    const todoDia = p.categoria.startsWith('condominio');
     for (let d = 0; d <= 6; d++) {
-      if (d === 0 && p.categoria !== 'mercado' && p.categoria !== 'restaurante') continue;
+      if (!todoDia && d === 0 && p.categoria !== 'mercado') continue;
       inserir('INSERT INTO local_horarios (local_id, dia_semana, abre, fecha) VALUES (?, ?, ?, ?)', id, d, p.abre, p.fecha);
     }
     return { ...p, id };
   });
 
-  // Uma TV por ponto; o mercado e a academia ganham a segunda (uma delas em retrato, tipo totem).
+  // As telas de cada ponto: elevador e hall em condomínio; fila do caixa, balcão e recepção no comércio.
   const telas = [];
   for (const p of pontos) {
-    telas.push({
-      id: inserir(`INSERT INTO telas (local_id, nome, orientacao, status, relogio, legenda, pareada_em, aparelho, largura, altura, versao_player,
-          ultimo_contato, criado_em) VALUES (?, ?, 'paisagem', 'ativa', 1, ?, ?, 'TV Box Android 11', 1920, 1080, '1.0', ?, ?)`,
-        p.id, `TV ${p.nome.split(' ').slice(-1)[0]}`, `Bem-vindo à ${p.nome}`, criado, agora(), criado),
-      local_id: p.id,
-      ponto: p,
-    });
+    for (const [nome, orientacao, posicao] of p.telas) {
+      const retrato = orientacao === 'retrato';
+      telas.push({
+        id: inserir(`INSERT INTO telas (local_id, nome, posicao, orientacao, status, relogio, legenda, pareada_em, aparelho, largura, altura, versao_player,
+            ultimo_contato, criado_em) VALUES (?, ?, ?, ?, 'ativa', 1, ?, ?, ?, ?, ?, '1.0', ?, ?)`,
+          p.id, nome, posicao, orientacao, p.categoria.startsWith('condominio') ? null : `Bem-vindo à ${p.nome}`, criado,
+          retrato ? 'Mini PC' : 'TV Box Android 11', retrato ? 1080 : 1920, retrato ? 1920 : 1080, agora(), criado),
+        local_id: p.id,
+        ponto: p,
+      });
+    }
   }
-  const mercado = pontos.find((p) => p.categoria === 'mercado');
-  telas.push({ id: inserir(`INSERT INTO telas (local_id, nome, orientacao, status, relogio, pareada_em, aparelho, largura, altura, versao_player, ultimo_contato, criado_em)
-    VALUES (?, 'Totem da entrada', 'retrato', 'ativa', 1, ?, 'Mini PC', 1080, 1920, '1.0', ?, ?)`, mercado.id, criado, agora(), criado), local_id: mercado.id, ponto: mercado });
-  const academia = pontos.find((p) => p.categoria === 'academia');
-  telas.push({ id: inserir(`INSERT INTO telas (local_id, nome, orientacao, status, relogio, pareada_em, aparelho, largura, altura, versao_player, ultimo_contato, criado_em)
-    VALUES (?, 'TV da esteira', 'paisagem', 'ativa', 0, ?, 'Fire TV Stick', 1920, 1080, '1.0', ?, ?)`, academia.id, criado, agora(), criado), local_id: academia.id, ponto: academia });
   // Uma TV recém-instalada, ainda sem parear (aparece no diagnóstico).
-  inserir(`INSERT INTO telas (local_id, nome, orientacao, status, criado_em) VALUES (?, 'TV nova (a parear)', 'paisagem', 'ativa', ?)`,
-    pontos.at(-1).id, criado);
+  inserir(`INSERT INTO telas (local_id, nome, posicao, orientacao, status, criado_em) VALUES (?, 'Elevador de serviço', 'Elevador de serviço', 'retrato', 'ativa', ?)`,
+    pontos[0].id, criado);
 
   const gravarMidia = (dados, { anuncianteId = null, localId = null, nome, uso = 'campanha', duracao = cfg.duracao_imagem_s }) => {
     const lido = arquivos.salvar(dados, { duracaoInformada: duracao, duracaoImagemPadrao: cfg.duracao_imagem_s });
@@ -127,6 +170,27 @@ function criar(db) {
   gravarMidia(cartaz(1080, 1920, [11, 27, 63]), { nome: 'Anuncie aqui (retrato)', uso: 'institucional', duracao: 10 });
   gravarMidia(cartaz(1920, 1080, [217, 119, 6]), { nome: 'Promoção do dia da padaria', uso: 'institucional', localId: pontos[0].id, duracao: 10 });
 
+  const agencias = AGENCIAS.map((a) => ({
+    ...a,
+    id: inserir('INSERT INTO agencias (nome, documento, contato, email, telefone, comissao_percentual, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      a.nome, a.documento, a.contato, a.email, a.telefone, a.comissao, criado),
+  }));
+
+  const circuitos = CIRCUITOS.map((c) => {
+    const id = inserir('INSERT INTO circuitos (nome, descricao, valor_mes_centavos, cpm_centavos, insercoes_hora, criado_em) VALUES (?, ?, ?, ?, ?, ?)',
+      c.nome, c.descricao, c.valor, c.cpm, c.insercoes, criado);
+    for (const a of c.alvos) db.prepare('INSERT INTO circuito_alvos (circuito_id, tipo, valor) VALUES (?, ?, ?)').run(id, a.tipo, a.valor);
+    return { ...c, id };
+  });
+
+  for (const c of COMUNICADOS) {
+    const ponto = pontos[c.ponto];
+    inserir(`INSERT INTO comunicados (local_id, titulo, texto, tipo, inicio, fim, duracao_s, status, aprovado_em, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, 10, ?, ?, ?)`,
+      ponto.id, c.titulo, c.texto, c.tipo, somarDias(hoje(), -2), somarDias(hoje(), c.dias), c.pendente ? 'pendente' : 'aprovado',
+      c.pendente ? null : criado, criado);
+  }
+
   const anunciantes = ANUNCIANTES.map((a) => ({
     ...a,
     id: inserir('INSERT INTO anunciantes (nome, documento, contato, email, telefone, status, criado_em) VALUES (?, ?, ?, ?, ?, \'ativo\', ?)',
@@ -135,24 +199,38 @@ function criar(db) {
 
   // Campanhas: formatos de cobrança e segmentações diferentes, para mostrar o painel com vida.
   const planos = [
+    // Construtora no circuito residencial, comprada por agência (com PI) — o caso clássico de elevador.
+    { a: 2, nome: 'Lançamento Residencial Aurora', cobranca: 'mensal', valor: 350_000, insercoes: 8, circuito: 0, agencia: 0, pi: 'PI-2026-4471',
+      dias: '0123456', hi: '00:00', hf: '00:00', prioridade: 5 },
     { a: 0, nome: 'Óculos de sol — verão', cobranca: 'mensal', valor: 180_000, insercoes: 8, alvos: [], dias: '0123456', hi: '00:00', hf: '00:00', prioridade: 4 },
-    { a: 1, nome: 'Pizza em dobro na terça', cobranca: 'mensal', valor: 90_000, insercoes: 6, alvos: [{ tipo: 'categoria', valor: 'mercado' }, { tipo: 'categoria', valor: 'academia' }], dias: '12', hi: '16:00', hf: '22:00', prioridade: 3 },
-    { a: 2, nome: 'Apartamentos no Cambuí', cobranca: 'cpm', cpm: 1800, insercoes: 4, alvos: [{ tipo: 'cidade', valor: 'Campinas' }], dias: '0123456', hi: '08:00', hf: '20:00', prioridade: 3 },
-    { a: 3, nome: 'Vestibular 2027', cobranca: 'mensal', valor: 240_000, insercoes: 10, alvos: [], dias: '0123456', hi: '00:00', hf: '00:00', prioridade: 5 },
-    { a: 4, nome: 'Revisão com desconto', cobranca: 'cpm', cpm: 1500, insercoes: 3, alvos: [{ tipo: 'categoria', valor: 'padaria' }, { tipo: 'categoria', valor: 'restaurante' }], dias: '12345', hi: '06:00', hf: '18:00', prioridade: 2 },
+    { a: 1, nome: 'Pizza em dobro na terça', cobranca: 'mensal', valor: 90_000, insercoes: 6, circuito: 2, dias: '12', hi: '16:00', hf: '22:00', prioridade: 3 },
+    { a: 3, nome: 'Vestibular 2027', cobranca: 'cpm', cpm: 2200, insercoes: 10, circuito: 1, agencia: 1, pi: 'PI-2026-0098',
+      dias: '12345', hi: '07:00', hf: '20:00', prioridade: 4 },
+    { a: 4, nome: 'Revisão com desconto', cobranca: 'cpm', cpm: 1500, insercoes: 3,
+      alvos: [{ tipo: 'categoria', valor: 'padaria' }, { tipo: 'categoria', valor: 'mercado' }], dias: '12345', hi: '06:00', hf: '18:00', prioridade: 2 },
   ];
 
   const campanhas = planos.map((p, i) => {
     const anunciante = anunciantes[p.a];
-    const id = inserir(`INSERT INTO campanhas (anunciante_id, nome, status, inicio, fim, cobranca, valor_centavos, cpm_centavos, insercoes_hora, prioridade,
-        dias_semana, hora_inicio, hora_fim, aprovada_em, criado_em) VALUES (?, ?, 'ativa', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      anunciante.id, p.nome, somarDias(hoje(), -40), somarDias(hoje(), 50), p.cobranca, p.valor ?? 0, p.cpm ?? 0, p.insercoes, p.prioridade,
+    const agencia = p.agencia !== undefined ? agencias[p.agencia] : null;
+    const circuito = p.circuito !== undefined ? circuitos[p.circuito] : null;
+    const id = inserir(`INSERT INTO campanhas (anunciante_id, agencia_id, circuito_id, pi, comissao_agencia_percentual, nome, status, inicio, fim, cobranca,
+        valor_centavos, cpm_centavos, insercoes_hora, prioridade, dias_semana, hora_inicio, hora_fim, aprovada_em, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, 'ativa', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      anunciante.id, agencia?.id ?? null, circuito?.id ?? null, p.pi ?? null, agencia?.comissao ?? 0,
+      p.nome, somarDias(hoje(), -40), somarDias(hoje(), 50), p.cobranca, p.valor ?? 0, p.cpm ?? 0, p.insercoes, p.prioridade,
       p.dias, p.hi, p.hf, criado, criado);
+    // Campanha vendida em circuito herda os alvos dele.
+    if (circuito) {
+      for (const a of db.prepare('SELECT tipo, valor FROM circuito_alvos WHERE circuito_id = ?').all(circuito.id)) {
+        db.prepare('INSERT OR IGNORE INTO campanha_alvos (campanha_id, tipo, valor) VALUES (?, ?, ?)').run(id, a.tipo, a.valor);
+      }
+    }
     const paisagem = gravarMidia(cartaz(1920, 1080, anunciante.cor), { anuncianteId: anunciante.id, nome: `${p.nome} — 16:9`, duracao: 10 + (i % 3) * 5 });
     const retrato = gravarMidia(cartaz(1080, 1920, anunciante.cor), { anuncianteId: anunciante.id, nome: `${p.nome} — 9:16`, duracao: 10 + (i % 3) * 5 });
     db.prepare('INSERT INTO campanha_midias (campanha_id, midia_id, ordem) VALUES (?, ?, 0)').run(id, paisagem);
     db.prepare('INSERT INTO campanha_midias (campanha_id, midia_id, ordem) VALUES (?, ?, 1)').run(id, retrato);
-    for (const alvo of p.alvos) db.prepare('INSERT INTO campanha_alvos (campanha_id, tipo, valor) VALUES (?, ?, ?)').run(id, alvo.tipo, alvo.valor);
+    for (const alvo of p.alvos ?? []) db.prepare('INSERT OR IGNORE INTO campanha_alvos (campanha_id, tipo, valor) VALUES (?, ?, ?)').run(id, alvo.tipo, alvo.valor);
     return { id, ...p };
   });
 
@@ -175,7 +253,7 @@ function criar(db) {
 
   // Os últimos DETALHE_DIAS ficam com a prova de exibição linha por linha (é o que se consulta no dia a dia);
   // os dias mais antigos entram só como resumo diário, que é o que alimenta relatórios e faturamento.
-  const DETALHE_DIAS = 7;
+  const DETALHE_DIAS = 3;
   let gravadas = 0;
   let resumidas = 0;
   for (let d = 30; d >= 0; d--) {
@@ -236,7 +314,9 @@ function criar(db) {
   };
   acesso('Carla Operadora', 'operador@midia.com.br', 'operador', {});
   acesso(`${anunciantes[0].nome} — contato`, 'anunciante@midia.com.br', 'anunciante', { anunciante_id: anunciantes[0].id });
-  acesso(`${pontos[0].responsavel}`, 'lojista@midia.com.br', 'lojista', { local_id: pontos[0].id });
+  acesso(`${pontos[0].responsavel}`, 'sindico@midia.com.br', 'lojista', { local_id: pontos[0].id });
+  acesso(`${pontos.find((p) => p.categoria === 'mercado').responsavel}`, 'lojista@midia.com.br', 'lojista',
+    { local_id: pontos.find((p) => p.categoria === 'mercado').id });
 
   if (!lerConfig(db).pix_chave) {
     gravarConfig(db, 'pix_chave', 'financeiro@midiaindoor.com.br');
@@ -251,7 +331,7 @@ function criar(db) {
   faturas.filter((_, i) => i % 2 === 0).forEach((f) => db.prepare("UPDATE faturas SET status = 'paga', pago_em = ? WHERE id = ?").run(somarDias(hoje(), -3), f.id));
 
   return { pontos: pontos.length, telas: telas.length + 1, anunciantes: anunciantes.length, campanhas: campanhas.length + 1,
-    exibicoes: gravadas, resumidas, fechamento, senhas };
+    agencias: agencias.length, circuitos: circuitos.length, comunicados: COMUNICADOS.length, exibicoes: gravadas, resumidas, fechamento, senhas };
 }
 
 if (require.main === module) {
@@ -262,8 +342,9 @@ if (require.main === module) {
     process.exit(1);
   }
   const r = transacao(db, () => criar(db));
-  console.log(`[Mídia Indoor] Demonstração criada: ${r.pontos} pontos, ${r.telas} telas, ${r.anunciantes} anunciantes, ${r.campanhas} campanhas,`);
-  console.log(`[Mídia Indoor] ${r.exibicoes.toLocaleString('pt-BR')} exibições detalhadas (últimos 7 dias) e mais `
+  console.log(`[Mídia Indoor] Demonstração criada: ${r.pontos} pontos, ${r.telas} telas, ${r.anunciantes} anunciantes, ${r.agencias} agências,`);
+  console.log(`[Mídia Indoor] ${r.circuitos} circuitos, ${r.campanhas} campanhas e ${r.comunicados} comunicados de condomínio;`);
+  console.log(`[Mídia Indoor] ${r.exibicoes.toLocaleString('pt-BR')} exibições detalhadas (últimos 3 dias) e mais `
     + `${r.resumidas.toLocaleString('pt-BR')} no resumo diário; ${r.fechamento.geradas} faturas (${r.fechamento.competencia}).`);
   console.log('[Mídia Indoor] Acessos de demonstração:');
   for (const s of r.senhas) console.log(`  ${s.perfil.padEnd(11)} ${s.email}  senha: ${s.senha}`);

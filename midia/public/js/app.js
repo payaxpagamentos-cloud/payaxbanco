@@ -12,8 +12,10 @@ let nomePlataforma = 'Mídia Indoor';
 const MENUS = {
   equipe: [
     ['resumo', 'Visão geral', 'dashboard'], ['telas', 'TVs', 'telas'], ['pontos', 'Pontos', 'pontos'],
-    ['anunciantes', 'Anunciantes', 'anunciantes'], ['campanhas', 'Campanhas', 'campanhas'], ['criativos', 'Criativos', 'midias'],
-    ['programacao', 'Programação', 'grade'], ['relatorios', 'Relatórios', 'relatorios'], ['faturamento', 'Faturamento', 'faturamento'],
+    ['comunicados', 'Comunicados', 'aprovacoes'],
+    ['anunciantes', 'Anunciantes e agências', 'anunciantes'], ['campanhas', 'Campanhas', 'campanhas'], ['criativos', 'Criativos', 'midias'],
+    ['programacao', 'Programação', 'grade'], ['inventario', 'Inventário', 'ocupacao'],
+    ['relatorios', 'Relatórios', 'relatorios'], ['faturamento', 'Faturamento', 'faturamento'],
     ['repasses', 'Repasses aos pontos', 'repasses'], ['diagnostico', 'Diagnóstico', 'diagnostico'],
     ['usuarios', 'Usuários', 'usuarios', ['master']], ['configuracoes', 'Configurações', 'configuracoes', ['master']],
     ['historico', 'Histórico', 'historico'],
@@ -23,20 +25,23 @@ const MENUS = {
     ['prova', 'Prova de exibição', 'relatorios'], ['faturas', 'Faturas', 'faturamento'], ['rede', 'Onde meus anúncios passam', 'rede'],
   ],
   lojista: [
-    ['resumo', 'Minhas TVs', 'telas'], ['conteudo', 'Conteúdo da loja', 'midias'], ['repasses', 'Meu repasse', 'dinheiro'],
-    ['relatorios', 'Exibições', 'relatorios'],
+    ['resumo', 'Minhas TVs', 'telas'], ['comunicados', 'Comunicados', 'aprovacoes'], ['conteudo', 'Conteúdo próprio', 'midias'],
+    ['repasses', 'Meu repasse', 'dinheiro'], ['relatorios', 'Exibições', 'relatorios'],
   ],
 };
 
 const SUBTITULOS = {
   resumo: 'O que está acontecendo na rede agora', telas: 'Aparelhos instalados, estado e programação de cada um',
-  pontos: 'Comércios onde as TVs estão instaladas', anunciantes: 'Quem paga pela publicidade', campanhas: 'O que vai ao ar, onde, quando e por quanto',
+  pontos: 'Condomínios, prédios e comércios onde as TVs estão instaladas',
+  comunicados: 'Recados do próprio ponto que entram entre os anúncios',
+  anunciantes: 'Quem paga pela publicidade e as agências que compram a mídia',
+  inventario: 'O que a rede tem para vender: circuitos, pontos, telas e audiência', campanhas: 'O que vai ao ar, onde, quando e por quanto',
   criativos: 'Imagens e vídeos que vão para as telas', programacao: 'Como fica o loop de cada TV e quanto ainda cabe de publicidade',
   relatorios: 'Inserções, impactos e a prova de exibição', faturamento: 'Fechamento do mês e faturas dos anunciantes',
   repasses: 'Comissão dos lojistas sobre a receita das telas', diagnostico: 'Verificações da rede e das TVs',
   usuarios: 'Quem acessa o painel e os portais', configuracoes: 'Regras da programação, preços de tabela e PIX das faturas',
   historico: 'Registro de quem fez o quê', prova: 'Cada vez que seu anúncio foi ao ar', faturas: 'Suas faturas e o PIX para pagamento',
-  rede: 'Pontos e telas onde a publicidade pode passar', conteudo: 'Imagens e vídeos da sua loja na TV', conta: 'Sua conta',
+  rede: 'Pontos e telas onde a publicidade pode passar', conteudo: 'Imagens e vídeos do seu ponto na TV', conta: 'Sua conta',
 };
 
 const grupo = (perfil) => (['master', 'operador'].includes(perfil) ? 'equipe' : perfil);

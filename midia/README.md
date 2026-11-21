@@ -1,11 +1,17 @@
 # Mídia Indoor
 
-Sistema para **passar publicidade em TVs instaladas em comércios** (mídia indoor / DOOH), publicado em `/midia`.
+Plataforma de **mídia digital em telas** (mídia indoor / DOOH), publicada em `/midia`.
 
-Você instala uma TV na padaria, no mercado, na academia ou na clínica; o aparelho ligado nela abre o player e passa a
-exibir, em loop, os anúncios das campanhas vendidas. O painel cuida do resto: cadastro dos pontos, aprovação dos
-criativos, montagem automática da programação de cada tela, **prova de exibição**, faturamento dos anunciantes e
-repasse da comissão aos lojistas.
+Você instala telas em condomínios, prédios comerciais, academias e no comércio; o aparelho ligado em cada uma abre o
+player e passa a exibir, em carrossel, os anúncios das campanhas vendidas — troca a cada poucos segundos, da
+construtora para a loja de calçados, e assim por diante. O painel cuida do resto: cadastro dos pontos, aprovação dos
+criativos, montagem automática da programação de cada tela, **prova de exibição**, faturamento dos anunciantes (direto
+ou por agência) e a contrapartida de cada ponto.
+
+Em **condomínio**, a contrapartida normalmente não é dinheiro: é o espaço para os **comunicados do prédio** na própria
+tela — assembleia, manutenção do elevador, encomendas na portaria —, escritos pelo síndico e desenhados pela TV entre
+os anúncios. Em comércio, costuma ser comissão sobre a receita das telas daquele ponto. As duas formas convivem, e
+ainda há a de valor fixo por mês.
 
 Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do repositório. Tema claro por padrão, com o escuro no botão do topo.
 
@@ -14,34 +20,47 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
 | **Master** | Tudo: pontos, TVs, anunciantes, campanhas, criativos, programação, relatórios, faturamento, repasses, usuários, configurações e histórico. |
 | **Operador** | O dia a dia: cadastros, campanhas, aprovação de criativos, pareamento de TVs, relatórios, faturamento e repasses. Não mexe em usuários, configurações nem exclui cadastros. |
 | **Anunciante** (portal) | Só as campanhas dele: onde passaram, quantas inserções, quantas pessoas alcançou, a prova de exibição em CSV, os criativos e as faturas com PIX. |
-| **Lojista** (portal do ponto) | Só o comércio dele: se a TV está no ar, o que está passando, o aviso da própria loja na faixa, o conteúdo da loja e o repasse a receber. |
+| **Responsável pelo ponto** (portal) | Síndico, administradora ou lojista: só o ponto dele — se a tela está no ar, o que está passando, os **comunicados** do prédio ou da loja, o conteúdo próprio e o repasse a receber. |
 
 ## Como funciona, do começo ao fim
 
-1. **Cadastre o ponto** (o comércio): endereço, categoria, horário de funcionamento, fluxo estimado de pessoas por dia
-   e a comissão combinada com o lojista.
-2. **Instale a TV** e abra `/midia/tv/` no aparelho. Ele mostra um código de 6 caracteres na tela.
-3. **Pareie** em *TVs › Parear aparelho*: digite o código e diga onde a TV fica. Pronto — o aparelho já começa a exibir.
-4. **Cadastre o anunciante**, envie os criativos (imagem ou vídeo) e **aprove** cada um. Nada vai ao ar sem aprovação.
-5. **Crie a campanha**: período, dias da semana, faixa de horário, inserções por hora, prioridade, onde passa
-   (toda a rede, uma categoria, uma cidade, pontos ou telas específicas) e como cobra. Envie para aprovação e aprove.
-6. As TVs **baixam a programação sozinhas** em segundos e começam a exibir. Cada exibição é registrada.
-7. No fim do mês, *Faturamento* fecha a competência: gera as faturas dos anunciantes (com PIX) e os repasses dos lojistas.
+1. **Cadastre o ponto**: ambiente (condomínio residencial ou comercial, prédio corporativo, academia, mercado, padaria,
+   clínica, shopping, painel de rua…), endereço, unidades (apartamentos ou salas), passagens de pessoas por dia,
+   horário de funcionamento e a **contrapartida combinada** — comissão sobre a receita, valor fixo por mês ou nenhuma
+   (o caso do condomínio que recebe os comunicados em troca).
+2. **Instale a tela** e abra `/midia/tv/` no aparelho. Ele mostra um código de 6 caracteres na tela. Diga também **onde
+   ela fica** dentro do ponto: elevador social, hall, portaria, recepção, fila do caixa.
+3. **Pareie** em *TVs › Parear aparelho*: digite o código e escolha o ponto. Pronto — o aparelho já começa a exibir.
+4. **Monte os circuitos** (*Inventário*): o pacote que o comercial vende, como "Residencial Campinas" ou "Corporativo",
+   com a audiência somada e o preço de tabela. O circuito se atualiza sozinho quando entra um ponto novo que bate na regra.
+5. **Cadastre o anunciante** (e a **agência**, quando a compra vem por ela), envie os criativos e **aprove** cada um.
+   Nada vai ao ar sem aprovação.
+6. **Crie a campanha**: circuito (ou alvos manuais), período, dias da semana, faixa de horário, inserções por hora,
+   prioridade, número do **PI** e como cobra. Envie para aprovação e aprove.
+7. As telas **baixam a programação sozinhas** em segundos e começam a exibir. Cada exibição é registrada.
+8. No fim do mês, *Faturamento* fecha a competência: faturas dos anunciantes (bruto, comissão de agência e líquido,
+   com PIX) e os repasses dos pontos.
 
 ## Telas
 
 ### Painel da equipe
 - **Visão geral**: TVs no ar, inserções de hoje, campanhas ativas, receita prevista do mês, inserções por dia,
   publicidade × institucional, campanhas e pontos que mais exibiram, e o que precisa de atenção.
-- **TVs**: um cartão por tela com o estado (no ar, sem contato, aguardando pareamento), o que está no ar agora,
-  pareamento, aviso na faixa e o detalhe de cada aparelho (programação atual, histórico de quedas, números do dia).
-- **Pontos**: os comércios, com TVs no ar, público por dia, comissão, horário de funcionamento, repasses e o acesso do lojista.
-- **Anunciantes**: cadastro, campanhas, faturas e o acesso ao portal (com senha provisória).
+- **TVs**: um cartão por tela com o estado (no ar, sem contato, aguardando pareamento), onde ela fica no ponto, o que
+  está no ar agora, pareamento, aviso na faixa e o detalhe de cada aparelho (programação atual, quedas, números do dia).
+- **Pontos**: condomínios, prédios e comércios, com telas no ar, unidades, passagens por dia, contrapartida combinada,
+  horário de funcionamento, comunicados, repasses e o acesso do responsável.
+- **Comunicados**: a fila dos recados dos pontos (vindos do portal do síndico ou do lojista) para a equipe aprovar,
+  recusar com motivo ou escrever direto.
+- **Anunciantes e agências**: cadastro dos dois, campanhas, faturas e o acesso ao portal (com senha provisória).
+  A agência carrega a comissão padrão, que entra nas campanhas dela.
 - **Campanhas**: lista com situação e entrega de hoje; no detalhe, criativos, onde passa, desempenho e as ações de
   situação (enviar, aprovar, recusar, pausar, retomar, encerrar).
 - **Criativos**: grade com prévia de cada imagem/vídeo, fila de aprovação, validade e em quantas campanhas está.
 - **Programação**: o loop de uma TV (linha do tempo proporcional, fatia de cada anunciante e inserções por hora),
   com simulação de **qualquer dia e hora**, mais a **ocupação de todas as TVs** — onde ainda cabe campanha.
+- **Inventário (mídia kit)**: o que a rede tem para vender — circuitos com telas, pontos, formatos, audiência e preço,
+  e a lista de pontos com ambiente, unidades, onde as telas ficam e a tabela. Exporta em CSV para montar a proposta.
 - **Relatórios**: por campanha, por TV, por ponto e a **prova de exibição** linha por linha; tudo com CSV.
 - **Faturamento**: prévia do mês (calculada do que foi exibido), fechamento, faturas com PIX copia e cola e QR Code.
 - **Repasses aos pontos**: comissão de cada lojista sobre a receita das telas dele, com baixa de pagamento.
@@ -53,9 +72,10 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
 Campanhas no ar, inserções e pessoas alcançadas no mês, desempenho por campanha, onde cada anúncio passou,
 **prova de exibição com CSV**, envio de criativos (que a equipe aprova) e faturas com o PIX para pagar.
 
-### Portal do lojista
-As TVs da loja (no ar ou não, e o que está passando agora), o **aviso da loja na faixa da TV**
-("Pão quentinho às 17h"), envio de conteúdo do estabelecimento e o repasse a receber, mês a mês.
+### Portal do responsável pelo ponto (síndico, administradora ou lojista)
+As telas do ponto (no ar ou não, e o que está passando agora), os **comunicados** do prédio ou da loja
+("Assembleia dia 12", "Elevador 2 em manutenção") — que a TV desenha entre os anúncios —, o **aviso na faixa**
+("Pão quentinho às 17h"), envio de conteúdo próprio e o repasse a receber, mês a mês.
 
 ## Como a programação de cada TV é montada
 
@@ -66,11 +86,35 @@ O servidor monta a grade **na hora**, para cada tela, e o player só baixa de no
 2. Cada campanha recebe inserções no loop **proporcionais às inserções por hora contratadas**, sempre com pelo menos
    uma por criativo (todos vão ao ar). Campanha com teto diário sai da grade daquela TV quando bate a meta.
 3. Se o loop passar do **tempo máximo**, as campanhas de **menor prioridade** perdem inserções primeiro.
-   Se ficar abaixo do **tempo mínimo**, o conteúdo institucional (da rede e do próprio ponto) completa.
+   Entre os anúncios entram **todos os comunicados aprovados daquele ponto** (pelo menos uma vez cada) e, se o loop
+   ainda ficar abaixo do **tempo mínimo**, o conteúdo institucional (da rede e do próprio ponto) completa.
 4. As inserções são **espalhadas** pelo loop e, sempre que possível, dois anúncios do mesmo anunciante não ficam em sequência.
 5. Tela em retrato prefere criativo em retrato; em paisagem, o contrário.
 
 A tela *Programação* mostra exatamente esse resultado, inclusive simulando outro dia e horário.
+
+## Comunicados do ponto
+
+O recado do próprio ponto que entra no carrossel entre os anúncios. Em condomínio, é a moeda de troca pelo espaço.
+
+- O **síndico (ou lojista) escreve no portal**: título, texto, tipo (aviso, manutenção, assembleia, entrega, urgente)
+  e por quantos dias fica no ar. A equipe aprova em *Comunicados* — ou a plataforma pode ser configurada para que
+  entrem direto (*Configurações › comunicado do ponto entra no ar direto*).
+- A **TV desenha o comunicado na hora**: letras grandes, tipo em destaque, nome do prédio e a data. Não existe arte
+  para produzir nem arquivo para baixar, e o texto aparece bem em tela deitada ou em pé.
+- Cada exibição entra na prova de exibição como tempo **não vendido**, então a ocupação da grade continua honesta.
+- Alterar um comunicado que já está no ar manda ele de volta para a conferência da equipe.
+
+## Circuitos e inventário
+
+**Circuito** é o pacote que o comercial vende: um conjunto de telas definido por regra (ambiente, cidade, pontos ou
+telas específicas), com a audiência somada, as inserções por hora e o preço de tabela. Exemplos: "Residencial
+Campinas", "Corporativo", "Comércio e academia".
+
+- A campanha pode ser criada **escolhendo o circuito**: os alvos e as inserções já vêm dele.
+- O circuito **cresce sozinho**: um condomínio novo que bate na regra entra no pacote sem ninguém mexer nas campanhas.
+- O **Inventário** mostra a rede inteira para a proposta — telas por formato, onde ficam, unidades atendidas,
+  passagens por dia e por mês, preço de tabela — e exporta em CSV.
 
 ## Prova de exibição, impactos e faturamento
 
@@ -83,8 +127,13 @@ A tela *Programação* mostra exatamente esse resultado, inclusive simulando out
   - **CPM**: impactos do mês ÷ 1.000 × o CPM contratado;
   - **cortesia**: entra na fatura com valor zero, só para constar o que foi exibido.
   Campanha **sem nenhuma exibição no mês não é cobrada**. Fechar o mês de novo **não altera** fatura paga ou cancelada.
-- **Repasse ao lojista**: a receita de cada campanha é dividida entre os pontos na proporção do tempo que ela ocupou
-  em cada um; sobre a parte de cada ponto aplica-se a comissão combinada.
+- **Agência**: quando a campanha vem por agência, a comissão dela (padrão da agência, ajustável por campanha) sai do
+  bruto. A fatura mostra **bruto, comissão e líquido**, e o número do **PI** fica em cada item.
+- **Contrapartida ao ponto**, conforme o combinado em cada um:
+  - **comissão**: a receita líquida de cada campanha é dividida entre os pontos na proporção do tempo que ela ocupou
+    em cada um; sobre a parte do ponto aplica-se o percentual combinado;
+  - **valor fixo por mês**: pago enquanto as telas do ponto exibiram (o aluguel do espaço, comum em prédios);
+  - **nenhuma**: sem repasse em dinheiro — o caso do condomínio cuja contrapartida são os comunicados na tela.
 - A fatura sai com **PIX copia e cola** (BR Code do Banco Central) e QR Code, com a chave configurada em *Configurações*.
 
 ## O player (o que roda na TV)
@@ -98,6 +147,7 @@ Fire TV Stick, Chromecast com Google TV, mini PC, Raspberry Pi** ou no navegador
   a TV continua exibindo o que tem e mostra um aviso discreto; a fila de exibições é enviada quando a conexão volta.
 - **Imagem e vídeo** em tela cheia, com a próxima peça pré-carregada e transição suave. Vídeo roda até o fim; imagem,
   pelo tempo contratado. Vídeo entra sem som, a menos que a tela esteja configurada com som.
+- **Comunicados do ponto** desenhados pela própria TV (sem arquivo), com o tipo em destaque e o nome do prédio.
 - **Faixa de baixo** com relógio, a legenda fixa da tela e o aviso do lojista (quando houver).
 - **Troca de programação na virada do loop**, para nunca cortar um anúncio no meio.
 - Atalhos para quem instala: **i** mostra o diagnóstico do aparelho (TV, ponto, versão da grade, fila, conexão),
@@ -113,7 +163,7 @@ Quem quiser usar outro aparelho ou software pode falar direto com a API (`<ender
 | `GET /pareamento?codigo=` | Consulta até a equipe confirmar; devolve o **token do aparelho**. |
 | `GET /programacao` | A grade atual: itens em ordem, duração, versão e a configuração da tela. |
 | `POST /batida` | Diz que está vivo e o que está no ar; a resposta avisa se a grade mudou. |
-| `POST /exibicoes` | Prova de exibição em lote (até 500 por vez, sem duplicar). |
+| `POST /exibicoes` | Prova de exibição em lote (até 500 por vez, sem duplicar): `midia_id` ou `comunicado_id`. |
 | `GET /midia/:id` | O arquivo, com cache longo e download parcial (vídeo). |
 
 As rotas usam `Authorization: Bearer <token do aparelho>`.
@@ -126,11 +176,13 @@ Requisitos: **Node.js 22.13+**.
 npm install
 npm run demo      # opcional: 6 pontos, 9 TVs, 5 anunciantes, campanhas e 31 dias de exibições
 npm start         # painel em http://localhost:3600/midia/ e player em http://localhost:3600/midia/tv/
-npm test          # 28 testes de aceite
+npm test          # 38 testes de aceite
 ```
 
-A demonstração cria também estes acessos: `operador@midia.com.br` / `operador-demo-2026`,
-`anunciante@midia.com.br` / `anunciante-demo-2026` e `lojista@midia.com.br` / `lojista-demo-2026`.
+A demonstração monta uma rede com 3 condomínios residenciais, um condomínio comercial, academia, mercado, padaria e
+clínica — 15 telas entre elevadores, halls, portarias e áreas de atendimento —, 3 circuitos, 2 agências, campanhas com
+PI e comunicados de condomínio. Acessos: `operador@midia.com.br` / `operador-demo-2026`,
+`anunciante@midia.com.br` / `anunciante-demo-2026`, `sindico@midia.com.br` e `lojista@midia.com.br` / `lojista-demo-2026`.
 O master é o configurado em `MIDIA_ADMIN_EMAIL` (padrão `master@midia.com.br` / `master123`).
 As TVs da demonstração aparecem como *sem contato* até um player de verdade se parear.
 
@@ -148,15 +200,16 @@ O banco e os arquivos das mídias ficam em `/app/data` — monte um volume persi
 
 Nome que aparece no painel e nas TVs; duração padrão de imagem; inserções por hora sugeridas; tempo **mínimo** e
 **máximo** do loop; intervalo da batida das TVs e quanto tempo sem contato conta como offline; se o lojista pode
-escrever o aviso da própria TV; preços de tabela (mensalidade por TV e CPM); comissão sugerida ao lojista; dia de
-vencimento das faturas; por quantos dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta
-relatórios e faturamento, **nunca** é apagado); e os dados do PIX.
+escrever o aviso da própria TV; se o comunicado publicado pelo ponto entra no ar direto ou passa pela equipe;
+preços de tabela (mensalidade por tela e CPM); comissão sugerida ao ponto; dia de vencimento das faturas; por quantos
+dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta relatórios e faturamento, **nunca** é
+apagado); e os dados do PIX.
 
 ## Segurança
 
 - Senhas com **scrypt**; sessões do painel por token assinado (HMAC), com validade de 12 horas.
-- Cada perfil só enxerga o que é dele: o anunciante nunca vê dados de outro anunciante, o lojista nunca vê outro ponto,
-  e o token de uma TV não abre o painel (nem o contrário).
+- Cada perfil só enxerga o que é dele: o anunciante nunca vê dados de outro anunciante, o responsável pelo ponto nunca
+  vê outro ponto (nem de quem é cada anúncio que passa na tela dele), e o token de uma TV não abre o painel (nem o contrário).
 - Arquivos das mídias ficam **fora da pasta pública**, com nome aleatório, e o tipo é reconhecido pelo conteúdo do
   arquivo — não pelo nome nem pelo cabeçalho enviado.
 - Limite de tentativas de login por IP, cabeçalhos de segurança e CSP restrita.
@@ -168,4 +221,7 @@ relatórios e faturamento, **nunca** é apagado); e os dados do PIX.
 - **Ligar e desligar a TV sozinha** (CEC/RS-232) depende do modelo do aparelho; o normal é configurar o próprio
   aparelho para ligar com a energia e nunca descansar a tela.
 - **Aviso por WhatsApp/e-mail** de fatura ou de TV caída: hoje o painel mostra em Diagnóstico e na Visão geral.
-- **Medição real de público** (câmera com contagem de pessoas): os impactos usam o fluxo estimado cadastrado no ponto.
+- **Medição real de público** (câmera com contagem de pessoas, dados de operadora): os impactos usam o fluxo estimado
+  cadastrado no ponto. Onde houver medição externa, basta atualizar o campo de passagens por dia.
+- **Integração com sistemas de agência** (envio automático de PI, checking eletrônico por padrão de mercado): o PI é
+  registrado na campanha e a prova de exibição sai em CSV para anexar ao relatório de veiculação.

@@ -3,7 +3,8 @@ import { api, qs, baixar } from './api.js';
 import {
   el, limpar, icone, toast, acao, modal, formModal, confirmar, campo, escolha, lerForm, repetir,
   inteiro, dinheiro, duracao, dataBr, dataHora, etiquetaDe, etiqueta, percentual, competenciaTexto, situacao,
-  diasTexto, faixaHorario, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_FATURA, STATUS_REPASSE, CATEGORIAS,
+  diasTexto, faixaHorario, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_FATURA, STATUS_REPASSE, STATUS_COMUNICADO,
+  TIPOS_COMUNICADO, REPASSES, CATEGORIAS,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio, previa, enviarArquivo } from './comum.js';
 import { barras, pizza, CORES } from './graficos.js';
@@ -153,10 +154,15 @@ async function abrirFaturaAnunciante(id) {
       el('div', { class: 'linha' }, f.atrasada ? etiqueta('Atrasada', 'erro') : etiquetaDe(STATUS_FATURA, f.status),
         el('span', { class: 'mudo pequeno' }, `Vence em ${dataBr(f.vencimento)}`)),
       el('strong', { style: 'font-size:20px' }, dinheiro(f.valor_centavos))),
+    f.agencia ? el('p', { class: 'mudo pequeno', style: 'margin:6px 0 0' }, `Veiculação pela agência ${f.agencia}.`) : null,
     el('table', { class: 'fatura-itens', style: 'margin:16px 0' },
       el('thead', {}, el('tr', {}, el('th', {}, 'Campanha'), el('th', { class: 'dir' }, 'Inserções'), el('th', { class: 'dir' }, 'Pessoas alcançadas'), el('th', { class: 'dir' }, 'Valor'))),
       el('tbody', {}, f.itens.map((i) => el('tr', {}, el('td', {}, i.descricao), el('td', { class: 'dir num' }, inteiro(i.insercoes)),
-        el('td', { class: 'dir num' }, inteiro(i.impactos)), el('td', { class: 'dir num' }, dinheiro(i.valor_centavos)))))),
+        el('td', { class: 'dir num' }, inteiro(i.impactos)), el('td', { class: 'dir num' }, dinheiro(i.valor_centavos))))),
+      f.comissao_agencia_centavos ? el('tfoot', {},
+        el('tr', {}, el('td', { colspan: 3 }, 'Bruto'), el('td', { class: 'dir num' }, dinheiro(f.bruto_centavos))),
+        el('tr', {}, el('td', { colspan: 3 }, 'Comissão de agência'), el('td', { class: 'dir num' }, `- ${dinheiro(f.comissao_agencia_centavos)}`)),
+        el('tr', {}, el('td', { colspan: 3 }, 'Total a pagar'), el('td', { class: 'dir num' }, dinheiro(f.valor_centavos)))) : null),
     f.pix ? el('div', { class: 'pix' },
       f.pix.qr ? el('img', { src: f.pix.qr, alt: 'QR Code do PIX' }) : el('div', {}),
       el('div', {}, el('strong', {}, 'PIX copia e cola'), el('div', { class: 'segredo', style: 'margin:8px 0' }, f.pix.codigo),
@@ -192,7 +198,15 @@ async function resumoLojista(ctx) {
       })),
       el('div', { class: 'c3' }, indicador({ rotulo: 'Exibições hoje', valor: inteiro(d.hoje.insercoes), ic: 'tocar', nota: duracao(d.hoje.segundos) })),
       el('div', { class: 'c3' }, indicador({ rotulo: `Exibições em ${competenciaTexto(new Date().toLocaleDateString('en-CA').slice(0, 7))}`, valor: inteiro(d.mes.insercoes), ic: 'relatorios', cor: 'roxo' })),
-      el('div', { class: 'c3' }, indicador({ rotulo: 'Repasse a receber', valor: dinheiro(d.a_receber_centavos), ic: 'dinheiro', cor: 'verde', nota: `Comissão de ${percentual(d.ponto.comissao_percentual)}` })),
+      el('div', { class: 'c3' }, indicador({
+        rotulo: d.ponto.repasse_tipo === 'nenhum' ? 'Comunicados no ar' : 'Repasse a receber',
+        valor: d.ponto.repasse_tipo === 'nenhum'
+          ? inteiro((d.comunicados ?? []).filter((c) => c.status === 'aprovado').length)
+          : dinheiro(d.a_receber_centavos),
+        ic: d.ponto.repasse_tipo === 'nenhum' ? 'aprovacoes' : 'dinheiro',
+        cor: 'verde',
+        nota: REPASSES[d.ponto.repasse_tipo ?? 'comissao'],
+      })),
 
       el('div', { class: 'c12' }, cartao('Minhas TVs',
         el('div', { class: 'telas' }, d.telas.map((t) => el('div', { class: 'tela-cartao' },
@@ -244,6 +258,60 @@ const avisoLojista = (t, recarregar) => formModal(`Aviso na TV — ${t.nome}`, (
   recarregar();
 }, { rotulo: 'Salvar' });
 
+/** Comunicados do ponto: o síndico (ou o lojista) escreve e o recado entra entre os anúncios. */
+async function comunicadosLojista(ctx) {
+  const corpo = el('div', { class: 'cartao' });
+  const pintar = async () => {
+    const d = await api.get('/ponto/comunicados');
+    limpar(corpo,
+      el('p', { class: 'mudo', style: 'margin:0 0 12px' }, d.automatico
+        ? 'O que você publicar entra na TV direto.'
+        : 'O que você publicar passa por uma conferência rápida da equipe antes de ir para a TV.'),
+      tabela([
+        [(c) => el('div', {}, el('div', {}, c.titulo), el('div', { class: 'pequeno mudo' }, c.texto.slice(0, 90))), 'Comunicado'],
+        [(c) => TIPOS_COMUNICADO[c.tipo] ?? c.tipo, 'Tipo'],
+        [(c) => `${dataBr(c.inicio)} a ${dataBr(c.fim)}`, 'No ar'],
+        [(c) => etiquetaDe(STATUS_COMUNICADO, c.status), 'Situação'],
+        [(c) => c.motivo ?? '—', 'Observação'],
+        [(c) => el('div', { class: 'acoes' },
+          el('button', { class: 'btn pequeno', onclick: () => editarComunicadoPonto(c, pintar) }, 'Editar'),
+          el('button', {
+            class: 'icone-btn perigo', title: 'Remover', onclick: (e) => acao(e.target, async () => {
+              if (!await confirmar('Remover comunicado', `Tirar "${c.titulo}" da TV?`, 'Remover')) return;
+              await api.del(`/ponto/comunicados/${c.id}`);
+              toast('Comunicado removido.');
+              pintar();
+            }),
+          }, icone('lixo'))), '', 'acoes'],
+      ], d.itens, { vazioTexto: 'Nenhum comunicado ainda. Use para avisar sobre assembleia, manutenção, entrega de encomendas…' }));
+  };
+  limpar(ctx.conteudo,
+    el('div', { class: 'linha entre', style: 'margin-bottom:16px' },
+      el('p', { class: 'mudo', style: 'margin:0' }, 'Seus recados aparecem na TV entre os anúncios, escritos em letras grandes.'),
+      el('button', { class: 'btn primario', onclick: () => editarComunicadoPonto(null, pintar) }, icone('mais'), 'Novo comunicado')),
+    corpo);
+  await pintar();
+}
+
+function editarComunicadoPonto(c, recarregar) {
+  const hoje = hojeLocal();
+  const emDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA'); };
+  return formModal(c ? 'Editar comunicado' : 'Novo comunicado', () => [
+    campo('Título', { name: 'titulo', value: c?.titulo ?? '', required: true, maxlength: 80, placeholder: 'Ex.: Assembleia dia 12' }),
+    el('label', { class: 'campo' }, 'Texto',
+      (() => { const t = el('textarea', { name: 'texto', required: true, maxlength: 400, placeholder: 'Ex.: Às 19h no salão de festas.' }); t.value = c?.texto ?? ''; return t; })()),
+    el('div', { class: 'tres' },
+      escolha('Tipo', 'tipo', TIPOS_COMUNICADO, c?.tipo ?? 'aviso'),
+      campo('No ar de', { name: 'inicio', type: 'date', value: c?.inicio ?? hoje, required: true }),
+      campo('até', { name: 'fim', type: 'date', value: c?.fim ?? emDias(7), required: true })),
+  ], async (d) => {
+    if (c) await api.patch(`/ponto/comunicados/${c.id}`, d);
+    else await api.post('/ponto/comunicados', d);
+    toast(c ? 'Comunicado atualizado.' : 'Comunicado enviado.');
+    recarregar();
+  });
+}
+
 async function conteudoLojista(ctx) {
   const corpo = el('div', {});
   const pintar = async () => {
@@ -277,7 +345,11 @@ async function repassesLojista(ctx) {
   limpar(ctx.conteudo, el('div', { class: 'coluna' },
     el('div', { class: 'grade' },
       indicador({ rotulo: 'A receber', valor: dinheiro(d.a_receber_centavos), ic: 'dinheiro', cor: 'verde' }),
-      indicador({ rotulo: 'Minha comissão', valor: percentual(d.ponto.comissao_percentual), ic: 'repasses', nota: 'sobre a receita das minhas TVs' }),
+      indicador({
+        rotulo: 'Como foi combinado', ic: 'repasses',
+        valor: d.ponto.repasse_tipo === 'fixo' ? 'Valor fixo' : (d.ponto.repasse_tipo === 'nenhum' ? 'Sem repasse' : percentual(d.ponto.comissao_percentual)),
+        nota: REPASSES[d.ponto.repasse_tipo ?? 'comissao'],
+      }),
       indicador({ rotulo: 'Público estimado da loja', valor: inteiro(d.ponto.publico_dia), ic: 'pessoas', cor: 'ciano', nota: 'pessoas por dia' })),
     el('div', { class: 'cartao' }, tabela([
       [(r) => competenciaTexto(r.competencia), 'Mês'],
@@ -357,6 +429,7 @@ export const TELAS_ANUNCIANTE = {
 
 export const TELAS_LOJISTA = {
   resumo: resumoLojista,
+  comunicados: comunicadosLojista,
   conteudo: conteudoLojista,
   repasses: repassesLojista,
   relatorios: relatoriosLojista,

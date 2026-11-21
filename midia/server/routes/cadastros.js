@@ -12,7 +12,7 @@ const { montarPorTela } = require('../lib/grade');
 const { hoje } = require('../lib/datas');
 const v = require('../lib/validacao');
 
-const CATEGORIAS = ['mercado', 'padaria', 'farmacia', 'academia', 'clinica', 'salao', 'restaurante', 'lanchonete', 'loja', 'oficina', 'posto', 'escola', 'predio', 'outro'];
+const CATEGORIAS = v.CATEGORIAS;
 const SENHA_ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
 const senhaProvisoria = () => Array.from(crypto.randomBytes(10), (b) => SENHA_ALFABETO[b % SENHA_ALFABETO.length]).join('');
 
@@ -23,6 +23,11 @@ function lerLocal(c, cfg, parcial = false) {
   if (tem('nome')) d.nome = v.texto(c.nome, 'o nome do ponto', 120);
   if (tem('categoria')) d.categoria = v.opcao(c.categoria ?? 'outro', 'a categoria', CATEGORIAS);
   if (c.documento !== undefined) d.documento = c.documento === null || c.documento === '' ? null : v.documento(c.documento);
+  if (c.administradora !== undefined) d.administradora = v.opcional(c.administradora, 'a administradora', 120);
+  if (c.unidades !== undefined) d.unidades = v.inteiro(c.unidades, 'o número de unidades', { max: 100_000 });
+  // Contrapartida ao ponto: comissão sobre a receita, valor fixo por mês ou nenhuma (caso comum em condomínio).
+  if (c.repasse_tipo !== undefined) d.repasse_tipo = v.opcao(c.repasse_tipo, 'a forma de repasse', ['comissao', 'fixo', 'nenhum']);
+  if (c.repasse_fixo_centavos !== undefined) d.repasse_fixo_centavos = v.inteiro(c.repasse_fixo_centavos, 'o valor fixo do repasse', { max: 100_000_000 });
   for (const [k, nome, max] of [['cep', 'o CEP', 9], ['logradouro', 'o endereço', 160], ['numero', 'o número', 20], ['bairro', 'o bairro', 80],
     ['responsavel', 'o responsável', 120], ['email', 'o e-mail', 160], ['observacao', 'a observação', 500]]) {
     if (c[k] !== undefined) d[k] = v.opcional(c[k], nome, max);
@@ -49,6 +54,24 @@ function gravarHorarios(db, localId, horarios) {
         .run(localId, dia, v.hora(h.abre, 'a hora de abertura'), v.hora(h.fecha, 'a hora de fechamento'));
     }
   });
+}
+
+/** Campos do comunicado (usado pelo painel e pelo portal do ponto). */
+function lerComunicado(db, c, parcial = false) {
+  const d = {};
+  const tem = (k) => c[k] !== undefined || !parcial;
+  if (!parcial) {
+    d.local_id = Number(c.local_id);
+    if (!db.prepare('SELECT 1 FROM locais WHERE id = ?').get(d.local_id)) throw new ErroNegocio('Ponto não encontrado.', 422);
+  }
+  if (tem('titulo')) d.titulo = v.texto(c.titulo, 'o título', 80);
+  if (tem('texto')) d.texto = v.texto(c.texto, 'o texto', 400);
+  if (tem('tipo')) d.tipo = v.opcao(c.tipo ?? 'aviso', 'o tipo', ['aviso', 'manutencao', 'assembleia', 'entrega', 'urgente']);
+  if (tem('inicio')) d.inicio = v.data(c.inicio ?? hoje(), 'a data de início');
+  if (tem('fim')) d.fim = v.data(c.fim, 'a data de término');
+  if (c.duracao_s !== undefined) d.duracao_s = v.inteiro(c.duracao_s, 'a duração', { min: 5, max: 60 });
+  if (d.inicio && d.fim && d.fim < d.inicio) throw new ErroNegocio('O término não pode ser antes do início.', 422);
+  return d;
 }
 
 module.exports = (db) => {
@@ -81,6 +104,7 @@ module.exports = (db) => {
       telas: db.prepare('SELECT * FROM telas WHERE local_id = ? ORDER BY nome').all(l.id).map((t) => ({ ...t, online: t.ultimo_contato > limite })),
       usuarios: db.prepare("SELECT id, nome, email, ativo, ultimo_acesso FROM usuarios WHERE local_id = ? AND perfil = 'lojista'").all(l.id),
       repasses: db.prepare('SELECT * FROM repasses WHERE local_id = ? ORDER BY competencia DESC LIMIT 12').all(l.id),
+      comunicados: db.prepare("SELECT * FROM comunicados WHERE local_id = ? ORDER BY (status = 'pendente') DESC, fim DESC LIMIT 20").all(l.id),
     });
   });
 
@@ -174,6 +198,7 @@ module.exports = (db) => {
     const d = {
       local_id: local.id,
       nome: v.texto(req.body.nome, 'o nome da tela', 120),
+      posicao: v.posicao(req.body.posicao),
       orientacao: v.opcao(req.body.orientacao ?? 'paisagem', 'a orientação', ['paisagem', 'retrato']),
       som: v.booleano(req.body.som) ? 1 : 0,
       relogio: req.body.relogio === undefined ? 1 : (v.booleano(req.body.relogio) ? 1 : 0),
@@ -192,6 +217,7 @@ module.exports = (db) => {
     if (!t) throw naoEncontrado('Tela');
     const d = {};
     if (req.body.nome !== undefined) d.nome = v.texto(req.body.nome, 'o nome da tela', 120);
+    if (req.body.posicao !== undefined) d.posicao = v.posicao(req.body.posicao);
     if (req.body.orientacao !== undefined) d.orientacao = v.opcao(req.body.orientacao, 'a orientação', ['paisagem', 'retrato']);
     if (req.body.status !== undefined) d.status = v.opcao(req.body.status, 'a situação', ['ativa', 'manutencao', 'inativa']);
     if (req.body.som !== undefined) d.som = v.booleano(req.body.som) ? 1 : 0;
@@ -275,6 +301,66 @@ module.exports = (db) => {
     }
     db.prepare('DELETE FROM telas WHERE id = ?').run(id);
     registrar(db, req, 'tela_excluida', { id, nome: t.nome });
+    res.status(204).end();
+  });
+
+  // ----------------------------------------------------------------- Comunicados do ponto
+  /**
+   * Comunicado é o recado do próprio ponto na tela ("assembleia dia 12", "elevador em manutenção").
+   * Em condomínio, costuma ser a contrapartida pelo espaço. O síndico escreve no portal; a equipe aprova aqui.
+   */
+  r.get('/comunicados', (req, res) => {
+    const onde = [];
+    const p = [];
+    if (req.query.local_id) { onde.push('c.local_id = ?'); p.push(Number(req.query.local_id)); }
+    if (req.query.status) { onde.push('c.status = ?'); p.push(req.query.status); }
+    res.json({
+      itens: db.prepare(`SELECT c.*, l.nome AS local_nome, l.cidade, u.nome AS autor FROM comunicados c
+        JOIN locais l ON l.id = c.local_id LEFT JOIN usuarios u ON u.id = c.criado_por
+        ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''}
+        ORDER BY (c.status = 'pendente') DESC, c.fim DESC, c.id DESC`).all(...p),
+      pendentes: db.prepare("SELECT COUNT(*) AS n FROM comunicados WHERE status = 'pendente'").get().n,
+    });
+  });
+
+  r.post('/comunicados', (req, res) => {
+    const d = lerComunicado(db, req.body);
+    const id = Number(db.prepare(`INSERT INTO comunicados (local_id, titulo, texto, tipo, inicio, fim, duracao_s, status, criado_por, aprovado_por, aprovado_em, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'aprovado', ?, ?, ?, ?)`)
+      .run(d.local_id, d.titulo, d.texto, d.tipo, d.inicio, d.fim, d.duracao_s, req.usuario.id, req.usuario.id, agora(), agora()).lastInsertRowid);
+    registrar(db, req, 'comunicado_criado', { id, local_id: d.local_id });
+    res.status(201).json(db.prepare('SELECT * FROM comunicados WHERE id = ?').get(id));
+  });
+
+  r.patch('/comunicados/:id', (req, res) => {
+    const id = Number(req.params.id);
+    const atual = db.prepare('SELECT * FROM comunicados WHERE id = ?').get(id);
+    if (!atual) throw naoEncontrado('Comunicado');
+    const d = lerComunicado(db, { local_id: atual.local_id, ...req.body }, true);
+    delete d.local_id;
+    if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
+    db.prepare(`UPDATE comunicados SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), id);
+    registrar(db, req, 'comunicado_alterado', { id });
+    res.json(db.prepare('SELECT * FROM comunicados WHERE id = ?').get(id));
+  });
+
+  r.post('/comunicados/:id/aprovacao', (req, res) => {
+    const id = Number(req.params.id);
+    const c = db.prepare('SELECT * FROM comunicados WHERE id = ?').get(id);
+    if (!c) throw naoEncontrado('Comunicado');
+    const aprovar = v.opcao(req.body.decisao, 'a decisão', ['aprovar', 'recusar']) === 'aprovar';
+    db.prepare('UPDATE comunicados SET status = ?, motivo = ?, aprovado_por = ?, aprovado_em = ? WHERE id = ?')
+      .run(aprovar ? 'aprovado' : 'recusado', aprovar ? null : v.texto(req.body.motivo, 'o motivo da recusa', 300), req.usuario.id, agora(), id);
+    registrar(db, req, aprovar ? 'comunicado_aprovado' : 'comunicado_recusado', { id, local_id: c.local_id });
+    res.json(db.prepare('SELECT * FROM comunicados WHERE id = ?').get(id));
+  });
+
+  r.delete('/comunicados/:id', (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM comunicados WHERE id = ?').get(id)) throw naoEncontrado('Comunicado');
+    db.prepare('UPDATE exibicoes SET comunicado_id = NULL WHERE comunicado_id = ?').run(id);
+    db.prepare('DELETE FROM comunicados WHERE id = ?').run(id);
+    registrar(db, req, 'comunicado_excluido', { id });
     res.status(204).end();
   });
 
@@ -362,3 +448,5 @@ module.exports = (db) => {
 
   return r;
 };
+
+module.exports.lerComunicado = lerComunicado;

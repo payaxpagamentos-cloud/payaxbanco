@@ -41,11 +41,22 @@ export function telefone(t) {
 }
 
 export const PERFIS = { master: 'Master', operador: 'Operador', anunciante: 'Anunciante (portal)', lojista: 'Lojista do ponto (portal)' };
+/** Ambientes onde a rede instala telas (mesma lista de server/lib/validacao.js). */
 export const CATEGORIAS = {
-  mercado: 'Mercado / supermercado', padaria: 'Padaria', farmacia: 'Farmácia', academia: 'Academia', clinica: 'Clínica / consultório',
-  salao: 'Salão / barbearia', restaurante: 'Restaurante', lanchonete: 'Lanchonete', loja: 'Loja', oficina: 'Oficina', posto: 'Posto',
-  escola: 'Escola', predio: 'Prédio / condomínio', outro: 'Outro',
+  condominio_residencial: 'Condomínio residencial', condominio_comercial: 'Condomínio comercial', predio_corporativo: 'Prédio corporativo',
+  academia: 'Academia', mercado: 'Mercado / supermercado', padaria: 'Padaria', farmacia: 'Farmácia', clinica: 'Clínica / consultório',
+  hospital: 'Hospital', universidade: 'Universidade', escola: 'Escola', salao: 'Salão / barbearia', restaurante: 'Restaurante',
+  lanchonete: 'Lanchonete', loja: 'Loja', shopping: 'Shopping', posto: 'Posto', oficina: 'Oficina', aeroporto: 'Aeroporto',
+  transporte: 'Terminal / transporte', rua: 'Painel de rua', predio: 'Prédio (genérico)', outro: 'Outro',
 };
+/** Ambientes em que o ponto é um prédio com moradores ou empresas (muda o vocabulário do formulário). */
+export const PREDIOS = ['condominio_residencial', 'condominio_comercial', 'predio_corporativo', 'predio'];
+/** Sugestões de onde a tela fica dentro do ponto. */
+export const POSICOES = ['Elevador social', 'Elevador de serviço', 'Hall de entrada', 'Portaria', 'Recepção', 'Salão de festas',
+  'Academia do prédio', 'Corredor', 'Fila do caixa', 'Balcão', 'Sala de espera', 'Vitrine', 'Fachada'];
+export const REPASSES = { comissao: 'Comissão sobre a receita', fixo: 'Valor fixo por mês', nenhum: 'Sem repasse em dinheiro' };
+export const TIPOS_COMUNICADO = { aviso: 'Aviso', manutencao: 'Manutenção', assembleia: 'Assembleia', entrega: 'Entrega', urgente: 'Urgente' };
+export const STATUS_COMUNICADO = { pendente: ['Aguardando aprovação', 'aviso'], aprovado: ['No ar', 'ok'], recusado: ['Recusado', 'erro'] };
 export const STATUS_PONTO = { ativo: ['Ativo', 'ok'], pausado: ['Pausado', 'aviso'], encerrado: ['Encerrado', 'erro'] };
 export const STATUS_TELA = { ativa: ['Ativa', 'ok'], manutencao: ['Manutenção', 'aviso'], inativa: ['Inativa', 'erro'] };
 export const STATUS_CAMPANHA = {

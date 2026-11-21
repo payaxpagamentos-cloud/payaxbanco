@@ -27,6 +27,11 @@ const SQL_CRIATIVOS = `SELECT m.id, m.nome, m.tipo, m.mime, m.sha256, m.orientac
   WHERE cm.campanha_id = ? AND m.status = 'aprovada' AND (m.validade_ate IS NULL OR m.validade_ate >= ?)
   ORDER BY cm.ordem, m.id`;
 
+// Comunicados do ponto no ar hoje (a contrapartida do condomínio): todos entram pelo menos uma vez no loop.
+const SQL_COMUNICADOS = `SELECT id, titulo, texto, tipo, duracao_s FROM comunicados
+  WHERE local_id = ? AND status = 'aprovado' AND inicio <= ? AND fim >= ?
+  ORDER BY (tipo = 'urgente') DESC, id`;
+
 // Institucional: primeiro o conteúdo do próprio ponto, depois o da plataforma (anunciante_id e local_id nulos).
 const SQL_INSTITUCIONAL = `SELECT m.id, m.nome, m.tipo, m.mime, m.sha256, m.orientacao, m.bytes, m.duracao_s, m.local_id
   FROM midias m
@@ -148,16 +153,17 @@ function montar(db, tela, instante = new Date()) {
   const slots = espalhar(blocos);
   const vendido = slots.reduce((t, s) => t + s.criativo.duracao_s, 0);
 
-  // Completa o loop com institucional (do ponto e da plataforma) até o tempo mínimo.
+  // Entre os anúncios entram os comunicados do ponto (todos, sempre) e o institucional, até o tempo mínimo do loop.
+  const comunicados = db.prepare(SQL_COMUNICADOS).all(tela.local_id, momento.data, momento.data);
   const institucional = db.prepare(SQL_INSTITUCIONAL).all(momento.data, tela.local_id)
     .filter((m) => !m.orientacao || m.orientacao === tela.orientacao);
-  const preenchimento = [];
+  const preenchimento = comunicados.map((c) => ({ comunicado: c }));
+  let tempo = vendido + preenchimento.reduce((t, p) => t + p.comunicado.duracao_s, 0);
   if (institucional.length) {
-    let tempo = vendido;
     const minimo = slots.length ? cfg.bloco_minimo_s : Math.max(cfg.bloco_minimo_s, 1);
     for (let i = 0; tempo < minimo && i < 60; i++) {
       const m = institucional[i % institucional.length];
-      preenchimento.push(m);
+      preenchimento.push({ midia: m });
       tempo += m.duracao_s;
     }
   }
@@ -169,29 +175,52 @@ function montar(db, tela, instante = new Date()) {
     let f = 0;
     slots.forEach((s, i) => {
       itens.push(s);
-      if ((i + 1) % passo === 0 && f < preenchimento.length) itens.push({ institucional: preenchimento[f++] });
+      if ((i + 1) % passo === 0 && f < preenchimento.length) itens.push(preenchimento[f++]);
     });
-    while (f < preenchimento.length) itens.push({ institucional: preenchimento[f++] });
+    while (f < preenchimento.length) itens.push(preenchimento[f++]);
   } else if (slots.length) {
     itens.push(...slots);
   } else {
-    itens.push(...preenchimento.map((m) => ({ institucional: m })));
+    itens.push(...preenchimento);
   }
 
   const lista = itens.map((it, i) => {
-    const m = it.institucional ?? it.criativo;
+    const ordem = i + 1;
+    // Comunicado do ponto: o player desenha na hora, não existe arquivo para baixar.
+    if (it.comunicado) {
+      const c = it.comunicado;
+      return {
+        ordem,
+        formato: 'comunicado',
+        comunicado_id: c.id,
+        midia_id: null,
+        nome: c.titulo,
+        titulo: c.titulo,
+        texto: c.texto,
+        tipo: c.tipo,
+        duracao_s: c.duracao_s,
+        campanha_id: null,
+        campanha: null,
+        anunciante_id: null,
+        anunciante: null,
+        local: tela.local_nome ?? null,
+      };
+    }
+    const m = it.midia ?? it.criativo;
     return {
-      ordem: i + 1,
+      ordem,
+      formato: 'midia',
       midia_id: m.id,
+      comunicado_id: null,
       nome: m.nome,
       tipo: m.tipo,
       mime: m.mime,
       duracao_s: m.duracao_s,
       bytes: m.bytes ?? null,
-      campanha_id: it.institucional ? null : it.bloco.campanha_id,
-      campanha: it.institucional ? null : it.bloco.campanha_nome,
-      anunciante_id: it.institucional ? null : it.bloco.anunciante_id,
-      anunciante: it.institucional ? null : it.bloco.anunciante,
+      campanha_id: it.criativo ? it.bloco.campanha_id : null,
+      campanha: it.criativo ? it.bloco.campanha_nome : null,
+      anunciante_id: it.criativo ? it.bloco.anunciante_id : null,
+      anunciante: it.criativo ? it.bloco.anunciante : null,
       url: `midia/${m.id}?v=${String(m.sha256).slice(0, 12)}`,
     };
   });
@@ -213,7 +242,7 @@ function montar(db, tela, instante = new Date()) {
   }).sort((a, b) => b.segundos - a.segundos);
 
   const assinatura = JSON.stringify([
-    lista.map((i) => [i.midia_id, i.duracao_s, i.campanha_id]),
+    lista.map((i) => [i.midia_id, i.comunicado_id, i.duracao_s, i.campanha_id, i.texto ?? '']),
     tela.som, tela.relogio, tela.legenda ?? '', (tela.aviso_ate && tela.aviso_ate < new Date().toISOString()) ? '' : (tela.aviso ?? ''),
   ]);
 

@@ -118,7 +118,8 @@ async function guardarArquivos(itens) {
   const cache = await caches.open(CACHE);
   const vistos = lido(CHAVES.vistos) ?? {};
   const agora = Date.now();
-  for (const item of itens) {
+  // Comunicados não têm arquivo: a própria TV desenha.
+  for (const item of itens.filter((i) => i.formato !== 'comunicado')) {
     const url = enderecoDoItem(item);
     vistos[url] = agora;
     if (await cache.match(url)) continue;
@@ -155,7 +156,13 @@ async function origemDoItem(item) {
 
 // ---------------------------------------------------------------- Prova de exibição
 function anotarExibicao(item, inicio, segundos) {
-  estado.fila.push({ midia_id: item.midia_id, campanha_id: item.campanha_id, exibida_em: new Date(inicio).toISOString(), duracao_s: Math.round(segundos) });
+  estado.fila.push({
+    midia_id: item.midia_id ?? null,
+    comunicado_id: item.comunicado_id ?? null,
+    campanha_id: item.campanha_id,
+    exibida_em: new Date(inicio).toISOString(),
+    duracao_s: Math.round(segundos),
+  });
   if (estado.fila.length > MAX_FILA) estado.fila = estado.fila.slice(-MAX_FILA);
   guardar(CHAVES.fila, estado.fila);
 }
@@ -207,10 +214,44 @@ function trocarCamada() {
   return entra;
 }
 
+const TIPOS_COMUNICADO = { aviso: 'Aviso', manutencao: 'Manutenção', assembleia: 'Assembleia', entrega: 'Entrega', urgente: 'Urgente' };
+
+/** Comunicado do ponto: a própria TV desenha (não existe arquivo para baixar). */
+function montarComunicado(item) {
+  const caixa = document.createElement('div');
+  caixa.className = `comunicado ${item.tipo ?? 'aviso'}`;
+  const topo = document.createElement('div');
+  topo.className = 'cabeca';
+  const selo = document.createElement('span');
+  selo.className = 'selo-tipo';
+  selo.textContent = TIPOS_COMUNICADO[item.tipo] ?? 'Aviso';
+  const onde = document.createElement('span');
+  onde.className = 'onde';
+  onde.textContent = item.local ?? '';
+  topo.append(selo, onde);
+  const titulo = document.createElement('h1');
+  titulo.textContent = item.titulo ?? '';
+  const texto = document.createElement('p');
+  texto.textContent = item.texto ?? '';
+  const data = document.createElement('div');
+  data.className = 'quando';
+  // "sábado, 21 de novembro" com a primeira letra maiúscula (capitalize do CSS estragaria o "de").
+  const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  data.textContent = hoje.charAt(0).toUpperCase() + hoje.slice(1);
+  caixa.append(topo, titulo, texto, data);
+  return caixa;
+}
+
 /** Prepara o elemento do item na camada que está fora do ar e devolve uma função que o põe no ar. */
 async function prepararItem(item) {
+  const alvoCamada = $(`camada-${estado.camadaAtual === 'a' ? 'b' : 'a'}`);
+  if (item.formato === 'comunicado') {
+    const cartao = montarComunicado(item);
+    alvoCamada.replaceChildren(cartao);
+    return cartao;
+  }
   const origem = await origemDoItem(item);
-  const alvo = $(`camada-${estado.camadaAtual === 'a' ? 'b' : 'a'}`);
+  const alvo = alvoCamada;
   let elemento;
   if (item.tipo === 'video') {
     elemento = document.createElement('video');
@@ -247,7 +288,7 @@ async function exibir(item) {
   const elemento = await prepararItem(item);
   trocarCamada();
   const inicio = Date.now();
-  if (item.tipo === 'video') {
+  if (item.formato !== 'comunicado' && item.tipo === 'video') {
     try { await elemento.play(); } catch { /* alguns aparelhos só tocam sem som */ }
     await Promise.race([
       new Promise((fim) => elemento.addEventListener('ended', fim, { once: true })),

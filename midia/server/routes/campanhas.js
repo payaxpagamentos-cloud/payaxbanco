@@ -29,6 +29,26 @@ function lerCampanha(db, c, cfg, parcial = false) {
   if (c.hora_inicio !== undefined) d.hora_inicio = v.hora(c.hora_inicio, 'a hora de início');
   if (c.hora_fim !== undefined) d.hora_fim = v.hora(c.hora_fim, 'a hora de término');
   if (c.limite_dia !== undefined) d.limite_dia = v.inteiro(c.limite_dia, 'o limite por dia', { max: 10_000 });
+  if (c.pi !== undefined) d.pi = v.opcional(c.pi, 'o número do PI', 40);
+  if (c.agencia_id !== undefined) {
+    if (c.agencia_id === null || c.agencia_id === '') {
+      d.agencia_id = null;
+      d.comissao_agencia_percentual = 0;
+    } else {
+      const ag = db.prepare("SELECT * FROM agencias WHERE id = ? AND status = 'ativa'").get(Number(c.agencia_id));
+      if (!ag) throw new ErroNegocio('Agência não encontrada ou inativa.', 422);
+      d.agencia_id = ag.id;
+      // A comissão da campanha começa na da agência e pode ser ajustada caso a caso.
+      d.comissao_agencia_percentual = c.comissao_agencia_percentual !== undefined
+        ? v.percentual(c.comissao_agencia_percentual, 'a comissão da agência') : ag.comissao_percentual;
+    }
+  } else if (c.comissao_agencia_percentual !== undefined) {
+    d.comissao_agencia_percentual = v.percentual(c.comissao_agencia_percentual, 'a comissão da agência');
+  }
+  if (c.circuito_id !== undefined) {
+    d.circuito_id = c.circuito_id === null || c.circuito_id === '' ? null : Number(c.circuito_id);
+    if (d.circuito_id && !db.prepare('SELECT 1 FROM circuitos WHERE id = ?').get(d.circuito_id)) throw new ErroNegocio('Circuito não encontrado.', 422);
+  }
   if (!parcial && c.anunciante_id !== undefined) {
     const a = db.prepare("SELECT 1 FROM anunciantes WHERE id = ? AND status = 'ativo'").get(Number(c.anunciante_id));
     if (!a) throw new ErroNegocio('Anunciante não encontrado ou inativo.', 422);
@@ -41,7 +61,9 @@ function lerCampanha(db, c, cfg, parcial = false) {
 
 /** Detalhe completo da campanha: criativos, onde vai ao ar e desempenho. */
 function detalhe(db, id) {
-  const c = db.prepare(`SELECT c.*, a.nome AS anunciante FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id WHERE c.id = ?`).get(id);
+  const c = db.prepare(`SELECT c.*, a.nome AS anunciante, ag.nome AS agencia, ci.nome AS circuito
+    FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
+    LEFT JOIN agencias ag ON ag.id = c.agencia_id LEFT JOIN circuitos ci ON ci.id = c.circuito_id WHERE c.id = ?`).get(id);
   if (!c) throw naoEncontrado('Campanha');
   const criativos = db.prepare(`SELECT cm.id AS vinculo_id, cm.ordem, COALESCE(cm.duracao_s, m.duracao_s) AS duracao_s, cm.duracao_s AS duracao_propria,
       m.id, m.nome, m.tipo, m.mime, m.status, m.validade_ate, m.largura, m.altura, m.orientacao, m.bytes, m.duracao_s AS duracao_midia
@@ -80,12 +102,12 @@ module.exports = (db) => {
     if (req.query.anunciante_id) { onde.push('c.anunciante_id = ?'); p.push(Number(req.query.anunciante_id)); }
     if (req.query.status) { onde.push('c.status = ?'); p.push(req.query.status); }
     if (req.query.busca) { onde.push('(c.nome LIKE ? OR a.nome LIKE ?)'); p.push(`%${req.query.busca}%`, `%${req.query.busca}%`); }
-    const itens = db.prepare(`SELECT c.*, a.nome AS anunciante,
+    const itens = db.prepare(`SELECT c.*, a.nome AS anunciante, ag.nome AS agencia, ci.nome AS circuito,
         (SELECT COUNT(*) FROM campanha_midias cm WHERE cm.campanha_id = c.id) AS criativos,
         (SELECT COUNT(*) FROM campanha_midias cm JOIN midias m ON m.id = cm.midia_id WHERE cm.campanha_id = c.id AND m.status = 'aprovada') AS criativos_ok,
         (SELECT COUNT(*) FROM campanha_alvos ca WHERE ca.campanha_id = c.id) AS alvos,
         (SELECT COALESCE(SUM(insercoes), 0) FROM resumo_dia rd WHERE rd.campanha_id = c.id AND rd.data = ?) AS insercoes_hoje
-      FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
+      FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id LEFT JOIN agencias ag ON ag.id = c.agencia_id LEFT JOIN circuitos ci ON ci.id = c.circuito_id
       ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY CASE c.status WHEN 'ativa' THEN 0 WHEN 'aguardando' THEN 1 WHEN 'pausada' THEN 2 WHEN 'rascunho' THEN 3 ELSE 4 END,
       c.inicio DESC`).all(hoje(), ...p);
     res.json({ itens, padroes: { insercoes_hora: cfg().insercoes_hora_padrao, mensalidade_tela_centavos: cfg().mensalidade_tela_centavos, cpm_centavos: cfg().cpm_centavos } });
@@ -223,6 +245,23 @@ module.exports = (db) => {
       }
     });
     registrar(db, req, 'campanha_alvos', { campanha_id: id, alvos: alvos.length });
+    res.json(detalhe(db, id));
+  });
+
+  /** Aplica um circuito na campanha: os alvos do circuito viram os alvos dela (e o preço de tabela é sugerido). */
+  r.post('/campanhas/:id/circuito', (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM campanhas WHERE id = ?').get(id)) throw naoEncontrado('Campanha');
+    const circuito = db.prepare('SELECT * FROM circuitos WHERE id = ?').get(Number(req.body.circuito_id));
+    if (!circuito) throw new ErroNegocio('Circuito não encontrado.', 422);
+    transacao(db, () => {
+      db.prepare('DELETE FROM campanha_alvos WHERE campanha_id = ?').run(id);
+      for (const a of db.prepare('SELECT tipo, valor FROM circuito_alvos WHERE circuito_id = ?').all(circuito.id)) {
+        db.prepare('INSERT OR IGNORE INTO campanha_alvos (campanha_id, tipo, valor) VALUES (?, ?, ?)').run(id, a.tipo, a.valor);
+      }
+      db.prepare('UPDATE campanhas SET circuito_id = ?, insercoes_hora = ? WHERE id = ?').run(circuito.id, circuito.insercoes_hora, id);
+    });
+    registrar(db, req, 'campanha_circuito', { campanha_id: id, circuito_id: circuito.id });
     res.json(detalhe(db, id));
   });
 

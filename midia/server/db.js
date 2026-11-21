@@ -24,13 +24,19 @@ CREATE TABLE IF NOT EXISTS anunciantes (
   criado_em TEXT NOT NULL
 );
 
--- Pontos de mídia: o comércio onde a TV fica. publico_dia = fluxo estimado de pessoas por dia (base dos impactos).
--- comissao_percentual = quanto da receita das telas deste ponto é repassado ao lojista.
+-- Pontos de mídia: onde a TV fica (condomínio, prédio comercial, academia, comércio, hospital...).
+-- publico_dia = passagens de pessoas por dia na frente da tela (base dos impactos).
+-- A contrapartida ao ponto pode ser comissão sobre a receita, um valor fixo por mês ou nenhuma
+-- (em condomínio, muitas vezes a contrapartida é o espaço para os comunicados do prédio).
+-- A lista de categorias fica na validação (server/lib/validacao.js), para crescer sem mexer no banco.
 CREATE TABLE IF NOT EXISTS locais (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nome TEXT NOT NULL,
-  categoria TEXT NOT NULL DEFAULT 'outro'
-    CHECK (categoria IN ('mercado','padaria','farmacia','academia','clinica','salao','restaurante','lanchonete','loja','oficina','posto','escola','predio','outro')),
+  categoria TEXT NOT NULL DEFAULT 'outro',
+  administradora TEXT,
+  unidades INTEGER NOT NULL DEFAULT 0 CHECK (unidades >= 0),
+  repasse_tipo TEXT NOT NULL DEFAULT 'comissao' CHECK (repasse_tipo IN ('comissao','fixo','nenhum')),
+  repasse_fixo_centavos INTEGER NOT NULL DEFAULT 0 CHECK (repasse_fixo_centavos >= 0),
   documento TEXT,
   cep TEXT,
   logradouro TEXT,
@@ -64,6 +70,8 @@ CREATE TABLE IF NOT EXISTS telas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   local_id INTEGER NOT NULL REFERENCES locais(id),
   nome TEXT NOT NULL,
+  -- Onde a tela está dentro do ponto: elevador social, hall, portaria, recepção, academia, fachada...
+  posicao TEXT,
   orientacao TEXT NOT NULL DEFAULT 'paisagem' CHECK (orientacao IN ('paisagem','retrato')),
   status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa','manutencao','inativa')),
   som INTEGER NOT NULL DEFAULT 0,
@@ -131,11 +139,70 @@ CREATE TABLE IF NOT EXISTS midias (
 );
 CREATE INDEX IF NOT EXISTS idx_midias_anunciante ON midias (anunciante_id, status);
 
+-- Agências de publicidade: compram mídia para os anunciantes e ficam com uma comissão sobre o valor da veiculação.
+CREATE TABLE IF NOT EXISTS agencias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  documento TEXT,
+  contato TEXT,
+  email TEXT,
+  telefone TEXT,
+  comissao_percentual INTEGER NOT NULL DEFAULT 2000 CHECK (comissao_percentual BETWEEN 0 AND 10000),
+  status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa','inativa')),
+  criado_em TEXT NOT NULL
+);
+
+-- Circuito: o pacote que o comercial vende (ex.: "Residencial Campinas", "Academias"). Junta telas por regra
+-- e carrega o preço de tabela. A campanha pode aplicar um circuito, que vira os alvos dela.
+CREATE TABLE IF NOT EXISTS circuitos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  descricao TEXT,
+  valor_mes_centavos INTEGER NOT NULL DEFAULT 0 CHECK (valor_mes_centavos >= 0),
+  cpm_centavos INTEGER NOT NULL DEFAULT 0 CHECK (cpm_centavos >= 0),
+  insercoes_hora INTEGER NOT NULL DEFAULT 6 CHECK (insercoes_hora BETWEEN 1 AND 120),
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS circuito_alvos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  circuito_id INTEGER NOT NULL REFERENCES circuitos(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL CHECK (tipo IN ('tela','local','categoria','cidade')),
+  valor TEXT NOT NULL,
+  UNIQUE (circuito_id, tipo, valor)
+);
+
+-- Comunicado do ponto (a contrapartida do condomínio): o síndico escreve, a equipe aprova e ele entra
+-- no carrossel entre os anúncios. O player desenha na hora — não existe arquivo.
+CREATE TABLE IF NOT EXISTS comunicados (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  local_id INTEGER NOT NULL REFERENCES locais(id) ON DELETE CASCADE,
+  titulo TEXT NOT NULL,
+  texto TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'aviso' CHECK (tipo IN ('aviso','manutencao','assembleia','entrega','urgente')),
+  inicio TEXT NOT NULL,
+  fim TEXT NOT NULL,
+  duracao_s INTEGER NOT NULL DEFAULT 10 CHECK (duracao_s BETWEEN 5 AND 60),
+  status TEXT NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','aprovado','recusado')),
+  motivo TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  aprovado_por INTEGER REFERENCES usuarios(id),
+  aprovado_em TEXT,
+  criado_em TEXT NOT NULL,
+  CHECK (fim >= inicio)
+);
+CREATE INDEX IF NOT EXISTS idx_comunicados_local ON comunicados (local_id, status, fim);
+
 -- Campanha: o que vai ao ar, quando, onde e quanto custa.
 -- cobranca: 'mensal' (valor fechado por mês), 'cpm' (por mil impactos) ou 'cortesia' (não fatura).
 CREATE TABLE IF NOT EXISTS campanhas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   anunciante_id INTEGER NOT NULL REFERENCES anunciantes(id),
+  agencia_id INTEGER REFERENCES agencias(id),
+  circuito_id INTEGER REFERENCES circuitos(id),
+  -- Número do PI (pedido de inserção) que a agência emitiu.
+  pi TEXT,
+  comissao_agencia_percentual INTEGER NOT NULL DEFAULT 0 CHECK (comissao_agencia_percentual BETWEEN 0 AND 10000),
   nome TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'rascunho' CHECK (status IN ('rascunho','aguardando','ativa','pausada','encerrada')),
   inicio TEXT NOT NULL,
@@ -185,11 +252,13 @@ CREATE TABLE IF NOT EXISTS exibicoes (
   campanha_id INTEGER REFERENCES campanhas(id),
   anunciante_id INTEGER REFERENCES anunciantes(id),
   midia_id INTEGER REFERENCES midias(id),
+  comunicado_id INTEGER REFERENCES comunicados(id),
   data TEXT NOT NULL,
   exibida_em TEXT NOT NULL,
   duracao_s INTEGER NOT NULL CHECK (duracao_s >= 0),
   criado_em TEXT NOT NULL,
-  UNIQUE (tela_id, midia_id, exibida_em)
+  -- Uma tela exibe uma coisa de cada vez: tela + instante identificam a exibição (e barram o reenvio repetido).
+  UNIQUE (tela_id, exibida_em)
 );
 CREATE INDEX IF NOT EXISTS idx_exibicoes_data ON exibicoes (data, tela_id);
 CREATE INDEX IF NOT EXISTS idx_exibicoes_periodo ON exibicoes (data, exibida_em);
@@ -221,8 +290,12 @@ CREATE INDEX IF NOT EXISTS idx_eventos_tela ON telas_eventos (tela_id, criado_em
 CREATE TABLE IF NOT EXISTS faturas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   anunciante_id INTEGER NOT NULL REFERENCES anunciantes(id),
+  agencia_id INTEGER REFERENCES agencias(id),
   competencia TEXT NOT NULL,
   vencimento TEXT NOT NULL,
+  -- bruto = soma das veiculações; valor = o que a plataforma recebe (bruto menos a comissão da agência).
+  bruto_centavos INTEGER NOT NULL DEFAULT 0 CHECK (bruto_centavos >= 0),
+  comissao_agencia_centavos INTEGER NOT NULL DEFAULT 0 CHECK (comissao_agencia_centavos >= 0),
   valor_centavos INTEGER NOT NULL DEFAULT 0 CHECK (valor_centavos >= 0),
   status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','paga','cancelada')),
   pago_em TEXT,
@@ -246,6 +319,7 @@ CREATE TABLE IF NOT EXISTS repasses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   local_id INTEGER NOT NULL REFERENCES locais(id),
   competencia TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'comissao',
   base_centavos INTEGER NOT NULL DEFAULT 0,
   comissao_percentual INTEGER NOT NULL DEFAULT 0,
   valor_centavos INTEGER NOT NULL DEFAULT 0,
@@ -305,8 +379,10 @@ const CONFIG_PADRAO = {
   comissao_local_percentual: '1500',
   // Dia de vencimento das faturas e quantos dias antes elas são geradas.
   vencimento_dia: '10',
-  // O lojista pode escrever o aviso que passa na faixa da própria TV.
+  // O responsável pelo ponto (lojista ou síndico) pode escrever o aviso que passa na faixa da própria TV.
   aviso_lojista: '1',
+  // Comunicado publicado pelo ponto entra no ar direto (1) ou espera a equipe aprovar (0).
+  comunicado_automatico: '0',
   // Por quantos dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta
   // relatórios e faturamento, nunca é apagado). 0 = guardar tudo.
   prova_dias: '180',
@@ -325,6 +401,8 @@ function abrir(arquivo = config.dbFile) {
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
 
+  migrar(db);
+
   const cfg = db.prepare('INSERT OR IGNORE INTO configuracoes (chave, valor) VALUES (?, ?)');
   for (const [k, val] of Object.entries(CONFIG_PADRAO)) cfg.run(k, val);
 
@@ -333,6 +411,65 @@ function abrir(arquivo = config.dbFile) {
       .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha), agora());
   }
   return db;
+}
+
+/** Colunas que entraram depois da primeira versão (bancos antigos recebem cada uma por ALTER TABLE). */
+const COLUNAS_NOVAS = [
+  ['locais', 'administradora', 'TEXT'],
+  ['locais', 'unidades', 'INTEGER NOT NULL DEFAULT 0'],
+  ['locais', 'repasse_tipo', "TEXT NOT NULL DEFAULT 'comissao'"],
+  ['locais', 'repasse_fixo_centavos', 'INTEGER NOT NULL DEFAULT 0'],
+  ['telas', 'posicao', 'TEXT'],
+  ['campanhas', 'agencia_id', 'INTEGER REFERENCES agencias(id)'],
+  ['campanhas', 'circuito_id', 'INTEGER REFERENCES circuitos(id)'],
+  ['campanhas', 'pi', 'TEXT'],
+  ['campanhas', 'comissao_agencia_percentual', 'INTEGER NOT NULL DEFAULT 0'],
+  ['exibicoes', 'comunicado_id', 'INTEGER REFERENCES comunicados(id)'],
+  ['faturas', 'agencia_id', 'INTEGER REFERENCES agencias(id)'],
+  ['faturas', 'bruto_centavos', 'INTEGER NOT NULL DEFAULT 0'],
+  ['faturas', 'comissao_agencia_centavos', 'INTEGER NOT NULL DEFAULT 0'],
+  ['repasses', 'tipo', "TEXT NOT NULL DEFAULT 'comissao'"],
+];
+
+const temColuna = (db, tabela, coluna) => db.prepare(`PRAGMA table_info(${tabela})`).all().some((c) => c.name === coluna);
+const sqlDaTabela = (db, tabela) => db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(tabela)?.sql ?? '';
+
+/**
+ * Migrações de bancos criados por versões anteriores. Duas delas refazem a tabela, porque o SQLite não altera
+ * restrições: a lista fixa de categorias do ponto (agora a lista vive na validação) e a chave de exibição
+ * (era tela+mídia+instante; comunicado não tem mídia, então passou a ser tela+instante).
+ */
+function migrar(db) {
+  for (const [tabela, coluna, tipo] of COLUNAS_NOVAS) {
+    if (!temColuna(db, tabela, coluna)) db.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
+  }
+
+  if (/CHECK \(categoria IN/.test(sqlDaTabela(db, 'locais'))) refazerTabela(db, 'locais');
+  if (/UNIQUE \(tela_id, midia_id, exibida_em\)/.test(sqlDaTabela(db, 'exibicoes'))) refazerTabela(db, 'exibicoes');
+}
+
+/** Recria a tabela no formato novo (do SCHEMA) e copia os dados pelas colunas que existem nas duas. */
+function refazerTabela(db, tabela) {
+  const criar = SCHEMA.split(/;\s*\n/).map((x) => `${x.trim()};`).find((x) => new RegExp(`CREATE TABLE IF NOT EXISTS ${tabela} \\(`).test(x));
+  if (!criar) throw new Error(`[Mídia Indoor] Não achei o CREATE TABLE de ${tabela} para migrar.`);
+  const antigas = new Set(db.prepare(`PRAGMA table_info(${tabela})`).all().map((c) => c.name));
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    db.exec(criar.replace(`CREATE TABLE IF NOT EXISTS ${tabela} (`, `CREATE TABLE ${tabela}_novo (`));
+    const colunas = db.prepare(`PRAGMA table_info(${tabela}_novo)`).all().map((c) => c.name).filter((c) => antigas.has(c));
+    db.exec(`INSERT OR IGNORE INTO ${tabela}_novo (${colunas.join(', ')}) SELECT ${colunas.join(', ')} FROM ${tabela}`);
+    db.exec(`DROP TABLE ${tabela}`);
+    db.exec(`ALTER TABLE ${tabela}_novo RENAME TO ${tabela}`);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+  }
+  // Os índices da tabela refeita são recriados pelo SCHEMA (CREATE INDEX IF NOT EXISTS).
+  db.exec(SCHEMA);
 }
 
 const abertas = new WeakSet();

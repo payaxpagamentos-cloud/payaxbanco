@@ -42,3 +42,23 @@ body.com-faixa .palco{ bottom: var(--faixa-altura); }
 .info{ position: fixed; top: 2.4vh; right: 2.4vh; z-index: 7; background: rgba(0,0,0,.82); border: 1px solid rgba(255,255,255,.16); border-radius: 1.4vh;
   padding: 2vh 2.4vh; font-size: 1.9vh; line-height: 1.7; max-width: 46vw; font-variant-numeric: tabular-nums; }
 .info b{ color: #93B4F7; font-weight: 700; }
+
+/* Comunicado do ponto (recado do condomínio ou da loja), desenhado pela própria TV. */
+.comunicado{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 3vh; padding: 8vh 9vw;
+  background: linear-gradient(135deg, #111A2B 0%, #0B1220 100%); color: #fff; text-align: left; }
+.comunicado .cabeca{ display: flex; align-items: center; gap: 2vh; min-width: 0; }
+.comunicado .selo-tipo{ flex: none; }
+.comunicado .selo-tipo{ font-size: 2.4vh; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: .9vh 2.2vh; border-radius: 999px;
+  background: rgba(255,255,255,.14); }
+.comunicado .onde{ font-size: 2.4vh; font-weight: 600; color: #9FB2D4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
+.comunicado h1{ font-size: 8.5vh; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; margin: 0; }
+.comunicado p{ font-size: 4.4vh; line-height: 1.35; margin: 0; color: #E3EAF7; }
+.comunicado .quando{ font-size: 2.4vh; color: #7F93B8; margin-top: auto; }
+/* Uma faixa de cor por tipo de recado. */
+.comunicado.urgente{ background: linear-gradient(135deg, #3B0A0A 0%, #1A0505 100%); }
+.comunicado.urgente .selo-tipo{ background: #DC2626; }
+.comunicado.manutencao{ background: linear-gradient(135deg, #3A2606 0%, #170F02 100%); }
+.comunicado.manutencao .selo-tipo{ background: #D97706; }
+.comunicado.assembleia .selo-tipo{ background: #2563EB; }
+.comunicado.entrega{ background: linear-gradient(135deg, #0A2A1B 0%, #04120B 100%); }
+.comunicado.entrega .selo-tipo{ background: #15803D; }

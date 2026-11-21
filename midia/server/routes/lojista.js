@@ -7,6 +7,7 @@ const { registrar } = require('../lib/auditoria');
 const arquivos = require('../lib/arquivos');
 const { estaOnline, pontoAberto } = require('../lib/monitor');
 const { montarPorTela } = require('../lib/grade');
+const { lerComunicado } = require('./cadastros');
 const rel = require('../lib/relatorios');
 const { hoje, mes, somarDias, inicioMes, fimMes } = require('../lib/datas');
 const v = require('../lib/validacao');
@@ -44,6 +45,8 @@ module.exports = (db) => {
       repasses: db.prepare('SELECT * FROM repasses WHERE local_id = ? ORDER BY competencia DESC LIMIT 12').all(meu(req)),
       a_receber_centavos: db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM repasses WHERE local_id = ? AND status = 'a_pagar'").get(meu(req)).n,
       midias: db.prepare('SELECT id, nome, tipo, status, motivo, duracao_s, criado_em FROM midias WHERE local_id = ? ORDER BY id DESC').all(meu(req)),
+      comunicados: db.prepare("SELECT * FROM comunicados WHERE local_id = ? ORDER BY (status = 'pendente') DESC, fim DESC, id DESC LIMIT 30").all(meu(req)),
+      comunicado_automatico: Boolean(c.comunicado_automatico),
     });
   });
 
@@ -68,6 +71,51 @@ module.exports = (db) => {
       .run(texto, texto ? new Date(Date.now() + horas * 3_600_000).toISOString() : null, t.id);
     registrar(db, req, 'aviso_lojista', { tela_id: t.id, aviso: texto });
     res.json(db.prepare('SELECT id, aviso, aviso_ate FROM telas WHERE id = ?').get(t.id));
+  });
+
+  /**
+   * Comunicados do ponto: o recado do prédio ou da loja ("assembleia dia 12", "elevador em manutenção").
+   * Entram no carrossel entre os anúncios e são desenhados pela própria TV, sem precisar de arte.
+   */
+  r.get('/comunicados', (req, res) => {
+    res.json({
+      itens: db.prepare("SELECT * FROM comunicados WHERE local_id = ? ORDER BY (status = 'pendente') DESC, fim DESC, id DESC").all(meu(req)),
+      automatico: Boolean(lerConfig(db).comunicado_automatico),
+    });
+  });
+
+  r.post('/comunicados', (req, res) => {
+    const automatico = Boolean(lerConfig(db).comunicado_automatico);
+    const d = lerComunicado(db, { ...req.body, local_id: meu(req) });
+    const id = Number(db.prepare(`INSERT INTO comunicados (local_id, titulo, texto, tipo, inicio, fim, duracao_s, status, criado_por, aprovado_em, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(d.local_id, d.titulo, d.texto, d.tipo, d.inicio, d.fim, d.duracao_s ?? 10, automatico ? 'aprovado' : 'pendente', req.usuario.id,
+        automatico ? agora() : null, agora()).lastInsertRowid);
+    registrar(db, req, 'comunicado_do_ponto', { id, local_id: d.local_id, automatico });
+    res.status(201).json(db.prepare('SELECT * FROM comunicados WHERE id = ?').get(id));
+  });
+
+  r.patch('/comunicados/:id', (req, res) => {
+    const c = db.prepare('SELECT * FROM comunicados WHERE id = ? AND local_id = ?').get(Number(req.params.id), meu(req));
+    if (!c) throw naoEncontrado('Comunicado');
+    const d = lerComunicado(db, { local_id: c.local_id, ...req.body }, true);
+    delete d.local_id;
+    if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
+    // Alterar um comunicado já no ar manda ele de volta para a aprovação da equipe.
+    const automatico = Boolean(lerConfig(db).comunicado_automatico);
+    db.prepare(`UPDATE comunicados SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')}, status = ?, motivo = NULL WHERE id = ?`)
+      .run(...Object.values(d), automatico ? 'aprovado' : 'pendente', c.id);
+    registrar(db, req, 'comunicado_alterado_ponto', { id: c.id });
+    res.json(db.prepare('SELECT * FROM comunicados WHERE id = ?').get(c.id));
+  });
+
+  r.delete('/comunicados/:id', (req, res) => {
+    const c = db.prepare('SELECT * FROM comunicados WHERE id = ? AND local_id = ?').get(Number(req.params.id), meu(req));
+    if (!c) throw naoEncontrado('Comunicado');
+    db.prepare('UPDATE exibicoes SET comunicado_id = NULL WHERE comunicado_id = ?').run(c.id);
+    db.prepare('DELETE FROM comunicados WHERE id = ?').run(c.id);
+    registrar(db, req, 'comunicado_removido_ponto', { id: c.id });
+    res.status(204).end();
   });
 
   /** Conteúdo do próprio estabelecimento (entra no preenchimento da grade depois de aprovado). */
