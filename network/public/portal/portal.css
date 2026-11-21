@@ -1,0 +1,102 @@
+/*
+ * Portal do assinante.
+ *
+ * Folha própria, sem nada do sistema interno: quem entra aqui é cliente, usa o celular na maior parte das
+ * vezes, e não deve baixar o CSS nem o JavaScript de um painel de operação que ele jamais vai abrir.
+ *
+ * Desenhado para o polegar: alvos de 48 px, uma coluna, texto grande, e o que mais importa — o valor a
+ * pagar e o botão de copiar o PIX — sempre acima da dobra.
+ */
+:root {
+  --verde: #00794a; --verde-escuro: #05311f; --verde-claro: #e8f5ed; --verde-vivo: #19c37d;
+  --fundo: #f4f7f4; --cartao: #fff; --texto: #10241b; --texto-2: #5a6f62; --texto-3: #8b9d91;
+  --borda: #e2e9e4; --vermelho: #b3261e; --vermelho-suave: #fdeceb; --laranja: #9a5b16; --laranja-suave: #fdf2e3;
+  --raio: 16px; --sombra: 0 2px 10px rgba(10, 40, 25, .06);
+  --fonte: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font-family: var(--fonte); background: var(--fundo); color: var(--texto); font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--verde-vivo); outline-offset: 3px; }
+[hidden] { display: none !important; }
+
+.p-app { max-width: 560px; margin: 0 auto; padding: 0 16px 48px; }
+.p-topo { display: flex; align-items: center; gap: 10px; padding: 18px 0 16px; }
+.p-topo svg { width: 42px; height: 27px; flex: none; }
+/* min-width:0 deixa o bloco encolher dentro do flex: sem isso o nome do provedor empurra o "Sair" para fora da tela. */
+.p-marca { font-size: 19px; font-weight: 700; letter-spacing: -.02em; line-height: 1; min-width: 0; }
+/* Nome de provedor é comprido e cabe em duas linhas num celular: line-height folgado para a segunda
+ * linha não subir por cima da primeira, e espaçamento menor para a maioria caber numa linha só. */
+.p-marca small { display: block; font-size: 8.5px; letter-spacing: .22em; line-height: 1.5; color: var(--texto-3); font-weight: 600; margin-top: 4px; }
+.p-sair { margin-left: auto; background: none; border: 0; color: var(--texto-2); font-size: 14px; padding: 10px; min-height: 44px; }
+
+.p-cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); padding: 18px; margin-bottom: 14px; }
+.p-cartao h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: -.01em; }
+.p-cartao h2 .p-fraco { font-weight: 400; }
+
+.p-estado { display: flex; gap: 12px; align-items: flex-start; }
+.p-bolha { width: 12px; height: 12px; border-radius: 50%; flex: none; margin-top: 6px; background: var(--texto-3); }
+.p-bolha.no_ar { background: var(--verde-vivo); box-shadow: 0 0 0 4px rgba(25, 195, 125, .18); }
+.p-bolha.sem_sinal { background: var(--vermelho); box-shadow: 0 0 0 4px rgba(179, 38, 30, .14); }
+.p-bolha.suspenso_pagamento { background: #e08a2b; box-shadow: 0 0 0 4px rgba(224, 138, 43, .16); }
+.p-estado strong { display: block; font-size: 17px; line-height: 1.3; }
+.p-estado p { margin: 4px 0 0; color: var(--texto-2); font-size: 14px; }
+
+.p-valor { font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+.p-valor small { font-size: 15px; font-weight: 500; color: var(--texto-2); letter-spacing: 0; }
+.p-linha { display: flex; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--borda); font-size: 14.5px; }
+.p-linha:last-child { border-bottom: 0; }
+.p-linha span:first-child { color: var(--texto-2); }
+.p-linha b { font-variant-numeric: tabular-nums; }
+
+.p-botao {
+  width: 100%; min-height: 50px; border-radius: 12px; border: 1px solid var(--verde); background: var(--verde); color: #fff;
+  font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px;
+}
+.p-botao:active { filter: brightness(.94); }
+.p-botao.secundario { background: var(--cartao); color: var(--verde); }
+.p-botao.discreto { background: none; border-color: var(--borda); color: var(--texto-2); }
+.p-botao:disabled { opacity: .6; cursor: wait; }
+
+.p-etq { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--verde-claro); color: var(--verde); }
+.p-etq.vencida { background: var(--vermelho-suave); color: var(--vermelho); }
+.p-etq.paga { background: #eef1ee; color: var(--texto-2); }
+.p-etq.aberta { background: var(--laranja-suave); color: var(--laranja); }
+
+.p-fatura { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--borda); }
+.p-fatura:last-child { border-bottom: 0; }
+.p-fatura .p-info { flex: 1; min-width: 0; }
+.p-fatura .p-info b { display: block; font-size: 15px; }
+.p-fatura .p-info span { font-size: 13px; color: var(--texto-2); }
+
+.p-codigo { word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  background: var(--fundo); border: 1px solid var(--borda); border-radius: 10px; padding: 12px; margin-top: 12px; user-select: all; }
+.p-aviso { padding: 12px 14px; border-radius: 12px; font-size: 14px; margin-bottom: 14px; background: var(--laranja-suave); color: var(--laranja); }
+.p-aviso.erro { background: var(--vermelho-suave); color: var(--vermelho); }
+.p-aviso.ok { background: var(--verde-claro); color: var(--verde); }
+.p-aviso:empty { display: none; }
+.p-fraco { color: var(--texto-2); font-size: 13.5px; }
+.p-centro { text-align: center; }
+
+.p-campo { display: block; margin-bottom: 14px; }
+.p-campo span { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.p-campo input { width: 100%; min-height: 50px; border: 1px solid var(--borda); border-radius: 12px; padding: 0 14px; font-size: 16px; background: var(--cartao); }
+.p-campo input:focus { outline: none; border-color: var(--verde); box-shadow: 0 0 0 3px rgba(0, 121, 74, .12); }
+.p-campo .p-ajuda { font-size: 12.5px; color: var(--texto-3); font-weight: 400; margin-top: 6px; display: block; }
+
+.p-entrada { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: 24px 0; }
+.p-entrada h1 { font-size: 26px; letter-spacing: -.03em; margin: 0 0 4px; }
+.p-entrada .p-fraco { margin-bottom: 22px; }
+.p-trocar { background: none; border: 0; color: var(--verde); font-size: 14px; text-decoration: underline; padding: 12px; min-height: 44px; width: 100%; }
+
+.p-aba { display: flex; gap: 4px; background: var(--cartao); border: 1px solid var(--borda); border-radius: 12px; padding: 4px; margin-bottom: 16px; }
+.p-aba button { flex: 1; min-height: 42px; border: 0; background: none; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--texto-2); }
+.p-aba button[aria-selected=true] { background: var(--verde-claro); color: var(--verde); }
+
+.p-nota { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--verde-escuro); color: #fff;
+  padding: 13px 18px; border-radius: 12px; font-size: 14.5px; max-width: calc(100% - 32px); box-shadow: 0 8px 24px rgba(0, 0, 0, .2); z-index: 10; }
+.p-nota.erro { background: var(--vermelho); }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

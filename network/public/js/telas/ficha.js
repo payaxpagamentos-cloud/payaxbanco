@@ -1,6 +1,6 @@
 import { api } from '../api.js';
 import { el, limpar, icone, pode, cabecalho, painel, tabela, abas, etq, etqDe, rotulo, opcoes, dinheiro, numero, data, dataHora, desde, dl,
-  documento, telefone, competencia, velocidade, carregando, formulario, pedirMotivo, botao, toast, faixa, stat, vazio, hoje } from '../ui.js';
+  documento, telefone, competencia, velocidade, carregando, formulario, pedirMotivo, botao, toast, faixa, stat, vazio, hoje, modal } from '../ui.js';
 import { baixa } from './faturamento.js';
 import { emitirCobranca, verCobranca } from './cobrancas.js';
 import { painelWifi } from './wifi.js';
@@ -391,7 +391,8 @@ function historico({ f }) {
 }
 
 // ---------------- Cadastro ----------------
-function cadastro({ f }) {
+function cadastro(ctx) {
+  const { f } = ctx;
   return el('div', { class: 'grade duas' },
     painel('Identificação', dl([
       ['Tipo', rotulo('tipoPessoa', f.tipo)],
@@ -415,7 +416,66 @@ function cadastro({ f }) {
       ['Coordenadas', f.latitude ? `${f.latitude}, ${f.longitude}` : null],
       ['Consentimento LGPD', f.consentimento_em ? dataHora(f.consentimento_em) : 'não registrado'],
       ['Observações', f.observacoes],
-    ])));
+    ])),
+    acessoPortal(ctx));
+}
+
+/*
+ * Acesso do assinante ao portal.
+ *
+ * O código de primeiro acesso aparece UMA vez, aqui, e depois só existe em hash: quem fechar a janela sem
+ * copiar gera outro. Quem entrega o código ao cliente é a equipe, pelo canal que já usa com ele — enquanto
+ * não houver provedor de mensagens contratado, o sistema não envia nada, e diz isso em vez de fingir.
+ */
+function acessoPortal({ f, recarregar }) {
+  const p = f.portal ?? { tem_acesso: false, ativo: false, convite_aberto: null };
+  const podeMexer = pode('assinantes.editar');
+
+  const mostrarCodigo = async (r) => {
+    await modal('Código de acesso ao portal', (fechar) => [
+      faixa(r.aviso, '', 'alerta'),
+      el('input', { type: 'text', readonly: true, value: r.codigo, class: 'codigo-grande',
+        onfocus: (e) => e.target.select(), 'aria-label': 'Código de acesso' }),
+      el('p', { class: 'fraco' }, `O assinante entra em ${location.origin}/portal/ com o CPF/CNPJ dele e este código.`),
+      el('div', { class: 'form-acoes' }, el('button', { class: 'botao', onclick: async () => {
+        try { await navigator.clipboard.writeText(r.codigo); toast('Código copiado.'); } catch { /* sem área de transferência */ }
+        fechar();
+      } }, 'Copiar e fechar')),
+    ]);
+    recarregar();
+  };
+
+  const gerar = (motivo) => async () => {
+    try { await mostrarCodigo(await api.post(`/assinantes/${f.id}/portal/convite`, { motivo })); }
+    catch (err) { toast(err.message, true); }
+  };
+
+  const estado = !p.tem_acesso
+    ? etq('sem acesso', 'neutra')
+    : !p.ativo ? etq('desativado', 'perigo')
+      : p.bloqueado ? etq('bloqueado por tentativas', 'alerta') : etq('ativo', 'ok');
+
+  return painel('Acesso ao portal do assinante', el('div', {},
+    dl([
+      ['Situação', estado],
+      ['Último acesso', p.ultimo_acesso ? `${dataHora(p.ultimo_acesso)} (${desde(p.ultimo_acesso)})` : 'nunca entrou'],
+      p.bloqueado_ate && p.bloqueado ? ['Liberação automática', dataHora(p.bloqueado_ate)] : null,
+      p.convite_aberto ? ['Convite em aberto', `gerado em ${dataHora(p.convite_aberto.criado_em)} · vale até ${dataHora(p.convite_aberto.expira_em)}`] : null,
+    ].filter(Boolean)),
+    p.convite_aberto
+      ? faixa('Já existe um código em aberto para este assinante. Gerar outro cancela o anterior — e o código antigo deixa de funcionar.', '', 'alerta')
+      : null,
+    podeMexer ? el('div', { class: 'form-acoes', style: 'justify-content:flex-start' },
+      botao(p.tem_acesso ? 'Gerar código de redefinição' : 'Gerar código de primeiro acesso',
+        gerar(p.tem_acesso ? 'redefinir' : 'primeiro_acesso'), { tipo: p.tem_acesso ? 'secundario' : '', ic: 'cadeado' }),
+      p.tem_acesso && p.ativo ? botao('Desativar acesso', () => pedirMotivo('Desativar o acesso ao portal',
+        'Por quê? (fica na auditoria)', async () => {
+          await api.remover(`/assinantes/${f.id}/portal`);
+          toast('Acesso desativado. O assinante não entra mais no portal.');
+          recarregar();
+        }, { rotuloEnviar: 'Desativar' }), { tipo: 'secundario perigo' }) : null,
+    ) : null,
+  ));
 }
 
 // ---------------- Ações do topo ----------------

@@ -1761,6 +1761,66 @@ CREATE UNIQUE INDEX idx_certificados_impressao ON certificados(organizacao_id, i
 ALTER TABLE organizacoes ADD COLUMN documento TEXT;
 `,
   },
+  {
+    versao: 10,
+    nome: 'portal_assinante',
+    sql: `
+/*
+ * Acesso do assinante ao portal.
+ *
+ * É uma porta para FORA: quem entra aqui não é da equipe, e a superfície fica exposta à internet. Daí as
+ * escolhas:
+ *
+ * - O acesso é uma tabela à parte de "usuarios". Misturar cliente e equipe na mesma tabela é o caminho
+ *   mais curto para um cliente herdar uma permissão interna por descuido de uma consulta.
+ * - A senha é hash, como a da equipe. Nunca em claro, nunca recuperável.
+ * - Tentativa errada conta e bloqueia por tempo. Sem isso, CPF é um usuário conhecido e a senha vira
+ *   questão de paciência.
+ */
+CREATE TABLE assinante_acessos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  assinante_id INTEGER NOT NULL REFERENCES assinantes(id),
+  senha_hash TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  bloqueado_ate TEXT,
+  ultimo_acesso TEXT,
+  ultimo_ip TEXT,
+  criado_em TEXT NOT NULL,
+  criado_por INTEGER REFERENCES usuarios(id),
+  UNIQUE (organizacao_id, assinante_id)
+);
+
+/*
+ * Convite de primeiro acesso (e de redefinição de senha).
+ *
+ * O código é gerado pela equipe e entregue ao assinante pelo canal que já se usa com ele. Fica GUARDADO
+ * EM HASH: quem tiver o banco não consegue entrar na conta de ninguém. Vale uma vez e expira — convite
+ * eterno é senha eterna.
+ */
+CREATE TABLE assinante_convites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  assinante_id INTEGER NOT NULL REFERENCES assinantes(id),
+  codigo_hash TEXT NOT NULL,
+  motivo TEXT NOT NULL DEFAULT 'primeiro_acesso' CHECK (motivo IN ('primeiro_acesso','redefinir')),
+  expira_em TEXT NOT NULL,
+  usado_em TEXT,
+  cancelado_em TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX idx_convites_assinante ON assinante_convites(assinante_id, id DESC);
+
+/*
+ * De onde veio o chamado. O que o assinante abre pelo portal chega sem triagem: sem saber a origem, a
+ * equipe trata igual ao que ela mesma classificou, e a fila perde a diferença entre o relato cru do
+ * cliente e o diagnóstico de quem já olhou.
+ */
+ALTER TABLE chamados ADD COLUMN origem TEXT NOT NULL DEFAULT 'equipe';
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

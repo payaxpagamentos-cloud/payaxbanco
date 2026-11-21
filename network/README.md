@@ -39,6 +39,8 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 17 | **Consulta de CNPJ e CEP** | Cadastro preenchido pela base pública da Receita e pelos Correios, com a fonte e o horário à vista, o que veio marcado até alguém conferir, e queda para a fonte seguinte. Fonte fora do ar não trava o cadastro. |
 | 18 | **Integrações** | Rastreador, coletores de monitoramento e Downdetector: configuração, teste de conexão, estado (não configurada, conectada, parcial, desatualizada, sem permissão, limite atingido, falha), último sucesso, erro com ID e histórico de coletas. |
 
+| 19 | **Portal do assinante** | O autoatendimento do cliente, em `/portal/`, separado do sistema da equipe: 2ª via com **PIX na hora** e linha digitável, situação do serviço dita em português de cliente, plano e contrato, abertura e acompanhamento de chamados, troca de contato e de senha. Primeiro acesso **só por convite** gerado pela equipe (código de uso único, com prazo, guardado em hash), bloqueio por tentativas e público de token próprio — o token do portal não abre nada do sistema, e o da equipe não abre o portal. |
+
 Mais: **Organização e acessos** (usuários, perfis, matriz de permissões, parâmetros da operação e auditoria com request ID).
 
 ## Perfis
@@ -81,6 +83,10 @@ Dados fictícios (pessoas, placas, endereços, medições, valores de comissão,
 selo **Ambiente demonstrativo** só nessa organização. Acessos com a senha `demo12345`: `demo@`, `gestor.demo@`, `noc.demo@`,
 `frota.demo@`, `lucas.demo@` (técnico), `comissoes.demo@`, `financeiro.demo@` e `tv.demo@managerprovedor.local`. O script recusa rodar com
 `NODE_ENV=production`; use um banco separado. Rastreador e Downdetector ficam não configurados.
+
+A demonstração também deixa o **portal do assinante** pronto para abrir: um assinante com fatura em aberto já tem acesso ativo
+(o script imprime o documento dele e a senha `portal12345`) e outro fica com um **convite em aberto**, para a ficha mostrar como é um
+primeiro acesso ainda não usado. Abra em `/portal/`.
 
 ## Configuração
 
@@ -359,6 +365,33 @@ e a regra de que nenhum adaptador mexe no financeiro por conta própria.
 certificado mTLS, ambiente de homologação) e esse manual só sai depois do credenciamento. Escrever um adaptador de
 memória produziria chamadas que falham em produção e, pior, um sistema que *parece* conectado. Para ligar um banco
 ou a PayAx, basta a especificação da API e as credenciais: nada no núcleo muda.
+
+### Portal do assinante
+
+Fica em `/portal/`, servido pelo mesmo processo, com tela, estilo e sessão próprios. O cliente nunca passa pela
+tela da equipe, e a equipe não entra pelo portal: são dois públicos de token (`aud`), e cada um recusa o outro.
+Há teste provando isso nos dois sentidos.
+
+**Primeiro acesso.** Não existe cadastro aberto nem recuperação por e-mail: quem libera é a equipe, na ficha do
+assinante, gerando um código de uso único que vale 72 horas. O código aparece **uma vez** na resposta e no banco
+fica só o hash — nem a auditoria o registra, só o fato de ter sido gerado e por quem. Enquanto não houver provedor
+de mensagens contratado, quem entrega o código ao cliente é a equipe, pelo canal que já usa com ele; o sistema diz
+isso em vez de fingir que envia.
+
+**Isolamento.** Em toda rota autenticada o assinante vem do token, nunca da URL nem do corpo. Trocar o número no
+endereço da fatura devolve 404, não a fatura do vizinho — e é isso que o teste verifica, não a ausência de link na
+tela. Documento desconhecido e senha errada devolvem a *mesma* mensagem, para o portal não virar uma consulta de
+quem é cliente. Cinco tentativas erradas bloqueiam a conta por 15 minutos.
+
+**O que o cliente vê do serviço.** Por dentro o Panorama distingue sete situações; três delas são problema do
+provedor, não do cliente, e nenhuma é frase para ele ler. O portal traduz: *no ar*, *não estamos recebendo sinal do
+seu equipamento*, *serviço suspenso por pendência*, *instalação em andamento*. Quando o sistema não tem leitura
+recente daquele ponto, ele diz **"não conseguimos confirmar agora"** e explica que isso não significa que o serviço
+caiu — garantir "está tudo bem" para quem está sem internet é o jeito mais rápido de perder a confiança no portal
+inteiro.
+
+**O que o portal não faz:** não muda endereço (mudança de endereço é visita técnica, não formulário), não cancela
+contrato e não altera plano. Essas ações passam pela equipe, e o portal diz onde falar.
 
 ## Integrações
 

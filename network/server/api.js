@@ -23,6 +23,12 @@ function criarApi(db, extras = {}) {
    */
   api.get('/publico', autenticado, (req, res) => res.json({ mapa: config.mapa }));
 
+  /*
+   * Portal do assinante. Montado ANTES da autenticação da equipe, de propósito: ele tem o próprio
+   * verificador e o próprio público de token, e nada aqui deve passar pelo middleware interno.
+   */
+  api.use('/portal', require('./routes/portal')(db));
+
   // Arquivo por link temporário assinado (para <img> e abrir comprovantes); a permissão é conferida de novo aqui.
   api.get('/arquivos/:id', (req, res) => {
     if (!anexos.conferirLink(req.params.id, req.query.u, req.query.e, req.query.s)) throw new ErroNegocio('Link expirado ou inválido.', 403);

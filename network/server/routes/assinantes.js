@@ -9,6 +9,7 @@ const { listaPaginada, like, conferirVersao, csv } = require('../lib/http');
 const { dataLocal } = require('../lib/datas');
 const { endereco } = require('../lib/enderecos');
 const ficha = require('../lib/ficha');
+const portal = require('../lib/portal');
 const v = require('../lib/validacao');
 
 
@@ -88,6 +89,40 @@ module.exports = (db) => {
    * do tempo unificada. É uma chamada só porque é uma conversa só: quem atende precisa do todo ao mesmo tempo.
    * Cada seção respeita a permissão de quem pediu, e o que ficou de fora vem em `secoes_ocultas`.
    */
+  /* ---------------- Acesso ao portal ---------------- */
+
+  /**
+   * Gera o código de primeiro acesso (ou de redefinição) do assinante.
+   *
+   * O código aparece UMA vez, nesta resposta, e depois só existe em hash. Quem o entrega ao cliente é a
+   * equipe, pelo canal que já usa com ele — enquanto não houver provedor de mensagens, não há como o
+   * sistema enviar, e fingir que envia seria pior do que dizer que não envia.
+   */
+  r.post('/:id/portal/convite', exigir('assinantes.editar'), (req, res) => {
+    const a = buscar(req, req.params.id);
+    const motivo = v.opcao(req.body?.motivo ?? 'primeiro_acesso', 'o motivo', ['primeiro_acesso', 'redefinir']);
+    const convite = portal.criarConvite(db, { org: req.org, assinanteId: a.id, motivo, usuarioId: req.usuario.id });
+    // O código NÃO vai para a auditoria: lá fica só o fato de ter sido gerado, e por quem.
+    registrar(db, req, 'portal_convite_gerado', { recurso: 'assinante', recursoId: a.id, depois: { motivo, expira_em: convite.expira_em } });
+    res.status(201).json({
+      ...convite,
+      aviso: `Entregue este código ao assinante pelo canal que vocês já usam. Ele vale ${convite.horas} horas, serve uma vez `
+        + 'e não poderá ser visto de novo.',
+    });
+  });
+
+  r.get('/:id/portal', exigir('assinantes.ver'), (req, res) => {
+    const a = buscar(req, req.params.id);
+    res.json(portal.situacaoDoAcesso(db, a.id));
+  });
+
+  r.delete('/:id/portal', exigir('assinantes.editar'), (req, res) => {
+    const a = buscar(req, req.params.id);
+    const r2 = portal.desativar(db, a.id);
+    registrar(db, req, 'portal_acesso_desativado', { recurso: 'assinante', recursoId: a.id, depois: r2 });
+    res.json({ ...r2, aviso: 'O assinante não entra mais no portal, e qualquer convite em aberto foi cancelado.' });
+  });
+
   r.get('/:id', exigir('assinantes.ver'), (req, res) => {
     res.json(ficha.montar(db, { org: req.org, assinante: buscar(req, req.params.id), perfil: req.usuario.perfil, hoje: hoje(req) }));
   });

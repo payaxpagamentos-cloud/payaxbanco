@@ -22,6 +22,7 @@ const fat = require('./lib/faturamento');
 const cob = require('./lib/cobranca');
 
 const SENHA = 'demo12345';
+const SENHA_PORTAL = 'portal12345';
 const db = abrir();
 if (db.prepare("SELECT 1 FROM usuarios WHERE email = 'demo@managerprovedor.local'").get()) {
   console.log('A organização demonstrativa já existe (demo@managerprovedor.local).');
@@ -459,6 +460,20 @@ const servidor = criarApp(db).listen(0, async () => {
     ] });
     const bal = await req('financeiro.demo', 'GET', `/contabil/balancete?de=${C_ATUAL}&ate=${C_ATUAL}`);
 
+    /*
+     * Portal do assinante: um acesso já ativo, para abrir o portal e olhar, e um convite em aberto,
+     * para a equipe ver na ficha como fica um primeiro acesso ainda não usado. O código do convite só
+     * existe em claro neste instante — no banco fica o resumo criptográfico dele.
+     */
+    const comFatura = db.prepare(`SELECT a.id, a.documento, a.nome FROM faturas f JOIN assinantes a ON a.id = f.assinante_id
+      WHERE f.organizacao_id = ? AND f.situacao IN ('aberta','parcial') ORDER BY f.vencimento LIMIT 1`).get(org);
+    const convite = await post('demo', `/assinantes/${comFatura.id}/portal/convite`, {});
+    const ativacao = await fetch(`${base}/portal/ativar`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documento: comFatura.documento, codigo: convite.codigo, senha: SENHA_PORTAL }) });
+    if (!ativacao.ok) throw new Error(`ativar portal: ${ativacao.status} ${await ativacao.text()}`);
+    const emEspera = carteira.find((x) => x.assinante.id !== comFatura.id);
+    const conviteAberto = await post('demo', `/assinantes/${emEspera.assinante.id}/portal/convite`, {});
+
     console.log(`Carteira demonstrativa: ${carteira.length} assinantes, ${execucao.regua.bloqueios} corte(s) pela régua, ${execucao.regua.avisos} aviso(s) preparado(s).`);
     console.log(`TR-069: ACS configurado e ${aparelhos} aparelho(s) de assinante registrados (sem credencial de chamada: a tela diz que a mudança espera o contato do aparelho).`);
     console.log(`Provisionamento: ${provisionados} serviço(s) no concentrador BRAS-PG-01 (sem acesso de gerência: nenhum equipamento real foi inventado).`);
@@ -471,6 +486,8 @@ const servidor = criarApp(db).listen(0, async () => {
       + `(não há concentrador real para varrer) · ${semMapa} contrato(s) sem coordenada, de propósito, para a aba "Fora do mapa".`);
     console.log(`Contabilidade: plano padrão, automática ligada, ${contab.faturas} fatura(s) e ${contab.pagamentos} baixa(s) `
       + `contabilizadas a partir do próprio financeiro · balancete de ${C_ATUAL} ${bal.fecha ? 'fecha' : 'NÃO FECHA'}.`);
+    console.log(`Portal do assinante em /portal/ : ${comFatura.nome} entra com o documento ${comFatura.documento} e a senha ${SENHA_PORTAL} `
+      + `· ${emEspera.assinante.nome} tem convite em aberto (código ${conviteAberto.codigo}, vence ${conviteAberto.expira_em}).`);
     console.log('Rastreador e Downdetector ficam não configurados: não há conexão real inventada.');
   } catch (err) {
     console.error('Falha ao criar a demonstração:', err.message);

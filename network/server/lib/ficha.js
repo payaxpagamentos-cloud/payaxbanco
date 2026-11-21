@@ -6,6 +6,7 @@ const fat = require('./faturamento');
 const cob = require('./cobranca');
 const prov = require('./provisionamento');
 const acs = require('./acs');
+const portal = require('./portal');
 
 /*
  * Ficha do assinante: tudo que se sabe sobre um cliente, numa resposta só.
@@ -55,6 +56,9 @@ function montar(db, { org, assinante, perfil, hoje }) {
     financeiro,
     cobranca,
     chamados,
+    // Acesso ao portal: vem junto para a aba não precisar de uma segunda chamada. Nunca traz o código do
+    // convite — ele existe em claro só no instante em que é gerado.
+    portal: portal.situacaoDoAcesso(db, assinante.id),
     linha_tempo: linha.filter((x) => x.em).sort((a, b) => String(b.em).localeCompare(String(a.em))).slice(0, LIMITE_LINHA),
     secoes_ocultas: ocultas,
   };

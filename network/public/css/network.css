@@ -689,3 +689,9 @@ main.tela-cheia { padding: 0; display: flex; animation: none; }
   .partida-linha { grid-template-columns: 1fr 1fr; }
   .partida-linha .conta { grid-column: 1 / -1; }
 }
+
+/* Código de acesso ao portal: aparece uma vez só, então precisa ser lido e copiado sem erro. */
+.codigo-grande {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 26px; font-weight: 700; letter-spacing: .22em; text-align: center;
+}
