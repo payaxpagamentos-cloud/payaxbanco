@@ -17,7 +17,7 @@ const ETAPAS = {
   novo: 'Novo', contato: 'Contato feito', proposta: 'Proposta', negociacao: 'Negociação', ganho: 'Ganho', perdido: 'Perdido',
 };
 const ABERTAS = ['novo', 'contato', 'proposta', 'negociacao'];
-const TIPOS = { anunciante: 'Quer anunciar', ponto: 'Quer tela no prédio' };
+const TIPOS = { anunciante: 'Quer anunciar', ponto: 'Quer tela no espaço dele' };
 const ORIGENS = { site: 'Site', indicacao: 'Indicação', prospeccao: 'Prospecção', evento: 'Evento', outro: 'Outro' };
 const INTERACOES = {
   nota: 'Anotação', ligacao: 'Ligação', email: 'E-mail', whatsapp: 'WhatsApp', reuniao: 'Reunião', visita: 'Visita', etapa: 'Mudança de etapa',
@@ -203,7 +203,8 @@ async function abrirLead(id, recarregar) {
             class: 'btn primario', onclick: (e) => acao(e.target, async () => {
               const texto = l.tipo === 'anunciante'
                 ? 'Vai nascer o cadastro do cliente a partir deste lead. Depois é só criar a campanha.'
-                : 'Vai nascer o cadastro do ponto a partir deste lead. Confira a categoria e a contrapartida depois.';
+                : 'Vai nascer o cadastro do ponto a partir deste lead — condomínio, loja, academia, o que for. '
+                  + 'Confira o ambiente e a contrapartida depois.';
               if (!await confirmar('Ganhamos!', texto, 'Ganhar')) return;
               const r = await api.post(`/painel/crm/leads/${l.id}/ganhar`, {});
               toast(r.cliente ? `Cliente ${r.cliente} criado.` : (r.ponto ? `Ponto ${r.ponto} criado.` : 'Lead ganho.'));
@@ -239,7 +240,7 @@ async function abrirLead(id, recarregar) {
 function registrarConversa(l, recarregar) {
   return formModal(`Conversa com ${l.nome}`, () => [
     escolha('Como foi', 'tipo', { ligacao: 'Ligação', whatsapp: 'WhatsApp', email: 'E-mail', reuniao: 'Reunião', visita: 'Visita', nota: 'Anotação' }, 'ligacao'),
-    area('O que ficou combinado', { name: 'texto', required: true, maxlength: 500, placeholder: 'Ex.: Falei com o síndico. Pediu proposta para 6 meses até sexta.' }, ''),
+    area('O que ficou combinado', { name: 'texto', required: true, maxlength: 500, placeholder: 'Ex.: Falei com o gerente. Pediu proposta para 6 meses até sexta.' }, ''),
     el('div', { class: 'duas' },
       campo('Próximo passo', { name: 'proximo_passo', maxlength: 160, value: l.proximo_passo ?? '', placeholder: 'Ex.: Enviar proposta' }),
       campo('Quando', { name: 'proximo_em', type: 'date', value: l.proximo_em ?? emDias(3) })),
@@ -255,7 +256,7 @@ function registrarConversa(l, recarregar) {
 function editarLead(l, opcoes, recarregar) {
   return formModal(l ? `Editar ${l.nome}` : 'Novo lead', () => [
     el('div', { class: 'duas' },
-      campo('Empresa ou condomínio', { name: 'nome', value: l?.nome ?? '', required: true, maxlength: 120, autofocus: !l }),
+      campo('Empresa, condomínio ou estabelecimento', { name: 'nome', value: l?.nome ?? '', required: true, maxlength: 120, autofocus: !l }),
       escolha('O que quer', 'tipo', TIPOS, l?.tipo ?? 'anunciante')),
     el('div', { class: 'tres' },
       campo('Falar com', { name: 'contato', value: l?.contato ?? '', maxlength: 120 }),
@@ -267,11 +268,11 @@ function editarLead(l, opcoes, recarregar) {
       escolha('Origem', 'origem', ORIGENS, l?.origem ?? 'prospeccao')),
     el('div', { class: 'tres' },
       campo('Valor estimado por mês (R$)', { name: 'valor', value: reaisCampo(l?.valor_estimado_centavos), inputmode: 'decimal' }),
-      campo('Próximo passo', { name: 'proximo_passo', value: l?.proximo_passo ?? '', maxlength: 160, placeholder: 'Ex.: Ligar para o síndico' }),
+      campo('Próximo passo', { name: 'proximo_passo', value: l?.proximo_passo ?? '', maxlength: 160, placeholder: 'Ex.: Ligar para o responsável' }),
       campo('Quando', { name: 'proximo_em', type: 'date', value: l?.proximo_em ?? emDias(2) })),
     escolha('Responsável', 'responsavel_id', { '': 'Ninguém ainda', ...Object.fromEntries((opcoes.equipe ?? []).map((u) => [u.id, u.nome])) }, l?.responsavel_id ?? ''),
     area('Observação', { name: 'observacao', maxlength: 500 }, l?.observacao ?? ''),
-    l ? null : area('Primeira anotação (opcional)', { name: 'nota', maxlength: 500, placeholder: 'Ex.: Indicação do síndico do Jardim das Acácias.' }, ''),
+    l ? null : area('Primeira anotação (opcional)', { name: 'nota', maxlength: 500, placeholder: 'Ex.: Indicação do gerente da academia do Taquaral.' }, ''),
   ], async (d) => {
     const corpo = { ...d, valor_estimado_centavos: centavos(d.valor) ?? 0 };
     delete corpo.valor;

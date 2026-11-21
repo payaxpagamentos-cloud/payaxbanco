@@ -38,7 +38,7 @@ const MENUS = {
 
 const SUBTITULOS = {
   resumo: 'O que está acontecendo na rede agora', telas: 'Aparelhos instalados, estado e programação de cada um',
-  pontos: 'Condomínios, prédios e comércios onde as TVs estão instaladas',
+  pontos: 'Condomínios, prédios, comércios, academias e clínicas onde as TVs estão instaladas',
   comunicados: 'Recados do próprio ponto que entram entre os anúncios',
   anunciantes: 'Quem paga pela publicidade e as agências que compram a mídia',
   inventario: 'O que a rede tem para vender: circuitos, pontos, telas e audiência', campanhas: 'O que vai ao ar, onde, quando e por quanto',

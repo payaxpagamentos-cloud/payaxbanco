@@ -142,7 +142,7 @@ const camposTela = (t = {}, opcoes) => [
     t.id ? escolha('Situação', 'status', { ativa: 'Ativa', manutencao: 'Manutenção', inativa: 'Inativa' }, t.status ?? 'ativa') : null),
   escolha('Layout da tela', 'layout', LAYOUTS, t.layout ?? 'cheia'),
   el('p', { class: 'pequeno mudo', style: 'margin:-6px 0 0' },
-    'Dividida é o padrão de elevador: o comunicado do condomínio fica parado de um lado e a publicidade gira do outro. '
+    'Dividida é o padrão de elevador: o recado do ponto fica parado de um lado e a publicidade gira do outro. '
     + 'Em tela cheia, o anúncio ocupa tudo e o comunicado entra no meio do carrossel.'),
   campo('Legenda fixa na faixa (opcional)', { name: 'legenda', value: t.legenda ?? '', maxlength: 200, placeholder: 'Ex.: Bem-vindo à Padaria Pão Quente' }),
   el('div', { class: 'linha' }, marcar('Som ligado nos vídeos', { name: 'som', checked: Boolean(t.som) }), marcar('Mostrar o relógio', { name: 'relogio', checked: t.id ? Boolean(t.relogio) : true })),
@@ -291,7 +291,7 @@ async function abrirPonto(id, recarregar) {
       }, 'Remover') : null),
     el('p', { class: 'pequeno mudo' }, `Assinatura: ${d.assinatura ?? `Administração / Síndico — ${d.nome}`}`),
     el('h3', {}, 'Comunicados do ponto'),
-    el('p', { class: 'pequeno mudo', style: 'margin:0 0 8px' }, 'Recados do prédio ou da loja que entram no carrossel entre os anúncios.'),
+    el('p', { class: 'pequeno mudo', style: 'margin:0 0 8px' }, 'Recados do ponto — prédio, loja, academia, clínica — que entram no carrossel entre os anúncios.'),
     tabela([
       [(c) => el('div', {}, el('div', {}, c.titulo), el('div', { class: 'pequeno mudo' }, c.texto.slice(0, 80))), 'Comunicado'],
       [(c) => TIPOS_COMUNICADO[c.tipo] ?? c.tipo, 'Tipo'],
@@ -316,7 +316,7 @@ async function abrirPonto(id, recarregar) {
     d.usuarios.length
       ? el('div', {}, d.usuarios.map((u) => el('div', { class: 'chave' }, el('span', {}, `${u.nome} · ${u.email}`),
         el('span', { class: 'pequeno mudo' }, u.ultimo_acesso ? `último acesso ${dataHora(u.ultimo_acesso)}` : 'nunca acessou'))))
-      : vazio('Sem acesso criado. Pelo portal, o responsável (lojista ou síndico) acompanha as TVs, publica comunicados e vê o repasse.'),
+      : vazio('Sem acesso criado. Pelo portal, o responsável pelo ponto (lojista, síndico ou gerente) acompanha as TVs, publica comunicados e vê o repasse.'),
     el('div', { class: 'linha entre', style: 'margin-top:18px' },
       el('button', { class: 'btn', onclick: () => { fechar(); criarAcessoLojista(d, recarregar); } }, icone('pessoas'), 'Criar acesso do lojista'),
       el('div', { class: 'linha' },
@@ -356,7 +356,7 @@ function editarPonto(p, recarregar) {
     el('fieldset', {}, el('legend', {}, 'Contrapartida ao ponto'),
       el('p', { class: 'pequeno mudo', style: 'margin:0' },
         'Em comércio costuma ser comissão sobre a receita; em condomínio, muitas vezes não há dinheiro — '
-        + 'a contrapartida é o espaço para os comunicados do prédio na própria tela.'),
+        + 'a contrapartida é o espaço para os recados do ponto na própria tela.'),
       el('div', { class: 'tres' },
         escolha('Forma', 'repasse_tipo', REPASSES, p?.repasse_tipo ?? 'comissao'),
         campo('Comissão (%)', { name: 'comissao_percentual', value: p ? (p.comissao_percentual / 100) : '', type: 'number', min: 0, max: 100, step: 0.5 }),
@@ -508,7 +508,7 @@ function editarComunicado(c, ponto, recarregar, opcoes = null) {
       campo('Data do evento (opcional)', { name: 'evento_em', type: 'date', value: c?.evento_em ?? '' }),
       campo('Hora', { name: 'evento_hora', type: 'time', value: c?.evento_hora ?? '' })),
     el('p', { class: 'pequeno mudo', style: 'margin:-4px 0 0' },
-      'Com a data preenchida, o recado também entra na agenda da tela — o quadro "O que vem por aí" que o morador acompanha.'),
+      'Com a data preenchida, o recado também entra na agenda da tela — o quadro "O que vem por aí" que quem passa acompanha.'),
     campo('Tempo na tela (segundos)', { name: 'duracao_s', type: 'number', min: 5, max: 60, value: c?.duracao_s ?? 10 }),
   ], async (d) => {
     const corpo = { ...d, local_id: ponto?.id ?? c?.local_id ?? d.local_id };

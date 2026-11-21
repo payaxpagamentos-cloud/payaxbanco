@@ -293,7 +293,7 @@ function montarComunicado(item) {
   titulo.textContent = item.titulo ?? '';
   caixa.append(topo, titulo);
 
-  // Parágrafos separados por linha em branco, como o síndico escreveu.
+  // Parágrafos separados por linha em branco, como o responsável escreveu.
   for (const paragrafo of String(item.texto ?? '').split(/\n{2,}/)) {
     const p = document.createElement('p');
     p.textContent = paragrafo.trim();
@@ -341,8 +341,8 @@ function rodarZonaComunicados() {
   clearTimeout(estado.zonaTimer);
   const zona = $('zona-comunicado');
   const g = estado.programacao?.grade;
-  // Além dos comunicados, a zona do condomínio mostra a agenda do prédio e o clima do dia:
-  // é o que o morador olha por vontade própria — e o que valoriza o anúncio ao lado.
+  // Além dos comunicados, a zona do ponto mostra a agenda do lugar e o clima do dia:
+  // é o que as pessoas olham por vontade própria — e o que valoriza o anúncio ao lado.
   const extras = [
     ...(g?.agenda?.length ? [{ quadro: 'agenda', duracao_s: MINIMO_NA_ZONA_S }] : []),
     ...(g?.clima ? [{ quadro: 'clima', duracao_s: MINIMO_NA_ZONA_S }] : []),
@@ -371,7 +371,7 @@ function rodarZonaComunicados() {
 
 const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
-/** Agenda do prédio: o que vem pela frente, em ordem. */
+/** Agenda do ponto: o que vem pela frente, em ordem. */
 function montarAgenda(agenda) {
   const ponto = estado.programacao?.grade?.ponto ?? {};
   const caixa = document.createElement('div');

@@ -2,14 +2,16 @@
 
 Plataforma de **mídia digital em telas** (mídia indoor / DOOH), publicada em `/midia`.
 
-Você instala telas em condomínios, prédios comerciais, academias e no comércio; o aparelho ligado em cada uma abre o
+Você instala telas onde passa gente todo dia — condomínios, prédios comerciais, mercados, academias, clínicas,
+padarias, lojas; o aparelho ligado em cada uma abre o
 player e passa a exibir, em carrossel, os anúncios das campanhas vendidas — troca a cada poucos segundos, da
 construtora para a loja de calçados, e assim por diante. O painel cuida do resto: cadastro dos pontos, aprovação dos
 criativos, montagem automática da programação de cada tela, **prova de exibição**, faturamento dos anunciantes (direto
 ou por agência) e a contrapartida de cada ponto.
 
-Em **condomínio**, a contrapartida normalmente não é dinheiro: é o espaço para os **comunicados do prédio** na própria
-tela — assembleia, manutenção do elevador, encomendas na portaria —, escritos pelo síndico. Na tela de elevador eles
+A contrapartida muda conforme o ponto. Em **condomínio**, normalmente não é dinheiro: é o espaço para os
+**comunicados do prédio** na própria tela — assembleia, manutenção do elevador, encomendas na portaria —, escritos
+pelo síndico. Na tela de elevador eles
 ficam **parados de um lado enquanto a publicidade gira do outro**, com a logo da administradora e a assinatura do
 síndico. Em comércio, a contrapartida costuma ser comissão sobre a receita das telas daquele ponto. As duas formas
 convivem, e ainda há a de valor fixo por mês.
@@ -50,7 +52,7 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
   publicidade × institucional, campanhas e pontos que mais exibiram, e o que precisa de atenção.
 - **TVs**: um cartão por tela com o estado (no ar, sem contato, aguardando pareamento), onde ela fica no ponto, o que
   está no ar agora, pareamento, aviso na faixa e o detalhe de cada aparelho (programação atual, quedas, números do dia).
-- **Pontos**: condomínios, prédios e comércios, com telas no ar, unidades, passagens por dia, contrapartida combinada,
+- **Pontos**: condomínios, prédios comerciais, mercados, academias, clínicas e lojas, com telas no ar, unidades, passagens por dia, contrapartida combinada,
   horário de funcionamento, comunicados, repasses, o acesso do responsável e a **identidade que vai no comunicado**
   (logo da administradora e assinatura).
 - **Comunicados**: a fila dos recados dos pontos (vindos do portal do síndico ou do lojista) para a equipe aprovar,
@@ -70,7 +72,8 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
   alcançadas estimadas, onde o anúncio passa ponto a ponto, o investimento (com desconto e CPM) e a validade.
 - **CRM**, com duas abas:
   - **Funil**: o quadro de quem ainda não é cliente — os dois lados do negócio, quem quer **anunciar** e o
-    condomínio que quer **tela**. Cada lead tem etapa, valor estimado, responsável, o histórico das conversas e,
+    ponto que quer **tela** (condomínio, loja, academia, clínica, prédio comercial — o lead nasce sem ambiente
+    definido, porque quem sabe qual é é a equipe). Cada lead tem etapa, valor estimado, responsável, o histórico das conversas e,
     acima de tudo, **o próximo passo e a data**: lead sem próximo passo marcado é lead que morre numa coluna, e por
     isso ele aparece em destaque. No alto, *o que está combinado para hoje* e o que já passou da data.
     Ganhar o lead **cria o cliente** (ou o ponto) a partir dele, e o lead continua apontando para o cadastro que
@@ -185,7 +188,8 @@ informa quanto aplicar. Ninguém quer um sistema decidindo aumento por conta pr�
 
 ## Comunicados do ponto e o layout da tela
 
-O recado do próprio ponto. Em condomínio, é a moeda de troca pelo espaço.
+O recado do próprio ponto — a assembleia no prédio, o horário das aulas na academia, o aviso da recepção na
+clínica. Em condomínio, costuma ser a moeda de troca pelo espaço.
 
 - O **síndico (ou lojista) escreve no portal**: título, texto, tipo (aviso, manutenção, assembleia, entrega, urgente)
   e por quantos dias fica no ar. A equipe aprova em *Comunicados* — ou a plataforma pode ser configurada para que
@@ -208,11 +212,13 @@ fundo com a própria peça desfocada — em vez de barras pretas no meio do hall
 
 ## O que o morador olha por vontade própria
 
-Tela de elevador que só passa anúncio vira papel de parede. Ao lado dos comunicados, a zona do condomínio
-mostra mais duas coisas — e é isso que faz o morador olhar de novo amanhã:
+Tela que só passa anúncio vira papel de parede. Ao lado dos comunicados, a zona do ponto mostra mais duas coisas
+— e é isso que faz a pessoa olhar de novo amanhã, seja o morador no elevador, o aluno na academia ou quem espera
+na recepção da clínica:
 
-- **A agenda do prédio** ("O que vem por aí"): todo comunicado pode ter **data e hora do evento**. Os próximos
-  quatro entram num quadro em ordem de data (assembleia, dedetização, entrega). Sem data preenchida, o recado
+- **A agenda do ponto** ("O que vem por aí"): todo comunicado pode ter **data e hora do evento**. Os próximos
+  quatro entram num quadro em ordem de data — a assembleia e a dedetização no prédio, a aula especial na academia,
+  o fim da promoção na loja. Sem data preenchida, o recado
   continua girando normalmente como comunicado — a agenda é um extra, não uma obrigação.
 - **O clima do dia**: temperatura, descrição, máxima e mínima, no quadro e também na faixa de baixo (em telas
   em pé, só a temperatura, que é o que cabe). Os dados vêm do **Open-Meteo** (gratuito, sem cadastro), buscados
@@ -341,8 +347,8 @@ número — envio automático exige contratar um provedor oficial da Meta (veja 
 
 A pasta `site/` é o site institucional: uma página só, sem framework e sem build, com a mesma identidade do
 produto (o preto, o lime e a Manrope). Ela traz a capa com uma **tela de elevador de verdade** desenhada em CSS
-— o mesmo layout do player —, onde a rede fica, como funciona, o que muda para quem anuncia e para o condomínio,
-e o formulário de contato.
+— o mesmo layout do player —, onde a rede fica, como funciona, o que muda para quem anuncia e para quem tem o
+espaço (condomínio, loja, academia, clínica), e o formulário de contato.
 
 Duas coisas fazem o site trabalhar em vez de só existir:
 

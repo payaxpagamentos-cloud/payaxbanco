@@ -301,7 +301,7 @@ const avisoLojista = (t, recarregar) => formModal(`Aviso na TV — ${t.nome}`, (
   recarregar();
 }, { rotulo: 'Salvar' });
 
-/** Comunicados do ponto: o síndico (ou o lojista) escreve e o recado entra entre os anúncios. */
+/** Comunicados do ponto: quem responde pelo lugar escreve e o recado entra entre os anúncios. */
 async function comunicadosLojista(ctx) {
   const corpo = el('div', { class: 'cartao' });
   const pintar = async () => {
@@ -351,7 +351,7 @@ function editarComunicadoPonto(c, recarregar) {
       campo('Data do evento (opcional)', { name: 'evento_em', type: 'date', value: c?.evento_em ?? '' }),
       campo('Hora', { name: 'evento_hora', type: 'time', value: c?.evento_hora ?? '' })),
     el('p', { class: 'pequeno mudo', style: 'margin:-4px 0 0' },
-      'Com a data preenchida, o recado também entra na agenda da tela — o quadro "O que vem por aí" que o morador acompanha.'),
+      'Com a data preenchida, o recado também entra na agenda da tela — o quadro "O que vem por aí" que quem passa acompanha.'),
   ], async (d) => {
     if (c) await api.patch(`/ponto/comunicados/${c.id}`, d);
     else await api.post('/ponto/comunicados', d);

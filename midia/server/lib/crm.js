@@ -122,10 +122,12 @@ function ganhar(db, id, { usuarioId = null, criarCadastro = true } = {}) {
         .run(l.nome, l.contato, l.email, l.telefone, `Veio do CRM (origem: ${l.origem}).`, agora()).lastInsertRowid);
     }
     if (criarCadastro && l.tipo === 'ponto' && !localId) {
+      // Nasce sem ambiente definido de propósito: um ponto pode ser condomínio, mercado, academia,
+      // clínica ou qualquer lugar onde passa gente — quem sabe qual é é a equipe, não o sistema.
       localId = Number(db.prepare(`INSERT INTO locais (nome, categoria, cidade, uf, responsavel, telefone, email, status, observacao, criado_em)
-        VALUES (?, 'condominio_residencial', ?, ?, ?, ?, ?, 'ativo', ?, ?)`)
+        VALUES (?, 'outro', ?, ?, ?, ?, ?, 'ativo', ?, ?)`)
         .run(l.nome, l.cidade ?? '—', l.uf ?? 'SP', l.contato, l.telefone, l.email,
-          `Veio do CRM (origem: ${l.origem}). Confira a categoria e a contrapartida combinada.`, agora()).lastInsertRowid);
+          `Veio do CRM (origem: ${l.origem}). Escolha o ambiente e confirme a contrapartida combinada.`, agora()).lastInsertRowid);
     }
     db.prepare("UPDATE leads SET etapa = 'ganho', ganho_em = ?, anunciante_id = ?, local_id = ?, proximo_passo = NULL, proximo_em = NULL, atualizado_em = ? WHERE id = ?")
       .run(hoje(), anuncianteId, localId, agora(), id);

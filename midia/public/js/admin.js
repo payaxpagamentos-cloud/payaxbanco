@@ -120,7 +120,7 @@ export async function configuracoes(ctx) {
         + 'Os dados vêm do Open-Meteo (gratuito, sem cadastro) e exigem que o servidor alcance a internet; '
         + 'a busca é uma por cidade, a cada 30 minutos. Se o serviço não responder, a tela simplesmente deixa de mostrar o clima.'),
       el('p', { class: 'pequeno mudo', style: 'margin:0' },
-        'A agenda do prédio ("O que vem por aí") aparece sozinha quando um comunicado tem data de evento.')),
+        'A agenda do ponto ("O que vem por aí") aparece sozinha quando um comunicado tem data de evento — vale para a assembleia do prédio, a aula da academia ou a promoção da loja.')),
 
     el('fieldset', {}, el('legend', {}, 'Prova visual das telas'),
       campo('A TV manda uma foto do que está na tela a cada (minutos)', { name: 'foto_minutos', type: 'number', min: 0, max: 1440, value: c.foto_minutos }),
