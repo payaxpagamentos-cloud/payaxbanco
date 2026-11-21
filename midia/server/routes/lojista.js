@@ -30,7 +30,9 @@ module.exports = (db) => {
     const competencia = mes();
     const telas = db.prepare('SELECT * FROM telas WHERE local_id = ? ORDER BY nome').all(meu(req));
     res.json({
-      ponto: db.prepare('SELECT id, nome, categoria, cidade, uf, publico_dia, comissao_percentual, status FROM locais WHERE id = ?').get(meu(req)),
+      // A forma de repasse combinada precisa vir junto: é ela que decide o que o portal mostra no lugar do valor.
+      ponto: db.prepare(`SELECT id, nome, categoria, cidade, uf, publico_dia, repasse_tipo, comissao_percentual, repasse_fixo_centavos, status
+        FROM locais WHERE id = ?`).get(meu(req)),
       aberto: pontoAberto(db, meu(req)),
       pode_avisar: Boolean(c.aviso_lojista),
       telas: telas.map((t) => ({

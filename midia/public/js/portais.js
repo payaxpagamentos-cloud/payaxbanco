@@ -194,7 +194,7 @@ async function resumoLojista(ctx) {
     limpar(ctx.conteudo, el('div', { class: 'grade-dash' },
       el('div', { class: 'c3' }, indicador({
         rotulo: 'TVs no ar', valor: `${d.telas.filter((t) => t.online).length} de ${d.telas.length}`, ic: 'telas',
-        cor: d.telas.every((t) => t.online) ? 'verde' : 'laranja', nota: d.aberto ? 'Loja aberta agora' : 'Loja fechada agora',
+        cor: d.telas.every((t) => t.online) ? 'verde' : 'laranja', nota: d.aberto ? 'Ponto aberto agora' : 'Ponto fechado agora',
       })),
       el('div', { class: 'c3' }, indicador({ rotulo: 'Exibições hoje', valor: inteiro(d.hoje.insercoes), ic: 'tocar', nota: duracao(d.hoje.segundos) })),
       el('div', { class: 'c3' }, indicador({ rotulo: `Exibições em ${competenciaTexto(new Date().toLocaleDateString('en-CA').slice(0, 7))}`, valor: inteiro(d.mes.insercoes), ic: 'relatorios', cor: 'roxo' })),
@@ -205,7 +205,9 @@ async function resumoLojista(ctx) {
           : dinheiro(d.a_receber_centavos),
         ic: d.ponto.repasse_tipo === 'nenhum' ? 'aprovacoes' : 'dinheiro',
         cor: 'verde',
-        nota: REPASSES[d.ponto.repasse_tipo ?? 'comissao'],
+        nota: d.ponto.repasse_tipo === 'fixo'
+          ? `${dinheiro(d.ponto.repasse_fixo_centavos)} por mês`
+          : REPASSES[d.ponto.repasse_tipo ?? 'comissao'],
       })),
 
       el('div', { class: 'c12' }, cartao('Minhas TVs',

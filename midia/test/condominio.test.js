@@ -467,3 +467,26 @@ test('Financeiro: contrato do cliente, contas a receber e contas a pagar', async
     assert.ok(!depois.itens.some((x) => x.tipo === 'repasse'), 'repasse pago sai da lista de abertas');
   });
 });
+
+/** O portal do ponto tem de dizer a verdade sobre o que foi combinado com aquele ponto. */
+test('Portal do ponto mostra a contrapartida combinada, não um valor que não existe', async (t) => {
+  const { iniciar: iniciarApi } = require('./helpers');
+  const api = await iniciarApi();
+  t.after(api.fechar);
+  const master = await api.login();
+
+  const criar = async (nome, repasse) => {
+    const ponto = (await api.post('/painel/locais', { nome, categoria: 'condominio_residencial', cidade: 'Campinas', uf: 'SP', ...repasse }, master)).dados.id;
+    const acesso = await api.post(`/painel/locais/${ponto}/acesso`, { nome: 'Responsável', email: `${nome.toLowerCase().replace(/\W/g, '')}@exemplo.com` }, master);
+    return api.login(acesso.dados.id && `${nome.toLowerCase().replace(/\W/g, '')}@exemplo.com`, acesso.dados.senha_provisoria);
+  };
+
+  const semRepasse = await criar('Sem Repasse', { repasse_tipo: 'nenhum' });
+  const comFixo = await criar('Com Fixo', { repasse_tipo: 'fixo', repasse_fixo_centavos: 30_000 });
+  const comComissao = await criar('Com Comissao', { repasse_tipo: 'comissao', comissao_percentual: 20 });
+
+  const ponto = async (tk) => (await api.get('/ponto/resumo', tk)).dados.ponto;
+  assert.equal((await ponto(semRepasse)).repasse_tipo, 'nenhum', 'o portal sabe que este ponto não recebe dinheiro');
+  assert.equal((await ponto(comFixo)).repasse_fixo_centavos, 30_000, 'e sabe o valor combinado quando é fixo');
+  assert.equal((await ponto(comComissao)).comissao_percentual, 2000);
+});
