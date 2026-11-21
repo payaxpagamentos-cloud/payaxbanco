@@ -2,7 +2,7 @@
 import { api, qs } from './api.js';
 import {
   el, limpar, $, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, marcar, area, lerForm, repetir,
-  inteiro, dinheiro, dataHora, duracao, percentual, dataBr, etiqueta, etiquetaDe, situacao, centavos, reaisCampo,
+  inteiro, dinheiro, dataHora, duracao, percentual, dataBr, etiqueta, etiquetaDe, situacao, centavos, reaisCampo, telefone, abrirWhatsApp,
   CATEGORIAS, PREDIOS, POSICOES, REPASSES, LAYOUTS, ORIENTACOES, STATUS_TELA, STATUS_PONTO, STATUS_COMUNICADO, TIPOS_COMUNICADO, DIAS,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa, imagemDaApi, enviarArquivo, BASE_API } from './comum.js';
@@ -258,9 +258,19 @@ async function abrirPonto(id, recarregar) {
     el('div', {}, [
       ['Ambiente', CATEGORIAS[d.categoria] ?? d.categoria], ['Administradora', d.administradora ?? '—'], ['Endereço', [d.logradouro, d.numero, d.bairro].filter(Boolean).join(', ') || '—'],
       ['Cidade', `${d.cidade}/${d.uf}`], ['CEP', d.cep ?? '—'], ['CNPJ/CPF', d.documento ?? '—'],
-      ['Responsável', d.responsavel ?? '—'], ['Telefone', d.telefone ?? '—'], ['E-mail', d.email ?? '—'],
+      ['Responsável', d.responsavel ?? '—'], ['Telefone / WhatsApp', d.telefone ? telefone(d.telefone) : '—'], ['E-mail', d.email ?? '—'],
       ['Parceria desde', d.inicio_parceria ? dataBr(d.inicio_parceria) : '—'], ['Agora', d.aberto ? 'aberto' : 'fechado'],
     ].map(([k, v]) => el('div', { class: 'chave' }, el('span', { class: 'mudo' }, k), el('strong', {}, String(v))))),
+    (d.telefone || d.email)
+      ? el('div', { class: 'linha', style: 'margin-top:10px' },
+        d.telefone
+          ? el('button', {
+            class: 'btn pequeno',
+            onclick: () => abrirWhatsApp(d.telefone, `Olá${d.responsavel ? `, ${d.responsavel}` : ''}! Aqui é da Vai Mídia, sobre a tela do ${d.nome}.`),
+          }, icone('enviar'), 'Chamar no WhatsApp')
+          : null,
+        d.email ? el('a', { class: 'btn pequeno', href: `mailto:${d.email}`, target: '_blank', rel: 'noopener' }, 'Mandar e-mail') : null)
+      : null,
     el('h3', {}, 'Funcionamento'),
     d.horarios.length
       ? el('div', { class: 'fichas' }, d.horarios.map((h) => el('span', { class: 'ficha' }, `${DIAS[h.dia_semana]} ${h.abre}–${h.fecha}`)))
@@ -333,7 +343,7 @@ function editarPonto(p, recarregar) {
       campo('Bairro', { name: 'bairro', value: p?.bairro ?? '', maxlength: 80 })),
     el('div', { class: 'tres' },
       campo('Responsável', { name: 'responsavel', value: p?.responsavel ?? '', maxlength: 120 }),
-      campo('Telefone', { name: 'telefone', value: p?.telefone ?? '', maxlength: 20 }),
+      campo('Telefone / WhatsApp', { name: 'telefone', value: p?.telefone ?? '', maxlength: 20 }),
       campo('E-mail', { name: 'email', value: p?.email ?? '', type: 'email', maxlength: 160 })),
     el('div', { class: 'tres' },
       campo('Administradora / rede (opcional)', { name: 'administradora', value: p?.administradora ?? '', maxlength: 120 }),

@@ -239,6 +239,12 @@ select{ appearance: none; padding-right: 34px; cursor: pointer;
 .moldura .foto{ position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }
 .moldura .foto img{ width: 100%; height: 100%; object-fit: cover; display: block; }
 
+.falar-equipe{ display: flex; align-items: center; gap: 10px; margin: auto 10px 12px; padding: 11px 14px; border-radius: var(--radius-sm);
+  background: rgba(200,255,49,.14); color: var(--cor); text-decoration: none; font-size: 13.5px; font-weight: 700; }
+.falar-equipe:hover{ background: rgba(200,255,49,.22); }
+.falar-equipe svg{ width: 17px; height: 17px; flex: none; }
+.casca.recolhida .falar-equipe{ justify-content: center; padding: 11px 0; }
+
 /* CRM: o quadro do funil, os cartões de lead e a linha do tempo das conversas */
 .funil{ display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; align-items: flex-start; }
 .coluna-funil{ flex: 1 0 230px; max-width: 320px; background: var(--surface-2); border-radius: var(--radius); padding: 12px; min-width: 0; }

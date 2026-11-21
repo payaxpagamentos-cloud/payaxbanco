@@ -2,7 +2,7 @@
 import { api, qs } from './api.js';
 import {
   el, limpar, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, marcar, area, lerForm, centavos, reaisCampo,
-  inteiro, dinheiro, duracao, dataHora, dataBr, competenciaTexto, etiquetaDe, etiqueta, mb, diasTexto, faixaHorario,
+  inteiro, dinheiro, duracao, dataHora, dataBr, competenciaTexto, etiquetaDe, etiqueta, mb, diasTexto, faixaHorario, telefone, abrirWhatsApp,
   CATEGORIAS, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_CONTRATO, DIAS,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio, previa, miniatura, linhaDoLoop, itensDoLoop, resumoDoLoop, enviarArquivo } from './comum.js';
@@ -54,7 +54,7 @@ const editarAnunciante = (a, recarregar) => formModal(a ? `Editar ${a.nome}` : '
     campo('Pessoa de contato', { name: 'contato', value: a?.contato ?? '', maxlength: 120 })),
   el('div', { class: 'duas' },
     campo('E-mail', { name: 'email', type: 'email', value: a?.email ?? '', maxlength: 160 }),
-    campo('Telefone', { name: 'telefone', value: a?.telefone ?? '', maxlength: 20 })),
+    campo('Telefone / WhatsApp', { name: 'telefone', value: a?.telefone ?? '', maxlength: 20 })),
   a ? escolha('Situação', 'status', { ativo: 'Ativo', inativo: 'Inativo' }, a.status) : null,
   area('Observação', { name: 'observacao', maxlength: 500 }, a?.observacao ?? ''),
 ], async (d) => {
@@ -69,8 +69,19 @@ async function abrirAnunciante(id, recarregar) {
   const atualizar = (fechar) => { fechar(); recarregar(); abrirAnunciante(id, recarregar); };
   const f = d.financeiro;
   await modal(d.nome, (fechar) => [
-    el('div', {}, [['CNPJ/CPF', d.documento ?? '—'], ['Contato', d.contato ?? '—'], ['E-mail', d.email ?? '—'], ['Telefone', d.telefone ?? '—']]
+    el('div', {}, [['CNPJ/CPF', d.documento ?? '—'], ['Contato', d.contato ?? '—'], ['E-mail', d.email ?? '—'],
+      ['Telefone / WhatsApp', d.telefone ? telefone(d.telefone) : '—']]
       .map(([k, v]) => el('div', { class: 'chave' }, el('span', { class: 'mudo' }, k), el('strong', {}, v)))),
+    // Os dois canais lado a lado: na prática, o que responde é o WhatsApp.
+    (d.telefone || d.email)
+      ? el('div', { class: 'linha', style: 'margin-top:10px' },
+        d.telefone
+          ? el('button', {
+            class: 'btn pequeno', onclick: () => abrirWhatsApp(d.telefone, `Olá${d.contato ? `, ${d.contato}` : ''}! Aqui é da Vai Mídia.`),
+          }, icone('enviar'), 'Chamar no WhatsApp')
+          : null,
+        d.email ? el('a', { class: 'btn pequeno', href: `mailto:${d.email}`, target: '_blank', rel: 'noopener' }, 'Mandar e-mail') : null)
+      : null,
 
     // O financeiro do cliente fica aqui: é o que se procura quando ele liga.
     el('h3', {}, 'Financeiro do cliente'),

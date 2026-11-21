@@ -322,7 +322,8 @@ module.exports = (db) => {
     if (req.query.ate) { onde.push('f.vencimento <= ?'); p.push(v.data(req.query.ate, 'a data final')); }
     if (req.query.nota === 'sim') onde.push('f.nf_numero IS NOT NULL');
     if (req.query.nota === 'nao') onde.push('f.nf_numero IS NULL');
-    const itens = db.prepare(`SELECT f.*, a.nome AS anunciante, ag.nome AS agencia, c.numero AS contrato
+    const itens = db.prepare(`SELECT f.*, a.nome AS anunciante, a.telefone AS anunciante_telefone, a.email AS anunciante_email,
+        ag.nome AS agencia, c.numero AS contrato
       FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id
       LEFT JOIN agencias ag ON ag.id = f.agencia_id LEFT JOIN contratos c ON c.id = f.contrato_id
       WHERE ${onde.join(' AND ')} ORDER BY f.vencimento DESC, a.nome`).all(...p)

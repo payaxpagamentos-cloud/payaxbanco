@@ -142,6 +142,12 @@ export async function configuracoes(ctx) {
         }),
       }, 'Enviar e-mail de teste para mim'))),
 
+    el('fieldset', {}, el('legend', {}, 'WhatsApp da empresa'),
+      campo('Número com DDD', { name: 'whatsapp', value: c.whatsapp, maxlength: 20, placeholder: '(19) 99999-0000' }),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'É o número que aparece para o cliente: no site, nos portais do anunciante e do ponto, e na proposta que ele abre pelo link. '
+        + 'As mensagens continuam saindo do WhatsApp de quem opera — o sistema abre a conversa com o texto pronto, não dispara sozinho.')),
+
     el('fieldset', {}, el('legend', {}, 'Nota fiscal'),
       campo('CNPJ da empresa', { name: 'empresa_documento', value: c.empresa_documento, maxlength: 20, placeholder: '00.000.000/0001-00' }),
       el('p', { class: 'pequeno mudo', style: 'margin:0' },

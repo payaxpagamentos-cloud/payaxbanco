@@ -189,6 +189,15 @@ a{ color: inherit; }
 .resposta{ font-size: 15px; font-weight: 600; padding: 12px 14px; border-radius: 10px; background: rgba(200,255,49,.3); }
 .resposta.erro{ background: #FDECEC; color: #9F1239; }
 
+/* Botão flutuante do WhatsApp (só aparece com número cadastrado) */
+.whats-flutuante{ position: fixed; right: 18px; bottom: 18px; z-index: 45; width: 56px; height: 56px; border-radius: 50%;
+  display: grid; place-items: center; background: #25D366; color: #fff; box-shadow: 0 12px 30px -8px rgba(0,0,0,.45);
+  transition: transform .15s; }
+.whats-flutuante:hover{ transform: translateY(-2px); }
+.whats-flutuante svg{ width: 32px; height: 32px; }
+.link-whats{ font-weight: 700; }
+@media print{ .whats-flutuante{ display: none; } }
+
 /* ----------------------------------------------------------------- Rodapé */
 .rodape{ background: var(--preto); color: #fff; padding: 48px 24px 32px; }
 .faixa-rodape{ max-width: var(--largura); margin: 0 auto; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }

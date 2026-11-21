@@ -2,7 +2,7 @@
 import { api, qs, baixar } from './api.js';
 import {
   el, limpar, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, area, lerForm, centavos, reaisCampo,
-  inteiro, dinheiro, duracao, dataBr, dataHora, etiquetaDe, etiqueta, percentual, competenciaTexto,
+  inteiro, dinheiro, duracao, dataBr, dataHora, etiquetaDe, etiqueta, percentual, competenciaTexto, abrirWhatsApp,
   STATUS_FATURA, STATUS_REPASSE, COBRANCA, REPASSES,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio } from './comum.js';
@@ -200,6 +200,21 @@ function blocoNota(f, recarregar) {
         }, icone('lixeira')) : null)));
 }
 
+/**
+ * Cobrança no WhatsApp: a mesma coisa que o e-mail automático diz, no canal em que o cliente responde.
+ * Quando a fatura tem PIX, o código copia e cola vai junto — é o que resolve o pagamento na hora,
+ * sem o cliente precisar abrir o portal.
+ */
+function cobrarNoWhatsApp(f, pix = null) {
+  const vencida = f.status === 'aberta' && f.vencimento < hojeLocal();
+  const texto = `Olá, ${f.anunciante}! ${vencida ? 'Passando para lembrar da' : 'Segue a'} fatura de `
+    + `${competenciaTexto(f.competencia)} da veiculação: ${dinheiro(f.valor_centavos)}, com vencimento em ${dataBr(f.vencimento)}.`
+    + (pix?.codigo ? `\n\nPIX copia e cola:\n${pix.codigo}` : '')
+    + '\n\nQualquer dúvida é só responder por aqui.';
+  return abrirWhatsApp(f.anunciante_telefone ?? f.telefone, texto,
+    'Este cliente não tem telefone cadastrado. Inclua o número na ficha dele para cobrar por WhatsApp.');
+}
+
 async function abrirFatura(id, recarregar) {
   const f = await api.get(`/painel/faturas/${id}`);
   await modal(`Fatura ${competenciaTexto(f.competencia)} — ${f.anunciante}`, (fechar) => [
@@ -237,6 +252,10 @@ async function abrirFatura(id, recarregar) {
             recarregar();
           }),
         }, icone('ok'), 'Marcar como paga') : null,
+        f.status === 'aberta' ? el('button', {
+          class: 'btn', title: 'Abre o WhatsApp do cliente com a cobrança e o PIX prontos',
+          onclick: () => cobrarNoWhatsApp(f, f.pix),
+        }, icone('enviar'), 'Cobrar no WhatsApp') : null,
         f.status !== 'paga' ? el('button', {
           class: 'btn perigo', onclick: (e) => acao(e.target, async () => {
             const motivo = await perguntar('Cancelar fatura', 'Motivo');
@@ -368,6 +387,12 @@ export async function contasAReceber(ctx) {
         [(f) => (f.atrasada ? etiqueta(`${f.dias_atraso} dia(s) de atraso`, 'erro') : etiquetaDe(STATUS_FATURA, f.status)), 'Situação'],
         [(f) => (f.pago_em ? dataBr(f.pago_em) : '—'), 'Recebido em'],
         [(f) => (f.nf_numero ? etiqueta(`NF ${f.nf_numero}`, 'ok') : etiqueta('Sem nota')), 'Nota fiscal'],
+        [(f) => (f.status === 'aberta'
+          ? el('button', {
+            class: 'btn pequeno', title: 'Cobrar este cliente no WhatsApp',
+            onclick: (e) => { e.stopPropagation(); cobrarNoWhatsApp(f); },
+          }, icone('enviar'), 'Cobrar')
+          : ''), '', 'acoes'],
       ], d.itens, { aoClicar: (f) => abrirFatura(f.id, pintar), vazioTexto: 'Nenhuma fatura. Elas nascem no fechamento do mês, em Faturamento.' })));
   };
 

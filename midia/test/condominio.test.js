@@ -324,6 +324,18 @@ test('Rede em condomínios: comunicados, circuitos e agência', async (t) => {
     assert.equal((await api.get(`/publico/proposta/${p.link_token}`)).status, 410, 'proposta recusada sai do ar');
   });
 
+  await t.test('o WhatsApp da empresa chega a quem abre a proposta e o site', async () => {
+    await api.put('/painel/configuracoes', { whatsapp: '19999990000' }, master);
+    assert.equal((await api.get('/publico')).dados.whatsapp, '19999990000', 'o site e os portais pegam o número daqui');
+
+    const p = (await api.post('/painel/propostas', { circuito_id: circuito, anunciante_id: anunciante, meses: 1 }, master)).dados;
+    assert.equal((await api.get(`/publico/proposta/${p.link_token}`)).dados.whatsapp, '19999990000',
+      'quem abre a proposta pelo link responde pelo WhatsApp dali mesmo');
+
+    await api.put('/painel/configuracoes', { whatsapp: '' }, master);
+    assert.equal((await api.get('/publico')).dados.whatsapp, null, 'sem número cadastrado, nada de WhatsApp aparece');
+  });
+
   await t.test('a folha guardada não muda quando a rede muda', async () => {
     const p = (await api.post('/painel/propostas', { circuito_id: circuito, meses: 1 }, master)).dados;
     const telasNaEpoca = p.folha.circuito.telas;

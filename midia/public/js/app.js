@@ -1,5 +1,5 @@
 import { api, sessao } from './api.js';
-import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, PERFIS } from './ui.js';
+import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, formModal, repetir, linkWhatsApp, PERFIS } from './ui.js';
 import { TELAS_EQUIPE } from './painel.js';
 import { TELAS_ANUNCIANTE, TELAS_LOJISTA } from './portais.js';
 
@@ -8,6 +8,8 @@ let pararTela = null;
 let pararSaude = null;
 let nomePlataforma = 'Vai Mídia';
 let slogan = 'Sua marca em movimento.';
+// WhatsApp da empresa: vira o botão "Falar com a equipe" nos portais do anunciante e do ponto.
+let whatsappEquipe = '';
 
 // [rota, rótulo, ícone, perfis que veem (vazio = todos do grupo)]
 const MENUS = {
@@ -95,7 +97,14 @@ async function desenhar() {
       casca.classList.toggle('recolhida');
       try { localStorage.setItem('midia.menu', casca.classList.contains('recolhida') ? 'recolhido' : 'aberto'); } catch { /* ignora */ }
     } }, icone('seta'))),
-    itens);
+    itens,
+    // Quem está no portal não tem com quem falar dentro do sistema: este botão resolve isso.
+    whatsappEquipe && u.perfil !== 'master' && u.perfil !== 'operador'
+      ? el('a', {
+        class: 'falar-equipe', target: '_blank', rel: 'noopener',
+        href: linkWhatsApp(whatsappEquipe, `Olá! Sou ${u.anunciante_nome ?? u.local_nome ?? u.nome} e queria falar com a equipe.`),
+      }, icone('enviar'), el('span', { class: 'rotulo' }, 'Falar com a equipe'))
+      : null);
 
   const subtitulo = SUBTITULOS[nome] ? el('p', { class: 'subtitulo' }, SUBTITULOS[nome]) : null;
   const vinculo = u.anunciante_nome ?? u.local_nome ?? null;
@@ -232,4 +241,5 @@ function telaNovaSenha(codigo) {
 api.get('/publico').then((p) => {
   nomePlataforma = p.nome || 'Vai Mídia';
   slogan = p.slogan ?? '';
+  whatsappEquipe = p.whatsapp ?? '';
 }).catch(() => {}).finally(desenhar);

@@ -8,7 +8,7 @@
 import { api, qs } from './api.js';
 import {
   el, limpar, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, area, lerForm, centavos, reaisCampo,
-  inteiro, dinheiro, dataBr, dataHora, etiqueta, percentual, pessoa,
+  inteiro, dinheiro, dataBr, dataHora, etiqueta, percentual, telefone, abrirWhatsApp,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio } from './comum.js';
 import { propostas, gerarProposta } from './proposta.js';
@@ -129,7 +129,10 @@ async function abrirLead(id, recarregar) {
     el('div', { class: 'dados', style: 'margin:16px 0' },
       l.contato ? el('div', {}, el('span', { class: 'rotulo' }, 'Falar com'), el('span', {}, l.contato)) : null,
       l.email ? el('div', {}, el('span', { class: 'rotulo' }, 'E-mail'), el('span', {}, l.email)) : null,
-      l.telefone ? el('div', {}, el('span', { class: 'rotulo' }, 'Telefone'), el('span', {}, l.telefone)) : null,
+      l.telefone
+        ? el('div', {}, el('span', { class: 'rotulo' }, 'Telefone / WhatsApp'),
+          el('span', {}, telefone(l.telefone)))
+        : null,
       l.cidade ? el('div', {}, el('span', { class: 'rotulo' }, 'Cidade'), el('span', {}, `${l.cidade}${l.uf ? `/${l.uf}` : ''}`)) : null,
       el('div', {}, el('span', { class: 'rotulo' }, 'Responsável'), el('span', {}, l.responsavel ?? 'ninguém ainda')),
       el('div', {}, el('span', { class: 'rotulo' }, 'Próximo passo'),
@@ -168,6 +171,19 @@ async function abrirLead(id, recarregar) {
 
     el('h3', {}, 'Conversas'),
     el('div', { class: 'linha', style: 'margin-bottom:10px' },
+      l.telefone
+        ? el('button', {
+          class: 'btn pequeno', title: 'Abre o WhatsApp deste contato e já anota a conversa aqui',
+          onclick: (e) => acao(e.target, async () => {
+            if (!abrirWhatsApp(l.telefone, `Olá${l.contato ? `, ${l.contato}` : ''}! Aqui é da Vai Mídia.`)) return;
+            await api.post(`/painel/crm/leads/${l.id}/interacoes`, { tipo: 'whatsapp', texto: 'Chamado no WhatsApp.' });
+            atualizar(fechar);
+          }),
+        }, icone('enviar'), 'Chamar no WhatsApp')
+        : null,
+      l.email
+        ? el('a', { class: 'btn pequeno', href: `mailto:${l.email}`, target: '_blank', rel: 'noopener' }, 'Mandar e-mail')
+        : null,
       el('button', { class: 'btn pequeno primario', onclick: () => { fechar(); registrarConversa(l, () => recarregar()); } }, icone('mais'), 'Anotar conversa'),
       ABERTAS.includes(l.etapa)
         ? el('button', { class: 'btn pequeno', onclick: () => { fechar(); gerarProposta(null, l.nome, () => recarregar(), { lead: l }); } }, icone('relatorios'), 'Gerar proposta')
@@ -244,7 +260,7 @@ function editarLead(l, opcoes, recarregar) {
     el('div', { class: 'tres' },
       campo('Falar com', { name: 'contato', value: l?.contato ?? '', maxlength: 120 }),
       campo('E-mail', { name: 'email', type: 'email', value: l?.email ?? '' }),
-      campo('Telefone', { name: 'telefone', value: l?.telefone ?? '', maxlength: 20 })),
+      campo('Telefone / WhatsApp', { name: 'telefone', value: l?.telefone ?? '', maxlength: 20 })),
     el('div', { class: 'tres' },
       campo('Cidade', { name: 'cidade', value: l?.cidade ?? '', maxlength: 80 }),
       campo('UF', { name: 'uf', value: l?.uf ?? '', maxlength: 2, placeholder: 'SP' }),

@@ -16,7 +16,7 @@ function criarApi(db) {
   // Lido pela tela de entrada e pelo player antes de parear (só o nome da plataforma).
   api.get('/publico', (_req, res) => {
     const c = lerConfig(db);
-    res.json({ nome: c.nome_plataforma, slogan: c.slogan });
+    res.json({ nome: c.nome_plataforma, slogan: c.slogan, whatsapp: c.whatsapp || null });
   });
 
   /**
@@ -25,7 +25,8 @@ function criarApi(db) {
    * O link é aleatório e a folha é só de leitura — nada do painel vai junto.
    */
   api.get('/publico/proposta/:token', require('./lib/limitador').limitar({ janelaMs: 60_000, maximo: 30 }), (req, res) => {
-    res.json(require('./lib/propostas').porToken(db, req.params.token));
+    const c = lerConfig(db);
+    res.json({ ...require('./lib/propostas').porToken(db, req.params.token), whatsapp: c.whatsapp || null });
   });
 
   /**

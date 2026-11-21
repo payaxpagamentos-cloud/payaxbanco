@@ -299,6 +299,25 @@ Quem quiser usar outro aparelho ou software pode falar direto com a API (`<ender
 
 As rotas usam `Authorization: Bearer <token do aparelho>`.
 
+## WhatsApp ao lado do e-mail
+
+No Brasil, cobrança e proposta se resolvem no WhatsApp — então, onde o sistema já falava por e-mail, agora fala
+pelos dois. Em um clique, o painel **abre a conversa certa com o texto já escrito**:
+
+- **Cobrança da fatura** (em *Contas a receber* e na própria fatura): competência, valor, vencimento e, quando há,
+  o **PIX copia e cola** junto — que é o que resolve o pagamento na hora.
+- **Lead do CRM**: chama no WhatsApp e já anota a conversa no histórico do lead.
+- **Ficha do cliente e do ponto**: WhatsApp e e-mail lado a lado, ali onde o telefone está.
+- **Proposta**: abre o WhatsApp do cliente com a mensagem e o link da proposta (veja a seção seguinte).
+
+Do outro lado, quem é cliente também ganha o caminho de volta: configurando o **WhatsApp da empresa**
+(*Configurações → WhatsApp da empresa*), aparece um botão **Falar com a equipe** nos portais do anunciante e do
+ponto, um botão no site e outro na proposta que o cliente abre pelo link.
+
+O que o sistema **não** faz é disparar sozinho: quem aperta "enviar" é a pessoa, do próprio número. Disparo
+automático exige contratar um provedor oficial da Meta — veja *O que depende de terceiros*. O e-mail automático
+(fatura vencida, tela fora do ar, contrato vencendo) continua como está.
+
 ## A proposta no WhatsApp
 
 É por WhatsApp que a proposta chega ao cliente, então ela tem endereço próprio: cada proposta nasce com um
@@ -401,7 +420,10 @@ apagado); e os dados do PIX.
 - **Compra do aparelho e da TV** e a internet do ponto. O player roda no navegador; não há instalação de app.
 - **Ligar e desligar a TV sozinha** (CEC/RS-232) depende do modelo do aparelho; o normal é configurar o próprio
   aparelho para ligar com a energia e nunca descansar a tela.
-- **WhatsApp**: exige contratar um provedor de mensagens. Por e-mail os avisos já saem automaticamente (com SMTP configurado).
+- **WhatsApp automático**: disparar mensagem sozinho (aviso de fatura vencida, confirmação de proposta) exige
+  contratar um provedor oficial da Meta — a API de Negócios tem custo por conversa e precisa de número e modelos
+  de mensagem aprovados. O que o sistema faz sem isso: abre a conversa com o texto pronto, para a pessoa enviar
+  do próprio WhatsApp. Por e-mail, os avisos já saem automaticamente (com SMTP configurado).
 - **Baixa automática do PIX**: depende de integração com o banco. Hoje a fatura é marcada como paga no painel.
 - **Emissão automática da NFS-e**: depende de **certificado digital A1/A3** da empresa e da integração com o sistema
   do município, que muda de cidade para cidade. O painel faz a parte que não depende disso: monta a planilha com

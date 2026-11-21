@@ -265,6 +265,7 @@ function criar(db) {
   // Clima: na demonstração vem preenchido e ligado, para a tela mostrar o quadro do dia.
   // Em produção, o servidor busca sozinho no Open-Meteo (quando ligado nas configurações).
   gravarConfig(db, 'clima_ligado', '1');
+  gravarConfig(db, 'whatsapp', '19999990000');
   for (const [cidade, uf, temp, max, min, codigo] of [['Campinas', 'SP', 27.4, 31, 19, 2], ['Valinhos', 'SP', 26.1, 30, 18, 3]]) {
     db.prepare(`INSERT INTO clima (cidade, uf, temperatura, maxima, minima, codigo, atualizado_em)
       VALUES (?, ?, ?, ?, ?, ?, ?)`).run(cidade, uf, temp, max, min, codigo, new Date().toISOString());

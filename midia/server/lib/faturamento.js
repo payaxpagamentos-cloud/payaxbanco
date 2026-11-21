@@ -184,7 +184,7 @@ function faturarAutomatico(db) {
 
 /** Fatura com itens, PIX copia e cola e situação. */
 function detalhe(db, faturaId) {
-  const f = db.prepare(`SELECT f.*, a.nome AS anunciante, a.documento, a.email, ag.nome AS agencia
+  const f = db.prepare(`SELECT f.*, a.nome AS anunciante, a.documento, a.email, a.telefone, ag.nome AS agencia
     FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id LEFT JOIN agencias ag ON ag.id = f.agencia_id WHERE f.id = ?`).get(faturaId);
   if (!f) throw new ErroNegocio('Fatura não encontrada.', 404);
   const cfg = lerConfig(db);

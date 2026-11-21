@@ -56,6 +56,31 @@ for (const botao of document.querySelectorAll('[data-intencao]')) {
 
 document.getElementById('ano').textContent = String(new Date().getFullYear());
 
+// ----------------------------------------------------------------- WhatsApp da empresa
+/** Link do WhatsApp com a mensagem pronta (o mesmo formato usado no painel). */
+function linkWhats(numero, texto) {
+  const d = String(numero ?? '').replace(/\D/g, '');
+  const completo = d.length === 10 || d.length === 11 ? `55${d}` : d;
+  return completo.length < 12 ? null : `https://wa.me/${completo}?text=${encodeURIComponent(texto)}`;
+}
+
+(async () => {
+  const base = await api();
+  if (!base) return;
+  try {
+    const p = await fetch(new URL('publico', base)).then((r) => (r.ok ? r.json() : null));
+    const link = p?.whatsapp && linkWhats(p.whatsapp, 'Olá! Vim pelo site e queria falar sobre as telas da Vai Mídia.');
+    if (!link) return;
+    // Na lista de contato e num botão flutuante: é por aqui que a maior parte das pessoas prefere falar.
+    for (const alvo of document.querySelectorAll('[data-whatsapp]')) {
+      alvo.href = link;
+      alvo.hidden = false;
+    }
+    const flutuante = document.getElementById('whats-flutuante');
+    if (flutuante) { flutuante.href = link; flutuante.hidden = false; }
+  } catch { /* sem WhatsApp configurado, o site segue com o formulário */ }
+})();
+
 // ----------------------------------------------------------------- Números da rede (ao vivo)
 const inteiro = (n) => Number(n ?? 0).toLocaleString('pt-BR');
 

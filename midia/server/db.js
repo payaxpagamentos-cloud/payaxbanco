@@ -610,6 +610,8 @@ const CONFIG_PADRAO = {
   foto_minutos: '30',
   // Quantos dias antes do fim do contrato a equipe é avisada.
   contrato_aviso_dias: '30',
+  // WhatsApp da empresa: é o canal que aparece para o cliente no site, nos portais e na proposta.
+  whatsapp: '',
   // CNPJ da empresa (prestador do serviço), usado na planilha que vai ao contador para emitir as notas.
   empresa_documento: '',
   // Dados do PIX impresso na fatura do anunciante.
@@ -617,7 +619,7 @@ const CONFIG_PADRAO = {
   pix_nome: '',
   pix_cidade: '',
 };
-const TEXTO = new Set(['nome_plataforma', 'slogan', 'empresa_documento', 'pix_chave', 'pix_nome', 'pix_cidade']);
+const TEXTO = new Set(['nome_plataforma', 'slogan', 'whatsapp', 'empresa_documento', 'pix_chave', 'pix_nome', 'pix_cidade']);
 
 const agora = () => new Date().toISOString();
 
