@@ -1,12 +1,11 @@
 'use strict';
 
-const tls = require('node:tls');
-const net = require('node:net');
 const crypto = require('node:crypto');
 const { agora } = require('../db');
 const { ErroNegocio } = require('./erros');
 const { cifrar, decifrar } = require('./cripto');
 const { diasEntre, dataLocal } = require('./datas');
+const pkcs12 = require('./fiscal/pkcs12');
 
 /*
  * Certificado digital e-CNPJ (A1).
@@ -23,60 +22,55 @@ const { diasEntre, dataLocal } = require('./datas');
 // Um A1 tem alguns quilobytes. Arquivo muito maior não é certificado: é outra coisa.
 const MAX_BYTES = 256 * 1024;
 
+/** Um campo do assunto ou do emissor, no formato de várias linhas que o X509Certificate devolve. */
+const campo = (texto, nome) => {
+  const linha = String(texto ?? '').split('\n').find((l) => l.startsWith(`${nome}=`));
+  return linha ? linha.slice(nome.length + 1).trim() : null;
+};
+
 /**
  * Lê o certificado sem nenhuma biblioteca externa.
  *
- * O caminho é indireto de propósito: o Node não expõe leitura de PKCS#12, mas aceita um .pfx para montar
- * um contexto TLS — e de um socket desse contexto dá para pedir o certificado local. É o que permite
- * validar arquivo e senha de uma vez: se a senha estiver errada, o contexto nem é criado.
+ * O arquivo é aberto pelo leitor próprio de PKCS#12 (lib/fiscal/pkcs12.js), que entende tanto a cifra
+ * nova (PBES2/AES) quanto as antigas (3DES e RC2-40). As antigas importam: muito A1 brasileiro ainda vem
+ * em RC2-40, que o OpenSSL 3 empurrou para o provedor legado e o Node recusa — abrir por conta própria é
+ * o que faz esses certificados funcionarem em vez de o sistema mandar o cliente converter o arquivo.
+ *
+ * O mesmo leitor entrega a chave privada, que é o que permite assinar a nota fiscal. Por isso ele existe.
  */
 function ler(pfx, senha) {
   if (!Buffer.isBuffer(pfx) || !pfx.length) throw new ErroNegocio('Envie o arquivo do certificado (.pfx ou .p12).', 422);
   if (pfx.length > MAX_BYTES) throw new ErroNegocio('Arquivo grande demais para ser um certificado A1.', 422);
 
-  let contexto;
-  try {
-    contexto = tls.createSecureContext({ pfx, passphrase: String(senha ?? '') });
-  } catch (err) {
-    /*
-     * "Unsupported PKCS12 PFX data" quase nunca é arquivo corrompido: é certificado gerado com a cifra
-     * antiga (RC2-40 ou 3DES), que o OpenSSL 3 move para o provedor legado e o Node recusa por padrão.
-     * Muitos A1 brasileiros ainda vêm assim, então o erro precisa dizer o que fazer, não só que falhou.
-     */
-    if (/PKCS12|pkcs12/.test(err.message)) {
-      throw new ErroNegocio('Este certificado usa a cifra antiga (RC2 ou 3DES), que o sistema não aceita por padrão. '
-        + 'Há dois caminhos: iniciar o servidor com a opção "--openssl-legacy-provider", ou converter o arquivo uma vez com '
-        + '"openssl pkcs12 -in seu.pfx -nodes -legacy | openssl pkcs12 -export -out novo.pfx". O conteúdo do certificado não muda.', 422);
-    }
-    if (/mac verify|wrong|decrypt|password/i.test(err.message)) {
-      throw new ErroNegocio('Senha do certificado incorreta.', 422);
-    }
-    throw new ErroNegocio(`Não foi possível ler o certificado: ${err.message}`, 422);
-  }
-
-  let bruto;
-  const socket = new tls.TLSSocket(new net.Socket(), { secureContext: contexto, isServer: true });
-  try { bruto = socket.getCertificate(); } finally { socket.destroy(); }
-  if (!bruto || !bruto.subject) throw new ErroNegocio('O arquivo foi aberto, mas não contém um certificado legível.', 422);
+  const { certificado } = pkcs12.abrir(pfx, String(senha ?? ''));
 
   /*
    * No padrão ICP-Brasil o nome comum traz "RAZÃO SOCIAL:CNPJ". Quando não traz, o CNPJ fica em branco em
    * vez de ser adivinhado — identificar a empresa errada num documento assinado é pior que não identificar.
    */
-  const cn = String(bruto.subject.CN ?? '');
+  const cn = campo(certificado.subject, 'CN') ?? '';
   const m = /^(.*?):(\d{11,14})$/.exec(cn);
-  const documento = m ? m[2] : null;
 
   return {
     titular: (m ? m[1] : cn).trim() || null,
-    documento,
-    emissor: [bruto.issuer?.CN, bruto.issuer?.O].filter(Boolean).join(' · ') || null,
-    valido_de: new Date(bruto.valid_from).toISOString(),
-    valido_ate: new Date(bruto.valid_to).toISOString(),
-    serie: bruto.serialNumber ?? null,
-    impressao: bruto.fingerprint256 ?? crypto.createHash('sha256').update(pfx).digest('hex'),
+    documento: m ? m[2] : null,
+    emissor: [campo(certificado.issuer, 'CN'), campo(certificado.issuer, 'O')].filter(Boolean).join(' · ') || null,
+    valido_de: new Date(certificado.validFrom).toISOString(),
+    valido_ate: new Date(certificado.validTo).toISOString(),
+    serie: certificado.serialNumber ?? null,
+    impressao: certificado.fingerprint256 ?? crypto.createHash('sha256').update(pfx).digest('hex'),
     bytes: pfx.length,
   };
+}
+
+/**
+ * Abre o certificado ativo da organização e devolve o que assina: a chave privada e o certificado.
+ * Fica aqui, e não em quem emite a nota, para a chave privada ter um só caminho de saída no sistema.
+ */
+function paraAssinar(db, org) {
+  const { pfx, passphrase, dados } = usar(db, org);
+  const aberto = pkcs12.abrir(pfx, passphrase);
+  return { chave: aberto.chave, certificadoDer: aberto.certificadoDer, certificado: aberto.certificado, pfx, passphrase, dados };
 }
 
 /** Quanto tempo ainda vale, e como a tela deve tratar isso. */
@@ -201,4 +195,4 @@ const pendenciasDe = (db, org) => {
   }));
 };
 
-module.exports = { MAX_BYTES, ler, situacao, publico, ativoDe, instalar, remover, usar, testar, historico, INTEGRACOES, pendenciasDe };
+module.exports = { MAX_BYTES, ler, situacao, publico, ativoDe, instalar, remover, usar, paraAssinar, testar, historico, INTEGRACOES, pendenciasDe };

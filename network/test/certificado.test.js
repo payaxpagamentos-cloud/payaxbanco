@@ -41,17 +41,24 @@ test('certificado digital: leitura, validação e o formato antigo que o Node re
     assert.throws(() => cert.ler(Buffer.alloc(0), 'x'), /Envie o arquivo/);
   });
 
-  await t.test('FORMATO ANTIGO (RC2) é recusado DIZENDO O QUE FAZER', () => {
-    const c = criarCertificado({ legado: true });
-    try {
-      cert.ler(c.bytes, c.senha);
-      // Se o servidor estiver com o provedor legado ligado, ler funciona — e é um resultado válido.
-      assert.ok(true, 'o provedor legado do OpenSSL está ativo nesta máquina');
-    } catch (err) {
-      // Muitos A1 brasileiros vêm assim. O erro precisa ensinar a saída, não só constatar a falha.
-      assert.match(err.message, /cifra antiga/i);
-      assert.match(err.message, /openssl-legacy-provider/, 'oferece o caminho do servidor');
-      assert.match(err.message, /openssl pkcs12/, 'oferece o caminho da conversão do arquivo');
+  await t.test('FORMATO ANTIGO (RC2-40) ABRE — é o formato de muito A1 brasileiro', () => {
+    /*
+     * Este é o caso que o OpenSSL 3 recusa: ele moveu o RC2 para o provedor legado e o Node não o liga.
+     * O sistema abre o arquivo por conta própria (lib/fiscal/pkcs12.js + rc2.js), então o que antes era
+     * uma recusa com instruções de conversão hoje é só um certificado que funciona.
+     */
+    const c = criarCertificado({ legado: true, nome: 'PROVEDOR ANTIGO LTDA', cnpj: '11222333000181' });
+    const d = cert.ler(c.bytes, c.senha);
+    assert.equal(d.titular, 'PROVEDOR ANTIGO LTDA');
+    assert.equal(d.documento, '11222333000181');
+    assert.ok(d.valido_ate > d.valido_de);
+  });
+
+  await t.test('senha errada diz que é senha errada, em qualquer formato de arquivo', () => {
+    for (const legado of [false, true]) {
+      const c = criarCertificado({ legado });
+      assert.throws(() => cert.ler(c.bytes, 'senha-que-nao-e-a-dele'), /[Ss]enha do certificado incorreta/,
+        `formato ${legado ? 'antigo' : 'novo'}`);
     }
   });
 

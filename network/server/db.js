@@ -1821,6 +1821,223 @@ CREATE INDEX idx_convites_assinante ON assinante_convites(assinante_id, id DESC)
 ALTER TABLE chamados ADD COLUMN origem TEXT NOT NULL DEFAULT 'equipe';
 `,
   },
+  {
+    versao: 11,
+    nome: 'nfcom',
+    sql: `
+/*
+ * NFCom — Nota Fiscal Fatura de Serviço de Comunicação Eletrônica, modelo 62.
+ *
+ * É a nota fiscal do provedor de internet. Instituída pelo Ajuste SINIEF 7/22, substitui os modelos 21 e
+ * 22 em papel, e sem ela o provedor não fatura legalmente.
+ *
+ * Três escolhas de projeto, todas pelo mesmo motivo — nota fiscal é documento que, uma vez autorizado,
+ * não se corrige por UPDATE:
+ *
+ * 1. O XML é guardado como foi TRANSMITIDO, e o protocolo como foi RECEBIDO. Nada é remontado depois: o
+ *    que vale perante o Fisco são aqueles bytes, assinados. Remontar o XML a partir do banco produziria,
+ *    em qualquer mudança futura de código, um documento diferente do que foi assinado.
+ * 2. Os itens são copiados para nfcom_itens em vez de lidos da fatura. A fatura pode ser estornada,
+ *    cancelada ou recalculada; a nota não pode. Ela precisa saber o que foi dito ao Fisco naquele dia.
+ * 3. Cancelamento é EVENTO, com seu próprio XML e protocolo — nunca um DELETE nem uma troca de situação
+ *    sem lastro.
+ */
+
+/*
+ * Configuração fiscal da organização.
+ *
+ * "layout_validado" repete a lição do boleto: enquanto nenhuma nota tiver sido autorizada de verdade em
+ * homologação, toda emissão avisa que o leiaute nunca passou pelo validador da SEFAZ. O que está escrito
+ * aqui segue o MOC, mas manual lido não é nota aceita.
+ */
+CREATE TABLE fiscal_config (
+  organizacao_id INTEGER PRIMARY KEY REFERENCES organizacoes(id),
+  -- 1 = produção, 2 = homologação. Nasce em homologação: ninguém estreia em produção.
+  ambiente INTEGER NOT NULL DEFAULT 2 CHECK (ambiente IN (1, 2)),
+  serie INTEGER NOT NULL DEFAULT 1 CHECK (serie >= 0 AND serie <= 999),
+  proximo_numero INTEGER NOT NULL DEFAULT 1 CHECK (proximo_numero >= 1),
+  -- Regime tributário do emitente (CRT): 1 Simples, 2 Simples com excesso de sublimite, 3 normal, 4 MEI.
+  crt INTEGER NOT NULL DEFAULT 3 CHECK (crt IN (1, 2, 3, 4)),
+  -- Regime do IBS/CBS da Reforma Tributária (tpRegimeIBSCBS), quando exigido pelo CRT.
+  regime_ibscbs TEXT,
+  inscricao_estadual TEXT,
+  -- Onde a nota é autorizada: SVRS, ou MG, MS e MT, que autorizam por conta própria.
+  autorizador TEXT NOT NULL DEFAULT 'SVRS',
+  -- Site do autorizador que entra na chave de acesso (nSiteAutoriz). Zero quando há um site só.
+  site_autorizador INTEGER NOT NULL DEFAULT 0 CHECK (site_autorizador BETWEEN 0 AND 9),
+  -- Serviço prestado (tpServUtil). 4 = provimento de acesso à internet.
+  tp_serv_util INTEGER NOT NULL DEFAULT 4,
+  -- Responsável técnico pelo sistema emissor (gRespTec), exigido no leiaute.
+  resp_tec_cnpj TEXT,
+  resp_tec_contato TEXT,
+  resp_tec_email TEXT,
+  resp_tec_fone TEXT,
+  layout_validado INTEGER NOT NULL DEFAULT 0,
+  validado_em TEXT,
+  validado_por INTEGER REFERENCES usuarios(id),
+  -- Emitir a nota sozinho quando a fatura é emitida, ou só sob comando.
+  emissao_automatica INTEGER NOT NULL DEFAULT 0,
+  atualizado_em TEXT,
+  versao INTEGER NOT NULL DEFAULT 1
+);
+
+/*
+ * Regra fiscal por tipo de item da fatura.
+ *
+ * O sistema NÃO decide tributação sozinho. Ele traz uma sugestão a partir das tabelas oficiais, e a
+ * contabilidade do provedor confirma ou corrige — classificação de item e alíquota de ICMS dependem do
+ * estado, do benefício fiscal e de como o serviço foi contratado. Chutar aqui é emitir nota errada em
+ * silêncio, todo mês, para a carteira inteira.
+ */
+CREATE TABLE fiscal_regras (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  -- Mesmos valores de fatura_itens.origem, mais 'juros' e 'multa', que nascem na baixa.
+  origem TEXT NOT NULL,
+  cclass TEXT NOT NULL,
+  cfop TEXT NOT NULL,
+  u_med INTEGER NOT NULL DEFAULT 4,
+  cst_icms TEXT NOT NULL DEFAULT '00',
+  p_icms TEXT NOT NULL DEFAULT '0.00',
+  p_fcp TEXT,
+  p_red_bc TEXT,
+  cst_pis TEXT NOT NULL DEFAULT '01',
+  p_pis TEXT NOT NULL DEFAULT '0.00',
+  cst_cofins TEXT NOT NULL DEFAULT '01',
+  p_cofins TEXT NOT NULL DEFAULT '0.00',
+  p_fust TEXT,
+  p_funttel TEXT,
+  -- Reforma Tributária: classificação do IBS/CBS (tabela externa da RT).
+  cst_ibscbs TEXT,
+  cclass_trib TEXT,
+  conferida INTEGER NOT NULL DEFAULT 0,
+  conferida_em TEXT,
+  conferida_por INTEGER REFERENCES usuarios(id),
+  atualizado_em TEXT,
+  UNIQUE (organizacao_id, origem)
+);
+
+/*
+ * A nota.
+ *
+ * A chave de acesso é única na organização e é o que identifica a nota perante o Fisco. O par
+ * (serie, numero) também é único: número repetido na mesma série é rejeição certa, e é melhor o banco
+ * recusar do que a SEFAZ.
+ */
+CREATE TABLE nfcom (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  fatura_id INTEGER REFERENCES faturas(id),
+  assinante_id INTEGER NOT NULL REFERENCES assinantes(id),
+  contrato_id INTEGER REFERENCES contratos(id),
+  chave TEXT NOT NULL,
+  serie INTEGER NOT NULL,
+  numero INTEGER NOT NULL,
+  c_nf TEXT NOT NULL,
+  c_dv TEXT NOT NULL,
+  ambiente INTEGER NOT NULL CHECK (ambiente IN (1, 2)),
+  -- 1 normal, 2 contingência off-line.
+  tp_emis INTEGER NOT NULL DEFAULT 1 CHECK (tp_emis IN (1, 2)),
+  -- 0 normal, 3 substituição, 4 ajuste.
+  fin_nfcom INTEGER NOT NULL DEFAULT 0 CHECK (fin_nfcom IN (0, 3, 4)),
+  competencia TEXT,
+  vencimento TEXT,
+  emitida_em TEXT NOT NULL,
+  /*
+   * rascunho  → montada, ainda não assinada
+   * assinada  → XML pronto e assinado, ainda não transmitido
+   * enviando  → transmissão em curso (evita envio duplo)
+   * autorizada, rejeitada, denegada, cancelada
+   * contingencia → emitida off-line, aguardando transmissão
+   */
+  situacao TEXT NOT NULL DEFAULT 'rascunho'
+    CHECK (situacao IN ('rascunho','assinada','enviando','autorizada','rejeitada','denegada','cancelada','contingencia')),
+  valor_total_centavos INTEGER NOT NULL DEFAULT 0,
+  valor_icms_centavos INTEGER NOT NULL DEFAULT 0,
+  -- O XML como foi assinado e transmitido. É o documento; o resto desta tabela é índice.
+  xml TEXT,
+  -- O XML de retorno da SEFAZ, com o protocolo. Guardado inteiro, como veio.
+  xml_protocolo TEXT,
+  protocolo TEXT,
+  c_stat TEXT,
+  x_motivo TEXT,
+  autorizada_em TEXT,
+  -- Contingência: quando entrou e por quê (dhCont e xJust do leiaute).
+  contingencia_em TEXT,
+  contingencia_justificativa TEXT,
+  -- Substituição: a nota que esta substitui, e o motivo (motSub).
+  substitui_chave TEXT,
+  motivo_substituicao TEXT,
+  -- Aviso gravado na emissão quando o leiaute ainda não foi validado contra a SEFAZ.
+  aviso TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organizacao_id, chave),
+  UNIQUE (organizacao_id, serie, numero)
+);
+CREATE INDEX idx_nfcom_assinante ON nfcom(assinante_id, emitida_em DESC);
+CREATE INDEX idx_nfcom_situacao ON nfcom(organizacao_id, situacao, emitida_em DESC);
+CREATE INDEX idx_nfcom_fatura ON nfcom(fatura_id);
+CREATE INDEX idx_nfcom_competencia ON nfcom(organizacao_id, competencia);
+
+/* Os itens como foram declarados. Cópia de propósito: a fatura muda, a nota não. */
+CREATE TABLE nfcom_itens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nfcom_id INTEGER NOT NULL REFERENCES nfcom(id),
+  n_item INTEGER NOT NULL,
+  descricao TEXT NOT NULL,
+  origem TEXT NOT NULL,
+  cclass TEXT NOT NULL,
+  cfop TEXT,
+  u_med INTEGER NOT NULL,
+  quantidade TEXT NOT NULL,
+  valor_unitario_centavos INTEGER NOT NULL,
+  valor_centavos INTEGER NOT NULL,
+  -- Item de dedução (cClass começando em 5) subtrai do total em vez de somar.
+  deduz INTEGER NOT NULL DEFAULT 0,
+  cst_icms TEXT,
+  bc_icms_centavos INTEGER NOT NULL DEFAULT 0,
+  p_icms TEXT,
+  icms_centavos INTEGER NOT NULL DEFAULT 0,
+  pis_centavos INTEGER NOT NULL DEFAULT 0,
+  cofins_centavos INTEGER NOT NULL DEFAULT 0,
+  fust_centavos INTEGER NOT NULL DEFAULT 0,
+  funttel_centavos INTEGER NOT NULL DEFAULT 0,
+  ibs_centavos INTEGER NOT NULL DEFAULT 0,
+  cbs_centavos INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (nfcom_id, n_item)
+);
+CREATE INDEX idx_nfcom_itens ON nfcom_itens(nfcom_id);
+
+/*
+ * Eventos da nota. Hoje só o 110111 (cancelamento) é de autoria do emitente; os demais são gerados pelo
+ * Fisco e chegam pela consulta. A tabela aceita todos para que o que o Fisco disser fique guardado.
+ */
+CREATE TABLE nfcom_eventos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  nfcom_id INTEGER REFERENCES nfcom(id),
+  chave TEXT NOT NULL,
+  tipo TEXT NOT NULL,
+  descricao TEXT,
+  sequencia INTEGER NOT NULL DEFAULT 1,
+  justificativa TEXT,
+  xml TEXT,
+  xml_retorno TEXT,
+  protocolo TEXT,
+  c_stat TEXT,
+  x_motivo TEXT,
+  situacao TEXT NOT NULL DEFAULT 'pendente' CHECK (situacao IN ('pendente','registrado','rejeitado')),
+  registrado_em TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, chave, tipo, sequencia)
+);
+CREATE INDEX idx_nfcom_eventos ON nfcom_eventos(nfcom_id, criado_em DESC);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();
