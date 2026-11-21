@@ -2075,6 +2075,23 @@ ALTER TABLE assinantes ADD COLUMN codigo_municipio TEXT;
 ALTER TABLE contratos ADD COLUMN codigo_municipio TEXT;
 `,
   },
+  {
+    versao: 13,
+    nome: 'enderecos_sefaz',
+    sql: `
+/*
+ * Endereços próprios dos serviços da SEFAZ.
+ *
+ * MG, MS e MT autorizam a NFCom por conta própria, e os endereços deles não constam das fontes oficiais
+ * que este sistema leu. Em vez de inventar uma URL — que mandaria a nota para lugar nenhum —, o provedor
+ * informa aqui o endereço que a SEFAZ do estado dele publicou.
+ *
+ * Guardado como JSON com as chaves recepcao, consulta, evento e status. Em branco, valem os endereços
+ * conhecidos da SVRS.
+ */
+ALTER TABLE fiscal_config ADD COLUMN urls TEXT;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

@@ -10,6 +10,7 @@ const certificado = require('../lib/certificado');
 const t = require('../lib/fiscal/tabelas');
 const nfcom = require('../lib/fiscal/nfcom');
 const emissao = require('../lib/fiscal/emissao');
+const transmissao = require('../lib/fiscal/transmissao');
 const v = require('../lib/validacao');
 
 /*
@@ -22,6 +23,21 @@ const v = require('../lib/validacao');
  * 2. A prévia não consome número de nota. Ver o XML, os tributos e o total antes de emitir é o que
  *    separa um erro de configuração corrigido em dois minutos de uma nota fiscal errada no mundo.
  */
+
+/** Valida os endereços informados: só https, e só os quatro serviços que existem. */
+function urlsDeServico(valor) {
+  if (!valor || (typeof valor === 'object' && !Object.keys(valor).length)) return null;
+  const fora = {};
+  for (const [servico, url] of Object.entries(valor)) {
+    v.opcao(servico, 'o serviço', ['recepcao', 'consulta', 'evento', 'status']);
+    if (!url) continue;
+    let alvo;
+    try { alvo = new URL(String(url)); } catch { throw new ErroNegocio(`Endereço inválido para "${servico}".`, 422); }
+    if (alvo.protocol !== 'https:') throw new ErroNegocio(`O endereço de "${servico}" precisa ser https.`, 422);
+    fora[servico] = alvo.toString();
+  }
+  return Object.keys(fora).length ? JSON.stringify(fora) : null;
+}
 
 const SITUACOES = ['rascunho', 'assinada', 'enviando', 'autorizada', 'rejeitada', 'denegada', 'cancelada', 'contingencia'];
 
@@ -61,6 +77,12 @@ module.exports = (db) => {
       resp_tec_email: b.resp_tec_email !== undefined ? v.opcional(b.resp_tec_email, 'o e-mail do responsável técnico', 60) : antes.resp_tec_email,
       resp_tec_fone: b.resp_tec_fone !== undefined ? v.opcional(b.resp_tec_fone, 'o telefone do responsável técnico', 20) : antes.resp_tec_fone,
       emissao_automatica: b.emissao_automatica !== undefined ? (v.booleano(b.emissao_automatica) ? 1 : 0) : antes.emissao_automatica,
+      /*
+       * Endereços próprios dos serviços. Existem para as UFs que autorizam por conta própria e cujos
+       * endereços este sistema não conhece: é melhor o provedor informar o que a SEFAZ dele publicou do
+       * que o sistema inventar uma URL. Só HTTPS: documento fiscal não trafega em claro.
+       */
+      urls: b.urls !== undefined ? urlsDeServico(b.urls) : antes.urls,
     };
 
     /*
@@ -75,10 +97,10 @@ module.exports = (db) => {
 
     db.prepare(`UPDATE fiscal_config SET ambiente = ?, serie = ?, crt = ?, regime_ibscbs = ?, inscricao_estadual = ?,
       autorizador = ?, site_autorizador = ?, tp_serv_util = ?, resp_tec_cnpj = ?, resp_tec_contato = ?, resp_tec_email = ?,
-      resp_tec_fone = ?, emissao_automatica = ?, atualizado_em = ?, versao = versao + 1 WHERE organizacao_id = ?`)
+      resp_tec_fone = ?, emissao_automatica = ?, urls = ?, atualizado_em = ?, versao = versao + 1 WHERE organizacao_id = ?`)
       .run(d.ambiente, d.serie, d.crt, d.regime_ibscbs, d.inscricao_estadual, d.autorizador, d.site_autorizador,
         d.tp_serv_util, d.resp_tec_cnpj, d.resp_tec_contato, d.resp_tec_email, d.resp_tec_fone, d.emissao_automatica,
-        agora(), req.org);
+        d.urls, agora(), req.org);
     registrar(db, req, 'fiscal_config_alterada', { recurso: 'fiscal', recursoId: req.org, antes, depois: d });
     res.json(publico(config(req)));
   });
@@ -210,6 +232,31 @@ module.exports = (db) => {
     const nota = emissao.emitir(db, req.org, faturaId, { usuarioId: req.usuario.id, contingencia });
     registrar(db, req, 'nfcom_emitida', { recurso: 'nfcom', recursoId: nota.id, depois: { chave: nota.chave, numero: nota.numero, total: nota.valor_total_centavos } });
     res.status(201).json(nota);
+  });
+
+  /* ---------------- SEFAZ ---------------- */
+
+  /** Teste de conexão. É a primeira coisa a fazer depois de instalar o certificado. */
+  r.post('/sefaz/testar', exigir('fiscal.ver'), async (req, res) => {
+    res.json(await transmissao.testar(db, req.org));
+  });
+
+  r.post('/nfcom/:id/transmitir', exigir('fiscal.emitir'), async (req, res) => {
+    const nota = await transmissao.transmitir(db, req.org, Number(req.params.id), { usuarioId: req.usuario.id });
+    registrar(db, req, 'nfcom_transmitida', { recurso: 'nfcom', recursoId: nota.id, depois: { situacao: nota.situacao, c_stat: nota.c_stat, protocolo: nota.protocolo } });
+    res.json(nota);
+  });
+
+  /** Pergunta à SEFAZ o que ela sabe. É como se resolve uma nota presa em "enviando". */
+  r.post('/nfcom/:id/consultar', exigir('fiscal.ver'), async (req, res) => {
+    res.json(await transmissao.consultar(db, req.org, Number(req.params.id)));
+  });
+
+  r.post('/nfcom/:id/cancelar', exigir('fiscal.cancelar'), async (req, res) => {
+    const justificativa = v.texto(req.body?.justificativa, 'a justificativa', 255);
+    const r2 = await transmissao.cancelar(db, req.org, Number(req.params.id), { justificativa, usuarioId: req.usuario.id });
+    registrar(db, req, 'nfcom_cancelada', { recurso: 'nfcom', recursoId: Number(req.params.id), depois: { cancelada: r2.cancelada, c_stat: r2.c_stat, justificativa } });
+    res.json(r2);
   });
 
   return r;
