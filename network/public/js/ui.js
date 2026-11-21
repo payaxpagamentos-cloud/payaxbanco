@@ -1,7 +1,7 @@
 /** Componentes e formatação comuns. Texto vindo do servidor entra sempre como texto, nunca como HTML. */
 import { sessao } from './api.js';
 
-// Ícones de traço (24×24) da referência visual do Manager Network.
+// Ícones de traço (24×24) da referência visual do Manager Provedor.
 const ICONES = {
   painel: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   atividade: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',

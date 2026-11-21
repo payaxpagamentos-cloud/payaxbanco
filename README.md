@@ -7,7 +7,7 @@ usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 >
 > E o **PABX** (pasta [`pabx/`](pabx/README.md), publicado em `/pabx`): painel do master e das empresas para ramais, chamadas, campanhas, números entrantes, terminação e integração com a central telefônica, com servidor próprio.
 >
-> E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): ERP para provedores de internet — assinantes, contratos, planos, faturamento com pró-rata e ciclo mensal simulável, régua de cobrança com bloqueio e desbloqueio de confiança, provisionamento por camada de drivers (corte e religação no equipamento), consulta de CNPJ e CEP, rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
+> E o **Manager Provedor** (pasta [`network/`](network/README.md), publicado em `/network`): ERP para provedores de internet — assinantes, contratos, planos, faturamento com pró-rata e ciclo mensal simulável, régua de cobrança com bloqueio e desbloqueio de confiança, provisionamento por camada de drivers (corte e religação no equipamento), consulta de CNPJ e CEP, rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
 
 ## Módulos
 

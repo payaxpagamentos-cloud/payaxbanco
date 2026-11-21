@@ -1,4 +1,4 @@
-# Manager Network
+# Manager Provedor
 
 ERP para provedores de internet: **assinantes, contratos, faturamento e cobrança** ao lado de **rede óptica, Central NOC,
 chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento**. Publicado em `/network`, com
@@ -64,7 +64,7 @@ npm start          # http://localhost:3500/  (com NETWORK_BASE_PATH=/network →
 npm test           # 165 testes de aceite (inclui o rastreador real, se rastreador/node_modules existir)
 ```
 
-Acesso inicial: `admin@managernetwork.local` / `admin12345` (defina `NETWORK_ADMIN_EMAIL` e `NETWORK_ADMIN_SENHA`; em produção a senha é obrigatória).
+Acesso inicial: `admin@managerprovedor.local` / `admin12345` (defina `NETWORK_ADMIN_EMAIL` e `NETWORK_ADMIN_SENHA`; em produção a senha é obrigatória).
 O primeiro start cria a organização (`NETWORK_ORGANIZACAO`) **vazia**: os cadastros reais começam do zero.
 
 ### Ambiente demonstrativo (opcional)
@@ -75,7 +75,7 @@ npm run demo       # cria a organização "Provedor Demonstração", separada e 
 
 Dados fictícios (pessoas, placas, endereços, medições, valores de comissão, carteira de assinantes com três meses faturados, faturas pagas e vencidas, cortes feitos pela régua e um desbloqueio de confiança), criados pela própria API. A interface mostra o
 selo **Ambiente demonstrativo** só nessa organização. Acessos com a senha `demo12345`: `demo@`, `gestor.demo@`, `noc.demo@`,
-`frota.demo@`, `lucas.demo@` (técnico), `comissoes.demo@`, `financeiro.demo@` e `tv.demo@managernetwork.local`. O script recusa rodar com
+`frota.demo@`, `lucas.demo@` (técnico), `comissoes.demo@`, `financeiro.demo@` e `tv.demo@managerprovedor.local`. O script recusa rodar com
 `NODE_ENV=production`; use um banco separado. Rastreador e Downdetector ficam não configurados.
 
 ## Configuração

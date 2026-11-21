@@ -5,7 +5,7 @@
  * "Ambiente demonstrativo"), com pessoas, placas, endereços, valores e medições FICTÍCIOS. Não toca nas outras organizações.
  * Os dados entram pela própria API (com as mesmas validações da operação). Recusa rodar em produção sem NETWORK_PERMITIR_DEMO=1.
  *
- *   npm run demo            → acessos: demo@managernetwork.local (e os demais perfis) / senha demo12345
+ *   npm run demo            → acessos: demo@managerprovedor.local (e os demais perfis) / senha demo12345
  */
 
 const config = require('./config');
@@ -23,8 +23,8 @@ const cob = require('./lib/cobranca');
 
 const SENHA = 'demo12345';
 const db = abrir();
-if (db.prepare("SELECT 1 FROM usuarios WHERE email = 'demo@managernetwork.local'").get()) {
-  console.log('A organização demonstrativa já existe (demo@managernetwork.local).');
+if (db.prepare("SELECT 1 FROM usuarios WHERE email = 'demo@managerprovedor.local'").get()) {
+  console.log('A organização demonstrativa já existe (demo@managerprovedor.local).');
   process.exit(0);
 }
 const org = criarOrganizacao(db, { nome: 'Provedor Demonstração', demonstracao: true });
@@ -36,7 +36,7 @@ const NOMES = { demo: 'Adriano Almeida', 'gestor.demo': 'Gestão Operacional', '
 const ids = {};
 for (const [k, perfil] of Object.entries(PERFIS)) {
   ids[k] = Number(db.prepare('INSERT INTO usuarios (organizacao_id, nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(org, NOMES[k], `${k}@managernetwork.local`, hashSenha(SENHA), perfil, agora()).lastInsertRowid);
+    .run(org, NOMES[k], `${k}@managerprovedor.local`, hashSenha(SENHA), perfil, agora()).lastInsertRowid);
 }
 
 const servidor = criarApp(db).listen(0, async () => {
@@ -44,7 +44,7 @@ const servidor = criarApp(db).listen(0, async () => {
   const tokens = {};
   const req = async (quem, metodo, caminho, corpo) => {
     tokens[quem] ??= (await (await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: `${quem}@managernetwork.local`, senha: SENHA }) })).json()).token;
+      body: JSON.stringify({ email: `${quem}@managerprovedor.local`, senha: SENHA }) })).json()).token;
     const r = await fetch(base + caminho, { method: metodo, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokens[quem]}` }, body: corpo ? JSON.stringify(corpo) : undefined });
     const d = await r.json().catch(() => null);
     if (!r.ok) throw new Error(`${metodo} ${caminho}: ${r.status} ${JSON.stringify(d)}`);
@@ -291,7 +291,7 @@ const servidor = criarApp(db).listen(0, async () => {
     console.log(`Provisionamento: ${provisionados} serviço(s) no concentrador BRAS-PG-01 (sem acesso de gerência: nenhum equipamento real foi inventado).`);
 
     console.log('Organização demonstrativa criada. Acessos (senha demo12345):');
-    for (const [k, p] of Object.entries(PERFIS)) console.log(`  ${k}@managernetwork.local  (${p})`);
+    for (const [k, p] of Object.entries(PERFIS)) console.log(`  ${k}@managerprovedor.local  (${p})`);
     console.log('Rastreador e Downdetector ficam não configurados: não há conexão real inventada.');
   } catch (err) {
     console.error('Falha ao criar a demonstração:', err.message);

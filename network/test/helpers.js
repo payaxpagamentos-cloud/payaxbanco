@@ -39,7 +39,7 @@ async function iniciar() {
     try { dados = JSON.parse(texto); } catch { /* csv / vazio */ }
     return { status: resp.status, dados, headers: resp.headers };
   }
-  async function login(email = 'admin@managernetwork.local', senha = 'admin12345') {
+  async function login(email = 'admin@managerprovedor.local', senha = 'admin12345') {
     const r = await req('POST', '/auth/login', { email, senha });
     if (r.status !== 200) throw new Error(`Login falhou para ${email}: ${JSON.stringify(r.dados)}`);
     return r.dados.token;

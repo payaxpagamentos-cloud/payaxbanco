@@ -10,7 +10,7 @@ test('fundação: acesso, perfis, isolamento, idempotência, anexos e auditoria'
   const tk = await api.equipe();
 
   await t.test('login e permissões devolvidas pelo servidor', async () => {
-    assert.equal((await api.post('/auth/login', { email: 'admin@managernetwork.local', senha: 'errada' })).status, 401);
+    assert.equal((await api.post('/auth/login', { email: 'admin@managerprovedor.local', senha: 'errada' })).status, 401);
     assert.equal((await api.get('/frota/veiculos')).status, 401);
     const me = (await api.get('/auth/me', tk.tecnico)).dados.usuario;
     assert.equal(me.perfil, 'tecnico');

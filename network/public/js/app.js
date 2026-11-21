@@ -82,7 +82,7 @@ function estrutura(rota, principal) {
     if (abrir) menu.querySelector('a')?.focus();
   };
   menu.append(
-    el('a', { class: 'marca', href: '#/visao' }, simbolo(), el('span', { class: 'marca-texto' }, 'manager', el('small', {}, 'NETWORK'))),
+    el('a', { class: 'marca', href: '#/visao' }, simbolo(), el('span', { class: 'marca-texto' }, 'manager', el('small', {}, 'PROVEDOR'))),
     el('div', { class: 'contexto' }, el('span', { class: 'logo' }, iniciais(u.organizacao_nome)), el('div', {}, el('strong', {}, u.organizacao_nome), el('small', {}, u.perfil_nome))),
   );
   for (const [grupo, itens] of MENU) {
@@ -168,8 +168,8 @@ function telaEntrada() {
   const rede = icone('rede', 'rede');
   rede.setAttribute('stroke-width', '0.6');
   limpar(raiz, el('div', { class: 'entrada' },
-    el('section', { class: 'entrada-marca' }, el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'manager', el('small', {}, 'NETWORK'))),
-      el('div', {}, el('h1', {}, 'Rede, equipes e veículos sob a mesma visão.'), el('p', {}, 'Rede óptica, Central NOC, chamados técnicos, comissões, frota e rastreamento para provedores de internet.')),
+    el('section', { class: 'entrada-marca' }, el('div', { class: 'marca' }, simbolo(), el('span', { class: 'marca-texto' }, 'manager', el('small', {}, 'PROVEDOR'))),
+      el('div', {}, el('h1', {}, 'O provedor inteiro sob a mesma visão.'), el('p', {}, 'Assinantes, contratos, faturamento e cobrança ao lado do provisionamento, da rede óptica, da Central NOC, dos chamados técnicos, das comissões e da frota.')),
       el('small', { style: 'color:#8fa996' }, 'Os dados exibidos vêm das fontes conectadas, com horário de coleta.'), rede),
     el('section', { class: 'entrada-form' }, form)));
   email.focus();

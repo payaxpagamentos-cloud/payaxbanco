@@ -249,7 +249,7 @@ test('rastreador real: vínculo pelo IMEI, deduplicação, ordem e campos ausent
   const rid = (await rq('GET', '/master/rastreadores', null, master)).find((x) => x.imei === 'gw-0001').id;
   const cliente = (await rq('POST', '/auth/login', { email: 'g@p.com', senha: 'senha-gestor-1' })).token;
   await rq('POST', `/empresas/${emp.id}/veiculos`, { placa: 'FRT2A41', descricao: 'Strada', rastreador_id: rid }, cliente);
-  const chave = (await rq('POST', `/empresas/${emp.id}/chaves`, { nome: 'Manager Network' }, cliente)).chave;
+  const chave = (await rq('POST', `/empresas/${emp.id}/chaves`, { nome: 'Manager Provedor' }, cliente)).chave;
   const pos = (lat, em, extra = {}) => rq('POST', '/integracao/posicoes', [{ imei: 'gw-0001', lat, lng: -46.43, velocidade_kmh: 0, gps_em: em, ...extra }], null, { 'X-Api-Key': chave });
   await pos(-24.01, min(-3));
 

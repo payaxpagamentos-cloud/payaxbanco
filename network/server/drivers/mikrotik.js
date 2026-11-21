@@ -39,7 +39,7 @@ function camposDoSecret(servico, desejado) {
   const campos = {
     name: desejado.login,
     service: 'pppoe',
-    comment: `Manager Network · contrato ${desejado.contrato_numero}`,
+    comment: `Manager Provedor · contrato ${desejado.contrato_numero}`,
     disabled: desejado.situacao === 'cortado' ? 'true' : 'false',
   };
   if (desejado.senha) campos.password = desejado.senha;

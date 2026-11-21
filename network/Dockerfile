@@ -1,4 +1,4 @@
-# Manager Network — imagem de produção
+# Manager Provedor — imagem de produção
 ARG BASE=node:22-slim
 FROM ${BASE}
 

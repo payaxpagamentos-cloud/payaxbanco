@@ -2,7 +2,7 @@
 
 /*
  * Agente de coleta de exemplo para rodar DENTRO da rede do provedor (não exponha equipamentos à internet).
- * Testa conexão TCP em cada alvo e envia ao Manager Network:
+ * Testa conexão TCP em cada alvo e envia ao Manager Provedor:
  *   disponibilidade = 1 (respondeu) ou 0 (não respondeu), e latencia_ms quando responde.
  * Uso:
  *   NETWORK_URL=https://seu-dominio/network NETWORK_COLETOR_TOKEN=mnc_... \
@@ -50,7 +50,7 @@ async function ciclo() {
     const d = await r.json().catch(() => ({}));
     console.log(new Date().toISOString(), r.status, `gravadas: ${d.recebidas ?? 0}/${amostras.length}`, d.erro ?? '');
   } catch (err) {
-    // Sem conexão com o Manager Network: a próxima rodada tenta de novo (as amostras desta rodada se perdem; use uma fila se precisar).
+    // Sem conexão com o Manager Provedor: a próxima rodada tenta de novo (as amostras desta rodada se perdem; use uma fila se precisar).
     console.error(new Date().toISOString(), 'falha ao enviar:', err.message);
   }
 }

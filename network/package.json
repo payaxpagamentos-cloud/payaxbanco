@@ -1,7 +1,7 @@
 {
-  "name": "manager-network",
+  "name": "manager-provedor",
   "version": "1.0.0",
-  "description": "Manager Network — rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet.",
+  "description": "Manager Provedor — rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet.",
   "main": "server/index.js",
   "private": true,
   "type": "commonjs",

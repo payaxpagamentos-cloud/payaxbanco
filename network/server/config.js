@@ -68,7 +68,7 @@ module.exports = {
   admin: {
     organizacao: process.env.NETWORK_ORGANIZACAO || 'Minha operação',
     nome: process.env.NETWORK_ADMIN_NOME || 'Administrador',
-    email: process.env.NETWORK_ADMIN_EMAIL || 'admin@managernetwork.local',
+    email: process.env.NETWORK_ADMIN_EMAIL || 'admin@managerprovedor.local',
     senha: process.env.NETWORK_ADMIN_SENHA || 'admin12345',
   },
 };
