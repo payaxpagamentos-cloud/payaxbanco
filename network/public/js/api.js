@@ -66,6 +66,17 @@ export async function abrirAnexo(id) {
   window.open(`${BASE}${l.url}`, '_blank', 'noopener');
 }
 
+/** Download de um recurso que precisa de corpo (a área desenhada não cabe numa query string). */
+export async function baixarPost(caminho, corpo, nome) {
+  const resp = await chamar('POST', caminho, corpo, { bruto: true });
+  const url = URL.createObjectURL(await resp.blob());
+  const a = Object.assign(document.createElement('a'), { href: url, download: nome });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export async function baixar(caminho, nome) {
   const resp = await chamar('GET', caminho, undefined, { bruto: true, idempotente: false });
   const url = URL.createObjectURL(await resp.blob());

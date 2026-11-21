@@ -1521,6 +1521,60 @@ CREATE TABLE retornos (
 CREATE INDEX idx_retornos ON retornos(organizacao_id, id DESC);
 `,
   },
+  {
+    versao: 7,
+    nome: 'conexao_assinante',
+    sql: `
+/*
+ * Estado de conexão do serviço: o que o mapa pinta de verde ou vermelho.
+ *
+ * O dado NÃO é inventado nem inferido: vem da leitura do concentrador (tarefa "ler" do provisionamento),
+ * que devolve se existe sessão ativa para aquele login. Por isso guardamos junto QUANDO foi lido — uma
+ * leitura de três dias atrás não é "está conectado agora", e a tela diz isso em vez de pintar verde.
+ *
+ * conectado:    1 sessão ativa na última leitura, 0 sem sessão, NULL nunca lido.
+ * conexao_em:   instante da leitura que produziu esse valor.
+ * desde:        desde quando está nesse estado (início da sessão atual, ou início da queda).
+ * quedas_hoje:  quantas vezes caiu no dia corrente da organização, zerado na virada.
+ */
+ALTER TABLE servicos ADD COLUMN conectado INTEGER CHECK (conectado IS NULL OR conectado IN (0,1));
+ALTER TABLE servicos ADD COLUMN conexao_em TEXT;
+ALTER TABLE servicos ADD COLUMN conexao_desde TEXT;
+ALTER TABLE servicos ADD COLUMN conexao_ip TEXT;
+ALTER TABLE servicos ADD COLUMN quedas_hoje INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE servicos ADD COLUMN quedas_dia TEXT;
+CREATE INDEX idx_servicos_conexao ON servicos(organizacao_id, conectado);
+
+-- De quantos em quantos minutos varrer as sessões dos concentradores. Zero desliga a varredura.
+ALTER TABLE organizacoes ADD COLUMN sessoes_minutos INTEGER NOT NULL DEFAULT 5;
+
+/*
+ * Histórico de conexão: guarda TRANSIÇÕES, não leituras.
+ *
+ * Gravar toda leitura encheria o banco com o óbvio (um assinante conectado lido de 20 em 20 segundos).
+ * O que interessa é quando MUDOU: caiu às 14h02, voltou às 14h19. Disso sai o tempo fora do ar, a
+ * contagem de quedas do dia e o mapa de calor — sem nenhuma estimativa.
+ */
+CREATE TABLE conexao_eventos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  servico_id INTEGER NOT NULL REFERENCES servicos(id),
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id),
+  -- 'caiu' (tinha sessão, não tem mais), 'voltou', 'primeira_leitura'.
+  evento TEXT NOT NULL CHECK (evento IN ('caiu','voltou','primeira_leitura')),
+  conectado INTEGER NOT NULL CHECK (conectado IN (0,1)),
+  -- Quanto tempo durou o estado ANTERIOR: num 'voltou', é o tempo que o assinante ficou sem internet.
+  duracao_s INTEGER CHECK (duracao_s IS NULL OR duracao_s >= 0),
+  ip TEXT,
+  -- Posição do contrato no momento do evento, copiada para o mapa de calor não depender de o endereço mudar depois.
+  lat REAL,
+  lng REAL,
+  em TEXT NOT NULL
+);
+CREATE INDEX idx_conexao_eventos_periodo ON conexao_eventos(organizacao_id, em);
+CREATE INDEX idx_conexao_eventos_servico ON conexao_eventos(servico_id, id DESC);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

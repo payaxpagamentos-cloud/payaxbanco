@@ -510,7 +510,8 @@ input.preenchido, select.preenchido, textarea.preenchido { border-color: var(--v
 .lista-aviso { margin: 0; padding-left: 16px; color: var(--texto-2); font-size: 12.5px; }
 .lista-aviso li + li { margin-top: 3px; }
 .tabela .acoes-celula { text-align: right; white-space: nowrap; }
-.stats.compactas { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+/* auto-fit: os mesmos indicadores servem na janela larga e na coluna estreita ao lado do mapa. */
+.stats.compactas { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; margin: 14px 0; }
 .stats.compactas .stat { padding: 12px 14px; }
 .stats.compactas .valor { font-size: 22px; }
 /* As linhas cruas do retorno: largura fixa importa para conferir posição de campo. */
@@ -520,6 +521,57 @@ pre.bruto {
   white-space: pre; border-radius: var(--raio-ctl); border: 1px solid var(--borda); background: var(--fundo); color: var(--texto-2);
 }
 .modal-rodape { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--borda); }
+
+
+/* ---------------- Panorama ---------------- */
+/* Classe própria: redefinir ".mapa" mudaria a altura dos mapas da Visão geral e da Rede óptica. */
+.mapa-panorama { height: 520px; }
+/*
+ * A casinha do assinante. A cor responde "o que eu faço com isso?":
+ * verde nada, vermelho é defeito agora, âmbar é corte por inadimplência (não chame técnico),
+ * roxo é falta de provisionamento, azul ainda não entrou no ar, cinza o sistema não sabe.
+ */
+.casa {
+  width: 26px; height: 26px; border-radius: 7px 7px 5px 5px; display: grid; place-items: center;
+  background: #fff; border: 2px solid #b9c3b2; color: #9aa691; box-shadow: 0 2px 6px rgba(0, 0, 0, .28);
+}
+.casa.conectado { border-color: var(--verde); color: var(--verde); }
+.casa.sem_conexao { border-color: var(--vermelho-vivo); color: var(--vermelho-vivo); animation: pulso 2.2s ease-out infinite; }
+.casa.bloqueado { border-color: var(--laranja-vivo); color: var(--laranja-vivo); }
+.casa.desconhecido { border-color: #8a6fb0; color: #8a6fb0; }
+.casa.sem_servico { border-color: #8a6fb0; color: #8a6fb0; border-style: dashed; }
+.casa.implantacao { border-color: #4a7fb5; color: #4a7fb5; }
+.casa.suspenso { border-color: #b9c3b2; color: #9aa691; }
+/* Sem leitura recente: contorno tracejado, porque é literalmente um dado incerto. */
+.casa.leitura_antiga, .casa.nunca_lido { border-style: dashed; }
+.pino.chamado { border-color: var(--laranja-vivo); color: var(--laranja-vivo); border-radius: 50% 50% 50% 2px; }
+.pino.chamado::after { display: none; }
+.pino.chamado.critica, .pino.chamado.alta { border-color: var(--vermelho-vivo); color: var(--vermelho-vivo); }
+
+.leaflet-container.desenhando { cursor: crosshair; }
+.celula-calor { cursor: pointer; }
+
+.painel-mapa { position: relative; }
+.legenda-mapa { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: 12.5px; color: var(--texto-2); }
+.legenda-mapa span { display: inline-flex; align-items: center; gap: 6px; }
+.legenda-mapa i { width: 12px; height: 12px; border-radius: 3px; border: 2px solid currentColor; background: #fff; flex: none; }
+.legenda-mapa .conectado { color: var(--verde); }
+.legenda-mapa .sem_conexao { color: var(--vermelho-vivo); }
+.legenda-mapa .bloqueado { color: var(--laranja-vivo); }
+.legenda-mapa .desconhecido { color: #8a6fb0; }
+.legenda-mapa .implantacao { color: #4a7fb5; }
+.legenda-mapa .nunca_lido { color: #9aa691; }
+.legenda-mapa .nunca_lido i { border-style: dashed; }
+
+.camadas-mapa { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 12px; }
+.camadas-mapa label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+/* Sobreposta ao mapa, não acima dele: o mapa não pode sair do lugar quando a barra aparece. */
+.barra-desenho:not(:empty) {
+  position: absolute; z-index: 500; left: 12px; right: 12px; top: 12px;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 12px;
+  border-radius: var(--raio-ctl); border: 1px solid var(--verde); background: var(--painel);
+  box-shadow: var(--sombra); font-size: 13px;
+}
 @media (max-width: 860px) {
-  .stats.compactas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mapa-panorama { height: 360px; }
 }

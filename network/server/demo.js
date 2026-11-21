@@ -225,12 +225,25 @@ const servidor = criarApp(db).listen(0, async () => {
     ];
     const carteira = [];
     for (const [nome, documento, tipo, telefone, bairro, rua, numero, plano, venc, ativacao, destino] of CARTEIRA) {
+      const cto = ctos[carteira.length % ctos.length];
+      /*
+       * Endereço do assinante perto da caixa que o atende, que é como fica no mundo real: a casinha do mapa
+       * cai a uma quadra da CTO, não em cima dela. O desvio é determinístico para a demonstração ser sempre
+       * igual. Dois contratos ficam DE PROPÓSITO sem coordenada, para a aba "Fora do mapa" ter o que mostrar
+       * — todo provedor tem cadastro assim, e o mapa não pode escondê-los.
+       */
+      const i = carteira.length;
+      const semCoordenada = i === 6 || i === 7;
+      const ponto = semCoordenada ? {} : {
+        latitude: Number((cto.lat + ((i % 3) - 1) * 0.0011 + (i % 2 ? 0.0004 : -0.0004)).toFixed(6)),
+        longitude: Number((cto.lng + ((i % 4) - 1.5) * 0.0013).toFixed(6)),
+      };
       const a = await fin('/assinantes', { tipo, nome, documento, telefone, email: `${nome.split(' ')[0].toLowerCase()}@exemplo.com`,
-        cep: '11701000', logradouro: rua, numero, bairro, cidade: 'Praia Grande', uf: 'SP', consentimento: true });
+        cep: '11701000', logradouro: rua, numero, bairro, cidade: 'Praia Grande', uf: 'SP', consentimento: true, ...ponto });
       // Uma porta livre por contrato: a reserva acompanha o contrato mesmo antes de o serviço ser ativado.
       const portaId = livres[carteira.length]?.id;
       const c = await fin('/contratos', { assinante_id: a.id, plano_id: planos[plano].id, dia_vencimento: venc,
-        cto_id: ctos[carteira.length % ctos.length].id, porta_id: portaId });
+        cto_id: cto.id, porta_id: portaId, ...ponto });
       if (ativacao) await fin(`/contratos/${c.id}/ativar`, { ativacao, porta_id: portaId });
       carteira.push({ assinante: a, contrato: c, destino, plano });
     }
@@ -373,6 +386,48 @@ const servidor = criarApp(db).listen(0, async () => {
       aparelhos += 1;
     }
 
+    /*
+     * Estado de conexão da demonstração.
+     *
+     * Em produção isto NUNCA é escrito à mão: vem da varredura das sessões do concentrador. Aqui o
+     * concentrador é de mentira e não há equipamento para varrer, então as leituras são gravadas como se a
+     * varredura tivesse acabado de rodar — e o console diz isso, para ninguém confundir demonstração com medição.
+     *
+     * A carteira fica com um de cada caso que o mapa precisa saber distinguir: no ar, caído, cortado por
+     * inadimplência, nunca lido e leitura velha.
+     */
+    const agoraIso = new Date().toISOString();
+    const horasAtras = (h) => new Date(Date.now() - h * 3600_000).toISOString();
+    const ESTADOS_DEMO = [
+      // [índice na carteira, conectado, há quantas horas foi lido, quedas hoje]
+      [0, 1, 0.05, 0], [1, 0, 0.05, 2], [2, 1, 0.05, 1], [3, 0, 0.05, 0], [4, 1, 0.05, 0], [5, 1, 30, 0],
+    ];
+    let comLeitura = 0;
+    for (const [i, conectado, horas, quedas] of ESTADOS_DEMO) {
+      const alvo = carteira[i];
+      const servico = alvo && db.prepare('SELECT * FROM servicos WHERE contrato_id = ?').get(alvo.contrato.id);
+      if (!servico) continue;
+      const lido = horasAtras(horas);
+      db.prepare(`UPDATE servicos SET conectado = ?, conexao_em = ?, conexao_desde = ?, conexao_ip = ?,
+        quedas_hoje = ?, quedas_dia = ?, estado_real = ?, lido_em = ? WHERE id = ?`)
+        .run(conectado, lido, horasAtras(horas + 3), conectado ? `100.64.0.${10 + i}` : null, quedas, HOJE,
+          JSON.stringify({ presente: true, login: servico.login, situacao: 'liberado', conectado: Boolean(conectado) }), lido, servico.id);
+      comLeitura += 1;
+      // Quedas das últimas horas, para o histórico e o mapa de calor terem o que mostrar.
+      for (let q = 0; q < quedas; q++) {
+        const caiuEm = horasAtras(horas + 2 + q * 5);
+        const voltouEm = horasAtras(horas + 2 + q * 5 - 0.4);
+        const posicao = db.prepare('SELECT latitude, longitude FROM contratos WHERE id = ?').get(alvo.contrato.id);
+        const gravar = db.prepare(`INSERT INTO conexao_eventos (organizacao_id, servico_id, contrato_id, evento, conectado, duracao_s, ip, lat, lng, em)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        gravar.run(org, servico.id, alvo.contrato.id, 'caiu', 0, 3600 * 6, null, posicao?.latitude ?? null, posicao?.longitude ?? null, caiuEm);
+        gravar.run(org, servico.id, alvo.contrato.id, 'voltou', 1, 1440, `100.64.0.${10 + i}`, posicao?.latitude ?? null, posicao?.longitude ?? null, voltouEm);
+      }
+    }
+    const semMapa = db.prepare(`SELECT COUNT(*) AS n FROM contratos c JOIN assinantes a ON a.id = c.assinante_id
+      WHERE c.organizacao_id = ? AND c.situacao <> 'cancelado' AND COALESCE(c.latitude, a.latitude) IS NULL`).get(org).n;
+    void agoraIso;
+
     console.log(`Carteira demonstrativa: ${carteira.length} assinantes, ${execucao.regua.bloqueios} corte(s) pela régua, ${execucao.regua.avisos} aviso(s) preparado(s).`);
     console.log(`TR-069: ACS configurado e ${aparelhos} aparelho(s) de assinante registrados (sem credencial de chamada: a tela diz que a mudança espera o contato do aparelho).`);
     console.log(`Provisionamento: ${provisionados} serviço(s) no concentrador BRAS-PG-01 (sem acesso de gerência: nenhum equipamento real foi inventado).`);
@@ -381,6 +436,8 @@ const servidor = criarApp(db).listen(0, async () => {
 
     console.log('Organização demonstrativa criada. Acessos (senha demo12345):');
     for (const [k, p] of Object.entries(PERFIS)) console.log(`  ${k}@managerprovedor.local  (${p})`);
+    console.log(`Panorama: ${comLeitura} serviço(s) com estado de conexão gravado COMO SE a varredura tivesse rodado agora `
+      + `(não há concentrador real para varrer) · ${semMapa} contrato(s) sem coordenada, de propósito, para a aba "Fora do mapa".`);
     console.log('Rastreador e Downdetector ficam não configurados: não há conexão real inventada.');
   } catch (err) {
     console.error('Falha ao criar a demonstração:', err.message);

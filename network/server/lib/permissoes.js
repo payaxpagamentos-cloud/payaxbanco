@@ -69,6 +69,14 @@ const P = {
   'cobranca.executar': ['admin', 'financeiro'],
   'bloqueios.aplicar': ['admin', 'financeiro'],
   'bloqueios.liberar': ['admin', 'financeiro'],
+  /*
+   * Panorama: o mapa mostra nome, endereço e telefone de toda a carteira numa tela só. É a visão mais
+   * sensível do sistema, e por isso NÃO acompanha 'rede.ver': o técnico enxerga a planta óptica, não a
+   * base de assinantes — no chamado dele vêm só os dados daquele atendimento.
+   */
+  'panorama.ver': ['admin', 'gestor', 'noc', 'financeiro'],
+  // Desenhar área, medir impacto e abrir incidente a partir dela é operação de rede.
+  'panorama.area': ['admin', 'gestor', 'noc'],
   'integracoes.ver': ['admin', 'noc', 'frota', 'gestor'],
   'integracoes.editar': ['admin'],
   'usuarios.gerenciar': ['admin'],

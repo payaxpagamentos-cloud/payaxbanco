@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const { agora, transacao } = require('../db');
 const { ErroNegocio } = require('./erros');
+const conexao = require('./conexao');
 const { cifrar, decifrar } = require('./cripto');
 const drivers = require('../drivers');
 const { ErroEquipamento, novoErroId, limparSegredo } = require('../drivers/base');
@@ -90,6 +91,39 @@ function desejado(db, servico) {
     situacao_contrato: contrato.situacao,
   };
 }
+
+/**
+ * Varre as sessões de um concentrador e atualiza o estado de conexão de toda a carteira dele.
+ *
+ * Uma chamada ao equipamento para milhares de assinantes. Se o equipamento não responder, NADA é alterado:
+ * o erro fica registrado nele e o estado dos assinantes envelhece sozinho até a tela dizer que a leitura
+ * está velha. Marcar todo mundo de vermelho porque a gerência caiu seria inventar uma pane.
+ */
+async function varrerSessoes(db, org, equipamentoId) {
+  const { driver, ctx } = contexto(db, equipamentoId);
+  const pode = drivers.suporta(driver, 'sessoes');
+  if (!pode.pode) return { ok: false, sem_suporte: true, motivo: pode.motivo };
+  const t = agora();
+  try {
+    const sessoes = await driver.sessoes(ctx);
+    const fuso = db.prepare('SELECT fuso FROM organizacoes WHERE id = ?').get(org)?.fuso;
+    const r = transacao(db, () => conexao.varrer(db, { org, concentradorId: equipamentoId, sessoes, em: t, fuso: fuso || undefined }));
+    db.prepare("UPDATE equipamentos SET estado_conexao = 'conectado', ultimo_contato = ?, ultimo_erro = NULL, erro_id = NULL WHERE id = ?").run(t, equipamentoId);
+    return { ok: true, ...r };
+  } catch (err) {
+    const erroId = novoErroId();
+    const estado = err instanceof ErroEquipamento ? err.estado : 'falha';
+    db.prepare('UPDATE equipamentos SET estado_conexao = ?, ultimo_erro = ?, erro_id = ? WHERE id = ?')
+      .run(estado, limparSegredo(err.message, ''), erroId, equipamentoId);
+    return { ok: false, erro: limparSegredo(err.message, ''), erro_id: erroId };
+  }
+}
+
+/** Concentradores que a varredura deve visitar: ativos, com driver que sabe listar sessões e com carteira. */
+const concentradoresVarreveis = (db, org) => db.prepare(`SELECT DISTINCT e.id, e.nome, e.driver FROM equipamentos e
+  JOIN servicos s ON s.concentrador_id = e.id JOIN contratos c ON c.id = s.contrato_id
+  WHERE e.organizacao_id = ? AND e.ativo = 1 AND e.driver IS NOT NULL AND c.situacao <> 'cancelado' ORDER BY e.id`).all(org)
+  .filter((e) => drivers.obter(e.driver)?.capacidades.includes('sessoes'));
 
 /** Versão do desejado sem a senha, para guardar, comparar e mostrar. */
 const desejadoPublico = (d) => { const { senha, ...resto } = d; return { ...resto, senha_definida: Boolean(senha) }; };
@@ -228,7 +262,12 @@ async function executarTarefa(db, tarefa) {
         db.prepare('UPDATE equipamentos SET identificacao = ? WHERE id = ?').run(JSON.stringify(resultado), equipamentoId);
       }
       if (servico && !tarefa.ensaio) {
-        if (tarefa.acao === 'ler') db.prepare('UPDATE servicos SET estado_real = ?, lido_em = ?, versao = versao + 1 WHERE id = ?').run(JSON.stringify(resultado), t, servico.id);
+        if (tarefa.acao === 'ler') {
+          db.prepare('UPDATE servicos SET estado_real = ?, lido_em = ?, versao = versao + 1 WHERE id = ?').run(JSON.stringify(resultado), t, servico.id);
+          // A leitura é a ÚNICA fonte do verde e do vermelho no mapa: é aqui que o estado de conexão nasce.
+          const fuso = db.prepare('SELECT fuso FROM organizacoes WHERE id = ?').get(servico.organizacao_id)?.fuso;
+          conexao.registrar(db, { servico, resultado, em: t, fuso: fuso || undefined });
+        }
         else db.prepare('UPDATE servicos SET aplicado_em = ?, desejado_aplicado = ?, versao = versao + 1 WHERE id = ?').run(t, JSON.stringify(desejadoPublico(alvo)), servico.id);
       }
     });
@@ -313,5 +352,6 @@ function reconciliar(db, org, { horas = 12, maximo = 200 } = {}) {
   return { enfileirados: n, ja_na_fila: jaNaFila, candidatos: alvos.length };
 }
 
-module.exports = { SITUACAO_POR_CONTRATO, CAMPOS_PUBLICOS, publico, senhaGerada, desejado, desejadoPublico, divergencias,
+module.exports = {
+  varrerSessoes, concentradoresVarreveis, SITUACAO_POR_CONTRATO, CAMPOS_PUBLICOS, publico, senhaGerada, desejado, desejadoPublico, divergencias,
   chaveDe, enfileirar, contexto, equipamentoDa, executarTarefa, processarFila, sincronizar, pedirCorte, reconciliar, cifrar };

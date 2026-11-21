@@ -18,9 +18,13 @@ const OBRIGATORIOS = ['nome', 'rotulo', 'fabricante', 'papeis', 'capacidades'];
  * Ações da fila de discagem (o sistema abre a conexão com o equipamento). O aparelho do assinante fica de
  * fora de propósito: no TR-069 quem liga é ele, então Wi-Fi e reinício de CPE vivem no ACS, com fila própria.
  */
-const ACOES = ['identificar', 'ler', 'aplicar', 'cortar', 'religar', 'remover'];
+/*
+ * "sessoes" é diferente das demais: não fala de UM serviço, e sim do concentrador inteiro — devolve quem
+ * está com sessão ativa agora. É o que alimenta o mapa sem uma requisição por assinante.
+ */
+const ACOES = ['identificar', 'ler', 'aplicar', 'cortar', 'religar', 'remover', 'sessoes'];
 /** Nome do método que executa cada ação (a ação é snake_case na fila; o método é camelCase no driver). */
-const METODO = { identificar: 'identificar', ler: 'ler', aplicar: 'aplicar', cortar: 'cortar', religar: 'religar', remover: 'remover' };
+const METODO = { identificar: 'identificar', ler: 'ler', aplicar: 'aplicar', cortar: 'cortar', religar: 'religar', remover: 'remover', sessoes: 'sessoes' };
 
 const registro = new Map();
 for (const d of DRIVERS) {

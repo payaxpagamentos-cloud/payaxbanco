@@ -32,6 +32,7 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 12 | **Manutenção e lavagem** | Planos preventivos por item, por dias e/ou km (alerta no primeiro limite, antecedência e tolerância); ordens solicitado → orçado → aprovado (alçada por valor) → agendado → em execução → concluído; lavagem sem zerar a mecânica; fornecedores; custos orçado e realizado separados. |
 | 13 | **Abastecimentos** | Comprovante, volume, preço, odômetro e tanque cheio; total = litros × preço; preço médio ponderado; consumo por ciclo entre tanques cheios (com os parciais); lançamento retroativo validado; volume acima do tanque sinalizado; correção autorizada com valor original guardado; relatórios por veículo, técnico e posto; CSV protegido. |
 | 14 | **Rastreamento** | Posições do rastreador com horário da medição e idade; parado ≠ sem comunicação; ignição ausente = desconhecida; trajeto do período; vínculo dispositivo ↔ veículo pelo IMEI (a placa só sugere); chamados próximos por distância em linha reta (não é ETA). |
+| 14.1 | **Panorama** | A operação inteira num mapa: cada contrato é uma casinha no endereço dele. A cor responde "o que eu faço com isso?" — **verde** no ar, **vermelho** contrato ativo e sem sessão (defeito agora), **âmbar** cortado por inadimplência (fora do ar é o esperado), **roxo** login que não existe no concentrador (falta provisionar), **azul** em implantação, **cinza tracejado** o sistema não sabe. Camadas de caixas ópticas e chamados abertos; filtros por estado, plano, caixa, concentrador e bairro; clique no ponto abre o assinante inteiro com as ações, sem trocar de tela. Desenho de **área de impacto** (quem está dentro, quanto de mensalidade, quais CTOs, e abrir incidente no NOC a partir dali), **viabilidade** por proximidade de CTO com porta livre, **mapa de calor das quedas** como grade com contagem exata, e a lista de quem está **fora do mapa** por falta de coordenada. |
 | 15 | **Provisionamento** | A ponte entre o contratado e o equipamento, por uma **camada de drivers**: o sistema fala em estado desejado (login, velocidade, IP, corte) e cada fabricante é um driver plugável, que declara o que sabe fazer. Fila de tarefas com ensaio (dry-run), tentativa com recuo, erro legível e histórico; releitura periódica que acha o que foi mexido por fora; e a tela de divergências, que mostra serviço liberado com contrato bloqueado (receita escapando) e contrato ativo com serviço cortado. |
 | 16 | **Wi-Fi do assinante (TR-069)** | ACS próprio: o roteador do assinante liga para o sistema, se registra sozinho e passa a ser gerenciável. Trocar SSID, senha e canal e reiniciar o aparelho saem da ficha do cliente, nos dois dialetos de parâmetro (TR-098 e TR-181). Para não esperar o contato periódico, o sistema bate na porta do CPE (Connection Request com Digest) pedindo que ligue agora — e grava nele, no primeiro encontro, a credencial que torna isso possível. |
 | 17 | **Consulta de CNPJ e CEP** | Cadastro preenchido pela base pública da Receita e pelos Correios, com a fonte e o horário à vista, o que veio marcado até alguém conferir, e queda para a fonte seguinte. Fonte fora do ar não trava o cadastro. |
@@ -151,6 +152,39 @@ acumulado sem repetir o que já havia feito. `NETWORK_COLETAS=0` desliga também
 
 Migrações: aplicadas automaticamente no start, em ordem e numa transação cada (`server/db.js`, tabela `schema_migracoes`).
 `npm run migrar` aplica sem iniciar o servidor. Produção com Docker: `docker build -t manager-network network/` e volume em `/app/data`.
+
+### Panorama: de onde vêm o verde e o vermelho
+
+Nenhuma cor do mapa é inferida. O estado de conexão vem de **uma fonte só**: a varredura das sessões do
+concentrador, que pergunta ao equipamento quem está com sessão ativa agora.
+
+A varredura custa **uma chamada por concentrador**, não uma por assinante — ler assinante a assinante seriam
+duas requisições por cliente a cada ciclo, o que com dois mil clientes inviabilizaria qualquer cadência útil.
+O intervalo é da organização (`sessoes_minutos`, padrão 5; zero desliga). Uma leitura vale como "agora" por
+três ciclos; passado isso o ponto fica tracejado e a tela diz há quanto tempo foi lido.
+
+Três cuidados que valem mais do que o mapa em si:
+
+1. **Concentrador que não responde não pinta ninguém de vermelho.** Equipamento mudo não é prova de que
+   ninguém está conectado. A falha fica registrada no equipamento, o estado dos assinantes envelhece
+   sozinho, e a tela passa a dizer que a leitura está velha — que é a verdade.
+2. **Caiu ≠ cortado.** Quem perdeu a sessão e quem foi bloqueado por inadimplência não podem ter a mesma
+   cor: um é defeito para consertar agora, o outro é a cobrança funcionando. Separados, o vermelho do mapa
+   volta a significar alguma coisa.
+3. **Quem não tem coordenada não some.** O contador aparece em toda tela do mapa, a aba *Fora do mapa* lista
+   quem é, e a área desenhada avisa que pode haver gente dentro dela que o mapa não enxerga.
+
+O histórico guarda **transições**, não leituras: caiu às 14h02, voltou às 14h19. Daí saem o tempo exato fora
+do ar, as quedas do dia e o mapa de calor, sem nenhuma estimativa. O mapa de calor é uma grade de células
+clicáveis com a contagem real, e não um degradê — um borrão sugere uma precisão que o dado não tem.
+
+A **viabilidade** ordena as caixas por distância em **linha reta** entre coordenadas. A metragem de cabo é
+maior, às vezes muito maior (atravessar uma avenida pode custar duzentos metros de poste), então o número
+serve para escolher candidatas, nunca para prometer prazo ou custo — e a tela diz isso junto do resultado.
+
+Ver o Panorama exige `panorama.ver`, que o **técnico não tem**: o mapa mostra nome, endereço e telefone da
+carteira inteira numa tela só, e no chamado do técnico vêm apenas os dados daquele atendimento. Desenhar
+área e abrir incidente a partir dela exigem `panorama.area`.
 
 ### Cobrança bancária: conta, remessa e retorno
 
@@ -301,6 +335,8 @@ network/
 - **Cartão de crédito e débito automático**: exigem contrato com um meio de pagamento.
 - **Envio automático de aviso por WhatsApp ou e-mail**: exige contrato com um provedor de mensagens. A régua deixa o aviso pronto, com o texto da regra, e registra quem despachou e quando.
 - **Nota fiscal (NFCom, modelo 62)**: exige certificado digital e credenciamento na SEFAZ.
+- **Estado de conexão fora do MikroTik**: o verde e o vermelho do Panorama dependem de o driver do concentrador saber listar sessões (capacidade `sessoes`). Hoje só o driver MikroTik RouterOS a implementa; em concentrador de outro fabricante os pontos ficam como "nunca lido", que é o correto, em vez de verde por otimismo.
+- **Coordenada do assinante**: o mapa só mostra contrato com latitude e longitude. A consulta de CEP traz o logradouro, não o ponto exato da casa — quem marca é a equipe, no cadastro ou no chamado de instalação.
 - **Drivers de outros fabricantes**: hoje acompanha o driver de **MikroTik RouterOS** (concentrador PPPoE, API REST), testado de ponta a ponta. Huawei, ZTE, Fiberhome, Datacom, Parks, Intelbras e Cisco entram pelo mesmo contrato — OLT e CPE normalmente exigem SSH/Telnet/SNMP ou TR-069, caminhos que ainda não estão escritos. O que falta é driver, não arquitetura.
 - **Alcance do ACS**: o CPE precisa chegar ao endereço do ACS, e o ACS precisa chegar ao CPE para o "aplicar agora". Em CGNAT sem porta aberta a mudança continua funcionando — só espera o contato periódico do aparelho.
 - **Downdetector**: acesso autorizado (API Enterprise), credencial e a documentação dos recursos contratados.

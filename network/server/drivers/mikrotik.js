@@ -57,7 +57,7 @@ module.exports = {
   papeis: ['concentrador'],
   protocolo: 'https',
   portaPadrao: 443,
-  capacidades: ['identificar', 'ler', 'aplicar', 'cortar', 'religar', 'remover'],
+  capacidades: ['identificar', 'ler', 'aplicar', 'cortar', 'religar', 'remover', 'sessoes'],
   campos: [
     { nome: 'host', rotulo: 'IP de gerência', obrigatorio: true },
     { nome: 'porta', rotulo: 'Porta do serviço REST', ajuda: 'Normalmente 443 (www-ssl). Em laboratório, 80 com o serviço www.' },
@@ -65,6 +65,23 @@ module.exports = {
     { nome: 'senha', rotulo: 'Senha', tipo: 'password', obrigatorio: true },
   ],
   ajuda: 'Ligue o serviço www-ssl no RouterOS 7 (IP → Services) e use um usuário com os direitos "api", "read" e "write" no grupo ppp.',
+
+  /*
+   * Todas as sessões ativas do concentrador numa chamada só.
+   *
+   * É o que torna o mapa viável: ler assinante por assinante custaria duas requisições POR CLIENTE a cada
+   * varredura — com dois mil assinantes, quatro mil requisições de cinco em cinco minutos. Aqui é uma.
+   */
+  async sessoes(ctx) {
+    const r = await http(ctx, { caminho: '/rest/ppp/active' });
+    const lista = Array.isArray(r.dados) ? r.dados : [];
+    return lista.filter((x) => x?.name).map((x) => ({
+      login: x.name,
+      ip: x.address ?? null,
+      desde: x.uptime ?? null,
+      chamador: x['caller-id'] ?? null,
+    }));
+  },
 
   async identificar(ctx) {
     const r = await http(ctx, { caminho: '/rest/system/resource' });

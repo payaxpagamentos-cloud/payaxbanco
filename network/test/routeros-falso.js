@@ -75,6 +75,8 @@ function criarRouterOsFalso({ usuario = 'admin', senha = 'senha-do-roteador', ve
     conectar(login, address = '100.64.0.10') {
       ativos.set(login, { '.id': `*A${(proximoId++).toString(16).toUpperCase()}`, name: login, address, uptime: '2h13m', 'caller-id': 'AA:BB:CC:DD:EE:FF' });
     },
+    /** Derruba a sessão sem apagar o secret: é o que acontece quando o assinante cai de verdade. */
+    desconectar(login) { ativos.delete(login); },
     conectado: (login) => ativos.has(login),
     secretDe: (login) => [...secrets.values()].find((s) => s.name === login) ?? null,
     /** Chamadas que escreveram no equipamento (o que o ensaio nunca pode produzir). */

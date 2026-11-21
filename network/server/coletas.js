@@ -95,4 +95,43 @@ function iniciarProvisionamento(db) {
   ciclo().catch(() => {});
 }
 
-module.exports = { iniciarColetas, iniciarCobranca, iniciarProvisionamento };
+/**
+ * Varredura de sessões: o que mantém o mapa vivo.
+ *
+ * Custa UMA chamada por concentrador, não uma por assinante — por isso pode rodar de minuto em minuto sem
+ * castigar o equipamento. É daqui que saem o verde, o vermelho e a contagem de quedas do dia.
+ */
+function iniciarSessoes(db) {
+  let rodando = false;
+  const ultima = new Map();
+  const ciclo = async () => {
+    if (rodando) return;
+    rodando = true;
+    try {
+      for (const org of db.prepare('SELECT id, nome, sessoes_minutos FROM organizacoes').all()) {
+        if (!org.sessoes_minutos) continue;
+        const agendado = (ultima.get(org.id) ?? 0) + org.sessoes_minutos * 60_000;
+        if (Date.now() < agendado) continue;
+        ultima.set(org.id, Date.now());
+        for (const eq of prov.concentradoresVarreveis(db, org.id)) {
+          try {
+            const r = await prov.varrerSessoes(db, org.id, eq.id);
+            if (!r.ok && !r.sem_suporte) {
+              console.warn(`[Network] Sessões de ${eq.nome} (${org.nome}): ${r.erro} (${r.erro_id}). Nenhum assinante foi marcado como fora do ar.`);
+            } else if (r.ok && (r.caiu || r.voltou)) {
+              console.log(`[Network] Sessões de ${eq.nome}: ${r.caiu} queda(s), ${r.voltou} retorno(s) em ${r.servicos} serviço(s).`);
+            }
+          } catch (err) {
+            console.error(`[Network] Varredura de sessões (${eq.nome}):`, err.message);
+          }
+        }
+      }
+    } finally {
+      rodando = false;
+    }
+  };
+  setInterval(() => ciclo().catch((err) => console.error('[Network] Agenda da varredura:', err.message)), 30_000).unref();
+  ciclo().catch(() => {});
+}
+
+module.exports = { iniciarColetas, iniciarCobranca, iniciarProvisionamento, iniciarSessoes };
