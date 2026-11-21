@@ -24,12 +24,14 @@ const DO_APP = [
   './',
   './index.html',
   './app.webmanifest',
+  './privacidade.html',
+  './termos.html',
   './css/tv.css',
   './fonts/manrope.woff2',
   './img/favicon.svg',
   './img/icone-192.png',
   './img/icone-512.png',
-  ...['api', 'app', 'cartoes', 'conta', 'entrada', 'envio', 'motor-nativo', 'perfis', 'player', 'titulo', 'tv', 'ui']
+  ...['api', 'app', 'cartoes', 'conta', 'entrada', 'envio', 'excluir-conta', 'motor-nativo', 'perfis', 'player', 'titulo', 'tv', 'ui']
     .map((n) => `./js/${n}.js`),
 ].map(arquivo);
 

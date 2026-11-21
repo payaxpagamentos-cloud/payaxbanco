@@ -96,7 +96,7 @@ export const api = {
   post: (c, b = {}, o) => chamar('POST', c, b, o),
   put: (c, b, o) => chamar('PUT', c, b, o),
   patch: (c, b, o) => chamar('PATCH', c, b, o),
-  del: (c, o) => chamar('DELETE', c, undefined, o),
+  del: (c, b, o) => chamar('DELETE', c, b, o),
 };
 
 /** Endereço de uma arte (capa, banner, logo) pelo id do arquivo. */

@@ -103,6 +103,8 @@ operação, em Faturas (a integração automática com o banco ficou fora do esc
 | Smart TV | Apps para Samsung (Tizen/AVPlay), LG (webOS) e TCL/Android TV (ExoPlayer), com navegação por controle remoto |
 | Celular e tablet | App instalável pelo navegador (ícone na tela inicial, tela cheia, sem loja) e apps nativos de Android e iPhone, com player do aparelho e janela flutuante |
 | APKs de teste | `dist/PLAYTECHVIP-celular-android-teste.apk` e `dist/PLAYTECHVIP-androidtv-teste.apk`, compilados e prontos para instalar; pedem o endereço do servidor na primeira abertura |
+| Envio às lojas | Pacotes assinados (`.aab`) para a Google Play, capturas no tamanho de cada loja, gráfico de destaque, textos da ficha e respostas dos formulários — guia em `LOJAS.md` |
+| Exigências legais | Exclusão de conta dentro do app (App Store 5.1.1(v)), política de privacidade e termos de uso publicados pela plataforma |
 | Produção | Docker Compose com HTTPS automático, backup e monitoramento por `/api/saude` |
 | Testes | 56 testes automáticos, incluindo uma conversão de vídeo de verdade e as guardas de produção |
 

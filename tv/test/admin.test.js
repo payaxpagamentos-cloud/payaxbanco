@@ -70,9 +70,9 @@ test('arquivo em uso não pode ser apagado', async (t) => {
   const admin = await s.adminLogin();
   const video = await s.enviarVideo(admin);
   const titulo = await s.post('/admin/titulos', { tipo: 'filme', nome: 'Em Uso', video_midia_id: video }, admin);
-  assert.equal((await s.del(`/admin/midias/${video}`, admin)).status, 409);
+  assert.equal((await s.del(`/admin/midias/${video}`, undefined, admin)).status, 409);
   await s.patch(`/admin/titulos/${titulo.dados.titulo.id}`, { video_midia_id: null }, admin);
-  assert.equal((await s.del(`/admin/midias/${video}`, admin)).status, 204);
+  assert.equal((await s.del(`/admin/midias/${video}`, undefined, admin)).status, 204);
 });
 
 test('curadoria cuida do conteúdo, mas não do financeiro', async (t) => {
@@ -126,7 +126,7 @@ test('perfis de visualização: limite do plano, PIN e perfil principal', async 
   assert.equal(terceiro.status, 409, 'o plano Essencial permite 2 perfis');
 
   const principal = (await s.get('/conta/perfis', cliente.token)).dados.perfis.find((p) => p.principal);
-  assert.equal((await s.del(`/conta/perfis/${principal.id}`, cliente.token)).status, 409);
+  assert.equal((await s.del(`/conta/perfis/${principal.id}`, undefined, cliente.token)).status, 409);
 
   // Com PIN, o perfil só vale com a chave que vem ao digitar o PIN.
   await s.patch(`/conta/perfis/${segundo.dados.perfil.id}`, { pin: '4321' }, cliente.token);

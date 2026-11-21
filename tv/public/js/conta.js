@@ -1,4 +1,5 @@
-import { api, sessao, perfil as perfilGuardado } from './api.js';
+import { api, sessao, perfil as perfilGuardado, BASE } from './api.js';
+import { botaoExcluirConta } from './excluir-conta.js';
 import { el, limpar, icone, toast, acao, modal, lerForm, dinheiro, dataBR, dataHora, copiar, confirmar, QUALIDADES, corPerfil, iniciais } from './ui.js';
 
 const STATUS = {
@@ -15,6 +16,8 @@ export async function telaConta(raiz, { ir, aoMudar }) {
   const a = conta.assinatura;
 
   const recarregar = async () => { await telaConta(raiz, { ir, aoMudar }); aoMudar?.(); };
+
+  const botaoExcluir = botaoExcluirConta();
 
   // ---- Assinatura
   const botoes = el('div', { class: 'linha', style: 'margin-top:14px' });
@@ -154,5 +157,16 @@ export async function telaConta(raiz, { ir, aoMudar }) {
 
     el('h2', { style: 'margin-top:26px' }, 'Dados de acesso'),
     el('div', { class: 'cartao' }, formDados, el('div', { class: 'linha', style: 'margin-top:12px' }, botaoSenha,
-      el('button', { class: 'btn pequeno vazio perigo', onclick: () => { sessao.limpar(); window.dispatchEvent(new CustomEvent('tv:sair')); } }, 'Sair da conta')))));
+      el('button', { class: 'btn pequeno vazio perigo', onclick: () => { sessao.limpar(); window.dispatchEvent(new CustomEvent('tv:sair')); } }, 'Sair da conta'))),
+
+    el('h2', { style: 'margin-top:26px' }, 'Excluir minha conta'),
+    el('div', { class: 'cartao' },
+      el('p', { class: 'mudo', style: 'margin:0 0 12px' },
+        'Apaga o cadastro, os perfis e o histórico de quem assistiu. A assinatura é cancelada na hora e o acesso acaba imediatamente. Não dá para desfazer.'),
+      el('div', { class: 'linha' }, botaoExcluir)),
+
+    el('p', { class: 'pequeno mudo', style: 'margin-top:22px' },
+      el('a', { href: `${BASE}/privacidade.html`, target: '_blank', rel: 'noopener' }, 'Política de privacidade'),
+      ' · ',
+      el('a', { href: `${BASE}/termos.html`, target: '_blank', rel: 'noopener' }, 'Termos de uso'))));
 }

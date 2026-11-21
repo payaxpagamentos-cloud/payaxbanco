@@ -1,5 +1,6 @@
 import { api, sessao, perfil as perfilGuardado } from './api.js';
 import { el, marca, lerForm, acao, toast, icone, dinheiro, QUALIDADES, limpar } from './ui.js';
+import { botaoExcluirConta } from './excluir-conta.js';
 
 const campo = (rotulo, attrs) => el('label', { class: 'campo' }, rotulo, el('input', attrs));
 
@@ -100,11 +101,17 @@ export function telaPlanos(raiz, { assinatura, aoAssinar, aoVoltar, titulo = 'Es
       })());
   };
 
+  // Quem ainda não assinou para nesta tela: daqui ele precisa conseguir sair e, se quiser,
+  // apagar a conta — é o que a App Store confere na revisão.
+  const conta = el('div', { class: 'linha', style: 'margin-top:20px;gap:10px;justify-content:center;flex-wrap:wrap' },
+    el('button', { class: 'btn pequeno vazio', onclick: () => { sessao.limpar(); window.dispatchEvent(new CustomEvent('tv:sair')); } }, 'Sair da conta'),
+    botaoExcluirConta({ classe: 'btn pequeno vazio perigo' }));
+
   limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'caixa larga' },
     marca(),
     el('h1', { style: 'margin:18px 0 6px' }, titulo),
     el('p', { class: 'mudo', style: 'margin:0 0 18px' }, aviso ?? 'Todos os planos dão acesso aos canais ao vivo e ao catálogo completo. Cancele quando quiser.'),
-    lista, rodape)));
+    lista, rodape, aoVoltar ? null : conta)));
 
   api.get('/conta/planos').then((r) => {
     escolhido = escolhido ?? r.planos[Math.min(1, r.planos.length - 1)]?.id ?? null;

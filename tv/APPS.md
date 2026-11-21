@@ -12,6 +12,9 @@ os mesmos planos e o mesmo limite de telas.
 | **LG** | App webOS para a LG Content Store | `tv-apps/lg-webos/` | `<video>` do webOS |
 | **TCL, Google TV, Sony, Philips** | App Android TV para a Google Play | `tv-apps/android-tv/` | **ExoPlayer** do aparelho |
 
+> **Para enviar às lojas**, o passo a passo completo — pacotes, artes, textos prontos, respostas
+> dos formulários de privacidade e notas para o avaliador — está em [`LOJAS.md`](LOJAS.md).
+
 Um comando aponta todos eles para o servidor de vocês:
 
 ```bash

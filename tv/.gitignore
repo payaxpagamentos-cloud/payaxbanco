@@ -21,3 +21,9 @@ tv-apps/android-tv/local.properties
 # projeto iOS gerado pelo XcodeGen
 celular-apps/ios/*.xcodeproj/
 celular-apps/ios/*.xcworkspace/
+
+# chave de publicação dos apps (nunca entra no repositório)
+celular-apps/android/key.properties
+tv-apps/android-tv/key.properties
+*.jks
+*.keystore

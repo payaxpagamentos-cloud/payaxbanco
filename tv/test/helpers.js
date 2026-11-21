@@ -117,7 +117,7 @@ async function iniciar() {
     post: (c, b, tk, e) => req('POST', c, b ?? {}, tk, e),
     put: (c, b, tk, e) => req('PUT', c, b, tk, e),
     patch: (c, b, tk, e) => req('PATCH', c, b, tk, e),
-    del: (c, tk, e) => req('DELETE', c, undefined, tk, e),
+    del: (c, b, tk, e) => req('DELETE', c, b, tk, e),
     fechar: () => new Promise((r) => servidor.close(r)),
   };
 }

@@ -1,0 +1,12 @@
+# Chave de publicação da Google Play. Copie para `key.properties` e preencha.
+# ATENÇÃO: o arquivo .jks e estas senhas NÃO entram no repositório, e não podem ser perdidos —
+# sem eles não dá para publicar atualização do app, nunca mais.
+#
+# Para criar a chave (uma vez, e guarde a cópia em lugar seguro):
+#   keytool -genkeypair -v -keystore playtechvip.jks -keyalg RSA -keysize 4096 \
+#     -validity 10000 -alias playtechvip
+#
+storeFile=/caminho/seguro/playtechvip.jks
+storePassword=
+keyAlias=playtechvip
+keyPassword=

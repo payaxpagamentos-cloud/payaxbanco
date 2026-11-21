@@ -198,6 +198,21 @@ clássicos em preto e branco. O script só importa sozinho o que tem licença li
 O detalhe — fontes, o que é legal, o que não é e por que listas de IPTV "VOD" ficam de fora —
 está em [`ACERVO.md`](ACERVO.md).
 
+## Publicação nas lojas
+
+Os apps saem prontos para enviar: pacote assinado (`.aab`), capturas no tamanho exato de cada
+loja, gráfico de destaque, textos da ficha e as respostas dos formulários de privacidade. O guia
+é o [`LOJAS.md`](LOJAS.md); as capturas se refazem com o catálogo definitivo em um comando:
+
+```bash
+node scripts/capturas-lojas.js https://play.seudominio.com.br
+```
+
+Duas páginas públicas acompanham a plataforma, porque as duas lojas exigem:
+`/privacidade.html` e `/termos.html` — com os dados da empresa entre colchetes, para preencher.
+E o assinante apaga a própria conta em **Minha conta → Excluir minha conta**, como a App Store
+exige de todo app com cadastro.
+
 ## Grade dos canais abertos
 
 Em **Configurações → Grade dos canais abertos (EPG)**, a operação cadastra o endereço de um arquivo **XMLTV**

@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const { Router } = require('express');
 const QRCode = require('qrcode');
 const config = require('../config');
@@ -206,6 +207,46 @@ module.exports = (db) => {
       ? player.fechar(db, req.usuario.id, v.inteiro(req.body.id, 'a tela', { min: 1 }), 'outra_tela').encerrada ? 1 : 0
       : player.encerrarOutras(db, req.usuario.id, req.body.manter ?? null);
     res.json({ encerradas });
+  });
+
+  // ---------- Excluir a conta ----------
+
+  /**
+   * O assinante apaga a própria conta de dentro do app.
+   *
+   * É exigência da App Store para qualquer app com cadastro (regra 5.1.1(v)) e é o que a LGPD
+   * chama de direito à eliminação. O que acontece aqui:
+   *   · as telas abertas caem na hora e a assinatura é cancelada;
+   *   · perfis, listas, progresso e faturas em aberto são apagados;
+   *   · as faturas **pagas** ficam, sem nada que identifique a pessoa, porque são registro fiscal;
+   *   · o cadastro é anonimizado e não entra mais: o e-mail fica livre para um novo cadastro.
+   */
+  r.delete('/', (req, res) => {
+    const u = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.usuario.id);
+    v.exigir(u.perfil === 'assinante', 'Contas da operação são removidas pelo painel, em Equipe.');
+    if (!verificarSenha(String(req.body?.senha ?? ''), u.senha_hash)) throw new ErroNegocio('Senha incorreta.', 403);
+
+    const apagadas = transacao(db, () => {
+      player.encerrarOutras(db, u.id, null);
+      const viva = db.prepare("SELECT id FROM assinaturas WHERE usuario_id = ? AND status <> 'cancelada'").get(u.id);
+      if (viva) {
+        db.prepare("UPDATE assinaturas SET status = 'cancelada', cancelar_no_fim = 0, motivo = 'conta excluída pelo assinante', cancelada_em = ?, atualizada_em = ? WHERE id = ?")
+          .run(agora(), agora(), viva.id);
+      }
+      const faturas = db.prepare("DELETE FROM faturas WHERE usuario_id = ? AND status <> 'paga'").run(u.id).changes;
+      // A fatura paga fica para o registro fiscal, mas sem o PIX, que é dado de pagamento.
+      db.prepare("UPDATE faturas SET pix_copia_cola = NULL WHERE usuario_id = ?").run(u.id);
+      const perfis = db.prepare('DELETE FROM perfis WHERE usuario_id = ?').run(u.id).changes;
+      db.prepare(`UPDATE usuarios SET nome = 'Conta removida', email = ?, telefone = NULL, senha_hash = ?, ativo = 0 WHERE id = ?`)
+        .run(`removido+${u.id}@playtechvip.invalido`, hashSenha(crypto.randomBytes(24).toString('hex')), u.id);
+      return { perfis, faturas };
+    });
+
+    registrar(db, req, 'conta_excluida', { usuario_id: u.id, perfis: apagadas.perfis, faturas_removidas: apagadas.faturas });
+    res.json({
+      ok: true,
+      aviso: 'Conta excluída. Os dados de acesso, os perfis e o histórico de quem assistiu foram apagados.',
+    });
   });
 
   return r;
