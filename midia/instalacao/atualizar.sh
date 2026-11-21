@@ -40,10 +40,10 @@ fi
 titulo "Copiando a versão nova"
 if command -v rsync >/dev/null 2>&1; then
   rsync -a --delete \
-    --exclude node_modules --exclude data --exclude .git --exclude instalacao \
+    --exclude node_modules --exclude data --exclude .git \
     "$RAIZ"/ "$DESTINO"/
 else
-  (cd "$RAIZ" && tar --exclude=./node_modules --exclude=./data --exclude=./.git --exclude=./instalacao -cf - .) | tar -xf - -C "$DESTINO"
+  (cd "$RAIZ" && tar --exclude=./node_modules --exclude=./data --exclude=./.git -cf - .) | tar -xf - -C "$DESTINO"
 fi
 chown -R root:root "$DESTINO"
 

@@ -7,6 +7,7 @@ com HTTPS do Let's Encrypt, subindo sozinho quando a máquina reinicia.
 | Arquivo | O que é |
 |---|---|
 | `conferir.sh` | Diz, antes e depois, se a máquina tem o que é preciso (DNS, PTR, portas, serviços). |
+| `dns-registrobr.sh` | Imprime os registros prontos para colar no Registro.br, com o DKIM já dividido. |
 | `instalar.sh` | A instalação inteira, de uma vez. Pode rodar de novo sem medo. |
 | `atualizar.sh` | Troca o código por uma versão nova, guardando antes uma cópia do banco. |
 | `vaimidia.service` | O serviço do systemd (quem mantém o sistema no ar). |
@@ -73,6 +74,19 @@ sudo ./instalar.sh --dominio vaimidia.com.br --sem-email   # sem o servidor de e
 ```
 
 Rodar de novo é seguro: a configuração, as senhas e a chave DKIM que já existem não são tocadas.
+
+## O DNS no Registro.br
+
+Depois de instalar, rode no servidor:
+
+```bash
+sudo /opt/vaimidia/instalacao/dns-registrobr.sh --dominio vaimidia.com.br
+```
+
+Ele imprime cada registro no formato da tela do Registro.br, com o IP desta máquina e **a chave DKIM
+já dividida em pedaços de 255 letras** — um registro TXT não aceita mais do que isso de uma vez, e é
+o erro que mais trava gente ali. Também lembra dos três detalhes que fazem o Registro.br recusar a
+linha: o ponto final no MX, as aspas do DKIM e o campo *nome* ser relativo ao domínio.
 
 ## Depois
 

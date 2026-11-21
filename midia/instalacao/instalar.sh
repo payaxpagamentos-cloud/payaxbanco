@@ -87,11 +87,11 @@ RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 copiar_sistema() {
   if command -v rsync >/dev/null 2>&1; then
     executar rsync -a --delete \
-      --exclude node_modules --exclude data --exclude .git --exclude instalacao \
+      --exclude node_modules --exclude data --exclude .git \
       "$RAIZ"/ "$DESTINO"/
   else
     aviso "rsync não está instalado: copiando com tar (arquivo removido na versão nova continua lá)."
-    executar bash -c "cd '$RAIZ' && tar --exclude=./node_modules --exclude=./data --exclude=./.git --exclude=./instalacao -cf - . | tar -xf - -C '$DESTINO'"
+    executar bash -c "cd '$RAIZ' && tar --exclude=./node_modules --exclude=./data --exclude=./.git -cf - . | tar -xf - -C '$DESTINO'"
   fi
 }
 
@@ -345,6 +345,11 @@ cat <<TXT
 TXT
 fi
 cat <<TXT
+
+  Para colar esses registros no Registro.br (com a chave DKIM já dividida em pedaços,
+  que é o que a tela deles exige):
+
+    sudo $DESTINO/instalacao/dns-registrobr.sh --dominio $DOMINIO
 
   Para o sistema RESPONDER e-mail, preencha MIDIA_SMTP_* em $ENV_ARQ
   e reinicie: sudo systemctl restart vaimidia
