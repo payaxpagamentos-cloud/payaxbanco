@@ -2,8 +2,8 @@
 import { api, qs } from './api.js';
 import {
   el, limpar, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, marcar, area, lerForm, centavos, reaisCampo,
-  inteiro, dinheiro, duracao, dataHora, dataBr, etiquetaDe, etiqueta, mb, diasTexto, faixaHorario,
-  CATEGORIAS, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, DIAS,
+  inteiro, dinheiro, duracao, dataHora, dataBr, competenciaTexto, etiquetaDe, etiqueta, mb, diasTexto, faixaHorario,
+  CATEGORIAS, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_CONTRATO, DIAS,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio, previa, miniatura, linhaDoLoop, itensDoLoop, resumoDoLoop, enviarArquivo } from './comum.js';
 import { agencias } from './inventario.js';
@@ -65,12 +65,55 @@ const editarAnunciante = (a, recarregar) => formModal(a ? `Editar ${a.nome}` : '
 
 async function abrirAnunciante(id, recarregar) {
   const d = await api.get(`/painel/anunciantes/${id}`);
+  const atualizar = (fechar) => { fechar(); recarregar(); abrirAnunciante(id, recarregar); };
+  const f = d.financeiro;
   await modal(d.nome, (fechar) => [
     el('div', {}, [['CNPJ/CPF', d.documento ?? '—'], ['Contato', d.contato ?? '—'], ['E-mail', d.email ?? '—'], ['Telefone', d.telefone ?? '—']]
       .map(([k, v]) => el('div', { class: 'chave' }, el('span', { class: 'mudo' }, k), el('strong', {}, v)))),
+
+    // O financeiro do cliente fica aqui: é o que se procura quando ele liga.
+    el('h3', {}, 'Financeiro do cliente'),
+    el('div', { class: 'grade' },
+      indicador({
+        rotulo: 'Em aberto', valor: dinheiro(f.aberto_centavos), ic: 'faturamento',
+        cor: f.atrasado_centavos ? 'vermelho' : 'azul',
+        nota: f.atrasado_centavos ? `${dinheiro(f.atrasado_centavos)} vencido` : `${f.faturas_abertas} fatura(s)`,
+      }),
+      indicador({
+        rotulo: 'Próximo vencimento', ic: 'relogio', cor: 'laranja',
+        valor: f.proxima ? dataBr(f.proxima.vencimento) : '—',
+        nota: f.proxima ? dinheiro(f.proxima.valor_centavos) : 'nada em aberto',
+      }),
+      indicador({
+        rotulo: 'Já recebido', valor: dinheiro(f.recebido_centavos), ic: 'ok', cor: 'verde',
+        nota: f.ultimo_pagamento ? `último em ${dataBr(f.ultimo_pagamento.pago_em)}` : 'nenhum pagamento ainda',
+      })),
+
+    el('h3', {}, `Contratos (${d.contratos.length})`),
+    tabela([
+      [(c) => el('div', {}, el('div', {}, c.numero), el('div', { class: 'pequeno mudo' }, c.objeto ?? '—')), 'Contrato'],
+      [(c) => `${dataBr(c.inicio)} → ${c.fim ? dataBr(c.fim) : 'sem fim'}`, 'Vigência'],
+      [(c) => COBRANCA[c.cobranca] ?? c.cobranca, 'Cobrança'],
+      [(c) => (c.valor_centavos ? dinheiro(c.valor_centavos) : '—'), 'Valor', 'num dir'],
+      [(c) => inteiro(c.campanhas), 'Campanhas', 'num dir'],
+      [(c) => etiquetaDe(STATUS_CONTRATO, c.status), 'Situação'],
+      [(c) => el('button', { class: 'btn pequeno', onclick: (e) => { e.stopPropagation(); fechar(); editarContrato(c, d, () => recarregar()); } }, 'Editar'), '', 'acoes'],
+    ], d.contratos, { vazioTexto: 'Nenhum contrato cadastrado para este cliente.' }),
+    el('button', { class: 'btn', style: 'margin-top:10px', onclick: () => { fechar(); editarContrato(null, d, () => recarregar()); } }, icone('mais'), 'Novo contrato'),
+
+    el('h3', {}, 'Histórico de pagamentos'),
+    tabela([
+      [(x) => competenciaTexto(x.competencia), 'Competência'],
+      [(x) => dinheiro(x.valor_centavos), 'Valor', 'num dir'],
+      [(x) => dataBr(x.vencimento), 'Vencimento'],
+      [(x) => dataBr(x.pago_em), 'Pago em'],
+      [(x) => (x.pago_em > x.vencimento ? etiqueta('Pagou em atraso', 'aviso') : etiqueta('Em dia', 'ok')), ''],
+    ], d.pagamentos, { vazioTexto: 'Nenhum pagamento registrado ainda.' }),
+
     el('h3', {}, 'Campanhas'),
     tabela([
-      [(c) => c.nome, 'Campanha'], [(c) => etiquetaDe(STATUS_CAMPANHA, c.status), 'Situação'],
+      [(c) => el('div', {}, el('div', {}, c.nome), c.contrato ? el('div', { class: 'pequeno mudo' }, `contrato ${c.contrato}`) : null), 'Campanha'],
+      [(c) => etiquetaDe(STATUS_CAMPANHA, c.status), 'Situação'],
       [(c) => `${dataBr(c.inicio)} a ${c.fim ? dataBr(c.fim) : 'sem fim'}`, 'Período'],
       [(c) => (c.cobranca === 'cpm' ? `CPM ${dinheiro(c.cpm_centavos)}` : c.cobranca === 'mensal' ? `${dinheiro(c.valor_centavos)}/mês` : 'cortesia'), 'Cobrança', 'num dir'],
     ], d.campanhas, { vazioTexto: 'Nenhuma campanha.' }),
@@ -89,6 +132,39 @@ async function abrirAnunciante(id, recarregar) {
       el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
   ], { largo: true });
 }
+
+/** Contrato do cliente: o acordo que sustenta as campanhas dele. */
+function editarContrato(contrato, cliente, recarregar) {
+  const hoje = new Date().toLocaleDateString('en-CA');
+  return api.get('/painel/opcoes').then((opcoes) => formModal(contrato ? `Contrato ${contrato.numero}` : `Novo contrato — ${cliente.nome}`, () => [
+    el('div', { class: 'duas' },
+      campo('Número do contrato', { name: 'numero', value: contrato?.numero ?? '', required: true, maxlength: 40, placeholder: 'Ex.: 2026-014' }),
+      escolha('Agência (opcional)', 'agencia_id', { '': 'Direto com o cliente', ...Object.fromEntries(opcoes.agencias.map((x) => [x.id, x.nome])) }, contrato?.agencia_id ?? '')),
+    campo('Objeto', { name: 'objeto', value: contrato?.objeto ?? '', maxlength: 300, placeholder: 'Ex.: veiculação no circuito Residencial Campinas' }),
+    el('div', { class: 'duas' },
+      campo('Início da vigência', { name: 'inicio', type: 'date', value: contrato?.inicio ?? hoje, required: true }),
+      campo('Fim (vazio = sem prazo)', { name: 'fim', type: 'date', value: contrato?.fim ?? '' })),
+    el('div', { class: 'tres' },
+      escolha('Cobrança', 'cobranca', COBRANCA_CONTRATO, contrato?.cobranca ?? 'mensal'),
+      campo('Valor (R$)', { name: 'valor', value: reaisCampo(contrato?.valor_centavos), inputmode: 'decimal' }),
+      campo('Dia de vencimento', { name: 'vencimento_dia', type: 'number', min: 1, max: 28, value: contrato?.vencimento_dia ?? 10 })),
+    el('div', { class: 'duas' },
+      campo('Reajuste', { name: 'reajuste', value: contrato?.reajuste ?? '', maxlength: 60, placeholder: 'Ex.: IPCA a cada 12 meses' }),
+      contrato ? escolha('Situação', 'status', STATUS_CONTRATO_OPCOES, contrato.status) : null),
+    marcar('Renovação automática', { name: 'renovacao_automatica', checked: Boolean(contrato?.renovacao_automatica) }),
+    area('Observação', { name: 'observacao', maxlength: 500 }, contrato?.observacao ?? ''),
+  ], async (d) => {
+    const corpo = { ...d, anunciante_id: cliente.id, valor_centavos: centavos(d.valor) ?? 0, fim: d.fim || null };
+    delete corpo.valor;
+    if (contrato) await api.patch(`/painel/contratos/${contrato.id}`, corpo);
+    else await api.post('/painel/contratos', corpo);
+    toast(contrato ? 'Contrato atualizado.' : 'Contrato cadastrado.');
+    recarregar();
+  }, { largo: true }));
+}
+
+const COBRANCA_CONTRATO = { mensal: 'Valor mensal', cpm: 'CPM (por mil impactos)', pacote: 'Pacote fechado', cortesia: 'Cortesia' };
+const STATUS_CONTRATO_OPCOES = { rascunho: 'Rascunho', ativo: 'Ativo', suspenso: 'Suspenso', encerrado: 'Encerrado' };
 
 const criarAcessoAnunciante = (a, recarregar) => formModal(`Acesso ao portal — ${a.nome}`, () => [
   campo('Nome da pessoa', { name: 'nome', value: a.contato ?? '', required: true, maxlength: 120 }),

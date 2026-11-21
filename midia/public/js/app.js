@@ -16,8 +16,11 @@ const MENUS = {
     ['comunicados', 'Comunicados', 'aprovacoes'],
     ['anunciantes', 'Anunciantes e agências', 'anunciantes'], ['campanhas', 'Campanhas', 'campanhas'], ['criativos', 'Criativos', 'midias'],
     ['programacao', 'Programação', 'grade'], ['inventario', 'Inventário', 'ocupacao'],
-    ['relatorios', 'Relatórios', 'relatorios'], ['faturamento', 'Faturamento', 'faturamento'],
-    ['repasses', 'Repasses aos pontos', 'repasses'], ['diagnostico', 'Diagnóstico', 'diagnostico'],
+    ['relatorios', 'Relatórios', 'relatorios'],
+    ['financeiro', 'Financeiro', 'faturamento', null, [
+      ['receber', 'Contas a receber'], ['pagar', 'Contas a pagar'], ['faturamento', 'Faturamento'],
+    ]],
+    ['diagnostico', 'Diagnóstico', 'diagnostico'],
     ['usuarios', 'Usuários', 'usuarios', ['master']], ['configuracoes', 'Configurações', 'configuracoes', ['master']],
     ['historico', 'Histórico', 'historico'],
   ],
@@ -41,6 +44,8 @@ const SUBTITULOS = {
   relatorios: 'Inserções, impactos e a prova de exibição', faturamento: 'Fechamento do mês e faturas dos anunciantes',
   repasses: 'Comissão dos lojistas sobre a receita das telas', diagnostico: 'Verificações da rede e das TVs',
   usuarios: 'Quem acessa o painel e os portais', configuracoes: 'Regras da programação, preços de tabela e PIX das faturas',
+  receber: 'Faturas dos anunciantes: o que entra, o que está vencendo e o que atrasou',
+  pagar: 'Repasses aos pontos e despesas da operação: o que sai',
   historico: 'Registro de quem fez o quê', prova: 'Cada vez que seu anúncio foi ao ar', faturas: 'Suas faturas e o PIX para pagamento',
   rede: 'Pontos e telas onde a publicidade pode passar', conteudo: 'Imagens e vídeos do seu ponto na TV', conta: 'Sua conta',
 };
@@ -67,16 +72,22 @@ async function desenhar() {
   const menu = MENUS[g];
   const telas = { equipe: TELAS_EQUIPE, anunciante: TELAS_ANUNCIANTE, lojista: TELAS_LOJISTA }[g];
   const [nome, ...resto] = rota();
-  const item = menu.find(([k, , , perfis]) => k === nome && (!perfis || perfis.includes(u.perfil)));
-  if (!item || !telas[nome]) return ir(menu[0][0]);
+  const item = menu.find(([k, , , perfis, subs]) => (k === nome || subs?.some(([sk]) => sk === nome)) && (!perfis || perfis.includes(u.perfil)));
+  // Um grupo (só submenus) leva para a primeira tela dele.
+  if (item?.[4] && item[0] === nome) return ir(item[4][0][0]);
+  if (!item || !telas[nome]) return ir(menu[0][4]?.[0][0] ?? menu[0][0]);
 
   const conteudo = el('main', { class: 'conteudo' });
   let recolhida = false;
   try { recolhida = localStorage.getItem('midia.menu') === 'recolhido'; } catch { /* padrão */ }
   const casca = el('div', { class: `casca${recolhida ? ' recolhida' : ''}` });
 
-  const itens = menu.filter(([, , , perfis]) => !perfis || perfis.includes(u.perfil))
-    .map(([k, rotulo, ic]) => el('a', { class: `item${k === nome ? ' on' : ''}`, href: `#/${k}`, title: rotulo }, icone(ic), el('span', { class: 'rotulo' }, rotulo)));
+  const itens = menu.filter(([, , , perfis]) => !perfis || perfis.includes(u.perfil)).map(([k, rotulo, ic, , subs]) => {
+    const aberto = k === nome || subs?.some(([sk]) => sk === nome);
+    const link = el('a', { class: `item${aberto ? ' on' : ''}`, href: `#/${subs ? subs[0][0] : k}`, title: rotulo }, icone(ic), el('span', { class: 'rotulo' }, rotulo));
+    if (!subs || !aberto) return link;
+    return [link, el('div', { class: 'grupo-sub' }, subs.map(([sk, sr]) => el('a', { class: `sub${sk === nome ? ' on' : ''}`, href: `#/${sk}` }, sr)))];
+  });
 
   const lateral = el('nav', { class: 'lateral', 'aria-label': 'Menu' },
     el('div', { class: 'topo-lateral' }, marca(nomePlataforma), el('button', { class: 'recolher', title: 'Recolher menu', onclick: () => {
@@ -87,12 +98,17 @@ async function desenhar() {
 
   const subtitulo = SUBTITULOS[nome] ? el('p', { class: 'subtitulo' }, SUBTITULOS[nome]) : null;
   const vinculo = u.anunciante_nome ?? u.local_nome ?? null;
+  // Dentro de um grupo, o título é o da tela e a trilha mostra de onde ela vem.
+  const dentroDeGrupo = item[4] && item[0] !== nome;
+  const tituloTela = dentroDeGrupo ? item[4].find(([sk]) => sk === nome)[1] : item[1];
   const topo = el('header', { class: 'topo' },
-    el('div', {}, vinculo ? el('div', { class: 'trilha' }, vinculo) : null, el('h1', { style: 'margin:0' }, item[1]), subtitulo),
+    el('div', {},
+      dentroDeGrupo ? el('div', { class: 'trilha' }, item[1]) : (vinculo ? el('div', { class: 'trilha' }, vinculo) : null),
+      el('h1', { style: 'margin:0' }, tituloTela), subtitulo),
     ferramentas(u));
   casca.append(lateral, el('div', { class: 'principal' }, topo, conteudo));
   limpar(raiz, casca);
-  document.title = `${item[1]} · ${nomePlataforma}`;
+  document.title = `${tituloTela} · ${nomePlataforma}`;
 
   const ctx = {
     usuario: u,

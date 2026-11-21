@@ -242,6 +242,34 @@ function criar(db) {
     return { id, ...p };
   });
 
+  // Contratos: o acordo que sustenta as campanhas de cada cliente (ficam na ficha dele).
+  campanhas.forEach((c, i) => {
+    const anunciante = anunciantes[c.a];
+    const numero = `2026-${String(14 + i).padStart(3, '0')}`;
+    const contrato = inserir(`INSERT INTO contratos (anunciante_id, agencia_id, numero, objeto, inicio, fim, cobranca, valor_centavos, vencimento_dia,
+        reajuste, renovacao_automatica, status, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, 'IPCA a cada 12 meses', ?, 'ativo', ?)`,
+      anunciante.id, c.agencia !== undefined ? agencias[c.agencia].id : null, numero,
+      `Veiculação de "${c.nome}"${c.circuito !== undefined ? ` no circuito ${circuitos[c.circuito].nome}` : ' na rede'}`,
+      somarDias(hoje(), -40), somarDias(hoje(), 325), c.cobranca === 'cpm' ? 'cpm' : 'mensal', c.valor ?? 0, i % 2 === 0 ? 1 : 0, criado);
+    db.prepare('UPDATE campanhas SET contrato_id = ? WHERE id = ?').run(contrato, c.id);
+    db.prepare('UPDATE faturas SET contrato_id = ? WHERE anunciante_id = ? AND contrato_id IS NULL').run(contrato, anunciante.id);
+  });
+
+  // Contas a pagar da operação, além dos repasses: internet dos prédios, aparelhos e manutenção.
+  const despesa = (descricao, fornecedor, categoria, localId, diasParaVencer, valor, meses = 0) => {
+    for (let i = 0; i <= meses; i++) {
+      inserir(`INSERT INTO despesas (descricao, fornecedor, categoria, local_id, vencimento, valor_centavos, status, pago_em, repete_meses, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        descricao, fornecedor, categoria, localId, somarDias(hoje(), diasParaVencer + i * 30), valor,
+        diasParaVencer + i * 30 < -5 ? 'paga' : 'aberta', diasParaVencer + i * 30 < -5 ? somarDias(hoje(), diasParaVencer + i * 30) : null, meses, criado);
+    }
+  };
+  despesa('Internet do Edifício Jardim das Acácias', 'Provedor Fibra', 'internet', pontos[0].id, -35, 12_900, 2);
+  despesa('Internet do Centro Empresarial Nações', 'Provedor Fibra', 'internet', pontos[3].id, -33, 19_900, 2);
+  despesa('Compra de 2 TV box para o Vista Verde', 'Loja de Informática', 'aparelho', pontos[1].id, -12, 89_800);
+  despesa('Instalação das telas do Vista Verde', 'Eletricista Souza', 'instalacao', pontos[1].id, 4, 45_000);
+  despesa('Comissão de venda — circuito residencial', 'Vendedor Externo', 'comissao', null, 8, 35_000);
+
   // Uma campanha esperando aprovação e um criativo na fila, para a tela de aprovações ter conteúdo.
   const aguardando = inserir(`INSERT INTO campanhas (anunciante_id, nome, status, inicio, fim, cobranca, valor_centavos, insercoes_hora, prioridade,
       dias_semana, hora_inicio, hora_fim, criado_em) VALUES (?, 'Lançamento da loja nova', 'aguardando', ?, ?, 'mensal', 120000, 6, 3, '0123456', '09:00', '21:00', ?)`,

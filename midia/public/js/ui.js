@@ -65,6 +65,9 @@ export const STATUS_CAMPANHA = {
   pausada: ['Pausada', 'aviso'], encerrada: ['Encerrada', ''],
 };
 export const STATUS_MIDIA = { pendente: ['Aguardando aprovação', 'aviso'], aprovada: ['Aprovada', 'ok'], recusada: ['Recusada', 'erro'] };
+export const STATUS_CONTRATO = {
+  rascunho: ['Rascunho', ''], ativo: ['Ativo', 'ok'], suspenso: ['Suspenso', 'aviso'], encerrado: ['Encerrado', ''],
+};
 export const STATUS_FATURA = { aberta: ['Aberta', 'info'], paga: ['Paga', 'ok'], cancelada: ['Cancelada', ''] };
 export const STATUS_REPASSE = { a_pagar: ['A pagar', 'aviso'], pago: ['Pago', 'ok'], cancelado: ['Cancelado', ''] };
 export const COBRANCA = { mensal: 'Valor mensal', cpm: 'CPM (por mil impactos)', cortesia: 'Cortesia (não fatura)' };

@@ -141,7 +141,8 @@ module.exports = (db) => {
     res.json({ data, linhas });
   });
 
-  // ----------------------------------------------------------------- Faturamento e repasses
+  // ----------------------------------------------------------------- Fechamento do mês
+  // (as faturas, os repasses, os contratos e as despesas ficam em routes/financeiro.js)
   r.get('/faturamento', (req, res) => {
     const competencia = req.query.competencia ? v.competencia(req.query.competencia) : somarMeses(mes(), -1);
     const previa = faturamento.calcular(db, competencia);
@@ -162,75 +163,6 @@ module.exports = (db) => {
     const resultado = faturamento.gerar(db, competencia, { vencimento: req.body.vencimento ? v.data(req.body.vencimento, 'o vencimento') : null });
     registrar(db, req, 'faturamento_gerado', resultado);
     res.status(201).json(resultado);
-  });
-
-  r.get('/faturas', (req, res) => {
-    const onde = [];
-    const p = [];
-    if (req.query.status) { onde.push('f.status = ?'); p.push(req.query.status); }
-    if (req.query.anunciante_id) { onde.push('f.anunciante_id = ?'); p.push(Number(req.query.anunciante_id)); }
-    if (req.query.competencia) { onde.push('f.competencia = ?'); p.push(v.competencia(req.query.competencia)); }
-    const itens = db.prepare(`SELECT f.*, a.nome AS anunciante, (f.status = 'aberta' AND f.vencimento < ?) AS atrasada
-      FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''}
-      ORDER BY f.competencia DESC, a.nome`).all(hoje(), ...p);
-    res.json({
-      itens,
-      totais: {
-        aberto_centavos: itens.filter((f) => f.status === 'aberta').reduce((t, f) => t + f.valor_centavos, 0),
-        pago_centavos: itens.filter((f) => f.status === 'paga').reduce((t, f) => t + f.valor_centavos, 0),
-        atrasadas: itens.filter((f) => f.atrasada).length,
-      },
-    });
-  });
-
-  r.get('/faturas/:id', async (req, res) => {
-    const f = faturamento.detalhe(db, Number(req.params.id));
-    if (f.pix) f.pix.qr = await QRCode.toDataURL(f.pix.codigo, { margin: 1, width: 320 }).catch(() => null);
-    res.json(f);
-  });
-
-  r.post('/faturas/:id/pagar', (req, res) => {
-    const id = Number(req.params.id);
-    const f = db.prepare('SELECT * FROM faturas WHERE id = ?').get(id);
-    if (!f) throw naoEncontrado('Fatura');
-    if (f.status !== 'aberta') throw new ErroNegocio('Esta fatura não está aberta.', 409);
-    const pago = req.body.pago_em ? v.data(req.body.pago_em, 'a data do pagamento') : hoje();
-    db.prepare("UPDATE faturas SET status = 'paga', pago_em = ?, observacao = COALESCE(?, observacao) WHERE id = ?")
-      .run(pago, v.opcional(req.body.observacao, 'a observação', 300), id);
-    registrar(db, req, 'fatura_paga', { id, valor_centavos: f.valor_centavos, pago_em: pago });
-    res.json(db.prepare('SELECT * FROM faturas WHERE id = ?').get(id));
-  });
-
-  r.post('/faturas/:id/cancelar', (req, res) => {
-    const id = Number(req.params.id);
-    const f = db.prepare('SELECT * FROM faturas WHERE id = ?').get(id);
-    if (!f) throw naoEncontrado('Fatura');
-    if (f.status === 'paga') throw new ErroNegocio('Fatura paga não pode ser cancelada.', 409);
-    db.prepare("UPDATE faturas SET status = 'cancelada', observacao = ? WHERE id = ?").run(v.texto(req.body.motivo, 'o motivo', 300), id);
-    registrar(db, req, 'fatura_cancelada', { id });
-    res.json(db.prepare('SELECT * FROM faturas WHERE id = ?').get(id));
-  });
-
-  r.get('/repasses', (req, res) => {
-    const onde = [];
-    const p = [];
-    if (req.query.status) { onde.push('r.status = ?'); p.push(req.query.status); }
-    if (req.query.competencia) { onde.push('r.competencia = ?'); p.push(v.competencia(req.query.competencia)); }
-    if (req.query.local_id) { onde.push('r.local_id = ?'); p.push(Number(req.query.local_id)); }
-    const itens = db.prepare(`SELECT r.*, l.nome AS local, l.cidade, l.responsavel, l.telefone FROM repasses r JOIN locais l ON l.id = r.local_id
-      ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY r.competencia DESC, r.valor_centavos DESC`).all(...p);
-    res.json({ itens, total_centavos: itens.filter((x) => x.status === 'a_pagar').reduce((t, x) => t + x.valor_centavos, 0) });
-  });
-
-  r.post('/repasses/:id/pagar', (req, res) => {
-    const id = Number(req.params.id);
-    const x = db.prepare('SELECT * FROM repasses WHERE id = ?').get(id);
-    if (!x) throw naoEncontrado('Repasse');
-    if (x.status !== 'a_pagar') throw new ErroNegocio('Este repasse não está a pagar.', 409);
-    db.prepare("UPDATE repasses SET status = 'pago', pago_em = ?, observacao = COALESCE(?, observacao) WHERE id = ?")
-      .run(req.body.pago_em ? v.data(req.body.pago_em, 'a data do pagamento') : hoje(), v.opcional(req.body.observacao, 'a observação', 300), id);
-    registrar(db, req, 'repasse_pago', { id, valor_centavos: x.valor_centavos });
-    res.json(db.prepare('SELECT * FROM repasses WHERE id = ?').get(id));
   });
 
   // ----------------------------------------------------------------- Agências

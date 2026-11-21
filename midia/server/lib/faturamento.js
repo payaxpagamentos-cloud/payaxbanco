@@ -55,12 +55,13 @@ function calcular(db, competencia) {
     const comissao = Math.round((valor * (c.comissao_agencia_percentual ?? 0)) / 10_000);
     if (!porAnunciante.has(c.anunciante_id)) {
       porAnunciante.set(c.anunciante_id, {
-        anunciante_id: c.anunciante_id, anunciante: c.anunciante_nome, agencia_id: null, agencia: null,
+        anunciante_id: c.anunciante_id, anunciante: c.anunciante_nome, agencia_id: null, agencia: null, contrato_id: null,
         competencia, bruto_centavos: 0, comissao_agencia_centavos: 0, valor_centavos: 0, itens: [],
       });
     }
     const f = porAnunciante.get(c.anunciante_id);
     if (c.agencia_id && !f.agencia_id) { f.agencia_id = c.agencia_id; f.agencia = c.agencia_nome; }
+    if (c.contrato_id && !f.contrato_id) f.contrato_id = c.contrato_id;
     f.itens.push({
       campanha_id: c.id,
       descricao: `${c.nome} (${c.cobranca === 'cpm' ? 'CPM' : c.cobranca === 'mensal' ? 'mensal' : 'cortesia'}${nota ? `, ${nota}` : ''}`
@@ -140,13 +141,14 @@ function gerar(db, competencia, { vencimento } = {}) {
       if (atual && atual.status !== 'aberta') { mantidas++; continue; }
       let id = atual?.id;
       if (id) {
-        db.prepare('UPDATE faturas SET valor_centavos = ?, bruto_centavos = ?, comissao_agencia_centavos = ?, agencia_id = ?, vencimento = ? WHERE id = ?')
-          .run(f.valor_centavos, f.bruto_centavos, f.comissao_agencia_centavos, f.agencia_id, venc, id);
+        db.prepare(`UPDATE faturas SET valor_centavos = ?, bruto_centavos = ?, comissao_agencia_centavos = ?, agencia_id = ?, contrato_id = ?, vencimento = ?
+          WHERE id = ?`).run(f.valor_centavos, f.bruto_centavos, f.comissao_agencia_centavos, f.agencia_id, f.contrato_id, venc, id);
         db.prepare('DELETE FROM fatura_itens WHERE fatura_id = ?').run(id);
       } else {
-        id = Number(db.prepare(`INSERT INTO faturas (anunciante_id, agencia_id, competencia, vencimento, bruto_centavos, comissao_agencia_centavos, valor_centavos, criado_em)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-          .run(f.anunciante_id, f.agencia_id, competencia, venc, f.bruto_centavos, f.comissao_agencia_centavos, f.valor_centavos, agora()).lastInsertRowid);
+        id = Number(db.prepare(`INSERT INTO faturas (anunciante_id, agencia_id, contrato_id, competencia, vencimento, bruto_centavos,
+          comissao_agencia_centavos, valor_centavos, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(f.anunciante_id, f.agencia_id, f.contrato_id, competencia, venc, f.bruto_centavos, f.comissao_agencia_centavos,
+            f.valor_centavos, agora()).lastInsertRowid);
       }
       for (const i of f.itens) {
         db.prepare('INSERT INTO fatura_itens (fatura_id, campanha_id, descricao, insercoes, impactos, telas, valor_centavos) VALUES (?, ?, ?, ?, ?, ?, ?)')

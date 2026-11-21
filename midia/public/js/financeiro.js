@@ -1,7 +1,7 @@
 /** Relatórios, fechamento do mês (faturas dos anunciantes) e repasses aos lojistas. */
 import { api, qs, baixar } from './api.js';
 import {
-  el, limpar, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, lerForm,
+  el, limpar, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, area, lerForm, centavos, reaisCampo,
   inteiro, dinheiro, duracao, dataBr, dataHora, etiquetaDe, etiqueta, percentual, competenciaTexto,
   STATUS_FATURA, STATUS_REPASSE, COBRANCA, REPASSES,
 } from './ui.js';
@@ -105,13 +105,13 @@ export async function faturamento(ctx) {
 
   const pintar = async () => {
     const d = await api.get(`/painel/faturamento${qs({ competencia: estado.competencia })}`);
-    const faturas = await api.get('/painel/faturas');
+    const receber = await api.get('/painel/contas-a-receber');
     limpar(corpo,
       el('div', { class: 'grade' },
         indicador({ rotulo: `Previsto em ${competenciaTexto(d.competencia)}`, valor: dinheiro(d.total_centavos), ic: 'dinheiro', cor: 'verde', nota: `${d.previa.length} anunciantes` }),
         indicador({ rotulo: 'Repasse aos pontos', valor: dinheiro(d.repasses.reduce((t, r) => t + r.valor_centavos, 0)), ic: 'repasses', cor: 'laranja', nota: `${d.repasses.length} pontos` }),
-        indicador({ rotulo: 'Faturas em aberto', valor: dinheiro(faturas.totais.aberto_centavos), ic: 'faturamento', cor: faturas.totais.atrasadas ? 'vermelho' : 'azul', nota: `${faturas.totais.atrasadas} atrasadas` }),
-        indicador({ rotulo: 'Recebido (tudo)', valor: dinheiro(faturas.totais.pago_centavos), ic: 'ok', cor: 'verde' })),
+        indicador({ rotulo: 'Faturas em aberto', valor: dinheiro(receber.totais.aberto_centavos), ic: 'faturamento', cor: receber.totais.atrasado_centavos ? 'vermelho' : 'azul', nota: `${dinheiro(receber.totais.atrasado_centavos)} atrasado` }),
+        indicador({ rotulo: 'Recebido (tudo)', valor: dinheiro(receber.totais.recebido_centavos), ic: 'ok', cor: 'verde' })),
 
       cartao(`Prévia do fechamento — ${competenciaTexto(d.competencia)}`,
         el('p', { class: 'pequeno mudo', style: 'margin-top:-8px' },
@@ -135,14 +135,20 @@ export async function faturamento(ctx) {
             }),
           }, icone('ok'), 'Fechar o mês'))),
 
-      cartao('Faturas', tabela([
-        [(f) => f.anunciante, 'Anunciante'],
-        [(f) => competenciaTexto(f.competencia), 'Competência'],
-        [(f) => dinheiro(f.valor_centavos), 'Valor', 'num dir'],
-        [(f) => el('span', { style: f.atrasada ? 'color:var(--erro);font-weight:700' : null }, dataBr(f.vencimento)), 'Vencimento'],
-        [(f) => (f.atrasada ? etiqueta('Atrasada', 'erro') : etiquetaDe(STATUS_FATURA, f.status)), 'Situação'],
-        [(f) => (f.pago_em ? dataBr(f.pago_em) : '—'), 'Pagamento'],
-      ], faturas.itens, { aoClicar: (f) => abrirFatura(f.id, pintar), vazioTexto: 'Nenhuma fatura gerada.' })));
+      cartao(`Faturas de ${competenciaTexto(d.competencia)}`,
+        el('p', { class: 'pequeno mudo', style: 'margin-top:-8px' }, 'A lista completa, com baixa e cobrança, fica em Contas a receber.'),
+        tabela([
+          [(f) => f.anunciante, 'Anunciante'],
+          [(f) => dinheiro(f.valor_centavos), 'Valor', 'num dir'],
+          [(f) => dataBr(f.vencimento), 'Vencimento'],
+          [(f) => etiquetaDe(STATUS_FATURA, f.status), 'Situação'],
+        ], d.faturas, { aoClicar: (f) => abrirFatura(f.id, pintar), vazioTexto: 'Esta competência ainda não foi fechada.' })),
+      cartao('Repasses gerados', tabela([
+        [(x) => x.local, 'Ponto'],
+        [(x) => (x.tipo === 'fixo' ? 'Valor fixo' : percentual(x.comissao_percentual)), 'Combinado', 'num dir'],
+        [(x) => dinheiro(x.base_centavos), 'Receita das telas', 'num dir'],
+        [(x) => el('strong', {}, dinheiro(x.valor_centavos)), 'Repasse', 'num dir'],
+      ], d.repasses, { vazioTexto: 'Nenhum repasse nesta competência.' })));
   };
 
   limpar(ctx.conteudo,
@@ -202,38 +208,149 @@ async function abrirFatura(id, recarregar) {
   ], { largo: true });
 }
 
-// ---------------------------------------------------------------- Repasses
-export async function repasses(ctx) {
-  const estado = { status: '', competencia: '' };
-  const corpo = el('div', { class: 'cartao' });
+// ================================================================ Contas a receber
+/** As faturas dos anunciantes: o que entra, o que vence e o que já atrasou (com as faixas de atraso). */
+export async function contasAReceber(ctx) {
+  const estado = { status: '', anunciante_id: '', de: '', ate: '' };
+  const corpo = el('div', { class: 'coluna' });
+  const opcoes = await api.get('/painel/opcoes');
 
   const pintar = async () => {
-    const d = await api.get(`/painel/repasses${qs(estado)}`);
+    const d = await api.get(`/painel/contas-a-receber${qs(estado)}`);
+    const a = d.atraso;
     limpar(corpo,
-      el('p', { class: 'pequeno mudo' }, `A pagar: ${dinheiro(d.total_centavos)}`),
-      tabela([
-        [(r) => el('div', {}, el('div', {}, r.local), el('div', { class: 'pequeno mudo' }, `${r.cidade ?? ''}${r.responsavel ? ` · ${r.responsavel}` : ''}`)), 'Ponto'],
-        [(r) => competenciaTexto(r.competencia), 'Competência'],
-        [(r) => dinheiro(r.base_centavos), 'Receita das TVs', 'num dir'],
-        [(r) => (r.tipo === 'fixo' ? 'Valor fixo' : percentual(r.comissao_percentual)), 'Combinado', 'num dir'],
-        [(r) => el('strong', {}, dinheiro(r.valor_centavos)), 'Repasse', 'num dir'],
-        [(r) => etiquetaDe(STATUS_REPASSE, r.status), 'Situação'],
-        [(r) => (r.pago_em ? dataBr(r.pago_em) : '—'), 'Pago em'],
-        [(r) => (r.status === 'a_pagar' ? el('button', {
-          class: 'btn pequeno primario', onclick: (e) => acao(e.target, async () => {
-            if (!await confirmar('Marcar repasse como pago', `${r.local} — ${dinheiro(r.valor_centavos)} (${competenciaTexto(r.competencia)})`, 'Marcar como pago')) return;
-            await api.post(`/painel/repasses/${r.id}/pagar`, {});
-            toast('Repasse marcado como pago.');
-            pintar();
-          }),
-        }, 'Pagar') : '—'), '', 'acoes'],
-      ], d.itens, { vazioTexto: 'Nenhum repasse. Eles são criados quando o mês é fechado no Faturamento.' }));
+      el('div', { class: 'grade' },
+        indicador({ rotulo: 'Em aberto', valor: dinheiro(d.totais.aberto_centavos), ic: 'faturamento', cor: 'azul' }),
+        indicador({
+          rotulo: 'Atrasado', valor: dinheiro(d.totais.atrasado_centavos), ic: 'erro',
+          cor: d.totais.atrasado_centavos ? 'vermelho' : 'verde',
+          nota: d.totais.clientes_em_atraso ? `${d.totais.clientes_em_atraso} cliente(s)` : 'ninguém em atraso',
+        }),
+        indicador({ rotulo: 'Vence em 7 dias', valor: dinheiro(d.totais.vence_em_7_centavos), ic: 'relogio', cor: 'laranja' }),
+        indicador({ rotulo: 'Já recebido', valor: dinheiro(d.totais.recebido_centavos), ic: 'ok', cor: 'verde' })),
+
+      d.totais.atrasado_centavos
+        ? cartao('Atraso por faixa', tabela([
+          [(x) => x.faixa, 'Faixa'],
+          [(x) => dinheiro(x.valor), 'Valor', 'num dir'],
+        ], [
+          { faixa: 'Até 30 dias', valor: a.ate_30 }, { faixa: '31 a 60 dias', valor: a.de_31_a_60 },
+          { faixa: '61 a 90 dias', valor: a.de_61_a_90 }, { faixa: 'Mais de 90 dias', valor: a.mais_de_90 },
+        ].filter((x) => x.valor > 0)))
+        : null,
+
+      cartao('Faturas', tabela([
+        [(f) => el('div', {}, el('div', {}, f.anunciante),
+          el('div', { class: 'pequeno mudo' }, [f.agencia ? `via ${f.agencia}` : null, f.contrato ? `contrato ${f.contrato}` : null].filter(Boolean).join(' · ') || '—')), 'Cliente'],
+        [(f) => competenciaTexto(f.competencia), 'Competência'],
+        [(f) => dinheiro(f.valor_centavos), 'Valor', 'num dir'],
+        [(f) => el('span', { style: f.atrasada ? 'color:var(--erro);font-weight:700' : null }, dataBr(f.vencimento)), 'Vencimento'],
+        [(f) => (f.atrasada ? etiqueta(`${f.dias_atraso} dia(s) de atraso`, 'erro') : etiquetaDe(STATUS_FATURA, f.status)), 'Situação'],
+        [(f) => (f.pago_em ? dataBr(f.pago_em) : '—'), 'Recebido em'],
+      ], d.itens, { aoClicar: (f) => abrirFatura(f.id, pintar), vazioTexto: 'Nenhuma fatura. Elas nascem no fechamento do mês, em Faturamento.' })));
   };
 
   limpar(ctx.conteudo,
     el('div', { class: 'filtros livre' },
-      escolha('Situação', 'status', { '': 'Todos', a_pagar: 'A pagar', pago: 'Pagos' }, '', { onchange: (e) => { estado.status = e.target.value; pintar(); } }),
-      campo('Competência', { type: 'month', onchange: (e) => { estado.competencia = e.target.value; pintar(); } })),
+      escolha('Situação', 'status', { '': 'Todas', aberta: 'Em aberto', paga: 'Recebidas' }, '', { onchange: (e) => { estado.status = e.target.value; pintar(); } }),
+      escolha('Cliente', 'anunciante_id', { '': 'Todos', ...Object.fromEntries(opcoes.anunciantes.map((x) => [x.id, x.nome])) }, '',
+        { onchange: (e) => { estado.anunciante_id = e.target.value; pintar(); } }),
+      campo('Vencimento de', { type: 'date', onchange: (e) => { estado.de = e.target.value; pintar(); } }),
+      campo('até', { type: 'date', onchange: (e) => { estado.ate = e.target.value; pintar(); } })),
     corpo);
   await pintar();
+}
+
+// ================================================================ Contas a pagar
+const CATEGORIAS_DESPESA = {
+  internet: 'Internet do ponto', aparelho: 'Aparelho / TV', instalacao: 'Instalação', manutencao: 'Manutenção',
+  aluguel_espaco: 'Aluguel de espaço', comissao: 'Comissão de venda', energia: 'Energia', software: 'Software',
+  imposto: 'Imposto', outros: 'Outros',
+};
+
+/** O que a rede tem para pagar: os repasses aos pontos e as despesas da operação, numa lista só. */
+export async function contasAPagar(ctx) {
+  const estado = { status: '', tipo: '', de: '', ate: '' };
+  const corpo = el('div', { class: 'coluna' });
+
+  const pintar = async () => {
+    const d = await api.get(`/painel/contas-a-pagar${qs(estado)}`);
+    limpar(corpo,
+      el('div', { class: 'grade' },
+        indicador({ rotulo: 'Em aberto', valor: dinheiro(d.totais.aberto_centavos), ic: 'repasses', cor: 'azul' }),
+        indicador({ rotulo: 'Atrasado', valor: dinheiro(d.totais.atrasado_centavos), ic: 'erro', cor: d.totais.atrasado_centavos ? 'vermelho' : 'verde' }),
+        indicador({ rotulo: 'Vence em 7 dias', valor: dinheiro(d.totais.vence_em_7_centavos), ic: 'relogio', cor: 'laranja' }),
+        indicador({
+          rotulo: 'Repasses aos pontos', valor: dinheiro(d.totais.repasses_centavos), ic: 'pontos', cor: 'roxo',
+          nota: `despesas: ${dinheiro(d.totais.despesas_centavos)}`,
+        })),
+
+      cartao('Contas', tabela([
+        [(x) => el('div', {}, el('div', {}, x.descricao),
+          el('div', { class: 'pequeno mudo' }, x.tipo === 'repasse' ? 'Repasse ao ponto (do fechamento do mês)' : (CATEGORIAS_DESPESA[x.categoria] ?? x.categoria))), 'Conta'],
+        [(x) => x.fornecedor ?? '—', 'Para quem'],
+        [(x) => el('span', { style: x.atrasada ? 'color:var(--erro);font-weight:700' : null }, dataBr(x.vencimento)), 'Vencimento'],
+        [(x) => dinheiro(x.valor_centavos), 'Valor', 'num dir'],
+        [(x) => (x.status === 'paga' ? etiqueta(`Pago em ${dataBr(x.pago_em)}`, 'ok') : (x.atrasada ? etiqueta('Atrasada', 'erro') : etiqueta('Em aberto', 'info'))), 'Situação'],
+        [(x) => el('div', { class: 'acoes' },
+          x.status === 'aberta'
+            ? el('button', {
+              class: 'btn pequeno primario', onclick: (e) => acao(e.target, async () => {
+                const quando = await perguntar('Marcar como paga', 'Data do pagamento (AAAA-MM-DD)', { valor: hojeLocal() });
+                if (!quando) return;
+                await api.post(`/painel/${x.tipo === 'repasse' ? 'repasses' : 'despesas'}/${x.id}/pagar`, { pago_em: quando });
+                toast('Conta baixada.');
+                pintar();
+              }),
+            }, 'Pagar')
+            : (x.tipo === 'despesa'
+              ? el('button', {
+                class: 'btn pequeno', onclick: (e) => acao(e.target, async () => {
+                  await api.post(`/painel/despesas/${x.id}/estornar`, {});
+                  toast('Pagamento estornado.');
+                  pintar();
+                }),
+              }, 'Estornar')
+              : '—'),
+          x.tipo === 'despesa' && x.status === 'aberta'
+            ? el('button', { class: 'icone-btn', title: 'Editar', onclick: () => editarDespesa(x, pintar) }, icone('editar'))
+            : null), '', 'acoes'],
+      ], d.itens, { vazioTexto: 'Nada a pagar no período. Os repasses aparecem quando o mês é fechado.' })));
+  };
+
+  limpar(ctx.conteudo,
+    el('div', { class: 'filtros livre' },
+      escolha('Situação', 'status', { '': 'Todas', aberta: 'Em aberto', paga: 'Pagas' }, '', { onchange: (e) => { estado.status = e.target.value; pintar(); } }),
+      escolha('Tipo', 'tipo', { '': 'Tudo', repasse: 'Repasses aos pontos', despesa: 'Despesas da operação' }, '', { onchange: (e) => { estado.tipo = e.target.value; pintar(); } }),
+      campo('Vencimento de', { type: 'date', onchange: (e) => { estado.de = e.target.value; pintar(); } }),
+      campo('até', { type: 'date', onchange: (e) => { estado.ate = e.target.value; pintar(); } }),
+      el('button', { class: 'btn primario', onclick: () => editarDespesa(null, pintar) }, icone('mais'), 'Lançar despesa')),
+    corpo);
+  await pintar();
+}
+
+/** Lançamento de despesa, com repetição mensal para as contas que chegam todo mês. */
+function editarDespesa(despesa, recarregar) {
+  return api.get('/painel/opcoes').then((opcoes) => formModal(despesa ? 'Editar despesa' : 'Lançar despesa', () => [
+    campo('Descrição', { name: 'descricao', value: despesa?.descricao ?? '', required: true, maxlength: 160, placeholder: 'Ex.: Internet do Edifício Jardim' }),
+    el('div', { class: 'duas' },
+      campo('Fornecedor', { name: 'fornecedor', value: despesa?.fornecedor ?? '', maxlength: 120 }),
+      escolha('Categoria', 'categoria', CATEGORIAS_DESPESA, despesa?.categoria ?? 'outros')),
+    el('div', { class: 'duas' },
+      campo('Vencimento', { name: 'vencimento', type: 'date', value: despesa?.vencimento ?? hojeLocal(), required: true }),
+      campo('Valor (R$)', { name: 'valor', value: reaisCampo(despesa?.valor_centavos), inputmode: 'decimal', required: true })),
+    el('div', { class: 'duas' },
+      escolha('Ponto (quando a conta é de um ponto)', 'local_id', { '': 'Nenhum', ...Object.fromEntries(opcoes.locais.map((l) => [l.id, l.nome])) }, despesa?.local_id ?? ''),
+      despesa ? null : escolha('Repetir', 'repete_meses', { 0: 'Só esta', 2: 'Por 3 meses', 5: 'Por 6 meses', 11: 'Por 12 meses', 23: 'Por 24 meses' }, 0)),
+    area('Observação', { name: 'observacao', maxlength: 300 }, despesa?.observacao ?? ''),
+  ], async (d) => {
+    const corpo = { ...d, valor_centavos: centavos(d.valor), repete_meses: Number(d.repete_meses ?? 0) };
+    delete corpo.valor;
+    if (despesa) await api.patch(`/painel/despesas/${despesa.id}`, corpo);
+    else {
+      const r = await api.post('/painel/despesas', corpo);
+      toast(r.criadas > 1 ? `${r.criadas} contas lançadas (uma por mês).` : 'Despesa lançada.');
+    }
+    recarregar();
+  }));
 }

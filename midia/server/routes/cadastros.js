@@ -443,11 +443,30 @@ module.exports = (db) => {
   r.get('/anunciantes/:id', (req, res) => {
     const a = db.prepare('SELECT * FROM anunciantes WHERE id = ?').get(Number(req.params.id));
     if (!a) throw naoEncontrado('Anunciante');
+    const data = hoje();
+    const faturas = db.prepare('SELECT * FROM faturas WHERE anunciante_id = ? ORDER BY competencia DESC').all(a.id);
+    const soma = (f) => faturas.filter(f).reduce((t, x) => t + x.valor_centavos, 0);
     res.json({
       ...a,
-      campanhas: db.prepare('SELECT id, nome, status, inicio, fim, cobranca, valor_centavos, cpm_centavos FROM campanhas WHERE anunciante_id = ? ORDER BY inicio DESC').all(a.id),
+      // Contratos e financeiro do cliente ficam na ficha dele: é onde se procura quando o telefone toca.
+      contratos: db.prepare(`SELECT c.*, ag.nome AS agencia, (SELECT COUNT(*) FROM campanhas x WHERE x.contrato_id = c.id) AS campanhas
+        FROM contratos c LEFT JOIN agencias ag ON ag.id = c.agencia_id WHERE c.anunciante_id = ?
+        ORDER BY CASE c.status WHEN 'ativo' THEN 0 WHEN 'suspenso' THEN 1 WHEN 'rascunho' THEN 2 ELSE 3 END, c.inicio DESC`).all(a.id),
+      financeiro: {
+        aberto_centavos: soma((f) => f.status === 'aberta'),
+        atrasado_centavos: soma((f) => f.status === 'aberta' && f.vencimento < data),
+        recebido_centavos: soma((f) => f.status === 'paga'),
+        faturas_abertas: faturas.filter((f) => f.status === 'aberta').length,
+        proxima: faturas.filter((f) => f.status === 'aberta').sort((x, y) => x.vencimento.localeCompare(y.vencimento))[0] ?? null,
+        ultimo_pagamento: faturas.filter((f) => f.status === 'paga' && f.pago_em).sort((x, y) => y.pago_em.localeCompare(x.pago_em))[0] ?? null,
+      },
+      // Histórico de pagamento, do mais recente para o mais antigo.
+      pagamentos: faturas.filter((f) => f.status === 'paga').slice(0, 24)
+        .map((f) => ({ competencia: f.competencia, valor_centavos: f.valor_centavos, vencimento: f.vencimento, pago_em: f.pago_em })),
+      campanhas: db.prepare(`SELECT c.id, c.nome, c.status, c.inicio, c.fim, c.cobranca, c.valor_centavos, c.cpm_centavos, ct.numero AS contrato
+        FROM campanhas c LEFT JOIN contratos ct ON ct.id = c.contrato_id WHERE c.anunciante_id = ? ORDER BY c.inicio DESC`).all(a.id),
       midias: db.prepare('SELECT id, nome, tipo, status, duracao_s, validade_ate, criado_em FROM midias WHERE anunciante_id = ? ORDER BY id DESC').all(a.id),
-      faturas: db.prepare('SELECT * FROM faturas WHERE anunciante_id = ? ORDER BY competencia DESC LIMIT 12').all(a.id),
+      faturas: faturas.slice(0, 12),
       usuarios: db.prepare("SELECT id, nome, email, ativo, ultimo_acesso FROM usuarios WHERE anunciante_id = ? AND perfil = 'anunciante'").all(a.id),
     });
   });

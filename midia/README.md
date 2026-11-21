@@ -55,8 +55,10 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
   (logo da administradora e assinatura).
 - **Comunicados**: a fila dos recados dos pontos (vindos do portal do síndico ou do lojista) para a equipe aprovar,
   recusar com motivo ou escrever direto.
-- **Anunciantes e agências**: cadastro dos dois, campanhas, faturas e o acesso ao portal (com senha provisória).
-  A agência carrega a comissão padrão, que entra nas campanhas dela.
+- **Anunciantes e agências**: cadastro dos dois e o acesso ao portal (com senha provisória). A agência carrega a
+  comissão padrão, que entra nas campanhas dela. A ficha do cliente é onde fica o que se procura quando ele liga:
+  **o financeiro dele** (em aberto, vencido, próximo vencimento, já recebido), os **contratos**, o **histórico de
+  pagamentos**, as campanhas e as faturas.
 - **Campanhas**: lista com situação e entrega de hoje; no detalhe, criativos, onde passa, desempenho e as ações de
   situação (enviar, aprovar, recusar, pausar, retomar, encerrar).
 - **Criativos**: grade com prévia de cada imagem/vídeo, fila de aprovação, validade e em quantas campanhas está.
@@ -65,8 +67,14 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
 - **Inventário (mídia kit)**: o que a rede tem para vender — circuitos com telas, pontos, formatos, audiência e preço,
   e a lista de pontos com ambiente, unidades, onde as telas ficam e a tabela. Exporta em CSV para montar a proposta.
 - **Relatórios**: por campanha, por TV, por ponto e a **prova de exibição** linha por linha; tudo com CSV.
-- **Faturamento**: prévia do mês (calculada do que foi exibido), fechamento, faturas com PIX copia e cola e QR Code.
-- **Repasses aos pontos**: comissão de cada lojista sobre a receita das telas dele, com baixa de pagamento.
+- **Financeiro**, com três telas:
+  - **Contas a receber**: as faturas dos anunciantes, com o que vence nos próximos 7 dias, o que já atrasou (e há
+    quantos dias), o **atraso por faixa** (até 30, 31–60, 61–90, mais de 90) e a baixa do pagamento.
+  - **Contas a pagar**: numa lista só, os **repasses aos pontos** (que nascem do fechamento) e as **despesas da
+    operação** — internet do prédio, aparelho, instalação, manutenção, comissão de venda, aluguel de espaço.
+    O lançamento aceita **repetição mensal** (a internet que chega todo mês vira 12 contas de uma vez) e tem baixa e estorno.
+  - **Faturamento**: a prévia do mês calculada do que foi exibido, o fechamento (que gera faturas e repasses) e as
+    faturas da competência, com PIX copia e cola e QR Code.
 - **Diagnóstico**: TVs offline ou sem parear, campanhas sem criativo aprovado, criativos vencendo, pontos sem TV,
   faturas vencidas e PIX não configurado.
 - **Usuários**, **Configurações** e **Histórico** (auditoria de quem fez o quê).
@@ -124,6 +132,15 @@ Esse tempo é **não vendido**, e é anotado na prova de exibição como tal: el
 divisão dos impactos, então o anunciante nunca recebe o público que passou enquanto a tela mostrava a marca da rede.
 Em *Configurações › Tela da marca* dá para desligar ou mudar quanto tempo ela fica no ar. Conteúdo institucional que
 a equipe tenha enviado tem preferência: a peça da marca só completa o que faltar.
+
+## Contratos
+
+O contrato é o acordo comercial que sustenta as campanhas de um cliente, e por isso mora **na ficha dele**:
+número, objeto, vigência, forma de cobrança (mensal, CPM, pacote ou cortesia), valor, dia de vencimento, reajuste,
+renovação automática e situação (rascunho, ativo, suspenso, encerrado).
+
+As campanhas se ligam ao contrato, e a fatura nasce carregando de qual contrato ela veio — então, olhando uma conta
+a receber, dá para saber na hora qual acordo ela está cumprindo. Contrato que já gerou fatura não é excluído: encerra.
 
 ## Comunicados do ponto e o layout da tela
 
@@ -221,12 +238,12 @@ Requisitos: **Node.js 22.13+**.
 npm install
 npm run demo      # opcional: 6 pontos, 9 TVs, 5 anunciantes, campanhas e 31 dias de exibições
 npm start         # painel em http://localhost:3600/midia/ e player em http://localhost:3600/midia/tv/
-npm test          # 55 testes de aceite
+npm test          # 60 testes de aceite
 ```
 
 A demonstração monta uma rede com 3 condomínios residenciais, um condomínio comercial, academia, mercado, padaria e
 clínica — 15 telas entre elevadores, halls, portarias e áreas de atendimento, sendo as dos prédios no layout dividido
-—, 3 circuitos, 2 agências, campanhas com PI e comunicados de condomínio. Acessos: `operador@midia.com.br` / `operador-demo-2026`,
+—, 3 circuitos, 2 agências, campanhas com PI e contrato, comunicados de condomínio e contas a pagar da operação. Acessos: `operador@midia.com.br` / `operador-demo-2026`,
 `anunciante@midia.com.br` / `anunciante-demo-2026`, `sindico@midia.com.br` e `lojista@midia.com.br` / `lojista-demo-2026`.
 O master é o configurado em `MIDIA_ADMIN_EMAIL` (padrão `master@midia.com.br` / `master123`).
 As TVs da demonstração aparecem como *sem contato* até um player de verdade se parear.

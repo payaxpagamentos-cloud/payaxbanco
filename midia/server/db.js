@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS campanhas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   anunciante_id INTEGER NOT NULL REFERENCES anunciantes(id),
   agencia_id INTEGER REFERENCES agencias(id),
+  contrato_id INTEGER REFERENCES contratos(id),
   circuito_id INTEGER REFERENCES circuitos(id),
   -- Número do PI (pedido de inserção) que a agência emitiu.
   pi TEXT,
@@ -309,11 +310,55 @@ CREATE TABLE IF NOT EXISTS telas_eventos (
 );
 CREATE INDEX IF NOT EXISTS idx_eventos_tela ON telas_eventos (tela_id, criado_em);
 
+-- Contrato do cliente: o acordo comercial que sustenta as campanhas dele. Fica na ficha do anunciante.
+CREATE TABLE IF NOT EXISTS contratos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  anunciante_id INTEGER NOT NULL REFERENCES anunciantes(id),
+  agencia_id INTEGER REFERENCES agencias(id),
+  numero TEXT NOT NULL,
+  objeto TEXT,
+  inicio TEXT NOT NULL,
+  fim TEXT,
+  cobranca TEXT NOT NULL DEFAULT 'mensal' CHECK (cobranca IN ('mensal','cpm','pacote','cortesia')),
+  valor_centavos INTEGER NOT NULL DEFAULT 0 CHECK (valor_centavos >= 0),
+  vencimento_dia INTEGER NOT NULL DEFAULT 10 CHECK (vencimento_dia BETWEEN 1 AND 28),
+  reajuste TEXT,
+  renovacao_automatica INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('rascunho','ativo','suspenso','encerrado')),
+  observacao TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  UNIQUE (numero),
+  CHECK (fim IS NULL OR fim >= inicio)
+);
+CREATE INDEX IF NOT EXISTS idx_contratos_anunciante ON contratos (anunciante_id, status);
+
+-- Contas a pagar da operação (o que não é repasse ao ponto): internet do prédio, aparelho, manutenção,
+-- comissão de vendedor, aluguel de espaço. Repasse tem tabela própria e aparece junto na tela.
+CREATE TABLE IF NOT EXISTS despesas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  descricao TEXT NOT NULL,
+  fornecedor TEXT,
+  categoria TEXT NOT NULL DEFAULT 'outros',
+  local_id INTEGER REFERENCES locais(id),
+  competencia TEXT,
+  vencimento TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos >= 0),
+  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','paga','cancelada')),
+  pago_em TEXT,
+  repete_meses INTEGER NOT NULL DEFAULT 0 CHECK (repete_meses >= 0),
+  observacao TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_despesas_vencimento ON despesas (status, vencimento);
+
 -- Faturas do anunciante (uma por competência) e o detalhe por campanha.
 CREATE TABLE IF NOT EXISTS faturas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   anunciante_id INTEGER NOT NULL REFERENCES anunciantes(id),
   agencia_id INTEGER REFERENCES agencias(id),
+  contrato_id INTEGER REFERENCES contratos(id),
   competencia TEXT NOT NULL,
   vencimento TEXT NOT NULL,
   -- bruto = soma das veiculações; valor = o que a plataforma recebe (bruto menos a comissão da agência).
@@ -486,6 +531,8 @@ const COLUNAS_NOVAS = [
   ['faturas', 'bruto_centavos', 'INTEGER NOT NULL DEFAULT 0'],
   ['faturas', 'comissao_agencia_centavos', 'INTEGER NOT NULL DEFAULT 0'],
   ['repasses', 'tipo', "TEXT NOT NULL DEFAULT 'comissao'"],
+  ['campanhas', 'contrato_id', 'INTEGER REFERENCES contratos(id)'],
+  ['faturas', 'contrato_id', 'INTEGER REFERENCES contratos(id)'],
 ];
 
 const temColuna = (db, tabela, coluna) => db.prepare(`PRAGMA table_info(${tabela})`).all().some((c) => c.name === coluna);

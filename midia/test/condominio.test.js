@@ -363,3 +363,107 @@ test('Esqueci minha senha: link de uso único por e-mail', async (t) => {
     assert.equal((await api.post('/auth/nova-senha', { codigo: antigo, senha: 'senha-do-link-velho' })).status, 410);
   });
 });
+
+/** Contratos na ficha do cliente e o financeiro em duas pontas: o que entra e o que sai. */
+test('Financeiro: contrato do cliente, contas a receber e contas a pagar', async (t) => {
+  const { iniciar: iniciarApi, dia: diaRel } = require('./helpers');
+  const api = await iniciarApi();
+  t.after(api.fechar);
+  const master = await api.login();
+  let cliente, contrato, ponto;
+
+  await t.test('contrato fica na ficha do cliente e amarra as campanhas dele', async () => {
+    cliente = (await api.post('/painel/anunciantes', { nome: 'Construtora Horizonte', email: 'financeiro@horizonte.com.br' }, master)).dados.id;
+    const outro = (await api.post('/painel/anunciantes', { nome: 'Outro Cliente' }, master)).dados.id;
+
+    const c = await api.post('/painel/contratos', {
+      anunciante_id: cliente, numero: '2026-014', objeto: 'Veiculação no circuito residencial',
+      inicio: diaRel(-30), fim: diaRel(335), cobranca: 'mensal', valor_centavos: 350_000, vencimento_dia: 10,
+      reajuste: 'IPCA a cada 12 meses', renovacao_automatica: true,
+    }, master);
+    assert.equal(c.status, 201, JSON.stringify(c.dados));
+    contrato = c.dados.id;
+    assert.equal(c.dados.status, 'ativo');
+    assert.equal((await api.post('/painel/contratos', { anunciante_id: cliente, numero: '2026-014', inicio: diaRel(0) }, master)).status, 409,
+      'número de contrato não se repete');
+
+    const campanha = (await api.post('/painel/campanhas', {
+      anunciante_id: cliente, nome: 'Lançamento', inicio: diaRel(-10), cobranca: 'mensal', valor_centavos: 350_000,
+    }, master)).dados.id;
+    assert.equal((await api.post(`/painel/contratos/${contrato}/campanhas`, { campanha_id: campanha }, master)).status, 200);
+
+    const doOutro = (await api.post('/painel/campanhas', { anunciante_id: outro, nome: 'De outro', inicio: diaRel(0), cobranca: 'cortesia' }, master)).dados.id;
+    assert.equal((await api.post(`/painel/contratos/${contrato}/campanhas`, { campanha_id: doOutro }, master)).status, 422,
+      'campanha de outro cliente não entra no contrato');
+
+    const ficha = (await api.get(`/painel/anunciantes/${cliente}`, master)).dados;
+    assert.equal(ficha.contratos.length, 1);
+    assert.equal(ficha.contratos[0].campanhas, 1);
+    assert.equal(ficha.campanhas[0].contrato, '2026-014', 'a campanha mostra o contrato dela');
+  });
+
+  await t.test('contas a receber: faturas com atraso por faixa', async () => {
+    const inserir = api.db.prepare(`INSERT INTO faturas (anunciante_id, contrato_id, competencia, vencimento, valor_centavos, status, pago_em, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+    inserir.run(cliente, contrato, '2026-08', diaRel(-100), 350_000, 'aberta', null, new Date().toISOString());
+    inserir.run(cliente, contrato, '2026-09', diaRel(-40), 350_000, 'aberta', null, new Date().toISOString());
+    inserir.run(cliente, contrato, '2026-10', diaRel(-5), 350_000, 'paga', diaRel(-4), new Date().toISOString());
+    inserir.run(cliente, contrato, '2026-11', diaRel(5), 350_000, 'aberta', null, new Date().toISOString());
+
+    const d = (await api.get('/painel/contas-a-receber', master)).dados;
+    assert.equal(d.totais.aberto_centavos, 1_050_000);
+    assert.equal(d.totais.atrasado_centavos, 700_000, 'as duas vencidas');
+    assert.equal(d.totais.recebido_centavos, 350_000);
+    assert.equal(d.totais.vence_em_7_centavos, 350_000, 'a que vence daqui a 5 dias');
+    assert.equal(d.totais.clientes_em_atraso, 1);
+    assert.equal(d.atraso.de_31_a_60, 350_000);
+    assert.equal(d.atraso.mais_de_90, 350_000);
+    assert.equal(d.itens.find((f) => f.competencia === '2026-08').dias_atraso, 100);
+    assert.equal(d.itens[0].contrato, '2026-014', 'a fatura mostra de qual contrato veio');
+
+    const so = (await api.get('/painel/contas-a-receber?status=paga', master)).dados;
+    assert.equal(so.itens.length, 1);
+  });
+
+  await t.test('o financeiro do cliente aparece na ficha dele', async () => {
+    const ficha = (await api.get(`/painel/anunciantes/${cliente}`, master)).dados;
+    assert.equal(ficha.financeiro.aberto_centavos, 1_050_000);
+    assert.equal(ficha.financeiro.atrasado_centavos, 700_000);
+    assert.equal(ficha.financeiro.recebido_centavos, 350_000);
+    assert.equal(ficha.financeiro.proxima.competencia, '2026-08', 'a mais antiga em aberto é a próxima a cobrar');
+    assert.equal(ficha.pagamentos.length, 1);
+    assert.equal(ficha.pagamentos[0].pago_em, diaRel(-4));
+  });
+
+  await t.test('contas a pagar junta repasse do ponto com despesa da operação', async () => {
+    ponto = (await api.post('/painel/locais', { nome: 'Edifício Pagar', categoria: 'condominio_residencial', cidade: 'Campinas', uf: 'SP' }, master)).dados.id;
+    api.db.prepare(`INSERT INTO repasses (local_id, competencia, tipo, base_centavos, comissao_percentual, valor_centavos, criado_em)
+      VALUES (?, '2026-10', 'fixo', 0, 0, 30000, ?)`).run(ponto, new Date().toISOString());
+
+    const nova = await api.post('/painel/despesas', {
+      descricao: 'Internet do Edifício Pagar', fornecedor: 'Provedor X', categoria: 'internet',
+      local_id: ponto, vencimento: diaRel(-3), valor_centavos: 12_000, repete_meses: 2,
+    }, master);
+    assert.equal(nova.status, 201);
+    assert.equal(nova.dados.criadas, 3, 'repetir cria uma conta por mês');
+
+    const d = (await api.get('/painel/contas-a-pagar', master)).dados;
+    assert.equal(d.itens.filter((x) => x.tipo === 'repasse').length, 1);
+    assert.equal(d.itens.filter((x) => x.tipo === 'despesa').length, 3);
+    assert.equal(d.totais.repasses_centavos, 30_000);
+    assert.equal(d.totais.despesas_centavos, 36_000);
+    // Atrasado = a primeira parcela da internet (venceu há 3 dias) + o repasse de 2026-10, que vence no dia 10 do mês seguinte.
+    const repasseVencido = d.itens.find((x) => x.tipo === 'repasse').atrasada ? 30_000 : 0;
+    assert.equal(d.totais.atrasado_centavos, 12_000 + repasseVencido);
+
+    const atrasada = d.itens.find((x) => x.tipo === 'despesa' && x.atrasada);
+    assert.equal((await api.post(`/painel/despesas/${atrasada.id}/pagar`, { pago_em: diaRel(0) }, master)).dados.status, 'paga');
+    assert.equal((await api.post(`/painel/despesas/${atrasada.id}/pagar`, {}, master)).status, 409, 'não paga duas vezes');
+    assert.equal((await api.post(`/painel/despesas/${atrasada.id}/estornar`, {}, master)).dados.status, 'aberta');
+
+    const repasse = d.itens.find((x) => x.tipo === 'repasse');
+    assert.equal((await api.post(`/painel/repasses/${repasse.id}/pagar`, {}, master)).dados.status, 'pago');
+    const depois = (await api.get('/painel/contas-a-pagar?status=aberta', master)).dados;
+    assert.ok(!depois.itens.some((x) => x.tipo === 'repasse'), 'repasse pago sai da lista de abertas');
+  });
+});
