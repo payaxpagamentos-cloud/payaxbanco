@@ -152,6 +152,24 @@ renovação automática e situação (rascunho, ativo, suspenso, encerrado).
 As campanhas se ligam ao contrato, e a fatura nasce carregando de qual contrato ela veio — então, olhando uma conta
 a receber, dá para saber na hora qual acordo ela está cumprindo. Contrato que já gerou fatura não é excluído: encerra.
 
+### O ciclo do contrato: vencer, reajustar e renovar
+
+Contrato que acaba sem ninguém ver é receita que cai sozinha, e reajuste esquecido é desconto que o cliente nem
+pediu. O sistema cuida dos três:
+
+- **Avisa**: contratos que vencem nos próximos dias (padrão 30, configurável), os que já passaram da data e
+  continuam ativos, e os que chegaram na data do reajuste. Sai por e-mail uma vez por dia e aparece no *Diagnóstico*
+  e na ficha do cliente, na coluna **Ciclo**.
+- **Reajusta**: na data combinada, pelo percentual. O reajuste vale também para **as campanhas do contrato** — é da
+  campanha que a fatura nasce, então reajustar só o papel não mudaria a cobrança. Cada reajuste fica no histórico
+  (de quanto para quanto, em que data, por qual índice e quem aplicou), e o anunciante vê a data do último no portal.
+- **Renova**: onde foi combinada renovação automática, o contrato se estende sozinho pelo mesmo período, **estendendo
+  junto as campanhas que terminavam com ele** — senão a veiculação pararia no dia seguinte ao contrato renovado.
+
+O que o sistema **não** faz: inventar o índice. Ele não sabe o IPCA do mês. Com um **percentual fixo** guardado no
+contrato, o reajuste sai sozinho na data; **sem** percentual, o contrato entra na lista de pendências e a equipe
+informa quanto aplicar. Ninguém quer um sistema decidindo aumento por conta própria.
+
 ## Comunicados do ponto e o layout da tela
 
 O recado do próprio ponto. Em condomínio, é a moeda de troca pelo espaço.

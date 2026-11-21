@@ -129,7 +129,7 @@ module.exports = (db) => {
         FROM faturas f LEFT JOIN contratos c ON c.id = f.contrato_id
         WHERE f.anunciante_id = ? ORDER BY f.competencia DESC`).all(hoje(), eu),
       contratos: db.prepare(`SELECT c.id, c.numero, c.objeto, c.inicio, c.fim, c.cobranca, c.valor_centavos, c.vencimento_dia,
-          c.reajuste, c.renovacao_automatica, c.status, ag.nome AS agencia,
+          c.reajuste, c.ultimo_reajuste, c.renovacao_automatica, c.renovacoes, c.status, ag.nome AS agencia,
           (SELECT COUNT(*) FROM campanhas ca WHERE ca.contrato_id = c.id) AS campanhas
         FROM contratos c LEFT JOIN agencias ag ON ag.id = c.agencia_id
         WHERE c.anunciante_id = ? AND c.status <> 'rascunho' ORDER BY (c.status = 'ativo') DESC, c.inicio DESC`).all(eu),

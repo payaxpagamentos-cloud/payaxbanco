@@ -12,6 +12,7 @@ const { montarPorTela } = require('../lib/grade');
 const config = require('../config');
 const arquivos = require('../lib/arquivos');
 const { hoje } = require('../lib/datas');
+const contratosLib = require('../lib/contratos');
 const v = require('../lib/validacao');
 
 const CATEGORIAS = v.CATEGORIAS;
@@ -451,7 +452,8 @@ module.exports = (db) => {
       // Contratos e financeiro do cliente ficam na ficha dele: é onde se procura quando o telefone toca.
       contratos: db.prepare(`SELECT c.*, ag.nome AS agencia, (SELECT COUNT(*) FROM campanhas x WHERE x.contrato_id = c.id) AS campanhas
         FROM contratos c LEFT JOIN agencias ag ON ag.id = c.agencia_id WHERE c.anunciante_id = ?
-        ORDER BY CASE c.status WHEN 'ativo' THEN 0 WHEN 'suspenso' THEN 1 WHEN 'rascunho' THEN 2 ELSE 3 END, c.inicio DESC`).all(a.id),
+        ORDER BY CASE c.status WHEN 'ativo' THEN 0 WHEN 'suspenso' THEN 1 WHEN 'rascunho' THEN 2 ELSE 3 END, c.inicio DESC`).all(a.id)
+        .map((c) => contratosLib.comCiclo(c)),
       financeiro: {
         aberto_centavos: soma((f) => f.status === 'aberta'),
         atrasado_centavos: soma((f) => f.status === 'aberta' && f.vencimento < data),

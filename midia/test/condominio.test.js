@@ -598,3 +598,126 @@ test('Portal do ponto mostra a contrapartida combinada, não um valor que não e
   assert.equal((await ponto(comFixo)).repasse_fixo_centavos, 30_000, 'e sabe o valor combinado quando é fixo');
   assert.equal((await ponto(comComissao)).comissao_percentual, 2000);
 });
+
+/**
+ * O contrato é o que sustenta a receita: ele vence, reajusta e renova. Se o sistema não cuidar disso,
+ * o dinheiro some devagar — contrato que acabou e ninguém viu, reajuste que ninguém aplicou.
+ */
+test('Contrato avisa, reajusta e renova — e leva as campanhas junto', async (t) => {
+  const { iniciar: iniciarApi, dia: diaRel } = require('./helpers');
+  const api = await iniciarApi();
+  t.after(api.fechar);
+  const master = await api.login();
+  const contratos = require('../server/lib/contratos');
+
+  const cliente = (await api.post('/painel/anunciantes', { nome: 'Rede Bom Dia' }, master)).dados.id;
+  // Começou há 13 meses: já passou da data do reajuste anual e está a 5 dias do fim.
+  const criar = async (extra) => (await api.post('/painel/contratos', {
+    anunciante_id: cliente, numero: extra.numero, inicio: diaRel(-395), fim: diaRel(5),
+    cobranca: 'mensal', valor_centavos: 200_000, status: 'ativo', reajuste: 'IPCA a cada 12 meses', ...extra,
+  }, master)).dados;
+
+  await t.test('o que está na data aparece como pendência, no painel e no diagnóstico', async () => {
+    const c = await criar({ numero: 'C-100' });
+    assert.equal(c.reajuste_em, diaRel(-30), 'o próximo reajuste conta do início do contrato');
+    assert.equal(c.reajuste_vencido, true);
+    assert.equal(c.dias_para_fim, 5);
+
+    const p = (await api.get('/painel/contratos/pendencias', master)).dados;
+    assert.equal(p.reajustar.length, 1);
+    assert.equal(p.vencendo.length, 1, 'vence dentro do prazo de aviso');
+    assert.equal(p.vencidos.length, 0);
+
+    const d = (await api.get('/painel/diagnostico', master)).dados;
+    const check = (nome) => d.verificacoes.find((x) => x.nome === nome);
+    assert.equal(check('Contratos vencendo').ok, false);
+    assert.equal(check('Reajustes na data').ok, false);
+  });
+
+  await t.test('o reajuste sobe o contrato e as campanhas dele (é da campanha que a fatura nasce)', async () => {
+    const c = await criar({ numero: 'C-200' });
+    const mensal = (await api.post('/painel/campanhas', {
+      anunciante_id: cliente, nome: 'Mensal', inicio: diaRel(-30), fim: diaRel(5), cobranca: 'mensal', valor_centavos: 100_000,
+    }, master)).dados.id;
+    const porCpm = (await api.post('/painel/campanhas', {
+      anunciante_id: cliente, nome: 'Por CPM', inicio: diaRel(-30), cobranca: 'cpm', cpm_centavos: 2000,
+    }, master)).dados.id;
+    for (const id of [mensal, porCpm]) await api.post(`/painel/contratos/${c.id}/campanhas`, { campanha_id: id }, master);
+
+    const r = (await api.post(`/painel/contratos/${c.id}/reajuste`, { percentual: 1000, indice: 'IPCA 10%' }, master)).dados;
+    assert.equal(r.reajuste.de_centavos, 200_000);
+    assert.equal(r.reajuste.para_centavos, 220_000, '10% em cima de 2.000,00');
+    assert.equal(r.reajuste.campanhas, 2);
+    assert.equal((await api.get(`/painel/campanhas/${mensal}`, master)).dados.valor_centavos, 110_000);
+    assert.equal((await api.get(`/painel/campanhas/${porCpm}`, master)).dados.cpm_centavos, 2200, 'campanha por CPM reajusta o CPM');
+
+    const depois = (await api.get(`/painel/contratos/${c.id}`, master)).dados;
+    assert.equal(depois.reajuste_vencido, false, 'a data do próximo reajuste anda para a frente');
+    assert.equal(depois.reajustes.length, 1);
+    assert.equal(depois.reajustes[0].indice, 'IPCA 10%');
+
+    assert.equal((await api.post(`/painel/contratos/${c.id}/reajuste`, { percentual: 0 }, master)).status, 422);
+  });
+
+  await t.test('renovar estende o contrato e as campanhas que acabavam com ele', async () => {
+    const c = await criar({ numero: 'C-300' });
+    const junto = (await api.post('/painel/campanhas', {
+      anunciante_id: cliente, nome: 'Acaba com o contrato', inicio: diaRel(-10), fim: diaRel(5), cobranca: 'cortesia',
+    }, master)).dados.id;
+    const propria = (await api.post('/painel/campanhas', {
+      anunciante_id: cliente, nome: 'Prazo próprio', inicio: diaRel(-10), fim: diaRel(2), cobranca: 'cortesia',
+    }, master)).dados.id;
+    for (const id of [junto, propria]) await api.post(`/painel/contratos/${c.id}/campanhas`, { campanha_id: id }, master);
+
+    const r = (await api.post(`/painel/contratos/${c.id}/renovar`, { meses: 12 }, master)).dados;
+    assert.equal(r.renovacao.campanhas, 1, 'só a que terminava junto');
+    assert.equal(r.fim, r.renovacao.ate);
+    assert.equal((await api.get(`/painel/campanhas/${junto}`, master)).dados.fim, r.renovacao.ate);
+    assert.equal((await api.get(`/painel/campanhas/${propria}`, master)).dados.fim, diaRel(2), 'campanha de prazo próprio não muda');
+    assert.equal((await api.get(`/painel/contratos/${c.id}`, master)).dados.renovacoes, 1);
+  });
+
+  await t.test('sozinho: renova o que é automático e reajusta só quem tem percentual fixo', async () => {
+    // Vigência de um ano redondo que terminou ontem: renova por mais um ano.
+    const automatico = await criar({ numero: 'C-400', inicio: diaRel(-366), fim: diaRel(-1), renovacao_automatica: 1, reajuste_percentual: 500 });
+    const manual = await criar({ numero: 'C-500', renovacao_automatica: 0 });
+
+    const r = contratos.rodarAutomatico(api.db);
+    assert.equal(r.renovados.length, 1);
+    assert.equal(r.renovados[0].numero, 'C-400');
+    assert.equal(r.reajustados.length, 1, 'o sem percentual fixo espera a equipe — ninguém quer sistema inventando aumento');
+    assert.equal(r.reajustados[0].numero, 'C-400');
+    assert.equal(r.reajustados[0].para_centavos, 210_000, '5% em cima de 2.000,00');
+
+    const depois = (await api.get(`/painel/contratos/${automatico.id}`, master)).dados;
+    assert.equal(depois.renovacoes, 1);
+    assert.equal(depois.fim, somarMeses12(diaRel(-1)));
+    assert.equal(depois.reajustes[0].automatico, 1);
+
+    // Rodar de novo não faz nada: as datas já andaram.
+    const denovo = contratos.rodarAutomatico(api.db);
+    assert.equal(denovo.renovados.length + denovo.reajustados.length, 0);
+    assert.equal((await api.get(`/painel/contratos/${manual.id}`, master)).dados.valor_centavos, 200_000);
+  });
+
+  await t.test('o aviso por e-mail sai uma vez por dia com os três grupos', async () => {
+    const avisos = require('../server/lib/avisos');
+    const email = require('../server/lib/email');
+    email.caixaTeste.length = 0;
+    await api.put('/painel/configuracoes', { avisos_email: 1 }, master);
+
+    const r = await avisos.contratosParaCuidar(api.db);
+    assert.equal(r.enviados, 1);
+    const msg = email.caixaTeste.at(-1);
+    assert.match(msg.assunto, /Contratos para cuidar/);
+    assert.match(msg.html, /C-100/);
+
+    assert.equal((await avisos.contratosParaCuidar(api.db)).enviados, 0, 'não repete no mesmo dia');
+  });
+});
+
+/** Soma 12 meses a uma data, como o contrato faz ao renovar. */
+function somarMeses12(data) {
+  const [a, m, d] = data.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1 + 12, Math.min(d, 28))).toISOString().slice(0, 10);
+}

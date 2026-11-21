@@ -246,11 +246,16 @@ function criar(db) {
   campanhas.forEach((c, i) => {
     const anunciante = anunciantes[c.a];
     const numero = `2026-${String(14 + i).padStart(3, '0')}`;
+    // O primeiro cliente é de renovação: começou há mais de um ano, então já passou da data do reajuste
+    // e está perto do fim — é assim que a tela de contratos mostra o que precisa de atenção.
+    const antigo = i === 0;
     const contrato = inserir(`INSERT INTO contratos (anunciante_id, agencia_id, numero, objeto, inicio, fim, cobranca, valor_centavos, vencimento_dia,
-        reajuste, renovacao_automatica, status, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, 'IPCA a cada 12 meses', ?, 'ativo', ?)`,
+        reajuste, reajuste_meses, reajuste_percentual, renovacao_automatica, status, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, 'IPCA a cada 12 meses', 12, 0, ?, 'ativo', ?)`,
       anunciante.id, c.agencia !== undefined ? agencias[c.agencia].id : null, numero,
       `Veiculação de "${c.nome}"${c.circuito !== undefined ? ` no circuito ${circuitos[c.circuito].nome}` : ' na rede'}`,
-      somarDias(hoje(), -40), somarDias(hoje(), 325), c.cobranca === 'cpm' ? 'cpm' : 'mensal', c.valor ?? 0, i % 2 === 0 ? 1 : 0, criado);
+      somarDias(hoje(), antigo ? -400 : -40), somarDias(hoje(), antigo ? 20 : 325),
+      c.cobranca === 'cpm' ? 'cpm' : 'mensal', c.valor ?? 0, i % 2 === 0 ? 1 : 0, criado);
     db.prepare('UPDATE campanhas SET contrato_id = ? WHERE id = ?').run(contrato, c.id);
     db.prepare('UPDATE faturas SET contrato_id = ? WHERE anunciante_id = ? AND contrato_id IS NULL').run(contrato, anunciante.id);
   });

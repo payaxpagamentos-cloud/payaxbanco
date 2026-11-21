@@ -155,9 +155,13 @@ const cartaoContrato = (c) => el('div', { class: 'cartao raso' },
         el('span', {}, dinheiro(c.valor_centavos)))
       : null,
     el('div', {}, el('span', { class: 'rotulo' }, 'Vencimento'), el('span', {}, `todo dia ${c.vencimento_dia}`)),
-    c.reajuste ? el('div', {}, el('span', { class: 'rotulo' }, 'Reajuste'), el('span', {}, c.reajuste)) : null,
+    c.reajuste
+      ? el('div', {}, el('span', { class: 'rotulo' }, 'Reajuste'),
+        el('span', {}, c.ultimo_reajuste ? `${c.reajuste} · último em ${dataBr(c.ultimo_reajuste)}` : c.reajuste))
+      : null,
     el('div', {}, el('span', { class: 'rotulo' }, 'Renovação'),
-      el('span', {}, c.renovacao_automatica ? 'Automática' : 'Mediante novo aceite')),
+      el('span', {}, (c.renovacao_automatica ? 'Automática' : 'Mediante novo aceite')
+        + (c.renovacoes ? ` · ${c.renovacoes}ª vigência` : ''))),
     c.agencia ? el('div', {}, el('span', { class: 'rotulo' }, 'Agência'), el('span', {}, c.agencia)) : null,
     el('div', {}, el('span', { class: 'rotulo' }, 'Campanhas'), el('span', {}, `${inteiro(c.campanhas)} no contrato`))));
 

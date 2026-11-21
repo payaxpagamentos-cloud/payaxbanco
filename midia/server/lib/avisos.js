@@ -3,6 +3,7 @@
 const { agora, lerConfig } = require('../db');
 const { hoje } = require('./datas');
 const { estaOnline } = require('./monitor');
+const contratos = require('./contratos');
 const email = require('./email');
 
 /**
@@ -107,11 +108,45 @@ async function filaDeAprovacao(db) {
   return { enviados: r.enviado ? 1 : 0 };
 }
 
+/**
+ * Contratos: o que vence, o que já venceu e o que está na data do reajuste. Uma vez por dia.
+ * É o aviso que evita o pior silêncio do negócio — o contrato que acabou e ninguém percebeu.
+ */
+async function contratosParaCuidar(db) {
+  const cfg = lerConfig(db);
+  const chaveDia = `contratos:${hoje()}`;
+  if (jaAvisou(db, chaveDia)) return { enviados: 0 };
+  const p = contratos.pendencias(db);
+  marcar(db, chaveDia);
+  if (!p.vencendo.length && !p.vencidos.length && !p.reajustar.length) return { enviados: 0 };
+
+  const dia = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('pt-BR');
+  const linhas = [];
+  if (p.vencidos.length) linhas.push(`${p.vencidos.length} contrato(s) já passaram da data de término e continuam ativos.`);
+  if (p.vencendo.length) linhas.push(`${p.vencendo.length} contrato(s) vencem nos próximos ${p.aviso_dias} dias.`);
+  if (p.reajustar.length) linhas.push(`${p.reajustar.length} contrato(s) estão na data do reajuste combinado.`);
+
+  const r = await email.enviar({
+    para: equipe(db),
+    assunto: `Contratos para cuidar: ${p.vencidos.length + p.vencendo.length} vencendo, ${p.reajustar.length} para reajustar`,
+    plataforma: cfg.nome_plataforma,
+    titulo: 'Contratos pedindo atenção',
+    linhas,
+    tabela: [
+      ...p.vencidos.map((c) => [`${c.anunciante} — ${c.numero}`, `venceu em ${dia(c.fim)}`]),
+      ...p.vencendo.map((c) => [`${c.anunciante} — ${c.numero}`, `vence em ${dia(c.fim)} (${c.dias_para_fim} dia(s))`]),
+      ...p.reajustar.map((c) => [`${c.anunciante} — ${c.numero}`, `reajuste desde ${dia(c.reajuste_em)}${c.reajuste ? ` — ${c.reajuste}` : ''}`]),
+    ],
+    botao: { texto: 'Abrir os contratos', url: email.linkPainel('#/contratos') },
+  });
+  return { enviados: r.enviado ? 1 : 0 };
+}
+
 /** Roda todos os avisos (chamado de hora em hora pelo servidor). */
 async function rodar(db) {
   if (!ligado(db)) return { ligado: false, enviados: 0 };
-  const partes = await Promise.all([telasForaDoAr(db), faturasVencidas(db), filaDeAprovacao(db)]);
+  const partes = await Promise.all([telasForaDoAr(db), faturasVencidas(db), filaDeAprovacao(db), contratosParaCuidar(db)]);
   return { ligado: true, enviados: partes.reduce((t, p) => t + p.enviados, 0) };
 }
 
-module.exports = { rodar, telasForaDoAr, faturasVencidas, filaDeAprovacao, equipe, ligado };
+module.exports = { rodar, telasForaDoAr, faturasVencidas, filaDeAprovacao, contratosParaCuidar, equipe, ligado };

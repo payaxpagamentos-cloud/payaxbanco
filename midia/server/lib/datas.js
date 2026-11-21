@@ -53,6 +53,15 @@ function somarMeses(competencia, n) {
   const d = new Date(Date.UTC(a, m - 1 + n, 1));
   return d.toISOString().slice(0, 7);
 }
+/** Soma meses a uma data 'AAAA-MM-DD' mantendo o dia (28 no máximo, para não escorregar de mês). */
+function somarMesesData(data, n) {
+  const [a, m, d] = data.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1 + n, Math.min(d, 28))).toISOString().slice(0, 10);
+}
+
+/** Dias inteiros de uma data até outra (negativo quando a segunda já passou). */
+const diasEntre = (de, ate) => Math.round((Date.parse(`${ate}T12:00:00Z`) - Date.parse(`${de}T12:00:00Z`)) / 86_400_000);
+
 /** Dias do período da campanha que caem na competência (para proporcionalizar a mensalidade). */
 function diasNaCompetencia(competencia, inicio, fim) {
   const de = inicioMes(competencia) > inicio ? inicioMes(competencia) : inicio;
@@ -71,4 +80,4 @@ function dentroDaJanela(hhmm, inicio, fim) {
   return i < f ? m >= i && m < f : m >= i || m < f;
 }
 
-module.exports = { local, hoje, somarDias, inicioDia, intervalo, mes, inicioMes, fimMes, diasNoMes, somarMeses, diasNaCompetencia, minutosDe, dentroDaJanela };
+module.exports = { local, hoje, somarDias, somarMesesData, diasEntre, inicioDia, intervalo, mes, inicioMes, fimMes, diasNoMes, somarMeses, diasNaCompetencia, minutosDe, dentroDaJanela };

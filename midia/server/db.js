@@ -322,8 +322,16 @@ CREATE TABLE IF NOT EXISTS contratos (
   cobranca TEXT NOT NULL DEFAULT 'mensal' CHECK (cobranca IN ('mensal','cpm','pacote','cortesia')),
   valor_centavos INTEGER NOT NULL DEFAULT 0 CHECK (valor_centavos >= 0),
   vencimento_dia INTEGER NOT NULL DEFAULT 10 CHECK (vencimento_dia BETWEEN 1 AND 28),
+  -- Reajuste: o índice é só o nome do combinado ("IPCA a cada 12 meses"); o que o sistema usa são os
+  -- meses de periodicidade e, quando o percentual é fixo, o percentual (em centésimos: 450 = 4,5%).
+  -- Sem percentual fixo o sistema avisa na data e a equipe decide quanto aplicar.
   reajuste TEXT,
+  reajuste_meses INTEGER NOT NULL DEFAULT 12 CHECK (reajuste_meses BETWEEN 0 AND 120),
+  reajuste_percentual INTEGER NOT NULL DEFAULT 0 CHECK (reajuste_percentual BETWEEN 0 AND 10000),
+  ultimo_reajuste TEXT,
   renovacao_automatica INTEGER NOT NULL DEFAULT 0,
+  renovado_em TEXT,
+  renovacoes INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('rascunho','ativo','suspenso','encerrado')),
   observacao TEXT,
   criado_por INTEGER REFERENCES usuarios(id),
@@ -332,6 +340,22 @@ CREATE TABLE IF NOT EXISTS contratos (
   CHECK (fim IS NULL OR fim >= inicio)
 );
 CREATE INDEX IF NOT EXISTS idx_contratos_anunciante ON contratos (anunciante_id, status);
+
+-- Cada reajuste aplicado, para saber de onde veio o valor de hoje (e para o cliente poder conferir).
+CREATE TABLE IF NOT EXISTS contrato_reajustes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id) ON DELETE CASCADE,
+  data TEXT NOT NULL,
+  percentual INTEGER NOT NULL,
+  indice TEXT,
+  de_centavos INTEGER NOT NULL,
+  para_centavos INTEGER NOT NULL,
+  campanhas INTEGER NOT NULL DEFAULT 0,
+  automatico INTEGER NOT NULL DEFAULT 0,
+  aplicado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reajustes_contrato ON contrato_reajustes (contrato_id, data);
 
 -- Contas a pagar da operação (o que não é repasse ao ponto): internet do prédio, aparelho, manutenção,
 -- comissão de vendedor, aluguel de espaço. Repasse tem tabela própria e aparece junto na tela.
@@ -486,6 +510,8 @@ const CONFIG_PADRAO = {
   // Por quantos dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta
   // relatórios e faturamento, nunca é apagado). 0 = guardar tudo.
   prova_dias: '180',
+  // Quantos dias antes do fim do contrato a equipe é avisada.
+  contrato_aviso_dias: '30',
   // CNPJ da empresa (prestador do serviço), usado na planilha que vai ao contador para emitir as notas.
   empresa_documento: '',
   // Dados do PIX impresso na fatura do anunciante.
@@ -540,6 +566,8 @@ const COLUNAS_NOVAS = [
   ['repasses', 'tipo', "TEXT NOT NULL DEFAULT 'comissao'"],
   ['campanhas', 'contrato_id', 'INTEGER REFERENCES contratos(id)'],
   ['faturas', 'contrato_id', 'INTEGER REFERENCES contratos(id)'],
+  ['contratos', 'reajuste_meses', 'INTEGER NOT NULL DEFAULT 12'], ['contratos', 'reajuste_percentual', 'INTEGER NOT NULL DEFAULT 0'],
+  ['contratos', 'ultimo_reajuste', 'TEXT'], ['contratos', 'renovado_em', 'TEXT'], ['contratos', 'renovacoes', 'INTEGER NOT NULL DEFAULT 0'],
   ['faturas', 'nf_numero', 'TEXT'], ['faturas', 'nf_emitida_em', 'TEXT'], ['faturas', 'nf_link', 'TEXT'],
 ];
 

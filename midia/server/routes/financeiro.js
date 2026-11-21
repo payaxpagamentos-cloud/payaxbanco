@@ -6,8 +6,9 @@ const { agora, transacao, lerConfig } = require('../db');
 const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
-const { hoje, mes, somarMeses, somarDias } = require('../lib/datas');
+const { hoje, mes, somarMeses, somarMesesData, somarDias } = require('../lib/datas');
 const faturamento = require('../lib/faturamento');
+const contratosLib = require('../lib/contratos');
 const rel = require('../lib/relatorios');
 const v = require('../lib/validacao');
 
@@ -30,9 +31,12 @@ module.exports = (db) => {
       JOIN anunciantes a ON a.id = c.anunciante_id LEFT JOIN agencias ag ON ag.id = c.agencia_id WHERE c.id = ?`).get(id);
     if (!c) throw naoEncontrado('Contrato');
     return {
-      ...c,
+      ...contratosLib.comCiclo(c),
       campanhas: db.prepare('SELECT id, nome, status, inicio, fim, cobranca, valor_centavos, cpm_centavos FROM campanhas WHERE contrato_id = ? ORDER BY inicio DESC').all(c.id),
       faturas: db.prepare("SELECT id, competencia, vencimento, valor_centavos, status, pago_em FROM faturas WHERE contrato_id = ? ORDER BY competencia DESC").all(c.id),
+      reajustes: db.prepare(`SELECT r.*, u.nome AS aplicado_por_nome FROM contrato_reajustes r
+        LEFT JOIN usuarios u ON u.id = r.aplicado_por WHERE r.contrato_id = ? ORDER BY r.data DESC, r.id DESC`).all(c.id),
+      duracao_meses: contratosLib.duracaoMeses(c),
     };
   }
 
@@ -51,6 +55,8 @@ module.exports = (db) => {
     if (c.valor_centavos !== undefined) d.valor_centavos = v.inteiro(c.valor_centavos, 'o valor', { max: 1_000_000_000 });
     if (c.vencimento_dia !== undefined) d.vencimento_dia = v.inteiro(c.vencimento_dia, 'o dia de vencimento', { min: 1, max: 28 });
     if (c.reajuste !== undefined) d.reajuste = v.opcional(c.reajuste, 'o reajuste', 60);
+    if (c.reajuste_meses !== undefined) d.reajuste_meses = v.inteiro(c.reajuste_meses, 'a periodicidade do reajuste', { min: 0, max: 120 });
+    if (c.reajuste_percentual !== undefined) d.reajuste_percentual = v.inteiro(c.reajuste_percentual, 'o percentual do reajuste', { min: 0, max: 10_000 });
     if (c.renovacao_automatica !== undefined) d.renovacao_automatica = v.booleano(c.renovacao_automatica) ? 1 : 0;
     if (c.status !== undefined) d.status = v.opcao(c.status, 'a situação', ['rascunho', 'ativo', 'suspenso', 'encerrado']);
     if (c.observacao !== undefined) d.observacao = v.opcional(c.observacao, 'a observação', 500);
@@ -75,12 +81,43 @@ module.exports = (db) => {
       ORDER BY CASE c.status WHEN 'ativo' THEN 0 WHEN 'suspenso' THEN 1 WHEN 'rascunho' THEN 2 ELSE 3 END, c.inicio DESC`).all(...p);
     const data = hoje();
     res.json({
-      itens: itens.map((c) => ({ ...c, vencendo: Boolean(c.status === 'ativo' && c.fim && c.fim <= somarDias(data, 30)) })),
+      itens: itens.map((c) => {
+        const ciclo = contratosLib.comCiclo(c, data);
+        return { ...ciclo, vencendo: Boolean(ciclo.dias_para_fim !== null && ciclo.dias_para_fim >= 0 && ciclo.dias_para_fim <= 30 && c.status === 'ativo') };
+      }),
       totais: {
         ativos: itens.filter((c) => c.status === 'ativo').length,
         mensal_centavos: itens.filter((c) => c.status === 'ativo' && c.cobranca === 'mensal').reduce((t, c) => t + c.valor_centavos, 0),
       },
     });
+  });
+
+  /** O que precisa de atenção nos contratos: vencendo, vencidos e reajuste na data. */
+  r.get('/contratos/pendencias', (req, res) => res.json(contratosLib.pendencias(db, req.query.dias ? Number(req.query.dias) : null)));
+
+  /**
+   * Aplica o reajuste combinado. O percentual vem em centésimos (450 = 4,5%) e vale também para as
+   * campanhas do contrato — é de lá que a fatura sai, então reajustar só o contrato não mudaria a cobrança.
+   */
+  r.post('/contratos/:id/reajuste', (req, res) => {
+    const feito = contratosLib.aplicarReajuste(db, Number(req.params.id), {
+      percentual: v.inteiro(req.body.percentual, 'o percentual do reajuste', { min: 1, max: 10_000 }),
+      indice: v.opcional(req.body.indice, 'o índice', 60),
+      data: req.body.data ? v.data(req.body.data, 'a data do reajuste') : null,
+      usuarioId: req.usuario.id,
+    });
+    registrar(db, req, 'contrato_reajustado', feito);
+    res.json({ ...detalheContrato(feito.contrato_id), reajuste: feito });
+  });
+
+  /** Renova o contrato e estende junto as campanhas que terminavam com ele. */
+  r.post('/contratos/:id/renovar', (req, res) => {
+    const feito = contratosLib.renovar(db, Number(req.params.id), {
+      meses: req.body.meses === undefined || req.body.meses === '' ? null : v.inteiro(req.body.meses, 'o período da renovação', { min: 1, max: 60 }),
+      usuarioId: req.usuario.id,
+    });
+    registrar(db, req, 'contrato_renovado', feito);
+    res.json({ ...detalheContrato(feito.contrato_id), renovacao: feito });
   });
 
   r.get('/contratos/:id', (req, res) => res.json(detalheContrato(Number(req.params.id))));
@@ -544,9 +581,3 @@ function competenciaTextoBr(competencia) {
   return `${nomes[Number(mesNum) - 1]}/${ano}`;
 }
 
-/** Soma meses a uma data 'AAAA-MM-DD' mantendo o dia (28 no máximo, para não escorregar de mês). */
-function somarMesesData(data, n) {
-  const [a, m, d] = data.split('-').map(Number);
-  const alvo = new Date(Date.UTC(a, m - 1 + n, Math.min(d, 28)));
-  return alvo.toISOString().slice(0, 10);
-}

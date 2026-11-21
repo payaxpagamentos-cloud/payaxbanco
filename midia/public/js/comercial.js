@@ -96,8 +96,16 @@ async function abrirAnunciante(id, recarregar) {
       [(c) => COBRANCA[c.cobranca] ?? c.cobranca, 'Cobrança'],
       [(c) => (c.valor_centavos ? dinheiro(c.valor_centavos) : '—'), 'Valor', 'num dir'],
       [(c) => inteiro(c.campanhas), 'Campanhas', 'num dir'],
+      [(c) => cicloDoContrato(c), 'Ciclo'],
       [(c) => etiquetaDe(STATUS_CONTRATO, c.status), 'Situação'],
-      [(c) => el('button', { class: 'btn pequeno', onclick: (e) => { e.stopPropagation(); fechar(); editarContrato(c, d, () => recarregar()); } }, 'Editar'), '', 'acoes'],
+      [(c) => el('div', { class: 'acoes' },
+        c.status === 'ativo' && c.reajuste_vencido
+          ? el('button', { class: 'btn pequeno primario', onclick: (e) => { e.stopPropagation(); fechar(); reajustarContrato(c, () => recarregar()); } }, 'Reajustar')
+          : null,
+        c.status === 'ativo' && c.fim && c.dias_para_fim <= 45
+          ? el('button', { class: 'btn pequeno', onclick: (e) => { e.stopPropagation(); fechar(); renovarContrato(c, () => recarregar()); } }, 'Renovar')
+          : null,
+        el('button', { class: 'btn pequeno', onclick: (e) => { e.stopPropagation(); fechar(); editarContrato(c, d, () => recarregar()); } }, 'Editar')), '', 'acoes'],
     ], d.contratos, { vazioTexto: 'Nenhum contrato cadastrado para este cliente.' }),
     el('button', { class: 'btn', style: 'margin-top:10px', onclick: () => { fechar(); editarContrato(null, d, () => recarregar()); } }, icone('mais'), 'Novo contrato'),
 
@@ -134,6 +142,60 @@ async function abrirAnunciante(id, recarregar) {
 }
 
 /** Contrato do cliente: o acordo que sustenta as campanhas dele. */
+/** O que o contrato pede agora: reajuste na data, fim chegando, ou nada (o normal). */
+function cicloDoContrato(c) {
+  if (c.status !== 'ativo') return el('span', { class: 'mudo' }, '—');
+  const partes = [];
+  if (c.reajuste_vencido) partes.push(etiqueta(`Reajuste desde ${dataBr(c.reajuste_em)}`, 'aviso'));
+  else if (c.reajuste_em) partes.push(el('div', { class: 'pequeno mudo' }, `Reajuste em ${dataBr(c.reajuste_em)}`));
+  if (c.vencido) partes.push(etiqueta('Venceu e segue ativo', 'erro'));
+  else if (c.dias_para_fim !== null && c.dias_para_fim <= 45) {
+    partes.push(etiqueta(`Vence em ${c.dias_para_fim} dia(s)`, c.dias_para_fim <= 15 ? 'erro' : 'aviso'));
+  }
+  if (c.renovacao_automatica) partes.push(el('div', { class: 'pequeno mudo' }, 'Renova sozinho'));
+  return partes.length ? el('div', {}, ...partes) : el('span', { class: 'mudo' }, 'em dia');
+}
+
+/**
+ * Reajuste: o sistema não sabe o IPCA do mês, então quem aplica informa o percentual.
+ * O valor muda no contrato e nas campanhas dele — é da campanha que a fatura nasce.
+ */
+function reajustarContrato(c, recarregar) {
+  return formModal(`Reajustar o contrato ${c.numero}`, () => [
+    el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
+      `Combinado: ${c.reajuste || 'sem índice anotado'}. O valor de hoje é ${dinheiro(c.valor_centavos)}.`),
+    el('div', { class: 'duas' },
+      campo('Percentual do reajuste (%)', { name: 'percentual', type: 'number', min: 0.01, max: 100, step: '0.01', required: true, autofocus: true,
+        value: c.reajuste_percentual ? (c.reajuste_percentual / 100).toString() : '' }),
+      campo('Data', { name: 'data', type: 'date', value: c.reajuste_em ?? new Date().toLocaleDateString('en-CA'), required: true })),
+    campo('Índice aplicado', { name: 'indice', value: c.reajuste ?? '', maxlength: 60, placeholder: 'Ex.: IPCA acumulado 12 meses' }),
+    el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' }, 'As campanhas em aberto deste contrato sobem no mesmo percentual.'),
+  ], async (d) => {
+    const r = await api.post(`/painel/contratos/${c.id}/reajuste`, {
+      percentual: Math.round(Number(String(d.percentual).replace(',', '.')) * 100),
+      data: d.data,
+      indice: d.indice,
+    });
+    toast(`Reajustado: ${dinheiro(r.reajuste.de_centavos)} → ${dinheiro(r.reajuste.para_centavos)} (${r.reajuste.campanhas} campanha(s)).`);
+    recarregar();
+  });
+}
+
+/** Renovação: estende o contrato e, junto, as campanhas que terminavam com ele. */
+function renovarContrato(c, recarregar) {
+  return formModal(`Renovar o contrato ${c.numero}`, () => [
+    el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
+      `A vigência atual termina em ${dataBr(c.fim)}. A renovação começa a contar daí.`),
+    escolha('Renovar por', 'meses', { 12: '12 meses', 6: '6 meses', 3: '3 meses', 24: '24 meses' }, '12'),
+    el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' },
+      'As campanhas que acabavam junto com o contrato passam a acabar na nova data — senão a veiculação pararia com o contrato renovado.'),
+  ], async (d) => {
+    const r = await api.post(`/painel/contratos/${c.id}/renovar`, { meses: Number(d.meses) });
+    toast(`Renovado até ${dataBr(r.renovacao.ate)} (${r.renovacao.campanhas} campanha(s) estendidas).`);
+    recarregar();
+  });
+}
+
 function editarContrato(contrato, cliente, recarregar) {
   const hoje = new Date().toLocaleDateString('en-CA');
   return api.get('/painel/opcoes').then((opcoes) => formModal(contrato ? `Contrato ${contrato.numero}` : `Novo contrato — ${cliente.nome}`, () => [
@@ -148,14 +210,28 @@ function editarContrato(contrato, cliente, recarregar) {
       escolha('Cobrança', 'cobranca', COBRANCA_CONTRATO, contrato?.cobranca ?? 'mensal'),
       campo('Valor (R$)', { name: 'valor', value: reaisCampo(contrato?.valor_centavos), inputmode: 'decimal' }),
       campo('Dia de vencimento', { name: 'vencimento_dia', type: 'number', min: 1, max: 28, value: contrato?.vencimento_dia ?? 10 })),
-    el('div', { class: 'duas' },
+    el('div', { class: 'tres' },
       campo('Reajuste', { name: 'reajuste', value: contrato?.reajuste ?? '', maxlength: 60, placeholder: 'Ex.: IPCA a cada 12 meses' }),
-      contrato ? escolha('Situação', 'status', STATUS_CONTRATO_OPCOES, contrato.status) : null),
-    marcar('Renovação automática', { name: 'renovacao_automatica', checked: Boolean(contrato?.renovacao_automatica) }),
+      campo('A cada (meses)', { name: 'reajuste_meses', type: 'number', min: 0, max: 120, value: contrato?.reajuste_meses ?? 12 }),
+      campo('Percentual fixo (%)', { name: 'reajuste_percentual_pct', type: 'number', min: 0, max: 100, step: '0.01',
+        value: contrato?.reajuste_percentual ? (contrato.reajuste_percentual / 100).toString() : '' })),
+    el('p', { class: 'pequeno mudo', style: 'margin:-4px 0 0' },
+      'Com percentual fixo, o reajuste é aplicado sozinho na data. Sem ele, o sistema avisa e a equipe informa quanto — '
+      + 'o IPCA do mês o sistema não tem como saber. Zero meses desliga o reajuste.'),
+    contrato ? escolha('Situação', 'status', STATUS_CONTRATO_OPCOES, contrato.status) : null,
+    marcar('Renovação automática (estende sozinho no fim da vigência)', { name: 'renovacao_automatica', checked: Boolean(contrato?.renovacao_automatica) }),
     area('Observação', { name: 'observacao', maxlength: 500 }, contrato?.observacao ?? ''),
   ], async (d) => {
-    const corpo = { ...d, anunciante_id: cliente.id, valor_centavos: centavos(d.valor) ?? 0, fim: d.fim || null };
+    const corpo = {
+      ...d,
+      anunciante_id: cliente.id,
+      valor_centavos: centavos(d.valor) ?? 0,
+      fim: d.fim || null,
+      reajuste_meses: Number(d.reajuste_meses ?? 12),
+      reajuste_percentual: Math.round(Number(String(d.reajuste_percentual_pct || 0).replace(',', '.')) * 100),
+    };
     delete corpo.valor;
+    delete corpo.reajuste_percentual_pct;
     if (contrato) await api.patch(`/painel/contratos/${contrato.id}`, corpo);
     else await api.post('/painel/contratos', corpo);
     toast(contrato ? 'Contrato atualizado.' : 'Contrato cadastrado.');

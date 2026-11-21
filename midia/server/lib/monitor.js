@@ -100,6 +100,25 @@ function diagnostico(db) {
   const semTela = todos("SELECT nome FROM locais WHERE status = 'ativo' AND NOT EXISTS (SELECT 1 FROM telas t WHERE t.local_id = locais.id AND t.status <> 'inativa')");
   verificacoes.push({ nome: 'Pontos sem TV ativa', ok: !semTela.length, detalhe: semTela.length ? semTela.slice(0, 6).map((l) => l.nome).join(', ') : 'Todos os pontos ativos têm TV.' });
 
+  // Contrato que acaba sem ninguém ver é receita que cai sozinha; reajuste esquecido é desconto que o cliente nem pediu.
+  const ciclo = require('./contratos').pendencias(db);
+  verificacoes.push({
+    nome: 'Contratos vencendo',
+    ok: !ciclo.vencendo.length && !ciclo.vencidos.length,
+    detalhe: ciclo.vencendo.length || ciclo.vencidos.length
+      ? [...ciclo.vencidos.map((c) => `${c.numero} (${c.anunciante}) venceu em ${c.fim}`),
+        ...ciclo.vencendo.map((c) => `${c.numero} (${c.anunciante}) vence em ${c.fim}`)].slice(0, 6).join(', ')
+      : `Nenhum contrato ativo termina nos próximos ${ciclo.aviso_dias} dias.`,
+  });
+  verificacoes.push({
+    nome: 'Reajustes na data',
+    ok: !ciclo.reajustar.length,
+    detalhe: ciclo.reajustar.length
+      ? `${ciclo.reajustar.length} contrato(s) chegaram na data do reajuste: ${ciclo.reajustar.slice(0, 6).map((c) => `${c.numero} (${c.anunciante})`).join(', ')}. `
+        + 'O sistema aplica sozinho os que têm percentual fixo; os demais esperam a equipe informar quanto.'
+      : 'Nenhum reajuste pendente.',
+  });
+
   const faturas = um("SELECT COUNT(*) AS n, COALESCE(SUM(valor_centavos), 0) AS v FROM faturas WHERE status = 'aberta' AND vencimento < ?", data);
   verificacoes.push({ nome: 'Faturas vencidas', ok: !faturas.n, detalhe: faturas.n ? `${faturas.n} em atraso, somando R$ ${(faturas.v / 100).toFixed(2)}.` : 'Nenhuma fatura vencida.' });
 
