@@ -28,25 +28,29 @@ function obterTransporte() {
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/** Corpo do e-mail na identidade da marca (preto, lime e o símbolo). */
+/*
+ * Corpo do e-mail no padrão do site: papel #F5F7FA, faixa de marca na tinta #18232A, cartão branco de
+ * cantos arredondados e o botão em tinta com texto branco. Caixa de e-mail não carrega fonte de fora,
+ * então aqui a tipografia é a do sistema de quem lê — o resto (cor, forma, hierarquia) é o do site.
+ */
 function modelo({ plataforma, titulo, linhas = [], tabela = [], botao, rodape }) {
   const tab = tabela.length ? `<table style="width:100%;border-collapse:collapse;margin:16px 0">${tabela.map(([a, b]) =>
-    `<tr><td style="padding:8px 0;border-bottom:1px solid #E4E7EC;color:#5A6170">${esc(a)}</td>`
-    + `<td style="padding:8px 0;border-bottom:1px solid #E4E7EC;text-align:right;font-weight:700;color:#111417">${esc(b)}</td></tr>`).join('')}</table>` : '';
+    `<tr><td style="padding:8px 0;border-bottom:1px solid #D9DFE5;color:#58636B">${esc(a)}</td>`
+    + `<td style="padding:8px 0;border-bottom:1px solid #D9DFE5;text-align:right;font-weight:700;color:#18232A">${esc(b)}</td></tr>`).join('')}</table>` : '';
   const simbolo = '<svg width="26" height="21" viewBox="0 0 138 111" style="vertical-align:middle">'
     + '<path fill="#C8FF31" d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z"/></svg>';
-  return `<!doctype html><html><body style="margin:0;background:#F7F8FA;font-family:Arial,Helvetica,sans-serif">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#F7F8FA;padding:24px 0"><tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:16px;overflow:hidden">
-<tr><td style="background:#111417;padding:20px 28px">${simbolo}
-<span style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-.3px;margin-left:8px;text-transform:uppercase">${esc(plataforma)}</span></td></tr>
+  return `<!doctype html><html><body style="margin:0;background:#F5F7FA;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F7FA;padding:24px 0"><tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:18px;overflow:hidden">
+<tr><td style="background:#18232A;padding:20px 28px">${simbolo}
+<span style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-.8px;margin-left:8px;text-transform:uppercase">${esc(plataforma)}</span></td></tr>
 <tr><td style="padding:28px">
-<h1 style="margin:0 0 14px;font-size:20px;color:#111417">${esc(titulo)}</h1>
-${linhas.map((l) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#24262B">${esc(l)}</p>`).join('')}
+<h1 style="margin:0 0 14px;font-size:21px;letter-spacing:-.6px;color:#18232A">${esc(titulo)}</h1>
+${linhas.map((l) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#44525A">${esc(l)}</p>`).join('')}
 ${tab}
-${botao ? `<p style="margin:22px 0 6px"><a href="${esc(botao.url)}" style="display:inline-block;background:#C8FF31;color:#111417;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px">${esc(botao.texto)}</a></p>` : ''}
+${botao ? `<p style="margin:22px 0 6px"><a href="${esc(botao.url)}" style="display:inline-block;background:#18232A;color:#ffffff;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:10px">${esc(botao.texto)}</a></p>` : ''}
 </td></tr>
-<tr><td style="padding:16px 28px;background:#F1F3F6;font-size:12px;color:#6B7280">${esc(rodape || 'Mensagem automática. Não é preciso responder.')}</td></tr>
+<tr><td style="padding:16px 28px;background:#EDF1F4;font-size:12px;color:#58636B">${esc(rodape || 'Mensagem automática. Não é preciso responder.')}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 

@@ -132,18 +132,30 @@ A tela *Programação* mostra exatamente esse resultado, inclusive simulando out
 
 ## A marca na tela
 
-A identidade **Vai Mídia** está aplicada no painel, no player e nas telas dos pontos:
+**O padrão é o do site.** O visual aprovado no atendimento (`site/`) manda em tudo: painel, portais, player das
+TVs, as folhas que o cliente recebe em PDF e os e-mails automáticos. Quem sai de vaimidia.com.br e entra no
+painel tem de sentir que é a mesma casa.
 
 | | |
 |---|---|
-| Preto | `#111417` — menu, rodapé das telas e fundo dos comunicados |
-| Lime | `#C8FF31` — destaques, botão principal, relógio e o símbolo |
-| Off-white | `#F7F8FA` — fundo do painel no tema claro |
+| Tinta | `#18232A` — menu lateral, botão principal, títulos, fundo dos comunicados na TV |
+| Lima | `#C8FF31` — destaques: item ativo do menu, tracinho das seções, relógio da TV e o símbolo |
+| Papel | `#F5F7FA` — fundo do painel no tema claro, do site e dos e-mails |
+| Linha | `#D9DFE5` — borda de cartão e de tabela |
+| Tipografia | **Open Sans**, a mesma do site, em `woff2` recortado (cada peso em torno de 15 kB) |
+
+Três regras que vêm do site e valem em todo lugar: **o botão principal é da cor da tinta com texto branco**
+(o lima é destaque, não preenchimento de bloco); **título é pesado e apertado** (800, `letter-spacing` negativo);
+e **cartão é branco com linha fina e canto de 18px**. No tema escuro a tinta sumiria no fundo, então lá o botão
+principal é o próprio lima com texto na tinta — é a única inversão.
 
 O símbolo (o "V") está em [`public/img/marca.svg`](public/img/marca.svg), em vetor e herdando a cor de onde está
 (`currentColor`), e é o mesmo desenho usado no favicon, no menu do painel, na tela de pareamento e no rodapé das telas.
-Sobre o lime, o texto é sempre o preto da marca — em fundo claro, o lime puro não tem contraste para ler, então
+Sobre o lima, o texto é sempre a tinta da marca — em fundo claro, o lima puro não tem contraste para ler, então
 textos e traços de gráfico usam a versão escurecida (`--cor-tinta`).
+
+O teste *Padrão visual: o sistema inteiro segue o site* lê as cores direto de `site/css/styles.css` e cobra
+painel, TV e e-mail: se alguém reintroduzir o preto antigo ou outra fonte, o teste quebra.
 
 O **nome e a frase da marca** ficam em *Configurações › Marca* e valem para o painel inteiro e para as telas: quem
 revende a plataforma com outro nome troca ali, sem mexer no código.

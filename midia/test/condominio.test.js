@@ -1099,3 +1099,49 @@ test('Site do Vai Mídia: abre na raiz e o formulário vira lead', async (t) => 
     assert.ok(!JSON.stringify(d).includes('Secreto'), 'nenhum nome de ponto vai para o site');
   });
 });
+
+/**
+ * O visual é um só. O site foi aprovado no atendimento, e painel, portais, TV e as folhas que o cliente
+ * recebe seguem o mesmo padrão: o papel, a tinta, o verde-lima e a tipografia saem todos daqui.
+ * Este teste existe para ninguém reintroduzir o preto antigo ou outra fonte sem perceber.
+ */
+test('Padrão visual: o sistema inteiro segue o site', async (t) => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const ler = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
+  const site = ler('site/css/styles.css');
+  const painel = ler('public/css/midia.css');
+  const tv = ler('public/tv/tv.css');
+  const email = ler('server/lib/email.js');
+
+  await t.test('as cores do site são as do painel, da TV e dos e-mails', () => {
+    const tokens = Object.fromEntries([...site.matchAll(/--(paper|ink|lime|muted|line):\s*(#[0-9a-fA-F]{6})/g)]
+      .map((m) => [m[1], m[2].toUpperCase()]));
+    assert.deepEqual(tokens, { paper: '#F5F7FA', ink: '#18232A', muted: '#58636B', line: '#D9DFE5', lime: '#C8FF31' },
+      'o site é a fonte da verdade do padrão visual');
+
+    for (const [onde, css] of [['painel', painel], ['TV', tv]]) {
+      assert.ok(css.includes(tokens.ink), `a tinta do site está no ${onde}`);
+      assert.ok(css.includes(tokens.lime), `o verde-lima está no ${onde}`);
+      assert.ok(!/#111417/i.test(css), `o preto antigo saiu do ${onde}`);
+    }
+    assert.ok(email.includes(tokens.ink) && email.includes(tokens.paper), 'o e-mail usa o papel e a tinta do site');
+  });
+
+  await t.test('a tipografia é a mesma, e uma só', () => {
+    for (const [onde, css] of [['painel', painel], ['TV', tv]]) {
+      assert.match(css, /font-family: "OpenSans"/, `o ${onde} escreve na fonte do site`);
+      assert.ok(!/Manrope/i.test(css), `a fonte antiga saiu do ${onde}`);
+    }
+    for (const peso of ['400', '600', '700', '800']) {
+      assert.ok(fs.existsSync(path.join(__dirname, '..', `public/fonts/opensans-${peso}.woff2`)), `o peso ${peso} está no painel`);
+      assert.ok(fs.existsSync(path.join(__dirname, '..', `site/assets/fonts/opensans-${peso}.woff2`)), `o peso ${peso} está no site`);
+    }
+  });
+
+  await t.test('a folha que o cliente recebe segue o mesmo padrão', () => {
+    assert.match(painel, /\.folha\{[^}]*color: #18232A/, 'a proposta é escrita na tinta do site');
+    assert.match(painel, /\.folha h2::before\{[^}]*background: #C8FF31/, 'o título de seção leva o tracinho lima do site');
+    assert.match(painel, /\.folha\{[^}]*border-radius: 18px/, 'o canto da folha é o do site');
+  });
+});

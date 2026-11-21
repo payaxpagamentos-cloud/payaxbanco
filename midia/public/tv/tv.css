@@ -1,18 +1,26 @@
-/* Player da TV: tela cheia, fundo preto e nada que distraia. Pensado para TV box, Fire Stick, mini PC e smart TV. */
-@font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+/*
+ * Player da TV: tela cheia e nada que distraia. Pensado para TV box, Fire Stick, mini PC e smart TV.
+ *
+ * Segue o mesmo padrão do site: a tinta #18232A nas superfícies da marca, o verde-lima como destaque
+ * e a Open Sans do site. Atrás do anúncio o fundo continua preto de verdade — é o que some na moldura
+ * da TV e não disputa com a peça do cliente.
+ */
+@font-face { font-family: "OpenSans"; src: url("../fonts/opensans-600.woff2") format("woff2"); font-weight: 500 600; font-display: swap; }
+@font-face { font-family: "OpenSans"; src: url("../fonts/opensans-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "OpenSans"; src: url("../fonts/opensans-800.woff2") format("woff2"); font-weight: 800 900; font-display: swap; }
 
 :root{
   --faixa-altura: 7.4vh;
-  /* Cores da marca */
-  --preto: #111417;
+  /* Cores do site */
+  --preto: #18232A;
   --lime: #C8FF31;
-  --claro: #F7F8FA;
+  --claro: #F5F7FA;
 }
 *{ box-sizing: border-box; }
 /* O atributo hidden tem de vencer o display das classes abaixo (senão a tela de espera fica por cima do anúncio). */
 [hidden]{ display: none !important; }
 html, body{ margin: 0; height: 100%; overflow: hidden; background: #000; }
-body{ color: #fff; font-family: "Manrope", system-ui, sans-serif; cursor: none; user-select: none; -webkit-user-select: none; }
+body{ color: #fff; font-family: "OpenSans", system-ui, sans-serif; cursor: none; user-select: none; -webkit-user-select: none; }
 
 .palco{ position: fixed; inset: 0; background: #000; display: grid; }
 .zona-anuncio{ position: relative; overflow: hidden; background: #000; }
@@ -59,7 +67,7 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
   display: flex; align-items: center; gap: 2.5vw; padding: 0 2.5vw; border-top: 2px solid var(--lime); }
 .faixa .marca-faixa{ display: flex; align-items: center; gap: 1.2vh; flex: none; }
 .faixa .marca-faixa svg{ height: 3.2vh; width: auto; color: var(--lime); }
-.faixa .marca-faixa span{ font-size: 2.6vh; font-weight: 800; letter-spacing: -.01em; text-transform: uppercase; color: #fff; }
+.faixa .marca-faixa span{ font-size: 2.6vh; font-weight: 800; letter-spacing: -.05em; text-transform: uppercase; color: #fff; }
 .faixa .texto{ font-size: 3vh; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; color: #D7DBE0; }
 .faixa .clima{ font-size: 2.8vh; font-weight: 700; flex: none; color: #D7DBE0; margin-left: auto; white-space: nowrap; }
 .faixa .clima + .relogio{ margin-left: 2vh; }
@@ -69,13 +77,13 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 
 /* Tela de espera: pareamento, sem programação ou erro. */
 .espera{ position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 1.2vh; text-align: center;
-  background: radial-gradient(1100px 620px at 50% 8%, #1A2016 0%, #14171A 45%, var(--preto) 100%); padding: 6vh; z-index: 5; }
+  background: radial-gradient(1100px 620px at 50% 8%, #24351F 0%, #1D2B33 45%, #101920 100%); padding: 6vh; z-index: 5; }
 .espera .slogan{ font-size: 2.6vh; color: var(--lime); font-weight: 600; margin: -.6vh 0 2.4vh; }
-.espera h1{ font-size: 5vh; font-weight: 800; margin: 0; letter-spacing: -.02em; }
+.espera h1{ font-size: 5vh; font-weight: 800; margin: 0; letter-spacing: -.045em; }
 .espera .mudo{ color: #A8AFB9; font-size: 2.6vh; margin: 0; max-width: 60ch; }
 .espera .ajuda{ color: #868D98; font-size: 2.1vh; margin-top: 1vh; }
 .espera .ajuda strong{ color: var(--lime); }
-.marca-tv{ display: flex; align-items: center; gap: 1.6vh; font-size: 4vh; font-weight: 800; letter-spacing: -.01em; text-transform: uppercase; color: #fff; }
+.marca-tv{ display: flex; align-items: center; gap: 1.6vh; font-size: 4vh; font-weight: 800; letter-spacing: -.05em; text-transform: uppercase; color: #fff; }
 .marca-tv .simbolo{ height: 5.2vh; width: auto; color: var(--lime); }
 .codigo{ font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13vh; font-weight: 800; letter-spacing: 1.2vh; line-height: 1.1; color: var(--lime);
   background: rgba(200,255,49,.08); border: 2px solid rgba(200,255,49,.45); border-radius: 2.4vh; padding: 2vh 4vh 2vh 5.2vh; margin: 2vh 0; }
@@ -83,7 +91,7 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 .aviso-conexao{ position: fixed; top: 2.4vh; left: 2.4vh; z-index: 6; background: rgba(180, 83, 9, .92); color: #fff; font-size: 2vh; font-weight: 700;
   padding: .9vh 1.8vh; border-radius: 999px; }
 
-.info{ position: fixed; top: 2.4vh; right: 2.4vh; z-index: 7; background: rgba(0,0,0,.82); border: 1px solid rgba(255,255,255,.16); border-radius: 1.4vh;
+.info{ position: fixed; top: 2.4vh; right: 2.4vh; z-index: 7; background: rgba(24, 35, 42, .88); border: 1px solid rgba(255,255,255,.16); border-radius: 1.4vh;
   padding: 2vh 2.4vh; font-size: 1.9vh; line-height: 1.7; max-width: 46vw; font-variant-numeric: tabular-nums; }
 .info b{ color: #C8FF31; font-weight: 700; }
 
@@ -98,25 +106,25 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 
 /* Comunicado do ponto (recado do condomínio ou da loja), desenhado pela própria TV. */
 .comunicado{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 3vh; padding: 8vh 9vw;
-  background: linear-gradient(135deg, #1A1F23 0%, var(--preto) 100%); color: #fff; text-align: left; }
+  background: linear-gradient(135deg, #22323B 0%, #141E24 100%); color: #fff; text-align: left; }
 .comunicado .cabeca{ display: flex; align-items: center; gap: 2vh; min-width: 0; }
 .comunicado .selo-tipo{ flex: none; }
 .comunicado .selo-tipo{ font-size: 2.4vh; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: .9vh 2.2vh; border-radius: 999px;
   background: var(--lime); color: var(--preto); }
 .comunicado .onde{ font-size: 2.4vh; font-weight: 600; color: #A8AFB9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
-.comunicado h1{ font-size: 8.5vh; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; margin: 0; }
+.comunicado h1{ font-size: 8.5vh; font-weight: 800; line-height: 1.05; letter-spacing: -.045em; margin: 0; }
 .comunicado p{ font-size: 4.4vh; line-height: 1.35; margin: 0; color: #E6E8EC; }
 .comunicado .quando{ font-size: 2.4vh; color: #868D98; }
 /* Agenda do prédio e clima do dia: o conteúdo que o morador procura por vontade própria. */
-.comunicado.quadro-agenda{ background: linear-gradient(135deg, #10212B 0%, #070E12 100%); }
+.comunicado.quadro-agenda{ background: linear-gradient(135deg, #14303F 0%, #0B141A 100%); }
 .comunicado.quadro-agenda .selo-tipo{ background: #38BDF8; color: var(--preto); }
 .comunicado .agenda{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.6vh; }
 .comunicado .agenda li{ display: flex; flex-direction: column; gap: .3vh; border-left: .5vh solid var(--lime); padding-left: 2vh; }
 .comunicado .agenda .quando{ font-size: 2.6vh; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--lime); }
 .comunicado .agenda li > span + span{ font-size: 4vh; font-weight: 600; line-height: 1.15; color: #E6E8EC; }
-.comunicado.quadro-clima{ background: linear-gradient(135deg, #0C1E2E 0%, #050B12 100%); }
+.comunicado.quadro-clima{ background: linear-gradient(135deg, #102B3F 0%, #09131A 100%); }
 .comunicado.quadro-clima .selo-tipo{ background: #FACC15; color: var(--preto); }
-.comunicado .grau{ font-size: 16vh; font-weight: 800; line-height: .95; letter-spacing: -.04em; color: var(--lime); }
+.comunicado .grau{ font-size: 16vh; font-weight: 800; line-height: .95; letter-spacing: -.055em; color: var(--lime); }
 .comunicado.quadro-clima h1{ font-size: 5.6vh; }
 /* Zona em pé (elevador): a zona tem menos altura, então o número e o texto encolhem. */
 @media (max-aspect-ratio: 3/4){
@@ -126,12 +134,12 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 }
 
 /* Uma faixa de cor por tipo de recado. */
-.comunicado.urgente{ background: linear-gradient(135deg, #3B0A0A 0%, #1A0505 100%); }
+.comunicado.urgente{ background: linear-gradient(135deg, #43120F 0%, #1C0908 100%); }
 .comunicado.urgente .selo-tipo{ background: #DC2626; }
-.comunicado.manutencao{ background: linear-gradient(135deg, #3A2606 0%, #170F02 100%); }
+.comunicado.manutencao{ background: linear-gradient(135deg, #412B0B 0%, #191104 100%); }
 .comunicado.manutencao .selo-tipo{ background: #D97706; }
 .comunicado.assembleia .selo-tipo{ background: #E6EAF0; color: var(--preto); }
-.comunicado.entrega{ background: linear-gradient(135deg, #0A2A1B 0%, #04120B 100%); }
+.comunicado.entrega{ background: linear-gradient(135deg, #0E3022 0%, #06160E 100%); }
 .comunicado.entrega .selo-tipo{ background: #15803D; }
 
 /*
@@ -143,7 +151,7 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 .cartao-marca .lockup{ display: flex; align-items: center; gap: 2.4vh; z-index: 1; }
 .cartao-marca .lockup .v{ height: 11vh; width: auto; color: var(--lime); flex: none; }
 .cartao-marca .nome{ display: flex; flex-direction: column; line-height: .94; }
-.cartao-marca .nome em{ font-style: normal; font-weight: 800; font-size: 8.4vh; letter-spacing: -.02em; }
+.cartao-marca .nome em{ font-style: normal; font-weight: 800; font-size: 8.4vh; letter-spacing: -.055em; }
 .cartao-marca .frase{ margin: 0; font-size: 4.4vh; font-weight: 600; color: #EDEFF2; max-width: 60%; z-index: 1; }
 /* O símbolo gigante sai pela borda, como nas peças da marca. */
 .cartao-marca .v-gigante{ position: absolute; color: var(--lime); z-index: 0;

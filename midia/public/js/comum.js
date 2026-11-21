@@ -90,7 +90,7 @@ export async function enviarArquivo(rota, arquivo, dados = {}) {
 }
 
 // Cada campanha ganha uma cor na linha do tempo do loop; o par leva a cor do texto que fica legível nela.
-const CORES_LOOP = [['#C8FF31', '#111417'], ['#111417', '#FFFFFF'], ['#5A7D00', '#FFFFFF'], ['#0E7490', '#FFFFFF'],
+const CORES_LOOP = [['#C8FF31', '#18232A'], ['#18232A', '#FFFFFF'], ['#5A7D00', '#FFFFFF'], ['#0E7490', '#FFFFFF'],
   ['#B45309', '#FFFFFF'], ['#9D174D', '#FFFFFF'], ['#1D4ED8', '#FFFFFF'], ['#166534', '#FFFFFF']];
 
 /** Linha do tempo do loop: cada item com largura proporcional à duração. */

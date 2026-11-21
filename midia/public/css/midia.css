@@ -1,22 +1,38 @@
-/* Mídia Indoor — painel da equipe, do anunciante e do lojista. Visual limpo: superfícies neutras, linhas finas e um único tom de destaque. */
-@font-face { font-family: "Manrope"; src: url("../fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+/*
+ * Mídia Indoor — painel da equipe, do anunciante e do lojista.
+ *
+ * O padrão visual é o do site vaimidia.com.br: papel claro levemente azulado, tinta escura no lugar
+ * do preto, linha fina, cantos de 18px e o verde-lima só como destaque — nunca como fundo de bloco
+ * grande. Quem sai do site e entra no painel tem de sentir que é a mesma casa.
+ *
+ * Open Sans é a tipografia do site. Aqui ela vem recortada (só latim) e em woff2: os quatro pesos
+ * somam menos de 60 kB, contra 880 kB dos arquivos originais.
+ */
+@font-face { font-family: "OpenSans"; src: url("../fonts/opensans-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "OpenSans"; src: url("../fonts/opensans-600.woff2") format("woff2"); font-weight: 500 600; font-display: swap; }
+@font-face { font-family: "OpenSans"; src: url("../fonts/opensans-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "OpenSans"; src: url("../fonts/opensans-800.woff2") format("woff2"); font-weight: 800 900; font-display: swap; }
 
-/* Claro (padrão): off-white da marca, cartões brancos, lime como destaque. */
+/* Claro (padrão): o papel, a tinta e a linha do site. */
 :root, :root[data-tema="claro"]{
-  --bg: #F7F8FA;
+  --bg: #F5F7FA;
   --surface: #FFFFFF;
-  --surface-2: #F1F3F6;
-  --hover: #EDEFF3;
+  --surface-2: #EDF1F4;
+  --hover: #E6EBEF;
   --campo: #FFFFFF;
-  --border: #E4E7EC;
-  --border-forte: #D2D7DF;
-  --text: #111417;
-  --text-2: #5A6170;
-  --text-3: #8A909C;
+  --border: #D9DFE5;
+  --border-forte: #C5CED6;
+  --text: #18232A;
+  --text-2: #58636B;
+  --text-3: #8A949C;
   /* Lime da marca: serve de preenchimento. Sobre ele, o texto é sempre o preto da marca. */
   --cor: #C8FF31;
   --cor-forte: #B6EF18;
-  --cor-contraste: #111417;
+  --cor-contraste: #18232A;
+  /* Botão principal: no site ele é da cor da tinta, com texto branco. O lima fica para os destaques. */
+  --btn-bg: #18232A;
+  --btn-bg-hover: #2C3D48;
+  --btn-texto: #FFFFFF;
   /* Lime escurecido, para texto e traço sobre fundo claro (o lime puro não tem contraste em branco). */
   --cor-tinta: #46650A;
   --destaque-bg: rgba(200, 255, 49, .24);
@@ -32,33 +48,37 @@
   --info-bg: rgba(200, 255, 49, .24);
   --barra-fundo: #E8EAEE;
   --barra: #9FD400;
-  --radius: 14px;
-  --radius-sm: 9px;
-  --shadow: 0 1px 2px rgba(17, 20, 23, .04), 0 4px 16px -8px rgba(17, 20, 23, .1);
-  --shadow-flutuante: 0 18px 50px -12px rgba(17, 20, 23, .28), 0 0 0 1px var(--border);
-  /* Menu lateral: o preto da marca nos dois temas */
-  --lateral: linear-gradient(180deg, #171B1F 0%, #0C0F12 100%);
-  --lateral-texto: #C3C9D2;
-  --lateral-fraco: #848C97;
+  --radius: 18px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(37, 52, 77, .04), 0 9px 32px rgba(37, 52, 77, .075);
+  --shadow-flutuante: 0 25px 80px rgba(24, 35, 42, .25), 0 0 0 1px var(--border);
+  /* Menu lateral: a tinta do site nos dois temas */
+  --lateral: linear-gradient(180deg, #1D2B33 0%, #141E24 100%);
+  --lateral-texto: #C6CFD5;
+  --lateral-fraco: #8C98A0;
   --lateral-hover: rgba(255, 255, 255, .07);
   --lateral-borda: rgba(255, 255, 255, .08);
   color-scheme: light;
-  font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "OpenSans", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 :root[data-tema="escuro"]{
-  --bg: #0E1114;
-  --surface: #171B20;
-  --surface-2: #1F242A;
-  --hover: #262C33;
-  --campo: #13171A;
-  --border: #272D34;
-  --border-forte: #39414A;
-  --text: #F7F8FA;
-  --text-2: #A4ACB8;
-  --text-3: #79818D;
+  --bg: #0F171C;
+  --surface: #18232A;
+  --surface-2: #1F2C34;
+  --hover: #27353E;
+  --campo: #131C21;
+  --border: #2A3942;
+  --border-forte: #3C4D57;
+  --text: #F5F7FA;
+  --text-2: #A7B2BA;
+  --text-3: #7D8990;
   --cor: #C8FF31;
   --cor-forte: #D6FF5E;
-  --cor-contraste: #111417;
+  --cor-contraste: #18232A;
+  /* No escuro a tinta sumiria no fundo: aí o botão principal é o próprio lima. */
+  --btn-bg: #C8FF31;
+  --btn-bg-hover: #D6FF5E;
+  --btn-texto: #18232A;
   /* No escuro o lime já tem contraste de sobra: ele mesmo vira a cor do texto de destaque. */
   --cor-tinta: #C8FF31;
   --destaque-bg: rgba(200, 255, 49, .16);
@@ -74,18 +94,19 @@
   --barra: #C8FF31;
   --shadow: 0 1px 0 rgba(255,255,255,.02) inset;
   --shadow-flutuante: 0 18px 50px -12px rgba(0,0,0,.72), 0 0 0 1px var(--border);
-  --lateral: linear-gradient(180deg, #14181C 0%, #0A0D10 100%);
+  --lateral: linear-gradient(180deg, #16222A 0%, #0D161B 100%);
   color-scheme: dark;
 }
 *{ box-sizing: border-box; }
 html, body{ margin: 0; min-height: 100%; }
 body{ background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 input, select, textarea, button{ font: inherit; color: inherit; }
-h1, h2, h3{ margin: 0 0 .5em; line-height: 1.25; letter-spacing: -.015em; }
-h1{ font-size: 22px; font-weight: 700; } h2{ font-size: 15px; font-weight: 700; } h3{ font-size: 13px; font-weight: 700; }
+h1, h2, h3{ margin: 0 0 .5em; line-height: 1.2; letter-spacing: -.035em; }
+h1{ font-size: 23px; font-weight: 800; } h2{ font-size: 15.5px; font-weight: 700; } h3{ font-size: 13px; font-weight: 700; }
 a{ color: var(--cor); }
 ::selection{ background: var(--destaque-bg); }
-:focus-visible{ outline: 2px solid var(--cor); outline-offset: 2px; }
+/* O azul de foco do site: aparece nos dois temas e não se confunde com o lima. */
+:focus-visible{ outline: 2px solid #487BBA; outline-offset: 2px; }
 .oculto{ display: none !important; }
 .mudo{ color: var(--text-2); }
 .fraco{ color: var(--text-3); }
@@ -109,7 +130,7 @@ a{ color: var(--cor); }
 .marca .simbolo svg{ width: 32px; height: auto; display: block; }
 
 .marca .texto{ display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
-.marca .texto strong{ font-size: 19px; font-weight: 800; letter-spacing: -.005em; line-height: 1.05; }
+.marca .texto strong{ font-size: 19px; font-weight: 800; letter-spacing: -.045em; line-height: 1.05; }
 .marca .texto small{ font-size: 13px; font-weight: 600; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
 .lateral .marca{ color: #fff; }
 .lateral .marca .texto small{ color: #D8DEE6; }
@@ -129,8 +150,8 @@ a{ color: var(--cor); }
   transition: background .12s, color .12s; }
 .lateral a.item svg{ width: 18px; height: 18px; flex: none; }
 .lateral a.item:hover{ background: var(--lateral-hover); color: #fff; }
-.lateral a.item.on{ background: var(--cor); color: #111417; box-shadow: 0 6px 18px -8px rgba(200, 255, 49, .55); }
-.lateral a.item.on svg{ color: #111417; }
+.lateral a.item.on{ background: var(--cor); color: #18232A; box-shadow: 0 6px 18px -8px rgba(200, 255, 49, .55); }
+.lateral a.item.on svg{ color: #18232A; }
 .lateral a.sub{ padding: 7px 12px 7px 42px; font-weight: 500; font-size: 12.5px; color: var(--lateral-fraco); border-radius: 8px; text-decoration: none; display: block; }
 .lateral a.sub.on{ color: #fff; font-weight: 600; }
 .lateral a.sub:hover:not(.on){ color: #fff; }
@@ -140,7 +161,7 @@ a{ color: var(--cor); }
 .casca.recolhida .lateral a.item{ justify-content: center; padding: 10px; }
 .principal{ min-width: 0; display: flex; flex-direction: column; }
 .topo{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 32px 8px; position: relative; }
-.topo h1{ font-size: 25px; font-weight: 800; letter-spacing: -.02em; }
+.topo h1{ font-size: 26px; font-weight: 800; letter-spacing: -.045em; }
 .topo .subtitulo{ margin: 2px 0 0; color: var(--text-2); font-size: 13.5px; }
 .topo > div:first-child{ display: flex; flex-direction: column; min-width: 0; }
 .topo .trilha{ order: -1; font-size: 12px; color: var(--text-3); margin: 0 0 4px; }
@@ -157,7 +178,7 @@ a{ color: var(--cor); }
 .ferramentas button svg{ width: 16px; height: 16px; }
 .ferramentas button.on{ background: var(--surface-2); color: var(--text); box-shadow: 0 0 0 1px var(--border) inset; }
 .ferramentas .usuario > svg{ width: 14px; height: 14px; color: var(--text-3); }
-.ferramentas .avatar{ width: 32px; height: 32px; border-radius: 50%; background: var(--cor); color: #111417; font-weight: 800; display: grid; place-items: center; font-size: 11px; }
+.ferramentas .avatar{ width: 32px; height: 32px; border-radius: 50%; background: var(--cor); color: #18232A; font-weight: 800; display: grid; place-items: center; font-size: 11px; }
 .ferramentas .usuario{ display: flex; align-items: center; gap: 8px; cursor: pointer; border: 0; background: none; width: auto; height: auto; padding: 3px 10px 3px 3px; border-radius: 999px; margin-left: 8px; }
 .ferramentas .usuario:hover{ background: var(--hover); }
 .ferramentas .usuario .nome{ font-weight: 600; color: var(--text); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
@@ -180,20 +201,20 @@ a{ color: var(--cor); }
 .indicador.com-icone .valor{ margin-top: 0; }
 .indicador .ic{ width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; flex: none; }
 .indicador .ic svg{ width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.ic.azul{ background: var(--destaque-bg); color: var(--cor-tinta); } .ic.verde{ background: #E5F7EC; color: #16A34A; } .ic.roxo{ background: #ECEEF1; color: #111417; }
+.ic.azul{ background: var(--destaque-bg); color: var(--cor-tinta); } .ic.verde{ background: #E5F7EC; color: #16A34A; } .ic.roxo{ background: #E7ECF0; color: #18232A; }
 .ic.laranja{ background: #FEF1E2; color: #EA7A0B; } .ic.vermelho{ background: #FDECEC; color: #DC2626; } .ic.ciano{ background: #EAF1E0; color: #3F5B00; }
 :root[data-tema="escuro"] .ic{ background: var(--surface-2) !important; }
 .indicador .rotulo{ font-size: 12.5px; color: var(--text-2); font-weight: 500; }
-.indicador .valor{ font-size: 26px; font-weight: 800; letter-spacing: -.025em; margin-top: 6px; line-height: 1.15; }
+.indicador .valor{ font-size: 27px; font-weight: 800; letter-spacing: -.04em; margin-top: 6px; line-height: 1.12; }
 .indicador .nota{ font-size: 12px; color: var(--text-3); margin-top: 2px; }
 
 /* Botões e campos */
 .btn{ display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; border: 1px solid var(--border-forte); background: var(--surface); border-radius: var(--radius-sm);
-  padding: 7px 14px; font-weight: 600; cursor: pointer; text-decoration: none; color: var(--text); min-height: 36px; font-size: 13px; transition: background .12s, border-color .12s, box-shadow .12s; }
+  padding: 8px 15px; font-weight: 700; cursor: pointer; text-decoration: none; color: var(--text); min-height: 38px; font-size: 13px; transition: background .12s, border-color .12s, box-shadow .12s; }
 .btn:hover{ background: var(--hover); }
 .btn:disabled{ opacity: .5; cursor: default; }
-.btn.primario{ background: var(--cor); border-color: transparent; color: var(--cor-contraste); font-weight: 700; box-shadow: 0 6px 16px -10px rgba(145, 196, 0, .9); }
-.btn.primario:hover{ background: var(--cor-forte); }
+.btn.primario{ background: var(--btn-bg); border-color: transparent; color: var(--btn-texto); font-weight: 700; box-shadow: 0 5px 12px rgba(24, 35, 42, .12); }
+.btn.primario:hover{ background: var(--btn-bg-hover); box-shadow: 0 8px 24px rgba(24, 35, 42, .18); }
 .btn.perigo{ color: var(--erro); }
 .btn.perigo:hover{ background: var(--erro-bg); }
 .btn.pequeno{ min-height: 30px; padding: 4px 11px; font-size: 12.5px; border-radius: 8px; }
@@ -209,12 +230,12 @@ input, select, textarea{ border: 1px solid var(--border-forte); background: var(
 input::placeholder, textarea::placeholder{ color: var(--text-3); }
 input:hover, select:hover, textarea:hover{ border-color: var(--text-3); }
 textarea{ min-height: 90px; resize: vertical; }
-input:focus, select:focus, textarea:focus{ outline: none; border-color: var(--cor); box-shadow: 0 0 0 3px var(--destaque-bg); }
+input:focus, select:focus, textarea:focus{ outline: none; border-color: #487BBA; box-shadow: 0 0 0 3px rgba(72, 123, 186, .18); }
 input:disabled, select:disabled, textarea:disabled{ opacity: .6; cursor: not-allowed; }
 input[type="checkbox"]{ appearance: none; width: 18px; height: 18px; min-height: 0; padding: 0; border-radius: 5px; border: 1.5px solid var(--border-forte); background: var(--campo);
   display: inline-grid; place-items: center; cursor: pointer; flex: none; }
 input[type="checkbox"]:checked{ background: var(--cor); border-color: var(--cor-forte); }
-input[type="checkbox"]:checked::after{ content: ""; width: 9px; height: 5px; border: 2px solid #111417; border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+input[type="checkbox"]:checked::after{ content: ""; width: 9px; height: 5px; border: 2px solid #18232A; border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
 select{ appearance: none; padding-right: 34px; cursor: pointer;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D929C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 10px center; background-size: 16px; }
@@ -383,8 +404,14 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .entrada .slogan-marca{ color: var(--cor); }
 
 /* Entrada */
+/* Sobre a tinta, o botão principal e os links voltam a ser lima e branco — tinta sobre tinta some. */
+.entrada .btn.primario{ background: var(--cor); color: #18232A; box-shadow: 0 6px 18px -8px rgba(200, 255, 49, .55); }
+.entrada .btn.primario:hover{ background: var(--cor-forte); }
+.entrada .btn:not(.primario){ color: #fff; border-color: rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); }
+.entrada .btn:not(.primario):hover{ background: rgba(255, 255, 255, .16); }
+.entrada a{ color: var(--cor); }
 .entrada{ min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
-  background: radial-gradient(760px 440px at 50% -4%, rgba(200, 255, 49, .22), transparent 70%), linear-gradient(180deg, #181C20, #0B0E11); }
+  background: radial-gradient(760px 440px at 50% -4%, rgba(200, 255, 49, .22), transparent 70%), linear-gradient(180deg, #1D2B33, #0D161B); }
 .entrada .cartao{ width: min(400px, 100%); padding: 32px; box-shadow: var(--shadow-flutuante); border: 0; }
 .entrada .marca .simbolo, .entrada .marca .simbolo svg{ width: 40px; height: 40px; }
 .entrada .marca .texto strong{ font-size: 22px; }
@@ -392,7 +419,7 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 @media (max-width: 860px){
   .casca, .casca.recolhida{ grid-template-columns: 1fr; }
   .lateral{ position: sticky; top: 0; z-index: 50; height: auto; flex-direction: row; overflow-x: auto; padding: 8px 12px; gap: 2px; border-right: 0; border-bottom: 1px solid var(--border);
-    background: #111417; scrollbar-width: none; }
+    background: #18232A; scrollbar-width: none; }
   .lateral::-webkit-scrollbar{ display: none; }
   .lateral .topo-lateral, .lateral .grupo-sub{ display: none; }
   .lateral a.item{ white-space: nowrap; }
@@ -416,43 +443,53 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 }
 @media print{ .lateral, .ferramentas, .filtros, .btn{ display: none !important; } .casca{ display: block; } .cartao{ border: 0; } }
 
-/* ---------------------------------------------------------------- Proposta comercial (folha para imprimir ou salvar em PDF) */
-.folha-proposta{ position: fixed; inset: 0; z-index: 1200; overflow: auto; background: var(--fundo-2, #E9EBEF); padding: 24px 16px 60px; }
+/* ----------------------------------------------------------------
+   Proposta, relatório de veiculação e fatura: a folha que o cliente recebe.
+
+   É a peça do sistema que mais sai da empresa — vai por WhatsApp, por e-mail, impressa na mesa de
+   uma agência. Por isso ela segue o padrão do site ao pé da letra: papel claro, tinta #18232A,
+   títulos pesados e apertados, e o verde-lima só como marca de seção, nunca como fundo.
+   ---------------------------------------------------------------- */
+.folha-proposta{ position: fixed; inset: 0; z-index: 1200; overflow: auto; background: #E7ECF0; padding: 24px 16px 60px; }
 .folha-proposta .acoes-folha{ display: flex; justify-content: center; gap: 10px; margin-bottom: 18px; }
-.folha{ width: min(820px, 100%); margin: 0 auto; background: #FFFFFF; color: #111417; padding: 44px 48px 36px; border-radius: 10px;
-  box-shadow: 0 16px 48px rgba(17,20,23,.18); font-size: 13.5px; line-height: 1.55; }
-.folha header{ display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 16px; border-bottom: 2px solid #111417; }
+.folha{ width: min(820px, 100%); margin: 0 auto; background: #FFFFFF; color: #18232A; padding: 44px 48px 36px; border-radius: 18px;
+  box-shadow: 0 9px 32px rgba(37, 52, 77, .12); font-size: 12.5px; line-height: 1.6; }
+.folha header{ display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 16px; border-bottom: 2px solid #18232A; }
 .folha .marca-folha{ display: flex; align-items: center; gap: 12px; }
-.folha .marca-folha .simbolo{ width: 34px; color: #111417; display: block; }
+.folha .marca-folha .simbolo{ width: 34px; color: #18232A; display: block; }
 .folha .marca-folha .simbolo svg{ width: 100%; display: block; }
-.folha .marca-folha strong{ font-size: 18px; letter-spacing: .08em; }
-.folha .marca-folha .slogan{ font-size: 11.5px; color: #5B6470; }
-.folha .titulo-doc{ font-weight: 700; font-size: 14px; }
+.folha .marca-folha strong{ font-size: 19px; font-weight: 800; letter-spacing: -.055em; }
+.folha .marca-folha .slogan{ font-size: 11.5px; color: #58636B; }
+.folha .titulo-doc{ font-weight: 700; font-size: 14px; letter-spacing: -.03em; }
 .folha .dir{ text-align: right; }
 .folha .pequeno{ font-size: 11.5px; }
-.folha .mudo{ color: #5B6470; }
-.folha h1{ font-size: 26px; margin: 22px 0 4px; line-height: 1.2; }
-.folha h2{ font-size: 13px; text-transform: uppercase; letter-spacing: .09em; color: #46650A; margin: 26px 0 10px; }
-.folha .para{ font-weight: 600; margin: 0 0 4px; }
-.folha .resumo{ color: #39414B; margin: 6px 0 0; }
+.folha .mudo{ color: #58636B; }
+.folha h1{ font-size: 27px; font-weight: 800; letter-spacing: -.05em; margin: 22px 0 4px; line-height: 1.12; }
+/* Título de seção com o tracinho lima do site, em vez de letra colorida. */
+.folha h2{ font-size: 12.5px; text-transform: uppercase; letter-spacing: .11em; font-weight: 700; color: #58636B; margin: 28px 0 12px;
+  display: flex; align-items: center; gap: 10px; }
+.folha h2::before{ content: ""; width: 20px; height: 4px; border-radius: 3px; background: #C8FF31; flex: none; }
+.folha .para{ font-weight: 700; margin: 0 0 4px; }
+.folha .resumo{ color: #44525A; margin: 6px 0 0; }
 .folha .blocos{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.folha .bloco{ background: #F4F6F8; border-left: 3px solid #C8FF31; border-radius: 6px; padding: 12px 14px; }
-.folha .bloco .valor{ font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
-.folha .bloco .rotulo{ font-size: 11.5px; color: #39414B; font-weight: 600; }
-.folha .bloco .nota{ font-size: 10.5px; color: #6B7482; margin-top: 2px; }
+.folha .bloco{ background: #F5F7FA; border: 1px solid #E4E9EE; border-radius: 12px; padding: 13px 15px; }
+.folha .bloco .valor{ font-size: 22px; font-weight: 800; letter-spacing: -.045em; line-height: 1.1; }
+.folha .bloco .valor::after{ content: ""; display: block; width: 20px; height: 3px; border-radius: 2px; background: #C8FF31; margin-top: 7px; }
+.folha .bloco .rotulo{ font-size: 11.5px; color: #44525A; font-weight: 600; margin-top: 6px; }
+.folha .bloco .nota{ font-size: 10.5px; color: #6B7681; margin-top: 2px; }
 .folha .tabela-folha{ width: 100%; border-collapse: collapse; }
-.folha .tabela-folha th{ text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #5B6470;
-  border-bottom: 1px solid #D5DAE1; padding: 7px 8px; }
-.folha .tabela-folha td{ padding: 8px; border-bottom: 1px solid #EDF0F3; vertical-align: top; }
+.folha .tabela-folha th{ text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #58636B;
+  font-weight: 700; padding: 8px; border-bottom: 1px solid #D9DFE5; }
+.folha .tabela-folha td{ padding: 8px; border-bottom: 1px solid #EDF1F4; vertical-align: top; }
 .folha .tabela-folha .dir{ text-align: right; }
 .folha .tabela-folha .num{ font-variant-numeric: tabular-nums; }
-.folha .tabela-folha tfoot td{ font-weight: 700; border-top: 2px solid #111417; border-bottom: 0; }
+.folha .tabela-folha tfoot td{ font-weight: 700; border-top: 2px solid #18232A; border-bottom: 0; }
 .folha .investimento td{ padding: 9px 8px; }
-.folha .investimento tr.forte td{ font-weight: 700; font-size: 15px; }
-.folha .observacao{ background: #F4F6F8; border-radius: 6px; padding: 12px 14px; margin-top: 18px; white-space: pre-wrap; }
-.folha .condicoes{ margin: 0; padding-left: 18px; color: #39414B; }
+.folha .investimento tr.forte td{ font-weight: 800; font-size: 15px; letter-spacing: -.03em; }
+.folha .observacao{ background: #F5F7FA; border: 1px solid #E4E9EE; border-radius: 12px; padding: 13px 15px; margin-top: 18px; white-space: pre-wrap; }
+.folha .condicoes{ margin: 0; padding-left: 18px; color: #44525A; }
 .folha .condicoes li{ margin-bottom: 5px; }
-.folha footer{ margin-top: 30px; padding-top: 14px; border-top: 1px solid #D5DAE1; font-size: 11px; color: #5B6470; text-align: center; }
+.folha footer{ margin-top: 30px; padding-top: 14px; border-top: 1px solid #D9DFE5; font-size: 11px; color: #58636B; text-align: center; }
 /* Tabela larga não quebra a folha no celular: ela rola dentro da própria caixa. */
 .folha .rolagem{ overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .folha .rolagem .tabela-folha{ min-width: 420px; }
@@ -474,6 +511,8 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .folha-proposta{ position: static; padding: 0; background: #FFFFFF; overflow: visible; }
   .folha-proposta .acoes-folha{ display: none !important; }
   .folha{ width: 100%; box-shadow: none; border-radius: 0; padding: 0; font-size: 11.5px; }
+  .folha .bloco{ background: #F5F7FA !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .folha h2::before, .folha .bloco .valor::after{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .folha h2{ break-after: avoid; }
   .folha .tabela-folha tr{ break-inside: avoid; }
 }
@@ -486,94 +525,51 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 @keyframes tocar{ 0%{ box-shadow: 0 0 0 0 rgba(34, 197, 94, .55); } 100%{ box-shadow: 0 0 0 26px rgba(34, 197, 94, 0); } }
 @keyframes tremer{ 0%, 60%, 100%{ transform: rotate(0); } 10%, 30%, 50%{ transform: rotate(-14deg); } 20%, 40%{ transform: rotate(14deg); } }
 /* ==========================================================================
-   Efeito vidro: superfícies translúcidas com desfoque sobre um fundo com luzes de cor.
-   Sem suporte a backdrop-filter, o navegador fica com as superfícies sólidas acima.
+   Vidro, do jeito do site: o fundo é papel liso e os cartões são brancos de verdade.
+   Só o que flutua por cima do conteúdo — barra de estado, menu do usuário, aviso rápido e as
+   janelas — ganha a superfície translúcida com desfoque, igual à barra de navegação do site.
+   Sem suporte a backdrop-filter, tudo isso fica sólido, e o painel continua igual.
    ========================================================================== */
 :root, :root[data-tema="claro"]{
-  --vidro: rgba(255, 255, 255, .52);
-  --vidro-forte: rgba(255, 255, 255, .78);
-  --vidro-borda: rgba(255, 255, 255, .75);
-  --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, .9);
-  --vidro-sombra: 0 8px 32px -12px rgba(17, 20, 23, .2);
-  --vidro-desfoque: blur(18px) saturate(170%);
-  --vidro-campo: rgba(255, 255, 255, .7);
-  --vidro-lateral: linear-gradient(180deg, rgba(23, 27, 31, .94) 0%, rgba(12, 15, 18, .96) 100%);
-  --luz-1: rgba(200, 255, 49, .38);
-  --luz-2: rgba(159, 212, 0, .22);
-  --luz-3: rgba(17, 20, 23, .07);
+  --vidro: rgba(255, 255, 255, .72);
+  --vidro-forte: rgba(255, 255, 255, .9);
+  --vidro-borda: rgba(255, 255, 255, .9);
+  --vidro-sombra: 0 9px 32px rgba(37, 52, 77, .075);
+  --vidro-desfoque: blur(22px) saturate(150%);
 }
 :root[data-tema="escuro"]{
-  --vidro: rgba(23, 27, 32, .58);
-  --vidro-forte: rgba(23, 27, 32, .82);
+  --vidro: rgba(24, 35, 42, .68);
+  --vidro-forte: rgba(24, 35, 42, .88);
   --vidro-borda: rgba(255, 255, 255, .09);
-  --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, .06);
   --vidro-sombra: 0 10px 36px -12px rgba(0, 0, 0, .6);
-  --vidro-campo: rgba(19, 23, 26, .62);
-  --vidro-lateral: linear-gradient(180deg, rgba(20, 24, 28, .8) 0%, rgba(10, 13, 16, .84) 100%);
-  --luz-1: rgba(200, 255, 49, .20);
-  --luz-2: rgba(159, 212, 0, .14);
-  --luz-3: rgba(255, 255, 255, .05);
 }
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
-  /* Fundo com luzes de cor (fixo), para o vidro ter o que desfocar */
-  body{ background:
-      radial-gradient(42rem 32rem at 12% -6%, var(--luz-1), transparent 70%),
-      radial-gradient(38rem 30rem at 96% 8%, var(--luz-2), transparent 70%),
-      radial-gradient(46rem 36rem at 60% 108%, var(--luz-3), transparent 70%),
-      var(--bg);
-    background-attachment: fixed; }
-
-  .cartao, .modal, .menu-usuario, .status-sistema, .toast, .ferramentas .usuario:hover, .btn:not(.primario){
-    background: var(--vidro);
+  .status-sistema, .menu-usuario, .toast, .modal{
+    background: var(--vidro-forte);
     -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque);
     border: 1px solid var(--vidro-borda);
-    box-shadow: var(--vidro-brilho), var(--vidro-sombra);
+    box-shadow: var(--vidro-sombra);
   }
-  .modal, .menu-usuario, .toast{ background: var(--vidro-forte); }
-  .btn:not(.primario){ box-shadow: var(--vidro-brilho); }
-  .btn:not(.primario):hover{ background: var(--vidro-forte); }
+  .modal{ box-shadow: var(--shadow-flutuante); }
+  .modal-fundo{ background: rgba(24, 35, 42, .5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 
-  /* Menu lateral azul-marinho em vidro */
-  .lateral{ background: var(--vidro-lateral); -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%);
-    border-right: 1px solid rgba(255, 255, 255, .08); box-shadow: inset -1px 0 0 rgba(255, 255, 255, .04); }
-  .lateral a.item.on{ background: linear-gradient(135deg, #C8FF31, #A6E000); color: #111417; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 8px 20px -10px rgba(200, 255, 49, .8); }
-
-  /* Campos e teclas levemente translúcidos */
-  input:not([type="checkbox"]), select, textarea{ background-color: var(--vidro-campo); }
-  /* Ícones dos indicadores e etiquetas com um toque de vidro */
-  .indicador .ic{ box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 0 0 1px rgba(255, 255, 255, .35); }
-  .tabela tr.clicavel:hover td{ background: rgba(159, 212, 0, .10); }
-  .tabela tr.clicavel:hover td:first-child{ box-shadow: -12px 0 0 rgba(159, 212, 0, .10); }
-  .tabela tr.clicavel:hover td:last-child{ box-shadow: 12px 0 0 rgba(159, 212, 0, .10); }
-
-  /* Fundos atrás das janelas: desfoque mais forte */
-  .modal-fundo{ background: rgba(8, 15, 32, .35); -webkit-backdrop-filter: blur(8px) saturate(140%); backdrop-filter: blur(8px) saturate(140%); }
-
-  /* Entrada: cartão de vidro sobre o preto da marca, com o brilho lime */
-  .entrada{ background:
-      radial-gradient(36rem 26rem at 18% 8%, rgba(200, 255, 49, .30), transparent 70%),
-      radial-gradient(30rem 24rem at 86% 88%, rgba(159, 212, 0, .20), transparent 70%),
-      linear-gradient(180deg, #181C20, #0B0E11); }
+  /* Entrada: cartão de vidro sobre a tinta da marca — a mesma ideia da barra do site. */
   .entrada .cartao{ background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .2); color: #fff;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 24px 60px -20px rgba(0, 0, 0, .6);
-    -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 25px 80px rgba(0, 0, 0, .45);
+    -webkit-backdrop-filter: blur(22px) saturate(160%); backdrop-filter: blur(22px) saturate(160%); }
   .entrada .cartao .mudo, .entrada label.campo, .entrada .marca .texto small{ color: rgba(255, 255, 255, .78); }
   .entrada .marca{ color: #fff; }
   .entrada input{ background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .25); color: #fff; }
   .entrada input::placeholder{ color: rgba(255, 255, 255, .55); }
   .entrada input:focus{ border-color: #C8FF31; box-shadow: 0 0 0 3px rgba(200, 255, 49, .3); }
-
-  /* Celular: menu do topo em vidro */
-  @media (max-width: 860px){
-    .lateral{ background: var(--vidro-lateral); }
-  }
 }
+
 @media (prefers-reduced-motion: reduce){ *{ animation: none !important; transition: none !important; } }
 
 /* ---------------------------------------------------------------- Telas (TVs) */
 .telas{ display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
 .tela-cartao{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; }
-.tela-cartao .moldura{ position: relative; background: #111417; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; }
+.tela-cartao .moldura{ position: relative; background: #18232A; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; }
 .tela-cartao .moldura.retrato{ aspect-ratio: 4 / 3; }
 .tela-cartao .moldura img{ max-width: 100%; max-height: 100%; object-fit: contain; }
 .tela-cartao .moldura .vazia{ color: #868D98; font-size: 12px; text-align: center; padding: 10px; }
@@ -597,13 +593,13 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .itens-grade .item{ display: grid; grid-template-columns: 34px 54px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .itens-grade .item:last-child{ border-bottom: 0; }
 .itens-grade .ordem{ font-size: 12px; color: var(--text-3); font-weight: 700; text-align: right; }
-.itens-grade .mini{ width: 54px; height: 32px; border-radius: 6px; background: #111417; display: grid; place-items: center; overflow: hidden; flex: none; }
+.itens-grade .mini{ width: 54px; height: 32px; border-radius: 6px; background: #18232A; display: grid; place-items: center; overflow: hidden; flex: none; }
 .itens-grade .mini img{ width: 100%; height: 100%; object-fit: cover; }
 
 /* Criativos */
 .midias{ display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); }
 .midia-cartao{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; }
-.midia-cartao .previa{ background: #111417; aspect-ratio: 16 / 10; display: grid; place-items: center; position: relative; }
+.midia-cartao .previa{ background: #18232A; aspect-ratio: 16 / 10; display: grid; place-items: center; position: relative; }
 .midia-cartao .previa img, .midia-cartao .previa video{ max-width: 100%; max-height: 100%; object-fit: contain; }
 .midia-cartao .previa .tipo{ position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,.65); color: #fff; font-size: 10.5px; font-weight: 700; border-radius: 6px; padding: 2px 7px; }
 .midia-cartao .corpo{ padding: 11px 13px 13px; display: flex; flex-direction: column; gap: 7px; flex: 1; }
@@ -649,5 +645,5 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .checagem p{ margin: 2px 0 0; font-size: 12.5px; color: var(--text-2); }
 
 /* Itens que a própria tela desenha (não têm arquivo para mostrar em miniatura) */
-.itens-grade .mini.selo-marca{ background: #111417; color: #C8FF31; font-weight: 700; }
+.itens-grade .mini.selo-marca{ background: #18232A; color: #C8FF31; font-weight: 700; }
 .itens-grade .mini.selo-comunicado{ background: var(--surface-2); color: var(--text-2); font-weight: 700; border: 1px dashed var(--border-forte); }

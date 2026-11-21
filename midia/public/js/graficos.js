@@ -10,7 +10,7 @@ const svg = (tag, attrs = {}, ...filhos) => {
 };
 
 /** Paleta dos gráficos: o lime da marca na frente, grafite e tons de apoio atrás. */
-export const CORES = { marca: '#9FD400', lime: '#C8FF31', grafite: '#111417', oliva: '#5A7D00', cinza: '#A8AEB8',
+export const CORES = { marca: '#9FD400', lime: '#C8FF31', grafite: '#18232A', oliva: '#5A7D00', cinza: '#A8AEB8',
   amarelo: '#F59E0B', verde: '#16A34A', vermelho: '#EF4444', azul: '#2563EB' };
 
 /** Pizza: [{ rotulo, valor, cor }]. Mostra a legenda e o valor de cada fatia ao passar o mouse. */
