@@ -103,11 +103,12 @@ const CIRCUITOS = [
 ];
 
 const COMUNICADOS = [
-  { ponto: 0, titulo: 'Assembleia geral dia 12', texto: 'Às 19h no salão de festas. Pauta: previsão orçamentária de 2027 e troca do portão social.', tipo: 'assembleia', dias: 12 },
-  { ponto: 0, titulo: 'Dedetização na quinta', texto: 'Garagem e áreas comuns a partir das 8h. Retire os veículos até as 7h30.', tipo: 'manutencao', dias: 5 },
+  // `evento` (dias a partir de hoje) e `hora` alimentam a agenda "O que vem por aí" na tela.
+  { ponto: 0, titulo: 'Assembleia geral', texto: 'Às 19h no salão de festas. Pauta: previsão orçamentária de 2027 e troca do portão social.', tipo: 'assembleia', dias: 12, evento: 12, hora: '19:00' },
+  { ponto: 0, titulo: 'Dedetização', texto: 'Garagem e áreas comuns a partir das 8h. Retire os veículos até as 7h30.', tipo: 'manutencao', dias: 5, evento: 4, hora: '08:00' },
   { ponto: 1, titulo: 'Encomendas na portaria', texto: 'Retire suas encomendas em até 48 horas. Depois disso elas voltam para os Correios.', tipo: 'entrega', dias: 20 },
-  { ponto: 1, titulo: 'Elevador 2 em manutenção', texto: 'Manutenção preventiva na sexta, das 9h às 12h. Use o elevador 1.', tipo: 'manutencao', dias: 3, pendente: true },
-  { ponto: 3, titulo: 'Limpeza da fachada', texto: 'Rapel na torre B entre segunda e quarta. Mantenha as janelas fechadas.', tipo: 'aviso', dias: 7 },
+  { ponto: 1, titulo: 'Elevador 2 em manutenção', texto: 'Manutenção preventiva na sexta, das 9h às 12h. Use o elevador 1.', tipo: 'manutencao', dias: 3, pendente: true, evento: 3, hora: '09:00' },
+  { ponto: 3, titulo: 'Limpeza da fachada', texto: 'Rapel na torre B entre segunda e quarta. Mantenha as janelas fechadas.', tipo: 'aviso', dias: 7, evento: 6 },
 ];
 
 const ANUNCIANTES = [
@@ -193,9 +194,10 @@ function criar(db) {
 
   for (const c of COMUNICADOS) {
     const ponto = pontos[c.ponto];
-    inserir(`INSERT INTO comunicados (local_id, titulo, texto, tipo, inicio, fim, duracao_s, status, aprovado_em, criado_em)
-      VALUES (?, ?, ?, ?, ?, ?, 10, ?, ?, ?)`,
-      ponto.id, c.titulo, c.texto, c.tipo, somarDias(hoje(), -2), somarDias(hoje(), c.dias), c.pendente ? 'pendente' : 'aprovado',
+    inserir(`INSERT INTO comunicados (local_id, titulo, texto, tipo, evento_em, evento_hora, inicio, fim, duracao_s, status, aprovado_em, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10, ?, ?, ?)`,
+      ponto.id, c.titulo, c.texto, c.tipo, c.evento === undefined ? null : somarDias(hoje(), c.evento), c.hora ?? null,
+      somarDias(hoje(), -2), somarDias(hoje(), c.dias), c.pendente ? 'pendente' : 'aprovado',
       c.pendente ? null : criado, criado);
   }
 
@@ -259,6 +261,14 @@ function criar(db) {
     db.prepare('UPDATE campanhas SET contrato_id = ? WHERE id = ?').run(contrato, c.id);
     db.prepare('UPDATE faturas SET contrato_id = ? WHERE anunciante_id = ? AND contrato_id IS NULL').run(contrato, anunciante.id);
   });
+
+  // Clima: na demonstração vem preenchido e ligado, para a tela mostrar o quadro do dia.
+  // Em produção, o servidor busca sozinho no Open-Meteo (quando ligado nas configurações).
+  gravarConfig(db, 'clima_ligado', '1');
+  for (const [cidade, uf, temp, max, min, codigo] of [['Campinas', 'SP', 27.4, 31, 19, 2], ['Valinhos', 'SP', 26.1, 30, 18, 3]]) {
+    db.prepare(`INSERT INTO clima (cidade, uf, temperatura, maxima, minima, codigo, atualizado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(cidade, uf, temp, max, min, codigo, new Date().toISOString());
+  }
 
   // Propostas: o funil do comercial — uma na mesa do cliente, uma recusada e uma que virou contrato.
   const propostasLib = require('./lib/propostas');

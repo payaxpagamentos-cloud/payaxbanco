@@ -20,7 +20,7 @@ const { local, dentroDaJanela, minutosDe } = require('./datas');
  */
 
 /** Tela com os dados do ponto que a programação usa (inclusive a identidade que vai no comunicado). */
-const SQL_TELA = `SELECT t.*, l.categoria, l.cidade, l.nome AS local_nome, l.administradora, l.assinatura, l.logo_arquivo
+const SQL_TELA = `SELECT t.*, l.categoria, l.cidade, l.uf, l.nome AS local_nome, l.administradora, l.assinatura, l.logo_arquivo
   FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`;
 
 const SQL_CAMPANHAS = `SELECT c.*, a.nome AS anunciante_nome FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
@@ -35,6 +35,12 @@ const SQL_CRIATIVOS = `SELECT m.id, m.nome, m.tipo, m.mime, m.sha256, m.orientac
 const SQL_COMUNICADOS = `SELECT id, titulo, texto, tipo, duracao_s FROM comunicados
   WHERE local_id = ? AND status = 'aprovado' AND inicio <= ? AND fim >= ?
   ORDER BY (tipo = 'urgente') DESC, id`;
+
+// Agenda do ponto: o que ainda vai acontecer (assembleia, dedetização, entrega), para a tela mostrar
+// ao morador o que vem pela frente — a parte da tela que ele procura por vontade própria.
+const SQL_AGENDA = `SELECT titulo, tipo, evento_em, evento_hora FROM comunicados
+  WHERE local_id = ? AND status = 'aprovado' AND evento_em IS NOT NULL AND evento_em >= ?
+  ORDER BY evento_em, COALESCE(evento_hora, '00:00') LIMIT 4`;
 
 // Institucional: primeiro o conteúdo do próprio ponto, depois o da plataforma (anunciante_id e local_id nulos).
 const SQL_INSTITUCIONAL = `SELECT m.id, m.nome, m.tipo, m.mime, m.sha256, m.orientacao, m.bytes, m.duracao_s, m.local_id
@@ -158,6 +164,8 @@ function montar(db, tela, instante = new Date()) {
   const vendido = slots.reduce((t, s) => t + s.criativo.duracao_s, 0);
 
   const comunicados = db.prepare(SQL_COMUNICADOS).all(tela.local_id, momento.data, momento.data);
+  const agenda = db.prepare(SQL_AGENDA).all(tela.local_id, momento.data);
+  const clima = require('./clima').doPonto(db, { cidade: tela.cidade, uf: tela.uf });
   // Tela dividida (o padrão de elevador): o comunicado fica parado na sua metade enquanto a publicidade gira na outra.
   // Tela cheia: o comunicado entra no meio do carrossel, como mais um item.
   const dividida = tela.layout === 'dividida';
@@ -272,6 +280,7 @@ function montar(db, tela, instante = new Date()) {
   const assinatura = JSON.stringify([
     lista.map((i) => [i.formato, i.midia_id, i.comunicado_id, i.duracao_s, i.campanha_id, i.texto ?? '']),
     dividida ? comunicados.map((c) => [c.id, c.titulo, c.texto, c.tipo, c.duracao_s]) : [],
+    agenda.map((a) => [a.titulo, a.evento_em, a.evento_hora]),
     tela.layout, tela.som, tela.relogio, tela.legenda ?? '',
     (tela.aviso_ate && tela.aviso_ate < new Date().toISOString()) ? '' : (tela.aviso ?? ''),
   ]);
@@ -283,6 +292,11 @@ function montar(db, tela, instante = new Date()) {
     comunicados: dividida ? comunicados.map((c) => ({
       comunicado_id: c.id, titulo: c.titulo, texto: c.texto, tipo: c.tipo, duracao_s: c.duracao_s,
     })) : [],
+    // A agenda e o clima acompanham a tela dividida (zona do condomínio) e a faixa.
+    // O clima fica fora da assinatura da versão: a temperatura muda sozinha e não deve
+    // obrigar a TV a baixar a programação de novo.
+    agenda: agenda.map((a) => ({ titulo: a.titulo, tipo: a.tipo, em: a.evento_em, hora: a.evento_hora })),
+    clima,
     ponto: {
       nome: tela.local_nome ?? null,
       administradora: tela.administradora ?? null,

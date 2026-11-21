@@ -61,9 +61,11 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 .faixa .marca-faixa svg{ height: 3.2vh; width: auto; color: var(--lime); }
 .faixa .marca-faixa span{ font-size: 2.6vh; font-weight: 800; letter-spacing: -.01em; text-transform: uppercase; color: #fff; }
 .faixa .texto{ font-size: 3vh; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; color: #D7DBE0; }
+.faixa .clima{ font-size: 2.8vh; font-weight: 700; flex: none; color: #D7DBE0; margin-left: auto; white-space: nowrap; }
+.faixa .clima + .relogio{ margin-left: 2vh; }
 .faixa .relogio{ font-size: 3.4vh; font-weight: 800; font-variant-numeric: tabular-nums; flex: none; color: var(--lime); margin-left: auto; }
-/* Tela estreita (elevador em pé): só a marca e o relógio cabem. */
-@media (max-aspect-ratio: 3/4){ .faixa .texto{ display: none; } }
+/* Tela estreita (elevador em pé): só a marca, o clima e o relógio cabem. */
+@media (max-aspect-ratio: 3/4){ .faixa .texto{ display: none; } .faixa .clima{ font-size: 2.4vh; } }
 
 /* Tela de espera: pareamento, sem programação ou erro. */
 .espera{ position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 1.2vh; text-align: center;
@@ -105,6 +107,24 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 .comunicado h1{ font-size: 8.5vh; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; margin: 0; }
 .comunicado p{ font-size: 4.4vh; line-height: 1.35; margin: 0; color: #E6E8EC; }
 .comunicado .quando{ font-size: 2.4vh; color: #868D98; }
+/* Agenda do prédio e clima do dia: o conteúdo que o morador procura por vontade própria. */
+.comunicado.quadro-agenda{ background: linear-gradient(135deg, #10212B 0%, #070E12 100%); }
+.comunicado.quadro-agenda .selo-tipo{ background: #38BDF8; color: var(--preto); }
+.comunicado .agenda{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.6vh; }
+.comunicado .agenda li{ display: flex; flex-direction: column; gap: .3vh; border-left: .5vh solid var(--lime); padding-left: 2vh; }
+.comunicado .agenda .quando{ font-size: 2.6vh; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--lime); }
+.comunicado .agenda li > span + span{ font-size: 4vh; font-weight: 600; line-height: 1.15; color: #E6E8EC; }
+.comunicado.quadro-clima{ background: linear-gradient(135deg, #0C1E2E 0%, #050B12 100%); }
+.comunicado.quadro-clima .selo-tipo{ background: #FACC15; color: var(--preto); }
+.comunicado .grau{ font-size: 16vh; font-weight: 800; line-height: .95; letter-spacing: -.04em; color: var(--lime); }
+.comunicado.quadro-clima h1{ font-size: 5.6vh; }
+/* Zona em pé (elevador): a zona tem menos altura, então o número e o texto encolhem. */
+@media (max-aspect-ratio: 3/4){
+  .comunicado .grau{ font-size: 11vh; }
+  .comunicado.quadro-clima h1{ font-size: 4.4vh; }
+  .comunicado .agenda li > span + span{ font-size: 3.4vh; }
+}
+
 /* Uma faixa de cor por tipo de recado. */
 .comunicado.urgente{ background: linear-gradient(135deg, #3B0A0A 0%, #1A0505 100%); }
 .comunicado.urgente .selo-tipo{ background: #DC2626; }

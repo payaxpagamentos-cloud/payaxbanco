@@ -494,6 +494,11 @@ function editarComunicado(c, ponto, recarregar, opcoes = null) {
       escolha('Tipo', 'tipo', TIPOS_COMUNICADO, c?.tipo ?? 'aviso'),
       campo('No ar de', { name: 'inicio', type: 'date', value: c?.inicio ?? hoje, required: true }),
       campo('até', { name: 'fim', type: 'date', value: c?.fim ?? emDias(7), required: true })),
+    el('div', { class: 'duas' },
+      campo('Data do evento (opcional)', { name: 'evento_em', type: 'date', value: c?.evento_em ?? '' }),
+      campo('Hora', { name: 'evento_hora', type: 'time', value: c?.evento_hora ?? '' })),
+    el('p', { class: 'pequeno mudo', style: 'margin:-4px 0 0' },
+      'Com a data preenchida, o recado também entra na agenda da tela — o quadro "O que vem por aí" que o morador acompanha.'),
     campo('Tempo na tela (segundos)', { name: 'duracao_s', type: 'number', min: 5, max: 60, value: c?.duracao_s ?? 10 }),
   ], async (d) => {
     const corpo = { ...d, local_id: ponto?.id ?? c?.local_id ?? d.local_id };

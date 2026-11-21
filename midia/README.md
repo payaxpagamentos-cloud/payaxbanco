@@ -200,6 +200,22 @@ Cada tela escolhe como mostra isso (*TVs › Editar › Layout da tela*):
 Na tela dividida, o anúncio que não tem a proporção exata da zona é exibido **inteiro** (nada é cortado) sobre um
 fundo com a própria peça desfocada — em vez de barras pretas no meio do hall.
 
+## O que o morador olha por vontade própria
+
+Tela de elevador que só passa anúncio vira papel de parede. Ao lado dos comunicados, a zona do condomínio
+mostra mais duas coisas — e é isso que faz o morador olhar de novo amanhã:
+
+- **A agenda do prédio** ("O que vem por aí"): todo comunicado pode ter **data e hora do evento**. Os próximos
+  quatro entram num quadro em ordem de data (assembleia, dedetização, entrega). Sem data preenchida, o recado
+  continua girando normalmente como comunicado — a agenda é um extra, não uma obrigação.
+- **O clima do dia**: temperatura, descrição, máxima e mínima, no quadro e também na faixa de baixo (em telas
+  em pé, só a temperatura, que é o que cabe). Os dados vêm do **Open-Meteo** (gratuito, sem cadastro), buscados
+  pelo servidor **uma vez por cidade a cada 30 minutos** — dez prédios na mesma cidade usam uma consulta só.
+
+A TV nunca espera por uma API de terceiro: o servidor busca em segundo plano e guarda. Se a internet do servidor
+cair ou o serviço recusar, a tela deixa de mostrar o clima e **nada mais muda** — nenhum anúncio deixa de passar.
+Por depender de acesso à internet, vem **desligado** de fábrica (*Configurações → Conteúdo útil na tela*).
+
 ## Circuitos e inventário
 
 **Circuito** é o pacote que o comercial vende: um conjunto de telas definido por regra (ambiente, cidade, pontos ou

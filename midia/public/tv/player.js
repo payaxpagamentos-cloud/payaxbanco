@@ -307,15 +307,21 @@ function montarComunicado(item) {
   data.textContent = hoje.charAt(0).toUpperCase() + hoje.slice(1);
   caixa.append(data);
 
-  if (ponto.assinatura) {
-    const assinatura = document.createElement('div');
-    assinatura.className = 'assinatura';
-    const quem = document.createElement('strong');
-    quem.textContent = ponto.assinatura;
-    assinatura.append('Atenciosamente,', quem);
-    caixa.append(assinatura);
-  }
+  const assinatura = assinaturaDoPonto();
+  if (assinatura) caixa.append(assinatura);
   return caixa;
+}
+
+/** "Atenciosamente, Administração / Síndico — Edifício X" (o mesmo pé nos quadros do condomínio). */
+function assinaturaDoPonto() {
+  const ponto = estado.programacao?.grade?.ponto ?? {};
+  if (!ponto.assinatura) return null;
+  const assinatura = document.createElement('div');
+  assinatura.className = 'assinatura';
+  const quem = document.createElement('strong');
+  quem.textContent = ponto.assinatura;
+  assinatura.append('Atenciosamente,', quem);
+  return assinatura;
 }
 
 /** Baixa a logo da administradora uma vez e guarda como blob (a tag <img> não manda cabeçalho). */
@@ -334,24 +340,102 @@ async function carregarLogo() {
 function rodarZonaComunicados() {
   clearTimeout(estado.zonaTimer);
   const zona = $('zona-comunicado');
-  const lista = estado.programacao?.grade?.comunicados ?? [];
-  const dividida = estado.programacao?.grade?.layout === 'dividida';
+  const g = estado.programacao?.grade;
+  // Além dos comunicados, a zona do condomínio mostra a agenda do prédio e o clima do dia:
+  // é o que o morador olha por vontade própria — e o que valoriza o anúncio ao lado.
+  const extras = [
+    ...(g?.agenda?.length ? [{ quadro: 'agenda', duracao_s: MINIMO_NA_ZONA_S }] : []),
+    ...(g?.clima ? [{ quadro: 'clima', duracao_s: MINIMO_NA_ZONA_S }] : []),
+  ];
+  const lista = [...(g?.comunicados ?? []), ...extras];
+  const dividida = g?.layout === 'dividida';
   document.body.classList.toggle('dividida', dividida && lista.length > 0);
   zona.hidden = !(dividida && lista.length);
   if (zona.hidden) return;
 
   const mostrar = () => {
     const item = lista[estado.zonaIndice % lista.length];
-    zona.replaceChildren(montarComunicado({ ...item, local: estado.programacao.grade.ponto?.nome }));
+    const peca = item.quadro === 'agenda' ? montarAgenda(g.agenda) : (item.quadro === 'clima' ? montarClima(g.clima) : null);
+    zona.replaceChildren(peca ?? montarComunicado({ ...item, local: g.ponto?.nome }));
     const inicio = Date.now();
     const segundos = Math.max(MINIMO_NA_ZONA_S, item.duracao_s || MINIMO_NA_ZONA_S);
     estado.zonaTimer = setTimeout(() => {
-      anotarExibicao({ comunicado_id: item.comunicado_id, campanha_id: null }, inicio, segundos);
+      // Agenda e clima não são comunicado nem publicidade: entram na prova como tempo do próprio ponto.
+      anotarExibicao({ comunicado_id: item.comunicado_id ?? null, campanha_id: null }, inicio, segundos);
       estado.zonaIndice = (estado.zonaIndice + 1) % lista.length;
       mostrar();
     }, segundos * 1000);
   };
   mostrar();
+}
+
+const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+/** Agenda do prédio: o que vem pela frente, em ordem. */
+function montarAgenda(agenda) {
+  const ponto = estado.programacao?.grade?.ponto ?? {};
+  const caixa = document.createElement('div');
+  caixa.className = 'comunicado quadro-agenda';
+  const topo = document.createElement('div');
+  topo.className = 'cabeca';
+  const selo = document.createElement('span');
+  selo.className = 'selo-tipo';
+  selo.textContent = 'Agenda';
+  const onde = document.createElement('span');
+  onde.className = 'onde';
+  onde.textContent = ponto.nome ?? '';
+  topo.append(selo, onde);
+  const titulo = document.createElement('h1');
+  titulo.textContent = 'O que vem por aí';
+  caixa.append(topo, titulo);
+
+  const itens = document.createElement('ul');
+  itens.className = 'agenda';
+  for (const a of agenda) {
+    const data = new Date(`${a.em}T12:00:00`);
+    const li = document.createElement('li');
+    const quando = document.createElement('span');
+    quando.className = 'quando';
+    quando.textContent = `${String(data.getDate()).padStart(2, '0')}/${String(data.getMonth() + 1).padStart(2, '0')}`
+      + ` ${DIAS_CURTOS[data.getDay()]}${a.hora ? ` · ${a.hora}` : ''}`;
+    const oque = document.createElement('span');
+    oque.textContent = a.titulo;
+    li.append(quando, oque);
+    itens.append(li);
+  }
+  caixa.append(itens);
+  const pe = assinaturaDoPonto();
+  if (pe) caixa.append(pe);
+  return caixa;
+}
+
+/** Clima do dia, com a máxima e a mínima. */
+function montarClima(clima) {
+  const ponto = estado.programacao?.grade?.ponto ?? {};
+  const caixa = document.createElement('div');
+  caixa.className = 'comunicado quadro-clima';
+  const topo = document.createElement('div');
+  topo.className = 'cabeca';
+  const selo = document.createElement('span');
+  selo.className = 'selo-tipo';
+  selo.textContent = 'Hoje';
+  const onde = document.createElement('span');
+  onde.className = 'onde';
+  onde.textContent = clima.cidade ?? ponto.nome ?? '';
+  topo.append(selo, onde);
+
+  const grau = document.createElement('div');
+  grau.className = 'grau';
+  grau.textContent = `${clima.temperatura}°`;
+  const desc = document.createElement('h1');
+  desc.textContent = clima.descricao;
+  caixa.append(topo, grau, desc);
+  if (clima.maxima !== null && clima.minima !== null) {
+    const faixa = document.createElement('p');
+    faixa.textContent = `Máxima de ${clima.maxima}° e mínima de ${clima.minima}°.`;
+    caixa.append(faixa);
+  }
+  return caixa;
 }
 
 /**
@@ -507,16 +591,22 @@ function mostrarEspera(titulo, texto, codigo) {
 }
 const esconderEspera = () => { $('espera').hidden = true; };
 
-/** Faixa de baixo: aviso do ponto (prioridade), legenda fixa e relógio. */
+/** Faixa de baixo: aviso do ponto (prioridade), legenda fixa, clima e relógio. */
 function desenharFaixa() {
   const t = estado.programacao?.tela;
+  const clima = estado.programacao?.grade?.clima ?? null;
   const texto = t?.aviso || t?.legenda || '';
   const relogio = Boolean(t?.relogio);
-  // O rodapé leva a marca da rede: aparece sempre que a tela tiver relógio ou algum recado na faixa.
-  const mostrar = Boolean(texto || relogio);
+  // O rodapé leva a marca da rede: aparece sempre que a tela tiver relógio, clima ou algum recado.
+  const mostrar = Boolean(texto || relogio || clima);
   $('faixa').hidden = !mostrar;
   document.body.classList.toggle('com-faixa', mostrar);
   $('faixa-texto').textContent = texto;
+  $('clima').hidden = !clima;
+  if (clima) {
+    const estreita = t?.orientacao === 'retrato';
+    $('clima').textContent = estreita ? `${clima.temperatura}°` : `${clima.temperatura}° · ${clima.descricao}`;
+  }
   $('relogio').hidden = !relogio;
 }
 

@@ -347,6 +347,11 @@ function editarComunicadoPonto(c, recarregar) {
       escolha('Tipo', 'tipo', TIPOS_COMUNICADO, c?.tipo ?? 'aviso'),
       campo('No ar de', { name: 'inicio', type: 'date', value: c?.inicio ?? hoje, required: true }),
       campo('até', { name: 'fim', type: 'date', value: c?.fim ?? emDias(7), required: true })),
+    el('div', { class: 'duas' },
+      campo('Data do evento (opcional)', { name: 'evento_em', type: 'date', value: c?.evento_em ?? '' }),
+      campo('Hora', { name: 'evento_hora', type: 'time', value: c?.evento_hora ?? '' })),
+    el('p', { class: 'pequeno mudo', style: 'margin:-4px 0 0' },
+      'Com a data preenchida, o recado também entra na agenda da tela — o quadro "O que vem por aí" que o morador acompanha.'),
   ], async (d) => {
     if (c) await api.patch(`/ponto/comunicados/${c.id}`, d);
     else await api.post('/ponto/comunicados', d);

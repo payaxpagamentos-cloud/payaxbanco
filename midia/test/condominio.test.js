@@ -635,6 +635,96 @@ test('Financeiro: contrato do cliente, contas a receber e contas a pagar', async
   });
 });
 
+/**
+ * A tela do condomínio não vive só de anúncio: o que faz o morador olhar de novo amanhã é a
+ * informação útil — o que vem pela frente no prédio e a temperatura de hoje.
+ */
+test('Conteúdo útil na tela: agenda do prédio e clima do dia', async (t) => {
+  const { iniciar: iniciarApi, dia: diaRel } = require('./helpers');
+  const api = await iniciarApi();
+  t.after(api.fechar);
+  const master = await api.login();
+  const grade = require('../server/lib/grade');
+  const clima = require('../server/lib/clima');
+
+  const ponto = (await api.post('/painel/locais', {
+    nome: 'Edifício Agenda', categoria: 'condominio_residencial', cidade: 'Campinas', uf: 'SP', publico_dia: 600,
+  }, master)).dados.id;
+  const tela = (await api.post('/painel/telas', { local_id: ponto, nome: 'Elevador', orientacao: 'retrato', layout: 'dividida' }, master)).dados.id;
+
+  await t.test('comunicado com data entra na agenda, em ordem', async () => {
+    const criar = (titulo, dias, hora) => api.post('/painel/comunicados', {
+      local_id: ponto, titulo, texto: 'Detalhes com o síndico.', tipo: 'assembleia',
+      inicio: diaRel(0), fim: diaRel(20), evento_em: diaRel(dias), evento_hora: hora,
+    }, master);
+    assert.equal((await criar('Assembleia geral', 7, '19:00')).status, 201);
+    await criar('Dedetização', 3, '08:00');
+    await criar('Já passou', -2, null);
+    await api.post('/painel/comunicados', {
+      local_id: ponto, titulo: 'Sem data', texto: 'Recado solto.', inicio: diaRel(0), fim: diaRel(20),
+    }, master);
+
+    const g = grade.montar(api.db, grade.buscarTela(api.db, tela));
+    assert.equal(g.agenda.length, 2, 'o que já passou e o que não tem data ficam de fora');
+    assert.equal(g.agenda[0].titulo, 'Dedetização', 'em ordem de data');
+    assert.equal(g.agenda[0].hora, '08:00');
+    assert.equal(g.agenda[1].titulo, 'Assembleia geral');
+    assert.equal(g.comunicados.length, 4, 'todos continuam girando como comunicado');
+
+    assert.equal((await api.post('/painel/comunicados', {
+      local_id: ponto, titulo: 'Data errada', texto: 'x', inicio: diaRel(0), fim: diaRel(2), evento_em: '12/12/2026',
+    }, master)).status, 422);
+  });
+
+  await t.test('o clima só aparece quando está ligado e com dado fresco', async () => {
+    const g = () => grade.montar(api.db, grade.buscarTela(api.db, tela));
+    assert.equal(g().clima, null, 'vem desligado de fábrica');
+
+    api.db.prepare(`INSERT INTO clima (cidade, uf, temperatura, maxima, minima, codigo, atualizado_em)
+      VALUES ('Campinas', 'SP', 27.4, 31, 19, 3, ?)`).run(new Date().toISOString());
+    assert.equal(g().clima, null, 'mesmo com dado guardado, desligado não vai para a tela');
+
+    await api.put('/painel/configuracoes', { clima_ligado: 1 }, master);
+    const c = g().clima;
+    assert.equal(c.temperatura, 27, 'arredonda para a tela');
+    assert.equal(c.descricao, 'Nublado');
+    assert.equal(c.maxima, 31);
+    assert.equal(c.cidade, 'Campinas');
+
+    // Dado velho não é mostrado como "agora".
+    api.db.prepare("UPDATE clima SET atualizado_em = ? WHERE cidade = 'Campinas'")
+      .run(new Date(Date.now() - 5 * 3_600_000).toISOString());
+    assert.equal(g().clima, null);
+  });
+
+  await t.test('a temperatura não muda a versão da grade (a TV não rebaixa a programação à toa)', async () => {
+    await api.put('/painel/configuracoes', { clima_ligado: 1 }, master);
+    const agora = new Date().toISOString();
+    const gravar = (temp) => api.db.prepare(`INSERT INTO clima (cidade, uf, temperatura, maxima, minima, codigo, atualizado_em)
+      VALUES ('Campinas', 'SP', ?, 30, 18, 0, ?) ON CONFLICT (cidade, uf) DO UPDATE SET temperatura = excluded.temperatura,
+        atualizado_em = excluded.atualizado_em`).run(temp, agora);
+
+    gravar(21);
+    const antes = grade.montar(api.db, grade.buscarTela(api.db, tela));
+    gravar(28);
+    const depois = grade.montar(api.db, grade.buscarTela(api.db, tela));
+    assert.equal(depois.versao, antes.versao, 'a versão é a mesma');
+    assert.equal(depois.clima.temperatura, 28, 'mas a tela recebe a temperatura nova na próxima batida');
+  });
+
+  await t.test('sem internet, o clima some e nada trava', async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = () => Promise.reject(new Error('sem rede'));
+    try {
+      assert.equal(await clima.atualizarCidade(api.db, 'Valinhos', 'SP'), null);
+      const r = await clima.atualizar(api.db);
+      assert.equal(r.ligado, true, 'tentou, não quebrou');
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
+
 /** O portal do ponto tem de dizer a verdade sobre o que foi combinado com aquele ponto. */
 test('Portal do ponto mostra a contrapartida combinada, não um valor que não existe', async (t) => {
   const { iniciar: iniciarApi } = require('./helpers');

@@ -74,6 +74,9 @@ function lerComunicado(db, c, parcial = false) {
   if (tem('inicio')) d.inicio = v.data(c.inicio ?? hoje(), 'a data de início');
   if (tem('fim')) d.fim = v.data(c.fim, 'a data de término');
   if (c.duracao_s !== undefined) d.duracao_s = v.inteiro(c.duracao_s, 'a duração', { min: 5, max: 60 });
+  // Data do fato (assembleia, dedetização, entrega): alimenta a agenda na tela do condomínio.
+  if (c.evento_em !== undefined) d.evento_em = c.evento_em ? v.data(c.evento_em, 'a data do evento') : null;
+  if (c.evento_hora !== undefined) d.evento_hora = c.evento_hora ? v.hora(c.evento_hora, 'a hora do evento') : null;
   if (d.inicio && d.fim && d.fim < d.inicio) throw new ErroNegocio('O término não pode ser antes do início.', 422);
   return d;
 }
@@ -399,9 +402,10 @@ module.exports = (db) => {
 
   r.post('/comunicados', (req, res) => {
     const d = lerComunicado(db, req.body);
-    const id = Number(db.prepare(`INSERT INTO comunicados (local_id, titulo, texto, tipo, inicio, fim, duracao_s, status, criado_por, aprovado_por, aprovado_em, criado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'aprovado', ?, ?, ?, ?)`)
-      .run(d.local_id, d.titulo, d.texto, d.tipo, d.inicio, d.fim, d.duracao_s, req.usuario.id, req.usuario.id, agora(), agora()).lastInsertRowid);
+    // Lista de colunas montada do que veio: campos opcionais (duração, data do evento) ficam no padrão do banco.
+    const campos = { ...d, status: 'aprovado', criado_por: req.usuario.id, aprovado_por: req.usuario.id, aprovado_em: agora(), criado_em: agora() };
+    const id = Number(db.prepare(`INSERT INTO comunicados (${Object.keys(campos).join(', ')})
+      VALUES (${Object.keys(campos).map(() => '?').join(', ')})`).run(...Object.values(campos)).lastInsertRowid);
     registrar(db, req, 'comunicado_criado', { id, local_id: d.local_id });
     res.status(201).json(db.prepare('SELECT * FROM comunicados WHERE id = ?').get(id));
   });

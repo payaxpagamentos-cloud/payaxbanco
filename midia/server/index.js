@@ -8,6 +8,7 @@ const { faturarAutomatico } = require('./lib/faturamento');
 const backup = require('./lib/backup');
 const avisos = require('./lib/avisos');
 const contratos = require('./lib/contratos');
+const clima = require('./lib/clima');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
@@ -64,6 +65,13 @@ const cuidarDosContratos = () => {
 };
 setInterval(cuidarDosContratos, 12 * 3_600_000).unref();
 setTimeout(cuidarDosContratos, 150_000).unref();
+
+// Clima do dia nas telas (quando ligado nas configurações): uma consulta por cidade, de meia em meia hora.
+const buscarClima = () => clima.atualizar(db)
+  .then((r) => { if (r.ligado && r.atualizadas) console.log(`[Vai Mídia] Clima atualizado em ${r.atualizadas} de ${r.cidades} cidade(s)`); })
+  .catch((err) => console.error('[Vai Mídia] Falha ao buscar o clima:', err.message));
+setInterval(buscarClima, 30 * 60_000).unref();
+setTimeout(buscarClima, 45_000).unref();
 
 // Avisos por e-mail: tela fora do ar, fatura vencida, fila de aprovação parada e contratos para cuidar.
 const avisar = () => avisos.rodar(db)

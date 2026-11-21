@@ -192,6 +192,9 @@ CREATE TABLE IF NOT EXISTS comunicados (
   titulo TEXT NOT NULL,
   texto TEXT NOT NULL,
   tipo TEXT NOT NULL DEFAULT 'aviso' CHECK (tipo IN ('aviso','manutencao','assembleia','entrega','urgente')),
+  -- Quando o fato acontece (assembleia, dedetização, entrega). Alimenta a agenda na tela.
+  evento_em TEXT,
+  evento_hora TEXT,
   inicio TEXT NOT NULL,
   fim TEXT NOT NULL,
   duracao_s INTEGER NOT NULL DEFAULT 10 CHECK (duracao_s BETWEEN 5 AND 60),
@@ -360,6 +363,18 @@ CREATE TABLE IF NOT EXISTS contrato_reajustes (
   criado_em TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_reajustes_contrato ON contrato_reajustes (contrato_id, data);
+
+-- Clima por cidade (uma consulta serve todas as telas da cidade). Ver lib/clima.js.
+CREATE TABLE IF NOT EXISTS clima (
+  cidade TEXT NOT NULL,
+  uf TEXT NOT NULL,
+  temperatura REAL NOT NULL,
+  maxima REAL,
+  minima REAL,
+  codigo INTEGER NOT NULL DEFAULT 0,
+  atualizado_em TEXT NOT NULL,
+  PRIMARY KEY (cidade, uf)
+);
 
 -- Propostas comerciais. A proposta guarda o CÁLCULO DO DIA em que foi feita (a coluna folha, um JSON):
 -- a rede muda toda semana, e reimprimir uma proposta de dois meses atrás tem de mostrar o que foi oferecido,
@@ -544,6 +559,8 @@ const CONFIG_PADRAO = {
   // Por quantos dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta
   // relatórios e faturamento, nunca é apagado). 0 = guardar tudo.
   prova_dias: '180',
+  // Clima do dia na tela (Open-Meteo, sem chave). Depende de internet no servidor, por isso vem desligado.
+  clima_ligado: '0',
   // De quanto em quanto tempo a TV manda uma foto do que está na tela (0 desliga).
   foto_minutos: '30',
   // Quantos dias antes do fim do contrato a equipe é avisada.
@@ -604,6 +621,8 @@ const COLUNAS_NOVAS = [
   ['faturas', 'contrato_id', 'INTEGER REFERENCES contratos(id)'],
   ['contratos', 'reajuste_meses', 'INTEGER NOT NULL DEFAULT 12'], ['contratos', 'reajuste_percentual', 'INTEGER NOT NULL DEFAULT 0'],
   ['contratos', 'ultimo_reajuste', 'TEXT'], ['contratos', 'renovado_em', 'TEXT'], ['contratos', 'renovacoes', 'INTEGER NOT NULL DEFAULT 0'],
+  ['locais', 'latitude', 'REAL'], ['locais', 'longitude', 'REAL'],
+  ['comunicados', 'evento_em', 'TEXT'], ['comunicados', 'evento_hora', 'TEXT'],
   ['telas', 'foto_arquivo', 'TEXT'], ['telas', 'foto_em', 'TEXT'], ['telas', 'foto_item', 'TEXT'],
   ['faturas', 'nf_numero', 'TEXT'], ['faturas', 'nf_emitida_em', 'TEXT'], ['faturas', 'nf_link', 'TEXT'],
 ];

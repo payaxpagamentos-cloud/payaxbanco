@@ -89,10 +89,16 @@ module.exports = (db) => {
   r.post('/comunicados', (req, res) => {
     const automatico = Boolean(lerConfig(db).comunicado_automatico);
     const d = lerComunicado(db, { ...req.body, local_id: meu(req) });
-    const id = Number(db.prepare(`INSERT INTO comunicados (local_id, titulo, texto, tipo, inicio, fim, duracao_s, status, criado_por, aprovado_em, criado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .run(d.local_id, d.titulo, d.texto, d.tipo, d.inicio, d.fim, d.duracao_s ?? 10, automatico ? 'aprovado' : 'pendente', req.usuario.id,
-        automatico ? agora() : null, agora()).lastInsertRowid);
+    const campos = {
+      ...d,
+      duracao_s: d.duracao_s ?? 10,
+      status: automatico ? 'aprovado' : 'pendente',
+      criado_por: req.usuario.id,
+      aprovado_em: automatico ? agora() : null,
+      criado_em: agora(),
+    };
+    const id = Number(db.prepare(`INSERT INTO comunicados (${Object.keys(campos).join(', ')})
+      VALUES (${Object.keys(campos).map(() => '?').join(', ')})`).run(...Object.values(campos)).lastInsertRowid);
     registrar(db, req, 'comunicado_do_ponto', { id, local_id: d.local_id, automatico });
     res.status(201).json(db.prepare('SELECT * FROM comunicados WHERE id = ?').get(id));
   });
