@@ -337,7 +337,7 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 @media (max-width: 860px){
   .casca, .casca.recolhida{ grid-template-columns: 1fr; }
   .lateral{ position: sticky; top: 0; z-index: 50; height: auto; flex-direction: row; overflow-x: auto; padding: 8px 12px; gap: 2px; border-right: 0; border-bottom: 1px solid var(--border);
-    background: #241152; scrollbar-width: none; }
+    background: #111417; scrollbar-width: none; }
   .lateral::-webkit-scrollbar{ display: none; }
   .lateral .topo-lateral, .lateral .grupo-sub{ display: none; }
   .lateral a.item{ white-space: nowrap; }
@@ -456,10 +456,10 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 /* ---------------------------------------------------------------- Telas (TVs) */
 .telas{ display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
 .tela-cartao{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; }
-.tela-cartao .moldura{ position: relative; background: #0A0A0F; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; }
+.tela-cartao .moldura{ position: relative; background: #111417; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; }
 .tela-cartao .moldura.retrato{ aspect-ratio: 4 / 3; }
 .tela-cartao .moldura img{ max-width: 100%; max-height: 100%; object-fit: contain; }
-.tela-cartao .moldura .vazia{ color: #6B7A97; font-size: 12px; text-align: center; padding: 10px; }
+.tela-cartao .moldura .vazia{ color: #868D98; font-size: 12px; text-align: center; padding: 10px; }
 .tela-cartao .selo{ position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.62); color: #fff; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700;
   display: inline-flex; align-items: center; gap: 6px; }
 .tela-cartao .selo::before{ content: ""; width: 7px; height: 7px; border-radius: 50%; background: #22C55E; }
@@ -480,13 +480,13 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .itens-grade .item{ display: grid; grid-template-columns: 34px 54px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .itens-grade .item:last-child{ border-bottom: 0; }
 .itens-grade .ordem{ font-size: 12px; color: var(--text-3); font-weight: 700; text-align: right; }
-.itens-grade .mini{ width: 54px; height: 32px; border-radius: 6px; background: #0A0A0F; display: grid; place-items: center; overflow: hidden; flex: none; }
+.itens-grade .mini{ width: 54px; height: 32px; border-radius: 6px; background: #111417; display: grid; place-items: center; overflow: hidden; flex: none; }
 .itens-grade .mini img{ width: 100%; height: 100%; object-fit: cover; }
 
 /* Criativos */
 .midias{ display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); }
 .midia-cartao{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; }
-.midia-cartao .previa{ background: #0A0A0F; aspect-ratio: 16 / 10; display: grid; place-items: center; position: relative; }
+.midia-cartao .previa{ background: #111417; aspect-ratio: 16 / 10; display: grid; place-items: center; position: relative; }
 .midia-cartao .previa img, .midia-cartao .previa video{ max-width: 100%; max-height: 100%; object-fit: contain; }
 .midia-cartao .previa .tipo{ position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,.65); color: #fff; font-size: 10.5px; font-weight: 700; border-radius: 6px; padding: 2px 7px; }
 .midia-cartao .corpo{ padding: 11px 13px 13px; display: flex; flex-direction: column; gap: 7px; flex: 1; }
