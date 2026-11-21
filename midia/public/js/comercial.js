@@ -7,6 +7,7 @@ import {
 } from './ui.js';
 import { cartao, indicador, tabela, vazio, previa, miniatura, linhaDoLoop, itensDoLoop, resumoDoLoop, enviarArquivo } from './comum.js';
 import { agencias } from './inventario.js';
+import { relatorioDeVeiculacao } from './veiculacao.js';
 
 // ---------------------------------------------------------------- Anunciantes e agências
 export async function anunciantes(ctx) {
@@ -399,7 +400,12 @@ async function abrirCampanha(id, recarregar, opcoes) {
     el('button', { class: 'btn', onclick: () => { fechar(); editarAlvos(d, () => recarregar(), opcoes); } }, icone('pontos'), 'Escolher onde passa'),
 
     el('div', { class: 'linha entre', style: 'margin-top:20px' },
-      el('button', { class: 'btn', onclick: () => { fechar(); editarCampanha(d, recarregar, opcoes); } }, icone('editar'), 'Editar campanha'),
+      el('div', { class: 'linha' },
+        el('button', { class: 'btn', onclick: () => { fechar(); editarCampanha(d, recarregar, opcoes); } }, icone('editar'), 'Editar campanha'),
+        el('button', {
+          class: 'btn', title: 'O checking da agência: o que a campanha fez no mês, pronto para imprimir ou salvar em PDF',
+          onclick: () => { fechar(); relatorioDeVeiculacao(d.id, d.nome); },
+        }, icone('relatorios'), 'Relatório de veiculação')),
       el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
   ], { largo: true });
 }

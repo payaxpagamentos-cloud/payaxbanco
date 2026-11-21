@@ -211,6 +211,24 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
     assert.match(csv.dados, /Ótica Visão/);
   });
 
+  await t.test('relatório de veiculação: o checking que a agência pede', async () => {
+    const r = (await api.get(`/painel/campanhas/${campanha}/veiculacao?de=${dia(-1)}&ate=${dia(0)}`, master)).dados;
+    assert.equal(r.campanha.anunciante, 'Ótica Visão');
+    assert.equal(r.resumo.insercoes, 3, 'as três inserções provadas pela TV');
+    assert.equal(r.resumo.telas, 1);
+    assert.equal(r.por_ponto.length, 1);
+    assert.equal(r.por_ponto[0].insercoes, 3);
+    assert.equal(r.criativos.reduce((t, m) => t + m.insercoes, 0), 3, 'as inserções somam por criativo exibido');
+    assert.ok(r.amostra.length && r.amostra[0].exibida_em, 'a folha mostra as últimas linhas da prova');
+    assert.ok(r.plataforma.nome);
+
+    const csv = await api.get(`/painel/campanhas/${campanha}/veiculacao?de=${dia(-1)}&ate=${dia(0)}&csv=1`, master);
+    assert.match(csv.headers.get('content-type'), /text\/csv/);
+    assert.equal(csv.dados.split('\r\n').filter(Boolean).length, 4, 'cabeçalho e as três inserções');
+
+    assert.equal((await api.get('/painel/campanhas/9999/veiculacao', master)).status, 404);
+  });
+
   await t.test('faturamento do mês e repasse ao lojista', async () => {
     const competencia = dia(0).slice(0, 7);
     await api.put('/painel/configuracoes', { pix_chave: 'financeiro@midiaindoor.com.br', pix_nome: 'Midia Indoor', pix_cidade: 'Campinas' }, master);

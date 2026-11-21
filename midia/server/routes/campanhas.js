@@ -8,7 +8,8 @@ const { registrar } = require('../lib/auditoria');
 const arquivos = require('../lib/arquivos');
 const grade = require('../lib/grade');
 const { hoje, mes } = require('../lib/datas');
-const { porCampanha, periodo, porDia } = require('../lib/relatorios');
+const rel = require('../lib/relatorios');
+const { porCampanha, periodo, porDia } = rel;
 const v = require('../lib/validacao');
 
 const TIPOS_ALVO = ['tela', 'local', 'categoria', 'cidade'];
@@ -114,6 +115,22 @@ module.exports = (db) => {
   });
 
   r.get('/campanhas/:id', (req, res) => res.json(detalhe(db, Number(req.params.id))));
+
+  /**
+   * Relatório de veiculação (o checking que a agência pede): o que a campanha fez no período.
+   * Em JSON para a folha impressa; com ?csv=1, a prova de exibição linha a linha para anexar.
+   */
+  r.get('/campanhas/:id/veiculacao', (req, res) => {
+    const id = Number(req.params.id);
+    const { de, ate } = periodo(req.query);
+    const d = rel.veiculacao(db, id, { de, ate });
+    if (!d) throw naoEncontrado('Campanha');
+    if (req.query.csv) {
+      return rel.enviarCsv(res, `veiculacao-${d.campanha.nome.replace(/\W+/g, '-').toLowerCase()}-${de}-${ate}.csv`,
+        rel.csv(rel.COLUNAS_PROVA, rel.prova(db, { de, ate, campanhaId: id, limite: 20000 }).itens));
+    }
+    res.json({ ...d, plataforma: { nome: cfg().nome_plataforma, slogan: cfg().slogan } });
+  });
 
   r.post('/campanhas', (req, res) => {
     const d = lerCampanha(db, { cobranca: 'mensal', ...req.body }, cfg());

@@ -105,6 +105,50 @@ function prova(db, { de, ate, campanhaId = null, telaId = null, anuncianteId = n
   return { de, ate, total: total.n, segundos: total.segundos, itens };
 }
 
+/**
+ * Relatório de veiculação (o "checking" que a agência pede): tudo o que uma campanha fez no período,
+ * do total de inserções à linha a linha. Sai na mesma folha impressa da proposta, com a marca.
+ */
+function veiculacao(db, campanhaId, { de, ate }) {
+  const c = db.prepare(`SELECT c.*, a.nome AS anunciante, a.documento, ag.nome AS agencia, ci.nome AS circuito
+    FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
+    LEFT JOIN agencias ag ON ag.id = c.agencia_id LEFT JOIN circuitos ci ON ci.id = c.circuito_id WHERE c.id = ?`).get(campanhaId);
+  if (!c) return null;
+
+  const resumo = db.prepare(`${TOTAIS}
+    SELECT COALESCE(SUM(r.insercoes), 0) AS insercoes, COALESCE(SUM(r.segundos), 0) AS segundos,
+      COUNT(DISTINCT r.tela_id) AS telas, COUNT(DISTINCT r.local_id) AS pontos, COUNT(DISTINCT r.data) AS dias,
+      MIN(r.data) AS primeiro_dia, MAX(r.data) AS ultimo_dia, ${IMPACTOS} AS impactos
+    ${JUNCAO} WHERE r.data BETWEEN ? AND ? AND r.campanha_id = ?`).get(de, ate, de, ate, campanhaId);
+
+  const porPonto = db.prepare(`${TOTAIS}
+    SELECT l.nome AS local, l.cidade, l.uf, l.categoria, l.publico_dia, COUNT(DISTINCT r.tela_id) AS telas,
+      SUM(r.insercoes) AS insercoes, SUM(r.segundos) AS segundos, ${IMPACTOS} AS impactos
+    ${JUNCAO} WHERE r.data BETWEEN ? AND ? AND r.campanha_id = ?
+    GROUP BY l.id ORDER BY insercoes DESC`).all(de, ate, de, ate, campanhaId).map((x) => ({ ...x, impactos: arred(x.impactos) }));
+
+  // Os criativos vêm da prova detalhada (guardada por alguns meses); o total acima vem do resumo diário,
+  // que nunca é apagado. Num mês fechado os dois batem.
+  const criativos = db.prepare(`SELECT m.nome, m.tipo, COUNT(*) AS insercoes, SUM(e.duracao_s) AS segundos
+    FROM exibicoes e JOIN midias m ON m.id = e.midia_id
+    WHERE e.campanha_id = ? AND e.data BETWEEN ? AND ? GROUP BY m.id ORDER BY insercoes DESC`).all(campanhaId, de, ate);
+
+  return {
+    periodo: { de, ate },
+    campanha: {
+      id: c.id, nome: c.nome, status: c.status, anunciante: c.anunciante, documento: c.documento, agencia: c.agencia,
+      pi: c.pi, circuito: c.circuito, inicio: c.inicio, fim: c.fim, cobranca: c.cobranca,
+      insercoes_hora: c.insercoes_hora, dias_semana: c.dias_semana, hora_inicio: c.hora_inicio, hora_fim: c.hora_fim,
+    },
+    resumo: { ...resumo, impactos: arred(resumo.impactos) },
+    por_ponto: porPonto,
+    por_dia: porDia(db, { de, ate, campanhaId }),
+    criativos,
+    // Uma amostra da prova linha a linha: a folha mostra as últimas, e o CSV traz tudo.
+    amostra: prova(db, { de, ate, campanhaId, limite: 12 }).itens,
+  };
+}
+
 /** Texto CSV (separador ;, com BOM para abrir acentuado no Excel). */
 function csv(colunas, linhas) {
   const esc = (x) => {
@@ -129,4 +173,4 @@ const COLUNAS_PROVA = [
   ['anunciante', 'Anunciante'], ['campanha', 'Campanha'], ['midia', 'Criativo'], ['tipo', 'Tipo'], ['duracao_s', 'Duração (s)'],
 ];
 
-module.exports = { periodo, periodoMes, porCampanha, porTela, porLocal, porDia, porHora, prova, csv, reais, dataHoraBr, enviarCsv, COLUNAS_PROVA };
+module.exports = { periodo, periodoMes, porCampanha, porTela, porLocal, porDia, porHora, prova, veiculacao, csv, reais, dataHoraBr, enviarCsv, COLUNAS_PROVA };

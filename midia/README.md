@@ -73,7 +73,9 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
   oferecido, não o inventário de hoje. A tela mostra o que está na mesa do cliente, o que virou contrato e a taxa de
   conversão; quando o cliente aceita, **nascem o contrato e a campanha** (em rascunho, esperando o criativo) com as
   telas do circuito, sem ninguém redigitar o que já foi combinado.
-- **Relatórios**: por campanha, por TV, por ponto e a **prova de exibição** linha por linha; tudo com CSV.
+- **Relatórios**: por campanha, por TV, por ponto e a **prova de exibição** linha por linha; tudo com CSV. Cada
+  campanha gera ainda o **relatório de veiculação** (o *checking* que a agência pede): o que foi ao ar no mês, por
+  ponto, por criativo e as últimas linhas da prova, na mesma folha impressa da proposta — com o CSV completo em anexo.
 - **Financeiro**, com quatro telas:
   - **Fluxo de caixa**: o que entrou e o que saiu no período (pela data do pagamento), o que ainda está previsto
     (pela data do vencimento), o saldo projetado do mês, a série **mês a mês**, para onde foi o dinheiro e os
