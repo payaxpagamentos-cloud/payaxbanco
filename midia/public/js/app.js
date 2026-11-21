@@ -15,7 +15,7 @@ const MENUS = {
     ['resumo', 'Visão geral', 'dashboard'], ['telas', 'TVs', 'telas'], ['pontos', 'Pontos', 'pontos'],
     ['comunicados', 'Comunicados', 'aprovacoes'],
     ['anunciantes', 'Anunciantes e agências', 'anunciantes'], ['campanhas', 'Campanhas', 'campanhas'], ['criativos', 'Criativos', 'midias'],
-    ['programacao', 'Programação', 'grade'], ['inventario', 'Inventário', 'ocupacao'],
+    ['programacao', 'Programação', 'grade'], ['inventario', 'Inventário', 'ocupacao'], ['propostas', 'Propostas', 'relatorios'],
     ['relatorios', 'Relatórios', 'relatorios'],
     ['financeiro', 'Financeiro', 'faturamento', null, [
       ['caixa', 'Fluxo de caixa'], ['receber', 'Contas a receber'], ['pagar', 'Contas a pagar'], ['faturamento', 'Faturamento'],
@@ -46,6 +46,7 @@ const SUBTITULOS = {
   usuarios: 'Quem acessa o painel e os portais', configuracoes: 'Regras da programação, preços de tabela e PIX das faturas',
   receber: 'Faturas dos anunciantes: o que entra, o que está vencendo e o que atrasou',
   pagar: 'Repasses aos pontos e despesas da operação: o que sai',
+  propostas: 'O que foi oferecido, o que espera resposta e o que virou contrato',
   historico: 'Registro de quem fez o quê', prova: 'Cada vez que seu anúncio foi ao ar', faturas: 'Seu contrato, as faturas e o PIX para pagamento',
   rede: 'Pontos e telas onde a publicidade pode passar', conteudo: 'Imagens e vídeos do seu ponto na TV', conta: 'Sua conta',
 };

@@ -260,6 +260,21 @@ function criar(db) {
     db.prepare('UPDATE faturas SET contrato_id = ? WHERE anunciante_id = ? AND contrato_id IS NULL').run(contrato, anunciante.id);
   });
 
+  // Propostas: o funil do comercial — uma na mesa do cliente, uma recusada e uma que virou contrato.
+  const propostasLib = require('./lib/propostas');
+  const proposta = (circuitoIdx, anuncianteIdx, meses, desconto, observacao) => propostasLib.criar(db, {
+    circuito_id: circuitos[circuitoIdx].id,
+    anunciante_id: anuncianteIdx === null ? null : anunciantes[anuncianteIdx].id,
+    meses, desconto_percentual: desconto, validade_dias: 20, observacao,
+  }, db.prepare("SELECT id FROM usuarios WHERE perfil = 'master' LIMIT 1").get()?.id ?? null);
+
+  const naMesa = proposta(0, 3, 6, 1000, 'Produção da peça incluída no primeiro mês.');
+  db.prepare("UPDATE propostas SET status = 'enviada', enviada_em = ? WHERE id = ?").run(somarDias(hoje(), -4), naMesa.id);
+  const recusada = proposta(1, 4, 3, 0, null);
+  db.prepare("UPDATE propostas SET status = 'recusada', enviada_em = ?, respondida_em = ?, motivo = ? WHERE id = ?")
+    .run(somarDias(hoje(), -20), somarDias(hoje(), -12), 'Ficou acima do orçamento do semestre.', recusada.id);
+  proposta(0, null, 12, 1500, 'Circuito inteiro, pagamento trimestral.');
+
   // Contas a pagar da operação, além dos repasses: internet dos prédios, aparelhos e manutenção.
   const despesa = (descricao, fornecedor, categoria, localId, diasParaVencer, valor, meses = 0) => {
     for (let i = 0; i <= meses; i++) {

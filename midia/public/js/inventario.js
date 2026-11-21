@@ -77,7 +77,7 @@ async function abrirCircuito(id, recarregar) {
     el('div', { class: 'linha entre', style: 'margin-top:18px' },
       el('div', { class: 'linha' },
         el('button', {
-          class: 'btn primario', onclick: (e) => acao(e.target, async () => { fechar(); await gerarProposta(c.id, c.nome); }),
+          class: 'btn primario', onclick: (e) => acao(e.target, async () => { fechar(); await gerarProposta(c.id, c.nome, recarregar); }),
         }, icone('relatorios'), 'Gerar proposta'),
         el('button', { class: 'btn', onclick: () => { fechar(); editarCircuito(c, recarregar); } }, icone('editar'), 'Editar circuito')),
       el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),

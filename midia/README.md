@@ -68,6 +68,11 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
   e a lista de pontos com ambiente, unidades, onde as telas ficam e a tabela. Exporta em CSV, e cada circuito gera a
   **proposta comercial** pronta para imprimir ou salvar em PDF: a marca, a rede alcançada, as inserções e pessoas
   alcançadas estimadas, onde o anúncio passa ponto a ponto, o investimento (com desconto e CPM) e a validade.
+- **Propostas**: o funil entre o inventário e o contrato. Cada proposta fica guardada com a **folha do dia em que
+  foi feita** — a rede muda toda semana, e reimprimir uma proposta de dois meses atrás tem de mostrar o que foi
+  oferecido, não o inventário de hoje. A tela mostra o que está na mesa do cliente, o que virou contrato e a taxa de
+  conversão; quando o cliente aceita, **nascem o contrato e a campanha** (em rascunho, esperando o criativo) com as
+  telas do circuito, sem ninguém redigitar o que já foi combinado.
 - **Relatórios**: por campanha, por TV, por ponto e a **prova de exibição** linha por linha; tudo com CSV.
 - **Financeiro**, com quatro telas:
   - **Fluxo de caixa**: o que entrou e o que saiu no período (pela data do pagamento), o que ainda está previsto

@@ -261,6 +261,65 @@ test('Rede em condomínios: comunicados, circuitos e agência', async (t) => {
     assert.equal((await api.get('/painel/circuitos/9999/proposta', master)).status, 404);
     assert.equal((await api.get(`/painel/circuitos/${circuito}/proposta?meses=99`, master)).status, 422);
   });
+
+  await t.test('a proposta fica guardada e, aceita, vira contrato e campanha', async () => {
+    const nova = await api.post('/painel/propostas', {
+      circuito_id: circuito, anunciante_id: anunciante, meses: 6, desconto_percentual: 1000, validade_dias: 20,
+      observacao: 'Produção da peça incluída.',
+    }, master);
+    assert.equal(nova.status, 201, JSON.stringify(nova.dados));
+    const p = nova.dados;
+    assert.match(p.numero, /^P-\d{4}-001$/);
+    assert.equal(p.status, 'rascunho');
+    assert.equal(p.mes_centavos, 315_000, '10% de desconto sobre os 3.500,00 de tabela');
+    assert.equal(p.total_centavos, 315_000 * 6);
+    assert.equal(p.folha.circuito.telas, 2, 'a folha guarda o cálculo do dia');
+
+    const funil = (await api.get('/painel/propostas', master)).dados;
+    assert.equal(funil.totais.rascunho, 1);
+    assert.equal(funil.totais.na_mesa_centavos, 0, 'rascunho ainda não está na mesa do cliente');
+
+    assert.equal((await api.post(`/painel/propostas/${p.id}/aceitar`, {}, master)).status, 200, 'aceitar direto do rascunho é permitido');
+    const aceita = (await api.get(`/painel/propostas/${p.id}`, master)).dados;
+    assert.equal(aceita.status, 'aceita');
+
+    // O contrato nasceu com o que foi vendido, e a campanha com as telas do circuito.
+    const contrato = (await api.get(`/painel/contratos/${aceita.contrato_id}`, master)).dados;
+    assert.equal(contrato.valor_centavos, 315_000);
+    assert.equal(contrato.anunciante, 'Construtora Aurora');
+    assert.equal(contrato.campanhas.length, 1);
+    const campanha = (await api.get(`/painel/campanhas/${aceita.campanha_id}`, master)).dados;
+    assert.equal(campanha.status, 'rascunho', 'falta o criativo: quem aprova é a equipe');
+    assert.equal(campanha.valor_centavos, 315_000);
+    assert.equal(campanha.alvos.length, 1, 'herdou o alvo do circuito');
+
+    assert.equal((await api.post(`/painel/propostas/${p.id}/aceitar`, {}, master)).status, 409, 'não aceita duas vezes');
+    assert.equal((await api.del(`/painel/propostas/${p.id}`, {}, master)).status, 409, 'proposta que virou contrato não se apaga');
+
+    const depois = (await api.get('/painel/propostas', master)).dados;
+    assert.equal(depois.totais.aceitas, 1);
+    assert.equal(depois.totais.fechado_centavos, 315_000 * 6);
+    assert.equal(depois.totais.conversao_percentual, 10_000, '1 de 1 respondida');
+  });
+
+  await t.test('a folha guardada não muda quando a rede muda', async () => {
+    const p = (await api.post('/painel/propostas', { circuito_id: circuito, meses: 1 }, master)).dados;
+    const telasNaEpoca = p.folha.circuito.telas;
+
+    // Entra um condomínio novo, que o circuito alcança pela regra de categoria.
+    const novo = (await api.post('/painel/locais', { nome: 'Edifício Depois', categoria: 'condominio_residencial', cidade: 'Campinas', uf: 'SP', publico_dia: 500 }, master)).dados.id;
+    await api.post('/painel/telas', { local_id: novo, nome: 'Hall', orientacao: 'retrato' }, master);
+
+    const relida = (await api.get(`/painel/propostas/${p.id}`, master)).dados;
+    assert.equal(relida.folha.circuito.telas, telasNaEpoca, 'reimprimir mostra o que foi oferecido, não o inventário de hoje');
+    const agora = (await api.get(`/painel/circuitos/${circuito}/proposta`, master)).dados;
+    assert.equal(agora.circuito.telas, telasNaEpoca + 1, 'a prévia de hoje já conta a tela nova');
+
+    assert.equal((await api.post(`/painel/propostas/${p.id}/aceitar`, {}, master)).status, 422, 'sem cliente não dá para fazer contrato');
+    assert.equal((await api.post(`/painel/propostas/${p.id}/recusar`, { motivo: 'Ficou para o ano que vem' }, master)).dados.status, 'recusada');
+    assert.equal((await api.post(`/painel/propostas/${p.id}/reabrir`, {}, master)).dados.status, 'rascunho');
+    assert.equal((await api.del(`/painel/propostas/${p.id}`, {}, master)).status, 204);
+  });
 });
 
 /** Os avisos automáticos: é o que faz a equipe saber da queda antes do síndico ligar. */

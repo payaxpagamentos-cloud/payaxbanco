@@ -357,6 +357,36 @@ CREATE TABLE IF NOT EXISTS contrato_reajustes (
 );
 CREATE INDEX IF NOT EXISTS idx_reajustes_contrato ON contrato_reajustes (contrato_id, data);
 
+-- Propostas comerciais. A proposta guarda o CÁLCULO DO DIA em que foi feita (a coluna folha, um JSON):
+-- a rede muda toda semana, e reimprimir uma proposta de dois meses atrás tem de mostrar o que foi oferecido,
+-- não o inventário de hoje. Quando o cliente aceita, ela vira contrato e campanha sem ninguém redigitar nada.
+CREATE TABLE IF NOT EXISTS propostas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  numero TEXT NOT NULL,
+  anunciante_id INTEGER REFERENCES anunciantes(id),
+  agencia_id INTEGER REFERENCES agencias(id),
+  circuito_id INTEGER REFERENCES circuitos(id),
+  titulo TEXT NOT NULL,
+  meses INTEGER NOT NULL DEFAULT 3 CHECK (meses BETWEEN 1 AND 36),
+  desconto_percentual INTEGER NOT NULL DEFAULT 0 CHECK (desconto_percentual BETWEEN 0 AND 5000),
+  insercoes_hora INTEGER NOT NULL DEFAULT 6,
+  mes_centavos INTEGER NOT NULL DEFAULT 0,
+  total_centavos INTEGER NOT NULL DEFAULT 0,
+  valida_ate TEXT NOT NULL,
+  observacao TEXT,
+  status TEXT NOT NULL DEFAULT 'rascunho' CHECK (status IN ('rascunho','enviada','aceita','recusada')),
+  motivo TEXT,
+  folha TEXT NOT NULL,
+  contrato_id INTEGER REFERENCES contratos(id),
+  campanha_id INTEGER REFERENCES campanhas(id),
+  enviada_em TEXT,
+  respondida_em TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  UNIQUE (numero)
+);
+CREATE INDEX IF NOT EXISTS idx_propostas_status ON propostas (status, criado_em);
+
 -- Contas a pagar da operação (o que não é repasse ao ponto): internet do prédio, aparelho, manutenção,
 -- comissão de vendedor, aluguel de espaço. Repasse tem tabela própria e aparece junto na tela.
 CREATE TABLE IF NOT EXISTS despesas (
