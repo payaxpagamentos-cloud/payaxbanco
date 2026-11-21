@@ -174,17 +174,36 @@ const CFOP = {
 const TP_AMB = { 1: 'Produção', 2: 'Homologação' };
 const TP_EMIS = { 1: 'Normal', 2: 'Contingência off-line' };
 const FIN_NFCOM = { 0: 'Normal', 3: 'Substituição', 4: 'Ajuste' };
-const TP_FAT = { 0: 'Normal', 1: 'Centralizado', 2: 'Cofaturamento' };
-const IND_IE_DEST = { 1: 'Contribuinte do ICMS', 2: 'Isento de inscrição', 9: 'Não contribuinte' };
-const CRT = { 1: 'Simples Nacional', 2: 'Simples Nacional — excesso de sublimite', 3: 'Regime normal', 4: 'MEI' };
+const TP_FAT = { 0: 'Faturamento normal', 1: 'Faturamento centralizado', 2: 'Cofaturamento' };
+const IND_IE_DEST = {
+  1: 'Contribuinte do ICMS (informar a IE do destinatário)',
+  2: 'Contribuinte isento de inscrição no cadastro de contribuintes do ICMS',
+  9: 'Não contribuinte, que pode ou não ter inscrição estadual',
+};
+/* O domínio publicado tem só 1, 2 e 3; o MEI aparece como 4 nas regras de validação, não na tabela. */
+const CRT = {
+  1: 'Simples Nacional', 2: 'Simples Nacional, excesso de sublimite de receita bruta', 3: 'Regime normal', 4: 'MEI',
+};
 const U_MED = { 1: 'Minuto', 2: 'MB', 3: 'GB', 4: 'UN' };
 const TP_SERV_UTIL = {
   1: 'Telefonia', 2: 'Comunicação de dados', 3: 'TV por assinatura',
   4: 'Provimento de acesso à internet', 5: 'Multimídia', 6: 'Outros', 7: 'Vários',
 };
+/*
+ * Tipo de assinante (D16). Não é "pessoa física ou jurídica", como o nome sugere: é a natureza do
+ * assinante para fins de ICMS, e por isso tem produtor rural, templo e missão diplomática no meio.
+ * Para um provedor, o que vale no dia a dia é 3 (residencial) e 1 (comercial).
+ */
 const TP_ASSINANTE = {
-  1: 'Comercial/industrial', 2: 'Poder público', 3: 'Residencial/pessoa física', 4: 'Público',
-  5: 'Semipúblico', 6: 'Outros', 7: 'Pessoa jurídica', 8: 'Pessoa física', 99: 'Outros',
+  1: 'Comercial',
+  2: 'Industrial',
+  3: 'Residencial/pessoa física',
+  4: 'Produtor rural',
+  5: 'Órgão da administração pública estadual direta, suas fundações e autarquias (Convênio ICMS 107/95)',
+  6: 'Prestador de serviço de telecomunicação responsável pelo recolhimento na cessão de meios de rede (Convênio ICMS 17/13)',
+  7: 'Missões diplomáticas, repartições consulares e organismos internacionais (Convênio ICMS 158/94)',
+  8: 'Igrejas e templos de qualquer natureza',
+  99: 'Outros não especificados anteriormente',
 };
 const MOT_SUB = {
   '01': 'Erro de preço', '02': 'Erro cadastral', '03': 'Decisão judicial',

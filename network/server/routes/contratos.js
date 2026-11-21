@@ -107,10 +107,10 @@ module.exports = (db) => {
     const id = transacao(db, () => {
       const numero = proximoNumero(db, req.org, 'contrato');
       const novo = Number(db.prepare(`INSERT INTO contratos (organizacao_id, assinante_id, numero, plano_id, mensalidade_centavos, instalacao_centavos, dia_vencimento,
-        cep, logradouro, numero_endereco, complemento, bairro, cidade, uf, latitude, longitude, cto_id, porta_id, carencia_dias, observacoes, criado_por, criado_em)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        cep, logradouro, numero_endereco, complemento, bairro, cidade, uf, codigo_municipio, latitude, longitude, cto_id, porta_id, carencia_dias, observacoes, criado_por, criado_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(req.org, assinante.id, numero, d.plano_id, d.mensalidade_centavos, d.instalacao_centavos, d.dia_vencimento, d.cep, d.logradouro, d.numero_endereco,
-          d.complemento, d.bairro, d.cidade, d.uf, d.latitude, d.longitude, d.cto_id, d.porta_id, d.carencia_dias, d.observacoes, req.usuario.id, agora()).lastInsertRowid);
+          d.complemento, d.bairro, d.cidade, d.uf, d.codigo_municipio, d.latitude, d.longitude, d.cto_id, d.porta_id, d.carencia_dias, d.observacoes, req.usuario.id, agora()).lastInsertRowid);
       const contrato = db.prepare('SELECT * FROM contratos WHERE id = ?').get(novo);
       cob.registrarEvento(db, contrato, { evento: 'criado', para: 'em_implantacao', usuarioId: req.usuario.id });
       // O primeiro contrato transforma o prospecto em cliente.
@@ -155,9 +155,9 @@ module.exports = (db) => {
         if (d.porta_id && antes.situacao !== 'em_implantacao') marcarPorta(req, { portaId: d.porta_id, contrato: antes, situacao: 'ocupada', motivo: `Contrato ${antes.numero}` });
       }
       db.prepare(`UPDATE contratos SET plano_id = ?, mensalidade_centavos = ?, instalacao_centavos = ?, dia_vencimento = ?, cep = ?, logradouro = ?, numero_endereco = ?,
-        complemento = ?, bairro = ?, cidade = ?, uf = ?, latitude = ?, longitude = ?, cto_id = ?, porta_id = ?, carencia_dias = ?, observacoes = ?, versao = versao + 1
+        complemento = ?, bairro = ?, cidade = ?, uf = ?, codigo_municipio = ?, latitude = ?, longitude = ?, cto_id = ?, porta_id = ?, carencia_dias = ?, observacoes = ?, versao = versao + 1
         WHERE id = ?`).run(d.plano_id, d.mensalidade_centavos, d.instalacao_centavos, d.dia_vencimento, d.cep, d.logradouro, d.numero_endereco, d.complemento,
-        d.bairro, d.cidade, d.uf, d.latitude, d.longitude, d.cto_id, d.porta_id, d.carencia_dias, d.observacoes, antes.id);
+        d.bairro, d.cidade, d.uf, d.codigo_municipio, d.latitude, d.longitude, d.cto_id, d.porta_id, d.carencia_dias, d.observacoes, antes.id);
       if (d.mensalidade_centavos !== antes.mensalidade_centavos) {
         cob.registrarEvento(db, antes, { evento: 'valor_alterado', de: String(antes.mensalidade_centavos), para: String(d.mensalidade_centavos),
           motivo: v.opcional(req.body?.motivo, 'o motivo', 300), usuarioId: req.usuario.id });

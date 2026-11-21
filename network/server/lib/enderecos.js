@@ -21,6 +21,17 @@ function endereco(b, atual = {}, chaveNumero = 'numero') {
     bairro: val('bairro', (x) => v.opcional(x, 'o bairro', 80)),
     cidade: val('cidade', (x) => v.opcional(x, 'a cidade', 80)),
     uf: val('uf', uf),
+    /*
+     * Código IBGE do município. A nota fiscal exige, e a consulta de CEP não o traz de forma confiável.
+     * Sete dígitos: os dois primeiros são a UF, e o sistema confere só o tamanho — a lista de municípios
+     * do IBGE muda, e recusar um município novo seria pior do que aceitar.
+     */
+    codigo_municipio: val('codigo_municipio', (x) => {
+      const t = v.digitos(x);
+      if (!t) return null;
+      v.exigir(t.length === 7, 'Código do município inválido (são 7 dígitos do IBGE).');
+      return t;
+    }),
     latitude: b.latitude !== undefined && b.latitude !== '' ? v.coordenadas(b.latitude, b.longitude ?? atual.longitude)[0] : atual.latitude ?? null,
     longitude: b.longitude !== undefined && b.longitude !== '' ? v.coordenadas(b.latitude ?? atual.latitude, b.longitude)[1] : atual.longitude ?? null,
   };

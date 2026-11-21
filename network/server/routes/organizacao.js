@@ -9,6 +9,7 @@ const { registrar } = require('../lib/auditoria');
 const { PERFIS, P } = require('../lib/permissoes');
 const { listaPaginada } = require('../lib/http');
 const v = require('../lib/validacao');
+const { CUF: UFS } = require('../lib/fiscal/tabelas');
 
 const FUSOS = ['America/Sao_Paulo', 'America/Manaus', 'America/Cuiaba', 'America/Rio_Branco', 'America/Noronha', 'America/Belem', 'America/Fortaleza',
   'America/Recife', 'America/Bahia', 'America/Porto_Velho', 'America/Boa_Vista', 'America/Campo_Grande'];
@@ -59,13 +60,34 @@ module.exports = (db) => {
       provisionamento_automatico: b.provisionamento_automatico !== undefined ? (v.booleano(b.provisionamento_automatico) ? 1 : 0) : antes.provisionamento_automatico,
       corte_automatico: b.corte_automatico !== undefined ? (v.booleano(b.corte_automatico) ? 1 : 0) : antes.corte_automatico,
       reconciliacao_horas: b.reconciliacao_horas !== undefined ? v.inteiro(b.reconciliacao_horas, 'o intervalo de reconciliação', { max: 720 }) : antes.reconciliacao_horas,
+      /*
+       * Endereço da empresa. A nota fiscal exige o grupo enderEmit completo, e o código IBGE do
+       * município é também o local do fato gerador do ICMS (cMunFG). Nada aqui é adivinhado a partir
+       * do CEP: quem preenche é a pessoa, e a emissão diz qual campo falta quando falta.
+       */
+      nome_fantasia: b.nome_fantasia !== undefined ? v.opcional(b.nome_fantasia, 'o nome fantasia', 60) : antes.nome_fantasia,
+      inscricao_estadual: b.inscricao_estadual !== undefined ? v.opcional(b.inscricao_estadual, 'a inscrição estadual', 14) : antes.inscricao_estadual,
+      cep: b.cep !== undefined ? v.opcional(b.cep, 'o CEP', 9) : antes.cep,
+      logradouro: b.logradouro !== undefined ? v.opcional(b.logradouro, 'o logradouro', 60) : antes.logradouro,
+      numero_endereco: b.numero_endereco !== undefined ? v.opcional(b.numero_endereco, 'o número', 60) : antes.numero_endereco,
+      complemento: b.complemento !== undefined ? v.opcional(b.complemento, 'o complemento', 60) : antes.complemento,
+      bairro: b.bairro !== undefined ? v.opcional(b.bairro, 'o bairro', 60) : antes.bairro,
+      cidade: b.cidade !== undefined ? v.opcional(b.cidade, 'a cidade', 60) : antes.cidade,
+      uf: b.uf !== undefined ? (b.uf ? v.opcao(String(b.uf).toUpperCase(), 'a UF', Object.keys(UFS)) : null) : antes.uf,
+      codigo_municipio: b.codigo_municipio !== undefined ? v.opcional(b.codigo_municipio, 'o código do município', 7) : antes.codigo_municipio,
+      telefone: b.telefone !== undefined ? v.opcional(b.telefone, 'o telefone', 20) : antes.telefone,
+      email: b.email !== undefined ? v.opcional(b.email, 'o e-mail', 60) : antes.email,
     };
     db.prepare(`UPDATE organizacoes SET nome = ?, documento = ?, fuso = ?, aprovacao_manutencao_centavos = ?, janela_recorrencia_min = ?, desatualizado_min = ?,
       reserva_porta_horas = ?, dia_vencimento_padrao = ?, carencia_bloqueio_dias = ?, multa_atraso_pct_centesimos = ?, juros_mes_pct_centesimos = ?,
-      pro_rata = ?, confianca_dias = ?, confianca_max_ano = ?, provisionamento_automatico = ?, corte_automatico = ?, reconciliacao_horas = ? WHERE id = ?`)
+      pro_rata = ?, confianca_dias = ?, confianca_max_ano = ?, provisionamento_automatico = ?, corte_automatico = ?, reconciliacao_horas = ?,
+      nome_fantasia = ?, inscricao_estadual = ?, cep = ?, logradouro = ?, numero_endereco = ?, complemento = ?, bairro = ?, cidade = ?, uf = ?,
+      codigo_municipio = ?, telefone = ?, email = ? WHERE id = ?`)
       .run(d.nome, d.documento, d.fuso, d.aprovacao_manutencao_centavos, d.janela_recorrencia_min, d.desatualizado_min, d.reserva_porta_horas, d.dia_vencimento_padrao,
         d.carencia_bloqueio_dias, d.multa_atraso_pct_centesimos, d.juros_mes_pct_centesimos, d.pro_rata, d.confianca_dias, d.confianca_max_ano,
-        d.provisionamento_automatico, d.corte_automatico, d.reconciliacao_horas, req.org);
+        d.provisionamento_automatico, d.corte_automatico, d.reconciliacao_horas,
+        d.nome_fantasia, d.inscricao_estadual, d.cep, d.logradouro, d.numero_endereco, d.complemento, d.bairro, d.cidade, d.uf,
+        d.codigo_municipio, d.telefone, d.email, req.org);
     registrar(db, req, 'organizacao_alterada', { recurso: 'organizacao', recursoId: req.org, antes, depois: d });
     res.json(db.prepare('SELECT * FROM organizacoes WHERE id = ?').get(req.org));
   });

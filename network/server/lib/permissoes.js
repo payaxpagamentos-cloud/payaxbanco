@@ -87,6 +87,15 @@ const P = {
   'contabil.plano': ['admin', 'financeiro'],
   'contabil.fechar': ['admin', 'financeiro'],
   'contabil.reabrir': ['admin'],
+  /*
+   * Fiscal (NFCom). Emitir nota é ato com efeito perante o Fisco, e cancelar também: ambos ficam com
+   * quem responde pelo financeiro. Ver fica mais aberto, porque o atendimento precisa saber se a nota
+   * do cliente saiu.
+   */
+  'fiscal.ver': ['admin', 'gestor', 'financeiro'],
+  'fiscal.configurar': ['admin', 'financeiro'],
+  'fiscal.emitir': ['admin', 'financeiro'],
+  'fiscal.cancelar': ['admin', 'financeiro'],
   'integracoes.ver': ['admin', 'noc', 'frota', 'gestor'],
   'integracoes.editar': ['admin'],
   'usuarios.gerenciar': ['admin'],

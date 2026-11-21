@@ -12,6 +12,9 @@ const contabilizacao = require('../lib/contabilizacao');
 const fat = require('../lib/faturamento');
 const v = require('../lib/validacao');
 
+/* Mesmos valores que fatura_itens.origem aceita: é o que liga o item à regra fiscal da nota. */
+const ORIGENS_ITEM = ['mensalidade', 'pro_rata', 'instalacao', 'sva', 'equipamento', 'ponto_adicional', 'desconto', 'avulso', 'outro'];
+
 const FORMAS = ['pix', 'boleto', 'dinheiro', 'cartao', 'transferencia', 'outro'];
 const SITUACOES = ['aberta', 'parcial', 'paga', 'cancelada'];
 
@@ -138,13 +141,23 @@ module.exports = (db) => {
       contratoId = c.id;
     }
     const vencimento = v.data(b.vencimento, 'o vencimento');
-    const itens = (Array.isArray(b.itens) ? b.itens : []).map((i) => ({
-      descricao: v.texto(i.descricao, 'a descrição do item', 160),
-      valor_centavos: v.centavos(i.valor, 'o valor do item'),
-      origem: 'avulso',
-    }));
+    /*
+     * A origem do item não é enfeite: é ela que escolhe a regra fiscal (cClass, CFOP, CST) na hora de
+     * emitir a nota. Sem ela, tudo viraria "avulso" e a nota sairia classificando mensalidade como
+     * outros serviços. O desconto é guardado negativo, como no contrato: o sinal é da regra.
+     */
+    const itens = (Array.isArray(b.itens) ? b.itens : []).map((i) => {
+      const origem = i.origem ? v.opcao(i.origem, 'a origem do item', ORIGENS_ITEM) : 'avulso';
+      const valor = v.centavos(i.valor, 'o valor do item');
+      return {
+        descricao: v.texto(i.descricao, 'a descrição do item', 160),
+        valor_centavos: origem === 'desconto' ? -valor : valor,
+        origem,
+      };
+    });
     v.exigir(itens.length, 'Informe pelo menos um item na cobrança.');
-    v.exigir(itens.every((i) => i.valor_centavos > 0), 'Cada item precisa de um valor maior que zero.');
+    v.exigir(itens.every((i) => Math.abs(i.valor_centavos) > 0), 'Cada item precisa de um valor maior que zero.');
+    v.exigir(itens.reduce((t, i) => t + i.valor_centavos, 0) > 0, 'O total da cobrança precisa ser maior que zero.');
     const nova = transacao(db, () => fat.emitirFatura(db, { org: req.org, assinanteId: assinante.id, contratoId, vencimento, itens,
       observacoes: v.opcional(b.observacoes, 'as observações', 500), usuarioId: req.usuario.id }));
     registrar(db, req, 'fatura_avulsa_emitida', { recurso: 'fatura', recursoId: nova.id, depois: { ...nova, assinante_id: assinante.id, itens } });

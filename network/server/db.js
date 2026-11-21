@@ -2038,6 +2038,43 @@ CREATE TABLE nfcom_eventos (
 CREATE INDEX idx_nfcom_eventos ON nfcom_eventos(nfcom_id, criado_em DESC);
 `,
   },
+  {
+    versao: 12,
+    nome: 'endereco_do_emitente',
+    sql: `
+/*
+ * Endereço da própria empresa.
+ *
+ * Até aqui o sistema sabia o endereço de todo mundo menos o do provedor: o cadastro da organização tinha
+ * nome e CNPJ e mais nada. A nota fiscal exige o grupo enderEmit completo, com o código IBGE do município
+ * — e o código do município também é o que vai no cMunFG, o local do fato gerador do ICMS.
+ *
+ * Campo em branco não é preenchido por palpite. Quem emite sem endereço completo recebe uma recusa
+ * dizendo exatamente qual campo falta, em vez de uma nota rejeitada pela SEFAZ dias depois.
+ */
+ALTER TABLE organizacoes ADD COLUMN nome_fantasia TEXT;
+ALTER TABLE organizacoes ADD COLUMN inscricao_estadual TEXT;
+ALTER TABLE organizacoes ADD COLUMN cep TEXT;
+ALTER TABLE organizacoes ADD COLUMN logradouro TEXT;
+ALTER TABLE organizacoes ADD COLUMN numero_endereco TEXT;
+ALTER TABLE organizacoes ADD COLUMN complemento TEXT;
+ALTER TABLE organizacoes ADD COLUMN bairro TEXT;
+ALTER TABLE organizacoes ADD COLUMN cidade TEXT;
+ALTER TABLE organizacoes ADD COLUMN uf TEXT;
+ALTER TABLE organizacoes ADD COLUMN codigo_municipio TEXT;
+ALTER TABLE organizacoes ADD COLUMN telefone TEXT;
+ALTER TABLE organizacoes ADD COLUMN email TEXT;
+
+/*
+ * Código IBGE do município do assinante.
+ *
+ * O destinatário da nota também precisa dele, e a consulta de CEP não o traz de forma confiável. Fica
+ * junto do endereço do assinante; quando está vazio, a emissão recusa e diz de quem é o endereço.
+ */
+ALTER TABLE assinantes ADD COLUMN codigo_municipio TEXT;
+ALTER TABLE contratos ADD COLUMN codigo_municipio TEXT;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

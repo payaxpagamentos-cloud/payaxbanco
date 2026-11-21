@@ -75,10 +75,10 @@ module.exports = (db) => {
     if (existente) throw new ErroNegocio(`Este ${d.tipo === 'pj' ? 'CNPJ' : 'CPF'} já é do assinante ${existente.codigo} · ${existente.nome}.`, 409);
     const codigo = proximoNumero(db, req.org, 'assinante');
     const id = Number(db.prepare(`INSERT INTO assinantes (organizacao_id, codigo, tipo, nome, nome_fantasia, documento, identidade, nascimento, email, telefone, telefone2,
-      cep, logradouro, numero, complemento, bairro, cidade, uf, latitude, longitude, observacoes, consentimento_em, criado_por, criado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      cep, logradouro, numero, complemento, bairro, cidade, uf, codigo_municipio, latitude, longitude, observacoes, consentimento_em, criado_por, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(req.org, codigo, d.tipo, d.nome, d.nome_fantasia, d.documento, d.identidade, d.nascimento, d.email, d.telefone, d.telefone2, d.cep, d.logradouro,
-        d.numero, d.complemento, d.bairro, d.cidade, d.uf, d.latitude, d.longitude, d.observacoes, d.consentimento_em, req.usuario.id, agora()).lastInsertRowid);
+        d.numero, d.complemento, d.bairro, d.cidade, d.uf, d.codigo_municipio, d.latitude, d.longitude, d.observacoes, d.consentimento_em, req.usuario.id, agora()).lastInsertRowid);
     registrar(db, req, 'assinante_criado', { recurso: 'assinante', recursoId: id, depois: { codigo, ...d } });
     res.status(201).json(buscar(req, id));
   });
@@ -135,9 +135,9 @@ module.exports = (db) => {
       throw new ErroNegocio('Já existe outro assinante com este documento.', 409);
     }
     db.prepare(`UPDATE assinantes SET tipo = ?, nome = ?, nome_fantasia = ?, documento = ?, identidade = ?, nascimento = ?, email = ?, telefone = ?, telefone2 = ?,
-      cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade = ?, uf = ?, latitude = ?, longitude = ?, observacoes = ?, consentimento_em = ?,
+      cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade = ?, uf = ?, codigo_municipio = ?, latitude = ?, longitude = ?, observacoes = ?, consentimento_em = ?,
       versao = versao + 1 WHERE id = ?`).run(d.tipo, d.nome, d.nome_fantasia, d.documento, d.identidade, d.nascimento, d.email, d.telefone, d.telefone2, d.cep,
-      d.logradouro, d.numero, d.complemento, d.bairro, d.cidade, d.uf, d.latitude, d.longitude, d.observacoes, d.consentimento_em, antes.id);
+      d.logradouro, d.numero, d.complemento, d.bairro, d.cidade, d.uf, d.codigo_municipio, d.latitude, d.longitude, d.observacoes, d.consentimento_em, antes.id);
     registrar(db, req, 'assinante_alterado', { recurso: 'assinante', recursoId: antes.id, antes, depois: d });
     res.json(buscar(req, antes.id));
   });
