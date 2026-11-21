@@ -57,6 +57,9 @@ const ir = (tela) => { location.hash = `#/${tela}`; };
 async function desenhar() {
   pararTela?.();
   pararTela = null;
+  // Link de nova senha, vindo do e-mail: vale mesmo sem sessão.
+  const [primeiro, codigo] = rota();
+  if (primeiro === 'nova-senha' && codigo) { pararSaude?.(); pararSaude = null; return telaNovaSenha(codigo); }
   const s = sessao.get();
   if (!s?.token) { pararSaude?.(); pararSaude = null; return telaEntrada(); }
   const u = s.usuario;
@@ -167,7 +170,45 @@ function telaEntrada() {
     slogan ? el('p', { class: 'slogan-marca' }, slogan) : null,
     el('h1', { style: 'margin:22px 0 4px;font-size:20px' }, 'Entrar no painel'),
     el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'Equipe, anunciantes e responsáveis pelos pontos entram por aqui.'), f,
-    el('p', { class: 'pequeno mudo', style: 'margin:18px 0 0' }, 'Instalando uma TV? Abra ', el('a', { href: 'tv/' }, 'o player'), ' no aparelho.'))));
+    el('div', { class: 'linha entre', style: 'margin-top:14px' },
+      el('button', { type: 'button', class: 'btn pequeno', style: 'border:0;background:none;padding:0', onclick: esqueciSenha }, 'Esqueci minha senha'),
+      el('span', { class: 'pequeno mudo' }, 'Instalando uma tela? Abra ', el('a', { href: 'tv/' }, 'o player'), ' no aparelho.')))));
+  f.querySelector('input').focus();
+}
+
+/** Pede o link de nova senha (a resposta é a mesma exista ou não a conta). */
+const esqueciSenha = () => formModal('Esqueci minha senha', () => [
+  el('p', { class: 'mudo', style: 'margin:0' }, 'Informe o e-mail da sua conta. Se existir, chega um link para criar uma senha nova.'),
+  campo('E-mail', { name: 'email', type: 'email', required: true, autocomplete: 'username' }),
+], async (d) => {
+  const r = await api.post('/auth/recuperar', d);
+  toast(r.aviso);
+}, { rotulo: 'Enviar o link' });
+
+/** Tela aberta pelo link do e-mail. */
+function telaNovaSenha(codigo) {
+  const f = el('form', { class: 'form' },
+    campo('Nova senha (mínimo 8 caracteres)', { name: 'senha', type: 'password', required: true, minlength: 8, autocomplete: 'new-password' }),
+    campo('Repita a nova senha', { name: 'repetir', type: 'password', required: true, minlength: 8, autocomplete: 'new-password' }),
+    el('button', { class: 'btn primario', style: 'min-height:42px;margin-top:4px' }, 'Salvar e entrar'));
+  f.addEventListener('submit', (e) => {
+    e.preventDefault();
+    acao(f.querySelector('button'), async () => {
+      const d = lerForm(f);
+      if (d.senha !== d.repetir) throw new Error('As duas senhas precisam ser iguais.');
+      const r = await api.post('/auth/nova-senha', { codigo, senha: d.senha });
+      const entrada = await api.post('/auth/login', { email: r.email, senha: d.senha });
+      sessao.set(entrada);
+      location.hash = '';
+      toast('Senha trocada.');
+      desenhar();
+    });
+  });
+  limpar(raiz, el('div', { class: 'entrada' }, el('div', { class: 'cartao' },
+    marca(nomePlataforma),
+    slogan ? el('p', { class: 'slogan-marca' }, slogan) : null,
+    el('h1', { style: 'margin:22px 0 4px;font-size:20px' }, 'Criar uma nova senha'),
+    el('p', { class: 'mudo', style: 'margin:0 0 16px' }, 'O link do e-mail vale por uma hora e só funciona uma vez.'), f)));
   f.querySelector('input').focus();
 }
 

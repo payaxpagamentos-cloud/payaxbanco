@@ -234,3 +234,132 @@ test('Rede em condomínios: comunicados, circuitos e agência', async (t) => {
     assert.match(csv.dados, /Edifício Jardim das Acácias/);
   });
 });
+
+/** Os avisos automáticos: é o que faz a equipe saber da queda antes do síndico ligar. */
+test('Avisos por e-mail: tela fora do ar, fatura vencida e fila parada', async (t) => {
+  const { iniciar: iniciarApi, png: imagem, dia: diaRel } = require('./helpers');
+  const email = require('../server/lib/email');
+  const avisos = require('../server/lib/avisos');
+  const { manutencao } = require('../server/lib/monitor');
+
+  const api = await iniciarApi();
+  t.after(api.fechar);
+  const master = await api.login();
+  email.caixaTeste.length = 0;
+
+  const ponto = (await api.post('/painel/locais', { nome: 'Edifício Aviso', categoria: 'condominio_residencial', cidade: 'Campinas', uf: 'SP' }, master)).dados.id;
+  const tela = (await api.post('/painel/telas', { local_id: ponto, nome: 'Elevador' }, master)).dados.id;
+
+  await t.test('tela que para de responder vira e-mail para a equipe — uma vez por queda', async () => {
+    // A tela pareia, responde e some (o último contato fica para trás).
+    const tv = api.aparelho();
+    const reg = await tv.registrar();
+    await api.post('/painel/telas/parear', { codigo: reg.dados.codigo, tela_id: tela }, master);
+    tv.usar((await tv.pareamento(reg.dados.codigo)).dados.token);
+    await tv.batida({});
+
+    api.db.prepare("UPDATE telas SET ultimo_contato = ? WHERE id = ?").run(new Date(Date.now() - 3_600_000).toISOString(), tela);
+    manutencao(api.db);
+
+    const r = await avisos.telasForaDoAr(api.db);
+    assert.equal(r.enviados, 1);
+    const aviso = email.caixaTeste.at(-1);
+    assert.match(aviso.assunto, /Tela fora do ar: Edifício Aviso/);
+    assert.ok(aviso.para.includes('master@midia.com.br'), 'vai para quem opera a rede');
+
+    const repetido = await avisos.telasForaDoAr(api.db);
+    assert.equal(repetido.enviados, 0, 'a mesma queda não vira e-mail toda hora');
+  });
+
+  await t.test('fatura vencida avisa o anunciante e resume para a equipe', async () => {
+    const anunciante = (await api.post('/painel/anunciantes', { nome: 'Loja Atrasada', email: 'financeiro@lojaatrasada.com.br' }, master)).dados.id;
+    api.db.prepare(`INSERT INTO faturas (anunciante_id, competencia, vencimento, valor_centavos, criado_em)
+      VALUES (?, '2026-09', ?, 120000, ?)`).run(anunciante, diaRel(-10), new Date().toISOString());
+
+    email.caixaTeste.length = 0;
+    const r = await avisos.faturasVencidas(api.db);
+    assert.equal(r.enviados, 1);
+    assert.ok(email.caixaTeste.some((m) => m.para.includes('financeiro@lojaatrasada.com.br')), 'o anunciante é avisado');
+    assert.ok(email.caixaTeste.some((m) => /vencida/i.test(m.assunto) && m.para.includes('master@midia.com.br')), 'a equipe recebe o resumo');
+
+    email.caixaTeste.length = 0;
+    assert.equal((await avisos.faturasVencidas(api.db)).enviados, 0, 'é um aviso por dia, não a cada hora');
+  });
+
+  await t.test('fila de aprovação parada há mais de um dia vira aviso', async () => {
+    const anunciante = (await api.post('/painel/anunciantes', { nome: 'Nova Marca' }, master)).dados.id;
+    const m = await api.enviarArquivo(`/painel/midias?nome=Parado&anunciante_id=${anunciante}`, imagem(800, 600), master);
+    api.db.prepare('UPDATE midias SET criado_em = ? WHERE id = ?').run(new Date(Date.now() - 48 * 3_600_000).toISOString(), m.dados.id);
+
+    email.caixaTeste.length = 0;
+    assert.equal((await avisos.filaDeAprovacao(api.db)).enviados, 1);
+    assert.match(email.caixaTeste.at(-1).assunto, /esperando aprovação/);
+  });
+
+  await t.test('desligar os avisos nas configurações para tudo', async () => {
+    await api.put('/painel/configuracoes', { avisos_email: 0 }, master);
+    email.caixaTeste.length = 0;
+    const r = await avisos.rodar(api.db);
+    assert.equal(r.ligado, false);
+    assert.equal(email.caixaTeste.length, 0);
+  });
+
+  await t.test('o painel diz se o e-mail está de pé e manda um teste', async () => {
+    const c = (await api.get('/painel/configuracoes', master)).dados;
+    assert.equal(c.email.configurado, true, 'no modo de teste o envio está ligado');
+    assert.ok(c.email.equipe >= 1);
+    const teste = await api.post('/painel/configuracoes/email-teste', { para: 'quem.opera@exemplo.com' }, master);
+    assert.equal(teste.status, 200);
+    assert.equal(teste.dados.enviado, true);
+  });
+});
+
+/** Recuperação de senha: o síndico que esquece a senha não pode depender de telefonar para a equipe. */
+test('Esqueci minha senha: link de uso único por e-mail', async (t) => {
+  const { iniciar: iniciarApi } = require('./helpers');
+  const email = require('../server/lib/email');
+  const api = await iniciarApi();
+  t.after(api.fechar);
+  const master = await api.login();
+  email.caixaTeste.length = 0;
+
+  const ponto = (await api.post('/painel/locais', { nome: 'Edifício Senha', categoria: 'condominio_residencial', cidade: 'Campinas', uf: 'SP' }, master)).dados.id;
+  await api.post(`/painel/locais/${ponto}/acesso`, { nome: 'Síndica Rita', email: 'rita@edificiosenha.com.br' }, master);
+
+  await t.test('pedir o link não revela se a conta existe', async () => {
+    const existe = await api.post('/auth/recuperar', { email: 'rita@edificiosenha.com.br' });
+    const naoExiste = await api.post('/auth/recuperar', { email: 'ninguem@lugar-nenhum.com' });
+    assert.equal(existe.status, 200);
+    assert.deepEqual(existe.dados, naoExiste.dados, 'mesma resposta nos dois casos');
+    assert.equal(email.caixaTeste.length, 1, 'só quem existe recebe e-mail');
+  });
+
+  await t.test('o link troca a senha uma vez só', async () => {
+    const link = /#\/nova-senha\/([A-Za-z0-9_-]+)/.exec(email.caixaTeste.at(-1).html);
+    assert.ok(link, 'o e-mail traz o link com o código');
+    const codigo = link[1];
+
+    assert.equal((await api.post('/auth/nova-senha', { codigo, senha: 'curta' })).status, 422);
+    const r = await api.post('/auth/nova-senha', { codigo, senha: 'senha-nova-da-rita' });
+    assert.equal(r.status, 200);
+    assert.equal(r.dados.email, 'rita@edificiosenha.com.br');
+
+    const tk = await api.login('rita@edificiosenha.com.br', 'senha-nova-da-rita');
+    assert.ok(tk, 'entra com a senha nova');
+    assert.equal((await api.post('/auth/nova-senha', { codigo, senha: 'outra-senha-qualquer' })).status, 410, 'o mesmo link não serve de novo');
+  });
+
+  await t.test('link vencido não vale', async () => {
+    await api.post('/auth/recuperar', { email: 'rita@edificiosenha.com.br' });
+    const codigo = /#\/nova-senha\/([A-Za-z0-9_-]+)/.exec(email.caixaTeste.at(-1).html)[1];
+    api.db.prepare("UPDATE senha_pedidos SET expira_em = ? WHERE usado_em IS NULL").run(new Date(Date.now() - 1000).toISOString());
+    assert.equal((await api.post('/auth/nova-senha', { codigo, senha: 'mais-uma-senha' })).status, 410);
+  });
+
+  await t.test('pedir de novo invalida o link anterior', async () => {
+    await api.post('/auth/recuperar', { email: 'rita@edificiosenha.com.br' });
+    const antigo = /#\/nova-senha\/([A-Za-z0-9_-]+)/.exec(email.caixaTeste.at(-1).html)[1];
+    await api.post('/auth/recuperar', { email: 'rita@edificiosenha.com.br' });
+    assert.equal((await api.post('/auth/nova-senha', { codigo: antigo, senha: 'senha-do-link-velho' })).status, 410);
+  });
+});

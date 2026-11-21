@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '1.0';
+const VERSAO = '1.1';
 const API = new URL('../api/', location.href).href;
 const CHAVES = { token: 'midia.tv.token', grade: 'midia.tv.grade', fila: 'midia.tv.fila', codigo: 'midia.tv.codigo', vistos: 'midia.tv.vistos' };
 // Um arquivo que sumiu da programação (campanha só de manhã, por exemplo) ainda fica no cache por estes dias,
@@ -203,8 +203,31 @@ async function bater(erro) {
     });
     marcarConexao(true);
     if (r.recarregar) estado.trocarPendente = true;
+    if (r.comandos?.length) await obedecer(r.comandos);
   } catch (err) {
     if (err.message !== 'despareado') marcarConexao(false);
+  }
+}
+
+/**
+ * Comandos vindos do painel. É assim que uma versão nova do player entra nas telas já instaladas,
+ * sem ninguém ir até o prédio.
+ */
+async function obedecer(comandos) {
+  if (comandos.includes('limpar_cache')) {
+    try {
+      if ('caches' in window) await caches.delete(CACHE);
+      apagar(CHAVES.vistos);
+    } catch { /* segue para o recarregamento mesmo assim */ }
+  }
+  if (comandos.some((c) => ['recarregar', 'limpar_cache', 'reiniciar'].includes(c))) {
+    // Manda a fila de exibições antes de recarregar, para nada se perder.
+    await enviarExibicoes();
+    if (comandos.includes('reiniciar')) {
+      try { await chamar('player/reinicio', { metodo: 'POST', corpo: { motivo: 'Reinício pedido pelo painel' } }); } catch { /* segue */ }
+    }
+    estado.parado = true;
+    location.reload();
   }
 }
 

@@ -12,6 +12,9 @@ const { diagnostico, estaOnline } = require('../lib/monitor');
 const grade = require('../lib/grade');
 const rel = require('../lib/relatorios');
 const faturamento = require('../lib/faturamento');
+const backup = require('../lib/backup');
+const emailLib = require('../lib/email');
+const avisos = require('../lib/avisos');
 const exibicoes = require('../lib/exibicoes');
 const v = require('../lib/validacao');
 
@@ -442,13 +445,51 @@ module.exports = (db) => {
     res.json(db.prepare('SELECT id, nome, email, perfil, ativo FROM usuarios WHERE id = ?').get(id));
   });
 
-  r.get('/configuracoes', permitir('master'), (_req, res) => res.json({ ...cfg(), padroes: CONFIG_PADRAO }));
+  // ----------------------------------------------------------------- Backup
+  r.get('/backups', permitir('master'), (_req, res) => {
+    res.json({ ...backup.situacao(), itens: backup.listar(), arquivos_bytes: require('../lib/arquivos').tamanhoNoDisco() });
+  });
+
+  r.post('/backups', permitir('master'), (req, res) => {
+    const b = backup.gerar(db);
+    const espelho = backup.espelhar();
+    registrar(db, req, 'backup_gerado', { nome: b.nome, tamanho: b.tamanho, espelhados: espelho.copiados });
+    res.status(201).json({ ...b, espelho });
+  });
+
+  r.get('/backups/:nome', permitir('master'), (req, res) => {
+    const caminho = backup.caminho(req.params.nome);
+    if (!caminho) throw naoEncontrado('Backup');
+    registrar(db, req, 'backup_baixado', { nome: req.params.nome });
+    res.download(caminho);
+  });
+
+  r.get('/configuracoes', permitir('master'), (_req, res) => res.json({
+    ...cfg(),
+    padroes: CONFIG_PADRAO,
+    email: { configurado: emailLib.configurado(), equipe: avisos.equipe(db).length, url: require('../config').url || null },
+  }));
+
+  /** Teste de envio: confirma que o SMTP está falando com o mundo antes de depender dele. */
+  r.post('/configuracoes/email-teste', permitir('master'), async (req, res) => {
+    const para = req.body.para ? v.email(req.body.para) : req.usuario.email;
+    const r2 = await emailLib.enviar({
+      para,
+      assunto: 'Teste de envio',
+      plataforma: cfg().nome_plataforma,
+      titulo: 'Deu certo',
+      linhas: ['Se esta mensagem chegou, os avisos automáticos da plataforma conseguem sair deste servidor.'],
+      botao: { texto: 'Abrir o painel', url: emailLib.linkPainel('') },
+    }, { exigir: true });
+    registrar(db, req, 'email_teste', { para, enviado: r2.enviado });
+    res.json(r2);
+  });
 
   r.put('/configuracoes', permitir('master'), (req, res) => {
     const limites = {
       duracao_imagem_s: [3, 120], insercoes_hora_padrao: [1, 120], bloco_minimo_s: [30, 3600], bloco_maximo_s: [60, 7200],
       batida_intervalo_s: [15, 900], offline_minutos: [2, 1440], mensalidade_tela_centavos: [0, 1_000_000_00], cpm_centavos: [0, 1_000_000],
-      comissao_local_percentual: [0, 10_000], vencimento_dia: [1, 28], aviso_lojista: [0, 1], comunicado_automatico: [0, 1], marca_preenche: [0, 1], marca_duracao_s: [5, 60], prova_dias: [0, 3650],
+      comissao_local_percentual: [0, 10_000], vencimento_dia: [1, 28], aviso_lojista: [0, 1], comunicado_automatico: [0, 1], marca_preenche: [0, 1], marca_duracao_s: [5, 60], avisos_email: [0, 1], prova_dias: [0, 3650],
     };
     transacao(db, () => {
       for (const [k] of Object.entries(CONFIG_PADRAO)) {

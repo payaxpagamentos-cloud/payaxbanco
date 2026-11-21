@@ -26,14 +26,20 @@ function criarApp(db) {
   });
   // Tudo é servido em MIDIA_BASE_PATH (ex.: /midia): o painel, a API em <endereço>/api e o player das TVs em <endereço>/tv/.
   const r = express.Router();
-  r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  r.use(['/api/auth/login', '/api/auth/recuperar', '/api/auth/nova-senha'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // O envio de mídia tem o corpo bruto (arquivo) e limite próprio; o resto é JSON de até 400 kB.
   // O envio de criativo vai no corpo bruto (arquivo) com limite próprio; o resto é JSON de até 400 kB.
   r.use('/api', (req, res, next) => (req.method === 'POST' && /^\/(painel|anunciante|ponto)\/midias$|^\/painel\/locais\/\d+\/logo$/.test(req.path)
     ? express.raw({ type: '*/*', limit: config.midiaMaxBytes })(req, res, next)
     : express.json({ limit: '400kb' })(req, res, next)));
   r.use('/api', criarApi(db));
-  r.use(express.static(path.join(__dirname, '..', 'public')));
+  // O player precisa poder ser atualizado: a página e o script dele sempre revalidam com o servidor,
+  // enquanto fontes, estilos e imagens seguem o cache normal.
+  r.use(express.static(path.join(__dirname, '..', 'public'), {
+    setHeaders: (res, caminho) => {
+      if (/public[\\/]+(tv[\\/]+)?(index\.html|player\.js)$/.test(caminho)) res.set('Cache-Control', 'no-cache');
+    },
+  }));
   if (config.basePath) {
     app.get(config.basePath, (req, res, next) => (req.originalUrl.split('?')[0] === config.basePath ? res.redirect(`${config.basePath}/`) : next()));
     app.get('/', (_req, res) => res.redirect(`${config.basePath}/`));

@@ -287,11 +287,23 @@ CREATE TABLE IF NOT EXISTS resumo_dia (
 );
 CREATE INDEX IF NOT EXISTS idx_resumo_campanha ON resumo_dia (campanha_id, data);
 
+-- Fila de comandos para a tela, entregues na batida (que acontece de minuto em minuto):
+-- recarregar o player (para subir uma versão nova), limpar o cache dos arquivos ou reiniciar.
+CREATE TABLE IF NOT EXISTS tela_comandos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tela_id INTEGER NOT NULL REFERENCES telas(id) ON DELETE CASCADE,
+  comando TEXT NOT NULL CHECK (comando IN ('recarregar','limpar_cache','reiniciar')),
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  entregue_em TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_comandos_tela ON tela_comandos (tela_id, entregue_em);
+
 -- Vida da TV: pareamento, quedas, voltas e erros do player (base do tempo no ar).
 CREATE TABLE IF NOT EXISTS telas_eventos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tela_id INTEGER NOT NULL REFERENCES telas(id) ON DELETE CASCADE,
-  tipo TEXT NOT NULL CHECK (tipo IN ('pareada','online','offline','erro','reinicio','desparear')),
+  tipo TEXT NOT NULL CHECK (tipo IN ('pareada','online','offline','erro','reinicio','desparear','comando')),
   detalhe TEXT,
   criado_em TEXT NOT NULL
 );
@@ -357,6 +369,25 @@ CREATE TABLE IF NOT EXISTS usuarios (
   CHECK ((perfil = 'lojista') = (local_id IS NOT NULL))
 );
 
+-- Pedidos de nova senha: o link vale por pouco tempo e só serve uma vez. Guardamos o resumo do código,
+-- nunca ele mesmo — quem puser as mãos no banco não consegue entrar na conta de ninguém.
+CREATE TABLE IF NOT EXISTS senha_pedidos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  codigo_hash TEXT NOT NULL,
+  expira_em TEXT NOT NULL,
+  usado_em TEXT,
+  ip TEXT,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_senha_pedidos ON senha_pedidos (usuario_id, usado_em);
+
+-- Marca o que já foi avisado por e-mail, para não repetir o mesmo aviso todo ciclo.
+CREATE TABLE IF NOT EXISTS avisos (
+  chave TEXT PRIMARY KEY,
+  criado_em TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS auditoria (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   usuario_id INTEGER REFERENCES usuarios(id),
@@ -400,6 +431,8 @@ const CONFIG_PADRAO = {
   // e é o que aparece numa tela que ainda não tem campanha. 0 desliga.
   marca_preenche: '1',
   marca_duracao_s: '10',
+  // Avisos automáticos por e-mail (tela fora do ar, fatura vencida, fila de aprovação parada).
+  avisos_email: '1',
   // Por quantos dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta
   // relatórios e faturamento, nunca é apagado). 0 = guardar tudo.
   prova_dias: '180',
@@ -469,6 +502,7 @@ function migrar(db) {
   }
 
   if (/CHECK \(categoria IN/.test(sqlDaTabela(db, 'locais'))) refazerTabela(db, 'locais');
+  if (!/'comando'/.test(sqlDaTabela(db, 'telas_eventos'))) refazerTabela(db, 'telas_eventos');
   if (/UNIQUE \(tela_id, midia_id, exibida_em\)/.test(sqlDaTabela(db, 'exibicoes'))) refazerTabela(db, 'exibicoes');
 }
 

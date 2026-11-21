@@ -5,6 +5,8 @@ const { abrir } = require('./db');
 const { criarApp } = require('./app');
 const { manutencao } = require('./lib/monitor');
 const { faturarAutomatico } = require('./lib/faturamento');
+const backup = require('./lib/backup');
+const avisos = require('./lib/avisos');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
@@ -23,6 +25,20 @@ setInterval(() => {
   }
 }, 60_000).unref();
 
+// Backup do banco (padrão: a cada 24 h, guardando as 30 mais recentes) e espelho das mídias, quando configurado.
+const fazerBackup = () => {
+  try {
+    const b = backup.gerar(db);
+    const espelho = backup.espelhar();
+    console.log(`[Vai Mídia] Backup gerado: ${b.nome} (${Math.round(b.tamanho / 1024)} kB)`
+      + (espelho.ligado ? `; arquivos espelhados: ${espelho.copiados}` : ''));
+  } catch (err) {
+    console.error('[Vai Mídia] Falha no backup:', err.message);
+  }
+};
+setInterval(fazerBackup, config.backupIntervaloHoras * 3_600_000).unref();
+if (!backup.listar().length) setTimeout(fazerBackup, 30_000).unref();
+
 // Faturas do mês fechado: gera na virada (quem fatura confere e marca como paga no painel).
 const faturar = () => {
   try {
@@ -34,3 +50,10 @@ const faturar = () => {
 };
 setInterval(faturar, 6 * 3_600_000).unref();
 setTimeout(faturar, 120_000).unref();
+
+// Avisos por e-mail: tela fora do ar, fatura vencida e fila de aprovação parada.
+const avisar = () => avisos.rodar(db)
+  .then((r) => { if (r.enviados) console.log(`[Vai Mídia] Avisos enviados: ${r.enviados}`); })
+  .catch((err) => console.error('[Vai Mídia] Falha nos avisos:', err.message));
+setInterval(avisar, 3_600_000).unref();
+setTimeout(avisar, 90_000).unref();

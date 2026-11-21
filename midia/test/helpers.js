@@ -10,6 +10,7 @@ process.env.MIDIA_SECRET = 'segredo-de-teste';
 process.env.MIDIA_LIMITE_LOGIN = '1000';
 // Os arquivos das mídias dos testes ficam numa pasta temporária, apagada no fim.
 process.env.MIDIA_ARQUIVOS = fs.mkdtempSync(path.join(os.tmpdir(), 'midia-teste-'));
+process.env.MIDIA_BACKUPS = fs.mkdtempSync(path.join(os.tmpdir(), 'midia-backup-'));
 
 const { abrir } = require('../server/db');
 const { criarApp } = require('../server/app');
@@ -133,7 +134,9 @@ async function iniciar() {
 const dia = (n = 0) => require('../server/lib/datas').somarDias(require('../server/lib/datas').hoje(), n);
 
 function limparArquivos() {
-  try { fs.rmSync(process.env.MIDIA_ARQUIVOS, { recursive: true, force: true }); } catch { /* já limpo */ }
+  for (const pasta of [process.env.MIDIA_ARQUIVOS, process.env.MIDIA_BACKUPS]) {
+    try { fs.rmSync(pasta, { recursive: true, force: true }); } catch { /* já limpo */ }
+  }
 }
 
 module.exports = { iniciar, png, mp4, dia, limparArquivos };

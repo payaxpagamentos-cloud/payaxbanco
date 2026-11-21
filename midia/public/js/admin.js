@@ -1,8 +1,8 @@
 /** Administração: usuários, configurações da plataforma, diagnóstico e histórico. */
-import { api, qs } from './api.js';
+import { api, qs, baixar } from './api.js';
 import {
   el, limpar, icone, toast, acao, formModal, confirmar, perguntar, campo, escolha, marcar, lerForm,
-  inteiro, dinheiro, dataHora, etiqueta, reaisCampo, centavos, repetir, PERFIS,
+  inteiro, dinheiro, dataHora, etiqueta, reaisCampo, centavos, repetir, mb, PERFIS,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio } from './comum.js';
 
@@ -112,6 +112,20 @@ export async function configuracoes(ctx) {
         campo('Guardar a prova de exibição detalhada por (dias)', { name: 'prova_dias', type: 'number', min: 0, max: 3650, value: c.prova_dias })),
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O resumo por dia (relatórios e faturamento) nunca é apagado; 0 guarda todo o detalhe para sempre.')),
 
+    el('fieldset', {}, el('legend', {}, 'Avisos por e-mail'),
+      c.email.configurado
+        ? el('p', { class: 'aviso ok' }, `Envio configurado. Os avisos vão para quem opera a rede (${c.email.equipe} pessoa(s)).`)
+        : el('p', { class: 'aviso' }, 'Sem servidor de e-mail (MIDIA_SMTP_HOST). Ninguém é avisado quando uma tela cai ou uma fatura vence.'),
+      marcar('Avisar por e-mail: tela fora do ar, fatura vencida e fila de aprovação parada', { name: 'avisos_email', checked: Boolean(c.avisos_email) }),
+      c.email.url ? null : el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'Dica: configure MIDIA_URL com o endereço público do painel para os links dos e-mails abrirem direto na tela certa.'),
+      el('div', { class: 'linha' }, el('button', {
+        type: 'button', class: 'btn pequeno', onclick: (e) => acao(e.target, async () => {
+          const r = await api.post('/painel/configuracoes/email-teste', {});
+          toast(r.enviado ? 'E-mail de teste enviado. Confira a sua caixa.' : `Não saiu: ${r.motivo}`, !r.enviado);
+        }),
+      }, 'Enviar e-mail de teste para mim'))),
+
     el('fieldset', {}, el('legend', {}, 'PIX das faturas'),
       campo('Chave PIX', { name: 'pix_chave', value: c.pix_chave, maxlength: 80, placeholder: 'e-mail, CNPJ, telefone ou chave aleatória' }),
       el('div', { class: 'duas' },
@@ -130,6 +144,7 @@ export async function configuracoes(ctx) {
         aviso_lojista: d.aviso_lojista ? 1 : 0,
         comunicado_automatico: d.comunicado_automatico ? 1 : 0,
         marca_preenche: d.marca_preenche ? 1 : 0,
+        avisos_email: d.avisos_email ? 1 : 0,
         mensalidade_tela_centavos: centavos(d.mensalidade) ?? 0,
         cpm_centavos: centavos(d.cpm) ?? 0,
         comissao_local_percentual: Math.round(Number(String(d.comissao).replace(',', '.')) * 100),
@@ -139,7 +154,41 @@ export async function configuracoes(ctx) {
       toast('Configurações salvas.');
     });
   });
-  limpar(ctx.conteudo, el('div', { class: 'cartao grande', style: 'max-width:860px' }, f));
+  limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'max-width:860px' },
+    el('div', { class: 'cartao grande' }, f),
+    await cartaoBackup()));
+}
+
+/** Backup: cópia do banco guardada pelo servidor, com download, e o espelho dos arquivos das mídias. */
+async function cartaoBackup() {
+  const corpo = el('div', { class: 'cartao' });
+  const pintar = async () => {
+    const d = await api.get('/painel/backups');
+    limpar(corpo,
+      el('div', { class: 'linha entre' },
+        el('h2', { style: 'margin:0' }, 'Backup'),
+        el('button', {
+          class: 'btn primario pequeno', onclick: (e) => acao(e.target, async () => {
+            const r = await api.post('/painel/backups');
+            toast(`Cópia gerada (${Math.round(r.tamanho / 1024)} kB)${r.espelho.ligado ? ` e ${r.espelho.copiados} arquivo(s) espelhado(s)` : ''}.`);
+            pintar();
+          }),
+        }, icone('baixar'), 'Gerar agora')),
+      el('p', { class: 'pequeno mudo' },
+        `O banco é copiado a cada ${d.intervalo_horas} h, guardando as ${d.manter} mais recentes em ${d.pasta}.`),
+      d.espelho
+        ? el('p', { class: 'aviso ok' }, `Os arquivos das mídias (${mb(d.arquivos_bytes)}) são espelhados em ${d.espelho}.`)
+        : el('p', { class: 'aviso' }, `O backup guarda só o banco. Os arquivos das mídias ocupam ${mb(d.arquivos_bytes)} e `
+          + 'não têm cópia: configure MIDIA_ESPELHO apontando para outro disco ou volume.'),
+      tabela([
+        [(b) => b.nome, 'Cópia'],
+        [(b) => dataHora(b.criado_em), 'Quando'],
+        [(b) => mb(b.tamanho), 'Tamanho', 'num dir'],
+        [(b) => el('button', { class: 'btn pequeno', onclick: (e) => acao(e.target, () => baixar(`/painel/backups/${b.nome}`, b.nome)) }, 'Baixar'), '', 'acoes'],
+      ], d.itens, { vazioTexto: 'Nenhuma cópia ainda. A primeira sai alguns minutos depois de o servidor subir.' }));
+  };
+  await pintar();
+  return corpo;
 }
 
 export async function diagnostico(ctx) {

@@ -74,6 +74,16 @@ function diagnostico(db) {
     { nome: 'TVs sem programação', ok: !semGrade.length, detalhe: semGrade.length ? `${semGrade.length} pareadas ainda sem baixar a grade.` : 'Todas com programação baixada.' },
   ];
 
+  const desatualizadas = telas.filter((t) => t.pareada_em && t.versao_player && t.versao_player !== require('../config').playerVersao);
+  verificacoes.push({
+    nome: 'Telas com player antigo',
+    ok: !desatualizadas.length,
+    detalhe: desatualizadas.length
+      ? `${desatualizadas.length} rodando versão anterior: ${desatualizadas.slice(0, 6).map((t) => `${t.nome} (${t.versao_player})`).join(', ')}. `
+        + 'Mande recarregar pelo painel, em TVs.'
+      : `Todas na versão publicada (${require('../config').playerVersao}).`,
+  });
+
   const semMidia = todos(`SELECT c.id, c.nome FROM campanhas c WHERE c.status IN ('ativa','aguardando')
     AND NOT EXISTS (SELECT 1 FROM campanha_midias cm JOIN midias m ON m.id = cm.midia_id WHERE cm.campanha_id = c.id AND m.status = 'aprovada')`);
   verificacoes.push({ nome: 'Campanhas sem criativo aprovado', ok: !semMidia.length, detalhe: semMidia.length ? `${semMidia.length}: ${semMidia.slice(0, 6).map((c) => c.nome).join(', ')}` : 'Toda campanha no ar tem criativo aprovado.' });
@@ -92,6 +102,33 @@ function diagnostico(db) {
 
   const faturas = um("SELECT COUNT(*) AS n, COALESCE(SUM(valor_centavos), 0) AS v FROM faturas WHERE status = 'aberta' AND vencimento < ?", data);
   verificacoes.push({ nome: 'Faturas vencidas', ok: !faturas.n, detalhe: faturas.n ? `${faturas.n} em atraso, somando R$ ${(faturas.v / 100).toFixed(2)}.` : 'Nenhuma fatura vencida.' });
+
+  const b = require('./backup').situacao();
+  verificacoes.push({
+    nome: 'Backup do banco',
+    ok: !b.atrasado,
+    detalhe: b.ultima
+      ? `Última cópia em ${new Date(b.ultima.criado_em).toLocaleString('pt-BR')} (${b.copias} guardadas, a cada ${b.intervalo_horas} h).`
+      : 'Nenhuma cópia ainda. O backup roda sozinho depois que o servidor fica algumas horas no ar.',
+  });
+  verificacoes.push({
+    nome: 'Espelho dos arquivos das mídias',
+    ok: Boolean(b.espelho),
+    detalhe: b.espelho
+      ? `Os vídeos e imagens são copiados para ${b.espelho}.`
+      : 'Desligado: o backup guarda só o banco. Configure MIDIA_ESPELHO (outro disco ou volume) para os arquivos '
+        + 'das campanhas também terem cópia — sem isso, perder o disco perde as peças.',
+  });
+
+  const email = require('./email');
+  const avisosLigados = lerConfig(db).avisos_email;
+  verificacoes.push({
+    nome: 'Avisos por e-mail',
+    ok: email.configurado() && Boolean(avisosLigados),
+    detalhe: !email.configurado()
+      ? 'SMTP não configurado (MIDIA_SMTP_HOST): ninguém é avisado quando uma tela cai ou uma fatura vence.'
+      : (avisosLigados ? 'Ligados: tela fora do ar, fatura vencida e fila de aprovação parada.' : 'SMTP configurado, mas os avisos estão desligados nas Configurações.'),
+  });
 
   const semPix = !lerConfig(db).pix_chave;
   verificacoes.push({ nome: 'PIX das faturas', ok: !semPix, detalhe: semPix ? 'Chave PIX não configurada: as faturas saem sem o código de pagamento.' : 'Chave configurada.' });

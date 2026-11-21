@@ -34,8 +34,30 @@ module.exports = {
   limiteLoginPorMinuto: Number(process.env.MIDIA_LIMITE_LOGIN) || 10,
   // Fuso usado na programação das TVs (dias e horários das campanhas) e nos relatórios.
   fuso: process.env.MIDIA_FUSO || 'America/Sao_Paulo',
+  // Backup: cópia do banco a cada N horas, guardando as mais recentes. O espelho das mídias é opcional
+  // (sem MIDIA_ESPELHO, os arquivos não são copiados — o painel e o diagnóstico avisam).
+  backupDir: process.env.MIDIA_BACKUPS || path.join(__dirname, '..', 'data', 'backups'),
+  backupIntervaloHoras: Number(process.env.MIDIA_BACKUP_HORAS) || 24,
+  backupManter: Number(process.env.MIDIA_BACKUP_MANTER) || 30,
+  espelho: process.env.MIDIA_ESPELHO || null,
+  // Versão do player publicada aqui. A tela manda a dela na batida; o diagnóstico aponta quem ficou para trás
+  // e o painel manda recarregar (sem ninguém precisar ir até o prédio).
+  playerVersao: '1.1',
   // Tamanho máximo de um arquivo de mídia enviado ao painel.
   midiaMaxBytes: (Number(process.env.MIDIA_MAX_MB) || 200) * 1024 * 1024,
+  // Envio de e-mails (avisos de tela fora do ar, fatura vencida e recuperação de senha).
+  // Sem MIDIA_SMTP_HOST, fica desligado e o painel avisa. 'teste' guarda as mensagens em memória (testes).
+  smtp: {
+    modo: process.env.MIDIA_SMTP_MODO || (process.env.NODE_ENV === 'test' ? 'teste' : ''),
+    host: process.env.MIDIA_SMTP_HOST || '',
+    porta: Number(process.env.MIDIA_SMTP_PORTA) || 587,
+    seguro: process.env.MIDIA_SMTP_SEGURO === '1',
+    usuario: process.env.MIDIA_SMTP_USUARIO || '',
+    senha: process.env.MIDIA_SMTP_SENHA || '',
+    remetente: process.env.MIDIA_SMTP_DE || 'Vai Mídia <nao-responda@vaimidia.com.br>',
+  },
+  // Endereço público do painel, usado nos links dos e-mails.
+  url: (process.env.MIDIA_URL || '').replace(/\/+$/, ''),
   admin: {
     nome: process.env.MIDIA_ADMIN_NOME || 'Master',
     email: process.env.MIDIA_ADMIN_EMAIL || 'master@midia.com.br',

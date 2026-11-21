@@ -34,6 +34,7 @@ export async function telasEquipe(ctx) {
 
   limpar(ctx.conteudo,
     el('div', { class: 'filtros livre' }, el('label', { class: 'campo' }, 'Buscar', busca), selPonto, selStatus,
+      el('button', { class: 'btn', onclick: (e) => mandarComando(e.target, { desatualizadas: true, comando: 'recarregar' }, pintar) }, icone('relogio'), 'Atualizar players'),
       el('button', { class: 'btn', onclick: () => abrirPareamento(opcoes, pintar) }, icone('parear'), 'Parear aparelho'),
       el('button', { class: 'btn primario', onclick: () => novaTela(opcoes, pintar) }, icone('mais'), 'Nova TV')),
     corpo);
@@ -83,8 +84,21 @@ async function abrirTela(id, recarregar) {
     d.grade?.itens?.length ? el('div', { style: 'margin-top:14px' }, resumoDoLoop(d.grade)) : null,
     d.grade?.itens?.length ? el('details', { style: 'margin-top:10px' }, el('summary', { class: 'mudo pequeno' }, 'Ver o loop item por item'), itensDoLoop(d.grade)) : null,
     el('h3', {}, 'Aparelho'),
+    d.desatualizada
+      ? el('p', { class: 'aviso' }, `Esta tela está com o player ${d.versao_player} e a versão publicada é a ${d.player_publicado}. `
+        + 'Mande recarregar: a tela se atualiza sozinha na próxima batida.')
+      : null,
+    el('div', { class: 'linha', style: 'margin-bottom:12px' },
+      el('button', { class: 'btn pequeno', onclick: (e) => mandarComando(e.target, { tela_id: d.id, comando: 'recarregar' }) }, icone('relogio'), 'Recarregar o player'),
+      el('button', { class: 'btn pequeno', onclick: (e) => mandarComando(e.target, { tela_id: d.id, comando: 'limpar_cache' }) }, 'Limpar o cache e recarregar')),
+    d.comandos?.length
+      ? el('details', { style: 'margin-bottom:10px' }, el('summary', { class: 'mudo pequeno' }, 'Comandos enviados'),
+        tabela([[(c) => c.comando.replace('_', ' '), 'Comando'], [(c) => dataHora(c.criado_em), 'Enviado'],
+          [(c) => (c.entregue_em ? dataHora(c.entregue_em) : 'aguardando a tela'), 'Recebido']], d.comandos))
+      : null,
     el('div', {}, [
-      ['Aparelho', d.aparelho ?? '—'], ['Resolução', d.largura ? `${d.largura} × ${d.altura}` : '—'], ['Versão do player', d.versao_player ?? '—'],
+      ['Aparelho', d.aparelho ?? '—'], ['Resolução', d.largura ? `${d.largura} × ${d.altura}` : '—'],
+      ['Versão do player', `${d.versao_player ?? '—'} (publicada: ${d.player_publicado})`],
       ['Pareada em', d.pareada_em ? dataHora(d.pareada_em) : 'não pareada'], ['Último contato', d.ultimo_contato ? dataHora(d.ultimo_contato) : '—'],
       ['IP', d.ip ?? '—'], ['Legenda fixa', d.legenda ?? '—'],
     ].map(([k, v]) => el('div', { class: 'chave' }, el('span', { class: 'mudo' }, k), el('strong', {}, String(v))))),
@@ -386,6 +400,13 @@ function enviarLogo(ponto, recarregar) {
     return f;
   });
 }
+
+/** Envia o comando e avisa quantas telas vão receber (chega na próxima batida). */
+const mandarComando = (botao, corpo, recarregar = null) => acao(botao, async () => {
+  const r = await api.post('/painel/telas/comando', corpo);
+  toast(`${r.comando.replace('_', ' ')} enviado para ${r.telas} tela(s). ${r.aviso}`);
+  recarregar?.();
+});
 
 // ---------------------------------------------------------------- Comunicados dos pontos
 /**

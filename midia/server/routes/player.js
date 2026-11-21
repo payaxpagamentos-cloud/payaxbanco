@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { Router } = require('express');
 const { agora, lerConfig } = require('../db');
+const config = require('../config');
 const { autenticarTela, emitirTokenTela } = require('../auth');
 const { ErroNegocio } = require('../lib/erros');
 const { limitar } = require('../lib/limitador');
@@ -93,9 +94,17 @@ module.exports = (db) => {
     const g = grade.montar(db, tela);
     db.prepare('UPDATE telas SET ultimo_contato = ?, ip = ?, versao_player = COALESCE(?, versao_player), item_atual = COALESCE(?, item_atual), grade_versao = ? WHERE id = ?')
       .run(agora(), req.ip ?? null, limparTexto(req.body.versao, 20), limparTexto(req.body.item_atual, 160), g.versao, tela.id);
+    // Comandos que a equipe mandou pelo painel: saem da fila aqui e vão na resposta.
+    const pendentes = db.prepare('SELECT id, comando FROM tela_comandos WHERE tela_id = ? AND entregue_em IS NULL ORDER BY id').all(tela.id);
+    if (pendentes.length) {
+      const marcar = db.prepare('UPDATE tela_comandos SET entregue_em = ? WHERE id = ?');
+      for (const c of pendentes) marcar.run(agora(), c.id);
+    }
     res.json({
       grade_versao: g.versao,
       recarregar: String(req.body.grade_versao ?? '') !== g.versao,
+      comandos: pendentes.map((c) => c.comando),
+      player_versao: config.playerVersao,
       hora: agora(),
       batida_s: cfg.batida_intervalo_s,
     });

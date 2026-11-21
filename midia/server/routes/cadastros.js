@@ -9,6 +9,7 @@ const { registrar } = require('../lib/auditoria');
 const { hashSenha } = require('../lib/senha');
 const { estaOnline, pontoAberto, uptime } = require('../lib/monitor');
 const { montarPorTela } = require('../lib/grade');
+const config = require('../config');
 const arquivos = require('../lib/arquivos');
 const { hoje } = require('../lib/datas');
 const v = require('../lib/validacao');
@@ -219,6 +220,9 @@ module.exports = (db) => {
       aberto: pontoAberto(db, t.local_id),
       grade: montarPorTela(db, t.id),
       historico: uptime(db, t.id, 7),
+      player_publicado: config.playerVersao,
+      desatualizada: Boolean(t.pareada_em && t.versao_player && t.versao_player !== config.playerVersao),
+      comandos: db.prepare('SELECT comando, criado_em, entregue_em FROM tela_comandos WHERE tela_id = ? ORDER BY id DESC LIMIT 5').all(t.id),
       hoje: db.prepare(`SELECT COALESCE(SUM(insercoes), 0) AS insercoes, COALESCE(SUM(segundos), 0) AS segundos,
         COALESCE(SUM(CASE WHEN campanha_id <> 0 THEN insercoes ELSE 0 END), 0) AS insercoes_pagas
         FROM resumo_dia WHERE tela_id = ? AND data = ?`).get(t.id, hoje()),
@@ -314,6 +318,29 @@ module.exports = (db) => {
     });
     registrar(db, req, 'tela_pareada', { tela_id: resultado, codigo });
     res.status(201).json(db.prepare(`SELECT t.*, l.nome AS local_nome FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`).get(resultado));
+  });
+
+  /**
+   * Comando remoto para as telas: recarregar o player (para subir versão nova), limpar o cache dos
+   * arquivos ou reiniciar. Vai na próxima batida, que acontece de minuto em minuto.
+   */
+  r.post('/telas/comando', (req, res) => {
+    const comando = v.opcao(req.body.comando, 'o comando', ['recarregar', 'limpar_cache', 'reiniciar']);
+    let onde = 'AND t.pareada_em IS NOT NULL';
+    const p = [];
+    if (req.body.tela_id) { onde += ' AND t.id = ?'; p.push(Number(req.body.tela_id)); }
+    else if (req.body.local_id) { onde += ' AND t.local_id = ?'; p.push(Number(req.body.local_id)); }
+    else if (req.body.desatualizadas) { onde += ' AND (t.versao_player IS NULL OR t.versao_player <> ?)'; p.push(config.playerVersao); }
+    const telas = db.prepare(`SELECT t.id FROM telas t WHERE t.status <> 'inativa' ${onde}`).all(...p);
+    if (!telas.length) throw new ErroNegocio('Nenhuma tela pareada para receber o comando.', 422);
+    transacao(db, () => {
+      for (const t of telas) {
+        db.prepare('INSERT INTO tela_comandos (tela_id, comando, criado_por, criado_em) VALUES (?, ?, ?, ?)').run(t.id, comando, req.usuario.id, agora());
+        db.prepare("INSERT INTO telas_eventos (tela_id, tipo, detalhe, criado_em) VALUES (?, 'comando', ?, ?)").run(t.id, `Comando enviado: ${comando}`, agora());
+      }
+    });
+    registrar(db, req, 'telas_comando', { comando, telas: telas.length });
+    res.status(201).json({ comando, telas: telas.length, aviso: 'Chega na próxima batida de cada tela (até um minuto).' });
   });
 
   /** Desparear: o aparelho atual perde o acesso e precisa de um código novo. */

@@ -339,6 +339,36 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
     assert.equal((await api.del(`/painel/anunciantes/1`, undefined, op)).status, 403);
   });
 
+  await t.test('comando remoto chega na batida (é assim que o player é atualizado)', async () => {
+    assert.equal((await api.post('/painel/telas/comando', { tela_id: tela, comando: 'invalido' }, master)).status, 422);
+    const r = await api.post('/painel/telas/comando', { tela_id: tela, comando: 'limpar_cache' }, master);
+    assert.equal(r.status, 201, JSON.stringify(r.dados));
+    assert.equal(r.dados.telas, 1);
+
+    const b = await tv.batida({ grade_versao: 'x' });
+    assert.deepEqual(b.dados.comandos, ['limpar_cache'], 'a tela recebe o comando na batida seguinte');
+    assert.equal(b.dados.player_versao, require('../server/config').playerVersao);
+
+    const b2 = await tv.batida({ grade_versao: 'x' });
+    assert.deepEqual(b2.dados.comandos, [], 'comando entregue não volta');
+
+    const det = (await api.get(`/painel/telas/${tela}`, master)).dados;
+    assert.equal(det.comandos[0].comando, 'limpar_cache');
+    assert.ok(det.comandos[0].entregue_em, 'o painel mostra que a tela já recebeu');
+
+    // Em lote: pega só quem está numa versão anterior à publicada (é esse o caso desta TV de teste).
+    assert.equal((await api.get(`/painel/telas/${tela}`, master)).dados.desatualizada, true);
+    const lote = await api.post('/painel/telas/comando', { desatualizadas: true, comando: 'recarregar' }, master);
+    assert.equal(lote.status, 201);
+    assert.equal(lote.dados.telas, 1, 'só a tela com player antigo recebe');
+
+    // Depois que a tela sobe para a versão publicada, ela sai do lote.
+    await tv.batida({ grade_versao: 'x', versao: require('../server/config').playerVersao });
+    assert.equal((await api.get(`/painel/telas/${tela}`, master)).dados.desatualizada, false);
+    assert.equal((await api.post('/painel/telas/comando', { desatualizadas: true, comando: 'recarregar' }, master)).status, 422,
+      'nenhuma desatualizada: nada a fazer');
+  });
+
   await t.test('desparear tira o aparelho do ar; pausar a campanha esvazia a grade', async () => {
     assert.equal((await api.post(`/painel/campanhas/${campanha}/status`, { acao: 'pausar', motivo: 'Fim do estoque' }, master)).dados.status, 'pausada');
     const depois = (await tv.programacao()).dados.grade;
@@ -348,6 +378,29 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
     assert.equal((await api.post(`/painel/telas/${tela}/desparear`, {}, master)).status, 204);
     assert.equal((await tv.programacao()).status, 401, 'o token do aparelho despareado não vale mais');
     assert.equal((await tv.exibicoes([])).status, 401);
+  });
+
+  await t.test('backup: gera, lista, baixa e não deixa sair da pasta', async () => {
+    const antes = (await api.get('/painel/backups', master)).dados;
+    assert.equal(antes.itens.length, 0);
+    assert.ok(antes.arquivos_bytes > 0, 'os arquivos das mídias ocupam disco e isso é mostrado');
+
+    const g = await api.post('/painel/backups', {}, master);
+    assert.equal(g.status, 201);
+    assert.ok(g.dados.tamanho > 1000, 'a cópia do banco tem conteúdo');
+    assert.equal(g.dados.espelho.ligado, false, 'sem MIDIA_ESPELHO, os arquivos não são copiados');
+
+    const depois = (await api.get('/painel/backups', master)).dados;
+    assert.equal(depois.itens.length, 1);
+    assert.equal(depois.atrasado, false);
+
+    const baixado = await fetch(`${api.base}/painel/backups/${depois.itens[0].nome}`, { headers: { Authorization: `Bearer ${master}` } });
+    assert.equal(baixado.status, 200);
+    assert.ok((await baixado.arrayBuffer()).byteLength > 1000);
+
+    assert.equal((await api.get('/painel/backups/..%2F..%2Fetc%2Fpasswd', master)).status, 404);
+    const op = await api.login('carla@midia.com.br', 'senha-da-carla');
+    assert.equal((await api.get('/painel/backups', op)).status, 403, 'só o master mexe em backup');
   });
 
   await t.test('histórico guarda quem fez o quê', async () => {

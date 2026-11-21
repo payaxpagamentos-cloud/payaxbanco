@@ -5,7 +5,8 @@ FROM ${BASE}
 ENV NODE_ENV=production \
     PORT=3600 \
     MIDIA_DB=/app/data/midia.db \
-    MIDIA_ARQUIVOS=/app/data/arquivos
+    MIDIA_ARQUIVOS=/app/data/arquivos \
+    MIDIA_BACKUPS=/app/data/backups
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -13,8 +14,9 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY server ./server
 COPY public ./public
 
-# Banco e arquivos das mídias ficam em /app/data (monte um volume persistente aqui).
-RUN mkdir -p /app/data/arquivos && chown -R node:node /app/data
+# Banco, arquivos das mídias e backups ficam em /app/data (monte um volume persistente aqui).
+# Para o espelho das mídias, monte outro volume e aponte MIDIA_ESPELHO para ele.
+RUN mkdir -p /app/data/arquivos /app/data/backups && chown -R node:node /app/data
 USER node
 
 EXPOSE 3600

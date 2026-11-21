@@ -221,7 +221,7 @@ Requisitos: **Node.js 22.13+**.
 npm install
 npm run demo      # opcional: 6 pontos, 9 TVs, 5 anunciantes, campanhas e 31 dias de exibições
 npm start         # painel em http://localhost:3600/midia/ e player em http://localhost:3600/midia/tv/
-npm test          # 40 testes de aceite
+npm test          # 55 testes de aceite
 ```
 
 A demonstração monta uma rede com 3 condomínios residenciais, um condomínio comercial, academia, mercado, padaria e
@@ -250,6 +250,15 @@ preços de tabela (mensalidade por tela e CPM); comissão sugerida ao ponto; dia
 dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta relatórios e faturamento, **nunca** é
 apagado); e os dados do PIX.
 
+## Operação do dia a dia
+
+| | |
+|---|---|
+| **Comando remoto** | Em *TVs*, dá para mandar uma tela (ou todas de um ponto) **recarregar o player** ou **limpar o cache e recarregar**. O comando viaja na batida que já acontece de minuto em minuto — é assim que uma versão nova do player entra nas telas já instaladas, sem ninguém ir ao prédio. O botão **Atualizar players** pega de uma vez só as telas que ficaram numa versão anterior, e o Diagnóstico aponta quais são. |
+| **Backup** | O banco é copiado sozinho a cada 24 h (configurável), guardando as 30 cópias mais recentes; em *Configurações* dá para gerar na hora e baixar. Os arquivos das mídias são grandes e nunca mudam depois de enviados, então em vez de entrar em toda cópia eles são **espelhados** para a pasta de `MIDIA_ESPELHO` — e, enquanto isso não estiver configurado, o painel e o Diagnóstico dizem com todas as letras que as peças não têm cópia. |
+| **Avisos por e-mail** | **Tela fora do ar** (um aviso por queda, para quem opera), **fatura vencida** (uma vez por dia, para o anunciante e um resumo para a equipe) e **fila de aprovação parada** há mais de um dia. Tudo desligável, e sem SMTP configurado nada quebra — o Diagnóstico só avisa que ninguém está sendo alertado. |
+| **Esqueci minha senha** | O síndico ou o anunciante pede o link na tela de entrada e recebe por e-mail um endereço que vale **uma hora e serve uma vez só**. Pedir de novo derruba o link anterior, e a resposta é a mesma exista ou não a conta — ninguém descobre quem tem acesso. Sem SMTP, a tela manda falar com a equipe (que troca a senha no painel). |
+
 ## Segurança
 
 - Senhas com **scrypt**; sessões do painel por token assinado (HMAC), com validade de 12 horas.
@@ -259,13 +268,16 @@ apagado); e os dados do PIX.
   arquivo — não pelo nome nem pelo cabeçalho enviado.
 - Limite de tentativas de login por IP, cabeçalhos de segurança e CSP restrita.
 - **Histórico** registra quem criou, alterou, aprovou, pareou, faturou e pagou.
+- Do link de nova senha guardamos só o resumo (SHA-256), nunca o código; ele expira em uma hora, serve uma vez e
+  o limite de tentativas por IP vale também para o pedido.
 
 ## O que depende de terceiros (não incluído)
 
 - **Compra do aparelho e da TV** e a internet do ponto. O player roda no navegador; não há instalação de app.
 - **Ligar e desligar a TV sozinha** (CEC/RS-232) depende do modelo do aparelho; o normal é configurar o próprio
   aparelho para ligar com a energia e nunca descansar a tela.
-- **Aviso por WhatsApp/e-mail** de fatura ou de TV caída: hoje o painel mostra em Diagnóstico e na Visão geral.
+- **WhatsApp**: exige contratar um provedor de mensagens. Por e-mail os avisos já saem automaticamente (com SMTP configurado).
+- **Baixa automática do PIX**: depende de integração com o banco. Hoje a fatura é marcada como paga no painel.
 - **Medição real de público** (câmera com contagem de pessoas, dados de operadora): os impactos usam o fluxo estimado
   cadastrado no ponto. Onde houver medição externa, basta atualizar o campo de passagens por dia.
 - **Integração com sistemas de agência** (envio automático de PI, checking eletrônico por padrão de mercado): o PI é
