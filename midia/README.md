@@ -211,6 +211,16 @@ Campinas", "Corporativo", "Comércio e academia".
 - O **Inventário** mostra a rede inteira para a proposta — telas por formato, onde ficam, unidades atendidas,
   passagens por dia e por mês, preço de tabela — e exporta em CSV.
 
+## Prova visual: a foto do que está na tela
+
+A prova de exibição diz o que a TV *registrou*; a prova visual mostra o que ela está **exibindo**. De tempos em
+tempos (padrão: 30 minutos, configurável, 0 desliga) o player desenha num canvas o conteúdo que está no ar e envia
+a imagem ao servidor. O painel guarda **só a última de cada TV** — a anterior sai do disco — e a mostra na lista de
+TVs e no detalhe de cada aparelho, com a hora e o nome do que estava passando.
+
+É a diferença entre "a TV respondeu" e "a TV está mesmo mostrando o anúncio certo", sem ninguém ir até o prédio.
+Não há câmera nem leitura do ambiente: é uma cópia do que o próprio player está desenhando.
+
 ## Prova de exibição, impactos e faturamento
 
 - **Prova de exibição**: o player envia em lote tudo o que foi ao ar (mídia, campanha, instante e duração). Reenvio

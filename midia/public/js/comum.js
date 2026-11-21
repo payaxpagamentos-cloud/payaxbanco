@@ -48,6 +48,16 @@ export function previa(midia, { rota = 'painel', classe = '' } = {}) {
   return caixa;
 }
 
+/** Imagem servida pela API (que exige o token da sessão, por isso não dá para usar <img src> direto). */
+export function imagemDaApi(caminho, { alt = '', classe = '', vazio: textoVazio = 'Sem imagem' } = {}) {
+  const caixa = el('div', { class: classe });
+  fetch(`${BASE}/api${caminho}`, { headers: { Authorization: `Bearer ${sessao.get()?.token ?? ''}` } })
+    .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('sem imagem'))))
+    .then((b) => caixa.append(el('img', { src: URL.createObjectURL(b), alt })))
+    .catch(() => caixa.append(el('span', { class: 'mudo pequeno' }, textoVazio)));
+  return caixa;
+}
+
 /** Miniatura pequena (listas e grades). */
 export function miniatura(midiaId, rota = 'painel') {
   const caixa = el('div', { class: 'mini' });

@@ -211,6 +211,35 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
     assert.match(csv.dados, /Ótica Visão/);
   });
 
+  await t.test('prova visual: a TV manda uma foto do que está na tela', async () => {
+    const semFoto = (await api.get(`/painel/telas/${tela}/foto`, master));
+    assert.equal(semFoto.status, 404, 'antes da primeira foto não há o que mostrar');
+
+    const envio = await api.enviarArquivo(`/player/foto?item=${encodeURIComponent('Ótica Visão — 16:9')}`, png(640, 360), tv.token);
+    assert.equal(envio.status, 201, JSON.stringify(envio.dados));
+
+    const d = (await api.get(`/painel/telas/${tela}`, master)).dados;
+    assert.ok(d.foto_em, 'a tela passa a ter a hora da última foto');
+    assert.equal(d.foto_item, 'Ótica Visão — 16:9');
+
+    const foto = await api.get(`/painel/telas/${tela}/foto`, master);
+    assert.equal(foto.status, 200);
+    assert.match(foto.headers.get('content-type'), /image\/png/);
+
+    // Só a última fica: a foto anterior sai do disco.
+    const antes = d.foto_arquivo;
+    await api.enviarArquivo('/player/foto', png(320, 180), tv.token);
+    const depois = (await api.get(`/painel/telas/${tela}`, master)).dados;
+    assert.notEqual(depois.foto_arquivo, antes);
+    assert.equal(depois.foto_item, null, 'sem o nome do item, a legenda fica vazia');
+    assert.equal(require('node:fs').existsSync(require('node:path').join(process.env.MIDIA_ARQUIVOS, antes)), false, 'a anterior foi apagada');
+
+    // Desligada nas configurações, a TV não consegue mandar.
+    await api.put('/painel/configuracoes', { foto_minutos: 0 }, master);
+    assert.equal((await api.enviarArquivo('/player/foto', png(320, 180), tv.token)).status, 409);
+    await api.put('/painel/configuracoes', { foto_minutos: 30 }, master);
+  });
+
   await t.test('relatório de veiculação: o checking que a agência pede', async () => {
     const r = (await api.get(`/painel/campanhas/${campanha}/veiculacao?de=${dia(-1)}&ate=${dia(0)}`, master)).dados;
     assert.equal(r.campanha.anunciante, 'Ótica Visão');

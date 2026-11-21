@@ -29,9 +29,16 @@ function criarApp(db) {
   r.use(['/api/auth/login', '/api/auth/recuperar', '/api/auth/nova-senha'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // O envio de mídia tem o corpo bruto (arquivo) e limite próprio; o resto é JSON de até 400 kB.
   // O envio de criativo vai no corpo bruto (arquivo) com limite próprio; o resto é JSON de até 400 kB.
-  r.use('/api', (req, res, next) => (req.method === 'POST' && /^\/(painel|anunciante|ponto)\/midias$|^\/painel\/locais\/\d+\/logo$/.test(req.path)
-    ? express.raw({ type: '*/*', limit: config.midiaMaxBytes })(req, res, next)
-    : express.json({ limit: '400kb' })(req, res, next)));
+  r.use('/api', (req, res, next) => {
+    if (req.method !== 'POST') return express.json({ limit: '400kb' })(req, res, next);
+    // Criativo e logo: arquivo no corpo bruto, com o limite de mídia.
+    if (/^\/(painel|anunciante|ponto)\/midias$|^\/painel\/locais\/\d+\/logo$/.test(req.path)) {
+      return express.raw({ type: '*/*', limit: config.midiaMaxBytes })(req, res, next);
+    }
+    // Foto da tela (prova visual): imagem pequena, limite próprio.
+    if (req.path === '/player/foto') return express.raw({ type: '*/*', limit: '600kb' })(req, res, next);
+    return express.json({ limit: '400kb' })(req, res, next);
+  });
   r.use('/api', criarApi(db));
   // O player precisa poder ser atualizado: a página e o script dele sempre revalidam com o servidor,
   // enquanto fontes, estilos e imagens seguem o cache normal.

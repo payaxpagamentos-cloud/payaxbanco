@@ -230,6 +230,17 @@ module.exports = (db) => {
     });
   });
 
+  /** A última foto que a TV mandou do que estava na tela (prova visual). */
+  r.get('/telas/:id/foto', (req, res) => {
+    const t = db.prepare('SELECT foto_arquivo, foto_em FROM telas WHERE id = ?').get(Number(req.params.id));
+    if (!t?.foto_arquivo) throw naoEncontrado('Foto da tela');
+    const caminho = arquivos.caminho({ arquivo: t.foto_arquivo });
+    if (!require('node:fs').existsSync(caminho)) throw naoEncontrado('Arquivo da foto');
+    const tipos = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+    res.set({ 'Content-Type': tipos[t.foto_arquivo.split('.').pop()] ?? 'application/octet-stream', 'Cache-Control': 'private, max-age=60' });
+    require('node:fs').createReadStream(caminho).pipe(res);
+  });
+
   r.post('/telas', (req, res) => {
     const local = db.prepare('SELECT * FROM locais WHERE id = ?').get(Number(req.body.local_id));
     if (!local) throw new ErroNegocio('Ponto não encontrado.', 422);

@@ -405,6 +405,7 @@ module.exports = (db) => {
       duracao_imagem_s: [3, 120], insercoes_hora_padrao: [1, 120], bloco_minimo_s: [30, 3600], bloco_maximo_s: [60, 7200],
       batida_intervalo_s: [15, 900], offline_minutos: [2, 1440], mensalidade_tela_centavos: [0, 1_000_000_00], cpm_centavos: [0, 1_000_000],
       comissao_local_percentual: [0, 10_000], vencimento_dia: [1, 28], aviso_lojista: [0, 1], comunicado_automatico: [0, 1], marca_preenche: [0, 1], marca_duracao_s: [5, 60], avisos_email: [0, 1], prova_dias: [0, 3650],
+      foto_minutos: [0, 1440], contrato_aviso_dias: [0, 180],
     };
     transacao(db, () => {
       for (const [k] of Object.entries(CONFIG_PADRAO)) {

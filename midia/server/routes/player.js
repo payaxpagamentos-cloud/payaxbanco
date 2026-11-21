@@ -72,6 +72,8 @@ module.exports = (db) => {
       plataforma: cfg.nome_plataforma,
       slogan: cfg.slogan,
       batida_s: cfg.batida_intervalo_s,
+      // De quanto em quanto tempo esta TV manda uma foto do que está na tela (0 desliga).
+      foto_minutos: cfg.foto_minutos,
       grade: g,
     });
   });
@@ -115,6 +117,25 @@ module.exports = (db) => {
     const r2 = exibicoes.registrar(db, req.tela, req.body.exibicoes ?? req.body.itens ?? []);
     db.prepare('UPDATE telas SET ultimo_contato = ? WHERE id = ?').run(agora(), req.tela.id);
     res.json(r2);
+  });
+
+  /**
+   * Prova visual: a TV manda uma foto do que está na tela agora (o player desenha o próprio
+   * conteúdo num canvas e envia o JPEG). Guardamos só a última de cada tela — serve para ver
+   * que a TV está realmente no ar com o conteúdo certo, sem ir até o prédio.
+   */
+  r.post('/foto', autenticada, (req, res) => {
+    const cfg = lerConfig(db);
+    if (!cfg.foto_minutos) throw new ErroNegocio('A prova visual está desligada nas configurações.', 409);
+    const conteudo = Buffer.isBuffer(req.body) ? req.body : null;
+    if (!conteudo || !conteudo.length) throw new ErroNegocio('Envie a imagem.', 422);
+    const foto = arquivos.salvarImagem(conteudo, 600 * 1024);
+    const anterior = db.prepare('SELECT foto_arquivo FROM telas WHERE id = ?').get(req.tela.id)?.foto_arquivo;
+    db.prepare('UPDATE telas SET foto_arquivo = ?, foto_em = ?, foto_item = ?, ultimo_contato = ? WHERE id = ?')
+      .run(foto.arquivo, agora(), limparTexto(req.query.item, 160), agora(), req.tela.id);
+    // Só a última foto fica: a anterior sai do disco.
+    if (anterior) arquivos.remover({ arquivo: anterior });
+    res.status(201).json({ ok: true, proxima_em_min: cfg.foto_minutos });
   });
 
   /**

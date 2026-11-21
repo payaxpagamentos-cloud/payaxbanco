@@ -107,10 +107,17 @@ export async function configuracoes(ctx) {
         campo('Mensalidade por TV (R$)', { name: 'mensalidade', value: reaisCampo(c.mensalidade_tela_centavos), inputmode: 'decimal' }),
         campo('CPM — por mil impactos (R$)', { name: 'cpm', value: reaisCampo(c.cpm_centavos), inputmode: 'decimal' }),
         campo('Comissão sugerida ao lojista (%)', { name: 'comissao', value: (c.comissao_local_percentual / 100).toString().replace('.', ','), inputmode: 'decimal' })),
-      el('div', { class: 'duas' },
+      el('div', { class: 'tres' },
         campo('Dia de vencimento das faturas', { name: 'vencimento_dia', type: 'number', min: 1, max: 28, value: c.vencimento_dia }),
-        campo('Guardar a prova de exibição detalhada por (dias)', { name: 'prova_dias', type: 'number', min: 0, max: 3650, value: c.prova_dias })),
+        campo('Guardar a prova de exibição detalhada por (dias)', { name: 'prova_dias', type: 'number', min: 0, max: 3650, value: c.prova_dias }),
+        campo('Avisar do fim do contrato com (dias)', { name: 'contrato_aviso_dias', type: 'number', min: 0, max: 180, value: c.contrato_aviso_dias })),
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O resumo por dia (relatórios e faturamento) nunca é apagado; 0 guarda todo o detalhe para sempre.')),
+
+    el('fieldset', {}, el('legend', {}, 'Prova visual das telas'),
+      campo('A TV manda uma foto do que está na tela a cada (minutos)', { name: 'foto_minutos', type: 'number', min: 0, max: 1440, value: c.foto_minutos }),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'O player desenha o próprio conteúdo e envia a imagem; o painel guarda só a última de cada TV, em TVs. '
+        + 'Não há câmera nem leitura do ambiente — é uma cópia do que o aparelho está exibindo. 0 desliga.')),
 
     el('fieldset', {}, el('legend', {}, 'Avisos por e-mail'),
       c.email.configurado

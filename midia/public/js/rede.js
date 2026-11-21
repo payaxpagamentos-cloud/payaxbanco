@@ -5,7 +5,7 @@ import {
   inteiro, dinheiro, dataHora, duracao, percentual, dataBr, etiqueta, etiquetaDe, situacao, centavos, reaisCampo,
   CATEGORIAS, PREDIOS, POSICOES, REPASSES, LAYOUTS, ORIENTACOES, STATUS_TELA, STATUS_PONTO, STATUS_COMUNICADO, TIPOS_COMUNICADO, DIAS,
 } from './ui.js';
-import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa, enviarArquivo, BASE_API } from './comum.js';
+import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa, imagemDaApi, enviarArquivo, BASE_API } from './comum.js';
 
 // ---------------------------------------------------------------- TVs
 export async function telasEquipe(ctx) {
@@ -54,8 +54,11 @@ function cartaoAguardando(lista, opcoes, recarregar) {
 function cartaoTela(t, recarregar) {
   const estado = t.online ? 'no ar' : (t.pareada ? 'sem contato' : 'aguardando pareamento');
   const selo = el('span', { class: `selo${t.online ? '' : (t.pareada ? ' off' : ' esperando')}` }, estado);
+  // Com a prova visual ligada, a moldura mostra a última foto que a própria TV mandou.
   const moldura = el('div', { class: `moldura${t.orientacao === 'retrato' ? ' retrato' : ''}` }, selo,
-    el('div', { class: 'vazia' }, t.item_atual ? el('div', {}, el('div', { style: 'font-size:11px;opacity:.7' }, 'No ar agora'), el('strong', {}, t.item_atual)) : 'Sem informação do player'));
+    t.foto_em
+      ? imagemDaApi(`/painel/telas/${t.id}/foto`, { classe: 'foto', alt: `O que está na tela ${t.nome}`, vazio: 'Foto indisponível' })
+      : el('div', { class: 'vazia' }, t.item_atual ? el('div', {}, el('div', { style: 'font-size:11px;opacity:.7' }, 'No ar agora'), el('strong', {}, t.item_atual)) : 'Sem informação do player'));
   return el('div', { class: 'tela-cartao' }, moldura,
     el('div', { class: 'corpo' },
       el('h3', {}, t.nome),
@@ -79,6 +82,15 @@ async function abrirTela(id, recarregar) {
       indicador({ rotulo: 'Situação', valor: d.online ? 'No ar' : 'Sem contato', ic: 'telas', cor: d.online ? 'verde' : 'vermelho', nota: d.aberto ? 'Ponto aberto agora' : 'Ponto fechado agora' }),
       indicador({ rotulo: 'Inserções hoje', valor: inteiro(d.hoje.insercoes), ic: 'tocar', nota: `${inteiro(d.hoje.insercoes_pagas)} de publicidade` }),
       indicador({ rotulo: 'Tempo de tela hoje', valor: duracao(d.hoje.segundos), ic: 'relogio', cor: 'ciano' })),
+    d.foto_em
+      ? el('div', {},
+        el('h3', {}, 'O que está na tela'),
+        el('div', { class: 'foto-tela' },
+          imagemDaApi(`/painel/telas/${d.id}/foto`, { classe: 'quadro', alt: `Foto da tela ${d.nome}`, vazio: 'A foto ainda não chegou.' }),
+          el('div', { class: 'legenda-foto' },
+            el('strong', {}, d.foto_item ?? 'conteúdo em exibição'),
+            el('span', { class: 'mudo pequeno' }, `foto enviada pela própria TV em ${dataHora(d.foto_em)}`))))
+      : null,
     el('h3', {}, 'Programação agora'),
     linhaDoLoop(d.grade),
     d.grade?.itens?.length ? el('div', { style: 'margin-top:14px' }, resumoDoLoop(d.grade)) : null,

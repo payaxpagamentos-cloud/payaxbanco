@@ -29,6 +29,8 @@ const apagar = (chave) => { try { localStorage.removeItem(chave); } catch { /* i
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const estado = {
+  // Quando a última foto da tela foi enviada (prova visual).
+  ultimaFoto: 0,
   token: lido(CHAVES.token),
   programacao: lido(CHAVES.grade),
   fila: lido(CHAVES.fila) ?? [],
@@ -461,6 +463,38 @@ async function exibir(item) {
     await dormir(item.duracao_s * 1000);
   }
   anotarExibicao(item, inicio, Math.min(item.duracao_s + 5, (Date.now() - inicio) / 1000));
+  if (item.formato === 'midia') enviarFoto(elemento, item);
+}
+
+/**
+ * Prova visual: de tempos em tempos a TV desenha num canvas o que está exibindo e manda ao servidor.
+ * A equipe vê a última foto de cada tela no painel — é a diferença entre "a TV respondeu" e
+ * "a TV está mesmo mostrando o anúncio certo". Só o conteúdo do próprio player é capturado;
+ * não existe câmera nem leitura do que está em volta.
+ */
+async function enviarFoto(elemento, item) {
+  const minutos = Number(estado.programacao?.foto_minutos ?? 0);
+  if (!minutos || !elemento) return;
+  if (estado.ultimaFoto && Date.now() - estado.ultimaFoto < minutos * 60_000) return;
+  const ehVideo = elemento.tagName === 'VIDEO';
+  const largura = ehVideo ? elemento.videoWidth : elemento.naturalWidth;
+  const altura = ehVideo ? elemento.videoHeight : elemento.naturalHeight;
+  if (!largura || !altura) return;
+  estado.ultimaFoto = Date.now();
+  try {
+    const escala = Math.min(1, 640 / largura);
+    const tela = document.createElement('canvas');
+    tela.width = Math.round(largura * escala);
+    tela.height = Math.round(altura * escala);
+    tela.getContext('2d').drawImage(elemento, 0, 0, tela.width, tela.height);
+    const foto = await new Promise((pronto) => tela.toBlob(pronto, 'image/jpeg', 0.6));
+    if (!foto) return;
+    await fetch(`${API}player/foto?item=${encodeURIComponent(item.nome ?? item.midia_id ?? '')}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${estado.token}`, 'Content-Type': 'image/jpeg' },
+      body: foto,
+    });
+  } catch { /* a foto é um extra: nunca pode atrapalhar a exibição */ }
 }
 
 function mostrarEspera(titulo, texto, codigo) {

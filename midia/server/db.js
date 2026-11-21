@@ -95,6 +95,10 @@ CREATE TABLE IF NOT EXISTS telas (
   largura INTEGER,
   altura INTEGER,
   versao_player TEXT,
+  -- Prova visual: a última foto do que estava na tela (o próprio player desenha e envia).
+  foto_arquivo TEXT,
+  foto_em TEXT,
+  foto_item TEXT,
   ip TEXT,
   ultimo_contato TEXT,
   grade_versao TEXT,
@@ -540,6 +544,8 @@ const CONFIG_PADRAO = {
   // Por quantos dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta
   // relatórios e faturamento, nunca é apagado). 0 = guardar tudo.
   prova_dias: '180',
+  // De quanto em quanto tempo a TV manda uma foto do que está na tela (0 desliga).
+  foto_minutos: '30',
   // Quantos dias antes do fim do contrato a equipe é avisada.
   contrato_aviso_dias: '30',
   // CNPJ da empresa (prestador do serviço), usado na planilha que vai ao contador para emitir as notas.
@@ -598,6 +604,7 @@ const COLUNAS_NOVAS = [
   ['faturas', 'contrato_id', 'INTEGER REFERENCES contratos(id)'],
   ['contratos', 'reajuste_meses', 'INTEGER NOT NULL DEFAULT 12'], ['contratos', 'reajuste_percentual', 'INTEGER NOT NULL DEFAULT 0'],
   ['contratos', 'ultimo_reajuste', 'TEXT'], ['contratos', 'renovado_em', 'TEXT'], ['contratos', 'renovacoes', 'INTEGER NOT NULL DEFAULT 0'],
+  ['telas', 'foto_arquivo', 'TEXT'], ['telas', 'foto_em', 'TEXT'], ['telas', 'foto_item', 'TEXT'],
   ['faturas', 'nf_numero', 'TEXT'], ['faturas', 'nf_emitida_em', 'TEXT'], ['faturas', 'nf_link', 'TEXT'],
 ];
 

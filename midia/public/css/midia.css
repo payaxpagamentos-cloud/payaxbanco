@@ -236,6 +236,16 @@ select{ appearance: none; padding-right: 34px; cursor: pointer;
 .dados .rotulo{ font-size: 11.5px; font-weight: 600; color: var(--text-3); }
 .dados > div > span + span{ font-size: 13.5px; color: var(--text); }
 
+.moldura .foto{ position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }
+.moldura .foto img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Prova visual: a última foto que a TV mandou do que está na tela */
+.foto-tela{ display: flex; gap: 14px; align-items: flex-start; background: var(--surface-2); border-radius: var(--radius-sm); padding: 12px; }
+.foto-tela .quadro{ flex: none; width: 260px; border-radius: 8px; overflow: hidden; background: #000; display: grid; place-items: center; min-height: 90px; }
+.foto-tela img{ width: 100%; display: block; }
+.foto-tela .legenda-foto{ display: flex; flex-direction: column; gap: 4px; padding-top: 2px; min-width: 0; }
+@media (max-width: 640px){ .foto-tela{ flex-direction: column; } .foto-tela .quadro{ width: 100%; } }
+
 /* Etiquetas: discretas, com ponto de cor */
 .etiqueta{ display: inline-flex; align-items: center; gap: 6px; border-radius: 6px; padding: 2px 8px; font-size: 11.5px; font-weight: 600; background: var(--surface-2); color: var(--text-2);
   white-space: nowrap; line-height: 1.6; }
@@ -524,7 +534,7 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .tela-cartao .moldura.retrato{ aspect-ratio: 4 / 3; }
 .tela-cartao .moldura img{ max-width: 100%; max-height: 100%; object-fit: contain; }
 .tela-cartao .moldura .vazia{ color: #868D98; font-size: 12px; text-align: center; padding: 10px; }
-.tela-cartao .selo{ position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.62); color: #fff; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700;
+.tela-cartao .selo{ position: absolute; z-index: 2; top: 8px; left: 8px; background: rgba(0,0,0,.62); color: #fff; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700;
   display: inline-flex; align-items: center; gap: 6px; }
 .tela-cartao .selo::before{ content: ""; width: 7px; height: 7px; border-radius: 50%; background: #22C55E; }
 .tela-cartao .selo.off::before{ background: #EF4444; }
