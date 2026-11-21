@@ -4,6 +4,7 @@ const { agora, transacao } = require('../db');
 const { ErroNegocio } = require('./erros');
 const { dataLocal, diasEntre, somarDias, dataBr } = require('./datas');
 const fat = require('./faturamento');
+const prov = require('./provisionamento');
 
 /*
  * Régua de cobrança, bloqueio e desbloqueio.
@@ -60,7 +61,10 @@ function bloquear(db, { contrato, tipo, motivo, origem = 'usuario', regraId = nu
   const id = Number(db.prepare(`INSERT INTO bloqueios (organizacao_id, contrato_id, tipo, motivo, origem, regra_id, fatura_id, inicio, criado_por, criado_em)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(contrato.organizacao_id, contrato.id, tipo, motivo, origem, regraId, faturaId, t, usuarioId, t).lastInsertRowid);
   mudarSituacao(db, contrato, { para: 'bloqueado', evento: 'bloqueado', motivo, origem, usuarioId });
-  return { bloqueio_id: id, inicio: t };
+  // O bloqueio é a decisão comercial; cortar no equipamento é consequência dela e vai para a fila.
+  // Equipamento fora do ar não impede o bloqueio: o corte fica pendente, com tentativa e histórico.
+  const corte = prov.pedirCorte(db, { org: contrato.organizacao_id, contratoId: contrato.id, cortar: true, origem, usuarioId, motivo });
+  return { bloqueio_id: id, inicio: t, corte };
 }
 
 /** Libera o serviço: encerra o bloqueio em vigor com o motivo e devolve o contrato para ativo. */
@@ -69,7 +73,8 @@ function desbloquear(db, { contrato, motivo, origem = 'usuario', usuarioId = nul
   if (!aberto) throw new ErroNegocio('Este contrato não está bloqueado.', 422);
   db.prepare('UPDATE bloqueios SET fim = ?, motivo_liberacao = ?, liberado_por = ? WHERE id = ?').run(agora(), motivo, usuarioId, aberto.id);
   mudarSituacao(db, contrato, { para: 'ativo', evento: 'desbloqueado', motivo, origem, usuarioId });
-  return { bloqueio_id: aberto.id };
+  const religacao = prov.pedirCorte(db, { org: contrato.organizacao_id, contratoId: contrato.id, cortar: false, origem, usuarioId, motivo });
+  return { bloqueio_id: aberto.id, religacao };
 }
 
 /**

@@ -268,7 +268,27 @@ const servidor = criarApp(db).listen(0, async () => {
     const encerrado = carteira.find((x) => x.destino === 'cancelado');
     if (encerrado) await fin(`/contratos/${encerrado.contrato.id}/cancelar`, { motivo: 'Mudança para outra cidade', data: dia(-20) });
 
+    /*
+     * Provisionamento: o concentrador fica cadastrado com driver e papel, mas SEM acesso de gerência — não há
+     * equipamento de verdade para apontar, e inventar um endereço faria a tela mentir. Os serviços são criados
+     * com login e ONU, e aparecem como "nunca lidos": é exatamente o que o sistema mostra antes do primeiro contato.
+     */
+    const bras = await post('noc.demo', '/rede/equipamentos', { tipo: 'roteador', nome: 'BRAS-PG-01', ativo_id: pop.id, fabricante: 'MikroTik', modelo: 'CCR2004' });
+    db.prepare("UPDATE equipamentos SET driver = 'mikrotik_routeros', papel = 'concentrador' WHERE id = ?").run(bras.id);
+    let provisionados = 0;
+    for (const x of carteira) {
+      // Contrato cancelado não recebe provisionamento, e o que está em implantação ainda não tem serviço.
+      if (x.destino === 'cancelado' || x.destino === 'implantacao') continue;
+      const primeiro = x.assinante.nome.split(' ')[0].toLowerCase().normalize('NFD').replace(/[^a-z]/g, '');
+      await req('financeiro.demo', 'PUT', `/provisionamento/contratos/${x.contrato.id}/servico`, {
+        concentrador_id: bras.id, tipo_acesso: 'pppoe', login: `${primeiro}.${x.contrato.numero}`,
+        pon: `1/1/${(provisionados % 4) + 2}`, onu_serial: `ALCL${String(10000 + provisionados * 137).padStart(8, '0')}`,
+      });
+      provisionados += 1;
+    }
+
     console.log(`Carteira demonstrativa: ${carteira.length} assinantes, ${execucao.regua.bloqueios} corte(s) pela régua, ${execucao.regua.avisos} aviso(s) preparado(s).`);
+    console.log(`Provisionamento: ${provisionados} serviço(s) no concentrador BRAS-PG-01 (sem acesso de gerência: nenhum equipamento real foi inventado).`);
 
     console.log('Organização demonstrativa criada. Acessos (senha demo12345):');
     for (const [k, p] of Object.entries(PERFIS)) console.log(`  ${k}@managernetwork.local  (${p})`);

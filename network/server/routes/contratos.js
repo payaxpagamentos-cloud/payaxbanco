@@ -9,6 +9,7 @@ const { listaPaginada, like, conferirVersao } = require('../lib/http');
 const { dataLocal, somarDias, dataBr, competenciaBr } = require('../lib/datas');
 const { endereco } = require('../lib/enderecos');
 const cob = require('../lib/cobranca');
+const prov = require('../lib/provisionamento');
 const fat = require('../lib/faturamento');
 const v = require('../lib/validacao');
 
@@ -194,6 +195,7 @@ module.exports = (db) => {
     const motivo = v.texto(req.body?.motivo, 'o motivo da suspensão', 300);
     // Suspensão a pedido para de faturar; bloqueio por inadimplência continua faturando. São coisas diferentes.
     cob.mudarSituacao(db, c, { para: 'suspenso', evento: 'suspenso', motivo, usuarioId: req.usuario.id });
+    prov.pedirCorte(db, { org: req.org, contratoId: c.id, cortar: true, origem: 'usuario', usuarioId: req.usuario.id, motivo: `Suspensão a pedido: ${motivo}` });
     registrar(db, req, 'contrato_suspenso', { recurso: 'contrato', recursoId: c.id, antes: c, depois: { motivo } });
     res.json({ ...db.prepare(`SELECT ${COLUNAS} ${JUNCOES} WHERE c.id = ?`).get(c.id), aviso: 'Contrato suspenso: não entra mais no faturamento mensal enquanto estiver assim.' });
   });
@@ -202,6 +204,7 @@ module.exports = (db) => {
     const c = buscar(req, req.params.id);
     if (c.situacao !== 'suspenso') throw new ErroNegocio('Só um contrato suspenso é reativado por aqui (bloqueio por inadimplência se resolve na cobrança).', 422);
     cob.mudarSituacao(db, c, { para: 'ativo', evento: 'reativado', motivo: v.opcional(req.body?.motivo, 'o motivo', 300), usuarioId: req.usuario.id });
+    prov.pedirCorte(db, { org: req.org, contratoId: c.id, cortar: false, origem: 'usuario', usuarioId: req.usuario.id, motivo: 'Contrato reativado' });
     registrar(db, req, 'contrato_reativado', { recurso: 'contrato', recursoId: c.id, antes: c });
     res.json(db.prepare(`SELECT ${COLUNAS} ${JUNCOES} WHERE c.id = ?`).get(c.id));
   });
@@ -222,6 +225,12 @@ module.exports = (db) => {
       db.prepare("UPDATE contratos SET situacao = 'cancelado', cancelado_em = ?, motivo_cancelamento = ?, cancelado_por = ?, versao = versao + 1 WHERE id = ?")
         .run(data, motivo, req.usuario.id, c.id);
       cob.registrarEvento(db, c, { evento: 'cancelado', de: c.situacao, para: 'cancelado', motivo, usuarioId: req.usuario.id });
+      // Contrato cancelado: o acesso sai do equipamento (aqui, sim, é remoção, não corte).
+      const servico = db.prepare('SELECT * FROM servicos WHERE contrato_id = ?').get(c.id);
+      if (servico?.concentrador_id) {
+        prov.enfileirar(db, { org: req.org, servicoId: servico.id, acao: 'remover', origem: 'usuario', usuarioId: req.usuario.id,
+          pedido: { motivo }, chave: prov.chaveDe(servico.id, 'remover') });
+      }
       // Assinante sem nenhum contrato em vigor volta a ser inativo (as faturas em aberto continuam cobráveis).
       const vivos = db.prepare("SELECT COUNT(*) AS n FROM contratos WHERE assinante_id = ? AND situacao <> 'cancelado'").get(c.assinante_id).n;
       if (!vivos) db.prepare("UPDATE assinantes SET situacao = 'inativo', versao = versao + 1 WHERE id = ?").run(c.assinante_id);

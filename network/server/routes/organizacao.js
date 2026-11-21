@@ -45,12 +45,17 @@ module.exports = (db) => {
       pro_rata: b.pro_rata !== undefined ? (v.booleano(b.pro_rata) ? 1 : 0) : antes.pro_rata,
       confianca_dias: b.confianca_dias !== undefined ? v.inteiro(b.confianca_dias, 'o prazo do desbloqueio de confiança', { max: 90 }) : antes.confianca_dias,
       confianca_max_ano: b.confianca_max_ano !== undefined ? v.inteiro(b.confianca_max_ano, 'o limite de confiança por ano', { max: 24 }) : antes.confianca_max_ano,
+      // Provisionamento: o corte no equipamento acompanha o bloqueio comercial?
+      provisionamento_automatico: b.provisionamento_automatico !== undefined ? (v.booleano(b.provisionamento_automatico) ? 1 : 0) : antes.provisionamento_automatico,
+      corte_automatico: b.corte_automatico !== undefined ? (v.booleano(b.corte_automatico) ? 1 : 0) : antes.corte_automatico,
+      reconciliacao_horas: b.reconciliacao_horas !== undefined ? v.inteiro(b.reconciliacao_horas, 'o intervalo de reconciliação', { max: 720 }) : antes.reconciliacao_horas,
     };
     db.prepare(`UPDATE organizacoes SET nome = ?, fuso = ?, aprovacao_manutencao_centavos = ?, janela_recorrencia_min = ?, desatualizado_min = ?,
       reserva_porta_horas = ?, dia_vencimento_padrao = ?, carencia_bloqueio_dias = ?, multa_atraso_pct_centesimos = ?, juros_mes_pct_centesimos = ?,
-      pro_rata = ?, confianca_dias = ?, confianca_max_ano = ? WHERE id = ?`)
+      pro_rata = ?, confianca_dias = ?, confianca_max_ano = ?, provisionamento_automatico = ?, corte_automatico = ?, reconciliacao_horas = ? WHERE id = ?`)
       .run(d.nome, d.fuso, d.aprovacao_manutencao_centavos, d.janela_recorrencia_min, d.desatualizado_min, d.reserva_porta_horas, d.dia_vencimento_padrao,
-        d.carencia_bloqueio_dias, d.multa_atraso_pct_centesimos, d.juros_mes_pct_centesimos, d.pro_rata, d.confianca_dias, d.confianca_max_ano, req.org);
+        d.carencia_bloqueio_dias, d.multa_atraso_pct_centesimos, d.juros_mes_pct_centesimos, d.pro_rata, d.confianca_dias, d.confianca_max_ano,
+        d.provisionamento_automatico, d.corte_automatico, d.reconciliacao_horas, req.org);
     registrar(db, req, 'organizacao_alterada', { recurso: 'organizacao', recursoId: req.org, antes, depois: d });
     res.json(db.prepare('SELECT * FROM organizacoes WHERE id = ?').get(req.org));
   });

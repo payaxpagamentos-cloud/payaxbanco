@@ -1182,6 +1182,127 @@ CREATE TABLE consultas_cache (
 );
 `,
   },
+  {
+    versao: 4,
+    nome: 'provisionamento',
+    sql: `
+/*
+ * Acesso de gerência do equipamento: por onde o sistema fala com ele e com qual driver.
+ * A senha nunca sai daqui em claro: é cifrada com a mesma chave das integrações (AES-256-GCM) e
+ * jamais aparece em resposta de API, log ou auditoria.
+ */
+ALTER TABLE equipamentos ADD COLUMN driver TEXT;
+ALTER TABLE equipamentos ADD COLUMN papel TEXT CHECK (papel IS NULL OR papel IN ('concentrador','olt','acs','outro'));
+ALTER TABLE equipamentos ADD COLUMN host TEXT;
+ALTER TABLE equipamentos ADD COLUMN protocolo TEXT CHECK (protocolo IS NULL OR protocolo IN ('http','https','ssh','telnet','snmp'));
+ALTER TABLE equipamentos ADD COLUMN porta INTEGER CHECK (porta IS NULL OR (porta > 0 AND porta <= 65535));
+ALTER TABLE equipamentos ADD COLUMN usuario TEXT;
+ALTER TABLE equipamentos ADD COLUMN segredo_cifrado TEXT;
+-- Certificado do equipamento normalmente é autoassinado; a conferência é opcional e fica registrada.
+ALTER TABLE equipamentos ADD COLUMN verificar_tls INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE equipamentos ADD COLUMN estado_conexao TEXT NOT NULL DEFAULT 'nao_configurado'
+  CHECK (estado_conexao IN ('nao_configurado','conectado','sem_permissao','incompativel','falha','desatualizado'));
+ALTER TABLE equipamentos ADD COLUMN ultimo_contato TEXT;
+ALTER TABLE equipamentos ADD COLUMN ultimo_erro TEXT;
+ALTER TABLE equipamentos ADD COLUMN erro_id TEXT;
+-- O que o próprio equipamento informou sobre si (modelo, versão), para a tela não depender do que foi digitado.
+ALTER TABLE equipamentos ADD COLUMN identificacao TEXT;
+
+-- Nome do perfil de velocidade no concentrador. Sem ele, o driver usa a velocidade do plano diretamente, quando sabe.
+ALTER TABLE planos ADD COLUMN perfil_equipamento TEXT;
+
+/*
+ * Serviço provisionado de um contrato: a ponte entre o que foi vendido e o que está no equipamento.
+ *
+ * O ESTADO DESEJADO é derivado do contrato e do plano a cada execução (nunca é digitado duas vezes); o que fica
+ * aqui é só o que o desejado precisa e o contrato não sabe: login, senha, IP fixo, ONU, CPE e Wi-Fi.
+ * O ESTADO REAL é o que o equipamento respondeu na última leitura, guardado como veio, com o horário.
+ * A divergência entre os dois é calculada na hora: nada é "corrigido" em silêncio.
+ */
+CREATE TABLE servicos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  contrato_id INTEGER NOT NULL REFERENCES contratos(id),
+  -- Concentrador (BRAS/PPPoE) onde o acesso do assinante vive.
+  concentrador_id INTEGER REFERENCES equipamentos(id),
+  tipo_acesso TEXT NOT NULL DEFAULT 'pppoe' CHECK (tipo_acesso IN ('pppoe','ipoe','dhcp','ip_fixo')),
+  login TEXT,
+  senha_cifrada TEXT,
+  ip_fixo TEXT,
+  mac TEXT,
+  -- Fibra: a OLT, a PON e a ONU do assinante.
+  olt_id INTEGER REFERENCES equipamentos(id),
+  pon TEXT,
+  onu_serial TEXT,
+  onu_indice TEXT,
+  -- Equipamento do assinante (CPE) e o Wi-Fi que o sistema configura por TR-069.
+  cpe_serial TEXT,
+  cpe_modelo TEXT,
+  wifi_ssid TEXT,
+  wifi_senha_cifrada TEXT,
+  wifi_canal TEXT,
+  -- Última leitura do equipamento, como veio (JSON), e quando.
+  estado_real TEXT,
+  lido_em TEXT,
+  aplicado_em TEXT,
+  -- Resumo do que o sistema mandou por último, para a tela explicar a divergência sem reler o equipamento.
+  desejado_aplicado TEXT,
+  observacoes TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (contrato_id)
+);
+CREATE INDEX idx_servicos_concentrador ON servicos(concentrador_id);
+CREATE INDEX idx_servicos_olt ON servicos(olt_id, pon);
+CREATE UNIQUE INDEX idx_servicos_login ON servicos(concentrador_id, login) WHERE login IS NOT NULL;
+CREATE UNIQUE INDEX idx_servicos_onu ON servicos(olt_id, onu_serial) WHERE onu_serial IS NOT NULL;
+
+/*
+ * Fila de tarefas no equipamento. Tudo que toca o equipamento passa por aqui: a tela e a régua pedem, a fila executa.
+ *
+ * - "chave" torna o pedido idempotente: pedir o mesmo corte duas vezes não gera duas tarefas.
+ * - "ensaio" (dry-run) executa tudo menos a escrita, e guarda em "resultado" o que teria sido feito.
+ * - Falha não some: fica a tentativa, o erro legível, o id do erro e a próxima tentativa com recuo progressivo.
+ * - Nenhuma tarefa é apagada: o histórico do serviço é a fila.
+ */
+CREATE TABLE tarefas_equipamento (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  servico_id INTEGER REFERENCES servicos(id),
+  equipamento_id INTEGER REFERENCES equipamentos(id),
+  acao TEXT NOT NULL CHECK (acao IN ('identificar','ler','aplicar','cortar','religar','remover','configurar_wifi','reiniciar_cpe')),
+  pedido TEXT,
+  chave TEXT,
+  ensaio INTEGER NOT NULL DEFAULT 0,
+  situacao TEXT NOT NULL DEFAULT 'pendente' CHECK (situacao IN ('pendente','executando','concluida','falhou','cancelada','sem_suporte')),
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  proxima_tentativa TEXT,
+  resultado TEXT,
+  erro TEXT,
+  erro_id TEXT,
+  origem TEXT NOT NULL DEFAULT 'usuario' CHECK (origem IN ('usuario','regua','sistema','reconciliacao')),
+  usuario_id INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  iniciado_em TEXT,
+  concluido_em TEXT,
+  duracao_ms INTEGER
+);
+CREATE INDEX idx_tarefas_fila ON tarefas_equipamento(organizacao_id, situacao, proxima_tentativa);
+CREATE INDEX idx_tarefas_servico ON tarefas_equipamento(servico_id, id DESC);
+CREATE INDEX idx_tarefas_equipamento ON tarefas_equipamento(equipamento_id, id DESC);
+-- Mesma intenção pendente não entra duas vezes na fila.
+CREATE UNIQUE INDEX idx_tarefas_chave ON tarefas_equipamento(organizacao_id, chave)
+  WHERE chave IS NOT NULL AND situacao IN ('pendente','executando');
+
+-- Parâmetros do provisionamento na operação.
+ALTER TABLE organizacoes ADD COLUMN provisionamento_automatico INTEGER NOT NULL DEFAULT 1;
+-- Corte e religação do serviço acompanham o bloqueio comercial da régua?
+ALTER TABLE organizacoes ADD COLUMN corte_automatico INTEGER NOT NULL DEFAULT 1;
+-- Releitura periódica para achar divergência entre o contratado e o que está no equipamento (0 desliga).
+ALTER TABLE organizacoes ADD COLUMN reconciliacao_horas INTEGER NOT NULL DEFAULT 12;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

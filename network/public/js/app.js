@@ -8,6 +8,7 @@ const MENU = [
     ['noc', 'Central NOC', 'atividade', 'noc.ver', () => import('./telas/noc.js')],
     ['rede', 'Rede óptica', 'rede', 'rede.ver', () => import('./telas/rede.js')],
     ['chamados', 'Chamados técnicos', 'chamado', 'chamados.ver', () => import('./telas/chamados.js')],
+    ['provisionamento', 'Provisionamento', 'servidor', ['contratos.ver', 'faturamento.ver'], () => import('./telas/provisionamento.js')],
     ['equipe', 'Equipe e comissões', 'equipe', ['equipe.ver', 'comissoes.ver'], () => import('./telas/equipe.js')],
   ]],
   ['Assinantes e financeiro', [

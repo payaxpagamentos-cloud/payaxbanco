@@ -30,7 +30,9 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 12 | **Manutenção e lavagem** | Planos preventivos por item, por dias e/ou km (alerta no primeiro limite, antecedência e tolerância); ordens solicitado → orçado → aprovado (alçada por valor) → agendado → em execução → concluído; lavagem sem zerar a mecânica; fornecedores; custos orçado e realizado separados. |
 | 13 | **Abastecimentos** | Comprovante, volume, preço, odômetro e tanque cheio; total = litros × preço; preço médio ponderado; consumo por ciclo entre tanques cheios (com os parciais); lançamento retroativo validado; volume acima do tanque sinalizado; correção autorizada com valor original guardado; relatórios por veículo, técnico e posto; CSV protegido. |
 | 14 | **Rastreamento** | Posições do rastreador com horário da medição e idade; parado ≠ sem comunicação; ignição ausente = desconhecida; trajeto do período; vínculo dispositivo ↔ veículo pelo IMEI (a placa só sugere); chamados próximos por distância em linha reta (não é ETA). |
-| 15 | **Integrações** | Rastreador, coletores de monitoramento e Downdetector: configuração, teste de conexão, estado (não configurada, conectada, parcial, desatualizada, sem permissão, limite atingido, falha), último sucesso, erro com ID e histórico de coletas. |
+| 15 | **Provisionamento** | A ponte entre o contratado e o equipamento, por uma **camada de drivers**: o sistema fala em estado desejado (login, velocidade, IP, corte) e cada fabricante é um driver plugável, que declara o que sabe fazer. Fila de tarefas com ensaio (dry-run), tentativa com recuo, erro legível e histórico; releitura periódica que acha o que foi mexido por fora; e a tela de divergências, que mostra serviço liberado com contrato bloqueado (receita escapando) e contrato ativo com serviço cortado. |
+| 16 | **Consulta de CNPJ e CEP** | Cadastro preenchido pela base pública da Receita e pelos Correios, com a fonte e o horário à vista, o que veio marcado até alguém conferir, e queda para a fonte seguinte. Fonte fora do ar não trava o cadastro. |
+| 17 | **Integrações** | Rastreador, coletores de monitoramento e Downdetector: configuração, teste de conexão, estado (não configurada, conectada, parcial, desatualizada, sem permissão, limite atingido, falha), último sucesso, erro com ID e histórico de coletas. |
 
 Mais: **Organização e acessos** (usuários, perfis, matriz de permissões, parâmetros da operação e auditoria com request ID).
 
@@ -58,7 +60,7 @@ Requisitos: **Node.js 22.13+**.
 cd network
 npm install
 npm start          # http://localhost:3500/  (com NETWORK_BASE_PATH=/network → http://localhost:3500/network/)
-npm test           # 110 testes de aceite (inclui o rastreador real, se rastreador/node_modules existir)
+npm test           # 153 testes de aceite (inclui o rastreador real, se rastreador/node_modules existir)
 ```
 
 Acesso inicial: `admin@managernetwork.local` / `admin12345` (defina `NETWORK_ADMIN_EMAIL` e `NETWORK_ADMIN_SENHA`; em produção a senha é obrigatória).
@@ -94,6 +96,20 @@ Veja [`.env.exemplo`](.env.exemplo).
 | `NETWORK_COLETAS` | ligado | `0` desliga as coletas periódicas. |
 | `NETWORK_MAPA_TILES` / `_ATRIBUICAO` / `_LAT` / `_LNG` | Esri World Street Map | Camada de imagens do mapa (Leaflet). Para uso comercial e volume alto, use um provedor licenciado. |
 | `NETWORK_TRUST_PROXY` / `NETWORK_LIMITE_LOGIN` | `loopback` / `10` | Proxy reverso e tentativas de login por minuto. |
+
+### Parâmetros do provisionamento
+
+Também em **Organização e acessos**, e lidos pela fila a cada execução:
+
+| Parâmetro | Padrão | O que faz |
+|---|---|---|
+| Provisionamento automático | ligado | A fila executa sozinha as tarefas pedidas ao equipamento. Desligado, elas ficam aguardando o processamento manual. |
+| Corte automático | ligado | O bloqueio comercial da régua vira corte no equipamento. Desligado, o bloqueio continua existindo, só não chega à rede. |
+| Reconciliação | `12` horas | De quanto em quanto tempo os serviços são relidos para achar o que foi mexido por fora do sistema. Zero desliga. |
+
+O acesso de gerência de cada equipamento (driver, IP, usuário, senha) fica em **Provisionamento → Equipamentos**.
+A senha é cifrada com a mesma chave das integrações e nunca aparece em tela, log ou auditoria. A conferência do
+certificado TLS é por equipamento e vem desligada, porque certificado autoassinado é o normal em OLT e concentrador.
 
 ### Parâmetros de faturamento e cobrança
 
@@ -181,6 +197,12 @@ com `{servico}`, cabeçalho de autenticação, credencial e onde ler o volume de
 - **Dinheiro em centavos**, volume em mL e preço por litro em milésimos: todos os cálculos com inteiros.
 - **Concorrência**: reserva de porta, aprovação e mudanças de status com condição sobre o estado e versão otimista (`versao`); conflito devolve 409 legível.
 - **Idempotência**: todo POST da interface leva `Idempotency-Key`; repetir devolve a mesma resposta.
+- **O equipamento só é tocado pela fila**: a tela e a régua pedem, a fila executa com tentativa e histórico. Equipamento fora do ar não trava o atendimento nem perde o pedido.
+- **Ensaio antes de aplicar**: o mesmo caminho da execução, descrevendo o que faria, sem escrever.
+- **Corte não é exclusão**: o acesso é desabilitado e a sessão derrubada, para o assinante voltar igual ao religar. Apagar só no cancelamento.
+- **O que o driver não sabe fazer, ele declara**: a ação é recusada com o motivo. Nenhuma tela diz "aplicado" sem ter aplicado.
+- **A consulta pública é sugestão, não cadastro**: a resposta diz a fonte e o horário, os campos preenchidos ficam marcados, e quem salva é a pessoa.
+- **"Está tudo certo" só se diz do que foi lido**: com serviço nunca lido, a tela diz que não sabe.
 - **Segredos** só no servidor (cifrados), nunca em respostas ou na auditoria; anexos por link temporário assinado e permissão por recurso.
 
 ## Arquitetura
@@ -191,16 +213,19 @@ network/
     db.js              # migrações (organizações, frota, rede, chamados, comissões, rastreamento, NOC, integrações, auditoria)
     auth.js            # token HMAC e exigir(permissão)
     lib/permissoes.js  # matriz perfil × permissão
+    drivers/           # contrato único por fabricante: base (HTTP com TLS por equipamento), index (registro), mikrotik
+    lib/provisionamento.js # estado desejado x real, divergências, fila, reconciliação
+    lib/consultas.js   # CNPJ e CEP com cache, queda de fonte e degradação honesta
     lib/faturamento.js # pró-rata, ciclo, encargos, baixa, estorno
     lib/cobranca.js    # régua versionada, carência, bloqueio, confiança, inadimplência
     lib/frota.js manutencao.js combustivel.js rede.js comissoes.js noc.js anexos.js enderecos.js http.js (paginação, idempotência, CSV)
     conectores/        # base (SSRF, timeout, estados, backoff), rastreador, downdetector
-    routes/            # organizacao, assinantes, planos, contratos, faturamento, cobranca, frota, manutencao, combustivel, rede, chamados, equipe, noc, coletor, rastreamento, integracoes, painel
-    coletas.js         # agenda das coletas e a rotina diária de cobrança (uma vez por dia, no fuso da organização)
+    routes/            # organizacao, assinantes, planos, contratos, faturamento, cobranca, provisionamento, consultas, frota, manutencao, combustivel, rede, chamados, equipe, noc, coletor, rastreamento, integracoes, painel
+    coletas.js         # agenda das coletas, a rotina diária de cobrança e a fila do provisionamento
     demo.js            # organização demonstrativa (separada)
   public/              # SPA sem build (módulos ES), Leaflet + markercluster servidos do próprio pacote
   scripts/coletor-exemplo.js
-  test/                # node:test, incluindo o rastreador real em processo separado
+  test/                # node:test, incluindo o rastreador real e um RouterOS de mentira que fala a API REST de verdade
 ```
 
 ## O que depende de terceiros
@@ -209,7 +234,8 @@ network/
 - **Retorno bancário (CNAB) automático**: a baixa já aceita a origem `retorno`; a leitura do arquivo depende do layout do banco do provedor.
 - **Envio automático de aviso por WhatsApp ou e-mail**: exige contrato com um provedor de mensagens. A régua deixa o aviso pronto, com o texto da regra, e registra quem despachou e quando.
 - **Nota fiscal (NFCom, modelo 62)**: exige certificado digital e credenciamento na SEFAZ.
-- **Corte e religação no equipamento** (RADIUS, OLT, Mikrotik): o bloqueio aqui é a decisão comercial, registrada e auditada; a execução na rede depende do provisionamento, que ainda não faz parte deste módulo.
+- **Drivers de outros fabricantes**: hoje acompanha o driver de **MikroTik RouterOS** (concentrador PPPoE, API REST), testado de ponta a ponta. Huawei, ZTE, Fiberhome, Datacom, Parks, Intelbras e Cisco entram pelo mesmo contrato — OLT e CPE normalmente exigem SSH/Telnet/SNMP ou TR-069, caminhos que ainda não estão escritos. O que falta é driver, não arquitetura.
+- **Configurar o Wi-Fi do assinante** (SSID, senha, canal): a ação existe no contrato dos drivers (`configurar_wifi`); falta o driver TR-069/ACS que fala com o CPE.
 - **Downdetector**: acesso autorizado (API Enterprise), credencial e a documentação dos recursos contratados.
 - **Plataforma de monitoramento** do provedor (ou o agente de exemplo na rede interna) enviando amostras ao coletor.
 - **Rota viária e trânsito** para estimar chegada: hoje só distância em linha reta, identificada como tal.

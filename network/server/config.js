@@ -51,6 +51,12 @@ module.exports = {
   // Desligado por padrão para evitar que uma URL configurada alcance serviços internos (SSRF).
   conectorRedeInterna: process.env.NETWORK_CONECTOR_REDE_INTERNA === '1',
   conectorTimeoutMs: Number(process.env.NETWORK_CONECTOR_TIMEOUT_MS) || 10_000,
+  // Tempo máximo de cada chamada a um equipamento (concentrador, OLT, CPE). Equipamento carregado demora mais que uma API.
+  equipamentoTimeoutMs: Number(process.env.NETWORK_EQUIPAMENTO_TIMEOUT_MS) || 15_000,
+  // Liga a fila que executa as tarefas no equipamento. Nos testes, a fila é chamada diretamente.
+  provisionamentoAutomatico: process.env.NETWORK_PROVISIONAMENTO !== '0' && !teste,
+  // O endereço de gerência pode ser o próprio servidor? Desligado: 127.x normalmente é engano de cadastro.
+  equipamentoLoopback: process.env.NETWORK_EQUIPAMENTO_LOOPBACK === '1' || teste,
   // Liga as coletas periódicas (rastreador, Downdetector). Nos testes, as coletas são chamadas diretamente.
   coletasAutomaticas: process.env.NETWORK_COLETAS !== '0' && !teste,
   mapa: {

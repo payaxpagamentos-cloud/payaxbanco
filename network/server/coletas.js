@@ -4,6 +4,7 @@ const { agora } = require('./db');
 const rastreador = require('./conectores/rastreador');
 const downdetector = require('./conectores/downdetector');
 const cobranca = require('./lib/cobranca');
+const prov = require('./lib/provisionamento');
 
 const CONECTORES = { rastreador, downdetector };
 
@@ -61,4 +62,37 @@ function iniciarCobranca(db) {
   ciclo();
 }
 
-module.exports = { iniciarColetas, iniciarCobranca };
+/**
+ * Fila do provisionamento: executa o que foi pedido ao equipamento e, de tempos em tempos, relê os serviços
+ * para achar o que foi mexido por fora do sistema.
+ *
+ * A trava `rodando` é o que garante que não há duas execuções da fila ao mesmo tempo: dois comandos
+ * simultâneos no mesmo concentrador se atropelariam. A releitura respeita o intervalo da organização
+ * (0 desliga) e nunca enfileira duas leituras do mesmo serviço.
+ */
+function iniciarProvisionamento(db) {
+  let rodando = false;
+  const ciclo = async () => {
+    if (rodando) return;
+    rodando = true;
+    try {
+      for (const org of db.prepare('SELECT id, nome, reconciliacao_horas, provisionamento_automatico FROM organizacoes').all()) {
+        if (!org.provisionamento_automatico) continue;
+        try {
+          const r = await prov.processarFila(db, org.id, { maximo: 25 });
+          const falhas = r.tarefas.filter((x) => !x.ok && !x.sem_suporte);
+          if (falhas.length) console.warn(`[Network] Provisionamento ${org.nome}: ${falhas.length} tarefa(s) com erro (${falhas.map((f) => f.erro_id).join(', ')}).`);
+          if (org.reconciliacao_horas) prov.reconciliar(db, org.id, { horas: org.reconciliacao_horas, maximo: 50 });
+        } catch (err) {
+          console.error(`[Network] Fila de provisionamento (${org.nome}):`, err.message);
+        }
+      }
+    } finally {
+      rodando = false;
+    }
+  };
+  setInterval(() => ciclo().catch((err) => console.error('[Network] Agenda do provisionamento:', err.message)), 20_000).unref();
+  ciclo().catch(() => {});
+}
+
+module.exports = { iniciarColetas, iniciarCobranca, iniciarProvisionamento };

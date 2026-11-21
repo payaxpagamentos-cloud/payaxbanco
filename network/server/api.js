@@ -4,6 +4,7 @@ const express = require('express');
 const config = require('./config');
 const { autenticar, exigir } = require('./auth');
 const { ErroNegocio } = require('./lib/erros');
+const { ErroEquipamento } = require('./drivers/base');
 const { idempotencia } = require('./lib/http');
 const anexos = require('./lib/anexos');
 
@@ -44,6 +45,7 @@ function criarApi(db, extras = {}) {
   api.use('/contratos', require('./routes/contratos')(db));
   api.use('/faturamento', require('./routes/faturamento')(db));
   api.use('/cobranca', require('./routes/cobranca')(db));
+  api.use('/provisionamento', require('./routes/provisionamento')(db));
   api.use('/frota', require('./routes/frota')(db));
   api.use('/manutencao', require('./routes/manutencao')(db));
   api.use('/combustivel', require('./routes/combustivel')(db));
@@ -59,6 +61,12 @@ function criarApi(db, extras = {}) {
 
 function tratarErro(err, req, res) {
   if (err instanceof ErroNegocio) return res.status(err.status).json({ erro: err.message, detalhes: err.detalhes, request_id: req.requestId });
+  // Erro de equipamento levantado fora da fila (ex.: endereço de gerência inválido ao salvar o acesso):
+  // é problema do que foi informado, não falha do servidor.
+  if (err instanceof ErroEquipamento) {
+    const status = err.estado === 'sem_permissao' ? 403 : err.permanente ? 400 : 502;
+    return res.status(status).json({ erro: err.message, estado: err.estado, request_id: req.requestId });
+  }
   if (err.type === 'entity.parse.failed') return res.status(400).json({ erro: 'JSON inválido.', request_id: req.requestId });
   if (err.type === 'entity.too.large') return res.status(413).json({ erro: 'Arquivo ou requisição grande demais.', request_id: req.requestId });
   if (/UNIQUE constraint failed/i.test(err.message)) return res.status(409).json({ erro: 'Já existe um registro com esses dados.', request_id: req.requestId });

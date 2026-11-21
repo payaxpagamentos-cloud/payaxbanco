@@ -1,5 +1,6 @@
 import { api, qs } from '../api.js';
 import { buscarCep } from './assinantes.js';
+import { painelServico } from './provisionamento.js';
 import { el, limpar, icone, pode, cabecalho, painel, tabela, paginacao, etqDe, rotulo, opcoes, dinheiro, data, dataHora, dl, competencia, velocidade,
   carregar, carregando, formulario, pedirMotivo, confirmar, botao, toast, faixa, stat, hoje } from '../ui.js';
 
@@ -43,6 +44,11 @@ async function detalhe(alvo, id, ir) {
   let c;
   try { c = await api.get(`/contratos/${id}`); } catch (err) { limpar(alvo, el('div', { class: 'falha' }, err.message)); return; }
   const planos = pode('contratos.editar') ? await api.get('/planos?ativos=1').catch(() => []) : [];
+  // O serviço provisionado deste contrato (pode não existir ainda) e os concentradores disponíveis.
+  const [servico, concentradores] = await Promise.all([
+    api.get(`/provisionamento/servicos?contrato_id=${c.id}`).then((l) => (l.itens[0] ? api.get(`/provisionamento/servicos/${l.itens[0].id}`) : null)).catch(() => null),
+    pode('contratos.editar') ? api.get('/provisionamento/equipamentos?papel=concentrador').catch(() => []) : [],
+  ]);
   const chamar = async (caminho, corpo, mensagem) => {
     const r = await api.post(`/contratos/${c.id}${caminho}`, corpo);
     toast(r.aviso ?? mensagem);
@@ -155,6 +161,7 @@ async function detalhe(alvo, id, ir) {
             : el('span', { class: 'fraco' }, '—')) },
         ], c.bloqueios, { vazioTexto: 'Nunca foi bloqueado.' }), { semCorpo: true })),
       el('div', {},
+        painelServico(c, servico, concentradores, recarregar),
         painel('Dados', dl([
           ['Assinante', el('a', { href: `#/assinantes/${c.assinante_id}` }, `${c.assinante_codigo} · ${c.assinante_nome}`)],
           ['Plano', c.plano_nome],
