@@ -77,6 +77,16 @@ const P = {
   'panorama.ver': ['admin', 'gestor', 'noc', 'financeiro'],
   // Desenhar área, medir impacto e abrir incidente a partir dela é operação de rede.
   'panorama.area': ['admin', 'gestor', 'noc'],
+  /*
+   * Contabilidade. Ver o balancete e a DRE é ver o resultado inteiro da empresa, por isso fica no
+   * administrador, no gestor e no financeiro. Lançar e fechar competência mexem no que vai ao contador:
+   * só administrador e financeiro. Reabrir mês fechado desfaz o que já foi entregue: só administrador.
+   */
+  'contabil.ver': ['admin', 'gestor', 'financeiro'],
+  'contabil.lancar': ['admin', 'financeiro'],
+  'contabil.plano': ['admin', 'financeiro'],
+  'contabil.fechar': ['admin', 'financeiro'],
+  'contabil.reabrir': ['admin'],
   'integracoes.ver': ['admin', 'noc', 'frota', 'gestor'],
   'integracoes.editar': ['admin'],
   'usuarios.gerenciar': ['admin'],

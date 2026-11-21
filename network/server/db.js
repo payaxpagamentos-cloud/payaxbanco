@@ -1575,6 +1575,135 @@ CREATE INDEX idx_conexao_eventos_periodo ON conexao_eventos(organizacao_id, em);
 CREATE INDEX idx_conexao_eventos_servico ON conexao_eventos(servico_id, id DESC);
 `,
   },
+  {
+    versao: 8,
+    nome: 'contabilidade',
+    sql: `
+/*
+ * Plano de contas.
+ *
+ * Contas sintéticas (analitica = 0) só somam as filhas; lançamento entra apenas em conta analítica. Sem
+ * essa separação, o mesmo valor apareceria duas vezes no balancete — uma na filha e outra na mãe.
+ *
+ * A natureza (devedora ou credora) decide o SINAL do saldo. Ela é derivada do tipo, mas fica gravada:
+ * quando a dúvida aparece num balancete que não fecha, o que resolve é o dado explícito, não a convenção
+ * lembrada de cabeça.
+ */
+CREATE TABLE plano_contas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  -- Código hierárquico com pontos: 1, 1.1, 1.1.01. A ordem do balancete é a ordem do código.
+  codigo TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('ativo','passivo','patrimonio','receita','despesa')),
+  natureza TEXT NOT NULL CHECK (natureza IN ('devedora','credora')),
+  pai_id INTEGER REFERENCES plano_contas(id),
+  nivel INTEGER NOT NULL DEFAULT 1 CHECK (nivel > 0),
+  -- 1 = aceita lançamento (analítica); 0 = só totaliza as filhas (sintética).
+  analitica INTEGER NOT NULL DEFAULT 1,
+  -- Conta de resultado entra na DRE; de balanço, no balancete patrimonial.
+  resultado INTEGER NOT NULL DEFAULT 0,
+  ativa INTEGER NOT NULL DEFAULT 1,
+  observacoes TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organizacao_id, codigo)
+);
+CREATE INDEX idx_plano_contas_org ON plano_contas(organizacao_id, codigo);
+
+/*
+ * Lançamento contábil. Nada é apagado: errou, estorna — e o estorno é outro lançamento, que aponta para
+ * o original. O histórico da contabilidade É a prova; apagar linha seria destruir a prova.
+ *
+ * "chave" torna a contabilização automática idempotente: a mesma fatura não vira dois lançamentos, ainda
+ * que a rotina rode duas vezes.
+ */
+CREATE TABLE lancamentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  numero INTEGER NOT NULL,
+  data TEXT NOT NULL,
+  competencia TEXT NOT NULL,
+  historico TEXT NOT NULL,
+  origem TEXT NOT NULL DEFAULT 'manual' CHECK (origem IN ('manual','faturamento','recebimento','estorno','abertura','ajuste')),
+  origem_tipo TEXT,
+  origem_id INTEGER,
+  chave TEXT,
+  -- Quando este lançamento É um estorno, aponta para o que foi estornado.
+  estorna_id INTEGER REFERENCES lancamentos(id),
+  -- Quando este lançamento FOI estornado, aponta para o estorno.
+  estornado_por_id INTEGER REFERENCES lancamentos(id),
+  motivo_estorno TEXT,
+  -- Total do débito, que por construção é igual ao total do crédito.
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  UNIQUE (organizacao_id, numero)
+);
+CREATE INDEX idx_lancamentos_competencia ON lancamentos(organizacao_id, competencia, data);
+CREATE UNIQUE INDEX idx_lancamentos_chave ON lancamentos(organizacao_id, chave) WHERE chave IS NOT NULL;
+
+CREATE TABLE partidas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lancamento_id INTEGER NOT NULL REFERENCES lancamentos(id),
+  conta_id INTEGER NOT NULL REFERENCES plano_contas(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('D','C')),
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  historico TEXT
+);
+CREATE INDEX idx_partidas_lancamento ON partidas(lancamento_id);
+CREATE INDEX idx_partidas_conta ON partidas(conta_id);
+
+/*
+ * Planejamento contábil: quanto se espera de cada conta em cada competência. É o que transforma o
+ * balancete em gestão — sem o orçado, o realizado é só um número sem régua.
+ */
+CREATE TABLE orcamento (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  conta_id INTEGER NOT NULL REFERENCES plano_contas(id),
+  competencia TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL,
+  observacoes TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL,
+  versao INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organizacao_id, conta_id, competencia)
+);
+
+/*
+ * Competência fechada não recebe nem altera lançamento. Fechar é o que impede que o balancete entregue
+ * ao contador mude depois de entregue.
+ */
+CREATE TABLE fechamentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  competencia TEXT NOT NULL,
+  fechado_em TEXT NOT NULL,
+  fechado_por INTEGER REFERENCES usuarios(id),
+  lancamentos INTEGER NOT NULL DEFAULT 0,
+  observacoes TEXT,
+  UNIQUE (organizacao_id, competencia)
+);
+
+/*
+ * Qual conta usar para cada fato que o sistema contabiliza sozinho. Sem este mapa, a contabilização
+ * automática teria de adivinhar — e adivinhar em contabilidade é inventar.
+ */
+CREATE TABLE contas_padrao (
+  organizacao_id INTEGER NOT NULL REFERENCES organizacoes(id),
+  chave TEXT NOT NULL,
+  conta_id INTEGER NOT NULL REFERENCES plano_contas(id),
+  definido_por INTEGER REFERENCES usuarios(id),
+  definido_em TEXT NOT NULL,
+  PRIMARY KEY (organizacao_id, chave)
+);
+
+-- Contabilização automática: ligada só depois que o plano de contas estiver mapeado.
+ALTER TABLE organizacoes ADD COLUMN contabilidade_automatica INTEGER NOT NULL DEFAULT 0;
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();

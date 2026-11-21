@@ -19,6 +19,7 @@ const MENU = [
     ['cobranca', 'Cobrança e bloqueios', 'cadeado', 'cobranca.ver', () => import('./telas/cobranca.js')],
     ['bancos', 'Cobrança bancária', 'recibo', 'faturamento.ver', () => import('./telas/cobrancas.js')],
     ['planos', 'Planos', 'camadas', 'contratos.ver', () => import('./telas/planos.js')],
+    ['contabil', 'Contabilidade', 'painel', 'contabil.ver', () => import('./telas/contabil.js')],
   ]],
   ['Gestão de frota', [
     ['veiculos', 'Veículos', 'carro', 'frota.ver', () => import('./telas/veiculos.js')],

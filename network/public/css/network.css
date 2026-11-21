@@ -645,3 +645,23 @@ main.tela-cheia { padding: 0; display: flex; animation: none; }
 @media (max-width: 860px) {
   .mapa-panorama { height: 360px; }
 }
+
+/* ---------------- Contabilidade ---------------- */
+/* Débito e crédito lado a lado: é assim que um lançamento se lê, e a cor evita trocar um pelo outro. */
+.partidas { margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+.partidas li { display: flex; align-items: baseline; gap: 6px; }
+.partidas li + li { margin-top: 2px; }
+.partidas b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.tipo-d, .tipo-c { font-weight: 700; width: 14px; flex: none; text-align: center; border-radius: 3px; }
+.tipo-d { color: var(--verde); background: var(--verde-suave); }
+.tipo-c { color: #8a6fb0; background: rgba(138, 111, 176, .12); }
+.partida-linha { display: grid; grid-template-columns: 104px minmax(0, 1fr) 118px 34px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.partida-linha .botao-icone { justify-self: center; }
+.linha-dre { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--borda); }
+.linha-dre:last-of-type { border-bottom: 0; }
+.linha-dre strong { font-variant-numeric: tabular-nums; }
+.linha-dre.forte { font-weight: 600; background: var(--verde-suave); margin: 0 -14px; padding: 10px 14px; border-radius: var(--raio-ctl); border-bottom: 0; }
+@media (max-width: 560px) {
+  .partida-linha { grid-template-columns: 1fr 1fr; }
+  .partida-linha .conta { grid-column: 1 / -1; }
+}

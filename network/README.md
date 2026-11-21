@@ -27,6 +27,7 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 8 | **Faturamento** | Ciclo mensal **simulável quantas vezes quiser** antes de emitir, com o que será cobrado de cada contrato e o motivo de cada contrato fora do ciclo; **pró-rata** de entrada e de saída (e adiada quando o vencimento do mês de entrada já passou); instalação cobrada uma vez; competência que não roda duas vezes; multa e juros calculados no dia do pagamento, sem alterar o valor da fatura; baixa total ou parcial, estorno com motivo, cancelamento e cobrança avulsa. |
 | 9 | **Cobrança e bloqueios** | Régua versionada por dias em relação ao vencimento (avisar, bloquear, indicar para cancelamento), carência que prevalece sobre qualquer regra, execução idempotente (a mesma regra nunca roda duas vezes na mesma fatura), bloqueio que guarda a regra e a fatura que o originou, **desbloqueio de confiança** com prazo e limite anual, desbloqueio automático na quitação e inadimplência por faixa de atraso. |
 | 9.1 | **Cobrança bancária** | Como o assinante paga. **PIX** com BR Code gerado aqui (EMV BR Code com CRC16, sem API nenhuma: basta a chave) e **boleto** com código de barras e linha digitável montados no sistema (módulo 10 e 11, fator de vencimento com a virada de 2025). Registro e baixa por arquivo: **remessa CNAB 240** e leitura de **retorno 240 e 400**, com o mapa de posições à vista. O retorno nunca é aplicado direto — vira prévia (o que casou, por qual chave, com que divergência), e só então o operador manda aplicar. Uma conta cujo campo livre nunca foi conferido com o banco avisa isso em toda emissão. |
+| 9.2 | **Contabilidade** | Partidas dobradas com plano de contas hierárquico (sintéticas totalizam, analíticas recebem lançamento), lançamento que **só entra se fechar**, estorno que não apaga nada e **competência fechada que não muda**. O faturamento se contabiliza sozinho — fatura reconhece receita na competência, baixa separa principal de juros e multa, estorno e cancelamento desfazem — com chave por fato para nunca duplicar. Balancete com CSV, DRE, razão com saldo correndo e **orçado × realizado**. A conferência mostra o que o financeiro registrou e a contabilidade ainda não tem. |
 | 10 | **Planos** | Tabela comercial (internet, voz, SVA, combo) com tecnologia, velocidade, mensalidade, taxa de instalação e fidelidade. Alterar o plano não altera o que já foi contratado. |
 | 11 | **Veículos** | Placa normalizada e única por organização, responsáveis com início e fim, restrições (oficina, documento, sinistro…) que tiram o veículo da escala até a liberação, documentos com vencimento, histórico de manutenção, abastecimentos e chamados. |
 | 12 | **Manutenção e lavagem** | Planos preventivos por item, por dias e/ou km (alerta no primeiro limite, antecedência e tolerância); ordens solicitado → orçado → aprovado (alçada por valor) → agendado → em execução → concluído; lavagem sem zerar a mecânica; fornecedores; custos orçado e realizado separados. |
@@ -179,6 +180,54 @@ Dois controles do desenho precisaram de honestidade, porque o sistema não faz o
 A marca é o monograma **M** em fita. O símbolo **N**, herdado do nome anterior do sistema, saiu do menu, do
 modo TV e do favicon. Cada instância do SVG numera os próprios gradientes: dois SVGs com o mesmo `id` na
 página fariam o segundo herdar as cores do primeiro.
+
+### Contabilidade
+
+Partidas dobradas de verdade, com três regras que o sistema não deixa dobrar:
+
+1. **Todo lançamento fecha.** A soma dos débitos é conferida contra a dos créditos antes de gravar. Um
+   lançamento desbalanceado não é "quase certo": é um balancete que nunca mais fecha, e o erro só aparece
+   meses depois, quando ninguém lembra de onde veio.
+2. **Nada é apagado.** Errou, estorna — e o estorno é outro lançamento, que aponta para o original e é
+   apontado por ele. O histórico da contabilidade é a prova do que aconteceu.
+3. **Competência fechada não muda.** Depois de fechado o mês, nem lançamento novo nem estorno entram nele.
+   É o que impede o balancete entregue ao contador de mudar depois de entregue.
+
+Conta que ganha filhas vira **sintética** sozinha e para de receber lançamento — só totaliza. Conta que já
+tem lançamento não pode mais ganhar filhas, porque os valores dela ficariam órfãos no balancete. Conta com
+saldo não pode ser desativada: o valor sumiria da vista sem deixar de existir.
+
+**O financeiro se contabiliza sozinho.** Fatura emitida reconhece a receita na competência (regime de
+competência, não de caixa); baixa recebida entra no banco ou no caixa conforme a forma de pagamento;
+juros e multa viram receita financeira **separada**, sem abater a dívida do assinante — jogá-los contra
+"clientes a receber" deixaria o saldo dele negativo e sumiria com a receita do resultado. Estorno e
+cancelamento desfazem o lançamento, sem apagá-lo.
+
+Cada fato carrega uma **chave** (`fatura:412`, `pagamento:98`): rodar a contabilização dez vezes produz um
+lançamento só. E contabilizar **não bloqueia o faturamento** — se o plano de contas não estiver mapeado, a
+fatura sai do mesmo jeito e o fato fica pendente. Travar o provedor por um problema de escritório seria
+inverter as prioridades.
+
+A tela de **conferência** compara o que o financeiro registrou com o que a contabilidade tem e diz quantos
+fatos faltam. Contabilização silenciosamente incompleta é pior que nenhuma: dá a impressão de que o
+balancete está pronto. Fechar a competência com pendências avisa, em vez de carimbar um mês incompleto.
+
+Acompanham: **balancete** (com CSV), **DRE**, **razão** com saldo correndo lançamento a lançamento, e
+**orçado × realizado** por competência, que é o planejamento contábil — sem o orçado, o realizado é um
+número sem régua.
+
+#### O que ainda depende de certificado digital
+
+A integração com **Receita Federal, FGTS Digital e eSocial** exige o **e-CNPJ (A1 ou A3)** do provedor e,
+em vários casos, procuração eletrônica. Sem o certificado instalado não há como autenticar, assinar evento
+nem emitir guia — e inventar essas chamadas produziria um sistema que *parece* integrado, com o erro
+aparecendo só no vencimento da guia. Por isso essa parte não está escrita: entra quando o certificado
+existir, no mesmo molde dos adaptadores bancários. O que não depende de certificado — plano de contas,
+lançamentos, balancete, DRE, planejamento e a contabilização automática do faturamento — está pronto e
+funciona hoje.
+
+Fora do escopo desta entrega, e dito aqui para não parecer esquecimento: **apuração fiscal** (ICMS sobre
+telecom, ISS sobre SVA, PIS/COFINS ou Simples), **NFCom modelo 62** e **folha de pagamento**.
 
 ### Mapas: Google Maps
 

@@ -8,6 +8,7 @@ const { registrar } = require('../lib/auditoria');
 const { listaPaginada, like, csv } = require('../lib/http');
 const { dataLocal, somarDias, competenciaBr } = require('../lib/datas');
 const cob = require('../lib/cobranca');
+const contabilizacao = require('../lib/contabilizacao');
 const fat = require('../lib/faturamento');
 const v = require('../lib/validacao');
 
@@ -76,6 +77,10 @@ module.exports = (db) => {
     if (!simulacao) {
       registrar(db, req, 'ciclo_faturado', { recurso: 'ciclo', recursoId: resultado.ciclo_id,
         depois: { competencia, faturas: resultado.faturas, valor_centavos: resultado.valor_centavos, pulados: resultado.pulados.length } });
+      // Contabiliza o ciclo inteiro. Falha aqui não desfaz o faturamento: o fato fica pendente e aparece na conferência.
+      resultado.contabilizado = contabilizacao.ligada(db, req.org)
+        ? contabilizacao.contabilizarPendentes(db, req.org, { usuarioId: req.usuario.id })
+        : null;
     }
     res.status(simulacao ? 200 : 201).json(resultado);
   });
@@ -143,6 +148,7 @@ module.exports = (db) => {
     const nova = transacao(db, () => fat.emitirFatura(db, { org: req.org, assinanteId: assinante.id, contratoId, vencimento, itens,
       observacoes: v.opcional(b.observacoes, 'as observações', 500), usuarioId: req.usuario.id }));
     registrar(db, req, 'fatura_avulsa_emitida', { recurso: 'fatura', recursoId: nova.id, depois: { ...nova, assinante_id: assinante.id, itens } });
+    contabilizacao.aoAcontecer(db, req.org, 'fatura', { faturaId: nova.id, usuarioId: req.usuario.id });
     res.status(201).json(buscar(req, nova.id));
   });
 
@@ -177,6 +183,7 @@ module.exports = (db) => {
       return { ...pago, desbloqueio };
     });
     registrar(db, req, 'fatura_baixada', { recurso: 'fatura', recursoId: fatura.id, antes: fatura, depois: { ...dados, pagamento_id: resultado.pagamento_id } });
+    contabilizacao.aoAcontecer(db, req.org, 'pagamento', { pagamentoId: resultado.pagamento_id, usuarioId: req.usuario.id });
     res.status(201).json({
       ...resultado,
       aviso: resultado.desbloqueio?.desbloqueado ? 'Fatura quitada e serviço desbloqueado automaticamente.'
@@ -191,6 +198,7 @@ module.exports = (db) => {
     const motivo = v.texto(req.body?.motivo, 'o motivo do estorno', 300);
     const fatura = transacao(db, () => fat.estornarPagamento(db, { pagamento, motivo, usuarioId: req.usuario.id }));
     registrar(db, req, 'pagamento_estornado', { recurso: 'fatura', recursoId: pagamento.fatura_id, antes: pagamento, depois: { motivo } });
+    contabilizacao.aoAcontecer(db, req.org, 'estorno_pagamento', { pagamentoId: pagamento.id, motivo, usuarioId: req.usuario.id });
     // O estorno não refaz o bloqueio na hora: a régua volta a alcançar a fatura na próxima execução, com registro próprio.
     res.json({ ...fatura, aviso: 'Estorno registrado. Se a fatura voltar a ficar vencida, a régua de cobrança trata o bloqueio na próxima execução.' });
   });
@@ -200,6 +208,7 @@ module.exports = (db) => {
     const motivo = v.texto(req.body?.motivo, 'o motivo do cancelamento', 300);
     const nova = transacao(db, () => fat.cancelarFatura(db, { fatura, motivo, usuarioId: req.usuario.id }));
     registrar(db, req, 'fatura_cancelada', { recurso: 'fatura', recursoId: fatura.id, antes: fatura, depois: { motivo } });
+    contabilizacao.aoAcontecer(db, req.org, 'cancelamento_fatura', { faturaId: fatura.id, motivo, usuarioId: req.usuario.id });
     res.json({ ...nova, aviso: fatura.competencia ? `Competência ${competenciaBr(fatura.competencia)} liberada: o contrato pode ser faturado de novo nela.` : null });
   });
 

@@ -428,6 +428,37 @@ const servidor = criarApp(db).listen(0, async () => {
       WHERE c.organizacao_id = ? AND c.situacao <> 'cancelado' AND COALESCE(c.latitude, a.latitude) IS NULL`).get(org).n;
     void agoraIso;
 
+    /*
+     * Contabilidade: plano padrão, contabilização automática ligada e o histórico do financeiro trazido.
+     * Nada é inventado aqui — os lançamentos saem das faturas e baixas que a demonstração já criou.
+     */
+    await post('demo', '/contabil/plano/padrao', {});
+    await req('demo', 'PUT', '/contabil/automatica', { ligada: true });
+    const contab = await post('financeiro.demo', '/contabil/pendencias/contabilizar', {});
+    // Algumas despesas da operação, para a DRE ter os dois lados e o orçado ter o que comparar.
+    const contaDe = (codigo) => db.prepare('SELECT id FROM plano_contas WHERE organizacao_id = ? AND codigo = ?').get(org, codigo).id;
+    for (const [codDebito, valor, historico] of [
+      ['5.1.01', '4.500,00', 'Trânsito IP do mês'],
+      ['5.2.01', '18.400,00', 'Folha de pagamento'],
+      ['5.3.02', '1.250,00', 'Energia elétrica do POP'],
+      ['5.4.01', '2.100,00', 'Combustível da frota'],
+      ['5.3.04', '900,00', 'Honorários contábeis'],
+    ]) {
+      await post('financeiro.demo', '/contabil/lancamentos', {
+        data: dia(-6), historico,
+        partidas: [{ conta_id: contaDe(codDebito), tipo: 'D', valor }, { conta_id: contaDe('1.1.02'), tipo: 'C', valor }],
+      });
+    }
+    // Orçamento da competência, para a tela de orçado × realizado mostrar diferença de verdade.
+    await req('financeiro.demo', 'PUT', '/contabil/orcamento', { itens: [
+      { conta_id: contaDe('4.1.01'), competencia: C_ATUAL, valor: '32.000,00' },
+      { conta_id: contaDe('5.1.01'), competencia: C_ATUAL, valor: '4.000,00' },
+      { conta_id: contaDe('5.2.01'), competencia: C_ATUAL, valor: '18.000,00' },
+      { conta_id: contaDe('5.3.02'), competencia: C_ATUAL, valor: '1.400,00' },
+      { conta_id: contaDe('5.4.01'), competencia: C_ATUAL, valor: '1.800,00' },
+    ] });
+    const bal = await req('financeiro.demo', 'GET', `/contabil/balancete?de=${C_ATUAL}&ate=${C_ATUAL}`);
+
     console.log(`Carteira demonstrativa: ${carteira.length} assinantes, ${execucao.regua.bloqueios} corte(s) pela régua, ${execucao.regua.avisos} aviso(s) preparado(s).`);
     console.log(`TR-069: ACS configurado e ${aparelhos} aparelho(s) de assinante registrados (sem credencial de chamada: a tela diz que a mudança espera o contato do aparelho).`);
     console.log(`Provisionamento: ${provisionados} serviço(s) no concentrador BRAS-PG-01 (sem acesso de gerência: nenhum equipamento real foi inventado).`);
@@ -438,6 +469,8 @@ const servidor = criarApp(db).listen(0, async () => {
     for (const [k, p] of Object.entries(PERFIS)) console.log(`  ${k}@managerprovedor.local  (${p})`);
     console.log(`Panorama: ${comLeitura} serviço(s) com estado de conexão gravado COMO SE a varredura tivesse rodado agora `
       + `(não há concentrador real para varrer) · ${semMapa} contrato(s) sem coordenada, de propósito, para a aba "Fora do mapa".`);
+    console.log(`Contabilidade: plano padrão, automática ligada, ${contab.faturas} fatura(s) e ${contab.pagamentos} baixa(s) `
+      + `contabilizadas a partir do próprio financeiro · balancete de ${C_ATUAL} ${bal.fecha ? 'fecha' : 'NÃO FECHA'}.`);
     console.log('Rastreador e Downdetector ficam não configurados: não há conexão real inventada.');
   } catch (err) {
     console.error('Falha ao criar a demonstração:', err.message);

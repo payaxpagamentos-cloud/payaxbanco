@@ -11,6 +11,7 @@ const boleto = require('../lib/boleto');
 const pix = require('../lib/pix');
 const cob = require('../lib/cobrancas');
 const cobranca = require('../lib/cobranca');
+const contabilizacao = require('../lib/contabilizacao');
 const bancos = require('../bancos');
 const v = require('../lib/validacao');
 
@@ -225,6 +226,8 @@ module.exports = (db) => {
       return r2;
     });
     registrar(db, req, 'retorno_aplicado', { recurso: 'retorno', recursoId: x.id, depois: resultado });
+    // As baixas do retorno são pagamentos comuns: contabilizam como qualquer outro recebimento.
+    if (contabilizacao.ligada(db, req.org)) contabilizacao.contabilizarPendentes(db, req.org, { usuarioId: req.usuario.id });
     res.json({ ...resultado, aviso: `${resultado.baixados} fatura(s) baixada(s)${resultado.erros.length ? `; ${resultado.erros.length} com erro` : ''}.` });
   });
 
