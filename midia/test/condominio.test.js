@@ -233,6 +233,34 @@ test('Rede em condomínios: comunicados, circuitos e agência', async (t) => {
     assert.match(csv.headers.get('content-type'), /text\/csv/);
     assert.match(csv.dados, /Edifício Jardim das Acácias/);
   });
+
+  await t.test('proposta comercial sai do circuito com números do que está cadastrado', async () => {
+    const p = (await api.get(`/painel/circuitos/${circuito}/proposta?anunciante_id=${anunciante}&meses=6&desconto_percentual=1000&validade_dias=20`, master)).dados;
+
+    assert.equal(p.anunciante.nome, 'Construtora Aurora');
+    assert.equal(p.circuito.telas, 2, 'os dois condomínios do circuito');
+    assert.equal(p.circuito.unidades, 96 + 128);
+    assert.equal(p.pontos.length, 2);
+    assert.equal(p.valida_ate, dia(20));
+
+    // O condomínio tem horário 00:00–23:59, então são ~24 h por dia no ar.
+    const jardim = p.pontos.find((x) => x.nome.startsWith('Edifício Jardim'));
+    assert.ok(jardim.horas_dia >= 23.9, `horas no ar por dia: ${jardim.horas_dia}`);
+    assert.equal(jardim.insercoes_mes, Math.round(1 * 8 * jardim.horas_dia * 30), '1 tela × 8 por hora × horas × 30 dias');
+    assert.equal(p.veiculacao.insercoes_mes, p.pontos.reduce((t, x) => t + x.insercoes_mes, 0));
+    assert.equal(p.veiculacao.insercoes_periodo, p.veiculacao.insercoes_mes * 6);
+
+    // 8 inserções por hora de 12 s = 96 s de 3600, ou seja, 2,67% do tempo de tela.
+    assert.equal(p.veiculacao.share_percentual, Math.round((8 * 12 / 3600) * 10_000));
+
+    assert.equal(p.investimento.tabela_mes_centavos, 350_000);
+    assert.equal(p.investimento.mes_centavos, 315_000, '10% de desconto');
+    assert.equal(p.investimento.total_centavos, 315_000 * 6);
+    assert.equal(p.investimento.cpm_centavos, Math.round(315_000 / (p.veiculacao.impactos_mes / 1000)));
+
+    assert.equal((await api.get('/painel/circuitos/9999/proposta', master)).status, 404);
+    assert.equal((await api.get(`/painel/circuitos/${circuito}/proposta?meses=99`, master)).status, 422);
+  });
 });
 
 /** Os avisos automáticos: é o que faz a equipe saber da queda antes do síndico ligar. */

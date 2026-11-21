@@ -65,7 +65,9 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
 - **Programação**: o loop de uma TV (linha do tempo proporcional, fatia de cada anunciante e inserções por hora),
   com simulação de **qualquer dia e hora**, mais a **ocupação de todas as TVs** — onde ainda cabe campanha.
 - **Inventário (mídia kit)**: o que a rede tem para vender — circuitos com telas, pontos, formatos, audiência e preço,
-  e a lista de pontos com ambiente, unidades, onde as telas ficam e a tabela. Exporta em CSV para montar a proposta.
+  e a lista de pontos com ambiente, unidades, onde as telas ficam e a tabela. Exporta em CSV, e cada circuito gera a
+  **proposta comercial** pronta para imprimir ou salvar em PDF: a marca, a rede alcançada, as inserções e pessoas
+  alcançadas estimadas, onde o anúncio passa ponto a ponto, o investimento (com desconto e CPM) e a validade.
 - **Relatórios**: por campanha, por TV, por ponto e a **prova de exibição** linha por linha; tudo com CSV.
 - **Financeiro**, com quatro telas:
   - **Fluxo de caixa**: o que entrou e o que saiu no período (pela data do pagamento), o que ainda está previsto

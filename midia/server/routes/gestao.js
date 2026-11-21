@@ -7,7 +7,7 @@ const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { hashSenha } = require('../lib/senha');
-const { hoje, mes, somarDias, somarMeses, inicioMes, fimMes } = require('../lib/datas');
+const { hoje, mes, somarDias, somarMeses, inicioMes, fimMes, minutosDe } = require('../lib/datas');
 const { diagnostico, estaOnline } = require('../lib/monitor');
 const grade = require('../lib/grade');
 const rel = require('../lib/relatorios');
@@ -239,6 +239,96 @@ module.exports = (db) => {
     const c = db.prepare('SELECT * FROM circuitos WHERE id = ?').get(Number(req.params.id));
     if (!c) throw naoEncontrado('Circuito');
     res.json({ ...resumoCircuito(c), alvos: db.prepare('SELECT id, tipo, valor FROM circuito_alvos WHERE circuito_id = ? ORDER BY tipo, valor').all(c.id) });
+  });
+
+  /**
+   * Proposta comercial a partir do circuito: o que o cliente compra (pontos, telas, audiência),
+   * o que vai ao ar (inserções estimadas), quanto custa e até quando o preço vale.
+   * Os números de entrega saem do que está cadastrado — horário de funcionamento do ponto,
+   * inserções por hora do circuito e duração padrão do criativo.
+   */
+  r.get('/circuitos/:id/proposta', (req, res) => {
+    const c = db.prepare('SELECT * FROM circuitos WHERE id = ?').get(Number(req.params.id));
+    if (!c) throw naoEncontrado('Circuito');
+    const resumo = resumoCircuito(c);
+    const conf = cfg();
+    const meses = v.inteiro(req.query.meses ?? 3, 'o período em meses', { min: 1, max: 36 });
+    const desconto = v.inteiro(req.query.desconto_percentual ?? 0, 'o desconto', { min: 0, max: 5000 });
+    const validadeDias = v.inteiro(req.query.validade_dias ?? 15, 'a validade da proposta', { min: 1, max: 180 });
+    const insercoesHora = v.inteiro(req.query.insercoes_hora ?? c.insercoes_hora, 'as inserções por hora', { min: 1, max: 120 });
+    const anunciante = req.query.anunciante_id
+      ? db.prepare('SELECT id, nome, documento, contato, email FROM anunciantes WHERE id = ?').get(Number(req.query.anunciante_id)) ?? null
+      : null;
+
+    // Horas no ar por dia em cada ponto: a média da semana pelo horário cadastrado (sem horário, 12 h).
+    const horasPorPonto = new Map();
+    for (const localId of new Set(resumo.lista.map((t) => t.local_id))) {
+      const dias = db.prepare('SELECT abre, fecha FROM local_horarios WHERE local_id = ?').all(localId);
+      const horas = dias.length
+        ? dias.reduce((t, d) => t + Math.max(0, (minutosDe(d.fecha) - minutosDe(d.abre)) / 60), 0) / 7
+        : 12;
+      horasPorPonto.set(localId, Math.round(horas * 10) / 10);
+    }
+
+    // Um ponto entra uma vez na audiência, mas cada tela exibe: a fatia do tempo de tela é o que vira impacto.
+    const fatia = Math.min(1, (insercoesHora * conf.duracao_imagem_s) / 3600);
+    const pontos = [...new Map(resumo.lista.map((t) => [t.local_id, t])).values()].map((t) => {
+      const telas = resumo.lista.filter((x) => x.local_id === t.local_id);
+      const horas = horasPorPonto.get(t.local_id);
+      return {
+        nome: t.local_nome,
+        categoria: t.categoria,
+        cidade: t.cidade,
+        uf: t.uf,
+        unidades: t.unidades,
+        publico_dia: t.publico_dia,
+        telas: telas.length,
+        posicoes: [...new Set(telas.map((x) => x.posicao).filter(Boolean))],
+        horas_dia: horas,
+        insercoes_mes: Math.round(telas.length * insercoesHora * horas * 30),
+        impactos_mes: Math.round(t.publico_dia * fatia * 30),
+      };
+    }).sort((a, b) => b.publico_dia - a.publico_dia || a.nome.localeCompare(b.nome));
+
+    const insercoesMes = pontos.reduce((t, p) => t + p.insercoes_mes, 0);
+    const impactosMes = pontos.reduce((t, p) => t + p.impactos_mes, 0);
+    const tabelaMes = c.valor_mes_centavos || resumo.telas * conf.mensalidade_tela_centavos;
+    const mesComDesconto = Math.round((tabelaMes * (10_000 - desconto)) / 10_000);
+
+    res.json({
+      emitida_em: hoje(),
+      valida_ate: somarDias(hoje(), validadeDias),
+      plataforma: { nome: conf.nome_plataforma, slogan: conf.slogan },
+      anunciante,
+      circuito: {
+        id: c.id, nome: c.nome, descricao: c.descricao,
+        telas: resumo.telas, pontos: resumo.pontos, cidades: resumo.cidades,
+        paisagem: resumo.paisagem, retrato: resumo.retrato,
+        publico_dia: resumo.publico_dia, publico_mes: resumo.publico_mes,
+        unidades: pontos.reduce((t, p) => t + (p.unidades ?? 0), 0),
+      },
+      veiculacao: {
+        insercoes_hora: insercoesHora,
+        duracao_s: conf.duracao_imagem_s,
+        insercoes_mes: insercoesMes,
+        insercoes_periodo: insercoesMes * meses,
+        impactos_mes: impactosMes,
+        impactos_periodo: impactosMes * meses,
+        // Quanto do tempo de tela é do anunciante (o resto fica com os outros, o institucional e a marca).
+        share_percentual: Math.round(fatia * 10_000),
+      },
+      investimento: {
+        meses,
+        tabela_mes_centavos: tabelaMes,
+        desconto_percentual: desconto,
+        mes_centavos: mesComDesconto,
+        total_centavos: mesComDesconto * meses,
+        // CPM efetivo: o que o cliente paga por mil pessoas alcançadas.
+        cpm_centavos: impactosMes ? Math.round(mesComDesconto / (impactosMes / 1000)) : 0,
+        cpm_tabela_centavos: c.cpm_centavos,
+      },
+      pontos,
+    });
   });
 
   const lerCircuito = (c, parcial = false) => {

@@ -375,6 +375,55 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .menu-usuario{ right: 16px; top: 56px; }
 }
 @media print{ .lateral, .ferramentas, .filtros, .btn{ display: none !important; } .casca{ display: block; } .cartao{ border: 0; } }
+
+/* ---------------------------------------------------------------- Proposta comercial (folha para imprimir ou salvar em PDF) */
+.folha-proposta{ position: fixed; inset: 0; z-index: 1200; overflow: auto; background: var(--fundo-2, #E9EBEF); padding: 24px 16px 60px; }
+.folha-proposta .acoes-folha{ display: flex; justify-content: center; gap: 10px; margin-bottom: 18px; }
+.folha{ width: min(820px, 100%); margin: 0 auto; background: #FFFFFF; color: #111417; padding: 44px 48px 36px; border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(17,20,23,.18); font-size: 13.5px; line-height: 1.55; }
+.folha header{ display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 16px; border-bottom: 2px solid #111417; }
+.folha .marca-folha{ display: flex; align-items: center; gap: 12px; }
+.folha .marca-folha .simbolo{ width: 34px; color: #111417; display: block; }
+.folha .marca-folha .simbolo svg{ width: 100%; display: block; }
+.folha .marca-folha strong{ font-size: 18px; letter-spacing: .08em; }
+.folha .marca-folha .slogan{ font-size: 11.5px; color: #5B6470; }
+.folha .titulo-doc{ font-weight: 700; font-size: 14px; }
+.folha .dir{ text-align: right; }
+.folha .pequeno{ font-size: 11.5px; }
+.folha .mudo{ color: #5B6470; }
+.folha h1{ font-size: 26px; margin: 22px 0 4px; line-height: 1.2; }
+.folha h2{ font-size: 13px; text-transform: uppercase; letter-spacing: .09em; color: #46650A; margin: 26px 0 10px; }
+.folha .para{ font-weight: 600; margin: 0 0 4px; }
+.folha .resumo{ color: #39414B; margin: 6px 0 0; }
+.folha .blocos{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.folha .bloco{ background: #F4F6F8; border-left: 3px solid #C8FF31; border-radius: 6px; padding: 12px 14px; }
+.folha .bloco .valor{ font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+.folha .bloco .rotulo{ font-size: 11.5px; color: #39414B; font-weight: 600; }
+.folha .bloco .nota{ font-size: 10.5px; color: #6B7482; margin-top: 2px; }
+.folha .tabela-folha{ width: 100%; border-collapse: collapse; }
+.folha .tabela-folha th{ text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #5B6470;
+  border-bottom: 1px solid #D5DAE1; padding: 7px 8px; }
+.folha .tabela-folha td{ padding: 8px; border-bottom: 1px solid #EDF0F3; vertical-align: top; }
+.folha .tabela-folha .dir{ text-align: right; }
+.folha .tabela-folha .num{ font-variant-numeric: tabular-nums; }
+.folha .tabela-folha tfoot td{ font-weight: 700; border-top: 2px solid #111417; border-bottom: 0; }
+.folha .investimento td{ padding: 9px 8px; }
+.folha .investimento tr.forte td{ font-weight: 700; font-size: 15px; }
+.folha .observacao{ background: #F4F6F8; border-radius: 6px; padding: 12px 14px; margin-top: 18px; white-space: pre-wrap; }
+.folha .condicoes{ margin: 0; padding-left: 18px; color: #39414B; }
+.folha .condicoes li{ margin-bottom: 5px; }
+.folha footer{ margin-top: 30px; padding-top: 14px; border-top: 1px solid #D5DAE1; font-size: 11px; color: #5B6470; text-align: center; }
+@media (max-width: 720px){ .folha{ padding: 26px 20px; } .folha .blocos{ grid-template-columns: repeat(2, 1fr); } }
+
+/* Na impressão só a folha vai para o papel. */
+@media print{
+  body:has(.folha-proposta) > *:not(.folha-proposta){ display: none !important; }
+  .folha-proposta{ position: static; padding: 0; background: #FFFFFF; overflow: visible; }
+  .folha-proposta .acoes-folha{ display: none !important; }
+  .folha{ width: 100%; box-shadow: none; border-radius: 0; padding: 0; font-size: 11.5px; }
+  .folha h2{ break-after: avoid; }
+  .folha .tabela-folha tr{ break-inside: avoid; }
+}
 .acao-ligar, .acao-desligar{ display: grid; place-items: center; width: 62px; height: 62px; border-radius: 50%; border: 0; cursor: pointer; color: #fff; margin: 0 auto; }
 .acao-ligar{ background: #22C55E; box-shadow: 0 10px 22px -10px rgba(34, 197, 94, .9); } .acao-ligar:hover{ background: #16A34A; }
 .acao-desligar{ background: #EF4444; box-shadow: 0 10px 22px -10px rgba(239, 68, 68, .9); } .acao-desligar:hover{ background: #DC2626; }

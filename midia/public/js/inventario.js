@@ -5,6 +5,7 @@ import {
   inteiro, dinheiro, dataBr, etiqueta, CATEGORIAS, ORIENTACOES,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio } from './comum.js';
+import { gerarProposta } from './proposta.js';
 
 export async function inventario(ctx) {
   const corpo = el('div', { class: 'coluna' });
@@ -74,7 +75,11 @@ async function abrirCircuito(id, recarregar) {
       [(t) => inteiro(t.publico_dia), 'Passagens/dia', 'num dir'],
     ], c.lista, { vazioTexto: 'Nenhuma tela bate com as regras deste circuito.' }),
     el('div', { class: 'linha entre', style: 'margin-top:18px' },
-      el('button', { class: 'btn', onclick: () => { fechar(); editarCircuito(c, recarregar); } }, icone('editar'), 'Editar circuito'),
+      el('div', { class: 'linha' },
+        el('button', {
+          class: 'btn primario', onclick: (e) => acao(e.target, async () => { fechar(); await gerarProposta(c.id, c.nome); }),
+        }, icone('relatorios'), 'Gerar proposta'),
+        el('button', { class: 'btn', onclick: () => { fechar(); editarCircuito(c, recarregar); } }, icone('editar'), 'Editar circuito')),
       el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
   ], { largo: true });
 }
