@@ -11,13 +11,46 @@
 html, body{ margin: 0; height: 100%; overflow: hidden; background: #000; }
 body{ color: #fff; font-family: "Manrope", system-ui, sans-serif; cursor: none; user-select: none; -webkit-user-select: none; }
 
-.palco{ position: fixed; inset: 0; background: #000; }
+.palco{ position: fixed; inset: 0; background: #000; display: grid; }
+.zona-anuncio{ position: relative; overflow: hidden; background: #000; }
 .camada{ position: absolute; inset: 0; opacity: 0; transition: opacity .45s ease; display: grid; place-items: center; }
 .camada.no-ar{ opacity: 1; }
 .camada img, .camada video{ width: 100%; height: 100%; object-fit: contain; background: #000; }
 
 /* Com a faixa ligada, o conteúdo sobe para não ficar coberto. */
 body.com-faixa .palco{ bottom: var(--faixa-altura); }
+
+/*
+  Na tela dividida o anúncio quase nunca tem a proporção exata da zona. Em vez de barras pretas, o fundo
+  recebe a própria peça desfocada — nada é cortado e a tela não fica com buracos pretos no hall.
+*/
+body.dividida .zona-anuncio{ background: #0B1220; }
+.camada .fundo{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(34px) brightness(.45) saturate(1.1);
+  transform: scale(1.12); z-index: 0; }
+.camada img:not(.fundo), .camada video{ position: relative; z-index: 1; }
+
+/* Tela dividida: comunicado de um lado, publicidade do outro. Em pé, um em cima do outro. */
+body.dividida .palco{ grid-template-columns: 44% 56%; }
+@media (max-aspect-ratio: 1/1){ body.dividida .palco{ grid-template-columns: 1fr; grid-template-rows: 46% 54%; } }
+.zona-comunicado{ position: relative; overflow: hidden; background: #0B1220; border-right: 1px solid rgba(255,255,255,.08); }
+@media (max-aspect-ratio: 1/1){ .zona-comunicado{ border-right: 0; border-bottom: 1px solid rgba(255,255,255,.08); } }
+/* Na zona, o texto começa no alto (centralizar cortaria as pontas quando o recado é longo). */
+.zona-comunicado .comunicado{ padding: 5vh 4vw; gap: 2vh; justify-content: flex-start; }
+.zona-comunicado .comunicado h1{ font-size: 5.6vh; }
+.zona-comunicado .comunicado p{ font-size: 3vh; }
+/* Tela em pé: a zona é mais baixa, então tudo encolhe para caber sem cortar a assinatura. */
+@media (max-aspect-ratio: 1/1){
+  .zona-comunicado .comunicado{ padding: 3.4vh 6vw; gap: 1.2vh; }
+  .zona-comunicado .comunicado .marca-adm{ margin-bottom: 0; }
+  .zona-comunicado .comunicado .marca-adm img{ max-height: 4.4vh; }
+  .zona-comunicado .comunicado .marca-adm span{ font-size: 1.9vh; }
+  .zona-comunicado .comunicado .selo-tipo{ font-size: 1.9vh; padding: .7vh 1.6vh; }
+  .zona-comunicado .comunicado .onde{ font-size: 1.9vh; }
+  .zona-comunicado .comunicado h1{ font-size: 4.2vh; }
+  .zona-comunicado .comunicado p{ font-size: 2.4vh; }
+  .zona-comunicado .comunicado .quando{ font-size: 1.9vh; }
+  .zona-comunicado .comunicado .assinatura{ font-size: 1.8vh; padding-top: 1.1vh; }
+}
 
 .faixa{ position: fixed; left: 0; right: 0; bottom: 0; height: var(--faixa-altura); background: linear-gradient(90deg, #0B1B3F, #14306B);
   display: flex; align-items: center; justify-content: space-between; gap: 2vw; padding: 0 2.5vw; border-top: 1px solid rgba(255,255,255,.12); }
@@ -43,6 +76,15 @@ body.com-faixa .palco{ bottom: var(--faixa-altura); }
   padding: 2vh 2.4vh; font-size: 1.9vh; line-height: 1.7; max-width: 46vw; font-variant-numeric: tabular-nums; }
 .info b{ color: #93B4F7; font-weight: 700; }
 
+/* Cabeçalho do comunicado: logo da administradora e nome dela, como nas telas de condomínio. */
+.comunicado .marca-adm{ display: flex; align-items: center; gap: 1.6vh; margin-bottom: .6vh; min-width: 0; }
+.comunicado .marca-adm img{ max-height: 6vh; max-width: 40%; object-fit: contain; }
+.comunicado .marca-adm span{ font-size: 2.2vh; font-weight: 700; color: #C7D4EC; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comunicado .assinatura{ font-size: 2.2vh; color: #9FB2D4; border-top: 1px solid rgba(255,255,255,.12); padding-top: 1.6vh; margin-top: auto; }
+/* Sem assinatura, é a data que fica no pé do cartão. */
+.comunicado .quando:last-child{ margin-top: auto; }
+.comunicado .assinatura strong{ display: block; color: #E3EAF7; font-weight: 700; }
+
 /* Comunicado do ponto (recado do condomínio ou da loja), desenhado pela própria TV. */
 .comunicado{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 3vh; padding: 8vh 9vw;
   background: linear-gradient(135deg, #111A2B 0%, #0B1220 100%); color: #fff; text-align: left; }
@@ -53,7 +95,7 @@ body.com-faixa .palco{ bottom: var(--faixa-altura); }
 .comunicado .onde{ font-size: 2.4vh; font-weight: 600; color: #9FB2D4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
 .comunicado h1{ font-size: 8.5vh; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; margin: 0; }
 .comunicado p{ font-size: 4.4vh; line-height: 1.35; margin: 0; color: #E3EAF7; }
-.comunicado .quando{ font-size: 2.4vh; color: #7F93B8; margin-top: auto; }
+.comunicado .quando{ font-size: 2.4vh; color: #7F93B8; }
 /* Uma faixa de cor por tipo de recado. */
 .comunicado.urgente{ background: linear-gradient(135deg, #3B0A0A 0%, #1A0505 100%); }
 .comunicado.urgente .selo-tipo{ background: #DC2626; }

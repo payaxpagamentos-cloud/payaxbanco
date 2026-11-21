@@ -29,7 +29,7 @@ function criarApp(db) {
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // O envio de mídia tem o corpo bruto (arquivo) e limite próprio; o resto é JSON de até 400 kB.
   // O envio de criativo vai no corpo bruto (arquivo) com limite próprio; o resto é JSON de até 400 kB.
-  r.use('/api', (req, res, next) => (req.method === 'POST' && /^\/(painel|anunciante|ponto)\/midias$/.test(req.path)
+  r.use('/api', (req, res, next) => (req.method === 'POST' && /^\/(painel|anunciante|ponto)\/midias$|^\/painel\/locais\/\d+\/logo$/.test(req.path)
     ? express.raw({ type: '*/*', limit: config.midiaMaxBytes })(req, res, next)
     : express.json({ limit: '400kb' })(req, res, next)));
   r.use('/api', criarApi(db));

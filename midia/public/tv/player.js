@@ -38,7 +38,14 @@ const estado = {
   batidaS: 60,
   trocarPendente: false,
   parado: false,
+  // Tela dividida: o comunicado fica parado na zona dele e troca no seu próprio ritmo.
+  zonaIndice: 0,
+  zonaTimer: null,
+  logoUrl: null,
 };
+
+// Na tela dividida o comunicado fica parado: mesmo que o recado seja curto, ele permanece tempo suficiente para ler.
+const MINIMO_NA_ZONA_S = 15;
 
 // ---------------------------------------------------------------- Conversa com o servidor
 async function chamar(caminho, { metodo = 'GET', corpo, comToken = true } = {}) {
@@ -106,6 +113,8 @@ async function baixarProgramacao() {
   estado.batidaS = Math.max(15, Number(p.batida_s) || 60);
   guardar(CHAVES.grade, p);
   marcarConexao(true);
+  await carregarLogo();
+  rodarZonaComunicados();
   guardarArquivos(p.grade.itens).catch(() => {});
   return p;
 }
@@ -216,10 +225,32 @@ function trocarCamada() {
 
 const TIPOS_COMUNICADO = { aviso: 'Aviso', manutencao: 'Manutenção', assembleia: 'Assembleia', entrega: 'Entrega', urgente: 'Urgente' };
 
-/** Comunicado do ponto: a própria TV desenha (não existe arquivo para baixar). */
+/**
+ * Comunicado do ponto: a própria TV desenha (não existe arquivo para baixar).
+ * Leva a logo da administradora no alto e a assinatura embaixo, como nas telas de condomínio.
+ */
 function montarComunicado(item) {
+  const ponto = estado.programacao?.grade?.ponto ?? {};
   const caixa = document.createElement('div');
   caixa.className = `comunicado ${item.tipo ?? 'aviso'}`;
+
+  if (estado.logoUrl || ponto.administradora) {
+    const marca = document.createElement('div');
+    marca.className = 'marca-adm';
+    if (estado.logoUrl) {
+      const img = document.createElement('img');
+      img.src = estado.logoUrl;
+      img.alt = '';
+      marca.append(img);
+    }
+    if (ponto.administradora) {
+      const nome = document.createElement('span');
+      nome.textContent = ponto.administradora;
+      marca.append(nome);
+    }
+    caixa.append(marca);
+  }
+
   const topo = document.createElement('div');
   topo.className = 'cabeca';
   const selo = document.createElement('span');
@@ -227,19 +258,72 @@ function montarComunicado(item) {
   selo.textContent = TIPOS_COMUNICADO[item.tipo] ?? 'Aviso';
   const onde = document.createElement('span');
   onde.className = 'onde';
-  onde.textContent = item.local ?? '';
+  onde.textContent = item.local ?? ponto.nome ?? '';
   topo.append(selo, onde);
+
   const titulo = document.createElement('h1');
   titulo.textContent = item.titulo ?? '';
-  const texto = document.createElement('p');
-  texto.textContent = item.texto ?? '';
+  caixa.append(topo, titulo);
+
+  // Parágrafos separados por linha em branco, como o síndico escreveu.
+  for (const paragrafo of String(item.texto ?? '').split(/\n{2,}/)) {
+    const p = document.createElement('p');
+    p.textContent = paragrafo.trim();
+    if (p.textContent) caixa.append(p);
+  }
+
   const data = document.createElement('div');
   data.className = 'quando';
   // "sábado, 21 de novembro" com a primeira letra maiúscula (capitalize do CSS estragaria o "de").
   const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
   data.textContent = hoje.charAt(0).toUpperCase() + hoje.slice(1);
-  caixa.append(topo, titulo, texto, data);
+  caixa.append(data);
+
+  if (ponto.assinatura) {
+    const assinatura = document.createElement('div');
+    assinatura.className = 'assinatura';
+    const quem = document.createElement('strong');
+    quem.textContent = ponto.assinatura;
+    assinatura.append('Atenciosamente,', quem);
+    caixa.append(assinatura);
+  }
   return caixa;
+}
+
+/** Baixa a logo da administradora uma vez e guarda como blob (a tag <img> não manda cabeçalho). */
+async function carregarLogo() {
+  if (!estado.programacao?.grade?.ponto?.logo || estado.logoUrl) return;
+  try {
+    const resp = await fetch(`${API}player/logo`, { headers: { Authorization: `Bearer ${estado.token}` } });
+    if (resp.ok) estado.logoUrl = URL.createObjectURL(await resp.blob());
+  } catch { /* sem logo, o comunicado sai só com o nome */ }
+}
+
+/**
+ * Zona do comunicado (tela dividida): mostra um recado de cada vez, no ritmo dele, sem mexer no carrossel.
+ * Cada troca também entra na prova de exibição.
+ */
+function rodarZonaComunicados() {
+  clearTimeout(estado.zonaTimer);
+  const zona = $('zona-comunicado');
+  const lista = estado.programacao?.grade?.comunicados ?? [];
+  const dividida = estado.programacao?.grade?.layout === 'dividida';
+  document.body.classList.toggle('dividida', dividida && lista.length > 0);
+  zona.hidden = !(dividida && lista.length);
+  if (zona.hidden) return;
+
+  const mostrar = () => {
+    const item = lista[estado.zonaIndice % lista.length];
+    zona.replaceChildren(montarComunicado({ ...item, local: estado.programacao.grade.ponto?.nome }));
+    const inicio = Date.now();
+    const segundos = Math.max(MINIMO_NA_ZONA_S, item.duracao_s || MINIMO_NA_ZONA_S);
+    estado.zonaTimer = setTimeout(() => {
+      anotarExibicao({ comunicado_id: item.comunicado_id, campanha_id: null }, inicio, segundos);
+      estado.zonaIndice = (estado.zonaIndice + 1) % lista.length;
+      mostrar();
+    }, segundos * 1000);
+  };
+  mostrar();
 }
 
 /** Prepara o elemento do item na camada que está fora do ar e devolve uma função que o põe no ar. */
@@ -264,7 +348,11 @@ async function prepararItem(item) {
     elemento.alt = '';
   }
   if (origem.temporario) elemento.dataset.blob = origem.src;
-  alvo.replaceChildren(elemento);
+  // Na tela dividida, a peça desfocada preenche o fundo da zona (em vez de barras pretas).
+  const fundo = estado.programacao?.grade?.layout === 'dividida' && item.tipo === 'imagem'
+    ? Object.assign(document.createElement('img'), { src: origem.src, alt: '', className: 'fundo' })
+    : null;
+  alvo.replaceChildren(...[fundo, elemento].filter(Boolean));
   // Espera o arquivo estar pronto (com teto, para não travar o loop num arquivo ruim).
   await Promise.race([
     new Promise((pronto, falhou) => {
@@ -330,6 +418,7 @@ function desenharInfo() {
     ['TV', p?.tela?.nome ?? '—'],
     ['Ponto', p?.tela?.local ?? '—'],
     ['Programação', g ? `${g.itens.length} itens · ${g.duracao_s}s · ${g.ocupacao}% vendido` : '—'],
+    ['Layout', g ? (g.layout === 'dividida' ? `dividida · ${g.comunicados.length} comunicado(s) na zona` : 'tela cheia') : '—'],
     ['Versão da grade', g?.versao ?? '—'],
     ['No ar', itemAtual()?.nome ?? '—'],
     ['Fila para enviar', String(estado.fila.length)],
@@ -442,6 +531,7 @@ async function iniciar() {
   // Reaproveita a programação guardada para começar a exibir mesmo sem internet.
   if (estado.token && estado.programacao) {
     desenharFaixa();
+    rodarZonaComunicados();
     baixarProgramacao().catch(() => marcarConexao(false));
   }
   await enviarExibicoes();

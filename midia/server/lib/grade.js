@@ -19,6 +19,10 @@ const { local, dentroDaJanela, minutosDe } = require('./datas');
  * O resultado é determinístico: a mesma situação gera a mesma versão, e o player só baixa de novo quando ela muda.
  */
 
+/** Tela com os dados do ponto que a programação usa (inclusive a identidade que vai no comunicado). */
+const SQL_TELA = `SELECT t.*, l.categoria, l.cidade, l.nome AS local_nome, l.administradora, l.assinatura, l.logo_arquivo
+  FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`;
+
 const SQL_CAMPANHAS = `SELECT c.*, a.nome AS anunciante_nome FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
   WHERE c.status = 'ativa' AND a.status = 'ativo' AND c.inicio <= ? AND (c.fim IS NULL OR c.fim >= ?)`;
 
@@ -153,11 +157,13 @@ function montar(db, tela, instante = new Date()) {
   const slots = espalhar(blocos);
   const vendido = slots.reduce((t, s) => t + s.criativo.duracao_s, 0);
 
-  // Entre os anúncios entram os comunicados do ponto (todos, sempre) e o institucional, até o tempo mínimo do loop.
   const comunicados = db.prepare(SQL_COMUNICADOS).all(tela.local_id, momento.data, momento.data);
+  // Tela dividida (o padrão de elevador): o comunicado fica parado na sua metade enquanto a publicidade gira na outra.
+  // Tela cheia: o comunicado entra no meio do carrossel, como mais um item.
+  const dividida = tela.layout === 'dividida';
   const institucional = db.prepare(SQL_INSTITUCIONAL).all(momento.data, tela.local_id)
     .filter((m) => !m.orientacao || m.orientacao === tela.orientacao);
-  const preenchimento = comunicados.map((c) => ({ comunicado: c }));
+  const preenchimento = dividida ? [] : comunicados.map((c) => ({ comunicado: c }));
   let tempo = vendido + preenchimento.reduce((t, p) => t + p.comunicado.duracao_s, 0);
   if (institucional.length) {
     const minimo = slots.length ? cfg.bloco_minimo_s : Math.max(cfg.bloco_minimo_s, 1);
@@ -243,11 +249,24 @@ function montar(db, tela, instante = new Date()) {
 
   const assinatura = JSON.stringify([
     lista.map((i) => [i.midia_id, i.comunicado_id, i.duracao_s, i.campanha_id, i.texto ?? '']),
-    tela.som, tela.relogio, tela.legenda ?? '', (tela.aviso_ate && tela.aviso_ate < new Date().toISOString()) ? '' : (tela.aviso ?? ''),
+    dividida ? comunicados.map((c) => [c.id, c.titulo, c.texto, c.tipo, c.duracao_s]) : [],
+    tela.layout, tela.som, tela.relogio, tela.legenda ?? '',
+    (tela.aviso_ate && tela.aviso_ate < new Date().toISOString()) ? '' : (tela.aviso ?? ''),
   ]);
 
   return {
     versao: crypto.createHash('sha256').update(assinatura).digest('hex').slice(0, 16),
+    layout: dividida ? 'dividida' : 'cheia',
+    // Na tela dividida, estes comunicados giram na zona própria (fora do carrossel de publicidade).
+    comunicados: dividida ? comunicados.map((c) => ({
+      comunicado_id: c.id, titulo: c.titulo, texto: c.texto, tipo: c.tipo, duracao_s: c.duracao_s,
+    })) : [],
+    ponto: {
+      nome: tela.local_nome ?? null,
+      administradora: tela.administradora ?? null,
+      assinatura: tela.assinatura ?? (tela.local_nome ? `Administração / Síndico — ${tela.local_nome}` : null),
+      logo: Boolean(tela.logo_arquivo),
+    },
     gerada_em: new Date(instante).toISOString(),
     valida_ate: validaAte(db, instante, momento),
     duracao_s: duracao,
@@ -262,8 +281,11 @@ function montar(db, tela, instante = new Date()) {
 
 /** Grade de uma tela pelo id (busca a tela com os dados do ponto). */
 function montarPorTela(db, telaId, instante = new Date()) {
-  const tela = db.prepare(`SELECT t.*, l.categoria, l.cidade, l.nome AS local_nome FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`).get(telaId);
+  const tela = db.prepare(SQL_TELA).get(telaId);
   return tela ? montar(db, tela, instante) : null;
 }
 
-module.exports = { montar, montarPorTela, elegiveis, alvoBate, espalhar, noPrazo, noDia, naHora };
+/** A tela com tudo que a programação precisa (usado pelas rotas). */
+const buscarTela = (db, telaId) => db.prepare(SQL_TELA).get(telaId);
+
+module.exports = { montar, montarPorTela, buscarTela, elegiveis, alvoBate, espalhar, noPrazo, noDia, naHora, SQL_TELA };

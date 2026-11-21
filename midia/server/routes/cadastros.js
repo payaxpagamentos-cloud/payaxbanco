@@ -9,6 +9,7 @@ const { registrar } = require('../lib/auditoria');
 const { hashSenha } = require('../lib/senha');
 const { estaOnline, pontoAberto, uptime } = require('../lib/monitor');
 const { montarPorTela } = require('../lib/grade');
+const arquivos = require('../lib/arquivos');
 const { hoje } = require('../lib/datas');
 const v = require('../lib/validacao');
 
@@ -24,6 +25,7 @@ function lerLocal(c, cfg, parcial = false) {
   if (tem('categoria')) d.categoria = v.opcao(c.categoria ?? 'outro', 'a categoria', CATEGORIAS);
   if (c.documento !== undefined) d.documento = c.documento === null || c.documento === '' ? null : v.documento(c.documento);
   if (c.administradora !== undefined) d.administradora = v.opcional(c.administradora, 'a administradora', 120);
+  if (c.assinatura !== undefined) d.assinatura = v.opcional(c.assinatura, 'a assinatura do comunicado', 120);
   if (c.unidades !== undefined) d.unidades = v.inteiro(c.unidades, 'o número de unidades', { max: 100_000 });
   // Contrapartida ao ponto: comissão sobre a receita, valor fixo por mês ou nenhuma (caso comum em condomínio).
   if (c.repasse_tipo !== undefined) d.repasse_tipo = v.opcao(c.repasse_tipo, 'a forma de repasse', ['comissao', 'fixo', 'nenhum']);
@@ -147,6 +149,37 @@ module.exports = (db) => {
     res.status(204).end();
   });
 
+  /**
+   * Logo da administradora (ou do próprio ponto): aparece no alto do comunicado na tela.
+   * Envio com o arquivo no corpo: POST /locais/:id/logo
+   */
+  r.post('/locais/:id/logo', (req, res) => {
+    const l = db.prepare('SELECT * FROM locais WHERE id = ?').get(Number(req.params.id));
+    if (!l) throw naoEncontrado('Ponto');
+    const img = arquivos.salvarImagem(req.body);
+    const anterior = l.logo_arquivo;
+    db.prepare('UPDATE locais SET logo_arquivo = ?, logo_mime = ? WHERE id = ?').run(img.arquivo, img.mime, l.id);
+    if (anterior) arquivos.remover({ arquivo: anterior });
+    registrar(db, req, 'logo_do_ponto', { local_id: l.id, bytes: img.bytes });
+    res.status(201).json({ ok: true, largura: img.largura ?? null, altura: img.altura ?? null });
+  });
+
+  r.get('/locais/:id/logo', (req, res) => {
+    const l = db.prepare('SELECT logo_arquivo, logo_mime FROM locais WHERE id = ?').get(Number(req.params.id));
+    if (!l?.logo_arquivo) throw naoEncontrado('Logo');
+    res.set({ 'Content-Type': l.logo_mime, 'Cache-Control': 'private, max-age=86400' });
+    require('node:fs').createReadStream(arquivos.caminho({ arquivo: l.logo_arquivo })).pipe(res);
+  });
+
+  r.delete('/locais/:id/logo', (req, res) => {
+    const l = db.prepare('SELECT * FROM locais WHERE id = ?').get(Number(req.params.id));
+    if (!l?.logo_arquivo) throw naoEncontrado('Logo');
+    db.prepare('UPDATE locais SET logo_arquivo = NULL, logo_mime = NULL WHERE id = ?').run(l.id);
+    arquivos.remover({ arquivo: l.logo_arquivo });
+    registrar(db, req, 'logo_do_ponto_removida', { local_id: l.id });
+    res.status(204).end();
+  });
+
   /** Acesso do lojista ao portal do próprio ponto (senha provisória que ele troca depois). */
   r.post('/locais/:id/acesso', (req, res) => {
     const l = db.prepare('SELECT * FROM locais WHERE id = ?').get(Number(req.params.id));
@@ -199,6 +232,7 @@ module.exports = (db) => {
       local_id: local.id,
       nome: v.texto(req.body.nome, 'o nome da tela', 120),
       posicao: v.posicao(req.body.posicao),
+      layout: v.opcao(req.body.layout ?? 'cheia', 'o layout', ['cheia', 'dividida']),
       orientacao: v.opcao(req.body.orientacao ?? 'paisagem', 'a orientação', ['paisagem', 'retrato']),
       som: v.booleano(req.body.som) ? 1 : 0,
       relogio: req.body.relogio === undefined ? 1 : (v.booleano(req.body.relogio) ? 1 : 0),
@@ -218,6 +252,7 @@ module.exports = (db) => {
     const d = {};
     if (req.body.nome !== undefined) d.nome = v.texto(req.body.nome, 'o nome da tela', 120);
     if (req.body.posicao !== undefined) d.posicao = v.posicao(req.body.posicao);
+    if (req.body.layout !== undefined) d.layout = v.opcao(req.body.layout, 'o layout', ['cheia', 'dividida']);
     if (req.body.orientacao !== undefined) d.orientacao = v.opcao(req.body.orientacao, 'a orientação', ['paisagem', 'retrato']);
     if (req.body.status !== undefined) d.status = v.opcao(req.body.status, 'a situação', ['ativa', 'manutencao', 'inativa']);
     if (req.body.som !== undefined) d.som = v.booleano(req.body.som) ? 1 : 0;

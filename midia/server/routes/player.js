@@ -59,7 +59,7 @@ module.exports = (db) => {
   /** Programação atual da TV: o que rodar, em que ordem e por quanto tempo. */
   r.get('/programacao', autenticada, (req, res) => {
     const cfg = lerConfig(db);
-    const tela = db.prepare(`SELECT t.*, l.categoria, l.cidade, l.nome AS local_nome FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`).get(req.tela.id);
+    const tela = grade.buscarTela(db, req.tela.id);
     const g = grade.montar(db, tela);
     db.prepare('UPDATE telas SET grade_versao = ?, ultimo_contato = ?, ip = ? WHERE id = ?').run(g.versao, agora(), req.ip ?? null, tela.id);
     const avisoVale = tela.aviso && (!tela.aviso_ate || tela.aviso_ate >= agora());
@@ -80,7 +80,7 @@ module.exports = (db) => {
    */
   r.post('/batida', autenticada, (req, res) => {
     const cfg = lerConfig(db);
-    const tela = db.prepare(`SELECT t.*, l.categoria, l.cidade FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`).get(req.tela.id);
+    const tela = grade.buscarTela(db, req.tela.id);
     const anterior = db.prepare('SELECT tipo FROM telas_eventos WHERE tela_id = ? ORDER BY id DESC LIMIT 1').get(tela.id)?.tipo;
     if (anterior !== 'online' && anterior !== 'pareada') {
       db.prepare("INSERT INTO telas_eventos (tela_id, tipo, detalhe, criado_em) VALUES (?, 'online', ?, ?)")
@@ -137,6 +137,14 @@ module.exports = (db) => {
     }
     res.set('Content-Length', String(tamanho));
     return fs.createReadStream(caminho).pipe(res);
+  });
+
+  /** Logo da administradora do ponto, para o cabeçalho do comunicado na tela. */
+  r.get('/logo', autenticada, (req, res) => {
+    const l = db.prepare('SELECT logo_arquivo, logo_mime FROM locais WHERE id = ?').get(req.tela.local_id);
+    if (!l?.logo_arquivo) throw new ErroNegocio('Este ponto não tem logo.', 404);
+    res.set({ 'Content-Type': l.logo_mime, 'Cache-Control': 'private, max-age=86400' });
+    fs.createReadStream(arquivos.caminho({ arquivo: l.logo_arquivo })).pipe(res);
   });
 
   // Deixa a TV avisar que foi reiniciada (aparece no histórico do aparelho).

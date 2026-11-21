@@ -3,9 +3,9 @@ import { api, qs } from './api.js';
 import {
   el, limpar, $, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, marcar, area, lerForm, repetir,
   inteiro, dinheiro, dataHora, duracao, percentual, dataBr, etiqueta, etiquetaDe, situacao, centavos, reaisCampo,
-  CATEGORIAS, PREDIOS, POSICOES, REPASSES, ORIENTACOES, STATUS_TELA, STATUS_PONTO, STATUS_COMUNICADO, TIPOS_COMUNICADO, DIAS,
+  CATEGORIAS, PREDIOS, POSICOES, REPASSES, LAYOUTS, ORIENTACOES, STATUS_TELA, STATUS_PONTO, STATUS_COMUNICADO, TIPOS_COMUNICADO, DIAS,
 } from './ui.js';
-import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa } from './comum.js';
+import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa, enviarArquivo, BASE_API } from './comum.js';
 
 // ---------------------------------------------------------------- TVs
 export async function telasEquipe(ctx) {
@@ -60,6 +60,7 @@ function cartaoTela(t, recarregar) {
       el('h3', {}, t.nome),
       el('div', { class: 'pequeno mudo' }, `${t.local_nome}${t.posicao ? ` · ${t.posicao}` : ''} · ${t.cidade ?? ''} · ${ORIENTACOES[t.orientacao]}`),
       el('div', { class: 'linha' }, etiquetaDe(STATUS_TELA, t.status),
+        t.layout === 'dividida' ? etiqueta('Tela dividida', 'info') : null,
         t.versao_player ? el('span', { class: 'pequeno mudo' }, `player ${t.versao_player}`) : null),
       el('div', { class: 'pequeno mudo' }, t.ultimo_contato ? `Último contato: ${dataHora(t.ultimo_contato)}` : 'Nunca falou com o servidor'),
       t.aviso ? el('p', { class: 'aviso', style: 'margin:0' }, `Aviso na faixa: “${t.aviso}”`) : null,
@@ -113,6 +114,10 @@ const camposTela = (t = {}, opcoes) => [
   el('div', { class: 'duas' },
     escolha('Orientação', 'orientacao', ORIENTACOES, t.orientacao ?? 'paisagem'),
     t.id ? escolha('Situação', 'status', { ativa: 'Ativa', manutencao: 'Manutenção', inativa: 'Inativa' }, t.status ?? 'ativa') : null),
+  escolha('Layout da tela', 'layout', LAYOUTS, t.layout ?? 'cheia'),
+  el('p', { class: 'pequeno mudo', style: 'margin:-6px 0 0' },
+    'Dividida é o padrão de elevador: o comunicado do condomínio fica parado de um lado e a publicidade gira do outro. '
+    + 'Em tela cheia, o anúncio ocupa tudo e o comunicado entra no meio do carrossel.'),
   campo('Legenda fixa na faixa (opcional)', { name: 'legenda', value: t.legenda ?? '', maxlength: 200, placeholder: 'Ex.: Bem-vindo à Padaria Pão Quente' }),
   el('div', { class: 'linha' }, marcar('Som ligado nos vídeos', { name: 'som', checked: Boolean(t.som) }), marcar('Mostrar o relógio', { name: 'relogio', checked: t.id ? Boolean(t.relogio) : true })),
   area('Observação (opcional)', { name: 'observacao', maxlength: 500 }, t.observacao ?? ''),
@@ -234,6 +239,21 @@ async function abrirPonto(id, recarregar) {
     d.horarios.length
       ? el('div', { class: 'fichas' }, d.horarios.map((h) => el('span', { class: 'ficha' }, `${DIAS[h.dia_semana]} ${h.abre}–${h.fecha}`)))
       : vazio('Sem horário cadastrado: a TV conta como aberta o tempo todo.'),
+    el('h3', {}, 'Identidade nos comunicados'),
+    el('div', { class: 'linha' },
+      d.logo_arquivo
+        ? el('img', { src: `${BASE_API}/painel/locais/${d.id}/logo`, alt: 'Logo', style: 'max-height:54px;max-width:200px;object-fit:contain;background:#fff;border-radius:8px;padding:6px' })
+        : el('span', { class: 'mudo pequeno' }, 'Sem logo. A tela mostra só o nome.'),
+      el('button', { class: 'btn pequeno', onclick: () => { fechar(); enviarLogo(d, recarregar); } }, icone('enviar'), d.logo_arquivo ? 'Trocar logo' : 'Enviar logo'),
+      d.logo_arquivo ? el('button', {
+        class: 'btn pequeno perigo', onclick: (e) => acao(e.target, async () => {
+          await api.del(`/painel/locais/${d.id}/logo`);
+          toast('Logo removida.');
+          fechar();
+          recarregar();
+        }),
+      }, 'Remover') : null),
+    el('p', { class: 'pequeno mudo' }, `Assinatura: ${d.assinatura ?? `Administração / Síndico — ${d.nome}`}`),
     el('h3', {}, 'Comunicados do ponto'),
     el('p', { class: 'pequeno mudo', style: 'margin:0 0 8px' }, 'Recados do prédio ou da loja que entram no carrossel entre os anúncios.'),
     tabela([
@@ -293,6 +313,10 @@ function editarPonto(p, recarregar) {
       campo('Administradora / rede (opcional)', { name: 'administradora', value: p?.administradora ?? '', maxlength: 120 }),
       campo('Unidades (apartamentos, salas ou lojas)', { name: 'unidades', value: p?.unidades ?? 0, type: 'number', min: 0 }),
       campo('Passagens de pessoas por dia', { name: 'publico_dia', value: p?.publico_dia ?? 0, type: 'number', min: 0, step: 10 })),
+    campo('Assinatura dos comunicados (como aparece na tela)', {
+      name: 'assinatura', value: p?.assinatura ?? '', maxlength: 120,
+      placeholder: p ? `Administração / Síndico — ${p.nome}` : 'Administração / Síndico do Condomínio…',
+    }),
     el('fieldset', {}, el('legend', {}, 'Contrapartida ao ponto'),
       el('p', { class: 'pequeno mudo', style: 'margin:0' },
         'Em comércio costuma ser comissão sobre a receita; em condomínio, muitas vezes não há dinheiro — '
@@ -338,6 +362,30 @@ const criarAcessoLojista = (p, recarregar) => formModal(`Acesso ao portal — ${
     el('div', { class: 'linha entre' }, el('span', {}), el('button', { class: 'btn primario', onclick: () => fechar() }, 'Entendi')),
   ]);
 });
+
+/** Envio da logo da administradora (aparece no alto do comunicado na tela). */
+function enviarLogo(ponto, recarregar) {
+  return modal(`Logo — ${ponto.nome}`, (fechar) => {
+    const arquivo = el('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', required: true });
+    const ok = el('button', { class: 'btn primario largo' }, 'Enviar');
+    const f = el('form', { class: 'form' },
+      el('label', { class: 'campo' }, 'Imagem (PNG, JPG ou WEBP, até 3 MB)', arquivo),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Funciona melhor com fundo transparente ou claro, deitada. Ela aparece no alto do comunicado.'),
+      el('div', { class: 'linha entre' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Cancelar'), ok));
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      acao(ok, async () => {
+        const alvo = arquivo.files?.[0];
+        if (!alvo) throw new Error('Escolha a imagem.');
+        await enviarArquivo(`painel/locais/${ponto.id}/logo`, alvo);
+        toast('Logo enviada.');
+        fechar();
+        recarregar();
+      });
+    });
+    return f;
+  });
+}
 
 // ---------------------------------------------------------------- Comunicados dos pontos
 /**

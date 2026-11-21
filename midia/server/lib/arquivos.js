@@ -136,6 +136,18 @@ function salvar(conteudo, { duracaoInformada, duracaoImagemPadrao }) {
   };
 }
 
+/** Imagem simples (logo da administradora): só o arquivo, sem duração nem aprovação. */
+function salvarImagem(conteudo, maxBytes = 3 * 1024 * 1024) {
+  if (!Buffer.isBuffer(conteudo) || conteudo.length === 0) throw new ErroNegocio('Envie o arquivo da imagem.', 422);
+  if (conteudo.length > maxBytes) throw new ErroNegocio(`Imagem maior que ${Math.round(maxBytes / 1024)} kB.`, 413);
+  const t = detectarTipo(conteudo);
+  if (!t || t.tipo !== 'imagem') throw new ErroNegocio('Envie uma imagem (JPG, PNG ou WEBP).', 415);
+  const arquivo = `${crypto.randomBytes(20).toString('hex')}.${t.ext}`;
+  fs.mkdirSync(config.arquivos, { recursive: true });
+  fs.writeFileSync(path.join(config.arquivos, arquivo), conteudo, { flag: 'wx', mode: 0o600 });
+  return { arquivo, mime: t.mime, bytes: conteudo.length, ...(dimensoesImagem(conteudo, t.mime) ?? {}) };
+}
+
 const caminho = (m) => path.join(config.arquivos, path.basename(m.arquivo));
 
 /** Apaga o arquivo de uma mídia removida (o registro sai do banco em transação; o arquivo, aqui). */
@@ -151,4 +163,4 @@ const tamanhoNoDisco = () => {
   } catch { return 0; }
 };
 
-module.exports = { detectarTipo, dimensoesImagem, lerVideo, lerMp4, salvar, caminho, remover, sha256, orientacaoDe, tamanhoNoDisco };
+module.exports = { detectarTipo, dimensoesImagem, lerVideo, lerMp4, salvar, salvarImagem, caminho, remover, sha256, orientacaoDe, tamanhoNoDisco };

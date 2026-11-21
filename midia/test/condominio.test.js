@@ -112,6 +112,44 @@ test('Rede em condomínios: comunicados, circuitos e agência', async (t) => {
     assert.ok(!noMercado.itens.some((i) => i.formato === 'comunicado'), 'o recado do prédio não aparece em outro ponto');
   });
 
+  await t.test('tela dividida: o comunicado sai do carrossel e fica na zona ao lado', async () => {
+    // Antes: tela cheia, comunicado intercalado entre os anúncios.
+    const cheia = (await api.get(`/painel/grade/${elevador}`, master)).dados;
+    assert.ok(cheia.itens.some((i) => i.formato === 'comunicado'));
+    assert.equal(cheia.layout, 'cheia');
+    assert.deepEqual(cheia.comunicados, []);
+
+    const r = await api.patch(`/painel/telas/${elevador}`, { layout: 'dividida' }, master);
+    assert.equal(r.status, 200, JSON.stringify(r.dados));
+
+    const dividida = (await api.get(`/painel/grade/${elevador}`, master)).dados;
+    assert.equal(dividida.layout, 'dividida');
+    assert.ok(!dividida.itens.some((i) => i.formato === 'comunicado'), 'o carrossel fica só com publicidade');
+    assert.equal(dividida.comunicados.length, 1, 'o comunicado passa para a zona própria');
+    assert.equal(dividida.comunicados[0].titulo, 'Assembleia geral dia 12');
+    assert.equal(dividida.ponto.nome, 'Edifício Jardim das Acácias');
+    assert.equal(dividida.ponto.assinatura, 'Administração / Síndico — Edifício Jardim das Acácias');
+    assert.notEqual(dividida.versao, cheia.versao, 'mudar o layout muda a versão e a TV baixa de novo');
+  });
+
+  await t.test('logo da administradora aparece no comunicado', async () => {
+    await api.patch(`/painel/locais/${predio}`, { administradora: 'Administra Bem', assinatura: 'Administração / Síndico — Acácias' }, master);
+    const envio = await api.enviarArquivo(`/painel/locais/${predio}/logo`, png(420, 120), master);
+    assert.equal(envio.status, 201, JSON.stringify(envio.dados));
+
+    const g = (await api.get(`/painel/grade/${elevador}`, master)).dados;
+    assert.equal(g.ponto.logo, true);
+    assert.equal(g.ponto.administradora, 'Administra Bem');
+    assert.equal(g.ponto.assinatura, 'Administração / Síndico — Acácias');
+
+    const arquivo = await fetch(`${api.base}/painel/locais/${predio}/logo`, { headers: { Authorization: `Bearer ${master}` } });
+    assert.equal(arquivo.status, 200);
+    assert.equal(arquivo.headers.get('content-type'), 'image/png');
+
+    // Texto não vale como logo.
+    assert.equal((await api.enviarArquivo(`/painel/locais/${predio}/logo`, Buffer.from('não é imagem'), master)).status, 415);
+  });
+
   await t.test('a TV exibe o comunicado e isso entra na prova de exibição', async () => {
     const tv = api.aparelho();
     const reg = await tv.registrar({ aparelho: 'Mini PC do elevador', largura: 1080, altura: 1920, versao: '1.0' });
@@ -119,9 +157,14 @@ test('Rede em condomínios: comunicados, circuitos e agência', async (t) => {
     tv.usar((await tv.pareamento(reg.dados.codigo)).dados.token);
 
     const prog = await tv.programacao();
-    const item = prog.dados.grade.itens.find((i) => i.formato === 'comunicado');
+    // A tela agora é dividida: o comunicado vem na zona, não no carrossel.
+    const item = prog.dados.grade.comunicados[0];
     assert.equal(item.texto, 'Às 19h no salão de festas. Pauta: previsão orçamentária.');
-    assert.equal(item.local, 'Edifício Jardim das Acácias');
+    assert.equal(prog.dados.grade.ponto.nome, 'Edifício Jardim das Acácias');
+    assert.equal(prog.dados.grade.ponto.logo, true);
+
+    const logo = await fetch(`${api.base}/player/logo`, { headers: { Authorization: `Bearer ${tv.token}` } });
+    assert.equal(logo.status, 200, 'a TV baixa a logo da administradora');
 
     const agora = Date.now();
     const r = await tv.exibicoes([

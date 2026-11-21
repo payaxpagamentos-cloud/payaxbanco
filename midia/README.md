@@ -9,9 +9,10 @@ criativos, montagem automática da programação de cada tela, **prova de exibi�
 ou por agência) e a contrapartida de cada ponto.
 
 Em **condomínio**, a contrapartida normalmente não é dinheiro: é o espaço para os **comunicados do prédio** na própria
-tela — assembleia, manutenção do elevador, encomendas na portaria —, escritos pelo síndico e desenhados pela TV entre
-os anúncios. Em comércio, costuma ser comissão sobre a receita das telas daquele ponto. As duas formas convivem, e
-ainda há a de valor fixo por mês.
+tela — assembleia, manutenção do elevador, encomendas na portaria —, escritos pelo síndico. Na tela de elevador eles
+ficam **parados de um lado enquanto a publicidade gira do outro**, com a logo da administradora e a assinatura do
+síndico. Em comércio, a contrapartida costuma ser comissão sobre a receita das telas daquele ponto. As duas formas
+convivem, e ainda há a de valor fixo por mês.
 
 Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do repositório. Tema claro por padrão, com o escuro no botão do topo.
 
@@ -29,7 +30,8 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
    horário de funcionamento e a **contrapartida combinada** — comissão sobre a receita, valor fixo por mês ou nenhuma
    (o caso do condomínio que recebe os comunicados em troca).
 2. **Instale a tela** e abra `/midia/tv/` no aparelho. Ele mostra um código de 6 caracteres na tela. Diga também **onde
-   ela fica** dentro do ponto: elevador social, hall, portaria, recepção, fila do caixa.
+   ela fica** dentro do ponto (elevador social, hall, portaria, recepção, fila do caixa) e o **layout**: dividida,
+   com o comunicado do prédio parado ao lado da publicidade, ou tela cheia.
 3. **Pareie** em *TVs › Parear aparelho*: digite o código e escolha o ponto. Pronto — o aparelho já começa a exibir.
 4. **Monte os circuitos** (*Inventário*): o pacote que o comercial vende, como "Residencial Campinas" ou "Corporativo",
    com a audiência somada e o preço de tabela. O circuito se atualiza sozinho quando entra um ponto novo que bate na regra.
@@ -49,7 +51,8 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
 - **TVs**: um cartão por tela com o estado (no ar, sem contato, aguardando pareamento), onde ela fica no ponto, o que
   está no ar agora, pareamento, aviso na faixa e o detalhe de cada aparelho (programação atual, quedas, números do dia).
 - **Pontos**: condomínios, prédios e comércios, com telas no ar, unidades, passagens por dia, contrapartida combinada,
-  horário de funcionamento, comunicados, repasses e o acesso do responsável.
+  horário de funcionamento, comunicados, repasses, o acesso do responsável e a **identidade que vai no comunicado**
+  (logo da administradora e assinatura).
 - **Comunicados**: a fila dos recados dos pontos (vindos do portal do síndico ou do lojista) para a equipe aprovar,
   recusar com motivo ou escrever direto.
 - **Anunciantes e agências**: cadastro dos dois, campanhas, faturas e o acesso ao portal (com senha provisória).
@@ -93,17 +96,28 @@ O servidor monta a grade **na hora**, para cada tela, e o player só baixa de no
 
 A tela *Programação* mostra exatamente esse resultado, inclusive simulando outro dia e horário.
 
-## Comunicados do ponto
+## Comunicados do ponto e o layout da tela
 
-O recado do próprio ponto que entra no carrossel entre os anúncios. Em condomínio, é a moeda de troca pelo espaço.
+O recado do próprio ponto. Em condomínio, é a moeda de troca pelo espaço.
 
 - O **síndico (ou lojista) escreve no portal**: título, texto, tipo (aviso, manutenção, assembleia, entrega, urgente)
   e por quantos dias fica no ar. A equipe aprova em *Comunicados* — ou a plataforma pode ser configurada para que
   entrem direto (*Configurações › comunicado do ponto entra no ar direto*).
-- A **TV desenha o comunicado na hora**: letras grandes, tipo em destaque, nome do prédio e a data. Não existe arte
-  para produzir nem arquivo para baixar, e o texto aparece bem em tela deitada ou em pé.
+- A **tela desenha o comunicado na hora**: logo da administradora, tipo em destaque, nome do prédio, título em letras
+  grandes, o texto, a data e a assinatura ("Administração / Síndico — …"). Não existe arte para produzir nem arquivo
+  para baixar, e o mesmo texto se ajusta a tela deitada ou em pé.
 - Cada exibição entra na prova de exibição como tempo **não vendido**, então a ocupação da grade continua honesta.
 - Alterar um comunicado que já está no ar manda ele de volta para a conferência da equipe.
+
+Cada tela escolhe como mostra isso (*TVs › Editar › Layout da tela*):
+
+| Layout | Como fica |
+|---|---|
+| **Dividida** | O padrão de elevador: o comunicado fica **parado** numa parte da tela (44% deitada, 46% em pé) enquanto a **publicidade gira** na outra. Com vários comunicados no ar, eles se revezam nessa zona, no ritmo de cada um (no mínimo 15 segundos, para dar tempo de ler). |
+| **Tela cheia** | O anúncio ocupa a tela inteira e o comunicado entra **no meio do carrossel**, como mais um item. É o normal em comércio, onde quase não há recado do ponto. |
+
+Na tela dividida, o anúncio que não tem a proporção exata da zona é exibido **inteiro** (nada é cortado) sobre um
+fundo com a própria peça desfocada — em vez de barras pretas no meio do hall.
 
 ## Circuitos e inventário
 
@@ -147,7 +161,8 @@ Fire TV Stick, Chromecast com Google TV, mini PC, Raspberry Pi** ou no navegador
   a TV continua exibindo o que tem e mostra um aviso discreto; a fila de exibições é enviada quando a conexão volta.
 - **Imagem e vídeo** em tela cheia, com a próxima peça pré-carregada e transição suave. Vídeo roda até o fim; imagem,
   pelo tempo contratado. Vídeo entra sem som, a menos que a tela esteja configurada com som.
-- **Comunicados do ponto** desenhados pela própria TV (sem arquivo), com o tipo em destaque e o nome do prédio.
+- **Comunicados do ponto** desenhados pela própria TV (sem arquivo), em tela cheia ou na zona fixa ao lado da
+  publicidade, com a logo da administradora e a assinatura do síndico.
 - **Faixa de baixo** com relógio, a legenda fixa da tela e o aviso do lojista (quando houver).
 - **Troca de programação na virada do loop**, para nunca cortar um anúncio no meio.
 - Atalhos para quem instala: **i** mostra o diagnóstico do aparelho (TV, ponto, versão da grade, fila, conexão),
@@ -165,6 +180,7 @@ Quem quiser usar outro aparelho ou software pode falar direto com a API (`<ender
 | `POST /batida` | Diz que está vivo e o que está no ar; a resposta avisa se a grade mudou. |
 | `POST /exibicoes` | Prova de exibição em lote (até 500 por vez, sem duplicar): `midia_id` ou `comunicado_id`. |
 | `GET /midia/:id` | O arquivo, com cache longo e download parcial (vídeo). |
+| `GET /logo` | A logo da administradora do ponto, para o cabeçalho do comunicado. |
 
 As rotas usam `Authorization: Bearer <token do aparelho>`.
 
@@ -176,12 +192,12 @@ Requisitos: **Node.js 22.13+**.
 npm install
 npm run demo      # opcional: 6 pontos, 9 TVs, 5 anunciantes, campanhas e 31 dias de exibições
 npm start         # painel em http://localhost:3600/midia/ e player em http://localhost:3600/midia/tv/
-npm test          # 38 testes de aceite
+npm test          # 40 testes de aceite
 ```
 
 A demonstração monta uma rede com 3 condomínios residenciais, um condomínio comercial, academia, mercado, padaria e
-clínica — 15 telas entre elevadores, halls, portarias e áreas de atendimento —, 3 circuitos, 2 agências, campanhas com
-PI e comunicados de condomínio. Acessos: `operador@midia.com.br` / `operador-demo-2026`,
+clínica — 15 telas entre elevadores, halls, portarias e áreas de atendimento, sendo as dos prédios no layout dividido
+—, 3 circuitos, 2 agências, campanhas com PI e comunicados de condomínio. Acessos: `operador@midia.com.br` / `operador-demo-2026`,
 `anunciante@midia.com.br` / `anunciante-demo-2026`, `sindico@midia.com.br` e `lojista@midia.com.br` / `lojista-demo-2026`.
 O master é o configurado em `MIDIA_ADMIN_EMAIL` (padrão `master@midia.com.br` / `master123`).
 As TVs da demonstração aparecem como *sem contato* até um player de verdade se parear.

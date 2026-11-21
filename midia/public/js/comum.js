@@ -2,6 +2,9 @@
 import { el, icone, inteiro, dinheiro, duracao, mb, etiqueta } from './ui.js';
 import { BASE, sessao } from './api.js';
 
+/** Prefixo da API (para <img> que o navegador busca direto, como a logo do ponto). */
+export const BASE_API = `${BASE}/api`;
+
 export const cartao = (titulo, ...filhos) => el('div', { class: 'cartao' }, titulo ? el('h2', {}, titulo) : null, ...filhos);
 export const vazio = (texto) => el('p', { class: 'mudo', style: 'margin:6px 0' }, texto);
 export const carregando = () => el('p', { class: 'mudo' }, 'Carregando…');
@@ -87,6 +90,10 @@ export function linhaDoLoop(grade) {
     if (!cores.has(id)) cores.set(id, CORES_LOOP[cores.size % CORES_LOOP.length]);
     return cores.get(id);
   };
+  const zona = grade.layout === 'dividida' && grade.comunicados?.length
+    ? el('p', { class: 'pequeno mudo', style: 'margin:8px 0 0' },
+      `Tela dividida: ${grade.comunicados.length} comunicado(s) do ponto giram na zona ao lado, fora do carrossel.`)
+    : null;
   return el('div', {},
     el('div', { class: 'loop' }, grade.itens.map((i) => el('div', {
       class: `item${i.campanha_id ? '' : ' institucional'}`,
@@ -95,7 +102,8 @@ export function linhaDoLoop(grade) {
     }, i.duracao_s >= total / 14 ? `${i.duracao_s}s` : ''))),
     el('div', { class: 'loop-legenda' },
       el('span', {}, `Loop de ${duracao(grade.duracao_s)} · ${grade.itens.length} itens`),
-      el('span', {}, `${grade.ocupacao}% vendido · ${duracao(grade.institucional_s)} de institucional`)));
+      el('span', {}, `${grade.ocupacao}% vendido · ${duracao(grade.institucional_s)} de institucional`)),
+    zona);
 }
 
 /** Lista dos itens do loop, com miniatura. */

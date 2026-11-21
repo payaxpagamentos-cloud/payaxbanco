@@ -9,10 +9,17 @@
   <link rel="stylesheet" href="tv.css">
 </head>
 <body>
-  <!-- Duas camadas de exibição: enquanto uma está no ar, a outra já carrega o próximo item. -->
-  <div class="palco">
-    <div class="camada" id="camada-a"></div>
-    <div class="camada" id="camada-b"></div>
+  <!--
+    Palco da tela. Em "tela cheia" só existe a zona de anúncio (duas camadas: enquanto uma está no ar,
+    a outra já carrega o próximo item). Em "tela dividida", o comunicado do ponto fica parado de um lado
+    e a publicidade gira do outro — o padrão das telas de elevador.
+  -->
+  <div class="palco" id="palco">
+    <div class="zona-comunicado" id="zona-comunicado" hidden></div>
+    <div class="zona-anuncio">
+      <div class="camada" id="camada-a"></div>
+      <div class="camada" id="camada-b"></div>
+    </div>
   </div>
 
   <div class="espera" id="espera" hidden>

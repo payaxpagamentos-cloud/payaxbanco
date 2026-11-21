@@ -34,6 +34,11 @@ CREATE TABLE IF NOT EXISTS locais (
   nome TEXT NOT NULL,
   categoria TEXT NOT NULL DEFAULT 'outro',
   administradora TEXT,
+  -- Logo da administradora (ou do próprio ponto), que aparece no alto do comunicado na tela.
+  logo_arquivo TEXT,
+  logo_mime TEXT,
+  -- Assinatura do rodapé do comunicado (padrão: "Administração / Síndico" com o nome do ponto).
+  assinatura TEXT,
   unidades INTEGER NOT NULL DEFAULT 0 CHECK (unidades >= 0),
   repasse_tipo TEXT NOT NULL DEFAULT 'comissao' CHECK (repasse_tipo IN ('comissao','fixo','nenhum')),
   repasse_fixo_centavos INTEGER NOT NULL DEFAULT 0 CHECK (repasse_fixo_centavos >= 0),
@@ -72,6 +77,9 @@ CREATE TABLE IF NOT EXISTS telas (
   nome TEXT NOT NULL,
   -- Onde a tela está dentro do ponto: elevador social, hall, portaria, recepção, academia, fachada...
   posicao TEXT,
+  -- 'cheia': a publicidade ocupa a tela inteira e o comunicado entra no meio do carrossel.
+  -- 'dividida': o comunicado do ponto fica parado numa metade e a publicidade gira na outra (padrão de elevador).
+  layout TEXT NOT NULL DEFAULT 'cheia' CHECK (layout IN ('cheia','dividida')),
   orientacao TEXT NOT NULL DEFAULT 'paisagem' CHECK (orientacao IN ('paisagem','retrato')),
   status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa','manutencao','inativa')),
   som INTEGER NOT NULL DEFAULT 0,
@@ -420,6 +428,10 @@ const COLUNAS_NOVAS = [
   ['locais', 'repasse_tipo', "TEXT NOT NULL DEFAULT 'comissao'"],
   ['locais', 'repasse_fixo_centavos', 'INTEGER NOT NULL DEFAULT 0'],
   ['telas', 'posicao', 'TEXT'],
+  ['telas', 'layout', "TEXT NOT NULL DEFAULT 'cheia'"],
+  ['locais', 'logo_arquivo', 'TEXT'],
+  ['locais', 'logo_mime', 'TEXT'],
+  ['locais', 'assinatura', 'TEXT'],
   ['campanhas', 'agencia_id', 'INTEGER REFERENCES agencias(id)'],
   ['campanhas', 'circuito_id', 'INTEGER REFERENCES circuitos(id)'],
   ['campanhas', 'pi', 'TEXT'],

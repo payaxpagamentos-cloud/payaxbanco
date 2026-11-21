@@ -387,8 +387,7 @@ module.exports = (db) => {
 
   /** Simulação: como fica a grade de uma tela agora (ou num dia e hora escolhidos). */
   r.get('/grade/:telaId', (req, res) => {
-    const tela = db.prepare(`SELECT t.*, l.categoria, l.cidade, l.nome AS local_nome FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`)
-      .get(Number(req.params.telaId));
+    const tela = grade.buscarTela(db, Number(req.params.telaId));
     if (!tela) throw naoEncontrado('Tela');
     let instante = new Date();
     if (req.query.data || req.query.hora) {

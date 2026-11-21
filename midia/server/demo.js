@@ -64,16 +64,16 @@ function cartaz(largura, altura, [r, g, b]) {
 const PONTOS = [
   { nome: 'Edifício Jardim das Acácias', categoria: 'condominio_residencial', cidade: 'Campinas', bairro: 'Cambuí', publico_dia: 940, unidades: 96,
     administradora: 'Administra Bem', repasse: 'nenhum', comissao: 0, fixo: 0, responsavel: 'Síndico Paulo Rocha', telefone: '19988881111',
-    abre: '00:00', fecha: '23:59', telas: [['Elevador social 1', 'retrato', 'Elevador social'], ['Hall de entrada', 'paisagem', 'Hall de entrada']] },
+    abre: '00:00', fecha: '23:59', telas: [['Elevador social 1', 'retrato', 'Elevador social', 'dividida'], ['Hall de entrada', 'paisagem', 'Hall de entrada', 'dividida']] },
   { nome: 'Residencial Vista Verde', categoria: 'condominio_residencial', cidade: 'Campinas', bairro: 'Taquaral', publico_dia: 1240, unidades: 128,
     administradora: 'Administra Bem', repasse: 'fixo', comissao: 0, fixo: 30_000, responsavel: 'Síndica Marta Souza', telefone: '19988882222',
-    abre: '00:00', fecha: '23:59', telas: [['Elevador social 1', 'retrato', 'Elevador social'], ['Elevador social 2', 'retrato', 'Elevador social'], ['Portaria', 'paisagem', 'Portaria']] },
+    abre: '00:00', fecha: '23:59', telas: [['Elevador social 1', 'retrato', 'Elevador social', 'dividida'], ['Elevador social 2', 'retrato', 'Elevador social', 'dividida'], ['Portaria', 'paisagem', 'Portaria', 'dividida']] },
   { nome: 'Condomínio Alphaville Valinhos', categoria: 'condominio_residencial', cidade: 'Valinhos', bairro: 'Alphaville', publico_dia: 680, unidades: 74,
     administradora: 'Lar Gestão', repasse: 'nenhum', comissao: 0, fixo: 0, responsavel: 'Síndico Tiago Alves', telefone: '19988883333',
-    abre: '00:00', fecha: '23:59', telas: [['Hall social', 'retrato', 'Hall de entrada']] },
+    abre: '00:00', fecha: '23:59', telas: [['Hall social', 'retrato', 'Hall de entrada', 'dividida']] },
   { nome: 'Centro Empresarial Nações', categoria: 'condominio_comercial', cidade: 'Campinas', bairro: 'Centro', publico_dia: 2100, unidades: 180,
     administradora: 'Prime Facilities', repasse: 'fixo', comissao: 0, fixo: 60_000, responsavel: 'Gerente predial Helena Dias', telefone: '19988884444',
-    abre: '06:00', fecha: '22:00', telas: [['Elevador torre A', 'retrato', 'Elevador social'], ['Recepção', 'paisagem', 'Recepção']] },
+    abre: '06:00', fecha: '22:00', telas: [['Elevador torre A', 'retrato', 'Elevador social', 'dividida'], ['Recepção', 'paisagem', 'Recepção', 'dividida']] },
   { nome: 'Academia Força Total', categoria: 'academia', cidade: 'Campinas', bairro: 'Cambuí', publico_dia: 430, unidades: 0,
     administradora: null, repasse: 'comissao', comissao: 2500, fixo: 0, responsavel: 'Rafael Dias', telefone: '19988885555',
     abre: '06:00', fecha: '23:00', telas: [['TV da esteira', 'paisagem', 'Área de cardio'], ['Recepção', 'retrato', 'Recepção']] },
@@ -129,6 +129,14 @@ function criar(db) {
       VALUES (?, ?, ?, ?, ?, 'SP', ?, 'Rua Exemplo', ?, ?, ?, ?, ?, ?, ?, 'ativo', ?, ?)`,
       p.nome, p.categoria, p.administradora, p.unidades, p.cidade, p.bairro, String(100 + Math.floor(Math.random() * 900)), p.responsavel, p.telefone,
       p.publico_dia, p.repasse, p.comissao, p.fixo, somarDias(hoje(), -120), criado);
+    if (p.categoria.startsWith('condominio')) {
+      db.prepare('UPDATE locais SET assinatura = ? WHERE id = ?').run(`Administração / Síndico — ${p.nome}`, id);
+    }
+    // Logo da administradora no alto do comunicado (na demonstração, uma marca simples gerada aqui).
+    if (p.administradora) {
+      const img = arquivos.salvarImagem(cartaz(420, 120, [255, 255, 255]));
+      db.prepare('UPDATE locais SET logo_arquivo = ?, logo_mime = ? WHERE id = ?').run(img.arquivo, img.mime, id);
+    }
     // Condomínio tem tela ligada todo dia; comércio segue o horário de funcionamento (domingo só no mercado).
     const todoDia = p.categoria.startsWith('condominio');
     for (let d = 0; d <= 6; d++) {
@@ -141,12 +149,12 @@ function criar(db) {
   // As telas de cada ponto: elevador e hall em condomínio; fila do caixa, balcão e recepção no comércio.
   const telas = [];
   for (const p of pontos) {
-    for (const [nome, orientacao, posicao] of p.telas) {
+    for (const [nome, orientacao, posicao, layout = 'cheia'] of p.telas) {
       const retrato = orientacao === 'retrato';
       telas.push({
-        id: inserir(`INSERT INTO telas (local_id, nome, posicao, orientacao, status, relogio, legenda, pareada_em, aparelho, largura, altura, versao_player,
-            ultimo_contato, criado_em) VALUES (?, ?, ?, ?, 'ativa', 1, ?, ?, ?, ?, ?, '1.0', ?, ?)`,
-          p.id, nome, posicao, orientacao, p.categoria.startsWith('condominio') ? null : `Bem-vindo à ${p.nome}`, criado,
+        id: inserir(`INSERT INTO telas (local_id, nome, posicao, layout, orientacao, status, relogio, legenda, pareada_em, aparelho, largura, altura,
+            versao_player, ultimo_contato, criado_em) VALUES (?, ?, ?, ?, ?, 'ativa', 1, ?, ?, ?, ?, ?, '1.0', ?, ?)`,
+          p.id, nome, posicao, layout, orientacao, p.categoria.startsWith('condominio') ? null : `Bem-vindo à ${p.nome}`, criado,
           retrato ? 'Mini PC' : 'TV Box Android 11', retrato ? 1080 : 1920, retrato ? 1920 : 1080, agora(), criado),
         local_id: p.id,
         ponto: p,

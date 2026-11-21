@@ -54,6 +54,7 @@ export const PREDIOS = ['condominio_residencial', 'condominio_comercial', 'predi
 /** Sugestões de onde a tela fica dentro do ponto. */
 export const POSICOES = ['Elevador social', 'Elevador de serviço', 'Hall de entrada', 'Portaria', 'Recepção', 'Salão de festas',
   'Academia do prédio', 'Corredor', 'Fila do caixa', 'Balcão', 'Sala de espera', 'Vitrine', 'Fachada'];
+export const LAYOUTS = { cheia: 'Tela cheia (anúncio ocupa tudo)', dividida: 'Dividida (comunicado ao lado da publicidade)' };
 export const REPASSES = { comissao: 'Comissão sobre a receita', fixo: 'Valor fixo por mês', nenhum: 'Sem repasse em dinheiro' };
 export const TIPOS_COMUNICADO = { aviso: 'Aviso', manutencao: 'Manutenção', assembleia: 'Assembleia', entrega: 'Entrega', urgente: 'Urgente' };
 export const STATUS_COMUNICADO = { pendente: ['Aguardando aprovação', 'aviso'], aprovado: ['No ar', 'ok'], recusado: ['Recusado', 'erro'] };
