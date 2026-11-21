@@ -8,7 +8,7 @@ const { registrar } = require('../lib/auditoria');
 const { listaPaginada, like, conferirVersao, csv } = require('../lib/http');
 const { dataLocal } = require('../lib/datas');
 const { endereco } = require('../lib/enderecos');
-const fat = require('../lib/faturamento');
+const ficha = require('../lib/ficha');
 const v = require('../lib/validacao');
 
 
@@ -82,25 +82,14 @@ module.exports = (db) => {
     res.status(201).json(buscar(req, id));
   });
 
+  /*
+   * Ficha do assinante: a resposta traz TUDO que se sabe do cliente — cadastro, contratos com o serviço no
+   * equipamento, faturas com itens e baixas, bloqueios, confianças, o que a régua já fez, chamados e uma linha
+   * do tempo unificada. É uma chamada só porque é uma conversa só: quem atende precisa do todo ao mesmo tempo.
+   * Cada seção respeita a permissão de quem pediu, e o que ficou de fora vem em `secoes_ocultas`.
+   */
   r.get('/:id', exigir('assinantes.ver'), (req, res) => {
-    const a = buscar(req, req.params.id);
-    const d = hoje(req);
-    const organizacao = db.prepare('SELECT * FROM organizacoes WHERE id = ?').get(req.org);
-    const contratos = db.prepare(`SELECT c.*, p.nome AS plano_nome, p.download_mbps, p.upload_mbps, ar.codigo AS cto_codigo, pr.numero AS porta_numero
-      FROM contratos c JOIN planos p ON p.id = c.plano_id LEFT JOIN ativos_rede ar ON ar.id = c.cto_id LEFT JOIN portas_rede pr ON pr.id = c.porta_id
-      WHERE c.assinante_id = ? ORDER BY c.numero DESC`).all(a.id);
-    const faturas = db.prepare('SELECT * FROM faturas WHERE assinante_id = ? ORDER BY vencimento DESC, id DESC LIMIT 36').all(a.id);
-    res.json({
-      ...a,
-      contratos: contratos.map((c) => ({ ...c, posicao: fat.posicaoDoContrato(db, c.id, d),
-        bloqueio: db.prepare('SELECT * FROM bloqueios WHERE contrato_id = ? AND fim IS NULL').get(c.id) ?? null })),
-      faturas: faturas.map((f) => ({ ...f, encargos: fat.encargos(f, organizacao, d) })),
-      posicao: {
-        saldo_centavos: faturas.filter((f) => ['aberta', 'parcial'].includes(f.situacao)).reduce((s, f) => s + (f.valor_centavos - f.pago_centavos), 0),
-        vencidas: faturas.filter((f) => ['aberta', 'parcial'].includes(f.situacao) && f.vencimento < d).length,
-        devido_centavos: faturas.filter((f) => ['aberta', 'parcial'].includes(f.situacao)).reduce((s, f) => s + fat.encargos(f, organizacao, d).total_devido_centavos, 0),
-      },
-    });
+    res.json(ficha.montar(db, { org: req.org, assinante: buscar(req, req.params.id), perfil: req.usuario.perfil, hoje: hoje(req) }));
   });
 
   r.patch('/:id', exigir('assinantes.editar'), (req, res) => {

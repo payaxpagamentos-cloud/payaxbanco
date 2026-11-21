@@ -21,7 +21,8 @@ integração dele, recebe as medições da rede por um **coletor** autenticado e
 | 3 | **Rede óptica** | POPs, CEOs e CTOs com coordenadas validadas; portas com reserva (validade e responsável), ocupação, defeito e histórico; ligações com percurso até o POP (trecho desconhecido explícito); fusões por bandeja sem extremidade repetida; cabos; equipamentos ativos (OLT/PON). Situação de CTO/CEO sempre com a origem: inspeção manual ou inferência pelo equipamento ativo. |
 | 4 | **Chamados técnicos** | Kanban e lista; aberto → atribuído → em rota → em execução → concluído (em validação) → aprovado/retornado, com cancelar, reagendar e reabrir auditados. Atribuição recusa veículo indisponível (com o motivo) e sinaliza conflito de agenda. Checklist versionado por tipo (potência antes/depois, foto, porta…), evidências por câmera, interface do técnico no celular. |
 | 5 | **Equipe e comissões** | Técnicos, produtividade por período (concluídos, aprovados, tempo médio, prazo, retrabalho), regras versionadas (valor fixo ou valor × quantidade do checklist), conferência (ninguém aprova a própria), rateio da equipe, ajustes/estornos e **registro administrativo** de pagamento com comprovante. |
-| 6 | **Assinantes** | Pessoa física e jurídica com CPF/CNPJ conferido pelo dígito e único na operação, endereço georreferenciado, contatos, consentimento de contato comercial (LGPD) e posição financeira. Situação comercial (prospecto → cliente → inativo) mantida pelo próprio sistema; o estado do serviço é do contrato, nunca copiado. |
+| 6 | **Assinantes** | Pessoa física e jurídica com CPF/CNPJ conferido pelo dígito e único na operação, endereço georreferenciado, contatos, consentimento de contato comercial (LGPD) e posição financeira. Situação comercial (prospecto → cliente → inativo) mantida pelo próprio sistema; o estado do serviço é do contrato, nunca copiado. Abrir um assinante abre a **ficha**: uma tela só. |
+| 6.1 | **Ficha do assinante** | Tudo do cliente numa resposta e numa tela: alertas do que precisa ser dito primeiro, indicadores, contratos com itens e serviço no equipamento, faturas com itens e baixas, bloqueios e confianças, o que a régua já fez, chamados e uma **linha do tempo unificada** (contrato, faturamento, cobrança e atendimento, cada fato uma vez só). Trocar de aba não vai ao servidor, e nenhuma ação — baixa, estorno, corte, religação, confiança, sincronizar, novo contrato, cobrança avulsa — leva para outra tela. As abas que o perfil não pode ver não aparecem. |
 | 7 | **Contratos** | O serviço de um assinante num endereço: plano, mensalidade contratada (independente da tabela de preços de hoje), dia de vencimento, fidelidade, ponto na planta (CTO e porta, ocupada de verdade na ativação) e itens fixos por competência (SVA, aluguel de equipamento, ponto adicional, desconto). Ciclo em implantação → ativo → bloqueado/suspenso → cancelado, cada passo com quem fez, de onde veio e por quê. |
 | 8 | **Faturamento** | Ciclo mensal **simulável quantas vezes quiser** antes de emitir, com o que será cobrado de cada contrato e o motivo de cada contrato fora do ciclo; **pró-rata** de entrada e de saída (e adiada quando o vencimento do mês de entrada já passou); instalação cobrada uma vez; competência que não roda duas vezes; multa e juros calculados no dia do pagamento, sem alterar o valor da fatura; baixa total ou parcial, estorno com motivo, cancelamento e cobrança avulsa. |
 | 9 | **Cobrança e bloqueios** | Régua versionada por dias em relação ao vencimento (avisar, bloquear, indicar para cancelamento), carência que prevalece sobre qualquer regra, execução idempotente (a mesma regra nunca roda duas vezes na mesma fatura), bloqueio que guarda a regra e a fatura que o originou, **desbloqueio de confiança** com prazo e limite anual, desbloqueio automático na quitação e inadimplência por faixa de atraso. |
@@ -60,7 +61,7 @@ Requisitos: **Node.js 22.13+**.
 cd network
 npm install
 npm start          # http://localhost:3500/  (com NETWORK_BASE_PATH=/network → http://localhost:3500/network/)
-npm test           # 153 testes de aceite (inclui o rastreador real, se rastreador/node_modules existir)
+npm test           # 165 testes de aceite (inclui o rastreador real, se rastreador/node_modules existir)
 ```
 
 Acesso inicial: `admin@managernetwork.local` / `admin12345` (defina `NETWORK_ADMIN_EMAIL` e `NETWORK_ADMIN_SENHA`; em produção a senha é obrigatória).
@@ -203,6 +204,7 @@ com `{servico}`, cabeçalho de autenticação, credencial e onde ler o volume de
 - **O que o driver não sabe fazer, ele declara**: a ação é recusada com o motivo. Nenhuma tela diz "aplicado" sem ter aplicado.
 - **A consulta pública é sugestão, não cadastro**: a resposta diz a fonte e o horário, os campos preenchidos ficam marcados, e quem salva é a pessoa.
 - **"Está tudo certo" só se diz do que foi lido**: com serviço nunca lido, a tela diz que não sabe.
+- **Uma tela por assunto, não uma tela por tabela**: a ficha do assinante responde "ele pagou?", "está cortado?", "qual o login dele?" e "abriu chamado?" sem trocar de tela, porque é tudo a mesma conversa.
 - **Segredos** só no servidor (cifrados), nunca em respostas ou na auditoria; anexos por link temporário assinado e permissão por recurso.
 
 ## Arquitetura
@@ -214,6 +216,7 @@ network/
     auth.js            # token HMAC e exigir(permissão)
     lib/permissoes.js  # matriz perfil × permissão
     drivers/           # contrato único por fabricante: base (HTTP com TLS por equipamento), index (registro), mikrotik
+    lib/ficha.js       # a ficha do assinante inteira numa resposta, filtrada pela permissão do perfil
     lib/provisionamento.js # estado desejado x real, divergências, fila, reconciliação
     lib/consultas.js   # CNPJ e CEP com cache, queda de fonte e degradação honesta
     lib/faturamento.js # pró-rata, ciclo, encargos, baixa, estorno

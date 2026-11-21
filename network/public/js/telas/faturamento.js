@@ -249,7 +249,8 @@ async function detalhe(alvo, id, ir) {
           : el('p', { class: 'fraco' }, 'A régua ainda não alcançou esta fatura.')))));
 }
 
-function baixa(f, depois) {
+/** Formulário de baixa, usado na tela de faturamento e na ficha do assinante. */
+export function baixa(f, depois) {
   const saldo = f.valor_centavos - f.pago_centavos;
   const real = (c) => (c / 100).toFixed(2).replace('.', ',');
   return formulario(`Baixa da fatura #${f.numero}`, [

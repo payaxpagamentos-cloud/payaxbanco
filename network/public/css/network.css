@@ -402,6 +402,31 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 /* O painel TV é lido a metros de distância: nada de transparência ali. */
 .modo-tv, .modo-tv * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 
+/* ---------------- Blocos que abrem no lugar (ficha do assinante) ---------------- */
+/*
+ * Na ficha, nada leva para outra tela: fatura, serviço no equipamento e histórico do contrato abrem aqui
+ * mesmo. <details> faz isso sem estado em JS e já vem acessível pelo teclado.
+ */
+.bloco-expansivel { border-top: 1px solid var(--borda); }
+.bloco-expansivel:first-child { border-top: 0; }
+.bloco-expansivel > summary {
+  cursor: pointer; padding: 11px 2px; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  list-style: none; border-radius: var(--raio-ctl);
+}
+.bloco-expansivel > summary::-webkit-details-marker { display: none; }
+.bloco-expansivel > summary::before {
+  content: ''; width: 7px; height: 7px; flex-shrink: 0; border-right: 1.6px solid var(--texto-3); border-bottom: 1.6px solid var(--texto-3);
+  transform: rotate(-45deg); transition: transform 0.18s; margin-left: 4px;
+}
+.bloco-expansivel[open] > summary::before { transform: rotate(45deg); }
+.bloco-expansivel > summary:hover { background: var(--verde-suave); }
+.bloco-expansivel > summary .fraco { color: var(--texto-3); font-weight: 400; }
+.bloco-expansivel > summary .num { margin-left: auto; font-variant-numeric: tabular-nums; }
+.bloco-expansivel .detalhe-fatura { padding: 4px 0 18px 23px; display: grid; gap: 12px; }
+.bloco-expansivel .detalhe-fatura .aviso-faixa { margin-bottom: 0; }
+.bloco-expansivel > :not(summary) { padding-left: 23px; }
+.linha-tempo li.grave strong { color: var(--vermelho); }
+
 /* ---------------- Campo com consulta (CNPJ, CEP) ---------------- */
 .campo-com-acao { display: flex; gap: 8px; align-items: center; }
 .campo-com-acao input { flex: 1; min-width: 0; }
