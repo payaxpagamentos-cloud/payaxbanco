@@ -1,23 +1,24 @@
 /*
- * Tela de entrada do Manager Provedor.
+ * Tela de entrada do Manager Provedor — versão data center.
  *
  * Folha separada e inteiramente escopada em ".m-login-page": a tela de login tem proporções próprias
- * (cartão de vidro de 420 px, esfera, tipografia grande) que não têm nada a ver com o resto do sistema,
- * e misturar as duas faria qualquer ajuste de uma quebrar a outra.
- *
- * Veio do pacote de design aprovado. Não faz nenhuma requisição externa: o grão do fundo é um SVG em
- * data URI e a tipografia usa as fontes do sistema (Inter, se o navegador já tiver).
- *
- * Os pontos de ajuste cobrem notebook de pouca altura, tablet e celular; em tela baixa a página rola
- * em vez de cortar o formulário, e os campos têm 16 px para o navegador do celular não dar zoom sozinho.
+ * (cartão de vidro de até 480 px, tipografia grande, fundo sangrando) que não têm nada a ver com o resto
+ * do sistema, e misturar as duas faria qualquer ajuste de uma quebrar a outra.
  *
  * TODO seletor está prefixado com ".m-login-page" de propósito. O sistema tem uma regra global
  * "input[type=email], input[type=password], ... { font-size: 14px }", cuja especificidade (0,1,1) vence
  * uma classe sozinha (0,1,0) — carregar esta folha depois não resolveria. Sem o prefixo, os campos do
  * login voltariam a 14 px e o Safari do iPhone daria zoom sozinho ao focar cada um deles.
+ *
+ * O fundo é o data center da arte aprovada, convertido de PNG para WebP: 49 KB no lugar de 1,45 MB, com
+ * diferença imperceptível (erro médio de 0,8 em 255). Numa tela que carrega antes de qualquer sessão, e
+ * muitas vezes de um tablet em campo, um megabyte e meio de imagem é tempo de espera sem contrapartida.
+ * Em navegador sem WebP a imagem simplesmente não aparece e fica o verde escuro do fundo — a tela
+ * continua inteiramente utilizável.
  */
 .m-login-page {
   --m-bg: #041c14; --m-ink: #082d22; --m-muted: #426b5c;
+  --m-background-image: url("../img/datacenter.webp");
   --m-green: #008652; --m-mint: #a3f3cc; --m-radius: 28px;
   position: relative; isolation: isolate; min-height: 100svh; width: 100%;
   overflow: hidden; color: #f5fff9; background: var(--m-bg);
@@ -32,53 +33,41 @@
 .m-login-page :focus-visible { outline: 3px solid #63d9a2; outline-offset: 4px; }
 .m-login-page [hidden] { display: none !important; }
 .m-login-page .m-atmosphere { position: absolute; inset: 0; z-index: -2; pointer-events: none;
-  background: radial-gradient(ellipse at 99% -4%, rgba(146,252,194,.82), transparent 38%),
-    radial-gradient(ellipse 60% 48% at 78% 46%, rgba(44,170,110,.46), transparent 62%),
-    radial-gradient(ellipse 44% 40% at 40% 66%, rgba(26,168,105,.34), transparent 60%),
-    radial-gradient(ellipse 70% 52% at 8% 4%, rgba(2,20,14,.72), transparent 64%),
-    linear-gradient(118deg, #021309 0%, #04281a 58%, #0b4530 100%);
+  background-image: linear-gradient(180deg, rgba(0,15,10,.08), rgba(0,22,15,.04)), var(--m-background-image);
+  background-position: center center; background-size: cover; background-repeat: no-repeat;
 }
 .m-login-page .m-atmosphere::after { content: ''; position: absolute; inset: 0; opacity: .045;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='.8' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-/*
- * O rastro de luz que atravessa o fundo. Tudo aqui é desfocado de propósito: uma borda nítida vira um
- * vinco atravessando a tela, que é exatamente o que a arte NÃO tem — ali a luz é um sopro.
- */
-.m-login-page .m-light-trail { position: absolute; width: 170%; height: 50%; left: -38%; top: 37%; border-radius: 50%;
-  border-bottom: 2px solid rgba(160,255,212,.30); transform: rotate(-20deg); z-index: -1; pointer-events: none;
-  filter: blur(2.5px);
-}
-.m-login-page .m-light-trail::before { content: ''; position: absolute; inset: -70px 0 70px; border-radius: inherit;
-  border-bottom: 2px solid rgba(126,246,190,.16); filter: blur(9px); }
-.m-login-page .m-light-trail::after { content: ''; position: absolute; inset: 34px 0 -34px; border-radius: inherit;
-  border-bottom: 5px solid rgba(118,243,185,.13); filter: blur(16px); }
-.m-login-page .m-shell { width: min(100%, 1640px); min-height: 100svh; margin: 0 auto; padding: 36px clamp(28px, 4.6vw, 76px) 24px;
+
+
+.m-login-page .m-shell { width: min(100%, 1800px); min-height: 100svh; margin: 0 auto; padding: 36px clamp(28px, 4vw, 80px) 24px;
   display: grid; grid-template-rows: auto 1fr auto; row-gap: 24px; }
 .m-login-page .m-header { display: flex; align-items: center; min-height: 48px; }
 .m-login-page .m-brand { display: inline-flex; align-items: center; gap: 13px; user-select: none; }
-.m-login-page .m-mark { width: 55px; height: 36px; flex: none; display: block; overflow: visible; }
+.m-login-page .m-mark { width: 62px; height: 39px; flex: none; display: block; overflow: visible; }
 .m-login-page .m-wordmark { display: flex; flex-direction: column; }
-.m-login-page .m-wordmark strong { font-size: 32px; line-height: 1; letter-spacing: -1.3px; font-weight: 700; }
+.m-login-page .m-wordmark strong { font-size: clamp(30px, 2.15vw, 37px); line-height: 1; letter-spacing: -1.3px; font-weight: 700; }
 .m-login-page .m-wordmark span { font-size: 10px; letter-spacing: 5.1px; margin-top: 7px; font-weight: 500; color: #c3ddcd; }
-.m-login-page .m-main { display: grid; grid-template-columns: minmax(0, 1.38fr) minmax(350px, 420px);
-  align-items: center; gap: clamp(36px, 5vw, 94px); padding: 20px 0; }
-.m-login-page .m-hero { position: relative; min-height: 600px; align-self: stretch; display: flex; flex-direction: column; justify-content: flex-start; }
-.m-login-page .m-hero-copy { position: relative; z-index: 2; padding-top: 12px; pointer-events: none; }
+.m-login-page .m-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(350px, min(28.7vw, 480px));
+  align-items: center; gap: clamp(36px, 5vw, 84px); padding: 20px clamp(0px, 4.7vw, 80px); }
+.m-login-page .m-hero { position: relative; min-height: 440px; align-self: stretch; display: flex; flex-direction: column; justify-content: flex-start; }
+.m-login-page .m-hero-copy { position: relative; z-index: 2; padding-top: clamp(32px, 6vh, 66px); pointer-events: none; }
 .m-login-page .m-headline { margin: 0; max-width: 760px; font-size: clamp(46px, 4.55vw, 73px); font-weight: 650; line-height: 1.06; letter-spacing: -.05em; text-wrap: balance; }
 .m-login-page .m-headline .m-line { display: block; }
-.m-login-page .m-headline em { font-style: normal; color: var(--m-mint); }
-.m-login-page .m-hero-lead { font-size: clamp(16px, 1.3vw, 19px); line-height: 1.55; color: #b5d3bf; margin: 22px 0 0; max-width: 480px; }
-.m-login-page .m-sphere { position: absolute; width: min(640px, 111%); aspect-ratio: 1; right: -40px; bottom: -90px; z-index: 0; pointer-events: none; }
-.m-login-page .m-sphere canvas { width: 100%; height: 100%; display: block; }
-.m-login-page .m-features { display: flex; align-items: center; gap: 0; padding: 0; margin: auto 0 2px; list-style: none; position: relative; z-index: 3; }
-.m-login-page .m-features li { display: inline-flex; align-items: center; gap: 12px; color: #e0f4e8; font-size: 13px; white-space: nowrap; }
-.m-login-page .m-features li + li { border-left: 1px solid rgba(171,233,197,.35); margin-left: 28px; padding-left: 28px; }
-.m-login-page .m-features svg { width: 25px; height: 25px; color: #a8dcbf; flex: none; stroke-width: 1.3; }
+.m-login-page .m-headline .m-line:nth-child(2) { padding-left: 14px; }
+.m-login-page .m-headline em { display: block; padding-left: 32px; font-style: normal; color: var(--m-mint); }
+.m-login-page .m-hero-lead { font-size: clamp(16px, 1.3vw, 19px); line-height: 1.55; color: #d3e7dc; margin: 22px 0 0 60px; max-width: 520px; }
+
+
+
+
+
+
 .m-login-page .m-login-card { width: 100%; padding: 32px; color: var(--m-ink); border: 1px solid rgba(224,255,234,.8); border-radius: var(--m-radius);
-  background: linear-gradient(138deg, rgba(243,253,247,.94), rgba(218,240,228,.88) 62%, rgba(203,232,215,.90));
+  background: linear-gradient(138deg, rgba(235,251,240,.88), rgba(203,233,217,.75) 66%, rgba(189,222,204,.78));
   -webkit-backdrop-filter: blur(28px) saturate(1.15); backdrop-filter: blur(28px) saturate(1.15);
-  box-shadow: 0 28px 90px rgba(0,17,10,.30), inset 0 1px 2px rgba(255,255,255,.92), 0 0 60px rgba(115,252,172,.07);
+  box-shadow: 0 24px 80px rgba(0,17,10,.23), inset 0 1px 2px rgba(255,255,255,.86), 0 0 50px rgba(115,252,172,.04);
   position: relative; z-index: 4; }
 .m-login-page .m-card-mark { width: 54px; height: 35px; margin-bottom: 18px; }
 .m-login-page .m-card-title { font-size: 34px; font-weight: 700; letter-spacing: -1.3px; line-height: 1.15; margin: 0; }
@@ -89,11 +78,11 @@
 .m-login-page .m-label { font-size: 14px; font-weight: 600; line-height: 1.4; }
 .m-login-page .m-input-wrap { display: flex; align-items: center; position: relative; }
 .m-login-page .m-input { width: 100%; min-width: 0; height: 50px; border: 1px solid rgba(255,255,255,.66); border-radius: 11px;
-  background: rgba(255,255,255,.72); color: #113526; font-size: 16px; padding: 0 15px;
+  background: rgba(255,255,255,.57); color: #143e2d; font-size: 16px; padding: 0 15px;
   box-shadow: 0 1px 3px rgba(9,65,37,.025); transition: border-color .18s, box-shadow .18s, background .18s; }
 .m-login-page .m-input::placeholder { color: #658276; opacity: 1; }
-.m-login-page .m-input:hover { background: rgba(255,255,255,.82); }
-.m-login-page .m-input:focus { outline: none; border-color: #228b60; background: rgba(255,255,255,.93); box-shadow: 0 0 0 3px rgba(26,142,89,.13); }
+.m-login-page .m-input:hover { background: rgba(255,255,255,.69); }
+.m-login-page .m-input:focus { outline: none; border-color: #228b60; background: rgba(255,255,255,.8); box-shadow: 0 0 0 3px rgba(26,142,89,.13); }
 .m-login-page .m-input-email { padding-left: 45px; }
 .m-login-page .m-input-password { padding-right: 54px; letter-spacing: .12em; }
 .m-login-page .m-input-password[type='text'] { letter-spacing: normal; }
@@ -130,11 +119,12 @@
   .m-login-page .m-shell { padding-top: 22px; padding-bottom: 16px; row-gap: 14px; }
   .m-login-page .m-header { min-height: 40px; }
   .m-login-page .m-wordmark strong { font-size: 29px; }
-  .m-login-page .m-main { padding: 0; }
+  .m-login-page .m-main { padding-top: 0; padding-bottom: 0; }
+  .m-login-page .m-hero-copy { padding-top: 30px; }
   .m-login-page .m-hero { min-height: 490px; }
   .m-login-page .m-headline { font-size: clamp(42px, 4.2vw, 62px); }
-  .m-login-page .m-hero-lead { margin-top: 16px; font-size: 16px; max-width: 400px; }
-  .m-login-page .m-sphere { width: min(520px, 114%); bottom: -145px; right: -20px; }
+  .m-login-page .m-hero-lead { margin-left: 20px; margin-top: 16px; font-size: 16px; max-width: 400px; }
+
   .m-login-page .m-login-card { padding: 25px 28px; border-radius: 25px; }
   .m-login-page .m-card-mark { display: none; }
   .m-login-page .m-card-title { font-size: 31px; }
@@ -144,17 +134,17 @@
   .m-login-page .m-options { margin-bottom: 9px; }
   .m-login-page .m-submit { min-height: 48px; }
   .m-login-page .m-card-note { margin-top: 17px; }
-  .m-login-page .m-features li + li { margin-left: 18px; padding-left: 18px; }
-  .m-login-page .m-features li { font-size: 12px; gap: 8px; }
+
+
 }
 @media (max-width: 1100px) and (min-width: 901px) {
-  .m-login-page .m-main { gap: 32px; grid-template-columns: minmax(0, 1fr) minmax(330px, 380px); }
+  .m-login-page .m-main { padding-left: 0; padding-right: 0; gap: 32px; grid-template-columns: minmax(0, 1fr) minmax(330px, 380px); }
   .m-login-page .m-login-card { padding: 28px; }
   .m-login-page .m-headline { font-size: 49px; }
-  .m-login-page .m-sphere { right: -65px; width: 118%; }
-  .m-login-page .m-features li + li { margin-left: 15px; padding-left: 15px; }
-  .m-login-page .m-features li { font-size: 11px; gap: 7px; }
-  .m-login-page .m-features svg { width: 22px; height: 22px; }
+
+
+
+
 }
 @media (min-width: 901px) and (max-height: 740px) {
   .m-login-page .m-shell { padding-top: 18px; padding-bottom: 14px; row-gap: 10px; }
@@ -168,7 +158,7 @@
   .m-login-page .m-options { margin-bottom: 7px; }
   .m-login-page .m-card-note { margin-top: 12px; font-size: 11px; }
   .m-login-page .m-headline { font-size: clamp(40px, 4vw, 57px); }
-  .m-login-page .m-sphere { width: min(520px, 114%); bottom: -145px; right: -20px; }
+
 }
 @media (max-width: 900px) {
   .m-login-page .m-shell { padding: 27px clamp(20px, 6vw, 50px) 22px; row-gap: 28px; max-width: 660px; }
@@ -181,17 +171,19 @@
   .m-login-page .m-hero { min-height: auto; align-self: center; width: min(100%, 420px); }
   .m-login-page .m-hero-copy { padding-top: 0; }
   .m-login-page .m-headline { font-size: clamp(29px, 5.4vw, 39px); line-height: 1.13; letter-spacing: -.04em; max-width: 480px; }
-  .m-login-page .m-headline .m-line { display: inline; }
+  .m-login-page .m-headline .m-line { display: inline; padding-left: 0; }
+  .m-login-page .m-headline .m-line:nth-child(2) { padding-left: 0; }
+  .m-login-page .m-headline em { display: inline; padding-left: 0; }
   .m-login-page .m-headline .m-line::after { content: ' '; }
-  .m-login-page .m-hero-lead { font-size: 14px; line-height: 1.5; margin-top: 12px; max-width: 380px; }
-  .m-login-page .m-sphere, .m-login-page .m-features { display: none; }
+  .m-login-page .m-hero-lead { font-size: 14px; line-height: 1.5; margin: 12px 0 0; max-width: 380px; }
+
   .m-login-page .m-login-card { max-width: 420px; padding: 28px; border-radius: 24px; }
   .m-login-page .m-card-mark { display: none; }
   .m-login-page .m-card-title { font-size: 30px; }
   .m-login-page .m-card-subtitle { margin: 7px 0 24px; font-size: 14px; }
   .m-login-page .m-footer { justify-content: center; font-size: 10px; }
-  .m-login-page .m-atmosphere { background: radial-gradient(ellipse at 100% 0%, rgba(87,212,144,.49), transparent 58%), linear-gradient(145deg, #041d14, #083b28); }
-  .m-login-page .m-light-trail { width: 220%; left: -70%; top: 25%; opacity: .6; }
+  .m-login-page .m-atmosphere { background-position: 18% bottom; background-image: linear-gradient(180deg, rgba(1,20,13,.54), rgba(0,24,16,.35)), var(--m-background-image); }
+
 }
 @media (max-width: 380px) {
   .m-login-page .m-shell { padding-left: 18px; padding-right: 18px; row-gap: 24px; }

@@ -205,7 +205,6 @@ function simbolo(classe = 'marca-simbolo') {
 /* ---------------- Entrada ---------------- */
 
 function telaEntrada() {
-  const canvasEsfera = el('canvas', { id: 'entrada-esfera' });
   const lembrado = (() => { try { return localStorage.getItem(EMAIL_LEMBRADO) ?? ''; } catch { return ''; } })();
 
   const email = el('input', {
@@ -300,8 +299,8 @@ function telaEntrada() {
     simbolo(`m-mark ${classe}`), el('div', { class: 'm-wordmark', 'aria-hidden': 'true' }, el('strong', {}, 'manager'), el('span', {}, 'PROVEDOR')));
 
   const tela = el('div', { class: 'm-login-page' },
+    // O fundo é a fotografia do data center; texto, marca e cartão continuam sendo HTML, não imagem.
     el('div', { class: 'm-atmosphere', 'aria-hidden': 'true' }),
-    el('div', { class: 'm-light-trail', 'aria-hidden': 'true' }),
     el('div', { class: 'm-shell' },
       el('header', { class: 'm-header' }, marca('')),
       el('main', { class: 'm-main' },
@@ -309,13 +308,7 @@ function telaEntrada() {
           el('div', { class: 'm-hero-copy' },
             el('h1', { class: 'm-headline', id: 'entrada-titulo' },
               el('span', { class: 'm-line' }, 'O provedor inteiro'), el('span', { class: 'm-line' }, 'sob a mesma'), el('em', {}, 'visão.')),
-            el('p', { class: 'm-hero-lead' }, 'Gestão, rede e operação em um só lugar.')),
-          el('div', { class: 'm-sphere', 'aria-hidden': 'true' }, canvasEsfera),
-          el('ul', { class: 'm-features', 'aria-label': 'Áreas do Manager' },
-            [['Rede óptica', '<path d="M3 21 12 12m-5 5 1-9m3 5 7-2M6 18 4 12m8 0 2-7m1 5 5-5"/><circle cx="8" cy="5" r="2"/><circle cx="15" cy="3" r="2"/><circle cx="21" cy="4" r="2"/><circle cx="20" cy="11" r="2"/>'],
-              ['Central NOC', '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 22h8m-6-5-1 5m5-5 1 5"/>'],
-              ['Operação', '<path d="m12 2 10 6-10 6L2 8l10-6Zm-10 10 10 6 10-6M2 16l10 6 10-6"/>']]
-              .map(([texto, caminho]) => el('li', {}, svg('0 0 24 24', caminho, traco('1.3')), texto)))),
+            el('p', { class: 'm-hero-lead' }, 'Gestão, rede e operação em um só lugar.'))),
         el('section', { class: 'm-login-card', 'aria-labelledby': 'entrada-cartao' },
           simbolo('m-mark m-card-mark'),
           el('h2', { class: 'm-card-title', id: 'entrada-cartao' }, 'Bem-vindo'),
@@ -325,11 +318,6 @@ function telaEntrada() {
       el('footer', { class: 'm-footer' }, `© ${new Date().getFullYear()} Manager Provedor`)));
 
   limpar(raiz, tela);
-  // A esfera só começa depois de estar no documento: ela se dimensiona pelo tamanho real do elemento.
-  // A esfera entra na mesma lista de limpeza das telas: ao sair do login, ela se desmonta sozinha.
-  import('./esfera.js')
-    .then(({ criarEsfera }) => { const parar = criarEsfera(canvasEsfera); limpeza.push(parar); })
-    .catch(() => { /* sem esfera o login funciona igual: ela é decoração */ });
   (lembrado ? senha : email).focus();
 }
 

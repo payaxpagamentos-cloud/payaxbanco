@@ -161,9 +161,11 @@ prefixado com `.m-login-page`: a regra global `input[type=email], … { font-siz
 especificidade maior que uma classe sozinha, e sem o prefixo os campos do login voltariam a 14 px, fazendo
 o Safari do iPhone dar zoom sozinho a cada foco.
 
-A esfera (`public/js/esfera.js`) é decoração em Canvas 2D, sem biblioteca: no máximo 30 quadros por segundo,
-para quando sai da tela ou a aba vai para segundo plano, respeita `prefers-reduced-motion` e se desmonta ao
-sair do login, pelo mesmo mecanismo de limpeza das demais telas.
+O fundo é a fotografia do data center da arte aprovada, convertida de PNG para **WebP**: 49 KB no lugar de
+1,45 MB, com diferença imperceptível (erro médio de 0,8 em 255). Numa tela que carrega antes de qualquer
+sessão, muitas vezes de um tablet em campo, um megabyte e meio de imagem é espera sem contrapartida. Em
+navegador sem WebP a imagem não aparece e fica o verde escuro do fundo — a tela continua utilizável.
+Texto, marca e cartão são HTML, não imagem: redimensionam com a janela e são lidos por leitor de tela.
 
 Dois controles do desenho precisaram de honestidade, porque o sistema não faz o que o nome sugere:
 
