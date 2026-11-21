@@ -20,6 +20,19 @@ function criarApi(db) {
   });
 
   /**
+   * Números da rede para o site: só agregados, nenhum nome de ponto ou cliente.
+   * É o que mantém a página sempre atual sem ninguém editar HTML.
+   */
+  api.get('/publico/rede', (_req, res) => {
+    const n = db.prepare(`SELECT COUNT(DISTINCT t.id) AS telas, COUNT(DISTINCT l.id) AS pontos,
+        COUNT(DISTINCT l.cidade) AS cidades, COALESCE(SUM(DISTINCT 0), 0) AS zero
+      FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.status = 'ativa' AND l.status = 'ativo'`).get();
+    const publico = db.prepare(`SELECT COALESCE(SUM(l.publico_dia), 0) AS dia FROM locais l
+      WHERE l.status = 'ativo' AND EXISTS (SELECT 1 FROM telas t WHERE t.local_id = l.id AND t.status = 'ativa')`).get().dia;
+    res.json({ telas: n.telas, pontos: n.pontos, cidades: n.cidades, publico_mes: publico * 30 });
+  });
+
+  /**
    * Formulário do site: quem pede contato entra direto no CRM como lead.
    * É público de propósito (não há login para quem ainda não é cliente), então tem limite por IP
    * e grava só o que o formulário manda — nada daqui vai para a tela sem alguém da equipe aprovar.

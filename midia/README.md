@@ -299,6 +299,26 @@ Quem quiser usar outro aparelho ou software pode falar direto com a API (`<ender
 
 As rotas usam `Authorization: Bearer <token do aparelho>`.
 
+## O site do Vai Mídia
+
+A pasta `site/` é o site institucional: uma página só, sem framework e sem build, com a mesma identidade do
+produto (o preto, o lime e a Manrope). Ela traz a capa com uma **tela de elevador de verdade** desenhada em CSS
+— o mesmo layout do player —, onde a rede fica, como funciona, o que muda para quem anuncia e para o condomínio,
+e o formulário de contato.
+
+Duas coisas fazem o site trabalhar em vez de só existir:
+
+- **O formulário cai no CRM**: o pedido entra como *lead* com origem "site", já com a mensagem na primeira
+  anotação. Ninguém copia e-mail para planilha.
+- **Os números da rede são ao vivo**: telas, pontos, cidades e pessoas por mês vêm da API (`/api/publico/rede`,
+  só agregados — nenhum nome de ponto ou cliente). Com a rede ainda vazia, a faixa de números simplesmente não
+  aparece.
+
+O servidor publica o site na **raiz do domínio** (onde o visitante chega) e também em `<base>/site/`; o painel
+segue em `<base>/` (padrão `/midia/`). Para hospedar o site separado (Vercel, Netlify, nginx), basta subir a
+pasta `site/` e desligar aqui com `MIDIA_SITE=0` — nesse caso ele descobre a API sozinho, ou você fixa o
+endereço com `<body data-api="https://seu-dominio/midia/api/">`.
+
 ## Como executar
 
 Requisitos: **Node.js 22.13+**.

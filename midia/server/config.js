@@ -24,6 +24,8 @@ const basePath = String(process.env.MIDIA_BASE_PATH ?? '/midia').replace(/\/+$/,
 module.exports = {
   producao,
   basePath,
+  // Servir o site institucional (pasta site/) na raiz e em <base>/site/. MIDIA_SITE=0 desliga.
+  site: String(process.env.MIDIA_SITE ?? '1') !== '0',
   port: Number(process.env.PORT) || 3600,
   dbFile: process.env.MIDIA_DB || path.join(__dirname, '..', 'data', 'midia.db'),
   // Arquivos das mídias (vídeos e imagens) ficam fora da pasta pública, com nome aleatório.

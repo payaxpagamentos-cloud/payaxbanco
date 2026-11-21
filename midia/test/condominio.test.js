@@ -993,3 +993,39 @@ test('CRM: do lead ao contrato, sem redigitar nada', async (t) => {
     assert.equal((await api.del(`/painel/crm/leads/${novo.id}`, {}, master)).status, 204);
   });
 });
+
+/** O site é a porta de entrada: tem de abrir, falar com a API certa e transformar visita em lead. */
+test('Site do Vai Mídia: abre na raiz e o formulário vira lead', async (t) => {
+  const { iniciar: iniciarApi } = require('./helpers');
+  const api = await iniciarApi();
+  t.after(api.fechar);
+  const raiz = api.base.replace(/\/midia\/api$/, '');
+
+  await t.test('a raiz do domínio serve o site, já com o endereço da API', async () => {
+    const r = await fetch(`${raiz}/`);
+    assert.equal(r.status, 200);
+    const html = await r.text();
+    assert.match(html, /Sua marca <em>em movimento<\/em>/);
+    assert.match(html, /data-api="\/midia\/api\/"/, 'o site não precisa sair procurando a API');
+
+    // O painel continua no lugar dele, e o site também responde em /midia/site/.
+    assert.equal((await fetch(`${raiz}/midia/`)).status, 200);
+    assert.equal((await fetch(`${raiz}/midia/site/`)).status, 200);
+    assert.equal((await fetch(`${raiz}/site.css`)).status, 200, 'os arquivos do site saem na raiz');
+  });
+
+  await t.test('os números da rede são agregados, sem nome de ninguém', async () => {
+    const master = await api.login();
+    const ponto = (await api.post('/painel/locais', {
+      nome: 'Edifício Secreto', categoria: 'condominio_residencial', cidade: 'Campinas', uf: 'SP', publico_dia: 1000,
+    }, master)).dados.id;
+    await api.post('/painel/telas', { local_id: ponto, nome: 'Hall' }, master);
+
+    const d = (await api.get('/publico/rede')).dados;
+    assert.equal(d.telas, 1);
+    assert.equal(d.pontos, 1);
+    assert.equal(d.cidades, 1);
+    assert.equal(d.publico_mes, 30_000);
+    assert.ok(!JSON.stringify(d).includes('Secreto'), 'nenhum nome de ponto vai para o site');
+  });
+});

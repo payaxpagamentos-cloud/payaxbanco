@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const config = require('./config');
@@ -47,9 +48,26 @@ function criarApp(db) {
       if (/public[\\/]+(tv[\\/]+)?(index\.html|player\.js)$/.test(caminho)) res.set('Cache-Control', 'no-cache');
     },
   }));
+  // Site institucional: servido em <base>/site/ e também na raiz do domínio, que é onde o visitante chega.
+  // Quem hospeda o site separado (Vercel, Netlify, nginx) desliga com MIDIA_SITE=0 — a pasta site/ é estática.
+  const site = path.join(__dirname, '..', 'site');
+  if (config.site && fs.existsSync(site)) {
+    // Servido por aqui, o site já sabe onde fica a API (sem precisar sair procurando).
+    const montarPagina = () => fs.readFileSync(path.join(site, 'index.html'), 'utf8')
+      .replace('<body>', `<body data-api="${config.basePath}/api/">`);
+    // Em produção a página é lida uma vez; fora dela, a cada pedido, para quem está editando o site ver na hora.
+    let pagina = montarPagina();
+    const inicio = (_req, res) => res.type('html').set('Cache-Control', 'no-cache').send(config.producao ? pagina : (pagina = montarPagina()));
+    r.get(['/site', '/site/', '/site/index.html'], inicio);
+    r.use('/site', express.static(site, { index: false }));
+    app.get(['/site', '/site/', '/site/index.html'], inicio);
+    app.use('/site', express.static(site, { index: false }));
+    app.get('/', inicio);
+    app.use(express.static(site, { index: false }));
+  }
   if (config.basePath) {
     app.get(config.basePath, (req, res, next) => (req.originalUrl.split('?')[0] === config.basePath ? res.redirect(`${config.basePath}/`) : next()));
-    app.get('/', (_req, res) => res.redirect(`${config.basePath}/`));
+    if (!config.site || !fs.existsSync(site)) app.get('/', (_req, res) => res.redirect(`${config.basePath}/`));
   }
   app.use(config.basePath || '/', r);
   // eslint-disable-next-line no-unused-vars

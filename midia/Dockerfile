@@ -13,6 +13,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY server ./server
 COPY public ./public
+COPY site ./site
 
 # Banco, arquivos das mídias e backups ficam em /app/data (monte um volume persistente aqui).
 # Para o espelho das mídias, monte outro volume e aponte MIDIA_ESPELHO para ele.
