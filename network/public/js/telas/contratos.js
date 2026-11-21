@@ -1,4 +1,5 @@
 import { api, qs } from '../api.js';
+import { buscarCep } from './assinantes.js';
 import { el, limpar, icone, pode, cabecalho, painel, tabela, paginacao, etqDe, rotulo, opcoes, dinheiro, data, dataHora, dl, competencia, velocidade,
   carregar, carregando, formulario, pedirMotivo, confirmar, botao, toast, faixa, stat, hoje } from '../ui.js';
 
@@ -190,7 +191,8 @@ function editar(c, planos, depois) {
     { nome: 'cto_id', rotulo: 'ID da CTO', tipo: 'number', valor: c.cto_id },
     { nome: 'porta_id', rotulo: 'ID da porta', tipo: 'number', valor: c.porta_id, ajuda: 'Trocar a porta libera a anterior e ocupa a nova na planta.' },
     { tipo: 'secao', rotulo: 'Endereço de instalação (em branco = o do assinante)' },
-    { nome: 'cep', rotulo: 'CEP', valor: c.cep }, { nome: 'logradouro', rotulo: 'Logradouro', valor: c.logradouro },
+    { nome: 'cep', rotulo: 'CEP', valor: c.cep, busca: { rotulo: 'Buscar CEP', executar: (x) => buscarCep(x, 'numero_endereco') } },
+    { nome: 'logradouro', rotulo: 'Logradouro', valor: c.logradouro },
     { nome: 'numero_endereco', rotulo: 'Número', valor: c.numero_endereco }, { nome: 'complemento', rotulo: 'Complemento', valor: c.complemento },
     { nome: 'bairro', rotulo: 'Bairro', valor: c.bairro }, { nome: 'cidade', rotulo: 'Cidade', valor: c.cidade }, { nome: 'uf', rotulo: 'UF', valor: c.uf },
     { nome: 'observacoes', rotulo: 'Observações', tipo: 'textarea', valor: c.observacoes, inteiro: true },

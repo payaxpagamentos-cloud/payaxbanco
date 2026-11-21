@@ -28,12 +28,30 @@
   --sombra-alta: 0 18px 50px rgba(21, 38, 30, 0.18);
   --menu-largura: 232px;
   --fonte: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Vidro: superfícies translúcidas sobre o fundo ambiente. A opacidade é alta de propósito —
+     o texto precisa manter o mesmo contraste do painel opaco (AA), o vidro é só a moldura. */
+  --vidro: rgba(255, 255, 255, 0.74);
+  --vidro-forte: rgba(255, 255, 255, 0.86);
+  --vidro-borda: rgba(255, 255, 255, 0.8);
+  --vidro-menu: rgba(21, 38, 30, 0.84);
+  --vidro-desfoque: 18px;
+  --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   color-scheme: light;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body { font-family: var(--fonte); font-size: 14px; line-height: 1.45; color: var(--texto); background: var(--fundo); -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--fonte); font-size: 14px; line-height: 1.45; color: var(--texto); -webkit-font-smoothing: antialiased;
+  background-color: var(--fundo);
+  /* Luz de fundo em verde-esmeralda, grafite e um toque de laranja: é ela que aparece desfocada através do vidro. */
+  background-image:
+    radial-gradient(46rem 46rem at 8% -8%, rgba(56, 199, 139, 0.30), transparent 62%),
+    radial-gradient(40rem 40rem at 94% -2%, rgba(25, 114, 78, 0.22), transparent 64%),
+    radial-gradient(36rem 36rem at 84% 98%, rgba(213, 139, 58, 0.18), transparent 62%),
+    radial-gradient(32rem 32rem at 4% 90%, rgba(21, 38, 30, 0.16), transparent 60%);
+  background-attachment: fixed;
+}
 button, input, select, textarea { font: inherit; color: inherit; }
 a { color: var(--verde); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -45,8 +63,9 @@ p { margin: 0; }
 
 /* ---------------- Estrutura ---------------- */
 .menu {
-  position: fixed; inset: 0 auto 0 0; width: var(--menu-largura); background: var(--grafite); color: #dfe9e1; display: flex; flex-direction: column;
-  padding: 22px 16px 16px; z-index: 40; overflow-y: auto;
+  position: fixed; inset: 0 auto 0 0; width: var(--menu-largura); background: var(--vidro-menu); color: #dfe9e1; display: flex; flex-direction: column;
+  padding: 22px 16px 16px; z-index: 40; overflow-y: auto; border-right: 1px solid rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(24px) saturate(1.2); -webkit-backdrop-filter: blur(24px) saturate(1.2);
 }
 .marca { display: flex; align-items: center; gap: 10px; color: #fff; padding: 0 6px 18px; text-decoration: none !important; }
 .marca .marca-simbolo { width: 34px; height: 34px; color: var(--verde-vivo); }
@@ -76,7 +95,8 @@ p { margin: 0; }
 
 .principal { margin-left: var(--menu-largura); min-height: 100vh; display: flex; flex-direction: column; min-width: 0; }
 .topo {
-  height: 64px; background: var(--painel); border-bottom: 1px solid var(--borda); display: flex; align-items: center; gap: 14px; padding: 0 32px; position: sticky; top: 0; z-index: 30;
+  height: 64px; background: rgba(255, 255, 255, 0.68); border-bottom: 1px solid var(--vidro-borda); display: flex; align-items: center; gap: 14px; padding: 0 32px;
+  position: sticky; top: 0; z-index: 30; backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
 }
 .caminho { display: flex; gap: 8px; align-items: center; color: var(--texto-3); font-size: 13px; min-width: 0; }
 .caminho strong { color: var(--texto); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -137,7 +157,8 @@ input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--verd
 .filtros .busca { flex: 1; min-width: 200px; }
 
 /* ---------------- Painéis e indicadores ---------------- */
-.painel { background: var(--painel); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); min-width: 0; }
+.painel { background: var(--vidro); border: 1px solid var(--vidro-borda); border-radius: var(--raio); box-shadow: var(--sombra), var(--vidro-brilho); min-width: 0;
+  backdrop-filter: blur(var(--vidro-desfoque)) saturate(1.35); -webkit-backdrop-filter: blur(var(--vidro-desfoque)) saturate(1.35); }
 .painel-cab { display: flex; align-items: center; gap: 12px; padding: 18px 22px 0; flex-wrap: wrap; }
 .painel-cab h2 { font-size: 15.5px; font-weight: 650; }
 .painel-cab .acoes { margin-left: auto; display: flex; gap: 6px; align-items: center; }
@@ -149,7 +170,8 @@ input:focus, select:focus, textarea:focus { outline: 0; border-color: var(--verd
 .grade.principal-lateral { grid-template-columns: minmax(0, 1fr) 320px; }
 .grade + .grade, .painel + .painel, .grade + .painel, .painel + .grade { margin-top: 18px; }
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
-.stat { background: var(--painel); border: 1px solid var(--borda); border-radius: var(--raio); padding: 18px 20px; box-shadow: var(--sombra); min-width: 0; position: relative; }
+.stat { background: var(--vidro); border: 1px solid var(--vidro-borda); border-radius: var(--raio); padding: 18px 20px; box-shadow: var(--sombra), var(--vidro-brilho);
+  min-width: 0; position: relative; backdrop-filter: blur(var(--vidro-desfoque)) saturate(1.35); -webkit-backdrop-filter: blur(var(--vidro-desfoque)) saturate(1.35); }
 .stat .rotulo { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--texto-2); font-size: 13px; }
 .stat .rotulo svg { width: 30px; height: 30px; padding: 6px; border-radius: 8px; background: var(--fundo); color: var(--texto-2); }
 .stat .valor { font-size: 32px; font-weight: 650; letter-spacing: -0.03em; margin: 8px 0 4px; line-height: 1.1; }
@@ -309,9 +331,12 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .cartao-servico small { color: var(--texto-3); font-size: 12px; display: block; }
 
 /* ---------------- Modal e toast ---------------- */
-.modal-fundo { position: fixed; inset: 0; background: rgba(15, 28, 21, 0.45); display: grid; place-items: center; padding: 16px; z-index: 100; animation: aparecer 0.2s ease-out; }
+.modal-fundo { position: fixed; inset: 0; background: rgba(15, 28, 21, 0.38); display: grid; place-items: center; padding: 16px; z-index: 100; animation: aparecer 0.2s ease-out;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 @keyframes aparecer { from { opacity: 0; } }
-.modal { background: #fff; border-radius: 16px; width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 22px 24px; box-shadow: var(--sombra-alta); }
+.modal { background: var(--vidro-forte); border: 1px solid var(--vidro-borda); border-radius: 16px; width: min(560px, 100%); max-height: calc(100vh - 32px);
+  overflow-y: auto; padding: 22px 24px; box-shadow: var(--sombra-alta), var(--vidro-brilho);
+  backdrop-filter: blur(28px) saturate(1.5); -webkit-backdrop-filter: blur(28px) saturate(1.5); }
 .modal.largo { width: min(860px, 100%); }
 .modal-cab { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .modal-cab h2 { font-size: 18px; flex: 1; }
@@ -347,6 +372,46 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .modo-tv .tv-inc small { display: block; font-size: 15px; color: #a8c0ae; }
 .modo-tv .tv-fontes { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 24px; font-size: 15px; color: #a8c0ae; }
 .modo-tv .botao.secundario { background: transparent; color: #fff; border-color: #3d5546; }
+
+/* ---------------- Vidro: quando desligar ---------------- */
+/*
+ * O vidro sai e tudo volta ao opaco em três situações: o botão "pausar efeitos" do topo (o desfoque é o efeito
+ * mais caro da tela), navegador sem backdrop-filter, e pessoa que pediu menos transparência no sistema.
+ * O texto não muda de cor em nenhum caso: o contraste já é o do painel opaco.
+ */
+.sem-efeitos .painel, .sem-efeitos .stat, .sem-efeitos .topo, .sem-efeitos .modal {
+  background: var(--painel) !important; border-color: var(--borda) !important; box-shadow: var(--sombra) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+.sem-efeitos .modal { box-shadow: var(--sombra-alta) !important; }
+.sem-efeitos .menu { background: var(--grafite) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.sem-efeitos .modal-fundo { background: rgba(15, 28, 21, 0.45); backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.sem-efeitos body, body.sem-efeitos { background-image: none; }
+
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  .painel, .stat, .topo, .modal { background: var(--painel); border-color: var(--borda); }
+  .menu { background: var(--grafite); }
+  body { background-image: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .painel, .stat, .topo, .modal { background: var(--painel) !important; border-color: var(--borda) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .menu { background: var(--grafite) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .modal-fundo { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  body { background-image: none; }
+}
+/* O painel TV é lido a metros de distância: nada de transparência ali. */
+.modo-tv, .modo-tv * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+
+/* ---------------- Campo com consulta (CNPJ, CEP) ---------------- */
+.campo-com-acao { display: flex; gap: 8px; align-items: center; }
+.campo-com-acao input { flex: 1; min-width: 0; }
+.campo-com-acao .botao { flex-shrink: 0; white-space: nowrap; }
+/* Campo preenchido por consulta: marcado até a pessoa mexer nele, para conferir o que veio da fonte. */
+input.preenchido, select.preenchido, textarea.preenchido { border-color: var(--verde); background: var(--verde-suave); }
+.aviso-busca { grid-column: 1 / -1; margin-top: 12px; border-radius: 9px; padding: 10px 12px; font-size: 13px; background: var(--azul-suave); color: #3e5266; border: 1px solid #dbe3ec; }
+.aviso-busca.ok { background: var(--verde-suave); color: var(--verde-escuro); border-color: #cfe7d5; }
+.aviso-busca.atencao { background: var(--laranja-suave); color: #7a4a14; border-color: #f3dcbd; }
+.aviso-busca .fraco { color: inherit; opacity: 0.78; font-size: 12px; margin-top: 4px; }
 
 /* ---------------- Efeitos pausados e movimento reduzido ---------------- */
 .sem-efeitos *, .sem-efeitos *::before, .sem-efeitos *::after { animation: none !important; transition: none !important; }

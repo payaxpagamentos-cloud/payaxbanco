@@ -312,12 +312,31 @@ export function modal(titulo, conteudo, { largo = false } = {}) {
 /**
  * Formulário em janela a partir da descrição dos campos. O erro do servidor aparece dentro do formulário (que continua aberto).
  * campo: { nome, rotulo, tipo: text|number|email|password|date|datetime-local|select|textarea|checkbox|file, opcoes: [[v, r]], obrigatorio, valor, ajuda, passo, inteiro, accept }
+ *
+ * Um campo pode trazer `busca: { rotulo, executar }` para consultar uma fonte a partir do que foi digitado (CNPJ, CEP)
+ * e preencher os outros campos. `executar(valor)` devolve `{ dados, aviso }`: os campos vêm preenchidos como sugestão,
+ * marcados na tela, e quem salva é a pessoa — a consulta nunca grava nada sozinha.
  */
 export function formulario(titulo, campos, { enviar, rotuloEnviar = 'Salvar', largo = false, antes = null } = {}) {
   return modal(titulo, (fechar) => {
     const erro = el('div', { class: 'erro-form', role: 'alert', hidden: true });
     const entradas = {};
     const grade = el('div', { class: 'form-grade' });
+    const avisoBusca = el('div', { class: 'aviso-busca', role: 'status', hidden: true });
+    /** Preenche os campos com o que a fonte devolveu, marcando o que foi preenchido para a pessoa conferir. */
+    const preencher = (dados) => {
+      const postos = [];
+      for (const [nome, valor] of Object.entries(dados ?? {})) {
+        const alvo = entradas[nome];
+        if (!alvo || valor === null || valor === undefined || valor === '') continue;
+        if (alvo.c.tipo === 'checkbox') alvo.entrada.checked = Boolean(valor);
+        else alvo.entrada.value = valor;
+        alvo.entrada.classList.add('preenchido');
+        alvo.entrada.addEventListener('input', () => alvo.entrada.classList.remove('preenchido'), { once: true });
+        postos.push(alvo.c.rotulo);
+      }
+      return postos;
+    };
     for (const c of campos.filter(Boolean)) {
       if (c.tipo === 'secao') { grade.append(el('div', { class: 'inteiro sobretitulo', style: 'margin:8px 0 -4px' }, c.rotulo)); continue; }
       let entrada;
@@ -332,12 +351,49 @@ export function formulario(titulo, campos, { enviar, rotuloEnviar = 'Salvar', la
         placeholder: c.placeholder ?? null, inputmode: c.inputmode ?? (c.tipo === 'decimal' ? 'decimal' : null), autocomplete: c.autocomplete ?? 'off' });
       if (c.tipo === 'decimal') { entrada.type = 'text'; entrada.inputMode = 'decimal'; }
       entradas[c.nome] = { c, entrada };
+      let corpo = entrada;
+      if (c.busca) {
+        // Botão de consulta ao lado do campo: busca na fonte e sugere o preenchimento dos demais.
+        const botaoBusca = el('button', { type: 'button', class: 'botao secundario pequeno', title: c.busca.rotulo ?? 'Consultar' }, icone('busca'), c.busca.rotulo ?? 'Consultar');
+        const consultar = async () => {
+          avisoBusca.hidden = true;
+          avisoBusca.className = 'aviso-busca';
+          const valor = entrada.value.trim();
+          if (!valor) { entrada.focus(); return; }
+          botaoBusca.disabled = true;
+          botaoBusca.replaceChildren(icone('relogio'), 'Consultando…');
+          try {
+            const r = await c.busca.executar(valor);
+            const postos = preencher(r?.dados);
+            avisoBusca.hidden = false;
+            if (r?.dados) {
+              avisoBusca.classList.add('ok');
+              avisoBusca.textContent = `${postos.length} campo(s) preenchido(s) por ${r.fonte}${r.consultado_em ? ` · consulta de ${new Date(r.consultado_em).toLocaleDateString('pt-BR')}` : ''}. Confira antes de salvar.`;
+              if (r.aviso) avisoBusca.append(el('div', { class: 'fraco' }, r.aviso));
+              if (r.resumo) avisoBusca.append(el('div', { class: 'fraco' }, r.resumo));
+            } else {
+              avisoBusca.classList.add('atencao');
+              avisoBusca.textContent = r?.aviso ?? 'A consulta não encontrou este registro. Preencha à mão.';
+            }
+          } catch (err) {
+            avisoBusca.hidden = false;
+            avisoBusca.classList.add('atencao');
+            avisoBusca.textContent = `${err.message} O cadastro não depende da consulta: pode preencher à mão.`;
+          } finally {
+            botaoBusca.disabled = false;
+            botaoBusca.replaceChildren(icone('busca'), c.busca.rotulo ?? 'Consultar');
+          }
+        };
+        botaoBusca.addEventListener('click', consultar);
+        entrada.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); consultar(); } });
+        corpo = el('div', { class: 'campo-com-acao' }, entrada, botaoBusca);
+      }
       grade.append(c.tipo === 'checkbox'
         ? el('label', { class: `check ${c.inteiro ? 'inteiro' : ''}` }, entrada, c.rotulo)
-        : el('label', { class: `campo ${c.inteiro ? 'inteiro' : ''}`, for: comum.id }, el('span', {}, c.rotulo, c.obrigatorio ? ' *' : ''), entrada, c.ajuda ? el('span', { class: 'ajuda' }, c.ajuda) : null));
+        : el('label', { class: `campo ${c.inteiro ? 'inteiro' : ''}`, for: comum.id }, el('span', {}, c.rotulo, c.obrigatorio ? ' *' : ''), corpo, c.ajuda ? el('span', { class: 'ajuda' }, c.ajuda) : null));
     }
     const enviarBtn = el('button', { type: 'submit', class: 'botao' }, rotuloEnviar);
-    const form = el('form', { novalidate: true }, antes, grade, erro, el('div', { class: 'form-acoes' },
+    const form = el('form', { novalidate: true }, antes, grade, avisoBusca, erro, el('div', { class: 'form-acoes' },
       el('button', { type: 'button', class: 'botao secundario', onclick: () => fechar() }, 'Cancelar'), enviarBtn));
     form.addEventListener('submit', async (e) => {
       e.preventDefault();

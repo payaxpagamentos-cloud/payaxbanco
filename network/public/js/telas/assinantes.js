@@ -42,22 +42,45 @@ export default async function assinantes({ alvo, params, query, ir }) {
   atualizar();
 }
 
+/** Consulta o CNPJ na base da Receita e devolve os campos do cadastro, com a situação cadastral em uma linha. */
+async function buscarCnpj(valor) {
+  const r = await api.get(`/consultas/cnpj/${String(valor).replace(/\D/g, '')}`);
+  if (!r.encontrado) return r;
+  const d = r.dados;
+  // O tipo passa a PJ sozinho (quem consultou CNPJ está cadastrando empresa) e a data de abertura
+  // ocupa o campo de nascimento, que para empresa é exatamente isso.
+  return { ...r, dados: { ...d, tipo: 'pj', nascimento: d.abertura ?? null },
+    resumo: [d.situacao ? `Situação cadastral: ${d.situacao}${d.situacao_desde ? ` desde ${d.situacao_desde.split('-').reverse().join('/')}` : ''}` : null,
+      d.atividade, d.porte, d.simples].filter(Boolean).join(' · ') };
+}
+
+/** Consulta o CEP e devolve só os campos de endereço (o número e o complemento continuam com quem cadastra). */
+async function buscarCep(valor, chaveNumero = 'numero') {
+  const r = await api.get(`/consultas/cep/${String(valor).replace(/\D/g, '')}`);
+  if (!r.encontrado) return r;
+  const { complemento, ibge, [chaveNumero]: _n, ...resto } = r.dados;
+  return { ...r, dados: resto };
+}
+
 function editar(a, depois) {
   const pj = () => (a?.tipo ?? 'pf') === 'pj';
   return formulario(a ? `Assinante ${a.codigo}` : 'Novo assinante', [
     { tipo: 'secao', rotulo: 'Identificação' },
     { nome: 'tipo', rotulo: 'Tipo', tipo: 'select', vazio: false, opcoes: opcoes('tipoPessoa'), valor: a?.tipo ?? 'pf' },
-    { nome: 'documento', rotulo: 'CPF / CNPJ', obrigatorio: true, valor: a ? documento(a.documento) : '', ajuda: 'Conferido pelo dígito verificador e único na operação.' },
+    { nome: 'documento', rotulo: 'CPF / CNPJ', obrigatorio: true, valor: a ? documento(a.documento) : '',
+      ajuda: 'Conferido pelo dígito verificador e único na operação. Com CNPJ, "Buscar na Receita" preenche o cadastro.',
+      busca: { rotulo: 'Buscar na Receita', executar: buscarCnpj } },
     { nome: 'nome', rotulo: pj() ? 'Razão social' : 'Nome', obrigatorio: true, valor: a?.nome, inteiro: true },
     { nome: 'nome_fantasia', rotulo: 'Nome fantasia', valor: a?.nome_fantasia },
-    { nome: 'identidade', rotulo: pj() ? 'Inscrição estadual' : 'RG', valor: a?.identidade },
-    { nome: 'nascimento', rotulo: 'Nascimento / abertura', tipo: 'date', valor: a?.nascimento },
+    { nome: 'identidade', rotulo: 'RG / Inscrição estadual', valor: a?.identidade },
+    { nome: 'nascimento', rotulo: 'Nascimento / abertura', tipo: 'date', valor: a?.nascimento, ajuda: 'Para empresa, a data de abertura.' },
     { tipo: 'secao', rotulo: 'Contato' },
     { nome: 'telefone', rotulo: 'Telefone', valor: a?.telefone, ajuda: 'Com DDD.' },
     { nome: 'telefone2', rotulo: 'Outro telefone', valor: a?.telefone2 },
     { nome: 'email', rotulo: 'E-mail', tipo: 'email', valor: a?.email, inteiro: true },
     { tipo: 'secao', rotulo: 'Endereço' },
-    { nome: 'cep', rotulo: 'CEP', valor: a?.cep },
+    { nome: 'cep', rotulo: 'CEP', valor: a?.cep, ajuda: 'Preenche logradouro, bairro, cidade e UF.',
+      busca: { rotulo: 'Buscar CEP', executar: (x) => buscarCep(x, 'numero') } },
     { nome: 'logradouro', rotulo: 'Logradouro', valor: a?.logradouro },
     { nome: 'numero', rotulo: 'Número', valor: a?.numero },
     { nome: 'complemento', rotulo: 'Complemento', valor: a?.complemento },
@@ -155,7 +178,8 @@ function novoContrato(a, planos, depois) {
     { nome: 'dia_vencimento', rotulo: 'Dia do vencimento', tipo: 'number', min: 1, max: 28, ajuda: 'De 1 a 28, para existir em todo mês.' },
     { nome: 'carencia_dias', rotulo: 'Carência própria (dias)', tipo: 'number', ajuda: 'Em branco usa a carência da operação antes de qualquer bloqueio.' },
     { tipo: 'secao', rotulo: 'Endereço de instalação (em branco = o do assinante)' },
-    { nome: 'cep', rotulo: 'CEP' }, { nome: 'logradouro', rotulo: 'Logradouro' }, { nome: 'numero_endereco', rotulo: 'Número' },
+    { nome: 'cep', rotulo: 'CEP', busca: { rotulo: 'Buscar CEP', executar: (x) => buscarCep(x, 'numero_endereco') } },
+    { nome: 'logradouro', rotulo: 'Logradouro' }, { nome: 'numero_endereco', rotulo: 'Número' },
     { nome: 'complemento', rotulo: 'Complemento' }, { nome: 'bairro', rotulo: 'Bairro' }, { nome: 'cidade', rotulo: 'Cidade' }, { nome: 'uf', rotulo: 'UF' },
     { nome: 'observacoes', rotulo: 'Observações', tipo: 'textarea', inteiro: true },
   ], {
@@ -170,4 +194,4 @@ function novoContrato(a, planos, depois) {
   });
 }
 
-export { editar as editarAssinante };
+export { editar as editarAssinante, buscarCep };

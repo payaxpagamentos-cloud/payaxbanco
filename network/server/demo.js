@@ -218,7 +218,7 @@ const servidor = criarApp(db).listen(0, async () => {
     const carteira = [];
     for (const [nome, documento, tipo, telefone, bairro, rua, numero, plano, venc, ativacao, destino] of CARTEIRA) {
       const a = await fin('/assinantes', { tipo, nome, documento, telefone, email: `${nome.split(' ')[0].toLowerCase()}@exemplo.com`,
-        cep: '11700000', logradouro: rua, numero, bairro, cidade: 'Praia Grande', uf: 'SP', consentimento: true });
+        cep: '11701000', logradouro: rua, numero, bairro, cidade: 'Praia Grande', uf: 'SP', consentimento: true });
       // Uma porta livre por contrato: a reserva acompanha o contrato mesmo antes de o serviço ser ativado.
       const portaId = livres[carteira.length]?.id;
       const c = await fin('/contratos', { assinante_id: a.id, plano_id: planos[plano].id, dia_vencimento: venc,

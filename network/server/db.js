@@ -1163,6 +1163,25 @@ CREATE INDEX idx_confiancas_contrato ON confiancas(contrato_id, id DESC);
 CREATE INDEX idx_confiancas_abertas ON confiancas(organizacao_id, encerrada_em, ate);
 `,
   },
+  {
+    versao: 3,
+    nome: 'consultas_publicas',
+    sql: `
+/*
+ * Cache das consultas públicas (CNPJ na base da Receita e CEP). Não tem organizacao_id de propósito: o dado é
+ * público e igual para todos, e guardá-lo uma vez evita gastar a cota da fonte com a mesma pergunta.
+ * Nada aqui é verdade do cadastro: o que vale é o que a equipe confirmou e salvou no assinante.
+ */
+CREATE TABLE consultas_cache (
+  tipo TEXT NOT NULL CHECK (tipo IN ('cnpj','cep')),
+  chave TEXT NOT NULL,
+  dados TEXT NOT NULL,
+  fonte TEXT NOT NULL,
+  consultado_em TEXT NOT NULL,
+  PRIMARY KEY (tipo, chave)
+);
+`,
+  },
 ];
 
 const agora = () => new Date().toISOString();
