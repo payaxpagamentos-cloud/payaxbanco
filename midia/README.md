@@ -75,7 +75,7 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
     isso ele aparece em destaque. No alto, *o que está combinado para hoje* e o que já passou da data.
     Ganhar o lead **cria o cliente** (ou o ponto) a partir dele, e o lead continua apontando para o cadastro que
     nasceu dali — é assim que se sabe de onde veio cada contrato.
-  - **Propostas**: o papel que sai do funil. Cada proposta fica guardada com a **folha do dia em que foi feita** —
+  - **Propostas**: o papel que sai do funil — com **link próprio para mandar no WhatsApp**. Cada proposta fica guardada com a **folha do dia em que foi feita** —
     a rede muda toda semana, e reimprimir uma proposta de dois meses atrás tem de mostrar o que foi oferecido, não o
     inventário de hoje. Quando o cliente aceita, **nascem o cliente, o contrato e a campanha** (em rascunho,
     esperando o criativo) com as telas do circuito, sem ninguém redigitar o que já foi combinado.
@@ -298,6 +298,25 @@ Quem quiser usar outro aparelho ou software pode falar direto com a API (`<ender
 | `GET /logo` | A logo da administradora do ponto, para o cabeçalho do comunicado. |
 
 As rotas usam `Authorization: Bearer <token do aparelho>`.
+
+## A proposta no WhatsApp
+
+É por WhatsApp que a proposta chega ao cliente, então ela tem endereço próprio: cada proposta nasce com um
+**link aleatório** (`/midia/proposta/?p=…`) que abre a folha inteira no celular, **sem login e sem app**, e com
+o botão *Salvar em PDF* — o PDF sai do próprio navegador, pelo imprimir. No painel, um botão abre o WhatsApp do
+cliente com a mensagem já escrita e o link dentro; mandar a proposta é o que a tira do rascunho e a move para
+*na mesa do cliente*.
+
+Dois cuidados que valem explicação:
+
+- **A folha é a do dia em que a proposta foi feita.** Se a rede crescer amanhã, o link continua mostrando o que
+  foi oferecido — e não um inventário que o cliente nunca viu.
+- **A equipe sabe quando o cliente abriu** (quantas vezes e a última delas). É o que permite dar o retorno na
+  hora certa, em vez de ligar no escuro. Proposta recusada sai do ar; proposta vencida continua abrindo, mas
+  com o aviso de que o prazo terminou.
+
+O que **não** é feito automaticamente: o disparo. Quem aperta "enviar" no WhatsApp é a pessoa, com o próprio
+número — envio automático exige contratar um provedor oficial da Meta (veja *O que depende de terceiros*).
 
 ## O site do Vai Mídia
 

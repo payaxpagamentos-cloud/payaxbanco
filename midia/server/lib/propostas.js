@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const { agora, lerConfig, transacao } = require('../db');
 const { hoje, somarDias, somarMesesData, minutosDe } = require('./datas');
 const { ErroNegocio } = require('./erros');
@@ -162,12 +163,15 @@ function criar(db, dados, usuarioId = null) {
   const folha = calcular(db, Number(dados.circuito_id), dados);
   const numero = proximoNumero(db);
   const titulo = folha.anunciante ? `${folha.circuito.nome} — ${folha.anunciante.nome}` : folha.circuito.nome;
+  // O link público nasce com a proposta: é ele que vai no WhatsApp, e é aleatório o bastante
+  // para não ser adivinhado (quem tem o link vê a folha; ninguém mais).
+  const token = crypto.randomBytes(16).toString('hex');
   const id = Number(db.prepare(`INSERT INTO propostas (numero, anunciante_id, lead_id, circuito_id, titulo, meses, desconto_percentual,
-      insercoes_hora, mes_centavos, total_centavos, valida_ate, observacao, folha, criado_por, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      insercoes_hora, mes_centavos, total_centavos, valida_ate, observacao, folha, link_token, criado_por, criado_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     numero, folha.anunciante?.id ?? null, dados.lead_id ?? null, folha.circuito.id, titulo, folha.investimento.meses, folha.investimento.desconto_percentual,
     folha.veiculacao.insercoes_hora, folha.investimento.mes_centavos, folha.investimento.total_centavos, folha.valida_ate,
-    dados.observacao ?? null, JSON.stringify({ ...folha, numero, observacao: dados.observacao ?? null }), usuarioId, agora(),
+    dados.observacao ?? null, JSON.stringify({ ...folha, numero, observacao: dados.observacao ?? null }), token, usuarioId, agora(),
   ).lastInsertRowid);
   return detalhe(db, id);
 }
@@ -175,7 +179,8 @@ function criar(db, dados, usuarioId = null) {
 /** A proposta guardada, com a folha do dia em que foi feita. */
 function detalhe(db, id) {
   const p = db.prepare(`SELECT p.*, a.nome AS anunciante, ci.nome AS circuito, u.nome AS criado_por_nome,
-      ct.numero AS contrato_numero, ca.nome AS campanha_nome, le.nome AS lead
+      ct.numero AS contrato_numero, ca.nome AS campanha_nome, le.nome AS lead,
+      a.telefone AS anunciante_telefone, a.email AS anunciante_email, le.telefone AS lead_telefone, le.email AS lead_email
     FROM propostas p LEFT JOIN anunciantes a ON a.id = p.anunciante_id LEFT JOIN circuitos ci ON ci.id = p.circuito_id
     LEFT JOIN usuarios u ON u.id = p.criado_por LEFT JOIN contratos ct ON ct.id = p.contrato_id
     LEFT JOIN campanhas ca ON ca.id = p.campanha_id LEFT JOIN leads le ON le.id = p.lead_id WHERE p.id = ?`).get(id);
@@ -265,4 +270,25 @@ function listar(db, filtros = {}) {
   };
 }
 
-module.exports = { telasDoCircuito, resumoCircuito, calcular, criar, detalhe, aceitar, listar, proximoNumero };
+/**
+ * A proposta vista por quem recebeu o link (cliente, síndico, dono da loja): a folha do dia em que
+ * foi feita, sem nada do painel. Cada abertura fica registrada — saber que o cliente abriu, e quando,
+ * é metade do trabalho de dar o retorno na hora certa.
+ */
+function porToken(db, token) {
+  const p = db.prepare('SELECT * FROM propostas WHERE link_token = ?').get(String(token ?? ''));
+  if (!p) throw new ErroNegocio('Proposta não encontrada.', 404);
+  if (p.status === 'recusada') throw new ErroNegocio('Esta proposta não está mais disponível.', 410);
+  db.prepare('UPDATE propostas SET aberta_em = ?, aberturas = aberturas + 1 WHERE id = ?').run(agora(), p.id);
+  return {
+    numero: p.numero,
+    titulo: p.titulo,
+    status: p.status,
+    valida_ate: p.valida_ate,
+    expirada: p.valida_ate < hoje(),
+    observacao: p.observacao,
+    folha: JSON.parse(p.folha),
+  };
+}
+
+module.exports = { telasDoCircuito, resumoCircuito, calcular, criar, detalhe, aceitar, listar, proximoNumero, porToken };

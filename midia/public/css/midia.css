@@ -447,7 +447,20 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .folha .condicoes{ margin: 0; padding-left: 18px; color: #39414B; }
 .folha .condicoes li{ margin-bottom: 5px; }
 .folha footer{ margin-top: 30px; padding-top: 14px; border-top: 1px solid #D5DAE1; font-size: 11px; color: #5B6470; text-align: center; }
-@media (max-width: 720px){ .folha{ padding: 26px 20px; } .folha .blocos{ grid-template-columns: repeat(2, 1fr); } }
+/* Tabela larga não quebra a folha no celular: ela rola dentro da própria caixa. */
+.folha .rolagem{ overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.folha .rolagem .tabela-folha{ min-width: 420px; }
+/* O investimento tem duas colunas e é o que mais importa: nunca sai da tela. */
+.folha .rolagem .tabela-folha.investimento{ min-width: 0; }
+@media (max-width: 720px){
+  .folha{ padding: 26px 20px; }
+  .folha .blocos{ grid-template-columns: repeat(2, 1fr); }
+  .folha h1{ font-size: 21px; }
+  .folha header{ flex-direction: column; gap: 10px; }
+  .folha .dir{ text-align: left; }
+  .folha .tabela-folha .dir{ text-align: right; }
+}
+@media print{ .folha .rolagem{ overflow: visible; } .folha .rolagem .tabela-folha{ min-width: 0; } }
 
 /* Na impressão só a folha vai para o papel. */
 @media print{

@@ -86,7 +86,7 @@ function abrirFolhaVeiculacao(r) {
         bloco('Pessoas alcançadas', inteiro(r.resumo.impactos), 'estimativa pelo fluxo de cada ponto')),
 
       el('h2', {}, 'Por ponto'),
-      el('table', { class: 'tabela-folha' },
+      el('div', { class: 'rolagem' }, el('table', { class: 'tabela-folha' },
         el('thead', {}, el('tr', {}, el('th', {}, 'Ponto'), el('th', {}, 'Ambiente'), el('th', {}, 'Cidade'),
           el('th', { class: 'dir' }, 'Telas'), el('th', { class: 'dir' }, 'Inserções'), el('th', { class: 'dir' }, 'Tempo'),
           el('th', { class: 'dir' }, 'Pessoas'))),
@@ -103,30 +103,30 @@ function abrirFolhaVeiculacao(r) {
           el('td', { class: 'dir num' }, inteiro(r.resumo.telas)),
           el('td', { class: 'dir num' }, inteiro(r.resumo.insercoes)),
           el('td', { class: 'dir num' }, duracao(r.resumo.segundos)),
-          el('td', { class: 'dir num' }, inteiro(r.resumo.impactos))))),
+          el('td', { class: 'dir num' }, inteiro(r.resumo.impactos)))))),
 
       r.criativos.length
         ? el('div', {},
           el('h2', {}, 'Criativos exibidos'),
-          el('table', { class: 'tabela-folha' },
+          el('div', { class: 'rolagem' }, el('table', { class: 'tabela-folha' },
             el('thead', {}, el('tr', {}, el('th', {}, 'Criativo'), el('th', {}, 'Tipo'), el('th', { class: 'dir' }, 'Inserções'), el('th', { class: 'dir' }, 'Tempo'))),
             el('tbody', {}, r.criativos.map((m) => el('tr', {},
               el('td', {}, m.nome), el('td', {}, m.tipo === 'video' ? 'Vídeo' : 'Imagem'),
-              el('td', { class: 'dir num' }, inteiro(m.insercoes)), el('td', { class: 'dir num' }, duracao(m.segundos)))))))
+              el('td', { class: 'dir num' }, inteiro(m.insercoes)), el('td', { class: 'dir num' }, duracao(m.segundos))))))))
         : null,
 
       el('h2', {}, 'Prova de exibição'),
       el('p', { class: 'resumo' },
         'Cada vez que o anúncio foi ao ar é registrada pela própria TV, com data, hora e tela. '
         + `Abaixo, as últimas ${r.amostra.length} de ${inteiro(r.resumo.insercoes)} inserções; a lista completa vai no arquivo em anexo.`),
-      el('table', { class: 'tabela-folha' },
+      el('div', { class: 'rolagem' }, el('table', { class: 'tabela-folha' },
         el('thead', {}, el('tr', {}, el('th', {}, 'Data e hora'), el('th', {}, 'Ponto'), el('th', {}, 'TV'), el('th', {}, 'Criativo'), el('th', { class: 'dir' }, 'Duração'))),
         el('tbody', {}, r.amostra.map((x) => el('tr', {},
           el('td', {}, dataHora(x.exibida_em)),
           el('td', {}, `${x.local} — ${x.cidade}/${x.uf}`),
           el('td', {}, x.tela),
           el('td', {}, x.midia ?? '—'),
-          el('td', { class: 'dir num' }, `${x.duracao_s}s`))))),
+          el('td', { class: 'dir num' }, `${x.duracao_s}s`)))))),
 
       el('footer', {}, `${r.plataforma.nome} · ${r.plataforma.slogan} · relatório gerado em ${dataBr(new Date().toLocaleDateString('en-CA'))}`)));
 

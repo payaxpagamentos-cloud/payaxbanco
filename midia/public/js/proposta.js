@@ -3,10 +3,10 @@
  * Monta uma folha pronta para imprimir ou salvar em PDF (o navegador faz o PDF, sem biblioteca):
  * a marca, o que o cliente compra, o que vai ao ar, quanto custa e até quando o preço vale.
  */
-import { api, qs } from './api.js';
+import { api, qs, BASE } from './api.js';
 import {
   el, limpar, icone, toast, acao, modal, formModal, confirmar, perguntar, campo, escolha, area, lerForm, simbolo,
-  inteiro, dinheiro, dataBr, dataHora, etiqueta, percentual, CATEGORIAS,
+  inteiro, dinheiro, dataBr, dataHora, etiqueta, percentual, telefone, abrirWhatsApp, CATEGORIAS,
 } from './ui.js';
 import { cartao, indicador, tabela } from './comum.js';
 
@@ -65,17 +65,14 @@ export async function gerarProposta(circuitoId, nomeCircuito, recarregar = null,
 const bloco = (rotulo, valor, nota) => el('div', { class: 'bloco' },
   el('div', { class: 'valor' }, valor), el('div', { class: 'rotulo' }, rotulo), nota ? el('div', { class: 'nota' }, nota) : null);
 
-/** A folha em si: ocupa a tela inteira e é o único elemento que vai para a impressora. */
-export function abrirFolha(p, observacao, guardada = null) {
+/**
+ * A folha da proposta. Vale para os dois lugares onde ela aparece: a janela do painel e a página
+ * pública que o cliente abre pelo link do WhatsApp — o mesmo papel, sem nada do sistema em volta.
+ */
+export function montarFolha(p, observacao, guardada = null) {
   const i = p.investimento;
   const vendido = p.veiculacao;
-  const fechar = () => { folha.remove(); document.body.style.overflow = ''; };
-  const folha = el('div', { class: 'folha-proposta' },
-    el('div', { class: 'acoes-folha' },
-      el('button', { class: 'btn primario', onclick: () => window.print() }, icone('baixar'), 'Imprimir / salvar em PDF'),
-      el('button', { class: 'btn', onclick: fechar }, 'Fechar')),
-
-    el('article', { class: 'folha' },
+  return el('article', { class: 'folha' },
       el('header', {},
         el('div', { class: 'marca-folha' }, el('span', { class: 'simbolo' }, simbolo()),
           el('div', {}, el('strong', {}, p.plataforma.nome.toUpperCase()), el('div', { class: 'slogan' }, p.plataforma.slogan))),
@@ -104,7 +101,7 @@ export function abrirFolha(p, observacao, guardada = null) {
         bloco('Espaço na tela', percentual(vendido.share_percentual), `cada anúncio fica ${vendido.duracao_s}s no ar`)),
 
       el('h2', {}, 'Onde o anúncio passa'),
-      el('table', { class: 'tabela-folha' },
+      el('div', { class: 'rolagem' }, el('table', { class: 'tabela-folha' },
         el('thead', {}, el('tr', {}, el('th', {}, 'Ponto'), el('th', {}, 'Ambiente'), el('th', {}, 'Cidade'),
           el('th', { class: 'dir' }, 'Telas'), el('th', { class: 'dir' }, 'Pessoas/dia'), el('th', { class: 'dir' }, 'Inserções/mês'))),
         el('tbody', {}, p.pontos.map((x) => el('tr', {},
@@ -118,10 +115,10 @@ export function abrirFolha(p, observacao, guardada = null) {
           el('td', { colspan: 3 }, 'Total'),
           el('td', { class: 'dir num' }, inteiro(p.circuito.telas)),
           el('td', { class: 'dir num' }, inteiro(p.circuito.publico_dia)),
-          el('td', { class: 'dir num' }, inteiro(vendido.insercoes_mes))))),
+          el('td', { class: 'dir num' }, inteiro(vendido.insercoes_mes)))))),
 
       el('h2', {}, 'Investimento'),
-      el('table', { class: 'tabela-folha investimento' },
+      el('div', { class: 'rolagem' }, el('table', { class: 'tabela-folha investimento' },
         el('tbody', {},
           el('tr', {}, el('td', {}, 'Tabela mensal'), el('td', { class: 'dir num' }, dinheiro(i.tabela_mes_centavos))),
           i.desconto_percentual
@@ -131,7 +128,7 @@ export function abrirFolha(p, observacao, guardada = null) {
           el('tr', { class: 'forte' }, el('td', {}, 'Por mês'), el('td', { class: 'dir num' }, dinheiro(i.mes_centavos))),
           el('tr', { class: 'forte' }, el('td', {}, `Total do período (${i.meses} ${i.meses === 1 ? 'mês' : 'meses'})`),
             el('td', { class: 'dir num' }, dinheiro(i.total_centavos))),
-          el('tr', {}, el('td', {}, 'Custo por mil pessoas alcançadas (CPM)'), el('td', { class: 'dir num' }, dinheiro(i.cpm_centavos))))),
+          el('tr', {}, el('td', {}, 'Custo por mil pessoas alcançadas (CPM)'), el('td', { class: 'dir num' }, dinheiro(i.cpm_centavos)))))),
 
       observacao ? el('div', { class: 'observacao' }, observacao) : null,
 
@@ -143,7 +140,19 @@ export function abrirFolha(p, observacao, guardada = null) {
         el('li', {}, 'As pessoas alcançadas são uma estimativa do fluxo de cada ponto pela fatia de tempo de tela contratada, não uma medição individual.'),
         el('li', {}, `Proposta válida até ${dataBr(p.valida_ate)}. Faturamento mensal, com nota fiscal de serviço.`)),
 
-      el('footer', {}, `${p.plataforma.nome} · ${p.plataforma.slogan}`)));
+      el('footer', {}, `${p.plataforma.nome} · ${p.plataforma.slogan}`));
+}
+
+/** A folha na janela do painel: ocupa a tela inteira e é o único elemento que vai para a impressora. */
+export function abrirFolha(p, observacao, guardada = null) {
+  const fechar = () => { folha.remove(); document.body.style.overflow = ''; };
+  const folha = el('div', { class: 'folha-proposta' },
+    el('div', { class: 'acoes-folha' },
+      el('button', { class: 'btn primario', onclick: () => window.print() }, icone('baixar'), 'Imprimir / salvar em PDF'),
+      guardada ? el('button', { class: 'btn', onclick: () => enviarPorWhatsApp(guardada) }, icone('enviar'), 'Enviar por WhatsApp') : null,
+      guardada ? el('button', { class: 'btn', onclick: () => copiarLink(guardada) }, 'Copiar o link') : null,
+      el('button', { class: 'btn', onclick: fechar }, 'Fechar')),
+    montarFolha(p, observacao, guardada));
 
   // Enquanto a folha está aberta, o painel atrás não rola (e o Esc fecha).
   document.body.style.overflow = 'hidden';
@@ -154,6 +163,54 @@ export function abrirFolha(p, observacao, guardada = null) {
   });
   document.body.append(folha);
   folha.scrollTop = 0;
+}
+
+/**
+ * O endereço público da proposta: é isso que vai no WhatsApp.
+ * O cliente abre no celular, lê a folha inteira e salva em PDF ali mesmo, sem login e sem app.
+ */
+export const linkDaProposta = (p) => `${location.origin}${BASE}/proposta/?p=${p.link_token}`;
+
+/** A mensagem que acompanha o link (o vendedor ainda pode mexer antes de enviar). */
+function mensagemDaProposta(p) {
+  const quem = p.anunciante ?? p.lead ?? '';
+  const plataforma = p.folha?.plataforma?.nome ?? 'Vai Mídia';
+  return `${quem ? `Olá, ${quem}! ` : 'Olá! '}Segue a proposta ${p.numero} da ${plataforma} `
+    + `(${p.folha.circuito.nome}, ${p.meses} ${p.meses === 1 ? 'mês' : 'meses'} por ${dinheiro(p.mes_centavos)}/mês).\n\n`
+    + `${linkDaProposta(p)}\n\nO link abre a proposta completa e dá para salvar em PDF. Vale até ${dataBr(p.valida_ate)}.`;
+}
+
+/**
+ * Abre o WhatsApp do cliente com a mensagem e o link prontos.
+ * Mandar a proposta é o que a tira do rascunho: ela passa sozinha para "na mesa do cliente".
+ */
+async function enviarPorWhatsApp(p, recarregar = null) {
+  const numero = p.anunciante_telefone || p.lead_telefone;
+  const foi = abrirWhatsApp(numero, mensagemDaProposta(p),
+    'Este cliente não tem telefone cadastrado. Copie o link e mande por onde preferir.');
+  if (!foi) return copiarLink(p);
+  if (p.status === 'rascunho') {
+    try {
+      await api.post(`/painel/propostas/${p.id}/enviar`, {});
+      toast(`Proposta ${p.numero} marcada como enviada.`);
+      if (recarregar) recarregar();
+    } catch { /* o WhatsApp já abriu: a marcação pode ser feita depois, na ficha */ }
+  }
+  return true;
+}
+
+async function copiarLink(p) {
+  try {
+    await navigator.clipboard.writeText(linkDaProposta(p));
+    toast('Link da proposta copiado.');
+  } catch {
+    // Sem permissão para a área de transferência: mostrar o link resolve do mesmo jeito.
+    await modal(`Link da proposta ${p.numero}`, (fechar) => [
+      el('p', { class: 'mudo' }, 'Copie e mande por WhatsApp, e-mail ou do jeito que preferir.'),
+      el('div', { class: 'segredo' }, linkDaProposta(p)),
+      el('div', { class: 'linha entre' }, el('span', {}), el('button', { class: 'btn primario', onclick: () => fechar() }, 'Fechar')),
+    ]);
+  }
 }
 
 // ================================================================ O funil: as propostas guardadas
@@ -194,6 +251,10 @@ export async function propostas(ctx) {
           el('div', { class: 'pequeno mudo' }, `${dinheiro(p.mes_centavos)}/mês${p.desconto_percentual ? ` · ${percentual(p.desconto_percentual)} off` : ''}`)), 'Valor', 'num dir'],
         [(p) => (p.expirada ? etiqueta(`Prazo venceu em ${dataBr(p.valida_ate)}`, 'aviso') : etiqueta(...STATUS_PROPOSTA[p.status] ?? [p.status, ''])), 'Situação'],
         [(p) => (p.contrato_numero ? el('span', {}, `contrato ${p.contrato_numero}`) : dataBr(p.criado_em.slice(0, 10))), 'Resultado'],
+        [(p) => el('button', {
+          class: 'btn pequeno', title: 'Mandar a proposta no WhatsApp do cliente',
+          onclick: async (e) => { e.stopPropagation(); await enviarPorWhatsApp(await api.get(`/painel/propostas/${p.id}`), pintar); },
+        }, icone('enviar'), 'WhatsApp'), '', 'acoes'],
       ], d.itens, {
         aoClicar: (p) => abrirProposta(p.id, pintar),
         vazioTexto: 'Nenhuma proposta ainda. Elas nascem no Inventário, em cada circuito.',
@@ -229,7 +290,13 @@ async function abrirProposta(id, recarregar) {
       el('div', {}, el('span', { class: 'rotulo' }, 'Inserções/mês'), el('span', {}, inteiro(p.folha.veiculacao.insercoes_mes))),
       el('div', {}, el('span', { class: 'rotulo' }, 'Feita em'), el('span', {}, dataHora(p.criado_em))),
       p.enviada_em ? el('div', {}, el('span', { class: 'rotulo' }, 'Enviada em'), el('span', {}, dataBr(p.enviada_em))) : null,
-      p.respondida_em ? el('div', {}, el('span', { class: 'rotulo' }, 'Respondida em'), el('span', {}, dataBr(p.respondida_em))) : null),
+      p.respondida_em ? el('div', {}, el('span', { class: 'rotulo' }, 'Respondida em'), el('span', {}, dataBr(p.respondida_em))) : null,
+      // Saber que o cliente abriu (e quando) é metade do trabalho de dar o retorno na hora certa.
+      el('div', {}, el('span', { class: 'rotulo' }, 'O cliente abriu'),
+        el('span', {}, p.aberturas ? `${inteiro(p.aberturas)}× · última em ${dataHora(p.aberta_em)}` : 'ainda não')),
+      (p.anunciante_telefone || p.lead_telefone)
+        ? el('div', {}, el('span', { class: 'rotulo' }, 'WhatsApp'), el('span', {}, telefone(p.anunciante_telefone || p.lead_telefone)))
+        : null),
 
     p.motivo ? el('p', { class: 'aviso' }, `Recusada: ${p.motivo}`) : null,
     p.contrato_numero
@@ -241,6 +308,11 @@ async function abrirProposta(id, recarregar) {
     el('div', { class: 'linha entre', style: 'margin-top:18px' },
       el('div', { class: 'linha' },
         el('button', { class: 'btn', onclick: () => { fechar(); abrirFolha(p.folha, p.observacao, p); } }, icone('relatorios'), 'Ver a folha'),
+        el('button', {
+          class: 'btn primario', title: 'Abre o WhatsApp do cliente com a mensagem e o link da proposta prontos',
+          onclick: () => enviarPorWhatsApp(p, () => { fechar(); recarregar(); }),
+        }, icone('enviar'), 'Mandar no WhatsApp'),
+        el('button', { class: 'btn', onclick: () => copiarLink(p) }, 'Copiar o link'),
         p.status === 'rascunho'
           ? el('button', {
             class: 'btn primario', onclick: (e) => acao(e.target, async () => {

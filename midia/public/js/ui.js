@@ -40,6 +40,29 @@ export function telefone(t) {
   return d;
 }
 
+/**
+ * Link do WhatsApp com a mensagem já escrita (wa.me). Abre o WhatsApp de quem está no painel —
+ * Web no computador, aplicativo no celular — com a conversa certa aberta e o texto pronto para enviar.
+ *
+ * Não é disparo automático: quem aperta "enviar" é a pessoa. Envio automático exige contratar um
+ * provedor oficial da Meta, e até lá este caminho resolve o dia a dia sem mensalidade nenhuma.
+ */
+export function linkWhatsApp(telefone, texto = '') {
+  const d = String(telefone ?? '').replace(/\D/g, '');
+  // Número brasileiro com DDD vira 55DDDNÚMERO; o que já vem com código de país é respeitado.
+  const numero = d.length === 10 || d.length === 11 ? `55${d}` : d;
+  if (numero.length < 12) return null;
+  return `https://wa.me/${numero}${texto ? `?text=${encodeURIComponent(texto)}` : ''}`;
+}
+
+/** Abre o WhatsApp numa aba nova (ou avisa quando não há número cadastrado). */
+export function abrirWhatsApp(telefone, texto, aviso = 'Este contato não tem telefone cadastrado.') {
+  const link = linkWhatsApp(telefone, texto);
+  if (!link) return toast(aviso, true);
+  window.open(link, '_blank', 'noopener');
+  return true;
+}
+
 export const PERFIS = { master: 'Master', operador: 'Operador', anunciante: 'Anunciante (portal)', lojista: 'Lojista do ponto (portal)' };
 /** Ambientes onde a rede instala telas (mesma lista de server/lib/validacao.js). */
 export const CATEGORIAS = {

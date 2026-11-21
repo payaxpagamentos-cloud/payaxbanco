@@ -302,6 +302,28 @@ test('Rede em condomínios: comunicados, circuitos e agência', async (t) => {
     assert.equal(depois.totais.conversao_percentual, 10_000, '1 de 1 respondida');
   });
 
+  await t.test('a proposta tem um link público para mandar no WhatsApp', async () => {
+    const p = (await api.post('/painel/propostas', { circuito_id: circuito, anunciante_id: anunciante, meses: 3 }, master)).dados;
+    assert.match(p.link_token, /^[0-9a-f]{32}$/, 'o link nasce com a proposta e é difícil de adivinhar');
+    assert.equal(p.aberturas, 0);
+
+    // Quem recebe o link vê a folha, sem login.
+    const publica = (await api.get(`/publico/proposta/${p.link_token}`)).dados;
+    assert.equal(publica.numero, p.numero);
+    assert.equal(publica.expirada, false);
+    assert.equal(publica.folha.circuito.nome, 'Residencial Campinas');
+    assert.ok(!JSON.stringify(publica).includes('link_token'), 'a página pública não devolve o próprio token');
+
+    // E a equipe sabe que ele abriu (e quando).
+    const depois = (await api.get(`/painel/propostas/${p.id}`, master)).dados;
+    assert.equal(depois.aberturas, 1);
+    assert.ok(depois.aberta_em);
+
+    assert.equal((await api.get('/publico/proposta/naoexiste')).status, 404);
+    await api.post(`/painel/propostas/${p.id}/recusar`, { motivo: 'desistiu' }, master);
+    assert.equal((await api.get(`/publico/proposta/${p.link_token}`)).status, 410, 'proposta recusada sai do ar');
+  });
+
   await t.test('a folha guardada não muda quando a rede muda', async () => {
     const p = (await api.post('/painel/propostas', { circuito_id: circuito, meses: 1 }, master)).dados;
     const telasNaEpoca = p.folha.circuito.telas;

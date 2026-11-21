@@ -437,6 +437,10 @@ CREATE TABLE IF NOT EXISTS propostas (
   status TEXT NOT NULL DEFAULT 'rascunho' CHECK (status IN ('rascunho','enviada','aceita','recusada')),
   motivo TEXT,
   folha TEXT NOT NULL,
+  -- Endereço público da proposta (o que vai no WhatsApp). Quem tem o link vê a folha; ninguém mais.
+  link_token TEXT,
+  aberta_em TEXT,
+  aberturas INTEGER NOT NULL DEFAULT 0,
   contrato_id INTEGER REFERENCES contratos(id),
   campanha_id INTEGER REFERENCES campanhas(id),
   enviada_em TEXT,
@@ -663,6 +667,7 @@ const COLUNAS_NOVAS = [
   ['contratos', 'reajuste_meses', 'INTEGER NOT NULL DEFAULT 12'], ['contratos', 'reajuste_percentual', 'INTEGER NOT NULL DEFAULT 0'],
   ['contratos', 'ultimo_reajuste', 'TEXT'], ['contratos', 'renovado_em', 'TEXT'], ['contratos', 'renovacoes', 'INTEGER NOT NULL DEFAULT 0'],
   ['propostas', 'lead_id', 'INTEGER REFERENCES leads(id)'],
+  ['propostas', 'link_token', 'TEXT'], ['propostas', 'aberta_em', 'TEXT'], ['propostas', 'aberturas', 'INTEGER NOT NULL DEFAULT 0'],
   ['locais', 'latitude', 'REAL'], ['locais', 'longitude', 'REAL'],
   ['comunicados', 'evento_em', 'TEXT'], ['comunicados', 'evento_hora', 'TEXT'],
   ['telas', 'foto_arquivo', 'TEXT'], ['telas', 'foto_em', 'TEXT'], ['telas', 'foto_item', 'TEXT'],

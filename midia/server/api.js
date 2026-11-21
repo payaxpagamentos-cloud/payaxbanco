@@ -20,6 +20,15 @@ function criarApi(db) {
   });
 
   /**
+   * A proposta aberta pelo link do WhatsApp. Público de propósito: quem recebeu o link é o cliente,
+   * e exigir senha de quem ainda nem fechou negócio é o jeito mais rápido de perder a venda.
+   * O link é aleatório e a folha é só de leitura — nada do painel vai junto.
+   */
+  api.get('/publico/proposta/:token', require('./lib/limitador').limitar({ janelaMs: 60_000, maximo: 30 }), (req, res) => {
+    res.json(require('./lib/propostas').porToken(db, req.params.token));
+  });
+
+  /**
    * Números da rede para o site: só agregados, nenhum nome de ponto ou cliente.
    * É o que mantém a página sempre atual sem ninguém editar HTML.
    */
