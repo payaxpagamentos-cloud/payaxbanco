@@ -70,7 +70,7 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
   e a lista de pontos com ambiente, unidades, onde as telas ficam e a tabela. Exporta em CSV, e cada circuito gera a
   **proposta comercial** pronta para imprimir ou salvar em PDF: a marca, a rede alcançada, as inserções e pessoas
   alcançadas estimadas, onde o anúncio passa ponto a ponto, o investimento (com desconto e CPM) e a validade.
-- **CRM**, com duas abas:
+- **CRM**, em três telas no menu lateral:
   - **Funil**: o quadro de quem ainda não é cliente — os dois lados do negócio, quem quer **anunciar** e o
     ponto que quer **tela** (condomínio, loja, academia, clínica, prédio comercial — o lead nasce sem ambiente
     definido, porque quem sabe qual é é a equipe). Cada lead tem etapa, valor estimado, responsável, o histórico das conversas e,
@@ -82,6 +82,10 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
     a rede muda toda semana, e reimprimir uma proposta de dois meses atrás tem de mostrar o que foi oferecido, não o
     inventário de hoje. Quando o cliente aceita, **nascem o cliente, o contrato e a campanha** (em rascunho,
     esperando o criativo) com as telas do circuito, sem ninguém redigitar o que já foi combinado.
+  - **E-mail**: a caixa de entrada da empresa dentro do sistema — o que chega pelo servidor de e-mail da
+    plataforma cai aqui **ligado ao lead de quem escreveu**, a resposta sai daqui e as duas coisas entram no
+    histórico do funil. Mensagem de desconhecido fica marcada como "sem lead" e vira lead com um botão.
+    Detalhes e o que o domínio precisa ter: *Caixa de entrada do CRM*, mais abaixo.
 - **Relatórios**: por campanha, por TV, por ponto e a **prova de exibição** linha por linha; tudo com CSV. Cada
   campanha gera ainda o **relatório de veiculação** (o *checking* que a agência pede): o que foi ao ar no mês, por
   ponto, por criativo e as últimas linhas da prova, na mesma folha impressa da proposta — com o CSV completo em anexo.
@@ -335,6 +339,58 @@ ponto, um botão no site e outro na proposta que o cliente abre pelo link.
 O que o sistema **não** faz é disparar sozinho: quem aperta "enviar" é a pessoa, do próprio número. Disparo
 automático exige contratar um provedor oficial da Meta — veja *O que depende de terceiros*. O e-mail automático
 (fatura vencida, tela fora do ar, contrato vencendo) continua como está.
+
+## Caixa de entrada do CRM (servidor de e-mail próprio)
+
+Em **CRM › E-mail** fica a caixa de entrada da empresa, dentro do sistema. O que chega entra ligado ao lead
+de quem escreveu, a resposta sai daqui e **as duas coisas entram no histórico do funil**, junto com as
+ligações e as visitas. A razão é prática: a conversa que decide a venda estava espalhada na caixa pessoal de
+cada atendente; quem pegasse o cliente no dia seguinte não sabia o que tinha sido combinado.
+
+O que já funciona:
+
+- **Receber**: o sistema tem o próprio servidor SMTP (`server/lib/smtp-servidor.js`). Com
+  `MIDIA_EMAIL_DOMINIOS` preenchido, ele ouve na porta 25 e aceita o que for endereçado aos seus domínios.
+- **Ler**: assunto e corpo saem legíveis mesmo com acento, codificação antiga ou mensagem só em HTML.
+  O painel mostra **texto**, nunca o HTML de quem mandou — e-mail de desconhecido não executa nada aqui
+  dentro. A mensagem original fica guardada em `.eml` e pode ser baixada; os anexos saem dela na hora.
+- **Responder**: sai pelo servidor de envio configurado (`MIDIA_SMTP_*`), amarrado à mesma conversa
+  (quem recebe vê a resposta embaixo da pergunta) e vira anotação no lead.
+- **Ligar ao funil**: mensagem de desconhecido fica marcada como "sem lead" e vira lead com um botão.
+  A caixa **não** cria lead sozinha de propósito: caixa de e-mail recebe spam, e lead automático entope o funil.
+- **Não retransmite**: mensagem para domínio que não é seu é recusada na porta (`550`). Sem isso, o endereço
+  vira "relay aberto", serve de trampolim para spam e entra em lista negra na mesma semana.
+
+### O que o domínio precisa ter (e o que ainda depende de terceiros)
+
+Receber e-mail não é só ligar o programa. Para o mundo entregar mensagem aqui:
+
+| | |
+|---|---|
+| **MX** | `vaimidia.com.br` → o endereço desta máquina, prioridade 10 |
+| **A** | o nome do servidor apontando para o IP fixo |
+| **Porta 25 aberta** | de entrada, liberada pelo provedor de hospedagem |
+| **DNS reverso (PTR)** | o IP respondendo com o nome do servidor |
+| **SPF** | `v=spf1 ip4:SEU.IP -all`, para o que sai |
+| **DKIM** | `MIDIA_DKIM_*` com a chave privada aqui e a pública no TXT `<seletor>._domainkey` |
+| **DMARC** | `v=DMARC1; p=none; rua=mailto:...`, para acompanhar |
+
+Três avisos honestos, antes de apontar o MX:
+
+1. **Porta 25 costuma ser bloqueada.** Quase toda nuvem (AWS, Google Cloud, Azure, Oracle) bloqueia a porta 25
+   por padrão, e muitas só liberam mediante pedido. Em Linux, porta abaixo de 1024 também exige permissão:
+   `setcap 'cap_net_bind_service=+ep' $(which node)`, ou ouvir numa porta alta com um redirecionamento.
+2. **Enviar pelo servidor próprio é o pedaço difícil.** Receber é tranquilo; mandar e *chegar na caixa de
+   entrada* depende de reputação de IP, que leva meses. A recomendação é a que já está no código:
+   **receber aqui e enviar por um provedor** (Google Workspace, Zoho, Amazon SES, Mailgun) em `MIDIA_SMTP_*`.
+   Assim a resposta ao cliente não cai no spam.
+3. **Não há filtro de spam nem antivírus.** Tudo que for endereçado aos seus domínios é guardado. Os anexos
+   ficam em disco e nunca são abertos pelo sistema, mas quem clicar baixa o que veio. Se a caixa for muito
+   divulgada, o caminho é um provedor na frente, filtrando, e o encaminhamento para cá.
+   A conexão na porta 25 também é **sem TLS** (o servidor recusa `STARTTLS`): entre servidores, a mensagem
+   trafega aberta. Para exigir sigilo no transporte, use um provedor na frente.
+
+O *Diagnóstico* mostra o estado do servidor de e-mail e quantas mensagens estão esperando resposta.
 
 ## A proposta no WhatsApp
 

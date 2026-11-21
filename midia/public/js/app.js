@@ -17,7 +17,10 @@ const MENUS = {
     ['resumo', 'Visão geral', 'dashboard'], ['telas', 'TVs', 'telas'], ['pontos', 'Pontos', 'pontos'],
     ['comunicados', 'Comunicados', 'aprovacoes'],
     ['anunciantes', 'Anunciantes e agências', 'anunciantes'], ['campanhas', 'Campanhas', 'campanhas'], ['criativos', 'Criativos', 'midias'],
-    ['programacao', 'Programação', 'grade'], ['inventario', 'Inventário', 'ocupacao'], ['crm', 'CRM', 'anunciantes'],
+    ['programacao', 'Programação', 'grade'], ['inventario', 'Inventário', 'ocupacao'],
+    ['crm', 'CRM', 'anunciantes', null, [
+      ['funil', 'Funil'], ['propostas', 'Propostas'], ['emails', 'E-mail'],
+    ]],
     ['relatorios', 'Relatórios', 'relatorios'],
     ['financeiro', 'Financeiro', 'faturamento', null, [
       ['caixa', 'Fluxo de caixa'], ['receber', 'Contas a receber'], ['pagar', 'Contas a pagar'], ['faturamento', 'Faturamento'],
@@ -48,7 +51,9 @@ const SUBTITULOS = {
   usuarios: 'Quem acessa o painel e os portais', configuracoes: 'Regras da programação, preços de tabela e PIX das faturas',
   receber: 'Faturas dos anunciantes: o que entra, o que está vencendo e o que atrasou',
   pagar: 'Repasses aos pontos e despesas da operação: o que sai',
-  crm: 'O funil: com quem estamos falando, o que ficou combinado e o que virou contrato',
+  funil: 'O funil: com quem estamos falando, o que ficou combinado e o que virou contrato',
+  propostas: 'O papel que sai do funil e volta como contrato',
+  emails: 'A conversa por e-mail com quem está no funil, do lado de dentro do sistema',
   historico: 'Registro de quem fez o quê', prova: 'Cada vez que seu anúncio foi ao ar', faturas: 'Seu contrato, as faturas e o PIX para pagamento',
   rede: 'Pontos e telas onde a publicidade pode passar', conteudo: 'Imagens e vídeos do seu ponto na TV', conta: 'Sua conta',
 };
@@ -77,7 +82,7 @@ async function desenhar() {
   const [nome, ...resto] = rota();
   const item = menu.find(([k, , , perfis, subs]) => (k === nome || subs?.some(([sk]) => sk === nome)) && (!perfis || perfis.includes(u.perfil)));
   // Um grupo (só submenus) leva para a primeira tela dele.
-  if (item?.[4] && item[0] === nome) return ir(item[4][0][0]);
+  if (item?.[4] && item[0] === nome && item[4][0][0] !== nome) return ir(item[4][0][0]);
   if (!item || !telas[nome]) return ir(menu[0][4]?.[0][0] ?? menu[0][0]);
 
   const conteudo = el('main', { class: 'conteudo' });

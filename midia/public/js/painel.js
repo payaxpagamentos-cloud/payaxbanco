@@ -5,6 +5,8 @@ import { anunciantes, campanhas, criativos, programacao } from './comercial.js';
 import { relatorios, faturamento, contasAReceber, contasAPagar, fluxoCaixa } from './financeiro.js';
 import { inventario } from './inventario.js';
 import { crm } from './crm.js';
+import { propostas } from './proposta.js';
+import { emails } from './emails.js';
 import { usuarios, configuracoes, diagnostico, historico } from './admin.js';
 
 export const TELAS_EQUIPE = {
@@ -17,7 +19,9 @@ export const TELAS_EQUIPE = {
   criativos,
   programacao,
   inventario,
-  crm,
+  funil: crm,
+  propostas,
+  emails,
   relatorios,
   faturamento,
   caixa: fluxoCaixa,

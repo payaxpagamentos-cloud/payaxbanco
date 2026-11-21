@@ -313,6 +313,49 @@ function criar(db) {
       motivo, criado_em, atualizado_em) VALUES (?, 'anunciante', ?, ?, 'Valinhos', 'SP', 'prospeccao', 'perdido', ?, ?, ?, ?, ?)`,
     'Loja do Celular', 'Rafael', '19988770066', equipeId, 60_000, 'Achou caro para uma loja só.', criado, criado);
 
+  /*
+   * Caixa de entrada do CRM: duas mensagens que chegaram pelo servidor de e-mail da plataforma e a
+   * resposta que saiu daqui. Uma delas é de quem já está no funil (cai grudada no lead); a outra é de
+   * um desconhecido, esperando alguém decidir se vira lead.
+   */
+  const caixaLib = require('./lib/caixa');
+  const cartaDeExemplo = ({ de, nome, assunto, corpo, id }) => Buffer.from([
+    `From: ${nome} <${de}>`,
+    'To: comercial@vaimidia.com.br',
+    `Subject: ${assunto}`,
+    `Message-ID: <${id}>`,
+    `Date: ${new Date().toUTCString()}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    corpo,
+  ].join('\r\n'), 'utf8');
+
+  try {
+    caixaLib.receber(db, {
+      bruto: cartaDeExemplo({
+        de: 'contato@clinicasorriso.com.br', nome: 'Dra. Paula', assunto: 'Recebi o mídia kit',
+        id: `demo-clinica-${Date.now()}@clinicasorriso.com.br`,
+        corpo: 'Boa tarde! Recebi o mídia kit e gostei dos prédios do Cambuí.\n\n'
+          + 'Consegue me mandar uma proposta de 3 meses? Quero começar no mês que vem.',
+      }),
+      de: 'contato@clinicasorriso.com.br',
+      para: ['comercial@vaimidia.com.br'],
+    });
+    caixaLib.receber(db, {
+      bruto: cartaDeExemplo({
+        de: 'sindico@residencialaurora.com.br', nome: 'Síndico Marcelo', assunto: 'Tela no nosso prédio',
+        id: `demo-aurora-${Date.now()}@residencialaurora.com.br`,
+        corpo: 'Olá! Sou síndico de um prédio com 120 apartamentos em Campinas e vi a tela de vocês em '
+          + 'outro condomínio.\n\nComo funciona para instalar aqui? Tem custo para o condomínio?',
+      }),
+      de: 'sindico@residencialaurora.com.br',
+      para: ['comercial@vaimidia.com.br'],
+    });
+  } catch (err) {
+    console.error('[Vai Mídia] Demonstração: não consegui criar a caixa de e-mail:', err.message);
+  }
+
   // Propostas: o funil do comercial — uma na mesa do cliente, uma recusada e uma que virou contrato.
   const propostasLib = require('./lib/propostas');
   const proposta = (circuitoIdx, anuncianteIdx, meses, desconto, observacao) => propostasLib.criar(db, {

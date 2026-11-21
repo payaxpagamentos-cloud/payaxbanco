@@ -417,6 +417,41 @@ CREATE TABLE IF NOT EXISTS lead_interacoes (
 );
 CREATE INDEX IF NOT EXISTS idx_interacoes_lead ON lead_interacoes (lead_id, criado_em);
 
+-- Caixa de entrada do CRM: as mensagens que chegam no servidor de e-mail da própria plataforma e as
+-- respostas que saem daqui. O corpo fica no banco (texto limpo) e a mensagem original inteira, com anexos,
+-- fica em disco (.eml) — é ela que vale como prova do que o cliente escreveu.
+-- A ligação com o lead é por e-mail do remetente: a conversa aparece na ficha de quem está no funil.
+CREATE TABLE IF NOT EXISTS emails (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  direcao TEXT NOT NULL CHECK (direcao IN ('entrada','saida')),
+  de TEXT NOT NULL,
+  de_nome TEXT,
+  para TEXT NOT NULL,
+  assunto TEXT NOT NULL DEFAULT '',
+  previa TEXT NOT NULL DEFAULT '',
+  texto TEXT,
+  -- Identificadores do próprio e-mail, que amarram pergunta e resposta na mesma conversa.
+  message_id TEXT,
+  em_resposta_a TEXT,
+  thread TEXT,
+  arquivo TEXT,
+  tamanho INTEGER NOT NULL DEFAULT 0,
+  anexos INTEGER NOT NULL DEFAULT 0,
+  lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL,
+  anunciante_id INTEGER REFERENCES anunciantes(id) ON DELETE SET NULL,
+  local_id INTEGER REFERENCES locais(id) ON DELETE SET NULL,
+  lido_em TEXT,
+  arquivado_em TEXT,
+  ip TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  recebido_em TEXT NOT NULL,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_emails_caixa ON emails (arquivado_em, recebido_em);
+CREATE INDEX IF NOT EXISTS idx_emails_lead ON emails (lead_id, recebido_em);
+CREATE INDEX IF NOT EXISTS idx_emails_thread ON emails (thread, recebido_em);
+CREATE INDEX IF NOT EXISTS idx_emails_de ON emails (de);
+
 -- Propostas comerciais. A proposta guarda o CÁLCULO DO DIA em que foi feita (a coluna folha, um JSON):
 -- a rede muda toda semana, e reimprimir uma proposta de dois meses atrás tem de mostrar o que foi oferecido,
 -- não o inventário de hoje. Quando o cliente aceita, ela vira contrato e campanha sem ninguém redigitar nada.

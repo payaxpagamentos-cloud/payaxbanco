@@ -6,6 +6,7 @@ const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { hoje } = require('../lib/datas');
 const crm = require('../lib/crm');
+const caixa = require('../lib/caixa');
 const propostas = require('../lib/propostas');
 const v = require('../lib/validacao');
 
@@ -228,6 +229,71 @@ module.exports = (db) => {
     db.prepare('DELETE FROM propostas WHERE id = ?').run(id);
     registrar(db, req, 'proposta_excluida', { id, numero: p.numero });
     res.status(204).end();
+  });
+
+  /* ------------------------------------------------------------------ Caixa de entrada do CRM */
+
+  /**
+   * A conversa por e-mail fica aqui dentro, ligada ao lead. O que entra vem pelo servidor de e-mail da
+   * plataforma (lib/smtp-servidor.js); o que sai vai pelo servidor de envio configurado.
+   */
+  r.get('/crm/emails', (req, res) => res.json(caixa.listar(db, req.query)));
+
+  r.get('/crm/emails/:id', (req, res) => {
+    const e = caixa.ler(db, Number(req.params.id));
+    // Abrir é ler: a caixa não fica com número de não lidos que não corresponde à verdade.
+    if (e.direcao === 'entrada' && !e.lido_em) return res.json(caixa.marcarLido(db, e.id));
+    res.json(e);
+  });
+
+  r.get('/crm/emails/:id/anexo/:indice', (req, res) => {
+    const a = caixa.anexo(db, Number(req.params.id), req.params.indice);
+    res.set('Content-Type', a.mime || 'application/octet-stream');
+    res.set('Content-Disposition', `attachment; filename="${a.nome.replace(/[^\w.\- ]+/g, '_')}"`);
+    res.send(a.conteudo);
+  });
+
+  r.get('/crm/emails/:id/original', (req, res) => {
+    const o = caixa.original(db, Number(req.params.id));
+    res.set('Content-Type', 'message/rfc822');
+    res.set('Content-Disposition', `attachment; filename="${o.nome}"`);
+    res.send(o.conteudo);
+  });
+
+  r.post('/crm/emails/:id/lido', (req, res) => res.json(caixa.marcarLido(db, Number(req.params.id), req.body.lido !== false)));
+
+  r.post('/crm/emails/:id/arquivar', (req, res) => {
+    const e = caixa.arquivar(db, Number(req.params.id), req.body.arquivado !== false);
+    registrar(db, req, 'email_arquivado', { id: e.id, de: e.de });
+    res.json(e);
+  });
+
+  r.post('/crm/emails/:id/lead', (req, res) => {
+    const id = Number(req.params.id);
+    const leadId = req.body.lead_id === null || req.body.lead_id === '' ? null : Number(req.body.lead_id);
+    const e = caixa.vincularLead(db, id, leadId);
+    registrar(db, req, 'email_vinculado', { id, lead_id: leadId });
+    res.json(e);
+  });
+
+  r.post('/crm/emails/:id/virar-lead', (req, res) => {
+    const tipo = v.opcao(req.body.tipo ?? 'anunciante', 'o tipo', ['anunciante', 'ponto']);
+    const r2 = caixa.virarLead(db, Number(req.params.id), { usuarioId: req.usuario.id, tipo });
+    registrar(db, req, 'lead_criado', { id: r2.lead_id, origem: 'e-mail' });
+    res.status(201).json(r2);
+  });
+
+  r.post('/crm/emails', async (req, res) => {
+    const e = await caixa.enviar(db, {
+      para: req.body.para,
+      assunto: v.opcional(req.body.assunto, 'o assunto', 200),
+      texto: req.body.texto,
+      responder_a: req.body.responder_a ?? null,
+      lead_id: req.body.lead_id ?? null,
+      usuarioId: req.usuario.id,
+    });
+    registrar(db, req, 'email_enviado', { id: e.id, para: e.para, assunto: e.assunto });
+    res.status(201).json(e);
   });
 
   return r;

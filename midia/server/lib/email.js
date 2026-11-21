@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const nodemailer = require('nodemailer');
 const config = require('../config');
 const { ErroNegocio } = require('./erros');
@@ -13,6 +14,22 @@ const caixaTeste = []; // no modo teste as mensagens ficam aqui, para os testes 
 
 const configurado = () => config.smtp.modo === 'teste' || Boolean(config.smtp.host);
 
+/*
+ * Assinatura DKIM: a chave privada fica num arquivo PEM e a pública num registro TXT do domínio. É ela
+ * que prova, para quem recebe, que a mensagem saiu mesmo de quem diz ter saído. Sem DKIM (e sem SPF),
+ * provedor grande manda a mensagem direto para o spam — veja o README.
+ */
+function lerDkim() {
+  const { dominio, seletor, chaveArquivo } = config.dkim;
+  if (!dominio || !chaveArquivo) return undefined;
+  try {
+    return { domainName: dominio, keySelector: seletor, privateKey: fs.readFileSync(chaveArquivo, 'utf8') };
+  } catch (err) {
+    console.error('[Vai Mídia] Não consegui ler a chave DKIM:', err.message);
+    return undefined;
+  }
+}
+
 function obterTransporte() {
   if (transporte) return transporte;
   transporte = config.smtp.modo === 'teste'
@@ -22,6 +39,7 @@ function obterTransporte() {
       port: config.smtp.porta,
       secure: config.smtp.seguro,
       auth: config.smtp.usuario ? { user: config.smtp.usuario, pass: config.smtp.senha } : undefined,
+      dkim: lerDkim(),
     });
   return transporte;
 }
@@ -75,7 +93,41 @@ async function enviar({ para, assunto, texto, ...conteudo }, { exigir = false } 
   }
 }
 
+/**
+ * Envio escrito por uma pessoa (a resposta da caixa de entrada do CRM), não um aviso automático.
+ *
+ * Vai como texto e também em HTML no padrão da marca; os identificadores de resposta mantêm a conversa
+ * amarrada, então no programa de quem recebe a resposta aparece embaixo da mensagem original.
+ */
+async function enviarDireto({ para, assunto, texto, emRespostaA = null, referencias = [] }) {
+  if (!configurado()) return { enviado: false, motivo: 'o envio de e-mails não está configurado (MIDIA_SMTP_HOST)' };
+  const corpo = String(texto ?? '').trim();
+  const html = modelo({
+    plataforma: 'Vai Mídia',
+    titulo: assunto,
+    linhas: corpo.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean),
+    rodape: 'Pode responder a este e-mail: a resposta chega direto na nossa equipe.',
+  });
+  try {
+    const info = await obterTransporte().sendMail({
+      from: config.smtp.remetente,
+      to: para,
+      subject: assunto,
+      text: corpo,
+      html,
+      inReplyTo: emRespostaA ? `<${emRespostaA}>` : undefined,
+      references: referencias.length ? referencias.map((r) => `<${r}>`).join(' ') : undefined,
+    });
+    if (config.smtp.modo === 'teste') caixaTeste.push({ para: [para], assunto, html, texto: corpo, info });
+    const remetente = /<([^>]+)>/.exec(config.smtp.remetente)?.[1] ?? config.smtp.remetente;
+    return { enviado: true, de: remetente, message_id: String(info.messageId ?? '').replace(/^<|>$/g, '') || null };
+  } catch (err) {
+    console.error('[Vai Mídia] Falha ao enviar e-mail:', err.message);
+    return { enviado: false, motivo: err.message };
+  }
+}
+
 /** Endereço do painel para os links dos e-mails. */
 const linkPainel = (caminho = '') => `${config.url || `http://localhost:${config.port}${config.basePath}`}/${String(caminho).replace(/^\/+/, '')}`;
 
-module.exports = { enviar, configurado, modelo, linkPainel, caixaTeste };
+module.exports = { enviar, enviarDireto, configurado, modelo, linkPainel, caixaTeste };

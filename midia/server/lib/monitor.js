@@ -149,6 +149,25 @@ function diagnostico(db) {
       : (avisosLigados ? 'Ligados: tela fora do ar, fatura vencida e fila de aprovação parada.' : 'SMTP configurado, mas os avisos estão desligados nas Configurações.'),
   });
 
+  // Caixa de entrada do CRM: o servidor de e-mail da casa e a fila de quem está esperando resposta.
+  const caixa = require('./caixa').estado();
+  const esperando = um(`SELECT COUNT(*) AS n FROM emails e WHERE e.direcao = 'entrada' AND e.arquivado_em IS NULL
+    AND NOT EXISTS (SELECT 1 FROM emails r WHERE r.direcao = 'saida' AND r.thread = e.thread AND r.recebido_em > e.recebido_em)`).n;
+  verificacoes.push({
+    nome: 'Servidor de e-mail (caixa do CRM)',
+    ok: caixa.configurado ? caixa.ouvindo : true,
+    detalhe: !caixa.configurado
+      ? 'Desligado (MIDIA_EMAIL_DOMINIOS vazio): o CRM só guarda o que sai daqui. Veja o README para ligar o recebimento.'
+      : (caixa.ouvindo
+        ? `Recebendo para ${caixa.dominios.join(', ')} na porta ${caixa.porta}.`
+        : `Configurado para ${caixa.dominios.join(', ')}, mas não subiu${caixa.erro ? `: ${caixa.erro}` : ''}.`),
+  });
+  verificacoes.push({
+    nome: 'E-mails esperando resposta',
+    ok: esperando < 5,
+    detalhe: esperando ? `${esperando} mensagem(ns) sem retorno na caixa do CRM.` : 'Ninguém esperando.',
+  });
+
   const semPix = !lerConfig(db).pix_chave;
   verificacoes.push({ nome: 'PIX das faturas', ok: !semPix, detalhe: semPix ? 'Chave PIX não configurada: as faturas saem sem o código de pagamento.' : 'Chave configurada.' });
 

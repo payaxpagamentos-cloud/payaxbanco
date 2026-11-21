@@ -11,6 +11,11 @@ process.env.MIDIA_LIMITE_LOGIN = '1000';
 // Os arquivos das mídias dos testes ficam numa pasta temporária, apagada no fim.
 process.env.MIDIA_ARQUIVOS = fs.mkdtempSync(path.join(os.tmpdir(), 'midia-teste-'));
 process.env.MIDIA_BACKUPS = fs.mkdtempSync(path.join(os.tmpdir(), 'midia-backup-'));
+// Caixa de entrada: domínio da casa e uma pasta temporária para as mensagens originais (.eml).
+process.env.MIDIA_EMAIL_DOMINIOS = process.env.MIDIA_EMAIL_DOMINIOS || 'vaimidia.com.br';
+process.env.MIDIA_EMAIL_PASTA = fs.mkdtempSync(path.join(os.tmpdir(), 'midia-emails-'));
+// Porta 0 = o servidor de e-mail não sobe sozinho nos testes; cada teste abre o seu numa porta livre.
+process.env.MIDIA_EMAIL_PORTA = '0';
 
 const { abrir } = require('../server/db');
 const { criarApp } = require('../server/app');
@@ -130,13 +135,63 @@ async function iniciar() {
   };
 }
 
+/**
+ * Sobe o servidor de e-mail numa porta livre e devolve uma função que entrega uma mensagem nele,
+ * falando SMTP de verdade — é assim que o Gmail, o Outlook e o provedor do cliente entregam.
+ */
+async function servidorDeEmail(db) {
+  const net = require('node:net');
+  const { criarServidor } = require('../server/lib/smtp-servidor');
+  const servidor = criarServidor(db);
+  servidor.listen(0, '127.0.0.1');
+  await new Promise((r) => servidor.once('listening', r));
+  const porta = servidor.address().port;
+
+  /** Conversa SMTP completa; devolve as respostas do servidor, em ordem. */
+  const entregar = ({ de, para, mensagem, comandos = null }) => new Promise((resolve, reject) => {
+    const socket = net.createConnection(porta, '127.0.0.1');
+    const respostas = [];
+    const passos = comandos ?? [
+      'EHLO teste.exemplo.com',
+      `MAIL FROM:<${de}>`,
+      ...[].concat(para).map((p) => `RCPT TO:<${p}>`),
+      'DATA',
+      `${String(mensagem).replace(/\r?\n/g, '\r\n')}\r\n.`,
+      'QUIT',
+    ];
+    let i = -1;
+    let buffer = '';
+    socket.setEncoding('utf8');
+    socket.on('data', (p) => {
+      buffer += p;
+      let quebra = buffer.indexOf('\n');
+      while (quebra !== -1) {
+        const linha = buffer.slice(0, quebra).trim();
+        buffer = buffer.slice(quebra + 1);
+        // Resposta de várias linhas (250-...) ainda não terminou.
+        if (!/^\d{3}-/.test(linha)) {
+          respostas.push(linha);
+          i += 1;
+          if (i < passos.length) socket.write(`${passos[i]}\r\n`);
+          else socket.end();
+        }
+        quebra = buffer.indexOf('\n');
+      }
+    });
+    socket.on('error', reject);
+    socket.on('close', () => resolve(respostas));
+  });
+
+  return { porta, entregar, fechar: () => new Promise((r) => servidor.close(r)) };
+}
+
 /** Data relativa a hoje no fuso do sistema ('AAAA-MM-DD'). */
 const dia = (n = 0) => require('../server/lib/datas').somarDias(require('../server/lib/datas').hoje(), n);
 
 function limparArquivos() {
-  for (const pasta of [process.env.MIDIA_ARQUIVOS, process.env.MIDIA_BACKUPS]) {
+  for (const pasta of [process.env.MIDIA_ARQUIVOS, process.env.MIDIA_BACKUPS, process.env.MIDIA_EMAIL_PASTA]) {
     try { fs.rmSync(pasta, { recursive: true, force: true }); } catch { /* já limpo */ }
   }
 }
 
-module.exports = { iniciar, png, mp4, dia, limparArquivos };
+module.exports = { iniciar, png, mp4, dia, limparArquivos, servidorDeEmail };

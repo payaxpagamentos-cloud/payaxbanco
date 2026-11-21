@@ -9,11 +9,18 @@ const backup = require('./lib/backup');
 const avisos = require('./lib/avisos');
 const contratos = require('./lib/contratos');
 const clima = require('./lib/clima');
+const smtpServidor = require('./lib/smtp-servidor');
 
 const db = abrir();
 criarApp(db).listen(config.port, () => {
   console.log(`[Vai Mídia] Painel: http://localhost:${config.port}${config.basePath}/`);
   console.log(`[Vai Mídia] Player da TV: http://localhost:${config.port}${config.basePath}/tv/`);
+});
+
+// Servidor de e-mail da plataforma: só sobe com MIDIA_EMAIL_DOMINIOS configurado. O que chega cai na
+// caixa de entrada do CRM, ligado ao lead de quem escreveu.
+smtpServidor.iniciar(db, {
+  aoReceber: (e) => console.log(`[Vai Mídia] E-mail recebido de ${e.de}: ${e.assunto}`),
 });
 
 // Marca as TVs que pararam de falar com o servidor, encerra campanhas vencidas e expira códigos de pareamento.

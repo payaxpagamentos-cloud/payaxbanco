@@ -60,6 +60,29 @@ module.exports = {
   },
   // Endereço público do painel, usado nos links dos e-mails.
   url: (process.env.MIDIA_URL || '').replace(/\/+$/, ''),
+  /*
+   * Caixa de entrada do CRM: o servidor de e-mail da própria plataforma.
+   *
+   * Com MIDIA_EMAIL_DOMINIOS preenchido (ex.: "vaimidia.com.br"), o sistema abre um servidor SMTP e passa
+   * a RECEBER mensagens endereçadas a esses domínios — elas caem no CRM, ligadas ao lead de quem escreveu.
+   * Sem isso, fica desligado e o painel avisa. O ENVIO continua pelo MIDIA_SMTP_* (ver README: um servidor
+   * que manda sozinho, sem reputação, costuma cair na caixa de spam de quem recebe).
+   */
+  entrada: {
+    dominios: String(process.env.MIDIA_EMAIL_DOMINIOS || '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
+    porta: Number(process.env.MIDIA_EMAIL_PORTA ?? 25),
+    // Em que endereço ouvir. Vazio = todas as interfaces (é o normal para receber da internet).
+    host: process.env.MIDIA_EMAIL_HOST || undefined,
+    maxBytes: (Number(process.env.MIDIA_EMAIL_MAX_MB) || 10) * 1024 * 1024,
+    // Onde ficam as mensagens originais (.eml), fora da pasta pública.
+    pasta: process.env.MIDIA_EMAIL_PASTA || path.join(__dirname, '..', 'data', 'emails'),
+  },
+  // Assinatura DKIM do que sai (melhora muito a chance de não cair em spam). Chave privada em arquivo PEM.
+  dkim: {
+    dominio: process.env.MIDIA_DKIM_DOMINIO || '',
+    seletor: process.env.MIDIA_DKIM_SELETOR || 'vaimidia',
+    chaveArquivo: process.env.MIDIA_DKIM_CHAVE || '',
+  },
   admin: {
     nome: process.env.MIDIA_ADMIN_NOME || 'Master',
     email: process.env.MIDIA_ADMIN_EMAIL || 'master@midia.com.br',

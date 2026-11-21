@@ -11,7 +11,8 @@ import {
   inteiro, dinheiro, dataBr, dataHora, etiqueta, percentual, telefone, abrirWhatsApp,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio } from './comum.js';
-import { propostas, gerarProposta } from './proposta.js';
+import { gerarProposta } from './proposta.js';
+import { escreverEmail, abrirEmail } from './emails.js';
 
 const ETAPAS = {
   novo: 'Novo', contato: 'Contato feito', proposta: 'Proposta', negociacao: 'Negociação', ganho: 'Ganho', perdido: 'Perdido',
@@ -26,12 +27,11 @@ const hojeLocal = () => new Date().toLocaleDateString('en-CA');
 const emDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA'); };
 
 export async function crm(ctx) {
-  const estado = { aba: 'funil', tipo: '', origem: '', responsavel_id: '', busca: '' };
+  const estado = { tipo: '', origem: '', responsavel_id: '', busca: '' };
   const corpo = el('div', { class: 'coluna' });
   const opcoes = await api.get('/painel/opcoes');
 
   const pintar = async () => {
-    if (estado.aba === 'propostas') return propostas({ conteudo: corpo });
     const d = await api.get(`/painel/crm/funil${qs({ tipo: estado.tipo, origem: estado.origem, responsavel_id: estado.responsavel_id, busca: estado.busca })}`);
     const t = d.totais;
     limpar(corpo,
@@ -65,16 +65,6 @@ export async function crm(ctx) {
       el('div', { class: 'funil' }, d.etapas.map((coluna) => colunaDoFunil(coluna, pintar))));
   };
 
-  const abas = el('div', { class: 'linha' }, Object.entries({ funil: 'Funil', propostas: 'Propostas' }).map(([k, rotulo]) => el('button', {
-    class: `btn pequeno${estado.aba === k ? ' primario' : ''}`,
-    onclick: (e) => {
-      estado.aba = k;
-      for (const b of e.target.parentElement.children) b.classList.toggle('primario', b === e.target);
-      filtros.hidden = k !== 'funil';
-      pintar();
-    },
-  }, rotulo)));
-
   const filtros = el('div', { class: 'filtros livre' },
     campo('Buscar', { placeholder: 'Nome, contato, cidade…', oninput: (e) => { estado.busca = e.target.value; clearTimeout(filtros.t); filtros.t = setTimeout(pintar, 350); } }),
     escolha('Tipo', 'tipo', { '': 'Todos', ...TIPOS }, '', { onchange: (e) => { estado.tipo = e.target.value; pintar(); } }),
@@ -83,7 +73,7 @@ export async function crm(ctx) {
       { onchange: (e) => { estado.responsavel_id = e.target.value; pintar(); } }),
     el('button', { class: 'btn primario', onclick: () => editarLead(null, opcoes, pintar) }, icone('mais'), 'Novo lead'));
 
-  limpar(ctx.conteudo, abas, filtros, corpo);
+  limpar(ctx.conteudo, filtros, corpo);
   await pintar();
 }
 
@@ -169,6 +159,16 @@ async function abrirLead(id, recarregar) {
         ], l.propostas_lista))
       : null,
 
+    l.emails?.length
+      ? el('div', {},
+        el('h3', {}, 'E-mails'),
+        tabela([
+          [(e) => (e.direcao === 'saida' ? `Nós → ${e.para}` : `${e.de_nome || e.de} → nós`), 'Quem'],
+          [(e) => el('div', {}, el('div', {}, e.assunto), el('div', { class: 'pequeno mudo' }, e.previa)), 'Assunto'],
+          [(e) => dataHora(e.recebido_em), 'Quando', 'num dir'],
+        ], l.emails, { aoClicar: (e) => { fechar(); abrirEmail(e.id, () => recarregar()); } }))
+      : null,
+
     el('h3', {}, 'Conversas'),
     el('div', { class: 'linha', style: 'margin-bottom:10px' },
       l.telefone
@@ -182,7 +182,10 @@ async function abrirLead(id, recarregar) {
         }, icone('enviar'), 'Chamar no WhatsApp')
         : null,
       l.email
-        ? el('a', { class: 'btn pequeno', href: `mailto:${l.email}`, target: '_blank', rel: 'noopener' }, 'Mandar e-mail')
+        ? el('button', {
+          class: 'btn pequeno', title: 'Escreve pelo e-mail da empresa e guarda a conversa aqui',
+          onclick: () => { fechar(); escreverEmail(null, () => recarregar(), { para: l.email, lead_id: l.id }); },
+        }, icone('enviar'), 'Mandar e-mail')
         : null,
       el('button', { class: 'btn pequeno primario', onclick: () => { fechar(); registrarConversa(l, () => recarregar()); } }, icone('mais'), 'Anotar conversa'),
       ABERTAS.includes(l.etapa)

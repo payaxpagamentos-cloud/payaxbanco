@@ -58,6 +58,9 @@ function detalhe(db, id) {
       WHERE i.lead_id = ? ORDER BY i.criado_em DESC, i.id DESC`).all(id),
     propostas_lista: db.prepare(`SELECT id, numero, titulo, status, total_centavos, valida_ate, contrato_id
       FROM propostas WHERE lead_id = ? ORDER BY criado_em DESC`).all(id),
+    // A conversa por e-mail fica na mesma ficha: quem pega o lead amanhã lê o que foi dito ontem.
+    emails: db.prepare(`SELECT id, direcao, de, de_nome, para, assunto, previa, anexos, recebido_em
+      FROM emails WHERE lead_id = ? ORDER BY recebido_em DESC LIMIT 20`).all(id),
   };
 }
 

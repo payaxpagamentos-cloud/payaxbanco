@@ -647,3 +647,8 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 /* Itens que a própria tela desenha (não têm arquivo para mostrar em miniatura) */
 .itens-grade .mini.selo-marca{ background: #18232A; color: #C8FF31; font-weight: 700; }
 .itens-grade .mini.selo-comunicado{ background: var(--surface-2); color: var(--text-2); font-weight: 700; border: 1px dashed var(--border-forte); }
+
+/* Caixa de entrada do CRM: o corpo da mensagem é texto puro, com as quebras de linha que a pessoa escreveu. */
+.corpo-email{ white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 16px 18px; max-height: 46vh; overflow: auto; font-size: 13.5px; line-height: 1.65; }
+.corpo-email:empty::after{ content: "(mensagem sem texto)"; color: var(--text-3); }
