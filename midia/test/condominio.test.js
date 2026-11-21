@@ -490,6 +490,34 @@ test('Financeiro: contrato do cliente, contas a receber e contas a pagar', async
     assert.match(csv.dados, /-300,00/, 'a saída sai com sinal negativo na planilha');
   });
 
+  await t.test('nota fiscal: o painel registra o número, não emite a nota', async () => {
+    const fatura = (await api.get('/painel/contas-a-receber?status=paga', master)).dados.itens[0];
+    assert.equal(fatura.nf_numero, null, 'nasce sem nota');
+
+    const faltando = (await api.get('/painel/notas-fiscais?emitida=nao', master)).dados;
+    assert.equal(faltando.emissao_automatica, false, 'a emissão depende de certificado digital e da prefeitura');
+    assert.equal(faltando.totais.sem_nota, faltando.itens.length);
+    assert.match(faltando.itens[0].servico, /Veicula..o de publicidade em m.dia digital indoor — \w+\/\d{4}/);
+
+    assert.equal((await api.put(`/painel/faturas/${fatura.id}/nota`, { nf_numero: '2026/0001', nf_link: 'ftp://x' }, master)).status, 422,
+      'link precisa ser http(s)');
+    const nota = await api.put(`/painel/faturas/${fatura.id}/nota`, {
+      nf_numero: '2026/0001', nf_emitida_em: diaRel(-3), nf_link: 'https://nfse.campinas.sp.gov.br/nota/2026-0001',
+    }, master);
+    assert.equal(nota.status, 200);
+    assert.equal(nota.dados.nf_numero, '2026/0001');
+
+    const comNota = (await api.get('/painel/contas-a-receber?nota=sim', master)).dados;
+    assert.equal(comNota.itens.length, 1);
+    assert.ok((await api.get('/painel/contas-a-receber?nota=nao', master)).dados.itens.every((f) => !f.nf_numero));
+
+    const csv = await api.get('/painel/notas-fiscais?emitida=nao&csv=1', master);
+    assert.match(csv.dados.split('\r\n')[0], /Compet.ncia;Tomador;CNPJ \/ CPF;E-mail;Discrimina..o do servi.o/);
+    assert.ok(!csv.dados.includes('2026/0001'), 'a planilha do contador traz só o que ainda falta emitir');
+
+    assert.equal((await api.del(`/painel/faturas/${fatura.id}/nota`, {}, master)).dados.nf_numero, null);
+  });
+
   await t.test('contas a receber e a pagar saem em CSV', async () => {
     const receber = await api.get('/painel/contas-a-receber?csv=1', master);
     assert.match(receber.headers.get('content-type'), /text\/csv/);

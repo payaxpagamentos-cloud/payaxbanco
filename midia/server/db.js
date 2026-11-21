@@ -367,6 +367,11 @@ CREATE TABLE IF NOT EXISTS faturas (
   valor_centavos INTEGER NOT NULL DEFAULT 0 CHECK (valor_centavos >= 0),
   status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','paga','cancelada')),
   pago_em TEXT,
+  -- Nota fiscal de serviço: a emissão é feita no sistema da prefeitura (exige certificado digital),
+  -- e aqui fica o registro de qual nota corresponde a esta fatura.
+  nf_numero TEXT,
+  nf_emitida_em TEXT,
+  nf_link TEXT,
   observacao TEXT,
   criado_em TEXT NOT NULL,
   UNIQUE (anunciante_id, competencia)
@@ -481,12 +486,14 @@ const CONFIG_PADRAO = {
   // Por quantos dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta
   // relatórios e faturamento, nunca é apagado). 0 = guardar tudo.
   prova_dias: '180',
+  // CNPJ da empresa (prestador do serviço), usado na planilha que vai ao contador para emitir as notas.
+  empresa_documento: '',
   // Dados do PIX impresso na fatura do anunciante.
   pix_chave: '',
   pix_nome: '',
   pix_cidade: '',
 };
-const TEXTO = new Set(['nome_plataforma', 'slogan', 'pix_chave', 'pix_nome', 'pix_cidade']);
+const TEXTO = new Set(['nome_plataforma', 'slogan', 'empresa_documento', 'pix_chave', 'pix_nome', 'pix_cidade']);
 
 const agora = () => new Date().toISOString();
 
@@ -533,6 +540,7 @@ const COLUNAS_NOVAS = [
   ['repasses', 'tipo', "TEXT NOT NULL DEFAULT 'comissao'"],
   ['campanhas', 'contrato_id', 'INTEGER REFERENCES contratos(id)'],
   ['faturas', 'contrato_id', 'INTEGER REFERENCES contratos(id)'],
+  ['faturas', 'nf_numero', 'TEXT'], ['faturas', 'nf_emitida_em', 'TEXT'], ['faturas', 'nf_link', 'TEXT'],
 ];
 
 const temColuna = (db, tabela, coluna) => db.prepare(`PRAGMA table_info(${tabela})`).all().some((c) => c.name === coluna);

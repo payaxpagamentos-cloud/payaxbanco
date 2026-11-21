@@ -161,6 +161,45 @@ export async function faturamento(ctx) {
   await pintar();
 }
 
+/**
+ * Nota fiscal da fatura. A emissão da NFS-e sai do sistema da prefeitura (exige certificado digital),
+ * então o painel guarda o número, a data e o link da nota — e mostra quais faturas ainda estão sem.
+ */
+function blocoNota(f, recarregar) {
+  const registrar = () => formModal(f.nf_numero ? 'Alterar a nota fiscal' : 'Registrar a nota fiscal', () => [
+    el('p', { class: 'mudo pequeno', style: 'margin:0 0 10px' },
+      'Emita a NFS-e no sistema da prefeitura e anote aqui o número, para o financeiro saber o que já foi para o contador.'),
+    el('div', { class: 'duas' },
+      campo('Número da nota', { name: 'nf_numero', value: f.nf_numero ?? '', required: true, maxlength: 40 }),
+      campo('Emitida em', { name: 'nf_emitida_em', type: 'date', value: f.nf_emitida_em ?? hojeLocal(), required: true })),
+    campo('Link da nota (opcional)', { name: 'nf_link', value: f.nf_link ?? '', maxlength: 500, placeholder: 'https://…' }),
+  ], async (form) => {
+    await api.put(`/painel/faturas/${f.id}/nota`, lerForm(form));
+    toast('Nota registrada.');
+    recarregar();
+  });
+
+  if (f.status === 'cancelada') return null;
+  return el('div', { class: 'cartao raso', style: 'margin-top:14px' },
+    el('div', { class: 'linha entre' },
+      el('div', {},
+        el('strong', {}, 'Nota fiscal'),
+        el('div', { class: 'pequeno mudo' }, f.nf_numero
+          ? `Nº ${f.nf_numero} · emitida em ${dataBr(f.nf_emitida_em)}`
+          : 'Ainda não emitida para esta fatura.')),
+      el('div', { class: 'linha' },
+        f.nf_link ? el('a', { class: 'btn pequeno', href: f.nf_link, target: '_blank', rel: 'noopener' }, 'Abrir nota') : null,
+        el('button', { class: `btn pequeno ${f.nf_numero ? '' : 'primario'}`, onclick: registrar }, f.nf_numero ? 'Alterar' : 'Registrar nota'),
+        f.nf_numero ? el('button', {
+          class: 'icone-btn', title: 'Remover o registro da nota', onclick: (e) => acao(e.target, async () => {
+            if (!await confirmar('Remover a nota', 'O número da nota sai da fatura. A nota emitida na prefeitura não é afetada.')) return;
+            await api.del(`/painel/faturas/${f.id}/nota`);
+            toast('Registro removido.');
+            recarregar();
+          }),
+        }, icone('lixeira')) : null)));
+}
+
 async function abrirFatura(id, recarregar) {
   const f = await api.get(`/painel/faturas/${id}`);
   await modal(`Fatura ${competenciaTexto(f.competencia)} — ${f.anunciante}`, (fechar) => [
@@ -184,6 +223,7 @@ async function abrirFatura(id, recarregar) {
         el('button', {
           class: 'btn pequeno', onclick: () => { navigator.clipboard?.writeText(f.pix.codigo); toast('Código PIX copiado.'); },
         }, 'Copiar código'))) : null,
+    blocoNota(f, async () => { fechar(); await recarregar(); abrirFatura(f.id, recarregar); }),
     f.observacao ? el('p', { class: 'aviso' }, f.observacao) : null,
     el('div', { class: 'linha entre', style: 'margin-top:18px' },
       el('div', { class: 'linha' },
@@ -287,7 +327,7 @@ export async function fluxoCaixa(ctx) {
 // ================================================================ Contas a receber
 /** As faturas dos anunciantes: o que entra, o que vence e o que já atrasou (com as faixas de atraso). */
 export async function contasAReceber(ctx) {
-  const estado = { status: '', anunciante_id: '', de: '', ate: '' };
+  const estado = { status: '', anunciante_id: '', de: '', ate: '', nota: '' };
   const corpo = el('div', { class: 'coluna' });
   const opcoes = await api.get('/painel/opcoes');
 
@@ -303,7 +343,11 @@ export async function contasAReceber(ctx) {
           nota: d.totais.clientes_em_atraso ? `${d.totais.clientes_em_atraso} cliente(s)` : 'ninguém em atraso',
         }),
         indicador({ rotulo: 'Vence em 7 dias', valor: dinheiro(d.totais.vence_em_7_centavos), ic: 'relogio', cor: 'laranja' }),
-        indicador({ rotulo: 'Já recebido', valor: dinheiro(d.totais.recebido_centavos), ic: 'ok', cor: 'verde' })),
+        indicador({ rotulo: 'Já recebido', valor: dinheiro(d.totais.recebido_centavos), ic: 'ok', cor: 'verde' }),
+        indicador({
+          rotulo: 'Faturas sem nota', valor: inteiro(d.totais.sem_nota), ic: 'relatorios', cor: d.totais.sem_nota ? 'laranja' : 'verde',
+          nota: 'NFS-e emitida na prefeitura',
+        })),
 
       d.totais.atrasado_centavos
         ? cartao('Atraso por faixa', tabela([
@@ -323,6 +367,7 @@ export async function contasAReceber(ctx) {
         [(f) => el('span', { style: f.atrasada ? 'color:var(--erro);font-weight:700' : null }, dataBr(f.vencimento)), 'Vencimento'],
         [(f) => (f.atrasada ? etiqueta(`${f.dias_atraso} dia(s) de atraso`, 'erro') : etiquetaDe(STATUS_FATURA, f.status)), 'Situação'],
         [(f) => (f.pago_em ? dataBr(f.pago_em) : '—'), 'Recebido em'],
+        [(f) => (f.nf_numero ? etiqueta(`NF ${f.nf_numero}`, 'ok') : etiqueta('Sem nota')), 'Nota fiscal'],
       ], d.itens, { aoClicar: (f) => abrirFatura(f.id, pintar), vazioTexto: 'Nenhuma fatura. Elas nascem no fechamento do mês, em Faturamento.' })));
   };
 
@@ -333,9 +378,15 @@ export async function contasAReceber(ctx) {
         { onchange: (e) => { estado.anunciante_id = e.target.value; pintar(); } }),
       campo('Vencimento de', { type: 'date', onchange: (e) => { estado.de = e.target.value; pintar(); } }),
       campo('até', { type: 'date', onchange: (e) => { estado.ate = e.target.value; pintar(); } }),
+      escolha('Nota fiscal', 'nota', { '': 'Todas', nao: 'Sem nota emitida', sim: 'Com nota' }, '',
+        { onchange: (e) => { estado.nota = e.target.value; pintar(); } }),
       el('button', {
         class: 'btn', onclick: (e) => acao(e.target, () => baixar(`/painel/contas-a-receber${qs({ ...estado, csv: 1 })}`, `contas-a-receber-${hojeLocal()}.csv`)),
-      }, icone('baixar'), 'Baixar CSV')),
+      }, icone('baixar'), 'Baixar CSV'),
+      el('button', {
+        class: 'btn', title: 'Planilha com tomador, CNPJ, descrição do serviço e valor — o que o contador precisa para emitir as notas',
+        onclick: (e) => acao(e.target, () => baixar(`/painel/notas-fiscais${qs({ competencia: '', emitida: 'nao', csv: 1 })}`, `notas-a-emitir-${hojeLocal()}.csv`)),
+      }, icone('baixar'), 'Notas a emitir')),
     corpo);
   await pintar();
 }

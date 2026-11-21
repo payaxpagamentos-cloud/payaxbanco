@@ -126,6 +126,11 @@ export async function configuracoes(ctx) {
         }),
       }, 'Enviar e-mail de teste para mim'))),
 
+    el('fieldset', {}, el('legend', {}, 'Nota fiscal'),
+      campo('CNPJ da empresa', { name: 'empresa_documento', value: c.empresa_documento, maxlength: 20, placeholder: '00.000.000/0001-00' }),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'A NFS-e é emitida no sistema da prefeitura (precisa de certificado digital). O painel guarda o número da nota em cada fatura e monta a planilha com tomador, CNPJ, serviço e valor para a emissão.')),
+
     el('fieldset', {}, el('legend', {}, 'PIX das faturas'),
       campo('Chave PIX', { name: 'pix_chave', value: c.pix_chave, maxlength: 80, placeholder: 'e-mail, CNPJ, telefone ou chave aleatória' }),
       el('div', { class: 'duas' },

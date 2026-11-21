@@ -169,6 +169,8 @@ a{ color: var(--cor); }
 
 /* Cartões */
 .cartao{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); min-width: 0; }
+/* Bloco de apoio dentro de outro cartão ou de um modal (sem sombra, fundo rebaixado). */
+.cartao.raso{ background: var(--surface-2); box-shadow: none; padding: 14px 16px; }
 .cartao.plano{ box-shadow: none; }
 .cartao.grande{ padding: 28px 36px; }
 .cartao h2{ margin-bottom: 16px; font-size: 15px; font-weight: 700; }

@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const QRCode = require('qrcode');
-const { agora, transacao } = require('../db');
+const { agora, transacao, lerConfig } = require('../db');
 const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
@@ -182,6 +182,75 @@ module.exports = (db) => {
     res.json(db.prepare('SELECT * FROM faturas WHERE id = ?').get(id));
   });
 
+  /**
+   * Nota fiscal da fatura. A emissão da NFS-e é feita no sistema da prefeitura (exige certificado
+   * digital e o cadastro do município), então aqui guardamos o número, a data e o link da nota
+   * emitida — é o que permite saber qual fatura já foi para o contador e qual ainda não.
+   */
+  r.put('/faturas/:id/nota', (req, res) => {
+    const id = Number(req.params.id);
+    const f = db.prepare('SELECT * FROM faturas WHERE id = ?').get(id);
+    if (!f) throw naoEncontrado('Fatura');
+    if (f.status === 'cancelada') throw new ErroNegocio('Fatura cancelada não tem nota.', 409);
+    const numero = v.texto(req.body.nf_numero, 'o número da nota', 40);
+    const emitida = req.body.nf_emitida_em ? v.data(req.body.nf_emitida_em, 'a data de emissão') : hoje();
+    const link = v.opcional(req.body.nf_link, 'o link da nota', 500);
+    if (link && !/^https?:\/\//i.test(link)) throw new ErroNegocio('O link da nota precisa começar com http:// ou https://.', 422);
+    db.prepare('UPDATE faturas SET nf_numero = ?, nf_emitida_em = ?, nf_link = ? WHERE id = ?').run(numero, emitida, link, id);
+    registrar(db, req, 'fatura_nota', { id, nf_numero: numero, nf_emitida_em: emitida });
+    res.json(db.prepare('SELECT * FROM faturas WHERE id = ?').get(id));
+  });
+
+  r.delete('/faturas/:id/nota', (req, res) => {
+    const id = Number(req.params.id);
+    const f = db.prepare('SELECT * FROM faturas WHERE id = ?').get(id);
+    if (!f) throw naoEncontrado('Fatura');
+    db.prepare('UPDATE faturas SET nf_numero = NULL, nf_emitida_em = NULL, nf_link = NULL WHERE id = ?').run(id);
+    registrar(db, req, 'fatura_nota_removida', { id, nf_numero: f.nf_numero });
+    res.json(db.prepare('SELECT * FROM faturas WHERE id = ?').get(id));
+  });
+
+  /**
+   * O que o contador precisa para emitir as notas do mês: tomador, documento, descrição do
+   * serviço e valor. Em CSV, é a planilha que vai junto do pedido de emissão.
+   */
+  r.get('/notas-fiscais', (req, res) => {
+    const competencia = req.query.competencia ? v.competencia(req.query.competencia) : null;
+    const onde = ["f.status <> 'cancelada'"];
+    const p = [];
+    if (competencia) { onde.push('f.competencia = ?'); p.push(competencia); }
+    if (req.query.emitida === 'sim') onde.push('f.nf_numero IS NOT NULL');
+    if (req.query.emitida === 'nao') onde.push('f.nf_numero IS NULL');
+    const cfg = lerConfig(db);
+    const itens = db.prepare(`SELECT f.id, f.competencia, f.vencimento, f.status, f.pago_em, f.valor_centavos, f.bruto_centavos,
+        f.comissao_agencia_centavos, f.nf_numero, f.nf_emitida_em, f.nf_link,
+        a.nome AS tomador, a.documento, a.email, a.telefone, ag.nome AS agencia
+      FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id LEFT JOIN agencias ag ON ag.id = f.agencia_id
+      WHERE ${onde.join(' AND ')} ORDER BY f.competencia DESC, a.nome`).all(...p)
+      .map((f) => ({ ...f, servico: `Veiculação de publicidade em mídia digital indoor — ${competenciaTextoBr(f.competencia)}` }));
+
+    if (req.query.csv) {
+      return rel.enviarCsv(res, `notas-fiscais-${competencia ?? 'todas'}.csv`, rel.csv([
+        ['competencia', 'Competência'], ['tomador', 'Tomador'], [(x) => x.documento ?? '', 'CNPJ / CPF'],
+        [(x) => x.email ?? '', 'E-mail'], ['servico', 'Discriminação do serviço'],
+        [(x) => rel.reais(x.valor_centavos), 'Valor do serviço (R$)'], ['vencimento', 'Vencimento'],
+        [(x) => x.pago_em ?? '', 'Pago em'], [(x) => x.nf_numero ?? '', 'Nota fiscal'], [(x) => x.nf_emitida_em ?? '', 'Emitida em'],
+      ], itens));
+    }
+
+    res.json({
+      itens,
+      prestador: { nome: cfg.nome_plataforma, documento: cfg.empresa_documento || null },
+      totais: {
+        emitidas: itens.filter((f) => f.nf_numero).length,
+        sem_nota: itens.filter((f) => !f.nf_numero).length,
+        sem_nota_centavos: itens.filter((f) => !f.nf_numero).reduce((t, f) => t + f.valor_centavos, 0),
+      },
+      // A emissão em si depende de certificado digital e do sistema da prefeitura: o painel registra, não emite.
+      emissao_automatica: false,
+    });
+  });
+
   r.get('/repasses', (req, res) => {
     const onde = [];
     const p = [];
@@ -214,6 +283,8 @@ module.exports = (db) => {
     if (req.query.competencia) { onde.push('f.competencia = ?'); p.push(v.competencia(req.query.competencia)); }
     if (req.query.de) { onde.push('f.vencimento >= ?'); p.push(v.data(req.query.de, 'a data inicial')); }
     if (req.query.ate) { onde.push('f.vencimento <= ?'); p.push(v.data(req.query.ate, 'a data final')); }
+    if (req.query.nota === 'sim') onde.push('f.nf_numero IS NOT NULL');
+    if (req.query.nota === 'nao') onde.push('f.nf_numero IS NULL');
     const itens = db.prepare(`SELECT f.*, a.nome AS anunciante, ag.nome AS agencia, c.numero AS contrato
       FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id
       LEFT JOIN agencias ag ON ag.id = f.agencia_id LEFT JOIN contratos c ON c.id = f.contrato_id
@@ -226,6 +297,7 @@ module.exports = (db) => {
         ['competencia', 'Competência'], ['anunciante', 'Cliente'], [(x) => x.agencia ?? '', 'Agência'],
         [(x) => x.contrato ?? '', 'Contrato'], ['vencimento', 'Vencimento'], ['status', 'Situação'],
         [(x) => (x.atrasada ? x.dias_atraso : ''), 'Dias em atraso'], [(x) => x.pago_em ?? '', 'Pago em'],
+        [(x) => x.nf_numero ?? '', 'Nota fiscal'], [(x) => x.nf_emitida_em ?? '', 'Nota emitida em'],
         [(x) => rel.reais(x.valor_centavos), 'Valor (R$)'],
       ], itens));
     }
@@ -240,6 +312,7 @@ module.exports = (db) => {
         recebido_centavos: soma((x) => x.status === 'paga'),
         vence_em_7_centavos: soma((x) => x.status === 'aberta' && !x.atrasada && x.vencimento <= somarDias(data, 7)),
         clientes_em_atraso: new Set(itens.filter((x) => x.atrasada).map((x) => x.anunciante_id)).size,
+        sem_nota: itens.filter((x) => !x.nf_numero).length,
       },
       // Atraso por faixa, para saber o que ainda dá para cobrar por telefone e o que já virou perda.
       atraso: { ate_30: faixa(1, 30), de_31_a_60: faixa(31, 60), de_61_a_90: faixa(61, 90), mais_de_90: faixa(91, null) },
@@ -463,6 +536,13 @@ module.exports = (db) => {
 
   return r;
 };
+
+/** "2026-11" vira "novembro/2026": é como a competência aparece na discriminação do serviço. */
+function competenciaTextoBr(competencia) {
+  const [ano, mesNum] = competencia.split('-');
+  const nomes = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  return `${nomes[Number(mesNum) - 1]}/${ano}`;
+}
 
 /** Soma meses a uma data 'AAAA-MM-DD' mantendo o dia (28 no máximo, para não escorregar de mês). */
 function somarMesesData(data, n) {

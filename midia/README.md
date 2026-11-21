@@ -67,14 +67,20 @@ Servidor próprio (Node.js + SQLite), sem depender dos outros sistemas do reposi
 - **Inventário (mídia kit)**: o que a rede tem para vender — circuitos com telas, pontos, formatos, audiência e preço,
   e a lista de pontos com ambiente, unidades, onde as telas ficam e a tabela. Exporta em CSV para montar a proposta.
 - **Relatórios**: por campanha, por TV, por ponto e a **prova de exibição** linha por linha; tudo com CSV.
-- **Financeiro**, com três telas:
+- **Financeiro**, com quatro telas:
+  - **Fluxo de caixa**: o que entrou e o que saiu no período (pela data do pagamento), o que ainda está previsto
+    (pela data do vencimento), o saldo projetado do mês, a série **mês a mês**, para onde foi o dinheiro e os
+    lançamentos um a um. É a visão que contas a receber e contas a pagar só dão separadas.
   - **Contas a receber**: as faturas dos anunciantes, com o que vence nos próximos 7 dias, o que já atrasou (e há
-    quantos dias), o **atraso por faixa** (até 30, 31–60, 61–90, mais de 90) e a baixa do pagamento.
+    quantos dias), o **atraso por faixa** (até 30, 31–60, 61–90, mais de 90), a baixa do pagamento e o **controle de
+    nota fiscal** (quais faturas já têm NFS-e emitida e quais não).
   - **Contas a pagar**: numa lista só, os **repasses aos pontos** (que nascem do fechamento) e as **despesas da
     operação** — internet do prédio, aparelho, instalação, manutenção, comissão de venda, aluguel de espaço.
     O lançamento aceita **repetição mensal** (a internet que chega todo mês vira 12 contas de uma vez) e tem baixa e estorno.
   - **Faturamento**: a prévia do mês calculada do que foi exibido, o fechamento (que gera faturas e repasses) e as
     faturas da competência, com PIX copia e cola e QR Code.
+  As três primeiras exportam em **CSV**, e a planilha *notas a emitir* sai com tomador, CNPJ, discriminação do serviço
+  e valor — o que o contador precisa para emitir.
 - **Diagnóstico**: TVs offline ou sem parear, campanhas sem criativo aprovado, criativos vencendo, pontos sem TV,
   faturas vencidas e PIX não configurado.
 - **Usuários**, **Configurações** e **Histórico** (auditoria de quem fez o quê).
@@ -195,6 +201,8 @@ Campinas", "Corporativo", "Comércio e academia".
   - **valor fixo por mês**: pago enquanto as telas do ponto exibiram (o aluguel do espaço, comum em prédios);
   - **nenhuma**: sem repasse em dinheiro — o caso do condomínio cuja contrapartida são os comunicados na tela.
 - A fatura sai com **PIX copia e cola** (BR Code do Banco Central) e QR Code, com a chave configurada em *Configurações*.
+- **Nota fiscal**: cada fatura guarda o **número, a data e o link** da NFS-e, e o painel mostra quais ainda estão sem.
+  A **emissão** em si é feita no sistema da prefeitura — veja *O que depende de terceiros*.
 
 ## O player (o que roda na TV)
 
@@ -295,6 +303,10 @@ apagado); e os dados do PIX.
   aparelho para ligar com a energia e nunca descansar a tela.
 - **WhatsApp**: exige contratar um provedor de mensagens. Por e-mail os avisos já saem automaticamente (com SMTP configurado).
 - **Baixa automática do PIX**: depende de integração com o banco. Hoje a fatura é marcada como paga no painel.
+- **Emissão automática da NFS-e**: depende de **certificado digital A1/A3** da empresa e da integração com o sistema
+  do município, que muda de cidade para cidade. O painel faz a parte que não depende disso: monta a planilha com
+  tomador, CNPJ, discriminação do serviço e valor, e guarda o número da nota emitida em cada fatura, para o financeiro
+  saber o que já foi e o que falta.
 - **Medição real de público** (câmera com contagem de pessoas, dados de operadora): os impactos usam o fluxo estimado
   cadastrado no ponto. Onde houver medição externa, basta atualizar o campo de passagens por dia.
 - **Integração com sistemas de agência** (envio automático de PI, checking eletrônico por padrão de mercado): o PI é
