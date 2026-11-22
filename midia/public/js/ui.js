@@ -146,7 +146,10 @@ export function modal(titulo, conteudo, { largo = false } = {}) {
     const esc = (e) => { if (e.key === 'Escape') fechar(); };
     document.addEventListener('keydown', esc);
     fundo.addEventListener('mousedown', (e) => { if (e.target === fundo) fechar(); });
-    const caixa = el('div', { class: `modal${largo ? ' largo' : ''}`, role: 'dialog', 'aria-label': titulo }, el('h2', {}, titulo));
+    // Título com o X de fechar: no celular a janela ocupa quase a tela toda e precisa de uma saída à vista.
+    const caixa = el('div', { class: `modal${largo ? ' largo' : ''}`, role: 'dialog', 'aria-label': titulo },
+      el('div', { class: 'modal-topo' }, el('h2', {}, titulo),
+        el('button', { type: 'button', class: 'fechar-modal', title: 'Fechar', 'aria-label': 'Fechar', onclick: () => fechar() }, icone('fechar'))));
     caixa.append(...[].concat(typeof conteudo === 'function' ? conteudo(fechar) : conteudo).flat(Infinity).filter((f) => f !== null && f !== undefined && f !== false));
     fundo.append(caixa);
     document.body.append(fundo);
