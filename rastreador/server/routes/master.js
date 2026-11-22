@@ -140,7 +140,7 @@ module.exports = (db, extras = {}) => {
 
   r.get('/empresas/:id', (req, res) => {
     const e = empresa(req.params.id);
-    res.json({ ...e, usuarios: db.prepare('SELECT id, nome, email, perfil, ativo, ultimo_acesso FROM usuarios WHERE empresa_id = ? ORDER BY nome').all(e.id) });
+    res.json({ ...e, usuarios: db.prepare('SELECT id, nome, email, perfil, acesso, ativo, ultimo_acesso FROM usuarios WHERE empresa_id = ? ORDER BY nome').all(e.id) });
   });
 
   const dadosEmpresa = (d, atual) => {
@@ -351,12 +351,13 @@ module.exports = (db, extras = {}) => {
     else if (q.empresa_id) { onde.push('u.empresa_id = ?'); p.push(Number(q.empresa_id)); }
     if (q.perfil) { onde.push('u.perfil = ?'); p.push(v.opcao(q.perfil, 'o perfil', PERFIS)); }
     if (q.busca) { onde.push('(u.nome LIKE ? OR u.email LIKE ?)'); p.push(`%${q.busca}%`, `%${q.busca}%`); }
-    res.json(db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.ativo, u.ultimo_acesso, u.criado_em, u.empresa_id, e.nome AS empresa_nome
+    res.json(db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.acesso, u.ativo, u.ultimo_acesso, u.criado_em, u.empresa_id, e.nome AS empresa_nome
       FROM usuarios u LEFT JOIN empresas e ON e.id = u.empresa_id WHERE ${onde.join(' AND ')} ORDER BY u.empresa_id IS NOT NULL, e.nome, u.nome LIMIT 1000`).all(...p));
   });
   r.post('/usuarios', soMaster, (req, res) => {
     const d = req.body;
     const daEmpresa = ['cliente', 'operador'].includes(d.perfil);
+    if (daEmpresa && d.acesso === 'frota' && !empresa(d.empresa_id).gestao_frota) throw new ErroNegocio('Ligue a Gestão de Frota na empresa antes de criar um usuário só do módulo.', 422);
     const id = criarUsuario(db, d, { perfis: PERFIS, empresaId: daEmpresa ? empresa(d.empresa_id).id : null });
     registrar(db, req, 'usuario_criado', { id, perfil: d.perfil }, daEmpresa ? Number(d.empresa_id) : null);
     res.status(201).json({ id });
@@ -366,6 +367,7 @@ module.exports = (db, extras = {}) => {
     if (!u) throw naoEncontrado('Usuário');
     const desativando = req.body.ativo !== undefined && !v.booleano(req.body.ativo);
     v.exigir(!(u.id === req.usuario.id && (desativando || (req.body.perfil && req.body.perfil !== 'master'))), 'Você não pode desativar nem rebaixar o seu próprio usuário.');
+    if (req.body.acesso === 'frota' && u.empresa_id && !empresa(u.empresa_id).gestao_frota) throw new ErroNegocio('Ligue a Gestão de Frota na empresa antes de deixar o usuário só no módulo.', 422);
     transacao(db, () => {
       alterarUsuario(db, u, req.body, { perfis: PERFIS });
       // Sempre sobra ao menos um master ativo.

@@ -975,6 +975,8 @@ function migrar(db) {
       multas_credito_centavos: 'INTEGER NOT NULL DEFAULT 0', multas_preco_completa: 'INTEGER', multas_preco_renainf: 'INTEGER', multas_preco_resumida: 'INTEGER' },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
     motoristas: { senha_hash: 'TEXT', app_ultimo_acesso: 'TEXT' },
+    // acesso: completo (rastreamento + módulos contratados) ou frota (só a Gestão de Frota, nada do rastreamento).
+    usuarios: { acesso: "TEXT NOT NULL DEFAULT 'completo'" },
     rastreadores: { configurado_em: 'TEXT', rele_invertido: 'INTEGER NOT NULL DEFAULT 0', sinal_gsm: 'INTEGER', firmware: 'TEXT', perfil: "TEXT NOT NULL DEFAULT 'padrao'", saude: 'TEXT', saude_em: 'TEXT' },
     comandos: { rotulo: 'TEXT' },
     ocorrencias: { tipo: "TEXT NOT NULL DEFAULT 'roubo'", perseguicao: 'INTEGER NOT NULL DEFAULT 0' },

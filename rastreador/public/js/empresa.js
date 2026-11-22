@@ -6,7 +6,7 @@
 /** Telas do painel da empresa (administrador e operador; o master entra pela lista de empresas). */
 import { api, qs, baixar, BASE } from './api.js';
 import { etiquetaRele, el, limpar, dinheiro, dataHora, hora, data, desde, km, kmh, placa, telefone, inteiro, toast, acao, campo, escolha, marcar, formModal, modal, confirmar,
-  perguntar, repetir, etiqueta, etiquetaSituacao, etiquetaComando, etiquetaAlerta, hojeLocal, somarDias, centavos, reaisCampo, icone, PERFIS, TIPOS_VEICULO,
+  perguntar, repetir, etiqueta, etiquetaSituacao, etiquetaComando, etiquetaAlerta, hojeLocal, somarDias, centavos, reaisCampo, icone, PERFIS, ACESSOS, TIPOS_VEICULO,
   TIPOS_ALERTA, TIPOS_COMANDO, PROTOCOLOS, ALERTAS_SEGURANCA } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo, linhaDado, campoData, painelMapa, faixaVeiculo, painelIntegracoes, blocoDestaque } from './comum.js';
 import { criarMapa, configPublica, linkGoogle, COR_SITUACAO } from './mapa.js';
@@ -15,6 +15,7 @@ import { acionarRoubo, estacionar, desarmar, STATUS_ROUBO } from './seguranca.js
 import { abrirFicha } from './frota.js';
 import { testarBloqueio, etiquetaTeste } from './teste-bloqueio.js';
 import { qrVeiculo, cartaoAvarias } from './diario.js';
+import { miniaturaVeiculo } from './gestao.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}`;
 const pode = (ctx) => !ctx.somenteLeitura;
@@ -375,9 +376,18 @@ async function telaAlertas(ctx) {
 async function formVeiculo(ctx, x, aoSalvar) {
   const [det, rastreadores, motoristas] = await Promise.all([x ? api.get(`${base(ctx)}/veiculos/${x.id}`) : null, api.get(`${base(ctx)}/rastreadores`), api.get(`${base(ctx)}/motoristas`)]);
   const livres = rastreadores.filter((r) => !r.veiculo_id || r.veiculo_id === x?.id);
+  // O desenho ao lado do tipo troca conforme o tipo escolhido (carro, moto, caminhão, ônibus...).
+  const tipoSel = escolha('Tipo', 'tipo', TIPOS_VEICULO, x?.tipo ?? 'carro');
+  const previa = el('div', { class: 'previa-veiculo' });
+  const desenharPrevia = () => {
+    const t = tipoSel.querySelector('select').value;
+    limpar(previa, miniaturaVeiculo(t), el('span', { class: 'pequeno mudo' }, TIPOS_VEICULO[t]));
+  };
+  tipoSel.querySelector('select').addEventListener('change', desenharPrevia);
+  desenharPrevia();
   const r = await formModal(x ? `Editar ${placa(x.placa)}` : 'Novo veículo', () => [
-    el('div', { class: 'duas' }, campo('Placa', { name: 'placa', required: true, maxlength: 8, value: x ? placa(x.placa) : '', placeholder: 'ABC1D23', style: 'text-transform:uppercase' }),
-      escolha('Tipo', 'tipo', TIPOS_VEICULO, x?.tipo ?? 'carro')),
+    el('div', { class: 'linha-previa' }, el('div', { class: 'coluna', style: 'gap:12px;flex:1;min-width:0' },
+      campo('Placa', { name: 'placa', required: true, maxlength: 8, value: x ? placa(x.placa) : '', placeholder: 'ABC1D23', style: 'text-transform:uppercase' }), tipoSel), previa),
     campo('Descrição (como aparece no mapa)', { name: 'descricao', maxlength: 120, value: x?.descricao ?? '', placeholder: 'Ex.: Caminhão 03 · Entregas' }),
     el('div', { class: 'tres' }, campo('Marca', { name: 'marca', maxlength: 60, value: x?.marca ?? '' }), campo('Modelo', { name: 'modelo', maxlength: 60, value: x?.modelo ?? '' }),
       campo('Ano', { name: 'ano', type: 'number', min: 1950, max: new Date().getFullYear() + 1, value: x?.ano ?? '' })),
@@ -835,13 +845,16 @@ async function telaConfiguracoes(ctx) {
       campo('Nome', { name: 'nome', required: true, maxlength: 120, value: u?.nome ?? '' }),
       u ? null : campo('E-mail', { name: 'email', type: 'email', required: true }),
       escolha('Perfil', 'perfil', { cliente: PERFIS.cliente, operador: PERFIS.operador }, u?.perfil ?? 'operador'),
+      // Só aparece quando a empresa contratou a Gestão de Frota.
+      e.gestao_frota ? escolha('O que este usuário enxerga', 'acesso', ACESSOS, u?.acesso ?? 'completo') : null,
+      e.gestao_frota ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Somente Gestão de Frota: entra direto no módulo e não vê mapa, rastreadores, alertas, comandos nem nada do rastreamento.') : null,
       campo(u ? 'Nova senha (vazio = manter)' : 'Senha (mínimo 8 caracteres)', { name: 'senha', type: 'password', minlength: 8, required: !u, autocomplete: 'new-password' }),
       u ? marcar('Ativo', { name: 'ativo', checked: Boolean(u.ativo) }) : null,
     ], (d) => (u ? api.put(`${base(ctx)}/usuarios/${u.id}`, d) : api.post(`${base(ctx)}/usuarios`, d)));
     if (r) { toast('Usuário salvo.'); recarregarUsuarios(); }
   };
-  const desenharUsuarios = (lista) => limpar(usuarios, tabela(['Nome', 'E-mail', 'Perfil', 'Situação', 'Último acesso', '^Ações'], lista.map((u) => el('tr', {},
-    td(u.nome), td(u.email), td(PERFIS[u.perfil]), td(u.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo')), td(dataHora(u.ultimo_acesso)),
+  const desenharUsuarios = (lista) => limpar(usuarios, tabela(['Nome', 'E-mail', 'Perfil', 'Acesso', 'Situação', 'Último acesso', '^Ações'], lista.map((u) => el('tr', {},
+    td(u.nome), td(u.email), td(PERFIS[u.perfil]), td(u.acesso === 'frota' ? etiqueta('Somente Gestão de Frota', 'aviso') : ACESSOS.completo), td(u.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo')), td(dataHora(u.ultimo_acesso)),
     el('td', { class: 'acoes' }, pode(ctx) ? botaoIcone('editar', 'Editar', () => formUsuario(u)) : null))), 'Nenhum usuário.'));
   const recarregarUsuarios = async () => desenharUsuarios((await api.get(`${base(ctx)}/configuracoes`)).usuarios);
   desenharUsuarios(c.usuarios);

@@ -6,7 +6,7 @@
 /** Telas do master (equipe da plataforma). */
 import { api, qs, baixar, sessao, BASE } from './api.js';
 import { el, limpar, dinheiro, dataHora, data, desde, inteiro, toast, campo, area, escolha, marcar, formModal, perguntar, confirmar, repetir, telefone, etiqueta, placa,
-  TIPOS_EMPRESA, PERFIS, PROTOCOLOS, MODELOS_RASTREADOR, reaisCampo, centavos, icone, acao } from './ui.js';
+  TIPOS_EMPRESA, PERFIS, ACESSOS, PROTOCOLOS, MODELOS_RASTREADOR, reaisCampo, centavos, icone, acao } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, painelMapa, painelIntegracoes, situacaoDiag, linhaDado, blocoDestaque } from './comum.js';
 import { configPublica } from './mapa.js';
 import { detalheVeiculo } from './empresa.js';
@@ -335,19 +335,25 @@ async function telaUsuarios(ctx) {
   const formUsuario = (u) => formModal(u ? `Editar ${u.nome}` : 'Novo usuário', (f) => {
     const perfil = escolha('Perfil', 'perfil', PERFIS, u?.perfil ?? 'cliente', { required: true });
     const empresa = escolha('Empresa', 'empresa_id', Object.fromEntries(empresas.map((e) => [e.id, e.nome])), u?.empresa_id ?? empresas[0]?.id);
-    const ajustar = () => { empresa.classList.toggle('oculto', ['master', 'suporte'].includes(f.querySelector('[name=perfil]').value) || Boolean(u)); };
+    const acesso = escolha('O que enxerga na empresa', 'acesso', ACESSOS, u?.acesso ?? 'completo');
+    const ajustar = () => {
+      const plataforma = ['master', 'suporte'].includes(f.querySelector('[name=perfil]').value);
+      empresa.classList.toggle('oculto', plataforma || Boolean(u));
+      acesso.classList.toggle('oculto', plataforma);
+    };
     perfil.querySelector('select').addEventListener('change', ajustar);
     queueMicrotask(ajustar);
     return [
       campo('Nome', { name: 'nome', required: true, maxlength: 120, value: u?.nome ?? '' }),
       u ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, `${u.email}${u.empresa_nome ? ` · ${u.empresa_nome}` : ''}`) : campo('E-mail', { name: 'email', type: 'email', required: true }),
-      perfil, empresa,
+      perfil, empresa, acesso,
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Master: tudo. Suporte: empresas, rastreadores, mapa geral e diagnóstico. Administrador da empresa: o painel da empresa. Operador: acompanha a frota e trata alertas.'),
       campo(u ? 'Nova senha (deixe em branco para manter)' : 'Senha inicial (mínimo 8)', { name: 'senha', type: 'password', minlength: 8, required: !u, autocomplete: 'new-password' }),
       u ? marcar('Usuário ativo', { name: 'ativo', checked: Boolean(u.ativo) }) : null,
     ];
   }, async (d) => {
     if (!d.senha) delete d.senha;
+    if (['master', 'suporte'].includes(d.perfil)) delete d.acesso;
     if (u) {
       delete d.empresa_id;
       return api.patch(`/master/usuarios/${u.id}`, d);
@@ -358,7 +364,7 @@ async function telaUsuarios(ctx) {
   async function carregar() {
     const usuarios = await api.get(`/master/usuarios${qs(estado)}`);
     limpar(lista, tabela(['Nome', 'E-mail', 'Perfil', 'Empresa', 'Último acesso', 'Situação', '^Ações'], usuarios.map((u) => el('tr', {},
-      td(u.nome), td(u.email), td(PERFIS[u.perfil]), td(u.empresa_nome ?? el('span', { class: 'mudo' }, 'Plataforma')), td(dataHora(u.ultimo_acesso)),
+      td(u.nome), td(u.email), td([PERFIS[u.perfil], u.acesso === 'frota' ? el('div', {}, etiqueta('Somente Gestão de Frota', 'aviso')) : null]), td(u.empresa_nome ?? el('span', { class: 'mudo' }, 'Plataforma')), td(dataHora(u.ultimo_acesso)),
       td(u.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo', 'erro')),
       el('td', { class: 'acoes' }, botaoIcone('editar', 'Editar', async () => { if (await formUsuario(u)) { toast('Usuário salvo.'); carregar(); } })))), 'Nenhum usuário.'));
   }

@@ -663,9 +663,9 @@ module.exports = (db, extras = {}) => {
       empresa: { nome: e.nome, documento: e.documento, tipo: e.tipo, email: e.email, telefone: e.telefone, limite_veiculos: e.limite_veiculos,
         mensalidade_centavos: e.mensalidade_centavos, alertar_ignicao: Boolean(e.alertar_ignicao), horario_inicio: e.horario_inicio, horario_fim: e.horario_fim,
         dias_uso: e.dias_uso, sem_comunicacao_min: e.sem_comunicacao_min, preco_combustivel_centavos: e.preco_combustivel_centavos, ocioso_l_h: e.ocioso_l_h,
-        app_ranking: Boolean(e.app_ranking) },
+        app_ranking: Boolean(e.app_ranking), gestao_frota: Boolean(e.gestao_frota) },
       veiculos_ativos: db.prepare('SELECT COUNT(*) AS n FROM veiculos WHERE empresa_id = ? AND ativo = 1').get(e.id).n,
-      usuarios: db.prepare('SELECT id, nome, email, perfil, ativo, ultimo_acesso FROM usuarios WHERE empresa_id = ? ORDER BY nome').all(e.id),
+      usuarios: db.prepare('SELECT id, nome, email, perfil, acesso, ativo, ultimo_acesso FROM usuarios WHERE empresa_id = ? ORDER BY nome').all(e.id),
     });
   });
 
@@ -696,17 +696,19 @@ module.exports = (db, extras = {}) => {
   });
 
   r.post('/usuarios', gestor, (req, res) => {
+    if (req.body.acesso === 'frota' && !req.empresa.gestao_frota) throw new ErroNegocio('A Gestão de Frota não está contratada para esta empresa.', 422);
     const id = criarUsuario(db, req.body, { perfis: PERFIS_EMPRESA, empresaId: eid(req) });
-    registrar(db, req, 'usuario_criado', { email: req.body.email, perfil: req.body.perfil });
+    registrar(db, req, 'usuario_criado', { email: req.body.email, perfil: req.body.perfil, acesso: req.body.acesso || 'completo' });
     res.status(201).json({ id });
   });
 
   r.put('/usuarios/:id', gestor, (req, res) => {
     const u = db.prepare('SELECT * FROM usuarios WHERE id = ? AND empresa_id = ?').get(nid(req), eid(req));
     if (!u) throw naoEncontrado('Usuário');
-    if (u.id === req.usuario.id && (req.body.ativo === false || (req.body.perfil && req.body.perfil !== u.perfil))) {
-      throw new ErroNegocio('Você não pode desativar nem mudar o perfil da sua própria conta.', 422);
+    if (u.id === req.usuario.id && (req.body.ativo === false || (req.body.perfil && req.body.perfil !== u.perfil) || (req.body.acesso && req.body.acesso !== u.acesso))) {
+      throw new ErroNegocio('Você não pode desativar nem mudar o perfil ou o acesso da sua própria conta.', 422);
     }
+    if (req.body.acesso === 'frota' && !req.empresa.gestao_frota) throw new ErroNegocio('A Gestão de Frota não está contratada para esta empresa.', 422);
     alterarUsuario(db, u, req.body, { perfis: PERFIS_EMPRESA });
     registrar(db, req, 'usuario_alterado', { email: u.email });
     res.status(204).end();

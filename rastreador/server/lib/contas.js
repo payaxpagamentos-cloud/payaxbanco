@@ -11,6 +11,10 @@ const { hashSenha } = require('./senha');
 const { ErroNegocio } = require('./erros');
 const v = require('./validacao');
 
+/** Acesso do usuário da empresa: tudo, ou só a Gestão de Frota. */
+const ACESSOS = { completo: 'Rastreamento e gestão de frota', frota: 'Somente Gestão de Frota' };
+const lerAcesso = (x) => v.opcao(String(x), 'o acesso', Object.keys(ACESSOS));
+
 const hashChave = (segredo) => crypto.createHash('sha256').update(segredo).digest('hex');
 
 /** Cria um usuário. Perfis da plataforma (master, suporte) sem empresa; cliente e operador, sempre de uma empresa. */
@@ -19,8 +23,9 @@ function criarUsuario(db, d, { perfis, empresaId = null }) {
   const email = v.email(d.email);
   if (db.prepare('SELECT 1 FROM usuarios WHERE email = ?').get(email)) throw new ErroNegocio('Já existe um usuário com este e-mail.', 409);
   const plataforma = ['master', 'suporte'].includes(perfil);
-  const r = db.prepare('INSERT INTO usuarios (nome, email, senha_hash, perfil, empresa_id, criado_em) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(v.texto(d.nome, 'o nome', 120), email, hashSenha(v.senha(d.senha)), perfil, plataforma ? null : empresaId, agora());
+  const acesso = plataforma || d.acesso === undefined || d.acesso === '' ? 'completo' : lerAcesso(d.acesso);
+  const r = db.prepare('INSERT INTO usuarios (nome, email, senha_hash, perfil, empresa_id, acesso, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(v.texto(d.nome, 'o nome', 120), email, hashSenha(v.senha(d.senha)), perfil, plataforma ? null : empresaId, acesso, agora());
   return Number(r.lastInsertRowid);
 }
 
@@ -32,6 +37,7 @@ function alterarUsuario(db, u, d, { perfis }) {
     v.exigir(['master', 'suporte'].includes(d.perfil) === ['master', 'suporte'].includes(u.perfil), 'Não é possível mover o usuário entre a plataforma e uma empresa.');
     db.prepare('UPDATE usuarios SET perfil = ? WHERE id = ?').run(d.perfil, u.id);
   }
+  if (d.acesso !== undefined && d.acesso !== '' && u.empresa_id) db.prepare('UPDATE usuarios SET acesso = ? WHERE id = ?').run(lerAcesso(d.acesso), u.id);
   if (d.ativo !== undefined) db.prepare('UPDATE usuarios SET ativo = ? WHERE id = ?').run(v.booleano(d.ativo) ? 1 : 0, u.id);
   if (d.senha) db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(hashSenha(v.senha(d.senha)), u.id);
 }
@@ -58,4 +64,4 @@ function lerChave(db, chave) {
   return db.prepare("SELECT * FROM empresas WHERE id = ? AND status <> 'excluida'").get(k.empresa_id) ?? null;
 }
 
-module.exports = { criarUsuario, alterarUsuario, criarChave, lerChave, hashChave };
+module.exports = { ACESSOS, criarUsuario, alterarUsuario, criarChave, lerChave, hashChave };

@@ -40,7 +40,7 @@ function lerToken(token, aud = 'rastreador') {
 const PLATAFORMA = ['master', 'suporte'];
 
 function autenticar(db) {
-  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.empresa_id, u.ativo, e.nome AS empresa_nome, e.status AS empresa_status
+  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.empresa_id, u.ativo, u.acesso, e.nome AS empresa_nome, e.status AS empresa_status
     FROM usuarios u LEFT JOIN empresas e ON e.id = u.empresa_id WHERE u.id = ?`);
   return (req, _res, next) => {
     const c = req.get('authorization') || '';
@@ -107,6 +107,12 @@ function acessoEmpresa(db) {
     // Operador: só consulta, trata alertas, usa o assistente e contrata os seguros que o administrador liberou para ele.
     if (u.perfil === 'operador' && req.method !== 'GET' && !/^\/(alertas|assistente|seguros\/contratar)(\/|$)/.test(req.path)) {
       return next(new ErroNegocio('O operador só consulta e trata alertas.', 403));
+    }
+    // Acesso "Somente Gestão de Frota": nada do rastreamento. Só o módulo (quando contratado) e o nome da empresa.
+    if (u.acesso === 'frota' && !PLATAFORMA.includes(u.perfil)) {
+      const noModulo = /\/gestao$/.test(req.baseUrl);
+      if (!empresa.gestao_frota) return next(new ErroNegocio('A Gestão de Frota não está contratada para esta empresa. Fale com o suporte.', 403));
+      if (!noModulo && !(req.method === 'GET' && req.path === '/')) return next(new ErroNegocio('Seu acesso é somente à Gestão de Frota.', 403));
     }
     req.empresa = empresa;
     next();

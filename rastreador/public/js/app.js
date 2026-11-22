@@ -152,10 +152,14 @@ async function desenhar() {
   const s = sessao.get();
   if (!s?.token) return telaEntrada();
   const u = s.usuario;
+  // Acesso "Somente Gestão de Frota": o menu tem só o módulo e a página inicial é o painel dele.
+  const soFrota = !PLATAFORMA.includes(u.perfil) && u.acesso === 'frota';
+  const inicio = soFrota ? 'gestao-painel' : 'dashboard';
   let { empresaId, tela } = rota();
+  if (soFrota && tela === 'dashboard') tela = inicio;
   // Usuário de empresa sempre fica no painel da própria empresa.
   if (!PLATAFORMA.includes(u.perfil) && empresaId !== u.empresa_id) {
-    history.replaceState(null, '', link(u.empresa_id, empresaId ? tela : 'dashboard'));
+    history.replaceState(null, '', link(u.empresa_id, empresaId ? tela : inicio));
     ({ empresaId, tela } = rota());
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
@@ -172,10 +176,16 @@ async function desenhar() {
   }
   const modulos = empresaId ? modulosEmpresa.get(empresaId) ?? {} : {};
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
-  const contratado = (k) => !MODULO_DO_MENU[k] || Boolean(modulos[MODULO_DO_MENU[k]]);
+  const contratado = (k) => (soFrota ? k === 'gestao' : true) && (!MODULO_DO_MENU[k] || Boolean(modulos[MODULO_DO_MENU[k]]));
+  if (soFrota && empresaId && !modulos.gestao_frota) {
+    return limpar(raiz, el('div', { class: 'cartao', style: 'max-width:520px;margin:15vh auto;padding:28px;text-align:center' },
+      el('h2', {}, 'Gestão de Frota indisponível'),
+      el('p', { class: 'mudo' }, 'Seu acesso é somente à Gestão de Frota, e o módulo não está ativo para a sua empresa. Fale com o administrador.'),
+      el('button', { class: 'btn', onclick: () => { sessao.limpar(); nomesEmpresa.clear(); modulosEmpresa.clear(); location.hash = ''; desenhar(); } }, 'Sair')));
+  }
   const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp]) => permitido(sp));
   const item = menu.find(([k, , , perfis, subs]) => permitido(perfis) && contratado(k) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));
-  if (!item || !telas[tela]) return ir(empresaId, 'dashboard');
+  if (!item || !telas[tela]) return tela === inicio ? undefined : ir(empresaId, inicio);
   const secoes = secoesDe(item[4]);
   const secao = secoes.find(([sk]) => sk === tela);
 
@@ -219,14 +229,14 @@ async function desenhar() {
     } }, icone('seta')), menuCel),
     itens,
     empresaId && PLATAFORMA.includes(u.perfil) ? el('a', { class: 'item voltar', href: '#/empresas', title: 'Voltar ao master' }, icone('entrar'), el('span', { class: 'rotulo' }, 'Voltar ao master')) : null,
-    el('div', { class: 'rodape-lateral' }, el('strong', {}, nomeEmpresa ?? nomePlataforma), PERFIS[u.perfil] ?? '',
+    el('div', { class: 'rodape-lateral' }, el('strong', {}, nomeEmpresa ?? nomePlataforma), `${PERFIS[u.perfil] ?? ''}${soFrota ? ' · só Gestão de Frota' : ''}`,
       versao ? el('span', { class: 'versao', title: 'Versão instalada' }, `Versão ${versao}`) : null));
   lateral.children[0].after(el('div', { class: 'rotulo-secao' }, empresaId ? 'Painel da empresa' : 'Plataforma'));
 
   const trilha = el('nav', { class: 'trilha', 'aria-label': 'Você está em' });
   if (empresaId) {
     if (PLATAFORMA.includes(u.perfil)) trilha.append(el('a', { href: '#/empresas' }, 'Empresas'), el('span', { class: 'sep' }, '/'));
-    trilha.append(el('a', { href: link(empresaId, 'dashboard') }, nomeEmpresa), el('span', { class: 'sep' }, '/'));
+    trilha.append(el('a', { href: link(empresaId, inicio) }, nomeEmpresa), el('span', { class: 'sep' }, '/'));
   } else {
     trilha.append(nomePlataforma, el('span', { class: 'sep', 'aria-hidden': 'true' }, '/'));
   }
@@ -263,7 +273,7 @@ async function desenhar() {
     esquecerModulos: (id) => modulosEmpresa.delete(id),
   };
   // Assistente com IA: botão fixo no canto, em todas as telas da empresa (só aparece se a plataforma ligou).
-  if (empresaId) montarAssistente(casca, ctx);
+  if (empresaId && !soFrota) montarAssistente(casca, ctx);
   try {
     await telas[tela](ctx);
   } catch (err) {
@@ -348,4 +358,10 @@ function telaEntrada() {
   f.querySelector('input').focus();
 }
 
-api.get('/publico').then((p) => { nomePlataforma = p.nome || 'Rastreador'; versao = p.versao || ''; }).catch(() => {}).finally(desenhar);
+// Ao abrir, os dados do usuário vêm do servidor (o acesso pode ter mudado desde o login).
+const atualizarUsuario = async () => {
+  const s = sessao.get();
+  if (!s?.token) return;
+  try { const { usuario } = await api.get('/auth/me'); sessao.set({ ...s, usuario }); } catch { /* sessão vencida: o desenho manda para o login */ }
+};
+Promise.all([api.get('/publico').then((p) => { nomePlataforma = p.nome || 'Rastreador'; versao = p.versao || ''; }).catch(() => {}), atualizarUsuario()]).finally(desenhar);

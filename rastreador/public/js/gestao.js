@@ -17,7 +17,7 @@ const pode = (ctx) => !ctx.somenteLeitura;
 const ir = (ctx, tela) => { location.hash = `#/empresa/${ctx.empresaId}/${tela}`; };
 let catalogo = null;
 const cat = async (ctx) => (catalogo ??= await api.get(`${base(ctx)}/catalogos`));
-const veiculosDa = async (ctx) => (await api.get(`/empresas/${ctx.empresaId}/veiculos`)).filter((x) => x.ativo);
+const veiculosDa = async (ctx) => (await api.get(`${base(ctx)}/veiculos`)).filter((x) => x.ativo);
 const nomeVeiculo = (x) => `${placa(x.placa)}${x.descricao ? ` · ${x.descricao}` : ''}`;
 const opcoesVeiculos = (lista) => Object.fromEntries(lista.map((x) => [x.id, nomeVeiculo(x)]));
 const mm = (x) => (x === null || x === undefined ? '—' : `${String(Math.round(x * 10) / 10).replace('.', ',')} mm`);
@@ -240,11 +240,15 @@ const PECAS_MOTOR = {
     svg: `<rect class="mt-peca" x="462" y="404" width="38" height="46" rx="8"/><rect class="mt-fio-c" x="472" y="396" width="18" height="10" rx="3"/>` },
 };
 
-function desenhoMotor(ctx, comps, aoClicar) {
+const familiaDe = (tipo) => (tipo === 'moto' ? 'moto' : ['caminhao', 'onibus', 'maquina'].includes(tipo) ? 'pesado' : 'leve');
+
+function desenhoMotor(ctx, comps, aoClicar, plano = null) {
   const W = 760; const H = 620; const LW = 168; const LH = 50;
   const ativo = new Map(comps.map((x) => [x.tipo, x]));
   const pecas = []; const etiquetas = [];
+  const existe = (tipo) => !plano || plano.includes(tipo) || ativo.has(tipo);
   for (const [tipo, p] of Object.entries(PECAS_MOTOR)) {
+    if (!existe(tipo)) continue;
     const comp = ativo.get(tipo);
     const tom = comp ? TOM_COMP[comp.estado] : 'ausente';
     pecas.push(`<g class="mt-grupo vp-${tom}" data-tipo="${tipo}" role="button" tabindex="0" aria-label="${esc(p.nome)}">${p.svg}</g>`);
@@ -275,7 +279,7 @@ function desenhoMotor(ctx, comps, aoClicar) {
   }
   // Celular: cada peça numa lista legível, embaixo do desenho.
   const CLASSE = { ok: 'ok', aviso: 'aviso', erro: 'erro', ausente: 'vazia' };
-  raiz.append(el('div', { class: 'lista-pneus-cel' }, Object.entries(PECAS_MOTOR).map(([tipo, p]) => {
+  raiz.append(el('div', { class: 'lista-pneus-cel' }, Object.entries(PECAS_MOTOR).filter(([tipo]) => existe(tipo)).map(([tipo, p]) => {
     const comp = ativo.get(tipo);
     return el('button', { type: 'button', class: CLASSE[comp ? TOM_COMP[comp.estado] : 'ausente'], onclick: () => aoClicar(tipo, comp) },
       el('strong', {}, p.nome), el('span', { class: 'pequeno' }, comp ? textoUso(comp) : (pode(ctx) ? '+ incluir' : 'fora do plano')));
@@ -340,7 +344,7 @@ async function telaPreventiva(ctx) {
           if (await confirmar(`Incluir ${c.componentes[tipo].nome}`, 'Esta peça ainda não está no plano deste veículo. Incluir com a vida útil de referência, instalada no km de hoje?', 'Incluir')) {
             await incluirNoPlano(ctx, v.id, tipo); carregar();
           }
-        }),
+        }, c.planos[familiaDe(v.tipo)]),
         el('div', { class: 'coluna', style: 'gap:10px;max-width:320px' },
           el('div', { class: 'legenda' }, etiqueta('em dia', 'ok'), etiqueta('atenção: 85%', 'aviso'), etiqueta('vencido', 'erro'), etiqueta('fora do plano', '')),
           el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Toque numa peça para trocar, abrir OS ou editar. A cor sai do km do rastreador e do tempo desde a última troca.'),
@@ -440,6 +444,22 @@ const FIGURAS = {
 };
 const figuraDe = (tipo) => FIGURAS[tipo === 'moto' ? 'moto' : tipo === 'caminhao' ? 'caminhao' : tipo === 'onibus' ? 'onibus' : 'leve'];
 const COR_PNEU = { ok: 'ok', atencao: 'aviso', trocar: 'erro', sem_medicao: 'neutro' };
+
+/** Miniatura do veículo visto de cima (cadastro do veículo): muda junto com o tipo escolhido. */
+export function miniaturaVeiculo(tipo) {
+  const f = figuraDe(tipo);
+  const [tw, th] = f.pneu;
+  const rodas = Object.values(f.rodas).map(([x, y, lado]) => (lado === 'estepe'
+    ? `<circle cx="${x}" cy="${y}" r="34" class="vp-pneu"/><circle cx="${x}" cy="${y}" r="15" class="vp-aro"/>`
+    : `<rect x="${x - tw / 2}" y="${y - th / 2}" width="${tw}" height="${th}" rx="${Math.min(12, tw / 2.6)}" class="vp-pneu"/>`)).join('');
+  const discos = Object.values(f.freios ?? {}).flatMap((p) => p.ys.flatMap((y) => p.xs.map((x) => `<circle cx="${x}" cy="${y}" r="13" class="fr-rotor"/>`))).join('');
+  // Recorta as sobras laterais (onde ficam as etiquetas no desenho grande).
+  const xs = Object.values(f.rodas).map(([x]) => x);
+  const x0 = Math.min(...xs) - 60; const x1 = Math.max(...xs) + 60;
+  const d = el('div', { class: 'miniatura-veiculo' });
+  d.innerHTML = `<svg viewBox="${x0} 0 ${x1 - x0} ${f.h}" role="img" aria-label="Desenho do veículo"><text x="${f.w / 2}" y="22" class="vp-frente">▲ FRENTE</text>${f.corpo}${discos}${rodas}</svg>`;
+  return d;
+}
 
 const FREIOS = { dianteiro: ['pastilha_dianteira', 'disco_dianteiro'], traseiro: ['pastilha_traseira', 'disco_traseiro'] };
 const PIOR = { vencido: 3, atencao: 2, ok: 1 };
@@ -681,7 +701,7 @@ async function telaPneus(ctx) {
 // ---------- Documentos ----------
 async function telaDocumentos(ctx) {
   await tela(ctx, async () => {
-    const [veiculos, motoristas, c] = await Promise.all([veiculosDa(ctx), api.get(`/empresas/${ctx.empresaId}/motoristas`), cat(ctx)]);
+    const [veiculos, motoristas, c] = await Promise.all([veiculosDa(ctx), api.get(`${base(ctx)}/motoristas`), cat(ctx)]);
     const lista = el('div');
     const form = (d) => formModal(d ? `Editar ${d.nome_tipo}` : 'Novo documento', (f) => {
       const tipo = escolha('Documento', 'tipo', c.documentos, d?.tipo ?? 'licenciamento');

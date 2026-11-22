@@ -13,7 +13,8 @@ const { ErroNegocio } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const v = require('../lib/validacao');
 
-const publico = (u) => ({ id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, empresa_id: u.empresa_id, empresa_nome: u.empresa_nome ?? null });
+const publico = (u) => ({ id: u.id, nome: u.nome, email: u.email, perfil: u.perfil, empresa_id: u.empresa_id, empresa_nome: u.empresa_nome ?? null,
+  acesso: u.acesso ?? 'completo' });
 
 /** Login e a própria conta. Não há cadastro aberto: os usuários são criados pelo master ou pelo administrador da empresa. */
 module.exports = (db, autenticado) => {

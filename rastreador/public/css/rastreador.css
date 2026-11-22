@@ -1420,6 +1420,12 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 @media (prefers-reduced-motion: reduce){ .vp-erro .mt-peca{ animation: none; } }
 :root[data-tema="escuro"] .mt-fio{ stroke: #94A3B8; }
 :root[data-tema="escuro"] .mt-correia{ stroke: #CBD5E1; } :root[data-tema="escuro"] .mt-sinal{ fill: #E2E8F0; }
+/* Cadastro do veículo: miniatura que troca com o tipo */
+.linha-previa{ display: flex; gap: 16px; align-items: center; }
+.previa-veiculo{ flex: 0 0 120px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.miniatura-veiculo{ width: 100%; }
+.miniatura-veiculo svg{ width: 100%; height: auto; max-height: 190px; display: block; }
+.miniatura-veiculo .vp-frente{ font-size: 22px; }
 .lista-pneus-cel{ display: none; }
 @media (max-width: 640px){
   .lista-pneus-cel{ display: grid; gap: 8px; width: 100%; }

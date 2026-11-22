@@ -31,6 +31,10 @@ module.exports = (db) => {
     sulco_atencao_mm: gf.SULCO_ATENCAO_MM, sulco_limite_mm: gf.SULCO_LIMITE_MM,
   }));
   r.get('/painel', (req, res) => res.json(gf.painel(db, eid(req))));
+  // Veículos e motoristas só com o que o módulo usa (sem posição nem rastreador): servem também ao usuário "Somente Gestão de Frota".
+  r.get('/veiculos', (req, res) => res.json(db.prepare(`SELECT id, placa, descricao, tipo, marca, modelo, ano, cor, ativo, hodometro_m FROM veiculos
+    WHERE empresa_id = ? ORDER BY placa`).all(eid(req))));
+  r.get('/motoristas', (req, res) => res.json(db.prepare('SELECT id, nome, ativo FROM motoristas WHERE empresa_id = ? ORDER BY nome').all(eid(req))));
 
   // ---------- Ordens de serviço ----------
   r.get('/os', (req, res) => res.json(gf.listarOS(db, eid(req), { status: req.query.status, veiculoId: req.query.veiculo_id })));

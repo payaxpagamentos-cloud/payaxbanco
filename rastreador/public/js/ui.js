@@ -59,6 +59,8 @@ export function desde(iso) {
 
 export const TIPOS_EMPRESA = { frota: 'Frota', pessoa: 'Pessoa física', locadora: 'Locadora' };
 export const PERFIS = { master: 'Master', suporte: 'Suporte', cliente: 'Administrador da empresa', operador: 'Operador (monitoramento)' };
+/** O que o usuário da empresa enxerga: tudo, ou só a Gestão de Frota. */
+export const ACESSOS = { completo: 'Rastreamento e gestão de frota', frota: 'Somente Gestão de Frota' };
 export const TIPOS_VEICULO = { carro: 'Carro', moto: 'Moto', caminhao: 'Caminhão', van: 'Van / utilitário', onibus: 'Ônibus', maquina: 'Máquina', outro: 'Outro' };
 export const PROTOCOLOS = { gt06: 'GT06 (TCP)', osmand: 'Celular / OsmAnd (HTTP)', api: 'API (outro sistema)' };
 export const SITUACOES = {

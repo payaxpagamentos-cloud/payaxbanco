@@ -990,9 +990,32 @@ test('Rastreador', async (t) => {
     assert.equal((await api.get(`${G}/fornecedores`, cliente)).dados.find((x) => x.id === f.dados.id).gasto_centavos, 8000);
     // Excluir o veículo devolve os pneus montados ao estoque (não some com o pneu).
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM frota_pneus WHERE veiculo_id = ? AND status = 'montado'").get(veiculo).n, 1);
+    // Usuário "Somente Gestão de Frota": entra no módulo e não enxerga nada do rastreamento.
+    const uf = await api.post(`${base()}/usuarios`, { nome: 'Frota Só', email: 'frota@rota.com', senha: 'senha-da-frota', perfil: 'cliente', acesso: 'frota' }, cliente);
+    assert.equal(uf.status, 201);
+    const soFrota = await api.login('frota@rota.com', 'senha-da-frota');
+    assert.equal((await api.get('/auth/me', soFrota)).dados.usuario.acesso, 'frota');
+    assert.equal((await api.get(base(), soFrota)).status, 200, 'nome da empresa e módulos');
+    assert.equal((await api.get(`${G}/painel`, soFrota)).status, 200);
+    const vs = (await api.get(`${G}/veiculos`, soFrota)).dados;
+    assert.ok(vs.length && vs.every((x) => x.lat === undefined && x.imei === undefined), 'veículos sem posição nem rastreador');
+    assert.equal((await api.get(`${G}/motoristas`, soFrota)).status, 200);
+    for (const rota of ['/veiculos', '/dashboard', '/alertas', '/motoristas', '/configuracoes', `/veiculos/${veiculo}`]) {
+      assert.equal((await api.get(`${base()}${rota}`, soFrota)).status, 403, `bloqueado: ${rota}`);
+    }
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'bloquear' }, soFrota)).status, 403, 'nenhum comando');
+    assert.equal((await api.post(`${G}/fornecedores`, { nome: 'Borracharia', tipo: 'borracharia' }, soFrota)).status, 201, 'lança na gestão');
+    // Ninguém muda o próprio acesso; o administrador volta o usuário para o acesso completo.
+    assert.equal((await api.put(`${base()}/usuarios/${uf.dados.id}`, { acesso: 'completo' }, soFrota)).status, 403);
+    assert.equal((await api.put(`${base()}/usuarios/${uf.dados.id}`, { acesso: 'completo' }, cliente)).status, 204);
+    assert.equal((await api.get(`${base()}/dashboard`, soFrota)).status, 200);
+    assert.equal((await api.put(`${base()}/usuarios/${uf.dados.id}`, { acesso: 'frota' }, cliente)).status, 204);
     // Desligar o módulo fecha o acesso; os dados continuam.
     await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: false }, master);
     assert.equal((await api.get(`${G}/painel`, cliente)).status, 403);
+    assert.equal((await api.get(base(), soFrota)).status, 403, 'sem o módulo, o usuário só da frota não entra');
+    assert.equal((await api.post(`${base()}/usuarios`, { nome: 'X', email: 'x2@rota.com', senha: 'senha-qualquer', perfil: 'operador', acesso: 'frota' }, cliente)).status, 422);
+    db.prepare('UPDATE usuarios SET ativo = 0 WHERE id = ?').run(uf.dados.id);
     db.prepare('UPDATE veiculos SET tipo = ? WHERE id = ?').run(tipoAntes, veiculo);
   });
 
