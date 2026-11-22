@@ -95,15 +95,25 @@ async function desenhar() {
   const itens = menu.filter(([, , , perfis]) => !perfis || perfis.includes(u.perfil)).map(([k, rotulo, ic, , subs]) => {
     const aberto = k === nome || subs?.some(([sk]) => sk === nome);
     const link = el('a', { class: `item${aberto ? ' on' : ''}`, href: `#/${subs ? subs[0][0] : k}`, title: rotulo }, icone(ic), el('span', { class: 'rotulo' }, rotulo));
-    if (!subs || !aberto) return link;
-    return [link, el('div', { class: 'grupo-sub' }, subs.filter(([, , ps]) => pode(ps)).map(([sk, sr]) => el('a', { class: `sub${sk === nome ? ' on' : ''}`, href: `#/${sk}` }, sr)))];
+    if (!subs) return link;
+    // O submenu do grupo aberto aparece na lateral; os outros só no menu do celular, que mostra tudo de uma vez.
+    return [link, el('div', { class: `grupo-sub${aberto ? '' : ' fechado'}` },
+      subs.filter(([, , ps]) => pode(ps)).map(([sk, sr]) => el('a', { class: `sub${sk === nome ? ' on' : ''}`, href: `#/${sk}` }, sr)))];
   });
 
+  // No celular a lateral vira uma barra com a marca e o botão Menu, que abre a lista inteira (com os submenus).
+  const botaoMenu = el('button', { class: 'abrir-menu', type: 'button', 'aria-expanded': 'false', onclick: () => {
+    const aberta = lateral.classList.toggle('aberta');
+    botaoMenu.setAttribute('aria-expanded', String(aberta));
+    limpar(botaoMenu, icone(aberta ? 'fechar' : 'menu'), el('span', {}, aberta ? 'Fechar' : 'Menu'));
+    document.documentElement.classList.toggle('menu-aberto', aberta);
+  } }, icone('menu'), el('span', {}, 'Menu'));
+  document.documentElement.classList.remove('menu-aberto');
   const lateral = el('nav', { class: 'lateral', 'aria-label': 'Menu' },
     el('div', { class: 'topo-lateral' }, marca(nomePlataforma), el('button', { class: 'recolher', title: 'Recolher menu', onclick: () => {
       casca.classList.toggle('recolhida');
       try { localStorage.setItem('midia.menu', casca.classList.contains('recolhida') ? 'recolhido' : 'aberto'); } catch { /* ignora */ }
-    } }, icone('seta'))),
+    } }, icone('seta')), botaoMenu),
     itens,
     // Quem está no portal não tem com quem falar dentro do sistema: este botão resolve isso.
     whatsappEquipe && u.perfil !== 'master' && u.perfil !== 'operador'

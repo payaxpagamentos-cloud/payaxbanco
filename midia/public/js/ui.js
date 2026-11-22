@@ -255,6 +255,8 @@ const P = {
   lixo: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   abaixo: 'M6 9l6 6 6-6',
   seta: 'M15 18l-6-6 6-6',
+  menu: 'M4 6h16M4 12h16M4 18h16',
+  fechar: 'M6 6l12 12M18 6L6 18',
   entrar: 'M10 17l5-5-5-5M15 12H3M14 3h6v18h-6',
   baixar: 'M12 3v12M7 10l5 5 5-5M4 21h16',
   enviar: 'M12 21V9M7 14l5-5 5 5M4 3h16',

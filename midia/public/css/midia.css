@@ -158,6 +158,11 @@ a{ color: var(--cor); }
 .lateral a.sub.on{ color: #fff; font-weight: 600; }
 .lateral a.sub:hover:not(.on){ color: #fff; }
 .lateral .grupo-sub{ display: flex; flex-direction: column; gap: 0; margin: 2px 0 6px; }
+.lateral .grupo-sub.fechado{ display: none; }
+/* Botão Menu: só existe no celular. */
+.lateral .abrir-menu{ display: none; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06);
+  color: #fff; font: inherit; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 999px; cursor: pointer; }
+.lateral .abrir-menu svg{ width: 18px; height: 18px; }
 .lateral .voltar{ margin-top: auto; }
 .casca.recolhida .lateral .rotulo, .casca.recolhida .lateral .grupo-sub, .casca.recolhida .marca .texto{ display: none; }
 .casca.recolhida .lateral a.item{ justify-content: center; padding: 10px; }
@@ -513,13 +518,21 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   /* Menu em cima e conteúdo embaixo. Sem fixar as linhas, a grade (com altura mínima de uma tela) repartia a
      sobra entre as duas — em página curta o menu esticava e o item aberto virava um bloco gigante. */
   .casca, .casca.recolhida{ grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .lateral{ position: sticky; top: 0; z-index: 50; height: auto; flex-direction: row; overflow-x: auto; padding: 8px 12px; gap: 2px; border-right: 0; border-bottom: 1px solid var(--border);
-    background: #18232A; scrollbar-width: none; }
-  .lateral::-webkit-scrollbar{ display: none; }
-  .lateral .topo-lateral, .lateral .grupo-sub{ display: none; }
-  .lateral{ align-self: start; align-items: center; }
-  .lateral a.item{ white-space: nowrap; flex: none; }
-  .lateral .voltar{ margin-top: 0; }
+  /* No celular: uma barra com a marca e o botão Menu. O Menu abre a lista inteira por cima da tela,
+     com todos os submenus (CRM, Financeiro) — na faixa que rolava para o lado eles não apareciam. */
+  .lateral{ position: sticky; top: 0; z-index: 50; height: auto; align-self: start; flex-direction: column; overflow: visible;
+    padding: 10px 16px; gap: 2px; border-right: 0; background: #18232A; }
+  .lateral .topo-lateral{ padding: 0; }
+  .lateral .recolher{ display: none; }
+  .lateral .abrir-menu{ display: inline-flex; }
+  .lateral > a.item, .lateral > .grupo-sub, .lateral > .falar-equipe{ display: none; }
+  .lateral.aberta{ position: fixed; top: 0; right: 0; bottom: 0; left: 0; height: 100vh; height: 100dvh; overflow-y: auto; overscroll-behavior: contain;
+    z-index: 1500; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .lateral.aberta .topo-lateral{ position: sticky; top: -10px; z-index: 1; background: #18232A; padding: 0 0 14px; margin-bottom: 4px; }
+  .lateral.aberta > a.item, .lateral.aberta > .falar-equipe{ display: flex; font-size: 16px; padding: 12px 14px; }
+  .lateral.aberta > .grupo-sub{ display: flex; margin: 0 0 6px; }
+  .lateral.aberta a.sub{ font-size: 15px; padding: 10px 14px 10px 46px; }
+  html.menu-aberto, html.menu-aberto body{ overflow: hidden; }
   .topo{ padding: 16px 16px 2px; }
   .conteudo{ padding: 12px 16px 28px; }
   .cartao{ padding: 16px; }
