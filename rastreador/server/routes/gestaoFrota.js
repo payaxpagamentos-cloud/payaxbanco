@@ -110,5 +110,8 @@ module.exports = (db) => {
     res.json(gf.custos(db, eid(req), de, ate));
   });
 
+  // ---------- Detran (despesas do veículo com o governo: IPVA, licenciamento, seguro e multas) ----------
+  r.get('/detran', (req, res) => res.json(gf.detran(db, eid(req), { ano: req.query.ano, veiculoId: req.query.veiculo_id || undefined })));
+
   return r;
 };

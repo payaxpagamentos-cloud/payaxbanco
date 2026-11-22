@@ -1002,6 +1002,23 @@ test('Rastreador', async (t) => {
     assert.equal((await api.get(`${G}/fornecedores`, cliente)).dados.find((x) => x.id === f.dados.id).gasto_centavos, 8000);
     // Excluir o veículo devolve os pneus montados ao estoque (não some com o pneu).
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM frota_pneus WHERE veiculo_id = ? AND status = 'montado'").get(veiculo).n, 1);
+    // Detran: IPVA, licenciamento, seguro e multas do veículo no ano, com o que está pago e o que está em aberto.
+    const anoD = new Date().getFullYear();
+    db.prepare("DELETE FROM frota_documentos WHERE veiculo_id = ?").run(veiculo);
+    const antes = (await api.get(`${G}/detran?ano=${anoD}&veiculo_id=${veiculo}`, cliente)).dados.totais; // multas de testes anteriores
+    await api.post(`${G}/documentos`, { tipo: 'ipva', veiculo_id: veiculo, vencimento: `${anoD}-12-30`, valor_centavos: 180000 }, cliente);
+    const lic = await api.post(`${G}/documentos`, { tipo: 'licenciamento', veiculo_id: veiculo, vencimento: `${anoD}-12-31`, valor_centavos: 16000 }, cliente);
+    await api.put(`${G}/documentos/${lic.dados.id}`, { pago: true }, cliente);
+    db.prepare("INSERT INTO multas (empresa_id, veiculo_id, placa, descricao, valor_centavos, pontos, ocorrida_em, situacao, criada_em) VALUES (?, ?, 'ABC1D23', 'Excesso de velocidade', 13016, 4, ?, 'a_pagar', ?)")
+      .run(empresa, veiculo, `${anoD}-01-15T12:00:00.000Z`, new Date().toISOString());
+    const detr = (await api.get(`${G}/detran?ano=${anoD}&veiculo_id=${veiculo}`, cliente)).dados;
+    assert.equal(detr.totais.ipva_centavos, 180000);
+    assert.equal(detr.totais.licenciamento_seguro_centavos, 16000);
+    assert.equal(detr.totais.multas, antes.multas + 1);
+    assert.equal(detr.totais.pago_centavos - antes.pago_centavos, 16000, 'licenciamento pago');
+    assert.equal(detr.totais.aberto_centavos - antes.aberto_centavos, 180000 + 13016, 'IPVA e multa em aberto');
+    assert.equal(detr.veiculos[0].total - antes.total_centavos, 180000 + 16000 + 13016);
+    assert.equal((await api.get(`${G}/detran`, operador)).status, 200, 'o operador consulta');
     // Usuário "Somente Gestão de Frota": entra no módulo e não enxerga nada do rastreamento.
     const uf = await api.post(`${base()}/usuarios`, { nome: 'Frota Só', email: 'frota@rota.com', senha: 'senha-da-frota', perfil: 'cliente', acesso: 'frota' }, cliente);
     assert.equal(uf.status, 201);

@@ -89,6 +89,7 @@ const MENU_EMPRESA = [
     ['gestao-documentos', 'Documentos', 'relatorios', 'IPVA, licenciamento, seguro, tacógrafo e CNH'],
     ['gestao-fornecedores', 'Fornecedores', 'empresas', 'Oficinas, borracharias e autopeças'],
     ['gestao-custos', 'Custos', 'carteira', 'Custo total e por km de cada veículo'],
+    ['gestao-detran', 'Detran', 'multa', 'IPVA, licenciamento, seguro e multas de cada veículo'],
   ]],
   ['relatorios', 'Relatórios', 'relatorios', null, [
     ['relatorios', 'Relatórios', 'relatorios', 'Por veículo e período, em planilha e PDF'],

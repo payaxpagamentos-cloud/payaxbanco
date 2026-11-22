@@ -712,6 +712,71 @@ function painel(db, empresaId) {
   };
 }
 
+// ---------- Detran: IPVA, licenciamento, seguro, multas e débitos de cada veículo ----------
+const CATEGORIA_DOC = { ipva: 'ipva', licenciamento: 'licenciamento', seguro: 'seguro' };
+const soLetras = (p) => String(p ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+function detran(db, empresaId, { ano, veiculoId } = {}) {
+  const dia = hoje();
+  const a = Number.isInteger(Number(ano)) && Number(ano) >= 2000 && Number(ano) <= 2100 ? Number(ano) : Number(dia.slice(0, 4));
+  const de = `${a}-01-01`; const ate = `${a}-12-31`;
+  const [ini, fim] = intervalo(de, ate);
+  const veiculos = db.prepare('SELECT id, placa, descricao FROM veiculos WHERE empresa_id = ? AND ativo = 1 ORDER BY placa').all(empresaId)
+    .filter((x) => !veiculoId || x.id === Number(veiculoId));
+  const porId = new Map(veiculos.map((x) => [x.id, x]));
+  const lancamentos = [];
+  // Documentos do veículo com vencimento no ano (CNH e exame são do motorista: ficam fora).
+  for (const d of db.prepare("SELECT * FROM frota_documentos WHERE empresa_id = ? AND veiculo_id IS NOT NULL AND vencimento BETWEEN ? AND ?").all(empresaId, de, ate)) {
+    const x = porId.get(d.veiculo_id);
+    if (!x) continue;
+    lancamentos.push({ origem: 'documento', id: d.id, data: d.vencimento, veiculo_id: x.id, placa: x.placa, categoria: CATEGORIA_DOC[d.tipo] ?? 'outros',
+      // IPVA, licenciamento e seguro já aparecem no tipo: a descrição mostra só o que foi anotado (ou o número do documento).
+      descricao: (CATEGORIA_DOC[d.tipo] ? [d.descricao, d.numero ? `nº ${d.numero}` : null] : [TIPOS_DOCUMENTO[d.tipo] ?? d.tipo, d.descricao]).filter(Boolean).join(' · ') || '—', valor_centavos: d.valor_centavos,
+      situacao: d.pago ? 'pago' : d.vencimento < dia ? 'vencido' : 'a_pagar' });
+  }
+  // Multas cometidas no ano (canceladas ficam fora).
+  for (const m of db.prepare("SELECT * FROM multas WHERE empresa_id = ? AND situacao <> 'cancelada' AND ocorrida_em >= ? AND ocorrida_em < ?").all(empresaId, ini, fim)) {
+    const x = porId.get(m.veiculo_id);
+    if (!x) continue;
+    lancamentos.push({ origem: 'multa', id: m.id, data: m.ocorrida_em.slice(0, 10), veiculo_id: x.id, placa: x.placa, categoria: 'multa',
+      descricao: `${m.descricao}${m.pontos ? ` · ${m.pontos} pontos` : ''}`, valor_centavos: m.valor_centavos ?? 0, vencimento: m.vencimento,
+      situacao: m.situacao === 'paga' ? 'pago' : m.situacao === 'em_recurso' ? 'em_recurso' : m.vencimento && m.vencimento < dia ? 'vencido' : 'a_pagar' });
+  }
+  lancamentos.sort((p, q) => q.data.localeCompare(p.data));
+  const soma = (f) => lancamentos.filter(f).reduce((s, x) => s + x.valor_centavos, 0);
+  const CATS = ['ipva', 'licenciamento', 'seguro', 'multa', 'outros'];
+  const linhas = veiculos.map((x) => {
+    const r = { veiculo_id: x.id, placa: x.placa, descricao: x.descricao };
+    for (const c of CATS) r[c] = soma((l) => l.veiculo_id === x.id && l.categoria === c);
+    r.total = CATS.reduce((s, c) => s + r[c], 0);
+    r.aberto = soma((l) => l.veiculo_id === x.id && ['a_pagar', 'vencido'].includes(l.situacao));
+    return r;
+  });
+  // Débitos em aberto que o Detran devolveu na última consulta de cada placa (Central de multas → Consultar débitos).
+  const placas = new Map(veiculos.map((x) => [soLetras(x.placa), x]));
+  const debitos = [];
+  for (const c of db.prepare(`SELECT placa, resultado, criado_em FROM multas_consultas WHERE id IN (SELECT MAX(id) FROM multas_consultas
+    WHERE empresa_id = ? AND status = 'ok' AND resultado IS NOT NULL GROUP BY placa)`).all(empresaId)) {
+    const x = placas.get(soLetras(c.placa));
+    if (!x) continue;
+    let r = null;
+    try { r = JSON.parse(c.resultado); } catch { continue; }
+    for (const ap of Array.isArray(r?.apontamentos) ? r.apontamentos : []) {
+      if (!(ap.valor_centavos > 0) || ['restricao', 'resumo'].includes(ap.tipo)) continue;
+      debitos.push({ veiculo_id: x.id, placa: x.placa, tipo: ap.tipo, descricao: String(ap.descricao ?? ap.tipo).slice(0, 120), valor_centavos: ap.valor_centavos, consultado_em: c.criado_em });
+    }
+  }
+  return {
+    ano: a,
+    totais: {
+      total_centavos: soma(() => true), pago_centavos: soma((l) => l.situacao === 'pago'), aberto_centavos: soma((l) => ['a_pagar', 'vencido'].includes(l.situacao)),
+      vencido_centavos: soma((l) => l.situacao === 'vencido'), ipva_centavos: soma((l) => l.categoria === 'ipva'),
+      licenciamento_seguro_centavos: soma((l) => ['licenciamento', 'seguro'].includes(l.categoria)), multas_centavos: soma((l) => l.categoria === 'multa'),
+      multas: lancamentos.filter((l) => l.categoria === 'multa').length, debitos_centavos: debitos.reduce((s, x) => s + x.valor_centavos, 0),
+    },
+    veiculos: linhas, lancamentos, debitos,
+  };
+}
+
 // ---------- Avisos (WhatsApp e painel) ----------
 let ultimaRodada = 0;
 /** A cada 30 min: avisa uma vez cada componente perto do fim, pneu com sulco baixo e documento perto de vencer. */
@@ -756,5 +821,5 @@ module.exports = {
   listarComponentes, criarComponente, editarComponente, excluirComponente, aplicarPlano, trocarComponente, registrarTroca, historicoComponentes, componenteDa,
   criarOS, editarOS, adicionarItem, removerItem, iniciarOS, concluirOS, cancelarOS, listarOS, detalheOS,
   listarPneus, cadastrarPneu, montarPneu, desmontarPneu, rodizio, medirPneu, enviarRecapagem, voltarRecapagem, consertoPneu, descartarPneu, historicoPneu, pneusDoVeiculo,
-  listarDocumentos, criarDocumento, editarDocumento, documentoDa, listarFornecedores, salvarFornecedor, fornecedorDa, custos, painel, rodadaAvisos,
+  listarDocumentos, criarDocumento, editarDocumento, documentoDa, listarFornecedores, salvarFornecedor, fornecedorDa, custos, detran, painel, rodadaAvisos,
 };
