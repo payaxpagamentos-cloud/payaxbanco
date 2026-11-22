@@ -63,10 +63,18 @@ async function chamar(metodo, caminho, corpo, { bruto = false } = {}) {
   if (s?.token) headers.Authorization = `Bearer ${s.token}`;
   if (corpo !== undefined) headers['Content-Type'] = 'application/json';
   let resp;
+  // Internet que trava sem cair deixava o botão girando para sempre. Com limite, a tela avisa e dá para tentar de novo.
+  // (Baixar arquivo fica sem limite: backup e vídeo podem demorar de verdade.)
+  const corte = !bruto && typeof AbortController === 'function' ? new AbortController() : null;
+  const relogio = corte ? setTimeout(() => corte.abort(), 90_000) : null;
   try {
-    resp = await fetch(`${BASE}/api${caminho}`, { method: metodo, headers, body: corpo === undefined ? undefined : JSON.stringify(corpo) });
-  } catch {
-    throw new ErroApi('Sem conexão com o servidor. Verifique a internet.', 0);
+    resp = await fetch(`${BASE}/api${caminho}`, { method: metodo, headers, body: corpo === undefined ? undefined : JSON.stringify(corpo), signal: corte?.signal });
+  } catch (err) {
+    throw new ErroApi(err?.name === 'AbortError'
+      ? 'O servidor demorou demais para responder. Confira a internet e tente de novo.'
+      : 'Sem conexão com o servidor. Verifique a internet.', 0);
+  } finally {
+    clearTimeout(relogio);
   }
   if (resp.status === 401 && !caminho.startsWith('/auth/')) {
     sessao.limpar();

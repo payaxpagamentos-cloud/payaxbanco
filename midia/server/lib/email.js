@@ -108,6 +108,8 @@ function obterTransporte() {
       secure: config.smtp.seguro,
       auth: config.smtp.usuario ? { user: config.smtp.usuario, pass: config.smtp.senha } : undefined,
       dkim: lerDkim(),
+      // Provedor que não responde não pode prender a tela de quem está enviando por minutos.
+      connectionTimeout: 20_000, greetingTimeout: 20_000, socketTimeout: 60_000,
     });
   return transporte;
 }

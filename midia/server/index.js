@@ -13,10 +13,36 @@ const smtpServidor = require('./lib/smtp-servidor');
 
 const db = abrir();
 // MIDIA_HOST=127.0.0.1 faz o sistema atender só o nginx da própria máquina (o certo no servidor).
-criarApp(db).listen(config.port, process.env.MIDIA_HOST || undefined, () => {
+const servidor = criarApp(db).listen(config.port, process.env.MIDIA_HOST || undefined, () => {
   console.log(`[Vai Mídia] Painel: http://localhost:${config.port}${config.basePath}/`);
   console.log(`[Vai Mídia] Player da TV: http://localhost:${config.port}${config.basePath}/tv/`);
 });
+// Vídeo grande em internet lenta passa dos 5 minutos que o Node dá por padrão para um envio: 30 minutos.
+// O nginx fica na frente e já corta conexão parada; aqui o prazo é só para o envio legítimo não ser interrompido.
+servidor.requestTimeout = 30 * 60_000;
+// Maior que o tempo que o nginx mantém a conexão aberta, para o Node nunca fechar no meio de um pedido (erro 502).
+servidor.keepAliveTimeout = 75_000;
+servidor.headersTimeout = 80_000;
+
+// Um erro solto numa rotina de fundo fica registrado, mas não derruba o painel nem as TVs.
+process.on('unhandledRejection', (motivo) => {
+  console.error('[Vai Mídia] Erro não tratado:', motivo?.stack || motivo);
+});
+
+// Reinício e atualização: para de aceitar pedidos novos, deixa os que estão no meio terminarem e fecha
+// o banco direito. Sem isto, quem estava enviando um arquivo na hora do reinício perdia o envio.
+let encerrando = false;
+const encerrar = (sinal) => {
+  if (encerrando) return;
+  encerrando = true;
+  console.log(`[Vai Mídia] Encerrando (${sinal})…`);
+  const fim = () => { try { db.close(); } catch { /* já fechado */ } process.exit(0); };
+  servidor.close(fim);
+  servidor.closeIdleConnections?.();
+  setTimeout(fim, 8000).unref();
+};
+process.on('SIGTERM', () => encerrar('SIGTERM'));
+process.on('SIGINT', () => encerrar('SIGINT'));
 
 // Servidor de e-mail da plataforma: só sobe com MIDIA_EMAIL_DOMINIOS configurado. O que chega cai na
 // caixa de entrada do CRM, ligado ao lead de quem escreveu.
