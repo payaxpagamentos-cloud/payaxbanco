@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '1.9';
+const VERSAO = '2.0';
 // Carimbo com que esta página foi carregada (vem no endereço do script; ver server/lib/carimbo-player.js).
 const CARIMBO = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch { return ''; } })();
 const API = new URL('../api/', location.href).href;
@@ -779,30 +779,24 @@ const emTelaCheia = () => Boolean(document.fullscreenElement || document.webkitF
 // Um pedido só, sem opções — como na primeira versão, que maximizou com dois cliques na TV Samsung.
 // Cuidado: navegador antigo devolve "undefined" em requestFullscreen (não uma promessa); encadear o
 // pedido do WebKit depois dele (com ??) fazia um segundo pedido que cancelava o primeiro.
-// O que o navegador respondeu no último pedido: aparece no botão quando não maximiza, para a equipe
-// saber se é a TV que bloqueia (e por quê) sem precisar de ferramenta nenhuma.
-const diagnosticoTela = { metodo: '', resposta: '' };
+// Tela cheia exatamente como no teste que funcionou na TV Samsung (tv/teste-tela-cheia.html, botão 1):
+// um pedido só, requestFullscreen() sem opções, feito DENTRO do clique do botão. Nada de pedir ao abrir a
+// página nem em todo evento da tela: na Samsung, esses pedidos extras gastavam a permissão do clique.
+const diagnosticoTela = { resposta: '' };
 function pedirTelaCheia() {
   if (emTelaCheia()) return;
   const raiz = document.documentElement;
   try {
     if (raiz.requestFullscreen) {
-      diagnosticoTela.metodo = 'requestFullscreen';
       const pedido = raiz.requestFullscreen();
-      diagnosticoTela.resposta = pedido && typeof pedido.then === 'function' ? 'aguardando' : 'sem resposta';
+      diagnosticoTela.resposta = 'enviado';
       if (pedido && typeof pedido.then === 'function') {
         pedido.then(() => { diagnosticoTela.resposta = 'aceito'; }, (e) => { diagnosticoTela.resposta = `recusado: ${e?.message || e?.name || e}`; });
       }
     } else if (raiz.webkitRequestFullscreen) {
-      diagnosticoTela.metodo = 'webkitRequestFullscreen';
       raiz.webkitRequestFullscreen();
-      diagnosticoTela.resposta = 'enviado';
-    } else if (raiz.webkitRequestFullScreen) {
-      diagnosticoTela.metodo = 'webkitRequestFullScreen';
-      raiz.webkitRequestFullScreen();
-      diagnosticoTela.resposta = 'enviado';
+      diagnosticoTela.resposta = 'enviado (webkit)';
     } else {
-      diagnosticoTela.metodo = 'nenhum';
       diagnosticoTela.resposta = 'navegador sem tela cheia';
     }
   } catch (e) {
@@ -817,49 +811,35 @@ function telaCheia() {
   const instalado = matchMedia('(display-mode: fullscreen)').matches;
   let canto;
   let sumir;
-  // Só a resposta do próprio navegador conta: medir a janela engana em TV (a barra do navegador
-  // às vezes fica por cima da página, e a janela "parece" ocupar a tela toda).
   const ocupaTudo = () => emTelaCheia() || instalado;
   const atualizar = () => {
     clearTimeout(canto);
     clearTimeout(sumir);
     botao.hidden = ocupaTudo();
     if (!botao.hidden) {
-      botao.classList.remove('canto');
-      // Grande no meio por 20 s; depois vai para o canto, menor; em 2 min sai (volta ao tocar em algo).
+      botao.classList.remove('canto', 'aviso');
+      texto.textContent = 'Clique aqui para maximizar';
+      // Grande no alto por 20 s; depois vai para o canto, menor; em 2 min sai (volta ao mexer no controle).
       canto = setTimeout(() => botao.classList.add('canto'), 20_000);
       sumir = setTimeout(() => { botao.hidden = true; }, 120_000);
     }
   };
-  // O ponteiro do controle da Samsung manda pointerdown, e nem sempre um click: o botão escuta os dois.
-  let conferindo = false;
-  const apertou = () => {
-    if (conferindo) return;
-    conferindo = true;
-    // Se em 2 s não abriu, o navegador desta TV não deixa site nenhum ocupar a tela.
+  botao.addEventListener('click', () => {
+    pedirTelaCheia();
     setTimeout(() => {
-      conferindo = false;
       if (ocupaTudo()) return;
       botao.classList.add('aviso');
-      const permitido = document.fullscreenEnabled ?? document.webkitFullscreenEnabled;
-      texto.textContent = `Não maximizou. Mande uma foto desta mensagem para o suporte — ${diagnosticoTela.metodo || 'sem pedido'} · `
-        + `${diagnosticoTela.resposta || '—'} · permitido: ${permitido === undefined ? '?' : (permitido ? 'sim' : 'não')} · `
-        + `${(navigator.userAgent.match(/(Tizen[^;)]*|SamsungBrowser\/[\d.]+|Chrome\/[\d.]+|Web0S|NetCast)/g) || []).join(' ')}`;
+      texto.textContent = `Não maximizou (${diagnosticoTela.resposta || 'sem resposta'}). Tente de novo ou mande uma foto para o suporte.`;
     }, 2000);
-  };
-  for (const evento of ['pointerdown', 'click', 'keydown']) botao.addEventListener(evento, apertou);
-  pedirTelaCheia();
-  // Clique, dois cliques, toque ou tecla OK — em qualquer lugar da tela, botão incluído.
-  for (const evento of ['click', 'dblclick', 'keydown', 'touchend']) {
-    document.addEventListener(evento, pedirTelaCheia, { capture: true });
-  }
-  // Mexeu no controle e a TV continua sem tela cheia: o botão volta.
+  });
+  // Dois cliques em qualquer lugar também maximizam (um pedido só, no próprio duplo clique).
+  document.addEventListener('dblclick', (e) => { if (e.target !== botao) pedirTelaCheia(); });
+  // Mexeu no controle e a TV continua sem tela cheia: o botão volta, já selecionado (o OK cai nele).
   document.addEventListener('keydown', () => { if (botao.hidden && !ocupaTudo()) { atualizar(); botao.focus(); } });
   document.addEventListener('fullscreenchange', atualizar);
   document.addEventListener('webkitfullscreenchange', atualizar);
-  setTimeout(atualizar, 1000);
-  // Com o botão na tela, o OK do controle já cai nele.
-  setTimeout(() => { if (!botao.hidden) botao.focus(); }, 1100);
+  atualizar();
+  setTimeout(() => { if (!botao.hidden) botao.focus(); }, 300);
 }
 
 function atalhos() {
