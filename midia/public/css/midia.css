@@ -707,7 +707,8 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .dias{ display: flex; gap: 6px; flex-wrap: wrap; }
 .dias label{ display: grid; place-items: center; width: 40px; height: 38px; border: 1px solid var(--border-forte); border-radius: 9px; cursor: pointer; font-size: 12px; font-weight: 700;
   color: var(--text-2); }
-.dias label:has(input:checked){ background: var(--destaque-bg); border-color: var(--destaque-borda); color: var(--cor); }
+/* Dia marcado: lima cheio com a tinta por cima — antes era lima claro sobre lima claro e mal se lia qual estava marcado. */
+.dias label:has(input:checked){ background: var(--cor); border-color: var(--cor-forte); color: #18232A; }
 .dias input{ display: none; }
 
 /* Fatura */

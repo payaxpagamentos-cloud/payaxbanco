@@ -80,6 +80,8 @@ function detalhe(db, id) {
     alvos,
     telas_alcancadas: telas.length,
     telas,
+    // O motivo, em português, de a campanha não estar passando agora (vazio quando está tudo certo).
+    agora: grade.porQueNaoPassa(db, id),
     desempenho: porCampanha(db, { de, ate, campanhaId: id })[0] ?? { insercoes: 0, segundos: 0, telas: 0, impactos: 0 },
     por_dia: porDia(db, { de, ate, campanhaId: id }),
   };

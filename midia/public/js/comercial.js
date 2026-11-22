@@ -355,6 +355,21 @@ function editarCampanha(c, recarregar, opcoes) {
 }
 
 /** Detalhe da campanha: criativos, onde passa, desempenho e as ações de situação. */
+/**
+ * "Está passando agora?" — a resposta que o painel não dava. Campanha no ar com o dia errado, o horário
+ * errado ou o criativo sem aprovar parecia funcionando e a TV mostrava só a tela da marca.
+ */
+function situacaoAgora(a) {
+  if (!a) return null;
+  if (a.passando) {
+    return el('p', { class: 'aviso ok', style: 'margin-top:12px' },
+      `Passando agora (${a.agora}) em ${a.telas} TV${a.telas === 1 ? '' : 's'}. A TV pega mudanças em até um minuto.`);
+  }
+  return el('div', { class: 'aviso', style: 'margin-top:12px' },
+    el('strong', {}, `Não está passando agora (${a.agora}). Por quê:`),
+    el('ul', { style: 'margin:6px 0 0;padding-left:20px' }, a.motivos.map((m) => el('li', {}, m))));
+}
+
 async function abrirCampanha(id, recarregar, opcoes) {
   const d = await api.get(`/painel/campanhas/${id}`);
   const atualizar = async (fechar) => { fechar(); recarregar(); await abrirCampanha(id, recarregar, opcoes); };
@@ -367,6 +382,7 @@ async function abrirCampanha(id, recarregar, opcoes) {
         d.circuito ? etiqueta(`Circuito ${d.circuito}`, '') : null),
       el('div', { class: 'linha' }, ...acoesStatus(d, () => atualizar(fechar)))),
     d.motivo ? el('p', { class: 'aviso' }, `Motivo registrado: ${d.motivo}`) : null,
+    situacaoAgora(d.agora),
 
     el('div', { class: 'grade', style: 'margin:16px 0' },
       indicador({ rotulo: 'Inserções no período', valor: inteiro(d.desempenho.insercoes), ic: 'tocar' }),

@@ -90,6 +90,66 @@ function elegiveis(db, tela, { data, hhmm, diaSemana }) {
   return lista;
 }
 
+const NOMES_DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+const dataBr = (d) => (d ? d.split('-').reverse().join('/') : '');
+
+/**
+ * Por que a campanha está (ou não está) passando AGORA.
+ *
+ * Campanha "no ar" no painel não quer dizer anúncio na TV: ela pode estar fora do dia, fora do horário,
+ * sem criativo aprovado ou sem TV escolhida — e de fora não dá para ver nada disso. Este diagnóstico
+ * aplica as MESMAS regras que montam o loop da TV (elegiveis), então o motivo que ele dá é o motivo real.
+ */
+function porQueNaoPassa(db, campanhaId, instante = new Date()) {
+  const { data, hhmm, diaSemana } = local(instante);
+  const c = db.prepare(`SELECT c.*, a.status AS anunciante_status FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
+    WHERE c.id = ?`).get(campanhaId);
+  if (!c) return null;
+  const motivos = [];
+
+  if (c.status !== 'ativa') {
+    const situacao = { rascunho: 'rascunho', aguardando: 'aguardando aprovação', pausada: 'pausada', encerrada: 'encerrada', recusada: 'recusada' }[c.status] ?? c.status;
+    motivos.push(`A campanha está ${situacao} — só campanha no ar vai para as TVs.`);
+  }
+  if (c.anunciante_status !== 'ativo') motivos.push('O anunciante está inativo.');
+  if (c.inicio > data) motivos.push(`Ainda não começou: começa em ${dataBr(c.inicio)}.`);
+  if (c.fim && c.fim < data) motivos.push(`Já terminou: o último dia foi ${dataBr(c.fim)}.`);
+  if (!noDia(c, diaSemana)) {
+    const dias = String(c.dias_semana).split('').map(Number).sort().map((d) => NOMES_DIAS[d]);
+    // "no domingo", "na segunda"; com vários dias, a lista corrida: "segunda, terça e sábado".
+    const quando = dias.length === 1
+      ? `${['domingo', 'sábado'].includes(dias[0]) ? 'no' : 'na'} ${dias[0]}`
+      : `${dias.slice(0, -1).join(', ')} e ${dias.at(-1)}`;
+    motivos.push(`Hoje é ${NOMES_DIAS[diaSemana]}, e a campanha só passa ${quando}.`);
+  }
+  if (!naHora(c, hhmm)) motivos.push(`Fora do horário: agora são ${hhmm}, e ela passa das ${c.hora_inicio} às ${c.hora_fim}.`);
+
+  const criativos = db.prepare(`SELECT m.status, m.validade_ate FROM campanha_midias cm JOIN midias m ON m.id = cm.midia_id
+    WHERE cm.campanha_id = ?`).all(campanhaId);
+  const validos = criativos.filter((m) => m.status === 'aprovada' && (!m.validade_ate || m.validade_ate >= data));
+  if (!criativos.length) motivos.push('Nenhum criativo na campanha.');
+  else if (!validos.length) {
+    const pendentes = criativos.filter((m) => m.status === 'pendente').length;
+    const vencidos = criativos.filter((m) => m.status === 'aprovada' && m.validade_ate && m.validade_ate < data).length;
+    motivos.push(`Nenhum criativo pode ir ao ar${pendentes ? `: ${pendentes} aguardando aprovação (aprove em Criativos)` : ''}`
+      + `${vencidos ? `${pendentes ? ',' : ':'} ${vencidos} com a validade vencida` : ''}.`);
+  }
+
+  const alvos = db.prepare('SELECT tipo, valor FROM campanha_alvos WHERE campanha_id = ?').all(campanhaId);
+  const telas = db.prepare(`SELECT t.*, l.categoria, l.cidade, l.uf FROM telas t JOIN locais l ON l.id = t.local_id
+    WHERE t.status = 'ativa' AND l.status = 'ativo'`).all().filter((t) => alvoBate(alvos, t));
+  if (!telas.length) motivos.push('Nenhuma TV escolhida em "Onde passa" (ou as escolhidas estão inativas).');
+  else if (!telas.some((t) => t.pareada_em)) motivos.push('As TVs escolhidas ainda não foram pareadas com um aparelho.');
+
+  if (c.limite_dia > 0 && telas.length) {
+    const hoje = db.prepare('SELECT tela_id, insercoes FROM resumo_dia WHERE data = ? AND campanha_id = ?').all(data, campanhaId);
+    if (telas.every((t) => (hoje.find((h) => h.tela_id === t.id)?.insercoes ?? 0) >= c.limite_dia)) {
+      motivos.push(`Já bateu o limite de ${c.limite_dia} inserções por TV hoje; volta amanhã.`);
+    }
+  }
+  return { passando: motivos.length === 0, motivos, telas: telas.length, agora: `${NOMES_DIAS[diaSemana]}, ${hhmm}` };
+}
+
 /** Espalha as inserções pelo loop: cada uma ganha uma posição fracionária e a ordem sai dela. */
 function espalhar(blocos) {
   const slots = [];
@@ -324,4 +384,4 @@ function montarPorTela(db, telaId, instante = new Date()) {
 /** A tela com tudo que a programação precisa (usado pelas rotas). */
 const buscarTela = (db, telaId) => db.prepare(SQL_TELA).get(telaId);
 
-module.exports = { montar, montarPorTela, buscarTela, elegiveis, alvoBate, espalhar, noPrazo, noDia, naHora, SQL_TELA };
+module.exports = { montar, montarPorTela, buscarTela, elegiveis, alvoBate, espalhar, noPrazo, noDia, naHora, porQueNaoPassa, SQL_TELA };
