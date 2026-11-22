@@ -1384,10 +1384,42 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 .vp-t2{ font-size: 12.5px; fill: var(--text-2); }
 @keyframes vp-pulso{ 50%{ stroke-opacity: .35; } }
 @media (prefers-reduced-motion: reduce){ .vp-erro .vp-anel{ animation: none; } }
-:root[data-theme="dark"] .vp-vidro, :root[data-theme="dark"] .vp-frisos rect{ fill: #3E5F86; }
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .vp-vidro, :root:not([data-theme="light"]) .vp-frisos rect{ fill: #3E5F86; } }
-:root[data-theme="dark"] .vp-sombra{ fill: rgba(0, 0, 0, .35); }
+:root[data-tema="escuro"] .vp-vidro, :root[data-tema="escuro"] .vp-frisos rect{ fill: #3E5F86; }
+:root[data-tema="escuro"] .vp-sombra{ fill: rgba(0, 0, 0, .35); }
 /* No celular a ilustração encolhe: a lista embaixo repete cada pneu com letra legível. */
+/* Motor ilustrado (cofre visto de cima) */
+.motor-ilustrado{ max-width: 760px; }
+.mt-cofre{ fill: var(--surface-2); stroke: var(--border-forte); stroke-width: 2; }
+.mt-bloco{ fill: var(--surface); stroke: var(--border-forte); stroke-width: 2; }
+.mt-rotulo{ font-size: 15px; font-weight: 800; letter-spacing: .2em; fill: var(--text-3); text-anchor: middle; }
+.mt-firewall{ stroke: var(--border-forte); stroke-width: 3; stroke-dasharray: 10 6; }
+.mt-peca{ fill: #CBD5E1; stroke: #64748B; stroke-width: 2; transition: stroke-width .15s; }
+.mt-fio{ fill: none; stroke: #64748B; stroke-width: 2; stroke-linecap: round; }
+.mt-fio-c{ fill: #94A3B8; stroke: #64748B; stroke-width: 1.5; }
+.mt-correia{ fill: none; stroke: #334155; stroke-width: 6; stroke-linejoin: round; }
+.mt-sinal{ font-size: 18px; font-weight: 800; fill: #334155; text-anchor: middle; }
+.mt-grupo{ cursor: pointer; outline: none; }
+.mt-grupo:hover .mt-peca, .mt-grupo:focus-visible .mt-peca{ stroke-width: 4; }
+.vp-ok .mt-peca{ fill: var(--ok-bg); stroke: var(--ok); }
+.vp-aviso .mt-peca{ fill: var(--aviso-bg); stroke: var(--aviso); }
+.vp-erro .mt-peca{ fill: var(--erro-bg); stroke: var(--erro); animation: mt-pulso 1.6s ease-in-out infinite; }
+.vp-ausente .mt-peca{ fill: transparent; stroke: var(--text-3); stroke-dasharray: 6 5; }
+.vp-ausente .mt-fio, .vp-ausente .mt-fio-c, .vp-ausente .mt-correia{ opacity: .35; }
+.vp-ausente .vp-cartao{ fill: transparent; stroke-dasharray: 6 5; }
+.vp-ausente .vp-ponto{ fill: none; stroke: var(--text-3); }
+@keyframes mt-pulso{ 50%{ stroke-opacity: .35; } }
+/* Freios no desenho dos pneus: disco + pinça em cada roda */
+.fr-disco{ cursor: pointer; outline: none; }
+.fr-rotor{ fill: #9CA3AF; stroke: #4B5563; stroke-width: 2; }
+.fr-cubo{ fill: #4B5563; }
+.fr-pinca{ fill: #64748B; stroke: #334155; stroke-width: 1; }
+.fr-disco.vp-ok .fr-pinca{ fill: var(--ok); } .fr-disco.vp-aviso .fr-pinca{ fill: var(--aviso); } .fr-disco.vp-erro .fr-pinca{ fill: var(--erro); }
+.fr-disco.vp-ok .fr-rotor{ stroke: var(--ok); } .fr-disco.vp-aviso .fr-rotor{ stroke: var(--aviso); } .fr-disco.vp-erro .fr-rotor{ stroke: var(--erro); stroke-width: 3; }
+.fr-disco.vp-ausente .fr-rotor{ stroke-dasharray: 4 4; fill: transparent; }
+.fr-disco:hover .fr-rotor, .fr-disco:focus-visible .fr-rotor{ stroke-width: 4; }
+@media (prefers-reduced-motion: reduce){ .vp-erro .mt-peca{ animation: none; } }
+:root[data-tema="escuro"] .mt-fio{ stroke: #94A3B8; }
+:root[data-tema="escuro"] .mt-correia{ stroke: #CBD5E1; } :root[data-tema="escuro"] .mt-sinal{ fill: #E2E8F0; }
 .lista-pneus-cel{ display: none; }
 @media (max-width: 640px){
   .lista-pneus-cel{ display: grid; gap: 8px; width: 100%; }

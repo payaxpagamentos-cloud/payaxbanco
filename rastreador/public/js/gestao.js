@@ -174,6 +174,115 @@ async function telaOS(ctx) {
   });
 }
 
+// ---------- Peças do plano: ações comuns (plano, desenho do motor e freios) ----------
+const TOM_COMP = { ok: 'ok', atencao: 'aviso', vencido: 'erro' };
+/** "82% · faltam 1.200 km" (ou o que passou, ou a data). */
+const textoUso = (x) => `${Math.round(x.pct)}%${x.restante_km !== null ? (x.restante_km >= 0 ? ` · faltam ${inteiro(x.restante_km)} km` : ` · passou ${inteiro(-x.restante_km)} km`)
+  : x.previsao ? ` · até ${data(x.previsao)}` : ''}`;
+const registrarTroca = (ctx, comp) => formModal(`Registrar troca · ${comp.nome}`, () => [
+  el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Troca feita sem OS (ex.: na estrada). Com OS, a troca é registrada ao concluir a OS.'),
+  el('div', { class: 'duas' }, campo('Km', { name: 'km', type: 'number', min: 0, value: comp.km_atual }), campo('Data', { name: 'data', type: 'date', value: hojeLocal() })),
+  el('div', { class: 'duas' }, campo('Custo (R$)', { name: 'custo', inputmode: 'decimal' }), campo('Marca da peça nova', { name: 'marca', maxlength: 60, value: comp.marca ?? '' })),
+], (d) => api.post(`${base(ctx)}/componentes/${comp.id}/trocar`, { km: d.km, data: d.data, custo_centavos: centavos(d.custo) ?? 0, marca: d.marca }), { rotulo: 'Registrar troca' })
+  .then((r) => { if (r) toast('Troca registrada: a vida útil recomeçou.'); return r; });
+/** Inclui a peça no plano do veículo com a vida útil de referência do catálogo (instalada no km de hoje). */
+async function incluirNoPlano(ctx, veiculoId, tipo) {
+  const x = (await cat(ctx)).componentes[tipo];
+  await api.post(`${base(ctx)}/componentes`, { veiculo_id: veiculoId, tipo, vida_km: x.km ?? '', vida_dias: x.dias ?? '' });
+  toast(`${x.nome} incluído no plano, instalado no km de hoje. Ajuste o km da última troca se souber.`);
+}
+/** Ficha rápida de uma peça: uso, próxima troca e as ações. */
+const acoesComponente = (ctx, comp, { aoEditar, depois } = {}) => modal(`${comp.nome} · ${placa(comp.placa)}`, (fechar) => {
+  const fazer = (fn) => async () => { fechar(); const r = await fn(); if (r) depois?.(); };
+  return [
+    el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap' }, etiqueta(...ESTADO[comp.estado]), etiqueta(comp.grupo, 'info')),
+    barraVida(comp.pct),
+    el('div', { class: 'grade-dados' },
+      el('div', {}, el('span', { class: 'mudo pequeno' }, 'Instalado'), el('div', {}, `${kmTxt(comp.instalado_km)} · ${data(comp.instalado_em)}`)),
+      el('div', {}, el('span', { class: 'mudo pequeno' }, 'Vida útil'), el('div', {}, [comp.vida_km ? kmTxt(comp.vida_km) : null, comp.vida_dias ? `${inteiro(comp.vida_dias)} dias` : null].filter(Boolean).join(' ou '))),
+      el('div', {}, el('span', { class: 'mudo pequeno' }, 'Próxima troca'), el('div', {}, [comp.proxima_km ? kmTxt(comp.proxima_km) : null, comp.previsao ? `por volta de ${data(comp.previsao)}` : null].filter(Boolean).join(' · ') || '—'))),
+    el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:6px' },
+      pode(ctx) ? [botao('Abrir OS', 'primario', fazer(() => novaOS(ctx, { veiculo_id: comp.veiculo_id, tipo: 'preventiva', componentes: [comp.id], descricao: `Troca: ${comp.nome}` }))),
+        botao('Registrar troca', '', fazer(() => registrarTroca(ctx, comp))), aoEditar ? botao('Editar', '', fazer(() => aoEditar(comp))) : null] : null,
+      el('button', { class: 'btn', type: 'button', onclick: () => fechar() }, 'Fechar')),
+  ];
+});
+
+// ---------- Desenho do motor (visto de cima, frente do carro no alto) ----------
+// Cada peça: o desenho (no cofre, deslocado 60 px para dar lugar às etiquetas), o ponto de ligação e a altura da etiqueta.
+const DX = 60;
+const PECAS_MOTOR = {
+  arrefecimento: { nome: 'Arrefecimento', lado: 'dir', ly: 70, anc: [470, 77],
+    svg: `<rect class="mt-peca" x="170" y="58" width="300" height="38" rx="8"/>${Array.from({ length: 14 }, (_, i) => `<line class="mt-fio" x1="${186 + i * 20}" x2="${186 + i * 20}" y1="64" y2="90"/>`).join('')}` },
+  correia_acessorios: { nome: 'Correia de acessórios', lado: 'esq', ly: 140, anc: [236, 140],
+    svg: `<path class="mt-correia" d="M250 126 L390 126 Q404 126 404 140 L344 188 Q320 198 296 188 L236 140 Q236 126 250 126 Z"/>
+      <circle class="mt-peca" cx="250" cy="140" r="14"/><circle class="mt-peca" cx="390" cy="140" r="14"/><circle class="mt-peca" cx="320" cy="178" r="20"/>` },
+  filtro_ar: { nome: 'Filtro de ar', lado: 'esq', ly: 222, anc: [132, 236],
+    svg: `<rect class="mt-peca" x="132" y="198" width="80" height="78" rx="12"/><path class="mt-fio" d="M212 236 Q224 236 230 230"/><circle class="mt-fio-c" cx="172" cy="237" r="18"/>` },
+  velas: { nome: 'Velas de ignição', lado: 'dir', ly: 150, anc: [380, 250],
+    svg: [260, 300, 340, 380].map((x) => `<circle class="mt-peca" cx="${x}" cy="250" r="12"/><rect class="mt-fio-c" x="${x - 3}" y="236" width="6" height="10" rx="2"/>`).join('') },
+  bateria: { nome: 'Bateria', lado: 'dir', ly: 230, anc: [508, 235],
+    svg: `<rect class="mt-peca" x="448" y="200" width="60" height="70" rx="8"/><rect class="mt-fio-c" x="456" y="192" width="12" height="10" rx="2"/><rect class="mt-fio-c" x="488" y="192" width="12" height="10" rx="2"/>
+      <text class="mt-sinal" x="462" y="242">+</text><text class="mt-sinal" x="488" y="242">−</text>` },
+  correia_dentada: { nome: 'Correia dentada', lado: 'dir', ly: 310, anc: [438, 300],
+    svg: `<rect class="mt-peca" x="414" y="200" width="24" height="170" rx="10"/>${Array.from({ length: 9 }, (_, i) => `<line class="mt-fio" x1="418" x2="434" y1="${214 + i * 18}" y2="${214 + i * 18}"/>`).join('')}` },
+  oleo_motor: { nome: 'Óleo do motor', lado: 'dir', ly: 390, anc: [316, 330],
+    svg: `<circle class="mt-peca" cx="300" cy="330" r="18"/><path class="mt-fio-c" d="M300 320 Q309 332 300 340 Q291 332 300 320 Z"/>` },
+  filtro_oleo: { nome: 'Filtro de óleo', lado: 'esq', ly: 302, anc: [204, 325],
+    svg: `<rect class="mt-peca" x="202" y="298" width="24" height="56" rx="10"/><line class="mt-fio" x1="204" x2="224" y1="310" y2="310"/><line class="mt-fio" x1="204" x2="224" y1="342" y2="342"/>` },
+  embreagem: { nome: 'Embreagem', lado: 'esq', ly: 382, anc: [262, 394],
+    svg: `<rect class="mt-peca" x="262" y="384" width="116" height="22" rx="10"/>` },
+  oleo_cambio: { nome: 'Óleo do câmbio', lado: 'dir', ly: 470, anc: [370, 446],
+    svg: `<path class="mt-peca" d="M272 410 L368 410 L358 484 Q320 494 282 484 Z"/><line class="mt-fio" x1="320" x2="320" y1="420" y2="476"/>` },
+  filtro_combustivel: { nome: 'Filtro de combustível', lado: 'esq', ly: 462, anc: [150, 430],
+    svg: `<rect class="mt-peca" x="150" y="418" width="56" height="24" rx="12"/><line class="mt-fio" x1="206" x2="230" y1="430" y2="430"/>` },
+  fluido_freio: { nome: 'Fluido de freio', lado: 'dir', ly: 550, anc: [500, 430],
+    svg: `<rect class="mt-peca" x="462" y="404" width="38" height="46" rx="8"/><rect class="mt-fio-c" x="472" y="396" width="18" height="10" rx="3"/>` },
+};
+
+function desenhoMotor(ctx, comps, aoClicar) {
+  const W = 760; const H = 620; const LW = 168; const LH = 50;
+  const ativo = new Map(comps.map((x) => [x.tipo, x]));
+  const pecas = []; const etiquetas = [];
+  for (const [tipo, p] of Object.entries(PECAS_MOTOR)) {
+    const comp = ativo.get(tipo);
+    const tom = comp ? TOM_COMP[comp.estado] : 'ausente';
+    pecas.push(`<g class="mt-grupo vp-${tom}" data-tipo="${tipo}" role="button" tabindex="0" aria-label="${esc(p.nome)}">${p.svg}</g>`);
+    const lx = p.lado === 'esq' ? 8 : W - LW - 8;
+    const [ax, ay] = [p.anc[0] + DX, p.anc[1]];
+    etiquetas.push(`<g class="vp-etiqueta vp-${tom}" data-tipo="${tipo}" role="button" tabindex="-1">
+      <line class="vp-ligacao" x1="${ax}" y1="${ay}" x2="${p.lado === 'esq' ? lx + LW : lx}" y2="${p.ly + LH / 2}"/>
+      <rect x="${lx}" y="${p.ly}" width="${LW}" height="${LH}" rx="12" class="vp-cartao"/>
+      <circle cx="${lx + 16}" cy="${p.ly + 17}" r="5" class="vp-ponto"/>
+      <text x="${lx + 28}" y="${p.ly + 21}" class="vp-t1">${esc(p.nome)}</text>
+      <text x="${lx + 16}" y="${p.ly + 39}" class="vp-t2">${comp ? esc(textoUso(comp)) : (pode(ctx) ? '+ incluir no plano' : 'fora do plano')}</text></g>`);
+  }
+  const raiz = el('div', { class: 'veiculo-ilustrado motor-ilustrado' });
+  raiz.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Motor">
+    <text x="${W / 2}" y="24" class="vp-frente">▲ FRENTE</text>
+    <g transform="translate(${DX} 0)">
+      <rect class="mt-cofre" x="120" y="40" width="400" height="472" rx="34"/>
+      <rect class="mt-bloco" x="230" y="196" width="180" height="180" rx="20"/>
+      <text class="mt-rotulo" x="320" y="296">MOTOR</text>
+      <line class="mt-firewall" x1="128" x2="512" y1="500" y2="500"/>
+      ${pecas.join('')}
+    </g>${etiquetas.join('')}
+    <text x="${W / 2}" y="${H - 8}" class="vp-frente">CABINE</text></svg>`;
+  for (const g of raiz.querySelectorAll('[data-tipo]')) {
+    const abrir = () => aoClicar(g.dataset.tipo, ativo.get(g.dataset.tipo));
+    g.addEventListener('click', abrir);
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); } });
+  }
+  // Celular: cada peça numa lista legível, embaixo do desenho.
+  const CLASSE = { ok: 'ok', aviso: 'aviso', erro: 'erro', ausente: 'vazia' };
+  raiz.append(el('div', { class: 'lista-pneus-cel' }, Object.entries(PECAS_MOTOR).map(([tipo, p]) => {
+    const comp = ativo.get(tipo);
+    return el('button', { type: 'button', class: CLASSE[comp ? TOM_COMP[comp.estado] : 'ausente'], onclick: () => aoClicar(tipo, comp) },
+      el('strong', {}, p.nome), el('span', { class: 'pequeno' }, comp ? textoUso(comp) : (pode(ctx) ? '+ incluir' : 'fora do plano')));
+  })));
+  return raiz;
+}
+
 // ---------- Plano preventivo (componentes) ----------
 async function telaPreventiva(ctx) {
   await tela(ctx, async () => {
@@ -183,10 +292,11 @@ async function telaPreventiva(ctx) {
     const sel = escolha(null, 'veiculo', { '': 'Todos os veículos', ...opcoesVeiculos(veiculos) }, veiculoId);
     sel.addEventListener('change', () => { veiculoId = sel.value; sessionStorage.setItem('gestao.veiculo', veiculoId); carregar(); });
     const tipos = Object.fromEntries(Object.entries(c.componentes).map(([k, x]) => [k, `${x.grupo} · ${x.nome}`]));
-    const form = (comp) => formModal(comp ? `Editar ${comp.nome}` : 'Novo componente', (f) => {
-      const tipo = escolha('Componente', 'tipo', tipos, comp?.tipo ?? 'oleo_motor');
-      const vidaKm = campo('Vida útil (km)', { name: 'vida_km', type: 'number', min: 1, value: comp?.vida_km ?? c.componentes.oleo_motor.km ?? '' });
-      const vidaDias = campo('Ou tempo (dias)', { name: 'vida_dias', type: 'number', min: 1, value: comp?.vida_dias ?? c.componentes.oleo_motor.dias ?? '' });
+    const form = (comp, pre = {}) => formModal(comp ? `Editar ${comp.nome}` : 'Novo componente', (f) => {
+      const t0 = pre.tipo ?? 'oleo_motor';
+      const tipo = escolha('Componente', 'tipo', tipos, comp?.tipo ?? t0);
+      const vidaKm = campo('Vida útil (km)', { name: 'vida_km', type: 'number', min: 1, value: comp?.vida_km ?? c.componentes[t0].km ?? '' });
+      const vidaDias = campo('Ou tempo (dias)', { name: 'vida_dias', type: 'number', min: 1, value: comp?.vida_dias ?? c.componentes[t0].dias ?? '' });
       // Ao escolher o componente, sugere a vida útil de referência.
       if (!comp) tipo.querySelector('select').addEventListener('change', (e) => { const x = c.componentes[e.target.value]; f.vida_km.value = x.km ?? ''; f.vida_dias.value = x.dias ?? ''; });
       return [
@@ -203,12 +313,8 @@ async function telaPreventiva(ctx) {
       const corpo = { ...d, custo_centavos: centavos(d.custo) ?? 0 };
       return comp ? api.put(`${base(ctx)}/componentes/${comp.id}`, corpo) : api.post(`${base(ctx)}/componentes`, corpo);
     }).then((r) => { if (r) { toast('Componente salvo.'); carregar(); } });
-    const trocar = (comp) => formModal(`Registrar troca · ${comp.nome}`, () => [
-      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Troca feita sem OS (ex.: na estrada). Com OS, a troca é registrada ao concluir a OS.'),
-      el('div', { class: 'duas' }, campo('Km', { name: 'km', type: 'number', min: 0, value: comp.km_atual }), campo('Data', { name: 'data', type: 'date', value: hojeLocal() })),
-      el('div', { class: 'duas' }, campo('Custo (R$)', { name: 'custo', inputmode: 'decimal' }), campo('Marca da peça nova', { name: 'marca', maxlength: 60, value: comp.marca ?? '' })),
-    ], (d) => api.post(`${base(ctx)}/componentes/${comp.id}/trocar`, { km: d.km, data: d.data, custo_centavos: centavos(d.custo) ?? 0, marca: d.marca }), { rotulo: 'Registrar troca' })
-      .then((r) => { if (r) { toast('Troca registrada: a vida útil recomeçou.'); carregar(); } });
+    const trocar = (comp) => registrarTroca(ctx, comp).then((r) => r && carregar());
+    const motor = el('div');
     const historico = async () => {
       if (!veiculoId) return toast('Escolha um veículo para ver o histórico.', true);
       const h = await api.get(`${base(ctx)}/veiculos/${veiculoId}/historico`);
@@ -225,6 +331,20 @@ async function telaPreventiva(ctx) {
     };
     async function carregar() {
       const comps = await api.get(`${base(ctx)}/componentes${qs({ veiculo_id: veiculoId || undefined })}`);
+      // Com um veículo escolhido: o motor desenhado, cada peça na cor do desgaste.
+      const v = veiculos.find((x) => String(x.id) === String(veiculoId));
+      limpar(motor, v ? cartao(`Motor de ${placa(v.placa)}`, el('div', { class: 'pneus-topo' },
+        desenhoMotor(ctx, comps, async (tipo, comp) => {
+          if (comp) return acoesComponente(ctx, comp, { aoEditar: (x) => form(x), depois: carregar });
+          if (!pode(ctx)) return;
+          if (await confirmar(`Incluir ${c.componentes[tipo].nome}`, 'Esta peça ainda não está no plano deste veículo. Incluir com a vida útil de referência, instalada no km de hoje?', 'Incluir')) {
+            await incluirNoPlano(ctx, v.id, tipo); carregar();
+          }
+        }),
+        el('div', { class: 'coluna', style: 'gap:10px;max-width:320px' },
+          el('div', { class: 'legenda' }, etiqueta('em dia', 'ok'), etiqueta('atenção: 85%', 'aviso'), etiqueta('vencido', 'erro'), etiqueta('fora do plano', '')),
+          el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Toque numa peça para trocar, abrir OS ou editar. A cor sai do km do rastreador e do tempo desde a última troca.'),
+          el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Freios e pastilhas aparecem também no desenho dos pneus.')))) : null);
       limpar(lista, tabela(['Veículo', 'Componente', 'Instalado', 'Vida útil', 'Uso', 'Próxima troca', 'Situação', '^Ações'], comps.map((x) => el('tr', {},
         td([el('strong', {}, placa(x.placa)), el('div', { class: 'pequeno mudo' }, `hoje ${kmTxt(x.km_atual)}`)]),
         td([x.nome, el('div', { class: 'pequeno mudo' }, [x.grupo, x.posicao, x.marca].filter(Boolean).join(' · '))]),
@@ -252,7 +372,7 @@ async function telaPreventiva(ctx) {
           carregar();
         } }, 'Aplicar plano padrão'),
         el('button', { class: 'btn primario', onclick: () => (veiculos.length ? form(null) : toast('Cadastre um veículo antes.', true)) }, 'Novo componente')) : null),
-      cartao(null, lista));
+      motor, cartao(null, lista));
     await carregar();
   });
 }
@@ -275,6 +395,7 @@ const FIGURAS = {
       <rect class="vp-luz-tras" x="244" y="526" width="38" height="10" rx="5" transform="rotate(14 263 531)"/><rect class="vp-luz-tras" x="338" y="526" width="38" height="10" rx="5" transform="rotate(-14 357 531)"/>
       <ellipse class="vp-lataria" cx="200" cy="232" rx="14" ry="9"/><ellipse class="vp-lataria" cx="420" cy="232" rx="14" ry="9"/>`,
     rodas: { DE: [192, 150, 'esq'], DD: [428, 150, 'dir'], TE: [192, 460, 'esq'], TD: [428, 460, 'dir'], EST: [310, 618, 'estepe'] },
+    freios: { dianteiro: { ys: [150], xs: [234, 386], cx: 310 }, traseiro: { ys: [460], xs: [234, 386], cx: 310 } },
   },
   moto: {
     w: 560, h: 600, pneu: [34, 124],
@@ -285,6 +406,7 @@ const FIGURAS = {
       <rect class="vp-vidro" x="264" y="176" width="32" height="40" rx="10"/>
       <circle class="vp-detalhe" cx="210" cy="119" r="8"/><circle class="vp-detalhe" cx="350" cy="119" r="8"/>`,
     rodas: { D: [280, 120, 'dir'], T: [280, 478, 'dir'] },
+    freios: { dianteiro: { ys: [120], xs: [242], cx: 120 }, traseiro: { ys: [478], xs: [242], cx: 120 } },
   },
   caminhao: {
     w: 660, h: 1060, pneu: [32, 94],
@@ -301,6 +423,7 @@ const FIGURAS = {
       <rect class="vp-luz-tras" x="246" y="930" width="36" height="8" rx="4"/><rect class="vp-luz-tras" x="378" y="930" width="36" height="8" rx="4"/>`,
     rodas: { '1E': [208, 150, 'esq'], '1D': [452, 150, 'dir'], '2EE': [176, 690, 'esq'], '2EI': [212, 690, 'esq'], '2DI': [448, 690, 'dir'], '2DE': [484, 690, 'dir'],
       '3EE': [176, 830, 'esq'], '3EI': [212, 830, 'esq'], '3DI': [448, 830, 'dir'], '3DE': [484, 830, 'dir'], EST: [330, 1010, 'estepe'] },
+    freios: { dianteiro: { ys: [150], xs: [250, 410], cx: 330 }, traseiro: { ys: [690, 830], xs: [254, 406], cx: 330, ly: 760 } },
   },
   onibus: {
     w: 660, h: 940, pneu: [32, 94],
@@ -312,12 +435,24 @@ const FIGURAS = {
       <g class="vp-frisos">${Array.from({ length: 6 }, (_, i) => `<rect x="268" y="${170 + i * 104}" width="124" height="70" rx="10"/>`).join('')}</g>
       <rect class="vp-luz-tras" x="244" y="822" width="40" height="8" rx="4"/><rect class="vp-luz-tras" x="376" y="822" width="40" height="8" rx="4"/>`,
     rodas: { '1E': [208, 190, 'esq'], '1D': [452, 190, 'dir'], '2EE': [176, 640, 'esq'], '2EI': [212, 640, 'esq'], '2DI': [448, 640, 'dir'], '2DE': [484, 640, 'dir'], EST: [330, 890, 'estepe'] },
+    freios: { dianteiro: { ys: [190], xs: [250, 410], cx: 330 }, traseiro: { ys: [640], xs: [254, 406], cx: 330 } },
   },
 };
 const figuraDe = (tipo) => FIGURAS[tipo === 'moto' ? 'moto' : tipo === 'caminhao' ? 'caminhao' : tipo === 'onibus' ? 'onibus' : 'leve'];
 const COR_PNEU = { ok: 'ok', atencao: 'aviso', trocar: 'erro', sem_medicao: 'neutro' };
 
-function desenhoPneus(ctx, mapa, aoClicar) {
+const FREIOS = { dianteiro: ['pastilha_dianteira', 'disco_dianteiro'], traseiro: ['pastilha_traseira', 'disco_traseiro'] };
+const PIOR = { vencido: 3, atencao: 2, ok: 1 };
+/** Situação dos freios de cada eixo: as peças do plano e a pior delas manda na cor. */
+function freiosDe(comps) {
+  return Object.fromEntries(Object.entries(FREIOS).map(([eixo, tipos]) => {
+    const itens = tipos.map((t) => comps.find((x) => x.tipo === t)).filter(Boolean);
+    const pior = itens.reduce((a, x) => (PIOR[x.estado] > PIOR[a] ? x.estado : a), 'ok');
+    return [eixo, { tipos, itens, tom: itens.length ? TOM_COMP[pior] : 'ausente' }];
+  }));
+}
+
+function desenhoPneus(ctx, mapa, aoClicar, freios = null, aoFreio = null) {
   const f = figuraDe(mapa.veiculo.tipo);
   const [tw, th] = f.pneu;
   const porCodigo = new Map(mapa.posicoes.map((p) => [p.codigo, p]));
@@ -367,17 +502,47 @@ function desenhoPneus(ctx, mapa, aoClicar) {
       <text x="${lx + 28}" y="${ly + 21}" class="vp-t1">${linha1}</text>
       <text x="${lx + 16}" y="${ly + 39}" class="vp-t2">${linha2}</text></g>`);
   }
+  // Freios: o disco com a pinça em cada roda e, no meio do eixo, a etiqueta com a pastilha e o disco.
+  const freio = [];
+  if (freios && f.freios) {
+    const NOME = { pastilha_dianteira: 'pastilha', pastilha_traseira: 'pastilha', disco_dianteiro: 'disco', disco_traseiro: 'disco' };
+    for (const [eixo, pos] of Object.entries(f.freios)) {
+      const fr = freios[eixo];
+      for (const y of pos.ys) for (const x of pos.xs) {
+        freio.push(`<g class="fr-disco vp-${fr.tom}" data-freio="${eixo}" role="button" tabindex="0" aria-label="Freio ${eixo}">
+          <circle cx="${x}" cy="${y}" r="15" class="fr-rotor"/><circle cx="${x}" cy="${y}" r="5" class="fr-cubo"/>
+          <path class="fr-pinca" d="M${x - 9} ${y - 16} Q${x} ${y - 23} ${x + 9} ${y - 16} L${x + 7} ${y - 10} Q${x} ${y - 15} ${x - 7} ${y - 10} Z"/></g>`);
+      }
+      const yy = pos.ly ?? pos.ys[0];
+      const w = 172; const lx = pos.cx - w / 2; const ly = yy + 26;
+      const t2 = fr.itens.length ? fr.itens.map((c) => `${NOME[c.tipo]} ${Math.round(c.pct)}%`).join(' · ') : (pode(ctx) ? '+ incluir no plano' : 'fora do plano');
+      freio.push(`<g class="vp-etiqueta fr-etiqueta vp-${fr.tom}" data-freio="${eixo}" role="button" tabindex="-1">
+        <rect x="${lx}" y="${ly}" width="${w}" height="46" rx="12" class="vp-cartao"/>
+        <circle cx="${lx + 15}" cy="${ly + 16}" r="5" class="vp-ponto"/>
+        <text x="${lx + 27}" y="${ly + 20}" class="vp-t1">Freio ${eixo}</text>
+        <text x="${lx + 15}" y="${ly + 37}" class="vp-t2">${esc(t2)}</text></g>`);
+    }
+  }
   const raiz = el('div', { class: 'veiculo-ilustrado' });
   raiz.innerHTML = `<svg viewBox="0 0 ${f.w} ${f.h}" role="img" aria-label="Pneus de ${esc(mapa.veiculo.placa)}">
-    <text x="${f.w / 2}" y="22" class="vp-frente">▲ FRENTE</text>${f.corpo}${partes.join('')}${etiquetas.join('')}</svg>`;
-  // Celular: a mesma informação numa lista legível, embaixo do desenho.
-  raiz.append(el('div', { class: 'lista-pneus-cel' }, mapa.posicoes.map((pos) => {
+    <text x="${f.w / 2}" y="22" class="vp-frente">▲ FRENTE</text>${f.corpo}${freio.filter((x) => x.includes('fr-disco')).join('')}${partes.join('')}${etiquetas.join('')}${freio.filter((x) => !x.includes('fr-disco')).join('')}</svg>`;
+  for (const g of raiz.querySelectorAll('[data-freio]')) {
+    const abrir = () => aoFreio?.(g.dataset.freio);
+    g.addEventListener('click', abrir);
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); } });
+  }
+  // Celular: a mesma informação numa lista legível, embaixo do desenho (pneus e depois os freios).
+  const CLASSE_FR = { ok: 'ok', aviso: 'aviso', erro: 'erro', ausente: 'vazia' };
+  const freiosCel = freios && f.freios ? Object.keys(f.freios).map((eixo) => el('button', { type: 'button', class: CLASSE_FR[freios[eixo].tom], onclick: () => aoFreio?.(eixo) },
+    el('strong', {}, `Freio ${eixo}`),
+    el('span', { class: 'pequeno' }, freios[eixo].itens.length ? freios[eixo].itens.map((c) => `${c.tipo.startsWith('disco') ? 'disco' : 'pastilha'} ${Math.round(c.pct)}%`).join(' · ') : (pode(ctx) ? '+ incluir' : 'fora do plano')))) : [];
+  raiz.append(el('div', { class: 'lista-pneus-cel' }, [...mapa.posicoes.map((pos) => {
     const p = pos.pneu;
     const tom = p ? ({ ok: 'ok', atencao: 'aviso', trocar: 'erro' }[p.estado] ?? '') : 'vazia';
     return el('button', { type: 'button', class: tom, onclick: () => aoClicar(pos) },
       el('span', {}, el('strong', {}, `${pos.codigo} · ${p ? p.numero_fogo : 'vazia'}`), el('div', { class: 'pequeno mudo' }, pos.nome)),
       el('span', { class: 'pequeno' }, p ? `${mm(p.sulco_mm)} · ${kmTxt(p.km_pneu)}` : (pode(ctx) ? '+ montar' : '')));
-  })));
+  }), ...freiosCel]));
   for (const g of raiz.querySelectorAll('[data-pos]')) {
     const abrir = () => aoClicar(porCodigo.get(g.dataset.pos));
     g.addEventListener('click', abrir);
@@ -463,12 +628,33 @@ async function telaPneus(ctx) {
       if (r) { toast('Rodízio registrado.'); carregar(); }
     };
     async function carregar() {
-      const [mapa, fora] = await Promise.all([veiculoId ? api.get(`${base(ctx)}/veiculos/${veiculoId}/pneus`) : null, api.get(`${base(ctx)}/pneus`)]);
+      const [mapa, fora, comps] = await Promise.all([veiculoId ? api.get(`${base(ctx)}/veiculos/${veiculoId}/pneus`) : null, api.get(`${base(ctx)}/pneus`),
+        veiculoId ? api.get(`${base(ctx)}/componentes?veiculo_id=${veiculoId}`) : []]);
+      const freios = freiosDe(comps);
+      // Ficha do freio do eixo: pastilha e disco, cada um com a barra de desgaste e as ações.
+      const fichaFreio = (eixo) => modal(`Freio ${eixo} · ${placa(mapa.veiculo.placa)}`, (fechar) => {
+        const fr = freios[eixo];
+        return [
+          el('div', { class: 'coluna', style: 'gap:12px' }, fr.tipos.map((tipo) => {
+            const comp = fr.itens.find((x) => x.tipo === tipo);
+            const nome = c.componentes[tipo].nome;
+            return el('div', { class: 'cartao', style: 'padding:12px 14px;margin:0' },
+              el('div', { class: 'linha entre', style: 'gap:8px' }, el('strong', {}, nome), comp ? etiqueta(...ESTADO[comp.estado]) : etiqueta('fora do plano', '')),
+              comp ? [barraVida(comp.pct), el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' }, `Instalado em ${kmTxt(comp.instalado_km)} · ${textoUso(comp)}`)] : null,
+              pode(ctx) ? el('div', { class: 'linha', style: 'gap:8px;justify-content:flex-end;margin-top:8px' }, comp ? [
+                botao('Abrir OS', 'primario', async () => { fechar(); await novaOS(ctx, { veiculo_id: comp.veiculo_id, tipo: 'preventiva', componentes: [comp.id], descricao: `Troca: ${comp.nome}` }); carregar(); }),
+                botao('Registrar troca', '', async () => { fechar(); if (await registrarTroca(ctx, comp)) carregar(); })]
+                : botao('Incluir no plano', 'primario', async () => { fechar(); await incluirNoPlano(ctx, mapa.veiculo.id, tipo); carregar(); })) : null);
+          })),
+          el('div', { class: 'linha', style: 'justify-content:flex-end;margin-top:12px' }, el('button', { class: 'btn', type: 'button', onclick: () => fechar() }, 'Fechar')),
+        ];
+      });
       limpar(desenho, mapa ? cartao(`Pneus de ${placa(mapa.veiculo.placa)} · hodômetro ${kmTxt(mapa.veiculo.km_atual)}`,
         el('div', { class: 'pneus-topo' },
-          desenhoPneus(ctx, mapa, (pos) => (pos.pneu ? acoesMontado(pos) : pode(ctx) ? montarEm(pos) : null)),
+          desenhoPneus(ctx, mapa, (pos) => (pos.pneu ? acoesMontado(pos) : pode(ctx) ? montarEm(pos) : null), freios, fichaFreio),
           el('div', { class: 'coluna', style: 'gap:10px;max-width:360px' },
             el('div', { class: 'legenda' }, etiqueta('bom', 'ok'), etiqueta(`atenção: até ${c.sulco_atencao_mm} mm`, 'aviso'), etiqueta(`trocar: até ${String(c.sulco_limite_mm).replace('.', ',')} mm`, 'erro')),
+            el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O disco desenhado em cada roda é o freio: a cor sai do desgaste da pastilha e do disco. Toque nele para trocar ou abrir OS.'),
             el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Toque numa roda para medir, ver o histórico ou desmontar. Roda vazia: monte um pneu do estoque. O km de cada pneu vem do rastreador.'),
             pode(ctx) ? el('div', {}, botao('Rodízio', '', () => rodizio(mapa))) : null))) : cartao(null, el('p', { class: 'mudo' }, 'Cadastre um veículo para controlar os pneus.')));
       const lista = fora.filter((p) => p.status !== 'montado');

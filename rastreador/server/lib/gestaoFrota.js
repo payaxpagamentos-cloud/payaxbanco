@@ -37,6 +37,7 @@ const COMPONENTES = {
   pastilha_dianteira: { nome: 'Pastilhas de freio dianteiras', grupo: 'Freios', km: 30000 },
   pastilha_traseira: { nome: 'Pastilhas ou lonas traseiras', grupo: 'Freios', km: 40000 },
   disco_dianteiro: { nome: 'Discos de freio dianteiros', grupo: 'Freios', km: 60000 },
+  disco_traseiro: { nome: 'Discos ou tambores traseiros', grupo: 'Freios', km: 80000 },
   fluido_freio: { nome: 'Fluido de freio', grupo: 'Freios', dias: 730 },
   amortecedor_dianteiro: { nome: 'Amortecedores dianteiros', grupo: 'Suspensão', km: 60000 },
   amortecedor_traseiro: { nome: 'Amortecedores traseiros', grupo: 'Suspensão', km: 60000 },
@@ -50,15 +51,15 @@ const COMPONENTES = {
 // Plano preventivo padrão por tipo de veículo (o que se aplica de uma vez). Pesados: intervalos maiores no motor.
 const PLANOS = {
   leve: ['oleo_motor', 'filtro_oleo', 'filtro_ar', 'filtro_combustivel', 'filtro_cabine', 'velas', 'correia_dentada', 'correia_acessorios', 'arrefecimento',
-    'pastilha_dianteira', 'pastilha_traseira', 'disco_dianteiro', 'fluido_freio', 'amortecedor_dianteiro', 'amortecedor_traseiro', 'suspensao', 'alinhamento',
-    'bateria', 'palhetas', 'embreagem'],
-  moto: ['oleo_motor', 'filtro_oleo', 'filtro_ar', 'velas', 'relacao', 'pastilha_dianteira', 'pastilha_traseira', 'fluido_freio', 'bateria'],
-  pesado: ['oleo_motor', 'filtro_oleo', 'filtro_ar', 'filtro_combustivel', 'arrefecimento', 'correia_acessorios', 'pastilha_dianteira', 'pastilha_traseira',
+    'pastilha_dianteira', 'pastilha_traseira', 'disco_dianteiro', 'disco_traseiro', 'fluido_freio', 'amortecedor_dianteiro', 'amortecedor_traseiro', 'suspensao', 'alinhamento',
+    'bateria', 'palhetas', 'embreagem', 'oleo_cambio'],
+  moto: ['oleo_motor', 'filtro_oleo', 'filtro_ar', 'velas', 'relacao', 'pastilha_dianteira', 'pastilha_traseira', 'disco_dianteiro', 'disco_traseiro', 'fluido_freio', 'bateria'],
+  pesado: ['oleo_motor', 'filtro_oleo', 'filtro_ar', 'filtro_combustivel', 'arrefecimento', 'correia_acessorios', 'pastilha_dianteira', 'pastilha_traseira', 'disco_dianteiro', 'disco_traseiro',
     'fluido_freio', 'amortecedor_dianteiro', 'amortecedor_traseiro', 'suspensao', 'alinhamento', 'bateria', 'embreagem', 'oleo_cambio'],
 };
 const AJUSTE_PLANO = {
   moto: { oleo_motor: { km: 4000, dias: 180 }, filtro_oleo: { km: 8000 }, filtro_ar: { km: 10000 }, velas: { km: 10000 }, pastilha_dianteira: { km: 15000 },
-    pastilha_traseira: { km: 20000 } },
+    pastilha_traseira: { km: 20000 }, disco_dianteiro: { km: 40000 }, disco_traseiro: { km: 50000 } },
   pesado: { oleo_motor: { km: 20000 }, filtro_oleo: { km: 20000 }, filtro_ar: { km: 40000 }, filtro_combustivel: { km: 40000 }, pastilha_dianteira: { km: 60000 },
     pastilha_traseira: { km: 80000 }, embreagem: { km: 200000 }, oleo_cambio: { km: 120000 } },
 };
