@@ -74,7 +74,6 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 .faixa .clima{ font-size: 2.8vh; font-weight: 700; flex: none; color: #D7DBE0; margin-left: auto; white-space: nowrap; }
 .faixa .clima + .relogio{ margin-left: 2vh; }
 .faixa .relogio{ font-size: 3.4vh; font-weight: 800; font-variant-numeric: tabular-nums; flex: none; color: var(--lime); margin-left: auto; }
-/* Tela estreita (elevador em pé): só a marca, o clima e o relógio cabem. */
 /* Tela estreita (elevador em pé): o logo no centro e o relógio no canto; o recado e o clima não cabem. */
 @media (max-aspect-ratio: 3/4){ .faixa .texto, .faixa .clima{ display: none !important; } }
 
