@@ -357,6 +357,8 @@ module.exports = (db) => {
     if (req.body.nome !== undefined) d.nome = v.texto(req.body.nome, 'o nome da empresa', 120);
     if (req.body.documento !== undefined) d.documento = req.body.documento ? v.documento(req.body.documento) : null;
     if (req.body.ativo !== undefined) d.ativo = v.booleano(req.body.ativo) ? 1 : 0;
+    // Perdeu o celular: a equipe desliga a verificação em duas etapas da pessoa (ligar, só ela mesma).
+    if (req.body.duas_etapas === false) { d.totp_ativo = 0; d.totp_segredo = null; d.totp_reserva = null; }
     if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
     if (d.ativo === 0 && !db.prepare('SELECT 1 FROM empresas WHERE ativo = 1 AND id <> ?').get(id)) {
       throw new ErroNegocio('Precisa existir pelo menos uma empresa ativa.', 409);
@@ -370,7 +372,7 @@ module.exports = (db) => {
     // Cada empresa vê a própria equipe e os acessos de portal dos seus anunciantes e pontos; o master vê todos.
     const [onde, p] = empresas.filtro(req, 'COALESCE(u.empresa_id, a.empresa_id, l.empresa_id)');
     res.json({
-      itens: db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.ativo, u.ultimo_acesso, u.criado_em, u.empresa_id,
+      itens: db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.ativo, u.ultimo_acesso, u.criado_em, u.empresa_id, u.totp_ativo AS duas_etapas,
           a.nome AS anunciante, l.nome AS ponto, e.nome AS empresa
         FROM usuarios u LEFT JOIN anunciantes a ON a.id = u.anunciante_id LEFT JOIN locais l ON l.id = u.local_id
         LEFT JOIN empresas e ON e.id = COALESCE(u.empresa_id, a.empresa_id, l.empresa_id)

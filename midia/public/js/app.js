@@ -1,5 +1,5 @@
 import { api, sessao } from './api.js';
-import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, marcar, formModal, repetir, linkWhatsApp, PERFIS } from './ui.js';
+import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, marcar, formModal, modal, repetir, linkWhatsApp, PERFIS } from './ui.js';
 import { TELAS_EQUIPE } from './painel.js';
 import { carregarEmpresas } from './comum.js';
 import { TELAS_ANUNCIANTE, TELAS_LOJISTA } from './portais.js';
@@ -208,6 +208,7 @@ function ferramentas(u) {
     el('button', { class: 'so-celular', onclick: () => { menu.classList.add('oculto'); trocar(document.documentElement.dataset.tema === 'escuro' ? 'claro' : 'escuro'); } },
       tema === 'escuro' ? 'Usar tema claro' : 'Usar tema escuro'),
     el('button', { onclick: () => { menu.classList.add('oculto'); alterarSenha(); } }, 'Alterar senha'),
+    el('button', { onclick: () => { menu.classList.add('oculto'); duasEtapas(); } }, 'Verificação em duas etapas'),
     el('button', { onclick: () => { sessao.limpar(); location.hash = ''; desenhar(); } }, 'Sair'));
   const status = el('span', { class: 'status-sistema', title: 'Conexão com o servidor' }, 'Sistema Online');
   pararSaude?.();
@@ -227,6 +228,40 @@ function ferramentas(u) {
     el('button', { class: 'usuario', title: u.nome, onclick: () => menu.classList.toggle('oculto') },
       el('span', { class: 'avatar' }, iniciais(u.nome)), el('span', { class: 'nome' }, u.nome), icone('abaixo')),
     menu);
+}
+
+/**
+ * Verificação em duas etapas: além da senha, um código de 6 números do aplicativo autenticador do
+ * celular. Quem roubar só a senha não entra.
+ */
+async function duasEtapas() {
+  const eu = (await api.get('/auth/me')).usuario;
+  if (eu.duas_etapas) {
+    return formModal('Verificação em duas etapas', () => [
+      el('p', { class: 'aviso ok' }, 'Está ligada: para entrar, o sistema pede a senha e o código do aplicativo.'),
+      campo('Para desligar, digite sua senha', { name: 'senha', type: 'password', required: true, autocomplete: 'current-password' }),
+    ], async (d) => { await api.post('/auth/duas-etapas/desligar', d); toast('Verificação em duas etapas desligada.'); }, { rotulo: 'Desligar' });
+  }
+  const inicio = await api.post('/auth/duas-etapas/iniciar');
+  let reserva = null;
+  await formModal('Ligar a verificação em duas etapas', () => [
+    el('p', { class: 'mudo' }, '1. Instale um aplicativo autenticador no celular (Google Authenticator, Microsoft Authenticator ou Authy).'),
+    el('p', { class: 'mudo' }, '2. No aplicativo, adicione uma conta lendo este código — ou digitando a chave abaixo.'),
+    el('div', { style: 'text-align:center' }, el('img', { src: inicio.qr, alt: 'Código para o aplicativo', width: 200, height: 200, style: 'border-radius:12px;background:#fff;padding:6px' })),
+    el('div', { style: 'display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap' },
+      el('code', { style: 'word-break:break-all' }, inicio.segredo),
+      el('button', { type: 'button', class: 'btn pequeno', onclick: () => { navigator.clipboard?.writeText(inicio.segredo); toast('Chave copiada.'); } }, 'Copiar chave')),
+    campo('3. Digite o código de 6 números que o aplicativo mostra', { name: 'codigo', inputmode: 'numeric', autocomplete: 'one-time-code', required: true, maxlength: 7, placeholder: '000000' }),
+  ], async (d) => { reserva = (await api.post('/auth/duas-etapas/ativar', d)).codigos_reserva; }, { rotulo: 'Ligar' });
+  if (!reserva) return;
+  await modal('Guarde estes códigos de reserva', (fechar) => [
+    el('p', { class: 'aviso' }, 'Se perder o celular, cada código abaixo entra no lugar do código do aplicativo, uma vez só. Anote ou tire um print e guarde em lugar seguro. Eles não aparecem de novo.'),
+    el('pre', { style: 'font-size:16px;line-height:1.7;text-align:center;margin:0' }, reserva.join('\n')),
+    el('div', { class: 'acoes' },
+      el('button', { type: 'button', class: 'btn', onclick: () => { navigator.clipboard?.writeText(reserva.join('\n')); toast('Códigos copiados.'); } }, 'Copiar'),
+      el('button', { type: 'button', class: 'btn primario', onclick: () => fechar() }, 'Já guardei')),
+  ]);
+  toast('Verificação em duas etapas ligada.');
 }
 
 function alterarSenha() {
@@ -279,6 +314,8 @@ function telaEntrada() {
       placeholder: 'seuemail@empresa.com.br', value: sessao.emailLembrado(),
     }),
     campoSenha('Senha', { name: 'senha', autocomplete: 'current-password', required: true, placeholder: '••••••' }),
+    el('label', { class: 'campo', id: 'campo-codigo', hidden: true }, el('span', {}, 'Código do aplicativo autenticador'),
+      el('input', { name: 'codigo', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 12, placeholder: '000000' })),
     el('div', { class: 'opcoes' },
       marcar('Lembrar de mim', { name: 'lembrar', checked: lembradoAntes }),
       el('button', { type: 'button', class: 'link-texto', onclick: esqueciSenha }, 'Esqueci minha senha')),
@@ -288,7 +325,15 @@ function telaEntrada() {
     e.preventDefault();
     acao(f.querySelector('button.primario'), async () => {
       const d = lerForm(f);
-      const r = await api.post('/auth/login', { email: d.email, senha: d.senha });
+      const r = await api.post('/auth/login', { email: d.email, senha: d.senha, codigo: d.codigo || undefined });
+      // A conta tem verificação em duas etapas: mostra o campo do código e espera a pessoa digitar.
+      if (r.precisa_codigo) {
+        const c = f.querySelector('#campo-codigo');
+        c.hidden = false;
+        c.querySelector('input').focus();
+        toast('Digite o código do aplicativo autenticador (ou um código de reserva).');
+        return;
+      }
       // Marcou "lembrar": a sessão sobrevive a fechar o navegador e o e-mail volta preenchido.
       sessao.set(r, { lembrar: d.lembrar });
       sessao.lembrarEmail(d.lembrar ? d.email : '');

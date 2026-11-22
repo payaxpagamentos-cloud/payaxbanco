@@ -32,6 +32,14 @@ export async function usuarios(ctx) {
             toast('Senha trocada.');
           }),
         }, 'Senha'),
+        u.duas_etapas ? el('button', {
+          class: 'btn pequeno', title: 'A pessoa perdeu o celular', onclick: (e) => acao(e.target, async () => {
+            if (!await confirmar('Desligar as duas etapas?', `${u.nome} volta a entrar só com a senha, até ligar de novo.`, 'Desligar')) return;
+            await api.patch(`/painel/usuarios/${u.id}`, { duas_etapas: false });
+            toast('Verificação em duas etapas desligada.');
+            pintar();
+          }),
+        }, 'Desligar 2 etapas') : null,
         el('button', {
           class: `btn pequeno${u.ativo ? ' perigo' : ''}`, onclick: (e) => acao(e.target, async () => {
             await api.patch(`/painel/usuarios/${u.id}`, { ativo: !u.ativo });

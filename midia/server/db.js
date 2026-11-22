@@ -593,6 +593,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
   sessao_versao INTEGER NOT NULL DEFAULT 0,
   falhas INTEGER NOT NULL DEFAULT 0,
   bloqueado_ate TEXT,
+  -- Verificação em duas etapas (aplicativo autenticador) e os códigos de reserva (resumos, uso único).
+  totp_segredo TEXT,
+  totp_ativo INTEGER NOT NULL DEFAULT 0,
+  totp_reserva TEXT,
   CHECK ((perfil = 'anunciante') = (anunciante_id IS NOT NULL)),
   CHECK ((perfil = 'lojista') = (local_id IS NOT NULL))
 );
@@ -744,6 +748,9 @@ const COLUNAS_NOVAS = [
   ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'bloqueado_ate', 'TEXT'],
+  ['usuarios', 'totp_segredo', 'TEXT'],
+  ['usuarios', 'totp_ativo', 'INTEGER NOT NULL DEFAULT 0'],
+  ['usuarios', 'totp_reserva', 'TEXT'],
   ['usuarios', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
   ['locais', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
   ['anunciantes', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],

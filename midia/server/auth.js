@@ -40,7 +40,7 @@ const lerTokenTela = (token) => abrirToken(token, 'tela');
 const EQUIPE = ['master', 'administrador', 'operador'];
 
 function autenticar(db) {
-  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.anunciante_id, u.local_id, u.ativo, u.empresa_id, u.sessao_versao,
+  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.anunciante_id, u.local_id, u.ativo, u.empresa_id, u.sessao_versao, u.totp_ativo,
       a.nome AS anunciante_nome, a.status AS anunciante_status, l.nome AS local_nome, l.status AS local_status,
       e.nome AS empresa_nome, e.ativo AS empresa_ativa
     FROM usuarios u
