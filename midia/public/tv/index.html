@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#18232A">
   <title>Player — Vai Mídia</title>
   <link rel="icon" href="../img/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="tv.css">
 </head>
 <body>
@@ -46,6 +49,8 @@
   </div>
 
   <div class="aviso-conexao" id="sem-conexao" hidden>Sem internet — exibindo o conteúdo guardado</div>
+
+  <div class="aviso-tela-cheia" id="aviso-tela-cheia" hidden>Aperte <b>OK</b> no controle para tela cheia</div>
 
   <div class="info" id="info" hidden></div>
   <noscript>Ative o JavaScript neste aparelho para exibir a programação.</noscript>

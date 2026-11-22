@@ -699,6 +699,45 @@ async function manterTelaAcesa() {
   } catch { /* aparelho sem a função: configure o descanso de tela no próprio aparelho */ }
 }
 
+// ---------------------------------------------------------------- Tela cheia
+// O navegador só deixa uma página ocupar a tela inteira depois de um gesto de quem está na frente
+// dela — é regra de segurança, não dá para pular por código. Então o player tenta sozinho ao abrir
+// (navegador de quiosque e app instalado deixam) e, se não deu, transforma QUALQUER tecla do
+// controle ou toque na tela em "tela cheia". Basta apertar OK uma vez.
+const emTelaCheia = () => Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+
+function pedirTelaCheia() {
+  if (emTelaCheia()) return;
+  const raiz = document.documentElement;
+  try {
+    const pedido = raiz.requestFullscreen?.({ navigationUI: 'hide' }) ?? raiz.webkitRequestFullscreen?.();
+    pedido?.catch?.(() => {});
+  } catch { /* aparelho sem a função */ }
+}
+
+function telaCheia() {
+  const aviso = $('aviso-tela-cheia');
+  const suporta = Boolean(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  // App instalado na tela inicial (manifesto com display fullscreen) já abre ocupando tudo.
+  const instalado = matchMedia('(display-mode: fullscreen)').matches;
+  let sumir;
+  const atualizar = () => {
+    clearTimeout(sumir);
+    const mostrar = suporta && !instalado && !emTelaCheia();
+    aviso.hidden = !mostrar;
+    // O lembrete fica um tempo e sai: a tela é de anúncio, não de recado.
+    if (mostrar) sumir = setTimeout(() => { aviso.hidden = true; }, 20_000);
+  };
+  pedirTelaCheia();
+  for (const evento of ['keydown', 'pointerdown', 'touchend', 'click']) {
+    document.addEventListener(evento, pedirTelaCheia, { capture: true });
+  }
+  document.addEventListener('fullscreenchange', atualizar);
+  document.addEventListener('webkitfullscreenchange', atualizar);
+  // Dá um instante para o pedido automático responder antes de mostrar o lembrete.
+  setTimeout(atualizar, 1500);
+}
+
 function atalhos() {
   document.addEventListener('keydown', (e) => {
     const tecla = e.key.toLowerCase();
@@ -708,10 +747,7 @@ function atalhos() {
       if (mostrar) desenharInfo();
     }
     if (tecla === 'r') location.reload();
-    if (tecla === 'f') document.documentElement.requestFullscreen?.().catch(() => {});
   });
-  // Toque/clique longo também abre a tela cheia (controle de TV sem teclado).
-  document.addEventListener('dblclick', () => document.documentElement.requestFullscreen?.().catch(() => {}));
 }
 
 /** Nome e frase da marca nas telas de espera e no rodapé. */
@@ -729,6 +765,7 @@ async function iniciar() {
   mostrarEspera('Preparando a tela…', 'Carregando a programação guardada.');
   relogio();
   atalhos();
+  telaCheia();
   manterTelaAcesa();
   // A batida segue o intervalo configurado na plataforma (o servidor informa a cada resposta).
   const baterSempre = async () => {

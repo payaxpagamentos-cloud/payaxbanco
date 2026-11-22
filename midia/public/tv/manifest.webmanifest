@@ -1,0 +1,11 @@
+{
+  "name": "Vai Mídia — Player",
+  "short_name": "Vai Mídia TV",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#18232A",
+  "theme_color": "#18232A",
+  "icons": [{ "src": "../img/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
