@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '1.4';
+const VERSAO = '1.5';
 const API = new URL('../api/', location.href).href;
 const CHAVES = { token: 'midia.tv.token', grade: 'midia.tv.grade', fila: 'midia.tv.fila', codigo: 'midia.tv.codigo', vistos: 'midia.tv.vistos' };
 // Um arquivo que sumiu da programação (campanha só de manhã, por exemplo) ainda fica no cache por estes dias,
@@ -65,7 +65,21 @@ async function chamar(caminho, { metodo = 'GET', corpo, comToken = true } = {}) 
     throw new Error('despareado');
   }
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  acertarRelogio(resp);
   return resp.status === 204 ? null : resp.json();
+}
+
+// ---------------------------------------------------------------- Hora certa
+// O relógio do aparelho não é confiável: TV box sai de fábrica com a hora errada ou em outro fuso.
+// A TV usa a hora do servidor (o cabeçalho Date de cada resposta) e o fuso da rede.
+function acertarRelogio(resp) {
+  const data = Date.parse(resp.headers.get('date') ?? '');
+  if (Number.isFinite(data)) estado.desvioRelogio = data - Date.now();
+}
+const agoraCerto = () => Date.now() + (estado.desvioRelogio ?? 0);
+const fusoDaRede = () => estado.programacao?.fuso || 'America/Sao_Paulo';
+function formatarHora(opcoes) {
+  try { return new Date(agoraCerto()).toLocaleString('pt-BR', { ...opcoes, timeZone: fusoDaRede() }); } catch { return new Date(agoraCerto()).toLocaleString('pt-BR', opcoes); }
 }
 
 function marcarConexao(ok) {
@@ -175,7 +189,8 @@ function anotarExibicao(item, inicio, segundos) {
     // A tela da própria rede também é anotada: é tempo de tela não vendido, e entra na conta dos impactos.
     tipo: item.formato === 'marca' ? 'marca' : undefined,
     campanha_id: item.campanha_id,
-    exibida_em: new Date(inicio).toISOString(),
+    // Hora do servidor, não a do aparelho: a prova de exibição sai certa mesmo com a TV desacertada.
+    exibida_em: new Date(inicio + (estado.desvioRelogio ?? 0)).toISOString(),
     duracao_s: Math.round(segundos),
   });
   if (estado.fila.length > MAX_FILA) estado.fila = estado.fila.slice(-MAX_FILA);
@@ -306,7 +321,7 @@ function montarComunicado(item) {
   const data = document.createElement('div');
   data.className = 'quando';
   // "sábado, 21 de novembro" com a primeira letra maiúscula (capitalize do CSS estragaria o "de").
-  const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  const hoje = formatarHora({ weekday: 'long', day: '2-digit', month: 'long' });
   data.textContent = hoje.charAt(0).toUpperCase() + hoje.slice(1);
   caixa.append(data);
 
@@ -729,7 +744,7 @@ async function rodar() {
 
 // ---------------------------------------------------------------- Rotinas de fundo
 function relogio() {
-  const marcar = () => { $('relogio').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+  const marcar = () => { $('relogio').textContent = formatarHora({ hour: '2-digit', minute: '2-digit' }); };
   marcar();
   setInterval(marcar, 15_000);
 }

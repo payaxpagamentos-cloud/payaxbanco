@@ -71,6 +71,8 @@ module.exports = (db) => {
       },
       plataforma: cfg.nome_plataforma,
       slogan: cfg.slogan,
+      // A TV mostra a hora no fuso da rede, não no do aparelho (TV box costuma vir em outro fuso).
+      fuso: config.fuso,
       batida_s: cfg.batida_intervalo_s,
       // De quanto em quanto tempo esta TV manda uma foto do que está na tela (0 desliga).
       foto_minutos: cfg.foto_minutos,
