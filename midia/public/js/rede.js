@@ -140,10 +140,10 @@ const camposTela = (t = {}, opcoes) => [
   el('div', { class: 'duas' },
     escolha('Orientação', 'orientacao', ORIENTACOES, t.orientacao ?? 'paisagem'),
     t.id ? escolha('Situação', 'status', { ativa: 'Ativa', manutencao: 'Manutenção', inativa: 'Inativa' }, t.status ?? 'ativa') : null),
-  escolha('Layout da tela', 'layout', LAYOUTS, t.layout ?? 'cheia'),
+  escolha('Tela dividida?', 'layout', LAYOUTS, t.layout ?? 'cheia'),
   el('p', { class: 'pequeno mudo', style: 'margin:-6px 0 0' },
-    'Dividida é o padrão de elevador: o recado do ponto fica parado de um lado e a publicidade gira do outro. '
-    + 'Em tela cheia, o anúncio ocupa tudo e o comunicado entra no meio do carrossel.'),
+    'Sim: meio a meio — o recado do ponto com imagem de um lado e o anúncio do outro (bom para condomínio e elevador). '
+    + 'Não: o anúncio ocupa a tela toda e o comunicado entra no meio dos anúncios.'),
   campo('Legenda fixa na faixa (opcional)', { name: 'legenda', value: t.legenda ?? '', maxlength: 200, placeholder: 'Ex.: Bem-vindo à Padaria Pão Quente' }),
   el('div', { class: 'linha' }, marcar('Som ligado nos vídeos', { name: 'som', checked: Boolean(t.som) }), marcar('Mostrar o relógio', { name: 'relogio', checked: t.id ? Boolean(t.relogio) : true })),
   area('Observação (opcional)', { name: 'observacao', maxlength: 500 }, t.observacao ?? ''),
