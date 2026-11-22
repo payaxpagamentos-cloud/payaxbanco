@@ -1372,8 +1372,9 @@ test('Rastreador', async (t) => {
 
       // Avisos no celular: inscreve o aparelho; o aviso sai assinado; aparelho que sumiu (410) sai da lista.
       assert.equal((await mot('POST', '/avisos', { endpoint: 'http://inseguro', keys: { p256dh: 'a', auth: 'b' } })).status, 422);
-      assert.equal((await mot('POST', '/avisos', { endpoint: 'https://push.exemplo/ok', keys: { p256dh: 'chave', auth: 'segredo' } })).status, 201);
-      assert.equal((await mot('POST', '/avisos', { endpoint: 'https://push.exemplo/sumiu', keys: { p256dh: 'chave', auth: 'segredo' } })).status, 201);
+      assert.equal((await mot('POST', '/avisos', { endpoint: 'https://10.0.0.5:8443/admin', keys: { p256dh: 'chave', auth: 'segredo' } })).status, 422, 'só serviços de aviso conhecidos');
+      assert.equal((await mot('POST', '/avisos', { endpoint: 'https://fcm.googleapis.com/fcm/send/ok', keys: { p256dh: 'chave', auth: 'segredo' } })).status, 201);
+      assert.equal((await mot('POST', '/avisos', { endpoint: 'https://fcm.googleapis.com/fcm/send/sumiu', keys: { p256dh: 'chave', auth: 'segredo' } })).status, 201);
       assert.equal((await mot('GET', '/eu')).dados.avisos.inscrito, true);
       assert.equal(await push.enviar(db, ze, { titulo: 'Teste', texto: 'Olá' }), 1);
       assert.equal(enviados.length, 2);
@@ -1425,8 +1426,41 @@ test('Rastreador', async (t) => {
     assert.equal((await api.get(`${base()}/veiculos/${veiculo}/qr`, operador)).status, 403);
     // Só o master mexe no plano; o suporte segue editando o cadastro.
     assert.equal((await api.post(`${base()}/usuarios`, { nome: 'Sup', email: 'sup@plataforma.com', senha: 'senha-do-sup', perfil: 'suporte' }, cliente)).status, 422);
-    assert.equal((await api.post('/master/usuarios', { nome: 'Sup', email: 'sup@plataforma.com', senha: 'senha-do-sup', perfil: 'suporte' }, master)).status, 201);
+    assert.equal((await api.post('/master/usuarios', { nome: 'Sup', email: 'sup@plataforma.com', senha: 'senha-do-sup', perfil: 'suporte' }, master)).status, 403, 'conta da plataforma pede a senha de quem cria');
+    assert.equal((await api.post('/master/usuarios', { nome: 'Sup', email: 'sup@plataforma.com', senha: 'senha-do-sup', perfil: 'suporte', confirmacao: 'master123' }, master)).status, 201);
     const suporte = await api.login('sup@plataforma.com', 'senha-do-sup');
+    // Segurança: o suporte não cria acessos na empresa; ninguém troca a própria senha pelo cadastro de usuários.
+    assert.equal((await api.post(`${base()}/usuarios`, { nome: 'Porta', email: 'porta@rota.com', senha: 'senha-qualquer', perfil: 'cliente' }, suporte)).status, 403);
+    assert.equal((await api.post(`${base()}/chaves`, { nome: 'x' }, suporte)).status, 403);
+    const eu = (await api.get('/auth/me', cliente)).dados.usuario.id;
+    assert.equal((await api.put(`${base()}/usuarios/${eu}`, { senha: 'outra-senha-123' }, cliente)).status, 422);
+    assert.equal((await api.put(`${base()}/usuarios/${eu}`, { ativo: 0 }, cliente)).status, 422, 'não se desativa (nem com 0)');
+    const euMaster = (await api.get('/auth/me', master)).dados.usuario.id;
+    assert.equal((await api.patch(`/master/usuarios/${euMaster}`, { senha: 'outra-senha-123' }, master)).status, 422);
+    // Trocar a senha derruba as sessões antigas; quem trocou segue com o token novo.
+    await api.post(`${base()}/usuarios`, { nome: 'Troca', email: 'troca@rota.com', senha: 'senha-antiga-1', perfil: 'operador' }, cliente);
+    const tAntigo = await api.login('troca@rota.com', 'senha-antiga-1');
+    const outraSessao = await api.login('troca@rota.com', 'senha-antiga-1');
+    const troca = await api.post('/auth/senha', { atual: 'senha-antiga-1', nova: 'senha-nova-22' }, tAntigo);
+    assert.equal(troca.status, 200);
+    assert.equal((await api.get('/auth/me', outraSessao)).status, 401, 'sessão antiga cai');
+    assert.equal((await api.get('/auth/me', troca.dados.token)).status, 200);
+    // Empresa só pelo número puro; comando livre só consulta, sem letra "parecida" nem ajuste do aparelho.
+    assert.equal((await api.get(`/empresas/${empresa}.0/dashboard`, cliente)).status, 404);
+    const livre = (texto, quem = cliente) => api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'personalizado', texto }, quem);
+    assert.equal((await livre('\u0152ELAY,1#')).status, 422, 'Œ viraria R no fio');
+    assert.equal((await livre('SERVER,1,evil.example,5023,0#')).status, 403);
+    assert.equal((await livre('#SERVER,1,evil.example,5023,0#')).status, 403);
+    assert.equal((await livre('CENTER,A,11999990000#')).status, 403);
+    assert.equal((await livre('RELAY1#', master)).status, 422, 'corte nunca por texto livre');
+    // Trava por conta: 5 senhas erradas seguidas e a conta descansa; o acerto zera.
+    const { criarTrava } = require('../server/lib/tentativas');
+    const trava = criarTrava({ maximo: 5, bloqueioMs: 60_000 });
+    for (let i = 0; i < 4; i++) trava.falhou('m:1');
+    trava.conferir('m:1'); trava.acertou('m:1');
+    for (let i = 0; i < 5; i++) trava.falhou('m:1');
+    assert.throws(() => trava.conferir('m:1'), /senhas erradas/);
+    trava.conferir('m:2');
     assert.equal((await api.put(`/master/empresas/${empresa}`, { mensalidade_centavos: 100 }, suporte)).status, 403);
     assert.ok((await api.put(`/master/empresas/${empresa}`, { telefone: '11999990000' }, suporte)).status < 300);
     assert.equal((await api.post('/master/empresas', { nome: 'Nova', limite_veiculos: 1, mensalidade_centavos: 100 }, suporte)).status, 403);

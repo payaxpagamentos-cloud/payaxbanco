@@ -316,8 +316,10 @@ function alterarSenha() {
     campo('Senha atual', { name: 'atual', type: 'password', required: true, autocomplete: 'current-password' }),
     campo('Nova senha (mínimo 8 caracteres)', { name: 'nova', type: 'password', required: true, minlength: 8, autocomplete: 'new-password' }),
   ], async (d) => {
-    await api.post('/auth/senha', d);
-    toast('Senha alterada.');
+    const r = await api.post('/auth/senha', d);
+    // As outras sessões caem com a troca; esta continua com o token novo.
+    if (r?.token) sessao.set({ ...sessao.get(), token: r.token });
+    toast('Senha alterada. Os outros aparelhos em que você estava logado precisam entrar de novo.');
   });
 }
 

@@ -29,11 +29,17 @@ function contar(db, protocolo) {
     ON CONFLICT (data, protocolo) DO UPDATE SET mensagens = mensagens + 1`).run(local().data, protocolo);
 }
 
+let desdeLimpeza = 0;
 function registrarDesconhecido(db, imei, protocolo, ip) {
   const t = agora();
   db.prepare(`INSERT INTO desconhecidos (imei, protocolo, ip, primeiro_contato, ultimo_contato) VALUES (?, ?, ?, ?, ?)
     ON CONFLICT (imei) DO UPDATE SET protocolo = excluded.protocolo, ip = excluded.ip, ultimo_contato = excluded.ultimo_contato, mensagens = mensagens + 1`)
     .run(String(imei).slice(0, 40), protocolo, ip ?? null, t, t);
+  // Teto da lista: quem mandar identificadores inventados sem parar não enche o banco (ficam os 2.000 contatos mais recentes).
+  if (++desdeLimpeza >= 100) {
+    desdeLimpeza = 0;
+    db.prepare('DELETE FROM desconhecidos WHERE imei IN (SELECT imei FROM desconhecidos ORDER BY ultimo_contato DESC LIMIT -1 OFFSET 2000)').run();
+  }
 }
 
 /** Fora do horário de uso da empresa ('HH:MM' a 'HH:MM', que pode virar a noite, nos dias da semana permitidos). */
@@ -94,7 +100,9 @@ function receber(db, m) {
     }
     // O endereço do celular (OsmAnd) é público: só aceita os identificadores cadastrados como celular. Um IMEI de GT06 enviado
     // por ali (posição forjada) é ignorado; o GT06 de verdade fala pela porta TCP.
-    if (m.protocolo === 'osmand' && r.protocolo !== 'osmand') return { status: 'protocolo_errado', rastreador_id: r.id };
+    // E o contrário: um identificador cadastrado como celular não recebe o que chega pela porta dos rastreadores (assim ninguém
+    // "reserva" o IMEI de um aparelho que ainda não foi cadastrado para receber as posições dele).
+    if ((m.protocolo === 'osmand') !== (r.protocolo === 'osmand')) return { status: 'protocolo_errado', rastreador_id: r.id };
     const t = agora();
     db.prepare('UPDATE rastreadores SET ultima_comunicacao = ?, ultimo_ip = COALESCE(?, ultimo_ip) WHERE id = ?').run(t, m.ip ?? null, r.id);
     const v = db.prepare(`SELECT v.*, e.status AS empresa_status, e.alertar_ignicao, e.horario_inicio, e.horario_fim, e.dias_uso

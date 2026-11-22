@@ -241,10 +241,18 @@ function iniciarGt06(db, porta, { host, aoMudar = () => {} } = {}) {
       const d = decodificar(q, { fusoMin: cx.fusoMin });
       if (d.ack) socket.write(quadro(q.protocolo, Buffer.alloc(0), q.serial));
       if (d.tipo === 'login') {
+        // Uma conexão é de um aparelho só: um segundo login com outro IMEI na mesma conexão não é coisa de rastreador.
+        if (cx.imei && cx.imei !== d.imei) { socket.destroy(); return; }
         cx.imei = d.imei;
         cx.fusoMin = d.fusoMin;
         const anterior = conexoes.get(d.imei);
-        if (anterior && anterior !== cx) anterior.socket.destroy();
+        if (anterior && anterior !== cx) {
+          // Troca de IP com a conexão antiga ainda viva: normal na rede celular, mas fica registrado (ajuda a ver um IMEI clonado).
+          if (anterior.socket.remoteAddress !== socket.remoteAddress && !anterior.socket.destroyed) {
+            console.warn(`[Rastreador] GT06: ${d.imei} reconectou de outro IP (${anterior.socket.remoteAddress} → ${socket.remoteAddress}).`);
+          }
+          anterior.socket.destroy();
+        }
         conexoes.set(d.imei, cx);
         aoMudar(); // o painel fica sabendo na hora que o aparelho conectou
         receber(db, { imei: d.imei, protocolo: 'gt06', ip: socket.remoteAddress });
@@ -287,6 +295,7 @@ function iniciarGt06(db, porta, { host, aoMudar = () => {} } = {}) {
   const novoComando = ({ imei, protocolo }) => { if (protocolo === 'gt06') entregar(imei); };
   com.canal.on('comando', novoComando);
   servidor.on('close', () => com.canal.off('comando', novoComando));
+  servidor.maxConnections = 20_000; // teto de conexões abertas (cada aparelho usa uma)
   servidor.listen(porta, host);
   return {
     servidor,

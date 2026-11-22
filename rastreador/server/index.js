@@ -56,7 +56,7 @@ if (config.portaGt06 > 0) {
     if (Date.now() - semServicoDesde > SEM_SERVICO_MS) { semServicoDesde = null; usarProprio('o serviço separado parou'); }
   }, 5000).unref();
 }
-const http = criarApp(db, extras).listen(config.port, () => {
+const http = criarApp(db, extras).listen(config.port, config.host, () => {
   console.log(`[Rastreador] Painel: http://localhost:${config.port}${config.basePath}/`);
 });
 http.on('error', (err) => {

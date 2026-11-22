@@ -931,7 +931,13 @@ const CONFIG_TEXTO = ['pix_chave', 'pix_nome', 'pix_cidade', 'nome_plataforma', 
 const agora = () => new Date().toISOString();
 
 function abrir(arquivo = config.dbFile) {
-  if (arquivo !== ':memory:') fs.mkdirSync(path.dirname(arquivo), { recursive: true });
+  if (arquivo !== ':memory:') {
+    fs.mkdirSync(path.dirname(arquivo), { recursive: true });
+    // A pasta de dados da instalação (banco, fotos, cópias de segurança) só é lida pelo usuário que roda o sistema.
+    if (path.resolve(path.dirname(arquivo)) === path.resolve(__dirname, '..', 'data')) {
+      try { fs.chmodSync(path.dirname(arquivo), 0o700); } catch { /* sem permissão para mudar: segue como está */ }
+    }
+  }
   const db = novoBanco(arquivo);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
@@ -943,6 +949,7 @@ function abrir(arquivo = config.dbFile) {
   if (!db.prepare("SELECT 1 FROM usuarios WHERE perfil = 'master' LIMIT 1").get()) {
     db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, 'master', ?)")
       .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha), agora());
+    if (config.admin.senhaSorteada) console.warn(`[Rastreador] Master criado: ${config.admin.email} / senha ${config.admin.senha} (anote e troque no primeiro acesso; não aparece de novo).`);
   }
 
   // Catálogo inicial de seguros (editável pelo master): 6 tipos. Só semeia se a tabela estiver vazia.

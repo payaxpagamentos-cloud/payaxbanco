@@ -49,6 +49,8 @@ const STATUS_ALERTA = ['pendentes', 'tratados', 'todos'];
 module.exports = (db, extras = {}) => {
   const r = Router();
   const gestor = permitir('master', 'suporte', 'cliente');
+  // Usuários e chaves de API da empresa: o administrador dela e o master (o suporte não cria acessos, como no painel da plataforma).
+  const contas = permitir('master', 'cliente');
   const eid = (req) => req.empresa.id;
   const nid = (req) => Number(req.params.id);
   const daEmpresa = (tabela, nome, masc = true) => (req, id) => {
@@ -386,6 +388,10 @@ module.exports = (db, extras = {}) => {
   /** A empresa cadastra sozinha um celular como rastreador (app Traccar Client). Os equipamentos GT06 vêm do estoque do master. */
   r.post('/rastreadores', gestor, (req, res) => {
     const imei = req.body.imei ? v.imei(req.body.imei) : `app-${crypto.randomInt(10 ** 9, 10 ** 10)}`;
+    // Um IMEI que já falou pela porta dos rastreadores é de um aparelho de verdade: quem cadastra é a plataforma, do estoque.
+    if (db.prepare("SELECT 1 FROM desconhecidos WHERE imei = ? AND protocolo = 'gt06'").get(imei)) {
+      throw new ErroNegocio('Este identificador é de um rastreador (não de um celular). Peça o cadastro ao suporte.', 422);
+    }
     const id = Number(db.prepare("INSERT INTO rastreadores (imei, modelo, protocolo, empresa_id, criado_em) VALUES (?, ?, 'osmand', ?, ?)")
       .run(imei, v.opcional(req.body.modelo, 'o modelo', 60) ?? 'Celular (Traccar Client)', eid(req), agora()).lastInsertRowid);
     db.prepare('DELETE FROM desconhecidos WHERE imei = ?').run(imei);
@@ -695,17 +701,19 @@ module.exports = (db, extras = {}) => {
     res.status(204).end();
   });
 
-  r.post('/usuarios', gestor, (req, res) => {
+  r.post('/usuarios', contas, (req, res) => {
     if (req.body.acesso === 'frota' && !req.empresa.gestao_frota) throw new ErroNegocio('A Gestão de Frota não está contratada para esta empresa.', 422);
     const id = criarUsuario(db, req.body, { perfis: PERFIS_EMPRESA, empresaId: eid(req) });
     registrar(db, req, 'usuario_criado', { email: req.body.email, perfil: req.body.perfil, acesso: req.body.acesso || 'completo' });
     res.status(201).json({ id });
   });
 
-  r.put('/usuarios/:id', gestor, (req, res) => {
+  r.put('/usuarios/:id', contas, (req, res) => {
     const u = db.prepare('SELECT * FROM usuarios WHERE id = ? AND empresa_id = ?').get(nid(req), eid(req));
     if (!u) throw naoEncontrado('Usuário');
-    if (u.id === req.usuario.id && (req.body.ativo === false || (req.body.perfil && req.body.perfil !== u.perfil) || (req.body.acesso && req.body.acesso !== u.acesso))) {
+    // A própria senha só se troca em "Alterar senha", que pede a senha atual (uma sessão roubada não troca a senha por aqui).
+    if (u.id === req.usuario.id && req.body.senha) throw new ErroNegocio('Para trocar a sua senha, use "Alterar senha" no menu do seu usuário.', 422);
+    if (u.id === req.usuario.id && ((req.body.ativo !== undefined && !v.booleano(req.body.ativo)) || (req.body.perfil && req.body.perfil !== u.perfil) || (req.body.acesso && req.body.acesso !== u.acesso))) {
       throw new ErroNegocio('Você não pode desativar nem mudar o perfil ou o acesso da sua própria conta.', 422);
     }
     if (req.body.acesso === 'frota' && !req.empresa.gestao_frota) throw new ErroNegocio('A Gestão de Frota não está contratada para esta empresa.', 422);
@@ -718,7 +726,7 @@ module.exports = (db, extras = {}) => {
   r.get('/chaves', gestor, (req, res) => {
     res.json(db.prepare('SELECT id, nome, prefixo, criada_em, ultimo_uso, revogada_em FROM chaves_api WHERE empresa_id = ? ORDER BY id DESC').all(eid(req)));
   });
-  r.post('/chaves', gestor, (req, res) => {
+  r.post('/chaves', contas, (req, res) => {
     const k = criarChave(db, eid(req), req.body.nome, req.usuario.id);
     registrar(db, req, 'chave_criada', { prefixo: k.prefixo });
     res.status(201).json(k);

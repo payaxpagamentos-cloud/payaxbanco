@@ -8,7 +8,9 @@
 const { Router } = require('express');
 const { agora } = require('../db');
 const { emitirTokenMotorista, autenticarMotorista } = require('../auth');
-const { verificarSenha } = require('../lib/senha');
+const { verificarSenha, gastarTempo } = require('../lib/senha');
+const { criarTrava } = require('../lib/tentativas');
+const { registrar } = require('../lib/auditoria');
 const { ErroNegocio } = require('../lib/erros');
 const agenda = require('../lib/agenda');
 const v = require('../lib/validacao');
@@ -26,13 +28,23 @@ module.exports = (db) => {
   const r = Router();
   const autenticado = autenticarMotorista(db);
 
+  // A senha do app é curta (4 a 6 números): 5 erros seguidos no mesmo CPF travam o acesso por 15 minutos.
+  const trava = criarTrava({ maximo: 5, bloqueioMs: 15 * 60_000 });
   r.post('/login', (req, res) => {
     const cpf = v.digitos(req.body.cpf);
     const senha = String(req.body.senha ?? '');
+    const chave = `m:${cpf || req.ip}`;
+    trava.conferir(chave);
     const lista = cpf ? db.prepare(`SELECT m.*, e.status AS empresa_status FROM motoristas m JOIN empresas e ON e.id = m.empresa_id
       WHERE m.cpf = ? AND m.ativo = 1 AND m.senha_hash IS NOT NULL`).all(cpf) : [];
     const m = lista.find((x) => x.empresa_status === 'ativa' && verificarSenha(senha, x.senha_hash));
-    if (!m) throw new ErroNegocio('CPF ou senha incorretos. Peça ao gestor para conferir seu acesso.', 401);
+    if (!m) {
+      if (!lista.length) gastarTempo(senha);
+      trava.falhou(chave);
+      registrar(db, req, 'login_motorista_falhou', { cpf: String(cpf ?? '').slice(0, 14) }, lista[0]?.empresa_id ?? null);
+      throw new ErroNegocio('CPF ou senha incorretos. Peça ao gestor para conferir seu acesso.', 401);
+    }
+    trava.acertou(chave);
     db.prepare('UPDATE motoristas SET app_ultimo_acesso = ? WHERE id = ?').run(agora(), m.id);
     res.json({ token: emitirTokenMotorista(m), motorista: { nome: m.nome } });
   });

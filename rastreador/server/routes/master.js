@@ -6,6 +6,7 @@
 */
 
 const fs = require('node:fs');
+const path = require('node:path');
 const { Router, raw } = require('express');
 const config = require('../config');
 const { transacao, agora, lerConfig, CONFIG_PADRAO, CONFIG_TEXTO } = require('../db');
@@ -354,9 +355,16 @@ module.exports = (db, extras = {}) => {
     res.json(db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.acesso, u.ativo, u.ultimo_acesso, u.criado_em, u.empresa_id, e.nome AS empresa_nome
       FROM usuarios u LEFT JOIN empresas e ON e.id = u.empresa_id WHERE ${onde.join(' AND ')} ORDER BY u.empresa_id IS NOT NULL, e.nome, u.nome LIMIT 1000`).all(...p));
   });
+  // Criar ou mexer em conta da plataforma (master/suporte) pede a senha de quem está fazendo: com uma sessão roubada, ninguém
+  // cria um segundo master nem troca a senha de outro para passar pela confirmação da atualização do sistema.
+  const confirmarSenha = (req) => {
+    const u = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(req.usuario.id);
+    if (!u || !verificarSenha(String(req.body.confirmacao ?? ''), u.senha_hash)) throw new ErroNegocio('Confirme com a sua senha para criar ou alterar um usuário da plataforma.', 403);
+  };
   r.post('/usuarios', soMaster, (req, res) => {
     const d = req.body;
     const daEmpresa = ['cliente', 'operador'].includes(d.perfil);
+    if (!daEmpresa) confirmarSenha(req);
     if (daEmpresa && d.acesso === 'frota' && !empresa(d.empresa_id).gestao_frota) throw new ErroNegocio('Ligue a Gestão de Frota na empresa antes de criar um usuário só do módulo.', 422);
     const id = criarUsuario(db, d, { perfis: PERFIS, empresaId: daEmpresa ? empresa(d.empresa_id).id : null });
     registrar(db, req, 'usuario_criado', { id, perfil: d.perfil }, daEmpresa ? Number(d.empresa_id) : null);
@@ -366,6 +374,11 @@ module.exports = (db, extras = {}) => {
     const u = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(nid(req));
     if (!u) throw naoEncontrado('Usuário');
     const desativando = req.body.ativo !== undefined && !v.booleano(req.body.ativo);
+    // A própria senha só se troca em "Alterar senha" (pede a atual).
+    if (u.id === req.usuario.id && req.body.senha) throw new ErroNegocio('Para trocar a sua senha, use "Alterar senha" no menu do seu usuário.', 422);
+    const mudaPerfil = req.body.perfil && req.body.perfil !== u.perfil;
+    const mudaAtivo = req.body.ativo !== undefined && v.booleano(req.body.ativo) !== Boolean(u.ativo);
+    if (!u.empresa_id && u.id !== req.usuario.id && (req.body.senha || mudaPerfil || mudaAtivo)) confirmarSenha(req);
     v.exigir(!(u.id === req.usuario.id && (desativando || (req.body.perfil && req.body.perfil !== 'master'))), 'Você não pode desativar nem rebaixar o seu próprio usuário.');
     if (req.body.acesso === 'frota' && u.empresa_id && !empresa(u.empresa_id).gestao_frota) throw new ErroNegocio('Ligue a Gestão de Frota na empresa antes de deixar o usuário só no módulo.', 422);
     transacao(db, () => {
@@ -649,9 +662,26 @@ module.exports = (db, extras = {}) => {
     WHERE a.acao IN ('sistema_atualizado', 'sistema_revertido') ORDER BY a.id DESC LIMIT 15`).all()
     .map((h) => ({ acao: h.acao, usuario: h.usuario, criado_em: h.criado_em, detalhes: h.detalhes ? JSON.parse(h.detalhes) : {} }));
 
+  // Cópia do banco antes de atualizar (a versão nova pode mudar tabelas): fica uma só, em data/atualizacoes/banco-antes.db.
+  // Banco muito grande (mais de 1 GB) ou criptografado não é copiado aqui, para não encher o disco; nesse caso faça o backup por fora.
+  const copiarBancoAntes = () => {
+    try {
+      const arq = config.dbFile;
+      // Banco criptografado: a cópia fica por conta do backup de fora (aqui não se arrisca gravar uma cópia sem a criptografia).
+      if (!arq || arq === ':memory:' || process.env.RASTREADOR_DB_CHAVE || fs.statSync(arq).size > 1024 ** 3) return;
+      const dir = path.join(path.dirname(arq), 'atualizacoes');
+      fs.mkdirSync(dir, { recursive: true });
+      const destino = path.join(dir, 'banco-antes.db');
+      fs.rmSync(destino, { force: true });
+      db.exec(`VACUUM INTO '${destino.replace(/'/g, "''")}'`);
+    } catch (err) {
+      console.warn('[Rastreador] Não consegui copiar o banco antes da atualização:', err.message);
+    }
+  };
   r.get('/sistema', soMaster, (_req, res) => res.json({ ...atualizador.estado(), historico: historicoSistema() }));
   r.post('/sistema/atualizar', soMaster, raw({ type: '*/*', limit: '80mb' }), (req, res) => {
     conferirSenha(req);
+    copiarBancoAntes();
     const out = atualizador.aplicar(req.body);
     registrar(db, req, 'sistema_atualizado', { de: out.anterior, para: out.versao });
     res.json({ ok: true, versao: out.versao });

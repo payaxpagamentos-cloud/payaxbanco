@@ -11,15 +11,23 @@ const { ErroNegocio } = require('./lib/erros');
 
 const assinar = (dados) => crypto.createHmac('sha256', config.secret).update(dados).digest('base64url');
 
+/**
+ * Marca da senha dentro do token: trocar a senha muda a marca e derruba as sessões abertas com a senha antiga
+ * (quem roubou um token perde o acesso na hora em que o dono troca a senha).
+ */
+const marcaSenha = (hash) => crypto.createHash('sha256').update(String(hash ?? '')).digest('base64url').slice(0, 12);
+/** Token antigo (sem a marca) vale até vencer; com a marca, só enquanto a senha for a mesma. */
+const senhaConfere = (dados, hash) => dados.k === undefined || dados.k === marcaSenha(hash);
+
 /** Token assinado (HMAC) com o id do usuário e a validade. Perfil, empresa e situação são sempre lidos do banco. */
 function emitirToken(usuario) {
-  const payload = Buffer.from(JSON.stringify({ sub: usuario.id, aud: 'rastreador', exp: Math.floor(Date.now() / 1000) + config.tokenTtlSeconds })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ sub: usuario.id, aud: 'rastreador', k: marcaSenha(usuario.senha_hash), exp: Math.floor(Date.now() / 1000) + config.tokenTtlSeconds })).toString('base64url');
   return `${payload}.${assinar(payload)}`;
 }
 
 /** Token do app do motorista: outro público ("rastreador-motorista"), com o id do motorista. */
 function emitirTokenMotorista(motorista) {
-  const payload = Buffer.from(JSON.stringify({ sub: motorista.id, aud: 'rastreador-motorista', exp: Math.floor(Date.now() / 1000) + 30 * 86_400 })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ sub: motorista.id, aud: 'rastreador-motorista', k: marcaSenha(motorista.senha_hash), exp: Math.floor(Date.now() / 1000) + 30 * 86_400 })).toString('base64url');
   return `${payload}.${assinar(payload)}`;
 }
 
@@ -40,14 +48,15 @@ function lerToken(token, aud = 'rastreador') {
 const PLATAFORMA = ['master', 'suporte'];
 
 function autenticar(db) {
-  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.empresa_id, u.ativo, u.acesso, e.nome AS empresa_nome, e.status AS empresa_status
+  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.empresa_id, u.ativo, u.acesso, u.senha_hash, e.nome AS empresa_nome, e.status AS empresa_status
     FROM usuarios u LEFT JOIN empresas e ON e.id = u.empresa_id WHERE u.id = ?`);
   return (req, _res, next) => {
     const c = req.get('authorization') || '';
     const dados = lerToken(c.startsWith('Bearer ') ? c.slice(7) : null);
     if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
-    const usuario = buscar.get(dados.sub);
-    if (!usuario || !usuario.ativo) return next(new ErroNegocio('Usuário inativo.', 401));
+    const { senha_hash: hash, ...usuario } = buscar.get(dados.sub) ?? {};
+    if (!usuario.id || !usuario.ativo) return next(new ErroNegocio('Usuário inativo.', 401));
+    if (!senhaConfere(dados, hash)) return next(new ErroNegocio('A senha foi alterada. Entre de novo.', 401));
     if (usuario.empresa_id && usuario.empresa_status !== 'ativa') return next(new ErroNegocio('Empresa bloqueada. Fale com o suporte.', 401));
     req.usuario = usuario;
     next();
@@ -62,7 +71,7 @@ function autenticarMotorista(db) {
     const dados = lerToken(c.startsWith('Bearer ') ? c.slice(7) : null, 'rastreador-motorista');
     if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
     const m = buscar.get(dados.sub);
-    if (!m || !m.ativo || !m.senha_hash || m.empresa_status !== 'ativa') return next(new ErroNegocio('Acesso do motorista desativado.', 401));
+    if (!m || !m.ativo || !m.senha_hash || m.empresa_status !== 'ativa' || !senhaConfere(dados, m.senha_hash)) return next(new ErroNegocio('Acesso do motorista desativado.', 401));
     req.motorista = m;
     next();
   };
@@ -70,7 +79,7 @@ function autenticarMotorista(db) {
 
 /** Token do app do cliente (usuário final): público "rastreador-usuario", 30 dias, com o id do usuário final. */
 function emitirTokenUsuarioFinal(uf) {
-  const payload = Buffer.from(JSON.stringify({ sub: uf.id, aud: 'rastreador-usuario', exp: Math.floor(Date.now() / 1000) + 30 * 86_400 })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ sub: uf.id, aud: 'rastreador-usuario', k: marcaSenha(uf.senha_hash), exp: Math.floor(Date.now() / 1000) + 30 * 86_400 })).toString('base64url');
   return `${payload}.${assinar(payload)}`;
 }
 
@@ -82,7 +91,7 @@ function autenticarUsuarioFinal(db) {
     const dados = lerToken(c.startsWith('Bearer ') ? c.slice(7) : null, 'rastreador-usuario');
     if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
     const uf = buscar.get(dados.sub);
-    if (!uf || !uf.ativo || !uf.senha_hash || uf.empresa_status !== 'ativa') return next(new ErroNegocio('Acesso do cliente desativado.', 401));
+    if (!uf || !uf.ativo || !uf.senha_hash || uf.empresa_status !== 'ativa' || !senhaConfere(dados, uf.senha_hash)) return next(new ErroNegocio('Acesso do cliente desativado.', 401));
     req.usuarioFinal = uf;
     next();
   };
@@ -100,7 +109,8 @@ function acessoEmpresa(db) {
   const buscar = db.prepare("SELECT * FROM empresas WHERE id = ? AND status <> 'excluida'");
   return (req, _res, next) => {
     const u = req.usuario;
-    const eid = Number(req.params.eid);
+    // Só o número puro ("1.0" ou "0x1" abririam a mesma empresa por um endereço que os limites de tentativas não reconhecem).
+    const eid = /^\d+$/.test(String(req.params.eid)) ? Number(req.params.eid) : NaN;
     if (!PLATAFORMA.includes(u.perfil) && u.empresa_id !== eid) return next(new ErroNegocio('Empresa não encontrada.', 404));
     const empresa = Number.isInteger(eid) ? buscar.get(eid) : null;
     if (!empresa) return next(new ErroNegocio('Empresa não encontrada.', 404));

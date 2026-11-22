@@ -8,7 +8,8 @@
 const { Router } = require('express');
 const { agora } = require('../db');
 const { emitirTokenUsuarioFinal, autenticarUsuarioFinal } = require('../auth');
-const { verificarSenha } = require('../lib/senha');
+const { verificarSenha, gastarTempo } = require('../lib/senha');
+const { criarTrava } = require('../lib/tentativas');
 const { ErroNegocio } = require('../lib/erros');
 const v = require('../lib/validacao');
 const uf = require('../lib/usuariosFinais');
@@ -19,15 +20,24 @@ module.exports = (db) => {
   const r = Router();
   const autenticado = autenticarUsuarioFinal(db);
 
+  // 10 senhas erradas seguidas na mesma conta travam o acesso por 15 minutos.
+  const trava = criarTrava({ maximo: 10, bloqueioMs: 15 * 60_000 });
   r.post('/login', (req, res) => {
     const id = String(req.body.identificador ?? req.body.email ?? req.body.cpf ?? '').trim();
     const senha = String(req.body.senha ?? '');
+    const chave = `u:${id.toLowerCase().slice(0, 160) || req.ip}`;
+    trava.conferir(chave);
     const q = 'SELECT uf.*, e.status AS es FROM usuarios_finais uf JOIN empresas e ON e.id = uf.empresa_id WHERE uf.ativo = 1 AND uf.senha_hash IS NOT NULL AND ';
     let lista = [];
     if (id.includes('@')) lista = db.prepare(`${q}uf.email = ?`).all(id.toLowerCase());
     else { const cpf = v.digitos(id); if (cpf) lista = db.prepare(`${q}uf.cpf = ?`).all(cpf); }
     const u = lista.find((x) => x.es === 'ativa' && verificarSenha(senha, x.senha_hash));
-    if (!u) throw new ErroNegocio('E-mail/CPF ou senha incorretos. Fale com a empresa que fez o seu cadastro.', 401);
+    if (!u) {
+      if (!lista.length) gastarTempo(senha);
+      trava.falhou(chave);
+      throw new ErroNegocio('E-mail/CPF ou senha incorretos. Fale com a empresa que fez o seu cadastro.', 401);
+    }
+    trava.acertou(chave);
     db.prepare('UPDATE usuarios_finais SET ultimo_acesso = ? WHERE id = ?').run(agora(), u.id);
     res.json({ token: emitirTokenUsuarioFinal(u), usuario: { nome: u.nome } });
   });

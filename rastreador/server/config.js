@@ -15,6 +15,15 @@ if (!process.env.RASTREADOR_SECRET && process.env.NODE_ENV !== 'test') {
 
 const producao = process.env.NODE_ENV === 'production';
 
+// Os valores de exemplo do .env.exemplo são públicos: com eles qualquer um assinaria uma sessão de master. Nunca valem.
+if (/^troque-/.test(process.env.RASTREADOR_SECRET ?? '') || /^troque-/.test(process.env.RASTREADOR_ADMIN_SENHA ?? '')) {
+  throw new Error('[Rastreador] O .env ainda tem os valores de exemplo ("troque-..."). Defina RASTREADOR_SECRET e RASTREADOR_ADMIN_SENHA próprios.');
+}
+// Fora de produção e sem senha definida: "master123" só em desenvolvimento e nos testes; nos outros casos, uma senha sorteada
+// (mostrada uma vez no console, quando o master é criado).
+const ambienteDev = ['development', 'test'].includes(process.env.NODE_ENV ?? '');
+const senhaSorteada = !process.env.RASTREADOR_ADMIN_SENHA && !ambienteDev ? crypto.randomBytes(12).toString('base64url') : null;
+
 // Em produção, recusa iniciar com segredos ausentes ou fracos.
 if (producao) {
   const faltando = ['RASTREADOR_SECRET', 'RASTREADOR_ADMIN_SENHA'].filter((k) => !process.env[k]);
@@ -55,6 +64,9 @@ module.exports = {
   secret,
   tokenTtlSeconds: 12 * 60 * 60,
   trustProxy: process.env.RASTREADOR_TRUST_PROXY ?? 'loopback',
+  // Endereço em que o painel escuta. Atrás de um proxy (Nginx/Apache) no mesmo servidor, use 127.0.0.1: a porta deixa de
+  // responder para fora e ninguém fala com o painel sem passar pelo proxy (HTTPS e limites de tentativas).
+  host: process.env.RASTREADOR_HOST || undefined,
   limiteLoginPorMinuto: Number(process.env.RASTREADOR_LIMITE_LOGIN) || 10,
   // Fuso das datas do dashboard e dos relatórios.
   fuso: process.env.RASTREADOR_FUSO || 'America/Sao_Paulo',
@@ -114,6 +126,7 @@ module.exports = {
   admin: {
     nome: process.env.RASTREADOR_ADMIN_NOME || 'Master',
     email: process.env.RASTREADOR_ADMIN_EMAIL || 'master@rastreador.com.br',
-    senha: process.env.RASTREADOR_ADMIN_SENHA || 'master123',
+    senha: process.env.RASTREADOR_ADMIN_SENHA || senhaSorteada || 'master123',
+    senhaSorteada: Boolean(senhaSorteada),
   },
 };

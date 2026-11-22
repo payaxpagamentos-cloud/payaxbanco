@@ -336,10 +336,14 @@ async function telaUsuarios(ctx) {
     const perfil = escolha('Perfil', 'perfil', PERFIS, u?.perfil ?? 'cliente', { required: true });
     const empresa = escolha('Empresa', 'empresa_id', Object.fromEntries(empresas.map((e) => [e.id, e.nome])), u?.empresa_id ?? empresas[0]?.id);
     const acesso = escolha('O que enxerga na empresa', 'acesso', ACESSOS, u?.acesso ?? 'completo');
+    const eu = u?.id === ctx.usuario.id;
+    // Conta da plataforma (master/suporte): criar, trocar a senha, o perfil ou desativar pede a senha de quem está fazendo.
+    const confirma = campo('Sua senha (confirma a criação ou alteração de um usuário da plataforma)', { name: 'confirmacao', type: 'password', autocomplete: 'current-password' });
     const ajustar = () => {
       const plataforma = ['master', 'suporte'].includes(f.querySelector('[name=perfil]').value);
       empresa.classList.toggle('oculto', plataforma || Boolean(u));
       acesso.classList.toggle('oculto', plataforma);
+      confirma.classList.toggle('oculto', !plataforma || eu);
     };
     perfil.querySelector('select').addEventListener('change', ajustar);
     queueMicrotask(ajustar);
@@ -348,11 +352,14 @@ async function telaUsuarios(ctx) {
       u ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, `${u.email}${u.empresa_nome ? ` · ${u.empresa_nome}` : ''}`) : campo('E-mail', { name: 'email', type: 'email', required: true }),
       perfil, empresa, acesso,
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Master: tudo. Suporte: empresas, rastreadores, mapa geral e diagnóstico. Administrador da empresa: o painel da empresa. Operador: acompanha a frota e trata alertas.'),
-      campo(u ? 'Nova senha (deixe em branco para manter)' : 'Senha inicial (mínimo 8)', { name: 'senha', type: 'password', minlength: 8, required: !u, autocomplete: 'new-password' }),
+      eu ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Para trocar a sua senha, use "Alterar senha" no menu do seu usuário (no alto da tela).')
+        : campo(u ? 'Nova senha (deixe em branco para manter)' : 'Senha inicial (mínimo 8)', { name: 'senha', type: 'password', minlength: 8, required: !u, autocomplete: 'new-password' }),
       u ? marcar('Usuário ativo', { name: 'ativo', checked: Boolean(u.ativo) }) : null,
+      confirma,
     ];
   }, async (d) => {
     if (!d.senha) delete d.senha;
+    if (!d.confirmacao) delete d.confirmacao;
     if (['master', 'suporte'].includes(d.perfil)) delete d.acesso;
     if (u) {
       delete d.empresa_id;

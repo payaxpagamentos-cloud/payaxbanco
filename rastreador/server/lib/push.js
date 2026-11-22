@@ -26,11 +26,21 @@ function chaves(db) {
 }
 const chavePublica = (db) => chaves(db).publicKey;
 
+/** Só os serviços de aviso dos navegadores (Google, Apple, Mozilla, Microsoft): o servidor nunca é levado a chamar outro endereço. */
+function servicoDePush(endpoint) {
+  try {
+    const u = new URL(endpoint);
+    return u.protocol === 'https:' && !u.port && /(^|\.)(fcm\.googleapis\.com|push\.apple\.com|push\.services\.mozilla\.com|notify\.windows\.com)$/.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
 function inscrever(db, motoristaId, s) {
   const endpoint = String(s?.endpoint ?? '');
   const p256dh = String(s?.keys?.p256dh ?? '');
   const auth = String(s?.keys?.auth ?? '');
-  if (!/^https:\/\//.test(endpoint) || endpoint.length > 1000 || !p256dh || !auth || p256dh.length > 200 || auth.length > 100) return false;
+  if (!servicoDePush(endpoint) || endpoint.length > 1000 || !p256dh || !auth || p256dh.length > 200 || auth.length > 100) return false;
   db.prepare(`INSERT INTO push_inscricoes (motorista_id, endpoint, p256dh, auth, criado_em) VALUES (?, ?, ?, ?, ?)
     ON CONFLICT (endpoint) DO UPDATE SET motorista_id = excluded.motorista_id, p256dh = excluded.p256dh, auth = excluded.auth`).run(motoristaId, endpoint, p256dh, auth, agora());
   return true;

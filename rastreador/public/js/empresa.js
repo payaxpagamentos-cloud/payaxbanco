@@ -848,7 +848,8 @@ async function telaConfiguracoes(ctx) {
       // Só aparece quando a empresa contratou a Gestão de Frota.
       e.gestao_frota ? escolha('O que este usuário enxerga', 'acesso', ACESSOS, u?.acesso ?? 'completo') : null,
       e.gestao_frota ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Somente Gestão de Frota: entra direto no módulo e não vê mapa, rastreadores, alertas, comandos nem nada do rastreamento.') : null,
-      campo(u ? 'Nova senha (vazio = manter)' : 'Senha (mínimo 8 caracteres)', { name: 'senha', type: 'password', minlength: 8, required: !u, autocomplete: 'new-password' }),
+      u?.id === ctx.usuario.id ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Para trocar a sua senha, use "Alterar senha" no menu do seu usuário (no alto da tela).')
+        : campo(u ? 'Nova senha (vazio = manter)' : 'Senha (mínimo 8 caracteres)', { name: 'senha', type: 'password', minlength: 8, required: !u, autocomplete: 'new-password' }),
       u ? marcar('Ativo', { name: 'ativo', checked: Boolean(u.ativo) }) : null,
     ], (d) => (u ? api.put(`${base(ctx)}/usuarios/${u.id}`, d) : api.post(`${base(ctx)}/usuarios`, d)));
     if (r) { toast('Usuário salvo.'); recarregarUsuarios(); }

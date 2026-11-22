@@ -21,4 +21,8 @@ function verificarSenha(senha, armazenado) {
   return crypto.timingSafeEqual(esperado, calculado);
 }
 
-module.exports = { hashSenha, verificarSenha };
+/** Gasta o mesmo tempo de uma conferência real: login de conta que não existe não responde mais rápido (não revela quem tem cadastro). */
+const HASH_FALSO = hashSenha(crypto.randomBytes(12).toString('hex'));
+const gastarTempo = (senha) => { verificarSenha(senha, HASH_FALSO); };
+
+module.exports = { hashSenha, verificarSenha, gastarTempo };

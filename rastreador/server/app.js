@@ -57,6 +57,13 @@ function criarApp(db, extras = {}) {
   app.use(require('compression')({ threshold: 1024 }));
   const r = express.Router();
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  // Atualizar/reverter o sistema pede a senha do master: poucas tentativas por minuto.
+  r.use(/^\/api\/master\/sistema\/(atualizar|reverter)\/?$/i, limitar({ janelaMs: 60_000, maximo: 5 }));
+  r.use(/^\/api\/master\/usuarios(\/\d+)?\/?$/i, limitar({ janelaMs: 60_000, maximo: 60, todosMetodos: true }));
+  // Posições dos celulares (endereço público): um teto por IP segura quem tenta encher o banco com identificadores inventados.
+  r.use('/api/osmand', limitar({ janelaMs: 60_000, maximo: 600, todosMetodos: true }));
+  // Teste de contato do WhatsApp: poucos envios por minuto.
+  r.use(/^\/api\/empresas\/\d+\/contatos\/\d+\/testar\/?$/i, limitar({ janelaMs: 60_000, maximo: 5 }));
   r.use('/api/motorista/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   r.use('/api/usuario/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   r.use(/^\/api\/usuario\/seguros\/solicitar\/?$/i, limitar({ janelaMs: 60_000, maximo: 5 }));
@@ -74,6 +81,8 @@ function criarApp(db, extras = {}) {
   r.use(express.urlencoded({ extended: false, limit: '100kb' }));
   // Sem corpo (ou com um valor solto), as rotas leem req.body.x sem erro.
   r.use((req, _res, next) => { if (req.body === undefined || req.body === null || typeof req.body !== 'object') req.body = {}; next(); });
+  // Respostas da API (token, dados pessoais, posições) nunca ficam guardadas em cache de navegador ou de proxy.
+  r.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   r.use('/api', criarApi(db, extras));
   // Leaflet (mapa) servido do próprio pacote, sem CDN.
   r.use('/vendor/leaflet', express.static(path.dirname(require.resolve('leaflet/dist/leaflet.js')), { maxAge: '7d' }));

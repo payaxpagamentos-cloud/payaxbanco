@@ -56,6 +56,9 @@ function textoComando(cfg, tipo, rastreador, texto) {
  * Um bloqueio ou desbloqueio ainda não enviado é substituído pelo novo.
  */
 // `doSistema`: texto montado pelo próprio sistema (funções do equipamento, ex.: anti-jammer com JAMRELAY), nunca o digitado.
+/** Texto livre de quem não é da plataforma: só consulta, sem parâmetro (nada depois do nome além do #). */
+const CONSULTAS_LIVRES = /^(STATUS|PARAM|WHERE|URL|VERSION|GPRSSET|CXZT|IMEI|ICCID|SCXSZ|RESET)#?$/i;
+
 function criar(db, veiculo, d, usuarioId, { doSistema = false, plataforma = false } = {}) {
   v.exigir(veiculo.rastreador_id, 'O veículo não tem rastreador instalado.');
   const r = db.prepare('SELECT * FROM rastreadores WHERE id = ?').get(veiculo.rastreador_id);
@@ -68,13 +71,18 @@ function criar(db, veiculo, d, usuarioId, { doSistema = false, plataforma = fals
     const digitada = String(d.confirmacao ?? '').toUpperCase().replace(/[\s-]/g, '');
     if (digitada !== veiculo.placa) throw new ErroNegocio('Para bloquear, digite a placa do veículo para confirmar.', 422);
   }
-  // Corte e desbloqueio só pelos botões (placa, velocidade segura, relé invertido e o estado na tela); nunca por texto livre.
-  if (tipo === 'personalizado' && !doSistema && /(^|[^A-Z])(RELAY|DYD|HFYD|JAMRELAY)\b/i.test(String(d.texto ?? ''))) {
-    throw new ErroNegocio('Para cortar ou liberar o veículo, use os botões Bloquear e Desbloquear.', 422);
-  }
-  // Servidor, APN, padrão de fábrica, sono e intervalos: um erro tira o aparelho do ar. Por texto livre, só a equipe da plataforma.
-  if (tipo === 'personalizado' && !doSistema && !plataforma && /^\s*(SERVER|APN|FACTORY|GMT|TIMER|HBT|PASSWORD|PWD|SZCS#\s*SLPDISCONNECT)\b/i.test(String(d.texto ?? ''))) {
-    throw new ErroNegocio('Este ajuste tira o aparelho do ar se sair errado: só a equipe da plataforma envia. Peça ao suporte.', 403);
+  if (tipo === 'personalizado' && !doSistema) {
+    const livre = String(d.texto ?? '').trim();
+    // Só letras, números e pontuação comuns: o aparelho recebe 1 byte por caractere, e um caractere "parecido" (ex.: Œ) chegaria
+    // lá como outra letra (R), passando pelo filtro abaixo sem ser visto.
+    if (!/^[\x20-\x7E]{1,120}$/.test(livre)) throw new ErroNegocio('O comando só pode ter letras sem acento, números e pontuação simples (até 120 caracteres).', 422);
+    // Corte e desbloqueio só pelos botões (placa, velocidade segura, relé invertido e o estado na tela); nunca por texto livre.
+    if (/RELAY|DYD|HFYD/i.test(livre)) throw new ErroNegocio('Para cortar ou liberar o veículo, use os botões Bloquear e Desbloquear.', 422);
+    // Quem não é da plataforma só envia consultas (sem parâmetros): servidor, APN, fábrica, números e intervalos mudam o aparelho
+    // e um erro tira ele do ar.
+    if (!plataforma && !CONSULTAS_LIVRES.test(livre)) {
+      throw new ErroNegocio('Por aqui só vão as consultas (STATUS#, PARAM#, WHERE#, URL#, VERSION#, GPRSSET#, RESET#). Ajustes do aparelho ficam na ficha do veículo ou com o suporte.', 403);
+    }
   }
   const texto = textoComando(lerConfig(db), tipo, r, d.texto);
   const id = transacao(db, () => {

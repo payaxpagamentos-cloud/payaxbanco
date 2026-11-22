@@ -8,7 +8,7 @@
 const { Router } = require('express');
 const { agora } = require('../db');
 const { emitirToken } = require('../auth');
-const { hashSenha, verificarSenha } = require('../lib/senha');
+const { hashSenha, verificarSenha, gastarTempo } = require('../lib/senha');
 const { ErroNegocio } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const v = require('../lib/validacao');
@@ -23,6 +23,7 @@ module.exports = (db, autenticado) => {
   r.post('/login', (req, res) => {
     const u = db.prepare(`SELECT u.*, e.nome AS empresa_nome, e.status AS empresa_status FROM usuarios u LEFT JOIN empresas e ON e.id = u.empresa_id
       WHERE u.email = ?`).get(String(req.body.email ?? '').trim());
+    if (!u) gastarTempo(String(req.body.senha ?? ''));
     if (!u || !verificarSenha(String(req.body.senha ?? ''), u.senha_hash)) {
       registrar(db, req, 'login_falhou', { email: String(req.body.email ?? '').slice(0, 160) }, u?.empresa_id ?? null);
       throw new ErroNegocio('E-mail ou senha incorretos.', 401);
@@ -39,9 +40,11 @@ module.exports = (db, autenticado) => {
   r.post('/senha', autenticado, (req, res) => {
     const u = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(req.usuario.id);
     if (!verificarSenha(String(req.body.atual ?? ''), u.senha_hash)) throw new ErroNegocio('Senha atual incorreta.', 422);
-    db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(hashSenha(v.senha(req.body.nova)), req.usuario.id);
+    const novo = hashSenha(v.senha(req.body.nova));
+    db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(novo, req.usuario.id);
     registrar(db, req, 'senha_alterada', undefined, req.usuario.empresa_id);
-    res.status(204).end();
+    // As sessões antigas caem com a troca; quem trocou recebe um token novo e continua logado.
+    res.json({ token: emitirToken({ id: req.usuario.id, senha_hash: novo }) });
   });
 
   return r;

@@ -56,6 +56,18 @@ function aplicar(bufferZip) {
         throw new ErroNegocio('Este .zip não é um pacote de atualização do Rastreador (faltam arquivos do sistema). Envie o arquivo de atualização correto.', 400);
       }
     }
+    // Nada de atalhos (links simbólicos) dentro do pacote, nem pacote gigante: um arquivo assim não saiu do empacotador.
+    let bytes = 0;
+    const conferir = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        const st = fs.lstatSync(p);
+        if (st.isSymbolicLink()) throw new ErroNegocio('Pacote recusado: contém atalhos (links simbólicos).', 400);
+        if (st.isDirectory()) conferir(p); else bytes += st.size;
+        if (bytes > 300 * 1024 * 1024) throw new ErroNegocio('Pacote recusado: grande demais.', 400);
+      }
+    };
+    conferir(path.join(base, 'server')); conferir(path.join(base, 'public'));
     let novaVersao;
     try { novaVersao = JSON.parse(fs.readFileSync(path.join(base, 'server', 'versao.json'), 'utf8')).versao; }
     catch { throw new ErroNegocio('O pacote não tem a versão (versao.json). Envie o arquivo de atualização correto.', 400); }
