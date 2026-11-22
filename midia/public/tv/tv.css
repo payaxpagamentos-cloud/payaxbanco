@@ -74,7 +74,8 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
 .faixa .marca-faixa span{ font-size: 2.6vh; font-weight: 800; letter-spacing: -.05em; text-transform: uppercase; color: #fff; }
 .faixa .texto{ font-size: 3vh; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; max-width: 36vw; min-width: 0; color: #D7DBE0; }
 .faixa .clima{ font-size: 2.8vh; font-weight: 700; flex: none; color: #D7DBE0; margin-left: auto; white-space: nowrap; }
-.faixa .clima + .relogio{ margin-left: 2vh; }
+/* Com o clima na tela, o relógio fica colado nele; sem o clima, o relógio vai sozinho para o canto direito. */
+.faixa .clima:not([hidden]) + .relogio{ margin-left: 2vh; }
 .faixa .relogio{ font-size: 3.4vh; font-weight: 800; font-variant-numeric: tabular-nums; flex: none; color: var(--lime); margin-left: auto; }
 /* Tela estreita (elevador em pé): o logo no centro e o relógio no canto; o recado e o clima não cabem. */
 @media (max-aspect-ratio: 3/4){ .faixa .texto, .faixa .clima{ display: none !important; } }
