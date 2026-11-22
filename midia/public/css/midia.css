@@ -108,6 +108,8 @@ a{ color: var(--cor); }
 /* O azul de foco do site: aparece nos dois temas e não se confunde com o lima. */
 :focus-visible{ outline: 2px solid #487BBA; outline-offset: 2px; }
 .oculto{ display: none !important; }
+/* O atributo hidden tem de vencer o display dos campos (label.campo é flex e, sem isto, aparecia assim mesmo). */
+[hidden]{ display: none !important; }
 .mudo{ color: var(--text-2); }
 .fraco{ color: var(--text-3); }
 .pequeno{ font-size: 12px; }

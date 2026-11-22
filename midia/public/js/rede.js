@@ -164,7 +164,12 @@ const editarTela = (t, recarregar) => api.get('/painel/opcoes').then((opcoes) =>
 /** Pareamento: digita o código que está na TV e escolhe onde ela fica. */
 function abrirPareamento(opcoes, recarregar, codigoInicial = '') {
   return modal('Parear aparelho', (fechar) => {
-    const codigo = el('input', { class: 'codigo-pareamento', value: codigoInicial, maxlength: 7, placeholder: 'ABC234', required: true, autocapitalize: 'characters' });
+    // O nome é o que faz o código ir junto no envio: sem ele, o formulário mandava o código vazio
+    // e o servidor respondia "não encontrado" para qualquer código, mesmo o certo.
+    const codigo = el('input', {
+      class: 'codigo-pareamento', name: 'codigo', value: codigoInicial, maxlength: 7, placeholder: 'ABC234',
+      required: true, autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false',
+    });
     const modo = escolha('Onde esta TV fica', 'modo', { nova: 'Criar uma TV nova neste ponto', existente: 'Ligar a uma TV já cadastrada' }, 'nova');
     const ponto = escolha('Ponto', 'local_id', Object.fromEntries(opcoes.locais.map((l) => [l.id, `${l.nome} — ${l.cidade}`])), '');
     const nome = campo('Nome da TV', { name: 'nome', placeholder: 'TV do caixa', maxlength: 120 });
