@@ -155,7 +155,7 @@ function diagnostico(db, { empresaId = null } = {}) {
     nome: 'Avisos por e-mail',
     ok: email.configurado() && Boolean(avisosLigados),
     detalhe: !email.configurado()
-      ? 'SMTP não configurado (MIDIA_SMTP_HOST): ninguém é avisado quando uma tela cai ou uma fatura vence.'
+      ? 'O envio de e-mail não está ligado no servidor: ninguém é avisado quando uma tela cai ou uma fatura vence.'
       : (avisosLigados ? 'Ligados: tela fora do ar, fatura vencida e fila de aprovação parada.' : 'SMTP configurado, mas os avisos estão desligados nas Configurações.'),
   });
 

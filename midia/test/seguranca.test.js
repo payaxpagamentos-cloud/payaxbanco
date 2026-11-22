@@ -161,3 +161,50 @@ test('E-mails por usuário: criar, associar, receber e enviar', async (t) => {
   assert.equal((await api.del(`/painel/enderecos-email/${criado.dados.id}`, undefined, master)).status, 204);
   assert.deepEqual(await assuntos(tkBeto), [daAna.id, geral.id].sort());
 });
+
+/** Envio direto (sem provedor): acha o servidor do destino pelo DNS, entrega na porta dele e assina com DKIM. */
+test('E-mail: entrega direta ao servidor do destinatário, com DKIM', async (t) => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dns = require('node:dns').promises;
+  const crypto = require('node:crypto');
+  const config = require('../server/config');
+  const emailLib = require('../server/lib/email');
+  const { criarServidor } = require('../server/lib/smtp-servidor');
+  const { iniciar, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+
+  const chave = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vm-dkim-')), 'dkim.pem');
+  fs.writeFileSync(chave, crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' }));
+  const guardado = { dominios: config.entrada.dominios, dkim: { ...config.dkim }, porta: config.smtp.portaDireta, mx: dns.resolveMx };
+  config.entrada.dominios = ['destino.test'];
+  Object.assign(config.dkim, { dominio: 'vaimidia.com.br', seletor: 'vaimidia', chaveArquivo: chave });
+  dns.resolveMx = async () => [{ exchange: '127.0.0.1', priority: 10 }];
+
+  const recebidas = [];
+  const servidor = criarServidor(api.db, { aoReceber: (m) => recebidas.push(m) });
+  await new Promise((ok) => servidor.listen(0, '127.0.0.1', ok));
+  config.smtp.portaDireta = servidor.address().port;
+  t.after(() => {
+    servidor.close(); api.fechar(); limparArquivos();
+    config.entrada.dominios = guardado.dominios; Object.assign(config.dkim, guardado.dkim);
+    config.smtp.portaDireta = guardado.porta; dns.resolveMx = guardado.mx;
+  });
+
+  const r = await emailLib.transporteDireto.sendMail({
+    from: { name: 'Ana Comercial', address: 'ana@vaimidia.com.br' }, to: 'cliente@destino.test', subject: 'Olá', text: 'Mensagem de teste.',
+  });
+  assert.match(r.messageId, /@vaimidia\.com\.br>$/);
+  const chegou = api.db.prepare("SELECT * FROM emails WHERE direcao = 'entrada' ORDER BY id DESC LIMIT 1").get();
+  assert.equal(chegou.de, 'ana@vaimidia.com.br');
+  assert.equal(chegou.de_nome, 'Ana Comercial');
+  assert.equal(chegou.assunto, 'Olá');
+  const original = fs.readFileSync(path.join(config.entrada.pasta, chegou.arquivo), 'utf8');
+  assert.match(original, /DKIM-Signature:[\s\S]*d=vaimidia\.com\.br/);
+
+  // Destino sem servidor que atenda: o erro volta para quem enviou, em vez de sumir.
+  dns.resolveMx = async () => [{ exchange: '127.0.0.1', priority: 10 }];
+  config.smtp.portaDireta = 1;
+  await assert.rejects(emailLib.transporteDireto.sendMail({ from: 'a@vaimidia.com.br', to: 'x@destino.test', subject: 's', text: 't' }));
+});

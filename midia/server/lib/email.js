@@ -12,7 +12,10 @@ const { ErroNegocio } = require('./erros');
 let transporte = null;
 const caixaTeste = []; // no modo teste as mensagens ficam aqui, para os testes automáticos conferirem
 
-const configurado = () => config.smtp.modo === 'teste' || Boolean(config.smtp.host);
+// Sem provedor configurado, o servidor entrega direto ao destino — desde que tenha a assinatura DKIM
+// (sem ela, quase tudo cairia no spam; por isso não se liga sozinho sem a chave).
+const direto = () => config.smtp.modo !== 'teste' && !config.smtp.host && Boolean(config.dkim.dominio && config.dkim.chaveArquivo);
+const configurado = () => config.smtp.modo === 'teste' || Boolean(config.smtp.host) || direto();
 
 /*
  * Assinatura DKIM: a chave privada fica num arquivo PEM e a pública num registro TXT do domínio. É ela
@@ -48,8 +51,55 @@ function registroDkim() {
   }
 }
 
+/**
+ * Entrega direta: descobre no DNS o servidor de e-mail de cada destinatário (registro MX) e entrega lá,
+ * na porta 25, apresentando-se com o nome desta máquina e assinando com DKIM. É o que um provedor faz;
+ * funciona porque o domínio tem SPF, DKIM e o nome reverso do IP. Tenta cada servidor do destino em ordem.
+ */
+const transporteDireto = {
+  async sendMail(mensagem) {
+    const dns = require('node:dns').promises;
+    const lista = [].concat(mensagem.to).flatMap((x) => String(x).split(',')).map((x) => x.trim()).filter(Boolean);
+    const origem = typeof mensagem.from === 'string' ? (/<([^>]+)>/.exec(mensagem.from)?.[1] ?? mensagem.from) : mensagem.from.address;
+    const messageId = `<${require('node:crypto').randomUUID()}@${config.dkim.dominio}>`;
+    const porDominio = new Map();
+    for (const e of lista) {
+      const d = e.split('@')[1]?.toLowerCase();
+      if (!d) continue;
+      porDominio.set(d, [...(porDominio.get(d) ?? []), e]);
+    }
+    const falhas = [];
+    let entregues = 0;
+    for (const [dominio, destinos] of porDominio) {
+      let servidores = [];
+      try { servidores = (await dns.resolveMx(dominio)).sort((a, b) => a.priority - b.priority).map((m) => m.exchange).filter(Boolean); } catch { /* sem MX */ }
+      if (!servidores.length) servidores = [dominio];
+      let ok = false;
+      let ultimo = 'sem servidor de e-mail';
+      for (const host of servidores.slice(0, 4)) {
+        const t = nodemailer.createTransport({
+          host, port: config.smtp.portaDireta, secure: false, name: config.entrada.nome || config.dkim.dominio,
+          // O certificado do servidor do destino nem sempre bate com o nome do MX: usa-se criptografia quando há, sem recusar por isso.
+          tls: { rejectUnauthorized: false }, dkim: lerDkim(),
+          connectionTimeout: 15_000, greetingTimeout: 15_000, socketTimeout: 45_000,
+        });
+        try {
+          await t.sendMail({ ...mensagem, messageId, envelope: { from: origem, to: destinos } });
+          ok = true;
+          break;
+        } catch (err) { ultimo = err.message; } finally { t.close(); }
+      }
+      if (ok) entregues += destinos.length; else falhas.push(`${dominio}: ${ultimo}`);
+    }
+    if (!entregues) throw new Error(falhas.join('; ') || 'nenhum destinatário válido');
+    if (falhas.length) console.error('[Vai Mídia] E-mail não entregue a parte dos destinos:', falhas.join('; '));
+    return { messageId, envelope: { from: origem, to: lista } };
+  },
+};
+
 function obterTransporte() {
   if (transporte) return transporte;
+  if (direto()) return (transporte = transporteDireto);
   transporte = config.smtp.modo === 'teste'
     ? nodemailer.createTransport({ jsonTransport: true })
     : nodemailer.createTransport({
@@ -119,7 +169,7 @@ async function enviar({ para, assunto, texto, ...conteudo }, { exigir = false } 
  * amarrada, então no programa de quem recebe a resposta aparece embaixo da mensagem original.
  */
 async function enviarDireto({ para, assunto, texto, emRespostaA = null, referencias = [], de = null }) {
-  if (!configurado()) return { enviado: false, motivo: 'o envio de e-mails não está configurado (MIDIA_SMTP_HOST)' };
+  if (!configurado()) return { enviado: false, motivo: 'o envio de e-mails não está configurado no servidor' };
   const corpo = String(texto ?? '').trim();
   const html = modelo({
     plataforma: 'Vai Mídia',
@@ -152,4 +202,4 @@ async function enviarDireto({ para, assunto, texto, emRespostaA = null, referenc
 /** Endereço do painel para os links dos e-mails. */
 const linkPainel = (caminho = '') => `${config.url || `http://localhost:${config.port}${config.basePath}`}/${String(caminho).replace(/^\/+/, '')}`;
 
-module.exports = { registroDkim, enviar, enviarDireto, configurado, modelo, linkPainel, caixaTeste };
+module.exports = { direto, transporteDireto, registroDkim, enviar, enviarDireto, configurado, modelo, linkPainel, caixaTeste };

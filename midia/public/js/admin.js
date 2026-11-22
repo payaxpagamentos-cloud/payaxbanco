@@ -282,7 +282,7 @@ export async function configuracoes(ctx) {
     el('fieldset', {}, el('legend', {}, 'Avisos por e-mail'),
       c.email.configurado
         ? el('p', { class: 'aviso ok' }, `Envio configurado. Os avisos vão para quem opera a rede (${c.email.equipe} pessoa(s)).`)
-        : el('p', { class: 'aviso' }, 'Sem servidor de e-mail (MIDIA_SMTP_HOST). Ninguém é avisado quando uma tela cai ou uma fatura vence.'),
+        : el('p', { class: 'aviso' }, 'O envio de e-mail não está ligado no servidor. Ninguém é avisado quando uma tela cai ou uma fatura vence.'),
       marcar('Avisar por e-mail: tela fora do ar, fatura vencida e fila de aprovação parada', { name: 'avisos_email', checked: Boolean(c.avisos_email) }),
       c.email.url ? null : el('p', { class: 'pequeno mudo', style: 'margin:0' },
         'Dica: configure MIDIA_URL com o endereço público do painel para os links dos e-mails abrirem direto na tela certa.'),

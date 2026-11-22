@@ -53,6 +53,8 @@ module.exports = {
     modo: process.env.MIDIA_SMTP_MODO || (process.env.NODE_ENV === 'test' ? 'teste' : ''),
     host: process.env.MIDIA_SMTP_HOST || '',
     porta: Number(process.env.MIDIA_SMTP_PORTA) || 587,
+    // Entrega direta (sem provedor): a porta dos servidores de e-mail do mundo é a 25. Só muda em teste.
+    portaDireta: Number(process.env.MIDIA_SMTP_PORTA_DIRETA) || 25,
     seguro: process.env.MIDIA_SMTP_SEGURO === '1',
     usuario: process.env.MIDIA_SMTP_USUARIO || '',
     senha: process.env.MIDIA_SMTP_SENHA || '',

@@ -91,7 +91,7 @@ function avisoDoServidor(s) {
   }
   if (!s.envio) {
     return el('p', { class: 'aviso' },
-      'Está recebendo normalmente, mas o envio não está configurado (MIDIA_SMTP_HOST): dá para ler, não dá para responder.');
+      'Está recebendo normalmente, mas o envio não está ligado no servidor: dá para ler, não dá para responder.');
   }
   return null;
 }
