@@ -1429,6 +1429,13 @@ test('Rastreador', async (t) => {
     assert.equal((await api.post('/master/usuarios', { nome: 'Sup', email: 'sup@plataforma.com', senha: 'senha-do-sup', perfil: 'suporte' }, master)).status, 403, 'conta da plataforma pede a senha de quem cria');
     assert.equal((await api.post('/master/usuarios', { nome: 'Sup', email: 'sup@plataforma.com', senha: 'senha-do-sup', perfil: 'suporte', confirmacao: 'master123' }, master)).status, 201);
     const suporte = await api.login('sup@plataforma.com', 'senha-do-sup');
+    // Diagnóstico do servidor: só o master, consultas fixas, sem segredo na resposta.
+    assert.equal((await api.get('/master/sistema/diagnostico', suporte)).status, 403);
+    assert.equal((await api.get('/master/sistema/diagnostico', cliente)).status, 403);
+    const diag = await api.get('/master/sistema/diagnostico', master);
+    assert.equal(diag.status, 200);
+    assert.match(diag.dados.texto, /Servidor web instalado/);
+    assert.ok(!diag.dados.texto.includes(require('../server/config').secret), 'sem segredo');
     // Segurança: o suporte não cria acessos na empresa; ninguém troca a própria senha pelo cadastro de usuários.
     assert.equal((await api.post(`${base()}/usuarios`, { nome: 'Porta', email: 'porta@rota.com', senha: 'senha-qualquer', perfil: 'cliente' }, suporte)).status, 403);
     assert.equal((await api.post(`${base()}/chaves`, { nome: 'x' }, suporte)).status, 403);

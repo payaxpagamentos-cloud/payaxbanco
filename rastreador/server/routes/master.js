@@ -678,6 +678,11 @@ module.exports = (db, extras = {}) => {
       console.warn('[Rastreador] Não consegui copiar o banco antes da atualização:', err.message);
     }
   };
+  // Diagnóstico do servidor (consultas fixas, só leitura): servidor web, portas e como o painel está publicado.
+  r.get('/sistema/diagnostico', soMaster, (req, res) => {
+    registrar(db, req, 'sistema_diagnostico');
+    res.json({ texto: require('../lib/diagnosticoServidor').diagnostico() });
+  });
   r.get('/sistema', soMaster, (_req, res) => res.json({ ...atualizador.estado(), historico: historicoSistema() }));
   r.post('/sistema/atualizar', soMaster, raw({ type: '*/*', limit: '80mb' }), (req, res) => {
     conferirSenha(req);

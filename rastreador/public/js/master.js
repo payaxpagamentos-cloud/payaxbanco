@@ -643,6 +643,18 @@ async function telaSistema(ctx) {
     await esperarReinicio(r.versao, status);
   }));
 
+  // Diagnóstico do servidor: consultas fixas (servidor web, portas, endereço). Nada digitado aqui vira comando.
+  const saidaDiag = el('div');
+  const botaoDiag = el('button', { class: 'btn' }, icone('lupa'), 'Rodar o diagnóstico');
+  botaoDiag.addEventListener('click', () => acao(botaoDiag, async () => {
+    const { texto } = await api.get('/master/sistema/diagnostico');
+    const copiar = el('button', { class: 'btn pequeno', type: 'button' }, 'Copiar');
+    copiar.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(texto); toast('Copiado.'); } catch { toast('Selecione o texto e copie.', true); }
+    });
+    limpar(saidaDiag, el('pre', { class: 'saida-diagnostico' }, texto), el('div', { class: 'linha', style: 'margin-top:8px' }, copiar));
+  }));
+
   limpar(ctx.conteudo,
     cartao('Atualizar o sistema',
       el('p', { class: 'mudo', style: 'margin:0 0 14px' }, 'Envie aqui o arquivo da atualização (rastreador-AAAA.MM.NN.zip). O sistema confere o arquivo e instala sozinho, do mesmo jeito que a atualização pelo terminal. Se a versão nova não subir, ele volta para a anterior.'),
@@ -654,6 +666,9 @@ async function telaSistema(ctx) {
       el('label', { class: 'campo', style: 'margin-top:12px;max-width:320px' }, 'Sua senha (para confirmar)', senha),
       el('div', { class: 'linha', style: 'margin-top:14px' }, enviar),
       status),
+    cartao('Diagnóstico do servidor',
+      el('p', { class: 'mudo', style: 'margin:0 0 12px' }, 'Mostra qual servidor web está na máquina (Nginx ou Apache), as portas em uso e como o Rastreador está publicado. Só consulta: não muda nada e não mostra senha nem chave.'),
+      botaoDiag, saidaDiag),
     cartao('Atualizações', (info.historico || []).length ? el('div', {}, info.historico.map(linhaHist)) : el('p', { class: 'mudo', style: 'margin:0' }, 'Ainda sem atualizações registradas.')),
     reverter ? cartao('Segurança', el('p', { class: 'pequeno fraco', style: 'margin:0 0 10px' }, `${info.backups.length} backup(s) guardado(s). Se algo sair errado depois de atualizar, reverta para a versão anterior.`), reverter) : null);
 }

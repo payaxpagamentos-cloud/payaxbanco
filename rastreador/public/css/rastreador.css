@@ -1435,3 +1435,6 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
   .lista-pneus-cel .ok{ border-color: var(--ok); background: var(--ok-bg); } .lista-pneus-cel .aviso{ border-color: var(--aviso); background: var(--aviso-bg); }
   .lista-pneus-cel .erro{ border-color: var(--erro); background: var(--erro-bg); } .lista-pneus-cel .vazia{ border-style: dashed; color: var(--text-3); }
 }
+
+/* Saída do diagnóstico do servidor (menu Sistema) */
+.saida-diagnostico{ margin: 12px 0 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow: auto; }
