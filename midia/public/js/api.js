@@ -29,6 +29,12 @@ export const sessao = {
     try { guarda.setItem(CHAVE, JSON.stringify(dados)); } catch { /* armazenamento indisponível */ }
     try { outro.removeItem(CHAVE); } catch { /* ignora */ }
   },
+  /** Troca só o acesso (depois de mudar a senha), sem mexer em onde ele está guardado. */
+  trocarToken(token) {
+    let lembrar = false;
+    try { lembrar = Boolean(localStorage.getItem(CHAVE)); } catch { /* ignora */ }
+    this.set({ ...this.get(), token }, { lembrar });
+  },
   limpar() {
     memoria = null;
     for (const guarda of [localStorage, sessionStorage]) {

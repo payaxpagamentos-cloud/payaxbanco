@@ -16,4 +16,9 @@ function verificarSenha(senha, armazenado) {
   return crypto.timingSafeEqual(esperado, calculado);
 }
 
-module.exports = { hashSenha, verificarSenha };
+// Usado quando o e-mail não existe: gasta o mesmo tempo de uma conferência de verdade,
+// para o tempo de resposta não revelar quais e-mails têm cadastro.
+const FALSA = hashSenha(crypto.randomBytes(12).toString('hex'));
+const gastarTempo = (senha) => { verificarSenha(senha, FALSA); };
+
+module.exports = { hashSenha, verificarSenha, gastarTempo };

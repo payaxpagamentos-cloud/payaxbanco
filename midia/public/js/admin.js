@@ -26,7 +26,7 @@ export async function usuarios(ctx) {
           : null,
         el('button', {
           class: 'btn pequeno', onclick: (e) => acao(e.target, async () => {
-            const nova = await perguntar('Trocar senha', `Nova senha de ${u.nome} (mínimo 8 caracteres)`);
+            const nova = await perguntar('Trocar senha', `Nova senha de ${u.nome} (mínimo 10 caracteres)`);
             if (!nova) return;
             await api.patch(`/painel/usuarios/${u.id}`, { senha: nova });
             toast('Senha trocada.');
@@ -134,7 +134,7 @@ function novoUsuario(opcoes, recarregar, master = true) {
     return [
       campo('Nome', { name: 'nome', required: true, maxlength: 120 }),
       campo('E-mail (login)', { name: 'email', type: 'email', required: true }),
-      campo('Senha (mínimo 8 caracteres)', { name: 'senha', type: 'password', required: true, minlength: 8 }),
+      campo('Senha (mínimo 10 caracteres)', { name: 'senha', type: 'password', required: true, minlength: 10 }),
       perfil, master ? campoEmpresa() : null, anunciante, ponto,
       master && listaDeEmpresas().length > 1
         ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'A empresa vale para administrador e operador: eles só enxergam os dados dela. Acesso de portal segue a empresa do anunciante ou do ponto.')

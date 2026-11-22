@@ -27,7 +27,7 @@ function abrirToken(token, audiencia) {
 }
 
 /** Sessão do painel: só o id e a validade; perfil, vínculo e situação são sempre lidos do banco. */
-const emitirToken = (usuario) => montar({ sub: usuario.id, aud: 'midia', exp: Math.floor(Date.now() / 1000) + config.tokenTtlSeconds });
+const emitirToken = (usuario) => montar({ sub: usuario.id, sv: usuario.sessao_versao ?? 0, aud: 'midia', exp: Math.floor(Date.now() / 1000) + config.tokenTtlSeconds });
 const lerToken = (token) => abrirToken(token, 'midia');
 
 /**
@@ -40,7 +40,7 @@ const lerTokenTela = (token) => abrirToken(token, 'tela');
 const EQUIPE = ['master', 'administrador', 'operador'];
 
 function autenticar(db) {
-  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.anunciante_id, u.local_id, u.ativo, u.empresa_id,
+  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.anunciante_id, u.local_id, u.ativo, u.empresa_id, u.sessao_versao,
       a.nome AS anunciante_nome, a.status AS anunciante_status, l.nome AS local_nome, l.status AS local_status,
       e.nome AS empresa_nome, e.ativo AS empresa_ativa
     FROM usuarios u
@@ -54,6 +54,8 @@ function autenticar(db) {
     if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
     const usuario = buscar.get(dados.sub);
     if (!usuario || !usuario.ativo) return next(new ErroNegocio('Usuário inativo.', 401));
+    // A senha foi trocada depois deste acesso: ele deixa de valer.
+    if ((dados.sv ?? 0) !== usuario.sessao_versao) return next(new ErroNegocio('Sessão encerrada. Entre de novo.', 401));
     if (usuario.anunciante_id && usuario.anunciante_status !== 'ativo') return next(new ErroNegocio('Anunciante inativo. Fale com a equipe.', 401));
     if (usuario.local_id && usuario.local_status === 'encerrado') return next(new ErroNegocio('Ponto encerrado. Fale com a equipe.', 401));
     if (usuario.empresa_id && usuario.empresa_ativa === 0) return next(new ErroNegocio('Empresa desativada. Fale com o administrador do sistema.', 401));
@@ -68,7 +70,7 @@ const permitir = (...perfis) => (req, _res, next) =>
 
 /** Autentica a TV pelo token do aparelho (o player não tem usuário nem senha). */
 function autenticarTela(db) {
-  const buscar = db.prepare(`SELECT t.*, l.nome AS local_nome, l.cidade, l.status AS local_status FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`);
+  const buscar = db.prepare(`SELECT t.*, l.nome AS local_nome, l.cidade, l.status AS local_status, l.empresa_id FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`);
   return (req, _res, next) => {
     const c = req.get('authorization') || '';
     const dados = lerTokenTela(c.startsWith('Bearer ') ? c.slice(7) : null);

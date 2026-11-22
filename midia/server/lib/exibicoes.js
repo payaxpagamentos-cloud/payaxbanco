@@ -14,8 +14,11 @@ function registrar(db, tela, lista) {
   if (!Array.isArray(lista)) throw new ErroNegocio('Envie a lista de exibições.', 422);
   if (lista.length > LIMITE_LOTE) throw new ErroNegocio(`Envie no máximo ${LIMITE_LOTE} exibições por vez.`, 413);
 
-  const midias = new Map(db.prepare('SELECT id, anunciante_id FROM midias').all().map((m) => [m.id, m]));
-  const campanhas = new Map(db.prepare('SELECT id, anunciante_id FROM campanhas').all().map((c) => [c.id, c]));
+  // Só vale exibição de mídia e campanha da mesma empresa da TV.
+  const empresa = tela.empresa_id ?? db.prepare('SELECT empresa_id FROM locais WHERE id = ?').get(tela.local_id)?.empresa_id ?? null;
+  const midias = new Map(db.prepare('SELECT id, anunciante_id FROM midias WHERE ?1 IS NULL OR empresa_id IS NULL OR empresa_id = ?1').all(empresa).map((m) => [m.id, m]));
+  const campanhas = new Map(db.prepare(`SELECT c.id, c.anunciante_id FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
+    WHERE ?1 IS NULL OR a.empresa_id IS NULL OR a.empresa_id = ?1`).all(empresa).map((c) => [c.id, c]));
   const comunicados = new Set(db.prepare('SELECT id FROM comunicados WHERE local_id = ?').all(tela.local_id).map((c) => c.id));
   const limiteFuturo = Date.now() + 3_600_000;
   const limitePassado = Date.now() - 30 * 86_400_000;

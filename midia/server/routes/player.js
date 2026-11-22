@@ -47,13 +47,16 @@ module.exports = (db) => {
   });
 
   // A TV consulta até a equipe confirmar; quando confirma, recebe o token e guarda.
-  r.get('/pareamento', (req, res) => {
+  r.get('/pareamento', limitar({ janelaMs: 60_000, maximo: 120, todos: true }), (req, res) => {
     const p = db.prepare('SELECT * FROM pareamentos WHERE codigo = ?').get(String(req.query.codigo ?? '').toUpperCase().trim());
     if (!p || p.expira_em < agora()) return res.json({ pareado: false, expirado: true });
     if (!p.tela_id) return res.json({ pareado: false, expira_em: p.expira_em });
     const tela = db.prepare('SELECT * FROM telas WHERE id = ?').get(p.tela_id);
     if (!tela) return res.json({ pareado: false, expirado: true });
-    db.prepare('UPDATE pareamentos SET entregue_em = ? WHERE id = ?').run(agora(), p.id);
+    // O acesso é entregue à TV que pediu o código. Depois de entregue, o código só repete a entrega
+    // por 2 minutos (caso a resposta tenha se perdido) — não serve para outra pessoa que viu o código.
+    if (p.entregue_em && Date.parse(p.entregue_em) < Date.now() - 120_000) return res.json({ pareado: false, expirado: true });
+    db.prepare('UPDATE pareamentos SET entregue_em = COALESCE(entregue_em, ?) WHERE id = ?').run(agora(), p.id);
     res.json({ pareado: true, token: emitirTokenTela(tela), tela: { id: tela.id, nome: tela.nome, orientacao: tela.orientacao } });
   });
 
@@ -150,6 +153,7 @@ module.exports = (db) => {
     const m = db.prepare("SELECT * FROM midias WHERE id = ? AND status = 'aprovada'").get(Number(req.params.id));
     if (!m) throw new ErroNegocio('Mídia não encontrada.', 404);
     if (m.local_id && m.local_id !== req.tela.local_id) throw new ErroNegocio('Mídia não é desta tela.', 403);
+    if (m.empresa_id && req.tela.empresa_id && m.empresa_id !== req.tela.empresa_id) throw new ErroNegocio('Mídia não é desta tela.', 403);
     const caminho = arquivos.caminho(m);
     let tamanho;
     try { tamanho = fs.statSync(caminho).size; } catch { throw new ErroNegocio('Arquivo da mídia não encontrado no servidor.', 500); }

@@ -232,10 +232,11 @@ function ferramentas(u) {
 function alterarSenha() {
   formModal('Alterar senha', () => [
     campo('Senha atual', { name: 'atual', type: 'password', required: true, autocomplete: 'current-password' }),
-    campo('Nova senha (mínimo 8 caracteres)', { name: 'nova', type: 'password', required: true, minlength: 8, autocomplete: 'new-password' }),
+    campo('Nova senha (mínimo 10 caracteres)', { name: 'nova', type: 'password', required: true, minlength: 10, autocomplete: 'new-password' }),
   ], async (d) => {
-    await api.post('/auth/senha', d);
-    toast('Senha alterada.');
+    const r = await api.post('/auth/senha', d);
+    if (r?.token) sessao.trocarToken(r.token);
+    toast('Senha alterada. Os outros aparelhos foram desconectados.');
   });
 }
 
@@ -318,8 +319,8 @@ const esqueciSenha = () => formModal('Esqueci minha senha', () => [
 /** Tela aberta pelo link do e-mail. */
 function telaNovaSenha(codigo) {
   const f = el('form', { class: 'form' },
-    campoSenha('Nova senha (mínimo 8 caracteres)', { name: 'senha', required: true, minlength: 8, autocomplete: 'new-password' }),
-    campoSenha('Repita a nova senha', { name: 'repetir', required: true, minlength: 8, autocomplete: 'new-password' }),
+    campoSenha('Nova senha (mínimo 10 caracteres)', { name: 'senha', required: true, minlength: 10, autocomplete: 'new-password' }),
+    campoSenha('Repita a nova senha', { name: 'repetir', required: true, minlength: 10, autocomplete: 'new-password' }),
     el('button', { class: 'btn primario' }, 'Salvar e entrar'));
   f.addEventListener('submit', (e) => {
     e.preventDefault();

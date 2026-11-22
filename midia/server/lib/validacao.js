@@ -73,7 +73,7 @@ const email = (v) => {
 };
 
 const senha = (v) => {
-  exigir(typeof v === 'string' && v.length >= 8, 'A senha deve ter pelo menos 8 caracteres.');
+  exigir(typeof v === 'string' && v.length >= 10, 'A senha deve ter pelo menos 10 caracteres.');
   exigir(v.length <= 200, 'Senha longa demais.');
   return v;
 };

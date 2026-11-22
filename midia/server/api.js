@@ -24,7 +24,7 @@ function criarApi(db) {
    * e exigir senha de quem ainda nem fechou negócio é o jeito mais rápido de perder a venda.
    * O link é aleatório e a folha é só de leitura — nada do painel vai junto.
    */
-  api.get('/publico/proposta/:token', require('./lib/limitador').limitar({ janelaMs: 60_000, maximo: 30 }), (req, res) => {
+  api.get('/publico/proposta/:token', require('./lib/limitador').limitar({ janelaMs: 60_000, maximo: 30, todos: true }), (req, res) => {
     const c = lerConfig(db);
     res.json({ ...require('./lib/propostas').porToken(db, req.params.token), whatsapp: c.whatsapp || null });
   });

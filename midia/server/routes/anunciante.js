@@ -145,11 +145,12 @@ module.exports = (db) => {
   });
 
   /** A rede de telas onde os anúncios podem rodar (sem dados de outros anunciantes). */
-  r.get('/rede', (_req, res) => {
+  r.get('/rede', (req, res) => {
+    const empresa = db.prepare('SELECT empresa_id FROM anunciantes WHERE id = ?').get(meu(req))?.empresa_id ?? null;
     res.json({
       pontos: db.prepare(`SELECT l.nome, l.categoria, l.cidade, l.uf, l.publico_dia, COUNT(t.id) AS telas
         FROM locais l LEFT JOIN telas t ON t.local_id = l.id AND t.status = 'ativa'
-        WHERE l.status = 'ativo' GROUP BY l.id HAVING telas > 0 ORDER BY l.cidade, l.nome`).all(),
+        WHERE l.status = 'ativo' AND (?1 IS NULL OR l.empresa_id = ?1) GROUP BY l.id HAVING telas > 0 ORDER BY l.cidade, l.nome`).all(empresa),
     });
   });
 

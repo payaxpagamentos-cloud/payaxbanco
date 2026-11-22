@@ -215,8 +215,10 @@ module.exports = (db) => {
       .map((t) => ({ ...t, online: Boolean(t.ultimo_contato && t.ultimo_contato > limite), pareada: Boolean(t.pareada_em) }));
     res.json({
       itens,
-      aguardando: db.prepare('SELECT id, codigo, aparelho, largura, altura, versao, criado_em, expira_em FROM pareamentos WHERE tela_id IS NULL AND expira_em > ? ORDER BY id DESC')
-        .all(agora()),
+      // Com mais de uma empresa, só o master vê os códigos esperando: os demais digitam o código que está na TV.
+      aguardando: (!empresas.empresaDe(req) || db.prepare('SELECT COUNT(*) AS n FROM empresas').get().n <= 1)
+        ? db.prepare('SELECT id, codigo, aparelho, largura, altura, versao, criado_em, expira_em FROM pareamentos WHERE tela_id IS NULL AND expira_em > ? ORDER BY id DESC').all(agora())
+        : [],
     });
   });
 

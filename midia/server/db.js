@@ -588,6 +588,11 @@ CREATE TABLE IF NOT EXISTS usuarios (
   ativo INTEGER NOT NULL DEFAULT 1,
   ultimo_acesso TEXT,
   criado_em TEXT NOT NULL,
+  -- Segurança do acesso: trocar a senha aumenta a versão e derruba as sessões antigas;
+  -- senha errada várias vezes seguidas trava a conta por alguns minutos.
+  sessao_versao INTEGER NOT NULL DEFAULT 0,
+  falhas INTEGER NOT NULL DEFAULT 0,
+  bloqueado_ate TEXT,
   CHECK ((perfil = 'anunciante') = (anunciante_id IS NOT NULL)),
   CHECK ((perfil = 'lojista') = (local_id IS NOT NULL))
 );
@@ -736,6 +741,9 @@ function abrir(arquivo = config.dbFile) {
 
 /** Colunas que entraram depois da primeira versão (bancos antigos recebem cada uma por ALTER TABLE). */
 const COLUNAS_NOVAS = [
+  ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
+  ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],
+  ['usuarios', 'bloqueado_ate', 'TEXT'],
   ['usuarios', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
   ['locais', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
   ['anunciantes', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],

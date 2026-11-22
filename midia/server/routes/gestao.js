@@ -407,7 +407,7 @@ module.exports = (db) => {
     const d = {};
     if (req.body.nome !== undefined) d.nome = v.texto(req.body.nome, 'o nome', 120);
     if (req.body.email !== undefined) d.email = v.email(req.body.email);
-    if (req.body.senha !== undefined) d.senha_hash = hashSenha(v.senha(req.body.senha));
+    if (req.body.senha !== undefined) { d.senha_hash = hashSenha(v.senha(req.body.senha)); d.falhas = 0; d.bloqueado_ate = null; if (id !== req.usuario.id) d.sessao_versao = u.sessao_versao + 1; }
     if (req.body.ativo !== undefined) d.ativo = v.booleano(req.body.ativo) ? 1 : 0;
     if (req.body.perfil !== undefined && ['master', 'administrador', 'operador'].includes(u.perfil)) {
       d.perfil = v.opcao(req.body.perfil, 'o perfil', ['master', 'administrador', 'operador']);
@@ -486,6 +486,13 @@ module.exports = (db) => {
     }
     const pedido = atualizacao.pedir(req.body, req.usuario);
     registrar(db, req, 'atualizacao_pedida', { bytes: pedido.bytes });
+    // Todo master fica sabendo: se não foi alguém da casa, dá tempo de agir.
+    const masters = db.prepare("SELECT email FROM usuarios WHERE perfil = 'master' AND ativo = 1").all().map((m) => m.email);
+    require('../lib/email').enviar({
+      para: masters, assunto: 'O sistema está sendo atualizado', plataforma: lerConfig(db).nome_plataforma, titulo: 'Atualização do sistema pedida',
+      linhas: [`${req.usuario.nome} (${req.usuario.email}) enviou uma atualização do sistema pelo painel.`,
+        'Se não foi alguém da equipe, troque as senhas dos usuários master agora.'],
+    }).catch(() => {});
     res.status(202).json({ ok: true, pedido });
   });
 
