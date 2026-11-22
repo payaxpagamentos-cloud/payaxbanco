@@ -129,6 +129,7 @@
       content: 'Campanhas de marca, promoções e datas comemorativas.',
       fotos: [
         foto('outdoor.webp', 1400, 933, 'Painel digital da rede em uma avenida movimentada, aplicação ilustrativa.', 'Na avenida, no caminho de todo mundo.'),
+        foto('outdoor-noite.webp', 1400, 933, 'Painel digital da rede aceso no fim da tarde, em avenida de tráfego intenso, aplicação ilustrativa.', 'E aceso, quando a cidade volta para casa.'),
       ],
     },
     recepcoes: {
