@@ -74,6 +74,17 @@ rodar() {
       echo; echo "== Sistema atendendo só por dentro da máquina"
       if grep -q '^MIDIA_HOST=' "$ENV"; then echo "Já está: $(grep '^MIDIA_HOST=' "$ENV")"
       else echo "MIDIA_HOST=127.0.0.1" >> "$ENV"; echo "Acrescentado MIDIA_HOST=127.0.0.1"; systemctl restart vaimidia; sleep 3; systemctl is-active vaimidia; fi ;;
+    email-web)
+      # mail.DOMINIO no navegador: em vez de cair em outra página do servidor, abre a caixa de e-mail do sistema.
+      ARQ=/etc/nginx/sites-available/vaimidia-mail
+      IPV6=""; grep -q 'listen \[::\]:80' /etc/nginx/sites-available/vaimidia 2>/dev/null && IPV6="    listen [::]:80;"
+      printf 'server {\n    listen 80;\n%s\n    server_name mail.%s;\n    location / { return 302 https://%s/midia/#/emails; }\n}\n' "$IPV6" "$DOMINIO" "$DOMINIO" > "$ARQ"
+      ln -sf "$ARQ" /etc/nginx/sites-enabled/vaimidia-mail
+      if nginx -t 2>&1; then systemctl reload nginx; echo "Endereço mail.$DOMINIO ligado."
+      else rm -f /etc/nginx/sites-enabled/vaimidia-mail; echo "A configuração não passou no teste: desfiz e nada mudou."; return 1; fi
+      echo; echo "== Cadeado (HTTPS) para mail.$DOMINIO"
+      certbot --nginx -d "mail.$DOMINIO" --redirect --non-interactive --agree-tos --register-unsafely-without-email 2>&1 | tail -6 \
+        || echo "O cadeado não saiu agora; o endereço funciona sem ele e dá para tentar de novo depois." ;;
     reiniciar)
       systemctl restart vaimidia && sleep 3 && systemctl is-active vaimidia && echo "Sistema reiniciado." ;;
     email-nome)

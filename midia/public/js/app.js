@@ -337,7 +337,8 @@ function telaEntrada() {
       // Marcou "lembrar": a sessão sobrevive a fechar o navegador e o e-mail volta preenchido.
       sessao.set(r, { lembrar: d.lembrar });
       sessao.lembrarEmail(d.lembrar ? d.email : '');
-      location.hash = '';
+      // Quem chegou por um endereço que já aponta para uma tela (ex.: mail.dominio → E-mail) cai nela depois de entrar.
+      if (rota()[0] !== 'emails') location.hash = '';
       desenhar();
     });
   });

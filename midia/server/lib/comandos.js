@@ -19,6 +19,7 @@ const LISTA = [
   { id: 'reforcar', nome: 'Reforçar a segurança do servidor', descricao: 'Liga o bloqueio de quem erra a senha do acesso remoto 5 vezes, fecha a porta 8080 sem uso e deixa o sistema atendendo só por dentro da máquina.', muda: true },
   { id: 'erros', nome: 'Ver os últimos registros do sistema', descricao: 'As últimas 80 linhas do registro, para achar um erro. Não muda nada.' },
   { id: 'email-nome', nome: 'Ajustar o nome do servidor de e-mail', descricao: 'Acrescenta MIDIA_EMAIL_NOME na configuração, se faltar, e reinicia.', muda: true },
+  { id: 'email-web', nome: 'Abrir o e-mail em mail.(seu domínio)', descricao: 'Faz o endereço mail.vaimidia.com.br abrir a caixa de e-mail do sistema, com cadeado (HTTPS).', muda: true },
   { id: 'certificado', nome: 'Renovar o cadeado (HTTPS) com todos os endereços', descricao: 'Inclui www, midia e tv no certificado do site.', muda: true },
   { id: 'reiniciar', nome: 'Reiniciar o sistema', descricao: 'O painel e as TVs ficam alguns segundos sem resposta e voltam sozinhos.', muda: true },
 ];
