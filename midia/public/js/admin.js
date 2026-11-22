@@ -467,6 +467,7 @@ async function cartaoAtualizacao(ctx) {
     el('label', { class: 'campo' }, el('span', {}, 'Sua senha, para confirmar'), senha),
     el('div', {}, botao));
   let acompanhando = false;
+  const versao = el('p', { style: 'margin:0 0 8px;font-weight:700' });
 
   const pintar = async () => {
     const s = await api.get('/painel/sistema/atualizacao');
@@ -474,6 +475,7 @@ async function cartaoAtualizacao(ctx) {
     const emAndamento = s.esperando || (e && !FINAIS.includes(e.etapa)
       && Date.now() - Date.parse(e.atualizado_em) < 15 * 60_000);
     const linhas = [];
+    versao.textContent = s.versao ? `Versão instalada: ${s.versao}` : 'Versão instalada: sem número (anterior à numeração)';
     if (s.sem_resposta) {
       linhas.push(el('p', { class: 'aviso erro' }, 'O servidor ainda não pegou o pedido. O atualizador automático é instalado na '
         + 'primeira atualização feita pelos comandos (./atualizar.sh). Depois dela, este botão passa a funcionar.'));
@@ -533,6 +535,7 @@ async function cartaoAtualizacao(ctx) {
 
   limpar(corpo,
     el('h2', { style: 'margin:0 0 4px' }, 'Atualizar sistema'),
+    versao,
     el('p', { class: 'pequeno mudo', style: 'margin:0 0 12px' },
       'Envie o vaimidia.zip da versão nova, inclusive pelo celular. O servidor guarda uma cópia da versão atual antes de trocar '
       + 'e, se a nova não subir, volta para ela sozinho.'),

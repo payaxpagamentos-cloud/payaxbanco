@@ -16,6 +16,9 @@ CHAVE="${VAIMIDIA_CHAVE:-$RAIZ/midia-chaves/assinatura-privada.pem}"
 TEMP="$(mktemp -d)"; trap 'rm -rf "$TEMP"' EXIT
 git -C "$RAIZ" archive --prefix=vaimidia/ HEAD:midia | tar -x -C "$TEMP"
 cd "$TEMP/vaimidia"
+# Número da atualização: ano-mês-sequência (a sequência é a contagem de alterações gravadas, só cresce).
+VERSAO="$(date +%Y-%m)-$(git -C "$RAIZ" rev-list --count HEAD -- midia)"
+echo "$VERSAO" > VERSAO
 find . -type f ! -path './instalacao/MANIFESTO' ! -path './instalacao/MANIFESTO.sig' -printf '%P\n' | LC_ALL=C sort \
   | while IFS= read -r f; do printf '%s  %s\n' "$(sha256sum "$f" | cut -d' ' -f1)" "$f"; done > instalacao/MANIFESTO
 node -e "
@@ -24,4 +27,5 @@ fs.writeFileSync('instalacao/MANIFESTO.sig', c.sign(null, fs.readFileSync('insta
 " "$CHAVE"
 node instalacao/conferir-assinatura.js . instalacao/assinatura-publica.pem
 rm -f "$SAIDA"; cd "$TEMP" && zip -qr "$SAIDA" vaimidia
+echo "Versão $VERSAO"
 echo "Pacote assinado: $SAIDA ($(du -h "$SAIDA" | cut -f1))"

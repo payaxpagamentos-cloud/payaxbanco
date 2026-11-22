@@ -18,6 +18,11 @@ const MAX_BYTES = 80 * 1024 * 1024;
 // Sem resposta do serviço do servidor nesse tempo, o painel avisa que ele não está instalado ou parado.
 const SEM_RESPOSTA_MS = 2 * 60_000;
 
+/** Número da atualização instalada (o arquivo VERSAO vem dentro do pacote). */
+function versao() {
+  try { return fs.readFileSync(path.join(__dirname, '..', '..', 'VERSAO'), 'utf8').trim().slice(0, 40) || null; } catch { return null; }
+}
+
 const pasta = () => process.env.MIDIA_ATUALIZACAO || path.join(path.dirname(config.dbFile), 'atualizacao');
 const arquivo = (nome) => path.join(pasta(), nome);
 
@@ -33,7 +38,7 @@ function situacao() {
   try { log = fs.readFileSync(arquivo('ultima.log'), 'utf8').split('\n').slice(-40).join('\n'); } catch { /* ainda não houve */ }
   const esperando = Boolean(pedido);
   const semResposta = esperando && Date.now() - Date.parse(pedido.pedido_em) > SEM_RESPOSTA_MS;
-  return { estado, pedido, esperando, sem_resposta: semResposta, log };
+  return { versao: versao(), estado, pedido, esperando, sem_resposta: semResposta, log };
 }
 
 /** Guarda o pacote e deixa o pedido para o serviço do servidor. */
@@ -58,4 +63,4 @@ function pedir(corpo, usuario) {
   return pedido;
 }
 
-module.exports = { pasta, situacao, pedir, MAX_BYTES };
+module.exports = { versao, pasta, situacao, pedir, MAX_BYTES };
