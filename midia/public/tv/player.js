@@ -777,8 +777,9 @@ function pintarAvisos(texto) {
     if (avisos.length < 2 && conteudo <= largura) return;
     caixa.classList.add('trem');
     fila.style.setProperty('--entrada', `${largura}px`);
-    // Velocidade constante (um sétimo da largura da tela por segundo), qualquer que seja o tamanho do texto.
-    fila.style.animationDuration = `${Math.max(8, (largura + conteudo) / (window.innerWidth / 7))}s`;
+    // Velocidade constante (um décimo da largura da tela por segundo), qualquer que seja o tamanho do texto:
+    // devagar o bastante para ler com calma de longe.
+    fila.style.animationDuration = `${Math.max(10, (largura + conteudo) / (window.innerWidth / 10))}s`;
   });
 }
 
