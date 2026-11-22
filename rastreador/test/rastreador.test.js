@@ -1019,6 +1019,13 @@ test('Rastreador', async (t) => {
     assert.equal(detr.totais.aberto_centavos - antes.aberto_centavos, 180000 + 13016, 'IPVA e multa em aberto');
     assert.equal(detr.veiculos[0].total - antes.total_centavos, 180000 + 16000 + 13016);
     assert.equal((await api.get(`${G}/detran`, operador)).status, 200, 'o operador consulta');
+    // Filtro do mês: a multa de 15 de janeiro aparece em janeiro e não em fevereiro.
+    const jan = (await api.get(`${G}/detran?ano=${anoD}&mes=1&veiculo_id=${veiculo}`, cliente)).dados;
+    const fev = (await api.get(`${G}/detran?ano=${anoD}&mes=2&veiculo_id=${veiculo}`, cliente)).dados;
+    assert.equal(jan.mes, 1);
+    assert.ok(jan.lancamentos.some((l) => l.categoria === 'multa' && l.data === `${anoD}-01-15`));
+    assert.ok(!fev.lancamentos.some((l) => l.data === `${anoD}-01-15`));
+    assert.equal(fev.totais.ipva_centavos, 0, 'o IPVA vence em dezembro');
     // Usuário "Somente Gestão de Frota": entra no módulo e não enxerga nada do rastreamento.
     const uf = await api.post(`${base()}/usuarios`, { nome: 'Frota Só', email: 'frota@rota.com', senha: 'senha-da-frota', perfil: 'cliente', acesso: 'frota' }, cliente);
     assert.equal(uf.status, 201);

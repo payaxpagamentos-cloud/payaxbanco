@@ -715,10 +715,14 @@ function painel(db, empresaId) {
 // ---------- Detran: IPVA, licenciamento, seguro, multas e débitos de cada veículo ----------
 const CATEGORIA_DOC = { ipva: 'ipva', licenciamento: 'licenciamento', seguro: 'seguro' };
 const soLetras = (p) => String(p ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-function detran(db, empresaId, { ano, veiculoId } = {}) {
+function detran(db, empresaId, { ano, mes, veiculoId } = {}) {
   const dia = hoje();
   const a = Number.isInteger(Number(ano)) && Number(ano) >= 2000 && Number(ano) <= 2100 ? Number(ano) : Number(dia.slice(0, 4));
-  const de = `${a}-01-01`; const ate = `${a}-12-31`;
+  // Mês (1 a 12) opcional: sem ele, o ano inteiro.
+  const m = Number.isInteger(Number(mes)) && Number(mes) >= 1 && Number(mes) <= 12 ? Number(mes) : null;
+  const mm = m ? String(m).padStart(2, '0') : null;
+  const de = m ? `${a}-${mm}-01` : `${a}-01-01`;
+  const ate = m ? somarDias(m === 12 ? `${a + 1}-01-01` : `${a}-${String(m + 1).padStart(2, '0')}-01`, -1) : `${a}-12-31`;
   const [ini, fim] = intervalo(de, ate);
   const veiculos = db.prepare('SELECT id, placa, descricao FROM veiculos WHERE empresa_id = ? AND ativo = 1 ORDER BY placa').all(empresaId)
     .filter((x) => !veiculoId || x.id === Number(veiculoId));
@@ -766,7 +770,7 @@ function detran(db, empresaId, { ano, veiculoId } = {}) {
     }
   }
   return {
-    ano: a,
+    ano: a, mes: m,
     totais: {
       total_centavos: soma(() => true), pago_centavos: soma((l) => l.situacao === 'pago'), aberto_centavos: soma((l) => ['a_pagar', 'vencido'].includes(l.situacao)),
       vencido_centavos: soma((l) => l.situacao === 'vencido'), ipva_centavos: soma((l) => l.categoria === 'ipva'),

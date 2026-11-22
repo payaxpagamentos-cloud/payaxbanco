@@ -803,7 +803,11 @@ async function telaDetran(ctx) {
     const veiculos = await veiculosDa(ctx);
     const anoAtual = Number(hojeLocal().slice(0, 4));
     let ano = anoAtual;
+    let mes = '';
     let veiculoId = '';
+    const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const selMes = escolha(null, 'mes', { '': 'Ano inteiro', ...Object.fromEntries(MESES.map((n, i) => [i + 1, n])) }, '');
+    selMes.addEventListener('change', () => { mes = selMes.value; carregar(); });
     const selVeiculo = escolha(null, 'veiculo', { '': 'Todos os veículos', ...opcoesVeiculos(veiculos) }, '');
     const selAno = escolha(null, 'ano', Object.fromEntries([0, 1, 2, 3].map((i) => [anoAtual - i, String(anoAtual - i)])), ano);
     selVeiculo.addEventListener('change', () => { veiculoId = selVeiculo.value; carregar(); });
@@ -811,16 +815,17 @@ async function telaDetran(ctx) {
     const corpo = el('div', { class: 'coluna', style: 'gap:18px' });
     const soFrota = ctx.usuario?.acesso === 'frota' && !ctx.master;
     async function carregar() {
-      const r = await api.get(`${base(ctx)}/detran${qs({ ano, veiculo_id: veiculoId || undefined })}`);
+      const r = await api.get(`${base(ctx)}/detran${qs({ ano, mes: mes || undefined, veiculo_id: veiculoId || undefined })}`);
+      const periodo = r.mes ? `${MESES[r.mes - 1]} de ${r.ano}` : String(r.ano);
       const t = r.totais;
       limpar(corpo,
         el('div', { class: 'grade' },
-          indicador(`Total de ${r.ano}`, dinheiro(t.total_centavos), 'IPVA, licenciamento, seguro e multas', '', 'carteira'),
-          indicador('Pago', dinheiro(t.pago_centavos), 'quitado no ano', t.pago_centavos ? 'ok' : '', 'check'),
+          indicador(`Total · ${periodo}`, dinheiro(t.total_centavos), 'IPVA, licenciamento, seguro e multas', '', 'carteira'),
+          indicador('Pago', dinheiro(t.pago_centavos), r.mes ? 'quitado no mês' : 'quitado no ano', t.pago_centavos ? 'ok' : '', 'check'),
           indicador('Em aberto', dinheiro(t.aberto_centavos), t.vencido_centavos ? `${dinheiro(t.vencido_centavos)} já vencido` : 'nada vencido', t.vencido_centavos ? 'erro' : t.aberto_centavos ? 'aviso' : 'ok', 'alertas'),
-          indicador('IPVA', dinheiro(t.ipva_centavos), 'imposto do ano', '', 'relatorios'),
+          indicador('IPVA', dinheiro(t.ipva_centavos), r.mes ? 'vencendo no mês' : 'imposto do ano', '', 'relatorios'),
           indicador('Licenciamento e seguro', dinheiro(t.licenciamento_seguro_centavos), 'CRLV e seguro do veículo', '', 'veiculos'),
-          indicador('Multas', dinheiro(t.multas_centavos), `${inteiro(t.multas)} multa(s) no ano`, t.multas ? 'aviso' : '', 'multa')),
+          indicador('Multas', dinheiro(t.multas_centavos), `${inteiro(t.multas)} multa(s) ${r.mes ? 'no mês' : 'no ano'}`, t.multas ? 'aviso' : '', 'multa')),
         r.debitos.length ? cartao(`Débitos em aberto no Detran · ${dinheiro(t.debitos_centavos)}`, tabela(['Veículo', 'Débito', '>Valor', 'Consultado em'], r.debitos.map((x) => el('tr', {},
           td(el('strong', {}, placa(x.placa))), td(x.descricao), td(dinheiro(x.valor_centavos), 'dir num'), td(dataHora(x.consultado_em))))),
           el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' }, 'Resultado da última consulta de cada placa no Detran. Depois de pagar, lance em Documentos como pago e consulte de novo.')) : null,
@@ -828,14 +833,14 @@ async function telaDetran(ctx) {
           td([el('strong', {}, placa(x.placa)), x.descricao ? el('div', { class: 'pequeno mudo' }, x.descricao) : null]),
           ...['ipva', 'licenciamento', 'seguro', 'multa', 'outros'].map((k) => td(dinheiro(x[k]), 'dir num')),
           td(el('strong', {}, dinheiro(x.total)), 'dir num'), td(x.aberto ? el('span', { class: 'texto-erro' }, dinheiro(x.aberto)) : dinheiro(0), 'dir num'))), 'Nenhum veículo.')),
-        cartao(`Lançamentos de ${r.ano}`, tabela(['Data', 'Veículo', 'Tipo', 'Descrição', '>Valor', 'Situação'], r.lancamentos.map((x) => el('tr', {},
+        cartao(`Lançamentos · ${periodo}`, tabela(['Data', 'Veículo', 'Tipo', 'Descrição', '>Valor', 'Situação'], r.lancamentos.map((x) => el('tr', {},
           td(data(x.data), 'sem-quebra'), td(el('strong', {}, placa(x.placa))), td(CAT_DETRAN[x.categoria]), td(x.descricao),
           td(dinheiro(x.valor_centavos), 'dir num'), td(etiqueta(...SIT_DETRAN[x.situacao])))),
-          `Nada lançado em ${r.ano}. Cadastre IPVA, licenciamento e seguro em Documentos; as multas vêm da Central de multas.`)));
+          `Nada lançado em ${periodo}. Cadastre IPVA, licenciamento e seguro em Documentos; as multas vêm da Central de multas.`)));
     }
     limpar(ctx.conteudo,
       acoesTopo(el('div', { class: 'linha', style: 'gap:10px;flex-wrap:wrap' },
-        el('label', { class: 'campo', style: 'min-width:260px' }, 'Veículo', selVeiculo), el('label', { class: 'campo', style: 'min-width:120px' }, 'Ano', selAno)),
+        el('label', { class: 'campo', style: 'min-width:260px' }, 'Veículo', selVeiculo), el('label', { class: 'campo', style: 'min-width:150px' }, 'Mês', selMes), el('label', { class: 'campo', style: 'min-width:110px' }, 'Ano', selAno)),
       el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap' },
         soFrota ? null : el('button', { class: 'btn', onclick: () => ir(ctx, 'multas-consultar') }, icone('lupa'), 'Consultar débitos'),
         pode(ctx) ? el('button', { class: 'btn primario', onclick: () => ir(ctx, 'gestao-documentos') }, 'Lançar IPVA, licenciamento ou seguro') : null)),
