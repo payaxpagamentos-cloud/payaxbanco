@@ -108,8 +108,8 @@
       locations: 'Prédios residenciais e edifícios comerciais.',
       content: 'Campanhas, serviços locais e comunicação do condomínio.',
       fotos: [
-        foto('elevador-hall.webp', 1400, 933, 'Tela da rede no hall dos elevadores de um edifício, aplicação ilustrativa.', 'Espera de elevador é tempo de atenção.'),
-        foto('lobby.webp', 1400, 933, 'Totem da rede no lobby de um edifício corporativo, aplicação ilustrativa.', 'Do lobby ao andar, a marca acompanha.'),
+        foto('elevador-dentro.webp', 1400, 933, 'Passageiro olhando a tela da rede dentro do elevador, aplicação ilustrativa.', 'Dentro do elevador, a atenção é toda da tela.'),
+        foto('elevador-hall.webp', 1400, 933, 'Tela da rede no hall dos elevadores de um edifício, aplicação ilustrativa.', 'E na espera, antes de entrar.'),
       ],
     },
     tv: {
@@ -129,7 +129,7 @@
       content: 'Campanhas de marca, serviços e informações do espaço.',
       fotos: [
         foto('clinica.webp', 1400, 933, 'Tela da rede na recepção de uma clínica, aplicação ilustrativa.', 'Na sala de espera, com tempo para ler.'),
-        foto('restaurante.webp', 1400, 933, 'Totem da rede na recepção de um restaurante, aplicação ilustrativa.', 'Na entrada, antes de sentar à mesa.'),
+        foto('lobby.webp', 1400, 933, 'Totem da rede no lobby de um edifício corporativo, aplicação ilustrativa.', 'No lobby, quem entra já vê.'),
       ],
     },
   };
