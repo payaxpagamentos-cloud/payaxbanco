@@ -82,29 +82,30 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
 
 /* Tela de espera: pareamento, sem programação ou erro. */
 .espera{ position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 1.2vh; text-align: center;
-  background: radial-gradient(1100px 620px at 50% 8%, #24351F 0%, #1D2B33 45%, #101920 100%); padding: 6vh; z-index: 5; }
+  background: radial-gradient(1100px 620px at 50% 8%, #24351F 0%, #1D2B33 45%, #101920 100%); padding: 6vh min(6vh, 5vw); z-index: 5; }
+.espera > *{ max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
 .espera .slogan{ font-size: 2.6vh; color: var(--lime); font-weight: 600; margin: -.6vh 0 2.4vh; }
-.espera h1{ font-size: 5vh; font-weight: 800; margin: 0; letter-spacing: -.045em; }
-.espera .mudo{ color: #A8AFB9; font-size: 2.6vh; margin: 0; max-width: 60ch; }
-.espera .ajuda{ color: #868D98; font-size: 2.1vh; margin-top: 1vh; }
+.espera h1{ font-size: min(5vh, 8vw); font-weight: 800; margin: 0; letter-spacing: -.045em; }
+.espera .mudo{ color: #A8AFB9; font-size: min(2.6vh, 4.4vw); margin: 0; max-width: 60ch; }
+.espera .ajuda{ color: #868D98; font-size: min(2.1vh, 3.8vw); margin-top: 1vh; }
 .espera .ajuda strong{ color: var(--lime); }
 .marca-tv{ display: flex; align-items: center; gap: 1.6vh; font-size: 4vh; font-weight: 800; letter-spacing: -.05em; text-transform: uppercase; color: #fff; }
 .marca-tv .simbolo{ height: 5.2vh; width: auto; color: var(--lime); }
-.codigo{ font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13vh; font-weight: 800; letter-spacing: 1.2vh; line-height: 1.1; color: var(--lime);
-  background: rgba(200,255,49,.08); border: 2px solid rgba(200,255,49,.45); border-radius: 2.4vh; padding: 2vh 4vh 2vh 5.2vh; margin: 2vh 0; }
+.codigo{ font-family: ui-monospace, Menlo, Consolas, monospace; font-size: min(13vh, 11vw); font-weight: 800; letter-spacing: min(1.2vh, 1vw); line-height: 1.1; color: var(--lime);
+  background: rgba(200,255,49,.08); border: 2px solid rgba(200,255,49,.45); border-radius: 2.4vh; padding: 2vh min(4vh, 4vw) 2vh min(5.2vh, 5vw); margin: 2vh 0; white-space: nowrap; }
 
 .aviso-conexao{ position: fixed; top: 2.4vh; left: 2.4vh; z-index: 6; background: rgba(180, 83, 9, .92); color: #fff; font-size: 2vh; font-weight: 700;
   padding: .9vh 1.8vh; border-radius: 999px; }
 
 /* Botão "Clique aqui para maximizar": grande no alto da tela (sem cobrir o código de pareamento); depois de um tempo vai para o canto, menor. */
 .botao-tela-cheia{ position: fixed; left: 50%; top: 6vh; transform: translateX(-50%); z-index: 9; display: flex; align-items: center; gap: 1.6vh;
-  background: #C8FF31; color: #18232A; border: 0; border-radius: 999px; padding: 2.4vh 4.4vh; font: inherit; font-size: 3.6vh; font-weight: 800;
+  background: #C8FF31; color: #18232A; border: 0; border-radius: 999px; padding: 2.4vh min(4.4vh, 5vw); font: inherit; font-size: min(3.6vh, 4.2vw); font-weight: 800; max-width: 94vw; white-space: nowrap;
   cursor: pointer; box-shadow: 0 1vh 5vh rgba(0,0,0,.5); }
 .botao-tela-cheia svg{ width: 4.4vh; height: 4.4vh; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .botao-tela-cheia:focus{ outline: .6vh solid #fff; outline-offset: .6vh; }
 .botao-tela-cheia.canto{ left: auto; top: auto; right: 2.4vh; bottom: 10vh; transform: none; font-size: 2vh; padding: 1.2vh 2.2vh; opacity: .85; }
 .botao-tela-cheia.canto svg{ width: 2.6vh; height: 2.6vh; }
-.botao-tela-cheia.aviso{ background: rgba(24, 35, 42, .96); color: #fff; max-width: 86vw; font-size: 2.4vh; text-align: left; border-radius: 2vh; }
+.botao-tela-cheia.aviso{ white-space: normal; background: rgba(24, 35, 42, .96); color: #fff; max-width: 86vw; font-size: 2.4vh; text-align: left; border-radius: 2vh; }
 
 .info{ position: fixed; top: 2.4vh; right: 2.4vh; z-index: 7; background: rgba(24, 35, 42, .88); border: 1px solid rgba(255,255,255,.16); border-radius: 1.4vh;
   padding: 2vh 2.4vh; font-size: 1.9vh; line-height: 1.7; max-width: 46vw; font-variant-numeric: tabular-nums; }

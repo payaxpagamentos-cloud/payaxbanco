@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '2.1';
+const VERSAO = '2.2';
 // Carimbo com que esta página foi carregada (vem no endereço do script; ver server/lib/carimbo-player.js).
 const CARIMBO = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch { return ''; } })();
 const API = new URL('../api/', location.href).href;
@@ -52,8 +52,22 @@ const estado = {
 const MINIMO_NA_ZONA_S = 15;
 
 // ---------------------------------------------------------------- Conversa com o servidor
+/**
+ * fetch com tempo limite. Internet de comércio trava sem cair: sem limite, um pedido ficava pendurado
+ * por minutos e a TV parava na tela de espera. Com limite, ela desiste e segue com o que tem guardado.
+ */
+async function buscar(url, opcoes = {}, limiteMs = 20_000) {
+  if (typeof AbortController !== 'function') return fetch(url, opcoes);
+  const corte = new AbortController();
+  const relogioDoCorte = setTimeout(() => corte.abort(), limiteMs);
+  try { return await fetch(url, { ...opcoes, signal: corte.signal }); } finally { clearTimeout(relogioDoCorte); }
+}
+// Arquivo de anúncio (vídeo) pode ser grande: ganha mais tempo que uma consulta comum.
+const LIMITE_ARQUIVO_MS = 180_000;
+const cabecalhoToken = () => ({ Authorization: `Bearer ${estado.token}` });
+
 async function chamar(caminho, { metodo = 'GET', corpo, comToken = true } = {}) {
-  const resp = await fetch(API + caminho, {
+  const resp = await buscar(API + caminho, {
     method: metodo,
     headers: { ...(corpo ? { 'Content-Type': 'application/json' } : {}), ...(comToken && estado.token ? { Authorization: `Bearer ${estado.token}` } : {}) },
     body: corpo ? JSON.stringify(corpo) : undefined,
@@ -66,7 +80,10 @@ async function chamar(caminho, { metodo = 'GET', corpo, comToken = true } = {}) 
     estado.programacao = null;
     throw new Error('despareado');
   }
+  // Tela desativada (ou ponto encerrado) no painel: para de exibir até ser reativada.
+  if (resp.status === 403 && comToken) { estado.desativada = true; throw new Error('desativada'); }
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  if (comToken) estado.desativada = false;
   acertarRelogio(resp);
   return resp.status === 204 ? null : resp.json();
 }
@@ -96,7 +113,8 @@ async function parear() {
   let guardado = lido(CHAVES.codigo);
   while (!estado.token) {
     try {
-      if (!guardado || Date.parse(guardado.expira_em) < Date.now()) {
+      // Pela hora do servidor: com o relógio do aparelho errado, o código "vencia" na hora e trocava sem parar.
+      if (!guardado || Date.parse(guardado.expira_em) < agoraCerto()) {
         const r = await chamar('player/registrar', {
           metodo: 'POST',
           comToken: false,
@@ -154,7 +172,7 @@ async function guardarArquivos(itens) {
     vistos[url] = agora;
     if (await cache.match(url)) continue;
     try {
-      const resp = await fetch(url, { headers: { Authorization: `Bearer ${estado.token}` } });
+      const resp = await buscar(url, { headers: cabecalhoToken() }, LIMITE_ARQUIVO_MS);
       if (resp.ok) await cache.put(url, resp);
     } catch { /* tenta no próximo ciclo */ }
   }
@@ -179,7 +197,7 @@ async function origemDoItem(item) {
     } catch { /* cache indisponível */ }
   }
   // Sem cache: busca com o token e transforma em blob (a tag <img>/<video> não manda cabeçalho).
-  const resp = await fetch(url, { headers: { Authorization: `Bearer ${estado.token}` } });
+  const resp = await buscar(url, { headers: cabecalhoToken() }, LIMITE_ARQUIVO_MS);
   if (!resp.ok) throw new Error(`arquivo ${item.midia_id}: HTTP ${resp.status}`);
   return { src: URL.createObjectURL(await resp.blob()), temporario: true };
 }
@@ -233,7 +251,7 @@ async function bater(erro) {
     if (r.recarregar) estado.trocarPendente = true;
     if (r.comandos?.length) await obedecer(r.comandos);
   } catch (err) {
-    if (err.message !== 'despareado') marcarConexao(false);
+    if (err.message !== 'despareado' && err.message !== 'desativada') marcarConexao(false);
   }
 }
 
@@ -352,6 +370,35 @@ function assinaturaDoPonto() {
   return assinatura;
 }
 
+/**
+ * Imagem pequena do ponto (logo, foto do comunicado): tenta a internet e guarda no cache da TV; sem
+ * internet, usa a guardada. Assim o comunicado sai com a foto mesmo se a TV for ligada fora do ar.
+ */
+async function imagemDoPonto(url) {
+  const cache = 'caches' in window ? await caches.open(CACHE).catch(() => null) : null;
+  try {
+    const resp = await buscar(url, { headers: cabecalhoToken() }, 30_000);
+    if (resp.ok) {
+      if (cache) await cache.put(url, resp.clone()).catch(() => {});
+      marcarVisto(url);
+      return URL.createObjectURL(await resp.blob());
+    }
+    // O servidor respondeu que não existe mais: não adianta mostrar a guardada.
+    if (cache) await cache.delete(url).catch(() => {});
+    return null;
+  } catch {
+    const achado = cache ? await cache.match(url).catch(() => null) : null;
+    if (achado) marcarVisto(url);
+    return achado ? URL.createObjectURL(await achado.blob()) : null;
+  }
+}
+// A limpeza do cache apaga o que não é "visto" há dias: estas imagens também contam como vistas.
+function marcarVisto(url) {
+  const vistos = lido(CHAVES.vistos) ?? {};
+  vistos[url] = Date.now();
+  guardar(CHAVES.vistos, vistos);
+}
+
 /** Baixa a logo da administradora uma vez e guarda como blob (a tag <img> não manda cabeçalho). */
 /** Fotos dos comunicados (as que o ponto anexou): baixadas uma vez e guardadas enquanto a TV estiver ligada. */
 async function carregarFotosComunicados() {
@@ -359,10 +406,9 @@ async function carregarFotosComunicados() {
   const g = estado.programacao?.grade;
   const ids = new Set([...(g?.itens ?? []), ...(g?.comunicados ?? [])].filter((c) => c.imagem && c.comunicado_id).map((c) => c.comunicado_id));
   await Promise.all([...ids].filter((id) => !estado.fotosComunicado[id]).map(async (id) => {
-    try {
-      const resp = await fetch(`${API}player/comunicados/${id}/imagem`, { headers: { Authorization: `Bearer ${estado.token}` } });
-      if (resp.ok) estado.fotosComunicado[id] = URL.createObjectURL(await resp.blob());
-    } catch { /* sem a foto, entra a ilustração do tipo */ }
+    // Sem a foto, entra a ilustração do tipo.
+    const foto = await imagemDoPonto(`${API}player/comunicados/${id}/imagem`).catch(() => null);
+    if (foto) estado.fotosComunicado[id] = foto;
   }));
 }
 
@@ -401,10 +447,8 @@ function visualDoComunicado(item) {
 
 async function carregarLogo() {
   if (!estado.programacao?.grade?.ponto?.logo || estado.logoUrl) return;
-  try {
-    const resp = await fetch(`${API}player/logo`, { headers: { Authorization: `Bearer ${estado.token}` } });
-    if (resp.ok) estado.logoUrl = URL.createObjectURL(await resp.blob());
-  } catch { /* sem logo, o comunicado sai só com o nome */ }
+  // Sem logo, o comunicado sai só com o nome.
+  estado.logoUrl = await imagemDoPonto(`${API}player/logo`).catch(() => null);
 }
 
 /**
@@ -598,7 +642,7 @@ async function prepararItem(item) {
         elemento.addEventListener('error', () => falhou(new Error(`imagem ${item.midia_id} não abriu`)), { once: true });
       }
     }),
-    dormir(15000),
+    dormir(20_000).then(() => { throw new Error(`${item.tipo === 'video' ? 'vídeo' : 'imagem'} ${item.midia_id} demorou demais para abrir`); }),
   ]);
   return elemento;
 }
@@ -609,7 +653,14 @@ async function exibir(item) {
   trocarCamada();
   const inicio = Date.now();
   if (item.formato === 'midia' && item.tipo === 'video') {
-    try { await elemento.play(); } catch { /* alguns aparelhos só tocam sem som */ }
+    try {
+      await elemento.play();
+    } catch {
+      // Navegador de TV costuma barrar vídeo COM som sem alguém ter tocado na tela: toca sem som.
+      elemento.muted = true;
+      elemento.setAttribute('muted', '');
+      try { await elemento.play(); } catch { throw new Error(`vídeo ${item.midia_id} não tocou`); }
+    }
     await Promise.race([
       new Promise((fim) => elemento.addEventListener('ended', fim, { once: true })),
       dormir((item.duracao_s + 5) * 1000),
@@ -644,11 +695,11 @@ async function enviarFoto(elemento, item) {
     tela.getContext('2d').drawImage(elemento, 0, 0, tela.width, tela.height);
     const foto = await new Promise((pronto) => tela.toBlob(pronto, 'image/jpeg', 0.6));
     if (!foto) return;
-    await fetch(`${API}player/foto?item=${encodeURIComponent(item.nome ?? item.midia_id ?? '')}`, {
+    await buscar(`${API}player/foto?item=${encodeURIComponent(item.nome ?? item.midia_id ?? '')}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${estado.token}`, 'Content-Type': 'image/jpeg' },
+      headers: { ...cabecalhoToken(), 'Content-Type': 'image/jpeg' },
       body: foto,
-    });
+    }, 30_000);
   } catch { /* a foto é um extra: nunca pode atrapalhar a exibição */ }
 }
 
@@ -712,12 +763,18 @@ async function rodar() {
       await parear();
       continue;
     }
+    if (estado.desativada) {
+      mostrarEspera('Tela desativada', 'Esta TV foi desativada no painel. Ela volta a exibir sozinha quando for reativada.');
+      await dormir(60_000);
+      try { await baixarProgramacao(); } catch { /* continua desativada ou sem internet */ }
+      continue;
+    }
     if (!estado.programacao) {
       try {
         await baixarProgramacao();
         bater(); // avisa o painel na hora que esta TV entrou no ar
       } catch (err) {
-        if (err.message === 'despareado') continue;
+        if (err.message === 'despareado' || err.message === 'desativada') continue;
         marcarConexao(false);
         mostrarEspera('Sem conexão', 'A tela volta a exibir assim que a internet voltar.');
         await dormir(10_000);
@@ -894,7 +951,8 @@ async function iniciar() {
     rodarZonaComunicados();
     baixarProgramacao().catch(() => marcarConexao(false));
   }
-  await enviarExibicoes();
+  // Não espera a internet para começar: sem rede, a TV abre direto no que está guardado.
+  enviarExibicoes();
   rodar();
 }
 
