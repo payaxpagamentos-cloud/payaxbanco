@@ -139,13 +139,27 @@ export async function acao(botao, fn) {
 }
 
 /** Janela modal; resolve com o valor passado a fechar() ou null ao cancelar. */
+// O Voltar do navegador (a seta do Safari, o gesto de arrastar da borda, o botão do Android) fecha a
+// janela aberta em vez de sair da tela: cada janela entra no histórico quando abre.
+window.addEventListener('popstate', () => {
+  const abertas = document.querySelectorAll('.modal-fundo');
+  abertas[abertas.length - 1]?.fecharModal?.();
+});
+
 export function modal(titulo, conteudo, { largo = false } = {}) {
   return new Promise((resolve) => {
     const fundo = el('div', { class: 'modal-fundo' });
-    const fechar = (v = null) => { fundo.remove(); document.removeEventListener('keydown', esc); resolve(v); };
+    const fechar = (v = null) => {
+      if (!fundo.isConnected) return;
+      fundo.remove(); document.removeEventListener('keydown', esc); resolve(v);
+    };
+    fundo.fecharModal = fechar;
+    try { history.pushState({ janela: true }, ''); } catch { /* sem histórico: o X e o toque fora continuam fechando */ }
     const esc = (e) => { if (e.key === 'Escape') fechar(); };
     document.addEventListener('keydown', esc);
+    // Tocar fora da janela fecha (no iPhone o toque chega como click; no computador, mousedown).
     fundo.addEventListener('mousedown', (e) => { if (e.target === fundo) fechar(); });
+    fundo.addEventListener('click', (e) => { if (e.target === fundo) fechar(); });
     // Título com o X de fechar: no celular a janela ocupa quase a tela toda e precisa de uma saída à vista.
     const caixa = el('div', { class: `modal${largo ? ' largo' : ''}`, role: 'dialog', 'aria-label': titulo },
       el('div', { class: 'modal-topo' }, el('h2', {}, titulo),
