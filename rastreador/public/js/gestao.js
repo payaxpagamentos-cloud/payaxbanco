@@ -299,10 +299,10 @@ async function telaPreventiva(ctx) {
     sel.addEventListener('change', () => { veiculoId = sel.value; sessionStorage.setItem('gestao.veiculo', veiculoId); carregar(); });
     const tipos = Object.fromEntries(Object.entries(c.componentes).map(([k, x]) => [k, `${x.grupo} · ${x.nome}`]));
     const form = (comp, pre = {}) => formModal(comp ? `Editar ${comp.nome}` : 'Novo componente', (f) => {
-      const t0 = pre.tipo ?? 'oleo_motor';
+      const t0 = comp?.tipo ?? pre.tipo ?? 'oleo_motor';
       const tipo = escolha('Componente', 'tipo', tipos, comp?.tipo ?? t0);
-      const vidaKm = campo('Vida útil (km)', { name: 'vida_km', type: 'number', min: 1, value: comp?.vida_km ?? c.componentes[t0].km ?? '' });
-      const vidaDias = campo('Ou tempo (dias)', { name: 'vida_dias', type: 'number', min: 1, value: comp?.vida_dias ?? c.componentes[t0].dias ?? '' });
+      const vidaKm = campo('Vida útil (km)', { name: 'vida_km', type: 'number', min: 1, value: comp ? comp.vida_km ?? '' : c.componentes[t0].km ?? '' });
+      const vidaDias = campo('Ou tempo (dias)', { name: 'vida_dias', type: 'number', min: 1, value: comp ? comp.vida_dias ?? '' : c.componentes[t0].dias ?? '' });
       // Ao escolher o componente, sugere a vida útil de referência.
       if (!comp) tipo.querySelector('select').addEventListener('change', (e) => { const x = c.componentes[e.target.value]; f.vida_km.value = x.km ?? ''; f.vida_dias.value = x.dias ?? ''; });
       return [
@@ -614,10 +614,10 @@ async function telaPneus(ctx) {
     { rotulo: 'Cadastrar' }).then((r) => { if (r) { toast('Pneu cadastrado.'); carregar(); } });
     const montarEm = async (pos) => {
       const livres = await api.get(`${base(ctx)}/pneus?status=estoque`);
-      if (!livres.length) return novo(pos);
+      if (!livres.length) return novo({ posicao: pos.codigo, nome: pos.nome });
       const r = await formModal(`Montar em ${pos.nome}`, () => [
         escolha('Pneu do estoque', 'pneu_id', Object.fromEntries(livres.map((p) => [p.id, `${p.numero_fogo} · ${[p.marca, p.medida].filter(Boolean).join(' ')} · ${mm(p.sulco_mm)} · ${kmTxt(p.km_pneu)}`])), livres[0].id),
-        el('button', { type: 'button', class: 'btn pequeno', onclick: (e) => { e.target.closest('.modal-fundo').fechar(); novo(pos); } }, 'Cadastrar um pneu novo'),
+        el('button', { type: 'button', class: 'btn pequeno', onclick: (e) => { e.target.closest('.modal-fundo').fechar(); novo({ posicao: pos.codigo, nome: pos.nome }); } }, 'Cadastrar um pneu novo'),
       ], (d) => P(`/pneus/${d.pneu_id}/montar`, { veiculo_id: veiculoId, posicao: pos.codigo }), { rotulo: 'Montar' });
       if (r) { toast('Pneu montado.'); carregar(); }
     };

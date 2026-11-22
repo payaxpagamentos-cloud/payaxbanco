@@ -14,7 +14,7 @@
 const { transacao, agora } = require('../db');
 const v = require('./validacao');
 const { ErroNegocio } = require('./erros');
-const { hoje, somarDias, intervalo } = require('./datas');
+const { hoje, somarDias, intervalo, inicioDia } = require('./datas');
 
 const TIPOS_FORNECEDOR = {
   oficina: 'Oficina mecânica', autopecas: 'Autopeças', borracharia: 'Borracharia', concessionaria: 'Concessionária',
@@ -177,8 +177,19 @@ function editarComponente(db, empresaId, id, d) {
   const x = dadosComponente(d, c);
   const instaladoKm = d.instalado_km !== undefined && d.instalado_km !== '' ? v.inteiro(d.instalado_km, 'o km da instalação', { max: 10_000_000 }) : c.instalado_km;
   const instaladoEm = d.instalado_em ? v.data(String(d.instalado_em).slice(0, 10), 'a data da instalação') : c.instalado_em;
-  db.prepare(`UPDATE frota_componentes SET tipo = ?, nome = ?, posicao = ?, marca = ?, vida_km = ?, vida_dias = ?, instalado_km = ?, instalado_em = ?, custo_centavos = ?, aviso_enviado = 0
-    WHERE id = ?`).run(x.tipo, x.nome, x.posicao, x.marca, x.vida_km, x.vida_dias, instaladoKm, instaladoEm, x.custo_centavos, c.id);
+  // O aviso de "perto do fim" só volta a valer se mudou a vida útil ou a instalação (trocar a marca não reenvia o WhatsApp).
+  const mudouVida = x.vida_km !== c.vida_km || x.vida_dias !== c.vida_dias || instaladoKm !== c.instalado_km || instaladoEm !== c.instalado_em || x.tipo !== c.tipo;
+  db.prepare(`UPDATE frota_componentes SET tipo = ?, nome = ?, posicao = ?, marca = ?, vida_km = ?, vida_dias = ?, instalado_km = ?, instalado_em = ?, custo_centavos = ?,
+    aviso_enviado = CASE WHEN ? THEN 0 ELSE aviso_enviado END WHERE id = ?`).run(x.tipo, x.nome, x.posicao, x.marca, x.vida_km, x.vida_dias, instaladoKm, instaladoEm, x.custo_centavos, mudouVida ? 1 : 0, c.id);
+}
+
+/** Tira o componente do plano: só o ativo e fora de OS aberta (o histórico de trocas não se apaga). */
+function excluirComponente(db, empresaId, id) {
+  const c = componenteDa(db, empresaId, id);
+  v.exigir(c.status === 'ativo', 'Troca já registrada: o histórico não se apaga.');
+  v.exigir(!db.prepare(`SELECT 1 FROM frota_os_itens i JOIN frota_os o ON o.id = i.os_id WHERE i.componente_id = ? AND o.status IN ('aberta','em_execucao')`).get(c.id),
+    'Este componente está numa OS aberta. Tire da OS ou cancele a OS antes.');
+  db.prepare('DELETE FROM frota_componentes WHERE id = ?').run(c.id);
 }
 
 /** Plano preventivo padrão no veículo: cria os componentes do tipo dele que ainda não existem (instalados no km de hoje). */
@@ -200,9 +211,19 @@ function aplicarPlano(db, empresaId, veiculoId) {
 
 /** Troca o componente: o atual vira histórico e nasce um novo, igual, instalado agora (km e data da troca). */
 function trocarComponente(db, c, { km, data, custo = 0, osId = null, marca }) {
-  db.prepare("UPDATE frota_componentes SET status = 'trocado', trocado_em = ?, trocado_km = ?, os_id = COALESCE(?, os_id) WHERE id = ?").run(data, km, osId, c.id);
-  return Number(db.prepare(`INSERT INTO frota_componentes (empresa_id, veiculo_id, tipo, nome, posicao, marca, vida_km, vida_dias, instalado_km, instalado_em, custo_centavos, os_id, criado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(c.empresa_id, c.veiculo_id, c.tipo, c.nome, c.posicao, marca ?? c.marca, c.vida_km, c.vida_dias, km, data, custo, osId, agora()).lastInsertRowid);
+  return transacao(db, () => {
+    db.prepare("UPDATE frota_componentes SET status = 'trocado', trocado_em = ?, trocado_km = ?, os_id = COALESCE(?, os_id) WHERE id = ?").run(data, km, osId, c.id);
+    return Number(db.prepare(`INSERT INTO frota_componentes (empresa_id, veiculo_id, tipo, nome, posicao, marca, vida_km, vida_dias, instalado_km, instalado_em, custo_centavos, os_id, criado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(c.empresa_id, c.veiculo_id, c.tipo, c.nome, c.posicao, marca ?? c.marca, c.vida_km, c.vida_dias, km, data, custo, osId, agora()).lastInsertRowid);
+  });
+}
+
+/** Troca registrada direto, sem OS (ex.: o próprio motorista trocou a palheta). Km vazio = km de hoje do rastreador. */
+function registrarTroca(db, empresaId, id, d) {
+  const c = componenteDa(db, empresaId, id);
+  v.exigir(c.status === 'ativo', 'Este componente já foi trocado.');
+  const km = d.km !== undefined && d.km !== '' && d.km !== null ? v.inteiro(d.km, 'o km da troca', { max: 10_000_000 }) : kmDe(veiculoDa(db, empresaId, c.veiculo_id));
+  return trocarComponente(db, c, { km, data: dataOuHoje(d.data, 'a data da troca'), custo: centavos(d.custo_centavos, 'o custo'), marca: v.opcional(d.marca, 'a marca', 60) ?? undefined });
 }
 
 function historicoComponentes(db, empresaId, veiculoId) {
@@ -236,11 +257,12 @@ function criarOS(db, empresaId, d, usuarioId) {
   const fornecedor = d.fornecedor_id ? fornecedorDa(db, empresaId, d.fornecedor_id).id : null;
   const kmAbertura = d.km_abertura !== undefined && d.km_abertura !== '' && d.km_abertura !== null ? v.inteiro(d.km_abertura, 'o km', { max: 10_000_000 }) : kmDe(veiculo);
   const previsao = d.previsao ? v.data(String(d.previsao).slice(0, 10), 'a previsão') : null;
-  const componentes = Array.isArray(d.componentes) ? d.componentes.map((id) => componenteDa(db, empresaId, id)) : [];
+  const componentes = Array.isArray(d.componentes) ? [...new Set(d.componentes.map(Number))].map((id) => componenteDa(db, empresaId, id)) : [];
   for (const c of componentes) v.exigir(c.veiculo_id === veiculo.id && c.status === 'ativo', 'Componente de outro veículo ou já trocado.');
   if (origem === 'avaria' && d.origem_id) {
-    const a = db.prepare('SELECT id FROM avarias WHERE id = ? AND empresa_id = ?').get(Number(d.origem_id), empresaId);
+    const a = db.prepare('SELECT id, veiculo_id FROM avarias WHERE id = ? AND empresa_id = ?').get(Number(d.origem_id), empresaId);
     v.exigir(a, 'Avaria não encontrada.');
+    v.exigir(a.veiculo_id === veiculo.id, 'A avaria é de outro veículo.');
     v.exigir(!db.prepare("SELECT 1 FROM frota_os WHERE origem = 'avaria' AND origem_id = ? AND status <> 'cancelada'").get(a.id), 'Já existe uma OS para esta avaria.');
   }
   return transacao(db, () => {
@@ -337,7 +359,7 @@ function concluirOS(db, empresaId, id, d, usuarioId) {
       trocados++;
     }
     db.prepare("UPDATE frota_os SET status = 'concluida', km_conclusao = ?, concluida_em = ?, parado = 0, observacao = COALESCE(?, observacao) WHERE id = ?")
-      .run(km, `${data}T${agora().slice(11)}`, v.opcional(d.observacao, 'a observação', 500), os.id);
+      .run(km, data === hoje() ? agora() : new Date(Date.parse(inicioDia(data)) + 12 * 3_600_000).toISOString(), v.opcional(d.observacao, 'a observação', 500), os.id);
     if (os.origem === 'avaria' && os.origem_id) {
       db.prepare("UPDATE avarias SET status = 'resolvida', resolvida_em = ?, resolvida_por = ? WHERE id = ? AND empresa_id = ?").run(agora(), usuarioId ?? null, os.origem_id, empresaId);
     }
@@ -400,6 +422,7 @@ function listarPneus(db, empresaId, { status, veiculoId } = {}) {
   if (status) { onde.push('p.status = ?'); par.push(status); } else onde.push("p.status <> 'descartado'");
   if (veiculoId) { onde.push('p.veiculo_id = ?'); par.push(Number(veiculoId)); }
   const custos = db.prepare("SELECT COALESCE(SUM(custo_centavos), 0) AS c FROM frota_pneu_eventos WHERE pneu_id = ? AND tipo IN ('recapagem','conserto')");
+  const kmRecapagem = db.prepare("SELECT km_pneu FROM frota_pneu_eventos WHERE pneu_id = ? AND tipo = 'recapagem' ORDER BY id DESC LIMIT 1");
   return db.prepare(`SELECT p.*, v.placa, v.hodometro_m FROM frota_pneus p LEFT JOIN veiculos v ON v.id = p.veiculo_id WHERE ${onde.join(' AND ')} ORDER BY v.placa, p.posicao, p.numero_fogo`)
     .all(...par).map((p) => {
       const kmPneu = kmDoPneu(p, Math.round((p.hodometro_m ?? 0) / 1000));
@@ -407,7 +430,9 @@ function listarPneus(db, empresaId, { status, veiculoId } = {}) {
       const { hodometro_m: _h, ...resto } = p;
       // Desgaste por km: quanto de borracha foi usado e quantos km faltam até o limite, na mesma proporção.
       const gasto = p.sulco_novo_mm && p.sulco_mm !== null ? p.sulco_novo_mm - p.sulco_mm : null;
-      const kmRestante = gasto > 0.3 && kmPneu > 500 ? Math.max(0, Math.round(((p.sulco_mm - SULCO_LIMITE_MM) / gasto) * kmPneu)) : null;
+      // Depois de recapado, a borracha é nova: conta só os km desde a última recapagem.
+      const kmVida = kmPneu - (p.vida > 0 ? kmRecapagem.get(p.id)?.km_pneu ?? 0 : 0);
+      const kmRestante = gasto > 0.3 && kmVida > 500 ? Math.max(0, Math.round(((p.sulco_mm - SULCO_LIMITE_MM) / gasto) * kmVida)) : null;
       return { ...resto, km_pneu: kmPneu, custo_total_centavos: custoTotal, custo_km_centavos: kmPneu > 0 ? Math.round((custoTotal / kmPneu) * 100) / 100 : null,
         km_restante: kmRestante, estado: estadoPneu(p) };
     });
@@ -511,8 +536,10 @@ function voltarRecapagem(db, empresaId, id, d, usuarioId) {
 function enviarRecapagem(db, empresaId, id, usuarioId) {
   const p = pneuDa(db, empresaId, id);
   v.exigir(p.status === 'estoque', 'Só um pneu do estoque vai para a recapagem (desmonte antes).');
-  db.prepare("UPDATE frota_pneus SET status = 'recapagem' WHERE id = ?").run(p.id);
-  evento(db, p, 'desmontagem', { km_pneu: p.km_rodado, observacao: 'Enviado para a recapagem', usuario_id: usuarioId });
+  transacao(db, () => {
+    db.prepare("UPDATE frota_pneus SET status = 'recapagem' WHERE id = ?").run(p.id);
+    evento(db, p, 'desmontagem', { km_pneu: p.km_rodado, observacao: 'Enviado para a recapagem', usuario_id: usuarioId });
+  });
 }
 
 function consertoPneu(db, empresaId, id, d, usuarioId) {
@@ -628,8 +655,9 @@ function custos(db, empresaId, de, ate) {
     km: db.prepare('SELECT COALESCE(SUM(distancia_m), 0) AS m FROM uso_diario WHERE veiculo_id = ? AND data BETWEEN ? AND ?'),
     combustivel: db.prepare('SELECT COALESCE(SUM(valor_centavos), 0) AS c FROM abastecimentos WHERE veiculo_id = ? AND criado_em >= ? AND criado_em < ?'),
     manutencao: db.prepare("SELECT COALESCE(SUM(total_centavos), 0) AS c FROM frota_os WHERE veiculo_id = ? AND status = 'concluida' AND concluida_em >= ? AND concluida_em < ?"),
-    // Pneu novo entra no custo do veículo onde foi montado pela primeira vez (km do pneu = 0).
-    pneusCompra: db.prepare("SELECT COALESCE(SUM(p.custo_centavos), 0) AS c FROM frota_pneu_eventos e JOIN frota_pneus p ON p.id = e.pneu_id WHERE e.veiculo_id = ? AND e.tipo = 'montagem' AND e.km_pneu = 0 AND e.criado_em >= ? AND e.criado_em < ?"),
+    // A compra do pneu entra no custo do veículo onde ele foi montado pela primeira vez (uma vez só).
+    pneusCompra: db.prepare(`SELECT COALESCE(SUM(p.custo_centavos), 0) AS c FROM frota_pneu_eventos e JOIN frota_pneus p ON p.id = e.pneu_id WHERE e.veiculo_id = ? AND e.tipo = 'montagem'
+      AND e.id = (SELECT MIN(x.id) FROM frota_pneu_eventos x WHERE x.pneu_id = e.pneu_id AND x.tipo = 'montagem') AND e.criado_em >= ? AND e.criado_em < ?`),
     pneusServ: db.prepare("SELECT COALESCE(SUM(custo_centavos), 0) AS c FROM frota_pneu_eventos WHERE veiculo_id = ? AND tipo IN ('recapagem','conserto') AND criado_em >= ? AND criado_em < ?"),
     documentos: db.prepare('SELECT COALESCE(SUM(valor_centavos), 0) AS c FROM frota_documentos WHERE veiculo_id = ? AND vencimento BETWEEN ? AND ?'),
     multas: db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS c FROM multas WHERE veiculo_id = ? AND situacao <> 'cancelada' AND ocorrida_em >= ? AND ocorrida_em < ?"),
@@ -693,29 +721,39 @@ function rodadaAvisos(db, { forcar = false } = {}) {
   const notif = require('./notificacoes');
   let n = 0;
   for (const { id: empresaId } of db.prepare("SELECT id FROM empresas WHERE gestao_frota = 1 AND status = 'ativa'").all()) {
-    const caminho = `/empresa/${empresaId}/gestao-painel`;
-    for (const c of listarComponentes(db, empresaId).filter((x) => x.pct >= 90 && !x.aviso_enviado)) {
-      notif.avisar(db, empresaId, 'frota', { titulo: `Manutenção · ${c.placa}`, texto: `${c.nome}: ${Math.round(c.pct)}% da vida útil${c.restante_km !== null ? ` (faltam ${Math.max(0, c.restante_km)} km)` : ''}.`, caminho });
-      db.prepare('UPDATE frota_componentes SET aviso_enviado = 1 WHERE id = ?').run(c.id);
-      n++;
+    try {
+      n += avisosDaEmpresa(db, empresaId, notif);
+    } catch (err) {
+      console.error(`[Gestão de Frota] avisos da empresa ${empresaId}:`, err.message); // uma empresa com problema não para as outras
     }
-    for (const p of listarPneus(db, empresaId, { status: 'montado' }).filter((x) => x.sulco_mm !== null && x.sulco_mm <= SULCO_ATENCAO_MM && !x.aviso_sulco)) {
-      notif.avisar(db, empresaId, 'frota', { titulo: `Pneu gasto · ${p.placa}`, texto: `Pneu ${p.numero_fogo} (${p.posicao}) com ${String(p.sulco_mm).replace('.', ',')} mm de sulco${p.sulco_mm <= SULCO_LIMITE_MM ? ', abaixo do limite legal' : ''}.`, caminho });
-      db.prepare('UPDATE frota_pneus SET aviso_sulco = 1 WHERE id = ?').run(p.id);
-      n++;
-    }
-    for (const d of listarDocumentos(db, empresaId).filter((x) => (x.estado === 'vencendo' && x.dias <= 15 || x.estado === 'vencido') && !x.aviso_enviado)) {
-      notif.avisar(db, empresaId, 'frota', { titulo: `Documento · ${d.placa ?? d.motorista ?? ''}`, texto: `${d.nome_tipo} ${d.estado === 'vencido' ? `vencido desde ${dataBR(d.vencimento)}` : `vence em ${d.dias} dia(s) (${dataBR(d.vencimento)})`}.`, caminho });
-      db.prepare('UPDATE frota_documentos SET aviso_enviado = 1 WHERE id = ?').run(d.id);
-      n++;
-    }
+  }
+  return n;
+}
+
+function avisosDaEmpresa(db, empresaId, notif) {
+  let n = 0;
+  const caminho = `/empresa/${empresaId}/gestao-painel`;
+  for (const c of listarComponentes(db, empresaId).filter((x) => x.pct >= 90 && !x.aviso_enviado)) {
+    notif.avisar(db, empresaId, 'frota', { titulo: `Manutenção · ${c.placa}`, texto: `${c.nome}: ${Math.round(c.pct)}% da vida útil${c.restante_km !== null ? ` (faltam ${Math.max(0, c.restante_km)} km)` : ''}.`, caminho });
+    db.prepare('UPDATE frota_componentes SET aviso_enviado = 1 WHERE id = ?').run(c.id);
+    n++;
+  }
+  for (const p of listarPneus(db, empresaId, { status: 'montado' }).filter((x) => x.sulco_mm !== null && x.sulco_mm <= SULCO_ATENCAO_MM && !x.aviso_sulco)) {
+    notif.avisar(db, empresaId, 'frota', { titulo: `Pneu gasto · ${p.placa}`, texto: `Pneu ${p.numero_fogo} (${p.posicao}) com ${String(p.sulco_mm).replace('.', ',')} mm de sulco${p.sulco_mm <= SULCO_LIMITE_MM ? ', abaixo do limite legal' : ''}.`, caminho });
+    db.prepare('UPDATE frota_pneus SET aviso_sulco = 1 WHERE id = ?').run(p.id);
+    n++;
+  }
+  for (const d of listarDocumentos(db, empresaId).filter((x) => (x.estado === 'vencendo' && x.dias <= 15 || x.estado === 'vencido') && !x.aviso_enviado)) {
+    notif.avisar(db, empresaId, 'frota', { titulo: `Documento · ${d.placa ?? d.motorista ?? ''}`, texto: `${d.nome_tipo} ${d.estado === 'vencido' ? `vencido desde ${dataBR(d.vencimento)}` : `vence em ${d.dias} dia(s) (${dataBR(d.vencimento)})`}.`, caminho });
+    db.prepare('UPDATE frota_documentos SET aviso_enviado = 1 WHERE id = ?').run(d.id);
+    n++;
   }
   return n;
 }
 
 module.exports = {
   TIPOS_FORNECEDOR, COMPONENTES, PLANOS, POSICOES, TIPOS_DOCUMENTO, SULCO_ATENCAO_MM, SULCO_LIMITE_MM, posicoesDe, familia, situacaoComponente,
-  listarComponentes, criarComponente, editarComponente, aplicarPlano, trocarComponente, historicoComponentes, componenteDa,
+  listarComponentes, criarComponente, editarComponente, excluirComponente, aplicarPlano, trocarComponente, registrarTroca, historicoComponentes, componenteDa,
   criarOS, editarOS, adicionarItem, removerItem, iniciarOS, concluirOS, cancelarOS, listarOS, detalheOS,
   listarPneus, cadastrarPneu, montarPneu, desmontarPneu, rodizio, medirPneu, enviarRecapagem, voltarRecapagem, consertoPneu, descartarPneu, historicoPneu, pneusDoVeiculo,
   listarDocumentos, criarDocumento, editarDocumento, documentoDa, listarFornecedores, salvarFornecedor, fornecedorDa, custos, painel, rodadaAvisos,

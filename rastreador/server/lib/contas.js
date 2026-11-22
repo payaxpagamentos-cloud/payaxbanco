@@ -6,7 +6,7 @@
 */
 
 const crypto = require('node:crypto');
-const { agora } = require('../db');
+const { agora, transacao } = require('../db');
 const { hashSenha } = require('./senha');
 const { ErroNegocio } = require('./erros');
 const v = require('./validacao');
@@ -31,6 +31,10 @@ function criarUsuario(db, d, { perfis, empresaId = null }) {
 
 /** Alteração de nome, perfil, situação e senha (opcional) de um usuário existente. */
 function alterarUsuario(db, u, d, { perfis }) {
+  // Tudo ou nada: um campo inválido não deixa os outros salvos pela metade.
+  transacao(db, () => alterarCampos(db, u, d, perfis));
+}
+function alterarCampos(db, u, d, perfis) {
   if (d.nome !== undefined) db.prepare('UPDATE usuarios SET nome = ? WHERE id = ?').run(v.texto(d.nome, 'o nome', 120), u.id);
   if (d.perfil !== undefined && d.perfil !== u.perfil) {
     v.opcao(d.perfil, 'o perfil', perfis);

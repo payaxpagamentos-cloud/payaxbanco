@@ -59,20 +59,9 @@ module.exports = (db) => {
   r.get('/componentes', (req, res) => res.json(gf.listarComponentes(db, eid(req), { veiculoId: req.query.veiculo_id })));
   r.post('/componentes', (req, res) => res.status(201).json({ id: gf.criarComponente(db, eid(req), req.body) }));
   r.put('/componentes/:id', (req, res) => { gf.editarComponente(db, eid(req), req.params.id, req.body); ok(res); });
-  r.delete('/componentes/:id', (req, res) => {
-    const c = gf.componenteDa(db, eid(req), req.params.id);
-    db.prepare('DELETE FROM frota_componentes WHERE id = ?').run(c.id);
-    res.status(204).end();
-  });
+  r.delete('/componentes/:id', (req, res) => { gf.excluirComponente(db, eid(req), req.params.id); res.status(204).end(); });
   // Troca registrada direto (sem OS): ex. o próprio motorista trocou a palheta.
-  r.post('/componentes/:id/trocar', (req, res) => {
-    const c = gf.componenteDa(db, eid(req), req.params.id);
-    if (c.status !== 'ativo') throw new ErroNegocio('Este componente já foi trocado.', 422);
-    const veiculo = db.prepare('SELECT hodometro_m FROM veiculos WHERE id = ?').get(c.veiculo_id);
-    const km = req.body.km !== undefined && req.body.km !== '' ? Number(req.body.km) : Math.round(veiculo.hodometro_m / 1000);
-    if (!Number.isInteger(km) || km < 0) throw new ErroNegocio('Km inválido.', 422);
-    res.status(201).json({ id: gf.trocarComponente(db, c, { km, data: req.body.data || hoje(), custo: Number(req.body.custo_centavos) || 0, marca: req.body.marca || undefined }) });
-  });
+  r.post('/componentes/:id/trocar', (req, res) => res.status(201).json({ id: gf.registrarTroca(db, eid(req), req.params.id, req.body) }));
   r.post('/veiculos/:vid/plano-padrao', (req, res) => res.status(201).json({ criados: gf.aplicarPlano(db, eid(req), req.params.vid) }));
   r.get('/veiculos/:vid/historico', (req, res) => res.json({
     componentes: gf.historicoComponentes(db, eid(req), req.params.vid),

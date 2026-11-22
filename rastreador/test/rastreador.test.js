@@ -910,6 +910,18 @@ test('Rastreador', async (t) => {
     assert.equal(os.status, 201);
     const os2 = await api.post(`${G}/os`, { veiculo_id: veiculo, descricao: 'Outra' }, cliente);
     assert.equal(os2.dados.numero, os.dados.numero + 1, 'numeração própria por empresa');
+    // Revisão: peça em OS aberta não se exclui; data inválida não entra; peça repetida não duplica; editar a marca não reenvia o aviso.
+    assert.equal((await api.del(`${G}/componentes/${filtro.id}`, undefined, cliente)).status, 422, 'componente em OS aberta');
+    const velas = comps.find((c) => c.tipo === 'velas');
+    assert.equal((await api.post(`${G}/componentes/${velas.id}/trocar`, { data: 'abc' }, cliente)).status, 422, 'data inválida');
+    assert.equal((await api.post(`${G}/componentes/${velas.id}/trocar`, { custo_centavos: -5 }, cliente)).status, 422, 'custo negativo');
+    assert.equal((await api.get(`${G}/painel`, cliente)).status, 200, 'o painel continua de pé');
+    const osDup = await api.post(`${G}/os`, { veiculo_id: veiculo, descricao: 'Velas', componentes: [velas.id, velas.id] }, cliente);
+    assert.equal((await api.get(`${G}/os/${osDup.dados.id}`, cliente)).dados.itens.length, 1, 'a mesma peça entra uma vez');
+    await api.post(`${G}/os/${osDup.dados.id}/cancelar`, {}, cliente);
+    db.prepare('UPDATE frota_componentes SET aviso_enviado = 1 WHERE id = ?').run(velas.id);
+    await api.put(`${G}/componentes/${velas.id}`, { marca: 'NGK' }, cliente);
+    assert.equal(db.prepare('SELECT aviso_enviado FROM frota_componentes WHERE id = ?').get(velas.id).aviso_enviado, 1, 'só a marca: aviso não volta');
     await api.post(`${G}/os/${os2.dados.id}/cancelar`, {}, cliente);
     assert.equal((await api.post(`${G}/os/${os.dados.id}/itens`, { tipo: 'servico', descricao: 'Mão de obra', valor_centavos: 12000 }, cliente)).status, 201);
     assert.equal((await api.put(`${G}/os/${os.dados.id}`, { observacao: 'Óleo 5W30' }, cliente)).status, 200);
