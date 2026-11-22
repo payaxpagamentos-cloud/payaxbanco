@@ -248,7 +248,14 @@ async function bater(erro) {
       location.reload();
       return;
     }
-    if (r.recarregar) estado.trocarPendente = true;
+    if (r.recarregar) {
+      estado.trocarPendente = true;
+      // A lista de anúncios só troca na virada do loop (para não cortar ninguém no meio), mas o que é
+      // do rodapé — aviso, legenda, relógio — entra na hora: um aviso não pode esperar o loop acabar.
+      chamar('player/programacao').then((p) => {
+        if (estado.programacao && p?.tela) { estado.programacao.tela = p.tela; desenharFaixa(); }
+      }).catch(() => {});
+    }
     if (r.comandos?.length) await obedecer(r.comandos);
   } catch (err) {
     if (err.message !== 'despareado' && err.message !== 'desativada') marcarConexao(false);
