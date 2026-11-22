@@ -145,7 +145,7 @@
   };
   let currentFormat = 'shopping';
   const tabs = $$('[role="tab"]');
-  function selectFormat(key, focusTab) {
+  function selectFormat(key, focusTab, rolar = false) {
     if (!formats[key]) return;
     currentFormat = key;
     const data = formats[key];
@@ -157,6 +157,8 @@
     $('#format-locations').textContent = data.locations;
     $('#format-content').textContent = data.content;
     // As fotos de cima são o que muda ao trocar de aba. Formato com uma foto só ocupa a linha inteira.
+    // Trocar de aba não pode deixar metade da foto fora da tela.
+    if (rolar) requestAnimationFrame(() => $('.gallery-pair').scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
     const umaFoto = data.fotos.length < 2;
     $('#figura-b').hidden = umaFoto;
     $('.gallery-pair').classList.toggle('uma', umaFoto);
@@ -175,7 +177,7 @@
     });
   }
   tabs.forEach((tab, index) => {
-    tab.addEventListener('click', () => selectFormat(tab.dataset.format, false));
+    tab.addEventListener('click', () => selectFormat(tab.dataset.format, false, true));
     tab.addEventListener('keydown', event => {
       let next = index;
       if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
@@ -183,7 +185,7 @@
       else if (event.key === 'Home') next = 0;
       else if (event.key === 'End') next = tabs.length - 1;
       else return;
-      event.preventDefault(); selectFormat(tabs[next].dataset.format, true);
+      event.preventDefault(); selectFormat(tabs[next].dataset.format, true, true);
     });
   });
 

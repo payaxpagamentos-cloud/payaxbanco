@@ -413,15 +413,12 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .entrada{ position: relative; isolation: isolate; min-height: 100vh; min-height: 100dvh; display: flex; align-items: center;
   justify-content: flex-end; padding: clamp(32px, 5vh, 70px) clamp(24px, 6vw, 112px); color: var(--text); }
 /* A fotografia e o véu que garante contraste do texto branco em cima dela. */
-.entrada::before{ content: ""; position: fixed; inset: 0; z-index: -3; background: #cbd4d9 url("../img/entrada.webp") center/cover no-repeat; }
+/* O totem fica inteiro na tela: o enquadramento sobe um pouco, em vez de cortar o alto da peça. */
+.entrada::before{ content: ""; position: fixed; inset: 0; z-index: -3;
+  background: #cbd4d9 url("../img/entrada.webp") 50% 22%/cover no-repeat; }
 .entrada::after{ content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
   background: linear-gradient(0deg, rgba(8, 20, 25, .34), transparent 36%); }
 
-.entrada .voltar-site{ position: absolute; top: max(25px, env(safe-area-inset-top)); right: clamp(24px, 4vw, 70px);
-  padding: 7px 12px; font-size: 13.5px; font-weight: 600; color: #fff; text-decoration: underline; text-underline-offset: 5px;
-  background: rgba(13, 26, 33, .36); border: 1px solid rgba(255, 255, 255, .17); border-radius: 8px;
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 2; }
-.entrada .voltar-site:hover{ background: rgba(13, 26, 33, .6); }
 
 .entrada .cartao{ width: 440px; max-width: 100%; padding: 30px 34px 26px; border-radius: 27px;
   border: 1.5px solid rgba(255, 255, 255, .92); background: rgba(250, 251, 252, .79); color: #14242B;
@@ -478,18 +475,16 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 }
 @media (max-width: 860px){
   .entrada{ justify-content: center; padding: 86px 24px 86px; }
-  .entrada::before{ background-position: 35% center; }
+  .entrada::before{ background-position: 38% 25%; }
   .entrada::after{ background: rgba(12, 28, 36, .12); }
   .entrada .cartao{ width: 430px; background: rgba(250, 251, 252, .85); }
   .entrada .assinatura{ max-width: 100%; left: 0; right: 0; bottom: 25px; text-align: center; font-size: 1.2rem; }
-  .entrada .voltar-site{ right: 20px; top: 20px; }
 }
 @media (max-width: 540px){
   .entrada{ padding: 76px 16px 26px; }
   .entrada .cartao{ width: 100%; padding: 28px 24px 24px; border-radius: 22px; }
   .entrada h1{ font-size: 2.05rem; margin-top: 24px; }
   .entrada .assinatura{ display: none; }
-  .entrada .voltar-site{ font-size: 12.5px; }
 }
 /* Notebook de tela baixa: tudo encolhe um pouco para o cartão caber sem barra de rolagem. */
 @media (max-height: 760px) and (min-width: 861px){

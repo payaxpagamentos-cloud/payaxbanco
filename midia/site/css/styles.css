@@ -58,3 +58,12 @@
 /* Formato com uma foto só: ela fica do mesmo tamanho das outras, centrada — não estica a página inteira. */
 .gallery-pair.uma{grid-template-columns:minmax(0,calc(50% - 9px));justify-content:center}
 @media(max-width:540px){.gallery-pair.uma{grid-template-columns:1fr}}
+
+/*
+ * As fotos dos formatos aparecem inteiras (3:2), e foto 3:2 é alta. Numa tela de notebook o par
+ * estourava a janela e ficava cortado ao trocar de aba — então a dupla tem largura máxima e fica
+ * centrada: a foto continua inteira, só um pouco menor, e o par cabe na tela sem rolar.
+ */
+.gallery-pair{max-width:1080px;margin-inline:auto;scroll-margin-top:120px;scroll-margin-bottom:24px}
+.gallery-pair.uma{grid-template-columns:minmax(0,531px)}
+@media(max-width:850px){.gallery-pair{max-width:none}}

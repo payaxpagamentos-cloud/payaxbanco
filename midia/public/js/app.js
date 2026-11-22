@@ -1,4 +1,4 @@
-import { api, sessao, BASE } from './api.js';
+import { api, sessao } from './api.js';
 import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, marcar, formModal, repetir, linkWhatsApp, PERFIS } from './ui.js';
 import { TELAS_EQUIPE } from './painel.js';
 import { TELAS_ANUNCIANTE, TELAS_LOJISTA } from './portais.js';
@@ -188,8 +188,6 @@ function alterarSenha() {
  */
 function cascaDeEntrada(...dentro) {
   return el('div', { class: 'entrada' },
-    // O site fica na raiz do domínio; o painel, em <base>/. Daqui se volta para a vitrine.
-    el('a', { class: 'voltar-site', href: `${BASE.replace(/\/[^/]*$/, '') || ''}/` }, 'Voltar ao site'),
     el('div', { class: 'cartao' },
       marca(nomePlataforma),
       ...dentro.flat(Infinity).filter(Boolean)),
