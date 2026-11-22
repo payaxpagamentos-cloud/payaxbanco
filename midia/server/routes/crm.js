@@ -270,6 +270,12 @@ module.exports = (db) => {
 
   r.post('/crm/emails/:id/lido', (req, res) => res.json(caixa.marcarLido(db, Number(req.params.id), req.body.lido !== false)));
 
+  r.delete('/crm/emails/:id', (req, res) => {
+    const e = caixa.excluir(db, Number(req.params.id));
+    registrar(db, req, 'email_excluido', { id: e.id, de: e.de, assunto: e.assunto });
+    res.status(204).end();
+  });
+
   r.post('/crm/emails/:id/arquivar', (req, res) => {
     const e = caixa.arquivar(db, Number(req.params.id), req.body.arquivado !== false);
     registrar(db, req, 'email_arquivado', { id: e.id, de: e.de });

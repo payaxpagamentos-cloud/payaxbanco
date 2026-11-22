@@ -157,6 +157,15 @@ test('E-mails por usuário: criar, associar, receber e enviar', async (t) => {
   const doBeto = await api.post('/painel/crm/emails', { para: 'cliente@fora.com', assunto: 'Oi', texto: 'Olá!' }, tkBeto);
   assert.notEqual(doBeto.dados.de, 'ana@vaimidia.com.br');
 
+  // Excluir uma mensagem: some da caixa e do disco; o Beto não exclui a da caixa da Ana.
+  assert.equal((await api.del(`/painel/crm/emails/${daAna.id}`, undefined, tkBeto)).status, 403);
+  const guardado = require('node:path').join(config.entrada.pasta, daAna.arquivo);
+  assert.equal(require('node:fs').existsSync(guardado), true);
+  const extra = caixa.receber(api.db, { bruto: msg('ana@vaimidia.com.br'), de: 'cliente@fora.com', para: ['ana@vaimidia.com.br'] });
+  assert.equal((await api.del(`/painel/crm/emails/${extra.id}`, undefined, tkAna)).status, 204);
+  assert.equal((await api.get(`/painel/crm/emails/${extra.id}`, tkAna)).status, 404);
+  assert.equal(require('node:fs').existsSync(require('node:path').join(config.entrada.pasta, extra.arquivo)), false);
+
   // Excluir o endereço não apaga as mensagens.
   assert.equal((await api.del(`/painel/enderecos-email/${criado.dados.id}`, undefined, master)).status, 204);
   assert.deepEqual(await assuntos(tkBeto), [daAna.id, geral.id].sort());

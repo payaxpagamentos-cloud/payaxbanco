@@ -231,6 +231,15 @@ const marcarLido = (db, id, lido = true) => {
   return ler(db, id);
 };
 
+/** Apaga a mensagem de vez: a linha no banco e o arquivo original guardado em disco. */
+function excluir(db, id) {
+  const e = db.prepare('SELECT id, de, assunto, arquivo FROM emails WHERE id = ?').get(id);
+  if (!e) throw new ErroNegocio('Mensagem não encontrada.', 404);
+  db.prepare('DELETE FROM emails WHERE id = ?').run(id);
+  if (e.arquivo) { try { fs.unlinkSync(caminhoOriginal(e.arquivo)); } catch { /* já não estava lá */ } }
+  return e;
+}
+
 const arquivar = (db, id, arquivado = true) => {
   db.prepare('UPDATE emails SET arquivado_em = ?, lido_em = COALESCE(lido_em, ?) WHERE id = ?')
     .run(arquivado ? agora() : null, arquivado ? agora() : null, id);
@@ -348,7 +357,7 @@ const estado = () => ({
   ...ligado,
 });
 
-module.exports = { podeVer, enderecoDe,
+module.exports = { excluir, podeVer, enderecoDe,
   receber, listar, ler, anexo, original, marcarLido, arquivar, vincularLead, virarLead, enviar,
   estado, registrarEstado, vincular, caminhoOriginal,
 };

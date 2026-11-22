@@ -11,7 +11,7 @@
  */
 import { api, qs, baixar } from './api.js';
 import {
-  el, limpar, icone, toast, acao, modal, formModal, campo, escolha, area, inteiro, dataHora, etiqueta, repetir,
+  el, limpar, icone, toast, acao, modal, formModal, confirmar, campo, escolha, area, inteiro, dataHora, etiqueta, repetir,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio } from './comum.js';
 
@@ -155,6 +155,13 @@ async function abrir(id, recarregar) {
           ? el('button', { class: 'btn', onclick: (ev) => acao(ev.target, () => fecharE(() => desvincular(e))) }, 'Desligar do lead')
           : el('button', { class: 'btn', onclick: () => { fechar(); ligarAoFunil(e, recarregar); } }, icone('anunciantes'), 'Ligar ao funil'));
     }
+    acoes.append(el('button', {
+      class: 'btn perigo',
+      onclick: (ev) => acao(ev.currentTarget, async () => {
+        if (!await confirmar('Excluir esta mensagem?', 'Ela é apagada de vez e não dá para recuperar. Para só tirar da caixa, use Arquivar.', 'Excluir')) return;
+        await fecharE(async () => { await api.del(`/painel/crm/emails/${e.id}`); toast('Mensagem excluída.'); });
+      }),
+    }, 'Excluir'));
     acoes.append(el('button', {
       class: 'btn pequeno',
       onclick: (ev) => acao(ev.target, () => baixar(`/painel/crm/emails/${e.id}/original`, `mensagem-${e.id}.eml`)),
