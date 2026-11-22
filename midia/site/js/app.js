@@ -22,7 +22,6 @@
   }
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
-  const sourceSize = { width: 1487, height: 1058 };
   let resizeFrame = 0;
 
   // Apenas enquadramento no navegador: o arquivo visual aprovado não é alterado.
@@ -32,10 +31,14 @@
     if (!image || crop.length !== 4 || crop.some(n => !Number.isFinite(n))) return;
     const [x, y, width, height] = crop;
     if (width <= 0 || height <= 0) return;
+    // Cada foto tem o tamanho dela (os atributos width/height do <img>), e o recorte é em cima dele.
+    const sourceWidth = Number(image.getAttribute('width')) || image.naturalWidth;
+    const sourceHeight = Number(image.getAttribute('height')) || image.naturalHeight;
+    if (!sourceWidth || !sourceHeight) return;
     const box = frame.getBoundingClientRect();
     const scale = Math.max(box.width / width, box.height / height);
-    image.style.width = (sourceSize.width * scale) + 'px';
-    image.style.height = (sourceSize.height * scale) + 'px';
+    image.style.width = (sourceWidth * scale) + 'px';
+    image.style.height = (sourceHeight * scale) + 'px';
     image.style.left = ((box.width - width * scale) / 2 - x * scale) + 'px';
     image.style.top = ((box.height - height * scale) / 2 - y * scale) + 'px';
   }
@@ -82,11 +85,53 @@
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && !menu.hidden) { closeMenu(); menuToggle.focus(); } });
   window.matchMedia('(min-width: 851px)').addEventListener('change', event => { if (event.matches) closeMenu(); });
 
+  /*
+   * Cada aba tem o par de fotos dela: clicar troca as DUAS de cima. A foto grande de baixo é fixa —
+   * ela abre o bloco do formato e não fica competindo com o par.
+   * O recorte (x, y, largura, altura) é sobre o arquivo original, feito no navegador.
+   */
+  const foto = (arquivo, largura, altura, crop, alt, legenda) => ({ src: 'assets/fotos/' + arquivo, w: largura, h: altura, crop, alt, legenda });
   const formats = {
-    shopping: { name: 'Shopping', checkbox: 'Shopping', title: 'Sua marca no caminho das pessoas.', description: 'Campanhas digitais que entram na rotina de quem passeia, encontra e consome.', locations: 'Corredores, entradas e áreas de circulação.', content: 'Lançamentos, ofertas e campanhas institucionais.', crop: '584,122,511,438', alt: 'Painel com campanha de perfume em shopping, aplicação ilustrativa.' },
-    elevadores: { name: 'Elevadores', checkbox: 'Elevadores', title: 'Presença em cada trajeto.', description: 'Uma mensagem bem apresentada pode fazer parte dos pequenos deslocamentos do dia.', locations: 'Prédios residenciais e edifícios comerciais.', content: 'Campanhas, serviços locais e comunicação do condomínio.', crop: '62,753,650,272', alt: 'Campanha automotiva em tela próxima ao elevador, aplicação ilustrativa.' },
-    tv: { name: 'TVs indoor', checkbox: 'TVs indoor', title: 'A mensagem no ambiente certo.', description: 'Telas que aproximam marcas dos momentos de pausa, convivência e consumo.', locations: 'Restaurantes, cafés, academias e salas de espera.', content: 'Ofertas, vídeos curtos e comunicação institucional.', crop: '1132,350,332,239', alt: 'Campanha de café em uma TV de ambiente interno, aplicação ilustrativa.' },
-    recepcoes: { name: 'Recepções', checkbox: 'Recepções e totens', title: 'Receba bem. Comunique melhor.', description: 'Totens e telas que integram a campanha à experiência de visitantes e clientes.', locations: 'Clínicas, hotéis, escritórios e áreas comuns.', content: 'Campanhas de marca, serviços e informações do espaço.', crop: '733,754,690,269', alt: 'Campanha em totem de recepção, aplicação ilustrativa.' }
+    shopping: {
+      name: 'Shopping', checkbox: 'Shopping', title: 'Sua marca no caminho das pessoas.',
+      description: 'Campanhas digitais que entram na rotina de quem passeia, encontra e consome.',
+      locations: 'Corredores, entradas e áreas de circulação.',
+      content: 'Lançamentos, ofertas e campanhas institucionais.',
+      fotos: [
+        foto('shopping-corredor.webp', 1400, 876, '150,60,1250,641', 'Totem da rede no corredor de um shopping, aplicação ilustrativa.', 'A tela no caminho de quem passa.'),
+        foto('restaurante.webp', 1400, 933, '380,160,1020,523', 'Totem da rede na entrada de um restaurante de shopping, aplicação ilustrativa.', 'Na praça de alimentação, na hora da escolha.'),
+      ],
+    },
+    elevadores: {
+      name: 'Elevadores', checkbox: 'Elevadores', title: 'Presença em cada trajeto.',
+      description: 'Uma mensagem bem apresentada pode fazer parte dos pequenos deslocamentos do dia.',
+      locations: 'Prédios residenciais e edifícios comerciais.',
+      content: 'Campanhas, serviços locais e comunicação do condomínio.',
+      fotos: [
+        foto('elevador-hall.webp', 1400, 933, '480,80,920,472', 'Tela da rede no hall dos elevadores de um edifício, aplicação ilustrativa.', 'Espera de elevador é tempo de atenção.'),
+        foto('lobby.webp', 1400, 933, '430,60,970,497', 'Totem da rede no lobby de um edifício corporativo, aplicação ilustrativa.', 'Do lobby ao andar, a marca acompanha.'),
+      ],
+    },
+    tv: {
+      name: 'TVs indoor', checkbox: 'TVs indoor', title: 'A mensagem no ambiente certo.',
+      description: 'Telas que aproximam marcas dos momentos de pausa, convivência e consumo.',
+      locations: 'Restaurantes, cafés, academias, farmácias e salas de espera.',
+      content: 'Ofertas, vídeos curtos e comunicação institucional.',
+      fotos: [
+        foto('academia.webp', 1400, 933, '140,90,1260,646', 'TV da rede com anúncio de bebida esportiva em uma academia, aplicação ilustrativa.', 'Na academia, entre uma série e outra.'),
+        foto('farmacia.webp', 1400, 933, '140,70,1260,646', 'TV da rede com anúncio de dermocosméticos em uma farmácia, aplicação ilustrativa.', 'Na farmácia, bem na hora da compra.'),
+      ],
+    },
+    recepcoes: {
+      name: 'Recepções', checkbox: 'Recepções e totens', title: 'Receba bem. Comunique melhor.',
+      description: 'Totens e telas que integram a campanha à experiência de visitantes e clientes.',
+      locations: 'Clínicas, hotéis, escritórios e áreas comuns.',
+      content: 'Campanhas de marca, serviços e informações do espaço.',
+      fotos: [
+        foto('clinica.webp', 1400, 933, '500,170,900,462', 'Tela da rede na recepção de uma clínica, aplicação ilustrativa.', 'Na sala de espera, com tempo para ler.'),
+        foto('restaurante.webp', 1400, 933, '380,160,1020,523', 'Totem da rede na recepção de um restaurante, aplicação ilustrativa.', 'Na entrada, antes de sentar à mesa.'),
+      ],
+    },
   };
   let currentFormat = 'shopping';
   const tabs = $$('[role="tab"]');
@@ -101,9 +146,22 @@
     $('#format-description').textContent = data.description;
     $('#format-locations').textContent = data.locations;
     $('#format-content').textContent = data.content;
-    $('#format-image').dataset.crop = data.crop;
-    $('#format-image img').alt = data.alt;
-    framePhoto($('#format-image'));
+    // As duas fotos de cima são o que muda ao trocar de aba.
+    [['#foto-a', '#legenda-a'], ['#foto-b', '#legenda-b']].forEach(([janela, legenda], i) => {
+      const f = data.fotos[i];
+      const quadro = $(janela);
+      if (!f || !quadro) return;
+      const img = $('img', quadro);
+      if (img.getAttribute('src') !== f.src) {
+        img.setAttribute('src', f.src);
+        img.setAttribute('width', f.w);
+        img.setAttribute('height', f.h);
+      }
+      img.alt = f.alt;
+      quadro.dataset.crop = f.crop;
+      $(legenda).textContent = f.legenda;
+      framePhoto(quadro);
+    });
   }
   tabs.forEach((tab, index) => {
     tab.addEventListener('click', () => selectFormat(tab.dataset.format, false));

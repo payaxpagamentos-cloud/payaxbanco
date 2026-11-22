@@ -74,6 +74,7 @@ robots.txt
 sitemap.xml
 assets/marca.svg
 assets/layout-aprovado.webp
+assets/fotos/            (as fotos das abas de formatos)
 assets/og-capa.jpg
 assets/VAI_MIDIA_Portfolio_Comercial.pdf
 assets/fonts/
@@ -81,7 +82,8 @@ assets/fonts/
 
 ## Imagens e identidade
 
-`assets/layout-aprovado.webp` é a arte aprovada no atendimento (convertida de PNG para WebP: 2 MB viraram
+`assets/layout-aprovado.webp
+assets/fotos/            (as fotos das abas de formatos)` é a arte aprovada no atendimento (convertida de PNG para WebP: 2 MB viraram
 183 kB, com as mesmas dimensões, então os recortes `data-crop` continuam valendo). As fotografias são enquadradas a partir dessa referência no navegador, por `data-crop`, sem inserir os textos da interface como imagem: títulos, botões, navegação, abas e formulários são HTML real.
 
 Para substituir por fotografias independentes em maior resolução, ajuste o `src`, as dimensões da fonte e o enquadramento em `js/app.js`. O arquivo de referência continua útil para conferir o resultado. As imagens são simulações; não devem ser apresentadas como prova de instalações ou clientes reais.
