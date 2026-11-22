@@ -139,7 +139,7 @@ module.exports = (db) => {
     res.json(db.prepare('SELECT * FROM locais WHERE id = ?').get(id));
   });
 
-  r.delete('/locais/:id', permitir('master'), (req, res) => {
+  r.delete('/locais/:id', permitir('master', 'administrador'), (req, res) => {
     const id = Number(req.params.id);
     const l = db.prepare('SELECT * FROM locais WHERE id = ?').get(id);
     if (!l) throw naoEncontrado('Ponto');
@@ -370,7 +370,7 @@ module.exports = (db) => {
     res.status(204).end();
   });
 
-  r.delete('/telas/:id', permitir('master'), (req, res) => {
+  r.delete('/telas/:id', permitir('master', 'administrador'), (req, res) => {
     const id = Number(req.params.id);
     const t = db.prepare('SELECT * FROM telas WHERE id = ?').get(id);
     if (!t) throw naoEncontrado('Tela');
@@ -527,7 +527,7 @@ module.exports = (db) => {
     res.json(db.prepare('SELECT * FROM anunciantes WHERE id = ?').get(id));
   });
 
-  r.delete('/anunciantes/:id', permitir('master'), (req, res) => {
+  r.delete('/anunciantes/:id', permitir('master', 'administrador'), (req, res) => {
     const id = Number(req.params.id);
     const a = db.prepare('SELECT * FROM anunciantes WHERE id = ?').get(id);
     if (!a) throw naoEncontrado('Anunciante');

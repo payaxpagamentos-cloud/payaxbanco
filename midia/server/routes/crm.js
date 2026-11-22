@@ -38,7 +38,7 @@ module.exports = (db) => {
     if (c.observacao !== undefined) d.observacao = v.opcional(c.observacao, 'a observação', 500);
     if (c.responsavel_id !== undefined) {
       d.responsavel_id = c.responsavel_id === null || c.responsavel_id === '' ? null : Number(c.responsavel_id);
-      if (d.responsavel_id && !db.prepare("SELECT 1 FROM usuarios WHERE id = ? AND perfil IN ('master','operador')").get(d.responsavel_id)) {
+      if (d.responsavel_id && !db.prepare("SELECT 1 FROM usuarios WHERE id = ? AND perfil IN ('master','administrador','operador')").get(d.responsavel_id)) {
         throw new ErroNegocio('Responsável não encontrado.', 422);
       }
     }

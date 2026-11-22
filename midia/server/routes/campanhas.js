@@ -284,7 +284,7 @@ module.exports = (db) => {
     res.json(detalhe(db, id));
   });
 
-  r.delete('/campanhas/:id', permitir('master'), (req, res) => {
+  r.delete('/campanhas/:id', permitir('master', 'administrador'), (req, res) => {
     const id = Number(req.params.id);
     const c = db.prepare('SELECT * FROM campanhas WHERE id = ?').get(id);
     if (!c) throw naoEncontrado('Campanha');

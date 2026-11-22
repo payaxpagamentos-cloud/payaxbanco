@@ -143,7 +143,7 @@ module.exports = (db) => {
     res.json(detalheContrato(id));
   });
 
-  r.delete('/contratos/:id', permitir('master'), (req, res) => {
+  r.delete('/contratos/:id', permitir('master', 'administrador'), (req, res) => {
     const id = Number(req.params.id);
     const c = db.prepare('SELECT * FROM contratos WHERE id = ?').get(id);
     if (!c) throw naoEncontrado('Contrato');

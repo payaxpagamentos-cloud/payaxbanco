@@ -136,7 +136,7 @@ module.exports = (db) => {
   });
 
   /** Recalcula o resumo de um dia a partir das exibições (manutenção). */
-  r.post('/relatorios/recalcular', permitir('master'), (req, res) => {
+  r.post('/relatorios/recalcular', permitir('master', 'administrador'), (req, res) => {
     const data = v.data(req.body.data, 'a data');
     const linhas = exibicoes.recalcularDia(db, data);
     registrar(db, req, 'resumo_recalculado', { data, linhas });
@@ -269,7 +269,7 @@ module.exports = (db) => {
     res.json(db.prepare('SELECT * FROM circuitos WHERE id = ?').get(id));
   });
 
-  r.delete('/circuitos/:id', permitir('master'), (req, res) => {
+  r.delete('/circuitos/:id', permitir('master', 'administrador'), (req, res) => {
     const id = Number(req.params.id);
     if (!db.prepare('SELECT 1 FROM circuitos WHERE id = ?').get(id)) throw naoEncontrado('Circuito');
     db.prepare('UPDATE campanhas SET circuito_id = NULL WHERE circuito_id = ?').run(id);
@@ -316,15 +316,17 @@ module.exports = (db) => {
   });
 
   // ----------------------------------------------------------------- Usuários, configurações e histórico
-  r.get('/usuarios', permitir('master'), (_req, res) => {
+  r.get('/usuarios', permitir('master', 'administrador'), (_req, res) => {
     res.json({
       itens: db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.ativo, u.ultimo_acesso, u.criado_em, a.nome AS anunciante, l.nome AS ponto
         FROM usuarios u LEFT JOIN anunciantes a ON a.id = u.anunciante_id LEFT JOIN locais l ON l.id = u.local_id ORDER BY u.perfil, u.nome`).all(),
     });
   });
 
-  r.post('/usuarios', permitir('master'), (req, res) => {
-    const perfil = v.opcao(req.body.perfil, 'o perfil', ['master', 'operador', 'anunciante', 'lojista']);
+  r.post('/usuarios', permitir('master', 'administrador'), (req, res) => {
+    const perfil = v.opcao(req.body.perfil, 'o perfil', ['master', 'administrador', 'operador', 'anunciante', 'lojista']);
+    // O administrador cuida da equipe, mas não cria master (senão conseguiria se promover).
+    if (perfil === 'master' && req.usuario.perfil !== 'master') throw new ErroNegocio('Só o master cria outro master.', 403);
     const d = { nome: v.texto(req.body.nome, 'o nome', 120), email: v.email(req.body.email), senha_hash: hashSenha(v.senha(req.body.senha)), perfil };
     if (perfil === 'anunciante') {
       d.anunciante_id = Number(req.body.anunciante_id);
@@ -340,16 +342,20 @@ module.exports = (db) => {
     res.status(201).json({ id, nome: d.nome, email: d.email, perfil });
   });
 
-  r.patch('/usuarios/:id', permitir('master'), (req, res) => {
+  r.patch('/usuarios/:id', permitir('master', 'administrador'), (req, res) => {
     const id = Number(req.params.id);
     const u = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
     if (!u) throw naoEncontrado('Usuário');
+    if (u.perfil === 'master' && req.usuario.perfil !== 'master') throw new ErroNegocio('Só o master altera um master.', 403);
     const d = {};
     if (req.body.nome !== undefined) d.nome = v.texto(req.body.nome, 'o nome', 120);
     if (req.body.email !== undefined) d.email = v.email(req.body.email);
     if (req.body.senha !== undefined) d.senha_hash = hashSenha(v.senha(req.body.senha));
     if (req.body.ativo !== undefined) d.ativo = v.booleano(req.body.ativo) ? 1 : 0;
-    if (req.body.perfil !== undefined && ['master', 'operador'].includes(u.perfil)) d.perfil = v.opcao(req.body.perfil, 'o perfil', ['master', 'operador']);
+    if (req.body.perfil !== undefined && ['master', 'administrador', 'operador'].includes(u.perfil)) {
+      d.perfil = v.opcao(req.body.perfil, 'o perfil', ['master', 'administrador', 'operador']);
+      if (d.perfil === 'master' && req.usuario.perfil !== 'master') throw new ErroNegocio('Só o master promove alguém a master.', 403);
+    }
     if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
     // Sempre precisa sobrar um master ativo.
     if ((d.ativo === 0 || (d.perfil && d.perfil !== 'master')) && u.perfil === 'master') {
@@ -380,14 +386,14 @@ module.exports = (db) => {
     res.download(caminho);
   });
 
-  r.get('/configuracoes', permitir('master'), (_req, res) => res.json({
+  r.get('/configuracoes', permitir('master', 'administrador'), (_req, res) => res.json({
     ...cfg(),
     padroes: CONFIG_PADRAO,
     email: { configurado: emailLib.configurado(), equipe: avisos.equipe(db).length, url: require('../config').url || null },
   }));
 
   /** Teste de envio: confirma que o SMTP está falando com o mundo antes de depender dele. */
-  r.post('/configuracoes/email-teste', permitir('master'), async (req, res) => {
+  r.post('/configuracoes/email-teste', permitir('master', 'administrador'), async (req, res) => {
     const para = req.body.para ? v.email(req.body.para) : req.usuario.email;
     const r2 = await emailLib.enviar({
       para,
@@ -418,7 +424,7 @@ module.exports = (db) => {
     res.status(202).json({ ok: true, pedido });
   });
 
-  r.put('/configuracoes', permitir('master'), (req, res) => {
+  r.put('/configuracoes', permitir('master', 'administrador'), (req, res) => {
     const limites = {
       duracao_imagem_s: [3, 120], insercoes_hora_padrao: [1, 120], bloco_minimo_s: [30, 3600], bloco_maximo_s: [60, 7200],
       batida_intervalo_s: [15, 900], offline_minutos: [2, 1440], mensalidade_tela_centavos: [0, 1_000_000_00], cpm_centavos: [0, 1_000_000],
@@ -468,7 +474,7 @@ module.exports = (db) => {
         WHERE t.status <> 'inativa' ORDER BY l.nome, t.nome`).all().map((t) => ({ ...t, online: estaOnline(t, c) })),
       cidades: db.prepare("SELECT DISTINCT cidade FROM locais WHERE cidade <> '' ORDER BY cidade").all().map((x) => x.cidade),
       // Quem pode ser responsável por um lead no CRM.
-      equipe: db.prepare("SELECT id, nome FROM usuarios WHERE perfil IN ('master','operador') AND ativo = 1 ORDER BY nome").all(),
+      equipe: db.prepare("SELECT id, nome FROM usuarios WHERE perfil IN ('master','administrador','operador') AND ativo = 1 ORDER BY nome").all(),
       competencias: db.prepare('SELECT DISTINCT substr(data, 1, 7) AS competencia FROM resumo_dia ORDER BY competencia DESC LIMIT 24').all().map((x) => x.competencia),
     });
   });

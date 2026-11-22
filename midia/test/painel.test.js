@@ -183,3 +183,26 @@ test('Comunicado: foto anexada chega à TV do ponto e só a ela', async (t) => {
   assert.match(css, /body\.dividida \.palco\{ grid-template-columns: 1fr 1fr;/);
   assert.match(css, /body\.dividida \.zona-anuncio \.camada img:not\(\.fundo\), body\.dividida \.zona-anuncio \.camada video\{ object-fit: cover; \}/);
 });
+
+/** Administrador: faz tudo o que o master faz, menos atualizar o sistema e mexer no backup — e não vira master. */
+test('Perfil administrador: tudo menos a aba Sistema, sem poder se promover', async (t) => {
+  const { iniciar, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+  t.after(() => { api.fechar(); limparArquivos(); });
+  const master = await api.login();
+  const criado = await api.post('/painel/usuarios', { nome: 'Robson', email: 'robson@vaimidia.com.br', senha: 'robson-2026', perfil: 'administrador' }, master);
+  assert.equal(criado.status, 201, JSON.stringify(criado.dados));
+  const adm = await api.login('robson@vaimidia.com.br', 'robson-2026');
+
+  assert.equal((await api.get('/painel/configuracoes', adm)).status, 200, 'mexe nas configurações');
+  assert.equal((await api.put('/painel/configuracoes', { cpm_centavos: 3000 }, adm)).status, 200, 'mexe nos preços');
+  assert.equal((await api.get('/painel/usuarios', adm)).status, 200, 'cuida da equipe');
+  assert.equal((await api.post('/painel/usuarios', { nome: 'Op', email: 'op2@vaimidia.com.br', senha: 'operador-2026', perfil: 'operador' }, adm)).status, 201);
+
+  assert.equal((await api.get('/painel/sistema/atualizacao', adm)).status, 403, 'não atualiza o sistema');
+  assert.equal((await api.get('/painel/backups', adm)).status, 403, 'não mexe no backup');
+  assert.equal((await api.post('/painel/usuarios', { nome: 'X', email: 'x@vaimidia.com.br', senha: 'xxxxxxxx-1', perfil: 'master' }, adm)).status, 403, 'não cria master');
+  assert.equal((await api.patch(`/painel/usuarios/${criado.dados.id}`, { perfil: 'master' }, adm)).status, 403, 'não se promove');
+  const mestre = (await api.get('/painel/usuarios', master)).dados.itens.find((u) => u.perfil === 'master');
+  assert.equal((await api.patch(`/painel/usuarios/${mestre.id}`, { ativo: false }, adm)).status, 403, 'não desativa o master');
+});

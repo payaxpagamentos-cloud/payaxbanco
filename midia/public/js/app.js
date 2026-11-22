@@ -26,7 +26,7 @@ const MENUS = {
     ['telas', 'TVs', 'telas'],
     ['#vendas', '3 · Vendas'],
     ['crm', 'CRM', 'anunciantes', null, [
-      ['funil', 'Funil'], ['propostas', 'Propostas'], ['produtos', 'Produtos', ['master']], ['emails', 'E-mail'],
+      ['funil', 'Funil'], ['propostas', 'Propostas'], ['produtos', 'Produtos', ['master', 'administrador']], ['emails', 'E-mail'],
     ]],
     ['inventario', 'Inventário', 'ocupacao'],
     ['#acompanhar', '4 · Acompanhar'],
@@ -36,7 +36,7 @@ const MENUS = {
     ]],
     ['diagnostico', 'Diagnóstico', 'diagnostico'],
     ['#admin', 'Administração'],
-    ['usuarios', 'Usuários', 'usuarios', ['master']], ['configuracoes', 'Configurações', 'configuracoes', ['master']],
+    ['usuarios', 'Usuários', 'usuarios', ['master', 'administrador']], ['configuracoes', 'Configurações', 'configuracoes', ['master', 'administrador']],
     ['historico', 'Histórico', 'historico'],
   ],
   anunciante: [
@@ -69,7 +69,7 @@ const SUBTITULOS = {
   rede: 'Pontos e telas onde a publicidade pode passar', conteudo: 'Imagens e vídeos do seu ponto na TV', conta: 'Sua conta',
 };
 
-const grupo = (perfil) => (['master', 'operador'].includes(perfil) ? 'equipe' : perfil);
+const grupo = (perfil) => (['master', 'administrador', 'operador'].includes(perfil) ? 'equipe' : perfil);
 
 window.addEventListener('midia:sair', () => desenhar());
 window.addEventListener('hashchange', () => desenhar());
@@ -139,7 +139,7 @@ async function desenhar() {
     } }, icone('seta')), botaoMenu),
     itens,
     // Quem está no portal não tem com quem falar dentro do sistema: este botão resolve isso.
-    whatsappEquipe && u.perfil !== 'master' && u.perfil !== 'operador'
+    whatsappEquipe && grupo(u.perfil) !== 'equipe'
       ? el('a', {
         class: 'falar-equipe', target: '_blank', rel: 'noopener',
         href: linkWhatsApp(whatsappEquipe, `Olá! Sou ${u.anunciante_nome ?? u.local_nome ?? u.nome} e queria falar com a equipe.`),

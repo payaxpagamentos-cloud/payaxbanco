@@ -63,7 +63,7 @@ export function abrirWhatsApp(telefone, texto, aviso = 'Este contato não tem te
   return true;
 }
 
-export const PERFIS = { master: 'Master', operador: 'Operador', anunciante: 'Anunciante (portal)', lojista: 'Lojista do ponto (portal)' };
+export const PERFIS = { master: 'Master', administrador: 'Administrador', operador: 'Operador', anunciante: 'Anunciante (portal)', lojista: 'Lojista do ponto (portal)' };
 /** Ambientes onde a rede instala telas (mesma lista de server/lib/validacao.js). */
 export const CATEGORIAS = {
   condominio_residencial: 'Condomínio residencial', condominio_comercial: 'Condomínio comercial', predio_corporativo: 'Prédio corporativo',

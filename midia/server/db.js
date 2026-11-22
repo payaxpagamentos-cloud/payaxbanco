@@ -562,7 +562,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nome TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   senha_hash TEXT NOT NULL,
-  perfil TEXT NOT NULL CHECK (perfil IN ('master','operador','anunciante','lojista')),
+  perfil TEXT NOT NULL CHECK (perfil IN ('master','administrador','operador','anunciante','lojista')),
   anunciante_id INTEGER REFERENCES anunciantes(id),
   local_id INTEGER REFERENCES locais(id),
   ativo INTEGER NOT NULL DEFAULT 1,
@@ -727,6 +727,8 @@ function migrar(db) {
   }
 
   if (/CHECK \(categoria IN/.test(sqlDaTabela(db, 'locais'))) refazerTabela(db, 'locais');
+  // Perfil administrador (tudo menos atualizar o sistema e o backup): bancos antigos não aceitavam o valor.
+  if (!/'administrador'/.test(sqlDaTabela(db, 'usuarios'))) refazerTabela(db, 'usuarios');
   if (!/'comando'/.test(sqlDaTabela(db, 'telas_eventos'))) refazerTabela(db, 'telas_eventos');
   if (/UNIQUE \(tela_id, midia_id, exibida_em\)/.test(sqlDaTabela(db, 'exibicoes'))) refazerTabela(db, 'exibicoes');
 }

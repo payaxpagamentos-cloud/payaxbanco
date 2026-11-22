@@ -15,7 +15,7 @@ const jaAvisou = (db, chave) => Boolean(db.prepare('SELECT 1 FROM avisos WHERE c
 const marcar = (db, chave) => db.prepare('INSERT OR REPLACE INTO avisos (chave, criado_em) VALUES (?, ?)').run(chave, agora());
 
 /** E-mails de quem opera a plataforma. */
-const equipe = (db) => db.prepare("SELECT email FROM usuarios WHERE perfil IN ('master','operador') AND ativo = 1").all().map((u) => u.email);
+const equipe = (db) => db.prepare("SELECT email FROM usuarios WHERE perfil IN ('master','administrador','operador') AND ativo = 1").all().map((u) => u.email);
 
 const ligado = (db) => email.configurado() && Boolean(lerConfig(db).avisos_email);
 

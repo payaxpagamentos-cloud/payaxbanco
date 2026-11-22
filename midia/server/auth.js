@@ -37,7 +37,7 @@ const lerToken = (token) => abrirToken(token, 'midia');
 const emitirTokenTela = (tela) => montar({ sub: tela.id, ver: tela.token_versao, aud: 'tela' });
 const lerTokenTela = (token) => abrirToken(token, 'tela');
 
-const EQUIPE = ['master', 'operador'];
+const EQUIPE = ['master', 'administrador', 'operador'];
 
 function autenticar(db) {
   const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.anunciante_id, u.local_id, u.ativo,

@@ -40,14 +40,16 @@ export async function usuarios(ctx) {
   limpar(ctx.conteudo,
     el('div', { class: 'linha entre', style: 'margin-bottom:16px' },
       el('p', { class: 'mudo', style: 'margin:0' }, 'Equipe (master e operador) e os acessos dos portais do anunciante e do lojista.'),
-      el('button', { class: 'btn primario', onclick: () => novoUsuario(opcoes, pintar) }, icone('mais'), 'Novo usuário')),
+      el('button', { class: 'btn primario', onclick: () => novoUsuario(opcoes, pintar, ctx.master) }, icone('mais'), 'Novo usuário')),
     corpo);
   await pintar();
 }
 
-function novoUsuario(opcoes, recarregar) {
+function novoUsuario(opcoes, recarregar, master = true) {
   return formModal('Novo usuário', () => {
-    const perfil = escolha('Perfil', 'perfil', PERFIS, 'operador');
+    // Só o master cria outro master.
+    const perfis = master ? PERFIS : Object.fromEntries(Object.entries(PERFIS).filter(([k]) => k !== 'master'));
+    const perfil = escolha('Perfil', 'perfil', perfis, 'operador');
     const anunciante = escolha('Anunciante', 'anunciante_id', Object.fromEntries(opcoes.anunciantes.map((a) => [a.id, a.nome])), '');
     const ponto = escolha('Ponto', 'local_id', Object.fromEntries(opcoes.locais.map((l) => [l.id, l.nome])), '');
     anunciante.hidden = true;
@@ -101,7 +103,9 @@ function formConfig(conteudo, rotuloBotao = 'Salvar') {
 }
 
 export async function configuracoes(ctx) {
-  const aba = ABAS_CONFIG.some(([k]) => k === ctx.parametros[0]) ? ctx.parametros[0] : 'empresa';
+  // A aba Sistema (atualizar o sistema e backup) é só do master; o administrador vê o resto.
+  const abasVisiveis = ctx.master ? ABAS_CONFIG : ABAS_CONFIG.filter(([k]) => k !== 'sistema');
+  const aba = abasVisiveis.some(([k]) => k === ctx.parametros[0]) ? ctx.parametros[0] : 'empresa';
   const c = await api.get('/painel/configuracoes');
   let corpo;
   if (aba === 'empresa') {
@@ -191,7 +195,7 @@ export async function configuracoes(ctx) {
     corpo = el('div', { class: 'coluna' }, await cartaoAtualizacao(ctx), await cartaoBackup());
   }
   limpar(ctx.conteudo, el('div', { class: 'coluna' },
-    abas(ABAS_CONFIG, aba, 'configuracoes'),
+    abas(abasVisiveis, aba, 'configuracoes'),
     el('p', { class: 'pequeno mudo', style: 'margin:0' },
       aba === 'empresa' ? 'Os dados da empresa: marca, PIX e nota fiscal das faturas, WhatsApp e avisos.'
         : aba === 'tvs' ? 'Como as telas montam o loop, falam com o servidor e o que mostram além dos anúncios.'
