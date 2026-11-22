@@ -297,12 +297,25 @@ if [[ $COM_TLS -eq 1 ]]; then
   for extra in "www.$DOMINIO" "midia.$DOMINIO" "tv.$DOMINIO"; do
     if getent ahostsv4 "$extra" >/dev/null 2>&1; then NOMES+=(-d "$extra"); else aviso "$extra ainda não resolve: fica fora do certificado por enquanto."; fi
   done
+  # Reescrever o arquivo do nginx apaga os blocos de HTTPS que o certbot tinha escrito nele. Por isso
+  # os blocos de HTTPS que o certbot tinha escrito nele. Por isso esta etapa sempre acontece: primeiro
+  # tenta emitir (ou ampliar, quando entrou nome novo) e, se não der — limite de emissões do Let's
+  # Encrypt, DNS ainda propagando —, recoloca no nginx o certificado que já existe. Sem isso, a
+  # atualização deixa o site inteiro sem HTTPS.
+  emitido=0
   if [[ -n "$EMAIL_ADMIN" ]]; then
-    executar certbot --nginx "${NOMES[@]}" --agree-tos -m "$EMAIL_ADMIN" --redirect --non-interactive || \
-      aviso "O certificado não saiu agora. Confira o DNS e rode: sudo certbot --nginx -d $DOMINIO"
+    executar certbot --nginx "${NOMES[@]}" --agree-tos -m "$EMAIL_ADMIN" --expand --redirect --non-interactive && emitido=1
   else
-    executar certbot --nginx "${NOMES[@]}" --agree-tos --register-unsafely-without-email --redirect --non-interactive || \
+    executar certbot --nginx "${NOMES[@]}" --agree-tos --register-unsafely-without-email --expand --redirect --non-interactive && emitido=1
+  fi
+  if [[ $emitido -eq 0 ]]; then
+    if [[ -d "/etc/letsencrypt/live/$DOMINIO" ]]; then
+      aviso "Não consegui emitir agora; recolocando no nginx o certificado que já existe."
+      executar certbot install --cert-name "$DOMINIO" --nginx --non-interactive \
+        || aviso "Também não consegui recolocar. O site segue em HTTP. Rode: sudo certbot --nginx -d $DOMINIO"
+    else
       aviso "O certificado não saiu agora. Confira o DNS e rode: sudo certbot --nginx -d $DOMINIO"
+    fi
   fi
 fi
 
