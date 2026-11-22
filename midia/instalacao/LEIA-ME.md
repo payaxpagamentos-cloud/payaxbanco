@@ -11,6 +11,8 @@ com HTTPS do Let's Encrypt, subindo sozinho quando a máquina reinicia.
 | `instalar.sh` | A instalação inteira, de uma vez. Pode rodar de novo sem medo. |
 | `atualizar.sh` | Troca o código por uma versão nova, guardando antes uma cópia do banco. |
 | `vaimidia.service` | O serviço do systemd (quem mantém o sistema no ar). |
+| `atualizar-pelo-painel.sh` | A atualização pedida pelo painel, com volta automática se a versão nova não subir. |
+| `vaimidia-atualizar.path` / `.service` | Vigiam o pedido do painel e chamam o script acima como root. |
 | `nginx-vaimidia.conf` | O nginx na frente, com o tamanho de envio certo para vídeo. |
 
 ## O que a máquina precisa ter
@@ -138,6 +140,21 @@ sudo ./atualizar.sh
 Copia o código novo, reinstala as dependências e reinicia — sem tocar na configuração, no banco nem nos
 criativos. Antes de trocar qualquer coisa, guarda uma cópia do banco em
 `/var/lib/vaimidia/backups/antes-da-atualizacao-*.db`.
+
+## Atualizar pelo painel (pelo celular)
+
+Depois da primeira atualização pelos comandos acima, o painel ganha **Configurações › Atualizar sistema**
+(só para o master): escolha o `vaimidia.zip`, digite a sua senha de novo e confirme.
+
+Por segurança, o sistema não se troca sozinho — ele roda como um usuário sem poder na máquina. O painel só
+deixa o pacote em `/var/lib/vaimidia/atualizacao`, e o serviço `vaimidia-atualizar` (root) faz o resto:
+confere se o zip é mesmo o sistema, guarda uma cópia da versão no ar em `/opt/vaimidia.anterior`, instala a
+nova e, **se ela não subir, volta para a anterior sozinho**. O painel mostra cada etapa e o registro.
+
+```bash
+sudo systemctl status vaimidia-atualizar.path   # o vigia está ligado?
+sudo journalctl -u vaimidia-atualizar -n 50     # o que aconteceu na última atualização
+```
 
 ## Quando alguma coisa não sobe
 

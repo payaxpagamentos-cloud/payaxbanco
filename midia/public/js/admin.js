@@ -1,5 +1,5 @@
 /** Administração: usuários, configurações da plataforma, diagnóstico e histórico. */
-import { api, qs, baixar } from './api.js';
+import { api, qs, baixar, BASE, sessao } from './api.js';
 import {
   el, limpar, icone, toast, acao, formModal, confirmar, perguntar, campo, escolha, marcar, lerForm,
   inteiro, dinheiro, dataHora, etiqueta, reaisCampo, centavos, repetir, mb, PERFIS,
@@ -184,7 +184,106 @@ export async function configuracoes(ctx) {
   });
   limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'max-width:860px' },
     el('div', { class: 'cartao grande' }, f),
+    await cartaoAtualizacao(ctx),
     await cartaoBackup()));
+}
+
+// Etapas que o atualizador do servidor informa (atualizar-pelo-painel.sh).
+const ETAPAS = {
+  conferindo: 'Conferindo o pacote', guardando: 'Guardando uma cópia da versão no ar', instalando: 'Instalando a versão nova',
+  testando: 'Conferindo se o sistema voltou', revertendo: 'Voltando para a versão anterior',
+};
+const FINAIS = ['concluida', 'falhou', 'revertida'];
+
+/**
+ * Atualizar o sistema pelo painel (dá para fazer do celular): envia o vaimidia.zip com a senha
+ * digitada de novo. Quem troca a versão é um serviço do servidor; se a nova não subir, ele volta a anterior.
+ */
+async function cartaoAtualizacao(ctx) {
+  const corpo = el('div', { class: 'cartao' });
+  const situacao = el('div', { class: 'coluna', style: 'gap:8px' });
+  const arquivo = el('input', { type: 'file', name: 'pacote', accept: '.zip,application/zip', required: true });
+  const senha = el('input', { type: 'password', name: 'senha', autocomplete: 'current-password', required: true, placeholder: 'Sua senha' });
+  const botao = el('button', { class: 'btn primario' }, icone('enviar'), 'Atualizar agora');
+  const f = el('form', { class: 'coluna', style: 'gap:10px' },
+    el('label', { class: 'campo' }, el('span', {}, 'Arquivo vaimidia.zip'), arquivo),
+    el('label', { class: 'campo' }, el('span', {}, 'Sua senha, para confirmar'), senha),
+    el('div', {}, botao));
+  let acompanhando = false;
+
+  const pintar = async () => {
+    const s = await api.get('/painel/sistema/atualizacao');
+    const e = s.estado;
+    const emAndamento = s.esperando || (e && !FINAIS.includes(e.etapa)
+      && Date.now() - Date.parse(e.atualizado_em) < 15 * 60_000);
+    const linhas = [];
+    if (s.sem_resposta) {
+      linhas.push(el('p', { class: 'aviso erro' }, 'O servidor ainda não pegou o pedido. O atualizador automático é instalado na '
+        + 'primeira atualização feita pelos comandos (./atualizar.sh). Depois dela, este botão passa a funcionar.'));
+    } else if (s.esperando) {
+      linhas.push(el('p', { class: 'aviso' }, 'Pacote recebido. Esperando o servidor começar…'));
+    } else if (e && emAndamento) {
+      linhas.push(el('p', { class: 'aviso' }, `${ETAPAS[e.etapa] ?? e.mensagem}… não feche esta página.`));
+    } else if (e) {
+      const classe = e.etapa === 'concluida' ? 'aviso ok' : 'aviso erro';
+      linhas.push(el('p', { class: classe }, `${e.mensagem} (${dataHora(e.atualizado_em)})`));
+      if (e.etapa === 'concluida' && acompanhando) {
+        linhas.push(el('div', {}, el('button', { class: 'btn primario', type: 'button', onclick: () => location.reload() }, 'Recarregar a página')));
+      }
+    }
+    if (e && e.etapa !== 'concluida' && s.log && !emAndamento) {
+      linhas.push(el('details', {}, el('summary', { class: 'pequeno' }, 'Ver o registro'), el('pre', { class: 'pequeno', style: 'white-space:pre-wrap;max-height:240px;overflow:auto' }, s.log)));
+    }
+    limpar(situacao, ...linhas);
+    f.hidden = Boolean(emAndamento && !s.sem_resposta);
+  };
+
+  f.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    acao(botao, async () => {
+      const zip = arquivo.files[0];
+      if (!zip) throw new Error('Escolha o arquivo vaimidia.zip.');
+      if (!/\.zip$/i.test(zip.name)) throw new Error('Escolha o arquivo .zip do sistema (vaimidia.zip).');
+      const ok = await confirmar('Atualizar o sistema agora?',
+        'O sistema fica fora do ar por cerca de 1 minuto. Antes de trocar, o servidor guarda uma cópia da versão atual '
+        + 'e, se a nova não subir, volta para ela sozinho.', 'Atualizar');
+      if (!ok) return;
+      let resp;
+      try {
+        resp = await fetch(`${BASE}/api/painel/sistema/atualizacao`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${sessao.get()?.token ?? ''}`, 'Content-Type': 'application/zip',
+            'X-Confirmar-Senha': encodeURIComponent(senha.value),
+          },
+          body: zip,
+        });
+      } catch {
+        throw new Error('Sem conexão com o servidor durante o envio.');
+      }
+      if (!resp.ok) {
+        let msg = `Erro ${resp.status}`;
+        try { msg = (await resp.json()).erro || msg; } catch { /* sem corpo */ }
+        throw new Error(msg);
+      }
+      senha.value = '';
+      arquivo.value = '';
+      acompanhando = true;
+      toast('Pacote enviado. O servidor está atualizando.');
+      await pintar();
+    });
+  });
+
+  limpar(corpo,
+    el('h2', { style: 'margin:0 0 4px' }, 'Atualizar sistema'),
+    el('p', { class: 'pequeno mudo', style: 'margin:0 0 12px' },
+      'Envie o vaimidia.zip da versão nova, inclusive pelo celular. O servidor guarda uma cópia da versão atual antes de trocar '
+      + 'e, se a nova não subir, volta para ela sozinho.'),
+    situacao, f);
+  try { await pintar(); } catch { /* o cartão aparece mesmo assim */ }
+  // Durante a troca o sistema reinicia: a consulta falha por alguns segundos e a próxima tenta de novo.
+  ctx.parar(repetir(pintar, 4000));
+  return corpo;
 }
 
 /** Backup: cópia do banco guardada pelo servidor, com download, e o espelho dos arquivos das mídias. */

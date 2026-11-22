@@ -54,6 +54,17 @@ else
   npm install --omit=dev --prefix "$DESTINO"
 fi
 
+titulo "Atualização pelo painel"
+# O painel deixa o pacote nesta pasta; o serviço vaimidia-atualizar (root) vigia e faz a troca.
+install -d -o vaimidia -g vaimidia -m 750 "$DADOS/atualizacao"
+chmod +x "$DESTINO"/instalacao/*.sh
+install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.path" /etc/systemd/system/vaimidia-atualizar.path
+install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.service" /etc/systemd/system/vaimidia-atualizar.service
+systemctl daemon-reload
+systemctl enable --now vaimidia-atualizar.path >/dev/null 2>&1 || true
+command -v unzip >/dev/null 2>&1 || apt-get install -y unzip >/dev/null 2>&1 || true
+echo "    Ativa: Configurações › Atualizar sistema, no painel."
+
 titulo "Reiniciando"
 systemctl restart vaimidia
 sleep 2

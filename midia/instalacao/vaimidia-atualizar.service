@@ -1,0 +1,13 @@
+# Vai Mídia — faz a atualização pedida pelo painel (ver atualizar-pelo-painel.sh).
+[Unit]
+Description=Vai Mídia — atualização pedida pelo painel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/vaimidia/instalacao/atualizar-pelo-painel.sh
+TimeoutStartSec=20min
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vaimidia-atualizar

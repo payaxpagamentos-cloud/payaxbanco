@@ -117,7 +117,7 @@ titulo "Instalando o que falta no sistema"
 if [[ $SO_ARQUIVOS -eq 1 ]]; then
   echo "    (--so-arquivos: pulando os pacotes do sistema)"
 fi
-PACOTES=(curl ca-certificates gnupg rsync nginx)
+PACOTES=(curl ca-certificates gnupg rsync nginx unzip)
 [[ $COM_TLS -eq 1 ]] && PACOTES+=(certbot python3-certbot-nginx)
 [[ $COM_FIREWALL -eq 1 ]] && PACOTES+=(ufw)
 if [[ $SO_ARQUIVOS -eq 0 ]]; then
@@ -257,8 +257,13 @@ else
   sed "s|/usr/bin/node|$NODE_BIN|" "$RAIZ/instalacao/vaimidia.service" > /etc/systemd/system/vaimidia.service
   chmod 644 /etc/systemd/system/vaimidia.service
 fi
+executar install -d -o "$USUARIO" -g "$USUARIO" -m 750 "$DADOS/atualizacao"
+# Atualização pelo painel: o painel deixa o pacote em $DADOS/atualizacao e este serviço (root) faz a troca.
+executar install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.path" /etc/systemd/system/vaimidia-atualizar.path
+executar install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.service" /etc/systemd/system/vaimidia-atualizar.service
 executar systemctl daemon-reload
 executar systemctl enable vaimidia
+executar systemctl enable --now vaimidia-atualizar.path
 executar systemctl restart vaimidia
 
 # ---------------------------------------------------------------- nginx

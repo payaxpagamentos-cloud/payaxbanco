@@ -1,0 +1,13 @@
+# Vai Mídia — vigia o pedido de atualização feito pelo painel.
+#
+# O painel só deixa o pacote e o arquivo "pedido" em /var/lib/vaimidia/atualizacao. Quando o pedido
+# aparece, o systemd chama o vaimidia-atualizar.service, que faz a troca como root.
+[Unit]
+Description=Vai Mídia — pedido de atualização pelo painel
+
+[Path]
+PathExists=/var/lib/vaimidia/atualizacao/pedido
+Unit=vaimidia-atualizar.service
+
+[Install]
+WantedBy=multi-user.target

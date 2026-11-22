@@ -71,3 +71,50 @@ test('Campanha: o painel diz por que não está passando agora', async (t) => {
   const loop = JSON.stringify(grade.montarPorTela(api.db, tela));
   assert.ok(loop.includes(`"campanha_id":${c.id}`) || loop.includes('Só num dia'), 'a campanha entrou no loop da TV');
 });
+
+/**
+ * Atualizar o sistema pelo painel (pelo celular): só o master, com a senha digitada de novo, e só um
+ * .zip. O painel não troca nada sozinho — deixa o pacote e o pedido para o serviço do servidor.
+ */
+test('Atualização pelo painel: pede a senha, aceita só zip e deixa o pedido para o servidor', async (t) => {
+  const os = require('node:os');
+  const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'midia-atualizacao-'));
+  process.env.MIDIA_ATUALIZACAO = pasta;
+  const { iniciar, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+  t.after(() => { api.fechar(); limparArquivos(); delete process.env.MIDIA_ATUALIZACAO; fs.rmSync(pasta, { recursive: true, force: true }); });
+  const master = await api.login();
+  const zip = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(200, 1)]);
+  const enviar = (corpo, senha, tk = master) => fetch(`${api.base}/painel/sistema/atualizacao`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/zip', 'X-Confirmar-Senha': encodeURIComponent(senha) },
+    body: corpo,
+  });
+
+  assert.equal((await enviar(zip, 'senha-errada')).status, 403, 'sem a senha certa, nada acontece');
+  assert.ok(!fs.existsSync(path.join(pasta, 'pedido')));
+  assert.equal((await enviar(Buffer.from('não sou zip'), 'master123')).status, 422, 'só aceita .zip');
+
+  const r = await enviar(zip, 'master123');
+  assert.equal(r.status, 202);
+  assert.ok(fs.existsSync(path.join(pasta, 'pacote.zip')), 'o pacote fica para o servidor');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(pasta, 'pedido'), 'utf8')).por, 'master@midia.com.br');
+  assert.equal((await enviar(zip, 'master123')).status, 409, 'uma atualização por vez');
+
+  const s = (await api.get('/painel/sistema/atualizacao', master)).dados;
+  assert.equal(s.esperando, true);
+  assert.equal(s.sem_resposta, false);
+
+  // O servidor terminou: o painel mostra o resultado.
+  fs.rmSync(path.join(pasta, 'pedido'));
+  fs.writeFileSync(path.join(pasta, 'estado.json'), JSON.stringify({ etapa: 'concluida', mensagem: 'Sistema atualizado.', atualizado_em: new Date().toISOString() }));
+  const fim = (await api.get('/painel/sistema/atualizacao', master)).dados;
+  assert.equal(fim.estado.etapa, 'concluida');
+  assert.equal(fim.esperando, false);
+
+  // Quem não é master nem vê.
+  await api.post('/painel/usuarios', { nome: 'Op', email: 'op@midia.com.br', perfil: 'operador', senha: 'operador-123' }, master);
+  const op = await api.login('op@midia.com.br', 'operador-123');
+  assert.equal((await api.get('/painel/sistema/atualizacao', op)).status, 403);
+  assert.equal((await enviar(zip, 'operador-123', op)).status, 403);
+});

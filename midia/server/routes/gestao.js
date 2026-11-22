@@ -6,7 +6,8 @@ const { agora, transacao, lerConfig, gravarConfig, CONFIG_PADRAO, TEXTO } = requ
 const { permitir } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
-const { hashSenha } = require('../lib/senha');
+const { hashSenha, verificarSenha } = require('../lib/senha');
+const atualizacao = require('../lib/atualizacao');
 const { hoje, mes, somarDias, somarMeses, inicioMes, fimMes, minutosDe } = require('../lib/datas');
 const { diagnostico, estaOnline } = require('../lib/monitor');
 const grade = require('../lib/grade');
@@ -398,6 +399,23 @@ module.exports = (db) => {
     }, { exigir: true });
     registrar(db, req, 'email_teste', { para, enviado: r2.enviado });
     res.json(r2);
+  });
+
+  // Atualizar o sistema pelo painel: só o master, e com a senha digitada de novo.
+  r.get('/sistema/atualizacao', permitir('master'), (_req, res) => res.json(atualizacao.situacao()));
+
+  r.post('/sistema/atualizacao', permitir('master'), (req, res) => {
+    let senha = '';
+    // A senha vem num cabeçalho (o corpo é o próprio .zip), codificada para aceitar acento.
+    try { senha = decodeURIComponent(String(req.get('X-Confirmar-Senha') ?? '')); } catch { /* fica vazia */ }
+    const u = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(req.usuario.id);
+    if (!u || !verificarSenha(senha, u.senha_hash)) {
+      registrar(db, req, 'atualizacao_senha_errada', {});
+      throw new ErroNegocio('Senha incorreta. A atualização não foi feita.', 403);
+    }
+    const pedido = atualizacao.pedir(req.body, req.usuario);
+    registrar(db, req, 'atualizacao_pedida', { bytes: pedido.bytes });
+    res.status(202).json({ ok: true, pedido });
   });
 
   r.put('/configuracoes', permitir('master'), (req, res) => {

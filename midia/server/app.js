@@ -28,6 +28,9 @@ function criarApp(db) {
   // Tudo é servido em MIDIA_BASE_PATH (ex.: /midia): o painel, a API em <endereço>/api e o player das TVs em <endereço>/tv/.
   const r = express.Router();
   r.use(['/api/auth/login', '/api/auth/recuperar', '/api/auth/nova-senha'], limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
+  // Atualizar o sistema pede a senha de novo: a tentativa conta como uma tentativa de login.
+  const limiteAtualizacao = limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto });
+  r.use('/api/painel/sistema/atualizacao', (req, res, next) => (req.method === 'POST' ? limiteAtualizacao(req, res, next) : next()));
   // O envio de mídia tem o corpo bruto (arquivo) e limite próprio; o resto é JSON de até 400 kB.
   // O envio de criativo vai no corpo bruto (arquivo) com limite próprio; o resto é JSON de até 400 kB.
   r.use('/api', (req, res, next) => {
@@ -36,6 +39,8 @@ function criarApp(db) {
     if (/^\/(painel|anunciante|ponto)\/midias$|^\/painel\/locais\/\d+\/logo$/.test(req.path)) {
       return express.raw({ type: '*/*', limit: config.midiaMaxBytes })(req, res, next);
     }
+    // Pacote de atualização do sistema (o vaimidia.zip), enviado pelo painel.
+    if (req.path === '/painel/sistema/atualizacao') return express.raw({ type: '*/*', limit: '80mb' })(req, res, next);
     // Foto da tela (prova visual): imagem pequena, limite próprio.
     if (req.path === '/player/foto') return express.raw({ type: '*/*', limit: '600kb' })(req, res, next);
     return express.json({ limit: '400kb' })(req, res, next);
