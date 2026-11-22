@@ -510,12 +510,15 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 }
 
 @media (max-width: 860px){
-  .casca, .casca.recolhida{ grid-template-columns: 1fr; }
+  /* Menu em cima e conteúdo embaixo. Sem fixar as linhas, a grade (com altura mínima de uma tela) repartia a
+     sobra entre as duas — em página curta o menu esticava e o item aberto virava um bloco gigante. */
+  .casca, .casca.recolhida{ grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .lateral{ position: sticky; top: 0; z-index: 50; height: auto; flex-direction: row; overflow-x: auto; padding: 8px 12px; gap: 2px; border-right: 0; border-bottom: 1px solid var(--border);
     background: #18232A; scrollbar-width: none; }
   .lateral::-webkit-scrollbar{ display: none; }
   .lateral .topo-lateral, .lateral .grupo-sub{ display: none; }
-  .lateral a.item{ white-space: nowrap; }
+  .lateral{ align-self: start; align-items: center; }
+  .lateral a.item{ white-space: nowrap; flex: none; }
   .lateral .voltar{ margin-top: 0; }
   .topo{ padding: 16px 16px 2px; }
   .conteudo{ padding: 12px 16px 28px; }
