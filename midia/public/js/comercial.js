@@ -559,45 +559,95 @@ function cartaoMidia(m, recarregar) {
         }, icone('lixo')))));
 }
 
-/** Envio do arquivo: o tipo e a duração do vídeo saem do próprio arquivo. */
+/**
+ * Envio de criativos — um ou vários de uma vez.
+ *
+ * Subir uma campanha com cinco peças, uma por uma, era cinco vezes o mesmo formulário. Agora dá para
+ * escolher vários arquivos de uma vez: cada um vira um criativo com o nome do próprio arquivo, todos
+ * com o mesmo anunciante, uso e validade. O tipo e a duração do vídeo continuam saindo do arquivo.
+ *
+ * "Aprovar já" existe porque, quando quem sobe é a própria equipe, a peça já foi conferida — obrigar a
+ * aprovar uma por uma depois era só mais cinco cliques. Desmarcado, entram como "aguardando aprovação".
+ */
 function enviarCriativo({ anuncianteId = '', campanhaId = null } = {}, recarregar, opcoes) {
-  return modal('Enviar criativo', (fechar) => {
-    const arquivo = el('input', { type: 'file', name: 'arquivo', accept: 'image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm', required: true });
-    const nome = campo('Nome do criativo', { name: 'nome', required: true, maxlength: 140 });
+  return modal('Enviar criativos', (fechar) => {
+    const arquivo = el('input', {
+      type: 'file', name: 'arquivo', multiple: true, required: true,
+      accept: 'image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm',
+    });
+    const lista = el('div', { class: 'pequeno mudo', style: 'margin-top:-6px' });
+    const nome = campo('Nome do criativo', { name: 'nome', maxlength: 140 });
     const uso = escolha('Uso', 'uso', { campanha: 'De campanha (publicidade)', institucional: 'Institucional / conteúdo do ponto' }, 'campanha');
-    const anunciante = escolha('Anunciante', 'anunciante_id', Object.fromEntries(opcoes.anunciantes.map((a) => [a.id, a.nome])), anuncianteId);
+    // Sem a opção vazia explícita, o seletor parecia ter um anunciante escolhido e mandava vazio.
+    const anunciante = escolha('Anunciante', 'anunciante_id',
+      { '': 'Escolha o anunciante…', ...Object.fromEntries(opcoes.anunciantes.map((a) => [a.id, a.nome])) }, anuncianteId,
+      { required: true });
+    // Chaves numéricas vêm primeiro num objeto: a opção vazia ia para o fim da lista. Ela volta para o topo.
+    const seletorAnunciante = anunciante.querySelector('select');
+    seletorAnunciante.prepend(seletorAnunciante.querySelector('option[value=""]'));
+    seletorAnunciante.value = anuncianteId ? String(anuncianteId) : '';
     const ponto = escolha('Ponto (opcional, para conteúdo da loja)', 'local_id', { '': 'Institucional da rede', ...Object.fromEntries(opcoes.locais.map((l) => [l.id, l.nome])) }, '');
     ponto.hidden = true;
     uso.querySelector('select').addEventListener('change', (e) => {
       const campanha = e.target.value === 'campanha';
       anunciante.hidden = !campanha;
+      anunciante.querySelector('select').required = campanha;
       ponto.hidden = campanha;
     });
-    const duracaoCampo = campo('Duração da imagem (segundos)', { name: 'duracao_s', type: 'number', min: 1, max: 600, placeholder: 'padrão da plataforma' });
+    const duracaoCampo = campo('Duração de cada imagem (segundos)', { name: 'duracao_s', type: 'number', min: 1, max: 600, placeholder: 'padrão da plataforma' });
     const validade = campo('Válido até (opcional)', { name: 'validade_ate', type: 'date' });
+    const aprovarJa = marcar('Aprovar já ao enviar (entra direto na programação)', { name: 'aprovar', checked: true });
     const ok = el('button', { class: 'btn primario largo' }, 'Enviar');
+
     arquivo.addEventListener('change', () => {
-      const f = arquivo.files?.[0];
-      if (f && !nome.querySelector('input').value) nome.querySelector('input').value = f.name.replace(/\.[^.]+$/, '').slice(0, 140);
-      duracaoCampo.hidden = Boolean(f && f.type.startsWith('video'));
+      const arquivos = [...(arquivo.files ?? [])];
+      const varios = arquivos.length > 1;
+      // Com vários arquivos, cada um leva o próprio nome; o campo de nome só faz sentido para um.
+      nome.hidden = varios;
+      if (arquivos.length === 1 && !nome.querySelector('input').value) {
+        nome.querySelector('input').value = arquivos[0].name.replace(/\.[^.]+$/, '').slice(0, 140);
+      }
+      duracaoCampo.hidden = arquivos.length > 0 && arquivos.every((f) => f.type.startsWith('video'));
+      limpar(lista, varios ? `${arquivos.length} arquivos: ${arquivos.map((f) => f.name).join(', ')}` : '');
+      ok.textContent = varios ? `Enviar ${arquivos.length} criativos` : 'Enviar';
     });
+
     const f = el('form', { class: 'form' },
-      el('label', { class: 'campo' }, 'Arquivo (imagem JPG/PNG/WEBP ou vídeo MP4/MOV/WEBM)', arquivo),
-      nome, uso, anunciante, ponto, duracaoCampo, validade,
-      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'A duração do vídeo e o tamanho da imagem são lidos do próprio arquivo. O criativo entra como "aguardando aprovação".'),
+      el('label', { class: 'campo' }, 'Arquivos (imagem JPG/PNG/WEBP ou vídeo MP4/MOV/WEBM) — pode escolher vários', arquivo),
+      lista, nome, uso, anunciante, ponto, duracaoCampo, validade, aprovarJa,
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'Segure Ctrl (ou Shift) para escolher vários arquivos. A duração do vídeo e o tamanho da imagem são lidos do próprio arquivo.'),
       el('div', { class: 'linha entre' }, el('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Cancelar'), ok));
+
     f.addEventListener('submit', (e) => {
       e.preventDefault();
       acao(ok, async () => {
         const d = lerForm(f);
-        const alvo = arquivo.files?.[0];
-        if (!alvo) throw new Error('Escolha o arquivo.');
-        const m = await enviarArquivo('painel/midias', alvo, {
-          nome: d.nome, uso: d.uso, anunciante_id: d.uso === 'campanha' ? d.anunciante_id : '', local_id: d.uso === 'campanha' ? '' : d.local_id,
-          duracao_s: d.duracao_s, validade_ate: d.validade_ate,
-        });
-        if (campanhaId) await api.post(`/painel/campanhas/${campanhaId}/criativos`, { midia_id: m.id });
-        toast('Criativo enviado. Aprove para ele entrar na programação.');
+        const arquivos = [...(arquivo.files ?? [])];
+        if (!arquivos.length) throw new Error('Escolha pelo menos um arquivo.');
+        const enviados = [];
+        const falhas = [];
+        for (const [i, alvo] of arquivos.entries()) {
+          ok.textContent = arquivos.length > 1 ? `Enviando ${i + 1} de ${arquivos.length}…` : 'Enviando…';
+          try {
+            const nomeDoCriativo = arquivos.length === 1 && d.nome ? d.nome : alvo.name.replace(/\.[^.]+$/, '').slice(0, 140);
+            const m = await enviarArquivo('painel/midias', alvo, {
+              nome: nomeDoCriativo, uso: d.uso,
+              anunciante_id: d.uso === 'campanha' ? d.anunciante_id : '', local_id: d.uso === 'campanha' ? '' : d.local_id,
+              duracao_s: d.duracao_s, validade_ate: d.validade_ate,
+            });
+            if (d.aprovar) await api.post(`/painel/midias/${m.id}/aprovacao`, { decisao: 'aprovar' });
+            if (campanhaId) await api.post(`/painel/campanhas/${campanhaId}/criativos`, { midia_id: m.id });
+            enviados.push(alvo.name);
+          } catch (err) {
+            // Um arquivo ruim não derruba os outros: segue, e no fim avisa qual não entrou e por quê.
+            falhas.push(`${alvo.name}: ${err.message}`);
+          }
+        }
+        if (falhas.length && !enviados.length) throw new Error(`Nenhum arquivo entrou. ${falhas.join(' · ')}`);
+        const quantos = enviados.length === 1 ? '1 criativo enviado' : `${enviados.length} criativos enviados`;
+        toast(`${quantos}${d.aprovar ? ' e aprovados' : ' — aprove para entrarem na programação'}.`
+          + (falhas.length ? ` Não entraram: ${falhas.join(' · ')}` : ''), Boolean(falhas.length));
         fechar();
         recarregar();
       });

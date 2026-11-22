@@ -19,3 +19,12 @@ test('Painel: o formulário de pareamento manda o código digitado', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'public/css/midia.css'), 'utf8');
   assert.match(css, /\[hidden\]\{ display: none !important; \}/, 'campo escondido tem de ficar escondido');
 });
+
+test('Painel: criativos sobem vários de uma vez', () => {
+  const comercial = fs.readFileSync(path.join(__dirname, '..', 'public/js/comercial.js'), 'utf8');
+  const envio = comercial.slice(comercial.indexOf('function enviarCriativo'), comercial.indexOf('// ----', comercial.indexOf('function enviarCriativo')));
+  assert.match(envio, /type: 'file', name: 'arquivo', multiple: true/, 'o seletor de arquivo aceita vários');
+  assert.match(envio, /for \(const \[i, alvo\] of arquivos\.entries\(\)\)/, 'cada arquivo vira um criativo');
+  assert.match(envio, /name: 'aprovar', checked: true/, 'a equipe pode aprovar já ao enviar');
+  assert.match(envio, /'Escolha o anunciante…'/, 'o anunciante é escolhido de propósito, não por acaso');
+});
