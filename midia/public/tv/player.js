@@ -634,8 +634,18 @@ async function prepararItem(item) {
     elemento.alt = '';
   }
   if (origem.temporario) elemento.dataset.blob = origem.src;
-  // Na tela dividida a peça cobre a metade inteira (object-fit: cover no CSS), sem barras nem fundo desfocado.
-  alvo.replaceChildren(elemento);
+  // A arte quase nunca tem a proporção exata do espaço (o rodapé come um pouco da altura). Em vez de
+  // faixas pretas, a sobra recebe a própria arte desfocada: nada é cortado e a tela fica preenchida.
+  // Só para imagem — duplicar um vídeo pesaria em TV fraca.
+  if (item.tipo !== 'video') {
+    const fundo = document.createElement('img');
+    fundo.className = 'fundo';
+    fundo.src = origem.src;
+    fundo.alt = '';
+    alvo.replaceChildren(fundo, elemento);
+  } else {
+    alvo.replaceChildren(elemento);
+  }
   // Espera o arquivo estar pronto (com teto, para não travar o loop num arquivo ruim).
   await Promise.race([
     new Promise((pronto, falhou) => {

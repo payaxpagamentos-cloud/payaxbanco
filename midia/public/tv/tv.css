@@ -28,6 +28,8 @@ body{ color: #fff; font-family: "OpenSans", system-ui, sans-serif; cursor: none;
 .camada.no-ar{ opacity: 1; }
 /* A peça fica presa ao quadro (acima do rodapé) e se ajusta por dentro: sem cortar e sem passar do rodapé. */
 .camada img, .camada video{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+/* Imagem: o fundo é a própria arte desfocada (ver .fundo), então ela mesma não leva fundo preto. */
+.camada img:not(.fundo){ background: transparent; }
 
 /* Com a faixa ligada, o conteúdo sobe para não ficar coberto. */
 body.com-faixa .palco{ bottom: var(--faixa-altura); }
