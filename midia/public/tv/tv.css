@@ -22,17 +22,11 @@
 html, body{ margin: 0; height: 100%; overflow: hidden; background: #000; }
 body{ color: #fff; font-family: "OpenSans", system-ui, sans-serif; cursor: none; user-select: none; -webkit-user-select: none; }
 
-.palco{ position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: #000; display: grid; }
-.zona-anuncio{ position: relative; overflow: hidden; background: #000; min-height: 0; height: 100%; }
-.camada{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; opacity: 0; transition: opacity .45s ease; display: grid; place-items: center; }
+.palco{ position: fixed; inset: 0; background: #000; display: grid; }
+.zona-anuncio{ position: relative; overflow: hidden; background: #000; }
+.camada{ position: absolute; inset: 0; opacity: 0; transition: opacity .45s ease; display: grid; place-items: center; }
 .camada.no-ar{ opacity: 1; }
-/*
-  O quadro manda: a peça fica presa nele (posição absoluta nas quatro bordas) e se ajusta por dentro,
-  sem cortar nem esticar. Navegador de TV costuma ser um Chromium antigo, que não entende "inset" —
-  por isso as quatro bordas estão escritas uma a uma neste arquivo; sem isso a imagem saía do tamanho
-  dela e passava por cima do rodapé.
-*/
-.camada img, .camada video{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.camada img, .camada video{ width: 100%; height: 100%; object-fit: contain; background: #000; }
 
 /* Com o rodapé ligado, o quadro do anúncio fica só na parte de cima e a peça se ajusta a ele sozinha. */
 body.com-faixa .palco{ bottom: var(--faixa-altura); }
@@ -42,9 +36,9 @@ body.com-faixa .palco{ bottom: var(--faixa-altura); }
   recebe a própria peça desfocada — nada é cortado e a tela não fica com buracos pretos no hall.
 */
 body.dividida .zona-anuncio{ background: var(--preto); }
-.camada .fundo{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(34px) brightness(.45) saturate(1.1);
+.camada .fundo{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(34px) brightness(.45) saturate(1.1);
   transform: scale(1.12); z-index: 0; }
-.camada img:not(.fundo), .camada video{ z-index: 1; background: transparent; }
+.camada img:not(.fundo), .camada video{ position: relative; z-index: 1; }
 
 /* Tela dividida: comunicado de um lado, publicidade do outro. Em pé, um em cima do outro. */
 body.dividida .palco{ grid-template-columns: 44% 56%; }
@@ -81,7 +75,7 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 .faixa .relogio{ font-size: 3.2vh; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; }
 
 /* Tela de espera: pareamento, sem programação ou erro. */
-.espera{ position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: grid; place-content: center; justify-items: center; gap: 1.2vh; text-align: center;
+.espera{ position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 1.2vh; text-align: center;
   background: radial-gradient(1100px 620px at 50% 8%, #24351F 0%, #1D2B33 45%, #101920 100%); padding: 6vh; z-index: 5; }
 .espera .slogan{ font-size: 2.6vh; color: var(--lime); font-weight: 600; margin: -.6vh 0 2.4vh; }
 .espera h1{ font-size: 5vh; font-weight: 800; margin: 0; letter-spacing: -.045em; }
@@ -114,7 +108,7 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 .comunicado .assinatura strong{ display: block; color: #E6E8EC; font-weight: 700; }
 
 /* Comunicado do ponto (recado do condomínio ou da loja), desenhado pela própria TV. */
-.comunicado{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; justify-content: center; gap: 3vh; padding: 8vh 9vw;
+.comunicado{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 3vh; padding: 8vh 9vw;
   background: linear-gradient(135deg, #22323B 0%, #141E24 100%); color: #fff; text-align: left; }
 .comunicado .cabeca{ display: flex; align-items: center; gap: 2vh; min-width: 0; }
 .comunicado .selo-tipo{ flex: none; }
@@ -155,7 +149,7 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
   Tela da própria rede: logotipo, frase e o símbolo grande sangrando no canto — a peça que aparece
   numa tela recém-instalada e que completa o loop quando sobra espaço.
 */
-.cartao-marca{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; background: var(--preto); color: #fff;
+.cartao-marca{ position: absolute; inset: 0; overflow: hidden; background: var(--preto); color: #fff;
   display: flex; flex-direction: column; justify-content: flex-start; gap: 2.4vh; padding: 9vh 7vw; }
 .cartao-marca .lockup{ display: flex; align-items: center; gap: 2.4vh; z-index: 1; }
 .cartao-marca .lockup .v{ height: 11vh; width: auto; color: var(--lime); flex: none; }
