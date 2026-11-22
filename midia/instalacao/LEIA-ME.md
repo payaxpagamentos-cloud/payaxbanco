@@ -29,6 +29,7 @@ Crie estes registros no painel do seu domínio. Sem eles o HTTPS não sai e o e-
 |---|---|---|
 | A | `vaimidia.com.br` | o IP do servidor |
 | A | `www.vaimidia.com.br` | o IP do servidor |
+| A | `midia.vaimidia.com.br` | o IP do servidor (atalho para o painel) |
 | A | `mail.vaimidia.com.br` | o IP do servidor |
 | MX | `vaimidia.com.br` | `mail.vaimidia.com.br`, prioridade 10 |
 | TXT | `vaimidia.com.br` | `v=spf1 ip4:SEU.IP -all` |
@@ -97,7 +98,7 @@ linha: o ponto final no MX, as aspas do DKIM e o campo *nome* ser relativo ao do
 
 ```
 Site .............. https://vaimidia.com.br
-Painel ............ https://vaimidia.com.br/midia/
+Painel ............ https://midia.vaimidia.com.br   (ou https://vaimidia.com.br/midia/)
 Player das TVs .... https://vaimidia.com.br/midia/tv/
 ```
 

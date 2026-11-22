@@ -292,11 +292,16 @@ fi
 if [[ $COM_TLS -eq 1 ]]; then
   titulo "Certificado HTTPS (Let's Encrypt)"
   aviso "Isto só funciona se $DOMINIO já estiver apontando para o IP desta máquina."
+  # Só entram no certificado os nomes que já existem no DNS: um nome que não resolve derruba a emissão inteira.
+  NOMES=(-d "$DOMINIO")
+  for extra in "www.$DOMINIO" "midia.$DOMINIO"; do
+    if getent ahostsv4 "$extra" >/dev/null 2>&1; then NOMES+=(-d "$extra"); else aviso "$extra ainda não resolve: fica fora do certificado por enquanto."; fi
+  done
   if [[ -n "$EMAIL_ADMIN" ]]; then
-    executar certbot --nginx -d "$DOMINIO" -d "www.$DOMINIO" --agree-tos -m "$EMAIL_ADMIN" --redirect --non-interactive || \
+    executar certbot --nginx "${NOMES[@]}" --agree-tos -m "$EMAIL_ADMIN" --redirect --non-interactive || \
       aviso "O certificado não saiu agora. Confira o DNS e rode: sudo certbot --nginx -d $DOMINIO"
   else
-    executar certbot --nginx -d "$DOMINIO" --agree-tos --register-unsafely-without-email --redirect --non-interactive || \
+    executar certbot --nginx "${NOMES[@]}" --agree-tos --register-unsafely-without-email --redirect --non-interactive || \
       aviso "O certificado não saiu agora. Confira o DNS e rode: sudo certbot --nginx -d $DOMINIO"
   fi
 fi
@@ -312,7 +317,7 @@ titulo "Pronto"
 cat <<TXT
 
   Site .................. https://$DOMINIO
-  Painel da equipe ...... https://$DOMINIO/midia/
+  Painel da equipe ...... https://midia.$DOMINIO  (ou https://$DOMINIO/midia/)
   Player das TVs ........ https://$DOMINIO/midia/tv/
 
   Serviço ............... sudo systemctl status vaimidia
@@ -334,6 +339,7 @@ cat <<TXT
 
   A       $DOMINIO                   ->  $IP_PUBLICO
   A       www.$DOMINIO               ->  $IP_PUBLICO
+  A       midia.$DOMINIO             ->  $IP_PUBLICO   (atalho para o painel)
 TXT
 if [[ $COM_EMAIL -eq 1 ]]; then
 cat <<TXT
