@@ -16,6 +16,7 @@ const LISTA = [
   { id: 'conferir', nome: 'Conferir o servidor', descricao: 'Mostra o que está certo e o que falta: domínio, e-mail, portas e serviços. Não muda nada.' },
   { id: 'dns', nome: 'Ver os registros de DNS', descricao: 'Mostra tudo o que o Registro.br precisa ter, pronto para copiar. Não muda nada.' },
   { id: 'seguranca', nome: 'Conferir a segurança do servidor', descricao: 'Mostra como está o acesso remoto, o firewall e as atualizações. Não muda nada.' },
+  { id: 'reforcar', nome: 'Reforçar a segurança do servidor', descricao: 'Liga o bloqueio de quem erra a senha do acesso remoto 5 vezes, fecha a porta 8080 sem uso e deixa o sistema atendendo só por dentro da máquina.', muda: true },
   { id: 'erros', nome: 'Ver os últimos registros do sistema', descricao: 'As últimas 80 linhas do registro, para achar um erro. Não muda nada.' },
   { id: 'email-nome', nome: 'Ajustar o nome do servidor de e-mail', descricao: 'Acrescenta MIDIA_EMAIL_NOME na configuração, se faltar, e reinicia.', muda: true },
   { id: 'certificado', nome: 'Renovar o cadeado (HTTPS) com todos os endereços', descricao: 'Inclui www, midia e tv no certificado do site.', muda: true },

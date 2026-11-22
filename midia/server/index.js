@@ -12,7 +12,8 @@ const clima = require('./lib/clima');
 const smtpServidor = require('./lib/smtp-servidor');
 
 const db = abrir();
-criarApp(db).listen(config.port, () => {
+// MIDIA_HOST=127.0.0.1 faz o sistema atender só o nginx da própria máquina (o certo no servidor).
+criarApp(db).listen(config.port, process.env.MIDIA_HOST || undefined, () => {
   console.log(`[Vai Mídia] Painel: http://localhost:${config.port}${config.basePath}/`);
   console.log(`[Vai Mídia] Player da TV: http://localhost:${config.port}${config.basePath}/tv/`);
 });

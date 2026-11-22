@@ -59,6 +59,21 @@ rodar() {
       ss -tlnH 2>/dev/null | awk '{print $4}' | sort -u
       echo; echo "== Atualizações de segurança pendentes"
       (apt-get -s upgrade 2>/dev/null | grep -ci '^inst.*security' | sed 's/$/ pacote(s)/') || true ;;
+    reforcar)
+      echo "== Bloqueio de tentativas de senha no acesso remoto (fail2ban)"
+      export DEBIAN_FRONTEND=noninteractive
+      if ! command -v fail2ban-client >/dev/null; then apt-get install -y fail2ban >/dev/null 2>&1 || echo "não consegui instalar o fail2ban"; fi
+      if command -v fail2ban-client >/dev/null; then
+        printf '[sshd]\nenabled = true\nmaxretry = 5\nfindtime = 10m\nbantime = 1h\n' > /etc/fail2ban/jail.d/vaimidia.local
+        systemctl enable fail2ban >/dev/null 2>&1; systemctl restart fail2ban; sleep 2
+        fail2ban-client status sshd 2>&1 | head -6
+      fi
+      echo; echo "== Porta 8080 (aberta no firewall sem uso)"
+      if ss -tlnH 2>/dev/null | grep -q ':8080 '; then echo "Tem um programa usando a 8080: deixei como está."
+      else ufw delete allow 8080/tcp 2>&1 | tail -2; fi
+      echo; echo "== Sistema atendendo só por dentro da máquina"
+      if grep -q '^MIDIA_HOST=' "$ENV"; then echo "Já está: $(grep '^MIDIA_HOST=' "$ENV")"
+      else echo "MIDIA_HOST=127.0.0.1" >> "$ENV"; echo "Acrescentado MIDIA_HOST=127.0.0.1"; systemctl restart vaimidia; sleep 3; systemctl is-active vaimidia; fi ;;
     reiniciar)
       systemctl restart vaimidia && sleep 3 && systemctl is-active vaimidia && echo "Sistema reiniciado." ;;
     email-nome)
