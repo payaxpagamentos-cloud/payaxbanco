@@ -51,7 +51,11 @@
 
   <div class="aviso-conexao" id="sem-conexao" hidden>Sem internet — exibindo o conteúdo guardado</div>
 
-  <div class="aviso-tela-cheia" id="aviso-tela-cheia" hidden>Aperte <b>OK</b> no controle para tela cheia</div>
+  <!-- Botão de tela cheia: aparece enquanto a TV não estiver ocupando a tela toda. -->
+  <button type="button" class="botao-tela-cheia" id="aviso-tela-cheia" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    <span id="texto-tela-cheia">Clique aqui para maximizar</span>
+  </button>
 
   <div class="info" id="info" hidden></div>
   <noscript>Ative o JavaScript neste aparelho para exibir a programação.</noscript>

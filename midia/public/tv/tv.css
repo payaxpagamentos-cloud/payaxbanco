@@ -95,9 +95,15 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
 .aviso-conexao{ position: fixed; top: 2.4vh; left: 2.4vh; z-index: 6; background: rgba(180, 83, 9, .92); color: #fff; font-size: 2vh; font-weight: 700;
   padding: .9vh 1.8vh; border-radius: 999px; }
 
-.aviso-tela-cheia{ position: fixed; left: 50%; bottom: 12vh; transform: translateX(-50%); z-index: 6; background: rgba(24, 35, 42, .9);
-  border: 1px solid rgba(255,255,255,.18); color: #fff; font-size: 2.2vh; font-weight: 600; padding: 1.1vh 2.4vh; border-radius: 999px; white-space: nowrap; }
-.aviso-tela-cheia b{ color: #C8FF31; font-weight: 800; }
+/* Botão "Clique aqui para maximizar": grande no alto da tela (sem cobrir o código de pareamento); depois de um tempo vai para o canto, menor. */
+.botao-tela-cheia{ position: fixed; left: 50%; top: 6vh; transform: translateX(-50%); z-index: 9; display: flex; align-items: center; gap: 1.6vh;
+  background: #C8FF31; color: #18232A; border: 0; border-radius: 999px; padding: 2.4vh 4.4vh; font: inherit; font-size: 3.6vh; font-weight: 800;
+  cursor: pointer; box-shadow: 0 1vh 5vh rgba(0,0,0,.5); }
+.botao-tela-cheia svg{ width: 4.4vh; height: 4.4vh; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.botao-tela-cheia:focus{ outline: .6vh solid #fff; outline-offset: .6vh; }
+.botao-tela-cheia.canto{ left: auto; top: auto; right: 2.4vh; bottom: 10vh; transform: none; font-size: 2vh; padding: 1.2vh 2.2vh; opacity: .85; }
+.botao-tela-cheia.canto svg{ width: 2.6vh; height: 2.6vh; }
+.botao-tela-cheia.aviso{ background: rgba(24, 35, 42, .94); color: #fff; max-width: 80vw; }
 
 .info{ position: fixed; top: 2.4vh; right: 2.4vh; z-index: 7; background: rgba(24, 35, 42, .88); border: 1px solid rgba(255,255,255,.16); border-radius: 1.4vh;
   padding: 2vh 2.4vh; font-size: 1.9vh; line-height: 1.7; max-width: 46vw; font-variant-numeric: tabular-nums; }

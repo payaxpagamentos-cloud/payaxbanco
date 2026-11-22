@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '1.3';
+const VERSAO = '1.4';
 const API = new URL('../api/', location.href).href;
 const CHAVES = { token: 'midia.tv.token', grade: 'midia.tv.grade', fila: 'midia.tv.fila', codigo: 'midia.tv.codigo', vistos: 'midia.tv.vistos' };
 // Um arquivo que sumiu da programação (campanha só de manhã, por exemplo) ainda fica no cache por estes dias,
@@ -754,54 +754,67 @@ const emTelaCheia = () => Boolean(document.fullscreenElement || document.webkitF
 
 // Um pedido por vez, do jeito mais simples (sem opções): navegador de TV antigo recusa o pedido com
 // opções, e alguns cancelam a tela cheia quando ela é pedida de novo antes de terminar de abrir.
+// Tenta a página inteira e, se o navegador não deixar, o corpo da página (e as versões antigas do WebKit).
 let pedindoTelaCheia = false;
 function pedirTelaCheia() {
   if (emTelaCheia() || pedindoTelaCheia) return;
-  const raiz = document.documentElement;
   pedindoTelaCheia = true;
   const liberar = () => { pedindoTelaCheia = false; };
-  try {
-    if (raiz.requestFullscreen) {
-      const pedido = raiz.requestFullscreen();
+  for (const alvo of [document.documentElement, document.body]) {
+    const pedir = alvo.requestFullscreen || alvo.webkitRequestFullscreen || alvo.webkitRequestFullScreen || alvo.mozRequestFullScreen || alvo.msRequestFullscreen;
+    if (!pedir) continue;
+    try {
+      const pedido = pedir.call(alvo);
       if (pedido && pedido.then) pedido.then(liberar, liberar); else liberar();
-    } else if (raiz.webkitRequestFullscreen) {
-      raiz.webkitRequestFullscreen();
-      liberar();
-    } else {
-      liberar();
-    }
-  } catch { liberar(); }
+      return;
+    } catch { /* tenta o próximo */ }
+  }
+  liberar();
 }
 
+/** Botão "Clique aqui para maximizar": fica na tela enquanto a TV não estiver em tela cheia. */
 function telaCheia() {
-  const aviso = $('aviso-tela-cheia');
-  const suporta = Boolean(document.fullscreenEnabled || document.webkitFullscreenEnabled
-    || document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
-  // App instalado na tela inicial (manifesto com display fullscreen) já abre ocupando tudo.
+  const botao = $('aviso-tela-cheia');
+  const texto = $('texto-tela-cheia');
   const instalado = matchMedia('(display-mode: fullscreen)').matches;
-  // Navegador de TV que não deixa o site ocupar a tela: o caminho é o "Tela cheia" do próprio navegador.
-  aviso.innerHTML = suporta
-    ? 'Aperte <b>OK</b> no controle para tela cheia'
-    : 'Para tela cheia, use a opção <b>Tela cheia</b> no menu do navegador da TV';
+  let canto;
   let sumir;
+  // Só a resposta do próprio navegador conta: medir a janela engana em TV (a barra do navegador
+  // às vezes fica por cima da página, e a janela "parece" ocupar a tela toda).
+  const ocupaTudo = () => emTelaCheia() || instalado;
   const atualizar = () => {
+    clearTimeout(canto);
     clearTimeout(sumir);
-    const cheia = emTelaCheia() || instalado
-      || (innerHeight >= screen.height - 2 && innerWidth >= screen.width - 2);
-    aviso.hidden = cheia;
-    // O lembrete fica um tempo e sai: a tela é de anúncio, não de recado.
-    if (!cheia) sumir = setTimeout(() => { aviso.hidden = true; }, 30_000);
+    botao.hidden = ocupaTudo();
+    if (!botao.hidden) {
+      botao.classList.remove('canto');
+      // Grande no meio por 20 s; depois vai para o canto, menor; em 2 min sai (volta ao tocar em algo).
+      canto = setTimeout(() => botao.classList.add('canto'), 20_000);
+      sumir = setTimeout(() => { botao.hidden = true; }, 120_000);
+    }
   };
+  botao.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pedirTelaCheia();
+    // Se em 1,5 s não abriu, o navegador desta TV não deixa site nenhum ocupar a tela.
+    setTimeout(() => {
+      if (ocupaTudo()) return;
+      botao.classList.add('aviso');
+      texto.textContent = 'Esta TV não deixa o site maximizar: use "Tela cheia" no menu do navegador';
+    }, 1500);
+  });
   pedirTelaCheia();
-  // Um clique (ou dois), um toque ou a tecla OK do controle pedem a tela cheia.
+  // Clique, duplo clique, toque ou a tecla OK em qualquer lugar também maximizam.
   for (const evento of ['click', 'dblclick', 'keydown', 'touchend']) {
     document.addEventListener(evento, pedirTelaCheia, { capture: true });
   }
+  // Mexeu no controle e a TV continua sem tela cheia: o botão volta.
+  document.addEventListener('keydown', () => { if (botao.hidden && !ocupaTudo()) { atualizar(); botao.focus(); } });
   document.addEventListener('fullscreenchange', atualizar);
   document.addEventListener('webkitfullscreenchange', atualizar);
-  addEventListener('resize', atualizar);
-  // Dá um instante para o pedido automático responder antes de mostrar o lembrete.
-  setTimeout(atualizar, 1500);
+  setTimeout(atualizar, 1000);
+  // Com o botão na tela, o OK do controle já cai nele.
+  setTimeout(() => { if (!botao.hidden) botao.focus(); }, 1100);
 }
 
 function atalhos() {
