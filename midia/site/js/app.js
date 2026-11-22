@@ -118,8 +118,8 @@
       locations: 'Restaurantes, cafés, academias, farmácias e salas de espera.',
       content: 'Ofertas, vídeos curtos e comunicação institucional.',
       fotos: [
+        foto('restaurante-tv.webp', 1400, 933, '420,60,980,503', 'TV da rede com anúncio de restaurante acima do balcão, aplicação ilustrativa.', 'No restaurante, na hora de escolher o prato.'),
         foto('academia.webp', 1400, 933, '140,90,1260,646', 'TV da rede com anúncio de bebida esportiva em uma academia, aplicação ilustrativa.', 'Na academia, entre uma série e outra.'),
-        foto('farmacia.webp', 1400, 933, '140,70,1260,646', 'TV da rede com anúncio de dermocosméticos em uma farmácia, aplicação ilustrativa.', 'Na farmácia, bem na hora da compra.'),
       ],
     },
     recepcoes: {
