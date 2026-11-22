@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '1.8';
+const VERSAO = '1.9';
 // Carimbo com que esta página foi carregada (vem no endereço do script; ver server/lib/carimbo-player.js).
 const CARIMBO = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch { return ''; } })();
 const API = new URL('../api/', location.href).href;
@@ -779,19 +779,35 @@ const emTelaCheia = () => Boolean(document.fullscreenElement || document.webkitF
 // Um pedido só, sem opções — como na primeira versão, que maximizou com dois cliques na TV Samsung.
 // Cuidado: navegador antigo devolve "undefined" em requestFullscreen (não uma promessa); encadear o
 // pedido do WebKit depois dele (com ??) fazia um segundo pedido que cancelava o primeiro.
+// O que o navegador respondeu no último pedido: aparece no botão quando não maximiza, para a equipe
+// saber se é a TV que bloqueia (e por quê) sem precisar de ferramenta nenhuma.
+const diagnosticoTela = { metodo: '', resposta: '' };
 function pedirTelaCheia() {
   if (emTelaCheia()) return;
   const raiz = document.documentElement;
   try {
     if (raiz.requestFullscreen) {
+      diagnosticoTela.metodo = 'requestFullscreen';
       const pedido = raiz.requestFullscreen();
-      if (pedido && typeof pedido.catch === 'function') pedido.catch(() => {});
+      diagnosticoTela.resposta = pedido && typeof pedido.then === 'function' ? 'aguardando' : 'sem resposta';
+      if (pedido && typeof pedido.then === 'function') {
+        pedido.then(() => { diagnosticoTela.resposta = 'aceito'; }, (e) => { diagnosticoTela.resposta = `recusado: ${e?.message || e?.name || e}`; });
+      }
     } else if (raiz.webkitRequestFullscreen) {
+      diagnosticoTela.metodo = 'webkitRequestFullscreen';
       raiz.webkitRequestFullscreen();
+      diagnosticoTela.resposta = 'enviado';
     } else if (raiz.webkitRequestFullScreen) {
+      diagnosticoTela.metodo = 'webkitRequestFullScreen';
       raiz.webkitRequestFullScreen();
+      diagnosticoTela.resposta = 'enviado';
+    } else {
+      diagnosticoTela.metodo = 'nenhum';
+      diagnosticoTela.resposta = 'navegador sem tela cheia';
     }
-  } catch { /* aparelho sem a função */ }
+  } catch (e) {
+    diagnosticoTela.resposta = `erro: ${e?.message || e}`;
+  }
 }
 
 /** Botão "Clique aqui para maximizar": fica na tela enquanto a TV não estiver em tela cheia. */
@@ -825,7 +841,10 @@ function telaCheia() {
       conferindo = false;
       if (ocupaTudo()) return;
       botao.classList.add('aviso');
-      texto.textContent = 'Esta TV não deixa o site maximizar: use "Tela cheia" no menu do navegador';
+      const permitido = document.fullscreenEnabled ?? document.webkitFullscreenEnabled;
+      texto.textContent = `Não maximizou. Mande uma foto desta mensagem para o suporte — ${diagnosticoTela.metodo || 'sem pedido'} · `
+        + `${diagnosticoTela.resposta || '—'} · permitido: ${permitido === undefined ? '?' : (permitido ? 'sim' : 'não')} · `
+        + `${(navigator.userAgent.match(/(Tizen[^;)]*|SamsungBrowser\/[\d.]+|Chrome\/[\d.]+|Web0S|NetCast)/g) || []).join(' ')}`;
     }, 2000);
   };
   for (const evento of ['pointerdown', 'click', 'keydown']) botao.addEventListener(evento, apertou);
