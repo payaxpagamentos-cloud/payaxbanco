@@ -1388,7 +1388,8 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 :root[data-tema="escuro"] .vp-sombra{ fill: rgba(0, 0, 0, .35); }
 /* No celular a ilustração encolhe: a lista embaixo repete cada pneu com letra legível. */
 /* Motor ilustrado (cofre visto de cima) */
-.motor-ilustrado{ max-width: 760px; }
+.motor-ilustrado{ max-width: 800px; }
+.sem-quebra{ white-space: nowrap; }
 .mt-cofre{ fill: var(--surface-2); stroke: var(--border-forte); stroke-width: 2; }
 .mt-bloco{ fill: var(--surface); stroke: var(--border-forte); stroke-width: 2; }
 .mt-rotulo{ font-size: 15px; font-weight: 800; letter-spacing: .2em; fill: var(--text-3); text-anchor: middle; }

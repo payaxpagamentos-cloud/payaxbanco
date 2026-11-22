@@ -9,7 +9,7 @@
  */
 import { api, qs } from './api.js';
 import { el, limpar, dinheiro, inteiro, data, dataHora, placa, toast, modal, formModal, confirmar, campo, area, marcar, escolha, etiqueta,
-  reaisCampo, centavos, hojeLocal, somarDias, icone } from './ui.js';
+  reaisCampo, centavos, hojeLocal, somarDias, icone, telefone } from './ui.js';
 import { cartao, indicador, tabela, td, botao, botaoIcone, acoesTopo } from './comum.js';
 
 const base = (ctx) => `/empresas/${ctx.empresaId}/gestao`;
@@ -21,6 +21,8 @@ const veiculosDa = async (ctx) => (await api.get(`${base(ctx)}/veiculos`)).filte
 const nomeVeiculo = (x) => `${placa(x.placa)}${x.descricao ? ` · ${x.descricao}` : ''}`;
 const opcoesVeiculos = (lista) => Object.fromEntries(lista.map((x) => [x.id, nomeVeiculo(x)]));
 const mm = (x) => (x === null || x === undefined ? '—' : `${String(Math.round(x * 10) / 10).replace('.', ',')} mm`);
+/** Data prevista da troca só quando ainda vai chegar e está a até 5 anos (mais longe que isso é chute, não ajuda). */
+const previsaoUtil = (d) => { const f = d ? Date.parse(d) - Date.now() : NaN; return f > 0 && f < 5 * 365.25 * 86_400_000 ? d : null; };
 const kmTxt = (x) => (x === null || x === undefined ? '—' : `${inteiro(x)} km`);
 const ESTADO = { ok: ['em dia', 'ok'], atencao: ['atenção', 'aviso'], vencido: ['vencido', 'erro'] };
 const PRIORIDADE = { baixa: ['baixa', ''], media: ['média', 'info'], alta: ['alta', 'aviso'], urgente: ['urgente', 'erro'] };
@@ -57,7 +59,7 @@ async function telaPainel(ctx) {
         indicador('Custo do mês', dinheiro(i.custo_mes_centavos), `${inteiro(i.km_mes)} km rodados`, '', 'carteira'),
         indicador('Custo por km', i.custo_km_centavos === null ? '—' : dinheiro(Math.round(i.custo_km_centavos)), 'combustível, manutenção, pneus, documentos e multas', '', 'rota'),
         indicador('Disponibilidade', `${String(i.disponibilidade).replace('.', ',')}%`, `${i.parados} parado(s) na oficina de ${i.veiculos}`, i.parados ? 'aviso' : 'ok', 'veiculos'),
-        indicador('OS abertas', inteiro(i.os_abertas), null, '', 'manutencao'),
+        indicador('OS abertas', inteiro(i.os_abertas), 'na oficina ou aguardando', '', 'manutencao'),
         indicador('Vencidos', inteiro(i.vencidos), 'manutenção, pneus e documentos', i.vencidos ? 'erro' : 'ok', 'alertas'),
         indicador('Atenção', inteiro(i.atencao), 'perto de vencer', i.atencao ? 'aviso' : 'ok', 'relatorios')),
       cartao('Precisa de atenção agora', tabela(['Veículo', 'Item', 'Situação', '^Ação'], p.atencao.map((a) => el('tr', {},
@@ -200,7 +202,7 @@ const acoesComponente = (ctx, comp, { aoEditar, depois } = {}) => modal(`${comp.
     el('div', { class: 'grade-dados' },
       el('div', {}, el('span', { class: 'mudo pequeno' }, 'Instalado'), el('div', {}, `${kmTxt(comp.instalado_km)} · ${data(comp.instalado_em)}`)),
       el('div', {}, el('span', { class: 'mudo pequeno' }, 'Vida útil'), el('div', {}, [comp.vida_km ? kmTxt(comp.vida_km) : null, comp.vida_dias ? `${inteiro(comp.vida_dias)} dias` : null].filter(Boolean).join(' ou '))),
-      el('div', {}, el('span', { class: 'mudo pequeno' }, 'Próxima troca'), el('div', {}, [comp.proxima_km ? kmTxt(comp.proxima_km) : null, comp.previsao ? `por volta de ${data(comp.previsao)}` : null].filter(Boolean).join(' · ') || '—'))),
+      el('div', {}, el('span', { class: 'mudo pequeno' }, 'Próxima troca'), el('div', {}, [comp.proxima_km ? kmTxt(comp.proxima_km) : null, previsaoUtil(comp.previsao) ? `por volta de ${data(comp.previsao)}` : null].filter(Boolean).join(' · ') || '—'))),
     el('div', { class: 'linha', style: 'gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:6px' },
       pode(ctx) ? [botao('Abrir OS', 'primario', fazer(() => novaOS(ctx, { veiculo_id: comp.veiculo_id, tipo: 'preventiva', componentes: [comp.id], descricao: `Troca: ${comp.nome}` }))),
         botao('Registrar troca', '', fazer(() => registrarTroca(ctx, comp))), aoEditar ? botao('Editar', '', fazer(() => aoEditar(comp))) : null] : null,
@@ -210,7 +212,7 @@ const acoesComponente = (ctx, comp, { aoEditar, depois } = {}) => modal(`${comp.
 
 // ---------- Desenho do motor (visto de cima, frente do carro no alto) ----------
 // Cada peça: o desenho (no cofre, deslocado 60 px para dar lugar às etiquetas), o ponto de ligação e a altura da etiqueta.
-const DX = 60;
+const DX = 80;
 const PECAS_MOTOR = {
   arrefecimento: { nome: 'Água do radiador', lado: 'dir', ly: 70, anc: [470, 77],
     svg: `<rect class="mt-peca" x="170" y="58" width="300" height="38" rx="8"/>${Array.from({ length: 14 }, (_, i) => `<line class="mt-fio" x1="${186 + i * 20}" x2="${186 + i * 20}" y1="64" y2="90"/>`).join('')}` },
@@ -243,7 +245,7 @@ const PECAS_MOTOR = {
 const familiaDe = (tipo) => (tipo === 'moto' ? 'moto' : ['caminhao', 'onibus', 'maquina'].includes(tipo) ? 'pesado' : 'leve');
 
 function desenhoMotor(ctx, comps, aoClicar, plano = null) {
-  const W = 760; const H = 620; const LW = 168; const LH = 50;
+  const W = 800; const H = 620; const LW = 190; const LH = 50;
   const ativo = new Map(comps.map((x) => [x.tipo, x]));
   const pecas = []; const etiquetas = [];
   const existe = (tipo) => !plano || plano.includes(tipo) || ativo.has(tipo);
@@ -349,14 +351,15 @@ async function telaPreventiva(ctx) {
           el('div', { class: 'legenda' }, etiqueta('em dia', 'ok'), etiqueta('atenção: 85%', 'aviso'), etiqueta('vencido', 'erro'), etiqueta('fora do plano', '')),
           el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Toque numa peça para trocar, abrir OS ou editar. A cor sai do km do rastreador e do tempo desde a última troca.'),
           el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Freios e pastilhas aparecem também no desenho dos pneus.')))) : null);
-      limpar(lista, tabela(['Veículo', 'Componente', 'Instalado', 'Vida útil', 'Uso', 'Próxima troca', 'Situação', '^Ações'], comps.map((x) => el('tr', {},
-        td([el('strong', {}, placa(x.placa)), el('div', { class: 'pequeno mudo' }, `hoje ${kmTxt(x.km_atual)}`)]),
+      const umVeiculo = Boolean(veiculoId);
+      limpar(lista, tabela([umVeiculo ? null : 'Veículo', 'Componente', 'Instalado', 'Vida útil', 'Uso', 'Próxima troca', 'Situação', '^Ações'].filter(Boolean), comps.map((x) => el('tr', {},
+        umVeiculo ? null : td([el('strong', {}, placa(x.placa)), el('div', { class: 'pequeno mudo' }, `hoje ${kmTxt(x.km_atual)}`)], 'sem-quebra'),
         td([x.nome, el('div', { class: 'pequeno mudo' }, [x.grupo, x.posicao, x.marca].filter(Boolean).join(' · '))]),
-        td([kmTxt(x.instalado_km), el('div', { class: 'pequeno mudo' }, data(x.instalado_em))]),
+        td([kmTxt(x.instalado_km), el('div', { class: 'pequeno mudo' }, data(x.instalado_em))], 'sem-quebra'),
         td([x.vida_km ? kmTxt(x.vida_km) : null, x.vida_dias ? `${inteiro(x.vida_dias)} dias` : null].filter(Boolean).join(' ou ')),
         td(barraVida(x.pct)),
         td([x.proxima_km ? kmTxt(x.proxima_km) : '—', el('div', { class: 'pequeno mudo' }, x.restante_km !== null ? (x.restante_km >= 0 ? `faltam ${inteiro(x.restante_km)} km` : `passou ${inteiro(-x.restante_km)} km`) : ''),
-          x.previsao ? el('div', { class: 'pequeno mudo' }, `por volta de ${data(x.previsao)}`) : null]),
+          previsaoUtil(x.previsao) ? el('div', { class: 'pequeno mudo' }, `por volta de ${data(x.previsao)}`) : null], 'sem-quebra'),
         td(etiqueta(...ESTADO[x.estado])),
         el('td', { class: 'acoes' }, pode(ctx) ? [
           x.estado !== 'ok' ? botao('Abrir OS', 'primario', () => novaOS(ctx, { veiculo_id: x.veiculo_id, tipo: 'preventiva', componentes: [x.id], descricao: `Troca: ${x.nome}` })) : null,
@@ -676,7 +679,7 @@ async function telaPneus(ctx) {
             el('div', { class: 'legenda' }, etiqueta('bom', 'ok'), etiqueta(`atenção: até ${c.sulco_atencao_mm} mm`, 'aviso'), etiqueta(`trocar: até ${String(c.sulco_limite_mm).replace('.', ',')} mm`, 'erro')),
             el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O disco desenhado em cada roda é o freio: a cor sai do desgaste da pastilha e do disco. Toque nele para trocar ou abrir OS.'),
             el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Toque numa roda para medir, ver o histórico ou desmontar. Roda vazia: monte um pneu do estoque. O km de cada pneu vem do rastreador.'),
-            pode(ctx) ? el('div', {}, botao('Rodízio', '', () => rodizio(mapa))) : null))) : cartao(null, el('p', { class: 'mudo' }, 'Cadastre um veículo para controlar os pneus.')));
+            pode(ctx) && mapa.posicoes.filter((p) => p.pneu).length >= 2 ? el('div', {}, botao('Rodízio', '', () => rodizio(mapa))) : null))) : cartao(null, el('p', { class: 'mudo' }, 'Cadastre um veículo para controlar os pneus.')));
       const lista = fora.filter((p) => p.status !== 'montado');
       limpar(estoque, cartao('Estoque e recapagem', tabela(['Nº de fogo', 'Pneu', 'Situação', '>Sulco', '>Km rodado', '>Custo/km', '^Ações'], lista.map((p) => el('tr', {},
         td(el('strong', {}, p.numero_fogo)), td([[p.marca, p.modelo].filter(Boolean).join(' ') || '—', el('div', { class: 'pequeno mudo' }, [p.medida, `vida ${p.vida}`].filter(Boolean).join(' · '))]),
@@ -749,7 +752,7 @@ async function telaFornecedores(ctx) {
       const fs = await api.get(`${base(ctx)}/fornecedores`);
       limpar(lista, tabela(['Fornecedor', 'Tipo', 'Contato', '>Serviços', '>Gasto total', '^Ações'], fs.map((f) => el('tr', {},
         td([el('strong', {}, f.nome), f.cidade ? el('div', { class: 'pequeno mudo' }, f.cidade) : null]), td(c.fornecedores[f.tipo]),
-        td(f.telefone ? el('a', { href: `https://wa.me/55${f.telefone}`, target: '_blank', rel: 'noopener' }, f.telefone) : '—'), td(inteiro(f.servicos), 'dir num'), td(dinheiro(f.gasto_centavos), 'dir num'),
+        td(f.telefone ? el('a', { href: `https://wa.me/55${f.telefone}`, target: '_blank', rel: 'noopener' }, telefone(f.telefone)) : '—'), td(inteiro(f.servicos), 'dir num'), td(dinheiro(f.gasto_centavos), 'dir num'),
         el('td', { class: 'acoes' }, pode(ctx) ? [botaoIcone('editar', 'Editar', () => form(f)),
           botaoIcone('lixo', 'Remover', async () => { if (await confirmar('Remover fornecedor', `Remover ${f.nome}? As OS antigas continuam com o nome.`, 'Remover')) { await api.del(`${base(ctx)}/fornecedores/${f.id}`); carregar(); } }, 'perigo')] : null))),
       'Nenhum fornecedor. Cadastre as oficinas, borracharias e autopeças para escolher na OS e comparar o gasto.'));
@@ -778,8 +781,8 @@ async function telaCustos(ctx) {
       limpar(corpo,
         el('div', { class: 'grade' },
           indicador('Custo total', dinheiro(t.total_centavos), `${inteiro(t.km)} km rodados`, '', 'carteira'), indicador('Custo por km', porKm(t.custo_km_centavos), 'média da frota', '', 'rota'),
-          indicador('Combustível', dinheiro(t.combustivel_centavos), null, '', 'combustivel'), indicador('Manutenção', dinheiro(t.manutencao_centavos), 'ordens de serviço concluídas', '', 'manutencao'),
-          indicador('Pneus', dinheiro(t.pneus_centavos), 'compra, recapagem e conserto', '', 'veiculos'), indicador('Documentos e multas', dinheiro(t.documentos_centavos + t.multas_centavos), null, '', 'multa')),
+          indicador('Combustível', dinheiro(t.combustivel_centavos), 'abastecimentos do app', '', 'combustivel'), indicador('Manutenção', dinheiro(t.manutencao_centavos), 'ordens de serviço concluídas', '', 'manutencao'),
+          indicador('Pneus', dinheiro(t.pneus_centavos), 'compra, recapagem e conserto', '', 'veiculos'), indicador('Documentos e multas', dinheiro(t.documentos_centavos + t.multas_centavos), 'IPVA, seguro, licença e multas', '', 'multa')),
         cartao('Por veículo', tabela(['Veículo', '>Km', '>Combustível', '>Manutenção', '>Pneus', '>Documentos', '>Multas', '>Total', '>Custo/km'], r.veiculos.map((x) => el('tr', {},
           td([el('strong', {}, placa(x.placa)), x.descricao ? el('div', { class: 'pequeno mudo' }, x.descricao) : null]), td(inteiro(x.km), 'dir num'),
           td(dinheiro(x.combustivel_centavos), 'dir num'), td(dinheiro(x.manutencao_centavos), 'dir num'), td(dinheiro(x.pneus_centavos), 'dir num'),
