@@ -150,7 +150,8 @@ export function modal(titulo, conteudo, { largo = false } = {}) {
     caixa.append(...[].concat(typeof conteudo === 'function' ? conteudo(fechar) : conteudo).flat(Infinity).filter((f) => f !== null && f !== undefined && f !== false));
     fundo.append(caixa);
     document.body.append(fundo);
-    caixa.querySelector('input:not([type=hidden]), select, textarea')?.focus();
+    // No celular, focar o primeiro campo abre o teclado na hora e cobre metade da janela: só com mouse.
+    if (matchMedia('(pointer: fine)').matches) caixa.querySelector('input:not([type=hidden]), select, textarea')?.focus();
   });
 }
 

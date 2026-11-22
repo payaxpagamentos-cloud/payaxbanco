@@ -388,7 +388,7 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 13px; }
 .toast.erro{ background: var(--surface); color: var(--text); }
 .toast.erro::before{ background: var(--erro); }
 .modal-fundo{ position: fixed; inset: 0; background: rgba(5, 6, 8, .6); backdrop-filter: blur(4px); z-index: 2000; display: grid; place-items: center; padding: 16px; animation: aparecer .15s ease-out; }
-.modal{ background: var(--surface); border-radius: 16px; padding: 24px; width: min(600px, 100%); max-height: calc(100vh - 32px); overflow: auto; box-shadow: var(--shadow-flutuante);
+.modal{ background: var(--surface); border-radius: 16px; padding: 24px; width: min(600px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain; box-shadow: var(--shadow-flutuante);
   animation: subir .18s ease-out; }
 .modal h2{ font-size: 16px; }
 .modal.largo{ width: min(940px, 100%); }
@@ -743,3 +743,31 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .abas .aba{ padding: 8px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; color: var(--text-2); text-decoration: none; white-space: nowrap; }
 .abas .aba:hover{ color: var(--text); background: var(--hover); }
 .abas .aba.on{ background: var(--btn-bg); color: var(--btn-texto); }
+
+/*
+  Celular. O Safari do iPhone dá zoom sozinho quando o campo focado tem letra menor que 16px — e
+  a tela "estoura": a janela fica maior que o celular e some por baixo da barra do navegador.
+  Com 16px nos campos isso não acontece. As janelas viram uma folha que sobe de baixo, do tamanho
+  da tela visível (dvh, que desconta as barras do navegador), com o título preso no alto e os
+  botões presos embaixo — o resto rola no meio.
+*/
+html{ -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+@media (max-width: 720px){
+  input, select, textarea{ font-size: 16px; }
+  .modal-fundo{ padding: 0; place-items: end stretch; }
+  .modal, .modal.largo{ background: var(--surface); width: 100%; max-height: 92vh; max-height: 92dvh; border-radius: 20px 20px 0 0;
+    padding: 0 16px calc(16px + env(safe-area-inset-bottom)); }
+  .modal > h2{ position: sticky; top: 0; z-index: 2; margin: 0 -16px 8px; padding: 18px 16px 12px; background: var(--surface);
+    border-bottom: 1px solid var(--border); font-size: 17px; }
+  .modal .form > .linha.entre:last-child{ position: sticky; bottom: calc(-16px - env(safe-area-inset-bottom)); z-index: 2;
+    margin: 4px -16px calc(-16px - env(safe-area-inset-bottom)); padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--border); }
+  .modal .form > .linha.entre:last-child .btn{ flex: 1; justify-content: center; }
+  /* Listas de marcar: uma por linha e compactas — nome de ponto e de tela é comprido e quebraria em 3 linhas. */
+  .escolhas{ grid-template-columns: 1fr; gap: 6px; max-height: 240px; }
+  .escolhas label{ padding: 8px 10px; font-size: 14px; gap: 9px; min-width: 0; }
+  .cartao.grande{ padding: 18px 14px; }
+  .form fieldset{ padding: 10px 12px; }
+  .abas{ width: 100%; }
+  .abas .aba{ flex: 1; text-align: center; padding: 8px 10px; }
+}
