@@ -86,6 +86,9 @@ function criarApp(db) {
     app.get(config.basePath, (req, res, next) => (req.originalUrl.split('?')[0] === config.basePath ? res.redirect(`${config.basePath}/`) : next()));
     if (!config.site || !fs.existsSync(site)) app.get('/', (_req, res) => res.redirect(`${config.basePath}/`));
   }
+  // Atalho curto para a página de diagnóstico de tela cheia (digitar com controle remoto é penoso):
+  // tv.SEU-DOMINIO/teste.
+  app.get('/teste', (_req, res) => res.redirect(302, `${config.basePath}/tv/teste-tela-cheia.html`));
   app.use(config.basePath || '/', r);
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => tratarErro(err, res));
