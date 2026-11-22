@@ -27,7 +27,13 @@ const email = require('./email');
  */
 
 const LIMITE_TEXTO = 60_000;
-const previaDe = (texto) => String(texto ?? '').replace(/\s+/g, ' ').trim().slice(0, 180);
+// A prévia mostra o que a pessoa escreveu agora, não o trecho citado da mensagem anterior.
+const semCitacao = (texto) => {
+  const linhas = String(texto ?? '').split('\n');
+  const corte = linhas.findIndex((l) => /^\s*>/.test(l) || /^(Em .+ escreveu:|On .+ wrote:)\s*$/i.test(l.trim()));
+  return (corte > 0 ? linhas.slice(0, corte) : linhas).join('\n');
+};
+const previaDe = (texto) => (semCitacao(texto).replace(/\s+/g, ' ').trim() || String(texto ?? '').replace(/\s+/g, ' ').trim()).slice(0, 180);
 
 const pastaDoMes = (quando) => path.join(config.entrada.pasta, String(quando).slice(0, 7));
 

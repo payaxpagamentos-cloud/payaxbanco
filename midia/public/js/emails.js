@@ -45,19 +45,20 @@ export async function emails(ctx) {
         indicador({ rotulo: 'Enviados', valor: inteiro(t.enviados), ic: 'enviar', cor: 'verde', nota: 'respostas que saíram daqui' })),
 
       cartao(CAIXAS[estado.caixa], d.itens.length
-        ? tabela([
-          [(e) => el('div', {},
-            el('div', {}, el('strong', { style: e.lido_em ? '' : 'font-weight:800' }, e.direcao === 'saida' ? `Para ${e.para}` : quem(e))),
-            el('div', { class: 'pequeno mudo' }, e.assunto)), 'De / assunto'],
-          [(e) => el('div', { class: 'pequeno mudo' }, e.previa || '—'), 'Mensagem'],
-          [(e) => (e.lead
-            ? etiqueta(e.lead, 'info')
-            : (e.anunciante ? etiqueta(e.anunciante, 'ok') : (e.ponto ? etiqueta(e.ponto, 'ok') : el('span', { class: 'mudo pequeno' }, 'sem vínculo')))), 'No funil'],
-          [(e) => el('div', { class: 'linha', style: 'gap:6px' },
-            e.anexos ? etiqueta(`${e.anexos} anexo(s)`) : null,
-            e.direcao === 'entrada' && !e.lido_em ? etiqueta('Novo', 'aviso') : null), 'Estado'],
-          [(e) => dataHora(e.recebido_em), 'Quando', 'num dir'],
-        ], d.itens, { aoClicar: (e) => abrir(e.id, pintar) })
+        ? el('div', { class: 'lista-email' }, d.itens.map((e) => {
+          const novo = e.direcao === 'entrada' && !e.lido_em;
+          const vinculo = e.lead ?? e.anunciante ?? e.ponto;
+          return el('button', { type: 'button', class: `item-email${novo ? ' novo' : ''}`, onclick: () => abrir(e.id, pintar) },
+            el('div', { class: 'cabeca' },
+              el('strong', {}, e.direcao === 'saida' ? `Para ${e.para}` : (e.de_nome || e.de)),
+              el('span', { class: 'quando' }, dataHora(e.recebido_em))),
+            el('div', { class: 'assunto' }, e.assunto || '(sem assunto)'),
+            el('div', { class: 'previa' }, previaLimpa(e.previa) || '—'),
+            (novo || e.anexos || vinculo) ? el('div', { class: 'linha', style: 'gap:6px;flex-wrap:wrap;margin-top:6px' },
+              novo ? etiqueta('Novo', 'aviso') : null,
+              e.anexos ? etiqueta(`${e.anexos} anexo(s)`) : null,
+              vinculo ? etiqueta(vinculo, e.lead ? 'info' : 'ok') : null) : null);
+        }))
         : vazio(estado.caixa === 'entrada'
           ? 'Nenhuma mensagem na caixa. Quando alguém escrever para um endereço da empresa, ela aparece aqui.'
           : 'Nada por aqui.')));
@@ -69,7 +70,8 @@ export async function emails(ctx) {
       placeholder: 'Remetente, assunto, trecho…',
       oninput: (e) => { estado.busca = e.target.value; clearTimeout(barra.t); barra.t = setTimeout(pintar, 350); },
     }),
-    el('button', { class: 'btn primario', onclick: () => escrever(null, pintar) }, icone('enviar'), 'Escrever'));
+    el('button', { class: 'btn primario', onclick: () => escrever(null, pintar) }, icone('enviar'), 'Escrever'),
+    el('button', { class: 'btn', title: 'Buscar mensagens novas agora', onclick: (e) => acao(e.currentTarget, async () => { await pintar(); toast('Caixa atualizada.'); }) }, 'Enviar e receber'));
 
   limpar(ctx.conteudo, barra, corpo);
   await pintar();
@@ -95,6 +97,9 @@ function avisoDoServidor(s) {
   }
   return null;
 }
+
+/** A prévia da lista sem o trecho citado da mensagem anterior (o que vem depois de ">" ou de "fulano escreveu:"). */
+const previaLimpa = (p) => String(p ?? '').split(/\s>\s|\s>$|\sEm \d{1,2} de [^>]{0,120}$|\sOn [A-Z][a-z]{2},? [^>]{0,120}$/)[0].replace(/\s*Em \d{1,2} de .{0,160}escreveu:.*$/i, '').trim();
 
 /**
  * Separa o que a pessoa escreveu agora do que veio citado da mensagem anterior (as linhas com ">" e o
