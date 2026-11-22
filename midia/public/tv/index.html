@@ -37,15 +37,20 @@
     <p id="espera-ajuda" class="ajuda" hidden>Informe este código no painel, em <strong>TVs › Parear aparelho</strong>.</p>
   </div>
 
-  <!-- Rodapé da tela: o recado da faixa, o clima e o relógio (a marca da rede fica de fora: a tela é do anunciante). -->
+  <!--
+    Rodapé da tela (só na TV deitada; em pé ele sai): o recado à esquerda, a marca da rede no centro
+    como marca d'água e o horário, também discreto, no canto direito.
+  -->
   <div class="faixa" id="faixa" hidden>
-    <div class="marca-faixa" hidden>
-      <svg viewBox="0 0 138 111" aria-hidden="true"><path fill="currentColor" d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z"/></svg>
+    <div class="texto" id="faixa-texto"></div>
+    <div class="marca-faixa" aria-hidden="true">
+      <svg viewBox="0 0 138 111"><path fill="currentColor" d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z"/></svg>
       <span id="faixa-plataforma">Vai Mídia</span>
     </div>
-    <div class="texto" id="faixa-texto"></div>
-    <div class="clima" id="clima" hidden></div>
-    <div class="relogio" id="relogio" hidden></div>
+    <div class="canto">
+      <div class="clima" id="clima" hidden></div>
+      <div class="relogio" id="relogio"></div>
+    </div>
   </div>
 
   <div class="aviso-conexao" id="sem-conexao" hidden>Sem internet — exibindo o conteúdo guardado</div>

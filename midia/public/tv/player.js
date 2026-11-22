@@ -591,23 +591,20 @@ function mostrarEspera(titulo, texto, codigo) {
 }
 const esconderEspera = () => { $('espera').hidden = true; };
 
-/** Faixa de baixo: aviso do ponto (prioridade), legenda fixa, clima e relógio. */
+/**
+ * Rodapé: só na TV deitada — recado do ponto à esquerda, a marca da rede no centro como marca d'água
+ * e o horário discreto no canto direito. Na TV em pé ele sai, e o anúncio fica com a tela inteira.
+ */
 function desenharFaixa() {
   const t = estado.programacao?.tela;
   const clima = estado.programacao?.grade?.clima ?? null;
-  const texto = t?.aviso || t?.legenda || '';
-  const relogio = Boolean(t?.relogio);
-  // O rodapé aparece só com recado, clima ou relógio — e sem a marca da rede: a tela é do anunciante.
-  const mostrar = Boolean(texto || relogio || clima);
+  const emPe = t?.orientacao === 'retrato' || innerHeight > innerWidth;
+  const mostrar = Boolean(t) && !emPe;
   $('faixa').hidden = !mostrar;
   document.body.classList.toggle('com-faixa', mostrar);
-  $('faixa-texto').textContent = texto;
+  $('faixa-texto').textContent = t?.aviso || t?.legenda || '';
   $('clima').hidden = !clima;
-  if (clima) {
-    const estreita = t?.orientacao === 'retrato';
-    $('clima').textContent = estreita ? `${clima.temperatura}°` : `${clima.temperatura}° · ${clima.descricao}`;
-  }
-  $('relogio').hidden = !relogio;
+  if (clima) $('clima').textContent = `${clima.temperatura}°`;
 }
 
 function desenharInfo() {
@@ -772,6 +769,7 @@ async function iniciar() {
   marcarPlataforma(estado.programacao?.plataforma, estado.programacao?.slogan);
   mostrarEspera('Preparando a tela…', 'Carregando a programação guardada.');
   relogio();
+  addEventListener('resize', desenharFaixa);
   atalhos();
   telaCheia();
   manterTelaAcesa();
