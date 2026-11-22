@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '1.2';
+const VERSAO = '1.3';
 const API = new URL('../api/', location.href).href;
 const CHAVES = { token: 'midia.tv.token', grade: 'midia.tv.grade', fila: 'midia.tv.fila', codigo: 'midia.tv.codigo', vistos: 'midia.tv.vistos' };
 // Um arquivo que sumiu da programação (campanha só de manhã, por exemplo) ainda fica no cache por estes dias,
@@ -752,13 +752,25 @@ async function manterTelaAcesa() {
 // controle ou toque na tela em "tela cheia". Basta apertar OK uma vez.
 const emTelaCheia = () => Boolean(document.fullscreenElement || document.webkitFullscreenElement);
 
+// Um pedido por vez, do jeito mais simples (sem opções): navegador de TV antigo recusa o pedido com
+// opções, e alguns cancelam a tela cheia quando ela é pedida de novo antes de terminar de abrir.
+let pedindoTelaCheia = false;
 function pedirTelaCheia() {
-  if (emTelaCheia()) return;
+  if (emTelaCheia() || pedindoTelaCheia) return;
   const raiz = document.documentElement;
+  pedindoTelaCheia = true;
+  const liberar = () => { pedindoTelaCheia = false; };
   try {
-    const pedido = raiz.requestFullscreen?.({ navigationUI: 'hide' }) ?? raiz.webkitRequestFullscreen?.();
-    pedido?.catch?.(() => {});
-  } catch { /* aparelho sem a função */ }
+    if (raiz.requestFullscreen) {
+      const pedido = raiz.requestFullscreen();
+      if (pedido && pedido.then) pedido.then(liberar, liberar); else liberar();
+    } else if (raiz.webkitRequestFullscreen) {
+      raiz.webkitRequestFullscreen();
+      liberar();
+    } else {
+      liberar();
+    }
+  } catch { liberar(); }
 }
 
 function telaCheia() {
@@ -781,8 +793,8 @@ function telaCheia() {
     if (!cheia) sumir = setTimeout(() => { aviso.hidden = true; }, 30_000);
   };
   pedirTelaCheia();
-  // Controle de TV manda ora keydown, ora só keyup; no modo "ponteiro" (Magic Remote, Samsung), é clique.
-  for (const evento of ['keydown', 'keyup', 'pointerdown', 'mousedown', 'touchend', 'click']) {
+  // Um clique (ou dois), um toque ou a tecla OK do controle pedem a tela cheia.
+  for (const evento of ['click', 'dblclick', 'keydown', 'touchend']) {
     document.addEventListener(evento, pedirTelaCheia, { capture: true });
   }
   document.addEventListener('fullscreenchange', atualizar);
