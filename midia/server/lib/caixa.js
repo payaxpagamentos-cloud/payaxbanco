@@ -293,7 +293,7 @@ async function enviar(db, { para, assunto, texto, responder_a = null, lead_id = 
     assunto: titulo,
     texto,
     // Quem tem endereço próprio escreve com ele; os demais, com o endereço geral do sistema.
-    de: remetente ? { endereco: remetente.endereco, nome: remetente.nome } : null,
+    de: remetente ? { endereco: remetente.endereco, nome: remetente.nome, assinatura: remetente.assinatura } : null,
     emRespostaA: anterior?.message_id ?? null,
     referencias: anterior?.thread ? [anterior.thread, anterior.message_id].filter(Boolean) : [],
   });

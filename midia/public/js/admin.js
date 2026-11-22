@@ -1,7 +1,7 @@
 /** Administração: usuários, configurações da plataforma, diagnóstico e histórico. */
 import { api, qs, baixar, BASE, sessao } from './api.js';
 import {
-  el, limpar, icone, toast, acao, formModal, confirmar, perguntar, campo, escolha, marcar, lerForm,
+  el, limpar, icone, toast, acao, formModal, confirmar, perguntar, campo, escolha, area, marcar, lerForm,
   inteiro, dinheiro, dataHora, etiqueta, reaisCampo, centavos, repetir, mb, PERFIS,
 } from './ui.js';
 import { cartao, indicador, tabela, vazio, campoEmpresa, carregarEmpresas, listaDeEmpresas } from './comum.js';
@@ -74,11 +74,12 @@ async function cartaoEnderecos(ctx) {
       dados.dominios.length > 1
         ? escolha('', 'dominio', Object.fromEntries(dados.dominios.map((d) => [d, `@${d}`])), dados.dominios[0])
         : el('strong', { style: 'padding-bottom:12px' }, `@${dados.dominios[0]}`)),
-    campo('Nome que aparece para quem recebe', { name: 'nome', maxlength: 120, placeholder: 'Robson — Vai Mídia', value: atual?.nome ?? '' }),
+    campo('Nome de exibição (como aparece na caixa de quem recebe)', { name: 'nome', maxlength: 120, placeholder: 'Robson — Vai Mídia', value: atual?.nome ?? '' }),
+    area('Assinatura (vai no fim de todo e-mail escrito com este endereço)', { name: 'assinatura', rows: 5, maxlength: 1000, placeholder: 'Robson Silva\nComercial — Vai Mídia\n(19) 99999-0000\nvaimidia.com.br' }, atual?.assinatura ?? ''),
     escolha('De quem é este e-mail', 'usuario_id', { '': 'De ninguém (caixa geral, todos veem)', ...equipe }, atual?.usuario_id ?? ''),
     atual ? null : el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Não precisa de senha: a pessoa lê e responde dentro do sistema, em CRM › E-mails.'),
   ], async (d) => {
-    const corpoReq = { nome: d.nome, usuario_id: d.usuario_id || null };
+    const corpoReq = { nome: d.nome, assinatura: d.assinatura ?? '', usuario_id: d.usuario_id || null };
     if (atual) await api.patch(`/painel/enderecos-email/${atual.id}`, corpoReq);
     else await api.post('/painel/enderecos-email', { ...corpoReq, local: d.local, dominio: d.dominio });
     toast(atual ? 'E-mail alterado.' : 'E-mail criado.');

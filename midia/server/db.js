@@ -472,6 +472,8 @@ CREATE TABLE IF NOT EXISTS enderecos_email (
   empresa_id INTEGER REFERENCES empresas(id),
   endereco TEXT NOT NULL UNIQUE COLLATE NOCASE,
   nome TEXT,
+  -- O texto que fecha toda mensagem escrita com este endereço (nome, cargo, telefone…).
+  assinatura TEXT,
   usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL
@@ -758,6 +760,7 @@ function abrir(arquivo = config.dbFile) {
 /** Colunas que entraram depois da primeira versão (bancos antigos recebem cada uma por ALTER TABLE). */
 const COLUNAS_NOVAS = [
   ['emails', 'endereco_id', 'INTEGER'],
+  ['enderecos_email', 'assinatura', 'TEXT'],
   ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'bloqueado_ate', 'TEXT'],

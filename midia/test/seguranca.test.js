@@ -145,6 +145,14 @@ test('E-mails por usuário: criar, associar, receber e enviar', async (t) => {
   const resposta = await api.post('/painel/crm/emails', { para: 'cliente@fora.com', texto: 'Olá!', responder_a: daAna.id }, tkAna);
   assert.equal(resposta.status, 201);
   assert.equal(resposta.dados.de, 'ana@vaimidia.com.br');
+  // Nome de exibição e assinatura vão na mensagem.
+  await api.patch(`/painel/enderecos-email/${criado.dados.id}`, { nome: 'Ana Comercial', assinatura: 'Ana Souza\nComercial — Vai Mídia' }, master);
+  const emailLib = require('../server/lib/email');
+  await api.post('/painel/crm/emails', { para: 'cliente@fora.com', assunto: 'Proposta', texto: 'Segue.' }, tkAna);
+  const enviada = emailLib.caixaTeste.at(-1);
+  assert.match(String(enviada.texto), /Segue\.\n\n-- \nAna Souza\nComercial — Vai Mídia/);
+  assert.match(enviada.html, /Ana Souza<br>Comercial — Vai Mídia/);
+  assert.equal(enviada.info.envelope.from, 'ana@vaimidia.com.br');
   // O Beto não tem endereço: sai com o geral do sistema.
   const doBeto = await api.post('/painel/crm/emails', { para: 'cliente@fora.com', assunto: 'Oi', texto: 'Olá!' }, tkBeto);
   assert.notEqual(doBeto.dados.de, 'ana@vaimidia.com.br');

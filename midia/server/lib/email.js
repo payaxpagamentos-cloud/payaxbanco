@@ -69,7 +69,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
  * cantos arredondados e o botão em tinta com texto branco. Caixa de e-mail não carrega fonte de fora,
  * então aqui a tipografia é a do sistema de quem lê — o resto (cor, forma, hierarquia) é o do site.
  */
-function modelo({ plataforma, titulo, linhas = [], tabela = [], botao, rodape }) {
+function modelo({ plataforma, titulo, linhas = [], tabela = [], botao, rodape, assinatura }) {
   const tab = tabela.length ? `<table style="width:100%;border-collapse:collapse;margin:16px 0">${tabela.map(([a, b]) =>
     `<tr><td style="padding:8px 0;border-bottom:1px solid #D9DFE5;color:#58636B">${esc(a)}</td>`
     + `<td style="padding:8px 0;border-bottom:1px solid #D9DFE5;text-align:right;font-weight:700;color:#18232A">${esc(b)}</td></tr>`).join('')}</table>` : '';
@@ -84,6 +84,7 @@ function modelo({ plataforma, titulo, linhas = [], tabela = [], botao, rodape })
 <h1 style="margin:0 0 14px;font-size:21px;letter-spacing:-.6px;color:#18232A">${esc(titulo)}</h1>
 ${linhas.map((l) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#44525A">${esc(l)}</p>`).join('')}
 ${tab}
+${assinatura ? `<p style="margin:22px 0 0;padding-top:14px;border-top:1px solid #D9DFE5;font-size:14px;line-height:1.5;color:#18232A">${esc(assinatura).replace(/\r?\n/g, '<br>')}</p>` : ''}
 ${botao ? `<p style="margin:22px 0 6px"><a href="${esc(botao.url)}" style="display:inline-block;background:#18232A;color:#ffffff;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:10px">${esc(botao.texto)}</a></p>` : ''}
 </td></tr>
 <tr><td style="padding:16px 28px;background:#EDF1F4;font-size:12px;color:#58636B">${esc(rodape || 'Mensagem automática. Não é preciso responder.')}</td></tr>
@@ -125,19 +126,21 @@ async function enviarDireto({ para, assunto, texto, emRespostaA = null, referenc
     titulo: assunto,
     linhas: corpo.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean),
     rodape: 'Pode responder a este e-mail: a resposta chega direto na nossa equipe.',
+    assinatura: String(de?.assinatura ?? '').trim() || undefined,
   });
   try {
+    const assinatura = String(de?.assinatura ?? '').trim();
     const origem = de ? { name: de.nome || 'Vai Mídia', address: de.endereco } : config.smtp.remetente;
     const info = await obterTransporte().sendMail({
       from: origem,
       to: para,
       subject: assunto,
-      text: corpo,
+      text: assinatura ? `${corpo}\n\n-- \n${assinatura}` : corpo,
       html,
       inReplyTo: emRespostaA ? `<${emRespostaA}>` : undefined,
       references: referencias.length ? referencias.map((r) => `<${r}>`).join(' ') : undefined,
     });
-    if (config.smtp.modo === 'teste') caixaTeste.push({ para: [para], assunto, html, texto: corpo, info });
+    if (config.smtp.modo === 'teste') caixaTeste.push({ para: [para], assunto, html, texto: assinatura ? `${corpo}\n\n-- \n${assinatura}` : corpo, info });
     const remetente = de?.endereco ?? /<([^>]+)>/.exec(config.smtp.remetente)?.[1] ?? config.smtp.remetente;
     return { enviado: true, de: remetente, message_id: String(info.messageId ?? '').replace(/^<|>$/g, '') || null };
   } catch (err) {

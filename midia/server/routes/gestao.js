@@ -452,6 +452,7 @@ module.exports = (db) => {
       if (db.prepare('SELECT 1 FROM enderecos_email WHERE endereco = ?').get(d.endereco)) throw new ErroNegocio('Este endereço já existe.', 409);
     }
     if (req.body.nome !== undefined) d.nome = v.opcional(req.body.nome, 'o nome', 120);
+    if (req.body.assinatura !== undefined) d.assinatura = String(req.body.assinatura ?? '').replace(/\r/g, '').trim().slice(0, 1000) || null;
     if (req.body.ativo !== undefined) d.ativo = v.booleano(req.body.ativo) ? 1 : 0;
     if (req.body.usuario_id !== undefined) {
       const uid = req.body.usuario_id ? Number(req.body.usuario_id) : null;
@@ -482,8 +483,8 @@ module.exports = (db) => {
     const d = lerEndereco(req, null);
     // A empresa do endereço é a da pessoa ligada a ele; sem pessoa, a de quem está criando.
     const doUsuario = d.usuario_id ? db.prepare('SELECT empresa_id FROM usuarios WHERE id = ?').get(d.usuario_id)?.empresa_id : null;
-    const id = Number(db.prepare('INSERT INTO enderecos_email (empresa_id, endereco, nome, usuario_id, criado_em) VALUES (?, ?, ?, ?, ?)')
-      .run(doUsuario ?? empresas.empresaParaGravar(db, req, req.body.empresa_id), d.endereco, d.nome ?? null, d.usuario_id ?? null, agora()).lastInsertRowid);
+    const id = Number(db.prepare('INSERT INTO enderecos_email (empresa_id, endereco, nome, assinatura, usuario_id, criado_em) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(doUsuario ?? empresas.empresaParaGravar(db, req, req.body.empresa_id), d.endereco, d.nome ?? null, d.assinatura ?? null, d.usuario_id ?? null, agora()).lastInsertRowid);
     registrar(db, req, 'endereco_email_criado', { id, endereco: d.endereco });
     res.status(201).json(umEndereco(id));
   });

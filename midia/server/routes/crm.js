@@ -300,7 +300,7 @@ module.exports = (db) => {
       lead_id: req.body.lead_id ?? null,
       usuarioId: req.usuario.id,
       empresa_id: empresas.empresaParaGravar(db, req),
-      remetente: db.prepare('SELECT id, endereco, COALESCE(nome, ?) AS nome FROM enderecos_email WHERE usuario_id = ? AND ativo = 1 ORDER BY id LIMIT 1').get(req.usuario.nome, req.usuario.id) ?? null,
+      remetente: db.prepare("SELECT id, endereco, COALESCE(NULLIF(nome, ''), ?) AS nome, assinatura FROM enderecos_email WHERE usuario_id = ? AND ativo = 1 ORDER BY id LIMIT 1").get(req.usuario.nome, req.usuario.id) ?? null,
     });
     registrar(db, req, 'email_enviado', { id: e.id, para: e.para, assunto: e.assunto });
     res.status(201).json(e);
