@@ -160,6 +160,10 @@ a{ color: var(--cor); }
 .lateral .grupo-sub{ display: flex; flex-direction: column; gap: 0; margin: 2px 0 6px; }
 .lateral .grupo-sub.fechado{ display: none; }
 .veu-menu{ display: none; }
+/* Títulos das etapas no menu (1 · Cliente e anúncio, 2 · Telas…): dizem a ordem do trabalho. */
+.lateral .secao-menu{ font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--lateral-fraco);
+  padding: 16px 12px 5px; white-space: nowrap; }
+.casca.recolhida .lateral .secao-menu{ font-size: 0; padding: 8px 0 0; border-top: 1px solid rgba(255,255,255,.08); margin: 8px 10px 0; }
 .lateral .seta-grupo{ display: none; }
 .lateral .seta-grupo svg{ width: 16px; height: 16px; }
 @keyframes gaveta{ from{ transform: translateX(-100%); } }
@@ -529,7 +533,8 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .lateral .topo-lateral{ padding: 0; }
   .lateral .recolher{ display: none; }
   .lateral .abrir-menu{ display: inline-flex; }
-  .lateral > a.item, .lateral > .grupo-sub, .lateral > .falar-equipe{ display: none; }
+  .lateral > a.item, .lateral > .grupo-sub, .lateral > .falar-equipe, .lateral > .secao-menu{ display: none; }
+  .lateral.aberta > .secao-menu{ display: block; font-size: 11px; padding: 16px 12px 4px; }
   /* Aberto, o menu é a lateral de sempre: uma gaveta que desliza da esquerda, com a página escurecida atrás. */
   .lateral.aberta{ position: fixed; top: 0; bottom: 0; left: 0; width: min(320px, 84vw); height: 100vh; height: 100dvh; overflow-y: auto;
     overscroll-behavior: contain; z-index: 1500; padding: 14px 12px calc(24px + env(safe-area-inset-bottom));

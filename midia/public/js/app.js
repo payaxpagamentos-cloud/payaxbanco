@@ -13,19 +13,27 @@ let whatsappEquipe = '';
 
 // [rota, rótulo, ícone, perfis que veem (vazio = todos do grupo), submenus [rota, rótulo, perfis?]]
 const MENUS = {
+  // Na ordem do trabalho: cada etapa tem um título, e dentro dela os itens seguem a sequência em que
+  // se faz (primeiro o anunciante, depois o criativo, depois a campanha…). Itens que começam com "#" são títulos.
   equipe: [
-    ['resumo', 'Visão geral', 'dashboard'], ['telas', 'TVs', 'telas'], ['pontos', 'Pontos', 'pontos'],
-    ['comunicados', 'Comunicados', 'aprovacoes'],
-    ['anunciantes', 'Anunciantes e agências', 'anunciantes'], ['campanhas', 'Campanhas', 'campanhas'], ['criativos', 'Criativos', 'midias'],
-    ['programacao', 'Programação', 'grade'], ['inventario', 'Inventário', 'ocupacao'],
+    ['resumo', 'Visão geral', 'dashboard'],
+    ['#anuncio', '1 · Cliente e anúncio'],
+    ['anunciantes', 'Anunciantes e agências', 'anunciantes'], ['criativos', 'Criativos', 'midias'],
+    ['campanhas', 'Campanhas', 'campanhas'], ['programacao', 'Programação', 'grade'],
+    ['#telas', '2 · Telas'],
+    ['pontos', 'Pontos', 'pontos'], ['telas', 'TVs', 'telas'], ['comunicados', 'Comunicados', 'aprovacoes'],
+    ['#vendas', '3 · Vendas'],
     ['crm', 'CRM', 'anunciantes', null, [
       ['funil', 'Funil'], ['propostas', 'Propostas'], ['produtos', 'Produtos', ['master']], ['emails', 'E-mail'],
     ]],
+    ['inventario', 'Inventário', 'ocupacao'],
+    ['#acompanhar', '4 · Acompanhar'],
     ['relatorios', 'Relatórios', 'relatorios'],
     ['financeiro', 'Financeiro', 'faturamento', null, [
       ['caixa', 'Fluxo de caixa'], ['receber', 'Contas a receber'], ['pagar', 'Contas a pagar'], ['faturamento', 'Faturamento'],
     ]],
     ['diagnostico', 'Diagnóstico', 'diagnostico'],
+    ['#admin', 'Administração'],
     ['usuarios', 'Usuários', 'usuarios', ['master']], ['configuracoes', 'Configurações', 'configuracoes', ['master']],
     ['historico', 'Histórico', 'historico'],
   ],
@@ -92,7 +100,11 @@ async function desenhar() {
   try { recolhida = localStorage.getItem('midia.menu') === 'recolhido'; } catch { /* padrão */ }
   const casca = el('div', { class: `casca${recolhida ? ' recolhida' : ''}` });
 
-  const itens = menu.filter(([, , , perfis]) => !perfis || perfis.includes(u.perfil)).map(([k, rotulo, ic, , subs]) => {
+  const visiveis = menu.filter(([, , , perfis]) => !perfis || perfis.includes(u.perfil))
+    // Título de etapa só aparece se tiver algum item visível embaixo dele.
+    .filter(([k], i, l) => !k.startsWith('#') || (l[i + 1] && !l[i + 1][0].startsWith('#')));
+  const itens = visiveis.map(([k, rotulo, ic, , subs]) => {
+    if (k.startsWith('#')) return el('div', { class: 'secao-menu' }, rotulo);
     const aberto = k === nome || subs?.some(([sk]) => sk === nome);
     const link = el('a', { class: `item${aberto ? ' on' : ''}`, href: `#/${subs ? subs[0][0] : k}`, title: rotulo }, icone(ic), el('span', { class: 'rotulo' }, rotulo));
     if (!subs) return link;
