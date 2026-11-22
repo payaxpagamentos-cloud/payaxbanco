@@ -475,6 +475,9 @@ module.exports = (db) => {
   // Atualizar o sistema pelo painel: só o master, e com a senha digitada de novo.
   r.get('/sistema/atualizacao', permitir('master'), (_req, res) => res.json(atualizacao.situacao()));
 
+  // O registro DKIM para colar no Registro.br (só a chave pública).
+  r.get('/sistema/dkim', permitir('master'), (_req, res) => res.json(require('../lib/email').registroDkim()));
+
   r.post('/sistema/atualizacao', permitir('master'), (req, res) => {
     let senha = '';
     // A senha vem num cabeçalho (o corpo é o próprio .zip), codificada para aceitar acento.

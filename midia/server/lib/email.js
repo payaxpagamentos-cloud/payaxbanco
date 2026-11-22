@@ -30,6 +30,24 @@ function lerDkim() {
   }
 }
 
+/**
+ * O registro DKIM para colar no DNS (Registro.br): o nome, e o valor já cortado em pedaços de até 255
+ * letras entre aspas. Só a chave PÚBLICA sai daqui — a privada nunca deixa o servidor.
+ */
+function registroDkim() {
+  const { dominio, seletor, chaveArquivo } = config.dkim;
+  if (!dominio || !chaveArquivo) return { configurado: false, motivo: 'A assinatura DKIM não está configurada no servidor.' };
+  try {
+    const publica = require('node:crypto').createPublicKey(fs.readFileSync(chaveArquivo, 'utf8'))
+      .export({ type: 'spki', format: 'der' }).toString('base64');
+    const valor = `v=DKIM1; k=rsa; p=${publica}`;
+    const dados = valor.match(/.{1,255}/g).map((p) => `"${p}"`).join(' ');
+    return { configurado: true, tipo: 'TXT', nome: `${seletor}._domainkey`, dominio, dados, nome_servidor: config.entrada.nome || null };
+  } catch {
+    return { configurado: false, motivo: 'Não consegui ler a chave DKIM no servidor.' };
+  }
+}
+
 function obterTransporte() {
   if (transporte) return transporte;
   transporte = config.smtp.modo === 'teste'
@@ -130,4 +148,4 @@ async function enviarDireto({ para, assunto, texto, emRespostaA = null, referenc
 /** Endereço do painel para os links dos e-mails. */
 const linkPainel = (caminho = '') => `${config.url || `http://localhost:${config.port}${config.basePath}`}/${String(caminho).replace(/^\/+/, '')}`;
 
-module.exports = { enviar, enviarDireto, configurado, modelo, linkPainel, caixaTeste };
+module.exports = { registroDkim, enviar, enviarDireto, configurado, modelo, linkPainel, caixaTeste };

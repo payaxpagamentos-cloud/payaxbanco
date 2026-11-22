@@ -268,7 +268,7 @@ export async function configuracoes(ctx) {
         + 'Não há câmera nem leitura do ambiente — é uma cópia do que o aparelho está exibindo. 0 desliga.'),
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O resumo por dia (relatórios e faturamento) nunca é apagado; 0 guarda todo o detalhe da prova de exibição para sempre.'))]));
   } else {
-    corpo = el('div', { class: 'coluna' }, await cartaoAtualizacao(ctx), await cartaoBackup());
+    corpo = el('div', { class: 'coluna' }, await cartaoAtualizacao(ctx), await cartaoDkim(), await cartaoBackup());
   }
   limpar(ctx.conteudo, el('div', { class: 'coluna' },
     abas(abasVisiveis, aba, 'configuracoes'),
@@ -308,6 +308,23 @@ const FINAIS = ['concluida', 'falhou', 'revertida'];
  * Atualizar o sistema pelo painel (dá para fazer do celular): envia o vaimidia.zip com a senha
  * digitada de novo. Quem troca a versão é um serviço do servidor; se a nova não subir, ele volta a anterior.
  */
+/** O registro DKIM pronto para copiar e colar no Registro.br, sem precisar entrar no servidor. */
+async function cartaoDkim() {
+  const d = await api.get('/painel/sistema/dkim').catch(() => ({ configurado: false, motivo: 'Não foi possível consultar.' }));
+  const linha = (rotulo, valor) => el('div', { class: 'chave', style: 'gap:10px;align-items:flex-start' },
+    el('span', { class: 'mudo' }, rotulo),
+    el('span', { style: 'display:flex;gap:8px;align-items:flex-start;min-width:0' },
+      el('code', { style: 'word-break:break-all;text-align:right' }, valor),
+      el('button', { class: 'btn pequeno', onclick: () => { navigator.clipboard?.writeText(valor); toast(`${rotulo} copiado.`); } }, 'Copiar')));
+  return el('div', { class: 'cartao' },
+    el('h2', {}, 'E-mail: registro DKIM'),
+    d.configurado
+      ? el('div', { class: 'coluna' },
+        el('p', { class: 'mudo', style: 'margin-top:-8px' }, `No Registro.br, no domínio ${d.dominio}, crie um registro novo com estes dados. Ele evita que os e-mails do sistema caiam no spam.`),
+        linha('Tipo', d.tipo), linha('Nome', d.nome), linha('Dados', d.dados))
+      : el('p', { class: 'mudo' }, d.motivo));
+}
+
 async function cartaoAtualizacao(ctx) {
   const corpo = el('div', { class: 'cartao' });
   const situacao = el('div', { class: 'coluna', style: 'gap:8px' });
