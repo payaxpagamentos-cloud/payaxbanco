@@ -813,3 +813,10 @@ html{ -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .indicador .ic svg{ width: 19px; height: 19px; }
   .indicador .valor{ font-size: 20px; }
 }
+
+/* App instalado na tela inicial do iPhone: a barra de status fica por cima da página, então o topo
+   (a barra do menu e a gaveta aberta) desce o tamanho dela. */
+@media (max-width: 860px){
+  .lateral{ padding-top: calc(10px + env(safe-area-inset-top)); }
+  .lateral.aberta{ padding-top: calc(14px + env(safe-area-inset-top)); }
+}

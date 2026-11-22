@@ -118,3 +118,18 @@ test('Atualização pelo painel: pede a senha, aceita só zip e deixa o pedido p
   assert.equal((await api.get('/painel/sistema/atualizacao', op)).status, 403);
   assert.equal((await enviar(zip, 'operador-123', op)).status, 403);
 });
+
+/** Adicionado à tela inicial do celular, o painel aparece com o ícone colorido da marca. */
+test('Painel: ícone colorido ao instalar no celular', () => {
+  const raiz = path.join(__dirname, '..', 'public');
+  const html = fs.readFileSync(path.join(raiz, 'index.html'), 'utf8');
+  assert.match(html, /rel="apple-touch-icon" href="img\/apple-touch-icon.png"/, 'o iPhone usa o apple-touch-icon');
+  assert.match(html, /rel="manifest" href="manifest.webmanifest"/);
+  const manifesto = JSON.parse(fs.readFileSync(path.join(raiz, 'manifest.webmanifest'), 'utf8'));
+  assert.equal(manifesto.display, 'standalone');
+  for (const i of manifesto.icons) {
+    const png = fs.readFileSync(path.join(raiz, i.src));
+    assert.equal(png.readUInt32BE(0), 0x89504e47, `${i.src} é PNG`);
+    assert.equal(png.readUInt32BE(16), Number(i.sizes.split('x')[0]), `${i.src} tem o tamanho declarado`);
+  }
+});
