@@ -3,7 +3,7 @@ import { visao } from './visao.js';
 import { telasEquipe, pontos, comunicados } from './rede.js';
 import { anunciantes, campanhas, criativos, programacao } from './comercial.js';
 import { relatorios, faturamento, contasAReceber, contasAPagar, fluxoCaixa } from './financeiro.js';
-import { inventario } from './inventario.js';
+import { inventario, circuitos } from './inventario.js';
 import { crm } from './crm.js';
 import { propostas } from './proposta.js';
 import { emails } from './emails.js';
@@ -19,6 +19,7 @@ export const TELAS_EQUIPE = {
   criativos,
   programacao,
   inventario,
+  circuitos,
   funil: crm,
   propostas,
   emails,

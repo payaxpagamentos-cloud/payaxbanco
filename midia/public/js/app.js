@@ -26,6 +26,7 @@ const MENUS = {
     // Comunicado é recado do próprio ponto: fica dentro de Pontos.
     ['grupo-pontos', 'Pontos', 'pontos', null, [['pontos', 'Pontos'], ['comunicados', 'Comunicados']]],
     ['telas', 'TVs', 'telas'],
+    ['circuitos', 'Circuitos', 'grade'],
     ['#vendas', '3 · Vendas'],
     ['crm', 'CRM', 'anunciantes', null, [
       ['funil', 'Funil'], ['propostas', 'Propostas'], ['produtos', 'Produtos', ['master']], ['emails', 'E-mail'],
@@ -57,7 +58,7 @@ const SUBTITULOS = {
   pontos: 'Condomínios, prédios, comércios, academias e clínicas onde as TVs estão instaladas',
   comunicados: 'Recados do próprio ponto que entram entre os anúncios',
   anunciantes: 'Quem paga pela publicidade e as agências que compram a mídia',
-  inventario: 'O que a rede tem para vender: circuitos, pontos, telas e audiência', campanhas: 'O que vai ao ar, onde, quando e por quanto',
+  inventario: 'O que a rede tem para vender: pontos, telas e audiência', circuitos: 'Grupos de TVs vendidos em bloco', campanhas: 'O que vai ao ar, onde, quando e por quanto',
   criativos: 'Imagens e vídeos que vão para as telas', programacao: 'Como fica o loop de cada TV e quanto ainda cabe de publicidade',
   relatorios: 'Inserções, impactos e a prova de exibição', faturamento: 'Fechamento do mês e faturas dos anunciantes',
   repasses: 'Comissão dos lojistas sobre a receita das telas', diagnostico: 'Verificações da rede e das TVs',

@@ -19,25 +19,6 @@ export async function inventario(ctx) {
         indicador({ rotulo: 'Passagens por dia', valor: inteiro(d.totais.publico_dia), ic: 'pessoas', cor: 'ciano', nota: `${inteiro(d.totais.publico_dia * 30)} por mês` }),
         indicador({ rotulo: 'Unidades atendidas', valor: inteiro(d.totais.unidades), ic: 'pontos', cor: 'laranja', nota: 'apartamentos, salas e lojas' })),
 
-      cartao('Circuitos',
-        el('p', { class: 'pequeno mudo', style: 'margin-top:-8px' },
-          'O pacote que o comercial vende: um conjunto de telas por regra, com a audiência somada e o preço de tabela. '
-          + 'Ao criar a campanha, escolher o circuito já define onde ela passa.'),
-        d.circuitos.length
-          ? tabela([
-            [(c) => el('div', {}, el('div', {}, c.nome), c.descricao ? el('div', { class: 'pequeno mudo' }, c.descricao) : null), 'Circuito'],
-            [(c) => inteiro(c.telas), 'Telas', 'num dir'],
-            [(c) => inteiro(c.pontos), 'Pontos', 'num dir'],
-            [(c) => `${c.paisagem}/${c.retrato}`, 'Paisagem/Retrato', 'num dir'],
-            [(c) => inteiro(c.publico_mes), 'Público/mês', 'num dir'],
-            [(c) => `${c.insercoes_hora}/h`, 'Inserções', 'num dir'],
-            [(c) => (c.valor_mes_centavos ? dinheiro(c.valor_mes_centavos) : '—'), 'Tabela/mês', 'num dir'],
-            [(c) => (c.cpm_centavos ? dinheiro(c.cpm_centavos) : '—'), 'CPM', 'num dir'],
-            [(c) => (c.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Inativo', '')), 'Situação'],
-          ], d.circuitos, { aoClicar: (c) => abrirCircuito(c.id, pintar) })
-          : vazio('Nenhum circuito. Crie pacotes como "Residencial Campinas" ou "Academias" para vender em bloco.'),
-        el('button', { class: 'btn primario', style: 'margin-top:12px', onclick: () => editarCircuito(null, pintar) }, icone('mais'), 'Novo circuito')),
-
       cartao('Pontos e telas',
         el('div', { class: 'linha entre', style: 'margin-top:-8px;margin-bottom:10px' },
           el('span', { class: 'pequeno mudo' }, `Tabela: ${dinheiro(d.mensalidade_tela_centavos)} por tela/mês · CPM ${dinheiro(d.cpm_centavos)}`),
@@ -53,6 +34,35 @@ export async function inventario(ctx) {
         ], d.itens, { vazioTexto: 'Nenhum ponto ativo.' })));
   };
 
+  limpar(ctx.conteudo, corpo);
+  await pintar();
+}
+
+/** Circuitos: os grupos de TVs vendidos em bloco (academias, farmácias, um bairro…). Fica junto das telas. */
+export async function circuitos(ctx) {
+  const corpo = el('div', { class: 'coluna' });
+  const pintar = async () => {
+    const d = await api.get('/painel/inventario');
+    limpar(corpo,
+      cartao('Circuitos',
+        el('p', { class: 'pequeno mudo', style: 'margin-top:-8px' },
+          'Um circuito é um grupo de TVs vendido em bloco — por exemplo, todas as academias ou todas as farmácias — com a audiência somada e o preço de tabela. '
+          + 'Ao criar a campanha, escolher o circuito já define onde ela passa.'),
+        d.circuitos.length
+          ? tabela([
+            [(c) => el('div', {}, el('div', {}, c.nome), c.descricao ? el('div', { class: 'pequeno mudo' }, c.descricao) : null), 'Circuito'],
+            [(c) => inteiro(c.telas), 'Telas', 'num dir'],
+            [(c) => inteiro(c.pontos), 'Pontos', 'num dir'],
+            [(c) => `${c.paisagem}/${c.retrato}`, 'Paisagem/Retrato', 'num dir'],
+            [(c) => inteiro(c.publico_mes), 'Público/mês', 'num dir'],
+            [(c) => `${c.insercoes_hora}/h`, 'Inserções', 'num dir'],
+            [(c) => (c.valor_mes_centavos ? dinheiro(c.valor_mes_centavos) : '—'), 'Tabela/mês', 'num dir'],
+            [(c) => (c.cpm_centavos ? dinheiro(c.cpm_centavos) : '—'), 'CPM', 'num dir'],
+            [(c) => (c.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Inativo', '')), 'Situação'],
+          ], d.circuitos, { aoClicar: (c) => abrirCircuito(c.id, pintar) })
+          : vazio('Nenhum circuito. Crie pacotes como "Residencial Campinas" ou "Academias" para vender em bloco.'),
+        el('button', { class: 'btn primario', style: 'margin-top:12px', onclick: () => editarCircuito(null, pintar) }, icone('mais'), 'Novo circuito')));
+  };
   limpar(ctx.conteudo, corpo);
   await pintar();
 }
