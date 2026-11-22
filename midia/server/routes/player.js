@@ -109,6 +109,8 @@ module.exports = (db) => {
       recarregar: String(req.body.grade_versao ?? '') !== g.versao,
       comandos: pendentes.map((c) => c.comando),
       player_versao: config.playerVersao,
+      // Mudou o carimbo dos arquivos do player (o sistema foi atualizado): a TV recarrega sozinha.
+      player_arquivos: require('../lib/carimbo-player').carimboPlayer(),
       hora: agora(),
       batida_s: cfg.batida_intervalo_s,
     });

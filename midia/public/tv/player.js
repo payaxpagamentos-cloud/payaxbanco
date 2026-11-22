@@ -13,7 +13,9 @@
  */
 'use strict';
 
-const VERSAO = '1.6';
+const VERSAO = '1.7';
+// Carimbo com que esta página foi carregada (vem no endereço do script; ver server/lib/carimbo-player.js).
+const CARIMBO = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch { return ''; } })();
 const API = new URL('../api/', location.href).href;
 const CHAVES = { token: 'midia.tv.token', grade: 'midia.tv.grade', fila: 'midia.tv.fila', codigo: 'midia.tv.codigo', vistos: 'midia.tv.vistos' };
 // Um arquivo que sumiu da programação (campanha só de manhã, por exemplo) ainda fica no cache por estes dias,
@@ -220,6 +222,13 @@ async function bater(erro) {
       corpo: { grade_versao: estado.programacao?.grade?.versao ?? null, versao: VERSAO, item_atual: item ? item.nome : null, erro: erro ?? null },
     });
     marcarConexao(true);
+    // O sistema foi atualizado (os arquivos do player mudaram): recarrega para pegar a versão nova.
+    if (r.player_arquivos && CARIMBO && r.player_arquivos !== CARIMBO) {
+      await enviarExibicoes();
+      estado.parado = true;
+      location.reload();
+      return;
+    }
     if (r.recarregar) estado.trocarPendente = true;
     if (r.comandos?.length) await obedecer(r.comandos);
   } catch (err) {

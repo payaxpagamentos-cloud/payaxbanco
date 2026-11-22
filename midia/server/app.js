@@ -46,6 +46,17 @@ function criarApp(db) {
     return express.json({ limit: '400kb' })(req, res, next);
   });
   r.use('/api', criarApi(db));
+  // Página do player com o endereço do script e do estilo carimbado pela versão (data dos arquivos):
+  // navegador de TV que guarda tudo na memória (Samsung) é obrigado a buscar os arquivos novos depois
+  // de cada atualização, sem ninguém precisar limpar o cache da TV.
+  const { carimboPlayer, pastaPlayer } = require('./lib/carimbo-player');
+  const paginaTv = () => {
+    const carimbo = carimboPlayer();
+    return fs.readFileSync(path.join(pastaPlayer, 'index.html'), 'utf8')
+      .replace('href="tv.css"', `href="tv.css?v=${carimbo}"`)
+      .replace('src="player.js"', `src="player.js?v=${carimbo}"`);
+  };
+  r.get(['/tv/', '/tv/index.html'], (_req, res) => res.type('html').set('Cache-Control', 'no-store').send(paginaTv()));
   // O player precisa poder ser atualizado: a página e o script dele sempre revalidam com o servidor,
   // enquanto fontes, estilos e imagens seguem o cache normal.
   r.use(express.static(path.join(__dirname, '..', 'public'), {
