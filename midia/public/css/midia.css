@@ -159,6 +159,8 @@ a{ color: var(--cor); }
 .lateral a.sub:hover:not(.on){ color: #fff; }
 .lateral .grupo-sub{ display: flex; flex-direction: column; gap: 0; margin: 2px 0 6px; }
 .lateral .grupo-sub.fechado{ display: none; }
+.veu-menu{ display: none; }
+@keyframes gaveta{ from{ transform: translateX(-100%); } }
 /* Botão Menu: só existe no celular. */
 .lateral .abrir-menu{ display: none; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06);
   color: #fff; font: inherit; font-weight: 700; font-size: 14px; padding: 8px 14px; border-radius: 999px; cursor: pointer; }
@@ -526,12 +528,16 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .lateral .recolher{ display: none; }
   .lateral .abrir-menu{ display: inline-flex; }
   .lateral > a.item, .lateral > .grupo-sub, .lateral > .falar-equipe{ display: none; }
-  .lateral.aberta{ position: fixed; top: 0; right: 0; bottom: 0; left: 0; height: 100vh; height: 100dvh; overflow-y: auto; overscroll-behavior: contain;
-    z-index: 1500; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  /* Aberto, o menu é a lateral de sempre: uma gaveta que desliza da esquerda, com a página escurecida atrás. */
+  .lateral.aberta{ position: fixed; top: 0; bottom: 0; left: 0; width: min(320px, 84vw); height: 100vh; height: 100dvh; overflow-y: auto;
+    overscroll-behavior: contain; z-index: 1500; padding: 14px 12px calc(24px + env(safe-area-inset-bottom));
+    box-shadow: 12px 0 40px -12px rgba(0, 0, 0, .6); animation: gaveta .2s ease-out; }
+  html.menu-aberto .veu-menu{ display: block; position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1400;
+    background: rgba(5, 6, 8, .55); animation: aparecer .2s ease-out; }
   .lateral.aberta .topo-lateral{ position: sticky; top: -10px; z-index: 1; background: #18232A; padding: 0 0 14px; margin-bottom: 4px; }
-  .lateral.aberta > a.item, .lateral.aberta > .falar-equipe{ display: flex; font-size: 16px; padding: 12px 14px; }
+  .lateral.aberta > a.item, .lateral.aberta > .falar-equipe{ display: flex; font-size: 15px; padding: 11px 12px; }
   .lateral.aberta > .grupo-sub{ display: flex; margin: 0 0 6px; }
-  .lateral.aberta a.sub{ font-size: 15px; padding: 10px 14px 10px 46px; }
+  .lateral.aberta a.sub{ font-size: 14px; padding: 9px 12px 9px 42px; }
   html.menu-aberto, html.menu-aberto body{ overflow: hidden; }
   .topo{ padding: 16px 16px 2px; }
   .conteudo{ padding: 12px 16px 28px; }

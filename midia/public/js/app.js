@@ -133,7 +133,9 @@ async function desenhar() {
       dentroDeGrupo ? el('div', { class: 'trilha' }, item[1]) : (vinculo ? el('div', { class: 'trilha' }, vinculo) : null),
       el('h1', { style: 'margin:0' }, tituloTela), subtitulo),
     ferramentas(u));
-  casca.append(lateral, el('div', { class: 'principal' }, topo, conteudo));
+  // Véu atrás da gaveta do menu no celular: tocar fora fecha.
+  const veu = el('div', { class: 'veu-menu', onclick: () => botaoMenu.click() });
+  casca.append(lateral, veu, el('div', { class: 'principal' }, topo, conteudo));
   // A tela inteira é redesenhada a cada troca. Sem guardar onde o menu estava, ele volta para o
   // começo e quem tem muitos itens perde a referência do que acabou de clicar.
   const rolagemMenu = $('.lateral')?.scrollTop ?? 0;
