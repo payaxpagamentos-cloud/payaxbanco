@@ -68,7 +68,7 @@ module.exports = (db) => {
   r.put('/telas/:id/aviso', (req, res) => {
     if (!lerConfig(db).aviso_lojista) throw new ErroNegocio('O aviso pelo portal está desligado. Fale com a equipe.', 403);
     const t = minhaTela(req, req.params.id);
-    const texto = req.body.aviso === null || req.body.aviso === '' ? null : v.texto(req.body.aviso, 'o aviso', 160);
+    const texto = v.avisos(req.body.aviso, 160);
     const horas = texto ? v.inteiro(req.body.horas ?? 12, 'as horas', { min: 1, max: 72 }) : 0;
     db.prepare('UPDATE telas SET aviso = ?, aviso_ate = ? WHERE id = ?')
       .run(texto, texto ? new Date(Date.now() + horas * 3_600_000).toISOString() : null, t.id);

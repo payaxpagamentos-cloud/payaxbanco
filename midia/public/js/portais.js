@@ -1,7 +1,7 @@
 /** Portais: o anunciante acompanha as próprias campanhas; o lojista acompanha as TVs do ponto dele. */
 import { api, qs, baixar } from './api.js';
 import {
-  el, limpar, icone, toast, acao, modal, formModal, confirmar, campo, escolha, lerForm, repetir,
+  el, limpar, icone, toast, acao, modal, formModal, confirmar, campo, escolha, area, lerForm, repetir,
   inteiro, dinheiro, duracao, dataBr, dataHora, etiquetaDe, etiqueta, percentual, competenciaTexto, situacao,
   diasTexto, faixaHorario, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_FATURA, STATUS_CONTRATO, STATUS_REPASSE, STATUS_COMUNICADO,
   TIPOS_COMUNICADO, REPASSES, CATEGORIAS,
@@ -293,7 +293,7 @@ async function verProgramacao(t) {
 
 const avisoLojista = (t, recarregar) => formModal(`Aviso na TV — ${t.nome}`, () => [
   el('p', { class: 'mudo', style: 'margin:0' }, 'O texto passa na faixa de baixo da TV. Deixe em branco para tirar.'),
-  campo('Aviso', { name: 'aviso', value: t.aviso ?? '', maxlength: 160, placeholder: 'Ex.: Pão quentinho às 17h' }),
+  area('Avisos (um por linha; com mais de um, eles passam correndo no rodapé)', { name: 'aviso', rows: 4, maxlength: 1000, placeholder: 'Pão quentinho às 17h\nAmanhã abrimos às 8h' }, t.aviso ?? ''),
   escolha('Por quanto tempo', 'horas', { 2: '2 horas', 6: '6 horas', 12: '12 horas', 24: '1 dia', 48: '2 dias', 72: '3 dias' }, 12),
 ], async (d) => {
   await api.put(`/ponto/telas/${t.id}/aviso`, { aviso: d.aviso || null, horas: Number(d.horas) });

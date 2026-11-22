@@ -730,13 +730,46 @@ function desenharFaixa() {
   const mostrar = Boolean(texto || relogio || clima);
   $('faixa').hidden = !mostrar;
   document.body.classList.toggle('com-faixa', mostrar);
-  $('faixa-texto').textContent = texto;
+  pintarAvisos(texto);
   $('clima').hidden = !clima;
   if (clima) {
     const estreita = t?.orientacao === 'retrato';
     $('clima').textContent = estreita ? `${clima.temperatura}°` : `${clima.temperatura}° · ${clima.descricao}`;
   }
   $('relogio').hidden = !relogio;
+}
+
+/**
+ * Avisos do rodapé. Um aviso curto fica parado; com mais de um (ou um que não cabe), eles passam
+ * correndo da direita para a esquerda, um atrás do outro, sem parar — como um letreiro.
+ */
+function pintarAvisos(texto) {
+  const caixa = $('faixa-texto');
+  // Chamado a cada anúncio: só mexe quando o texto muda, para o letreiro não recomeçar toda hora.
+  if (caixa.dataset.texto === texto) return;
+  caixa.dataset.texto = texto;
+  const avisos = String(texto).split('\n').map((a) => a.trim()).filter(Boolean);
+  caixa.classList.remove('trem');
+  if (!avisos.length) { caixa.replaceChildren(); return; }
+  const fila = document.createElement('span');
+  fila.className = 'fila';
+  avisos.forEach((a, i) => {
+    if (i) { const ponto = document.createElement('i'); ponto.textContent = '•'; fila.append(ponto); }
+    const item = document.createElement('span');
+    item.textContent = a;
+    fila.append(item);
+  });
+  caixa.replaceChildren(fila);
+  // Mede depois de desenhar: se há mais de um aviso ou o texto passa da largura, vira letreiro.
+  requestAnimationFrame(() => {
+    const largura = caixa.clientWidth;
+    const conteudo = fila.scrollWidth;
+    if (avisos.length < 2 && conteudo <= largura) return;
+    caixa.classList.add('trem');
+    fila.style.setProperty('--entrada', `${largura}px`);
+    // Velocidade constante (um sétimo da largura da tela por segundo), qualquer que seja o tamanho do texto.
+    fila.style.animationDuration = `${Math.max(8, (largura + conteudo) / (window.innerWidth / 7))}s`;
+  });
 }
 
 function desenharInfo() {

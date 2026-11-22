@@ -207,7 +207,7 @@ function abrirPareamento(opcoes, recarregar, codigoInicial = '') {
 function editarAviso(t, recarregar) {
   return formModal(`Aviso na faixa — ${t.nome}`, () => [
     el('p', { class: 'mudo', style: 'margin:0' }, 'O texto passa na faixa de baixo da TV, junto com o relógio. Deixe em branco para tirar.'),
-    campo('Aviso', { name: 'aviso', value: t.aviso ?? '', maxlength: 200, placeholder: 'Ex.: Promoção de hoje: pão francês R$ 9,90' }),
+    area('Avisos (um por linha; com mais de um, eles passam correndo no rodapé)', { name: 'aviso', rows: 4, maxlength: 1300, placeholder: 'Promoção de hoje: pão francês R$ 9,90\nElevador social em manutenção até as 18h' }, t.aviso ?? ''),
     escolha('Por quanto tempo', 'horas', { 2: '2 horas', 6: '6 horas', 12: '12 horas', 24: '1 dia', 72: '3 dias', 168: '1 semana' }, t.aviso ? 12 : 12),
   ], async (d) => {
     await api.put(`/painel/telas/${t.id}/aviso`, { aviso: d.aviso || null, horas: Number(d.horas) });

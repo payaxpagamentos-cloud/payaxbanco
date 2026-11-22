@@ -72,6 +72,14 @@ const email = (v) => {
   return e;
 };
 
+/** Avisos do rodapé da TV: um por linha, até 6, cada um com tamanho limitado. Devolve o texto pronto (ou null). */
+const avisos = (v, maxCada = 200) => {
+  const linhas = String(v ?? '').replace(/\r/g, '').split('\n').map((l) => l.replace(/[\u0000-\u001f]/g, '').trim()).filter(Boolean);
+  exigir(linhas.length <= 6, 'Use no máximo 6 avisos (um por linha).');
+  for (const l of linhas) exigir(l.length <= maxCada, `Cada aviso pode ter até ${maxCada} letras.`);
+  return linhas.length ? linhas.join('\n') : null;
+};
+
 const senha = (v) => {
   exigir(typeof v === 'string' && v.length >= 10, 'A senha deve ter pelo menos 10 caracteres.');
   exigir(v.length <= 200, 'Senha longa demais.');
@@ -146,5 +154,5 @@ const posicao = (v) => opcional(v, 'a posição da tela', 60);
 
 const booleano = (v) => v === true || v === 1 || v === '1' || v === 'true' || v === 'on';
 
-module.exports = { digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, telefone, data,
+module.exports = { digitos, cpfValido, cnpjValido, emailValido, dataValida, exigir, falhar, texto, opcional, inteiro, numero, opcao, email, senha, avisos, telefone, data,
   documento, hora, competencia, percentual, diasSemana, uf, booleano, CATEGORIAS, posicao };

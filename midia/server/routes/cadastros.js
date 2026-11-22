@@ -301,7 +301,7 @@ module.exports = (db) => {
   r.put('/telas/:id/aviso', (req, res) => {
     const id = Number(req.params.id);
     if (!db.prepare('SELECT 1 FROM telas WHERE id = ?').get(id)) throw naoEncontrado('Tela');
-    const texto = req.body.aviso === null || req.body.aviso === '' ? null : v.texto(req.body.aviso, 'o aviso', 200);
+    const texto = v.avisos(req.body.aviso, 200);
     const horas = texto ? v.inteiro(req.body.horas ?? 12, 'as horas', { min: 1, max: 720 }) : 0;
     db.prepare('UPDATE telas SET aviso = ?, aviso_ate = ? WHERE id = ?')
       .run(texto, texto ? new Date(Date.now() + horas * 3_600_000).toISOString() : null, id);
