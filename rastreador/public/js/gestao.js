@@ -258,34 +258,132 @@ async function telaPreventiva(ctx) {
 }
 
 // ---------- Pneus ----------
-/** Desenho do veículo visto de cima: um eixo por linha, esquerda e direita do chassi, estepe embaixo. */
+// ---------- Ilustração dos pneus: o veículo visto de cima, com cada pneu no lugar real ----------
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Corpo de cada tipo de veículo (SVG) e onde fica cada pneu (centro, tamanho e de que lado vai a etiqueta).
+const FIGURAS = {
+  leve: {
+    w: 620, h: 660, pneu: [38, 88],
+    corpo: `
+      <rect class="vp-sombra" x="208" y="58" width="204" height="518" rx="86"/>
+      <rect class="vp-lataria" x="210" y="52" width="200" height="520" rx="84"/>
+      <path class="vp-capo" d="M226 150 Q310 70 394 150 L386 196 Q310 178 234 196 Z"/>
+      <path class="vp-vidro" d="M236 206 Q310 186 384 206 L374 262 Q310 250 246 262 Z"/>
+      <rect class="vp-teto" x="246" y="270" width="128" height="150" rx="22"/>
+      <path class="vp-vidro" d="M248 428 Q310 440 372 428 L382 474 Q310 492 238 474 Z"/>
+      <rect class="vp-detalhe" x="244" y="88" width="38" height="11" rx="5.5" transform="rotate(-14 263 93)"/><rect class="vp-detalhe" x="338" y="88" width="38" height="11" rx="5.5" transform="rotate(14 357 93)"/>
+      <rect class="vp-luz-tras" x="244" y="526" width="38" height="10" rx="5" transform="rotate(14 263 531)"/><rect class="vp-luz-tras" x="338" y="526" width="38" height="10" rx="5" transform="rotate(-14 357 531)"/>
+      <ellipse class="vp-lataria" cx="200" cy="232" rx="14" ry="9"/><ellipse class="vp-lataria" cx="420" cy="232" rx="14" ry="9"/>`,
+    rodas: { DE: [192, 150, 'esq'], DD: [428, 150, 'dir'], TE: [192, 460, 'esq'], TD: [428, 460, 'dir'], EST: [310, 618, 'estepe'] },
+  },
+  moto: {
+    w: 560, h: 600, pneu: [34, 124],
+    corpo: `
+      <rect class="vp-lataria" x="206" y="112" width="148" height="14" rx="7"/>
+      <path class="vp-lataria" d="M262 168 Q280 150 298 168 L306 300 Q280 316 254 300 Z"/>
+      <rect class="vp-teto" x="256" y="308" width="48" height="118" rx="22"/>
+      <rect class="vp-vidro" x="264" y="176" width="32" height="40" rx="10"/>
+      <circle class="vp-detalhe" cx="210" cy="119" r="8"/><circle class="vp-detalhe" cx="350" cy="119" r="8"/>`,
+    rodas: { D: [280, 120, 'dir'], T: [280, 478, 'dir'] },
+  },
+  caminhao: {
+    w: 660, h: 1060, pneu: [32, 94],
+    corpo: `
+      <rect class="vp-sombra" x="222" y="46" width="216" height="186" rx="34"/>
+      <rect class="vp-lataria" x="224" y="40" width="212" height="186" rx="34"/>
+      <path class="vp-vidro" d="M244 70 Q330 52 416 70 L408 118 Q330 106 252 118 Z"/>
+      <rect class="vp-teto" x="252" y="128" width="156" height="84" rx="16"/>
+      <ellipse class="vp-lataria" cx="212" cy="96" rx="12" ry="18"/><ellipse class="vp-lataria" cx="448" cy="96" rx="12" ry="18"/>
+      <rect class="vp-chassi" x="292" y="226" width="76" height="20"/>
+      <rect class="vp-sombra" x="234" y="252" width="196" height="700" rx="12"/>
+      <rect class="vp-bau" x="232" y="244" width="196" height="700" rx="12"/>
+      <g class="vp-frisos">${Array.from({ length: 13 }, (_, i) => `<line x1="244" x2="416" y1="${300 + i * 50}" y2="${300 + i * 50}"/>`).join('')}</g>
+      <rect class="vp-luz-tras" x="246" y="930" width="36" height="8" rx="4"/><rect class="vp-luz-tras" x="378" y="930" width="36" height="8" rx="4"/>`,
+    rodas: { '1E': [208, 150, 'esq'], '1D': [452, 150, 'dir'], '2EE': [176, 690, 'esq'], '2EI': [212, 690, 'esq'], '2DI': [448, 690, 'dir'], '2DE': [484, 690, 'dir'],
+      '3EE': [176, 830, 'esq'], '3EI': [212, 830, 'esq'], '3DI': [448, 830, 'dir'], '3DE': [484, 830, 'dir'], EST: [330, 1010, 'estepe'] },
+  },
+  onibus: {
+    w: 660, h: 940, pneu: [32, 94],
+    corpo: `
+      <rect class="vp-sombra" x="226" y="36" width="212" height="810" rx="46"/>
+      <rect class="vp-lataria" x="224" y="30" width="212" height="810" rx="46"/>
+      <path class="vp-vidro" d="M244 62 Q330 40 416 62 L410 120 Q330 108 250 120 Z"/>
+      <rect class="vp-teto" x="250" y="132" width="160" height="680" rx="22"/>
+      <g class="vp-frisos">${Array.from({ length: 6 }, (_, i) => `<rect x="268" y="${170 + i * 104}" width="124" height="70" rx="10"/>`).join('')}</g>
+      <rect class="vp-luz-tras" x="244" y="822" width="40" height="8" rx="4"/><rect class="vp-luz-tras" x="376" y="822" width="40" height="8" rx="4"/>`,
+    rodas: { '1E': [208, 190, 'esq'], '1D': [452, 190, 'dir'], '2EE': [176, 640, 'esq'], '2EI': [212, 640, 'esq'], '2DI': [448, 640, 'dir'], '2DE': [484, 640, 'dir'], EST: [330, 890, 'estepe'] },
+  },
+};
+const figuraDe = (tipo) => FIGURAS[tipo === 'moto' ? 'moto' : tipo === 'caminhao' ? 'caminhao' : tipo === 'onibus' ? 'onibus' : 'leve'];
+const COR_PNEU = { ok: 'ok', atencao: 'aviso', trocar: 'erro', sem_medicao: 'neutro' };
+
 function desenhoPneus(ctx, mapa, aoClicar) {
-  const eixoDe = (cod) => (/^\d/.test(cod) ? Number(cod[0]) : { DE: 1, DD: 1, D: 1, TE: 2, TD: 2, T: 2 }[cod] ?? 9);
-  const lado = (cod) => (cod === 'D' || cod === 'T' ? 'centro' : /^(DE|TE|\dE|\dEE|\dEI)$/.test(cod) ? 'esq' : 'dir');
-  const ordemEsq = (c) => (c.endsWith('EE') ? 0 : 1);
-  const ordemDir = (c) => (c.endsWith('DI') ? 0 : 1);
-  const roda = (pos) => {
-    const p = pos.pneu;
-    const est = p ? PNEU[p.estado] : null;
-    return el('button', { type: 'button', class: `roda ${p ? `com ${est[1] || 'neutro'}` : 'vazia'}`, title: pos.nome, onclick: () => aoClicar(pos) },
-      el('span', { class: 'roda-pos' }, pos.codigo),
-      p ? [el('strong', {}, p.numero_fogo), el('span', {}, mm(p.sulco_mm)), el('span', { class: 'pequeno' }, kmTxt(p.km_pneu))] : el('span', { class: 'pequeno' }, pode(ctx) ? '+ montar' : 'vazia'));
-  };
-  const eixos = new Map();
-  for (const pos of mapa.posicoes.filter((x) => x.codigo !== 'EST')) {
-    const e = eixoDe(pos.codigo);
-    if (!eixos.has(e)) eixos.set(e, { esq: [], dir: [], centro: [] });
-    eixos.get(e)[lado(pos.codigo)].push(pos);
+  const f = figuraDe(mapa.veiculo.tipo);
+  const [tw, th] = f.pneu;
+  const porCodigo = new Map(mapa.posicoes.map((p) => [p.codigo, p]));
+  // Etiquetas: duas por lado num eixo duplo (externo em cima, interno embaixo), uma no eixo simples.
+  const LW = 150; const LH = 50;
+  const partes = [];
+  const etiquetas = [];
+  const grupos = new Map();
+  for (const [cod, [x, y, lado]] of Object.entries(f.rodas)) {
+    if (!porCodigo.has(cod)) continue;
+    const k = `${lado}:${y}`;
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(cod);
   }
-  const estepe = mapa.posicoes.find((x) => x.codigo === 'EST');
-  return el('div', { class: 'veiculo-pneus' },
-    el('div', { class: 'frente' }, 'frente'),
-    [...eixos.entries()].sort((a, b) => a[0] - b[0]).map(([, g]) => el('div', { class: 'eixo' },
-      g.centro.length ? el('div', { class: 'lado centro' }, g.centro.map(roda)) : [
-        el('div', { class: 'lado esq' }, g.esq.sort((a, b) => ordemEsq(a.codigo) - ordemEsq(b.codigo)).map(roda)),
-        el('div', { class: 'chassi' }),
-        el('div', { class: 'lado dir' }, g.dir.sort((a, b) => ordemDir(a.codigo) - ordemDir(b.codigo)).map(roda))])),
-    estepe ? el('div', { class: 'estepe' }, el('span', { class: 'pequeno mudo' }, 'Estepe'), roda(estepe)) : null);
+  // No eixo duplo, o pneu de fora (mais longe do chassi) fica com a etiqueta de cima, dos dois lados.
+  for (const g of grupos.values()) g.sort((a, b) => Math.abs(f.rodas[b][0] - f.w / 2) - Math.abs(f.rodas[a][0] - f.w / 2));
+  for (const [cod, [x, y, lado]] of Object.entries(f.rodas)) {
+    const pos = porCodigo.get(cod);
+    if (!pos) continue;
+    const p = pos.pneu;
+    const tom = p ? COR_PNEU[p.estado] ?? 'neutro' : 'vazia';
+    const estepe = lado === 'estepe';
+    // O pneu: borracha escura com os sulcos desenhados e o anel na cor do estado.
+    if (estepe) {
+      partes.push(`<g class="vp-roda vp-${tom}" data-pos="${esc(cod)}" tabindex="0" role="button" aria-label="${esc(pos.nome)}">
+        <circle cx="${x}" cy="${y}" r="34" class="vp-pneu"/><circle cx="${x}" cy="${y}" r="15" class="vp-aro"/><circle cx="${x}" cy="${y}" r="40" class="vp-anel"/></g>`);
+    } else {
+      const sulcos = Array.from({ length: Math.floor(th / 12) }, (_, i) => `<line x1="${x - tw / 2 + 5}" x2="${x + tw / 2 - 5}" y1="${y - th / 2 + 9 + i * 12}" y2="${y - th / 2 + 9 + i * 12}"/>`).join('');
+      partes.push(`<g class="vp-roda vp-${tom}" data-pos="${esc(cod)}" tabindex="0" role="button" aria-label="${esc(pos.nome)}">
+        <rect x="${x - tw / 2 - 5}" y="${y - th / 2 - 5}" width="${tw + 10}" height="${th + 10}" rx="${tw / 2}" class="vp-anel"/>
+        <rect x="${x - tw / 2}" y="${y - th / 2}" width="${tw}" height="${th}" rx="${Math.min(12, tw / 2.6)}" class="vp-pneu"/>
+        <g class="vp-sulcos">${sulcos}</g></g>`);
+    }
+    // A etiqueta ao lado, ligada ao pneu por uma linha.
+    const grupo = grupos.get(`${lado}:${y}`);
+    const i = grupo.indexOf(cod);
+    const ly = grupo.length > 1 ? y - LH - 4 + i * (LH + 8) : y - LH / 2;
+    const lx = estepe ? x + 54 : lado === 'esq' ? 8 : lado === 'dir' ? f.w - LW - 8 : x + 30;
+    const ancX = estepe ? x + 40 : lado === 'esq' ? x - tw / 2 - 6 : x + tw / 2 + 6;
+    const fimX = lado === 'esq' ? lx + LW : lx;
+    const linha1 = `${esc(cod)} · ${p ? esc(p.numero_fogo) : 'vazia'}`;
+    const linha2 = p ? `${p.sulco_mm === null ? 'sem medição' : `${String(Math.round(p.sulco_mm * 10) / 10).replace('.', ',')} mm`} · ${inteiro(p.km_pneu)} km` : (pode(ctx) ? '+ montar pneu' : 'sem pneu');
+    etiquetas.push(`<g class="vp-etiqueta vp-${tom}" data-pos="${esc(cod)}" role="button" tabindex="-1">
+      ${grupo.length > 1 ? '' : `<line class="vp-ligacao" x1="${ancX}" y1="${y}" x2="${fimX}" y2="${ly + LH / 2}"/>`}
+      <rect x="${lx}" y="${ly}" width="${LW}" height="${LH}" rx="12" class="vp-cartao"/>
+      <circle cx="${lx + 16}" cy="${ly + 17}" r="5" class="vp-ponto"/>
+      <text x="${lx + 28}" y="${ly + 21}" class="vp-t1">${linha1}</text>
+      <text x="${lx + 16}" y="${ly + 39}" class="vp-t2">${linha2}</text></g>`);
+  }
+  const raiz = el('div', { class: 'veiculo-ilustrado' });
+  raiz.innerHTML = `<svg viewBox="0 0 ${f.w} ${f.h}" role="img" aria-label="Pneus de ${esc(mapa.veiculo.placa)}">
+    <text x="${f.w / 2}" y="22" class="vp-frente">▲ FRENTE</text>${f.corpo}${partes.join('')}${etiquetas.join('')}</svg>`;
+  // Celular: a mesma informação numa lista legível, embaixo do desenho.
+  raiz.append(el('div', { class: 'lista-pneus-cel' }, mapa.posicoes.map((pos) => {
+    const p = pos.pneu;
+    const tom = p ? ({ ok: 'ok', atencao: 'aviso', trocar: 'erro' }[p.estado] ?? '') : 'vazia';
+    return el('button', { type: 'button', class: tom, onclick: () => aoClicar(pos) },
+      el('span', {}, el('strong', {}, `${pos.codigo} · ${p ? p.numero_fogo : 'vazia'}`), el('div', { class: 'pequeno mudo' }, pos.nome)),
+      el('span', { class: 'pequeno' }, p ? `${mm(p.sulco_mm)} · ${kmTxt(p.km_pneu)}` : (pode(ctx) ? '+ montar' : '')));
+  })));
+  for (const g of raiz.querySelectorAll('[data-pos]')) {
+    const abrir = () => aoClicar(porCodigo.get(g.dataset.pos));
+    g.addEventListener('click', abrir);
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); } });
+  }
+  return raiz;
 }
 
 async function telaPneus(ctx) {

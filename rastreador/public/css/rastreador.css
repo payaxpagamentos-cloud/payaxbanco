@@ -1350,3 +1350,49 @@ input, textarea, select, [contenteditable="true"]{ caret-color: auto; }
 .roda.com.aviso{ border-color: var(--aviso); background: var(--aviso-bg); }
 .roda.com.erro{ border-color: var(--erro); background: var(--erro-bg); }
 @media (max-width: 520px){ .roda{ width: 66px; min-height: 92px; font-size: 11px; } .veiculo-pneus{ min-width: 0; width: 100%; padding: 12px 8px; } .veiculo-pneus .chassi{ width: 18px; } }
+
+/* ---------- Pneus: ilustração do veículo visto de cima ---------- */
+.veiculo-ilustrado{ flex: 1 1 520px; max-width: 620px; min-width: 0; }
+.veiculo-ilustrado svg{ width: 100%; height: auto; display: block; }
+.vp-frente{ font-size: 13px; font-weight: 700; letter-spacing: .18em; fill: var(--text-3); text-anchor: middle; }
+.vp-sombra{ fill: rgba(15, 23, 42, .07); }
+.vp-lataria, .vp-bau{ fill: var(--surface); stroke: var(--border-forte); stroke-width: 2; }
+.vp-capo, .vp-teto{ fill: var(--surface-2); stroke: var(--border); stroke-width: 1.5; }
+.vp-vidro{ fill: #A9C9EC; opacity: .8; }
+.vp-frisos line{ stroke: var(--border); stroke-width: 1.5; }
+.vp-frisos rect{ fill: #A9C9EC; opacity: .45; }
+.vp-chassi{ fill: var(--border-forte); }
+.vp-detalhe{ fill: #FCD34D; }
+.vp-luz-tras{ fill: #F87171; }
+.vp-pneu{ fill: #22262E; }
+.vp-sulcos line{ stroke: #3B414C; stroke-width: 2.2; stroke-linecap: round; }
+.vp-aro{ fill: #6B7280; }
+.vp-anel{ fill: none; stroke-width: 4; }
+.vp-roda, .vp-etiqueta{ cursor: pointer; outline: none; }
+.vp-roda:hover .vp-anel, .vp-roda:focus-visible .vp-anel{ stroke-width: 7; }
+.vp-ok .vp-anel{ stroke: var(--ok); } .vp-aviso .vp-anel{ stroke: var(--aviso); } .vp-erro .vp-anel{ stroke: var(--erro); animation: vp-pulso 1.6s ease-in-out infinite; }
+.vp-neutro .vp-anel{ stroke: var(--text-3); }
+.vp-vazia .vp-pneu{ fill: transparent; stroke: var(--text-3); stroke-width: 2; stroke-dasharray: 7 6; }
+.vp-vazia .vp-anel, .vp-vazia .vp-sulcos, .vp-vazia .vp-aro{ display: none; }
+.vp-ligacao{ stroke: var(--border-forte); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.vp-cartao{ fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+.vp-ok .vp-cartao{ fill: var(--ok-bg); stroke: var(--ok); } .vp-aviso .vp-cartao{ fill: var(--aviso-bg); stroke: var(--aviso); } .vp-erro .vp-cartao{ fill: var(--erro-bg); stroke: var(--erro); }
+.vp-vazia .vp-cartao{ stroke-dasharray: 6 5; fill: transparent; }
+.vp-etiqueta:hover .vp-cartao{ stroke-width: 2.5; }
+.vp-ponto{ fill: var(--text-3); } .vp-ok .vp-ponto{ fill: var(--ok); } .vp-aviso .vp-ponto{ fill: var(--aviso); } .vp-erro .vp-ponto{ fill: var(--erro); } .vp-vazia .vp-ponto{ fill: none; stroke: var(--text-3); }
+.vp-t1{ font-size: 14px; font-weight: 700; fill: var(--text); }
+.vp-t2{ font-size: 12.5px; fill: var(--text-2); }
+@keyframes vp-pulso{ 50%{ stroke-opacity: .35; } }
+@media (prefers-reduced-motion: reduce){ .vp-erro .vp-anel{ animation: none; } }
+:root[data-theme="dark"] .vp-vidro, :root[data-theme="dark"] .vp-frisos rect{ fill: #3E5F86; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .vp-vidro, :root:not([data-theme="light"]) .vp-frisos rect{ fill: #3E5F86; } }
+:root[data-theme="dark"] .vp-sombra{ fill: rgba(0, 0, 0, .35); }
+/* No celular a ilustração encolhe: a lista embaixo repete cada pneu com letra legível. */
+.lista-pneus-cel{ display: none; }
+@media (max-width: 640px){
+  .lista-pneus-cel{ display: grid; gap: 8px; width: 100%; }
+  .lista-pneus-cel button{ display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 12px;
+    border-radius: 12px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+  .lista-pneus-cel .ok{ border-color: var(--ok); background: var(--ok-bg); } .lista-pneus-cel .aviso{ border-color: var(--aviso); background: var(--aviso-bg); }
+  .lista-pneus-cel .erro{ border-color: var(--erro); background: var(--erro-bg); } .lista-pneus-cel .vazia{ border-style: dashed; color: var(--text-3); }
+}
