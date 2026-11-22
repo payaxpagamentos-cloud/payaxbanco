@@ -96,9 +96,18 @@ async function desenhar() {
     const aberto = k === nome || subs?.some(([sk]) => sk === nome);
     const link = el('a', { class: `item${aberto ? ' on' : ''}`, href: `#/${subs ? subs[0][0] : k}`, title: rotulo }, icone(ic), el('span', { class: 'rotulo' }, rotulo));
     if (!subs) return link;
-    // O submenu do grupo aberto aparece na lateral; os outros só no menu do celular, que mostra tudo de uma vez.
-    return [link, el('div', { class: `grupo-sub${aberto ? '' : ' fechado'}` },
-      subs.filter(([, , ps]) => pode(ps)).map(([sk, sr]) => el('a', { class: `sub${sk === nome ? ' on' : ''}`, href: `#/${sk}` }, sr)))];
+    // Na lateral do computador, o submenu do grupo aberto aparece embaixo dele. No menu do celular, todos
+    // começam fechados: tocar no grupo abre (ou fecha) o submenu ali mesmo, sem trocar de tela.
+    const sub = el('div', { class: `grupo-sub${aberto ? '' : ' fechado'}` },
+      subs.filter(([, , ps]) => pode(ps)).map(([sk, sr]) => el('a', { class: `sub${sk === nome ? ' on' : ''}`, href: `#/${sk}` }, sr)));
+    link.classList.add('grupo');
+    link.append(el('span', { class: 'seta-grupo' }, icone('abaixo')));
+    link.addEventListener('click', (e) => {
+      if (!lateral.classList.contains('aberta')) return;
+      e.preventDefault();
+      link.classList.toggle('expandido');
+    });
+    return [link, sub];
   });
 
   // No celular a lateral vira uma barra com a marca e o botão Menu, que abre a lista inteira (com os submenus).

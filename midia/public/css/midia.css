@@ -160,6 +160,8 @@ a{ color: var(--cor); }
 .lateral .grupo-sub{ display: flex; flex-direction: column; gap: 0; margin: 2px 0 6px; }
 .lateral .grupo-sub.fechado{ display: none; }
 .veu-menu{ display: none; }
+.lateral .seta-grupo{ display: none; }
+.lateral .seta-grupo svg{ width: 16px; height: 16px; }
 @keyframes gaveta{ from{ transform: translateX(-100%); } }
 /* Botão Menu: só existe no celular. */
 .lateral .abrir-menu{ display: none; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06);
@@ -536,7 +538,11 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
     background: rgba(5, 6, 8, .55); animation: aparecer .2s ease-out; }
   .lateral.aberta .topo-lateral{ position: sticky; top: -10px; z-index: 1; background: #18232A; padding: 0 0 14px; margin-bottom: 4px; }
   .lateral.aberta > a.item, .lateral.aberta > .falar-equipe{ display: flex; font-size: 15px; padding: 11px 12px; }
-  .lateral.aberta > .grupo-sub{ display: flex; margin: 0 0 6px; }
+  /* Submenu fechado até tocar no grupo; a seta mostra que ali tem mais. */
+  .lateral.aberta > .grupo-sub{ display: none; margin: 0 0 6px; }
+  .lateral.aberta > a.item.expandido + .grupo-sub{ display: flex; }
+  .lateral.aberta a.item.grupo .seta-grupo{ display: grid; margin-left: auto; transition: transform .15s; }
+  .lateral.aberta a.item.grupo.expandido .seta-grupo{ transform: rotate(180deg); }
   .lateral.aberta a.sub{ font-size: 14px; padding: 9px 12px 9px 42px; }
   html.menu-aberto, html.menu-aberto body{ overflow: hidden; }
   .topo{ padding: 16px 16px 2px; }
