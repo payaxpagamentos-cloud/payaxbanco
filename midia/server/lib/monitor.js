@@ -56,13 +56,18 @@ function manutencao(db) {
 }
 
 /** Verificações para a tela de Diagnóstico do painel. */
-function diagnostico(db) {
+function diagnostico(db, { empresaId = null } = {}) {
   const cfg = lerConfig(db);
   const data = hoje();
   const um = (sql, ...p) => db.prepare(sql).get(...p);
   const todos = (sql, ...p) => db.prepare(sql).all(...p);
+  // Empresa: cada uma vê os problemas dela; o que é do servidor (backup, e-mail) só o master vê.
+  const E = empresaId;
+  const ep = E == null ? [] : [E];
+  const locE = (col = 'l.empresa_id') => (E == null ? '' : ` AND ${col} = ?`);
+  const anunE = (col = 'anunciante_id') => (E == null ? '' : ` AND ${col} IN (SELECT id FROM anunciantes WHERE empresa_id = ?)`);
 
-  const telas = todos("SELECT t.*, l.nome AS local_nome FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.status = 'ativa'");
+  const telas = todos(`SELECT t.*, l.nome AS local_nome FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.status = 'ativa'${locE()}`, ...ep);
   const offline = telas.filter((t) => t.pareada_em && !estaOnline(t, cfg));
   const semParear = telas.filter((t) => !t.pareada_em);
   const semGrade = telas.filter((t) => t.pareada_em && !t.grade_versao);
@@ -85,23 +90,23 @@ function diagnostico(db) {
   });
 
   const semMidia = todos(`SELECT c.id, c.nome FROM campanhas c WHERE c.status IN ('ativa','aguardando')
-    AND NOT EXISTS (SELECT 1 FROM campanha_midias cm JOIN midias m ON m.id = cm.midia_id WHERE cm.campanha_id = c.id AND m.status = 'aprovada')`);
+    AND NOT EXISTS (SELECT 1 FROM campanha_midias cm JOIN midias m ON m.id = cm.midia_id WHERE cm.campanha_id = c.id AND m.status = 'aprovada')${anunE('c.anunciante_id')}`, ...ep);
   verificacoes.push({ nome: 'Campanhas sem criativo aprovado', ok: !semMidia.length, detalhe: semMidia.length ? `${semMidia.length}: ${semMidia.slice(0, 6).map((c) => c.nome).join(', ')}` : 'Toda campanha no ar tem criativo aprovado.' });
 
-  const pendentes = um("SELECT COUNT(*) AS n FROM midias WHERE status = 'pendente'").n;
+  const pendentes = um(`SELECT COUNT(*) AS n FROM midias WHERE status = 'pendente'${locE('empresa_id')}`, ...ep).n;
   verificacoes.push({ nome: 'Mídias aguardando aprovação', ok: !pendentes, detalhe: pendentes ? `${pendentes} esperando revisão da equipe.` : 'Nada na fila.' });
 
-  const vencendo = todos("SELECT nome, validade_ate FROM midias WHERE status = 'aprovada' AND validade_ate IS NOT NULL AND validade_ate BETWEEN ? AND ?", data, somarDias(data, 7));
+  const vencendo = todos(`SELECT nome, validade_ate FROM midias WHERE status = 'aprovada' AND validade_ate IS NOT NULL AND validade_ate BETWEEN ? AND ?${locE('empresa_id')}`, data, somarDias(data, 7), ...ep);
   verificacoes.push({ nome: 'Criativos vencendo em 7 dias', ok: !vencendo.length, detalhe: vencendo.length ? vencendo.slice(0, 6).map((m) => `${m.nome} (até ${m.validade_ate})`).join(', ') : 'Nenhum.' });
 
-  const acabando = todos("SELECT nome, fim FROM campanhas WHERE status = 'ativa' AND fim IS NOT NULL AND fim BETWEEN ? AND ?", data, somarDias(data, 7));
+  const acabando = todos(`SELECT nome, fim FROM campanhas WHERE status = 'ativa' AND fim IS NOT NULL AND fim BETWEEN ? AND ?${anunE()}`, data, somarDias(data, 7), ...ep);
   verificacoes.push({ nome: 'Campanhas terminando em 7 dias', ok: !acabando.length, detalhe: acabando.length ? acabando.slice(0, 6).map((c) => `${c.nome} (até ${c.fim})`).join(', ') : 'Nenhuma.' });
 
-  const semTela = todos("SELECT nome FROM locais WHERE status = 'ativo' AND NOT EXISTS (SELECT 1 FROM telas t WHERE t.local_id = locais.id AND t.status <> 'inativa')");
+  const semTela = todos(`SELECT nome FROM locais WHERE status = 'ativo' AND NOT EXISTS (SELECT 1 FROM telas t WHERE t.local_id = locais.id AND t.status <> 'inativa')${locE('empresa_id')}`, ...ep);
   verificacoes.push({ nome: 'Pontos sem TV ativa', ok: !semTela.length, detalhe: semTela.length ? semTela.slice(0, 6).map((l) => l.nome).join(', ') : 'Todos os pontos ativos têm TV.' });
 
   // Contrato que acaba sem ninguém ver é receita que cai sozinha; reajuste esquecido é desconto que o cliente nem pediu.
-  const ciclo = require('./contratos').pendencias(db);
+  const ciclo = require('./contratos').pendencias(db, null, E ?? null);
   verificacoes.push({
     nome: 'Contratos vencendo',
     ok: !ciclo.vencendo.length && !ciclo.vencidos.length,
@@ -119,8 +124,13 @@ function diagnostico(db) {
       : 'Nenhum reajuste pendente.',
   });
 
-  const faturas = um("SELECT COUNT(*) AS n, COALESCE(SUM(valor_centavos), 0) AS v FROM faturas WHERE status = 'aberta' AND vencimento < ?", data);
+  const faturas = um(`SELECT COUNT(*) AS n, COALESCE(SUM(valor_centavos), 0) AS v FROM faturas WHERE status = 'aberta' AND vencimento < ?${anunE()}`, data, ...ep);
   verificacoes.push({ nome: 'Faturas vencidas', ok: !faturas.n, detalhe: faturas.n ? `${faturas.n} em atraso, somando R$ ${(faturas.v / 100).toFixed(2)}.` : 'Nenhuma fatura vencida.' });
+
+  // Daqui para baixo é o servidor e a configuração da rede: assunto do master.
+  if (E != null) {
+    return { verificacoes, telas: { total: telas.length, online: telas.filter((t) => estaOnline(t, cfg)).length, offline: offline.length, sem_parear: semParear.length } };
+  }
 
   const b = require('./backup').situacao();
   verificacoes.push({

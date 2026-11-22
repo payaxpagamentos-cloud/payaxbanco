@@ -25,9 +25,13 @@ const periodoMes = (competencia) => ({ de: inicioMes(competencia), ate: fimMes(c
 const arred = (n) => Math.round(n ?? 0);
 
 /** Por campanha: inserções, tempo no ar, telas e impactos. */
-function porCampanha(db, { de, ate, anuncianteId = null, campanhaId = null } = {}) {
-  const filtros = [anuncianteId ? 'AND c.anunciante_id = ?' : '', campanhaId ? 'AND c.id = ?' : ''].join(' ');
-  const p = [de, ate, de, ate, ...(anuncianteId ? [anuncianteId] : []), ...(campanhaId ? [campanhaId] : [])];
+// empresaId (opcional) em todas as consultas: só as TVs daquela empresa entram na conta (null = a rede inteira).
+const eEmpresa = (empresaId, coluna = 'l.empresa_id') => (empresaId == null ? ['', []] : [` AND ${coluna} = ?`, [empresaId]]);
+
+function porCampanha(db, { de, ate, anuncianteId = null, campanhaId = null, empresaId = null } = {}) {
+  const [ef, ep] = eEmpresa(empresaId);
+  const filtros = [anuncianteId ? 'AND c.anunciante_id = ?' : '', campanhaId ? 'AND c.id = ?' : '', ef].join(' ');
+  const p = [de, ate, de, ate, ...(anuncianteId ? [anuncianteId] : []), ...(campanhaId ? [campanhaId] : []), ...ep];
   return db.prepare(`${TOTAIS}
     SELECT c.id AS campanha_id, c.nome AS campanha, c.status, c.cobranca, c.inicio, c.fim, a.id AS anunciante_id, a.nome AS anunciante,
       SUM(r.insercoes) AS insercoes, SUM(r.segundos) AS segundos, COUNT(DISTINCT r.tela_id) AS telas, COUNT(DISTINCT r.local_id) AS pontos,
@@ -38,8 +42,9 @@ function porCampanha(db, { de, ate, anuncianteId = null, campanhaId = null } = {
 }
 
 /** Por tela: quanto rodou, quanto foi publicidade e quanto foi institucional. */
-function porTela(db, { de, ate, localId = null } = {}) {
-  const p = [de, ate, de, ate, ...(localId ? [localId] : [])];
+function porTela(db, { de, ate, localId = null, empresaId = null } = {}) {
+  const [ef, ep] = eEmpresa(empresaId);
+  const p = [de, ate, de, ate, ...(localId ? [localId] : []), ...ep];
   return db.prepare(`${TOTAIS}
     SELECT t.id AS tela_id, t.nome AS tela, t.orientacao, l.id AS local_id, l.nome AS local, l.cidade, l.categoria, l.publico_dia,
       SUM(r.insercoes) AS insercoes, SUM(r.segundos) AS segundos,
@@ -48,38 +53,41 @@ function porTela(db, { de, ate, localId = null } = {}) {
       COUNT(DISTINCT CASE WHEN r.campanha_id <> 0 THEN r.campanha_id END) AS campanhas,
       COUNT(DISTINCT r.data) AS dias
     ${JUNCAO} JOIN telas t ON t.id = r.tela_id
-    WHERE r.data BETWEEN ? AND ? ${localId ? 'AND r.local_id = ?' : ''}
+    WHERE r.data BETWEEN ? AND ? ${localId ? 'AND r.local_id = ?' : ''}${ef}
     GROUP BY t.id ORDER BY insercoes DESC`).all(...p)
     .map((x) => ({ ...x, ocupacao: x.segundos ? Math.round((x.segundos_pagos / x.segundos) * 1000) / 10 : 0 }));
 }
 
 /** Por ponto (comércio): o que o lojista vê e a base do repasse. */
-function porLocal(db, { de, ate } = {}) {
+function porLocal(db, { de, ate, empresaId = null } = {}) {
+  const [ef, ep] = eEmpresa(empresaId);
   return db.prepare(`${TOTAIS}
     SELECT l.id AS local_id, l.nome AS local, l.cidade, l.uf, l.categoria, l.publico_dia, l.comissao_percentual,
       COUNT(DISTINCT r.tela_id) AS telas, SUM(r.insercoes) AS insercoes, SUM(r.segundos) AS segundos,
       SUM(CASE WHEN r.campanha_id <> 0 THEN r.insercoes ELSE 0 END) AS insercoes_pagas,
       ${IMPACTOS} AS impactos
     ${JUNCAO}
-    WHERE r.data BETWEEN ? AND ?
-    GROUP BY l.id ORDER BY insercoes DESC`).all(de, ate, de, ate).map((x) => ({ ...x, impactos: arred(x.impactos) }));
+    WHERE r.data BETWEEN ? AND ?${ef}
+    GROUP BY l.id ORDER BY insercoes DESC`).all(de, ate, de, ate, ...ep).map((x) => ({ ...x, impactos: arred(x.impactos) }));
 }
 
 /** Por dia (gráfico): inserções e tempo no ar. */
-function porDia(db, { de, ate, campanhaId = null, telaId = null, anuncianteId = null } = {}) {
+function porDia(db, { de, ate, campanhaId = null, telaId = null, anuncianteId = null, empresaId = null } = {}) {
   const onde = ['r.data BETWEEN ? AND ?'];
   const p = [de, ate];
   if (campanhaId) { onde.push('r.campanha_id = ?'); p.push(campanhaId); }
   if (telaId) { onde.push('r.tela_id = ?'); p.push(telaId); }
   if (anuncianteId) { onde.push('r.campanha_id IN (SELECT id FROM campanhas WHERE anunciante_id = ?)'); p.push(anuncianteId); }
+  if (empresaId != null) { onde.push('r.local_id IN (SELECT id FROM locais WHERE empresa_id = ?)'); p.push(empresaId); }
   return db.prepare(`SELECT r.data, SUM(r.insercoes) AS insercoes, SUM(r.segundos) AS segundos, COUNT(DISTINCT r.tela_id) AS telas
     FROM resumo_dia r WHERE ${onde.join(' AND ')} GROUP BY r.data ORDER BY r.data`).all(...p);
 }
 
 /** Inserções por hora do dia (quando a TV mais roda), a partir das exibições. */
-function porHora(db, { de, ate, telaId = null } = {}) {
+function porHora(db, { de, ate, telaId = null, empresaId = null } = {}) {
   const horas = db.prepare(`SELECT CAST(strftime('%H', exibida_em) AS INTEGER) AS hora_utc, COUNT(*) AS insercoes
-    FROM exibicoes WHERE data BETWEEN ? AND ? ${telaId ? 'AND tela_id = ?' : ''} GROUP BY hora_utc`).all(...[de, ate, ...(telaId ? [telaId] : [])]);
+    FROM exibicoes WHERE data BETWEEN ? AND ? ${telaId ? 'AND tela_id = ?' : ''}${empresaId != null ? ' AND local_id IN (SELECT id FROM locais WHERE empresa_id = ?)' : ''}
+    GROUP BY hora_utc`).all(...[de, ate, ...(telaId ? [telaId] : []), ...(empresaId != null ? [empresaId] : [])]);
   // As exibições são gravadas em UTC: a hora UTC da meia-noite local dá o deslocamento do fuso.
   const deslocamento = new Date(inicioDia(de)).getUTCHours();
   const porH = Array.from({ length: 24 }, (_, h) => ({ hora: h, insercoes: 0 }));
@@ -88,13 +96,14 @@ function porHora(db, { de, ate, telaId = null } = {}) {
 }
 
 /** Prova de exibição: uma linha por vez que o criativo foi ao ar. */
-function prova(db, { de, ate, campanhaId = null, telaId = null, anuncianteId = null, localId = null, limite = 5000, pagina = 1 } = {}) {
+function prova(db, { de, ate, campanhaId = null, telaId = null, anuncianteId = null, localId = null, limite = 5000, pagina = 1, empresaId = null } = {}) {
   const onde = ['e.data BETWEEN ? AND ?'];
   const p = [de, ate];
   if (campanhaId) { onde.push('e.campanha_id = ?'); p.push(campanhaId); }
   if (telaId) { onde.push('e.tela_id = ?'); p.push(telaId); }
   if (anuncianteId) { onde.push('e.anunciante_id = ?'); p.push(anuncianteId); }
   if (localId) { onde.push('e.local_id = ?'); p.push(localId); }
+  if (empresaId != null) { onde.push('l.empresa_id = ?'); p.push(empresaId); }
   const base = `FROM exibicoes e JOIN telas t ON t.id = e.tela_id JOIN locais l ON l.id = e.local_id
     LEFT JOIN campanhas c ON c.id = e.campanha_id LEFT JOIN anunciantes a ON a.id = e.anunciante_id LEFT JOIN midias m ON m.id = e.midia_id
     WHERE ${onde.join(' AND ')}`;

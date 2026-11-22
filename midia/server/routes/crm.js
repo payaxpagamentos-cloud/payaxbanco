@@ -9,6 +9,7 @@ const crm = require('../lib/crm');
 const caixa = require('../lib/caixa');
 const propostas = require('../lib/propostas');
 const v = require('../lib/validacao');
+const empresas = require('../lib/empresas');
 
 /**
  * CRM e propostas: o caminho entre "alguém pediu uma proposta" e "existe um contrato".
@@ -45,13 +46,13 @@ module.exports = (db) => {
     return d;
   };
 
-  r.get('/crm/funil', (req, res) => res.json(crm.funil(db, req.query)));
+  r.get('/crm/funil', (req, res) => res.json(crm.funil(db, { ...req.query, _empresa: empresas.empresaDe(req) })));
 
   r.get('/crm/leads/:id', (req, res) => res.json(crm.detalhe(db, Number(req.params.id))));
 
   r.post('/crm/leads', (req, res) => {
     const d = lerLead(req.body);
-    const campos = { ...d, criado_por: req.usuario.id, criado_em: agora(), atualizado_em: agora() };
+    const campos = { ...d, empresa_id: empresas.empresaParaGravar(db, req, req.body.empresa_id), criado_por: req.usuario.id, criado_em: agora(), atualizado_em: agora() };
     const id = Number(db.prepare(`INSERT INTO leads (${Object.keys(campos).join(', ')})
       VALUES (${Object.keys(campos).map(() => '?').join(', ')})`).run(...Object.values(campos)).lastInsertRowid);
     if (req.body.nota) crm.anotar(db, id, { texto: req.body.nota, usuarioId: req.usuario.id });
@@ -141,7 +142,7 @@ module.exports = (db) => {
   });
 
   // ----------------------------------------------------------------- Propostas (o papel que sai do funil)
-  r.get('/propostas', (req, res) => res.json(propostas.listar(db, req.query)));
+  r.get('/propostas', (req, res) => res.json(propostas.listar(db, { ...req.query, _empresa: empresas.empresaDe(req) })));
 
   r.get('/propostas/:id', (req, res) => res.json(propostas.detalhe(db, Number(req.params.id))));
 
@@ -237,7 +238,7 @@ module.exports = (db) => {
    * A conversa por e-mail fica aqui dentro, ligada ao lead. O que entra vem pelo servidor de e-mail da
    * plataforma (lib/smtp-servidor.js); o que sai vai pelo servidor de envio configurado.
    */
-  r.get('/crm/emails', (req, res) => res.json(caixa.listar(db, req.query)));
+  r.get('/crm/emails', (req, res) => res.json(caixa.listar(db, { ...req.query, _empresa: empresas.empresaDe(req) })));
 
   r.get('/crm/emails/:id', (req, res) => {
     const e = caixa.ler(db, Number(req.params.id));
@@ -291,6 +292,7 @@ module.exports = (db) => {
       responder_a: req.body.responder_a ?? null,
       lead_id: req.body.lead_id ?? null,
       usuarioId: req.usuario.id,
+      empresa_id: empresas.empresaParaGravar(db, req),
     });
     registrar(db, req, 'email_enviado', { id: e.id, para: e.para, assunto: e.assunto });
     res.status(201).json(e);

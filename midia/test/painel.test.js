@@ -195,7 +195,8 @@ test('Perfil administrador: tudo menos a aba Sistema, sem poder se promover', as
   const adm = await api.login('robson@vaimidia.com.br', 'robson-2026');
 
   assert.equal((await api.get('/painel/configuracoes', adm)).status, 200, 'mexe nas configurações');
-  assert.equal((await api.put('/painel/configuracoes', { cpm_centavos: 3000 }, adm)).status, 200, 'mexe nos preços');
+  // As configurações valem para a rede inteira (todas as empresas): só o master altera.
+  assert.equal((await api.put('/painel/configuracoes', { cpm_centavos: 3000 }, adm)).status, 403, 'não mexe nas regras da rede');
   assert.equal((await api.get('/painel/usuarios', adm)).status, 200, 'cuida da equipe');
   assert.equal((await api.post('/painel/usuarios', { nome: 'Op', email: 'op2@vaimidia.com.br', senha: 'operador-2026', perfil: 'operador' }, adm)).status, 201);
 

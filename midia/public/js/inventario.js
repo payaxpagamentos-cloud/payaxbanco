@@ -4,7 +4,7 @@ import {
   el, limpar, icone, toast, acao, modal, formModal, confirmar, campo, escolha, marcar, area, lerForm, centavos, reaisCampo,
   inteiro, dinheiro, dataBr, etiqueta, CATEGORIAS, ORIENTACOES,
 } from './ui.js';
-import { cartao, indicador, tabela, vazio } from './comum.js';
+import { cartao, indicador, tabela, vazio, campoEmpresa } from './comum.js';
 import { gerarProposta } from './proposta.js';
 
 export async function inventario(ctx) {
@@ -155,6 +155,7 @@ export async function agencias(corpo) {
 }
 
 const editarAgencia = (a, recarregar) => formModal(a ? `Editar ${a.nome}` : 'Nova agência', () => [
+  a ? null : campoEmpresa(),
   campo('Nome', { name: 'nome', value: a?.nome ?? '', required: true, maxlength: 120 }),
   el('div', { class: 'duas' },
     campo('CNPJ', { name: 'documento', value: a?.documento ?? '', maxlength: 20 }),

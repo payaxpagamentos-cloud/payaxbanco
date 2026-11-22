@@ -30,7 +30,13 @@ const SQL_CAMPANHAS_DO_MES = `SELECT c.*, a.nome AS anunciante_nome, a.status AS
   WHERE c.status <> 'rascunho' AND c.inicio <= ? AND (c.fim IS NULL OR c.fim >= ?)`;
 
 /** Prévia da fatura de cada anunciante na competência (não grava nada). */
-function calcular(db, competencia) {
+/** Só o que é da empresa (null = a rede inteira): o anunciante da fatura, o ponto do repasse. */
+function daEmpresa(db, tabela, id, empresaId) {
+  if (empresaId == null) return true;
+  return db.prepare(`SELECT empresa_id FROM ${tabela} WHERE id = ?`).get(id)?.empresa_id === empresaId;
+}
+
+function calcular(db, competencia, { empresaId = null } = {}) {
   const { de, ate } = periodoMes(competencia);
   const desempenho = new Map(porCampanha(db, { de, ate }).map((c) => [c.campanha_id, c]));
   const dias = diasNoMes(competencia);
@@ -77,11 +83,12 @@ function calcular(db, competencia) {
     f.comissao_agencia_centavos += comissao;
     f.valor_centavos = f.bruto_centavos - f.comissao_agencia_centavos;
   }
-  return [...porAnunciante.values()].sort((a, b) => b.valor_centavos - a.valor_centavos);
+  return [...porAnunciante.values()].filter((f) => daEmpresa(db, 'anunciantes', f.anunciante_id, empresaId))
+    .sort((a, b) => b.valor_centavos - a.valor_centavos);
 }
 
 /** Quanto cada ponto gerou de receita na competência e qual a contrapartida combinada com ele. */
-function calcularRepasses(db, competencia, faturas = calcular(db, competencia)) {
+function calcularRepasses(db, competencia, faturas = calcular(db, competencia), { empresaId = null } = {}) {
   const { de, ate } = periodoMes(competencia);
   // Receita líquida por campanha (depois da comissão de agência): é ela que sustenta o repasse.
   const receitaCampanha = new Map();
@@ -122,16 +129,17 @@ function calcularRepasses(db, competencia, faturas = calcular(db, competencia)) 
         valor_centavos: valor,
       };
     })
-    .filter((r) => r.valor_centavos > 0)
+    .filter((r) => r.valor_centavos > 0 && daEmpresa(db, 'locais', r.local_id, empresaId))
     .sort((a, b) => b.valor_centavos - a.valor_centavos);
 }
 
 /** Gera (ou refaz) as faturas abertas e os repasses a pagar da competência. Faturas pagas ou canceladas não são tocadas. */
-function gerar(db, competencia, { vencimento } = {}) {
+function gerar(db, competencia, { vencimento, empresaId = null } = {}) {
   const cfg = lerConfig(db);
   const venc = vencimento || `${somarMeses(competencia, 1)}-${String(cfg.vencimento_dia).padStart(2, '0')}`;
-  const faturas = calcular(db, competencia);
-  const repasses = calcularRepasses(db, competencia, faturas);
+  // Fechamento de uma empresa só gera as faturas e os repasses dela.
+  const faturas = calcular(db, competencia, { empresaId });
+  const repasses = calcularRepasses(db, competencia, faturas, { empresaId });
 
   return transacao(db, () => {
     let geradas = 0;

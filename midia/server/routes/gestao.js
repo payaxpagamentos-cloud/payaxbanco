@@ -8,6 +8,7 @@ const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { hashSenha, verificarSenha } = require('../lib/senha');
 const atualizacao = require('../lib/atualizacao');
+const empresas = require('../lib/empresas');
 const { hoje, mes, somarDias, somarMeses, inicioMes, fimMes, minutosDe } = require('../lib/datas');
 const { diagnostico, estaOnline } = require('../lib/monitor');
 const grade = require('../lib/grade');
@@ -25,18 +26,24 @@ module.exports = (db) => {
   const cfg = () => lerConfig(db);
 
   // ----------------------------------------------------------------- Visão geral
-  r.get('/resumo', (_req, res) => {
+  r.get('/resumo', (req, res) => {
     const c = cfg();
     const data = hoje();
     const competencia = mes(data);
     const limite = new Date(Date.now() - c.offline_minutos * 60_000).toISOString();
-    const telas = db.prepare("SELECT * FROM telas WHERE status <> 'inativa'").all();
+    // Tudo da empresa de quem olha (o master vê a rede inteira).
+    const E = empresas.empresaDe(req);
+    const ep = E === null ? [] : [E];
+    const locE = E === null ? '' : ' AND empresa_id = ?';
+    const telaE = E === null ? '' : ' AND local_id IN (SELECT id FROM locais WHERE empresa_id = ?)';
+    const anunE = E === null ? '' : ' AND anunciante_id IN (SELECT id FROM anunciantes WHERE empresa_id = ?)';
+    const telas = db.prepare(`SELECT * FROM telas WHERE status <> 'inativa'${telaE}`).all(...ep);
     const online = telas.filter((t) => t.ultimo_contato && t.ultimo_contato > limite);
 
     const doDia = db.prepare(`SELECT COALESCE(SUM(insercoes), 0) AS insercoes, COALESCE(SUM(segundos), 0) AS segundos,
-      COALESCE(SUM(CASE WHEN campanha_id <> 0 THEN insercoes ELSE 0 END), 0) AS insercoes_pagas FROM resumo_dia WHERE data = ?`).get(data);
-    const doMes = rel.porCampanha(db, { de: inicioMes(competencia), ate: fimMes(competencia) });
-    const previsao = faturamento.calcular(db, competencia);
+      COALESCE(SUM(CASE WHEN campanha_id <> 0 THEN insercoes ELSE 0 END), 0) AS insercoes_pagas FROM resumo_dia WHERE data = ?${telaE}`).get(data, ...ep);
+    const doMes = rel.porCampanha(db, { de: inicioMes(competencia), ate: fimMes(competencia), empresaId: E });
+    const previsao = faturamento.calcular(db, competencia, { empresaId: E });
 
     res.json({
       competencia,
@@ -47,15 +54,15 @@ module.exports = (db) => {
         sem_parear: telas.filter((t) => !t.pareada_em).length,
         manutencao: telas.filter((t) => t.status === 'manutencao').length,
       },
-      pontos: db.prepare("SELECT COUNT(*) AS total, COUNT(DISTINCT cidade) AS cidades FROM locais WHERE status = 'ativo'").get(),
-      publico_dia: db.prepare("SELECT COALESCE(SUM(publico_dia), 0) AS n FROM locais WHERE status = 'ativo'").get().n,
+      pontos: db.prepare(`SELECT COUNT(*) AS total, COUNT(DISTINCT cidade) AS cidades FROM locais WHERE status = 'ativo'${locE}`).get(...ep),
+      publico_dia: db.prepare(`SELECT COALESCE(SUM(publico_dia), 0) AS n FROM locais WHERE status = 'ativo'${locE}`).get(...ep).n,
       hoje: doDia,
       campanhas: db.prepare(`SELECT
           COALESCE(SUM(status = 'ativa'), 0) AS ativas,
           COALESCE(SUM(status = 'aguardando'), 0) AS aguardando,
           COALESCE(SUM(status = 'pausada'), 0) AS pausadas,
-          COALESCE(SUM(status = 'rascunho'), 0) AS rascunhos FROM campanhas`).get(),
-      midias_pendentes: db.prepare("SELECT COUNT(*) AS n FROM midias WHERE status = 'pendente'").get().n,
+          COALESCE(SUM(status = 'rascunho'), 0) AS rascunhos FROM campanhas WHERE 1 = 1${anunE}`).get(...ep),
+      midias_pendentes: db.prepare(`SELECT COUNT(*) AS n FROM midias WHERE status = 'pendente'${locE}`).get(...ep).n,
       mes: {
         insercoes: doMes.reduce((t, x) => t + x.insercoes, 0),
         impactos: doMes.reduce((t, x) => t + x.impactos, 0),
@@ -64,22 +71,22 @@ module.exports = (db) => {
       },
       faturas: db.prepare(`SELECT COALESCE(SUM(status = 'aberta'), 0) AS abertas,
           COALESCE(SUM(CASE WHEN status = 'aberta' THEN valor_centavos ELSE 0 END), 0) AS aberto_centavos,
-          COALESCE(SUM(status = 'aberta' AND vencimento < ?), 0) AS atrasadas FROM faturas`).get(data),
+          COALESCE(SUM(status = 'aberta' AND vencimento < ?), 0) AS atrasadas FROM faturas WHERE 1 = 1${anunE}`).get(data, ...ep),
       repasses: db.prepare(`SELECT COALESCE(SUM(status = 'a_pagar'), 0) AS a_pagar,
-          COALESCE(SUM(CASE WHEN status = 'a_pagar' THEN valor_centavos ELSE 0 END), 0) AS valor_centavos FROM repasses`).get(),
-      por_dia: rel.porDia(db, { de: somarDias(data, -13), ate: data }),
+          COALESCE(SUM(CASE WHEN status = 'a_pagar' THEN valor_centavos ELSE 0 END), 0) AS valor_centavos FROM repasses WHERE 1 = 1${telaE}`).get(...ep),
+      por_dia: rel.porDia(db, { de: somarDias(data, -13), ate: data, empresaId: E }),
       top_campanhas: doMes.slice(0, 8),
-      top_pontos: rel.porLocal(db, { de: inicioMes(competencia), ate: fimMes(competencia) }).slice(0, 8),
-      alertas: diagnostico(db).verificacoes.filter((x) => !x.ok),
+      top_pontos: rel.porLocal(db, { de: inicioMes(competencia), ate: fimMes(competencia), empresaId: E }).slice(0, 8),
+      alertas: diagnostico(db, { empresaId: E }).verificacoes.filter((x) => !x.ok),
     });
   });
 
-  r.get('/diagnostico', (_req, res) => res.json(diagnostico(db)));
+  r.get('/diagnostico', (req, res) => res.json(diagnostico(db, { empresaId: empresas.empresaDe(req) })));
 
   // ----------------------------------------------------------------- Relatórios
   r.get('/relatorios/campanhas', (req, res) => {
     const p = rel.periodo(req.query);
-    const itens = rel.porCampanha(db, { ...p, anuncianteId: req.query.anunciante_id ? Number(req.query.anunciante_id) : null });
+    const itens = rel.porCampanha(db, { ...p, anuncianteId: req.query.anunciante_id ? Number(req.query.anunciante_id) : null, empresaId: empresas.empresaDe(req) });
     if (req.query.csv) {
       return rel.enviarCsv(res, `campanhas-${p.de}-${p.ate}.csv`, rel.csv([['anunciante', 'Anunciante'], ['campanha', 'Campanha'], ['status', 'Situação'],
         ['insercoes', 'Inserções'], ['segundos', 'Tempo no ar (s)'], ['telas', 'TVs'], ['pontos', 'Pontos'], ['impactos', 'Impactos']], itens));
@@ -89,7 +96,7 @@ module.exports = (db) => {
 
   r.get('/relatorios/telas', (req, res) => {
     const p = rel.periodo(req.query);
-    const itens = rel.porTela(db, { ...p, localId: req.query.local_id ? Number(req.query.local_id) : null });
+    const itens = rel.porTela(db, { ...p, localId: req.query.local_id ? Number(req.query.local_id) : null, empresaId: empresas.empresaDe(req) });
     if (req.query.csv) {
       return rel.enviarCsv(res, `telas-${p.de}-${p.ate}.csv`, rel.csv([['tela', 'TV'], ['local', 'Ponto'], ['cidade', 'Cidade'], ['categoria', 'Categoria'],
         ['insercoes', 'Inserções'], ['insercoes_pagas', 'Inserções pagas'], ['segundos', 'Tempo no ar (s)'], ['ocupacao', 'Ocupação (%)'], ['dias', 'Dias com exibição']], itens));
@@ -99,7 +106,7 @@ module.exports = (db) => {
 
   r.get('/relatorios/pontos', (req, res) => {
     const p = rel.periodo(req.query);
-    const itens = rel.porLocal(db, p);
+    const itens = rel.porLocal(db, { ...p, empresaId: empresas.empresaDe(req) });
     if (req.query.csv) {
       return rel.enviarCsv(res, `pontos-${p.de}-${p.ate}.csv`, rel.csv([['local', 'Ponto'], ['cidade', 'Cidade'], ['uf', 'UF'], ['categoria', 'Categoria'],
         ['telas', 'TVs'], ['publico_dia', 'Público/dia'], ['insercoes', 'Inserções'], ['insercoes_pagas', 'Inserções pagas'], ['impactos', 'Impactos'],
@@ -110,12 +117,12 @@ module.exports = (db) => {
 
   r.get('/relatorios/dias', (req, res) => {
     const p = rel.periodo(req.query);
-    res.json({ ...p, itens: rel.porDia(db, { ...p, campanhaId: req.query.campanha_id ? Number(req.query.campanha_id) : null, telaId: req.query.tela_id ? Number(req.query.tela_id) : null }) });
+    res.json({ ...p, itens: rel.porDia(db, { ...p, campanhaId: req.query.campanha_id ? Number(req.query.campanha_id) : null, telaId: req.query.tela_id ? Number(req.query.tela_id) : null, empresaId: empresas.empresaDe(req) }) });
   });
 
   r.get('/relatorios/horas', (req, res) => {
     const p = rel.periodo(req.query);
-    res.json({ ...p, itens: rel.porHora(db, { ...p, telaId: req.query.tela_id ? Number(req.query.tela_id) : null }) });
+    res.json({ ...p, itens: rel.porHora(db, { ...p, telaId: req.query.tela_id ? Number(req.query.tela_id) : null, empresaId: empresas.empresaDe(req) }) });
   });
 
   /** Prova de exibição: o relatório que o anunciante recebe (cada vez que o anúncio foi ao ar). */
@@ -129,6 +136,7 @@ module.exports = (db) => {
       localId: req.query.local_id ? Number(req.query.local_id) : null,
       pagina: Math.max(1, Number(req.query.pagina) || 1),
       limite: req.query.csv ? 20000 : Math.min(500, Number(req.query.limite) || 200),
+      empresaId: empresas.empresaDe(req),
     };
     const dados = rel.prova(db, filtros);
     if (req.query.csv) return rel.enviarCsv(res, `prova-de-exibicao-${p.de}-${p.ate}.csv`, rel.csv(rel.COLUNAS_PROVA, dados.itens));
@@ -136,7 +144,7 @@ module.exports = (db) => {
   });
 
   /** Recalcula o resumo de um dia a partir das exibições (manutenção). */
-  r.post('/relatorios/recalcular', permitir('master', 'administrador'), (req, res) => {
+  r.post('/relatorios/recalcular', permitir('master'), (req, res) => {
     const data = v.data(req.body.data, 'a data');
     const linhas = exibicoes.recalcularDia(db, data);
     registrar(db, req, 'resumo_recalculado', { data, linhas });
@@ -147,32 +155,35 @@ module.exports = (db) => {
   // (as faturas, os repasses, os contratos e as despesas ficam em routes/financeiro.js)
   r.get('/faturamento', (req, res) => {
     const competencia = req.query.competencia ? v.competencia(req.query.competencia) : somarMeses(mes(), -1);
-    const previa = faturamento.calcular(db, competencia);
+    const E = empresas.empresaDe(req);
+    const [fe, fp] = empresas.filtro(req, 'a.empresa_id');
+    const previa = faturamento.calcular(db, competencia, { empresaId: E });
     res.json({
       competencia,
       previa,
       total_centavos: previa.reduce((t, f) => t + f.valor_centavos, 0),
-      repasses: faturamento.calcularRepasses(db, competencia, previa),
-      faturas: db.prepare(`SELECT f.*, a.nome AS anunciante FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id WHERE f.competencia = ? ORDER BY f.valor_centavos DESC`)
-        .all(competencia),
-      gravados: db.prepare('SELECT COUNT(*) AS n FROM faturas WHERE competencia = ?').get(competencia).n,
+      repasses: faturamento.calcularRepasses(db, competencia, previa, { empresaId: E }),
+      faturas: db.prepare(`SELECT f.*, a.nome AS anunciante FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id WHERE f.competencia = ?${fe} ORDER BY f.valor_centavos DESC`)
+        .all(competencia, ...fp),
+      gravados: db.prepare(`SELECT COUNT(*) AS n FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id WHERE f.competencia = ?${fe}`).get(competencia, ...fp).n,
     });
   });
 
   r.post('/faturamento/gerar', (req, res) => {
     const competencia = v.competencia(req.body.competencia);
     if (competencia > mes()) throw new ErroNegocio('Não é possível fechar uma competência futura.', 422);
-    const resultado = faturamento.gerar(db, competencia, { vencimento: req.body.vencimento ? v.data(req.body.vencimento, 'o vencimento') : null });
+    const resultado = faturamento.gerar(db, competencia, { vencimento: req.body.vencimento ? v.data(req.body.vencimento, 'o vencimento') : null, empresaId: empresas.empresaDe(req) });
     registrar(db, req, 'faturamento_gerado', resultado);
     res.status(201).json(resultado);
   });
 
   // ----------------------------------------------------------------- Agências
-  r.get('/agencias', (_req, res) => {
+  r.get('/agencias', (req, res) => {
+    const [fe, fp] = empresas.filtro(req, 'a.empresa_id');
     res.json({
       itens: db.prepare(`SELECT a.*, (SELECT COUNT(*) FROM campanhas c WHERE c.agencia_id = a.id) AS campanhas,
           (SELECT COUNT(*) FROM campanhas c WHERE c.agencia_id = a.id AND c.status = 'ativa') AS campanhas_ativas
-        FROM agencias a ORDER BY a.nome`).all(),
+        FROM agencias a WHERE 1 = 1${fe} ORDER BY a.nome`).all(...fp),
     });
   });
 
@@ -190,6 +201,7 @@ module.exports = (db) => {
 
   r.post('/agencias', (req, res) => {
     const d = lerAgencia(req.body);
+    d.empresa_id = empresas.empresaParaGravar(db, req, req.body.empresa_id);
     const id = Number(db.prepare(`INSERT INTO agencias (${Object.keys(d).join(', ')}, criado_em) VALUES (${Object.keys(d).map(() => '?').join(', ')}, ?)`)
       .run(...Object.values(d), agora()).lastInsertRowid);
     registrar(db, req, 'agencia_criada', { id, nome: d.nome });
@@ -212,8 +224,9 @@ module.exports = (db) => {
   const telasDoCircuito = (circuitoId) => propostasLib.telasDoCircuito(db, circuitoId);
   const resumoCircuito = (c) => propostasLib.resumoCircuito(db, c);
 
-  r.get('/circuitos', (_req, res) => {
-    res.json({ itens: db.prepare('SELECT * FROM circuitos ORDER BY ativo DESC, nome').all().map((c) => ({ ...resumoCircuito(c), lista: undefined })) });
+  r.get('/circuitos', (req, res) => {
+    const [fe, fp] = empresas.filtro(req, 'empresa_id');
+    res.json({ itens: db.prepare(`SELECT * FROM circuitos WHERE 1 = 1${fe} ORDER BY ativo DESC, nome`).all(...fp).map((c) => ({ ...resumoCircuito(c), lista: undefined })) });
   });
 
   r.get('/circuitos/:id', (req, res) => {
@@ -239,6 +252,7 @@ module.exports = (db) => {
   r.post('/circuitos', (req, res) => {
     const d = lerCircuito(req.body);
     const id = transacao(db, () => {
+      d.empresa_id = empresas.empresaParaGravar(db, req, req.body.empresa_id);
       const novo = Number(db.prepare(`INSERT INTO circuitos (${Object.keys(d).join(', ')}, criado_em) VALUES (${Object.keys(d).map(() => '?').join(', ')}, ?)`)
         .run(...Object.values(d), agora()).lastInsertRowid);
       for (const a of req.body.alvos ?? []) {
@@ -285,7 +299,7 @@ module.exports = (db) => {
         SUM(t.orientacao = 'retrato') AS retrato, SUM(t.orientacao = 'paisagem') AS paisagem,
         GROUP_CONCAT(DISTINCT t.posicao) AS posicoes
       FROM locais l LEFT JOIN telas t ON t.local_id = l.id AND t.status = 'ativa'
-      WHERE l.status = 'ativo' GROUP BY l.id ORDER BY l.cidade, l.nome`).all();
+      WHERE l.status = 'ativo'${empresas.filtro(req, 'l.empresa_id')[0]} GROUP BY l.id ORDER BY l.cidade, l.nome`).all(...empresas.filtro(req, 'l.empresa_id')[1]);
     const itens = pontos.map((p) => ({
       ...p,
       posicoes: p.posicoes ? p.posicoes.split(',').filter(Boolean) : [],
@@ -309,17 +323,58 @@ module.exports = (db) => {
         cidades: new Set(itens.map((x) => x.cidade)).size,
         unidades: itens.reduce((t, x) => t + (x.unidades ?? 0), 0),
       },
-      circuitos: db.prepare('SELECT * FROM circuitos WHERE ativo = 1 ORDER BY nome').all().map((x) => ({ ...resumoCircuito(x), lista: undefined })),
+      circuitos: db.prepare(`SELECT * FROM circuitos WHERE ativo = 1${empresas.filtro(req, 'empresa_id')[0]} ORDER BY nome`).all(...empresas.filtro(req, 'empresa_id')[1]).map((x) => ({ ...resumoCircuito(x), lista: undefined })),
       mensalidade_tela_centavos: c.mensalidade_tela_centavos,
       cpm_centavos: c.cpm_centavos,
     });
   });
 
   // ----------------------------------------------------------------- Usuários, configurações e histórico
-  r.get('/usuarios', permitir('master', 'administrador'), (_req, res) => {
+  // ----------------------------------------------------------------- Empresas (só o master)
+  r.get('/empresas', permitir('master'), (_req, res) => {
     res.json({
-      itens: db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.ativo, u.ultimo_acesso, u.criado_em, a.nome AS anunciante, l.nome AS ponto
-        FROM usuarios u LEFT JOIN anunciantes a ON a.id = u.anunciante_id LEFT JOIN locais l ON l.id = u.local_id ORDER BY u.perfil, u.nome`).all(),
+      itens: db.prepare(`SELECT e.*,
+          (SELECT COUNT(*) FROM locais l WHERE l.empresa_id = e.id) AS pontos,
+          (SELECT COUNT(*) FROM telas t JOIN locais l ON l.id = t.local_id WHERE l.empresa_id = e.id) AS telas,
+          (SELECT COUNT(*) FROM anunciantes a WHERE a.empresa_id = e.id) AS anunciantes,
+          (SELECT COUNT(*) FROM usuarios u WHERE u.empresa_id = e.id) AS usuarios
+        FROM empresas e ORDER BY e.nome`).all(),
+    });
+  });
+
+  r.post('/empresas', permitir('master'), (req, res) => {
+    const nome = v.texto(req.body.nome, 'o nome da empresa', 120);
+    const documento = req.body.documento ? v.documento(req.body.documento) : null;
+    const id = Number(db.prepare('INSERT INTO empresas (nome, documento, criado_em) VALUES (?, ?, ?)').run(nome, documento, agora()).lastInsertRowid);
+    registrar(db, req, 'empresa_criada', { id, nome });
+    res.status(201).json(db.prepare('SELECT * FROM empresas WHERE id = ?').get(id));
+  });
+
+  r.patch('/empresas/:id', permitir('master'), (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM empresas WHERE id = ?').get(id)) throw naoEncontrado('Empresa');
+    const d = {};
+    if (req.body.nome !== undefined) d.nome = v.texto(req.body.nome, 'o nome da empresa', 120);
+    if (req.body.documento !== undefined) d.documento = req.body.documento ? v.documento(req.body.documento) : null;
+    if (req.body.ativo !== undefined) d.ativo = v.booleano(req.body.ativo) ? 1 : 0;
+    if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
+    if (d.ativo === 0 && !db.prepare('SELECT 1 FROM empresas WHERE ativo = 1 AND id <> ?').get(id)) {
+      throw new ErroNegocio('Precisa existir pelo menos uma empresa ativa.', 409);
+    }
+    db.prepare(`UPDATE empresas SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), id);
+    registrar(db, req, 'empresa_alterada', { id, campos: Object.keys(d) });
+    res.json(db.prepare('SELECT * FROM empresas WHERE id = ?').get(id));
+  });
+
+  r.get('/usuarios', permitir('master', 'administrador'), (req, res) => {
+    // Cada empresa vê a própria equipe e os acessos de portal dos seus anunciantes e pontos; o master vê todos.
+    const [onde, p] = empresas.filtro(req, 'COALESCE(u.empresa_id, a.empresa_id, l.empresa_id)');
+    res.json({
+      itens: db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.ativo, u.ultimo_acesso, u.criado_em, u.empresa_id,
+          a.nome AS anunciante, l.nome AS ponto, e.nome AS empresa
+        FROM usuarios u LEFT JOIN anunciantes a ON a.id = u.anunciante_id LEFT JOIN locais l ON l.id = u.local_id
+        LEFT JOIN empresas e ON e.id = COALESCE(u.empresa_id, a.empresa_id, l.empresa_id)
+        WHERE 1 = 1${onde} ORDER BY u.perfil, u.nome`).all(...p),
     });
   });
 
@@ -336,9 +391,11 @@ module.exports = (db) => {
       d.local_id = Number(req.body.local_id);
       if (!db.prepare('SELECT 1 FROM locais WHERE id = ?').get(d.local_id)) throw new ErroNegocio('Informe o ponto deste acesso.', 422);
     }
+    // Equipe de empresa (administrador, operador) fica presa à empresa: a do criador, ou a que o master escolher.
+    if (['administrador', 'operador'].includes(perfil)) d.empresa_id = empresas.empresaParaGravar(db, req, req.body.empresa_id);
     const id = Number(db.prepare(`INSERT INTO usuarios (${Object.keys(d).join(', ')}, criado_em) VALUES (${Object.keys(d).map(() => '?').join(', ')}, ?)`)
       .run(...Object.values(d), agora()).lastInsertRowid);
-    registrar(db, req, 'usuario_criado', { id, perfil, email: d.email });
+    registrar(db, req, 'usuario_criado', { id, perfil, email: d.email, empresa_id: d.empresa_id ?? null });
     res.status(201).json({ id, nome: d.nome, email: d.email, perfil });
   });
 
@@ -356,6 +413,14 @@ module.exports = (db) => {
       d.perfil = v.opcao(req.body.perfil, 'o perfil', ['master', 'administrador', 'operador']);
       if (d.perfil === 'master' && req.usuario.perfil !== 'master') throw new ErroNegocio('Só o master promove alguém a master.', 403);
     }
+    // Empresa: o master pode trocar a de alguém da equipe. Virou master, fica sem empresa; deixou de ser, ganha uma.
+    const perfilFinal = d.perfil ?? u.perfil;
+    if (perfilFinal === 'master') {
+      if (u.empresa_id !== null) d.empresa_id = null;
+    } else if (['administrador', 'operador'].includes(perfilFinal)
+      && (u.empresa_id === null || (req.body.empresa_id !== undefined && req.usuario.perfil === 'master'))) {
+      d.empresa_id = empresas.empresaParaGravar(db, req, req.body.empresa_id);
+    }
     if (!Object.keys(d).length) throw new ErroNegocio('Nada para alterar.', 422);
     // Sempre precisa sobrar um master ativo.
     if ((d.ativo === 0 || (d.perfil && d.perfil !== 'master')) && u.perfil === 'master') {
@@ -364,7 +429,7 @@ module.exports = (db) => {
     }
     db.prepare(`UPDATE usuarios SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), id);
     registrar(db, req, 'usuario_alterado', { id, campos: Object.keys(d) });
-    res.json(db.prepare('SELECT id, nome, email, perfil, ativo FROM usuarios WHERE id = ?').get(id));
+    res.json(db.prepare('SELECT id, nome, email, perfil, ativo, empresa_id FROM usuarios WHERE id = ?').get(id));
   });
 
   // ----------------------------------------------------------------- Backup
@@ -424,7 +489,7 @@ module.exports = (db) => {
     res.status(202).json({ ok: true, pedido });
   });
 
-  r.put('/configuracoes', permitir('master', 'administrador'), (req, res) => {
+  r.put('/configuracoes', permitir('master'), (req, res) => {
     const limites = {
       duracao_imagem_s: [3, 120], insercoes_hora_padrao: [1, 120], bloco_minimo_s: [30, 3600], bloco_maximo_s: [60, 7200],
       batida_intervalo_s: [15, 900], offline_minutos: [2, 1440], mensalidade_tela_centavos: [0, 1_000_000_00], cpm_centavos: [0, 1_000_000],
@@ -455,26 +520,36 @@ module.exports = (db) => {
     const p = [];
     if (req.query.acao) { onde.push('a.acao LIKE ?'); p.push(`%${req.query.acao}%`); }
     if (req.query.usuario_id) { onde.push('a.usuario_id = ?'); p.push(Number(req.query.usuario_id)); }
+    const [fe, fp] = empresas.filtro(req, 'COALESCE(u.empresa_id, ua.empresa_id, ul.empresa_id)');
+    if (fe) { onde.push(fe.replace(' AND ', '')); p.push(...fp); }
     const limite = Math.min(500, Number(req.query.limite) || 100);
     res.json({
       itens: db.prepare(`SELECT a.*, u.nome AS usuario FROM auditoria a LEFT JOIN usuarios u ON u.id = a.usuario_id
+        LEFT JOIN anunciantes ua ON ua.id = u.anunciante_id LEFT JOIN locais ul ON ul.id = u.local_id
         ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY a.id DESC LIMIT ?`).all(...p, limite),
     });
   });
 
   /** Lista enxuta para preencher seletores (anunciantes, pontos e telas). */
-  r.get('/opcoes', (_req, res) => {
+  r.get('/opcoes', (req, res) => {
     const c = cfg();
+    // Só o que é da empresa de quem está usando (o master vê tudo e também escolhe a empresa).
+    const f = (col) => empresas.filtro(req, col);
+    const [fa, pa] = f('empresa_id');
+    const [fl, pl] = f('l.empresa_id');
+    const master = empresas.empresaDe(req) === null;
     res.json({
-      anunciantes: db.prepare("SELECT id, nome FROM anunciantes WHERE status = 'ativo' ORDER BY nome").all(),
-      agencias: db.prepare("SELECT id, nome, comissao_percentual FROM agencias WHERE status = 'ativa' ORDER BY nome").all(),
-      circuitos: db.prepare('SELECT id, nome, insercoes_hora, valor_mes_centavos, cpm_centavos FROM circuitos WHERE ativo = 1 ORDER BY nome').all(),
-      locais: db.prepare("SELECT id, nome, cidade, categoria FROM locais WHERE status <> 'encerrado' ORDER BY nome").all(),
+      anunciantes: db.prepare(`SELECT id, nome FROM anunciantes WHERE status = 'ativo'${fa} ORDER BY nome`).all(...pa),
+      agencias: db.prepare(`SELECT id, nome, comissao_percentual FROM agencias WHERE status = 'ativa'${fa} ORDER BY nome`).all(...pa),
+      circuitos: db.prepare(`SELECT id, nome, insercoes_hora, valor_mes_centavos, cpm_centavos FROM circuitos WHERE ativo = 1${fa} ORDER BY nome`).all(...pa),
+      locais: db.prepare(`SELECT id, nome, cidade, categoria FROM locais WHERE status <> 'encerrado'${fa} ORDER BY nome`).all(...pa),
       telas: db.prepare(`SELECT t.id, t.nome, t.orientacao, t.local_id, l.nome AS local_nome, t.ultimo_contato FROM telas t JOIN locais l ON l.id = t.local_id
-        WHERE t.status <> 'inativa' ORDER BY l.nome, t.nome`).all().map((t) => ({ ...t, online: estaOnline(t, c) })),
-      cidades: db.prepare("SELECT DISTINCT cidade FROM locais WHERE cidade <> '' ORDER BY cidade").all().map((x) => x.cidade),
-      // Quem pode ser responsável por um lead no CRM.
-      equipe: db.prepare("SELECT id, nome FROM usuarios WHERE perfil IN ('master','administrador','operador') AND ativo = 1 ORDER BY nome").all(),
+        WHERE t.status <> 'inativa'${fl} ORDER BY l.nome, t.nome`).all(...pl).map((t) => ({ ...t, online: estaOnline(t, c) })),
+      cidades: db.prepare(`SELECT DISTINCT cidade FROM locais WHERE cidade <> ''${fa} ORDER BY cidade`).all(...pa).map((x) => x.cidade),
+      // Quem pode ser responsável por um lead no CRM: a equipe da empresa (e os masters).
+      equipe: db.prepare(`SELECT id, nome FROM usuarios WHERE perfil IN ('master','administrador','operador') AND ativo = 1
+        ${master ? '' : 'AND (empresa_id = ? OR perfil = \'master\')'} ORDER BY nome`).all(...(master ? [] : [empresas.empresaDe(req)])),
+      empresas: master ? db.prepare('SELECT id, nome, ativo FROM empresas ORDER BY nome').all() : [],
       competencias: db.prepare('SELECT DISTINCT substr(data, 1, 7) AS competencia FROM resumo_dia ORDER BY competencia DESC LIMIT 24').all().map((x) => x.competencia),
     });
   });

@@ -15,6 +15,7 @@ const foto = require('../lib/comunicado-foto');
 const { hoje } = require('../lib/datas');
 const contratosLib = require('../lib/contratos');
 const v = require('../lib/validacao');
+const empresas = require('../lib/empresas');
 
 const CATEGORIAS = v.CATEGORIAS;
 const SENHA_ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -94,11 +95,13 @@ module.exports = (db) => {
     if (req.query.categoria) { onde.push('l.categoria = ?'); p.push(req.query.categoria); }
     if (req.query.cidade) { onde.push('l.cidade = ?'); p.push(req.query.cidade); }
     if (req.query.status) { onde.push('l.status = ?'); p.push(req.query.status); }
+    const [doEmp, pe] = empresas.filtro(req, 'l.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     const itens = db.prepare(`SELECT l.*, (SELECT COUNT(*) FROM telas t WHERE t.local_id = l.id AND t.status <> 'inativa') AS telas,
         (SELECT COUNT(*) FROM telas t WHERE t.local_id = l.id AND t.ultimo_contato > ?) AS telas_online
       FROM locais l ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY l.nome`)
       .all(new Date(Date.now() - cfg().offline_minutos * 60_000).toISOString(), ...p);
-    res.json({ itens, categorias: CATEGORIAS, cidades: db.prepare("SELECT DISTINCT cidade FROM locais WHERE cidade <> '' ORDER BY cidade").all().map((x) => x.cidade) });
+    res.json({ itens, categorias: CATEGORIAS, cidades: db.prepare(`SELECT DISTINCT cidade FROM locais l WHERE cidade <> ''${doEmp} ORDER BY cidade`).all(...pe).map((x) => x.cidade) });
   });
 
   r.get('/locais/:id', (req, res) => {
@@ -119,8 +122,8 @@ module.exports = (db) => {
   r.post('/locais', (req, res) => {
     const d = lerLocal(req.body, cfg());
     const campos = Object.keys(d);
-    const id = Number(db.prepare(`INSERT INTO locais (${campos.join(', ')}, criado_em) VALUES (${campos.map(() => '?').join(', ')}, ?)`)
-      .run(...campos.map((k) => d[k]), agora()).lastInsertRowid);
+    const id = Number(db.prepare(`INSERT INTO locais (${campos.join(', ')}, empresa_id, criado_em) VALUES (${campos.map(() => '?').join(', ')}, ?, ?)`)
+      .run(...campos.map((k) => d[k]), empresas.empresaParaGravar(db, req, req.body.empresa_id), agora()).lastInsertRowid);
     if (req.body.horarios) gravarHorarios(db, id, req.body.horarios);
     registrar(db, req, 'local_criado', { id, nome: d.nome });
     res.status(201).json({ id, ...d });
@@ -205,6 +208,8 @@ module.exports = (db) => {
     if (req.query.local_id) { onde.push('t.local_id = ?'); p.push(Number(req.query.local_id)); }
     if (req.query.status) { onde.push('t.status = ?'); p.push(req.query.status); }
     if (req.query.busca) { onde.push('(t.nome LIKE ? OR l.nome LIKE ?)'); p.push(`%${req.query.busca}%`, `%${req.query.busca}%`); }
+    const [doEmp, pe] = empresas.filtro(req, 'l.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     const itens = db.prepare(`SELECT t.*, l.nome AS local_nome, l.cidade, l.uf, l.categoria FROM telas t JOIN locais l ON l.id = t.local_id
       ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY l.nome, t.nome`).all(...p)
       .map((t) => ({ ...t, online: Boolean(t.ultimo_contato && t.ultimo_contato > limite), pareada: Boolean(t.pareada_em) }));
@@ -347,7 +352,8 @@ module.exports = (db) => {
     if (req.body.tela_id) { onde += ' AND t.id = ?'; p.push(Number(req.body.tela_id)); }
     else if (req.body.local_id) { onde += ' AND t.local_id = ?'; p.push(Number(req.body.local_id)); }
     else if (req.body.desatualizadas) { onde += ' AND (t.versao_player IS NULL OR t.versao_player <> ?)'; p.push(config.playerVersao); }
-    const telas = db.prepare(`SELECT t.id FROM telas t WHERE t.status <> 'inativa' ${onde}`).all(...p);
+    const [doEmp, pe] = empresas.filtro(req, 'l.empresa_id');
+    const telas = db.prepare(`SELECT t.id FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.status <> 'inativa' ${onde}${doEmp}`).all(...p, ...pe);
     if (!telas.length) throw new ErroNegocio('Nenhuma tela pareada para receber o comando.', 422);
     transacao(db, () => {
       for (const t of telas) {
@@ -392,12 +398,14 @@ module.exports = (db) => {
     const p = [];
     if (req.query.local_id) { onde.push('c.local_id = ?'); p.push(Number(req.query.local_id)); }
     if (req.query.status) { onde.push('c.status = ?'); p.push(req.query.status); }
+    const [doEmp, pe] = empresas.filtro(req, 'l.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     res.json({
       itens: db.prepare(`SELECT c.*, l.nome AS local_nome, l.cidade, u.nome AS autor FROM comunicados c
         JOIN locais l ON l.id = c.local_id LEFT JOIN usuarios u ON u.id = c.criado_por
         ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''}
         ORDER BY (c.status = 'pendente') DESC, c.fim DESC, c.id DESC`).all(...p),
-      pendentes: db.prepare("SELECT COUNT(*) AS n FROM comunicados WHERE status = 'pendente'").get().n,
+      pendentes: db.prepare(`SELECT COUNT(*) AS n FROM comunicados c JOIN locais l ON l.id = c.local_id WHERE c.status = 'pendente'${doEmp}`).get(...pe).n,
     });
   });
 
@@ -457,6 +465,8 @@ module.exports = (db) => {
     const p = [];
     if (req.query.busca) { onde.push('(a.nome LIKE ? OR a.documento LIKE ?)'); p.push(`%${req.query.busca}%`, `%${req.query.busca}%`); }
     if (req.query.status) { onde.push('a.status = ?'); p.push(req.query.status); }
+    const [doEmp, pe] = empresas.filtro(req, 'a.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     res.json({
       itens: db.prepare(`SELECT a.*, (SELECT COUNT(*) FROM campanhas c WHERE c.anunciante_id = a.id AND c.status = 'ativa') AS campanhas_ativas,
           (SELECT COUNT(*) FROM campanhas c WHERE c.anunciante_id = a.id) AS campanhas,
@@ -511,6 +521,7 @@ module.exports = (db) => {
 
   r.post('/anunciantes', (req, res) => {
     const d = lerAnunciante(req.body);
+    d.empresa_id = empresas.empresaParaGravar(db, req, req.body.empresa_id);
     const id = Number(db.prepare(`INSERT INTO anunciantes (${Object.keys(d).join(', ')}, criado_em) VALUES (${Object.keys(d).map(() => '?').join(', ')}, ?)`)
       .run(...Object.values(d), agora()).lastInsertRowid);
     registrar(db, req, 'anunciante_criado', { id, nome: d.nome });

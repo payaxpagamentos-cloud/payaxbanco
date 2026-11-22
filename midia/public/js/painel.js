@@ -7,7 +7,7 @@ import { inventario } from './inventario.js';
 import { crm } from './crm.js';
 import { propostas } from './proposta.js';
 import { emails } from './emails.js';
-import { usuarios, configuracoes, produtos, diagnostico, historico } from './admin.js';
+import { usuarios, configuracoes, produtos, diagnostico, historico, empresas } from './admin.js';
 
 export const TELAS_EQUIPE = {
   resumo: visao,
@@ -29,6 +29,7 @@ export const TELAS_EQUIPE = {
   pagar: contasAPagar,
   diagnostico,
   usuarios,
+  empresas,
   configuracoes,
   produtos,
   historico,

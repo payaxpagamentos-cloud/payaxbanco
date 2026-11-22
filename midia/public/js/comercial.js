@@ -5,7 +5,7 @@ import {
   inteiro, dinheiro, duracao, dataHora, dataBr, competenciaTexto, etiquetaDe, etiqueta, mb, diasTexto, faixaHorario, telefone, abrirWhatsApp,
   CATEGORIAS, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_CONTRATO, DIAS,
 } from './ui.js';
-import { cartao, indicador, tabela, vazio, previa, miniatura, linhaDoLoop, itensDoLoop, resumoDoLoop, enviarArquivo } from './comum.js';
+import { cartao, indicador, tabela, vazio, previa, miniatura, linhaDoLoop, itensDoLoop, resumoDoLoop, enviarArquivo, campoEmpresa } from './comum.js';
 import { agencias } from './inventario.js';
 import { relatorioDeVeiculacao } from './veiculacao.js';
 
@@ -48,6 +48,7 @@ export async function anunciantes(ctx) {
 }
 
 const editarAnunciante = (a, recarregar) => formModal(a ? `Editar ${a.nome}` : 'Novo anunciante', () => [
+  a ? null : campoEmpresa(),
   campo('Nome / razão social', { name: 'nome', value: a?.nome ?? '', required: true, maxlength: 120 }),
   el('div', { class: 'duas' },
     campo('CNPJ/CPF', { name: 'documento', value: a?.documento ?? '', maxlength: 20 }),

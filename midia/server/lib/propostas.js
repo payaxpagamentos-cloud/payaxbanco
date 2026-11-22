@@ -23,9 +23,11 @@ const grade = require('./grade');
 /** Telas que o circuito alcança (as regras do circuito aplicadas ao inventário de agora). */
 function telasDoCircuito(db, circuitoId) {
   const alvos = db.prepare('SELECT tipo, valor FROM circuito_alvos WHERE circuito_id = ?').all(circuitoId);
+  // O circuito vende só as TVs da empresa dona dele.
+  const empresa = db.prepare('SELECT empresa_id FROM circuitos WHERE id = ?').get(circuitoId)?.empresa_id ?? null;
   const telas = db.prepare(`SELECT t.id, t.nome, t.orientacao, t.posicao, l.id AS local_id, l.nome AS local_nome, l.categoria, l.cidade, l.uf,
-      l.publico_dia, l.unidades FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.status = 'ativa' AND l.status = 'ativo'`).all();
-  return telas.filter((t) => grade.alvoBate(alvos, t));
+      l.publico_dia, l.unidades, l.empresa_id FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.status = 'ativa' AND l.status = 'ativo'`).all();
+  return telas.filter((t) => (empresa == null || t.empresa_id == null || t.empresa_id === empresa) && grade.alvoBate(alvos, t));
 }
 
 /** O circuito com a audiência somada — o público do ponto conta uma vez, mesmo com várias telas nele. */
@@ -173,6 +175,8 @@ function criar(db, dados, usuarioId = null) {
     folha.veiculacao.insercoes_hora, folha.investimento.mes_centavos, folha.investimento.total_centavos, folha.valida_ate,
     dados.observacao ?? null, JSON.stringify({ ...folha, numero, observacao: dados.observacao ?? null }), token, usuarioId, agora(),
   ).lastInsertRowid);
+  // A proposta é da empresa dona do circuito (a rota já garantiu que é a de quem está vendendo).
+  db.prepare('UPDATE propostas SET empresa_id = COALESCE((SELECT empresa_id FROM circuitos WHERE id = ?), empresa_id) WHERE id = ?').run(folha.circuito.id, id);
   return detalhe(db, id);
 }
 
@@ -244,6 +248,7 @@ function listar(db, filtros = {}) {
   if (filtros.anunciante_id) { onde.push('p.anunciante_id = ?'); p.push(Number(filtros.anunciante_id)); }
   if (filtros.circuito_id) { onde.push('p.circuito_id = ?'); p.push(Number(filtros.circuito_id)); }
   if (filtros.lead_id) { onde.push('p.lead_id = ?'); p.push(Number(filtros.lead_id)); }
+  if (filtros._empresa != null) { onde.push('p.empresa_id = ?'); p.push(filtros._empresa); }
   const itens = db.prepare(`SELECT p.id, p.numero, p.titulo, p.status, p.meses, p.desconto_percentual, p.mes_centavos, p.total_centavos,
       p.valida_ate, p.criado_em, p.enviada_em, p.respondida_em, p.contrato_id, p.campanha_id, p.lead_id,
       a.nome AS anunciante, ci.nome AS circuito, ct.numero AS contrato_numero, le.nome AS lead

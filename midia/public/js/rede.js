@@ -5,7 +5,7 @@ import {
   inteiro, dinheiro, dataHora, duracao, percentual, dataBr, etiqueta, etiquetaDe, situacao, centavos, reaisCampo, telefone, abrirWhatsApp,
   CATEGORIAS, PREDIOS, POSICOES, REPASSES, LAYOUTS, ORIENTACOES, STATUS_TELA, STATUS_PONTO, STATUS_COMUNICADO, TIPOS_COMUNICADO, DIAS,
 } from './ui.js';
-import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa, imagemDaApi, enviarArquivo, BASE_API, campoFotoComunicado } from './comum.js';
+import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa, imagemDaApi, enviarArquivo, BASE_API, campoFotoComunicado, campoEmpresa } from './comum.js';
 
 // ---------------------------------------------------------------- TVs
 export async function telasEquipe(ctx) {
@@ -334,6 +334,7 @@ async function abrirPonto(id, recarregar) {
 function editarPonto(p, recarregar) {
   const existentes = new Map((p?.horarios ?? []).map((h) => [h.dia_semana, h]));
   return formModal(p ? `Editar ${p.nome}` : 'Novo ponto', () => [
+    p ? null : campoEmpresa(),
     campo('Nome do comércio', { name: 'nome', value: p?.nome ?? '', required: true, maxlength: 120 }),
     el('div', { class: 'duas' },
       escolha('Categoria', 'categoria', CATEGORIAS, p?.categoria ?? 'outro'),

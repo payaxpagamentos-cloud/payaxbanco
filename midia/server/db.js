@@ -11,9 +11,20 @@ const { hashSenha } = require('./lib/senha');
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS configuracoes (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
 
+-- Empresas que usam o sistema. Cada uma só enxerga os próprios pontos, TVs, clientes, campanhas e
+-- financeiro; o master enxerga todas. O dado "raiz" de cada coisa carrega a empresa (empresa_id).
+CREATE TABLE IF NOT EXISTS empresas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  documento TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL
+);
+
 -- Quem paga pela publicidade.
 CREATE TABLE IF NOT EXISTS anunciantes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   nome TEXT NOT NULL,
   documento TEXT,
   contato TEXT,
@@ -31,6 +42,7 @@ CREATE TABLE IF NOT EXISTS anunciantes (
 -- A lista de categorias fica na validação (server/lib/validacao.js), para crescer sem mexer no banco.
 CREATE TABLE IF NOT EXISTS locais (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   nome TEXT NOT NULL,
   categoria TEXT NOT NULL DEFAULT 'outro',
   administradora TEXT,
@@ -128,6 +140,7 @@ CREATE TABLE IF NOT EXISTS pareamentos (
 -- uso: 'campanha' (entra nas campanhas do anunciante) ou 'institucional' (preenche a grade quando falta publicidade).
 CREATE TABLE IF NOT EXISTS midias (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   anunciante_id INTEGER REFERENCES anunciantes(id),
   local_id INTEGER REFERENCES locais(id),
   nome TEXT NOT NULL,
@@ -154,6 +167,7 @@ CREATE INDEX IF NOT EXISTS idx_midias_anunciante ON midias (anunciante_id, statu
 -- Agências de publicidade: compram mídia para os anunciantes e ficam com uma comissão sobre o valor da veiculação.
 CREATE TABLE IF NOT EXISTS agencias (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   nome TEXT NOT NULL,
   documento TEXT,
   contato TEXT,
@@ -168,6 +182,7 @@ CREATE TABLE IF NOT EXISTS agencias (
 -- e carrega o preço de tabela. A campanha pode aplicar um circuito, que vira os alvos dela.
 CREATE TABLE IF NOT EXISTS circuitos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   nome TEXT NOT NULL,
   descricao TEXT,
   valor_mes_centavos INTEGER NOT NULL DEFAULT 0 CHECK (valor_mes_centavos >= 0),
@@ -380,6 +395,7 @@ CREATE TABLE IF NOT EXISTS clima (
 -- É de onde nascem a proposta, o contrato e a campanha — e, do outro lado, o ponto novo na rede.
 CREATE TABLE IF NOT EXISTS leads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   nome TEXT NOT NULL,
   tipo TEXT NOT NULL DEFAULT 'anunciante' CHECK (tipo IN ('anunciante','ponto')),
   contato TEXT,
@@ -423,6 +439,7 @@ CREATE INDEX IF NOT EXISTS idx_interacoes_lead ON lead_interacoes (lead_id, cria
 -- A ligação com o lead é por e-mail do remetente: a conversa aparece na ficha de quem está no funil.
 CREATE TABLE IF NOT EXISTS emails (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   direcao TEXT NOT NULL CHECK (direcao IN ('entrada','saida')),
   de TEXT NOT NULL,
   de_nome TEXT,
@@ -457,6 +474,7 @@ CREATE INDEX IF NOT EXISTS idx_emails_de ON emails (de);
 -- não o inventário de hoje. Quando o cliente aceita, ela vira contrato e campanha sem ninguém redigitar nada.
 CREATE TABLE IF NOT EXISTS propostas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   numero TEXT NOT NULL,
   anunciante_id INTEGER REFERENCES anunciantes(id),
   agencia_id INTEGER REFERENCES agencias(id),
@@ -490,6 +508,7 @@ CREATE INDEX IF NOT EXISTS idx_propostas_status ON propostas (status, criado_em)
 -- comissão de vendedor, aluguel de espaço. Repasse tem tabela própria e aparece junto na tela.
 CREATE TABLE IF NOT EXISTS despesas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   descricao TEXT NOT NULL,
   fornecedor TEXT,
   categoria TEXT NOT NULL DEFAULT 'outros',
@@ -559,6 +578,7 @@ CREATE TABLE IF NOT EXISTS repasses (
 -- master: tudo. operador: opera sem usuários/configurações. anunciante: portal do próprio anunciante. lojista: portal do próprio ponto.
 CREATE TABLE IF NOT EXISTS usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
   nome TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   senha_hash TEXT NOT NULL,
@@ -600,6 +620,27 @@ CREATE TABLE IF NOT EXISTS auditoria (
   criado_em TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_auditoria_data ON auditoria (criado_em);
+
+-- Empresa de quem não informou: herda do anunciante, do ponto ou do lead ligado; sem nada, a empresa inicial.
+-- (O painel grava a empresa de quem está criando; isto cobre o site, os portais e a caixa de e-mail.)
+CREATE TRIGGER IF NOT EXISTS empresa_anunciantes AFTER INSERT ON anunciantes WHEN NEW.empresa_id IS NULL
+BEGIN UPDATE anunciantes SET empresa_id = (SELECT MIN(id) FROM empresas WHERE ativo = 1) WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS empresa_locais AFTER INSERT ON locais WHEN NEW.empresa_id IS NULL
+BEGIN UPDATE locais SET empresa_id = (SELECT MIN(id) FROM empresas WHERE ativo = 1) WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS empresa_agencias AFTER INSERT ON agencias WHEN NEW.empresa_id IS NULL
+BEGIN UPDATE agencias SET empresa_id = (SELECT MIN(id) FROM empresas WHERE ativo = 1) WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS empresa_circuitos AFTER INSERT ON circuitos WHEN NEW.empresa_id IS NULL
+BEGIN UPDATE circuitos SET empresa_id = (SELECT MIN(id) FROM empresas WHERE ativo = 1) WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS empresa_leads AFTER INSERT ON leads WHEN NEW.empresa_id IS NULL
+BEGIN UPDATE leads SET empresa_id = (SELECT MIN(id) FROM empresas WHERE ativo = 1) WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS empresa_despesas AFTER INSERT ON despesas WHEN NEW.empresa_id IS NULL
+BEGIN UPDATE despesas SET empresa_id = (SELECT MIN(id) FROM empresas WHERE ativo = 1) WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS empresa_midias AFTER INSERT ON midias WHEN NEW.empresa_id IS NULL
+BEGIN UPDATE midias SET empresa_id = COALESCE((SELECT empresa_id FROM anunciantes WHERE id = NEW.anunciante_id), (SELECT empresa_id FROM locais WHERE id = NEW.local_id), (SELECT MIN(id) FROM empresas WHERE ativo = 1)) WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS empresa_propostas AFTER INSERT ON propostas WHEN NEW.empresa_id IS NULL
+BEGIN UPDATE propostas SET empresa_id = COALESCE((SELECT empresa_id FROM leads WHERE id = NEW.lead_id), (SELECT empresa_id FROM anunciantes WHERE id = NEW.anunciante_id), (SELECT MIN(id) FROM empresas WHERE ativo = 1)) WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS empresa_emails AFTER INSERT ON emails WHEN NEW.empresa_id IS NULL
+BEGIN UPDATE emails SET empresa_id = COALESCE((SELECT empresa_id FROM leads WHERE id = NEW.lead_id), (SELECT MIN(id) FROM empresas WHERE ativo = 1)) WHERE id = NEW.id; END;
 `;
 
 // Configurações da plataforma (texto ou número; TEXTO lista as que não são número).
@@ -671,6 +712,21 @@ function abrir(arquivo = config.dbFile) {
   // Instalações que ainda estavam com o nome genérico anterior passam a usar a marca (um nome escolhido no painel não muda).
   db.prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'nome_plataforma' AND valor = 'Vai Mídia'").run(CONFIG_PADRAO.nome_plataforma);
 
+  // Empresas: a primeira instalação (ou a atualização que trouxe as empresas) cria a empresa inicial
+  // com o nome da plataforma, e tudo o que já existia passa a ser dela — uma vez só.
+  if (!db.prepare('SELECT 1 FROM empresas LIMIT 1').get()) {
+    db.prepare('INSERT INTO empresas (nome, criado_em) VALUES (?, ?)')
+      .run(db.prepare("SELECT valor FROM configuracoes WHERE chave = 'nome_plataforma'").get()?.valor || CONFIG_PADRAO.nome_plataforma, agora());
+  }
+  if (!db.prepare("SELECT 1 FROM configuracoes WHERE chave = '_empresas_migradas'").get()) {
+    const inicial = db.prepare('SELECT id FROM empresas ORDER BY id LIMIT 1').get().id;
+    for (const t of ['locais', 'anunciantes', 'agencias', 'circuitos', 'leads', 'propostas', 'despesas', 'midias', 'emails']) {
+      db.prepare(`UPDATE ${t} SET empresa_id = ? WHERE empresa_id IS NULL`).run(inicial);
+    }
+    db.prepare("UPDATE usuarios SET empresa_id = ? WHERE empresa_id IS NULL AND perfil IN ('administrador','operador')").run(inicial);
+    db.prepare("INSERT INTO configuracoes (chave, valor) VALUES ('_empresas_migradas', '1')").run();
+  }
+
   if (!db.prepare("SELECT 1 FROM usuarios WHERE perfil = 'master' LIMIT 1").get()) {
     db.prepare("INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, 'master', ?)")
       .run(config.admin.nome, config.admin.email, hashSenha(config.admin.senha), agora());
@@ -680,6 +736,16 @@ function abrir(arquivo = config.dbFile) {
 
 /** Colunas que entraram depois da primeira versão (bancos antigos recebem cada uma por ALTER TABLE). */
 const COLUNAS_NOVAS = [
+  ['usuarios', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
+  ['locais', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
+  ['anunciantes', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
+  ['agencias', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
+  ['circuitos', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
+  ['leads', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
+  ['propostas', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
+  ['despesas', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
+  ['midias', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
+  ['emails', 'empresa_id', 'INTEGER REFERENCES empresas(id)'],
   ['locais', 'administradora', 'TEXT'],
   ['locais', 'unidades', 'INTEGER NOT NULL DEFAULT 0'],
   ['locais', 'repasse_tipo', "TEXT NOT NULL DEFAULT 'comissao'"],

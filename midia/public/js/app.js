@@ -1,11 +1,13 @@
 import { api, sessao } from './api.js';
 import { el, $, limpar, icone, marca, iniciais, toast, acao, lerForm, campo, marcar, formModal, repetir, linkWhatsApp, PERFIS } from './ui.js';
 import { TELAS_EQUIPE } from './painel.js';
+import { carregarEmpresas } from './comum.js';
 import { TELAS_ANUNCIANTE, TELAS_LOJISTA } from './portais.js';
 
 const raiz = $('#app');
 let pararTela = null;
 let pararSaude = null;
+let empresasCarregadas = false;
 let nomePlataforma = 'Vai Mídia';
 let slogan = 'Sua marca em movimento.';
 // WhatsApp da empresa: vira o botão "Falar com a equipe" nos portais do anunciante e do ponto.
@@ -26,7 +28,7 @@ const MENUS = {
     ['telas', 'TVs', 'telas'],
     ['#vendas', '3 · Vendas'],
     ['crm', 'CRM', 'anunciantes', null, [
-      ['funil', 'Funil'], ['propostas', 'Propostas'], ['produtos', 'Produtos', ['master', 'administrador']], ['emails', 'E-mail'],
+      ['funil', 'Funil'], ['propostas', 'Propostas'], ['produtos', 'Produtos', ['master']], ['emails', 'E-mail'],
     ]],
     ['inventario', 'Inventário', 'ocupacao'],
     ['#acompanhar', '4 · Acompanhar'],
@@ -36,7 +38,8 @@ const MENUS = {
     ]],
     ['diagnostico', 'Diagnóstico', 'diagnostico'],
     ['#admin', 'Administração'],
-    ['usuarios', 'Usuários', 'usuarios', ['master', 'administrador']], ['configuracoes', 'Configurações', 'configuracoes', ['master', 'administrador']],
+    ['empresas', 'Empresas', 'pontos', ['master']],
+    ['usuarios', 'Usuários', 'usuarios', ['master', 'administrador']], ['configuracoes', 'Configurações', 'configuracoes', ['master']],
     ['historico', 'Histórico', 'historico'],
   ],
   anunciante: [
@@ -58,7 +61,8 @@ const SUBTITULOS = {
   criativos: 'Imagens e vídeos que vão para as telas', programacao: 'Como fica o loop de cada TV e quanto ainda cabe de publicidade',
   relatorios: 'Inserções, impactos e a prova de exibição', faturamento: 'Fechamento do mês e faturas dos anunciantes',
   repasses: 'Comissão dos lojistas sobre a receita das telas', diagnostico: 'Verificações da rede e das TVs',
-  usuarios: 'Quem acessa o painel e os portais', configuracoes: 'Empresa, TVs e sistema',
+  usuarios: 'Quem acessa o painel e os portais',
+  empresas: 'As empresas que usam o sistema, cada uma com os próprios dados', configuracoes: 'Empresa, TVs e sistema',
   produtos: 'A tabela de preços da rede: o ponto de partida das propostas e do faturamento',
   receber: 'Faturas dos anunciantes: o que entra, o que está vencendo e o que atrasou',
   pagar: 'Repasses aos pontos e despesas da operação: o que sai',
@@ -147,7 +151,7 @@ async function desenhar() {
       : null);
 
   const subtitulo = SUBTITULOS[nome] ? el('p', { class: 'subtitulo' }, SUBTITULOS[nome]) : null;
-  const vinculo = u.anunciante_nome ?? u.local_nome ?? null;
+  const vinculo = u.anunciante_nome ?? u.local_nome ?? u.empresa_nome ?? null;
   // Dentro de um grupo, o título é o da tela e a trilha mostra de onde ela vem.
   const dentroDeGrupo = item[4] && item[0] !== nome;
   const tituloTela = dentroDeGrupo ? item[4].find(([sk]) => sk === nome)[1] : item[1];
@@ -173,6 +177,8 @@ async function desenhar() {
   window.scrollTo({ top: 0 });
   document.title = `${tituloTela} · ${nomePlataforma}`;
 
+  // O master escolhe a empresa dos cadastros novos: a lista vem uma vez por sessão.
+  if (u.perfil === 'master' && !empresasCarregadas) { empresasCarregadas = true; await carregarEmpresas(); }
   const ctx = {
     usuario: u,
     conteudo,

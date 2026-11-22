@@ -4,7 +4,7 @@ import {
   el, limpar, icone, toast, acao, formModal, confirmar, perguntar, campo, escolha, marcar, lerForm,
   inteiro, dinheiro, dataHora, etiqueta, reaisCampo, centavos, repetir, mb, PERFIS,
 } from './ui.js';
-import { cartao, indicador, tabela, vazio } from './comum.js';
+import { cartao, indicador, tabela, vazio, campoEmpresa, carregarEmpresas, listaDeEmpresas } from './comum.js';
 
 export async function usuarios(ctx) {
   const corpo = el('div', { class: 'cartao' });
@@ -15,6 +15,7 @@ export async function usuarios(ctx) {
     limpar(corpo, tabela([
       [(u) => el('div', {}, el('div', {}, u.nome), el('div', { class: 'pequeno mudo' }, u.email)), 'Usuário'],
       [(u) => PERFIS[u.perfil], 'Perfil'],
+      ctx.master ? [(u) => u.empresa ?? (u.perfil === 'master' ? 'Todas' : '—'), 'Empresa'] : null,
       [(u) => u.anunciante ?? u.ponto ?? '—', 'Vínculo'],
       [(u) => (u.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Inativo', 'erro')), 'Situação'],
       [(u) => (u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca'), 'Último acesso'],
@@ -38,8 +39,9 @@ export async function usuarios(ctx) {
             pintar();
           }),
         }, u.ativo ? 'Desativar' : 'Ativar')), '', 'acoes'],
-    ], d.itens, { vazioTexto: 'Nenhum usuário.' }));
+    ].filter(Boolean), d.itens, { vazioTexto: 'Nenhum usuário.' }));
   };
+  if (ctx.master) await carregarEmpresas();
 
   limpar(ctx.conteudo,
     el('div', { class: 'linha entre', style: 'margin-bottom:16px' },
@@ -47,6 +49,51 @@ export async function usuarios(ctx) {
       el('button', { class: 'btn primario', onclick: () => novoUsuario(opcoes, pintar, ctx.master) }, icone('mais'), 'Novo usuário')),
     corpo);
   await pintar();
+}
+
+/** Empresas que usam o sistema (só o master): cada uma enxerga só os próprios dados. */
+export async function empresas(ctx) {
+  const corpo = el('div', { class: 'cartao' });
+  const pintar = async () => {
+    const d = await api.get('/painel/empresas');
+    limpar(corpo, tabela([
+      [(e) => el('div', {}, el('div', {}, e.nome), e.documento ? el('div', { class: 'pequeno mudo' }, e.documento) : null), 'Empresa'],
+      [(e) => inteiro(e.pontos), 'Pontos', 'num'],
+      [(e) => inteiro(e.telas), 'TVs', 'num'],
+      [(e) => inteiro(e.anunciantes), 'Anunciantes', 'num'],
+      [(e) => inteiro(e.usuarios), 'Equipe', 'num'],
+      [(e) => (e.ativo ? etiqueta('Ativa', 'ok') : etiqueta('Desativada', 'erro')), 'Situação'],
+      [(e) => el('div', { class: 'acoes' },
+        el('button', { class: 'btn pequeno', onclick: () => editarEmpresa(e, pintar) }, icone('editar'), 'Editar'),
+        el('button', {
+          class: `btn pequeno${e.ativo ? ' perigo' : ''}`, onclick: (ev) => acao(ev.target, async () => {
+            if (e.ativo && !await confirmar('Desativar empresa', `A equipe de ${e.nome} deixa de entrar no sistema. Os dados ficam guardados.`, 'Desativar')) return;
+            await api.patch(`/painel/empresas/${e.id}`, { ativo: !e.ativo });
+            toast(e.ativo ? 'Empresa desativada.' : 'Empresa ativada.');
+            pintar();
+          }),
+        }, e.ativo ? 'Desativar' : 'Ativar')), '', 'acoes'],
+    ], d.itens, { vazioTexto: 'Nenhuma empresa.' }));
+  };
+  limpar(ctx.conteudo,
+    el('div', { class: 'linha entre', style: 'margin-bottom:16px' },
+      el('p', { class: 'mudo', style: 'margin:0' }, 'Cada empresa enxerga só os próprios pontos, TVs, clientes, campanhas e financeiro. O master vê todas.'),
+      el('button', { class: 'btn primario', onclick: () => editarEmpresa(null, pintar) }, icone('mais'), 'Nova empresa')),
+    corpo);
+  await pintar();
+}
+
+function editarEmpresa(e, recarregar) {
+  return formModal(e ? `Editar ${e.nome}` : 'Nova empresa', () => [
+    campo('Nome', { name: 'nome', value: e?.nome ?? '', required: true, maxlength: 120 }),
+    campo('CNPJ (opcional)', { name: 'documento', value: e?.documento ?? '', maxlength: 20 }),
+  ], async (d) => {
+    if (e) await api.patch(`/painel/empresas/${e.id}`, d);
+    else await api.post('/painel/empresas', d);
+    toast(e ? 'Empresa atualizada.' : 'Empresa criada. Agora cadastre a equipe dela em Usuários.');
+    await carregarEmpresas();
+    recarregar();
+  });
 }
 
 /** Corrigir nome, e-mail (que é o login) e, na equipe, o perfil. */
@@ -58,10 +105,13 @@ function editarUsuario(u, recarregar, master) {
     campo('Nome', { name: 'nome', value: u.nome, required: true, maxlength: 120 }),
     campo('E-mail (login)', { name: 'email', type: 'email', value: u.email, required: true }),
     daEquipe ? escolha('Perfil', 'perfil', perfis, u.perfil) : null,
+    // O master pode trocar a pessoa de empresa (quem é master enxerga todas e fica sem).
+    daEquipe && master && u.perfil !== 'master' ? campoEmpresa(u.empresa_id ? String(u.empresa_id) : '') : null,
     el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Mudando o e-mail, a pessoa passa a entrar com o e-mail novo. A senha continua a mesma.'),
   ], async (d) => {
     const corpo = { nome: d.nome, email: d.email };
     if (daEquipe && d.perfil && d.perfil !== u.perfil) corpo.perfil = d.perfil;
+    if (d.empresa_id && Number(d.empresa_id) !== u.empresa_id) corpo.empresa_id = Number(d.empresa_id);
     await api.patch(`/painel/usuarios/${u.id}`, corpo);
     toast('Usuário atualizado.');
     recarregar();
@@ -85,7 +135,10 @@ function novoUsuario(opcoes, recarregar, master = true) {
       campo('Nome', { name: 'nome', required: true, maxlength: 120 }),
       campo('E-mail (login)', { name: 'email', type: 'email', required: true }),
       campo('Senha (mínimo 8 caracteres)', { name: 'senha', type: 'password', required: true, minlength: 8 }),
-      perfil, anunciante, ponto,
+      perfil, master ? campoEmpresa() : null, anunciante, ponto,
+      master && listaDeEmpresas().length > 1
+        ? el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'A empresa vale para administrador e operador: eles só enxergam os dados dela. Acesso de portal segue a empresa do anunciante ou do ponto.')
+        : null,
     ];
   }, async (d) => {
     await api.post('/painel/usuarios', d);

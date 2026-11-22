@@ -20,10 +20,10 @@ const { local, dentroDaJanela, minutosDe } = require('./datas');
  */
 
 /** Tela com os dados do ponto que a programação usa (inclusive a identidade que vai no comunicado). */
-const SQL_TELA = `SELECT t.*, l.categoria, l.cidade, l.uf, l.nome AS local_nome, l.administradora, l.assinatura, l.logo_arquivo
+const SQL_TELA = `SELECT t.*, l.categoria, l.cidade, l.uf, l.nome AS local_nome, l.administradora, l.assinatura, l.logo_arquivo, l.empresa_id
   FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.id = ?`;
 
-const SQL_CAMPANHAS = `SELECT c.*, a.nome AS anunciante_nome FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
+const SQL_CAMPANHAS = `SELECT c.*, a.nome AS anunciante_nome, a.empresa_id FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
   WHERE c.status = 'ativa' AND a.status = 'ativo' AND c.inicio <= ? AND (c.fim IS NULL OR c.fim >= ?)`;
 
 const SQL_CRIATIVOS = `SELECT m.id, m.nome, m.tipo, m.mime, m.sha256, m.orientacao, m.bytes, COALESCE(cm.duracao_s, m.duracao_s) AS duracao_s, cm.ordem
@@ -46,10 +46,18 @@ const SQL_AGENDA = `SELECT titulo, tipo, evento_em, evento_hora FROM comunicados
 const SQL_INSTITUCIONAL = `SELECT m.id, m.nome, m.tipo, m.mime, m.sha256, m.orientacao, m.bytes, m.duracao_s, m.local_id
   FROM midias m
   WHERE m.uso = 'institucional' AND m.status = 'aprovada' AND (m.validade_ate IS NULL OR m.validade_ate >= ?)
-    AND (m.local_id IS NULL OR m.local_id = ?)
+    AND (m.local_id IS NULL OR m.local_id = ?) AND (m.empresa_id IS NULL OR ? IS NULL OR m.empresa_id = ?)
   ORDER BY (m.local_id IS NULL), m.id`;
 
-/** A campanha pode ir nesta tela? Sem alvos, vai em todas. */
+/** Empresa da TV (a do ponto). Quem chama sem ela (objeto montado à mão) faz a consulta aqui. */
+function empresaDaTela(db, tela) {
+  if (tela.empresa_id !== undefined) return tela.empresa_id;
+  return db.prepare('SELECT empresa_id FROM locais WHERE id = ?').get(tela.local_id)?.empresa_id ?? null;
+}
+/** Cada empresa só anuncia nas próprias TVs. */
+const mesmaEmpresa = (empresaCampanha, empresaTela) => empresaCampanha == null || empresaTela == null || empresaCampanha === empresaTela;
+
+/** A campanha pode ir nesta tela? Sem alvos, vai em todas (da mesma empresa). */
 function alvoBate(alvos, tela) {
   if (!alvos.length) return true;
   return alvos.some((a) => {
@@ -76,7 +84,9 @@ function elegiveis(db, tela, { data, hhmm, diaSemana }) {
     .map((r) => [r.campanha_id, r.insercoes]));
 
   const lista = [];
+  const empresaTela = empresaDaTela(db, tela);
   for (const c of db.prepare(SQL_CAMPANHAS).all(data, data)) {
+    if (!mesmaEmpresa(c.empresa_id, empresaTela)) continue;
     if (!noDia(c, diaSemana) || !naHora(c, hhmm)) continue;
     if (!alvoBate(alvosPor.get(c.id) ?? [], tela)) continue;
     if (c.limite_dia > 0 && (jaHoje.get(c.id) ?? 0) >= c.limite_dia) continue;
@@ -102,7 +112,7 @@ const dataBr = (d) => (d ? d.split('-').reverse().join('/') : '');
  */
 function porQueNaoPassa(db, campanhaId, instante = new Date()) {
   const { data, hhmm, diaSemana } = local(instante);
-  const c = db.prepare(`SELECT c.*, a.status AS anunciante_status FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
+  const c = db.prepare(`SELECT c.*, a.status AS anunciante_status, a.empresa_id FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id
     WHERE c.id = ?`).get(campanhaId);
   if (!c) return null;
   const motivos = [];
@@ -136,8 +146,8 @@ function porQueNaoPassa(db, campanhaId, instante = new Date()) {
   }
 
   const alvos = db.prepare('SELECT tipo, valor FROM campanha_alvos WHERE campanha_id = ?').all(campanhaId);
-  const telas = db.prepare(`SELECT t.*, l.categoria, l.cidade, l.uf FROM telas t JOIN locais l ON l.id = t.local_id
-    WHERE t.status = 'ativa' AND l.status = 'ativo'`).all().filter((t) => alvoBate(alvos, t));
+  const telas = db.prepare(`SELECT t.*, l.categoria, l.cidade, l.uf, l.empresa_id FROM telas t JOIN locais l ON l.id = t.local_id
+    WHERE t.status = 'ativa' AND l.status = 'ativo'`).all().filter((t) => mesmaEmpresa(c.empresa_id, t.empresa_id) && alvoBate(alvos, t));
   if (!telas.length) motivos.push('Nenhuma TV escolhida em "Onde passa" (ou as escolhidas estão inativas).');
   else if (!telas.some((t) => t.pareada_em)) motivos.push('As TVs escolhidas ainda não foram pareadas com um aparelho.');
 
@@ -229,7 +239,7 @@ function montar(db, tela, instante = new Date()) {
   // Tela dividida (o padrão de elevador): o comunicado fica parado na sua metade enquanto a publicidade gira na outra.
   // Tela cheia: o comunicado entra no meio do carrossel, como mais um item.
   const dividida = tela.layout === 'dividida';
-  const institucional = db.prepare(SQL_INSTITUCIONAL).all(momento.data, tela.local_id)
+  const institucional = db.prepare(SQL_INSTITUCIONAL).all(momento.data, tela.local_id, empresaDaTela(db, tela), empresaDaTela(db, tela))
     .filter((m) => !m.orientacao || m.orientacao === tela.orientacao);
   const preenchimento = dividida ? [] : comunicados.map((c) => ({ comunicado: c }));
   let tempo = vendido + preenchimento.reduce((t, p) => t + p.comunicado.duracao_s, 0);

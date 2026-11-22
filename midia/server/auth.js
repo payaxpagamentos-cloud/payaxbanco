@@ -40,11 +40,13 @@ const lerTokenTela = (token) => abrirToken(token, 'tela');
 const EQUIPE = ['master', 'administrador', 'operador'];
 
 function autenticar(db) {
-  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.anunciante_id, u.local_id, u.ativo,
-      a.nome AS anunciante_nome, a.status AS anunciante_status, l.nome AS local_nome, l.status AS local_status
+  const buscar = db.prepare(`SELECT u.id, u.nome, u.email, u.perfil, u.anunciante_id, u.local_id, u.ativo, u.empresa_id,
+      a.nome AS anunciante_nome, a.status AS anunciante_status, l.nome AS local_nome, l.status AS local_status,
+      e.nome AS empresa_nome, e.ativo AS empresa_ativa
     FROM usuarios u
     LEFT JOIN anunciantes a ON a.id = u.anunciante_id
     LEFT JOIN locais l ON l.id = u.local_id
+    LEFT JOIN empresas e ON e.id = u.empresa_id
     WHERE u.id = ?`);
   return (req, _res, next) => {
     const c = req.get('authorization') || '';
@@ -54,6 +56,7 @@ function autenticar(db) {
     if (!usuario || !usuario.ativo) return next(new ErroNegocio('Usuário inativo.', 401));
     if (usuario.anunciante_id && usuario.anunciante_status !== 'ativo') return next(new ErroNegocio('Anunciante inativo. Fale com a equipe.', 401));
     if (usuario.local_id && usuario.local_status === 'encerrado') return next(new ErroNegocio('Ponto encerrado. Fale com a equipe.', 401));
+    if (usuario.empresa_id && usuario.empresa_ativa === 0) return next(new ErroNegocio('Empresa desativada. Fale com o administrador do sistema.', 401));
     req.usuario = usuario;
     next();
   };

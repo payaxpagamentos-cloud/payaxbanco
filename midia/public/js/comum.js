@@ -1,6 +1,6 @@
 /** Peças repetidas nas telas do painel: cartões, indicadores, tabelas, prévias e a linha do tempo do loop. */
-import { el, icone, inteiro, dinheiro, duracao, mb, etiqueta } from './ui.js';
-import { BASE, sessao } from './api.js';
+import { el, icone, inteiro, dinheiro, duracao, mb, etiqueta, escolha } from './ui.js';
+import { BASE, sessao, api } from './api.js';
 
 /** Prefixo da API (para <img> que o navegador busca direto, como a logo do ponto). */
 export const BASE_API = `${BASE}/api`;
@@ -174,4 +174,20 @@ export function campoFotoComunicado(c, rota) {
     return null;
   };
   return { campo, salvar };
+}
+
+/*
+ * Empresas: o master escolhe de qual empresa é o cadastro novo (ponto, anunciante, agência, usuário).
+ * Quem é de uma empresa nem vê o campo — o servidor grava a empresa dele.
+ */
+let empresasDoMaster = [];
+export async function carregarEmpresas() {
+  try { empresasDoMaster = (await api.get('/painel/opcoes')).empresas ?? []; } catch { empresasDoMaster = []; }
+  return empresasDoMaster;
+}
+export const listaDeEmpresas = () => empresasDoMaster;
+export function campoEmpresa(valor = '') {
+  const ativas = empresasDoMaster.filter((e) => e.ativo);
+  if (ativas.length < 2) return null;
+  return escolha('Empresa', 'empresa_id', Object.fromEntries(ativas.map((e) => [e.id, e.nome])), valor || String(ativas[0].id));
 }

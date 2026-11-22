@@ -52,11 +52,11 @@ function duracaoMeses(c) {
 }
 
 /** O que precisa de atenção hoje: contratos vencendo, vencidos e com reajuste na hora. */
-function pendencias(db, dias = null) {
+function pendencias(db, dias = null, empresaId = null) {
   const data = hoje();
   const aviso = dias ?? Number(lerConfig(db).contrato_aviso_dias) ?? 30;
   const ativos = db.prepare(`SELECT c.*, a.nome AS anunciante FROM contratos c JOIN anunciantes a ON a.id = c.anunciante_id
-    WHERE c.status = 'ativo'`).all().map((c) => comCiclo(c, data));
+    WHERE c.status = 'ativo'${empresaId === null ? '' : ' AND a.empresa_id = ?'}`).all(...(empresaId === null ? [] : [empresaId])).map((c) => comCiclo(c, data));
   return {
     aviso_dias: aviso,
     vencendo: ativos.filter((c) => c.dias_para_fim !== null && c.dias_para_fim >= 0 && c.dias_para_fim <= aviso),

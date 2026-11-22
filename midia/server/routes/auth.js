@@ -17,6 +17,7 @@ const publico = (u) => ({
   id: u.id, nome: u.nome, email: u.email, perfil: u.perfil,
   anunciante_id: u.anunciante_id ?? null, anunciante_nome: u.anunciante_nome ?? null,
   local_id: u.local_id ?? null, local_nome: u.local_nome ?? null,
+  empresa_id: u.empresa_id ?? null, empresa_nome: u.empresa_nome ?? null,
 });
 
 /** Login e a própria conta. Não há cadastro aberto: a equipe cria os acessos do anunciante e do lojista. */
@@ -24,8 +25,10 @@ module.exports = (db, autenticado) => {
   const r = Router();
 
   r.post('/login', (req, res) => {
-    const u = db.prepare(`SELECT u.*, a.nome AS anunciante_nome, a.status AS anunciante_status, l.nome AS local_nome, l.status AS local_status
-      FROM usuarios u LEFT JOIN anunciantes a ON a.id = u.anunciante_id LEFT JOIN locais l ON l.id = u.local_id WHERE u.email = ?`)
+    const u = db.prepare(`SELECT u.*, a.nome AS anunciante_nome, a.status AS anunciante_status, l.nome AS local_nome, l.status AS local_status,
+        e.nome AS empresa_nome, e.ativo AS empresa_ativa
+      FROM usuarios u LEFT JOIN anunciantes a ON a.id = u.anunciante_id LEFT JOIN locais l ON l.id = u.local_id
+      LEFT JOIN empresas e ON e.id = u.empresa_id WHERE u.email = ?`)
       .get(String(req.body.email ?? '').trim());
     if (!u || !verificarSenha(String(req.body.senha ?? ''), u.senha_hash)) {
       registrar(db, req, 'login_falhou', { email: String(req.body.email ?? '').slice(0, 160) });
@@ -34,6 +37,7 @@ module.exports = (db, autenticado) => {
     if (!u.ativo) throw new ErroNegocio('Usuário desativado. Fale com a equipe.', 403);
     if (u.anunciante_id && u.anunciante_status !== 'ativo') throw new ErroNegocio('Anunciante inativo. Fale com a equipe.', 403);
     if (u.local_id && u.local_status === 'encerrado') throw new ErroNegocio('Ponto encerrado. Fale com a equipe.', 403);
+    if (u.empresa_id && u.empresa_ativa === 0) throw new ErroNegocio('Empresa desativada. Fale com o administrador do sistema.', 403);
     db.prepare('UPDATE usuarios SET ultimo_acesso = ? WHERE id = ?').run(agora(), u.id);
     registrar(db, { usuario: u, ip: req.ip }, 'login');
     res.json({ token: emitirToken(u), usuario: publico(u) });

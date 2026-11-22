@@ -11,6 +11,7 @@ const faturamento = require('../lib/faturamento');
 const contratosLib = require('../lib/contratos');
 const rel = require('../lib/relatorios');
 const v = require('../lib/validacao');
+const empresas = require('../lib/empresas');
 
 const CATEGORIAS_DESPESA = ['internet', 'aparelho', 'instalacao', 'manutencao', 'aluguel_espaco', 'comissao', 'energia', 'software', 'imposto', 'outros'];
 
@@ -73,6 +74,8 @@ module.exports = (db) => {
     if (req.query.anunciante_id) { onde.push('c.anunciante_id = ?'); p.push(Number(req.query.anunciante_id)); }
     if (req.query.status) { onde.push('c.status = ?'); p.push(req.query.status); }
     if (req.query.busca) { onde.push('(c.numero LIKE ? OR a.nome LIKE ?)'); p.push(`%${req.query.busca}%`, `%${req.query.busca}%`); }
+    const [doEmp, pe] = empresas.filtro(req, 'a.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     const itens = db.prepare(`SELECT c.*, a.nome AS anunciante, ag.nome AS agencia,
         (SELECT COUNT(*) FROM campanhas x WHERE x.contrato_id = c.id) AS campanhas,
         (SELECT COALESCE(SUM(f.valor_centavos), 0) FROM faturas f WHERE f.contrato_id = c.id AND f.status = 'aberta') AS aberto_centavos
@@ -93,7 +96,7 @@ module.exports = (db) => {
   });
 
   /** O que precisa de atenção nos contratos: vencendo, vencidos e reajuste na data. */
-  r.get('/contratos/pendencias', (req, res) => res.json(contratosLib.pendencias(db, req.query.dias ? Number(req.query.dias) : null)));
+  r.get('/contratos/pendencias', (req, res) => res.json(contratosLib.pendencias(db, req.query.dias ? Number(req.query.dias) : null, empresas.empresaDe(req))));
 
   /**
    * Aplica o reajuste combinado. O percentual vem em centésimos (450 = 4,5%) e vale também para as
@@ -178,6 +181,8 @@ module.exports = (db) => {
     if (req.query.status) { onde.push('f.status = ?'); p.push(req.query.status); }
     if (req.query.anunciante_id) { onde.push('f.anunciante_id = ?'); p.push(Number(req.query.anunciante_id)); }
     if (req.query.competencia) { onde.push('f.competencia = ?'); p.push(v.competencia(req.query.competencia)); }
+    const [doEmp, pe] = empresas.filtro(req, 'a.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     const itens = db.prepare(`SELECT f.*, a.nome AS anunciante, (f.status = 'aberta' AND f.vencimento < ?) AS atrasada
       FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''}
       ORDER BY f.competencia DESC, a.nome`).all(hoje(), ...p);
@@ -258,6 +263,8 @@ module.exports = (db) => {
     if (competencia) { onde.push('f.competencia = ?'); p.push(competencia); }
     if (req.query.emitida === 'sim') onde.push('f.nf_numero IS NOT NULL');
     if (req.query.emitida === 'nao') onde.push('f.nf_numero IS NULL');
+    const [doEmp, pe] = empresas.filtro(req, 'a.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     const cfg = lerConfig(db);
     const itens = db.prepare(`SELECT f.id, f.competencia, f.vencimento, f.status, f.pago_em, f.valor_centavos, f.bruto_centavos,
         f.comissao_agencia_centavos, f.nf_numero, f.nf_emitida_em, f.nf_link,
@@ -294,6 +301,8 @@ module.exports = (db) => {
     if (req.query.status) { onde.push('r.status = ?'); p.push(req.query.status); }
     if (req.query.competencia) { onde.push('r.competencia = ?'); p.push(v.competencia(req.query.competencia)); }
     if (req.query.local_id) { onde.push('r.local_id = ?'); p.push(Number(req.query.local_id)); }
+    const [doEmp, pe] = empresas.filtro(req, 'l.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     const itens = db.prepare(`SELECT r.*, l.nome AS local, l.cidade, l.responsavel, l.telefone FROM repasses r JOIN locais l ON l.id = r.local_id
       ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY r.competencia DESC, r.valor_centavos DESC`).all(...p);
     res.json({ itens, total_centavos: itens.filter((x) => x.status === 'a_pagar').reduce((t, x) => t + x.valor_centavos, 0) });
@@ -322,6 +331,8 @@ module.exports = (db) => {
     if (req.query.ate) { onde.push('f.vencimento <= ?'); p.push(v.data(req.query.ate, 'a data final')); }
     if (req.query.nota === 'sim') onde.push('f.nf_numero IS NOT NULL');
     if (req.query.nota === 'nao') onde.push('f.nf_numero IS NULL');
+    const [doEmp, pe] = empresas.filtro(req, 'a.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     const itens = db.prepare(`SELECT f.*, a.nome AS anunciante, a.telefone AS anunciante_telefone, a.email AS anunciante_email,
         ag.nome AS agencia, c.numero AS contrato
       FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id
@@ -379,13 +390,14 @@ module.exports = (db) => {
     const d = lerDespesa(req.body);
     // Repetir cria uma conta por mês, com o mesmo dia de vencimento (internet, aluguel do espaço...).
     const repetir = v.inteiro(req.body.repete_meses ?? 0, 'a repetição', { max: 36 });
+    const empresaDespesa = empresas.empresaParaGravar(db, req, req.body.empresa_id);
     const ids = transacao(db, () => {
       const criados = [];
       for (let i = 0; i <= repetir; i++) {
         const campos = { ...d, vencimento: i === 0 ? d.vencimento : somarMesesData(d.vencimento, i), repete_meses: repetir };
         if (campos.competencia && i > 0) campos.competencia = somarMeses(campos.competencia, i);
-        criados.push(Number(db.prepare(`INSERT INTO despesas (${Object.keys(campos).join(', ')}, criado_por, criado_em)
-          VALUES (${Object.keys(campos).map(() => '?').join(', ')}, ?, ?)`).run(...Object.values(campos), req.usuario.id, agora()).lastInsertRowid));
+        criados.push(Number(db.prepare(`INSERT INTO despesas (${Object.keys(campos).join(', ')}, empresa_id, criado_por, criado_em)
+          VALUES (${Object.keys(campos).map(() => '?').join(', ')}, ?, ?, ?)`).run(...Object.values(campos), empresaDespesa, req.usuario.id, agora()).lastInsertRowid));
       }
       return criados;
     });
@@ -443,13 +455,15 @@ module.exports = (db) => {
     const ate = req.query.ate ? v.data(req.query.ate, 'a data final') : null;
     const dentro = (vencimento) => (!de || vencimento >= de) && (!ate || vencimento <= ate);
 
-    const repasses = db.prepare(`SELECT r.*, l.nome AS local FROM repasses r JOIN locais l ON l.id = r.local_id WHERE r.status <> 'cancelado'`).all()
+    const [empL, pL] = empresas.filtro(req, 'l.empresa_id');
+    const [empD, pD] = empresas.filtro(req, 'empresa_id');
+    const repasses = db.prepare(`SELECT r.*, l.nome AS local FROM repasses r JOIN locais l ON l.id = r.local_id WHERE r.status <> 'cancelado'${empL}`).all(...pL)
       .map((x) => ({
         tipo: 'repasse', id: x.id, descricao: `Repasse ${x.competencia} — ${x.local}`, fornecedor: x.local, categoria: 'repasse',
         competencia: x.competencia, vencimento: x.competencia ? `${somarMeses(x.competencia, 1)}-10` : data,
         valor_centavos: x.valor_centavos, status: x.status === 'pago' ? 'paga' : 'aberta', pago_em: x.pago_em, local_id: x.local_id,
       }));
-    const despesas = db.prepare("SELECT * FROM despesas WHERE status <> 'cancelada'").all()
+    const despesas = db.prepare(`SELECT * FROM despesas WHERE status <> 'cancelada'${empD}`).all(...pD)
       .map((x) => ({ ...x, tipo: 'despesa', fornecedor: x.fornecedor ?? null }));
 
     const itens = [...repasses, ...despesas]
@@ -491,17 +505,23 @@ module.exports = (db) => {
       Number(mes().slice(0, 4)), Number(mes().slice(5, 7)), 0)).getUTCDate()).padStart(2, '0')}`;
     const de = req.query.de ? v.data(req.query.de, 'a data inicial') : `${mes()}-01`;
     v.exigir(de <= ate, 'A data inicial não pode ser depois da final.');
+    // Só o dinheiro da empresa de quem olha (o master vê a rede inteira).
+    const E = empresas.empresaDe(req);
+    const ep = E === null ? [] : [E];
+    const fatE = E === null ? '' : ' AND anunciante_id IN (SELECT id FROM anunciantes WHERE empresa_id = ?)';
+    const despE = E === null ? '' : ' AND empresa_id = ?';
+    const repE = E === null ? '' : ' AND local_id IN (SELECT id FROM locais WHERE empresa_id = ?)';
 
     const entradas = db.prepare(`SELECT f.pago_em AS data, f.valor_centavos, f.competencia, a.nome AS quem
       FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id
-      WHERE f.status = 'paga' AND f.pago_em BETWEEN ? AND ?`).all(de, ate)
+      WHERE f.status = 'paga' AND f.pago_em BETWEEN ? AND ?${fatE.replace('anunciante_id', 'f.anunciante_id')}`).all(de, ate, ...ep)
       .map((x) => ({ ...x, tipo: 'entrada', origem: 'fatura', descricao: `Fatura ${x.competencia} — ${x.quem}` }));
 
     const saidasDespesas = db.prepare(`SELECT d.pago_em AS data, d.valor_centavos, d.descricao, d.categoria, d.fornecedor AS quem
-      FROM despesas d WHERE d.status = 'paga' AND d.pago_em BETWEEN ? AND ?`).all(de, ate)
+      FROM despesas d WHERE d.status = 'paga' AND d.pago_em BETWEEN ? AND ?${despE.replace('empresa_id', 'd.empresa_id')}`).all(de, ate, ...ep)
       .map((x) => ({ ...x, tipo: 'saida', origem: 'despesa' }));
     const saidasRepasses = db.prepare(`SELECT r.pago_em AS data, r.valor_centavos, r.competencia, l.nome AS quem
-      FROM repasses r JOIN locais l ON l.id = r.local_id WHERE r.status = 'pago' AND r.pago_em BETWEEN ? AND ?`).all(de, ate)
+      FROM repasses r JOIN locais l ON l.id = r.local_id WHERE r.status = 'pago' AND r.pago_em BETWEEN ? AND ?${repE.replace('local_id', 'r.local_id')}`).all(de, ate, ...ep)
       .map((x) => ({ ...x, tipo: 'saida', origem: 'repasse', categoria: 'repasse', descricao: `Repasse ${x.competencia} — ${x.quem}` }));
 
     const movimentos = [...entradas, ...saidasDespesas, ...saidasRepasses].sort((a, b) => a.data.localeCompare(b.data));
@@ -518,20 +538,20 @@ module.exports = (db) => {
     }
 
     // Previsto no mesmo período: o que vence e ainda não foi pago (dos dois lados).
-    const aReceber = db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM faturas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?").get(de, ate).n;
-    const aPagarDespesas = db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM despesas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?").get(de, ate).n;
-    const aPagarRepasses = db.prepare("SELECT competencia, valor_centavos FROM repasses WHERE status = 'a_pagar'").all()
+    const aReceber = db.prepare(`SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM faturas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?${fatE}`).get(de, ate, ...ep).n;
+    const aPagarDespesas = db.prepare(`SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM despesas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?${despE}`).get(de, ate, ...ep).n;
+    const aPagarRepasses = db.prepare(`SELECT competencia, valor_centavos FROM repasses WHERE status = 'a_pagar'${repE}`).all(...ep)
       .filter((x) => { const venc = `${somarMeses(x.competencia, 1)}-10`; return venc >= de && venc <= ate; })
       .reduce((t, x) => t + x.valor_centavos, 0);
 
     // Série dos últimos 12 meses (pelo caixa), para ver a tendência.
     const serie = db.prepare(`
-      SELECT substr(pago_em, 1, 7) AS competencia, SUM(valor_centavos) AS entrou, 0 AS saiu FROM faturas WHERE status = 'paga' AND pago_em >= ? GROUP BY 1
+      SELECT substr(pago_em, 1, 7) AS competencia, SUM(valor_centavos) AS entrou, 0 AS saiu FROM faturas WHERE status = 'paga' AND pago_em >= ?${fatE} GROUP BY 1
       UNION ALL
-      SELECT substr(pago_em, 1, 7), 0, SUM(valor_centavos) FROM despesas WHERE status = 'paga' AND pago_em >= ? GROUP BY 1
+      SELECT substr(pago_em, 1, 7), 0, SUM(valor_centavos) FROM despesas WHERE status = 'paga' AND pago_em >= ?${despE} GROUP BY 1
       UNION ALL
-      SELECT substr(pago_em, 1, 7), 0, SUM(valor_centavos) FROM repasses WHERE status = 'pago' AND pago_em >= ? GROUP BY 1`)
-      .all(`${somarMeses(mes(), -11)}-01`, `${somarMeses(mes(), -11)}-01`, `${somarMeses(mes(), -11)}-01`);
+      SELECT substr(pago_em, 1, 7), 0, SUM(valor_centavos) FROM repasses WHERE status = 'pago' AND pago_em >= ?${repE} GROUP BY 1`)
+      .all(`${somarMeses(mes(), -11)}-01`, ...ep, `${somarMeses(mes(), -11)}-01`, ...ep, `${somarMeses(mes(), -11)}-01`, ...ep);
     const porMes = new Map();
     for (const x of serie) {
       const m = porMes.get(x.competencia) ?? { competencia: x.competencia, entrou: 0, saiu: 0 };
@@ -564,10 +584,10 @@ module.exports = (db) => {
       movimentos: movimentos.slice(-300).reverse(),
       // Os próximos 30 dias, para saber se o caixa aperta.
       proximos: {
-        receber_centavos: db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM faturas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?")
-          .get(data, somarDias(data, 30)).n,
-        pagar_centavos: db.prepare("SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM despesas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?")
-          .get(data, somarDias(data, 30)).n,
+        receber_centavos: db.prepare(`SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM faturas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?${fatE}`)
+          .get(data, somarDias(data, 30), ...ep).n,
+        pagar_centavos: db.prepare(`SELECT COALESCE(SUM(valor_centavos), 0) AS n FROM despesas WHERE status = 'aberta' AND vencimento BETWEEN ? AND ?${despE}`)
+          .get(data, somarDias(data, 30), ...ep).n,
       },
     });
   });

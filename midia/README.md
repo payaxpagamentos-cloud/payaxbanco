@@ -508,6 +508,17 @@ docker run -p 3600:3600 -v midia-dados:/app/data \
 
 O banco e os arquivos das mídias ficam em `/app/data` — monte um volume persistente aí.
 
+## Empresas (dados separados)
+
+O sistema pode ser usado por mais de uma empresa (franquias, filiais, parceiros). Cada uma enxerga **só os próprios**
+pontos, TVs, anunciantes, agências, criativos, campanhas, CRM, propostas, contratos, faturas, repasses, despesas e
+relatórios — e a campanha de uma empresa **só passa nas TVs dela**. O **master** enxerga todas, cadastra as empresas
+(*Administração › Empresas*) e escolhe a empresa ao criar um ponto, um anunciante, uma agência ou um usuário.
+Administrador e operador ficam presos à empresa deles. Na instalação (ou na atualização que trouxe as empresas), tudo o
+que já existia passa a ser da empresa inicial, com o nome da plataforma. Empresa desativada: a equipe dela não entra.
+
+As **configurações** (regras das TVs, preços de tabela, PIX) valem para a rede inteira: só o master altera.
+
 ## Configurações da plataforma
 
 Em abas, na própria tela de *Configurações*:

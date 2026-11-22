@@ -11,6 +11,7 @@ const { hoje, mes } = require('../lib/datas');
 const rel = require('../lib/relatorios');
 const { porCampanha, periodo, porDia } = rel;
 const v = require('../lib/validacao');
+const empresas = require('../lib/empresas');
 
 const TIPOS_ALVO = ['tela', 'local', 'categoria', 'cidade'];
 
@@ -89,9 +90,11 @@ function detalhe(db, id) {
 
 /** Quais telas ativas a campanha alcança com os alvos atuais. */
 function telasDaCampanha(db, campanhaId, alvos = db.prepare('SELECT tipo, valor FROM campanha_alvos WHERE campanha_id = ?').all(campanhaId)) {
-  return db.prepare(`SELECT t.id, t.nome, t.orientacao, t.status, l.id AS local_id, l.nome AS local_nome, l.categoria, l.cidade, l.publico_dia
+  // Só as TVs da empresa do anunciante: cada empresa anuncia nas próprias telas.
+  const empresa = db.prepare('SELECT a.empresa_id FROM campanhas c JOIN anunciantes a ON a.id = c.anunciante_id WHERE c.id = ?').get(campanhaId)?.empresa_id ?? null;
+  return db.prepare(`SELECT t.id, t.nome, t.orientacao, t.status, l.id AS local_id, l.nome AS local_nome, l.categoria, l.cidade, l.publico_dia, l.empresa_id
     FROM telas t JOIN locais l ON l.id = t.local_id WHERE t.status = 'ativa' AND l.status = 'ativo'`).all()
-    .filter((t) => grade.alvoBate(alvos, t));
+    .filter((t) => (empresa == null || t.empresa_id == null || t.empresa_id === empresa) && grade.alvoBate(alvos, t));
 }
 
 module.exports = (db) => {
@@ -105,6 +108,8 @@ module.exports = (db) => {
     if (req.query.anunciante_id) { onde.push('c.anunciante_id = ?'); p.push(Number(req.query.anunciante_id)); }
     if (req.query.status) { onde.push('c.status = ?'); p.push(req.query.status); }
     if (req.query.busca) { onde.push('(c.nome LIKE ? OR a.nome LIKE ?)'); p.push(`%${req.query.busca}%`, `%${req.query.busca}%`); }
+    const [doEmp, pe] = empresas.filtro(req, 'a.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     const itens = db.prepare(`SELECT c.*, a.nome AS anunciante, ag.nome AS agencia, ci.nome AS circuito,
         (SELECT COUNT(*) FROM campanha_midias cm WHERE cm.campanha_id = c.id) AS criativos,
         (SELECT COUNT(*) FROM campanha_midias cm JOIN midias m ON m.id = cm.midia_id WHERE cm.campanha_id = c.id AND m.status = 'aprovada') AS criativos_ok,
@@ -305,12 +310,14 @@ module.exports = (db) => {
     if (req.query.uso) { onde.push('m.uso = ?'); p.push(req.query.uso); }
     if (req.query.local_id) { onde.push('m.local_id = ?'); p.push(Number(req.query.local_id)); }
     if (req.query.busca) { onde.push('m.nome LIKE ?'); p.push(`%${req.query.busca}%`); }
+    const [doEmp, pe] = empresas.filtro(req, 'm.empresa_id');
+    if (doEmp) { onde.push(doEmp.replace(' AND ', '')); p.push(...pe); }
     res.json({
       itens: db.prepare(`SELECT m.*, a.nome AS anunciante, l.nome AS local_nome,
           (SELECT COUNT(*) FROM campanha_midias cm WHERE cm.midia_id = m.id) AS campanhas
         FROM midias m LEFT JOIN anunciantes a ON a.id = m.anunciante_id LEFT JOIN locais l ON l.id = m.local_id
         ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''} ORDER BY m.id DESC`).all(...p),
-      pendentes: db.prepare("SELECT COUNT(*) AS n FROM midias WHERE status = 'pendente'").get().n,
+      pendentes: db.prepare(`SELECT COUNT(*) AS n FROM midias m WHERE status = 'pendente'${doEmp}`).get(...pe).n,
       disco_bytes: arquivos.tamanhoNoDisco(),
     });
   });
@@ -341,10 +348,14 @@ module.exports = (db) => {
     const nome = v.texto(q.nome ?? `Criativo ${hoje()}`, 'o nome do criativo', 140);
     const validade = q.validade_ate ? v.data(q.validade_ate, 'a validade') : null;
     try {
+      // Empresa do criativo: a do anunciante, a do ponto ou, no institucional solto, a de quem envia.
+      const empresaId = (anuncianteId && db.prepare('SELECT empresa_id FROM anunciantes WHERE id = ?').get(anuncianteId)?.empresa_id)
+        || (localId && db.prepare('SELECT empresa_id FROM locais WHERE id = ?').get(localId)?.empresa_id)
+        || empresas.empresaParaGravar(db, req, q.empresa_id);
       const id = Number(db.prepare(`INSERT INTO midias (anunciante_id, local_id, nome, uso, tipo, arquivo, mime, bytes, sha256, largura, altura, duracao_s, orientacao,
-          status, validade_ate, enviada_por, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendente', ?, ?, ?)`)
+          status, validade_ate, enviada_por, empresa_id, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendente', ?, ?, ?, ?)`)
         .run(anuncianteId, localId, nome, uso, lido.tipo, lido.arquivo, lido.mime, lido.bytes, lido.sha256, lido.largura, lido.altura, lido.duracao_s, lido.orientacao,
-          validade, req.usuario.id, agora()).lastInsertRowid);
+          validade, req.usuario.id, empresaId, agora()).lastInsertRowid);
       registrar(db, req, 'midia_enviada', { id, nome, bytes: lido.bytes, tipo: lido.tipo });
       res.status(201).json(db.prepare('SELECT * FROM midias WHERE id = ?').get(id));
     } catch (err) {
@@ -420,9 +431,10 @@ module.exports = (db) => {
   });
 
   /** Ocupação das telas: quanto do loop está vendido em cada uma (ajuda a saber onde ainda cabe campanha). */
-  r.get('/ocupacao', (_req, res) => {
-    const telas = db.prepare(`SELECT t.*, l.categoria, l.cidade, l.nome AS local_nome, l.publico_dia FROM telas t JOIN locais l ON l.id = t.local_id
-      WHERE t.status = 'ativa' AND l.status = 'ativo' ORDER BY l.nome, t.nome`).all();
+  r.get('/ocupacao', (req, res) => {
+    const [doEmp, pe] = empresas.filtro(req, 'l.empresa_id');
+    const telas = db.prepare(`SELECT t.*, l.categoria, l.cidade, l.nome AS local_nome, l.publico_dia, l.empresa_id FROM telas t JOIN locais l ON l.id = t.local_id
+      WHERE t.status = 'ativa' AND l.status = 'ativo'${doEmp} ORDER BY l.nome, t.nome`).all(...pe);
     const itens = telas.map((t) => {
       const g = grade.montar(db, t);
       return {

@@ -116,6 +116,8 @@ function listar(db, filtros = {}) {
   else if (filtros.caixa === 'nao_lidos') onde.push("e.direcao = 'entrada' AND e.lido_em IS NULL AND e.arquivado_em IS NULL");
   else onde.push("e.arquivado_em IS NULL AND e.direcao = 'entrada'");
   if (filtros.lead_id) { onde.push('e.lead_id = ?'); p.push(Number(filtros.lead_id)); }
+  const daEmpresa = filtros._empresa != null;
+  if (daEmpresa) { onde.push('e.empresa_id = ?'); p.push(filtros._empresa); }
   if (filtros.busca) {
     onde.push('(e.de LIKE ? OR e.assunto LIKE ? OR e.previa LIKE ? OR e.para LIKE ?)');
     const b = `%${String(filtros.busca).trim()}%`;
@@ -134,11 +136,12 @@ function listar(db, filtros = {}) {
       COUNT(*) FILTER (WHERE direcao = 'entrada' AND arquivado_em IS NULL) AS na_caixa,
       COUNT(*) FILTER (WHERE direcao = 'entrada' AND lead_id IS NULL AND arquivado_em IS NULL) AS sem_vinculo,
       COUNT(*) FILTER (WHERE direcao = 'saida') AS enviados
-    FROM emails`).get();
+    FROM emails${daEmpresa ? ' WHERE empresa_id = ?' : ''}`).get(...(daEmpresa ? [filtros._empresa] : []));
 
   // Quem escreveu e ainda não teve resposta: é a fila que não pode crescer.
   const semResposta = db.prepare(`SELECT COUNT(*) AS n FROM emails e WHERE e.direcao = 'entrada' AND e.arquivado_em IS NULL
-    AND NOT EXISTS (SELECT 1 FROM emails r WHERE r.direcao = 'saida' AND r.thread = e.thread AND r.recebido_em > e.recebido_em)`).get().n;
+    AND NOT EXISTS (SELECT 1 FROM emails r WHERE r.direcao = 'saida' AND r.thread = e.thread AND r.recebido_em > e.recebido_em)
+    ${daEmpresa ? 'AND e.empresa_id = ?' : ''}`).get(...(daEmpresa ? [filtros._empresa] : [])).n;
 
   return { itens, totais: { ...n, sem_resposta: semResposta }, servidor: estado() };
 }
@@ -218,6 +221,7 @@ function virarLead(db, id, { usuarioId = null, tipo = 'anunciante' } = {}) {
       etapa: 'novo',
       mensagem: String(e.texto ?? '').slice(0, 500),
       criado_por: usuarioId,
+      empresa_id: e.empresa_id ?? null,
       criado_em: agora(),
       atualizado_em: agora(),
     };
@@ -235,7 +239,7 @@ function virarLead(db, id, { usuarioId = null, tipo = 'anunciante' } = {}) {
  * aqui como mensagem enviada e entra no histórico do lead. Responder mantém a conversa amarrada pelos
  * identificadores do e-mail, então a resposta cai na mesma thread no programa de quem recebe.
  */
-async function enviar(db, { para, assunto, texto, responder_a = null, lead_id = null, usuarioId = null }) {
+async function enviar(db, { para, assunto, texto, responder_a = null, lead_id = null, usuarioId = null, empresa_id = null }) {
   const destino = String(para ?? '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destino)) throw new ErroNegocio('Informe um e-mail de destino válido.', 422);
   if (!String(texto ?? '').trim()) throw new ErroNegocio('Escreva a mensagem.', 422);
@@ -277,6 +281,7 @@ async function enviar(db, { para, assunto, texto, responder_a = null, lead_id = 
     local_id: anterior?.local_id ?? null,
     lido_em: agora(),
     criado_por: usuarioId,
+    empresa_id: anterior?.empresa_id ?? empresa_id ?? null,
     recebido_em: agora(),
     criado_em: agora(),
   };

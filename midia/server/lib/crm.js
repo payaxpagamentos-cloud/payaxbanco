@@ -72,6 +72,8 @@ function funil(db, filtros = {}) {
   if (filtros.tipo) { onde.push('l.tipo = ?'); p.push(filtros.tipo); }
   if (filtros.responsavel_id) { onde.push('l.responsavel_id = ?'); p.push(Number(filtros.responsavel_id)); }
   if (filtros.origem) { onde.push('l.origem = ?'); p.push(filtros.origem); }
+  // Empresa (posta pela rota; o master não filtra).
+  if (filtros._empresa != null) { onde.push('l.empresa_id = ?'); p.push(filtros._empresa); }
   if (filtros.busca) {
     onde.push('(l.nome LIKE ? OR l.contato LIKE ? OR l.email LIKE ? OR l.cidade LIKE ?)');
     const b = `%${String(filtros.busca).trim()}%`;
@@ -120,17 +122,17 @@ function ganhar(db, id, { usuarioId = null, criarCadastro = true } = {}) {
     let anuncianteId = l.anunciante_id;
     let localId = l.local_id;
     if (criarCadastro && l.tipo === 'anunciante' && !anuncianteId) {
-      anuncianteId = Number(db.prepare(`INSERT INTO anunciantes (nome, contato, email, telefone, status, observacao, criado_em)
-        VALUES (?, ?, ?, ?, 'ativo', ?, ?)`)
-        .run(l.nome, l.contato, l.email, l.telefone, `Veio do CRM (origem: ${l.origem}).`, agora()).lastInsertRowid);
+      anuncianteId = Number(db.prepare(`INSERT INTO anunciantes (nome, contato, email, telefone, status, observacao, empresa_id, criado_em)
+        VALUES (?, ?, ?, ?, 'ativo', ?, ?, ?)`)
+        .run(l.nome, l.contato, l.email, l.telefone, `Veio do CRM (origem: ${l.origem}).`, l.empresa_id ?? null, agora()).lastInsertRowid);
     }
     if (criarCadastro && l.tipo === 'ponto' && !localId) {
       // Nasce sem ambiente definido de propósito: um ponto pode ser condomínio, mercado, academia,
       // clínica ou qualquer lugar onde passa gente — quem sabe qual é é a equipe, não o sistema.
-      localId = Number(db.prepare(`INSERT INTO locais (nome, categoria, cidade, uf, responsavel, telefone, email, status, observacao, criado_em)
-        VALUES (?, 'outro', ?, ?, ?, ?, ?, 'ativo', ?, ?)`)
+      localId = Number(db.prepare(`INSERT INTO locais (nome, categoria, cidade, uf, responsavel, telefone, email, status, observacao, empresa_id, criado_em)
+        VALUES (?, 'outro', ?, ?, ?, ?, ?, 'ativo', ?, ?, ?)`)
         .run(l.nome, l.cidade ?? '—', l.uf ?? 'SP', l.contato, l.telefone, l.email,
-          `Veio do CRM (origem: ${l.origem}). Escolha o ambiente e confirme a contrapartida combinada.`, agora()).lastInsertRowid);
+          `Veio do CRM (origem: ${l.origem}). Escolha o ambiente e confirme a contrapartida combinada.`, l.empresa_id ?? null, agora()).lastInsertRowid);
     }
     db.prepare("UPDATE leads SET etapa = 'ganho', ganho_em = ?, anunciante_id = ?, local_id = ?, proximo_passo = NULL, proximo_em = NULL, atualizado_em = ? WHERE id = ?")
       .run(hoje(), anuncianteId, localId, agora(), id);
