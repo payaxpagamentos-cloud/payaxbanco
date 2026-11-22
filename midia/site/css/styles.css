@@ -54,3 +54,7 @@
  */
 .foto-formato{position:relative;overflow:hidden;background:#e8edf1}
 .foto-formato>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+
+/* Formato com uma foto só: ela fica do mesmo tamanho das outras, centrada — não estica a página inteira. */
+.gallery-pair.uma{grid-template-columns:minmax(0,calc(50% - 9px));justify-content:center}
+@media(max-width:540px){.gallery-pair.uma{grid-template-columns:1fr}}

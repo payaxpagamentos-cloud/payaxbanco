@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#F5F7FA">
-  <meta name="description" content="VAI MÍDIA. Mídia digital em shopping, elevadores, TVs indoor e recepções. Conheça os formatos e planeje sua campanha.">
+  <meta name="description" content="VAI MÍDIA. Mídia digital em shopping, elevadores, TVs indoor, recepções e painéis de rua. Conheça os formatos e planeje sua campanha.">
   <!--
     O endereço oficial fica aqui, escrito no HTML: quem gera a prévia do link (WhatsApp, Instagram,
     Google) não roda JavaScript. O canonical também evita que o mesmo site, servido em /midia/site/,
@@ -94,6 +94,7 @@
           <button id="tab-elevadores" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="elevadores">Elevadores</button>
           <button id="tab-tv" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="tv">TVs indoor</button>
           <button id="tab-recepcoes" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="recepcoes">Recepções</button>
+          <button id="tab-outdoor" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="outdoor">Outdoor</button>
         </div>
       </div>
       <!--
@@ -105,7 +106,7 @@
           <div class="gallery-image foto-formato" id="foto-a"><img src="assets/fotos/shopping-corredor.webp" width="1400" height="876" alt="Totem da rede no corredor de um shopping, aplicação ilustrativa." loading="lazy"></div>
           <figcaption id="legenda-a">A tela no caminho de quem passa.</figcaption>
         </figure>
-        <figure>
+        <figure id="figura-b">
           <div class="gallery-image foto-formato" id="foto-b"><img src="assets/fotos/restaurante.webp" width="1400" height="933" alt="Totem da rede na entrada de um restaurante, aplicação ilustrativa." loading="lazy"></div>
           <figcaption id="legenda-b">Campanhas que fazem parte do ambiente.</figcaption>
         </figure>
@@ -161,7 +162,7 @@
     <section class="faq section-shell" aria-labelledby="faq-title">
       <h2 id="faq-title">Vamos tirar suas dúvidas?</h2>
       <div class="faq-list">
-        <details><summary>Quais formatos posso combinar?</summary><p>Shopping, elevadores, TVs indoor e recepções podem compor o planejamento. A seleção dos pontos depende da disponibilidade e dos objetivos da campanha.</p></details>
+        <details><summary>Quais formatos posso combinar?</summary><p>Shopping, elevadores, TVs indoor, recepções e painéis de rua podem compor o planejamento. A seleção dos pontos depende da disponibilidade e dos objetivos da campanha.</p></details>
         <details><summary>Preciso ter a arte pronta?</summary><p>Você pode partir de uma peça existente ou incluir a criação e a adaptação das peças no escopo da proposta comercial.</p></details>
         <details><summary>Como é definido o investimento?</summary><p>O valor depende dos pontos, dos formatos, do período e do escopo criativo. O briefing ajuda a reunir essas informações para a proposta.</p></details>
         <details><summary>Posso indicar meu espaço para receber telas?</summary><p>Sim. Use a opção “Quero receber telas” para preparar uma apresentação do local. A instalação e as condições dependem de avaliação.</p></details>
@@ -203,7 +204,7 @@
           <label>Objetivo<select name="objetivo" required><option value="">Selecione</option><option>Lançar um produto ou serviço</option><option>Divulgar uma oferta</option><option>Fortalecer a marca</option><option>Apresentar meu espaço</option><option>Outro objetivo</option></select></label>
           <label>Período desejado<select name="periodo"><option>A definir</option><option>Até 15 dias</option><option>De 15 a 30 dias</option><option>Mais de 30 dias</option></select></label>
         </div>
-        <fieldset class="format-options"><legend>Formatos de interesse</legend><label><input type="checkbox" name="formatos" value="Shopping">Shopping</label><label><input type="checkbox" name="formatos" value="Elevadores">Elevadores</label><label><input type="checkbox" name="formatos" value="TVs indoor">TVs indoor</label><label><input type="checkbox" name="formatos" value="Recepções e totens">Recepções e totens</label><label><input type="checkbox" name="formatos" value="Preciso de orientação">Preciso de orientação</label></fieldset>
+        <fieldset class="format-options"><legend>Formatos de interesse</legend><label><input type="checkbox" name="formatos" value="Shopping">Shopping</label><label><input type="checkbox" name="formatos" value="Elevadores">Elevadores</label><label><input type="checkbox" name="formatos" value="TVs indoor">TVs indoor</label><label><input type="checkbox" name="formatos" value="Recepções e totens">Recepções e totens</label><label><input type="checkbox" name="formatos" value="Outdoor digital">Outdoor digital</label><label><input type="checkbox" name="formatos" value="Preciso de orientação">Preciso de orientação</label></fieldset>
         <label>Conte um pouco mais <span class="optional">(opcional)</span><textarea name="detalhes" rows="3" maxlength="1500"></textarea></label>
         <p id="form-error" class="form-error" role="alert" hidden>Escolha pelo menos um formato ou a opção “Preciso de orientação”.</p>
         <button type="submit" class="prepare-brief">Enviar para a equipe</button>

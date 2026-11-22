@@ -122,6 +122,15 @@
         foto('academia.webp', 1400, 933, 'TV da rede com anúncio de bebida esportiva em uma academia, aplicação ilustrativa.', 'Na academia, entre uma série e outra.'),
       ],
     },
+    outdoor: {
+      name: 'Outdoor', checkbox: 'Outdoor digital', title: 'A avenida inteira vê.',
+      description: 'Painel digital de rua: alcance de massa para quem passa de carro, de moto ou a pé.',
+      locations: 'Avenidas e corredores de tráfego.',
+      content: 'Campanhas de marca, promoções e datas comemorativas.',
+      fotos: [
+        foto('outdoor.webp', 1400, 933, 'Painel digital da rede em uma avenida movimentada, aplicação ilustrativa.', 'Na avenida, no caminho de todo mundo.'),
+      ],
+    },
     recepcoes: {
       name: 'Recepções', checkbox: 'Recepções e totens', title: 'Receba bem. Comunique melhor.',
       description: 'Totens e telas que integram a campanha à experiência de visitantes e clientes.',
@@ -146,7 +155,10 @@
     $('#format-description').textContent = data.description;
     $('#format-locations').textContent = data.locations;
     $('#format-content').textContent = data.content;
-    // As duas fotos de cima são o que muda ao trocar de aba.
+    // As fotos de cima são o que muda ao trocar de aba. Formato com uma foto só ocupa a linha inteira.
+    const umaFoto = data.fotos.length < 2;
+    $('#figura-b').hidden = umaFoto;
+    $('.gallery-pair').classList.toggle('uma', umaFoto);
     [['#foto-a', '#legenda-a'], ['#foto-b', '#legenda-b']].forEach(([janela, legenda], i) => {
       const f = data.fotos[i];
       const quadro = $(janela);
