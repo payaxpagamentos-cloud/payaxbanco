@@ -597,7 +597,7 @@ function desenharFaixa() {
   const clima = estado.programacao?.grade?.clima ?? null;
   const texto = t?.aviso || t?.legenda || '';
   const relogio = Boolean(t?.relogio);
-  // O rodapé leva a marca da rede: aparece sempre que a tela tiver relógio, clima ou algum recado.
+  // O rodapé aparece só com recado, clima ou relógio — e sem a marca da rede: a tela é do anunciante.
   const mostrar = Boolean(texto || relogio || clima);
   $('faixa').hidden = !mostrar;
   document.body.classList.toggle('com-faixa', mostrar);

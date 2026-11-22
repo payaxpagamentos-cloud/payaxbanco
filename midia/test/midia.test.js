@@ -124,8 +124,7 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
     const publicidade = prog.dados.grade.itens.filter((i) => i.campanha_id);
     assert.equal(publicidade.length, 2, 'os dois criativos entram no loop');
     assert.equal(prog.dados.grade.vendido_s, 27, 'a publicidade ocupa os 27 segundos contratados');
-    assert.ok(prog.dados.grade.itens.some((i) => i.formato === 'marca'), 'a marca da rede completa o resto do loop');
-    assert.ok(prog.dados.grade.ocupacao > 0 && prog.dados.grade.ocupacao < 100);
+    assert.ok(!prog.dados.grade.itens.some((i) => i.formato === 'marca'), 'com anúncio no ar, a marca da rede não entra no meio');
     assert.equal(prog.dados.grade.campanhas[0].contratado_hora, 6);
     tv.versao = prog.dados.grade.versao;
   });
@@ -334,7 +333,7 @@ test('Vai Mídia — da instalação da TV ao faturamento', async (t) => {
 
     const prog = (await api.get(`/ponto/telas/${tela}/programacao`, tk)).dados;
     assert.equal(prog.itens.filter((i) => i.publicidade).length, 2);
-    assert.ok(prog.itens.some((i) => !i.publicidade), 'a marca da rede também aparece na lista');
+    assert.ok(prog.itens.every((i) => i.publicidade), 'com anúncio no ar, a lista é só de publicidade');
     assert.ok(!('anunciante' in prog.itens[0]), 'o lojista não vê de quem é cada anúncio');
 
     const versaoAntes = (await tv.programacao()).dados.grade.versao;

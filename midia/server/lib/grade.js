@@ -241,13 +241,11 @@ function montar(db, tela, instante = new Date()) {
       tempo += m.duracao_s;
     }
   }
-  // Sobrou espaço: entra a tela da própria rede, desenhada pelo player. Com anúncio no ar, ela aparece
-  // UMA vez por volta, como assinatura da rede — encher o loop com ela deixava, numa tela com poucos
-  // anúncios, "anúncio, marca, anúncio, marca", e quem olha acha que o anúncio não está passando.
-  // Sem nenhum anúncio, aí sim ela segura a tela inteira, para a TV nunca ficar preta.
-  if (cfg.marca_preenche) {
-    const vezes = slots.length ? 1 : 30;
-    for (let i = 0; tempo < minimo && i < vezes; i++) {
+  // A tela da própria rede só entra quando NÃO há anúncio: a tela é do cliente, e a marca no meio dos
+  // anúncios ("anúncio, Vai Mídia, anúncio, Vai Mídia") parecia defeito e tirava tempo de quem pagou.
+  // Sem nenhum anúncio, ela segura a tela inteira, para a TV nunca ficar preta.
+  if (cfg.marca_preenche && !slots.length) {
+    for (let i = 0; tempo < minimo && i < 30; i++) {
       preenchimento.push({ marca: { duracao_s: cfg.marca_duracao_s } });
       tempo += cfg.marca_duracao_s;
     }

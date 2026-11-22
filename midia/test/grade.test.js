@@ -202,7 +202,7 @@ test('limite de inserções por dia tira a campanha do ar quando bate a meta', (
   assert.equal(montar(c.db, c.daTela(t)).sem_conteudo, true, 'batido o teto do dia, sai da grade daquela TV');
 });
 
-test('a tela da marca completa o loop e segura a tela que ainda não tem campanha', () => {
+test('a tela da marca só segura a tela que ainda não tem campanha', () => {
   const c = cenario();
   const t = c.tela(c.ponto('Prédio novo', 'condominio_residencial', 'Campinas'), 'Elevador');
   gravarConfig(c.db, 'marca_preenche', 1);
@@ -220,9 +220,9 @@ test('a tela da marca completa o loop e segura a tela que ainda não tem campanh
   const g = montar(c.db, c.daTela(t));
   assert.equal(g.vendido_s, 15, 'a publicidade não perde espaço para a marca');
   assert.ok(g.itens.some((i) => i.campanha === 'Lançamento'));
-  // Com anúncio no ar, a marca assina a volta uma vez só — não fica "anúncio, marca, anúncio, marca".
-  assert.equal(g.itens.filter((i) => i.formato === 'marca').length, 1, 'a marca aparece uma vez por volta');
-  assert.equal(g.duracao_s, 25);
+  // Com anúncio no ar, a tela é do cliente: a marca da rede não entra no meio.
+  assert.ok(!g.itens.some((i) => i.formato === 'marca'), 'com anúncio no ar, a marca não aparece');
+  assert.equal(g.duracao_s, 15);
 
   gravarConfig(c.db, 'marca_preenche', 0);
   const semMarca = montar(c.db, c.daTela(t));
