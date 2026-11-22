@@ -70,6 +70,13 @@ module.exports = {
    */
   entrada: {
     dominios: String(process.env.MIDIA_EMAIL_DOMINIOS || '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
+    /*
+     * O nome próprio desta máquina como servidor de e-mail (ex.: mail.vaimidia.com.br). É ele que vai
+     * no registro MX do domínio, no DNS reverso do IP e na apresentação ao outro servidor — que
+     * desconfia de quem se apresenta com um nome que não existe no DNS.
+     * Sem definir, usa o primeiro domínio da lista.
+     */
+    nome: (process.env.MIDIA_EMAIL_NOME || '').trim().toLowerCase(),
     porta: Number(process.env.MIDIA_EMAIL_PORTA ?? 25),
     // Em que endereço ouvir. Vazio = todas as interfaces (é o normal para receber da internet).
     host: process.env.MIDIA_EMAIL_HOST || undefined,

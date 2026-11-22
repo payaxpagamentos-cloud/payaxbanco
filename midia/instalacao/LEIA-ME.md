@@ -29,13 +29,18 @@ Crie estes registros no painel do seu domínio. Sem eles o HTTPS não sai e o e-
 |---|---|---|
 | A | `vaimidia.com.br` | o IP do servidor |
 | A | `www.vaimidia.com.br` | o IP do servidor |
-| MX | `vaimidia.com.br` | `vaimidia.com.br`, prioridade 10 |
+| A | `mail.vaimidia.com.br` | o IP do servidor |
+| MX | `vaimidia.com.br` | `mail.vaimidia.com.br`, prioridade 10 |
 | TXT | `vaimidia.com.br` | `v=spf1 ip4:SEU.IP -all` |
 | TXT | `vaimidia._domainkey.vaimidia.com.br` | a chave DKIM que a instalação imprime no fim |
 | TXT | `_dmarc.vaimidia.com.br` | `v=DMARC1; p=none; rua=mailto:postmaster@vaimidia.com.br` |
 
-Duas coisas que **só o provedor da máquina resolve**: o **DNS reverso (PTR)** do IP apontando para o
-domínio, e a **porta 25 liberada na entrada** — quase toda nuvem bloqueia a 25 por padrão e abre a pedido.
+O MX não recebe endereço de IP: ele aponta para um **nome**, e esse nome precisa ter o registro A acima.
+Por isso o `mail.` existe — e é ele que vai também no DNS reverso. Se um dia o e-mail mudar de máquina,
+troca-se um registro só, sem mexer no site.
+
+Duas coisas que **só o provedor da máquina resolve**: o **DNS reverso (PTR)** do IP apontando para
+`mail.vaimidia.com.br`, e a **porta 25 liberada na entrada** — quase toda nuvem bloqueia a 25 por padrão e abre a pedido.
 
 ## Antes de instalar: conferir a máquina
 

@@ -81,8 +81,22 @@ fi
 # ------------------------------------------------------------------ e-mail no DNS
 titulo "Registros de e-mail no DNS"
 MX="$(consulta MX "$DOMINIO" | head -3)"
-if [[ -z "$MX" ]]; then vermelho "Sem registro MX: ninguém sabe para onde mandar e-mail deste domínio."
-else verde "MX: $(echo "$MX" | tr '\n' ' ')"; fi
+if [[ -z "$MX" ]]; then
+  vermelho "Sem registro MX: ninguém sabe para onde mandar e-mail deste domínio."
+else
+  verde "MX: $(echo "$MX" | tr '\n' ' ')"
+  # O MX aponta para um NOME, e esse nome precisa existir no DNS e levar a esta máquina.
+  ALVO_MX="$(echo "$MX" | head -1 | awk '{print $NF}' | sed 's/\.$//')"
+  IP_MX="$(consulta A "$ALVO_MX" | head -1)"
+  if [[ -z "$IP_MX" ]]; then
+    vermelho "O MX aponta para $ALVO_MX, que não tem endereço no DNS: o e-mail volta para quem mandou."
+    echo "       Crie um registro A de $ALVO_MX apontando para ${IP_PUBLICO:-o IP desta máquina}."
+  elif [[ "$IP_MX" == "$IP_PUBLICO" ]]; then
+    verde "$ALVO_MX leva a esta máquina ($IP_MX)."
+  else
+    amarelo "$ALVO_MX leva a $IP_MX, e esta máquina é $IP_PUBLICO. O e-mail vai cair em outro lugar."
+  fi
+fi
 
 SPF="$(consulta TXT "$DOMINIO" | grep -i 'v=spf1' | head -1)"
 if [[ -z "$SPF" ]]; then vermelho "Sem SPF."; else verde "SPF: $SPF"; fi

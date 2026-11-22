@@ -56,7 +56,7 @@ function criarContador() {
 
 function criarServidor(db, { aoReceber } = {}) {
   const contar = criarContador();
-  const nomeDoServidor = config.entrada.dominios[0] || os.hostname();
+  const nomeDoServidor = config.entrada.nome || config.entrada.dominios[0] || os.hostname();
 
   const servidor = net.createServer((socket) => {
     const ip = socket.remoteAddress ?? '';

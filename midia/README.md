@@ -383,10 +383,10 @@ Receber e-mail não é só ligar o programa. Para o mundo entregar mensagem aqui
 
 | | |
 |---|---|
-| **MX** | `vaimidia.com.br` → o endereço desta máquina, prioridade 10 |
-| **A** | o nome do servidor apontando para o IP fixo |
+| **A** | `mail.vaimidia.com.br` → o IP fixo da máquina |
+| **MX** | `vaimidia.com.br` → `mail.vaimidia.com.br`, prioridade 10 (o MX aponta para um nome, nunca para um IP) |
 | **Porta 25 aberta** | de entrada, liberada pelo provedor de hospedagem |
-| **DNS reverso (PTR)** | o IP respondendo com o nome do servidor |
+| **DNS reverso (PTR)** | o IP respondendo `mail.vaimidia.com.br` — o mesmo nome do MX |
 | **SPF** | `v=spf1 ip4:SEU.IP -all`, para o que sai |
 | **DKIM** | `MIDIA_DKIM_*` com a chave privada aqui e a pública no TXT `<seletor>._domainkey` |
 | **DMARC** | `v=DMARC1; p=none; rua=mailto:...`, para acompanhar |

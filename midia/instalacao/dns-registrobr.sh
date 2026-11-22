@@ -59,7 +59,8 @@ printf ' %-22s | %-5s | %s\n' "NOME (campo 1)" "TIPO" "DADOS (campo 3)"
 printf ' %-22s-+-%-5s-+-%s\n' "----------------------" "-----" "------------------------------------------"
 printf ' %-22s | %-5s | %s\n' "(deixe em branco)" "A" "$IP"
 printf ' %-22s | %-5s | %s\n' "www" "A" "$IP"
-printf ' %-22s | %-5s | %s\n' "(deixe em branco)" "MX" "10 $DOMINIO."
+printf ' %-22s | %-5s | %s\n' "mail" "A" "$IP"
+printf ' %-22s | %-5s | %s\n' "(deixe em branco)" "MX" "10 mail.$DOMINIO."
 printf ' %-22s | %-5s | %s\n' "(deixe em branco)" "TXT" "\"v=spf1 ip4:$IP -all\""
 if [[ -n "$DKIM_PUB" ]]; then
   printf ' %-22s | %-5s | %s\n' "${SELETOR}._domainkey" "TXT" "$(dkim_em_partes)"
@@ -75,7 +76,8 @@ echo
 zona() { printf '%-22s IN %-4s %s\n' "$1" "$2" "$3"; }
 zona "@" A "$IP"
 zona "www" A "$IP"
-zona "@" MX "10 $DOMINIO."
+zona "mail" A "$IP"
+zona "@" MX "10 mail.$DOMINIO."
 zona "@" TXT "\"v=spf1 ip4:$IP -all\""
 [[ -n "$DKIM_PUB" ]] && zona "${SELETOR}._domainkey" TXT "$(dkim_em_partes)"
 zona "_dmarc" TXT "\"v=DMARC1; p=none; rua=mailto:postmaster@$DOMINIO\""
@@ -85,8 +87,10 @@ cat <<TXT
  Três detalhes que fazem o Registro.br recusar a linha
 -------------------------------------------------------------------
 
- 1. O ponto final no MX. É "10 $DOMINIO." com ponto no fim — sem ele,
-    o Registro.br entende "$DOMINIO.$DOMINIO".
+ 1. O ponto final no MX. É "10 mail.$DOMINIO." com ponto no fim — sem ele,
+    o Registro.br entende "mail.$DOMINIO.$DOMINIO". E o nome do servidor
+    (mail.$DOMINIO) precisa do registro A acima: MX apontando para nome que
+    não existe no DNS faz o e-mail voltar para quem mandou.
 
  2. O DKIM vem em pedaços entre aspas, um ao lado do outro. Cole tudo,
     com as aspas, na mesma linha. Quem junta de volta é quem lê.
@@ -101,6 +105,7 @@ cat <<TXT
    ./conferir.sh --dominio $DOMINIO
 
  O que o Registro.br NÃO resolve: o nome reverso (PTR) do IP $IP.
- Esse é o provedor do servidor que configura, apontando para $DOMINIO.
+ Esse é o provedor do servidor que configura, apontando para mail.$DOMINIO
+ — o mesmo nome que está no MX.
 TXT
 echo

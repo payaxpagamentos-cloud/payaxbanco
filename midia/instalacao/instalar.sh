@@ -203,6 +203,8 @@ MIDIA_BACKUP_MANTER=30
 
 # Caixa de entrada do CRM: receber e-mail dos clientes neste domínio.
 $( [[ $COM_EMAIL -eq 1 ]] && echo "MIDIA_EMAIL_DOMINIOS=$DOMINIO" || echo "# MIDIA_EMAIL_DOMINIOS=$DOMINIO" )
+# Nome desta máquina como servidor de e-mail: é o que vai no MX e no DNS reverso do IP.
+MIDIA_EMAIL_NOME=mail.$DOMINIO
 MIDIA_EMAIL_PORTA=25
 MIDIA_EMAIL_PASTA=$DADOS/emails
 MIDIA_EMAIL_MAX_MB=10
@@ -335,12 +337,13 @@ cat <<TXT
 TXT
 if [[ $COM_EMAIL -eq 1 ]]; then
 cat <<TXT
-  MX      $DOMINIO                   ->  $DOMINIO   (prioridade 10)
+  A       mail.$DOMINIO              ->  $IP_PUBLICO
+  MX      $DOMINIO                   ->  mail.$DOMINIO   (prioridade 10)
   TXT     $DOMINIO                   ->  "v=spf1 ip4:$IP_PUBLICO -all"
   TXT     vaimidia._domainkey.$DOMINIO ->  "v=DKIM1; k=rsa; p=$DKIM_PUB"
   TXT     _dmarc.$DOMINIO            ->  "v=DMARC1; p=none; rua=mailto:postmaster@$DOMINIO"
 
-  E, no provedor da máquina: DNS reverso (PTR) do IP $IP_PUBLICO para $DOMINIO, e a porta 25
+  E, no provedor da máquina: DNS reverso (PTR) do IP $IP_PUBLICO para mail.$DOMINIO, e a porta 25
   liberada na entrada. Quase toda nuvem bloqueia a 25 por padrão e só abre a pedido.
 TXT
 fi
