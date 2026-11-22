@@ -317,7 +317,7 @@ titulo "Pronto"
 cat <<TXT
 
   Site .................. https://$DOMINIO
-  Painel da equipe ...... https://midia.$DOMINIO  (ou https://$DOMINIO/midia/)
+  Painel da equipe ...... https://$DOMINIO/p  (ou https://midia.$DOMINIO)
   Player das TVs ........ https://tv.$DOMINIO  (ou https://$DOMINIO/tv)
 
   Serviço ............... sudo systemctl status vaimidia

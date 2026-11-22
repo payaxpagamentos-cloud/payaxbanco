@@ -99,7 +99,7 @@ linha: o ponto final no MX, as aspas do DKIM e o campo *nome* ser relativo ao do
 
 ```
 Site .............. https://vaimidia.com.br
-Painel ............ https://midia.vaimidia.com.br   (ou https://vaimidia.com.br/midia/)
+Painel ............ https://vaimidia.com.br/p      (ou https://midia.vaimidia.com.br)
 Player das TVs .... https://tv.vaimidia.com.br   (ou https://vaimidia.com.br/tv)
 ```
 
