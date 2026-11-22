@@ -411,7 +411,7 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
    o cliente vê do produto, e a tela de entrada é a página mais aberta do sistema.
    ---------------------------------------------------------------- */
 .entrada{ position: relative; isolation: isolate; min-height: 100vh; min-height: 100dvh; display: flex; align-items: center;
-  justify-content: flex-end; padding: 82px clamp(24px, 6vw, 112px) 76px; color: var(--text); }
+  justify-content: flex-end; padding: clamp(32px, 5vh, 70px) clamp(24px, 6vw, 112px); color: var(--text); }
 /* A fotografia e o véu que garante contraste do texto branco em cima dela. */
 .entrada::before{ content: ""; position: fixed; inset: 0; z-index: -3; background: #cbd4d9 url("../img/entrada.webp") center/cover no-repeat; }
 .entrada::after{ content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
@@ -423,7 +423,7 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 2; }
 .entrada .voltar-site:hover{ background: rgba(13, 26, 33, .6); }
 
-.entrada .cartao{ width: 440px; max-width: 100%; padding: 36px 38px 30px; border-radius: 27px;
+.entrada .cartao{ width: 440px; max-width: 100%; padding: 30px 34px 26px; border-radius: 27px;
   border: 1.5px solid rgba(255, 255, 255, .92); background: rgba(250, 251, 252, .79); color: #14242B;
   box-shadow: 0 20px 65px rgba(16, 28, 36, .15), inset 0 1px 0 rgba(255, 255, 255, .75);
   -webkit-backdrop-filter: blur(24px) saturate(115%); backdrop-filter: blur(24px) saturate(115%); }
@@ -431,10 +431,10 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .entrada .marca{ display: flex; justify-content: center; }
 .entrada .marca .simbolo, .entrada .marca .simbolo svg{ width: 40px; height: 40px; }
 .entrada .marca .texto strong{ font-size: 1.65rem; letter-spacing: -.065em; }
-.entrada h1{ font-size: 2.25rem; font-weight: 800; letter-spacing: -.055em; line-height: 1.15; margin: 28px 0 7px; text-align: center; }
-.entrada .abertura{ font-size: 1rem; color: #4D575D; margin: 0 0 26px; text-align: center; }
+.entrada h1{ font-size: clamp(1.9rem, 3.4vh, 2.25rem); font-weight: 800; letter-spacing: -.055em; line-height: 1.15; margin: 20px 0 6px; text-align: center; }
+.entrada .abertura{ font-size: 1rem; color: #4D575D; margin: 0 0 20px; text-align: center; }
 
-.entrada .form{ gap: 18px; }
+.entrada .form{ gap: 15px; }
 .entrada label.campo{ font-size: 13.5px; font-weight: 700; color: #14242B; gap: 7px; }
 .entrada input:not([type="checkbox"]){ height: 48px; min-height: 48px; padding: 12px 15px; font-size: 1rem;
   border: 1px solid rgba(91, 104, 117, .38); border-radius: 10px; background: rgba(255, 255, 255, .64); color: #14242B; }
@@ -461,7 +461,7 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .entrada .btn.primario{ width: 100%; min-height: 49px; font-size: 1rem; background: #14242B; color: #fff; border-color: #14242B; }
 .entrada .btn.primario:hover{ background: #253E48; }
 
-.entrada .ir-player{ border-top: 1px solid rgba(100, 113, 123, .18); margin-top: 26px; padding-top: 22px; text-align: center; }
+.entrada .ir-player{ border-top: 1px solid rgba(100, 113, 123, .18); margin-top: 20px; padding-top: 18px; text-align: center; }
 .entrada .ir-player a{ font-size: .96rem; font-weight: 700; color: #14242B; text-decoration: none; display: inline-block;
   border-bottom: 3px solid var(--cor); padding-bottom: 2px; }
 .entrada .ir-player a:hover{ border-color: #879F19; }
@@ -491,13 +491,23 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .entrada .assinatura{ display: none; }
   .entrada .voltar-site{ font-size: 12.5px; }
 }
-/* Tela baixa (notebook): o cartão sobe para o botão não ficar escondido. */
-@media (max-height: 740px) and (min-width: 861px){
-  .entrada{ align-items: flex-start; padding-top: 72px; padding-bottom: 32px; }
-  .entrada .cartao{ padding: 26px 32px 24px; }
-  .entrada h1{ font-size: 2rem; margin-top: 22px; }
-  .entrada .ir-player{ margin-top: 20px; padding-top: 17px; }
+/* Notebook de tela baixa: tudo encolhe um pouco para o cartão caber sem barra de rolagem. */
+@media (max-height: 760px) and (min-width: 861px){
+  .entrada{ padding-block: 24px; }
+  .entrada .cartao{ padding: 22px 30px 20px; }
+  .entrada .marca .simbolo, .entrada .marca .simbolo svg{ width: 34px; height: 34px; }
+  .entrada .marca .texto strong{ font-size: 1.45rem; }
+  .entrada h1{ font-size: 1.8rem; margin: 14px 0 4px; }
+  .entrada .abertura{ font-size: .95rem; margin-bottom: 14px; }
+  .entrada .form{ gap: 12px; }
+  .entrada input:not([type="checkbox"]){ height: 44px; min-height: 44px; }
+  .entrada .ver-senha{ height: 36px; }
+  .entrada .btn.primario{ min-height: 45px; }
+  .entrada .ir-player{ margin-top: 14px; padding-top: 12px; }
+  .entrada .ir-player p{ display: none; }
+  .entrada .assinatura{ bottom: 20px; font-size: 1.15rem; max-width: 42%; }
 }
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))){
   .entrada .cartao{ background: rgba(249, 250, 251, .96); }
 }

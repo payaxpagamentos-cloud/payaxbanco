@@ -90,7 +90,7 @@
    * ela abre o bloco do formato e não fica competindo com o par.
    * O recorte (x, y, largura, altura) é sobre o arquivo original, feito no navegador.
    */
-  const foto = (arquivo, largura, altura, crop, alt, legenda) => ({ src: 'assets/fotos/' + arquivo, w: largura, h: altura, crop, alt, legenda });
+  const foto = (arquivo, largura, altura, alt, legenda) => ({ src: 'assets/fotos/' + arquivo, w: largura, h: altura, alt, legenda });
   const formats = {
     shopping: {
       name: 'Shopping', checkbox: 'Shopping', title: 'Sua marca no caminho das pessoas.',
@@ -98,8 +98,8 @@
       locations: 'Corredores, entradas e áreas de circulação.',
       content: 'Lançamentos, ofertas e campanhas institucionais.',
       fotos: [
-        foto('shopping-corredor.webp', 1400, 876, '150,60,1250,641', 'Totem da rede no corredor de um shopping, aplicação ilustrativa.', 'A tela no caminho de quem passa.'),
-        foto('restaurante.webp', 1400, 933, '380,160,1020,523', 'Totem da rede na entrada de um restaurante de shopping, aplicação ilustrativa.', 'Na praça de alimentação, na hora da escolha.'),
+        foto('shopping-corredor.webp', 1400, 876, 'Totem da rede no corredor de um shopping, aplicação ilustrativa.', 'A tela no caminho de quem passa.'),
+        foto('restaurante.webp', 1400, 933, 'Totem da rede na entrada de um restaurante de shopping, aplicação ilustrativa.', 'Na praça de alimentação, na hora da escolha.'),
       ],
     },
     elevadores: {
@@ -108,8 +108,8 @@
       locations: 'Prédios residenciais e edifícios comerciais.',
       content: 'Campanhas, serviços locais e comunicação do condomínio.',
       fotos: [
-        foto('elevador-hall.webp', 1400, 933, '480,80,920,472', 'Tela da rede no hall dos elevadores de um edifício, aplicação ilustrativa.', 'Espera de elevador é tempo de atenção.'),
-        foto('lobby.webp', 1400, 933, '430,60,970,497', 'Totem da rede no lobby de um edifício corporativo, aplicação ilustrativa.', 'Do lobby ao andar, a marca acompanha.'),
+        foto('elevador-hall.webp', 1400, 933, 'Tela da rede no hall dos elevadores de um edifício, aplicação ilustrativa.', 'Espera de elevador é tempo de atenção.'),
+        foto('lobby.webp', 1400, 933, 'Totem da rede no lobby de um edifício corporativo, aplicação ilustrativa.', 'Do lobby ao andar, a marca acompanha.'),
       ],
     },
     tv: {
@@ -118,8 +118,8 @@
       locations: 'Restaurantes, cafés, academias, farmácias e salas de espera.',
       content: 'Ofertas, vídeos curtos e comunicação institucional.',
       fotos: [
-        foto('restaurante-tv.webp', 1400, 933, '420,60,980,503', 'TV da rede com anúncio de restaurante acima do balcão, aplicação ilustrativa.', 'No restaurante, na hora de escolher o prato.'),
-        foto('academia.webp', 1400, 933, '140,90,1260,646', 'TV da rede com anúncio de bebida esportiva em uma academia, aplicação ilustrativa.', 'Na academia, entre uma série e outra.'),
+        foto('restaurante-tv.webp', 1400, 933, 'TV da rede com anúncio de restaurante acima do balcão, aplicação ilustrativa.', 'No restaurante, na hora de escolher o prato.'),
+        foto('academia.webp', 1400, 933, 'TV da rede com anúncio de bebida esportiva em uma academia, aplicação ilustrativa.', 'Na academia, entre uma série e outra.'),
       ],
     },
     recepcoes: {
@@ -128,8 +128,8 @@
       locations: 'Clínicas, hotéis, escritórios e áreas comuns.',
       content: 'Campanhas de marca, serviços e informações do espaço.',
       fotos: [
-        foto('clinica.webp', 1400, 933, '500,170,900,462', 'Tela da rede na recepção de uma clínica, aplicação ilustrativa.', 'Na sala de espera, com tempo para ler.'),
-        foto('restaurante.webp', 1400, 933, '380,160,1020,523', 'Totem da rede na recepção de um restaurante, aplicação ilustrativa.', 'Na entrada, antes de sentar à mesa.'),
+        foto('clinica.webp', 1400, 933, 'Tela da rede na recepção de uma clínica, aplicação ilustrativa.', 'Na sala de espera, com tempo para ler.'),
+        foto('restaurante.webp', 1400, 933, 'Totem da rede na recepção de um restaurante, aplicação ilustrativa.', 'Na entrada, antes de sentar à mesa.'),
       ],
     },
   };
@@ -158,9 +158,7 @@
         img.setAttribute('height', f.h);
       }
       img.alt = f.alt;
-      quadro.dataset.crop = f.crop;
       $(legenda).textContent = f.legenda;
-      framePhoto(quadro);
     });
   }
   tabs.forEach((tab, index) => {
