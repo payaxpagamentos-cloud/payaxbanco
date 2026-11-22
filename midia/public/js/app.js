@@ -175,6 +175,9 @@ function ferramentas(u) {
   };
   const menu = el('div', { class: 'menu-usuario oculto' },
     el('div', { class: 'quem' }, el('strong', {}, u.nome), el('div', { class: 'pequeno mudo' }, u.email), el('div', { class: 'pequeno mudo' }, PERFIS[u.perfil])),
+    // No celular os botões de tema saem do topo (não cabem ao lado do título) e ficam aqui.
+    el('button', { class: 'so-celular', onclick: () => { menu.classList.add('oculto'); trocar(document.documentElement.dataset.tema === 'escuro' ? 'claro' : 'escuro'); } },
+      tema === 'escuro' ? 'Usar tema claro' : 'Usar tema escuro'),
     el('button', { onclick: () => { menu.classList.add('oculto'); alterarSenha(); } }, 'Alterar senha'),
     el('button', { onclick: () => { sessao.limpar(); location.hash = ''; desenhar(); } }, 'Sair'));
   const status = el('span', { class: 'status-sistema', title: 'Conexão com o servidor' }, 'Sistema Online');

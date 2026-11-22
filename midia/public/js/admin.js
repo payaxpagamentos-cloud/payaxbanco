@@ -190,7 +190,7 @@ export async function configuracoes(ctx) {
   } else {
     corpo = el('div', { class: 'coluna' }, await cartaoAtualizacao(ctx), await cartaoBackup());
   }
-  limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'max-width:860px' },
+  limpar(ctx.conteudo, el('div', { class: 'coluna' },
     abas(ABAS_CONFIG, aba, 'configuracoes'),
     el('p', { class: 'pequeno mudo', style: 'margin:0' },
       aba === 'empresa' ? 'Os dados da empresa: marca, PIX e nota fiscal das faturas, WhatsApp e avisos.'
@@ -202,7 +202,7 @@ export async function configuracoes(ctx) {
 /** CRM › Produtos: a tabela de preços que a proposta e o faturamento usam. */
 export async function produtos(ctx) {
   const c = await api.get('/painel/configuracoes');
-  limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'max-width:860px' },
+  limpar(ctx.conteudo, el('div', { class: 'coluna' },
     el('div', { class: 'cartao grande' }, formConfig([
     el('fieldset', {}, el('legend', {}, 'Preços de tabela e faturamento'),
       el('div', { class: 'tres' },
