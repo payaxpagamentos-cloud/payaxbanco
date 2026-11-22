@@ -238,7 +238,14 @@ module.exports = (db) => {
    * A conversa por e-mail fica aqui dentro, ligada ao lead. O que entra vem pelo servidor de e-mail da
    * plataforma (lib/smtp-servidor.js); o que sai vai pelo servidor de envio configurado.
    */
-  r.get('/crm/emails', (req, res) => res.json(caixa.listar(db, { ...req.query, _empresa: empresas.empresaDe(req) })));
+  r.get('/crm/emails', (req, res) => res.json(caixa.listar(db, {
+    ...req.query, _empresa: empresas.empresaDe(req), _usuario: req.usuario.id,
+    _operador: req.usuario.perfil === 'operador' ? req.usuario.id : null,
+  })));
+
+  // E-mail de endereço pessoal de outra pessoa: o operador não abre.
+  r.use('/crm/emails/:id', (req, _res, next) => (caixa.podeVer(db, Number(req.params.id), req.usuario)
+    ? next() : next(new ErroNegocio('Esta mensagem é da caixa de outra pessoa.', 403))));
 
   r.get('/crm/emails/:id', (req, res) => {
     const e = caixa.ler(db, Number(req.params.id));
@@ -293,6 +300,7 @@ module.exports = (db) => {
       lead_id: req.body.lead_id ?? null,
       usuarioId: req.usuario.id,
       empresa_id: empresas.empresaParaGravar(db, req),
+      remetente: db.prepare('SELECT id, endereco, COALESCE(nome, ?) AS nome FROM enderecos_email WHERE usuario_id = ? AND ativo = 1 ORDER BY id LIMIT 1').get(req.usuario.nome, req.usuario.id) ?? null,
     });
     registrar(db, req, 'email_enviado', { id: e.id, para: e.para, assunto: e.assunto });
     res.status(201).json(e);

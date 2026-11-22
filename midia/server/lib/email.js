@@ -117,7 +117,7 @@ async function enviar({ para, assunto, texto, ...conteudo }, { exigir = false } 
  * Vai como texto e também em HTML no padrão da marca; os identificadores de resposta mantêm a conversa
  * amarrada, então no programa de quem recebe a resposta aparece embaixo da mensagem original.
  */
-async function enviarDireto({ para, assunto, texto, emRespostaA = null, referencias = [] }) {
+async function enviarDireto({ para, assunto, texto, emRespostaA = null, referencias = [], de = null }) {
   if (!configurado()) return { enviado: false, motivo: 'o envio de e-mails não está configurado (MIDIA_SMTP_HOST)' };
   const corpo = String(texto ?? '').trim();
   const html = modelo({
@@ -127,8 +127,9 @@ async function enviarDireto({ para, assunto, texto, emRespostaA = null, referenc
     rodape: 'Pode responder a este e-mail: a resposta chega direto na nossa equipe.',
   });
   try {
+    const origem = de ? { name: de.nome || 'Vai Mídia', address: de.endereco } : config.smtp.remetente;
     const info = await obterTransporte().sendMail({
-      from: config.smtp.remetente,
+      from: origem,
       to: para,
       subject: assunto,
       text: corpo,
@@ -137,7 +138,7 @@ async function enviarDireto({ para, assunto, texto, emRespostaA = null, referenc
       references: referencias.length ? referencias.map((r) => `<${r}>`).join(' ') : undefined,
     });
     if (config.smtp.modo === 'teste') caixaTeste.push({ para: [para], assunto, html, texto: corpo, info });
-    const remetente = /<([^>]+)>/.exec(config.smtp.remetente)?.[1] ?? config.smtp.remetente;
+    const remetente = de?.endereco ?? /<([^>]+)>/.exec(config.smtp.remetente)?.[1] ?? config.smtp.remetente;
     return { enviado: true, de: remetente, message_id: String(info.messageId ?? '').replace(/^<|>$/g, '') || null };
   } catch (err) {
     console.error('[Vai Mídia] Falha ao enviar e-mail:', err.message);

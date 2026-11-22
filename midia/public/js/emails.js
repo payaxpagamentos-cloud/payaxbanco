@@ -15,7 +15,7 @@ import {
 } from './ui.js';
 import { cartao, indicador, tabela, vazio } from './comum.js';
 
-const CAIXAS = { entrada: 'Caixa de entrada', nao_lidos: 'Não lidos', enviados: 'Enviados', arquivados: 'Arquivados' };
+const CAIXAS = { entrada: 'Caixa de entrada', meus: 'Meus e-mails', nao_lidos: 'Não lidos', enviados: 'Enviados', arquivados: 'Arquivados' };
 const TIPOS_LEAD = { anunciante: 'Quer anunciar', ponto: 'Quer tela no espaço dele' };
 const tamanho = (b) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round((b ?? 0) / 1024))} kB`);
 const quem = (e) => (e.de_nome ? `${e.de_nome} <${e.de}>` : e.de);

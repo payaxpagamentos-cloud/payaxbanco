@@ -55,8 +55,69 @@ export async function usuarios(ctx) {
     el('div', { class: 'linha entre', style: 'margin-bottom:16px' },
       el('p', { class: 'mudo', style: 'margin:0' }, 'Equipe (master, administrador e operador) e os acessos dos portais do anunciante e do lojista.'),
       el('button', { class: 'btn primario', onclick: () => novoUsuario(opcoes, pintar, ctx.master) }, icone('mais'), 'Novo usuário')),
-    corpo);
+    corpo, await cartaoEnderecos(ctx));
   await pintar();
+}
+
+/**
+ * E-mails da empresa (robson@, comercial@…) e de quem é cada um. O que chega para o endereço de uma
+ * pessoa aparece para ela em CRM › E-mails › Meus e-mails, e o que ela escreve sai com esse endereço.
+ */
+async function cartaoEnderecos(ctx) {
+  const corpo = el('div', {});
+  let dados = { itens: [], dominios: [] };
+  let equipe = {};
+
+  const formulario = (atual) => formModal(atual ? `E-mail ${atual.endereco}` : 'Novo e-mail', () => [
+    atual ? null : el('div', { style: 'display:flex;gap:8px;align-items:flex-end' },
+      el('div', { style: 'flex:1;min-width:0' }, campo('Endereço', { name: 'local', required: true, maxlength: 40, placeholder: 'robson', autocapitalize: 'none', autocomplete: 'off' })),
+      dados.dominios.length > 1
+        ? escolha('', 'dominio', Object.fromEntries(dados.dominios.map((d) => [d, `@${d}`])), dados.dominios[0])
+        : el('strong', { style: 'padding-bottom:12px' }, `@${dados.dominios[0]}`)),
+    campo('Nome que aparece para quem recebe', { name: 'nome', maxlength: 120, placeholder: 'Robson — Vai Mídia', value: atual?.nome ?? '' }),
+    escolha('De quem é este e-mail', 'usuario_id', { '': 'De ninguém (caixa geral, todos veem)', ...equipe }, atual?.usuario_id ?? ''),
+    atual ? null : el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Não precisa de senha: a pessoa lê e responde dentro do sistema, em CRM › E-mails.'),
+  ], async (d) => {
+    const corpoReq = { nome: d.nome, usuario_id: d.usuario_id || null };
+    if (atual) await api.patch(`/painel/enderecos-email/${atual.id}`, corpoReq);
+    else await api.post('/painel/enderecos-email', { ...corpoReq, local: d.local, dominio: d.dominio });
+    toast(atual ? 'E-mail alterado.' : 'E-mail criado.');
+    pintar();
+  }, { rotulo: atual ? 'Salvar' : 'Criar e-mail' });
+
+  const pintar = async () => {
+    const [d, us] = await Promise.all([api.get('/painel/enderecos-email'), api.get('/painel/usuarios')]);
+    dados = d;
+    equipe = Object.fromEntries(us.itens.filter((u) => u.ativo && ['master', 'administrador', 'operador'].includes(u.perfil)).map((u) => [u.id, u.nome]));
+    limpar(corpo,
+      el('div', { class: 'linha entre', style: 'margin:24px 0 16px' },
+        el('div', {}, el('h2', { style: 'margin:0' }, 'E-mails'),
+          el('p', { class: 'mudo', style: 'margin:4px 0 0' }, 'Endereços da empresa e de quem é cada um.')),
+        d.dominios.length ? el('button', { class: 'btn primario', onclick: () => formulario(null) }, icone('mais'), 'Novo e-mail') : null),
+      !d.dominios.length
+        ? el('p', { class: 'aviso' }, 'O servidor de e-mail ainda não está ligado neste sistema, então não dá para criar endereços.')
+        : el('div', { class: 'cartao' }, tabela([
+          [(e) => el('div', {}, el('div', {}, e.endereco), e.nome ? el('div', { class: 'pequeno mudo' }, e.nome) : null), 'E-mail'],
+          [(e) => e.usuario ?? 'Caixa geral', 'De quem é'],
+          ctx.master && listaDeEmpresas().length > 1 ? [(e) => e.empresa ?? '—', 'Empresa'] : null,
+          [(e) => inteiro(e.recebidos), 'Recebidos', 'num dir'],
+          [(e) => (e.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Parado', 'erro')), 'Situação'],
+          [(e) => el('div', { class: 'acoes' },
+            el('button', { class: 'btn pequeno', onclick: () => formulario(e) }, icone('editar'), 'Editar'),
+            el('button', { class: 'btn pequeno', onclick: (ev) => acao(ev.target, async () => {
+              await api.patch(`/painel/enderecos-email/${e.id}`, { ativo: !e.ativo });
+              pintar();
+            }) }, e.ativo ? 'Parar' : 'Ativar'),
+            el('button', { class: 'btn pequeno perigo', onclick: (ev) => acao(ev.target, async () => {
+              if (!await confirmar('Excluir este e-mail?', `${e.endereco} deixa de existir. As mensagens já recebidas continuam na caixa geral.`, 'Excluir')) return;
+              await api.del(`/painel/enderecos-email/${e.id}`);
+              toast('E-mail excluído.');
+              pintar();
+            }) }, 'Excluir')), '', 'acoes'],
+        ].filter(Boolean), d.itens, { vazioTexto: 'Nenhum e-mail criado ainda.' })));
+  };
+  await pintar();
+  return corpo;
 }
 
 /** Empresas que usam o sistema (só o master): cada uma enxerga só os próprios dados. */

@@ -457,11 +457,23 @@ CREATE TABLE IF NOT EXISTS emails (
   lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL,
   anunciante_id INTEGER REFERENCES anunciantes(id) ON DELETE SET NULL,
   local_id INTEGER REFERENCES locais(id) ON DELETE SET NULL,
+  endereco_id INTEGER,
   lido_em TEXT,
   arquivado_em TEXT,
   ip TEXT,
   criado_por INTEGER REFERENCES usuarios(id),
   recebido_em TEXT NOT NULL,
+  criado_em TEXT NOT NULL
+);
+-- Endereços de e-mail da empresa (comercial@, robson@…). Cada um pode ser de uma pessoa da equipe:
+-- o que chega para ele aparece para ela, e o que ela escreve sai com esse endereço.
+CREATE TABLE IF NOT EXISTS enderecos_email (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER REFERENCES empresas(id),
+  endereco TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  nome TEXT,
+  usuario_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_emails_caixa ON emails (arquivado_em, recebido_em);
@@ -745,6 +757,7 @@ function abrir(arquivo = config.dbFile) {
 
 /** Colunas que entraram depois da primeira versão (bancos antigos recebem cada uma por ALTER TABLE). */
 const COLUNAS_NOVAS = [
+  ['emails', 'endereco_id', 'INTEGER'],
   ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'bloqueado_ate', 'TEXT'],

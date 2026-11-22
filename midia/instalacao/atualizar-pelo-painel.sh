@@ -76,6 +76,13 @@ if [[ -z "$NOVO" ]] || ! grep -q '"name": "payax-midia"' "$NOVO/package.json"; t
   estado falhou "Este zip não é o pacote do sistema (vaimidia.zip). Nada foi mudado."; limpar; exit 1
 fi
 
+# Só entra pacote assinado por nós. A chave pública usada é a que JÁ ESTÁ no servidor, nunca a do pacote.
+CHAVE_PUB="/etc/vaimidia/assinatura-publica.pem"
+[[ -f "$CHAVE_PUB" ]] || CHAVE_PUB="$DESTINO/instalacao/assinatura-publica.pem"
+if ! node "$DESTINO/instalacao/conferir-assinatura.js" "$NOVO" "$CHAVE_PUB"; then
+  estado falhou "Este pacote não tem a assinatura do Vai Mídia. Nada foi mudado."; limpar; exit 1
+fi
+
 estado guardando "Guardando uma cópia da versão que está no ar"
 rm -rf "$ANTERIOR"
 cp -a "$DESTINO" "$ANTERIOR"

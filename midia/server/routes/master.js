@@ -20,6 +20,7 @@ const EMPRESA_DE = {
   leads: 'SELECT empresa_id FROM leads WHERE id = ?',
   propostas: 'SELECT empresa_id FROM propostas WHERE id = ?',
   emails: 'SELECT empresa_id FROM emails WHERE id = ?',
+  enderecos_email: 'SELECT empresa_id FROM enderecos_email WHERE id = ?',
   contratos: 'SELECT a.empresa_id FROM contratos c JOIN anunciantes a ON a.id = c.anunciante_id WHERE c.id = ?',
   faturas: 'SELECT a.empresa_id FROM faturas f JOIN anunciantes a ON a.id = f.anunciante_id WHERE f.id = ?',
   repasses: 'SELECT l.empresa_id FROM repasses r JOIN locais l ON l.id = r.local_id WHERE r.id = ?',
@@ -37,6 +38,7 @@ const ROTAS = [
   [/^\/midias\/(\d+)/, 'midias'], [/^\/crm\/leads\/(\d+)/, 'leads'], [/^\/propostas\/(\d+)/, 'propostas'],
   [/^\/crm\/emails\/(\d+)/, 'emails'], [/^\/contratos\/(\d+)/, 'contratos'], [/^\/faturas\/(\d+)/, 'faturas'],
   [/^\/repasses\/(\d+)/, 'repasses'], [/^\/despesas\/(\d+)/, 'despesas'], [/^\/usuarios\/(\d+)/, 'usuarios'],
+  [/^\/enderecos-email\/(\d+)/, 'enderecos_email'],
 ];
 
 // Campos do corpo (ou da URL) que apontam para outra coisa: também precisam ser da mesma empresa.

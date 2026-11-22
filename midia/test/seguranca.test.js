@@ -105,3 +105,51 @@ test('Segurança: verificação em duas etapas', async (t) => {
   assert.equal((await api.post('/auth/duas-etapas/desligar', { senha: 'master123' }, master)).status, 204);
   assert.ok((await entrar({})).dados.token);
 });
+
+/** E-mails da empresa ligados a pessoas: o que chega para o endereço de alguém é dele; e ele escreve com esse endereço. */
+test('E-mails por usuário: criar, associar, receber e enviar', async (t) => {
+  const config = require('../server/config');
+  const caixa = require('../server/lib/caixa');
+  const antes = config.entrada.dominios;
+  config.entrada.dominios = ['vaimidia.com.br'];
+  const { iniciar, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+  t.after(() => { api.fechar(); limparArquivos(); config.entrada.dominios = antes; });
+  const master = await api.login();
+  const ana = (await api.post('/painel/usuarios', { nome: 'Ana', email: 'ana@x.com.br', senha: 'senha-da-ana', perfil: 'operador' }, master)).dados.id;
+  await api.post('/painel/usuarios', { nome: 'Beto', email: 'beto@x.com.br', senha: 'senha-do-beto', perfil: 'operador' }, master);
+  const tkAna = await api.login('ana@x.com.br', 'senha-da-ana');
+  const tkBeto = await api.login('beto@x.com.br', 'senha-do-beto');
+
+  assert.equal((await api.post('/painel/enderecos-email', { local: 'ana' }, tkAna)).status, 403, 'operador não cria e-mail');
+  assert.equal((await api.post('/painel/enderecos-email', { local: 'a b', usuario_id: ana }, master)).status, 422);
+  assert.equal((await api.post('/painel/enderecos-email', { local: 'ana', dominio: 'outro.com' }, master)).status, 422);
+  const criado = await api.post('/painel/enderecos-email', { local: 'Ana', nome: 'Ana — Vai Mídia', usuario_id: ana }, master);
+  assert.equal(criado.status, 201);
+  assert.equal(criado.dados.endereco, 'ana@vaimidia.com.br');
+  assert.equal((await api.post('/painel/enderecos-email', { local: 'ana' }, master)).status, 409, 'não repete');
+  await api.post('/painel/enderecos-email', { local: 'comercial' }, master);
+
+  const msg = (para) => Buffer.from(`From: Cliente <cliente@fora.com>\r\nTo: ${para}\r\nSubject: Oi ${para}\r\nMessage-ID: <${para}@fora.com>\r\n\r\nQuero anunciar.\r\n`);
+  const daAna = caixa.receber(api.db, { bruto: msg('ana@vaimidia.com.br'), de: 'cliente@fora.com', para: ['ana@vaimidia.com.br'] });
+  const geral = caixa.receber(api.db, { bruto: msg('comercial@vaimidia.com.br'), de: 'cliente@fora.com', para: ['comercial@vaimidia.com.br'] });
+
+  const assuntos = async (tk, q = '') => (await api.get(`/painel/crm/emails${q}`, tk)).dados.itens.map((e) => e.id).sort();
+  assert.deepEqual(await assuntos(tkAna), [daAna.id, geral.id].sort());
+  assert.deepEqual(await assuntos(tkAna, '?caixa=meus'), [daAna.id]);
+  assert.deepEqual(await assuntos(tkBeto), [geral.id], 'o Beto não vê a caixa da Ana');
+  assert.equal((await api.get(`/painel/crm/emails/${daAna.id}`, tkBeto)).status, 403);
+  assert.equal((await api.get(`/painel/crm/emails/${daAna.id}`, master)).status, 200, 'o master vê tudo');
+
+  // A Ana responde: sai com o endereço dela.
+  const resposta = await api.post('/painel/crm/emails', { para: 'cliente@fora.com', texto: 'Olá!', responder_a: daAna.id }, tkAna);
+  assert.equal(resposta.status, 201);
+  assert.equal(resposta.dados.de, 'ana@vaimidia.com.br');
+  // O Beto não tem endereço: sai com o geral do sistema.
+  const doBeto = await api.post('/painel/crm/emails', { para: 'cliente@fora.com', assunto: 'Oi', texto: 'Olá!' }, tkBeto);
+  assert.notEqual(doBeto.dados.de, 'ana@vaimidia.com.br');
+
+  // Excluir o endereço não apaga as mensagens.
+  assert.equal((await api.del(`/painel/enderecos-email/${criado.dados.id}`, undefined, master)).status, 204);
+  assert.deepEqual(await assuntos(tkBeto), [daAna.id, geral.id].sort());
+});

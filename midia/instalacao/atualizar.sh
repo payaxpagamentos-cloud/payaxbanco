@@ -60,6 +60,8 @@ install -d -o vaimidia -g vaimidia -m 750 "$DADOS/atualizacao"
 chmod +x "$DESTINO"/instalacao/*.sh
 install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.path" /etc/systemd/system/vaimidia-atualizar.path
 install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.service" /etc/systemd/system/vaimidia-atualizar.service
+# Chave que confere a assinatura dos próximos pacotes: fica em /etc, onde só o root escreve.
+[[ -f "$RAIZ/instalacao/assinatura-publica.pem" ]] && install -m 644 -o root -g root "$RAIZ/instalacao/assinatura-publica.pem" /etc/vaimidia/assinatura-publica.pem
 # Comandos pelo painel: o painel pede pelo nome um comando da lista; o serviço vaimidia-comando (root) roda.
 install -d -o vaimidia -g vaimidia -m 750 "$DADOS/comandos"
 install -m 644 "$RAIZ/instalacao/vaimidia-comando.path" /etc/systemd/system/vaimidia-comando.path

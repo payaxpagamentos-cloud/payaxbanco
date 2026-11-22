@@ -3,7 +3,7 @@
 const { Router } = require('express');
 const QRCode = require('qrcode');
 const { agora, transacao, lerConfig, gravarConfig, CONFIG_PADRAO, TEXTO } = require('../db');
-const { permitir } = require('../auth');
+const { permitir, EQUIPE } = require('../auth');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { hashSenha, verificarSenha } = require('../lib/senha');
@@ -435,6 +435,80 @@ module.exports = (db) => {
   });
 
   // ----------------------------------------------------------------- Backup
+  /**
+   * Endereços de e-mail da empresa. Criar um endereço aqui não cria senha nem caixa em outro lugar: o
+   * que chega para ele entra na caixa do CRM, e ele pode ser ligado a uma pessoa da equipe.
+   */
+  const dominiosEmail = () => require('../config').entrada.dominios;
+  const lerEndereco = (req, atual) => {
+    const d = {};
+    if (!atual) {
+      const local = String(req.body.local ?? '').trim().toLowerCase();
+      const dominio = String(req.body.dominio ?? dominiosEmail()[0] ?? '').trim().toLowerCase();
+      if (!dominiosEmail().length) throw new ErroNegocio('O servidor de e-mail ainda não tem domínio configurado (MIDIA_EMAIL_DOMINIOS).', 409);
+      if (!/^[a-z0-9](?:[a-z0-9._-]{0,38}[a-z0-9])?$/.test(local)) throw new ErroNegocio('Use só letras, números, ponto, hífen e sublinhado antes do @.', 422);
+      if (!dominiosEmail().includes(dominio)) throw new ErroNegocio('Domínio não atendido por este servidor.', 422);
+      d.endereco = `${local}@${dominio}`;
+      if (db.prepare('SELECT 1 FROM enderecos_email WHERE endereco = ?').get(d.endereco)) throw new ErroNegocio('Este endereço já existe.', 409);
+    }
+    if (req.body.nome !== undefined) d.nome = v.opcional(req.body.nome, 'o nome', 120);
+    if (req.body.ativo !== undefined) d.ativo = v.booleano(req.body.ativo) ? 1 : 0;
+    if (req.body.usuario_id !== undefined) {
+      const uid = req.body.usuario_id ? Number(req.body.usuario_id) : null;
+      if (uid) {
+        const u = db.prepare('SELECT id, perfil, empresa_id FROM usuarios WHERE id = ? AND ativo = 1').get(uid);
+        if (!u || !EQUIPE.includes(u.perfil)) throw new ErroNegocio('Escolha uma pessoa ativa da equipe.', 422);
+        const minha = empresas.empresaDe(req);
+        if (minha != null && u.empresa_id !== minha) throw new ErroNegocio('Esta pessoa não é da sua empresa.', 403);
+      }
+      d.usuario_id = uid;
+    }
+    return d;
+  };
+  const umEndereco = (id) => db.prepare(`SELECT en.*, u.nome AS usuario FROM enderecos_email en LEFT JOIN usuarios u ON u.id = en.usuario_id WHERE en.id = ?`).get(id);
+
+  r.get('/enderecos-email', permitir('master', 'administrador'), (req, res) => {
+    const [onde, p] = empresas.filtro(req, 'en.empresa_id');
+    res.json({
+      dominios: dominiosEmail(),
+      itens: db.prepare(`SELECT en.*, u.nome AS usuario, e.nome AS empresa,
+          (SELECT COUNT(*) FROM emails m WHERE m.endereco_id = en.id AND m.direcao = 'entrada') AS recebidos
+        FROM enderecos_email en LEFT JOIN usuarios u ON u.id = en.usuario_id LEFT JOIN empresas e ON e.id = en.empresa_id
+        WHERE 1 = 1${onde} ORDER BY en.endereco`).all(...p),
+    });
+  });
+
+  r.post('/enderecos-email', permitir('master', 'administrador'), (req, res) => {
+    const d = lerEndereco(req, null);
+    // A empresa do endereço é a da pessoa ligada a ele; sem pessoa, a de quem está criando.
+    const doUsuario = d.usuario_id ? db.prepare('SELECT empresa_id FROM usuarios WHERE id = ?').get(d.usuario_id)?.empresa_id : null;
+    const id = Number(db.prepare('INSERT INTO enderecos_email (empresa_id, endereco, nome, usuario_id, criado_em) VALUES (?, ?, ?, ?, ?)')
+      .run(doUsuario ?? empresas.empresaParaGravar(db, req, req.body.empresa_id), d.endereco, d.nome ?? null, d.usuario_id ?? null, agora()).lastInsertRowid);
+    registrar(db, req, 'endereco_email_criado', { id, endereco: d.endereco });
+    res.status(201).json(umEndereco(id));
+  });
+
+  r.patch('/enderecos-email/:id', permitir('master', 'administrador'), (req, res) => {
+    const id = Number(req.params.id);
+    const atual = db.prepare('SELECT * FROM enderecos_email WHERE id = ?').get(id);
+    if (!atual) throw naoEncontrado('Endereço');
+    const d = lerEndereco(req, atual);
+    if (Object.keys(d).length) db.prepare(`UPDATE enderecos_email SET ${Object.keys(d).map((k) => `${k} = ?`).join(', ')} WHERE id = ?`).run(...Object.values(d), id);
+    registrar(db, req, 'endereco_email_alterado', { id, campos: Object.keys(d) });
+    res.json(umEndereco(id));
+  });
+
+  r.delete('/enderecos-email/:id', permitir('master', 'administrador'), (req, res) => {
+    const id = Number(req.params.id);
+    const atual = db.prepare('SELECT * FROM enderecos_email WHERE id = ?').get(id);
+    if (!atual) throw naoEncontrado('Endereço');
+    // As mensagens ficam (voltam para a caixa geral); só o endereço sai.
+    db.prepare('UPDATE emails SET endereco_id = NULL WHERE endereco_id = ?').run(id);
+    db.prepare('DELETE FROM enderecos_email WHERE id = ?').run(id);
+    registrar(db, req, 'endereco_email_excluido', { id, endereco: atual.endereco });
+    res.status(204).end();
+  });
+
   r.get('/backups', permitir('master'), (_req, res) => {
     res.json({ ...backup.situacao(), itens: backup.listar(), arquivos_bytes: require('../lib/arquivos').tamanhoNoDisco() });
   });

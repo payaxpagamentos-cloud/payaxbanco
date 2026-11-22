@@ -56,6 +56,37 @@ function vincular(db, endereco) {
   return { lead_id: lead?.id ?? null, anunciante_id: anunciante?.id ?? null, local_id: local?.id ?? null };
 }
 
+/** O endereço da empresa para o qual a mensagem veio (o primeiro destinatário que for um endereço cadastrado). */
+function enderecoDe(db, destinos) {
+  const achar = db.prepare('SELECT * FROM enderecos_email WHERE endereco = ? AND ativo = 1');
+  for (const d of destinos) {
+    const e = achar.get(String(d ?? '').trim().toLowerCase());
+    if (e) return e;
+  }
+  return null;
+}
+
+/**
+ * Quem pode ver: o e-mail de um endereço que é de uma pessoa aparece para ela, para o administrador e
+ * para o master. O operador vê os dele e os de endereços sem dono (comercial@, contato@…).
+ */
+function escopo(filtros) {
+  const onde = [];
+  const p = [];
+  if (filtros._empresa != null) { onde.push('e.empresa_id = ?'); p.push(filtros._empresa); }
+  if (filtros._operador) {
+    onde.push('(e.endereco_id IS NULL OR e.endereco_id IN (SELECT id FROM enderecos_email WHERE usuario_id IS NULL OR usuario_id = ?))');
+    p.push(filtros._operador);
+  }
+  return [onde, p];
+}
+
+function podeVer(db, id, usuario) {
+  if (usuario.perfil !== 'operador') return true;
+  const e = db.prepare(`SELECT en.usuario_id FROM emails e LEFT JOIN enderecos_email en ON en.id = e.endereco_id WHERE e.id = ?`).get(id);
+  return !e || !e.usuario_id || e.usuario_id === usuario.id;
+}
+
 /** A conversa a que esta mensagem pertence (pergunta e resposta ficam juntas). */
 function acharThread(db, lida) {
   const candidatos = [lida.em_resposta_a, ...(lida.referencias ?? [])].filter(Boolean);
@@ -76,6 +107,8 @@ function receber(db, { bruto, de, para, ip = null }) {
 
   return transacao(db, () => {
     const vinculo = vincular(db, remetente);
+    // O envelope (para quem o servidor entregou) vale mais que o cabeçalho, que o remetente escreve como quer.
+    const endereco = enderecoDe(db, [].concat(para ?? [], lida.para));
     const campos = {
       direcao: 'entrada',
       de: remetente || 'desconhecido',
@@ -91,6 +124,7 @@ function receber(db, { bruto, de, para, ip = null }) {
       tamanho: Buffer.byteLength(bruto),
       anexos: lida.anexos.length,
       ...vinculo,
+      ...(endereco ? { endereco_id: endereco.id, ...(endereco.empresa_id ? { empresa_id: endereco.empresa_id } : {}) } : {}),
       ip,
       recebido_em: quando,
       criado_em: agora(),
@@ -116,8 +150,9 @@ function listar(db, filtros = {}) {
   else if (filtros.caixa === 'nao_lidos') onde.push("e.direcao = 'entrada' AND e.lido_em IS NULL AND e.arquivado_em IS NULL");
   else onde.push("e.arquivado_em IS NULL AND e.direcao = 'entrada'");
   if (filtros.lead_id) { onde.push('e.lead_id = ?'); p.push(Number(filtros.lead_id)); }
-  const daEmpresa = filtros._empresa != null;
-  if (daEmpresa) { onde.push('e.empresa_id = ?'); p.push(filtros._empresa); }
+  if (filtros.caixa === 'meus') { onde.push('e.endereco_id IN (SELECT id FROM enderecos_email WHERE usuario_id = ?)'); p.push(filtros._usuario ?? 0); }
+  const [ondeEscopo, pEscopo] = escopo(filtros);
+  onde.push(...ondeEscopo); p.push(...pEscopo);
   if (filtros.busca) {
     onde.push('(e.de LIKE ? OR e.assunto LIKE ? OR e.previa LIKE ? OR e.para LIKE ?)');
     const b = `%${String(filtros.busca).trim()}%`;
@@ -131,17 +166,18 @@ function listar(db, filtros = {}) {
     ${onde.length ? `WHERE ${onde.join(' AND ')}` : ''}
     ORDER BY e.recebido_em DESC, e.id DESC LIMIT 200`).all(...p);
 
+  const e2 = ondeEscopo.length ? ` AND ${ondeEscopo.join(' AND ')}` : '';
   const n = db.prepare(`SELECT
       COUNT(*) FILTER (WHERE direcao = 'entrada' AND lido_em IS NULL AND arquivado_em IS NULL) AS nao_lidos,
       COUNT(*) FILTER (WHERE direcao = 'entrada' AND arquivado_em IS NULL) AS na_caixa,
       COUNT(*) FILTER (WHERE direcao = 'entrada' AND lead_id IS NULL AND arquivado_em IS NULL) AS sem_vinculo,
       COUNT(*) FILTER (WHERE direcao = 'saida') AS enviados
-    FROM emails${daEmpresa ? ' WHERE empresa_id = ?' : ''}`).get(...(daEmpresa ? [filtros._empresa] : []));
+    FROM emails e WHERE 1 = 1${e2}`).get(...pEscopo);
 
   // Quem escreveu e ainda não teve resposta: é a fila que não pode crescer.
   const semResposta = db.prepare(`SELECT COUNT(*) AS n FROM emails e WHERE e.direcao = 'entrada' AND e.arquivado_em IS NULL
     AND NOT EXISTS (SELECT 1 FROM emails r WHERE r.direcao = 'saida' AND r.thread = e.thread AND r.recebido_em > e.recebido_em)
-    ${daEmpresa ? 'AND e.empresa_id = ?' : ''}`).get(...(daEmpresa ? [filtros._empresa] : [])).n;
+    ${e2}`).get(...pEscopo).n;
 
   return { itens, totais: { ...n, sem_resposta: semResposta }, servidor: estado() };
 }
@@ -239,7 +275,7 @@ function virarLead(db, id, { usuarioId = null, tipo = 'anunciante' } = {}) {
  * aqui como mensagem enviada e entra no histórico do lead. Responder mantém a conversa amarrada pelos
  * identificadores do e-mail, então a resposta cai na mesma thread no programa de quem recebe.
  */
-async function enviar(db, { para, assunto, texto, responder_a = null, lead_id = null, usuarioId = null, empresa_id = null }) {
+async function enviar(db, { para, assunto, texto, responder_a = null, lead_id = null, usuarioId = null, empresa_id = null, remetente = null }) {
   const destino = String(para ?? '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destino)) throw new ErroNegocio('Informe um e-mail de destino válido.', 422);
   if (!String(texto ?? '').trim()) throw new ErroNegocio('Escreva a mensagem.', 422);
@@ -256,6 +292,8 @@ async function enviar(db, { para, assunto, texto, responder_a = null, lead_id = 
     para: destino,
     assunto: titulo,
     texto,
+    // Quem tem endereço próprio escreve com ele; os demais, com o endereço geral do sistema.
+    de: remetente ? { endereco: remetente.endereco, nome: remetente.nome } : null,
     emRespostaA: anterior?.message_id ?? null,
     referencias: anterior?.thread ? [anterior.thread, anterior.message_id].filter(Boolean) : [],
   });
@@ -281,6 +319,7 @@ async function enviar(db, { para, assunto, texto, responder_a = null, lead_id = 
     local_id: anterior?.local_id ?? null,
     lido_em: agora(),
     criado_por: usuarioId,
+    endereco_id: remetente?.id ?? null,
     empresa_id: anterior?.empresa_id ?? empresa_id ?? null,
     recebido_em: agora(),
     criado_em: agora(),
@@ -303,7 +342,7 @@ const estado = () => ({
   ...ligado,
 });
 
-module.exports = {
+module.exports = { podeVer, enderecoDe,
   receber, listar, ler, anexo, original, marcarLido, arquivar, vincularLead, virarLead, enviar,
   estado, registrarEstado, vincular, caminhoOriginal,
 };
