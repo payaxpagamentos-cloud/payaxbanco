@@ -1,0 +1,41 @@
+[Unit]
+Description=Manager Provedor — ERP para provedores de internet
+Documentation=https://provedor.meumanager.com.br
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USUARIO__
+Group=__USUARIO__
+WorkingDirectory=__DESTINO__
+EnvironmentFile=__DESTINO__/.env
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning __DESTINO__/server/index.js
+Restart=always
+RestartSec=3
+
+# Reinício em cascata não resolve nada: se cair cinco vezes em um minuto, para e espera gente olhar.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# O processo não precisa de nada fora da própria pasta de dados.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=__DESTINO__/dados
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+# Só IPv4/IPv6 e sockets locais: o sistema fala com equipamentos e com a SEFAZ, nada além disso.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=manager-provedor
+
+[Install]
+WantedBy=multi-user.target

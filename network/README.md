@@ -88,6 +88,25 @@ A demonstração também deixa o **portal do assinante** pronto para abrir: um a
 (o script imprime o documento dele e a senha `portal12345`) e outro fica com um **convite em aberto**, para a ficha mostrar como é um
 primeiro acesso ainda não usado. Abra em `/portal/`.
 
+## Instalar num servidor
+
+A pasta [`implantar/`](implantar/LEIA-ME.md) traz o necessário para pôr o sistema no ar num servidor
+Debian ou Ubuntu limpo, com domínio e HTTPS:
+
+```bash
+cd /provedor
+sudo EMAIL_TLS=seu@email.com bash implantar/instalar.sh
+```
+
+Instala o Node 22, cria o usuário do serviço, gera os segredos uma única vez, aplica as migrações, sobe
+a unidade do systemd, configura o nginx para o domínio, emite o certificado com o certbot e agenda o
+backup diário. Pode ser rodado de novo quantas vezes quiser: só faz o que falta, e não apaga dados.
+
+**Dois segredos não podem ser perdidos**, e ficam em `/provedor/.env`: `NETWORK_CHAVE_CREDENCIAIS`
+(cifra as senhas de equipamento guardadas no banco — perdê-la obriga a redigitar todas) e
+`NETWORK_SECRET` (assina as sessões). Um backup do banco sem o `.env` não restaura a operação, e é por
+isso que o backup diário leva os dois.
+
 ## Configuração
 
 Veja [`.env.exemplo`](.env.exemplo).
