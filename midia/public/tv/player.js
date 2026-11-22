@@ -509,8 +509,9 @@ async function prepararItem(item) {
     elemento.alt = '';
   }
   if (origem.temporario) elemento.dataset.blob = origem.src;
-  // Na tela dividida, a peça desfocada preenche o fundo da zona (em vez de barras pretas).
-  const fundo = estado.programacao?.grade?.layout === 'dividida' && item.formato === 'midia' && item.tipo === 'imagem'
+  // A peça nunca é cortada nem esticada: ela se ajusta ao quadro, e a própria peça desfocada preenche
+  // a sobra (em vez de barras pretas) — na tela dividida e no quadro acima do rodapé.
+  const fundo = item.formato === 'midia' && item.tipo === 'imagem'
     ? Object.assign(document.createElement('img'), { src: origem.src, alt: '', className: 'fundo' })
     : null;
   alvo.replaceChildren(...[fundo, elemento].filter(Boolean));
