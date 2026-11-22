@@ -11,6 +11,7 @@ const { estaOnline, pontoAberto, uptime } = require('../lib/monitor');
 const { montarPorTela } = require('../lib/grade');
 const config = require('../config');
 const arquivos = require('../lib/arquivos');
+const foto = require('../lib/comunicado-foto');
 const { hoje } = require('../lib/datas');
 const contratosLib = require('../lib/contratos');
 const v = require('../lib/validacao');
@@ -433,11 +434,19 @@ module.exports = (db) => {
     res.json(db.prepare('SELECT * FROM comunicados WHERE id = ?').get(id));
   });
 
+  // Foto do comunicado (arquivo no corpo): cobre o espaço do recado na TV.
+  const comunicado = (id) => db.prepare('SELECT * FROM comunicados WHERE id = ?').get(Number(id));
+  r.post('/comunicados/:id/imagem', (req, res) => res.status(201).json(foto.salvar(db, req, comunicado(req.params.id), 'comunicado_foto')));
+  r.get('/comunicados/:id/imagem', (req, res) => foto.enviar(res, comunicado(req.params.id)));
+  r.delete('/comunicados/:id/imagem', (req, res) => { foto.remover(db, req, comunicado(req.params.id), 'comunicado_foto_removida'); res.status(204).end(); });
+
   r.delete('/comunicados/:id', (req, res) => {
     const id = Number(req.params.id);
-    if (!db.prepare('SELECT 1 FROM comunicados WHERE id = ?').get(id)) throw naoEncontrado('Comunicado');
+    const c = db.prepare('SELECT imagem_arquivo FROM comunicados WHERE id = ?').get(id);
+    if (!c) throw naoEncontrado('Comunicado');
     db.prepare('UPDATE exibicoes SET comunicado_id = NULL WHERE comunicado_id = ?').run(id);
     db.prepare('DELETE FROM comunicados WHERE id = ?').run(id);
+    if (c.imagem_arquivo) arquivos.remover({ arquivo: c.imagem_arquivo });
     registrar(db, req, 'comunicado_excluido', { id });
     res.status(204).end();
   });

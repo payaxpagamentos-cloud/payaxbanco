@@ -36,7 +36,7 @@ function criarApp(db) {
   r.use('/api', (req, res, next) => {
     if (req.method !== 'POST') return express.json({ limit: '400kb' })(req, res, next);
     // Criativo e logo: arquivo no corpo bruto, com o limite de mídia.
-    if (/^\/(painel|anunciante|ponto)\/midias$|^\/painel\/locais\/\d+\/logo$/.test(req.path)) {
+    if (/^\/(painel|anunciante|ponto)\/midias$|^\/painel\/locais\/\d+\/logo$|^\/(painel|ponto)\/comunicados\/\d+\/imagem$/.test(req.path)) {
       return express.raw({ type: '*/*', limit: config.midiaMaxBytes })(req, res, next);
     }
     // Pacote de atualização do sistema (o vaimidia.zip), enviado pelo painel.

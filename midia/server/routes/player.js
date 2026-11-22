@@ -171,6 +171,12 @@ module.exports = (db) => {
   });
 
   /** Logo da administradora do ponto, para o cabeçalho do comunicado na tela. */
+  // Foto do comunicado: só de comunicado do ponto desta TV.
+  r.get('/comunicados/:id/imagem', autenticada, (req, res) => {
+    const c = db.prepare('SELECT * FROM comunicados WHERE id = ? AND local_id = ?').get(Number(req.params.id), req.tela.local_id);
+    require('../lib/comunicado-foto').enviar(res, c);
+  });
+
   r.get('/logo', autenticada, (req, res) => {
     const l = db.prepare('SELECT logo_arquivo, logo_mime FROM locais WHERE id = ?').get(req.tela.local_id);
     if (!l?.logo_arquivo) throw new ErroNegocio('Este ponto não tem logo.', 404);

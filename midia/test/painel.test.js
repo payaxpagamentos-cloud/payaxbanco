@@ -133,3 +133,53 @@ test('Painel: ícone colorido ao instalar no celular', () => {
     assert.equal(png.readUInt32BE(16), Number(i.sizes.split('x')[0]), `${i.src} tem o tamanho declarado`);
   }
 });
+
+/**
+ * Comunicado sempre com imagem: o ponto anexa uma foto que cobre o espaço do recado na TV. A foto só
+ * sai para as TVs daquele ponto, e trocar a foto muda a versão da programação (a TV baixa de novo).
+ */
+test('Comunicado: foto anexada chega à TV do ponto e só a ela', async (t) => {
+  const { iniciar, png, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+  t.after(() => { api.fechar(); limparArquivos(); });
+  const master = await api.login();
+  const novoPonto = async (nome) => (await api.post('/painel/locais', { nome, categoria: 'condominio_residencial', cidade: 'Campinas', uf: 'SP', publico_dia: 100 }, master)).dados.id;
+  const predio = await novoPonto('Edifício Foto');
+  const outro = await novoPonto('Edifício Vizinho');
+  const parear = async (local) => {
+    const tv = api.aparelho();
+    const reg = await tv.registrar({ aparelho: 'TV', largura: 1080, altura: 1920, versao: '1.2' });
+    const p = await api.post('/painel/telas/parear', { codigo: reg.dados.codigo, local_id: local, nome: 'Elevador' }, master);
+    await api.patch(`/painel/telas/${p.dados.id}`, { layout: 'dividida' }, master);
+    tv.usar((await tv.pareamento(reg.dados.codigo)).dados.token);
+    return tv;
+  };
+  const tvPredio = await parear(predio);
+  const tvVizinho = await parear(outro);
+
+  const hoje = new Date().toLocaleDateString('en-CA');
+  const c = (await api.post('/painel/comunicados', { local_id: predio, titulo: 'Assembleia', texto: 'Às 19h no salão.', tipo: 'assembleia', inicio: hoje, fim: hoje }, master)).dados;
+  const antes = (await tvPredio.programacao()).dados.grade;
+  assert.equal(antes.comunicados[0].imagem, false, 'sem foto, a TV desenha a ilustração do tipo');
+
+  assert.equal((await api.enviarArquivo(`/painel/comunicados/${c.id}/imagem`, Buffer.from('não é imagem'), master)).status, 415);
+  assert.equal((await api.enviarArquivo(`/painel/comunicados/${c.id}/imagem`, png(1200, 800), master)).status, 201);
+
+  const depois = (await tvPredio.programacao()).dados.grade;
+  assert.equal(depois.comunicados[0].imagem, true);
+  assert.notEqual(depois.versao, antes.versao, 'trocar a foto faz a TV baixar a programação de novo');
+
+  const foto = await fetch(`${api.base}/player/comunicados/${c.id}/imagem`, { headers: { Authorization: `Bearer ${tvPredio.token}` } });
+  assert.equal(foto.status, 200);
+  assert.equal(foto.headers.get('content-type'), 'image/png');
+  const alheia = await fetch(`${api.base}/player/comunicados/${c.id}/imagem`, { headers: { Authorization: `Bearer ${tvVizinho.token}` } });
+  assert.equal(alheia.status, 404, 'a foto de um prédio não sai na TV do vizinho');
+
+  assert.equal((await api.del(`/painel/comunicados/${c.id}/imagem`, undefined, master)).status, 204);
+  assert.equal((await tvPredio.programacao()).dados.grade.comunicados[0].imagem, false);
+
+  // O layout dividido é meio a meio e o anúncio cobre a metade dele.
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public/tv/tv.css'), 'utf8');
+  assert.match(css, /body\.dividida \.palco\{ grid-template-columns: 1fr 1fr;/);
+  assert.match(css, /body\.dividida \.zona-anuncio \.camada img:not\(\.fundo\), body\.dividida \.zona-anuncio \.camada video\{ object-fit: cover; \}/);
+});

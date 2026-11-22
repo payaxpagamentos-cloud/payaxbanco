@@ -5,6 +5,7 @@ const { agora, lerConfig } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const arquivos = require('../lib/arquivos');
+const foto = require('../lib/comunicado-foto');
 const { estaOnline, pontoAberto } = require('../lib/monitor');
 const { montarPorTela } = require('../lib/grade');
 const { lerComunicado } = require('./cadastros');
@@ -117,11 +118,31 @@ module.exports = (db) => {
     res.json(db.prepare('SELECT * FROM comunicados WHERE id = ?').get(c.id));
   });
 
+  // Foto do comunicado: o ponto só mexe nos dele. Trocar a foto passa pela aprovação, como trocar o texto.
+  const doPonto = (req) => db.prepare('SELECT * FROM comunicados WHERE id = ? AND local_id = ?').get(Number(req.params.id), meu(req));
+  const reaprovar = (id) => {
+    if (!lerConfig(db).comunicado_automatico) db.prepare("UPDATE comunicados SET status = 'pendente', motivo = NULL WHERE id = ?").run(id);
+  };
+  r.post('/comunicados/:id/imagem', (req, res) => {
+    const c = doPonto(req);
+    const r2 = foto.salvar(db, req, c, 'comunicado_foto_ponto');
+    reaprovar(c.id);
+    res.status(201).json(r2);
+  });
+  r.get('/comunicados/:id/imagem', (req, res) => foto.enviar(res, doPonto(req)));
+  r.delete('/comunicados/:id/imagem', (req, res) => {
+    const c = doPonto(req);
+    foto.remover(db, req, c, 'comunicado_foto_removida_ponto');
+    reaprovar(c.id);
+    res.status(204).end();
+  });
+
   r.delete('/comunicados/:id', (req, res) => {
     const c = db.prepare('SELECT * FROM comunicados WHERE id = ? AND local_id = ?').get(Number(req.params.id), meu(req));
     if (!c) throw naoEncontrado('Comunicado');
     db.prepare('UPDATE exibicoes SET comunicado_id = NULL WHERE comunicado_id = ?').run(c.id);
     db.prepare('DELETE FROM comunicados WHERE id = ?').run(c.id);
+    if (c.imagem_arquivo) arquivos.remover({ arquivo: c.imagem_arquivo });
     registrar(db, req, 'comunicado_removido_ponto', { id: c.id });
     res.status(204).end();
   });

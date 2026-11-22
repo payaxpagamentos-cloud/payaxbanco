@@ -5,7 +5,7 @@ import {
   inteiro, dinheiro, dataHora, duracao, percentual, dataBr, etiqueta, etiquetaDe, situacao, centavos, reaisCampo, telefone, abrirWhatsApp,
   CATEGORIAS, PREDIOS, POSICOES, REPASSES, LAYOUTS, ORIENTACOES, STATUS_TELA, STATUS_PONTO, STATUS_COMUNICADO, TIPOS_COMUNICADO, DIAS,
 } from './ui.js';
-import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa, imagemDaApi, enviarArquivo, BASE_API } from './comum.js';
+import { cartao, indicador, tabela, vazio, linhaDoLoop, itensDoLoop, resumoDoLoop, previa, imagemDaApi, enviarArquivo, BASE_API, campoFotoComunicado } from './comum.js';
 
 // ---------------------------------------------------------------- TVs
 export async function telasEquipe(ctx) {
@@ -500,8 +500,9 @@ export async function comunicados(ctx) {
 function editarComunicado(c, ponto, recarregar, opcoes = null) {
   const hoje = new Date().toLocaleDateString('en-CA');
   const emDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA'); };
+  const foto = campoFotoComunicado(c, 'painel');
   const montar = (op) => formModal(c ? 'Editar comunicado' : 'Novo comunicado', () => [
-    el('p', { class: 'mudo', style: 'margin:0' }, 'O comunicado entra no carrossel entre os anúncios. A própria TV desenha o texto — não precisa de arte.'),
+    el('p', { class: 'mudo', style: 'margin:0' }, 'O recado aparece nas TVs do ponto com uma imagem cobrindo o espaço dele e o texto por cima.'),
     c || ponto ? null : escolha('Ponto', 'local_id', Object.fromEntries(op.locais.map((l) => [l.id, `${l.nome} — ${l.cidade}`])), '', { required: true }),
     campo('Título', { name: 'titulo', value: c?.titulo ?? '', required: true, maxlength: 80, placeholder: 'Ex.: Assembleia dia 12' }),
     area('Texto', { name: 'texto', required: true, maxlength: 400, placeholder: 'Ex.: Às 19h no salão de festas. Pauta: previsão orçamentária.' }, c?.texto ?? ''),
@@ -515,10 +516,11 @@ function editarComunicado(c, ponto, recarregar, opcoes = null) {
     el('p', { class: 'pequeno mudo', style: 'margin:-4px 0 0' },
       'Com a data preenchida, o recado também entra na agenda da tela — o quadro "O que vem por aí" que quem passa acompanha.'),
     campo('Tempo na tela (segundos)', { name: 'duracao_s', type: 'number', min: 5, max: 60, value: c?.duracao_s ?? 10 }),
+    foto.campo,
   ], async (d) => {
     const corpo = { ...d, local_id: ponto?.id ?? c?.local_id ?? d.local_id };
-    if (c) await api.patch(`/painel/comunicados/${c.id}`, corpo);
-    else await api.post('/painel/comunicados', corpo);
+    const salvo = c ? await api.patch(`/painel/comunicados/${c.id}`, corpo) : await api.post('/painel/comunicados', corpo);
+    await foto.salvar(salvo.id);
     toast(c ? 'Comunicado atualizado.' : 'Comunicado criado e no ar.');
     recarregar();
   });

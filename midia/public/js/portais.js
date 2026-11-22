@@ -6,7 +6,7 @@ import {
   diasTexto, faixaHorario, COBRANCA, ORIENTACOES, STATUS_CAMPANHA, STATUS_MIDIA, STATUS_FATURA, STATUS_CONTRATO, STATUS_REPASSE, STATUS_COMUNICADO,
   TIPOS_COMUNICADO, REPASSES, CATEGORIAS,
 } from './ui.js';
-import { cartao, indicador, tabela, vazio, previa, enviarArquivo } from './comum.js';
+import { cartao, indicador, tabela, vazio, previa, enviarArquivo, campoFotoComunicado } from './comum.js';
 import { barras, pizza, CORES } from './graficos.js';
 
 const hojeLocal = () => new Date().toLocaleDateString('en-CA');
@@ -339,6 +339,7 @@ async function comunicadosLojista(ctx) {
 function editarComunicadoPonto(c, recarregar) {
   const hoje = hojeLocal();
   const emDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('en-CA'); };
+  const foto = campoFotoComunicado(c, 'ponto');
   return formModal(c ? 'Editar comunicado' : 'Novo comunicado', () => [
     campo('Título', { name: 'titulo', value: c?.titulo ?? '', required: true, maxlength: 80, placeholder: 'Ex.: Assembleia dia 12' }),
     el('label', { class: 'campo' }, 'Texto',
@@ -352,9 +353,10 @@ function editarComunicadoPonto(c, recarregar) {
       campo('Hora', { name: 'evento_hora', type: 'time', value: c?.evento_hora ?? '' })),
     el('p', { class: 'pequeno mudo', style: 'margin:-4px 0 0' },
       'Com a data preenchida, o recado também entra na agenda da tela — o quadro "O que vem por aí" que quem passa acompanha.'),
+    foto.campo,
   ], async (d) => {
-    if (c) await api.patch(`/ponto/comunicados/${c.id}`, d);
-    else await api.post('/ponto/comunicados', d);
+    const salvo = c ? await api.patch(`/ponto/comunicados/${c.id}`, d) : await api.post('/ponto/comunicados', d);
+    await foto.salvar(salvo.id);
     toast(c ? 'Comunicado atualizado.' : 'Comunicado enviado.');
     recarregar();
   });

@@ -687,6 +687,8 @@ const COLUNAS_NOVAS = [
   ['telas', 'posicao', 'TEXT'],
   ['telas', 'layout', "TEXT NOT NULL DEFAULT 'cheia'"],
   ['locais', 'logo_arquivo', 'TEXT'],
+  ['comunicados', 'imagem_arquivo', 'TEXT'],
+  ['comunicados', 'imagem_mime', 'TEXT'],
   ['locais', 'logo_mime', 'TEXT'],
   ['locais', 'assinatura', 'TEXT'],
   ['campanhas', 'agencia_id', 'INTEGER REFERENCES agencias(id)'],

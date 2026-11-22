@@ -42,8 +42,10 @@ body.dividida .zona-anuncio{ background: var(--preto); }
 .camada img:not(.fundo), .camada video{ z-index: 1; }
 
 /* Tela dividida: comunicado de um lado, publicidade do outro. Em pé, um em cima do outro. */
-body.dividida .palco{ grid-template-columns: 44% 56%; }
-@media (max-aspect-ratio: 1/1){ body.dividida .palco{ grid-template-columns: 1fr; grid-template-rows: 46% 54%; } }
+/* Meio a meio: cada um com o seu espaço, simétrico. E em cada metade a imagem cobre o espaço inteiro. */
+body.dividida .palco{ grid-template-columns: 1fr 1fr; grid-template-rows: 100%; }
+@media (max-aspect-ratio: 1/1){ body.dividida .palco{ grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio .camada video{ object-fit: cover; }
 .zona-comunicado{ position: relative; overflow: hidden; background: var(--preto); border-right: 2px solid var(--lime); }
 @media (max-aspect-ratio: 1/1){ .zona-comunicado{ border-right: 0; border-bottom: 2px solid var(--lime); } }
 /* Na zona, o texto começa no alto (centralizar cortaria as pontas quando o recado é longo). */
@@ -174,3 +176,33 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 .zona-anuncio .cartao-marca .lockup .v{ height: 6vh; }
 .zona-anuncio .cartao-marca .nome em{ font-size: 4.6vh; }
 .zona-anuncio .cartao-marca .frase{ font-size: 2.8vh; max-width: 100%; }
+
+/*
+  Comunicado com imagem: a foto do ponto (ou a ilustração do tipo de recado) cobre o espaço inteiro,
+  e o texto fica embaixo, sobre um véu escuro que garante a leitura. O logo da administradora fica no alto.
+*/
+.comunicado.com-visual{ justify-content: flex-end; background: #141E24; overflow: hidden; }
+.comunicado.com-visual > *:not(.visual){ position: relative; z-index: 2; }
+.comunicado.com-visual .visual{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 0; }
+.comunicado.com-visual::after{ content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 1;
+  background: linear-gradient(180deg, rgba(10,16,20,.55) 0%, rgba(10,16,20,0) 22%, rgba(10,16,20,.15) 40%, rgba(10,16,20,.88) 68%, rgba(10,16,20,.96) 100%); }
+.comunicado.com-visual .marca-adm{ margin-bottom: auto; }
+.comunicado.com-visual .assinatura{ margin-top: 0; }
+.comunicado.com-visual .quando:last-child{ margin-top: 0; }
+.comunicado .visual.foto img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Ilustração: o símbolo do tipo, grande, sobre a cor do tipo. */
+.comunicado .visual.ilustracao{ display: grid; place-items: center; padding-bottom: 30%; }
+.comunicado .visual.ilustracao svg{ width: 42%; max-width: 46vh; height: auto; fill: none; stroke: currentColor; stroke-width: 1.4;
+  stroke-linecap: round; stroke-linejoin: round; opacity: .9; }
+.comunicado .visual.ilustracao.aviso{ background: radial-gradient(circle at 70% 25%, #3E5A12 0%, #1C2A10 45%, #11180B 100%); color: #C8FF31; }
+.comunicado .visual.ilustracao.manutencao{ background: radial-gradient(circle at 70% 25%, #6B4A12 0%, #33230A 45%, #1A1206 100%); color: #FBBF24; }
+.comunicado .visual.ilustracao.assembleia{ background: radial-gradient(circle at 70% 25%, #1B4D73 0%, #0F2A40 45%, #0A1622 100%); color: #7DD3FC; }
+.comunicado .visual.ilustracao.entrega{ background: radial-gradient(circle at 70% 25%, #14574F 0%, #0B312C 45%, #071A18 100%); color: #5EEAD4; }
+.comunicado .visual.ilustracao.urgente{ background: radial-gradient(circle at 70% 25%, #7A1D1D 0%, #3F0F0F 45%, #1F0707 100%); color: #FCA5A5; }
+/* Na TV em pé a metade do recado é baixa: a ilustração vai para o canto, menor, como marca d'água. */
+@media (max-aspect-ratio: 1/1){
+  .zona-comunicado .visual.ilustracao{ place-items: start end; padding: 3vh 5vw 0 0; }
+  .zona-comunicado .visual.ilustracao svg{ width: 30%; opacity: .35; }
+  /* O texto ocupa quase a metade toda: o véu escurece mais cedo para a foto não brigar com a leitura. */
+  .zona-comunicado .comunicado.com-visual::after{ background: linear-gradient(180deg, rgba(10,16,20,.6) 0%, rgba(10,16,20,.72) 35%, rgba(10,16,20,.93) 70%, rgba(10,16,20,.97) 100%); }
+}

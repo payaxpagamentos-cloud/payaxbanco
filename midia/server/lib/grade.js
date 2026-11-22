@@ -32,7 +32,7 @@ const SQL_CRIATIVOS = `SELECT m.id, m.nome, m.tipo, m.mime, m.sha256, m.orientac
   ORDER BY cm.ordem, m.id`;
 
 // Comunicados do ponto no ar hoje (a contrapartida do condomínio): todos entram pelo menos uma vez no loop.
-const SQL_COMUNICADOS = `SELECT id, titulo, texto, tipo, duracao_s FROM comunicados
+const SQL_COMUNICADOS = `SELECT id, titulo, texto, tipo, duracao_s, imagem_arquivo FROM comunicados
   WHERE local_id = ? AND status = 'aprovado' AND inicio <= ? AND fim >= ?
   ORDER BY (tipo = 'urgente') DESC, id`;
 
@@ -281,6 +281,7 @@ function montar(db, tela, instante = new Date()) {
         titulo: c.titulo,
         texto: c.texto,
         tipo: c.tipo,
+        imagem: Boolean(c.imagem_arquivo),
         duracao_s: c.duracao_s,
         campanha_id: null,
         campanha: null,
@@ -341,7 +342,8 @@ function montar(db, tela, instante = new Date()) {
 
   const assinatura = JSON.stringify([
     lista.map((i) => [i.formato, i.midia_id, i.comunicado_id, i.duracao_s, i.campanha_id, i.texto ?? '']),
-    dividida ? comunicados.map((c) => [c.id, c.titulo, c.texto, c.tipo, c.duracao_s]) : [],
+    // A foto entra na versão: trocar a foto do comunicado faz a TV baixar de novo.
+    comunicados.map((c) => [c.id, c.titulo, c.texto, c.tipo, c.duracao_s, c.imagem_arquivo ?? '']),
     agenda.map((a) => [a.titulo, a.evento_em, a.evento_hora]),
     tela.layout, tela.som, tela.relogio, tela.legenda ?? '',
     (tela.aviso_ate && tela.aviso_ate < new Date().toISOString()) ? '' : (tela.aviso ?? ''),
@@ -352,7 +354,7 @@ function montar(db, tela, instante = new Date()) {
     layout: dividida ? 'dividida' : 'cheia',
     // Na tela dividida, estes comunicados giram na zona própria (fora do carrossel de publicidade).
     comunicados: dividida ? comunicados.map((c) => ({
-      comunicado_id: c.id, titulo: c.titulo, texto: c.texto, tipo: c.tipo, duracao_s: c.duracao_s,
+      comunicado_id: c.id, titulo: c.titulo, texto: c.texto, tipo: c.tipo, duracao_s: c.duracao_s, imagem: Boolean(c.imagem_arquivo),
     })) : [],
     // A agenda e o clima acompanham a tela dividida (zona do condomínio) e a faixa.
     // O clima fica fora da assinatura da versão: a temperatura muda sozinha e não deve

@@ -117,6 +117,7 @@ async function baixarProgramacao() {
   guardar(CHAVES.grade, p);
   marcarConexao(true);
   await carregarLogo();
+  await carregarFotosComunicados();
   rodarZonaComunicados();
   guardarArquivos(p.grade.itens).catch(() => {});
   return p;
@@ -260,7 +261,9 @@ const TIPOS_COMUNICADO = { aviso: 'Aviso', manutencao: 'Manutenção', assemblei
 function montarComunicado(item) {
   const ponto = estado.programacao?.grade?.ponto ?? {};
   const caixa = document.createElement('div');
-  caixa.className = `comunicado ${item.tipo ?? 'aviso'}`;
+  // Sempre com imagem cobrindo o espaço todo (a foto do ponto ou a ilustração do tipo), e o texto por cima.
+  caixa.className = `comunicado com-visual ${item.tipo ?? 'aviso'}`;
+  caixa.append(visualDoComunicado(item));
 
   if (estado.logoUrl || ponto.administradora) {
     const marca = document.createElement('div');
@@ -325,6 +328,52 @@ function assinaturaDoPonto() {
 }
 
 /** Baixa a logo da administradora uma vez e guarda como blob (a tag <img> não manda cabeçalho). */
+/** Fotos dos comunicados (as que o ponto anexou): baixadas uma vez e guardadas enquanto a TV estiver ligada. */
+async function carregarFotosComunicados() {
+  estado.fotosComunicado ??= {};
+  const g = estado.programacao?.grade;
+  const ids = new Set([...(g?.itens ?? []), ...(g?.comunicados ?? [])].filter((c) => c.imagem && c.comunicado_id).map((c) => c.comunicado_id));
+  await Promise.all([...ids].filter((id) => !estado.fotosComunicado[id]).map(async (id) => {
+    try {
+      const resp = await fetch(`${API}player/comunicados/${id}/imagem`, { headers: { Authorization: `Bearer ${estado.token}` } });
+      if (resp.ok) estado.fotosComunicado[id] = URL.createObjectURL(await resp.blob());
+    } catch { /* sem a foto, entra a ilustração do tipo */ }
+  }));
+}
+
+// Ilustração de cada tipo de recado, para quando o ponto não anexa foto: o espaço nunca fica só com texto.
+const ILUSTRACOES = {
+  aviso: 'M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15 9a3 3 0 0 1 0 6M18 6a7 7 0 0 1 0 12',
+  manutencao: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z',
+  assembleia: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20a6 6 0 0 1 12 0M17 11a2.5 2.5 0 1 0 0-5M21 20a5 5 0 0 0-4-4.9',
+  entrega: 'M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10',
+  urgente: 'M12 3l10 18H2zM12 10v5M12 18h.01',
+};
+
+/** A imagem que cobre o espaço do comunicado: a foto do ponto ou, sem ela, a ilustração do tipo. */
+function visualDoComunicado(item) {
+  const visual = document.createElement('div');
+  const foto = item.imagem && estado.fotosComunicado?.[item.comunicado_id];
+  if (foto) {
+    visual.className = 'visual foto';
+    const img = document.createElement('img');
+    img.src = foto;
+    img.alt = '';
+    visual.append(img);
+    return visual;
+  }
+  visual.className = `visual ilustracao ${item.tipo ?? 'aviso'}`;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  const caminho = document.createElementNS(ns, 'path');
+  caminho.setAttribute('d', ILUSTRACOES[item.tipo] ?? ILUSTRACOES.aviso);
+  svg.append(caminho);
+  visual.append(svg);
+  return visual;
+}
+
 async function carregarLogo() {
   if (!estado.programacao?.grade?.ponto?.logo || estado.logoUrl) return;
   try {
@@ -509,11 +558,8 @@ async function prepararItem(item) {
     elemento.alt = '';
   }
   if (origem.temporario) elemento.dataset.blob = origem.src;
-  // Na tela dividida, a peça desfocada preenche o fundo da zona (em vez de barras pretas).
-  const fundo = estado.programacao?.grade?.layout === 'dividida' && item.formato === 'midia' && item.tipo === 'imagem'
-    ? Object.assign(document.createElement('img'), { src: origem.src, alt: '', className: 'fundo' })
-    : null;
-  alvo.replaceChildren(...[fundo, elemento].filter(Boolean));
+  // Na tela dividida a peça cobre a metade inteira (object-fit: cover no CSS), sem barras nem fundo desfocado.
+  alvo.replaceChildren(elemento);
   // Espera o arquivo estar pronto (com teto, para não travar o loop num arquivo ruim).
   await Promise.race([
     new Promise((pronto, falhou) => {

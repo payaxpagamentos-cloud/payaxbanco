@@ -151,3 +151,27 @@ export const resumoDoLoop = (grade) => tabela([
 export const dinheiroOuTraco = (c) => (c ? dinheiro(c) : '—');
 export const numeroOuTraco = (n) => (n ? inteiro(n) : '—');
 export const bytes = mb;
+
+/**
+ * Foto do comunicado no formulário (painel e portal do ponto). A foto cobre o espaço do recado na TV;
+ * sem ela, a TV usa uma ilustração do tipo do aviso. Os campos não têm nome: não vão junto do texto —
+ * `salvar(id)` envia (ou tira) a foto depois que o comunicado foi gravado.
+ */
+export function campoFotoComunicado(c, rota) {
+  const arquivo = el('input', { type: 'file', accept: 'image/jpeg,image/png,image/webp' });
+  const tirar = el('input', { type: 'checkbox' });
+  const campo = el('div', { class: 'coluna', style: 'gap:6px' },
+    el('label', { class: 'campo' }, 'Foto (opcional)', arquivo),
+    c?.imagem_arquivo ? el('label', { class: 'marcar' }, tirar, 'Tirar a foto atual') : null,
+    el('p', { class: 'pequeno mudo', style: 'margin:0' },
+      'A foto cobre o espaço do recado na TV, com o texto por cima. Sem foto, a TV usa uma ilustração do tipo do aviso.'));
+  const salvar = async (id) => {
+    if (arquivo.files[0]) return enviarArquivo(`${rota}/comunicados/${id}/imagem`, arquivo.files[0]);
+    if (tirar.checked) {
+      const r = await fetch(`${BASE}/api/${rota}/comunicados/${id}/imagem`, { method: 'DELETE', headers: { Authorization: `Bearer ${sessao.get()?.token ?? ''}` } });
+      if (!r.ok && r.status !== 404) throw new Error('Não deu para tirar a foto.');
+    }
+    return null;
+  };
+  return { campo, salvar };
+}
