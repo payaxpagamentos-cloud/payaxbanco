@@ -44,7 +44,7 @@ module.exports = {
   espelho: process.env.MIDIA_ESPELHO || null,
   // Versão do player publicada aqui. A tela manda a dela na batida; o diagnóstico aponta quem ficou para trás
   // e o painel manda recarregar (sem ninguém precisar ir até o prédio).
-  playerVersao: '1.7',
+  playerVersao: '1.8',
   // Tamanho máximo de um arquivo de mídia enviado ao painel.
   midiaMaxBytes: (Number(process.env.MIDIA_MAX_MB) || 200) * 1024 * 1024,
   // Envio de e-mails (avisos de tela fora do ar, fatura vencida e recuperação de senha).

@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '1.7';
+const VERSAO = '1.8';
 // Carimbo com que esta página foi carregada (vem no endereço do script; ver server/lib/carimbo-player.js).
 const CARIMBO = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch { return ''; } })();
 const API = new URL('../api/', location.href).href;
@@ -776,15 +776,21 @@ async function manterTelaAcesa() {
 // controle ou toque na tela em "tela cheia". Basta apertar OK uma vez.
 const emTelaCheia = () => Boolean(document.fullscreenElement || document.webkitFullscreenElement);
 
-// Exatamente o pedido da versão que funcionou na TV Samsung de teste (player 1.1): com a opção de esconder
-// a barra do navegador, o WebKit como reserva, e pedido de novo a cada evento do gesto (pointerdown,
-// click…) — as versões "simplificadas" depois disso pararam de maximizar ali.
+// Um pedido só, sem opções — como na primeira versão, que maximizou com dois cliques na TV Samsung.
+// Cuidado: navegador antigo devolve "undefined" em requestFullscreen (não uma promessa); encadear o
+// pedido do WebKit depois dele (com ??) fazia um segundo pedido que cancelava o primeiro.
 function pedirTelaCheia() {
   if (emTelaCheia()) return;
   const raiz = document.documentElement;
   try {
-    const pedido = raiz.requestFullscreen?.({ navigationUI: 'hide' }) ?? raiz.webkitRequestFullscreen?.();
-    pedido?.catch?.(() => {});
+    if (raiz.requestFullscreen) {
+      const pedido = raiz.requestFullscreen();
+      if (pedido && typeof pedido.catch === 'function') pedido.catch(() => {});
+    } else if (raiz.webkitRequestFullscreen) {
+      raiz.webkitRequestFullscreen();
+    } else if (raiz.webkitRequestFullScreen) {
+      raiz.webkitRequestFullScreen();
+    }
   } catch { /* aparelho sem a função */ }
 }
 
@@ -824,8 +830,8 @@ function telaCheia() {
   };
   for (const evento of ['pointerdown', 'click', 'keydown']) botao.addEventListener(evento, apertou);
   pedirTelaCheia();
-  // Os mesmos eventos da versão que funcionou na Samsung: tecla, ponteiro, toque e clique (em qualquer lugar, botão incluído).
-  for (const evento of ['keydown', 'pointerdown', 'touchend', 'click']) {
+  // Clique, dois cliques, toque ou tecla OK — em qualquer lugar da tela, botão incluído.
+  for (const evento of ['click', 'dblclick', 'keydown', 'touchend']) {
     document.addEventListener(evento, pedirTelaCheia, { capture: true });
   }
   // Mexeu no controle e a TV continua sem tela cheia: o botão volta.
