@@ -202,13 +202,22 @@ export function escolha(rotulo, nome, opcoes, valor, attrs = {}) {
 export const reaisCampo = (c) => (c === null || c === undefined ? '' : ((c ?? 0) / 100).toFixed(2).replace('.', ','));
 export const centavos = (txt) => (txt === '' || txt === undefined ? undefined : Math.round(Number(String(txt).replace(/\./g, '').replace(',', '.')) * 100));
 
-/** Repete fn a cada ms enquanto a página está visível (consulta o servidor para atualizar a tela). */
+/*
+ * Repete fn a cada ms enquanto a página está visível (consulta o servidor para atualizar a tela).
+ *
+ * A tela é redesenhada inteira a cada atualização. Se isso acontecer no meio de uma digitação, o que
+ * foi escrito some e o cursor pula — então a atualização espera: enquanto houver janela aberta ou
+ * alguém com o cursor num campo, o ciclo pula a vez e tenta de novo no intervalo seguinte.
+ */
+const ocupado = () => Boolean(document.querySelector('.modal-fundo'))
+  || ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+
 export function repetir(fn, ms) {
   let parado = false;
   let timer;
   const ciclo = async () => {
     if (parado) return;
-    if (document.visibilityState === 'visible') { try { await fn(); } catch { /* próxima tentativa */ } }
+    if (document.visibilityState === 'visible' && !ocupado()) { try { await fn(); } catch { /* próxima tentativa */ } }
     if (!parado) timer = setTimeout(ciclo, ms);
   };
   ciclo();

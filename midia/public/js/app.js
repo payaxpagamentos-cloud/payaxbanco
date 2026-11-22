@@ -122,7 +122,18 @@ async function desenhar() {
       el('h1', { style: 'margin:0' }, tituloTela), subtitulo),
     ferramentas(u));
   casca.append(lateral, el('div', { class: 'principal' }, topo, conteudo));
+  // A tela inteira é redesenhada a cada troca. Sem guardar onde o menu estava, ele volta para o
+  // começo e quem tem muitos itens perde a referência do que acabou de clicar.
+  const rolagemMenu = $('.lateral')?.scrollTop ?? 0;
   limpar(raiz, casca);
+  lateral.scrollTop = rolagemMenu;
+  // Se o item aberto ficou fora da vista (menu longo, tela baixa), ele é trazido para o meio.
+  const ativo = lateral.querySelector('a.item.on');
+  if (ativo && (ativo.offsetTop < lateral.scrollTop || ativo.offsetTop + ativo.offsetHeight > lateral.scrollTop + lateral.clientHeight)) {
+    lateral.scrollTop = Math.max(0, ativo.offsetTop - lateral.clientHeight / 2);
+  }
+  // E a tela nova começa do alto, não no meio da rolagem da tela anterior.
+  window.scrollTo({ top: 0 });
   document.title = `${tituloTela} · ${nomePlataforma}`;
 
   const ctx = {
