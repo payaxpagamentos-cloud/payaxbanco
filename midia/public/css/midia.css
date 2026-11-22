@@ -495,14 +495,14 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
   .entrada .assinatura{ font-size: 1.5rem; max-width: 44%; left: 32px; }
 }
 @media (max-width: 860px){
-  .entrada{ justify-content: center; padding: 86px 24px 86px; }
+  .entrada{ justify-content: center; padding: 40px 24px; }
   .entrada::before{ background-position: 38% 25%; }
   .entrada::after{ background: rgba(12, 28, 36, .12); }
   .entrada .cartao{ width: 430px; background: rgba(250, 251, 252, .85); }
   .entrada .assinatura{ max-width: 100%; left: 0; right: 0; bottom: 25px; text-align: center; font-size: 1.2rem; }
 }
 @media (max-width: 540px){
-  .entrada{ padding: 76px 16px 26px; }
+  .entrada{ padding: 24px 16px; }
   .entrada .cartao{ width: 100%; padding: 28px 24px 24px; border-radius: 22px; }
   .entrada h1{ font-size: 2.05rem; margin-top: 24px; }
   .entrada .assinatura{ display: none; }

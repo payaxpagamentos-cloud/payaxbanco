@@ -345,10 +345,7 @@ function telaEntrada() {
   limpar(raiz, cascaDeEntrada(
     el('h1', {}, 'Bem-vindo'),
     el('p', { class: 'abertura' }, 'Acesse sua conta.'),
-    f,
-    el('div', { class: 'ir-player' },
-      el('a', { href: 'tv/' }, 'Acessar player'),
-      el('p', { class: 'pequeno mudo', style: 'margin:8px 0 0' }, 'Para o aparelho ligado à TV.'))));
+    f));
   f.querySelector('input').focus();
 }
 
