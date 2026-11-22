@@ -56,7 +56,11 @@
    * A rede em números. Vem da API do painel, então o site nunca mostra um número desatualizado;
    * com a rede ainda vazia (ou sem API por perto), a faixa simplesmente não aparece.
    */
+  // Desligada por enquanto, a pedido: com a rede pequena, os números não ajudam a vender.
+  // Para voltar a mostrar quando a rede crescer, troque para true.
+  const MOSTRAR_NUMEROS_DA_REDE = false;
   (async () => {
+    if (!MOSTRAR_NUMEROS_DA_REDE) return;
     const base = await api();
     if (!base) return;
     try {
