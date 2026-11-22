@@ -658,6 +658,8 @@ async function telaSistema(ctx) {
   limpar(ctx.conteudo,
     cartao('Atualizar o sistema',
       el('p', { class: 'mudo', style: 'margin:0 0 14px' }, 'Envie aqui o arquivo da atualização (rastreador-AAAA.MM.NN.zip). O sistema confere o arquivo e instala sozinho, do mesmo jeito que a atualização pelo terminal. Se a versão nova não subir, ele volta para a anterior.'),
+      info.exemplo_no_env?.length ? el('p', { class: 'aviso erro', style: 'margin:0 0 14px' },
+        `Atenção: o arquivo .env do servidor ainda tem o valor de exemplo em ${info.exemplo_no_env.join(' e ')}. Esse valor é público. Troque por um próprio e reinicie o sistema.`) : null,
       linhaDado('Versão instalada', info.versao || '—'),
       linhaDado('Node.js', info.node),
       ultima ? el('p', { class: 'aviso ok', style: 'margin:14px 0 0' }, `✓ Atualizado para a versão ${ultima.detalhes?.para || info.versao} em ${dataHora(ultima.criado_em)}.`) : null,

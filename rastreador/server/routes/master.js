@@ -683,7 +683,7 @@ module.exports = (db, extras = {}) => {
     registrar(db, req, 'sistema_diagnostico');
     res.json({ texto: require('../lib/diagnosticoServidor').diagnostico() });
   });
-  r.get('/sistema', soMaster, (_req, res) => res.json({ ...atualizador.estado(), historico: historicoSistema() }));
+  r.get('/sistema', soMaster, (_req, res) => res.json({ ...atualizador.estado(), historico: historicoSistema(), exemplo_no_env: config.exemploNoEnv }));
   r.post('/sistema/atualizar', soMaster, raw({ type: '*/*', limit: '80mb' }), (req, res) => {
     conferirSenha(req);
     copiarBancoAntes();

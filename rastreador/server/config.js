@@ -15,9 +15,12 @@ if (!process.env.RASTREADOR_SECRET && process.env.NODE_ENV !== 'test') {
 
 const producao = process.env.NODE_ENV === 'production';
 
-// Os valores de exemplo do .env.exemplo são públicos: com eles qualquer um assinaria uma sessão de master. Nunca valem.
-if (/^troque-/.test(process.env.RASTREADOR_SECRET ?? '') || /^troque-/.test(process.env.RASTREADOR_ADMIN_SENHA ?? '')) {
-  throw new Error('[Rastreador] O .env ainda tem os valores de exemplo ("troque-..."). Defina RASTREADOR_SECRET e RASTREADOR_ADMIN_SENHA próprios.');
+// Os valores de exemplo do .env.exemplo são públicos: com o segredo de exemplo qualquer um assinaria uma sessão de master.
+// Uma instalação que já está no ar não pode parar por isso numa atualização: o sistema sobe, avisa no console e no menu
+// Sistema, e o master troca os valores no .env.
+const exemploNoEnv = ['RASTREADOR_SECRET', 'RASTREADOR_ADMIN_SENHA'].filter((k) => /^troque-/.test(process.env[k] ?? ''));
+if (exemploNoEnv.length) {
+  console.error(`[Rastreador] ATENÇÃO: o .env ainda tem o valor de exemplo em ${exemploNoEnv.join(' e ')}. Troque por valores próprios (o de exemplo é público).`);
 }
 // Fora de produção e sem senha definida: "master123" só em desenvolvimento e nos testes; nos outros casos, uma senha sorteada
 // (mostrada uma vez no console, quando o master é criado).
@@ -63,6 +66,8 @@ module.exports = {
     : path.join(path.dirname(process.env.RASTREADOR_DB || path.join(__dirname, '..', 'data', 'rastreador.db')), 'fotos')),
   secret,
   tokenTtlSeconds: 12 * 60 * 60,
+  // Variáveis do .env que ainda estão com o valor de exemplo (aviso no menu Sistema).
+  exemploNoEnv,
   trustProxy: process.env.RASTREADOR_TRUST_PROXY ?? 'loopback',
   // Endereço em que o painel escuta. Atrás de um proxy (Nginx/Apache) no mesmo servidor, use 127.0.0.1: a porta deixa de
   // responder para fora e ninguém fala com o painel sem passar pelo proxy (HTTPS e limites de tentativas).
