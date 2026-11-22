@@ -261,9 +261,13 @@ executar install -d -o "$USUARIO" -g "$USUARIO" -m 750 "$DADOS/atualizacao"
 # Atualização pelo painel: o painel deixa o pacote em $DADOS/atualizacao e este serviço (root) faz a troca.
 executar install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.path" /etc/systemd/system/vaimidia-atualizar.path
 executar install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.service" /etc/systemd/system/vaimidia-atualizar.service
+executar install -d -o "$USUARIO" -g "$USUARIO" -m 750 "$DADOS/comandos"
+executar install -m 644 "$RAIZ/instalacao/vaimidia-comando.path" /etc/systemd/system/vaimidia-comando.path
+executar install -m 644 "$RAIZ/instalacao/vaimidia-comando.service" /etc/systemd/system/vaimidia-comando.service
 executar systemctl daemon-reload
 executar systemctl enable vaimidia
 executar systemctl enable --now vaimidia-atualizar.path
+executar systemctl enable --now vaimidia-comando.path
 executar systemctl restart vaimidia
 
 # ---------------------------------------------------------------- nginx

@@ -1,0 +1,11 @@
+# Vai Mídia — roda o comando pedido pelo painel (ver comando-pelo-painel.sh). Só comandos da lista.
+[Unit]
+Description=Vai Mídia — comando pedido pelo painel
+
+[Service]
+Type=oneshot
+ExecStart=/opt/vaimidia/instalacao/comando-pelo-painel.sh
+TimeoutStartSec=6min
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vaimidia-comando

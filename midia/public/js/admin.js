@@ -268,7 +268,7 @@ export async function configuracoes(ctx) {
         + 'Não há câmera nem leitura do ambiente — é uma cópia do que o aparelho está exibindo. 0 desliga.'),
       el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O resumo por dia (relatórios e faturamento) nunca é apagado; 0 guarda todo o detalhe da prova de exibição para sempre.'))]));
   } else {
-    corpo = el('div', { class: 'coluna' }, await cartaoAtualizacao(ctx), await cartaoDkim(), await cartaoBackup());
+    corpo = el('div', { class: 'coluna' }, await cartaoAtualizacao(ctx), await cartaoComandos(ctx), await cartaoDkim(), await cartaoBackup());
   }
   limpar(ctx.conteudo, el('div', { class: 'coluna' },
     abas(abasVisiveis, aba, 'configuracoes'),
@@ -308,6 +308,67 @@ const FINAIS = ['concluida', 'falhou', 'revertida'];
  * Atualizar o sistema pelo painel (dá para fazer do celular): envia o vaimidia.zip com a senha
  * digitada de novo. Quem troca a versão é um serviço do servidor; se a nova não subir, ele volta a anterior.
  */
+/**
+ * Comandos do servidor pelo celular: uma lista fechada (conferir, ver DNS, reiniciar…). Escolhe,
+ * confirma com a senha e a resposta do servidor aparece aqui embaixo, com botão de copiar.
+ */
+async function cartaoComandos(ctx) {
+  const corpo = el('div', { class: 'cartao' });
+  const resposta = el('div', { class: 'coluna', style: 'gap:8px' });
+  const escolha = el('select', { name: 'id' });
+  const explica = el('p', { class: 'mudo pequeno', style: 'margin:0' });
+  const senha = el('input', { type: 'password', autocomplete: 'current-password', required: true, placeholder: 'Sua senha' });
+  const botao = el('button', { class: 'btn primario' }, 'Rodar comando');
+  const f = el('form', { class: 'coluna', style: 'gap:10px' },
+    el('label', { class: 'campo' }, el('span', {}, 'Comando'), escolha), explica,
+    el('label', { class: 'campo' }, el('span', {}, 'Sua senha, para confirmar'), senha),
+    el('div', {}, botao));
+  let lista = [];
+  const mostrarExplicacao = () => { explica.textContent = lista.find((c) => c.id === escolha.value)?.descricao ?? ''; };
+  escolha.addEventListener('change', mostrarExplicacao);
+
+  const pintar = async () => {
+    const s = await api.get('/painel/sistema/comandos');
+    if (!lista.length) {
+      lista = s.lista;
+      limpar(escolha, ...lista.map((c) => el('option', { value: c.id }, c.nome)));
+      mostrarExplicacao();
+    }
+    const nome = lista.find((c) => c.id === s.estado?.id)?.nome ?? 'Comando';
+    const linhas = [];
+    if (s.sem_resposta) {
+      linhas.push(el('p', { class: 'aviso erro' }, 'O servidor não pegou o pedido. Esta parte passa a funcionar depois da próxima atualização do sistema.'));
+    } else if (s.rodando) {
+      linhas.push(el('p', { class: 'aviso' }, 'Rodando no servidor… aguarde.'));
+    } else if (s.estado) {
+      linhas.push(el('p', { class: s.estado.etapa === 'concluido' ? 'aviso ok' : 'aviso erro' },
+        `${nome}: ${s.estado.etapa === 'concluido' ? 'terminou' : 'terminou com erro'} (${dataHora(s.estado.atualizado_em)})`));
+      if (s.saida) {
+        linhas.push(el('pre', { class: 'pequeno', style: 'white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto;margin:0' }, s.saida));
+        linhas.push(el('div', {}, el('button', { class: 'btn pequeno', type: 'button', onclick: () => { navigator.clipboard?.writeText(s.saida); toast('Resposta copiada.'); } }, 'Copiar a resposta')));
+      }
+    }
+    limpar(resposta, ...linhas);
+    botao.disabled = Boolean(s.rodando && !s.sem_resposta);
+  };
+
+  f.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    acao(botao, async () => {
+      await api.post('/painel/sistema/comandos', { id: escolha.value, senha: senha.value });
+      senha.value = '';
+      await pintar();
+    });
+  });
+
+  corpo.append(el('h2', {}, 'Comandos'),
+    el('p', { class: 'mudo', style: 'margin-top:-8px' }, 'Para resolver as coisas do servidor pelo celular. A resposta aparece aqui embaixo.'),
+    f, resposta);
+  await pintar().catch(() => {});
+  ctx.parar(repetir(() => pintar().catch(() => {}), 4000));
+  return corpo;
+}
+
 /** O registro DKIM pronto para copiar e colar no Registro.br, sem precisar entrar no servidor. */
 async function cartaoDkim() {
   const d = await api.get('/painel/sistema/dkim').catch(() => ({ configurado: false, motivo: 'Não foi possível consultar.' }));

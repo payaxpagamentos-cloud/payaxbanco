@@ -60,8 +60,13 @@ install -d -o vaimidia -g vaimidia -m 750 "$DADOS/atualizacao"
 chmod +x "$DESTINO"/instalacao/*.sh
 install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.path" /etc/systemd/system/vaimidia-atualizar.path
 install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.service" /etc/systemd/system/vaimidia-atualizar.service
+# Comandos pelo painel: o painel pede pelo nome um comando da lista; o serviço vaimidia-comando (root) roda.
+install -d -o vaimidia -g vaimidia -m 750 "$DADOS/comandos"
+install -m 644 "$RAIZ/instalacao/vaimidia-comando.path" /etc/systemd/system/vaimidia-comando.path
+install -m 644 "$RAIZ/instalacao/vaimidia-comando.service" /etc/systemd/system/vaimidia-comando.service
 systemctl daemon-reload
 systemctl enable --now vaimidia-atualizar.path >/dev/null 2>&1 || true
+systemctl enable --now vaimidia-comando.path >/dev/null 2>&1 || true
 command -v unzip >/dev/null 2>&1 || apt-get install -y unzip >/dev/null 2>&1 || true
 echo "    Ativa: Configurações › Sistema › Atualizar sistema, no painel."
 

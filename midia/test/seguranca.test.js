@@ -52,3 +52,26 @@ test('Segurança: código de pareamento não é reaproveitado', async (t) => {
   assert.equal(depois.pareado, false);
   assert.equal(depois.token, undefined);
 });
+
+/** Comandos pelo painel: só o master, só os da lista, e com a senha. O painel deixa apenas o nome. */
+test('Sistema: comandos pelo painel são uma lista fechada', async (t) => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'vm-comandos-'));
+  process.env.MIDIA_COMANDOS = pasta;
+  const { iniciar, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+  t.after(() => { api.fechar(); limparArquivos(); delete process.env.MIDIA_COMANDOS; fs.rmSync(pasta, { recursive: true, force: true }); });
+  const master = await api.login();
+  await api.post('/painel/usuarios', { nome: 'Adm', email: 'adm@x.com.br', senha: 'senha-do-adm', perfil: 'administrador' }, master);
+  const adm = await api.login('adm@x.com.br', 'senha-do-adm');
+
+  assert.equal((await api.get('/painel/sistema/comandos', adm)).status, 403);
+  assert.equal((await api.post('/painel/sistema/comandos', { id: 'dns', senha: 'errada' }, master)).status, 403);
+  assert.equal((await api.post('/painel/sistema/comandos', { id: 'rm -rf /', senha: 'master123' }, master)).status, 422);
+  assert.equal(fs.existsSync(path.join(pasta, 'pedido')), false);
+  assert.equal((await api.post('/painel/sistema/comandos', { id: 'dns', senha: 'master123' }, master)).status, 202);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(pasta, 'pedido'), 'utf8')).id, 'dns');
+  assert.equal((await api.post('/painel/sistema/comandos', { id: 'conferir', senha: 'master123' }, master)).status, 409, 'um de cada vez');
+});

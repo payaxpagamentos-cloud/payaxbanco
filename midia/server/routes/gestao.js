@@ -475,6 +475,19 @@ module.exports = (db) => {
   // Atualizar o sistema pelo painel: só o master, e com a senha digitada de novo.
   r.get('/sistema/atualizacao', permitir('master'), (_req, res) => res.json(atualizacao.situacao()));
 
+  // Comandos do servidor: só o master, só os da lista e com a senha digitada de novo.
+  r.get('/sistema/comandos', permitir('master'), (_req, res) => res.json(require('../lib/comandos').situacao()));
+  r.post('/sistema/comandos', permitir('master'), (req, res) => {
+    const u = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(req.usuario.id);
+    if (!u || !verificarSenha(String(req.body.senha ?? ''), u.senha_hash)) {
+      registrar(db, req, 'comando_senha_errada', {});
+      throw new ErroNegocio('Senha incorreta. O comando não foi rodado.', 403);
+    }
+    const item = require('../lib/comandos').pedir(String(req.body.id ?? ''), req.usuario);
+    registrar(db, req, 'comando_pedido', { id: item.id });
+    res.status(202).json({ ok: true, comando: item });
+  });
+
   // O registro DKIM para colar no Registro.br (só a chave pública).
   r.get('/sistema/dkim', permitir('master'), (_req, res) => res.json(require('../lib/email').registroDkim()));
 
