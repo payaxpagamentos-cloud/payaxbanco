@@ -30,7 +30,7 @@ const COMPONENTES = {
   velas: { nome: 'Velas de ignição', grupo: 'Motor', km: 30000 },
   correia_dentada: { nome: 'Correia dentada e tensor', grupo: 'Motor', km: 60000, dias: 1460 },
   correia_acessorios: { nome: 'Correia de acessórios', grupo: 'Motor', km: 50000, dias: 1460 },
-  arrefecimento: { nome: 'Líquido de arrefecimento', grupo: 'Motor', km: 40000, dias: 730 },
+  arrefecimento: { nome: 'Água do radiador (aditivo)', grupo: 'Motor', km: 40000, dias: 730 },
   embreagem: { nome: 'Kit de embreagem', grupo: 'Transmissão', km: 100000 },
   oleo_cambio: { nome: 'Óleo do câmbio', grupo: 'Transmissão', km: 60000 },
   relacao: { nome: 'Kit relação (corrente, coroa e pinhão)', grupo: 'Transmissão', km: 20000 },

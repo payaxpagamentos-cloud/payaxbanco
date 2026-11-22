@@ -212,7 +212,7 @@ const acoesComponente = (ctx, comp, { aoEditar, depois } = {}) => modal(`${comp.
 // Cada peça: o desenho (no cofre, deslocado 60 px para dar lugar às etiquetas), o ponto de ligação e a altura da etiqueta.
 const DX = 60;
 const PECAS_MOTOR = {
-  arrefecimento: { nome: 'Arrefecimento', lado: 'dir', ly: 70, anc: [470, 77],
+  arrefecimento: { nome: 'Água do radiador', lado: 'dir', ly: 70, anc: [470, 77],
     svg: `<rect class="mt-peca" x="170" y="58" width="300" height="38" rx="8"/>${Array.from({ length: 14 }, (_, i) => `<line class="mt-fio" x1="${186 + i * 20}" x2="${186 + i * 20}" y1="64" y2="90"/>`).join('')}` },
   correia_acessorios: { nome: 'Correia de acessórios', lado: 'esq', ly: 140, anc: [236, 140],
     svg: `<path class="mt-correia" d="M250 126 L390 126 Q404 126 404 140 L344 188 Q320 198 296 188 L236 140 Q236 126 250 126 Z"/>

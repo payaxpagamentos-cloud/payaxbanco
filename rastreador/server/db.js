@@ -999,6 +999,8 @@ function migrar(db) {
       }
     }
   }
+  // Nome mais claro para o arrefecimento (só troca o nome padrão; o que o gestor renomeou fica como está).
+  db.exec("UPDATE frota_componentes SET nome = 'Água do radiador (aditivo)' WHERE tipo = 'arrefecimento' AND nome = 'Líquido de arrefecimento'");
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_veiculo_qr ON veiculos(codigo_qr) WHERE codigo_qr IS NOT NULL');
   const sqlAlertas = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'alertas'").get()?.sql ?? '';
   if (!sqlAlertas.includes('sumico_suspeito')) {
