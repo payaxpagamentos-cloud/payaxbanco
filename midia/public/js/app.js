@@ -21,7 +21,9 @@ const MENUS = {
     ['anunciantes', 'Anunciantes e agências', 'anunciantes'], ['criativos', 'Criativos', 'midias'],
     ['campanhas', 'Campanhas', 'campanhas'], ['programacao', 'Programação', 'grade'],
     ['#telas', '2 · Telas'],
-    ['pontos', 'Pontos', 'pontos'], ['telas', 'TVs', 'telas'], ['comunicados', 'Comunicados', 'aprovacoes'],
+    // Comunicado é recado do próprio ponto: fica dentro de Pontos.
+    ['grupo-pontos', 'Pontos', 'pontos', null, [['pontos', 'Pontos'], ['comunicados', 'Comunicados']]],
+    ['telas', 'TVs', 'telas'],
     ['#vendas', '3 · Vendas'],
     ['crm', 'CRM', 'anunciantes', null, [
       ['funil', 'Funil'], ['propostas', 'Propostas'], ['produtos', 'Produtos', ['master']], ['emails', 'E-mail'],
