@@ -171,13 +171,13 @@ async function enviar({ para, assunto, texto, ...conteudo }, { exigir = false } 
 async function enviarDireto({ para, assunto, texto, emRespostaA = null, referencias = [], de = null }) {
   if (!configurado()) return { enviado: false, motivo: 'o envio de e-mails não está configurado no servidor' };
   const corpo = String(texto ?? '').trim();
-  const html = modelo({
-    plataforma: 'Vai Mídia',
-    titulo: assunto,
-    linhas: corpo.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean),
-    rodape: 'Pode responder a este e-mail: a resposta chega direto na nossa equipe.',
-    assinatura: String(de?.assinatura ?? '').trim() || undefined,
-  });
+  const assinaturaTexto = String(de?.assinatura ?? '').trim();
+  // Mensagem de pessoa para pessoa: HTML simples, só o texto e a assinatura — como um e-mail comum.
+  const paragrafo = (t, estilo = '') => `<p style="margin:0 0 14px;${estilo}">${esc(t).replace(/\r?\n/g, '<br>')}</p>`;
+  const html = `<!doctype html><html><body style="margin:0;padding:16px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#18232A">`
+    + corpo.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean).map((p) => paragrafo(p)).join('')
+    + (assinaturaTexto ? paragrafo(assinaturaTexto, 'margin-top:22px;padding-top:12px;border-top:1px solid #D9DFE5;font-size:14px;color:#44525A') : '')
+    + '</body></html>';
   try {
     const assinatura = String(de?.assinatura ?? '').trim();
     const origem = de ? { name: de.nome || 'Vai Mídia', address: de.endereco } : config.smtp.remetente;

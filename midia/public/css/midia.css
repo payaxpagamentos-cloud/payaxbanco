@@ -777,6 +777,12 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 /* Caixa de entrada do CRM: o corpo da mensagem é texto puro, com as quebras de linha que a pessoa escreveu. */
 .corpo-email{ white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: 16px 18px; max-height: 46vh; overflow: auto; font-size: 13.5px; line-height: 1.65; }
+.dados-email{ grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.dados-email > div > span + span{ overflow-wrap: anywhere; }
+.leitura-email{ display: flex; flex-direction: column; gap: 10px; }
+.leitura-email > .corpo-email{ background: var(--surface); font-size: 15px; }
+.citacao-email summary{ cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-2); padding: 4px 0; }
+.corpo-email.citado{ margin-top: 8px; border-left: 3px solid var(--border-strong, var(--border)); color: var(--text-2); max-height: 32vh; }
 .corpo-email:empty::after{ content: "(mensagem sem texto)"; color: var(--text-3); }
 
 /* Abas no alto da tela (submenu da própria página, como em Configurações). */

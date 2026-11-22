@@ -96,6 +96,39 @@ function avisoDoServidor(s) {
   return null;
 }
 
+/**
+ * Separa o que a pessoa escreveu agora do que veio citado da mensagem anterior (as linhas com ">" e o
+ * cabeçalho "Em tal dia, fulano escreveu:"). O novo aparece limpo; o citado fica recolhido.
+ */
+function separarCitacao(texto) {
+  const linhas = String(texto ?? '').split('\n');
+  let corte = linhas.findIndex((l) => /^\s*>/.test(l));
+  // Programa que não põe ">" marca a citação com uma linha de cabeçalho.
+  if (corte < 0) corte = linhas.findIndex((l) => /^(Em .+ escreveu:|On .+ wrote:|-{2,}\s*(Mensagem original|Original Message)\s*-{2,})\s*$/i.test(l.trim()));
+  if (corte < 0) return { novo: String(texto ?? '').trim(), citado: '' };
+  // O cabeçalho ("Em ..., fulano escreveu:") pode vir sem ">" logo acima, em até três linhas.
+  for (let i = corte - 1; i >= Math.max(0, corte - 4); i--) {
+    if (/(escreveu|wrote):\s*$/i.test(linhas[i])) {
+      let ini = i;
+      while (ini > 0 && ini > i - 2 && linhas[ini - 1].trim() && !/^(Em|On) /i.test(linhas[ini])) ini--;
+      corte = ini;
+      break;
+    }
+    if (linhas[i].trim()) break;
+  }
+  const citado = linhas.slice(corte).map((l) => l.replace(/^\s*>\s?/, '')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return { novo: linhas.slice(0, corte).join('\n').trim(), citado };
+}
+
+function corpoDaMensagem(texto) {
+  const { novo, citado } = separarCitacao(texto);
+  return el('div', { class: 'leitura-email' },
+    el('div', { class: 'corpo-email' }, novo || (citado ? '(sem texto novo)' : '(mensagem sem texto)')),
+    citado ? el('details', { class: 'citacao-email' },
+      el('summary', {}, 'Ver a mensagem anterior'),
+      el('div', { class: 'corpo-email citado' }, citado)) : null);
+}
+
 /** A mensagem aberta: o texto, os anexos e o que fazer com ela. */
 async function abrir(id, recarregar) {
   const e = await api.get(`/painel/crm/emails/${id}`);
@@ -123,14 +156,14 @@ async function abrir(id, recarregar) {
     }, icone('baixar'), 'Original (.eml)'));
 
     return [
-      el('div', { class: 'dados', style: 'margin-bottom:14px' },
+      el('div', { class: 'dados dados-email', style: 'margin-bottom:14px' },
         el('div', {}, el('span', { class: 'rotulo' }, 'De'), el('span', {}, quem(e))),
         el('div', {}, el('span', { class: 'rotulo' }, 'Para'), el('span', {}, e.para)),
         el('div', {}, el('span', { class: 'rotulo' }, 'Quando'), el('span', {}, dataHora(e.recebido_em))),
         el('div', {}, el('span', { class: 'rotulo' }, 'No funil'),
           el('span', {}, e.lead ?? e.anunciante ?? e.ponto ?? 'sem vínculo'))),
 
-      el('div', { class: 'corpo-email' }, e.texto || '(mensagem sem texto)'),
+      corpoDaMensagem(e.texto),
 
       e.anexos.length
         ? el('div', { style: 'margin-top:14px' },
