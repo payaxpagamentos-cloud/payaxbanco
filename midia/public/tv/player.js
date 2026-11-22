@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '1.5';
+const VERSAO = '1.6';
 const API = new URL('../api/', location.href).href;
 const CHAVES = { token: 'midia.tv.token', grade: 'midia.tv.grade', fila: 'midia.tv.fila', codigo: 'midia.tv.codigo', vistos: 'midia.tv.vistos' };
 // Um arquivo que sumiu da programação (campanha só de manhã, por exemplo) ainda fica no cache por estes dias,
@@ -767,24 +767,16 @@ async function manterTelaAcesa() {
 // controle ou toque na tela em "tela cheia". Basta apertar OK uma vez.
 const emTelaCheia = () => Boolean(document.fullscreenElement || document.webkitFullscreenElement);
 
-// Um pedido por vez, do jeito mais simples (sem opções): navegador de TV antigo recusa o pedido com
-// opções, e alguns cancelam a tela cheia quando ela é pedida de novo antes de terminar de abrir.
-// Tenta a página inteira e, se o navegador não deixar, o corpo da página (e as versões antigas do WebKit).
-let pedindoTelaCheia = false;
+// Exatamente o pedido da versão que funcionou na TV Samsung de teste (player 1.1): com a opção de esconder
+// a barra do navegador, o WebKit como reserva, e pedido de novo a cada evento do gesto (pointerdown,
+// click…) — as versões "simplificadas" depois disso pararam de maximizar ali.
 function pedirTelaCheia() {
-  if (emTelaCheia() || pedindoTelaCheia) return;
-  pedindoTelaCheia = true;
-  const liberar = () => { pedindoTelaCheia = false; };
-  for (const alvo of [document.documentElement, document.body]) {
-    const pedir = alvo.requestFullscreen || alvo.webkitRequestFullscreen || alvo.webkitRequestFullScreen || alvo.mozRequestFullScreen || alvo.msRequestFullscreen;
-    if (!pedir) continue;
-    try {
-      const pedido = pedir.call(alvo);
-      if (pedido && pedido.then) pedido.then(liberar, liberar); else liberar();
-      return;
-    } catch { /* tenta o próximo */ }
-  }
-  liberar();
+  if (emTelaCheia()) return;
+  const raiz = document.documentElement;
+  try {
+    const pedido = raiz.requestFullscreen?.({ navigationUI: 'hide' }) ?? raiz.webkitRequestFullscreen?.();
+    pedido?.catch?.(() => {});
+  } catch { /* aparelho sem a função */ }
 }
 
 /** Botão "Clique aqui para maximizar": fica na tela enquanto a TV não estiver em tela cheia. */
@@ -808,19 +800,23 @@ function telaCheia() {
       sumir = setTimeout(() => { botao.hidden = true; }, 120_000);
     }
   };
-  botao.addEventListener('click', (e) => {
-    e.stopPropagation();
-    pedirTelaCheia();
-    // Se em 1,5 s não abriu, o navegador desta TV não deixa site nenhum ocupar a tela.
+  // O ponteiro do controle da Samsung manda pointerdown, e nem sempre um click: o botão escuta os dois.
+  let conferindo = false;
+  const apertou = () => {
+    if (conferindo) return;
+    conferindo = true;
+    // Se em 2 s não abriu, o navegador desta TV não deixa site nenhum ocupar a tela.
     setTimeout(() => {
+      conferindo = false;
       if (ocupaTudo()) return;
       botao.classList.add('aviso');
       texto.textContent = 'Esta TV não deixa o site maximizar: use "Tela cheia" no menu do navegador';
-    }, 1500);
-  });
+    }, 2000);
+  };
+  for (const evento of ['pointerdown', 'click', 'keydown']) botao.addEventListener(evento, apertou);
   pedirTelaCheia();
-  // Clique, duplo clique, toque ou a tecla OK em qualquer lugar também maximizam.
-  for (const evento of ['click', 'dblclick', 'keydown', 'touchend']) {
+  // Os mesmos eventos da versão que funcionou na Samsung: tecla, ponteiro, toque e clique (em qualquer lugar, botão incluído).
+  for (const evento of ['keydown', 'pointerdown', 'touchend', 'click']) {
     document.addEventListener(evento, pedirTelaCheia, { capture: true });
   }
   // Mexeu no controle e a TV continua sem tela cheia: o botão volta.
