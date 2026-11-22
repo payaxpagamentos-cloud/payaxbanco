@@ -11,7 +11,7 @@ let slogan = 'Sua marca em movimento.';
 // WhatsApp da empresa: vira o botão "Falar com a equipe" nos portais do anunciante e do ponto.
 let whatsappEquipe = '';
 
-// [rota, rótulo, ícone, perfis que veem (vazio = todos do grupo)]
+// [rota, rótulo, ícone, perfis que veem (vazio = todos do grupo), submenus [rota, rótulo, perfis?]]
 const MENUS = {
   equipe: [
     ['resumo', 'Visão geral', 'dashboard'], ['telas', 'TVs', 'telas'], ['pontos', 'Pontos', 'pontos'],
@@ -19,7 +19,7 @@ const MENUS = {
     ['anunciantes', 'Anunciantes e agências', 'anunciantes'], ['campanhas', 'Campanhas', 'campanhas'], ['criativos', 'Criativos', 'midias'],
     ['programacao', 'Programação', 'grade'], ['inventario', 'Inventário', 'ocupacao'],
     ['crm', 'CRM', 'anunciantes', null, [
-      ['funil', 'Funil'], ['propostas', 'Propostas'], ['emails', 'E-mail'],
+      ['funil', 'Funil'], ['propostas', 'Propostas'], ['produtos', 'Produtos', ['master']], ['emails', 'E-mail'],
     ]],
     ['relatorios', 'Relatórios', 'relatorios'],
     ['financeiro', 'Financeiro', 'faturamento', null, [
@@ -48,7 +48,8 @@ const SUBTITULOS = {
   criativos: 'Imagens e vídeos que vão para as telas', programacao: 'Como fica o loop de cada TV e quanto ainda cabe de publicidade',
   relatorios: 'Inserções, impactos e a prova de exibição', faturamento: 'Fechamento do mês e faturas dos anunciantes',
   repasses: 'Comissão dos lojistas sobre a receita das telas', diagnostico: 'Verificações da rede e das TVs',
-  usuarios: 'Quem acessa o painel e os portais', configuracoes: 'Regras da programação, preços de tabela e PIX das faturas',
+  usuarios: 'Quem acessa o painel e os portais', configuracoes: 'Empresa, TVs e sistema',
+  produtos: 'A tabela de preços da rede: o ponto de partida das propostas e do faturamento',
   receber: 'Faturas dos anunciantes: o que entra, o que está vencendo e o que atrasou',
   pagar: 'Repasses aos pontos e despesas da operação: o que sai',
   funil: 'O funil: com quem estamos falando, o que ficou combinado e o que virou contrato',
@@ -80,7 +81,8 @@ async function desenhar() {
   const menu = MENUS[g];
   const telas = { equipe: TELAS_EQUIPE, anunciante: TELAS_ANUNCIANTE, lojista: TELAS_LOJISTA }[g];
   const [nome, ...resto] = rota();
-  const item = menu.find(([k, , , perfis, subs]) => (k === nome || subs?.some(([sk]) => sk === nome)) && (!perfis || perfis.includes(u.perfil)));
+  const pode = (perfis) => !perfis || perfis.includes(u.perfil);
+  const item = menu.find(([k, , , perfis, subs]) => (k === nome || subs?.some(([sk, , ps]) => sk === nome && pode(ps))) && pode(perfis));
   // Um grupo (só submenus) leva para a primeira tela dele.
   if (item?.[4] && item[0] === nome && item[4][0][0] !== nome) return ir(item[4][0][0]);
   if (!item || !telas[nome]) return ir(menu[0][4]?.[0][0] ?? menu[0][0]);
@@ -94,7 +96,7 @@ async function desenhar() {
     const aberto = k === nome || subs?.some(([sk]) => sk === nome);
     const link = el('a', { class: `item${aberto ? ' on' : ''}`, href: `#/${subs ? subs[0][0] : k}`, title: rotulo }, icone(ic), el('span', { class: 'rotulo' }, rotulo));
     if (!subs || !aberto) return link;
-    return [link, el('div', { class: 'grupo-sub' }, subs.map(([sk, sr]) => el('a', { class: `sub${sk === nome ? ' on' : ''}`, href: `#/${sk}` }, sr)))];
+    return [link, el('div', { class: 'grupo-sub' }, subs.filter(([, , ps]) => pode(ps)).map(([sk, sr]) => el('a', { class: `sub${sk === nome ? ' on' : ''}`, href: `#/${sk}` }, sr)))];
   });
 
   const lateral = el('nav', { class: 'lateral', 'aria-label': 'Menu' },

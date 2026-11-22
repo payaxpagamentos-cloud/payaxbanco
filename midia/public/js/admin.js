@@ -69,14 +69,81 @@ function novoUsuario(opcoes, recarregar) {
   });
 }
 
+// Configurações em abas: cada uma é um formulário que salva só os próprios campos.
+const ABAS_CONFIG = [['empresa', 'Empresa'], ['tvs', 'TVs'], ['sistema', 'Sistema']];
+const LIGA_DESLIGA = ['aviso_lojista', 'comunicado_automatico', 'marca_preenche', 'avisos_email', 'clima_ligado'];
+
+/** Abas no alto da tela (submenu na própria página): trocar de aba muda o endereço, então dá para voltar nela. */
+export function abas(lista, atual, rota) {
+  return el('nav', { class: 'abas', 'aria-label': 'Seções' },
+    lista.map(([k, rotulo]) => el('a', { class: `aba${k === atual ? ' on' : ''}`, href: `#/${rota}/${k}`, 'aria-current': k === atual ? 'page' : null }, rotulo)));
+}
+
+/** Formulário de configurações que manda só os campos dele (o servidor não mexe no que não veio). */
+function formConfig(conteudo, rotuloBotao = 'Salvar') {
+  const f = el('form', { class: 'form' }, ...conteudo,
+    el('div', { class: 'linha entre' }, el('span', {}), el('button', { class: 'btn primario largo' }, rotuloBotao)));
+  f.addEventListener('submit', (e) => {
+    e.preventDefault();
+    acao(f.querySelector('button[class*=primario]'), async () => {
+      const d = lerForm(f);
+      const corpo = { ...d };
+      for (const k of LIGA_DESLIGA) if (f.elements[k]) corpo[k] = d[k] ? 1 : 0;
+      if ('mensalidade' in d) corpo.mensalidade_tela_centavos = centavos(d.mensalidade) ?? 0;
+      if ('cpm' in d) corpo.cpm_centavos = centavos(d.cpm) ?? 0;
+      if ('comissao' in d) corpo.comissao_local_percentual = Math.round(Number(String(d.comissao).replace(',', '.')) * 100);
+      for (const k of ['mensalidade', 'cpm', 'comissao']) delete corpo[k];
+      await api.put('/painel/configuracoes', corpo);
+      toast('Configurações salvas.');
+    });
+  });
+  return f;
+}
+
 export async function configuracoes(ctx) {
+  const aba = ABAS_CONFIG.some(([k]) => k === ctx.parametros[0]) ? ctx.parametros[0] : 'empresa';
   const c = await api.get('/painel/configuracoes');
-  const f = el('form', { class: 'form' },
+  let corpo;
+  if (aba === 'empresa') {
+    corpo = el('div', { class: 'cartao grande' }, formConfig([
     el('fieldset', {}, el('legend', {}, 'Marca'),
       el('div', { class: 'duas' },
         campo('Nome que aparece no painel e nas telas', { name: 'nome_plataforma', value: c.nome_plataforma, required: true, maxlength: 60 }),
         campo('Frase da marca', { name: 'slogan', value: c.slogan, maxlength: 80, placeholder: 'Sua marca em movimento.' }))),
 
+    el('fieldset', {}, el('legend', {}, 'PIX das faturas'),
+      campo('Chave PIX', { name: 'pix_chave', value: c.pix_chave, maxlength: 80, placeholder: 'e-mail, CNPJ, telefone ou chave aleatória' }),
+      el('div', { class: 'duas' },
+        campo('Nome do recebedor', { name: 'pix_nome', value: c.pix_nome, maxlength: 60 }),
+        campo('Cidade do recebedor', { name: 'pix_cidade', value: c.pix_cidade, maxlength: 40 })),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Sem a chave, a fatura sai sem o código de pagamento.')),
+
+    el('fieldset', {}, el('legend', {}, 'Nota fiscal'),
+      campo('CNPJ da empresa', { name: 'empresa_documento', value: c.empresa_documento, maxlength: 20, placeholder: '00.000.000/0001-00' }),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'A NFS-e é emitida no sistema da prefeitura (precisa de certificado digital). O painel guarda o número da nota em cada fatura e monta a planilha com tomador, CNPJ, serviço e valor para a emissão.')),
+
+    el('fieldset', {}, el('legend', {}, 'WhatsApp da empresa'),
+      campo('Número com DDD', { name: 'whatsapp', value: c.whatsapp, maxlength: 20, placeholder: '(19) 99999-0000' }),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'É o número que aparece para o cliente: no site, nos portais do anunciante e do ponto, e na proposta que ele abre pelo link. '
+        + 'As mensagens continuam saindo do WhatsApp de quem opera — o sistema abre a conversa com o texto pronto, não dispara sozinho.')),
+
+    el('fieldset', {}, el('legend', {}, 'Avisos por e-mail'),
+      c.email.configurado
+        ? el('p', { class: 'aviso ok' }, `Envio configurado. Os avisos vão para quem opera a rede (${c.email.equipe} pessoa(s)).`)
+        : el('p', { class: 'aviso' }, 'Sem servidor de e-mail (MIDIA_SMTP_HOST). Ninguém é avisado quando uma tela cai ou uma fatura vence.'),
+      marcar('Avisar por e-mail: tela fora do ar, fatura vencida e fila de aprovação parada', { name: 'avisos_email', checked: Boolean(c.avisos_email) }),
+      c.email.url ? null : el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'Dica: configure MIDIA_URL com o endereço público do painel para os links dos e-mails abrirem direto na tela certa.'),
+      el('div', { class: 'linha' }, el('button', {
+        type: 'button', class: 'btn pequeno', onclick: (e) => acao(e.target, async () => {
+          const r = await api.post('/painel/configuracoes/email-teste', {});
+          toast(r.enviado ? 'E-mail de teste enviado. Confira a sua caixa.' : `Não saiu: ${r.motivo}`, !r.enviado);
+        }),
+      }, 'Enviar e-mail de teste para mim')))]));
+  } else if (aba === 'tvs') {
+    corpo = el('div', { class: 'cartao grande' }, formConfig([
     el('fieldset', {}, el('legend', {}, 'Programação das telas'),
       el('div', { class: 'duas' },
         campo('Duração padrão de uma imagem (segundos)', { name: 'duracao_imagem_s', type: 'number', min: 3, max: 120, value: c.duracao_imagem_s }),
@@ -103,17 +170,6 @@ export async function configuracoes(ctx) {
         marcar('Mostrar a tela da marca quando não houver campanha', { name: 'marca_preenche', checked: Boolean(c.marca_preenche) }),
         campo('Tempo de cada aparição (segundos)', { name: 'marca_duracao_s', type: 'number', min: 5, max: 60, value: c.marca_duracao_s }))),
 
-    el('fieldset', {}, el('legend', {}, 'Preços de tabela e faturamento'),
-      el('div', { class: 'tres' },
-        campo('Mensalidade por TV (R$)', { name: 'mensalidade', value: reaisCampo(c.mensalidade_tela_centavos), inputmode: 'decimal' }),
-        campo('CPM — por mil impactos (R$)', { name: 'cpm', value: reaisCampo(c.cpm_centavos), inputmode: 'decimal' }),
-        campo('Comissão sugerida ao lojista (%)', { name: 'comissao', value: (c.comissao_local_percentual / 100).toString().replace('.', ','), inputmode: 'decimal' })),
-      el('div', { class: 'tres' },
-        campo('Dia de vencimento das faturas', { name: 'vencimento_dia', type: 'number', min: 1, max: 28, value: c.vencimento_dia }),
-        campo('Guardar a prova de exibição detalhada por (dias)', { name: 'prova_dias', type: 'number', min: 0, max: 3650, value: c.prova_dias }),
-        campo('Avisar do fim do contrato com (dias)', { name: 'contrato_aviso_dias', type: 'number', min: 0, max: 180, value: c.contrato_aviso_dias })),
-      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O resumo por dia (relatórios e faturamento) nunca é apagado; 0 guarda todo o detalhe para sempre.')),
-
     el('fieldset', {}, el('legend', {}, 'Conteúdo útil na tela'),
       marcar('Mostrar o clima do dia nas telas', { name: 'clima_ligado', checked: Boolean(c.clima_ligado) }),
       el('p', { class: 'pequeno mudo', style: 'margin:0' },
@@ -124,68 +180,41 @@ export async function configuracoes(ctx) {
         'A agenda do ponto ("O que vem por aí") aparece sozinha quando um comunicado tem data de evento — vale para a assembleia do prédio, a aula da academia ou a promoção da loja.')),
 
     el('fieldset', {}, el('legend', {}, 'Prova visual das telas'),
-      campo('A TV manda uma foto do que está na tela a cada (minutos)', { name: 'foto_minutos', type: 'number', min: 0, max: 1440, value: c.foto_minutos }),
+      el('div', { class: 'duas' },
+        campo('A TV manda uma foto do que está na tela a cada (minutos)', { name: 'foto_minutos', type: 'number', min: 0, max: 1440, value: c.foto_minutos }),
+        campo('Guardar a prova de exibição detalhada por (dias)', { name: 'prova_dias', type: 'number', min: 0, max: 3650, value: c.prova_dias })),
       el('p', { class: 'pequeno mudo', style: 'margin:0' },
         'O player desenha o próprio conteúdo e envia a imagem; o painel guarda só a última de cada TV, em TVs. '
-        + 'Não há câmera nem leitura do ambiente — é uma cópia do que o aparelho está exibindo. 0 desliga.')),
-
-    el('fieldset', {}, el('legend', {}, 'Avisos por e-mail'),
-      c.email.configurado
-        ? el('p', { class: 'aviso ok' }, `Envio configurado. Os avisos vão para quem opera a rede (${c.email.equipe} pessoa(s)).`)
-        : el('p', { class: 'aviso' }, 'Sem servidor de e-mail (MIDIA_SMTP_HOST). Ninguém é avisado quando uma tela cai ou uma fatura vence.'),
-      marcar('Avisar por e-mail: tela fora do ar, fatura vencida e fila de aprovação parada', { name: 'avisos_email', checked: Boolean(c.avisos_email) }),
-      c.email.url ? null : el('p', { class: 'pequeno mudo', style: 'margin:0' },
-        'Dica: configure MIDIA_URL com o endereço público do painel para os links dos e-mails abrirem direto na tela certa.'),
-      el('div', { class: 'linha' }, el('button', {
-        type: 'button', class: 'btn pequeno', onclick: (e) => acao(e.target, async () => {
-          const r = await api.post('/painel/configuracoes/email-teste', {});
-          toast(r.enviado ? 'E-mail de teste enviado. Confira a sua caixa.' : `Não saiu: ${r.motivo}`, !r.enviado);
-        }),
-      }, 'Enviar e-mail de teste para mim'))),
-
-    el('fieldset', {}, el('legend', {}, 'WhatsApp da empresa'),
-      campo('Número com DDD', { name: 'whatsapp', value: c.whatsapp, maxlength: 20, placeholder: '(19) 99999-0000' }),
-      el('p', { class: 'pequeno mudo', style: 'margin:0' },
-        'É o número que aparece para o cliente: no site, nos portais do anunciante e do ponto, e na proposta que ele abre pelo link. '
-        + 'As mensagens continuam saindo do WhatsApp de quem opera — o sistema abre a conversa com o texto pronto, não dispara sozinho.')),
-
-    el('fieldset', {}, el('legend', {}, 'Nota fiscal'),
-      campo('CNPJ da empresa', { name: 'empresa_documento', value: c.empresa_documento, maxlength: 20, placeholder: '00.000.000/0001-00' }),
-      el('p', { class: 'pequeno mudo', style: 'margin:0' },
-        'A NFS-e é emitida no sistema da prefeitura (precisa de certificado digital). O painel guarda o número da nota em cada fatura e monta a planilha com tomador, CNPJ, serviço e valor para a emissão.')),
-
-    el('fieldset', {}, el('legend', {}, 'PIX das faturas'),
-      campo('Chave PIX', { name: 'pix_chave', value: c.pix_chave, maxlength: 80, placeholder: 'e-mail, CNPJ, telefone ou chave aleatória' }),
-      el('div', { class: 'duas' },
-        campo('Nome do recebedor', { name: 'pix_nome', value: c.pix_nome, maxlength: 60 }),
-        campo('Cidade do recebedor', { name: 'pix_cidade', value: c.pix_cidade, maxlength: 40 })),
-      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Sem a chave, a fatura sai sem o código de pagamento.')),
-
-    el('div', { class: 'linha entre' }, el('span', {}), el('button', { class: 'btn primario largo' }, 'Salvar configurações')));
-
-  f.addEventListener('submit', (e) => {
-    e.preventDefault();
-    acao(f.querySelector('button[class*=primario]'), async () => {
-      const d = lerForm(f);
-      const corpo = {
-        ...d,
-        aviso_lojista: d.aviso_lojista ? 1 : 0,
-        comunicado_automatico: d.comunicado_automatico ? 1 : 0,
-        marca_preenche: d.marca_preenche ? 1 : 0,
-        avisos_email: d.avisos_email ? 1 : 0,
-        mensalidade_tela_centavos: centavos(d.mensalidade) ?? 0,
-        cpm_centavos: centavos(d.cpm) ?? 0,
-        comissao_local_percentual: Math.round(Number(String(d.comissao).replace(',', '.')) * 100),
-      };
-      for (const k of ['mensalidade', 'cpm', 'comissao']) delete corpo[k];
-      await api.put('/painel/configuracoes', corpo);
-      toast('Configurações salvas.');
-    });
-  });
+        + 'Não há câmera nem leitura do ambiente — é uma cópia do que o aparelho está exibindo. 0 desliga.'),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'O resumo por dia (relatórios e faturamento) nunca é apagado; 0 guarda todo o detalhe da prova de exibição para sempre.'))]));
+  } else {
+    corpo = el('div', { class: 'coluna' }, await cartaoAtualizacao(ctx), await cartaoBackup());
+  }
   limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'max-width:860px' },
-    el('div', { class: 'cartao grande' }, f),
-    await cartaoAtualizacao(ctx),
-    await cartaoBackup()));
+    abas(ABAS_CONFIG, aba, 'configuracoes'),
+    el('p', { class: 'pequeno mudo', style: 'margin:0' },
+      aba === 'empresa' ? 'Os dados da empresa: marca, PIX e nota fiscal das faturas, WhatsApp e avisos.'
+        : aba === 'tvs' ? 'Como as telas montam o loop, falam com o servidor e o que mostram além dos anúncios.'
+          : 'Atualização do sistema e cópias de segurança do banco.'),
+    corpo));
+}
+
+/** CRM › Produtos: a tabela de preços que a proposta e o faturamento usam. */
+export async function produtos(ctx) {
+  const c = await api.get('/painel/configuracoes');
+  limpar(ctx.conteudo, el('div', { class: 'coluna', style: 'max-width:860px' },
+    el('div', { class: 'cartao grande' }, formConfig([
+    el('fieldset', {}, el('legend', {}, 'Preços de tabela e faturamento'),
+      el('div', { class: 'tres' },
+        campo('Mensalidade por TV (R$)', { name: 'mensalidade', value: reaisCampo(c.mensalidade_tela_centavos), inputmode: 'decimal' }),
+        campo('CPM — por mil impactos (R$)', { name: 'cpm', value: reaisCampo(c.cpm_centavos), inputmode: 'decimal' }),
+        campo('Comissão sugerida ao lojista (%)', { name: 'comissao', value: (c.comissao_local_percentual / 100).toString().replace('.', ','), inputmode: 'decimal' })),
+      el('div', { class: 'duas' },
+        campo('Dia de vencimento das faturas', { name: 'vencimento_dia', type: 'number', min: 1, max: 28, value: c.vencimento_dia }),
+        campo('Avisar do fim do contrato com (dias)', { name: 'contrato_aviso_dias', type: 'number', min: 0, max: 180, value: c.contrato_aviso_dias })),),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'A mensalidade e o CPM são o ponto de partida da proposta comercial; dá para ajustar o preço em cada proposta. '
+        + 'A comissão é a sugerida ao cadastrar um ponto novo.')], 'Salvar preços'))));
 }
 
 // Etapas que o atualizador do servidor informa (atualizar-pelo-painel.sh).

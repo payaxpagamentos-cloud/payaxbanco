@@ -177,7 +177,7 @@ textos e traços de gráfico usam a versão escurecida (`--cor-tinta`).
 O teste *Padrão visual: o sistema inteiro segue o site* lê as cores direto de `site/css/styles.css` e cobra
 painel, TV e e-mail: se alguém reintroduzir o preto antigo ou outra fonte, o teste quebra.
 
-O **nome e a frase da marca** ficam em *Configurações › Marca* e valem para o painel inteiro e para as telas: quem
+O **nome e a frase da marca** ficam em *Configurações › Empresa › Marca* e valem para o painel inteiro e para as telas: quem
 revende a plataforma com outro nome troca ali, sem mexer no código.
 
 ### A tela da marca
@@ -188,7 +188,7 @@ Ninguém precisa produzir nem subir arte, e uma tela nova nunca aparece preta nu
 
 Esse tempo é **não vendido**, e é anotado na prova de exibição como tal: ele entra no denominador da ocupação e da
 divisão dos impactos, então o anunciante nunca recebe o público que passou enquanto a tela mostrava a marca da rede.
-Em *Configurações › Tela da marca* dá para desligar ou mudar quanto tempo ela fica no ar. Conteúdo institucional que
+Em *Configurações › TVs › Tela da marca* dá para desligar ou mudar quanto tempo ela fica no ar. Conteúdo institucional que
 a equipe tenha enviado tem preferência: a peça da marca só completa o que faltar.
 
 ## Contratos
@@ -225,7 +225,7 @@ clínica. Em condomínio, costuma ser a moeda de troca pelo espaço.
 
 - O **síndico (ou lojista) escreve no portal**: título, texto, tipo (aviso, manutenção, assembleia, entrega, urgente)
   e por quantos dias fica no ar. A equipe aprova em *Comunicados* — ou a plataforma pode ser configurada para que
-  entrem direto (*Configurações › comunicado do ponto entra no ar direto*).
+  entrem direto (*Configurações › TVs › comunicado do ponto entra no ar direto*).
 - A **tela desenha o comunicado na hora**: logo da administradora, tipo em destaque, nome do prédio, título em letras
   grandes, o texto, a data e a assinatura ("Administração / Síndico — …"). Não existe arte para produzir nem arquivo
   para baixar, e o mesmo texto se ajusta a tela deitada ou em pé.
@@ -510,12 +510,17 @@ O banco e os arquivos das mídias ficam em `/app/data` — monte um volume persi
 
 ## Configurações da plataforma
 
-Nome que aparece no painel e nas TVs; duração padrão de imagem; inserções por hora sugeridas; tempo **mínimo** e
-**máximo** do loop; intervalo da batida das TVs e quanto tempo sem contato conta como offline; se o lojista pode
-escrever o aviso da própria TV; se o comunicado publicado pelo ponto entra no ar direto ou passa pela equipe;
-preços de tabela (mensalidade por tela e CPM); comissão sugerida ao ponto; dia de vencimento das faturas; por quantos
-dias a prova de exibição detalhada é guardada (o resumo por dia, que alimenta relatórios e faturamento, **nunca** é
-apagado); e os dados do PIX.
+Em abas, na própria tela de *Configurações*:
+
+- **Empresa** — nome e frase da marca (painel e TVs), PIX e CNPJ das faturas, WhatsApp da empresa e avisos por e-mail.
+- **TVs** — duração padrão de imagem; inserções por hora sugeridas; tempo **mínimo** e **máximo** do loop; intervalo
+  da batida das TVs e quanto tempo sem contato conta como offline; se o lojista pode escrever o aviso da própria TV;
+  se o comunicado do ponto entra no ar direto; tela da marca; clima; prova visual e por quantos dias a prova de
+  exibição detalhada é guardada (o resumo por dia, que alimenta relatórios e faturamento, **nunca** é apagado).
+- **Sistema** — atualizar o sistema pelo painel e as cópias de segurança do banco.
+
+Os **preços de tabela** (mensalidade por tela e CPM), a comissão sugerida ao ponto, o dia de vencimento das faturas e
+o aviso de fim de contrato ficam no CRM, em *CRM › Produtos*.
 
 ## Operação do dia a dia
 

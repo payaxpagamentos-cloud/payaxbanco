@@ -143,7 +143,7 @@ criativos. Antes de trocar qualquer coisa, guarda uma cópia do banco em
 
 ## Atualizar pelo painel (pelo celular)
 
-Depois da primeira atualização pelos comandos acima, o painel ganha **Configurações › Atualizar sistema**
+Depois da primeira atualização pelos comandos acima, o painel ganha **Configurações › Sistema › Atualizar sistema**
 (só para o master): escolha o `vaimidia.zip`, digite a sua senha de novo e confirme.
 
 Por segurança, o sistema não se troca sozinho — ele roda como um usuário sem poder na máquina. O painel só

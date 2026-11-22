@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Vai Mídia — atualização pedida pelo painel (Configurações › Atualizar sistema).
+# Vai Mídia — atualização pedida pelo painel (Configurações › Sistema › Atualizar sistema).
 #
 # Quem chama é o systemd (vaimidia-atualizar.service), como root, quando o painel deixa um pedido.
 # O passo a passo:

@@ -63,7 +63,7 @@ install -m 644 "$RAIZ/instalacao/vaimidia-atualizar.service" /etc/systemd/system
 systemctl daemon-reload
 systemctl enable --now vaimidia-atualizar.path >/dev/null 2>&1 || true
 command -v unzip >/dev/null 2>&1 || apt-get install -y unzip >/dev/null 2>&1 || true
-echo "    Ativa: Configurações › Atualizar sistema, no painel."
+echo "    Ativa: Configurações › Sistema › Atualizar sistema, no painel."
 
 titulo "Reiniciando"
 systemctl restart vaimidia
