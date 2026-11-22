@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '2.0';
+const VERSAO = '2.1';
 // Carimbo com que esta página foi carregada (vem no endereço do script; ver server/lib/carimbo-player.js).
 const CARIMBO = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch { return ''; } })();
 const API = new URL('../api/', location.href).href;
@@ -84,9 +84,10 @@ function formatarHora(opcoes) {
   try { return new Date(agoraCerto()).toLocaleString('pt-BR', { ...opcoes, timeZone: fusoDaRede() }); } catch { return new Date(agoraCerto()).toLocaleString('pt-BR', opcoes); }
 }
 
+// Sem internet, a TV segue com o que está guardado e não avisa na tela: o espaço é do anunciante.
+// Quem precisa saber é a equipe — o painel mostra a TV sem contato e o Diagnóstico acusa.
 function marcarConexao(ok) {
   estado.online = ok;
-  $('sem-conexao').hidden = ok;
 }
 
 // ---------------------------------------------------------------- Pareamento
@@ -864,7 +865,15 @@ function marcarPlataforma(nome, slogan) {
   if (slogan !== undefined) $('espera-slogan').textContent = slogan ?? '';
 }
 
+/** Guarda a página do player na TV (ver tv/sw.js): ligada sem internet, ela abre mesmo assim. */
+function guardarPaginaNaTv() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('sw.js', { scope: '/' })
+    .catch(() => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
 async function iniciar() {
+  guardarPaginaNaTv();
   marcarPlataforma(estado.programacao?.plataforma, estado.programacao?.slogan);
   mostrarEspera('Preparando a tela…', 'Carregando a programação guardada.');
   relogio();

@@ -62,6 +62,8 @@ function criarApp(db) {
   r.use(express.static(path.join(__dirname, '..', 'public'), {
     setHeaders: (res, caminho) => {
       if (/public[\\/]+(tv[\\/]+)?(index\.html|player\.js|tv\.css)$/.test(caminho)) res.set('Cache-Control', 'no-cache');
+      // O service worker do player: sempre a versão nova, e autorizado a abrir o player pela raiz (tv.dominio/) sem internet.
+      if (/public[\\/]+tv[\\/]+sw\.js$/.test(caminho)) res.set({ 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' });
     },
   }));
   // Site institucional: servido em <base>/site/ e também na raiz do domínio, que é onde o visitante chega.

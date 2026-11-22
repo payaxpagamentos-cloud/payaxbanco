@@ -206,3 +206,25 @@ test('Perfil administrador: tudo menos a aba Sistema, sem poder se promover', as
   const mestre = (await api.get('/painel/usuarios', master)).dados.itens.find((u) => u.perfil === 'master');
   assert.equal((await api.patch(`/painel/usuarios/${mestre.id}`, { ativo: false }, adm)).status, 403, 'não desativa o master');
 });
+
+/** Corrigir o e-mail de um usuário: a pessoa passa a entrar com o e-mail novo, com a mesma senha. */
+test('Usuários: editar nome e e-mail', async (t) => {
+  const { iniciar, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+  t.after(() => { api.fechar(); limparArquivos(); });
+  const master = await api.login();
+  const u = (await api.post('/painel/usuarios', { nome: 'Robson', email: 'robson@vimidia.com.br', senha: 'robson-2026', perfil: 'administrador' }, master)).dados;
+  const r = await api.patch(`/painel/usuarios/${u.id}`, { nome: 'Robson Silva', email: 'robson@vaimidia.com.br' }, master);
+  assert.equal(r.status, 200, JSON.stringify(r.dados));
+  assert.equal(r.dados.email, 'robson@vaimidia.com.br');
+  assert.ok(await api.login('robson@vaimidia.com.br', 'robson-2026'), 'entra com o e-mail novo e a senha de antes');
+  assert.equal((await api.patch(`/painel/usuarios/${u.id}`, { email: 'master@midia.com.br' }, master)).status, 409, 'e-mail de outra pessoa não pode');
+});
+
+/** O player abre sem internet: a página fica guardada na TV (service worker) e o aviso não aparece na tela. */
+test('Player: guarda a página na TV e não avisa "sem internet" na tela', () => {
+  const tv = (f) => fs.readFileSync(path.join(__dirname, '..', 'public/tv', f), 'utf8');
+  assert.match(tv('player.js'), /serviceWorker\.register\('sw\.js'/);
+  assert.match(tv('sw.js'), /cache\.put\(`\$\{BASE\}\/tv\/`/, 'a página é guardada já na instalação');
+  assert.ok(!tv('index.html').includes('sem-conexao'), 'sem aviso de internet em cima do anúncio');
+});

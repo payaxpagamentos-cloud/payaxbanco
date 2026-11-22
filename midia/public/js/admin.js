@@ -19,6 +19,10 @@ export async function usuarios(ctx) {
       [(u) => (u.ativo ? etiqueta('Ativo', 'ok') : etiqueta('Inativo', 'erro')), 'Situação'],
       [(u) => (u.ultimo_acesso ? dataHora(u.ultimo_acesso) : 'nunca'), 'Último acesso'],
       [(u) => el('div', { class: 'acoes' },
+        // Só o master mexe num master (o servidor também recusa).
+        u.perfil !== 'master' || ctx.master
+          ? el('button', { class: 'btn pequeno', onclick: () => editarUsuario(u, pintar, ctx.master) }, icone('editar'), 'Editar')
+          : null,
         el('button', {
           class: 'btn pequeno', onclick: (e) => acao(e.target, async () => {
             const nova = await perguntar('Trocar senha', `Nova senha de ${u.nome} (mínimo 8 caracteres)`);
@@ -39,10 +43,29 @@ export async function usuarios(ctx) {
 
   limpar(ctx.conteudo,
     el('div', { class: 'linha entre', style: 'margin-bottom:16px' },
-      el('p', { class: 'mudo', style: 'margin:0' }, 'Equipe (master e operador) e os acessos dos portais do anunciante e do lojista.'),
+      el('p', { class: 'mudo', style: 'margin:0' }, 'Equipe (master, administrador e operador) e os acessos dos portais do anunciante e do lojista.'),
       el('button', { class: 'btn primario', onclick: () => novoUsuario(opcoes, pintar, ctx.master) }, icone('mais'), 'Novo usuário')),
     corpo);
   await pintar();
+}
+
+/** Corrigir nome, e-mail (que é o login) e, na equipe, o perfil. */
+function editarUsuario(u, recarregar, master) {
+  const daEquipe = ['master', 'administrador', 'operador'].includes(u.perfil);
+  const perfis = Object.fromEntries(Object.entries(PERFIS)
+    .filter(([k]) => ['administrador', 'operador'].includes(k) || (k === 'master' && master)));
+  return formModal(`Editar ${u.nome}`, () => [
+    campo('Nome', { name: 'nome', value: u.nome, required: true, maxlength: 120 }),
+    campo('E-mail (login)', { name: 'email', type: 'email', value: u.email, required: true }),
+    daEquipe ? escolha('Perfil', 'perfil', perfis, u.perfil) : null,
+    el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Mudando o e-mail, a pessoa passa a entrar com o e-mail novo. A senha continua a mesma.'),
+  ], async (d) => {
+    const corpo = { nome: d.nome, email: d.email };
+    if (daEquipe && d.perfil && d.perfil !== u.perfil) corpo.perfil = d.perfil;
+    await api.patch(`/painel/usuarios/${u.id}`, corpo);
+    toast('Usuário atualizado.');
+    recarregar();
+  });
 }
 
 function novoUsuario(opcoes, recarregar, master = true) {
