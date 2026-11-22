@@ -66,15 +66,17 @@ body.dividida .palco{ grid-template-columns: 44% 56%; }
 
 .faixa{ position: fixed; left: 0; right: 0; bottom: 0; height: var(--faixa-altura); background: var(--preto);
   display: flex; align-items: center; gap: 2.5vw; padding: 0 2.5vw; border-top: 2px solid var(--lime); }
-.faixa .marca-faixa{ display: flex; align-items: center; gap: 1.2vh; flex: none; }
+/* O logo colorido fica no centro do rodapé; o recado à esquerda e o horário à direita não chegam nele. */
+.faixa .marca-faixa{ display: flex; align-items: center; gap: 1.2vh; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
 .faixa .marca-faixa svg{ height: 3.2vh; width: auto; color: var(--lime); }
 .faixa .marca-faixa span{ font-size: 2.6vh; font-weight: 800; letter-spacing: -.05em; text-transform: uppercase; color: #fff; }
-.faixa .texto{ font-size: 3vh; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; color: #D7DBE0; }
+.faixa .texto{ font-size: 3vh; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; max-width: 36vw; min-width: 0; color: #D7DBE0; }
 .faixa .clima{ font-size: 2.8vh; font-weight: 700; flex: none; color: #D7DBE0; margin-left: auto; white-space: nowrap; }
 .faixa .clima + .relogio{ margin-left: 2vh; }
 .faixa .relogio{ font-size: 3.4vh; font-weight: 800; font-variant-numeric: tabular-nums; flex: none; color: var(--lime); margin-left: auto; }
 /* Tela estreita (elevador em pé): só a marca, o clima e o relógio cabem. */
-@media (max-aspect-ratio: 3/4){ .faixa .texto{ display: none; } .faixa .clima{ font-size: 2.4vh; } }
+/* Tela estreita (elevador em pé): o logo no centro e o relógio no canto; o recado e o clima não cabem. */
+@media (max-aspect-ratio: 3/4){ .faixa .texto, .faixa .clima{ display: none !important; } }
 
 /* Tela de espera: pareamento, sem programação ou erro. */
 .espera{ position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 1.2vh; text-align: center;
