@@ -294,7 +294,7 @@ if [[ $COM_TLS -eq 1 ]]; then
   aviso "Isto só funciona se $DOMINIO já estiver apontando para o IP desta máquina."
   # Só entram no certificado os nomes que já existem no DNS: um nome que não resolve derruba a emissão inteira.
   NOMES=(-d "$DOMINIO")
-  for extra in "www.$DOMINIO" "midia.$DOMINIO"; do
+  for extra in "www.$DOMINIO" "midia.$DOMINIO" "tv.$DOMINIO"; do
     if getent ahostsv4 "$extra" >/dev/null 2>&1; then NOMES+=(-d "$extra"); else aviso "$extra ainda não resolve: fica fora do certificado por enquanto."; fi
   done
   if [[ -n "$EMAIL_ADMIN" ]]; then
@@ -318,7 +318,7 @@ cat <<TXT
 
   Site .................. https://$DOMINIO
   Painel da equipe ...... https://midia.$DOMINIO  (ou https://$DOMINIO/midia/)
-  Player das TVs ........ https://$DOMINIO/midia/tv/
+  Player das TVs ........ https://tv.$DOMINIO  (ou https://$DOMINIO/tv)
 
   Serviço ............... sudo systemctl status vaimidia
   Registro ao vivo ...... sudo journalctl -u vaimidia -f
@@ -340,6 +340,7 @@ cat <<TXT
   A       $DOMINIO                   ->  $IP_PUBLICO
   A       www.$DOMINIO               ->  $IP_PUBLICO
   A       midia.$DOMINIO             ->  $IP_PUBLICO   (atalho para o painel)
+  A       tv.$DOMINIO                ->  $IP_PUBLICO   (atalho para o player das TVs)
 TXT
 if [[ $COM_EMAIL -eq 1 ]]; then
 cat <<TXT
