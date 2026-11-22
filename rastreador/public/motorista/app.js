@@ -322,6 +322,45 @@ async function telaMultas() {
     }) : el('section', { class: 'cartao' }, el('p', { class: 'mudo', style: 'margin:0' }, 'Nenhuma multa em seu nome. Continue assim! 👏')));
 }
 
+// ---------- Pneus (Gestão de Frota): o motorista mede o sulco de cada pneu do veículo ----------
+const PNEU_APP = { ok: ['bom', 'ok'], atencao: ['atenção', 'aviso'], trocar: ['trocar', 'erro'], sem_medicao: ['sem medição', ''] };
+async function telaPneus(veiculos) {
+  const corpo = el('div', { class: 'coluna', style: 'gap:12px' }, el('p', { class: 'mudo' }, 'Carregando…'));
+  tela('Pneus', corpo);
+  let veiculoId = veiculos[0].id;
+  async function carregar() {
+    let r;
+    try { r = await chamar('GET', `/pneus?veiculo_id=${veiculoId}`); } catch (err) { return aviso(corpo, err.message); }
+    const sel = veiculos.length > 1 ? el('select', { onchange: (e) => { veiculoId = Number(e.target.value); carregar(); } },
+      veiculos.map((x) => el('option', { value: x.id, selected: x.id === veiculoId }, placa(x.placa)))) : null;
+    limpar(corpo,
+      el('section', { class: 'cartao' }, el('strong', {}, placa(r.veiculo.placa)), el('p', { class: 'pequeno mudo', style: 'margin:4px 0 0' },
+        'Meça o sulco com o medidor, no centro da banda. Abaixo de 1,6 mm o pneu está fora da lei.'), sel),
+      r.posicoes.map((pos) => {
+        const p = pos.pneu;
+        if (!p) return el('article', { class: 'cartao' }, el('div', { class: 'linha entre' }, el('strong', {}, pos.nome), el('span', { class: 'pequeno mudo' }, 'sem pneu cadastrado')));
+        const [rot, tom] = PNEU_APP[p.estado] ?? ['', ''];
+        const campo = el('input', { inputmode: 'decimal', placeholder: 'mm', style: 'width:90px', 'aria-label': `Sulco do pneu ${p.numero_fogo} em milímetros` });
+        const msg = el('div');
+        const salvar = el('button', { type: 'button', class: 'btn primario pequeno', onclick: async () => {
+          const v = Number(String(campo.value).replace(',', '.'));
+          if (!campo.value || !Number.isFinite(v) || v < 0 || v > 40) return aviso(msg, 'Informe o sulco em milímetros (ex.: 4,5).');
+          salvar.disabled = true;
+          try {
+            const x = await chamar('POST', `/pneus/${p.id}/medicao`, { sulco_mm: v });
+            aviso(msg, x.estado === 'trocar' ? 'Medição enviada. Pneu abaixo do limite: avise o gestor.' : x.estado === 'atencao' ? 'Medição enviada. Pneu perto do limite.' : 'Medição enviada. Obrigado!', x.estado === 'ok' ? 'ok' : 'erro');
+            setTimeout(carregar, 1500);
+          } catch (err) { salvar.disabled = false; aviso(msg, err.message); }
+        } }, 'Enviar');
+        return el('article', { class: 'cartao' },
+          el('div', { class: 'linha entre', style: 'gap:8px' }, el('div', {}, el('strong', {}, pos.nome), el('div', { class: 'pequeno mudo' }, `Pneu ${p.numero_fogo}${p.sulco_mm !== null ? ` · último: ${String(p.sulco_mm).replace('.', ',')} mm` : ''}`)),
+            rot ? el('span', { class: `etiqueta ${tom}` }, rot) : null),
+          el('div', { class: 'linha', style: 'gap:8px;margin-top:10px;align-items:center' }, campo, el('span', { class: 'pequeno mudo' }, 'mm'), salvar), msg);
+      }));
+  }
+  carregar();
+}
+
 // ---------- SOS ----------
 function botaoSos(veiculos) {
   const anel = el('span', { class: 'sos-progresso' });
@@ -507,7 +546,8 @@ async function inicio() {
         atalho('combustivel', 'Abastecer', 'litros e cupom', telaAbastecimento),
         atalho('manutencao', 'Avaria', 'avisar o gestor', telaAvaria),
         atalho('estrela', 'Minha nota', 'e as dicas', () => telaNota()),
-        atalho('multa', 'Minhas multas', 'que você recebeu', telaMultas)),
+        atalho('multa', 'Minhas multas', 'que você recebeu', telaMultas),
+        dados.gestao_frota && dados.veiculos.length ? atalho('veiculos', 'Pneus', 'medir o sulco', () => telaPneus(dados.veiculos)) : null),
       cartaoAvisos(),
       dados.pedidos.length ? el('section', { class: 'cartao' }, el('h2', {}, 'Meus pedidos de liberação'), el('ul', { class: 'pedidos' }, dados.pedidos.slice(0, 6).map((p) => el('li', {},
         el('div', {}, el('strong', {}, placa(p.placa)), el('div', { class: 'pequeno mudo' }, dataHora(p.criado_em))),

@@ -55,6 +55,8 @@ module.exports = (db) => {
     res.json({
       motorista: { nome: m.nome, empresa: m.empresa_nome }, veiculos, pedidos, checklist_itens: diario.ITENS_CHECKLIST,
       avisos: { chave: push.chavePublica(db), inscrito: push.inscrito(db, m.id) },
+      // Gestão de Frota contratada: o app mostra a medição dos pneus.
+      gestao_frota: Boolean(db.prepare('SELECT gestao_frota FROM empresas WHERE id = ?').get(m.empresa_id)?.gestao_frota),
     });
   });
 
@@ -114,6 +116,24 @@ module.exports = (db) => {
     res.status(201).json(diario.avaria(db, req.motorista, x, req.body));
   });
   r.get('/historico', autenticado, (req, res) => res.json(diario.historicoMotorista(db, req.motorista)));
+
+  // ---------- Pneus (Gestão de Frota, quando a empresa tem o módulo): o motorista mede o sulco dos pneus do veículo dele ----------
+  const comGestao = (m) => {
+    if (!db.prepare('SELECT gestao_frota FROM empresas WHERE id = ?').get(m.empresa_id)?.gestao_frota) throw new ErroNegocio('Sua empresa não usa a gestão de pneus.', 403);
+  };
+  r.get('/pneus', autenticado, (req, res) => {
+    comGestao(req.motorista);
+    const x = condutores.doMotorista(db, req.motorista, req.query.veiculo_id);
+    res.json(require('../lib/gestaoFrota').pneusDoVeiculo(db, req.motorista.empresa_id, x.id));
+  });
+  r.post('/pneus/:id/medicao', autenticado, (req, res) => {
+    comGestao(req.motorista);
+    const gf = require('../lib/gestaoFrota');
+    const veiculos = condutores.veiculosDo(db, req.motorista).map((x) => x.id);
+    const p = db.prepare("SELECT veiculo_id FROM frota_pneus WHERE id = ? AND empresa_id = ? AND status = 'montado'").get(Number(req.params.id), req.motorista.empresa_id);
+    if (!p || !veiculos.includes(p.veiculo_id)) throw new ErroNegocio('Este pneu não está num veículo seu.', 403);
+    res.status(201).json({ estado: gf.medirPneu(db, req.motorista.empresa_id, req.params.id, req.body, { motoristaId: req.motorista.id }) });
+  });
 
   // ---------- Minha nota (com as dicas do que mais pesou) ----------
   r.get('/nota', autenticado, (req, res) => {

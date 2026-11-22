@@ -163,6 +163,145 @@ CREATE TABLE IF NOT EXISTS posicoes (
 CREATE INDEX IF NOT EXISTS idx_posicoes_gps ON posicoes(gps_em);
 
 -- Uso por dia (no fuso configurado): quilômetros, tempo ligado e velocidade máxima, somados a cada posição.
+-- ---------- Gestão de Frota (módulo vendido à parte; o master liga por empresa em empresas.gestao_frota) ----------
+-- Oficinas, autopeças, borracharias e demais fornecedores da frota.
+CREATE TABLE IF NOT EXISTS frota_fornecedores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'oficina' CHECK (tipo IN ('oficina','autopecas','borracharia','concessionaria','eletrica','funilaria','posto','despachante','outro')),
+  telefone TEXT,
+  documento TEXT,
+  cidade TEXT,
+  observacao TEXT,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_frota_fornecedores ON frota_fornecedores(empresa_id, ativo);
+-- Ordem de serviço: preventiva (plano), corretiva (defeito) ou inspeção. Numeração própria por empresa.
+CREATE TABLE IF NOT EXISTS frota_os (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  numero INTEGER NOT NULL,
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL DEFAULT 'corretiva' CHECK (tipo IN ('preventiva','corretiva','inspecao')),
+  status TEXT NOT NULL DEFAULT 'aberta' CHECK (status IN ('aberta','em_execucao','concluida','cancelada')),
+  prioridade TEXT NOT NULL DEFAULT 'media' CHECK (prioridade IN ('baixa','media','alta','urgente')),
+  descricao TEXT NOT NULL,
+  origem TEXT NOT NULL DEFAULT 'manual' CHECK (origem IN ('manual','plano','avaria','checklist','pneu','motorista')),
+  origem_id INTEGER,
+  fornecedor_id INTEGER REFERENCES frota_fornecedores(id) ON DELETE SET NULL,
+  km_abertura INTEGER,
+  km_conclusao INTEGER,
+  parado INTEGER NOT NULL DEFAULT 0,
+  previsao TEXT,
+  aberta_em TEXT NOT NULL,
+  iniciada_em TEXT,
+  concluida_em TEXT,
+  observacao TEXT,
+  total_centavos INTEGER NOT NULL DEFAULT 0,
+  criado_por INTEGER REFERENCES usuarios(id),
+  UNIQUE (empresa_id, numero)
+);
+CREATE INDEX IF NOT EXISTS idx_frota_os ON frota_os(empresa_id, status);
+CREATE INDEX IF NOT EXISTS idx_frota_os_veiculo ON frota_os(veiculo_id, aberta_em);
+-- Peças e serviços da OS. Uma peça com componente_tipo troca o componente do plano preventivo ao concluir a OS.
+CREATE TABLE IF NOT EXISTS frota_os_itens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  os_id INTEGER NOT NULL REFERENCES frota_os(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL DEFAULT 'peca' CHECK (tipo IN ('peca','servico')),
+  descricao TEXT NOT NULL,
+  quantidade REAL NOT NULL DEFAULT 1 CHECK (quantidade > 0),
+  valor_centavos INTEGER NOT NULL DEFAULT 0 CHECK (valor_centavos >= 0),
+  componente_id INTEGER,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_frota_os_itens ON frota_os_itens(os_id);
+-- Componentes com vida útil (óleo, filtros, pastilhas, discos, amortecedores, suspensão, correias, bateria...): o desgaste sai
+-- do km real do rastreador e do tempo desde a instalação. Ao trocar, o antigo fica 'trocado' (histórico) e nasce um novo.
+CREATE TABLE IF NOT EXISTS frota_componentes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL,
+  nome TEXT NOT NULL,
+  posicao TEXT,
+  marca TEXT,
+  vida_km INTEGER CHECK (vida_km > 0),
+  vida_dias INTEGER CHECK (vida_dias > 0),
+  instalado_km INTEGER NOT NULL DEFAULT 0,
+  instalado_em TEXT NOT NULL,
+  custo_centavos INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'ativo' CHECK (status IN ('ativo','trocado')),
+  trocado_em TEXT,
+  trocado_km INTEGER,
+  os_id INTEGER REFERENCES frota_os(id) ON DELETE SET NULL,
+  aviso_enviado INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL,
+  CHECK (vida_km IS NOT NULL OR vida_dias IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_frota_componentes ON frota_componentes(veiculo_id, status);
+-- Pneus, um a um, pelo número de fogo: montado no veículo (posição), em estoque, na recapagem ou descartado.
+-- km do pneu = km_rodado (montagens anteriores) + o que o veículo andou desde a montagem atual.
+CREATE TABLE IF NOT EXISTS frota_pneus (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  numero_fogo TEXT NOT NULL,
+  marca TEXT,
+  modelo TEXT,
+  medida TEXT,
+  dot TEXT,
+  vida INTEGER NOT NULL DEFAULT 0,
+  custo_centavos INTEGER NOT NULL DEFAULT 0,
+  sulco_novo_mm REAL,
+  sulco_mm REAL,
+  sulco_em TEXT,
+  status TEXT NOT NULL DEFAULT 'estoque' CHECK (status IN ('estoque','montado','recapagem','descartado')),
+  veiculo_id INTEGER REFERENCES veiculos(id) ON DELETE SET NULL,
+  posicao TEXT,
+  montado_km INTEGER,
+  km_rodado INTEGER NOT NULL DEFAULT 0,
+  aviso_sulco INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL,
+  UNIQUE (empresa_id, numero_fogo)
+);
+CREATE INDEX IF NOT EXISTS idx_frota_pneus ON frota_pneus(empresa_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_frota_pneus_posicao ON frota_pneus(veiculo_id, posicao) WHERE status = 'montado';
+CREATE TABLE IF NOT EXISTS frota_pneu_eventos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  pneu_id INTEGER NOT NULL REFERENCES frota_pneus(id) ON DELETE CASCADE,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('cadastro','montagem','desmontagem','rodizio','medicao','recapagem','conserto','descarte')),
+  veiculo_id INTEGER REFERENCES veiculos(id) ON DELETE SET NULL,
+  posicao TEXT,
+  km_veiculo INTEGER,
+  km_pneu INTEGER,
+  sulco_mm REAL,
+  custo_centavos INTEGER NOT NULL DEFAULT 0,
+  observacao TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  motorista_id INTEGER REFERENCES motoristas(id) ON DELETE SET NULL,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_frota_pneu_eventos ON frota_pneu_eventos(pneu_id, criado_em);
+CREATE INDEX IF NOT EXISTS idx_frota_pneu_eventos_empresa ON frota_pneu_eventos(empresa_id, criado_em);
+-- Documentos com vencimento: do veículo (IPVA, licenciamento, seguro, tacógrafo...) ou do motorista (CNH, exame).
+CREATE TABLE IF NOT EXISTS frota_documentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  veiculo_id INTEGER REFERENCES veiculos(id) ON DELETE CASCADE,
+  motorista_id INTEGER REFERENCES motoristas(id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL,
+  descricao TEXT,
+  numero TEXT,
+  vencimento TEXT NOT NULL,
+  valor_centavos INTEGER NOT NULL DEFAULT 0,
+  pago INTEGER NOT NULL DEFAULT 0,
+  aviso_enviado INTEGER NOT NULL DEFAULT 0,
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_frota_documentos ON frota_documentos(empresa_id, vencimento);
+
 -- Nota do motorista por veículo e dia já fechado (motor ligado parado, tempo acima do limite, variações bruscas): calculado uma
 -- vez das posições e reaproveitado. Uma posição atrasada daquele dia apaga a linha (é recalculada na próxima consulta).
 CREATE TABLE IF NOT EXISTS desempenho_dia (
@@ -832,6 +971,7 @@ function migrar(db) {
     empresas: { preco_combustivel_centavos: 'INTEGER NOT NULL DEFAULT 0', ocioso_l_h: 'REAL NOT NULL DEFAULT 0.8', app_ranking: 'INTEGER NOT NULL DEFAULT 0',
       plano_nome: 'TEXT', plano_valor_centavos: 'INTEGER', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT',
       multas_auto_dias: 'INTEGER NOT NULL DEFAULT 0', multas_auto_tipo: "TEXT NOT NULL DEFAULT 'completa'",
+      gestao_frota: 'INTEGER NOT NULL DEFAULT 0', gestao_frota_preco_centavos: 'INTEGER',
       multas_credito_centavos: 'INTEGER NOT NULL DEFAULT 0', multas_preco_completa: 'INTEGER', multas_preco_renainf: 'INTEGER', multas_preco_resumida: 'INTEGER' },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
     motoristas: { senha_hash: 'TEXT', app_ultimo_acesso: 'TEXT' },

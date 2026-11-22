@@ -878,6 +878,124 @@ test('Rastreador', async (t) => {
     db.prepare("UPDATE rastreadores SET configurado_em = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?").run(rastreador);
   });
 
+  await t.test('gestão de frota: módulo pago, plano preventivo pelo km do GPS, OS, pneus, documentos e custo por km', async () => {
+    const db = api.db;
+    const G = `${base()}/gestao`;
+    // Sem o módulo contratado, nada responde.
+    assert.equal((await api.get(`${G}/painel`, cliente)).status, 403);
+    assert.equal((await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: true, preco_centavos: 9900 }, cliente)).status, 403, 'só o master liga');
+    assert.equal((await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: true, preco_centavos: 9900 }, master)).status, 204);
+    assert.equal((await api.get(base(), cliente)).dados.modulos.gestao_frota, true);
+    const tipoAntes = veic().tipo;
+    db.prepare("UPDATE veiculos SET tipo = 'carro', hodometro_m = 50000000 WHERE id = ?").run(veiculo); // 50.000 km
+    // Plano padrão: cria os componentes do carro instalados no km de hoje.
+    const plano = await api.post(`${G}/veiculos/${veiculo}/plano-padrao`, {}, cliente);
+    assert.ok(plano.dados.criados >= 15, `plano padrão: ${plano.dados.criados}`);
+    assert.equal((await api.post(`${G}/veiculos/${veiculo}/plano-padrao`, {}, cliente)).dados.criados, 0, 'não duplica');
+    // Rodou 9.000 km: o óleo (10.000 km) entra em atenção; 10.500 km: vencido.
+    db.prepare('UPDATE veiculos SET hodometro_m = 59000000 WHERE id = ?').run(veiculo);
+    let comps = (await api.get(`${G}/componentes?veiculo_id=${veiculo}`, cliente)).dados;
+    const oleo = () => comps.find((c) => c.tipo === 'oleo_motor');
+    assert.equal(oleo().estado, 'atencao');
+    assert.equal(oleo().restante_km, 1000);
+    db.prepare('UPDATE veiculos SET hodometro_m = 60500000 WHERE id = ?').run(veiculo);
+    comps = (await api.get(`${G}/componentes?veiculo_id=${veiculo}`, cliente)).dados;
+    assert.equal(oleo().estado, 'vencido');
+    const painel = (await api.get(`${G}/painel`, cliente)).dados;
+    assert.ok(painel.atencao.some((a) => a.tipo === 'componente' && a.gravidade === 2), 'o painel mostra o vencido');
+    // OS preventiva com o óleo e o filtro: ao concluir, os dois são trocados e o contador recomeça no km da conclusão.
+    const filtro = comps.find((c) => c.tipo === 'filtro_oleo');
+    assert.equal((await api.post(`${G}/os`, { veiculo_id: veiculo, descricao: 'Troca de óleo' }, operador)).status, 403, 'operador só consulta');
+    const os = await api.post(`${G}/os`, { veiculo_id: veiculo, tipo: 'preventiva', descricao: 'Revisão 60 mil', componentes: [oleo().id, filtro.id], parado: true }, cliente);
+    assert.equal(os.status, 201);
+    const os2 = await api.post(`${G}/os`, { veiculo_id: veiculo, descricao: 'Outra' }, cliente);
+    assert.equal(os2.dados.numero, os.dados.numero + 1, 'numeração própria por empresa');
+    await api.post(`${G}/os/${os2.dados.id}/cancelar`, {}, cliente);
+    assert.equal((await api.post(`${G}/os/${os.dados.id}/itens`, { tipo: 'servico', descricao: 'Mão de obra', valor_centavos: 12000 }, cliente)).status, 201);
+    assert.equal((await api.put(`${G}/os/${os.dados.id}`, { observacao: 'Óleo 5W30' }, cliente)).status, 200);
+    let det = (await api.get(`${G}/os/${os.dados.id}`, cliente)).dados;
+    const itOleo = det.itens.find((i) => i.descricao === 'Óleo do motor');
+    assert.equal((await api.post(`${G}/os/${os.dados.id}/itens`, { descricao: 'Óleo de novo', componente_id: oleo().id }, cliente)).status, 422, 'a mesma peça do plano não entra duas vezes');
+    assert.equal((await api.del(`${G}/os/${os.dados.id}/itens/${itOleo.id}`, undefined, cliente)).status, 204);
+    await api.post(`${G}/os/${os.dados.id}/itens`, { tipo: 'peca', descricao: 'Óleo do motor 5W30 (4 L)', quantidade: 4, valor_centavos: 4500, componente_id: oleo().id }, cliente);
+    assert.equal((await api.get(`${G}/painel`, cliente)).dados.indicadores.parados, 1, 'veículo parado na oficina');
+    const fim = await api.post(`${G}/os/${os.dados.id}/concluir`, {}, cliente);
+    assert.equal(fim.dados.componentes_trocados, 2);
+    assert.equal(fim.dados.total_centavos, 12000 + 4 * 4500 + filtro.custo_centavos);
+    comps = (await api.get(`${G}/componentes?veiculo_id=${veiculo}`, cliente)).dados;
+    assert.equal(oleo().instalado_km, 60500);
+    assert.equal(oleo().estado, 'ok');
+    assert.equal(oleo().custo_centavos, 18000);
+    assert.equal((await api.post(`${G}/os/${os.dados.id}/itens`, { descricao: 'x' }, cliente)).status, 422, 'OS concluída não muda');
+    const hist = (await api.get(`${G}/veiculos/${veiculo}/historico`, cliente)).dados;
+    assert.ok(hist.componentes.some((c) => c.tipo === 'oleo_motor' && c.trocado_km === 60500 && c.os_numero === os.dados.numero));
+    // Avaria do motorista vira OS; concluir a OS resolve a avaria.
+    const av = db.prepare("INSERT INTO avarias (empresa_id, veiculo_id, descricao, gravidade, criado_em) VALUES (?, ?, 'Barulho na suspensão', 'media', ?)").run(empresa, veiculo, new Date().toISOString()).lastInsertRowid;
+    const osAv = await api.post(`${G}/os`, { veiculo_id: veiculo, descricao: 'Barulho na suspensão', origem: 'avaria', origem_id: av }, cliente);
+    assert.equal((await api.post(`${G}/os`, { veiculo_id: veiculo, descricao: 'x', origem: 'avaria', origem_id: av }, cliente)).status, 422, 'uma OS por avaria');
+    assert.equal(db.prepare('SELECT status FROM avarias WHERE id = ?').get(av).status, 'em_andamento');
+    await api.post(`${G}/os/${osAv.dados.id}/concluir`, {}, cliente);
+    assert.equal(db.prepare('SELECT status FROM avarias WHERE id = ?').get(av).status, 'resolvida');
+
+    // Pneus: cadastro, montagem, km pelo GPS, rodízio, sulco, recapagem e custo por km.
+    const p1 = await api.post(`${G}/pneus`, { numero_fogo: 'f-001', marca: 'Pirelli', medida: '205/55 R16', custo_centavos: 50000, sulco_novo_mm: 8, veiculo_id: veiculo, posicao: 'DE' }, cliente);
+    const p2 = await api.post(`${G}/pneus`, { numero_fogo: 'F-002', marca: 'Pirelli', custo_centavos: 50000, sulco_novo_mm: 8 }, cliente);
+    assert.equal((await api.post(`${G}/pneus`, { numero_fogo: 'F-001' }, cliente)).status, 422, 'número de fogo único');
+    assert.equal((await api.post(`${G}/pneus/${p2.dados.id}/montar`, { veiculo_id: veiculo, posicao: 'DE' }, cliente)).status, 422, 'posição ocupada');
+    assert.equal((await api.post(`${G}/pneus/${p2.dados.id}/montar`, { veiculo_id: veiculo, posicao: 'X9' }, cliente)).status, 422, 'posição que o carro não tem');
+    await api.post(`${G}/pneus/${p2.dados.id}/montar`, { veiculo_id: veiculo, posicao: 'DD' }, cliente);
+    db.prepare('UPDATE veiculos SET hodometro_m = 70500000 WHERE id = ?').run(veiculo); // +10.000 km
+    let pneus = (await api.get(`${G}/pneus`, cliente)).dados;
+    assert.equal(pneus.find((p) => p.numero_fogo === 'F-001').km_pneu, 10000);
+    assert.equal(pneus.find((p) => p.numero_fogo === 'F-001').custo_km_centavos, 5, 'R$ 500 em 10.000 km = 5 centavos/km');
+    assert.equal((await api.post(`${G}/veiculos/${veiculo}/rodizio`, { trocas: [{ pneu_id: p1.dados.id, posicao: 'DD' }, { pneu_id: p2.dados.id, posicao: 'DE' }] }, cliente)).status, 200);
+    const mapa = (await api.get(`${G}/veiculos/${veiculo}/pneus`, cliente)).dados;
+    assert.equal(mapa.posicoes.find((x) => x.codigo === 'DD').pneu.numero_fogo, 'F-001', 'rodízio trocou as posições');
+    assert.equal(mapa.posicoes.length, 5, 'carro: 4 rodas + estepe');
+    assert.equal((await api.post(`${G}/pneus/${p1.dados.id}/medir`, { sulco_mm: 2.5 }, cliente)).dados.estado, 'atencao');
+    pneus = (await api.get(`${G}/pneus`, cliente)).dados;
+    assert.equal(pneus.find((p) => p.numero_fogo === 'F-001').km_restante, 1636, '5,5 mm gastos em 10.000 km; faltam 0,9 mm até 1,6 mm = 1.636 km');
+    assert.ok((await api.get(`${G}/painel`, cliente)).dados.atencao.some((a) => a.tipo === 'pneu'));
+    await api.post(`${G}/pneus/${p1.dados.id}/desmontar`, { destino: 'recapagem', sulco_mm: 2.4 }, cliente);
+    await api.post(`${G}/pneus/${p1.dados.id}/voltar-recapagem`, { custo_centavos: 20000, sulco_mm: 7 }, cliente);
+    pneus = (await api.get(`${G}/pneus`, cliente)).dados;
+    const rec = pneus.find((p) => p.numero_fogo === 'F-001');
+    assert.deepEqual([rec.status, rec.vida, rec.km_pneu, rec.custo_total_centavos], ['estoque', 1, 10000, 70000]);
+    assert.ok((await api.get(`${G}/pneus/${p1.dados.id}/historico`, cliente)).dados.length >= 6);
+
+    // Documentos e o aviso (uma vez).
+    const hojeIso = new Date().toISOString().slice(0, 10);
+    const daqui = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+    assert.equal((await api.post(`${G}/documentos`, { tipo: 'licenciamento', veiculo_id: veiculo, vencimento: daqui(10), valor_centavos: 16000 }, cliente)).status, 201);
+    assert.equal((await api.post(`${G}/documentos`, { tipo: 'cnh', vencimento: daqui(5) }, cliente)).status, 422, 'CNH pede o motorista');
+    const docs = (await api.get(`${G}/documentos`, cliente)).dados;
+    assert.equal(docs[0].estado, 'vencendo');
+    const gf = require('../server/lib/gestaoFrota');
+    gf.rodadaAvisos(db, { forcar: true });
+    assert.equal(db.prepare('SELECT aviso_enviado FROM frota_documentos WHERE veiculo_id = ?').get(veiculo).aviso_enviado, 1);
+    assert.equal(gf.rodadaAvisos(db, { forcar: true }), 0, 'não repete o aviso');
+
+    // Custos do mês: manutenção (OS), pneus (compra no 1º uso + recapagem) e documentos, com o custo por km.
+    db.prepare('INSERT INTO uso_diario (veiculo_id, data, distancia_m, ligado_s, velocidade_max_kmh, posicoes) VALUES (?, ?, 1000000, 0, 0, 1) ON CONFLICT DO UPDATE SET distancia_m = distancia_m + 1000000').run(veiculo, hojeIso);
+    const c = (await api.get(`${G}/custos?de=${hojeIso}&ate=${daqui(30)}`, cliente)).dados;
+    const linha = c.veiculos.find((x) => x.id === veiculo);
+    assert.equal(linha.manutencao_centavos, fim.dados.total_centavos);
+    assert.equal(linha.pneus_centavos, 50000 + 50000 + 20000);
+    assert.equal(linha.documentos_centavos, 16000);
+    assert.ok(linha.km >= 1000 && linha.custo_km_centavos > 0);
+    // Fornecedor e o gasto com ele.
+    const f = await api.post(`${G}/fornecedores`, { nome: 'Auto Center Silva', tipo: 'oficina', telefone: '(11) 98888-7777' }, cliente);
+    const os3 = await api.post(`${G}/os`, { veiculo_id: veiculo, descricao: 'Alinhamento', fornecedor_id: f.dados.id, itens: [{ tipo: 'servico', descricao: 'Alinhamento', valor_centavos: 8000 }] }, cliente);
+    await api.post(`${G}/os/${os3.dados.id}/concluir`, {}, cliente);
+    assert.equal((await api.get(`${G}/fornecedores`, cliente)).dados.find((x) => x.id === f.dados.id).gasto_centavos, 8000);
+    // Excluir o veículo devolve os pneus montados ao estoque (não some com o pneu).
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM frota_pneus WHERE veiculo_id = ? AND status = 'montado'").get(veiculo).n, 1);
+    // Desligar o módulo fecha o acesso; os dados continuam.
+    await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: false }, master);
+    assert.equal((await api.get(`${G}/painel`, cliente)).status, 403);
+    db.prepare('UPDATE veiculos SET tipo = ? WHERE id = ?').run(tipoAntes, veiculo);
+  });
+
   await t.test('segurança: estacionado, sumiço suspeito, bloqueio programado com código do motorista e WhatsApp', async () => {
     const http = require('node:http');
     const config = require('../server/config');

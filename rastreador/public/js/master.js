@@ -112,11 +112,21 @@ async function telaEmpresas(ctx) {
       ctx.renomearEmpresa(e.id, e.nome);
       ctx.ir('dashboard', e.id);
     } },
-      td([el('strong', {}, e.nome), e.status === 'bloqueada' ? el('div', {}, el('span', { class: 'etiqueta erro', title: e.motivo_bloqueio ?? '' }, `bloqueada: ${e.motivo_bloqueio ?? ''}`)) : null]),
+      td([el('strong', {}, e.nome), e.status === 'bloqueada' ? el('div', {}, el('span', { class: 'etiqueta erro', title: e.motivo_bloqueio ?? '' }, `bloqueada: ${e.motivo_bloqueio ?? ''}`)) : null,
+        e.gestao_frota ? el('div', {}, etiqueta('Gestão de Frota', 'info')) : null]),
       td(TIPOS_EMPRESA[e.tipo]), td(`${e.veiculos}/${e.limite_veiculos}`, 'centro num'), td(inteiro(e.online), 'centro num'), td(inteiro(e.rastreadores), 'centro num'),
       td(e.alertas_pendentes ? etiqueta(inteiro(e.alertas_pendentes), 'aviso') : '0', 'centro'),
       el('td', { class: 'acoes' },
         botaoIcone('editar', 'Editar', async () => { if (await formEmpresa(await api.get(`/master/empresas/${e.id}`))) { toast('Empresa salva.'); carregar(); } }),
+        ctx.soMaster ? botaoIcone('manutencao', 'Módulos contratados', async () => {
+          // Módulos vendidos à parte: ligar ou desligar para esta empresa, com o preço mensal combinado.
+          const r = await formModal(`Módulos · ${e.nome}`, () => [
+            marcar('Gestão de Frota (ordens de serviço, plano preventivo, pneus, documentos e custo por km)', { name: 'ativo', checked: Boolean(e.gestao_frota) }),
+            campo('Preço mensal combinado (R$, para o financeiro)', { name: 'preco', inputmode: 'decimal', value: reaisCampo(e.gestao_frota_preco_centavos) }),
+            el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Desligado, o menu some para a empresa e os dados ficam guardados.'),
+          ], (d) => api.put(`/master/empresas/${e.id}/gestao-frota`, { ativo: d.ativo, preco_centavos: centavos(d.preco) ?? '' }));
+          if (r) { ctx.esquecerModulos?.(e.id); toast('Módulos atualizados.'); carregar(); }
+        }) : null,
         e.status === 'bloqueada'
           ? botaoIcone('aberto', 'Desbloquear', async () => {
             if (!await confirmar('Desbloquear empresa', `${e.nome} volta a ter as posições gravadas e os usuários voltam a entrar.`, 'Desbloquear')) return;

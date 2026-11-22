@@ -54,6 +54,8 @@ function manutencao(db, { limpar = false } = {}) {
   relatoriosProgramados.executar(db).catch((err) => console.error('[Rastreador] Relatório programado:', err.message));
   // Multas: consulta automática (só com o serviço contratado ligado no .env), poucos veículos por minuto.
   require('./multasConsulta').rodada(db).catch((err) => console.error('[Rastreador] Consulta de multas:', err.message));
+  // Gestão de Frota: avisa componente no fim da vida, pneu gasto e documento vencendo (no máximo a cada 30 min).
+  try { require('./gestaoFrota').rodadaAvisos(db); } catch (err) { console.error('[Rastreador] Gestão de frota (avisos):', err.message); }
   // Nota do motorista: adianta o cálculo dos dias fechados (a tela de ranking e custos abre na hora).
   try { require('./desempenho').adiantar(db); } catch (err) { console.error('[Rastreador] Nota do motorista:', err.message); }
   const expirados = expirar(db, cfg.comando_expira_horas);

@@ -63,7 +63,8 @@ module.exports = (db, extras = {}) => {
 
   r.get('/', (req, res) => {
     const e = req.empresa;
-    res.json({ id: e.id, nome: e.nome, tipo: e.tipo, status: e.status, limite_veiculos: e.limite_veiculos });
+    // modulos: o que a empresa contratou à parte (o menu só mostra o que está ligado).
+    res.json({ id: e.id, nome: e.nome, tipo: e.tipo, status: e.status, limite_veiculos: e.limite_veiculos, modulos: { gestao_frota: Boolean(e.gestao_frota) } });
   });
 
   // ---------- Dashboard e mapa ----------
@@ -231,6 +232,9 @@ module.exports = (db, extras = {}) => {
       db.prepare('DELETE FROM manutencao_registros WHERE veiculo_id = ?').run(x.id);
       db.prepare('DELETE FROM usuario_final_veiculos WHERE veiculo_id = ?').run(x.id);
       db.prepare('DELETE FROM testes_bloqueio WHERE veiculo_id = ?').run(x.id);
+      // Gestão de Frota: os pneus montados voltam ao estoque com o km que rodaram (o pneu é da empresa, não do veículo).
+      db.prepare(`UPDATE frota_pneus SET status = 'estoque', km_rodado = km_rodado + MAX(0, ? - COALESCE(montado_km, ?)), posicao = NULL, montado_km = NULL
+        WHERE veiculo_id = ? AND status = 'montado'`).run(Math.round(x.hodometro_m / 1000), Math.round(x.hodometro_m / 1000), x.id);
       db.prepare('UPDATE seguros_contratacoes SET veiculo_id = NULL WHERE veiculo_id = ?').run(x.id);
       db.prepare('UPDATE multas SET veiculo_id = NULL WHERE veiculo_id = ?').run(x.id);
       db.prepare('DELETE FROM veiculos WHERE id = ?').run(x.id);

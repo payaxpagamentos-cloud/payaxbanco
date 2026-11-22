@@ -15,6 +15,7 @@ import { TELAS_DIARIO } from './diario.js';
 import { TELAS_SEGUROS, TELAS_SEGUROS_MASTER } from './seguros.js';
 import { TELAS_CLIENTES } from './clientes.js';
 import { TELAS_MULTAS, TELAS_MULTAS_MASTER } from './multas.js';
+import { TELAS_GESTAO } from './gestao.js';
 import { iniciarCena } from './cena-entrada.js';
 import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 
@@ -23,6 +24,9 @@ let pararTela = null;
 let nomePlataforma = 'Rastreador';
 let versao = '';
 const nomesEmpresa = new Map();
+// Módulos contratados por empresa (o menu esconde o que não foi ligado).
+const modulosEmpresa = new Map();
+const MODULO_DO_MENU = { gestao: 'gestao_frota' };
 
 const PLATAFORMA = ['master', 'suporte'];
 // [rota, rótulo, ícone, perfis que veem (vazio = todos), seções]
@@ -75,6 +79,16 @@ const MENU_EMPRESA = [
     ['custos', 'Custos', 'carteira', 'Combustível e motor parado em reais'],
     ['manutencao', 'Manutenção', 'manutencao', 'Planos por km e por data'],
     ['equipamentos', 'Equipamentos', 'rastreadores', 'Saúde e funções do J16'],
+  ]],
+  // Módulo vendido à parte: só aparece para a empresa em que o master ligou (MODULO_DO_MENU).
+  ['gestao', 'Gestão de frota', 'manutencao', null, [
+    ['gestao-painel', 'Painel', 'dashboard', 'O que vence, o que está parado e o custo do mês'],
+    ['gestao-os', 'Ordens de serviço', 'manutencao', 'Manutenção corretiva e preventiva, peças e oficina'],
+    ['gestao-preventiva', 'Plano preventivo', 'check', 'Óleo, filtros, freios, suspensão e correias pelo km do GPS'],
+    ['gestao-pneus', 'Pneus', 'veiculos', 'Posição, rodízio, sulco, recapagem e custo por km'],
+    ['gestao-documentos', 'Documentos', 'relatorios', 'IPVA, licenciamento, seguro, tacógrafo e CNH'],
+    ['gestao-fornecedores', 'Fornecedores', 'empresas', 'Oficinas, borracharias e autopeças'],
+    ['gestao-custos', 'Custos', 'carteira', 'Custo total e por km de cada veículo'],
   ]],
   ['relatorios', 'Relatórios', 'relatorios', null, [
     ['relatorios', 'Relatórios', 'relatorios', 'Por veículo e período, em planilha e PDF'],
@@ -146,11 +160,21 @@ async function desenhar() {
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
   const telas = empresaId
-    ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO, ...TELAS_SEGUROS, ...TELAS_CLIENTES, ...TELAS_MULTAS }
+    ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO, ...TELAS_SEGUROS, ...TELAS_CLIENTES, ...TELAS_MULTAS, ...TELAS_GESTAO }
     : { ...TELAS_MASTER, ...TELAS_SEGUROS_MASTER, ...TELAS_MULTAS_MASTER };
+  // Dados da empresa (nome e módulos contratados) antes do menu: um módulo não contratado não aparece nem abre.
+  if (empresaId && !modulosEmpresa.has(empresaId)) {
+    try {
+      const e = await api.get(`/empresas/${empresaId}`);
+      nomesEmpresa.set(empresaId, e.nome);
+      modulosEmpresa.set(empresaId, e.modulos ?? {});
+    } catch { /* o erro aparece logo abaixo, na busca do nome */ }
+  }
+  const modulos = empresaId ? modulosEmpresa.get(empresaId) ?? {} : {};
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
+  const contratado = (k) => !MODULO_DO_MENU[k] || Boolean(modulos[MODULO_DO_MENU[k]]);
   const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp]) => permitido(sp));
-  const item = menu.find(([k, , , perfis, subs]) => permitido(perfis) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));
+  const item = menu.find(([k, , , perfis, subs]) => permitido(perfis) && contratado(k) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));
   if (!item || !telas[tela]) return ir(empresaId, 'dashboard');
   const secoes = secoesDe(item[4]);
   const secao = secoes.find(([sk]) => sk === tela);
@@ -175,7 +199,7 @@ async function desenhar() {
   try { recolhida = localStorage.getItem('rastreador.menu') === 'recolhido'; } catch { /* padrão */ }
   const casca = el('div', { class: `casca${recolhida ? ' recolhida' : ''}` });
 
-  const itens = menu.filter(([, , , perfis, subs]) => permitido(perfis) && (!subs || secoesDe(subs).length)).map(([k, rotulo, ic, , subs]) => {
+  const itens = menu.filter(([k, , , perfis, subs]) => permitido(perfis) && contratado(k) && (!subs || secoesDe(subs).length)).map(([k, rotulo, ic, , subs]) => {
     const ativo = subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela;
     return el('a', { class: `item${ativo ? ' on' : ''}`, href: link(empresaId, subs ? secoesDe(subs)[0][0] : k), title: rotulo, 'aria-current': ativo ? 'page' : null },
       icone(ic), el('span', { class: 'rotulo' }, rotulo));
@@ -236,6 +260,7 @@ async function desenhar() {
     parar: (fn) => { if (conteudo.isConnected) pararTela = fn; else fn(); },
     ir: (tela2, eid = empresaId) => ir(eid, tela2),
     renomearEmpresa: (id, nome) => nomesEmpresa.set(id, nome),
+    esquecerModulos: (id) => modulosEmpresa.delete(id),
   };
   // Assistente com IA: botão fixo no canto, em todas as telas da empresa (só aparece se a plataforma ligou).
   if (empresaId) montarAssistente(casca, ctx);
@@ -256,7 +281,7 @@ function ferramentas(u) {
   const menu = el('div', { class: 'menu-usuario oculto' },
     el('div', { class: 'quem' }, el('strong', {}, u.nome), el('div', { class: 'pequeno mudo' }, u.email), el('div', { class: 'pequeno mudo' }, PERFIS[u.perfil])),
     el('button', { onclick: () => { menu.classList.add('oculto'); alterarSenha(); } }, 'Alterar senha'),
-    el('button', { onclick: () => { sessao.limpar(); nomesEmpresa.clear(); location.hash = ''; desenhar(); } }, 'Sair'));
+    el('button', { onclick: () => { sessao.limpar(); nomesEmpresa.clear(); modulosEmpresa.clear(); location.hash = ''; desenhar(); } }, 'Sair'));
   // Pausar / ativar os efeitos contínuos (gradiente, órbita, pulsos).
   const efeitos = el('button', { class: 'controle-efeitos', type: 'button' });
   const desenharEfeitos = () => {
