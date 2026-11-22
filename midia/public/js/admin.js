@@ -96,8 +96,9 @@ export async function configuracoes(ctx) {
 
     el('fieldset', {}, el('legend', {}, 'Tela da marca'),
       el('p', { class: 'pequeno mudo', style: 'margin:0' },
-        'Quando sobra espaço no loop — ou quando a tela ainda não tem campanha —, a própria tela desenha a peça da '
-        + 'marca (logotipo, frase e o símbolo). Não precisa subir arte, e ela se ajusta a telas deitadas e em pé.'),
+        'Com anúncio no ar e espaço sobrando no loop, a peça da marca (logotipo, frase e o símbolo) aparece uma vez '
+        + 'por volta. Sem nenhuma campanha, ela ocupa a tela, para a TV nunca ficar preta. A própria tela desenha a '
+        + 'peça: não precisa subir arte, e ela se ajusta a telas deitadas e em pé.'),
       el('div', { class: 'duas' },
         marcar('Usar a tela da marca para completar o loop', { name: 'marca_preenche', checked: Boolean(c.marca_preenche) }),
         campo('Tempo de cada aparição (segundos)', { name: 'marca_duracao_s', type: 'number', min: 5, max: 60, value: c.marca_duracao_s }))),

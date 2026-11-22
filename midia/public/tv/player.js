@@ -13,7 +13,7 @@
  */
 'use strict';
 
-const VERSAO = '1.1';
+const VERSAO = '1.2';
 const API = new URL('../api/', location.href).href;
 const CHAVES = { token: 'midia.tv.token', grade: 'midia.tv.grade', fila: 'midia.tv.fila', codigo: 'midia.tv.codigo', vistos: 'midia.tv.vistos' };
 // Um arquivo que sumiu da programação (campanha só de manhã, por exemplo) ainda fica no cache por estes dias,
@@ -717,23 +717,31 @@ function pedirTelaCheia() {
 
 function telaCheia() {
   const aviso = $('aviso-tela-cheia');
-  const suporta = Boolean(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  const suporta = Boolean(document.fullscreenEnabled || document.webkitFullscreenEnabled
+    || document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
   // App instalado na tela inicial (manifesto com display fullscreen) já abre ocupando tudo.
   const instalado = matchMedia('(display-mode: fullscreen)').matches;
+  // Navegador de TV que não deixa o site ocupar a tela: o caminho é o "Tela cheia" do próprio navegador.
+  aviso.innerHTML = suporta
+    ? 'Aperte <b>OK</b> no controle para tela cheia'
+    : 'Para tela cheia, use a opção <b>Tela cheia</b> no menu do navegador da TV';
   let sumir;
   const atualizar = () => {
     clearTimeout(sumir);
-    const mostrar = suporta && !instalado && !emTelaCheia();
-    aviso.hidden = !mostrar;
+    const cheia = emTelaCheia() || instalado
+      || (innerHeight >= screen.height - 2 && innerWidth >= screen.width - 2);
+    aviso.hidden = cheia;
     // O lembrete fica um tempo e sai: a tela é de anúncio, não de recado.
-    if (mostrar) sumir = setTimeout(() => { aviso.hidden = true; }, 20_000);
+    if (!cheia) sumir = setTimeout(() => { aviso.hidden = true; }, 30_000);
   };
   pedirTelaCheia();
-  for (const evento of ['keydown', 'pointerdown', 'touchend', 'click']) {
+  // Controle de TV manda ora keydown, ora só keyup; no modo "ponteiro" (Magic Remote, Samsung), é clique.
+  for (const evento of ['keydown', 'keyup', 'pointerdown', 'mousedown', 'touchend', 'click']) {
     document.addEventListener(evento, pedirTelaCheia, { capture: true });
   }
   document.addEventListener('fullscreenchange', atualizar);
   document.addEventListener('webkitfullscreenchange', atualizar);
+  addEventListener('resize', atualizar);
   // Dá um instante para o pedido automático responder antes de mostrar o lembrete.
   setTimeout(atualizar, 1500);
 }

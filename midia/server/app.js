@@ -45,7 +45,7 @@ function criarApp(db) {
   // enquanto fontes, estilos e imagens seguem o cache normal.
   r.use(express.static(path.join(__dirname, '..', 'public'), {
     setHeaders: (res, caminho) => {
-      if (/public[\\/]+(tv[\\/]+)?(index\.html|player\.js)$/.test(caminho)) res.set('Cache-Control', 'no-cache');
+      if (/public[\\/]+(tv[\\/]+)?(index\.html|player\.js|tv\.css)$/.test(caminho)) res.set('Cache-Control', 'no-cache');
     },
   }));
   // Site institucional: servido em <base>/site/ e também na raiz do domínio, que é onde o visitante chega.

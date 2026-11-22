@@ -219,9 +219,10 @@ test('a tela da marca completa o loop e segura a tela que ainda não tem campanh
   c.campanha(a, 'Lançamento', [c.midia(a, 'lancamento', 15)], { insercoes_hora: 6 });
   const g = montar(c.db, c.daTela(t));
   assert.equal(g.vendido_s, 15, 'a publicidade não perde espaço para a marca');
-  assert.ok(g.duracao_s >= 60);
   assert.ok(g.itens.some((i) => i.campanha === 'Lançamento'));
-  assert.ok(g.itens.some((i) => i.formato === 'marca'));
+  // Com anúncio no ar, a marca assina a volta uma vez só — não fica "anúncio, marca, anúncio, marca".
+  assert.equal(g.itens.filter((i) => i.formato === 'marca').length, 1, 'a marca aparece uma vez por volta');
+  assert.equal(g.duracao_s, 25);
 
   gravarConfig(c.db, 'marca_preenche', 0);
   const semMarca = montar(c.db, c.daTela(t));

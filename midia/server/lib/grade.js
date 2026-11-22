@@ -241,9 +241,13 @@ function montar(db, tela, instante = new Date()) {
       tempo += m.duracao_s;
     }
   }
-  // Sobrou espaço (ou a tela ainda não tem nada): entra a tela da própria rede, desenhada pelo player.
+  // Sobrou espaço: entra a tela da própria rede, desenhada pelo player. Com anúncio no ar, ela aparece
+  // UMA vez por volta, como assinatura da rede — encher o loop com ela deixava, numa tela com poucos
+  // anúncios, "anúncio, marca, anúncio, marca", e quem olha acha que o anúncio não está passando.
+  // Sem nenhum anúncio, aí sim ela segura a tela inteira, para a TV nunca ficar preta.
   if (cfg.marca_preenche) {
-    for (let i = 0; tempo < minimo && i < 30; i++) {
+    const vezes = slots.length ? 1 : 30;
+    for (let i = 0; tempo < minimo && i < vezes; i++) {
       preenchimento.push({ marca: { duracao_s: cfg.marca_duracao_s } });
       tempo += cfg.marca_duracao_s;
     }
