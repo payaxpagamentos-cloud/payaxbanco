@@ -62,7 +62,7 @@ function criarApp(db, extras = {}) {
   const r = express.Router();
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // Atualizar/reverter o sistema pede a senha do master: poucas tentativas por minuto.
-  r.use(/^\/api\/master\/sistema\/(atualizar|reverter)\/?$/i, limitar({ janelaMs: 60_000, maximo: 5 }));
+  r.use(/^\/api\/master\/sistema\/(atualizar|reverter|dominio|dominio\/retirar)\/?$/i, limitar({ janelaMs: 60_000, maximo: 5 }));
   r.use(/^\/api\/master\/usuarios(\/\d+)?\/?$/i, limitar({ janelaMs: 60_000, maximo: 60, todosMetodos: true }));
   // Posições dos celulares (endereço público): um teto por IP segura quem tenta encher o banco com identificadores inventados.
   r.use('/api/osmand', limitar({ janelaMs: 60_000, maximo: 600, todosMetodos: true }));

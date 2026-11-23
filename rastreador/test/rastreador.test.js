@@ -186,6 +186,57 @@ test('viagens, paradas, cercas, horário e manutenção', () => {
   assert.equal(situacaoManutencao(plano, 51_000, '2026-07-01').proxima_data, '2026-11-28');
 });
 
+test('domínio próprio (Caddy): só nome de site, bloco marcado, validação antes de valer e volta se algo falha', async () => {
+  const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+  const arq = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'caddy-')), 'Caddyfile');
+  const original = 'meumanager.com.br {\n\treverse_proxy 127.0.0.1:3000\n}\n';
+  fs.writeFileSync(arq, original);
+  process.env.RASTREADOR_CADDYFILE_TESTE = arq;
+  delete require.cache[require.resolve('../server/lib/dominio')];
+  const d = require('../server/lib/dominio');
+  // Nada que o Caddy interprete entra como domínio.
+  for (const ruim of ['a b.com', 'x.com {', 'x.com/../y', '-x.com', 'x', 'x.com\nredir / http://mal', 'meumanager.com.br; rm -rf /', '*.x.com', '127.0.0.1']) {
+    assert.throws(() => d.lerDominio(ruim), /inválido/, ruim);
+  }
+  assert.equal(d.lerDominio(' https://Frota.MeuManager.com.br/ '), 'frota.meumanager.com.br');
+  // Simulador dos programas do sistema.
+  const chamadas = [];
+  const fazer = (falha = {}) => (prog, args) => {
+    chamadas.push([prog, ...args].join(' '));
+    if (prog === 'caddy' && args[0] === 'version') return { ok: true, existe: true, saida: 'v2.8.4' };
+    if (prog === 'systemctl' && args[0] === 'is-active') return { ok: true, existe: true, saida: 'active' };
+    if (prog === 'systemctl' && args[0] === 'show') return { ok: true, existe: true, saida: `ExecStart={ path=/usr/bin/caddy ; argv[]=/usr/bin/caddy run --environ --config ${arq} }\nExecReload={ argv[]=/usr/bin/caddy reload --config ${arq} --force }` };
+    if (prog === 'caddy' && args[0] === 'validate') return falha.validar ? { ok: false, existe: true, saida: 'Error: adapting config: unexpected token' } : { ok: true, existe: true, saida: 'Valid configuration' };
+    if (prog === 'systemctl' && args[0] === 'reload') return falha.recarga && chamadas.filter((c) => c === 'systemctl reload caddy').length === 1 ? { ok: false, existe: true, saida: 'Job failed' } : { ok: true, existe: true, saida: '' };
+    return { ok: false, existe: false, saida: '' };
+  };
+  assert.equal(d.situacao(fazer()).pode, true);
+  // Sem o serviço usando este arquivo, não mexe.
+  assert.equal(d.situacao((p, a) => (p === 'systemctl' && a[0] === 'show' ? { ok: true, existe: true, saida: 'ExecStart={ argv[]=/usr/bin/caddy run --resume }' } : fazer()(p, a))).pode, false);
+  // Domínio que não aponta para lugar nenhum: recusa antes de tocar no arquivo.
+  await assert.rejects(d.publicar('nao-existe-mesmo.invalid', fazer()), /não aponta/);
+  assert.equal(fs.readFileSync(arq, 'utf8'), original);
+  // Bloco novo entra no fim, marcado; o resto fica igual; retirar devolve o arquivo exatamente como era.
+  const novo = d.comBloco(original, 'frota.meumanager.com.br', { porta: 3410, basePath: '/rastreador' });
+  assert.ok(novo.startsWith(original.trimEnd()) && novo.includes('reverse_proxy 127.0.0.1:3410') && novo.includes('redir / /rastreador/'));
+  assert.deepEqual(d.publicados(novo), ['frota.meumanager.com.br']);
+  assert.equal(d.semBloco(novo, 'frota.meumanager.com.br'), original);
+  assert.throws(() => d.comBloco(original, 'meumanager.com.br'), /outro site/);
+  assert.throws(() => d.comBloco(novo, 'frota.meumanager.com.br'), /já está publicado/);
+  // Validação recusada ou recarga com erro: o arquivo anterior volta.
+  fs.writeFileSync(arq, novo);
+  assert.throws(() => d.retirar('frota.meumanager.com.br', fazer({ validar: true })), /recusou/);
+  assert.equal(fs.readFileSync(arq, 'utf8'), novo, 'validação falhou: nada mudou');
+  chamadas.length = 0;
+  assert.throws(() => d.retirar('frota.meumanager.com.br', fazer({ recarga: true })), /recarregar/);
+  assert.equal(fs.readFileSync(arq, 'utf8'), novo, 'recarga falhou: nada mudou');
+  // Caminho feliz: retira e o arquivo volta ao original.
+  d.retirar('frota.meumanager.com.br', fazer());
+  assert.equal(fs.readFileSync(arq, 'utf8'), original);
+  delete process.env.RASTREADOR_CADDYFILE_TESTE;
+  delete require.cache[require.resolve('../server/lib/dominio')];
+});
+
 test('Rastreador', async (t) => {
   const api = await iniciar();
   t.after(api.fechar);

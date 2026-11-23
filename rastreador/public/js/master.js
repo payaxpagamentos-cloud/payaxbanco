@@ -663,6 +663,39 @@ async function telaSistema(ctx) {
     limpar(saidaDiag, el('pre', { class: 'saida-diagnostico' }, texto), el('div', { class: 'linha', style: 'margin-top:8px' }, copiar));
   }));
 
+  // Publicar num domínio próprio (servidor web Caddy): um botão, com a senha do master; dá para retirar depois.
+  const areaDominio = el('div');
+  async function desenharDominio() {
+    const d = await api.get('/master/sistema/dominio').catch(() => null);
+    if (!d) return limpar(areaDominio, el('p', { class: 'mudo', style: 'margin:0' }, 'Não consegui consultar o servidor web agora.'));
+    const campoDominio = el('input', { placeholder: 'frota.suaempresa.com.br', autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false' });
+    const senhaDominio = el('input', { type: 'password', autocomplete: 'current-password', placeholder: 'sua senha' });
+    const resultado = el('div');
+    const publicar = el('button', { class: 'btn primario' }, 'Publicar no domínio');
+    publicar.addEventListener('click', () => acao(publicar, async () => {
+      if (!campoDominio.value.trim()) { toast('Escreva o domínio.', true); return; }
+      if (!senhaDominio.value) { toast('Digite a sua senha para confirmar.', true); return; }
+      const r = await api.post('/master/sistema/dominio', { dominio: campoDominio.value, senha: senhaDominio.value });
+      senhaDominio.value = '';
+      limpar(resultado, el('p', { class: 'aviso ok', style: 'margin:12px 0 0' },
+        `Publicado. O endereço novo é ${r.endereco} — o certificado de segurança (HTTPS) sai sozinho e pode levar até 1 minuto na primeira vez. O endereço antigo continua funcionando.`));
+      setTimeout(desenharDominio, 4000);
+    }));
+    const retirar = (nome) => botao('Retirar', 'perigo', async () => {
+      const s = await perguntar(`Retirar ${nome}`, 'O endereço deixa de abrir o sistema; o acesso pelo endereço antigo continua. Digite a sua senha para confirmar.');
+      if (!s) return;
+      await api.post('/master/sistema/dominio/retirar', { dominio: nome, senha: s });
+      toast('Domínio retirado.'); desenharDominio();
+    });
+    limpar(areaDominio,
+      d.publicados.length ? el('div', { style: 'margin-bottom:12px' }, d.publicados.map((n) => linhaDado(el('a', { href: `https://${n}${d.caminho === '/' ? '' : d.caminho}/`, target: '_blank', rel: 'noopener' }, n), retirar(n)))) : null,
+      d.pode ? [
+        el('div', { class: 'duas', style: 'max-width:640px' }, el('label', { class: 'campo' }, 'Domínio', campoDominio), el('label', { class: 'campo' }, 'Sua senha (para confirmar)', senhaDominio)),
+        el('div', { class: 'linha', style: 'margin-top:12px' }, publicar), resultado,
+      ] : el('p', { class: 'aviso', style: 'margin:0' }, `Não dá para publicar por aqui: ${d.motivo}`));
+  }
+  desenharDominio();
+
   limpar(ctx.conteudo,
     cartao('Atualizar o sistema',
       el('p', { class: 'mudo', style: 'margin:0 0 14px' }, 'Envie aqui o arquivo da atualização (rastreador-AAAA.MM.NN.zip). O sistema confere o arquivo, testa a versão nova antes de instalar e instala sozinho; se ela não ficar de pé, volta sozinho para a anterior. Funciona do mesmo jeito que a atualização pelo terminal. Se a versão nova não subir, ele volta para a anterior.'),
@@ -678,6 +711,9 @@ async function telaSistema(ctx) {
       el('label', { class: 'campo', style: 'margin-top:12px;max-width:320px' }, 'Sua senha (para confirmar)', senha),
       el('div', { class: 'linha', style: 'margin-top:14px' }, enviar),
       status),
+    cartao('Endereço próprio (domínio)',
+      el('p', { class: 'mudo', style: 'margin:0 0 12px' }, 'Abre o sistema num endereço seu, com cadeado (HTTPS). Antes, crie no DNS do domínio um registro tipo A apontando para o IP deste servidor. O sistema acrescenta só o endereço novo no servidor web, confere a configuração antes de valer e não mexe nos outros sites da máquina.'),
+      areaDominio),
     cartao('Diagnóstico do servidor',
       el('p', { class: 'mudo', style: 'margin:0 0 12px' }, 'Mostra qual servidor web está na máquina (Nginx ou Apache), as portas em uso e como o sistema está publicado. Só consulta: não muda nada e não mostra senha nem chave.'),
       botaoDiag, saidaDiag),

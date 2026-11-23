@@ -47,6 +47,7 @@ function diagnostico() {
     `Porta dos rastreadores (GT06): ${config.portaGt06 || 'desligada'}`,
     '',
     'Servidor web instalado:',
+    `  Caddy:   ${versao('caddy', ['version']) ?? 'não encontrado'}`,
     `  Nginx:   ${versao('nginx') ?? 'não encontrado'}`,
     `  Apache:  ${versao('apache2') ?? versao('httpd') ?? 'não encontrado'}`,
     `  Certbot: ${versao('certbot', ['--version']) ?? 'não encontrado'}`,
@@ -59,6 +60,11 @@ function diagnostico() {
     const lista = nomes(pasta);
     if (lista) linhas.push('', `${rotulo}:`, ...(lista.length ? lista.map((n) => `  ${n}`) : ['  (vazio)']));
   }
+  // Caddy: só os endereços dos sites (a primeira palavra de cada bloco), nunca o conteúdo do arquivo.
+  try {
+    const sites = fs.readFileSync('/etc/caddy/Caddyfile', 'utf8').split('\n').filter((l) => /^[^\s#{}(][^{]*\{\s*$/.test(l)).map((l) => l.replace(/\{\s*$/, '').trim()).slice(0, 60);
+    linhas.push('', 'Sites do Caddy (/etc/caddy/Caddyfile):', ...(sites.length ? sites.map((n) => `  ${n}`) : ['  (nenhum)']));
+  } catch { /* sem Caddy ou sem permissão */ }
   return linhas.join('\n');
 }
 

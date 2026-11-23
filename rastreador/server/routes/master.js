@@ -678,6 +678,22 @@ module.exports = (db, extras = {}) => {
       console.warn('[Rastreador] Não consegui copiar o banco antes da atualização:', err.message);
     }
   };
+  // ---------- Publicar o painel num domínio próprio (servidor web Caddy) ----------
+  const dominio = require('../lib/dominio');
+  r.get('/sistema/dominio', soMaster, (_req, res) => res.json(dominio.situacao()));
+  r.post('/sistema/dominio', soMaster, async (req, res) => {
+    conferirSenha(req);
+    const out = await dominio.publicar(req.body.dominio);
+    registrar(db, req, 'dominio_publicado', { dominio: out.dominio });
+    res.status(201).json(out);
+  });
+  r.post('/sistema/dominio/retirar', soMaster, (req, res) => {
+    conferirSenha(req);
+    const out = dominio.retirar(req.body.dominio);
+    registrar(db, req, 'dominio_retirado', { dominio: out.dominio });
+    res.json(out);
+  });
+
   // Diagnóstico do servidor (consultas fixas, só leitura): servidor web, portas e como o painel está publicado.
   r.get('/sistema/diagnostico', soMaster, (req, res) => {
     registrar(db, req, 'sistema_diagnostico');
