@@ -73,7 +73,9 @@ sudo bash scripts/instalar-servidor.sh --simular --sem-dominio
    existir um `.env`, ele é mantido — rodar de novo nunca troca o segredo nem derruba sessão.
 6. **Libera 80, 443 e a porta do SSH** no `ufw`, quando ele estiver ativo.
 7. **Sobe a plataforma** com `docker compose up -d --build` e espera ela responder.
-8. **Cria os dados de demonstração** na primeira instalação (canais, planos e catálogo).
+8. **Cria os dados de demonstração** na primeira instalação (canais, planos e catálogo). Essa
+   parte roda **solta no servidor**: se a conexão cair, ela continua. Acompanhe com
+   `sudo docker compose exec -T app tail -f /app/data/seed.log`. Para pular, use `--sem-demo`.
 9. **Agenda o backup diário** às 03:20, guardando as 7 cópias mais recentes em
    `/var/backups/playtechvip`.
 10. **Roda a conferência** de ponta a ponta e mostra os endereços e a senha do administrador.
@@ -82,6 +84,21 @@ sudo bash scripts/instalar-servidor.sh --simular --sem-dominio
 > cifrada e não há como recuperá-la (só criar outra).
 
 ---
+
+## A conexão caiu no meio
+
+Não tem problema: os contêineres rodam soltos e a plataforma continua no ar. Entre de novo e
+confira em que pé está:
+
+```bash
+ssh -o ServerAliveInterval=30 -p 62052 playtv@45.190.156.250
+cd /opt/playtechvip
+sudo docker compose ps                                       # está no ar?
+sudo docker compose exec -T app tail -20 /app/data/seed.log  # o catálogo terminou?
+```
+
+Para evitar a queda, use `ssh -o ServerAliveInterval=30` — ele manda um sinal de vida a cada 30
+segundos e impede que o roteador ou o provedor derrubem a sessão ociosa.
 
 ## Depois que subir
 

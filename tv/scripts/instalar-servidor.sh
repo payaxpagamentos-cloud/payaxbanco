@@ -7,6 +7,7 @@
 #   sudo bash instalar-servidor.sh play.seudominio.com.br
 #   sudo bash instalar-servidor.sh --sem-dominio      # sobe num endereço de teste, no próprio IP
 #   sudo bash instalar-servidor.sh --simular          # mostra o que faria, sem mexer em nada
+#   sudo bash instalar-servidor.sh --sem-demo         # sem o catálogo de demonstração
 #
 # O que ele faz, nesta ordem:
 #   1. confere o sistema e instala o Docker, se faltar;
@@ -25,11 +26,13 @@ PORTA_SSH=${PORTA_SSH:-22}
 SIMULAR=0
 DOMINIO=""
 TESTE=0
+SEM_DEMO=0
 
 for arg in "$@"; do
   case "$arg" in
     --simular) SIMULAR=1 ;;
     --teste|--sem-dominio) TESTE=1 ;;
+    --sem-demo) SEM_DEMO=1 ;;
     --ajuda|-h) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "Opção desconhecida: $arg"; exit 1 ;;
     *) DOMINIO="$arg" ;;
@@ -216,10 +219,31 @@ fi
 
 # ---------------------------------------------------------------- 8. dados de demonstração
 
-if [ "$SIMULAR" = 0 ] && [ ! -f "$DESTINO/data/tv.db" ]; then
-  azul "8. Dados de demonstração"
-  aviso "banco vazio: criando canais, planos e catálogo de exemplo (pode levar alguns minutos)"
-  rodar "cd '$DESTINO' && docker compose exec -T app node --disable-warning=ExperimentalWarning server/seed.js || true"
+azul "8. Dados de demonstração"
+
+# Quem sabe se já existe conteúdo é o próprio contêiner: os dados moram no volume do Docker,
+# não numa pasta do servidor. Perguntar pelo caminho de fora dava "vazio" sempre.
+TEM_CONTEUDO=1
+if [ "$SIMULAR" = 0 ]; then
+  (cd "$DESTINO" && docker compose exec -T app node --disable-warning=ExperimentalWarning \
+    -e "const {abrir}=require('./server/db'); process.exit(abrir().prepare('SELECT COUNT(*) n FROM canais').get().n > 0 ? 0 : 1)") >/dev/null 2>&1 || TEM_CONTEUDO=0
+fi
+
+if [ "$SEM_DEMO" = 1 ]; then
+  ok "pulando os dados de demonstração (--sem-demo)"
+elif [ "$SIMULAR" = 1 ]; then
+  printf '  \033[90m› criaria canais, planos e catálogo de exemplo, se o banco estivesse vazio\033[0m\n'
+elif [ "$TEM_CONTEUDO" = 1 ]; then
+  ok "já existe conteúdo cadastrado — nada a criar"
+else
+  aviso "banco vazio: criando canais, planos e catálogo de exemplo"
+  aviso "os filmes são baixados e convertidos: leva de 20 a 40 minutos nesta máquina"
+  # Roda solto dentro do contêiner: se o SSH cair, a criação continua do mesmo jeito.
+  (cd "$DESTINO" && docker compose exec -d app sh -c \
+    'node --disable-warning=ExperimentalWarning server/seed.js > /app/data/seed.log 2>&1') || true
+  ok "iniciado em segundo plano"
+  echo "  acompanhe com: cd $DESTINO && sudo docker compose exec -T app tail -f /app/data/seed.log"
+  echo "  (pode fechar o terminal: a criação segue no servidor)"
 fi
 
 # ---------------------------------------------------------------- 9. backup
