@@ -141,6 +141,21 @@ BASE=https://SEU-DOMINIO bash scripts/conferir-instalacao.sh   # conferir de nov
 3. **Configurações** → cadastrar o endereço do XMLTV da grade, para a programação se manter
    sozinha, e o token do TMDB, para o catálogo trazer capa e ficha dos títulos.
 
+## Emitir o certificado quando as portas liberarem
+
+Com as portas 80 e 443 chegando no servidor, um comando resolve — ele confere se o mundo
+realmente enxerga esta máquina pelo domínio, limpa a tentativa travada no servidor de testes da
+Let's Encrypt e acompanha a emissão:
+
+```bash
+cd /opt/playtechvip
+sudo bash scripts/certificado.sh                      # usa o domínio atual
+sudo bash scripts/certificado.sh play.dominio.com.br  # troca o domínio e emite
+```
+
+Se quem responder no domínio não for a plataforma, ele para e diz isso — é o sinal de que o
+tráfego ainda vai para outra máquina.
+
 ## Trocar o domínio depois
 
 É o que vai acontecer nesta instalação, assim que o cliente informar o endereço.
