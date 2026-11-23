@@ -5,6 +5,10 @@
  criação de obra derivada sem autorização expressa do titular (Leis 9.609/98 e 9.610/98 — Brasil).
 */
 
+// Antes de tudo: se a versão recém-instalada não ficar de pé, esta guarda volta sozinha para a anterior (ver o arquivo).
+const guarda = require('./lib/guardaAtualizacao');
+guarda.aoIniciar();
+
 const config = require('./config');
 const { abrir } = require('./db');
 const { criarApp } = require('./app');
@@ -58,6 +62,7 @@ if (config.portaGt06 > 0) {
 }
 const http = criarApp(db, extras).listen(config.port, config.host, () => {
   console.log(`[Rastreador] Painel: http://localhost:${config.port}${config.basePath}/`);
+  guarda.aoAtender();
 });
 http.on('error', (err) => {
   console.error(`[Rastreador] O painel não iniciou na porta ${config.port}: ${err.message}`);

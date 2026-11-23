@@ -595,6 +595,14 @@ async function esperarReinicio(versaoNova, status) {
     } catch { /* ainda reiniciando */ }
     limpar(status, el('p', { class: 'mudo' }, `Reiniciando o sistema… aguarde (${i + 1})`));
   }
+  // Não chegou na versão nova: se o sistema voltou sozinho para a anterior, diz o que houve.
+  try {
+    const info = await api.get('/master/sistema');
+    if (info.ultima_falha?.versao === versaoNova) {
+      limpar(status, el('p', { class: 'aviso erro' }, `A versão ${versaoNova} não iniciou neste servidor e o sistema voltou sozinho para a versão ${info.versao}. Nada foi perdido.${info.ultima_falha.erro ? ` Motivo: ${info.ultima_falha.erro}` : ''}`));
+      return;
+    }
+  } catch { /* ainda sem resposta */ }
   limpar(status, el('p', { class: 'aviso' }, 'O sistema está demorando a voltar. Recarregue a página (F5) em alguns segundos.'));
 }
 
@@ -657,9 +665,11 @@ async function telaSistema(ctx) {
 
   limpar(ctx.conteudo,
     cartao('Atualizar o sistema',
-      el('p', { class: 'mudo', style: 'margin:0 0 14px' }, 'Envie aqui o arquivo da atualização (rastreador-AAAA.MM.NN.zip). O sistema confere o arquivo e instala sozinho, do mesmo jeito que a atualização pelo terminal. Se a versão nova não subir, ele volta para a anterior.'),
+      el('p', { class: 'mudo', style: 'margin:0 0 14px' }, 'Envie aqui o arquivo da atualização (rastreador-AAAA.MM.NN.zip). O sistema confere o arquivo, testa a versão nova antes de instalar e instala sozinho; se ela não ficar de pé, volta sozinho para a anterior. Funciona do mesmo jeito que a atualização pelo terminal. Se a versão nova não subir, ele volta para a anterior.'),
       info.exemplo_no_env?.length ? el('p', { class: 'aviso erro', style: 'margin:0 0 14px' },
         `Atenção: o arquivo .env do servidor ainda tem o valor de exemplo em ${info.exemplo_no_env.join(' e ')}. Esse valor é público. Troque por um próprio e reinicie o sistema.`) : null,
+      info.ultima_falha ? el('p', { class: 'aviso erro', style: 'margin:0 0 14px' },
+        `A atualização para a versão ${info.ultima_falha.versao || '?'} (${dataHora(info.ultima_falha.em)}) não iniciou neste servidor, e o sistema voltou sozinho para a versão anterior.${info.ultima_falha.erro ? ` Motivo: ${info.ultima_falha.erro}` : ''}`) : null,
       linhaDado('Versão instalada', info.versao || '—'),
       linhaDado('Node.js', info.node),
       ultima ? el('p', { class: 'aviso ok', style: 'margin:14px 0 0' }, `✓ Atualizado para a versão ${ultima.detalhes?.para || info.versao} em ${dataHora(ultima.criado_em)}.`) : null,

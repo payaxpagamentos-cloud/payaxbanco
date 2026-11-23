@@ -976,8 +976,10 @@ test('Rastreador', async (t) => {
     assert.ok((await api.get(`${G}/pneus/${p1.dados.id}/historico`, cliente)).dados.length >= 6);
 
     // Documentos e o aviso (uma vez).
-    const hojeIso = new Date().toISOString().slice(0, 10);
-    const daqui = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+    // Data local (a do sistema), não a do relógio mundial: depois das 21h de Brasília elas são dias diferentes.
+    const datasLocais = require('../server/lib/datas');
+    const hojeIso = datasLocais.hoje();
+    const daqui = (n) => datasLocais.somarDias(hojeIso, n);
     assert.equal((await api.post(`${G}/documentos`, { tipo: 'licenciamento', veiculo_id: veiculo, vencimento: daqui(10), valor_centavos: 16000 }, cliente)).status, 201);
     assert.equal((await api.post(`${G}/documentos`, { tipo: 'cnh', vencimento: daqui(5) }, cliente)).status, 422, 'CNH pede o motorista');
     const docs = (await api.get(`${G}/documentos`, cliente)).dados;

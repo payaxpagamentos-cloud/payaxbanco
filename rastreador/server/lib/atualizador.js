@@ -27,7 +27,43 @@ function backupsExistentes() {
   try { return fs.readdirSync(DIR_BACKUP).filter((n) => n.startsWith('backup-')).sort((a, b) => horaDoBackup(b) - horaDoBackup(a)); } catch { return []; }
 }
 function estado() {
-  return { versao: versaoAtual(), node: process.versions.node, backups: backupsExistentes() };
+  return { versao: versaoAtual(), node: process.versions.node, backups: backupsExistentes(), ultima_falha: require('./guardaAtualizacao').ultimaFalha() };
+}
+
+/**
+ * Teste antes de instalar: confere a sintaxe de cada arquivo do servidor e carrega a versão nova num processo à parte, com a
+ * configuração real deste servidor (o mesmo .env). Se ela não carregar aqui, não é instalada, e o sistema continua como está.
+ */
+function testarAntes(base) {
+  const arquivos = [];
+  const juntar = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) juntar(path.join(dir, e.name)); else if (e.name.endsWith('.js')) arquivos.push(path.join(dir, e.name));
+    }
+  };
+  juntar(path.join(base, 'server'));
+  // O teste usa as bibliotecas instaladas NESTE servidor (as do pacote não são copiadas na atualização): se a versão nova
+  // precisar de uma biblioteca que aqui não existe, isso aparece agora, e não depois de instalada.
+  fs.rmSync(path.join(base, 'node_modules'), { recursive: true, force: true });
+  const rodar = (args, opcoes = {}) => {
+    try {
+      execFileSync(process.execPath, args, { stdio: 'pipe', timeout: 60_000, ...opcoes });
+      return null;
+    } catch (err) {
+      const txt = `${err.stderr ?? ''}${err.stdout ?? ''}`.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('at ') && !/^node:|^\^+$|^Node\.js/.test(l));
+      // A linha que diz o erro ("Error: ..."), sem o trecho de código que o Node mostra antes dela.
+      const linha = txt.find((l) => /^\w*Error\b|^Erro\b/.test(l)) ?? txt.find((l) => /\[Rastreador\]/.test(l)) ?? txt[0] ?? err.message;
+      return linha.replace(/^\w*Error:\s*/, '').slice(0, 300);
+    }
+  };
+  for (let i = 0; i < arquivos.length; i += 40) {
+    const erro = rodar(['--check', ...arquivos.slice(i, i + 40)]);
+    if (erro) throw new ErroNegocio(`Atualização recusada: o pacote tem um arquivo com erro (${erro}). Nada foi alterado.`, 400);
+  }
+  // Carrega a configuração e os módulos do painel da versão nova, usando as bibliotecas já instaladas neste servidor.
+  const teste = "require('./server/config');require('./server/db');require('./server/app');require('./server/lib/gt06');require('./server/lib/manutencao');process.exit(0)";
+  const erro = rodar(['--disable-warning=ExperimentalWarning', '-e', teste], { cwd: base, env: { ...process.env, NODE_PATH: path.join(RAIZ, 'node_modules'), RASTREADOR_TESTE_ATUALIZACAO: '1' } });
+  if (erro) throw new ErroNegocio(`Atualização recusada: a versão nova não inicia neste servidor (${erro}). Nada foi alterado; o sistema continua na versão atual.`, 400);
 }
 
 function limparBackupsAntigos() {
@@ -68,6 +104,7 @@ function aplicar(bufferZip) {
       }
     };
     conferir(path.join(base, 'server')); conferir(path.join(base, 'public'));
+    testarAntes(base);
     let novaVersao;
     try { novaVersao = JSON.parse(fs.readFileSync(path.join(base, 'server', 'versao.json'), 'utf8')).versao; }
     catch { throw new ErroNegocio('O pacote não tem a versão (versao.json). Envie o arquivo de atualização correto.', 400); }
@@ -89,6 +126,8 @@ function aplicar(bufferZip) {
     // Serviço GT06 separado: só reinicia (e os rastreadores reconectam) se o código que ele usa mudou.
     if (antes && gt06.digital(sit.arquivos) !== antes) gt06.pedirReinicio();
 
+    // Marca para a guarda: se a versão nova não ficar de pé, o sistema volta sozinho para este backup.
+    require('./guardaAtualizacao').marcar({ backup: path.basename(bkp), de: anterior, para: novaVersao });
     limparBackupsAntigos();
     return { versao: novaVersao, anterior };
   } finally {
@@ -102,6 +141,7 @@ function reverter() {
   if (!lista.length) throw new ErroNegocio('Não há backup guardado para reverter.', 400);
   const de = versaoAtual();
   const bkp = path.join(DIR_BACKUP, lista[0]);
+  fs.rmSync(require('./guardaAtualizacao').PENDENTE, { force: true }); // volta pedida pelo master: nada pendente de confirmar
   const gt06 = require('./servicoGt06');
   const sit = gt06.ler();
   const antes = sit?.arquivos ? gt06.digital(sit.arquivos) : null;
