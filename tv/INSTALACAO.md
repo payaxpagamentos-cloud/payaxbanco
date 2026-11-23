@@ -1,6 +1,6 @@
 # Instalação no servidor
 
-Servidor desta instalação: **45.190.156.250**, SSH na porta **62052**.
+Servidor desta instalação: **45.190.156.250**, SSH na porta **62052**, usuário **playtv**.
 
 A instalação é um comando. Ele instala o Docker se faltar, sobe a plataforma, emite o
 certificado HTTPS, agenda o backup diário e confere tudo no fim.
@@ -13,7 +13,7 @@ certificado HTTPS, agenda o backup diário e confere tudo no fim.
 |---|---|---|
 | **Domínio apontado para 45.190.156.250** | Sem domínio não há HTTPS, e sem HTTPS o app de celular, o PWA e as Smart TVs não funcionam | Cliente, no painel do DNS |
 | **Portas 80 e 443 abertas** | A porta 80 é usada na emissão do certificado; fechada, o HTTPS não sai | Cliente, no firewall do provedor |
-| **Usuário com sudo no servidor** | Para instalar o Docker e subir os containers | Cliente |
+| **Usuário com sudo no servidor** | Para instalar o Docker e subir os containers. Aqui é o `playtv` — ele precisa poder usar `sudo` | Cliente |
 
 **Sem o domínio, dá para subir hoje.** Com `--sem-dominio`, a instalação usa um endereço do tipo
 `45-190-156-250.sslip.io` — um DNS público que aponta para o próprio IP. O HTTPS é real (o
@@ -31,10 +31,10 @@ Na máquina onde está este código (precisa de `ssh` e acesso ao servidor):
 
 ```bash
 # agora, sem domínio (é o caso desta instalação)
-bash scripts/enviar-servidor.sh root@45.190.156.250 --porta 62052 --teste
+bash scripts/enviar-servidor.sh playtv@45.190.156.250 --porta 62052 --sem-dominio
 
 # depois, com o domínio definitivo
-bash scripts/enviar-servidor.sh root@45.190.156.250 --porta 62052 play.seudominio.com.br
+bash scripts/enviar-servidor.sh playtv@45.190.156.250 --porta 62052 play.seudominio.com.br
 ```
 
 Ele copia o código para `/opt/playtechvip` e roda o instalador lá dentro.
@@ -43,12 +43,13 @@ Ele copia o código para `/opt/playtechvip` e roda o instalador lá dentro.
 
 ```bash
 # 1. mande o pacote da entrega para o servidor
-scp -P 62052 PLAYTECHVIP-servidor.tar.gz root@45.190.156.250:/tmp/
+scp -P 62052 PLAYTECHVIP-servidor.tar.gz playtv@45.190.156.250:/tmp/
 
 # 2. entre, descompacte e instale
-ssh -p 62052 root@45.190.156.250
+ssh -p 62052 playtv@45.190.156.250
 sudo mkdir -p /opt/playtechvip
 sudo tar -C /opt/playtechvip -xzf /tmp/PLAYTECHVIP-servidor.tar.gz
+sudo chmod +x /opt/playtechvip/scripts/*.sh
 cd /opt/playtechvip
 sudo bash scripts/instalar-servidor.sh --sem-dominio      # ou o domínio, quando houver
 ```
@@ -119,8 +120,9 @@ O certificado do domínio novo é emitido sozinho, em segundos. Os dados ficam t
 ## Atualizar a plataforma
 
 ```bash
-bash scripts/enviar-servidor.sh root@45.190.156.250 --porta 62052 --so-enviar
-ssh -p 62052 root@45.190.156.250 'cd /opt/playtechvip && sudo docker compose up -d --build'
+bash scripts/enviar-servidor.sh playtv@45.190.156.250 --porta 62052 --so-enviar
+ssh -p 62052 -t playtv@45.190.156.250 \
+  'sudo tar -C /opt/playtechvip -xzf /tmp/playtechvip.tar.gz && cd /opt/playtechvip && sudo docker compose up -d --build'
 ```
 
 Banco e vídeos ficam no volume `dados` e não são tocados pela atualização.
@@ -131,6 +133,7 @@ Banco e vídeos ficam no volume `dados` e não são tocados pela atualização.
 
 | Sintoma | O que olhar |
 |---|---|
+| `sudo` pede senha e o envio para | Use o caminho A: ele abre um terminal de verdade no passo da instalação, e a senha pode ser digitada |
 | O site não abre, mas o container está de pé | DNS apontando para o IP certo, e 80/443 abertas no firewall do provedor |
 | HTTPS não é emitido | `docker compose logs proxy` — quase sempre é a porta 80 fechada ou o DNS ainda não propagado |
 | A plataforma não sobe | `docker compose logs app` — em produção ela recusa subir sem `TV_SECRET` e `TV_ADMIN_SENHA` de verdade |

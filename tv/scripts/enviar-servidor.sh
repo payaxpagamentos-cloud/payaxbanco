@@ -4,16 +4,18 @@
 #
 # Rode na SUA máquina (onde está este código), não no servidor:
 #
-#   bash scripts/enviar-servidor.sh root@45.190.156.250 --porta 62052 play.seudominio.com.br
-#   bash scripts/enviar-servidor.sh root@45.190.156.250 --porta 62052 --teste
-#   bash scripts/enviar-servidor.sh root@45.190.156.250 --porta 62052 --so-enviar
+#   bash scripts/enviar-servidor.sh playtv@45.190.156.250 --porta 62052 --sem-dominio
+#   bash scripts/enviar-servidor.sh playtv@45.190.156.250 --porta 62052 play.seudominio.com.br
+#   bash scripts/enviar-servidor.sh playtv@45.190.156.250 --porta 62052 --so-enviar
 #
 # O que acontece:
 #   1. confere se o SSH responde;
-#   2. copia o código (sem node_modules, sem data, sem dist) para /opt/playtechvip;
-#   3. roda o instalador lá dentro, que cuida de Docker, .env, HTTPS, backup e conferência.
+#   2. copia o código (sem node_modules, sem data, sem dist) para o servidor;
+#   3. instala em /opt/playtechvip e roda o instalador, que cuida de Docker, .env, HTTPS,
+#      backup e conferência.
 #
-# Precisa de: ssh e tar na sua máquina, e um usuário com sudo no servidor.
+# Precisa de: ssh e tar na sua máquina, e um usuário com sudo no servidor (não precisa ser
+# root: o sudo é pedido na hora, e a senha pode ser digitada normalmente).
 
 set -euo pipefail
 
@@ -26,7 +28,7 @@ DESTINO=${DESTINO:-/opt/playtechvip}
 while [ $# -gt 0 ]; do
   case "$1" in
     --porta|-p) PORTA="$2"; shift 2 ;;
-    --teste) DOMINIO="--teste"; shift ;;
+    --teste|--sem-dominio) DOMINIO="--sem-dominio"; shift ;;
     --so-enviar) SO_ENVIAR=1; shift ;;
     --ajuda|-h) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "Opção desconhecida: $1"; exit 1 ;;
@@ -40,11 +42,11 @@ erro() { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; }
 
 if [ -z "$ALVO" ]; then
   erro "Informe o servidor. Exemplo:"
-  erro "  bash $0 root@45.190.156.250 --porta 62052 play.seudominio.com.br"
+  erro "  bash $0 playtv@45.190.156.250 --porta 62052 --sem-dominio"
   exit 1
 fi
 if [ -z "$DOMINIO" ] && [ "$SO_ENVIAR" = 0 ]; then
-  erro "Informe o domínio (ou --teste para subir num domínio de teste no próprio IP)."
+  erro "Informe o domínio (ou --sem-dominio para subir num endereço de teste, no próprio IP)."
   exit 1
 fi
 
@@ -61,22 +63,27 @@ fi
 ok "SSH respondendo"
 ok "servidor: $("${SSH[@]}" '. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -a')"
 
-azul "2. Enviando os arquivos para $DESTINO"
-TAMANHO=$(tar -C "$RAIZ" --exclude=node_modules --exclude=data --exclude=dist --exclude=.git --exclude=build --exclude=.gradle \
-  --exclude='*.jks' --exclude=key.properties -cf - . | wc -c)
-printf '  %s MB de código\n' "$((TAMANHO / 1024 / 1024))"
-tar -C "$RAIZ" --exclude=node_modules --exclude=data --exclude=dist --exclude=.git --exclude=build --exclude=.gradle \
-  --exclude='*.jks' --exclude=key.properties -czf - . \
-  | "${SSH[@]}" "sudo mkdir -p '$DESTINO' && sudo tar -C '$DESTINO' -xzf - && sudo chmod +x '$DESTINO'/scripts/*.sh"
-ok "código em $DESTINO"
+azul "2. Enviando os arquivos"
+EXCLUIR=(--exclude=node_modules --exclude=data --exclude=dist --exclude=.git --exclude=build
+         --exclude=.gradle --exclude='*.jks' --exclude=key.properties)
+TAMANHO=$(tar -C "$RAIZ" "${EXCLUIR[@]}" -czf - . | wc -c)
+printf '  %s MB compactados\n' "$((TAMANHO / 1024 / 1024 + 1))"
+# Vai primeiro para /tmp, que não precisa de sudo; a instalação em /opt vem no passo seguinte,
+# num terminal de verdade, onde o sudo pode pedir a senha.
+tar -C "$RAIZ" "${EXCLUIR[@]}" -czf - . | "${SSH[@]}" "cat > /tmp/playtechvip.tar.gz"
+ok "pacote no servidor, em /tmp/playtechvip.tar.gz"
+
+ABRIR="sudo mkdir -p '$DESTINO' && sudo tar -C '$DESTINO' -xzf /tmp/playtechvip.tar.gz && sudo chmod +x '$DESTINO'/scripts/*.sh"
 
 if [ "$SO_ENVIAR" = 1 ]; then
   echo
   azul "Enviado. Para instalar, entre no servidor e rode:"
   echo "  ssh -p $PORTA $ALVO"
-  echo "  sudo bash $DESTINO/scripts/instalar-servidor.sh SEU-DOMINIO"
+  echo "  $ABRIR"
+  echo "  sudo bash $DESTINO/scripts/instalar-servidor.sh --sem-dominio"
   exit 0
 fi
 
-azul "3. Instalando no servidor"
-"${SSH[@]}" -t "sudo PORTA_SSH=$PORTA bash '$DESTINO/scripts/instalar-servidor.sh' '$DOMINIO'"
+azul "3. Instalando em $DESTINO"
+echo "  (o sudo do servidor pode pedir a senha de $ALVO)"
+"${SSH[@]}" -t "$ABRIR && sudo PORTA_SSH=$PORTA bash '$DESTINO/scripts/instalar-servidor.sh' '$DOMINIO'"
