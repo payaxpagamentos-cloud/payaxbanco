@@ -15,10 +15,13 @@ certificado HTTPS, agenda o backup diário e confere tudo no fim.
 | **Portas 80 e 443 abertas** | A porta 80 é usada na emissão do certificado; fechada, o HTTPS não sai | Cliente, no firewall do provedor |
 | **Usuário com sudo no servidor** | Para instalar o Docker e subir os containers | Cliente |
 
-Se o domínio ainda não existir, dá para subir **agora mesmo em modo de teste**: a instalação usa
-um endereço do tipo `45-190-156-250.sslip.io`, que é um DNS público apontando para o próprio IP.
-Funciona com HTTPS de verdade e serve para validar tudo; depois é só rodar de novo com o domínio
-definitivo.
+**Sem o domínio, dá para subir hoje.** Com `--sem-dominio`, a instalação usa um endereço do tipo
+`45-190-156-250.sslip.io` — um DNS público que aponta para o próprio IP. O HTTPS é real (o
+certificado é emitido normalmente), tudo funciona, e quando o domínio definitivo chegar a troca
+é de duas linhas, sem perder dado nenhum nem reinstalar.
+
+Nesse modo o login da operação fica em `admin@playtechvip.com.br`, e **não** no endereço
+provisório — assim o acesso continua o mesmo depois da troca de domínio.
 
 ---
 
@@ -27,11 +30,11 @@ definitivo.
 Na máquina onde está este código (precisa de `ssh` e acesso ao servidor):
 
 ```bash
-# com o domínio definitivo
-bash scripts/enviar-servidor.sh root@45.190.156.250 --porta 62052 play.seudominio.com.br
-
-# ou, para validar agora, sem domínio
+# agora, sem domínio (é o caso desta instalação)
 bash scripts/enviar-servidor.sh root@45.190.156.250 --porta 62052 --teste
+
+# depois, com o domínio definitivo
+bash scripts/enviar-servidor.sh root@45.190.156.250 --porta 62052 play.seudominio.com.br
 ```
 
 Ele copia o código para `/opt/playtechvip` e roda o instalador lá dentro.
@@ -39,17 +42,21 @@ Ele copia o código para `/opt/playtechvip` e roda o instalador lá dentro.
 ## Caminho B — direto no servidor
 
 ```bash
-ssh -p 62052 root@45.190.156.250
+# 1. mande o pacote da entrega para o servidor
+scp -P 62052 PLAYTECHVIP-servidor.tar.gz root@45.190.156.250:/tmp/
 
-# leve o código para o servidor (git, scp ou o zip da entrega), depois:
+# 2. entre, descompacte e instale
+ssh -p 62052 root@45.190.156.250
+sudo mkdir -p /opt/playtechvip
+sudo tar -C /opt/playtechvip -xzf /tmp/PLAYTECHVIP-servidor.tar.gz
 cd /opt/playtechvip
-sudo bash scripts/instalar-servidor.sh play.seudominio.com.br
+sudo bash scripts/instalar-servidor.sh --sem-dominio      # ou o domínio, quando houver
 ```
 
 Antes de valer, dá para ver o que o instalador vai fazer, sem ele mexer em nada:
 
 ```bash
-sudo bash scripts/instalar-servidor.sh --simular play.seudominio.com.br
+sudo bash scripts/instalar-servidor.sh --simular --sem-dominio
 ```
 
 ---
@@ -98,6 +105,8 @@ BASE=https://SEU-DOMINIO bash scripts/conferir-instalacao.sh   # conferir de nov
    sozinha, e o token do TMDB, para o catálogo trazer capa e ficha dos títulos.
 
 ## Trocar o domínio depois
+
+É o que vai acontecer nesta instalação, assim que o cliente informar o endereço.
 
 ```bash
 cd /opt/playtechvip

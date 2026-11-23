@@ -5,7 +5,7 @@
 # Rode DENTRO do servidor, como root (ou com sudo):
 #
 #   sudo bash instalar-servidor.sh play.seudominio.com.br
-#   sudo bash instalar-servidor.sh --teste            # usa um domínio de teste no próprio IP
+#   sudo bash instalar-servidor.sh --sem-dominio      # sobe num endereço de teste, no próprio IP
 #   sudo bash instalar-servidor.sh --simular          # mostra o que faria, sem mexer em nada
 #
 # O que ele faz, nesta ordem:
@@ -29,7 +29,7 @@ TESTE=0
 for arg in "$@"; do
   case "$arg" in
     --simular) SIMULAR=1 ;;
-    --teste) TESTE=1 ;;
+    --teste|--sem-dominio) TESTE=1 ;;
     --ajuda|-h) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "Opção desconhecida: $arg"; exit 1 ;;
     *) DOMINIO="$arg" ;;
@@ -80,10 +80,18 @@ IP_PUBLICO=$(curl -s --max-time 10 https://api.ipify.org || true)
 [ -n "$IP_PUBLICO" ] && ok "IP público: $IP_PUBLICO" || aviso "não consegui descobrir o IP público"
 
 if [ "$TESTE" = 1 ]; then
-  if [ -z "$IP_PUBLICO" ]; then erro "o modo --teste precisa descobrir o IP público"; exit 1; fi
+  if [ -z "$IP_PUBLICO" ]; then erro "o modo sem domínio precisa descobrir o IP público"; exit 1; fi
   DOMINIO="${IP_PUBLICO//./-}.sslip.io"
-  aviso "modo de teste: usando $DOMINIO (DNS público que aponta para o próprio IP)"
+  aviso "sem domínio: usando $DOMINIO (DNS público que aponta para o próprio IP)"
+  aviso "o HTTPS é real; quando o domínio definitivo chegar, troque em duas linhas (veja o fim)"
 fi
+
+# O e-mail da operação não acompanha endereço provisório: senão, ao trocar de domínio,
+# o login continuaria sendo o do sslip.io, o que confunde quem opera.
+case "$DOMINIO" in
+  *.sslip.io|*.nip.io) EMAIL_ADMIN="admin@playtechvip.com.br" ;;
+  *) EMAIL_ADMIN="admin@$DOMINIO" ;;
+esac
 
 if [ -z "$DOMINIO" ]; then
   erro "Informe o domínio: sudo bash $0 play.seudominio.com.br"
@@ -155,7 +163,7 @@ PORT=3600
 TV_SECRET=$SEGREDO
 
 # Administrador da operação, criado no primeiro start.
-TV_ADMIN_EMAIL=admin@$DOMINIO
+TV_ADMIN_EMAIL=$EMAIL_ADMIN
 TV_ADMIN_SENHA=$SENHA_NOVA
 TV_ADMIN_NOME=Operação PLAY TECH VIP
 
@@ -250,7 +258,7 @@ echo "  Painel da operação: https://$DOMINIO/admin/"
 if [ -n "$SENHA_NOVA" ]; then
   echo
   echo "  Entre no painel com:"
-  echo "    usuário: admin@$DOMINIO"
+  echo "    usuário: $EMAIL_ADMIN"
   echo "    senha  : $SENHA_NOVA"
   echo
   echo "  ANOTE A SENHA AGORA: ela não é mostrada de novo (fica cifrada no banco)."
@@ -260,3 +268,10 @@ echo
 echo "  Logs            : cd $DESTINO && docker compose logs -f app"
 echo "  Parar / subir   : docker compose down  ·  docker compose up -d"
 echo "  Conferir de novo: BASE=https://$DOMINIO bash $DESTINO/scripts/conferir-instalacao.sh"
+if [ "$TESTE" = 1 ]; then
+  echo
+  azul "Quando o domínio definitivo chegar:"
+  echo "  cd $DESTINO"
+  echo "  sudo sed -i 's|^DOMINIO=.*|DOMINIO=play.seudominio.com.br|' .env"
+  echo "  sudo docker compose up -d        # o certificado novo sai em segundos; os dados ficam"
+fi
