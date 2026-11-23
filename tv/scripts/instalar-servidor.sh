@@ -27,12 +27,14 @@ SIMULAR=0
 DOMINIO=""
 TESTE=0
 SEM_DEMO=0
+IGNORAR_PORTAS=0
 
 for arg in "$@"; do
   case "$arg" in
     --simular) SIMULAR=1 ;;
     --teste|--sem-dominio) TESTE=1 ;;
     --sem-demo) SEM_DEMO=1 ;;
+    --ignorar-portas) IGNORAR_PORTAS=1 ;;
     --ajuda|-h) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*) echo "Opção desconhecida: $arg"; exit 1 ;;
     *) DOMINIO="$arg" ;;
@@ -188,6 +190,23 @@ fi
 
 azul "6. Portas"
 
+# Outro serviço segurando a 80 ou a 443 impede o HTTPS: o proxy sobe, não consegue escutar, e a
+# plataforma parece no ar por dentro enquanto, de fora, quem responde é o outro serviço.
+if [ "$SIMULAR" = 0 ] && command -v ss >/dev/null 2>&1; then
+  OCUPANTE=$(ss -tlnp 2>/dev/null | awk '$4 ~ /:(80|443)$/' | grep -v docker-proxy || true)
+  if [ -n "$OCUPANTE" ]; then
+    erro "as portas 80 e/ou 443 já estão ocupadas por outro serviço:"
+    printf '%s\n' "$OCUPANTE" | sed 's/^/      /'
+    erro "a plataforma precisa dessas portas para emitir o certificado e responder de fora."
+    erro "Pare ou desinstale o serviço acima e rode este instalador de novo."
+    erro "Para seguir assim mesmo (a plataforma fica só acessível por dentro): --ignorar-portas"
+    [ "$IGNORAR_PORTAS" = 1 ] || exit 1
+    aviso "seguindo com as portas ocupadas, a pedido"
+  else
+    ok "portas 80 e 443 livres"
+  fi
+fi
+
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
   rodar "ufw allow ${PORTA_SSH}/tcp"
   rodar "ufw allow 80/tcp"
@@ -214,7 +233,19 @@ if [ "$SIMULAR" = 0 ]; then
     printf '.'; sleep 5
   done
   printf '\n'
-  [ "$PRONTA" = 1 ] && ok "no ar" || aviso "ainda não respondeu — veja: docker compose -f $DESTINO/docker-compose.yml logs -f app"
+  [ "$PRONTA" = 1 ] && ok "a plataforma responde por dentro" \
+    || aviso "ainda não respondeu — veja: docker compose -f $DESTINO/docker-compose.yml logs -f app"
+
+  # O proxy é quem entrega a plataforma para o mundo: se ele não ficou de pé, o resto não adianta.
+  ESTADO_PROXY=$(cd "$DESTINO" && docker compose ps --format '{{.Service}} {{.State}}' 2>/dev/null | awk '$1=="proxy"{print $2}')
+  case "$ESTADO_PROXY" in
+    running) ok "proxy no ar (HTTPS)" ;;
+    "") aviso "não consegui ler o estado do proxy" ;;
+    *)
+      erro "o proxy está em '$ESTADO_PROXY' — quase sempre é conflito nas portas 80/443."
+      (cd "$DESTINO" && docker compose logs --tail 15 proxy 2>&1 | sed 's/^/      /') || true
+      ;;
+  esac
 fi
 
 # ---------------------------------------------------------------- 8. dados de demonstração

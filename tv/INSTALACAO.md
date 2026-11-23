@@ -151,6 +151,7 @@ Banco e vídeos ficam no volume `dados` e não são tocados pela atualização.
 | Sintoma | O que olhar |
 |---|---|
 | `sudo` pede senha e o envio para | Use o caminho A: ele abre um terminal de verdade no passo da instalação, e a senha pode ser digitada |
+| Abre "Not found" ou um certificado de outro domínio | Outro serviço está com as portas 80/443. Veja `sudo ss -tlnp \| grep -E ':80 \|:443 '` — o instalador agora detecta isso e para antes de subir |
 | O site não abre, mas o container está de pé | DNS apontando para o IP certo, e 80/443 abertas no firewall do provedor |
 | HTTPS não é emitido | `docker compose logs proxy` — quase sempre é a porta 80 fechada ou o DNS ainda não propagado |
 | A plataforma não sobe | `docker compose logs app` — em produção ela recusa subir sem `TV_SECRET` e `TV_ADMIN_SENHA` de verdade |
