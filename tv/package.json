@@ -20,7 +20,9 @@
     "catalogo-demo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/catalogo-tmdb.js",
     "catalogo-publico": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/catalogo-publico.js",
     "epg": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/epg-mapear.js",
-    "conferir": "bash scripts/conferir-instalacao.sh"
+    "conferir": "bash scripts/conferir-instalacao.sh",
+    "instalar": "bash scripts/instalar-servidor.sh",
+    "enviar": "bash scripts/enviar-servidor.sh"
   },
   "dependencies": {
     "express": "^5.2.1",

@@ -260,6 +260,11 @@ No Nginx, o `location /tv/` precisa de `proxy_buffering off` (entrega em fluxo d
 
 ## No ar com um domínio (docker compose + HTTPS)
 
+> Para instalar num servidor do zero, há um caminho mais curto: o
+> [`INSTALACAO.md`](INSTALACAO.md) e o comando `npm run enviar`, que leva o código, instala o
+> Docker, sobe a plataforma, emite o HTTPS, agenda o backup e confere tudo.
+
+
 Para subir num servidor próprio (VPS, nuvem ou máquina na empresa), com HTTPS automático:
 
 ```bash
