@@ -227,20 +227,20 @@ fi
 azul "9. Backup diário"
 
 CRON="/etc/cron.d/playtechvip-backup"
-if [ -f "$CRON" ]; then
-  ok "já agendado"
+BACKUP_DIR=${BACKUP_DIR:-/var/backups/playtechvip}
+if [ "$SIMULAR" = 1 ]; then
+  printf '  \033[90m› criaria %s (03:20 todo dia), gravando em %s\033[0m\n' "$CRON" "$BACKUP_DIR"
 else
-  if [ "$SIMULAR" = 1 ]; then
-    printf '  \033[90m› criaria %s (03:20 todo dia)\033[0m\n' "$CRON"
-  else
-    cat > "$CRON" <<FIM
+  mkdir -p "$BACKUP_DIR"
+  # O contêiner roda como o usuário 'node' (uid 1000): sem isto, ele não escreve na pasta.
+  chown -R 1000:1000 "$BACKUP_DIR"
+  cat > "$CRON" <<FIM
 # Backup diário da PLAY TECH VIP (banco + mídia), guardando as 7 cópias mais recentes.
-20 3 * * * root cd $DESTINO && docker compose exec -T app node --disable-warning=ExperimentalWarning scripts/backup.js /var/backups/playtechvip >> /var/log/playtechvip-backup.log 2>&1
+# Grava em $BACKUP_DIR, no disco do servidor — a pasta /backup dentro do contêiner é ela.
+20 3 * * * root cd $DESTINO && docker compose exec -T app node --disable-warning=ExperimentalWarning scripts/backup.js /backup >> /var/log/playtechvip-backup.log 2>&1
 FIM
-    chmod 644 "$CRON"
-    mkdir -p /var/backups/playtechvip
-    ok "agendado para as 03:20, em /var/backups/playtechvip"
-  fi
+  chmod 644 "$CRON"
+  ok "agendado para as 03:20, em $BACKUP_DIR"
 fi
 
 # ---------------------------------------------------------------- 10. conferência

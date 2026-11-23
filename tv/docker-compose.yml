@@ -24,6 +24,9 @@ services:
     volumes:
       # Banco, vídeos, artes e legendas. É o que precisa de backup.
       - dados:/app/data
+      # Onde o backup diário é gravado: uma pasta do servidor, fora do contêiner — senão
+      # a cópia se perderia na primeira atualização da imagem.
+      - ${BACKUP_DIR:-/var/backups/playtechvip}:/backup
     expose:
       - "3600"
     # Converter vídeo consome CPU; sem limite, um 4K longo pode engasgar o servidor inteiro.

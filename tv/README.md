@@ -314,8 +314,14 @@ npm run backup /var/backups/playtechvip -- --manter 14
 npm run backup /var/backups/playtechvip -- --sem-midia
 ```
 
-O banco sai por `VACUUM INTO` (cópia consistente, com o servidor no ar) e a mídia é espelhada com `rsync`. Numa
-rotina diária, basta o cron:
+O banco sai por `VACUUM INTO` (cópia consistente, com o servidor no ar) e a mídia é espelhada com `rsync`.
+
+**Com Docker**, a plataforma grava o backup em `/backup`, que é a pasta `/var/backups/playtechvip` do próprio
+servidor (um *bind mount*, não um volume) — assim a cópia sobrevive a qualquer atualização da imagem. O
+`scripts/instalar-servidor.sh` cria a pasta, ajusta o dono e agenda o cron. Para mudar o lugar, defina
+`BACKUP_DIR` no `.env`.
+
+Fora do Docker, numa rotina diária, basta o cron:
 
 ```
 20 3 * * * cd /caminho/do/tv && npm run backup /var/backups/playtechvip >> /var/log/playtechvip-backup.log 2>&1
