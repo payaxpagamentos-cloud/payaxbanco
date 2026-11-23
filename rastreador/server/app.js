@@ -54,7 +54,11 @@ function criarApp(db, extras = {}) {
   });
   // Tudo é servido em RASTREADOR_BASE_PATH (ex.: /rastreador): o painel, a página de compartilhamento e a API em <endereço>/api.
   // Compacta (gzip) telas, scripts e respostas da API: no 4G, o painel abre baixando uma fração do tamanho.
-  app.use(require('compression')({ threshold: 1024 }));
+  // A biblioteca de compactação pode não estar instalada num servidor atualizado pelo painel (a atualização troca o código,
+  // não as bibliotecas): nesse caso o sistema funciona igual, só sem compactar.
+  let compactar = null;
+  try { compactar = require('compression'); } catch { console.warn('[Rastreador] Biblioteca "compression" não instalada: páginas sem compactação (rode "npm install" na pasta do sistema para ativar).'); }
+  if (compactar) app.use(compactar({ threshold: 1024 }));
   const r = express.Router();
   r.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
   // Atualizar/reverter o sistema pede a senha do master: poucas tentativas por minuto.
