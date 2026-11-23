@@ -1079,6 +1079,20 @@ test('Rastreador', async (t) => {
     assert.ok(jan.lancamentos.some((l) => l.categoria === 'multa' && l.data === `${anoD}-01-15`));
     assert.ok(!fev.lancamentos.some((l) => l.data === `${anoD}-01-15`));
     assert.equal(fev.totais.ipva_centavos, 0, 'o IPVA vence em dezembro');
+    // Empresa que contratou só a Gestão de Frota (sem rastreamento): o módulo, os cadastros e as multas; nada de mapa, alertas ou comandos.
+    assert.equal((await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: false, rastreamento: false }, master)).status, 422, 'ao menos um produto');
+    assert.equal((await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: true, rastreamento: false, preco_centavos: 9900 }, master)).status, 204);
+    assert.deepEqual((await api.get(base(), cliente)).dados.modulos, { gestao_frota: true, rastreamento: false });
+    for (const rota of ['/dashboard', '/mapa', '/alertas', '/cercas', '/rastreadores', '/comandos', `/veiculos/${veiculo}/posicoes`, '/relatorios/uso']) {
+      assert.equal((await api.get(`${base()}${rota}`, cliente)).status, 403, `sem rastreamento: ${rota}`);
+    }
+    assert.equal((await api.post(`${base()}/veiculos/${veiculo}/comandos`, { tipo: 'bloquear', confirmacao: 'x' }, cliente)).status, 403);
+    for (const rota of ['/veiculos', `/veiculos/${veiculo}`, '/motoristas', '/multas', '/configuracoes', '/gestao/painel', '/gestao/detran']) {
+      assert.equal((await api.get(`${base()}${rota}`, cliente)).status, 200, `continua valendo: ${rota}`);
+    }
+    assert.equal((await api.get(`${base()}/dashboard`, master)).status, 200, 'a plataforma continua vendo tudo');
+    assert.equal((await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: true, rastreamento: true, preco_centavos: 9900 }, master)).status, 204);
+    assert.equal((await api.get(`${base()}/dashboard`, cliente)).status, 200);
     // Usuário "Somente Gestão de Frota": entra no módulo e não enxerga nada do rastreamento.
     const uf = await api.post(`${base()}/usuarios`, { nome: 'Frota Só', email: 'frota@rota.com', senha: 'senha-da-frota', perfil: 'cliente', acesso: 'frota' }, cliente);
     assert.equal(uf.status, 201);
@@ -1089,6 +1103,7 @@ test('Rastreador', async (t) => {
     const vs = (await api.get(`${G}/veiculos`, soFrota)).dados;
     assert.ok(vs.length && vs.every((x) => x.lat === undefined && x.imei === undefined), 'veículos sem posição nem rastreador');
     assert.equal((await api.get(`${G}/motoristas`, soFrota)).status, 200);
+    assert.equal((await api.get(`${base()}/multas`, soFrota)).status, 200, 'as multas fazem parte do módulo');
     for (const rota of ['/veiculos', '/dashboard', '/alertas', '/motoristas', '/configuracoes', `/veiculos/${veiculo}`]) {
       assert.equal((await api.get(`${base()}${rota}`, soFrota)).status, 403, `bloqueado: ${rota}`);
     }

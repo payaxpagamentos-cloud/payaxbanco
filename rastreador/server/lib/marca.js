@@ -17,7 +17,7 @@ const NOME_SO_RASTREAMENTO = 'Rastreador';
 function nomeSistema(db, empresa = null) {
   const base = lerConfig(db).nome_plataforma || NOME_COMPLETO;
   if (base !== NOME_COMPLETO || !empresa) return base;
-  const e = typeof empresa === 'object' ? empresa : db.prepare('SELECT gestao_frota FROM empresas WHERE id = ?').get(Number(empresa));
+  const e = typeof empresa === 'object' ? empresa : db.prepare('SELECT gestao_frota, rastreamento FROM empresas WHERE id = ?').get(Number(empresa));
   return e && !e.gestao_frota ? NOME_SO_RASTREAMENTO : NOME_COMPLETO;
 }
 

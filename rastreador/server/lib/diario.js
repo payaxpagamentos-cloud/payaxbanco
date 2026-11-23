@@ -91,6 +91,10 @@ function abastecimento(db, m, veiculo, d) {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(veiculo.empresa_id, veiculo.id, m.id, Math.round(litros * 100) / 100, valor, km,
       Math.floor((veiculo.hodometro_m ?? 0) / 1000), posto, d.completo === false ? 0 : 1, agora()).lastInsertRowid);
     fotos.salvar(db, veiculo.empresa_id, 'abastecimento', novo, lista);
+    // Veículo sem rastreador: o km do painel informado no abastecimento atualiza o hodômetro (só para a frente).
+    if (km !== null && !veiculo.rastreador_id && km * 1000 > (veiculo.hodometro_m ?? 0)) {
+      db.prepare('UPDATE veiculos SET hodometro_m = ? WHERE id = ?').run(km * 1000, veiculo.id);
+    }
     return novo;
   });
   return { id, preco_litro_centavos: Math.round(valor / litros) };

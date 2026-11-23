@@ -105,6 +105,9 @@ const permitir = (...perfis) => (req, _res, next) =>
  * Acesso ao painel de uma empresa (/empresas/:eid): a equipe da plataforma entra em qualquer empresa não excluída;
  * cliente e operador, só na própria. O operador consulta, trata os alertas e pergunta ao assistente, sem alterar cadastros nem enviar comandos.
  */
+/** O que a empresa sem rastreamento usa fora do módulo (nada de mapa, posições, alertas, cercas, comandos ou roubo). */
+const SEM_RASTREAMENTO = /^\/($|veiculos\/?$|veiculos\/\d+\/?$|veiculos\/\d+\/(qr|hodometro)\/?$|motoristas(\/|$)|checklists(\/|$)|avarias(\/|$)|abastecimentos(\/|$)|fotos(\/|$)|multas(\/|$)|configuracoes\/?$|usuarios(\/|$)|contatos(\/|$)|notificacoes(\/|$))/;
+
 function acessoEmpresa(db) {
   const buscar = db.prepare("SELECT * FROM empresas WHERE id = ? AND status <> 'excluida'");
   return (req, _res, next) => {
@@ -118,11 +121,17 @@ function acessoEmpresa(db) {
     if (u.perfil === 'operador' && req.method !== 'GET' && !/^\/(alertas|assistente|seguros\/contratar)(\/|$)/.test(req.path)) {
       return next(new ErroNegocio('O operador só consulta e trata alertas.', 403));
     }
-    // Acesso "Somente Gestão de Frota": nada do rastreamento. Só o módulo (quando contratado) e o nome da empresa.
+    const noModulo = /\/gestao$/.test(req.baseUrl);
+    // Acesso "Somente Gestão de Frota": nada do rastreamento. Só o módulo (quando contratado), as multas (que fazem parte dele)
+    // e o nome da empresa.
     if (u.acesso === 'frota' && !PLATAFORMA.includes(u.perfil)) {
-      const noModulo = /\/gestao$/.test(req.baseUrl);
       if (!empresa.gestao_frota) return next(new ErroNegocio('A Gestão de Frota não está contratada para esta empresa. Fale com o suporte.', 403));
-      if (!noModulo && !(req.method === 'GET' && req.path === '/')) return next(new ErroNegocio('Seu acesso é somente à Gestão de Frota.', 403));
+      if (!noModulo && !(req.method === 'GET' && req.path === '/') && !/^\/multas(\/|$)/.test(req.path)) return next(new ErroNegocio('Seu acesso é somente à Gestão de Frota.', 403));
+    }
+    // Empresa que contratou só a Gestão de Frota (sem rastreamento): fora do módulo, só os cadastros que ele usa
+    // (veículos, motoristas, o que vem do app do motorista), as multas, os usuários e as configurações.
+    if (!empresa.rastreamento && !noModulo && !PLATAFORMA.includes(u.perfil) && !SEM_RASTREAMENTO.test(req.path)) {
+      return next(new ErroNegocio('Esta função é do rastreamento, que não está contratado para esta empresa.', 403));
     }
     req.empresa = empresa;
     next();

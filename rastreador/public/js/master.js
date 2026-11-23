@@ -118,14 +118,16 @@ async function telaEmpresas(ctx) {
       td(e.alertas_pendentes ? etiqueta(inteiro(e.alertas_pendentes), 'aviso') : '0', 'centro'),
       el('td', { class: 'acoes' },
         botaoIcone('editar', 'Editar', async () => { if (await formEmpresa(await api.get(`/master/empresas/${e.id}`))) { toast('Empresa salva.'); carregar(); } }),
-        ctx.soMaster ? botaoIcone('manutencao', 'Módulos contratados', async () => {
+        ctx.soMaster ? botaoIcone('manutencao', 'Produtos contratados', async () => {
           // Módulos vendidos à parte: ligar ou desligar para esta empresa, com o preço mensal combinado.
-          const r = await formModal(`Módulos · ${e.nome}`, () => [
-            marcar('Gestão de Frota (ordens de serviço, plano preventivo, pneus, documentos e custo por km)', { name: 'ativo', checked: Boolean(e.gestao_frota) }),
-            campo('Preço mensal combinado (R$, para o financeiro)', { name: 'preco', inputmode: 'decimal', value: reaisCampo(e.gestao_frota_preco_centavos) }),
-            el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Desligado, o menu some para a empresa e os dados ficam guardados.'),
-          ], (d) => api.put(`/master/empresas/${e.id}/gestao-frota`, { ativo: d.ativo, preco_centavos: centavos(d.preco) ?? '' }));
-          if (r) { ctx.esquecerModulos?.(e.id); toast('Módulos atualizados.'); carregar(); }
+          const r = await formModal(`Produtos contratados · ${e.nome}`, () => [
+            el('p', { class: 'mudo', style: 'margin:0' }, 'O que esta empresa contratou. Pode ser só um dos dois ou os dois juntos; o menu dela mostra só o que estiver ligado, sem nada repetido.'),
+            marcar('Rastreamento (mapa ao vivo, histórico, alertas, segurança, cercas, comandos e equipamentos)', { name: 'rastreamento', checked: e.rastreamento !== 0 }),
+            marcar('Gestão de Frota (ordens de serviço, plano preventivo, pneus, documentos, multas, Detran e custos)', { name: 'ativo', checked: Boolean(e.gestao_frota) }),
+            campo('Preço mensal da Gestão de Frota (R$, para o financeiro)', { name: 'preco', inputmode: 'decimal', value: reaisCampo(e.gestao_frota_preco_centavos) }),
+            el('p', { class: 'pequeno mudo', style: 'margin:0' }, 'Desligado, o menu some para a empresa e os dados ficam guardados. Ao menos um dos dois fica ligado.'),
+          ], (d) => api.put(`/master/empresas/${e.id}/gestao-frota`, { ativo: d.ativo, rastreamento: d.rastreamento, preco_centavos: centavos(d.preco) ?? '' }));
+          if (r) { ctx.esquecerModulos?.(e.id); toast('Produtos atualizados.'); carregar(); }
         }) : null,
         e.status === 'bloqueada'
           ? botaoIcone('aberto', 'Desbloquear', async () => {

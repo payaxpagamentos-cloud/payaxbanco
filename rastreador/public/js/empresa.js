@@ -374,7 +374,9 @@ async function telaAlertas(ctx) {
 
 /** Cadastro do veículo (novo ou edição), usado na lista de Veículos e na faixa do veículo no mapa. `aoSalvar` recarrega a tela. */
 async function formVeiculo(ctx, x, aoSalvar) {
-  const [det, rastreadores, motoristas] = await Promise.all([x ? api.get(`${base(ctx)}/veiculos/${x.id}`) : null, api.get(`${base(ctx)}/rastreadores`), api.get(`${base(ctx)}/motoristas`)]);
+  // Empresa sem rastreamento contratado: o cadastro fica só com os dados do veículo (sem rastreador, limite e bloqueio).
+  const R = ctx.modulos?.rastreamento !== false;
+  const [det, rastreadores, motoristas] = await Promise.all([x ? api.get(`${base(ctx)}/veiculos/${x.id}`) : null, R ? api.get(`${base(ctx)}/rastreadores`) : [], api.get(`${base(ctx)}/motoristas`)]);
   const livres = rastreadores.filter((r) => !r.veiculo_id || r.veiculo_id === x?.id);
   // O desenho ao lado do tipo troca conforme o tipo escolhido (carro, moto, caminhão, ônibus...).
   const tipoSel = escolha('Tipo', 'tipo', TIPOS_VEICULO, x?.tipo ?? 'carro');
@@ -393,15 +395,15 @@ async function formVeiculo(ctx, x, aoSalvar) {
       campo('Ano', { name: 'ano', type: 'number', min: 1950, max: new Date().getFullYear() + 1, value: x?.ano ?? '' })),
     el('div', { class: 'duas' }, campo('Cor', { name: 'cor', maxlength: 30, value: x?.cor ?? '' }),
       campo('RENAVAM (para a consulta de multas)', { name: 'renavam', inputmode: 'numeric', maxlength: 11, value: x?.renavam ?? '' })),
-    el('div', { class: 'duas' },
-      campo('Limite de velocidade (km/h, 0 = sem alerta)', { name: 'limite_velocidade_kmh', type: 'number', min: 0, max: 300, value: x?.limite_velocidade_kmh ?? 0 })),
-    el('div', { class: 'duas' }, campo('Consumo médio (km/l, para o custo em reais)', { name: 'consumo_km_l', inputmode: 'decimal', maxlength: 6,
+    R ? el('div', { class: 'duas' },
+      campo('Limite de velocidade (km/h, 0 = sem alerta)', { name: 'limite_velocidade_kmh', type: 'number', min: 0, max: 300, value: x?.limite_velocidade_kmh ?? 0 })) : null,
+    !R ? null : el('div', { class: 'duas' }, campo('Consumo médio (km/l, para o custo em reais)', { name: 'consumo_km_l', inputmode: 'decimal', maxlength: 6,
       value: x?.consumo_km_l ? String(x.consumo_km_l).replace('.', ',') : '', placeholder: 'Ex.: 9,5' }),
     el('div', { class: 'campo-marcar' }, marcar('Estacionar automático à noite (22h às 6h, ao desligar a ignição)', { name: 'estacionado_auto', checked: Boolean(x?.estacionado_auto) }))),
-    escolha('Rastreador', 'rastreador_id', { '': 'Sem rastreador', ...Object.fromEntries(livres.map((r) => [r.id, `${r.imei} · ${r.modelo ?? PROTOCOLOS[r.protocolo]}`])) }, x?.rastreador_id ?? ''),
+    !R ? null : escolha('Rastreador', 'rastreador_id', { '': 'Sem rastreador', ...Object.fromEntries(livres.map((r) => [r.id, `${r.imei} · ${r.modelo ?? PROTOCOLOS[r.protocolo]}`])) }, x?.rastreador_id ?? ''),
     escolha('Motorista', 'motorista_id', { '': 'Sem motorista fixo', ...Object.fromEntries(motoristas.filter((m) => m.ativo).map((m) => [m.id, m.nome])) }, x?.motorista_id ?? ''),
     x ? null : campo('Hodômetro atual (km)', { name: 'hodometro_km', type: 'number', min: 0, step: '0.1', value: 0 }),
-    x ? marcar('Veículo ativo (inativo não conta no limite do plano e libera o rastreador)', { name: 'ativo', checked: Boolean(x.ativo) }) : null,
+    x ? marcar(R ? 'Veículo ativo (inativo não conta no limite do plano e libera o rastreador)' : 'Veículo ativo (inativo não conta no limite do plano)', { name: 'ativo', checked: Boolean(x.ativo) }) : null,
     x?.rastreador_id ? marcar('Bloqueio desativado: a instalação do relé está em revisão (nenhum bloqueio ou desbloqueio é enviado, nem pelo Modo Roubo ou bloqueio programado)',
       { name: 'bloqueio_desativado', checked: Boolean(x.bloqueio_desativado) }) : null,
     det?.compartilhamentos.length ? el('fieldset', {}, el('legend', {}, 'Links de localização ativos'), det.compartilhamentos.map((c) => {
@@ -427,11 +429,29 @@ async function ajustarHodometro(ctx, x, aoSalvar) {
 async function telaVeiculos(ctx) {
   const corpo = el('div', { class: 'coluna', style: 'gap:18px' });
   const novo = pode(ctx) ? el('button', { class: 'btn primario', onclick: () => formVeiculo(ctx, null, carregar) }, 'Novo veículo') : null;
+  const R = ctx.modulos?.rastreamento !== false;
   let rastreadores = [];
 
   async function carregar() {
-    const [veiculos, rs] = await Promise.all([api.get(`${base(ctx)}/veiculos`), api.get(`${base(ctx)}/rastreadores`)]);
+    const [veiculos, rs] = await Promise.all([api.get(`${base(ctx)}/veiculos`), R ? api.get(`${base(ctx)}/rastreadores`) : []]);
     rastreadores = rs;
+    // Sem rastreamento contratado: só o cadastro (placa, veículo, motorista e o hodômetro informado à mão).
+    if (!R) {
+      return limpar(corpo, cartao(null, tabela(['Placa', 'Veículo', 'Motorista', '>Hodômetro', 'Situação', '^Ações'], veiculos.map((x) => el('tr', { class: x.ativo ? '' : 'inativo' },
+        td(el('strong', {}, placa(x.placa))), td([x.descricao ?? TIPOS_VEICULO[x.tipo], el('div', { class: 'pequeno mudo' }, [x.marca, x.modelo, x.ano, x.cor].filter(Boolean).join(' · '))]),
+        td(x.motorista ?? '—'), td(km(x.hodometro_m), 'dir num'), td(x.ativo ? etiqueta('ativo', 'ok') : etiqueta('inativo')),
+        el('td', { class: 'acoes' },
+          x.ativo ? botaoIcone('qr', 'QR code do veículo (app do motorista)', () => qrVeiculo(ctx, x), 'qr') : null,
+          pode(ctx) ? botaoIcone('relatorios', 'Atualizar o hodômetro', () => ajustarHodometro(ctx, x, carregar)) : null,
+          pode(ctx) ? botaoIcone('editar', 'Editar', () => formVeiculo(ctx, x, carregar)) : null,
+          pode(ctx) ? botaoIcone('lixo', 'Excluir', async () => {
+            const conf = await perguntar(`Excluir ${placa(x.placa)}`, 'Apaga o veículo e todo o histórico dele. Digite a placa para confirmar:');
+            if (!conf) return;
+            await api.del(`${base(ctx)}/veiculos/${x.id}`, { confirmacao: conf });
+            toast('Veículo excluído.');
+            carregar();
+          }, 'perigo') : null))), 'Nenhum veículo cadastrado.')));
+    }
     limpar(corpo,
       cartao(null, tabela(['Placa', 'Veículo', 'Rastreador', 'Motorista', '>Limite', '>Hodômetro', 'Situação', '^Ações'], veiculos.map((x) => el('tr', { class: x.ativo ? '' : 'inativo' },
         td(el('strong', {}, placa(x.placa))), td([x.descricao ?? TIPOS_VEICULO[x.tipo], el('div', { class: 'pequeno mudo' }, [x.marca, x.modelo, x.ano, x.cor].filter(Boolean).join(' · '))]),
@@ -477,7 +497,7 @@ async function telaVeiculos(ctx) {
         ]);
       })) : null));
   }
-  limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, 'Veículos rastreados, com o rastreador instalado, motorista e limite de velocidade.'), novo), corpo);
+  limpar(ctx.conteudo, acoesTopo(el('p', { class: 'mudo', style: 'margin:0' }, R ? 'Veículos rastreados, com o rastreador instalado, motorista e limite de velocidade.' : 'Veículos da frota. Sem rastreador, o hodômetro é informado por você ou pelo motorista no abastecimento.'), novo), corpo);
   await carregar();
 }
 

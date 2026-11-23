@@ -979,6 +979,8 @@ function migrar(db) {
       plano_nome: 'TEXT', plano_valor_centavos: 'INTEGER', atend_whatsapp: 'TEXT', atend_telefone: 'TEXT', atend_horario: 'TEXT',
       multas_auto_dias: 'INTEGER NOT NULL DEFAULT 0', multas_auto_tipo: "TEXT NOT NULL DEFAULT 'completa'",
       gestao_frota: 'INTEGER NOT NULL DEFAULT 0', gestao_frota_preco_centavos: 'INTEGER',
+      // O que a empresa contratou: rastreamento (mapa, alertas, comandos), Gestão de Frota, ou os dois. Ao menos um fica ligado.
+      rastreamento: 'INTEGER NOT NULL DEFAULT 1',
       multas_credito_centavos: 'INTEGER NOT NULL DEFAULT 0', multas_preco_completa: 'INTEGER', multas_preco_renainf: 'INTEGER', multas_preco_resumida: 'INTEGER' },
     cercas: { horario_inicio: 'TEXT', horario_fim: 'TEXT', acao_saida: "TEXT NOT NULL DEFAULT 'avisar'" },
     motoristas: { senha_hash: 'TEXT', app_ultimo_acesso: 'TEXT' },

@@ -66,7 +66,7 @@ module.exports = (db, extras = {}) => {
   r.get('/', (req, res) => {
     const e = req.empresa;
     // modulos: o que a empresa contratou à parte (o menu só mostra o que está ligado).
-    res.json({ id: e.id, nome: e.nome, tipo: e.tipo, status: e.status, limite_veiculos: e.limite_veiculos, modulos: { gestao_frota: Boolean(e.gestao_frota) } });
+    res.json({ id: e.id, nome: e.nome, tipo: e.tipo, status: e.status, limite_veiculos: e.limite_veiculos, modulos: { gestao_frota: Boolean(e.gestao_frota), rastreamento: Boolean(e.rastreamento) } });
   });
 
   // ---------- Dashboard e mapa ----------

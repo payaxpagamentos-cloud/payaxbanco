@@ -27,9 +27,13 @@ let nomeBase = NOME_COMPLETO;
 let nomePlataforma = NOME_COMPLETO;
 let versao = '';
 const nomesEmpresa = new Map();
-// Módulos contratados por empresa (o menu esconde o que não foi ligado).
+// O que cada empresa contratou: rastreamento, Gestão de Frota ou os dois (o menu mostra só o que vale para ela).
 const modulosEmpresa = new Map();
-const MODULO_DO_MENU = { gestao: 'gestao_frota' };
+/*
+ Cada item e cada seção do menu da empresa pode trazer, no fim, o que precisa para aparecer:
+   'R'  = só com o rastreamento        'G' = só com a Gestão de Frota        '!G' = só sem a Gestão de Frota
+   'oculta' = a tela abre (por um botão), mas não ganha aba.
+*/
 
 const PLATAFORMA = ['master', 'suporte'];
 // [rota, rótulo, ícone, perfis que veem (vazio = todos), seções]
@@ -62,57 +66,63 @@ const MENU_MASTER = [
 ];
 const GESTOR = ['master', 'suporte', 'cliente'];
 const MENU_EMPRESA = [
-  ['dashboard', 'Dashboard', 'dashboard'], ['mapa', 'Mapa ao vivo', 'mapa'], ['historico', 'Histórico', 'historico'], ['alertas', 'Alertas', 'alertas'],
+  ['dashboard', 'Dashboard', 'dashboard', null, null, 'R'], ['mapa', 'Mapa ao vivo', 'mapa', null, null, 'R'], ['historico', 'Histórico', 'historico', null, null, 'R'],
+  ['alertas', 'Alertas', 'alertas', null, null, 'R'],
   ['seguranca', 'Segurança', 'seguranca', null, [
     ['roubo', 'Roubo', 'seguranca', 'Modo Roubo com bloqueio inteligente e o kit de ocorrência'],
     ['estacionados', 'Estacionados', 'alvo', 'Veículo parado e vigiado: avisa se ligar ou sair'],
     ['bloqueio-programado', 'Bloqueio programado', 'cadeado', 'Horário de bloqueio e o app do motorista'],
     ['liberacoes', 'Liberações', 'aberto', 'Código do motorista para liberar o veículo', GESTOR],
-  ]],
-  ['cercas', 'Cercas', 'cercas'],
+  ], 'R'],
+  ['cercas', 'Cercas', 'cercas', null, null, 'R'],
+  // Sem a Gestão de Frota, as multas têm o item próprio; com ela, ficam dentro do módulo (uma vez só).
   ['multas', 'Central de multas', 'multa', null, [
     ['multas', 'Central', 'multa', 'Multas, prazos, notificação e quem dirigia'],
     ['multas-consultar', 'Consultar débitos', 'lupa', 'Multas, IPVA, licenciamento e restrições de um veículo'],
-  ]],
-  ['frota', 'Frota', 'veiculos', null, [
-    ['veiculos', 'Veículos', 'veiculos', 'Cadastro, rastreador e motorista fixo'],
-    ['motoristas', 'Motoristas', 'motoristas', 'Cadastro, CNH e acesso ao app'],
-    ['checklists', 'Checklists', 'check', 'Saída do veículo, pelo app do motorista'],
-    ['ranking', 'Nota e ranking', 'dashboard', 'Nota de 0 a 100 de cada motorista'],
-    ['custos', 'Custos', 'carteira', 'Combustível e motor parado em reais'],
-    ['manutencao', 'Manutenção', 'manutencao', 'Planos por km e por data'],
-    ['equipamentos', 'Equipamentos', 'rastreadores', 'Saúde e funções do J16'],
-  ]],
-  // Módulo vendido à parte: só aparece para a empresa em que o master ligou (MODULO_DO_MENU).
+  ], '!G'],
+  // Gestão de Frota: só para a empresa que contratou. Manutenção, pneus, documentos, multas, Detran e custos num lugar só.
   ['gestao', 'Gestão de frota', 'manutencao', null, [
     ['gestao-painel', 'Painel', 'dashboard', 'O que vence, o que está parado e o custo do mês'],
-    ['gestao-os', 'Ordens de serviço', 'manutencao', 'Manutenção corretiva e preventiva, peças e oficina'],
-    ['gestao-preventiva', 'Plano preventivo', 'check', 'Óleo, filtros, freios, suspensão e correias pelo km do GPS'],
+    ['gestao-os', 'Ordens (OS)', 'manutencao', 'Manutenção corretiva e preventiva, peças e oficina'],
+    ['gestao-preventiva', 'Preventiva', 'check', 'Óleo, filtros, freios, suspensão e correias pelo km rodado'],
     ['gestao-pneus', 'Pneus', 'veiculos', 'Posição, rodízio, sulco, recapagem e custo por km'],
     ['gestao-documentos', 'Documentos', 'relatorios', 'IPVA, licenciamento, seguro, tacógrafo e CNH'],
     ['gestao-fornecedores', 'Fornecedores', 'empresas', 'Oficinas, borracharias e autopeças'],
     ['gestao-detran', 'Detran', 'multa', 'IPVA, licenciamento, seguro e multas de cada veículo'],
+    ['multas', 'Multas', 'multa', 'Multas, prazos, notificação e quem dirigia'],
+    ['multas-consultar', 'Consultar débitos', 'lupa', 'Multas, IPVA, licenciamento e restrições de um veículo', null, 'oculta'],
     ['gestao-custos', 'Custos', 'carteira', 'Custo total e por km de cada veículo'],
+  ], 'G'],
+  // Cadastros (valem para os dois produtos). O que depende do GPS só aparece com o rastreamento.
+  ['frota', 'Veículos e motoristas', 'veiculos', null, [
+    ['veiculos', 'Veículos', 'veiculos', 'Cadastro, hodômetro e motorista fixo'],
+    ['motoristas', 'Motoristas', 'motoristas', 'Cadastro, CNH e acesso ao app'],
+    ['checklists', 'Checklists', 'check', 'Saída do veículo, pelo app do motorista'],
+    ['ranking', 'Nota e ranking', 'dashboard', 'Nota de 0 a 100 de cada motorista', null, 'R'],
+    ['custos', 'Combustível', 'combustivel', 'Gasto estimado pelo GPS: km rodado e motor parado', null, 'R'],
+    // A manutenção simples é de quem não tem a Gestão de Frota (com ela, vale o Plano preventivo e as ordens de serviço).
+    ['manutencao', 'Manutenção', 'manutencao', 'Planos por km e por data', null, 'R !G'],
+    ['equipamentos', 'Equipamentos', 'rastreadores', 'Saúde e funções do J16', null, 'R'],
   ]],
   ['relatorios', 'Relatórios', 'relatorios', null, [
     ['relatorios', 'Relatórios', 'relatorios', 'Por veículo e período, em planilha e PDF'],
     ['programados', 'Programados', 'historico', 'PDF pelo WhatsApp: diário, semanal, quinzenal e mensal'],
-  ]],
+  ], 'R'],
   ['seguros', 'Seguros', 'seguro', null, [
     ['seguros', 'Contratar', 'seguro', 'Seguros disponíveis para a sua frota'],
     ['seguros-precos', 'Preços de revenda', 'carteira', 'Margem que a sua empresa cobra por seguro', GESTOR],
     ['seguros-contratacoes', 'Contratações', 'relatorios', 'Pedidos de contratação e apólices'],
     ['seguros-usuarios', 'Quem pode contratar', 'usuarios', 'Libere o que cada operador pode contratar', GESTOR],
-  ]],
+  ], 'R'],
   ['app-cliente', 'App do cliente', 'usuarios', GESTOR, [
     ['usuarios-app', 'Usuários', 'usuarios', 'Quem acessa o app do cliente e vê o próprio veículo'],
     ['atendimento', 'Atendimento e plano', 'pergunta', 'Contatos de suporte e o nome do plano'],
-  ]],
+  ], 'R'],
   ['configuracoes', 'Configurações', 'configuracoes', null, [
     ['configuracoes', 'Geral', 'configuracoes', 'Alertas, horário de uso, custos, plano e usuários'],
     ['notificacoes', 'Notificações', 'alertas', 'Contatos do WhatsApp e o que cada um recebe'],
-    ['comandos', 'Comandos', 'comandos', 'Envio de comandos aos rastreadores e as respostas'],
-    ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas', GESTOR],
+    ['comandos', 'Comandos', 'comandos', 'Envio de comandos aos rastreadores e as respostas', null, 'R'],
+    ['integracoes', 'Integrações', 'integracoes', 'Chaves de API e envio de posições por outros sistemas', GESTOR, 'R'],
   ]],
 ];
 
@@ -128,7 +138,7 @@ const SUBTITULOS_MASTER = {
 const SUBTITULOS_EMPRESA = {
   dashboard: 'Resumo da frota, dos deslocamentos e dos alertas.', mapa: 'Última posição de cada veículo.', historico: 'Trajetos, paradas e viagens por período.',
   alertas: 'Ocorrências dos veículos e o que já foi tratado.', cercas: 'Áreas monitoradas: entrada, saída, horário e ação ao sair.',
-  seguranca: 'Modo Roubo, estacionados, bloqueio programado e liberações.', frota: 'Veículos, motoristas, nota, custos, manutenção e equipamentos.',
+  seguranca: 'Modo Roubo, estacionados, bloqueio programado e liberações.', frota: 'Cadastro dos veículos e dos motoristas da empresa.',
   relatorios: 'Relatórios por período e os que chegam sozinhos pelo WhatsApp.', configuracoes: 'Preferências, avisos pelo WhatsApp, comandos e integrações.',
   seguros: 'Seguros disponíveis para a sua frota, contratações e permissões.',
   'app-cliente': 'Usuários do app do cliente e as informações de atendimento.',
@@ -158,12 +168,10 @@ async function desenhar() {
   const u = s.usuario;
   // Acesso "Somente Gestão de Frota": o menu tem só o módulo e a página inicial é o painel dele.
   const soFrota = !PLATAFORMA.includes(u.perfil) && u.acesso === 'frota';
-  const inicio = soFrota ? 'gestao-painel' : 'dashboard';
   let { empresaId, tela } = rota();
-  if (soFrota && tela === 'dashboard') tela = inicio;
   // Usuário de empresa sempre fica no painel da própria empresa.
   if (!PLATAFORMA.includes(u.perfil) && empresaId !== u.empresa_id) {
-    history.replaceState(null, '', link(u.empresa_id, empresaId ? tela : inicio));
+    history.replaceState(null, '', link(u.empresa_id, empresaId ? tela : 'dashboard'));
     ({ empresaId, tela } = rota());
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
@@ -181,16 +189,23 @@ async function desenhar() {
   const modulos = empresaId ? modulosEmpresa.get(empresaId) ?? {} : {};
   // Empresa sem o módulo Gestão de Frota usa só o rastreamento: para ela o sistema se chama Rastreador.
   nomePlataforma = empresaId && nomeBase === NOME_COMPLETO && modulosEmpresa.has(empresaId) && !modulos.gestao_frota ? 'Rastreador' : nomeBase;
+  // Produtos da empresa: rastreamento (padrão) e Gestão de Frota. A página inicial de quem não tem o rastreamento (ou do
+  // usuário "Somente Gestão de Frota") é o painel da gestão.
+  const R = !empresaId || modulos.rastreamento !== false;
+  const G = Boolean(modulos.gestao_frota);
+  const inicio = empresaId && (soFrota || !R) ? 'gestao-painel' : 'dashboard';
+  if (tela === 'dashboard' && inicio !== 'dashboard') { tela = inicio; history.replaceState(null, '', link(empresaId, inicio)); }
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
-  const contratado = (k) => (soFrota ? k === 'gestao' : true) && (!MODULO_DO_MENU[k] || Boolean(modulos[MODULO_DO_MENU[k]]));
+  const atende = (req) => String(req ?? '').split(' ').every((x) => (x === 'R' ? R : x === 'G' ? G : x === '!G' ? !G : true));
+  const contratado = (k, req) => (soFrota ? k === 'gestao' : true) && atende(req);
   if (soFrota && empresaId && !modulos.gestao_frota) {
     return limpar(raiz, el('div', { class: 'cartao', style: 'max-width:520px;margin:15vh auto;padding:28px;text-align:center' },
       el('h2', {}, 'Gestão de Frota indisponível'),
       el('p', { class: 'mudo' }, 'Seu acesso é somente à Gestão de Frota, e o módulo não está ativo para a sua empresa. Fale com o administrador.'),
       el('button', { class: 'btn', onclick: () => { sessao.limpar(); nomesEmpresa.clear(); modulosEmpresa.clear(); location.hash = ''; desenhar(); } }, 'Sair')));
   }
-  const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp]) => permitido(sp));
-  const item = menu.find(([k, , , perfis, subs]) => permitido(perfis) && contratado(k) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));
+  const secoesDe = (subs) => (subs ?? []).filter(([, , , , sp, sreq]) => permitido(sp) && atende(sreq));
+  const item = menu.find(([k, , , perfis, subs, req]) => permitido(perfis) && contratado(k, req) && (subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela));
   if (!item || !telas[tela]) return tela === inicio ? undefined : ir(empresaId, inicio);
   const secoes = secoesDe(item[4]);
   const secao = secoes.find(([sk]) => sk === tela);
@@ -215,7 +230,7 @@ async function desenhar() {
   try { recolhida = localStorage.getItem('rastreador.menu') === 'recolhido'; } catch { /* padrão */ }
   const casca = el('div', { class: `casca${recolhida ? ' recolhida' : ''}` });
 
-  const itens = menu.filter(([k, , , perfis, subs]) => permitido(perfis) && contratado(k) && (!subs || secoesDe(subs).length)).map(([k, rotulo, ic, , subs]) => {
+  const itens = menu.filter(([k, , , perfis, subs, req]) => permitido(perfis) && contratado(k, req) && (!subs || secoesDe(subs).length)).map(([k, rotulo, ic, , subs]) => {
     const ativo = subs ? secoesDe(subs).some(([sk]) => sk === tela) : k === tela;
     return el('a', { class: `item${ativo ? ' on' : ''}`, href: link(empresaId, subs ? secoesDe(subs)[0][0] : k), title: rotulo, 'aria-current': ativo ? 'page' : null },
       icone(ic), el('span', { class: 'rotulo' }, rotulo));
@@ -254,8 +269,12 @@ async function desenhar() {
   const topo = el('header', { class: 'topo' }, el('div', {}, trilha,
     el('h1', { style: 'margin:0' }, titulo), subtitulo ? el('p', { class: 'subtitulo' }, subtitulo) : null), ferramentas(u));
   // Seções em cartões no topo da página (ficam fora do conteúdo, que cada tela redesenha).
-  const abas = secoes.length > 1 ? el('nav', { class: 'abas-config', 'aria-label': `Seções de ${titulo}` }, secoes.map(([sk, sr, sic, sd]) => {
-    const on = sk === tela;
+  // Aba para cada seção, menos as que só abrem por um botão (a tela dela acende a aba "de casa", a anterior na lista).
+  const oculta = (x) => String(x?.[5] ?? '').includes('oculta');
+  const comAba = secoes.filter((x) => !oculta(x));
+  const abaDaTela = oculta(secao) ? secoes[secoes.indexOf(secao) - 1]?.[0] : tela;
+  const abas = comAba.length > 1 ? el('nav', { class: 'abas-config', 'aria-label': `Seções de ${titulo}` }, comAba.map(([sk, sr, sic, sd]) => {
+    const on = sk === abaDaTela;
     return el('a', { class: `aba-config${on ? ' on' : ''}`, href: link(empresaId, sk), 'aria-current': on ? 'page' : null },
       el('span', { class: 'aba-icone' }, icone(sic)), el('span', { class: 'aba-texto' }, el('strong', {}, sr), el('small', {}, sd)));
   })) : null;
@@ -270,6 +289,8 @@ async function desenhar() {
 
   const ctx = {
     usuario: u, empresaId, nomeEmpresa, conteudo,
+    // O que a empresa contratou (as telas escondem o que é do rastreamento quando ele não foi contratado).
+    modulos: { rastreamento: R, gestao_frota: G },
     master: PLATAFORMA.includes(u.perfil), soMaster: u.perfil === 'master', somenteLeitura: u.perfil === 'operador',
     telaCheia: () => { conteudo.classList.add('cheio'); casca.classList.add('com-mapa'); },
     // Uma tela que termina de montar depois de o usuário já ter trocado de página não pode registrar a parada no lugar da tela nova.
@@ -279,7 +300,7 @@ async function desenhar() {
     esquecerModulos: (id) => modulosEmpresa.delete(id),
   };
   // Assistente com IA: botão fixo no canto, em todas as telas da empresa (só aparece se a plataforma ligou).
-  if (empresaId && !soFrota) montarAssistente(casca, ctx);
+  if (empresaId && !soFrota && R) montarAssistente(casca, ctx);
   try {
     await telas[tela](ctx);
   } catch (err) {

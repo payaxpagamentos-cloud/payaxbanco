@@ -90,7 +90,7 @@ module.exports = (db, extras = {}) => {
     if (q.tipo) { onde.push('e.tipo = ?'); p.push(v.opcao(q.tipo, 'o tipo', TIPOS)); }
     if (q.status) { onde.push('e.status = ?'); p.push(v.opcao(q.status, 'o status', ['ativa', 'bloqueada'])); }
     res.json(db.prepare(`SELECT e.id, e.nome, e.documento, e.tipo, e.status, e.motivo_bloqueio, e.limite_veiculos, e.mensalidade_centavos, e.email, e.telefone,
-        e.gestao_frota, e.gestao_frota_preco_centavos,
+        e.gestao_frota, e.gestao_frota_preco_centavos, e.rastreamento,
         (SELECT COUNT(*) FROM veiculos v WHERE v.empresa_id = e.id AND v.ativo = 1) AS veiculos,
         (SELECT COUNT(*) FROM veiculos v WHERE v.empresa_id = e.id AND v.ativo = 1 AND v.comunicacao_em >= ?) AS online,
         (SELECT COUNT(*) FROM rastreadores r WHERE r.empresa_id = e.id) AS rastreadores,
@@ -184,9 +184,12 @@ module.exports = (db, extras = {}) => {
     if (req.usuario.perfil !== 'master') throw new ErroNegocio('Só o master liga os módulos pagos.', 403);
     const e = empresa(req.params.id);
     const ativo = v.booleano(req.body.ativo) ? 1 : 0;
+    // O que a empresa contratou: só o rastreamento, só a Gestão de Frota, ou os dois (ao menos um).
+    const rastreamento = req.body.rastreamento === undefined ? e.rastreamento : (v.booleano(req.body.rastreamento) ? 1 : 0);
+    v.exigir(ativo || rastreamento, 'A empresa precisa ter ao menos um produto ligado: Rastreamento ou Gestão de Frota.');
     const preco = req.body.preco_centavos === undefined || req.body.preco_centavos === '' || req.body.preco_centavos === null ? null : v.inteiro(req.body.preco_centavos, 'o preço', { min: 0, max: 10_000_000 });
-    db.prepare('UPDATE empresas SET gestao_frota = ?, gestao_frota_preco_centavos = ? WHERE id = ?').run(ativo, preco, e.id);
-    registrar(db, req, ativo ? 'modulo_ligado' : 'modulo_desligado', { modulo: 'gestao_frota', preco_centavos: preco }, e.id);
+    db.prepare('UPDATE empresas SET gestao_frota = ?, gestao_frota_preco_centavos = ?, rastreamento = ? WHERE id = ?').run(ativo, preco, rastreamento, e.id);
+    registrar(db, req, ativo ? 'modulo_ligado' : 'modulo_desligado', { modulo: 'gestao_frota', preco_centavos: preco, rastreamento: Boolean(rastreamento) }, e.id);
     res.status(204).end();
   });
 

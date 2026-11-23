@@ -65,7 +65,7 @@ async function telaPainel(ctx) {
       cartao('Precisa de atenção agora', tabela(['Veículo', 'Item', 'Situação', '^Ação'], p.atencao.map((a) => el('tr', {},
         td(el('strong', {}, a.placa ? placa(a.placa) : '—')), td([a.titulo, el('div', { class: 'pequeno mudo' }, { componente: 'Plano preventivo', pneu: 'Pneu', documento: 'Documento' }[a.tipo])]),
         td(etiqueta(a.texto, a.gravidade === 2 ? 'erro' : 'aviso')), el('td', { class: 'acoes' }, acaoAtencao(a)))),
-      'Tudo em dia. Os vencimentos aparecem aqui pelo km do rastreador, pelo tempo e pela medição dos pneus.')),
+      'Tudo em dia. Os vencimentos aparecem aqui pelo km rodado, pelo tempo e pela medição dos pneus.')),
       p.avarias.length ? cartao('Problemas informados pelos motoristas', tabela(['Quando', 'Veículo', 'Problema', 'Gravidade', '^Ação'], p.avarias.map((a) => el('tr', {},
         td(dataHora(a.criado_em)), td(placa(a.placa)), td([a.descricao, a.motorista ? el('div', { class: 'pequeno mudo' }, a.motorista) : null]),
         td(etiqueta({ baixa: 'baixa', media: 'média', alta: 'alta' }[a.gravidade] ?? a.gravidade, a.gravidade === 'alta' ? 'erro' : a.gravidade === 'media' ? 'aviso' : '')),
