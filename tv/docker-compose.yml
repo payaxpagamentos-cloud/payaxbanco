@@ -29,6 +29,12 @@ services:
       - ${BACKUP_DIR:-/var/backups/playtechvip}:/backup
     expose:
       - "3600"
+    ports:
+      # Só no próprio servidor (127.0.0.1), nunca na internet: serve para conferir a plataforma
+      # por um túnel SSH quando o acesso externo ainda não está liberado —
+      #   ssh -p <porta> -L 3600:127.0.0.1:3600 usuario@servidor
+      # e depois abrir http://localhost:3600/ no navegador.
+      - "127.0.0.1:${PORTA_LOCAL:-3600}:3600"
     # Converter vídeo consome CPU; sem limite, um 4K longo pode engasgar o servidor inteiro.
     deploy:
       resources:

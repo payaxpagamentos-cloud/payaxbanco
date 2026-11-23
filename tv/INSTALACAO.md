@@ -100,6 +100,25 @@ sudo docker compose exec -T app tail -20 /app/data/seed.log  # o catálogo termi
 Para evitar a queda, use `ssh -o ServerAliveInterval=30` — ele manda um sinal de vida a cada 30
 segundos e impede que o roteador ou o provedor derrubem a sessão ociosa.
 
+## Ver a plataforma antes de liberar o acesso externo
+
+Enquanto o provedor não encaminha as portas 80 e 443 para o servidor, dá para conferir tudo por
+um **túnel SSH** — a plataforma escuta em `127.0.0.1:3600` dentro do servidor, sem ficar exposta:
+
+```bash
+ssh -p 62052 -L 3600:127.0.0.1:3600 playtv@45.190.156.250
+```
+
+Deixe essa janela aberta e abra no navegador do seu computador:
+
+```
+http://localhost:3600/          app do assinante
+http://localhost:3600/admin/    painel da operação
+```
+
+É a plataforma de verdade, rodando no servidor. Só o HTTPS fica de fora (o túnel é local), então
+a instalação do app no celular e o acesso pela Smart TV continuam dependendo das portas abertas.
+
 ## Depois que subir
 
 ```bash
@@ -151,6 +170,7 @@ Banco e vídeos ficam no volume `dados` e não são tocados pela atualização.
 | Sintoma | O que olhar |
 |---|---|
 | `sudo` pede senha e o envio para | Use o caminho A: ele abre um terminal de verdade no passo da instalação, e a senha pode ser digitada |
+| `acme-challenge ... 404` no log do proxy, vindo de outro IP | O tráfego que entra no IP público não chega neste servidor (NAT do provedor). Peça o encaminhamento das portas 80 e 443 para esta máquina |
 | Abre "Not found" ou um certificado de outro domínio | Outro serviço está com as portas 80/443. Veja `sudo ss -tlnp \| grep -E ':80 \|:443 '` — o instalador agora detecta isso e para antes de subir |
 | O site não abre, mas o container está de pé | DNS apontando para o IP certo, e 80/443 abertas no firewall do provedor |
 | HTTPS não é emitido | `docker compose logs proxy` — quase sempre é a porta 80 fechada ou o DNS ainda não propagado |
