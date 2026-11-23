@@ -57,7 +57,7 @@ async function enviar(db, agenda, { de, ate } = {}) {
   let status = 'enviado';
   let erro = null;
   try {
-    const plataforma = lerConfig(db).nome_plataforma;
+    const plataforma = require('./marca').nomeSistema(db, agenda.empresa_id);
     const arquivo = await pdf.relatorioPeriodo(db, agenda.empresa_id, ini, fim, agenda.conteudo.split(','), plataforma);
     const empresa = db.prepare('SELECT nome FROM empresas WHERE id = ?').get(agenda.empresa_id).nome;
     const texto = `*${agenda.nome}* · ${empresa}\nPeríodo: ${ini === fim ? dataBr(ini) : `${dataBr(ini)} a ${dataBr(fim)}`}\nO relatório completo está no PDF.`;

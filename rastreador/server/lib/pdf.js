@@ -22,7 +22,7 @@ const reais = (c) => (c === null || c === undefined ? '—' : `R$ ${(c / 100).to
 const km = (x) => `${Number(x ?? 0).toFixed(1).replace('.', ',')} km`;
 
 function novoDoc(titulo) {
-  const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: titulo, Author: 'Rastreador' }, bufferPages: true });
+  const doc = new PDFDocument({ size: 'A4', margin: 40, info: { Title: titulo, Author: 'Gestão de Frota' }, bufferPages: true });
   const partes = [];
   doc.on('data', (b) => partes.push(b));
   const pronto = new Promise((ok) => doc.on('end', () => ok(Buffer.concat(partes))));
@@ -95,7 +95,7 @@ function rodape(doc, texto) {
 }
 
 /** Relatório do período. `conteudo`: lista entre frota, seguranca, motoristas e custos. */
-async function relatorioPeriodo(db, empresaId, de, ate, conteudo = ['frota', 'seguranca', 'motoristas', 'custos'], plataforma = 'Rastreador') {
+async function relatorioPeriodo(db, empresaId, de, ate, conteudo = ['frota', 'seguranca', 'motoristas', 'custos'], plataforma = 'Gestão de Frota') {
   const empresa = db.prepare('SELECT nome FROM empresas WHERE id = ?').get(empresaId).nome;
   const d = calcular(db, empresaId, de, ate);
   const [ini, fim] = intervalo(de, ate);
@@ -138,7 +138,7 @@ async function relatorioPeriodo(db, empresaId, de, ate, conteudo = ['frota', 'se
 }
 
 /** Relatório de uma ocorrência de roubo: veículo, linha do tempo e as posições desde 2 h antes do acionamento. */
-async function relatorioOcorrencia(db, ocorrencia, plataforma = 'Rastreador') {
+async function relatorioOcorrencia(db, ocorrencia, plataforma = 'Gestão de Frota') {
   const v = db.prepare('SELECT * FROM veiculos WHERE id = ?').get(ocorrencia.veiculo_id);
   const empresa = db.prepare('SELECT nome, telefone, email FROM empresas WHERE id = ?').get(ocorrencia.empresa_id);
   const eventos = db.prepare('SELECT em, texto, velocidade_kmh FROM ocorrencia_eventos WHERE ocorrencia_id = ? ORDER BY id').all(ocorrencia.id);

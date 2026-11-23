@@ -125,7 +125,7 @@ function verificar(db) {
     db.prepare('UPDATE liberacoes SET aviso_enviado = 1 WHERE id = ?').run(l.id);
     const texto = `A liberação do ${l.placa} termina às ${horaCurta(l.libera_ate)}. Depois disso o veículo volta a ser bloqueado (só com ele parado ou devagar).`;
     notif.avisar(db, l.empresa_id, 'liberacao', { titulo: `Liberação acabando · ${l.placa}`, texto, caminho: `/empresa/${l.empresa_id}/liberacoes` });
-    if (l.motorista_telefone) zap.enfileirar(db, { empresaId: l.empresa_id, numero: l.motorista_telefone, texto: `*Rastreador*\n${texto}`, origem: 'liberacao' });
+    if (l.motorista_telefone) zap.enfileirar(db, { empresaId: l.empresa_id, numero: l.motorista_telefone, texto: `*${require('./marca').nomeSistema(db, l.empresa_id)}*\n${texto}`, origem: 'liberacao' });
     push.avisar(db, l.motorista_id, { titulo: `Liberação acabando · ${l.placa}`, texto });
   }
   for (const l of db.prepare(`SELECT l.*, v.placa FROM liberacoes l JOIN veiculos v ON v.id = l.veiculo_id WHERE l.status = 'ativa' AND l.libera_ate <= ?`).all(agoraIso)) {

@@ -844,7 +844,7 @@ module.exports = (db, extras = {}) => {
   r.post('/contatos/:id/testar', gestor, (req, res) => {
     const c = contato(req, req.params.id);
     v.exigir(zap.configurado(), 'O WhatsApp ainda não foi ligado no servidor. Fale com o suporte.');
-    zap.enfileirar(db, { empresaId: eid(req), numero: c.numero, texto: `*Rastreador · ${req.empresa.nome}*\nMensagem de teste: os avisos vão chegar neste número.`, origem: 'teste' });
+    zap.enfileirar(db, { empresaId: eid(req), numero: c.numero, texto: `*${require('../lib/marca').nomeSistema(db, req.empresa)} · ${req.empresa.nome}*\nMensagem de teste: os avisos vão chegar neste número.`, origem: 'teste' });
     res.status(202).json({ ok: true });
   });
 
@@ -1050,13 +1050,13 @@ module.exports = (db, extras = {}) => {
     try {
       const [de, ate] = rel.periodo(req.query, { padraoDias: 29, maxDias: 93 });
       const conteudo = String(req.query.conteudo || 'frota,seguranca,motoristas,custos').split(',').filter((c) => progr.CONTEUDOS[c]);
-      enviarPdf(res, `relatorio-${de}-a-${ate}.pdf`, await pdf.relatorioPeriodo(db, eid(req), de, ate, conteudo, lerConfig(db).nome_plataforma));
+      enviarPdf(res, `relatorio-${de}-a-${ate}.pdf`, await pdf.relatorioPeriodo(db, eid(req), de, ate, conteudo, require('../lib/marca').nomeSistema(db, req.empresa)));
     } catch (err) { next(err); }
   });
   r.get('/roubo/:id/relatorio.pdf', async (req, res, next) => {
     try {
       const oc = ocorrencia(req, req.params.id);
-      enviarPdf(res, `ocorrencia-${oc.id}.pdf`, await pdf.relatorioOcorrencia(db, oc, lerConfig(db).nome_plataforma));
+      enviarPdf(res, `ocorrencia-${oc.id}.pdf`, await pdf.relatorioOcorrencia(db, oc, require('../lib/marca').nomeSistema(db, req.empresa)));
     } catch (err) { next(err); }
   });
   r.post('/roubo/:id/relatorio/whatsapp', gestor, async (req, res, next) => {
@@ -1066,7 +1066,7 @@ module.exports = (db, extras = {}) => {
       const c = contato(req, req.body.contato_id);
       const placaV = db.prepare('SELECT placa FROM veiculos WHERE id = ?').get(oc.veiculo_id).placa;
       zap.enfileirar(db, { empresaId: eid(req), numero: c.numero, texto: `*Ocorrência de roubo · ${placaV}*\nRelatório com o veículo, a linha do tempo e o trajeto.`,
-        arquivo: await pdf.relatorioOcorrencia(db, oc, lerConfig(db).nome_plataforma), arquivoNome: `ocorrencia-${placaV}.pdf`, origem: 'roubo' });
+        arquivo: await pdf.relatorioOcorrencia(db, oc, require('../lib/marca').nomeSistema(db, req.empresa)), arquivoNome: `ocorrencia-${placaV}.pdf`, origem: 'roubo' });
       res.status(202).json({ ok: true });
     } catch (err) { next(err); }
   });

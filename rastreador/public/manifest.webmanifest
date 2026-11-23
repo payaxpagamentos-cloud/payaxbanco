@@ -1,6 +1,6 @@
 {
-  "name": "Rastreador",
-  "short_name": "Rastreador",
+  "name": "Gestão de Frota",
+  "short_name": "Frota",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

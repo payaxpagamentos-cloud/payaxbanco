@@ -8,8 +8,8 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('push', (e) => {
   let d = {};
-  try { d = e.data ? e.data.json() : {}; } catch { d = { titulo: 'Rastreador', texto: e.data?.text() ?? '' }; }
-  e.waitUntil(self.registration.showNotification(d.titulo || 'Rastreador', {
+  try { d = e.data ? e.data.json() : {}; } catch { d = { titulo: 'App do motorista', texto: e.data?.text() ?? '' }; }
+  e.waitUntil(self.registration.showNotification(d.titulo || 'App do motorista', {
     body: d.texto || '', icon: '../img/favicon.svg', badge: '../img/favicon.svg', tag: d.titulo, renotify: true, data: { url: './' },
   }));
 });

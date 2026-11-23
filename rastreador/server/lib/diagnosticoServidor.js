@@ -42,7 +42,7 @@ function diagnostico() {
   try { sistema = /PRETTY_NAME="?([^"\n]+)/.exec(fs.readFileSync('/etc/os-release', 'utf8'))?.[1] ?? null; } catch { /* outro sistema */ }
   const linhas = [
     `Sistema: ${sistema ?? os.type()} · Node ${process.versions.node} · usuário ${os.userInfo().username}`,
-    `Rastreador: versão ${config.versao || '—'} · porta ${config.port} · endereço de escuta ${config.host || 'todos (0.0.0.0)'} · caminho "${config.basePath || '/'}"`,
+    `Painel: versão ${config.versao || '—'} · porta ${config.port} · endereço de escuta ${config.host || 'todos (0.0.0.0)'} · caminho "${config.basePath || '/'}"`,
     `Endereço público configurado: ${config.urlPublica || '(não definido)'} · proxy confiável: ${config.trustProxy}`,
     `Porta dos rastreadores (GT06): ${config.portaGt06 || 'desligada'}`,
     '',

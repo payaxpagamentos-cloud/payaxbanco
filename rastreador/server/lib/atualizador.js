@@ -89,7 +89,7 @@ function aplicar(bufferZip) {
     const base = fs.existsSync(path.join(tmp, 'rastreador', 'server')) ? path.join(tmp, 'rastreador') : tmp;
     for (const req of ['server/index.js', 'server/versao.json', 'public']) {
       if (!fs.existsSync(path.join(base, req))) {
-        throw new ErroNegocio('Este .zip não é um pacote de atualização do Rastreador (faltam arquivos do sistema). Envie o arquivo de atualização correto.', 400);
+        throw new ErroNegocio('Este .zip não é um pacote de atualização do sistema (faltam arquivos do sistema). Envie o arquivo de atualização correto.', 400);
       }
     }
     // Nada de atalhos (links simbólicos) dentro do pacote, nem pacote gigante: um arquivo assim não saiu do empacotador.

@@ -76,7 +76,7 @@ function sair() {
 }
 
 const marca = (claro = false) => el('div', { class: 'marca' },
-  el('span', { class: 'ic' }, ico(IC.radar)), el('span', {}, claro ? 'Rastreador' : 'Rastreador'));
+  el('span', { class: 'ic' }, ico(IC.radar)), el('span', {}, 'Minha conta'));
 
 // ---------- Login ----------
 function entrar() {

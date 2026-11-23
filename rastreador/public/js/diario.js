@@ -49,7 +49,7 @@ export async function qrVeiculo(ctx, v, depois) {
     w.document.write(`<!doctype html><meta charset="utf-8"><title>QR ${placa(q.placa)}</title><style>body{font-family:system-ui,sans-serif;text-align:center;padding:24px}
       .q{width:320px;margin:12px auto}h1{font-size:40px;margin:8px 0}p{color:#334;font-size:16px;margin:6px 0}small{color:#667}</style>
       <h1>${placa(q.placa)}</h1><p>${(q.descricao ?? '').replace(/[<>&]/g, '')}</p><div class="q">${q.svg}</div>
-      <p><b>Motorista:</b> aponte a câmera do celular para o código e toque no link.</p><small>App do motorista · Rastreador</small>`);
+      <p><b>Motorista:</b> aponte a câmera do celular para o código e toque no link.</p><small>App do motorista</small>`);
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 300);

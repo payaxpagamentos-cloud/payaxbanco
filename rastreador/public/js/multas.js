@@ -25,7 +25,7 @@ const LOGO = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke
 export async function fichaMulta(m, { placaTxt, origem, condutor } = {}) {
   const janela = window.open('', '_blank');
   if (!janela) return toast('Libere as janelas (pop-up) deste site para ver a multa.', true);
-  const nome = (await configPublica().catch(() => null))?.nome ?? 'Rastreador';
+  const nome = (await configPublica().catch(() => null))?.nome ?? 'Gestão de Frota';
   const linha = (rot, val) => (val ? `<tr><th>${escHtml(rot)}</th><td>${escHtml(val)}</td></tr>` : '');
   const pl = placa(placaTxt ?? m.placa ?? '');
   janela.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

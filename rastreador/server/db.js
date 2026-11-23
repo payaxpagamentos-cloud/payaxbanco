@@ -886,7 +886,7 @@ CREATE TABLE IF NOT EXISTS multa_arquivos (
 `;
 
 const CONFIG_PADRAO = {
-  nome_plataforma: 'Rastreador',
+  nome_plataforma: 'Gestão de Frota',
   // Veículo que comunicou há até N minutos conta como online.
   online_min: '10',
   // Parado por N minutos (ou com a ignição desligada) encerra a viagem nos relatórios.
@@ -1008,6 +1008,9 @@ function migrar(db) {
   }
   // Nome mais claro para o arrefecimento (só troca o nome padrão; o que o gestor renomeou fica como está).
   db.exec("UPDATE frota_componentes SET nome = 'Água do radiador (aditivo)' WHERE tipo = 'arrefecimento' AND nome = 'Líquido de arrefecimento'");
+  // O sistema completo passou a se chamar "Gestão de Frota": quem ainda está com o nome antigo de fábrica recebe o novo (um nome
+  // próprio, definido pelo master, fica como está).
+  db.prepare("UPDATE configuracoes SET valor = ? WHERE chave = 'nome_plataforma' AND valor = 'Rastreador'").run('Gestão de Frota');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_veiculo_qr ON veiculos(codigo_qr) WHERE codigo_qr IS NOT NULL');
   const sqlAlertas = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'alertas'").get()?.sql ?? '';
   if (!sqlAlertas.includes('sumico_suspeito')) {

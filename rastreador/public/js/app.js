@@ -21,7 +21,10 @@ import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 
 const raiz = $('#app');
 let pararTela = null;
-let nomePlataforma = 'Rastreador';
+// O sistema completo é "Gestão de Frota"; "Rastreador" é o nome para a empresa que usa só o rastreamento.
+const NOME_COMPLETO = 'Gestão de Frota';
+let nomeBase = NOME_COMPLETO;
+let nomePlataforma = NOME_COMPLETO;
 let versao = '';
 const nomesEmpresa = new Map();
 // Módulos contratados por empresa (o menu esconde o que não foi ligado).
@@ -176,6 +179,8 @@ async function desenhar() {
     } catch { /* o erro aparece logo abaixo, na busca do nome */ }
   }
   const modulos = empresaId ? modulosEmpresa.get(empresaId) ?? {} : {};
+  // Empresa sem o módulo Gestão de Frota usa só o rastreamento: para ela o sistema se chama Rastreador.
+  nomePlataforma = empresaId && nomeBase === NOME_COMPLETO && modulosEmpresa.has(empresaId) && !modulos.gestao_frota ? 'Rastreador' : nomeBase;
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
   const contratado = (k) => (soFrota ? k === 'gestao' : true) && (!MODULO_DO_MENU[k] || Boolean(modulos[MODULO_DO_MENU[k]]));
   if (soFrota && empresaId && !modulos.gestao_frota) {
@@ -367,4 +372,4 @@ const atualizarUsuario = async () => {
   if (!s?.token) return;
   try { const { usuario } = await api.get('/auth/me'); sessao.set({ ...s, usuario }); } catch { /* sessão vencida: o desenho manda para o login */ }
 };
-Promise.all([api.get('/publico').then((p) => { nomePlataforma = p.nome || 'Rastreador'; versao = p.versao || ''; }).catch(() => {}), atualizarUsuario()]).finally(desenhar);
+Promise.all([api.get('/publico').then((p) => { nomeBase = p.nome || NOME_COMPLETO; nomePlataforma = nomeBase; versao = p.versao || ''; }).catch(() => {}), atualizarUsuario()]).finally(desenhar);

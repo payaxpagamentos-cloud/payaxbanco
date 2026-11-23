@@ -498,7 +498,7 @@ module.exports = (db, extras = {}) => {
   });
   r.post('/whatsapp/teste', soMaster, (req, res) => {
     v.exigir(zap.configurado(), 'Configure a Evolution no .env do servidor (RASTREADOR_EVOLUTION_URL, _INSTANCIA e _CHAVE).');
-    zap.enfileirar(db, { numero: v.telefone(req.body.numero), texto: '*Rastreador*\nMensagem de teste: o WhatsApp da plataforma está funcionando.', origem: 'teste' });
+    zap.enfileirar(db, { numero: v.telefone(req.body.numero), texto: '*Gestão de Frota*\nMensagem de teste: o WhatsApp da plataforma está funcionando.', origem: 'teste' });
     res.status(202).json({ ok: true });
   });
   const dadosContato = (d, atual) => {
