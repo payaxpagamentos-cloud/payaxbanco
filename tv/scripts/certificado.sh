@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 #
-# Emite (ou refaz) o certificado HTTPS da plataforma.
+# Emite (ou refaz) o certificado HTTPS da plataforma, e serve também para trocar o endereço.
 #
-# Rode no servidor, depois que as portas 80 e 443 estiverem chegando nele:
+# Rode no servidor, com as portas 80 e 443 já chegando nele:
 #
-#   sudo bash scripts/certificado.sh                    # usa o domínio do .env
-#   sudo bash scripts/certificado.sh play.dominio.com.br  # troca o domínio e emite
+#   sudo bash scripts/certificado.sh                        # usa o domínio do .env
+#   sudo bash scripts/certificado.sh play.dominio.com.br    # troca o domínio e emite
 #
 # O que ele faz:
-#   1. confere se o mundo enxerga ESTE servidor no domínio (é o que a Let's Encrypt faz);
-#   2. limpa a tentativa anterior presa no servidor de testes da Let's Encrypt;
-#   3. reinicia o proxy e acompanha a emissão;
-#   4. confirma pelo certificado que está no ar.
+#   1. confere se o mundo, usando esse endereço, chega NESTE servidor;
+#   2. grava o endereço novo, se foi informado;
+#   3. limpa a tentativa presa no servidor de testes da Let's Encrypt;
+#   4. sobe o proxy com o endereço novo e acompanha a emissão;
+#   5. confirma pelo lado de fora que o certificado está valendo.
 
 set -euo pipefail
 
@@ -23,71 +24,66 @@ ok()    { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 aviso() { printf '  \033[33m!\033[0m %s\n' "$*"; }
 erro()  { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; }
 
-NOVO=${1:-}
-if [ -n "$NOVO" ]; then
-  sed -i "s|^DOMINIO=.*|DOMINIO=$NOVO|" .env
-  ok "domínio trocado para $NOVO no .env"
+ATUAL=$(grep -E '^DOMINIO=' .env | cut -d= -f2-)
+DOMINIO=${1:-$ATUAL}
+[ -n "$DOMINIO" ] || { erro "informe o domínio: sudo bash $0 play.dominio.com.br"; exit 1; }
+
+azul "1. O endereço $DOMINIO chega neste servidor?"
+
+# A Let's Encrypt valida pela porta 80. Quem responde ali precisa ser o nosso proxy — é esse o
+# teste que falha quando o IP público do servidor atende em outra máquina (NAT do provedor).
+CABECALHO=$(curl -sSi --max-time 15 "http://$DOMINIO/.well-known/acme-challenge/teste-playtechvip" 2>/dev/null || true)
+if [ -z "$CABECALHO" ]; then
+  erro "ninguém respondeu em http://$DOMINIO"
+  erro "A porta 80 não está chegando neste servidor, ou o DNS não aponta para ele."
+  exit 1
 fi
-DOMINIO=$(grep -E '^DOMINIO=' .env | cut -d= -f2-)
-[ -n "$DOMINIO" ] || { erro "sem DOMINIO no .env"; exit 1; }
+if ! printf '%s' "$CABECALHO" | grep -qi '^server: *Caddy'; then
+  erro "quem responde em http://$DOMINIO não é este servidor:"
+  printf '%s\n' "$CABECALHO" | head -5 | sed 's/^/      /'
+  erro "O tráfego está indo para outra máquina. Fale com o provedor sobre o encaminhamento."
+  exit 1
+fi
+ok "sim: quem atende na porta 80 é o proxy desta instalação"
 
-azul "1. O mundo chega neste servidor pelo domínio $DOMINIO?"
+azul "2. Endereço da plataforma"
+if [ "$DOMINIO" != "$ATUAL" ]; then
+  sed -i "s|^DOMINIO=.*|DOMINIO=$DOMINIO|" .env
+  ok "trocado: $ATUAL → $DOMINIO"
+else
+  ok "mantido: $DOMINIO"
+fi
 
-# A Let's Encrypt vai bater na porta 80 do domínio. Se quem responder não for a nossa
-# plataforma, o certificado nunca sai — e é esse o erro mais comum (NAT, outro servidor no IP).
-RESPOSTA=$(curl -s --max-time 15 "http://$DOMINIO/api/saude" || true)
-case "$RESPOSTA" in
-  *'"ok":true'*)
-    ok "sim: quem responde em http://$DOMINIO é esta plataforma"
-    ;;
-  "")
-    erro "ninguém respondeu em http://$DOMINIO (porta 80 fechada ou DNS sem apontar)"
-    erro "Peça o encaminhamento das portas 80 e 443 para este servidor antes de seguir."
-    exit 1
-    ;;
-  *)
-    erro "quem responde em http://$DOMINIO NÃO é esta plataforma."
-    erro "Resposta recebida: $(printf '%s' "$RESPOSTA" | head -c 120)"
-    erro "O tráfego do domínio está indo para outra máquina (NAT do provedor ou DNS errado)."
-    exit 1
-    ;;
-esac
+azul "3. Limpando a tentativa anterior"
+# Depois de várias falhas o Caddy passa a usar o servidor de testes da Let's Encrypt, cujo
+# certificado o navegador recusa. Apagar esse estado faz ele tentar de novo no servidor real.
+if docker compose exec -T proxy sh -c 'rm -rf /data/caddy/certificates/acme-staging-v02.api.letsencrypt.org-directory' 2>/dev/null; then
+  ok "estado de teste removido"
+else
+  aviso "nada a limpar (ou o proxy está parado)"
+fi
 
-azul "2. Limpando a tentativa anterior"
-
-# Depois de várias falhas o Caddy cai no servidor de testes da Let's Encrypt, cujo certificado
-# o navegador não aceita. Apagar esse estado faz ele tentar de novo no servidor de verdade.
-docker compose exec -T proxy sh -c 'rm -rf /data/caddy/certificates/acme-staging-v02.api.letsencrypt.org-directory' 2>/dev/null \
-  && ok "estado de teste removido" || aviso "nada a limpar"
-
-azul "3. Emitindo o certificado"
+azul "4. Emitindo o certificado"
+docker compose up -d >/dev/null
 docker compose restart proxy >/dev/null
 printf '  aguardando'
 EMITIDO=0
-for _ in $(seq 1 40); do
-  if docker compose logs --since 2m proxy 2>/dev/null | grep -q "certificate obtained successfully"; then EMITIDO=1; break; fi
+for _ in $(seq 1 48); do
+  if docker compose logs --since 3m proxy 2>/dev/null | grep -q "certificate obtained successfully"; then EMITIDO=1; break; fi
   printf '.'; sleep 5
 done
 printf '\n'
+[ "$EMITIDO" = 1 ] && ok "certificado emitido" || aviso "sem confirmação ainda; o log vai abaixo"
 
-if [ "$EMITIDO" = 1 ]; then
-  ok "certificado emitido"
-else
-  aviso "ainda não apareceu a confirmação; veja o log:"
-  docker compose logs --tail 15 proxy | sed 's/^/      /'
-fi
-
-azul "4. Conferindo de fora"
-EMISSOR=$(echo | openssl s_client -connect "$DOMINIO:443" -servername "$DOMINIO" 2>/dev/null \
-  | openssl x509 -noout -issuer 2>/dev/null || true)
-NOME=$(echo | openssl s_client -connect "$DOMINIO:443" -servername "$DOMINIO" 2>/dev/null \
-  | openssl x509 -noout -subject 2>/dev/null || true)
-[ -n "$EMISSOR" ] && echo "  $EMISSOR" || aviso "não consegui ler o certificado"
-[ -n "$NOME" ] && echo "  $NOME" || true
-
-case "$EMISSOR" in
-  *"(STAGING)"*|*"Fake"*) erro "ainda é certificado de teste — rode este script de novo em alguns minutos" ;;
-  *"Let's Encrypt"*|*"ZeroSSL"*) ok "certificado válido no ar" ;;
+azul "5. Conferindo pelo lado de fora"
+RESPOSTA=$(curl -sS --max-time 20 "https://$DOMINIO/api/saude" 2>&1 || true)
+case "$RESPOSTA" in
+  *'"ok":true'*) ok "a plataforma responde em https://$DOMINIO (certificado aceito)" ;;
+  *certificate*|*SSL*|*TLS*|*tls*)
+    aviso "o HTTPS ainda não está valendo: $(printf '%s' "$RESPOSTA" | head -c 110)"
+    docker compose logs --tail 12 proxy | sed 's/^/      /'
+    ;;
+  *) aviso "resposta inesperada: $(printf '%s' "$RESPOSTA" | head -c 110)" ;;
 esac
 
 echo

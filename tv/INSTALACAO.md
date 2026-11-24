@@ -1,6 +1,9 @@
 # Instalação no servidor
 
-Servidor desta instalação: **45.190.156.250**, SSH na porta **62052**, usuário **playtv**.
+Servidor desta instalação: SSH em **45.190.156.250**, porta **62052**, usuário **playtv**.
+
+Endereço público da plataforma: **45.190.156.169** — é esse IP que o provedor encaminha para
+as portas 80 e 443 desta máquina, e é ele que o domínio definitivo deve apontar.
 
 A instalação é um comando. Ele instala o Docker se faltar, sobe a plataforma, emite o
 certificado HTTPS, agenda o backup diário e confere tudo no fim.
