@@ -31,6 +31,8 @@ test('acesso.payax.com.br: só a ativação', async (t) => {
     assert.match(p.corpo, /Ative seu acesso/);
     assert.equal(p.headers['cache-control'], 'no-store');
     for (const a of ['/acesso/acesso.js', '/acesso/acesso.css', '/acesso/payax-logo.svg']) assert.equal((await pedir(api.raiz, a, h)).status, 200, a);
+    assert.match(p.corpo, /<link rel="apple-touch-icon" sizes="180x180" href="\/apple-touch-icon\.png">/);
+    assert.equal((await pedir(api.raiz, '/apple-touch-icon.png', h)).headers['content-type'], 'image/png');
   });
 
   await t.test('a API de ativação responde; o resto do sistema não', async () => {

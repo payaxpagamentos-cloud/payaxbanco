@@ -35,6 +35,12 @@ function criarApp(db) {
     next();
   });
 
+  // Ícone da PAY AX nos caminhos que o celular e o navegador pedem sozinhos, em qualquer endereço do sistema:
+  // sem eles, "Adicionar à Tela de Início" mostra só uma letra no lugar do ícone.
+  const pastaIcones = path.join(__dirname, '..', 'comum', 'icones');
+  const ICONES_DA_RAIZ = { '/apple-touch-icon.png': 'apple-touch-icon.png', '/apple-touch-icon-precomposed.png': 'apple-touch-icon.png', '/favicon.ico': 'favicon.ico' };
+  app.get(Object.keys(ICONES_DA_RAIZ), (req, res) => res.set('Cache-Control', 'public, max-age=86400').sendFile(path.join(pastaIcones, ICONES_DA_RAIZ[req.path])));
+
   // ------------------------------------------------- Backoffice PAY AX
   const equipe = express.Router();
   equipe.use('/api/auth/login', limitar({ janelaMs: 60_000, maximo: config.limiteLoginPorMinuto }));
