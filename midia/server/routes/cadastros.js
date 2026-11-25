@@ -415,9 +415,12 @@ module.exports = (db) => {
     if (!db.prepare('SELECT 1 FROM locais WHERE id = ?').get(id)) throw new ErroNegocio('Escolha o ponto.', 422);
     return id;
   };
-  r.get('/senhas', (req, res) => res.json(senhas.situacao(db, pontoDaSenha(req), req.query.guiche)));
+  r.get('/senhas', (req, res) => res.json(senhas.situacao(db, pontoDaSenha(req), req.query.guiche, req.usuario.id)));
+  r.post('/senhas/disponivel', (req, res) => res.json(senhas.disponibilidade(db, pontoDaSenha(req), req.usuario.id, req.body)));
+  r.get('/senhas/totem', (req, res) => res.json(senhas.configuracao(db, pontoDaSenha(req))));
+  r.post('/senhas/totem', (req, res) => res.json(senhas.configurar(db, pontoDaSenha(req), req.body)));
   r.post('/senhas/chamar', (req, res) => res.status(201).json(senhas.chamar(db, pontoDaSenha(req), req.body, req.usuario.id)));
-  r.post('/senhas/encerrar', (req, res) => res.json(senhas.encerrar(db, pontoDaSenha(req), req.body)));
+  r.post('/senhas/encerrar', (req, res) => res.json(senhas.encerrar(db, pontoDaSenha(req), req.body, req.usuario.id)));
   r.post('/senhas/assunto', (req, res) => res.json(senhas.definirAssunto(db, pontoDaSenha(req), req.body.id, req.body.assunto, req.body.guiche)));
   r.post('/senhas/repetir', (req, res) => res.json(senhas.repetir(db, pontoDaSenha(req), req.body.guiche)));
   r.post('/senhas/zerar', (req, res) => {

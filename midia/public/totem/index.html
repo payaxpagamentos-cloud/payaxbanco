@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#18232A">
+  <meta name="robots" content="noindex">
+  <title>Totem de senha — Vai Mídia</title>
+  <link rel="icon" href="../img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="totem.css">
+</head>
+<body>
+  <!-- Totem de senha: o cliente digita o CPF, escolhe o atendimento e recebe a senha. Uma tela por vez. -->
+  <header class="topo">
+    <div class="ponto" id="ponto"></div>
+    <div class="relogio" id="relogio"></div>
+  </header>
+
+  <main class="tela" id="tela-inicio">
+    <h1>Bem-vindo!</h1>
+    <p class="chamada">Toque na tela para retirar sua senha</p>
+    <button class="grande" id="comecar" type="button">Retirar senha</button>
+  </main>
+
+  <main class="tela" id="tela-cpf" hidden>
+    <h2>Digite o seu CPF</h2>
+    <div class="visor" id="visor" aria-live="polite">___.___.___-__</div>
+    <p class="erro" id="erro-cpf" hidden></p>
+    <div class="teclado" id="teclado"></div>
+    <div class="acoes">
+      <button class="secundario" id="voltar-cpf" type="button">Cancelar</button>
+      <button class="grande" id="continuar" type="button" disabled>Continuar</button>
+    </div>
+  </main>
+
+  <main class="tela" id="tela-servico" hidden>
+    <h2>Qual atendimento você precisa?</h2>
+    <div class="servicos" id="servicos"></div>
+    <button class="preferencial" id="preferencial" type="button" aria-pressed="false">
+      <span class="caixa"></span>
+      <span><strong>Atendimento preferencial</strong><small>Idosos, gestantes, pessoas com deficiência ou com criança de colo</small></span>
+    </button>
+    <p class="erro" id="erro-servico" hidden></p>
+    <div class="acoes"><button class="secundario" id="voltar-servico" type="button">Voltar</button></div>
+  </main>
+
+  <main class="tela" id="tela-senha" hidden>
+    <p class="rotulo">Sua senha</p>
+    <div class="senha" id="senha"></div>
+    <p class="qual" id="qual"></p>
+    <p class="chamada" id="aviso"></p>
+    <button class="grande" id="concluir" type="button">Concluir</button>
+  </main>
+
+  <main class="tela" id="tela-erro" hidden>
+    <h2>Totem não configurado</h2>
+    <p class="chamada" id="motivo"></p>
+  </main>
+
+  <footer class="rodape"><img src="../img/marca.svg" alt=""><span id="plataforma">Vai Mídia</span></footer>
+  <script src="totem.js"></script>
+</body>
+</html>

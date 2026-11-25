@@ -490,6 +490,18 @@ CREATE TABLE IF NOT EXISTS senhas (
 );
 CREATE INDEX IF NOT EXISTS idx_senhas_dia ON senhas (local_id, data, id);
 
+-- Quem está atendendo em cada ponto. A senha tirada no totem vai sozinha para quem está disponível
+-- e há mais tempo sem atender (livre_desde mais antigo). visto_em diz se a tela do atendente segue aberta.
+CREATE TABLE IF NOT EXISTS senha_operadores (
+  local_id INTEGER NOT NULL REFERENCES locais(id) ON DELETE CASCADE,
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  guiche TEXT NOT NULL,
+  disponivel INTEGER NOT NULL DEFAULT 0,
+  livre_desde TEXT,
+  visto_em TEXT,
+  PRIMARY KEY (local_id, usuario_id)
+);
+
 -- Endereços de e-mail da empresa (comercial@, robson@…). Cada um pode ser de uma pessoa da equipe:
 -- o que chega para ele aparece para ela, e o que ela escreve sai com esse endereço.
 CREATE TABLE IF NOT EXISTS enderecos_email (
@@ -791,6 +803,15 @@ const COLUNAS_NOVAS = [
   ['telas', 'zona', "TEXT NOT NULL DEFAULT 'comunicado'"],
   ['senhas', 'assunto', 'TEXT'],
   ['senhas', 'encerrada_em', 'TEXT'],
+  // Senha tirada no totem: espera = 1 enquanto ninguém chamou; emitida_em é a hora em que o cliente tirou.
+  ['senhas', 'espera', 'INTEGER NOT NULL DEFAULT 0'],
+  ['senhas', 'emitida_em', 'TEXT'],
+  ['senhas', 'servico', 'TEXT'],
+  ['senhas', 'cpf', 'TEXT'],
+  ['senhas', 'operador_id', 'INTEGER REFERENCES usuarios(id)'],
+  // O totem do ponto: a chave do link (sem login) e os atendimentos que o cliente escolhe (um por linha).
+  ['locais', 'totem_chave', 'TEXT'],
+  ['locais', 'senha_servicos', 'TEXT'],
   ['enderecos_email', 'assinatura', 'TEXT'],
   ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],

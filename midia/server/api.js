@@ -30,6 +30,25 @@ function criarApi(db) {
   });
 
   /**
+   * Totem de senha do ponto: o cliente digita o CPF e escolhe o atendimento. Sem login — quem abre é o
+   * aparelho do totem, pelo link com a chave do ponto (gerado na tela Senhas). Tem limite por IP.
+   */
+  const limiteTotem = require('./lib/limitador').limitar({ janelaMs: 60_000, maximo: 40, todos: true });
+  const totem = (req) => {
+    const p = require('./lib/senhas').pontoDoTotem(db, req.params.chave);
+    if (!p) throw new ErroNegocio('Totem não reconhecido. Abra de novo pelo link da tela Senhas.', 404);
+    return p;
+  };
+  api.get('/totem/:chave', limiteTotem, (req, res) => {
+    const p = totem(req);
+    const c = lerConfig(db);
+    res.json({ ponto: p.nome, plataforma: c.nome_plataforma, servicos: require('./lib/senhas').servicosDoPonto(db, p.id) });
+  });
+  api.post('/totem/:chave/senha', limiteTotem, (req, res) => {
+    res.status(201).json(require('./lib/senhas').emitir(db, totem(req).id, req.body));
+  });
+
+  /**
    * Números da rede para o site: só agregados, nenhum nome de ponto ou cliente.
    * É o que mantém a página sempre atual sem ninguém editar HTML.
    */

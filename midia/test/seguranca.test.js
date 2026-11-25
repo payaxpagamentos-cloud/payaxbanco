@@ -297,3 +297,92 @@ test('Controle de senha: chamar, repetir, número específico e zerar', async (t
   assert.equal(zerado.atual, null);
   assert.equal((await api.get(`/painel/senhas?local_id=${b}`, master)).dados.atual.codigo, 'N0001', 'zerar um ponto não mexe no outro');
 });
+
+/** Totem: o cliente tira a senha com CPF e atendimento; ela vai sozinha para quem está há mais tempo livre. */
+test('Totem de senha: fila e entrega automática ao atendente há mais tempo disponível', async (t) => {
+  const { iniciar, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+  t.after(() => { api.fechar(); limparArquivos(); });
+  const master = await api.login();
+  const a = (await api.post('/painel/locais', { nome: 'Loja A', categoria: 'outro', cidade: 'São Paulo', uf: 'SP', publico_dia: 10 }, master)).dados.id;
+  const operador = async (nome) => {
+    const email = `${nome.toLowerCase()}@x.com.br`;
+    await api.post('/painel/usuarios', { nome, email, senha: `senha-de-${nome}`, perfil: 'operador' }, master);
+    return api.login(email, `senha-de-${nome}`);
+  };
+  const ana = await operador('Ana');
+  const bia = await operador('Bia');
+
+  // O link do totem e os atendimentos do ponto.
+  const cfg = (await api.get(`/painel/senhas/totem?local_id=${a}`, master)).dados;
+  assert.ok(cfg.totem_chave.length >= 16);
+  assert.deepEqual(cfg.servicos, ['Comercial', 'Suporte']);
+  const totem = `/totem/${cfg.totem_chave}`;
+  assert.deepEqual((await api.get(totem)).dados.servicos, ['Comercial', 'Suporte']);
+  assert.equal((await api.get('/totem/chave-que-nao-existe-000')).status, 404);
+
+  // CPF e atendimento são conferidos.
+  assert.equal((await api.post(`${totem}/senha`, { cpf: '111.111.111-11', servico: 'Suporte' })).status, 422);
+  assert.equal((await api.post(`${totem}/senha`, { cpf: '529.982.247-25', servico: 'Outro' })).status, 422);
+
+  // Ninguém disponível: a senha fica na fila e não aparece na TV.
+  const s1 = await api.post(`${totem}/senha`, { cpf: '529.982.247-25', servico: 'Suporte' });
+  assert.equal(s1.status, 201);
+  assert.equal(s1.dados.codigo, 'N0001');
+  assert.equal(s1.dados.guiche, null);
+  assert.equal((await api.post(`${totem}/senha`, { cpf: '52998224725', servico: 'Comercial' })).dados.codigo, 'N0001', 'o mesmo CPF aguardando não ganha outra senha');
+  let sit = (await api.get(`/painel/senhas?local_id=${a}&guiche=Mesa 1`, ana)).dados;
+  assert.equal(sit.aguardando, 1);
+  assert.equal(sit.atual, null, 'senha aguardando não vai para a TV');
+  assert.equal(sit.em_atendimento, null, 'em pausa não recebe senha');
+  assert.equal(sit.proxima.N, 'N0001', 'o botão de chamar pega quem está na fila');
+
+  // Ana fica disponível: recebe a que estava esperando.
+  sit = (await api.post('/painel/senhas/disponivel', { local_id: a, guiche: 'Mesa 1', disponivel: true }, ana)).dados;
+  assert.equal(sit.em_atendimento.codigo, 'N0001');
+  assert.equal(sit.em_atendimento.servico, 'Suporte');
+  assert.equal(sit.em_atendimento.cpf, '529.982.247-25');
+  assert.equal(sit.atual.guiche, 'Mesa 1');
+
+  // Bia fica disponível depois. Duas senhas: a primeira vai para a Bia (a Ana está ocupada)…
+  await api.post('/painel/senhas/disponivel', { local_id: a, guiche: 'Mesa 2', disponivel: true }, bia);
+  const s2 = (await api.post(`${totem}/senha`, { cpf: '168.995.350-09', servico: 'Comercial' })).dados;
+  assert.equal(s2.guiche, 'Mesa 2', 'havendo atendente livre, a senha já sai chamada');
+  // …e a seguinte espera, porque as duas estão atendendo.
+  const s3 = (await api.post(`${totem}/senha`, { cpf: '111.444.777-35', servico: 'Suporte', preferencial: true })).dados;
+  assert.equal(s3.codigo, 'P0001');
+  assert.equal(s3.guiche, null);
+
+  // Ana encerra: está disponível e há fila, então a próxima já vem para ela.
+  sit = (await api.post('/painel/senhas/encerrar', { local_id: a, guiche: 'Mesa 1', assunto: 'Sem sinal' }, ana)).dados;
+  assert.equal(sit.em_atendimento.codigo, 'P0001');
+  assert.equal(sit.atendimentos.find((x) => x.codigo === 'N0001').assunto, 'Sem sinal');
+  assert.ok(sit.atendimentos.find((x) => x.codigo === 'N0001').espera_s >= 0);
+
+  // As duas livres: quem está há mais tempo sem atender recebe primeiro.
+  await api.post('/painel/senhas/encerrar', { local_id: a, guiche: 'Mesa 2' }, bia);
+  await api.post('/painel/senhas/encerrar', { local_id: a, guiche: 'Mesa 1' }, ana);
+  api.db.prepare("UPDATE senha_operadores SET livre_desde = ? WHERE guiche = 'Mesa 2'").run(new Date(Date.now() - 600_000).toISOString());
+  api.db.prepare("UPDATE senha_operadores SET livre_desde = ? WHERE guiche = 'Mesa 1'").run(new Date(Date.now() - 60_000).toISOString());
+  assert.equal((await api.post(`${totem}/senha`, { cpf: '390.533.447-05', servico: 'Suporte' })).dados.guiche, 'Mesa 2', 'Bia está livre há mais tempo');
+  assert.equal((await api.post(`${totem}/senha`, { cpf: '935.411.347-80', servico: 'Suporte' })).dados.guiche, 'Mesa 1');
+
+  // Quem pausa ou fecha a tela não recebe.
+  await api.post('/painel/senhas/encerrar', { local_id: a, guiche: 'Mesa 2' }, bia);
+  await api.post('/painel/senhas/encerrar', { local_id: a, guiche: 'Mesa 1' }, ana);
+  await api.post('/painel/senhas/disponivel', { local_id: a, guiche: 'Mesa 2', disponivel: false }, bia);
+  api.db.prepare("UPDATE senha_operadores SET visto_em = ? WHERE guiche = 'Mesa 1'").run(new Date(Date.now() - 3_600_000).toISOString());
+  assert.equal((await api.post(`${totem}/senha`, { cpf: '529.982.247-25', servico: 'Suporte' })).dados.guiche, null);
+  // Sem ninguém disponível, o atendente ainda pode chamar a fila no botão.
+  sit = (await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N', guiche: 'Mesa 2' }, bia)).dados;
+  assert.equal(sit.em_atendimento.cpf, '529.982.247-25');
+  assert.equal(sit.aguardando, 0);
+
+  // Atendimentos do totem configuráveis; link novo derruba o antigo.
+  assert.equal((await api.post('/painel/senhas/totem', { local_id: a, servicos: '' }, master)).status, 422);
+  const novo = (await api.post('/painel/senhas/totem', { local_id: a, servicos: 'Comercial\nSuporte\nFinanceiro', novo_link: true }, master)).dados;
+  assert.deepEqual(novo.servicos, ['Comercial', 'Suporte', 'Financeiro']);
+  assert.notEqual(novo.totem_chave, cfg.totem_chave);
+  assert.equal((await api.get(totem)).status, 404);
+  assert.equal((await api.post(`/totem/${novo.totem_chave}/senha`, { cpf: '168.995.350-09', servico: 'Financeiro' })).status, 201);
+});

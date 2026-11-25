@@ -57,7 +57,7 @@ const SUBTITULOS = {
   resumo: 'O que está acontecendo na rede agora', telas: 'Aparelhos instalados, estado e programação de cada um',
   pontos: 'Condomínios, prédios, comércios, academias e clínicas onde as TVs estão instaladas',
   comunicados: 'Recados do próprio ponto que entram entre os anúncios',
-  senhas: 'Chame a próxima senha: ela aparece na TV do ponto',
+  senhas: 'A senha do totem vem para quem está disponível e aparece na TV do ponto',
   anunciantes: 'Quem paga pela publicidade e as agências que compram a mídia',
   inventario: 'O que a rede tem para vender: pontos, telas e audiência', circuitos: 'Grupos de TVs vendidos em bloco', campanhas: 'O que vai ao ar, onde, quando e por quanto',
   criativos: 'Imagens e vídeos que vão para as telas', programacao: 'Como fica o loop de cada TV e quanto ainda cabe de publicidade',
