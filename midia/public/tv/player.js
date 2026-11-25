@@ -22,7 +22,9 @@ if (!Element.prototype.replaceChildren) {
   };
 }
 
-const VERSAO = '2.2';
+// O arquivo foi lido pelo navegador (se nem isto acontecer, o vigia mostra na tela).
+window.vaimidiaCarregou = true;
+const VERSAO = '2.3';
 // Carimbo com que esta página foi carregada (vem no endereço do script; ver server/lib/carimbo-player.js).
 const CARIMBO = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch { return ''; } })();
 const API = new URL('../api/', location.href).href;
@@ -767,8 +769,25 @@ function aplicarGiro() {
     guardar(CHAVE_GIRO_TENTANDO, Date.now());
     setTimeout(() => apagar(CHAVE_GIRO_TENTANDO), 20_000);
   }
-  document.body.classList.toggle('girada', girar);
-  document.body.classList.toggle('esquerda', girar && giro === 270);
+  // O estilo do giro só entra na página quando a TV gira: as demais ficam com o estilo simples.
+  let folha = document.getElementById('estilo-girada');
+  if (!girar) {
+    if (folha) folha.remove();
+    document.body.classList.remove('girada', 'esquerda');
+    return;
+  }
+  const virar = () => {
+    document.body.classList.add('girada');
+    document.body.classList.toggle('esquerda', giro === 270);
+  };
+  if (folha) { virar(); return; }
+  folha = document.createElement('link');
+  folha.id = 'estilo-girada';
+  folha.rel = 'stylesheet';
+  folha.href = `tv-girada.css?v=${CARIMBO}`;
+  // Só vira depois que o estilo chegou: virar antes deixaria a tela torta por um instante.
+  folha.onload = virar;
+  document.head.append(folha);
 }
 // Largura da tela como quem olha vê (numa TV girada, é a altura do aparelho).
 const larguraVista = () => (document.body.classList.contains('girada') ? window.innerHeight : window.innerWidth);
@@ -1025,6 +1044,8 @@ function guardarPaginaNaTv() {
 }
 
 async function iniciar() {
+  // Avisa o vigia (diag.js) que o player começou a rodar: sem este aviso, ele limpa a TV e abre de novo.
+  window.vaimidiaVivo = Date.now();
   guardarPaginaNaTv();
   marcarPlataforma(estado.programacao?.plataforma, estado.programacao?.slogan);
   mostrarEspera('Preparando a tela…', 'Carregando a programação guardada.');

@@ -33,6 +33,67 @@
     mostrar('promessa: ' + (r && (r.message || r.name) ? (r.message || r.name) : String(r)));
   });
   window.vaimidiaDiag = mostrar;
+
+  /*
+   * Vigia. O player avisa que está vivo (window.vaimidiaVivo) assim que começa a rodar. Se em 15 segundos
+   * ele não avisou, a TV ficaria preta — então esta página, sozinha, sem ninguém digitar nada:
+   *   1. escreve na tela o que sabe sobre o navegador e o que está guardado (para uma foto);
+   *   2. apaga o que o navegador guardou (páginas antigas, programação, ordem de giro) e abre de novo.
+   * A limpeza só acontece uma vez a cada 10 minutos, para não ficar em círculo; o pareamento é mantido.
+   */
+  function simNao(v) { return v ? 'sim' : 'NAO'; }
+  function relatorio() {
+    var l = [];
+    try {
+      l.push('Navegador: ' + navigator.userAgent);
+      l.push('Tela: ' + screen.width + 'x' + screen.height + ' janela ' + window.innerWidth + 'x' + window.innerHeight);
+      var sup = (window.CSS && CSS.supports) ? function (a, b) { return simNao(CSS.supports(a, b)); } : function () { return '?'; };
+      l.push('CSS: inset ' + sup('inset', '0') + ' | min() ' + sup('width', 'min(1vh, 1vw)') + ' | calc(var) ' + sup('width', 'calc(var(--x) * 2)') + ' | object-fit ' + sup('object-fit', 'cover'));
+      l.push('JS: fetch ' + simNao(typeof fetch === 'function') + ' | AbortController ' + simNao(typeof AbortController === 'function')
+        + ' | replaceChildren ' + simNao(!!Element.prototype.replaceChildren) + ' | service worker ' + simNao('serviceWorker' in navigator)
+        + (navigator.serviceWorker && navigator.serviceWorker.controller ? ' (controlando)' : ''));
+      var grade = null;
+      try { grade = JSON.parse(localStorage.getItem('midia.tv.grade')); } catch (e) { grade = null; }
+      l.push('Guardado: pareada ' + simNao(!!localStorage.getItem('midia.tv.token')) + ' | programacao ' + simNao(!!grade)
+        + ' | giro ' + (grade && grade.tela ? grade.tela.giro : '-') + ' | giro.tentando ' + simNao(!!localStorage.getItem('midia.tv.giro.tentando'))
+        + ' | giro.falhou ' + simNao(!!localStorage.getItem('midia.tv.giro.falhou')));
+      l.push('Player: arquivo ' + simNao(!!window.vaimidiaCarregou) + ' | rodando ' + simNao(!!window.vaimidiaVivo));
+    } catch (e) { l.push('relatorio: ' + (e && e.message)); }
+    return l.join('\n');
+  }
+  function limpar(depois) {
+    var passos = [];
+    try {
+      var chaves = ['midia.tv.grade', 'midia.tv.vistos', 'midia.tv.giro.tentando', 'midia.tv.giro.falhou', 'midia.tv.codigo'];
+      for (var i = 0; i < chaves.length; i++) localStorage.removeItem(chaves[i]);
+    } catch (e) { /* segue */ }
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+        passos.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+          var u = []; for (var i = 0; i < regs.length; i++) u.push(regs[i].unregister()); return Promise.all(u);
+        }).then(null, function () {}));
+      }
+      if (window.caches && caches.keys) {
+        passos.push(caches.keys().then(function (nomes) {
+          var u = []; for (var i = 0; i < nomes.length; i++) u.push(caches.delete(nomes[i])); return Promise.all(u);
+        }).then(null, function () {}));
+      }
+    } catch (e) { /* segue */ }
+    if (window.Promise && passos.length) Promise.all(passos).then(depois, depois); else depois();
+  }
+  setTimeout(function () {
+    if (window.vaimidiaVivo) return;
+    mostrados = 0;
+    var ultima = 0;
+    try { ultima = Number(localStorage.getItem('midia.tv.autolimpeza')) || 0; } catch (e) { ultima = 0; }
+    var jaLimpou = ultima && (new Date().getTime() - ultima) < 600000;
+    mostrar('O PLAYER NAO INICIOU NESTA TV.\n' + relatorio() + '\n'
+      + (jaLimpou ? 'A limpeza automatica ja foi feita e nao resolveu. Mande uma foto desta tela para o suporte.'
+        : 'Limpando o que esta guardado e abrindo de novo em 12 segundos...'));
+    if (jaLimpou) return;
+    try { localStorage.setItem('midia.tv.autolimpeza', String(new Date().getTime())); } catch (e) { /* segue */ }
+    setTimeout(function () { limpar(function () { location.replace(location.pathname + '?limpo=' + new Date().getTime()); }); }, 12000);
+  }, 15000);
   // Informação do navegador, para a foto dizer com quem estamos falando.
   window.vaimidiaNavegador = (navigator.userAgent.match(/(Chrome|Chromium|Version|Web0S|Tizen)\/[\d.]+/g) || []).join(' ');
 }());

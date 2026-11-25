@@ -12,7 +12,7 @@ const pasta = path.join(__dirname, '..', '..', 'public', 'tv');
 
 function carimboPlayer() {
   try {
-    return ['player.js', 'tv.css'].map((f) => Math.floor(fs.statSync(path.join(pasta, f)).mtimeMs).toString(36)).join('');
+    return ['player.js', 'tv.css', 'tv-girada.css', 'diag.js'].map((f) => Math.floor(fs.statSync(path.join(pasta, f)).mtimeMs).toString(36)).join('');
   } catch {
     return '';
   }
