@@ -125,6 +125,7 @@ export function telaEntrada(raiz, { aoEntrar }) {
   // ---------- montagem ----------
 
   const conteudo = el('div', { class: 'login-card-content' });
+  let primeiroDesenho = true;
 
   const trocarModo = (novo) => { modo = novo; recado.hidden = true; desenharCartao(); };
 
@@ -140,7 +141,10 @@ export function telaEntrada(raiz, { aoEntrar }) {
         el('span', {}, entrando ? 'Ainda não tem conta? ' : 'Já tem conta? ',
           el('button', { class: 'text-link', type: 'button', onclick: () => trocarModo(entrando ? 'cadastro' : 'entrar') }, entrando ? 'Criar conta' : 'Entrar'))),
       el('p', { class: 'secure-note' }, iconeLinha('lock'), 'Acesso seguro'));
-    conteudo.querySelector('input')?.focus({ preventScroll: true });
+    // Só põe o cursor no campo quando a pessoa troca de aba (Entrar / Criar conta). Ao abrir a
+    // tela, não: o cursor piscando sozinho incomoda, e no celular faz o teclado subir sem pedido.
+    if (!primeiroDesenho) conteudo.querySelector('input')?.focus({ preventScroll: true });
+    primeiroDesenho = false;
   };
   desenharCartao();
 
