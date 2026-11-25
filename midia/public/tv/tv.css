@@ -24,9 +24,9 @@
 html, body{ margin: 0; height: 100%; overflow: hidden; background: #000; }
 body{ color: #fff; font-family: "OpenSans", system-ui, sans-serif; cursor: none; user-select: none; -webkit-user-select: none; }
 
-.palco{ position: fixed; inset: 0; background: #000; display: grid; }
+.palco{ position: fixed; top: 0; right: 0; bottom: 0; left: 0; background: #000; display: grid; }
 .zona-anuncio{ position: relative; overflow: hidden; background: #000; }
-.camada{ position: absolute; inset: 0; opacity: 0; transition: opacity .45s ease; display: grid; place-items: center; }
+.camada{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; opacity: 0; transition: opacity .45s ease; display: grid; place-items: center; }
 .camada.no-ar{ opacity: 1; }
 /* A peça fica presa ao quadro (acima do rodapé) e se ajusta por dentro: sem cortar e sem passar do rodapé. */
 .camada img, .camada video{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
@@ -41,7 +41,7 @@ body.com-faixa .palco{ bottom: var(--faixa-altura); }
   recebe a própria peça desfocada — nada é cortado e a tela não fica com buracos pretos no hall.
 */
 body.dividida .zona-anuncio{ background: var(--preto); }
-.camada .fundo{ position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(34px) brightness(.45) saturate(1.1);
+.camada .fundo{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(34px) brightness(.45) saturate(1.1);
   transform: scale(1.12); z-index: 0; }
 .camada img:not(.fundo), .camada video{ z-index: 1; }
 
@@ -100,7 +100,7 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
 @media (max-aspect-ratio: 3/4){ .faixa .texto, .faixa .clima{ display: none !important; } }
 
 /* Tela de espera: pareamento, sem programação ou erro. */
-.espera{ position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: calc(var(--uh) * 1.2); text-align: center;
+.espera{ position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: grid; place-content: center; justify-items: center; gap: calc(var(--uh) * 1.2); text-align: center;
   background: radial-gradient(1100px 620px at 50% 8%, #24351F 0%, #1D2B33 45%, #101920 100%); padding: calc(var(--uh) * 6) min(calc(var(--uh) * 6), calc(var(--uw) * 5)); z-index: 5; }
 .espera > *{ max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
 .espera .slogan{ font-size: calc(var(--uh) * 2.6); color: var(--lime); font-weight: 600; margin: -.6vh 0 calc(var(--uh) * 2.4); }
@@ -140,7 +140,7 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
 .comunicado .assinatura strong{ display: block; color: #E6E8EC; font-weight: 700; }
 
 /* Comunicado do ponto (recado do condomínio ou da loja), desenhado pela própria TV. */
-.comunicado{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: calc(var(--uh) * 3); padding: calc(var(--uh) * 8) calc(var(--uw) * 9);
+.comunicado{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; justify-content: center; gap: calc(var(--uh) * 3); padding: calc(var(--uh) * 8) calc(var(--uw) * 9);
   background: linear-gradient(135deg, #22323B 0%, #141E24 100%); color: #fff; text-align: left; }
 .comunicado .cabeca{ display: flex; align-items: center; gap: calc(var(--uh) * 2); min-width: 0; }
 .comunicado .selo-tipo{ flex: none; }
@@ -181,7 +181,7 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
   Tela da própria rede: logotipo, frase e o símbolo grande sangrando no canto — a peça que aparece
   numa tela recém-instalada e que completa o loop quando sobra espaço.
 */
-.cartao-marca{ position: absolute; inset: 0; overflow: hidden; background: var(--preto); color: #fff;
+.cartao-marca{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; background: var(--preto); color: #fff;
   display: flex; flex-direction: column; justify-content: flex-start; gap: calc(var(--uh) * 2.4); padding: calc(var(--uh) * 9) calc(var(--uw) * 7); }
 .cartao-marca .lockup{ display: flex; align-items: center; gap: calc(var(--uh) * 2.4); z-index: 1; }
 .cartao-marca .lockup .v{ height: calc(var(--uh) * 11); width: auto; color: var(--lime); flex: none; }

@@ -13,6 +13,15 @@
  */
 'use strict';
 
+// Navegador de TV costuma ser antigo. Estas duas funções só existem nos mais novos; aqui elas passam a
+// existir em todos, para o player não parar no meio em TV LG ou Samsung de alguns anos atrás.
+if (!Element.prototype.replaceChildren) {
+  Element.prototype.replaceChildren = function replaceChildren(...nos) {
+    while (this.lastChild) this.removeChild(this.lastChild);
+    this.append(...nos);
+  };
+}
+
 const VERSAO = '2.2';
 // Carimbo com que esta página foi carregada (vem no endereço do script; ver server/lib/carimbo-player.js).
 const CARIMBO = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch { return ''; } })();
@@ -409,7 +418,7 @@ function marcarVisto(url) {
 /** Baixa a logo da administradora uma vez e guarda como blob (a tag <img> não manda cabeçalho). */
 /** Fotos dos comunicados (as que o ponto anexou): baixadas uma vez e guardadas enquanto a TV estiver ligada. */
 async function carregarFotosComunicados() {
-  estado.fotosComunicado ??= {};
+  if (!estado.fotosComunicado) estado.fotosComunicado = {};
   const g = estado.programacao?.grade;
   const ids = new Set([...(g?.itens ?? []), ...(g?.comunicados ?? [])].filter((c) => c.imagem && c.comunicado_id).map((c) => c.comunicado_id));
   await Promise.all([...ids].filter((id) => !estado.fotosComunicado[id]).map(async (id) => {
