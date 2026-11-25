@@ -96,6 +96,8 @@ CREATE TABLE IF NOT EXISTS telas (
   status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa','manutencao','inativa')),
   som INTEGER NOT NULL DEFAULT 0,
   relogio INTEGER NOT NULL DEFAULT 1,
+  -- TV pendurada em pé cujo aparelho não gira a imagem: o player gira (0 = não, 90 = direita, 270 = esquerda).
+  giro INTEGER NOT NULL DEFAULT 0,
   legenda TEXT,
   aviso TEXT,
   aviso_ate TEXT,
@@ -763,6 +765,7 @@ function abrir(arquivo = config.dbFile) {
 const COLUNAS_NOVAS = [
   ['emails', 'endereco_id', 'INTEGER'],
   ['pareamentos', 'visto_em', 'TEXT'],
+  ['telas', 'giro', 'INTEGER NOT NULL DEFAULT 0'],
   ['enderecos_email', 'assinatura', 'TEXT'],
   ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],

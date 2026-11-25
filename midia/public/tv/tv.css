@@ -10,7 +10,9 @@
 @font-face { font-family: "OpenSans"; src: url("../fonts/opensans-800.woff2") format("woff2"); font-weight: 800 900; font-display: swap; }
 
 :root{
-  --faixa-altura: 7.4vh;
+  /* Unidades da tela: 1% da altura e 1% da largura. Numa TV girada pelo sistema, elas trocam (ver body.girada). */
+  --uh: 1vh; --uw: 1vw;
+  --faixa-altura: calc(var(--uh) * 7.4);
   /* Cores do site */
   --preto: #18232A;
   --lime: #C8FF31;
@@ -51,119 +53,119 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
 .zona-comunicado{ position: relative; overflow: hidden; background: var(--preto); border-right: 2px solid var(--lime); }
 @media (max-aspect-ratio: 1/1){ .zona-comunicado{ border-right: 0; border-bottom: 2px solid var(--lime); } }
 /* Na zona, o texto começa no alto (centralizar cortaria as pontas quando o recado é longo). */
-.zona-comunicado .comunicado{ padding: 5vh 4vw; gap: 2vh; justify-content: flex-start; }
-.zona-comunicado .comunicado h1{ font-size: 5.6vh; }
-.zona-comunicado .comunicado p{ font-size: 3vh; }
+.zona-comunicado .comunicado{ padding: calc(var(--uh) * 5) calc(var(--uw) * 4); gap: calc(var(--uh) * 2); justify-content: flex-start; }
+.zona-comunicado .comunicado h1{ font-size: calc(var(--uh) * 5.6); }
+.zona-comunicado .comunicado p{ font-size: calc(var(--uh) * 3); }
 /* Tela em pé: a zona é mais baixa, então tudo encolhe para caber sem cortar a assinatura. */
 @media (max-aspect-ratio: 1/1){
-  .zona-comunicado .comunicado{ padding: 3.4vh 6vw; gap: 1.2vh; }
+  .zona-comunicado .comunicado{ padding: calc(var(--uh) * 3.4) calc(var(--uw) * 6); gap: calc(var(--uh) * 1.2); }
   .zona-comunicado .comunicado .marca-adm{ margin-bottom: 0; }
-  .zona-comunicado .comunicado .marca-adm img{ max-height: 4.4vh; }
-  .zona-comunicado .comunicado .marca-adm span{ font-size: 1.9vh; }
-  .zona-comunicado .comunicado .selo-tipo{ font-size: 1.9vh; padding: .7vh 1.6vh; }
-  .zona-comunicado .comunicado .onde{ font-size: 1.9vh; }
-  .zona-comunicado .comunicado h1{ font-size: 4.2vh; }
-  .zona-comunicado .comunicado p{ font-size: 2.4vh; }
-  .zona-comunicado .comunicado .quando{ font-size: 1.9vh; }
-  .zona-comunicado .comunicado .assinatura{ font-size: 1.8vh; padding-top: 1.1vh; }
+  .zona-comunicado .comunicado .marca-adm img{ max-height: calc(var(--uh) * 4.4); }
+  .zona-comunicado .comunicado .marca-adm span{ font-size: calc(var(--uh) * 1.9); }
+  .zona-comunicado .comunicado .selo-tipo{ font-size: calc(var(--uh) * 1.9); padding: calc(var(--uh) * .7) calc(var(--uh) * 1.6); }
+  .zona-comunicado .comunicado .onde{ font-size: calc(var(--uh) * 1.9); }
+  .zona-comunicado .comunicado h1{ font-size: calc(var(--uh) * 4.2); }
+  .zona-comunicado .comunicado p{ font-size: calc(var(--uh) * 2.4); }
+  .zona-comunicado .comunicado .quando{ font-size: calc(var(--uh) * 1.9); }
+  .zona-comunicado .comunicado .assinatura{ font-size: calc(var(--uh) * 1.8); padding-top: calc(var(--uh) * 1.1); }
 }
 
 .faixa{ position: fixed; left: 0; right: 0; bottom: 0; height: var(--faixa-altura); background: var(--preto);
-  display: flex; align-items: center; gap: 2.5vw; padding: 0 2.5vw; border-top: 2px solid var(--lime); }
+  display: flex; align-items: center; gap: calc(var(--uw) * 2.5); padding: 0 calc(var(--uw) * 2.5); border-top: 2px solid var(--lime); }
 /* O logo colorido fica no centro do rodapé; o recado à esquerda e o horário à direita não chegam nele. */
-.faixa .marca-faixa{ display: flex; align-items: center; gap: 1.2vh; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+.faixa .marca-faixa{ display: flex; align-items: center; gap: calc(var(--uh) * 1.2); position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   /* Pílula de vidro: o logo ganha um fundo translúcido com brilho, e o rodapé continua como é. */
-  height: 5.4vh; padding: 0 2.6vh 0 2.2vh; border-radius: 999px; overflow: hidden;
+  height: calc(var(--uh) * 5.4); padding: 0 calc(var(--uh) * 2.6) 0 calc(var(--uh) * 2.2); border-radius: 999px; overflow: hidden;
   background: linear-gradient(180deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.07) 48%, rgba(255,255,255,.03) 52%, rgba(255,255,255,.12) 100%);
   border: 1px solid rgba(255,255,255,.34);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.08), 0 0 2.4vh rgba(200,255,49,.28), 0 .4vh 1.4vh rgba(0,0,0,.35); }
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.08), 0 0 calc(var(--uh) * 2.4) rgba(200,255,49,.28), 0 calc(var(--uh) * .4) calc(var(--uh) * 1.4) rgba(0,0,0,.35); }
 /* O reflexo que atravessa o vidro de tempos em tempos. */
 .faixa .marca-faixa::after{ content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 45%;
   background: linear-gradient(100deg, transparent, rgba(255,255,255,.55), transparent); transform: skewX(-18deg); animation: reflexo 7s ease-in-out infinite; }
 @keyframes reflexo{ 0%, 72%{ left: -60%; } 100%{ left: 130%; } }
-.faixa .marca-faixa svg{ height: 3.2vh; width: auto; color: var(--lime); filter: drop-shadow(0 0 .9vh rgba(200,255,49,.75)); }
-.faixa .marca-faixa span{ font-size: 2.6vh; font-weight: 800; letter-spacing: -.05em; text-transform: uppercase; color: #fff; text-shadow: 0 0 1.2vh rgba(255,255,255,.45); }
-.faixa .texto{ font-size: 3vh; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; max-width: 36vw; min-width: 0; color: #D7DBE0; }
-.faixa .clima{ font-size: 2.8vh; font-weight: 700; flex: none; color: #D7DBE0; margin-left: auto; white-space: nowrap; }
+.faixa .marca-faixa svg{ height: calc(var(--uh) * 3.2); width: auto; color: var(--lime); filter: drop-shadow(0 0 calc(var(--uh) * .9) rgba(200,255,49,.75)); }
+.faixa .marca-faixa span{ font-size: calc(var(--uh) * 2.6); font-weight: 800; letter-spacing: -.05em; text-transform: uppercase; color: #fff; text-shadow: 0 0 calc(var(--uh) * 1.2) rgba(255,255,255,.45); }
+.faixa .texto{ font-size: calc(var(--uh) * 3); font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; max-width: calc(var(--uw) * 36); min-width: 0; color: #D7DBE0; }
+.faixa .clima{ font-size: calc(var(--uh) * 2.8); font-weight: 700; flex: none; color: #D7DBE0; margin-left: auto; white-space: nowrap; }
 /* Letreiro dos avisos: a fila entra pela direita da área do recado e sai pela esquerda, sem parar. */
 .faixa .texto .fila{ display: inline-block; white-space: nowrap; }
-.faixa .texto .fila i{ font-style: normal; color: var(--lime); margin: 0 1.6vh; }
+.faixa .texto .fila i{ font-style: normal; color: var(--lime); margin: 0 calc(var(--uh) * 1.6); }
 .faixa .texto.trem{ text-overflow: clip; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
 .faixa .texto.trem .fila{ animation: trem 20s linear infinite; will-change: transform; }
-@keyframes trem{ from{ transform: translateX(var(--entrada, 36vw)); } to{ transform: translateX(-100%); } }
+@keyframes trem{ from{ transform: translateX(var(--entrada, calc(var(--uw) * 36))); } to{ transform: translateX(-100%); } }
 /* Com o clima na tela, o relógio fica colado nele; sem o clima, o relógio vai sozinho para o canto direito. */
-.faixa .clima:not([hidden]) + .relogio{ margin-left: 2vh; }
-.faixa .relogio{ font-size: 3.4vh; font-weight: 800; font-variant-numeric: tabular-nums; flex: none; color: var(--lime); margin-left: auto; }
+.faixa .clima:not([hidden]) + .relogio{ margin-left: calc(var(--uh) * 2); }
+.faixa .relogio{ font-size: calc(var(--uh) * 3.4); font-weight: 800; font-variant-numeric: tabular-nums; flex: none; color: var(--lime); margin-left: auto; }
 /* Tela estreita (elevador em pé): o logo no centro e o relógio no canto; o recado e o clima não cabem. */
 @media (max-aspect-ratio: 3/4){ .faixa .texto, .faixa .clima{ display: none !important; } }
 
 /* Tela de espera: pareamento, sem programação ou erro. */
-.espera{ position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: 1.2vh; text-align: center;
-  background: radial-gradient(1100px 620px at 50% 8%, #24351F 0%, #1D2B33 45%, #101920 100%); padding: 6vh min(6vh, 5vw); z-index: 5; }
+.espera{ position: fixed; inset: 0; display: grid; place-content: center; justify-items: center; gap: calc(var(--uh) * 1.2); text-align: center;
+  background: radial-gradient(1100px 620px at 50% 8%, #24351F 0%, #1D2B33 45%, #101920 100%); padding: calc(var(--uh) * 6) min(calc(var(--uh) * 6), calc(var(--uw) * 5)); z-index: 5; }
 .espera > *{ max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
-.espera .slogan{ font-size: 2.6vh; color: var(--lime); font-weight: 600; margin: -.6vh 0 2.4vh; }
-.espera h1{ font-size: min(5vh, 8vw); font-weight: 800; margin: 0; letter-spacing: -.045em; }
-.espera .mudo{ color: #A8AFB9; font-size: min(2.6vh, 4.4vw); margin: 0; max-width: 60ch; }
-.espera .ajuda{ color: #868D98; font-size: min(2.1vh, 3.8vw); margin-top: 1vh; }
+.espera .slogan{ font-size: calc(var(--uh) * 2.6); color: var(--lime); font-weight: 600; margin: -.6vh 0 calc(var(--uh) * 2.4); }
+.espera h1{ font-size: min(calc(var(--uh) * 5), calc(var(--uw) * 8)); font-weight: 800; margin: 0; letter-spacing: -.045em; }
+.espera .mudo{ color: #A8AFB9; font-size: min(calc(var(--uh) * 2.6), calc(var(--uw) * 4.4)); margin: 0; max-width: 60ch; }
+.espera .ajuda{ color: #868D98; font-size: min(calc(var(--uh) * 2.1), calc(var(--uw) * 3.8)); margin-top: calc(var(--uh) * 1); }
 .espera .ajuda strong{ color: var(--lime); }
-.marca-tv{ display: flex; align-items: center; gap: 1.6vh; font-size: 4vh; font-weight: 800; letter-spacing: -.05em; text-transform: uppercase; color: #fff; }
-.marca-tv .simbolo{ height: 5.2vh; width: auto; color: var(--lime); }
-.codigo{ font-family: ui-monospace, Menlo, Consolas, monospace; font-size: min(13vh, 11vw); font-weight: 800; letter-spacing: min(1.2vh, 1vw); line-height: 1.1; color: var(--lime);
-  background: rgba(200,255,49,.08); border: 2px solid rgba(200,255,49,.45); border-radius: 2.4vh; padding: 2vh min(4vh, 4vw) 2vh min(5.2vh, 5vw); margin: 2vh 0; white-space: nowrap; }
+.marca-tv{ display: flex; align-items: center; gap: calc(var(--uh) * 1.6); font-size: calc(var(--uh) * 4); font-weight: 800; letter-spacing: -.05em; text-transform: uppercase; color: #fff; }
+.marca-tv .simbolo{ height: calc(var(--uh) * 5.2); width: auto; color: var(--lime); }
+.codigo{ font-family: ui-monospace, Menlo, Consolas, monospace; font-size: min(calc(var(--uh) * 13), calc(var(--uw) * 11)); font-weight: 800; letter-spacing: min(calc(var(--uh) * 1.2), calc(var(--uw) * 1)); line-height: 1.1; color: var(--lime);
+  background: rgba(200,255,49,.08); border: 2px solid rgba(200,255,49,.45); border-radius: calc(var(--uh) * 2.4); padding: calc(var(--uh) * 2) min(calc(var(--uh) * 4), calc(var(--uw) * 4)) calc(var(--uh) * 2) min(calc(var(--uh) * 5.2), calc(var(--uw) * 5)); margin: calc(var(--uh) * 2) 0; white-space: nowrap; }
 
-.aviso-conexao{ position: fixed; top: 2.4vh; left: 2.4vh; z-index: 6; background: rgba(180, 83, 9, .92); color: #fff; font-size: 2vh; font-weight: 700;
-  padding: .9vh 1.8vh; border-radius: 999px; }
+.aviso-conexao{ position: fixed; top: calc(var(--uh) * 2.4); left: calc(var(--uh) * 2.4); z-index: 6; background: rgba(180, 83, 9, .92); color: #fff; font-size: calc(var(--uh) * 2); font-weight: 700;
+  padding: calc(var(--uh) * .9) calc(var(--uh) * 1.8); border-radius: 999px; }
 
 /* Botão "Clique aqui para maximizar": grande no alto da tela (sem cobrir o código de pareamento); depois de um tempo vai para o canto, menor. */
-.botao-tela-cheia{ position: fixed; left: 50%; top: 6vh; transform: translateX(-50%); z-index: 9; display: flex; align-items: center; gap: 1.6vh;
-  background: #C8FF31; color: #18232A; border: 0; border-radius: 999px; padding: 2.4vh min(4.4vh, 5vw); font: inherit; font-size: min(3.6vh, 4.2vw); font-weight: 800; max-width: 94vw; white-space: nowrap;
-  cursor: pointer; box-shadow: 0 1vh 5vh rgba(0,0,0,.5); }
-.botao-tela-cheia svg{ width: 4.4vh; height: 4.4vh; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.botao-tela-cheia:focus{ outline: .6vh solid #fff; outline-offset: .6vh; }
-.botao-tela-cheia.canto{ left: auto; top: auto; right: 2.4vh; bottom: 10vh; transform: none; font-size: 2vh; padding: 1.2vh 2.2vh; opacity: .85; }
-.botao-tela-cheia.canto svg{ width: 2.6vh; height: 2.6vh; }
-.botao-tela-cheia.aviso{ white-space: normal; background: rgba(24, 35, 42, .96); color: #fff; max-width: 86vw; font-size: 2.4vh; text-align: left; border-radius: 2vh; }
+.botao-tela-cheia{ position: fixed; left: 50%; top: calc(var(--uh) * 6); transform: translateX(-50%); z-index: 9; display: flex; align-items: center; gap: calc(var(--uh) * 1.6);
+  background: #C8FF31; color: #18232A; border: 0; border-radius: 999px; padding: calc(var(--uh) * 2.4) min(calc(var(--uh) * 4.4), calc(var(--uw) * 5)); font: inherit; font-size: min(calc(var(--uh) * 3.6), calc(var(--uw) * 4.2)); font-weight: 800; max-width: calc(var(--uw) * 94); white-space: nowrap;
+  cursor: pointer; box-shadow: 0 calc(var(--uh) * 1) calc(var(--uh) * 5) rgba(0,0,0,.5); }
+.botao-tela-cheia svg{ width: calc(var(--uh) * 4.4); height: calc(var(--uh) * 4.4); fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.botao-tela-cheia:focus{ outline: calc(var(--uh) * .6) solid #fff; outline-offset: calc(var(--uh) * .6); }
+.botao-tela-cheia.canto{ left: auto; top: auto; right: calc(var(--uh) * 2.4); bottom: calc(var(--uh) * 10); transform: none; font-size: calc(var(--uh) * 2); padding: calc(var(--uh) * 1.2) calc(var(--uh) * 2.2); opacity: .85; }
+.botao-tela-cheia.canto svg{ width: calc(var(--uh) * 2.6); height: calc(var(--uh) * 2.6); }
+.botao-tela-cheia.aviso{ white-space: normal; background: rgba(24, 35, 42, .96); color: #fff; max-width: calc(var(--uw) * 86); font-size: calc(var(--uh) * 2.4); text-align: left; border-radius: calc(var(--uh) * 2); }
 
-.info{ position: fixed; top: 2.4vh; right: 2.4vh; z-index: 7; background: rgba(24, 35, 42, .88); border: 1px solid rgba(255,255,255,.16); border-radius: 1.4vh;
-  padding: 2vh 2.4vh; font-size: 1.9vh; line-height: 1.7; max-width: 46vw; font-variant-numeric: tabular-nums; }
+.info{ position: fixed; top: calc(var(--uh) * 2.4); right: calc(var(--uh) * 2.4); z-index: 7; background: rgba(24, 35, 42, .88); border: 1px solid rgba(255,255,255,.16); border-radius: calc(var(--uh) * 1.4);
+  padding: calc(var(--uh) * 2) calc(var(--uh) * 2.4); font-size: calc(var(--uh) * 1.9); line-height: 1.7; max-width: calc(var(--uw) * 46); font-variant-numeric: tabular-nums; }
 .info b{ color: #C8FF31; font-weight: 700; }
 
 /* Cabeçalho do comunicado: logo da administradora e nome dela, como nas telas de condomínio. */
-.comunicado .marca-adm{ display: flex; align-items: center; gap: 1.6vh; margin-bottom: .6vh; min-width: 0; }
-.comunicado .marca-adm img{ max-height: 6vh; max-width: 40%; object-fit: contain; }
-.comunicado .marca-adm span{ font-size: 2.2vh; font-weight: 700; color: #C9CFD7; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.comunicado .assinatura{ font-size: 2.2vh; color: #A8AFB9; border-top: 1px solid rgba(255,255,255,.12); padding-top: 1.6vh; margin-top: auto; }
+.comunicado .marca-adm{ display: flex; align-items: center; gap: calc(var(--uh) * 1.6); margin-bottom: calc(var(--uh) * .6); min-width: 0; }
+.comunicado .marca-adm img{ max-height: calc(var(--uh) * 6); max-width: 40%; object-fit: contain; }
+.comunicado .marca-adm span{ font-size: calc(var(--uh) * 2.2); font-weight: 700; color: #C9CFD7; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comunicado .assinatura{ font-size: calc(var(--uh) * 2.2); color: #A8AFB9; border-top: 1px solid rgba(255,255,255,.12); padding-top: calc(var(--uh) * 1.6); margin-top: auto; }
 /* Sem assinatura, é a data que fica no pé do cartão. */
 .comunicado .quando:last-child{ margin-top: auto; }
 .comunicado .assinatura strong{ display: block; color: #E6E8EC; font-weight: 700; }
 
 /* Comunicado do ponto (recado do condomínio ou da loja), desenhado pela própria TV. */
-.comunicado{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 3vh; padding: 8vh 9vw;
+.comunicado{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: calc(var(--uh) * 3); padding: calc(var(--uh) * 8) calc(var(--uw) * 9);
   background: linear-gradient(135deg, #22323B 0%, #141E24 100%); color: #fff; text-align: left; }
-.comunicado .cabeca{ display: flex; align-items: center; gap: 2vh; min-width: 0; }
+.comunicado .cabeca{ display: flex; align-items: center; gap: calc(var(--uh) * 2); min-width: 0; }
 .comunicado .selo-tipo{ flex: none; }
-.comunicado .selo-tipo{ font-size: 2.4vh; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: .9vh 2.2vh; border-radius: 999px;
+.comunicado .selo-tipo{ font-size: calc(var(--uh) * 2.4); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: calc(var(--uh) * .9) calc(var(--uh) * 2.2); border-radius: 999px;
   background: var(--lime); color: var(--preto); }
-.comunicado .onde{ font-size: 2.4vh; font-weight: 600; color: #A8AFB9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
-.comunicado h1{ font-size: 8.5vh; font-weight: 800; line-height: 1.05; letter-spacing: -.045em; margin: 0; }
-.comunicado p{ font-size: 4.4vh; line-height: 1.35; margin: 0; color: #E6E8EC; }
-.comunicado .quando{ font-size: 2.4vh; color: #868D98; }
+.comunicado .onde{ font-size: calc(var(--uh) * 2.4); font-weight: 600; color: #A8AFB9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
+.comunicado h1{ font-size: calc(var(--uh) * 8.5); font-weight: 800; line-height: 1.05; letter-spacing: -.045em; margin: 0; }
+.comunicado p{ font-size: calc(var(--uh) * 4.4); line-height: 1.35; margin: 0; color: #E6E8EC; }
+.comunicado .quando{ font-size: calc(var(--uh) * 2.4); color: #868D98; }
 /* Agenda do prédio e clima do dia: o conteúdo que o morador procura por vontade própria. */
 .comunicado.quadro-agenda{ background: linear-gradient(135deg, #14303F 0%, #0B141A 100%); }
 .comunicado.quadro-agenda .selo-tipo{ background: #38BDF8; color: var(--preto); }
-.comunicado .agenda{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1.6vh; }
-.comunicado .agenda li{ display: flex; flex-direction: column; gap: .3vh; border-left: .5vh solid var(--lime); padding-left: 2vh; }
-.comunicado .agenda .quando{ font-size: 2.6vh; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--lime); }
-.comunicado .agenda li > span + span{ font-size: 4vh; font-weight: 600; line-height: 1.15; color: #E6E8EC; }
+.comunicado .agenda{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--uh) * 1.6); }
+.comunicado .agenda li{ display: flex; flex-direction: column; gap: calc(var(--uh) * .3); border-left: calc(var(--uh) * .5) solid var(--lime); padding-left: calc(var(--uh) * 2); }
+.comunicado .agenda .quando{ font-size: calc(var(--uh) * 2.6); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--lime); }
+.comunicado .agenda li > span + span{ font-size: calc(var(--uh) * 4); font-weight: 600; line-height: 1.15; color: #E6E8EC; }
 .comunicado.quadro-clima{ background: linear-gradient(135deg, #102B3F 0%, #09131A 100%); }
 .comunicado.quadro-clima .selo-tipo{ background: #FACC15; color: var(--preto); }
-.comunicado .grau{ font-size: 16vh; font-weight: 800; line-height: .95; letter-spacing: -.055em; color: var(--lime); }
-.comunicado.quadro-clima h1{ font-size: 5.6vh; }
+.comunicado .grau{ font-size: calc(var(--uh) * 16); font-weight: 800; line-height: .95; letter-spacing: -.055em; color: var(--lime); }
+.comunicado.quadro-clima h1{ font-size: calc(var(--uh) * 5.6); }
 /* Zona em pé (elevador): a zona tem menos altura, então o número e o texto encolhem. */
 @media (max-aspect-ratio: 3/4){
-  .comunicado .grau{ font-size: 11vh; }
-  .comunicado.quadro-clima h1{ font-size: 4.4vh; }
-  .comunicado .agenda li > span + span{ font-size: 3.4vh; }
+  .comunicado .grau{ font-size: calc(var(--uh) * 11); }
+  .comunicado.quadro-clima h1{ font-size: calc(var(--uh) * 4.4); }
+  .comunicado .agenda li > span + span{ font-size: calc(var(--uh) * 3.4); }
 }
 
 /* Uma faixa de cor por tipo de recado. */
@@ -180,27 +182,27 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
   numa tela recém-instalada e que completa o loop quando sobra espaço.
 */
 .cartao-marca{ position: absolute; inset: 0; overflow: hidden; background: var(--preto); color: #fff;
-  display: flex; flex-direction: column; justify-content: flex-start; gap: 2.4vh; padding: 9vh 7vw; }
-.cartao-marca .lockup{ display: flex; align-items: center; gap: 2.4vh; z-index: 1; }
-.cartao-marca .lockup .v{ height: 11vh; width: auto; color: var(--lime); flex: none; }
+  display: flex; flex-direction: column; justify-content: flex-start; gap: calc(var(--uh) * 2.4); padding: calc(var(--uh) * 9) calc(var(--uw) * 7); }
+.cartao-marca .lockup{ display: flex; align-items: center; gap: calc(var(--uh) * 2.4); z-index: 1; }
+.cartao-marca .lockup .v{ height: calc(var(--uh) * 11); width: auto; color: var(--lime); flex: none; }
 .cartao-marca .nome{ display: flex; flex-direction: column; line-height: .94; }
-.cartao-marca .nome em{ font-style: normal; font-weight: 800; font-size: 8.4vh; letter-spacing: -.055em; }
-.cartao-marca .frase{ margin: 0; font-size: 4.4vh; font-weight: 600; color: #EDEFF2; max-width: 60%; z-index: 1; }
+.cartao-marca .nome em{ font-style: normal; font-weight: 800; font-size: calc(var(--uh) * 8.4); letter-spacing: -.055em; }
+.cartao-marca .frase{ margin: 0; font-size: calc(var(--uh) * 4.4); font-weight: 600; color: #EDEFF2; max-width: 60%; z-index: 1; }
 /* O símbolo gigante sai pela borda, como nas peças da marca. */
 .cartao-marca .v-gigante{ position: absolute; color: var(--lime); z-index: 0;
   width: 62%; height: auto; right: -6%; bottom: -12%; }
 @media (max-aspect-ratio: 1/1){
-  .cartao-marca{ padding: 7vh 8vw; gap: 1.8vh; }
-  .cartao-marca .lockup .v{ height: 7.4vh; }
-  .cartao-marca .nome em{ font-size: 5.6vh; }
-  .cartao-marca .frase{ font-size: 3.4vh; max-width: 100%; }
+  .cartao-marca{ padding: calc(var(--uh) * 7) calc(var(--uw) * 8); gap: calc(var(--uh) * 1.8); }
+  .cartao-marca .lockup .v{ height: calc(var(--uh) * 7.4); }
+  .cartao-marca .nome em{ font-size: calc(var(--uh) * 5.6); }
+  .cartao-marca .frase{ font-size: calc(var(--uh) * 3.4); max-width: 100%; }
   .cartao-marca .v-gigante{ width: 92%; right: -10%; bottom: -6%; }
 }
 /* Na zona de anúncio da tela dividida, a peça é menor: encolhe junto. */
-.zona-anuncio .cartao-marca{ padding: 6vh 6%; gap: 1.4vh; }
-.zona-anuncio .cartao-marca .lockup .v{ height: 6vh; }
-.zona-anuncio .cartao-marca .nome em{ font-size: 4.6vh; }
-.zona-anuncio .cartao-marca .frase{ font-size: 2.8vh; max-width: 100%; }
+.zona-anuncio .cartao-marca{ padding: calc(var(--uh) * 6) 6%; gap: calc(var(--uh) * 1.4); }
+.zona-anuncio .cartao-marca .lockup .v{ height: calc(var(--uh) * 6); }
+.zona-anuncio .cartao-marca .nome em{ font-size: calc(var(--uh) * 4.6); }
+.zona-anuncio .cartao-marca .frase{ font-size: calc(var(--uh) * 2.8); max-width: 100%; }
 
 /*
   Comunicado com imagem: a foto do ponto (ou a ilustração do tipo de recado) cobre o espaço inteiro,
@@ -217,7 +219,7 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
 .comunicado .visual.foto img{ width: 100%; height: 100%; object-fit: cover; display: block; }
 /* Ilustração: o símbolo do tipo, grande, sobre a cor do tipo. */
 .comunicado .visual.ilustracao{ display: grid; place-items: center; padding-bottom: 30%; }
-.comunicado .visual.ilustracao svg{ width: 42%; max-width: 46vh; height: auto; fill: none; stroke: currentColor; stroke-width: 1.4;
+.comunicado .visual.ilustracao svg{ width: 42%; max-width: calc(var(--uh) * 46); height: auto; fill: none; stroke: currentColor; stroke-width: 1.4;
   stroke-linecap: round; stroke-linejoin: round; opacity: .9; }
 .comunicado .visual.ilustracao.aviso{ background: radial-gradient(circle at 70% 25%, #3E5A12 0%, #1C2A10 45%, #11180B 100%); color: #C8FF31; }
 .comunicado .visual.ilustracao.manutencao{ background: radial-gradient(circle at 70% 25%, #6B4A12 0%, #33230A 45%, #1A1206 100%); color: #FBBF24; }
@@ -226,8 +228,43 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
 .comunicado .visual.ilustracao.urgente{ background: radial-gradient(circle at 70% 25%, #7A1D1D 0%, #3F0F0F 45%, #1F0707 100%); color: #FCA5A5; }
 /* Na TV em pé a metade do recado é baixa: a ilustração vai para o canto, menor, como marca d'água. */
 @media (max-aspect-ratio: 1/1){
-  .zona-comunicado .visual.ilustracao{ place-items: start end; padding: 3vh 5vw 0 0; }
+  .zona-comunicado .visual.ilustracao{ place-items: start end; padding: calc(var(--uh) * 3) calc(var(--uw) * 5) 0 0; }
   .zona-comunicado .visual.ilustracao svg{ width: 30%; opacity: .35; }
   /* O texto ocupa quase a metade toda: o véu escurece mais cedo para a foto não brigar com a leitura. */
   .zona-comunicado .comunicado.com-visual::after{ background: linear-gradient(180deg, rgba(10,16,20,.6) 0%, rgba(10,16,20,.72) 35%, rgba(10,16,20,.93) 70%, rgba(10,16,20,.97) 100%); }
 }
+
+
+/*
+ * TV girada pelo sistema. A TV está pendurada em pé, mas o aparelho continua mandando a imagem deitada
+ * (smart TV não gira o navegador). O player gira tudo 90 graus e passa a tratar a tela como em pé:
+ * as unidades de altura e largura trocam, e valem as mesmas regras de "tela em pé" de cima.
+ */
+body.girada{ position: fixed; top: 50%; left: 50%; width: 100vh; height: 100vw; transform: translate(-50%, -50%) rotate(90deg);
+  --uh: 1vw; --uw: 1vh; --faixa-altura: calc(var(--uh) * 7.4); }
+body.girada.esquerda{ transform: translate(-50%, -50%) rotate(-90deg); }
+body.girada.dividida .palco{ grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+body.girada .zona-comunicado{ border-right: 0; border-bottom: 2px solid var(--lime); }
+body.girada .zona-comunicado .comunicado{ padding: calc(var(--uh) * 3.4) calc(var(--uw) * 6); gap: calc(var(--uh) * 1.2); }
+body.girada .zona-comunicado .comunicado .marca-adm{ margin-bottom: 0; }
+body.girada .zona-comunicado .comunicado .marca-adm img{ max-height: calc(var(--uh) * 4.4); }
+body.girada .zona-comunicado .comunicado .marca-adm span{ font-size: calc(var(--uh) * 1.9); }
+body.girada .zona-comunicado .comunicado .selo-tipo{ font-size: calc(var(--uh) * 1.9); padding: calc(var(--uh) * .7) calc(var(--uh) * 1.6); }
+body.girada .zona-comunicado .comunicado .onde{ font-size: calc(var(--uh) * 1.9); }
+body.girada .zona-comunicado .comunicado h1{ font-size: calc(var(--uh) * 4.2); }
+body.girada .zona-comunicado .comunicado p{ font-size: calc(var(--uh) * 2.4); }
+body.girada .zona-comunicado .comunicado .quando{ font-size: calc(var(--uh) * 1.9); }
+body.girada .zona-comunicado .comunicado .assinatura{ font-size: calc(var(--uh) * 1.8); padding-top: calc(var(--uh) * 1.1); }
+body.girada .faixa .texto, body.girada .faixa .clima{ display: none !important; }
+body.girada .comunicado .grau{ font-size: calc(var(--uh) * 11); }
+body.girada .comunicado.quadro-clima h1{ font-size: calc(var(--uh) * 4.4); }
+body.girada .comunicado .agenda li > span + span{ font-size: calc(var(--uh) * 3.4); }
+body.girada .cartao-marca{ padding: calc(var(--uh) * 7) calc(var(--uw) * 8); gap: calc(var(--uh) * 1.8); }
+body.girada .cartao-marca .lockup .v{ height: calc(var(--uh) * 7.4); }
+body.girada .cartao-marca .nome em{ font-size: calc(var(--uh) * 5.6); }
+body.girada .cartao-marca .frase{ font-size: calc(var(--uh) * 3.4); max-width: 100%; }
+body.girada .cartao-marca .v-gigante{ width: 92%; right: -10%; bottom: -6%; }
+body.girada .zona-comunicado .visual.ilustracao{ place-items: start end; padding: calc(var(--uh) * 3) calc(var(--uw) * 5) 0 0; }
+body.girada .zona-comunicado .visual.ilustracao svg{ width: 30%; opacity: .35; }
+body.girada /* O texto ocupa quase a metade toda: o véu escurece mais cedo para a foto não brigar com a leitura. */
+  .zona-comunicado .comunicado.com-visual::after{ background: linear-gradient(180deg, rgba(10,16,20,.6) 0%, rgba(10,16,20,.72) 35%, rgba(10,16,20,.93) 70%, rgba(10,16,20,.97) 100%); }

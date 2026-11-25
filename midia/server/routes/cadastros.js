@@ -265,6 +265,7 @@ module.exports = (db) => {
       orientacao: v.opcao(req.body.orientacao ?? 'paisagem', 'a orientação', ['paisagem', 'retrato']),
       som: v.booleano(req.body.som) ? 1 : 0,
       relogio: req.body.relogio === undefined ? 1 : (v.booleano(req.body.relogio) ? 1 : 0),
+      giro: Number(v.opcao(String(req.body.giro ?? 0), 'o giro da imagem', ['0', '90', '270'])),
       legenda: v.opcional(req.body.legenda, 'a legenda', 200),
       observacao: v.opcional(req.body.observacao, 'a observação', 500),
     };
@@ -286,6 +287,7 @@ module.exports = (db) => {
     if (req.body.status !== undefined) d.status = v.opcao(req.body.status, 'a situação', ['ativa', 'manutencao', 'inativa']);
     if (req.body.som !== undefined) d.som = v.booleano(req.body.som) ? 1 : 0;
     if (req.body.relogio !== undefined) d.relogio = v.booleano(req.body.relogio) ? 1 : 0;
+    if (req.body.giro !== undefined) d.giro = Number(v.opcao(String(req.body.giro), 'o giro da imagem', ['0', '90', '270']));
     if (req.body.legenda !== undefined) d.legenda = v.opcional(req.body.legenda, 'a legenda', 200);
     if (req.body.observacao !== undefined) d.observacao = v.opcional(req.body.observacao, 'a observação', 500);
     if (req.body.local_id !== undefined) {

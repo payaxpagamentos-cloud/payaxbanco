@@ -355,7 +355,7 @@ function montar(db, tela, instante = new Date()) {
     // A foto entra na versão: trocar a foto do comunicado faz a TV baixar de novo.
     comunicados.map((c) => [c.id, c.titulo, c.texto, c.tipo, c.duracao_s, c.imagem_arquivo ?? '']),
     agenda.map((a) => [a.titulo, a.evento_em, a.evento_hora]),
-    tela.layout, tela.som, tela.relogio, tela.legenda ?? '',
+    tela.layout, tela.som, tela.relogio, tela.giro ?? 0, tela.legenda ?? '',
     (tela.aviso_ate && tela.aviso_ate < new Date().toISOString()) ? '' : (tela.aviso ?? ''),
   ]);
 

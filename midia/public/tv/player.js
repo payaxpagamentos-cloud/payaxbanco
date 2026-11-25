@@ -731,7 +731,17 @@ function mostrarEspera(titulo, texto, codigo) {
 const esconderEspera = () => { $('espera').hidden = true; };
 
 /** Faixa de baixo: aviso do ponto (prioridade), legenda fixa, clima e relógio. */
+/** TV pendurada em pé com a imagem deitada: o player gira tudo (configurado na TV, no painel). */
+function aplicarGiro() {
+  const giro = Number(estado.programacao?.tela?.giro ?? 0);
+  document.body.classList.toggle('girada', giro === 90 || giro === 270);
+  document.body.classList.toggle('esquerda', giro === 270);
+}
+// Largura da tela como quem olha vê (numa TV girada, é a altura do aparelho).
+const larguraVista = () => (document.body.classList.contains('girada') ? window.innerHeight : window.innerWidth);
+
 function desenharFaixa() {
+  aplicarGiro();
   const t = estado.programacao?.tela;
   const clima = estado.programacao?.grade?.clima ?? null;
   const texto = t?.aviso || t?.legenda || '';
@@ -743,7 +753,7 @@ function desenharFaixa() {
   pintarAvisos(texto);
   $('clima').hidden = !clima;
   if (clima) {
-    const estreita = t?.orientacao === 'retrato';
+    const estreita = t?.orientacao === 'retrato' || document.body.classList.contains('girada');
     $('clima').textContent = estreita ? `${clima.temperatura}°` : `${clima.temperatura}° · ${clima.descricao}`;
   }
   $('relogio').hidden = !relogio;
@@ -779,7 +789,7 @@ function pintarAvisos(texto) {
     fila.style.setProperty('--entrada', `${largura}px`);
     // Velocidade constante (um décimo da largura da tela por segundo), qualquer que seja o tamanho do texto:
     // devagar o bastante para ler com calma de longe.
-    fila.style.animationDuration = `${Math.max(10, (largura + conteudo) / (window.innerWidth / 10))}s`;
+    fila.style.animationDuration = `${Math.max(10, (largura + conteudo) / (larguraVista() / 10))}s`;
   });
 }
 
@@ -983,6 +993,7 @@ function guardarPaginaNaTv() {
 async function iniciar() {
   guardarPaginaNaTv();
   marcarPlataforma(estado.programacao?.plataforma, estado.programacao?.slogan);
+  aplicarGiro();
   mostrarEspera('Preparando a tela…', 'Carregando a programação guardada.');
   relogio();
   atalhos();
