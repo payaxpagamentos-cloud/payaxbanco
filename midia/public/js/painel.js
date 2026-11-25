@@ -7,6 +7,7 @@ import { inventario, circuitos } from './inventario.js';
 import { crm } from './crm.js';
 import { propostas } from './proposta.js';
 import { emails } from './emails.js';
+import { senhasEquipe } from './senhas.js';
 import { usuarios, configuracoes, produtos, diagnostico, historico, empresas } from './admin.js';
 
 export const TELAS_EQUIPE = {
@@ -14,6 +15,7 @@ export const TELAS_EQUIPE = {
   telas: telasEquipe,
   pontos,
   comunicados,
+  senhas: senhasEquipe,
   anunciantes,
   campanhas,
   criativos,

@@ -80,6 +80,13 @@ module.exports = (db) => {
    * Comunicados do ponto: o recado do prédio ou da loja ("assembleia dia 12", "elevador em manutenção").
    * Entram no carrossel entre os anúncios e são desenhados pela própria TV, sem precisar de arte.
    */
+  // Controle de senha: o próprio ponto chama as senhas que aparecem na TV dele.
+  const senhas = require('../lib/senhas');
+  r.get('/senhas', (req, res) => res.json(senhas.situacao(db, meu(req))));
+  r.post('/senhas/chamar', (req, res) => res.status(201).json(senhas.chamar(db, meu(req), req.body, req.usuario.id)));
+  r.post('/senhas/repetir', (req, res) => res.json(senhas.repetir(db, meu(req))));
+  r.post('/senhas/zerar', (req, res) => res.json(senhas.zerar(db, meu(req))));
+
   r.get('/comunicados', (req, res) => {
     res.json({
       itens: db.prepare("SELECT * FROM comunicados WHERE local_id = ? ORDER BY (status = 'pendente') DESC, fim DESC, id DESC").all(meu(req)),

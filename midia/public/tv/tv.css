@@ -239,3 +239,34 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
  * arte desfocada. Quem decide é o player, olhando o tamanho de cada arte (ver ajustarEncaixe).
  */
 .camada img.esticar, .camada video.esticar{ object-fit: fill; }
+
+/*
+ * Chamada de senha. Fica no pedaço do ponto (à esquerda na TV deitada, em cima na TV em pé) e o anúncio
+ * no resto, inteiro — a senha precisa de pouco espaço, então o anúncio fica com a maior parte da tela.
+ */
+body.dividida.com-senha .palco{ grid-template-columns: 34% 66%; grid-template-rows: 100%; }
+body.dividida.com-senha .zona-anuncio .camada img:not(.fundo), body.dividida.com-senha .zona-anuncio .camada video{ object-fit: contain; }
+body.dividida.com-senha .zona-anuncio .camada img.esticar:not(.fundo), body.dividida.com-senha .zona-anuncio .camada video.esticar{ object-fit: fill; }
+.painel-senha{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 3vh 2vw; background: radial-gradient(circle at 50% 30%, #24351F 0%, #1D2B33 55%, #101920 100%); color: #fff; }
+.painel-senha .rotulo{ font-size: 3.4vh; font-weight: 700; letter-spacing: .32em; text-transform: uppercase; color: #C9CFD7; }
+.painel-senha .codigo-senha{ font-size: 19vh; font-weight: 800; line-height: 1; letter-spacing: -.03em; color: var(--lime); margin: 1.5vh 0 1vh;
+  font-variant-numeric: tabular-nums; text-shadow: 0 0 4vh rgba(200,255,49,.35); }
+.painel-senha .codigo-senha.vazio{ color: #5C6770; text-shadow: none; }
+.painel-senha .guiche{ font-size: 5.4vh; font-weight: 800; letter-spacing: -.02em; }
+.painel-senha .ultimas{ margin-top: 5vh; padding-top: 3vh; border-top: 1px solid rgba(255,255,255,.16); display: flex; flex-direction: column; gap: 1.2vh; width: 80%; }
+.painel-senha .ultimas .titulo{ font-size: 2.2vh; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #8C96A0; }
+.painel-senha .ultimas .item{ font-size: 3.2vh; color: #C9CFD7; }
+.painel-senha .ultimas .item b{ color: #fff; font-weight: 800; margin-right: 1vh; }
+.painel-senha.chamando .codigo-senha, .painel-senha.chamando .guiche{ animation: chamando .7s ease-in-out 5; }
+@keyframes chamando{ 0%, 100%{ opacity: 1; transform: scale(1); } 50%{ opacity: .25; transform: scale(1.06); } }
+@media (max-aspect-ratio: 1/1){
+body.dividida.com-senha .palco{ grid-template-columns: 1fr; grid-template-rows: 27% 73%; }
+.painel-senha{ padding: 1.2vh 4vw; }
+.painel-senha .rotulo{ font-size: 1.7vh; }
+.painel-senha .codigo-senha{ font-size: 10.5vh; margin: .5vh 0 .4vh; }
+.painel-senha .guiche{ font-size: 3vh; }
+.painel-senha .ultimas{ margin-top: 1.4vh; padding-top: 1.1vh; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: .6vh 2.6vw; width: 100%; }
+.painel-senha .ultimas .titulo{ font-size: 1.3vh; width: 100%; }
+.painel-senha .ultimas .item{ font-size: 1.9vh; }
+}

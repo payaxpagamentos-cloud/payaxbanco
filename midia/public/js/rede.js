@@ -174,6 +174,9 @@ const camposTela = (t = {}, opcoes) => [
   el('p', { class: 'pequeno mudo', style: 'margin:-6px 0 0' },
     'Sim: meio a meio — o recado do ponto com imagem de um lado e o anúncio do outro (bom para condomínio e elevador). '
     + 'Não: o anúncio ocupa a tela toda e o comunicado entra no meio dos anúncios.'),
+  escolha('Na tela dividida, a metade do ponto mostra', 'zona', { comunicado: 'Comunicados do ponto', senha: 'Chamada de senha' }, t.zona ?? 'comunicado'),
+  el('p', { class: 'pequeno mudo', style: 'margin:-6px 0 0' },
+    'Chamada de senha: a senha e o guichê ficam num pedaço da tela e o anúncio no resto. Quem chama é o atendente, em Pontos › Senhas (ou no portal do ponto).'),
   escolha('Girar a imagem na TV', 'giro', { 0: 'Não girar (o normal)', 90: 'Girar para a direita', 270: 'Girar para a esquerda' }, t.giro ?? 0),
   el('p', { class: 'pequeno mudo', style: 'margin:-6px 0 0' },
     'Use quando a TV está pendurada em pé, mas a imagem aparece deitada (de lado). Se depois de girar ficar de cabeça para baixo, troque o lado.'),

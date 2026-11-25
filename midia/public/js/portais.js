@@ -1,5 +1,6 @@
 /** Portais: o anunciante acompanha as próprias campanhas; o lojista acompanha as TVs do ponto dele. */
 import { api, qs, baixar } from './api.js';
+import { senhasLojista } from './senhas.js';
 import {
   el, limpar, icone, toast, acao, modal, formModal, confirmar, campo, escolha, area, lerForm, repetir,
   inteiro, dinheiro, duracao, dataBr, dataHora, etiquetaDe, etiqueta, percentual, competenciaTexto, situacao,
@@ -479,6 +480,7 @@ export const TELAS_ANUNCIANTE = {
 
 export const TELAS_LOJISTA = {
   resumo: resumoLojista,
+  senhas: senhasLojista,
   comunicados: comunicadosLojista,
   conteudo: conteudoLojista,
   repasses: repassesLojista,

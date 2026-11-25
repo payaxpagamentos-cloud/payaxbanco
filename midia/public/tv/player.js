@@ -478,6 +478,16 @@ function rodarZonaComunicados() {
   clearTimeout(estado.zonaTimer);
   const zona = $('zona-comunicado');
   const g = estado.programacao?.grade;
+  // Chamada de senha no lugar dos comunicados (escolhido na TV, no painel).
+  const comSenha = g?.layout === 'dividida' && estado.programacao?.tela?.zona === 'senha';
+  document.body.classList.toggle('com-senha', comSenha);
+  if (comSenha) {
+    document.body.classList.add('dividida');
+    zona.hidden = false;
+    rodarSenha(zona);
+    return;
+  }
+  pararSenha();
   // Além dos comunicados, a zona do ponto mostra a agenda do lugar e o clima do dia:
   // é o que as pessoas olham por vontade própria — e o que valoriza o anúncio ao lado.
   const extras = [
@@ -504,6 +514,80 @@ function rodarZonaComunicados() {
     }, segundos * 1000);
   };
   mostrar();
+}
+
+// ---------------------------------------------------------------- Chamada de senha
+/** Toque de chamada, feito na hora (sem arquivo de som). Se a TV não deixar tocar, a senha só pisca. */
+function tocarChamada() {
+  try {
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (!Audio) return;
+    estado.audio = estado.audio || new Audio();
+    const ctx = estado.audio;
+    if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
+    [[880, 0], [1175, 0.22]].forEach(([freq, quando]) => {
+      const osc = ctx.createOscillator();
+      const vol = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      vol.gain.setValueAtTime(0.0001, ctx.currentTime + quando);
+      vol.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + quando + 0.03);
+      vol.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + quando + 0.5);
+      osc.connect(vol);
+      vol.connect(ctx.destination);
+      osc.start(ctx.currentTime + quando);
+      osc.stop(ctx.currentTime + quando + 0.55);
+    });
+  } catch { /* sem som: segue só com a imagem */ }
+}
+
+function pintarSenha(zona, s) {
+  const peca = (tag, classe, texto) => { const e = document.createElement(tag); e.className = classe; if (texto !== undefined) e.textContent = texto; return e; };
+  const painel = peca('div', 'painel-senha');
+  painel.append(peca('div', 'rotulo', 'Senha'));
+  if (s?.atual) {
+    painel.append(peca('div', 'codigo-senha', s.atual.codigo), peca('div', 'guiche', s.atual.guiche));
+  } else {
+    painel.append(peca('div', 'codigo-senha vazio', '—'), peca('div', 'guiche', 'Aguarde ser chamado'));
+  }
+  if (s?.ultimas?.length) {
+    const lista = peca('div', 'ultimas');
+    lista.append(peca('span', 'titulo', 'Últimas chamadas'));
+    for (const u of s.ultimas.slice(0, 3)) {
+      const item = peca('span', 'item');
+      item.append(peca('b', '', u.codigo), document.createTextNode(` ${u.guiche}`));
+      lista.append(item);
+    }
+    painel.append(lista);
+  }
+  zona.replaceChildren(painel);
+  // Chamada nova (ou repetida): pisca e toca.
+  const marca = s?.atual ? `${s.atual.id}:${s.atual.repetida_em ?? ''}` : '';
+  if (marca && estado.senhaMarca !== undefined && marca !== estado.senhaMarca) {
+    painel.classList.add('chamando');
+    tocarChamada();
+  }
+  estado.senhaMarca = marca;
+}
+
+/** Enquanto a metade de cima for a senha, a TV pergunta ao servidor a cada 3 segundos. */
+function rodarSenha(zona) {
+  if (estado.senhaTimer) return;
+  if (!zona.querySelector('.painel-senha')) pintarSenha(zona, estado.senhaUltima ?? null);
+  const perguntar = async () => {
+    try {
+      const s = await chamar('player/senha');
+      const assinatura = JSON.stringify(s);
+      if (assinatura !== estado.senhaAssinatura) { estado.senhaAssinatura = assinatura; estado.senhaUltima = s; pintarSenha(zona, s); }
+    } catch { /* sem internet: fica a última senha na tela */ }
+    if (estado.senhaTimer) estado.senhaTimer = setTimeout(perguntar, 3000);
+  };
+  estado.senhaTimer = setTimeout(perguntar, 50);
+}
+function pararSenha() {
+  clearTimeout(estado.senhaTimer);
+  estado.senhaTimer = null;
+  estado.senhaAssinatura = null;
 }
 
 const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
@@ -683,7 +767,9 @@ async function prepararItem(item) {
  */
 function ajustarEncaixe(elemento, area) {
   const emPe = document.body.classList.contains('girada') || window.innerHeight > window.innerWidth;
-  if (!emPe || document.body.classList.contains('dividida')) return;
+  // Com a chamada de senha, o anúncio fica num pedaço da tela e nunca é cortado (em pé ou deitada).
+  const comSenha = document.body.classList.contains('com-senha');
+  if (!comSenha && (!emPe || document.body.classList.contains('dividida'))) return;
   const largura = elemento.videoWidth || elemento.naturalWidth;
   const altura = elemento.videoHeight || elemento.naturalHeight;
   if (!largura || !altura || !area.offsetWidth || !area.offsetHeight) return;

@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS telas (
   giro INTEGER NOT NULL DEFAULT 0,
   -- 1 = nesta TV só passam as artes no formato dela (em pé ou deitada), quando a campanha tem; 0 = passam todas.
   so_formato INTEGER NOT NULL DEFAULT 0,
+  -- O que vai na metade do ponto quando a tela é dividida: os comunicados ou a chamada de senha.
+  zona TEXT NOT NULL DEFAULT 'comunicado',
   legenda TEXT,
   aviso TEXT,
   aviso_ate TEXT,
@@ -471,6 +473,20 @@ CREATE TABLE IF NOT EXISTS emails (
   recebido_em TEXT NOT NULL,
   criado_em TEXT NOT NULL
 );
+-- Controle de senha (fila de atendimento): cada chamada feita pelo atendente, por ponto e por dia.
+CREATE TABLE IF NOT EXISTS senhas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  local_id INTEGER NOT NULL REFERENCES locais(id) ON DELETE CASCADE,
+  data TEXT NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('N','P')),
+  numero INTEGER NOT NULL,
+  guiche TEXT NOT NULL,
+  chamada_em TEXT NOT NULL,
+  repetida_em TEXT,
+  criado_por INTEGER REFERENCES usuarios(id)
+);
+CREATE INDEX IF NOT EXISTS idx_senhas_dia ON senhas (local_id, data, id);
+
 -- Endereços de e-mail da empresa (comercial@, robson@…). Cada um pode ser de uma pessoa da equipe:
 -- o que chega para ele aparece para ela, e o que ela escreve sai com esse endereço.
 CREATE TABLE IF NOT EXISTS enderecos_email (
@@ -769,6 +785,7 @@ const COLUNAS_NOVAS = [
   ['pareamentos', 'visto_em', 'TEXT'],
   ['telas', 'giro', 'INTEGER NOT NULL DEFAULT 0'],
   ['telas', 'so_formato', 'INTEGER NOT NULL DEFAULT 0'],
+  ['telas', 'zona', "TEXT NOT NULL DEFAULT 'comunicado'"],
   ['enderecos_email', 'assinatura', 'TEXT'],
   ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],

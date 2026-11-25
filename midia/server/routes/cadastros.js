@@ -267,6 +267,7 @@ module.exports = (db) => {
       relogio: req.body.relogio === undefined ? 1 : (v.booleano(req.body.relogio) ? 1 : 0),
       giro: Number(v.opcao(String(req.body.giro ?? 0), 'o giro da imagem', ['0', '90', '270'])),
       so_formato: v.booleano(req.body.so_formato) ? 1 : 0,
+      zona: v.opcao(req.body.zona ?? 'comunicado', 'o conteúdo da metade do ponto', ['comunicado', 'senha']),
       legenda: v.opcional(req.body.legenda, 'a legenda', 200),
       observacao: v.opcional(req.body.observacao, 'a observação', 500),
     };
@@ -290,6 +291,7 @@ module.exports = (db) => {
     if (req.body.relogio !== undefined) d.relogio = v.booleano(req.body.relogio) ? 1 : 0;
     if (req.body.giro !== undefined) d.giro = Number(v.opcao(String(req.body.giro), 'o giro da imagem', ['0', '90', '270']));
     if (req.body.so_formato !== undefined) d.so_formato = v.booleano(req.body.so_formato) ? 1 : 0;
+    if (req.body.zona !== undefined) d.zona = v.opcao(req.body.zona, 'o conteúdo da metade do ponto', ['comunicado', 'senha']);
     if (req.body.legenda !== undefined) d.legenda = v.opcional(req.body.legenda, 'a legenda', 200);
     if (req.body.observacao !== undefined) d.observacao = v.opcional(req.body.observacao, 'a observação', 500);
     if (req.body.local_id !== undefined) {
@@ -403,6 +405,23 @@ module.exports = (db) => {
     db.prepare('DELETE FROM telas WHERE id = ?').run(id);
     registrar(db, req, 'tela_excluida', { id, nome: t.nome });
     res.status(204).end();
+  });
+
+  // ----------------------------------------------------------------- Controle de senha do ponto
+  // (o ponto vem em local_id e passa pela guarda de empresa, como os demais)
+  const senhas = require('../lib/senhas');
+  const pontoDaSenha = (req) => {
+    const id = Number(req.query.local_id ?? req.body.local_id);
+    if (!db.prepare('SELECT 1 FROM locais WHERE id = ?').get(id)) throw new ErroNegocio('Escolha o ponto.', 422);
+    return id;
+  };
+  r.get('/senhas', (req, res) => res.json(senhas.situacao(db, pontoDaSenha(req))));
+  r.post('/senhas/chamar', (req, res) => res.status(201).json(senhas.chamar(db, pontoDaSenha(req), req.body, req.usuario.id)));
+  r.post('/senhas/repetir', (req, res) => res.json(senhas.repetir(db, pontoDaSenha(req))));
+  r.post('/senhas/zerar', (req, res) => {
+    const id = pontoDaSenha(req);
+    registrar(db, req, 'senhas_zeradas', { local_id: id });
+    res.json(senhas.zerar(db, id));
   });
 
   // ----------------------------------------------------------------- Comunicados do ponto

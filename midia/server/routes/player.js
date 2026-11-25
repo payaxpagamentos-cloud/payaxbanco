@@ -74,7 +74,7 @@ module.exports = (db) => {
     res.json({
       tela: {
         id: tela.id, nome: tela.nome, local: tela.local_nome, orientacao: tela.orientacao,
-        som: Boolean(tela.som), relogio: Boolean(tela.relogio), giro: tela.giro ?? 0, legenda: tela.legenda ?? null, aviso: avisoVale ? tela.aviso : null,
+        som: Boolean(tela.som), relogio: Boolean(tela.relogio), giro: tela.giro ?? 0, zona: tela.zona ?? 'comunicado', legenda: tela.legenda ?? null, aviso: avisoVale ? tela.aviso : null,
       },
       plataforma: cfg.nome_plataforma,
       slogan: cfg.slogan,
@@ -183,6 +183,12 @@ module.exports = (db) => {
   });
 
   /** Logo da administradora do ponto, para o cabeçalho do comunicado na tela. */
+  // Senha no painel (a TV pergunta a cada poucos segundos quando a metade de cima é a chamada de senha).
+  r.get('/senha', autenticada, (req, res) => {
+    const s = require('../lib/senhas').situacao(db, req.tela.local_id);
+    res.json({ atual: s.atual, ultimas: s.ultimas });
+  });
+
   // Foto do comunicado: só de comunicado do ponto desta TV.
   r.get('/comunicados/:id/imagem', autenticada, (req, res) => {
     const c = db.prepare('SELECT * FROM comunicados WHERE id = ? AND local_id = ?').get(Number(req.params.id), req.tela.local_id);

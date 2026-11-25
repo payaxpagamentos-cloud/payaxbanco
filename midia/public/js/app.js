@@ -24,7 +24,7 @@ const MENUS = {
     ['campanhas', 'Campanhas', 'campanhas'], ['programacao', 'Programação', 'grade'],
     ['#telas', '2 · Telas'],
     // Comunicado é recado do próprio ponto: fica dentro de Pontos.
-    ['grupo-pontos', 'Pontos', 'pontos', null, [['pontos', 'Pontos'], ['comunicados', 'Comunicados']]],
+    ['grupo-pontos', 'Pontos', 'pontos', null, [['pontos', 'Pontos'], ['comunicados', 'Comunicados'], ['senhas', 'Senhas']]],
     ['telas', 'TVs', 'telas'],
     ['circuitos', 'Circuitos', 'grade'],
     ['#vendas', '3 · Vendas'],
@@ -48,7 +48,7 @@ const MENUS = {
     ['prova', 'Prova de exibição', 'relatorios'], ['faturas', 'Faturas', 'faturamento'], ['rede', 'Onde meus anúncios passam', 'rede'],
   ],
   lojista: [
-    ['resumo', 'Minhas TVs', 'telas'], ['comunicados', 'Comunicados', 'aprovacoes'], ['conteudo', 'Conteúdo próprio', 'midias'],
+    ['resumo', 'Minhas TVs', 'telas'], ['senhas', 'Senhas', 'aprovacoes'], ['comunicados', 'Comunicados', 'aprovacoes'], ['conteudo', 'Conteúdo próprio', 'midias'],
     ['repasses', 'Meu repasse', 'dinheiro'], ['relatorios', 'Exibições', 'relatorios'],
   ],
 };
@@ -57,6 +57,7 @@ const SUBTITULOS = {
   resumo: 'O que está acontecendo na rede agora', telas: 'Aparelhos instalados, estado e programação de cada um',
   pontos: 'Condomínios, prédios, comércios, academias e clínicas onde as TVs estão instaladas',
   comunicados: 'Recados do próprio ponto que entram entre os anúncios',
+  senhas: 'Chame a próxima senha: ela aparece na TV do ponto',
   anunciantes: 'Quem paga pela publicidade e as agências que compram a mídia',
   inventario: 'O que a rede tem para vender: pontos, telas e audiência', circuitos: 'Grupos de TVs vendidos em bloco', campanhas: 'O que vai ao ar, onde, quando e por quanto',
   criativos: 'Imagens e vídeos que vão para as telas', programacao: 'Como fica o loop de cada TV e quanto ainda cabe de publicidade',

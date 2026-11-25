@@ -217,3 +217,51 @@ test('E-mail: entrega direta ao servidor do destinatário, com DKIM', async (t) 
   config.smtp.portaDireta = 1;
   await assert.rejects(emailLib.transporteDireto.sendMail({ from: 'a@vaimidia.com.br', to: 'x@destino.test', subject: 's', text: 't' }));
 });
+
+/** Controle de senha: o atendente chama, a TV do ponto mostra; cada ponto e cada dia têm a sua contagem. */
+test('Controle de senha: chamar, repetir, número específico e zerar', async (t) => {
+  const { iniciar, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+  t.after(() => { api.fechar(); limparArquivos(); });
+  const master = await api.login();
+  const ponto = async (nome) => (await api.post('/painel/locais', { nome, categoria: 'outro', cidade: 'São Paulo', uf: 'SP', publico_dia: 10 }, master)).dados.id;
+  const a = await ponto('Loja A');
+  const b = await ponto('Loja B');
+
+  const vazio = (await api.get(`/painel/senhas?local_id=${a}`, master)).dados;
+  assert.equal(vazio.atual, null);
+  assert.deepEqual(vazio.proxima, { N: 'N001', P: 'P001' });
+
+  const c1 = (await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N', guiche: 'Guichê 2' }, master)).dados;
+  assert.equal(c1.atual.codigo, 'N001');
+  assert.equal(c1.atual.guiche, 'Guichê 2');
+  await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N' }, master);
+  const p1 = (await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'P', guiche: 'Caixa' }, master)).dados;
+  assert.equal(p1.atual.codigo, 'P001', 'preferencial tem contagem própria');
+  assert.deepEqual(p1.ultimas.map((u) => u.codigo), ['N002', 'N001']);
+  assert.deepEqual(p1.proxima, { N: 'N003', P: 'P002' });
+
+  // Outro ponto não enxerga nem continua a contagem deste.
+  assert.equal((await api.post('/painel/senhas/chamar', { local_id: b, tipo: 'N' }, master)).dados.atual.codigo, 'N001');
+
+  // Voltar numa senha que ficou para trás e chamar de novo.
+  assert.equal((await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N', numero: 1 }, master)).dados.atual.codigo, 'N001');
+  const rep = (await api.post('/painel/senhas/repetir', { local_id: a }, master)).dados;
+  assert.ok(rep.atual.repetida_em, 'a repetição fica marcada (é o que faz a TV chamar de novo)');
+  assert.equal((await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'X' }, master)).status, 422);
+  assert.equal((await api.post('/painel/senhas/chamar', { local_id: a, numero: 0 }, master)).status, 422);
+
+  // A TV do ponto recebe a senha; a do outro ponto recebe a dele.
+  const tela = (await api.post('/painel/telas', { local_id: a, nome: 'TV', layout: 'dividida', zona: 'senha' }, master)).dados;
+  assert.equal(tela.zona, 'senha');
+  const { codigo } = (await api.post('/player/registrar', { aparelho: 'teste' })).dados;
+  await api.post('/painel/telas/parear', { codigo, tela_id: tela.id }, master);
+  const tk = (await api.get(`/player/pareamento?codigo=${codigo}`)).dados.token;
+  const naTv = (await api.get('/player/senha', tk)).dados;
+  assert.equal(naTv.atual.codigo, 'N001');
+  assert.equal((await api.get('/player/programacao', tk)).dados.tela.zona, 'senha');
+
+  const zerado = (await api.post('/painel/senhas/zerar', { local_id: a }, master)).dados;
+  assert.equal(zerado.atual, null);
+  assert.equal((await api.get(`/painel/senhas?local_id=${b}`, master)).dados.atual.codigo, 'N001', 'zerar um ponto não mexe no outro');
+});
