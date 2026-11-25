@@ -24,27 +24,33 @@ ok()    { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 aviso() { printf '  \033[33m!\033[0m %s\n' "$*"; }
 erro()  { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; }
 
+VERSAO="2026-11-25"   # impresso no início: mostra de cara se o pacote no servidor é o atual
+printf '\033[2mcertificado.sh %s\033[0m\n\n' "$VERSAO"
+
 ATUAL=$(grep -E '^DOMINIO=' .env | cut -d= -f2-)
 DOMINIO=${1:-$ATUAL}
 [ -n "$DOMINIO" ] || { erro "informe o domínio: sudo bash $0 play.dominio.com.br"; exit 1; }
 
 azul "1. O endereço $DOMINIO chega neste servidor?"
 
-# A Let's Encrypt valida pela porta 80. Quem responde ali precisa ser o nosso proxy — é esse o
-# teste que falha quando o IP público do servidor atende em outra máquina (NAT do provedor).
+# A Let's Encrypt valida pela porta 80, e quem responde ali precisa ser o nosso proxy. Este teste
+# sai de dentro do servidor em direção ao próprio IP público — muita rede não devolve esse
+# caminho (NAT sem hairpin), então o silêncio não prova nada e só vira aviso. O que faz parar é
+# OUTRA máquina respondendo: aí a validação iria para o lugar errado e queimaria tentativa.
 CABECALHO=$(curl -sSi --max-time 15 "http://$DOMINIO/.well-known/acme-challenge/teste-playtechvip" 2>/dev/null || true)
 if [ -z "$CABECALHO" ]; then
-  erro "ninguém respondeu em http://$DOMINIO"
-  erro "A porta 80 não está chegando neste servidor, ou o DNS não aponta para ele."
-  exit 1
-fi
-if ! printf '%s' "$CABECALHO" | grep -qi '^server: *Caddy'; then
+  aviso "daqui de dentro ninguém respondeu em http://$DOMINIO"
+  aviso "Normal quando a rede não devolve o próprio IP público para dentro; de fora pode estar"
+  aviso "chegando. Sigo em frente — a emissão no passo 4 é o teste de verdade."
+elif printf '%s' "$CABECALHO" | grep -qi '^server: *Caddy'; then
+  ok "sim: quem atende na porta 80 é o proxy desta instalação"
+else
   erro "quem responde em http://$DOMINIO não é este servidor:"
   printf '%s\n' "$CABECALHO" | head -5 | sed 's/^/      /'
-  erro "O tráfego está indo para outra máquina. Fale com o provedor sobre o encaminhamento."
+  erro "O tráfego está indo para outra máquina; a validação da Let's Encrypt cairia lá."
+  erro "Fale com o provedor sobre o encaminhamento das portas 80 e 443 para esta máquina."
   exit 1
 fi
-ok "sim: quem atende na porta 80 é o proxy desta instalação"
 
 azul "2. Endereço da plataforma"
 if [ "$DOMINIO" != "$ATUAL" ]; then
