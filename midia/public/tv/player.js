@@ -243,6 +243,7 @@ async function enviarExibicoes() {
 // ---------------------------------------------------------------- Batida (a TV diz que está viva)
 async function bater(erro) {
   if (!estado.token) return;
+  if (!erro && estado.erroDoGiro) { erro = estado.erroDoGiro; estado.erroDoGiro = null; }
   const item = itemAtual();
   try {
     const r = await chamar('player/batida', {
@@ -741,10 +742,33 @@ const esconderEspera = () => { $('espera').hidden = true; };
 
 /** Faixa de baixo: aviso do ponto (prioridade), legenda fixa, clima e relógio. */
 /** TV pendurada em pé com a imagem deitada: o player gira tudo (configurado na TV, no painel). */
+/*
+ * Trava de segurança do giro. Em TV com navegador antigo, girar a tela pode derrubar o navegador — e, como
+ * o giro fica guardado no aparelho, ele cairia de novo a cada abertura (tela preta para sempre).
+ * Antes de girar, o player deixa um bilhete no aparelho; se continuar vivo 20 s depois, apaga o bilhete.
+ * Se ao abrir o bilhete ainda estiver lá, é porque o giro derrubou o navegador: a TV volta sem girar,
+ * avisa o painel e só tenta de novo depois de uma atualização do sistema.
+ */
+const CHAVE_GIRO_TENTANDO = 'midia.tv.giro.tentando';
+const CHAVE_GIRO_FALHOU = 'midia.tv.giro.falhou';
+(() => {
+  if (lido(CHAVE_GIRO_TENTANDO)) {
+    guardar(CHAVE_GIRO_FALHOU, { carimbo: CARIMBO });
+    apagar(CHAVE_GIRO_TENTANDO);
+    estado.erroDoGiro = 'O giro da imagem travou o navegador desta TV; ela voltou sem girar.';
+  }
+})();
+const giroBloqueado = () => { const f = lido(CHAVE_GIRO_FALHOU); return Boolean(f && f.carimbo === CARIMBO); };
+
 function aplicarGiro() {
   const giro = Number(estado.programacao?.tela?.giro ?? 0);
-  document.body.classList.toggle('girada', giro === 90 || giro === 270);
-  document.body.classList.toggle('esquerda', giro === 270);
+  const girar = (giro === 90 || giro === 270) && !giroBloqueado() && !estado.semGiroAinda;
+  if (girar && !document.body.classList.contains('girada')) {
+    guardar(CHAVE_GIRO_TENTANDO, Date.now());
+    setTimeout(() => apagar(CHAVE_GIRO_TENTANDO), 20_000);
+  }
+  document.body.classList.toggle('girada', girar);
+  document.body.classList.toggle('esquerda', girar && giro === 270);
 }
 // Largura da tela como quem olha vê (numa TV girada, é a altura do aparelho).
 const larguraVista = () => (document.body.classList.contains('girada') ? window.innerHeight : window.innerWidth);
@@ -1003,7 +1027,6 @@ function guardarPaginaNaTv() {
 async function iniciar() {
   guardarPaginaNaTv();
   marcarPlataforma(estado.programacao?.plataforma, estado.programacao?.slogan);
-  aplicarGiro();
   mostrarEspera('Preparando a tela…', 'Carregando a programação guardada.');
   relogio();
   atalhos();
@@ -1019,9 +1042,13 @@ async function iniciar() {
   setInterval(() => { if (!$('info').hidden) desenharInfo(); }, 5000);
   // Reaproveita a programação guardada para começar a exibir mesmo sem internet.
   if (estado.token && estado.programacao) {
+    // O giro guardado só entra depois que o servidor responde (ele pode ter sido desligado no painel);
+    // sem internet, entra o guardado.
+    estado.semGiroAinda = true;
+    const liberarGiro = () => { estado.semGiroAinda = false; desenharFaixa(); };
     desenharFaixa();
     rodarZonaComunicados();
-    baixarProgramacao().catch(() => marcarConexao(false));
+    baixarProgramacao().then(liberarGiro, () => { marcarConexao(false); liberarGiro(); });
   }
   // Não espera a internet para começar: sem rede, a TV abre direto no que está guardado.
   enviarExibicoes();
