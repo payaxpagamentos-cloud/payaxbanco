@@ -46,9 +46,30 @@ function cartaoAguardando(lista, opcoes, recarregar) {
   return el('div', { class: 'cartao', style: 'border-color:var(--destaque-borda);background:var(--destaque-bg)' },
     el('h2', {}, `Aparelho aguardando pareamento (${lista.length})`),
     el('p', { class: 'mudo', style: 'margin-top:-8px' }, 'Um player abriu e está mostrando um código na TV. Escolha o ponto para ligar os dois.'),
-    el('div', { class: 'fichas' }, lista.map((p) => el('button', {
-      class: 'btn', onclick: () => abrirPareamento(opcoes, recarregar, p.codigo),
-    }, icone('parear'), `${p.codigo} — ${p.aparelho ?? 'aparelho'} ${p.largura ? `(${p.largura}×${p.altura})` : ''}`))));
+    el('div', { class: 'coluna', style: 'gap:8px' }, lista.map((p) => el('div', { style: 'display:flex;gap:8px;align-items:stretch' },
+      el('button', {
+        class: 'btn', style: 'flex:1;min-width:0;justify-content:flex-start;text-align:left;white-space:normal', onclick: () => abrirPareamento(opcoes, recarregar, p.codigo),
+      }, el('span', {}, el('strong', {}, p.codigo), ` — ${nomeDoAparelho(p.aparelho)}${p.largura ? ` (${p.largura}×${p.altura})` : ''}`)),
+      el('button', {
+        class: 'btn', title: 'Tirar da lista', 'aria-label': `Tirar ${p.codigo} da lista`,
+        onclick: (e) => acao(e.currentTarget, async () => { await api.del(`/painel/telas/pareamentos/${p.id}`); recarregar(); }),
+      }, '✕')))));
+}
+
+/** O navegador se apresenta com um texto comprido e técnico; aqui vira o nome do aparelho. */
+function nomeDoAparelho(texto) {
+  const t = String(texto ?? '');
+  if (/Tizen|SMART-TV|SamsungBrowser.*TV/i.test(t)) return 'TV Samsung';
+  if (/Web0S|webOS|NetCast/i.test(t)) return 'TV LG';
+  if (/AFT|Fire TV|Silk/i.test(t)) return 'Fire TV';
+  if (/Android TV|GoogleTV|BRAVIA|; TV\b|TV Box|SmartTV/i.test(t)) return 'Android TV / TV box';
+  if (/iPhone/i.test(t)) return 'iPhone (celular)';
+  if (/iPad/i.test(t)) return 'iPad';
+  if (/Android/i.test(t)) return /Mobile/i.test(t) ? 'Celular Android' : 'Tablet ou TV box Android';
+  if (/Windows/i.test(t)) return 'Computador Windows';
+  if (/Macintosh/i.test(t)) return 'Computador Mac';
+  if (/Linux|CrOS/i.test(t)) return 'Computador ou mini PC';
+  return 'Aparelho';
 }
 
 function cartaoTela(t, recarregar) {

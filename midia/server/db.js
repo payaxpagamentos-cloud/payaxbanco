@@ -133,6 +133,8 @@ CREATE TABLE IF NOT EXISTS pareamentos (
   pareado_em TEXT,
   entregue_em TEXT,
   expira_em TEXT NOT NULL,
+  -- Última vez que o aparelho perguntou pelo código: quem fechou a página para de perguntar e sai da lista.
+  visto_em TEXT,
   criado_em TEXT NOT NULL
 );
 
@@ -760,6 +762,7 @@ function abrir(arquivo = config.dbFile) {
 /** Colunas que entraram depois da primeira versão (bancos antigos recebem cada uma por ALTER TABLE). */
 const COLUNAS_NOVAS = [
   ['emails', 'endereco_id', 'INTEGER'],
+  ['pareamentos', 'visto_em', 'TEXT'],
   ['enderecos_email', 'assinatura', 'TEXT'],
   ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],

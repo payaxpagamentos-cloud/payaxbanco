@@ -39,9 +39,9 @@ module.exports = (db) => {
     const cfg = lerConfig(db);
     const codigo = novoCodigo(db);
     const expira = new Date(Date.now() + CODIGO_MINUTOS * 60_000).toISOString();
-    db.prepare('INSERT INTO pareamentos (codigo, aparelho, largura, altura, versao, ip, expira_em, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO pareamentos (codigo, aparelho, largura, altura, versao, ip, expira_em, criado_em, visto_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
       codigo, limparTexto(req.body.aparelho, 160), Number(req.body.largura) || null, Number(req.body.altura) || null,
-      limparTexto(req.body.versao, 20), req.ip ?? null, expira, agora(),
+      limparTexto(req.body.versao, 20), req.ip ?? null, expira, agora(), agora(),
     );
     res.status(201).json({ codigo, expira_em: expira, consulta_s: 5, plataforma: cfg.nome_plataforma, slogan: cfg.slogan });
   });
@@ -50,7 +50,11 @@ module.exports = (db) => {
   r.get('/pareamento', limitar({ janelaMs: 60_000, maximo: 120, todos: true }), (req, res) => {
     const p = db.prepare('SELECT * FROM pareamentos WHERE codigo = ?').get(String(req.query.codigo ?? '').toUpperCase().trim());
     if (!p || p.expira_em < agora()) return res.json({ pareado: false, expirado: true });
-    if (!p.tela_id) return res.json({ pareado: false, expira_em: p.expira_em });
+    if (!p.tela_id) {
+      // O aparelho continua com a página aberta: segue na lista de "aguardando" do painel.
+      db.prepare('UPDATE pareamentos SET visto_em = ? WHERE id = ?').run(agora(), p.id);
+      return res.json({ pareado: false, expira_em: p.expira_em });
+    }
     const tela = db.prepare('SELECT * FROM telas WHERE id = ?').get(p.tela_id);
     if (!tela) return res.json({ pareado: false, expirado: true });
     // O acesso é entregue à TV que pediu o código. Depois de entregue, o código só repete a entrega

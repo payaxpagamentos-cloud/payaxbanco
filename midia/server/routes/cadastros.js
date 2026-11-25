@@ -217,7 +217,9 @@ module.exports = (db) => {
       itens,
       // Com mais de uma empresa, só o master vê os códigos esperando: os demais digitam o código que está na TV.
       aguardando: (!empresas.empresaDe(req) || db.prepare('SELECT COUNT(*) AS n FROM empresas').get().n <= 1)
-        ? db.prepare('SELECT id, codigo, aparelho, largura, altura, versao, criado_em, expira_em FROM pareamentos WHERE tela_id IS NULL AND expira_em > ? ORDER BY id DESC').all(agora())
+        // Só quem está com a página do código aberta agora (o aparelho pergunta a cada 5 s). Página fechada some em meio minuto.
+        ? db.prepare('SELECT id, codigo, aparelho, largura, altura, versao, criado_em, expira_em FROM pareamentos WHERE tela_id IS NULL AND expira_em > ? AND visto_em > ? ORDER BY id DESC')
+          .all(agora(), new Date(Date.now() - 30_000).toISOString())
         : [],
     });
   });
@@ -313,6 +315,12 @@ module.exports = (db) => {
    * Pareamento: a equipe digita o código que apareceu na TV. Pode ligar numa tela já cadastrada
    * ou criar a tela na hora (informando o ponto).
    */
+  // Descartar um aparelho que está esperando (abriu a página por engano, por exemplo).
+  r.delete('/telas/pareamentos/:id', (req, res) => {
+    db.prepare('DELETE FROM pareamentos WHERE id = ? AND tela_id IS NULL').run(Number(req.params.id));
+    res.status(204).end();
+  });
+
   r.post('/telas/parear', (req, res) => {
     const codigo = String(req.body.codigo ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     const p = db.prepare('SELECT * FROM pareamentos WHERE codigo = ?').get(codigo);
