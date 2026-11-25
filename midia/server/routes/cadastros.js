@@ -392,9 +392,12 @@ module.exports = (db) => {
     const id = Number(req.params.id);
     const t = db.prepare('SELECT * FROM telas WHERE id = ?').get(id);
     if (!t) throw naoEncontrado('Tela');
-    if (db.prepare('SELECT 1 FROM exibicoes WHERE tela_id = ? LIMIT 1').get(id)) {
-      throw new ErroNegocio('Esta tela já tem histórico de exibições. Marque como inativa em vez de excluir.', 409);
+    // Só o que é prova para cliente segura a exclusão: anúncio de campanha que já passou nesta TV.
+    // TV de teste, que só mostrou a tela da marca, pode ser excluída.
+    if (db.prepare('SELECT 1 FROM exibicoes WHERE tela_id = ? AND (campanha_id IS NOT NULL OR midia_id IS NOT NULL) LIMIT 1').get(id)) {
+      throw new ErroNegocio('Esta TV já exibiu anúncios de campanha, e esse histórico é a prova para o cliente. Marque como inativa em vez de excluir.', 409);
     }
+    db.prepare('DELETE FROM resumo_dia WHERE tela_id = ?').run(id);
     db.prepare('DELETE FROM telas WHERE id = ?').run(id);
     registrar(db, req, 'tela_excluida', { id, nome: t.nome });
     res.status(204).end();

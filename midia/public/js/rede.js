@@ -138,7 +138,7 @@ async function abrirTela(id, recarregar) {
     el('h3', {}, 'Últimos eventos'),
     tabela([[(e) => dataHora(e.criado_em), 'Quando'], [(e) => e.tipo, 'O que'], [(e) => e.detalhe ?? '—', 'Detalhe']],
       d.historico.eventos.slice(0, 12), { vazioTexto: 'Sem eventos registrados.' }),
-    el('div', { class: 'linha entre', style: 'margin-top:18px' },
+    el('div', { class: 'linha entre', style: 'margin-top:18px;flex-wrap:wrap;gap:8px' },
       el('button', {
         class: 'btn perigo', onclick: async (ev) => acao(ev.target, async () => {
           if (!await confirmar('Desparear aparelho', 'O aparelho perde o acesso e passa a mostrar um novo código na TV. A programação não é apagada.', 'Desparear')) return;
@@ -148,6 +148,15 @@ async function abrirTela(id, recarregar) {
           recarregar();
         }),
       }, 'Desparear aparelho'),
+      el('button', {
+        class: 'btn perigo', onclick: async (ev) => acao(ev.target, async () => {
+          if (!await confirmar('Excluir esta TV?', `"${d.nome}" sai do sistema de vez, com o histórico dela. O aparelho perde o acesso. Não dá para desfazer.`, 'Excluir TV')) return;
+          await api.del(`/painel/telas/${d.id}`);
+          toast('TV excluída.');
+          fechar();
+          recarregar();
+        }),
+      }, 'Excluir TV'),
       el('button', { class: 'btn', onclick: () => fechar() }, 'Fechar')),
   ], { largo: true });
 }
