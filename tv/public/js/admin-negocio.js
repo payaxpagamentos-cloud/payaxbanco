@@ -19,6 +19,23 @@ async function baixar(caminho, nome) {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+/** Senha sorteada de 12 caracteres, sem O/0 e I/l — para ninguém errar ao ditar por telefone. */
+function senhaSorteada() {
+  const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => letras[b % letras.length]).join('');
+}
+
+/** Mostra a senha uma vez, para a operação anotar e repassar. Depois dela só dá para trocar. */
+const mostrarSenha = (nome, senha) => modal('Senha de acesso', (fechar) => [
+  el('p', { class: 'mudo' }, `Passe esta senha para ${nome}. Ela aparece só agora: no banco fica cifrada.`),
+  el('div', { class: 'copiavel', style: 'font-size:16px', onclick: (e) => {
+    navigator.clipboard?.writeText(senha);
+    e.currentTarget.style.borderColor = '#22C58B';
+    toast('Senha copiada.');
+  } }, senha),
+  el('div', { class: 'linha fim' }, el('button', { class: 'btn primario', onclick: () => fechar(true) }, 'Anotei')),
+]);
+
 // ---------------------------------------------------------------- Assinantes
 
 async function telaAssinantes(c) {
@@ -49,7 +66,7 @@ async function telaAssinantes(c) {
           fechar('salvo');
         }),
         botao('Nova senha', 'vazio', async () => {
-          const nova = Math.random().toString(36).slice(2, 10);
+          const nova = senhaSorteada();
           await api.patch(`/admin/assinantes/${id}`, { senha: nova });
           await modal('Senha provisória', (f2) => [
             el('p', { class: 'mudo' }, `Passe esta senha para ${d.assinante.nome}. Ela só aparece agora.`),
@@ -105,7 +122,43 @@ async function telaAssinantes(c) {
   const busca = el('input', { type: 'search', placeholder: 'Nome ou e-mail' });
   busca.addEventListener('input', () => { filtros.q = busca.value.trim(); carregar(); });
 
-  limpar(c, cabeca('Assinantes'),
+  const novoAssinante = async () => {
+    const planos = (await api.get('/admin/planos')).planos;
+    return modal('Novo assinante', (fechar) => {
+      const f = el('form', { class: 'form' },
+        campo('Nome completo', { name: 'nome', required: true, maxlength: 120, autocomplete: 'off' }),
+        campo('E-mail', { name: 'email', type: 'email', required: true, autocomplete: 'off' },
+          'É com ele que a pessoa entra no app.'),
+        campo('Celular com DDD (opcional)', { name: 'telefone', type: 'tel', placeholder: '(11) 99999-0000' }),
+        escolha('Plano', 'plano_id', [['', 'Sem plano (entra, mas não assiste)'],
+          ...planos.map((p) => [p.id, `${p.nome} · ${dinheiro(p.preco_centavos)}`])], ''),
+        campo('Liberar acesso até (teste ou cortesia, sem fatura)', { name: 'acesso_ate', type: 'date' },
+          'Em branco: segue a cobrança normal do plano.'),
+        campo('Senha (opcional)', { name: 'senha', minlength: 8, autocomplete: 'new-password' },
+          'Em branco, a plataforma sorteia uma e mostra na tela.'));
+
+      const criar = botao('Criar assinante', 'primario', async () => {
+        if (!f.reportValidity()) return;
+        const d = lerForm(f);
+        const r = await api.post('/admin/assinantes', {
+          nome: d.nome,
+          email: d.email,
+          ...(d.telefone ? { telefone: d.telefone } : {}),
+          ...(d.plano_id ? { plano_id: Number(d.plano_id) } : {}),
+          ...(d.acesso_ate ? { acesso_ate: d.acesso_ate } : {}),
+          ...(d.senha ? { senha: d.senha } : {}),
+        });
+        fechar('salvo');
+        await mostrarSenha(r.assinante.nome, r.senha);
+        toast('Assinante cadastrado.');
+      });
+      return [f, el('div', { class: 'linha fim', style: 'margin-top:14px' },
+        el('button', { class: 'btn vazio', type: 'button', onclick: () => fechar(false) }, 'Cancelar'), criar)];
+    });
+  };
+
+  limpar(c, cabeca('Assinantes',
+    botao('Novo assinante', 'primario', async () => { if (await novoAssinante()) carregar(); }, 'mais')),
     el('div', { class: 'filtros' },
       escolha('Situação', 'status', [['', 'Todas'], ['ativa', 'Ativas'], ['pendente', 'Aguardando pagamento'], ['suspensa', 'Suspensas'], ['cancelada', 'Canceladas']], '',
         { onchange: (e) => { filtros.status = e.target.value; carregar(); } }),

@@ -4,6 +4,7 @@ const { Router } = require('express');
 const config = require('../config');
 const { agora, transacao, lerConfig, gravarConfig } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
+const crypto = require('node:crypto');
 const { hashSenha } = require('../lib/senha');
 const { registrar } = require('../lib/auditoria');
 const { permitir } = require('../auth');
@@ -115,6 +116,57 @@ module.exports = (db) => {
         FROM usuarios u LEFT JOIN assinaturas a ON a.usuario_id = u.id AND a.status <> 'cancelada' LEFT JOIN planos p ON p.id = a.plano_id
         WHERE ${filtros.join(' AND ')} ORDER BY u.criado_em DESC LIMIT 300`).all(...params)
         .map((x) => ({ ...x, ativo: Boolean(x.ativo), cancelar_no_fim: Boolean(x.cancelar_no_fim) })),
+    });
+  });
+
+  /**
+   * A operação cadastra o assinante (balcão, telefone, teste). A conta nasce igual à de quem se
+   * cadastra sozinho — assinante, com o primeiro perfil de visualização —, e dá para já colocar
+   * num plano na mesma chamada.
+   *
+   * A senha pode vir informada ou ser sorteada aqui. Ela volta UMA vez, em texto, para a
+   * operação repassar ao cliente: no banco só fica a versão cifrada.
+   */
+  r.post('/assinantes', soAdmin, (req, res) => {
+    const d = req.body ?? {};
+    const email = v.email(d.email);
+    const nome = v.texto(d.nome, 'o nome', 120);
+    const telefone = d.telefone ? v.telefone(d.telefone) : null;
+    // 12 caracteres sorteados, sem confundir O/0 e I/l na hora de ditar por telefone.
+    const senha = d.senha ? v.senha(d.senha) : Array.from(crypto.randomBytes(12))
+      .map((b) => 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'[b % 56]).join('');
+
+    const id = transacao(db, () => {
+      if (db.prepare('SELECT 1 FROM usuarios WHERE email = ?').get(email)) throw new ErroNegocio('Já existe uma conta com este e-mail.', 409);
+      const r2 = db.prepare("INSERT INTO usuarios (nome, email, telefone, senha_hash, perfil, criado_em) VALUES (?, ?, ?, ?, 'assinante', ?)")
+        .run(nome, email, telefone, hashSenha(senha), agora());
+      const uid = Number(r2.lastInsertRowid);
+      db.prepare('INSERT INTO perfis (usuario_id, nome, principal, criado_em) VALUES (?, ?, 1, ?)')
+        .run(uid, nome.split(/\s+/)[0].slice(0, 30), agora());
+      return uid;
+    });
+
+    const u = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
+    if (d.plano_id !== undefined && d.plano_id !== null && d.plano_id !== '') {
+      const planoId = v.inteiro(d.plano_id, 'o plano', { min: 1 });
+      const saida = assinaturas.contratar(db, u, planoId);
+      // Com data de acesso, é cortesia ou teste: libera até ali e não deixa fatura em aberto.
+      if (d.acesso_ate) {
+        const ate = v.data(d.acesso_ate, 'a data do acesso');
+        const a = assinaturas.assinaturaDe(db, u.id);
+        transacao(db, () => {
+          db.prepare("UPDATE assinaturas SET status = 'ativa', inicio = COALESCE(inicio, ?), acesso_ate = ?, proxima_cobranca = ?, atualizada_em = ? WHERE id = ?")
+            .run(hoje(), ate, v.booleano(d.cobrar_depois, true) ? ate : null, agora(), a.id);
+          if (saida.fatura) db.prepare("UPDATE faturas SET status = 'cancelada' WHERE id = ? AND status = 'aberta'").run(saida.fatura.id);
+        });
+      }
+    }
+
+    registrar(db, req, 'assinante_criado_pela_operacao', { usuario_id: id, email, plano_id: d.plano_id ?? null });
+    res.status(201).json({
+      assinante: { id, nome, email, telefone },
+      senha,   // só aqui: depois não há como recuperar, apenas trocar
+      assinatura: assinaturas.resumo(db, u),
     });
   });
 

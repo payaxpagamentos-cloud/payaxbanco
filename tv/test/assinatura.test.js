@@ -144,3 +144,54 @@ test('o assinante não confirma o próprio pagamento fora do modo de testes', as
   config.pagamentos = 'simulado';
   assert.equal(tentativa.status, 409);
 });
+
+test('a operação cadastra o assinante, e ele entra com a senha devolvida', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const { planos } = await s.get('/admin/planos', admin).then((r) => r.dados);
+  const plano = planos[0];
+
+  const r = await s.post('/admin/assinantes', {
+    nome: 'Maria do Balcão', email: 'maria@exemplo.com.br', telefone: '11988887777', plano_id: plano.id,
+  }, admin);
+  assert.equal(r.status, 201, JSON.stringify(r.dados));
+  assert.equal(r.dados.assinante.email, 'maria@exemplo.com.br');
+  assert.ok(r.dados.senha.length >= 12, 'a senha sorteada volta uma vez, para a operação repassar');
+  assert.equal(r.dados.assinatura.plano.id, plano.id, 'já nasce no plano escolhido');
+
+  // O que importa de verdade: a pessoa consegue entrar com essa senha.
+  const tk = await s.login('maria@exemplo.com.br', r.dados.senha);
+  const me = await s.get('/auth/me', tk);
+  assert.equal(me.dados.usuario.perfil, 'assinante');
+  assert.equal(me.dados.perfis.length, 1, 'já vem com o primeiro perfil de visualização');
+
+  // Dois cadastros com o mesmo e-mail não podem virar duas contas.
+  const repetido = await s.post('/admin/assinantes', { nome: 'Outra Maria', email: 'maria@exemplo.com.br' }, admin);
+  assert.equal(repetido.status, 409);
+
+  // Só a operação cadastra: o próprio assinante não pode usar essa rota.
+  const pelaPessoa = await s.post('/admin/assinantes', { nome: 'X', email: 'x@exemplo.com.br' }, tk);
+  assert.equal(pelaPessoa.status, 403);
+});
+
+test('cadastro pela operação com acesso até uma data não deixa fatura em aberto', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const { planos } = await s.get('/admin/planos', admin).then((r) => r.dados);
+  const ate = new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10);
+
+  const r = await s.post('/admin/assinantes', {
+    nome: 'João Cortesia', email: 'joao@exemplo.com.br', plano_id: planos[0].id, acesso_ate: ate, senha: 'testedoJoao1',
+  }, admin);
+  assert.equal(r.status, 201, JSON.stringify(r.dados));
+  assert.equal(r.dados.senha, 'testedoJoao1', 'a senha informada é respeitada');
+  assert.equal(r.dados.assinatura.status, 'ativa');
+  assert.equal(r.dados.assinatura.acesso_ate, ate);
+
+  const { faturas } = (await s.get('/admin/faturas?status=aberta', admin)).dados;
+  assert.equal(faturas.filter((f) => f.email === 'joao@exemplo.com.br').length, 0, 'cortesia não cobra');
+
+  await s.login('joao@exemplo.com.br', 'testedoJoao1');
+});
