@@ -54,6 +54,7 @@ function criarApp(db) {
     const carimbo = carimboPlayer();
     return fs.readFileSync(path.join(pastaPlayer, 'index.html'), 'utf8')
       .replace('href="tv.css"', `href="tv.css?v=${carimbo}"`)
+      .replace('src="diag.js"', `src="diag.js?v=${carimbo}"`)
       .replace('src="player.js"', `src="player.js?v=${carimbo}"`);
   };
   r.get(['/tv/', '/tv/index.html'], (_req, res) => res.type('html').set('Cache-Control', 'no-store').send(paginaTv()));

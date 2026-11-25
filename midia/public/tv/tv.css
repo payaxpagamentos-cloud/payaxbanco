@@ -243,6 +243,11 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
 body.girada{ position: fixed; top: 50%; left: 50%; width: 100vh; height: 100vw; transform: translate(-50%, -50%) rotate(90deg);
   --uh: 1vw; --uw: 1vh; --faixa-altura: calc(var(--uh) * 7.4); }
 body.girada.esquerda{ transform: translate(-50%, -50%) rotate(-90deg); }
+/* Navegador de TV antigo se perde com bloco "fixed" dentro de um corpo girado (a tela fica preta):
+   girada, tudo passa a ser posicionado dentro do próprio corpo, que já tem o tamanho da tela em pé. */
+body.girada .palco, body.girada .faixa, body.girada .espera, body.girada .botao-tela-cheia, body.girada .info, body.girada .aviso-conexao{ position: absolute; }
+body.girada{ -webkit-transform: translate(-50%, -50%) rotate(90deg); overflow: hidden; }
+body.girada.esquerda{ -webkit-transform: translate(-50%, -50%) rotate(-90deg); }
 body.girada.dividida .palco{ grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
 body.girada .zona-comunicado{ border-right: 0; border-bottom: 2px solid var(--lime); }
 body.girada .zona-comunicado .comunicado{ padding: calc(var(--uh) * 3.4) calc(var(--uw) * 6); gap: calc(var(--uh) * 1.2); }

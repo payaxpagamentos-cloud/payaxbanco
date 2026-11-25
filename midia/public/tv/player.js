@@ -816,6 +816,7 @@ function desenharInfo() {
     ['Fila para enviar', String(estado.fila.length)],
     ['Conexão', estado.online ? 'ok' : 'sem internet'],
     ['Player', VERSAO],
+    ['Navegador', window.vaimidiaNavegador || '—'],
   ];
   for (const [rotulo, valor] of linhas) {
     const l = document.createElement('div');
@@ -862,7 +863,7 @@ async function rodar() {
       try {
         await exibir(item);
       } catch (err) {
-        bater(String(err.message).slice(0, 200));
+        bater(`${String(err.message).slice(0, 150)} [${window.vaimidiaNavegador || ''}]`);
         await dormir(1500);
       }
       estado.indice = (estado.indice + 1) % itens().length;
