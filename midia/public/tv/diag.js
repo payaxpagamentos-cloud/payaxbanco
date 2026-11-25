@@ -7,9 +7,16 @@
  */
 (function () {
   var mostrados = 0;
+  var sumir = null;
   function mostrar(texto) {
     try {
       if (mostrados >= 4) return;
+      // Com o player rodando, o aviso fica só meio minuto: tempo de fotografar, sem ficar na tela do cliente.
+      clearTimeout(sumir);
+      sumir = setTimeout(function () {
+        var c = document.getElementById('diag-erro');
+        if (c && window.vaimidiaVivo && c.parentNode) { c.parentNode.removeChild(c); mostrados = 0; }
+      }, 30000);
       mostrados += 1;
       var caixa = document.getElementById('diag-erro');
       if (!caixa) {
@@ -25,6 +32,9 @@
   window.addEventListener('error', function (ev) {
     // Erro de imagem ou de vídeo não é erro do player: esses o próprio player trata.
     if (ev && ev.target && ev.target !== window && ev.target.tagName && ev.target.tagName !== 'SCRIPT') return;
+    // "Script error." sem arquivo é erro de fora da nossa página (o próprio navegador da TV, uma extensão):
+    // não diz nada e não é do player. Com o player rodando, não vai para a tela do cliente.
+    if (ev && !ev.filename && /^Script error\.?$/i.test(String(ev.message || '')) ) return;
     var onde = ev && ev.filename ? ' (' + String(ev.filename).split('/').pop().split('?')[0] + ':' + ev.lineno + ')' : '';
     mostrar((ev && ev.message ? ev.message : 'arquivo do player nao carregou') + onde);
   }, true);
