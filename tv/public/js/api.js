@@ -19,13 +19,25 @@ let memoria = null;
 
 const guardar = (chave, valor) => { try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem armazenamento */ } };
 const ler = (chave) => { try { return JSON.parse(localStorage.getItem(chave)); } catch { return null; } };
+// "Lembrar de mim" desmarcado grava na sessionStorage: o acesso acaba quando o navegador fecha,
+// que é o que a pessoa espera ao entrar num computador emprestado.
+const guardarNaAba = (chave, valor) => { try { sessionStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem armazenamento */ } };
+const lerDaAba = (chave) => { try { return JSON.parse(sessionStorage.getItem(chave)); } catch { return null; } };
 
 export const sessao = {
-  get: () => ler(CHAVE_SESSAO) ?? memoria,
-  set(dados) { memoria = dados; guardar(CHAVE_SESSAO, dados); },
+  get: () => ler(CHAVE_SESSAO) ?? lerDaAba(CHAVE_SESSAO) ?? memoria,
+  /** @param {{lembrar?: boolean}} opcoes lembrar=false mantém o acesso só enquanto a aba viver. */
+  set(dados, { lembrar = true } = {}) {
+    memoria = dados;
+    if (lembrar) { guardar(CHAVE_SESSAO, dados); } else {
+      guardarNaAba(CHAVE_SESSAO, dados);
+      try { localStorage.removeItem(CHAVE_SESSAO); } catch { /* ignora */ }
+    }
+  },
   limpar() {
     memoria = null;
     try { localStorage.removeItem(CHAVE_SESSAO); localStorage.removeItem(CHAVE_PERFIL); } catch { /* ignora */ }
+    try { sessionStorage.removeItem(CHAVE_SESSAO); } catch { /* ignora */ }
   },
 };
 

@@ -19,13 +19,19 @@ function criarApi(db) {
     res.json({ ok: true, ffmpeg: transcodificar.temFfmpeg(), conversoes_na_fila: fila });
   });
 
-  /** Dados públicos da tela de entrada: marca, planos à venda e forma de cobrança. */
+  /** Dados públicos da tela de entrada: marca, planos à venda, forma de cobrança e vitrine. */
   api.get('/publico', (_req, res) => res.json({
     marca: config.marca,
     pagamentos: config.pagamentos,
     aviso: lerConfig(db).aviso_home,
     planos: db.prepare(`SELECT id, nome, slug, descricao, preco_centavos, periodicidade, telas, perfis_max, qualidade, downloads, canais_ao_vivo, nivel
       FROM planos WHERE ativo = 1 ORDER BY ordem, preco_centavos`).all(),
+    // Capas que giram atrás do formulário de entrada. Só título publicado e só com capa
+    // pronta — quem ainda não entrou não vê nome de rascunho nem moldura vazia.
+    vitrine: db.prepare(`SELECT t.id, t.nome, t.ano, t.tipo, t.capa_midia_id AS capa, t.banner_midia_id AS banner
+      FROM titulos t JOIN midias m ON m.id = t.capa_midia_id
+      WHERE t.situacao = 'publicado' AND m.tipo = 'imagem' AND m.status = 'pronta'
+      ORDER BY t.publicado_em DESC, t.id DESC LIMIT 16`).all(),
   }));
 
   api.use('/auth', require('./routes/auth')(db, autenticado));

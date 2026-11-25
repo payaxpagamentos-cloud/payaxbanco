@@ -167,3 +167,24 @@ test('base de filmes: sem token configurado, o painel não oferece a busca', asy
   assert.equal(erro.status, 409);
   assert.equal(erro.dados.detalhes?.motivo, 'sem_tmdb');
 });
+
+test('a vitrine da tela de entrada só mostra título publicado, e é pública', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+
+  // Sem catálogo, a vitrine vem vazia: a tela de entrada some com a faixa e continua inteira.
+  assert.deepEqual((await s.get('/publico')).dados.vitrine, []);
+
+  const noAr = await filme(s, admin, { nome: 'Cartaz no Ar' });
+  const capa = await s.enviarImagem(admin);
+  const video = await s.enviarVideo(admin);
+  await s.post('/admin/titulos', { tipo: 'filme', nome: 'Ainda Rascunho', capa_midia_id: capa, video_midia_id: video }, admin);
+
+  // Sem sessão nenhuma: quem ainda não entrou precisa ver os cartazes.
+  const vitrine = (await s.get('/publico')).dados.vitrine;
+  assert.equal(vitrine.length, 1, 'rascunho não aparece para quem não entrou');
+  assert.equal(vitrine[0].nome, 'Cartaz no Ar');
+  assert.equal(vitrine[0].id, noAr.id);
+  assert.ok(vitrine[0].capa, 'o cartaz vem com o id da capa, para montar o endereço da arte');
+});
