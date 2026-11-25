@@ -154,13 +154,18 @@ test('criativo pendente, recusado ou vencido não vai ao ar', () => {
   assert.deepEqual(g.itens.map((i) => i.campanha), ['No prazo']);
 });
 
-test('tela em retrato prefere o criativo em retrato', () => {
+test('por padrão passam todas as artes; com "só no formato da TV", a tela em retrato prefere o criativo em retrato', () => {
   const c = cenario();
   const p = c.ponto('Loja', 'loja', 'Campinas');
   const retrato = c.tela(p, 'Totem', 'retrato');
   const paisagem = c.tela(p, 'TV balcão', 'paisagem');
   const a = c.anunciante('Moda');
   c.campanha(a, 'Dois formatos', [c.midia(a, 'deitado', 10, { orientacao: 'paisagem' }), c.midia(a, 'empe', 10, { orientacao: 'retrato' })]);
+  // Padrão: a TV passa todas as artes da campanha, qualquer que seja o formato.
+  assert.deepEqual(montar(c.db, c.daTela(retrato)).itens.map((i) => i.nome).sort(), ['deitado', 'empe']);
+  assert.deepEqual(montar(c.db, c.daTela(paisagem)).itens.map((i) => i.nome).sort(), ['deitado', 'empe']);
+  // Com a opção ligada na TV, só as do formato dela.
+  c.db.prepare('UPDATE telas SET so_formato = 1').run();
   assert.deepEqual(montar(c.db, c.daTela(retrato)).itens.map((i) => i.nome), ['empe']);
   assert.deepEqual(montar(c.db, c.daTela(paisagem)).itens.map((i) => i.nome), ['deitado']);
 });

@@ -92,9 +92,12 @@ function elegiveis(db, tela, { data, hhmm, diaSemana }) {
     if (c.limite_dia > 0 && (jaHoje.get(c.id) ?? 0) >= c.limite_dia) continue;
     let criativos = db.prepare(SQL_CRIATIVOS).all(c.id, data);
     if (!criativos.length) continue;
-    // Se a campanha tem criativo na orientação da TV, só esses vão ao ar nela.
-    const naOrientacao = criativos.filter((m) => !m.orientacao || m.orientacao === tela.orientacao);
-    if (naOrientacao.length) criativos = naOrientacao;
+    // Por padrão passam todos os criativos da campanha. Com "só artes no formato da TV" ligado na tela,
+    // e havendo criativo na orientação dela, só esses vão ao ar (serve para quem sobe a versão em pé e a deitada).
+    if (tela.so_formato) {
+      const naOrientacao = criativos.filter((m) => !m.orientacao || m.orientacao === tela.orientacao);
+      if (naOrientacao.length) criativos = naOrientacao;
+    }
     lista.push({ campanha: c, criativos });
   }
   return lista;
@@ -355,7 +358,7 @@ function montar(db, tela, instante = new Date()) {
     // A foto entra na versão: trocar a foto do comunicado faz a TV baixar de novo.
     comunicados.map((c) => [c.id, c.titulo, c.texto, c.tipo, c.duracao_s, c.imagem_arquivo ?? '']),
     agenda.map((a) => [a.titulo, a.evento_em, a.evento_hora]),
-    tela.layout, tela.som, tela.relogio, tela.giro ?? 0, tela.legenda ?? '',
+    tela.layout, tela.som, tela.relogio, tela.giro ?? 0, tela.so_formato ?? 0, tela.legenda ?? '',
     (tela.aviso_ate && tela.aviso_ate < new Date().toISOString()) ? '' : (tela.aviso ?? ''),
   ]);
 

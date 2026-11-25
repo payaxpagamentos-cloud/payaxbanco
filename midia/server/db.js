@@ -98,6 +98,8 @@ CREATE TABLE IF NOT EXISTS telas (
   relogio INTEGER NOT NULL DEFAULT 1,
   -- TV pendurada em pé cujo aparelho não gira a imagem: o player gira (0 = não, 90 = direita, 270 = esquerda).
   giro INTEGER NOT NULL DEFAULT 0,
+  -- 1 = nesta TV só passam as artes no formato dela (em pé ou deitada), quando a campanha tem; 0 = passam todas.
+  so_formato INTEGER NOT NULL DEFAULT 0,
   legenda TEXT,
   aviso TEXT,
   aviso_ate TEXT,
@@ -766,6 +768,7 @@ const COLUNAS_NOVAS = [
   ['emails', 'endereco_id', 'INTEGER'],
   ['pareamentos', 'visto_em', 'TEXT'],
   ['telas', 'giro', 'INTEGER NOT NULL DEFAULT 0'],
+  ['telas', 'so_formato', 'INTEGER NOT NULL DEFAULT 0'],
   ['enderecos_email', 'assinatura', 'TEXT'],
   ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],
