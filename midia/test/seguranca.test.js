@@ -386,3 +386,55 @@ test('Totem de senha: fila e entrega automática ao atendente há mais tempo dis
   assert.equal((await api.get(totem)).status, 404);
   assert.equal((await api.post(`/totem/${novo.totem_chave}/senha`, { cpf: '168.995.350-09', servico: 'Financeiro' })).status, 201);
 });
+
+/** Notícias: manchete e foto guardadas no servidor; entram entre os anúncios ou seguram a tela sem campanha. */
+test('Notícias na tela: busca, filtro de assunto e entrada na programação', async (t) => {
+  const { iniciar, limparArquivos } = require('./helpers');
+  const api = await iniciar();
+  t.after(() => { api.fechar(); limparArquivos(); });
+  const master = await api.login();
+  const noticias = require('../server/lib/noticias');
+  const gradeDaTela = require('../server/lib/grade').montarPorTela;
+  const item = (editoria, slug, titulo, minutos) => `<item><title>${titulo}</title>
+    <link>https://agenciabrasil.ebc.com.br/${editoria}/noticia/2026-11/${slug}</link>
+    <imagem-destaque>https://imagens.ebc.com.br/x/${slug}.jpg</imagem-destaque>
+    <description>&lt;p&gt;&lt;strong&gt;Resumo de ${slug} &amp;amp; mais.&lt;/strong&gt;&lt;/p&gt;&lt;p&gt;Resto do texto.&lt;/p&gt;</description>
+    <pubDate>${new Date(Date.now() - minutos * 60_000).toUTCString()}</pubDate></item>`;
+  const feed = `<rss><channel><title>Feed</title><link>https://agenciabrasil.ebc.com.br/feed/</link>
+    ${item('economia', 'dolar', 'Dólar fecha em queda', 10)}${item('politica', 'eleicao', 'Assunto de política', 5)}
+    ${item('esportes', 'jogo', 'Seleção vence amistoso', 30)}${item('justica', 'julgamento', 'Assunto de justiça', 3)}</channel></rss>`;
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 1)]);
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const buscarFoto = async (url) => {
+    const nome = `${require('node:crypto').createHash('sha256').update(url).digest('hex').slice(0, 24)}.jpg`;
+    fs.mkdirSync(path.join(process.env.MIDIA_ARQUIVOS, 'noticias'), { recursive: true });
+    fs.writeFileSync(path.join(process.env.MIDIA_ARQUIVOS, 'noticias', nome), jpeg);
+    return { arquivo: nome, mime: 'image/jpeg' };
+  };
+
+  // Política e justiça não entram; o resumo vem limpo.
+  const lidas = noticias.lerFeed(feed);
+  assert.deepEqual(lidas.map((n) => n.categoria), ['Economia', 'Esportes']);
+  assert.equal(lidas[0].resumo, 'Resumo de dolar & mais.');
+
+  // Desligado de fábrica: não busca nem mostra.
+  assert.equal((await noticias.atualizar(api.db, { buscarFeed: async () => feed, buscarFoto })).ligado, false);
+  assert.equal((await api.put('/painel/configuracoes', { noticias_ligado: 1, noticias_cada: 2 }, master)).status, 200);
+  assert.equal((await noticias.atualizar(api.db, { buscarFeed: async () => feed, buscarFoto })).novas, 2);
+  assert.equal((await noticias.atualizar(api.db, { buscarFeed: async () => feed, buscarFoto })).novas, 0, 'não repete a mesma notícia');
+
+  // Tela sem campanha: as notícias seguram a programação, com a fonte.
+  const local = (await api.post('/painel/locais', { nome: 'Loja N', categoria: 'outro', cidade: 'São Paulo', uf: 'SP', publico_dia: 10 }, master)).dados.id;
+  const tela = (await api.post('/painel/telas', { nome: 'TV N', local_id: local }, master)).dados.id;
+  const g = gradeDaTela(api.db, tela);
+  const naTela = g.itens.filter((i) => i.formato === 'noticia');
+  assert.deepEqual(naTela.map((n) => n.titulo), ['Dólar fecha em queda', 'Seleção vence amistoso'], 'a mais nova primeiro');
+  assert.equal(naTela[0].fonte, 'Agência Brasil');
+  assert.equal(naTela[0].duracao_s, 12);
+
+  // Notícia velha sai da tela sozinha.
+  api.db.prepare("UPDATE noticias SET publicada_em = ? WHERE titulo LIKE 'Seleção%'").run(new Date(Date.now() - 48 * 3_600_000).toISOString());
+  assert.equal(gradeDaTela(api.db, tela).itens.filter((i) => i.formato === 'noticia').length, 1);
+  assert.notEqual(gradeDaTela(api.db, tela).versao, g.versao, 'trocar de notícia muda a versão: a TV recebe a nova');
+});

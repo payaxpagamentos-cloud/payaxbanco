@@ -387,6 +387,20 @@ CREATE TABLE IF NOT EXISTS contrato_reajustes (
 );
 CREATE INDEX IF NOT EXISTS idx_reajustes_contrato ON contrato_reajustes (contrato_id, data);
 
+-- Notícias que passam na tela (manchete e foto guardadas no servidor). Ver lib/noticias.js.
+CREATE TABLE IF NOT EXISTS noticias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  link TEXT NOT NULL UNIQUE,
+  titulo TEXT NOT NULL,
+  resumo TEXT,
+  categoria TEXT,
+  fonte TEXT NOT NULL,
+  imagem_arquivo TEXT NOT NULL,
+  imagem_mime TEXT NOT NULL,
+  publicada_em TEXT NOT NULL,
+  buscada_em TEXT NOT NULL
+);
+
 -- Clima por cidade (uma consulta serve todas as telas da cidade). Ver lib/clima.js.
 CREATE TABLE IF NOT EXISTS clima (
   cidade TEXT NOT NULL,
@@ -742,6 +756,11 @@ const CONFIG_PADRAO = {
   prova_dias: '180',
   // Clima do dia na tela (Open-Meteo, sem chave). Depende de internet no servidor, por isso vem desligado.
   clima_ligado: '0',
+  // Notícias entre os anúncios (Agência Brasil). Também depende de internet no servidor.
+  // noticias_cada: uma notícia a cada N anúncios; noticias_duracao_s: tempo de cada uma na tela.
+  noticias_ligado: '0',
+  noticias_cada: '3',
+  noticias_duracao_s: '12',
   // De quanto em quanto tempo a TV manda uma foto do que está na tela (0 desliga).
   foto_minutos: '30',
   // Quantos dias antes do fim do contrato a equipe é avisada.

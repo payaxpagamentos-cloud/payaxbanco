@@ -594,7 +594,7 @@ module.exports = (db) => {
       duracao_imagem_s: [3, 120], insercoes_hora_padrao: [1, 120], bloco_minimo_s: [30, 3600], bloco_maximo_s: [60, 7200],
       batida_intervalo_s: [15, 900], offline_minutos: [2, 1440], mensalidade_tela_centavos: [0, 1_000_000_00], cpm_centavos: [0, 1_000_000],
       comissao_local_percentual: [0, 10_000], vencimento_dia: [1, 28], aviso_lojista: [0, 1], comunicado_automatico: [0, 1], marca_preenche: [0, 1], marca_duracao_s: [5, 60], avisos_email: [0, 1], prova_dias: [0, 3650],
-      foto_minutos: [0, 1440], contrato_aviso_dias: [0, 180], clima_ligado: [0, 1],
+      foto_minutos: [0, 1440], contrato_aviso_dias: [0, 180], clima_ligado: [0, 1], noticias_ligado: [0, 1], noticias_cada: [1, 20], noticias_duracao_s: [6, 30],
     };
     transacao(db, () => {
       for (const [k] of Object.entries(CONFIG_PADRAO)) {
@@ -612,6 +612,8 @@ module.exports = (db) => {
       if (lerConfig(db).bloco_minimo_s > lerConfig(db).bloco_maximo_s) throw new ErroNegocio('O tempo mínimo do loop não pode ser maior que o máximo.', 422);
     });
     registrar(db, req, 'configuracoes_alteradas', { campos: Object.keys(req.body) });
+    // Ligou as notícias: busca agora, sem esperar a próxima rodada (nos testes não há internet).
+    if (Number(req.body.noticias_ligado) === 1 && process.env.NODE_ENV !== 'test') require('../lib/noticias').atualizar(db).catch(() => {});
     res.json(cfg());
   });
 

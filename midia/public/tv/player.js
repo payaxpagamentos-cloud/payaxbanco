@@ -164,6 +164,7 @@ async function baixarProgramacao() {
   marcarConexao(true);
   await carregarLogo();
   await carregarFotosComunicados();
+  await carregarFotosNoticias().catch(() => {});
   rodarZonaComunicados();
   guardarArquivos(p.grade.itens).catch(() => {});
   return p;
@@ -219,7 +220,8 @@ function anotarExibicao(item, inicio, segundos) {
     midia_id: item.midia_id ?? null,
     comunicado_id: item.comunicado_id ?? null,
     // A tela da própria rede também é anotada: é tempo de tela não vendido, e entra na conta dos impactos.
-    tipo: item.formato === 'marca' ? 'marca' : undefined,
+    // (A notícia conta do mesmo jeito: é tempo de tela da rede, não de anunciante.)
+    tipo: item.formato === 'marca' || item.formato === 'noticia' ? 'marca' : undefined,
     campanha_id: item.campanha_id,
     // Hora do servidor, não a do aparelho: a prova de exibição sai certa mesmo com a TV desacertada.
     exibida_em: new Date(inicio + (estado.desvioRelogio ?? 0)).toISOString(),
@@ -429,6 +431,71 @@ async function carregarFotosComunicados() {
     const foto = await imagemDoPonto(`${API}player/comunicados/${id}/imagem`).catch(() => null);
     if (foto) estado.fotosComunicado[id] = foto;
   }));
+}
+
+/** Fotos das notícias: baixadas uma vez e guardadas no cache da TV (a notícia sai com foto mesmo sem internet). */
+async function carregarFotosNoticias() {
+  if (!estado.fotosNoticia) estado.fotosNoticia = {};
+  const ids = new Set((estado.programacao?.grade?.itens ?? []).filter((i) => i.formato === 'noticia').map((i) => i.noticia_id));
+  // As que saíram da programação liberam a memória.
+  for (const id of Object.keys(estado.fotosNoticia)) {
+    if (!ids.has(Number(id))) { URL.revokeObjectURL(estado.fotosNoticia[id]); delete estado.fotosNoticia[id]; }
+  }
+  await Promise.all([...ids].filter((id) => !estado.fotosNoticia[id]).map(async (id) => {
+    const foto = await imagemDoPonto(`${API}player/noticias/${id}/imagem`).catch(() => null);
+    if (foto) estado.fotosNoticia[id] = foto;
+  }));
+}
+
+/** "há 20 min", "há 3 h", "ontem" — há quanto tempo a notícia saiu. */
+function haQuanto(iso) {
+  const min = Math.max(0, Math.round((Date.now() + (estado.desvioRelogio ?? 0) - Date.parse(iso)) / 60000));
+  if (min < 60) return `há ${Math.max(1, min)} min`;
+  if (min < 24 * 60) return `há ${Math.round(min / 60)} h`;
+  return 'ontem';
+}
+
+/**
+ * Notícia: a foto cobre a tela, com a manchete por cima e a fonte sempre à vista (é a condição para
+ * reproduzir). Usa a mesma armação do comunicado, então já serve deitada, em pé e na tela dividida.
+ */
+function montarNoticia(item) {
+  const caixa = document.createElement('div');
+  caixa.className = 'comunicado com-visual noticia';
+  const visual = document.createElement('div');
+  visual.className = 'visual foto';
+  const foto = estado.fotosNoticia?.[item.noticia_id];
+  if (foto) {
+    const img = document.createElement('img');
+    img.src = foto;
+    img.alt = '';
+    visual.append(img);
+  }
+  caixa.append(visual);
+
+  const topo = document.createElement('div');
+  topo.className = 'cabeca';
+  const selo = document.createElement('span');
+  selo.className = 'selo-tipo';
+  selo.textContent = item.categoria ?? 'Notícia';
+  const onde = document.createElement('span');
+  onde.className = 'onde';
+  onde.textContent = 'Notícias';
+  topo.append(selo, onde);
+
+  const titulo = document.createElement('h1');
+  titulo.textContent = item.titulo ?? '';
+  caixa.append(topo, titulo);
+  if (item.texto) {
+    const p = document.createElement('p');
+    p.textContent = item.texto;
+    caixa.append(p);
+  }
+  const fonte = document.createElement('div');
+  fonte.className = 'quando';
+  fonte.textContent = `Fonte: ${item.fonte ?? ''} · ${haQuanto(item.publicada_em)}`;
+  caixa.append(fonte);
+  return caixa;
 }
 
 // Ilustração de cada tipo de recado, para quando o ponto não anexa foto: o espaço nunca fica só com texto.
@@ -711,8 +778,18 @@ function simboloSvg(classe) {
 /** Prepara o elemento do item na camada que está fora do ar e devolve uma função que o põe no ar. */
 async function prepararItem(item) {
   const alvoCamada = $(`camada-${estado.camadaAtual === 'a' ? 'b' : 'a'}`);
-  if (item.formato === 'comunicado' || item.formato === 'marca') {
-    const cartao = item.formato === 'marca' ? montarMarca() : montarComunicado(item);
+  if (item.formato === 'comunicado' || item.formato === 'marca' || item.formato === 'noticia') {
+    // Notícia que ficou sem foto (TV sem internet e sem cache) não vai ao ar: pula para o próximo item.
+    if (item.formato === 'noticia' && !estado.fotosNoticia?.[item.noticia_id]) throw new Error('notícia sem foto');
+    const cartao = item.formato === 'marca' ? montarMarca() : (item.formato === 'noticia' ? montarNoticia(item) : montarComunicado(item));
+    if (item.formato === 'noticia') {
+      // O tamanho de verdade do espaço (já contando giro e tela dividida) decide o desenho da notícia.
+      const largura = alvoCamada.offsetWidth || window.innerWidth;
+      const altura = alvoCamada.offsetHeight || window.innerHeight;
+      cartao.style.setProperty('--n', `${Math.min(largura, altura) / 100}px`);
+      if (altura > largura * 1.1) cartao.classList.add('em-pe');
+      if (altura > largura * 1.1 && altura < largura * 1.45) cartao.classList.add('curta');
+    }
     alvoCamada.replaceChildren(cartao);
     return cartao;
   }

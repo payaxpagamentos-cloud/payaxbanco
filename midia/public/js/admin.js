@@ -219,7 +219,7 @@ function novoUsuario(opcoes, recarregar, master = true) {
 
 // Configurações em abas: cada uma é um formulário que salva só os próprios campos.
 const ABAS_CONFIG = [['empresa', 'Empresa'], ['tvs', 'TVs'], ['sistema', 'Sistema']];
-const LIGA_DESLIGA = ['aviso_lojista', 'comunicado_automatico', 'marca_preenche', 'avisos_email', 'clima_ligado'];
+const LIGA_DESLIGA = ['aviso_lojista', 'comunicado_automatico', 'marca_preenche', 'avisos_email', 'clima_ligado', 'noticias_ligado'];
 
 /** Abas no alto da tela (submenu na própria página): trocar de aba muda o endereço, então dá para voltar nela. */
 export function abas(lista, atual, rota) {
@@ -326,6 +326,14 @@ export async function configuracoes(ctx) {
         'A temperatura aparece na faixa de baixo e, nas telas divididas, num quadro ao lado dos comunicados. '
         + 'Os dados vêm do Open-Meteo (gratuito, sem cadastro) e exigem que o servidor alcance a internet; '
         + 'a busca é uma por cidade, a cada 30 minutos. Se o serviço não responder, a tela simplesmente deixa de mostrar o clima.'),
+      marcar('Mostrar notícias entre os anúncios', { name: 'noticias_ligado', checked: Boolean(c.noticias_ligado) }),
+      el('div', { class: 'duas' },
+        campo('Uma notícia a cada quantos anúncios', { name: 'noticias_cada', type: 'number', min: 1, max: 20, value: c.noticias_cada }),
+        campo('Tempo de cada notícia (segundos)', { name: 'noticias_duracao_s', type: 'number', min: 6, max: 30, value: c.noticias_duracao_s })),
+      el('p', { class: 'pequeno mudo', style: 'margin:0' },
+        'Manchete com foto, desenhada pela própria TV (deitada ou em pé). As notícias vêm da Agência Brasil, a agência pública, '
+        + 'que permite reproduzir citando a fonte — por isso o nome dela aparece sempre. Política, justiça e polícia ficam de fora. '
+        + 'Em tela sem campanha, as notícias ocupam a programação. O servidor busca as novas a cada 20 minutos; sem internet, a tela só deixa de mostrar notícia.'),
       el('p', { class: 'pequeno mudo', style: 'margin:0' },
         'A agenda do ponto ("O que vem por aí") aparece sozinha quando um comunicado tem data de evento — vale para a assembleia do prédio, a aula da academia ou a promoção da loja.')),
 

@@ -333,3 +333,27 @@ body.girada .painel-senha .guiche{ font-size: calc(var(--uh) * 3); }
 body.girada .painel-senha .ultimas{ margin-top: calc(var(--uh) * 1.4); padding-top: calc(var(--uh) * 1.1); flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: calc(var(--uh) * .6) calc(var(--uw) * 2.6); width: 100%; }
 body.girada .painel-senha .ultimas .titulo{ font-size: calc(var(--uh) * 1.3); width: 100%; }
 body.girada .painel-senha .ultimas .item{ font-size: calc(var(--uh) * 1.9); }
+
+/*
+ * Notícia. As medidas usam --n (1% do lado menor do espaço, calculado pelo player), então o mesmo
+ * desenho serve deitado, em pé, girado e na tela dividida. Deitada: a foto cobre tudo e o texto vai por
+ * cima. Em pé: foto na metade de cima, texto embaixo. A fonte fica sempre à vista.
+ */
+.comunicado.com-visual.noticia{ padding: calc(var(--n) * 6) calc(var(--n) * 7); gap: calc(var(--n) * 2.2); justify-content: flex-end; }
+.comunicado.com-visual.noticia .selo-tipo{ background: var(--lime); color: var(--preto); font-size: calc(var(--n) * 2.3); padding: calc(var(--n) * .8) calc(var(--n) * 2.2); }
+.comunicado.com-visual.noticia .cabeca{ gap: calc(var(--n) * 2); }
+.comunicado.com-visual.noticia .onde{ font-size: calc(var(--n) * 2.3); letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: #C9CFD7; }
+.comunicado.com-visual.noticia h1{ font-size: calc(var(--n) * 7.2); line-height: 1.08; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.comunicado.com-visual.noticia p{ font-size: calc(var(--n) * 3.5); line-height: 1.35; color: #D5DAE0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.comunicado.com-visual.noticia .quando{ font-size: calc(var(--n) * 2.4); color: #C9CFD7; font-weight: 600; margin-top: 0; }
+.comunicado.com-visual.noticia::after{ background: linear-gradient(180deg, rgba(10,16,20,.12) 0%, rgba(10,16,20,.5) 38%, rgba(10,16,20,.94) 78%, rgba(10,16,20,.98) 100%); }
+.comunicado.com-visual.noticia.em-pe .visual{ bottom: auto; height: 52%; }
+.comunicado.com-visual.noticia.em-pe::after{ background: linear-gradient(180deg, rgba(20,30,36,0) 0%, rgba(20,30,36,0) 30%, #141E24 51%, #141E24 100%); }
+.comunicado.com-visual.noticia.em-pe{ padding: calc(var(--n) * 7) calc(var(--n) * 8); gap: calc(var(--n) * 2.8); }
+.comunicado.com-visual.noticia.em-pe h1{ font-size: calc(var(--n) * 7.6); -webkit-line-clamp: 5; }
+.comunicado.com-visual.noticia.em-pe p{ font-size: calc(var(--n) * 4); -webkit-line-clamp: 6; }
+.comunicado.com-visual.noticia.em-pe .selo-tipo, .comunicado.com-visual.noticia.em-pe .onde{ font-size: calc(var(--n) * 2.8); }
+.comunicado.com-visual.noticia.em-pe .quando{ font-size: calc(var(--n) * 3); }
+/* Espaço em pé mas baixo (anúncio embaixo da senha): fica a manchete; o resumo sai. */
+.comunicado.com-visual.noticia.curta p{ display: none; }
+.comunicado.com-visual.noticia.curta h1{ -webkit-line-clamp: 4; }

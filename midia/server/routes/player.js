@@ -197,6 +197,9 @@ module.exports = (db) => {
     require('../lib/comunicado-foto').enviar(res, c);
   });
 
+  // Foto da notícia (a mesma para todas as TVs).
+  r.get('/noticias/:id/imagem', autenticada, (req, res) => require('../lib/noticias').enviarImagem(db, res, req.params.id));
+
   r.get('/logo', autenticada, (req, res) => {
     const l = db.prepare('SELECT logo_arquivo, logo_mime FROM locais WHERE id = ?').get(req.tela.local_id);
     if (!l?.logo_arquivo) throw new ErroNegocio('Este ponto não tem logo.', 404);

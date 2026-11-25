@@ -264,6 +264,15 @@ function montar(db, tela, instante = new Date()) {
     }
   }
 
+  // Notícias: sem anúncio, elas seguram a tela (a marca aparece entre elas); com anúncio, entra uma a cada N.
+  const noticias = require('./noticias').paraTela(db);
+  if (noticias.length && !slots.length) {
+    const soMarca = preenchimento.every((p) => p.marca);
+    if (soMarca) preenchimento.length = 0;
+    for (const n of noticias) preenchimento.push({ noticia: n });
+    if (soMarca && cfg.marca_preenche) preenchimento.push({ marca: { duracao_s: cfg.marca_duracao_s } });
+  }
+
   // O institucional é intercalado: entra a cada N inserções vendidas (ou sozinho, quando não há publicidade).
   const itens = [];
   if (preenchimento.length && slots.length) {
@@ -278,6 +287,19 @@ function montar(db, tela, instante = new Date()) {
     itens.push(...slots);
   } else {
     itens.push(...preenchimento);
+  }
+  // Com anúncio no ar: uma notícia depois de cada N anúncios, revezando as mais novas. Quando o loop é
+  // curto (menos de N anúncios), entra uma no fim — a notícia nunca aparece mais do que o anúncio.
+  if (noticias.length && slots.length) {
+    const cada = Math.max(1, cfg.noticias_cada);
+    let vistos = 0;
+    let qual = 0;
+    for (let i = 0; i < itens.length; i++) {
+      if (!itens[i].criativo) continue;
+      vistos++;
+      if (vistos % cada === 0 && qual < noticias.length) itens.splice(++i, 0, { noticia: noticias[qual++] });
+    }
+    if (!qual) itens.push({ noticia: noticias[0] });
   }
 
   const lista = itens.map((it, i) => {
@@ -301,6 +323,28 @@ function montar(db, tela, instante = new Date()) {
         anunciante_id: null,
         anunciante: null,
         local: tela.local_nome ?? null,
+      };
+    }
+    // Notícia: manchete e foto guardadas no servidor; a TV desenha com a fonte sempre à vista.
+    if (it.noticia) {
+      const n = it.noticia;
+      return {
+        ordem,
+        formato: 'noticia',
+        noticia_id: n.id,
+        midia_id: null,
+        comunicado_id: null,
+        nome: n.titulo,
+        titulo: n.titulo,
+        texto: n.resumo,
+        categoria: n.categoria,
+        fonte: n.fonte,
+        publicada_em: n.publicada_em,
+        duracao_s: cfg.noticias_duracao_s,
+        campanha_id: null,
+        campanha: null,
+        anunciante_id: null,
+        anunciante: null,
       };
     }
     // Tela da própria rede: o player desenha com o nome e a frase da plataforma.
@@ -354,7 +398,7 @@ function montar(db, tela, instante = new Date()) {
   }).sort((a, b) => b.segundos - a.segundos);
 
   const assinatura = JSON.stringify([
-    lista.map((i) => [i.formato, i.midia_id, i.comunicado_id, i.duracao_s, i.campanha_id, i.texto ?? '']),
+    lista.map((i) => [i.formato, i.midia_id, i.comunicado_id, i.noticia_id ?? 0, i.duracao_s, i.campanha_id, i.texto ?? '']),
     // A foto entra na versão: trocar a foto do comunicado faz a TV baixar de novo.
     comunicados.map((c) => [c.id, c.titulo, c.texto, c.tipo, c.duracao_s, c.imagem_arquivo ?? '']),
     agenda.map((a) => [a.titulo, a.evento_em, a.evento_hora]),

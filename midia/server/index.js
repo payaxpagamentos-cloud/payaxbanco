@@ -107,6 +107,13 @@ const buscarClima = () => clima.atualizar(db)
 setInterval(buscarClima, 30 * 60_000).unref();
 setTimeout(buscarClima, 45_000).unref();
 
+// Notícias na tela (quando ligado nas configurações): busca as manchetes novas de 20 em 20 minutos.
+const buscarNoticias = () => require('./lib/noticias').atualizar(db)
+  .then((r) => { if (r.novas) console.log(`[Vai Mídia] Notícias novas na tela: ${r.novas}`); })
+  .catch((err) => console.error('[Vai Mídia] Falha ao buscar notícias:', err.message));
+setInterval(buscarNoticias, 20 * 60_000).unref();
+setTimeout(buscarNoticias, 20_000).unref();
+
 // Avisos por e-mail: tela fora do ar, fatura vencida, fila de aprovação parada e contratos para cuidar.
 const avisar = () => avisos.rodar(db)
   .then((r) => { if (r.enviados) console.log(`[Vai Mídia] Avisos enviados: ${r.enviados}`); })
