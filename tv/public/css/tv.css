@@ -754,7 +754,7 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
 
 /* Abaixo disto não cabe cartaz e formulário ao mesmo tempo (janela muito baixa, ou zoom bem
    alto). O formulário é a função da página; o carrossel é enfeite, então é ele que sai. */
-@media (min-width: 1100px) and (max-height: 640px){
+@media (min-width: 1100px) and (max-height: 520px){
   .login-tela .catalogue{ display: none; }
   .login-tela .main-layout{ align-items: center; }
 }
