@@ -673,7 +673,23 @@ async function prepararItem(item) {
     }),
     dormir(20_000).then(() => { throw new Error(`${item.tipo === 'video' ? 'vídeo' : 'imagem'} ${item.midia_id} demorou demais para abrir`); }),
   ]);
+  ajustarEncaixe(elemento, alvo);
   return elemento;
+}
+
+/**
+ * TV em pé: decide como a arte ocupa o espaço, sem cortar nada. Formato parecido com o da tela (até 15%
+ * de diferença): estica o pouquinho que falta. Formato bem diferente: fica inteira, com a sobra desfocada.
+ */
+function ajustarEncaixe(elemento, area) {
+  const emPe = document.body.classList.contains('girada') || window.innerHeight > window.innerWidth;
+  if (!emPe || document.body.classList.contains('dividida')) return;
+  const largura = elemento.videoWidth || elemento.naturalWidth;
+  const altura = elemento.videoHeight || elemento.naturalHeight;
+  if (!largura || !altura || !area.offsetWidth || !area.offsetHeight) return;
+  const daArte = largura / altura;
+  const doEspaco = area.offsetWidth / area.offsetHeight;
+  if (Math.abs(daArte - doEspaco) / doEspaco <= 0.15) elemento.classList.add('esticar');
 }
 
 /** Roda um item: imagem pelo tempo contratado, vídeo até o fim (com teto de segurança). */

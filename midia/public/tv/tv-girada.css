@@ -279,12 +279,6 @@ body.girada .zona-comunicado .visual.ilustracao svg{ width: 30%; opacity: .35; }
 body.girada /* O texto ocupa quase a metade toda: o véu escurece mais cedo para a foto não brigar com a leitura. */
   .zona-comunicado .comunicado.com-visual::after{ background: linear-gradient(180deg, rgba(10,16,20,.6) 0%, rgba(10,16,20,.72) 35%, rgba(10,16,20,.93) 70%, rgba(10,16,20,.97) 100%); }
 
-/*
- * TV em pé (girada pelo sistema ou em pé de fábrica): a imagem e o vídeo cobrem o espaço inteiro, sem
- * sobra em cima e embaixo. Com arte vertical (1080×1920) nada se perde; arte deitada tem as laterais cortadas.
- */
-body.girada .zona-anuncio .camada img:not(.fundo), body.girada .zona-anuncio .camada video{ object-fit: cover; }
-@media (max-aspect-ratio: 1/1){ .zona-anuncio .camada img:not(.fundo), .zona-anuncio .camada video{ object-fit: cover; } }
 
 /*
  * Rodapé na TV girada. Em pé, a tela é muito mais alta que larga: o rodapé no tamanho da TV deitada
@@ -292,3 +286,11 @@ body.girada .zona-anuncio .camada img:not(.fundo), body.girada .zona-anuncio .ca
  */
 body.girada{ --faixa-altura: 4.6vw; }
 body.girada .faixa{ --uh: .62vw; }
+
+/*
+ * TV em pé: nada da arte é cortado. Arte no formato da tela (vertical) é esticada só o pouquinho que
+ * falta para encher o espaço acima do rodapé — a diferença é de poucos por cento e não se nota.
+ * Arte de outro formato (deitada numa TV em pé) aparece inteira, com a sobra preenchida pela própria
+ * arte desfocada. Quem decide é o player, olhando o tamanho de cada arte (ver ajustarEncaixe).
+ */
+.camada img.esticar, .camada video.esticar{ object-fit: fill; }

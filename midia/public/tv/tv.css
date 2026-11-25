@@ -232,5 +232,10 @@ body.dividida .zona-anuncio .camada img:not(.fundo), body.dividida .zona-anuncio
   .zona-comunicado .comunicado.com-visual::after{ background: linear-gradient(180deg, rgba(10,16,20,.6) 0%, rgba(10,16,20,.72) 35%, rgba(10,16,20,.93) 70%, rgba(10,16,20,.97) 100%); }
 }
 
-/* TV em pé de fábrica: a imagem e o vídeo cobrem o espaço inteiro (a TV girada pelo sistema usa tv-girada.css). */
-@media (max-aspect-ratio: 1/1){ .zona-anuncio .camada img:not(.fundo), .zona-anuncio .camada video{ object-fit: cover; } }
+/*
+ * TV em pé: nada da arte é cortado. Arte no formato da tela (vertical) é esticada só o pouquinho que
+ * falta para encher o espaço acima do rodapé — a diferença é de poucos por cento e não se nota.
+ * Arte de outro formato (deitada numa TV em pé) aparece inteira, com a sobra preenchida pela própria
+ * arte desfocada. Quem decide é o player, olhando o tamanho de cada arte (ver ajustarEncaixe).
+ */
+.camada img.esticar, .camada video.esticar{ object-fit: fill; }
