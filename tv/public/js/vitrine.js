@@ -19,7 +19,7 @@ const FADE_MS = 650;         // precisa casar com a transição de .poster-page 
  * @returns {{elemento: HTMLElement, destruir: () => void}|null} null quando não há título algum
  */
 export function carrosselEntrada(titulos) {
-  const filmes = normalizar(titulos);
+  const filmes = normalizar(titulos).filter((f) => f.arquivo || f.capa);
   if (!filmes.length) return null;
 
   const camadas = [montarCamada(), montarCamada()];
@@ -179,7 +179,10 @@ function cartaz(filme) {
   reserva.setAttribute('aria-hidden', 'true');
   cartao.append(reserva);
 
-  const url = arte(filme.capa);
+  // Dois jeitos de ter a arte: id de mídia do catálogo, ou arquivo entregue com o app.
+  const url = filme.arquivo
+    ? new URL(`../img/cartazes/${filme.arquivo}`, import.meta.url).pathname
+    : arte(filme.capa);
   if (url) {
     const img = new Image();
     img.className = 'poster-image';

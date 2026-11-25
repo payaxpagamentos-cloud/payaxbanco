@@ -3,6 +3,7 @@ import { el, marca, lerForm, acao, toast, icone, dinheiro, QUALIDADES, limpar } 
 import { botaoExcluirConta } from './excluir-conta.js';
 import { carrosselEntrada } from './vitrine.js';
 import { iconeLinha } from './login-icones.js';
+import { CARTAZES_DEMO } from './cartazes-demo.js';
 
 const campo = (rotulo, attrs) => el('label', { class: 'campo' }, rotulo, el('input', attrs));
 
@@ -130,9 +131,10 @@ export function telaEntrada(raiz, { aoEntrar }) {
   const desenharCartao = () => {
     const entrando = modo === 'entrar';
     limpar(conteudo,
-      (() => { const i = iconeLinha('play'); i.classList.add('login-play'); return i; })(),
-      el('h2', { id: 'login-heading' }, entrando ? 'Bem-vindo' : 'Criar conta'),
-      el('p', { class: 'login-subtitle' }, entrando ? 'Entre para continuar assistindo.' : 'Leva menos de um minuto.'),
+      el('div', { class: 'login-topo' },
+        (() => { const i = iconeLinha('play'); i.classList.add('login-play'); return i; })(),
+        el('h2', { id: 'login-heading' }, entrando ? 'Bem-vindo' : 'Criar conta'),
+        el('p', { class: 'login-subtitle' }, entrando ? 'Entre para continuar assistindo.' : 'Leva menos de um minuto.')),
       entrando ? formEntrar() : formCadastro(),
       el('div', { class: 'signup-line' },
         el('span', {}, entrando ? 'Ainda não tem conta? ' : 'Já tem conta? ',
@@ -174,11 +176,10 @@ export function telaEntrada(raiz, { aoEntrar }) {
           el('span', { 'aria-hidden': 'true' }, '·'),
           el('a', { href: 'privacidade.html' }, 'Privacidade'))))));
 
-  // O catálogo é enfeite: se a chamada falhar, a tela fica exatamente como está.
-  api.get('/publico').then((r) => {
-    carrossel = carrosselEntrada(r.vitrine);
-    if (carrossel) cartazes.append(carrossel.elemento);
-  }).catch(() => {});
+  // Cartazes do pacote de desenho. Para girar o catálogo do cliente, troque CARTAZES_DEMO por
+  // uma busca em /api/publico (campo `vitrine`) — o carrossel aceita as duas listas igual.
+  carrossel = carrosselEntrada(CARTAZES_DEMO);
+  if (carrossel) cartazes.append(carrossel.elemento);
 }
 
 const RECADO_SENHA = 'A redefinição de senha por e-mail ainda não está ligada nesta instalação. '

@@ -617,7 +617,10 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
   background: radial-gradient(ellipse at 0 0, #ffffff1c, transparent 38%),
     radial-gradient(ellipse at 100% 100%, #f0001822, transparent 37%); pointer-events: none; }
 .login-tela .login-card-content{ padding: clamp(28px, 2.9vw, 50px) clamp(28px, 3vw, 52px) 30px; }
-.login-tela .login-play{ width: 43px; height: 43px; color: var(--gold); stroke-width: 1.85; margin-bottom: 10px; margin-left: -5px; }
+/* "Bem-vindo" centralizado: só o bloco de cima do cartão; os campos seguem alinhados à esquerda. */
+.login-tela .login-topo{ text-align: center; }
+.login-tela .login-play{ width: 43px; height: 43px; color: var(--gold); stroke-width: 1.85;
+  margin: 0 auto 10px; }
 .login-tela .login-card h2{ font-size: clamp(30px, 2.45vw, 42px); letter-spacing: -.035em; line-height: 1.15; margin: 0; font-weight: 750; }
 .login-tela .login-subtitle{ margin: 10px 0 27px; font-size: clamp(16px, 1.45vw, 23px); line-height: 1.45; color: var(--fosco); }
 .login-tela .login-nota{ margin: 18px 0 0; font-size: 14px; line-height: 1.5; color: var(--fosco); }
@@ -689,7 +692,7 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
   .login-tela .page-shell{ padding-top: 28px; padding-bottom: 20px; }
   .login-tela .main-layout{ padding-block: 24px; }
   .login-tela .login-card-content{ padding: 25px 32px 24px; }
-  .login-tela .login-play{ width: 34px; height: 34px; margin-bottom: 7px; }
+  .login-tela .login-play{ width: 34px; height: 34px; margin: 0 auto 7px; }
   .login-tela .login-subtitle{ margin: 8px 0 20px; }
   .login-tela .field + .field{ margin-top: 16px; }
   .login-tela .input-wrap{ min-height: 49px; }
