@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proposta — Vai Mídia</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#18232A">
+<link rel="icon" href="../img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../css/midia.css">
+<style>
+  /* A proposta aberta pelo link é só o papel: nada de painel em volta. */
+  body{ background: var(--bg); }
+  .pagina-proposta{ min-height: 100vh; padding: 20px 16px 60px; }
+  .acoes-folha{ display: flex; justify-content: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .aviso-validade{ width: min(820px, 100%); margin: 0 auto 14px; }
+  @media print{ .acoes-folha, .aviso-validade{ display: none !important; } .pagina-proposta{ padding: 0; } }
+</style>
+</head>
+<body>
+<div class="pagina-proposta" id="pagina">
+  <p class="mudo" style="text-align:center">Carregando a proposta…</p>
+</div>
+<script type="module" src="proposta-publica.js"></script>
+</body>
+</html>

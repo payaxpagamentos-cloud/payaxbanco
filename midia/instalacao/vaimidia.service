@@ -1,0 +1,50 @@
+[Unit]
+Description=Vai Mídia — painel, player das TVs, site e servidor de e-mail
+Documentation=file:/opt/vaimidia/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vaimidia
+Group=vaimidia
+WorkingDirectory=/opt/vaimidia
+EnvironmentFile=/etc/vaimidia/vaimidia.env
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server/index.js
+Restart=always
+RestartSec=3
+# O servidor de e-mail ouve na porta 25, que é "privilegiada". Em vez de rodar tudo como root,
+# damos só esta permissão ao serviço — o processo continua sendo do usuário vaimidia.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+# Cerca em volta do processo: se um dia alguém achar um furo na aplicação, o estrago para aqui.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# As únicas pastas que o serviço pode escrever: os dados e os arquivos das mídias.
+ReadWritePaths=/var/lib/vaimidia
+StateDirectory=vaimidia
+UMask=0077
+
+# Registro no journal: journalctl -u vaimidia -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vaimidia
+
+[Install]
+WantedBy=multi-user.target

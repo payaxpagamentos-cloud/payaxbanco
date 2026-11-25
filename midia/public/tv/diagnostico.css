@@ -1,0 +1,7 @@
+html, body { margin: 0; background: #18232A; color: #fff; font-family: sans-serif; }
+body { padding: 20px 24px; }
+h1 { font-size: 26px; margin: 0 0 6px; color: #C8FF31; }
+p { font-size: 17px; margin: 0 0 12px; }
+button { font-size: 20px; font-weight: bold; padding: 12px 18px; margin: 0 10px 8px 0; border: 3px solid transparent; border-radius: 10px; background: #C8FF31; color: #18232A; }
+button:focus { border-color: #fff; outline: none; }
+pre { font-size: 17px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; background: #0D151A; padding: 14px; border-radius: 10px; margin: 0; }

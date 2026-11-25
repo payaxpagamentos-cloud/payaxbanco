@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18232A">
+  <title>Player — Vai Mídia</title>
+  <link rel="icon" href="../img/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" href="tv.css">
+</head>
+<body>
+  <!--
+    Palco da tela. Em "tela cheia" só existe a zona de anúncio (duas camadas: enquanto uma está no ar,
+    a outra já carrega o próximo item). Em "tela dividida", o comunicado do ponto fica parado de um lado
+    e a publicidade gira do outro — o padrão das telas de elevador.
+  -->
+  <div class="palco" id="palco">
+    <div class="zona-comunicado" id="zona-comunicado" hidden></div>
+    <div class="zona-anuncio">
+      <div class="camada" id="camada-a"></div>
+      <div class="camada" id="camada-b"></div>
+    </div>
+  </div>
+
+  <div class="espera" id="espera" hidden>
+    <div class="marca-tv">
+      <svg class="simbolo" viewBox="0 0 138 111" aria-hidden="true"><path fill="currentColor" d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z"/></svg>
+      <span id="espera-plataforma">Vai Mídia</span>
+    </div>
+    <p class="slogan" id="espera-slogan"></p>
+    <h1 id="espera-titulo">Preparando a tela…</h1>
+    <p id="espera-texto" class="mudo"></p>
+    <div class="codigo" id="codigo" hidden></div>
+    <p id="espera-ajuda" class="ajuda" hidden>Informe este código no painel, em <strong>TVs › Parear aparelho</strong>.</p>
+  </div>
+
+  <!-- Rodapé da tela: a marca da rede, o recado da faixa e o relógio. -->
+  <div class="faixa" id="faixa" hidden>
+    <div class="marca-faixa">
+      <svg viewBox="0 0 138 111" aria-hidden="true"><path fill="currentColor" d="M57 0 H101 L138 51 L94 111 H57 L0 18 H39 L76 83 L94 51 Z"/></svg>
+      <span id="faixa-plataforma">Vai Mídia</span>
+    </div>
+    <div class="texto" id="faixa-texto"></div>
+    <div class="clima" id="clima" hidden></div>
+    <div class="relogio" id="relogio" hidden></div>
+  </div>
+
+
+  <!-- Botão de tela cheia: aparece enquanto a TV não estiver ocupando a tela toda. -->
+  <button type="button" class="botao-tela-cheia" id="aviso-tela-cheia" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    <span id="texto-tela-cheia">Clique aqui para maximizar</span>
+  </button>
+
+  <div class="info" id="info" hidden></div>
+  <noscript>Ative o JavaScript neste aparelho para exibir a programação.</noscript>
+  <script src="diag.js"></script>
+  <script src="player.js"></script>
+</body>
+</html>

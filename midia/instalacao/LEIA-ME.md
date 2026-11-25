@@ -1,0 +1,168 @@
+# Instalação no servidor — Ubuntu 24.04 LTS
+
+Esta pasta põe o Vai Mídia no ar numa máquina limpa: o site, o painel da equipe, os portais do
+anunciante e do síndico, o player das TVs e o servidor de e-mail da caixa do CRM. Tudo atrás do nginx,
+com HTTPS do Let's Encrypt, subindo sozinho quando a máquina reinicia.
+
+| Arquivo | O que é |
+|---|---|
+| `conferir.sh` | Diz, antes e depois, se a máquina tem o que é preciso (DNS, PTR, portas, serviços). |
+| `dns-registrobr.sh` | Imprime os registros prontos para colar no Registro.br, com o DKIM já dividido. |
+| `instalar.sh` | A instalação inteira, de uma vez. Pode rodar de novo sem medo. |
+| `atualizar.sh` | Troca o código por uma versão nova, guardando antes uma cópia do banco. |
+| `vaimidia.service` | O serviço do systemd (quem mantém o sistema no ar). |
+| `atualizar-pelo-painel.sh` | A atualização pedida pelo painel, com volta automática se a versão nova não subir. |
+| `vaimidia-atualizar.path` / `.service` | Vigiam o pedido do painel e chamam o script acima como root. |
+| `nginx-vaimidia.conf` | O nginx na frente, com o tamanho de envio certo para vídeo. |
+
+## O que a máquina precisa ter
+
+- **Ubuntu 24.04 LTS** (testado nela; em outra versão pode faltar pacote).
+- **1 vCPU e 2 GB de RAM** dão conta de uma rede pequena; o disco é o que importa, porque criativo é
+  vídeo — comece com **40 GB** e acompanhe pelo *Diagnóstico*.
+- **IP fixo** e acesso root (sudo).
+- O **domínio apontando para o IP** antes de pedir o certificado.
+
+## Antes de rodar: o DNS
+
+Crie estes registros no painel do seu domínio. Sem eles o HTTPS não sai e o e-mail não entra.
+
+| Tipo | Nome | Valor |
+|---|---|---|
+| A | `vaimidia.com.br` | o IP do servidor |
+| A | `www.vaimidia.com.br` | o IP do servidor |
+| A | `midia.vaimidia.com.br` | o IP do servidor (atalho para o painel) |
+| A | `tv.vaimidia.com.br` | o IP do servidor (atalho para o player das TVs) |
+| A | `mail.vaimidia.com.br` | o IP do servidor |
+| MX | `vaimidia.com.br` | `mail.vaimidia.com.br`, prioridade 10 |
+| TXT | `vaimidia.com.br` | `v=spf1 ip4:SEU.IP -all` |
+| TXT | `vaimidia._domainkey.vaimidia.com.br` | a chave DKIM que a instalação imprime no fim |
+| TXT | `_dmarc.vaimidia.com.br` | `v=DMARC1; p=none; rua=mailto:postmaster@vaimidia.com.br` |
+
+O MX não recebe endereço de IP: ele aponta para um **nome**, e esse nome precisa ter o registro A acima.
+Por isso o `mail.` existe — e é ele que vai também no DNS reverso. Se um dia o e-mail mudar de máquina,
+troca-se um registro só, sem mexer no site.
+
+Duas coisas que **só o provedor da máquina resolve**: o **DNS reverso (PTR)** do IP apontando para
+`mail.vaimidia.com.br`, e a **porta 25 liberada na entrada** — quase toda nuvem bloqueia a 25 por padrão e abre a pedido.
+
+## Antes de instalar: conferir a máquina
+
+```bash
+cd midia/instalacao
+./conferir.sh --dominio vaimidia.com.br
+```
+
+Não altera nada. Em um minuto ele responde se o domínio aponta para esta máquina, se o IP tem **nome
+reverso (PTR)**, se os registros de e-mail existem, quais portas estão ouvindo e se o provedor deixa a
+máquina conversar com outros servidores de e-mail. Vale rodar de novo depois de instalar.
+
+**O PTR merece atenção especial.** Ele não se configura no DNS do domínio: quem acerta é o dono do IP,
+ou seja, o provedor da máquina. IP de conexão residencial normalmente **não tem PTR, muda sozinho e
+está em lista de bloqueio** — nessa situação, o site até funciona enquanto o IP não trocar, mas e-mail
+não vai a lugar nenhum, e o MX apontado para lá quebra no primeiro reinício do modem. Para o sistema em
+produção, use um servidor com **IP fixo de datacenter** (VPS).
+
+## Instalar
+
+```bash
+# na máquina, com o código já copiado (git clone ou scp)
+cd midia/instalacao
+sudo ./instalar.sh --dominio vaimidia.com.br --email voce@vaimidia.com.br
+```
+
+No fim ele mostra **a senha do master** (só desta vez — anote) e a lista do que falta no DNS, já com a
+chave DKIM pronta para copiar.
+
+Opções úteis:
+
+```bash
+sudo ./instalar.sh --dominio vaimidia.com.br --simular     # mostra tudo o que faria, sem mexer em nada
+sudo ./instalar.sh --dominio vaimidia.com.br --sem-tls     # sem certificado agora (fica em HTTP)
+sudo ./instalar.sh --dominio vaimidia.com.br --sem-email   # sem o servidor de e-mail
+```
+
+Rodar de novo é seguro: a configuração, as senhas e a chave DKIM que já existem não são tocadas.
+
+## O DNS no Registro.br
+
+Depois de instalar, rode no servidor:
+
+```bash
+sudo /opt/vaimidia/instalacao/dns-registrobr.sh --dominio vaimidia.com.br
+```
+
+Ele imprime cada registro no formato da tela do Registro.br, com o IP desta máquina e **a chave DKIM
+já dividida em pedaços de 255 letras** — um registro TXT não aceita mais do que isso de uma vez, e é
+o erro que mais trava gente ali. Também lembra dos três detalhes que fazem o Registro.br recusar a
+linha: o ponto final no MX, as aspas do DKIM e o campo *nome* ser relativo ao domínio.
+
+## Depois
+
+```
+Site .............. https://vaimidia.com.br
+Painel ............ https://vaimidia.com.br/p      (ou https://midia.vaimidia.com.br)
+Player das TVs .... https://tv.vaimidia.com.br   (ou https://vaimidia.com.br/tv)
+```
+
+```bash
+sudo systemctl status vaimidia      # está no ar?
+sudo journalctl -u vaimidia -f      # o que está acontecendo agora
+sudo nano /etc/vaimidia/vaimidia.env && sudo systemctl restart vaimidia
+```
+
+**Para o sistema responder e-mail**, preencha `MIDIA_SMTP_*` em `/etc/vaimidia/vaimidia.env` com um
+provedor (Google Workspace, Zoho, Amazon SES) e reinicie. Receber pelo servidor próprio é tranquilo;
+**mandar** e chegar na caixa de entrada depende de reputação de IP, que leva meses — por isso a
+recomendação é receber aqui e enviar por um provedor.
+
+## Onde ficam as coisas
+
+| | |
+|---|---|
+| Sistema | `/opt/vaimidia` |
+| Configuração e chave DKIM | `/etc/vaimidia/` |
+| Banco, criativos, e-mails e backups | `/var/lib/vaimidia/` |
+| Serviço | `/etc/systemd/system/vaimidia.service` |
+| nginx | `/etc/nginx/sites-available/vaimidia` |
+
+O backup do banco roda sozinho a cada 24 h, guardando as 30 cópias mais recentes em
+`/var/lib/vaimidia/backups`. **Isso não é backup de verdade enquanto estiver no mesmo disco**: aponte
+`MIDIA_ESPELHO` para outro volume, ou leve a pasta para fora da máquina.
+
+## Atualizar
+
+```bash
+cd midia/instalacao
+sudo ./atualizar.sh
+```
+
+Copia o código novo, reinstala as dependências e reinicia — sem tocar na configuração, no banco nem nos
+criativos. Antes de trocar qualquer coisa, guarda uma cópia do banco em
+`/var/lib/vaimidia/backups/antes-da-atualizacao-*.db`.
+
+## Atualizar pelo painel (pelo celular)
+
+Depois da primeira atualização pelos comandos acima, o painel ganha **Configurações › Sistema › Atualizar sistema**
+(só para o master): escolha o `vaimidia.zip`, digite a sua senha de novo e confirme.
+
+Por segurança, o sistema não se troca sozinho — ele roda como um usuário sem poder na máquina. O painel só
+deixa o pacote em `/var/lib/vaimidia/atualizacao`, e o serviço `vaimidia-atualizar` (root) faz o resto:
+confere se o zip é mesmo o sistema, guarda uma cópia da versão no ar em `/opt/vaimidia.anterior`, instala a
+nova e, **se ela não subir, volta para a anterior sozinho**. O painel mostra cada etapa e o registro.
+
+```bash
+sudo systemctl status vaimidia-atualizar.path   # o vigia está ligado?
+sudo journalctl -u vaimidia-atualizar -n 50     # o que aconteceu na última atualização
+```
+
+## Quando alguma coisa não sobe
+
+| Sintoma | Onde olhar |
+|---|---|
+| O site não abre | `sudo systemctl status vaimidia` e `sudo journalctl -u vaimidia -n 80` |
+| Erro 502 no navegador | o serviço caiu; o journal diz por quê |
+| O certificado não saiu | o DNS ainda não propagou. Repita: `sudo certbot --nginx -d vaimidia.com.br` |
+| Não chega e-mail | de fora da máquina: `nc -vz vaimidia.com.br 25`. Se não entra, é a porta 25 no provedor |
+| E-mail enviado cai no spam | falta SPF/DKIM/PTR, ou o IP é novo — use um provedor no `MIDIA_SMTP_*` |
+| Envio de criativo falha | vídeo acima de 200 MB (`MIDIA_MAX_MB`) ou disco cheio: veja o *Diagnóstico* |

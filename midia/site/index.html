@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#F5F7FA">
+  <meta name="description" content="VAI MÍDIA. Mídia digital em shopping, elevadores, TVs indoor, recepções e painéis de rua. Conheça os formatos e planeje sua campanha.">
+  <!--
+    O endereço oficial fica aqui, escrito no HTML: quem gera a prévia do link (WhatsApp, Instagram,
+    Google) não roda JavaScript. O canonical também evita que o mesmo site, servido em /midia/site/,
+    conte como página repetida.
+  -->
+  <link rel="canonical" href="https://vaimidia.com.br/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="VAI MÍDIA">
+  <meta property="og:locale" content="pt_BR">
+  <meta property="og:url" content="https://vaimidia.com.br/">
+  <meta property="og:title" content="VAI MÍDIA | Sua marca em movimento">
+  <meta property="og:description" content="Mídia digital nos lugares que fazem parte da vida. Conheça os formatos e planeje sua campanha.">
+  <meta property="og:image" content="https://vaimidia.com.br/assets/og-capa.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Tela VAI MÍDIA com um anúncio de perfume, instalada no corredor de um shopping.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://vaimidia.com.br/assets/og-capa.jpg">
+  <title>VAI MÍDIA | Sua marca em movimento</title>
+  <link rel="icon" type="image/svg+xml" href="assets/marca.svg">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preload" href="assets/fonts/opensans-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/opensans-800.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/config.js" defer></script>
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+  <header class="site-header">
+    <a class="brand" href="#inicio" aria-label="VAI MÍDIA, início">
+      <img src="assets/marca.svg" alt="" width="46" height="38">
+      <span>VAI MÍDIA</span>
+    </a>
+    <nav class="desktop-nav" aria-label="Navegação principal">
+      <a href="#solucoes">Soluções</a>
+      <a href="#anunciantes">Para anunciantes</a>
+      <a href="#parceiros">Para parceiros</a>
+    </nav>
+    <button class="header-cta" type="button" data-open-brief>Quero anunciar</button>
+    <button class="menu-toggle" type="button" aria-label="Abrir menu" aria-controls="mobile-menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <nav class="mobile-nav" id="mobile-menu" aria-label="Navegação para celular" hidden>
+      <a href="#solucoes">Soluções</a>
+      <a href="#anunciantes">Para anunciantes</a>
+      <a href="#parceiros">Para parceiros</a>
+      <a href="#portfolio">Portfólio</a>
+      <button type="button" data-open-brief>Quero anunciar</button>
+    </nav>
+  </header>
+
+  <main id="conteudo">
+    <section class="hero" id="inicio" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <h1 id="hero-title">Sua marca no<br><span>centro da atenção.</span></h1>
+        <p>Mídia digital nos lugares que fazem parte da vida.</p>
+        <div class="hero-actions">
+          <button class="hero-cta" type="button" data-open-brief><img src="assets/marca.svg" alt="" width="25" height="21">Quero anunciar</button>
+          <a class="formats-link" href="#solucoes">Conheça os formatos</a>
+        </div>
+      </div>
+      <div class="hero-art photo-window" data-crop="582,94,905,518">
+        <img src="assets/layout-aprovado.webp" width="1487" height="1058" alt="Aplicações ilustrativas: painel com campanha de perfume no shopping e TV com campanha de café." fetchpriority="high">
+      </div>
+    </section>
+
+    <!--
+      A rede em números, direto do sistema: só aparece quando já existe tela no ar.
+      Dado atualizado sozinho convence mais que número escrito à mão — e nunca fica velho.
+    -->
+    <section class="rede-numeros section-shell" id="rede-numeros" aria-labelledby="rede-title" hidden>
+      <h2 id="rede-title" class="sr-only">A rede hoje</h2>
+      <dl>
+        <div><dt>Telas no ar</dt><dd data-numero="telas">—</dd></div>
+        <div><dt>Pontos na rede</dt><dd data-numero="pontos">—</dd></div>
+        <div><dt>Cidades</dt><dd data-numero="cidades">—</dd></div>
+        <div><dt>Pessoas por mês</dt><dd data-numero="publico_mes">—</dd></div>
+      </dl>
+      <p class="rede-nota">Números da rede hoje, atualizados pelo próprio sistema.</p>
+    </section>
+
+    <section class="solutions section-shell" id="solucoes" aria-labelledby="solutions-title">
+      <div class="solutions-heading">
+        <h2 id="solutions-title">Onde a vida acontece.</h2>
+        <div class="format-tabs" role="tablist" aria-label="Formatos de mídia">
+          <button id="tab-shopping" type="button" role="tab" aria-selected="true" aria-controls="format-panel" tabindex="0" data-format="shopping">Shopping</button>
+          <button id="tab-elevadores" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="elevadores">Elevadores</button>
+          <button id="tab-tv" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="tv">TVs indoor</button>
+          <button id="tab-recepcoes" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="recepcoes">Recepções</button>
+          <button id="tab-outdoor" type="button" role="tab" aria-selected="false" aria-controls="format-panel" tabindex="-1" data-format="outdoor">Outdoor</button>
+        </div>
+      </div>
+      <!--
+        As duas fotos de cima mudam com a aba (cada formato tem o par dele, em js/app.js).
+        A de baixo é fixa de propósito: ela abre o bloco do formato e não compete com o par.
+      -->
+      <div class="gallery-pair" aria-label="Exemplos de campanhas">
+        <figure>
+          <div class="gallery-image foto-formato" id="foto-a"><img src="assets/fotos/shopping-corredor.webp" width="1400" height="876" alt="Totem da rede no corredor de um shopping, aplicação ilustrativa." loading="lazy"></div>
+          <figcaption id="legenda-a">A tela no caminho de quem passa.</figcaption>
+        </figure>
+        <figure id="figura-b">
+          <div class="gallery-image foto-formato" id="foto-b"><img src="assets/fotos/restaurante.webp" width="1400" height="933" alt="Totem da rede na entrada de um restaurante, aplicação ilustrativa." loading="lazy"></div>
+          <figcaption id="legenda-b">Campanhas que fazem parte do ambiente.</figcaption>
+        </figure>
+      </div>
+      <p class="image-note">Aplicações ilustrativas.</p>
+      <div class="format-panel" id="format-panel" role="tabpanel" aria-labelledby="tab-shopping" tabindex="0">
+        <div class="selected-image foto-formato" id="format-image"><img src="assets/fotos/farmacia.webp" width="1400" height="933" alt="TV da rede com anúncio de dermocosméticos em uma farmácia, aplicação ilustrativa." loading="lazy"></div>
+        <div class="format-copy" aria-live="polite" aria-atomic="true">
+          <span class="format-name" id="format-name">Shopping</span>
+          <h3 id="format-title">Sua marca no caminho das pessoas.</h3>
+          <p id="format-description">Campanhas digitais que entram na rotina de quem passeia, encontra e consome.</p>
+          <dl>
+            <div><dt>Ambientes</dt><dd id="format-locations">Corredores, entradas e áreas de circulação.</dd></div>
+            <div><dt>Possibilidades</dt><dd id="format-content">Lançamentos, ofertas e campanhas institucionais.</dd></div>
+          </dl>
+          <button class="select-format" type="button" id="choose-format">Planejar neste formato</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="advertisers section-shell" id="anunciantes" aria-labelledby="advertisers-title">
+      <div class="section-intro">
+        <span class="eyebrow">PARA ANUNCIANTES</span>
+        <h2 id="advertisers-title">Uma campanha.<br>O contexto certo.</h2>
+        <p>O ponto, a mensagem e o período trabalham juntos para aproximar sua marca das pessoas.</p>
+      </div>
+      <ol class="campaign-steps">
+        <li><span class="step-line"></span><div><h3>Defina o objetivo</h3><p>Apresentar um produto, divulgar uma oferta ou fortalecer a presença da marca.</p></div></li>
+        <li><span class="step-line"></span><div><h3>Escolha os ambientes</h3><p>Combine os formatos com o público e a região que fazem sentido para a campanha.</p></div></li>
+        <li><span class="step-line"></span><div><h3>Prepare a mensagem</h3><p>Peças pensadas para o tamanho da tela, o tempo de leitura e o contexto de cada local.</p></div></li>
+      </ol>
+    </section>
+
+    <section class="portfolio section-shell" id="portfolio" aria-labelledby="portfolio-title">
+      <div>
+        <h2 id="portfolio-title">Conheça as possibilidades.</h2>
+        <p>Veja os formatos e as aplicações no portfólio da VAI MÍDIA.</p>
+      </div>
+      <a class="portfolio-download" href="assets/VAI_MIDIA_Portfolio_Comercial.pdf" download="VAI_MIDIA_Portfolio_Comercial.pdf"><span>Baixar portfólio</span><span class="file-label">PDF · 8 páginas</span></a>
+    </section>
+
+    <section class="partners section-shell" id="parceiros" aria-labelledby="partners-title">
+      <div class="partner-art foto-formato"><img src="assets/fotos/lobby.webp" width="1400" height="933" alt="Totem da rede no lobby de um edifício corporativo, aplicação ilustrativa." loading="lazy"></div>
+      <div class="partner-copy">
+        <span class="eyebrow">PARA PARCEIROS</span>
+        <h2 id="partners-title">Seu espaço pode<br>ir além.</h2>
+        <p>Uma proposta para integrar telas à comunicação do seu ambiente e criar oportunidades para marcas.</p>
+        <p class="muted">O formato e as condições são definidos após a avaliação de cada local.</p>
+        <button class="partner-cta" type="button" data-open-brief data-intent="parceiro">Quero receber telas</button>
+      </div>
+    </section>
+
+    <section class="faq section-shell" aria-labelledby="faq-title">
+      <h2 id="faq-title">Vamos tirar suas dúvidas?</h2>
+      <div class="faq-list">
+        <details><summary>Quais formatos posso combinar?</summary><p>Shopping, elevadores, TVs indoor, recepções e painéis de rua podem compor o planejamento. A seleção dos pontos depende da disponibilidade e dos objetivos da campanha.</p></details>
+        <details><summary>Preciso ter a arte pronta?</summary><p>Você pode partir de uma peça existente ou incluir a criação e a adaptação das peças no escopo da proposta comercial.</p></details>
+        <details><summary>Como é definido o investimento?</summary><p>O valor depende dos pontos, dos formatos, do período e do escopo criativo. O briefing ajuda a reunir essas informações para a proposta.</p></details>
+        <details><summary>Posso indicar meu espaço para receber telas?</summary><p>Sim. Use a opção “Quero receber telas” para preparar uma apresentação do local. A instalação e as condições dependem de avaliação.</p></details>
+      </div>
+    </section>
+
+    <section class="closing section-shell" aria-labelledby="closing-title">
+      <div><h2 id="closing-title">Sua próxima campanha<br>começa com uma ideia.</h2><p>Conte onde sua marca quer chegar.</p></div>
+      <button class="closing-cta" type="button" data-open-brief>Quero anunciar</button>
+    </section>
+  </main>
+
+  <footer class="site-footer section-shell">
+    <div><a class="brand" href="#inicio" aria-label="VAI MÍDIA, voltar ao início"><img src="assets/marca.svg" width="37" height="31" alt=""><span>VAI MÍDIA</span></a><p>Sua marca em movimento.</p></div>
+    <nav aria-label="Links do rodapé"><a href="#solucoes">Soluções</a><a href="#parceiros">Seja parceiro</a><a href="assets/VAI_MIDIA_Portfolio_Comercial.pdf" download>Portfólio</a><a href="privacidade.html">Privacidade</a><a id="painel-link" href="../">Entrar no painel</a><a id="official-email" hidden></a><a id="official-instagram" hidden rel="noopener noreferrer" target="_blank">Instagram</a></nav>
+    <p class="footer-note">As imagens mostram aplicações ilustrativas. Pontos e condições são definidos em proposta comercial.</p>
+  </footer>
+
+  <dialog class="brief-dialog" id="brief-dialog" aria-labelledby="brief-title">
+    <div class="dialog-top"><a class="brand" href="#inicio" tabindex="-1"><img src="assets/marca.svg" width="31" height="26" alt=""><span>VAI MÍDIA</span></a><button type="button" class="close-dialog" aria-label="Fechar planejamento">×</button></div>
+    <div class="dialog-content">
+      <h2 id="brief-title">Vamos planejar sua campanha.</h2>
+      <p class="dialog-intro">Reúna as informações e salve um resumo para compartilhar com a equipe.</p>
+      <form id="brief-form">
+        <fieldset class="intent-field"><legend>Como podemos ajudar?</legend><label><input type="radio" name="intent" value="anunciante" checked> Quero anunciar</label><label><input type="radio" name="intent" value="parceiro"> Quero receber telas</label></fieldset>
+        <div class="form-grid">
+          <label>Empresa ou marca<input name="empresa" required maxlength="120" autocomplete="organization"></label>
+          <label>Cidade / região<input name="cidade" required maxlength="120" autocomplete="address-level2"></label>
+        </div>
+        <div class="form-grid">
+          <label>Seu nome<input name="contato" maxlength="120" autocomplete="name"></label>
+          <label>E-mail<input name="email" type="email" maxlength="160" autocomplete="email"></label>
+        </div>
+        <div class="form-grid">
+          <label>WhatsApp<input name="telefone" maxlength="20" autocomplete="tel" inputmode="tel"></label>
+          <span class="contact-hint">Deixe e-mail ou WhatsApp para a equipe responder.</span>
+        </div>
+        <div class="form-grid">
+          <label>Objetivo<select name="objetivo" required><option value="">Selecione</option><option>Lançar um produto ou serviço</option><option>Divulgar uma oferta</option><option>Fortalecer a marca</option><option>Apresentar meu espaço</option><option>Outro objetivo</option></select></label>
+          <label>Período desejado<select name="periodo"><option>A definir</option><option>Até 15 dias</option><option>De 15 a 30 dias</option><option>Mais de 30 dias</option></select></label>
+        </div>
+        <fieldset class="format-options"><legend>Formatos de interesse</legend><label><input type="checkbox" name="formatos" value="Shopping">Shopping</label><label><input type="checkbox" name="formatos" value="Elevadores">Elevadores</label><label><input type="checkbox" name="formatos" value="TVs indoor">TVs indoor</label><label><input type="checkbox" name="formatos" value="Recepções e totens">Recepções e totens</label><label><input type="checkbox" name="formatos" value="Outdoor digital">Outdoor digital</label><label><input type="checkbox" name="formatos" value="Preciso de orientação">Preciso de orientação</label></fieldset>
+        <label>Conte um pouco mais <span class="optional">(opcional)</span><textarea name="detalhes" rows="3" maxlength="1500"></textarea></label>
+        <p id="form-error" class="form-error" role="alert" hidden>Escolha pelo menos um formato ou a opção “Preciso de orientação”.</p>
+        <button type="submit" class="prepare-brief">Enviar para a equipe</button>
+        <p class="privacy-note">Ao enviar, você concorda que a VAI MÍDIA use os dados acima para responder ao seu pedido,
+          como explica a <a href="privacidade.html" target="_blank" rel="noopener">política de privacidade</a>. Você também pode baixar ou copiar o resumo.</p>
+      </form>
+      <section class="brief-result" id="brief-result" aria-labelledby="result-title" hidden>
+        <h3 id="result-title">Seu briefing está pronto.</h3>
+        <pre id="brief-preview"></pre>
+        <div class="result-actions"><button type="button" id="download-brief">Baixar briefing</button><button type="button" id="copy-brief">Copiar resumo</button><a id="send-whatsapp" target="_blank" rel="noopener noreferrer" hidden>Enviar pelo WhatsApp</a></div>
+        <p class="result-status" id="result-status" role="status" aria-live="polite"></p>
+        <button class="edit-brief" id="edit-brief" type="button">Editar informações</button>
+      </section>
+    </div>
+  </dialog>
+  <noscript><p class="noscript-note">Ative o JavaScript para visualizar as fotografias e usar o planejador. O portfólio em PDF está disponível para download.</p></noscript>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Organization","name":"VAI MÍDIA","url":"https://vaimidia.com.br/",
+"logo":"https://vaimidia.com.br/assets/marca.svg","image":"https://vaimidia.com.br/assets/og-capa.jpg",
+"description":"Mídia digital indoor: telas em shoppings, elevadores, recepções, condomínios e comércios.",
+"areaServed":"BR"}
+</script>
+</body>
+</html>

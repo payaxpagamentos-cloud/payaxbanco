@@ -1,0 +1,10 @@
+# Vai Mídia — vigia o pedido de comando feito pelo painel (Configurações › Sistema › Comandos).
+[Unit]
+Description=Vai Mídia — pedido de comando pelo painel
+
+[Path]
+PathExists=/var/lib/vaimidia/comandos/pedido
+Unit=vaimidia-comando.service
+
+[Install]
+WantedBy=multi-user.target

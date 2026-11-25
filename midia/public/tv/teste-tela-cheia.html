@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teste de tela cheia — Vai Mídia</title>
+  <!--
+    Página de diagnóstico: cada botão pede a tela cheia de um jeito, e o quadro da direita mostra tudo o
+    que a TV recebeu (clique, ponteiro, tecla) e o que o navegador respondeu. Serve para descobrir qual
+    jeito o navegador de uma TV aceita, e então usar esse jeito no player.
+  -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #18232A; color: #fff; font-family: system-ui, sans-serif; }
+    body { display: flex; gap: 3vw; padding: 4vh 4vw; box-sizing: border-box; }
+    .botoes { display: flex; flex-direction: column; gap: 1.8vh; width: 46vw; }
+    h1 { font-size: 3.4vh; margin: 0 0 1vh; }
+    p { font-size: 2vh; margin: 0 0 1vh; color: #C9CFD7; }
+    button { font: inherit; font-size: 2.6vh; font-weight: 700; padding: 1.8vh 2.4vh; border-radius: 1.4vh; border: .4vh solid transparent;
+      background: #C8FF31; color: #18232A; text-align: left; cursor: pointer; }
+    button:focus { border-color: #fff; outline: none; }
+    #registro { flex: 1; background: #0D151A; border-radius: 1.4vh; padding: 2vh; font: 1.8vh/1.45 ui-monospace, monospace; overflow: hidden; white-space: pre-wrap; }
+    #estado { font-size: 2.2vh; font-weight: 700; color: #C8FF31; margin-bottom: 1vh; }
+  </style>
+</head>
+<body>
+  <div class="botoes">
+    <h1>Teste de tela cheia</h1>
+    <p>Aperte um botão de cada vez (com o OK do controle ou clicando). Depois tire uma foto da tela inteira.</p>
+    <button id="b1">1 · Jeito da primeira versão (requestFullscreen)</button>
+    <button id="b2">2 · requestFullscreen escondendo a barra</button>
+    <button id="b3">3 · webkitRequestFullscreen</button>
+    <button id="b4">4 · Tela cheia no corpo da página</button>
+    <button id="b5">5 · Tela cheia num vídeo</button>
+    <p>Também vale: dois cliques em qualquer lugar fora dos botões.</p>
+    <div id="estado"></div>
+    <video id="video" muted playsinline style="width:1px;height:1px;opacity:0"></video>
+  </div>
+  <div id="registro"></div>
+  <script src="teste-tela-cheia.js"></script>
+</body>
+</html>
