@@ -31,7 +31,21 @@ self.addEventListener('install', (e) => {
     } catch { /* sem internet agora: guarda na próxima vez */ }
   })());
 });
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+// Versão deste arquivo: mudar o número faz toda TV trocar o service worker antigo pelo novo.
+const VERSAO_SW = 2;
+self.addEventListener('activate', (e) => e.waitUntil((async () => {
+  // Ao trocar de versão, joga fora as páginas guardadas pela versão anterior (podem estar velhas).
+  try {
+    const cache = await caches.open(CACHE);
+    const marca = await cache.match('/__versao_sw');
+    const anterior = marca ? Number(await marca.text()) : 0;
+    if (anterior !== VERSAO_SW) {
+      for (const req of await cache.keys()) await cache.delete(req);
+      await cache.put('/__versao_sw', new Response(String(VERSAO_SW)));
+    }
+  } catch (err) { /* sem cache, segue */ }
+  await self.clients.claim();
+})()));
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;
@@ -47,7 +61,12 @@ self.addEventListener('fetch', (e) => {
     try {
       const resp = await fetch(req);
       // Guarda a página do player e os arquivos dela (o redirecionamento da raiz não é guardado).
-      if (resp.ok && resp.type === 'basic' && !raizDaTv) await cache.put(req, resp.clone());
+      // Guardar é um extra: se a TV não deixar (pouco espaço, navegador antigo), a resposta da internet
+      // vale do mesmo jeito. Antes, uma falha ao guardar derrubava o carregamento e a TV ficava presa
+      // numa cópia antiga da página.
+      if (resp.ok && resp.type === 'basic' && !raizDaTv) {
+        try { await cache.put(req, resp.clone()); } catch (e) { /* segue sem guardar */ }
+      }
       return resp;
     } catch (erro) {
       // Sem internet: a página (qualquer endereço dela) sai do que foi guardado por último.
