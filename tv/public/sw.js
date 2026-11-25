@@ -12,7 +12,7 @@
  * Ao publicar uma versão nova do app, mude VERSAO: o navegador troca tudo na próxima abertura.
  */
 
-const VERSAO = 'v2';
+const VERSAO = 'v3';
 const CASCA = `playtechvip-casca-${VERSAO}`;
 const ARTES = `playtechvip-artes-${VERSAO}`;
 const ARTES_MAX = 150;

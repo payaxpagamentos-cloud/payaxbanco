@@ -38,9 +38,21 @@ export function registrarServiceWorker() {
   if (jaRegistrou || !('serviceWorker' in navigator)) return;
   jaRegistrou = true;
   const base = new URL('..', import.meta.url);
+  // Se já havia um service worker no comando, a troca de controlador significa versão nova.
+  // Na primeira visita não há nenhum, e aí a troca é só a instalação — não recarrega.
+  const jaTinhaControlador = Boolean(navigator.serviceWorker.controller);
+  let recarregando = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!jaTinhaControlador || recarregando) return;
+    // Não interrompe quem está assistindo: nesse caso a versão nova entra ao sair do player.
+    if ([...document.querySelectorAll('video')].some((v) => !v.paused && !v.ended)) return;
+    recarregando = true;
+    window.location.reload();
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(new URL('sw.js', base), { scope: base.pathname }).then((reg) => {
-      // Versão nova publicada: assume na próxima abertura, sem interromper quem está assistindo.
+      // Versão nova publicada: o service worker novo assume na hora e a página se recarrega
+      // uma vez sozinha, senão a aba continuaria mostrando os arquivos da versão anterior.
       reg.addEventListener('updatefound', () => {
         const novo = reg.installing;
         novo?.addEventListener('statechange', () => {

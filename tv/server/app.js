@@ -87,7 +87,17 @@ function criarApp(db) {
   r.use('/vendor/hls', express.static(path.join(path.dirname(require.resolve('hls.js/package.json')), 'dist'), { maxAge: '7d', index: false }));
   // "/admin" sem a barra final leva a "/admin/" (as páginas usam caminhos relativos à pasta).
   r.get(/^\/admin$/, (req, res) => res.redirect(`${req.baseUrl}${req.path}/`));
-  r.use(express.static(publico, { maxAge: config.producao ? '1h' : 0 }));
+  // A casca do app (páginas, css, js e o próprio service worker) não leva nome com versão,
+  // então não pode ficar guardada por tempo fixo: numa atualização o navegador continuaria
+  // servindo a anterior por até uma hora. Com 'no-cache' ele revalida pelo ETag e, quando nada
+  // mudou, a resposta é um 304 sem corpo — barato. Arte e fonte seguem com validade longa.
+  const SEM_GUARDAR = /\.(html|js|css|webmanifest)$/i;
+  r.use(express.static(publico, {
+    maxAge: config.producao ? '1h' : 0,
+    setHeaders(res, caminho) {
+      if (SEM_GUARDAR.test(caminho)) res.setHeader('Cache-Control', 'no-cache');
+    },
+  }));
   if (config.basePath) {
     app.get(['/', config.basePath], (req, res, next) => (req.originalUrl.split('?')[0] === '/' || req.originalUrl.split('?')[0] === config.basePath
       ? res.redirect(`${config.basePath}/`) : next()));
