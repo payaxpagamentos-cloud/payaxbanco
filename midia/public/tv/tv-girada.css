@@ -285,3 +285,10 @@ body.girada /* O texto ocupa quase a metade toda: o véu escurece mais cedo para
  */
 body.girada .zona-anuncio .camada img:not(.fundo), body.girada .zona-anuncio .camada video{ object-fit: cover; }
 @media (max-aspect-ratio: 1/1){ .zona-anuncio .camada img:not(.fundo), .zona-anuncio .camada video{ object-fit: cover; } }
+
+/*
+ * Rodapé na TV girada. Em pé, a tela é muito mais alta que larga: o rodapé no tamanho da TV deitada
+ * ficava grande demais. Aqui ele encolhe para cerca de 60% (logo, relógio e aviso encolhem juntos).
+ */
+body.girada{ --faixa-altura: 4.6vw; }
+body.girada .faixa{ --uh: .62vw; }
