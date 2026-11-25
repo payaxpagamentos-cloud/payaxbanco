@@ -483,6 +483,9 @@ CREATE TABLE IF NOT EXISTS senhas (
   guiche TEXT NOT NULL,
   chamada_em TEXT NOT NULL,
   repetida_em TEXT,
+  -- O atendimento: sobre o que foi e quando terminou (o tempo é a diferença para a chamada).
+  assunto TEXT,
+  encerrada_em TEXT,
   criado_por INTEGER REFERENCES usuarios(id)
 );
 CREATE INDEX IF NOT EXISTS idx_senhas_dia ON senhas (local_id, data, id);
@@ -786,6 +789,8 @@ const COLUNAS_NOVAS = [
   ['telas', 'giro', 'INTEGER NOT NULL DEFAULT 0'],
   ['telas', 'so_formato', 'INTEGER NOT NULL DEFAULT 0'],
   ['telas', 'zona', "TEXT NOT NULL DEFAULT 'comunicado'"],
+  ['senhas', 'assunto', 'TEXT'],
+  ['senhas', 'encerrada_em', 'TEXT'],
   ['enderecos_email', 'assinatura', 'TEXT'],
   ['usuarios', 'sessao_versao', 'INTEGER NOT NULL DEFAULT 0'],
   ['usuarios', 'falhas', 'INTEGER NOT NULL DEFAULT 0'],

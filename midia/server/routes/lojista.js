@@ -82,10 +82,12 @@ module.exports = (db) => {
    */
   // Controle de senha: o próprio ponto chama as senhas que aparecem na TV dele.
   const senhas = require('../lib/senhas');
-  r.get('/senhas', (req, res) => res.json(senhas.situacao(db, meu(req))));
+  r.get('/senhas', (req, res) => res.json(senhas.situacao(db, meu(req), req.query.guiche)));
   r.post('/senhas/chamar', (req, res) => res.status(201).json(senhas.chamar(db, meu(req), req.body, req.usuario.id)));
-  r.post('/senhas/repetir', (req, res) => res.json(senhas.repetir(db, meu(req))));
-  r.post('/senhas/zerar', (req, res) => res.json(senhas.zerar(db, meu(req))));
+  r.post('/senhas/encerrar', (req, res) => res.json(senhas.encerrar(db, meu(req), req.body)));
+  r.post('/senhas/assunto', (req, res) => res.json(senhas.definirAssunto(db, meu(req), req.body.id, req.body.assunto, req.body.guiche)));
+  r.post('/senhas/repetir', (req, res) => res.json(senhas.repetir(db, meu(req), req.body.guiche)));
+  r.post('/senhas/zerar', (req, res) => res.json(senhas.zerar(db, meu(req), req.body.guiche)));
 
   r.get('/comunicados', (req, res) => {
     res.json({

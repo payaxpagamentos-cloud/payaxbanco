@@ -797,6 +797,15 @@ pre.codigo{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .senha-chamar{ display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 92px; justify-content: center; white-space: normal; text-align: center; }
 .senha-chamar strong{ font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
 @media (max-width: 420px){ .senha-botoes{ grid-template-columns: 1fr; } }
+.senha-atendendo{ margin-top: 14px; padding: 14px; border-radius: var(--radius-sm); background: var(--destaque-bg); border: 1px solid var(--destaque-borda); }
+.senha-tempo{ font-variant-numeric: tabular-nums; font-size: 18px; }
+.lista-senhas{ display: flex; flex-direction: column; }
+.item-senha{ padding: 12px 0; border-bottom: 1px solid var(--border); }
+.item-senha:last-child{ border-bottom: 0; }
+.item-senha .cabeca{ display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.item-senha .cabeca strong{ font-size: 16px; font-variant-numeric: tabular-nums; }
+.item-senha .cabeca .tempo{ margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.item-senha .assunto{ display: block; width: 100%; text-align: left; background: none; border: 0; padding: 4px 0 0; font: inherit; font-size: 13.5px; color: var(--text-2); cursor: pointer; }
 .dados-email{ grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .dados-email > div > span + span{ overflow-wrap: anywhere; }
 .leitura-email{ display: flex; flex-direction: column; gap: 10px; }

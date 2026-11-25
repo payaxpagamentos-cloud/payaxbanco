@@ -230,26 +230,57 @@ test('Controle de senha: chamar, repetir, número específico e zerar', async (t
 
   const vazio = (await api.get(`/painel/senhas?local_id=${a}`, master)).dados;
   assert.equal(vazio.atual, null);
-  assert.deepEqual(vazio.proxima, { N: 'N001', P: 'P001' });
+  assert.deepEqual(vazio.proxima, { N: 'N0001', P: 'P0001' }, 'todo dia começa em 0001');
 
-  const c1 = (await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N', guiche: 'Guichê 2' }, master)).dados;
-  assert.equal(c1.atual.codigo, 'N001');
-  assert.equal(c1.atual.guiche, 'Guichê 2');
-  await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N' }, master);
+  // O operador (não só o master) chama a senha.
+  await api.post('/painel/usuarios', { nome: 'Olga', email: 'olga@x.com.br', senha: 'senha-da-olga', perfil: 'operador' }, master);
+  const olga = await api.login('olga@x.com.br', 'senha-da-olga');
+  const c1 = await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N', guiche: 'Guichê 2' }, olga);
+  assert.equal(c1.status, 201);
+  assert.equal(c1.dados.atual.codigo, 'N0001');
+  assert.equal(c1.dados.em_atendimento.codigo, 'N0001', 'a senha chamada fica em atendimento neste guichê');
+
+  // Chamar a próxima encerra o atendimento anterior do mesmo guichê, com o assunto e o tempo.
+  api.db.prepare('UPDATE senhas SET chamada_em = ? WHERE numero = 1 AND local_id = ?').run(new Date(Date.now() - 125_000).toISOString(), a);
+  const c2 = (await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N', guiche: 'Guichê 2', assunto_anterior: 'Plano novo' }, olga)).dados;
+  const primeiro = c2.atendimentos.find((x) => x.codigo === 'N0001');
+  assert.equal(primeiro.assunto, 'Plano novo');
+  assert.ok(primeiro.duracao_s >= 124 && primeiro.duracao_s <= 130, `tempo do atendimento (~125 s): ${primeiro.duracao_s}`);
+  assert.equal(c2.em_atendimento.codigo, 'N0002');
+  assert.equal(c2.encerrados_hoje, 1);
+  assert.ok(c2.tempo_medio_s >= 124);
+  assert.deepEqual(c2.assuntos, ['Plano novo'], 'o assunto vira sugestão');
+
+  // Outro guichê atende em paralelo, sem encerrar o do vizinho.
   const p1 = (await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'P', guiche: 'Caixa' }, master)).dados;
-  assert.equal(p1.atual.codigo, 'P001', 'preferencial tem contagem própria');
-  assert.deepEqual(p1.ultimas.map((u) => u.codigo), ['N002', 'N001']);
-  assert.deepEqual(p1.proxima, { N: 'N003', P: 'P002' });
+  assert.equal(p1.atual.codigo, 'P0001', 'preferencial tem contagem própria');
+  assert.equal(p1.atendimentos.find((x) => x.codigo === 'N0002').encerrada_em, null);
+  assert.deepEqual(p1.proxima, { N: 'N0003', P: 'P0002' });
+
+  // Encerrar sem chamar outra, e corrigir o assunto depois.
+  const enc = (await api.post('/painel/senhas/encerrar', { local_id: a, guiche: 'Guichê 2', assunto: 'Suporte' }, olga)).dados;
+  assert.equal(enc.em_atendimento, null);
+  const n2 = enc.atendimentos.find((x) => x.codigo === 'N0002');
+  assert.equal(n2.assunto, 'Suporte');
+  assert.equal((await api.post('/painel/senhas/encerrar', { local_id: a, guiche: 'Guichê 2' }, olga)).status, 409);
+  const corr = (await api.post('/painel/senhas/assunto', { local_id: a, id: n2.id, assunto: 'Segunda via' }, olga)).dados;
+  assert.equal(corr.atendimentos.find((x) => x.id === n2.id).assunto, 'Segunda via');
+  assert.equal((await api.post('/painel/senhas/assunto', { local_id: b, id: n2.id, assunto: 'x' }, master)).status, 404, 'senha de outro ponto');
 
   // Outro ponto não enxerga nem continua a contagem deste.
-  assert.equal((await api.post('/painel/senhas/chamar', { local_id: b, tipo: 'N' }, master)).dados.atual.codigo, 'N001');
+  assert.equal((await api.post('/painel/senhas/chamar', { local_id: b, tipo: 'N' }, master)).dados.atual.codigo, 'N0001');
 
   // Voltar numa senha que ficou para trás e chamar de novo.
-  assert.equal((await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N', numero: 1 }, master)).dados.atual.codigo, 'N001');
+  assert.equal((await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'N', numero: 1 }, master)).dados.atual.codigo, 'N0001');
   const rep = (await api.post('/painel/senhas/repetir', { local_id: a }, master)).dados;
   assert.ok(rep.atual.repetida_em, 'a repetição fica marcada (é o que faz a TV chamar de novo)');
   assert.equal((await api.post('/painel/senhas/chamar', { local_id: a, tipo: 'X' }, master)).status, 422);
   assert.equal((await api.post('/painel/senhas/chamar', { local_id: a, numero: 0 }, master)).status, 422);
+
+  // No dia seguinte a contagem recomeça sozinha.
+  api.db.prepare("UPDATE senhas SET data = '2020-01-01' WHERE local_id = ?").run(b);
+  assert.equal((await api.get(`/painel/senhas?local_id=${b}`, master)).dados.proxima.N, 'N0001');
+  await api.post('/painel/senhas/chamar', { local_id: b, tipo: 'N' }, master);
 
   // A TV do ponto recebe a senha; a do outro ponto recebe a dele.
   const tela = (await api.post('/painel/telas', { local_id: a, nome: 'TV', layout: 'dividida', zona: 'senha' }, master)).dados;
@@ -258,10 +289,11 @@ test('Controle de senha: chamar, repetir, número específico e zerar', async (t
   await api.post('/painel/telas/parear', { codigo, tela_id: tela.id }, master);
   const tk = (await api.get(`/player/pareamento?codigo=${codigo}`)).dados.token;
   const naTv = (await api.get('/player/senha', tk)).dados;
-  assert.equal(naTv.atual.codigo, 'N001');
+  assert.equal(naTv.atual.codigo, 'N0001');
+  assert.equal(naTv.atual.assunto, undefined, 'a TV não recebe o assunto do atendimento');
   assert.equal((await api.get('/player/programacao', tk)).dados.tela.zona, 'senha');
 
   const zerado = (await api.post('/painel/senhas/zerar', { local_id: a }, master)).dados;
   assert.equal(zerado.atual, null);
-  assert.equal((await api.get(`/painel/senhas?local_id=${b}`, master)).dados.atual.codigo, 'N001', 'zerar um ponto não mexe no outro');
+  assert.equal((await api.get(`/painel/senhas?local_id=${b}`, master)).dados.atual.codigo, 'N0001', 'zerar um ponto não mexe no outro');
 });

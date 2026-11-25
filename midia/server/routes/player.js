@@ -186,7 +186,9 @@ module.exports = (db) => {
   // Senha no painel (a TV pergunta a cada poucos segundos quando a metade de cima é a chamada de senha).
   r.get('/senha', autenticada, (req, res) => {
     const s = require('../lib/senhas').situacao(db, req.tela.local_id);
-    res.json({ atual: s.atual, ultimas: s.ultimas });
+    // Só o que vai para a tela: o assunto do atendimento é da loja, não aparece na TV.
+    const paraTela = (x) => (x ? { id: x.id, codigo: x.codigo, guiche: x.guiche, chamada_em: x.chamada_em, repetida_em: x.repetida_em } : null);
+    res.json({ atual: paraTela(s.atual), ultimas: s.ultimas.map(paraTela) });
   });
 
   // Foto do comunicado: só de comunicado do ponto desta TV.

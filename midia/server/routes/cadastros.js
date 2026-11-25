@@ -415,13 +415,15 @@ module.exports = (db) => {
     if (!db.prepare('SELECT 1 FROM locais WHERE id = ?').get(id)) throw new ErroNegocio('Escolha o ponto.', 422);
     return id;
   };
-  r.get('/senhas', (req, res) => res.json(senhas.situacao(db, pontoDaSenha(req))));
+  r.get('/senhas', (req, res) => res.json(senhas.situacao(db, pontoDaSenha(req), req.query.guiche)));
   r.post('/senhas/chamar', (req, res) => res.status(201).json(senhas.chamar(db, pontoDaSenha(req), req.body, req.usuario.id)));
-  r.post('/senhas/repetir', (req, res) => res.json(senhas.repetir(db, pontoDaSenha(req))));
+  r.post('/senhas/encerrar', (req, res) => res.json(senhas.encerrar(db, pontoDaSenha(req), req.body)));
+  r.post('/senhas/assunto', (req, res) => res.json(senhas.definirAssunto(db, pontoDaSenha(req), req.body.id, req.body.assunto, req.body.guiche)));
+  r.post('/senhas/repetir', (req, res) => res.json(senhas.repetir(db, pontoDaSenha(req), req.body.guiche)));
   r.post('/senhas/zerar', (req, res) => {
     const id = pontoDaSenha(req);
     registrar(db, req, 'senhas_zeradas', { local_id: id });
-    res.json(senhas.zerar(db, id));
+    res.json(senhas.zerar(db, id, req.body.guiche));
   });
 
   // ----------------------------------------------------------------- Comunicados do ponto

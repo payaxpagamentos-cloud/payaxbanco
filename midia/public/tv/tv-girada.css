@@ -305,7 +305,7 @@ body.dividida.com-senha .zona-anuncio .camada img.esticar:not(.fundo), body.divi
 .painel-senha{ position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; padding: calc(var(--uh) * 3) calc(var(--uw) * 2); background: radial-gradient(circle at 50% 30%, #24351F 0%, #1D2B33 55%, #101920 100%); color: #fff; }
 .painel-senha .rotulo{ font-size: calc(var(--uh) * 3.4); font-weight: 700; letter-spacing: .32em; text-transform: uppercase; color: #C9CFD7; }
-.painel-senha .codigo-senha{ font-size: calc(var(--uh) * 19); font-weight: 800; line-height: 1; letter-spacing: -.03em; color: var(--lime); margin: calc(var(--uh) * 1.5) 0 calc(var(--uh) * 1);
+.painel-senha .codigo-senha{ font-size: calc(var(--uh) * 15); font-weight: 800; line-height: 1; letter-spacing: -.03em; color: var(--lime); margin: calc(var(--uh) * 1.5) 0 calc(var(--uh) * 1);
   font-variant-numeric: tabular-nums; text-shadow: 0 0 calc(var(--uh) * 4) rgba(200,255,49,.35); }
 .painel-senha .codigo-senha.vazio{ color: #5C6770; text-shadow: none; }
 .painel-senha .guiche{ font-size: calc(var(--uh) * 5.4); font-weight: 800; letter-spacing: -.02em; }
@@ -319,7 +319,7 @@ body.dividida.com-senha .zona-anuncio .camada img.esticar:not(.fundo), body.divi
 body.dividida.com-senha .palco{ grid-template-columns: 1fr; grid-template-rows: 27% 73%; }
 .painel-senha{ padding: calc(var(--uh) * 1.2) calc(var(--uw) * 4); }
 .painel-senha .rotulo{ font-size: calc(var(--uh) * 1.7); }
-.painel-senha .codigo-senha{ font-size: calc(var(--uh) * 10.5); margin: calc(var(--uh) * .5) 0 calc(var(--uh) * .4); }
+.painel-senha .codigo-senha{ font-size: calc(var(--uh) * 9.6); margin: calc(var(--uh) * .5) 0 calc(var(--uh) * .4); }
 .painel-senha .guiche{ font-size: calc(var(--uh) * 3); }
 .painel-senha .ultimas{ margin-top: calc(var(--uh) * 1.4); padding-top: calc(var(--uh) * 1.1); flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: calc(var(--uh) * .6) calc(var(--uw) * 2.6); width: 100%; }
 .painel-senha .ultimas .titulo{ font-size: calc(var(--uh) * 1.3); width: 100%; }
@@ -328,7 +328,7 @@ body.dividida.com-senha .palco{ grid-template-columns: 1fr; grid-template-rows: 
 body.girada.dividida.com-senha .palco{ grid-template-columns: 1fr; grid-template-rows: 27% 73%; }
 body.girada .painel-senha{ padding: calc(var(--uh) * 1.2) calc(var(--uw) * 4); }
 body.girada .painel-senha .rotulo{ font-size: calc(var(--uh) * 1.7); }
-body.girada .painel-senha .codigo-senha{ font-size: calc(var(--uh) * 10.5); margin: calc(var(--uh) * .5) 0 calc(var(--uh) * .4); }
+body.girada .painel-senha .codigo-senha{ font-size: calc(var(--uh) * 9.6); margin: calc(var(--uh) * .5) 0 calc(var(--uh) * .4); }
 body.girada .painel-senha .guiche{ font-size: calc(var(--uh) * 3); }
 body.girada .painel-senha .ultimas{ margin-top: calc(var(--uh) * 1.4); padding-top: calc(var(--uh) * 1.1); flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: calc(var(--uh) * .6) calc(var(--uw) * 2.6); width: 100%; }
 body.girada .painel-senha .ultimas .titulo{ font-size: calc(var(--uh) * 1.3); width: 100%; }
