@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diagnóstico da TV — Vai Mídia</title>
+  <!--
+    Página para descobrir por que o player não abre numa TV. Escrita no JavaScript e no estilo mais
+    antigos possíveis, para funcionar até em navegador velho. Mostra o que a TV tem e o que falta,
+    testa cada passo e oferece um botão que limpa o que ficou guardado e reabre o player.
+  -->
+  <link rel="stylesheet" href="diagnostico.css">
+</head>
+<body>
+  <h1>Diagnóstico da TV — Vai Mídia</h1>
+  <p>Tire uma foto desta tela inteira e mande para o suporte.</p>
+  <p>
+    <button id="limpar">1 · Limpar o que está guardado e abrir o player</button>
+    <button id="abrir">2 · Só abrir o player</button>
+  </p>
+  <pre id="saida">Testando...</pre>
+  <script src="diagnostico.js"></script>
+</body>
+</html>

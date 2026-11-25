@@ -1,0 +1,1 @@
+window.vmT3 = (function () { const o = { ...{ x: 1 } }; const f = (...r) => r.length; async function g() { try { await 1; } catch { return 0; } } g(); return o.x === 1 && f(1, 2) === 2 && `${1}` === '1'; }());

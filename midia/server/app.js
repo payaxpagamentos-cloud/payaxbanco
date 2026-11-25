@@ -92,6 +92,8 @@ function criarApp(db) {
   // Atalho curto para a página de diagnóstico de tela cheia (digitar com controle remoto é penoso):
   // tv.SEU-DOMINIO/teste.
   app.get('/teste', (_req, res) => res.redirect(302, `${config.basePath}/tv/teste-tela-cheia.html`));
+  // Diagnóstico da TV: endereço curto para digitar no controle.
+  app.get(['/diag', '/d'], (_req, res) => res.redirect(302, `${config.basePath}/tv/diagnostico.html`));
   app.use(config.basePath || '/', r);
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => tratarErro(err, res));
