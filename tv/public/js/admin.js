@@ -5,6 +5,10 @@ import { cabeca, indicador, tabela, td, botao, campo, area, escolha, caixaSim, C
 import { enviarImagem, lerTexto } from './envio.js';
 import { telaCatalogo, telaTituloEditor } from './admin-catalogo.js';
 import { TELAS_NEGOCIO } from './admin-negocio.js';
+// O painel também precisa registrar o service worker. Sem isto ele era CONTROLADO por um
+// service worker registrado pelo app do assinante, mas nunca pedia atualização nem recarregava
+// quando uma versão nova entrava — e ficava com os arquivos antigos.
+import { registrarServiceWorker } from './instalar.js';
 
 const raiz = $('#app');
 let usuario = null;
@@ -722,3 +726,4 @@ async function telaHome(c) {
 }
 
 iniciar();
+registrarServiceWorker();

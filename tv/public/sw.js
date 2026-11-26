@@ -12,7 +12,7 @@
  * Ao publicar uma versão nova do app, mude VERSAO: o navegador troca tudo na próxima abertura.
  */
 
-const VERSAO = 'v4';
+const VERSAO = 'v5';
 const CASCA = `playtechvip-casca-${VERSAO}`;
 const ARTES = `playtechvip-artes-${VERSAO}`;
 const ARTES_MAX = 150;
@@ -100,7 +100,31 @@ self.addEventListener('fetch', (evento) => {
     return;
   }
 
-  // Arquivos do app: cache primeiro, atualizando por trás.
+  // Folhas de estilo e scripts: REDE PRIMEIRO, com o cache só como rede de segurança.
+  //
+  // Eles não levam versão no nome, então, servidos do cache primeiro, uma atualização só
+  // aparecia na abertura seguinte — e o painel, que não tinha o service worker registrado,
+  // podia ficar com o visual antigo para sempre. Foi o que aconteceu: o painel veio novo pela
+  // rede e o CSS veio velho do cache, misturando as duas versões na mesma tela.
+  //
+  // O custo é uma ida à rede por arquivo; como o servidor manda "no-cache" com ETag nesses
+  // arquivos, a resposta costuma ser um 304 sem corpo.
+  if (req.destination === 'style' || req.destination === 'script') {
+    evento.respondWith((async () => {
+      const cache = await caches.open(CASCA);
+      try {
+        const r = await fetch(req);
+        if (r.ok && r.type === 'basic') cache.put(req, r.clone());
+        return r;
+      } catch {
+        return (await cache.match(req)) ?? Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Fonte, ícone e o resto do app: cache primeiro, atualizando por trás. Esses mudam pouco,
+  // e a troca de VERSAO já limpa o cache antigo quando mudam de verdade.
   evento.respondWith((async () => {
     const cache = await caches.open(CASCA);
     const guardado = await cache.match(req);
