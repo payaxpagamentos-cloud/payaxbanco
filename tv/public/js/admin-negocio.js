@@ -461,7 +461,90 @@ async function telaConfig(c) {
       ['Tamanho máximo de vídeo', `${servidor.video_max_mb} MB`],
       ['Tela sem sinal de vida é encerrada em', `${servidor.telas_sem_sinal_s} segundos`],
       ['Pasta dos arquivos', servidor.midia_dir],
-    ].map(([k, v]) => el('tr', {}, td(el('strong', {}, k)), td(el('span', { class: 'mudo' }, String(v)))))));
+    ].map(([k, v]) => el('tr', {}, td(el('strong', {}, k)), td(el('span', { class: 'mudo' }, String(v)))))),
+    el('h2', { style: 'margin-top:24px' }, 'Sistema'),
+    el('p', { class: 'mudo', style: 'margin:0 0 12px' },
+      'Atualize a plataforma enviando o pacote que você recebeu. Funciona pelo celular, sem precisar de SSH.'),
+    await blocoSistema());
+}
+
+// ---------------------------------------------------------------- Sistema
+
+/**
+ * Atualização da plataforma pelo painel — serve para atualizar do celular, sem SSH.
+ *
+ * O painel só ENVIA o pacote; quem extrai e reconstrói é um agente que roda no servidor
+ * (scripts/atualizador.sh, no cron). Enquanto ele trabalha a plataforma reinicia, então a tela
+ * perde contato por alguns segundos: a espera abaixo conta com isso e fica tentando.
+ */
+async function blocoSistema() {
+  const caixa = el('div', { class: 'cartao' });
+
+  const desenhar = (s) => {
+    const arquivo = el('input', { type: 'file', accept: '.gz,.tgz,application/gzip,application/x-gzip' });
+    const enviar = botao('Enviar e atualizar', 'primario', async () => {
+      const f = arquivo.files?.[0];
+      if (!f) throw new Error('Escolha o arquivo .tar.gz da atualização.');
+      if (!await confirmar('Atualizar a plataforma',
+        `Vai ser aplicado o arquivo "${f.name}". A plataforma reinicia e fica alguns segundos fora do ar. `
+        + 'O banco, os vídeos e o catálogo não são tocados. Continuar?', 'Atualizar agora')) return;
+      // File é um Blob: o envio vai como corpo cru, igual ao das artes e dos vídeos.
+      await api.post('/admin/sistema/pacote', f, { tipo: 'application/gzip' });
+      toast('Pacote enviado. Aplicando…');
+      await acompanhar(s.versao.versao);
+    });
+
+    limpar(caixa,
+      el('div', { class: 'linha entre', style: 'flex-wrap:wrap;gap:10px' },
+        el('div', {},
+          el('div', { class: 'rotulo' }, 'Versão instalada'),
+          el('div', { style: 'font-size:20px;font-weight:700' }, s.versao.versao),
+          s.versao.gerado_em ? el('div', { class: 'mini apagado' }, `montada em ${dataHora(s.versao.gerado_em)}`) : null),
+        s.ultima ? el('span', { class: `etiqueta ${s.ultima.situacao === 'concluida' ? 'ok' : 'erro'}` },
+          s.ultima.situacao === 'concluida' ? 'última atualização concluída' : 'última atualização falhou') : null),
+      s.ultima?.detalhe ? el('p', { class: 'pequeno mudo', style: 'margin:10px 0 0' }, s.ultima.detalhe) : null,
+      !s.agente
+        ? el('div', { class: 'aviso atencao', style: 'margin-top:14px' },
+          'Esta instalação ainda não tem o agente de atualização. Faça uma atualização pelo servidor '
+          + '(o instalador o coloca no lugar) e depois esta tela passa a funcionar.')
+        : el('div', { style: 'margin-top:16px' },
+          el('label', { class: 'campo' }, 'Pacote da atualização (.tar.gz)', arquivo),
+          el('p', { class: 'mini apagado', style: 'margin:6px 0 12px' },
+            'Pelo celular: toque no campo, escolha o arquivo que você recebeu e envie. '
+            + 'A atualização leva de 1 a 3 minutos e a plataforma volta sozinha.'),
+          el('div', { class: 'linha' }, enviar)),
+      s.na_fila ? el('div', { class: 'aviso atencao', style: 'margin-top:14px' },
+        `Há um pacote na fila, enviado por ${s.na_fila.por}. O servidor aplica em até um minuto.`) : null,
+      s.registro ? el('details', { style: 'margin-top:14px' },
+        el('summary', { class: 'pequeno mudo' }, 'Registro da última atualização'),
+        el('pre', { class: 'mini', style: 'white-space:pre-wrap;max-height:240px;overflow:auto;margin:8px 0 0' }, s.registro)) : null);
+  };
+
+  /** Fica consultando até a versão mudar. A plataforma reinicia no meio, então falha é esperada. */
+  const acompanhar = async (versaoAntes) => {
+    const aviso = el('div', { class: 'aviso', style: 'margin-top:14px' }, 'Aplicando a atualização… a plataforma reinicia agora.');
+    caixa.append(aviso);
+    for (let i = 0; i < 90; i += 1) {
+      await new Promise((r) => { setTimeout(r, 2000); });
+      try {
+        const s = await api.get('/admin/sistema');
+        if (s.versao.versao !== versaoAntes && !s.na_fila) {
+          desenhar(s);
+          toast(`Atualizada para ${s.versao.versao}.`);
+          return;
+        }
+        if (s.ultima?.situacao === 'erro' && !s.na_fila) {
+          desenhar(s);
+          toast(s.ultima.detalhe || 'A atualização falhou.', true);
+          return;
+        }
+      } catch { /* a plataforma está reiniciando: continuar tentando */ }
+    }
+    aviso.textContent = 'A atualização está demorando mais que o esperado. Recarregue a página em instantes.';
+  };
+
+  desenhar(await api.get('/admin/sistema'));
+  return caixa;
 }
 
 // ---------------------------------------------------------------- Auditoria

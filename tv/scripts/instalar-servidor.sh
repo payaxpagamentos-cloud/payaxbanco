@@ -298,6 +298,22 @@ FIM
   ok "agendado para as 03:20, em $BACKUP_DIR"
 fi
 
+# ---------------------------------------------------------------- 9b. agente de atualização
+
+azul "9.1 Atualização pelo painel"
+
+ATUALIZACAO_DIR=${ATUALIZACAO_DIR:-/var/lib/playtechvip/atualizacao}
+if [ "$SIMULAR" = 1 ]; then
+  printf '  \033[90m› instalaria o agente de atualização, acompanhando %s\033[0m\n' "$ATUALIZACAO_DIR"
+else
+  # O agente roda no servidor, não no contêiner: é ele que extrai o pacote e reconstrói a
+  # imagem. O painel só deposita o arquivo na pasta — assim o contêiner nunca precisa de
+  # acesso ao Docker, que transformaria uma invasão do app em root na máquina.
+  mkdir -p "$ATUALIZACAO_DIR"
+  TV_ATUALIZACAO_HOST="$ATUALIZACAO_DIR" DESTINO="$DESTINO" bash "$DESTINO/scripts/atualizador.sh" --instalar > /dev/null
+  ok "agente instalado — dá para atualizar pelo painel, em Configurações › Sistema"
+fi
+
 # ---------------------------------------------------------------- 10. conferência
 
 azul "10. Conferência"

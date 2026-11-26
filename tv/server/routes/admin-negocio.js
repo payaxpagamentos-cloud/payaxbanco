@@ -15,6 +15,8 @@ const audiencia = require('../lib/audiencia');
 const player = require('../lib/player');
 const v = require('../lib/validacao');
 const qualidades = require('../lib/qualidades');
+const sistema = require('../lib/sistema');
+const express = require('express');
 
 const soAdmin = permitir('admin');
 
@@ -311,6 +313,32 @@ module.exports = (db) => {
         reais(l.aberto_centavos), reais(l.cancelado_centavos)]),
     ]);
   });
+
+  // ---------------- Sistema ----------------
+
+  /** Versão instalada, pedido na fila e como terminou a última atualização. */
+  r.get('/sistema', soAdmin, (_req, res) => res.json(sistema.estado()));
+
+  /**
+   * Recebe o pacote da atualização e deixa na pasta que o agente do servidor acompanha.
+   *
+   * Quem aplica é o agente de fora (scripts/atualizador.sh, no cron): o contêiner não tem, e
+   * não deve ter, acesso ao Docker do servidor. Aqui só é feita a entrega.
+   */
+  r.post('/sistema/pacote', soAdmin, express.raw({ type: ['application/gzip', 'application/x-gzip', 'application/octet-stream'], limit: config.pacoteMaxBytes }),
+    (req, res) => {
+      if (!sistema.agenteDisponivel()) {
+        throw new ErroNegocio('Esta instalação não tem o agente de atualização. Atualize uma vez pelo servidor para instalá-lo.', 409);
+      }
+      let pedido;
+      try {
+        pedido = sistema.guardarPacote(req.body, { por: req.usuario.email });
+      } catch (e) {
+        throw new ErroNegocio(e.message, 400);
+      }
+      registrar(db, req, 'atualizacao_enviada', { bytes: pedido.bytes, sha256: pedido.sha256.slice(0, 16) });
+      res.status(202).json({ pedido, estado: sistema.estado() });
+    });
 
   // ---------------- Equipe ----------------
 

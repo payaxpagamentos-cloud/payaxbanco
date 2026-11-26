@@ -27,6 +27,10 @@ services:
       # Onde o backup diário é gravado: uma pasta do servidor, fora do contêiner — senão
       # a cópia se perderia na primeira atualização da imagem.
       - ${BACKUP_DIR:-/var/backups/playtechvip}:/backup
+      # Ponte com o agente de atualização que roda no servidor (scripts/atualizador.sh).
+      # O painel só deposita o pacote aqui; quem reconstrói é o agente, de fora. O contêiner
+      # nunca recebe acesso ao Docker: com ele, invadir o app seria virar root na máquina.
+      - ${ATUALIZACAO_DIR:-/var/lib/playtechvip/atualizacao}:/atualizacao
     expose:
       - "3600"
     ports:

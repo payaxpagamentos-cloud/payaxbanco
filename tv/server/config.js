@@ -63,6 +63,9 @@ module.exports = {
   legendaMaxBytes: (Number(process.env.TV_LEGENDA_MAX_KB) || 512) * 1024,
   // Pedaço de cada envio do painel (o navegador fatia o arquivo): 8 MB por requisição.
   uploadParteMaxBytes: (Number(process.env.TV_UPLOAD_PARTE_MB) || 8) * 1024 * 1024,
+  // Pacote de atualização enviado pelo painel. Hoje ele tem ~2,5 MB; o teto é folgado
+  // para caber crescimento, e ainda assim pequeno o bastante para não virar porta de abuso.
+  pacoteMaxBytes: (Number(process.env.TV_PACOTE_MAX_MB) || 64) * 1024 * 1024,
   // Token de reprodução: vale por algumas horas e é assinado para o perfil e o aparelho.
   playTokenSegundos: Number(process.env.TV_PLAY_TTL) || 6 * 60 * 60,
   // Link assinado de cada segmento do canal ao vivo (curto: o player renova a cada lista).

@@ -173,11 +173,31 @@ O certificado do domínio novo é emitido sozinho, em segundos. Os dados ficam t
 
 ## Atualizar a plataforma
 
+Há dois caminhos. **Pelo painel** é o do dia a dia, e funciona do celular:
+
+1. Em `/admin/` → **Configurações** → role até **Sistema**.
+2. Escolha o arquivo `.tar.gz` que você recebeu e toque em **Enviar e atualizar**.
+3. A plataforma reinicia e volta sozinha em 1 a 3 minutos. A própria tela acompanha e avisa
+   quando terminou, mostrando a versão nova.
+
+Quem aplica é um agente que roda **no servidor**, fora do contêiner (`scripts/atualizador.sh`,
+no cron, instalado pelo instalador). O painel só deposita o pacote numa pasta compartilhada.
+Essa separação é de propósito: para o contêiner se atualizar sozinho, ele precisaria do Docker
+do servidor — e aí quem invadisse o app viraria root na máquina.
+
+Antes de mexer em qualquer coisa, o agente confere se o pacote abre e se é mesmo da plataforma.
+Pacote corrompido ou trocado por engano é recusado, e o painel mostra o motivo.
+
+**Pelo servidor**, quando o painel não estiver acessível:
+
 ```bash
 bash scripts/enviar-servidor.sh playtv@45.190.156.250 --porta 62052 --so-enviar
 ssh -p 62052 -t playtv@45.190.156.250 \
   'sudo tar -C /opt/playtechvip -xzf /tmp/playtechvip.tar.gz && cd /opt/playtechvip && sudo docker compose up -d --build'
 ```
+
+> O `--build` é obrigatório: o código vai **dentro da imagem**, então sem reconstruir o
+> contêiner continua servindo os arquivos antigos.
 
 Banco e vídeos ficam no volume `dados` e não são tocados pela atualização.
 
