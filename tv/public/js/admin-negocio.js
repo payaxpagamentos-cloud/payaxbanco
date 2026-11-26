@@ -91,9 +91,25 @@ async function telaAssinantes(c) {
           el('div', { class: 'pequeno mudo' }, `cliente desde ${dataBR(d.assinante.criado_em)}${d.assinante.ultimo_acesso ? ` · último acesso ${dataHora(d.assinante.ultimo_acesso)}` : ''}`),
           el('div', { class: 'linha', style: 'margin-top:8px;gap:6px' }, d.perfis.map((p) => el('span', { class: 'etiqueta' }, p.nome, p.infantil ? ' · infantil' : '')))),
         el('h3', { style: 'margin-top:16px' }, 'Faturas'),
-        tabela(['Competência', 'Vencimento', '>Valor', 'Situação'], d.faturas.slice(0, 8).map((f) => el('tr', {},
+        // A confirmação do pagamento fica aqui também, e não só na tela de Faturas: quando a
+        // operação recebe o PIX, é nesta ficha que ela está — e é um clique só para liberar.
+        tabela(['Competência', 'Vencimento', '>Valor', 'Situação', '>Ações'], d.faturas.slice(0, 8).map((f) => el('tr', {},
           td(f.competencia), td(dataBR(f.vencimento)), td(dinheiro(f.valor_centavos), true),
-          td(el('span', { class: `etiqueta ${f.status === 'paga' ? 'ok' : f.status === 'aberta' ? 'aviso' : ''}` }, f.status)))), 'Sem faturas.'),
+          td(el('span', { class: `etiqueta ${f.status === 'paga' ? 'ok' : f.status === 'aberta' ? 'aviso' : ''}` }, f.status)),
+          td(el('div', { class: 'linha', style: 'gap:6px;justify-content:flex-end' },
+            f.status === 'aberta' ? botao('Confirmar pagamento', 'primario', async () => {
+              if (!await confirmar('Confirmar pagamento',
+                `Dar ${dinheiro(f.valor_centavos)} como recebido de ${d.assinante.nome}? O acesso é liberado na hora e a próxima cobrança é remarcada.`,
+                'Confirmar')) return;
+              await api.post(`/admin/faturas/${f.id}/confirmar`);
+              toast('Pagamento confirmado e acesso liberado.');
+              fechar('salvo');
+            }) : null,
+            f.status === 'aberta' ? botao('Cancelar fatura', 'perigo', async () => {
+              if (!await confirmar('Cancelar fatura', 'A cobrança some e o acesso não é liberado. Continuar?', 'Cancelar fatura', true)) return;
+              await api.post(`/admin/faturas/${f.id}/cancelar`, {});
+              fechar('salvo');
+            }) : null), true))), 'Sem faturas.'),
         el('h3', { style: 'margin-top:16px' }, 'Mudar plano ou liberar acesso'),
         el('div', { class: 'duas' },
           el('label', { class: 'campo' }, 'Plano', trocarPlano),
