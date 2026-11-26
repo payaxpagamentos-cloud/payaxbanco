@@ -550,7 +550,7 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
 
 .login-tela .page-header{ display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .login-tela .brand{ display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
-.login-tela .brand-icon{ width: 34px; height: 31px; color: var(--gold); stroke-width: 1.8; margin-right: 4px; }
+.login-tela .brand-icon{ width: 34px; height: 34px; border-radius: 8px; display: block; margin-right: 6px; }
 .login-tela .brand-name{ font-size: clamp(20px, 1.4vw, 25px); font-weight: 800; letter-spacing: -1px; }
 .login-tela .brand-red{ color: #fa0a22; }
 .login-tela .vip-badge{ display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px 3px;
@@ -785,7 +785,7 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
   .login-tela .login-subtitle{ font-size: 17px; }
   .login-tela .form-options{ font-size: 13px; }
   .login-tela .signup-line{ font-size: 14px; }
-  .login-tela .brand-icon{ width: 33px; height: 31px; margin-right: 2px; }
+  .login-tela .brand-icon{ width: 30px; height: 30px; margin-right: 4px; }
   .login-tela .brand{ gap: 7px; }
   .login-tela .brand-name{ font-size: 23px; letter-spacing: -1px; }
   .login-tela .vip-badge{ font-size: 16px; padding: 4px 7px 3px; border-radius: 5px; }
@@ -803,7 +803,7 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
 @media (max-width: 379px){
   .login-tela .page-shell{ padding-inline: 16px; }
   .login-tela .brand-name{ font-size: 21px; }
-  .login-tela .brand-icon{ width: 29px; height: 29px; }
+  .login-tela .brand-icon{ width: 27px; height: 27px; }
   .login-tela .login-card-content{ padding: 26px 22px; }
   .login-tela .login-card h2{ font-size: 30px; }
   .login-tela .login-subtitle{ font-size: 15px; }

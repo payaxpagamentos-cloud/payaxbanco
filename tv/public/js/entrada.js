@@ -155,7 +155,9 @@ export function telaEntrada(raiz, { aoEntrar }) {
     el('div', { class: 'page-shell' },
       el('header', { class: 'page-header' },
         el('div', { class: 'brand' },
-          (() => { const i = iconeLinha('tv'); i.classList.add('brand-icon'); return i; })(),
+          // A marca de verdade (a mesma da aba do navegador, do app e do WhatsApp), e não um
+          // ícone desenhado à parte: assim a identidade é a mesma em todo lugar.
+          el('img', { class: 'brand-icon', src: new URL('../img/favicon.svg', import.meta.url).pathname, alt: '' }),
           el('span', { class: 'brand-name' }, el('span', { class: 'brand-red' }, 'PLAY'), 'TECH'),
           el('span', { class: 'vip-badge' }, 'VIP')),
         el('button', { class: 'help-link', type: 'button', onclick: () => mostrarRecado(RECADO_AJUDA) },
