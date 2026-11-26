@@ -84,6 +84,10 @@ function ir(novaTela, dados = null) {
   tela = novaTela;
   try { sessionStorage.setItem('playtechvip.admin.tela', tela); } catch { /* ignora */ }
   const principal = el('main');
+  // A gaveta trava a rolagem do fundo enquanto está aberta. Toda troca de tela desmonta a
+  // casca e monta outra, então a trava precisa ser solta aqui: sem isto, escolher um item do
+  // menu deixava a página seguinte sem rolagem — a tela parecia travada.
+  document.body.classList.remove('menu-aberto');
 
   // No celular o menu é uma gaveta: abre por cima do conteúdo e fecha ao escolher, ao tocar
   // fora ou com Esc. No computador ele continua fixo na lateral, e nada disso aparece.
@@ -121,7 +125,7 @@ function ir(novaTela, dados = null) {
         if (!itens.length) return null;
         return [el('div', { class: 'grupo' }, nomeGrupo), itens.map(([k, [rotulo]]) => el('button', {
           class: k === tela ? 'on' : '',
-          onclick: () => ir(k),
+          onclick: () => { fecharMenu(); ir(k); },
         }, rotulo, contadores[k] ? el('span', { class: 'contador' }, contadores[k]) : null))];
       }),
       el('div', { class: 'rodape' },
