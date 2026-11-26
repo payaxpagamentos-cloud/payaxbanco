@@ -439,7 +439,10 @@ video::cue{ background: rgba(0,0,0,.6); color: #fff; font-family: inherit; }
      fora da tela: para chegar em "Configurações" era preciso adivinhar que dava para arrastar. */
   .painel{ grid-template-columns: 1fr; }
   .painel-topo{ display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 40;
-    padding: 10px clamp(12px, 3vw, 18px); background: var(--bg-2); border-bottom: 1px solid var(--border); }
+    background: var(--bg-2); border-bottom: 1px solid var(--border);
+    /* Com o painel salvo na tela de início, o conteúdo começa colado no topo do aparelho: o
+       recuo extra tira a barra de baixo do relógio e da bateria. */
+    padding: max(10px, env(safe-area-inset-top)) clamp(12px, 3vw, 18px) 10px; }
   .painel-topo .marca{ font-size: 17px; flex-wrap: nowrap; white-space: nowrap; min-width: 0; }
   .painel-topo .marca .etiqueta{ display: none; }
   .painel-topo .topo-tela{ margin-left: auto; font-size: 13px; color: var(--text-3);
