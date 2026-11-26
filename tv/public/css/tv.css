@@ -606,8 +606,14 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
 
 .login-tela .page-shell{ position: relative; z-index: 1; width: min(100%, 1800px);
   min-height: 100vh; min-height: 100svh; margin-inline: auto;
-  padding: clamp(18px, 2.2vw, 32px) clamp(20px, 3.4vw, 56px) 18px;
-  display: grid; grid-template-rows: auto 1fr auto; }
+  display: grid; grid-template-rows: auto 1fr auto;
+  /* O app abre em tela cheia no celular, e aí o conteúdo começa colado no topo do aparelho.
+     Sem isto a marca fica por baixo do relógio e da bateria, e o rodapé por baixo da barra
+     de gestos. Em tela que não tem entalhe, o env() vale zero e o recuo é o de sempre. */
+  padding-top: max(clamp(18px, 2.2vw, 32px), env(safe-area-inset-top));
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
+  padding-left: max(clamp(20px, 3.4vw, 56px), env(safe-area-inset-left));
+  padding-right: max(clamp(20px, 3.4vw, 56px), env(safe-area-inset-right)); }
 
 .login-tela .page-header{ display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .login-tela .brand{ display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
@@ -751,7 +757,8 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
 }
 
 @media (min-width: 1100px) and (max-height: 1000px){
-  .login-tela .page-shell{ padding-top: 28px; padding-bottom: 20px; }
+  .login-tela .page-shell{ padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(14px, env(safe-area-inset-bottom)); }
   .login-tela .main-layout{ padding-block: 24px; }
   .login-tela .login-card-content{ padding: 25px 32px 24px; }
   .login-tela .login-play{ width: 34px; height: 34px; margin: 0 auto 7px; }
@@ -767,7 +774,8 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
 }
 /* Notebook de tela curta: a entrada tem que caber inteira, sem rolar para ver o rodapé. */
 @media (min-width: 1100px) and (max-height: 940px){
-  .login-tela .page-shell{ padding-top: 20px; padding-bottom: 10px; }
+  .login-tela .page-shell{ padding-top: max(14px, env(safe-area-inset-top));
+    padding-bottom: max(10px, env(safe-area-inset-bottom)); }
   .login-tela .main-layout{ padding-block: 14px; gap: clamp(32px, 4vw, 64px); }
   .login-tela .welcome{ padding-top: 0; }
   .login-tela .welcome h1{ font-size: clamp(38px, 3.6vw, 56px); margin-bottom: 14px; }
@@ -834,7 +842,11 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
   .login-tela .form-options{ gap: 8px; font-size: 12px; }
 }
 @media (max-width: 799px){
-  .login-tela .page-shell{ padding: 24px 24px 24px; }
+  .login-tela .page-shell{
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right)); }
   .login-tela .main-layout{ display: flex; flex-direction: column; gap: 36px; padding: 40px 0 36px; }
   .login-tela .login-card{ width: min(100%, 470px); order: -1; align-self: center; }
   .login-tela .login-card-content{ padding: 30px 28px 26px; }
@@ -862,7 +874,8 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
   .login-tela .catalogue-dots button{ width: 30px; height: 36px; }
 }
 @media (max-width: 379px){
-  .login-tela .page-shell{ padding-inline: 16px; }
+  .login-tela .page-shell{ padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right)); }
   .login-tela .brand-name{ font-size: 21px; }
   .login-tela .brand-icon{ width: 27px; height: 27px; }
   .login-tela .login-card-content{ padding: 26px 22px; }
