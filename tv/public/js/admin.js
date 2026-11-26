@@ -80,8 +80,37 @@ function ir(novaTela, dados = null) {
   tela = novaTela;
   try { sessionStorage.setItem('playtechvip.admin.tela', tela); } catch { /* ignora */ }
   const principal = el('main');
+
+  // No celular o menu é uma gaveta: abre por cima do conteúdo e fecha ao escolher, ao tocar
+  // fora ou com Esc. No computador ele continua fixo na lateral, e nada disso aparece.
+  const menu = el('nav', { class: 'menu', id: 'menu-painel' });
+  const fundo = el('div', { class: 'menu-fundo', 'aria-hidden': 'true' });
+  const botaoMenu = el('button', { class: 'menu-botao', type: 'button', 'aria-label': 'Abrir o menu',
+    'aria-controls': 'menu-painel', 'aria-expanded': 'false' }, icone('menu'));
+  const fecharMenu = () => {
+    menu.classList.remove('aberto');
+    fundo.classList.remove('aberto');
+    botaoMenu.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('menu-aberto');
+  };
+  const abrirMenu = () => {
+    menu.classList.add('aberto');
+    fundo.classList.add('aberto');
+    botaoMenu.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('menu-aberto');
+    menu.querySelector('button.on, button')?.focus({ preventScroll: true });
+  };
+  botaoMenu.addEventListener('click', () => (menu.classList.contains('aberto') ? fecharMenu() : abrirMenu()));
+  fundo.addEventListener('click', fecharMenu);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharMenu(); });
+
   limpar(raiz, el('div', { class: 'painel' },
-    el('nav', { class: 'menu' },
+    el('header', { class: 'painel-topo' },
+      botaoMenu,
+      marca('Operação'),
+      el('span', { class: 'topo-tela' }, TELAS[novaTela]?.[0] ?? '')),
+    fundo,
+    limpar(menu,
       marca('Operação'),
       GRUPOS.map(([nomeGrupo, chave]) => {
         const itens = Object.entries(TELAS).filter(([, t]) => t[2] === chave && (!t[3] || usuario.perfil === t[3]));

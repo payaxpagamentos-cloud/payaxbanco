@@ -430,11 +430,69 @@ video::cue{ background: rgba(0,0,0,.6); color: #fff; font-family: inherit; }
 .envio .meio{ flex: 1; min-width: 0; }
 .prev-arte{ width: 96px; aspect-ratio: 2/3; border-radius: var(--radius); object-fit: cover; background: var(--surface-2); }
 .prev-arte.deitada{ aspect-ratio: 16/9; width: 160px; }
+/* A barra de cima e a gaveta só existem no celular e no tablet. */
+.painel-topo{ display: none; }
+.menu-fundo{ display: none; }
+
 @media (max-width: 900px){
+  /* No celular o menu vira gaveta. A tira horizontal que havia aqui escondia metade dos itens
+     fora da tela: para chegar em "Configurações" era preciso adivinhar que dava para arrastar. */
   .painel{ grid-template-columns: 1fr; }
-  .menu{ position: static; height: auto; flex-direction: row; overflow-x: auto; padding: 10px; align-items: center; }
-  .menu .marca, .menu .rodape, .menu .grupo{ display: none; }
-  .menu button{ white-space: nowrap; }
+  .painel-topo{ display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 40;
+    padding: 10px clamp(12px, 3vw, 18px); background: var(--bg-2); border-bottom: 1px solid var(--border); }
+  .painel-topo .marca{ font-size: 17px; flex-wrap: nowrap; white-space: nowrap; min-width: 0; }
+  .painel-topo .marca .etiqueta{ display: none; }
+  .painel-topo .topo-tela{ margin-left: auto; font-size: 13px; color: var(--text-3);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42%; }
+  .menu-botao{ display: grid; place-items: center; width: 40px; height: 40px; flex: none;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); }
+  .menu-botao svg{ width: 22px; height: 22px; fill: currentColor; }
+
+  .menu{ position: fixed; top: 0; left: 0; z-index: 60; width: min(280px, 86vw); height: 100dvh;
+    padding: 18px 12px; overflow-y: auto; border-right: 1px solid var(--border);
+    transform: translateX(-100%); transition: transform .25s ease; }
+  .menu.aberto{ transform: none; box-shadow: 0 0 60px rgba(0,0,0,.6); }
+  .menu .marca{ flex-wrap: nowrap; white-space: nowrap; font-size: 17px; padding-bottom: 14px; }
+  .menu .marca .etiqueta{ flex-basis: auto; margin-left: 6px; }
+  .menu .grupo{ display: block; }
+  .menu button{ white-space: normal; text-align: left; }
+
+  .menu-fundo{ display: block; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.6);
+    opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+  .menu-fundo.aberto{ opacity: 1; pointer-events: auto; }
+  body.menu-aberto{ overflow: hidden; }
+
+  .painel main{ padding: 18px clamp(12px, 3vw, 18px) 28px; }
+
+  /* Filtros em coluna, todos da mesma largura: lado a lado eles ficavam com tamanhos
+     diferentes e a tela parecia desalinhada. */
+  .filtros{ flex-direction: column; align-items: stretch; gap: 12px; }
+  .filtros label.campo, .filtros .campo{ min-width: 0; width: 100%; }
+
+  /* A tabela vira lista empilhada. Rolando para o lado dentro do cartão, a situação e os
+     botões de ação ficavam escondidos — justamente o que se precisa ver no celular. */
+  .cartao.rolagem{ overflow: visible; }
+  .tabela, .tabela tbody, .tabela tr, .tabela td{ display: block; width: auto; }
+  .tabela thead{ display: none; }
+  .tabela tr{ padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .tabela tr:last-child{ border-bottom: 0; }
+  .tabela td{ padding: 4px 0; border: 0; display: flex; align-items: center; gap: 12px;
+    justify-content: space-between; text-align: left; }
+  .tabela td.dir, .tabela th.dir{ text-align: left; }
+  .tabela td::before{ content: attr(data-rotulo); flex: none; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-3); font-weight: 700; }
+  /* O valor fica à direita do rótulo e quebra quando for longo — e-mail, detalhe de auditoria,
+     endereço de sinal. Sem isto ele empurra a linha e a tela inteira passa a rolar de lado. */
+  .tabela td > *{ min-width: 0; text-align: right; overflow-wrap: anywhere; }
+  .tabela td:first-child > *{ text-align: left; }
+  /* A primeira célula é o nome da coisa: ocupa a linha inteira, como título do bloco. */
+  .tabela td:first-child{ display: block; margin-bottom: 6px; }
+  .tabela td:first-child::before{ display: none; }
+  /* Célula de ações: os botões quebram em linha nova e não espremem. */
+  .tabela td > .linha{ flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (max-width: 900px) and (prefers-reduced-motion: reduce){
+  .menu, .menu-fundo{ transition: none; }
 }
 @media print{ .menu, .filtros, .btn{ display: none !important; } .painel{ display: block; } }
 

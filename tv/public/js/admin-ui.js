@@ -7,11 +7,20 @@ export const cabeca = (titulo, ...acoes) => el('div', { class: 'cabeca' },
 export const indicador = (rotulo, valor, nota, destaque = false) => el('div', { class: `cartao indicador${destaque ? ' destaque' : ''}` },
   el('div', { class: 'rotulo' }, rotulo), el('div', { class: 'valor num' }, valor), nota ? el('div', { class: 'nota' }, nota) : null);
 
-export const tabela = (colunas, linhas, vazio = 'Nada por aqui.') => (linhas.length
-  ? el('div', { class: 'cartao rolagem', style: 'padding:0' }, el('table', { class: 'tabela' },
+export const tabela = (colunas, linhas, vazio = 'Nada por aqui.') => {
+  if (!linhas.length) return el('div', { class: 'cartao vazio' }, vazio);
+  const nomes = colunas.map((c) => c.replace(/^>/, ''));
+  // Cada célula leva o nome da sua coluna. No computador isso não aparece; no celular a tabela
+  // vira uma lista empilhada e é esse nome que diz o que é cada valor, sem rolar para o lado.
+  for (const linha of linhas) {
+    [...linha.children].forEach((celula, i) => {
+      if (nomes[i]) celula.dataset.rotulo = nomes[i];
+    });
+  }
+  return el('div', { class: 'cartao rolagem', style: 'padding:0' }, el('table', { class: 'tabela' },
     el('thead', {}, el('tr', {}, colunas.map((c) => el('th', { class: c.startsWith('>') ? 'dir' : '' }, c.replace(/^>/, ''))))),
-    el('tbody', {}, linhas)))
-  : el('div', { class: 'cartao vazio' }, vazio));
+    el('tbody', {}, linhas)));
+};
 
 export const td = (conteudo, dir = false) => el('td', { class: dir ? 'dir num' : '' }, conteudo);
 

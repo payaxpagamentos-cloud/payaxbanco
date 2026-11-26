@@ -25,6 +25,7 @@ export const limpar = (e, ...filhos) => {
 
 /** Ícone SVG (os desenhos são fixos no código, nunca vêm da API). */
 const ICONES = {
+  menu: 'M3.5 6.25h17v1.9h-17zm0 4.8h17v1.9h-17zm0 4.8h17v1.9h-17z',
   cadeado: 'M12 2a4.5 4.5 0 0 0-4.5 4.5V9H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1.5V6.5A4.5 4.5 0 0 0 12 2zm0 2a2.5 2.5 0 0 1 2.5 2.5V9h-5V6.5A2.5 2.5 0 0 1 12 4zm0 10a1.6 1.6 0 0 1 .8 3v1.6a.8.8 0 0 1-1.6 0V17a1.6 1.6 0 0 1 .8-3z',
   tocar: 'M8 5.5v13l11-6.5z',
   pausar: 'M7 5h3.6v14H7zm6.4 0H17v14h-3.6z',
