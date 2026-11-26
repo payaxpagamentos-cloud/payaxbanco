@@ -325,7 +325,7 @@ module.exports = (db) => {
    * Quem aplica é o agente de fora (scripts/atualizador.sh, no cron): o contêiner não tem, e
    * não deve ter, acesso ao Docker do servidor. Aqui só é feita a entrega.
    */
-  r.post('/sistema/pacote', soAdmin, express.raw({ type: ['application/gzip', 'application/x-gzip', 'application/octet-stream'], limit: config.pacoteMaxBytes }),
+  r.post('/sistema/pacote', soAdmin, express.raw({ type: ['application/gzip', 'application/x-gzip', 'application/zip', 'application/x-zip-compressed', 'application/octet-stream'], limit: config.pacoteMaxBytes }),
     (req, res) => {
       if (!sistema.agenteDisponivel()) {
         throw new ErroNegocio('Esta instalação não tem o agente de atualização. Atualize uma vez pelo servidor para instalá-lo.', 409);

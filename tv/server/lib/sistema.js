@@ -22,12 +22,19 @@ const zlib = require('node:zlib');
 // Lida na hora do uso, e não na carga do módulo: assim dá para apontar para outra pasta em
 // teste sem recarregar meio servidor, e uma troca em produção vale no próximo pedido.
 const pasta = () => process.env.TV_ATUALIZACAO || '/atualizacao';
-const pacote = () => path.join(pasta(), 'pacote.tar.gz');
 const pedidoEm = () => path.join(pasta(), 'pedido.json');
 const estadoEm = () => path.join(pasta(), 'estado.json');
 const registroEm = () => path.join(pasta(), 'registro.log');
 
 const GZIP = Buffer.from([0x1f, 0x8b]);
+const ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04]);   // "PK\x03\x04"
+
+/** .tar.gz ou .zip? Decidido pelos primeiros bytes, não pelo nome do arquivo. */
+const formatoDe = (b) => {
+  if (b.subarray(0, 2).equals(GZIP)) return 'tar.gz';
+  if (b.subarray(0, 4).equals(ZIP)) return 'zip';
+  return null;
+};
 
 const lerJson = (arquivo) => {
   try { return JSON.parse(fs.readFileSync(arquivo, 'utf8')); } catch { return null; }
@@ -45,6 +52,32 @@ function agenteDisponivel() {
     fs.accessSync(pasta(), fs.constants.W_OK);
     return true;
   } catch { return false; }
+}
+
+/**
+ * Lê os nomes dentro de um .zip pelo diretório central — a lista que fica no fim do arquivo e
+ * é a fonte confiável (nos cabeçalhos locais o tamanho pode vir zerado quando o zip foi feito
+ * em fluxo).
+ */
+function nomesNoZip(buf) {
+  // O fim do diretório central ("PK\x05\x06") fica nos últimos 64 KB, depois do comentário.
+  let fim = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 66_000); i -= 1) {
+    if (buf.readUInt32LE(i) === 0x0605_4b50) { fim = i; break; }
+  }
+  if (fim < 0) throw new Error('nao-e-zip');
+  const quantos = buf.readUInt16LE(fim + 10);
+  let i = buf.readUInt32LE(fim + 16);
+  const nomes = [];
+  for (let n = 0; n < quantos && i + 46 <= buf.length; n += 1) {
+    if (buf.readUInt32LE(i) !== 0x0201_4b50) break;
+    const tamNome = buf.readUInt16LE(i + 28);
+    const tamExtra = buf.readUInt16LE(i + 30);
+    const tamComentario = buf.readUInt16LE(i + 32);
+    nomes.push(buf.subarray(i + 46, i + 46 + tamNome).toString('utf8'));
+    i += 46 + tamNome + tamExtra + tamComentario;
+  }
+  return nomes;
 }
 
 /**
@@ -77,18 +110,19 @@ function nomesNoPacote(gz) {
  * no agente. Assim quem está no celular descobre na hora, e com o conteúdo do que mandou.
  */
 function conferirPacote(conteudo) {
+  const formato = formatoDe(conteudo);
   let nomes;
   try {
-    nomes = nomesNoPacote(conteudo);
+    nomes = formato === 'zip' ? nomesNoZip(conteudo) : nomesNoPacote(conteudo);
   } catch {
-    throw new Error('O arquivo está corrompido ou não é um .tar.gz. Baixe de novo e tente outra vez.');
+    throw new Error('O arquivo está corrompido ou não é um .zip nem um .tar.gz. Baixe de novo e tente outra vez.');
   }
   // Aceita tanto "./server/index.js" quanto "server/index.js": muda conforme como o tar foi feito.
   if (!nomes.some((n) => /(^|\/)server\/index\.js$/.test(n))) {
     // Só nomes legíveis entram na mensagem: um arquivo estranho não pode despejar binário na tela.
     const amostra = [...new Set(nomes.map((n) => n.replace(/^\.\//, '').split('/')[0]))]
       .filter((n) => /^[\w.][\w.\- ]{0,38}$/.test(n)).slice(0, 6);
-    throw new Error(`Este .tar.gz não é o pacote da plataforma${amostra.length ? ` (dentro dele há: ${amostra.join(', ')})` : ''}.`);
+    throw new Error(`Este arquivo não é o pacote da plataforma${amostra.length ? ` (dentro dele há: ${amostra.join(', ')})` : ''}.`);
   }
   return nomes.length;
 }
@@ -102,13 +136,18 @@ function guardarPacote(conteudo, { por }) {
   if (!Buffer.isBuffer(conteudo) || conteudo.length < 1024) {
     throw new Error('O arquivo chegou vazio ou pequeno demais para ser um pacote.');
   }
-  if (!conteudo.subarray(0, 2).equals(GZIP)) {
-    throw new Error('Isto não é um arquivo .tar.gz. No iPhone, não abra o arquivo: use "Salvar em Arquivos" e escolha o que foi salvo.');
+  const formato = formatoDe(conteudo);
+  if (!formato) {
+    throw new Error('Isto não é um .zip nem um .tar.gz. No iPhone, não abra o arquivo: use "Salvar em Arquivos" e escolha o que foi salvo.');
   }
   const arquivos = conferirPacote(conteudo);
   fs.mkdirSync(pasta(), { recursive: true });
+  // Um pedido de cada vez: o formato anterior não pode ficar para trás e confundir o agente.
+  for (const antigo of ['pacote.tar.gz', 'pacote.zip']) {
+    try { fs.unlinkSync(path.join(pasta(), antigo)); } catch { /* não existia */ }
+  }
   // Grava ao lado e só então renomeia: o agente nunca enxerga um pacote pela metade.
-  const destino = pacote();
+  const destino = path.join(pasta(), `pacote.${formato}`);
   const temporario = `${destino}.parcial`;
   fs.writeFileSync(temporario, conteudo);
   fs.renameSync(temporario, destino);
@@ -117,6 +156,7 @@ function guardarPacote(conteudo, { por }) {
     pedido_em: new Date().toISOString(),
     por,
     bytes: conteudo.length,
+    formato,
     arquivos,
     sha256: crypto.createHash('sha256').update(conteudo).digest('hex'),
   };
@@ -139,4 +179,4 @@ function estado() {
   };
 }
 
-module.exports = { versao, estado, guardarPacote, conferirPacote, agenteDisponivel, pasta };
+module.exports = { versao, estado, guardarPacote, conferirPacote, formatoDe, agenteDisponivel, pasta };

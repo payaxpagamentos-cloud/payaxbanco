@@ -497,7 +497,7 @@ async function blocoSistema() {
   const caixa = el('div', { class: 'cartao' });
 
   const desenhar = (s) => {
-    const arquivo = el('input', { type: 'file', accept: '.gz,.tgz,application/gzip,application/x-gzip' });
+    const arquivo = el('input', { type: 'file', accept: '.zip,.gz,.tgz,application/zip,application/gzip,application/x-gzip' });
     const enviar = botao('Enviar e atualizar', 'primario', async () => {
       const f = arquivo.files?.[0];
       if (!f) throw new Error('Escolha o arquivo .tar.gz da atualização.');
@@ -505,7 +505,7 @@ async function blocoSistema() {
         `Vai ser aplicado o arquivo "${f.name}". A plataforma reinicia e fica alguns segundos fora do ar. `
         + 'O banco, os vídeos e o catálogo não são tocados. Continuar?', 'Atualizar agora')) return;
       // File é um Blob: o envio vai como corpo cru, igual ao das artes e dos vídeos.
-      await api.post('/admin/sistema/pacote', f, { tipo: 'application/gzip' });
+      await api.post('/admin/sistema/pacote', f, { tipo: f.type || 'application/octet-stream' });
       toast('Pacote enviado. Aplicando…');
       await acompanhar(s.versao.versao);
     });
@@ -524,7 +524,7 @@ async function blocoSistema() {
           'Esta instalação ainda não tem o agente de atualização. Faça uma atualização pelo servidor '
           + '(o instalador o coloca no lugar) e depois esta tela passa a funcionar.')
         : el('div', { style: 'margin-top:16px' },
-          el('label', { class: 'campo' }, 'Pacote da atualização (.tar.gz)', arquivo),
+          el('label', { class: 'campo' }, 'Pacote da atualização (.zip ou .tar.gz)', arquivo),
           el('p', { class: 'mini apagado', style: 'margin:6px 0 12px' },
             'Pelo celular: toque no campo, escolha o arquivo que você recebeu e envie. '
             + 'A atualização leva de 1 a 3 minutos e a plataforma volta sozinha.'),

@@ -121,3 +121,23 @@ test('o pacote é conferido no envio, e o erro diz o que veio dentro', async (t)
   assert.equal(lixo.status, 400);
   assert.match(lixo.dados.erro, /corrompido|não é um \.tar\.gz/i);
 });
+
+test('o painel aceita o pacote em .zip, do mesmo jeito', async (t) => {
+  const pasta = pastaDeTeste(t);
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ptv-zip-'));
+  fs.mkdirSync(path.join(base, 'server'), { recursive: true });
+  fs.writeFileSync(path.join(base, 'server', 'index.js'), crypto.randomBytes(80 * 1024).toString('base64'));
+  const zip = `${base}.zip`;
+  execFileSync('zip', ['-qr', zip, '.'], { cwd: base });
+  t.after(() => { fs.rmSync(base, { recursive: true, force: true }); fs.rmSync(zip, { force: true }); });
+
+  const r = await s.req('POST', '/admin/sistema/pacote', fs.readFileSync(zip), admin, { headers: { 'Content-Type': 'application/zip' } });
+  assert.equal(r.status, 202, JSON.stringify(r.dados));
+  assert.equal(r.dados.pedido.formato, 'zip');
+  assert.ok(fs.existsSync(path.join(pasta, 'pacote.zip')), 'fica para o agente com a extensão certa');
+  assert.equal(fs.existsSync(path.join(pasta, 'pacote.tar.gz')), false, 'não sobra pacote do formato anterior');
+});

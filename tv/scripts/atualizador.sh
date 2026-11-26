@@ -19,7 +19,8 @@ set -uo pipefail
 
 DESTINO=${DESTINO:-/opt/playtechvip}
 PASTA=${TV_ATUALIZACAO_HOST:-/var/lib/playtechvip/atualizacao}
-PACOTE="$PASTA/pacote.tar.gz"
+PACOTE_TGZ="$PASTA/pacote.tar.gz"
+PACOTE_ZIP="$PASTA/pacote.zip"
 PEDIDO="$PASTA/pedido.json"
 ESTADO="$PASTA/estado.json"
 REGISTRO="$PASTA/registro.log"
@@ -60,33 +61,55 @@ FIM
 : > "$REGISTRO"
 registrar "[$(date -Is)] atualização pedida, começando"
 
-if [ ! -s "$PACOTE" ]; then
-  registrar "pacote não encontrado em $PACOTE"
+# O painel manda .tar.gz ou .zip — o que a pessoa tiver em mãos.
+if [ -s "$PACOTE_TGZ" ]; then
+  PACOTE="$PACOTE_TGZ"; FORMATO=tar.gz
+elif [ -s "$PACOTE_ZIP" ]; then
+  PACOTE="$PACOTE_ZIP"; FORMATO=zip
+else
+  registrar "pacote não encontrado em $PASTA"
   gravar_estado erro "O pacote não chegou ao servidor."
   rm -f "$PEDIDO"
   exit 1
 fi
+registrar "formato: $FORMATO"
 
 # Confere o pacote ANTES de mexer na instalação: um arquivo corrompido não pode deixar a
 # plataforma pela metade. O teste abaixo lê o tar inteiro sem gravar nada.
-if ! tar -tzf "$PACOTE" > /dev/null 2>>"$REGISTRO"; then
-  registrar "pacote corrompido ou não é um .tar.gz"
+listar() {
+  if [ "$FORMATO" = zip ]; then
+    python3 -c "import sys,zipfile;[print(n) for n in zipfile.ZipFile(sys.argv[1]).namelist()]" "$PACOTE"
+  else
+    tar -tzf "$PACOTE"
+  fi
+}
+
+if ! listar > /dev/null 2>>"$REGISTRO"; then
+  registrar "pacote corrompido ou ilegível"
   gravar_estado erro "O pacote está corrompido. Envie de novo."
   rm -f "$PEDIDO" "$PACOTE"
   exit 1
 fi
-# Aceita "./server/index.js" e "server/index.js": muda conforme como o tar foi montado.
-if ! tar -tzf "$PACOTE" | grep -qE '(^|/)server/index\.js$'; then
+# Aceita "./server/index.js" e "server/index.js": muda conforme como o pacote foi montado.
+if ! listar | grep -qE '(^|/)server/index\.js$'; then
   registrar "o pacote não tem server/index.js — não é a plataforma. O que veio dentro:"
-  tar -tzf "$PACOTE" | head -15 | sed 's/^/    /' >> "$REGISTRO"
-  gravar_estado erro "Este .tar.gz não é o pacote da plataforma."
+  listar | head -15 | sed 's/^/    /' >> "$REGISTRO"
+  gravar_estado erro "Este arquivo não é o pacote da plataforma."
   rm -f "$PEDIDO" "$PACOTE"
   exit 1
 fi
 
 # Guarda o .env e os dados: eles não vêm no pacote e não podem ser tocados.
 registrar "extraindo em $DESTINO"
-if ! tar -C "$DESTINO" -xzf "$PACOTE" >>"$REGISTRO" 2>&1; then
+extrair() {
+  if [ "$FORMATO" = zip ]; then
+    # unzip pode não estar instalado; o zipfile do Python vem com o sistema.
+    python3 -c "import sys,zipfile;zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$PACOTE" "$DESTINO"
+  else
+    tar -C "$DESTINO" -xzf "$PACOTE"
+  fi
+}
+if ! extrair >>"$REGISTRO" 2>&1; then
   registrar "falha ao extrair"
   gravar_estado erro "Não foi possível extrair o pacote no servidor."
   rm -f "$PEDIDO"
@@ -118,5 +141,5 @@ else
   gravar_estado erro "Os contêineres subiram, mas a plataforma não respondeu. Veja o registro."
 fi
 
-rm -f "$PEDIDO" "$PACOTE"
+rm -f "$PEDIDO" "$PACOTE_TGZ" "$PACOTE_ZIP"
 chown 1000:1000 "$REGISTRO" 2>/dev/null || true
