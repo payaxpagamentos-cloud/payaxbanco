@@ -13,7 +13,10 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY package.json package-lock.json ./
+# versao.json carimba o pacote: e o que o painel mostra como versao instalada, e o que
+# permite conferir se uma atualizacao entrou de verdade. Sem ele aqui dentro, o painel
+# so saberia dizer "desconhecida".
+COPY package.json package-lock.json versao.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY server ./server
 COPY public ./public

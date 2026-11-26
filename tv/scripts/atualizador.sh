@@ -75,8 +75,10 @@ if ! tar -tzf "$PACOTE" > /dev/null 2>>"$REGISTRO"; then
   rm -f "$PEDIDO" "$PACOTE"
   exit 1
 fi
-if ! tar -tzf "$PACOTE" | grep -q '^\./server/index.js$'; then
-  registrar "o pacote não tem server/index.js — não é a plataforma"
+# Aceita "./server/index.js" e "server/index.js": muda conforme como o tar foi montado.
+if ! tar -tzf "$PACOTE" | grep -qE '(^|/)server/index\.js$'; then
+  registrar "o pacote não tem server/index.js — não é a plataforma. O que veio dentro:"
+  tar -tzf "$PACOTE" | head -15 | sed 's/^/    /' >> "$REGISTRO"
   gravar_estado erro "Este .tar.gz não é o pacote da plataforma."
   rm -f "$PEDIDO" "$PACOTE"
   exit 1

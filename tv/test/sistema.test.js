@@ -7,7 +7,25 @@ const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const crypto = require('node:crypto');
+const { execFileSync } = require('node:child_process');
 const { iniciar } = require('./helpers');
+
+/** Monta um .tar.gz com a cara do pacote da plataforma (o que importa é ter server/index.js). */
+function pacoteDeMentira(t) {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'ptv-pacote-'));
+  fs.mkdirSync(path.join(base, 'server'), { recursive: true });
+  // Conteúdo aleatório: texto repetido comprime tanto que o .tar.gz sairia menor que o mínimo
+  // aceito, e o teste falharia por tamanho em vez de testar o que interessa.
+  fs.writeFileSync(path.join(base, 'server', 'index.js'), crypto.randomBytes(80 * 1024).toString('base64'));
+  fs.writeFileSync(path.join(base, 'versao.json'), '{"versao":"9999.01.01"}');
+  // O arquivo de saída fica FORA da pasta que o tar está lendo, senão ele reclama que o
+  // conteúdo mudou durante a leitura.
+  const saida = `${base}.tar.gz`;
+  execFileSync('tar', ['-C', base, '-czf', saida, '.']);
+  t.after(() => fs.rmSync(saida, { force: true }));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  return fs.readFileSync(saida);
+}
 
 /** Pasta compartilhada do agente, trocada por uma temporária durante o teste. */
 function pastaDeTeste(t) {
@@ -45,8 +63,7 @@ test('o pacote enviado fica na pasta do agente, com o pedido marcado', async (t)
   t.after(s.fechar);
   const admin = await s.adminLogin();
 
-  // Conteúdo aleatório: não comprime, então o gzip fica do tamanho de um pacote de verdade.
-  const pacote = zlib.gzipSync(crypto.randomBytes(64 * 1024));
+  const pacote = pacoteDeMentira(t);
   const r = await s.req('POST', '/admin/sistema/pacote', pacote, admin, { headers: { 'Content-Type': 'application/gzip' } });
   assert.equal(r.status, 202, JSON.stringify(r.dados));
   assert.equal(r.dados.pedido.bytes, pacote.length);
@@ -70,9 +87,37 @@ test('arquivo que não é um pacote é recusado antes de chegar ao agente', asyn
   const naoEhGzip = Buffer.alloc(4096, 0x41);
   const r = await s.req('POST', '/admin/sistema/pacote', naoEhGzip, admin, { headers: { 'Content-Type': 'application/octet-stream' } });
   assert.equal(r.status, 400);
-  assert.match(r.dados.erro, /pacote/i);
+  assert.match(r.dados.erro, /\.tar\.gz/i);
   assert.equal(fs.existsSync(path.join(pasta, 'pedido.json')), false, 'nada foi pedido ao agente');
 
   const vazio = Buffer.alloc(10);
   assert.equal((await s.req('POST', '/admin/sistema/pacote', vazio, admin, { headers: { 'Content-Type': 'application/gzip' } })).status, 400);
+});
+
+test('o pacote é conferido no envio, e o erro diz o que veio dentro', async (t) => {
+  const pasta = pastaDeTeste(t);
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const enviar = (b) => s.req('POST', '/admin/sistema/pacote', b, admin, { headers: { 'Content-Type': 'application/gzip' } });
+
+  // Um .tar.gz de verdade, mas de outra coisa: o painel precisa dizer isso na hora, e não
+  // deixar o agente descobrir depois.
+  const fora = fs.mkdtempSync(path.join(os.tmpdir(), 'ptv-outro-'));
+  // Grande o bastante para passar da guarda de tamanho: o que se testa aqui é o CONTEÚDO.
+  fs.writeFileSync(path.join(fora, 'leia.txt'), crypto.randomBytes(80 * 1024).toString('base64'));
+  const outro = path.join(fora, 'outro.tar.gz');
+  execFileSync('tar', ['-C', fora, '-czf', outro, 'leia.txt']);
+  t.after(() => fs.rmSync(fora, { recursive: true, force: true }));
+
+  const r = await enviar(fs.readFileSync(outro));
+  assert.equal(r.status, 400);
+  assert.match(r.dados.erro, /não é o pacote da plataforma/);
+  assert.match(r.dados.erro, /leia\.txt/, 'a mensagem mostra o que havia dentro');
+  assert.equal(fs.existsSync(path.join(pasta, 'pedido.json')), false, 'nada chega ao agente');
+
+  // Gzip de conteúdo qualquer: não é nem tar.
+  const lixo = await enviar(zlib.gzipSync(crypto.randomBytes(70 * 1024)));
+  assert.equal(lixo.status, 400);
+  assert.match(lixo.dados.erro, /corrompido|não é um \.tar\.gz/i);
 });
