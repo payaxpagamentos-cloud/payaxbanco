@@ -10,12 +10,30 @@ const { hoje, somarDias, intervalo, competencia, deslocamentoHoras } = require('
 
 const minutos = (segundos) => Math.round((segundos ?? 0) / 60);
 
-/** Telas assistindo neste instante (o "ao vivo" da operação). */
+/**
+ * Quantas telas estão assistindo agora — a conta, sem a lista.
+ *
+ * O painel tirava este número do tamanho da lista de `assistindoAgora`, que traz no máximo 200
+ * linhas: com mais de 200 pessoas assistindo, o indicador parava em 200 e a operação via um
+ * teto que não existia.
+ */
+function telasAgora(db) {
+  const corte = new Date(Date.now() - config.sessaoPlayerSegundos * 1000).toISOString();
+  return db.prepare('SELECT COUNT(*) AS n FROM sessoes_player INDEXED BY idx_sessoes_abertas WHERE encerrada_em IS NULL AND ultimo_ping >= ?').get(corte).n;
+}
+
+/**
+ * Telas assistindo neste instante (o "ao vivo" da operação).
+ *
+ * `INDEXED BY` porque, deixado à vontade, o banco escolhia o índice da data (para já devolver
+ * em ordem) e percorria o histórico inteiro atrás das poucas telas abertas: 63 ms com 500 mil
+ * sessões guardadas. Pelo índice das abertas ele pega só elas e ordena meia dúzia de linhas.
+ */
 function assistindoAgora(db) {
   const corte = new Date(Date.now() - config.sessaoPlayerSegundos * 1000).toISOString();
   const linhas = db.prepare(`SELECT s.id, s.tipo, s.dispositivo, s.iniciada_em, s.segundos, s.qualidade,
       u.nome AS assinante, pf.nome AS perfil, c.nome AS canal, t.nome AS titulo, e.nome AS episodio, e.numero AS episodio_numero
-    FROM sessoes_player s JOIN usuarios u ON u.id = s.usuario_id JOIN perfis pf ON pf.id = s.perfil_id
+    FROM sessoes_player s INDEXED BY idx_sessoes_abertas JOIN usuarios u ON u.id = s.usuario_id JOIN perfis pf ON pf.id = s.perfil_id
     LEFT JOIN canais c ON c.id = s.canal_id LEFT JOIN titulos t ON t.id = s.titulo_id LEFT JOIN episodios e ON e.id = s.episodio_id
     WHERE s.encerrada_em IS NULL AND s.ultimo_ping >= ? ORDER BY s.iniciada_em DESC LIMIT 200`).all(corte);
   return linhas.map((s) => ({ ...s, o_que: s.canal ?? (s.episodio ? `${s.titulo} · ep. ${s.episodio_numero}` : s.titulo) ?? 'Trailer' }));
@@ -46,7 +64,7 @@ function painel(db) {
     },
     receita: { mrr_centavos: mrr, recebido_no_mes_centavos: recebidoMes, a_receber_centavos: faturas.total, faturas_abertas: faturas.n,
       vencidas_n: vencidas.n, vencidas_centavos: vencidas.total },
-    audiencia: { telas_agora: assistindoAgora(db).length, sessoes_hoje: audienciaHoje.n, minutos_hoje: minutos(audienciaHoje.s) },
+    audiencia: { telas_agora: telasAgora(db), sessoes_hoje: audienciaHoje.n, minutos_hoje: minutos(audienciaHoje.s) },
     conteudo: {
       canais: umaConta('SELECT COUNT(*) AS n FROM canais WHERE ativo = 1').n,
       canais_fora_do_ar: umaConta("SELECT COUNT(*) AS n FROM canais WHERE ativo = 1 AND sinal_status = 'falha'").n,

@@ -344,6 +344,7 @@ module.exports = (db) => {
   r.delete('/programas/:id', (req, res) => {
     const p = achar('programas', req.params.id, 'Programa');
     db.prepare('DELETE FROM programas WHERE id = ?').run(p.id);
+    epg.gradeMudou();
     res.status(204).end();
   });
 

@@ -8,6 +8,11 @@ const catalogo = require('../lib/catalogo');
 const player = require('../lib/player');
 const epg = require('../lib/epg');
 const v = require('../lib/validacao');
+const embed = require('../lib/embed');
+const { memoriaPorBanco } = require('../lib/memoria');
+
+// O guia pronto, em texto, por faixa etária e plano (ver a rota /guia).
+const memoriaGuia = memoriaPorBanco({ validadeMs: 30_000, maximo: 80 });
 
 /**
  * O que o assinante vê. Toda rota aqui exige assinatura ativa (402 quando falta):
@@ -62,21 +67,33 @@ module.exports = (db) => {
       : diaPedido ? inicioDia(diaPedido) : new Date(Date.now() - 2 * 3600_000).toISOString();
     const ate = req.query.ate ? v.instante(req.query.ate, 'o fim')
       : diaPedido ? inicioDia(somarDias(diaPedido, 1)) : new Date(Date.now() + 36 * 3600_000).toISOString();
-    const canais = catalogo.canaisAoVivo(db, req.perfilView, req.acesso);
-    const programas = epg.grade(db, { de, ate });
-    res.json({
-      dia,
-      de,
-      ate,
-      canais: canais.map((c) => ({
-        ...c,
-        programas: programas.filter((p) => p.canal_id === c.id).map((p) => ({
+    const montar = () => {
+      const canais = catalogo.canaisAoVivo(db, req.perfilView, req.acesso);
+      // Agrupa numa passada. Antes cada canal filtrava a lista inteira de programas: com 116
+      // canais e ~6 mil programas na janela, eram quase 700 mil comparações por pedido.
+      const porCanal = new Map();
+      for (const p of epg.grade(db, { de, ate })) {
+        let lista = porCanal.get(p.canal_id);
+        if (!lista) porCanal.set(p.canal_id, lista = []);
+        lista.push({
           // Sem `descricao` de propósito: ela vem por /tv/programa/:id quando a janela abre.
           id: p.id, titulo: p.titulo, subtitulo: p.subtitulo, inicio: p.inicio, fim: p.fim,
           classificacao: p.classificacao, categoria: p.categoria, ao_vivo: Boolean(p.ao_vivo), andamento: epg.andamento(p),
-        })),
-      })),
-    });
+        });
+      }
+      return JSON.stringify({ dia, de, ate, canais: canais.map((c) => ({ ...c, programas: porCanal.get(c.id) ?? [] })) });
+    };
+    // O guia é a resposta mais pesada da plataforma (mais de 1 MB antes de comprimir) e sai
+    // igual para todo mundo que tem a mesma faixa etária e o mesmo plano. Guardado já em texto,
+    // por 30 s: quem pede em seguida recebe a cópia pronta, sem consulta e sem montar o JSON de
+    // novo. Só o pedido sem instante próprio entra aqui — "agora" e "o dia tal" são poucas
+    // chaves; um `de`/`ate` qualquer viraria uma chave por pedido.
+    const proprio = Boolean(req.query.de || req.query.ate);
+    const corpo = proprio ? montar() : memoriaGuia(db).obter(
+      [req.perfilView.classificacao_max, req.perfilView.infantil, req.acesso.nivel, req.acesso.canais_ao_vivo, diaPedido ?? 'agora', embed.versaoAtual()].join('|'),
+      montar,
+    );
+    res.type('application/json').send(corpo);
   });
 
   r.get('/catalogo', (req, res) => res.json(catalogo.navegar(db, req.perfilView, req.acesso, req.query)));

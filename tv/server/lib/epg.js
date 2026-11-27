@@ -4,6 +4,9 @@ const { agora, transacao } = require('../db');
 const { ErroNegocio } = require('./erros');
 const v = require('./validacao');
 
+/** Avisa que a grade mudou: o que estiver guardado em memória sobre canais e guia deixa de valer. */
+const gradeMudou = () => require('./embed').invalidar();
+
 /**
  * Grade de programação (EPG). A operação cadastra na mão, importa um XMLTV (o formato que as
  * emissoras e os agregadores publicam) ou deixa em branco: sem grade, o canal mostra "Ao vivo".
@@ -85,6 +88,9 @@ function salvarPrograma(db, canalId, d, { id = null } = {}) {
     v.inteiroOpcional(d.temporada, 'a temporada', { min: 1, max: 100 }),
     v.inteiroOpcional(d.episodio, 'o episódio', { min: 1, max: 10_000 }),
   ];
+  // Mexeu na grade pelo painel: as telas de canais e o guia guardam o resultado por alguns
+  // segundos, e sem este aviso a operação salvaria o programa e não o veria aparecer.
+  gradeMudou();
   if (id) {
     db.prepare(`UPDATE programas SET titulo = ?, subtitulo = ?, descricao = ?, inicio = ?, fim = ?, categoria = ?, classificacao = ?, ao_vivo = ?,
       temporada = ?, episodio = ? WHERE id = ? AND canal_id = ?`).run(...campos, Number(id), Number(canalId));
@@ -205,6 +211,7 @@ function importarXmltv(db, xml, { canalId = null, porIdExterno = {}, substituir 
       resultado.importados += 1;
     }
   });
+  gradeMudou();
   return { ...resultado, canais: resultado.canais.size };
 }
 
@@ -257,4 +264,4 @@ async function atualizarGradeAutomatica(db) {
 }
 
 module.exports = { agoraEmTodos, noAr, aSeguir, grade, andamento, salvarPrograma, limparAntigos, dataXmltv, importarXmltv,
-  importarDeUrl, atualizarGradeAutomatica, programa};
+  importarDeUrl, atualizarGradeAutomatica, programa, gradeMudou };

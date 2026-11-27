@@ -19,6 +19,8 @@ const sistema = require('../lib/sistema');
 const express = require('express');
 
 const soAdmin = permitir('admin');
+const memoriaAudiencia = require('../lib/memoria').memoriaPorBanco({ validadeMs: 5 * 60_000, maximo: 20 });
+const memoriaPainel = require('../lib/memoria').memoriaPorBanco({ validadeMs: 15_000, maximo: 4 });
 
 /** Operação: painel, planos, assinantes, faturas, relatórios, equipe e configurações. */
 module.exports = (db) => {
@@ -32,7 +34,10 @@ module.exports = (db) => {
   // ---------------- Painel ----------------
 
   r.get('/painel', (req, res) => {
-    const p = audiencia.painel(db);
+    // Os indicadores somam assinaturas, faturas e a audiência do dia: ~35 ms com a base cheia,
+    // e a tela inicial do painel se atualiza sozinha em cada aba aberta. Quinze segundos de
+    // memória não mudam nada para quem olha um painel, e tiram essa conta do caminho dos canais.
+    const p = memoriaPainel(db).obter('painel', () => audiencia.painel(db));
     res.json({
       ...p,
       // O curador cuida do conteúdo: os números de receita ficam com o administrador.
@@ -291,16 +296,21 @@ module.exports = (db) => {
     ate: q.ate ? v.data(q.ate, 'a data final') : hoje(),
   });
 
+  // O relatório soma o histórico do período inteiro, cinco vezes (por dia, por hora, por
+  // aparelho, por título, por canal): 1,6 s medido com 500 mil sessões — e nesse tempo o
+  // servidor não atende mais ninguém. Guardado por cinco minutos, abrir a tela, trocar de aba
+  // e voltar não repete a conta. O primeiro pedido de cada período ainda paga o preço; a saída
+  // de verdade, quando o histórico crescer, é somar por dia numa tabela à parte.
   r.get('/relatorios/audiencia', (req, res) => {
     const p = periodo(req.query);
-    res.json({
+    res.type('application/json').send(memoriaAudiencia(db).obter(`${p.de}|${p.ate}`, () => JSON.stringify({
       ...p,
       por_dia: audiencia.porDia(db, p),
       por_hora: audiencia.porHora(db, p),
       por_dispositivo: audiencia.porDispositivo(db, p),
       titulos: audiencia.topTitulos(db, { ...p, limite: 20 }),
       canais: audiencia.topCanais(db, { ...p, limite: 20 }),
-    });
+    })));
   });
 
   r.get('/relatorios/audiencia.csv', (req, res) => {

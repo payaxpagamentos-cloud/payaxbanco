@@ -382,6 +382,15 @@ CREATE TABLE IF NOT EXISTS sessoes_player (
 );
 CREATE INDEX IF NOT EXISTS idx_sessoes_vivas ON sessoes_player(usuario_id, encerrada_em, ultimo_ping);
 CREATE INDEX IF NOT EXISTS idx_sessoes_audiencia ON sessoes_player(iniciada_em);
+-- Só as telas ABERTAS. Toda abertura de canal fecha antes as telas que pararam de dar sinal de
+-- vida, e sem este índice isso varria o histórico inteiro: medido, 45 ms por abertura com 500
+-- mil sessões guardadas, crescendo junto com o histórico. As abertas são sempre poucas (quem
+-- está assistindo agora), então o índice é minúsculo e a busca não depende mais do passado.
+CREATE INDEX IF NOT EXISTS idx_sessoes_abertas ON sessoes_player(ultimo_ping) WHERE encerrada_em IS NULL;
+-- Só as sessões de filme e série, já com o título junto: é o que "Em alta" e "populares" contam.
+-- Canal ao vivo é a maior parte do histórico e não entra aqui, então o índice fica pequeno e a
+-- contagem não precisa ir à tabela.
+CREATE INDEX IF NOT EXISTS idx_sessoes_titulo ON sessoes_player(iniciada_em, titulo_id) WHERE titulo_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS auditoria (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

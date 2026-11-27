@@ -5,6 +5,8 @@ const { agora } = require('../db');
 const epg = require('./epg');
 const v = require('./validacao');
 const qualidades = require('./qualidades');
+const embed = require('./embed');
+const { memoriaPorBanco } = require('./memoria');
 
 /**
  * Consultas do catálogo (o que o assinante vê). Tudo passa por dois filtros:
@@ -78,11 +80,43 @@ const minhaLista = (db, perfil, limite = 60) => db.prepare(`${SELECT_CARD}
   WHERE f.perfil_id = ? AND t.situacao = 'publicado' AND t.classificacao <= ?
   ORDER BY f.criado_em DESC LIMIT ?`).all(perfil.id, limiteIdade(perfil), limite);
 
+/**
+ * Quantas vezes cada título foi aberto nos últimos dias.
+ *
+ * É a conta por trás de "Em alta" e da ordenação "populares", e era refeita a CADA pedido,
+ * varrendo o histórico de reprodução — a tabela que mais cresce na plataforma. Medido com 50
+ * mil sessões, ordenar o catálogo por populares levava quase 1 segundo; com o histórico de uns
+ * meses de operação passaria de 10, e nesse tempo o servidor não atende mais nada.
+ *
+ * A audiência dos últimos dias não muda de um minuto para o outro, e é a mesma para todo
+ * mundo. Então a contagem é feita uma vez a cada dez minutos, numa passada só, por um índice
+ * que só tem as sessões de filme e série (idx_sessoes_titulo).
+ */
+const memoriaAudiencia = memoriaPorBanco({ validadeMs: 10 * 60_000, maximo: 8 });
+const audienciaPorTitulo = (db, dias) => memoriaAudiencia(db).obter(String(dias), () => new Map(
+  db.prepare('SELECT titulo_id, COUNT(*) AS n FROM sessoes_player WHERE titulo_id IS NOT NULL AND iniciada_em >= ? GROUP BY titulo_id')
+    .all(new Date(Date.now() - dias * 86_400_000).toISOString()).map((x) => [x.titulo_id, x.n]),
+));
+
+/** Busca os cartões de uma lista de ids, devolvendo na ordem pedida. */
+function cartoesNaOrdem(db, ids, idadeMaxima) {
+  if (!ids.length) return [];
+  const linhas = db.prepare(`${SELECT_CARD} WHERE t.id IN (${ids.map(() => '?').join(',')}) AND t.situacao = 'publicado' AND t.classificacao <= ?`)
+    .all(...ids, idadeMaxima);
+  const porId = new Map(linhas.map((l) => [l.id, l]));
+  return ids.map((id) => porId.get(id)).filter(Boolean);
+}
+
 /** Em alta: mais telas abertas nos últimos dias (audiência real, não cadastro). */
-const emAlta = (db, perfil, { dias = 7, limite = 20 } = {}) => db.prepare(`${SELECT_CARD}
-  JOIN (SELECT titulo_id, COUNT(*) AS n FROM sessoes_player WHERE titulo_id IS NOT NULL AND iniciada_em >= ? GROUP BY titulo_id) a ON a.titulo_id = t.id
-  WHERE t.situacao = 'publicado' AND t.classificacao <= ?
-  ORDER BY a.n DESC, t.publicado_em DESC LIMIT ?`).all(new Date(Date.now() - dias * 86_400_000).toISOString(), limiteIdade(perfil), limite);
+function emAlta(db, perfil, { dias = 7, limite = 20 } = {}) {
+  const audiencia = audienciaPorTitulo(db, dias);
+  // Candidatos com folga: parte deles pode cair no filtro de idade ou ter saído do ar.
+  const candidatos = [...audiencia.entries()].sort((a, b) => b[1] - a[1]).slice(0, limite * 4 + 40).map(([id]) => id);
+  return cartoesNaOrdem(db, candidatos, limiteIdade(perfil))
+    // Empate na audiência: o publicado mais recentemente primeiro, como era.
+    .sort((a, b) => (audiencia.get(b.id) - audiencia.get(a.id)) || String(b.publicado_em ?? '').localeCompare(String(a.publicado_em ?? '')))
+    .slice(0, limite);
+}
 
 const novidades = (db, perfil, limite = 20) => db.prepare(`${SELECT_CARD}
   WHERE t.situacao = 'publicado' AND t.classificacao <= ? ORDER BY COALESCE(t.publicado_em, t.criado_em) DESC LIMIT ?`).all(limiteIdade(perfil), limite);
@@ -114,11 +148,35 @@ const manual = (db, perfil, fileiraId, limite = 20) => db.prepare(`${SELECT_CARD
  * TV aberta "sumiu". Quem precisa de poucos (as fileiras da home) passa `limite`.
  */
 function canaisAoVivo(db, perfil, acesso, { limite = 500 } = {}) {
+  // O que muda de um assinante para outro aqui é só a faixa etária (que canais ele vê) e o
+  // plano (quais aparecem bloqueados). O resto — canal, o que está no ar, o que vem depois — é
+  // igual para todos e custava ~25 ms por pedido, medido com 116 canais e sete dias de grade.
+  // Com a tela de canais se atualizando sozinha em cada aparelho, isso sozinho ocupava o
+  // servidor. Agora é calculado uma vez a cada 20 s por faixa etária.
+  // A versão dos canais entra na chave: mexeu num canal pelo painel, vale na hora.
+  const base = memoriaCanais(db).obter(`${limiteIdade(perfil)}|${limite}|${embed.versaoAtual()}`, () => baseDosCanais(db, limiteIdade(perfil), limite));
+  return base.map(({ canal: c, agora: p, depois }) => ({
+    ...c,
+    relay: Boolean(c.relay),
+    bloqueado: Boolean((c.nivel_minimo && acesso.nivel < c.nivel_minimo) || !acesso.canais_ao_vivo),
+    plano_nome: c.nivel_minimo ? c.plano_nome : null,
+    // O andamento é calculado na hora, não guardado: é o que faz a barra andar entre uma
+    // atualização e outra.
+    agora: p ? { id: p.id, titulo: p.titulo, subtitulo: p.subtitulo, descricao: p.descricao, inicio: p.inicio, fim: p.fim,
+      classificacao: p.classificacao, ao_vivo: Boolean(p.ao_vivo), andamento: epg.andamento(p) } : null,
+    depois,
+  }));
+}
+
+const memoriaCanais = memoriaPorBanco({ validadeMs: 20_000, maximo: 60 });
+
+/** Canais com o programa do momento e o seguinte, sem nada que dependa de quem pede. */
+function baseDosCanais(db, idadeMaxima, limite) {
   const canais = db.prepare(`SELECT c.id, c.numero, c.nome, c.slug, c.descricao, c.categoria, c.regiao, c.classificacao, c.logo_midia_id AS logo, c.logo_luz,
       c.sinal_status, c.relay, c.fonte,
       (SELECT nivel FROM planos p WHERE p.id = c.plano_minimo_id) AS nivel_minimo,
       (SELECT nome FROM planos p WHERE p.id = c.plano_minimo_id) AS plano_nome
-    FROM canais c WHERE c.ativo = 1 AND c.classificacao <= ? ORDER BY c.ordem, c.numero LIMIT ?`).all(limiteIdade(perfil), limite);
+    FROM canais c WHERE c.ativo = 1 AND c.classificacao <= ? ORDER BY c.ordem, c.numero LIMIT ?`).all(idadeMaxima, limite);
   const noAr = epg.agoraEmTodos(db, canais.map((c) => c.id));
   // O "a seguir" de todos os canais numa consulta só. Era uma por canal: com 116 canais e a tela
   // se atualizando sozinha de 2 em 2 minutos, viravam 116 consultas por assinante, o tempo todo.
@@ -132,19 +190,7 @@ function canaisAoVivo(db, perfil, acesso, { limite = 500 } = {}) {
       depoisDe.set(linha.canal_id, { titulo: linha.titulo, inicio: linha.inicio, fim: linha.fim });
     }
   }
-  return canais.map((c) => {
-    const p = noAr.get(c.id) ?? null;
-    const seguinte = depoisDe.get(c.id) ?? null;
-    return {
-      ...c,
-      relay: Boolean(c.relay),
-      bloqueado: Boolean((c.nivel_minimo && acesso.nivel < c.nivel_minimo) || !acesso.canais_ao_vivo),
-      plano_nome: c.nivel_minimo ? c.plano_nome : null,
-      agora: p ? { id: p.id, titulo: p.titulo, subtitulo: p.subtitulo, descricao: p.descricao, inicio: p.inicio, fim: p.fim,
-        classificacao: p.classificacao, ao_vivo: Boolean(p.ao_vivo), andamento: epg.andamento(p) } : null,
-      depois: seguinte,
-    };
-  });
+  return canais.map((c) => ({ canal: c, agora: noAr.get(c.id) ?? null, depois: depoisDe.get(c.id) ?? null }));
 }
 
 /** Destaques do topo da home (o que a curadoria quer mostrar primeiro). */
@@ -288,13 +334,24 @@ function navegar(db, perfil, acesso, { tipo = null, genero = null, ordem = 'rece
     recentes: 'COALESCE(t.publicado_em, t.criado_em) DESC',
     nome: 't.nome COLLATE NOCASE',
     ano: 't.ano DESC',
-    populares: `(SELECT COUNT(*) FROM sessoes_player s WHERE s.titulo_id = t.id) DESC`,
   };
-  const ord = ordens[ordem] ?? ordens.recentes;
   const p = Math.max(1, Number(pagina) || 1);
   const n = Math.min(60, Math.max(1, Number(porPagina) || 30));
   const where = filtros.join(' AND ');
   const total = db.prepare(`SELECT COUNT(*) AS n FROM titulos t WHERE ${where}`).get(...params).n;
+  if (ordem === 'populares') {
+    // Era uma contagem no histórico para CADA título do catálogo, a cada pedido (ver
+    // `audienciaPorTitulo`). Agora: pega os ids que passam no filtro, já na ordem de
+    // "recentes" (que vira o desempate), ordena pela audiência dos últimos 30 dias guardada em
+    // memória e só então busca os cartões da página pedida.
+    const audiencia = audienciaPorTitulo(db, 30);
+    const ids = db.prepare(`SELECT t.id FROM titulos t WHERE ${where} ORDER BY ${ordens.recentes}`).all(...params).map((x) => x.id);
+    const pos = new Map(ids.map((id, i) => [id, i]));
+    ids.sort((a, b) => ((audiencia.get(b) ?? 0) - (audiencia.get(a) ?? 0)) || (pos.get(a) - pos.get(b)));
+    const itens = cartoesNaOrdem(db, ids.slice((p - 1) * n, p * n), limiteIdade(perfil));
+    return { itens: marcar(itens, acesso), total, pagina: p, por_pagina: n };
+  }
+  const ord = ordens[ordem] ?? ordens.recentes;
   const itens = db.prepare(`${SELECT_CARD} WHERE ${where} ORDER BY ${ord} LIMIT ? OFFSET ?`).all(...params, n, (p - 1) * n);
   return { itens: marcar(itens, acesso), total, pagina: p, por_pagina: n };
 }
