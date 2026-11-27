@@ -7,7 +7,13 @@ ENV NODE_ENV=production \
     TV_DB=/app/data/tv.db \
     TV_MIDIA=/app/data/midia
 
-# O ffmpeg gera as versões menores (Full HD, HD e SD) dos vídeos enviados.
+# O ffmpeg faz tres coisas aqui: gera as versoes menores (Full HD, HD e SD) dos videos
+# enviados, converte o sinal ao vivo (RTMP/SRT) para HLS, e mede a claridade dos logos.
+# O pacote do Debian ja vem com tudo que a TV brasileira usa, conferido nesta versao:
+#   video  - H.264, H.265/HEVC, MPEG-2, VP9, AV1 (decodifica) e H.264 (codifica, libx264)
+#   audio  - AAC, AC-3, E-AC-3, MP2, MP3, Opus (decodifica) e AAC (codifica)
+# E o que permite pegar canal com audio em AC-3 (comum em TV aberta), que sairia MUDO no
+# Android e no Chrome se fosse copiado como esta, e entregar com som em todo aparelho.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
  && rm -rf /var/lib/apt/lists/*

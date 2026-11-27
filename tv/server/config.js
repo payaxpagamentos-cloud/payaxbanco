@@ -102,6 +102,12 @@ module.exports = {
     // oscilação — foi medido assim. Três pedaços de 4s são 12s de folga, e custam ~8s a mais
     // para abrir um canal que estava frio.
     pedacosParaComecar: Number(process.env.TV_AO_VIVO_PEDACOS_INICIO) || 3,
+    // Recodificar o VÍDEO de canal que não vem em H.264 nem H.265 (MPEG-2, por exemplo).
+    // Desligado por padrão, e com razão: o remux custa 1,8% de um núcleo por canal; recodificar
+    // vídeo custa quase um núcleo inteiro. Com 116 canais, ligar isso para todos derruba o
+    // servidor. O áudio é outra história — esse é convertido sempre que precisa, porque custa
+    // cerca de 1% e é o que faz o canal ter som no Android e no Chrome.
+    recodificarVideo: process.env.TV_AO_VIVO_RECODIFICAR_VIDEO === '1',
     // Pedaços mantidos em disco DEPOIS de saírem da lista, para quem ficou para trás não pedir
     // um arquivo apagado. O padrão do ffmpeg é 1, que é pouco: são ~1,5 MB cada.
     pedacosGuardados: Number(process.env.TV_AO_VIVO_PEDACOS_GUARDADOS) || 6,

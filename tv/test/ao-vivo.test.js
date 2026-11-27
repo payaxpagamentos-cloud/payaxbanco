@@ -323,3 +323,39 @@ test('o canal só é entregue com folga de buffer, não no primeiro pedaço', as
   fs.writeFileSync(arquivo, '#EXTM3U\n#EXT-X-TARGETDURATION:4\n# p000000.ts\n');
   assert.equal(aovivo.pedacosNaLista(7), 0, 'linha comentada não é pedaço');
 });
+
+test('conversão: copia o que dá, converte só o que precisa', (t) => {
+  // Por que este teste existe: a conversão era `-c copy` cego. Canal com áudio em AC-3 — comum
+  // em TV brasileira — era copiado como estava e saía MUDO no Android e no Chrome. Pior: o teste
+  // de sinal marcava esse canal como falha, e "testar e ligar" o DESLIGAVA. Canal bom fora do ar
+  // por um detalhe que custa 1% de um núcleo resolver.
+  const modo = (video, audio) => aovivo.modoDeConversao({ sinal_video: video, sinal_audio: audio }).join(' ');
+
+  // O caso bom: nada a fazer, qualidade idêntica à da origem.
+  assert.equal(modo('h264', 'aac'), '-c:v copy -c:a copy');
+  // H.265 também passa direto — toca em aparelho novo, e recodificar seria pior.
+  assert.equal(modo('hevc', 'aac'), '-c:v copy -c:a copy');
+
+  // Áudio que o Android e o Chrome não tocam: vídeo intocado, áudio convertido.
+  for (const ruim of ['ac3', 'eac3', 'mp2', 'opus', 'AC3']) {
+    assert.equal(modo('h264', ruim), '-c:v copy -c:a aac -b:a 128k -ac 2', `áudio ${ruim} precisa virar AAC`);
+  }
+  // mp3 toca em tudo: não se mexe no que já está bom.
+  assert.equal(modo('h264', 'mp3'), '-c:v copy -c:a copy');
+
+  // Canal nunca testado (sem codec guardado): copia, que é o comportamento de sempre. Mexer no
+  // escuro seria pior — o teste de sinal preenche isso na primeira passada.
+  assert.equal(modo(null, null), '-c:v copy -c:a copy');
+  assert.equal(modo('', ''), '-c:v copy -c:a copy');
+
+  // Vídeo que o HLS não aceita: por padrão NÃO recodifica. Custa quase um núcleo por canal,
+  // contra 1,8% do remux — com 116 canais isso não cabe em servidor nenhum.
+  assert.match(modo('mpeg2video', 'aac'), /^-c:v copy/, 'sem a chave ligada, não recodifica vídeo');
+
+  const antes = config.aoVivo.recodificarVideo;
+  config.aoVivo.recodificarVideo = true;
+  t.after(() => { config.aoVivo.recodificarVideo = antes; });
+  assert.match(modo('mpeg2video', 'aac'), /-c:v libx264/, 'com a chave ligada, recodifica');
+  assert.match(modo('mpeg2video', 'ac3'), /-c:v libx264 .*-c:a aac/, 'vídeo e áudio quando os dois precisam');
+  assert.match(modo('h264', 'aac'), /^-c:v copy/, 'a chave não estraga quem estava bom');
+});

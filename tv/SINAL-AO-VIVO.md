@@ -39,14 +39,34 @@ Nem RTMP nem SRT tocam em navegador, celular ou TV. Então, para cada canal liga
 mantém um `ffmpeg` conectado na origem **convertendo para HLS**, que é o formato que todo
 aparelho abre.
 
-A conversão é **remux** (`-c copy`), não recodificação:
+A conversão é **remux** (`-c copy`) sempre que dá:
 
 - os mesmos quadros saem do outro lado — **a qualidade é exatamente a da origem**;
-- o gasto de processador é quase zero;
-- exige que a origem já venha em H.264 + AAC.
+- o gasto de processador é quase zero (~1,8% de um núcleo).
 
-Se o sinal vier em outro codec, o painel avisa no "Testar" em vez de recodificar escondido —
-recodificar derrubaria o servidor com uma dúzia de canais.
+### Quando o sinal não vem perfeito
+
+Copiar **cegamente** quebra canal que vem bom, e era o que a plataforma fazia:
+
+| O que vem da origem | O que a plataforma faz | Custo |
+|---|---|---|
+| Vídeo H.264 ou H.265 | copia | ~1,8% de um núcleo |
+| Áudio AAC ou MP3 | copia | — |
+| **Áudio AC-3, E-AC-3, MP2, Opus** | **converte para AAC** | **~1% de um núcleo** |
+| Vídeo MPEG-2 ou outro | recusa, e explica no "Testar" | — |
+
+A linha do meio é a que importa na prática. **AC-3 é comum em TV aberta brasileira**, e o
+Android e o Chrome não tocam AC-3 dentro de HLS: o canal sairia **mudo**. Converter só o áudio
+custa cerca de 1% de um núcleo e faz o canal tocar em todo aparelho — não há motivo para não
+fazer, e por isso é automático.
+
+Vídeo é outra conversa: recodificar custa quase **um núcleo inteiro por canal**, contra 1,8% do
+remux. Com 116 canais isso não cabe em servidor nenhum, então fica desligado por padrão. Para
+ligar num servidor com folga: `TV_AO_VIVO_RECODIFICAR_VIDEO=1`.
+
+Quem decide é o **teste de sinal**: ele guarda os codecs de cada canal, e a conversão usa o que
+ficou guardado. Por isso o `testar-canais.js` vem antes de pôr os canais no ar — sem ele, a
+plataforma copia tudo, que é o comportamento seguro mas não o melhor.
 
 O assinante nunca vê o endereço da origem: ele recebe o endereço da plataforma, com token
 assinado por tela, que expira.

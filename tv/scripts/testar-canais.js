@@ -38,6 +38,7 @@ if (!canais.length) {
   const passaram = [];
   const falharam = [];
   const comAviso = [];
+  const comAudioConvertido = [];
 
   for (const c of canais) {
     let r;
@@ -46,14 +47,20 @@ if (!canais.length) {
     } catch (err) {
       r = { status: 'falha', detalhe: err.message };
     }
-    db.prepare('UPDATE canais SET sinal_status = ?, sinal_detalhe = ?, sinal_em = ? WHERE id = ?')
-      .run(r.status, r.detalhe, agora(), c.id);
+    // Os codecs ficam gravados: é com eles que a conversão decide, depois, se copia o áudio ou
+    // troca por AAC — sem precisar abrir uma segunda conexão na origem, que muito fornecedor
+    // não permite.
+    db.prepare('UPDATE canais SET sinal_status = ?, sinal_detalhe = ?, sinal_em = ?, sinal_video = ?, sinal_audio = ? WHERE id = ?')
+      .run(r.status, r.detalhe, agora(), r.video?.codec ?? null, r.audio?.codec ?? null, c.id);
 
     const marca = r.status === 'ok' ? '\x1b[32mok   \x1b[0m' : '\x1b[31mfalha\x1b[0m';
     console.log(`  ${marca} ${String(c.numero).padStart(3)} ${c.nome.padEnd(24)} ${r.detalhe ?? ''}`);
     if (r.status === 'ok') {
       passaram.push(c);
       if (r.video && r.video.codec !== 'h264') comAviso.push(`${c.nome}: vídeo em ${r.video.codec.toUpperCase()}`);
+      if (r.audio && !aovivo.AUDIO_COPIAVEL.includes(r.audio.codec)) {
+        comAudioConvertido.push(`${c.nome}: áudio em ${r.audio.codec.toUpperCase()}`);
+      }
     } else {
       falharam.push({ ...c, motivo: r.detalhe });
     }
@@ -63,6 +70,11 @@ if (!canais.length) {
   if (comAviso.length) {
     console.log('\nAtenção ao codec (toca em aparelho novo, mas não em Smart TV e iPhone antigos):');
     for (const a of comAviso) console.log(`  ${a}`);
+  }
+  if (comAudioConvertido.length) {
+    console.log(`\n${comAudioConvertido.length} canal(is) com áudio que será convertido para AAC na hora:`);
+    for (const a of comAudioConvertido) console.log(`  ${a}`);
+    console.log('  Custa cerca de 1% de um núcleo por canal. Sem isso eles sairiam MUDOS no Android e no Chrome.');
   }
 
   if (ligar) {

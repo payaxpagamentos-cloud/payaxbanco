@@ -275,8 +275,10 @@ module.exports = (db) => {
       if (c.fonte === 'rtmp') {
         if (!c.url_hls) throw new ErroNegocio('Este canal ainda não tem o endereço do sinal ao vivo.', 409);
         const r2 = await aovivo.conferir(c);
-        db.prepare('UPDATE canais SET sinal_status = ?, sinal_detalhe = ?, sinal_em = ? WHERE id = ?')
-          .run(r2.status, r2.detalhe, agora(), c.id);
+        // Os codecs vão junto: é com eles que a conversão decide, depois, se copia o áudio ou
+        // troca por AAC, sem abrir uma segunda conexão na origem.
+        db.prepare('UPDATE canais SET sinal_status = ?, sinal_detalhe = ?, sinal_em = ?, sinal_video = ?, sinal_audio = ? WHERE id = ?')
+          .run(r2.status, r2.detalhe, agora(), r2.video?.codec ?? null, r2.audio?.codec ?? null, c.id);
         return res.json({ canal_id: c.id, nome: c.nome, ...r2 });
       }
       relay.cacheLista.delete(c.url_hls);

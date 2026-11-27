@@ -26,6 +26,46 @@ const { ErroNegocio } = require('./erros');
 /** Protocolos de entrada aceitos. Nada de file:, http: ou concat: — nem por engano no painel. */
 const PROTOCOLOS = ['rtmp:', 'rtmps:', 'srt:', 'rtsp:', 'udp:'];
 
+/** Vídeo que o HLS entrega sem recodificar. H.265 toca em aparelho novo; H.264 toca em tudo. */
+const VIDEO_COPIAVEL = ['h264', 'hevc'];
+/** Áudio que todo aparelho toca. AC-3, E-AC-3 e MP2 não entram: Android e Chrome saem mudos. */
+const AUDIO_COPIAVEL = ['aac', 'mp3'];
+
+/**
+ * O que fazer com o sinal deste canal: copiar, ou converter o mínimo necessário.
+ *
+ * Copiar (`-c copy`) é o ideal — a qualidade é exatamente a da origem e o processador quase não
+ * sente. Mas copiar CEGAMENTE, que era o que havia aqui, quebra canal que vem bom:
+ *
+ * - áudio em AC-3, E-AC-3 ou MP2 (comum em TV brasileira) é copiado e o canal sai MUDO no
+ *   Android e no Chrome. Converter só o áudio para AAC custa cerca de 1% de um núcleo e faz o
+ *   canal tocar em tudo. Não há motivo para não fazer.
+ * - vídeo em MPEG-2 nem entra no HLS. Converter vídeo é outra conversa: custa quase um núcleo
+ *   INTEIRO por canal, contra 1,8% do remux. Com 116 canais isso não cabe em servidor nenhum,
+ *   então fica desligado por padrão e a operação liga se quiser, canal a canal.
+ *
+ * Sem informação de codec (canal nunca testado), copia — é o comportamento de sempre, e o teste
+ * de sinal preenche isso na primeira passada.
+ */
+function modoDeConversao(canal) {
+  const video = String(canal.sinal_video ?? '').toLowerCase();
+  const audio = String(canal.sinal_audio ?? '').toLowerCase();
+
+  const args = [];
+  if (video && !VIDEO_COPIAVEL.includes(video) && config.aoVivo.recodificarVideo) {
+    // Preset rápido e qualidade constante: o que dá para sustentar ao vivo sem engasgar.
+    args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-g', '50', '-pix_fmt', 'yuv420p');
+  } else {
+    args.push('-c:v', 'copy');
+  }
+  if (audio && !AUDIO_COPIAVEL.includes(audio)) {
+    args.push('-c:a', 'aac', '-b:a', '128k', '-ac', '2');
+  } else {
+    args.push('-c:a', 'copy');
+  }
+  return args;
+}
+
 // path.resolve e não path.join: a rota do pedaço serve o arquivo por caminho absoluto.
 const pastaDoCanal = (id) => path.resolve(config.aoVivo.pasta, String(id));
 const listaDoCanal = (id) => path.join(pastaDoCanal(id), 'lista.m3u8');
@@ -126,9 +166,8 @@ function ligar(canal, db) {
     // Só vídeo e áudio: dado e legenda embutidos de alguns sinais não cabem em MPEG-TS e
     // derrubariam a conversão no meio.
     '-map', '0:v:0', '-map', '0:a:0?',
-    // Remux: sem recodificar. Se a origem não for H.264/AAC, falha aqui — e é o que queremos,
-    // porque recodificar escondido derrubaria o servidor com poucos canais.
-    '-c', 'copy',
+    // O que fazer com vídeo e áudio deste canal — ver `modoDeConversao`.
+    ...modoDeConversao(canal),
     // Sinal ao vivo chega com relógio próprio; sem isto, pedaço com tempo estranho trava o player.
     '-fflags', '+genpts',
     '-f', 'hls',
@@ -241,7 +280,9 @@ function sincronizar(db) {
   if (!config.aoVivo.ligado) { desligarTudo(); return { ligados: 0, limitados: 0 }; }
   let canais;
   try {
-    canais = db.prepare("SELECT id, nome, url_hls FROM canais WHERE fonte = 'rtmp' AND ativo = 1 AND url_hls IS NOT NULL AND url_hls <> '' ORDER BY ordem, numero").all();
+    // Os codecs vêm junto: é `modoDeConversao` quem decide, por canal, se copia o áudio ou
+    // troca por AAC. Sem eles aqui, canal com áudio em AC-3 subiria copiado e sairia mudo.
+    canais = db.prepare("SELECT id, nome, url_hls, sinal_video, sinal_audio FROM canais WHERE fonte = 'rtmp' AND ativo = 1 AND url_hls IS NOT NULL AND url_hls <> '' ORDER BY ordem, numero").all();
   } catch { return { ligados: 0, limitados: 0 }; }
   const podem = new Set(canais.map((c) => c.id));
   // Canal desligado, apagado ou que deixou de ser RTMP para de converter na hora.
@@ -407,24 +448,36 @@ function conferir(canal) {
 
       const [num, den] = String(video.avg_frame_rate || '0/1').split('/').map(Number);
       const fps = den ? Math.round((num / den) * 100) / 100 : null;
-      const videoOk = ['h264', 'hevc'].includes(video.codec_name);
-      const audioOk = !audio || ['aac', 'mp3'].includes(audio.codec_name);
+      const videoCopia = VIDEO_COPIAVEL.includes(video.codec_name);
+      const audioCopia = !audio || AUDIO_COPIAVEL.includes(audio.codec_name);
+      // Áudio que não dá para copiar NÃO é mais falha: a conversão troca só o áudio por AAC, a
+      // 1% de um núcleo, e o canal passa a tocar em tudo. Antes isto reprovava o canal, e o
+      // "testar e ligar" o DESLIGAVA — canal bom fora do ar por um detalhe que a plataforma
+      // resolve sozinha.
+      const videoOk = videoCopia || config.aoVivo.recodificarVideo;
       const avisos = [];
       if (video.codec_name === 'hevc') avisos.push('O vídeo vem em H.265: toca em aparelho novo, mas Smart TV e iPhone antigos não abrem. O ideal é pedir H.264.');
-      if (!videoOk) avisos.push(`O vídeo vem em ${video.codec_name}, que o HLS não aceita: precisaria recodificar (gasta processador e perde um pouco de qualidade).`);
-      if (audio && !audioOk) avisos.push(`O áudio vem em ${audio.codec_name}: converta para AAC na origem, ou o canal sai sem som em parte dos aparelhos.`);
+      if (!videoCopia && !config.aoVivo.recodificarVideo) {
+        avisos.push(`O vídeo vem em ${video.codec_name}, que o HLS não aceita. Dá para recodificar (TV_AO_VIVO_RECODIFICAR_VIDEO=1), mas custa quase um núcleo por canal, contra 1,8% do remux — o ideal é pedir H.264 à origem.`);
+      } else if (!videoCopia) {
+        avisos.push(`O vídeo vem em ${video.codec_name} e será recodificado para H.264: funciona, mas custa quase um núcleo só deste canal.`);
+      }
+      if (audio && !audioCopia) avisos.push(`O áudio vem em ${audio.codec_name} e será convertido para AAC na hora (custa cerca de 1% de um núcleo). Sem isso o canal sairia mudo no Android e no Chrome.`);
       if (!audio) avisos.push('A origem não trouxe áudio.');
 
       const ficha = `${video.codec_name.toUpperCase()} ${video.width}x${video.height}${fps ? ` ${fps}fps` : ''}${audio ? ` + ${audio.codec_name.toUpperCase()}` : ''}`;
-      const bom = local ? `No ar agora, convertido sem perda: ${ficha}.` : `Sinal pronto para converter sem perda: ${ficha}.`;
+      const semPerda = videoCopia && audioCopia;
+      const bom = local
+        ? `No ar agora, convertido sem perda: ${ficha}.`
+        : `Sinal pronto para converter ${semPerda ? 'sem perda' : 'com ajuste de áudio'}: ${ficha}.`;
       resolve({
-        status: videoOk && audioOk ? 'ok' : 'falha',
-        detalhe: avisos.length ? avisos.join(' ') : bom,
+        status: videoOk ? 'ok' : 'falha',
+        detalhe: avisos.length ? `${ficha}. ${avisos.join(' ')}` : bom,
         // De onde veio a leitura: o que está no ar, ou a origem (canal ainda desligado).
         lido_de: local ? 'conversao' : 'origem',
         video: { codec: video.codec_name, largura: video.width ?? null, altura: video.height ?? null, fps },
         audio: audio ? { codec: audio.codec_name } : null,
-        remux: videoOk && audioOk,
+        remux: semPerda,
       });
     });
   });
@@ -444,7 +497,8 @@ function situacao(id) {
 }
 
 module.exports = {
-  PROTOCOLOS, conferirEndereco, conferir, ligar, desligar, desligarTudo, sincronizar, situacao, temSinal,
+  PROTOCOLOS, VIDEO_COPIAVEL, AUDIO_COPIAVEL, modoDeConversao,
+  conferirEndereco, conferir, ligar, desligar, desligarTudo, sincronizar, situacao, temSinal,
   pedacosNaLista, daParaAssistir,
   garantir, marcarUso, limparOciosos,
   listaDoPlayer, caminhoDoPedaco, pastaDoCanal, listaDoCanal,

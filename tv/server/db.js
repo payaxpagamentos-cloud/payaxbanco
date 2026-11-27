@@ -518,6 +518,12 @@ function migrar(db) {
   if (!colunas.includes('id_publico')) db.exec('ALTER TABLE canais ADD COLUMN id_publico TEXT');
   if (!colunas.includes('id_epg')) db.exec('ALTER TABLE canais ADD COLUMN id_epg TEXT');
   if (!colunas.includes('logo_luz')) db.exec('ALTER TABLE canais ADD COLUMN logo_luz REAL');
+  // Codecs que a origem entrega, guardados no último teste de sinal. Servem para a conversão
+  // escolher o que fazer com cada canal sem abrir uma segunda conexão na origem (muito
+  // fornecedor só aceita uma). Canal com áudio em AC-3, por exemplo, sai mudo no Android se for
+  // copiado como está — e custa 1% de processador converter só o áudio para AAC.
+  if (!colunas.includes('sinal_video')) db.exec('ALTER TABLE canais ADD COLUMN sinal_video TEXT');
+  if (!colunas.includes('sinal_audio')) db.exec('ALTER TABLE canais ADD COLUMN sinal_audio TEXT');
 
   const colunasPerfis = db.prepare('PRAGMA table_info(perfis)').all().map((c) => c.name);
   if (!colunasPerfis.includes('avatar')) {

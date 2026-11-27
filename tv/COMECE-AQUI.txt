@@ -1,0 +1,115 @@
+PLAY TECH VIP — comece por aqui
+================================
+
+Este arquivo .zip tem a plataforma inteira. Serve para as duas coisas:
+
+  A) instalar num servidor novo, do zero;
+  B) atualizar um servidor que já está no ar.
+
+Nada precisa ser baixado da internet depois: os codecs de vídeo e áudio (H.264,
+H.265, MPEG-2, AAC, AC-3, E-AC-3, MP2, Opus) vêm com a imagem que o instalador
+monta no servidor.
+
+
+--------------------------------------------------------------------------
+A) SERVIDOR NOVO — do zero ao ar
+--------------------------------------------------------------------------
+
+O que você precisa: um servidor Ubuntu ou Debian limpo, com acesso de
+administrador, e um domínio apontando para o IP dele (o HTTPS sai automático).
+
+1. No PC, envie este .zip para o servidor.
+
+   Windows (PowerShell), trocando usuario e IP pelos seus:
+
+       scp PLAYTECHVIP-servidor.zip usuario@SEU.IP:~/
+
+2. Entre no servidor:
+
+       ssh usuario@SEU.IP
+
+3. Descompacte e instale:
+
+       unzip -o PLAYTECHVIP-servidor.zip -d playtechvip
+       cd playtechvip
+       sudo bash scripts/instalar-servidor.sh play.seudominio.com.br
+
+   Sem domínio ainda? Use:   sudo bash scripts/instalar-servidor.sh --sem-dominio
+   Quer só ver o que faria?  acrescente --simular (não mexe em nada)
+
+O instalador cuida de tudo: instala o Docker se faltar, prepara
+/opt/playtechvip, gera o segredo e a senha do administrador (mostrados UMA VEZ
+só, no fim — anote), sobe a plataforma com HTTPS e agenda o backup diário.
+
+Leva de 5 a 15 minutos, dependendo da internet do servidor.
+
+
+--------------------------------------------------------------------------
+B) SERVIDOR QUE JÁ ESTÁ NO AR — atualizar
+--------------------------------------------------------------------------
+
+Pelo painel, do próprio celular (o jeito mais fácil):
+
+   Configurações -> Sistema -> escolher este .zip -> "Enviar e atualizar".
+   Leva de 1 a 3 minutos e a plataforma volta sozinha.
+
+Pelo terminal, se preferir ou se o painel recusar:
+
+       cd /opt/playtechvip
+       sudo docker compose down
+       sudo unzip -o ~/PLAYTECHVIP-servidor.zip -d /opt/playtechvip
+       sudo docker compose up -d --build
+
+O "--build" é obrigatório: o código vai dentro da imagem, e sem ele a
+plataforma sobe com a versão antiga.
+
+Seus dados NÃO são tocados por nenhum dos dois caminhos: banco, vídeos,
+catálogo e assinantes ficam em /opt/playtechvip/data, que a atualização não
+mexe. Mesmo assim, antes de atualizar vale rodar o backup:
+
+       sudo docker compose exec app node scripts/backup.js /backup
+
+
+--------------------------------------------------------------------------
+DEPOIS DE INSTALAR: pôr os canais no ar
+--------------------------------------------------------------------------
+
+1. Importar a lista do fornecedor (cria os canais, DESLIGADOS):
+
+       sudo docker compose exec -T app node scripts/importar-canais.js - --gravar \
+         < scripts/canais-fornecedor.txt
+
+2. Testar os canais um a um e ligar só os que responderem:
+
+       sudo docker compose exec app node scripts/testar-canais.js            # só testa
+       sudo docker compose exec app node scripts/testar-canais.js --ligar    # testa e liga
+
+   São alguns minutos: ele conecta em um canal por vez, de propósito — muito
+   fornecedor só aceita uma conexão por sinal.
+
+   Esse teste também guarda quais codecs cada canal usa. É com isso que a
+   conversão decide, depois, se copia o áudio ou converte para AAC. Canal com
+   áudio em AC-3 sairia MUDO no Android e no Chrome se fosse copiado; convertido
+   custa cerca de 1% de um núcleo e toca em tudo.
+
+3. Buscar os logos das emissoras:
+
+       sudo docker compose exec app node scripts/logos-canais.js
+
+   Se o relatório disser que o host bloqueou o servidor, rode de novo algumas
+   horas depois: ele só mexe em quem ainda está sem logo.
+
+
+--------------------------------------------------------------------------
+SE ALGO DER ERRADO
+--------------------------------------------------------------------------
+
+Ver se está de pé:        sudo docker compose ps
+Ver o que aconteceu:      sudo docker compose logs --tail=120 app
+Conferir a instalação:    sudo bash scripts/conferir-instalacao.sh
+
+NUNCA rode "docker compose down -v". O "-v" apaga os volumes, e com eles o
+banco, os vídeos e o catálogo.
+
+O arquivo .env guarda o segredo e as senhas. Ele não vai neste pacote, não
+entra em backup compartilhado e não deve ser enviado por mensagem.

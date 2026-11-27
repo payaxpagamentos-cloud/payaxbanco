@@ -74,4 +74,11 @@ if [ "$falhou" = 1 ]; then
   exit 1
 fi
 
-printf '\nPacote %s pronto:\n  %s\n  %s\n' "$VERSAO" "$ZIP" "$TGZ"
+# O .zip é o formato padrão de entrega: é o que o Windows abre com dois cliques, o que o
+# iPhone não descompacta por conta própria no caminho (o Safari abre .tar.gz sozinho ao
+# baixar, e quem envia pelo painel acaba mandando um .tar) e o que o painel e o instalador
+# aceitam igual. O .tar.gz continua saindo para quem preferir a linha de comando.
+printf '\nPacote %s pronto.\n\n' "$VERSAO"
+printf '  \033[1mPARA ENTREGAR:  %s\033[0m   (%s)\n' "$ZIP" "$(du -h "$ZIP" | cut -f1)"
+printf '  alternativa:    %s   (%s)\n\n' "$TGZ" "$(du -h "$TGZ" | cut -f1)"
+printf 'Dentro dele, COMECE-AQUI.txt tem o passo a passo de instalar e de atualizar.\n'
