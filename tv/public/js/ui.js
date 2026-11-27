@@ -101,7 +101,15 @@ export const etiquetaIdade = (c) => el('span', { class: `etiqueta idade ${c === 
 export const QUALIDADES = { sd: 'SD', hd: 'HD', fullhd: 'Full HD', '4k': '4K Ultra HD' };
 export const LINHAS_QUALIDADE = { sd: '480p', hd: '720p', fullhd: '1080p', '4k': '2160p' };
 export const CATEGORIAS_CANAL = { aberta: 'TV aberta', noticias: 'Notícias', esportes: 'Esportes', filmes: 'Filmes', series: 'Séries',
-  infantil: 'Infantil', documentarios: 'Documentários', musica: 'Música', variedades: 'Variedades', religioso: 'Religioso', local: 'Local' };
+  infantil: 'Kids', documentarios: 'Documentários', musica: 'Música', variedades: 'Variedades', religioso: 'Religioso', local: 'Local' };
+
+/**
+ * Ordem dos temas na tela de canais. É a ordem de guia de TV: o que a casa abre primeiro vem
+ * primeiro. Sem isto, os temas sairiam na ordem em que aparecessem no banco, que muda a cada
+ * canal novo — e a pessoa perderia a referência de onde estava.
+ */
+export const ORDEM_CATEGORIAS = ['aberta', 'noticias', 'esportes', 'filmes', 'series',
+  'infantil', 'documentarios', 'variedades', 'musica', 'religioso', 'local'];
 
 export function marca(sub) {
   return el('span', { class: 'marca' },

@@ -106,17 +106,35 @@ const manual = (db, perfil, fileiraId, limite = 20) => db.prepare(`${SELECT_CARD
   .all(Number(fileiraId), limiteIdade(perfil), limite);
 
 /** Canais ao vivo com o programa que está no ar e o próximo. */
-function canaisAoVivo(db, perfil, acesso, { limite = 100 } = {}) {
+/**
+ * Canais que este perfil pode ver.
+ *
+ * O teto é alto de propósito: com 116 canais no contrato, um limite de 100 cortaria justamente
+ * os últimos da lista — que é onde ficam Globo, SBT e Record — e ninguém entenderia por que a
+ * TV aberta "sumiu". Quem precisa de poucos (as fileiras da home) passa `limite`.
+ */
+function canaisAoVivo(db, perfil, acesso, { limite = 500 } = {}) {
   const canais = db.prepare(`SELECT c.id, c.numero, c.nome, c.slug, c.descricao, c.categoria, c.regiao, c.classificacao, c.logo_midia_id AS logo,
       c.sinal_status, c.relay, c.fonte,
       (SELECT nivel FROM planos p WHERE p.id = c.plano_minimo_id) AS nivel_minimo,
       (SELECT nome FROM planos p WHERE p.id = c.plano_minimo_id) AS plano_nome
     FROM canais c WHERE c.ativo = 1 AND c.classificacao <= ? ORDER BY c.ordem, c.numero LIMIT ?`).all(limiteIdade(perfil), limite);
   const noAr = epg.agoraEmTodos(db, canais.map((c) => c.id));
+  // O "a seguir" de todos os canais numa consulta só. Era uma por canal: com 116 canais e a tela
+  // se atualizando sozinha de 2 em 2 minutos, viravam 116 consultas por assinante, o tempo todo.
+  const depoisDe = new Map();
+  if (canais.length) {
+    const marcas = canais.map(() => '?').join(',');
+    for (const linha of db.prepare(`SELECT canal_id, titulo, inicio, fim FROM (
+        SELECT canal_id, titulo, inicio, fim, ROW_NUMBER() OVER (PARTITION BY canal_id ORDER BY inicio) AS n
+        FROM programas WHERE canal_id IN (${marcas}) AND inicio >= ?
+      ) WHERE n = 1`).all(...canais.map((c) => c.id), new Date().toISOString())) {
+      depoisDe.set(linha.canal_id, { titulo: linha.titulo, inicio: linha.inicio, fim: linha.fim });
+    }
+  }
   return canais.map((c) => {
     const p = noAr.get(c.id) ?? null;
-    const seguinte = db.prepare('SELECT titulo, inicio, fim FROM programas WHERE canal_id = ? AND inicio >= ? ORDER BY inicio LIMIT 1')
-      .get(c.id, new Date().toISOString()) ?? null;
+    const seguinte = depoisDe.get(c.id) ?? null;
     return {
       ...c,
       relay: Boolean(c.relay),

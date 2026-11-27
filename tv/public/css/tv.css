@@ -996,3 +996,23 @@ body.tv .topo::before{ background: var(--bg-2); }
   .topo::before, .painel-topo, .menu{ background: var(--bg-2); }
   .topo nav{ background: rgba(0,0,0,.97); }
 }
+
+/* ---- Canais separados por tema ----
+   Com mais de cem canais, a tela vira uma parede de cartões sem isto. As pílulas levam direto
+   ao tema; o corpo mostra um bloco por tema, na ordem de um guia de TV. */
+.pilulas-tema{ display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.pilulas-tema .conta{ margin-left: 7px; padding: 1px 6px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: rgba(255,255,255,.14); color: inherit; }
+.pilulas-tema .btn.primario .conta{ background: rgba(0,0,0,.22); }
+.tema > header{ margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--borda); }
+.tema > header h2{ margin: 0; font-size: 19px; letter-spacing: -.01em; }
+/* No celular a fila de pílulas rola de lado em vez de empilhar e empurrar os canais para baixo. */
+@media (max-width: 700px){
+  /* A fila sangra até a borda da tela, mas começa alinhada com o título. O scroll-padding é o
+     que garante isso: sem ele, o navegador encosta a primeira pílula na borda e come os 16px. */
+  .pilulas-tema{ flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-left: -16px; margin-right: -16px;
+    padding: 0 16px 4px; scroll-padding-left: 16px; }
+  .pilulas-tema::-webkit-scrollbar{ display: none; }
+  .pilulas-tema .btn{ flex: 0 0 auto; }
+  .tema > header h2{ font-size: 17px; }
+}

@@ -133,7 +133,8 @@ export function canalCartao(canal, { aoAbrir } = {}) {
     el('div', { class: 'logo' }, logo ? el('img', { src: logo, alt: canal.nome, loading: 'lazy' }) : String(canal.numero)),
     el('div', { class: 'meio' },
       el('div', { class: 'linha firme', style: 'gap:6px' },
-        el('span', { class: 'num' }, canal.numero),
+        // Sem logo, o quadrado da esquerda já mostra o número: repetir aqui fica estranho.
+        logo ? el('span', { class: 'num' }, canal.numero) : null,
         el('strong', { class: 'cortar' }, canal.nome),
         canal.sinal_status === 'falha' ? el('span', { class: 'etiqueta erro' }, 'fora do ar') : el('span', { class: 'etiqueta vivo' }, 'AO VIVO')),
       el('div', { class: 'pequeno cortar', style: 'margin-top:3px' }, canal.agora?.titulo ?? 'Programação ao vivo'),

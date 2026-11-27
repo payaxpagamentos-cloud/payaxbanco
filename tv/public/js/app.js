@@ -1,6 +1,6 @@
 import { api, sessao, perfil as perfilGuardado, arte } from './api.js';
 import { el, $, limpar, icone, toast, acao, marca, iniciais, corPerfil, etiquetaIdade, atrasar, repetir, hora, diaSemana,
-  hojeLocal, somarDias, duracao, modal, CATEGORIAS_CANAL } from './ui.js';
+  hojeLocal, somarDias, duracao, modal, CATEGORIAS_CANAL, ORDEM_CATEGORIAS } from './ui.js';
 import { telaEntrada, telaPlanos, telaPagamento } from './entrada.js';
 import { urlMascote } from './mascotes.js';
 import { telaPerfis } from './perfis.js';
@@ -329,18 +329,37 @@ function heroEl(destaques) {
 
 async function telaCanais() {
   const { canais } = await api.get('/tv/canais');
-  const categorias = [...new Set(canais.map((c) => c.categoria))];
+  // Separado por tema. Com mais de cem canais, uma lista só vira uma parede de cartões em que
+  // ninguém acha nada; por tema, a pessoa vai direto em Esportes ou Kids e pronto.
+  const temas = ORDEM_CATEGORIAS.filter((c) => canais.some((x) => x.categoria === c))
+    .concat([...new Set(canais.map((c) => c.categoria))].filter((c) => !ORDEM_CATEGORIAS.includes(c)));
   let filtro = 'todas';
-  const lista = el('div', { class: 'grade', style: '--min:280px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))' });
-  const pilulas = el('div', { class: 'linha', style: 'margin-bottom:16px' });
+  const corpo = el('div', { class: 'coluna', style: 'gap:26px' });
+  const pilulas = el('div', { class: 'pilulas-tema' });
+
+  const grade = (lista) => el('div', { class: 'grade', style: 'grid-template-columns:repeat(auto-fill,minmax(300px,1fr))' },
+    lista.map((c) => canalCartao(c, { aoAbrir: tocarCanal })));
 
   const pintar = () => {
-    limpar(pilulas, ['todas', ...categorias].map((c) => el('button', {
-      class: `btn pequeno${filtro === c ? ' primario' : ' vazio'}`,
-      onclick: () => { filtro = c; pintar(); },
-    }, c === 'todas' ? `Todos (${canais.length})` : CATEGORIAS_CANAL[c] ?? c)));
-    const visiveis = canais.filter((c) => filtro === 'todas' || c.categoria === filtro);
-    limpar(lista, visiveis.length ? visiveis.map((c) => canalCartao(c, { aoAbrir: tocarCanal })) : vazio('Nenhum canal nesta categoria.'));
+    limpar(pilulas, ['todas', ...temas].map((c) => {
+      const quantos = c === 'todas' ? canais.length : canais.filter((x) => x.categoria === c).length;
+      return el('button', {
+        class: `btn pequeno${filtro === c ? ' primario' : ' vazio'}`,
+        onclick: () => { filtro = c; pintar(); corpo.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+      }, c === 'todas' ? 'Todos' : CATEGORIAS_CANAL[c] ?? c, el('span', { class: 'conta' }, quantos));
+    }));
+
+    const mostrar = filtro === 'todas' ? temas : [filtro];
+    const secoes = mostrar.map((tema) => {
+      const doTema = canais.filter((c) => c.categoria === tema);
+      if (!doTema.length) return null;
+      return el('section', { class: 'tema' },
+        el('header', { class: 'linha entre' },
+          el('h2', {}, CATEGORIAS_CANAL[tema] ?? tema),
+          el('span', { class: 'mudo pequeno' }, doTema.length > 1 ? `${doTema.length} canais` : '1 canal')),
+        grade(doTema));
+    }).filter(Boolean);
+    limpar(corpo, secoes.length ? secoes : vazio('Nenhum canal neste tema.'));
   };
   pintar();
 
@@ -348,7 +367,7 @@ async function telaCanais() {
     el('div', { class: 'linha entre' },
       el('h1', {}, 'Canais ao vivo'),
       el('button', { class: 'btn pequeno', onclick: () => ir('#/guia') }, icone('tv'), 'Guia de programação')),
-    pilulas, lista));
+    pilulas, corpo));
   // O "no ar agora" muda sozinho: recarrega de 2 em 2 minutos.
   pararTela = repetir(async () => {
     const r = await api.get('/tv/canais');
