@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const config = require('../config');
-const { agora, transacao, lerConfig, gravarConfig } = require('../db');
+const { agora, transacao, lerConfig, gravarConfig, mascoteDe } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const crypto = require('node:crypto');
 const { hashSenha } = require('../lib/senha');
@@ -143,8 +143,9 @@ module.exports = (db) => {
       const r2 = db.prepare("INSERT INTO usuarios (nome, email, telefone, senha_hash, perfil, criado_em) VALUES (?, ?, ?, ?, 'assinante', ?)")
         .run(nome, email, telefone, hashSenha(senha), agora());
       const uid = Number(r2.lastInsertRowid);
-      db.prepare('INSERT INTO perfis (usuario_id, nome, principal, criado_em) VALUES (?, ?, 1, ?)')
-        .run(uid, nome.split(/\s+/)[0].slice(0, 30), agora());
+      const apelido = nome.split(/\s+/)[0].slice(0, 30);
+      db.prepare('INSERT INTO perfis (usuario_id, nome, avatar, principal, criado_em) VALUES (?, ?, ?, 1, ?)')
+        .run(uid, apelido, mascoteDe(apelido), agora());
       return uid;
     });
 

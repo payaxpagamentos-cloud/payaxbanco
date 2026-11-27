@@ -2,6 +2,7 @@ import { api, sessao, perfil as perfilGuardado, arte } from './api.js';
 import { el, $, limpar, icone, toast, acao, marca, iniciais, corPerfil, etiquetaIdade, atrasar, repetir, hora, diaSemana,
   hojeLocal, somarDias, duracao, modal, CATEGORIAS_CANAL } from './ui.js';
 import { telaEntrada, telaPlanos, telaPagamento } from './entrada.js';
+import { urlMascote } from './mascotes.js';
 import { telaPerfis } from './perfis.js';
 import { telaTitulo, modalTitulo } from './titulo.js';
 import { telaConta } from './conta.js';
@@ -112,7 +113,10 @@ function montarCasca() {
 
   nav = el('nav', {}, NAV.map(([hash, rotulo]) => el('button', { onclick: () => ir(hash), dataset: { hash } }, rotulo)));
 
-  const avatar = el('button', { class: 'avatar', style: `background:${corPerfil(p?.nome, p?.cor)}`, title: p?.nome ?? 'Perfil' }, iniciais(p?.nome));
+  // O mascote do perfil também na barra do topo: é o mesmo rosto que a pessoa escolheu.
+  const avatar = p?.avatar
+    ? el('button', { class: 'avatar com-foto', title: p.nome ?? 'Perfil' }, el('img', { src: urlMascote(p.avatar), alt: '' }))
+    : el('button', { class: 'avatar', style: `background:${corPerfil(p?.nome, p?.cor)}`, title: p?.nome ?? 'Perfil' }, iniciais(p?.nome));
   avatar.addEventListener('click', () => modal('Sua conta', (fechar) => [
     el('div', { class: 'linha', style: 'gap:12px;margin-bottom:14px' },
       el('span', { class: 'avatar g', style: `background:${corPerfil(p?.nome, p?.cor)}` }, iniciais(p?.nome)),

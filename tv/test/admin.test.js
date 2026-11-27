@@ -120,9 +120,9 @@ test('perfis de visualização: limite do plano, PIN e perfil principal', async 
   const s = await iniciar();
   t.after(s.fechar);
   const cliente = await s.assinante('perfis@exemplo.com.br', { plano: 1 }); // Essencial: 2 perfis
-  const segundo = await s.post('/conta/perfis', { nome: 'Visitas' }, cliente.token);
+  const segundo = await s.post('/conta/perfis', { nome: 'Visitas', avatar: 'gato' }, cliente.token);
   assert.equal(segundo.status, 201);
-  const terceiro = await s.post('/conta/perfis', { nome: 'Sobrando' }, cliente.token);
+  const terceiro = await s.post('/conta/perfis', { nome: 'Sobrando', avatar: 'urso' }, cliente.token);
   assert.equal(terceiro.status, 409, 'o plano Essencial permite 2 perfis');
 
   const principal = (await s.get('/conta/perfis', cliente.token)).dados.perfis.find((p) => p.principal);

@@ -41,7 +41,7 @@ test('ao excluir, a assinatura é cancelada e os perfis somem', async (t) => {
   const admin = await s.adminLogin();
   const cliente = await s.assinante('assina@exemplo.com.br');
   await s.post('/conta/assinar', { plano_id: 2 }, cliente.token);
-  await s.post('/conta/perfis', { nome: 'Crianças', infantil: true }, cliente.token);
+  await s.post('/conta/perfis', { nome: 'Crianças', avatar: 'dino', infantil: true }, cliente.token);
 
   const antes = await s.get('/conta', cliente.token);
   assert.ok(antes.dados.perfis.length >= 2, 'tinha mais de um perfil antes');
@@ -62,4 +62,32 @@ test('a conta da operação não é excluída por esta rota', async (t) => {
   const r = await s.del('/conta', { senha: 'admin123' }, admin);
   assert.equal(r.status, 422);
   assert.match(r.dados.erro, /Equipe/i);
+});
+
+test('o perfil exige uma foto, e ela tem que ser uma das nossas', async (t) => {
+  const s = await iniciar();
+  t.after(s.fechar);
+  const cliente = await s.assinante('comfoto@exemplo.com.br', { plano: 3 });
+
+  // O perfil que nasce junto com o cadastro já vem com mascote: ninguém fica sem foto.
+  const { perfis } = (await s.get('/conta/perfis', cliente.token)).dados;
+  assert.ok(perfis[0].avatar, 'o primeiro perfil vem com mascote');
+
+  // Sem escolher foto, não cria.
+  const semFoto = await s.post('/conta/perfis', { nome: 'Sem Foto' }, cliente.token);
+  assert.equal(semFoto.status, 422);
+  assert.match(semFoto.dados.erro, /foto/i);
+
+  // Nome inventado não pode virar caminho de arquivo.
+  const inventado = await s.post('/conta/perfis', { nome: 'Hacker', avatar: '../../etc/passwd' }, cliente.token);
+  assert.equal(inventado.status, 422);
+
+  // Com um mascote de verdade, cria e devolve.
+  const ok = await s.post('/conta/perfis', { nome: 'Filho', avatar: 'dino' }, cliente.token);
+  assert.equal(ok.status, 201, JSON.stringify(ok.dados));
+  assert.equal(ok.dados.perfil.avatar, 'dino');
+
+  // Dá para trocar, não para apagar.
+  assert.equal((await s.patch(`/conta/perfis/${ok.dados.perfil.id}`, { avatar: 'panda' }, cliente.token)).dados.perfil.avatar, 'panda');
+  assert.equal((await s.patch(`/conta/perfis/${ok.dados.perfil.id}`, { avatar: '' }, cliente.token)).status, 422);
 });

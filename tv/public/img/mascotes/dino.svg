@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Dino">
+  <defs>
+    <linearGradient id="fundo-dino" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#52B45C"/>
+      <stop offset="1" stop-color="#2C6A33"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="34" fill="url(#fundo-dino)"/>
+  <g>
+    <path d="M80 30 L88 48 L72 48 Z" fill="#2C6A33"/>
+    <path d="M58 40 L66 56 L50 54 Z" fill="#2C6A33"/>
+    <path d="M102 40 L94 56 L110 54 Z" fill="#2C6A33"/>
+    <ellipse cx="80" cy="86" rx="42" ry="40" fill="#7FD188"/>
+    <circle cx="64" cy="82" r="7" fill="#1B1B22"/>
+    <circle cx="96" cy="82" r="7" fill="#1B1B22"/>
+    <circle cx="67" cy="79" r="2.3333333333333335" fill="#fff"/>
+    <circle cx="99" cy="79" r="2.3333333333333335" fill="#fff"/>
+    <ellipse cx="80" cy="104" rx="20" ry="14" fill="#2C6A33" opacity=".25"/>
+    <ellipse cx="80" cy="99" rx="7" ry="5" fill="#1B1B22"/>
+    <path d="M80 103 Q80 110 72 112" stroke="#1B1B22" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M80 103 Q80 110 88 112" stroke="#1B1B22" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <ellipse cx="52" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+    <ellipse cx="108" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+  </g>
+</svg>

@@ -56,7 +56,7 @@ test('perfil infantil não vê (nem abre) conteúdo acima da classificação', a
   const livre = await filme(s, admin, { nome: 'Turma do Quintal', classificacao: 0 });
 
   const cliente = await s.assinante('familia@exemplo.com.br', { plano: 2 });
-  const infantil = await s.post('/conta/perfis', { nome: 'Kids', infantil: true }, cliente.token);
+  const infantil = await s.post('/conta/perfis', { nome: 'Kids', avatar: 'panda', infantil: true }, cliente.token);
   const comKids = { headers: { 'X-Perfil': String(infantil.dados.perfil.id) } };
   assert.equal(infantil.dados.perfil.classificacao_max, 10);
 

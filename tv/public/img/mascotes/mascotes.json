@@ -1,0 +1,62 @@
+[
+  {
+    "id": "leao",
+    "nome": "Leão",
+    "cor": "#F2A33C"
+  },
+  {
+    "id": "raposa",
+    "nome": "Raposa",
+    "cor": "#E8663C"
+  },
+  {
+    "id": "panda",
+    "nome": "Panda",
+    "cor": "#4FB3A6"
+  },
+  {
+    "id": "coruja",
+    "nome": "Coruja",
+    "cor": "#7B6CD9"
+  },
+  {
+    "id": "gato",
+    "nome": "Gato",
+    "cor": "#5AA7E8"
+  },
+  {
+    "id": "robo",
+    "nome": "Robô",
+    "cor": "#8E8E96"
+  },
+  {
+    "id": "astronauta",
+    "nome": "Astronauta",
+    "cor": "#2F3A8C"
+  },
+  {
+    "id": "dino",
+    "nome": "Dino",
+    "cor": "#52B45C"
+  },
+  {
+    "id": "urso",
+    "nome": "Urso",
+    "cor": "#A9714A"
+  },
+  {
+    "id": "pinguim",
+    "nome": "Pinguim",
+    "cor": "#3C6E9E"
+  },
+  {
+    "id": "tigre",
+    "nome": "Tigre",
+    "cor": "#E8912F"
+  },
+  {
+    "id": "alien",
+    "nome": "Alien",
+    "cor": "#43B07A"
+  }
+]

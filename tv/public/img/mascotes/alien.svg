@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Alien">
+  <defs>
+    <linearGradient id="fundo-alien" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#43B07A"/>
+      <stop offset="1" stop-color="#1E5C3C"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="34" fill="url(#fundo-alien)"/>
+  <g>
+    <path d="M80 44 L80 26" stroke="#1E5C3C" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="80" cy="22" r="8" fill="#1E5C3C"/>
+    <ellipse cx="80" cy="86" rx="42" ry="40" fill="#6FD9A3"/>
+    <circle cx="64" cy="82" r="13" fill="#1B1B22"/>
+    <circle cx="96" cy="82" r="13" fill="#1B1B22"/>
+    <circle cx="67" cy="79" r="4.333333333333333" fill="#fff"/>
+    <circle cx="99" cy="79" r="4.333333333333333" fill="#fff"/>
+    <ellipse cx="80" cy="98" rx="7" ry="5" fill="#1B1B22"/>
+    <path d="M72 108 Q80 114 88 108" stroke="#1B1B22" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="52" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+    <ellipse cx="108" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+  </g>
+</svg>

@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS perfis (
   usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   nome TEXT NOT NULL,
   cor TEXT NOT NULL DEFAULT '#E50914',
+  -- Mascote escolhido como foto do perfil (arquivo em public/img/mascotes). É obrigatório na
+  -- criação; perfis antigos recebem um na migração, para nenhum ficar sem foto.
+  avatar TEXT,
   infantil INTEGER NOT NULL DEFAULT 0,
   classificacao_max INTEGER NOT NULL DEFAULT 18 CHECK (classificacao_max IN (0,10,12,14,16,18)),
   pin_hash TEXT,
@@ -489,7 +492,27 @@ function migrar(db) {
   if (!colunas.includes('cabecalhos')) db.exec('ALTER TABLE canais ADD COLUMN cabecalhos TEXT');
   if (!colunas.includes('id_publico')) db.exec('ALTER TABLE canais ADD COLUMN id_publico TEXT');
   if (!colunas.includes('id_epg')) db.exec('ALTER TABLE canais ADD COLUMN id_epg TEXT');
+
+  const colunasPerfis = db.prepare('PRAGMA table_info(perfis)').all().map((c) => c.name);
+  if (!colunasPerfis.includes('avatar')) {
+    db.exec('ALTER TABLE perfis ADD COLUMN avatar TEXT');
+    // Perfil que já existia não pode ficar sem foto: recebe um mascote escolhido pelo nome,
+    // sempre o mesmo para o mesmo nome, para não mudar a cada atualização.
+    const perfis = db.prepare('SELECT id, nome FROM perfis').all();
+    const põe = db.prepare('UPDATE perfis SET avatar = ? WHERE id = ?');
+    for (const p of perfis) põe.run(MASCOTES[somaDoNome(p.nome) % MASCOTES.length], p.id);
+  }
 }
+
+/** Mascotes disponíveis (os arquivos em public/img/mascotes). */
+const MASCOTES = ['leao', 'raposa', 'panda', 'coruja', 'gato', 'robo',
+  'astronauta', 'dino', 'urso', 'pinguim', 'tigre', 'alien'];
+
+const somaDoNome = (nome) => [...String(nome ?? '')].reduce((a, c) => a + c.charCodeAt(0), 0);
+
+/** Mascote para o perfil criado automaticamente (cadastro, balcão, demonstração).
+ *  Sempre o mesmo para o mesmo nome, para não trocar de cara a cada reinstalação. */
+const mascoteDe = (nome) => MASCOTES[somaDoNome(nome) % MASCOTES.length];
 
 /** Endereço amigável: "Cine Aberta 2" -> "cine-aberta-2". */
 function slug(texto) {
@@ -538,4 +561,5 @@ function gravarConfig(db, valores) {
   for (const [k, val] of Object.entries(valores)) if (k in CONFIG_PADRAO) upd.run(String(val), k);
 }
 
-module.exports = { abrir, transacao, lerConfig, gravarConfig, agora, slug, CONFIG_PADRAO, PLANOS_PADRAO };
+module.exports = {
+  MASCOTES, mascoteDe, abrir, transacao, lerConfig, gravarConfig, agora, slug, CONFIG_PADRAO, PLANOS_PADRAO };

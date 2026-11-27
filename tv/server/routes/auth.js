@@ -1,7 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
-const { transacao, agora } = require('../db');
+const { transacao, agora, mascoteDe } = require('../db');
 const { emitirToken } = require('../auth');
 const { hashSenha, verificarSenha } = require('../lib/senha');
 const { ErroNegocio } = require('../lib/erros');
@@ -38,7 +38,9 @@ module.exports = (db, autenticado) => {
       const res2 = db.prepare("INSERT INTO usuarios (nome, email, telefone, senha_hash, perfil, criado_em) VALUES (?, ?, ?, ?, 'assinante', ?)")
         .run(nome, email, telefone, hashSenha(senha), agora());
       const uid = Number(res2.lastInsertRowid);
-      db.prepare('INSERT INTO perfis (usuario_id, nome, principal, criado_em) VALUES (?, ?, 1, ?)').run(uid, nome.split(/\s+/)[0].slice(0, 30), agora());
+      const apelido = nome.split(/\s+/)[0].slice(0, 30);
+      db.prepare('INSERT INTO perfis (usuario_id, nome, avatar, principal, criado_em) VALUES (?, ?, ?, 1, ?)')
+        .run(uid, apelido, mascoteDe(apelido), agora());
       return uid;
     });
     registrar(db, req, 'cadastro', { usuario_id: id, email });

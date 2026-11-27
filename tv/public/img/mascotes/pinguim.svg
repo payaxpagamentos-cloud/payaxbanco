@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Pinguim">
+  <defs>
+    <linearGradient id="fundo-pinguim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3C6E9E"/>
+      <stop offset="1" stop-color="#F6B93B"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="34" fill="url(#fundo-pinguim)"/>
+  <g>
+    <ellipse cx="80" cy="86" rx="42" ry="40" fill="#2B2B33"/>
+    <ellipse cx="80" cy="96" rx="26" ry="28" fill="#F4F4F6"/>
+    <circle cx="64" cy="82" r="7" fill="#1B1B22"/>
+    <circle cx="96" cy="82" r="7" fill="#1B1B22"/>
+    <circle cx="67" cy="79" r="2.3333333333333335" fill="#fff"/>
+    <circle cx="99" cy="79" r="2.3333333333333335" fill="#fff"/>
+    <path d="M80 92 L72 104 L88 104 Z" fill="#F6B93B"/>
+    <ellipse cx="52" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+    <ellipse cx="108" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+  </g>
+</svg>

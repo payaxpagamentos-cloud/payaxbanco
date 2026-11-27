@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Urso">
+  <defs>
+    <linearGradient id="fundo-urso" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#A9714A"/>
+      <stop offset="1" stop-color="#5E3A22"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="34" fill="url(#fundo-urso)"/>
+  <g>
+    <circle cx="48" cy="52" r="16" fill="#C98F63"/>
+    <circle cx="112" cy="52" r="16" fill="#C98F63"/>
+    <ellipse cx="80" cy="86" rx="42" ry="40" fill="#C98F63"/>
+    <circle cx="64" cy="82" r="7" fill="#1B1B22"/>
+    <circle cx="96" cy="82" r="7" fill="#1B1B22"/>
+    <circle cx="67" cy="79" r="2.3333333333333335" fill="#fff"/>
+    <circle cx="99" cy="79" r="2.3333333333333335" fill="#fff"/>
+    <ellipse cx="80" cy="98" rx="7" ry="5" fill="#1B1B22"/>
+    <path d="M72 108 Q80 114 88 108" stroke="#1B1B22" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="52" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+    <ellipse cx="108" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+  </g>
+</svg>

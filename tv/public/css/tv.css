@@ -191,6 +191,22 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
 .topo .espaco{ flex: 1; }
 .topo .acoes{ display: flex; align-items: center; gap: 14px; }
 .avatar{ width: 32px; height: 32px; border-radius: var(--radius); display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff; flex: none; cursor: pointer; border: 0; }
+/* Avatar com mascote: a arte ocupa o quadro inteiro, sem fundo de cor por baixo. */
+.avatar.com-foto{ background: none; padding: 0; overflow: hidden; position: relative; }
+.avatar.com-foto img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar.com-foto .marca-editar{ position: absolute; inset: 0; display: grid; place-items: center;
+  background: rgba(0,0,0,.55); color: #fff; }
+
+/* Galeria de mascotes no formulário do perfil. */
+.mascotes{ display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 10px; }
+.mascotes .mascote{ padding: 0; border: 2px solid transparent; border-radius: 14px; background: none;
+  cursor: pointer; aspect-ratio: 1; overflow: hidden; transition: border-color .15s, transform .15s; }
+.mascotes .mascote img{ width: 100%; height: 100%; display: block; }
+.mascotes .mascote:hover{ transform: translateY(-2px); }
+.mascotes .mascote.on{ border-color: var(--acento); transform: translateY(-2px); }
+@media (max-width: 560px){
+  .mascotes{ grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; }
+}
 .avatar.g{ width: 110px; height: 110px; border-radius: var(--radius); font-size: 40px; }
 .busca-topo{ display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,.75); border: 1px solid var(--text-2); border-radius: var(--radius); padding: 0 10px; }
 .busca-topo input{ border: 0; background: none; min-height: 34px; padding: 0; width: min(230px, 40vw); font-size: 14px; }

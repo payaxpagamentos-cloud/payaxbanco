@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 const { Router } = require('express');
 const QRCode = require('qrcode');
 const config = require('../config');
-const { agora, transacao } = require('../db');
+const { agora, transacao, MASCOTES } = require('../db');
 const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const { hashSenha, verificarSenha } = require('../lib/senha');
 const { registrar } = require('../lib/auditoria');
@@ -14,9 +14,20 @@ const player = require('../lib/player');
 const v = require('../lib/validacao');
 
 const perfilPublico = (p) => ({
-  id: p.id, nome: p.nome, cor: p.cor, infantil: Boolean(p.infantil), classificacao_max: p.classificacao_max,
-  tem_pin: Boolean(p.pin_hash), principal: Boolean(p.principal),
+  id: p.id, nome: p.nome, cor: p.cor, avatar: p.avatar, infantil: Boolean(p.infantil),
+  classificacao_max: p.classificacao_max, tem_pin: Boolean(p.pin_hash), principal: Boolean(p.principal),
 });
+
+/** O mascote precisa ser um dos nossos: nome vindo de fora não vira caminho de arquivo. */
+const mascote = (valor, { obrigatorio = false } = {}) => {
+  const id = String(valor ?? '').trim();
+  if (!id) {
+    if (obrigatorio) throw new ErroNegocio('Escolha uma foto para o perfil.', 422);
+    return null;
+  }
+  if (!MASCOTES.includes(id)) throw new ErroNegocio('Essa foto de perfil não existe.', 422);
+  return id;
+};
 
 const pin = (valor) => {
   const t = String(valor ?? '').trim();
@@ -134,8 +145,9 @@ module.exports = (db) => {
       const quantos = db.prepare('SELECT COUNT(*) AS n FROM perfis WHERE usuario_id = ?').get(req.usuario.id).n;
       if (quantos >= acesso.perfis_max) throw new ErroNegocio(`Seu plano permite ${acesso.perfis_max} perfis.`, 409);
       const infantil = v.booleano(d.infantil);
-      const r2 = db.prepare('INSERT INTO perfis (usuario_id, nome, cor, infantil, classificacao_max, pin_hash, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(req.usuario.id, v.texto(d.nome, 'o nome do perfil', 30), v.opcional(d.cor, 'a cor', 20) ?? '#E50914', infantil ? 1 : 0,
+      const r2 = db.prepare('INSERT INTO perfis (usuario_id, nome, cor, avatar, infantil, classificacao_max, pin_hash, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(req.usuario.id, v.texto(d.nome, 'o nome do perfil', 30), v.opcional(d.cor, 'a cor', 20) ?? '#E50914',
+          mascote(d.avatar, { obrigatorio: true }), infantil ? 1 : 0,
           infantil ? v.classificacao(d.classificacao_max, 10) : v.classificacao(d.classificacao_max, 18),
           d.pin ? hashSenha(pin(d.pin)) : null, agora());
       return db.prepare('SELECT * FROM perfis WHERE id = ?').get(Number(r2.lastInsertRowid));
@@ -154,6 +166,8 @@ module.exports = (db) => {
     const d = req.body;
     if (d.nome !== undefined) db.prepare('UPDATE perfis SET nome = ? WHERE id = ?').run(v.texto(d.nome, 'o nome do perfil', 30), p.id);
     if (d.cor !== undefined) db.prepare('UPDATE perfis SET cor = ? WHERE id = ?').run(v.texto(d.cor, 'a cor', 20), p.id);
+    // Dá para trocar de mascote, não para ficar sem: o perfil nunca volta a não ter foto.
+    if (d.avatar !== undefined) db.prepare('UPDATE perfis SET avatar = ? WHERE id = ?').run(mascote(d.avatar, { obrigatorio: true }), p.id);
     if (d.infantil !== undefined) {
       const inf = v.booleano(d.infantil);
       db.prepare('UPDATE perfis SET infantil = ?, classificacao_max = ? WHERE id = ?')

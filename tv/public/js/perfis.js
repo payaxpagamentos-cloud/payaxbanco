@@ -1,4 +1,5 @@
 import { api, perfil as perfilGuardado } from './api.js';
+import { MASCOTES, urlMascote } from './mascotes.js';
 import { el, marca, limpar, corPerfil, iniciais, icone, acao, toast, modal, lerForm, etiquetaIdade, CLASSIFICACOES } from './ui.js';
 
 /** Tela "Quem está assistindo?" — perfis da conta, como nas TVs. */
@@ -8,7 +9,7 @@ export function telaPerfis(raiz, { aoEscolher, permitirSair = true, maximo = 4, 
 
   const escolher = async (p) => {
     if (!p.tem_pin) {
-      perfilGuardado.set({ id: p.id, nome: p.nome, cor: p.cor, infantil: p.infantil });
+      perfilGuardado.set({ id: p.id, nome: p.nome, cor: p.cor, avatar: p.avatar, infantil: p.infantil });
       return aoEscolher(p);
     }
     const pin = await modal(`Perfil ${p.nome}`, (fechar) => {
@@ -21,7 +22,7 @@ export function telaPerfis(raiz, { aoEscolher, permitirSair = true, maximo = 4, 
     if (!pin) return undefined;
     try {
       const r = await api.post(`/conta/perfis/${p.id}/abrir`, { pin });
-      perfilGuardado.set({ id: p.id, nome: p.nome, cor: p.cor, infantil: p.infantil, chave: r.chave });
+      perfilGuardado.set({ id: p.id, nome: p.nome, cor: p.cor, avatar: p.avatar, infantil: p.infantil, chave: r.chave });
       return aoEscolher(p);
     } catch (err) {
       toast(err.message, true);
@@ -30,7 +31,21 @@ export function telaPerfis(raiz, { aoEscolher, permitirSair = true, maximo = 4, 
   };
 
   const formPerfil = (p = null) => modal(p ? `Perfil ${p.nome}` : 'Novo perfil', (fechar) => {
+    // Foto obrigatória: perfil sem cara fica sem identidade na hora de escolher quem vai assistir.
+    // Já vem um escolhido, para ninguém travar na tela sem saber o que fazer.
+    let avatar = p?.avatar ?? MASCOTES[0].id;
+    const galeria = el('div', { class: 'mascotes' }, MASCOTES.map((m) => {
+      const b = el('button', { type: 'button', class: `mascote${m.id === avatar ? ' on' : ''}`, title: m.nome, 'aria-label': m.nome },
+        el('img', { src: urlMascote(m.id), alt: '' }));
+      b.addEventListener('click', () => {
+        avatar = m.id;
+        [...galeria.children].forEach((x) => x.classList.toggle('on', x === b));
+      });
+      return b;
+    }));
+
     const f = el('form', { class: 'form' },
+      el('label', { class: 'campo' }, 'Foto do perfil', galeria),
       el('label', { class: 'campo' }, 'Nome do perfil', el('input', { name: 'nome', maxlength: 30, required: true, value: p?.nome ?? '' })),
       el('label', { class: 'campo linha-campo' }, el('input', { type: 'checkbox', name: 'infantil', ...(p?.infantil ? { checked: true } : {}) }), 'Perfil infantil (só conteúdo até 10 anos)'),
       el('label', { class: 'campo' }, 'Classificação máxima',
@@ -55,6 +70,7 @@ export function telaPerfis(raiz, { aoEscolher, permitirSair = true, maximo = 4, 
       const d = lerForm(f);
       const corpo = {
         nome: d.nome,
+        avatar,
         infantil: Boolean(d.infantil),
         classificacao_max: Number(d.classificacao_max),
         ...(d.pin ? { pin: d.pin, pin_atual: d.pin_atual ?? '' } : {}),
@@ -72,7 +88,10 @@ export function telaPerfis(raiz, { aoEscolher, permitirSair = true, maximo = 4, 
     const r = await api.get('/conta/perfis');
     limpar(grade, r.perfis.map((p) => {
       const b = el('button', { class: 'perfil-botao' },
-        el('span', { class: 'avatar g', style: `background:${corPerfil(p.nome, p.cor)}` }, editando ? icone('engrenagem', 26) : iniciais(p.nome)),
+        p.avatar
+          ? el('span', { class: 'avatar g com-foto' }, el('img', { src: urlMascote(p.avatar), alt: '' }),
+            editando ? el('span', { class: 'marca-editar' }, icone('engrenagem', 22)) : null)
+          : el('span', { class: 'avatar g', style: `background:${corPerfil(p.nome, p.cor)}` }, editando ? icone('engrenagem', 26) : iniciais(p.nome)),
         el('span', {}, p.nome),
         el('span', { class: 'linha', style: 'justify-content:center;gap:5px' },
           p.infantil ? el('span', { class: 'etiqueta ok' }, 'infantil') : null,

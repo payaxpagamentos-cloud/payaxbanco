@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Coruja">
+  <defs>
+    <linearGradient id="fundo-coruja" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7B6CD9"/>
+      <stop offset="1" stop-color="#3C3270"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="34" fill="url(#fundo-coruja)"/>
+  <g>
+    <path d="M52 56 L62 34 L74 54 Z" fill="#A79BE8"/>
+    <path d="M108 56 L98 34 L86 54 Z" fill="#A79BE8"/>
+    <ellipse cx="80" cy="86" rx="42" ry="40" fill="#A79BE8"/>
+    <circle cx="64" cy="84" r="17" fill="#fff" opacity=".92"/>
+    <circle cx="96" cy="84" r="17" fill="#fff" opacity=".92"/>
+    <circle cx="64" cy="84" r="17" fill="none" stroke="#3C3270" stroke-width="4"/>
+    <circle cx="96" cy="84" r="17" fill="none" stroke="#3C3270" stroke-width="4"/>
+    <circle cx="64" cy="84" r="7" fill="#1B1B22"/>
+    <circle cx="96" cy="84" r="7" fill="#1B1B22"/>
+    <circle cx="67" cy="81" r="2.3333333333333335" fill="#fff"/>
+    <circle cx="99" cy="81" r="2.3333333333333335" fill="#fff"/>
+    <path d="M80 92 L72 104 L88 104 Z" fill="#3C3270"/>
+    <ellipse cx="52" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+    <ellipse cx="108" cy="98" rx="8" ry="5" fill="#FF8A8A" opacity=".35"/>
+  </g>
+</svg>
