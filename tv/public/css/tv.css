@@ -446,6 +446,13 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
   color: var(--text); padding: 10px; border-radius: 3px; cursor: pointer; font-weight: 600; font-size: 13.5px; text-align: left; }
 .player .menu-flutuante button:hover{ background: var(--surface-2); }
 .player .menu-flutuante button.on{ color: var(--acento); }
+/* Espera do canal frio: a conversão está subindo e o app aguarda, em vez de mandar a pessoa
+   clicar de novo. Cobre a tela toda para ninguém tocar em outro canal no meio. */
+.aquecendo{ position: fixed; inset: 0; z-index: 2400; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px; background: rgba(0,0,0,.88);
+  padding: max(24px, env(safe-area-inset-top, 0px)) 24px max(24px, env(safe-area-inset-bottom, 0px));
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
 /* Aviso de som: aparece quando o navegador deixou o canal tocar, mas segurou o áudio. Fica
    acima dos controles de baixo e some ao primeiro toque. */
 .player .aviso-som{ position: absolute; left: 50%; transform: translateX(-50%); z-index: 3;

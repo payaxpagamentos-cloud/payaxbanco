@@ -66,11 +66,65 @@ const carregarHls = async () => {
 
 const PASSO = 10;
 
+/**
+ * Pede a abertura ao servidor, esperando o canal subir quando ele ainda está frio.
+ *
+ * Canal que ninguém está vendo não fica convertendo (116 canais ligados o tempo todo não cabem
+ * em servidor nenhum). Quem abre um canal frio liga a conversão — e ela leva alguns segundos
+ * até ter vídeo suficiente para tocar sem travar. Nesse intervalo o servidor responde "está
+ * entrando no ar, tente de novo".
+ *
+ * Antes isso virava um aviso discreto e PARAVA AÍ: o assinante clicava uma vez, não abria,
+ * clicava de novo, e na segunda ou terceira vez funcionava — porque o primeiro clique é que
+ * tinha ligado o canal. Quem repetia o pedido era a pessoa. Agora é o aplicativo, com a tela
+ * dizendo o que está acontecendo e um botão para desistir.
+ */
+async function abrirNoServidor(corpo) {
+  const PRAZO_MS = 45_000;
+  const ENTRE_MS = 1500;
+  // O próprio servidor já segura o primeiro pedido enquanto a conversão sobe. Sem este aviso,
+  // seriam vários segundos de tela parada depois do toque, sem nada indicando que algo começou
+  // — e é aí que a pessoa toca de novo, achando que o primeiro toque não pegou.
+  const ANTES_DE_AVISAR_MS = 600;
+  const fim = Date.now() + PRAZO_MS;
+  let espera = null;
+  let desistiu = false;
+
+  const mostrarEspera = () => {
+    if (espera || desistiu) return;
+    espera = el('div', { class: 'aquecendo' },
+      el('div', { class: 'rodinha' }),
+      el('div', { style: 'margin-top:16px;text-align:center' }, 'Entrando no ar…'),
+      el('div', { class: 'pequeno mudo', style: 'margin-top:4px;text-align:center' }, 'Este canal estava desligado. Leva alguns segundos.'),
+      el('button', { class: 'btn vazio', style: 'margin-top:18px', onclick: () => { desistiu = true; } }, 'Cancelar'));
+    document.body.append(espera);
+  };
+  const avisarSeDemorar = setTimeout(mostrarEspera, ANTES_DE_AVISAR_MS);
+
+  try {
+    for (;;) {
+      try {
+        return await api.post('/play/abrir', corpo);
+      } catch (err) {
+        const aquecendo = err instanceof ErroApi && err.status === 503 && err.detalhes?.motivo === 'aquecendo';
+        if (!aquecendo || desistiu || Date.now() >= fim) throw err;
+        mostrarEspera();
+        await new Promise((r) => { setTimeout(r, ENTRE_MS); });
+        if (desistiu) return null;
+      }
+    }
+  } finally {
+    clearTimeout(avisarSeDemorar);
+    espera?.remove();
+  }
+}
+
 /** Abre a tela cheia de reprodução. Devolve uma promessa que resolve quando o player fecha. */
 export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, episodio_id: episodioId, aoFechar, aoTrocar }) {
   let dados;
   try {
-    dados = await api.post('/play/abrir', { tipo, canal_id: canalId, titulo_id: tituloId, episodio_id: episodioId, dispositivo: nomeDoAparelho() });
+    dados = await abrirNoServidor({ tipo, canal_id: canalId, titulo_id: tituloId, episodio_id: episodioId, dispositivo: nomeDoAparelho() });
+    if (!dados) return null;          // a pessoa cancelou a espera
   } catch (err) {
     // 409 com as telas em uso: o assinante decide qual parar.
     if (err instanceof ErroApi && err.status === 409 && err.detalhes?.em_uso) {
