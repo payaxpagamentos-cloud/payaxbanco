@@ -18,6 +18,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { abrir, agora } = require('../server/db');
 const midia = require('../server/lib/midia');
 const logos = require('../server/lib/logos');
@@ -43,6 +44,8 @@ const MAPA = {
   '11-record.png': 'Record',
   '12-tv-cultura.png': 'TV Cultura',
   '13-rede-tv.png': 'RedeTV!',
+  '14-sbt.png': 'SBT',
+  '15-band.png': 'Band',
 };
 
 const PASTA = path.join(__dirname, '..', 'logos-canais');
@@ -67,6 +70,14 @@ for (const [arquivo, nome] of Object.entries(MAPA)) {
   if (!fs.existsSync(caminho)) { semArquivo.push(arquivo); continue; }
   const canal = porNome.get(nome);
   if (!canal) { semCanal.push(nome); continue; }
+  // Já é exatamente esta arte? Então não há o que fazer, nem com --forcar. Sem esta conferência,
+  // cada passada com --forcar gravava uma cópia nova do mesmo arquivo e trocava o logo do canal
+  // por ela — lixo em disco e um canal "alterado" que não mudou em nada.
+  const soma = crypto.createHash('sha256').update(fs.readFileSync(caminho)).digest('hex');
+  const atual = canal.logo_midia_id
+    ? db.prepare('SELECT sha256 FROM midias WHERE id = ?').get(canal.logo_midia_id) : null;
+  if (atual?.sha256 === soma) { console.log(`  já é esta  ${nome}`); pulados += 1; continue; }
+
   // Logo de demonstração (o quadrado com as iniciais que a instalação cria) não conta como
   // logo: é exatamente o que estas artes vêm substituir.
   if (canal.logo_midia_id && !forcar && !logos.ehDeDemonstracao(db, canal.logo_midia_id)) {
