@@ -1,6 +1,7 @@
 import { api, BASE, ErroApi, absoluto } from './api.js';
 import { el, icone, relogio, duracao, toast, modal, acao, nomeDoAparelho, etiquetaIdade, QUALIDADES, LINHAS_QUALIDADE } from './ui.js';
 import { temPonteAndroid, criarVideoTizen, tocarNoAndroidTV } from './motor-nativo.js';
+import { vigiarReproducao } from './vigia.js';
 
 /**
  * Player da PLAY TECH VIP: canais ao vivo (HLS pelo hls.js, com reserva para o HLS nativo do Safari)
@@ -115,8 +116,11 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   const selos = el('div', { class: 'linha', style: 'margin-top:6px' },
     aoVivo ? el('span', { class: 'etiqueta vivo' }, 'AO VIVO') : null,
     dados.info.classificacao !== undefined ? etiquetaIdade(dados.info.classificacao) : null,
-    seloQualidade,
-    dados.fonte.nossos_servidores ? el('span', { class: 'etiqueta ok', title: 'O sinal passa pelos nossos servidores' }, 'PLAY CDN') : null);
+    seloQualidade);
+  // Aqui havia um selo "PLAY CDN". Saiu: ele aparecia em todos os canais, sempre, porque todos
+  // passam pelos nossos servidores — etiqueta que nunca muda não informa nada, e "CDN" não quer
+  // dizer nada para quem assiste. A operação vê a mesma informação no painel, em português.
+
 
   const btn = (nomeIcone, rotulo, fn, extra = '') => {
     const b = el('button', { class: `pbtn ${extra}`, title: rotulo, 'aria-label': rotulo }, icone(nomeIcone));
@@ -190,6 +194,52 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
 
   // ---------- Fonte do vídeo ----------
   const semSuporteNativo = () => !video.canPlayType('application/vnd.apple.mpegurl');
+
+  /**
+   * O navegador diz que toca HLS sozinho — mas disse a verdade?
+   *
+   * `canPlayType('application/vnd.apple.mpegurl')` é pergunta de resposta frouxa: o Chrome
+   * responde "maybe" sem saber tocar HLS, e nesse caso o player ia pelo caminho nativo e ficava
+   * na tela preta. Em vez de adivinhar pelo nome do navegador, a plataforma confere o fato: se
+   * em alguns segundos o vídeo não carregou nem o cabeçalho, o suporte nativo era conversa e o
+   * hls.js assume. Quem fala a verdade (Safari, iPhone) não é penalizado — lá carrega antes
+   * disso e nada acontece.
+   */
+  let conferindoNativo = false;
+  function conferirSuporteNativo() {
+    if (dados.fonte.tipo !== 'hls' || video.nativo === 'avplay' || conferindoNativo) return;
+    conferindoNativo = true;
+    setTimeout(async () => {
+      conferindoNativo = false;
+      if (fechado || hls || video.readyState >= 1) return;
+      const H = await carregarHls();
+      if (!H?.isSupported()) return;      // sem hls.js não há para onde cair: fica como está
+      usarHls(H);
+    }, 6000);
+  }
+
+  function usarHls(H) {
+    // Se o caminho nativo já tinha posto um `src`, ele precisa sair antes: hls.js alimenta o
+    // vídeo por MSE, e os dois disputando o mesmo elemento dão tela preta sem erro nenhum.
+    if (video.getAttribute('src')) { video.removeAttribute('src'); video.load?.(); }
+    hls = new H({ lowLatencyMode: aoVivo, backBufferLength: aoVivo ? 30 : 90, enableWorker: true, maxBufferLength: 20 });
+    hls.on(H.Events.ERROR, (_e, info) => {
+      if (!info.fatal) return;
+      // Erro fatal de rede ou de mídia não é motivo para desistir: canal ao vivo cai e volta o
+      // tempo todo. Mas também não pode virar laço apertado — `startLoad()` chamado sem parar
+      // martela o servidor e nunca sai do lugar. Quem conta as tentativas e espera entre elas é
+      // o vigia, que vale para os dois motores.
+      if (info.type === H.ErrorTypes.NETWORK_ERROR || info.type === H.ErrorTypes.MEDIA_ERROR) {
+        vigia.forcar();
+        return;
+      }
+      mostrarErro('Não conseguimos manter a transmissão. Tente abrir de novo.');
+    });
+    hls.on(H.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+    hls.loadSource(absoluto(dados.fonte.url));
+    hls.attachMedia(video);
+  }
+
   async function ligarFonte() {
     // O AVPlay toca HLS e MP4 direto, sem hls.js.
     if (video.nativo === 'avplay') {
@@ -198,23 +248,62 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     }
     if (dados.fonte.tipo === 'hls' && semSuporteNativo()) {
       const H = await carregarHls();
-      if (H?.isSupported()) {
-        hls = new H({ lowLatencyMode: aoVivo, backBufferLength: aoVivo ? 30 : 90, enableWorker: true, maxBufferLength: 20 });
-        hls.on(H.Events.ERROR, (_e, info) => {
-          if (!info.fatal) return;
-          if (info.type === H.ErrorTypes.NETWORK_ERROR) hls.startLoad();
-          else if (info.type === H.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
-          else mostrarErro('Não conseguimos manter a transmissão. Tente abrir de novo.');
-        });
-        hls.on(H.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
-        hls.loadSource(absoluto(dados.fonte.url));
-        hls.attachMedia(video);
-        return;
-      }
+      if (H?.isSupported()) { usarHls(H); return; }
     }
     video.src = absoluto(dados.fonte.url);
     video.play().catch(() => {});
+    conferirSuporteNativo();
   }
+
+  // ---------- Vigia da reprodução: nada pode ficar travado ----------
+  // A lógica (detectar parada, subir o remédio, esperar entre tentativas) mora em vigia.js, para
+  // poder ser testada com um <video> e um HLS de verdade. Aqui ficam só os remédios, que
+  // dependem do motor: no iPhone não há hls.js, então os passos 2 e 3 caem direto no último.
+
+  /** Refaz a fonte do zero, guardando onde estava. É o último recurso, e o único do iPhone. */
+  async function religarFonte() {
+    const posicao = video.currentTime;
+    try { hls?.destroy(); } catch { /* segue */ }
+    hls = null;
+    try { video.removeAttribute('src'); video.load?.(); } catch { /* segue */ }
+    await ligarFonte();
+    if (!aoVivo && posicao > 1) {
+      video.addEventListener('loadedmetadata', () => {
+        try { video.currentTime = posicao; } catch { /* o arquivo ainda não aceitou o salto */ }
+      }, { once: true });
+    }
+    video.play().catch(() => {});
+  }
+
+  const vigia = vigiarReproducao(video, {
+    aoVivo,
+    remedios: [
+      // 1. Empurrão: no ao vivo, de volta para a ponta; no sob demanda, meio segundo à frente.
+      () => {
+        const s = video.seekable;
+        const fim = s?.length ? s.end(s.length - 1) : null;
+        try { video.currentTime = aoVivo && fim !== null ? Math.max(0, fim - 1) : video.currentTime + 0.5; } catch { /* ainda não dá */ }
+        video.play().catch(() => {});
+      },
+      // 2 e 3. A recuperação do próprio hls.js, quando é ele quem está tocando.
+      () => (hls ? hls.recoverMediaError() : religarFonte()),
+      () => { if (!hls) return religarFonte(); hls.stopLoad(); hls.startLoad(); return undefined; },
+      // 4 em diante: refazer a fonte inteira.
+      () => religarFonte(),
+    ],
+    aoMudar: ({ estado, passo }) => {
+      if (estado === 'voltou') { avisoCentro.classList.add('oculto'); avisoCentro.replaceChildren(el('div', { class: 'rodinha' })); return; }
+      if (estado === 'desistiu') { mostrarErro('A reprodução parou e não voltou. Tente de novo em instantes.'); return; }
+      avisoCentro.classList.remove('oculto');
+      // Depois de algumas tentativas, dizer o que está havendo: rodinha muda por um minuto é o
+      // que faz a pessoa achar que o aplicativo morreu.
+      if (passo >= 3) {
+        avisoCentro.replaceChildren(el('div', { class: 'rodinha' }),
+          el('div', { class: 'pequeno mudo', style: 'margin-top:12px;text-align:center' }, 'Reconectando…'));
+      }
+    },
+  });
+
 
   // ---------- Controles ----------
   const alternar = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
@@ -391,7 +480,12 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     btnSom.replaceChildren(icone(video.muted || video.volume === 0 ? 'mudo' : 'som'));
     faixaVolume.value = String(video.muted ? 0 : video.volume);
   });
-  video.addEventListener('error', () => mostrarErro(aoVivo ? 'O sinal deste canal está fora do ar neste momento.' : 'Não conseguimos tocar este vídeo.'));
+  video.addEventListener('error', () => {
+    // Canal ao vivo não ganha tela de erro no primeiro tropeço: a origem cai e volta, e o vigia
+    // reconecta sozinho. Só depois de insistir é que vale avisar — e, no ao vivo, nem aí.
+    if (aoVivo || !vigia.desistiu) { vigia.forcar(); return; }
+    mostrarErro('Não conseguimos tocar este vídeo.');
+  });
   video.addEventListener('ended', () => {
     salvar();
     if (dados.proximo_episodio) oferecerProximo();
@@ -405,7 +499,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
       el('h2', {}, 'Não foi possível assistir'),
       el('p', { class: 'mudo' }, msg),
       el('div', { class: 'linha', style: 'justify-content:center' },
-        el('button', { class: 'btn primario', onclick: () => { caixaErro.classList.add('oculto'); ligarFonte(); } }, 'Tentar de novo'),
+        el('button', { class: 'btn primario', onclick: () => { caixaErro.classList.add('oculto'); vigia.rearmar(); religarFonte(); } }, 'Tentar de novo'),
         el('button', { class: 'btn vazio', onclick: () => fechar() }, 'Voltar'))));
   }
 
@@ -514,6 +608,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     fechado = true;
     clearInterval(pararPing);
     clearInterval(pararSalvar);
+    vigia.parar();
     clearTimeout(esconder);
     document.removeEventListener('keydown', teclas);
     if (!aoVivo && dados.info.titulo_id && video.currentTime > 5) {
