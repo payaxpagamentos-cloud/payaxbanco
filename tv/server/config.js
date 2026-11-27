@@ -92,10 +92,14 @@ module.exports = {
     // Segmentos ficam aqui, ao lado do banco (fora da pasta pública). São apagados conforme saem
     // da lista: ao vivo não guarda histórico, e disco cheio derruba a plataforma inteira.
     pasta: process.env.TV_AO_VIVO_PASTA || path.join(path.dirname(dbFile), 'ao-vivo'),
-    // 4s por pedaço e 6 pedaços na lista: ~24s de folga contra engasgo, com uns 12s de atraso
-    // em relação ao ar. Pedaço menor diminui o atraso e aumenta o número de requisições.
-    segundosPorSegmento: Number(process.env.TV_AO_VIVO_SEGMENTO_S) || 4,
-    segmentosNaLista: Number(process.env.TV_AO_VIVO_LISTA) || 6,
+    // 2s por pedaço e 12 na lista: os mesmos ~24s de janela, mas o canal frio entra no ar na
+    // METADE do tempo. Medido nesta bancada: com pedaço de 4s, os três pedaços que o player
+    // precisa para começar sem travar ficam prontos em 13,6s; com 2s, em 6,5s. Doze segundos
+    // olhando tela preta é tempo demais para um canal de TV — e "não travar" não pode custar
+    // isso. O preço é o dobro de requisições por assinante (uma a cada 2s em vez de 4s), que
+    // o servidor atende do próprio disco.
+    segundosPorSegmento: Number(process.env.TV_AO_VIVO_SEGMENTO_S) || 2,
+    segmentosNaLista: Number(process.env.TV_AO_VIVO_LISTA) || 12,
     // Quantos pedaços a lista precisa ter antes de o canal ser entregue ao assinante. Três é a
     // recomendação do próprio HLS (RFC 8216) e o que o hls.js procura: começar a tocar a três
     // pedaços da ponta. Com um só, o player gruda na ponta sem reserva e trava na primeira
@@ -110,7 +114,17 @@ module.exports = {
     recodificarVideo: process.env.TV_AO_VIVO_RECODIFICAR_VIDEO === '1',
     // Pedaços mantidos em disco DEPOIS de saírem da lista, para quem ficou para trás não pedir
     // um arquivo apagado. O padrão do ffmpeg é 1, que é pouco: são ~1,5 MB cada.
-    pedacosGuardados: Number(process.env.TV_AO_VIVO_PEDACOS_GUARDADOS) || 6,
+    pedacosGuardados: Number(process.env.TV_AO_VIVO_PEDACOS_GUARDADOS) || 12,
+
+    // Canais que ficam convertendo SEMPRE, mesmo sem ninguém assistindo — por número, separados
+    // por vírgula. Ex.: TV_AO_VIVO_QUENTES=2,4,5,7,9,11,13 (a TV aberta).
+    //
+    // Existe porque "sob demanda" tem um preço que cai justamente nos canais mais vistos: quem
+    // abre a Globo espera o canal subir, toda vez que ele estiver frio. Deixar um punhado de
+    // canais quentes custa ~57 MB de memória cada e faz eles abrirem NA HORA. Com 116 canais
+    // não dá para fazer isso com todos; com os sete da TV aberta, são 400 MB bem gastos.
+    quentes: String(process.env.TV_AO_VIVO_QUENTES || '')
+      .split(',').map((n) => Number(String(n).trim())).filter((n) => Number.isInteger(n) && n > 0),
     // Sem nada chegar da origem por este tempo, o ffmpeg desiste e a gente reconecta.
     timeoutMs: Number(process.env.TV_AO_VIVO_TIMEOUT_MS) || 15_000,
     // Teto de canais convertendo AO MESMO TEMPO. Cada um é um processo e um fluxo de rede;

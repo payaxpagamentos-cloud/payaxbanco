@@ -80,7 +80,7 @@ Medido neste projeto, com sinal real de 720p a 3 Mbps:
 | Processador | **~1,8% de um núcleo** |
 | Memória | **~57 MB** |
 | Disco | só os segundos que estão na lista (poucos MB) |
-| Tempo até entrar no ar | **~12 s** (ver abaixo) |
+| Tempo até entrar no ar | **~6 s** (ver abaixo), ou na hora se for canal quente |
 
 Quem limita é a **memória**, não o processador: 60 canais pesam cerca de 3,5 GB de RAM e pouco
 mais de um núcleo. O teto está em `TV_AO_VIVO_MAX=60`; suba ou desça conforme a RAM do servidor.
@@ -88,7 +88,7 @@ mais de um núcleo. O teto está em `TV_AO_VIVO_MAX=60`; suba ou desça conforme
 A **banda de saída** é outra conta, e é a que manda: cada assinante assistindo consome o bitrate
 do canal. 3 Mbps × 300 assinantes = 900 Mbps de upload.
 
-### Por que o canal frio demora ~12 s, e não ~4 s
+### Por que o canal frio demora alguns segundos
 
 O ffmpeg escreve a lista assim que fecha o **primeiro** pedaço, com 4 segundos de vídeo dentro.
 Entregar o canal nesse instante é tentador — e foi o que a plataforma fazia. O resultado era o
@@ -98,9 +98,24 @@ que produz 4 segundos a cada 4 segundos. Qualquer oscilação da rede do celular
 O HLS (RFC 8216) recomenda começar a tocar a **três pedaços da ponta**, e o hls.js procura
 exatamente isso (`liveSyncDurationCount: 3`). Com um pedaço na lista, não há de onde tirar.
 
-Então a plataforma espera **três pedaços** — 12 segundos de folga — antes de entregar o canal.
-São uns 8 segundos a mais para abrir um canal frio, em troca de o canal não travar. Canal morno
-(visto nos últimos 5 minutos) continua entrando na hora, porque a folga já existe.
+Então a plataforma espera **três pedaços** antes de entregar o canal. Com pedaços de 2 segundos
+isso dá 6 segundos de folga e ~6 segundos de espera — metade do que era com pedaços de 4 s,
+medido nesta bancada: 13,6 s contra 6,5 s. Canal morno (visto nos últimos 5 minutos) entra na
+hora, porque a folga já existe.
+
+### Canais que nunca esfriam
+
+Sob demanda economiza memória, mas cobra o preço justamente nos canais mais vistos: quem abre a
+Globo espera o canal subir toda vez que ele esfriou. `TV_AO_VIVO_QUENTES` resolve isso — os
+números listados ficam convertendo sempre e abrem **na hora**:
+
+```
+TV_AO_VIVO_QUENTES=2,4,5,7,9,11,13
+```
+
+São os sete da TV aberta, ~400 MB de memória, e cobrem a maior parte do que a casa assiste. O
+teto `TV_AO_VIVO_MAX` continua valendo para eles, com cinco vagas sempre reservadas para quem
+abrir um canal qualquer.
 
 Medido nesta bancada:
 
@@ -135,7 +150,8 @@ Por que isso não é detalhe:
 
 Como fica para o assinante:
 
-- canal **frio** (ninguém via): entra no ar em ~12 s — o app mostra que está entrando no ar;
+- canal **frio** (ninguém via): entra no ar em ~6 s — o app mostra que está entrando no ar;
+- canal **quente** (`TV_AO_VIVO_QUENTES`): entra **na hora**, sempre;
 - canal **morno** (alguém viu nos últimos 5 minutos): entra **na hora**;
 - zapear entre canais que a casa costuma ver é instantâneo, porque eles ficam mornos.
 

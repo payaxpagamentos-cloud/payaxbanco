@@ -151,6 +151,9 @@ function ligar(canal, db) {
   const estado = atual ?? { tentativas: 0, erro: null, desde: null, processo: null, parando: false, proxima: null };
   estado.parando = false;
   estado.ultimoUso = Date.now();
+  // O número fica guardado porque é por ele que a operação marca um canal como sempre quente
+  // (TV_AO_VIVO_QUENTES), e a limpeza de ociosos precisa saber quem não pode desligar.
+  estado.numero = canal.numero;
   vivos.set(canal.id, estado);
 
   fs.mkdirSync(pastaDoCanal(canal.id), { recursive: true });
@@ -282,7 +285,7 @@ function sincronizar(db) {
   try {
     // Os codecs vêm junto: é `modoDeConversao` quem decide, por canal, se copia o áudio ou
     // troca por AAC. Sem eles aqui, canal com áudio em AC-3 subiria copiado e sairia mudo.
-    canais = db.prepare("SELECT id, nome, url_hls, sinal_video, sinal_audio FROM canais WHERE fonte = 'rtmp' AND ativo = 1 AND url_hls IS NOT NULL AND url_hls <> '' ORDER BY ordem, numero").all();
+    canais = db.prepare("SELECT id, numero, nome, url_hls, sinal_video, sinal_audio FROM canais WHERE fonte = 'rtmp' AND ativo = 1 AND url_hls IS NOT NULL AND url_hls <> '' ORDER BY ordem, numero").all();
   } catch { return { ligados: 0, limitados: 0 }; }
   const podem = new Set(canais.map((c) => c.id));
   // Canal desligado, apagado ou que deixou de ser RTMP para de converter na hora.
@@ -292,8 +295,13 @@ function sincronizar(db) {
     // Sob demanda, quem liga o canal é o assinante que o abre (garantir). Aqui só se faz a
     // limpeza: ficar de pé convertendo 116 canais que ninguém está vendo não cabe em servidor
     // nenhum, e seria banda entrando de graça o dia inteiro.
+    //
+    // A exceção são os canais quentes: os mais vistos ficam convertendo sempre, para abrirem na
+    // hora em vez de fazer o assinante esperar o canal subir toda vez que ele esfria.
+    const quentes = canaisQuentes(canais);
+    for (const c of quentes) if (!vivos.has(c.id)) ligar(c, db);
     limparOciosos();
-    return { ligados: vivos.size, limitados: 0, sob_demanda: true };
+    return { ligados: vivos.size, limitados: 0, sob_demanda: true, quentes: quentes.length };
   }
   const dentroDoTeto = canais.slice(0, config.aoVivo.maxCanais);
   for (const id of [...vivos.keys()]) if (!dentroDoTeto.some((c) => c.id === id)) desligar(id);
@@ -311,11 +319,33 @@ function marcarUso(id) {
 }
 
 /** Desliga quem ninguém está assistindo há mais do que o tempo de folga. */
+/** Os canais marcados para ficar sempre quentes, dentro do teto de memória. */
+function canaisQuentes(canais) {
+  if (!config.aoVivo.quentes.length) return [];
+  const numeros = new Set(config.aoVivo.quentes);
+  // O teto vale para eles também: canal quente não pode comer a memória toda e deixar o
+  // assinante que abriu um canal qualquer sem lugar.
+  return canais.filter((c) => numeros.has(c.numero)).slice(0, Math.max(0, config.aoVivo.maxCanais - 5));
+}
+
+/** Os ids que estão sempre quentes agora. Usado para não desligá-los por ociosidade. */
+function idsQuentes() {
+  if (!config.aoVivo.quentes.length) return new Set();
+  const numeros = new Set(config.aoVivo.quentes);
+  const ids = new Set();
+  for (const [id, e] of vivos) if (e.numero !== undefined && numeros.has(e.numero)) ids.add(id);
+  return ids;
+}
+
 function limparOciosos() {
   if (!config.aoVivo.sobDemanda) return 0;
   const corte = Date.now() - config.aoVivo.ociosoSegundos * 1000;
+  const quentes = idsQuentes();
   let desligados = 0;
   for (const [id, e] of vivos) {
+    // Canal quente nunca sai por ociosidade: é justamente para ele estar de pé quando alguém
+    // abrir que ele está aí.
+    if (quentes.has(id)) continue;
     if ((e.ultimoUso ?? 0) < corte) { desligar(id); desligados += 1; }
   }
   return desligados;

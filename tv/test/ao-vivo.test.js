@@ -359,3 +359,37 @@ test('conversão: copia o que dá, converte só o que precisa', (t) => {
   assert.match(modo('mpeg2video', 'ac3'), /-c:v libx264 .*-c:a aac/, 'vídeo e áudio quando os dois precisam');
   assert.match(modo('h264', 'aac'), /^-c:v copy/, 'a chave não estraga quem estava bom');
 });
+
+test('canal quente fica de pé e não é desligado por ociosidade', async (t) => {
+  // Por que isto existe: "sob demanda" economiza memória, mas cobra o preço justamente nos
+  // canais mais vistos — quem abre a Globo espera o canal subir toda vez que ele esfria. Com a
+  // TV aberta marcada como quente, esses abrem na hora, e o resto continua sob demanda.
+  const s = await iniciar();
+  t.after(() => { aovivo.desligarTudo(); return s.fechar(); });
+  const admin = await s.adminLogin();
+
+  const quente = (await s.post('/admin/canais', { numero: 5, nome: 'Globo Teste', fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/globo', ativo: true }, admin)).dados.canal;
+  const frio = (await s.post('/admin/canais', { numero: 77, nome: 'Canal Frio', fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/frio', ativo: true }, admin)).dados.canal;
+
+  const antes = config.aoVivo.quentes;
+  config.aoVivo.quentes = [5];
+  t.after(() => { config.aoVivo.quentes = antes; });
+
+  // Sem ninguém assistindo, o quente sobe sozinho e o frio não.
+  aovivo.sincronizar(s.db);
+  await new Promise((r) => { setTimeout(r, 400); });
+  assert.equal(aovivo.situacao(quente.id).convertendo, true, 'canal quente sobe sem ninguém pedir');
+  assert.equal(aovivo.situacao(frio.id).convertendo, false, 'canal comum continua sob demanda');
+
+  // E a limpeza de ociosos não pode derrubá-lo, por mais tempo que passe.
+  aovivo.marcarUso(frio.id);
+  await aovivo.garantir(frio, s.db, { esperarMs: 3000 });
+  assert.equal(aovivo.situacao(frio.id).convertendo, true);
+  const folga = config.aoVivo.ociosoSegundos;
+  config.aoVivo.ociosoSegundos = -1;            // tudo parece ocioso
+  t.after(() => { config.aoVivo.ociosoSegundos = folga; });
+  const desligados = aovivo.limparOciosos();
+  assert.equal(aovivo.situacao(quente.id).convertendo, true, 'quente sobrevive à limpeza');
+  assert.equal(aovivo.situacao(frio.id).convertendo, false, 'frio sai, como sempre saiu');
+  assert.equal(desligados, 1);
+});
