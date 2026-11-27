@@ -286,7 +286,33 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     // Se o caminho nativo já tinha posto um `src`, ele precisa sair antes: hls.js alimenta o
     // vídeo por MSE, e os dois disputando o mesmo elemento dão tela preta sem erro nenhum.
     if (video.getAttribute('src')) { video.removeAttribute('src'); video.load?.(); }
-    hls = new H({ lowLatencyMode: aoVivo, backBufferLength: aoVivo ? 30 : 90, enableWorker: true, maxBufferLength: 20 });
+    // Buffer do ao vivo: é o que decide se o canal atravessa um engasgo da rede sem parar.
+    //
+    // `maxBufferLength` é quanto vídeo o player guarda ADIANTADO — o "cache" que faz a imagem
+    // continuar enquanto a rede falha. Eram 20 s para tudo; no ao vivo passa a 60 s, que é o
+    // que a janela da lista permite guardar.
+    //
+    // `liveSyncDurationCount` é a quantos pedaços da ponta o player se mantém. Em 3 (o padrão)
+    // ele fica colado no ao vivo e qualquer atraso o alcança; em 5 fica uns 20 s atrás, com
+    // esses 20 s inteiros de folga para absorver oscilação. É a troca que a operação pediu: um
+    // pouco mais de atraso em relação ao ar, em nome de não travar.
+    //
+    // Medido com a origem cortada no meio da transmissão: com os 20 s de antes o canal ficava
+    // 14 s na tela depois da queda; com estes, 21 s (test/e2e, origem de 4 s por pedaço).
+    //
+    // Canal de TV não é videochamada: ninguém percebe meio minuto de atraso, e todo mundo
+    // percebe a imagem congelando.
+    hls = new H({
+      lowLatencyMode: aoVivo,
+      enableWorker: true,
+      backBufferLength: aoVivo ? 30 : 90,
+      maxBufferLength: aoVivo ? 60 : 20,
+      // 5 pedaços da ponta: com os 4s do servidor, são 20s de vídeo já guardados adiantado, e
+      // ainda sobram 3 pedaços de margem antes de a janela da lista (8) deixar a posição para
+      // trás. O teto de atraso acompanha a janela — passar disso seria pedir pedaço que a lista
+      // não tem mais, e aí o player salta para o ao vivo em vez de insistir no vazio.
+      ...(aoVivo ? { liveSyncDurationCount: 5, liveMaxLatencyDurationCount: 8 } : {}),
+    });
     hls.on(H.Events.ERROR, (_e, info) => {
       if (!info.fatal) return;
       // Erro fatal de rede ou de mídia não é motivo para desistir: canal ao vivo cai e volta o
