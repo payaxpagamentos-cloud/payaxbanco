@@ -39,6 +39,19 @@ const db = abrir();
   if (r.falharam.length) {
     console.log(`\n${r.falharam.length} falhou(aram) na busca:`);
     for (const f of r.falharam) console.log(`  ${f.canal}: ${f.erro}`);
+
+    // Falha espalhada por canais diferentes mas concentrada num host só, toda com o mesmo
+    // código, não é frequência: é a rede do servidor não deixando sair para aquele endereço.
+    // Sem este recado, a pessoa roda o script cinco vezes achando que é questão de esperar.
+    const porHost = {};
+    for (const f of r.falharam) if (f.host) porHost[f.host] = (porHost[f.host] ?? 0) + 1;
+    const [host, quantos] = Object.entries(porHost).sort((a, b) => b[1] - a[1])[0] ?? [];
+    if (quantos >= 5 && r.falharam.every((f) => /respondeu 40[13]/.test(f.erro))) {
+      console.log(`\nTodas as ${quantos} falhas são do mesmo endereço (${host}), e todas com o mesmo código.`);
+      console.log('Isso não é limite de frequência: é a rede deste servidor não deixando sair para esse endereço.');
+      console.log(`Rode no servidor para confirmar:  curl -I https://${host}/`);
+      console.log('Se não passar, libere a saída para esse endereço — repetir o script não resolve.');
+    }
   }
   console.log(`\nResultado: ${r.com_logo.length} com logo, ${r.sem_logo.length} sem, ${r.falharam.length} com erro.`);
 })().catch((err) => {

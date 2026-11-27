@@ -28,7 +28,15 @@ async function aplicar(db, canalId, { url = null, forcar = false } = {}) {
   const achado = url ? { url, nome: canal.nome } : await listasPublicas.logoDoCanal(canal.nome, { id: canal.id_publico });
   if (!achado) return null;
 
-  const conteudo = await baixarImagem(achado.url);
+  let conteudo;
+  try {
+    conteudo = await baixarImagem(achado.url);
+  } catch (err) {
+    // De onde a imagem viria: é o que distingue "esse host limitou a frequência" de "este
+    // servidor não consegue sair para esse host".
+    try { err.host = new URL(achado.url).hostname; } catch { /* endereço estranho */ }
+    throw err;
+  }
   const imagem = midia.salvarImagem(db, equipeLogos, conteudo, { nome: `logo-${canal.slug}` });
   db.prepare('UPDATE canais SET logo_midia_id = ?, atualizado_em = ? WHERE id = ?').run(imagem.id, agora(), canal.id);
   return { canal: canal.nome, logo_midia_id: imagem.id, origem: url ? 'endereço informado' : `lista pública (${achado.nome})` };
@@ -44,15 +52,15 @@ async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200 } = {}) {
   const semLogo = [];
   const falharam = [];
   for (const [i, c] of canais.entries()) {
-    // Pausa entre os canais: quem hospeda as imagens limita a frequência, e com os 116 canais
-    // de um provedor inteiro a conta estoura rápido. 1,2s dá uns 2 minutos e meio no total.
+    // Pausa entre os canais: quem hospeda as imagens limita a frequência, e um provedor com
+    // mais de cem canais chega perto desse limite. 1,2s dá uns 2 minutos e meio no total.
     if (i) await esperar(pausaMs);
     try {
       const r = await aplicar(db, c.id, { forcar });
       if (r) comLogo.push(r);
       else semLogo.push(c.nome);
     } catch (err) {
-      falharam.push({ canal: c.nome, erro: err.message });
+      falharam.push({ canal: c.nome, erro: err.message, host: err.host ?? null });
     }
   }
   return { com_logo: comLogo, sem_logo: semLogo, falharam };

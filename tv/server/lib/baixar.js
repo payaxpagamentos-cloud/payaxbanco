@@ -27,9 +27,8 @@ async function baixarImagem(url, { tentativas = 4 } = {}) {
   await conferirEndereco(url);
   let resp;
   for (let tentativa = 0; tentativa < tentativas; tentativa += 1) {
-    // Espera dobrando (2s, 4s, 8s). Quem hospeda a maior parte dos logos corta por frequência
-    // depois de algumas dezenas de imagens, e devolve 403 — esperar um pouco resolve, insistir
-    // na mesma velocidade não. Com a espera linear de antes, 47 dos 116 canais ficavam sem arte.
+    // Espera dobrando (2s, 4s, 8s): é o que serve contra limite de frequência de quem hospeda
+    // as imagens, que costuma responder 403 ou 429 quando chegam muitas seguidas.
     if (tentativa) await esperar(2000 * (2 ** (tentativa - 1)));
     try {
       resp = await fetch(url, {
@@ -47,7 +46,9 @@ async function baixarImagem(url, { tentativas = 4 } = {}) {
       }
       continue;
     }
-    // 403 e 429 aqui são quase sempre limite de frequência de quem hospeda a imagem.
+    // 403 e 429 aqui costumam ser limite de frequência de quem hospeda a imagem — mas podem
+    // ser também uma rede que não deixa sair para aquele domínio. Quando TODAS as imagens de um
+    // mesmo host falham com 403, é bloqueio de saída, não frequência: nenhuma espera resolve.
     if (resp.ok || ![403, 429, 500, 502, 503].includes(resp.status)) break;
   }
   if (!resp.ok) throw new ErroNegocio(`O endereço da imagem respondeu ${resp.status}.`, 502);
