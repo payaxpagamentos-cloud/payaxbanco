@@ -414,3 +414,29 @@ test('a contagem de quem precisa de logo usa a MESMA regra da busca', async (t) 
   assert.ok(aindaPrecisam.includes('Só Demonstração'));
   assert.ok(!aindaPrecisam.includes('Com Logo Bom'), 'logo de verdade não pode ser refeito à toa');
 });
+
+test('tratamento de imagem: o painel grava, valida e derruba a conversão antiga', async (t) => {
+  const s = await iniciar();
+  t.after(() => s.fechar());
+  const admin = await s.adminLogin();
+
+  const canal = (await s.post('/admin/canais', {
+    numero: 71, nome: 'PLAY Teste Imagem', fonte: 'rtmp', url_hls: 'srt://origem.interna:9000?mode=caller', ativo: false,
+  }, admin)).dados.canal;
+  // Canal novo nasce sem tratamento: recodificar custa 140 vezes mais e ninguém pediu.
+  assert.equal(canal.melhoria, 'nenhuma');
+
+  const ligado = await s.patch(`/admin/canais/${canal.id}`, { melhoria: 'fullhd' }, admin);
+  assert.equal(ligado.status, 200);
+  assert.equal(ligado.dados.canal.melhoria, 'fullhd');
+
+  // Valor inventado não entra. Importa porque "melhoria" é o único campo do canal capaz de
+  // multiplicar por 300 o custo de processador — um erro aqui derruba a plataforma inteira.
+  const ruim = await s.patch(`/admin/canais/${canal.id}`, { melhoria: 'ultra-4k' }, admin);
+  assert.equal(ruim.status, 422);
+  assert.equal(s.db.prepare('SELECT melhoria FROM canais WHERE id = ?').get(canal.id).melhoria, 'fullhd',
+    'pedido recusado não pode deixar o canal pela metade');
+
+  const volta = await s.patch(`/admin/canais/${canal.id}`, { melhoria: 'nenhuma' }, admin);
+  assert.equal(volta.dados.canal.melhoria, 'nenhuma');
+});

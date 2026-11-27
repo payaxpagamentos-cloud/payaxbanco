@@ -524,6 +524,12 @@ function migrar(db) {
   // copiado como está — e custa 1% de processador converter só o áudio para AAC.
   if (!colunas.includes('sinal_video')) db.exec('ALTER TABLE canais ADD COLUMN sinal_video TEXT');
   if (!colunas.includes('sinal_audio')) db.exec('ALTER TABLE canais ADD COLUMN sinal_audio TEXT');
+  // Tratamento de imagem deste canal. 'nenhuma' (o padrão) é remux puro: a imagem sai idêntica
+  // à da origem e custa 0,5% de um núcleo. Qualquer outro valor obriga a RECODIFICAR, e aí o
+  // custo pula para 69% ('limpar') ou 152% ('fullhd') de um núcleo POR CANAL — medido nesta
+  // máquina. Por isso é por canal e não geral: em 4 núcleos cabem ~5 canais limpando, ou ~2
+  // esticando, contra ~768 copiando.
+  if (!colunas.includes('melhoria')) db.exec("ALTER TABLE canais ADD COLUMN melhoria TEXT NOT NULL DEFAULT 'nenhuma'");
 
   const colunasPerfis = db.prepare('PRAGMA table_info(perfis)').all().map((c) => c.name);
   if (!colunasPerfis.includes('avatar')) {

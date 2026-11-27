@@ -23,6 +23,7 @@ const transcodificar = require('../lib/transcodificar');
 const qualidades = require('../lib/qualidades');
 const v = require('../lib/validacao');
 
+const MELHORIAS_VALIDAS = Object.keys(aovivo.MELHORIAS);
 const CATEGORIAS = ['aberta', 'noticias', 'esportes', 'filmes', 'series', 'infantil', 'documentarios', 'musica', 'variedades', 'religioso', 'local'];
 
 /** Ingestão e curadoria: canais, grade, catálogo, arquivos de vídeo, destaques e fileiras da home. */
@@ -101,6 +102,9 @@ module.exports = (db) => {
     plano_minimo_id: d.plano_minimo_id ? achar('planos', d.plano_minimo_id, 'Plano').id : null,
     classificacao: v.classificacao(d.classificacao),
     regiao: v.opcional(d.regiao, 'a região', 60),
+    // Tratamento de imagem deste canal. Ver `MELHORIAS` em lib/aovivo.js: qualquer coisa além
+    // de 'nenhuma' recodifica o canal e sai de 0,5% para 69%–152% de um núcleo.
+    melhoria: v.opcao(d.melhoria ?? 'nenhuma', 'a melhoria de imagem', MELHORIAS_VALIDAS),
     ordem: v.inteiro(d.ordem ?? 0, 'a ordem', { min: 0, max: 9999 }),
     ativo,
     slug: slugLivre('canais', d.slug || d.nome, id),
@@ -110,9 +114,9 @@ module.exports = (db) => {
   r.post('/canais', (req, res) => {
     const c = dadosCanal(req.body);
     const r2 = db.prepare(`INSERT INTO canais (numero, nome, slug, descricao, categoria, fonte, url_hls, url_embed, observacao, id_epg, relay, logo_midia_id,
-        plano_minimo_id, classificacao, regiao, ordem, ativo, criado_em, atualizado_em)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.fonte, c.url_hls,
-      c.url_embed, c.observacao, c.id_epg, c.relay, c.logo_midia_id, c.plano_minimo_id, c.classificacao, c.regiao, c.ordem, c.ativo, agora(), agora());
+        plano_minimo_id, classificacao, regiao, melhoria, ordem, ativo, criado_em, atualizado_em)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.fonte, c.url_hls,
+      c.url_embed, c.observacao, c.id_epg, c.relay, c.logo_midia_id, c.plano_minimo_id, c.classificacao, c.regiao, c.melhoria, c.ordem, c.ativo, agora(), agora());
     const canal = achar('canais', Number(r2.lastInsertRowid), 'Canal');
     embed.invalidar();
     // Canal em RTMP/SRT já ligado entra no ar agora, sem esperar a conferência de minuto em minuto.
@@ -125,16 +129,20 @@ module.exports = (db) => {
     const atual = achar('canais', req.params.id, 'Canal');
     const c = dadosCanal({ ...atual, ...req.body }, atual.id);
     db.prepare(`UPDATE canais SET numero = ?, nome = ?, slug = ?, descricao = ?, categoria = ?, fonte = ?, url_hls = ?, url_embed = ?, observacao = ?,
-        id_epg = ?, relay = ?, logo_midia_id = ?, plano_minimo_id = ?, classificacao = ?, regiao = ?, ordem = ?, ativo = ?, atualizado_em = ? WHERE id = ?`)
+        id_epg = ?, relay = ?, logo_midia_id = ?, plano_minimo_id = ?, classificacao = ?, regiao = ?, melhoria = ?, ordem = ?, ativo = ?, atualizado_em = ? WHERE id = ?`)
       .run(c.numero, c.nome, c.slug, c.descricao, c.categoria, c.fonte, c.url_hls, c.url_embed, c.observacao, c.id_epg, c.relay, c.logo_midia_id,
-        c.plano_minimo_id, c.classificacao, c.regiao, c.ordem, c.ativo, agora(), atual.id);
+        c.plano_minimo_id, c.classificacao, c.regiao, c.melhoria, c.ordem, c.ativo, agora(), atual.id);
     // Trocou o endereço do sinal: o cache da lista antiga não serve mais.
     if (atual.url_hls && c.url_hls !== atual.url_hls) relay.cacheLista.delete(atual.url_hls);
     embed.invalidar();
     // Desligou, ligou ou trocou o endereço: a conversão tem de acompanhar na hora. Trocar o
     // endereço exige derrubar o processo atual — ele só conhece o endereço com que subiu.
     if (atual.fonte === 'rtmp' || c.fonte === 'rtmp') {
-      if (atual.fonte === 'rtmp' && (c.fonte !== 'rtmp' || c.url_hls !== atual.url_hls)) aovivo.desligar(atual.id);
+      // Trocar a melhoria também: o ffmpeg em execução subiu com os filtros antigos e não os
+      // relê. Sem derrubar, a mudança só valeria no próximo religamento do canal — e a
+      // operação olharia a tela sem ver diferença nenhuma, concluindo que não funciona.
+      const trocou = c.fonte !== 'rtmp' || c.url_hls !== atual.url_hls || c.melhoria !== atual.melhoria;
+      if (atual.fonte === 'rtmp' && trocou) aovivo.desligar(atual.id);
       aovivo.sincronizar(db);
     }
     registrar(db, req, 'canal_alterado', { id: atual.id, nome: c.nome });

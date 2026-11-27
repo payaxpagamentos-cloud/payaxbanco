@@ -229,10 +229,25 @@ async function telaCanais(c) {
       placeholder: 'srt://10.0.0.5:9000?mode=caller  ou  rtmp://origem/live/canal1',
     }, 'É o endereço que o fornecedor do sinal passa. A plataforma converte para HLS sem recodificar: '
       + 'a qualidade é a mesma da origem. Pede H.264 + AAC; SRT é melhor que RTMP (aguenta perda de pacote e tem menos atraso).');
+    // Tratamento de imagem: só faz sentido no sinal que NÓS convertemos (RTMP/SRT). Em canal
+    // HLS ou embed, quem serve a imagem é a origem, e não há o que tratar aqui.
+    const campoMelhoria = escolha('Tratamento de imagem', 'melhoria', [
+      ['nenhuma', 'Nenhum — copiar a origem (recomendado)'],
+      ['limpar', 'Limpar os quadradinhos da compressão'],
+      ['fullhd', 'Limpar e esticar para Full HD'],
+    ], canal?.melhoria ?? 'nenhuma');
+    campoMelhoria.append(el('div', { class: 'mini apagado', style: 'margin-top:6px' },
+      'Copiar entrega a imagem exatamente como a origem manda e custa quase nada de processador. '
+      + 'As outras duas RECODIFICAM o canal: elas escondem defeito de compressão borrando, não '
+      + 'devolvem detalhe que a origem não mandou, e esticar não cria nitidez. O custo por canal '
+      + 'sai de 0,5% de um núcleo para cerca de 69% (limpar) ou 152% (esticar) — em 4 núcleos cabem '
+      + 'uns 5 canais limpando, ou 2 esticando. Ligue em um canal, compare na TV e decida.'));
+
     const trocarFonte = (fonte) => {
       campoHls.classList.toggle('oculto', fonte !== 'hls');
       campoRtmp.classList.toggle('oculto', fonte !== 'rtmp');
       campoEmbed.classList.toggle('oculto', fonte !== 'embed');
+      campoMelhoria.classList.toggle('oculto', fonte !== 'rtmp');
     };
     const previa = el('img', { class: 'prev-arte deitada', src: arte(logoId) ?? '', alt: '', style: logoId ? '' : 'display:none' });
     const entradaLogo = el('input', { type: 'file', accept: 'image/*' });
@@ -278,6 +293,7 @@ async function telaCanais(c) {
       ], canal?.fonte ?? 'hls', { onchange: (e) => trocarFonte(e.target.value) }),
       campoHls,
       campoRtmp,
+      campoMelhoria,
       campoEmbed,
       area('Observação da operação (de quem pedir o sinal, contrato, contato da afiliada)', { name: 'observacao', maxlength: 1000, rows: 2 }),
       el('div', { class: 'duas' },
@@ -320,6 +336,7 @@ async function telaCanais(c) {
         url_embed: d.url_embed || null,
         observacao: d.observacao || null,
         id_epg: d.id_epg || null,
+        melhoria: d.melhoria || 'nenhuma',
         classificacao: Number(d.classificacao),
         plano_minimo_id: d.plano_minimo_id ? Number(d.plano_minimo_id) : null,
         descricao: d.descricao || null,

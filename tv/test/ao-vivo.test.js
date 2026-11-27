@@ -445,3 +445,39 @@ test('prévia do painel abre sem gastar tela do plano, e a tela do assinante nã
   const ping = await s.post('/play/ping', { sessao_id: abrir.dados.sessao_id, segundos: 86_400 * 3 }, cliente.token, cliente.comPerfil);
   assert.equal(ping.status, 200, `três dias de canal ligado não podem derrubar a tela (veio ${ping.status})`);
 });
+
+test('tratamento de imagem por canal: só recodifica quando a operação manda', () => {
+  const modo = (melhoria, video = 'h264', audio = 'aac') =>
+    aovivo.modoDeConversao({ sinal_video: video, sinal_audio: audio, melhoria }).join(' ');
+
+  // O padrão é não mexer na imagem. Isto é o que protege os 116 canais: quem não foi escolhido
+  // a dedo continua custando 0,5% de um núcleo.
+  assert.equal(modo('nenhuma'), '-c:v copy -c:a copy');
+  assert.equal(modo(null), '-c:v copy -c:a copy');
+  assert.equal(modo(undefined), '-c:v copy -c:a copy');
+
+  // Valor que não existe cai no padrão. Importa porque um erro de digitação em algum script não
+  // pode ligar recodificação sem ninguém pedir — custaria 140 vezes mais por canal.
+  assert.equal(modo('turbo'), '-c:v copy -c:a copy');
+  assert.equal(modo('FULLHD'), '-c:v copy -c:a copy');
+
+  const limpar = modo('limpar');
+  assert.match(limpar, /-vf deblock=/, 'limpar precisa entrar com filtro de bloco');
+  assert.match(limpar, /-c:v libx264/, 'filtro exige recodificar');
+  assert.doesNotMatch(limpar, /scale=/, 'limpar mantém a resolução da origem');
+  assert.match(limpar, /-maxrate 4000k/, 'sem teto de taxa, pico de movimento vira travada e banda');
+
+  const cheio = modo('fullhd');
+  assert.match(cheio, /scale=max\(iw\\,1920\)/, 'fullhd estica, mas nunca reduz');
+  assert.match(cheio, /-c:v libx264/);
+  assert.match(cheio, /-maxrate 6000k/);
+  assert.match(cheio, /-bufsize 12000k/, 'o bufsize acompanha o teto (o dobro)');
+
+  // O áudio segue a regra de sempre, independente da imagem: AC-3 vira AAC ou o canal sai mudo.
+  assert.match(modo('fullhd', 'h264', 'ac3'), /-c:a aac/);
+  assert.match(modo('limpar', 'h264', 'aac'), /-c:a copy/);
+
+  // Mesmo com vídeo já copiável (h264), a escolha da operação prevalece: foi um pedido
+  // explícito, não uma correção automática.
+  assert.match(modo('limpar', 'h264'), /-c:v libx264/);
+});

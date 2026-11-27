@@ -25,7 +25,7 @@ const { abrir } = require('../server/db');
 const todos = process.argv.includes('--todos');
 const db = abrir();
 
-const canais = db.prepare(`SELECT numero, nome, sinal_status, sinal_detalhe, sinal_em
+const canais = db.prepare(`SELECT numero, nome, sinal_status, sinal_detalhe, sinal_em, melhoria
   FROM canais WHERE fonte = 'rtmp' AND url_hls IS NOT NULL AND url_hls <> ''
   ORDER BY numero`).all();
 
@@ -55,7 +55,8 @@ for (const c of canais) grupos.get(faixa(resolucao(c.sinal_detalhe))).push(c);
 const linha = (c) => {
   const r = resolucao(c.sinal_detalhe);
   const fora = c.sinal_status === 'falha' ? '  \x1b[33m(fora do ar na última medição)\x1b[0m' : '';
-  return `  ${String(c.numero).padStart(4)}  ${String(c.nome).slice(0, 30).padEnd(30)}  ${(r ? `${r.largura}x${r.altura}` : '—').padStart(9)}${fora}`;
+  const trat = c.melhoria && c.melhoria !== 'nenhuma' ? `  \x1b[36m[${c.melhoria}]\x1b[0m` : '';
+  return `  ${String(c.numero).padStart(4)}  ${String(c.nome).slice(0, 30).padEnd(30)}  ${(r ? `${r.largura}x${r.altura}` : '—').padStart(9)}${trat}${fora}`;
 };
 
 console.log('\nCOMO CADA CANAL CHEGA DA ORIGEM\n');
@@ -78,9 +79,21 @@ if (!mostrar.length) {
 const semMedida = grupos.get('sem medida').length;
 if (semMedida) console.log(`\n${canal(semMedida)} sem medida: rode  node scripts/testar-canais.js  para ler a origem.`);
 
+// Recodificar é a única coisa aqui capaz de derrubar o servidor por excesso: 69% a 152% de um
+// núcleo por canal, contra 0,5% da cópia. Se alguém esqueceu ligado em muitos canais, é melhor
+// descobrir por este aviso do que pelos assinantes.
+const tratados = canais.filter((c) => c.melhoria && c.melhoria !== 'nenhuma');
+if (tratados.length) {
+  console.log(`\n\x1b[36m${canal(tratados.length)} com tratamento de imagem ligado\x1b[0m (${tratados.map((c) => c.nome).join(', ')}).`);
+  if (tratados.length > 4) console.log('\x1b[33mAtenção: em 4 núcleos cabem cerca de 5 canais limpando, ou 2 esticando.\x1b[0m');
+}
+
 const maisVelha = canais.map((c) => c.sinal_em).filter(Boolean).sort()[0];
 if (maisVelha) console.log(`\nMedição mais antiga desta lista: ${maisVelha}.`);
-console.log('\nA plataforma copia o vídeo sem recomprimir — a imagem na tela é a que a origem entrega.');
-console.log('Para um canal subir de 720p para 1080p, o feed Full HD tem de vir do fornecedor.\n');
+console.log(tratados.length
+  ? '\nNos canais sem tratamento, a imagem na tela é exatamente a que a origem entrega.'
+  : '\nA plataforma copia o vídeo sem recomprimir — a imagem na tela é a que a origem entrega.');
+console.log('Tratamento não devolve detalhe: para um canal subir de verdade de 720p para 1080p,');
+console.log('o feed Full HD tem de vir do fornecedor.\n');
 
 db.close();

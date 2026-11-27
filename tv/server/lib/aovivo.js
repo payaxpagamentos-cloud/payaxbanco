@@ -28,6 +28,48 @@ const PROTOCOLOS = ['rtmp:', 'rtmps:', 'srt:', 'rtsp:', 'udp:'];
 
 /** Vídeo que o HLS entrega sem recodificar. H.265 toca em aparelho novo; H.264 toca em tudo. */
 const VIDEO_COPIAVEL = ['h264', 'hevc'];
+
+/**
+ * Tratamento de imagem, por canal. Existe porque a operação pediu "melhorar a qualidade mesmo
+ * recebendo mal". Antes de usar, saiba o que cada um faz DE VERDADE:
+ *
+ * - `limpar`  suaviza os quadradinhos da compressão. NÃO devolve detalhe: ele esconde defeito
+ *             borrando. Numa cena parada quase não se nota; em cena de movimento tira um pouco
+ *             da textura (cabelo, grama, camisa listrada).
+ * - `fullhd`  faz o mesmo e ainda estica para 1920 de largura. Esticar 720p para 1080p não cria
+ *             informação nenhuma — é a mesma imagem, maior. A TV do assinante já faz isso
+ *             sozinha, e normalmente faz melhor, porque trabalha no painel e não perde nada
+ *             recomprimindo. A largura nunca DIMINUI: canal que já venha em 1080p ou 4K passa
+ *             intacto pelo redimensionamento.
+ *
+ * O custo, medido nesta plataforma com origem 720p (segundos de CPU por segundo de vídeo):
+ *
+ *     copiar (nenhuma)      0,5% de um núcleo     cabem ~768 canais em 4 núcleos
+ *     limpar               69%   de um núcleo     cabem    ~5 canais em 4 núcleos
+ *     fullhd              152%   de um núcleo     cabem    ~2 canais em 4 núcleos
+ *
+ * É por isso que isto é escolha POR CANAL e não um botão geral: ligar nos 116 precisaria de
+ * umas 55 máquinas iguais a esta. E há um segundo custo, que não aparece no processador: o
+ * canal recodificado sai com mais bits, então cada assinante assistindo consome mais banda.
+ * Daí o teto de taxa em cada modo.
+ */
+const MELHORIAS = {
+  nenhuma: null,
+  limpar: {
+    filtro: 'deblock=filter=weak:block=4,hqdn3d=2:1:3:3',
+    teto: '4000k',
+  },
+  fullhd: {
+    // `max(iw,1920)` garante que o filtro só ESTICA: um canal que já chegue maior passa como
+    // está, em vez de ser reduzido para 1080p — que seria piorar o canal bom para "melhorar".
+    // A barra antes da vírgula é obrigatória: dentro de um filtro, vírgula separa um filtro do
+    // seguinte. Sem ela o ffmpeg lê "scale=max(iw" e "1920):-2:flags=lanczos" como dois filtros,
+    // não entende nenhum dos dois e o canal não sobe. Em JavaScript isso exige DUAS barras,
+    // senão a linguagem come a primeira e sobra a vírgula solta.
+    filtro: 'deblock=filter=weak:block=4,hqdn3d=2:1:3:3,scale=max(iw\\,1920):-2:flags=lanczos,unsharp=5:5:0.5',
+    teto: '6000k',
+  },
+};
 /** Áudio que todo aparelho toca. AC-3, E-AC-3 e MP2 não entram: Android e Chrome saem mudos. */
 const AUDIO_COPIAVEL = ['aac', 'mp3'];
 
@@ -51,8 +93,22 @@ function modoDeConversao(canal) {
   const video = String(canal.sinal_video ?? '').toLowerCase();
   const audio = String(canal.sinal_audio ?? '').toLowerCase();
 
+  // Valor desconhecido cai em `nenhuma`, que é copiar: na dúvida, não mexer na imagem e não
+  // gastar processador. O painel já valida a escolha; isto é a rede de segurança.
+  const melhoria = MELHORIAS[String(canal.melhoria ?? 'nenhuma')] ?? null;
+
   const args = [];
-  if (video && !VIDEO_COPIAVEL.includes(video) && config.aoVivo.recodificarVideo) {
+  if (melhoria) {
+    // Pedido explícito da operação para este canal: recodifica, venha o vídeo no codec que vier.
+    args.push(
+      '-vf', melhoria.filtro,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+      // Teto de taxa: sem ele, cena de movimento numa imagem esticada gera um pico de bits que
+      // o assinante paga em travada, e a operação paga em banda.
+      '-maxrate', melhoria.teto, '-bufsize', `${Number.parseInt(melhoria.teto, 10) * 2}k`,
+      '-g', '50', '-pix_fmt', 'yuv420p',
+    );
+  } else if (video && !VIDEO_COPIAVEL.includes(video) && config.aoVivo.recodificarVideo) {
     // Preset rápido e qualidade constante: o que dá para sustentar ao vivo sem engasgar.
     args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-g', '50', '-pix_fmt', 'yuv420p');
   } else {
@@ -315,7 +371,7 @@ function sincronizar(db) {
   try {
     // Os codecs vêm junto: é `modoDeConversao` quem decide, por canal, se copia o áudio ou
     // troca por AAC. Sem eles aqui, canal com áudio em AC-3 subiria copiado e sairia mudo.
-    canais = db.prepare("SELECT id, numero, nome, url_hls, sinal_video, sinal_audio FROM canais WHERE fonte = 'rtmp' AND ativo = 1 AND url_hls IS NOT NULL AND url_hls <> '' ORDER BY ordem, numero").all();
+    canais = db.prepare("SELECT id, numero, nome, url_hls, sinal_video, sinal_audio, melhoria FROM canais WHERE fonte = 'rtmp' AND ativo = 1 AND url_hls IS NOT NULL AND url_hls <> '' ORDER BY ordem, numero").all();
   } catch { return { ligados: 0, limitados: 0 }; }
   const podem = new Set(canais.map((c) => c.id));
   // Canal desligado, apagado ou que deixou de ser RTMP para de converter na hora.
@@ -557,7 +613,7 @@ function situacao(id) {
 }
 
 module.exports = {
-  PROTOCOLOS, VIDEO_COPIAVEL, AUDIO_COPIAVEL, modoDeConversao,
+  PROTOCOLOS, VIDEO_COPIAVEL, AUDIO_COPIAVEL, MELHORIAS, modoDeConversao,
   conferirEndereco, conferir, ligar, desligar, desligarTudo, sincronizar, situacao, temSinal,
   pedacosNaLista, daParaAssistir,
   garantir, marcarUso, limparOciosos,
