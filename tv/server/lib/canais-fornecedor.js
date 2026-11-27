@@ -24,8 +24,137 @@ const NUMERO_ABERTA = {
 };
 
 /**
- * Faixa de numeração de cada tema. A TV aberta fica de 2 a 13 (acima), e cada tema ganha a sua
- * faixa com folga para crescer: entrar um canal novo em Esportes não empurra Filmes para baixo.
+ * Número de cada canal fechado na grade da Claro/NET São Paulo.
+ *
+ * É a numeração que o assinante da região já tem na cabeça: 39 é SporTV, 40 é GloboNews. Foi
+ * levantada da grade publicada da operadora, não de memória — numerar mais de cem canais no
+ * chute custa mais caro do que deixá-los numa faixa temática qualquer.
+ *
+ * A TV ABERTA não entra aqui: ela segue NUMERO_ABERTA, com os números da antena (5 é a Globo),
+ * que é o que a casa usa. Na grade da Claro os abertos ficam em 16-22; a operação escolheu os
+ * da antena. Nenhum canal fechado cai entre 2 e 13, então os dois padrões convivem.
+ *
+ * Os canais que não existem na grade da Claro (Nickelodeon, MTV e Comedy Central saíram de lá;
+ * Chaves, Chapolin e as câmeras da Fazenda nunca foram canais de cabo) ocupam lacunas da faixa
+ * do próprio tema, para ficarem junto dos parceiros.
+ *
+ * A chave é o nome como o fornecedor manda, que não muda de uma lista para outra.
+ */
+const NUMERO_SP = {
+  COMBATE: 33,
+  OFF: 35,
+  ESPN_EXTRA: 36,
+  SPORTV_3: 37,
+  SPORTV_2: 38,
+  SPORTV: 39,
+  GLOBO_NEWS: 40,
+  MULTISHOW: 42,
+  GLOBO_PLAY_NOVELAS: 43,
+  SBT_NEWS: 45,
+  REALITY: 46,
+  COMEDY_CENTRAL: 47,
+  FAZENDA1: 48,
+  FAZENDA2: 49,
+  E: 50,
+  FAZENDA3: 51,
+  TLC: 52,
+  FOOD_NETWORK: 54,
+  DISCOVERY_HOME_E_HEALTH: 55,
+  'CURTA!': 56,
+  FISH_TV: 58,
+  HGTV: 60,
+  WOOHOO: 65,
+  ESPN: 70,
+  ESPN_2: 71,
+  ESPN_4: 73,
+  BAND_SPORTS: 75,
+  CNN_BRASIL: 77,
+  RECORD_NEWS: 78,
+  BAND_NEWS: 79,
+  DISCOVERY_CHANNEL: 81,
+  ANIMAL_PLANET: 82,
+  HISTORY: 83,
+  DISCOVERY_TURBO: 84,
+  DISCOVERY_SCIENCE: 85,
+  GLOOBINHO: 99,
+  DISCOVERY_KIDS: 100,
+  GLOOB: 101,
+  BABY_TV: 102,
+  ZOOMOO: 103,
+  CARTOON_NETWORK: 104,
+  ANIMES: 105,
+  NICK_JR: 106,
+  NICKELODEON: 107,
+  CARTOONITO: 108,
+  TV_RA_TIM_BUM: 109,
+  CHAVES: 110,
+  CHAPOLIN: 111,
+  BIS: 120,
+  MTV_POP: 121,
+  MTV: 124,
+  UNIVERSAL_TV: 130,
+  WARNER_CHANNEL: 132,
+  SONY_CHANNEL: 133,
+  AXN: 135,
+  TNT_NOVELAS: 136,
+  DISCOVERY_ID: 139,
+  USA: 140,
+  LIFE_TIME: 141,
+  AMC: 145,
+  CLASSICOS: 146,
+  FILM_E_ARTS: 148,
+  CANAL_BRASIL: 150,
+  TNT: 151,
+  MEGAPIX: 152,
+  SPACE_HD: 154,
+  CINEMAX: 155,
+  STUDIO_UNIVERSAL: 157,
+  TCM: 159,
+  TELE_CINE_PREMIUM: 161,
+  TELE_CINE_ACTION: 162,
+  TELE_CINE_TOUCH: 163,
+  TELE_CINE_FUN: 164,
+  TELE_CINE_PIPOCA: 165,
+  TELE_CINE_CULT: 166,
+  UNIVERSAL_REALITY: 170,
+  HBO: 171,
+  HBO_2: 172,
+  HBO_PLUS: 173,
+  HBO_FAMILY: 175,
+  HBO_SIGNATURE: 176,
+  HBO_POP: 177,
+  HBO_MUNDI: 178,
+  HBO_XTREME: 179,
+  REDE_VIDA: 193,
+  TV_APARECIDA: 195,
+  PREMIERE_CLUBES: 221,
+  PREMIERE_2: 222,
+  PREMIERE_3: 223,
+  PREMIERE_4: 224,
+  PREMIERE_5: 225,
+  PREMIERE_6: 226,
+  PREMIERE_7: 227,
+  CANAL_UOL: 549,
+  SABOR_E_ARTE: 561,
+  ESPN_6: 569,
+  ESPN_3: 572,
+  JOVEM_PAN_NEWS: 576,
+  DISCOVERY_THEATER: 592,
+  DISCOVERY_WORLD: 593,
+  HISTORY_2: 594,
+  ADULT_SWIM: 642,
+  TNT_SERIES: 643,
+  EURO_CHANNEL: 647,
+  UNIVERSAL_PREMIERE: 669,
+  NOVO_TEMPO: 684,
+  PARAMOUNT: 711,
+  PARAMOUNT_2: 712,
+  PARAMOUNT_3: 713,
+};
+
+/**
+ * Faixa de numeração de cada tema. Só serve de reserva: é para canal que não está nem em
+ * NUMERO_ABERTA nem em NUMERO_SP — uma lista nova do fornecedor, por exemplo.
  */
 const BLOCOS = [
   ['noticias', 20],
@@ -206,12 +335,13 @@ function montar(texto) {
     }
   }
 
-  // Número: a TV aberta pelo nome; o resto na faixa do tema, na ordem da lista do fornecedor.
+  // Número: a TV aberta pelos números da antena; o fechado pela grade da Claro São Paulo.
+  // Quem não estiver em nenhuma das duas cai na faixa do tema, que é a reserva.
   const proximo = Object.fromEntries(BLOCOS);
-  const usados = new Set(Object.values(NUMERO_ABERTA));
+  const usados = new Set([...Object.values(NUMERO_ABERTA), ...Object.values(NUMERO_SP)]);
   const semNumero = [];
   for (const c of prontos) {
-    const fixo = NUMERO_ABERTA[c.nome];
+    const fixo = NUMERO_ABERTA[c.nome] ?? NUMERO_SP[c.bruto.toUpperCase()] ?? NUMERO_SP[c.bruto];
     if (fixo) { c.numero = fixo; continue; }
     semNumero.push(c);
   }
@@ -230,5 +360,5 @@ function montar(texto) {
 }
 
 module.exports = {
-  montar, lerLista, bonito, categoriaDe, classificacaoDe, NUMERO_ABERTA, BLOCOS, NOMES, ID_PUBLICO,
+  montar, lerLista, bonito, categoriaDe, classificacaoDe, NUMERO_ABERTA, NUMERO_SP, BLOCOS, NOMES, ID_PUBLICO,
 };

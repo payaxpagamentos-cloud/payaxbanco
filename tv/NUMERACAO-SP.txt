@@ -1,136 +1,129 @@
-NUMERAÇÃO CLARO/NET SÃO PAULO — PROPOSTA, ainda não aplicada
+NUMERAÇÃO DA PLAY TECH VIP — aplicada
 
-Levantada da grade publicada da Claro tv+ São Paulo (311 canais), cruzada com
-a lista do fornecedor. Fica aqui para a operação conferir ANTES de virar
-código: numerar 116 canais errado dá mais trabalho do que a numeração temática
-que está no ar hoje.
+TV aberta : números da antena de São Paulo (2 Cultura, 4 SBT, 5 Globo, 7 Record...),
+            que é o que a casa tem na cabeça.
+Fechados  : grade da Claro/NET São Paulo (39 SporTV, 40 GloboNews...), levantada da
+            grade publicada da operadora.
 
-Confirmada, esta tabela vira NUMERO_SP em server/lib/canais-fornecedor.js e o
-importador passa a usá-la.
-
-Dois pontos em aberto:
-  - a TV aberta aqui vai para 16-22, que é onde a Claro a coloca; na antena de
-    São Paulo ela é 2, 4, 5 e 7, que foi o pedido anterior;
-  - alguns canais só existem em HD na grade (Canal UOL 549, ESPN 3 572,
-    Paramount+ 711-713), por isso o número alto.
-99 canais com o número oficial da grade da Claro SP; 17 encaixados nas lacunas
-da faixa do próprio tema, por não existirem naquela grade.
+Os 17 canais que não existem na grade da Claro (Nickelodeon, MTV, Comedy Central,
+Chaves, Chapolin, câmeras da Fazenda e outros) ocupam lacunas da faixa do próprio
+tema, para ficarem junto dos parceiros.
 
 num   canal                     tema
-------------------------------------------------------------
-  16  TV Cultura                aberta        
-  17  SBT                       aberta        
-  18  Globo                     aberta        
-  19  Record                    aberta        
-  20  RedeTV!                   aberta        
-  21  Gazeta                    aberta        
-  22  Band                      aberta        
-  33  Combate                   esportes      
-  35  Canal OFF                 variedades    
-  36  ESPN Extra                esportes      (encaixado na faixa do tema)
-  37  SporTV 3                  esportes      
-  38  SporTV 2                  esportes      
-  39  SporTV                    esportes      
-  40  Globo News                noticias      
-  42  Multishow                 variedades    
-  43  Globoplay Novelas         series        
-  45  SBT News                  noticias      (encaixado na faixa do tema)
-  46  Reality                   variedades    (encaixado na faixa do tema)
-  47  Comedy Central            variedades    (encaixado na faixa do tema)
-  48  A Fazenda · Câmera 1      variedades    (encaixado na faixa do tema)
-  49  A Fazenda · Câmera 2      variedades    (encaixado na faixa do tema)
-  50  E!                        variedades    
-  51  A Fazenda · Câmera 3      variedades    (encaixado na faixa do tema)
-  52  TLC                       variedades    
-  54  Food Network              variedades    
-  55  Discovery Home & Health   documentarios 
-  56  Curta!                    documentarios 
-  58  Fish TV                   esportes      
-  60  HGTV                      variedades    
-  65  WooHoo                    variedades    
-  70  ESPN                      esportes      
-  71  ESPN 2                    esportes      
-  73  ESPN 4                    esportes      
-  75  Band Sports               esportes      
-  77  CNN Brasil                noticias      
-  78  Record News               noticias      
-  79  Band News                 noticias      
-  81  Discovery Channel         documentarios 
-  82  Animal Planet             documentarios 
-  83  History                   documentarios 
-  84  Discovery Turbo           documentarios 
-  85  Discovery Science         documentarios 
-  99  Gloobinho                 infantil      
- 100  Discovery Kids            infantil      
- 101  Gloob                     infantil      
- 102  Baby TV                   infantil      (encaixado na faixa do tema)
- 103  ZooMoo                    infantil      (encaixado na faixa do tema)
- 104  Cartoon Network           infantil      
- 105  Animes                    infantil      (encaixado na faixa do tema)
- 106  Nick Jr.                  infantil      (encaixado na faixa do tema)
- 107  Nickelodeon               infantil      (encaixado na faixa do tema)
- 108  Cartoonito                infantil      
- 109  TV Rá-Tim-Bum             infantil      
- 110  Chaves                    infantil      (encaixado na faixa do tema)
- 111  Chapolin                  infantil      (encaixado na faixa do tema)
- 120  Bis                       musica        
- 121  MTV Pop                   musica        (encaixado na faixa do tema)
- 124  MTV                       musica        (encaixado na faixa do tema)
- 130  Universal TV              series        
- 132  Warner Channel            series        
- 133  Sony Channel              series        
- 135  AXN                       series        
- 136  TNT Novelas               series        
- 139  Discovery ID              documentarios 
- 140  USA Network               series        
- 141  Lifetime                  series        
- 145  AMC                       filmes        
- 146  Clássicos                 filmes        (encaixado na faixa do tema)
- 148  Film&Arts                 filmes        
- 150  Canal Brasil              filmes        
- 151  TNT                       series        
- 152  Megapix                   filmes        
- 154  Space                     filmes        
- 155  Cinemax                   filmes        
- 157  Studio Universal          filmes        
- 159  TCM                       filmes        
- 161  Telecine Premium          filmes        
- 162  Telecine Action           filmes        
- 163  Telecine Touch            filmes        
- 164  Telecine Fun              filmes        
- 165  Telecine Pipoca           filmes        
- 166  Telecine Cult             filmes        
- 170  Universal Reality         variedades    
- 171  HBO                       filmes        
- 172  HBO 2                     filmes        
- 173  HBO Plus                  filmes        
- 175  HBO Family                filmes        
- 176  HBO Signature             filmes        
- 177  HBO Pop                   filmes        
- 178  HBO Mundi                 filmes        
- 179  HBO Xtreme                filmes        
- 193  Rede Vida                 religioso     
- 195  TV Aparecida              religioso     
- 221  Premiere Clubes           esportes      
- 222  Premiere 2                esportes      
- 223  Premiere 3                esportes      
- 224  Premiere 4                esportes      
- 225  Premiere 5                esportes      
- 226  Premiere 6                esportes      
- 227  Premiere 7                esportes      
- 549  Canal UOL                 noticias      
- 561  Sabor & Arte              variedades    
- 569  ESPN 6                    esportes      
- 572  ESPN 3                    esportes      
- 576  Jovem Pan News            noticias      
- 592  Discovery Theater         documentarios 
- 593  Discovery World           documentarios 
- 594  History 2                 documentarios 
- 642  Adult Swim                series        
- 643  TNT Series                series        
- 647  Euro Channel              filmes        
- 669  Universal Premiere        esportes      
- 684  Novo Tempo                religioso     
- 711  Paramount                 filmes        
- 712  Paramount 2               filmes        
- 713  Paramount 3               filmes        
+----------------------------------------------------------
+   2  TV Cultura                aberta
+   4  SBT                       aberta
+   5  Globo                     aberta
+   7  Record                    aberta
+   9  RedeTV!                   aberta
+  11  Gazeta                    aberta
+  13  Band                      aberta
+  33  Combate                   esportes
+  35  Canal OFF                 variedades
+  36  ESPN Extra                esportes
+  37  SporTV 3                  esportes
+  38  SporTV 2                  esportes
+  39  SporTV                    esportes
+  40  Globo News                noticias
+  42  Multishow                 variedades
+  43  Globoplay Novelas         series
+  45  SBT News                  noticias
+  46  Reality                   variedades
+  47  Comedy Central            variedades
+  48  A Fazenda · Câmera 1      variedades
+  49  A Fazenda · Câmera 2      variedades
+  50  E!                        variedades
+  51  A Fazenda · Câmera 3      variedades
+  52  TLC                       variedades
+  54  Food Network              variedades
+  55  Discovery Home & Health   documentarios
+  56  Curta!                    documentarios
+  58  Fish TV                   esportes
+  60  HGTV                      variedades
+  65  WooHoo                    variedades
+  70  ESPN                      esportes
+  71  ESPN 2                    esportes
+  73  ESPN 4                    esportes
+  75  Band Sports               esportes
+  77  CNN Brasil                noticias
+  78  Record News               noticias
+  79  Band News                 noticias
+  81  Discovery Channel         documentarios
+  82  Animal Planet             documentarios
+  83  History                   documentarios
+  84  Discovery Turbo           documentarios
+  85  Discovery Science         documentarios
+  99  Gloobinho                 infantil
+ 100  Discovery Kids            infantil
+ 101  Gloob                     infantil
+ 102  Baby TV                   infantil
+ 103  ZooMoo                    infantil
+ 104  Cartoon Network           infantil
+ 105  Animes                    infantil
+ 106  Nick Jr.                  infantil
+ 107  Nickelodeon               infantil
+ 108  Cartoonito                infantil
+ 109  TV Rá-Tim-Bum             infantil
+ 110  Chaves                    infantil
+ 111  Chapolin                  infantil
+ 120  Bis                       musica
+ 121  MTV Pop                   musica
+ 124  MTV                       musica
+ 130  Universal TV              series
+ 132  Warner Channel            series
+ 133  Sony Channel              series
+ 135  AXN                       series
+ 136  TNT Novelas               series
+ 139  Discovery ID              documentarios
+ 140  USA Network               series
+ 141  Lifetime                  series
+ 145  AMC                       filmes
+ 146  Clássicos                 filmes
+ 148  Film&Arts                 filmes
+ 150  Canal Brasil              filmes
+ 151  TNT                       series
+ 152  Megapix                   filmes
+ 154  Space                     filmes
+ 155  Cinemax                   filmes
+ 157  Studio Universal          filmes
+ 159  TCM                       filmes
+ 161  Telecine Premium          filmes
+ 162  Telecine Action           filmes
+ 163  Telecine Touch            filmes
+ 164  Telecine Fun              filmes
+ 165  Telecine Pipoca           filmes
+ 166  Telecine Cult             filmes
+ 170  Universal Reality         variedades
+ 171  HBO                       filmes
+ 172  HBO 2                     filmes
+ 173  HBO Plus                  filmes
+ 175  HBO Family                filmes
+ 176  HBO Signature             filmes
+ 177  HBO Pop                   filmes
+ 178  HBO Mundi                 filmes
+ 179  HBO Xtreme                filmes
+ 193  Rede Vida                 religioso
+ 195  TV Aparecida              religioso
+ 221  Premiere Clubes           esportes
+ 222  Premiere 2                esportes
+ 223  Premiere 3                esportes
+ 224  Premiere 4                esportes
+ 225  Premiere 5                esportes
+ 226  Premiere 6                esportes
+ 227  Premiere 7                esportes
+ 549  Canal UOL                 noticias
+ 561  Sabor & Arte              variedades
+ 569  ESPN 6                    esportes
+ 572  ESPN 3                    esportes
+ 576  Jovem Pan News            noticias
+ 592  Discovery Theater         documentarios
+ 593  Discovery World           documentarios
+ 594  History 2                 documentarios
+ 642  Adult Swim                series
+ 643  TNT Series                series
+ 647  Euro Channel              filmes
+ 669  Universal Premiere        esportes
+ 684  Novo Tempo                religioso
+ 711  Paramount                 filmes
+ 712  Paramount 2               filmes
+ 713  Paramount 3               filmes

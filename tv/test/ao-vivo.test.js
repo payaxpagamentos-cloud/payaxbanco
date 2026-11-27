@@ -246,13 +246,36 @@ test('lista do fornecedor: número de São Paulo na TV aberta, tema e faixa no r
   // Número é único: é o que o assinante digita no controle.
   assert.equal(new Set(canais.map((c) => c.numero)).size, canais.length);
 
-  // Cada tema na sua faixa, sem invadir a do vizinho.
-  for (const [tema, inicio] of fornecedor.BLOCOS) {
-    const doTema = canais.filter((c) => c.categoria === tema);
-    for (const c of doTema) assert.ok(c.numero >= inicio, `${c.nome} (${c.numero}) deveria estar a partir de ${inicio}`);
-  }
+  // As faixas por tema deixaram de valer quando a numeração passou a ser a da Claro São Paulo:
+  // lá o critério é a grade da operadora, não o tema. O que não pode é canal sem número.
+  for (const c of canais) assert.ok(Number.isInteger(c.numero) && c.numero > 0, `${c.nome} sem número`);
   // Canal adulto não nasce liberado.
   assert.equal(canais.find((c) => c.nome === 'WooHoo').classificacao, 18);
   // E o endereço de todo canal sai pronto para o conversor.
   for (const c of canais) assert.match(c.endereco, /^srt:\/\/[\d.]+:\d+\?streamid=#!::r=[^&]+&latency=2000000$/);
+});
+
+test('numeração: abertos na antena de SP, fechados na grade da Claro', () => {
+  const fornecedor = require('../server/lib/canais-fornecedor');
+  const texto = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'canais-fornecedor.txt'), 'utf8');
+  const { canais } = fornecedor.montar(texto);
+  const n = (nome) => canais.find((c) => c.nome === nome)?.numero;
+
+  // TV aberta: os números da antena, que é o que a casa tem na cabeça.
+  assert.equal(n('TV Cultura'), 2);
+  assert.equal(n('Globo'), 5);
+  assert.equal(n('Band'), 13);
+
+  // Fechados: a grade da Claro São Paulo, conferida com os quatro exemplos da operação.
+  assert.equal(n('SporTV'), 39);
+  assert.equal(n('SporTV 2'), 38);
+  assert.equal(n('SporTV 3'), 37);
+  assert.equal(n('Globo News'), 40);
+
+  // Nenhum canal fechado pode cair na faixa da TV aberta: é o que faz os dois padrões conviverem.
+  for (const c of canais.filter((x) => x.categoria !== 'aberta')) {
+    assert.ok(c.numero < 2 || c.numero > 13, `${c.nome} (${c.numero}) invade a faixa da TV aberta`);
+  }
+  // E o número continua único — é o que o assinante digita no controle.
+  assert.equal(new Set(canais.map((c) => c.numero)).size, canais.length);
 });
