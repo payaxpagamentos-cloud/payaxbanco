@@ -16,8 +16,31 @@
  * automática bloqueada, que é a situação do iPhone.
  */
 
-/** Quanto esperar, depois de tirar o mudo, para ver se o navegador deixou. */
-const ESPERA_SOM_MS = 150;
+/** Quanto acompanhar o vídeo para ter certeza de que ele está mesmo tocando. */
+const CONFERIR_MS = 1500;
+const PASSO_MS = 150;
+
+const esperar = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+/**
+ * Está tocando DE VERDADE?
+ *
+ * No iPhone o `play()` pode resolver com sucesso e o sistema pausar o vídeo logo em seguida —
+ * a promessa não rejeita, mas o canal fica parado. Conferir uma vez, logo depois, não pega
+ * esse caso: a pausa chega atrasada. Por isso aqui se acompanha por um tempo, e basta um
+ * instante pausado para saber que não vingou.
+ *
+ * Pausa que a própria pessoa pediu não conta — senão o código brigaria com quem quer pausar.
+ */
+async function tocandoDeVerdade(video, { ms = CONFERIR_MS, pausouDeProposito = () => false } = {}) {
+  const fim = Date.now() + ms;
+  while (Date.now() < fim) {
+    await esperar(PASSO_MS);
+    if (pausouDeProposito()) return true;
+    if (video.paused) return false;
+  }
+  return !video.paused;
+}
 
 /**
  * @param video            o elemento <video>
@@ -30,17 +53,25 @@ export async function iniciarReproducao(video, {
   aoPrecisarDeToque = null,
   aoVoltarOSom = null,
   cancelado = () => false,
-  esperaSomMs = ESPERA_SOM_MS,
+  pausouDeProposito = () => false,
+  conferirMs = CONFERIR_MS,
 } = {}) {
   if (cancelado()) return false;
+  const conferir = () => tocandoDeVerdade(video, { ms: conferirMs, pausouDeProposito });
+
   // 1. Do jeito certo: com som. Funciona no computador e sempre que já houve gesto.
+  //
+  // Não basta o `play()` não dar erro. No iPhone ele resolve e o sistema pausa logo depois —
+  // era assim que o canal ficava parado, com a seta de play no meio, sem erro nenhum e sem nem
+  // mostrar o aviso de som. Por isso a reprodução é acompanhada antes de dar por boa.
   try {
     await video.play();
-    aoVoltarOSom?.();
-    return true;
+    if (await conferir()) { aoVoltarOSom?.(); return true; }
   } catch { /* bloqueado: vai pelo mudo */ }
 
-  if (cancelado()) return false;
+  if (cancelado() || pausouDeProposito()) return false;
+
+  // 2. Mudo, que é o que nenhum navegador bloqueia.
   const queriaComSom = !video.muted;
   video.muted = true;
   try {
@@ -48,20 +79,18 @@ export async function iniciarReproducao(video, {
   } catch {
     return false;        // nem mudo o navegador deixou: aí o problema é outro, e o vigia cuida
   }
+  if (!await conferir()) return false;
   if (!queriaComSom || cancelado()) return true;
 
-  // 2. No ar, mudo. Agora devolve o som.
+  // 3. No ar, mudo. Agora devolve o som — e confere de novo, porque tirar o mudo é exatamente
+  // o que faz o iPhone pausar.
   video.muted = false;
-  await new Promise((r) => { setTimeout(r, esperaSomMs); });
-  if (cancelado()) return true;
+  if (await conferir() && !video.muted) { aoVoltarOSom?.(); return true; }
 
-  // Tirar o mudo pode fazer o navegador pausar de novo. Só então vale incomodar a pessoa.
-  if (video.paused || video.muted) {
-    video.muted = true;
-    video.play().catch(() => {});
-    aoPrecisarDeToque?.();
-  } else {
-    aoVoltarOSom?.();
-  }
+  // O som não vingou. Melhor canal no ar mudo, com um convite de um toque, que tela parada.
+  if (cancelado() || pausouDeProposito()) return true;
+  video.muted = true;
+  video.play().catch(() => {});
+  aoPrecisarDeToque?.();
   return true;
 }

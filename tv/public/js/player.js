@@ -261,11 +261,18 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   // autoplay.js, para poder ser testada num navegador com a reprodução automática bloqueada —
   // que é a situação do iPhone. Aqui fica só o convite na tela.
   let avisoDeSom = null;
-  const tentarTocar = () => iniciarReproducao(video, {
-    cancelado: () => fechado,
-    aoPrecisarDeToque: mostrarAvisoDeSom,
-    aoVoltarOSom: tirarAvisoDeSom,
-  });
+  // Pausa que a pessoa pediu. Sem isto, o código que insiste para o canal tocar brigaria com
+  // quem simplesmente quer pausar: ela aperta pausa, ele manda tocar de novo.
+  let pausouDeProposito = false;
+  const tentarTocar = () => {
+    pausouDeProposito = false;
+    return iniciarReproducao(video, {
+      cancelado: () => fechado,
+      pausouDeProposito: () => pausouDeProposito,
+      aoPrecisarDeToque: mostrarAvisoDeSom,
+      aoVoltarOSom: tirarAvisoDeSom,
+    });
+  };
 
   function mostrarAvisoDeSom() {
     if (avisoDeSom || fechado) return;
@@ -331,7 +338,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
 
 
   // ---------- Controles ----------
-  const alternar = () => { if (video.paused) tentarTocar(); else video.pause(); };
+  const alternar = () => { if (video.paused) tentarTocar(); else { pausouDeProposito = true; video.pause(); } };
   const pular = (s) => { if (!aoVivo && Number.isFinite(video.duration)) video.currentTime = Math.min(video.duration - 0.5, Math.max(0, video.currentTime + s)); };
   const voltarAoVivo = () => {
     const fim = video.seekable.length ? video.seekable.end(video.seekable.length - 1) : null;
