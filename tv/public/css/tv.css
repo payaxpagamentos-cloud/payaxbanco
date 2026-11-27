@@ -1025,3 +1025,11 @@ body.tv .topo::before{ background: var(--bg-2); }
   .pilulas-tema .btn{ flex: 0 0 auto; }
   .tema > header h2{ font-size: 17px; }
 }
+
+/* ---- Logo escuro de emissora ----
+   Metade dos logos de canal é quase preta (SporTV, HBO, TCM, Warner): sobre o fundo escuro da
+   tela, somem. Esses ganham um quadro claro, com uma folga em volta para a arte não encostar
+   na borda. Os claros (TV Cultura, Fish TV) seguem no fundo escuro, onde aparecem bem — é por
+   isso que o fundo é escolhido por logo, e não igual para todos. */
+.logo.logo-escuro{ background: #F2F2F4 !important; }
+.logo.logo-escuro img{ padding: 4px; }

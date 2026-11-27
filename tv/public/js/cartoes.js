@@ -129,8 +129,12 @@ export function cartaz(item, { retrato = false, posicao = null, aoAbrir, aoTocar
 /** Cartão do canal ao vivo, com o que está no ar agora. */
 export function canalCartao(canal, { aoAbrir } = {}) {
   const logo = arte(canal.logo);
+  // Logo escuro sobre o fundo preto da tela some. A claridade vem medida do servidor; abaixo de
+  // 0,4 o quadro ganha fundo claro. Sem medida, fica o fundo de sempre.
+  const escuro = typeof canal.logo_luz === 'number' && canal.logo_luz < 0.4;
   const b = el('button', { class: 'canal-cartao' },
-    el('div', { class: 'logo' }, logo ? el('img', { src: logo, alt: canal.nome, loading: 'lazy' }) : String(canal.numero)),
+    el('div', { class: `logo${logo && escuro ? ' logo-escuro' : ''}` },
+      logo ? el('img', { src: logo, alt: canal.nome, loading: 'lazy' }) : String(canal.numero)),
     el('div', { class: 'meio' },
       el('div', { class: 'linha firme', style: 'gap:6px' },
         // Sem logo, o quadrado da esquerda já mostra o número: repetir aqui fica estranho.

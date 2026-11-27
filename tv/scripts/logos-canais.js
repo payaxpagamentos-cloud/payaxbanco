@@ -22,11 +22,22 @@ const forcar = process.argv.includes('--forcar');
 const db = abrir();
 
 (async () => {
+  // Logo que já estava no banco antes desta medição existir: mede agora. É o que decide se a
+  // tela põe fundo claro atrás dele — sem isso, metade dos logos continua sumindo no preto.
+  const semMedida = db.prepare('SELECT id, nome FROM canais WHERE logo_midia_id IS NOT NULL AND logo_luz IS NULL').all();
+  if (semMedida.length) {
+    console.log(`Medindo a claridade de ${semMedida.length} logo(s) que já estavam salvos…`);
+    let medidos = 0;
+    for (const c of semMedida) if (logos.medirDoCanal(db, c.id) !== null) medidos += 1;
+    console.log(`  ${medidos} medido(s).\n`);
+  }
+
   const quantos = db.prepare(`SELECT COUNT(*) AS n FROM canais ${forcar ? '' : 'WHERE logo_midia_id IS NULL'}`).get().n;
   if (!quantos) {
     console.log('Todos os canais já têm logo. Use --forcar para buscar de novo.');
     return;
   }
+
   console.log(`Buscando o logo de ${quantos} canal(is). Leva alguns minutos…\n`);
   const r = await logos.aplicarEmTodos(db, {
     forcar,

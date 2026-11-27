@@ -147,6 +147,10 @@ CREATE TABLE IF NOT EXISTS canais (
   -- 1: o sinal passa pelos nossos servidores; 0: o player vai direto na origem.
   relay INTEGER NOT NULL DEFAULT 1,
   logo_midia_id INTEGER REFERENCES midias(id),
+  -- Claridade do logo, de 0 (preto) a 1 (branco), medida quando ele é salvo.
+  -- Serve para a tela escolher o fundo: logo escuro sobre fundo preto simplesmente some, e
+  -- fundo branco para todos faria sumir os logos claros. Medir cada um é o único jeito.
+  logo_luz REAL,
   -- Identificador do canal na lista pública (iptv-org): serve para buscar o logo oficial.
   id_publico TEXT,
   -- Identificador do canal no XMLTV da grade (varia conforme o provedor de EPG).
@@ -513,6 +517,7 @@ function migrar(db) {
   if (!colunas.includes('cabecalhos')) db.exec('ALTER TABLE canais ADD COLUMN cabecalhos TEXT');
   if (!colunas.includes('id_publico')) db.exec('ALTER TABLE canais ADD COLUMN id_publico TEXT');
   if (!colunas.includes('id_epg')) db.exec('ALTER TABLE canais ADD COLUMN id_epg TEXT');
+  if (!colunas.includes('logo_luz')) db.exec('ALTER TABLE canais ADD COLUMN logo_luz REAL');
 
   const colunasPerfis = db.prepare('PRAGMA table_info(perfis)').all().map((c) => c.name);
   if (!colunasPerfis.includes('avatar')) {

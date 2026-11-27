@@ -114,7 +114,7 @@ const manual = (db, perfil, fileiraId, limite = 20) => db.prepare(`${SELECT_CARD
  * TV aberta "sumiu". Quem precisa de poucos (as fileiras da home) passa `limite`.
  */
 function canaisAoVivo(db, perfil, acesso, { limite = 500 } = {}) {
-  const canais = db.prepare(`SELECT c.id, c.numero, c.nome, c.slug, c.descricao, c.categoria, c.regiao, c.classificacao, c.logo_midia_id AS logo,
+  const canais = db.prepare(`SELECT c.id, c.numero, c.nome, c.slug, c.descricao, c.categoria, c.regiao, c.classificacao, c.logo_midia_id AS logo, c.logo_luz,
       c.sinal_status, c.relay, c.fonte,
       (SELECT nivel FROM planos p WHERE p.id = c.plano_minimo_id) AS nivel_minimo,
       (SELECT nome FROM planos p WHERE p.id = c.plano_minimo_id) AS plano_nome

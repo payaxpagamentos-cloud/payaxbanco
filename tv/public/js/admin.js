@@ -339,7 +339,8 @@ async function telaCanais(c) {
 
   const linhas = canais.map((x) => el('tr', {},
     td(el('div', { class: 'linha firme', style: 'gap:9px' },
-      el('span', { class: 'logo', style: 'width:34px;height:34px;border-radius:7px;overflow:hidden;display:grid;place-items:center;background:var(--bg-2)' },
+      el('span', { class: `logo${arte(x.logo_midia_id) && typeof x.logo_luz === 'number' && x.logo_luz < 0.4 ? ' logo-escuro' : ''}`,
+        style: 'width:34px;height:34px;border-radius:7px;overflow:hidden;display:grid;place-items:center;background:var(--bg-2)' },
         arte(x.logo_midia_id) ? el('img', { src: arte(x.logo_midia_id), alt: '', style: 'width:100%;height:100%;object-fit:contain;padding:3px' }) : String(x.numero)),
       el('div', {}, el('strong', {}, x.nome), el('div', { class: 'mini apagado' }, `canal ${x.numero} · ${CATEGORIAS_CANAL[x.categoria] ?? x.categoria}`)))),
     td(el('div', {}, el('div', { class: 'linha', style: 'gap:5px' },
