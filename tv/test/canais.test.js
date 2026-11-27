@@ -323,3 +323,37 @@ test('logo: host que bloqueia o servidor é abandonado, e os outros continuam', 
   assert.ok(r.pulados >= 4, `os canais seguintes são adiados, não tentados (foram ${r.pulados})`);
   assert.equal(r.com_logo.length, 0);
 });
+
+test('grade: o painel recebe a descrição, o guia do assinante não', async (t) => {
+  // Por que isto existe: tirei a descrição da grade para o guia do assinante parar de baixar
+  // 3 MB (eram 2,5 MB só de texto que a grade não mostra). Só que a MESMA consulta alimenta a
+  // tela de editar programa do painel, que preenche o formulário com ela — sem a descrição, o
+  // campo viria vazio e SALVAR APAGARIA o texto, sem ninguém perceber.
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const canal = (await s.post('/admin/canais', { numero: 90, nome: 'Com Grade', url_hls: 'https://origem.test/x.m3u8', ativo: true }, admin)).dados.canal;
+  const inicio = new Date(Date.now() - 600_000).toISOString();
+  const fim = new Date(Date.now() + 3_000_000).toISOString();
+  const criado = await s.post(`/admin/canais/${canal.id}/programas`, {
+    titulo: 'Jornal', descricao: 'O texto que não pode sumir.', inicio, fim,
+  }, admin);
+  assert.equal(criado.status, 201, JSON.stringify(criado.dados));
+
+  const noPainel = await s.get(`/admin/canais/${canal.id}/programas`, admin);
+  assert.equal(noPainel.status, 200);
+  assert.equal(noPainel.dados.programas[0].descricao, 'O texto que não pode sumir.',
+    'sem isto, editar um programa no painel apaga a descrição');
+
+  const cliente = await s.assinante('grade@exemplo.com.br', { plano: 2 });
+  const guia = await s.get('/tv/guia', cliente.token, cliente.comPerfil);
+  assert.equal(guia.status, 200);
+  const doGuia = guia.dados.canais.flatMap((c) => c.programas ?? []).find((p) => p.titulo === 'Jornal');
+  assert.ok(doGuia, 'o programa aparece no guia');
+  assert.equal(doGuia.descricao, undefined, 'a grade do assinante não carrega a descrição');
+
+  // E a janela do programa busca a descrição quando alguém toca nele.
+  const detalhe = await s.get(`/tv/programa/${doGuia.id}`, cliente.token, cliente.comPerfil);
+  assert.equal(detalhe.status, 200);
+  assert.equal(detalhe.dados.programa.descricao, 'O texto que não pode sumir.');
+});

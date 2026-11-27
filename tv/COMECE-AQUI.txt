@@ -92,7 +92,11 @@ DEPOIS DE INSTALAR: pôr os canais no ar
    áudio em AC-3 sairia MUDO no Android e no Chrome se fosse copiado; convertido
    custa cerca de 1% de um núcleo e toca em tudo.
 
-3. Buscar os logos das emissoras:
+3. Aplicar os logos que vêm no pacote (13 canais que não existem em lista pública):
+
+       sudo docker compose exec app node scripts/logos-arquivos.js --gravar
+
+4. Buscar na lista pública o logo dos demais:
 
        sudo docker compose exec app node scripts/logos-canais.js
 

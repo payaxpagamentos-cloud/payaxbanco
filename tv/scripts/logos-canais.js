@@ -24,9 +24,12 @@ const db = abrir();
 (async () => {
   // Logo que já estava no banco antes desta medição existir: mede agora. É o que decide se a
   // tela põe fundo claro atrás dele — sem isso, metade dos logos continua sumindo no preto.
-  const semMedida = db.prepare('SELECT id, nome FROM canais WHERE logo_midia_id IS NOT NULL AND logo_luz IS NULL').all();
+  // TODOS os logos salvos, não só os sem medida: a regra de medição mudou (passou a olhar o
+  // canal mais forte em vez da luminância, para cor saturada não ser confundida com cor
+  // escura), e valor medido pela regra antiga está errado. Medir de novo custa alguns segundos.
+  const semMedida = db.prepare('SELECT id, nome FROM canais WHERE logo_midia_id IS NOT NULL').all();
   if (semMedida.length) {
-    console.log(`Medindo a claridade de ${semMedida.length} logo(s) que já estavam salvos…`);
+    console.log(`Medindo de novo a claridade de ${semMedida.length} logo(s) salvos…`);
     let medidos = 0;
     for (const c of semMedida) if (logos.medirDoCanal(db, c.id) !== null) medidos += 1;
     console.log(`  ${medidos} medido(s).\n`);

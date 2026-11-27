@@ -27,9 +27,31 @@ const aSeguir = (db, canalId, limite = 4) => db.prepare('SELECT * FROM programas
   .all(Number(canalId), new Date().toISOString(), limite);
 
 /** Grade de um período (para a tela "Guia de canais"). */
-const grade = (db, { canalId = null, de, ate }) => db.prepare(`SELECT p.*, c.nome AS canal_nome, c.numero AS canal_numero FROM programas p JOIN canais c ON c.id = p.canal_id
+/**
+ * A grade do guia: colunas CONTADAS, não `p.*`.
+ *
+ * Medido com a grade real (116 canais, 38 horas, 2.784 programas): com `p.*` a resposta do guia
+ * saía com 3,1 MB, e 2,5 MB disso era a DESCRIÇÃO de cada programa — texto que a grade não
+ * mostra, só a janela que abre quando alguém toca num programa. Três megabytes para desenhar
+ * uma tabela de horários, no celular, no 4G do assinante.
+ *
+ * A descrição agora vem por `programa(db, id)`, quando a janela abre. Uma consulta de uma linha
+ * contra três megabytes que quase ninguém lê.
+ *
+ * `comDescricao` existe para o PAINEL, e é obrigatório lá: a tela de editar programa preenche o
+ * formulário com o que esta consulta devolve. Sem a descrição, o campo viria vazio e salvar
+ * APAGARIA o texto que estava lá — sem ninguém perceber até alguém reclamar da grade vazia.
+ */
+const grade = (db, { canalId = null, de, ate, comDescricao = false }) => db.prepare(`SELECT p.id, p.canal_id, p.titulo, p.subtitulo,
+    p.inicio, p.fim, p.categoria, p.classificacao, p.ao_vivo, p.temporada, p.episodio,
+    ${comDescricao ? 'p.descricao,' : ''}
+    c.nome AS canal_nome, c.numero AS canal_numero FROM programas p JOIN canais c ON c.id = p.canal_id
   WHERE p.fim > ? AND p.inicio < ? ${canalId ? 'AND p.canal_id = ?' : ''} AND c.ativo = 1
   ORDER BY c.ordem, c.numero, p.inicio`).all(de, ate, ...(canalId ? [Number(canalId)] : []));
+
+/** Um programa inteiro, com a descrição — para a janela que abre no guia. */
+const programa = (db, id) => db.prepare(`SELECT p.*, c.nome AS canal_nome, c.numero AS canal_numero
+  FROM programas p JOIN canais c ON c.id = p.canal_id WHERE p.id = ? AND c.ativo = 1`).get(Number(id)) ?? null;
 
 /** Quanto do programa já passou, em %, ou null quando ele não está no ar agora (a barrinha do guia). */
 function andamento(p) {
@@ -219,4 +241,4 @@ async function atualizarGradeAutomatica(db) {
 }
 
 module.exports = { agoraEmTodos, noAr, aSeguir, grade, andamento, salvarPrograma, limparAntigos, dataXmltv, importarXmltv,
-  importarDeUrl, atualizarGradeAutomatica };
+  importarDeUrl, atualizarGradeAutomatica, programa};

@@ -44,6 +44,17 @@ module.exports = (db) => {
    * Sem dia, a janela começa um pouco antes de agora — assim o programa no ar sempre aparece,
    * mesmo que o aparelho esteja num fuso diferente do da operação.
    */
+  /**
+   * Um programa da grade, com a descrição. A grade não a traz: ela sozinha respondia por 2,5 MB
+   * dos 3,1 MB do guia, e só aparece quando alguém toca num programa.
+   */
+  r.get('/programa/:id', (req, res) => {
+    const p = epg.programa(db, v.inteiro(req.params.id, 'o programa', { min: 1 }));
+    if (!p) throw naoEncontrado('Programa');
+    if (p.classificacao > (req.perfilView.classificacao_max ?? 18)) throw naoEncontrado('Programa');
+    return res.json({ programa: p });
+  });
+
   r.get('/guia', (req, res) => {
     const diaPedido = req.query.dia ? v.data(req.query.dia, 'o dia') : null;
     const dia = diaPedido ?? hoje();
@@ -60,7 +71,8 @@ module.exports = (db) => {
       canais: canais.map((c) => ({
         ...c,
         programas: programas.filter((p) => p.canal_id === c.id).map((p) => ({
-          id: p.id, titulo: p.titulo, subtitulo: p.subtitulo, descricao: p.descricao, inicio: p.inicio, fim: p.fim,
+          // Sem `descricao` de propósito: ela vem por /tv/programa/:id quando a janela abre.
+          id: p.id, titulo: p.titulo, subtitulo: p.subtitulo, inicio: p.inicio, fim: p.fim,
           classificacao: p.classificacao, categoria: p.categoria, ao_vivo: Boolean(p.ao_vivo), andamento: epg.andamento(p),
         })),
       })),

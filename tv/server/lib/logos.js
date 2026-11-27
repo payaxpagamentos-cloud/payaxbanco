@@ -23,12 +23,19 @@ const midia = require('./midia');
 const equipeLogos = { id: null, nome: 'logos' };
 
 /**
- * Claridade do logo, de 0 (preto) a 1 (branco).
+ * O quanto o logo se destaca do preto, de 0 (some) a 1 (salta aos olhos).
  *
  * Logo de emissora costuma vir com fundo transparente, e metade deles é escuro: SporTV, HBO,
  * TCM e Warner são praticamente pretos. Sobre o fundo preto da tela, somem. Pintar o fundo de
- * branco para todos resolveria esses e faria sumir os claros, como TV Cultura e Fish TV. Então
- * cada logo é medido na hora de salvar, e a tela escolhe o fundo dele.
+ * branco para todos resolveria esses e faria sumir os claros, como TV Cultura. Então cada logo
+ * é medido na hora de salvar, e a tela escolhe o fundo dele.
+ *
+ * A medição olha o CANAL MAIS FORTE de cada pixel, não a luminância. É uma correção: com
+ * luminância, cor saturada era confundida com cor escura. O laranja de "A Fazenda" dá 0,35 de
+ * luminância e ganhava fundo claro — onde justamente fica lavado —, sendo que sobre o preto ele
+ * salta. O azul da RedeTV! e o verde do Sabor & Arte caíam no mesmo erro. Pelo canal mais forte,
+ * laranja vivo dá 0,43 (fica no preto) e um desenho quase preto dá 0,03 (ganha o fundo claro),
+ * que é o que a vista faz.
  *
  * A medição reduz a imagem a 16x16 e tira a média ponderada pelo alpha: pixel transparente não
  * conta. O ffmpeg já está no servidor (é ele quem converte os vídeos) e lê PNG, WebP e SVG.
@@ -43,7 +50,7 @@ function medirLuz(arquivo) {
     for (let i = 0; i + 3 < bruto.length; i += 4) {
       const a = bruto[i + 3] / 255;
       if (a < 0.15) continue;                 // quase transparente: não é o desenho do logo
-      soma += (0.2126 * bruto[i] + 0.7152 * bruto[i + 1] + 0.0722 * bruto[i + 2]) * a;
+      soma += Math.max(bruto[i], bruto[i + 1], bruto[i + 2]) * a;
       peso += a;
     }
     return peso ? Number((soma / peso / 255).toFixed(3)) : null;

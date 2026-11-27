@@ -406,7 +406,15 @@ async function telaGuia(diaPedido) {
             etiquetaIdade(p.classificacao),
             noAr ? el('span', { class: 'etiqueta vivo' }, 'AO VIVO') : null),
           p.subtitulo ? el('p', { class: 'forte', style: 'margin:0' }, p.subtitulo) : null,
-          el('p', { class: 'mudo' }, p.descricao ?? 'Sem descrição na grade.'),
+          // A descrição vem agora, não junto com a grade inteira: ela sozinha respondia por
+          // 2,5 MB dos 3,1 MB do guia — texto que ninguém vê até tocar num programa.
+          (() => {
+            const alvo = el('p', { class: 'mudo' }, 'Carregando a descrição…');
+            api.get(`/tv/programa/${p.id}`)
+              .then((r) => { alvo.textContent = r.programa?.descricao || 'Sem descrição na grade.'; })
+              .catch(() => { alvo.textContent = 'Sem descrição na grade.'; });
+            return alvo;
+          })(),
           el('div', { class: 'linha fim' },
             el('button', { class: 'btn vazio', onclick: () => fechar() }, 'Fechar'),
             noAr ? el('button', { class: 'btn primario', onclick: () => { fechar(); tocarCanal(c); } }, icone('tocar'), 'Assistir agora') : null),

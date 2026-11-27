@@ -317,7 +317,9 @@ module.exports = (db) => {
     const c = achar('canais', req.params.id, 'Canal');
     const de = req.query.de ? v.instante(req.query.de, 'o início') : new Date(Date.now() - 3600_000).toISOString();
     const ate = req.query.ate ? v.instante(req.query.ate, 'o fim') : new Date(Date.now() + 7 * 86_400_000).toISOString();
-    res.json({ programas: epg.grade(db, { canalId: c.id, de, ate }).map((p) => ({ ...p, ao_vivo: Boolean(p.ao_vivo) })) });
+    // Com descrição: a tela de editar programa preenche o formulário com isto, e sem ela o
+    // campo viria vazio e salvar apagaria o texto.
+    res.json({ programas: epg.grade(db, { canalId: c.id, de, ate, comDescricao: true }).map((p) => ({ ...p, ao_vivo: Boolean(p.ao_vivo) })) });
   });
 
   r.post('/canais/:id/programas', (req, res) => {

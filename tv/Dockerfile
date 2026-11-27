@@ -30,6 +30,9 @@ COPY public ./public
 # o servidor nao tem node instalado, so o Docker. Sem isto, "docker compose exec app node
 # scripts/..." nao acha o arquivo.
 COPY scripts ./scripts
+# Os logos das emissoras que nao existem em lista publica nenhuma, enviados pelo fornecedor.
+# Vao dentro da imagem para o script `logos-arquivos.js` aplica-los sem depender de rede.
+COPY logos-canais ./logos-canais
 
 # O banco e os arquivos de vídeo ficam em /app/data (monte um volume persistente aqui:
 # os vídeos ocupam muito espaço, bem mais que o banco).
