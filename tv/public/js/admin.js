@@ -354,6 +354,29 @@ async function telaCanais(c) {
     return f;
   });
 
+  /**
+   * A ficha do sinal escrita na linha do canal: a resolução com que ele CHEGA da origem.
+   *
+   * Existia só como `title` do rótulo de falha — e `title` é dica de passar o mouse, que no
+   * celular não aparece nunca. Como a operação confere canal pelo celular, a informação que
+   * responde "dá para melhorar a imagem deste canal?" era justamente a invisível. Chegando em
+   * 1280x720, só o fornecedor resolve; chegando em 1920x1080 e ainda assim feia, o problema é
+   * taxa de bits, que é outro pedido.
+   */
+  const resumoDoSinal = (x) => {
+    if (x.fonte !== 'rtmp') return null;
+    const tratado = x.melhoria && x.melhoria !== 'nenhuma'
+      ? el('span', { class: 'etiqueta aviso', style: 'margin-left:6px' },
+        x.melhoria === 'fullhd' ? 'esticado p/ Full HD' : 'imagem limpa')
+      : null;
+    const m = /(\d{3,4})x(\d{3,4})/.exec(x.sinal_detalhe ?? '');
+    if (!m) return tratado ? el('div', { class: 'mini apagado', style: 'margin-top:3px' }, tratado) : null;
+    const altura = Number(m[2]);
+    const faixa = altura >= 1080 ? 'Full HD' : altura >= 720 ? 'HD' : 'SD';
+    return el('div', { class: 'mini apagado', style: 'margin-top:3px' },
+      el('strong', {}, `chega em ${m[1]}x${m[2]}`), ` (${faixa})`, tratado);
+  };
+
   const linhas = canais.map((x) => el('tr', {},
     td(el('div', { class: 'linha firme', style: 'gap:9px' },
       el('span', { class: `logo${arte(x.logo_midia_id) && typeof x.logo_luz === 'number' && x.logo_luz < 0.4 ? ' logo-escuro' : ''}`,
@@ -383,7 +406,8 @@ async function telaCanais(c) {
       x.fonte === 'rtmp' && x.ativo && x.ao_vivo?.tentativas
         ? `reconectando (${x.ao_vivo.tentativas} tentativa${x.ao_vivo.tentativas > 1 ? 's' : ''})`
         : x.fonte === 'rtmp' && x.ao_vivo?.no_ar ? `no ar desde ${dataHora(x.ao_vivo.desde)}`
-          : x.sinal_em ? `sinal conferido ${dataHora(x.sinal_em)}` : 'sinal ainda não conferido'))),
+          : x.sinal_em ? `sinal conferido ${dataHora(x.sinal_em)}` : 'sinal ainda não conferido'),
+      resumoDoSinal(x))),
     td(el('div', {}, el('strong', { class: 'pequeno' }, x.agora?.titulo ?? '—'),
       el('div', { class: 'mini apagado' }, `${x.programas_futuros} programa(s) na grade`),
       x.observacao ? el('div', { class: 'mini apagado duas-linhas', style: 'margin-top:4px;max-width:420px' }, x.observacao) : null)),
