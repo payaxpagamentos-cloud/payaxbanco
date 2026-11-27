@@ -55,6 +55,19 @@ export function createApp(options = {}) {
       const url = new URL(req.url, 'http://local');
       const path = decodeURIComponent(url.pathname);
       const method = req.method;
+      // Domínio único: quem entra por outro nome do mesmo site (ex.: www) vai para o endereço oficial.
+      if (origin && ['GET', 'HEAD'].includes(method)) {
+        const oficial = new URL(origin).host, pedido = String(req.headers.host || '').toLowerCase();
+        if (pedido && pedido !== oficial && pedido.replace(/^www\./, '') === oficial.replace(/^www\./, '')) { res.writeHead(301, { Location: origin + req.url, 'Cache-Control': 'public, max-age=86400' }); return res.end(); }
+      }
+      if (path === '/robots.txt' && ['GET', 'HEAD'].includes(method)) {
+        const corpo = `User-agent: *\nDisallow: /admin\nDisallow: /api/\n${origin ? `Sitemap: ${origin}/sitemap.xml\n` : ''}`;
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' }); return res.end(method === 'HEAD' ? undefined : corpo);
+      }
+      if (path === '/sitemap.xml' && origin && ['GET', 'HEAD'].includes(method)) {
+        const corpo = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${origin}/</loc></url></urlset>\n`;
+        res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' }); return res.end(method === 'HEAD' ? undefined : corpo);
+      }
       if (path.startsWith('/api/')) {
         if (!['GET','HEAD'].includes(method)) checkOrigin(req);
         if (path === '/api/health' && method === 'GET') return json(res, 200, { ok: true });
@@ -160,6 +173,10 @@ export function createApp(options = {}) {
         let html = bytes.toString('utf8').replace(/<title>[^<]*<\/title>/, `<title>${htmlEscape(config.seo.title)}</title>`).replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${htmlEscape(config.seo.description)}">`);
         const image = config.banners.find(v => v.active)?.image;
         if (image) html = html.replace('href="/assets/hero-casal.png"', `href="${htmlEscape(image)}"`);
+        if (origin) {
+          const imagem = image ? (image.startsWith('/') ? origin + image : image) : `${origin}/assets/hero-casal.png`;
+          html = html.replace('</head>', `  <link rel="canonical" href="${origin}/">\n  <meta property="og:type" content="website"><meta property="og:url" content="${origin}/"><meta property="og:site_name" content="LK TECH"><meta property="og:locale" content="pt_BR">\n  <meta property="og:title" content="${htmlEscape(config.seo.title)}"><meta property="og:description" content="${htmlEscape(config.seo.description)}"><meta property="og:image" content="${htmlEscape(imagem)}">\n</head>`);
+        }
         bytes = Buffer.from(html);
       }
       res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream', 'Content-Length': bytes.length, 'Cache-Control': extname(file) === '.html' || path.startsWith('/admin') ? 'no-store' : 'public, max-age=3600' });

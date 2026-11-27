@@ -86,3 +86,25 @@ test('painel não consegue entortar o layout: limites, linhas, quantidade, preç
   assert.equal(r.banners[0].imagePosition, '65% 50%');
   assert.equal(validateConfig({ ...base(), services: { ...seed.services, title: 'Mais perto.\nMais simples.' } }).services.title, 'Mais perto.\nMais simples.');
 });
+
+test('domínio oficial: www redireciona, Google recebe endereço oficial e painel fica fora da busca', async () => {
+  const { createApp } = await import('../server/index.mjs');
+  const { mkdtemp, rm } = await import('node:fs/promises'); const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+  const directory = await mkdtemp(join(tmpdir(), 'lk-dominio-'));
+  const app = createApp({ dataDir: directory, production: false, origin: 'https://lktechprovedor.com.br' });
+  await new Promise(r => app.server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${app.server.address().port}`;
+  try {
+    const http = await import('node:http');
+    const pedir = (caminho, host) => new Promise((ok, erro) => http.get(base + caminho, { headers: { Host: host } }, res => { let corpo = ''; res.on('data', d => corpo += d); res.on('end', () => ok({ status: res.statusCode, location: res.headers.location, corpo })); }).on('error', erro));
+    const www = await pedir('/?x=1', 'www.lktechprovedor.com.br');
+    assert.equal(www.status, 301); assert.equal(www.location, 'https://lktechprovedor.com.br/?x=1');
+    const outro = await pedir('/', 'outrosite.com.br'); assert.equal(outro.status, 200, 'só o www do próprio domínio é redirecionado');
+    const html = (await pedir('/', 'lktechprovedor.com.br')).corpo;
+    assert.match(html, /<link rel="canonical" href="https:\/\/lktechprovedor\.com\.br\/">/);
+    assert.match(html, /og:image" content="https:\/\/lktechprovedor\.com\.br\/assets\/hero-casal\.png"/);
+    const robots = await (await fetch(base + '/robots.txt')).text();
+    assert.match(robots, /Disallow: \/admin/); assert.match(robots, /Sitemap: https:\/\/lktechprovedor\.com\.br\/sitemap\.xml/);
+    assert.match(await (await fetch(base + '/sitemap.xml')).text(), /<loc>https:\/\/lktechprovedor\.com\.br\/<\/loc>/);
+  } finally { await new Promise(r => app.server.close(r)); app.store?.close?.(); await rm(directory, { recursive: true, force: true }); }
+});

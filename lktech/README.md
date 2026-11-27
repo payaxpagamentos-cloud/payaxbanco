@@ -120,6 +120,13 @@ location / {
 
 Com Docker, monte um volume persistente em `/app/data`, configure `PUBLIC_ORIGIN` e crie o administrador dentro do contêiner com `docker exec -it <container> npm run admin:create -- --email seu-email@empresa.com.br`. O Dockerfile já usa um usuário sem privilégios de root. Não mantenha múltiplas réplicas usando o mesmo SQLite; para escalar horizontalmente, migre a persistência para um serviço compartilhado.
 
+## Domínio oficial: lktechprovedor.com.br
+
+- No `.env` do servidor: `NODE_ENV=production`, `PUBLIC_ORIGIN=https://lktechprovedor.com.br` e `TRUST_PROXY=true` (atrás do proxy HTTPS).
+- Quem entra por `www.lktechprovedor.com.br` é redirecionado (301) para `https://lktechprovedor.com.br`.
+- A página entrega o endereço oficial ao Google e às redes sociais (`canonical` e `og:`), e o servidor responde `/robots.txt` (painel e API fora da busca) e `/sitemap.xml`.
+- O domínio hoje aponta para uma hospedagem compartilhada (Apache). Este site precisa de um servidor com Node.js 24 rodando o tempo todo e disco persistente (VPS ou equivalente). Quando o servidor estiver pronto, aponte os registros DNS `@` e `www` para o IP dele e emita o certificado HTTPS para os dois nomes.
+
 ## Backup e recuperação
 
 ```bash
