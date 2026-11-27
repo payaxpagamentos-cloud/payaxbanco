@@ -38,7 +38,7 @@ button[data-add]:disabled{opacity:.5;cursor:not-allowed}
   .toolbar-actions>*{font-size:.8rem;min-height:44px}
 }
 .login a{display:inline-flex;align-items:center;min-height:44px}
-@media(max-width:760px){
+@media(max-width:1150px){
   .table-scroll{overflow:visible}
   .table-scroll table,.table-scroll tbody,.table-scroll tr,.table-scroll td{display:block;width:100%}
   .table-scroll thead{display:none}
@@ -50,5 +50,6 @@ button[data-add]:disabled{opacity:.5;cursor:not-allowed}
 }
 td small{font-size:.8rem}
 .lead-acoes{display:flex;gap:8px;align-items:center}.lead-acoes select{flex:1;min-width:150px}
-@media(max-width:760px){.lead-acoes{flex-wrap:wrap;min-width:0}.lead-acoes select{min-width:0;flex:1 1 140px}.table-scroll td>*{min-width:0}}
-@media(max-width:760px){.table-scroll td small{grid-column:2}}
+@media(max-width:1150px){.lead-acoes{flex-wrap:wrap;min-width:0}.lead-acoes select{min-width:0;flex:1 1 140px}.table-scroll td>*{min-width:0}}
+@media(max-width:1150px){.table-scroll td small{grid-column:2}}
+@media(min-width:761px) and (max-width:1150px){.table-scroll tr{max-width:640px}}

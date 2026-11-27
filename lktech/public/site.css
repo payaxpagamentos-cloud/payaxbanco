@@ -81,3 +81,27 @@ dialog .consent input{width:22px;height:22px;margin-top:1px}
 .plan-controls .plan-dots{margin-top:0}
 .plan-pause{min-width:36px;min-height:36px;border-radius:50%;border:1px solid var(--line);background:#19324d99;color:white;font-size:.8rem}
 @media(max-width:600px){.plan-pause{min-width:44px;min-height:44px}}
+
+/* Telas baixas: o banner cabe na primeira tela e o botão principal aparece sem rolar */
+@media(max-width:600px) and (max-height:760px){
+  .hero{min-height:0}
+  .hero-picture{height:clamp(190px,34vh,360px)}
+  .hero-content{padding-top:calc(clamp(190px,34vh,360px) - 70px);padding-bottom:14px}
+  .eyebrow{margin-bottom:10px}
+  .hero-content h1{font-size:clamp(2rem,9.5vw,2.75rem)}
+  .hero-content .section-rule{margin-top:14px;margin-bottom:8px}
+  .hero-subtitle{margin-top:8px}
+  .hero-buttons{margin-top:16px}
+  .hero-controls{top:calc(clamp(190px,34vh,360px) - 44px)}
+}
+@media(min-width:601px) and (max-height:500px){
+  .header{min-height:60px;padding-top:8px;padding-bottom:8px}
+  .hero{min-height:0}
+  .hero-content{padding:24px 18px 28px 24px}
+  .eyebrow{margin-bottom:10px}
+  .hero-content h1{font-size:2.1rem}
+  h1+.section-rule{margin-top:14px}
+  .hero-subtitle{margin-top:10px;font-size:1rem}
+  .hero-buttons{margin-top:16px}
+  .hero-badge{display:none}
+}
