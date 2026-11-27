@@ -455,7 +455,7 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
 /* Cancelar é saída de emergência, não a ação principal: sem isto o botão virava um retângulo
    vazio do tamanho de um cartão, competindo com o aviso que importa. */
 .aquecendo .btn{ padding: 9px 22px; min-height: 0; width: auto; }
-.aquecendo > div:nth-of-type(2){ font-size: 17px; font-weight: 600; }
+.aquecendo .titulo-espera{ margin-top: 18px; font-size: 17px; font-weight: 600; text-align: center; }
 
 /* Aviso de som: aparece quando o navegador deixou o canal tocar, mas segurou o áudio. Fica
    acima dos controles de baixo e some ao primeiro toque. */

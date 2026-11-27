@@ -92,11 +92,14 @@ async function abrirNoServidor(corpo) {
 
   const mostrarEspera = () => {
     if (espera || desistiu) return;
+    // Só "Entrando no ar". A frase que havia aqui ("este canal estava desligado, leva alguns
+    // segundos") explicava o funcionamento interno da plataforma a quem só quer ver televisão —
+    // e "desligado" soa como defeito. Quem assiste não precisa saber que a conversão é sob
+    // demanda; precisa saber que o canal está vindo.
     espera = el('div', { class: 'aquecendo' },
       el('div', { class: 'rodinha' }),
-      el('div', { style: 'margin-top:16px;text-align:center' }, 'Entrando no ar…'),
-      el('div', { class: 'pequeno mudo', style: 'margin-top:4px;text-align:center' }, 'Este canal estava desligado. Leva alguns segundos.'),
-      el('button', { class: 'btn vazio', style: 'margin-top:18px', onclick: () => { desistiu = true; } }, 'Cancelar'));
+      el('div', { class: 'titulo-espera' }, 'Entrando no ar…'),
+      el('button', { class: 'btn vazio', style: 'margin-top:20px', onclick: () => { desistiu = true; } }, 'Cancelar'));
     document.body.append(espera);
   };
   const avisarSeDemorar = setTimeout(mostrarEspera, ANTES_DE_AVISAR_MS);
