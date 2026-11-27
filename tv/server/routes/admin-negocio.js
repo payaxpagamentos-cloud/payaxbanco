@@ -345,9 +345,17 @@ module.exports = (db) => {
       if (!sistema.agenteDisponivel()) {
         throw new ErroNegocio('Esta instalação não tem o agente de atualização. Atualize uma vez pelo servidor para instalá-lo.', 409);
       }
+      // A senha vem num cabeçalho porque o corpo é o arquivo. Chega codificada (pode ter acento
+      // ou símbolo, que cabeçalho HTTP não carrega) e não é registrada em lugar nenhum.
+      let senha = null;
+      try { senha = decodeURIComponent(String(req.get('x-senha-atualizacao') ?? '')) || null; } catch { senha = null; }
+      // Só poupa a espera: sem senha, o agente recusaria de qualquer jeito, um minuto depois.
+      if (sistema.exigeSenha() && !senha) {
+        throw new ErroNegocio('Informe a senha de atualização.', 422, { senha: true });
+      }
       let pedido;
       try {
-        pedido = sistema.guardarPacote(req.body, { por: req.usuario.email });
+        pedido = sistema.guardarPacote(req.body, { por: req.usuario.email, senha });
       } catch (e) {
         throw new ErroNegocio(e.message, 400);
       }

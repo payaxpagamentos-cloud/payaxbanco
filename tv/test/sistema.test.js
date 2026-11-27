@@ -203,3 +203,47 @@ test('arquivo recusado explica o que chegou, em vez de só dizer que não serve'
   assert.match(outro.dados.erro, /dentro dele há: fotos/);
   assert.match(outro.dados.erro, /MB/, 'o tamanho entra na mensagem');
 });
+
+test('senha de atualização: o painel exige, repassa ao agente e nunca devolve', async (t) => {
+  const pasta = pastaDeTeste(t);
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const pacote = pacoteDeMentira(t);
+  const enviar = (cabecalhos = {}) => s.req('POST', '/admin/sistema/pacote', pacote, admin, { headers: cabecalhos });
+
+  // Sem senha cadastrada no servidor, nada muda: é o comportamento de sempre.
+  assert.equal((await s.get('/admin/sistema', admin)).dados.exige_senha, false);
+  const livre = await enviar();
+  assert.equal(livre.status, 202);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(pasta, 'pedido.json'), 'utf8')).senha, undefined);
+
+  // O agente do servidor posta esta bandeira quando há senha cadastrada.
+  fs.writeFileSync(path.join(pasta, 'exige-senha'), '');
+  assert.equal((await s.get('/admin/sistema', admin)).dados.exige_senha, true);
+
+  // Sem a senha, o painel recusa na hora — e o pedido que estava lá não é trocado.
+  const semSenha = await enviar();
+  assert.equal(semSenha.status, 422);
+  assert.equal(semSenha.dados.detalhes.senha, true);
+
+  // Com a senha (com acento e símbolo, que cabeçalho HTTP não carrega sem codificar).
+  const digitada = 'atualização#2026 çã';
+  const comSenha = await enviar({ 'X-Senha-Atualizacao': encodeURIComponent(digitada) });
+  assert.equal(comSenha.status, 202, JSON.stringify(comSenha.dados));
+
+  // Chega ao agente exatamente como foi digitada...
+  const arquivo = path.join(pasta, 'pedido.json');
+  assert.equal(JSON.parse(fs.readFileSync(arquivo, 'utf8')).senha, digitada);
+  // ...num arquivo que só o dono lê...
+  assert.equal(fs.statSync(arquivo).mode & 0o777, 0o600);
+  // ...e não volta para o painel de jeito nenhum: nem na resposta do envio, nem no estado,
+  // nem na auditoria. Se voltasse, bastaria uma sessão de administrador para lê-la.
+  const tudoQueOPainelVe = JSON.stringify([
+    comSenha.dados,
+    (await s.get('/admin/sistema', admin)).dados,
+    (await s.get('/admin/auditoria', admin)).dados,
+  ]);
+  assert.ok(!tudoQueOPainelVe.includes(digitada), 'a senha de atualização apareceu numa resposta do painel');
+  assert.ok(!tudoQueOPainelVe.includes(encodeURIComponent(digitada)));
+});

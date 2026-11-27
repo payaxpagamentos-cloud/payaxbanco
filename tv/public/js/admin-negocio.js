@@ -498,14 +498,21 @@ async function blocoSistema() {
 
   const desenhar = (s) => {
     const arquivo = el('input', { type: 'file', accept: '.zip,.gz,.tgz,application/zip,application/gzip,application/x-gzip' });
+    // Senha de atualização: existe quando foi cadastrada no servidor. É conferida lá fora, pelo
+    // agente — o painel só repassa o que foi digitado aqui.
+    const senha = el('input', { type: 'password', autocomplete: 'off', placeholder: 'Senha de atualização' });
     const enviar = botao('Enviar e atualizar', 'primario', async () => {
       const f = arquivo.files?.[0];
       if (!f) throw new Error('Escolha o arquivo .tar.gz da atualização.');
+      if (s.exige_senha && !senha.value) throw new Error('Informe a senha de atualização.');
       if (!await confirmar('Atualizar a plataforma',
         `Vai ser aplicado o arquivo "${f.name}". A plataforma reinicia e fica alguns segundos fora do ar. `
         + 'O banco, os vídeos e o catálogo não são tocados. Continuar?', 'Atualizar agora')) return;
       // File é um Blob: o envio vai como corpo cru, igual ao das artes e dos vídeos.
-      await api.post('/admin/sistema/pacote', f, { tipo: f.type || 'application/octet-stream' });
+      await api.post('/admin/sistema/pacote', f, {
+        tipo: f.type || 'application/octet-stream',
+        cabecalhos: s.exige_senha ? { 'X-Senha-Atualizacao': encodeURIComponent(senha.value) } : {},
+      });
       toast('Pacote enviado. Aplicando…');
       await acompanhar(s.versao.versao);
     });
@@ -528,6 +535,14 @@ async function blocoSistema() {
           el('p', { class: 'mini apagado', style: 'margin:6px 0 12px' },
             'Pelo celular: toque no campo, escolha o arquivo que você recebeu e envie. '
             + 'A atualização leva de 1 a 3 minutos e a plataforma volta sozinha.'),
+          s.exige_senha
+            ? el('label', { class: 'campo', style: 'margin-bottom:12px' }, 'Senha de atualização', senha,
+              el('div', { class: 'mini apagado', style: 'margin-top:6px' },
+                'É a senha cadastrada no servidor só para atualizar. Não é a do seu login.'))
+            : el('div', { class: 'aviso atencao', style: 'margin-bottom:12px' },
+              'Proteção recomendada: hoje, quem tiver a senha de um administrador consegue atualizar a plataforma — e um pacote '
+              + 'de atualização manda no servidor inteiro. Para exigir uma senha separada a cada envio, rode uma vez no servidor: '
+              + 'sudo bash /opt/playtechvip/scripts/atualizador.sh --senha'),
           el('div', { class: 'linha' }, enviar)),
       s.na_fila ? el('div', { class: 'aviso atencao', style: 'margin-top:14px' },
         `Há um pacote na fila, enviado por ${s.na_fila.por}. O servidor aplica em até um minuto.`) : null,

@@ -218,9 +218,9 @@ module.exports = (db, autenticado, comPerfil) => {
   r.get('/canal/:id/segmento', async (req, res, next) => {
     try {
       const canalId = v.inteiro(req.params.id, 'o canal', { min: 1 });
-      // Sem conferir a sessão no banco: são muitos pedaços por minuto. A assinatura do token e do
-      // endereço já amarram o pedaço ao canal e à tela, e a lista (que a sessão confere) expira em segundos.
-      player.conferirToken(db, String(req.query.t ?? ''), { tipo: 'canal', canalId, exigirSessaoViva: false });
+      // A tela tem de estar viva — conferido com memória curta, porque são muitos pedaços por
+      // minuto (ver `sessaoVivaComMemoria`).
+      player.conferirToken(db, String(req.query.t ?? ''), { tipo: 'canal', canalId, sessaoComMemoria: true });
       const url = relay.lerUrlAssinada(canalId, req.query.u);
       if (!url) throw new ErroNegocio('Endereço de pedaço inválido.', 403);
       await relay.repassarSegmento(req, res, url, db.prepare('SELECT cabecalhos FROM canais WHERE id = ?').get(canalId));
@@ -236,9 +236,9 @@ module.exports = (db, autenticado, comPerfil) => {
    */
   r.get('/canal/:id/pedaco/:arquivo', (req, res) => {
     const canalId = v.inteiro(req.params.id, 'o canal', { min: 1 });
-    // Sem conferir a sessão no banco: são muitos pedaços por minuto. A assinatura do token já
-    // amarra o pedaço ao canal e à tela, e a lista (que a sessão confere) expira em segundos.
-    player.conferirToken(db, String(req.query.t ?? ''), { tipo: 'canal', canalId, exigirSessaoViva: false });
+    // A tela tem de estar viva. Só o token não basta: o nome do pedaço é previsível e o token
+    // vale horas, então sem isto dava para continuar assistindo depois de fechar a tela.
+    player.conferirToken(db, String(req.query.t ?? ''), { tipo: 'canal', canalId, sessaoComMemoria: true });
     const caminho = aovivo.caminhoDoPedaco(canalId, req.params.arquivo);
     if (!caminho) throw new ErroNegocio('Pedaço do sinal inválido.', 403);
     // Pedaço do ao vivo vive poucos segundos: o cache privado é curto e nada é guardado adiante.

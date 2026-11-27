@@ -86,12 +86,18 @@ export async function telaConta(raiz, { ir, aoMudar }) {
       el('label', { class: 'campo' }, 'Nome', el('input', { name: 'nome', value: conta.usuario.nome, maxlength: 120, required: true })),
       el('label', { class: 'campo' }, 'Celular', el('input', { name: 'telefone', value: conta.usuario.telefone ?? '', type: 'tel' }))),
     el('label', { class: 'campo' }, 'E-mail', el('input', { name: 'email', value: conta.usuario.email, type: 'email', required: true })),
+    el('label', { class: 'campo' }, 'Senha atual (só para trocar o e-mail)',
+      el('input', { name: 'senha_atual', type: 'password', autocomplete: 'current-password' })),
     el('div', { class: 'linha fim' }, el('button', { class: 'btn primario pequeno' }, 'Salvar dados')));
   formDados.addEventListener('submit', (e) => {
     e.preventDefault();
     const d = lerForm(formDados);
     acao(formDados.querySelector('button'), async () => {
-      await api.patch('/auth/me', { nome: d.nome, email: d.email, ...(d.telefone ? { telefone: d.telefone } : { telefone: null }) });
+      await api.patch('/auth/me', {
+        nome: d.nome, email: d.email, ...(d.telefone ? { telefone: d.telefone } : { telefone: null }),
+        ...(d.senha_atual ? { senha_atual: d.senha_atual } : {}),
+      });
+      formDados.querySelector('input[name=senha_atual]').value = '';
       toast('Dados salvos.');
       const s = sessao.get();
       sessao.set({ ...s, usuario: { ...s.usuario, nome: d.nome, email: d.email } });

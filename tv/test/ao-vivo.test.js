@@ -481,3 +481,33 @@ test('tratamento de imagem por canal: só recodifica quando a operação manda',
   // explícito, não uma correção automática.
   assert.match(modo('limpar', 'h264'), /-c:v libx264/);
 });
+
+test('fechou a tela, os pedaços param de sair — mesmo com o token ainda válido', async (t) => {
+  const s = await iniciar();
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
+  const admin = await s.adminLogin();
+  const canal = (await s.post('/admin/canais', {
+    numero: 77, nome: 'PLAY Tela Fechada', fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/fechada',
+  }, admin)).dados.canal;
+  const cliente = await s.assinante('telafechada@exemplo.com.br', { plano: 2 });
+  const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil);
+  assert.equal(abrir.status, 201, JSON.stringify(abrir.dados));
+
+  const lista = await s.req('GET', abrir.dados.fonte.url.replace(/^.*\/api/, ''));
+  const pedaco = String(lista.dados).split('\n').filter((l) => l && !l.startsWith('#')).pop().replace(/^.*\/api/, '');
+  assert.equal((await s.req('GET', pedaco)).status, 200, 'com a tela aberta, o pedaço sai');
+
+  // O abuso: fecha a tela (libera a vaga do plano) e continua buscando os pedaços direto, com
+  // o token que vale por horas. O nome é previsível — p000123.ts, p000124.ts — então nem a
+  // lista é necessária.
+  const fechou = await s.post('/play/fechar', { sessao_id: abrir.dados.sessao_id }, cliente.token);
+  assert.equal(fechou.dados.encerrada, true);
+  const depois = await s.req('GET', pedaco);
+  assert.equal(depois.status, 409, 'tela fechada não recebe mais pedaço');
+
+  // Abrir de novo volta a funcionar na hora, com o token novo.
+  const denovo = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil);
+  const lista2 = await s.req('GET', denovo.dados.fonte.url.replace(/^.*\/api/, ''));
+  const pedaco2 = String(lista2.dados).split('\n').filter((l) => l && !l.startsWith('#')).pop().replace(/^.*\/api/, '');
+  assert.equal((await s.req('GET', pedaco2)).status, 200);
+});

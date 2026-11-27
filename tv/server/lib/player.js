@@ -29,6 +29,10 @@ function lerToken(token) {
 
 const TIPOS = ['canal', 'filme', 'episodio', 'trailer'];
 
+// Memória curta de "esta tela está viva", usada pelos pedaços do ao vivo (ver `sessaoVivaComMemoria`).
+const vivasHaPouco = new Map();   // sessaoId -> até quando (ms) a resposta vale
+const VIVA_VALE_MS = 10_000;
+
 /** Telas que ainda dão sinal de vida (o plano limita quantas podem assistir ao mesmo tempo). */
 function sessoesVivas(db, usuarioId) {
   const corte = new Date(Date.now() - config.sessaoPlayerSegundos * 1000).toISOString();
@@ -46,8 +50,11 @@ function encerrarSessoesMortas(db) {
 
 /** Encerra as outras telas da conta (o assinante escolhe isso quando bate no limite do plano). */
 function encerrarOutras(db, usuarioId, manterId = null) {
-  return db.prepare("UPDATE sessoes_player SET encerrada_em = ?, motivo_fim = 'outra_tela' WHERE usuario_id = ? AND encerrada_em IS NULL AND id <> ?")
+  const n = db.prepare("UPDATE sessoes_player SET encerrada_em = ?, motivo_fim = 'outra_tela' WHERE usuario_id = ? AND encerrada_em IS NULL AND id <> ?")
     .run(agora(), Number(usuarioId), Number(manterId) || -1).changes;
+  // Derrubou telas de outros aparelhos: esquece tudo (barato) em vez de procurar quais foram.
+  if (n) vivasHaPouco.clear();
+  return n;
 }
 
 /**
@@ -88,7 +95,29 @@ function sessaoViva(db, sessaoId) {
  * Confere o token que veio na URL do player. `exigirSessaoViva` fica ligado nas chamadas
  * espaçadas (lista HLS, começo do vídeo) e desligado nos segmentos, que são muitos.
  */
-function conferirToken(db, token, { tipo = null, canalId = null, midiaId = null, exigirSessaoViva = true } = {}) {
+/**
+ * A tela ainda está viva? Versão para os pedaços do ao vivo, que são muitos por minuto.
+ *
+ * Pedaço era entregue sem olhar a sessão — só a lista conferia. Parecia bastar, mas o nome do
+ * pedaço é previsível (p000123.ts, p000124.ts...) e o token vale horas: quem fechasse a tela
+ * continuava buscando os pedaços direto, sem lista e sem ocupar vaga do plano. Era o jeito de
+ * assistir em mais telas do que o plano paga.
+ *
+ * Consultar o banco a cada pedaço custaria caro, então a resposta "está viva" vale por dez
+ * segundos. "Não está" nunca é guardado: reabrir a tela vale na hora.
+ */
+
+function sessaoVivaComMemoria(db, sessaoId) {
+  const id = Number(sessaoId);
+  const agoraMs = Date.now();
+  if ((vivasHaPouco.get(id) ?? 0) > agoraMs) return true;
+  if (!sessaoViva(db, id)) { vivasHaPouco.delete(id); return false; }
+  vivasHaPouco.set(id, agoraMs + VIVA_VALE_MS);
+  if (vivasHaPouco.size > 20_000) for (const [k, ate] of vivasHaPouco) if (ate <= agoraMs) vivasHaPouco.delete(k);
+  return true;
+}
+
+function conferirToken(db, token, { tipo = null, canalId = null, midiaId = null, exigirSessaoViva = true, sessaoComMemoria = false } = {}) {
   const d = lerToken(token);
   if (!d) throw new ErroNegocio('Link de reprodução expirado. Abra o conteúdo de novo.', 401);
   // Prévia do painel: a operação olha o canal sem abrir sessão nem gastar tela do plano. O
@@ -99,7 +128,9 @@ function conferirToken(db, token, { tipo = null, canalId = null, midiaId = null,
   if (canalId && Number(d.c) !== Number(canalId)) throw new ErroNegocio('Link de reprodução inválido para este canal.', 403);
   const liberadas = Array.isArray(d.m) ? d.m.map(Number) : [Number(d.m)];
   if (midiaId && !liberadas.includes(Number(midiaId))) throw new ErroNegocio('Link de reprodução inválido para este arquivo.', 403);
-  if (exigirSessaoViva && !sessaoViva(db, d.s)) throw new ErroNegocio('Esta tela foi encerrada. Abra o conteúdo de novo.', 409);
+  if (exigirSessaoViva && !(sessaoComMemoria ? sessaoVivaComMemoria(db, d.s) : sessaoViva(db, d.s))) {
+    throw new ErroNegocio('Esta tela foi encerrada. Abra o conteúdo de novo.', 409);
+  }
   return d;
 }
 
@@ -155,6 +186,9 @@ function ping(db, usuarioId, sessaoId, { segundos = null, posicao = null, duraca
 function fechar(db, usuarioId, sessaoId, motivo = 'fim') {
   const n = db.prepare("UPDATE sessoes_player SET encerrada_em = ?, motivo_fim = ? WHERE id = ? AND usuario_id = ? AND encerrada_em IS NULL")
     .run(agora(), String(motivo).slice(0, 40), Number(sessaoId), Number(usuarioId)).changes;
+  // Fechou a tela: a memória de "está viva" sai junto, senão os pedaços continuariam saindo
+  // por mais alguns segundos.
+  vivasHaPouco.delete(Number(sessaoId));
   return { encerrada: n > 0 };
 }
 

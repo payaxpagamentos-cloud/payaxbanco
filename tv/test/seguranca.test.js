@@ -182,3 +182,26 @@ test('SVG é servido em caixa de areia: aberto direto, não roda script nem enxe
   const png = await s.get(`/arte/${await s.enviarImagem(admin)}`);
   assert.doesNotMatch(png.headers.get('content-security-policy') ?? '', /sandbox/);
 });
+
+test('trocar o e-mail da conta pede a senha atual', async (t) => {
+  const s = await iniciar();
+  t.after(() => s.fechar());
+  const c = await s.assinante('dono@exemplo.com.br');
+
+  // O ataque: alguém com o aparelho logado troca o e-mail e o dono não entra mais.
+  const semSenha = await s.patch('/auth/me', { email: 'invasor@exemplo.com.br' }, c.token);
+  assert.equal(semSenha.status, 422);
+  const errada = await s.patch('/auth/me', { email: 'invasor@exemplo.com.br', senha_atual: 'chute12345' }, c.token);
+  assert.equal(errada.status, 422);
+  assert.equal(s.db.prepare('SELECT email FROM usuarios WHERE id = ?').get(c.usuario.id).email, 'dono@exemplo.com.br');
+
+  // Salvar nome e celular reenviando o MESMO e-mail (é o que a tela faz) não pede senha.
+  const mesmo = await s.patch('/auth/me', { nome: 'Novo Nome', email: 'Dono@Exemplo.com.br' }, c.token);
+  assert.equal(mesmo.status, 200, JSON.stringify(mesmo.dados));
+  assert.equal(mesmo.dados.usuario.nome, 'Novo Nome');
+
+  // Com a senha certa, troca.
+  const certa = await s.patch('/auth/me', { email: 'novo@exemplo.com.br', senha_atual: 'senha12345' }, c.token);
+  assert.equal(certa.status, 200);
+  assert.equal(certa.dados.usuario.email, 'novo@exemplo.com.br');
+});

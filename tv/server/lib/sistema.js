@@ -25,6 +25,11 @@ const pasta = () => process.env.TV_ATUALIZACAO || '/atualizacao';
 const pedidoEm = () => path.join(pasta(), 'pedido.json');
 const estadoEm = () => path.join(pasta(), 'estado.json');
 const registroEm = () => path.join(pasta(), 'registro.log');
+// Posta pelo agente do servidor quando há senha de atualização cadastrada. Serve só para o
+// painel saber que deve pedir a senha; quem decide se o pacote entra é o agente, do lado de
+// fora, contra um resumo que este contêiner não enxerga.
+const bandeiraEm = () => path.join(pasta(), 'exige-senha');
+const exigeSenha = () => fs.existsSync(bandeiraEm());
 
 const GZIP = Buffer.from([0x1f, 0x8b]);
 const ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04]);   // "PK\x03\x04"
@@ -160,7 +165,7 @@ function conferirPacote(conteudo) {
  * Confere a assinatura do gzip antes: arquivo trocado por engano para aqui, e a plataforma
  * ficaria fora do ar na próxima reconstrução.
  */
-function guardarPacote(conteudo, { por }) {
+function guardarPacote(conteudo, { por, senha = null }) {
   if (!Buffer.isBuffer(conteudo) || conteudo.length < 1024) {
     throw new Error('O arquivo chegou vazio ou pequeno demais para ser um pacote.');
   }
@@ -194,7 +199,12 @@ function guardarPacote(conteudo, { por }) {
     arquivos,
     sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
   };
-  fs.writeFileSync(pedidoEm(), JSON.stringify(pedido, null, 2));
+  // A senha de atualização viaja no pedido só até o agente conferi-la (ele a apaga em seguida).
+  // Não é conferida aqui de propósito: se o app soubesse conferir, quem invadisse o app
+  // saberia também. O arquivo nasce fechado (600) e a senha nunca volta para o painel nem
+  // entra na auditoria — por isso o que se devolve é `pedido`, sem ela.
+  try { fs.unlinkSync(pedidoEm()); } catch { /* não existia */ }
+  fs.writeFileSync(pedidoEm(), JSON.stringify(senha ? { ...pedido, senha: String(senha) } : pedido, null, 2), { mode: 0o600 });
   return pedido;
 }
 
@@ -207,10 +217,11 @@ function estado() {
   return {
     versao: versao(),
     agente: agenteDisponivel(),
+    exige_senha: exigeSenha(),
     na_fila: pedido ? { pedido_em: pedido.pedido_em, por: pedido.por, bytes: pedido.bytes } : null,
     ultima: ultimo,
     registro,
   };
 }
 
-module.exports = { versao, estado, guardarPacote, conferirPacote, formatoDe, agenteDisponivel, pasta };
+module.exports = { versao, estado, exigeSenha, guardarPacote, conferirPacote, formatoDe, agenteDisponivel, pasta };

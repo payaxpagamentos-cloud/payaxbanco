@@ -8,6 +8,15 @@
 #
 #   sudo bash scripts/atualizador.sh            # aplica se houver pedido
 #   sudo bash scripts/atualizador.sh --instalar # instala no cron (o instalador já faz isso)
+#   sudo bash scripts/atualizador.sh --senha    # cria ou troca a senha de atualização
+#   sudo bash scripts/atualizador.sh --sem-senha # volta a aceitar pacote sem senha
+#
+# SENHA DE ATUALIZAÇÃO. Este script roda como root e executa o que vier no pacote: quem consegue
+# pôr um pacote na pasta compartilhada manda no servidor. Sem a senha, isso é qualquer pessoa
+# com a senha do painel — ou qualquer falha que deixe gravar arquivo de dentro do app. Com ela,
+# o pacote só é aplicado se vier acompanhado de uma senha que o APP NÃO CONHECE: o resumo dela
+# fica em /etc/playtechvip, fora do contêiner e fora da pasta compartilhada. O painel só repassa
+# o que a pessoa digitou na hora; quem confere é este script.
 #
 # Pasta compartilhada (montada no contêiner como /atualizacao):
 #   pacote.tar.gz   enviado pelo painel
@@ -26,7 +35,51 @@ ESTADO="$PASTA/estado.json"
 REGISTRO="$PASTA/registro.log"
 TRAVA="$PASTA/.trava"
 
+# Resumo (PBKDF2) da senha de atualização. Só root lê; o contêiner não enxerga este caminho.
+CHAVE=${TV_ATUALIZACAO_CHAVE:-/etc/playtechvip/atualizacao.chave}
+# Só avisa o painel de que deve pedir a senha. Não decide nada: apagar este arquivo de dentro
+# do app não libera coisa alguma, porque quem manda é a existência de $CHAVE.
+BANDEIRA="$PASTA/exige-senha"
+
 mkdir -p "$PASTA"
+
+if [ "${1:-}" = "--senha" ]; then
+  # A senha é lida do terminal, sem eco, e nunca passa por argumento (apareceria no `ps` e no
+  # histórico). TV_NOVA_SENHA existe só para a instalação automática e para os testes.
+  if [ -n "${TV_NOVA_SENHA:-}" ]; then
+    senha1="$TV_NOVA_SENHA"; senha2="$TV_NOVA_SENHA"
+  else
+    read -r -s -p "Senha de atualização (mínimo 10 caracteres): " senha1; echo
+    read -r -s -p "Repita a senha: " senha2; echo
+  fi
+  if [ "$senha1" != "$senha2" ]; then echo "As duas senhas não são iguais. Nada foi alterado." >&2; exit 1; fi
+  if [ "${#senha1}" -lt 10 ]; then echo "A senha precisa de pelo menos 10 caracteres. Nada foi alterado." >&2; exit 1; fi
+  mkdir -p "$(dirname "$CHAVE")"
+  chmod 700 "$(dirname "$CHAVE")"
+  # Grava ao lado e renomeia: uma queda no meio não deixa a chave pela metade (o que travaria
+  # toda atualização pelo painel até alguém entrar por SSH).
+  if ! SENHA="$senha1" python3 - "$CHAVE.novo" <<'PYEOF'
+import hashlib, os, sys
+sal = os.urandom(16)
+voltas = 600000
+resumo = hashlib.pbkdf2_hmac('sha256', os.environ['SENHA'].encode('utf-8'), sal, voltas)
+fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, 'w') as f:
+    f.write('pbkdf2$%d$%s$%s\n' % (voltas, sal.hex(), resumo.hex()))
+PYEOF
+  then echo "Não foi possível gravar a senha." >&2; rm -f "$CHAVE.novo"; exit 1; fi
+  mv -f "$CHAVE.novo" "$CHAVE"
+  chmod 600 "$CHAVE"
+  : > "$BANDEIRA"; chown 1000:1000 "$BANDEIRA" 2>/dev/null || true
+  echo "Senha de atualização gravada. O painel passa a pedi-la a cada envio de pacote."
+  exit 0
+fi
+
+if [ "${1:-}" = "--sem-senha" ]; then
+  rm -f "$CHAVE" "$BANDEIRA"
+  echo "Senha de atualização removida: o painel volta a aplicar pacote só com o login do administrador."
+  exit 0
+fi
 
 if [ "${1:-}" = "--instalar" ]; then
   linha="* * * * * root DESTINO=$DESTINO bash $DESTINO/scripts/atualizador.sh >> $PASTA/cron.log 2>&1"
@@ -36,6 +89,14 @@ if [ "${1:-}" = "--instalar" ]; then
   chown -R 1000:1000 "$PASTA"
   echo "Agente de atualização instalado (verifica a cada minuto)."
   exit 0
+fi
+
+# Mantém a bandeira igual à realidade a cada passada (ela mora na pasta que o app escreve, então
+# pode ter sido apagada; a chave, não).
+if [ -s "$CHAVE" ]; then
+  [ -f "$BANDEIRA" ] || { : > "$BANDEIRA"; chown 1000:1000 "$BANDEIRA" 2>/dev/null || true; }
+else
+  rm -f "$BANDEIRA"
 fi
 
 [ -f "$PEDIDO" ] || exit 0
@@ -60,6 +121,38 @@ FIM
 
 : > "$REGISTRO"
 registrar "[$(date -Is)] atualização pedida, começando"
+
+# Senha de atualização: conferida ANTES de qualquer coisa do pacote ser lida ou extraída.
+if [ -s "$CHAVE" ]; then
+  if python3 - "$CHAVE" "$PEDIDO" <<'PYEOF'
+import hashlib, hmac, json, sys
+try:
+    alg, voltas, sal, esperado = open(sys.argv[1]).read().strip().split('$')
+    senha = json.load(open(sys.argv[2])).get('senha') or ''
+    feito = hashlib.pbkdf2_hmac('sha256', str(senha).encode('utf-8'), bytes.fromhex(sal), int(voltas)).hex()
+    ok = alg == 'pbkdf2' and bool(senha) and hmac.compare_digest(feito, esperado)
+except Exception:
+    ok = False
+sys.exit(0 if ok else 1)
+PYEOF
+  then
+    registrar "senha de atualização conferida"
+  else
+    # Uma tentativa por minuto é o teto natural (o cron): não há como testar senhas em massa.
+    registrar "senha de atualização ausente ou incorreta — pacote descartado sem ser aberto"
+    gravar_estado erro "Senha de atualização incorreta. O pacote não foi aplicado."
+    rm -f "$PEDIDO" "$PACOTE_TGZ" "$PACOTE_ZIP"
+    exit 1
+  fi
+fi
+# A senha não fica em disco depois de conferida: o pedido segue sem ela.
+python3 - "$PEDIDO" <<'PYEOF' 2>/dev/null || true
+import json, sys
+d = json.load(open(sys.argv[1]))
+if 'senha' in d:
+    d.pop('senha')
+    json.dump(d, open(sys.argv[1], 'w'), indent=2)
+PYEOF
 
 # O painel manda .tar.gz ou .zip — o que a pessoa tiver em mãos.
 if [ -s "$PACOTE_TGZ" ]; then

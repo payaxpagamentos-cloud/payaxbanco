@@ -64,8 +64,19 @@ module.exports = (db, autenticado) => {
     }
     if (d.email !== undefined) {
       const email = v.email(d.email);
-      if (db.prepare('SELECT 1 FROM usuarios WHERE email = ? AND id <> ?').get(email, req.usuario.id)) throw new ErroNegocio('Já existe uma conta com este e-mail.', 409);
-      db.prepare('UPDATE usuarios SET email = ? WHERE id = ?').run(email, req.usuario.id);
+      // O e-mail é o que identifica a conta no login. Trocá-lo só com a sessão aberta deixava
+      // quem pegasse um aparelho logado (ou um token) tomar a conta para si: muda o e-mail e o
+      // dono não entra mais. Então a troca — e só ela; a tela reenvia o mesmo e-mail a cada
+      // "salvar" — pede a senha atual, como a troca de senha já pedia.
+      if (email !== String(req.usuario.email).toLowerCase()) {
+        const u = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(req.usuario.id);
+        if (!verificarSenha(String(d.senha_atual ?? ''), u.senha_hash)) {
+          throw new ErroNegocio('Para trocar o e-mail, informe a sua senha atual.', 422, { senha_atual: true });
+        }
+        if (db.prepare('SELECT 1 FROM usuarios WHERE email = ? AND id <> ?').get(email, req.usuario.id)) throw new ErroNegocio('Já existe uma conta com este e-mail.', 409);
+        db.prepare('UPDATE usuarios SET email = ? WHERE id = ?').run(email, req.usuario.id);
+        registrar(db, req, 'email_trocado');
+      }
     }
     res.json({ usuario: publico(db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.usuario.id)) });
   });
