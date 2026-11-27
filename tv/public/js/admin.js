@@ -349,18 +349,23 @@ async function telaCanais(c) {
         ? el('span', { class: 'etiqueta aviso' }, 'aguardando sinal')
         : x.fonte === 'embed' ? el('span', { class: 'etiqueta info', title: 'Abre o player oficial da emissora' }, 'player da emissora')
           : x.fonte === 'rtmp'
-            ? x.ao_vivo?.no_ar
-              ? el('span', { class: 'etiqueta ok', title: 'O sinal RTMP/SRT está sendo convertido para HLS, sem recodificar' }, 'convertendo')
-              : el('span', { class: 'etiqueta aviso', title: x.ao_vivo?.erro ?? 'A conversão está começando.' },
-                x.ao_vivo?.convertendo ? 'conectando' : 'conversão parada')
+            // Canal desligado nunca teve conversão: dizer "parada" faria parecer que quebrou,
+            // e com cem canais assim o painel inteiro pareceria em pane sem nada estar errado.
+            ? !x.ativo
+              ? el('span', { class: 'etiqueta', title: 'Ligue o canal para ele entrar no ar' }, 'não ligado')
+              : x.ao_vivo?.no_ar
+                ? el('span', { class: 'etiqueta ok', title: 'O sinal RTMP/SRT está sendo convertido para HLS, sem recodificar' }, 'convertendo')
+                : x.ao_vivo?.erro
+                  ? el('span', { class: 'etiqueta aviso', title: x.ao_vivo.erro }, 'origem não responde')
+                  : el('span', { class: 'etiqueta info', title: 'A conversão sobe quando alguém abrir o canal' }, 'sob demanda')
             : x.relay ? el('span', { class: 'etiqueta info' }, 'nossa transmissão') : el('span', { class: 'etiqueta' }, 'direto'),
       x.sinal_status === 'falha' ? el('span', { class: 'etiqueta erro', title: x.sinal_detalhe ?? '' }, 'sinal com falha')
         : x.sinal_status === 'ok' ? el('span', { class: 'etiqueta ok' }, 'sinal ok') : null),
     el('div', { class: 'mini apagado', style: 'margin-top:3px' },
-      x.fonte === 'rtmp' && x.ao_vivo?.tentativas
+      x.fonte === 'rtmp' && x.ativo && x.ao_vivo?.tentativas
         ? `reconectando (${x.ao_vivo.tentativas} tentativa${x.ao_vivo.tentativas > 1 ? 's' : ''})`
         : x.fonte === 'rtmp' && x.ao_vivo?.no_ar ? `no ar desde ${dataHora(x.ao_vivo.desde)}`
-          : x.sinal_em ? `conferido ${dataHora(x.sinal_em)}` : 'sinal ainda não conferido'))),
+          : x.sinal_em ? `sinal conferido ${dataHora(x.sinal_em)}` : 'sinal ainda não conferido'))),
     td(el('div', {}, el('strong', { class: 'pequeno' }, x.agora?.titulo ?? '—'),
       el('div', { class: 'mini apagado' }, `${x.programas_futuros} programa(s) na grade`),
       x.observacao ? el('div', { class: 'mini apagado duas-linhas', style: 'margin-top:4px;max-width:420px' }, x.observacao) : null)),
