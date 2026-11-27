@@ -78,7 +78,10 @@ TEMP="$(mktemp -d)"
 # Arquivo de configuração do site. Se já existir, mantém tudo e só acerta o domínio.
 if [ -f "$CONFIG" ]; then
   cp "$CONFIG" "$TEMP/lktech.env"
-  sed -i "s#^PUBLIC_ORIGIN=.*#PUBLIC_ORIGIN=https://$DOMINIO#" "$TEMP/lktech.env"
+  for par in "PUBLIC_ORIGIN=https://$DOMINIO" "HOST=127.0.0.1" "TRUST_PROXY=true" "NODE_ENV=production"; do
+    chave="${par%%=*}"
+    if grep -q "^$chave=" "$TEMP/lktech.env"; then sed -i "s#^$chave=.*#$par#" "$TEMP/lktech.env"; else echo "$par" >> "$TEMP/lktech.env"; fi
+  done
 else
   cat > "$TEMP/lktech.env" <<EOF
 NODE_ENV=production
@@ -119,6 +122,15 @@ RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 LockPersonality=true
 CapabilityBoundingSet=
+UMask=0077
+ProtectClock=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+MemoryMax=1G
 
 [Install]
 WantedBy=multi-user.target
@@ -138,9 +150,16 @@ ExecStart=/usr/bin/node scripts/backup.mjs
 ExecStartPost=/usr/bin/find $BACKUPS -mindepth 1 -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=$DADOS $BACKUPS
+UMask=0077
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+CapabilityBoundingSet=
 EOF
 
 cat > "$TEMP/lktech-backup.timer" <<EOF
@@ -200,7 +219,7 @@ saude() {
 
 # Se qualquer passo daqui em diante falhar, volta a versão e a configuração anteriores.
 voltar() {
-  trap - ERR
+  trap - ERR INT HUP TERM
   set +e
   printf '\n\033[1;31mAlgo deu errado. Voltando para a versão anterior...\033[0m\n' >&2
   journalctl -u lktech -n 30 --no-pager 2>/dev/null
@@ -225,7 +244,7 @@ passo "Trocando para a versão nova"
 rm -rf "$APP.anterior"
 if [ -d "$APP" ]; then mv "$APP" "$APP.anterior"; fi
 mv "$APP.novo" "$APP"
-trap voltar ERR
+trap voltar ERR INT HUP TERM
 
 install -o root -g lktech -m 640 "$TEMP/lktech.env" "$CONFIG"
 install -m 644 "$TEMP/lktech.service" /etc/systemd/system/lktech.service
@@ -247,20 +266,22 @@ chmod 755 /usr/local/bin/lktech-admin
 passo "Firewall: só SSH, HTTP e HTTPS"
 SSH_PORTA="$(sshd -T 2>/dev/null | awk '$1=="port"{print $2; exit}' || true)"
 SSH_PORTA="${SSH_PORTA:-22}"
-ufw allow "$SSH_PORTA/tcp"
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw --force enable
-echo "SSH liberado na porta $SSH_PORTA."
-# Servidores na nuvem da Oracle (usada pelo VPS da HostGator) vêm com regras próprias de iptables
-# que bloqueiam tudo além do SSH. Libera as portas do site nelas também e grava para valer após reiniciar.
 if command -v netfilter-persistent >/dev/null; then
-  for porta in 80 443; do
+  # Servidores na nuvem da Oracle (usada pelo VPS da HostGator) já vêm com um firewall próprio em
+  # iptables que bloqueia tudo além do SSH. Nele o ufw não tem efeito, então liberamos as portas
+  # direto no iptables e gravamos para valer depois de reiniciar. O ufw não é ligado aqui.
+  for porta in "$SSH_PORTA" 80 443; do
     iptables -C INPUT -p tcp --dport "$porta" -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport "$porta" -j ACCEPT
     ip6tables -C INPUT -p tcp --dport "$porta" -j ACCEPT 2>/dev/null || ip6tables -I INPUT 1 -p tcp --dport "$porta" -j ACCEPT 2>/dev/null || true
   done
   netfilter-persistent save >/dev/null 2>&1 || true
-  echo "Portas 80 e 443 liberadas também nas regras de rede do provedor."
+  echo "Portas $SSH_PORTA (SSH), 80 e 443 liberadas no firewall do servidor."
+else
+  ufw allow "$SSH_PORTA/tcp"
+  ufw allow 80/tcp
+  ufw allow 443/tcp
+  ufw --force enable
+  echo "Firewall ligado. SSH liberado na porta $SSH_PORTA."
 fi
 
 passo "Ligando tudo"
@@ -270,7 +291,7 @@ systemctl restart lktech.service
 systemctl start lktech-backup.timer
 systemctl reload caddy 2>/dev/null || systemctl restart caddy
 if ! saude; then voltar; fi
-trap - ERR
+trap - ERR INT HUP TERM
 rm -rf "$TEMP"
 echo "Site respondendo em 127.0.0.1:3000."
 

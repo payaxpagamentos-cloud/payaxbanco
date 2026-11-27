@@ -23,5 +23,6 @@ export function sessionFor(store, req) {
   const cookie = (req.headers.cookie || '').split(';').map(v => v.trim()).find(v => v.startsWith('lk_session='));
   const token = cookie?.slice('lk_session='.length);
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
-  return store.db.prepare('SELECT sessions.*,admins.email FROM sessions JOIN admins ON admins.id=sessions.admin_id WHERE token_hash=? AND expires_at>?').get(hashToken(token), Date.now()) || null;
+  const row = store.db.prepare('SELECT sessions.*,admins.email FROM sessions JOIN admins ON admins.id=sessions.admin_id WHERE token_hash=? AND expires_at>?').get(hashToken(token), Date.now());
+  return row ? { ...row, token } : null;
 }

@@ -21,11 +21,13 @@ async function rawBody(req, max) {
 async function body(req) {
   if (!req.headers['content-type']?.startsWith('application/json')) throw new HttpError(415, 'Envie conteúdo JSON.');
   const bytes = await rawBody(req, 256 * 1024);
-  try { return JSON.parse(bytes.toString('utf8')); } catch { throw new HttpError(400, 'Conteúdo JSON inválido.'); }
+  let valor; try { valor = JSON.parse(bytes.toString('utf8')); } catch { throw new HttpError(400, 'Conteúdo JSON inválido.'); }
+  if (!valor || typeof valor !== 'object' || Array.isArray(valor)) throw new HttpError(400, 'Conteúdo JSON inválido.');
+  return valor;
 }
 function imageKind(bytes) {
   if (bytes.length > 24 && bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) && bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(16) <= 10000 && bytes.readUInt32BE(20) > 0 && bytes.readUInt32BE(20) <= 10000) return '.png';
-  if (bytes.length > 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 && bytes.at(-2) === 255 && bytes.at(-1) === 217) return '.jpg';
+  if (bytes.length > 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 && bytes.lastIndexOf(Buffer.from([255, 217])) > 2) return '.jpg';
   if (bytes.length > 16 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') return '.webp';
   throw new HttpError(400, 'Envie uma imagem PNG, JPG ou WebP válida (até 8 MB).');
 }
@@ -36,7 +38,7 @@ export function createApp(options = {}) {
   const origin = options.origin ?? process.env.PUBLIC_ORIGIN ?? '';
   if (production && !/^https:\/\/[^/]+$/.test(origin)) throw new Error('Configure PUBLIC_ORIGIN com o domínio HTTPS, sem barra final.');
   const hours = Math.min(24, Math.max(1, Number(process.env.SESSION_HOURS) || 8));
-  const cookie = (value, age = hours * 3600) => `lk_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${production ? '; Secure' : ''}`;
+  const cookie = (value, age = hours * 3600) => `lk_session=${value}; Path=/api/admin; HttpOnly; SameSite=Strict; Max-Age=${age}${production ? '; Secure' : ''}`;
   const dummyHash = hashPassword('unused-password-for-constant-cost');
   // IP do visitante. Atrás do Caddy vale o último item do X-Forwarded-For (o que o próprio proxy anotou).
   // Endereços IPv6 são agrupados pela rede /64, para ninguém escapar dos limites trocando de endereço.
@@ -54,7 +56,12 @@ export function createApp(options = {}) {
     conferindo++;
     try { return await verifyPassword(senha, hash); } finally { conferindo--; fila.shift()?.(); }
   };
-  const publicado = () => { const v = store.read('published'); v.config = ajustarAosLimites(v.config); return v; };
+  let cachePublicado = null;
+  const publicado = () => {
+    const v = store.read('published'), chave = `${v.revision}|${v.updatedAt}`;
+    if (cachePublicado?.chave !== chave) cachePublicado = { chave, config: ajustarAosLimites(v.config) };
+    return { ...v, config: structuredClone(cachePublicado.config) };
+  };
   const rascunho = () => { const v = store.read('draft'); v.config = ajustarAosLimites(v.config); return v; };
   function checkOrigin(req) {
     const source = req.headers.origin;
@@ -64,9 +71,10 @@ export function createApp(options = {}) {
   const server = http.createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'");
+    res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'; object-src 'none'");
     if (production) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
     try {
       const url = new URL(req.url, 'http://local');
@@ -107,6 +115,7 @@ export function createApp(options = {}) {
         }
         if (path === '/api/leads' && method === 'POST') {
           if (!store.limit(`leads:${ip(req)}`, 8, 3600)) throw new HttpError(429, 'Recebemos seus pedidos. Aguarde para enviar novamente.');
+          if (!store.limit('leads:todos', 300, 3600)) throw new HttpError(429, 'Muitos pedidos neste momento. Tente novamente mais tarde ou fale pelo WhatsApp.');
           const input = await body(req);
           if (input.website) return json(res, 201, { ok: true });
           const lead = validateLead(input);
@@ -114,21 +123,30 @@ export function createApp(options = {}) {
           return json(res, 201, { ok: true, message: 'Recebemos seu pedido. Nossa equipe vai entrar em contato.' });
         }
         if (path === '/api/admin/login' && method === 'POST') {
-          if (!store.limit(`login:${ip(req)}`, 10, 900)) throw new HttpError(429, 'Muitas tentativas. Aguarde 15 minutos.');
+          const chaveIp = `login:${ip(req)}`;
+          if (store.tentativas(chaveIp) >= 10) throw new HttpError(429, 'Muitas tentativas. Aguarde 15 minutos.');
           const input = await body(req);
           const email = String(input.email || '').trim().toLowerCase();
           const password = String(input.password || '');
           if (email.length > 160 || password.length > 512) throw new HttpError(400, 'Confira seus dados.');
-          if (!store.limit(`login-email:${email}`, 10, 900)) throw new HttpError(429, 'Muitas tentativas. Aguarde 15 minutos.');
+          // Erros seguidos no mesmo e-mail (de vários endereços) deixam cada tentativa mais lenta,
+          // sem trancar o dono da conta do lado de fora.
+          const chaveEmail = `login-email:${email}`, errosEmail = store.tentativas(chaveEmail);
+          if (errosEmail >= 10) await new Promise(ok => setTimeout(ok, Math.min(5000, (errosEmail - 9) * 500)));
           const admin = store.db.prepare('SELECT * FROM admins WHERE email=?').get(email);
           const valid = await conferirSenha(password, admin?.password_hash || await dummyHash);
-          if (!admin || !valid) throw new HttpError(401, 'E-mail ou senha inválidos.');
+          if (!admin || !valid) { store.registrarFalha(chaveIp, 900); store.registrarFalha(chaveEmail, 900); throw new HttpError(401, 'E-mail ou senha inválidos.'); }
+          store.zerar(chaveIp); store.zerar(chaveEmail);
           const session = createSession(store, admin.id, hours);
           return json(res, 200, { email, csrf: session.csrf }, { 'Set-Cookie': cookie(session.token) });
         }
         if (path.startsWith('/api/admin/')) {
           const session = sessionFor(store, req);
           if (!session) throw new HttpError(401, 'Entre no painel para continuar.');
+          if (session.expires_at - Date.now() < hours * 1800000 && path !== '/api/admin/logout') {
+            store.db.prepare('UPDATE sessions SET expires_at=? WHERE token_hash=?').run(Date.now() + hours * 3600000, session.token_hash);
+            res.setHeader('Set-Cookie', cookie(session.token));
+          }
           if (!['GET','HEAD'].includes(method) && req.headers['x-csrf-token'] !== session.csrf) throw new HttpError(403, 'Recarregue o painel para continuar.');
           if (path === '/api/admin/me' && method === 'GET') return json(res, 200, { email: session.email, csrf: session.csrf });
           if (path === '/api/admin/logout' && method === 'POST') { store.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.token_hash); return json(res, 200, { ok: true }, { 'Set-Cookie': cookie('', 0) }); }
@@ -159,6 +177,7 @@ export function createApp(options = {}) {
             const lista = await Promise.all(nomes.map(async n => ({ url: `/uploads/${n}`, quando: (await stat(resolve(pasta, n))).mtimeMs })));
             return json(res, 200, lista.sort((a, b) => b.quando - a.quando).map(({ url }) => ({ url })));
           }
+          if (path === '/api/admin/leads/resumo' && method === 'GET') return json(res, 200, store.db.prepare("SELECT COUNT(*) total, SUM(status='novo') novos FROM leads").get());
           if (path === '/api/admin/leads' && method === 'GET') return json(res, 200, store.db.prepare('SELECT * FROM leads ORDER BY id DESC LIMIT 1000').all());
           if (/^\/api\/admin\/leads\/\d+$/.test(path) && method === 'PATCH') {
             const input = await body(req);
@@ -175,12 +194,17 @@ export function createApp(options = {}) {
           if (path === '/api/admin/leads.csv' && method === 'GET') {
             const quote = v => { let s = String(v ?? ''); if (/^[=+@\-\t\r]/.test(s)) s = "'" + s; return '"' + s.replaceAll('"','""') + '"'; };
             const rows = store.db.prepare('SELECT name,phone,cep,plan,status,created_at FROM leads ORDER BY id DESC').all();
-            const csv = '\ufeffNome;Telefone;CEP;Plano;Situação;Data\r\n' + rows.map(r => Object.values(r).map(quote).join(';')).join('\r\n');
+            const situacao = { novo: 'Novo', em_atendimento: 'Em atendimento', concluido: 'Concluído' };
+            const data = v => new Date(v).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+            const csv = '\ufeffNome;Telefone;CEP;Plano;Situação;Data\r\n' + rows.map(r => [r.name, r.phone, r.cep, r.plan, situacao[r.status] || r.status, data(r.created_at)].map(quote).join(';')).join('\r\n');
             res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="lk-tech-contatos.csv"', 'Cache-Control': 'no-store' }); return res.end(csv);
           }
           if (path === '/api/admin/password' && method === 'POST') {
             const input = await body(req), admin = store.db.prepare('SELECT * FROM admins WHERE id=?').get(session.admin_id);
-            if (typeof input.current !== 'string' || input.current.length > 512 || !(await verifyPassword(input.current, admin.password_hash))) throw new HttpError(400, 'Senha atual incorreta.');
+            const chaveSenha = `senha:${session.admin_id}`;
+            if (store.tentativas(chaveSenha) >= 5) throw new HttpError(429, 'Muitas tentativas. Aguarde 15 minutos.');
+            if (typeof input.current !== 'string' || input.current.length > 512 || !(await conferirSenha(input.current, admin.password_hash))) { store.registrarFalha(chaveSenha, 900); throw new HttpError(400, 'Senha atual incorreta.'); }
+            store.zerar(chaveSenha);
             if (typeof input.password !== 'string' || input.password.length < 12 || input.password.length > 512) throw new HttpError(400, 'Use uma senha entre 12 e 512 caracteres.');
             const hash = await hashPassword(input.password);
             store.transaction(() => { store.db.prepare('UPDATE admins SET password_hash=? WHERE id=?').run(hash, session.admin_id); store.db.prepare('DELETE FROM sessions WHERE admin_id=?').run(session.admin_id); });
@@ -206,16 +230,16 @@ export function createApp(options = {}) {
       let bytes = await readFile(file);
       if (file === resolve(PUBLIC, 'index.html')) {
         const config = publicado().config;
-        let html = bytes.toString('utf8').replace(/<title>[^<]*<\/title>/, `<title>${htmlEscape(config.seo.title)}</title>`).replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${htmlEscape(config.seo.description)}">`);
+        let html = bytes.toString('utf8').replace(/<title>[^<]*<\/title>/, () => `<title>${htmlEscape(config.seo.title)}</title>`).replace(/<meta name="description" content="[^"]*">/, () => `<meta name="description" content="${htmlEscape(config.seo.description)}">`);
         const primeiro = config.banners.find(v => v.active), image = primeiro?.image;
         // Pré-carrega só a foto que a tela vai usar (computador ou celular).
         const preload = !primeiro ? '' : primeiro.mobileImage
           ? `<link rel="preload" as="image" href="${htmlEscape(primeiro.image)}" media="(min-width: 601px)"><link rel="preload" as="image" href="${htmlEscape(primeiro.mobileImage)}" media="(max-width: 600px)">`
           : `<link rel="preload" as="image" href="${htmlEscape(primeiro.image)}">`;
-        html = html.replace('<link rel="preload" as="image" href="/assets/hero-casal.jpg">', preload);
+        html = html.replace('<link rel="preload" as="image" href="/assets/hero-casal.jpg">', () => preload);
         if (origin) {
           const imagem = image ? (image.startsWith('/') ? origin + image : image) : `${origin}/assets/hero-casal.jpg`;
-          html = html.replace('</head>', `  <link rel="canonical" href="${origin}/">\n  <meta property="og:type" content="website"><meta property="og:url" content="${origin}/"><meta property="og:site_name" content="LK TECH"><meta property="og:locale" content="pt_BR">\n  <meta property="og:title" content="${htmlEscape(config.seo.title)}"><meta property="og:description" content="${htmlEscape(config.seo.description)}"><meta property="og:image" content="${htmlEscape(imagem)}">\n</head>`);
+          html = html.replace('</head>', () => `  <link rel="canonical" href="${origin}/">\n  <meta property="og:type" content="website"><meta property="og:url" content="${origin}/"><meta property="og:site_name" content="LK TECH"><meta property="og:locale" content="pt_BR">\n  <meta property="og:title" content="${htmlEscape(config.seo.title)}"><meta property="og:description" content="${htmlEscape(config.seo.description)}"><meta property="og:image" content="${htmlEscape(imagem)}">\n</head>`);
         }
         bytes = Buffer.from(html);
       }
@@ -223,7 +247,7 @@ export function createApp(options = {}) {
       res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Content-Length': bytes.length, 'Cache-Control': cache, ...(conferirSempre ? { ETag: etag } : {}) });
       res.end(method === 'HEAD' ? undefined : bytes);
     } catch (e) {
-      if (!res.headersSent && e.status === 404 && !req.url.startsWith('/api/') && ['GET', 'HEAD'].includes(req.method)) {
+      if (!res.headersSent && (e.status === 404 || e instanceof URIError) && !req.url.startsWith('/api/') && ['GET', 'HEAD'].includes(req.method)) {
         const pagina = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Página não encontrada | LK TECH</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/site.css"></head><body><main class="load-error"><img src="/assets/logo.svg" alt="LK TECH" width="190" height="65"><h1>Página não encontrada.</h1><p>O endereço que você abriu não existe ou mudou.</p><a class="primary" href="/">Ir para o início</a></main></body></html>';
         res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end(req.method === 'HEAD' ? undefined : pagina);
       }
@@ -239,7 +263,7 @@ export function createApp(options = {}) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argument = (name, fallback) => { const index = process.argv.indexOf(name); return index >= 0 ? process.argv[index + 1] : fallback; };
   const app = createApp(), port = Number(argument('--port', process.env.PORT || 3000));
-  app.server.listen(port, argument('--host', process.env.HOST || '0.0.0.0'), () => console.log(`LK TECH pronta em http://localhost:${port} | Painel: /admin`));
+  app.server.listen(port, argument('--host', process.env.HOST || '127.0.0.1'), () => console.log(`LK TECH pronta em http://localhost:${port} | Painel: /admin`));
   const close = () => app.server.close(() => { app.store.db.close(); process.exit(0); });
   process.once('SIGTERM', close); process.once('SIGINT', close);
 }

@@ -21,7 +21,7 @@ function texto(value, caminho, name, required = false) {
 }
 function posicao(v) { const m = /^(\d{1,3})% (\d{1,3})%$/.exec(v || ''); return m && +m[1] <= 100 && +m[2] <= 100 ? v : '65% 50%'; }
 function bool(v) { return v === true; }
-function list(v, name, limit = 40) { if (!Array.isArray(v)) fail(`Lista inválida: ${name}.`); if (v.length > limit) fail(`Use no máximo ${limit} ${name}, para manter o site organizado.`); return v; }
+function list(v, name, limit = 40, objetos = false) { if (!Array.isArray(v)) fail(`Lista inválida: ${name}.`); if (objetos && v.some(i => !i || typeof i !== 'object' || Array.isArray(i))) fail(`Lista inválida: ${name}.`); if (v.length > limit) fail(`Use no máximo ${limit} ${name}, para manter o site organizado.`); return v; }
 export function safeUrl(value, image = false) {
   const text = string(value, 'link', 1600);
   if (!text) return '';
@@ -36,14 +36,14 @@ export function validateConfig(c) {
   const id = v => { if (typeof v !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(v)) fail('Identificador inválido.'); return v; };
   const unique = values => { if (new Set(values.map(v => v.id)).size !== values.length) fail('Existem itens com identificadores repetidos.'); return values; };
   const interval = v => Number.isInteger(v) && v >= 4000 && v <= 20000 ? v : 6500;
-  const banners = unique(list(c.banners, 'banners', QUANTIDADE.banners).map(v => ({ id: id(v.id), active: bool(v.active), eyebrow: texto(v.eyebrow, 'banners.eyebrow', 'etiqueta do banner'), title: texto(v.title, 'banners.title', 'título do banner', true), highlight: texto(v.highlight, 'banners.highlight', 'trecho em laranja'), subtitle: texto(v.subtitle, 'banners.subtitle', 'descrição do banner'), image: safeUrl(v.image, true), mobileImage: safeUrl(v.mobileImage || '', true), imagePosition: posicao(v.imagePosition), primaryLabel: texto(v.primaryLabel, 'banners.primaryLabel', 'botão principal'), primaryUrl: safeUrl(v.primaryUrl), secondaryLabel: texto(v.secondaryLabel, 'banners.secondaryLabel', 'botão secundário'), secondaryUrl: safeUrl(v.secondaryUrl) })));
-  const plans = unique(list(c.plans, 'planos', QUANTIDADE.plans).map(v => {
+  const banners = unique(list(c.banners, 'banners', QUANTIDADE.banners, true).map(v => ({ id: id(v.id), active: bool(v.active), eyebrow: texto(v.eyebrow, 'banners.eyebrow', 'etiqueta do banner'), title: texto(v.title, 'banners.title', 'título do banner', true), highlight: texto(v.highlight, 'banners.highlight', 'trecho em laranja'), subtitle: texto(v.subtitle, 'banners.subtitle', 'descrição do banner'), image: safeUrl(v.image, true), mobileImage: safeUrl(v.mobileImage || '', true), imagePosition: posicao(v.imagePosition), primaryLabel: texto(v.primaryLabel, 'banners.primaryLabel', 'botão principal'), primaryUrl: safeUrl(v.primaryUrl), secondaryLabel: texto(v.secondaryLabel, 'banners.secondaryLabel', 'botão secundário'), secondaryUrl: safeUrl(v.secondaryUrl) })));
+  const plans = unique(list(c.plans, 'planos', QUANTIDADE.plans, true).map(v => {
     if (v.price !== null && (!Number.isFinite(v.price) || v.price < 0 || v.price > PRECO_MAXIMO)) fail('Preço inválido. Use um valor de 0 a 9.999,99 ou deixe vazio.');
-    return { id: id(v.id), active: bool(v.active), featured: bool(v.featured), label: texto(v.label, 'plans.label', 'etiqueta do plano'), name: texto(v.name, 'plans.name', 'nome do plano', true), description: texto(v.description, 'plans.description', 'descrição do plano'), price: v.price === null ? null : Math.round(v.price * 100) / 100, priceSuffix: texto(v.priceSuffix, 'plans.priceSuffix', 'período do preço'), terms: texto(v.terms, 'plans.terms', 'condições da oferta'), features: list(v.features, 'benefícios', QUANTIDADE.features).map(s => texto(s, 'plans.features', 'benefício')), button: texto(v.button, 'plans.button', 'botão do plano', true) };
+    return { id: id(v.id), active: bool(v.active), featured: bool(v.featured), label: texto(v.label, 'plans.label', 'etiqueta do plano'), name: texto(v.name, 'plans.name', 'nome do plano', true), description: texto(v.description, 'plans.description', 'descrição do plano'), price: v.price === null ? null : Math.round(v.price * 100) / 100, priceSuffix: texto(v.priceSuffix, 'plans.priceSuffix', 'período do preço'), terms: texto(v.terms, 'plans.terms', 'condições da oferta'), features: list(v.features, 'benefícios', QUANTIDADE.features).map(s => typeof s !== 'string' ? fail('Confira os benefícios.') : texto(s, 'plans.features', 'benefício')), button: texto(v.button, 'plans.button', 'botão do plano', true) };
   }));
   if (!banners.some(v => v.active)) fail('Mantenha ao menos um banner ativo.');
   if (!plans.some(v => v.active)) fail('Mantenha ao menos um plano ativo.');
-  const ranges = list(c.coverage?.ranges, 'cobertura', 300).map(v => {
+  const ranges = list(c.coverage?.ranges, 'cobertura', 300, true).map(v => {
     const start = String(v.start ?? '').replace(/\D/g, ''), end = String(v.end ?? '').replace(/\D/g, '');
     const nome = typeof v.name === 'string' && v.name.trim() ? ` da região “${v.name.trim().slice(0, 60)}”` : '';
     if (!/^\d{8}$/.test(start) || !/^\d{8}$/.test(end)) fail(`Confira os CEPs${nome}: use 8 dígitos, por exemplo 01000-000.`);
@@ -63,7 +63,7 @@ export function validateConfig(c) {
     services: { title: texto(c.services?.title, 'services.title', 'título do atendimento'), description: texto(c.services?.description, 'services.description', 'descrição do atendimento'), first: texto(c.services?.first, 'services.first', 'primeiro atalho'), second: texto(c.services?.second, 'services.second', 'segundo atalho') },
     coverage: { title: texto(c.coverage?.title, 'coverage.title', 'título da cobertura'), subtitle: texto(c.coverage?.subtitle, 'coverage.subtitle', 'texto da cobertura'), strict: bool(c.coverage?.strict), ranges },
     customer: { title: texto(c.customer?.title, 'customer.title', 'título “Já é cliente?”'), account: texto(c.customer?.account, 'customer.account', 'Minha conta'), invoice: texto(c.customer?.invoice, 'customer.invoice', 'Segunda via'), support: texto(c.customer?.support, 'customer.support', 'Suporte') },
-    faqs: list(c.faqs, 'perguntas', QUANTIDADE.faqs).map(v => ({ question: texto(v.question, 'faqs.question', 'pergunta', true), answer: texto(v.answer, 'faqs.answer', 'resposta', true) }))
+    faqs: list(c.faqs, 'perguntas', QUANTIDADE.faqs, true).map(v => ({ question: texto(v.question, 'faqs.question', 'pergunta', true), answer: texto(v.answer, 'faqs.answer', 'resposta', true) }))
   };
 }
 export function validateLead(body) {
@@ -87,6 +87,22 @@ export function ajustarAosLimites(entrada) {
     else c[secao] = { ...padrao, ...c[secao] };
   }
   if (!Array.isArray(c.coverage.ranges)) c.coverage.ranges = [];
+  const objeto = v => v && typeof v === 'object' && !Array.isArray(v);
+  const modeloPlano = { id: '', active: true, featured: false, label: '', name: 'Plano', description: '', price: null, priceSuffix: '/mês', terms: '', features: [], button: 'Consultar plano' };
+  c.banners = c.banners.filter(objeto).map((v, i) => ({ ...base.banners[0], id: 'banner-' + i, ...v }));
+  c.plans = c.plans.filter(objeto).map((v, i) => ({ ...modeloPlano, id: 'plano-' + i, ...v }));
+  c.faqs = c.faqs.filter(v => objeto(v) && typeof v.question === 'string' && typeof v.answer === 'string');
+  c.coverage.ranges = c.coverage.ranges.filter(v => objeto(v) && /^\d{8}$/.test(String(v.start).replace(/\D/g, '')) && /^\d{8}$/.test(String(v.end).replace(/\D/g, '')));
+  for (const p of c.plans) p.features = Array.isArray(p.features) ? p.features.filter(f => typeof f === 'string') : [];
+  // Texto que não é texto vira o valor inicial, para nada aparecer como "undefined" no site.
+  const textos = (obj, modelo) => { for (const [k, v] of Object.entries(modelo)) if (typeof v === 'string' && typeof obj[k] !== 'string') obj[k] = v; };
+  for (const secao of ['brand', 'seo', 'contact', 'hero', 'plansSection', 'services', 'coverage', 'customer']) textos(c[secao], base[secao]);
+  for (const b of c.banners) textos(b, base.banners[0]);
+  for (const p of c.plans) textos(p, modeloPlano);
+  if (!c.banners.some(v => v.active === true && v.image)) c.banners = base.banners;
+  for (const b of c.banners) b.imagePosition = posicao(b.imagePosition);
+  const intervalo = v => Number.isInteger(v) && v >= 4000 && v <= 20000 ? v : 6500;
+  c.hero.interval = intervalo(c.hero.interval); c.plansSection.interval = intervalo(c.plansSection.interval);
   const corta = (texto, caminho) => {
     const linhas = LINHAS[caminho] || 1;
     let limpo = linhas > 1

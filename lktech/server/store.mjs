@@ -15,6 +15,7 @@ export function openStore(directory = resolve(process.env.DATA_DIR || 'data')) {
     CREATE TABLE IF NOT EXISTS history(id INTEGER PRIMARY KEY, body TEXT NOT NULL, created_at TEXT NOT NULL, admin_id INTEGER);
     CREATE TABLE IF NOT EXISTS leads(id INTEGER PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL, cep TEXT NOT NULL, plan TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'novo', created_at TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS limits(key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS limits_expira ON limits(expires_at);
   `);
   const insert = db.prepare('INSERT OR IGNORE INTO documents VALUES (?, ?, 1, ?)');
   for (const kind of ['draft', 'published']) insert.run(kind, JSON.stringify(seed), new Date().toISOString());
@@ -36,6 +37,10 @@ export function openStore(directory = resolve(process.env.DATA_DIR || 'data')) {
       db.exec('DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY id DESC LIMIT 30)');
       return read('published');
     }); },
+    // Tentativas que falharam (login, troca de senha): conta só erros e zera quando acerta.
+    tentativas(key) { const row = db.prepare('SELECT count FROM limits WHERE key=? AND expires_at>=?').get(key, Date.now()); return row ? row.count : 0; },
+    registrarFalha(key, seconds) { const now = Date.now(); db.prepare('DELETE FROM limits WHERE key=? AND expires_at<?').run(key, now); db.prepare('INSERT INTO limits VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1').run(key, now + seconds * 1000); },
+    zerar(key) { db.prepare('DELETE FROM limits WHERE key=?').run(key); },
     limit(key, maximum, seconds) { return transaction(() => {
       const now = Date.now(); db.prepare('DELETE FROM limits WHERE expires_at<?').run(now);
       const row = db.prepare('SELECT * FROM limits WHERE key=?').get(key);

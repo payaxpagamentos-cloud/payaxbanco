@@ -155,3 +155,56 @@ test('conteúdo antigo fora das regras não derruba o site; publicar valida; res
     assert.equal((await fetch(base + '/site.js', { headers: { 'If-None-Match': etag } })).status, 304, 'arquivo igual não é baixado de novo');
   } finally { await new Promise(r => app.server.close(r)); await rm(directory, { recursive: true, force: true }); }
 });
+
+test('segurança: ninguém tranca o administrador, sessão renova, corpo inválido dá 400, "$" não quebra a página, CSV em português', async () => {
+  const { createApp } = await import('../server/index.mjs');
+  const { hashPassword } = await import('../server/auth.mjs');
+  const { mkdtemp, rm } = await import('node:fs/promises'); const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+  const directory = await mkdtemp(join(tmpdir(), 'lk-seg-'));
+  const antes = process.env.TRUST_PROXY; process.env.TRUST_PROXY = 'true';
+  const app = createApp({ dataDir: directory, production: false });
+  await new Promise(r => app.server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${app.server.address().port}`;
+  try {
+    app.store.db.prepare('INSERT INTO admins(email,password_hash,created_at) VALUES(?,?,?)').run('dono@exemplo.com', await hashPassword('SenhaDoDono12345'), new Date().toISOString());
+    const entrar = (senha, ipOrigem) => fetch(base + '/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Forwarded-For': ipOrigem }, body: JSON.stringify({ email: 'dono@exemplo.com', password: senha }) });
+    // 10 senhas erradas, cada uma de um endereço diferente
+    for (let i = 0; i < 10; i++) assert.equal((await entrar('errada', `9.9.9.${i}`)).status, 401);
+    const dono = await entrar('SenhaDoDono12345', '8.8.8.8');
+    assert.equal(dono.status, 200, 'o dono ainda consegue entrar');
+    // 10 erros do mesmo endereço bloqueiam só esse endereço
+    for (let i = 0; i < 10; i++) await entrar('errada', '7.7.7.7');
+    assert.equal((await entrar('SenhaDoDono12345', '7.7.7.7')).status, 429);
+
+    const cookie = dono.headers.get('set-cookie').split(';')[0], { csrf } = await dono.json();
+    assert.match(dono.headers.get('set-cookie'), /Path=\/api\/admin/);
+    // sessão perto do fim é renovada ao usar o painel
+    app.store.db.prepare('UPDATE sessions SET expires_at=?').run(Date.now() + 60000);
+    const uso = await fetch(base + '/api/admin/me', { headers: { Cookie: cookie } });
+    assert.equal(uso.status, 200); assert.match(uso.headers.get('set-cookie') || '', /lk_session=/, 'cookie renovado');
+    assert.ok(app.store.db.prepare('SELECT expires_at FROM sessions').get().expires_at > Date.now() + 3600000);
+
+    // corpo que não é objeto
+    assert.equal((await fetch(base + '/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: 'null' })).status, 400);
+    const admin = (caminho, method = 'GET', dados) => fetch(base + '/api/admin/' + caminho, { method, headers: { Cookie: cookie, 'X-CSRF-Token': csrf, Origin: base, ...(dados ? { 'Content-Type': 'application/json' } : {}) }, ...(dados ? { body: JSON.stringify(dados) } : {}) });
+    const rascunho = await (await admin('content')).json();
+    assert.equal((await admin('content', 'PUT', { config: { ...rascunho.config, banners: [null] }, revision: rascunho.revision })).status, 400);
+
+    // "$" no título e na descrição não bagunça o HTML
+    const c = rascunho.config; c.seo.title = "Plano $` top $&"; c.seo.description = "Internet $' fim";
+    const salvo = await (await admin('content', 'PUT', { config: c, revision: rascunho.revision })).json();
+    assert.equal((await admin('publish', 'POST', { revision: salvo.revision })).status, 200);
+    const html = await (await fetch(base + '/')).text();
+    assert.match(html, /<title>Plano \$` top \$&amp;<\/title>/); assert.match(html, /content="Internet \$&#39; fim"/);
+    assert.equal((html.match(/<meta name="description"/g) || []).length, 1);
+
+    // CSV com data de Brasília e situação por extenso
+    app.store.db.prepare("INSERT INTO leads(name,phone,cep,plan,status,created_at) VALUES('Ana','11999999999','','','em_atendimento','2026-11-27T15:00:00.000Z')").run();
+    const csv = await (await admin('leads.csv')).text();
+    assert.match(csv, /Em atendimento/); assert.match(csv, /27\/11\/2026, 12:00:00/);
+    assert.deepEqual(await (await admin('leads/resumo')).json(), { total: 1, novos: 0 });
+  } finally {
+    if (antes === undefined) delete process.env.TRUST_PROXY; else process.env.TRUST_PROXY = antes;
+    await new Promise(r => app.server.close(r)); await rm(directory, { recursive: true, force: true });
+  }
+});

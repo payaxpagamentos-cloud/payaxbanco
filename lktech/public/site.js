@@ -46,6 +46,7 @@ function render(preview) {
     <footer class="container footer"><div class="footer-brand">${logo}<p>${esc(c.brand.tagline)}</p></div><nav aria-label="Rodapé"><a href="#planos">Planos</a><a href="#atendimento">Atendimento</a>${action('account','Área do cliente','text-button')}</nav>${c.contact.phone || c.contact.email || c.contact.address ? `<div class="footer-contact">${c.contact.phone?`<span>${esc(c.contact.phone)}</span>`:''}${c.contact.email?`<a href="mailto:${esc(c.contact.email)}">${esc(c.contact.email)}</a>`:''}${c.contact.address?`<span>${esc(c.contact.address)}</span>`:''}</div>`:''}${c.contact.privacyUrl?`<a href="${esc(c.contact.privacyUrl)}">Privacidade</a>`:''}</footer>
     <button class="floating-contact primary" data-action="contact" aria-label="Falar com a LK TECH">${icon('chat')}</button>`;
   document.querySelector('#hero-image').style.objectPosition = banner.imagePosition;
+  document.querySelector('#hero-image').style.setProperty('--posicao-celular', banner.mobileImage ? '50% 40%' : '75% 40%');
 }
 function heroCopy(b) { return `<p class="eyebrow">${esc(b.eyebrow)}</p><h1>${esc(b.title)} <strong>${esc(b.highlight)}</strong></h1><span class="section-rule"></span><p class="hero-subtitle">${esc(b.subtitle)}</p><div class="hero-buttons">${b.primaryLabel?`<a class="primary" href="${esc(b.primaryUrl || '#planos')}"><span>${esc(b.primaryLabel)}</span></a>`:''}${b.secondaryLabel?`<a class="glass-button" href="${esc(b.secondaryUrl || '#cobertura')}"><span>${esc(b.secondaryLabel)}</span></a>`:''}</div>`; }
 function planCard(p) {
@@ -55,7 +56,7 @@ function showBanner(index) {
   currentBanner = (index + c.banners.length) % c.banners.length;
   const b = c.banners[currentBanner];
   document.querySelectorAll('.hero-slide').forEach((el, i) => { const ativo = i === currentBanner; el.classList.toggle('ativo', ativo); el.toggleAttribute('inert', !ativo); if (ativo) el.removeAttribute('aria-hidden'); else el.setAttribute('aria-hidden', 'true'); });
-  document.querySelector('#hero-image').src = b.image; document.querySelector('#hero-image').style.objectPosition = b.imagePosition;
+  document.querySelector('#hero-image').src = b.image; document.querySelector('#hero-image').style.objectPosition = b.imagePosition; document.querySelector('#hero-image').style.setProperty('--posicao-celular', b.mobileImage ? '50% 40%' : '75% 40%');
   document.querySelector('#hero-mobile').srcset = b.mobileImage || b.image;
   document.querySelectorAll('[data-banner]').forEach((el,i)=>{ el.classList.toggle('active',i===currentBanner); if(i===currentBanner)el.setAttribute('aria-current','true');else el.removeAttribute('aria-current'); });
 }

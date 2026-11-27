@@ -86,3 +86,34 @@ Verificado e correto:
 - página 404;
 - versão dos arquivos;
 - upload, CEP, contatos e CSV.
+
+## Segunda revisão completa (27/11/2026, servidor já instalado)
+
+### Telas
+71 combinações verificadas, de 320×568 a 2560×1440, incluindo celular deitado e notebooks de 1280×720 e 1366×768. Nenhum problema: sem rolagem lateral, sem erros, margens simétricas e o banner com o botão principal sempre visível na primeira tela.
+
+Ajustes desta etapa:
+- **Celulares pequenos e deitados:** o banner ficava maior que a tela. Agora a foto acompanha a altura da tela.
+- **Painel em tablet:** a tabela de contatos virou cartões também nessa largura.
+
+### Segurança e código (revisor independente; nenhum achado crítico)
+| Achado | Correção |
+|---|---|
+| Qualquer pessoa podia trancar o administrador fora do painel com 10 senhas erradas no e-mail dele | Conta só erros e zera ao acertar. O bloqueio é por endereço de origem; no e-mail as tentativas só ficam mais lentas |
+| Sessão de 8 horas fixas: ao vencer, as alterações não salvas sumiam | A sessão é renovada enquanto o painel é usado. Se vencer, o painel oferece recuperar as alterações |
+| `$` no título ou na descrição de busca bagunçava o HTML da página | Corrigido |
+| Corpo inválido (`null`, item vazio em lista) gerava erro 500 | Resposta 400, sem erro no servidor |
+| Conteúdo gravado com itens ou campos faltando podia derrubar o site | O ajuste completa os campos, descarta itens inválidos, garante um banner ativo e normaliza os tempos |
+| CSV com data em UTC e situação em código interno | Data no horário de Brasília e situação por extenso |
+| Contador de contatos limitado aos 1000 mais recentes | Contagem real. O painel avisa quando a lista mostra só os 1000 mais recentes |
+| Troca de senha sem limite de tentativas | 5 erros a cada 15 minutos |
+| Fotos JPG de alguns celulares eram recusadas | Aceitas |
+| Endereço malformado mostrava texto técnico | Página de erro em português |
+| Firewall: na nuvem Oracle o ufw não tem efeito | O instalador usa o firewall próprio do servidor (iptables) e libera SSH, 80 e 443 |
+| Configuração antiga podia deixar o site acessível fora do proxy | O instalador força `HOST=127.0.0.1` e `TRUST_PROXY=true`, e o código usa 127.0.0.1 como padrão |
+| Queda do SSH no meio da atualização | A versão anterior volta sozinha |
+| Proteções do serviço | Restrições extras no systemd (UMask, ProtectClock, ProtectProc, MemoryMax, entre outras) |
+| Cabeçalhos | O site não pode ser exibido dentro de outro site (DENY e frame-ancestors 'none'); COOP; cookie restrito ao painel |
+| Spam de contatos | Teto geral de 300 pedidos por hora e índice na tabela de limites |
+
+Testes automáticos: 7, todos aprovados.
