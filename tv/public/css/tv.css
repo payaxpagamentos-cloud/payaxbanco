@@ -29,6 +29,12 @@
   --sombra: 0 3px 10px rgba(0,0,0,.7);
   --sombra-forte: 0 25px 50px -12px rgba(0,0,0,.9);
   --topo-h: 68px;
+  /* Altura real da barra de cima, já contando a faixa do relógio e da bateria do aparelho.
+     O app é publicado com viewport-fit=cover (a arte sangra até a borda), então o sistema NÃO
+     reserva esse espaço: quem reserva somos nós. Sem isto, no iPhone instalado na tela de
+     início, o logo fica embaixo do relógio e o avatar embaixo da bateria.
+     Em aparelho sem recorte, o env() vale 0 e nada muda. */
+  --topo-total: calc(var(--topo-h) + env(safe-area-inset-top, 0px));
   color-scheme: dark;
   font-family: "Manrope", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
@@ -171,7 +177,9 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
 
 /* ---------- Topo ---------- */
 .topo{ position: fixed; top: 0; left: 0; right: 0; z-index: 900; display: flex; align-items: center; gap: 22px;
-  padding: 0 clamp(16px, 4vw, 60px); height: var(--topo-h); background: transparent;
+  padding: env(safe-area-inset-top, 0px) max(clamp(16px, 4vw, 60px), env(safe-area-inset-right, 0px)) 0
+    max(clamp(16px, 4vw, 60px), env(safe-area-inset-left, 0px));
+  height: var(--topo-total); background: transparent;
   border-bottom: 1px solid rgba(255,255,255,.06); transition: border-color .4s; }
 /* O vidro fica num pseudo-elemento, e não no .topo.
    Motivo: backdrop-filter faz do elemento o bloco de referência dos filhos "position: fixed" —
@@ -216,7 +224,8 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
 .busca-topo svg{ width: 17px; height: 17px; fill: #fff; flex: none; }
 
 .conteudo{ padding: 0 0 50px; min-height: 60vh; }
-.secao{ padding: calc(var(--topo-h) + 28px) clamp(16px, 4vw, 60px) 0; }
+.secao{ padding: calc(var(--topo-total) + 28px) max(clamp(16px, 4vw, 60px), env(safe-area-inset-right, 0px)) 0
+  max(clamp(16px, 4vw, 60px), env(safe-area-inset-left, 0px)); }
 .secao > h1, .secao > h2{ margin-bottom: 16px; }
 
 /* ---------- Billboard (destaque do topo) ---------- */
