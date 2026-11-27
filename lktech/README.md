@@ -21,11 +21,11 @@ Para o Code, comece por **[docs/PROMPT_PARA_CODE.md](docs/PROMPT_PARA_CODE.md)**
 
 ## O que funciona
 
-- Site responsivo para desktop, tablet e celular, com CSS de vidro real (`backdrop-filter`).
-- Banners com imagem desktop/celular, título, trecho em laranja, botões, ordenação, ativação e rotação automática configurável. Os controles aparecem quando há mais de um banner ativo.
+- Site responsivo para computador, tablet e celular, com CSS de vidro real (`backdrop-filter`).
+- Banners com imagem para computador e para celular, título, trecho em laranja, botões, ordenação, ativação e rotação automática configurável. Os controles aparecem quando há mais de um banner ativo.
 - Carrossel de planos com rolagem por toque, teclado, botões, indicadores e quantidade de cartões adaptada à tela. A rotação automática é opcional.
 - Planos: nome, preço, período, descrição, condições, benefícios, destaque, ativação e ordem. Preço vazio mostra “Valores sob consulta”. Zero é tratado como um preço válido.
-- Edição de logo, cores, slogan, textos, perguntas frequentes, título/descrição da página, contatos e links.
+- Edição de slogan, textos, perguntas frequentes, título/descrição da página, contatos e links.
 - Upload e galeria de imagens PNG, JPG e WebP até 8 MB. Os arquivos ficam no servidor, não no navegador do administrador.
 - Login com senha protegida por scrypt, sessão em cookie HttpOnly e troca de senha.
 - Rascunho, prévia autenticada, publicação explícita, controle de edição concorrente e histórico das últimas 30 versões publicadas.
@@ -50,9 +50,9 @@ Nada que o administrador altere no painel muda a estrutura ou o desenho do site:
 - **Limite de caracteres por campo**, do tamanho do espaço no desenho (ex.: nome do plano 12, título do banner 24, botões 20). O painel mostra o contador e não deixa digitar além; o servidor recusa ao salvar se o limite for ultrapassado. Os limites ficam em um único arquivo, `public/limites.js`, usado pelo painel e pelo servidor.
 - **Campos de uma linha** não guardam quebras de linha. Só o título do Atendimento (2 linhas) e as respostas das perguntas aceitam quebras.
 - **Quantidade máxima**: 8 banners, 12 planos, 4 benefícios por plano, 12 perguntas. Preço até R$ 9.999,99.
-- **Cores fixas** (laranja e azul-marinho): não são editáveis no painel.
-- **Logo em caixa de tamanho fixo**: qualquer arquivo se ajusta dentro dela sem mudar a altura do cabeçalho.
-- **Imagens do banner** sempre preenchem o mesmo espaço (recorte automático), em qualquer formato. O painel avisa quando a imagem é pequena demais e pode ficar borrada.
+- **Cores e logo fixos**: o laranja, o azul-marinho e o logo da empresa não são editáveis no painel.
+- **Site independente**: não abre nem se liga a nenhum outro sistema (PABX, Network etc.).
+- **Imagens do banner** sempre preenchem o mesmo espaço (recorte automático), em qualquer formato. O painel mostra a medida e a qualidade de cada imagem (computador: 1920 × 1080, JPG ou WebP; celular: 1080 × 1440) e recusa o envio de imagem menor que o mínimo (1600 × 900 e 720 × 960).
 - **Banners empilhados**: a altura do banner não muda quando ele troca.
 - **Cartões de plano** com a mesma altura, linha do preço e botão alinhados em todos; com poucos planos, o carrossel fica centralizado.
 - **Camada de segurança no CSS** (fim de `public/site.css`): mesmo que um texto antigo ultrapasse o espaço, ele é cortado com "…" ou quebra dentro da caixa, sem rolagem lateral.
@@ -83,7 +83,7 @@ tests/               Testes de integração
 docs/                Referência e orientação para o Code
 ```
 
-`public/assets/logo.svg` e `logo-dark.svg` são reconstruções vetoriais para desenvolvimento, com letras em curvas, sem dependência de fonte. Podem ser substituídas pelos arquivos oficiais da marca no painel. A foto do banner foi criada para este projeto e está incluída localmente.
+`public/assets/logo.svg` e `logo-dark.svg` são reconstruções vetoriais para desenvolvimento, com letras em curvas, sem dependência de fonte. O logo **não é alterado pelo painel**: para trocar pelo arquivo oficial da marca, substitua `public/assets/logo.svg` no servidor. A foto do banner foi criada para este projeto e está incluída localmente.
 
 ## Testar
 

@@ -63,8 +63,26 @@ export const QUANTIDADE = { banners: 8, plans: 12, features: 4, faqs: 12 };
 // Preço máximo exibível sem estourar o cartão (R$ 9.999,99).
 export const PRECO_MAXIMO = 9999.99;
 
-// Tamanho mínimo recomendado das imagens (o painel avisa quando a imagem é menor).
-export const IMAGEM_MINIMA = { banner: [1600, 800], bannerCelular: [700, 900], logo: [300, 80] };
+// Guia das imagens do banner, mostrado no painel ao lado de cada campo de imagem.
+// medida: tamanho ideal em pixels. minima: abaixo disso o painel não aceita o envio.
+export const IMAGENS = {
+  banner: { nome: 'Banner para computador', medida: [1920, 1080], minima: [1600, 900], formato: 'horizontal (16:9)', pesoIdeal: '300 a 600 KB',
+    dica: 'O lado esquerdo fica escurecido para o texto do banner. Deixe pessoas e produtos na metade direita da foto.' },
+  bannerCelular: { nome: 'Banner para celular', medida: [1080, 1440], minima: [720, 960], formato: 'vertical (3:4)', pesoIdeal: '150 a 350 KB',
+    dica: 'No celular a foto aparece no alto e o texto embaixo dela. Deixe o assunto principal no centro, na parte de cima.' }
+};
+export const TIPOS_DE_IMAGEM = ['image/jpeg', 'image/webp', 'image/png'];
+export const GUIA_QUALIDADE = [
+  'Formato: JPG ou WebP para fotos (qualidade de 80% a 90% ao exportar). PNG só para artes com áreas lisas.',
+  'Tamanho máximo do arquivo: 8 MB. Arquivos menores deixam o site mais rápido.',
+  'Cores em sRGB (padrão da internet). Evite CMYK, que fica com cores apagadas.',
+  'Não coloque texto, preço ou logo dentro da imagem: use os campos do banner, que se ajustam a cada tela.',
+  'A foto sempre preenche o mesmo espaço do banner; o que sobrar das bordas é recortado automaticamente.'
+];
+export const IMAGEM_MINIMA = Object.fromEntries(Object.entries(IMAGENS).map(([k, v]) => [k, v.minima]));
+
+// Logo da empresa: fixo, não é alterado pelo painel.
+export const LOGO = '/assets/logo.svg';
 
 // Cores fixas da identidade visual. Não são editáveis pelo painel.
 export const CORES = { accent: '#ff9300', background: '#0a192c' };

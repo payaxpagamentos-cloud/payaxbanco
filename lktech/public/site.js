@@ -1,4 +1,5 @@
 import { esc, icon, request, toast } from './shared.js';
+import { LOGO } from './limites.js';
 let c, currentBanner = 0, timers = [], lastCep = '';
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const money = n => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
@@ -14,7 +15,7 @@ async function boot() {
   } catch { document.querySelector('#site').innerHTML = '<main class="load-error"><h1>Estamos preparando sua conexão.</h1><p>Não foi possível carregar o site neste momento.</p><button class="primary" id="reload">Tentar novamente</button></main>'; document.querySelector('#reload').addEventListener('click', boot); }
 }
 function render(preview) {
-  const banner = c.banners[0], logo = `<img class="logo" src="${esc(c.brand.logo)}" alt="${esc(c.brand.name)}" width="190" height="65">`;
+  const banner = c.banners[0], logo = `<img class="logo" src="${LOGO}" alt="${esc(c.brand.name)}" width="190" height="65">`;
   document.querySelector('#site').innerHTML = `
     ${preview ? '<div class="preview-bar">Prévia do rascunho — visível apenas para quem está no painel.</div>' : ''}
     <header class="header glass container"><a href="#inicio" aria-label="${esc(c.brand.name)} — início">${logo}</a>

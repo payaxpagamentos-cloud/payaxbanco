@@ -78,9 +78,10 @@ test('painel não consegue entortar o layout: limites, linhas, quantidade, preç
   recusa(c => { c.plans[0].price = 10000; }, 'Preço');
   recusa(c => { c.services.title = 'Uma\nDuas\nTrês'; }, 'linhas');
   recusa(c => { c.banners = Array(QUANTIDADE.banners + 1).fill(0).map((_, i) => ({ ...seed.banners[0], id: 'b' + i })); });
-  const c = base(); c.brand.accent = '#00ff00'; c.brand.background = '#ffffff'; c.banners[0].title = 'Conecte\n   o   seu'; c.banners[0].imagePosition = '900% 50%';
+  const c = base(); c.brand.accent = '#00ff00'; c.brand.background = '#ffffff'; c.brand.logo = '/uploads/outro-logo.png'; c.banners[0].title = 'Conecte\n   o   seu'; c.banners[0].imagePosition = '900% 50%';
   const r = validateConfig(c);
   assert.deepEqual([r.brand.accent, r.brand.background], [CORES.accent, CORES.background], 'cores ficam fixas');
+  assert.equal(r.brand.logo, '/assets/logo.svg', 'logo da empresa fica fixo');
   assert.equal(r.banners[0].title, 'Conecte o seu', 'campos de uma linha não guardam quebras nem espaços extras');
   assert.equal(r.banners[0].imagePosition, '65% 50%');
   assert.equal(validateConfig({ ...base(), services: { ...seed.services, title: 'Mais perto.\nMais simples.' } }).services.title, 'Mais perto.\nMais simples.');

@@ -9,7 +9,7 @@ usuários e login próprios, com o Portal do Cliente para as empresas atendidas.
 >
 > E o **Manager Network** (pasta [`network/`](network/README.md), publicado em `/network`): rede óptica, Central NOC, chamados técnicos, equipe e comissões, frota, manutenção, abastecimentos e rastreamento para provedores de internet, com servidor próprio e conexão ao **Rastreador** (`rastreador/`) pela API de integração.
 
-> E o **Site da LK TECH** (pasta [`lktech/`](lktech/README.md)): site do provedor de internet com painel para banners, planos e preços, cobertura por CEP e pedidos de contato, com servidor próprio (Node.js 24 e SQLite).
+> E o **Site da LK TECH** (pasta [`lktech/`](lktech/README.md)): site independente do provedor (não abre nem se liga aos outros sistemas) de internet com painel para banners, planos e preços, cobertura por CEP e pedidos de contato, com servidor próprio (Node.js 24 e SQLite).
 
 ## Módulos
 

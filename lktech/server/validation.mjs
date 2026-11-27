@@ -1,4 +1,4 @@
-import { LIMITES, LINHAS, QUANTIDADE, PRECO_MAXIMO, CORES } from '../public/limites.js';
+import { LIMITES, LINHAS, QUANTIDADE, PRECO_MAXIMO, CORES, LOGO } from '../public/limites.js';
 export class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const fail = text => { throw new HttpError(400, text); };
 function string(value, name, max = 240, required = false) {
@@ -51,7 +51,7 @@ export function validateConfig(c) {
   const email = texto(contact.email, 'contact.email', 'e-mail');
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail('E-mail inválido.');
   return {
-    brand: { name: texto(b.name, 'brand.name', 'nome da empresa', true), tagline: texto(b.tagline, 'brand.tagline', 'slogan'), logo: safeUrl(b.logo, true), accent: CORES.accent, background: CORES.background },
+    brand: { name: texto(b.name, 'brand.name', 'nome da empresa', true), tagline: texto(b.tagline, 'brand.tagline', 'slogan'), logo: LOGO, accent: CORES.accent, background: CORES.background },
     seo: { title: texto(c.seo?.title, 'seo.title', 'título da página', true), description: texto(c.seo?.description, 'seo.description', 'descrição para buscadores') },
     contact: { whatsapp, email, phone: texto(contact.phone, 'contact.phone', 'telefone'), address: texto(contact.address, 'contact.address', 'endereço'), portalUrl: safeUrl(contact.portalUrl), invoiceUrl: safeUrl(contact.invoiceUrl), supportUrl: safeUrl(contact.supportUrl), privacyUrl: safeUrl(contact.privacyUrl) },
     hero: { autoplay: bool(c.hero?.autoplay), interval: interval(c.hero?.interval), badge: texto(c.hero?.badge, 'hero.badge', 'texto do cartão sobre a foto') }, banners, plans,

@@ -8,3 +8,10 @@
 .field [aria-invalid]{border-color:#b3261e}
 .nota-fixa{font-size:.88rem;color:#647992;grid-column:1/-1;margin:0}
 button[data-add]:disabled{opacity:.5;cursor:not-allowed}
+.guia-imagem{background:#fff7ec;border:1px solid #ffd8a3;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:.84rem;color:#3d4b5f}
+.guia-imagem strong{display:block;color:#13253c;margin-bottom:4px}
+.guia-imagem ul,.guia-lista{margin:0;padding-left:18px;display:grid;gap:3px}
+.guia-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.guia-grade .guia-imagem{margin:0}
+.guia-titulo{font-size:1rem;margin:18px 0 8px}
+.guia-lista{font-size:.9rem;color:#3d4b5f}
