@@ -326,7 +326,11 @@ module.exports = (db) => {
    * Quem aplica é o agente de fora (scripts/atualizador.sh, no cron): o contêiner não tem, e
    * não deve ter, acesso ao Docker do servidor. Aqui só é feita a entrega.
    */
-  r.post('/sistema/pacote', soAdmin, express.raw({ type: ['application/gzip', 'application/x-gzip', 'application/zip', 'application/x-zip-compressed', 'application/octet-stream'], limit: config.pacoteMaxBytes }),
+  // Aceita qualquer Content-Type de propósito. A lista fixa que havia aqui dependia do que o
+  // CELULAR diz que o arquivo é, e aparelho que chama o .tar.gz de outra coisa fazia o Express
+  // não ler o corpo: a rota recebia um objeto vazio e a operação via uma recusa sem explicação.
+  // Quem decide se é o pacote são os bytes do arquivo, em conferirPacote — não o rótulo.
+  r.post('/sistema/pacote', soAdmin, express.raw({ type: () => true, limit: config.pacoteMaxBytes }),
     (req, res) => {
       if (!sistema.agenteDisponivel()) {
         throw new ErroNegocio('Esta instalação não tem o agente de atualização. Atualize uma vez pelo servidor para instalá-lo.', 409);

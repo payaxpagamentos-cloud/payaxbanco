@@ -141,3 +141,65 @@ test('o painel aceita o pacote em .zip, do mesmo jeito', async (t) => {
   assert.ok(fs.existsSync(path.join(pasta, 'pacote.zip')), 'fica para o agente com a extensão certa');
   assert.equal(fs.existsSync(path.join(pasta, 'pacote.tar.gz')), false, 'não sobra pacote do formato anterior');
 });
+
+test('o pacote chega do iPhone já descompactado, e ainda assim é aceito', async (t) => {
+  // Por que este teste existe: o Safari do iPhone descompacta `.tar.gz` sozinho ao baixar. Quem
+  // envia do celular acaba mandando um `.tar` — o pacote CERTO, só que já aberto uma camada — e
+  // o painel recusava. Aceitar e recompactar aqui é melhor que pedir à operação que resolva um
+  // detalhe do navegador.
+  const pasta = pastaDeTeste(t);
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+
+  const fora = fs.mkdtempSync(path.join(os.tmpdir(), 'ptv-iphone-'));
+  t.after(() => fs.rmSync(fora, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(fora, 'server'), { recursive: true });
+  fs.writeFileSync(path.join(fora, 'server', 'index.js'), crypto.randomBytes(60 * 1024).toString('base64'));
+  const tar = path.join(fora, 'pacote.tar');
+  execFileSync('tar', ['-C', fora, '-cf', tar, 'server']);
+
+  // Content-Type que o aparelho resolveu inventar: não pode mais decidir nada.
+  const r = await s.req('POST', '/admin/sistema/pacote', fs.readFileSync(tar), admin,
+    { headers: { 'Content-Type': 'application/x-tar' } });
+  assert.equal(r.status, 202, JSON.stringify(r.dados));
+
+  // O agente só conhece pacote.tar.gz e pacote.zip: um pacote.tar ficaria esquecido na pasta
+  // para sempre, e a operação veria "enviado" sem nada acontecer.
+  assert.equal(r.dados.pedido.formato, 'tar.gz');
+  assert.equal(fs.existsSync(path.join(pasta, 'pacote.tar.gz')), true, 'o agente precisa achar o pacote');
+  assert.equal(fs.existsSync(path.join(pasta, 'pacote.tar')), false);
+  // E o que ficou gravado é um .tar.gz de verdade, com o conteúdo certo dentro.
+  const nomes = execFileSync('tar', ['-tzf', path.join(pasta, 'pacote.tar.gz')], { encoding: 'utf8' });
+  assert.match(nomes, /server\/index\.js/);
+});
+
+test('arquivo recusado explica o que chegou, em vez de só dizer que não serve', async (t) => {
+  // A mensagem antiga virava "Este arquivo não é o pacote da plataforma." e ponto, sempre que
+  // não desse para ler nome nenhum lá dentro. Quem estava no celular não tinha como saber se
+  // mandou o arquivo errado ou se a plataforma é que estava recusando o certo.
+  pastaDeTeste(t);
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const enviar = (b, tipo = 'application/octet-stream') =>
+    s.req('POST', '/admin/sistema/pacote', b, admin, { headers: { 'Content-Type': tipo } });
+
+  // Nem gzip, nem zip, nem tar: um arquivo qualquer.
+  const qualquer = await enviar(Buffer.alloc(50 * 1024, 0x41));
+  assert.equal(qualquer.status, 400);
+  assert.match(qualquer.dados.erro, /não é um \.tar\.gz, um \.tar nem um \.zip/);
+  assert.match(qualquer.dados.erro, /0\.05 MB/, 'diz quanto chegou');
+  assert.match(qualquer.dados.erro, /PLAYTECHVIP-servidor\.tar\.gz/, 'diz qual é o arquivo certo');
+
+  // Um tar legítimo, mas de outra coisa: a mensagem mostra o que havia dentro.
+  const fora = fs.mkdtempSync(path.join(os.tmpdir(), 'ptv-outro2-'));
+  t.after(() => fs.rmSync(fora, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(fora, 'fotos'), { recursive: true });
+  fs.writeFileSync(path.join(fora, 'fotos', 'a.txt'), crypto.randomBytes(60 * 1024).toString('base64'));
+  execFileSync('tar', ['-C', fora, '-czf', path.join(fora, 'x.tar.gz'), 'fotos']);
+  const outro = await enviar(fs.readFileSync(path.join(fora, 'x.tar.gz')));
+  assert.equal(outro.status, 400);
+  assert.match(outro.dados.erro, /dentro dele há: fotos/);
+  assert.match(outro.dados.erro, /MB/, 'o tamanho entra na mensagem');
+});

@@ -29,10 +29,18 @@ const registroEm = () => path.join(pasta(), 'registro.log');
 const GZIP = Buffer.from([0x1f, 0x8b]);
 const ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04]);   // "PK\x03\x04"
 
-/** .tar.gz ou .zip? Decidido pelos primeiros bytes, não pelo nome do arquivo. */
+/**
+ * .tar.gz, .zip ou .tar? Decidido pelos primeiros bytes, não pelo nome do arquivo.
+ *
+ * O tar puro entra na lista porque o Safari do iPhone descompacta `.tar.gz` sozinho ao baixar:
+ * quem envia do celular acaba mandando um `.tar`, que é o pacote certo, só que já aberto uma
+ * camada. Recusar isso seria recusar o arquivo certo por um detalhe do navegador.
+ */
 const formatoDe = (b) => {
+  if (!Buffer.isBuffer(b) || b.length < 4) return null;
   if (b.subarray(0, 2).equals(GZIP)) return 'tar.gz';
   if (b.subarray(0, 4).equals(ZIP)) return 'zip';
+  if (b.length >= 512 && b.subarray(257, 262).toString('latin1') === 'ustar') return 'tar';
   return null;
 };
 
@@ -87,8 +95,8 @@ function nomesNoZip(buf) {
  * do bloco de cabeçalho, e o tamanho vem em octal no campo seguinte, que diz quantos blocos de
  * conteúdo pular até o próximo cabeçalho.
  */
-function nomesNoPacote(gz) {
-  const tar = zlib.gunzipSync(gz, { maxOutputLength: 512 * 1024 * 1024 });
+function nomesNoPacote(conteudo, { jaAberto = false } = {}) {
+  const tar = jaAberto ? conteudo : zlib.gunzipSync(conteudo, { maxOutputLength: 512 * 1024 * 1024 });
   // Todo tar moderno traz "ustar" no byte 257 do primeiro cabeçalho. Sem isso, o que veio é
   // um gzip de outra coisa qualquer — e não adianta tentar ler nomes dali.
   if (tar.length < 512 || tar.subarray(257, 262).toString('latin1') !== 'ustar') {
@@ -109,20 +117,40 @@ function nomesNoPacote(gz) {
  * Confere que o arquivo é mesmo o pacote da plataforma, no momento do envio — e não lá adiante,
  * no agente. Assim quem está no celular descobre na hora, e com o conteúdo do que mandou.
  */
+/** Para a mensagem de erro: quantos MB chegaram, dito de um jeito que a operação entende. */
+const emMB = (n) => `${(n / 1048576).toFixed(2)} MB`;
+
 function conferirPacote(conteudo) {
+  // O corpo pode nem ser um arquivo: se o navegador mandou um tipo que a rota não esperava, o
+  // Express entrega um objeto vazio em vez dos bytes. Dizer isso é melhor que estourar com
+  // "subarray is not a function", que não ajuda ninguém no celular.
+  if (!Buffer.isBuffer(conteudo) || conteudo.length === 0) {
+    throw new Error('O navegador não enviou o conteúdo do arquivo. Escolha o arquivo de novo e tente outra vez.');
+  }
   const formato = formatoDe(conteudo);
+  if (!formato) {
+    throw new Error(`Isto não é um .tar.gz, um .tar nem um .zip (chegaram ${emMB(conteudo.length)}). `
+      + 'Escolha o arquivo PLAYTECHVIP-servidor.tar.gz que você recebeu, sem abrir nem renomear.');
+  }
   let nomes;
   try {
-    nomes = formato === 'zip' ? nomesNoZip(conteudo) : nomesNoPacote(conteudo);
+    nomes = formato === 'zip' ? nomesNoZip(conteudo) : nomesNoPacote(conteudo, { jaAberto: formato === 'tar' });
   } catch {
-    throw new Error('O arquivo está corrompido ou não é um .zip nem um .tar.gz. Baixe de novo e tente outra vez.');
+    throw new Error(`O arquivo chegou inteiro (${emMB(conteudo.length)}, ${formato}) mas não deu para abrir: `
+      + 'está corrompido ou foi cortado no meio do envio. Baixe de novo e tente outra vez.');
   }
   // Aceita tanto "./server/index.js" quanto "server/index.js": muda conforme como o tar foi feito.
   if (!nomes.some((n) => /(^|\/)server\/index\.js$/.test(n))) {
     // Só nomes legíveis entram na mensagem: um arquivo estranho não pode despejar binário na tela.
     const amostra = [...new Set(nomes.map((n) => n.replace(/^\.\//, '').split('/')[0]))]
       .filter((n) => /^[\w.][\w.\- ]{0,38}$/.test(n)).slice(0, 6);
-    throw new Error(`Este arquivo não é o pacote da plataforma${amostra.length ? ` (dentro dele há: ${amostra.join(', ')})` : ''}.`);
+    // Sem a parte do "dentro dele há", a mensagem antiga não dizia nada e a operação ficava sem
+    // saber se mandou o arquivo errado ou se a plataforma é que estava recusando o certo.
+    const dentro = amostra.length
+      ? `dentro dele há: ${amostra.join(', ')}`
+      : `não consegui ler nenhum nome de arquivo lá dentro (${nomes.length} entrada(s))`;
+    throw new Error(`Este arquivo não é o pacote da plataforma — ${emMB(conteudo.length)}, ${formato}, ${dentro}. `
+      + 'O pacote certo chama-se PLAYTECHVIP-servidor.tar.gz e tem a pasta "server" dentro.');
   }
   return nomes.length;
 }
@@ -136,11 +164,17 @@ function guardarPacote(conteudo, { por }) {
   if (!Buffer.isBuffer(conteudo) || conteudo.length < 1024) {
     throw new Error('O arquivo chegou vazio ou pequeno demais para ser um pacote.');
   }
-  const formato = formatoDe(conteudo);
-  if (!formato) {
-    throw new Error('Isto não é um .zip nem um .tar.gz. No iPhone, não abra o arquivo: use "Salvar em Arquivos" e escolha o que foi salvo.');
-  }
+  // Confere antes de gravar qualquer coisa, e é ele quem dá o recado quando o arquivo é outro.
   const arquivos = conferirPacote(conteudo);
+  let formato = formatoDe(conteudo);
+  let bytes = conteudo;
+  // Tar puro (o Safari do iPhone descompacta sozinho ao baixar) volta a ser .tar.gz aqui. O
+  // agente lá fora só conhece `pacote.tar.gz` e `pacote.zip`; um `pacote.tar` ficaria esquecido
+  // na pasta para sempre, e a operação veria "enviado" sem nada acontecer.
+  if (formato === 'tar') {
+    bytes = zlib.gzipSync(conteudo);
+    formato = 'tar.gz';
+  }
   fs.mkdirSync(pasta(), { recursive: true });
   // Um pedido de cada vez: o formato anterior não pode ficar para trás e confundir o agente.
   for (const antigo of ['pacote.tar.gz', 'pacote.zip']) {
@@ -149,16 +183,16 @@ function guardarPacote(conteudo, { por }) {
   // Grava ao lado e só então renomeia: o agente nunca enxerga um pacote pela metade.
   const destino = path.join(pasta(), `pacote.${formato}`);
   const temporario = `${destino}.parcial`;
-  fs.writeFileSync(temporario, conteudo);
+  fs.writeFileSync(temporario, bytes);
   fs.renameSync(temporario, destino);
 
   const pedido = {
     pedido_em: new Date().toISOString(),
     por,
-    bytes: conteudo.length,
+    bytes: bytes.length,
     formato,
     arquivos,
-    sha256: crypto.createHash('sha256').update(conteudo).digest('hex'),
+    sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
   };
   fs.writeFileSync(pedidoEm(), JSON.stringify(pedido, null, 2));
   return pedido;
