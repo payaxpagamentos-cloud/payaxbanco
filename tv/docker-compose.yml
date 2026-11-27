@@ -52,6 +52,8 @@ services:
       - app
     environment:
       DOMINIO: ${DOMINIO:?defina DOMINIO no .env, por exemplo play.seudominio.com.br}
+      # Opcional: um segundo endereço que também atende (IP via sslip.io, domínio provisório).
+      DOMINIO_ALTERNATIVO: ${DOMINIO_ALTERNATIVO:-}
     ports:
       - "80:80"
       - "443:443"

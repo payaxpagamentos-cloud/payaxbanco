@@ -1,5 +1,14 @@
 # Proxy da PLAY TECH VIP: HTTPS automático e repasse para o app.
-{$DOMINIO} {
+#
+# O segundo nome é opcional (DOMINIO_ALTERNATIVO no .env) e existe para o caso de o domínio
+# definitivo ainda não estar publicado: serve para entrar pelo IP, por um sslip.io ou por um
+# domínio provisório enquanto o oficial não entra no ar. Sem ele, o Caddy só tem certificado
+# para o nome principal e RECUSA o handshake de qualquer outro endereço — o navegador não
+# consegue explicar isso e mostra "sem conexão com o servidor", que não tem nada a ver com a
+# plataforma estar de pé.
+#
+# Vazio, a linha fica só com o nome principal e nada muda.
+{$DOMINIO} {$DOMINIO_ALTERNATIVO} {
 	encode zstd gzip
 
 	# Vídeo não é comprimido de novo (gasta CPU à toa) e precisa de tempo para fluir.
