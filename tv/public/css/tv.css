@@ -149,7 +149,10 @@ legend{ padding: 0 6px; font-size: 12px; font-weight: 800; color: var(--text-2);
   border-radius: var(--radius); z-index: 4000; box-shadow: var(--sombra); max-width: calc(100% - 32px); font-weight: 600; border-left: 4px solid var(--acento); }
 .toast.erro{ background: #2D1414; color: #FFC9C9; }
 
-.modal-fundo{ position: fixed; inset: 0; background: rgba(0,0,0,.62); z-index: 3000; display: grid; place-items: center; padding: 18px; overflow-y: auto;
+.modal-fundo{ position: fixed; inset: 0; background: rgba(0,0,0,.62); z-index: 3000; display: grid; place-items: center;
+  /* Janela mais alta que a tela rola, e o começo dela ficava embaixo do relógio do aparelho. */
+  padding: max(18px, env(safe-area-inset-top, 0px)) max(18px, env(safe-area-inset-right, 0px))
+    max(18px, env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px)); overflow-y: auto;
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 /* Vidro só onde há arte ou conteúdo atrás — janela, barra do topo e gaveta. Em lista longa o
    desfoque custa caro na GPU e quase não se nota, então cartão de lista segue sólido. */
@@ -397,17 +400,27 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
 .rodape-app a:hover, .rodape-app button:hover{ text-decoration: underline; color: var(--text-2); }
 
 /* ---------- Player ---------- */
-.player{ position: fixed; inset: 0; z-index: 2500; background: #000; display: flex; flex-direction: column; }
+/* O player cobre a tela inteira (inset: 0), e isso inclui a faixa do relógio e o recorte da
+   câmera. Sem respeitar a área segura, o título ficava embaixo do relógio no aparelho em pé e
+   o entalhe comia a seta de voltar e o botão de pausa no deitado. Estas duas medidas são o
+   recuo lateral de cada lado, nunca menor que o entalhe daquele lado. */
+.player{ position: fixed; inset: 0; z-index: 2500; background: #000; display: flex; flex-direction: column;
+  --p-esq: max(clamp(14px, 3vw, 40px), env(safe-area-inset-left, 0px));
+  --p-dir: max(clamp(14px, 3vw, 40px), env(safe-area-inset-right, 0px)); }
 .player video{ position: absolute; inset: 0; width: 100%; height: 100%; background: #000; }
 .player .cobertura{ position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between;
   background: linear-gradient(180deg, rgba(0,0,0,.75), transparent 20%, transparent 60%, rgba(0,0,0,.85)); transition: opacity .3s; }
 .player.limpo .cobertura{ opacity: 0; pointer-events: none; }
 .player.limpo{ cursor: none; }
-.player .p-topo{ display: flex; align-items: flex-start; gap: 16px; padding: 20px clamp(14px, 3vw, 40px); }
+.player .p-topo{ display: flex; align-items: flex-start; gap: 16px;
+  padding: max(20px, calc(env(safe-area-inset-top, 0px) + 10px)) var(--p-dir) 20px var(--p-esq); }
 .player .p-topo .info{ flex: 1; min-width: 0; }
 .player .p-topo h2{ margin: 0; font-size: clamp(17px, 2vw, 26px); font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,.8); }
 .player .p-topo .sub{ color: #D2D2D2; font-size: 14px; }
-.player .p-base{ padding: 10px clamp(14px, 3vw, 40px) clamp(16px, 3vw, 28px); display: flex; flex-direction: column; gap: 10px; }
+.player .p-base{ padding: 10px var(--p-dir) max(clamp(16px, 3vw, 28px), env(safe-area-inset-bottom, 0px)) var(--p-esq);
+  display: flex; flex-direction: column; gap: 10px; }
+/* "Voltar ao vivo" quebrava em duas linhas e virava um bloco alto no meio dos botões. */
+.player .botoes .btn{ white-space: nowrap; }
 .player .tempo-barra{ display: flex; align-items: center; gap: 14px; }
 .player .trilho{ position: relative; flex: 1; height: 22px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
 .player .trilho .fundo{ position: absolute; left: 0; right: 0; height: 4px; background: rgba(255,255,255,.3); overflow: hidden; }
@@ -426,7 +439,7 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
 .player .volume{ display: flex; align-items: center; gap: 8px; }
 .player .volume input{ width: 90px; min-height: 0; height: 4px; padding: 0; border: 0; background: rgba(255,255,255,.3); accent-color: #fff; }
 @media (max-width: 620px){ .player .volume input{ display: none; } }
-.player .menu-flutuante{ position: absolute; right: clamp(14px, 3vw, 40px); bottom: 92px; background: rgba(20,20,20,.97); border: 1px solid var(--border);
+.player .menu-flutuante{ position: absolute; right: var(--p-dir); bottom: 92px; background: rgba(20,20,20,.97); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 8px; min-width: 220px; box-shadow: var(--sombra); }
 .player .menu-flutuante h4{ margin: 6px 10px 8px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
 .player .menu-flutuante button{ display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; border: 0; background: none;
@@ -437,9 +450,9 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
 .player .rodinha{ width: 56px; height: 56px; border: 4px solid rgba(255,255,255,.22); border-top-color: var(--acento); border-radius: 50%; animation: gira .9s linear infinite; }
 @keyframes gira{ to{ transform: rotate(360deg) } }
 .player .erro-caixa{ position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.9); }
-.player .proximo{ position: absolute; right: clamp(14px, 3vw, 40px); bottom: 100px; background: rgba(20,20,20,.97); border: 1px solid var(--border);
+.player .proximo{ position: absolute; right: var(--p-dir); bottom: 100px; background: rgba(20,20,20,.97); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 14px; width: min(340px, 80vw); box-shadow: var(--sombra); }
-.player .pulo{ position: absolute; right: clamp(14px, 3vw, 40px); bottom: 104px; }
+.player .pulo{ position: absolute; right: var(--p-dir); bottom: 104px; }
 video::cue{ background: rgba(0,0,0,.6); color: #fff; font-family: inherit; }
 
 /* ---------- Painel da operação ---------- */
@@ -498,7 +511,11 @@ video::cue{ background: rgba(0,0,0,.6); color: #fff; font-family: inherit; }
   .menu-botao svg{ width: 22px; height: 22px; fill: currentColor; }
 
   .menu{ position: fixed; top: 0; left: 0; z-index: 60; width: min(280px, 86vw); height: 100dvh;
-    padding: 18px 12px; overflow-y: auto; border-right: 1px solid rgba(255,255,255,.1);
+    /* A gaveta cobre a tela toda de cima a baixo: sem isto a marca nascia atrás do relógio e o
+       último item do menu ficava embaixo da barra de gestos. */
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 12px calc(18px + env(safe-area-inset-bottom, 0px))
+      max(12px, env(safe-area-inset-left, 0px));
+    overflow-y: auto; border-right: 1px solid rgba(255,255,255,.1);
     background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.01) 40%), rgba(16,16,18,.86);
     -webkit-backdrop-filter: blur(24px) saturate(125%); backdrop-filter: blur(24px) saturate(125%);
     transform: translateX(-100%); transition: transform .25s ease; }
@@ -591,6 +608,12 @@ video::cue{ background: rgba(0,0,0,.6); color: #fff; font-family: inherit; }
   .hero{ min-height: 70vh; }
   .hero .texto{ max-width: 100%; }
   .player .p-base{ padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  /* No celular a fileira de baixo tinha sete controles e estourava a largura, empurrando o
+     botão de tela cheia para fora. A barrinha de volume é a primeira a sair: o aparelho já
+     tem botão de volume de verdade. O de silenciar fica. */
+  .player .volume input{ display: none; }
+  .player .botoes{ gap: 2px; }
+  .player .pbtn{ width: 40px; height: 40px; }
   .previa{ display: none !important; }
 }
 @media (max-width: 420px){
