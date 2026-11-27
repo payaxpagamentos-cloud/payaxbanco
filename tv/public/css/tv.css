@@ -452,6 +452,10 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
   align-items: center; justify-content: center; gap: 2px; background: rgba(0,0,0,.88);
   padding: max(24px, env(safe-area-inset-top, 0px)) 24px max(24px, env(safe-area-inset-bottom, 0px));
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+/* Cancelar é saída de emergência, não a ação principal: sem isto o botão virava um retângulo
+   vazio do tamanho de um cartão, competindo com o aviso que importa. */
+.aquecendo .btn{ padding: 9px 22px; min-height: 0; width: auto; }
+.aquecendo > div:nth-of-type(2){ font-size: 17px; font-weight: 600; }
 
 /* Aviso de som: aparece quando o navegador deixou o canal tocar, mas segurou o áudio. Fica
    acima dos controles de baixo e some ao primeiro toque. */
@@ -460,7 +464,10 @@ table.tabela{ width: 100%; border-collapse: collapse; font-size: 14px; }
   box-shadow: 0 6px 24px rgba(0,0,0,.6); }
 .player .aviso-som svg{ width: 18px; height: 18px; fill: currentColor; }
 .player .centro-aviso{ position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
-.player .rodinha{ width: 56px; height: 56px; border: 4px solid rgba(255,255,255,.22); border-top-color: var(--acento); border-radius: 50%; animation: gira .9s linear infinite; }
+/* A rodinha é usada no player E na tela de espera do canal frio, que não é o player. Presa a
+   `.player`, ela simplesmente não aparecia lá — ficava o texto solto, sem sinal de que algo
+   estava acontecendo, que é justamente o contrário do que aquela tela existe para fazer. */
+.rodinha{ width: 56px; height: 56px; border: 4px solid rgba(255,255,255,.22); border-top-color: var(--acento); border-radius: 50%; animation: gira .9s linear infinite; }
 @keyframes gira{ to{ transform: rotate(360deg) } }
 .player .erro-caixa{ position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.9); }
 .player .proximo{ position: absolute; right: var(--p-dir); bottom: 100px; background: rgba(20,20,20,.97); border: 1px solid var(--border);
