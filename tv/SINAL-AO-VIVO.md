@@ -252,3 +252,65 @@ tentativas já houve.
   data center do próprio provedor, e quem cadastra aqui é a operação, não o assinante.
 - **Teto de canais**: passando de `TV_AO_VIVO_MAX`, os canais além do teto ficam marcados com
   falha e um recado dizendo exatamente isso, em vez de a máquina inteira ficar sem memória.
+
+
+---
+
+## Estado da implantação (27/11/2026)
+
+O que está no ar, medido e conferido no servidor do provedor:
+
+| | |
+|---|---|
+| Canais do fornecedor | **116**, todos respondendo (0 falhas no teste) |
+| Vídeo | **116 em H.264** — nenhum H.265 |
+| Áudio | **116 em AAC** — nenhum precisa de conversão |
+| Resolução | 74 em 1280x720, 42 em 1920x1080, todos 30fps |
+| Logos | **todos**, menos os dois canais próprios da casa |
+| Numeração | aberta na antena de SP (2 Cultura … 13 Band); fechada na grade da Claro SP |
+
+Como o sinal vem limpo em todos, a conversão é **remux puro** em todo canal: ~1,8% de um
+núcleo cada, qualidade idêntica à origem, e toca em todo aparelho — inclusive Smart TV e iPhone
+antigos.
+
+### Ajustes aplicados no `.env` deste servidor
+
+```
+TV_AO_VIVO_QUENTES=2,4,5,7,9,11,13     # a TV aberta não esfria: abre na hora
+TV_AO_VIVO_MAX=70                      # teto de canais convertendo ao mesmo tempo
+```
+
+Para conferir o que está valendo:  `grep TV_AO_VIVO /opt/playtechvip/.env`
+
+### O que ficou em aberto
+
+**Grade de programação (EPG).** Não há fonte configurada, então todo canal mostra
+"Programação ao vivo" em vez do nome do programa, e a aba Guia fica vazia de conteúdo. A
+plataforma importa XMLTV e casa os canais sozinha (`scripts/epg-mapear.js`), mas o endereço do
+arquivo é escolha da operação — o projeto não embute nenhum de propósito.
+
+O caminho natural é **pedir ao fornecedor do sinal**: quem licencia os canais normalmente
+entrega a grade junto, e é a fonte que corresponde exatamente ao que está sendo transmitido.
+Fonte pública de terceiros não foi indicada aqui porque não houve como testar cobertura,
+atualização nem licença — e grade de emissora retransmitida sem autorização é problema jurídico,
+não técnico.
+
+Com a URL em mãos:
+
+```bash
+cd /opt/playtechvip
+sudo docker compose exec app node scripts/epg-mapear.js --listar <url>   # ver o que o arquivo traz
+sudo docker compose exec app node scripts/epg-mapear.js <url>            # casar e importar
+```
+
+Depois disso a importação diária passa a casar sozinha, e o guia enche.
+
+**Dimensionamento para a base inteira.** A máquina atual (7 GB de RAM, 4 núcleos) atende um
+piloto de algumas centenas de assinantes simultâneos. O limite não é o processador nem a
+conversão: é a **banda de saída**, que é física do link. Com a mistura de 720p e 1080p desta
+grade, mil pessoas assistindo ao mesmo tempo pedem cerca de 3,7 Gbps. Para a base de 20 mil, o
+caminho é servidor de borda ou CDN — a plataforma já separa origem de entrega para isso.
+
+**Dois canais próprios** (PLAY Destaques e PLAY Cinema) estão desligados, aguardando o conteúdo
+da casa. Eles vêm da instalação com sinal de demonstração; quando forem montados de verdade, é
+só trocar o endereço e religar.
