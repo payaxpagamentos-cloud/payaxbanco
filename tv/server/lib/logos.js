@@ -23,6 +23,21 @@ const midia = require('./midia');
 const equipeLogos = { id: null, nome: 'logos' };
 
 /**
+ * Quem ainda precisa de logo, em SQL — um lugar só.
+ *
+ * Entram os canais sem logo E os que estão com o logo de DEMONSTRAÇÃO (o quadrado com gradiente
+ * e as iniciais que a instalação desenha). Estes últimos pareciam resolvidos e não estavam.
+ *
+ * Mora aqui como constante porque a regra existia em dois lugares — a busca em si e a contagem
+ * que decide se vale a pena rodar — e eu corrigi só um. O script via "todos já têm logo" e saía
+ * antes de chegar na parte corrigida: o SBT ficou de fora por isso, e o relatório dizia que
+ * estava tudo certo. Uma regra, uma cópia.
+ *
+ * Usa `c` para canais e `m` para a mídia do logo (LEFT JOIN).
+ */
+const PRECISA_DE_LOGO = "c.logo_midia_id IS NULL OR m.nome_original LIKE 'logo-%.svg'";
+
+/**
  * O quanto o logo se destaca do preto, de 0 (some) a 1 (salta aos olhos).
  *
  * Logo de emissora costuma vir com fundo transparente, e metade deles é escuro: SporTV, HBO,
@@ -129,11 +144,8 @@ async function aplicar(db, canalId, { url = null, forcar = false, hostsBloqueado
 const RECUSAS_ATE_DESISTIR = 5;
 
 async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200, aoAndar = null } = {}) {
-  // Entram os sem logo E os que estão com o logo de demonstração — estes últimos pareciam
-  // resolvidos e não estavam.
   const canais = db.prepare(`SELECT c.id, c.nome FROM canais c LEFT JOIN midias m ON m.id = c.logo_midia_id
-    ${forcar ? '' : "WHERE c.logo_midia_id IS NULL OR m.nome_original LIKE 'logo-%.svg'"}
-    ORDER BY c.numero`).all();
+    ${forcar ? '' : `WHERE ${PRECISA_DE_LOGO}`} ORDER BY c.numero`).all();
   const comLogo = [];
   const semLogo = [];
   const falharam = [];
@@ -176,4 +188,4 @@ async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200, aoAndar = nu
   return { com_logo: comLogo, sem_logo: semLogo, falharam, hosts_bloqueados: [...bloqueados], pulados };
 }
 
-module.exports = { aplicar, aplicarEmTodos, medirLuz, medirDoCanal, ehDeDemonstracao };
+module.exports = { aplicar, aplicarEmTodos, medirLuz, medirDoCanal, ehDeDemonstracao, PRECISA_DE_LOGO };

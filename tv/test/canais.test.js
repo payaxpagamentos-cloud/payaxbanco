@@ -383,3 +383,34 @@ test('logo de demonstração é tratado como "sem logo", não como resolvido', a
     { nome: 'logo-chaves' });
   assert.equal(logos.ehDeDemonstracao(s.db, png.id), false, 'logo de verdade não pode ser trocado por engano');
 });
+
+test('a contagem de quem precisa de logo usa a MESMA regra da busca', async (t) => {
+  // Por que isto existe: a regra de "quem precisa de logo" tinha duas cópias — a busca em si e a
+  // contagem que decide se vale a pena rodar. Corrigi uma e esqueci a outra. O script via "todos
+  // já têm logo", saía antes de chegar na parte corrigida, e o relatório dizia que estava tudo
+  // certo enquanto o SBT seguia com o logo de demonstração na grade.
+  const logos = require('../server/lib/logos');
+  const midia = require('../server/lib/midia');
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const canal = (await s.post('/admin/canais', { numero: 92, nome: 'Só Demonstração', url_hls: 'https://origem.test/x.m3u8' }, admin)).dados.canal;
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#444"/></svg>');
+  const demo = midia.salvarImagem(s.db, { id: null, nome: 'logos' }, svg, { nome: 'logo-so-demonstracao.svg' });
+  s.db.prepare('UPDATE canais SET logo_midia_id = ? WHERE id = ?').run(demo.id, canal.id);
+
+  // A contagem (a que o script usa para decidir se roda) precisa enxergar este canal.
+  const quantos = s.db.prepare(`SELECT COUNT(*) AS n FROM canais c LEFT JOIN midias m ON m.id = c.logo_midia_id
+    WHERE ${logos.PRECISA_DE_LOGO}`).get().n;
+  assert.ok(quantos >= 1, 'canal com logo de demonstração tem de entrar na conta, senão o script nem roda');
+
+  // E a regra não pode varrer quem já tem logo de verdade.
+  const png = midia.salvarImagem(s.db, { id: null, nome: 'logos' },
+    require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'logos-canais', '01-chaves.png')), { nome: 'logo-chaves' });
+  const outro = (await s.post('/admin/canais', { numero: 93, nome: 'Com Logo Bom', url_hls: 'https://origem.test/y.m3u8' }, admin)).dados.canal;
+  s.db.prepare('UPDATE canais SET logo_midia_id = ? WHERE id = ?').run(png.id, outro.id);
+  const aindaPrecisam = s.db.prepare(`SELECT c.nome FROM canais c LEFT JOIN midias m ON m.id = c.logo_midia_id
+    WHERE ${logos.PRECISA_DE_LOGO}`).all().map((x) => x.nome);
+  assert.ok(aindaPrecisam.includes('Só Demonstração'));
+  assert.ok(!aindaPrecisam.includes('Com Logo Bom'), 'logo de verdade não pode ser refeito à toa');
+});

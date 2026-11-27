@@ -35,7 +35,11 @@ const db = abrir();
     console.log(`  ${medidos} medido(s).\n`);
   }
 
-  const quantos = db.prepare(`SELECT COUNT(*) AS n FROM canais ${forcar ? '' : 'WHERE logo_midia_id IS NULL'}`).get().n;
+  // A MESMA regra da busca (logos.PRECISA_DE_LOGO). Esta contagem tinha uma cópia própria, que
+  // ficou para trás quando a regra mudou: o script via "todos já têm logo" e saía antes de
+  // chegar na busca corrigida.
+  const quantos = db.prepare(`SELECT COUNT(*) AS n FROM canais c LEFT JOIN midias m ON m.id = c.logo_midia_id
+    ${forcar ? '' : `WHERE ${logos.PRECISA_DE_LOGO}`}`).get().n;
   if (!quantos) {
     console.log('Todos os canais já têm logo. Use --forcar para buscar de novo.');
     return;
