@@ -56,7 +56,8 @@
       "priceSuffix": "/mês",
       "terms": "",
       "features": [],
-      "button": "Quero este plano"
+      "button": "Quero este plano",
+      "apps": []
     },
     {
       "id": "play-700",
@@ -69,10 +70,44 @@
       "priceSuffix": "/mês",
       "terms": "",
       "features": [
-        "+1 app Standard",
-        "Ubook Plus, Nutri, Fluid e outros"
+        "SKY+ e Globo inclusos",
+        "+1 app Standard à sua escolha"
       ],
-      "button": "Quero este plano"
+      "button": "Quero este plano",
+      "apps": [
+        {
+          "nome": "SKY+",
+          "logo": ""
+        },
+        {
+          "nome": "Globo",
+          "logo": ""
+        },
+        {
+          "nome": "Social Games",
+          "logo": ""
+        },
+        {
+          "nome": "Nutri",
+          "logo": ""
+        },
+        {
+          "nome": "Ubook Plus",
+          "logo": ""
+        },
+        {
+          "nome": "Fluid",
+          "logo": ""
+        },
+        {
+          "nome": "HUB",
+          "logo": ""
+        },
+        {
+          "nome": "PK+",
+          "logo": ""
+        }
+      ]
     },
     {
       "id": "ultra-800",
@@ -85,11 +120,32 @@
       "priceSuffix": "/mês",
       "terms": "",
       "features": [
-        "SKY+ e Prime Video",
-        "+1 app Premium",
-        "Disney+, HBO Max, Globoplay e outros"
+        "SKY+ e Prime Video inclusos",
+        "+1 app Premium à sua escolha"
       ],
-      "button": "Quero este plano"
+      "button": "Quero este plano",
+      "apps": [
+        {
+          "nome": "SKY+",
+          "logo": ""
+        },
+        {
+          "nome": "Prime Video",
+          "logo": ""
+        },
+        {
+          "nome": "Disney+",
+          "logo": ""
+        },
+        {
+          "nome": "HBO Max",
+          "logo": ""
+        },
+        {
+          "nome": "Globoplay",
+          "logo": ""
+        }
+      ]
     },
     {
       "id": "power-900",
@@ -102,12 +158,45 @@
       "priceSuffix": "/mês",
       "terms": "",
       "features": [
-        "SKY+ e Prime Video",
+        "SKY+ e Prime Video inclusos",
         "+1 app Premium",
-        "+1 app Avançado ou Standard",
-        "Deezer, Globoplay, Looke e outros"
+        "+1 app Avançado ou Standard"
       ],
-      "button": "Quero este plano"
+      "button": "Quero este plano",
+      "apps": [
+        {
+          "nome": "SKY+",
+          "logo": ""
+        },
+        {
+          "nome": "Prime Video",
+          "logo": ""
+        },
+        {
+          "nome": "Deezer",
+          "logo": ""
+        },
+        {
+          "nome": "Globoplay",
+          "logo": ""
+        },
+        {
+          "nome": "Doowey",
+          "logo": ""
+        },
+        {
+          "nome": "Looke",
+          "logo": ""
+        },
+        {
+          "nome": "HotGo",
+          "logo": ""
+        },
+        {
+          "nome": "PK+",
+          "logo": ""
+        }
+      ]
     }
   ]
 }

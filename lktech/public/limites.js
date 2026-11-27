@@ -36,6 +36,7 @@ export const LIMITES = {
   'plans.terms': 120,
   'plans.features': 40,
   'plans.button': 20,
+  'plans.apps.nome': 16,
 
   // Textos
   'services.title': 40,
@@ -60,7 +61,7 @@ export const LIMITES = {
 export const LINHAS = { 'services.title': 2, 'faqs.answer': 8 };
 
 // Quantidade máxima de itens em listas.
-export const QUANTIDADE = { banners: 8, plans: 12, features: 4, faqs: 12 };
+export const QUANTIDADE = { banners: 8, plans: 12, features: 4, faqs: 12, apps: 8 };
 
 // Preço máximo exibível sem estourar o cartão (R$ 9.999,99).
 export const PRECO_MAXIMO = 9999.99;
@@ -71,7 +72,10 @@ export const IMAGENS = {
   banner: { nome: 'Banner para computador', medida: [1920, 1080], minima: [1600, 900], formato: 'horizontal (16:9)', pesoIdeal: '300 a 600 KB',
     dica: 'O lado esquerdo fica escurecido para o texto do banner. Deixe pessoas e produtos na metade direita da foto.' },
   bannerCelular: { nome: 'Banner para celular', medida: [1080, 1440], minima: [720, 960], formato: 'vertical (3:4)', pesoIdeal: '150 a 350 KB',
-    dica: 'No celular a foto aparece no alto e o texto embaixo dela. Deixe o assunto principal no centro, na parte de cima.' }
+    dica: 'No celular a foto aparece no alto e o texto embaixo dela. Deixe o assunto principal no centro, na parte de cima.' },
+  app: { nome: 'Logo de aplicativo (streaming)', medida: [300, 300], minima: [96, 96], formato: 'quadrado ou horizontal', pesoIdeal: 'até 50 KB',
+    tipoArquivo: 'PNG com fundo transparente (ou SVG convertido em PNG)',
+    dica: 'Use o logo oficial enviado pelo fornecedor do aplicativo. Ele aparece pequeno, dentro de um selo branco.' }
 };
 export const TIPOS_DE_IMAGEM = ['image/jpeg', 'image/webp', 'image/png'];
 export const GUIA_QUALIDADE = [

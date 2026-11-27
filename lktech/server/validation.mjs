@@ -39,7 +39,7 @@ export function validateConfig(c) {
   const banners = unique(list(c.banners, 'banners', QUANTIDADE.banners, true).map(v => ({ id: id(v.id), active: bool(v.active), eyebrow: texto(v.eyebrow, 'banners.eyebrow', 'etiqueta do banner'), title: texto(v.title, 'banners.title', 'título do banner', true), highlight: texto(v.highlight, 'banners.highlight', 'trecho em laranja'), subtitle: texto(v.subtitle, 'banners.subtitle', 'descrição do banner'), image: safeUrl(v.image, true), mobileImage: safeUrl(v.mobileImage || '', true), imagePosition: posicao(v.imagePosition), primaryLabel: texto(v.primaryLabel, 'banners.primaryLabel', 'botão principal'), primaryUrl: safeUrl(v.primaryUrl), secondaryLabel: texto(v.secondaryLabel, 'banners.secondaryLabel', 'botão secundário'), secondaryUrl: safeUrl(v.secondaryUrl) })));
   const plans = unique(list(c.plans, 'planos', QUANTIDADE.plans, true).map(v => {
     if (v.price !== null && (!Number.isFinite(v.price) || v.price < 0 || v.price > PRECO_MAXIMO)) fail('Preço inválido. Use um valor de 0 a 9.999,99 ou deixe vazio.');
-    return { id: id(v.id), active: bool(v.active), featured: bool(v.featured), label: texto(v.label, 'plans.label', 'etiqueta do plano'), name: texto(v.name, 'plans.name', 'nome do plano', true), description: texto(v.description, 'plans.description', 'descrição do plano'), price: v.price === null ? null : Math.round(v.price * 100) / 100, priceSuffix: texto(v.priceSuffix, 'plans.priceSuffix', 'período do preço'), terms: texto(v.terms, 'plans.terms', 'condições da oferta'), features: list(v.features, 'benefícios', QUANTIDADE.features).map(s => typeof s !== 'string' ? fail('Confira os benefícios.') : texto(s, 'plans.features', 'benefício')), button: texto(v.button, 'plans.button', 'botão do plano', true) };
+    return { id: id(v.id), active: bool(v.active), featured: bool(v.featured), label: texto(v.label, 'plans.label', 'etiqueta do plano'), name: texto(v.name, 'plans.name', 'nome do plano', true), description: texto(v.description, 'plans.description', 'descrição do plano'), price: v.price === null ? null : Math.round(v.price * 100) / 100, priceSuffix: texto(v.priceSuffix, 'plans.priceSuffix', 'período do preço'), terms: texto(v.terms, 'plans.terms', 'condições da oferta'), apps: list(v.apps ?? [], 'aplicativos', QUANTIDADE.apps, true).map(app => ({ nome: texto(app.nome, 'plans.apps.nome', 'nome do aplicativo', true), logo: safeUrl(app.logo ?? '', true) })), features: list(v.features, 'benefícios', QUANTIDADE.features).map(s => typeof s !== 'string' ? fail('Confira os benefícios.') : texto(s, 'plans.features', 'benefício')), button: texto(v.button, 'plans.button', 'botão do plano', true) };
   }));
   if (!banners.some(v => v.active)) fail('Mantenha ao menos um banner ativo.');
   if (!plans.some(v => v.active)) fail('Mantenha ao menos um plano ativo.');
@@ -88,12 +88,14 @@ export function ajustarAosLimites(entrada) {
   }
   if (!Array.isArray(c.coverage.ranges)) c.coverage.ranges = [];
   const objeto = v => v && typeof v === 'object' && !Array.isArray(v);
-  const modeloPlano = { id: '', active: true, featured: false, label: '', name: 'Plano', description: '', price: null, priceSuffix: '/mês', terms: '', features: [], button: 'Consultar plano' };
+  const modeloPlano = { id: '', active: true, featured: false, label: '', name: 'Plano', description: '', price: null, priceSuffix: '/mês', terms: '', features: [], apps: [], button: 'Consultar plano' };
   c.banners = c.banners.filter(objeto).map((v, i) => ({ ...base.banners[0], id: 'banner-' + i, ...v }));
   c.plans = c.plans.filter(objeto).map((v, i) => ({ ...modeloPlano, id: 'plano-' + i, ...v }));
   c.faqs = c.faqs.filter(v => objeto(v) && typeof v.question === 'string' && typeof v.answer === 'string');
   c.coverage.ranges = c.coverage.ranges.filter(v => objeto(v) && /^\d{8}$/.test(String(v.start).replace(/\D/g, '')) && /^\d{8}$/.test(String(v.end).replace(/\D/g, '')));
   for (const p of c.plans) p.features = Array.isArray(p.features) ? p.features.filter(f => typeof f === 'string') : [];
+  const logoSeguro = v => { try { return typeof v === 'string' ? safeUrl(v, true) : ''; } catch { return ''; } };
+  for (const p of c.plans) p.apps = Array.isArray(p.apps) ? p.apps.filter(a => objeto(a) && typeof a.nome === 'string' && a.nome.trim()).map(a => ({ nome: a.nome, logo: logoSeguro(a.logo) })) : [];
   // Texto que não é texto vira o valor inicial, para nada aparecer como "undefined" no site.
   const textos = (obj, modelo) => { for (const [k, v] of Object.entries(modelo)) if (typeof v === 'string' && typeof obj[k] !== 'string') obj[k] = v; };
   for (const secao of ['brand', 'seo', 'contact', 'hero', 'plansSection', 'services', 'coverage', 'customer']) textos(c[secao], base[secao]);

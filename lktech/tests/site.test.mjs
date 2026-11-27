@@ -223,3 +223,15 @@ test('campanhas prontas (pasta conteudo/) respeitam as regras do painel e as ima
     for (const b of r.banners) for (const img of [b.image, b.mobileImage].filter(v => v.startsWith('/assets/'))) await access(new URL('../public' + img, import.meta.url));
   }
 });
+
+test('aplicativos dos planos: até 8, nome curto e logo só por endereço seguro', async () => {
+  const { validateConfig, ajustarAosLimites } = await import('../server/validation.mjs');
+  const { seed } = await import('../server/seed.mjs');
+  const com = apps => { const c = structuredClone(seed); c.plans[0].apps = apps; return c; };
+  assert.equal(validateConfig(com([{ nome: 'SKY+', logo: '/uploads/0f8fad5b-d9cb-469f-a165-70867728950e.png' }, { nome: 'Globo', logo: '' }])).plans[0].apps.length, 2);
+  assert.throws(() => validateConfig(com(Array(9).fill({ nome: 'App', logo: '' }))), /no máximo 8/);
+  assert.throws(() => validateConfig(com([{ nome: 'Nome de aplicativo enorme', logo: '' }])), /caracteres/);
+  assert.throws(() => validateConfig(com([{ nome: 'App', logo: 'javascript:alert(1)' }])));
+  const ajustado = ajustarAosLimites(com([{ nome: 'App', logo: 'javascript:alert(1)' }, null, { nome: '' }]));
+  assert.deepEqual(ajustado.plans[0].apps, [{ nome: 'App', logo: '' }], 'conteúdo antigo: logo perigoso e itens inválidos são descartados');
+});

@@ -53,3 +53,13 @@ td small{font-size:.8rem}
 @media(max-width:1150px){.lead-acoes{flex-wrap:wrap;min-width:0}.lead-acoes select{min-width:0;flex:1 1 140px}.table-scroll td>*{min-width:0}}
 @media(max-width:1150px){.table-scroll td small{grid-column:2}}
 @media(min-width:761px) and (max-width:1150px){.table-scroll tr{max-width:640px}}
+.apps-editor{grid-column:1/-1;border-top:1px solid #e0e7f1;padding-top:16px;display:grid;gap:12px}
+.apps-editor h3{font-size:1rem;margin:0}
+.app-item{display:grid;grid-template-columns:1fr 1.4fr auto;gap:12px;align-items:start;background:#f7f9fc;border:1px solid #e0e7f1;border-radius:12px;padding:12px}
+.app-item>.danger{align-self:center}
+@media(max-width:900px){.app-item{grid-template-columns:1fr}}
+.apps-editor>.secondary{justify-self:start}
+.app-item .image-field{padding:10px 12px}
+.app-item .image-field .field small:not(.aviso-campo){display:none}
+.app-item .image-upload{margin-top:8px}
+.app-item .image-preview{width:auto;max-width:120px;max-height:48px;object-fit:contain;background:#fff;border-radius:8px;padding:4px}
