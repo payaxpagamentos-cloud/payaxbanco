@@ -1,6 +1,6 @@
 # Imagens e identidade
 
-- `public/assets/hero-casal.png`: fotografia criada para este layout e incluída no pacote; usada como primeira imagem de banner. Arquivo com pessoas ilustrativas, sem texto embutido, para permitir edição dos títulos pelo painel.
+- `public/assets/hero-casal.jpg`: fotografia criada para este layout e incluída no pacote; usada como primeira imagem de banner. Arquivo com pessoas ilustrativas, sem texto embutido, para permitir edição dos títulos pelo painel.
 - `public/assets/logo.svg`: reconstrução vetorial clara do logo aprovado, para fundos escuros.
 - `public/assets/logo-dark.svg`: versão para fundo claro.
 - `public/assets/favicon.svg`: ícone LK para a aba do navegador.

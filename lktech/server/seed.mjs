@@ -3,7 +3,7 @@ export const seed = {
   seo: { title: 'LK TECH | Sua vida mais conectada', description: 'Conheça as opções de internet fibra da LK TECH e consulte a disponibilidade para o seu endereço.' },
   contact: { whatsapp: '', email: '', phone: '', address: '', portalUrl: '', invoiceUrl: '', supportUrl: '', privacyUrl: '' },
   hero: { autoplay: true, interval: 6500, badge: 'Sua vida mais conectada.' },
-  banners: [{ id: 'principal', active: true, eyebrow: 'INTERNET FIBRA LK TECH', title: 'Conecte o seu', highlight: 'próximo passo.', subtitle: 'Internet para todos os seus momentos.', image: '/assets/hero-casal.png', mobileImage: '', imagePosition: '65% 50%', primaryLabel: 'Conhecer planos', primaryUrl: '#planos', secondaryLabel: 'Ver cobertura', secondaryUrl: '#cobertura' }],
+  banners: [{ id: 'principal', active: true, eyebrow: 'INTERNET FIBRA LK TECH', title: 'Conecte o seu', highlight: 'próximo passo.', subtitle: 'Internet para todos os seus momentos.', image: '/assets/hero-casal.jpg', mobileImage: '', imagePosition: '65% 50%', primaryLabel: 'Conhecer planos', primaryUrl: '#planos', secondaryLabel: 'Ver cobertura', secondaryUrl: '#cobertura' }],
   plansSection: { title: 'A conexão ideal para você.', subtitle: 'Deslize e encontre o plano ideal para você.', note: 'Exemplos de planos. Consulte ofertas e disponibilidade.', autoplay: false, interval: 6000 },
   plans: [
     { id: 'fibra-500', active: true, featured: false, label: 'INTERNET FIBRA', name: '500 MEGA', description: 'Para a sua casa', price: null, priceSuffix: '/mês', terms: '', features: [], button: 'Consultar plano' },

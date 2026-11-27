@@ -15,3 +15,40 @@ button[data-add]:disabled{opacity:.5;cursor:not-allowed}
 .guia-grade .guia-imagem{margin:0}
 .guia-titulo{font-size:1rem;margin:18px 0 8px}
 .guia-lista{font-size:.9rem;color:#3d4b5f}
+
+/* Acabamento: leitura e toque confortáveis */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.sidebar-label{font-size:.75rem}
+.small{min-height:40px;min-width:40px;font-size:.85rem}
+.check input{width:22px;height:22px;flex-shrink:0}
+.stat span{font-size:.9rem}
+.menu-secoes{display:none}
+@media(max-width:760px){
+  .menu-secoes{display:flex;align-items:center;gap:10px;width:100%;margin-top:14px;min-height:48px;padding:10px 14px;border:1px solid #ffffff26;border-radius:12px;background:#ffffff0d;color:#ffb340;font:inherit;font-weight:650;text-align:left}
+  .menu-secoes .icon{width:20px;height:20px}
+  .menu-secoes-seta{margin-left:auto;color:#c4d3e5;transition:transform .2s}
+  .sidebar.aberto .menu-secoes-seta{transform:rotate(180deg)}
+  .sidebar nav{display:none;overflow:visible;margin-top:8px;padding:0}
+  .sidebar.aberto nav{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .sidebar nav button{white-space:normal;font-size:.88rem;min-height:48px;padding:10px 12px}
+  .sidebar-bottom{margin-top:12px}
+  .sidebar-bottom .secondary{min-height:40px;padding:8px 16px}
+  .small{font-size:.85rem;padding:6px 10px}
+  .stat span{font-size:.8rem}
+  .toolbar-actions>*{font-size:.8rem;min-height:44px}
+}
+.login a{display:inline-flex;align-items:center;min-height:44px}
+@media(max-width:760px){
+  .table-scroll{overflow:visible}
+  .table-scroll table,.table-scroll tbody,.table-scroll tr,.table-scroll td{display:block;width:100%}
+  .table-scroll thead{display:none}
+  .table-scroll table{min-width:0}
+  .table-scroll tr{border:1px solid #dde5ef;border-radius:12px;padding:6px 14px;margin-bottom:12px;background:#fff}
+  .table-scroll td{display:grid;grid-template-columns:112px 1fr;gap:10px;padding:8px 0;border:0;border-bottom:1px solid #eef2f7;overflow-wrap:anywhere}
+  .table-scroll td:last-child{border-bottom:0}
+  .table-scroll td::before{content:attr(data-rotulo);font-size:.8rem;font-weight:650;color:#647992}
+}
+td small{font-size:.8rem}
+.lead-acoes{display:flex;gap:8px;align-items:center}.lead-acoes select{flex:1;min-width:150px}
+@media(max-width:760px){.lead-acoes{flex-wrap:wrap;min-width:0}.lead-acoes select{min-width:0;flex:1 1 140px}.table-scroll td>*{min-width:0}}
+@media(max-width:760px){.table-scroll td small{grid-column:2}}

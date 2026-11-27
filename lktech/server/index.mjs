@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { openStore } from './store.mjs';
 import { sessionFor, createSession, hashPassword, verifyPassword } from './auth.mjs';
-import { HttpError, validateConfig, validateLead } from './validation.mjs';
+import { HttpError, validateConfig, validateLead, ajustarAosLimites } from './validation.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = resolve(ROOT, 'public');
@@ -38,7 +38,24 @@ export function createApp(options = {}) {
   const hours = Math.min(24, Math.max(1, Number(process.env.SESSION_HOURS) || 8));
   const cookie = (value, age = hours * 3600) => `lk_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${production ? '; Secure' : ''}`;
   const dummyHash = hashPassword('unused-password-for-constant-cost');
-  const ip = req => process.env.TRUST_PROXY === 'true' ? String(req.headers['x-forwarded-for'] || req.socket.remoteAddress).split(',')[0].trim().slice(0, 100) : req.socket.remoteAddress;
+  // IP do visitante. Atrás do Caddy vale o último item do X-Forwarded-For (o que o próprio proxy anotou).
+  // Endereços IPv6 são agrupados pela rede /64, para ninguém escapar dos limites trocando de endereço.
+  const ip = req => {
+    const bruto = (process.env.TRUST_PROXY === 'true' ? String(req.headers['x-forwarded-for'] || req.socket.remoteAddress).split(',').at(-1) : String(req.socket.remoteAddress || '')).trim().slice(0, 100).replace(/^::ffff:/, '');
+    if (!bruto.includes(':')) return bruto;
+    const [esq, dir = ''] = bruto.split('::'), a = esq ? esq.split(':') : [], b = dir ? dir.split(':') : [];
+    const partes = [...a, ...Array(Math.max(0, 8 - a.length - b.length)).fill('0'), ...b];
+    return partes.slice(0, 4).join(':') + '::/64';
+  };
+  // No máximo 2 conferências de senha ao mesmo tempo: uma enxurrada de logins não trava o site.
+  let conferindo = 0; const fila = [];
+  const conferirSenha = async (senha, hash) => {
+    if (conferindo >= 2) { if (fila.length >= 20) throw new HttpError(429, 'Muitas tentativas. Aguarde alguns minutos.'); await new Promise(ok => fila.push(ok)); }
+    conferindo++;
+    try { return await verifyPassword(senha, hash); } finally { conferindo--; fila.shift()?.(); }
+  };
+  const publicado = () => { const v = store.read('published'); v.config = ajustarAosLimites(v.config); return v; };
+  const rascunho = () => { const v = store.read('draft'); v.config = ajustarAosLimites(v.config); return v; };
   function checkOrigin(req) {
     const source = req.headers.origin;
     const expected = origin || `http://${req.headers.host}`;
@@ -49,7 +66,7 @@ export function createApp(options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'");
+    res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-src 'self'; frame-ancestors 'self'; object-src 'none'");
     if (production) res.setHeader('Strict-Transport-Security', 'max-age=31536000');
     try {
       const url = new URL(req.url, 'http://local');
@@ -72,7 +89,7 @@ export function createApp(options = {}) {
         if (!['GET','HEAD'].includes(method)) checkOrigin(req);
         if (path === '/api/health' && method === 'GET') return json(res, 200, { ok: true });
         if (path === '/api/site' && method === 'GET') {
-          const value = store.read('published');
+          const value = publicado();
           value.config.banners = value.config.banners.filter(v => v.active);
           value.config.plans = value.config.plans.filter(v => v.active);
           value.config.coverage.ranges = [];
@@ -82,7 +99,7 @@ export function createApp(options = {}) {
           if (!store.limit(`coverage:${ip(req)}`, 40, 600)) throw new HttpError(429, 'Aguarde alguns minutos antes de consultar novamente.');
           const input = await body(req), cep = String(input.cep || '').replace(/\D/g, '');
           if (!/^\d{8}$/.test(cep)) throw new HttpError(400, 'Informe um CEP com 8 dígitos.');
-          const { coverage } = store.read('published').config;
+          const { coverage } = publicado().config;
           const range = coverage.ranges.find(v => cep >= v.start && cep <= v.end);
           const status = range ? 'available' : coverage.strict && coverage.ranges.length ? 'unavailable' : 'manual';
           const message = { available: 'Seu CEP está na nossa região de atendimento. Vamos confirmar a viabilidade no seu endereço?', unavailable: 'Ainda não encontramos cobertura para esse CEP. Deixe seu contato para consultar novas possibilidades.', manual: 'Nossa equipe vai confirmar a disponibilidade para o seu endereço. Deixe seu contato para continuar.' }[status];
@@ -102,8 +119,9 @@ export function createApp(options = {}) {
           const email = String(input.email || '').trim().toLowerCase();
           const password = String(input.password || '');
           if (email.length > 160 || password.length > 512) throw new HttpError(400, 'Confira seus dados.');
+          if (!store.limit(`login-email:${email}`, 10, 900)) throw new HttpError(429, 'Muitas tentativas. Aguarde 15 minutos.');
           const admin = store.db.prepare('SELECT * FROM admins WHERE email=?').get(email);
-          const valid = await verifyPassword(password, admin?.password_hash || await dummyHash);
+          const valid = await conferirSenha(password, admin?.password_hash || await dummyHash);
           if (!admin || !valid) throw new HttpError(401, 'E-mail ou senha inválidos.');
           const session = createSession(store, admin.id, hours);
           return json(res, 200, { email, csrf: session.csrf }, { 'Set-Cookie': cookie(session.token) });
@@ -114,15 +132,20 @@ export function createApp(options = {}) {
           if (!['GET','HEAD'].includes(method) && req.headers['x-csrf-token'] !== session.csrf) throw new HttpError(403, 'Recarregue o painel para continuar.');
           if (path === '/api/admin/me' && method === 'GET') return json(res, 200, { email: session.email, csrf: session.csrf });
           if (path === '/api/admin/logout' && method === 'POST') { store.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.token_hash); return json(res, 200, { ok: true }, { 'Set-Cookie': cookie('', 0) }); }
-          if (path === '/api/admin/content' && method === 'GET') return json(res, 200, store.read('draft'));
+          if (path === '/api/admin/content' && method === 'GET') return json(res, 200, rascunho());
           if (path === '/api/admin/content' && method === 'PUT') { const input = await body(req); return json(res, 200, store.save(validateConfig(input.config), input.revision)); }
-          if (path === '/api/admin/publish' && method === 'POST') { const input = await body(req); return json(res, 200, store.publish(input.revision, session.admin_id)); }
-          if (path === '/api/admin/preview' && method === 'GET') return json(res, 200, store.read('draft'));
+          if (path === '/api/admin/publish' && method === 'POST') {
+            // Só vai ao ar conteúdo que passa por todas as regras (limites, cores e logo fixos).
+            const input = await body(req), conferido = validateConfig(store.read('draft').config);
+            return json(res, 200, store.publish(input.revision, session.admin_id, conferido));
+          }
+          if (path === '/api/admin/preview' && method === 'GET') return json(res, 200, rascunho());
           if (path === '/api/admin/history' && method === 'GET') return json(res, 200, store.db.prepare('SELECT id,created_at FROM history ORDER BY id DESC').all());
           if (path === '/api/admin/restore' && method === 'POST') {
             const input = await body(req), row = store.db.prepare('SELECT body FROM history WHERE id=?').get(Number(input.id));
             if (!row) throw new HttpError(404, 'Versão não encontrada.');
-            return json(res, 200, store.save(validateConfig(JSON.parse(row.body)), input.revision));
+            // Versões antigas são ajustadas aos limites atuais antes de voltar ao rascunho.
+            return json(res, 200, store.save(validateConfig(ajustarAosLimites(JSON.parse(row.body))), input.revision));
           }
           if (path === '/api/admin/media' && method === 'POST') {
             if (!store.limit(`media:${session.admin_id}`, 100, 3600)) throw new HttpError(429, 'Aguarde para enviar novas imagens.');
@@ -132,13 +155,21 @@ export function createApp(options = {}) {
           }
           if (path === '/api/admin/media' && method === 'GET') {
             const { readdir } = await import('node:fs/promises');
-            return json(res, 200, (await readdir(resolve(store.directory, 'uploads'))).filter(n => /^[a-f0-9-]+\.(png|jpg|webp)$/.test(n)).map(n => ({ url: `/uploads/${n}` })).reverse());
+            const pasta = resolve(store.directory, 'uploads'), nomes = (await readdir(pasta)).filter(n => /^[a-f0-9-]+\.(png|jpg|webp)$/.test(n));
+            const lista = await Promise.all(nomes.map(async n => ({ url: `/uploads/${n}`, quando: (await stat(resolve(pasta, n))).mtimeMs })));
+            return json(res, 200, lista.sort((a, b) => b.quando - a.quando).map(({ url }) => ({ url })));
           }
           if (path === '/api/admin/leads' && method === 'GET') return json(res, 200, store.db.prepare('SELECT * FROM leads ORDER BY id DESC LIMIT 1000').all());
           if (/^\/api\/admin\/leads\/\d+$/.test(path) && method === 'PATCH') {
             const input = await body(req);
             if (!['novo','em_atendimento','concluido'].includes(input.status)) throw new HttpError(400, 'Situação inválida.');
-            store.db.prepare('UPDATE leads SET status=? WHERE id=?').run(input.status, Number(path.split('/').at(-1)));
+            const r = store.db.prepare('UPDATE leads SET status=? WHERE id=?').run(input.status, Number(path.split('/').at(-1)));
+            if (!r.changes) throw new HttpError(404, 'Contato não encontrado.');
+            return json(res, 200, { ok: true });
+          }
+          if (/^\/api\/admin\/leads\/\d+$/.test(path) && method === 'DELETE') {
+            const r = store.db.prepare('DELETE FROM leads WHERE id=?').run(Number(path.split('/').at(-1)));
+            if (!r.changes) throw new HttpError(404, 'Contato não encontrado.');
             return json(res, 200, { ok: true });
           }
           if (path === '/api/admin/leads.csv' && method === 'GET') {
@@ -167,21 +198,35 @@ export function createApp(options = {}) {
       else { file = resolve(PUBLIC, '.' + path); if (!file.startsWith(PUBLIC + '/') || !MIME[extname(file)] || /(^|\/)\./.test(path) || path.includes('\\')) throw new HttpError(404, 'Arquivo não encontrado.'); }
       const meta = await stat(file).catch(() => null);
       if (!meta?.isFile()) throw new HttpError(404, 'Arquivo não encontrado.');
+      // JS, CSS e SVG: o navegador sempre confere se mudou (ETag). Depois de uma atualização
+      // ninguém fica com um pedaço antigo do site misturado com um novo.
+      const ext = extname(file), conferirSempre = ['.js', '.css', '.svg'].includes(ext);
+      const etag = `W/"${meta.size.toString(16)}-${Math.floor(meta.mtimeMs).toString(16)}"`;
+      if (conferirSempre && req.headers['if-none-match'] === etag) { res.writeHead(304, { ETag: etag, 'Cache-Control': 'no-cache' }); return res.end(); }
       let bytes = await readFile(file);
       if (file === resolve(PUBLIC, 'index.html')) {
-        const config = store.read('published').config;
+        const config = publicado().config;
         let html = bytes.toString('utf8').replace(/<title>[^<]*<\/title>/, `<title>${htmlEscape(config.seo.title)}</title>`).replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${htmlEscape(config.seo.description)}">`);
-        const image = config.banners.find(v => v.active)?.image;
-        if (image) html = html.replace('href="/assets/hero-casal.png"', `href="${htmlEscape(image)}"`);
+        const primeiro = config.banners.find(v => v.active), image = primeiro?.image;
+        // Pré-carrega só a foto que a tela vai usar (computador ou celular).
+        const preload = !primeiro ? '' : primeiro.mobileImage
+          ? `<link rel="preload" as="image" href="${htmlEscape(primeiro.image)}" media="(min-width: 601px)"><link rel="preload" as="image" href="${htmlEscape(primeiro.mobileImage)}" media="(max-width: 600px)">`
+          : `<link rel="preload" as="image" href="${htmlEscape(primeiro.image)}">`;
+        html = html.replace('<link rel="preload" as="image" href="/assets/hero-casal.jpg">', preload);
         if (origin) {
-          const imagem = image ? (image.startsWith('/') ? origin + image : image) : `${origin}/assets/hero-casal.png`;
+          const imagem = image ? (image.startsWith('/') ? origin + image : image) : `${origin}/assets/hero-casal.jpg`;
           html = html.replace('</head>', `  <link rel="canonical" href="${origin}/">\n  <meta property="og:type" content="website"><meta property="og:url" content="${origin}/"><meta property="og:site_name" content="LK TECH"><meta property="og:locale" content="pt_BR">\n  <meta property="og:title" content="${htmlEscape(config.seo.title)}"><meta property="og:description" content="${htmlEscape(config.seo.description)}"><meta property="og:image" content="${htmlEscape(imagem)}">\n</head>`);
         }
         bytes = Buffer.from(html);
       }
-      res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream', 'Content-Length': bytes.length, 'Cache-Control': extname(file) === '.html' || path.startsWith('/admin') ? 'no-store' : 'public, max-age=3600' });
+      const cache = ext === '.html' || path.startsWith('/admin') ? 'no-store' : conferirSempre ? 'no-cache' : path.startsWith('/uploads/') ? 'public, max-age=31536000, immutable' : 'public, max-age=86400';
+      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Content-Length': bytes.length, 'Cache-Control': cache, ...(conferirSempre ? { ETag: etag } : {}) });
       res.end(method === 'HEAD' ? undefined : bytes);
     } catch (e) {
+      if (!res.headersSent && e.status === 404 && !req.url.startsWith('/api/') && ['GET', 'HEAD'].includes(req.method)) {
+        const pagina = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Página não encontrada | LK TECH</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/site.css"></head><body><main class="load-error"><img src="/assets/logo.svg" alt="LK TECH" width="190" height="65"><h1>Página não encontrada.</h1><p>O endereço que você abriu não existe ou mudou.</p><a class="primary" href="/">Ir para o início</a></main></body></html>';
+        res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end(req.method === 'HEAD' ? undefined : pagina);
+      }
       if (!res.headersSent) json(res, e.status || (e instanceof URIError ? 400 : 500), { error: e.status ? e.message : 'Não foi possível concluir. Tente novamente.' });
       else res.end();
       if (!e.status && !(e instanceof URIError)) console.error('Erro no servidor:', e.message);

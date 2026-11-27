@@ -1,4 +1,5 @@
 import { LIMITES, LINHAS, QUANTIDADE, PRECO_MAXIMO, CORES, LOGO } from '../public/limites.js';
+import { seed } from './seed.mjs';
 export class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const fail = text => { throw new HttpError(400, text); };
 function string(value, name, max = 240, required = false) {
@@ -43,8 +44,11 @@ export function validateConfig(c) {
   if (!banners.some(v => v.active)) fail('Mantenha ao menos um banner ativo.');
   if (!plans.some(v => v.active)) fail('Mantenha ao menos um plano ativo.');
   const ranges = list(c.coverage?.ranges, 'cobertura', 300).map(v => {
-    if (!/^\d{8}$/.test(v.start) || !/^\d{8}$/.test(v.end) || v.start > v.end) fail('Confira o intervalo de CEPs.');
-    return { name: texto(v.name, 'coverage.ranges.name', 'região', true), start: v.start, end: v.end };
+    const start = String(v.start ?? '').replace(/\D/g, ''), end = String(v.end ?? '').replace(/\D/g, '');
+    const nome = typeof v.name === 'string' && v.name.trim() ? ` da região “${v.name.trim().slice(0, 60)}”` : '';
+    if (!/^\d{8}$/.test(start) || !/^\d{8}$/.test(end)) fail(`Confira os CEPs${nome}: use 8 dígitos, por exemplo 01000-000.`);
+    if (start > end) fail(`Confira os CEPs${nome}: o CEP inicial deve ser menor que o final.`);
+    return { name: texto(v.name, 'coverage.ranges.name', 'região', true), start, end };
   });
   const whatsapp = string(contact.whatsapp, 'WhatsApp', 20).replace(/\D/g, '');
   if (whatsapp && !/^\d{10,15}$/.test(whatsapp)) fail('Confira o WhatsApp com DDI e DDD.');
@@ -69,4 +73,41 @@ export function validateLead(body) {
   if (cep && !/^\d{8}$/.test(cep)) fail('Informe um CEP com 8 dígitos.');
   if (body.consent !== true) fail('Autorize o contato para enviar.');
   return { name, phone, cep, plan: string(body.plan || '', 'plano', 100) };
+}
+
+// Ajusta um conteúdo qualquer (inclusive antigo, gravado antes das regras atuais) para caber
+// no desenho do site: completa o que falta com o conteúdo inicial, encurta textos longos,
+// corta listas no máximo permitido e fixa cores e logo. Nunca lança erro.
+export function ajustarAosLimites(entrada) {
+  const c = entrada && typeof entrada === 'object' ? structuredClone(entrada) : {};
+  const base = structuredClone(seed);
+  for (const [secao, padrao] of Object.entries(base)) {
+    if (Array.isArray(padrao)) { if (!Array.isArray(c[secao])) c[secao] = padrao; }
+    else if (!c[secao] || typeof c[secao] !== 'object' || Array.isArray(c[secao])) c[secao] = padrao;
+    else c[secao] = { ...padrao, ...c[secao] };
+  }
+  if (!Array.isArray(c.coverage.ranges)) c.coverage.ranges = [];
+  const corta = (texto, caminho) => {
+    const linhas = LINHAS[caminho] || 1;
+    let limpo = linhas > 1
+      ? texto.replace(/\r/g, '').split('\n').map(v => v.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, linhas).join('\n')
+      : texto.replace(/\s+/g, ' ').trim();
+    const max = LIMITES[caminho];
+    return max && limpo.length > max ? limpo.slice(0, max).trimEnd() : limpo;
+  };
+  const percorre = (valor, caminho) => {
+    if (typeof valor === 'string') return LIMITES[caminho] ? corta(valor, caminho) : valor;
+    if (Array.isArray(valor)) {
+      const nome = caminho.split('.').at(-1);
+      const lista = QUANTIDADE[nome] ? valor.slice(0, QUANTIDADE[nome]) : valor;
+      return lista.map(v => percorre(v, caminho));
+    }
+    if (valor && typeof valor === 'object') { for (const k of Object.keys(valor)) valor[k] = percorre(valor[k], caminho ? `${caminho}.${k}` : k); return valor; }
+    return valor;
+  };
+  percorre(c, '');
+  for (const p of c.plans) if (p && p.price !== null && !(Number.isFinite(p.price) && p.price >= 0 && p.price <= PRECO_MAXIMO)) p.price = null;
+  for (const p of c.plans) if (p && !Array.isArray(p.features)) p.features = [];
+  c.brand.accent = CORES.accent; c.brand.background = CORES.background; c.brand.logo = LOGO;
+  return c;
 }

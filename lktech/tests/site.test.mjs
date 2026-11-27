@@ -61,7 +61,7 @@ test('fluxo real: autenticação, rascunho, publicação, upload, cobertura, lea
 });
 
 test('arquivos de mídia e referências de entrada existem',async()=>{
-  for(const path of ['public/assets/logo.svg','public/assets/favicon.svg','public/assets/hero-casal.png','docs/referencia-layout.png'])assert.ok((await readFile(new URL('../'+path,import.meta.url))).length>0,path);
+  for(const path of ['public/assets/logo.svg','public/assets/favicon.svg','public/assets/hero-casal.jpg','docs/referencia-layout.png'])assert.ok((await readFile(new URL('../'+path,import.meta.url))).length>0,path);
 });
 
 test('painel não consegue entortar o layout: limites, linhas, quantidade, preço e cores', async () => {
@@ -102,9 +102,56 @@ test('domínio oficial: www redireciona, Google recebe endereço oficial e paine
     const outro = await pedir('/', 'outrosite.com.br'); assert.equal(outro.status, 200, 'só o www do próprio domínio é redirecionado');
     const html = (await pedir('/', 'lktechprovedor.com.br')).corpo;
     assert.match(html, /<link rel="canonical" href="https:\/\/lktechprovedor\.com\.br\/">/);
-    assert.match(html, /og:image" content="https:\/\/lktechprovedor\.com\.br\/assets\/hero-casal\.png"/);
+    assert.match(html, /og:image" content="https:\/\/lktechprovedor\.com\.br\/assets\/hero-casal\.jpg"/);
     const robots = await (await fetch(base + '/robots.txt')).text();
     assert.match(robots, /Disallow: \/admin/); assert.match(robots, /Sitemap: https:\/\/lktechprovedor\.com\.br\/sitemap\.xml/);
     assert.match(await (await fetch(base + '/sitemap.xml')).text(), /<loc>https:\/\/lktechprovedor\.com\.br\/<\/loc>/);
   } finally { await new Promise(r => app.server.close(r)); app.store?.close?.(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('conteúdo antigo fora das regras não derruba o site; publicar valida; restaurar ajusta; contatos podem ser excluídos', async () => {
+  const { createApp } = await import('../server/index.mjs');
+  const { hashPassword } = await import('../server/auth.mjs');
+  const { mkdtemp, rm } = await import('node:fs/promises'); const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+  const directory = await mkdtemp(join(tmpdir(), 'lk-antigo-'));
+  const app = createApp({ dataDir: directory, production: false });
+  await new Promise(r => app.server.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${app.server.address().port}`;
+  try {
+    // Conteúdo gravado por uma versão antiga: texto enorme, cores e logo trocados, perguntas ausentes.
+    const antigo = JSON.parse(app.store.db.prepare("SELECT body FROM documents WHERE kind='published'").get().body);
+    antigo.banners[0].title = 'T'.repeat(200); antigo.brand.accent = '#00ff00'; antigo.brand.logo = 'https://exemplo.com/logo.png'; delete antigo.faqs;
+    for (const kind of ['published', 'draft']) app.store.db.prepare('UPDATE documents SET body=? WHERE kind=?').run(JSON.stringify(antigo), kind);
+    app.store.db.prepare('INSERT INTO history(body,created_at,admin_id) VALUES(?,?,NULL)').run(JSON.stringify(antigo), new Date().toISOString());
+    const site = (await (await fetch(base + '/api/site')).json()).config;
+    assert.equal(site.banners[0].title.length, 24, 'texto antigo é encurtado para caber');
+    assert.deepEqual(site.faqs, [], 'campo ausente é completado');
+    assert.equal(site.brand.accent, '#ff9300'); assert.equal(site.brand.logo, '/assets/logo.svg');
+
+    app.store.db.prepare('INSERT INTO admins(email,password_hash,created_at) VALUES(?,?,?)').run('a@exemplo.com', await hashPassword('SenhaDeTeste12345'), new Date().toISOString());
+    const login = await fetch(base + '/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ email: 'a@exemplo.com', password: 'SenhaDeTeste12345' }) });
+    const cookie = login.headers.get('set-cookie').split(';')[0], { csrf } = await login.json();
+    const admin = (caminho, method = 'GET', dados) => fetch(base + '/api/admin/' + caminho, { method, headers: { Cookie: cookie, 'X-CSRF-Token': csrf, Origin: base, ...(dados ? { 'Content-Type': 'application/json' } : {}) }, ...(dados ? { body: JSON.stringify(dados) } : {}) });
+    const rev = (await (await admin('content')).json()).revision;
+    const pub = await admin('publish', 'POST', { revision: rev });
+    assert.equal(pub.status, 400, 'rascunho fora das regras não vai ao ar');
+    assert.match((await pub.json()).error, /caracteres/);
+    const historico = (await (await admin('history')).json())[0].id;
+    const restaurado = await admin('restore', 'POST', { id: historico, revision: rev });
+    assert.equal(restaurado.status, 200, 'versão antiga é ajustada ao restaurar');
+    const novoRev = (await restaurado.json()).revision;
+    assert.equal((await admin('publish', 'POST', { revision: novoRev })).status, 200, 'depois de ajustada, publica normalmente');
+
+    app.store.db.prepare("INSERT INTO leads(name,phone,cep,plan,created_at) VALUES('Maria','11999999999','','',?)").run(new Date().toISOString());
+    const id = app.store.db.prepare('SELECT id FROM leads').get().id;
+    assert.equal((await admin('leads/999999', 'PATCH', { status: 'concluido' })).status, 404);
+    assert.equal((await admin('leads/' + id, 'DELETE')).status, 200);
+    assert.equal(app.store.db.prepare('SELECT COUNT(*) n FROM leads').get().n, 0, 'contato excluído de verdade');
+
+    const pagina404 = await fetch(base + '/pagina-que-nao-existe');
+    assert.equal(pagina404.status, 404); assert.match(await pagina404.text(), /Página não encontrada/);
+    const js = await fetch(base + '/site.js'); const etag = js.headers.get('etag');
+    assert.equal(js.headers.get('cache-control'), 'no-cache');
+    assert.equal((await fetch(base + '/site.js', { headers: { 'If-None-Match': etag } })).status, 304, 'arquivo igual não é baixado de novo');
+  } finally { await new Promise(r => app.server.close(r)); await rm(directory, { recursive: true, force: true }); }
 });

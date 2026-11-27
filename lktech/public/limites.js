@@ -50,7 +50,9 @@ export const LIMITES = {
   'customer.support': 20,
   'faqs.question': 110,
   'faqs.answer': 600,
-  'coverage.ranges.name': 60
+  'coverage.ranges.name': 60,
+  'coverage.ranges.start': 9,
+  'coverage.ranges.end': 9
 };
 
 // Campos que aceitam quebra de linha e quantas linhas no máximo.

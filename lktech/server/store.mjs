@@ -27,8 +27,9 @@ export function openStore(directory = resolve(process.env.DATA_DIR || 'data')) {
       if (!result.changes) throw Object.assign(new Error('Este conteúdo foi alterado em outra sessão. Recarregue antes de salvar.'), { status: 409 });
       return read('draft');
     },
-    publish(expected, adminId) { return transaction(() => {
+    publish(expected, adminId, conferido) { return transaction(() => {
       const draft = read('draft');
+      if (conferido) draft.config = conferido;
       if (draft.revision !== expected) throw Object.assign(new Error('O rascunho mudou. Recarregue antes de publicar.'), { status: 409 });
       db.prepare('INSERT INTO history(body,created_at,admin_id) VALUES(?,?,?)').run(JSON.stringify(read('published').config), new Date().toISOString(), adminId);
       db.prepare('UPDATE documents SET body=?,revision=revision+1,updated_at=? WHERE kind=\'published\'').run(JSON.stringify(draft.config), new Date().toISOString());

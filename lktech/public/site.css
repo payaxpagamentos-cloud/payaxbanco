@@ -60,3 +60,24 @@ h1,h2,h3,p,li,summary,.footer-contact,.footer-contact a,.hero-badge span,.servic
   .footer .logo{width:145px;height:50px}
   .hero-buttons>a{flex:1 1 0}
 }
+
+/* Acabamento: alvos de toque confortáveis no celular (mínimo 44px) */
+@media(max-width:850px){
+  .mobile-toggle{min-width:44px;min-height:44px;display:grid;place-items:center}
+  .header-account{min-height:44px}
+  .carousel-arrow{width:44px;height:44px}
+  .coverage-next{min-height:44px}
+  .footer nav a,.footer nav .text-button{display:inline-flex;align-items:center;min-height:44px}
+}
+@media(max-width:600px){
+  .mobile-toggle{display:grid}
+  .carousel-arrow{width:40px;height:40px}
+  .carousel-arrow.prev{left:-12px}
+  .carousel-arrow.next{right:-12px}
+}
+.dialog-close{min-width:44px;min-height:44px;display:grid;place-items:center}
+dialog .consent input{width:22px;height:22px;margin-top:1px}
+.plan-controls{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:7px}
+.plan-controls .plan-dots{margin-top:0}
+.plan-pause{min-width:36px;min-height:36px;border-radius:50%;border:1px solid var(--line);background:#19324d99;color:white;font-size:.8rem}
+@media(max-width:600px){.plan-pause{min-width:44px;min-height:44px}}
