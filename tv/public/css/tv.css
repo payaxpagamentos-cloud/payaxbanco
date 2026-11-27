@@ -504,7 +504,35 @@ video::cue{ background: rgba(0,0,0,.6); color: #fff; font-family: inherit; }
   .topo{ gap: 10px; padding: 0 14px; background: linear-gradient(180deg, rgba(0,0,0,.95), rgba(0,0,0,.8) 70%, transparent); }
   .topo nav{ position: fixed; left: 0; right: 0; bottom: 0; z-index: 950; justify-content: space-between; gap: 2px;
     background: rgba(0,0,0,.96); border-top: 1px solid var(--border); padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
-  .topo nav button{ font-size: 12px; padding: 7px 9px; }
+  /* Alvos de toque. O polegar precisa de uns 44px; a barra de baixo tinha 28px de altura,
+     e era a navegação principal do app no celular. */
+  .topo nav button{ font-size: 12px; padding: 0 9px; min-height: 44px; display: inline-flex;
+    align-items: center; justify-content: center; }
+
+  /* "Ver tudo" só aparecia com o mouse em cima (opacity 0 até :hover). No celular não há
+     hover: o botão existia, ocupava espaço e era invisível. */
+  .fileira .ver-tudo{ opacity: 1; min-height: 40px; padding: 0 2px; font-size: 13px; }
+
+  /* Os pontinhos do destaque tinham 10px — impossíveis de acertar. O ponto continua do mesmo
+     tamanho, mas agora dentro de uma área de toque de verdade. */
+  .hero .pontos{ gap: 0; }
+  .hero .pontos button{ width: 30px; height: 34px; padding: 0; border-radius: 0; background: none;
+    display: grid; place-items: center; }
+  .hero .pontos button::before{ content: ''; width: 10px; height: 10px; border-radius: 50%;
+    background: rgba(255,255,255,.35); transition: width .2s; }
+  .hero .pontos button.on{ width: 44px; background: none; }
+  .hero .pontos button.on::before{ width: 26px; border-radius: 99px; background: var(--text); }
+
+  /* Título e ação na mesma linha ficam espremidos numa tela estreita. O título passa a ocupar
+     a linha inteira e a ação desce para baixo dele, com respiro. */
+  .conteudo > .linha.entre > h1, .conteudo > div > .linha.entre > h1{ flex-basis: 100%; margin-bottom: 10px; }
+
+  .btn.pequeno{ min-height: 40px; }
+  .avatar{ width: 38px; height: 38px; font-size: 15px; }
+  .rodape-app a, .rodape-app button{ min-height: 38px; display: flex; align-items: center; }
+  /* Links no meio de uma frase (termos, privacidade): a área de toque cresce para fora, com
+     margem negativa, então a linha do texto continua do mesmo tamanho. */
+  .pequeno a, .mudo a{ padding: 9px 2px; margin: -9px 0; }
   .topo .acoes{ flex: 1; justify-content: flex-end; }
   .busca-topo{ flex: 1; max-width: 240px; }
   .busca-topo input{ width: 100%; }
