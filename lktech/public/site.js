@@ -10,8 +10,6 @@ async function boot() {
     const result = await request(preview ? '/api/admin/preview' : '/api/site'); c = result.config;
     if (preview) { c.banners = c.banners.filter(v => v.active); c.plans = c.plans.filter(v => v.active); }
     document.title = c.seo.title; document.querySelector('meta[name="description"]').content = c.seo.description;
-    document.documentElement.style.setProperty('--accent', c.brand.accent);
-    document.documentElement.style.setProperty('--page', c.brand.background);
     render(preview); wire();
   } catch { document.querySelector('#site').innerHTML = '<main class="load-error"><h1>Estamos preparando sua conexão.</h1><p>Não foi possível carregar o site neste momento.</p><button class="primary" id="reload">Tentar novamente</button></main>'; document.querySelector('#reload').addEventListener('click', boot); }
 }
@@ -27,7 +25,7 @@ function render(preview) {
     <main id="conteudo">
       <section class="hero container" id="inicio" aria-label="Destaques da LK TECH" aria-roledescription="carrossel">
         <picture class="hero-picture"><source id="hero-mobile" media="(max-width: 700px)" srcset="${esc(banner.mobileImage || banner.image)}"><img id="hero-image" src="${esc(banner.image)}" alt="" fetchpriority="high" width="1800" height="1000"></picture>
-        <div class="hero-shade"></div><div class="hero-content" id="hero-copy">${heroCopy(banner)}</div>
+        <div class="hero-shade"></div><div class="hero-content" id="hero-copy">${c.banners.map((b, i) => `<div class="hero-slide${i ? '' : ' ativo'}"${i ? ' aria-hidden="true" inert' : ''}>${heroCopy(b)}</div>`).join('')}</div>
         <div class="hero-badge glass">${icon('network')}<span>${esc(c.hero.badge)}</span></div>
         ${c.banners.length > 1 ? `<div class="hero-controls glass"><button id="banner-prev" aria-label="Banner anterior">${icon('chevron','flip')}</button><div id="banner-dots">${c.banners.map((b,i) => `<button class="dot ${i===0?'active':''}" data-banner="${i}" aria-label="Ir para banner ${i+1}" ${i===0?'aria-current="true"':''}></button>`).join('')}</div><button id="banner-next" aria-label="Próximo banner">${icon('chevron')}</button><button id="banner-pause" aria-label="Pausar rotação dos banners" aria-pressed="false">Ⅱ</button></div>` : ''}
       </section>
@@ -45,13 +43,14 @@ function render(preview) {
     <button class="floating-contact primary" data-action="contact" aria-label="Falar com a LK TECH">${icon('chat')}</button>`;
   document.querySelector('#hero-image').style.objectPosition = banner.imagePosition;
 }
-function heroCopy(b) { return `<p class="eyebrow">${esc(b.eyebrow)}</p><h1>${esc(b.title)} <strong>${esc(b.highlight)}</strong></h1><span class="section-rule"></span><p class="hero-subtitle">${esc(b.subtitle)}</p><div class="hero-buttons">${b.primaryLabel?`<a class="primary" href="${esc(b.primaryUrl || '#planos')}">${esc(b.primaryLabel)}</a>`:''}${b.secondaryLabel?`<a class="glass-button" href="${esc(b.secondaryUrl || '#cobertura')}">${esc(b.secondaryLabel)}</a>`:''}</div>`; }
+function heroCopy(b) { return `<p class="eyebrow">${esc(b.eyebrow)}</p><h1>${esc(b.title)} <strong>${esc(b.highlight)}</strong></h1><span class="section-rule"></span><p class="hero-subtitle">${esc(b.subtitle)}</p><div class="hero-buttons">${b.primaryLabel?`<a class="primary" href="${esc(b.primaryUrl || '#planos')}"><span>${esc(b.primaryLabel)}</span></a>`:''}${b.secondaryLabel?`<a class="glass-button" href="${esc(b.secondaryUrl || '#cobertura')}"><span>${esc(b.secondaryLabel)}</span></a>`:''}</div>`; }
 function planCard(p) {
-  return `<article class="plan-card glass ${p.featured?'featured':''}" data-plan-id="${esc(p.id)}"><div class="plan-label">${icon('router')}<span>${esc(p.label)}</span></div><h3>${esc(p.name)}</h3><p class="plan-description">${esc(p.description)}</p><div class="plan-price">${p.price === null ? 'Valores sob consulta' : `<strong>${money(p.price)}</strong><span>${esc(p.priceSuffix)}</span>`}</div>${p.features.length?`<ul>${p.features.map(v=>`<li>${icon('check')}${esc(v)}</li>`).join('')}</ul>`:''}${p.terms?`<p class="plan-terms">${esc(p.terms)}</p>`:''}<button class="${p.featured?'primary':'glass-button'} plan-cta" data-plan="${esc(p.id)}">${esc(p.button)}</button></article>`;
+  return `<article class="plan-card glass ${p.featured?'featured':''}" data-plan-id="${esc(p.id)}"><div class="plan-label">${icon('router')}<span>${esc(p.label)}</span></div><h3 title="${esc(p.name)}">${esc(p.name)}</h3><p class="plan-description">${esc(p.description)}</p><div class="plan-price">${p.price === null ? 'Valores sob consulta' : `<strong>${money(p.price)}</strong><span>${esc(p.priceSuffix)}</span>`}</div>${p.features.length?`<ul>${p.features.map(v=>`<li>${icon('check')}<span>${esc(v)}</span></li>`).join('')}</ul>`:''}${p.terms?`<p class="plan-terms">${esc(p.terms)}</p>`:''}<button class="${p.featured?'primary':'glass-button'} plan-cta" data-plan="${esc(p.id)}"><span>${esc(p.button)}</span></button></article>`;
 }
 function showBanner(index) {
   currentBanner = (index + c.banners.length) % c.banners.length;
-  const b = c.banners[currentBanner]; document.querySelector('#hero-copy').innerHTML = heroCopy(b);
+  const b = c.banners[currentBanner];
+  document.querySelectorAll('.hero-slide').forEach((el, i) => { const ativo = i === currentBanner; el.classList.toggle('ativo', ativo); el.toggleAttribute('inert', !ativo); if (ativo) el.removeAttribute('aria-hidden'); else el.setAttribute('aria-hidden', 'true'); });
   document.querySelector('#hero-image').src = b.image; document.querySelector('#hero-image').style.objectPosition = b.imagePosition;
   document.querySelector('#hero-mobile').srcset = b.mobileImage || b.image;
   document.querySelectorAll('[data-banner]').forEach((el,i)=>{ el.classList.toggle('active',i===currentBanner); if(i===currentBanner)el.setAttribute('aria-current','true');else el.removeAttribute('aria-current'); });

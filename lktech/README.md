@@ -43,6 +43,20 @@ Para o Code, comece por **[docs/PROMPT_PARA_CODE.md](docs/PROMPT_PARA_CODE.md)**
 
 Use as setas no painel para ordenar banners, planos e perguntas. A exclusão de um item afeta o rascunho; a publicação anterior continua disponível no histórico.
 
+## Proteção do layout
+
+Nada que o administrador altere no painel muda a estrutura ou o desenho do site:
+
+- **Limite de caracteres por campo**, do tamanho do espaço no desenho (ex.: nome do plano 12, título do banner 24, botões 20). O painel mostra o contador e não deixa digitar além; o servidor recusa ao salvar se o limite for ultrapassado. Os limites ficam em um único arquivo, `public/limites.js`, usado pelo painel e pelo servidor.
+- **Campos de uma linha** não guardam quebras de linha. Só o título do Atendimento (2 linhas) e as respostas das perguntas aceitam quebras.
+- **Quantidade máxima**: 8 banners, 12 planos, 4 benefícios por plano, 12 perguntas. Preço até R$ 9.999,99.
+- **Cores fixas** (laranja e azul-marinho): não são editáveis no painel.
+- **Logo em caixa de tamanho fixo**: qualquer arquivo se ajusta dentro dela sem mudar a altura do cabeçalho.
+- **Imagens do banner** sempre preenchem o mesmo espaço (recorte automático), em qualquer formato. O painel avisa quando a imagem é pequena demais e pode ficar borrada.
+- **Banners empilhados**: a altura do banner não muda quando ele troca.
+- **Cartões de plano** com a mesma altura, linha do preço e botão alinhados em todos; com poucos planos, o carrossel fica centralizado.
+- **Camada de segurança no CSS** (fim de `public/site.css`): mesmo que um texto antigo ultrapasse o espaço, ele é cortado com "…" ou quebra dentro da caixa, sem rolagem lateral.
+
 ## Conteúdo que precisa ser preenchido
 
 Os planos iniciais são **exemplos visuais sem preços**: 500, 700, 900 e 100 Mega. O quarto item permite experimentar o carrossel já na primeira execução. Substitua pelos planos reais e revise a observação da seção.

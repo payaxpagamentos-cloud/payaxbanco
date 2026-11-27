@@ -32,7 +32,7 @@ test('fluxo real: autenticação, rascunho, publicação, upload, cobertura, lea
   const login=await call('/api/admin/login','POST',{email:'teste@example.com',password});assert.equal(login.response.status,200);cookie=login.response.headers.get('set-cookie').split(';')[0];csrf=login.payload.csrf;
   assert.match(login.response.headers.get('set-cookie'),/HttpOnly/);assert.match(login.response.headers.get('set-cookie'),/SameSite=Strict/);
   const draft=(await call('/api/admin/content')).payload;let config=draft.config,rev=draft.revision;
-  config.plans[0].price=89.9;config.banners[0].title='Título publicado no teste';config.seo.title='LK TECH <Internet> & Teste';config.coverage.ranges=[{name:'Região de teste',start:'01000000',end:'01999999'}];
+  config.plans[0].price=89.9;config.banners[0].title='Título do teste';config.seo.title='LK TECH <Internet> & Teste';config.coverage.ranges=[{name:'Região de teste',start:'01000000',end:'01999999'}];
   assert.equal((await call('/api/admin/content','PUT',{config,revision:rev},{'X-CSRF-Token':'incorreto'})).response.status,403);
   assert.equal((await call('/api/admin/content','PUT',{config,revision:rev},{Origin:'https://outra-origem.example'})).response.status,403);
   const save=await call('/api/admin/content','PUT',{config,revision:rev});assert.equal(save.response.status,200);rev=save.payload.revision;
@@ -62,4 +62,26 @@ test('fluxo real: autenticação, rascunho, publicação, upload, cobertura, lea
 
 test('arquivos de mídia e referências de entrada existem',async()=>{
   for(const path of ['public/assets/logo.svg','public/assets/favicon.svg','public/assets/hero-casal.png','docs/referencia-layout.png'])assert.ok((await readFile(new URL('../'+path,import.meta.url))).length>0,path);
+});
+
+test('painel não consegue entortar o layout: limites, linhas, quantidade, preço e cores', async () => {
+  const { validateConfig } = await import('../server/validation.mjs');
+  const { seed } = await import('../server/seed.mjs');
+  const { LIMITES, QUANTIDADE, CORES } = await import('../public/limites.js');
+  const base = () => structuredClone(seed);
+  assert.doesNotThrow(() => validateConfig(base()), 'o conteúdo inicial respeita os limites');
+  const recusa = (alterar, trecho) => { const c = base(); alterar(c); assert.throws(() => validateConfig(c), e => e.status === 400 && (!trecho || e.message.includes(trecho))); };
+  recusa(c => { c.banners[0].title = 'x'.repeat(LIMITES['banners.title'] + 1); }, 'caracteres');
+  recusa(c => { c.plans[0].name = 'x'.repeat(LIMITES['plans.name'] + 1); }, 'caracteres');
+  recusa(c => { c.plans[0].button = 'x'.repeat(LIMITES['plans.button'] + 1); });
+  recusa(c => { c.plans[0].features = Array(QUANTIDADE.features + 1).fill('Wi-Fi'); });
+  recusa(c => { c.plans[0].price = 10000; }, 'Preço');
+  recusa(c => { c.services.title = 'Uma\nDuas\nTrês'; }, 'linhas');
+  recusa(c => { c.banners = Array(QUANTIDADE.banners + 1).fill(0).map((_, i) => ({ ...seed.banners[0], id: 'b' + i })); });
+  const c = base(); c.brand.accent = '#00ff00'; c.brand.background = '#ffffff'; c.banners[0].title = 'Conecte\n   o   seu'; c.banners[0].imagePosition = '900% 50%';
+  const r = validateConfig(c);
+  assert.deepEqual([r.brand.accent, r.brand.background], [CORES.accent, CORES.background], 'cores ficam fixas');
+  assert.equal(r.banners[0].title, 'Conecte o seu', 'campos de uma linha não guardam quebras nem espaços extras');
+  assert.equal(r.banners[0].imagePosition, '65% 50%');
+  assert.equal(validateConfig({ ...base(), services: { ...seed.services, title: 'Mais perto.\nMais simples.' } }).services.title, 'Mais perto.\nMais simples.');
 });

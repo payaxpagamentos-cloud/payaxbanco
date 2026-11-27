@@ -1,11 +1,26 @@
+import { LIMITES, LINHAS, QUANTIDADE, PRECO_MAXIMO, CORES } from '../public/limites.js';
 export class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const fail = text => { throw new HttpError(400, text); };
 function string(value, name, max = 240, required = false) {
   if (typeof value !== 'string' || value.length > max || (required && !value.trim())) fail(`Confira o campo ${name}.`);
   return value.trim();
 }
+// Texto de um espaço do site: limite pelo caminho do campo, uma linha só (salvo os listados em LINHAS).
+function texto(value, caminho, name, required = false) {
+  const max = LIMITES[caminho];
+  if (typeof value !== 'string') fail(`Confira o campo ${name}.`);
+  const linhas = LINHAS[caminho] || 1;
+  let limpo = linhas > 1
+    ? value.replace(/\r/g, '').split('\n').map(v => v.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n')
+    : value.replace(/\s+/g, ' ').trim();
+  if (limpo.split('\n').length > linhas) fail(`O campo ${name} aceita no máximo ${linhas} linhas.`);
+  if (required && !limpo) fail(`Preencha o campo ${name}.`);
+  if (max && limpo.length > max) fail(`O campo ${name} aceita até ${max} caracteres (agora tem ${limpo.length}). Encurte o texto para não desalinhar o site.`);
+  return limpo;
+}
+function posicao(v) { const m = /^(\d{1,3})% (\d{1,3})%$/.exec(v || ''); return m && +m[1] <= 100 && +m[2] <= 100 ? v : '65% 50%'; }
 function bool(v) { return v === true; }
-function list(v, name, limit = 40) { if (!Array.isArray(v) || v.length > limit) fail(`Lista inválida: ${name}.`); return v; }
+function list(v, name, limit = 40) { if (!Array.isArray(v)) fail(`Lista inválida: ${name}.`); if (v.length > limit) fail(`Use no máximo ${limit} ${name}, para manter o site organizado.`); return v; }
 export function safeUrl(value, image = false) {
   const text = string(value, 'link', 1600);
   if (!text) return '';
@@ -17,35 +32,34 @@ export function safeUrl(value, image = false) {
 export function validateConfig(c) {
   if (!c || typeof c !== 'object') fail('Conteúdo inválido.');
   const b = c.brand || {}, contact = c.contact || {}, section = c.plansSection || {};
-  const color = (v, name) => { if (!/^#[\da-f]{6}$/i.test(v)) fail(`Cor inválida: ${name}.`); return v; };
   const id = v => { if (typeof v !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(v)) fail('Identificador inválido.'); return v; };
   const unique = values => { if (new Set(values.map(v => v.id)).size !== values.length) fail('Existem itens com identificadores repetidos.'); return values; };
   const interval = v => Number.isInteger(v) && v >= 4000 && v <= 20000 ? v : 6500;
-  const banners = unique(list(c.banners, 'banners', 20).map(v => ({ id: id(v.id), active: bool(v.active), eyebrow: string(v.eyebrow, 'etiqueta'), title: string(v.title, 'título', 90, true), highlight: string(v.highlight, 'destaque', 80), subtitle: string(v.subtitle, 'descrição'), image: safeUrl(v.image, true), mobileImage: safeUrl(v.mobileImage || '', true), imagePosition: /^\d{1,3}% \d{1,3}%$/.test(v.imagePosition) ? v.imagePosition : '65% 50%', primaryLabel: string(v.primaryLabel, 'botão principal', 48), primaryUrl: safeUrl(v.primaryUrl), secondaryLabel: string(v.secondaryLabel, 'botão secundário', 48), secondaryUrl: safeUrl(v.secondaryUrl) })));
-  const plans = unique(list(c.plans, 'planos', 40).map(v => {
-    if (v.price !== null && (!Number.isFinite(v.price) || v.price < 0 || v.price > 100000)) fail('Preço inválido. Use um número ou deixe vazio.');
-    return { id: id(v.id), active: bool(v.active), featured: bool(v.featured), label: string(v.label, 'etiqueta'), name: string(v.name, 'nome do plano', 70, true), description: string(v.description, 'descrição'), price: v.price === null ? null : Math.round(v.price * 100) / 100, priceSuffix: string(v.priceSuffix, 'período', 32), terms: string(v.terms, 'condições', 300), features: list(v.features, 'benefícios', 8).map(s => string(s, 'benefício', 100)), button: string(v.button, 'botão', 48, true) };
+  const banners = unique(list(c.banners, 'banners', QUANTIDADE.banners).map(v => ({ id: id(v.id), active: bool(v.active), eyebrow: texto(v.eyebrow, 'banners.eyebrow', 'etiqueta do banner'), title: texto(v.title, 'banners.title', 'título do banner', true), highlight: texto(v.highlight, 'banners.highlight', 'trecho em laranja'), subtitle: texto(v.subtitle, 'banners.subtitle', 'descrição do banner'), image: safeUrl(v.image, true), mobileImage: safeUrl(v.mobileImage || '', true), imagePosition: posicao(v.imagePosition), primaryLabel: texto(v.primaryLabel, 'banners.primaryLabel', 'botão principal'), primaryUrl: safeUrl(v.primaryUrl), secondaryLabel: texto(v.secondaryLabel, 'banners.secondaryLabel', 'botão secundário'), secondaryUrl: safeUrl(v.secondaryUrl) })));
+  const plans = unique(list(c.plans, 'planos', QUANTIDADE.plans).map(v => {
+    if (v.price !== null && (!Number.isFinite(v.price) || v.price < 0 || v.price > PRECO_MAXIMO)) fail('Preço inválido. Use um valor de 0 a 9.999,99 ou deixe vazio.');
+    return { id: id(v.id), active: bool(v.active), featured: bool(v.featured), label: texto(v.label, 'plans.label', 'etiqueta do plano'), name: texto(v.name, 'plans.name', 'nome do plano', true), description: texto(v.description, 'plans.description', 'descrição do plano'), price: v.price === null ? null : Math.round(v.price * 100) / 100, priceSuffix: texto(v.priceSuffix, 'plans.priceSuffix', 'período do preço'), terms: texto(v.terms, 'plans.terms', 'condições da oferta'), features: list(v.features, 'benefícios', QUANTIDADE.features).map(s => texto(s, 'plans.features', 'benefício')), button: texto(v.button, 'plans.button', 'botão do plano', true) };
   }));
   if (!banners.some(v => v.active)) fail('Mantenha ao menos um banner ativo.');
   if (!plans.some(v => v.active)) fail('Mantenha ao menos um plano ativo.');
   const ranges = list(c.coverage?.ranges, 'cobertura', 300).map(v => {
     if (!/^\d{8}$/.test(v.start) || !/^\d{8}$/.test(v.end) || v.start > v.end) fail('Confira o intervalo de CEPs.');
-    return { name: string(v.name, 'região', 120, true), start: v.start, end: v.end };
+    return { name: texto(v.name, 'coverage.ranges.name', 'região', true), start: v.start, end: v.end };
   });
   const whatsapp = string(contact.whatsapp, 'WhatsApp', 20).replace(/\D/g, '');
   if (whatsapp && !/^\d{10,15}$/.test(whatsapp)) fail('Confira o WhatsApp com DDI e DDD.');
-  const email = string(contact.email, 'e-mail', 160);
+  const email = texto(contact.email, 'contact.email', 'e-mail');
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail('E-mail inválido.');
   return {
-    brand: { name: string(b.name, 'empresa', 80, true), tagline: string(b.tagline, 'slogan'), logo: safeUrl(b.logo, true), accent: color(b.accent, 'destaque'), background: color(b.background, 'fundo') },
-    seo: { title: string(c.seo?.title, 'título da página', 120, true), description: string(c.seo?.description, 'descrição de busca', 320) },
-    contact: { whatsapp, email, phone: string(contact.phone, 'telefone', 50), address: string(contact.address, 'endereço', 240), portalUrl: safeUrl(contact.portalUrl), invoiceUrl: safeUrl(contact.invoiceUrl), supportUrl: safeUrl(contact.supportUrl), privacyUrl: safeUrl(contact.privacyUrl) },
-    hero: { autoplay: bool(c.hero?.autoplay), interval: interval(c.hero?.interval), badge: string(c.hero?.badge, 'texto no banner', 120) }, banners, plans,
-    plansSection: { title: string(section.title, 'título dos planos', 100, true), subtitle: string(section.subtitle, 'subtítulo'), note: string(section.note, 'observação', 320), autoplay: bool(section.autoplay), interval: interval(section.interval) },
-    services: { title: string(c.services?.title, 'título do atendimento', 120), description: string(c.services?.description, 'descrição do atendimento'), first: string(c.services?.first, 'primeiro serviço', 80), second: string(c.services?.second, 'segundo serviço', 80) },
-    coverage: { title: string(c.coverage?.title, 'título de cobertura', 120), subtitle: string(c.coverage?.subtitle, 'texto de cobertura'), strict: bool(c.coverage?.strict), ranges },
-    customer: { title: string(c.customer?.title, 'título do cliente', 100), account: string(c.customer?.account, 'minha conta', 48), invoice: string(c.customer?.invoice, 'fatura', 48), support: string(c.customer?.support, 'suporte', 48) },
-    faqs: list(c.faqs, 'perguntas', 30).map(v => ({ question: string(v.question, 'pergunta', 200, true), answer: string(v.answer, 'resposta', 1500, true) }))
+    brand: { name: texto(b.name, 'brand.name', 'nome da empresa', true), tagline: texto(b.tagline, 'brand.tagline', 'slogan'), logo: safeUrl(b.logo, true), accent: CORES.accent, background: CORES.background },
+    seo: { title: texto(c.seo?.title, 'seo.title', 'título da página', true), description: texto(c.seo?.description, 'seo.description', 'descrição para buscadores') },
+    contact: { whatsapp, email, phone: texto(contact.phone, 'contact.phone', 'telefone'), address: texto(contact.address, 'contact.address', 'endereço'), portalUrl: safeUrl(contact.portalUrl), invoiceUrl: safeUrl(contact.invoiceUrl), supportUrl: safeUrl(contact.supportUrl), privacyUrl: safeUrl(contact.privacyUrl) },
+    hero: { autoplay: bool(c.hero?.autoplay), interval: interval(c.hero?.interval), badge: texto(c.hero?.badge, 'hero.badge', 'texto do cartão sobre a foto') }, banners, plans,
+    plansSection: { title: texto(section.title, 'plansSection.title', 'título dos planos', true), subtitle: texto(section.subtitle, 'plansSection.subtitle', 'subtítulo dos planos'), note: texto(section.note, 'plansSection.note', 'observação dos planos'), autoplay: bool(section.autoplay), interval: interval(section.interval) },
+    services: { title: texto(c.services?.title, 'services.title', 'título do atendimento'), description: texto(c.services?.description, 'services.description', 'descrição do atendimento'), first: texto(c.services?.first, 'services.first', 'primeiro atalho'), second: texto(c.services?.second, 'services.second', 'segundo atalho') },
+    coverage: { title: texto(c.coverage?.title, 'coverage.title', 'título da cobertura'), subtitle: texto(c.coverage?.subtitle, 'coverage.subtitle', 'texto da cobertura'), strict: bool(c.coverage?.strict), ranges },
+    customer: { title: texto(c.customer?.title, 'customer.title', 'título “Já é cliente?”'), account: texto(c.customer?.account, 'customer.account', 'Minha conta'), invoice: texto(c.customer?.invoice, 'customer.invoice', 'Segunda via'), support: texto(c.customer?.support, 'customer.support', 'Suporte') },
+    faqs: list(c.faqs, 'perguntas', QUANTIDADE.faqs).map(v => ({ question: texto(v.question, 'faqs.question', 'pergunta', true), answer: texto(v.answer, 'faqs.answer', 'resposta', true) }))
   };
 }
 export function validateLead(body) {
