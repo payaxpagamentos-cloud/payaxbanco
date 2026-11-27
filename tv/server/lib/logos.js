@@ -46,7 +46,7 @@ async function aplicar(db, canalId, { url = null, forcar = false } = {}) {
  * Busca o logo de todos os canais de uma vez. Sem `forcar`, só mexe em quem ainda não tem.
  * Um canal que falhar não derruba os outros.
  */
-async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200 } = {}) {
+async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200, aoAndar = null } = {}) {
   const canais = db.prepare(`SELECT id, nome FROM canais ${forcar ? '' : 'WHERE logo_midia_id IS NULL'} ORDER BY numero`).all();
   const comLogo = [];
   const semLogo = [];
@@ -55,12 +55,16 @@ async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200 } = {}) {
     // Pausa entre os canais: quem hospeda as imagens limita a frequência, e um provedor com
     // mais de cem canais chega perto desse limite. 1,2s dá uns 2 minutos e meio no total.
     if (i) await esperar(pausaMs);
+    // Avisa canal a canal: com mais de cem canais, juntar tudo para imprimir no fim deixa quem
+    // está no terminal olhando uma tela parada por minutos, sem saber se travou.
     try {
       const r = await aplicar(db, c.id, { forcar });
       if (r) comLogo.push(r);
       else semLogo.push(c.nome);
+      aoAndar?.({ i: i + 1, total: canais.length, canal: c.nome, resultado: r ? 'ok' : 'sem-logo' });
     } catch (err) {
       falharam.push({ canal: c.nome, erro: err.message, host: err.host ?? null });
+      aoAndar?.({ i: i + 1, total: canais.length, canal: c.nome, resultado: 'erro', erro: err.message });
     }
   }
   return { com_logo: comLogo, sem_logo: semLogo, falharam };

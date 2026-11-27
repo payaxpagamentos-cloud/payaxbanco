@@ -28,9 +28,16 @@ const db = abrir();
     return;
   }
   console.log(`Buscando o logo de ${quantos} canal(is). Leva alguns minutos…\n`);
-  const r = await logos.aplicarEmTodos(db, { forcar });
+  const r = await logos.aplicarEmTodos(db, {
+    forcar,
+    // Uma linha por canal, na hora: é como se sabe que está andando.
+    aoAndar: ({ i, total, canal, resultado, erro }) => {
+      const marca = resultado === 'ok' ? '\x1b[32mok     \x1b[0m'
+        : resultado === 'sem-logo' ? '\x1b[33msem logo\x1b[0m' : '\x1b[31merro   \x1b[0m';
+      console.log(`  [${String(i).padStart(3)}/${total}] ${marca} ${canal}${erro ? ` — ${erro}` : ''}`);
+    },
+  });
 
-  for (const x of r.com_logo) console.log(`  ok    ${x.canal} — ${x.origem}`);
   if (r.sem_logo.length) {
     console.log(`\n${r.sem_logo.length} canal(is) sem logo na lista pública:`);
     console.log(`  ${r.sem_logo.join(', ')}`);
