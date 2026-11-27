@@ -224,3 +224,35 @@ test('endereço SRT do fornecedor: o streamid chega inteiro e o latency vira mic
   // latency já em microssegundos passa intacto.
   assert.match(aovivo.conferirEndereco('srt://1.2.3.4:5000?latency=2000000'), /latency=2000000$/);
 });
+
+test('lista do fornecedor: número de São Paulo na TV aberta, tema e faixa no resto', () => {
+  const fornecedor = require('../server/lib/canais-fornecedor');
+  const texto = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'canais-fornecedor.txt'), 'utf8');
+  const { canais, recusados } = fornecedor.montar(texto);
+
+  assert.equal(recusados.length, 0, 'nenhum endereço da lista pode ser recusado');
+  assert.equal(canais.length, 116);
+
+  // Os números que a casa de São Paulo já tem na cabeça.
+  const numeroDe = (nome) => canais.find((c) => c.nome === nome)?.numero;
+  assert.equal(numeroDe('TV Cultura'), 2);
+  assert.equal(numeroDe('SBT'), 4);
+  assert.equal(numeroDe('Globo'), 5);
+  assert.equal(numeroDe('Record'), 7);
+  assert.equal(numeroDe('RedeTV!'), 9);
+  assert.equal(numeroDe('Gazeta'), 11);
+  assert.equal(numeroDe('Band'), 13);
+
+  // Número é único: é o que o assinante digita no controle.
+  assert.equal(new Set(canais.map((c) => c.numero)).size, canais.length);
+
+  // Cada tema na sua faixa, sem invadir a do vizinho.
+  for (const [tema, inicio] of fornecedor.BLOCOS) {
+    const doTema = canais.filter((c) => c.categoria === tema);
+    for (const c of doTema) assert.ok(c.numero >= inicio, `${c.nome} (${c.numero}) deveria estar a partir de ${inicio}`);
+  }
+  // Canal adulto não nasce liberado.
+  assert.equal(canais.find((c) => c.nome === 'WooHoo').classificacao, 18);
+  // E o endereço de todo canal sai pronto para o conversor.
+  for (const c of canais) assert.match(c.endereco, /^srt:\/\/[\d.]+:\d+\?streamid=#!::r=[^&]+&latency=2000000$/);
+});

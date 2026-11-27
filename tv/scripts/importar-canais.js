@@ -17,203 +17,112 @@
  * o sinal é reclamação de assinante na certa. Teste no painel e ligue depois, ou passe --ligar
  * quando já tiver conferido.
  *
- * O logo de cada emissora é buscado depois, pelo painel ("Buscar logos das emissoras") ou por
- * `node scripts/logos-canais.js` — o servidor precisa de internet para isso.
+ * A regra de nome, tema, classificação e número está em server/lib/canais-fornecedor.js.
+ * Os logos vêm depois: `node scripts/logos-canais.js`.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 const { abrir, agora, slug } = require('../server/db');
-const aovivo = require('../server/lib/aovivo');
+const fornecedor = require('../server/lib/canais-fornecedor');
 
 const arquivo = process.argv[2];
 const gravar = process.argv.includes('--gravar');
 const ligar = process.argv.includes('--ligar');
 
 if (!arquivo) {
-  console.error('Uso: node scripts/importar-canais.js <arquivo da lista> [--gravar] [--ligar]');
+  console.error('Uso: node scripts/importar-canais.js <arquivo da lista | -> [--gravar] [--ligar]');
+  console.error('Dentro do Docker, com a lista vindo do servidor:');
+  console.error('  docker compose exec -T app node scripts/importar-canais.js - --gravar < scripts/canais-fornecedor.txt');
   process.exit(1);
 }
 
-/**
- * Categoria de cada canal, pelo nome. A ordem importa: a primeira regra que casar vence, então
- * o que é mais específico vem antes (DISCOVERY_KIDS é infantil, não documentário).
- */
-const REGRAS = [
-  [/KIDS|BABY|ZOOMOO|NICK|GLOOB|CARTOON|RA_TIM_BUM|ANIMES|CHAVES|CHAPOLIN/, 'infantil'],
-  [/NEWS|CNN|CANAL_UOL|JOVEM_PAN/, 'noticias'],
-  [/SPORTV|ESPN|PREMIERE|COMBATE|BAND_SPORTS|FISH_TV/, 'esportes'],
-  [/DISCOVERY|ANIMAL_PLANET|HISTORY|NAT_GEO|CURTA/, 'documentarios'],
-  [/COMEDY_CENTRAL/, 'variedades'],
-  [/MTV|BIS|MUSIC/, 'musica'],
-  [/APARECIDA|REDE_VIDA|NOVO_TEMPO|CANCAO_NOVA|RECORD_NEWS_GOSPEL/, 'religioso'],
-  [/HBO|TELE_CINE|MEGAPIX|CINEMAX|TCM|SPACE|PARAMOUNT|UNIVERSAL_PREMIERE|STUDIO_UNIVERSAL|FILM_E_ARTS|CANAL_BRASIL|AMC|EURO_CHANNEL|CLASSICOS/, 'filmes'],
-  [/UNIVERSAL_REALITY|REALITY/, 'variedades'],
-  [/TNT|AXN|SONY|WARNER|UNIVERSAL|USA|LIFE_TIME|ADULT_SWIM|NOVELAS|SERIES/, 'series'],
-  [/GLOBO_HD|^SBT$|^RECORD$|REDE_TV|GAZETA|^BAND$|TV_CULTURA/, 'aberta'],
-];
-const categoriaDe = (nome) => REGRAS.find(([re]) => re.test(nome))?.[1] ?? 'variedades';
-
-/**
- * Nomes que a regra geral não acerta. São marcas: "Telecine" é uma palavra só, e o "E" do meio
- * de "Film & Arts" é o "&" do nome, não a letra E.
- */
-const NOMES = {
-  TELE_CINE_PREMIUM: 'Telecine Premium',
-  TELE_CINE_TOUCH: 'Telecine Touch',
-  TELE_CINE_PIPOCA: 'Telecine Pipoca',
-  TELE_CINE_ACTION: 'Telecine Action',
-  TELE_CINE_FUN: 'Telecine Fun',
-  TELE_CINE_CULT: 'Telecine Cult',
-  FILM_E_ARTS: 'Film&Arts',
-  SABOR_E_ARTE: 'Sabor & Arte',
-  DISCOVERY_HOME_E_HEALTH: 'Discovery Home & Health',
-  SPORTV: 'SporTV',
-  SPORTV_2: 'SporTV 2',
-  SPORTV_3: 'SporTV 3',
-  GLOBO_HD: 'Globo',
-  REDE_TV: 'RedeTV!',
-  LIFE_TIME: 'Lifetime',
-  'CURTA!': 'Curta!',
-  E: 'E!',
-  OFF: 'Canal OFF',
-  USA: 'USA Network',
-  SPACE_HD: 'Space',
-  GLOBO_PLAY_NOVELAS: 'Globoplay Novelas',
-  PREMIERE_CLUBES: 'Premiere Clubes',
-  ESPN_EXTRA: 'ESPN Extra',
-  FAZENDA1: 'A Fazenda · Câmera 1',
-  FAZENDA2: 'A Fazenda · Câmera 2',
-  FAZENDA3: 'A Fazenda · Câmera 3',
-  TV_RA_TIM_BUM: 'TV Rá-Tim-Bum',
-  JOVEM_PAN_NEWS: 'Jovem Pan News',
-  CANAL_UOL: 'Canal UOL',
-  ANIMES: 'Animes',
-  CLASSICOS: 'Clássicos',
-  NOVO_TEMPO: 'Novo Tempo',
-  ZOOMOO: 'ZooMoo',
-  WOOHOO: 'WooHoo',
-  HGTV: 'HGTV',
-};
-
-/**
- * Classificação indicativa de partida. Canal adulto não pode nascer liberado: com 18 aqui, ele
- * some do perfil infantil e pede a senha no perfil adulto, sem ninguém precisar lembrar disso.
- * O resto fica em 0 (livre) e a operação ajusta canal a canal.
- */
-const CLASSIFICACAO = [
-  [/WOOHOO|SEXY|PLAYBOY|VENUS|HOT$/, 18],
-  [/ADULT_SWIM/, 16],
-  [/COMBATE|UFC/, 14],
-];
-const classificacaoDe = (nome) => CLASSIFICACAO.find(([re]) => re.test(nome))?.[1] ?? 0;
-
-/** TV_APARECIDA -> TV Aparecida. HBO_2 -> HBO 2. Nome que a pessoa lê na tela. */
-const SIGLAS = new Set(['TV', 'HBO', 'TNT', 'AXN', 'MTV', 'ESPN', 'CNN', 'SBT', 'TCM', 'AMC',
-  'USA', 'HD', 'TLC', 'HGTV', 'BIS', 'OFF', 'E', 'ID', 'UOL', 'NBA', 'PFC']);
-const bonito = (bruto) => NOMES[bruto.toUpperCase()] ?? bruto.split('_').filter(Boolean).map((p) => {
-  const limpo = p.replace(/!$/, '');
-  if (SIGLAS.has(limpo.toUpperCase())) return limpo.toUpperCase() + (p.endsWith('!') ? '!' : '');
-  if (/^\d+$/.test(p)) return p;
-  return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
-}).join(' ');
-
-/** Lê o arquivo do fornecedor. Aceita o formato como ele chega, com ou sem "Input:". */
-function lerLista(texto) {
-  const linhas = texto.split(/\r?\n/);
-  const canais = [];
-  let atual = null;
-  for (const linha of linhas) {
-    const cabecalho = /^\s*(\d{1,4})\s*[-–]\s*(.+?)\s*$/.exec(linha);
-    if (cabecalho && !/^\s*input\s*:/i.test(linha)) {
-      if (atual?.endereco) canais.push(atual);
-      atual = { numero: Number(cabecalho[1]), bruto: cabecalho[2].trim(), endereco: null };
-      continue;
-    }
-    const endereco = /^\s*(?:input\s*:\s*)?((?:srt|rtmp|rtmps|rtsp|udp):\/\/.+?)\s*$/i.exec(linha);
-    if (endereco && atual && !atual.endereco) atual.endereco = endereco[1];
-  }
-  if (atual?.endereco) canais.push(atual);
-  return canais;
-}
-
-const texto = fs.readFileSync(path.resolve(arquivo), 'utf8');
-const lidos = lerLista(texto);
-if (!lidos.length) {
+// Confere e acerta tudo ANTES de gravar: lista com um endereço torto não pode entrar pela
+// metade no banco.
+// "-" lê da entrada padrão: assim a lista pode vir do servidor sem estar dentro da imagem.
+const texto = arquivo === '-' ? fs.readFileSync(0, 'utf8') : fs.readFileSync(path.resolve(arquivo), 'utf8');
+const { canais, recusados } = fornecedor.montar(texto);
+if (!canais.length) {
   console.error('Não encontrei nenhum canal nesse arquivo. Confira o formato.');
   process.exit(1);
 }
 
-// Confere e acerta cada endereço ANTES de gravar qualquer coisa: lista com um endereço torto
-// não pode entrar pela metade no banco.
-const prontos = [];
-const recusados = [];
-for (const c of lidos) {
-  try {
-    prontos.push({
-      numero: c.numero,
-      nome: bonito(c.bruto),
-      bruto: c.bruto,
-      categoria: categoriaDe(c.bruto.toUpperCase()),
-      classificacao: classificacaoDe(c.bruto.toUpperCase()),
-      endereco: aovivo.conferirEndereco(c.endereco),
-      endereco_original: c.endereco,
-    });
-  } catch (err) {
-    recusados.push({ numero: c.numero, nome: c.bruto, erro: err.message });
-  }
+const porCategoria = canais.reduce((t, c) => ({ ...t, [c.categoria]: (t[c.categoria] ?? 0) + 1 }), {});
+console.log(`Lista: ${canais.length + recusados.length} canal(is) lido(s), ${canais.length} válido(s), ${recusados.length} recusado(s).\n`);
+console.log('Por tema e faixa de número:');
+for (const [cat, n] of Object.entries(porCategoria).sort((a, b) => b[1] - a[1])) {
+  const doTema = canais.filter((c) => c.categoria === cat);
+  console.log(`  ${String(n).padStart(3)}  ${cat.padEnd(14)} ${doTema[0].numero}–${doTema[doTema.length - 1].numero}`);
 }
 
-const porCategoria = prontos.reduce((t, c) => ({ ...t, [c.categoria]: (t[c.categoria] ?? 0) + 1 }), {});
-console.log(`Lista: ${lidos.length} canal(is) lido(s), ${prontos.length} válido(s), ${recusados.length} recusado(s).\n`);
-console.log('Por categoria:');
-for (const [cat, n] of Object.entries(porCategoria).sort((a, b) => b[1] - a[1])) console.log(`  ${String(n).padStart(3)}  ${cat}`);
+const abertos = canais.filter((c) => c.categoria === 'aberta');
+if (abertos.length) {
+  console.log('\nTV aberta (números de São Paulo):');
+  for (const c of abertos) console.log(`  ${String(c.numero).padStart(3)}  ${c.nome}`);
+}
 
-const corrigidos = prontos.filter((c) => c.endereco !== c.endereco_original);
+const corrigidos = canais.filter((c) => c.endereco !== c.endereco_original);
 if (corrigidos.length) {
   console.log(`\n${corrigidos.length} endereço(s) corrigido(s) na leitura. Exemplo:`);
   console.log(`  veio : ${corrigidos[0].endereco_original}`);
   console.log(`  vai  : ${corrigidos[0].endereco}`);
   console.log('  (espaço virou "&", e latency em milissegundos virou microssegundos, que é o que o conversor usa)');
 }
-const comIdade = prontos.filter((c) => c.classificacao > 0);
+
+const comIdade = canais.filter((c) => c.classificacao > 0);
 if (comIdade.length) {
   console.log('\nCom classificação de partida (some do perfil infantil):');
   for (const c of comIdade) console.log(`  ${c.nome} — ${c.classificacao} anos`);
 }
 if (recusados.length) {
   console.log('\nRecusados:');
-  for (const r of recusados) console.log(`  ${r.numero} ${r.nome}: ${r.erro}`);
+  for (const r of recusados) console.log(`  ${r.ordem} ${r.nome}: ${r.erro}`);
 }
 
 if (!gravar) {
   console.log('\nNada foi gravado. Rode de novo com --gravar para criar os canais.');
-  console.log('Os 10 primeiros ficariam assim:');
-  for (const c of prontos.slice(0, 10)) console.log(`  ${String(c.numero).padStart(3)}  ${c.nome.padEnd(26)} ${c.categoria}`);
   process.exit(0);
 }
 
 const db = abrir();
 let criados = 0;
 let atualizados = 0;
-const transacao = db.prepare('SELECT 1'); // só para garantir que o banco abriu
-transacao.get();
+let sobraram = [];
 
 db.exec('BEGIN');
 try {
-  for (const c of prontos) {
-    const ja = db.prepare('SELECT id FROM canais WHERE numero = ? OR slug = ?').get(c.numero, slug(c.nome));
-    if (ja) {
-      db.prepare(`UPDATE canais SET nome = ?, categoria = ?, fonte = 'rtmp', url_hls = ?, atualizado_em = ? WHERE id = ?`)
-        .run(c.nome, c.categoria, c.endereco, agora(), ja.id);
+  // O número que este canal vai receber pode estar com outro canal agora (numeração antiga, de
+  // uma importação anterior). Como o número é único, a numeração inteira sai do caminho primeiro
+  // — vira negativa — e só então cada canal recebe o seu.
+  const existentes = new Map(db.prepare('SELECT id, slug FROM canais').all().map((c) => [c.slug, c.id]));
+  if (existentes.size) db.prepare('UPDATE canais SET numero = -numero WHERE numero > 0').run();
+
+  for (const c of canais) {
+    const chave = slug(c.nome);
+    const id = existentes.get(chave);
+    if (id) {
+      db.prepare(`UPDATE canais SET numero = ?, nome = ?, categoria = ?, fonte = 'rtmp', url_hls = ?,
+          classificacao = ?, ordem = ?, id_publico = COALESCE(?, id_publico), atualizado_em = ? WHERE id = ?`)
+        .run(c.numero, c.nome, c.categoria, c.endereco, c.classificacao, c.numero, c.id_publico, agora(), id);
       atualizados += 1;
       continue;
     }
-    db.prepare(`INSERT INTO canais (numero, nome, slug, categoria, fonte, url_hls, observacao, relay, classificacao, ordem, ativo, criado_em, atualizado_em)
-      VALUES (?, ?, ?, ?, 'rtmp', ?, ?, 1, ?, ?, ?, ?, ?)`)
-      .run(c.numero, c.nome, slug(c.nome), c.categoria, c.endereco,
-        `Sinal do fornecedor (SRT). Identificador na origem: ${c.bruto}.`, c.classificacao, c.numero, ligar ? 1 : 0, agora(), agora());
+    db.prepare(`INSERT INTO canais (numero, nome, slug, categoria, fonte, url_hls, observacao, relay, classificacao, ordem, id_publico, ativo, criado_em, atualizado_em)
+      VALUES (?, ?, ?, ?, 'rtmp', ?, ?, 1, ?, ?, ?, ?, ?, ?)`)
+      .run(c.numero, c.nome, chave, c.categoria, c.endereco,
+        `Sinal do fornecedor (SRT). Identificador na origem: ${c.bruto}.`, c.classificacao, c.numero,
+        c.id_publico, ligar ? 1 : 0, agora(), agora());
     criados += 1;
+  }
+
+  // Canal que ficou com número negativo não está nesta lista: vai para a faixa 900+, onde não
+  // atrapalha a numeração nova, em vez de ser apagado por conta própria.
+  sobraram = db.prepare('SELECT id, nome FROM canais WHERE numero < 0').all();
+  let livre = 900;
+  for (const s of sobraram) {
+    while (db.prepare('SELECT 1 FROM canais WHERE numero = ?').get(livre)) livre += 1;
+    db.prepare('UPDATE canais SET numero = ?, ordem = ? WHERE id = ?').run(livre, livre, s.id);
+    livre += 1;
   }
   db.exec('COMMIT');
 } catch (err) {
@@ -223,8 +132,12 @@ try {
 }
 
 console.log(`\n${criados} canal(is) criado(s), ${atualizados} atualizado(s).`);
+if (sobraram.length) {
+  console.log(`\nAtenção: ${sobraram.length} canal(is) já cadastrado(s) não estão nesta lista e foram para a faixa 900+:`);
+  for (const s of sobraram) console.log(`  ${s.nome}`);
+}
 console.log(ligar
   ? 'Entraram LIGADOS. Confira cada um em Canais → Testar antes de avisar os assinantes.'
   : 'Entraram DESLIGADOS. No painel: Canais → Testar em cada um, e ligue os que responderem.');
-console.log('Para os logos: painel → Canais → "Buscar logos das emissoras" (o servidor precisa de internet).');
+console.log('Agora os logos: node scripts/logos-canais.js');
 db.close();

@@ -20,6 +20,10 @@ COPY package.json package-lock.json versao.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY server ./server
 COPY public ./public
+# Os scripts de manutencao (importar canais, buscar logos, empacotar) rodam DENTRO do conteiner:
+# o servidor nao tem node instalado, so o Docker. Sem isto, "docker compose exec app node
+# scripts/..." nao acha o arquivo.
+COPY scripts ./scripts
 
 # O banco e os arquivos de vídeo ficam em /app/data (monte um volume persistente aqui:
 # os vídeos ocupam muito espaço, bem mais que o banco).

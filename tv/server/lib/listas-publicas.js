@@ -95,6 +95,44 @@ function melhorLogo(lista) {
 }
 
 /**
+ * Escolhe, na lista pública, o canal que corresponde a este nome.
+ *
+ * Procurar só no país não basta. Boa parte do que um provedor brasileiro carrega é marca
+ * pan-regional, e a lista pública registra essas marcas fora do BR: Warner Channel está em
+ * `WarnerChannel.us`, Studio Universal em `StudioUniversalLatinAmerica.us`, Discovery Kids em
+ * `DiscoveryKidsLiveLatinAmerica.br`. Procurando só `country === 'BR'` com nome igual, metade
+ * dos canais ficava sem logo — e é a mesma arte.
+ *
+ * Então a escolha é por pontos, nesta ordem de peso: nome igual, país do assinante, feed
+ * brasileiro ou latino-americano, canal no ar. Empate desempata pelo id, para a mesma lista
+ * dar sempre o mesmo resultado.
+ */
+function melhorCanal(canais, nome, pais = 'BR') {
+  const alvo = chaveDoNome(nome);
+  if (!alvo) return null;
+  const nomes = (c) => [c.name, ...(c.alt_names ?? [])];
+  const nota = (c) => {
+    const igual = nomes(c).some((n) => chaveDoNome(n) === alvo);
+    const parecido = igual || nomes(c).some((n) => mesmoCanal(n, nome));
+    if (!parecido) return -1e9;
+    const id = String(c.id).toLowerCase();
+    let n = igual ? 1000 : 300;
+    if (c.country === pais) n += 500;
+    if (/brasil|brazil/.test(id)) n += 400;
+    if (/latinamerica|latino|americalatina/.test(id)) n += 300;
+    if (!c.closed) n += 200;
+    // Nome mais curto é o canal "puro": entre "Discovery Kids" e "Discovery Kids Live", o
+    // primeiro é o que a pessoa reconhece.
+    n -= Math.max(0, chaveDoNome(c.name).length - alvo.length) * 2;
+    return n;
+  };
+  const candidatos = canais.map((c) => [c, nota(c)]).filter(([, n]) => n > -1e8);
+  if (!candidatos.length) return null;
+  candidatos.sort((a, b) => b[1] - a[1] || String(a[0].id).localeCompare(String(b[0].id)));
+  return candidatos[0][0];
+}
+
+/**
  * Procura o logo de um canal pelo nome. Devolve { url, largura, altura, canal } ou null.
  * Casa pelo nome do canal na lista pública (e pelos nomes alternativos que ela traz).
  */
@@ -115,10 +153,7 @@ async function logoDoCanal(nome, { id = null, pais = 'BR', timeoutMs = 60_000 } 
     return null;
   }
 
-  const doPais = canais.filter((c) => c.country === pais && !c.closed);
-  const nomes = (c) => [c.name, ...(c.alt_names ?? [])];
-  const canal = doPais.find((c) => nomes(c).some((n) => chaveDoNome(n) === chaveDoNome(nome)))
-    ?? doPais.find((c) => nomes(c).some((n) => mesmoCanal(n, nome)));
+  const canal = melhorCanal(canais, nome, pais);
   if (!canal) return null;
 
   const logos = await carregarLogos({ timeoutMs });
@@ -182,4 +217,4 @@ async function canaisDoPais(pais = 'BR', { limite = 120 } = {}) {
     .slice(0, limite);
 }
 
-module.exports = { canaisDoPais, logoDoCanal, chaveDoNome, mesmoCanal, CATEGORIAS, FONTE_CANAIS, FONTE_FLUXOS, FONTE_LOGOS };
+module.exports = { canaisDoPais, logoDoCanal, melhorCanal, chaveDoNome, mesmoCanal, CATEGORIAS, FONTE_CANAIS, FONTE_FLUXOS, FONTE_LOGOS };
