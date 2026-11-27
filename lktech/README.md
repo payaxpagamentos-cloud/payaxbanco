@@ -125,7 +125,7 @@ Com Docker, monte um volume persistente em `/app/data`, configure `PUBLIC_ORIGIN
 - No `.env` do servidor: `NODE_ENV=production`, `PUBLIC_ORIGIN=https://lktechprovedor.com.br` e `TRUST_PROXY=true` (atrás do proxy HTTPS).
 - Quem entra por `www.lktechprovedor.com.br` é redirecionado (301) para `https://lktechprovedor.com.br`.
 - A página entrega o endereço oficial ao Google e às redes sociais (`canonical` e `og:`), e o servidor responde `/robots.txt` (painel e API fora da busca) e `/sitemap.xml`.
-- O domínio hoje aponta para uma hospedagem compartilhada (Apache). Este site precisa de um servidor com Node.js 24 rodando o tempo todo e disco persistente (VPS ou equivalente). Quando o servidor estiver pronto, aponte os registros DNS `@` e `www` para o IP dele e emita o certificado HTTPS para os dois nomes.
+- Hospedagem: VPS (Hostinger) com Ubuntu 24.04. A instalação é feita por um único comando; o passo a passo completo, incluindo o apontamento do domínio sem derrubar o e-mail, está em **[implantacao/LEIA-ME.md](implantacao/LEIA-ME.md)**.
 
 ## Backup e recuperação
 
