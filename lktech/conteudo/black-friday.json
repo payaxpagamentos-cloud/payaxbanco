@@ -1,6 +1,10 @@
 {
   "_sobre": "Campanha Black Friday. Aplicar com: sudo lktech-conteudo black-friday (vai para o RASCUNHO; confira na prévia e clique em Publicar no painel).",
-  "hero": { "autoplay": true, "interval": 6500, "badge": "Black Friday: pague em janeiro" },
+  "hero": {
+    "autoplay": true,
+    "interval": 6500,
+    "badge": "Black Friday: pague em janeiro"
+  },
   "banners": [
     {
       "id": "black-friday",
@@ -41,9 +45,69 @@
     "interval": 6000
   },
   "plans": [
-    { "id": "economico-300", "active": true, "featured": false, "label": "PLANO ECONÔMICO", "name": "300 MEGA", "description": "Internet fibra para o dia a dia", "price": 90, "priceSuffix": "/mês", "terms": "", "features": [], "button": "Quero este plano" },
-    { "id": "play-700", "active": true, "featured": true, "label": "PLANO PLAY · 1 APP", "name": "700 MEGA", "description": "Com SKY+ e Globo", "price": 99.99, "priceSuffix": "/mês", "terms": "", "features": ["SKY+ e Globo", "+1 app Standard", "Ubook Plus, Nutri, Fluid e outros"], "button": "Quero este plano" },
-    { "id": "ultra-800", "active": true, "featured": false, "label": "PLANO ULTRA · 1 APP", "name": "800 MEGA", "description": "1 app + SKY+ e Globo", "price": 129.99, "priceSuffix": "/mês", "terms": "", "features": ["SKY+ e Prime Video", "+1 app Premium", "Disney+, HBO Max, Globoplay e outros"], "button": "Quero este plano" },
-    { "id": "power-900", "active": true, "featured": false, "label": "PLANO POWER · 1 APP", "name": "900 MEGA", "description": "1 app + SKY+ / Globo", "price": 159.99, "priceSuffix": "/mês", "terms": "", "features": ["SKY+ e Prime Video", "+1 app Premium", "+1 app Avançado ou Standard", "Deezer, Globoplay, Looke e outros"], "button": "Quero este plano" }
+    {
+      "id": "economico-300",
+      "active": true,
+      "featured": false,
+      "label": "CONNECT + ECONÔMICO",
+      "name": "300 MEGA",
+      "description": "Internet fibra",
+      "price": 90,
+      "priceSuffix": "/mês",
+      "terms": "",
+      "features": [],
+      "button": "Quero este plano"
+    },
+    {
+      "id": "play-700",
+      "active": true,
+      "featured": true,
+      "label": "CONNECT + PLAY 1 APP",
+      "name": "700 MEGA",
+      "description": "SKY+ e Globo",
+      "price": 99.99,
+      "priceSuffix": "/mês",
+      "terms": "",
+      "features": [
+        "+1 app Standard",
+        "Ubook Plus, Nutri, Fluid e outros"
+      ],
+      "button": "Quero este plano"
+    },
+    {
+      "id": "ultra-800",
+      "active": true,
+      "featured": false,
+      "label": "CONNECT + ULTRA",
+      "name": "800 MEGA",
+      "description": "1 APP + SKY + GLOBO",
+      "price": 129.99,
+      "priceSuffix": "/mês",
+      "terms": "",
+      "features": [
+        "SKY+ e Prime Video",
+        "+1 app Premium",
+        "Disney+, HBO Max, Globoplay e outros"
+      ],
+      "button": "Quero este plano"
+    },
+    {
+      "id": "power-900",
+      "active": true,
+      "featured": false,
+      "label": "CONNECT + POWER",
+      "name": "900 MEGA",
+      "description": "1 APP + SKY+ / GLOBO",
+      "price": 159.99,
+      "priceSuffix": "/mês",
+      "terms": "",
+      "features": [
+        "SKY+ e Prime Video",
+        "+1 app Premium",
+        "+1 app Avançado ou Standard",
+        "Deezer, Globoplay, Looke e outros"
+      ],
+      "button": "Quero este plano"
+    }
   ]
 }
