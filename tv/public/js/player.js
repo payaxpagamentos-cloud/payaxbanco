@@ -8,6 +8,48 @@ import { temPonteAndroid, criarVideoTizen, tocarNoAndroidTV } from './motor-nati
  * e "continuar assistindo" salvo de tempo em tempo.
  */
 
+/**
+ * Tela cheia, com os três caminhos que existem — nessa ordem.
+ *
+ * O iPhone é o motivo deste código todo. Lá o `requestFullscreen` de um elemento qualquer
+ * simplesmente não existe: o Safari do iPhone só abre tela cheia no próprio <video>, por
+ * `webkitEnterFullscreen()`. (No iPad e no Android o jeito padrão funciona normalmente.) O bug
+ * do WebKit segue aberto desde 2022. Como a nossa caixa do player é uma <div>, o botão caía
+ * direto no "seu navegador não deixou" — que era verdade, mas inútil para quem só queria ver a
+ * TV em tela cheia.
+ *
+ * Preço do caminho do iPhone: a Apple assume os controles e os nossos somem enquanto durar a
+ * tela cheia. É assim em qualquer aplicativo de streaming no iPhone; não há outro caminho.
+ */
+export const naTelaCheia = (video) => Boolean(
+  document.fullscreenElement ?? document.webkitFullscreenElement ?? video?.webkitDisplayingFullscreen,
+);
+
+export async function alternarTelaCheia(caixa, video) {
+  if (naTelaCheia(video)) {
+    if (document.exitFullscreen && document.fullscreenElement) return document.exitFullscreen();
+    if (document.webkitExitFullscreen && document.webkitFullscreenElement) return document.webkitExitFullscreen();
+    if (video?.webkitDisplayingFullscreen) return video.webkitExitFullscreen?.();
+    return undefined;
+  }
+  // 1. O jeito padrão: Android, computador, iPad, TV.
+  if (caixa.requestFullscreen) {
+    try { return await caixa.requestFullscreen({ navigationUI: 'hide' }); } catch { /* tenta o próximo */ }
+  }
+  // 2. Safari antigo de computador.
+  if (caixa.webkitRequestFullscreen) {
+    try { return caixa.webkitRequestFullscreen(); } catch { /* tenta o próximo */ }
+  }
+  // 3. iPhone: só o <video> vai a tela cheia, e só depois de ter lido o cabeçalho do vídeo.
+  if (video?.webkitEnterFullscreen && video.readyState >= 1) {
+    try { return video.webkitEnterFullscreen(); } catch { /* acabaram os caminhos */ }
+  }
+  toast(video?.webkitEnterFullscreen
+    ? 'A tela cheia abre assim que o vídeo começar. Tente de novo em um instante.'
+    : 'Seu navegador não deixou abrir em tela cheia.', true);
+  return undefined;
+}
+
 let Hls = null;
 const carregarHls = async () => {
   if (Hls !== null) return Hls;
@@ -182,15 +224,17 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     if (fim) video.currentTime = fim - 1;
     video.play().catch(() => {});
   };
-  async function telaCheia() {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else await caixa.requestFullscreen({ navigationUI: 'hide' });
-    } catch { toast('Seu navegador não deixou abrir em tela cheia.', true); }
+  const elVideo = () => (video.elemento ?? video);
+  async function telaCheia() { await alternarTelaCheia(caixa, elVideo()); }
+  const marcarBotao = () => btnTela.replaceChildren(icone(naTelaCheia(elVideo()) ? 'telaSair' : 'tela'));
+  // No iPhone quem muda de estado é o <video>, não o documento: sem ouvir os eventos dele, o
+  // ícone ficaria mentindo depois de sair da tela cheia pelo player da Apple.
+  for (const evento of ['fullscreenchange', 'webkitfullscreenchange']) {
+    document.addEventListener(evento, marcarBotao);
   }
-  document.addEventListener('fullscreenchange', () => {
-    btnTela.replaceChildren(icone(document.fullscreenElement ? 'telaSair' : 'tela'));
-  });
+  for (const evento of ['webkitbeginfullscreen', 'webkitendfullscreen']) {
+    elVideo()?.addEventListener?.(evento, marcarBotao);
+  }
 
   const fecharMenu = () => { menuAberto?.remove(); menuAberto = null; };
   function abrirMenu(titulo2, itens) {
@@ -580,12 +624,9 @@ function tocarNoPlayerDaEmissora(dados, { aoFechar }) {
             el('span', { class: 'etiqueta', title: 'A transmissão é do player oficial da emissora' }, 'Player da emissora'))),
         (() => {
           const b = el('button', { class: 'btn pequeno vazio' }, icone('tela'), 'Tela cheia');
-          b.addEventListener('click', async () => {
-            try {
-              if (document.fullscreenElement) await document.exitFullscreen();
-              else await caixa.requestFullscreen({ navigationUI: 'hide' });
-            } catch { toast('Seu navegador não deixou abrir em tela cheia.', true); }
-          });
+          // Aqui o conteúdo é o player da emissora dentro de um quadro: não há <video> nosso
+          // para mandar a tela cheia, então no iPhone o botão de tela cheia é o da emissora.
+          b.addEventListener('click', () => alternarTelaCheia(caixa, null));
           return b;
         })())));
 
