@@ -263,6 +263,22 @@ exec runuser -u lktech -- /usr/bin/node --env-file=$CONFIG scripts/create-admin.
 EOF
 chmod 755 /usr/local/bin/lktech-admin
 
+# Coloca um conteúdo pronto (pasta conteudo/) no RASCUNHO do painel. Nada vai ao ar sozinho:
+# depois é só conferir em "Ver prévia" no painel e clicar em "Publicar".
+cat > /usr/local/bin/lktech-conteudo <<EOF
+#!/usr/bin/env bash
+# Uso: lktech-conteudo black-friday
+set -e
+if [ -z "\${1:-}" ]; then
+  echo "Uso: lktech-conteudo NOME"
+  echo "Disponíveis:"; ls $APP/conteudo/*.json 2>/dev/null | xargs -n1 basename | sed 's/[.]json\$//'
+  exit 1
+fi
+cd $APP
+exec runuser -u lktech -- /usr/bin/node --env-file=$CONFIG scripts/aplicar-conteudo.mjs "conteudo/\$1.json"
+EOF
+chmod 755 /usr/local/bin/lktech-conteudo
+
 passo "Firewall: só SSH, HTTP e HTTPS"
 SSH_PORTA="$(sshd -T 2>/dev/null | awk '$1=="port"{print $2; exit}' || true)"
 SSH_PORTA="${SSH_PORTA:-22}"

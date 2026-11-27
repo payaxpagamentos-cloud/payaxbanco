@@ -136,3 +136,15 @@ systemctl start lktech
 ```
 
 Guarde também uma cópia dos backups fora do VPS (por exemplo, baixando pelo FileZilla de tempos em tempos).
+
+## Campanhas prontas (ex.: Black Friday)
+
+A pasta `conteudo/` tem campanhas prontas: banners, planos e preços. Para colocar uma no painel:
+
+```bash
+sudo lktech-conteudo black-friday
+```
+
+O conteúdo vai para o **rascunho**. Nada vai ao ar sozinho: entre no painel, confira em **Ver prévia** e clique em **Publicar**. Depois, tudo continua editável pelo painel, como sempre.
+
+Para ver as campanhas disponíveis, rode `sudo lktech-conteudo` sem nome.

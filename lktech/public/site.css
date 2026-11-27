@@ -105,3 +105,12 @@ dialog .consent input{width:22px;height:22px;margin-top:1px}
   .hero-buttons{margin-top:16px}
   .hero-badge{display:none}
 }
+
+/* Celular: controles do banner no canto da foto (nunca sobre o texto) e
+   botões que vão para a linha de baixo, ocupando a largura toda, se o texto não couber */
+@media(max-width:600px){
+  .hero-controls,.hero-controls[class]{top:14px;bottom:auto;right:14px}
+  .hero-buttons{flex-wrap:wrap}
+  .hero-buttons>a{flex:1 1 auto}
+}
+@media(max-width:850px){.hero-controls>button{min-width:40px;min-height:40px;display:grid;place-items:center}}

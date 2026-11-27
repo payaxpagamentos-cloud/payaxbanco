@@ -208,3 +208,18 @@ test('segurança: ninguém tranca o administrador, sessão renova, corpo inváli
     await new Promise(r => app.server.close(r)); await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('campanhas prontas (pasta conteudo/) respeitam as regras do painel e as imagens existem', async () => {
+  const { validateConfig } = await import('../server/validation.mjs');
+  const { seed } = await import('../server/seed.mjs');
+  const { readdir, readFile, access } = await import('node:fs/promises');
+  const arquivos = (await readdir(new URL('../conteudo/', import.meta.url))).filter(n => n.endsWith('.json'));
+  assert.ok(arquivos.length > 0);
+  for (const nome of arquivos) {
+    const campanha = JSON.parse(await readFile(new URL('../conteudo/' + nome, import.meta.url), 'utf8'));
+    const config = structuredClone(seed);
+    for (const [k, v] of Object.entries(campanha)) if (!k.startsWith('_')) config[k] = v;
+    const r = validateConfig(config);
+    for (const b of r.banners) for (const img of [b.image, b.mobileImage].filter(v => v.startsWith('/assets/'))) await access(new URL('../public' + img, import.meta.url));
+  }
+});
