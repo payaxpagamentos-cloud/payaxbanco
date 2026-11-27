@@ -276,6 +276,10 @@ const ID_PUBLICO = {
   PREMIERE_5: 'PremiereFC5.br',
   PREMIERE_6: 'PremiereFC6.br',
   PREMIERE_7: 'PremiereFC7.br',
+  // Os três são o mesmo selo (Paramount+), e é esse o logo que a lista pública tem.
+  PARAMOUNT: 'ParamountPlusApresenta.br',
+  PARAMOUNT_2: 'ParamountPlusApresenta.br',
+  PARAMOUNT_3: 'ParamountPlusApresenta.br',
 };
 
 /** Siglas que continuam em maiúscula ao montar o nome. */
