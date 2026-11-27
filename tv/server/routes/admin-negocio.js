@@ -190,6 +190,14 @@ module.exports = (db) => {
   /** Ativa ou desativa a conta (a desativada não entra mais). */
   r.patch('/assinantes/:id', soAdmin, (req, res) => {
     const u = achar('usuarios', req.params.id, 'Assinante');
+    // Esta rota é a de ASSINANTE, e precisa dizer isso. A tabela `usuarios` guarda os dois, e
+    // sem esta conferência dava para alterar — ou desativar — uma conta da operação por aqui,
+    // passando por fora das proteções de /equipe. O caminho mais curto para o desastre era o
+    // administrador desativar a si mesmo: zero admins ativos e ninguém mais entra no painel,
+    // sem nenhuma forma de desfazer pela plataforma.
+    if (u.perfil !== 'assinante') {
+      throw new ErroNegocio('Esta é uma conta da operação. Altere em Equipe, que tem as proteções próprias.', 409, { motivo: 'nao_e_assinante' });
+    }
     if (req.body.ativo !== undefined) {
       db.prepare('UPDATE usuarios SET ativo = ? WHERE id = ?').run(v.booleano(req.body.ativo) ? 1 : 0, u.id);
       if (!v.booleano(req.body.ativo)) player.encerrarOutras(db, u.id);

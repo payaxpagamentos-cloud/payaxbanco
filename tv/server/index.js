@@ -72,14 +72,16 @@ process.on('uncaughtException', (err) => console.error(`[${config.marca}] Exceç
 
 /** Parada limpa: para de aceitar conexões, deixa as em curso terminarem e fecha o banco. */
 let encerrando = false;
-const encerrar = (sinal) => {
+const encerrar = async (sinal) => {
   if (encerrando) return;
   encerrando = true;
   console.log(`[${config.marca}] ${sinal} recebido: encerrando…`);
   const prazo = setTimeout(() => { console.log(`[${config.marca}] Encerrando à força.`); process.exit(0); }, 15_000);
   prazo.unref();
   // Os ffmpeg do ao vivo são filhos deste processo: sem isto ficariam órfãos escrevendo em disco.
-  try { aovivo.desligarTudo(); } catch { /* nada convertendo */ }
+  // Espera os ffmpeg morrerem antes de o processo sair: filho vivo escrevendo em disco na
+  // hora em que o contêiner é derrubado é pedaço pela metade na pasta do canal.
+  try { await aovivo.desligarTudo(); } catch { /* nada convertendo */ }
   servidor.close(() => {
     try { db.close(); } catch { /* já fechado */ }
     clearTimeout(prazo);

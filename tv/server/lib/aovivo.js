@@ -156,6 +156,10 @@ function ligar(canal, db) {
   estado.numero = canal.numero;
   vivos.set(canal.id, estado);
 
+  // Pasta limpa antes de começar. O processo anterior deste canal pode estar morrendo ainda, e
+  // a limpeza dele não apaga mais a pasta quando o canal foi relançado (ver `desligar`): é aqui
+  // que o pedaço velho sai, senão a lista nova nasceria com alguns segundos do que já passou.
+  limparPasta(canal.id);
   fs.mkdirSync(pastaDoCanal(canal.id), { recursive: true });
 
   const args = [
@@ -259,7 +263,16 @@ function desligar(id) {
   if (!processo) return limparPasta(id);
 
   let limpou = false;
-  const limpar = () => { if (!limpou) { limpou = true; limparPasta(id); } };
+  const limpar = () => {
+    if (limpou) return;
+    limpou = true;
+    // O canal pode ter voltado a ligar enquanto o processo velho agonizava — a rota de editar
+    // canal faz desligar + sincronizar, um atrás do outro. Nesse caso a pasta já é da conversão
+    // NOVA, e apagá-la aqui derrubaria um canal que acabou de subir. Quem relançou limpa a
+    // pasta antes de começar (ver `ligar`), então não fica pedaço velho para trás.
+    if (vivos.has(id)) return;
+    limparPasta(id);
+  };
   processo.once('exit', limpar);
   try { processo.kill('SIGTERM'); } catch { limpar(); }
   // Processo que não atende ao pedido educado leva SIGKILL; a pasta sai de um jeito ou de outro.
@@ -272,8 +285,25 @@ function desligar(id) {
   return undefined;
 }
 
-/** Desliga tudo (parada do servidor). */
-const desligarTudo = () => { for (const id of [...vivos.keys()]) desligar(id); };
+/**
+ * Desliga tudo e espera os processos morrerem de verdade.
+ *
+ * `desligar` só PEDE para o ffmpeg sair; ele ainda fecha o pedaço que está escrevendo e leva
+ * centenas de milissegundos. Quem encerra o servidor precisa esperar isso, senão o contêiner
+ * morre com filhos vivos escrevendo em disco. Devolve uma promessa para quem quiser esperar;
+ * quem não esperar continua funcionando como antes.
+ */
+function desligarTudo({ esperarMs = 5000 } = {}) {
+  const processos = [...vivos.values()].map((e) => e.processo).filter(Boolean);
+  for (const id of [...vivos.keys()]) desligar(id);
+  if (!processos.length) return Promise.resolve();
+  return Promise.race([
+    Promise.all(processos.map((p) => (p.exitCode !== null || p.signalCode !== null
+      ? Promise.resolve()
+      : new Promise((r) => p.once('exit', r))))),
+    new Promise((r) => { const t = setTimeout(r, esperarMs); if (t.unref) t.unref(); }),
+  ]);
+}
 
 /**
  * Acerta o que está convertendo com o que o banco diz: liga canal rtmp ativo, desliga o resto.

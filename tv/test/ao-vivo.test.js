@@ -58,7 +58,7 @@ test('nome de pedaço fora do formato não vira caminho no disco', () => {
 
 test('conversão é sob demanda: canal cadastrado não gasta nada até alguém assistir', async (t) => {
   const s = await iniciar();
-  t.after(() => { aovivo.desligarTudo(); return s.fechar(); });
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
   const admin = await s.adminLogin();
 
   const canal = (await s.post('/admin/canais', {
@@ -99,7 +99,7 @@ test('conversão é sob demanda: canal cadastrado não gasta nada até alguém a
 
 test('canal em RTMP: cadastro, conversão no ar e sinal entregue ao assinante', async (t) => {
   const s = await iniciar();
-  t.after(() => { aovivo.desligarTudo(); return s.fechar(); });
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
   const admin = await s.adminLogin();
 
   // Endereço de lista .m3u8 não serve para um canal que chega em RTMP, e vice-versa.
@@ -170,7 +170,7 @@ test('canal em RTMP: cadastro, conversão no ar e sinal entregue ao assinante', 
 
 test('testar o sinal de um canal no ar lê a conversão, não a origem', async (t) => {
   const s = await iniciar();
-  t.after(() => { aovivo.desligarTudo(); return s.fechar(); });
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
   const admin = await s.adminLogin();
 
   const canal = (await s.post('/admin/canais', {
@@ -188,7 +188,7 @@ test('testar o sinal de um canal no ar lê a conversão, não a origem', async (
 
 test('origem fora do ar: a conversão tenta de novo e o painel conta o que houve', async (t) => {
   const s = await iniciar();
-  t.after(() => { aovivo.desligarTudo(); return s.fechar(); });
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
   const admin = await s.adminLogin();
 
   const criado = await s.post('/admin/canais', {
@@ -365,7 +365,7 @@ test('canal quente fica de pé e não é desligado por ociosidade', async (t) =>
   // canais mais vistos — quem abre a Globo espera o canal subir toda vez que ele esfria. Com a
   // TV aberta marcada como quente, esses abrem na hora, e o resto continua sob demanda.
   const s = await iniciar();
-  t.after(() => { aovivo.desligarTudo(); return s.fechar(); });
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
   const admin = await s.adminLogin();
 
   const quente = (await s.post('/admin/canais', { numero: 5, nome: 'Globo Teste', fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/globo', ativo: true }, admin)).dados.canal;
@@ -392,4 +392,29 @@ test('canal quente fica de pé e não é desligado por ociosidade', async (t) =>
   assert.equal(aovivo.situacao(quente.id).convertendo, true, 'quente sobrevive à limpeza');
   assert.equal(aovivo.situacao(frio.id).convertendo, false, 'frio sai, como sempre saiu');
   assert.equal(desligados, 1);
+});
+
+test('canal religado no meio do desligamento não perde a pasta nova', async (t) => {
+  // Por que isto existe: `desligar` mata o ffmpeg e, QUANDO ELE MORRE, apaga a pasta do canal.
+  // Se o canal voltar a ligar nesse intervalo — e a rota de editar canal faz desligar seguido de
+  // sincronizar, um atrás do outro —, a pasta apagada passava a ser a da conversão NOVA. O canal
+  // subia e, milissegundos depois, ficava sem nenhum pedaço: tela preta num canal que acabou de
+  // ser ligado pela própria operação.
+  const s = await iniciar();
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
+  const admin = await s.adminLogin();
+  const canal = (await s.post('/admin/canais', { numero: 61, nome: 'Religado', fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/religado', ativo: true }, admin)).dados.canal;
+
+  await aovivo.garantir(canal, s.db, { esperarMs: 4000 });
+  assert.equal(aovivo.temSinal(canal.id), true, 'o canal subiu');
+
+  // Desliga e religa na sequência, como a rota faz.
+  aovivo.desligar(canal.id);
+  aovivo.ligar(canal, s.db);
+
+  // Dá tempo de o processo velho morrer e disparar a limpeza dele.
+  await new Promise((r) => { setTimeout(r, 1200); });
+
+  assert.equal(aovivo.situacao(canal.id).convertendo, true, 'a conversão nova continua de pé');
+  assert.equal(aovivo.temSinal(canal.id), true, 'e a pasta dela não foi apagada pelo processo velho');
 });

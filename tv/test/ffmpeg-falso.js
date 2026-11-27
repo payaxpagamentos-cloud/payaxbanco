@@ -55,6 +55,15 @@ function escrever() {
 
 escrever();
 const relogio = setInterval(escrever, 150);
+// O ffmpeg de verdade NÃO morre no instante do SIGTERM: ele fecha o pedaço que está escrevendo
+// e só então sai, o que leva centenas de milissegundos. Sair na hora aqui escondia uma corrida
+// de verdade — canal desligado e religado em seguida, com a limpeza do processo velho caindo em
+// cima da pasta do novo. Com o falso morrendo instantaneamente, a janela nem existia e o teste
+// passava com o defeito presente.
+const DEMORA_PARA_MORRER_MS = 300;
 for (const sinal of ['SIGTERM', 'SIGINT']) {
-  process.on(sinal, () => { clearInterval(relogio); process.exit(0); });
+  process.on(sinal, () => {
+    clearInterval(relogio);
+    setTimeout(() => process.exit(0), DEMORA_PARA_MORRER_MS);
+  });
 }
