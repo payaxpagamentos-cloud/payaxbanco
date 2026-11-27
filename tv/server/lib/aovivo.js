@@ -362,8 +362,15 @@ function conferir(canal) {
       url,
     ], { timeout: config.aoVivo.timeoutMs + 10_000, maxBuffer: 2 * 1024 * 1024 }, (err, saida, erroSaida) => {
       if (err) {
-        const motivo = err.killed ? 'A origem não respondeu no tempo esperado.' : String(erroSaida || err.message).trim().split('\n').pop();
-        return resolve({ status: 'falha', detalhe: motivo?.slice(0, 300) || 'A origem não respondeu.', lido_de: local ? 'conversao' : 'origem' });
+        let motivo = err.killed ? 'A origem não respondeu no tempo esperado.' : String(erroSaida || err.message).trim().split('\n').pop();
+        // O ffprobe repete o endereço inteiro antes do erro. Numa lista de 116 canais isso enche
+        // a tela de endereço e esconde o que importa — e endereço de sinal não precisa ficar
+        // espalhado por registro nenhum.
+        // O ":" tem de vir seguido de espaço: a porta e o streamid do endereço também têm ":",
+        // e sem essa exigência o corte parava em "srt://1.2.3.4:" e deixava o resto na mensagem.
+        motivo = String(motivo ?? '').replace(/^(?:srt|rtmp|rtmps|rtsp|udp):\/\/.*?:\s+/i, '').trim();
+        resolve({ status: 'falha', detalhe: motivo.slice(0, 300) || 'A origem não respondeu.', lido_de: local ? 'conversao' : 'origem' });
+        return;
       }
       let fluxos = [];
       try { fluxos = JSON.parse(saida).streams ?? []; } catch { /* saída estranha: cai no recado abaixo */ }
