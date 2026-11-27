@@ -49,7 +49,7 @@
       "id": "economico-300",
       "active": true,
       "featured": false,
-      "label": "CONNECT + ECONÔMICO",
+      "label": "LK TECH + ECONÔMICO",
       "name": "300 MEGA",
       "description": "Internet fibra",
       "price": 90,
@@ -63,7 +63,7 @@
       "id": "play-700",
       "active": true,
       "featured": true,
-      "label": "CONNECT + PLAY 1 APP",
+      "label": "LK TECH + PLAY 1 APP",
       "name": "700 MEGA",
       "description": "SKY+ e Globo",
       "price": 99.99,
@@ -113,7 +113,7 @@
       "id": "ultra-800",
       "active": true,
       "featured": false,
-      "label": "CONNECT + ULTRA",
+      "label": "LK TECH + ULTRA",
       "name": "800 MEGA",
       "description": "1 APP + SKY + GLOBO",
       "price": 129.99,
@@ -131,15 +131,15 @@
         },
         {
           "nome": "Prime Video",
-          "logo": ""
+          "logo": "/assets/apps/prime-video.png"
         },
         {
           "nome": "Disney+",
-          "logo": ""
+          "logo": "/assets/apps/disney-plus.png"
         },
         {
           "nome": "HBO Max",
-          "logo": ""
+          "logo": "/assets/apps/hbo-max.png"
         },
         {
           "nome": "Globoplay",
@@ -151,7 +151,7 @@
       "id": "power-900",
       "active": true,
       "featured": false,
-      "label": "CONNECT + POWER",
+      "label": "LK TECH + POWER",
       "name": "900 MEGA",
       "description": "1 APP + SKY+ / GLOBO",
       "price": 159.99,
@@ -170,7 +170,7 @@
         },
         {
           "nome": "Prime Video",
-          "logo": ""
+          "logo": "/assets/apps/prime-video.png"
         },
         {
           "nome": "Deezer",

@@ -221,6 +221,7 @@ test('campanhas prontas (pasta conteudo/) respeitam as regras do painel e as ima
     for (const [k, v] of Object.entries(campanha)) if (!k.startsWith('_')) config[k] = v;
     const r = validateConfig(config);
     for (const b of r.banners) for (const img of [b.image, b.mobileImage].filter(v => v.startsWith('/assets/'))) await access(new URL('../public' + img, import.meta.url));
+    for (const p of r.plans) for (const app of p.apps) if (app.logo.startsWith('/assets/')) await access(new URL('../public' + app.logo, import.meta.url));
   }
 });
 

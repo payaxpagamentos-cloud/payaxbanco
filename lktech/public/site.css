@@ -121,3 +121,4 @@ dialog .consent input{width:22px;height:22px;margin-top:1px}
 .plan-card .plan-apps li.app-selo{margin:0;height:36px;min-width:44px;max-width:100%;padding:0 12px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px #0003}
 .app-selo img{max-height:22px;max-width:84px;width:auto;height:auto;object-fit:contain;display:block}
 .plan-card .app-selo span{display:block;font-size:.78rem;font-weight:750;color:#12223a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.plan-card .plan-apps li.app-selo{height:40px}.app-selo img{max-height:28px;max-width:100px}
