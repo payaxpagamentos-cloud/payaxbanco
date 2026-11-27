@@ -136,6 +136,11 @@ function ligar(canal, db) {
     '-hls_list_size', String(config.aoVivo.segmentosNaLista),
     // delete_segments apaga o que saiu da lista; omit_endlist mantém a lista como "ao vivo".
     '-hls_flags', 'delete_segments+omit_endlist+temp_file',
+    // Por padrão o ffmpeg guarda UM pedaço além da lista. Medido: 6 na lista, 7 em disco. O
+    // player fica 3 pedaços atrás da ponta; atrasando mais dois numa oscilação de rede de
+    // celular, ele pede um arquivo já apagado, leva 404 e trava de vez. Guardar alguns a mais
+    // custa poucos MB por canal e é a diferença entre engasgar e parar.
+    '-hls_delete_threshold', String(config.aoVivo.pedacosGuardados),
     '-hls_segment_filename', path.join(pastaDoCanal(canal.id), 'p%06d.ts'),
     listaDoCanal(canal.id),
   ];
@@ -284,7 +289,7 @@ function limparOciosos() {
  */
 async function garantir(canal, db, { esperarMs = config.aoVivo.esperaPrimeiroPedacoMs } = {}) {
   if (!config.aoVivo.ligado) return false;
-  if (temSinal(canal.id)) { marcarUso(canal.id); return true; }
+  if (daParaAssistir(canal.id)) { marcarUso(canal.id); return true; }
   // Teto de canais simultâneos: antes de subir mais um, tenta abrir espaço no que está ocioso.
   if (!vivos.has(canal.id) && vivos.size >= config.aoVivo.maxCanais) {
     limparOciosos();
@@ -296,10 +301,13 @@ async function garantir(canal, db, { esperarMs = config.aoVivo.esperaPrimeiroPed
   const fim = Date.now() + esperarMs;
   while (Date.now() < fim) {
     await new Promise((r) => { setTimeout(r, 200); });
-    if (temSinal(canal.id)) { marcarUso(canal.id); return true; }
+    if (daParaAssistir(canal.id)) { marcarUso(canal.id); return true; }
     // A origem recusou a conexão: não adianta esperar o resto do prazo.
     if (!estado.processo && estado.erro) return false;
   }
+  // Acabou o prazo. Se há sinal, mesmo com menos folga do que o ideal, é melhor entregar o canal
+  // com o que existe do que dizer ao assinante que a origem não respondeu: ela respondeu.
+  if (temSinal(canal.id)) { marcarUso(canal.id); return true; }
   return false;
 }
 
@@ -317,6 +325,25 @@ function pedacoMaisNovo(id) {
 function temSinal(id) {
   try { return fs.statSync(listaDoCanal(id)).size > 0; } catch { return false; }
 }
+
+/**
+ * Quantos pedaços a lista já anuncia.
+ *
+ * "Tem sinal" e "dá para assistir" não são a mesma coisa, e confundir os dois era o motivo de o
+ * canal travar: o ffmpeg escreve a lista assim que fecha o PRIMEIRO pedaço, com 4 segundos de
+ * vídeo dentro. Quem entrasse ali ficava colado na ponta, sem reserva nenhuma, correndo atrás de
+ * um processo que produz 4 segundos a cada 4 segundos — qualquer oscilação da rede travava.
+ * O próprio hls.js quer ficar três pedaços atrás da ponta (liveSyncDurationCount: 3) e não tinha
+ * de onde tirar isso.
+ */
+function pedacosNaLista(id) {
+  try {
+    return (fs.readFileSync(listaDoCanal(id), 'utf8').match(/^p\d{6}\.ts$/gm) ?? []).length;
+  } catch { return 0; }
+}
+
+/** Já há vídeo suficiente na lista para o player começar com folga? */
+const daParaAssistir = (id) => pedacosNaLista(id) >= config.aoVivo.pedacosParaComecar;
 
 /** Lê a lista HLS que o ffmpeg está escrevendo e aponta cada pedaço para o nosso endereço. */
 function listaDoPlayer(canalId, { playToken, baseApi }) {
@@ -418,6 +445,7 @@ function situacao(id) {
 
 module.exports = {
   PROTOCOLOS, conferirEndereco, conferir, ligar, desligar, desligarTudo, sincronizar, situacao, temSinal,
+  pedacosNaLista, daParaAssistir,
   garantir, marcarUso, limparOciosos,
   listaDoPlayer, caminhoDoPedaco, pastaDoCanal, listaDoCanal,
 };

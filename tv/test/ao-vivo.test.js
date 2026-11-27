@@ -279,3 +279,47 @@ test('numeração: abertos na antena de SP, fechados na grade da Claro', () => {
   // E o número continua único — é o que o assinante digita no controle.
   assert.equal(new Set(canais.map((c) => c.numero)).size, canais.length);
 });
+
+test('o canal só é entregue com folga de buffer, não no primeiro pedaço', async (t) => {
+  // Por que este teste existe: a conversão escreve a lista assim que fecha o PRIMEIRO pedaço,
+  // com 4 segundos de vídeo. Entregar o canal ali deixava o player colado na ponta, sem reserva,
+  // correndo atrás de um processo que produz 4 segundos a cada 4 segundos — e travando na
+  // primeira oscilação de rede. Foi o que o assinante viu na prática.
+  const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'play-tech-vip-folga-'));
+  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+
+  const lista = (quantos) => [
+    '#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:4', '#EXT-X-MEDIA-SEQUENCE:0',
+    ...Array.from({ length: quantos }, (_, i) => `#EXTINF:4.000,\np${String(i).padStart(6, '0')}.ts`),
+    '',
+  ].join('\n');
+
+  const antes = config.aoVivo.pasta;
+  config.aoVivo.pasta = pasta;
+  t.after(() => { config.aoVivo.pasta = antes; });
+  fs.mkdirSync(path.join(pasta, '7'), { recursive: true });
+  const arquivo = path.join(pasta, '7', 'lista.m3u8');
+
+  // Lista vazia: nem sinal, nem folga.
+  fs.writeFileSync(arquivo, '');
+  assert.equal(aovivo.pedacosNaLista(7), 0);
+  assert.equal(aovivo.daParaAssistir(7), false);
+
+  // Um e dois pedaços: HÁ sinal, mas ainda não dá para assistir sem travar. É a distinção que
+  // faltava — "tem sinal" e "dá para assistir" não são a mesma coisa.
+  for (const n of [1, 2]) {
+    fs.writeFileSync(arquivo, lista(n));
+    assert.equal(aovivo.pedacosNaLista(7), n);
+    assert.equal(aovivo.temSinal(7), true, `com ${n} pedaço(s) já há sinal`);
+    assert.equal(aovivo.daParaAssistir(7), false, `com ${n} pedaço(s) o player travaria`);
+  }
+
+  // Três pedaços são os 12s que o hls.js procura (liveSyncDurationCount: 3) e o que o HLS
+  // recomenda: começar a tocar a três pedaços da ponta.
+  fs.writeFileSync(arquivo, lista(3));
+  assert.equal(aovivo.daParaAssistir(7), true);
+
+  // Só conta pedaço de verdade: comentário e cabeçalho não viram folga.
+  fs.writeFileSync(arquivo, '#EXTM3U\n#EXT-X-TARGETDURATION:4\n# p000000.ts\n');
+  assert.equal(aovivo.pedacosNaLista(7), 0, 'linha comentada não é pedaço');
+});

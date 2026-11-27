@@ -60,13 +60,42 @@ Medido neste projeto, com sinal real de 720p a 3 Mbps:
 | Processador | **~1,8% de um núcleo** |
 | Memória | **~57 MB** |
 | Disco | só os segundos que estão na lista (poucos MB) |
-| Tempo até entrar no ar | **~5 s** |
+| Tempo até entrar no ar | **~12 s** (ver abaixo) |
 
 Quem limita é a **memória**, não o processador: 60 canais pesam cerca de 3,5 GB de RAM e pouco
 mais de um núcleo. O teto está em `TV_AO_VIVO_MAX=60`; suba ou desça conforme a RAM do servidor.
 
 A **banda de saída** é outra conta, e é a que manda: cada assinante assistindo consome o bitrate
 do canal. 3 Mbps × 300 assinantes = 900 Mbps de upload.
+
+### Por que o canal frio demora ~12 s, e não ~4 s
+
+O ffmpeg escreve a lista assim que fecha o **primeiro** pedaço, com 4 segundos de vídeo dentro.
+Entregar o canal nesse instante é tentador — e foi o que a plataforma fazia. O resultado era o
+canal **travando**: o player ficava colado na ponta, sem reserva, correndo atrás de um processo
+que produz 4 segundos a cada 4 segundos. Qualquer oscilação da rede do celular parava a imagem.
+
+O HLS (RFC 8216) recomenda começar a tocar a **três pedaços da ponta**, e o hls.js procura
+exatamente isso (`liveSyncDurationCount: 3`). Com um pedaço na lista, não há de onde tirar.
+
+Então a plataforma espera **três pedaços** — 12 segundos de folga — antes de entregar o canal.
+São uns 8 segundos a mais para abrir um canal frio, em troca de o canal não travar. Canal morno
+(visto nos últimos 5 minutos) continua entrando na hora, porque a folga já existe.
+
+Medido nesta bancada:
+
+| | antes | depois |
+|---|---|---|
+| Lista liberada ao player | 3,6 s, com **1** pedaço | 11,7 s, com **3** pedaços |
+| Folga de vídeo na entrada | 4 s | **12 s** |
+| Pedaços guardados além da lista | 1 (4 s) | **6 (24 s)** |
+
+A última linha é um segundo defeito, independente: o ffmpeg apagava o pedaço quase na hora em
+que ele saía da lista. O player que ficasse dois pedaços atrás — comum em rede de celular —
+pedia um arquivo já apagado, levava 404 e parava de vez. Guardar seis a mais custa uns 9 MB por
+canal convertendo.
+
+Os dois valores são ajustáveis: `TV_AO_VIVO_PEDACOS_INICIO` e `TV_AO_VIVO_PEDACOS_GUARDADOS`.
 
 ---
 
@@ -86,7 +115,7 @@ Por que isso não é detalhe:
 
 Como fica para o assinante:
 
-- canal **frio** (ninguém via): entra no ar em ~5 s — o app mostra que está entrando no ar;
+- canal **frio** (ninguém via): entra no ar em ~12 s — o app mostra que está entrando no ar;
 - canal **morno** (alguém viu nos últimos 5 minutos): entra **na hora**;
 - zapear entre canais que a casa costuma ver é instantâneo, porque eles ficam mornos.
 

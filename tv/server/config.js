@@ -96,6 +96,15 @@ module.exports = {
     // em relação ao ar. Pedaço menor diminui o atraso e aumenta o número de requisições.
     segundosPorSegmento: Number(process.env.TV_AO_VIVO_SEGMENTO_S) || 4,
     segmentosNaLista: Number(process.env.TV_AO_VIVO_LISTA) || 6,
+    // Quantos pedaços a lista precisa ter antes de o canal ser entregue ao assinante. Três é a
+    // recomendação do próprio HLS (RFC 8216) e o que o hls.js procura: começar a tocar a três
+    // pedaços da ponta. Com um só, o player gruda na ponta sem reserva e trava na primeira
+    // oscilação — foi medido assim. Três pedaços de 4s são 12s de folga, e custam ~8s a mais
+    // para abrir um canal que estava frio.
+    pedacosParaComecar: Number(process.env.TV_AO_VIVO_PEDACOS_INICIO) || 3,
+    // Pedaços mantidos em disco DEPOIS de saírem da lista, para quem ficou para trás não pedir
+    // um arquivo apagado. O padrão do ffmpeg é 1, que é pouco: são ~1,5 MB cada.
+    pedacosGuardados: Number(process.env.TV_AO_VIVO_PEDACOS_GUARDADOS) || 6,
     // Sem nada chegar da origem por este tempo, o ffmpeg desiste e a gente reconecta.
     timeoutMs: Number(process.env.TV_AO_VIVO_TIMEOUT_MS) || 15_000,
     // Teto de canais convertendo AO MESMO TEMPO. Cada um é um processo e um fluxo de rede;
@@ -113,7 +122,12 @@ module.exports = {
     // zapear: voltar ao canal anterior dentro desse tempo é instantâneo.
     ociosoSegundos: Number(process.env.TV_AO_VIVO_OCIOSO_S) || 300,
     // Quanto o assinante espera, ao abrir um canal frio, antes de a plataforma desistir.
-    esperaPrimeiroPedacoMs: Number(process.env.TV_AO_VIVO_ESPERA_MS) || 12_000,
+    //
+    // Precisa caber a conversão dos três pedaços iniciais, que ficam prontos lá pelos 12s: um
+    // prazo de 12s ficaria exatamente na borda e estouraria em metade das tentativas. Estourando
+    // o prazo com sinal já no ar, o canal é entregue mesmo assim — o prazo é para o caso de a
+    // origem não responder, não para punir quem abriu um canal frio.
+    esperaPrimeiroPedacoMs: Number(process.env.TV_AO_VIVO_ESPERA_MS) || 20_000,
   },
   // Canais marcados para tocar direto na origem (sem transmissão) precisam que o domínio da emissora
   // seja liberado na política de segurança das páginas. Lista separada por vírgula, ex.: 'cdn.emissora.com.br'.
