@@ -82,6 +82,25 @@ module.exports = {
     segmentoMaxBytes: (Number(process.env.TV_RELAY_SEGMENTO_MAX_MB) || 32) * 1024 * 1024,
     userAgent: process.env.TV_RELAY_USER_AGENT || 'PLAYTECHVIP/1.0',
   },
+  // Canais que chegam em RTMP (é como a maioria dos fornecedores entrega o sinal). RTMP não toca
+  // em navegador, celular nem TV — virou coisa do Flash —, então o servidor mantém um ffmpeg por
+  // canal convertendo para HLS. A conversão é remux (`-c copy`): nenhum quadro é recodificado,
+  // a qualidade é a mesma da origem e o gasto de processador é quase zero.
+  aoVivo: {
+    ligado: process.env.TV_AO_VIVO !== '0',
+    // Segmentos ficam aqui, ao lado do banco (fora da pasta pública). São apagados conforme saem
+    // da lista: ao vivo não guarda histórico, e disco cheio derruba a plataforma inteira.
+    pasta: process.env.TV_AO_VIVO_PASTA || path.join(path.dirname(dbFile), 'ao-vivo'),
+    // 4s por pedaço e 6 pedaços na lista: ~24s de folga contra engasgo, com uns 12s de atraso
+    // em relação ao ar. Pedaço menor diminui o atraso e aumenta o número de requisições.
+    segundosPorSegmento: Number(process.env.TV_AO_VIVO_SEGMENTO_S) || 4,
+    segmentosNaLista: Number(process.env.TV_AO_VIVO_LISTA) || 6,
+    // Sem nada chegar da origem por este tempo, o ffmpeg desiste e a gente reconecta.
+    timeoutMs: Number(process.env.TV_AO_VIVO_TIMEOUT_MS) || 15_000,
+    // Teto de canais convertendo ao mesmo tempo. Cada um é um processo e um fluxo de rede;
+    // o remux custa pouco, mas não é de graça. Suba este número depois de medir no servidor.
+    maxCanais: Number(process.env.TV_AO_VIVO_MAX) || 60,
+  },
   // Canais marcados para tocar direto na origem (sem transmissão) precisam que o domínio da emissora
   // seja liberado na política de segurança das páginas. Lista separada por vírgula, ex.: 'cdn.emissora.com.br'.
   origensMidia: String(process.env.TV_ORIGENS_MIDIA || '').split(',').map((h) => h.trim()).filter(Boolean),

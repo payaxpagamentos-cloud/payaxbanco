@@ -132,9 +132,11 @@ CREATE TABLE IF NOT EXISTS canais (
     CHECK (categoria IN ('aberta','noticias','esportes','filmes','series','infantil','documentarios','musica','variedades','religioso','local')),
   -- Como o canal chega ao assinante:
   --   'hls'   = sinal próprio ou contratado, em lista .m3u8 (com ou sem transmissão nossa);
+  --   'rtmp'  = sinal entregue em RTMP pelo fornecedor; o servidor converte para HLS (lib/aovivo.js);
   --   'embed' = player oficial e público da emissora (abrimos o player dela, com os anúncios dela).
-  fonte TEXT NOT NULL DEFAULT 'hls' CHECK (fonte IN ('hls','embed')),
-  -- Endereço da lista HLS (quando fonte = 'hls'). Vazio enquanto o sinal não chega.
+  fonte TEXT NOT NULL DEFAULT 'hls' CHECK (fonte IN ('hls','rtmp','embed')),
+  -- Endereço de onde o sinal vem: a lista .m3u8 (fonte 'hls') ou o rtmp:// do fornecedor
+  -- (fonte 'rtmp'). Vazio enquanto o sinal não chega.
   url_hls TEXT,
   -- Endereço do player oficial da emissora (quando fonte = 'embed').
   url_embed TEXT,
@@ -482,9 +484,28 @@ function aceitarFullHd(db, tabela) {
   }
 }
 
+/**
+ * Abre espaço para 'rtmp' no CHECK de fonte, em canais que já existem.
+ * Mesmo caminho do aceitarFullHd: recriar a tabela canais custaria mais (programas, destaques e
+ * sessões apontam para ela) do que acertar o texto do schema.
+ */
+function aceitarRtmp(db) {
+  const linha = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'canais'").get();
+  if (!linha || String(linha.sql).includes("'rtmp'")) return;
+  try {
+    db.exec('PRAGMA writable_schema = ON');
+    db.prepare("UPDATE sqlite_master SET sql = replace(sql, ?, ?) WHERE type = 'table' AND name = 'canais'")
+      .run("'hls','embed'", "'hls','rtmp','embed'");
+    db.exec('PRAGMA writable_schema = RESET');
+  } catch {
+    db.exec('PRAGMA writable_schema = OFF');
+  }
+}
+
 function migrar(db) {
   aceitarFullHd(db, 'planos');
   aceitarFullHd(db, 'midias');
+  aceitarRtmp(db);
   const colunas = db.prepare('PRAGMA table_info(canais)').all().map((c) => c.name);
   if (!colunas.includes('fonte')) db.exec("ALTER TABLE canais ADD COLUMN fonte TEXT NOT NULL DEFAULT 'hls'");
   if (!colunas.includes('url_embed')) db.exec('ALTER TABLE canais ADD COLUMN url_embed TEXT');
