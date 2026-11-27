@@ -38,14 +38,15 @@ async function aplicar(db, canalId, { url = null, forcar = false } = {}) {
  * Busca o logo de todos os canais de uma vez. Sem `forcar`, só mexe em quem ainda não tem.
  * Um canal que falhar não derruba os outros.
  */
-async function aplicarEmTodos(db, { forcar = false } = {}) {
+async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200 } = {}) {
   const canais = db.prepare(`SELECT id, nome FROM canais ${forcar ? '' : 'WHERE logo_midia_id IS NULL'} ORDER BY numero`).all();
   const comLogo = [];
   const semLogo = [];
   const falharam = [];
   for (const [i, c] of canais.entries()) {
-    // Uma pausa curta entre os canais: quem hospeda as imagens limita a frequência.
-    if (i) await esperar(600);
+    // Pausa entre os canais: quem hospeda as imagens limita a frequência, e com os 116 canais
+    // de um provedor inteiro a conta estoura rápido. 1,2s dá uns 2 minutos e meio no total.
+    if (i) await esperar(pausaMs);
     try {
       const r = await aplicar(db, c.id, { forcar });
       if (r) comLogo.push(r);

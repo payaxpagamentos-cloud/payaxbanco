@@ -23,11 +23,14 @@ function refererDe(url) {
 }
 
 /** Baixa uma imagem e devolve o conteúdo. Lança ErroNegocio com o motivo quando não dá. */
-async function baixarImagem(url, { tentativas = 3 } = {}) {
+async function baixarImagem(url, { tentativas = 4 } = {}) {
   await conferirEndereco(url);
   let resp;
   for (let tentativa = 0; tentativa < tentativas; tentativa += 1) {
-    if (tentativa) await esperar(1500 * tentativa);
+    // Espera dobrando (2s, 4s, 8s). Quem hospeda a maior parte dos logos corta por frequência
+    // depois de algumas dezenas de imagens, e devolve 403 — esperar um pouco resolve, insistir
+    // na mesma velocidade não. Com a espera linear de antes, 47 dos 116 canais ficavam sem arte.
+    if (tentativa) await esperar(2000 * (2 ** (tentativa - 1)));
     try {
       resp = await fetch(url, {
         redirect: 'follow',
