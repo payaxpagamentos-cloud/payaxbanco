@@ -80,6 +80,31 @@ const mesmoCanal = (a, b) => {
 };
 
 /** Entre os logos do mesmo canal, o melhor para a grade: em uso, quadrado e nem grande nem minúsculo. */
+/**
+ * Quanto se pode confiar em quem hospeda a imagem.
+ *
+ * Isto não é capricho: 79% dos logos de canais brasileiros da lista pública estão no imgur, e o
+ * imgur bloqueia o ENDEREÇO depois de uma rajada de pedidos — medido aqui, 18 pedidos a cada
+ * 1,2s derrubaram o acesso inteiro, e depois disso tudo responde 403 em 4 ms, inclusive o que
+ * funcionava minutos antes. Um provedor com 116 canais estoura esse limite na primeira volta e
+ * fica sem a maior parte dos logos. Quando o mesmo canal tem logo em outro lugar, é de lá que a
+ * gente baixa.
+ */
+const CONFIANCA_DO_HOST = [
+  [/(^|\.)wikimedia\.org$/, 200],        // não bloqueia, serve bem e é estável
+  [/(^|\.)wikia\.nocookie\.net$/, 120],
+  [/(^|\.)googleusercontent\.com$/, 100],
+  [/(^|\.)ibb\.co$/, 80],
+  [/(^|\.)imgur\.com$/, -250],           // bloqueia por endereço: último recurso
+];
+
+function notaDoHost(url) {
+  let host;
+  try { host = new URL(url).hostname.toLowerCase(); } catch { return -500; }
+  for (const [padrao, nota] of CONFIANCA_DO_HOST) if (padrao.test(host)) return nota;
+  return 0;
+}
+
 function melhorLogo(lista) {
   const nota = (l) => {
     const largura = Number(l.width) || 0;
@@ -87,6 +112,7 @@ function melhorLogo(lista) {
     if (!largura || !altura) return -1e9;
     const proporcao = largura / altura;
     return (l.in_use ? 300 : 0)
+      + notaDoHost(l.url)
       + (String(l.format).toUpperCase() === 'SVG' ? 60 : 0)
       - Math.abs(Math.log(proporcao)) * 120          // perto do quadrado
       - Math.abs(Math.log(Math.max(largura, altura) / 512)) * 40;  // perto de 512 px
@@ -217,4 +243,4 @@ async function canaisDoPais(pais = 'BR', { limite = 120 } = {}) {
     .slice(0, limite);
 }
 
-module.exports = { canaisDoPais, logoDoCanal, melhorCanal, chaveDoNome, mesmoCanal, CATEGORIAS, FONTE_CANAIS, FONTE_FLUXOS, FONTE_LOGOS };
+module.exports = { canaisDoPais, logoDoCanal, melhorCanal, chaveDoNome, mesmoCanal, CATEGORIAS, FONTE_CANAIS, FONTE_FLUXOS, FONTE_LOGOS, notaDoHost, melhorLogo };

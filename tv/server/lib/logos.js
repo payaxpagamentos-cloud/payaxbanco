@@ -5,7 +5,10 @@ const { execFileSync } = require('node:child_process');
 const { agora } = require('../db');
 const config = require('../config');
 const { ErroNegocio, naoEncontrado } = require('./erros');
-const { baixarImagem, esperar } = require('./baixar');
+// O módulo inteiro, não as funções soltas: desestruturar aqui congela a referência e o teste
+// não consegue pôr um host de mentira no lugar para exercitar o bloqueio.
+const baixar = require('./baixar');
+const { esperar } = baixar;
 const listasPublicas = require('./listas-publicas');
 const midia = require('./midia');
 
@@ -62,7 +65,7 @@ function medirDoCanal(db, canalId) {
  * Põe o logo num canal: do endereço informado ou do que a lista pública tiver para ele.
  * Devolve { canal, logo_midia_id, origem } ou null quando não há logo para esse canal.
  */
-async function aplicar(db, canalId, { url = null, forcar = false } = {}) {
+async function aplicar(db, canalId, { url = null, forcar = false, hostsBloqueados = null } = {}) {
   const canal = db.prepare('SELECT * FROM canais WHERE id = ?').get(Number(canalId));
   if (!canal) throw naoEncontrado('Canal');
   if (canal.logo_midia_id && !forcar && !url) return { canal: canal.nome, logo_midia_id: canal.logo_midia_id, origem: 'já tinha' };
@@ -70,9 +73,15 @@ async function aplicar(db, canalId, { url = null, forcar = false } = {}) {
   const achado = url ? { url, nome: canal.nome } : await listasPublicas.logoDoCanal(canal.nome, { id: canal.id_publico });
   if (!achado) return null;
 
+  // Host que já se mostrou fechado nesta rodada: nem tenta. Economiza mais de dois minutos por
+  // canal e deixa o relatório final honesto sobre quantos ficaram para a próxima.
+  let hostDoLogo = null;
+  try { hostDoLogo = new URL(achado.url).hostname; } catch { /* endereço estranho */ }
+  if (hostDoLogo && hostsBloqueados?.has(hostDoLogo)) return { canal: canal.nome, pulado: true, host: hostDoLogo };
+
   let conteudo;
   try {
-    conteudo = await baixarImagem(achado.url);
+    conteudo = await baixar.baixarImagem(achado.url);
   } catch (err) {
     // De onde a imagem viria: é o que distingue "esse host limitou a frequência" de "este
     // servidor não consegue sair para esse host".
@@ -82,35 +91,58 @@ async function aplicar(db, canalId, { url = null, forcar = false } = {}) {
   const imagem = midia.salvarImagem(db, equipeLogos, conteudo, { nome: `logo-${canal.slug}` });
   db.prepare('UPDATE canais SET logo_midia_id = ?, atualizado_em = ? WHERE id = ?').run(imagem.id, agora(), canal.id);
   medirDoCanal(db, canal.id);
-  return { canal: canal.nome, logo_midia_id: imagem.id, origem: url ? 'endereço informado' : `lista pública (${achado.nome})` };
+  return { canal: canal.nome, logo_midia_id: imagem.id, host: hostDoLogo,
+    origem: url ? 'endereço informado' : `lista pública (${achado.nome})` };
 }
 
 /**
  * Busca o logo de todos os canais de uma vez. Sem `forcar`, só mexe em quem ainda não tem.
  * Um canal que falhar não derruba os outros.
  */
+const RECUSAS_ATE_DESISTIR = 5;
+
 async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200, aoAndar = null } = {}) {
   const canais = db.prepare(`SELECT id, nome FROM canais ${forcar ? '' : 'WHERE logo_midia_id IS NULL'} ORDER BY numero`).all();
   const comLogo = [];
   const semLogo = [];
   const falharam = [];
+  // Host que já recusou seguidas vezes. Quando quem hospeda bloqueia o ENDEREÇO do servidor —
+  // e o imgur, onde está a maioria dos logos brasileiros, faz isso depois de uma rajada —, a
+  // recusa chega em milissegundos e nenhuma espera resolve. Insistir nos 90 canais seguintes
+  // custa mais de uma hora de tentativa e devolve zero logo. Então desiste daquele host, segue
+  // com os outros e diz claramente o que houve, para a operação rodar de novo mais tarde.
+  const recusas = new Map();
+  const bloqueados = new Set();
+  let pulados = 0;
+
   for (const [i, c] of canais.entries()) {
-    // Pausa entre os canais: quem hospeda as imagens limita a frequência, e um provedor com
-    // mais de cem canais chega perto desse limite. 1,2s dá uns 2 minutos e meio no total.
-    if (i) await esperar(pausaMs);
-    // Avisa canal a canal: com mais de cem canais, juntar tudo para imprimir no fim deixa quem
-    // está no terminal olhando uma tela parada por minutos, sem saber se travou.
+    // Avisa ANTES de tentar: um canal que vai esgotar prazo e tentar de novo leva mais de dois
+    // minutos, e sem esta linha o terminal fica parado sem sinal de vida. Foi o que pareceu
+    // "travar em 110/123" na implantação.
+    aoAndar?.({ i: i + 1, total: canais.length, canal: c.nome, resultado: 'tentando' });
     try {
-      const r = await aplicar(db, c.id, { forcar });
+      const r = await aplicar(db, c.id, { forcar, hostsBloqueados: bloqueados });
+      if (r?.pulado) { pulados += 1; aoAndar?.({ i: i + 1, total: canais.length, canal: c.nome, resultado: 'pulado', host: r.host }); continue; }
       if (r) comLogo.push(r);
       else semLogo.push(c.nome);
+      if (r?.host) recusas.delete(r.host);   // voltou a responder: zera a contagem
       aoAndar?.({ i: i + 1, total: canais.length, canal: c.nome, resultado: r ? 'ok' : 'sem-logo' });
     } catch (err) {
-      falharam.push({ canal: c.nome, erro: err.message, host: err.host ?? null });
-      aoAndar?.({ i: i + 1, total: canais.length, canal: c.nome, resultado: 'erro', erro: err.message });
+      const host = err.host ?? null;
+      falharam.push({ canal: c.nome, erro: err.message, host });
+      if (host && /respondeu (403|429)/.test(err.message)) {
+        const n = (recusas.get(host) ?? 0) + 1;
+        recusas.set(host, n);
+        if (n >= RECUSAS_ATE_DESISTIR) bloqueados.add(host);
+      }
+      aoAndar?.({ i: i + 1, total: canais.length, canal: c.nome, resultado: 'erro', erro: err.message, host,
+        hostDesistido: host && bloqueados.has(host) && recusas.get(host) === RECUSAS_ATE_DESISTIR ? host : null });
     }
+    // Pausa entre os canais: quem hospeda as imagens limita a frequência, e um provedor com
+    // mais de cem canais chega perto desse limite.
+    if (i < canais.length - 1) await esperar(pausaMs);
   }
-  return { com_logo: comLogo, sem_logo: semLogo, falharam };
+  return { com_logo: comLogo, sem_logo: semLogo, falharam, hosts_bloqueados: [...bloqueados], pulados };
 }
 
 module.exports = { aplicar, aplicarEmTodos, medirLuz, medirDoCanal };

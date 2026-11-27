@@ -274,3 +274,52 @@ test('logo da emissora: o nome só casa quando é mesmo o canal', async () => {
   assert.equal(mesmoCanal('TV Rio', 'Rede Rio'), false);
   assert.equal(mesmoCanal('', 'Globo'), false);
 });
+
+test('logo: host que bloqueia o servidor é abandonado, e os outros continuam', async (t) => {
+  // Por que este teste existe: 79% dos logos de canais brasileiros da lista pública estão no
+  // imgur, que bloqueia o ENDEREÇO do servidor depois de uma rajada de pedidos. Medido: a partir
+  // daí ele responde 403 em 4 ms, para sempre naquela janela. Antes disto, o script insistia
+  // canal por canal — 4 tentativas de 30s mais esperas, mais de dois minutos cada — e um
+  // provedor com 116 canais ficava horas moendo para colher zero logo.
+  const { melhorLogo, notaDoHost } = require('../server/lib/listas-publicas');
+
+  // Entre logos iguais, o que não está num host que bloqueia ganha.
+  const doImgur = { channel: 'X.br', url: 'https://i.imgur.com/a.png', width: 512, height: 512, in_use: true };
+  const doWiki = { channel: 'X.br', url: 'https://upload.wikimedia.org/a.png', width: 512, height: 512, in_use: true };
+  assert.equal(melhorLogo([doImgur, doWiki]).url, doWiki.url, 'com alternativa, não se escolhe o imgur');
+  assert.equal(melhorLogo([doImgur]).url, doImgur.url, 'sem alternativa, o imgur ainda serve');
+  assert.ok(notaDoHost('https://upload.wikimedia.org/a.png') > notaDoHost('https://i.imgur.com/a.png'));
+  // Subdomínio não engana nem para o bem nem para o mal.
+  assert.equal(notaDoHost('https://i.imgur.com.exemplo.test/a.png'), 0);
+  assert.equal(notaDoHost('não é endereço'), -500);
+
+  // E a regra de desistir do host: cinco recusas seguidas e ele sai da rodada.
+  const logos = require('../server/lib/logos');
+  const { iniciar } = require('./helpers');
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  for (let i = 1; i <= 9; i += 1) {
+    const feito = await s.post('/admin/canais', { numero: 300 + i, nome: `Canal Bloqueado ${i}`, fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/x' }, admin);
+    assert.equal(feito.status, 201, JSON.stringify(feito.dados));
+  }
+
+  const baixar = require('../server/lib/baixar');
+  const originalBaixar = baixar.baixarImagem;
+  const publicas = require('../server/lib/listas-publicas');
+  const originalLogo = publicas.logoDoCanal;
+  let pedidos = 0;
+  publicas.logoDoCanal = async (nome) => ({ url: 'https://i.imgur.com/qualquer.png', nome });
+  baixar.baixarImagem = async () => {
+    pedidos += 1;
+    const err = new Error('O endereço da imagem respondeu 403.');
+    throw err;
+  };
+  t.after(() => { baixar.baixarImagem = originalBaixar; publicas.logoDoCanal = originalLogo; });
+
+  const r = await logos.aplicarEmTodos(s.db, { pausaMs: 0 });
+  assert.deepEqual(r.hosts_bloqueados, ['i.imgur.com'], 'o host que recusou cinco vezes é abandonado');
+  assert.equal(pedidos, 5, 'depois da quinta recusa não se pede mais nada àquele host');
+  assert.ok(r.pulados >= 4, `os canais seguintes são adiados, não tentados (foram ${r.pulados})`);
+  assert.equal(r.com_logo.length, 0);
+});

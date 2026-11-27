@@ -41,11 +41,25 @@ const db = abrir();
   console.log(`Buscando o logo de ${quantos} canal(is). Leva alguns minutos…\n`);
   const r = await logos.aplicarEmTodos(db, {
     forcar,
-    // Uma linha por canal, na hora: é como se sabe que está andando.
-    aoAndar: ({ i, total, canal, resultado, erro }) => {
+    // Uma linha por canal, na hora: é como se sabe que está andando. A linha "tentando" é
+    // reescrita por cima quando o canal termina — um canal que esgota prazo e repete leva mais
+    // de dois minutos, e sem ela o terminal fica mudo e parece travado.
+    aoAndar: ({ i, total, canal, resultado, erro, host, hostDesistido }) => {
+      const posicao = `  [${String(i).padStart(3)}/${total}] `;
+      if (resultado === 'tentando') {
+        if (process.stdout.isTTY) process.stdout.write(`${posicao}\x1b[2m…      ${canal}\x1b[0m`);
+        return;
+      }
+      if (process.stdout.isTTY) process.stdout.write('\r\x1b[2K');
       const marca = resultado === 'ok' ? '\x1b[32mok     \x1b[0m'
-        : resultado === 'sem-logo' ? '\x1b[33msem logo\x1b[0m' : '\x1b[31merro   \x1b[0m';
-      console.log(`  [${String(i).padStart(3)}/${total}] ${marca} ${canal}${erro ? ` — ${erro}` : ''}`);
+        : resultado === 'sem-logo' ? '\x1b[33msem logo\x1b[0m'
+          : resultado === 'pulado' ? '\x1b[33mpulado \x1b[0m' : '\x1b[31merro   \x1b[0m';
+      const cauda = resultado === 'pulado' ? ` — ${host} está recusando; fica para a próxima rodada` : (erro ? ` — ${erro}` : '');
+      console.log(`${posicao}${marca} ${canal}${cauda}`);
+      if (hostDesistido) {
+        console.log(`\n  \x1b[33m${hostDesistido} recusou ${5} vezes seguidas: parando de pedir a ele nesta rodada.\x1b[0m`);
+        console.log('  Os canais que dependem dele ficam para a próxima — os outros seguem normalmente.\n');
+      }
     },
   });
 
@@ -71,7 +85,21 @@ const db = abrir();
       console.log('Se não passar, libere a saída para esse endereço — repetir o script não resolve.');
     }
   }
-  console.log(`\nResultado: ${r.com_logo.length} com logo, ${r.sem_logo.length} sem, ${r.falharam.length} com erro.`);
+  if (r.hosts_bloqueados?.length) {
+    console.log(`\n\x1b[33mQuem hospeda bloqueou este servidor: ${r.hosts_bloqueados.join(', ')}.\x1b[0m`);
+    console.log('É bloqueio por ENDEREÇO, não por imagem: depois de muitos pedidos seguidos, o host fecha');
+    console.log('a porta para o IP inteiro e responde na hora, sem adiantar esperar nem tentar de novo agora.');
+    console.log('(A lista pública guarda 79% dos logos de canais brasileiros no imgur, que faz exatamente isso.)');
+    if (r.pulados) console.log(`\n${r.pulados} canal(is) nem chegaram a ser pedidos, para não gastar hora à toa.`);
+    console.log('\nO que fazer, em ordem:');
+    console.log('  1. Rode este mesmo comando daqui a algumas horas — ele só mexe em quem ainda está sem logo,');
+    console.log('     então vai direto no que faltou, sem refazer nada.');
+    console.log('  2. Nos canais que a operação não quer esperar, envie a imagem da emissora pelo painel:');
+    console.log('     Canais → Editar → logo. É o caminho que não depende de ninguém de fora.');
+  }
+  console.log(`\nResultado: ${r.com_logo.length} com logo, ${r.sem_logo.length} sem, ${r.falharam.length} com erro${r.pulados ? `, ${r.pulados} adiado(s)` : ''}.`);
+  const faltando = db.prepare('SELECT COUNT(*) AS n FROM canais WHERE logo_midia_id IS NULL').get().n;
+  if (faltando) console.log(`Ainda sem logo no total: ${faltando} canal(is).`);
 })().catch((err) => {
   console.error('Falhou:', err.message);
   process.exit(1);

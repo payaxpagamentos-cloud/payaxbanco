@@ -258,8 +258,16 @@ const NOMES = {
  * A chave é o nome como o fornecedor manda, que não muda.
  */
 const ID_PUBLICO = {
+  // TV aberta: são os sete canais que o assinante vê primeiro na lista, então nenhum deles pode
+  // depender de casar pelo nome. "Record" sozinho casava com Record News, Record RS e uma dúzia
+  // de praças; "Gazeta" com a Gazeta do Acre e a de Alagoas. Identificador fixo resolve.
+  TV_CULTURA: 'TVCultura.br',
   GLOBO_HD: 'RedeGlobo.br',
   SBT: 'SBTNacional.br',
+  RECORD: 'Record.br',
+  REDE_TV: 'RedeTV.br',
+  GAZETA: 'TVGazeta.br',
+  BAND: 'Band.br',
   NOVO_TEMPO: 'TVNovoTempo.br',
   HBO_PLUS: 'HBOPlus.br',
   DISCOVERY_ID: 'InvestigationDiscovery.br',
