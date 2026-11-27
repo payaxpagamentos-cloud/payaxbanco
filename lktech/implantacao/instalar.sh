@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Instalação do site LK TECH em um VPS novo (Ubuntu 24.04), por exemplo na Hostinger.
+# Instalação do site LK TECH em um VPS novo com Ubuntu 22.04 ou 24.04 (HostGator, Hostinger ou outro), sem cPanel.
 #
-# Uso (como root, de dentro da pasta do projeto enviada ao VPS):
-#   bash implantacao/instalar.sh
+# Uso (de dentro da pasta do projeto enviada ao VPS):
+#   sudo bash implantacao/instalar.sh
 #
 # O que faz:
 #   - instala Node.js 24, Caddy (HTTPS automático) e o firewall
@@ -27,7 +27,14 @@ erro() { printf '\n\033[1;31mERRO: %s\033[0m\n' "$1" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || erro "Execute como root (ou com sudo)."
 [ -f "$ORIGEM/server/index.mjs" ] || erro "Não encontrei o projeto em $ORIGEM. Rode o script de dentro da pasta lktech."
-grep -q 'VERSION_ID="24.04"' /etc/os-release 2>/dev/null || echo "Aviso: este script foi feito para Ubuntu 24.04. Continuando mesmo assim."
+command -v apt-get >/dev/null || erro "Este instalador é para Ubuntu (22.04 ou 24.04). No painel da HostGator, reinstale o VPS com Ubuntu, sem cPanel."
+grep -qE 'VERSION_ID="(22|24)\.04"' /etc/os-release 2>/dev/null || echo "Aviso: feito para Ubuntu 22.04 ou 24.04. Continuando mesmo assim."
+if [ -d /usr/local/cpanel ] || command -v whmapi1 >/dev/null; then erro "Este VPS tem cPanel, que ocupa as portas do site. Reinstale o VPS com Ubuntu puro, sem cPanel."; fi
+for porta in 80 443; do
+  if ss -ltnH "sport = :$porta" 2>/dev/null | grep -q . && ! ss -ltnpH "sport = :$porta" 2>/dev/null | grep -q caddy; then
+    erro "A porta $porta já está em uso por outro programa (ex.: Apache ou Nginx). Use um VPS limpo, só para este site."
+  fi
+done
 
 passo "Atualizando o sistema"
 export DEBIAN_FRONTEND=noninteractive
@@ -245,6 +252,16 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
 echo "SSH liberado na porta $SSH_PORTA."
+# Servidores na nuvem da Oracle (usada pelo VPS da HostGator) vêm com regras próprias de iptables
+# que bloqueiam tudo além do SSH. Libera as portas do site nelas também e grava para valer após reiniciar.
+if command -v netfilter-persistent >/dev/null; then
+  for porta in 80 443; do
+    iptables -C INPUT -p tcp --dport "$porta" -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport "$porta" -j ACCEPT
+    ip6tables -C INPUT -p tcp --dport "$porta" -j ACCEPT 2>/dev/null || ip6tables -I INPUT 1 -p tcp --dport "$porta" -j ACCEPT 2>/dev/null || true
+  done
+  netfilter-persistent save >/dev/null 2>&1 || true
+  echo "Portas 80 e 443 liberadas também nas regras de rede do provedor."
+fi
 
 passo "Ligando tudo"
 systemctl daemon-reload
