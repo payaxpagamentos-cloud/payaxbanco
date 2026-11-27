@@ -12,7 +12,7 @@
  * Ao publicar uma versão nova do app, mude VERSAO: o navegador troca tudo na próxima abertura.
  */
 
-const VERSAO = 'v5';
+const VERSAO = 'v6';
 const CASCA = `playtechvip-casca-${VERSAO}`;
 const ARTES = `playtechvip-artes-${VERSAO}`;
 const ARTES_MAX = 150;
@@ -31,7 +31,13 @@ const DO_APP = [
   './img/favicon.svg',
   './img/icone-192.png',
   './img/icone-512.png',
-  ...['api', 'app', 'cartoes', 'conta', 'entrada', 'envio', 'excluir-conta', 'motor-nativo', 'perfis', 'player', 'titulo', 'tv', 'ui']
+  // TODOS os módulos do app do assinante. A lista é conferida por teste (test/pwa.test.js):
+  // módulo novo que não entre aqui faz o app instalado abrir em branco sem rede, porque o
+  // primeiro `import` dele falha e derruba a cadeia inteira. Já aconteceu — faltavam sete.
+  // Os `admin*` ficam de fora de propósito: o painel é outra página e não funciona sem rede.
+  ...['api', 'app', 'autoplay', 'cartazes-demo', 'cartoes', 'conta', 'entrada', 'envio',
+    'excluir-conta', 'instalar', 'login-icones', 'mascotes', 'motor-nativo', 'perfis',
+    'player', 'titulo', 'tv', 'ui', 'vigia', 'vitrine']
     .map((n) => `./js/${n}.js`),
 ].map(arquivo);
 

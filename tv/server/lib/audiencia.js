@@ -62,9 +62,14 @@ function painel(db) {
 /** Audiência por dia (minutos assistidos e telas abertas). */
 function porDia(db, { de, ate }) {
   const [inicio, fim] = intervalo(de, ate);
-  const linhas = db.prepare(`SELECT substr(iniciada_em, 1, 10) AS dia, COUNT(*) AS sessoes, COALESCE(SUM(segundos), 0) AS segundos,
+  // O dia é o DA OPERAÇÃO, não o UTC. `substr(iniciada_em, 1, 10)` pegava a data crua: no
+  // Brasil, tudo que é assistido depois das 21h vira madrugada em UTC e caía no dia seguinte do
+  // relatório — justamente o horário nobre, somado no dia errado. `porHora` já fazia o acerto;
+  // aqui não fazia, e os dois relatórios discordavam sobre o mesmo dia.
+  const linhas = db.prepare(`SELECT date(iniciada_em, ?) AS dia, COUNT(*) AS sessoes, COALESCE(SUM(segundos), 0) AS segundos,
       COUNT(DISTINCT usuario_id) AS contas
-    FROM sessoes_player WHERE iniciada_em >= ? AND iniciada_em < ? GROUP BY dia ORDER BY dia`).all(inicio, fim);
+    FROM sessoes_player WHERE iniciada_em >= ? AND iniciada_em < ? GROUP BY dia ORDER BY dia`)
+    .all(`${deslocamentoHoras()} hours`, inicio, fim);
   return linhas.map((l) => ({ ...l, minutos: minutos(l.segundos) }));
 }
 

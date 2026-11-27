@@ -107,7 +107,13 @@ async function abrirNoServidor(corpo) {
   try {
     for (;;) {
       try {
-        return await api.post('/play/abrir', corpo);
+        const dados = await api.post('/play/abrir', corpo);
+        if (!desistiu) return dados;
+        // A pessoa tocou em Cancelar enquanto este pedido estava no ar. O servidor não sabe
+        // disso: ele já abriu a sessão e já contou uma tela do plano. Sem fechar aqui, o
+        // assinante perderia uma das telas simultâneas por ter desistido de assistir.
+        api.post('/play/fechar', { sessao_id: dados.sessao_id, motivo: 'cancelado' }).catch(() => {});
+        return null;
       } catch (err) {
         const aquecendo = err instanceof ErroApi && err.status === 503 && err.detalhes?.motivo === 'aquecendo';
         if (!aquecendo || desistiu || Date.now() >= fim) throw err;
@@ -407,9 +413,11 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   const marcarBotao = () => btnTela.replaceChildren(icone(naTelaCheia(elVideo()) ? 'telaSair' : 'tela'));
   // No iPhone quem muda de estado é o <video>, não o documento: sem ouvir os eventos dele, o
   // ícone ficaria mentindo depois de sair da tela cheia pelo player da Apple.
-  for (const evento of ['fullscreenchange', 'webkitfullscreenchange']) {
-    document.addEventListener(evento, marcarBotao);
-  }
+  // Guardados para sair junto com o player: sem remover, cada abrir/fechar deixava dois
+  // ouvintes presos no documento, apontando para um player que não existe mais. Em uma noite
+  // de zapeada são centenas.
+  const EVENTOS_TELA = ['fullscreenchange', 'webkitfullscreenchange'];
+  for (const evento of EVENTOS_TELA) document.addEventListener(evento, marcarBotao);
   for (const evento of ['webkitbeginfullscreen', 'webkitendfullscreen']) {
     elVideo()?.addEventListener?.(evento, marcarBotao);
   }
@@ -703,6 +711,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     clearInterval(pararSalvar);
     clearTimeout(esconder);
     document.removeEventListener('keydown', teclas);
+    for (const evento of EVENTOS_TELA) document.removeEventListener(evento, marcarBotao);
 
     // A TELA SAI NA HORA. Antes, o encerramento avisava o servidor e só então removia o player:
     // quem tocava em "voltar" com a rede ruim ficava olhando o canal, achando que o botão não

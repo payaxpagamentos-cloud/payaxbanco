@@ -302,7 +302,7 @@ module.exports = (db) => {
         ? `A conversão deste canal não está no ar: ${sit.erro}`
         : 'A conversão deste canal está começando. Tente de novo em alguns segundos.', 503);
     }
-    const token = player.emitirToken({ s: 0, u: req.usuario.id, p: 0, t: 'canal', c: c.id });
+    const token = player.emitirToken({ s: 0, u: req.usuario.id, p: 0, t: 'canal', c: c.id, op: 1 });
     const porNossosServidores = c.fonte === 'rtmp' || Boolean(c.relay && config.relay.ligado);
     return res.json({
       tipo: 'hls',

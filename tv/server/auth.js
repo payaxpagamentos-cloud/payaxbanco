@@ -76,8 +76,18 @@ function comPerfilVisualizacao(db) {
   const principal = db.prepare('SELECT * FROM perfis WHERE usuario_id = ? ORDER BY principal DESC, id LIMIT 1');
   return (req, _res, next) => {
     if (req.usuario.perfil !== 'assinante') {
-      // A operação assiste para conferir o sinal e o conteúdo: usa um perfil próprio, criado na hora.
-      req.perfilView = principal.get(req.usuario.id) ?? null;
+      // A operação assiste para conferir o sinal e o conteúdo, e para isso precisa de um perfil
+      // como qualquer outro. O comentário aqui dizia "criado na hora" — e não criava: a conta da
+      // operação não tem linha em `perfis`, então isto ficava NULO e toda chamada de /api/tv/*
+      // e /play/abrir estourava com 500. Só não aparecia porque a tela do painel não usa essas
+      // rotas; quem da equipe abrisse o app do assinante batia na parede.
+      let p = principal.get(req.usuario.id);
+      if (!p) {
+        db.prepare(`INSERT INTO perfis (usuario_id, nome, avatar, infantil, classificacao_max, principal, criado_em)
+          VALUES (?, 'Operação', 'gato', 0, 18, 1, ?)`).run(req.usuario.id, new Date().toISOString());
+        p = principal.get(req.usuario.id);
+      }
+      req.perfilView = p;
       return next();
     }
     const pedido = req.get('x-perfil') || req.query.perfil;

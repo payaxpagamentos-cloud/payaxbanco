@@ -168,7 +168,11 @@ function importarXmltv(db, xml, { canalId = null, porIdExterno = {}, substituir 
         const doCanal = programas.filter((p) => p.canal_id === cid);
         const de = doCanal.reduce((min, p) => (p.inicio < min ? p.inicio : min), doCanal[0].inicio);
         const ate = doCanal.reduce((max, p) => (p.fim > max ? p.fim : max), doCanal[0].fim);
-        resultado.removidos += db.prepare('DELETE FROM programas WHERE canal_id = ? AND inicio >= ? AND inicio < ?').run(cid, de, ate).changes;
+        // Apaga tudo que ENCOSTA na janela do arquivo, não só o que começa dentro dela. Um
+        // programa que começou antes do início e termina depois continuava no banco, sobreposto
+        // à grade nova — e `noAr` podia escolher justamente ele, mostrando ao assinante um
+        // programa que já acabou.
+        resultado.removidos += db.prepare('DELETE FROM programas WHERE canal_id = ? AND fim > ? AND inicio < ?').run(cid, de, ate).changes;
       }
     }
     const inserir = db.prepare(`INSERT OR REPLACE INTO programas (canal_id, titulo, subtitulo, descricao, inicio, fim, categoria, classificacao, ao_vivo, temporada, episodio, criado_em)

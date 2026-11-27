@@ -91,6 +91,10 @@ function sessaoViva(db, sessaoId) {
 function conferirToken(db, token, { tipo = null, canalId = null, midiaId = null, exigirSessaoViva = true } = {}) {
   const d = lerToken(token);
   if (!d) throw new ErroNegocio('Link de reprodução expirado. Abra o conteúdo de novo.', 401);
+  // Prévia do painel: a operação olha o canal sem abrir sessão nem gastar tela do plano. O
+  // token diz isso (`op: 1`) e é assinado como qualquer outro, então não dá para forjar. Sem
+  // esta exceção, a prévia pedia uma sessão que nunca existiu e respondia 409 em todo canal.
+  if (d.op) exigirSessaoViva = false;
   if (tipo && d.t !== tipo) throw new ErroNegocio('Link de reprodução inválido para este conteúdo.', 403);
   if (canalId && Number(d.c) !== Number(canalId)) throw new ErroNegocio('Link de reprodução inválido para este canal.', 403);
   const liberadas = Array.isArray(d.m) ? d.m.map(Number) : [Number(d.m)];
@@ -130,7 +134,13 @@ function ping(db, usuarioId, sessaoId, { segundos = null, posicao = null, duraca
   const s = db.prepare('SELECT * FROM sessoes_player WHERE id = ? AND usuario_id = ?').get(Number(sessaoId), Number(usuarioId));
   if (!s) throw naoEncontrado('Tela');
   if (s.encerrada_em) throw new ErroNegocio('Esta tela foi encerrada. Abra o conteúdo de novo.', 409, { encerrada: true });
-  const assistidos = segundos === null ? s.segundos : v.inteiro(Math.round(segundos), 'o tempo assistido', { min: 0, max: 86_400 * 2 });
+  // O tempo assistido é informação de audiência, não controle de acesso: recusar um valor alto
+  // derrubava o sinal de vida com 422, a tela era considerada abandonada e o assinante levava
+  // "encerrada em outro aparelho" sem ter feito nada. Canal ao vivo em TV de sala passa de 48 h
+  // ligado sem nenhuma dificuldade. Agora o valor é limitado, não recusado.
+  const TETO_SEGUNDOS = 86_400 * 30;
+  const assistidos = segundos === null ? s.segundos
+    : Math.min(TETO_SEGUNDOS, v.inteiro(Math.round(segundos), 'o tempo assistido', { min: 0, max: TETO_SEGUNDOS }));
   db.prepare('UPDATE sessoes_player SET ultimo_ping = ?, segundos = ? WHERE id = ?').run(agora(), Math.max(s.segundos, assistidos), s.id);
   // O assinante pode trocar a qualidade no meio: o relatório de audiência registra a última.
   if (qualidade && qualidade !== s.qualidade) {

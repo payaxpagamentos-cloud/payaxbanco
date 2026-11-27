@@ -418,3 +418,30 @@ test('canal religado no meio do desligamento não perde a pasta nova', async (t)
   assert.equal(aovivo.situacao(canal.id).convertendo, true, 'a conversão nova continua de pé');
   assert.equal(aovivo.temSinal(canal.id), true, 'e a pasta dela não foi apagada pelo processo velho');
 });
+
+test('prévia do painel abre sem gastar tela do plano, e a tela do assinante não cai em 48h', async (t) => {
+  const s = await iniciar();
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
+  const admin = await s.adminLogin();
+  const canal = (await s.post('/admin/canais', { numero: 62, nome: 'Prévia', fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/previa', ativo: true }, admin)).dados.canal;
+  await aovivo.garantir(canal, s.db, { esperarMs: 4000 });
+
+  // A prévia existe para a operação conferir o canal sem abrir sessão. Antes ela pedia uma
+  // sessão que nunca foi criada e respondia 409 em TODO canal — o botão simplesmente não
+  // funcionava, e ninguém descobria porque o recado era "esta tela foi encerrada".
+  const previa = await s.get(`/admin/canais/${canal.id}/previa`, admin);
+  assert.equal(previa.status, 200, JSON.stringify(previa.dados));
+  assert.match(previa.dados.url, /lista\.m3u8\?t=/);
+  const lista = await s.get(previa.dados.url.replace(/^.*\/api/, ''), admin);
+  assert.equal(lista.status, 200, 'a lista abre com o token da prévia');
+  assert.match(lista.dados, /^#EXTM3U/);
+
+  // Canal ao vivo numa TV de sala passa de 48 h ligado sem dificuldade. O sinal de vida não
+  // pode recusar isso: antes dava 422, a tela virava abandonada e o assinante levava
+  // "encerrada em outro aparelho" sem ter feito nada.
+  const cliente = await s.assinante('maratona@exemplo.com.br', { plano: 2 });
+  const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil);
+  assert.equal(abrir.status, 201);
+  const ping = await s.post('/play/ping', { sessao_id: abrir.dados.sessao_id, segundos: 86_400 * 3 }, cliente.token, cliente.comPerfil);
+  assert.equal(ping.status, 200, `três dias de canal ligado não podem derrubar a tela (veio ${ping.status})`);
+});
