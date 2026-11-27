@@ -36,6 +36,12 @@ for porta in 80 443; do
   fi
 done
 
+# Alguns VPS vêm sem o próprio nome em /etc/hosts, e o sudo avisa "unable to resolve host".
+NOME_SERVIDOR="$(hostname)"
+if ! getent hosts "$NOME_SERVIDOR" >/dev/null 2>&1; then
+  echo "127.0.1.1 $(hostname -f 2>/dev/null || echo "$NOME_SERVIDOR") $NOME_SERVIDOR" >> /etc/hosts
+fi
+
 passo "Atualizando o sistema"
 export DEBIAN_FRONTEND=noninteractive
 APT_OPCOES=(-y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
