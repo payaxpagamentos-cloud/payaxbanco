@@ -3,7 +3,7 @@ import UIKit
 /// Endereço do servidor da PLAY TECH VIP.
 /// Troque pelo domínio de vocês (precisa ser https). O empacotador faz isso sozinho:
 /// `node scripts/empacotar-apps.js https://play.seudominio.com.br`
-let SERVIDOR = "https://SEU-DOMINIO/"
+let SERVIDOR = "https://iptv.veluztv.com.br/"
 
 /**
  Onde o app procura a plataforma.

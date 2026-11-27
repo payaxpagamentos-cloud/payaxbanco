@@ -99,12 +99,23 @@ async function capturar(nav, formato) {
   // 6. Player com as qualidades abertas
   await pg.evaluate(() => { window.location.hash = '#/filmes'; });
   await dormir(2200);
-  const outro = pg.locator('.cartaz').first();
-  if (await outro.count()) {
-    await outro.click();
+  // Procura um título que REALMENTE toque: nem todo publicado tem vídeo pronto, e o botão
+  // "Assistir" fica desativado nesses. Sem isto a captura do player trava esperando um clique
+  // que nunca acontece.
+  const quantos = await pg.locator('.cartaz').count();
+  let tocou = false;
+  for (let i = 0; i < Math.min(quantos, 8) && !tocou; i += 1) {
+    // Fecha o que ficou aberto da volta anterior: a ficha do título é uma janela, e ela
+    // intercepta o clique seguinte.
+    await pg.keyboard.press('Escape');
+    await dormir(500);
+    await pg.evaluate(() => { window.location.hash = '#/filmes'; });
+    await dormir(1800);
+    await pg.locator('.cartaz').nth(i).click();
     await dormir(2500);
     const assistir = pg.locator('button:has-text("Assistir"), button:has-text("Continuar")').first();
-    if (await assistir.count()) {
+    if (await assistir.count() && await assistir.isEnabled()) {
+      tocou = true;
       await assistir.click();
       await dormir(7000);
       await pg.mouse.move(formato.largura / 2, formato.altura / 2);
@@ -118,6 +129,7 @@ async function capturar(nav, formato) {
       }
     }
   }
+  if (!tocou) console.log('    (nenhum título com vídeo pronto: a captura do player ficou de fora)');
 
   await ctx.close();
 }

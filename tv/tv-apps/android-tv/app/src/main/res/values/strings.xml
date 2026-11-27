@@ -2,7 +2,7 @@
 <resources>
   <string name="app_name">PLAY TECH VIP</string>
   <!-- Troque pelo endereço do servidor de vocês (precisa ser https). -->
-  <string name="servidor">https://SEU-DOMINIO/tv/?tv=1</string>
+  <string name="servidor">https://iptv.veluztv.com.br/?tv=1</string>
   <string name="sem_conexao">Sem internet. Confira a conexão da TV e tente de novo.</string>
   <string name="tentar">Tentar de novo</string>
   <string name="trocar_servidor">Trocar o endereço do servidor</string>
