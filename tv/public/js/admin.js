@@ -213,7 +213,7 @@ async function telaAssistindo(c) {
 // ---------------------------------------------------------------- Canais
 
 async function telaCanais(c) {
-  const { canais, relay_ligado: relayLigado } = await api.get('/admin/canais');
+  const { canais, relay_ligado: relayLigado, ao_vivo_ligado: aoVivoLigado } = await api.get('/admin/canais');
   const planos = usuario.perfil === 'admin' ? (await api.get('/admin/planos')).planos : [];
 
   const formCanal = (canal = null) => modal(canal ? `Canal ${canal.nome}` : 'Novo canal', (fechar) => {
@@ -222,8 +222,16 @@ async function telaCanais(c) {
       'Lista HLS que a emissora (ou a afiliada) fornece por contrato, ou o sinal do seu encoder. Deixe em branco enquanto o sinal não chega: o canal fica cadastrado e desligado.');
     const campoEmbed = campo('Endereço do player oficial da emissora', { name: 'url_embed', value: canal?.url_embed ?? '', placeholder: 'https://www.youtube.com/watch?v=… (transmissão ao vivo do canal verificado)' },
       'Cole o endereço da transmissão ao vivo oficial e pública da emissora. A PLAY TECH VIP abre o player dela, com os anúncios dela — não há transmissão.');
+    // Endereço do sinal ao vivo. Campo separado do .m3u8 de propósito: são endereços diferentes,
+    // conferidos de formas diferentes, e misturar os dois num campo só é onde o erro acontece.
+    const campoRtmp = campo('Endereço do sinal ao vivo (RTMP ou SRT)', {
+      name: 'url_rtmp', value: canal?.fonte === 'rtmp' ? (canal?.url_hls ?? '') : '',
+      placeholder: 'srt://10.0.0.5:9000?mode=caller  ou  rtmp://origem/live/canal1',
+    }, 'É o endereço que o fornecedor do sinal passa. A plataforma converte para HLS sem recodificar: '
+      + 'a qualidade é a mesma da origem. Pede H.264 + AAC; SRT é melhor que RTMP (aguenta perda de pacote e tem menos atraso).');
     const trocarFonte = (fonte) => {
       campoHls.classList.toggle('oculto', fonte !== 'hls');
+      campoRtmp.classList.toggle('oculto', fonte !== 'rtmp');
       campoEmbed.classList.toggle('oculto', fonte !== 'embed');
     };
     const previa = el('img', { class: 'prev-arte deitada', src: arte(logoId) ?? '', alt: '', style: logoId ? '' : 'display:none' });
@@ -265,9 +273,11 @@ async function telaCanais(c) {
         campo('Região (opcional)', { name: 'regiao', maxlength: 60, value: canal?.regiao ?? '' })),
       escolha('Como este canal chega', 'fonte', [
         ['hls', 'Sinal próprio ou contratado (.m3u8) — tocamos no nosso player'],
+        ['rtmp', 'Sinal ao vivo em RTMP ou SRT — convertemos aqui para HLS'],
         ['embed', 'Player oficial da emissora — abrimos o player dela, sem transmitir'],
       ], canal?.fonte ?? 'hls', { onchange: (e) => trocarFonte(e.target.value) }),
       campoHls,
+      campoRtmp,
       campoEmbed,
       area('Observação da operação (de quem pedir o sinal, contrato, contato da afiliada)', { name: 'observacao', maxlength: 1000, rows: 2 }),
       el('div', { class: 'duas' },
@@ -288,6 +298,7 @@ async function telaCanais(c) {
         caixaSim('Canal no ar para os assinantes', 'ativo', canal ? Boolean(canal.ativo) : true)),
       campo('Ordem na lista', { name: 'ordem', type: 'number', min: 0, max: 9999, value: canal?.ordem ?? 0 }),
       !relayLigado ? el('div', { class: 'aviso atencao' }, 'A transmissão pelos nossos servidores está desligada no servidor (TV_RELAY=0): os canais tocam direto na origem.') : null,
+      !aoVivoLigado ? el('div', { class: 'aviso atencao' }, 'A conversão de canais ao vivo está desligada no servidor (TV_AO_VIVO=0): canais em RTMP ou SRT não entram no ar.') : null,
       el('div', { class: 'linha fim' },
         el('button', { type: 'button', class: 'btn vazio', onclick: () => fechar() }, 'Cancelar'),
         el('button', { class: 'btn primario' }, canal ? 'Salvar canal' : 'Criar canal')));
@@ -304,7 +315,8 @@ async function telaCanais(c) {
         categoria: d.categoria,
         regiao: d.regiao || null,
         fonte: d.fonte,
-        url_hls: d.url_hls || null,
+        // A mesma coluna guarda os dois endereços; quem decide qual vale é a fonte escolhida.
+        url_hls: (d.fonte === 'rtmp' ? d.url_rtmp : d.url_hls) || null,
         url_embed: d.url_embed || null,
         observacao: d.observacao || null,
         id_epg: d.id_epg || null,
@@ -336,10 +348,19 @@ async function telaCanais(c) {
       (x.fonte === 'embed' ? !x.url_embed : !x.url_hls)
         ? el('span', { class: 'etiqueta aviso' }, 'aguardando sinal')
         : x.fonte === 'embed' ? el('span', { class: 'etiqueta info', title: 'Abre o player oficial da emissora' }, 'player da emissora')
-          : x.relay ? el('span', { class: 'etiqueta info' }, 'nossa transmissão') : el('span', { class: 'etiqueta' }, 'direto'),
+          : x.fonte === 'rtmp'
+            ? x.ao_vivo?.no_ar
+              ? el('span', { class: 'etiqueta ok', title: 'O sinal RTMP/SRT está sendo convertido para HLS, sem recodificar' }, 'convertendo')
+              : el('span', { class: 'etiqueta aviso', title: x.ao_vivo?.erro ?? 'A conversão está começando.' },
+                x.ao_vivo?.convertendo ? 'conectando' : 'conversão parada')
+            : x.relay ? el('span', { class: 'etiqueta info' }, 'nossa transmissão') : el('span', { class: 'etiqueta' }, 'direto'),
       x.sinal_status === 'falha' ? el('span', { class: 'etiqueta erro', title: x.sinal_detalhe ?? '' }, 'sinal com falha')
         : x.sinal_status === 'ok' ? el('span', { class: 'etiqueta ok' }, 'sinal ok') : null),
-    el('div', { class: 'mini apagado', style: 'margin-top:3px' }, x.sinal_em ? `conferido ${dataHora(x.sinal_em)}` : 'sinal ainda não conferido'))),
+    el('div', { class: 'mini apagado', style: 'margin-top:3px' },
+      x.fonte === 'rtmp' && x.ao_vivo?.tentativas
+        ? `reconectando (${x.ao_vivo.tentativas} tentativa${x.ao_vivo.tentativas > 1 ? 's' : ''})`
+        : x.fonte === 'rtmp' && x.ao_vivo?.no_ar ? `no ar desde ${dataHora(x.ao_vivo.desde)}`
+          : x.sinal_em ? `conferido ${dataHora(x.sinal_em)}` : 'sinal ainda não conferido'))),
     td(el('div', {}, el('strong', { class: 'pequeno' }, x.agora?.titulo ?? '—'),
       el('div', { class: 'mini apagado' }, `${x.programas_futuros} programa(s) na grade`),
       x.observacao ? el('div', { class: 'mini apagado duas-linhas', style: 'margin-top:4px;max-width:420px' }, x.observacao) : null)),
@@ -347,7 +368,8 @@ async function telaCanais(c) {
     td(el('div', { class: 'linha fim', style: 'gap:6px' },
       botao('Testar', 'vazio', async () => {
         const r = await api.post(`/admin/canais/${x.id}/testar`);
-        toast(r.status === 'ok' ? `${x.nome}: sinal respondendo.` : `${x.nome}: ${r.detalhe}`, r.status !== 'ok');
+        // Em RTMP/SRT o detalhe traz os codecs: é o que decide se converte sem recodificar.
+        toast(r.status === 'ok' ? `${x.nome}: ${r.detalhe ?? 'sinal respondendo.'}` : `${x.nome}: ${r.detalhe}`, r.status !== 'ok');
         ir('canais');
       }),
       botao('Prévia', 'vazio', async () => {

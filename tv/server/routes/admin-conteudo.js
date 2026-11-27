@@ -9,6 +9,7 @@ const { registrar } = require('../lib/auditoria');
 const { permitir } = require('../auth');
 const midia = require('../lib/midia');
 const relay = require('../lib/relay');
+const aovivo = require('../lib/aovivo');
 const epg = require('../lib/epg');
 const embed = require('../lib/embed');
 const { CANAIS_ABERTOS, AVISO_NUMEROS } = require('../lib/tv-aberta');
@@ -51,18 +52,35 @@ module.exports = (db) => {
   r.get('/canais', (req, res) => res.json({
     canais: db.prepare(`SELECT c.*, p.nome AS plano_nome, (SELECT COUNT(*) FROM programas pr WHERE pr.canal_id = c.id AND pr.fim > ?) AS programas_futuros
       FROM canais c LEFT JOIN planos p ON p.id = c.plano_minimo_id ORDER BY c.ordem, c.numero`).all(new Date().toISOString())
-      .map((c) => ({ ...c, ativo: Boolean(c.ativo), relay: Boolean(c.relay), agora: epg.noAr(db, c.id) })),
+      .map((c) => ({
+        ...c, ativo: Boolean(c.ativo), relay: Boolean(c.relay), agora: epg.noAr(db, c.id),
+        // Canal em RTMP/SRT: a operação precisa ver se a conversão está de pé e se já há sinal no ar.
+        ao_vivo: c.fonte === 'rtmp' ? aovivo.situacao(c.id) : null,
+      })),
     relay_ligado: config.relay.ligado,
+    ao_vivo_ligado: config.aoVivo.ligado,
+    protocolos_ao_vivo: aovivo.PROTOCOLOS,
   }));
 
   const dadosCanal = (d, id = null) => {
-    const fonte = v.opcao(d.fonte ?? 'hls', 'a forma de transmissão', ['hls', 'embed']);
+    const fonte = v.opcao(d.fonte ?? 'hls', 'a forma de transmissão', ['hls', 'rtmp', 'embed']);
     const ativo = v.booleano(d.ativo, true) ? 1 : 0;
-    const urlHls = v.urlHls(d.url_hls, { obrigatorio: false });
+    // Mesma coluna para os dois: a lista .m3u8 (fonte 'hls') ou o rtmp:// / srt:// do fornecedor
+    // (fonte 'rtmp'). Cada um com a sua conferência — um .m3u8 aqui não serve, nem o contrário.
+    const temEndereco = d.url_hls !== undefined && d.url_hls !== null && String(d.url_hls).trim() !== '';
+    const urlHls = fonte === 'rtmp'
+      ? (temEndereco ? aovivo.conferirEndereco(d.url_hls) : null)
+      : v.urlHls(d.url_hls, { obrigatorio: false });
     const urlEmbed = d.url_embed ? embed.normalizar(d.url_embed).url : null;
     // Um canal só vai ao ar com endereço: sem ele, fica cadastrado e desligado.
     if (ativo && fonte === 'hls' && !urlHls) {
       throw new ErroNegocio('Cadastre o endereço do sinal (.m3u8) ou deixe o canal desligado até ele chegar.', 422);
+    }
+    if (ativo && fonte === 'rtmp' && !urlHls) {
+      throw new ErroNegocio('Cadastre o endereço do sinal ao vivo (rtmp:// ou srt://) ou deixe o canal desligado até ele chegar.', 422);
+    }
+    if (ativo && fonte === 'rtmp' && !config.aoVivo.ligado) {
+      throw new ErroNegocio('A conversão de canais ao vivo está desligada neste servidor (TV_AO_VIVO=0).', 409);
     }
     if (ativo && fonte === 'embed' && !urlEmbed) {
       throw new ErroNegocio('Cadastre o endereço do player oficial da emissora ou deixe o canal desligado.', 422);
@@ -97,6 +115,8 @@ module.exports = (db) => {
       c.url_embed, c.observacao, c.id_epg, c.relay, c.logo_midia_id, c.plano_minimo_id, c.classificacao, c.regiao, c.ordem, c.ativo, agora(), agora());
     const canal = achar('canais', Number(r2.lastInsertRowid), 'Canal');
     embed.invalidar();
+    // Canal em RTMP/SRT já ligado entra no ar agora, sem esperar a conferência de minuto em minuto.
+    if (canal.fonte === 'rtmp') aovivo.sincronizar(db);
     registrar(db, req, 'canal_criado', { id: canal.id, nome: canal.nome });
     res.status(201).json({ canal });
   });
@@ -111,6 +131,12 @@ module.exports = (db) => {
     // Trocou o endereço do sinal: o cache da lista antiga não serve mais.
     if (atual.url_hls && c.url_hls !== atual.url_hls) relay.cacheLista.delete(atual.url_hls);
     embed.invalidar();
+    // Desligou, ligou ou trocou o endereço: a conversão tem de acompanhar na hora. Trocar o
+    // endereço exige derrubar o processo atual — ele só conhece o endereço com que subiu.
+    if (atual.fonte === 'rtmp' || c.fonte === 'rtmp') {
+      if (atual.fonte === 'rtmp' && (c.fonte !== 'rtmp' || c.url_hls !== atual.url_hls)) aovivo.desligar(atual.id);
+      aovivo.sincronizar(db);
+    }
     registrar(db, req, 'canal_alterado', { id: atual.id, nome: c.nome });
     res.json({ canal: achar('canais', atual.id, 'Canal') });
   });
@@ -123,6 +149,7 @@ module.exports = (db) => {
       db.prepare('DELETE FROM canais WHERE id = ?').run(c.id);
     });
     embed.invalidar();
+    if (c.fonte === 'rtmp') aovivo.desligar(c.id);
     registrar(db, req, 'canal_excluido', { id: c.id, nome: c.nome });
     res.status(204).end();
   });
@@ -243,10 +270,19 @@ module.exports = (db) => {
   r.post('/canais/:id/testar', async (req, res, next) => {
     try {
       const c = achar('canais', req.params.id, 'Canal');
+      // RTMP/SRT: conecta na origem e lê os codecs. O recado diz se dá para converter sem
+      // recodificar — é a informação que decide se o fornecedor precisa mudar algo no sinal dele.
+      if (c.fonte === 'rtmp') {
+        if (!c.url_hls) throw new ErroNegocio('Este canal ainda não tem o endereço do sinal ao vivo.', 409);
+        const r2 = await aovivo.conferir(c);
+        db.prepare('UPDATE canais SET sinal_status = ?, sinal_detalhe = ?, sinal_em = ? WHERE id = ?')
+          .run(r2.status, r2.detalhe, agora(), c.id);
+        return res.json({ canal_id: c.id, nome: c.nome, ...r2 });
+      }
       relay.cacheLista.delete(c.url_hls);
-      res.json(await relay.verificarCanal(db, c));
+      return res.json(await relay.verificarCanal(db, c));
     } catch (err) {
-      next(err);
+      return next(err);
     }
   });
 
@@ -258,11 +294,18 @@ module.exports = (db) => {
       return res.json({ tipo: 'embed', url: c.url_embed, nossos_servidores: false });
     }
     if (!c.url_hls) throw new ErroNegocio('Este canal ainda não tem o endereço do sinal.', 409);
+    if (c.fonte === 'rtmp' && !aovivo.temSinal(c.id)) {
+      const sit = aovivo.situacao(c.id);
+      throw new ErroNegocio(sit.erro
+        ? `A conversão deste canal não está no ar: ${sit.erro}`
+        : 'A conversão deste canal está começando. Tente de novo em alguns segundos.', 503);
+    }
     const token = player.emitirToken({ s: 0, u: req.usuario.id, p: 0, t: 'canal', c: c.id });
+    const porNossosServidores = c.fonte === 'rtmp' || Boolean(c.relay && config.relay.ligado);
     return res.json({
       tipo: 'hls',
-      url: c.relay && config.relay.ligado ? `${config.basePath}/api/play/canal/${c.id}/lista.m3u8?t=${encodeURIComponent(token)}` : c.url_hls,
-      nossos_servidores: Boolean(c.relay && config.relay.ligado),
+      url: porNossosServidores ? `${config.basePath}/api/play/canal/${c.id}/lista.m3u8?t=${encodeURIComponent(token)}` : c.url_hls,
+      nossos_servidores: porNossosServidores,
     });
   });
 

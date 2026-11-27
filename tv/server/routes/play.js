@@ -7,6 +7,7 @@ const assinaturas = require('../lib/assinaturas');
 const catalogo = require('../lib/catalogo');
 const player = require('../lib/player');
 const relay = require('../lib/relay');
+const aovivo = require('../lib/aovivo');
 const midia = require('../lib/midia');
 const versoes = require('../lib/versoes');
 const qualidades = require('../lib/qualidades');
@@ -60,6 +61,11 @@ module.exports = (db, autenticado, comPerfil) => {
       if (canal.fonte === 'embed' ? !canal.url_embed : !canal.url_hls) {
         throw new ErroNegocio('Este canal ainda não tem sinal cadastrado. Fale com o atendimento.', 409, { motivo: 'sem_sinal' });
       }
+      // RTMP/SRT: a conversão leva alguns segundos para escrever o primeiro pedaço. Abrir a tela
+      // antes disso daria tela preta; é melhor dizer que está entrando no ar.
+      if (canal.fonte === 'rtmp' && !aovivo.temSinal(canal.id)) {
+        throw new ErroNegocio('Este canal está entrando no ar. Tente de novo em alguns segundos.', 503, { motivo: 'aquecendo' });
+      }
       const { sessao, token } = player.abrirSessao(db, { usuario: req.usuario, perfil, acesso, tipo, canal, dispositivo, ip: req.ip });
       const noAr = epg.noAr(db, canal.id);
       return res.status(201).json({
@@ -67,9 +73,11 @@ module.exports = (db, autenticado, comPerfil) => {
         token,
         ao_vivo: true,
         // 'embed' abre o player oficial da emissora; 'hls' toca no nosso player.
+        // Canal em RTMP/SRT sempre sai pela nossa lista: o endereço da origem não é tocável
+        // por player nenhum, e ele nem aparece para o assinante.
         fonte: canal.fonte === 'embed'
           ? { tipo: 'embed', url: canal.url_embed, nossos_servidores: false, emissora: true }
-          : canal.relay && config.relay.ligado
+          : canal.fonte === 'rtmp' || (canal.relay && config.relay.ligado)
             ? { tipo: 'hls', url: `${baseApi()}/play/canal/${canal.id}/lista.m3u8?t=${encodeURIComponent(token)}`, nossos_servidores: true }
             : { tipo: 'hls', url: canal.url_hls, nossos_servidores: false },
         info: {
@@ -177,11 +185,20 @@ module.exports = (db, autenticado, comPerfil) => {
       const canal = canalDe(req.params.id);
       const token = String(req.query.t ?? '');
       player.conferirToken(db, token, { tipo: 'canal', canalId: canal.id });
+      // Canal em RTMP/SRT: a lista é a que o nosso ffmpeg está escrevendo em disco. Não há origem
+      // para buscar, e cada pedaço aponta para a rota que serve o arquivo local.
+      if (canal.fonte === 'rtmp') {
+        return res.set({
+          'Content-Type': 'application/vnd.apple.mpegurl',
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+        }).send(aovivo.listaDoPlayer(canal.id, { playToken: token, baseApi: baseApi() }));
+      }
       if (!canal.relay || !config.relay.ligado) throw new ErroNegocio('Este canal não passa pelos nossos servidores.', 409);
       const url = req.query.u ? relay.lerUrlAssinada(canal.id, req.query.u) : canal.url_hls;
       if (!url) throw new ErroNegocio('Endereço de lista inválido.', 403);
       const lista = await relay.listaReescrita(canal, { url, playToken: token, baseApi: baseApi() });
-      res.set({
+      return res.set({
         'Content-Type': 'application/vnd.apple.mpegurl',
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
@@ -204,6 +221,29 @@ module.exports = (db, autenticado, comPerfil) => {
     } catch (err) {
       next(err);
     }
+  });
+
+  /**
+   * Pedaço de um canal em RTMP/SRT: arquivo que o nosso ffmpeg acabou de escrever.
+   * O nome vem da nossa própria lista e é conferido contra o formato 'p000123.ts' antes de
+   * virar caminho — é o que impede alguém de pedir um arquivo qualquer do servidor por aqui.
+   */
+  r.get('/canal/:id/pedaco/:arquivo', (req, res) => {
+    const canalId = v.inteiro(req.params.id, 'o canal', { min: 1 });
+    // Sem conferir a sessão no banco: são muitos pedaços por minuto. A assinatura do token já
+    // amarra o pedaço ao canal e à tela, e a lista (que a sessão confere) expira em segundos.
+    player.conferirToken(db, String(req.query.t ?? ''), { tipo: 'canal', canalId, exigirSessaoViva: false });
+    const caminho = aovivo.caminhoDoPedaco(canalId, req.params.arquivo);
+    if (!caminho) throw new ErroNegocio('Pedaço do sinal inválido.', 403);
+    // Pedaço do ao vivo vive poucos segundos: o cache privado é curto e nada é guardado adiante.
+    res.sendFile(caminho, {
+      headers: { 'Content-Type': 'video/mp2t', 'Cache-Control': 'private, max-age=6', 'X-Content-Type-Options': 'nosniff' },
+    }, (err) => {
+      if (!err) return;
+      // Pedaço que já saiu da lista e foi apagado: o player pede o seguinte e segue sem engasgo.
+      if (!res.headersSent) res.status(err.status === 404 || err.code === 'ENOENT' ? 404 : 500).end();
+      else res.destroy();
+    });
   });
 
   /** Vídeo sob demanda, com Range (o player adianta e volta sem baixar tudo). */

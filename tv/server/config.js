@@ -54,6 +54,7 @@ module.exports = {
   },
   // Conversão automática das versões menores (Full HD, HD e SD) a partir do arquivo enviado.
   ffmpeg: process.env.TV_FFMPEG || 'ffmpeg',
+  ffprobe: process.env.TV_FFPROBE || 'ffprobe',
   conversao: {
     preset: process.env.TV_CONVERSAO_PRESET || 'veryfast',
     crf: Number(process.env.TV_CONVERSAO_CRF) || 23,

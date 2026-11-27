@@ -6,6 +6,7 @@ const { criarApp } = require('./app');
 const { encerrarSessoesMortas } = require('./lib/player');
 const { rodarCobranca } = require('./lib/assinaturas');
 const { verificarSinais } = require('./lib/relay');
+const aovivo = require('./lib/aovivo');
 const { atualizarGradeAutomatica, limparAntigos } = require('./lib/epg');
 const transcodificar = require('./lib/transcodificar');
 
@@ -29,6 +30,10 @@ cada(30_000, 'sessões do player', () => encerrarSessoesMortas(db));
 cada(60 * 60_000, 'cobrança', () => rodarCobranca(db));
 // Sinal dos canais: o painel mostra quem está fora do ar.
 cada(15 * 60_000, 'verificação de sinal', () => { verificarSinais(db).catch(() => {}); });
+// Conversão dos canais em RTMP/SRT: confere de minuto em minuto se o que está convertendo é o
+// que o banco manda. A operação ligar um canal já sincroniza na hora; isto é a rede de segurança
+// para um processo que morreu de um jeito que não deu para reconectar.
+cada(60_000, 'canais ao vivo', () => aovivo.sincronizar(db));
 // Grade dos canais abertos: busca o XMLTV cadastrado e limpa o que já passou.
 const cuidarDaGrade = () => {
   const removidos = limparAntigos(db, 7);
@@ -42,6 +47,12 @@ cada(24 * 60 * 60_000, 'atualização da grade', cuidarDaGrade);
 setTimeout(() => {
   try { rodarCobranca(db); } catch (err) { console.error(`[${config.marca}] Falha na cobrança:`, err.message); }
   verificarSinais(db).catch(() => {});
+  // Canais em RTMP/SRT voltam ao ar sozinhos depois de um reinício.
+  try {
+    const { ligados, limitados } = aovivo.sincronizar(db);
+    if (ligados) console.log(`[${config.marca}] Ao vivo: ${ligados} canal(is) convertendo para HLS.`);
+    if (limitados) console.warn(`[${config.marca}] Ao vivo: ${limitados} canal(is) além do teto de ${config.aoVivo.maxCanais}.`);
+  } catch (err) { console.error(`[${config.marca}] Falha ao ligar os canais ao vivo:`, err.message); }
   // Conversões que ficaram pela metade num reinício voltam para a fila.
   const retomadas = transcodificar.retomar(db);
   if (retomadas) console.log(`[${config.marca}] ${retomadas} conversão(ões) retomada(s).`);
@@ -66,6 +77,8 @@ const encerrar = (sinal) => {
   console.log(`[${config.marca}] ${sinal} recebido: encerrando…`);
   const prazo = setTimeout(() => { console.log(`[${config.marca}] Encerrando à força.`); process.exit(0); }, 15_000);
   prazo.unref();
+  // Os ffmpeg do ao vivo são filhos deste processo: sem isto ficariam órfãos escrevendo em disco.
+  try { aovivo.desligarTudo(); } catch { /* nada convertendo */ }
   servidor.close(() => {
     try { db.close(); } catch { /* já fechado */ }
     clearTimeout(prazo);
