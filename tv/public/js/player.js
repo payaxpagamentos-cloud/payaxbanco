@@ -2,6 +2,7 @@ import { api, BASE, ErroApi, absoluto } from './api.js';
 import { el, icone, relogio, duracao, toast, modal, acao, nomeDoAparelho, etiquetaIdade, QUALIDADES, LINHAS_QUALIDADE } from './ui.js';
 import { temPonteAndroid, criarVideoTizen, tocarNoAndroidTV } from './motor-nativo.js';
 import { vigiarReproducao } from './vigia.js';
+import { iniciarReproducao } from './autoplay.js';
 
 /**
  * Player da PLAY TECH VIP: canais ao vivo (HLS pelo hls.js, com reserva para o HLS nativo do Safari)
@@ -185,7 +186,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   window.playtechvipPlayer = {
     fechar: () => fechar(),
     alternar: () => alternar(),
-    tocar: () => video.play().catch(() => {}),
+    tocar: () => { tentarTocar(); },
     pausar: () => video.pause(),
     parar: () => fechar(),
     avancar: () => pular(30),
@@ -235,7 +236,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
       }
       mostrarErro('Não conseguimos manter a transmissão. Tente abrir de novo.');
     });
-    hls.on(H.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+    hls.on(H.Events.MANIFEST_PARSED, () => { tentarTocar(); });
     hls.loadSource(absoluto(dados.fonte.url));
     hls.attachMedia(video);
   }
@@ -251,9 +252,33 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
       if (H?.isSupported()) { usarHls(H); return; }
     }
     video.src = absoluto(dados.fonte.url);
-    video.play().catch(() => {});
+    tentarTocar();
     conferirSuporteNativo();
   }
+
+  // ---------- Começar a tocar sozinho ----------
+  // A regra (tocar mudo quando o navegador bloqueia o som, e devolver o som em seguida) mora em
+  // autoplay.js, para poder ser testada num navegador com a reprodução automática bloqueada —
+  // que é a situação do iPhone. Aqui fica só o convite na tela.
+  let avisoDeSom = null;
+  const tentarTocar = () => iniciarReproducao(video, {
+    cancelado: () => fechado,
+    aoPrecisarDeToque: mostrarAvisoDeSom,
+    aoVoltarOSom: tirarAvisoDeSom,
+  });
+
+  function mostrarAvisoDeSom() {
+    if (avisoDeSom || fechado) return;
+    avisoDeSom = el('button', { class: 'btn primario aviso-som' }, icone('som'), 'Toque para ativar o som');
+    avisoDeSom.addEventListener('click', (e) => {
+      e.stopPropagation();
+      video.muted = false;
+      video.play().catch(() => {});
+      tirarAvisoDeSom();
+    });
+    caixa.append(avisoDeSom);
+  }
+  function tirarAvisoDeSom() { avisoDeSom?.remove(); avisoDeSom = null; }
 
   // ---------- Vigia da reprodução: nada pode ficar travado ----------
   // A lógica (detectar parada, subir o remédio, esperar entre tentativas) mora em vigia.js, para
@@ -272,7 +297,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
         try { video.currentTime = posicao; } catch { /* o arquivo ainda não aceitou o salto */ }
       }, { once: true });
     }
-    video.play().catch(() => {});
+    tentarTocar();
   }
 
   const vigia = vigiarReproducao(video, {
@@ -283,7 +308,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
         const s = video.seekable;
         const fim = s?.length ? s.end(s.length - 1) : null;
         try { video.currentTime = aoVivo && fim !== null ? Math.max(0, fim - 1) : video.currentTime + 0.5; } catch { /* ainda não dá */ }
-        video.play().catch(() => {});
+        tentarTocar();
       },
       // 2 e 3. A recuperação do próprio hls.js, quando é ele quem está tocando.
       () => (hls ? hls.recoverMediaError() : religarFonte()),
@@ -306,12 +331,12 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
 
 
   // ---------- Controles ----------
-  const alternar = () => { if (video.paused) video.play().catch(() => {}); else video.pause(); };
+  const alternar = () => { if (video.paused) tentarTocar(); else video.pause(); };
   const pular = (s) => { if (!aoVivo && Number.isFinite(video.duration)) video.currentTime = Math.min(video.duration - 0.5, Math.max(0, video.currentTime + s)); };
   const voltarAoVivo = () => {
     const fim = video.seekable.length ? video.seekable.end(video.seekable.length - 1) : null;
     if (fim) video.currentTime = fim - 1;
-    video.play().catch(() => {});
+    tentarTocar();
   };
   const elVideo = () => (video.elemento ?? video);
   async function telaCheia() { await alternarTelaCheia(caixa, elVideo()); }
@@ -345,7 +370,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     avisoCentro.classList.remove('oculto');
     const retomar = () => {
       try { video.currentTime = posicao; } catch { /* o arquivo ainda não aceitou o salto */ }
-      if (tocando) video.play().catch(() => {});
+      if (tocando) tentarTocar();
       avisoCentro.classList.add('oculto');
     };
     video.addEventListener('loadedmetadata', retomar, { once: true });
@@ -606,28 +631,42 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
   async function fechar({ silencioso = false } = {}) {
     if (fechado) return;
     fechado = true;
+    // O vigia sai PRIMEIRO. Ele religa a fonte sozinho quando o vídeo não anda, e um player que
+    // está saindo tem o vídeo parado por definição: deixá-lo correr durante o encerramento
+    // reabriria a conversão de um canal que ninguém está mais vendo.
+    vigia.parar();
     clearInterval(pararPing);
     clearInterval(pararSalvar);
-    vigia.parar();
     clearTimeout(esconder);
     document.removeEventListener('keydown', teclas);
-    if (!aoVivo && dados.info.titulo_id && video.currentTime > 5) {
-      try {
-        await api.post('/play/ping', { sessao_id: dados.sessao_id, segundos: Math.floor(video.currentTime), posicao: Math.floor(video.currentTime), duracao: Math.floor(duracaoAtual()) });
-      } catch { /* segue */ }
-    }
-    try { await api.post('/play/fechar', { sessao_id: dados.sessao_id, motivo: 'fim' }); } catch { /* segue */ }
+
+    // A TELA SAI NA HORA. Antes, o encerramento avisava o servidor e só então removia o player:
+    // quem tocava em "voltar" com a rede ruim ficava olhando o canal, achando que o botão não
+    // funcionou. Avisar o servidor é importante (libera a tela do plano), mas é trabalho de
+    // bastidor — não pode segurar a pessoa na tela.
+    const posicao = Math.floor(video.currentTime);
+    const duracao = Math.floor(duracaoAtual());
     try { hls?.destroy(); } catch { /* segue */ }
     video.pause();
     video.destruir?.();
     video.removeAttribute('src');
     video.load();
-    if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch { /* segue */ } }
+    if (naTelaCheia(elVideo())) { try { await alternarTelaCheia(caixa, elVideo()); } catch { /* segue */ } }
     caixa.remove();
     document.body.style.overflow = '';
     window.playtechvipPlayer = null;
     if (!silencioso) aoFechar?.();
     resolverFim({ titulo_id: dados.info.titulo_id ?? null });
+
+    // Agora sim, sem ninguém esperando.
+    (async () => {
+      if (!aoVivo && dados.info.titulo_id && posicao > 5) {
+        try {
+          await api.post('/play/ping', { sessao_id: dados.sessao_id, segundos: posicao, posicao, duracao });
+        } catch { /* segue */ }
+      }
+      try { await api.post('/play/fechar', { sessao_id: dados.sessao_id, motivo: 'fim' }); } catch { /* segue */ }
+    })();
   }
 
   aplicarPreferencia();
