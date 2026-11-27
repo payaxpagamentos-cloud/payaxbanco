@@ -40,9 +40,11 @@ Roteiro do teste: `ROTEIRO-TESTE-IXC.md`.
   `https://openapisandbox.prebanco.com.br`. O sistema ainda usa `/auth/server/v1.1/token` e o endereço
   antigo de homologação: trocar quando o manual chegar.
 - Webhook (aviso de pagamento): o banco exige SSL OV ou EV no domínio da notificação, com validade acima
-  de 4 meses. Pedido feito em 19/11/2026: Sectigo InstantSSL (OV) para pagamentos.payax.com.br. Falta gerar
-  o CSR no servidor (/root/ssl-ov), validar o domínio por DNS, a validação da empresa, instalar o
-  certificado e pedir o cadastro do webhook ao banco.
+  de 4 meses. Pedido feito em 19/11/2026: Sectigo InstantSSL (OV) para pagamentos.payax.com.br. Em 26/11/2026
+  o CSR foi gerado no servidor (a chave fica em /root/ssl-ov) e o registro CNAME de validação do domínio
+  foi criado no Registro.br. Falta a certificadora conferir o domínio e validar a empresa (3 a 5 dias),
+  instalar o certificado com a chave de /root/ssl-ov e pedir o cadastro do webhook ao banco. Depois de
+  emitido, o registro CNAME de validação pode ser apagado.
 
 ## Do relatório "Terceiro habilitador no convênio" (para o próximo pacote)
 
