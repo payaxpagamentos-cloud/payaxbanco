@@ -357,3 +357,29 @@ test('grade: o painel recebe a descrição, o guia do assinante não', async (t)
   assert.equal(detalhe.status, 200);
   assert.equal(detalhe.dados.programa.descricao, 'O texto que não pode sumir.');
 });
+
+test('logo de demonstração é tratado como "sem logo", não como resolvido', async (t) => {
+  // Por que isto existe: a instalação cria canais de exemplo com um logo desenhado na hora —
+  // quadrado com gradiente e as iniciais do nome. A importação da lista do fornecedor reaproveita
+  // essas linhas pelo slug, e o canal fica com o logo de mentira. A busca de logos então PULAVA
+  // esses canais, porque eles "já tinham logo": TV Cultura, SBT, Record e RedeTV! ficaram com as
+  // iniciais na grade mesmo depois de a operação rodar a busca várias vezes.
+  const logos = require('../server/lib/logos');
+  const midia = require('../server/lib/midia');
+  const s = await iniciar();
+  t.after(s.fechar);
+  const admin = await s.adminLogin();
+  const canal = (await s.post('/admin/canais', { numero: 91, nome: 'Com Logo Falso', url_hls: 'https://origem.test/x.m3u8' }, admin)).dados.canal;
+
+  // Do jeito que o seed grava: SVG com nome logo-<slug>.svg.
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="#333"/></svg>');
+  const demo = midia.salvarImagem(s.db, { id: null, nome: 'logos' }, svg, { nome: 'logo-com-logo-falso.svg' });
+  s.db.prepare('UPDATE canais SET logo_midia_id = ? WHERE id = ?').run(demo.id, canal.id);
+  assert.equal(logos.ehDeDemonstracao(s.db, demo.id), true, 'o SVG do seed é reconhecido como demonstração');
+
+  // E um logo de verdade (PNG) não pode ser confundido com demonstração.
+  const png = midia.salvarImagem(s.db, { id: null, nome: 'logos' },
+    require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'logos-canais', '01-chaves.png')),
+    { nome: 'logo-chaves' });
+  assert.equal(logos.ehDeDemonstracao(s.db, png.id), false, 'logo de verdade não pode ser trocado por engano');
+});

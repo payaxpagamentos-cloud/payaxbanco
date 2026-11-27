@@ -67,7 +67,11 @@ for (const [arquivo, nome] of Object.entries(MAPA)) {
   if (!fs.existsSync(caminho)) { semArquivo.push(arquivo); continue; }
   const canal = porNome.get(nome);
   if (!canal) { semCanal.push(nome); continue; }
-  if (canal.logo_midia_id && !forcar) { console.log(`  já tinha   ${nome}`); pulados += 1; continue; }
+  // Logo de demonstração (o quadrado com as iniciais que a instalação cria) não conta como
+  // logo: é exatamente o que estas artes vêm substituir.
+  if (canal.logo_midia_id && !forcar && !logos.ehDeDemonstracao(db, canal.logo_midia_id)) {
+    console.log(`  já tinha   ${nome}`); pulados += 1; continue;
+  }
   if (!gravar) { console.log(`  aplicaria  ${nome.padEnd(22)} ← ${arquivo}`); aplicados += 1; continue; }
 
   const imagem = midia.salvarImagem(db, { id: null, nome: 'logos' }, fs.readFileSync(caminho), { nome: `logo-${canal.slug}` });

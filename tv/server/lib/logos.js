@@ -59,6 +59,23 @@ function medirLuz(arquivo) {
   }
 }
 
+/**
+ * O logo deste canal é o de demonstração?
+ *
+ * A instalação cria canais de exemplo com um logo desenhado na hora: quadrado com gradiente e
+ * as iniciais do nome (server/seed.js). Quando a lista do fornecedor é importada, ela reaproveita
+ * essas linhas pelo slug — e o canal fica com o logo de mentira. Pior: a busca de logos pulava
+ * esses canais, porque eles "já tinham logo". Foi o que deixou TV Cultura, SBT, Record e RedeTV!
+ * com as iniciais na grade mesmo depois de rodar a busca várias vezes.
+ *
+ * O marcador é o nome do arquivo: o seed salva `logo-<slug>.svg`, e logo de verdade é PNG ou WebP.
+ */
+function ehDeDemonstracao(db, midiaId) {
+  if (!midiaId) return false;
+  const m = db.prepare('SELECT nome_original FROM midias WHERE id = ?').get(Number(midiaId));
+  return Boolean(m && /^logo-.+\.svg$/i.test(String(m.nome_original ?? '')));
+}
+
 /** Mede e guarda a claridade do logo de um canal que já tem imagem. */
 function medirDoCanal(db, canalId) {
   const linha = db.prepare(`SELECT m.arquivo FROM canais c JOIN midias m ON m.id = c.logo_midia_id WHERE c.id = ?`).get(Number(canalId));
@@ -75,7 +92,10 @@ function medirDoCanal(db, canalId) {
 async function aplicar(db, canalId, { url = null, forcar = false, hostsBloqueados = null } = {}) {
   const canal = db.prepare('SELECT * FROM canais WHERE id = ?').get(Number(canalId));
   if (!canal) throw naoEncontrado('Canal');
-  if (canal.logo_midia_id && !forcar && !url) return { canal: canal.nome, logo_midia_id: canal.logo_midia_id, origem: 'já tinha' };
+  // Logo de demonstração não conta como logo: é para ser trocado assim que houver o de verdade.
+  if (canal.logo_midia_id && !forcar && !url && !ehDeDemonstracao(db, canal.logo_midia_id)) {
+    return { canal: canal.nome, logo_midia_id: canal.logo_midia_id, origem: 'já tinha' };
+  }
 
   const achado = url ? { url, nome: canal.nome } : await listasPublicas.logoDoCanal(canal.nome, { id: canal.id_publico });
   if (!achado) return null;
@@ -109,7 +129,11 @@ async function aplicar(db, canalId, { url = null, forcar = false, hostsBloqueado
 const RECUSAS_ATE_DESISTIR = 5;
 
 async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200, aoAndar = null } = {}) {
-  const canais = db.prepare(`SELECT id, nome FROM canais ${forcar ? '' : 'WHERE logo_midia_id IS NULL'} ORDER BY numero`).all();
+  // Entram os sem logo E os que estão com o logo de demonstração — estes últimos pareciam
+  // resolvidos e não estavam.
+  const canais = db.prepare(`SELECT c.id, c.nome FROM canais c LEFT JOIN midias m ON m.id = c.logo_midia_id
+    ${forcar ? '' : "WHERE c.logo_midia_id IS NULL OR m.nome_original LIKE 'logo-%.svg'"}
+    ORDER BY c.numero`).all();
   const comLogo = [];
   const semLogo = [];
   const falharam = [];
@@ -152,4 +176,4 @@ async function aplicarEmTodos(db, { forcar = false, pausaMs = 1200, aoAndar = nu
   return { com_logo: comLogo, sem_logo: semLogo, falharam, hosts_bloqueados: [...bloqueados], pulados };
 }
 
-module.exports = { aplicar, aplicarEmTodos, medirLuz, medirDoCanal };
+module.exports = { aplicar, aplicarEmTodos, medirLuz, medirDoCanal, ehDeDemonstracao };
